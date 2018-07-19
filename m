@@ -1,94 +1,66 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 19 Jul 2018 18:00:41 +0200
-Subject: [RFT 01/10] pinctrl: samsung: Define suspend and resume callbacks for
- all banks and SoCs
+Date: Thu, 19 Jul 2018 18:00:45 +0200
+Subject: [RFT 05/10] ARM: exynos: Define EINT_WAKEUP_MASK registers for
+ S5Pv210 and Exynos5433
 In-Reply-To: <20180719160050.22566-1-krzk@kernel.org>
 References: <20180719160050.22566-1-krzk@kernel.org>
-Message-ID: <20180719160050.22566-2-krzk@kernel.org>
+Message-ID: <20180719160050.22566-6-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend and resume callbacks in Exynos/S5Pv210 pin controller drivers,
-save and restore state of registers.  This operations should be done for
-all banks which have external interrupts (as denoted by using
-EXYNOS_PIN_BANK_EINTG/EINTW macros).
-
-Add all banks of Exynos5260 and Exynos5420.
-
-This is necessary step for supporting suspend to RAM.
+S5Pv210 and Exynos5433/Exynos7 have different address of
+EINT_WAKEUP_MASK register.  Rename existing S5P_EINT_WAKEUP_MASK to
+avoid confusion and add new ones.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- drivers/pinctrl/samsung/pinctrl-exynos-arm.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/mach-exynos/suspend.c              | 2 +-
+ include/linux/soc/samsung/exynos-regs-pmu.h | 6 +++++-
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos-arm.c b/drivers/pinctrl/samsung/pinctrl-exynos-arm.c
-index d82820fc349a..44c6b753f692 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos-arm.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos-arm.c
-@@ -616,16 +616,22 @@ static const struct samsung_pin_ctrl exynos5260_pin_ctrl[] __initconst = {
- 		.nr_banks	= ARRAY_SIZE(exynos5260_pin_banks0),
- 		.eint_gpio_init = exynos_eint_gpio_init,
- 		.eint_wkup_init = exynos_eint_wkup_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
- 	}, {
- 		/* pin-controller instance 1 data */
- 		.pin_banks	= exynos5260_pin_banks1,
- 		.nr_banks	= ARRAY_SIZE(exynos5260_pin_banks1),
- 		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
- 	}, {
- 		/* pin-controller instance 2 data */
- 		.pin_banks	= exynos5260_pin_banks2,
- 		.nr_banks	= ARRAY_SIZE(exynos5260_pin_banks2),
- 		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
- 	},
- };
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index 0ec52f442b97..991938e19e17 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -272,7 +272,7 @@ static int exynos5420_cpu_suspend(unsigned long arg)
+ static void exynos_pm_set_wakeup_mask(void)
+ {
+ 	/* Set wake-up mask registers */
+-	pmu_raw_writel(exynos_get_eint_wake_mask(), S5P_EINT_WAKEUP_MASK);
++	pmu_raw_writel(exynos_get_eint_wake_mask(), EXYNOS_EINT_WAKEUP_MASK);
+ 	pmu_raw_writel(exynos_irqwake_intmask & ~(1 << 31), S5P_WAKEUP_MASK);
+ }
  
-@@ -842,30 +848,40 @@ static const struct samsung_pin_ctrl exynos5420_pin_ctrl[] __initconst = {
- 		.nr_banks	= ARRAY_SIZE(exynos5420_pin_banks0),
- 		.eint_gpio_init = exynos_eint_gpio_init,
- 		.eint_wkup_init = exynos_eint_wkup_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
- 		.retention_data	= &exynos5420_retention_data,
- 	}, {
- 		/* pin-controller instance 1 data */
- 		.pin_banks	= exynos5420_pin_banks1,
- 		.nr_banks	= ARRAY_SIZE(exynos5420_pin_banks1),
- 		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
- 		.retention_data	= &exynos5420_retention_data,
- 	}, {
- 		/* pin-controller instance 2 data */
- 		.pin_banks	= exynos5420_pin_banks2,
- 		.nr_banks	= ARRAY_SIZE(exynos5420_pin_banks2),
- 		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
- 		.retention_data	= &exynos5420_retention_data,
- 	}, {
- 		/* pin-controller instance 3 data */
- 		.pin_banks	= exynos5420_pin_banks3,
- 		.nr_banks	= ARRAY_SIZE(exynos5420_pin_banks3),
- 		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
- 		.retention_data	= &exynos5420_retention_data,
- 	}, {
- 		/* pin-controller instance 4 data */
- 		.pin_banks	= exynos5420_pin_banks4,
- 		.nr_banks	= ARRAY_SIZE(exynos5420_pin_banks4),
- 		.eint_gpio_init = exynos_eint_gpio_init,
-+		.suspend	= exynos_pinctrl_suspend,
-+		.resume		= exynos_pinctrl_resume,
- 		.retention_data	= &exynos4_audio_retention_data,
- 	},
- };
+diff --git a/include/linux/soc/samsung/exynos-regs-pmu.h b/include/linux/soc/samsung/exynos-regs-pmu.h
+index 66dcb9ec273a..eb0d240df7a7 100644
+--- a/include/linux/soc/samsung/exynos-regs-pmu.h
++++ b/include/linux/soc/samsung/exynos-regs-pmu.h
+@@ -42,7 +42,7 @@
+ #define EXYNOS_SWRESET				0x0400
+ 
+ #define S5P_WAKEUP_STAT				0x0600
+-#define S5P_EINT_WAKEUP_MASK			0x0604
++#define EXYNOS_EINT_WAKEUP_MASK			0x0604
+ #define S5P_WAKEUP_MASK				0x0608
+ #define S5P_WAKEUP_MASK2				0x0614
+ 
+@@ -180,6 +180,9 @@
+ #define S5P_CORE_WAKEUP_FROM_LOCAL_CFG		(0x3 << 8)
+ #define S5P_CORE_AUTOWAKEUP_EN			(1 << 31)
+ 
++/* Only for S5Pv210 */
++#define S5PV210_EINT_WAKEUP_MASK	0xC004
++
+ /* Only for EXYNOS4210 */
+ #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	0x1154
+ #define S5P_CMU_RESET_LCD1_LOWPWR	0x1174
+@@ -641,6 +644,7 @@
+ 					 | EXYNOS5420_KFC_USE_STANDBY_WFI3)
+ 
+ /* For EXYNOS5433 */
++#define EXYNOS5433_EINT_WAKEUP_MASK				(0x060C)
+ #define EXYNOS5433_USBHOST30_PHY_CONTROL			(0x0728)
+ #define EXYNOS5433_PAD_RETENTION_AUD_OPTION			(0x3028)
+ #define EXYNOS5433_PAD_RETENTION_MMC2_OPTION			(0x30C8)
 -- 
 2.14.1
