@@ -1,178 +1,60 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Thu, 19 Jul 2018 18:07:25 +0800
-Subject: [RFC PATCH v2 1/2] dt-bindings: nand: meson: add Amlogic NAND
- controller driver
-In-Reply-To: <20180719115751.34ff1a51@bbrezillon>
-References: <20180719094612.5833-1-yixun.lan@amlogic.com>
- <20180719094612.5833-2-yixun.lan@amlogic.com>
- <20180719115751.34ff1a51@bbrezillon>
-Message-ID: <63bb7f53-81d2-fe98-9ae3-37aae7d8647c@amlogic.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Thu, 19 Jul 2018 11:08:13 +0100
+Subject: [GIT PULL v2] arm64: dts: hisilicon dts updates for v4.19
+Message-ID: <5B50630D.7060407@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris:
- see my comments, thanks for the quick response
+Hi Olof, Hi Arnd,
 
-On 07/19/18 17:57, Boris Brezillon wrote:
-> On Thu, 19 Jul 2018 17:46:11 +0800
-> Yixun Lan <yixun.lan@amlogic.com> wrote:
-> 
->> From: Liang Yang <liang.yang@amlogic.com>
->>
->> Add Amlogic NAND controller dt-bindings for Meson SoC,
->> Current this driver support GXBB/GXL/AXG platform.
->>
->> Signed-off-by: Liang Yang <liang.yang@amlogic.com>
->> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
->> ---
->>  .../bindings/mtd/amlogic,meson-nand.txt       | 95 +++++++++++++++++++
->>  1 file changed, 95 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
->> new file mode 100644
->> index 000000000000..31f910dcd27a
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
->> @@ -0,0 +1,95 @@
->> +Amlogic NAND Flash Controller (NFC) for GXBB/GXL/AXG family SoCs
->> +
->> +This file documents the properties in addition to those available in
->> +the MTD NAND bindings.
->> +
->> +Required properties:
->> +- compatible : contains one of:
->> +  - "amlogic,meson-gxl-nfc"
->> +  - "amlogic,meson-axg-nfc"
->> +- clocks     :
->> +	A list of phandle + clock-specifier pairs for the clocks listed
->> +	in clock-names.
->> +
->> +- clock-names: Should contain the following:
->> +	"core" - NFC module gate clock
->> +	"device" - device clock from eMMC sub clock controller
->> +
->> +- pins     : Select pins which NFC need.
->> +- nand_pins: Detail NAND pins information.
-> 
-> You should document pinctrl-0 and pinctrl-names, not pins and nand_pins.
-> 
-Ok, will fix this
+Please consider to pull the following changes.
+I rebased the pull on hisi-fixes-for-4.18 since there are
+some fixes for v4.18 have been merged.
 
->> +- amlogic,mmc-syscon	: Required for NAND clocks, it's shared with SD/eMMC
->> +				controller port C
-> 
-> Are you sure this is still needed, even after exposing MMC/NAND clks
-> through the CCF?
-> 
-yes, the SD_EMMC_CLOCK register from eMMC space explore a few other bit
-that not fit well into clock model, thus we still need to access them
-from NAND driver, we know it's kind of ugly..
+Thanks!
 
-#define SD_EMMC_CLOCK                   0x00
-#define   CLK_ALWAYS_ON                 BIT(28)
-#define   CLK_SELECT_NAND BIT(31)
-#define   CLK_DIV_MASK                  GENMASK(5, 0)
+Best Regards,
+Wei
 
-we probably could get rid of CLK_DIV_MASK, but need to keep other two
+---
 
+The following changes since commit a30449eb3ac908f26b4bc963a58039a5f2725ffa:
 
-> You forgot
-> - #address-cells
-> - #size-cells
-> - reg
-> - interrupts
-> - 
-> 
-will fix these
->> +
->> +Optional children nodes:
->> +Children nodes represent the available nand chips.
->> +
->> +Optional properties:
->> +- amlogic,nand-enable-scrambler: enable the NAND scrambler feature.
->> +	- (absent) = scrambler is disabled
->> +	- (present) = scrambler is enabled
-> 
-> I keep thinking this is not needed if you have the NAND chip properly
-> defined (NAND_NEED_SCRAMBLING flag set in chip->options).
-> 
-Ok, we will try this flag
->> +
->> +
->> +Other properties:
->> +see Documentation/devicetree/bindings/mtd/nand.txt for generic bindings.
->> +
->> +Example demonstrate on AXG SoC:
->> +
->> +	sd_emmc_c_clkc: mmc at 7000 {
->> +		compatible = "amlogic,meson-axg-mmc-clkc", "syscon";
->> +		reg = <0x0 0x7000 0x0 0x800>;
->> +		status = "okay";
->> +	};
->> +
->> +	nand: nfc at 7800 {
->> +		compatible = "amlogic,meson-axg-nfc";
->> +		reg = <0x0 0x7800 0x0 0x100>;
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		interrupts = <GIC_SPI 34 IRQ_TYPE_EDGE_RISING>;
->> +		status = "disabled";
->> +
->> +		clocks = <&clkc CLKID_SD_EMMC_C>,
->> +			<&sd_emmc_c_clkc CLKID_MMC_DIV>;
->> +		clock-names = "core", "device";
->> +		amlogic,mmc-syscon = <&sd_emmc_c_clkc>;
->> +
->> +		status = "okay";
->> +
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&nand_pins>;
->> +
->> +		nand at 0 {
->> +			reg = <0>;
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +
->> +			nand-on-flash-bbt;
->> +			nand-ecc-mode = "hw";
->> +			nand-ecc-strength = <8>;
->> +			nand-ecc-step-size = <1024>;
-> 
-> I'd recommend not forcing a specific ECC config in the example.
-> 
-Ok, will fix
+  arm64: dts: hikey960: Define wl1837 power capabilities (2018-06-28 17:07:44 +0100)
 
->> +
->> +			amlogic,nand-enable-scrambler;
->> +
->> +			partition at 0 {
->> +				label = "boot";
->> +				reg = <0x00000000 0x00200000>;
->> +				read-only;
->> +			};
-> 
-> Blank line here.
-will fix
-> 
->> +			partition at 200000 {
->> +				label = "env";
->> +				reg = <0x00200000 0x00400000>;
->> +			};
->> +			partition at 600000 {
->> +				label = "system";
->> +				reg = <0x00600000 0x00a00000>;
->> +			};
->> +			partition at 1000000 {
->> +				label = "rootfs";
->> +				reg = <0x01000000 0x03000000>;
->> +			};
->> +			partition at 4000000 {
->> +				label = "media";
->> +				reg = <0x04000000 0x8000000>;
->> +			};
->> +		};
->> +	};
-> 
-> .
-> 
+are available in the Git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.19v2
+
+for you to fetch changes up to 4d4585c21f53c15a10c52b45e0392de79e07127e:
+
+  arm64: dts: hisilicon: Add missing cooling device properties for CPUs (2018-07-17 13:56:45 +0100)
+
+----------------------------------------------------------------
+ARM64: DT: Hisilicon SoC DT updates for 4.19v2
+
+- Tidy up MMC properties for hi3660
+- Remove keep-power-in-suspend on hikey and hikey960 to
+  avoid keeping wifi power during suspend and let the
+  user enable it if required
+- Update idle states for hikey960
+- Add missing cooling device properties for cpus on hi6220
+
+----------------------------------------------------------------
+Vincent Guittot (1):
+      arm64: hikey960: update idle-states
+
+Viresh Kumar (1):
+      arm64: dts: hisilicon: Add missing cooling device properties for CPUs
+
+oscardagrach (4):
+      arm64: dts: hikey960: Remove deprecated MMC properties
+      arm64: dts: hikey960: Clean up MMC properties and move to proper file
+      arm64: dts: hikey960: Remove keep-power-in-suspend property
+      arm64: dts: hikey: Remove keep-power-in-suspend property
+
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 26 ++++++--
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 79 +++++++++--------------
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts    |  1 -
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi         | 16 ++++-
+ 4 files changed, 67 insertions(+), 55 deletions(-)
