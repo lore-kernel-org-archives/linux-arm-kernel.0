@@ -1,85 +1,201 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Thu, 19 Jul 2018 11:27:13 +0930
-Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc. BMC
- control fields
-In-Reply-To: <CAL_Jsq+YdcBe+VYBAZPvK-X9gwJyhzP4m6hAx59+2Nz0JzsKug@mail.gmail.com>
-References: <20180711053122.30773-1-andrew@aj.id.au>
- <20180711053122.30773-2-andrew@aj.id.au>
- <20180711200450.GB17291@rob-hp-laptop>
- <1531356830.3551458.1437853280.551CA8C5@webmail.messagingengine.com>
- <CAL_JsqKpXxR4t_-3BOy-0mFePXkaSck_4PfHRD=OZQ-_-T5P=w@mail.gmail.com>
- <b6ced4cad4d7ff78330181b2c893855c23103953.camel@kernel.crashing.org>
- <1531463489.747186.1439263128.075AECE1@webmail.messagingengine.com>
- <CAL_JsqLZo-=7UkuvvUFYdCR4asBBiWyC=Q1ryH=-HLU6vzf9tA@mail.gmail.com>
- <ece91112ecfdc7218184c4c4519e455cf9397e11.camel@kernel.crashing.org>
- <1531870098.3337969.1444201888.2476205D@webmail.messagingengine.com>
- <CAL_Jsq+YdcBe+VYBAZPvK-X9gwJyhzP4m6hAx59+2Nz0JzsKug@mail.gmail.com>
-Message-ID: <1531965433.2133841.1445577960.5C709A63@webmail.messagingengine.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 18 Jul 2018 19:20:23 -0700
+Subject: [PATCH 2/2] arm64: Clear the stack
+In-Reply-To: <20180718211013.14512-3-labbott@redhat.com>
+References: <20180718211013.14512-1-labbott@redhat.com>
+ <20180718211013.14512-3-labbott@redhat.com>
+Message-ID: <CAGXu5jLMVey1uZB-9BkWZuVQ44c5jE2KfKp_1vN-sy5Qh6BYpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Jul 2018, at 04:37, Rob Herring wrote:
-> On Tue, Jul 17, 2018 at 5:28 PM Andrew Jeffery <andrew@aj.id.au> wrote:
-> >
-> > On Tue, 17 Jul 2018, at 14:26, Benjamin Herrenschmidt wrote:
-> > > On Mon, 2018-07-16 at 07:55 -0600, Rob Herring wrote:
-> > > > If that data is one set per SoC, then i'm not that concerned having
-> > > > platform-specific data in the driver. That doesn't mean the driver is
-> > > > not "generic". It's still not clear to me in this thread, how much of
-> > > > this is board specific, but given that you've placed all the data in
-> > > > an SoC dtsi file it seems to be all per SoC.
-> > >
-> > > So Rob, I think that's precisely where the disconnect is.
-> > >
-> > > I think we all (well hopefully) agree that those few tunables don't fit
-> > > in any existing subystem and aren't likely to ever do (famous last
-> > > words...).
-> > >
-> > > Where we disagree is we want to make this parametrized via the DT, and
-> > > you want us to hard wire the list in some kind of SoC driver for a
-> > > given SoC family/version.
-> > >
-> > > The reason I think hard wiring the list in the driver is not a great
-> > > solution is that that list in itself is prone to variations, possibly
-> > > fairly often, between boards, vendors, versions of boards, etc...
-> > >
-> > > We can't know for sure every SoC tunable (out of the gazillions in
-> > > those chips) are going to be needed for a given system. We know which
-> > > ones we do use for ours, and that's a couple of handfuls, but it could
-> > > be that Dell need a slightly different set, and so might Yadro, or so
-> > > might our next board revision for that matter.
-> > >
-> > > Now, updating the device-tree in the board flash with whatever vendor
-> > > specific information is needed is a LOT easier than getting the kernel
-> > > driver constantly updated. The device-tree after all is there to
-> > > reflect among other things system specific ways in which the SoC is
-> > > wired and configured. This is rather close...
-> >
-> > Not sure this helps, but I feel that the proposal pretty closely matches what's described in Documentation/devicetree/bindings/mfd/mfd.txt. It's intended that nodes using the bindings I'm proposing are children of a 'compatible = "syscon", "simple-mfd"' node (this is the case with the features we're hoping to describe for our SoC). I should explicitly call that out.
-> 
-> IMO, any binding that has only those compatibles is not correct and a
-> specific compatible is needed. We should be able identify a specific
-> h/w block.
+On Wed, Jul 18, 2018 at 2:10 PM, Laura Abbott <labbott@redhat.com> wrote:
+>
+> Implementation of stackleak based heavily on the x86 version
+>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> Since last time: Minor style cleanups. Re-wrote check_alloca to
+> correctly handle all stack types. While doing that, I also realized
+> current_top_of_stack was incorrect so I fixed that as well.
 
-I didn't intend for that to get interpreted quite as literally, so apologies for that. We do have h/w-block-specific compatibles in there too. The point was to demonstrate that we're dealing (at this point, only) with mfds/syscons.
+Can you drop the include/linux/stackleak.h change from this series?
+I've included that in the v14 in linux-next already, so that these
+patches can land entirely separately in the arm64 tree (which was the
+request).
 
-> 
-> > But to go on, "simple-mfd" is effectively an alias of "simple-bus", which means its intended to match child node compatibles to drivers provided by the kernel. If we shouldn't be describing minor features of a SoC in the devicetree, doesn't this invalidate the case for simple-mfd? What is the *correct* use of simple-mfd? When is it not used to expose minor features in set of "miscellaneous system registers"? Why doesn't this proposed case fit?
-> 
-> I'm no fan of simple-mfd either. I think it is abused and often a sign
-> of bad binding design.
+Otherwise, this looks great!
 
-Ah, yes, this is a familiar feeling when reflecting on things I've done in the past. Hence trying to understand how to use it right.
+Reviewed-by: Kees Cook <keescook@chromium.org>
 
-> The general problem with MFD bindings is people
-> define child nodes based on what drivers they happen to have for some
-> OS. DT is not the only way to instantiate drivers. Child nodes are
-> really only needed when you have resources per child that need to be
-> defined. For example, if the MFD has an interrupt controller and
-> interrupts to sub-blocks or sub-blocks have their own clocks.
-> "simple-mfd" was for when the parent node has no driver or the child
-> nodes have no dependency on the parent.
+-Kees
 
-Thanks for the clarification, I'll keep that in mind going forward.
+> ---
+>  arch/arm64/Kconfig                    |  1 +
+>  arch/arm64/include/asm/processor.h    | 17 ++++++++++++++
+>  arch/arm64/kernel/entry.S             |  7 ++++++
+>  arch/arm64/kernel/process.c           | 32 +++++++++++++++++++++++++++
+>  arch/arm64/kvm/hyp/Makefile           |  3 ++-
+>  drivers/firmware/efi/libstub/Makefile |  3 ++-
+>  include/linux/stackleak.h             |  1 +
+>  7 files changed, 62 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 42c090cf0292..216d36a49ab5 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -96,6 +96,7 @@ config ARM64
+>         select HAVE_ARCH_MMAP_RND_BITS
+>         select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
+>         select HAVE_ARCH_SECCOMP_FILTER
+> +       select HAVE_ARCH_STACKLEAK
+>         select HAVE_ARCH_THREAD_STRUCT_WHITELIST
+>         select HAVE_ARCH_TRACEHOOK
+>         select HAVE_ARCH_TRANSPARENT_HUGEPAGE
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index a73ae1e49200..4f3062ee22c6 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -266,5 +266,22 @@ extern void __init minsigstksz_setup(void);
+>  #define SVE_SET_VL(arg)        sve_set_current_vl(arg)
+>  #define SVE_GET_VL()   sve_get_current_vl()
+>
+> +/*
+> + * For CONFIG_STACKLEAK
+> + *
+> + * These need to be macros because otherwise we get stuck in a nightmare
+> + * of header definitions for the use of task_stack_page.
+> + */
+> +
+> +#define current_top_of_stack()         \
+> +({                                     \
+> +       unsigned long _low = 0;         \
+> +       unsigned long _high = 0;        \
+> +                                       \
+> +       current_stack_type(current, current_stack_pointer, &_low, &_high); \
+> +       _high;  \
+> +})
+> +#define on_thread_stack()      (on_task_stack(current, current_stack_pointer, NULL, NULL))
+> +
+>  #endif /* __ASSEMBLY__ */
+>  #endif /* __ASM_PROCESSOR_H */
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 28ad8799406f..67d12016063d 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -431,6 +431,11 @@ tsk        .req    x28             // current thread_info
+>
+>         .text
+>
+> +       .macro  stackleak_erase
+> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+> +       bl      stackleak_erase
+> +#endif
+> +       .endm
+>  /*
+>   * Exception vectors.
+>   */
+> @@ -910,6 +915,7 @@ ret_fast_syscall:
+>         and     x2, x1, #_TIF_WORK_MASK
+>         cbnz    x2, work_pending
+>         enable_step_tsk x1, x2
+> +       stackleak_erase
+>         kernel_exit 0
+>  ret_fast_syscall_trace:
+>         enable_daif
+> @@ -936,6 +942,7 @@ ret_to_user:
+>         cbnz    x2, work_pending
+>  finish_ret_to_user:
+>         enable_step_tsk x1, x2
+> +       stackleak_erase
+>         kernel_exit 0
+>  ENDPROC(ret_to_user)
+>
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index e10bc363f533..904defa36689 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -493,3 +493,35 @@ void arch_setup_new_exec(void)
+>  {
+>         current->mm->context.flags = is_compat_task() ? MMCF_AARCH32 : 0;
+>  }
+> +
+> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+> +void __used stackleak_check_alloca(unsigned long size)
+> +{
+> +       unsigned long stack_left;
+> +       enum stack_type type;
+> +       unsigned long current_sp = current_stack_pointer;
+> +       unsigned long low, high;
+> +
+> +       type = current_stack_type(current, current_sp, &low, &high);
+> +       BUG_ON(type == STACK_TYPE_UNKNOWN);
+> +
+> +       stack_left = current_sp - low;
+> +
+> +       if (size >= stack_left) {
+> +               /*
+> +                * Kernel stack depth overflow is detected, let's report that.
+> +                * If CONFIG_VMAP_STACK is enabled, we can safely use BUG().
+> +                * If CONFIG_VMAP_STACK is disabled, BUG() handling can corrupt
+> +                * the neighbour memory. CONFIG_SCHED_STACK_END_CHECK calls
+> +                * panic() in a similar situation, so let's do the same if that
+> +                * option is on. Otherwise just use BUG() and hope for the best.
+> +                */
+> +#if !defined(CONFIG_VMAP_STACK) && defined(CONFIG_SCHED_STACK_END_CHECK)
+> +               panic("alloca() over the kernel stack boundary\n");
+> +#else
+> +               BUG();
+> +#endif
+> +       }
+> +}
+> +EXPORT_SYMBOL(stackleak_check_alloca);
+> +#endif
+> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+> index 4313f7475333..2fabc2dc1966 100644
+> --- a/arch/arm64/kvm/hyp/Makefile
+> +++ b/arch/arm64/kvm/hyp/Makefile
+> @@ -3,7 +3,8 @@
+>  # Makefile for Kernel-based Virtual Machine module, HYP part
+>  #
+>
+> -ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
+> +ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING \
+> +               $(DISABLE_STACKLEAK_PLUGIN)
+>
+>  KVM=../../../../virt/kvm
+>
+> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+> index a34e9290a699..25dd2a14560d 100644
+> --- a/drivers/firmware/efi/libstub/Makefile
+> +++ b/drivers/firmware/efi/libstub/Makefile
+> @@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)  += -I$(srctree)/scripts/dtc/libfdt
+>  KBUILD_CFLAGS                  := $(cflags-y) -DDISABLE_BRANCH_PROFILING \
+>                                    -D__NO_FORTIFY \
+>                                    $(call cc-option,-ffreestanding) \
+> -                                  $(call cc-option,-fno-stack-protector)
+> +                                  $(call cc-option,-fno-stack-protector) \
+> +                                  $(DISABLE_STACKLEAK_PLUGIN)
+>
+>  GCOV_PROFILE                   := n
+>  KASAN_SANITIZE                 := n
+> diff --git a/include/linux/stackleak.h b/include/linux/stackleak.h
+> index b911b973d328..08420ec6b7c3 100644
+> --- a/include/linux/stackleak.h
+> +++ b/include/linux/stackleak.h
+> @@ -5,6 +5,7 @@
+>  #include <linux/sched.h>
+>  #include <linux/sched/task_stack.h>
+>
+> +#include <asm/stacktrace.h>
+>  /*
+>   * Check that the poison value points to the unused hole in the
+>   * virtual memory map for your platform.
+> --
+> 2.17.1
+>
 
-Andrew
+
+
+-- 
+Kees Cook
+Pixel Security
