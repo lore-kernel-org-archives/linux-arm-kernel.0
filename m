@@ -1,42 +1,99 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Jul 2018 11:41:30 +0100
-Subject: [PATCH] arm64: Clear the stack
-In-Reply-To: <06dd55e6-d39e-7617-b644-bdd04fa3c030@redhat.com>
-References: <20180629190553.7282-1-labbott@redhat.com>
- <9733d929-3c6a-40e1-6110-8f79975323d3@linux.com>
- <1b97aa7d-2b6c-a5df-0caa-1cd16e18a816@redhat.com>
- <20180703121440.v4olvwqb3ykgt5fm@lakrids.cambridge.arm.com>
- <06dd55e6-d39e-7617-b644-bdd04fa3c030@redhat.com>
-Message-ID: <20180719104130.egfevpo3ie4azaq6@lakrids.cambridge.arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 19 Jul 2018 12:47:51 +0200
+Subject: [PATCH v2] firmware/psci: add support for SYSTEM_RESET2
+In-Reply-To: <8b08583c-121f-347a-700a-17b5d7784309@arm.com>
+References: <1525186288-536-1-git-send-email-sudeep.holla@arm.com>
+ <1525257003-8608-1-git-send-email-sudeep.holla@arm.com>
+ <34a420e1-9d2a-b838-dce2-71de408043da@xilinx.com>
+ <3e7235c7-d2c2-29f6-6bec-ae21cb841731@arm.com>
+ <0fce3ee6-873e-154f-b61e-546d9da338df@xilinx.com>
+ <8b08583c-121f-347a-700a-17b5d7784309@arm.com>
+Message-ID: <d2eaaf6d-01f9-2daa-ea1f-3396e3b93104@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jul 17, 2018 at 03:58:19PM -0700, Laura Abbott wrote:
-> On 07/03/2018 05:14 AM, Mark Rutland wrote:
-> > > It might be cleaner just to use on_accessible_stack and then another
-> > > function to get the top of stack. This also might just be
-> > > reimplementing what x86 already has? (Mark, Ard?)
-> > It looks like we could build a get_stack_info() as they have.
-> > 
-> > We could probably clean up our stack traced atop of that, too.
+On 9.7.2018 15:21, Sudeep Holla wrote:
 > 
-> So I spent some time looking at this and I'm not 100% clear
-> if there would actually be much benefit to re-writing with
-> get_stack_info. Most of that design seems to come from x86
-> needing to handle multiple unwind options which arm64 doesn't
-> need to worry about. Any rework ended up with roughly
-> the same code without any notable benefit that I could see.
-> It's possible I'm missing what kind of cleanup you're suggesting
-> but I think just going with a tweaked version of on_accessible_stack
-> would be fine.
+> 
+> On 09/07/18 14:13, Michal Simek wrote:
+>> On 9.7.2018 14:36, Sudeep Holla wrote:
+>>>
+>>>
+>>> On 09/07/18 13:17, Michal Simek wrote:
+>>>> Hi Sudeep,
+>>>>
+>>>> On 2.5.2018 12:30, Sudeep Holla wrote:
+>>>>> PSCI v1.1 introduced SYSTEM_RESET2 to allow both architectural resets
+>>>>> where the semantics are described by the PSCI specification itself as
+>>>>> well as vendor-specific resets. Currently only system warm reset
+>>>>> semantics is defined as part of architectural resets by the specification.
+>>>>>
+>>>>> This patch implements support for SYSTEM_RESET2 by making using of
+>>>>> reboot_mode passed by the reboot infrastructure in the kernel.
+>>>>>
+>>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>>> ---
+>>>>>  drivers/firmware/psci.c   | 21 +++++++++++++++++++++
+>>>>>  include/uapi/linux/psci.h |  2 ++
+>>>>>  2 files changed, 23 insertions(+)
+>>>>>
+>>>>> v1->v2:
+>>>>> 	- Added mising static anotation to psci_system_reset2_supported
+>>>>> 	- Added missing ')' in the comment
+>>>>>
+>>>>> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+>>>>> index c80ec1d03274..91748725534e 100644
+>>>>> --- a/drivers/firmware/psci.c
+>>>>> +++ b/drivers/firmware/psci.c
+>>>>> @@ -88,6 +88,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
+>>>>>  				PSCI_1_0_EXT_POWER_STATE_TYPE_MASK)
+>>>>>
+>>>>>  static u32 psci_cpu_suspend_feature;
+>>>>> +static bool psci_system_reset2_supported;
+>>>>>
+>>>>>  static inline bool psci_has_ext_power_state(void)
+>>>>>  {
+>>>>> @@ -253,6 +254,15 @@ static int get_set_conduit_method(struct device_node *np)
+>>>>>
+>>>>>  static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
+>>>>>  {
+>>>>> +	if ((reboot_mode == REBOOT_WARM || reboot_mode == REBOOT_SOFT) &&
+>>>>
+>>>> I am curious about this reboot_mode setup. I have grepped the kernel and
+>>>> reboot_mode is setup via kernel parameters at boot time.
+>>>> Shouldn't user decide what reboot type wants to do?
+>>>>
+>>>
+>>> I have almost forgotten how I tested this. IIRC and looking quickly @
+>>> kernel/reboot.c and __setup(reboot=,...), I recall passing reboot=w
+>>> while testing this.
+>>
+>> I would expect that too. It means static setting at boot time.
+>>
+>>> We can do something like what efi_reboot, but not
+>>> sure if we need that yet if users need too decide after boot.
+>>
+>>
+>> I am checking with colleague about all xilinx use cases but I would be
+>> surprised if static configuration at run time is enough.
+>>
+>> Also not quite sure about mixing reboot_warm and reboot_soft cases
+>> together. They shouldn't be the same.
+>>
+>> Based on psci 1.0 spec there are more options especially for bit[31]
+>> which should be likely setup via DT(no experience with EFI) with names
+>> and codes which should be passed to firmware but still the same issue
+>> remains how to setup reboot type.
+>>
+> 
+> I think with efi_reboot, if user execute the command "reboot warm", it
+> will set REBOOT_WARM. I was thinking something similar for psci too. I
+> can drop REBOOT_SOFT if that's not correct.
 
-I was mostly thinking that a struct stack_info with stack type
-enumeration would also be helpful for ensuring that we terminated stack
-traces when we had a loop.
-
-I'll reply on your new thread.
+Have you found more details about efi_reboot and passing information in
+case of reboot warm?
 
 Thanks,
-Mark.
+Michal
