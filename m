@@ -1,53 +1,35 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 Jul 2018 14:35:54 +0100
-Subject: [PATCH v2] mmc: sunxi: remove output of virtual base address
-Message-ID: <20180719133554.30737-1-andre.przywara@arm.com>
+From: fabio.berton@ossystems.com.br (Fabio Berton)
+Date: Thu, 19 Jul 2018 10:53:02 -0300
+Subject: Rockchip RV1108 mainline kernel support
+Message-ID: <CAAPZna3aGkUmDeAwM4J6LpeC9m1VA=CUQN_ChiwvTLkaE2zdrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent Linux versions refuse to print actual virtual kernel addresses,
-to not give a hint about the location of the kernel in a randomized virtual
-address space. This affects the output of the sunxi MMC controller
-driver, which now produces the rather uninformative line:
+Hi all!
 
-[    1.482660] sunxi-mmc 1c0f000.mmc: base:0x(____ptrval____) irq:8
+We're adding support to a custom Rockchip RV1108 in mainline kernel.
 
-Since the virtual base address is not really interesting in the first
-place, let's just drop this value. The same applies to Linux' notion of
-the interrupt number, which is independent from the GIC SPI number.
-We have the physical address as part of the DT node name, which is way
-more useful for debugging purposes.
-To keep a success message in the driver, we print some information that
-is not too obvious and that we learned while probing the device:
-the maximum request size and whether it uses the new timing mode.
-So the output turns into:
-sunxi-mmc 1c0f000.mmc: max request size: 16384 KB, uses new timings mode
-sunxi-mmc 1c11000.mmc: max request size: 2048 KB
+Currently this custom board runs fine on the Rockchip 3.10 vendor kernel.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
-Changelog v1 ... v2:
-- dropped output of Linux interrupt number
-- added max request size and timings mode output
+The main problems is that kernel 4.17 can't detect eMMC.
 
- drivers/mmc/host/sunxi-mmc.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+I would appreciate any help on how to make the mainline kernel to
+detect eMMC on this board
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 8e7f3e35ee3d..fbbc09d82338 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -1407,7 +1407,10 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto error_free_dma;
- 
--	dev_info(&pdev->dev, "base:0x%p irq:%u\n", host->reg_base, host->irq);
-+	dev_info(&pdev->dev, "max request size: %u KB%s\n",
-+		 mmc->max_req_size >> 10,
-+		 host->use_new_timings ? ", uses new timings mode" : "");
-+
- 	return 0;
- 
- error_free_dma:
--- 
-2.14.4
+Here the full log:
+https://gist.github.com/fbertux/df5b55928dcb703a28b990b72aa2e6fc
+
+and here the log from Rockchip kernel 3.10:
+https://gist.github.com/fbertux/9a476ca6903c2029d3db4ea53076be17
+
+This is dts file that we're using:
+
+https://github.com/OSSystems/linux/blob/wip-rockchip/arch/arm/boot/dts/rv1108-minievb-v10.dts
+
+Rockchip RV1108; http://rockchip.wikidot.com/rk1108
+Kernel Fork: https://github.com/OSSystems/linux/tree/wip-rockchip
+Rockchip kernel 3.10: https://github.com/rockchip-linux/kernel/tree/release-3.10
+
+Thanks!
+
+Fabio Berton
