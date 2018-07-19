@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 01:00:22 +0200
-Subject: [PATCH v3 29/33] mtd: rawnand: qcom: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 01:00:21 +0200
+Subject: [PATCH v3 28/33] mtd: rawnand: docg4: convert driver to nand_scan()
 In-Reply-To: <20180719230026.8741-1-miquel.raynal@bootlin.com>
 References: <20180719230026.8741-1-miquel.raynal@bootlin.com>
-Message-ID: <20180719230026.8741-30-miquel.raynal@bootlin.com>
+Message-ID: <20180719230026.8741-29-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,147 +14,97 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/qcom_nandc.c | 71 +++++++++++++--------------------------
- 1 file changed, 24 insertions(+), 47 deletions(-)
+ drivers/mtd/nand/raw/docg4.c | 55 ++++++++++++++++++++++++++------------------
+ 1 file changed, 32 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/qcom_nandc.c b/drivers/mtd/nand/raw/qcom_nandc.c
-index aa6c3e026ef1..aa66e51afdb8 100644
---- a/drivers/mtd/nand/raw/qcom_nandc.c
-+++ b/drivers/mtd/nand/raw/qcom_nandc.c
-@@ -2475,10 +2475,10 @@ qcom_nandc_calc_ecc_bytes(int step_size, int strength)
- NAND_ECC_CAPS_SINGLE(qcom_nandc_ecc_caps, qcom_nandc_calc_ecc_bytes,
- 		     NANDC_STEP_SIZE, 4, 8);
+diff --git a/drivers/mtd/nand/raw/docg4.c b/drivers/mtd/nand/raw/docg4.c
+index 4dccdfba6140..2f6fcd4efab2 100644
+--- a/drivers/mtd/nand/raw/docg4.c
++++ b/drivers/mtd/nand/raw/docg4.c
+@@ -1227,10 +1227,9 @@ static void __init init_mtd_structs(struct mtd_info *mtd)
+ 	 * required within a nand driver because they are performed by the nand
+ 	 * infrastructure code as part of nand_scan().  In this case they need
+ 	 * to be initialized here because we skip call to nand_scan_ident() (the
+-	 * first half of nand_scan()).  The call to nand_scan_ident() is skipped
+-	 * because for this device the chip id is not read in the manner of a
+-	 * standard nand device.  Unfortunately, nand_scan_ident() does other
+-	 * things as well, such as call nand_set_defaults().
++	 * first half of nand_scan()).  The call to nand_scan_ident() could be
++	 * skipped because for this device the chip id is not read in the manner
++	 * of a standard nand device.
+ 	 */
  
--static int qcom_nand_host_setup(struct qcom_nand_host *host)
-+static int qcom_nand_attach_chip(struct nand_chip *chip)
- {
--	struct nand_chip *chip = &host->chip;
- 	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct qcom_nand_host *host = to_qcom_nand_host(chip);
- 	struct nand_ecc_ctrl *ecc = &chip->ecc;
- 	struct qcom_nand_controller *nandc = get_qcom_nand_controller(chip);
- 	int cwperpage, bad_block_byte, ret;
-@@ -2640,6 +2640,10 @@ static int qcom_nand_host_setup(struct qcom_nand_host *host)
- 	return 0;
- }
+ 	struct nand_chip *nand = mtd_to_nand(mtd);
+@@ -1315,6 +1314,27 @@ static int __init read_id_reg(struct mtd_info *mtd)
  
-+static struct nand_controller_ops qcom_nandc_ops = {
-+	.attach_chip = qcom_nand_attach_chip,
+ static char const *part_probes[] = { "cmdlinepart", "saftlpart", NULL };
+ 
++static int docg4_attach_chip(struct nand_chip *chip)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct docg4_priv *doc = (struct docg4_priv *)(chip + 1);
++
++	init_mtd_structs(mtd);
++
++	/* Initialize kernel BCH algorithm */
++	doc->bch = init_bch(DOCG4_M, DOCG4_T, DOCG4_PRIMITIVE_POLY);
++	if (!doc->bch)
++		return -EINVAL;
++
++	reset(mtd);
++
++	return read_id_reg(mtd);
++}
++
++static struct nand_controller_ops docg4_controller_ops = {
++	.attach_chip = docg4_attach_chip,
 +};
 +
- static int qcom_nandc_alloc(struct qcom_nand_controller *nandc)
+ static int __init probe_docg4(struct platform_device *pdev)
  {
- 	int ret;
-@@ -2781,9 +2785,9 @@ static int qcom_nandc_setup(struct qcom_nand_controller *nandc)
- 	return 0;
- }
- 
--static int qcom_nand_host_init(struct qcom_nand_controller *nandc,
--			       struct qcom_nand_host *host,
--			       struct device_node *dn)
-+static int qcom_nand_host_init_and_register(struct qcom_nand_controller *nandc,
-+					    struct qcom_nand_host *host,
-+					    struct device_node *dn)
- {
- 	struct nand_chip *chip = &host->chip;
- 	struct mtd_info *mtd = nand_to_mtd(chip);
-@@ -2824,36 +2828,20 @@ static int qcom_nand_host_init(struct qcom_nand_controller *nandc,
- 	chip->block_markbad	= qcom_nandc_block_markbad;
- 
- 	chip->controller = &nandc->controller;
-+	chip->controller->ops = &qcom_nandc_ops;
- 	chip->options |= NAND_NO_SUBPAGE_WRITE | NAND_USE_BOUNCE_BUFFER |
- 			 NAND_SKIP_BBTSCAN;
- 
- 	/* set up initial status value */
- 	host->status = NAND_STATUS_READY | NAND_STATUS_WP;
- 
--	ret = nand_scan_ident(mtd, 1, NULL);
--	if (ret)
--		return ret;
+ 	struct mtd_info *mtd;
+@@ -1350,26 +1370,16 @@ static int __init probe_docg4(struct platform_device *pdev)
+ 	mtd->dev.parent = &pdev->dev;
+ 	doc->virtadr = virtadr;
+ 	doc->dev = dev;
 -
--	ret = qcom_nand_host_setup(host);
+-	init_mtd_structs(mtd);
 -
--	return ret;
--}
--
--static int qcom_nand_mtd_register(struct qcom_nand_controller *nandc,
--				  struct qcom_nand_host *host,
--				  struct device_node *dn)
--{
--	struct nand_chip *chip = &host->chip;
--	struct mtd_info *mtd = nand_to_mtd(chip);
--	int ret;
--
--	ret = nand_scan_tail(mtd);
-+	ret = nand_scan(mtd, 1);
- 	if (ret)
- 		return ret;
- 
- 	ret = mtd_device_register(mtd, NULL, 0);
- 	if (ret)
--		nand_cleanup(mtd_to_nand(mtd));
-+		nand_cleanup(chip);
- 
- 	return ret;
- }
-@@ -2862,9 +2850,19 @@ static int qcom_probe_nand_devices(struct qcom_nand_controller *nandc)
- {
- 	struct device *dev = nandc->dev;
- 	struct device_node *dn = dev->of_node, *child;
--	struct qcom_nand_host *host, *tmp;
-+	struct qcom_nand_host *host;
- 	int ret;
- 
-+	if (nandc->props->is_bam) {
-+		free_bam_transaction(nandc);
-+		nandc->bam_txn = alloc_bam_transaction(nandc);
-+		if (!nandc->bam_txn) {
-+			dev_err(nandc->dev,
-+				"failed to allocate bam transaction\n");
-+			return -ENOMEM;
-+		}
-+	}
-+
- 	for_each_available_child_of_node(dn, child) {
- 		host = devm_kzalloc(dev, sizeof(*host), GFP_KERNEL);
- 		if (!host) {
-@@ -2872,7 +2870,7 @@ static int qcom_probe_nand_devices(struct qcom_nand_controller *nandc)
- 			return -ENOMEM;
- 		}
- 
--		ret = qcom_nand_host_init(nandc, host, child);
-+		ret = qcom_nand_host_init_and_register(nandc, host, child);
- 		if (ret) {
- 			devm_kfree(dev, host);
- 			continue;
-@@ -2881,27 +2879,6 @@ static int qcom_probe_nand_devices(struct qcom_nand_controller *nandc)
- 		list_add_tail(&host->node, &nandc->host_list);
- 	}
- 
--	if (list_empty(&nandc->host_list))
--		return -ENODEV;
--
--	if (nandc->props->is_bam) {
--		free_bam_transaction(nandc);
--		nandc->bam_txn = alloc_bam_transaction(nandc);
--		if (!nandc->bam_txn) {
--			dev_err(nandc->dev,
--				"failed to allocate bam transaction\n");
--			return -ENOMEM;
--		}
+-	/* initialize kernel bch algorithm */
+-	doc->bch = init_bch(DOCG4_M, DOCG4_T, DOCG4_PRIMITIVE_POLY);
+-	if (doc->bch == NULL) {
+-		retval = -EINVAL;
+-		goto free_nand;
 -	}
 -
--	list_for_each_entry_safe(host, tmp, &nandc->host_list, node) {
--		ret = qcom_nand_mtd_register(nandc, host, child);
--		if (ret) {
--			list_del(&host->node);
--			devm_kfree(dev, host);
--		}
+ 	platform_set_drvdata(pdev, doc);
+ 
+-	reset(mtd);
+-	retval = read_id_reg(mtd);
+-	if (retval == -ENODEV) {
+-		dev_warn(dev, "No diskonchip G4 device found.\n");
+-		goto free_bch;
 -	}
 -
- 	if (list_empty(&nandc->host_list))
- 		return -ENODEV;
+-	retval = nand_scan_tail(mtd);
++	/*
++	 * Asking for 0 chips is useless here but it warns the user that the use
++	 * of the nand_scan() function is a bit abused here because the
++	 * initialization is actually a bit specific and re-handled again in the
++	 * ->attach_chip() hook. It will probably leak some memory though.
++	 */
++	nand->dummy_controller.ops = &docg4_controller_ops;
++	retval = nand_scan(mtd, 0);
+ 	if (retval)
+ 		goto free_bch;
  
+@@ -1389,7 +1399,6 @@ static int __init probe_docg4(struct platform_device *pdev)
+ 	nand_cleanup(nand);
+ free_bch:
+ 	free_bch(doc->bch);
+-free_nand:
+ 	kfree(nand);
+ unmap:
+ 	iounmap(virtadr);
 -- 
 2.14.1
