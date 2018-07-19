@@ -1,159 +1,45 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 19 Jul 2018 17:00:24 +0100
-Subject: [PATCH v3] drivers/firmware: psci_checker: stash and use
- topology_core_cpumask for hotplug tests
-In-Reply-To: <1531913132-21022-1-git-send-email-sudeep.holla@arm.com>
-References: <1531913132-21022-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1532016024-21834-1-git-send-email-sudeep.holla@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 19 Jul 2018 18:00:42 +0200
+Subject: [RFT 02/10] pinctrl: samsung: Document suspend and resume members
+In-Reply-To: <20180719160050.22566-1-krzk@kernel.org>
+References: <20180719160050.22566-1-krzk@kernel.org>
+Message-ID: <20180719160050.22566-3-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 7f9545aa1a91 ("arm64: smp: remove cpu and numa topology
-information when hotplugging out CPU") updates the cpu topology when
-the CPU is hotplugged out. However the PSCI checker code uses the
-topology_core_cpumask pointers for some of the cpu hotplug testing.
-Since the pointer to the core_cpumask of the first CPU in the group
-is used, which when that CPU itself is hotpugged out is just set to
-itself, the testing terminates after that particular CPU is tested out.
-But the intention of this tests is to cover all the CPU in the group.
+Add missing documentation for suspend and resume members of struct
+samsung_pin_ctrl and samsung_pinctrl_drv_data.
 
-In order to support that, we need to stash the topology_core_cpumask
-before the start of the test and use that value instead of pointer to
-a cpumask which will be updated on CPU hotplug.
-
-Fixes: 7f9545aa1a91a9a4 ("arm64: smp: remove cpu and numa topology
-	information when hotplugging out CPU")
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- drivers/firmware/psci_checker.c | 83 ++++++++++++++++++++++++-----------------
- 1 file changed, 49 insertions(+), 34 deletions(-)
+ drivers/pinctrl/samsung/pinctrl-samsung.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-v2->v3:
-	- Got rid of find_cpu_groups as suggested by Lorenzo
-
-diff --git a/drivers/firmware/psci_checker.c b/drivers/firmware/psci_checker.c
-index bb1c068bff19..346943657962 100644
---- a/drivers/firmware/psci_checker.c
-+++ b/drivers/firmware/psci_checker.c
-@@ -77,28 +77,6 @@ static int psci_ops_check(void)
- 	return 0;
- }
-
--static int find_cpu_groups(const struct cpumask *cpus,
--			   const struct cpumask **cpu_groups)
--{
--	unsigned int nb = 0;
--	cpumask_var_t tmp;
--
--	if (!alloc_cpumask_var(&tmp, GFP_KERNEL))
--		return -ENOMEM;
--	cpumask_copy(tmp, cpus);
--
--	while (!cpumask_empty(tmp)) {
--		const struct cpumask *cpu_group =
--			topology_core_cpumask(cpumask_any(tmp));
--
--		cpu_groups[nb++] = cpu_group;
--		cpumask_andnot(tmp, tmp, cpu_group);
--	}
--
--	free_cpumask_var(tmp);
--	return nb;
--}
--
- /*
-  * offlined_cpus is a temporary array but passing it as an argument avoids
-  * multiple allocations.
-@@ -166,29 +144,66 @@ static unsigned int down_and_up_cpus(const struct cpumask *cpus,
- 	return err;
- }
-
-+static void free_cpu_groups(int num, cpumask_var_t **pcpu_groups)
-+{
-+	int i;
-+	cpumask_var_t *cpu_groups = *pcpu_groups;
-+
-+	for (i = 0; i < num; ++i)
-+		free_cpumask_var(cpu_groups[i]);
-+	kfree(cpu_groups);
-+}
-+
-+static int alloc_init_cpu_groups(cpumask_var_t **pcpu_groups)
-+{
-+	int num_groups = 0;
-+	cpumask_var_t tmp, *cpu_groups;
-+
-+	if (!alloc_cpumask_var(&tmp, GFP_KERNEL))
-+		return -ENOMEM;
-+
-+	cpu_groups = kcalloc(nb_available_cpus, sizeof(cpu_groups),
-+			     GFP_KERNEL);
-+	if (!cpu_groups)
-+		return -ENOMEM;
-+
-+	cpumask_copy(tmp, cpu_online_mask);
-+
-+	while (!cpumask_empty(tmp)) {
-+		const struct cpumask *cpu_group =
-+			topology_core_cpumask(cpumask_any(tmp));
-+
-+		if (!alloc_cpumask_var(&cpu_groups[num_groups], GFP_KERNEL)) {
-+			free_cpu_groups(num_groups, &cpu_groups);
-+			return -ENOMEM;
-+		}
-+		cpumask_copy(cpu_groups[num_groups++], cpu_group);
-+		cpumask_andnot(tmp, tmp, cpu_group);
-+	}
-+
-+	free_cpumask_var(tmp);
-+	*pcpu_groups = cpu_groups;
-+
-+	return num_groups;
-+}
-+
- static int hotplug_tests(void)
- {
--	int err;
--	cpumask_var_t offlined_cpus;
--	int i, nb_cpu_group;
--	const struct cpumask **cpu_groups;
-+	int i, nb_cpu_group, err = -ENOMEM;
-+	cpumask_var_t offlined_cpus, *cpu_groups;
- 	char *page_buf;
-
--	err = -ENOMEM;
- 	if (!alloc_cpumask_var(&offlined_cpus, GFP_KERNEL))
- 		return err;
--	/* We may have up to nb_available_cpus cpu_groups. */
--	cpu_groups = kmalloc_array(nb_available_cpus, sizeof(*cpu_groups),
--				   GFP_KERNEL);
--	if (!cpu_groups)
-+
-+	nb_cpu_group = alloc_init_cpu_groups(&cpu_groups);
-+	if (nb_cpu_group < 0)
- 		goto out_free_cpus;
- 	page_buf = (char *)__get_free_page(GFP_KERNEL);
- 	if (!page_buf)
- 		goto out_free_cpu_groups;
-
- 	err = 0;
--	nb_cpu_group = find_cpu_groups(cpu_online_mask, cpu_groups);
--
- 	/*
- 	 * Of course the last CPU cannot be powered down and cpu_down() should
- 	 * refuse doing that.
-@@ -212,7 +227,7 @@ static int hotplug_tests(void)
-
- 	free_page((unsigned long)page_buf);
- out_free_cpu_groups:
--	kfree(cpu_groups);
-+	free_cpu_groups(nb_cpu_group, &cpu_groups);
- out_free_cpus:
- 	free_cpumask_var(offlined_cpus);
- 	return err;
---
-2.7.4
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
+index f0cda9424dfe..aac16cc8362a 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.h
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
+@@ -223,6 +223,10 @@ struct samsung_retention_data {
+  *	interrupts for the controller.
+  * @eint_wkup_init: platform specific callback to setup the external wakeup
+  *	interrupts for the controller.
++ * @suspend: platform specific suspend callback, executed during pin controller
++ *	device suspend, see samsung_pinctrl_suspend()
++ * @resume: platform specific resume callback, executed during pin controller
++ *	device suspend, see samsung_pinctrl_resume()
+  */
+ struct samsung_pin_ctrl {
+ 	const struct samsung_pin_bank_data *pin_banks;
+@@ -255,6 +259,10 @@ struct samsung_pin_ctrl {
+  * @pin_base: starting system wide pin number.
+  * @nr_pins: number of pins supported by the controller.
+  * @retention_ctrl: retention control runtime data.
++ * @suspend: platform specific suspend callback, executed during pin controller
++ *	device suspend, see samsung_pinctrl_suspend()
++ * @resume: platform specific resume callback, executed during pin controller
++ *	device suspend, see samsung_pinctrl_resume()
+  */
+ struct samsung_pinctrl_drv_data {
+ 	struct list_head		node;
+-- 
+2.14.1
