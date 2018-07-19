@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 01:00:21 +0200
-Subject: [PATCH v3 28/33] mtd: rawnand: docg4: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 01:00:23 +0200
+Subject: [PATCH v3 30/33] mtd: rawnand: jz4740: convert driver to nand_scan()
 In-Reply-To: <20180719230026.8741-1-miquel.raynal@bootlin.com>
 References: <20180719230026.8741-1-miquel.raynal@bootlin.com>
-Message-ID: <20180719230026.8741-29-miquel.raynal@bootlin.com>
+Message-ID: <20180719230026.8741-31-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,97 +14,122 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/docg4.c | 55 ++++++++++++++++++++++++++------------------
- 1 file changed, 32 insertions(+), 23 deletions(-)
+ drivers/mtd/nand/raw/jz4740_nand.c | 46 ++++++++++++++++++++++++--------------
+ 1 file changed, 29 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/docg4.c b/drivers/mtd/nand/raw/docg4.c
-index 4dccdfba6140..2f6fcd4efab2 100644
---- a/drivers/mtd/nand/raw/docg4.c
-+++ b/drivers/mtd/nand/raw/docg4.c
-@@ -1227,10 +1227,9 @@ static void __init init_mtd_structs(struct mtd_info *mtd)
- 	 * required within a nand driver because they are performed by the nand
- 	 * infrastructure code as part of nand_scan().  In this case they need
- 	 * to be initialized here because we skip call to nand_scan_ident() (the
--	 * first half of nand_scan()).  The call to nand_scan_ident() is skipped
--	 * because for this device the chip id is not read in the manner of a
--	 * standard nand device.  Unfortunately, nand_scan_ident() does other
--	 * things as well, such as call nand_set_defaults().
-+	 * first half of nand_scan()).  The call to nand_scan_ident() could be
-+	 * skipped because for this device the chip id is not read in the manner
-+	 * of a standard nand device.
- 	 */
+diff --git a/drivers/mtd/nand/raw/jz4740_nand.c b/drivers/mtd/nand/raw/jz4740_nand.c
+index 9bb8a89e09f9..72f5783a7da8 100644
+--- a/drivers/mtd/nand/raw/jz4740_nand.c
++++ b/drivers/mtd/nand/raw/jz4740_nand.c
+@@ -59,6 +59,7 @@
  
- 	struct nand_chip *nand = mtd_to_nand(mtd);
-@@ -1315,6 +1314,27 @@ static int __init read_id_reg(struct mtd_info *mtd)
+ struct jz_nand {
+ 	struct nand_chip chip;
++	struct platform_device *pdev;
+ 	void __iomem *base;
+ 	struct resource *mem;
  
- static char const *part_probes[] = { "cmdlinepart", "saftlpart", NULL };
+@@ -329,8 +330,8 @@ static int jz_nand_detect_bank(struct platform_device *pdev,
+ 	writel(ctrl, nand->base + JZ_REG_NAND_CTRL);
  
-+static int docg4_attach_chip(struct nand_chip *chip)
+ 	if (chipnr == 0) {
+-		/* Detect first chip. */
+-		ret = nand_scan_ident(mtd, 1, NULL);
++		/* Detect the first chip and register it */
++		ret = nand_scan(mtd, 1);
+ 		if (ret)
+ 			goto notfound_id;
+ 
+@@ -367,6 +368,25 @@ static int jz_nand_detect_bank(struct platform_device *pdev,
+ 	return ret;
+ }
+ 
++static int jz_nand_attach_chip(struct nand_chip *chip)
 +{
 +	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct docg4_priv *doc = (struct docg4_priv *)(chip + 1);
++	struct jz_nand *nand = mtd_to_jz_nand(mtd);
++	struct device *dev = mtd->dev.parent;
++	struct jz_nand_platform_data *pdata = dev_get_platdata(dev);
 +
-+	init_mtd_structs(mtd);
++	if (pdata && pdata->ident_callback) {
++		pdata->ident_callback(nand->pdev, mtd, &pdata->partitions,
++				      &pdata->num_partitions);
++	}
 +
-+	/* Initialize kernel BCH algorithm */
-+	doc->bch = init_bch(DOCG4_M, DOCG4_T, DOCG4_PRIMITIVE_POLY);
-+	if (!doc->bch)
-+		return -EINVAL;
-+
-+	reset(mtd);
-+
-+	return read_id_reg(mtd);
++	return 0;
 +}
 +
-+static struct nand_controller_ops docg4_controller_ops = {
-+	.attach_chip = docg4_attach_chip,
++static struct nand_controller_ops jz_nand_controller_ops = {
++	.attach_chip = jz_nand_attach_chip,
 +};
 +
- static int __init probe_docg4(struct platform_device *pdev)
+ static int jz_nand_probe(struct platform_device *pdev)
  {
- 	struct mtd_info *mtd;
-@@ -1350,26 +1370,16 @@ static int __init probe_docg4(struct platform_device *pdev)
+ 	int ret;
+@@ -397,6 +417,7 @@ static int jz_nand_probe(struct platform_device *pdev)
+ 	mtd		= nand_to_mtd(chip);
  	mtd->dev.parent = &pdev->dev;
- 	doc->virtadr = virtadr;
- 	doc->dev = dev;
--
--	init_mtd_structs(mtd);
--
--	/* initialize kernel bch algorithm */
--	doc->bch = init_bch(DOCG4_M, DOCG4_T, DOCG4_PRIMITIVE_POLY);
--	if (doc->bch == NULL) {
--		retval = -EINVAL;
--		goto free_nand;
+ 	mtd->name	= "jz4740-nand";
++	nand->pdev	= pdev;
+ 
+ 	chip->ecc.hwctl		= jz_nand_hwctl;
+ 	chip->ecc.calculate	= jz_nand_calculate_ecc_rs;
+@@ -410,6 +431,7 @@ static int jz_nand_probe(struct platform_device *pdev)
+ 	chip->chip_delay = 50;
+ 	chip->cmd_ctrl = jz_nand_cmd_ctrl;
+ 	chip->select_chip = jz_nand_select_chip;
++	chip->dummy_controller.ops = &jz_nand_controller_ops;
+ 
+ 	if (nand->busy_gpio)
+ 		chip->dev_ready = jz_nand_dev_ready;
+@@ -450,20 +472,10 @@ static int jz_nand_probe(struct platform_device *pdev)
+ 		else
+ 			nand->banks[chipnr] = 0;
+ 	}
++
+ 	if (chipnr == 0) {
+ 		dev_err(&pdev->dev, "No NAND chips found\n");
+-		goto err_iounmap_mmio;
 -	}
 -
- 	platform_set_drvdata(pdev, doc);
- 
--	reset(mtd);
--	retval = read_id_reg(mtd);
--	if (retval == -ENODEV) {
--		dev_warn(dev, "No diskonchip G4 device found.\n");
--		goto free_bch;
+-	if (pdata && pdata->ident_callback) {
+-		pdata->ident_callback(pdev, mtd, &pdata->partitions,
+-					&pdata->num_partitions);
 -	}
 -
--	retval = nand_scan_tail(mtd);
-+	/*
-+	 * Asking for 0 chips is useless here but it warns the user that the use
-+	 * of the nand_scan() function is a bit abused here because the
-+	 * initialization is actually a bit specific and re-handled again in the
-+	 * ->attach_chip() hook. It will probably leak some memory though.
-+	 */
-+	nand->dummy_controller.ops = &docg4_controller_ops;
-+	retval = nand_scan(mtd, 0);
- 	if (retval)
- 		goto free_bch;
+-	ret = nand_scan_tail(mtd);
+-	if (ret) {
+-		dev_err(&pdev->dev,  "Failed to scan NAND\n");
+-		goto err_unclaim_banks;
++		goto err_nand_release;
+ 	}
  
-@@ -1389,7 +1399,6 @@ static int __init probe_docg4(struct platform_device *pdev)
- 	nand_cleanup(nand);
- free_bch:
- 	free_bch(doc->bch);
--free_nand:
- 	kfree(nand);
- unmap:
- 	iounmap(virtadr);
+ 	ret = mtd_device_register(mtd, pdata ? pdata->partitions : NULL,
+@@ -471,15 +483,13 @@ static int jz_nand_probe(struct platform_device *pdev)
+ 
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to add mtd device\n");
+-		goto err_nand_release;
++		goto err_unclaim_banks;
+ 	}
+ 
+ 	dev_info(&pdev->dev, "Successfully registered JZ4740 NAND driver\n");
+ 
+ 	return 0;
+ 
+-err_nand_release:
+-	nand_release(mtd);
+ err_unclaim_banks:
+ 	while (chipnr--) {
+ 		unsigned char bank = nand->banks[chipnr];
+@@ -487,6 +497,8 @@ static int jz_nand_probe(struct platform_device *pdev)
+ 					 nand->bank_base[bank - 1]);
+ 	}
+ 	writel(0, nand->base + JZ_REG_NAND_CTRL);
++err_nand_release:
++	nand_release(mtd);
+ err_iounmap_mmio:
+ 	jz_nand_iounmap_resource(nand->mem, nand->base);
+ err_free:
 -- 
 2.14.1
