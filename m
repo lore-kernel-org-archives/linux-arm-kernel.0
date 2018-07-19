@@ -1,68 +1,52 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 19 Jul 2018 16:01:02 +0200
-Subject: [RFC PATCH] EDAC, ghes: Enable per-layer error reporting for ARM
-In-Reply-To: <1531762009-15112-1-git-send-email-tbaicar@codeaurora.org>
-References: <1531762009-15112-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20180719140102.GB25185@nazgul.tnic>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 19 Jul 2018 09:06:39 -0500
+Subject: [PATCH 3/3] clk: meson-g12a: Add EE Clock controller driver
+In-Reply-To: <7e1cce0b-fc86-b900-2019-a85c5e5ba2ae@amlogic.com> (Yixun Lan's
+ message of "Tue, 17 Jul 2018 09:24:02 +0800")
+References: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
+ <1531134767-29927-4-git-send-email-jian.hu@amlogic.com>
+ <CAFBinCBB9N_p6S_-dfiV=zDCf-RYnA3C-ir6oNLC7JAfdOqqiw@mail.gmail.com>
+ <ec49c089-bccf-9aac-5d0f-43bc27770ad9@amlogic.com>
+ <1531216472.2708.71.camel@baylibre.com> <7hfu0jmhbe.fsf@baylibre.com>
+ <7e1cce0b-fc86-b900-2019-a85c5e5ba2ae@amlogic.com>
+Message-ID: <7h601be2vk.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2018 at 01:26:49PM -0400, Tyler Baicar wrote:
-> Enable per-layer error reporting for ARM systems so that the error
-> counters are incremented per-DIMM.
-> 
-> On ARM systems that use firmware first error handling it is understood
-> that card=channel and module=DIMM on that channel. Populate that
-> information and enable per layer error reporting for ARM systems so that
-> the EDAC error counters are incremented based on DIMM number as per the
-> SMBIOS table rather than just incrementing the noinfo counters on the
-> memory controller.
+Yixun Lan <yixun.lan@amlogic.com> writes:
 
-I guess.
+[...]
 
-James?
+>> 
+>> As Jerome said, I think consistency is an important goal, so leaving off
+>> the "meson-" for drivers/clk is fine with me.
+>> 
+> ok
+>
+>> Also for consistency, for the rest of the drivers, keeping "meson-" is
+>> probably the right thing to do.
+>> 
+> ok, for the above, you are talking about the already exist compatible
+> names? or the patches we will push in the future?
 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> ---
->  drivers/edac/ghes_edac.c | 15 ++++++++++++---
->  1 file changed, 12 insertions(+), 3 deletions(-)
-> diff --git a/drivers/edac/ghes_edac.c b/drivers/edac/ghes_edac.c
-> index 473aeec..e4c8b6e 100644
-> --- a/drivers/edac/ghes_edac.c
-> +++ b/drivers/edac/ghes_edac.c
-> @@ -213,9 +213,18 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
->  	strcpy(e->label, "unknown label");
->  	e->msg = pvt->msg;
->  	e->other_detail = pvt->other_detail;
-> -	e->top_layer = -1;
-> -	e->mid_layer = -1;
-> -	e->low_layer = -1;
+I'm talking about future patches.
 
-<----- newline here.
+>> However, patches would be welcome to add compatibles without the "meson"
+>> for the rest of the drivers & documentation as well, but please do not
+>> remove any compatibles.
+>> 
+> I assume you are talking about the patches in the future we will push?
+> to drop the "meson".
+>
+> I'm confused here, as the above two paragraphs conflict with each other
 
-> +	if ((IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64))
-> +	    && (mem_err->validation_bits & CPER_MEM_VALID_CARD)
-> +	    && (mem_err->validation_bits & CPER_MEM_VALID_MODULE)) {
-> +		e->top_layer = mem_err->card;
-> +		e->mid_layer = mem_err->module;
-> +		e->low_layer = -1;
-> +		e->enable_per_layer_report = true;
-> +	} else {
-> +		e->top_layer = -1;
-> +		e->mid_layer = -1;
-> +		e->low_layer = -1;
-> +	}
+Yeah, what I wrote is confusing, sorry about that.
 
-ditto.
+What I mean is that new patches should stay consistent with compatibles
+in their existing drivers/subsystems.  That means keeping the "meson-"
+prefix for everything except drivers/clk.
 
->  	*pvt->other_detail = '\0';
->  	*pvt->msg = '\0';
->  
-> -- 
+In addition to that, patches would be welcome for *adding* compatibles
+without "meson" to all the current drivers.
 
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+Kevin
