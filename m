@@ -1,27 +1,27 @@
 From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 19 Jul 2018 18:28:40 +0200
-Subject: [PATCH v4 05/10] KVM: arm/arm64: vgic: Signal IRQs using their
- configured group
-In-Reply-To: <1531746387-7033-6-git-send-email-christoffer.dall@arm.com>
+Date: Thu, 19 Jul 2018 18:31:55 +0200
+Subject: [PATCH v4 06/10] KVM: arm/arm64: vgic: Permit uaccess writes to
+ return errors
+In-Reply-To: <1531746387-7033-7-git-send-email-christoffer.dall@arm.com>
 References: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
- <1531746387-7033-6-git-send-email-christoffer.dall@arm.com>
-Message-ID: <20180719162840.gakzztsbrwdnu5x3@kamzik.brq.redhat.com>
+ <1531746387-7033-7-git-send-email-christoffer.dall@arm.com>
+Message-ID: <20180719163155.atqejnaf63njizyj@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2018 at 03:06:22PM +0200, Christoffer Dall wrote:
-> Now when we have a group configuration on the struct IRQ, use this state
-> when populating the LR and signaling interrupts as either group 0 or
-> group 1 to the VM.  Depending on the model of the emulated GIC, and the
-> guest's configuration of the VMCR, interrupts may be signaled as IRQs or
-> FIQs to the VM.
+On Mon, Jul 16, 2018 at 03:06:23PM +0200, Christoffer Dall wrote:
+> Currently we do not allow any vgic mmio write operations to fail, which
+> makes sense from mmio traps from the guest.  However, we should be able
+> to report failures to userspace, if userspace writes incompatible values
+> to read-only registers.  Rework the internal interface to allow errors
+> to be returned on the write side for userspace writes.
 > 
 > Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 > ---
->  include/linux/irqchip/arm-gic.h | 1 +
->  virt/kvm/arm/vgic/vgic-v2.c     | 3 +++
->  virt/kvm/arm/vgic/vgic-v3.c     | 6 +-----
->  3 files changed, 5 insertions(+), 5 deletions(-)
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 12 +++++++-----
+>  virt/kvm/arm/vgic/vgic-mmio.c    | 18 +++++++++++++-----
+>  virt/kvm/arm/vgic/vgic-mmio.h    | 19 +++++++++++--------
+>  3 files changed, 31 insertions(+), 18 deletions(-)
 >
 
 Reviewed-by: Andrew Jones <drjones@redhat.com>
