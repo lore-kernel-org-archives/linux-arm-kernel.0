@@ -1,52 +1,125 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Thu, 19 Jul 2018 17:46:10 +0800
-Subject: [RFC PATCH v2 0/2] mtd: rawnand: meson: add Amlogic NAND driver
- support
-Message-ID: <20180719094612.5833-1-yixun.lan@amlogic.com>
+Date: Thu, 19 Jul 2018 17:46:11 +0800
+Subject: [RFC PATCH v2 1/2] dt-bindings: nand: meson: add Amlogic NAND
+ controller driver
+In-Reply-To: <20180719094612.5833-1-yixun.lan@amlogic.com>
+References: <20180719094612.5833-1-yixun.lan@amlogic.com>
+Message-ID: <20180719094612.5833-2-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  These two patches try to add initial NAND driver support for Amlogic Meson
-SoCs, current it has been tested on GXL(p212) and AXG(s400) platform.
+From: Liang Yang <liang.yang@amlogic.com>
 
-  Note this patch series actually depend on the eMMC clkc patch[2] which
-still not merged.
+Add Amlogic NAND controller dt-bindings for Meson SoC,
+Current this driver support GXBB/GXL/AXG platform.
 
-Changes since v1 at [1]:
-   - adopt property amlogic,nand-enable-scrambler - thanks Martin
-   - drop nand pins in DT
-   - convert clk access to emmc clkc model 
-   - fix regiser field definition alignment
-   - convert devm_kmalloc to kmalloc API
-   - drop nand-user-mode 
-   - parse cs id from DT
-   - rework n2m, m2n function
-   - explain why insert two "IDLE" command
-   - implement exec_op()
-   - drop meson_nfc_get_nand_chip_dts()
-   - release resource once error occur in meson_nfc_nand_chips_init(), 
-   - call nand_cleanup(nand) once mtd_device_register fail
-
-Items not addressed in this version:
-   - convert to ECC conf helper() 
-   - how to construct mtd->name
-
-[1] https://lkml.kernel.org/r/20180613161314.14894-1-yixun.lan at amlogic.com
-[2] https://lkml.kernel.org/r/20180712211244.11428-1-yixun.lan at amlogic.com
-
-Liang Yang (1):
-  dt-bindings: nand: meson: add Amlogic NAND controller driver
-
-Yixun Lan (1):
-  mtd: rawnand: meson: add support for Amlogic NAND flash controller
-
- .../bindings/mtd/amlogic,meson-nand.txt       |   95 ++
- drivers/mtd/nand/raw/Kconfig                  |   10 +
- drivers/mtd/nand/raw/Makefile                 |    1 +
- drivers/mtd/nand/raw/meson_nand.c             | 1333 +++++++++++++++++
- 4 files changed, 1439 insertions(+)
+Signed-off-by: Liang Yang <liang.yang@amlogic.com>
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+---
+ .../bindings/mtd/amlogic,meson-nand.txt       | 95 +++++++++++++++++++
+ 1 file changed, 95 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
- create mode 100644 drivers/mtd/nand/raw/meson_nand.c
 
+diff --git a/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
+new file mode 100644
+index 000000000000..31f910dcd27a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
+@@ -0,0 +1,95 @@
++Amlogic NAND Flash Controller (NFC) for GXBB/GXL/AXG family SoCs
++
++This file documents the properties in addition to those available in
++the MTD NAND bindings.
++
++Required properties:
++- compatible : contains one of:
++  - "amlogic,meson-gxl-nfc"
++  - "amlogic,meson-axg-nfc"
++- clocks     :
++	A list of phandle + clock-specifier pairs for the clocks listed
++	in clock-names.
++
++- clock-names: Should contain the following:
++	"core" - NFC module gate clock
++	"device" - device clock from eMMC sub clock controller
++
++- pins     : Select pins which NFC need.
++- nand_pins: Detail NAND pins information.
++- amlogic,mmc-syscon	: Required for NAND clocks, it's shared with SD/eMMC
++				controller port C
++
++Optional children nodes:
++Children nodes represent the available nand chips.
++
++Optional properties:
++- amlogic,nand-enable-scrambler: enable the NAND scrambler feature.
++	- (absent) = scrambler is disabled
++	- (present) = scrambler is enabled
++
++
++Other properties:
++see Documentation/devicetree/bindings/mtd/nand.txt for generic bindings.
++
++Example demonstrate on AXG SoC:
++
++	sd_emmc_c_clkc: mmc at 7000 {
++		compatible = "amlogic,meson-axg-mmc-clkc", "syscon";
++		reg = <0x0 0x7000 0x0 0x800>;
++		status = "okay";
++	};
++
++	nand: nfc at 7800 {
++		compatible = "amlogic,meson-axg-nfc";
++		reg = <0x0 0x7800 0x0 0x100>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interrupts = <GIC_SPI 34 IRQ_TYPE_EDGE_RISING>;
++		status = "disabled";
++
++		clocks = <&clkc CLKID_SD_EMMC_C>,
++			<&sd_emmc_c_clkc CLKID_MMC_DIV>;
++		clock-names = "core", "device";
++		amlogic,mmc-syscon = <&sd_emmc_c_clkc>;
++
++		status = "okay";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&nand_pins>;
++
++		nand at 0 {
++			reg = <0>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			nand-on-flash-bbt;
++			nand-ecc-mode = "hw";
++			nand-ecc-strength = <8>;
++			nand-ecc-step-size = <1024>;
++
++			amlogic,nand-enable-scrambler;
++
++			partition at 0 {
++				label = "boot";
++				reg = <0x00000000 0x00200000>;
++				read-only;
++			};
++			partition at 200000 {
++				label = "env";
++				reg = <0x00200000 0x00400000>;
++			};
++			partition at 600000 {
++				label = "system";
++				reg = <0x00600000 0x00a00000>;
++			};
++			partition at 1000000 {
++				label = "rootfs";
++				reg = <0x01000000 0x03000000>;
++			};
++			partition at 4000000 {
++				label = "media";
++				reg = <0x04000000 0x8000000>;
++			};
++		};
++	};
 -- 
 2.18.0
