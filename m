@@ -1,26 +1,52 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu, 19 Jul 2018 08:17:28 +0200
-Subject: [RFC PATCH 1/8] mtd: rawnand: ams-delta: Use private structure
-In-Reply-To: <20180718235710.18242-2-jmkrzyszt@gmail.com>
-References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
- <20180718235710.18242-2-jmkrzyszt@gmail.com>
-Message-ID: <20180719081728.46eb7ab5@bbrezillon>
+From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
+Date: Thu, 19 Jul 2018 15:18:53 +0900
+Subject: [PATCH] reset: uniphier: add reset control support for SPI
+Message-ID: <1531981133-25881-1-git-send-email-hayashibara.keiji@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Jul 2018 01:57:03 +0200
-Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
+From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 
-> Introduce a driver private structure and allocate it on device probe.
-> Use it for storing nand_chip structure, GPIO descriptors prevoiusly
-> stored in static variables as well as io_base pointer previously passed
-> as nand controller data or platform driver data.
+Add reset control for SPI controller on UniPhier SoCs.
 
-That's a good thing. Thanks for doing that.
+Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+---
+ drivers/reset/reset-uniphier.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-> Subsequent patches
-> may populate the structure with more members as needed.
-> 
-> While at it, fix missing mtd->dev.parent and drop useless mtd->owner.
-
-I'd prefer to have it done in a separate patch if you don't mind.
+diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
+index e9030ff..5605745 100644
+--- a/drivers/reset/reset-uniphier.c
++++ b/drivers/reset/reset-uniphier.c
+@@ -202,6 +202,12 @@ static const struct uniphier_reset_data uniphier_pro5_sd_reset_data[] = {
+ #define UNIPHIER_PERI_RESET_FI2C(id, ch)		\
+ 	UNIPHIER_RESETX((id), 0x114, 24 + (ch))
+ 
++#define UNIPHIER_PERI_RESET_SCSSI(id)			\
++	UNIPHIER_RESETX((id), 0x110, 17)
++
++#define UNIPHIER_PERI_RESET_MCSSI(id)			\
++	UNIPHIER_RESETX((id), 0x114, 14)
++
+ static const struct uniphier_reset_data uniphier_ld4_peri_reset_data[] = {
+ 	UNIPHIER_PERI_RESET_UART(0, 0),
+ 	UNIPHIER_PERI_RESET_UART(1, 1),
+@@ -212,6 +218,7 @@ static const struct uniphier_reset_data uniphier_ld4_peri_reset_data[] = {
+ 	UNIPHIER_PERI_RESET_I2C(6, 2),
+ 	UNIPHIER_PERI_RESET_I2C(7, 3),
+ 	UNIPHIER_PERI_RESET_I2C(8, 4),
++	UNIPHIER_PERI_RESET_SCSSI(11),
+ 	UNIPHIER_RESET_END,
+ };
+ 
+@@ -227,6 +234,8 @@ static const struct uniphier_reset_data uniphier_pro4_peri_reset_data[] = {
+ 	UNIPHIER_PERI_RESET_FI2C(8, 4),
+ 	UNIPHIER_PERI_RESET_FI2C(9, 5),
+ 	UNIPHIER_PERI_RESET_FI2C(10, 6),
++	UNIPHIER_PERI_RESET_SCSSI(11),
++	UNIPHIER_PERI_RESET_MCSSI(12),
+ 	UNIPHIER_RESET_END,
+ };
+ 
+-- 
+2.7.4
