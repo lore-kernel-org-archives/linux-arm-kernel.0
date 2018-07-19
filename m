@@ -1,9 +1,10 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 01:00:00 +0200
-Subject: [PATCH v3 07/33] mtd: rawnand: fsmc: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 01:00:04 +0200
+Subject: [PATCH v3 11/33] mtd: rawnand: lpc32xx_mlc: convert driver to
+ nand_scan()
 In-Reply-To: <20180719230026.8741-1-miquel.raynal@bootlin.com>
 References: <20180719230026.8741-1-miquel.raynal@bootlin.com>
-Message-ID: <20180719230026.8741-8-miquel.raynal@bootlin.com>
+Message-ID: <20180719230026.8741-12-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,174 +15,160 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/fsmc_nand.c | 148 +++++++++++++++++++++------------------
- 1 file changed, 78 insertions(+), 70 deletions(-)
+ drivers/mtd/nand/raw/lpc32xx_mlc.c | 109 ++++++++++++++++++++-----------------
+ 1 file changed, 59 insertions(+), 50 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/fsmc_nand.c b/drivers/mtd/nand/raw/fsmc_nand.c
-index 59524d181bfe..020495e6cd55 100644
---- a/drivers/mtd/nand/raw/fsmc_nand.c
-+++ b/drivers/mtd/nand/raw/fsmc_nand.c
-@@ -919,6 +919,82 @@ static int fsmc_nand_probe_config_dt(struct platform_device *pdev,
- 	return 0;
+diff --git a/drivers/mtd/nand/raw/lpc32xx_mlc.c b/drivers/mtd/nand/raw/lpc32xx_mlc.c
+index 052d123a8304..099f1dd308c6 100644
+--- a/drivers/mtd/nand/raw/lpc32xx_mlc.c
++++ b/drivers/mtd/nand/raw/lpc32xx_mlc.c
+@@ -184,6 +184,7 @@ static struct nand_bbt_descr lpc32xx_nand_bbt_mirror = {
+ };
+ 
+ struct lpc32xx_nand_host {
++	struct platform_device	*pdev;
+ 	struct nand_chip	nand_chip;
+ 	struct lpc32xx_mlc_platform_data *pdata;
+ 	struct clk		*clk;
+@@ -653,6 +654,58 @@ static struct lpc32xx_nand_cfg_mlc *lpc32xx_parse_dt(struct device *dev)
+ 	return ncfg;
  }
  
-+static int fsmc_nand_attach_chip(struct nand_chip *nand)
++static int lpc32xx_nand_attach_chip(struct nand_chip *chip)
 +{
-+	struct mtd_info *mtd = nand_to_mtd(nand);
-+	struct fsmc_nand_data *host = mtd_to_fsmc(mtd);
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct lpc32xx_nand_host *host = nand_get_controller_data(chip);
++	struct device *dev = &host->pdev->dev;
 +
-+	if (AMBA_REV_BITS(host->pid) >= 8) {
-+		switch (mtd->oobsize) {
-+		case 16:
-+		case 64:
-+		case 128:
-+		case 224:
-+		case 256:
-+			break;
-+		default:
-+			dev_warn(host->dev,
-+				 "No oob scheme defined for oobsize %d\n",
-+				 mtd->oobsize);
-+			return -EINVAL;
-+		}
++	host->dma_buf = devm_kzalloc(dev, mtd->writesize, GFP_KERNEL);
++	if (!host->dma_buf)
++		return -ENOMEM;
 +
-+		mtd_set_ooblayout(mtd, &fsmc_ecc4_ooblayout_ops);
++	host->dummy_buf = devm_kzalloc(dev, mtd->writesize, GFP_KERNEL);
++	if (!host->dummy_buf)
++		return -ENOMEM;
 +
-+		return 0;
++	chip->ecc.mode = NAND_ECC_HW;
++	chip->ecc.size = 512;
++	mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
++	host->mlcsubpages = mtd->writesize / 512;
++
++	/* initially clear interrupt status */
++	readb(MLC_IRQ_SR(host->io_base));
++
++	init_completion(&host->comp_nand);
++	init_completion(&host->comp_controller);
++
++	host->irq = platform_get_irq(host->pdev, 0);
++	if (host->irq < 0) {
++		dev_err(dev, "failed to get platform irq\n");
++		return -EINVAL;
 +	}
 +
-+	switch (nand->ecc.mode) {
-+	case NAND_ECC_HW:
-+		dev_info(host->dev, "Using 1-bit HW ECC scheme\n");
-+		nand->ecc.calculate = fsmc_read_hwecc_ecc1;
-+		nand->ecc.correct = nand_correct_data;
-+		nand->ecc.bytes = 3;
-+		nand->ecc.strength = 1;
-+		break;
-+
-+	case NAND_ECC_SOFT:
-+		if (nand->ecc.algo == NAND_ECC_BCH) {
-+			dev_info(host->dev,
-+				 "Using 4-bit SW BCH ECC scheme\n");
-+			break;
-+		}
-+
-+	case NAND_ECC_ON_DIE:
-+		break;
-+
-+	default:
-+		dev_err(host->dev, "Unsupported ECC mode!\n");
-+		return -ENOTSUPP;
-+	}
-+
-+	/*
-+	 * Don't set layout for BCH4 SW ECC. This will be
-+	 * generated later in nand_bch_init() later.
-+	 */
-+	if (nand->ecc.mode == NAND_ECC_HW) {
-+		switch (mtd->oobsize) {
-+		case 16:
-+		case 64:
-+		case 128:
-+			mtd_set_ooblayout(mtd,
-+					  &fsmc_ecc1_ooblayout_ops);
-+			break;
-+		default:
-+			dev_warn(host->dev,
-+				 "No oob scheme defined for oobsize %d\n",
-+				 mtd->oobsize);
-+			return -EINVAL;
-+		}
++	if (request_irq(host->irq, (irq_handler_t)&lpc3xxx_nand_irq,
++			IRQF_TRIGGER_HIGH, DRV_NAME, host)) {
++		dev_err(dev, "Error requesting NAND IRQ\n");
++		return -ENXIO;
 +	}
 +
 +	return 0;
 +}
 +
-+static struct nand_controller_ops fsmc_nand_controller_ops = {
-+	.attach_chip = fsmc_nand_attach_chip,
++static void lpc32xx_nand_detach_chip(struct nand_chip *chip)
++{
++	struct lpc32xx_nand_host *host = nand_get_controller_data(chip);
++
++	free_irq(host->irq, host);
++}
++
++static struct nand_controller_ops lpc32xx_nand_controller_ops = {
++	.attach_chip = lpc32xx_nand_attach_chip,
++	.detach_chip = lpc32xx_nand_detach_chip,
 +};
 +
  /*
-  * fsmc_nand_probe - Probe function
-  * @pdev:       platform device structure
-@@ -1048,76 +1124,8 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
- 	/*
- 	 * Scan to find existence of the device
- 	 */
--	ret = nand_scan_ident(mtd, 1, NULL);
--	if (ret) {
--		dev_err(&pdev->dev, "No NAND Device found!\n");
--		goto release_dma_write_chan;
--	}
--
--	if (AMBA_REV_BITS(host->pid) >= 8) {
--		switch (mtd->oobsize) {
--		case 16:
--		case 64:
--		case 128:
--		case 224:
--		case 256:
--			break;
--		default:
--			dev_warn(&pdev->dev, "No oob scheme defined for oobsize %d\n",
--				 mtd->oobsize);
--			ret = -EINVAL;
--			goto release_dma_write_chan;
--		}
--
--		mtd_set_ooblayout(mtd, &fsmc_ecc4_ooblayout_ops);
--	} else {
--		switch (nand->ecc.mode) {
--		case NAND_ECC_HW:
--			dev_info(&pdev->dev, "Using 1-bit HW ECC scheme\n");
--			nand->ecc.calculate = fsmc_read_hwecc_ecc1;
--			nand->ecc.correct = nand_correct_data;
--			nand->ecc.bytes = 3;
--			nand->ecc.strength = 1;
--			break;
--
--		case NAND_ECC_SOFT:
--			if (nand->ecc.algo == NAND_ECC_BCH) {
--				dev_info(&pdev->dev, "Using 4-bit SW BCH ECC scheme\n");
--				break;
--			}
--
--		case NAND_ECC_ON_DIE:
--			break;
--
--		default:
--			dev_err(&pdev->dev, "Unsupported ECC mode!\n");
--			goto release_dma_write_chan;
--		}
--
--		/*
--		 * Don't set layout for BCH4 SW ECC. This will be
--		 * generated later in nand_bch_init() later.
--		 */
--		if (nand->ecc.mode == NAND_ECC_HW) {
--			switch (mtd->oobsize) {
--			case 16:
--			case 64:
--			case 128:
--				mtd_set_ooblayout(mtd,
--						  &fsmc_ecc1_ooblayout_ops);
--				break;
--			default:
--				dev_warn(&pdev->dev,
--					 "No oob scheme defined for oobsize %d\n",
--					 mtd->oobsize);
--				ret = -EINVAL;
--				goto release_dma_write_chan;
--			}
--		}
--	}
--
--	/* Second stage of scan to fill MTD data-structures */
--	ret = nand_scan_tail(mtd);
-+	nand->dummy_controller.ops = &fsmc_nand_controller_ops;
-+	ret = nand_scan(mtd, 1);
- 	if (ret)
- 		goto release_dma_write_chan;
+  * Probe for NAND controller
+  */
+@@ -669,6 +722,8 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+ 	if (!host)
+ 		return -ENOMEM;
  
++	host->pdev = pdev;
++
+ 	rc = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	host->io_base = devm_ioremap_resource(&pdev->dev, rc);
+ 	if (IS_ERR(host->io_base))
+@@ -749,58 +804,14 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/*
+-	 * Scan to find existance of the device and
+-	 * Get the type of NAND device SMALL block or LARGE block
++	 * Scan to find existence of the device and get the type of NAND device:
++	 * SMALL block or LARGE block.
+ 	 */
+-	res = nand_scan_ident(mtd, 1, NULL);
++	nand_chip->dummy_controller.ops = &lpc32xx_nand_controller_ops;
++	res = nand_scan(mtd, 1);
+ 	if (res)
+ 		goto release_dma_chan;
+ 
+-	host->dma_buf = devm_kzalloc(&pdev->dev, mtd->writesize, GFP_KERNEL);
+-	if (!host->dma_buf) {
+-		res = -ENOMEM;
+-		goto release_dma_chan;
+-	}
+-
+-	host->dummy_buf = devm_kzalloc(&pdev->dev, mtd->writesize, GFP_KERNEL);
+-	if (!host->dummy_buf) {
+-		res = -ENOMEM;
+-		goto release_dma_chan;
+-	}
+-
+-	nand_chip->ecc.mode = NAND_ECC_HW;
+-	nand_chip->ecc.size = 512;
+-	mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
+-	host->mlcsubpages = mtd->writesize / 512;
+-
+-	/* initially clear interrupt status */
+-	readb(MLC_IRQ_SR(host->io_base));
+-
+-	init_completion(&host->comp_nand);
+-	init_completion(&host->comp_controller);
+-
+-	host->irq = platform_get_irq(pdev, 0);
+-	if (host->irq < 0) {
+-		dev_err(&pdev->dev, "failed to get platform irq\n");
+-		res = -EINVAL;
+-		goto release_dma_chan;
+-	}
+-
+-	if (request_irq(host->irq, (irq_handler_t)&lpc3xxx_nand_irq,
+-			IRQF_TRIGGER_HIGH, DRV_NAME, host)) {
+-		dev_err(&pdev->dev, "Error requesting NAND IRQ\n");
+-		res = -ENXIO;
+-		goto release_dma_chan;
+-	}
+-
+-	/*
+-	 * Fills out all the uninitialized function pointers with the defaults
+-	 * And scans for a bad block table if appropriate.
+-	 */
+-	res = nand_scan_tail(mtd);
+-	if (res)
+-		goto free_irq;
+-
+ 	mtd->name = DRV_NAME;
+ 
+ 	res = mtd_device_register(mtd, host->ncfg->parts,
+@@ -812,8 +823,6 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+ 
+ cleanup_nand:
+ 	nand_cleanup(nand_chip);
+-free_irq:
+-	free_irq(host->irq, host);
+ release_dma_chan:
+ 	if (use_dma)
+ 		dma_release_channel(host->dma_chan);
 -- 
 2.14.1
