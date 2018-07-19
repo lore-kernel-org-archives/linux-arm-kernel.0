@@ -1,376 +1,481 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 19 Jul 2018 14:36:30 -0600
-Subject: [PATCH v2 09/10] coresight: perf: Remove set_buffer call back
-In-Reply-To: <1531847501-22226-10-git-send-email-suzuki.poulose@arm.com>
-References: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
- <1531847501-22226-10-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180719203630.GC9421@xps15>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 19 Jul 2018 22:53:44 +0200
+Subject: [PATCH, libv4l]: Make libv4l2 usable on devices with complex
+ pipeline
+In-Reply-To: <20180708213258.GA18217@amd>
+References: <20180708213258.GA18217@amd>
+Message-ID: <20180719205344.GA12098@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 06:11:40PM +0100, Suzuki K Poulose wrote:
-> In coresight perf mode, we need to prepare the sink before
-> starting a session, which is done via set_buffer call back.
-> We then proceed to enable the tracing. If we fail to start
-> the session successfully, we leave the sink configuration
-> unchanged. This was fine for the existing backends as they
-> don't have any state associated with the buffers. But with
-> ETR, we need to keep track of the buffer details and need
-> to be cleaned up if we fail. In order to make the operation
-> atomic and to avoid yet another call back, we get rid of
-> the "set_buffer" call back and pass the buffer details
-> via enable() call back to the sink.
-
-Suzuki,
-
-I'm not sure I understand the problem you're trying to fix there.  From the
-implementation of tmc_enable_etr_sink_perf() in the next patch, wouldn't the
-same result been achievable using a callback?
-
-I'm fine with this patch and supportive of getting rid of callbacks if we can, I
-just need to understand the exact problem you're after.  From looking a your
-code (and the current implementation), if we succeed in setting the memory for
-the sink but fail in any of the subsequent steps i.e, enabling the rest of the
-compoment on the path or the source, the sink is left unchanged.
-
-
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/hwtracing/coresight/coresight-etb10.c    | 24 ++++++++++++++------
->  drivers/hwtracing/coresight/coresight-etm-perf.c |  9 ++------
->  drivers/hwtracing/coresight/coresight-priv.h     |  2 +-
->  drivers/hwtracing/coresight/coresight-tmc-etf.c  | 28 ++++++++++++++++--------
->  drivers/hwtracing/coresight/coresight-tmc-etr.c  |  7 +++---
->  drivers/hwtracing/coresight/coresight-tpiu.c     |  2 +-
->  drivers/hwtracing/coresight/coresight.c          | 11 +++++-----
->  include/linux/coresight.h                        |  6 +----
->  8 files changed, 51 insertions(+), 38 deletions(-)
+On Sun 2018-07-08 23:32:58, Pavel Machek wrote:
 > 
-> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-> index a729a7b..4e829db 100644
-> --- a/drivers/hwtracing/coresight/coresight-etb10.c
-> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
-> @@ -28,6 +28,7 @@
+> Add support for opening multiple devices in v4l2_open(), and for
+> mapping controls between devices.
+> 
+> This is necessary for complex devices, such as Nokia N900.
+> 
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+Ping?
+
+There's a lot of work to do on libv4l2... timely patch handling would
+be nice.
+
+> diff --git a/lib/include/libv4l2.h b/lib/include/libv4l2.h
+> index ea1870d..a0ec0a9 100644
+> --- a/lib/include/libv4l2.h
+> +++ b/lib/include/libv4l2.h
+> @@ -58,6 +58,10 @@ LIBV4L_PUBLIC extern FILE *v4l2_log_file;
+>     invalid memory address will not lead to failure with errno being EFAULT,
+>     as it would with a real ioctl, but will cause libv4l2 to break, and you
+>     get to keep both pieces.
+> +
+> +   You can open complex pipelines by passing ".cv" file with pipeline
+> +   description to v4l2_open(). libv4l2 will open all the required
+> +   devices automatically in that case.
+>  */
 >  
->  
->  #include "coresight-priv.h"
-> +#include "coresight-etm-perf.h"
->  
->  #define ETB_RAM_DEPTH_REG	0x004
->  #define ETB_STATUS_REG		0x00c
-> @@ -90,6 +91,9 @@ struct etb_drvdata {
->  	u32			trigger_cntr;
+>  LIBV4L_PUBLIC int v4l2_open(const char *file, int oflag, ...);
+> diff --git a/lib/libv4l2/libv4l2-priv.h b/lib/libv4l2/libv4l2-priv.h
+> index 1924c91..1ee697a 100644
+> --- a/lib/libv4l2/libv4l2-priv.h
+> +++ b/lib/libv4l2/libv4l2-priv.h
+> @@ -104,6 +104,7 @@ struct v4l2_dev_info {
+>  	void *plugin_library;
+>  	void *dev_ops_priv;
+>  	const struct libv4l_dev_ops *dev_ops;
+> +	struct v4l2_controls_map *map;
 >  };
 >  
-> +static int etb_set_buffer(struct coresight_device *csdev,
-> +			  struct perf_output_handle *handle);
+>  /* From v4l2-plugin.c */
+> @@ -130,4 +131,20 @@ static inline void v4l2_plugin_cleanup(void *plugin_lib, void *plugin_priv,
+>  extern const char *v4l2_ioctls[];
+>  void v4l2_log_ioctl(unsigned long int request, void *arg, int result);
+>  
 > +
->  static unsigned int etb_get_buffer_depth(struct etb_drvdata *drvdata)
->  {
->  	u32 depth = 0;
-> @@ -131,12 +135,19 @@ static void etb_enable_hw(struct etb_drvdata *drvdata)
->  	CS_LOCK(drvdata->base);
+> +struct v4l2_control_map {
+> +	unsigned long control;
+> +	int fd;
+> +};
+> +
+> +struct v4l2_controls_map {
+> +	int main_fd;
+> +	int num_fds;
+> +	int num_controls;
+> +	struct v4l2_control_map map[];
+> +};
+> +
+> +int v4l2_open_pipeline(struct v4l2_controls_map *map, int v4l2_flags);
+> +LIBV4L_PUBLIC int v4l2_get_fd_for_control(int fd, unsigned long control);
+> +
+>  #endif
+> diff --git a/lib/libv4l2/libv4l2.c b/lib/libv4l2/libv4l2.c
+> index 2db25d1..ac430f0 100644
+> --- a/lib/libv4l2/libv4l2.c
+> +++ b/lib/libv4l2/libv4l2.c
+> @@ -70,6 +70,8 @@
+>  #include <sys/types.h>
+>  #include <sys/mman.h>
+>  #include <sys/stat.h>
+> +#include <dirent.h>
+> +
+>  #include "libv4l2.h"
+>  #include "libv4l2-priv.h"
+>  #include "libv4l-plugin.h"
+> @@ -618,6 +620,8 @@ static void v4l2_update_fps(int index, struct v4l2_streamparm *parm)
+>  		devices[index].fps = 0;
 >  }
 >  
-> -static int etb_enable(struct coresight_device *csdev, u32 mode)
-> +static int etb_enable(struct coresight_device *csdev, u32 mode, void *data)
+> +static int v4l2_open_complex(int fd, int v4l2_flags);
+> +
+>  int v4l2_open(const char *file, int oflag, ...)
 >  {
-> +	int ret = 0;
->  	u32 val;
->  	unsigned long flags;
->  	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>  	int fd;
+> @@ -641,6 +645,21 @@ int v4l2_open(const char *file, int oflag, ...)
+>  	if (fd == -1)
+>  		return fd;
 >  
-> +	if (mode == CS_MODE_PERF) {
-> +		ret = etb_set_buffer(csdev, (struct perf_output_handle *)data);
-> +		if (ret)
-> +			goto out;
+> +	int len = strlen(file);
+> +	char *end = ".cv";
+> +	int len2 = strlen(end);
+> +	if ((len > len2) && (!strcmp(file + len - len2, end))) {
+> +		/* .cv extension */
+> +		struct stat sb;
+> +
+> +		if (fstat(fd, &sb) == 0) {
+> +			if ((sb.st_mode & S_IFMT) == S_IFREG) {
+> +				return v4l2_open_complex(fd, 0);
+> +			}
+> +		}
+> +		
 > +	}
 > +
->  	val = local_cmpxchg(&drvdata->mode,
->  			    CS_MODE_DISABLED, mode);
->  	/*
-> @@ -156,8 +167,9 @@ static int etb_enable(struct coresight_device *csdev, u32 mode)
->  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>  	if (v4l2_fd_open(fd, 0) == -1) {
+>  		int saved_err = errno;
 >  
->  out:
-> -	dev_dbg(drvdata->dev, "ETB enabled\n");
-> -	return 0;
-> +	if (!ret)
-> +		dev_dbg(drvdata->dev, "ETB enabled\n");
-> +	return ret;
->  }
+> @@ -787,6 +806,8 @@ no_capture:
+>  	if (index >= devices_used)
+>  		devices_used = index + 1;
 >  
->  static void etb_disable_hw(struct etb_drvdata *drvdata)
-> @@ -294,12 +306,11 @@ static void etb_free_buffer(void *config)
->  }
->  
->  static int etb_set_buffer(struct coresight_device *csdev,
-> -			  struct perf_output_handle *handle,
-> -			  void *sink_config)
-> +			  struct perf_output_handle *handle)
->  {
->  	int ret = 0;
->  	unsigned long head;
-> -	struct cs_buffers *buf = sink_config;
-> +	struct cs_buffers *buf = etm_perf_sink_config(handle);
->  
->  	/* wrap head around to the amount of space we have */
->  	head = handle->head & ((buf->nr_pages << PAGE_SHIFT) - 1);
-> @@ -453,7 +464,6 @@ static const struct coresight_ops_sink etb_sink_ops = {
->  	.disable	= etb_disable,
->  	.alloc_buffer	= etb_alloc_buffer,
->  	.free_buffer	= etb_free_buffer,
-> -	.set_buffer	= etb_set_buffer,
->  	.update_buffer	= etb_update_buffer,
->  };
->  
-> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> index 3cc4a0b..12a247d 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> @@ -269,16 +269,11 @@ static void etm_event_start(struct perf_event *event, int flags)
->  	path = etm_event_cpu_path(event_data, cpu);
->  	/* We need a sink, no need to continue without one */
->  	sink = coresight_get_sink(path);
-> -	if (WARN_ON_ONCE(!sink || !sink_ops(sink)->set_buffer))
-> -		goto fail_end_stop;
-> -
-> -	/* Configure the sink */
-> -	if (sink_ops(sink)->set_buffer(sink, handle,
-> -				       event_data->snk_config))
-> +	if (WARN_ON_ONCE(!sink))
->  		goto fail_end_stop;
->  
->  	/* Nothing will happen without a path */
-> -	if (coresight_enable_path(path, CS_MODE_PERF))
-> +	if (coresight_enable_path(path, CS_MODE_PERF, handle))
-
-Here we already have a handle on "event_data".  As such I think this is what we
-should feed to coresight_enable_path() rather than the handle.  That way we
-don't need to call etm_perf_sink_config(), we just use the data.
-
-Thanks,
-Mathieu 
-
->  		goto fail_end_stop;
->  
->  	/* Tell the perf core the event is alive */
-> diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-> index 1a6cf35..c11da55 100644
-> --- a/drivers/hwtracing/coresight/coresight-priv.h
-> +++ b/drivers/hwtracing/coresight/coresight-priv.h
-> @@ -137,7 +137,7 @@ static inline void coresight_write_reg_pair(void __iomem *addr, u64 val,
->  }
->  
->  void coresight_disable_path(struct list_head *path);
-> -int coresight_enable_path(struct list_head *path, u32 mode);
-> +int coresight_enable_path(struct list_head *path, u32 mode, void *sink_data);
->  struct coresight_device *coresight_get_sink(struct list_head *path);
->  struct coresight_device *coresight_get_enabled_sink(bool reset);
->  struct list_head *coresight_build_path(struct coresight_device *csdev,
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> index 31a98f9..4156c95 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> @@ -10,6 +10,10 @@
->  #include <linux/slab.h>
->  #include "coresight-priv.h"
->  #include "coresight-tmc.h"
-> +#include "coresight-etm-perf.h"
+> +	devices[index].map = NULL;
 > +
-> +static int tmc_set_etf_buffer(struct coresight_device *csdev,
-> +			      struct perf_output_handle *handle);
->  
->  static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
->  {
-> @@ -182,11 +186,12 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev)
->  	return ret;
+>  	/* Note we always tell v4lconvert to optimize src fmt selection for
+>  	   our default fps, the only exception is the app explicitly selecting
+>  	   a frame rate using the S_PARM ioctl after a S_FMT */
+> @@ -1056,12 +1077,47 @@ static int v4l2_s_fmt(int index, struct v4l2_format *dest_fmt)
+>  	return 0;
 >  }
 >  
-> -static int tmc_enable_etf_sink_perf(struct coresight_device *csdev)
-> +static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, void *data)
->  {
->  	int ret = 0;
->  	unsigned long flags;
->  	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-> +	struct perf_output_handle *handle = data;
->  
->  	spin_lock_irqsave(&drvdata->spinlock, flags);
->  	if (drvdata->reading) {
-> @@ -204,15 +209,19 @@ static int tmc_enable_etf_sink_perf(struct coresight_device *csdev)
->  		goto out;
->  	}
->  
-> -	drvdata->mode = CS_MODE_PERF;
-> -	tmc_etb_enable_hw(drvdata);
-> +	ret = tmc_set_etf_buffer(csdev, handle);
-> +	if (!ret) {
-> +		drvdata->mode = CS_MODE_PERF;
-> +		tmc_etb_enable_hw(drvdata);
+> +int v4l2_get_fd_for_control(int fd, unsigned long control)
+> +{
+> +	int index = v4l2_get_index(fd);
+> +	struct v4l2_controls_map *map;
+> +	int lo = 0;
+> +	int hi;
+> +
+> +	if (index < 0)
+> +		return fd;
+> +
+> +	map = devices[index].map;
+> +	if (!map)
+> +		return fd;
+> +	hi = map->num_controls;
+> +
+> +	while (lo < hi) {
+> +		int i = (lo + hi) / 2;
+> +		if (map->map[i].control == control) {
+> +			return map->map[i].fd;
+> +		}
+> +		if (map->map[i].control > control) {
+> +			hi = i;
+> +			continue;
+> +		}
+> +		if (map->map[i].control < control) {
+> +			lo = i+1;
+> +			continue;
+> +		}
+> +		printf("Bad: impossible condition in binary search\n");
+> +		exit(1);
 > +	}
->  out:
->  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
->  
->  	return ret;
->  }
->  
-> -static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
-> +static int tmc_enable_etf_sink(struct coresight_device *csdev,
-> +			       u32 mode, void *data)
->  {
->  	int ret;
->  	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-> @@ -222,7 +231,7 @@ static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
->  		ret = tmc_enable_etf_sink_sysfs(csdev);
->  		break;
->  	case CS_MODE_PERF:
-> -		ret = tmc_enable_etf_sink_perf(csdev);
-> +		ret = tmc_enable_etf_sink_perf(csdev, data);
->  		break;
->  	/* We shouldn't be here */
->  	default:
-> @@ -328,12 +337,14 @@ static void tmc_free_etf_buffer(void *config)
->  }
->  
->  static int tmc_set_etf_buffer(struct coresight_device *csdev,
-> -			      struct perf_output_handle *handle,
-> -			      void *sink_config)
-> +			      struct perf_output_handle *handle)
->  {
->  	int ret = 0;
->  	unsigned long head;
-> -	struct cs_buffers *buf = sink_config;
-> +	struct cs_buffers *buf = etm_perf_sink_config(handle);
+> +	return fd;
+> +}
 > +
-> +	if (!buf)
-> +		return -EINVAL;
->  
->  	/* wrap head around to the amount of space we have */
->  	head = handle->head & ((buf->nr_pages << PAGE_SHIFT) - 1);
-> @@ -472,7 +483,6 @@ static const struct coresight_ops_sink tmc_etf_sink_ops = {
->  	.disable	= tmc_disable_etf_sink,
->  	.alloc_buffer	= tmc_alloc_etf_buffer,
->  	.free_buffer	= tmc_free_etf_buffer,
-> -	.set_buffer	= tmc_set_etf_buffer,
->  	.update_buffer	= tmc_update_etf_buffer,
->  };
->  
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> index 85a3f59..bc0c932 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> @@ -1103,19 +1103,20 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
->  	return ret;
->  }
->  
-> -static int tmc_enable_etr_sink_perf(struct coresight_device *csdev)
-> +static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, void *data)
+>  int v4l2_ioctl(int fd, unsigned long int request, ...)
 >  {
->  	/* We don't support perf mode yet ! */
->  	return -EINVAL;
->  }
+>  	void *arg;
+>  	va_list ap;
+>  	int result, index, saved_err;
+> -	int is_capture_request = 0, stream_needs_locking = 0;
+> +	int is_capture_request = 0, stream_needs_locking = 0, 
+> +	    is_subdev_request = 0;
 >  
-> -static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
-> +static int tmc_enable_etr_sink(struct coresight_device *csdev,
-> +			       u32 mode, void *data)
->  {
->  	switch (mode) {
->  	case CS_MODE_SYSFS:
->  		return tmc_enable_etr_sink_sysfs(csdev);
->  	case CS_MODE_PERF:
-> -		return tmc_enable_etr_sink_perf(csdev);
-> +		return tmc_enable_etr_sink_perf(csdev, data);
+>  	va_start(ap, request);
+>  	arg = va_arg(ap, void *);
+> @@ -1076,18 +1132,19 @@ int v4l2_ioctl(int fd, unsigned long int request, ...)
+>  	   ioctl, causing it to get sign extended, depending upon this behavior */
+>  	request = (unsigned int)request;
+>  
+>  	if (devices[index].convert == NULL)
+>  		goto no_capture_request;
+>  
+>  	/* Is this a capture request and do we need to take the stream lock? */
+>  	switch (request) {
+> -	case VIDIOC_QUERYCAP:
+>  	case VIDIOC_QUERYCTRL:
+>  	case VIDIOC_G_CTRL:
+>  	case VIDIOC_S_CTRL:
+>  	case VIDIOC_G_EXT_CTRLS:
+> -	case VIDIOC_TRY_EXT_CTRLS:
+>  	case VIDIOC_S_EXT_CTRLS:
+> +		is_subdev_request = 1;
+> +	case VIDIOC_QUERYCAP:
+> +	case VIDIOC_TRY_EXT_CTRLS:
+>  	case VIDIOC_ENUM_FRAMESIZES:
+>  	case VIDIOC_ENUM_FRAMEINTERVALS:
+>  		is_capture_request = 1;
+> @@ -1151,10 +1209,15 @@ int v4l2_ioctl(int fd, unsigned long int request, ...)
 >  	}
 >  
->  	/* We shouldn't be here */
-> diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-> index 7daeb084..d7dd5e4 100644
-> --- a/drivers/hwtracing/coresight/coresight-tpiu.c
-> +++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-> @@ -67,7 +67,7 @@ static void tpiu_enable_hw(struct tpiu_drvdata *drvdata)
->  	CS_LOCK(drvdata->base);
+>  	if (!is_capture_request) {
+> +		int sub_fd;
+>  no_capture_request:
+> +		sub_fd = fd;
+> +		if (is_subdev_request) {
+> +			sub_fd = v4l2_get_fd_for_control(index, ((struct v4l2_queryctrl *) arg)->id);
+> +		}
+>  		result = devices[index].dev_ops->ioctl(
+>  				devices[index].dev_ops_priv,
+> -				fd, request, arg);
+> +				sub_fd, request, arg);
+>  		saved_err = errno;
+>  		v4l2_log_ioctl(request, arg, result);
+>  		errno = saved_err;
+> @@ -1782,3 +1845,194 @@ int v4l2_get_control(int fd, int cid)
+>  			(qctrl.maximum - qctrl.minimum) / 2) /
+>  		(qctrl.maximum - qctrl.minimum);
+>  }
+> +
+> +int v4l2_open_pipeline(struct v4l2_controls_map *map, int v4l2_flags)
+> +{
+> +	int index;
+> +	int i;
+> +
+> +	for (i=0; i<map->num_controls; i++) {
+> +		if (map->map[i].fd <= 0) {
+> +			V4L2_LOG_ERR("v4l2_open_pipeline: Bad fd in map.\n");
+> +			return -1;
+> +		}
+> +		if (i>=1 && map->map[i].control <= map->map[i-1].control) {
+> +			V4L2_LOG_ERR("v4l2_open_pipeline: Controls not sorted.\n");
+> +			return -1;
+> +		}
+> +	}
+> +
+> +	i = v4l2_fd_open(map->main_fd, v4l2_flags);
+> +	index = v4l2_get_index(map->main_fd);
+> +	devices[index].map = map;
+> +	return i;
+> +}
+> +
+> +static void scan_devices(char **device_names, int *device_fds, int num)
+> +{
+> +	struct dirent **namelist;
+> +	int n;
+> +	char *class_v4l = "/sys/class/video4linux";
+> +
+> +	n = scandir(class_v4l, &namelist, NULL, alphasort);
+> +	if (n < 0) {
+> +		perror("scandir");
+> +		return;
+> +	}
+> +	
+> +	while (n--) {
+> +		if (namelist[n]->d_name[0] != '.') {
+> +			char filename[1024], content[1024];
+> +			sprintf(filename, "%s/%s/name", class_v4l, namelist[n]->d_name);
+> +			FILE *f = fopen(filename, "r");
+> +			if (!f) {
+> +				printf("Strange, can't open %s", filename);
+> +			} else {
+> +				fgets(content, 1024, f);
+> +				fclose(f);
+> +
+> +				int i;
+> +				for (i = num-1; i >=0; i--) {
+> +					if (!strcmp(content, device_names[i])) {
+> +						sprintf(filename, "/dev/%s", namelist[n]->d_name);
+> +						device_fds[i] = open(filename, O_RDWR);
+> +						if (device_fds[i] < 0) {
+> +							V4L2_LOG_ERR("Error opening %s: %m\n", filename);
+> +						}
+> +					}
+> +				}
+> +			}
+> +		}
+> +		free(namelist[n]);
+> +	}
+> +	free(namelist);
+> +  
+> +}
+> +
+> +static int v4l2_open_complex(int fd, int v4l2_flags)
+> +{
+> +#define perr(s) V4L2_LOG_ERR("open_complex: " s "\n")
+> +#define BUF 256
+> +	FILE *f = fdopen(fd, "r");
+> +
+> +	int res = -1;
+> +	char buf[BUF];
+> +	int version, num_modes, num_devices, num_controls;
+> +	int dev, control;
+> +
+> +	if (!f) {
+> +		perr("open of .cv file failed: %m");
+> +		goto err;
+> +	}
+> +
+> +	if (fscanf(f, "Complex Video: %d\n", &version) != 1) {
+> +		perr(".cv file does not have required header");
+> +		goto close;
+> +	}
+> +
+> +	if (version != 0) {
+> +		perr(".cv file has unknown version");
+> +		goto close;
+> +	}
+> +  
+> +	if (fscanf(f, "#modes: %d\n", &num_modes) != 1) {
+> +		perr("could not parse modes");
+> +		goto close;
+> +	}
+> +
+> +	if (num_modes != 1) {
+> +		perr("only single mode is supported for now");
+> +		goto close;
+> +	}
+> +
+> +	if (fscanf(f, "Mode: %s\n", buf) != 1) {
+> +		perr("could not parse mode name");
+> +		goto close;
+> +	}
+> +
+> +	if (fscanf(f, " #devices: %d\n", &num_devices) != 1) {
+> +		perr("could not parse number of devices");
+> +		goto close;
+> +	}
+> +#define MAX_DEVICES 16
+> +	char *device_names[MAX_DEVICES] = { NULL, };
+> +	int device_fds[MAX_DEVICES];
+> +	if (num_devices > MAX_DEVICES) {
+> +		perr("too many devices");
+> +		goto close;
+> +	}
+> +  
+> +	for (dev = 0; dev < num_devices; dev++) {
+> +		int tmp;
+> +		if (fscanf(f, "%d: ", &tmp) != 1) {
+> +			perr("could not parse device");
+> +			goto free_devices;
+> +		}
+> +		if (tmp != dev) {
+> +			perr("bad device number");
+> +			goto free_devices;
+> +		}
+> +		fgets(buf, BUF, f);
+> +		device_names[dev] = strdup(buf);
+> +		device_fds[dev] = -1;
+> +	}
+> +
+> +	scan_devices(device_names, device_fds, num_devices);
+> +
+> +	for (dev = 0; dev < num_devices; dev++) {
+> +		if (device_fds[dev] == -1) {
+> +			perr("Could not open all required devices");
+> +			goto close_devices;
+> +		}
+> +	}
+> +
+> +	if (fscanf(f, " #controls: %d\n", &num_controls) != 1) {
+> +		perr("can not parse number of controls");
+> +		goto close_devices;
+> +	}
+> +
+> +	struct v4l2_controls_map *map = malloc(sizeof(struct v4l2_controls_map) +
+> +					       num_controls*sizeof(struct v4l2_control_map));
+> +
+> +	map->num_controls = num_controls;
+> +	map->num_fds = num_devices;
+> +	map->main_fd = device_fds[0];
+> +  
+> +	for (control = 0; control < num_controls; control++) {
+> +		unsigned long num;
+> +		int dev;
+> +		if (fscanf(f, "0x%lx: %d\n", &num, &dev) != 2) {
+> +			perr("could not parse control");
+> +			goto free_map;
+> +		}
+> +		if ((dev < 0) || (dev >= num_devices)) {
+> +			perr("device out of range");
+> +			goto free_map;
+> +		}
+> +		map->map[control].control = num;
+> +		map->map[control].fd = device_fds[dev];
+> +	}
+> +	if (fscanf(f, "%s", buf) > 0) {
+> +		perr("junk at end of file");
+> +		goto free_map;
+> +	}
+> +
+> +	res = v4l2_open_pipeline(map, v4l2_flags);
+> +
+> +	if (res < 0) {
+> +free_map:
+> +		free(map);
+> +close_devices:
+> +		for (dev = 0; dev < num_devices; dev++)
+> +			close(device_fds[dev]);
+> +	}
+> +free_devices:
+> +	for (dev = 0; dev < num_devices; dev++) {
+> +		free(device_names[dev]);
+> +	}
+> +close:
+> +	fclose(f);
+> +err:
+> +	return res;
+> +}
+> +
+> diff --git a/lib/libv4lconvert/control/libv4lcontrol.c b/lib/libv4lconvert/control/libv4lcontrol.c
+> index 59f28b1..c1e6f93 100644
+> --- a/lib/libv4lconvert/control/libv4lcontrol.c
+> +++ b/lib/libv4lconvert/control/libv4lcontrol.c
+> @@ -863,6 +863,7 @@ int v4lcontrol_vidioc_queryctrl(struct v4lcontrol_data *data, void *arg)
+>  	struct v4l2_queryctrl *ctrl = arg;
+>  	int retval;
+>  	uint32_t orig_id = ctrl->id;
+> +	int fd;
+>  
+>  	/* if we have an exact match return it */
+>  	for (i = 0; i < V4LCONTROL_COUNT; i++)
+> @@ -872,8 +873,9 @@ int v4lcontrol_vidioc_queryctrl(struct v4lcontrol_data *data, void *arg)
+>  			return 0;
+>  		}
+>  
+> +	fd = v4l2_get_fd_for_control(data->fd, ctrl->id);
+>  	/* find out what the kernel driver would respond. */
+> -	retval = data->dev_ops->ioctl(data->dev_ops_priv, data->fd,
+> +	retval = data->dev_ops->ioctl(data->dev_ops_priv, fd,
+>  			VIDIOC_QUERYCTRL, arg);
+>  
+>  	if ((data->priv_flags & V4LCONTROL_SUPPORTS_NEXT_CTRL) &&
+> @@ -903,6 +905,7 @@ int v4lcontrol_vidioc_g_ctrl(struct v4lcontrol_data *data, void *arg)
+>  {
+>  	int i;
+>  	struct v4l2_control *ctrl = arg;
+> +	int fd;
+>  
+>  	for (i = 0; i < V4LCONTROL_COUNT; i++)
+>  		if ((data->controls & (1 << i)) &&
+> @@ -911,7 +914,8 @@ int v4lcontrol_vidioc_g_ctrl(struct v4lcontrol_data *data, void *arg)
+>  			return 0;
+>  		}
+>  
+> -	return data->dev_ops->ioctl(data->dev_ops_priv, data->fd,
+> +	fd = v4l2_get_fd_for_control(data->fd, ctrl->id);
+> +	return data->dev_ops->ioctl(data->dev_ops_priv, fd,
+>  			VIDIOC_G_CTRL, arg);
 >  }
 >  
-> -static int tpiu_enable(struct coresight_device *csdev, u32 mode)
-> +static int tpiu_enable(struct coresight_device *csdev, u32 mode, void *__unused)
+> @@ -994,6 +998,7 @@ int v4lcontrol_vidioc_s_ctrl(struct v4lcontrol_data *data, void *arg)
 >  {
->  	struct tpiu_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>  	int i;
+>  	struct v4l2_control *ctrl = arg;
+> +	int fd;
 >  
-> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-> index c0dabbd..fab87c9 100644
-> --- a/drivers/hwtracing/coresight/coresight.c
-> +++ b/drivers/hwtracing/coresight/coresight.c
-> @@ -128,7 +128,8 @@ static int coresight_find_link_outport(struct coresight_device *csdev,
->  	return -ENODEV;
+>  	for (i = 0; i < V4LCONTROL_COUNT; i++)
+>  		if ((data->controls & (1 << i)) &&
+> @@ -1008,7 +1013,8 @@ int v4lcontrol_vidioc_s_ctrl(struct v4lcontrol_data *data, void *arg)
+>  			return 0;
+>  		}
+>  
+> -	return data->dev_ops->ioctl(data->dev_ops_priv, data->fd,
+> +	fd = v4l2_get_fd_for_control(data->fd, ctrl->id);
+> +	return data->dev_ops->ioctl(data->dev_ops_priv, fd,
+>  			VIDIOC_S_CTRL, arg);
 >  }
 >  
-> -static int coresight_enable_sink(struct coresight_device *csdev, u32 mode)
-> +static int coresight_enable_sink(struct coresight_device *csdev,
-> +				 u32 mode, void *data)
->  {
->  	int ret;
->  
-> @@ -137,7 +138,7 @@ static int coresight_enable_sink(struct coresight_device *csdev, u32 mode)
->  	 * existing "mode" of operation.
->  	 */
->  	if (sink_ops(csdev)->enable) {
-> -		ret = sink_ops(csdev)->enable(csdev, mode);
-> +		ret = sink_ops(csdev)->enable(csdev, mode, data);
->  		if (ret)
->  			return ret;
->  		csdev->enable = true;
-> @@ -315,7 +316,7 @@ void coresight_disable_path(struct list_head *path)
->  	}
->  }
->  
-> -int coresight_enable_path(struct list_head *path, u32 mode)
-> +int coresight_enable_path(struct list_head *path, u32 mode, void *sink_data)
->  {
->  
->  	int ret = 0;
-> @@ -340,7 +341,7 @@ int coresight_enable_path(struct list_head *path, u32 mode)
->  
->  		switch (type) {
->  		case CORESIGHT_DEV_TYPE_SINK:
-> -			ret = coresight_enable_sink(csdev, mode);
-> +			ret = coresight_enable_sink(csdev, mode, sink_data);
->  			/*
->  			 * Sink is the first component turned on. If we
->  			 * failed to enable the sink, there are no components
-> @@ -643,7 +644,7 @@ int coresight_enable(struct coresight_device *csdev)
->  		goto out;
->  	}
->  
-> -	ret = coresight_enable_path(path, CS_MODE_SYSFS);
-> +	ret = coresight_enable_path(path, CS_MODE_SYSFS, NULL);
->  	if (ret)
->  		goto err_path;
->  
-> diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-> index eafe4d1..3434758 100644
-> --- a/include/linux/coresight.h
-> +++ b/include/linux/coresight.h
-> @@ -190,18 +190,14 @@ struct coresight_device {
->   * @disable:		disables the sink.
->   * @alloc_buffer:	initialises perf's ring buffer for trace collection.
->   * @free_buffer:	release memory allocated in @get_config.
-> - * @set_buffer:		initialises buffer mechanic before a trace session.
->   * @update_buffer:	update buffer pointers after a trace session.
->   */
->  struct coresight_ops_sink {
-> -	int (*enable)(struct coresight_device *csdev, u32 mode);
-> +	int (*enable)(struct coresight_device *csdev, u32 mode, void *data);
->  	void (*disable)(struct coresight_device *csdev);
->  	void *(*alloc_buffer)(struct coresight_device *csdev, int cpu,
->  			      void **pages, int nr_pages, bool overwrite);
->  	void (*free_buffer)(void *config);
-> -	int (*set_buffer)(struct coresight_device *csdev,
-> -			  struct perf_output_handle *handle,
-> -			  void *sink_config);
->  	unsigned long (*update_buffer)(struct coresight_device *csdev,
->  			      struct perf_output_handle *handle,
->  			      void *sink_config);
-> -- 
-> 2.7.4
 > 
+
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180719/6a0a3fab/attachment-0001.sig>
