@@ -1,66 +1,89 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 19 Jul 2018 18:00:45 +0200
-Subject: [RFT 05/10] ARM: exynos: Define EINT_WAKEUP_MASK registers for
- S5Pv210 and Exynos5433
-In-Reply-To: <20180719160050.22566-1-krzk@kernel.org>
-References: <20180719160050.22566-1-krzk@kernel.org>
-Message-ID: <20180719160050.22566-6-krzk@kernel.org>
+Date: Thu, 19 Jul 2018 18:00:40 +0200
+Subject: [RFT 00/10] pinctrl: samsung: Remove ugly hack for sharing
+ eint_wakeup_mask
+Message-ID: <20180719160050.22566-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S5Pv210 and Exynos5433/Exynos7 have different address of
-EINT_WAKEUP_MASK register.  Rename existing S5P_EINT_WAKEUP_MASK to
-avoid confusion and add new ones.
+Hi All,
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- arch/arm/mach-exynos/suspend.c              | 2 +-
- include/linux/soc/samsung/exynos-regs-pmu.h | 6 +++++-
- 2 files changed, 6 insertions(+), 2 deletions(-)
+Tests
+=====
+This is both request for comments and requests for tests. Only basic
+tests were done, including suspend to RAM on Odroid U3 (Exynos4412)
+with max7768 RTC wakeup. Please kindly test it with devices capable of
+suspending and resuming. I am mostly thinking about S5Pv210-based (Aria),
+Trats, Trats2 and TM2 (Exynos5433). Existing platforms should not be
+broken however changing external interrupt wakeup mask was not done
+on Exynos5433.
 
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index 0ec52f442b97..991938e19e17 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -272,7 +272,7 @@ static int exynos5420_cpu_suspend(unsigned long arg)
- static void exynos_pm_set_wakeup_mask(void)
- {
- 	/* Set wake-up mask registers */
--	pmu_raw_writel(exynos_get_eint_wake_mask(), S5P_EINT_WAKEUP_MASK);
-+	pmu_raw_writel(exynos_get_eint_wake_mask(), EXYNOS_EINT_WAKEUP_MASK);
- 	pmu_raw_writel(exynos_irqwake_intmask & ~(1 << 31), S5P_WAKEUP_MASK);
- }
- 
-diff --git a/include/linux/soc/samsung/exynos-regs-pmu.h b/include/linux/soc/samsung/exynos-regs-pmu.h
-index 66dcb9ec273a..eb0d240df7a7 100644
---- a/include/linux/soc/samsung/exynos-regs-pmu.h
-+++ b/include/linux/soc/samsung/exynos-regs-pmu.h
-@@ -42,7 +42,7 @@
- #define EXYNOS_SWRESET				0x0400
- 
- #define S5P_WAKEUP_STAT				0x0600
--#define S5P_EINT_WAKEUP_MASK			0x0604
-+#define EXYNOS_EINT_WAKEUP_MASK			0x0604
- #define S5P_WAKEUP_MASK				0x0608
- #define S5P_WAKEUP_MASK2				0x0614
- 
-@@ -180,6 +180,9 @@
- #define S5P_CORE_WAKEUP_FROM_LOCAL_CFG		(0x3 << 8)
- #define S5P_CORE_AUTOWAKEUP_EN			(1 << 31)
- 
-+/* Only for S5Pv210 */
-+#define S5PV210_EINT_WAKEUP_MASK	0xC004
-+
- /* Only for EXYNOS4210 */
- #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	0x1154
- #define S5P_CMU_RESET_LCD1_LOWPWR	0x1174
-@@ -641,6 +644,7 @@
- 					 | EXYNOS5420_KFC_USE_STANDBY_WFI3)
- 
- /* For EXYNOS5433 */
-+#define EXYNOS5433_EINT_WAKEUP_MASK				(0x060C)
- #define EXYNOS5433_USBHOST30_PHY_CONTROL			(0x0728)
- #define EXYNOS5433_PAD_RETENTION_AUD_OPTION			(0x3028)
- #define EXYNOS5433_PAD_RETENTION_MMC2_OPTION			(0x30C8)
+
+Description
+===========
+The Exynos/S5Pv210 machine suspend code needs to write the external
+interrupt mask during suspend.  The mask is controlled by pin controller
+driver: the exynos_wkup_irq_set_wake() in IRQ chip for these wakeup
+interrupts.
+
+Therefore pinctrl driver code exposed an exynos_get_eint_wake_mask()
+function which was later used as an extern in machine code.
+
+This is quite ugly way of combining driver and machine code,
+not portable triggering Sparse and GCC warnings.
+
+
+This might break suspend capability S5Pv210 on with older DTBs (thus
+breaks DTB compatibility), however:
+1. just "might" because in case of using older DTB, the wakeup mask
+   will not be changed during suspend and default reset value (all
+   interrupts non-masked) should work,
+2. mainline support for S5Pv210 with DTB is limited and suspend
+   to RAM already might be broken.
+
+
+Dependencies
+============
+1. The first seven patches should be taken through one tree,
+   preferably samsung-pinctrl,
+2. The DTS patch (7/10) for S5Pv210 should go into next cycle,
+3. The remaining patches (8-10) should go after all previous,
+   so probably another release cycle.
+
+
+Best regards,
+Krzysztof
+
+
+Krzysztof Kozlowski (10):
+  pinctrl: samsung: Define suspend and resume callbacks for all banks
+    and SoCs
+  pinctrl: samsung: Document suspend and resume members
+  pinctrl: samsung: Document hidden requirement about one external
+    wakeup
+  pinctrl: samsung: Add dedicated compatible for S5Pv210 wakeup
+    interrupts
+  ARM: exynos: Define EINT_WAKEUP_MASK registers for S5Pv210 and
+    Exynos5433
+  pinctrl: samsung: Write external interrupt mask
+  ARM: dts: s5pv210: Switch to S5Pv210 specific pinctrl wakeup
+    compatible
+  ARM: s5pv210: Remove legacy setting of external wakeup interrupts
+  ARM: exynos: Remove legacy setting of external wakeup interrupts
+  pinctrl: samsung: Remove legacy API for handling external wakeup
+    interrupts mask
+
+ .../bindings/pinctrl/samsung-pinctrl.txt           | 11 ++-
+ arch/arm/boot/dts/s5pv210.dtsi                     |  2 +-
+ arch/arm/mach-exynos/common.h                      |  2 -
+ arch/arm/mach-exynos/suspend.c                     | 16 +++--
+ arch/arm/mach-s5pv210/common.h                     |  1 -
+ arch/arm/mach-s5pv210/pm.c                         | 16 +++--
+ drivers/pinctrl/samsung/pinctrl-exynos-arm.c       | 16 +++++
+ drivers/pinctrl/samsung/pinctrl-exynos.c           | 78 +++++++++++++++++++---
+ drivers/pinctrl/samsung/pinctrl-samsung.h          | 11 +++
+ include/linux/soc/samsung/exynos-regs-pmu.h        |  8 ++-
+ 10 files changed, 136 insertions(+), 25 deletions(-)
+
 -- 
 2.14.1
