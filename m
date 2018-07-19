@@ -1,223 +1,89 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Thu, 19 Jul 2018 15:22:22 +0800
-Subject: [PATCH v3 2/3] iommu/arm-smmu-v3: Poll for CMD_SYNC outside cmdq
- lock
-In-Reply-To: <625ffbc273577515c324f6deea66a366e675b751.1508334262.git.robin.murphy@arm.com>
-References: <cover.1508334262.git.robin.murphy@arm.com>
- <625ffbc273577515c324f6deea66a366e675b751.1508334262.git.robin.murphy@arm.com>
-Message-ID: <5B503C2E.40602@huawei.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 19 Jul 2018 15:24:05 +0800
+Subject: [PATCH] pinctrl: uniphier: add spi pin-mux settings
+In-Reply-To: <1531981249-26329-1-git-send-email-hayashibara.keiji@socionext.com>
+References: <1531981249-26329-1-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <201807191559.Hz06N37O%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Kunihiko,
 
+Thank you for the patch! Yet something to improve:
 
-On 2017/10/18 22:04, Robin Murphy wrote:
-> Even without the MSI trick, we can still do a lot better than hogging
-> the entire queue while it drains. All we actually need to do for the
-> necessary guarantee of completion is wait for our particular command to
-> have been consumed, and as long as we keep track of where it is there is
-> no need to block other CPUs from adding further commands in the
-> meantime. There is one theoretical (but incredibly unlikely) edge case
-> to avoid, where cons has wrapped twice to still appear 'behind' the sync
-> position - this is easily disambiguated by adding a generation count to
-> the queue to indicate when prod wraps, since cons cannot wrap twice
-> without prod having wrapped at least once.
+[auto build test ERROR on pinctrl/devel]
+[also build test ERROR on v4.18-rc5 next-20180718]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Hi Robin,
+url:    https://github.com/0day-ci/linux/commits/Keiji-Hayashibara/pinctrl-uniphier-add-spi-pin-mux-settings/20180719-144943
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git devel
+config: xtensa-allyesconfig (attached as .config)
+compiler: xtensa-linux-gcc (GCC) 8.1.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=8.1.0 make.cross ARCH=xtensa 
 
-I applied your patch and got below improvemnet for NVMe device.
+All errors (new ones prefixed by >>):
 
-Randomly Read  IOPS: 146K --> 214K
-Randomly Write IOPS: 143K --> 212K
+   In file included from drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c:21:
+>> drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c:629:27: error: 'spi0_groups' undeclared here (not in a function); did you mean 'spi_groups'?
+     UNIPHIER_PINMUX_FUNCTION(spi0),
+                              ^~~~
+   drivers/pinctrl/uniphier/pinctrl-uniphier.h:188:13: note: in definition of macro 'UNIPHIER_PINMUX_FUNCTION'
+      .groups = func##_groups,    \
+                ^~~~
+   In file included from include/linux/kernel.h:15,
+                    from drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c:16:
+   include/linux/build_bug.h:29:45: error: bit-field '<anonymous>' width not an integer constant
+    #define BUILD_BUG_ON_ZERO(e) (sizeof(struct { int:(-!!(e)); }))
+                                                ^
+   include/linux/compiler-gcc.h:65:28: note: in expansion of macro 'BUILD_BUG_ON_ZERO'
+    #define __must_be_array(a) BUILD_BUG_ON_ZERO(__same_type((a), &(a)[0]))
+                               ^~~~~~~~~~~~~~~~~
+   include/linux/kernel.h:72:59: note: in expansion of macro '__must_be_array'
+    #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
+                                                              ^~~~~~~~~~~~~~~
+   drivers/pinctrl/uniphier/pinctrl-uniphier.h:189:17: note: in expansion of macro 'ARRAY_SIZE'
+      .num_groups = ARRAY_SIZE(func##_groups),  \
+                    ^~~~~~~~~~
+   drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c:629:2: note: in expansion of macro 'UNIPHIER_PINMUX_FUNCTION'
+     UNIPHIER_PINMUX_FUNCTION(spi0),
+     ^~~~~~~~~~~~~~~~~~~~~~~~
 
-Tested-by: Zhen Lei <thunder.leizhen@huawei.com>
+vim +629 drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
 
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
-> v3:
->  - Move queue checks into helpers
->  - Avoid race by updating generation before prod (after some
->    deliberation I've concluded that it doesn't actually need any
->    special handling for the timeout failure case either)
-> 
->  drivers/iommu/arm-smmu-v3.c | 91 +++++++++++++++++++++++++++++++++------------
->  1 file changed, 68 insertions(+), 23 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 83b76404e882..3130e7182dde 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -417,7 +417,6 @@
->  
->  /* High-level queue structures */
->  #define ARM_SMMU_POLL_TIMEOUT_US	100
-> -#define ARM_SMMU_CMDQ_DRAIN_TIMEOUT_US	1000000 /* 1s! */
->  #define ARM_SMMU_SYNC_TIMEOUT_US	1000000 /* 1s! */
->  
->  #define MSI_IOVA_BASE			0x8000000
-> @@ -540,6 +539,7 @@ struct arm_smmu_queue {
->  struct arm_smmu_cmdq {
->  	struct arm_smmu_queue		q;
->  	spinlock_t			lock;
-> +	int				generation;
->  };
->  
->  struct arm_smmu_evtq {
-> @@ -737,6 +737,17 @@ static bool queue_empty(struct arm_smmu_queue *q)
->  	       Q_WRP(q, q->prod) == Q_WRP(q, q->cons);
->  }
->  
-> +static bool queue_behind(struct arm_smmu_queue *q, u32 idx)
-> +{
-> +	return Q_IDX(q, q->cons) < Q_IDX(q, idx);
-> +}
-> +
-> +static bool queue_ahead_not_wrapped(struct arm_smmu_queue *q, u32 idx)
-> +{
-> +	return Q_IDX(q, q->cons) >= Q_IDX(q, idx) &&
-> +	       Q_WRP(q, q->cons) == Q_WRP(q, idx);
-> +}
-> +
->  static void queue_sync_cons(struct arm_smmu_queue *q)
->  {
->  	q->cons = readl_relaxed(q->cons_reg);
-> @@ -770,21 +781,12 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
->  	writel(q->prod, q->prod_reg);
->  }
->  
-> -/*
-> - * Wait for the SMMU to consume items. If drain is true, wait until the queue
-> - * is empty. Otherwise, wait until there is at least one free slot.
-> - */
-> -static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
-> +/* Wait for the SMMU to consume items, until there is at least one free slot */
-> +static int queue_poll_cons(struct arm_smmu_queue *q, bool wfe)
->  {
-> -	ktime_t timeout;
-> -	unsigned int delay = 1;
-> +	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
->  
-> -	/* Wait longer if it's queue drain */
-> -	timeout = ktime_add_us(ktime_get(), drain ?
-> -					    ARM_SMMU_CMDQ_DRAIN_TIMEOUT_US :
-> -					    ARM_SMMU_POLL_TIMEOUT_US);
-> -
-> -	while (queue_sync_cons(q), (drain ? !queue_empty(q) : queue_full(q))) {
-> +	while (queue_sync_cons(q), queue_full(q)) {
->  		if (ktime_compare(ktime_get(), timeout) > 0)
->  			return -ETIMEDOUT;
->  
-> @@ -792,8 +794,7 @@ static int queue_poll_cons(struct arm_smmu_queue *q, bool drain, bool wfe)
->  			wfe();
->  		} else {
->  			cpu_relax();
-> -			udelay(delay);
-> -			delay *= 2;
-> +			udelay(1);
->  		}
->  	}
->  
-> @@ -959,15 +960,20 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
->  	queue_write(Q_ENT(q, cons), cmd, q->ent_dwords);
->  }
->  
-> -static void arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
-> +static u32 arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
->  {
->  	struct arm_smmu_queue *q = &smmu->cmdq.q;
->  	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
->  
-> +	if (Q_IDX(q, q->prod + 1) == 0)
-> +		smmu->cmdq.generation++;
-> +
->  	while (queue_insert_raw(q, cmd) == -ENOSPC) {
-> -		if (queue_poll_cons(q, false, wfe))
-> +		if (queue_poll_cons(q, wfe))
->  			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
->  	}
-> +
-> +	return q->prod;
->  }
->  
->  static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
-> @@ -1001,15 +1007,53 @@ static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
->  	return (int)(val - sync_idx) < 0 ? -ETIMEDOUT : 0;
->  }
->  
-> +static int arm_smmu_sync_poll_cons(struct arm_smmu_device *smmu, u32 sync_idx,
-> +				   int sync_gen)
-> +{
-> +	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_SYNC_TIMEOUT_US);
-> +	struct arm_smmu_queue *q = &smmu->cmdq.q;
-> +	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
-> +	unsigned int delay = 1;
-> +
-> +	do {
-> +		queue_sync_cons(q);
-> +		/*
-> +		 * If we see updates quickly enough, cons has passed sync_idx,
-> +		 * but not yet wrapped. At worst, cons might have actually
-> +		 * wrapped an even number of times, but that still guarantees
-> +		 * the original sync must have been consumed.
-> +		 */
-> +		if (queue_ahead_not_wrapped(q, sync_idx))
-> +			return 0;
-> +		/*
-> +		 * Otherwise, cons may have passed sync_idx and wrapped one or
-> +		 * more times to appear behind it again, but in that case prod
-> +		 * must also be one or more generations ahead.
-> +		 */
-> +		if (queue_behind(q, sync_idx) &&
-> +		    READ_ONCE(smmu->cmdq.generation) != sync_gen)
-> +			return 0;
-> +
-> +		if (wfe) {
-> +			wfe();
-> +		} else {
-> +			cpu_relax();
-> +			udelay(delay);
-> +			delay *= 2;
-> +		}
-> +	} while (ktime_before(ktime_get(), timeout));
-> +
-> +	return -ETIMEDOUT;
-> +}
-> +
->  static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
->  {
->  	u64 cmd[CMDQ_ENT_DWORDS];
->  	unsigned long flags;
-> -	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
->  	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
->  		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
->  	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
-> -	int ret;
-> +	int ret, sync_idx, sync_gen;
->  
->  	if (msi) {
->  		ent.sync.msidata = atomic_inc_return_relaxed(&smmu->sync_nr);
-> @@ -1018,13 +1062,14 @@ static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
->  	arm_smmu_cmdq_build_cmd(cmd, &ent);
->  
->  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
-> -	arm_smmu_cmdq_insert_cmd(smmu, cmd);
-> -	if (!msi)
-> -		ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
-> +	sync_idx = arm_smmu_cmdq_insert_cmd(smmu, cmd);
-> +	sync_gen = READ_ONCE(smmu->cmdq.generation);
->  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
->  
->  	if (msi)
->  		ret = arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
-> +	else
-> +		ret = arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
->  	if (ret)
->  		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
->  }
-> 
+   618	
+   619	static const struct uniphier_pinmux_function uniphier_sld8_functions[] = {
+   620		UNIPHIER_PINMUX_FUNCTION(emmc),
+   621		UNIPHIER_PINMUX_FUNCTION(ether_mii),
+   622		UNIPHIER_PINMUX_FUNCTION(ether_rmii),
+   623		UNIPHIER_PINMUX_FUNCTION(i2c0),
+   624		UNIPHIER_PINMUX_FUNCTION(i2c1),
+   625		UNIPHIER_PINMUX_FUNCTION(i2c2),
+   626		UNIPHIER_PINMUX_FUNCTION(i2c3),
+   627		UNIPHIER_PINMUX_FUNCTION(nand),
+   628		UNIPHIER_PINMUX_FUNCTION(sd),
+ > 629		UNIPHIER_PINMUX_FUNCTION(spi0),
+   630		UNIPHIER_PINMUX_FUNCTION(system_bus),
+   631		UNIPHIER_PINMUX_FUNCTION(uart0),
+   632		UNIPHIER_PINMUX_FUNCTION(uart1),
+   633		UNIPHIER_PINMUX_FUNCTION(uart2),
+   634		UNIPHIER_PINMUX_FUNCTION(uart3),
+   635		UNIPHIER_PINMUX_FUNCTION(usb0),
+   636		UNIPHIER_PINMUX_FUNCTION(usb1),
+   637		UNIPHIER_PINMUX_FUNCTION(usb2),
+   638	};
+   639	
 
--- 
-Thanks!
-BestRegards
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 54164 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180719/4786e6bc/attachment-0001.gz>
