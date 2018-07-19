@@ -1,67 +1,45 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 19 Jul 2018 17:13:39 +0900
-Subject: [PATCH] reset: uniphier: add reset control support for SPI
-In-Reply-To: <1531981133-25881-1-git-send-email-hayashibara.keiji@socionext.com>
-References: <1531981133-25881-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <CAK7LNASajYVUUz0Ggvpco9HhZVwp0Yw_t82Lq6YKXgsN0wLDGA@mail.gmail.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Thu, 19 Jul 2018 10:20:25 +0200
+Subject: [PATCH v2 0/3] net: extend eth_platform_get_mac_address()
+Message-ID: <20180719082028.26116-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-07-19 15:18 GMT+09:00 Keiji Hayashibara <hayashibara.keiji@socionext.com>:
-> From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
->
-> Add reset control for SPI controller on UniPhier SoCs.
->
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> ---
+This is a follow-up to a series I posted a while ago the goal of which
+was to replace the at24 platform data with device properties. To do so
+we need to somehow remove reading the MAC address from relevant board
+files.
 
+In my patches I used nvmem and MTD to read the MAC address from within
+the davinci emac driver. It was suggested that we generalize it further
+but since MTD doesn't support nvmem yet, the best we can do is to move
+this code over to net core code.
 
-Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+The following patches modify the eth_platform_get_mac_address()
+function which seems to be the best candidate for this code.
 
+The first patch calls is_valid_ether_addr() on the read address so
+that we're sure it's correct.
 
->  drivers/reset/reset-uniphier.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
->
-> diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
-> index e9030ff..5605745 100644
-> --- a/drivers/reset/reset-uniphier.c
-> +++ b/drivers/reset/reset-uniphier.c
-> @@ -202,6 +202,12 @@ static const struct uniphier_reset_data uniphier_pro5_sd_reset_data[] = {
->  #define UNIPHIER_PERI_RESET_FI2C(id, ch)               \
->         UNIPHIER_RESETX((id), 0x114, 24 + (ch))
->
-> +#define UNIPHIER_PERI_RESET_SCSSI(id)                  \
-> +       UNIPHIER_RESETX((id), 0x110, 17)
-> +
-> +#define UNIPHIER_PERI_RESET_MCSSI(id)                  \
-> +       UNIPHIER_RESETX((id), 0x114, 14)
-> +
->  static const struct uniphier_reset_data uniphier_ld4_peri_reset_data[] = {
->         UNIPHIER_PERI_RESET_UART(0, 0),
->         UNIPHIER_PERI_RESET_UART(1, 1),
-> @@ -212,6 +218,7 @@ static const struct uniphier_reset_data uniphier_ld4_peri_reset_data[] = {
->         UNIPHIER_PERI_RESET_I2C(6, 2),
->         UNIPHIER_PERI_RESET_I2C(7, 3),
->         UNIPHIER_PERI_RESET_I2C(8, 4),
-> +       UNIPHIER_PERI_RESET_SCSSI(11),
->         UNIPHIER_RESET_END,
->  };
->
-> @@ -227,6 +234,8 @@ static const struct uniphier_reset_data uniphier_pro4_peri_reset_data[] = {
->         UNIPHIER_PERI_RESET_FI2C(8, 4),
->         UNIPHIER_PERI_RESET_FI2C(9, 5),
->         UNIPHIER_PERI_RESET_FI2C(10, 6),
-> +       UNIPHIER_PERI_RESET_SCSSI(11),
-> +       UNIPHIER_PERI_RESET_MCSSI(12),
->         UNIPHIER_RESET_END,
->  };
->
-> --
-> 2.7.4
->
+The last two patches add nvmem and MTD support to the function. In
+order to stay compatible with existing users, nvmem and MTD will be
+tried last - after device tree and arch-specific callback.
 
+If this series gets accepted I will modify my previous patches to
+use it instead of handcoding the same operations in davinci_emac.
 
+v1 -> v2:
+- dropped patches 1 & 2
+- improved the MAC address verification and fixed a potential buffer
+  overflow in patch 2/3
+
+Bartosz Golaszewski (3):
+  net: fortify eth_platform_get_mac_address()
+  net: add support for nvmem to eth_platform_get_mac_address()
+  net: add MTD support to eth_platform_get_mac_address()
+
+ net/ethernet/eth.c | 47 +++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 46 insertions(+), 1 deletion(-)
 
 -- 
-Best Regards
-Masahiro Yamada
+2.17.1
