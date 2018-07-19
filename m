@@ -1,32 +1,97 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 19 Jul 2018 17:09:17 +0200
-Subject: [PATCH RESEND v2 1/2] drm/sun4i: sun4i: Register quirks with the
- backend structure
-In-Reply-To: <20180719080838.31598-1-paul.kocialkowski@bootlin.com>
-References: <20180719080838.31598-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180719150917.mzybrbbosjt2i2hm@flea>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 19 Jul 2018 16:10:50 +0100
+Subject: [PATCH v2] mmc: sunxi: remove output of virtual base address
+In-Reply-To: <20180719144650.hq3rtevp3gjkpvxh@flea>
+References: <20180719133554.30737-1-andre.przywara@arm.com>
+ <20180719144650.hq3rtevp3gjkpvxh@flea>
+Message-ID: <6d0ade81-c55d-8262-0f78-4d7d55e549cb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 10:08:37AM +0200, Paul Kocialkowski wrote:
-> In prevision for introducing a new quirk that will be used at atomic
-> plane check time, register the quirks structure with the backend
-> structure. This way, it can easily be grabbed where needed.
+Hi,
+
+On 19/07/18 15:46, Maxime Ripard wrote:
+> On Thu, Jul 19, 2018 at 02:35:54PM +0100, Andre Przywara wrote:
+>> Recent Linux versions refuse to print actual virtual kernel addresses,
+>> to not give a hint about the location of the kernel in a randomized virtual
+>> address space. This affects the output of the sunxi MMC controller
+>> driver, which now produces the rather uninformative line:
+>>
+>> [    1.482660] sunxi-mmc 1c0f000.mmc: base:0x(____ptrval____) irq:8
+>>
+>> Since the virtual base address is not really interesting in the first
+>> place, let's just drop this value. The same applies to Linux' notion of
+>> the interrupt number, which is independent from the GIC SPI number.
+>> We have the physical address as part of the DT node name, which is way
+>> more useful for debugging purposes.
+>> To keep a success message in the driver, we print some information that
+>> is not too obvious and that we learned while probing the device:
+>> the maximum request size and whether it uses the new timing mode.
+>> So the output turns into:
+>> sunxi-mmc 1c0f000.mmc: max request size: 16384 KB, uses new timings mode
+>> sunxi-mmc 1c11000.mmc: max request size: 2048 KB
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>> Changelog v1 ... v2:
+>> - dropped output of Linux interrupt number
+>> - added max request size and timings mode output
+>>
+>>  drivers/mmc/host/sunxi-mmc.c | 5 ++++-
+>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+>> index 8e7f3e35ee3d..fbbc09d82338 100644
+>> --- a/drivers/mmc/host/sunxi-mmc.c
+>> +++ b/drivers/mmc/host/sunxi-mmc.c
+>> @@ -1407,7 +1407,10 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+>>  	if (ret)
+>>  		goto error_free_dma;
+>>  
+>> -	dev_info(&pdev->dev, "base:0x%p irq:%u\n", host->reg_base, host->irq);
+>> +	dev_info(&pdev->dev, "max request size: %u KB%s\n",
+>> +		 mmc->max_req_size >> 10,
+>> +		 host->use_new_timings ? ", uses new timings mode" : "");
 > 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> I really don't know how to feel about this one.
+> 
+> This isn't more useful to the regular user wanting to see if the
+> driver is probed, which is what this message should be about. 
+> 
+> And this one isn't clearer or more obvious than the previous one
+> (which was already pretty bad). I really think having some message
+> that basically says "MMC controller initialized" or something along
+> those lines would work better.
 
-Applied both, thanks
+I see your point, and am happy to change that.
+On the other hand there might be people that complain about chatty
+drivers, and printing a line just to says "Success!!!!!" is a bit BSP
+kernel like ;-). That dmesg line could as well be used to print
+something useful, and transport the "success" message along with that.
+So basically I scanned the probe function for some information that
+would justify an output (something non-obvious or information probed),
+to avoid dropping this at all (as you initially said yesterday).
+MMC_CAP_1_8V_DDR was another candidate, btw.
 
-Maxime
+> However, I can also see value in having this printed, for developers,
+> but maybe as dev_dbg?
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180719/945d6d33/attachment.sig>
+I think it's useful to have this in non-debug kernels as well, because
+this is what people tend to use. And this would allow developers to much
+easier debug user problems, for instance when they create board DTs:
+When this line doesn't appear, there might be a regulator missing, for
+instance. If it's there, the MMC driver is happy and we have one less
+thing to worry about.
+
+So why not combine the benefit of the success message and the
+information for developers, if we have that one line of output anyway?
+I think we have way more chattier drivers and way more cryptic messages
+in the dmesg, so a single line with some technical details does not
+hurt, especially if we have that already.
+
+But I don't have a strong opinion on that, so leave it up for Ulf and
+you to decide: keep this patch (or print some other info); replace the
+output with a success message or drop the line at all.
+
+Cheers,
+Andre.
