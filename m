@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 01:00:09 +0200
-Subject: [PATCH v3 16/33] mtd: rawnand: nandsim: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 01:00:13 +0200
+Subject: [PATCH v3 20/33] mtd: rawnand: sh_flctl: convert driver to nand_scan()
 In-Reply-To: <20180719230026.8741-1-miquel.raynal@bootlin.com>
 References: <20180719230026.8741-1-miquel.raynal@bootlin.com>
-Message-ID: <20180719230026.8741-17-miquel.raynal@bootlin.com>
+Message-ID: <20180719230026.8741-21-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,109 +14,54 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/nandsim.c | 82 +++++++++++++++++++++++-------------------
- 1 file changed, 45 insertions(+), 37 deletions(-)
+ drivers/mtd/nand/raw/sh_flctl.c | 19 ++++++++-----------
+ 1 file changed, 8 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/nandsim.c b/drivers/mtd/nand/raw/nandsim.c
-index 8a3b36cfe5ea..62162b4f223c 100644
---- a/drivers/mtd/nand/raw/nandsim.c
-+++ b/drivers/mtd/nand/raw/nandsim.c
-@@ -2192,6 +2192,48 @@ static void ns_nand_read_buf(struct mtd_info *mtd, u_char *buf, int len)
- 	return;
+diff --git a/drivers/mtd/nand/raw/sh_flctl.c b/drivers/mtd/nand/raw/sh_flctl.c
+index d37d1d3ccbf9..aa9fd92818d9 100644
+--- a/drivers/mtd/nand/raw/sh_flctl.c
++++ b/drivers/mtd/nand/raw/sh_flctl.c
+@@ -1002,10 +1002,10 @@ static void flctl_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ 	flctl->index += len;
  }
  
-+static int ns_attach_chip(struct nand_chip *chip)
-+{
-+	unsigned int eccsteps, eccbytes;
-+
-+	if (!bch)
-+		return 0;
-+
-+	if (!mtd_nand_has_bch()) {
-+		NS_ERR("BCH ECC support is disabled\n");
-+		return -EINVAL;
-+	}
-+
-+	/* Use 512-byte ecc blocks */
-+	eccsteps = nsmtd->writesize / 512;
-+	eccbytes = ((bch * 13) + 7) / 8;
-+
-+	/* Do not bother supporting small page devices */
-+	if (nsmtd->oobsize < 64 || !eccsteps) {
-+		NS_ERR("BCH not available on small page devices\n");
-+		return -EINVAL;
-+	}
-+
-+	if (((eccbytes * eccsteps) + 2) > nsmtd->oobsize) {
-+		NS_ERR("Invalid BCH value %u\n", bch);
-+		return -EINVAL;
-+	}
-+
-+	chip->ecc.mode = NAND_ECC_SOFT;
-+	chip->ecc.algo = NAND_ECC_BCH;
-+	chip->ecc.size = 512;
-+	chip->ecc.strength = bch;
-+	chip->ecc.bytes = eccbytes;
-+
-+	NS_INFO("Using %u-bit/%u bytes BCH ECC\n", bch, chip->ecc.size);
-+
-+	return 0;
-+}
-+
-+static struct nand_controller_ops ns_controller_ops = {
-+	.attach_chip = ns_attach_chip,
+-static int flctl_chip_init_tail(struct mtd_info *mtd)
++static int flctl_chip_attach_chip(struct nand_chip *chip)
+ {
++	struct mtd_info *mtd = nand_to_mtd(chip);
+ 	struct sh_flctl *flctl = mtd_to_flctl(mtd);
+-	struct nand_chip *chip = &flctl->chip;
+ 
+ 	if (chip->options & NAND_BUSWIDTH_16) {
+ 		/*
+@@ -1073,6 +1073,10 @@ static int flctl_chip_init_tail(struct mtd_info *mtd)
+ 	return 0;
+ }
+ 
++static struct nand_controller_ops flctl_nand_controller_ops = {
++	.attach_chip = flctl_chip_attach_chip,
 +};
 +
- /*
-  * Module initialization function
-  */
-@@ -2276,44 +2318,10 @@ static int __init ns_init_module(void)
- 	if ((retval = parse_gravepages()) != 0)
- 		goto error;
+ static irqreturn_t flctl_handle_flste(int irq, void *dev_id)
+ {
+ 	struct sh_flctl *flctl = dev_id;
+@@ -1200,15 +1204,8 @@ static int flctl_probe(struct platform_device *pdev)
  
--	retval = nand_scan_ident(nsmtd, 1, NULL);
-+	chip->dummy_controller.ops = &ns_controller_ops;
-+	retval = nand_scan(nsmtd, 1);
- 	if (retval) {
--		NS_ERR("cannot scan NAND Simulator device\n");
--		goto error;
--	}
+ 	flctl_setup_dma(flctl);
+ 
+-	ret = nand_scan_ident(flctl_mtd, 1, NULL);
+-	if (ret)
+-		goto err_chip;
 -
--	if (bch) {
--		unsigned int eccsteps, eccbytes;
--		if (!mtd_nand_has_bch()) {
--			NS_ERR("BCH ECC support is disabled\n");
--			retval = -EINVAL;
--			goto error;
--		}
--		/* use 512-byte ecc blocks */
--		eccsteps = nsmtd->writesize/512;
--		eccbytes = (bch*13+7)/8;
--		/* do not bother supporting small page devices */
--		if ((nsmtd->oobsize < 64) || !eccsteps) {
--			NS_ERR("bch not available on small page devices\n");
--			retval = -EINVAL;
--			goto error;
--		}
--		if ((eccbytes*eccsteps+2) > nsmtd->oobsize) {
--			NS_ERR("invalid bch value %u\n", bch);
--			retval = -EINVAL;
--			goto error;
--		}
--		chip->ecc.mode = NAND_ECC_SOFT;
--		chip->ecc.algo = NAND_ECC_BCH;
--		chip->ecc.size = 512;
--		chip->ecc.strength = bch;
--		chip->ecc.bytes = eccbytes;
--		NS_INFO("using %u-bit/%u bytes BCH ECC\n", bch, chip->ecc.size);
--	}
+-	ret = flctl_chip_init_tail(flctl_mtd);
+-	if (ret)
+-		goto err_chip;
 -
--	retval = nand_scan_tail(nsmtd);
--	if (retval) {
--		NS_ERR("can't register NAND Simulator\n");
-+		NS_ERR("Could not scan NAND Simulator device\n");
- 		goto error;
- 	}
+-	ret = nand_scan_tail(flctl_mtd);
++	nand->dummy_controller.ops = &flctl_nand_controller_ops;
++	ret = nand_scan(flctl_mtd, 1);
+ 	if (ret)
+ 		goto err_chip;
  
 -- 
 2.14.1
