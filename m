@@ -1,93 +1,43 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 19 Jul 2018 13:11:17 +0200
-Subject: [RFC PATCH 11/16] KVM: arm64/sve: System register context switch
- and access support
-In-Reply-To: <1529593060-542-12-git-send-email-Dave.Martin@arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-12-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180719111117.qztdqqhco7klvfhz@kamzik.brq.redhat.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Jul 2018 12:16:41 +0100
+Subject: arm: v4.18-rc5 with cpuidle on TC2 (A7 boot) spectre v2 issue
+In-Reply-To: <20180719103919.GB19287@e105550-lin.cambridge.arm.com>
+References: <2abc6c11-2e8c-a4ea-6911-0f495d90ace6@arm.com>
+ <20180719100109.GH17271@n2100.armlinux.org.uk>
+ <20180719103919.GB19287@e105550-lin.cambridge.arm.com>
+Message-ID: <20180719111640.GJ17271@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2018 at 03:57:35PM +0100, Dave Martin wrote:
-> This patch adds the necessary support for context switching ZCR_EL1
-> for each vcpu.
+On Thu, Jul 19, 2018 at 11:39:19AM +0100, Morten Rasmussen wrote:
+> On Thu, Jul 19, 2018 at 11:01:10AM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Jul 19, 2018 at 11:42:50AM +0200, Dietmar Eggemann wrote:
+> > > Hi,
+> > > 
+> > > running v4.18-rc5 (plus still missing "power: vexpress: fix corruption in
+> > > notifier registration", otherwise I get this rcu_sched stall issue) on TC2
+> > > (A7 boot) with vanilla multi_v7_defconfig plus
+> > > CONFIG_ARM_BIG_LITTLE_CPUIDLE=y gives me continuous:
+> > > 
+> > > ...
+> > >  CPUX: Spectre v2: incorrect context switching function, system vulnerable
+> > > ...
+> > > 
+> > > messages.
+> > > 
+> > > Work around is to disable CONFIG_HARDEN_BRANCH_PREDICTOR.
+> > 
+> > or disable big.Little if you want the hardening.
+> > 
+> > The choices are currently either protection against Spectre or big.Little
+> > support since the two are mutually exclusive at the moment.
 > 
-> The ID_AA64PFR0_EL1 emulation code is updated to expose the
-> presence of SVE to the guest if appropriate, and ioctl() access to
-> ZCR_EL1 is also added.
-> 
-> In the context switch code itself, ZCR_EL1 is context switched if
-> the host is SVE-capable, irrespectively for now of whether SVE is
-> exposed to the guest or not.  Adding a dynamic vcpu_has_sve() check
-> may lose as much performance as would be gained in this simple
-> case.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/include/asm/kvm_host.h |  1 +
->  arch/arm64/include/asm/sysreg.h   |  3 +++
->  arch/arm64/kvm/hyp/sysreg-sr.c    |  5 +++++
->  arch/arm64/kvm/sys_regs.c         | 14 +++++++++-----
->  4 files changed, 18 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 609d08b..f331abf 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -111,6 +111,7 @@ enum vcpu_sysreg {
->  	SCTLR_EL1,	/* System Control Register */
->  	ACTLR_EL1,	/* Auxiliary Control Register */
->  	CPACR_EL1,	/* Coprocessor Access Control */
-> +	ZCR_EL1,	/* SVE Control */
->  	TTBR0_EL1,	/* Translation Table Base Register 0 */
->  	TTBR1_EL1,	/* Translation Table Base Register 1 */
->  	TCR_EL1,	/* Translation Control Register */
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index a8f8481..6476dbd 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -416,6 +416,9 @@
->  #define SYS_ICH_LR14_EL2		__SYS__LR8_EL2(6)
->  #define SYS_ICH_LR15_EL2		__SYS__LR8_EL2(7)
->  
-> +/* VHE encodings for architectural EL0/1 system registers */
-> +#define SYS_ZCR_EL12			sys_reg(3, 5, 1, 2, 0)
-> +
->  /* Common SCTLR_ELx flags. */
->  #define SCTLR_ELx_EE    (1 << 25)
->  #define SCTLR_ELx_IESB	(1 << 21)
-> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-> index 35bc168..0f4046a 100644
-> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
-> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-> @@ -21,6 +21,7 @@
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_hyp.h>
-> +#include <asm/sysreg.h>
->  
->  /*
->   * Non-VHE: Both host and guest must save everything.
-> @@ -57,6 +58,8 @@ static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
->  	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg_el1(sctlr);
->  	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
->  	ctxt->sys_regs[CPACR_EL1]	= read_sysreg_el1(cpacr);
-> +	if (system_supports_sve()) /* implies has_vhe() */
-> +		ctxt->sys_regs[ZCR_EL1]	= read_sysreg_s(SYS_ZCR_EL12);
->  	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg_el1(ttbr0);
->  	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg_el1(ttbr1);
->  	ctxt->sys_regs[TCR_EL1]		= read_sysreg_el1(tcr);
-> @@ -129,6 +132,8 @@ static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
->  	write_sysreg_el1(ctxt->sys_regs[SCTLR_EL1],	sctlr);
->  	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  	actlr_el1);
->  	write_sysreg_el1(ctxt->sys_regs[CPACR_EL1],	cpacr);
-> +	if (system_supports_sve()) /* implies has_vhe() */
-> +		write_sysreg_s(ctxt->sys_regs[ZCR_EL1],	SYS_ZCR_EL12);
+> Would it be possible to make those message only appear once like they do
+> when booting on A15?
 
-I feel like the ZCR_EL12 save/restores are out of place, as these
-functions are shared by non-VHE and VHE. Maybe they should be
-moved to the VHE callers?
+Yes, it's possible.  Feel free to send a patch, thanks.
 
-Thanks,
-drew
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
