@@ -1,74 +1,33 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Thu, 19 Jul 2018 22:27:55 +0800
-Subject: [PATCH 3/3] clk: meson-g12a: Add EE Clock controller driver
-In-Reply-To: <7h601be2vk.fsf@baylibre.com>
-References: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
- <1531134767-29927-4-git-send-email-jian.hu@amlogic.com>
- <CAFBinCBB9N_p6S_-dfiV=zDCf-RYnA3C-ir6oNLC7JAfdOqqiw@mail.gmail.com>
- <ec49c089-bccf-9aac-5d0f-43bc27770ad9@amlogic.com>
- <1531216472.2708.71.camel@baylibre.com> <7hfu0jmhbe.fsf@baylibre.com>
- <7e1cce0b-fc86-b900-2019-a85c5e5ba2ae@amlogic.com>
- <7h601be2vk.fsf@baylibre.com>
-Message-ID: <e1f0b672-65de-6afa-cec4-e2d910c58b7c@amlogic.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 19 Jul 2018 16:33:48 +0200
+Subject: [PATCH v2 0/5] ARM: dts: sunxi: Remove unused
+ address-cells/size-cells of dwmac-sun8i
+In-Reply-To: <1531914041-14751-1-git-send-email-clabbe@baylibre.com>
+References: <1531914041-14751-1-git-send-email-clabbe@baylibre.com>
+Message-ID: <20180719143348.5kx24tr6k7ytywsk@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/19/2018 10:06 PM, Kevin Hilman wrote:
-> Yixun Lan <yixun.lan@amlogic.com> writes:
-> 
-> [...]
-> 
->>>
->>> As Jerome said, I think consistency is an important goal, so leaving off
->>> the "meson-" for drivers/clk is fine with me.
->>>
->> ok
->>
->>> Also for consistency, for the rest of the drivers, keeping "meson-" is
->>> probably the right thing to do.
->>>
->> ok, for the above, you are talking about the already exist compatible
->> names? or the patches we will push in the future?
-> 
-> I'm talking about future patches.
-> 
-ok
+On Wed, Jul 18, 2018 at 11:40:36AM +0000, Corentin Labbe wrote:
+> address-cells/size-cells is unnecessary for dwmac-sun8i node.
+> It was in early days, but since a mdio node is used, it could be
+> removed.
+>
+> This patch fix the following DT warning:
+> Warning (avoid_unnecessary_addr_size): /soc/ethernet at 1c50000: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
 
->>> However, patches would be welcome to add compatibles without the "meson"
->>> for the rest of the drivers & documentation as well, but please do not
->>> remove any compatibles.
->>>
->> I assume you are talking about the patches in the future we will push?
->> to drop the "meson".
->>
->> I'm confused here, as the above two paragraphs conflict with each other
-> 
-> Yeah, what I wrote is confusing, sorry about that.
-> 
-> What I mean is that new patches should stay consistent with compatibles
-> in their existing drivers/subsystems.  That means keeping the "meson-"
-> prefix for everything except drivers/clk.
-> 
-sounds good to me.
+Applied, thanks
 
-> In addition to that, patches would be welcome for *adding* compatibles
-> without "meson" to all the current drivers.
-> 
-not sure if I parse above correctly, so let me rephrase..
+Maxime
 
-for "all the current drivers", do you mean all the drivers which already
-accepted at mainline kernel, which are mmc, uart, spi, i2c ..
-
-all of them follow "amlogic,meson-${SOC}-${FUNCTION}", so do you propose
-to add compatbiles like "amlogic,${SOC}-${FUNCTION}" ?
-
-take i2c for example, there is "amlogic,meson-axg-i2c" already, do you
-want to add another "amlogic,axg-i2c" ? I feel this will adding more
-confusion..
-
-How about only following the "amlogic,${SOC}-${FUNCTION}" syntax in the
-new added drivers in the future, for example NAND, PCIE driver which we
-want to push (those drivers doesn't exist in current mainline kernel).
-
-
-Yixun
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180719/fb156578/attachment.sig>
