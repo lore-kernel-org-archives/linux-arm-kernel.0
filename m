@@ -1,81 +1,30 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 19 Jul 2018 10:20:27 +0200
-Subject: [PATCH v2 2/3] net: add support for nvmem to
- eth_platform_get_mac_address()
-In-Reply-To: <20180719082028.26116-1-brgl@bgdev.pl>
-References: <20180719082028.26116-1-brgl@bgdev.pl>
-Message-ID: <20180719082028.26116-3-brgl@bgdev.pl>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 19 Jul 2018 10:22:07 +0200
+Subject: [PATCH 1/4] iio: adc: xilinx: Rename 'channels' variable name to
+ 'iio_xadc_channels'
+In-Reply-To: <d2c3ddfd-91da-e500-7b58-917d2da1d540@metafoo.de>
+References: <1531912331-26431-1-git-send-email-manish.narani@xilinx.com>
+ <1531912331-26431-2-git-send-email-manish.narani@xilinx.com>
+ <d2c3ddfd-91da-e500-7b58-917d2da1d540@metafoo.de>
+Message-ID: <7c4ee0db-ac33-b093-4dbb-1742fb029012@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On 18.7.2018 13:18, Lars-Peter Clausen wrote:
+> On 07/18/2018 01:12 PM, Manish Narani wrote:
+>> This patch fix the following checkpatch warning in xadc driver.
+>> - Reusing the krealloc arg is almost always a bug.
+>>
+>> Renamed the 'channels' variable as 'iio_xadc_channels' to fix the above
+>> warning.
+>>
+> 
+> This is a bug in checkpatch and should be fixed in checkpatch. The code is
+> not actually re-using the parameter. channels and xadc_channels are
+> independent variables, just checkpatch somehow does not realize this.
 
-Many non-DT platforms read the MAC address from EEPROM. Usually it's
-either done with callbacks defined in board files or from SoC-specific
-ethernet drivers.
+I think it should be fine to have this patch in tree. Change in commit
+message to reflect this should be enough. But that's just view.
 
-In order to generalize this, try to read the MAC from nvmem in
-eth_platform_get_mac_address() using a standard lookup name:
-"mac-address".
-
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- net/ethernet/eth.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
-
-diff --git a/net/ethernet/eth.c b/net/ethernet/eth.c
-index 39af03894598..af3b4b1b77eb 100644
---- a/net/ethernet/eth.c
-+++ b/net/ethernet/eth.c
-@@ -54,6 +54,7 @@
- #include <linux/if_ether.h>
- #include <linux/of_net.h>
- #include <linux/pci.h>
-+#include <linux/nvmem-consumer.h>
- #include <net/dst.h>
- #include <net/arp.h>
- #include <net/sock.h>
-@@ -527,8 +528,11 @@ unsigned char * __weak arch_get_platform_mac_address(void)
- 
- int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
- {
-+	unsigned char addrbuf[ETH_ALEN];
- 	const unsigned char *addr;
-+	struct nvmem_cell *nvmem;
- 	struct device_node *dp;
-+	size_t alen;
- 
- 	if (dev_is_pci(dev))
- 		dp = pci_device_to_OF_node(to_pci_dev(dev));
-@@ -541,6 +545,29 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
- 	if (!addr)
- 		addr = arch_get_platform_mac_address();
- 
-+	if (!addr) {
-+		nvmem = nvmem_cell_get(dev, "mac-address");
-+		if (IS_ERR(nvmem) && PTR_ERR(nvmem) == -EPROBE_DEFER)
-+			/* We may have a lookup registered for MAC address but
-+			 * the corresponding nvmem provider hasn't been
-+			 * registered yet.
-+			 */
-+			return -EPROBE_DEFER;
-+
-+		if (!IS_ERR(nvmem)) {
-+			addr = nvmem_cell_read(nvmem, &alen);
-+			if (!IS_ERR(addr)) {
-+				if (alen == ETH_ALEN)
-+					ether_addr_copy(addrbuf, addr);
-+
-+				kfree(addr);
-+				addr = alen == ETH_ALEN ? addrbuf : NULL;
-+			}
-+
-+			nvmem_cell_put(nvmem);
-+		}
-+	}
-+
- 	if (!addr || !is_valid_ether_addr(addr))
- 		return -ENODEV;
- 
--- 
-2.17.1
+Thanks,
+Michal
