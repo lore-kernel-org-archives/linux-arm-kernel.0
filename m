@@ -1,599 +1,599 @@
-From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Thu, 19 Jul 2018 15:51:57 +0900
-Subject: [PATCH 2/2] spi: add SPI controller driver for UniPhier SoC
-In-Reply-To: <1531983117-9443-1-git-send-email-hayashibara.keiji@socionext.com>
-References: <1531983117-9443-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <1531983117-9443-3-git-send-email-hayashibara.keiji@socionext.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Thu, 19 Jul 2018 14:57:43 +0800
+Subject: [PATCH v5 09/11] clk: mediatek: add new clkmux register API
+In-Reply-To: <1531817552-17221-10-git-send-email-mars.cheng@mediatek.com>
+References: <1531817552-17221-1-git-send-email-mars.cheng@mediatek.com>
+ <1531817552-17221-10-git-send-email-mars.cheng@mediatek.com>
+Message-ID: <1531983463.8953.235.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SPI controller driver implemented in Socionext UniPhier SoCs.
+On Tue, 2018-07-17 at 16:52 +0800, Mars Cheng wrote:
+> From: Owen Chen <owen.chen@mediatek.com>
+> 
+> MT6765 add "set/clr" register for each clkmux setting, and
+> one update register to trigger value change. It is designed
+> to prevent read-modify-write racing issue. The sw design
+> need to add a new API to handle this hw change with a new
+> mtk_clk_mux/mtk_clk_upd struct in new file "clk-mux"and
+> clk-upd".
+> 
 
-UniPhier SoCs have two types SPI controllers; SCSSI supports a
-single channel, and MCSSI supports multiple channels.
-Currently this driver supports SCSSI only.
+I don't see any word mtk_clk_upd or clk-upd in the patch
 
-This controller has 32bit TX/RX FIFO with depth of eight entry,
-and supports the SPI master mode only.
+and the patch needs to be split into more patches
 
-This commit is implemented in PIO transfer mode, not DMA transfer.
+> Signed-off-by: Owen Chen <owen.chen@mediatek.com>
+> ---
+>  drivers/clk/mediatek/Makefile  |    2 +-
+>  drivers/clk/mediatek/clk-mtk.c |   41 +++++++
+>  drivers/clk/mediatek/clk-mtk.h |   85 ++++++++++++---
+>  drivers/clk/mediatek/clk-mux.c |  236 ++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/mediatek/clk-mux.h |   38 +++++++
+>  5 files changed, 388 insertions(+), 14 deletions(-)
+>  create mode 100644 drivers/clk/mediatek/clk-mux.c
+>  create mode 100644 drivers/clk/mediatek/clk-mux.h
+> 
+> diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
+> index 844b55d..b97980d 100644
+> --- a/drivers/clk/mediatek/Makefile
+> +++ b/drivers/clk/mediatek/Makefile
+> @@ -1,5 +1,5 @@
+>  # SPDX-License-Identifier: GPL-2.0
+> -obj-$(CONFIG_COMMON_CLK_MEDIATEK) += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o clk-cpumux.o reset.o
+> +obj-$(CONFIG_COMMON_CLK_MEDIATEK) += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o clk-cpumux.o reset.o clk-mux.o
+>  obj-$(CONFIG_COMMON_CLK_MT6797) += clk-mt6797.o
+>  obj-$(CONFIG_COMMON_CLK_MT6797_IMGSYS) += clk-mt6797-img.o
+>  obj-$(CONFIG_COMMON_CLK_MT6797_MMSYS) += clk-mt6797-mm.o
+> diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
+> index 9c0ae42..50becd0 100644
+> --- a/drivers/clk/mediatek/clk-mtk.c
+> +++ b/drivers/clk/mediatek/clk-mtk.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/mfd/syscon.h>
+>  
+>  #include "clk-mtk.h"
+> +#include "clk-mux.h"
+>  #include "clk-gate.h"
+>  
+>  struct clk_onecell_data *mtk_alloc_clk_data(unsigned int clk_num)
+> @@ -144,6 +145,46 @@ int mtk_clk_register_gates(struct device_node *node,
+>  	return 0;
+>  }
+>  
+> +int mtk_clk_register_muxes(const struct mtk_mux *muxes,
+> +			   int num, struct device_node *node,
+> +			   spinlock_t *lock,
+> +			   struct clk_onecell_data *clk_data)
+> +{
+> +	struct regmap *regmap;
+> +	struct clk *clk;
+> +	int i;
+> +
+> +	if (!clk_data)
+> +		return -ENOMEM;
+> +
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
----
- drivers/spi/Kconfig        |   7 +
- drivers/spi/Makefile       |   1 +
- drivers/spi/spi-uniphier.c | 532 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 540 insertions(+)
- create mode 100644 drivers/spi/spi-uniphier.c
+general register function is able to handle that there is no clk_data.
+It looks like a optional, not a mandatory
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index ad5d68e..a3cb0b4 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -688,6 +688,13 @@ config SPI_TXX9
- 	help
- 	  SPI driver for Toshiba TXx9 MIPS SoCs
- 
-+config SPI_UNIPHIER
-+	tristate "Socionext UniPhier SPI Controller"
-+	depends on (ARCH_UNIPHIER || COMPILE_TEST) && OF
-+	help
-+	  This driver supports the SPI controller on Socionext
-+	  UniPhier SoCs.
-+
- config SPI_XCOMM
- 	tristate "Analog Devices AD-FMCOMMS1-EBZ SPI-I2C-bridge driver"
- 	depends on I2C
-diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
-index cb1f437..a90d559 100644
---- a/drivers/spi/Makefile
-+++ b/drivers/spi/Makefile
-@@ -101,6 +101,7 @@ spi-thunderx-objs			:= spi-cavium.o spi-cavium-thunderx.o
- obj-$(CONFIG_SPI_THUNDERX)		+= spi-thunderx.o
- obj-$(CONFIG_SPI_TOPCLIFF_PCH)		+= spi-topcliff-pch.o
- obj-$(CONFIG_SPI_TXX9)			+= spi-txx9.o
-+obj-$(CONFIG_SPI_UNIPHIER)		+= spi-uniphier.o
- obj-$(CONFIG_SPI_XCOMM)		+= spi-xcomm.o
- obj-$(CONFIG_SPI_XILINX)		+= spi-xilinx.o
- obj-$(CONFIG_SPI_XLP)			+= spi-xlp.o
-diff --git a/drivers/spi/spi-uniphier.c b/drivers/spi/spi-uniphier.c
-new file mode 100644
-index 0000000..92718ee
---- /dev/null
-+++ b/drivers/spi/spi-uniphier.c
-@@ -0,0 +1,532 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * spi-uniphier.c - Socionext UniPhier SPI controller driver
-+ *
-+ * Copyright 2012      Panasonic Corporation
-+ * Copyright 2016-2018 Socionext Inc.
-+ */
-+
-+#include <linux/bitfield.h>
-+#include <linux/bitops.h>
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/iopoll.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/spi/spi.h>
-+
-+#define SSI_TIMEOUT		2000	/* ms */
-+#define SSI_MAX_CLK_DIVIDER	254
-+#define SSI_MIN_CLK_DIVIDER	4
-+
-+struct uniphier_spi_priv {
-+	void __iomem *base;
-+	int irq;
-+	struct clk *clk;
-+	struct spi_master *master;
-+	struct completion xfer_done;
-+
-+	int error;
-+	unsigned int tx_bytes;
-+	unsigned int rx_bytes;
-+	const u8 *tx_buf;
-+	u8 *rx_buf;
-+
-+	u8 bits_per_word;
-+	u16 mode;
-+	u32 speed_hz;
-+};
-+
-+#define SSI_CTL			0x0
-+#define   SSI_CTL_EN		BIT(0)
-+
-+#define SSI_CKS			0x4
-+#define   SSI_CKS_CKRAT_MASK	GENMASK(7, 0)
-+#define   SSI_CKS_CKPHS		BIT(14)
-+#define   SSI_CKS_CKINIT	BIT(13)
-+#define   SSI_CKS_CKDLY		BIT(12)
-+
-+#define SSI_TXWDS		0x8
-+#define   SSI_TXWDS_WDLEN_MASK	GENMASK(13, 8)
-+#define   SSI_TXWDS_TDTF_MASK	GENMASK(7, 6)
-+#define   SSI_TXWDS_DTLEN_MASK	GENMASK(5, 0)
-+
-+#define SSI_RXWDS		0xc
-+#define   SSI_RXWDS_DTLEN_MASK	GENMASK(5, 0)
-+
-+#define SSI_FPS			0x10
-+#define   SSI_FPS_FSPOL		BIT(15)
-+#define   SSI_FPS_FSTRT		BIT(14)
-+
-+#define SSI_SR			0x14
-+#define   SSI_SR_RNE		BIT(0)
-+
-+#define SSI_IE			0x18
-+#define   SSI_IE_RCIE		BIT(3)
-+#define   SSI_IE_RORIE		BIT(0)
-+
-+#define SSI_IS			0x1c
-+#define   SSI_IS_RXRS		BIT(9)
-+#define   SSI_IS_RCID		BIT(3)
-+#define   SSI_IS_RORID		BIT(0)
-+
-+#define SSI_IC			0x1c
-+#define   SSI_IC_TCIC		BIT(4)
-+#define   SSI_IC_RCIC		BIT(3)
-+#define   SSI_IC_RORIC		BIT(0)
-+
-+#define SSI_FC			0x20
-+#define   SSI_FC_TXFFL		BIT(12)
-+#define   SSI_FC_TXFTH_MASK	GENMASK(11, 8)
-+#define   SSI_FC_RXFFL		BIT(4)
-+#define   SSI_FC_RXFTH_MASK	GENMASK(3, 0)
-+
-+#define SSI_TXDR		0x24
-+#define SSI_RXDR		0x24
-+
-+#define SSI_FIFO_DEPTH		8
-+
-+#define BYTES_PER_WORD(x)			\
-+({						\
-+	int __x;				\
-+	__x = (x <= 8)  ? 1 :			\
-+	      (x <= 16) ? 2 : 4;		\
-+	__x;					\
-+})
-+
-+static inline void uniphier_spi_irq_enable(struct spi_device *spi, u32 mask)
-+{
-+	struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
-+	u32 val;
-+
-+	val = readl(priv->base + SSI_IE);
-+	val |= mask;
-+	writel(val, priv->base + SSI_IE);
-+}
-+
-+static inline void uniphier_spi_irq_disable(struct spi_device *spi, u32 mask)
-+{
-+	struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
-+	u32 val;
-+
-+	val = readl(priv->base + SSI_IE);
-+	val &= ~mask;
-+	writel(val, priv->base + SSI_IE);
-+}
-+
-+static void uniphier_spi_set_transfer_size(struct spi_device *spi, int size)
-+{
-+	struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
-+	u32 val;
-+
-+	val = readl(priv->base + SSI_TXWDS);
-+	val &= ~(SSI_TXWDS_WDLEN_MASK | SSI_TXWDS_DTLEN_MASK);
-+	val |= FIELD_PREP(SSI_TXWDS_WDLEN_MASK, size);
-+	val |= FIELD_PREP(SSI_TXWDS_DTLEN_MASK, size);
-+	writel(val, priv->base + SSI_TXWDS);
-+
-+	val = readl(priv->base + SSI_RXWDS);
-+	val &= ~SSI_RXWDS_DTLEN_MASK;
-+	val |= FIELD_PREP(SSI_RXWDS_DTLEN_MASK, size);
-+	writel(val, priv->base + SSI_RXWDS);
-+}
-+
-+static int uniphier_spi_set_baudrate(struct spi_device *spi, unsigned int speed)
-+{
-+	struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
-+	u32 val, ckrat;
-+
-+	/*
-+	 * the supported rates are even numbers from 4 to 254. (4,6,8...254)
-+	 * round up as we look for equal or less speed
-+	 */
-+	ckrat = DIV_ROUND_UP(clk_get_rate(priv->clk), speed);
-+	ckrat = roundup(ckrat, 2);
-+
-+	/* check if requested speed is too small */
-+	if (ckrat > SSI_MAX_CLK_DIVIDER)
-+		return -EINVAL;
-+
-+	if (ckrat < SSI_MIN_CLK_DIVIDER)
-+		ckrat = SSI_MIN_CLK_DIVIDER;
-+
-+	val = readl(priv->base + SSI_CKS);
-+	val &= ~SSI_CKS_CKRAT_MASK;
-+	val |= ckrat & SSI_CKS_CKRAT_MASK;
-+	writel(val, priv->base + SSI_CKS);
-+
-+	return 0;
-+}
-+
-+static int uniphier_spi_setup_transfer(struct spi_device *spi,
-+				       struct spi_transfer *t)
-+{
-+	struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
-+	u32 val;
-+	int ret;
-+
-+	priv->error = 0;
-+	priv->tx_buf = t->tx_buf;
-+	priv->rx_buf = t->rx_buf;
-+	priv->tx_bytes = priv->rx_bytes = t->len;
-+
-+	if (priv->bits_per_word != t->bits_per_word) {
-+		uniphier_spi_set_transfer_size(spi, t->bits_per_word);
-+		priv->bits_per_word = t->bits_per_word;
-+	}
-+
-+	if (priv->speed_hz != t->speed_hz) {
-+		ret = uniphier_spi_set_baudrate(spi, t->speed_hz);
-+		if (ret)
-+			return ret;
-+		priv->speed_hz = t->speed_hz;
-+	}
-+
-+	/* reset FIFOs */
-+	val = SSI_FC_TXFFL | SSI_FC_RXFFL;
-+	writel(val, priv->base + SSI_FC);
-+
-+	return 0;
-+}
-+
-+static void uniphier_spi_send(struct uniphier_spi_priv *priv)
-+{
-+	int i, loop;
-+	u32 val = 0;
-+
-+	loop = BYTES_PER_WORD(priv->bits_per_word);
-+	if (priv->tx_bytes < loop)
-+		loop = priv->tx_bytes;
-+
-+	priv->tx_bytes -= loop;
-+
-+	if (priv->tx_buf)
-+		for (i = 0; i < loop; i++) {
-+			val |= (*(const u8 *)priv->tx_buf)
-+						<< (BITS_PER_BYTE * i);
-+			(const u8 *)priv->tx_buf++;
-+		}
-+
-+	writel(val, priv->base + SSI_TXDR);
-+}
-+
-+static void uniphier_spi_recv(struct uniphier_spi_priv *priv)
-+{
-+	int i, loop;
-+	u32 val;
-+
-+	loop = BYTES_PER_WORD(priv->bits_per_word);
-+	if (priv->rx_bytes < loop)
-+		loop = priv->rx_bytes;
-+
-+	priv->rx_bytes -= loop;
-+
-+	val = readl(priv->base + SSI_RXDR);
-+
-+	if (priv->rx_buf)
-+		for (i = 0; i < loop; i++) {
-+			val = val >> (BITS_PER_BYTE * i);
-+			*(u8 *)priv->rx_buf = val & GENMASK(7, 0);
-+			(u8 *)priv->rx_buf++;
-+		}
-+}
-+
-+static void uniphier_spi_fill_tx_fifo(struct uniphier_spi_priv *priv)
-+{
-+	unsigned int tx_count;
-+	int bytes_per_word = BYTES_PER_WORD(priv->bits_per_word);
-+	u32 val;
-+
-+	tx_count = priv->tx_bytes / bytes_per_word;
-+	if (tx_count > SSI_FIFO_DEPTH)
-+		tx_count = SSI_FIFO_DEPTH;
-+
-+	/* set fifo threthold */
-+	val = readl(priv->base + SSI_FC);
-+	val &= ~(SSI_FC_TXFTH_MASK | SSI_FC_RXFTH_MASK);
-+	val |= FIELD_PREP(SSI_FC_TXFTH_MASK, tx_count);
-+	val |= FIELD_PREP(SSI_FC_RXFTH_MASK, tx_count);
-+	writel(val, priv->base + SSI_FC);
-+
-+	while (tx_count--)
-+		uniphier_spi_send(priv);
-+}
-+
-+static void uniphier_spi_set_cs(struct spi_device *spi, bool enable)
-+{
-+	struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
-+	u32 val;
-+
-+	val = readl(priv->base + SSI_FPS);
-+
-+	if (enable)
-+		val |= SSI_FPS_FSPOL;
-+	else
-+		val &= ~SSI_FPS_FSPOL;
-+
-+	writel(val, priv->base + SSI_FPS);
-+}
-+
-+static int uniphier_spi_transfer_one(struct spi_master *master,
-+				     struct spi_device *spi,
-+				     struct spi_transfer *t)
-+{
-+	struct uniphier_spi_priv *priv = spi_master_get_devdata(master);
-+	int status;
-+
-+	status = uniphier_spi_setup_transfer(spi, t);
-+	if (status < 0)
-+		return status;
-+
-+	reinit_completion(&priv->xfer_done);
-+
-+	uniphier_spi_fill_tx_fifo(priv);
-+
-+	uniphier_spi_irq_enable(spi, SSI_IE_RCIE | SSI_IE_RORIE);
-+
-+	status = wait_for_completion_timeout(&priv->xfer_done,
-+					     msecs_to_jiffies(SSI_TIMEOUT));
-+
-+	uniphier_spi_irq_disable(spi, SSI_IE_RCIE | SSI_IE_RORIE);
-+
-+	if (status < 0)
-+		return status;
-+
-+	return priv->error;
-+}
-+
-+static int uniphier_spi_prepare_transfer_hardware(struct spi_master *master)
-+{
-+	struct uniphier_spi_priv *priv = spi_master_get_devdata(master);
-+
-+	writel(SSI_CTL_EN, priv->base + SSI_CTL);
-+
-+	return 0;
-+}
-+
-+static int uniphier_spi_unprepare_transfer_hardware(struct spi_master *master)
-+{
-+	struct uniphier_spi_priv *priv = spi_master_get_devdata(master);
-+
-+	writel(0, priv->base + SSI_CTL);
-+
-+	return 0;
-+}
-+
-+static int uniphier_spi_setup(struct spi_device *spi)
-+{
-+	struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
-+	u32 val1, val2;
-+
-+	if (priv->mode == spi->mode)
-+		return 0;
-+
-+	priv->mode = spi->mode;
-+
-+	/* clock setting
-+	 * CKPHS    capture timing. 0:rising edge, 1:falling edge
-+	 * CKINIT   clock initial level. 0:low, 1:high
-+	 * CKDLY    clock delay. 0:no delay, 1:delay depending on FSTRT
-+	 *          (FSTRT=0: 1 clock, FSTRT=1: 0.5 clock)
-+	 *
-+	 * frame setting
-+	 * FSPOL    frame signal porarity. 0: low, 1: high
-+	 * FSTRT    start frame timing
-+	 *          0: rising edge of clock, 1: falling edge of clock
-+	 */
-+	switch (spi->mode & (SPI_CPOL | SPI_CPHA)) {
-+	case SPI_MODE_0:
-+		/* CKPHS=1, CKINIT=0, CKDLY=1, FSTRT=0 */
-+		val1 = SSI_CKS_CKPHS | SSI_CKS_CKDLY;
-+		val2 = 0;
-+		break;
-+	case SPI_MODE_1:
-+		/* CKPHS=0, CKINIT=0, CKDLY=0, FSTRT=1 */
-+		val1 = 0;
-+		val2 = SSI_FPS_FSTRT;
-+		break;
-+	case SPI_MODE_2:
-+		/* CKPHS=0, CKINIT=1, CKDLY=1, FSTRT=1 */
-+		val1 = SSI_CKS_CKINIT | SSI_CKS_CKDLY;
-+		val2 = SSI_FPS_FSTRT;
-+		break;
-+	case SPI_MODE_3:
-+		/* CKPHS=1, CKINIT=1, CKDLY=0, FSTRT=0 */
-+		val1 = SSI_CKS_CKPHS | SSI_CKS_CKINIT;
-+		val2 = 0;
-+		break;
-+	}
-+
-+	if (!(spi->mode & SPI_CS_HIGH))
-+		val2 |= SSI_FPS_FSPOL;
-+
-+	writel(val1, priv->base + SSI_CKS);
-+	writel(val2, priv->base + SSI_FPS);
-+
-+	val1 = 0;
-+	if (spi->mode & SPI_LSB_FIRST)
-+		val1 |= FIELD_PREP(SSI_TXWDS_TDTF_MASK, 1);
-+	writel(val1, priv->base + SSI_TXWDS);
-+	writel(val1, priv->base + SSI_RXWDS);
-+
-+	return 0;
-+}
-+
-+static irqreturn_t uniphier_spi_handler(int irq, void *dev_id)
-+{
-+	struct uniphier_spi_priv *priv = dev_id;
-+	u32 val, stat;
-+
-+	stat = readl(priv->base + SSI_IS);
-+	val = SSI_IC_TCIC | SSI_IC_RCIC | SSI_IC_RORIC;
-+	writel(val, priv->base + SSI_IC);
-+
-+	/* rx fifo overrun */
-+	if (stat & SSI_IS_RORID) {
-+		priv->error = -EIO;
-+		goto done;
-+	}
-+
-+	/* rx complete */
-+	if ((stat & SSI_IS_RCID) && (stat & SSI_IS_RXRS)) {
-+		while ((readl(priv->base + SSI_SR) & SSI_SR_RNE) &&
-+				(priv->rx_bytes - priv->tx_bytes) > 0)
-+			uniphier_spi_recv(priv);
-+
-+		if ((readl(priv->base + SSI_SR) & SSI_SR_RNE) ||
-+				(priv->rx_bytes != priv->tx_bytes)) {
-+			priv->error = -EIO;
-+			goto done;
-+		} else if (priv->rx_bytes == 0)
-+			goto done;
-+
-+		/* next tx transfer */
-+		uniphier_spi_fill_tx_fifo(priv);
-+	}
-+
-+	return IRQ_HANDLED;
-+
-+done:
-+	complete(&priv->xfer_done);
-+	return IRQ_HANDLED;
-+}
-+
-+static int uniphier_spi_probe(struct platform_device *pdev)
-+{
-+	struct uniphier_spi_priv *priv;
-+	struct spi_master *master;
-+	struct resource *res;
-+	unsigned long clksrc;
-+	int ret;
-+
-+	master = spi_alloc_master(&pdev->dev, sizeof(*priv));
-+	if (!master)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, master);
-+
-+	priv = spi_master_get_devdata(master);
-+	priv->master = master;
-+	priv->bits_per_word = 0;
-+	priv->mode = 0;
-+	priv->speed_hz = 0;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	priv->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(priv->base)) {
-+		ret = PTR_ERR(priv->base);
-+		goto out_master_put;
-+	}
-+
-+	priv->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(priv->clk)) {
-+		dev_err(&pdev->dev, "failed to get clock\n");
-+		ret = PTR_ERR(priv->clk);
-+		goto out_master_put;
-+	}
-+
-+	ret = clk_prepare_enable(priv->clk);
-+	if (ret)
-+		goto out_master_put;
-+
-+	priv->irq = platform_get_irq(pdev, 0);
-+	if (priv->irq < 0) {
-+		dev_err(&pdev->dev, "failed to get IRQ\n");
-+		ret = -ENXIO;
-+		goto out_disable_clk;
-+	}
-+
-+	ret = devm_request_irq(&pdev->dev, priv->irq, uniphier_spi_handler,
-+			       0, "uniphier-spi", priv);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to request IRQ\n");
-+		goto out_disable_clk;
-+	}
-+
-+	init_completion(&priv->xfer_done);
-+
-+	clksrc = clk_get_rate(priv->clk);
-+
-+	master->max_speed_hz = DIV_ROUND_UP(clksrc, SSI_MIN_CLK_DIVIDER);
-+	master->min_speed_hz = DIV_ROUND_UP(clksrc, SSI_MAX_CLK_DIVIDER);
-+	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LSB_FIRST;
-+	master->dev.of_node = pdev->dev.of_node;
-+	master->bus_num = pdev->id;
-+	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(1, 32);
-+
-+	master->setup = uniphier_spi_setup;
-+	master->set_cs = uniphier_spi_set_cs;
-+	master->transfer_one = uniphier_spi_transfer_one;
-+	master->prepare_transfer_hardware
-+				= uniphier_spi_prepare_transfer_hardware;
-+	master->unprepare_transfer_hardware
-+				= uniphier_spi_unprepare_transfer_hardware;
-+	master->num_chipselect = 1;
-+
-+	ret = devm_spi_register_master(&pdev->dev, master);
-+	if (ret)
-+		goto out_disable_clk;
-+
-+	return ret;
-+
-+out_disable_clk:
-+	clk_disable_unprepare(priv->clk);
-+
-+out_master_put:
-+	spi_master_put(master);
-+	return ret;
-+}
-+
-+static int uniphier_spi_remove(struct platform_device *pdev)
-+{
-+	struct uniphier_spi_priv *priv = platform_get_drvdata(pdev);
-+
-+	clk_disable_unprepare(priv->clk);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id uniphier_spi_match[] = {
-+	{ .compatible = "socionext,uniphier-scssi", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, uniphier_spi_match);
-+
-+static struct platform_driver uniphier_spi_driver = {
-+	.probe = uniphier_spi_probe,
-+	.remove = uniphier_spi_remove,
-+	.driver = {
-+		.name = "uniphier-spi",
-+		.of_match_table = uniphier_spi_match,
-+	},
-+};
-+module_platform_driver(uniphier_spi_driver);
-+
-+MODULE_AUTHOR("Kunihiko Hayashi <hayashi.kunihiko@socionext.com>");
-+MODULE_AUTHOR("Keiji Hayashibara <hayashibara.keiji@socionext.com>");
-+MODULE_DESCRIPTION("Socionext UniPhier SPI controller driver");
-+MODULE_LICENSE("GPL v2");
--- 
-2.7.4
+> +	regmap = syscon_node_to_regmap(node);
+> +	if (IS_ERR(regmap)) {
+> +		pr_err("Cannot find regmap for %pOF: %ld\n", node,
+> +		       PTR_ERR(regmap));
+> +		return PTR_ERR(regmap);
+> +	}
+> +
+> +	for (i = 0; i < num; i++) {
+> +		const struct mtk_mux *mux = &muxes[i];
+> +
+> +		if (clk_data && !IS_ERR_OR_NULL(clk_data->clks[mux->id]))
+> +			continue;
+> +
+
+it seems not necessary to check clk data every time
+
+and always use positive check is good to read
+
+> +		clk = mtk_clk_register_mux(mux, regmap, lock);
+> +
+> +		if (IS_ERR(clk)) {
+> +			pr_err("Failed to register clk %s: %ld\n",
+> +			       mux->name, PTR_ERR(clk));
+> +			continue;
+> +		}
+> +
+> +		if (clk_data)
+> +			clk_data->clks[mux->id] = clk;
+
+don't alter any data from input, that is a surprise for users
+
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  struct clk *mtk_clk_register_composite(const struct mtk_composite *mc,
+>  		void __iomem *base, spinlock_t *lock)
+>  {
+> diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+> index 1882221..61693f6 100644
+> --- a/drivers/clk/mediatek/clk-mtk.h
+> +++ b/drivers/clk/mediatek/clk-mtk.h
+> @@ -24,7 +24,9 @@
+>  
+>  #define MAX_MUX_GATE_BIT	31
+>  #define INVALID_MUX_GATE_BIT	(MAX_MUX_GATE_BIT + 1)
+> -
+> +#define INVALID_OFS		-1
+> +#define INVALID_SHFT		-1
+> +#define INVALID_WIDTH		-1
+>  #define MHZ (1000 * 1000)
+>  
+>  struct mtk_fixed_clk {
+> @@ -84,10 +86,72 @@ struct mtk_composite {
+>  	signed char num_parents;
+>  };
+>  
+> +struct mtk_mux {
+> +	int id;
+> +	const char *name;
+> +	const char * const *parent_names;
+> +	unsigned int flags;
+> +
+> +	u32 mux_ofs;
+> +	u32 set_ofs;
+> +	u32 clr_ofs;
+> +	u32 upd_ofs;
+> +
+> +	signed char mux_shift;
+> +	signed char mux_width;
+> +	signed char gate_shift;
+> +	signed char upd_shift;
+> +
+> +	const struct clk_ops *ops;
+> +
+> +	signed char num_parents;
+> +};
+> +
+
+you have created a mtk-mux.h, why is you don't move the newly create
+struct in?
+
+>  /*
+>   * In case the rate change propagation to parent clocks is undesirable,
+>   * this macro allows to specify the clock flags manually.
+>   */
+> +#define CLR_SET_UPD_FLAGS(_id, _name, _parents, _mux_ofs, _mux_set_ofs,\
+> +			_mux_clr_ofs, _shift, _width, _gate,		\
+> +			_upd_ofs, _upd, _flags, _ops) {			\
+> +		.id = _id,						\
+> +		.name = _name,						\
+> +		.mux_ofs = _mux_ofs,					\
+> +		.set_ofs = _mux_set_ofs,				\
+> +		.clr_ofs = _mux_clr_ofs,				\
+> +		.upd_ofs = _upd_ofs,					\
+> +		.mux_shift = _shift,					\
+> +		.mux_width = _width,					\
+> +		.gate_shift = _gate,					\
+> +		.upd_shift = _upd,					\
+> +		.parent_names = _parents,				\
+> +		.num_parents = ARRAY_SIZE(_parents),			\
+> +		.flags = _flags,					\
+> +		.ops = &_ops,						\
+> +	}
+> +
+> +#define MUX_CLR_SET_UPD_FLAGS(_id, _name, _parents, _mux_ofs, _mux_set_ofs,\
+> +			_mux_clr_ofs, _shift, _width, _gate,		\
+> +			_upd_ofs, _upd, _flags)			\
+> +		CLR_SET_UPD_FLAGS(_id, _name, _parents, _mux_ofs,	\
+> +			_mux_set_ofs, _mux_clr_ofs, _shift, _width,	\
+> +			_gate, _upd_ofs, _upd, _flags,			\
+> +			mtk_mux_clr_set_upd_ops)
+> +
+> +#define MUX_CLR_SET_UPD(_id, _name, _parents, _mux_ofs, _mux_set_ofs,	\
+> +			_mux_clr_ofs, _shift, _width, _gate,		\
+> +			_upd_ofs, _upd)				\
+> +		MUX_CLR_SET_UPD_FLAGS(_id, _name, _parents, _mux_ofs,	\
+> +			_mux_set_ofs, _mux_clr_ofs, _shift, _width,	\
+> +			_gate, _upd_ofs, _upd, CLK_SET_RATE_PARENT)
+> +
+> +#define MUX_UPD(_id, _name, _parents, _mux_ofs, _shift, _width, _gate,	\
+> +			_upd_ofs, _upd)				\
+> +		CLR_SET_UPD_FLAGS(_id, _name, _parents, _mux_ofs,	\
+> +			INVALID_OFS, INVALID_OFS, _shift, _width,	\
+> +			_gate, _upd_ofs, _upd, CLK_SET_RATE_PARENT,	\
+> +			mtk_mux_upd_ops)
+> +
+>  #define MUX_GATE_FLAGS(_id, _name, _parents, _reg, _shift, _width,	\
+>  			_gate, _flags) {				\
+>  		.id = _id,						\
+> @@ -111,18 +175,8 @@ struct mtk_composite {
+>  	MUX_GATE_FLAGS(_id, _name, _parents, _reg, _shift, _width,	\
+>  		_gate, CLK_SET_RATE_PARENT)
+>  
+> -#define MUX(_id, _name, _parents, _reg, _shift, _width) {		\
+> -		.id = _id,						\
+> -		.name = _name,						\
+> -		.mux_reg = _reg,					\
+> -		.mux_shift = _shift,					\
+> -		.mux_width = _width,					\
+> -		.gate_shift = -1,					\
+> -		.divider_shift = -1,					\
+> -		.parent_names = _parents,				\
+> -		.num_parents = ARRAY_SIZE(_parents),			\
+> -		.flags = CLK_SET_RATE_PARENT,				\
+> -	}
+
+As Matthias always said that, you alter the common thing that is already
+used by a lot of SoC.
+
+You should have a dedicate patch to state why you need it, provide the
+way you propose. and use another patches for migrating old SoC, finally
+then add the patch for your own SoC.
+
+Don't mix everything in a single patch. The patch can't become reusable
+hard to read it, even hard to backport to the other SoC picking up
+patches they are really wanting.
+
+> +#define MUX(_id, _name, _parents, _reg, _shift, _width)		\
+> +	MUX_GATE(_id, _name, _parents, _reg, _shift, _width, INVALID_SHFT)
+>  
+>  #define DIV_GATE(_id, _name, _parent, _gate_reg, _gate_shift, _div_reg,	\
+>  					_div_width, _div_shift) {	\
+> @@ -138,6 +192,11 @@ struct mtk_composite {
+>  		.flags = 0,						\
+>  	}
+>  
+> +int mtk_clk_register_muxes(const struct mtk_mux *muxes,
+> +			   int num, struct device_node *node,
+> +			   spinlock_t *lock,
+> +			   struct clk_onecell_data *clk_data);
+> +
+
+move to mtk-mux.h
+
+>  struct clk *mtk_clk_register_composite(const struct mtk_composite *mc,
+>  		void __iomem *base, spinlock_t *lock);
+>  
+> diff --git a/drivers/clk/mediatek/clk-mux.c b/drivers/clk/mediatek/clk-mux.c
+> new file mode 100644
+> index 0000000..219181b
+> --- /dev/null
+> +++ b/drivers/clk/mediatek/clk-mux.c
+> @@ -0,0 +1,236 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (c) 2018 MediaTek Inc.
+> + * Author: Owen Chen <owen.chen@mediatek.com>
+> + */
+> +
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/slab.h>
+> +
+> +#include "clk-mtk.h"
+> +#include "clk-mux.h"
+> +
+> +static inline struct mtk_clk_mux
+> +	*to_mtk_clk_mux(struct clk_hw *hw)
+> +{
+> +	return container_of(hw, struct mtk_clk_mux, hw);
+> +}
+> +
+> +static int mtk_mux_enable(struct clk_hw *hw)
+> +{
+> +	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> +	u32 mask = BIT(mux->gate_shift);
+> +	unsigned long flags = 0;
+> +
+> +	if (mux->lock)
+> +		spin_lock_irqsave(mux->lock, flags);
+> +
+
+we can see many functions in kernel, similar to your need, they always
+be defined as two versions. for example.
+
+mtk_mux_enable refer to lock version
+
+mtk_mux_enable_nolock for lock-free version
+
+that makes less condition, more readable, and users don't care much
+about what stuff is put inside  
+
+> +	regmap_update_bits(mux->regmap, mux->mux_ofs, mask, 0);
+> +
+> +	if (mux->lock)
+> +		spin_unlock_irqrestore(mux->lock, flags);
+> +	return 0;
+> +}
+> +
+> +static void mtk_mux_disable(struct clk_hw *hw)
+> +{
+> +	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> +	u32 mask = BIT(mux->gate_shift);
+> +	unsigned long flags = 0;
+> +
+> +	if (mux->lock)
+> +		spin_lock_irqsave(mux->lock, flags);
+> +
+
+ditto
+
+> +	regmap_update_bits(mux->regmap, mux->mux_ofs, mask, mask);
+> +
+> +	if (mux->lock)
+> +		spin_unlock_irqrestore(mux->lock, flags);
+> +}
+> +
+> +static int mtk_mux_enable_setclr(struct clk_hw *hw)
+> +{
+> +	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> +	u32 val;
+> +	unsigned long flags = 0;
+> +
+> +	if (mux->lock)
+> +		spin_lock_irqsave(mux->lock, flags);
+> +
+
+ditto
+
+> +	val = BIT(mux->gate_shift);
+> +	regmap_write(mux->regmap, mux->mux_clr_ofs, val);
+> +
+> +	if (mux->lock)
+> +		spin_unlock_irqrestore(mux->lock, flags);
+> +	return 0;
+> +}
+> +
+> +static void mtk_mux_disable_setclr(struct clk_hw *hw)
+> +{
+> +	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> +	u32 val;
+> +	unsigned long flags = 0;
+> +
+> +	if (mux->lock)
+> +		spin_lock_irqsave(mux->lock, flags);
+> +
+
+ditto
+
+> +	val = BIT(mux->gate_shift);
+> +	regmap_write(mux->regmap, mux->mux_set_ofs, val);
+> +
+> +	if (mux->lock)
+> +		spin_unlock_irqrestore(mux->lock, flags);
+> +}
+> +
+> +static int mtk_mux_is_enabled(struct clk_hw *hw)
+> +{
+> +	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> +	u32 val = 0;
+> +
+> +	if (mux->gate_shift < 0)
+> +		return true;
+> +
+
+return value should be bool
+
+> +	regmap_read(mux->regmap, mux->mux_ofs, &val);
+> +
+> +	return (val & BIT(mux->gate_shift)) == 0;
+> +}
+> +
+> +static u8 mtk_mux_get_parent(struct clk_hw *hw)
+> +{
+
+
+return value should be int
+> +	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> +	int num_parents = clk_hw_get_num_parents(hw);
+> +	u32 mask = GENMASK(mux->mux_width - 1, 0);
+> +	u32 val;
+> +
+> +	regmap_read(mux->regmap, mux->mux_ofs, &val);
+> +	val = (val >> mux->mux_shift) & mask;
+> +
+> +	if (val >= num_parents)
+> +		return -EINVAL;
+> +
+> +	return val;
+> +}
+> +
+> +static int mtk_mux_set_parent(struct clk_hw *hw, u8 index)
+> +{
+> +	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> +	u32 mask = GENMASK(mux->mux_width - 1, 0);
+> +	u32 val, orig;
+> +	unsigned long flags = 0;
+> +
+> +	if (mux->lock)
+> +		spin_lock_irqsave(mux->lock, flags);
+> +
+
+use lock-free-or-not funciton
+
+> +	regmap_read(mux->regmap, mux->mux_ofs, &val);
+> +	orig = val;
+> +	val &= ~(mask << mux->mux_shift);
+> +	val |= index << mux->mux_shift;
+> +
+> +	if (val != orig) {
+> +		regmap_write(mux->regmap, mux->mux_ofs, val);
+> +
+> +		if (mux->upd_shift >= 0)
+> +			regmap_write(mux->regmap, mux->upd_ofs,
+> +				     BIT(mux->upd_shift));
+
+
+why not use regmap_update_bits like function ?
+
+> +	}
+> +
+> +	if (mux->lock)
+> +		spin_unlock_irqrestore(mux->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static int mtk_mux_set_parent_setclr(struct clk_hw *hw, u8 index)
+> +{
+> +	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> +	u32 mask = GENMASK(mux->mux_width - 1, 0);
+> +	u32 val, orig;
+> +	unsigned long flags = 0;
+> +
+> +	if (mux->lock)
+> +		spin_lock_irqsave(mux->lock, flags);
+> +
+
+use lock-free-or-not funciton
+
+> +	regmap_read(mux->regmap, mux->mux_ofs, &val);
+> +	orig = val;
+> +	val &= ~(mask << mux->mux_shift);
+> +	val |= index << mux->mux_shift;
+> +
+> +	if (val != orig) {
+> +		val = (mask << mux->mux_shift);
+> +		regmap_write(mux->regmap, mux->mux_clr_ofs, val);
+> +		val = (index << mux->mux_shift);
+> +		regmap_write(mux->regmap, mux->mux_set_ofs, val);
+> +
+
+why not use regmap_update_bits like function ?
+> +		if (mux->upd_shift >= 0)
+> +			regmap_write(mux->regmap, mux->upd_ofs,
+> +				     BIT(mux->upd_shift));
+> +	}
+> +
+> +	if (mux->lock)
+> +		spin_unlock_irqrestore(mux->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +const struct clk_ops mtk_mux_upd_ops = {
+> +	.enable = mtk_mux_enable,
+> +	.disable = mtk_mux_disable,
+> +	.is_enabled = mtk_mux_is_enabled,
+> +	.get_parent = mtk_mux_get_parent,
+> +	.set_parent = mtk_mux_set_parent,
+> +	.determine_rate = NULL,
+
+explicitly set as NULL can be removed
+> +};
+> +
+> +const struct clk_ops mtk_mux_clr_set_upd_ops = {
+> +	.enable = mtk_mux_enable_setclr,
+> +	.disable = mtk_mux_disable_setclr,
+> +	.is_enabled = mtk_mux_is_enabled,
+> +	.get_parent = mtk_mux_get_parent,
+> +	.set_parent = mtk_mux_set_parent_setclr,
+> +	.determine_rate = NULL,
+
+explicitly set as NULL can be removed
+> +};
+> +
+> +struct clk *mtk_clk_register_mux(const struct mtk_mux *mux,
+> +				 struct regmap *regmap,
+> +				 spinlock_t *lock)
+> +{
+> +	struct clk *clk;
+> +	struct clk_init_data init;
+> +	struct mtk_clk_mux *mtk_mux = NULL;
+> +	int ret;
+> +
+make declaration as reverse xmas tree
+
+> +	mtk_mux = kzalloc(sizeof(*mtk_mux), GFP_KERNEL);
+> +	if (!mtk_mux)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	init.name = mux->name;
+> +	init.flags = (mux->flags) | CLK_SET_RATE_PARENT;
+> +	init.parent_names = mux->parent_names;
+> +	init.num_parents = mux->num_parents;
+> +	init.ops = mux->ops;
+> +
+> +	mtk_mux->regmap = regmap;
+> +	mtk_mux->name = mux->name;
+> +	mtk_mux->mux_ofs = mux->mux_ofs;
+> +	mtk_mux->mux_set_ofs = mux->set_ofs;
+> +	mtk_mux->mux_clr_ofs = mux->clr_ofs;
+> +	mtk_mux->upd_ofs = mux->upd_ofs;
+> +	mtk_mux->mux_shift = mux->mux_shift;
+> +	mtk_mux->mux_width = mux->mux_width;
+> +	mtk_mux->gate_shift = mux->gate_shift;
+> +	mtk_mux->upd_shift = mux->upd_shift;
+> +
+> +	mtk_mux->lock = lock;
+> +	mtk_mux->hw.init = &init;
+> +
+> +	clk = clk_register(NULL, &mtk_mux->hw);
+> +	if (IS_ERR(clk)) {
+> +		ret = PTR_ERR(clk);
+
+
+ret is superfluous
+
+> +		goto err_out;
+> +	}
+> +
+> +	return clk;
+> +err_out:
+> +	kfree(mtk_mux);
+> +
+
+I felt err path can be optimized
+
+> +	return ERR_PTR(ret);
+> +}
+> diff --git a/drivers/clk/mediatek/clk-mux.h b/drivers/clk/mediatek/clk-mux.h
+> new file mode 100644
+> index 0000000..64f8e7c
+> --- /dev/null
+> +++ b/drivers/clk/mediatek/clk-mux.h
+> @@ -0,0 +1,38 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Copyright (c) 2018 MediaTek Inc.
+> + * Author: Owen Chen <owen.chen@mediatek.com>
+> + */
+> +
+> +#ifndef __DRV_CLK_MUX_H
+> +#define __DRV_CLK_MUX_H
+> +
+> +#include <linux/clk-provider.h>
+> +
+> +struct mtk_clk_mux {
+> +	struct clk_hw hw;
+> +	struct regmap *regmap;
+> +
+> +	const char *name;
+> +
+> +	int mux_set_ofs;
+> +	int mux_clr_ofs;
+> +	int mux_ofs;
+> +	int upd_ofs;
+> +
+> +	s8 mux_shift;
+> +	s8 mux_width;
+> +	s8 gate_shift;
+> +	s8 upd_shift;
+> +
+> +	spinlock_t *lock;
+> +};
+> +
+> +extern const struct clk_ops mtk_mux_upd_ops;
+> +extern const struct clk_ops mtk_mux_clr_set_upd_ops;
+> +
+
+
+extern  is superfluous
+
+> +struct clk *mtk_clk_register_mux(const struct mtk_mux *mux,
+> +				 struct regmap *regmap,
+> +				 spinlock_t *lock);
+> +
+> +#endif /* __DRV_CLK_MUX_H */
