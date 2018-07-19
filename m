@@ -1,208 +1,133 @@
-From: alex.popov@linux.com (Alexander Popov)
-Date: Thu, 19 Jul 2018 13:41:15 +0300
-Subject: [PATCH 2/2] arm64: Clear the stack
-In-Reply-To: <20180718211013.14512-3-labbott@redhat.com>
-References: <20180718211013.14512-1-labbott@redhat.com>
- <20180718211013.14512-3-labbott@redhat.com>
-Message-ID: <f590b536-5b8a-0cc4-c697-31675661b351@linux.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 19 Jul 2018 12:39:49 +0200
+Subject: [PATCH v8 09/26] kernel/cpu_pm: Manage runtime PM in the idle
+ path for CPUs
+In-Reply-To: <2205807.cU2puvubpP@aspire.rjw.lan>
+References: <20180620172226.15012-1-ulf.hansson@linaro.org>
+ <2056372.NMt4aPaF4h@aspire.rjw.lan> <2205807.cU2puvubpP@aspire.rjw.lan>
+Message-ID: <1726374.375PCQfjLZ@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Laura,
-
-Thanks again for your work.
-Please see some comments below.
-
-On 19.07.2018 00:10, Laura Abbott wrote:
-> Implementation of stackleak based heavily on the x86 version
+On Thursday, July 19, 2018 12:12:55 PM CEST Rafael J. Wysocki wrote:
+> On Wednesday, July 18, 2018 12:11:06 PM CEST Rafael J. Wysocki wrote:
+> > On Wednesday, June 20, 2018 7:22:09 PM CEST Ulf Hansson wrote:
+> > > To allow CPUs being power managed by PM domains, let's deploy support for
+> > > runtime PM for the CPU's corresponding struct device.
+> > > 
+> > > More precisely, at the point when the CPU is about to enter an idle state,
+> > > decrease the runtime PM usage count for its corresponding struct device,
+> > > via calling pm_runtime_put_sync_suspend(). Then, at the point when the CPU
+> > > resumes from idle, let's increase the runtime PM usage count, via calling
+> > > pm_runtime_get_sync().
+> > > 
+> > > Cc: Lina Iyer <ilina@codeaurora.org>
+> > > Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+> > > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > 
+> > I finally got to this one, sorry for the huge delay.
+> > 
+> > Let me confirm that I understand the code flow correctly.
+> > 
+> > > ---
+> > >  kernel/cpu_pm.c | 11 +++++++++++
+> > >  1 file changed, 11 insertions(+)
+> > > 
+> > > diff --git a/kernel/cpu_pm.c b/kernel/cpu_pm.c
+> > > index 67b02e138a47..492d4a83dca0 100644
+> > > --- a/kernel/cpu_pm.c
+> > > +++ b/kernel/cpu_pm.c
+> > > @@ -16,9 +16,11 @@
+> > >   */
+> > >  
+> > >  #include <linux/kernel.h>
+> > > +#include <linux/cpu.h>
+> > >  #include <linux/cpu_pm.h>
+> > >  #include <linux/module.h>
+> > >  #include <linux/notifier.h>
+> > > +#include <linux/pm_runtime.h>
+> > >  #include <linux/spinlock.h>
+> > >  #include <linux/syscore_ops.h>
+> > >  
+> > > @@ -91,6 +93,7 @@ int cpu_pm_enter(void)
+> > 
+> > This is called from a cpuidle driver's ->enter callback for the target state
+> > selected by the idle governor ->
+> > 
+> > >  {
+> > >  	int nr_calls;
+> > >  	int ret = 0;
+> > > +	struct device *dev = get_cpu_device(smp_processor_id());
+> > >  
+> > >  	ret = cpu_pm_notify(CPU_PM_ENTER, -1, &nr_calls);
+> > >  	if (ret)
+> > > @@ -100,6 +103,9 @@ int cpu_pm_enter(void)
+> > >  		 */
+> > >  		cpu_pm_notify(CPU_PM_ENTER_FAILED, nr_calls - 1, NULL);
+> > >  
+> > > +	if (!ret && dev && dev->pm_domain)
+> > > +		pm_runtime_put_sync_suspend(dev);
+> > 
+> > -> so this is going to invoke genpd_runtime_suspend() if the usage
+> > counter of dev is 0.
+> > 
+> > That will cause cpu_power_down_ok() to be called (because this is
+> > a CPU domain) and that will walk the domain cpumask and compute the
+> > estimated idle duration as the minimum of tick_nohz_get_next_wakeup()
+> > values over the CPUs in that cpumask.  [Note that the weight of the
+> > cpumask must be seriously limited for that to actually work, as this
+> > happens in the idle path.]  Next, it will return "true" if it can
+> > find a domain state with residency within the estimated idle
+> > duration.  [Note that this sort of overlaps with the idle governor's
+> > job.]
+> > 
+> > Next, __genpd_runtime_suspend() will be invoked to run the device-specific
+> > callback if any [Note that this has to be suitable for the idle path if
+> > present.] and genpd_stop_dev() runs (which, again, may invoke a callback)
+> > and genpd_power_off() runs under the domain lock (which must be a spinlock
+> > then).
+> > 
+> > > +
+> > >  	return ret;
+> > >  }
+> > >  EXPORT_SYMBOL_GPL(cpu_pm_enter);
+> > > @@ -118,6 +124,11 @@ EXPORT_SYMBOL_GPL(cpu_pm_enter);
+> > >   */
+> > >  int cpu_pm_exit(void)
+> > >  {
+> > > +	struct device *dev = get_cpu_device(smp_processor_id());
+> > > +
+> > > +	if (dev && dev->pm_domain)
+> > > +		pm_runtime_get_sync(dev);
+> > > +
+> > >  	return cpu_pm_notify(CPU_PM_EXIT, -1, NULL);
+> > >  }
+> > >  EXPORT_SYMBOL_GPL(cpu_pm_exit);
+> > > 
+> > 
+> > And this is called on wakeup when the cpuidle driver's ->enter callback
+> > is about to return and it reverses the suspend flow (except that the
+> > governor doesn't need to be called now).
+> > 
+> > Have I got that right?
 > 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> Since last time: Minor style cleanups. Re-wrote check_alloca to
-> correctly handle all stack types. While doing that, I also realized
-> current_top_of_stack was incorrect so I fixed that as well.
-> ---
->  arch/arm64/Kconfig                    |  1 +
->  arch/arm64/include/asm/processor.h    | 17 ++++++++++++++
->  arch/arm64/kernel/entry.S             |  7 ++++++
->  arch/arm64/kernel/process.c           | 32 +++++++++++++++++++++++++++
->  arch/arm64/kvm/hyp/Makefile           |  3 ++-
->  drivers/firmware/efi/libstub/Makefile |  3 ++-
->  include/linux/stackleak.h             |  1 +
->  7 files changed, 62 insertions(+), 2 deletions(-)
+> Assuming that I have got that right, there are concerns, mostly regarding
+> patch [07/26], but I will reply to that directly.
+
+Well, I haven't got that right, so never mind.
+
+There are a few minor things to address, but apart from that the general
+genpd patches look ready.
+
+> The $subject patch is fine by me by itself, but it obviously depends on the
+> previous ones.  Patches [01-02/26] are fine too, but they don't seem to be
+> particularly useful without the rest of the series.
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 42c090cf0292..216d36a49ab5 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -96,6 +96,7 @@ config ARM64
->  	select HAVE_ARCH_MMAP_RND_BITS
->  	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
->  	select HAVE_ARCH_SECCOMP_FILTER
-> +	select HAVE_ARCH_STACKLEAK
->  	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
->  	select HAVE_ARCH_TRACEHOOK
->  	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index a73ae1e49200..4f3062ee22c6 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -266,5 +266,22 @@ extern void __init minsigstksz_setup(void);
->  #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
->  #define SVE_GET_VL()	sve_get_current_vl()
->  
-> +/*
-> + * For CONFIG_STACKLEAK
+> As far as patches [10-26/26] go, I'd like to see some review comments and/or
+> tags from the people with vested interest in there, in particular from Daniel
+> on patch [12/26] and from Sudeep on the PSCI ones.
 
-Our config option is called CONFIG_GCC_PLUGIN_STACKLEAK.
+But this still holds.
 
-> + *
-> + * These need to be macros because otherwise we get stuck in a nightmare
-> + * of header definitions for the use of task_stack_page.
-> + */
-> +
-> +#define current_top_of_stack()		\
-> +({					\
-> +	unsigned long _low = 0;		\
-> +	unsigned long _high = 0;	\
-> +					\
-> +	current_stack_type(current, current_stack_pointer, &_low, &_high); \
-> +	_high;	\
-> +})
-
-Do you really need _low here? Ah, I see this in the previous patch:
-+	if (stack_low && stack_high) {
-+		*stack_low = low;
-+		*stack_high = high;
-+	}
-
-How about checking them against NULL separately? That would allow
-+	current_stack_type(current, current_stack_pointer, NULL, &_high);
-
-Also a minor comment - how about aligning backslashes?
-
-> +#define on_thread_stack()	(on_task_stack(current, current_stack_pointer, NULL, NULL))
-> +
->  #endif /* __ASSEMBLY__ */
->  #endif /* __ASM_PROCESSOR_H */
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 28ad8799406f..67d12016063d 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -431,6 +431,11 @@ tsk	.req	x28		// current thread_info
->  
->  	.text
->  
-> +	.macro	stackleak_erase
-> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
-> +	bl	stackleak_erase
-> +#endif
-> +	.endm
->  /*
->   * Exception vectors.
->   */
-> @@ -910,6 +915,7 @@ ret_fast_syscall:
->  	and	x2, x1, #_TIF_WORK_MASK
->  	cbnz	x2, work_pending
->  	enable_step_tsk x1, x2
-> +	stackleak_erase
->  	kernel_exit 0
->  ret_fast_syscall_trace:
->  	enable_daif
-> @@ -936,6 +942,7 @@ ret_to_user:
->  	cbnz	x2, work_pending
->  finish_ret_to_user:
->  	enable_step_tsk x1, x2
-> +	stackleak_erase
->  	kernel_exit 0
->  ENDPROC(ret_to_user)
->  
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index e10bc363f533..904defa36689 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -493,3 +493,35 @@ void arch_setup_new_exec(void)
->  {
->  	current->mm->context.flags = is_compat_task() ? MMCF_AARCH32 : 0;
->  }
-> +
-> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
-> +void __used stackleak_check_alloca(unsigned long size)
-> +{
-> +	unsigned long stack_left;
-> +	enum stack_type type;
-> +	unsigned long current_sp = current_stack_pointer;
-> +	unsigned long low, high;
-> +
-> +	type = current_stack_type(current, current_sp, &low, &high);
-> +	BUG_ON(type == STACK_TYPE_UNKNOWN);
-> +
-> +	stack_left = current_sp - low;
-> +
-> +	if (size >= stack_left) {
-> +		/*
-> +		 * Kernel stack depth overflow is detected, let's report that.
-> +		 * If CONFIG_VMAP_STACK is enabled, we can safely use BUG().
-> +		 * If CONFIG_VMAP_STACK is disabled, BUG() handling can corrupt
-> +		 * the neighbour memory. CONFIG_SCHED_STACK_END_CHECK calls
-> +		 * panic() in a similar situation, so let's do the same if that
-> +		 * option is on. Otherwise just use BUG() and hope for the best.
-> +		 */
-> +#if !defined(CONFIG_VMAP_STACK) && defined(CONFIG_SCHED_STACK_END_CHECK)
-> +		panic("alloca() over the kernel stack boundary\n");
-> +#else
-> +		BUG();
-> +#endif
-
-This comment and #if logic should be dropped, we should always use panic() here
-on arm64. Mark Rutland and I have worked out the solution for arm64 in this thread:
-http://openwall.com/lists/kernel-hardening/2018/05/11/12
-
-Rationale: on arm64 with CONFIG_VMAP_STACK, a stack overflow results in panic()
-anyway.
-
-> +	}
-> +}
-> +EXPORT_SYMBOL(stackleak_check_alloca);
-> +#endif
-> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> index 4313f7475333..2fabc2dc1966 100644
-> --- a/arch/arm64/kvm/hyp/Makefile
-> +++ b/arch/arm64/kvm/hyp/Makefile
-> @@ -3,7 +3,8 @@
->  # Makefile for Kernel-based Virtual Machine module, HYP part
->  #
->  
-> -ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
-> +ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING \
-> +		$(DISABLE_STACKLEAK_PLUGIN)
->  
->  KVM=../../../../virt/kvm
->  
-> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-> index a34e9290a699..25dd2a14560d 100644
-> --- a/drivers/firmware/efi/libstub/Makefile
-> +++ b/drivers/firmware/efi/libstub/Makefile
-> @@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
->  KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
->  				   -D__NO_FORTIFY \
->  				   $(call cc-option,-ffreestanding) \
-> -				   $(call cc-option,-fno-stack-protector)
-> +				   $(call cc-option,-fno-stack-protector) \
-> +				   $(DISABLE_STACKLEAK_PLUGIN)
->  
->  GCOV_PROFILE			:= n
->  KASAN_SANITIZE			:= n
-> diff --git a/include/linux/stackleak.h b/include/linux/stackleak.h
-> index b911b973d328..08420ec6b7c3 100644
-> --- a/include/linux/stackleak.h
-> +++ b/include/linux/stackleak.h
-> @@ -5,6 +5,7 @@
->  #include <linux/sched.h>
->  #include <linux/sched/task_stack.h>
->  
-> +#include <asm/stacktrace.h>
->  /*
->   * Check that the poison value points to the unused hole in the
->   * virtual memory map for your platform.
-> 
+Thanks,
+Rafael
