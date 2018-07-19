@@ -1,48 +1,41 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Thu, 19 Jul 2018 10:23:25 +0800
-Subject: [PATCH v11 03/15] powerpc, kexec_file: factor out memblock-based
- arch_kexec_walk_mem()
-In-Reply-To: <c8c09929-165a-b710-6993-0b149a0c3b99@arm.com>
-References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
- <20180711074203.3019-4-takahiro.akashi@linaro.org>
- <20180716122623.GB7160@dhcp-128-65.nay.redhat.com>
- <c8c09929-165a-b710-6993-0b149a0c3b99@arm.com>
-Message-ID: <20180719022325.GA2773@dhcp-128-65.nay.redhat.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 19 Jul 2018 10:24:26 +0800
+Subject: [PATCH V2] soc: imx: gpc: restrict register range for regmap
+ access
+In-Reply-To: <1531798126-24360-1-git-send-email-Anson.Huang@nxp.com>
+References: <1531798126-24360-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180719022424.GO4576@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
-On 07/18/18 at 05:52pm, James Morse wrote:
-> Hi Dave, Akashi,
+On Tue, Jul 17, 2018 at 11:28:46AM +0800, Anson Huang wrote:
+> GPC registers are NOT continuous, some registers are
+> reserved and accessing them from userspace will trigger
+> external abort, add regmap register access table to
+> avoid below abort:
 > 
-> On 16/07/18 13:26, Dave Young wrote:
-> > On 07/11/18 at 04:41pm, AKASHI Takahiro wrote:
-> >> Memblock list is another source for usable system memory layout.
-> >> So powerpc's arch_kexec_walk_mem() is moved to kexec_file.c so that
-> >> other memblock-based architectures, particularly arm64, can also utilise
-> >> it. A moved function is now renamed to kexec_walk_memblock() and merged
-> >> into the existing arch_kexec_walk_mem() for general use, either resource
-> >> list or memblock list.
-> >>
-> >> A consequent function will not work for kdump with memblock list, but
-> >> this will be fixed in the next patch.
-> > 
-> > If this breaks something, then it would be good to fold the following
-> > patch in this patch so that bisect can still work?
+> root at imx6slevk:~# cat /sys/kernel/debug/regmap/20dc000.gpc/registers
+> [  108.480477] Unhandled fault: imprecise external abort (0x1406) at 0xb6db5004
+> [  108.487985] pgd = 42b54bfd
+> [  108.490741] [b6db5004] *pgd=ba1b7831
+> [  108.494386] Internal error: : 1406 [#1] SMP ARM
+> [  108.498943] Modules linked in:
+> [  108.502043] CPU: 0 PID: 389 Comm: cat Not tainted 4.18.0-rc1-00074-gc9f1f60-dirty #482
+> [  108.509982] Hardware name: Freescale i.MX6 SoloLite (Device Tree)
+> [  108.516123] PC is at regmap_mmio_read32le+0x20/0x24
+> [  108.521031] LR is at regmap_mmio_read+0x40/0x60
+> [  108.525586] pc : [<c059cf74>]    lr : [<c059d1ac>]    psr: 20060093
+> [  108.531875] sp : eccf1d98  ip : eccf1da8  fp : eccf1da4
+> [  108.537122] r10: ec2d3800  r9 : eccf1f60  r8 : ecfc0000
+> [  108.542370] r7 : eccf1e2c  r6 : eccf1e2c  r5 : 00000028  r4 : ec338e00
+> [  108.548920] r3 : 00000000  r2 : eccf1e2c  r1 : f0980028  r0 : 00000000
+> [  108.555474] Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
+> [  108.562720] Control: 10c5387d  Table: acf4004a  DAC: 00000051
+> [  108.568491] Process cat (pid: 389, stack limit = 0xd4318a65)
+> [  108.574174] Stack: (0xeccf1d98 to 0xeccf2000)
 > 
-> This patch is just moving code from arch/powerpc that is generic.
-> powerpc doesn't support kdump via kexec_file, so nothing is damaged by adding
-> this new code in the next patch.
-> 
-> arm64 would need this kdump support, but it doesn't use it until patch 11.
+> Fixes: 721cabf6c660 ("soc: imx: move PGC handling to a new GPC driver")
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Ok, then I'm fine with it, thanks for the explanation.
-
-> 
-> 
-> Thanks,
-> 
-> James
-
-Thanks
-Dave
+Applied, thanks.
