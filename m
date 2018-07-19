@@ -1,61 +1,49 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Thu, 19 Jul 2018 23:23:56 +0530
-Subject: [PATCH 3/3] iommu/arm-smmu: Error out only if not enough context
- interrupts
-In-Reply-To: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
-References: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
-Message-ID: <20180719175356.14753-4-vivek.gautam@codeaurora.org>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Thu, 19 Jul 2018 23:14:03 +0530
+Subject: [PATCH v5 4/6] arm64: dts: actions: Enable I2C1 and I2C2 in
+ Bubblegum-96 board
+In-Reply-To: <20180719174405.7210-1-manivannan.sadhasivam@linaro.org>
+References: <20180719174405.7210-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180719174405.7210-5-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we check if the number of context banks is not equal to
-num_context_interrupts. However, there are booloaders such as, one
-on sdm845 that reserves few context banks and thus kernel views
-less than the total available context banks.
-So, although the hardware definition in device tree would mention
-the correct number of context interrupts, this number can be
-greater than the number of context banks visible to smmu in kernel.
-We should therefore error out only when the number of context banks
-is greater than the available number of context interrupts.
+Enable I2C1 and I2C2 exposed on the low speed expansion connector in
+Bubblegum-96 board.
 
-Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
-Suggested-by: Tomasz Figa <tfiga@chromium.org>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- drivers/iommu/arm-smmu.c | 19 +++++++++++++------
- 1 file changed, 13 insertions(+), 6 deletions(-)
+ arch/arm64/boot/dts/actions/s900-bubblegum-96.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 7c69736a30f8..4cb53bf4f423 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -2229,12 +2229,19 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
- 	if (err)
- 		return err;
+diff --git a/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts b/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
+index d0ba35df9015..57ae374cfb5a 100644
+--- a/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
++++ b/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
+@@ -7,6 +7,7 @@
+ /dts-v1/;
  
--	if (smmu->version == ARM_SMMU_V2 &&
--	    smmu->num_context_banks != smmu->num_context_irqs) {
--		dev_err(dev,
--			"found only %d context interrupt(s) but %d required\n",
--			smmu->num_context_irqs, smmu->num_context_banks);
--		return -ENODEV;
-+	if (smmu->version == ARM_SMMU_V2) {
-+		if (smmu->num_context_banks > smmu->num_context_irqs) {
-+			dev_err(dev,
-+			      "found only %d context irq(s) but %d required\n",
-+			      smmu->num_context_irqs, smmu->num_context_banks);
-+			return -ENODEV;
-+		} else if (smmu->num_context_banks < smmu->num_context_irqs) {
-+			/* loose extra context interrupts */
-+			dev_notice(dev,
-+			      "found %d context irq(s) but only %d required\n",
-+			      smmu->num_context_irqs, smmu->num_context_banks);
-+			smmu->num_context_irqs = smmu->num_context_banks;
-+		}
- 	}
+ #include "s900.dtsi"
++#include "s900-bubblegum-96-pins.dtsi"
  
- 	for (i = 0; i < smmu->num_global_irqs; ++i) {
+ / {
+ 	compatible = "ucrobotics,bubblegum-96", "actions,s900";
+@@ -35,6 +36,16 @@
+ 	clocks = <&cmu CLK_UART5>;
+ };
+ 
++&i2c1 {
++	status = "okay";
++	clocks = <&cmu CLK_I2C1>;
++};
++
++&i2c2 {
++	status = "okay";
++	clocks = <&cmu CLK_I2C2>;
++};
++
+ /*
+  * GPIO name legend: proper name = the GPIO line is used as GPIO
+  *         NC = not connected (pin out but not routed from the chip to
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+2.17.1
