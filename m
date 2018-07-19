@@ -1,192 +1,135 @@
-From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Thu, 19 Jul 2018 15:23:28 +0900
-Subject: [PATCH 2/3] ARM: dts: uniphier: add SPI node for UniPhier 32bit SoCs
-In-Reply-To: <1531981409-28396-1-git-send-email-hayashibara.keiji@socionext.com>
-References: <1531981409-28396-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <1531981409-28396-3-git-send-email-hayashibara.keiji@socionext.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Thu, 19 Jul 2018 08:25:38 +0200
+Subject: [RFC PATCH 4/8] mtd: rawnand: ams-delta: Optimize pointer
+ resolution on read/write
+In-Reply-To: <20180718235710.18242-5-jmkrzyszt@gmail.com>
+References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
+ <20180718235710.18242-5-jmkrzyszt@gmail.com>
+Message-ID: <20180719082538.222396bf@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+On Thu, 19 Jul 2018 01:57:06 +0200
+Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
 
-Add nodes of SPI controller for LD4, Pro4, sLD8, Pro5 and PXs2.
+> Further optimize processing speed of read/write callback functions by
+> resolving private structure pointer only once per callback and passing
+> it to all subfunctions instead of mtd_info.
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
----
- arch/arm/boot/dts/uniphier-ld4.dtsi  | 11 +++++++++++
- arch/arm/boot/dts/uniphier-pro4.dtsi | 22 ++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-pro5.dtsi | 33 +++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-pxs2.dtsi | 22 ++++++++++++++++++++++
- arch/arm/boot/dts/uniphier-sld8.dtsi | 11 +++++++++++
- 5 files changed, 99 insertions(+)
+Not sure this has a real impact on perfs, but I also prefer not using
+mtd_info objects within NAND drivers, so I'm good with the change
+itself (its probably worth changing the commit message though)
 
-diff --git a/arch/arm/boot/dts/uniphier-ld4.dtsi b/arch/arm/boot/dts/uniphier-ld4.dtsi
-index 37950ad..b7849be 100644
---- a/arch/arm/boot/dts/uniphier-ld4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ld4.dtsi
-@@ -63,6 +63,17 @@
- 			cache-level = <2>;
- 		};
- 
-+		spi: spi at 54006000 {
-+			compatible = "socionext,uniphier-scssi";
-+			status = "disabled";
-+			reg = <0x54006000 0x100>;
-+			interrupts = <0 39 4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi0>;
-+			clocks = <&peri_clk 11>;
-+			resets = <&peri_rst 11>;
-+		};
-+
- 		serial0: serial at 54006800 {
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/uniphier-pro4.dtsi b/arch/arm/boot/dts/uniphier-pro4.dtsi
-index 49539f0..d0c3e4a 100644
---- a/arch/arm/boot/dts/uniphier-pro4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pro4.dtsi
-@@ -71,6 +71,17 @@
- 			cache-level = <2>;
- 		};
- 
-+		spi0: spi at 54006000 {
-+			compatible = "socionext,uniphier-scssi";
-+			status = "disabled";
-+			reg = <0x54006000 0x100>;
-+			interrupts = <0 39 4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi0>;
-+			clocks = <&peri_clk 11>;
-+			resets = <&peri_rst 11>;
-+		};
-+
- 		serial0: serial at 54006800 {
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
-@@ -115,6 +126,17 @@
- 			resets = <&peri_rst 3>;
- 		};
- 
-+		spi1: spi at 54007000 {
-+			compatible = "socionext,uniphier-mcssi";
-+			status = "disabled";
-+			reg = <0x54007000 0x2000>;
-+			interrupts = <0 38 4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi1>;
-+			clocks = <&peri_clk 12>;
-+			resets = <&peri_rst 12>;
-+		};
-+
- 		gpio: gpio at 55000000 {
- 			compatible = "socionext,uniphier-gpio";
- 			reg = <0x55000000 0x200>;
-diff --git a/arch/arm/boot/dts/uniphier-pro5.dtsi b/arch/arm/boot/dts/uniphier-pro5.dtsi
-index 06c2cef..606573c 100644
---- a/arch/arm/boot/dts/uniphier-pro5.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pro5.dtsi
-@@ -156,6 +156,28 @@
- 			cache-level = <3>;
- 		};
- 
-+		spi0: spi at 54006000 {
-+			compatible = "socionext,uniphier-scssi";
-+			status = "disabled";
-+			reg = <0x54006000 0x100>;
-+			interrupts = <0 39 4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi0>;
-+			clocks = <&peri_clk 11>;
-+			resets = <&peri_rst 11>;
-+		};
-+
-+		spi1: spi at 54006100 {
-+			compatible = "socionext,uniphier-scssi";
-+			status = "disabled";
-+			reg = <0x54006100 0x100>;
-+			interrupts = <0 216 4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi1>;
-+			clocks = <&peri_clk 11>;
-+			resets = <&peri_rst 11>;
-+		};
-+
- 		serial0: serial at 54006800 {
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
-@@ -200,6 +222,17 @@
- 			resets = <&peri_rst 3>;
- 		};
- 
-+		spi2: spi at 54007000 {
-+			compatible = "socionext,uniphier-mcssi";
-+			status = "disabled";
-+			reg = <0x54007000 0x2000>;
-+			interrupts = <0 38 4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi2>;
-+			clocks = <&peri_clk 12>;
-+			resets = <&peri_rst 12>;
-+		};
-+
- 		gpio: gpio at 55000000 {
- 			compatible = "socionext,uniphier-gpio";
- 			reg = <0x55000000 0x200>;
-diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-index 641d961..15b4f75 100644
---- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-@@ -164,6 +164,28 @@
- 			cache-level = <2>;
- 		};
- 
-+		spi0: spi at 54006000 {
-+			compatible = "socionext,uniphier-scssi";
-+			status = "disabled";
-+			reg = <0x54006000 0x100>;
-+			interrupts = <0 39 4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi0>;
-+			clocks = <&peri_clk 11>;
-+			resets = <&peri_rst 11>;
-+		};
-+
-+		spi1: spi at 54006100 {
-+			compatible = "socionext,uniphier-scssi";
-+			status = "disabled";
-+			reg = <0x54006100 0x100>;
-+			interrupts = <0 216 4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi1>;
-+			clocks = <&peri_clk 11>;
-+			resets = <&peri_rst 11>;
-+		};
-+
- 		serial0: serial at 54006800 {
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/uniphier-sld8.dtsi b/arch/arm/boot/dts/uniphier-sld8.dtsi
-index e9b9b4f..83f832b 100644
---- a/arch/arm/boot/dts/uniphier-sld8.dtsi
-+++ b/arch/arm/boot/dts/uniphier-sld8.dtsi
-@@ -63,6 +63,17 @@
- 			cache-level = <2>;
- 		};
- 
-+		spi: spi at 54006000 {
-+			compatible = "socionext,uniphier-scssi";
-+			status = "disabled";
-+			reg = <0x54006000 0x100>;
-+			interrupts = <0 39 4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_spi0>;
-+			clocks = <&peri_clk 11>;
-+			resets = <&peri_rst 11>;
-+		};
-+
- 		serial0: serial at 54006800 {
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
--- 
-2.7.4
+> 
+> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+> ---
+>  drivers/mtd/nand/raw/ams-delta.c | 44 +++++++++++++++++++++++-----------------
+>  1 file changed, 25 insertions(+), 19 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/raw/ams-delta.c b/drivers/mtd/nand/raw/ams-delta.c
+> index dfefcd79b420..d7e4c9dbef67 100644
+> --- a/drivers/mtd/nand/raw/ams-delta.c
+> +++ b/drivers/mtd/nand/raw/ams-delta.c
+> @@ -72,10 +72,9 @@ static const struct mtd_partition partition_info[] = {
+>  	  .size		=  3 * SZ_256K },
+>  };
+>  
+> -static void ams_delta_write_next_byte(struct mtd_info *mtd, u_char byte)
+> +static void ams_delta_write_next_byte(struct ams_delta_nand *priv, u_char byte)
+>  {
+> -	struct nand_chip *this = mtd_to_nand(mtd);
+> -	struct ams_delta_nand *priv = nand_get_controller_data(this);
+> +	struct nand_chip *this = &priv->nand_chip;
+>  
+>  	writew(byte, this->IO_ADDR_W);
+>  	gpiod_set_value(priv->gpiod_nwe, 0);
+> @@ -83,21 +82,18 @@ static void ams_delta_write_next_byte(struct mtd_info *mtd, u_char byte)
+>  	gpiod_set_value(priv->gpiod_nwe, 1);
+>  }
+>  
+> -static void ams_delta_write_byte(struct mtd_info *mtd, u_char byte)
+> +static void ams_delta_write_first_byte(struct ams_delta_nand *priv, u_char byte)
+>  {
+> -	struct nand_chip *this = mtd_to_nand(mtd);
+> -	struct ams_delta_nand *priv = nand_get_controller_data(this);
+>  	void __iomem *io_base = priv->io_base;
+>  
+>  	writew(0, io_base + OMAP_MPUIO_IO_CNTL);
+>  
+> -	ams_delta_write_next_byte(mtd, byte);
+> +	ams_delta_write_next_byte(priv, byte);
+>  }
+>  
+> -static u_char ams_delta_read_next_byte(struct mtd_info *mtd)
+> +static u_char ams_delta_read_next_byte(struct ams_delta_nand *priv)
+>  {
+> -	struct nand_chip *this = mtd_to_nand(mtd);
+> -	struct ams_delta_nand *priv = nand_get_controller_data(this);
+> +	struct nand_chip *this = &priv->nand_chip;
+>  	u_char res;
+>  
+>  	gpiod_set_value(priv->gpiod_nre, 0);
+> @@ -108,36 +104,46 @@ static u_char ams_delta_read_next_byte(struct mtd_info *mtd)
+>  	return res;
+>  }
+>  
+> -static u_char ams_delta_read_byte(struct mtd_info *mtd)
+> +static u_char ams_delta_read_first_byte(struct ams_delta_nand *priv)
+>  {
+> -	struct nand_chip *this = mtd_to_nand(mtd);
+> -	struct ams_delta_nand *priv = nand_get_controller_data(this);
+>  	void __iomem *io_base = priv->io_base;
+>  
+>  	writew(~0, io_base + OMAP_MPUIO_IO_CNTL);
+>  
+> -	return ams_delta_read_next_byte(mtd);
+> +	return ams_delta_read_next_byte(priv);
+> +}
+> +
+> +static u_char ams_delta_read_byte(struct mtd_info *mtd)
+> +{
+> +	struct nand_chip *this = mtd_to_nand(mtd);
+> +	struct ams_delta_nand *priv = nand_get_controller_data(this);
+> +
+> +	return ams_delta_read_first_byte(priv);
+>  }
+>  
+>  static void ams_delta_write_buf(struct mtd_info *mtd, const u_char *buf,
+>  				int len)
+>  {
+> +	struct nand_chip *this = mtd_to_nand(mtd);
+> +	struct ams_delta_nand *priv = nand_get_controller_data(this);
+>  	int i;
+>  
+>  	if (len > 0)
+> -		ams_delta_write_byte(mtd, buf[0]);
+> +		ams_delta_write_first_byte(priv, buf[0]);
+>  	for (i = 1; i < len; i++)
+> -		ams_delta_write_next_byte(mtd, buf[i]);
+> +		ams_delta_write_next_byte(priv, buf[i]);
+>  }
+>  
+>  static void ams_delta_read_buf(struct mtd_info *mtd, u_char *buf, int len)
+>  {
+> +	struct nand_chip *this = mtd_to_nand(mtd);
+> +	struct ams_delta_nand *priv = nand_get_controller_data(this);
+>  	int i;
+>  
+>  	if (len > 0)
+> -		buf[0] = ams_delta_read_byte(mtd);
+> +		buf[0] = ams_delta_read_first_byte(priv);
+>  	for (i = 1; i < len; i++)
+> -		buf[i] = ams_delta_read_next_byte(mtd);
+> +		buf[i] = ams_delta_read_next_byte(priv);
+>  }
+>  
+>  /*
+> @@ -161,7 +167,7 @@ static void ams_delta_hwcontrol(struct mtd_info *mtd, int cmd,
+>  	}
+>  
+>  	if (cmd != NAND_CMD_NONE)
+> -		ams_delta_write_byte(mtd, cmd);
+> +		ams_delta_write_first_byte(priv, cmd);
+>  }
+>  
+>  static int ams_delta_nand_ready(struct mtd_info *mtd)
