@@ -1,79 +1,92 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 19 Jul 2018 17:32:43 +0200
-Subject: [PATCH v3 3/3] net: add MTD support to eth_platform_get_mac_address()
+Date: Thu, 19 Jul 2018 17:32:41 +0200
+Subject: [PATCH v3 1/3] net: split eth_platform_get_mac_address() into
+ subroutines
 In-Reply-To: <20180719153243.20944-1-brgl@bgdev.pl>
 References: <20180719153243.20944-1-brgl@bgdev.pl>
-Message-ID: <20180719153243.20944-4-brgl@bgdev.pl>
+Message-ID: <20180719153243.20944-2-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-MTD doesn't support nvmem yet. Some platforms use MTD to read the MAC
-address from SPI flash. If we want this function to generalize reading
-the MAC address, we need to separately try to use MTD.
+We want do add more sources from which to read the MAC address. In
+order to avoid bloating this function too much, start by splitting it
+into subroutines, each of which takes care of reading the MAC from
+one source.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- net/ethernet/eth.c | 33 ++++++++++++++++++++++++++++++++-
- 1 file changed, 32 insertions(+), 1 deletion(-)
+ net/ethernet/eth.c | 48 +++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 37 insertions(+), 11 deletions(-)
 
 diff --git a/net/ethernet/eth.c b/net/ethernet/eth.c
-index 98bc280b8a62..a0d5e4477afc 100644
+index ee28440f57c5..cf54cdf042b7 100644
 --- a/net/ethernet/eth.c
 +++ b/net/ethernet/eth.c
-@@ -55,6 +55,7 @@
- #include <linux/of_net.h>
- #include <linux/pci.h>
- #include <linux/nvmem-consumer.h>
-+#include <linux/mtd/mtd.h>
- #include <net/dst.h>
- #include <net/arp.h>
- #include <net/sock.h>
-@@ -593,6 +594,36 @@ static int mac_address_from_nvmem(struct device *dev, u8 *mac_addr)
- 	return rv;
+@@ -525,26 +525,52 @@ unsigned char * __weak arch_get_platform_mac_address(void)
+ 	return NULL;
  }
  
-+#ifdef CONFIG_MTD
-+static int mac_address_from_mtd(u8 *mac_addr)
-+{
-+	struct mtd_info *mtd;
-+	size_t alen;
-+	int rv = 0;
+-int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
++static int mac_address_from_of(struct device *dev, u8 *mac_addr)
+ {
+ 	const unsigned char *addr;
+-	struct device_node *dp;
++	struct device_node *np;
+ 
+-	if (dev_is_pci(dev))
+-		dp = pci_device_to_OF_node(to_pci_dev(dev));
+-	else
+-		dp = dev->of_node;
++	np = dev_is_pci(dev) ? pci_device_to_OF_node(to_pci_dev(dev))
++			     : dev->of_node;
+ 
+-	addr = NULL;
+-	if (dp)
+-		addr = of_get_mac_address(dp);
+-	if (!addr)
+-		addr = arch_get_platform_mac_address();
++	if (!np)
++		return -ENODEV;
+ 
++	addr = of_get_mac_address(np);
+ 	if (!addr)
+ 		return -ENODEV;
+ 
++	if (!addr || !is_valid_ether_addr(addr))
++		return -ENODEV;
 +
-+	mtd = get_mtd_device_nm("MAC-Address");
-+	if (IS_ERR(mtd))
-+		return PTR_ERR(mtd);
-+
-+	rv = mtd_read(mtd, 0, ETH_ALEN, &alen, mac_addr);
-+	if (rv)
-+		goto put_mtd;
-+
-+	if (alen != ETH_ALEN || !is_valid_ether_addr(mac_addr))
-+		rv = -ENODEV;
-+
-+put_mtd:
-+	put_mtd_device(mtd);
-+
-+	return rv;
++	ether_addr_copy(mac_addr, addr);
++	return 0;
 +}
-+#else /* CONFIG_MTD */
-+static int mac_address_from_mtd(u8 *mac_addr)
++
++static int mac_address_from_arch(u8 *mac_addr)
 +{
++	const unsigned char *addr;
++
++	addr = arch_get_platform_mac_address();
++	if (!addr || !is_valid_ether_addr(addr))
++		return -ENODEV;
++
+ 	ether_addr_copy(mac_addr, addr);
+ 	return 0;
+ }
++
++int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
++{
++	int rv;
++
++	rv = mac_address_from_of(dev, mac_addr);
++	if (!rv)
++		return 0;
++
++	rv = mac_address_from_arch(mac_addr);
++	if (!rv)
++		return 0;
++
 +	return -ENODEV;
 +}
-+#endif /* CONFIG_MTD */
-+
- int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
- {
- 	int rv;
-@@ -609,6 +640,6 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
- 	if (!rv)
- 		return 0;
- 
--	return -ENODEV;
-+	return mac_address_from_mtd(mac_addr);
- }
  EXPORT_SYMBOL(eth_platform_get_mac_address);
 -- 
 2.17.1
