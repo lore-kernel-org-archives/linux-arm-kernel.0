@@ -1,135 +1,31 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Thu, 19 Jul 2018 15:37:22 +0300
-Subject: [PATCH v2 2/3] net: add support for nvmem to
- eth_platform_get_mac_address()
-In-Reply-To: <CAMRc=Mdu5CLA99p48nNFZBSFHBKiERzp-m59vKDDe5STjjKZNA@mail.gmail.com>
-References: <20180719082028.26116-1-brgl@bgdev.pl>
- <20180719082028.26116-3-brgl@bgdev.pl>
- <20180719084503.tfv6jllsukk2zv3f@mwanda>
- <CAMpxmJUgyB1hYi-G3KVxMsm0P+aKGuHOB8LSuH+bJbYfjengJA@mail.gmail.com>
- <20180719090929.arbysqo2bk3esoar@mwanda>
- <CAMRc=Mdu5CLA99p48nNFZBSFHBKiERzp-m59vKDDe5STjjKZNA@mail.gmail.com>
-Message-ID: <20180719123722.sk5fcih6pufy4wpd@mwanda>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 19 Jul 2018 09:45:56 -0300
+Subject: [PATCH] ARM: dts: vf610: Add ZII CFU1 board
+In-Reply-To: <20180719005941.10458-1-andrew.smirnov@gmail.com>
+References: <20180719005941.10458-1-andrew.smirnov@gmail.com>
+Message-ID: <CAOMZO5D1rKH+_wuJrhD6Cr4psQwnk7CHVWm6qi0Jv7vnTiazUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 12:06:51PM +0200, Bartosz Golaszewski wrote:
-> It looks simpler as long as you don't add all the new routines
-> resulting from this approach. I've just tried to quickly implement
-> this solution and it resulted in much bigger and duplicated code
-> (checking the validity of mac_addr, copying it etc.). I would prefer
-> the current approach and would like to read someone else's opinion on
-> that.
+Hi Andrey,
 
-It's not too bad.  There is two extra ether_addr_copy() calls and one
-extra is_valid_ether_addr().  There are two extra alen declarations and
-one extra addr declaration.  The functions don't share *that* much code.
+On Wed, Jul 18, 2018 at 9:59 PM, Andrey Smirnov
+<andrew.smirnov@gmail.com> wrote:
 
-regards,
-dan carpenter
+> +/ {
+> +       model = "ZII VF610 CFU1 Board";
+> +       compatible = "zii,vf610cfu1", "zii,vf610dev", "fsl,vf610";
+> +
+> +       chosen {
+> +               stdout-path = &uart0;
+> +       };
+> +
+> +       memory {
 
-diff --git a/net/ethernet/eth.c b/net/ethernet/eth.c
-index fd8faa0dfa61..8ab7289a5069 100644
---- a/net/ethernet/eth.c
-+++ b/net/ethernet/eth.c
-@@ -54,6 +54,8 @@
- #include <linux/if_ether.h>
- #include <linux/of_net.h>
- #include <linux/pci.h>
-+#include <linux/nvmem-consumer.h>
-+#include <linux/mtd/mtd.h>
- #include <net/dst.h>
- #include <net/arp.h>
- #include <net/sock.h>
-@@ -525,7 +527,7 @@ unsigned char * __weak arch_get_platform_mac_address(void)
- 	return NULL;
- }
- 
--int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
-+static int of_eth_get_mac_address(struct device *dev, u8 *mac_addr)
- {
- 	const unsigned char *addr;
- 	struct device_node *dp;
-@@ -547,4 +549,82 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
- 	ether_addr_copy(mac_addr, addr);
- 	return 0;
- }
-+
-+static int nvmem_eth_get_mac_address(struct device *dev, u8 *mac_addr)
-+{
-+	struct nvmem_cell *nvmem;
-+	unsigned char *addr;
-+	size_t alen;
-+	int ret = 0;
-+
-+	nvmem = nvmem_cell_get(dev, "mac-address");
-+	if (PTR_ERR(nvmem) == -EPROBE_DEFER)
-+		/* We may have a lookup registered for MAC address but the
-+		 * corresponding nvmem provider hasn't been registered yet.
-+		 */
-+		return -EPROBE_DEFER;
-+	if (IS_ERR(nvmem))
-+		return PTR_ERR(nvmem);
-+	addr = nvmem_cell_read(nvmem, &alen);
-+	if (IS_ERR(addr)) {
-+		ret = PTR_ERR(addr);
-+		goto put_nvmem;
-+	}
-+	if (alen != ETH_ALEN || !is_valid_ether_addr(addr)) {
-+		ret = -EINVAL;
-+		goto free_addr;
-+	}
-+	ether_addr_copy(mac_addr, addr);
-+free_addr:
-+	kfree(addr);
-+put_nvmem:
-+	nvmem_cell_put(nvmem);
-+	return ret;
-+}
-+
-+static int mtd_eth_get_mac_address(struct device *dev, u8 *mac_addr)
-+{
-+	struct mtd_info *mtd;
-+	u8 addrbuf[ETH_ALEN];
-+	size_t alen;
-+	int ret;
-+
-+	/* This function should go away as soon as MTD gets nvmem support. */
-+	if (!IS_ENABLED(CONFIG_MTD))
-+		return -ENODEV;
-+
-+	mtd = get_mtd_device_nm("MAC-Address");
-+	if (IS_ERR(mtd))
-+		return PTR_ERR(mtd);
-+	ret = mtd_read(mtd, 0, ETH_ALEN, &alen, addrbuf);
-+	if (ret)
-+		goto put_mtd;
-+	if (!is_valid_ether_addr(addrbuf)) {
-+		ret = -EINVAL;
-+		goto put_mtd;
-+	}
-+	ether_addr_copy(mac_addr, addrbuf);
-+put_mtd:
-+	put_mtd_device(mtd);
-+	return ret;
-+}
-+
-+int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
-+{
-+	int ret;
-+
-+	ret = of_eth_get_mac_address(dev, mac_addr);
-+	if (!ret)
-+		return 0;
-+	ret = nvmem_eth_get_mac_address(dev, mac_addr);
-+	if (ret == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
-+	if (!ret)
-+		return 0;
-+	ret = mtd_eth_get_mac_address(dev, mac_addr);
-+	if (!ret)
-+		return 0;
-+
-+	return -ENODEV;
-+}
- EXPORT_SYMBOL(eth_platform_get_mac_address);
+memory at 80000000 to avoid dtc warnings with W=1, please.
+
+Please make sure that this patch does not introduce any W=1 warning.
+
+With this fixed:
+
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
