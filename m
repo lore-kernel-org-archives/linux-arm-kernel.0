@@ -1,149 +1,131 @@
-From: hari.vyas@broadcom.com (Hari Vyas)
-Date: Thu, 19 Jul 2018 15:18:54 +0530
-Subject: [PATCH] arm64: fix for restoring console loglevel after handling traps
-In-Reply-To: <1531993734-1463-1-git-send-email-hari.vyas@broadcom.com>
-References: <1531993734-1463-1-git-send-email-hari.vyas@broadcom.com>
-Message-ID: <1531993734-1463-2-git-send-email-hari.vyas@broadcom.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 19 Jul 2018 10:50:58 +0100
+Subject: [PATCH] drivers/firmware: psci_checker: stash and use
+ topology_core_cpumask for hotplug tests
+In-Reply-To: <20180718164930.GB21924@red-moon>
+References: <1531913132-21022-1-git-send-email-sudeep.holla@arm.com>
+ <20180718164930.GB21924@red-moon>
+Message-ID: <20180719095058.GA8702@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As part of handling traps, console loglevel is set to max i.e.
-motormouth to provide maximum log information but this is not
-restored after graceful handling of culprit user level process.
+On Wed, Jul 18, 2018 at 05:49:30PM +0100, Lorenzo Pieralisi wrote:
+> On Wed, Jul 18, 2018 at 12:25:32PM +0100, Sudeep Holla wrote:
+> > Commit 7f9545aa1a91 ("arm64: smp: remove cpu and numa topology
+> > information when hotplugging out CPU") updates the cpu topology when
+> > the CPU is hotplugged out. However the PSCI checker code uses the
+> > topology_core_cpumask pointers for some of the cpu hotplug testing.
+> > Since the pointer to the core_cpumask of the first CPU in the group
+> > is used, which when that CPU itself is hotpugged out is just set to
+> > itself, the testing terminates after that particular CPU is tested out.
+> > But the intention of this tests is to cover all the CPU in the group.
+> > 
+> > In order to support that, we need to stash the topology_core_cpumask
+> > before the start of the test and use that value instead of pointer to
+> > a cpumask which will be updated on CPU hotplug.
+> > 
+> > Fixes: 7f9545aa1a91a9a4 ("arm64: smp: remove cpu and numa topology
+> > 	information when hotplugging out CPU")
+> > Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> > Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> > ---
+> >  drivers/firmware/psci_checker.c | 30 ++++++++++++++++++++----------
+> >  1 file changed, 20 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/drivers/firmware/psci_checker.c b/drivers/firmware/psci_checker.c
+> > index bb1c068bff19..e330c6cb45f5 100644
+> > --- a/drivers/firmware/psci_checker.c
+> > +++ b/drivers/firmware/psci_checker.c
+> > @@ -77,21 +77,23 @@ static int psci_ops_check(void)
+> >  	return 0;
+> >  }
+> >  
+> > -static int find_cpu_groups(const struct cpumask *cpus,
+> > -			   const struct cpumask **cpu_groups)
+> > +static int find_cpu_groups(cpumask_var_t *cpu_groups)
+> >  {
+> >  	unsigned int nb = 0;
+> >  	cpumask_var_t tmp;
+> >  
+> >  	if (!alloc_cpumask_var(&tmp, GFP_KERNEL))
+> >  		return -ENOMEM;
+> > -	cpumask_copy(tmp, cpus);
+> > +	cpumask_copy(tmp, cpu_online_mask);
+> >  
+> >  	while (!cpumask_empty(tmp)) {
+> >  		const struct cpumask *cpu_group =
+> >  			topology_core_cpumask(cpumask_any(tmp));
+> >  
+> > -		cpu_groups[nb++] = cpu_group;
+> > +		if (cpu_groups && cpu_groups[nb])
+> > +			cpumask_copy(cpu_groups[nb], cpu_group);
+> > +
+> > +		nb++;
+> >  		cpumask_andnot(tmp, tmp, cpu_group);
+> >  	}
+> >  
+> > @@ -169,25 +171,31 @@ static unsigned int down_and_up_cpus(const struct cpumask *cpus,
+> >  static int hotplug_tests(void)
+> >  {
+> >  	int err;
+> > -	cpumask_var_t offlined_cpus;
+> > +	cpumask_var_t offlined_cpus, *cpu_groups;
+> >  	int i, nb_cpu_group;
+> > -	const struct cpumask **cpu_groups;
+> >  	char *page_buf;
+> >  
+> > +	/* first run to just get the number of cpu groups */
+> > +	nb_cpu_group = find_cpu_groups(NULL);
+> > +
+> >  	err = -ENOMEM;
+> >  	if (!alloc_cpumask_var(&offlined_cpus, GFP_KERNEL))
+> >  		return err;
+> > -	/* We may have up to nb_available_cpus cpu_groups. */
+> > -	cpu_groups = kmalloc_array(nb_available_cpus, sizeof(*cpu_groups),
+> > -				   GFP_KERNEL);
+> > +	cpu_groups = kcalloc(nb_cpu_group, sizeof(cpu_groups), GFP_KERNEL);
+> >  	if (!cpu_groups)
+> >  		goto out_free_cpus;
+> > +
+> > +	for (i = 0; i < nb_cpu_group; ++i)
+> > +		if (!alloc_cpumask_var(&cpu_groups[i], GFP_KERNEL))
+> > +			goto out_free_cpu_groups;
+> > +
+> >  	page_buf = (char *)__get_free_page(GFP_KERNEL);
+> >  	if (!page_buf)
+> >  		goto out_free_cpu_groups;
+> >  
+> >  	err = 0;
+> > -	nb_cpu_group = find_cpu_groups(cpu_online_mask, cpu_groups);
+> > +	/* second run to populate/copy the cpumask */
+> > +	nb_cpu_group = find_cpu_groups(cpu_groups);
+> >  
+> >  	/*
+> >  	 * Of course the last CPU cannot be powered down and cpu_down() should
+> > @@ -212,6 +220,8 @@ static int hotplug_tests(void)
+> >  
+> >  	free_page((unsigned long)page_buf);
+> >  out_free_cpu_groups:
+> > +	for (i = 0; i < nb_cpu_group; ++i)
+> > +		free_cpumask_var(cpu_groups[i]);
+> >  	kfree(cpu_groups);
+> >  out_free_cpus:
+> >  	free_cpumask_var(offlined_cpus);
+> 
+> Hi Sudeep,
+> 
+> thanks for the patch. I reckon that adding two functions, say,
+> alloc_cpu_groups() and free_cpu_groups() would make the code
+> more readable instead of relying on find_cpu_groups() to first
+> count then copy; it is for readability rather than correctness.
+> 
 
-As console loglevel is set to maximum, this causes unnecessary
-debug messages from modules which supports dynamic debugging.
-One such example is pci module which prints lot of unnecessary
-debug message while rescanning pci device.
+I agree, I can say I was lazy and started trying to keep delta small.
+I will respin.
 
-Issue is fixed by providing separate functions for changing
-console loglevel message, saving previous console loglevel
-and restoring loglevel.
-
-Currently loglevel is restored from arm64 traps handling where
-issue was observed but same can be adapted from other (platform)
-specific code on need basis.
-
-Signed-off-by: Hari Vyas <hari.vyas@broadcom.com>
----
- arch/arm64/kernel/traps.c |  6 +++++-
- include/linux/printk.h    | 38 +++++++++++++++++++++++++++++++++++---
- kernel/printk/printk.c    |  3 +++
- 3 files changed, 43 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index d399d45..6d37995 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -211,6 +211,8 @@ void die(const char *str, struct pt_regs *regs, int err)
- 
- 	bust_spinlocks(0);
- 	add_taint(TAINT_DIE, LOCKDEP_NOW_UNRELIABLE);
-+
-+	restore_console_loglevel();
- 	oops_exit();
- 
- 	if (in_interrupt())
-@@ -624,6 +626,7 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
- 	die("Oops - bad mode", regs, 0);
- 	local_daif_mask();
- 	panic("bad mode");
-+	restore_console_loglevel();
- }
- 
- /*
-@@ -680,6 +683,7 @@ asmlinkage void handle_bad_stack(struct pt_regs *regs)
- 	 * to get a better stack trace.
- 	 */
- 	nmi_panic(NULL, "kernel stack overflow");
-+	restore_console_loglevel();
- 	cpu_park_loop();
- }
- #endif
-@@ -694,7 +698,7 @@ void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr)
- 		__show_regs(regs);
- 
- 	nmi_panic(regs, "Asynchronous SError Interrupt");
--
-+	restore_console_loglevel();
- 	cpu_park_loop();
- 	unreachable();
- }
-diff --git a/include/linux/printk.h b/include/linux/printk.h
-index 6d7e800..7c261f8 100644
---- a/include/linux/printk.h
-+++ b/include/linux/printk.h
-@@ -60,22 +60,54 @@ static inline const char *printk_skip_headers(const char *buffer)
-  */
- #define CONSOLE_LOGLEVEL_DEFAULT CONFIG_CONSOLE_LOGLEVEL_DEFAULT
- 
-+#define LOGLEVEL_STACK_MAX 4
-+#define LOGLEVEL_STACK_EMPTY -1
- extern int console_printk[];
-+extern int stack_pos;
-+extern int old_console_loglevel[];
- 
- #define console_loglevel (console_printk[0])
- #define default_message_loglevel (console_printk[1])
- #define minimum_console_loglevel (console_printk[2])
- #define default_console_loglevel (console_printk[3])
- 
-+static inline void set_console_loglevel(int loglevel)
-+{
-+	console_loglevel = loglevel;
-+}
-+
-+static inline int get_console_loglevel(void)
-+{
-+	return console_loglevel;
-+}
-+
-+/* Sets new console log level and saves previous one */
-+static inline void break_console_loglevel(int loglevel)
-+{
-+	int current_loglevel = get_console_loglevel();
-+
-+	if (loglevel != current_loglevel) {
-+		if (stack_pos < LOGLEVEL_STACK_MAX)
-+			old_console_loglevel[++stack_pos] = current_loglevel;
-+		set_console_loglevel(loglevel);
-+	}
-+}
-+
-+/* Restores previous console log level */
-+static inline void restore_console_loglevel(void)
-+{
-+	if (stack_pos > LOGLEVEL_STACK_EMPTY)
-+		console_loglevel = old_console_loglevel[stack_pos--];
-+}
-+
- static inline void console_silent(void)
- {
--	console_loglevel = CONSOLE_LOGLEVEL_SILENT;
-+	break_console_loglevel(CONSOLE_LOGLEVEL_SILENT);
- }
- 
- static inline void console_verbose(void)
- {
--	if (console_loglevel)
--		console_loglevel = CONSOLE_LOGLEVEL_MOTORMOUTH;
-+	break_console_loglevel(CONSOLE_LOGLEVEL_MOTORMOUTH);
- }
- 
- /* strlen("ratelimit") + 1 */
-diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-index 2478083..6548b52 100644
---- a/kernel/printk/printk.c
-+++ b/kernel/printk/printk.c
-@@ -66,6 +66,9 @@
- 	CONSOLE_LOGLEVEL_DEFAULT,	/* default_console_loglevel */
- };
- 
-+int stack_pos = -1;
-+int old_console_loglevel[LOGLEVEL_STACK_MAX];
-+
- /*
-  * Low level drivers may need that to know if they can schedule in
-  * their unblank() callback or not. So let's export it.
--- 
-1.9.1
+--
+Regards,
+Sudeep
