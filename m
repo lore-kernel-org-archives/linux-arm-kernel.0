@@ -1,201 +1,150 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 18 Jul 2018 19:20:23 -0700
-Subject: [PATCH 2/2] arm64: Clear the stack
-In-Reply-To: <20180718211013.14512-3-labbott@redhat.com>
-References: <20180718211013.14512-1-labbott@redhat.com>
- <20180718211013.14512-3-labbott@redhat.com>
-Message-ID: <CAGXu5jLMVey1uZB-9BkWZuVQ44c5jE2KfKp_1vN-sy5Qh6BYpg@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 19 Jul 2018 11:22:22 +0900
+Subject: [PATCH 1/2] ARM: dts: arria10: update NAND clocking
+In-Reply-To: <CADhT+wfJ2Kq9Lq4_eA9uDgmRLoS8hHaWsr8cskUxWC5xh=vdRw@mail.gmail.com>
+References: <1531176063-30140-1-git-send-email-dinguyen@kernel.org>
+ <CAK7LNARAVSK5VY=_RfO2PXJCAnXJN3sXoAY=ijSwVojeo=c66w@mail.gmail.com>
+ <b33d18b2-1956-50a4-9a3f-6d2a0abd4b81@kernel.org>
+ <CAK7LNATNjPuGmzA_mS+yvVC8TpPsvQNvKedJ6emt114xGy7m3Q@mail.gmail.com>
+ <CADhT+wfJ2Kq9Lq4_eA9uDgmRLoS8hHaWsr8cskUxWC5xh=vdRw@mail.gmail.com>
+Message-ID: <CAK7LNASpfX8-F9+K_9mvCsafDYPV03NhcA41cdWPZ2HQTqPT1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 2:10 PM, Laura Abbott <labbott@redhat.com> wrote:
+2018-07-11 23:51 GMT+09:00 Dinh Nguyen <dinh.linux@gmail.com>:
+> Hi Masahiro,
 >
-> Implementation of stackleak based heavily on the x86 version
+> On Tue, Jul 10, 2018 at 9:45 PM Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>>
+>> 2018-07-10 22:35 GMT+09:00 Dinh Nguyen <dinguyen@kernel.org>:
+>> >
+>> >
+>> > On 07/09/2018 08:31 PM, Masahiro Yamada wrote:
+>> >> 2018-07-10 7:41 GMT+09:00 Dinh Nguyen <dinguyen@kernel.org>:
+>> >>> The NAND IP needs 2 clocks(nand_x_clk and nand_clk). This patch adds a
+>> >>> nand_x_clk, which is derived from the nand_clk, but has a fixed divider
+>> >>> of 4.
+>> >>>
+>> >>> Update the NAND node to use the additional clock.
+>> >>>
+>> >>> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+>> >>> ---
+>> >>>  arch/arm/boot/dts/socfpga_arria10.dtsi | 13 +++++++++++--
+>> >>>  1 file changed, 11 insertions(+), 2 deletions(-)
+>> >>>
+>> >>> diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
+>> >>> index a4dcb68..558b5ea 100644
+>> >>> --- a/arch/arm/boot/dts/socfpga_arria10.dtsi
+>> >>> +++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
+>> >>> @@ -377,13 +377,21 @@
+>> >>>                                                 clk-gate = <0xC8 11>;
+>> >>>                                         };
+>> >>>
+>> >>> -                                       nand_clk: nand_clk {
+>> >>> +                                       nand_x_clk: nand_x_clk {
+>> >>>                                                 #clock-cells = <0>;
+>> >>>                                                 compatible = "altr,socfpga-a10-gate-clk";
+>> >>>                                                 clocks = <&l4_mp_clk>;
+>> >>>                                                 clk-gate = <0xC8 10>;
+>> >>>                                         };
+>> >>>
+>> >>> +                                       nand_clk: nand_clk {
+>> >>> +                                               #clock-cells = <0>;
+>> >>> +                                               compatible = "altr,socfpga-a10-gate-clk";
+>> >>> +                                               clocks = <&nand_x_clk>;
+>> >>> +                                               fixed-divider = <4>;
+>> >>> +                                               clk-gate = <0xC8 10>;
+>> >>> +                                       };
+>> >>> +
+>> >>>                                         spi_m_clk: spi_m_clk {
+>> >>>                                                 #clock-cells = <0>;
+>> >>>                                                 compatible = "altr,socfpga-a10-gate-clk";
+>> >>> @@ -650,7 +658,8 @@
+>> >>>                         reg-names = "nand_data", "denali_reg";
+>> >>>                         interrupts = <0 99 4>;
+>> >>>                         dma-mask = <0xffffffff>;
+>> >>> -                       clocks = <&nand_clk>;
+>> >>> +                       clocks = <&nand_clk>, <&nand_x_clk>;
+>> >>> +                       clock-names = "nand", "nand_x";
+>> >>
+>> >>
+>> >> Doesn't SOCFPGA really need the ECC clock?
+>> >>
+>> >
+>> > I don't see any mentions of an ECC clock in any of the SoCFPGA
+>> > documentation for the NAND IP.
+>>
+>>
+>> I'd like you to check the IP documentation
+>> published by Denali (or Cadence),
+>> not published by Altera.
+>>
+>> Is it available for you?
+>>
+>>
+>>
+>> In my SoCs, the same clock signal (nand-clk-200m)
+>> is connected to clk_x and ecc_clk, like this:
+>>
+>>                                          -------------
+>> --------------                           | DENALI IP |
+>> |            |                           |           |
+>> | clk        |---(nand-clk-50m)--------->| clk       |
+>> | controller |                           |           |
+>> |            |---(nand-clk-200m)-------->| clk_x     |
+>> --------------?                      |   |           |
+>>                                      --->| ecc_clk   |
+>>                                          |           |
+>>                                          -------------
+>>
+>>
+>> Some clock lines are often tied-up,
+>> but such low-level information does not appear in
+>> user documents.
+>> I talked to a hardware engineer to get this information.
+>>
+>>
+>>
+>> I guess the situation is similar for your case,
+>> but I do not have information enough to argue this.
+>>
 >
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> Since last time: Minor style cleanups. Re-wrote check_alloca to
-> correctly handle all stack types. While doing that, I also realized
-> current_top_of_stack was incorrect so I fixed that as well.
+> I don't disagree with this representation. But after asking around,
+> I'm getting the impression that the ECC clock is not exposed to the
+> clock manager. This implies that the clock is always turned on and
+> there doesn't seem to be any software control for it. I tested ECC
+> with this patch and it looks to be working correctly, without any ecc
+> clock representation.
+>
+> I'm not sure if I should expose a dummy ecc_clk to satisfy the binding?
 
-Can you drop the include/linux/stackleak.h change from this series?
-I've included that in the v14 in linux-next already, so that these
-patches can land entirely separately in the arm64 tree (which was the
-request).
 
-Otherwise, this looks great!
+DT should represent the real HW.
+If the Denali IP in SOCFPGA needs ecc_clk input,
+DT should describe it.
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
 
--Kees
+I do not have knowledge about the SOCFPGA internals.
+I do not know which is correct:
 
-> ---
->  arch/arm64/Kconfig                    |  1 +
->  arch/arm64/include/asm/processor.h    | 17 ++++++++++++++
->  arch/arm64/kernel/entry.S             |  7 ++++++
->  arch/arm64/kernel/process.c           | 32 +++++++++++++++++++++++++++
->  arch/arm64/kvm/hyp/Makefile           |  3 ++-
->  drivers/firmware/efi/libstub/Makefile |  3 ++-
->  include/linux/stackleak.h             |  1 +
->  7 files changed, 62 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 42c090cf0292..216d36a49ab5 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -96,6 +96,7 @@ config ARM64
->         select HAVE_ARCH_MMAP_RND_BITS
->         select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
->         select HAVE_ARCH_SECCOMP_FILTER
-> +       select HAVE_ARCH_STACKLEAK
->         select HAVE_ARCH_THREAD_STRUCT_WHITELIST
->         select HAVE_ARCH_TRACEHOOK
->         select HAVE_ARCH_TRANSPARENT_HUGEPAGE
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index a73ae1e49200..4f3062ee22c6 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -266,5 +266,22 @@ extern void __init minsigstksz_setup(void);
->  #define SVE_SET_VL(arg)        sve_set_current_vl(arg)
->  #define SVE_GET_VL()   sve_get_current_vl()
->
-> +/*
-> + * For CONFIG_STACKLEAK
-> + *
-> + * These need to be macros because otherwise we get stuck in a nightmare
-> + * of header definitions for the use of task_stack_page.
-> + */
-> +
-> +#define current_top_of_stack()         \
-> +({                                     \
-> +       unsigned long _low = 0;         \
-> +       unsigned long _high = 0;        \
-> +                                       \
-> +       current_stack_type(current, current_stack_pointer, &_low, &_high); \
-> +       _high;  \
-> +})
-> +#define on_thread_stack()      (on_task_stack(current, current_stack_pointer, NULL, NULL))
-> +
->  #endif /* __ASSEMBLY__ */
->  #endif /* __ASM_PROCESSOR_H */
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 28ad8799406f..67d12016063d 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -431,6 +431,11 @@ tsk        .req    x28             // current thread_info
->
->         .text
->
-> +       .macro  stackleak_erase
-> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
-> +       bl      stackleak_erase
-> +#endif
-> +       .endm
->  /*
->   * Exception vectors.
->   */
-> @@ -910,6 +915,7 @@ ret_fast_syscall:
->         and     x2, x1, #_TIF_WORK_MASK
->         cbnz    x2, work_pending
->         enable_step_tsk x1, x2
-> +       stackleak_erase
->         kernel_exit 0
->  ret_fast_syscall_trace:
->         enable_daif
-> @@ -936,6 +942,7 @@ ret_to_user:
->         cbnz    x2, work_pending
->  finish_ret_to_user:
->         enable_step_tsk x1, x2
-> +       stackleak_erase
->         kernel_exit 0
->  ENDPROC(ret_to_user)
->
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index e10bc363f533..904defa36689 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -493,3 +493,35 @@ void arch_setup_new_exec(void)
->  {
->         current->mm->context.flags = is_compat_task() ? MMCF_AARCH32 : 0;
->  }
-> +
-> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
-> +void __used stackleak_check_alloca(unsigned long size)
-> +{
-> +       unsigned long stack_left;
-> +       enum stack_type type;
-> +       unsigned long current_sp = current_stack_pointer;
-> +       unsigned long low, high;
-> +
-> +       type = current_stack_type(current, current_sp, &low, &high);
-> +       BUG_ON(type == STACK_TYPE_UNKNOWN);
-> +
-> +       stack_left = current_sp - low;
-> +
-> +       if (size >= stack_left) {
-> +               /*
-> +                * Kernel stack depth overflow is detected, let's report that.
-> +                * If CONFIG_VMAP_STACK is enabled, we can safely use BUG().
-> +                * If CONFIG_VMAP_STACK is disabled, BUG() handling can corrupt
-> +                * the neighbour memory. CONFIG_SCHED_STACK_END_CHECK calls
-> +                * panic() in a similar situation, so let's do the same if that
-> +                * option is on. Otherwise just use BUG() and hope for the best.
-> +                */
-> +#if !defined(CONFIG_VMAP_STACK) && defined(CONFIG_SCHED_STACK_END_CHECK)
-> +               panic("alloca() over the kernel stack boundary\n");
-> +#else
-> +               BUG();
-> +#endif
-> +       }
-> +}
-> +EXPORT_SYMBOL(stackleak_check_alloca);
-> +#endif
-> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> index 4313f7475333..2fabc2dc1966 100644
-> --- a/arch/arm64/kvm/hyp/Makefile
-> +++ b/arch/arm64/kvm/hyp/Makefile
-> @@ -3,7 +3,8 @@
->  # Makefile for Kernel-based Virtual Machine module, HYP part
->  #
->
-> -ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
-> +ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING \
-> +               $(DISABLE_STACKLEAK_PLUGIN)
->
->  KVM=../../../../virt/kvm
->
-> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-> index a34e9290a699..25dd2a14560d 100644
-> --- a/drivers/firmware/efi/libstub/Makefile
-> +++ b/drivers/firmware/efi/libstub/Makefile
-> @@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)  += -I$(srctree)/scripts/dtc/libfdt
->  KBUILD_CFLAGS                  := $(cflags-y) -DDISABLE_BRANCH_PROFILING \
->                                    -D__NO_FORTIFY \
->                                    $(call cc-option,-ffreestanding) \
-> -                                  $(call cc-option,-fno-stack-protector)
-> +                                  $(call cc-option,-fno-stack-protector) \
-> +                                  $(DISABLE_STACKLEAK_PLUGIN)
->
->  GCOV_PROFILE                   := n
->  KASAN_SANITIZE                 := n
-> diff --git a/include/linux/stackleak.h b/include/linux/stackleak.h
-> index b911b973d328..08420ec6b7c3 100644
-> --- a/include/linux/stackleak.h
-> +++ b/include/linux/stackleak.h
-> @@ -5,6 +5,7 @@
->  #include <linux/sched.h>
->  #include <linux/sched/task_stack.h>
->
-> +#include <asm/stacktrace.h>
->  /*
->   * Check that the poison value points to the unused hole in the
->   * virtual memory map for your platform.
+  - The Denali IP in SOCFPGA needs ecc_clk,
+    but there is no software control for it.
+
+  - The Denali IP in SOCFPGA does not need ecc_clk.
+
+
+
+
+
+> Dinh
 > --
-> 2.17.1
->
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 
 
 -- 
-Kees Cook
-Pixel Security
+Best Regards
+Masahiro Yamada
