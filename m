@@ -1,33 +1,25 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu, 19 Jul 2018 08:47:49 +0200
-Subject: [RFC PATCH 8/8] mtd: rawnand: ams-delta: Use GPIO callbacks for
- data I/O
-In-Reply-To: <20180718235710.18242-9-jmkrzyszt@gmail.com>
-References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
- <20180718235710.18242-9-jmkrzyszt@gmail.com>
-Message-ID: <20180719084749.25ca96a6@bbrezillon>
+From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
+Date: Thu, 19 Jul 2018 15:51:55 +0900
+Subject: [PATCH 0/2] add SPI controller driver for UniPhier SoCs
+Message-ID: <1531983117-9443-1-git-send-email-hayashibara.keiji@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Jul 2018 01:57:10 +0200
-Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
+This series adds support for SPI controller driver implemented on UniPhier SoCs.
 
-> Don't readw()/writew() data directly from/to GPIO port which is under
-> control of gpio-omap driver, use GPIO chip callbacks instead.
-> 
-> Thanks to utilization of get/set_multiple() callbacks, performance
-> degrade is minor for typical data transfers.
+Keiji Hayashibara (1):
+  spi: add SPI controller driver for UniPhier SoC
 
-Same comment here, don't use the gpio_chip hooks directly, use the
-consumer API instead.
+Kunihiko Hayashi (1):
+  dt-bindings: spi: add DT bindings for UniPhier SPI controller
 
-> 
-> The driver should now work with any 8+-bit bidirectional GPIO port,
-> not only OMAP.
-> 
-> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
-> 
-> # Conflicts:
-> #	drivers/mtd/nand/raw/ams-delta.c
+ .../devicetree/bindings/spi/spi-uniphier.txt       |  26 +
+ drivers/spi/Kconfig                                |   7 +
+ drivers/spi/Makefile                               |   1 +
+ drivers/spi/spi-uniphier.c                         | 532 +++++++++++++++++++++
+ 4 files changed, 566 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-uniphier.txt
+ create mode 100644 drivers/spi/spi-uniphier.c
 
-Oh, some leftovers from a conflict resolution :).
+-- 
+2.7.4
