@@ -1,359 +1,344 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu, 19 Jul 2018 12:57:24 -0700
-Subject: [PATCH v2] ARM: dts: vf610: Add ZII CFU1 board
-Message-ID: <20180719195724.15563-1-andrew.smirnov@gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 19 Jul 2018 13:59:49 -0600
+Subject: [PATCH v2 10/10] coresight: etm-perf: Add support for ETR backend
+In-Reply-To: <1531847501-22226-11-git-send-email-suzuki.poulose@arm.com>
+References: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
+ <1531847501-22226-11-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180719195949.GA9421@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Zodiac Inflight Innovations CFU1
-board (VF610-based).
+On Tue, Jul 17, 2018 at 06:11:41PM +0100, Suzuki K Poulose wrote:
+> Add support for using TMC-ETR as backend for ETM perf tracing.
+> We use software double buffering at the moment. i.e, the TMC-ETR
+> uses a separate buffer than the perf ring buffer. The data is
+> copied to the perf ring buffer once a session completes.
+> 
+> The TMC-ETR would try to match the larger of perf ring buffer
+> or the ETR buffer size configured via sysfs, scaling down to
+> a minimum limit of 1MB.
+> 
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-tmc-etr.c | 248 +++++++++++++++++++++++-
+>  drivers/hwtracing/coresight/coresight-tmc.h     |   2 +
+>  2 files changed, 248 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> index bc0c932..6280790 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+> @@ -10,6 +10,7 @@
+>  #include <linux/slab.h>
+>  #include <linux/vmalloc.h>
+>  #include "coresight-catu.h"
+> +#include "coresight-etm-perf.h"
+>  #include "coresight-priv.h"
+>  #include "coresight-tmc.h"
+>  
+> @@ -21,6 +22,28 @@ struct etr_flat_buf {
+>  };
+>  
+>  /*
+> + * etr_perf_buffer - Perf buffer used for ETR
+> + * @etr_buf		- Actual buffer used by the ETR
+> + * @snaphost		- Perf session mode
+> + * @head		- handle->head at the beginning of the session.
+> + * @nr_pages		- Number of pages in the ring buffer.
+> + * @pages		- Array of Pages in the ring buffer.
+> + */
+> +struct etr_perf_buffer {
+> +	struct etr_buf		*etr_buf;
+> +	bool			snapshot;
+> +	unsigned long		head;
+> +	int			nr_pages;
+> +	void			**pages;
+> +};
+> +
+> +/* Convert the perf index to an offset within the ETR buffer */
+> +#define PERF_IDX2OFF(idx, buf)	((idx) % ((buf)->nr_pages << PAGE_SHIFT))
+> +
+> +/* Lower limit for ETR hardware buffer */
+> +#define TMC_ETR_PERF_MIN_BUF_SIZE	SZ_1M
+> +
+> +/*
+>   * The TMC ETR SG has a page size of 4K. The SG table contains pointers
+>   * to 4KB buffers. However, the OS may use a PAGE_SIZE different from
+>   * 4K (i.e, 16KB or 64KB). This implies that a single OS page could
+> @@ -1103,10 +1126,228 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
+>  	return ret;
+>  }
+>  
+> +/*
+> + * tmc_etr_setup_perf_buf: Allocate ETR buffer for use by perf.
+> + * The size of the hardware buffer is dependent on the size configured
+> + * via sysfs and the perf ring buffer size. We prefer to allocate the
+> + * largest possible size, scaling down the size by half until it
+> + * reaches a minimum limit (1M), beyond which we give up.
+> + */
+> +static struct etr_perf_buffer *
+> +tmc_etr_setup_perf_buf(struct tmc_drvdata *drvdata, int node, int nr_pages,
+> +		       void **pages, bool snapshot)
+> +{
+> +	struct etr_buf *etr_buf;
+> +	struct etr_perf_buffer *etr_perf;
+> +	unsigned long size;
+> +
+> +	etr_perf = kzalloc_node(sizeof(*etr_perf), GFP_KERNEL, node);
+> +	if (!etr_perf)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	/*
+> +	 * Try to match the perf ring buffer size if it is larger
+> +	 * than the size requested via sysfs.
+> +	 */
+> +	if ((nr_pages << PAGE_SHIFT) > drvdata->size) {
+> +		etr_buf = tmc_alloc_etr_buf(drvdata, (nr_pages << PAGE_SHIFT),
+> +					    0, node, NULL);
+> +		if (!IS_ERR(etr_buf))
+> +			goto done;
+> +	}
+> +
+> +	/*
+> +	 * Else switch to configured size for this ETR
+> +	 * and scale down until we hit the minimum limit.
+> +	 */
+> +	size = drvdata->size;
+> +	do {
+> +		etr_buf = tmc_alloc_etr_buf(drvdata, size, 0, node, NULL);
+> +		if (!IS_ERR(etr_buf))
+> +			goto done;
+> +		size /= 2;
+> +	} while (size >= TMC_ETR_PERF_MIN_BUF_SIZE);
+> +
+> +	kfree(etr_perf);
+> +	return ERR_PTR(-ENOMEM);
+> +
+> +done:
+> +	etr_perf->etr_buf = etr_buf;
+> +	return etr_perf;
+> +}
+> +
+> +
+> +static void *tmc_etr_alloc_perf_buffer(struct coresight_device *csdev,
+> +				       int cpu, void **pages, int nr_pages,
+> +				       bool snapshot)
+> +{
+> +	struct etr_perf_buffer *etr_perf;
+> +	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+> +
+> +	if (cpu == -1)
+> +		cpu = smp_processor_id();
+> +
+> +	etr_perf = tmc_etr_setup_perf_buf(drvdata, cpu_to_node(cpu),
+> +					  nr_pages, pages, snapshot);
+> +	if (IS_ERR(etr_perf)) {
+> +		dev_dbg(drvdata->dev, "Unable to allocate ETR buffer\n");
+> +		return NULL;
+> +	}
+> +
+> +	etr_perf->snapshot = snapshot;
+> +	etr_perf->nr_pages = nr_pages;
+> +	etr_perf->pages = pages;
+> +
+> +	return etr_perf;
+> +}
+> +
+> +static void tmc_etr_free_perf_buffer(void *config)
+> +{
+> +	struct etr_perf_buffer *etr_perf = config;
+> +
+> +	if (etr_perf->etr_buf)
+> +		tmc_free_etr_buf(etr_perf->etr_buf);
+> +	kfree(etr_perf);
+> +}
+> +
+> +/*
+> + * tmc_etr_sync_perf_buffer: Copy the actual trace data from the hardware
+> + * buffer to the perf ring buffer.
+> + */
+> +static void tmc_etr_sync_perf_buffer(struct etr_perf_buffer *etr_perf)
+> +{
+> +	long bytes, to_copy;
+> +	long pg_idx, pg_offset, src_offset;
+> +	unsigned long head = etr_perf->head;
+> +	char **dst_pages, *src_buf;
+> +	struct etr_buf *etr_buf = etr_perf->etr_buf;
+> +
+> +	head = etr_perf->head;
+> +	pg_idx = head >> PAGE_SHIFT;
+> +	pg_offset = head & (PAGE_SIZE - 1);
+> +	dst_pages = (char **)etr_perf->pages;
+> +	src_offset = etr_buf->offset;
+> +	to_copy = etr_buf->len;
+> +
+> +	while (to_copy > 0) {
+> +		/*
+> +		 * In one iteration, we can copy minimum of :
+> +		 *  1) what is available in the source buffer,
+> +		 *  2) what is available in the source buffer, before it
+> +		 *     wraps around.
+> +		 *  3) what is available in the destination page.
+> +		 * in one iteration.
+> +		 */
+> +		bytes = tmc_etr_buf_get_data(etr_buf, src_offset, to_copy,
+> +					     &src_buf);
+> +		if (WARN_ON_ONCE(bytes <= 0))
+> +			break;
+> +		bytes = min(bytes, (long)(PAGE_SIZE - pg_offset));
+> +
+> +		memcpy(dst_pages[pg_idx] + pg_offset, src_buf, bytes);
+> +
+> +		to_copy -= bytes;
+> +
+> +		/* Move destination pointers */
+> +		pg_offset += bytes;
+> +		if (pg_offset == PAGE_SIZE) {
+> +			pg_offset = 0;
+> +			if (++pg_idx == etr_perf->nr_pages)
+> +				pg_idx = 0;
+> +		}
+> +
+> +		/* Move source pointers */
+> +		src_offset += bytes;
+> +		if (src_offset >= etr_buf->size)
+> +			src_offset -= etr_buf->size;
+> +	}
+> +}
+> +
+> +/*
+> + * tmc_etr_update_perf_buffer : Update the perf ring buffer with the
+> + * available trace data. We use software double buffering at the moment.
+> + *
+> + * TODO: Add support for reusing the perf ring buffer.
+> + */
+> +static unsigned long
+> +tmc_etr_update_perf_buffer(struct coresight_device *csdev,
+> +			   struct perf_output_handle *handle,
+> +			   void *config)
+> +{
+> +	bool lost = false;
+> +	unsigned long flags, size = 0;
+> +	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+> +	struct etr_perf_buffer *etr_perf = config;
+> +	struct etr_buf *etr_buf = etr_perf->etr_buf;
+> +
+> +	spin_lock_irqsave(&drvdata->spinlock, flags);
+> +	if (WARN_ON(drvdata->perf_data != etr_perf)) {
+> +		lost = true;
+> +		spin_unlock_irqrestore(&drvdata->spinlock, flags);
+> +		goto out;
+> +	}
+> +
+> +	CS_UNLOCK(drvdata->base);
+> +
+> +	tmc_flush_and_stop(drvdata);
+> +	tmc_sync_etr_buf(drvdata);
+> +
+> +	CS_UNLOCK(drvdata->base);
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: cphealy at gmail.com
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
+This is a copy/paste oversight, here you want to lock again.
 
-Changes since [v1]:
+> +	/* Reset perf specific data */
+> +	drvdata->perf_data = NULL;
+> +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+> +
+> +	size = etr_buf->len;
+> +	tmc_etr_sync_perf_buffer(etr_perf);
+> +
+> +	/*
+> +	 * Update handle->head in snapshot mode. Also update the size to the
+> +	 * hardware buffer size if there was an overflow.
+> +	 */
+> +	if (etr_perf->snapshot) {
+> +		handle->head += size;
+> +		if (etr_buf->full)
+> +			size = etr_buf->size;
+> +	}
+> +
+> +	lost |= etr_buf->full;
+> +out:
+> +	if (lost)
+> +		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
+> +	return size;
+> +}
+> +
+>  static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, void *data)
+>  {
+> -	/* We don't support perf mode yet ! */
+> -	return -EINVAL;
+> +	int rc = 0;
+> +	unsigned long flags;
+> +	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+> +	struct perf_output_handle *handle = data;
+> +	struct etr_perf_buffer *etr_perf = etm_perf_sink_config(handle);
+> +
+> +	spin_lock_irqsave(&drvdata->spinlock, flags);
+> +	/*
+> +	 * There can be only one writer per sink in perf mode. If the sink
+> +	 * is already open in SYSFS mode, we can't use it.
+> +	 */
+> +	if (drvdata->mode != CS_MODE_DISABLED || drvdata->perf_data) {
+> +		rc = -EBUSY;
+> +		goto unlock_out;
+> +	}
+> +
+> +	if (WARN_ON(!etr_perf || !etr_perf->etr_buf)) {
+> +		rc = -EINVAL;
+> +		goto unlock_out;
+> +	}
+> +
+> +	etr_perf->head = PERF_IDX2OFF(handle->head, etr_perf);
+> +	drvdata->perf_data = etr_perf;
+> +	drvdata->mode = CS_MODE_PERF;
+> +	tmc_etr_enable_hw(drvdata, etr_perf->etr_buf);
+> +
+> +unlock_out:
+> +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+> +	return rc;
+>  }
+>  
+>  static int tmc_enable_etr_sink(struct coresight_device *csdev,
+> @@ -1148,6 +1389,9 @@ static void tmc_disable_etr_sink(struct coresight_device *csdev)
+>  static const struct coresight_ops_sink tmc_etr_sink_ops = {
+>  	.enable		= tmc_enable_etr_sink,
+>  	.disable	= tmc_disable_etr_sink,
+> +	.alloc_buffer	= tmc_etr_alloc_perf_buffer,
+> +	.update_buffer	= tmc_etr_update_perf_buffer,
+> +	.free_buffer	= tmc_etr_free_perf_buffer,
 
-    - Fixed DT warning when compiling with W=1
 
-    - Collected Reviewed-by from Fabio
+	.alloc_buffer	= tmc_alloc_etr_buffer,
+	.update_buffer	= tmc_update_etr_buffer,
+	.free_buffer	= tmc_free_etr_buffer,
 
-[v1] lkml.kernel.org/r/20180719005941.10458-1-andrew.smirnov at gmail.com
+To be consistant with .enable and .disable along with the naming convention on
+the ETF side.
 
- arch/arm/boot/dts/Makefile           |   1 +
- arch/arm/boot/dts/vf610-zii-cfu1.dts | 305 +++++++++++++++++++++++++++
- 2 files changed, 306 insertions(+)
- create mode 100644 arch/arm/boot/dts/vf610-zii-cfu1.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index e331b2c16539..85797819fdd9 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -569,6 +569,7 @@ dtb-$(CONFIG_SOC_VF610) += \
- 	vf610-cosmic.dtb \
- 	vf610m4-cosmic.dtb \
- 	vf610-twr.dtb \
-+	vf610-zii-cfu1.dtb \
- 	vf610-zii-dev-rev-b.dtb \
- 	vf610-zii-dev-rev-c.dtb \
- 	vf610-zii-ssmb-spu3.dtb
-diff --git a/arch/arm/boot/dts/vf610-zii-cfu1.dts b/arch/arm/boot/dts/vf610-zii-cfu1.dts
-new file mode 100644
-index 000000000000..37777cf22e67
---- /dev/null
-+++ b/arch/arm/boot/dts/vf610-zii-cfu1.dts
-@@ -0,0 +1,305 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+
-+/*
-+ * Copyright (C) 2018 Zodiac Inflight Innovations
-+ */
-+
-+/dts-v1/;
-+#include "vf610.dtsi"
-+
-+/ {
-+	model = "ZII VF610 CFU1 Board";
-+	compatible = "zii,vf610cfu1", "zii,vf610dev", "fsl,vf610";
-+
-+	chosen {
-+		stdout-path = &uart0;
-+	};
-+
-+	memory at 80000000 {
-+		reg = <0x80000000 0x20000000>;
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&pinctrl_leds_debug>;
-+		pinctrl-names = "default";
-+
-+		led-debug {
-+			label = "zii:green:debug1";
-+			gpios = <&gpio2 18 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+			max-brightness = <1>;
-+		};
-+
-+		led-fail {
-+			label = "zii:red:fail";
-+			gpios = <&gpio3 12 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+			max-brightness = <1>;
-+		};
-+
-+		led-status {
-+			label = "zii:green:status";
-+			gpios = <&gpio3 13 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			max-brightness = <1>;
-+		};
-+
-+		led-debug-a {
-+			label = "zii:green:debug_a";
-+			gpios = <&gpio3 14 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			max-brightness = <1>;
-+		};
-+
-+		led-debug-b {
-+			label = "zii:green:debug_b";
-+			gpios = <&gpio3 15 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			max-brightness = <1>;
-+		};
-+	};
-+
-+	reg_vcc_3v3_mcu: regulator-vcc-3v3-mcu {
-+		 compatible = "regulator-fixed";
-+		 regulator-name = "vcc_3v3_mcu";
-+		 regulator-min-microvolt = <3300000>;
-+		 regulator-max-microvolt = <3300000>;
-+	};
-+};
-+
-+&adc0 {
-+	vref-supply = <&reg_vcc_3v3_mcu>;
-+	status = "okay";
-+};
-+
-+&adc1 {
-+	vref-supply = <&reg_vcc_3v3_mcu>;
-+	status = "okay";
-+};
-+
-+&dspi1 {
-+	bus-num = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_dspi1>;
-+	status = "okay";
-+
-+	m25p128 at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "m25p128", "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <50000000>;
-+
-+		partition at 0 {
-+			label = "m25p128-0";
-+			reg = <0x0 0x01000000>;
-+		};
-+	};
-+};
-+
-+&edma0 {
-+	status = "okay";
-+};
-+
-+&edma1 {
-+	status = "okay";
-+};
-+
-+&esdhc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc0>;
-+	bus-width = <8>;
-+	non-removable;
-+	no-1-8-v;
-+	keep-power-in-suspend;
-+	status = "okay";
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1>;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
-+&fec1 {
-+	phy-mode = "rmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec1>;
-+	status = "okay";
-+
-+	fixed-link {
-+		speed = <100>;
-+		full-duplex;
-+	};
-+
-+	mdio1: mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "okay";
-+
-+		switch0: switch0 at 0 {
-+			compatible = "marvell,mv88e6085";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_switch>;
-+			reg = <0>;
-+			eeprom-length = <512>;
-+			interrupt-parent = <&gpio3>;
-+			interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			reset-gpios = <&gpio3 11 GPIO_ACTIVE_LOW>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					label = "eth_cu_1000_1";
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+					label = "eth_cu_1000_2";
-+				};
-+
-+				port at 2 {
-+					reg = <2>;
-+					label = "eth_cu_1000_3";
-+				};
-+
-+				port at 6 {
-+					reg = <6>;
-+					label = "cpu";
-+					ethernet = <&fec1>;
-+
-+					fixed-link {
-+						speed = <100>;
-+						full-duplex;
-+					};
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&i2c0 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c0>;
-+	status = "okay";
-+
-+	pca9554 at 22 {
-+		compatible = "nxp,pca9554";
-+		reg = <0x22>;
-+		gpio-controller;
-+	};
-+
-+	lm75 at 48 {
-+		compatible = "national,lm75";
-+		reg = <0x48>;
-+	};
-+
-+	at24c04 at 52 {
-+		compatible = "atmel,24c04";
-+		reg = <0x52>;
-+		label = "nvm";
-+	};
-+
-+	at24c04 at 54 {
-+		compatible = "atmel,24c04";
-+		reg = <0x54>;
-+		label = "nameplate";
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart0>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl_dspi1: dspi1grp {
-+		fsl,pins = <
-+			VF610_PAD_PTD5__DSPI1_CS0		0x1182
-+			VF610_PAD_PTC6__DSPI1_SIN		0x1181
-+			VF610_PAD_PTC7__DSPI1_SOUT		0x1182
-+			VF610_PAD_PTC8__DSPI1_SCK		0x1182
-+		>;
-+	};
-+
-+	pinctrl_esdhc0: esdhc0grp {
-+		fsl,pins = <
-+			VF610_PAD_PTC0__ESDHC0_CLK		0x31ef
-+			VF610_PAD_PTC1__ESDHC0_CMD		0x31ef
-+			VF610_PAD_PTC2__ESDHC0_DAT0		0x31ef
-+			VF610_PAD_PTC3__ESDHC0_DAT1		0x31ef
-+			VF610_PAD_PTC4__ESDHC0_DAT2		0x31ef
-+			VF610_PAD_PTC5__ESDHC0_DAT3		0x31ef
-+			VF610_PAD_PTD23__ESDHC0_DAT4		0x31ef
-+			VF610_PAD_PTD22__ESDHC0_DAT5		0x31ef
-+			VF610_PAD_PTD21__ESDHC0_DAT6		0x31ef
-+			VF610_PAD_PTD20__ESDHC0_DAT7		0x31ef
-+		>;
-+	};
-+
-+	pinctrl_esdhc1: esdhc1grp {
-+		fsl,pins = <
-+			VF610_PAD_PTA24__ESDHC1_CLK		0x31ef
-+			VF610_PAD_PTA25__ESDHC1_CMD		0x31ef
-+			VF610_PAD_PTA26__ESDHC1_DAT0		0x31ef
-+			VF610_PAD_PTA27__ESDHC1_DAT1		0x31ef
-+			VF610_PAD_PTA28__ESDHC1_DATA2		0x31ef
-+			VF610_PAD_PTA29__ESDHC1_DAT3		0x31ef
-+		>;
-+	};
-+
-+	pinctrl_fec1: fec1grp {
-+		fsl,pins = <
-+			VF610_PAD_PTA6__RMII_CLKIN		0x30d1
-+			VF610_PAD_PTC9__ENET_RMII1_MDC		0x30fe
-+			VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
-+			VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
-+			VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
-+			VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
-+			VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
-+			VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
-+			VF610_PAD_PTC16__ENET_RMII1_TXD0	0x30d2
-+			VF610_PAD_PTC17__ENET_RMII1_TXEN	0x30d2
-+		>;
-+	};
-+
-+	pinctrl_i2c0: i2c0grp {
-+		fsl,pins = <
-+			VF610_PAD_PTB14__I2C0_SCL		0x37ff
-+			VF610_PAD_PTB15__I2C0_SDA		0x37ff
-+		>;
-+	};
-+
-+	pinctrl_leds_debug: pinctrl-leds-debug {
-+		fsl,pins = <
-+			VF610_PAD_PTD3__GPIO_82			0x31c2
-+			VF610_PAD_PTE3__GPIO_108		0x31c2
-+			VF610_PAD_PTE4__GPIO_109		0x31c2
-+			VF610_PAD_PTE5__GPIO_110		0x31c2
-+			VF610_PAD_PTE6__GPIO_111		0x31c2
-+		>;
-+	};
-+
-+	pinctrl_switch: switch-grp {
-+		fsl,pins = <
-+			VF610_PAD_PTB28__GPIO_98		0x3061
-+			VF610_PAD_PTE2__GPIO_107		0x1042
-+		>;
-+	};
-+
-+	pinctrl_uart0: uart0grp {
-+		fsl,pins = <
-+			VF610_PAD_PTB10__UART0_TX		0x21a2
-+			VF610_PAD_PTB11__UART0_RX		0x21a1
-+		>;
-+	};
-+};
--- 
-2.17.1
+>  };
+>  
+>  const struct coresight_ops tmc_etr_cs_ops = {
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+> index 872f63e..487c537 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc.h
+> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
+> @@ -170,6 +170,7 @@ struct etr_buf {
+>   * @trigger_cntr: amount of words to store after a trigger.
+>   * @etr_caps:	Bitmask of capabilities of the TMC ETR, inferred from the
+>   *		device configuration register (DEVID)
+> + * @perf_data:	PERF buffer for ETR.
+>   * @sysfs_data:	SYSFS buffer for ETR.
+>   */
+>  struct tmc_drvdata {
+> @@ -191,6 +192,7 @@ struct tmc_drvdata {
+>  	u32			trigger_cntr;
+>  	u32			etr_caps;
+>  	struct etr_buf		*sysfs_buf;
+> +	void			*perf_data;
+>  };
+>  
+>  struct etr_buf_operations {
+> -- 
+> 2.7.4
+> 
