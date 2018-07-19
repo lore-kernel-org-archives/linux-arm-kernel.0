@@ -1,45 +1,114 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu, 19 Jul 2018 13:00:02 -0700
-Subject: [PATCH] ARM: dts: vf610-zii-ssmb-spu3: Fix W=1 level warnings
-Message-ID: <20180719200002.15857-1-andrew.smirnov@gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 19 Jul 2018 14:07:39 -0600
+Subject: [PATCH v2 08/10] coresight: perf: Add helper to retrieve sink
+ configuration
+In-Reply-To: <1531847501-22226-9-git-send-email-suzuki.poulose@arm.com>
+References: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
+ <1531847501-22226-9-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180719200739.GB9421@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix a couple of things that were causing warning when building DTB
-with W=1.
+On Tue, Jul 17, 2018 at 06:11:39PM +0100, Suzuki K Poulose wrote:
+> We can always find the sink configuration for a given perf_output_handle.
+> Add a helper to retrieve the sink configuration for a given
+> perf_output_handle. This will be used to get rid of the set_buffer()
+> call back.
+> 
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-etm-perf.c | 14 -------------
+>  drivers/hwtracing/coresight/coresight-etm-perf.h | 26 ++++++++++++++++++++++++
+>  2 files changed, 26 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> index 6a4252b..3cc4a0b 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> @@ -23,20 +23,6 @@
+>  static struct pmu etm_pmu;
+>  static bool etm_perf_up;
+>  
+> -/**
+> - * struct etm_event_data - Coresight specifics associated to an event
+> - * @work:		Handle to free allocated memory outside IRQ context.
+> - * @mask:		Hold the CPU(s) this event was set for.
+> - * @snk_config:		The sink configuration.
+> - * @path:		An array of path, each slot for one CPU.
+> - */
+> -struct etm_event_data {
+> -	struct work_struct work;
+> -	cpumask_t mask;
+> -	void *snk_config;
+> -	struct list_head * __percpu *path;
+> -};
+> -
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: cphealy at gmail.com
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+If this is moved to coresight-etm-perf.h, the #include <linux/percpu-defs.h> can
+be removed.
 
-diff --git a/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts b/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts
-index b692117d7839..fe357668865b 100644
---- a/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts
-+++ b/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts
-@@ -23,7 +23,7 @@
- 		stdout-path = &uart0;
- 	};
- 
--	memory {
-+	memory at 80000000 {
- 		reg = <0x80000000 0x20000000>;
- 	};
- 
-@@ -128,8 +128,6 @@
- 			compatible = "marvell,mv88e6190";
- 			pinctrl-0 = <&pinctrl_gpio_switch0>;
- 			pinctrl-names = "default";
--			#address-cells = <1>;
--			#size-cells = <0>;
- 			reg = <0>;
- 			eeprom-length = <65536>;
- 			reset-gpios = <&gpio3 11 GPIO_ACTIVE_LOW>;
--- 
-2.17.1
+>  static DEFINE_PER_CPU(struct perf_output_handle, ctx_handle);
+>  static DEFINE_PER_CPU(struct coresight_device *, csdev_src);
+>  
+> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.h b/drivers/hwtracing/coresight/coresight-etm-perf.h
+> index 4197df4..da7d933 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm-perf.h
+> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.h
+> @@ -7,6 +7,7 @@
+>  #ifndef _CORESIGHT_ETM_PERF_H
+>  #define _CORESIGHT_ETM_PERF_H
+>  
+> +#include <linux/percpu-defs.h>
+>  #include "coresight-priv.h"
+>  
+>  struct coresight_device;
+> @@ -42,14 +43,39 @@ struct etm_filters {
+>  	bool			ssstatus;
+>  };
+>  
+> +/**
+> + * struct etm_event_data - Coresight specifics associated to an event
+> + * @work:		Handle to free allocated memory outside IRQ context.
+> + * @mask:		Hold the CPU(s) this event was set for.
+> + * @snk_config:		The sink configuration.
+> + * @path:		An array of path, each slot for one CPU.
+> + */
+> +struct etm_event_data {
+> +	struct work_struct work;
+> +	cpumask_t mask;
+> +	void *snk_config;
+> +	struct list_head * __percpu *path;
+> +};
+>  
+>  #ifdef CONFIG_CORESIGHT
+>  int etm_perf_symlink(struct coresight_device *csdev, bool link);
+> +static inline void *etm_perf_sink_config(struct perf_output_handle *handle)
+> +{
+> +	struct etm_event_data *data = perf_get_aux(handle);
+>  
+> +	if (data)
+> +		return data->snk_config;
+> +	return NULL;
+> +}
+>  #else
+>  static inline int etm_perf_symlink(struct coresight_device *csdev, bool link)
+>  { return -EINVAL; }
+>  
+> +static inline void *etm_perf_sink_config(struct perf_output_handle *handle)
+> +{
+> +	return NULL;
+> +}
+> +
+
+I think we can do without those... See my comment in the next patch.
+
+Thanks,
+Mathieu
+
+>  #endif /* CONFIG_CORESIGHT */
+>  
+>  #endif
+> -- 
+> 2.7.4
+> 
