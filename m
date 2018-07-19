@@ -1,144 +1,98 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 19 Jul 2018 10:08:38 +0200
-Subject: [PATCH RESEND v2 2/2] drm/sun4i: sun4i: Introduce a quirk for lowest
- plane alpha support
-In-Reply-To: <20180719080838.31598-1-paul.kocialkowski@bootlin.com>
-References: <20180719080838.31598-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180719080838.31598-2-paul.kocialkowski@bootlin.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 19 Jul 2018 10:12:30 +0200
+Subject: [GIT PULL v2] ARM: dts: zynq: Xilinx DT changes for v4.19
+Message-ID: <f36dbbeb-059f-6042-ff83-10ae4187a96f@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not all sunxi platforms with the first version of the Display Engine
-support an alpha component on the plane with the lowest z position
-(as in: lowest z-pos), that gets blended with the background color.
+Hi,
 
-In particular, the A13 is known to have this limitation. However, it was
-recently discovered that the A20 and A33 are capable of having alpha on
-their lowest plane.
+Based on discussion with Olof all DT patches are using these prefixes.
+ARM: dts: zynq:. dt-bindings changes were reviewed by Rob.
 
-Thus, this introduces a specific quirk to indicate such support,
-per-platform. Since this was not tested on sun4i and sun6i platforms, a
-conservative approach is kept and this feature is not supported.
+Please pull the following ARM DT patches.
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
----
+Thanks,
+Michal
 
-Changes since v1:
-* reordered backend declaration;
-* updated comment to reflect that not all platforms are affected;
-* used num_alpha_planes_max variable instead of define, since it is now
-  dynamic;
-* reordered check to have quirk first in associated conditional.
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
- drivers/gpu/drm/sun4i/sun4i_backend.c | 40 +++++++++++++++++----------
- drivers/gpu/drm/sun4i/sun4i_backend.h |  1 -
- 2 files changed, 26 insertions(+), 15 deletions(-)
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 075cb0ff56ca..685fc3840c6d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -34,6 +34,8 @@
- struct sun4i_backend_quirks {
- 	/* backend <-> TCON muxing selection done in backend */
- 	bool needs_output_muxing;
-+	/* alpha at the lowest z position is not always supported */
-+	bool supports_lowest_plane_alpha;
- };
- 
- static const u32 sunxi_rgb2yuv_coef[12] = {
-@@ -463,12 +465,14 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 				      struct drm_crtc_state *crtc_state)
- {
- 	struct drm_plane_state *plane_states[SUN4I_BACKEND_NUM_LAYERS] = { 0 };
-+	struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
- 	struct drm_atomic_state *state = crtc_state->state;
- 	struct drm_device *drm = state->dev;
- 	struct drm_plane *plane;
- 	unsigned int num_planes = 0;
- 	unsigned int num_alpha_planes = 0;
- 	unsigned int num_frontend_planes = 0;
-+	unsigned int num_alpha_planes_max = 1;
- 	unsigned int num_yuv_planes = 0;
- 	unsigned int current_pipe = 0;
- 	unsigned int i;
-@@ -532,33 +536,39 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 	 * the layer with the highest priority.
- 	 *
- 	 * The second step is the actual alpha blending, that takes
--	 * the two pipes as input, and uses the eventual alpha
-+	 * the two pipes as input, and uses the potential alpha
- 	 * component to do the transparency between the two.
- 	 *
--	 * This two steps scenario makes us unable to guarantee a
-+	 * This two-step scenario makes us unable to guarantee a
- 	 * robust alpha blending between the 4 layers in all
- 	 * situations, since this means that we need to have one layer
- 	 * with alpha at the lowest position of our two pipes.
- 	 *
--	 * However, we cannot even do that, since the hardware has a
--	 * bug where the lowest plane of the lowest pipe (pipe 0,
--	 * priority 0), if it has any alpha, will discard the pixel
--	 * entirely and just display the pixels in the background
--	 * color (black by default).
-+	 * However, we cannot even do that on every platform, since the
-+	 * hardware has a bug where the lowest plane of the lowest pipe
-+	 * (pipe 0, priority 0), if it has any alpha, will discard the
-+	 * pixel data entirely and just display the pixels in the
-+	 * background color (black by default).
- 	 *
--	 * This means that we effectively have only three valid
--	 * configurations with alpha, all of them with the alpha being
--	 * on pipe1 with the lowest position, which can be 1, 2 or 3
--	 * depending on the number of planes and their zpos.
-+	 * This means that on the affected platforms, we effectively
-+	 * have only three valid configurations with alpha, all of them
-+	 * with the alpha being on pipe1 with the lowest position, which
-+	 * can be 1, 2 or 3 depending on the number of planes and their zpos.
- 	 */
--	if (num_alpha_planes > SUN4I_BACKEND_NUM_ALPHA_LAYERS) {
-+
-+	/* For platforms that are not affected by the issue described above. */
-+	if (backend->quirks->supports_lowest_plane_alpha)
-+		num_alpha_planes_max++;
-+
-+	if (num_alpha_planes > num_alpha_planes_max) {
- 		DRM_DEBUG_DRIVER("Too many planes with alpha, rejecting...\n");
- 		return -EINVAL;
- 	}
- 
- 	/* We can't have an alpha plane at the lowest position */
--	if (plane_states[0]->fb->format->has_alpha ||
--	    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE))
-+	if (!backend->quirks->supports_lowest_plane_alpha &&
-+	    (plane_states[0]->fb->format->has_alpha ||
-+	    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE)))
- 		return -EINVAL;
- 
- 	for (i = 1; i < num_planes; i++) {
-@@ -943,9 +953,11 @@ static const struct sun4i_backend_quirks sun6i_backend_quirks = {
- 
- static const struct sun4i_backend_quirks sun7i_backend_quirks = {
- 	.needs_output_muxing = true,
-+	.supports_lowest_plane_alpha = true,
- };
- 
- static const struct sun4i_backend_quirks sun8i_a33_backend_quirks = {
-+	.supports_lowest_plane_alpha = true,
- };
- 
- static const struct sun4i_backend_quirks sun9i_backend_quirks = {
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index ad6609323f0e..e3d4c6035eb2 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -167,7 +167,6 @@
- #define SUN4I_BACKEND_PIPE_OFF(p)		(0x5000 + (0x400 * (p)))
- 
- #define SUN4I_BACKEND_NUM_LAYERS		4
--#define SUN4I_BACKEND_NUM_ALPHA_LAYERS		1
- #define SUN4I_BACKEND_NUM_FRONTEND_LAYERS	1
- #define SUN4I_BACKEND_NUM_YUV_PLANES		1
- 
+are available in the git repository at:
+
+  https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-v4.19-v2
+
+for you to fetch changes up to 9153bf9fb5290cd91deefa99f2983a851f2ca5da:
+
+  ARM: dts: zynq: Remove #address/#size-cells from gpio-keys (2018-07-19
+10:08:52 +0200)
+
+----------------------------------------------------------------
+ARM: dts: zynq: DT changes for v4.19
+
+- Add Z-turn board
+- Add mmc aliases
+- Fix model information
+- Sort out documentatio
+- Update Zybo Z7
+- Fix gpio-keys
+
+----------------------------------------------------------------
+Anton Gerasimov (1):
+      ARM: dts: zynq: Add support for Z-turn board
+
+Luis Araneda (9):
+      ARM: dts: zynq: Set correct manufacturer for ZedBoard and MicroZed
+boards
+      ARM: dts: zynq: correct and improve the model property of dt files
+      dt-bindings: xilinx: zynq: Improve boards description
+      dt-bindings: xilinx: zynq: Sort entries alphabetically
+      dt-bindings: xilinx: zynq: Move Paralella board to Xilinx
+      dt-bindings: xilinx: zynq: Add missing boards
+      ARM: dts: zynq: Fix memory size on the Zybo Z7 board
+      ARM: dts: zynq: Use gpio constants for the Zybo Z7 board
+      ARM: dts: zynq: Add LEDs to the Zybo Z7 board
+
+Michal Simek (2):
+      ARM: dts: zynq: Add mmc alias for zc702/zc706/zed/zybo
+      ARM: dts: zynq: Remove #address/#size-cells from gpio-keys
+
+ Documentation/devicetree/bindings/arm/adapteva.txt |   7 -------
+ Documentation/devicetree/bindings/arm/xilinx.txt   |  30
++++++++++++++++++++++++++-----
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/zynq-cc108.dts                   |   2 +-
+ arch/arm/boot/dts/zynq-microzed.dts                |   4 ++--
+ arch/arm/boot/dts/zynq-parallella.dts              |   2 +-
+ arch/arm/boot/dts/zynq-zc702.dts                   |   5 ++---
+ arch/arm/boot/dts/zynq-zc706.dts                   |   3 ++-
+ arch/arm/boot/dts/zynq-zc770-xm010.dts             |   2 +-
+ arch/arm/boot/dts/zynq-zc770-xm011.dts             |   2 +-
+ arch/arm/boot/dts/zynq-zc770-xm012.dts             |   2 +-
+ arch/arm/boot/dts/zynq-zc770-xm013.dts             |   2 +-
+ arch/arm/boot/dts/zynq-zed.dts                     |   5 +++--
+ arch/arm/boot/dts/zynq-zturn.dts                   | 114
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/zynq-zybo-z7.dts                 |  16 +++++++++++++---
+ arch/arm/boot/dts/zynq-zybo.dts                    |   3 ++-
+ 16 files changed, 170 insertions(+), 30 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/adapteva.txt
+ create mode 100644 arch/arm/boot/dts/zynq-zturn.dts
+
+
 -- 
-2.18.0
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180719/c91b5a66/attachment.sig>
