@@ -1,78 +1,73 @@
 From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 19 Jul 2018 15:34:50 +0100
-Subject: [PATCH v8 1/4] arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
-In-Reply-To: <a840714a-16b3-2da8-c6e2-5be85c73bda2@arm.com>
+Date: Thu, 19 Jul 2018 15:37:38 +0100
+Subject: [PATCH v8 2/4] arm64: KVM: export the capability to set guest
+ SError syndrome
+In-Reply-To: <68c7db46-69df-38dd-af04-5a95285d115c@arm.com>
 References: <20180713154751.18131-1-james.morse@arm.com>
- <20180713154751.18131-2-james.morse@arm.com>
- <CAFEAcA-t8U-GmkCtAcAN8tj4UAaynCZhgTi1Cg1RhaarGUOJfg@mail.gmail.com>
- <49bb119c-ec31-34ee-f4e5-9f3e90d7c181@huawei.com>
- <a840714a-16b3-2da8-c6e2-5be85c73bda2@arm.com>
-Message-ID: <CAFEAcA8vav_yt2xMoVxAmdo_h8hP9THCZGzrCOEQEj--nHYGYg@mail.gmail.com>
+ <20180713154751.18131-3-james.morse@arm.com>
+ <CAFEAcA9pK7W=gSZXTOTxFEFDmc6kJ8GDYO4a6r_P1FHp+KuT9A@mail.gmail.com>
+ <86da7b47-5026-5ec7-96dc-4d3a14caa2f8@huawei.com>
+ <CAFEAcA_Amw6Pr+DmeZXHDWKQPSYf_826hDDwna2fwQvOP1+9og@mail.gmail.com>
+ <299f2265-ea03-52ef-d88e-9efab1752b60@huawei.com>
+ <68c7db46-69df-38dd-af04-5a95285d115c@arm.com>
+Message-ID: <CAFEAcA8KDQJRBqpUnBHO-iZhOtN+X+va+KCULr=AaJSMhiCR9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 19 July 2018 at 15:15, James Morse <james.morse@arm.com> wrote:
 > Hi guys,
 >
-> On 19/07/18 08:39, gengdongjiu wrote:
->> On 2018/7/18 0:33, Peter Maydell wrote:
->>> On 13 July 2018 at 16:47, James Morse <james.morse@arm.com> wrote:
->>>> From: Dongjiu Geng <gengdongjiu@huawei.com>
->>>>
->>>> For the migrating VMs, user space may need to know the exception
->>>> state. For example, in the machine A, KVM make an SError pending,
->>>> when migrate to B, KVM also needs to pend an SError.
->>>>
->>>> This new IOCTL exports user-invisible states related to SError.
->>>> Together with appropriate user space changes, user space can get/set
->>>> the SError exception state to do migrate/snapshot/suspend.
+> On 19/07/18 10:29, gengdongjiu wrote:
+>> On 2018/7/19 17:10, Peter Maydell wrote:
+>>>> The user space will firstly check the  KVM_CAP_VCPU_EVENTS through kvm_has_vcpu_events() to know whether KVM can support get/set vcpu events,
+>>>> If KVM supports get/set vcpu events, it will check KVM_CAP_ARM_SET_SERROR_ESR to know whether can set guest SError ESR, as shown the user space code in [1].
+>>> OK, so this capability affects the behaviour of
+>>> KVM_SET_VCPU_EVENTS. Can you make sure the documentation
+>>> of KVM_SET_VCPU_EVENTS clearly explains what happens
+>>> and the effect of whether this capability is present,
+>>> please? People trying to understand the behaviour of
+>>> that ioctl are not going to know that they need to
+>>> look here as well.
 >
->>>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
->>>> index d10944e619d3..e3940f8715a5 100644
->>>> --- a/Documentation/virtual/kvm/api.txt
->>>> +++ b/Documentation/virtual/kvm/api.txt
+>> sure, I will. Thanks peter's reminder and comments.
 >
->
->>>> +Gets currently pending SError exceptions as well as related states of the vcpu.
->>>
->>> Any chance of expanding this to explain what this state actually is?
->>> (ie something you could use to implement or review the userspace
->>> code which has to manipulate it)
->> sure, can expand it.
->>
->> serror_pending means whether KVM is pending Serror for guest.
->> serror_has_esr means whether KVM or user space can set the SError syndrome for guest.
->> serror_esr means the value of SError syndrome.
->
-> I've had a go at something more verbose for this section:
+> I've collected these changes, this description currently reads:
 > ------------------%<------------------
-> If the guest accesses a device that is being emulated by the host kernel in such
-> a way that a real device would generate a physical SError, KVM may make a
-> virtual SError pending for that VCPU. This system error interrupt remains
-> pending until the guest takes the exception by unmasking PSTATE.A.
->
-> Running the VCPU may cause it to take a pending SError, or make an access that
-> causes an SError to become pending. The event's description is only valid while
-> the VPCU is not running.
->
-> This API provides a way to read and write the pending 'event' state that is not
-> visible to the guest. To save, restore or migrate a VCPU the struct representing
-> the state can be read then written using this GET/SET API, along with the other
-> guest-visible registers. It is not possible to 'cancel' an SError that has been
-> made pending.
->
-> A device being emulated in user-space may also wish to generate an SError. To do
-> this the events structure can be populated by user-space. The current state
-> should be read first, to ensure no existing SError is pending. If an existing
-> SError is pending, the architectures 'Multiple SError interrupts' rules should
+> This capability indicates that userspace can specify the syndrome value reported
+> to the guest when it takes a virtual SError interrupt exception.
 
-"architecture's"
+Perhaps "specify (via the KVM_SET_VCPU_EVENTS ioctl)" ?
 
-> be followed. (2.5.3 of DDI0587.a "ARM Reliability, Availability, and
-> Serviceability (RAS) Specification").
+> If KVM advertises this capability, userspace can only specify the ISS field for
+> the ESR syndrome. Other parts of the ESR, such as the EC are generated by the
+> CPU when the exception is taken. If this virtual SError is taken to EL1 using
+> AArch64, this value will be reported in the ISS field of ESR_ELx.
+>
+> See KVM_CAP_VCPU_EVENTS for more details.
 > ------------------%<------------------
+>
+> and this patch adds to the GET/SET API section with:
+> ------------------%<------------------
+> SError exceptions always have an ESR value. Some CPUs have the ability to
+> specify what the virtual SError's ESR value should be. These systems will
+> advertise KVM_CAP_ARM_SET_SERROR_ESR. In this case exception.has_esr will
+> always have a non-zero value when read, and the agent making an SError
+> pending should specify the ISS field in the lower 24 bits of
+> exception.serror_esr. If the system supports KVM_CAP_ARM_SET_SERROR_ESR, but
+> user-space sets the events with exception.has_esr as zero, KVM will choose an ESR.
+>
+> Specifying exception.has_esr on a system that does not support it will return an
+> error. Settings anything other than the lower 24bits of exception.serror_esr
 
-Otherwise looks good.
+"Setting"
+
+> will return an error.
+
+I think you should state which error (presumably EINVAL?)
+
+> ------------------%<------------------
+>
+> because as Peter points out, this is where people will expect to find this.
 
 thanks
 -- PMM
