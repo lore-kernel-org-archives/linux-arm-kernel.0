@@ -1,27 +1,23 @@
-From: xuwei5@huawei.com (x00249684)
-Date: Thu, 19 Jul 2018 17:40:41 +0800
-Subject: [PATCH v11 3/4] [RESEND] arm64: dts: add ufs dts node
-In-Reply-To: <20180717093659.103263-4-liwei213@huawei.com>
-References: <20180717093659.103263-4-liwei213@huawei.com>
-Message-ID: <1531993241-173790-1-git-send-email-xuwei5@huawei.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Thu, 19 Jul 2018 11:42:50 +0200
+Subject: arm: v4.18-rc5 with cpuidle on TC2 (A7 boot) spectre v2 issue
+Message-ID: <2abc6c11-2e8c-a4ea-6911-0f495d90ace6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Li Wei <liwei213@huawei.com>
->
->arm64: dts: add ufs node for Hisilicon.
->
->Signed-off-by: Li Wei <liwei213@huawei.com>
->Reviewed-by: Rob Herring <robh@kernel.org>
->Tested-by: John Stultz <john.stultz@linaro.org>
+Hi,
 
-Fine to me. Thanks!
-Acked-by: Wei Xu <xuwei5@hisilicon.com>
+running v4.18-rc5 (plus still missing "power: vexpress: fix corruption 
+in notifier registration", otherwise I get this rcu_sched stall issue) 
+on TC2 (A7 boot) with vanilla multi_v7_defconfig plus 
+CONFIG_ARM_BIG_LITTLE_CPUIDLE=y gives me continuous:
 
-But it will not be so staightforward when applying the patch
-since in the recent pull request the hi3660.dtsi has been tidied up.
-If it makes inconvenient, I can apply it once the binding is merged.
-Thanks!
+...
+  CPUX: Spectre v2: incorrect context switching function, system vulnerable
+...
 
-Best Regards,
-Wei
+messages.
+
+Work around is to disable CONFIG_HARDEN_BRANCH_PREDICTOR.
+
+-- Dietmar
