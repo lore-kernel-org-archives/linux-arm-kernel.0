@@ -1,52 +1,49 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 19 Jul 2018 17:08:31 -0600
-Subject: [PATCH 1/3] dts: arm64/sdm845: Add node for arm,mmu-500
-In-Reply-To: <20180719175356.14753-2-vivek.gautam@codeaurora.org>
-References: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
- <20180719175356.14753-2-vivek.gautam@codeaurora.org>
-Message-ID: <CAL_JsqKQgZq23F7gqNoEDzpWj3zVR7Tsok3cZZCpCL=Br_+BeA@mail.gmail.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 19 Jul 2018 23:12:59 +0000
+Subject: [PATCH/RFT 2/7] ASoC: rsnd: Document R-Car M3-N support
+In-Reply-To: <1531856883-19645-3-git-send-email-ykaneko0929@gmail.com>
+References: <1531856883-19645-1-git-send-email-ykaneko0929@gmail.com>
+ <1531856883-19645-3-git-send-email-ykaneko0929@gmail.com>
+Message-ID: <87r2jy4yfl.wl-kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 11:54 AM Vivek Gautam
-<vivek.gautam@codeaurora.org> wrote:
->
-> Add device node for arm,mmu-500 available on sdm845.
-> This MMU-500 with single TCU and multiple TBU architecture
-> is shared among all the peripherals except gpu on sdm845.
->
-> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+
+Hi
+
+Thnak you for your patch
+
+> From: Hiroyuki Yokoyama <hiroyuki.yokoyama.vx@renesas.com>
+> 
+> Document support for the sound modules in the Renesas M3-N (r8a77965)
+> SoC.
+> 
+> No driver update is needed.
+> 
+> Signed-off-by: Hiroyuki Yokoyama <hiroyuki.yokoyama.vx@renesas.com>
+> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 > ---
->  arch/arm64/boot/dts/qcom/sdm845-mtp.dts |  4 ++
->  arch/arm64/boot/dts/qcom/sdm845.dtsi    | 73 +++++++++++++++++++++++++++++++++
->  2 files changed, 77 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
-> index 6d651f314193..13b50dff440f 100644
-> --- a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
-> +++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
-> @@ -58,3 +58,7 @@
->                 bias-pull-up;
->         };
->  };
-> +
-> +&apps_smmu {
-> +       status = "okay";
-> +};
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> index 00722b533a92..70ca18ae6cb3 100644
-> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> @@ -980,6 +980,79 @@
->                         cell-index = <0>;
->                 };
->
-> +               apps_smmu: arm,smmu at 15000000 {
 
-iommu at ...
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-> +                       compatible = "arm,mmu-500";
+But, I think this patch should go to ALSA SoC ML.
 
-Really unmodified by QCom? Would be better to have SoC specific compatible.
 
-Rob
+>  Documentation/devicetree/bindings/sound/renesas,rsnd.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/renesas,rsnd.txt b/Documentation/devicetree/bindings/sound/renesas,rsnd.txt
+> index b86d790..9e764270 100644
+> --- a/Documentation/devicetree/bindings/sound/renesas,rsnd.txt
+> +++ b/Documentation/devicetree/bindings/sound/renesas,rsnd.txt
+> @@ -352,6 +352,7 @@ Required properties:
+>  				    - "renesas,rcar_sound-r8a7794" (R-Car E2)
+>  				    - "renesas,rcar_sound-r8a7795" (R-Car H3)
+>  				    - "renesas,rcar_sound-r8a7796" (R-Car M3-W)
+> +				    - "renesas,rcar_sound-r8a77965" (R-Car M3-N)
+>  - reg				: Should contain the register physical address.
+>  				  required register is
+>  				   SRU/ADG/SSI      if generation1
+> -- 
+> 1.9.1
+> 
