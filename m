@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 01:00:24 +0200
-Subject: [PATCH v3 31/33] mtd: rawnand: tegra: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 01:00:22 +0200
+Subject: [PATCH v3 29/33] mtd: rawnand: qcom: convert driver to nand_scan()
 In-Reply-To: <20180719230026.8741-1-miquel.raynal@bootlin.com>
 References: <20180719230026.8741-1-miquel.raynal@bootlin.com>
-Message-ID: <20180719230026.8741-32-miquel.raynal@bootlin.com>
+Message-ID: <20180719230026.8741-30-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,240 +14,147 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/tegra_nand.c | 162 +++++++++++++++++++++-----------------
- 1 file changed, 88 insertions(+), 74 deletions(-)
+ drivers/mtd/nand/raw/qcom_nandc.c | 71 +++++++++++++--------------------------
+ 1 file changed, 24 insertions(+), 47 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/tegra_nand.c b/drivers/mtd/nand/raw/tegra_nand.c
-index 31c0d9ca9d23..c40a53066cee 100644
---- a/drivers/mtd/nand/raw/tegra_nand.c
-+++ b/drivers/mtd/nand/raw/tegra_nand.c
-@@ -906,74 +906,13 @@ static int tegra_nand_select_strength(struct nand_chip *chip, int oobsize)
- 				       bits_per_step, oobsize);
+diff --git a/drivers/mtd/nand/raw/qcom_nandc.c b/drivers/mtd/nand/raw/qcom_nandc.c
+index aa6c3e026ef1..aa66e51afdb8 100644
+--- a/drivers/mtd/nand/raw/qcom_nandc.c
++++ b/drivers/mtd/nand/raw/qcom_nandc.c
+@@ -2475,10 +2475,10 @@ qcom_nandc_calc_ecc_bytes(int step_size, int strength)
+ NAND_ECC_CAPS_SINGLE(qcom_nandc_ecc_caps, qcom_nandc_calc_ecc_bytes,
+ 		     NANDC_STEP_SIZE, 4, 8);
+ 
+-static int qcom_nand_host_setup(struct qcom_nand_host *host)
++static int qcom_nand_attach_chip(struct nand_chip *chip)
+ {
+-	struct nand_chip *chip = &host->chip;
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct qcom_nand_host *host = to_qcom_nand_host(chip);
+ 	struct nand_ecc_ctrl *ecc = &chip->ecc;
+ 	struct qcom_nand_controller *nandc = get_qcom_nand_controller(chip);
+ 	int cwperpage, bad_block_byte, ret;
+@@ -2640,6 +2640,10 @@ static int qcom_nand_host_setup(struct qcom_nand_host *host)
+ 	return 0;
  }
  
--static int tegra_nand_chips_init(struct device *dev,
--				 struct tegra_nand_controller *ctrl)
-+static int tegra_nand_attach_chip(struct nand_chip *chip)
++static struct nand_controller_ops qcom_nandc_ops = {
++	.attach_chip = qcom_nand_attach_chip,
++};
++
+ static int qcom_nandc_alloc(struct qcom_nand_controller *nandc)
  {
--	struct device_node *np = dev->of_node;
--	struct device_node *np_nand;
--	int nsels, nchips = of_get_child_count(np);
--	struct tegra_nand_chip *nand;
--	struct mtd_info *mtd;
--	struct nand_chip *chip;
-+	struct tegra_nand_controller *ctrl = to_tegra_ctrl(chip->controller);
-+	struct tegra_nand_chip *nand = to_tegra_chip(chip);
-+	struct mtd_info *mtd = nand_to_mtd(chip);
- 	int bits_per_step;
  	int ret;
--	u32 cs;
--
--	if (nchips != 1) {
--		dev_err(dev, "Currently only one NAND chip supported\n");
--		return -EINVAL;
--	}
--
--	np_nand = of_get_next_child(np, NULL);
--
--	nsels = of_property_count_elems_of_size(np_nand, "reg", sizeof(u32));
--	if (nsels != 1) {
--		dev_err(dev, "Missing/invalid reg property\n");
--		return -EINVAL;
--	}
--
--	/* Retrieve CS id, currently only single die NAND supported */
--	ret = of_property_read_u32(np_nand, "reg", &cs);
--	if (ret) {
--		dev_err(dev, "could not retrieve reg property: %d\n", ret);
--		return ret;
--	}
--
--	nand = devm_kzalloc(dev, sizeof(*nand), GFP_KERNEL);
--	if (!nand)
--		return -ENOMEM;
--
--	nand->cs[0] = cs;
--
--	nand->wp_gpio = devm_gpiod_get_optional(dev, "wp", GPIOD_OUT_LOW);
--
--	if (IS_ERR(nand->wp_gpio)) {
--		ret = PTR_ERR(nand->wp_gpio);
--		dev_err(dev, "Failed to request WP GPIO: %d\n", ret);
--		return ret;
--	}
--
--	chip = &nand->chip;
--	chip->controller = &ctrl->controller;
--
--	mtd = nand_to_mtd(chip);
--
--	mtd->dev.parent = dev;
--	mtd->owner = THIS_MODULE;
--
--	nand_set_flash_node(chip, np_nand);
--
--	if (!mtd->name)
--		mtd->name = "tegra_nand";
--
--	chip->options = NAND_NO_SUBPAGE_WRITE | NAND_USE_BOUNCE_BUFFER;
--	chip->exec_op = tegra_nand_exec_op;
--	chip->select_chip = tegra_nand_select_chip;
--	chip->setup_data_interface = tegra_nand_setup_data_interface;
--
+@@ -2781,9 +2785,9 @@ static int qcom_nandc_setup(struct qcom_nand_controller *nandc)
+ 	return 0;
+ }
+ 
+-static int qcom_nand_host_init(struct qcom_nand_controller *nandc,
+-			       struct qcom_nand_host *host,
+-			       struct device_node *dn)
++static int qcom_nand_host_init_and_register(struct qcom_nand_controller *nandc,
++					    struct qcom_nand_host *host,
++					    struct device_node *dn)
+ {
+ 	struct nand_chip *chip = &host->chip;
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
+@@ -2824,36 +2828,20 @@ static int qcom_nand_host_init(struct qcom_nand_controller *nandc,
+ 	chip->block_markbad	= qcom_nandc_block_markbad;
+ 
+ 	chip->controller = &nandc->controller;
++	chip->controller->ops = &qcom_nandc_ops;
+ 	chip->options |= NAND_NO_SUBPAGE_WRITE | NAND_USE_BOUNCE_BUFFER |
+ 			 NAND_SKIP_BBTSCAN;
+ 
+ 	/* set up initial status value */
+ 	host->status = NAND_STATUS_READY | NAND_STATUS_WP;
+ 
 -	ret = nand_scan_ident(mtd, 1, NULL);
 -	if (ret)
 -		return ret;
- 
- 	if (chip->bbt_options & NAND_BBT_USE_FLASH)
- 		chip->bbt_options |= NAND_BBT_NO_OOB;
-@@ -982,7 +921,8 @@ static int tegra_nand_chips_init(struct device *dev,
- 	chip->ecc.size = 512;
- 	chip->ecc.steps = mtd->writesize / chip->ecc.size;
- 	if (chip->ecc_step_ds != 512) {
--		dev_err(dev, "Unsupported step size %d\n", chip->ecc_step_ds);
-+		dev_err(ctrl->dev, "Unsupported step size %d\n",
-+			chip->ecc_step_ds);
- 		return -EINVAL;
- 	}
- 
-@@ -1004,14 +944,15 @@ static int tegra_nand_chips_init(struct device *dev,
- 	}
- 
- 	if (chip->ecc.algo == NAND_ECC_BCH && mtd->writesize < 2048) {
--		dev_err(dev, "BCH supports 2K or 4K page size only\n");
-+		dev_err(ctrl->dev, "BCH supports 2K or 4K page size only\n");
- 		return -EINVAL;
- 	}
- 
- 	if (!chip->ecc.strength) {
- 		ret = tegra_nand_select_strength(chip, mtd->oobsize);
- 		if (ret < 0) {
--			dev_err(dev, "No valid strength found, minimum %d\n",
-+			dev_err(ctrl->dev,
-+				"No valid strength found, minimum %d\n",
- 				chip->ecc_strength_ds);
- 			return ret;
- 		}
-@@ -1039,7 +980,7 @@ static int tegra_nand_chips_init(struct device *dev,
- 			nand->config_ecc |= CONFIG_TVAL_8;
- 			break;
- 		default:
--			dev_err(dev, "ECC strength %d not supported\n",
-+			dev_err(ctrl->dev, "ECC strength %d not supported\n",
- 				chip->ecc.strength);
- 			return -EINVAL;
- 		}
-@@ -1062,17 +1003,17 @@ static int tegra_nand_chips_init(struct device *dev,
- 			nand->bch_config |= BCH_TVAL_16;
- 			break;
- 		default:
--			dev_err(dev, "ECC strength %d not supported\n",
-+			dev_err(ctrl->dev, "ECC strength %d not supported\n",
- 				chip->ecc.strength);
- 			return -EINVAL;
- 		}
- 		break;
- 	default:
--		dev_err(dev, "ECC algorithm not supported\n");
-+		dev_err(ctrl->dev, "ECC algorithm not supported\n");
- 		return -EINVAL;
- 	}
- 
--	dev_info(dev, "Using %s with strength %d per 512 byte step\n",
-+	dev_info(ctrl->dev, "Using %s with strength %d per 512 byte step\n",
- 		 chip->ecc.algo == NAND_ECC_BCH ? "BCH" : "RS",
- 		 chip->ecc.strength);
- 
-@@ -1095,7 +1036,8 @@ static int tegra_nand_chips_init(struct device *dev,
- 		nand->config |= CONFIG_PS_4096;
- 		break;
- 	default:
--		dev_err(dev, "Unsupported writesize %d\n", mtd->writesize);
-+		dev_err(ctrl->dev, "Unsupported writesize %d\n",
-+			mtd->writesize);
- 		return -ENODEV;
- 	}
- 
-@@ -1106,7 +1048,79 @@ static int tegra_nand_chips_init(struct device *dev,
- 	nand->config |= CONFIG_TAG_BYTE_SIZE(mtd->oobsize - 1);
- 	writel_relaxed(nand->config, ctrl->regs + CONFIG);
- 
+-
+-	ret = qcom_nand_host_setup(host);
+-
+-	return ret;
+-}
+-
+-static int qcom_nand_mtd_register(struct qcom_nand_controller *nandc,
+-				  struct qcom_nand_host *host,
+-				  struct device_node *dn)
+-{
+-	struct nand_chip *chip = &host->chip;
+-	struct mtd_info *mtd = nand_to_mtd(chip);
+-	int ret;
+-
 -	ret = nand_scan_tail(mtd);
-+	return 0;
-+}
-+
-+static const struct nand_controller_ops tegra_nand_controller_ops = {
-+	.attach_chip = &tegra_nand_attach_chip,
-+};
-+
-+static int tegra_nand_chips_init(struct device *dev,
-+				 struct tegra_nand_controller *ctrl)
-+{
-+	struct device_node *np = dev->of_node;
-+	struct device_node *np_nand;
-+	int nsels, nchips = of_get_child_count(np);
-+	struct tegra_nand_chip *nand;
-+	struct mtd_info *mtd;
-+	struct nand_chip *chip;
-+	int ret;
-+	u32 cs;
-+
-+	if (nchips != 1) {
-+		dev_err(dev, "Currently only one NAND chip supported\n");
-+		return -EINVAL;
-+	}
-+
-+	np_nand = of_get_next_child(np, NULL);
-+
-+	nsels = of_property_count_elems_of_size(np_nand, "reg", sizeof(u32));
-+	if (nsels != 1) {
-+		dev_err(dev, "Missing/invalid reg property\n");
-+		return -EINVAL;
-+	}
-+
-+	/* Retrieve CS id, currently only single die NAND supported */
-+	ret = of_property_read_u32(np_nand, "reg", &cs);
-+	if (ret) {
-+		dev_err(dev, "could not retrieve reg property: %d\n", ret);
-+		return ret;
-+	}
-+
-+	nand = devm_kzalloc(dev, sizeof(*nand), GFP_KERNEL);
-+	if (!nand)
-+		return -ENOMEM;
-+
-+	nand->cs[0] = cs;
-+
-+	nand->wp_gpio = devm_gpiod_get_optional(dev, "wp", GPIOD_OUT_LOW);
-+
-+	if (IS_ERR(nand->wp_gpio)) {
-+		ret = PTR_ERR(nand->wp_gpio);
-+		dev_err(dev, "Failed to request WP GPIO: %d\n", ret);
-+		return ret;
-+	}
-+
-+	chip = &nand->chip;
-+	chip->controller = &ctrl->controller;
-+	chip->controller->ops = &tegra_nand_controller_ops;
-+
-+	mtd = nand_to_mtd(chip);
-+
-+	mtd->dev.parent = dev;
-+	mtd->owner = THIS_MODULE;
-+
-+	nand_set_flash_node(chip, np_nand);
-+
-+	if (!mtd->name)
-+		mtd->name = "tegra_nand";
-+
-+	chip->options = NAND_NO_SUBPAGE_WRITE | NAND_USE_BOUNCE_BUFFER;
-+	chip->exec_op = tegra_nand_exec_op;
-+	chip->select_chip = tegra_nand_select_chip;
-+	chip->setup_data_interface = tegra_nand_setup_data_interface;
-+
 +	ret = nand_scan(mtd, 1);
  	if (ret)
  		return ret;
+ 
+ 	ret = mtd_device_register(mtd, NULL, 0);
+ 	if (ret)
+-		nand_cleanup(mtd_to_nand(mtd));
++		nand_cleanup(chip);
+ 
+ 	return ret;
+ }
+@@ -2862,9 +2850,19 @@ static int qcom_probe_nand_devices(struct qcom_nand_controller *nandc)
+ {
+ 	struct device *dev = nandc->dev;
+ 	struct device_node *dn = dev->of_node, *child;
+-	struct qcom_nand_host *host, *tmp;
++	struct qcom_nand_host *host;
+ 	int ret;
+ 
++	if (nandc->props->is_bam) {
++		free_bam_transaction(nandc);
++		nandc->bam_txn = alloc_bam_transaction(nandc);
++		if (!nandc->bam_txn) {
++			dev_err(nandc->dev,
++				"failed to allocate bam transaction\n");
++			return -ENOMEM;
++		}
++	}
++
+ 	for_each_available_child_of_node(dn, child) {
+ 		host = devm_kzalloc(dev, sizeof(*host), GFP_KERNEL);
+ 		if (!host) {
+@@ -2872,7 +2870,7 @@ static int qcom_probe_nand_devices(struct qcom_nand_controller *nandc)
+ 			return -ENOMEM;
+ 		}
+ 
+-		ret = qcom_nand_host_init(nandc, host, child);
++		ret = qcom_nand_host_init_and_register(nandc, host, child);
+ 		if (ret) {
+ 			devm_kfree(dev, host);
+ 			continue;
+@@ -2881,27 +2879,6 @@ static int qcom_probe_nand_devices(struct qcom_nand_controller *nandc)
+ 		list_add_tail(&host->node, &nandc->host_list);
+ 	}
+ 
+-	if (list_empty(&nandc->host_list))
+-		return -ENODEV;
+-
+-	if (nandc->props->is_bam) {
+-		free_bam_transaction(nandc);
+-		nandc->bam_txn = alloc_bam_transaction(nandc);
+-		if (!nandc->bam_txn) {
+-			dev_err(nandc->dev,
+-				"failed to allocate bam transaction\n");
+-			return -ENOMEM;
+-		}
+-	}
+-
+-	list_for_each_entry_safe(host, tmp, &nandc->host_list, node) {
+-		ret = qcom_nand_mtd_register(nandc, host, child);
+-		if (ret) {
+-			list_del(&host->node);
+-			devm_kfree(dev, host);
+-		}
+-	}
+-
+ 	if (list_empty(&nandc->host_list))
+ 		return -ENODEV;
  
 -- 
 2.14.1
