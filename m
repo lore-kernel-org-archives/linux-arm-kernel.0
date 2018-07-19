@@ -1,106 +1,159 @@
-From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Thu, 19 Jul 2018 18:02:28 +0900
-Subject: [PATCH] pinctrl: uniphier: add spi pin-mux settings
-In-Reply-To: <201807191518.CFD3QbbB%fengguang.wu@intel.com>
-References: <1531981249-26329-1-git-send-email-hayashibara.keiji@socionext.com>
- <201807191518.CFD3QbbB%fengguang.wu@intel.com>
-Message-ID: <000001d41f3f$38818500$a9848f00$@socionext.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 19 Jul 2018 11:03:54 +0200
+Subject: [PATCH v2 2/2] arm64: dts: Add Mediatek X20 Development Board
+ support
+In-Reply-To: <20180718164304.GA4902@Mani-XPS-13-9360>
+References: <20180605163442.4812-1-manivannan.sadhasivam@linaro.org>
+ <20180605163442.4812-3-manivannan.sadhasivam@linaro.org>
+ <d88504b4-409c-c42b-f816-bedefce2a819@gmail.com>
+ <20180717140453.GA19076@mani>
+ <a48b0735-ff75-6228-22ba-c8e868240f0c@gmail.com>
+ <20180718164304.GA4902@Mani-XPS-13-9360>
+Message-ID: <e60134a3-0bd6-fadb-3ed4-1db28d6543cc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Sorry.
-I will fix this and send v2 patch.
 
-Thank you.
+On 18/07/18 18:43, Manivannan Sadhasivam wrote:
+> Hi Matthias,
+> 
+> On Wed, Jul 18, 2018 at 05:07:38PM +0200, Matthias Brugger wrote:
+>>
+>>
+>> On 17/07/18 16:04, Manivannan Sadhasivam wrote:
+>>> Hi Matthias,
+>>>
+>>> On Mon, Jul 16, 2018 at 03:24:44PM +0200, Matthias Brugger wrote:
+>>>> Hi Manivanna,
+>>>>
+>>>> On 05/06/18 18:34, Manivannan Sadhasivam wrote:
+>>>>> Add initial device tree support for Mediatek X20 Development Board
+>>>>> based on MT6797 Deca core SoC. This board is one of the 96Boards
+>>>>> Consumer Edition platform.
+>>>>>
+>>>>> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+>>>>> ---
+>>>>>  arch/arm64/boot/dts/mediatek/Makefile         |  1 +
+>>>>>  .../boot/dts/mediatek/mt6797-x20-dev.dts      | 33 +++++++++++++++++++
+>>>>>  2 files changed, 34 insertions(+)
+>>>>>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+>>>>>
+>>>>> diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
+>>>>> index ac17f60f998c..5b7fd6ad96e4 100644
+>>>>> --- a/arch/arm64/boot/dts/mediatek/Makefile
+>>>>> +++ b/arch/arm64/boot/dts/mediatek/Makefile
+>>>>> @@ -3,5 +3,6 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
+>>>>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
+>>>>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
+>>>>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
+>>>>> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-x20-dev.dtb
+>>>>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
+>>>>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
+>>>>> diff --git a/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+>>>>> new file mode 100644
+>>>>> index 000000000000..2c09ca95d9e2
+>>>>> --- /dev/null
+>>>>> +++ b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+>>>>> @@ -0,0 +1,33 @@
+>>>>> +// SPDX-License-Identifier: GPL-2.0
+>>>>> +/*
+>>>>> + * Device Tree Source for MediaTek X20 Development Board
+>>>>> + *
+>>>>> + * Copyright (C) 2018, Linaro Ltd.
+>>>>> + *
+>>>>> + */
+>>>>> +
+>>>>> +/dts-v1/;
+>>>>> +
+>>>>> +#include "mt6797.dtsi"
+>>>>> +
+>>>>> +/ {
+>>>>> +	model = "Mediatek X20 Development Board";
+>>>>> +	compatible = "archermind,mt6797-x20-dev", "mediatek,mt6797";
+>>>>> +
+>>>>> +	aliases {
+>>>>> +		serial0 = &uart1;
+>>>>> +	};
+>>>>
+>>>> Sorry for the late answer.
+>>>> Why did you use uart1 instead of uart0?
+>>>> I know that uart0 is used by the bootloader, but because of their exotic flash
+>>>> procedure I find it quite useful to see this messages in my serial connection.
+>>>> Of course you can only use 921600 baudrate then.
+>>>>
+>>>
+>>> The reason is, most of the Mezzanine boards use USB to UART bridge on the
+>>> UART1 port available on the Low Speed Expansion header. Additionally, the
+>>> convention followed by most of the Consumer Edition 96Boards is to use UART1
+>>> as the debug serial port. That's why eventhough the bootloader is using UART0,
+>>> I forced the kernel to use UART1.
+>>>
+>>
+>> Sounds reasonable, I don't have this 96 boards adapter and I forgot about it.
+>>
+> 
+> That's fine :)
+> 
+>>>>> +
+>>>>> +	memory at 40000000 {
+>>>>> +		device_type = "memory";
+>>>>> +		reg = <0 0x40000000 0 0x1e605000>;
+>>>>
+>>>> How comes this strange number for the memory size?
+>>>>
+>>>
+>>> Actually, the memory size is extracted from the downstream kernel [1].
+>>>
+>>
+>> Hm, Archermind "Helio X20 Development Board Hardware Manual" talks about 2GB
+>> LPDDR3-SDRAM. Would you mind to check if that is actually true?
+>>
+> 
+> Yes, it is 2GB. Shall I change the size to 0x80000000?
+> 
 
-Best Regards,
-Keiji Hayashibara
+Best would be if you boot the machine with this value and see if things look
+sane. Then resubmit. The other option is to resubmit and I'll check it tomorrow :)
 
-> -----Original Message-----
-> From: kbuild test robot [mailto:lkp at intel.com]
-> Sent: Thursday, July 19, 2018 5:02 PM
-> To: Hayashibara, Keiji/?? ?? <hayashibara.keiji@socionext.com>
-> Cc: kbuild-all at 01.org; linus.walleij at linaro.org; Yamada, Masahiro/?? ?? <yamada.masahiro@socionext.com>;
-> linux-gpio at vger.kernel.org; linux-arm-kernel at lists.infradead.org; masami.hiramatsu at linaro.org;
-> jaswinder.singh at linaro.org; linux-kernel at vger.kernel.org; Hayashibara, Keiji/?? ??
-> <hayashibara.keiji@socionext.com>; Hayashi, Kunihiko/? ?? <hayashi.kunihiko@socionext.com>
-> Subject: Re: [PATCH] pinctrl: uniphier: add spi pin-mux settings
->
-> Hi Kunihiko,
->
-> Thank you for the patch! Perhaps something to improve:
->
-> [auto build test WARNING on pinctrl/devel] [also build test WARNING on v4.18-rc5 next-20180718] [if your patch
-> is applied to the wrong git tree, please drop us a note to help improve the system]
->
-> url:
-> https://github.com/0day-ci/linux/commits/Keiji-Hayashibara/pinctrl-uniphier-add-spi-pin-mux-settings/2018071
-> 9-144943
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git devel
-> config: mips-allyesconfig (attached as .config)
-> compiler: mips-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-> reproduce:
->         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         GCC_VERSION=7.2.0 make.cross ARCH=mips
->
-> All warnings (new ones prefixed by >>):
->
->    In file included from drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c:21:0:
->    drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c:629:27: error: 'spi0_groups' undeclared here (not in a
-> function); did you mean 'spi_groups'?
->      UNIPHIER_PINMUX_FUNCTION(spi0),
->                               ^
->    drivers/pinctrl/uniphier/pinctrl-uniphier.h:188:13: note: in definition of macro 'UNIPHIER_PINMUX_FUNCTION'
->       .groups = func##_groups,    \
->                 ^~~~
->    In file included from include/linux/kernel.h:15:0,
->                     from drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c:16:
->    include/linux/build_bug.h:29:45: error: bit-field '<anonymous>' width not an integer constant
->     #define BUILD_BUG_ON_ZERO(e) (sizeof(struct { int:(-!!(e)); }))
->                                                 ^
->    include/linux/compiler-gcc.h:65:28: note: in expansion of macro 'BUILD_BUG_ON_ZERO'
->     #define __must_be_array(a) BUILD_BUG_ON_ZERO(__same_type((a), &(a)[0]))
->                                ^~~~~~~~~~~~~~~~~
->    include/linux/kernel.h:72:59: note: in expansion of macro '__must_be_array'
->     #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
->                                                               ^~~~~~~~~~~~~~~
-> >> drivers/pinctrl/uniphier/pinctrl-uniphier.h:189:17: note: in expansion of macro 'ARRAY_SIZE'
->       .num_groups = ARRAY_SIZE(func##_groups),  \
->                     ^~~~~~~~~~
-> >> drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c:629:2: note: in expansion of macro
-> 'UNIPHIER_PINMUX_FUNCTION'
->      UNIPHIER_PINMUX_FUNCTION(spi0),
->      ^~~~~~~~~~~~~~~~~~~~~~~~
->
-> vim +/UNIPHIER_PINMUX_FUNCTION +629 drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
->
->    618
->    619	static const struct uniphier_pinmux_function uniphier_sld8_functions[] = {
->    620		UNIPHIER_PINMUX_FUNCTION(emmc),
->    621		UNIPHIER_PINMUX_FUNCTION(ether_mii),
->    622		UNIPHIER_PINMUX_FUNCTION(ether_rmii),
->    623		UNIPHIER_PINMUX_FUNCTION(i2c0),
->    624		UNIPHIER_PINMUX_FUNCTION(i2c1),
->    625		UNIPHIER_PINMUX_FUNCTION(i2c2),
->    626		UNIPHIER_PINMUX_FUNCTION(i2c3),
->    627		UNIPHIER_PINMUX_FUNCTION(nand),
->    628		UNIPHIER_PINMUX_FUNCTION(sd),
->  > 629		UNIPHIER_PINMUX_FUNCTION(spi0),
->    630		UNIPHIER_PINMUX_FUNCTION(system_bus),
->    631		UNIPHIER_PINMUX_FUNCTION(uart0),
->    632		UNIPHIER_PINMUX_FUNCTION(uart1),
->    633		UNIPHIER_PINMUX_FUNCTION(uart2),
->    634		UNIPHIER_PINMUX_FUNCTION(uart3),
->    635		UNIPHIER_PINMUX_FUNCTION(usb0),
->    636		UNIPHIER_PINMUX_FUNCTION(usb1),
->    637		UNIPHIER_PINMUX_FUNCTION(usb2),
->    638	};
->    639
->
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Let me know if you can't do it for tomorrow morning. I plan to submit the pull
+requests tomorrow as I'm through nearly all open patches (yes, two days earlier
+\o/ )
+
+Best regards,
+Matthias
+
+> Thanks,
+> Mani
+> 
+>>>> BTW do you know the differences between the EVB board and the x20 one?
+>>>> I used the evb dts for booting up to now.
+>>>>
+>>>
+>>> Sorry, I don't know the difference between both boards!
+>>
+>> Sure, no problem :)
+>>
+>> Regards,
+>> Matthias
+>>
+>>>
+>>> Thanks,
+>>> Mani
+>>>
+>>> [1] https://github.com/helio-x20/linux/blob/helio-x20/arch/arm64/boot/dts/amt6797_64_open.dts#L8
+>>>
+>>>> Best regards,
+>>>> Matthias
+>>>>
+>>>>> +	};
+>>>>> +
+>>>>> +	chosen {
+>>>>> +		stdout-path = "serial0:115200n8";
+>>>>> +	};
+>>>>> +};
+>>>>> +
+>>>>> +&uart1 {
+>>>>> +	status = "okay";
+>>>>> +};
+>>>>>
