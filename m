@@ -1,42 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 19 Jul 2018 00:47:47 -0700
-Subject: [GIT PULL] few new beaglebone variants for v4.19 merge window
-Message-ID: <pull-1531986403-289188@atomide.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 19 Jul 2018 15:48:46 +0800
+Subject: i.MX fixes for 4.18, round 3
+Message-ID: <20180719074844.GW4576@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+The following changes since commit 2ceb2780b790b74bc408a949f6aedbad8afa693e:
 
-The following changes since commit 792f98677d7f777a4f58e567b5b0578191cb986a:
+  ARM: imx_v4_v5_defconfig: Select ULPI support (2018-07-03 21:12:04 +0800)
 
-  Merge commit '949bdcc8a97c' into omap-for-v4.19/dt (2018-07-11 05:54:32 -0700)
+are available in the git repository at:
 
-are available in the Git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.18-3
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/dt-pt2-signed
+for you to fetch changes up to de2d9b5284bcb5c159c5882ac69f6bfd4dec7c67:
 
-for you to fetch changes up to 91f6278bfa3966529c61808bd3cb8f05d7ed5dc6:
-
-  ARM: dts: am335x: add am335x-sancloud-bbe board support (2018-07-17 01:05:37 -0700)
+  soc: imx: gpc: restrict register range for regmap access (2018-07-19 10:24:00 +0800)
 
 ----------------------------------------------------------------
-Few more beaglebone variants for v4.19 merge window
-
-This adds dts files for two new beaglebone variants for
-Octavo Systems OSD3358-SM-RED and Sancloud am335x-sancloud-bbe.
+i.MX fixes for 4.18, round 3:
+ - Restrict GPC driver on register range that is accessible by regmap,
+   so that we can avoid user space from triggering imprecise external
+   abort exception.
 
 ----------------------------------------------------------------
-Koen Kooi (2):
-      dt-bindings: Add vendor prefix for Sancloud
-      ARM: dts: am335x: add am335x-sancloud-bbe board support
+Anson Huang (1):
+      soc: imx: gpc: restrict register range for regmap access
 
-Neeraj Dantu (1):
-      ARM: dts: Add DT support for Octavo Systems OSD3358-SM-RED based on TI AM335x
-
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   4 +-
- arch/arm/boot/dts/am335x-osd3358-sm-red.dts        | 457 +++++++++++++++++++++
- arch/arm/boot/dts/am335x-sancloud-bbe.dts          | 136 ++++++
- 4 files changed, 597 insertions(+), 1 deletion(-)
- create mode 100755 arch/arm/boot/dts/am335x-osd3358-sm-red.dts
- create mode 100644 arch/arm/boot/dts/am335x-sancloud-bbe.dts
+ drivers/soc/imx/gpc.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
