@@ -1,75 +1,474 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 19 Jul 2018 11:55:12 +0100
-Subject: [PATCH v2 08/10] coresight: dts: Document usage of graph bindings
+Date: Thu, 19 Jul 2018 11:55:15 +0100
+Subject: [PATCH v2 10/10] dts: juno: Update coresight bindings
 In-Reply-To: <1531997715-6767-1-git-send-email-suzuki.poulose@arm.com>
 References: <1531997715-6767-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1531997715-6767-9-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1531997715-6767-12-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before we update the bindings, document the current graph bindings
-and usage of additional properties.
+Switch to updated coresight bindings for Juno platforms.
 
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Liviu Dudau <liviu.dudau@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- .../devicetree/bindings/arm/coresight.txt          | 30 +++++++++++++++++++---
- 1 file changed, 26 insertions(+), 4 deletions(-)
+Changes since V2:
+  - Update to new format.
+---
+ arch/arm64/boot/dts/arm/juno-base.dtsi    | 161 +++++++++++++++---------------
+ arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi |  52 ++++------
+ arch/arm64/boot/dts/arm/juno.dts          |  13 +--
+ 3 files changed, 105 insertions(+), 121 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-index 5d1ad09..8e21512 100644
---- a/Documentation/devicetree/bindings/arm/coresight.txt
-+++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -54,9 +54,7 @@ its hardware characteristcs.
- 	  clocks the core of that coresight component. The latter clock
- 	  is optional.
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index ce56a4a..a418193 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -115,22 +115,17 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
  
--	* port or ports: The representation of the component's port
--	  layout using the generic DT graph presentation found in
--	  "bindings/graph.txt".
-+	* port or ports: see "Graph bindings for Coresight" below.
+-			/* input port */
+-			port at 0 {
+-				reg = <0>;
++		in-ports {
++			port {
+ 				etf0_in_port: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&main_funnel_out_port>;
+ 				};
+ 			};
++		};
  
- * Additional required properties for System Trace Macrocells (STM):
- 	* reg: along with the physical base address and length of the register
-@@ -73,7 +71,7 @@ its hardware characteristcs.
- 	  AMBA markee):
- 		- "arm,coresight-replicator"
+-			/* output port */
+-			port at 1 {
+-				reg = <0>;
++		out-ports {
++			port {
+ 				etf0_out_port: endpoint {
+ 				};
+ 			};
+@@ -144,10 +139,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			tpiu_in_port: endpoint {
+-				slave-mode;
+-				remote-endpoint = <&replicator_out_port0>;
++		in-ports {
++			port {
++				tpiu_in_port: endpoint {
++					remote-endpoint = <&replicator_out_port0>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -160,31 +156,29 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
  
--	* port or ports: same as above.
-+	* port or ports: see "Graph bindings for Coresight" below.
+-			/* output port */
+-			port at 0 {
+-				reg = <0>;
++		out-ports {
++			port {
+ 				main_funnel_out_port: endpoint {
+ 					remote-endpoint = <&etf0_in_port>;
+ 				};
+ 			};
++		};
  
- * Optional properties for ETM/PTMs:
- 
-@@ -96,6 +94,30 @@ its hardware characteristcs.
- 	* interrupts : Exactly one SPI may be listed for reporting the address
- 	  error
- 
-+Graph bindings for Coresight
-+-------------------------------
+-			/* input ports */
+-			port at 1 {
++		main_funnel_in_ports: in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+Coresight components are interconnected to create a data path for the flow of
-+trace data generated from the "sources" to their collection points "sink".
-+Each coresight component must describe the "input" and "output" connections.
-+The connections must be described via generic DT graph bindings as described
-+by the "bindings/graph.txt", where each "port" along with an "endpoint"
-+component represents a hardware port and the connection.
-+
-+Since it is possible to have multiple connections for any coresight component
-+with a specific direction of data flow, each connection must define the
-+following properties to uniquely identify the connection details.
-+
-+ * Direction of the data flow w.r.t the component :
-+   Each input port must have the following property defined at the "endpoint"
-+   for the port.
-+	"slave-mode"
-+
-+ * Hardware Port number at the component:
-+     -  The hardware port number is assumed to be the address of the "port"
-+         component.
-+
-+
- Example:
++			port at 0 {
+ 				reg = <0>;
+ 				main_funnel_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster0_funnel_out_port>;
+ 				};
+ 			};
  
- 1. Sinks
+-			port at 2 {
++			port at 1 {
+ 				reg = <1>;
+ 				main_funnel_in_port1: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster1_funnel_out_port>;
+ 				};
+ 			};
+@@ -199,10 +193,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			etr_in_port: endpoint {
+-				slave-mode;
+-				remote-endpoint = <&replicator_out_port1>;
++		in-ports {
++			port {
++				etr_in_port: endpoint {
++					remote-endpoint = <&replicator_out_port1>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -216,8 +211,10 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			stm_out_port: endpoint {
++		out-ports {
++			port {
++				stm_out_port: endpoint {
++				};
+ 			};
+ 		};
+ 	};
+@@ -238,9 +235,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			cluster0_etm0_out_port: endpoint {
+-				remote-endpoint = <&cluster0_funnel_in_port0>;
++		out-ports {
++			port {
++				cluster0_etm0_out_port: endpoint {
++					remote-endpoint = <&cluster0_funnel_in_port0>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -252,29 +251,28 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			port at 0 {
+-				reg = <0>;
++		out-ports {
++			port {
+ 				cluster0_funnel_out_port: endpoint {
+ 					remote-endpoint = <&main_funnel_in_port0>;
+ 				};
+ 			};
++		};
+ 
+-			port at 1 {
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
+ 				reg = <0>;
+ 				cluster0_funnel_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster0_etm0_out_port>;
+ 				};
+ 			};
+ 
+-			port at 2 {
++			port at 1 {
+ 				reg = <1>;
+ 				cluster0_funnel_in_port1: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster0_etm1_out_port>;
+ 				};
+ 			};
+@@ -297,9 +295,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			cluster0_etm1_out_port: endpoint {
+-				remote-endpoint = <&cluster0_funnel_in_port1>;
++		out-ports {
++			port {
++				cluster0_etm1_out_port: endpoint {
++					remote-endpoint = <&cluster0_funnel_in_port1>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -320,9 +320,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			cluster1_etm0_out_port: endpoint {
+-				remote-endpoint = <&cluster1_funnel_in_port0>;
++		out-ports {
++			port {
++				cluster1_etm0_out_port: endpoint {
++					remote-endpoint = <&cluster1_funnel_in_port0>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -334,43 +336,40 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			port at 0 {
+-				reg = <0>;
++		out-ports {
++			port {
+ 				cluster1_funnel_out_port: endpoint {
+ 					remote-endpoint = <&main_funnel_in_port1>;
+ 				};
+ 			};
++		};
+ 
+-			port at 1 {
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
+ 				reg = <0>;
+ 				cluster1_funnel_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster1_etm0_out_port>;
+ 				};
+ 			};
+ 
+-			port at 2 {
++			port at 1 {
+ 				reg = <1>;
+ 				cluster1_funnel_in_port1: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster1_etm1_out_port>;
+ 				};
+ 			};
+-			port at 3 {
++			port at 2 {
+ 				reg = <2>;
+ 				cluster1_funnel_in_port2: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster1_etm2_out_port>;
+ 				};
+ 			};
+-			port at 4 {
++			port at 3 {
+ 				reg = <3>;
+ 				cluster1_funnel_in_port3: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster1_etm3_out_port>;
+ 				};
+ 			};
+@@ -393,9 +392,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			cluster1_etm1_out_port: endpoint {
+-				remote-endpoint = <&cluster1_funnel_in_port1>;
++		out-ports {
++			port {
++				cluster1_etm1_out_port: endpoint {
++					remote-endpoint = <&cluster1_funnel_in_port1>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -416,9 +417,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			cluster1_etm2_out_port: endpoint {
+-				remote-endpoint = <&cluster1_funnel_in_port2>;
++		out-ports {
++			port {
++				cluster1_etm2_out_port: endpoint {
++					remote-endpoint = <&cluster1_funnel_in_port2>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -439,9 +442,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			cluster1_etm3_out_port: endpoint {
+-				remote-endpoint = <&cluster1_funnel_in_port3>;
++		out-ports {
++			port {
++				cluster1_etm3_out_port: endpoint {
++					remote-endpoint = <&cluster1_funnel_in_port3>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -454,7 +459,7 @@
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+ 
+-		ports {
++		out-ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
+@@ -472,12 +477,10 @@
+ 					remote-endpoint = <&etr_in_port>;
+ 				};
+ 			};
+-
+-			/* replicator input port */
+-			port at 2 {
+-				reg = <0>;
++		};
++		in-ports {
++			port {
+ 				replicator_in_port0: endpoint {
+-					slave-mode;
+ 				};
+ 			};
+ 		};
+diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+index 0c43fb3..cf28515 100644
+--- a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+@@ -7,23 +7,16 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			/* output port */
+-			port at 0 {
+-				reg = <0>;
++		out-ports {
++			port {
+ 				csys1_funnel_out_port: endpoint {
+ 					remote-endpoint = <&etf1_in_port>;
+ 				};
+ 			};
+-
+-			/* input port */
+-			port at 1 {
+-				reg = <0>;
++		};
++		in-ports {
++			port {
+ 				csys1_funnel_in_port0: endpoint {
+-					slave-mode;
+ 				};
+ 			};
+ 
+@@ -37,22 +30,15 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			/* input port */
+-			port at 0 {
+-				reg = <0>;
++		in-ports {
++			port {
+ 				etf1_in_port: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&csys1_funnel_out_port>;
+ 				};
+ 			};
+-
+-			/* output port */
+-			port at 1 {
+-				reg = <0>;
++		};
++		out-ports {
++			port {
+ 				etf1_out_port: endpoint {
+ 					remote-endpoint = <&csys2_funnel_in_port1>;
+ 				};
+@@ -67,20 +53,18 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			/* output port */
+-			port at 0 {
+-				reg = <0>;
++		out-ports {
++			port {
+ 				csys2_funnel_out_port: endpoint {
+ 					remote-endpoint = <&replicator_in_port0>;
+ 				};
+ 			};
++		};
+ 
+-			/* input ports */
+-			port at 1 {
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			port at 0 {
+ 				reg = <0>;
+ 				csys2_funnel_in_port0: endpoint {
+ 					slave-mode;
+@@ -88,7 +72,7 @@
+ 				};
+ 			};
+ 
+-			port at 2 {
++			port at 1 {
+ 				reg = <1>;
+ 				csys2_funnel_in_port1: endpoint {
+ 					slave-mode;
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index 2b2bf39..eb55c2f 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -257,14 +257,11 @@
+ 	remote-endpoint = <&main_funnel_in_port2>;
+ };
+ 
+-&main_funnel {
+-	ports {
+-		port at 3 {
+-			reg = <2>;
+-			main_funnel_in_port2: endpoint {
+-				slave-mode;
+-				remote-endpoint = <&stm_out_port>;
+-			};
++&main_funnel_in_ports {
++	port at 2 {
++		reg = <2>;
++		main_funnel_in_port2: endpoint {
++			remote-endpoint = <&stm_out_port>;
+ 		};
+ 	};
+ };
 -- 
 2.7.4
