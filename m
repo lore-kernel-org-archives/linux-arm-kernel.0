@@ -1,154 +1,61 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Thu, 19 Jul 2018 17:53:24 +0800
-Subject: [PATCH 2/2] mtd: rawnand: meson: add support for Amlogic NAND
- flash controller
-In-Reply-To: <20180719103953.26164eb6@bbrezillon>
-References: <20180613161314.14894-1-yixun.lan@amlogic.com>
- <20180613161314.14894-3-yixun.lan@amlogic.com>
- <20180624213844.2207ca6f@bbrezillon>
- <76d428ff-376a-dce3-cb51-d238564b7c3e@amlogic.com>
- <20180718210849.493f0087@bbrezillon>
- <45c1a96c-0d14-dece-37cf-ac428bb98621@amlogic.com>
- <20180719103953.26164eb6@bbrezillon>
-Message-ID: <ffa5a2ce-932b-700d-25ee-723db3cbd163@amlogic.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Thu, 19 Jul 2018 10:54:33 +0100
+Subject: [PATCH 0/2] dt: thermal: Fix broken cooling-maps
+In-Reply-To: <20180719024028.vudrlpgxiz6accky@vireshk-i7>
+References: <cover.1530766981.git.viresh.kumar@linaro.org>
+ <5B4F5E00.5050800@hisilicon.com> <20180719024028.vudrlpgxiz6accky@vireshk-i7>
+Message-ID: <5B505FD9.8040609@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Viresh,
 
-HI Boris
-
-
-On 07/19/18 16:39, Boris Brezillon wrote:
-> Hi Yixun,
-> 
-> On Thu, 19 Jul 2018 16:13:47 +0800
-> Yixun Lan <yixun.lan@amlogic.com> wrote:
-> 
->>>>> You're doing DMA on those buffers, and devm_kzalloc() is not
->>>>> DMA-friendly (returned buffers are not aligned on a cache line). Also,
->>>>> you don't have to allocate your own buffers because the core already
->>>>> allocate them (chip->data_buf, chip->oob_poi). All you need to do is
->>>>> set the NAND_USE_BOUNCE_BUFFER flag in chip->options to make sure
->>>>> you're always passed a DMA-able buffer.
->>>>>     
->>>>
->>>> thanks for the suggestion, we've migrated to use the
->>>> dmam_alloc_coherent() API  
+On 2018/7/19 3:40, Viresh Kumar wrote:
+> On 18-07-18, 16:34, Wei Xu wrote:
+>> Hi Viresh,
+>>
+>> On 2018/7/5 6:09, Viresh Kumar wrote:
+>>> Hi,
 >>>
->>> kzalloc() should be just fine, no need to alloc a DMA coherent region. 
->>>   
->>
->> we're a little bit confused here, isn't devm_kzalloc (previously we are
->> using) a variant of kzalloc? and since the NAND controller is doing DMA
->> here, using DMA coherent API is more proper way?
-> 
-> Well, making buffers DMA coherent might be expensive, especially if you
-> access them a lot (unless you have a coherency unit and the cache is
-> kept enabled).
-> 
-> Regarding the "why is devm_kzalloc() is not DMA-safe?" question, I'd
-> recommend that you read this discussion [1].
-> 
-great, thanks for the info.
-
-we fixed this in patch v2
-
->>>>>> +	mtd->name = devm_kasprintf(nfc->dev, GFP_KERNEL,
->>>>>> +				   "%s:nand", dev_name(dev));
->>>>>> +	if (!mtd->name) {
->>>>>> +		dev_err(nfc->dev, "Failed to allocate mtd->name\n");
->>>>>> +		return -ENOMEM;
->>>>>> +	}    
->>>>>
->>>>> You set the name after nand_scan_ident() and make it conditional (only
->>>>> if ->name == NULL) so that the label property defined in the DT takes
->>>>> precedence over the default name.    
->>>>  
->> for setting mtd->name conditional, do you mean doing something like this?
->>
->> if (!mtd->name)
->> 	mtd->name = devm_kasprintf(..)
-> 
-> Yes, that's what I meant.
-> 
->>
->> but we found mtd->name = "ffe07800.nfc" after function
->> nand_scan_ident(), which is same value as dev_name(dev)..
->> and there is no cs information encoded there.
-> 
-> Hm, that shouldn't be the case. Maybe you can add traces to find out
-> who is setting mtd->name to this value.
-> 
-will trace this, then get back to you
->>
->>>>  
->>>>> Also, I recommend suffixing this name
->>>>> with the CS id, just in case you ever need to support connecting several
->>>>> chips to the same controller. 
->>>>>     
->>>>
->>>> we actually didn't get the point here, cs is about chip selection with
->>>> multiple nand chip? and how to get this information?  
+>>> This is an attempt to fix the broken or partially defined DT bindings
+>>> for cooling-maps. We should list every device that participates in
+>>> cooling down at a certain trip point, instead of just the first in the
+>>> list as that depends on certain ordering of events to work properly.
 >>>
->>> Well, you currently seem to only support one chip per controller, but I
->>> guess the IP can handle several CS lines. So my recommendation is about
->>> choosing a name so that you can later easily add support for multiple
->>> chips without breaking setups where mtdparts is used.
+>>> The first patch extends the binding to allow a list of phandles in
+>>> "cooling-device" property and the second patch fixes one of the
+>>> platform's DT.
 >>>
->>> To sum-up, assuming your NAND chip is always connected to CS0 (on the
->>> controller side), I'd suggest doing:
->>>   
->> yes, this is exactly how the hardware connected.
->>> 	mtd->name = devm_kasprintf(nfc->dev, GFP_KERNEL,
->>> 				   "%s:nand.%d", dev_name(dev), cs_id);
+>>> This will be followed up by fixing all platform DT bindings that have
+>>> these issues after this set is accepted.
 >>>
->>> where cs_id is the value you extracted from the reg property of the
->>> NAND node.
->>>   
->> Ok, you right.
->> current, the NAND chip is only use one CS (which CE0) for now, what's in
->> the DT is
+>>> The kernel also requires some changes to handle the phandle list, but
+>>> wouldn't break with these changes as it reads the first phandle in the
+>>> list for now. We can update that separately.
+>>>
+>>> --
+>>> viresh
+>>>
+>>> Viresh Kumar (2):
+>>>   dt-bindings: thermal: Allow multiple devices to share cooling map
+>>>   arm64: dts: hi6220: Add all CPUs in cooling maps
+>>>
+>>>  Documentation/devicetree/bindings/thermal/thermal.txt | 11 +++--------
+>>>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi             |  9 ++++++++-
+>>>  2 files changed, 11 insertions(+), 9 deletions(-)
+>>>
 >>
->> nand at 0 {
->>  reg = < 0 >;
->>  ..
->> };
->>
->> so for the multiple chips it would something like this in DT?
->>
->> nand at 0 {
->>   reg = < 0 >;
->> };
->>
->> nand at 1 {
->>   reg = < 1 >;
->> };
+>> Thanks!
+>> Applied both to the hisilicon dt tree.
 > 
-> Yep, that's for 2 single-die chips.
+> Hi Wei,
 > 
->>
->> or even
->> nand at 0 {
->>   reg = < 0 2 >;
->> };
->>
->> nand at 1 {
+> I expected the first patch to go via the thermal tree as it is for the
+> thermal core maintainers. Second patch can very well go from your
+> tree, but only after the 1st one is applied by thermal maintainers.
 > 
-> nand at 3 {
-> 
->>   reg = < 3 4 >;
->> };
-> 
-> And this is describing 2 dual-die chips.
-> 
->>
->> do we need to encode all the cs information here? not sure if we
->> understand this correctly, but could send out the patch for review..
-> 
-> Yes, reg should contain an array of controller-side CS lines used to
-> select the chip (or a specific die in a chip, the index in the reg
-> table being the id of the die).
->
-much clear about this, thanks
 
-Yixun
+OK. I will drop them in the pull request and apply the dts patch later.
+
+Best Regards,
+Wei
