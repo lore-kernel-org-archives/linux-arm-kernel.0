@@ -1,38 +1,26 @@
 From: manish.narani@xilinx.com (Manish Narani)
-Date: Thu, 19 Jul 2018 15:35:47 +0530
-Subject: [PATCH 4/4] arm64: zynqmp: Add DDRC node
-In-Reply-To: <1531994747-15196-1-git-send-email-manish.narani@xilinx.com>
-References: <1531994747-15196-1-git-send-email-manish.narani@xilinx.com>
-Message-ID: <1531994747-15196-5-git-send-email-manish.narani@xilinx.com>
+Date: Thu, 19 Jul 2018 15:35:43 +0530
+Subject: [PATCH 0/4] EDAC: Enhancements to Synopsys EDAC driver
+Message-ID: <1531994747-15196-1-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds ddrc memory controller node in dts. The size mentioned
-in dts is 0x30000, because we need to access DDR_QOS INTR registers
-located at fd090208 from this driver.
+This patch series enhances the current EDAC driver to support different
+platforms.This series adds support for ZynqMP DDRC controller in synopsys
+EDAC driver. This series also adds Device tree properties and relevant
+binding documentation.
 
-Signed-off-by: Manish Narani <manish.narani@xilinx.com>
----
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+Manish Narani (4):
+  edac: synps: Add platform specific structures for ddrc controller
+  dt: bindings: Document ZynqMP DDRC in Synopsys documentation
+  edac: synopsys: Add EDAC ECC support for ZynqMP DDRC
+  arm64: zynqmp: Add DDRC node
 
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-index a091e6f..7d6a3cf 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-@@ -355,6 +355,13 @@
- 			xlnx,bus-width = <64>;
- 		};
- 
-+		mc: memory-controller at fd070000 {
-+			compatible = "xlnx,zynqmp-ddrc-2.40a";
-+			reg = <0x0 0xfd070000 0x0 0x30000>;
-+			interrupt-parent = <&gic>;
-+			interrupts = <0 112 4>;
-+		};
-+
- 		gem0: ethernet at ff0b0000 {
- 			compatible = "cdns,zynqmp-gem", "cdns,gem";
- 			status = "disabled";
+ .../bindings/memory-controllers/synopsys.txt       |  25 +-
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |   7 +
+ drivers/edac/Kconfig                               |   2 +-
+ drivers/edac/synopsys_edac.c                       | 916 ++++++++++++++++++++-
+ 4 files changed, 918 insertions(+), 32 deletions(-)
+
 -- 
 2.1.1
