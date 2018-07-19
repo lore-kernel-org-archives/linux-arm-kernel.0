@@ -1,104 +1,99 @@
-From: nick@shmanahar.org (Nick Dyer)
-Date: Thu, 19 Jul 2018 21:54:04 +0100
-Subject: [PATCH v2 1/2] Input: atmel_mxt_ts: Add support for  optional
- regulators.
-In-Reply-To: <2353752.vfvcsHJLR6@acerlaptop>
-References: <1531851386-17840-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
- <1531851386-17840-2-git-send-email-pawel.mikolaj.chmiel@gmail.com>
- <20180717210005.GA21416@hairyalien> <2353752.vfvcsHJLR6@acerlaptop>
-Message-ID: <20180719205403.GA29273@hairyalien>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Thu, 19 Jul 2018 22:56:53 +0200
+Subject: [PATCH v4 03/10] KVM: arm/arm64: vgic: GICv2 IGROUPR should read
+ as zero
+In-Reply-To: <20180719181636.mtlxhyrxtsweio2y@kamzik.brq.redhat.com>
+References: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
+ <1531746387-7033-4-git-send-email-christoffer.dall@arm.com>
+ <20180719181636.mtlxhyrxtsweio2y@kamzik.brq.redhat.com>
+Message-ID: <20180719205653.GA6399@C02W217FHV2R.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 06:21:30PM +0200, Pawe? Chmiel wrote:
-> On Tuesday, July 17, 2018 10:00:05 PM CEST Nick Dyer wrote:
-> > On Tue, Jul 17, 2018 at 08:16:25PM +0200, Pawe? Chmiel wrote:
-> > > This patch adds optional regulators, which can be used to power
-> > > up touchscreen. After enabling regulators, we need to wait 150msec.
-> > > This value is taken from official driver.
-> > > 
-> > > It was tested on Samsung Galaxy i9000 (based on Samsung S5PV210 SOC).
-> > > 
-> > > Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
-> > > ---
-> > > Changes from v1:
-> > >   - Enable regulators only if reset_gpio is present.
-> > >   - Switch from devm_regulator_get_optional to devm_regulator_get
-> > > ---
-> > >  drivers/input/touchscreen/atmel_mxt_ts.c | 46 ++++++++++++++++++++++++++++++--
-> > >  1 file changed, 44 insertions(+), 2 deletions(-)
+On Thu, Jul 19, 2018 at 08:16:36PM +0200, Andrew Jones wrote:
+> On Mon, Jul 16, 2018 at 03:06:20PM +0200, Christoffer Dall wrote:
+> > We currently don't support grouping in the emulated VGIC, which is a
+> > known defect on KVM (not hurting any currently used guests as far as
+> > we're aware). This is currently handled by treating all interrupts as
+> > group 0 interrupts for an emulated GICv2 and always signaling interrupts
+> > as group 0 to the virtual CPU interface.
 > > 
-> > Hi Pawel-
+> > However, when reading which group interrupts belongs to in the guest
+> > from the emulated VGIC, the VGIC currently reports group 1 instead of
+> > group 0, which is misleading.  Fix this temporarily before introducing
+> > full group support by changing the hander to _raz instead of _rao.
 > > 
-> > I see you've borrowed some of the logic from the patch I wrote a while
-> > back (see https://github.com/ndyer/linux/commit/8e9687e41ed062 )
-> Actually, i was looking at https://github.com/atmel-maxtouch/linux/blob/maxtouch-v3.14/drivers/input/touchscreen/atmel_mxt_ts.c (and didn't saw Your patch till now).
-> Are You going to submit it? (it has more functionalities - for example
-> suspend mode read from device tree).
-
-Getting that work upstream has stalled for a couple of years because I
-changed jobs. I have actually started recently to dust it off again, it
-was later on in my queue but if you have the time to work on it that is
-great.
-
-> > The correct behaviour according to Atmel should be:
+> > Fixes: fb848db39661a "KVM: arm/arm64: vgic-new: Add GICv2 MMIO handling framework"
+> > Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> > ---
+> >  virt/kvm/arm/vgic/vgic-init.c    | 2 +-
+> >  virt/kvm/arm/vgic/vgic-mmio-v2.c | 8 +++++++-
+> >  2 files changed, 8 insertions(+), 2 deletions(-)
 > > 
-> > * Make RESET zero
-> > * Bring up regulators
-> > * Wait for a period to settle (150 msec)
-> > * Release RESET
-> > * Wait for 100 msec whilst device gets through bootloader
-> > * Wait for CHG line assert before reading info block
-> > 
-> > I can't see the first and last steps in your patch at present.
-> About first step - reset_gpio is readed by using
-> devm_gpiod_get_optional with GPIOD_OUT_LOW flag, so i think (but might
-> be wrong)  that we don't need to set this gpio value again to 0 before
-> enabling regulators,
-
-I see what you mean - that is fair enough.
-
-> since currently only place where reset_gpio is used is in driver probe
-> (in Your patch it is used in other cases/places - for example in
-> mxt_start/stop, when we enable regulators).
-> About missing wait after releasing reset, shouldn't this be separate
-> patch (since currently driver is not doing it)? I can prepare it and
-> send with other in next version.
-
-According to the maxtouch documentation, it isn't ready for comms until
-the firmware asserts the CHG line. I've seen a bunch of devices that get
-by without an explicit wait because the board file does the power on,
-and by the time the driver gets to probe it's a few hundred ms later
-anyway, so it doesn't matter. But if we put it all in the driver, it
-will attempt to read the info block straight after the 100 msec delay
-without waiting for CHG, and I suspect we'll end up with occasional
-probe failures. It'll depend on the maxtouch device, though: they have a
-range of different power on timings.
-
-Which platform are you doing this for? Is it a Chromebook?
-
-> Thanks for feedback
-> > 
-> > The only downside with this approach is that there are a lot of
-> > delays during driver probe, but I believe the asynchronous probe stuff
-> > that's landed since I wrote the original patch should address that.
-> > 
-> > cheers
-> > 
-> > Nick
-> > 
-> > >  	}
-> > > @@ -3116,6 +3154,10 @@ static int mxt_remove(struct i2c_client *client)
-> > >  	struct mxt_data *data = i2c_get_clientdata(client);
-> > >  
-> > >  	disable_irq(data->irq);
-> > > +	if (data->reset_gpio) {
-> > > +		regulator_disable(data->avdd_reg);
-> > > +		regulator_disable(data->vdd_reg);
-> > > +	}
-> > >  	sysfs_remove_group(&client->dev.kobj, &mxt_attr_group);
-> > >  	mxt_free_input_device(data);
-> > >  	mxt_free_object_table(data);
-> > 
+> > diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> > index 8b6fc45..230c922 100644
+> > --- a/virt/kvm/arm/vgic/vgic-init.c
+> > +++ b/virt/kvm/arm/vgic/vgic-init.c
+> > @@ -298,7 +298,7 @@ int vgic_init(struct kvm *kvm)
+> >  
+> >  	vgic_debug_init(kvm);
+> >  
+> > -	dist->implementation_rev = 0;
+> > +	dist->implementation_rev = 1;
+> >  	dist->initialized = true;
+> >  
+> >  out:
+> > diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> > index f0c5351..db646f1 100644
+> > --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> > +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> > @@ -22,6 +22,12 @@
+> >  #include "vgic.h"
+> >  #include "vgic-mmio.h"
+> >  
+> > +/*
+> > + * The Revision field in the IIDR have the following meanings:
+> > + *
+> > + * Revision 1: Report GICv2 interrupts as group 0 instead of group 1
+> > + */
+> > +
+> >  static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
+> >  					    gpa_t addr, unsigned int len)
+> >  {
+> > @@ -365,7 +371,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+> >  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+> >  		VGIC_ACCESS_32bit),
+> >  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
+> > -		vgic_mmio_read_rao, vgic_mmio_write_wi, NULL, NULL, 1,
+> > +		vgic_mmio_read_raz, vgic_mmio_write_wi, NULL, NULL, 1,
+> >  		VGIC_ACCESS_32bit),
+> >  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
+> >  		vgic_mmio_read_enable, vgic_mmio_write_senable, NULL, NULL, 1,
+> > -- 
+> > 2.7.4
+> >
 > 
+> I realize that this is fixing the emulation, so any guest that would find
+> this change a problem is broken, but guest-visible changes without user
+> consent always seem a bit wrong.
 > 
+> We could drop this patch and only allow gicv2 guests to read ones from the
+> IGROUP registers until v2_groups_user_writable is true. Then, if a broken
+> guest needs to run on a host with an updated kernel, userspace, which must
+> have been updated too, can give the guest the broken group view it needs.
+
+That won't really help because those interrupts will no longer be
+injected as IRQs, but as FIQs, which is also a departure from what the
+guest expects.
+
+> 
+> That said, I'm not overly concerned about this guest-visible issue. So
+
+Any guests relying on this broken behavior will not run on hardwre, so
+I'm not going to change this.
+
+> 
+> Reviewed-by: Andrew Jones <drjones@redhat.com>
+
+Thanks!
+-Christoffer
