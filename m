@@ -1,34 +1,57 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Jul 2018 11:01:10 +0100
-Subject: arm: v4.18-rc5 with cpuidle on TC2 (A7 boot) spectre v2 issue
-In-Reply-To: <2abc6c11-2e8c-a4ea-6911-0f495d90ace6@arm.com>
-References: <2abc6c11-2e8c-a4ea-6911-0f495d90ace6@arm.com>
-Message-ID: <20180719100109.GH17271@n2100.armlinux.org.uk>
+From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
+Date: Thu, 19 Jul 2018 19:01:40 +0900
+Subject: [PATCH] arm64: fix for restoring console loglevel after handling
+ traps
+In-Reply-To: <1531993734-1463-2-git-send-email-hari.vyas@broadcom.com>
+References: <1531993734-1463-1-git-send-email-hari.vyas@broadcom.com>
+ <1531993734-1463-2-git-send-email-hari.vyas@broadcom.com>
+Message-ID: <20180719100140.GA424@jagdpanzerIV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 11:42:50AM +0200, Dietmar Eggemann wrote:
-> Hi,
-> 
-> running v4.18-rc5 (plus still missing "power: vexpress: fix corruption in
-> notifier registration", otherwise I get this rcu_sched stall issue) on TC2
-> (A7 boot) with vanilla multi_v7_defconfig plus
-> CONFIG_ARM_BIG_LITTLE_CPUIDLE=y gives me continuous:
-> 
-> ...
->  CPUX: Spectre v2: incorrect context switching function, system vulnerable
-> ...
-> 
-> messages.
-> 
-> Work around is to disable CONFIG_HARDEN_BRANCH_PREDICTOR.
+On (07/19/18 15:18), Hari Vyas wrote:
+[..]
 
-or disable big.Little if you want the hardening.
+Not so sure about the patch, sorry.
 
-The choices are currently either protection against Spectre or big.Little
-support since the two are mutually exclusive at the moment.
+> @@ -211,6 +211,8 @@ void die(const char *str, struct pt_regs *regs, int err)
+>  
+>  	bust_spinlocks(0);
+>  	add_taint(TAINT_DIE, LOCKDEP_NOW_UNRELIABLE);
+> +
+> +	restore_console_loglevel();
+>  	oops_exit();
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+This is *probably* the only place where you can roll-back the
+loglevel, but you restore console loglevel too early - a trap
+can panic() the system, we need to preserve the console verbose
+mode which we set at the start of the trap.
+
+> @@ -624,6 +626,7 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+>  	die("Oops - bad mode", regs, 0);
+>  	local_daif_mask();
+>  	panic("bad mode");
+> +	restore_console_loglevel();
+
+panic()
+
+> @@ -680,6 +683,7 @@ asmlinkage void handle_bad_stack(struct pt_regs *regs)
+>  	 * to get a better stack trace.
+>  	 */
+>  	nmi_panic(NULL, "kernel stack overflow");
+> +	restore_console_loglevel();
+
+panic()
+
+> @@ -694,7 +698,7 @@ void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr)
+>  		__show_regs(regs);
+>  
+>  	nmi_panic(regs, "Asynchronous SError Interrupt");
+> -
+> +	restore_console_loglevel();
+
+panic()
+
+What's the point of restore_console_loglevel() after panic()?
+
+	-ss
