@@ -1,132 +1,111 @@
-From: brendanhiggins@google.com (Brendan Higgins)
-Date: Thu, 19 Jul 2018 09:58:27 -0700
-Subject: [PATCH] i2c: aspeed: Improve driver to support multi-master use
- cases stably
-In-Reply-To: <a84da5d076924f40b1c836fe8b9d0844@TWMBX01.aspeed.com>
-References: <20180626165812.4141-1-jae.hyun.yoo@linux.intel.com>
- <CAFd5g45z--ucXf-So517tgrayZT6x2TGvaUvaDF7zeRNn7CPXw@mail.gmail.com>
- <e51471e6-0f8a-bffc-34c8-1e74239fdbcf@linux.intel.com>
- <CAFd5g47j_h4ZrT8Eg1FZ8sAj5ekCUH20jUVub75ozdkg8_YW7Q@mail.gmail.com>
- <921b1ab7-9c9f-0aeb-da89-5a1a27d009f0@linux.intel.com>
- <d3f10fc1-635b-3a5d-a967-2816eac005fc@linux.intel.com>
- <CAFd5g47zdPdqqjVJtNHtFk+jKgciKbMcEH9M-W9rL4DgLM5hkg@mail.gmail.com>
- <b8232faa-58f5-f3a5-d12a-3f326cf1d03d@linux.intel.com>
- <a84da5d076924f40b1c836fe8b9d0844@TWMBX01.aspeed.com>
-Message-ID: <CAFd5g44JNqaG58aAoiMRbgzfz1nE4CfsS4v2gt99=Q5LoaZA6Q@mail.gmail.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Fri, 20 Jul 2018 01:02:24 +0800
+Subject: [SPAM]Re: [PATCH] net: mediatek: use dma_zalloc_coherent
+ instead of allocator/memset
+In-Reply-To: <20180719141723.GM17271@n2100.armlinux.org.uk>
+References: <20180719140955.19444-1-yuehaibing@huawei.com>
+ <20180719141723.GM17271@n2100.armlinux.org.uk>
+Message-ID: <1532019744.8953.248.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 15, 2018 at 8:05 PM Gary Hsu <gary_hsu@aspeedtech.com> wrote:
->
-> Hi Jae,
->
-> In originally, we reserved these register bits for debug purpose. But for some error handling case, we found it is also useful to help to clarify some error conditions. So driver also can use these fields information to check something.
-> As for how driver use these information in their code, I have no comment. I don?t understand the driver. But these information is the real controller state, it had no problem to use information.
+On Thu, 2018-07-19 at 15:17 +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 19, 2018 at 10:09:55PM +0800, YueHaibing wrote:
+> > Use dma_zalloc_coherent instead of dma_alloc_coherent
+> > followed by memset 0.
+> > 
+> > Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+> > ---
+> >  drivers/net/ethernet/mediatek/mtk_eth_soc.c | 7 ++-----
+> >  1 file changed, 2 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+> > index d8ebf0a..fbdb3e3 100644
+> > --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+> > +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+> > @@ -1221,14 +1221,11 @@ static int mtk_tx_alloc(struct mtk_eth *eth)
+> >  	if (!ring->buf)
+> >  		goto no_tx_mem;
+> >  
+> > -	ring->dma = dma_alloc_coherent(eth->dev,
+> > -					  MTK_DMA_SIZE * sz,
+> > -					  &ring->phys,
+> > -					  GFP_ATOMIC | __GFP_ZERO);
+> > +	ring->dma = dma_zalloc_coherent(eth->dev, MTK_DMA_SIZE * sz,
+> > +					&ring->phys, GFP_ATOMIC | __GFP_ZERO);
+> >  	if (!ring->dma)
+> >  		goto no_tx_mem;
+> >  
+> > -	memset(ring->dma, 0, MTK_DMA_SIZE * sz);
+> 
+> I have to wonder whether this code needs two forms of zeroing... in
+> the original code, __GFP_ZERO _and_ a call to memset() just in case
+> __GFP_ZERO failed to do its job, and in the replacement code, just
+> in case dma_zalloc_coherent() hasn't got the idea...
+> 
+> I think you can drop the __GFP_ZERO. ;)
+> 
 
-Okay, so it was originally only intended for debugging, but then showed itself
-to be useful, got it. Just out of curiosity, why did you mark it that way in
-the documentation? It seems as though you are trying to discourage people from
-using it.
+Just now I did an experiment on 4.14.56 on armv7. I found that
+dma_zalloc_coherent does not guarantee that the buffer we get
+is all filled with 0.
 
->
-> Best Regards,
->
-> ??? Gary Hsu
->
-> ??????????
-> ASPEED Technology Inc.
->
-> 2F,No.15,Industry East Road 4.,Hsinchu Science Park, Hsinchu City 30077, Taiwan
-> ??????????? 15 ? 2F
->
-> Tel : 886-3-5789568 ext:807
-> Fax : 886-3-5789586
-> Web : http://www.aspeedtech.com
->
-> ************* Email Confidentiality Notice ********************
-> ????:
-> ???????????,???(????)????????????????? ???????????????????????????, ??????????????????????????????!
->
-> DISCLAIMER:
-> This message (and any attachments) may contain legally privileged and/or other confidential information. If you have received it in error, please notify the sender by reply e-mail and immediately delete the e-mail and any attachments without copying or disclosing the contents. Thank you.
->
-> -----Original Message-----
-> From: Jae Hyun Yoo [mailto:jae.hyun.yoo at linux.intel.com]
-> Sent: Saturday, July 14, 2018 2:54 AM
-> To: Brendan Higgins <brendanhiggins@google.com>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>; Joel Stanley <joel@jms.id.au>; Andrew Jeffery <andrew@aj.id.au>; linux-i2c at vger.kernel.org; OpenBMC Maillist <openbmc@lists.ozlabs.org>; Linux ARM <linux-arm-kernel@lists.infradead.org>; linux-aspeed at lists.ozlabs.org; Linux Kernel Mailing List <linux-kernel@vger.kernel.org>; james.feist at linux.intel.com; vernon.mauery at linux.intel.com; Benjamin Fair <benjaminfair@google.com>; Patrick Venture <venture@google.com>; Gary Hsu <gary_hsu@aspeedtech.com>; Ryan Chen <ryan_chen@aspeedtech.com>
-> Subject: Re: [PATCH] i2c: aspeed: Improve driver to support multi-master use cases stably
->
-> On 7/13/2018 11:12 AM, Brendan Higgins wrote:
-> > On Fri, Jul 13, 2018 at 10:22 AM Jae Hyun Yoo
-> > <jae.hyun.yoo@linux.intel.com> wrote:
-> >>
-> >> On 7/12/2018 11:21 AM, Jae Hyun Yoo wrote:
-> >>> On 7/12/2018 2:33 AM, Brendan Higgins wrote:
-> >>>> On Wed, Jun 27, 2018 at 10:55 AM Jae Hyun Yoo
-> >>>> <jae.hyun.yoo@linux.intel.com> wrote:
-> > <snip>
-> >>>> <snip>
-> >>>>>>> +       for (;;) {
-> >>>>>>> +               if (!(readl(bus->base + ASPEED_I2C_CMD_REG) &
-> >>>>>>> +                     (ASPEED_I2CD_BUS_BUSY_STS |
-> >>>>>>> +                      ASPEED_I2CD_XFER_MODE_STS_MASK)))
-> >>>>>>
-> >>>>>> Is using the Transfer Mode State Machine bits necessary? The
-> >>>>>> documentation marks it as "for debugging purpose only," so
-> >>>>>> relying on it makes me nervous.
-> >>>>>>
-> >>>>>
-> >>>>> As you said, the documentation marks it as "for debugging purpose only."
-> >>>>> but ASPEED also uses this way in their SDK code because it's the
-> >>>>> best way for checking bus busy status which can cover both single
-> >>>>> and multi-master use cases.
-> >>>>>
-> >>>>
-> >>>> Well, it would also be really nice to have access to this bit if
-> >>>> someone wants to implement MCTP. Could we maybe check with Aspeed
-> >>>> what them meant by "for debugging purposes only" and document it
-> >>>> here? It makes me nervous to rely on debugging functionality for
-> >>>> normal usage.
-> >>>>
-> >>>
-> >>> Okay, I'll check it with Aspeed. Will let you know their response.
-> >>>
-> >>
-> >> I've checked it with Gary Hsu <gary_hsu@aspeedtech.com> and he
-> >> confirmed that the bits reflect real information and good to be used
-> >> in practical code.
-> >
-> > Huh. For my own edification, could you ask them why they said "for
-> > debugging purpose only" in the documentation? I am just really curious
-> > what they meant by that. I would be satisfied if you just CC'ed me on
-> > your email thread with Gary, and I can ask him myself.
-> >
->
-> I've already CC'ed Gary and Ryan in this thread.
->
-> Hi Gary,
->
-> Can you explain why the documentation says that the bit field is 'for debugging purpose only'? Any plan to change the description?
->
-> Thanks,
->
-> Jae
->
-> >>
-> >> I'll add a comment like below:
-> >>
-> >> /*
-> >>    * This is marked as 'for debugging purpose only' in datasheet but
-> >>    * ASPEED confirmed that this reflects real information and good
-> >>    * to be used in practical code.
-> >>    */
-> >>
-> >> Is it acceptable then?
-> >
-> > Yeah, that's fine.
-> >
-> > <snip>
-> >
-> > Cheers
-> >
+
+I really think it's a little bit weird OR what was I missing something
+for enabling dma_zalloc_coherent ? The result seems to tell that we
+can't remove freely the memset with 0 at this moment until we get a
+cause.
+
+
+my test code is
+
+         ring->dma = dma_zalloc_coherent(eth->dev,
+                                          MTK_DMA_SIZE * sz,
+                                          &ring->phys,
+                                          GFP_ATOMIC);
+        if (!ring->dma)
+                goto no_tx_mem;
+
+        print_hex_dump(KERN_INFO, "mtk_tx_alloc:",
+                       DUMP_PREFIX_OFFSET, 16, 1,
+                       ring->dma, MTK_DMA_SIZE * sz, false);
+
+        memset(ring->dma, 0, MTK_DMA_SIZE * sz);
+
+        print_hex_dump(KERN_INFO, "mtk_tx_alloc2:",
+                       DUMP_PREFIX_OFFSET, 16, 1,
+                       ring->dma, MTK_DMA_SIZE * sz, false);
+
+
+and the output 
+
+...
+
+[  259.610413] mtk_tx_alloc:00000f40: 00 00 00 00 50 1f 00 bc 00 00 00 c0 00 00 00 00
+[  259.617934] mtk_tx_alloc:00000f50: 00 00 00 00 60 1f 00 bc 00 00 00 c0 00 00 00 00
+[  259.625470] mtk_tx_alloc:00000f60: 00 00 00 00 70 1f 00 bc 00 00 00 c0 00 00 00 00
+[  259.633005] mtk_tx_alloc:00000f70: 00 00 00 00 80 1f 00 bc 00 00 00 c0 00 00 00 00
+[  259.640539] mtk_tx_alloc:00000f80: 00 00 00 00 90 1f 00 bc 00 00 00 c0 00 00 00 00
+[  259.648073] mtk_tx_alloc:00000f90: 00 00 00 00 a0 1f 00 bc 00 00 00 c0 00 00 00 00
+[  259.655590] mtk_tx_alloc:00000fa0: 00 00 00 00 b0 1f 00 bc 00 00 00 c0 00 00 00 00
+[  259.663124] mtk_tx_alloc:00000fb0: 00 00 00 00 c0 1f 00 bc 00 00 00 c0 00 00 00 00
+[  259.670660] mtk_tx_alloc:00000fc0: 00 00 00 00 d0 1f 00 bc 00 00 00 c0 00 00 00 00
+[  259.678196] mtk_tx_alloc:00000fd0: 00 00 00 00 e0 1f 00 bc 00 00 00 c0 00 00 00 00
+[  259.685713] mtk_tx_alloc:00000fe0: 00 00 00 00 f0 1f 00 bc 00 00 00 c0 00 00 00 00
+[  259.693247] mtk_tx_alloc:00000ff0: 02 c0 90 ad 00 10 00 bc 00 40 5a c0 00 00 00 02
+[  259.700782] mtk_tx_alloc2:00000000: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  259.708405] mtk_tx_alloc2:00000010: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  259.716013] mtk_tx_alloc2:00000020: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  259.723634] mtk_tx_alloc2:00000030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  259.731253] mtk_tx_alloc2:00000040: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  259.738875] mtk_tx_alloc2:00000050: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  259.746481] mtk_tx_alloc2:00000060: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  259.754103] mtk_tx_alloc2:00000070: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  259.761723] mtk_tx_alloc2:00000080: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  259.769344] mtk_tx_alloc2:00000090: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  259.776951] mtk_tx_alloc2:000000a0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+....
+
+
+	Sean
