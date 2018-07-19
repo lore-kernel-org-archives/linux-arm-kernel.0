@@ -1,242 +1,253 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 01:00:26 +0200
-Subject: [PATCH v3 33/33] mtd: rawnand: allocate dynamically ONFI parameters
- during detection
+Date: Fri, 20 Jul 2018 01:00:24 +0200
+Subject: [PATCH v3 31/33] mtd: rawnand: tegra: convert driver to nand_scan()
 In-Reply-To: <20180719230026.8741-1-miquel.raynal@bootlin.com>
 References: <20180719230026.8741-1-miquel.raynal@bootlin.com>
-Message-ID: <20180719230026.8741-34-miquel.raynal@bootlin.com>
+Message-ID: <20180719230026.8741-32-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that it is possible to do dynamic allocations during the
-identification phase, convert the onfi_params structure (which is only
-needed with ONFI compliant chips) into a pointer that will be allocated
-only if needed.
+Two helpers have been added to the core to make ECC-related
+configuration between the detection phase and the final NAND scan. Use
+these hooks and convert the driver to just use nand_scan() instead of
+both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/nand_base.c    | 61 ++++++++++++++++++++++---------------
- drivers/mtd/nand/raw/nand_micron.c  |  6 ++--
- drivers/mtd/nand/raw/nand_timings.c | 12 ++++----
- include/linux/mtd/rawnand.h         |  6 ++--
- 4 files changed, 48 insertions(+), 37 deletions(-)
+ drivers/mtd/nand/raw/tegra_nand.c | 162 +++++++++++++++++++++-----------------
+ 1 file changed, 88 insertions(+), 74 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
-index dfee2556a8a8..4dc248769abb 100644
---- a/drivers/mtd/nand/raw/nand_base.c
-+++ b/drivers/mtd/nand/raw/nand_base.c
-@@ -5151,6 +5151,8 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
- {
- 	struct mtd_info *mtd = nand_to_mtd(chip);
- 	struct nand_onfi_params *p;
-+	struct onfi_params *onfi;
-+	int onfi_version = 0;
- 	char *model;
- 	char id[4];
- 	int i, ret, val;
-@@ -5207,21 +5209,19 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
- 	/* Check version */
- 	val = le16_to_cpu(p->revision);
- 	if (val & ONFI_VERSION_2_3)
--		chip->parameters.onfi.version = 23;
-+		onfi_version = 23;
- 	else if (val & ONFI_VERSION_2_2)
--		chip->parameters.onfi.version = 22;
-+		onfi_version = 22;
- 	else if (val & ONFI_VERSION_2_1)
--		chip->parameters.onfi.version = 21;
-+		onfi_version = 21;
- 	else if (val & ONFI_VERSION_2_0)
--		chip->parameters.onfi.version = 20;
-+		onfi_version = 20;
- 	else if (val & ONFI_VERSION_1_0)
--		chip->parameters.onfi.version = 10;
-+		onfi_version = 10;
- 
--	if (!chip->parameters.onfi.version) {
-+	if (!onfi_version) {
- 		pr_info("unsupported ONFI version: %d\n", val);
- 		goto free_onfi_param_page;
--	} else {
--		ret = 1;
- 	}
- 
- 	sanitize_string(p->manufacturer, sizeof(p->manufacturer));
-@@ -5262,7 +5262,7 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
- 	if (p->ecc_bits != 0xff) {
- 		chip->ecc_strength_ds = p->ecc_bits;
- 		chip->ecc_step_ds = 512;
--	} else if (chip->parameters.onfi.version >= 21 &&
-+	} else if (onfi_version >= 21 &&
- 		(le16_to_cpu(p->features) & ONFI_FEATURE_EXT_PARAM_PAGE)) {
- 
- 		/*
-@@ -5289,19 +5289,32 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
- 		bitmap_set(chip->parameters.set_feature_list,
- 			   ONFI_FEATURE_ADDR_TIMING_MODE, 1);
- 	}
--	chip->parameters.onfi.tPROG = le16_to_cpu(p->t_prog);
--	chip->parameters.onfi.tBERS = le16_to_cpu(p->t_bers);
--	chip->parameters.onfi.tR = le16_to_cpu(p->t_r);
--	chip->parameters.onfi.tCCS = le16_to_cpu(p->t_ccs);
--	chip->parameters.onfi.async_timing_mode =
--		le16_to_cpu(p->async_timing_mode);
--	chip->parameters.onfi.vendor_revision =
--		le16_to_cpu(p->vendor_revision);
--	memcpy(chip->parameters.onfi.vendor, p->vendor,
--	       sizeof(p->vendor));
- 
-+	onfi = kzalloc(sizeof(*onfi), GFP_KERNEL);
-+	if (!onfi) {
-+		ret = -ENOMEM;
-+		goto free_model;
-+	}
-+	onfi->version = onfi_version;
-+	onfi->tPROG = le16_to_cpu(p->t_prog);
-+	onfi->tBERS = le16_to_cpu(p->t_bers);
-+	onfi->tR = le16_to_cpu(p->t_r);
-+	onfi->tCCS = le16_to_cpu(p->t_ccs);
-+	onfi->async_timing_mode = le16_to_cpu(p->async_timing_mode);
-+	onfi->vendor_revision = le16_to_cpu(p->vendor_revision);
-+	memcpy(onfi->vendor, p->vendor, sizeof(p->vendor));
-+	chip->parameters.onfi = onfi;
-+
-+	/* Identification done, free the full ONFI parameter page and exit */
-+	kfree(p);
-+
-+	return 1;
-+
-+free_model:
-+	kfree(model);
- free_onfi_param_page:
- 	kfree(p);
-+
- 	return ret;
+diff --git a/drivers/mtd/nand/raw/tegra_nand.c b/drivers/mtd/nand/raw/tegra_nand.c
+index 31c0d9ca9d23..c40a53066cee 100644
+--- a/drivers/mtd/nand/raw/tegra_nand.c
++++ b/drivers/mtd/nand/raw/tegra_nand.c
+@@ -906,74 +906,13 @@ static int tegra_nand_select_strength(struct nand_chip *chip, int oobsize)
+ 				       bits_per_step, oobsize);
  }
  
-@@ -5562,9 +5575,7 @@ static bool find_full_id_nand(struct nand_chip *chip,
- 		chip->ecc_step_ds = NAND_ECC_STEP(type);
- 		chip->onfi_timing_mode_default =
- 					type->onfi_timing_mode_default;
--
--		strncpy(chip->parameters.model, type->name,
--			sizeof(chip->parameters.model) - 1);
-+		chip->parameters.model = type->name;
- 
- 		return true;
- 	}
-@@ -5703,7 +5714,6 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
- 		}
- 	}
- 
--	chip->parameters.onfi.version = 0;
- 	if (!type->name || !type->pagesize) {
- 		/* Check if the chip is ONFI compliant */
- 		ret = nand_flash_detect_onfi(chip);
-@@ -5723,8 +5733,7 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
- 	if (!type->name)
- 		return -ENODEV;
- 
--	strncpy(chip->parameters.model, type->name,
--		sizeof(chip->parameters.model) - 1);
-+	chip->parameters.model = type->name;
- 
- 	chip->chipsize = (uint64_t)type->chipsize << 20;
- 
-@@ -6033,6 +6042,8 @@ static int nand_scan_ident(struct mtd_info *mtd, int maxchips,
- static void nand_scan_ident_cleanup(struct nand_chip *chip)
+-static int tegra_nand_chips_init(struct device *dev,
+-				 struct tegra_nand_controller *ctrl)
++static int tegra_nand_attach_chip(struct nand_chip *chip)
  {
- 	kfree(chip->parameters.model);
-+	kfree(chip->parameters.onfi);
-+
- }
- 
- static int nand_set_ecc_soft_ops(struct mtd_info *mtd)
-diff --git a/drivers/mtd/nand/raw/nand_micron.c b/drivers/mtd/nand/raw/nand_micron.c
-index 656947d91841..8466a1740b3b 100644
---- a/drivers/mtd/nand/raw/nand_micron.c
-+++ b/drivers/mtd/nand/raw/nand_micron.c
-@@ -88,9 +88,9 @@ static int micron_nand_setup_read_retry(struct mtd_info *mtd, int retry_mode)
- static int micron_nand_onfi_init(struct nand_chip *chip)
- {
- 	struct nand_parameters *p = &chip->parameters;
--	struct nand_onfi_vendor_micron *micron = (void *)p->onfi.vendor;
-+	struct nand_onfi_vendor_micron *micron = (void *)p->onfi->vendor;
- 
--	if (chip->parameters.onfi.version && p->onfi.vendor_revision) {
-+	if (p->onfi && p->onfi->vendor_revision) {
- 		chip->read_retries = micron->read_retry_options;
- 		chip->setup_read_retry = micron_nand_setup_read_retry;
- 	}
-@@ -382,7 +382,7 @@ static int micron_supports_on_die_ecc(struct nand_chip *chip)
- 	u8 id[5];
+-	struct device_node *np = dev->of_node;
+-	struct device_node *np_nand;
+-	int nsels, nchips = of_get_child_count(np);
+-	struct tegra_nand_chip *nand;
+-	struct mtd_info *mtd;
+-	struct nand_chip *chip;
++	struct tegra_nand_controller *ctrl = to_tegra_ctrl(chip->controller);
++	struct tegra_nand_chip *nand = to_tegra_chip(chip);
++	struct mtd_info *mtd = nand_to_mtd(chip);
+ 	int bits_per_step;
  	int ret;
+-	u32 cs;
+-
+-	if (nchips != 1) {
+-		dev_err(dev, "Currently only one NAND chip supported\n");
+-		return -EINVAL;
+-	}
+-
+-	np_nand = of_get_next_child(np, NULL);
+-
+-	nsels = of_property_count_elems_of_size(np_nand, "reg", sizeof(u32));
+-	if (nsels != 1) {
+-		dev_err(dev, "Missing/invalid reg property\n");
+-		return -EINVAL;
+-	}
+-
+-	/* Retrieve CS id, currently only single die NAND supported */
+-	ret = of_property_read_u32(np_nand, "reg", &cs);
+-	if (ret) {
+-		dev_err(dev, "could not retrieve reg property: %d\n", ret);
+-		return ret;
+-	}
+-
+-	nand = devm_kzalloc(dev, sizeof(*nand), GFP_KERNEL);
+-	if (!nand)
+-		return -ENOMEM;
+-
+-	nand->cs[0] = cs;
+-
+-	nand->wp_gpio = devm_gpiod_get_optional(dev, "wp", GPIOD_OUT_LOW);
+-
+-	if (IS_ERR(nand->wp_gpio)) {
+-		ret = PTR_ERR(nand->wp_gpio);
+-		dev_err(dev, "Failed to request WP GPIO: %d\n", ret);
+-		return ret;
+-	}
+-
+-	chip = &nand->chip;
+-	chip->controller = &ctrl->controller;
+-
+-	mtd = nand_to_mtd(chip);
+-
+-	mtd->dev.parent = dev;
+-	mtd->owner = THIS_MODULE;
+-
+-	nand_set_flash_node(chip, np_nand);
+-
+-	if (!mtd->name)
+-		mtd->name = "tegra_nand";
+-
+-	chip->options = NAND_NO_SUBPAGE_WRITE | NAND_USE_BOUNCE_BUFFER;
+-	chip->exec_op = tegra_nand_exec_op;
+-	chip->select_chip = tegra_nand_select_chip;
+-	chip->setup_data_interface = tegra_nand_setup_data_interface;
+-
+-	ret = nand_scan_ident(mtd, 1, NULL);
+-	if (ret)
+-		return ret;
  
--	if (!chip->parameters.onfi.version)
-+	if (!chip->parameters.onfi)
- 		return MICRON_ON_DIE_UNSUPPORTED;
- 
- 	if (chip->bits_per_cell != 1)
-diff --git a/drivers/mtd/nand/raw/nand_timings.c b/drivers/mtd/nand/raw/nand_timings.c
-index 9bb599106a31..ebc7b5f76f77 100644
---- a/drivers/mtd/nand/raw/nand_timings.c
-+++ b/drivers/mtd/nand/raw/nand_timings.c
-@@ -294,6 +294,7 @@ int onfi_fill_data_interface(struct nand_chip *chip,
- 			     int timing_mode)
- {
- 	struct nand_data_interface *iface = &chip->data_interface;
-+	struct onfi_params *onfi = chip->parameters.onfi;
- 
- 	if (type != NAND_SDR_IFACE)
+ 	if (chip->bbt_options & NAND_BBT_USE_FLASH)
+ 		chip->bbt_options |= NAND_BBT_NO_OOB;
+@@ -982,7 +921,8 @@ static int tegra_nand_chips_init(struct device *dev,
+ 	chip->ecc.size = 512;
+ 	chip->ecc.steps = mtd->writesize / chip->ecc.size;
+ 	if (chip->ecc_step_ds != 512) {
+-		dev_err(dev, "Unsupported step size %d\n", chip->ecc_step_ds);
++		dev_err(ctrl->dev, "Unsupported step size %d\n",
++			chip->ecc_step_ds);
  		return -EINVAL;
-@@ -308,17 +309,16 @@ int onfi_fill_data_interface(struct nand_chip *chip,
- 	 * tPROG, tBERS, tR and tCCS.
- 	 * These information are part of the ONFI parameter page.
- 	 */
--	if (chip->parameters.onfi.version) {
--		struct nand_parameters *params = &chip->parameters;
-+	if (onfi) {
- 		struct nand_sdr_timings *timings = &iface->timings.sdr;
+ 	}
  
- 		/* microseconds -> picoseconds */
--		timings->tPROG_max = 1000000ULL * params->onfi.tPROG;
--		timings->tBERS_max = 1000000ULL * params->onfi.tBERS;
--		timings->tR_max = 1000000ULL * params->onfi.tR;
-+		timings->tPROG_max = 1000000ULL * onfi->tPROG;
-+		timings->tBERS_max = 1000000ULL * onfi->tBERS;
-+		timings->tR_max = 1000000ULL * onfi->tR;
+@@ -1004,14 +944,15 @@ static int tegra_nand_chips_init(struct device *dev,
+ 	}
  
- 		/* nanoseconds -> picoseconds */
--		timings->tCCS_min = 1000UL * params->onfi.tCCS;
-+		timings->tCCS_min = 1000UL * onfi->tCCS;
- 	} else {
- 		struct nand_sdr_timings *timings = &iface->timings.sdr;
- 		/*
-diff --git a/include/linux/mtd/rawnand.h b/include/linux/mtd/rawnand.h
-index 5723d940a47d..8074cbd4e3fe 100644
---- a/include/linux/mtd/rawnand.h
-+++ b/include/linux/mtd/rawnand.h
-@@ -488,7 +488,7 @@ struct nand_parameters {
- 	DECLARE_BITMAP(get_feature_list, ONFI_FEATURE_NUMBER);
+ 	if (chip->ecc.algo == NAND_ECC_BCH && mtd->writesize < 2048) {
+-		dev_err(dev, "BCH supports 2K or 4K page size only\n");
++		dev_err(ctrl->dev, "BCH supports 2K or 4K page size only\n");
+ 		return -EINVAL;
+ 	}
  
- 	/* ONFI parameters */
--	struct onfi_params onfi;
-+	struct onfi_params *onfi;
- };
+ 	if (!chip->ecc.strength) {
+ 		ret = tegra_nand_select_strength(chip, mtd->oobsize);
+ 		if (ret < 0) {
+-			dev_err(dev, "No valid strength found, minimum %d\n",
++			dev_err(ctrl->dev,
++				"No valid strength found, minimum %d\n",
+ 				chip->ecc_strength_ds);
+ 			return ret;
+ 		}
+@@ -1039,7 +980,7 @@ static int tegra_nand_chips_init(struct device *dev,
+ 			nand->config_ecc |= CONFIG_TVAL_8;
+ 			break;
+ 		default:
+-			dev_err(dev, "ECC strength %d not supported\n",
++			dev_err(ctrl->dev, "ECC strength %d not supported\n",
+ 				chip->ecc.strength);
+ 			return -EINVAL;
+ 		}
+@@ -1062,17 +1003,17 @@ static int tegra_nand_chips_init(struct device *dev,
+ 			nand->bch_config |= BCH_TVAL_16;
+ 			break;
+ 		default:
+-			dev_err(dev, "ECC strength %d not supported\n",
++			dev_err(ctrl->dev, "ECC strength %d not supported\n",
+ 				chip->ecc.strength);
+ 			return -EINVAL;
+ 		}
+ 		break;
+ 	default:
+-		dev_err(dev, "ECC algorithm not supported\n");
++		dev_err(ctrl->dev, "ECC algorithm not supported\n");
+ 		return -EINVAL;
+ 	}
  
- /* The maximum expected count of bytes in the NAND ID sequence */
-@@ -1618,10 +1618,10 @@ struct platform_nand_data {
- /* return the supported asynchronous timing mode. */
- static inline int onfi_get_async_timing_mode(struct nand_chip *chip)
- {
--	if (!chip->parameters.onfi.version)
-+	if (!chip->parameters.onfi)
- 		return ONFI_TIMING_MODE_UNKNOWN;
+-	dev_info(dev, "Using %s with strength %d per 512 byte step\n",
++	dev_info(ctrl->dev, "Using %s with strength %d per 512 byte step\n",
+ 		 chip->ecc.algo == NAND_ECC_BCH ? "BCH" : "RS",
+ 		 chip->ecc.strength);
  
--	return chip->parameters.onfi.async_timing_mode;
-+	return chip->parameters.onfi->async_timing_mode;
- }
+@@ -1095,7 +1036,8 @@ static int tegra_nand_chips_init(struct device *dev,
+ 		nand->config |= CONFIG_PS_4096;
+ 		break;
+ 	default:
+-		dev_err(dev, "Unsupported writesize %d\n", mtd->writesize);
++		dev_err(ctrl->dev, "Unsupported writesize %d\n",
++			mtd->writesize);
+ 		return -ENODEV;
+ 	}
  
- int onfi_fill_data_interface(struct nand_chip *chip,
+@@ -1106,7 +1048,79 @@ static int tegra_nand_chips_init(struct device *dev,
+ 	nand->config |= CONFIG_TAG_BYTE_SIZE(mtd->oobsize - 1);
+ 	writel_relaxed(nand->config, ctrl->regs + CONFIG);
+ 
+-	ret = nand_scan_tail(mtd);
++	return 0;
++}
++
++static const struct nand_controller_ops tegra_nand_controller_ops = {
++	.attach_chip = &tegra_nand_attach_chip,
++};
++
++static int tegra_nand_chips_init(struct device *dev,
++				 struct tegra_nand_controller *ctrl)
++{
++	struct device_node *np = dev->of_node;
++	struct device_node *np_nand;
++	int nsels, nchips = of_get_child_count(np);
++	struct tegra_nand_chip *nand;
++	struct mtd_info *mtd;
++	struct nand_chip *chip;
++	int ret;
++	u32 cs;
++
++	if (nchips != 1) {
++		dev_err(dev, "Currently only one NAND chip supported\n");
++		return -EINVAL;
++	}
++
++	np_nand = of_get_next_child(np, NULL);
++
++	nsels = of_property_count_elems_of_size(np_nand, "reg", sizeof(u32));
++	if (nsels != 1) {
++		dev_err(dev, "Missing/invalid reg property\n");
++		return -EINVAL;
++	}
++
++	/* Retrieve CS id, currently only single die NAND supported */
++	ret = of_property_read_u32(np_nand, "reg", &cs);
++	if (ret) {
++		dev_err(dev, "could not retrieve reg property: %d\n", ret);
++		return ret;
++	}
++
++	nand = devm_kzalloc(dev, sizeof(*nand), GFP_KERNEL);
++	if (!nand)
++		return -ENOMEM;
++
++	nand->cs[0] = cs;
++
++	nand->wp_gpio = devm_gpiod_get_optional(dev, "wp", GPIOD_OUT_LOW);
++
++	if (IS_ERR(nand->wp_gpio)) {
++		ret = PTR_ERR(nand->wp_gpio);
++		dev_err(dev, "Failed to request WP GPIO: %d\n", ret);
++		return ret;
++	}
++
++	chip = &nand->chip;
++	chip->controller = &ctrl->controller;
++	chip->controller->ops = &tegra_nand_controller_ops;
++
++	mtd = nand_to_mtd(chip);
++
++	mtd->dev.parent = dev;
++	mtd->owner = THIS_MODULE;
++
++	nand_set_flash_node(chip, np_nand);
++
++	if (!mtd->name)
++		mtd->name = "tegra_nand";
++
++	chip->options = NAND_NO_SUBPAGE_WRITE | NAND_USE_BOUNCE_BUFFER;
++	chip->exec_op = tegra_nand_exec_op;
++	chip->select_chip = tegra_nand_select_chip;
++	chip->setup_data_interface = tegra_nand_setup_data_interface;
++
++	ret = nand_scan(mtd, 1);
+ 	if (ret)
+ 		return ret;
+ 
 -- 
 2.14.1
