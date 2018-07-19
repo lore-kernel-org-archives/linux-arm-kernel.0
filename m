@@ -1,42 +1,34 @@
 From: sravanhome@gmail.com (Saravanan Sekar)
-Date: Thu, 19 Jul 2018 11:06:49 +0200
-Subject: [PATCH v7 5/5] arm64: dts: actions: Set UART clock reference from CMU
+Date: Thu, 19 Jul 2018 11:06:45 +0200
+Subject: [PATCH v7 1/5] clk: actions: Add missing REGMAP_MMIO dependency
 In-Reply-To: <20180719090649.12460-1-sravanhome@gmail.com>
 References: <20180719090649.12460-1-sravanhome@gmail.com>
-Message-ID: <20180719090649.12460-6-sravanhome@gmail.com>
+Message-ID: <20180719090649.12460-2-sravanhome@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+Add REGMAP_MMIO as dependency to avoid undefined
+reference to regmap symbols.
+
+Fixes: d85d20053e19 ("clk: actions: Add S900 SoC clock support")
 Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+Reviewed-by: Andreas F?rber <afaerber@suse.de>
 Reviewed-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- arch/arm64/boot/dts/actions/s700-cubieboard7.dts | 8 +-------
- 1 file changed, 1 insertion(+), 7 deletions(-)
+ drivers/clk/actions/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/actions/s700-cubieboard7.dts b/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
-index ef79d7905f44..c08808ca3346 100644
---- a/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
-+++ b/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
-@@ -28,12 +28,6 @@
- 		device_type = "memory";
- 		reg = <0x1 0xe0000000 0x0 0x0>;
- 	};
--
--	uart3_clk: uart3-clk {
--		compatible = "fixed-clock";
--		clock-frequency = <921600>;
--		#clock-cells = <0>;
--	};
- };
+diff --git a/drivers/clk/actions/Kconfig b/drivers/clk/actions/Kconfig
+index 8854adb37847..39491154abbf 100644
+--- a/drivers/clk/actions/Kconfig
++++ b/drivers/clk/actions/Kconfig
+@@ -1,6 +1,7 @@
+ config CLK_ACTIONS
+ 	bool "Clock driver for Actions Semi SoCs"
+ 	depends on ARCH_ACTIONS || COMPILE_TEST
++	select REGMAP_MMIO
+ 	default ARCH_ACTIONS
  
- &timer {
-@@ -42,5 +36,5 @@
- 
- &uart3 {
- 	status = "okay";
--	clocks = <&uart3_clk>;
-+	clocks = <&cmu CLK_UART3>;
- };
+ if CLK_ACTIONS
 -- 
 2.14.4
