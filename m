@@ -1,131 +1,154 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 19 Jul 2018 10:50:58 +0100
-Subject: [PATCH] drivers/firmware: psci_checker: stash and use
- topology_core_cpumask for hotplug tests
-In-Reply-To: <20180718164930.GB21924@red-moon>
-References: <1531913132-21022-1-git-send-email-sudeep.holla@arm.com>
- <20180718164930.GB21924@red-moon>
-Message-ID: <20180719095058.GA8702@e107155-lin>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Thu, 19 Jul 2018 15:22:21 +0530
+Subject: [PATCH 1/5] thermal: exynos: enable core tmu clk on exynos
+ platform
+In-Reply-To: <CAJKOXPfRBPgmGc17XEzW5+MK80JcudCbhBfLeMFTQYjWLJ3JeA@mail.gmail.com>
+References: <1531822342-4293-1-git-send-email-linux.amoon@gmail.com>
+ <CAJKOXPdP78VFQgSQ9z9WsgYY_YhEKPUt=0MOra6Pz6smQeiNGg@mail.gmail.com>
+ <CANAwSgS=08fVsqn95WHzSF71WTTyD2-=K2C6-BEz0tY0t6A1-g@mail.gmail.com>
+ <CAJKOXPdXYz77Bqyjr3HK+EA0HpEABPqmPOD0f5ew-yq2SFVpVQ@mail.gmail.com>
+ <CANAwSgRFehdmYZvPL3yD1=Ng_w1Yhtij=nvZEOqkof7zj8fcwA@mail.gmail.com>
+ <CAJKOXPfRBPgmGc17XEzW5+MK80JcudCbhBfLeMFTQYjWLJ3JeA@mail.gmail.com>
+Message-ID: <CANAwSgSmUFYjE1VyqFM87M-6JZH140P9VpnXP2sG6Mw=_1J3Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 05:49:30PM +0100, Lorenzo Pieralisi wrote:
-> On Wed, Jul 18, 2018 at 12:25:32PM +0100, Sudeep Holla wrote:
-> > Commit 7f9545aa1a91 ("arm64: smp: remove cpu and numa topology
-> > information when hotplugging out CPU") updates the cpu topology when
-> > the CPU is hotplugged out. However the PSCI checker code uses the
-> > topology_core_cpumask pointers for some of the cpu hotplug testing.
-> > Since the pointer to the core_cpumask of the first CPU in the group
-> > is used, which when that CPU itself is hotpugged out is just set to
-> > itself, the testing terminates after that particular CPU is tested out.
-> > But the intention of this tests is to cover all the CPU in the group.
-> > 
-> > In order to support that, we need to stash the topology_core_cpumask
-> > before the start of the test and use that value instead of pointer to
-> > a cpumask which will be updated on CPU hotplug.
-> > 
-> > Fixes: 7f9545aa1a91a9a4 ("arm64: smp: remove cpu and numa topology
-> > 	information when hotplugging out CPU")
-> > Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> > Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> > ---
-> >  drivers/firmware/psci_checker.c | 30 ++++++++++++++++++++----------
-> >  1 file changed, 20 insertions(+), 10 deletions(-)
-> > 
-> > diff --git a/drivers/firmware/psci_checker.c b/drivers/firmware/psci_checker.c
-> > index bb1c068bff19..e330c6cb45f5 100644
-> > --- a/drivers/firmware/psci_checker.c
-> > +++ b/drivers/firmware/psci_checker.c
-> > @@ -77,21 +77,23 @@ static int psci_ops_check(void)
-> >  	return 0;
-> >  }
-> >  
-> > -static int find_cpu_groups(const struct cpumask *cpus,
-> > -			   const struct cpumask **cpu_groups)
-> > +static int find_cpu_groups(cpumask_var_t *cpu_groups)
-> >  {
-> >  	unsigned int nb = 0;
-> >  	cpumask_var_t tmp;
-> >  
-> >  	if (!alloc_cpumask_var(&tmp, GFP_KERNEL))
-> >  		return -ENOMEM;
-> > -	cpumask_copy(tmp, cpus);
-> > +	cpumask_copy(tmp, cpu_online_mask);
-> >  
-> >  	while (!cpumask_empty(tmp)) {
-> >  		const struct cpumask *cpu_group =
-> >  			topology_core_cpumask(cpumask_any(tmp));
-> >  
-> > -		cpu_groups[nb++] = cpu_group;
-> > +		if (cpu_groups && cpu_groups[nb])
-> > +			cpumask_copy(cpu_groups[nb], cpu_group);
-> > +
-> > +		nb++;
-> >  		cpumask_andnot(tmp, tmp, cpu_group);
-> >  	}
-> >  
-> > @@ -169,25 +171,31 @@ static unsigned int down_and_up_cpus(const struct cpumask *cpus,
-> >  static int hotplug_tests(void)
-> >  {
-> >  	int err;
-> > -	cpumask_var_t offlined_cpus;
-> > +	cpumask_var_t offlined_cpus, *cpu_groups;
-> >  	int i, nb_cpu_group;
-> > -	const struct cpumask **cpu_groups;
-> >  	char *page_buf;
-> >  
-> > +	/* first run to just get the number of cpu groups */
-> > +	nb_cpu_group = find_cpu_groups(NULL);
-> > +
-> >  	err = -ENOMEM;
-> >  	if (!alloc_cpumask_var(&offlined_cpus, GFP_KERNEL))
-> >  		return err;
-> > -	/* We may have up to nb_available_cpus cpu_groups. */
-> > -	cpu_groups = kmalloc_array(nb_available_cpus, sizeof(*cpu_groups),
-> > -				   GFP_KERNEL);
-> > +	cpu_groups = kcalloc(nb_cpu_group, sizeof(cpu_groups), GFP_KERNEL);
-> >  	if (!cpu_groups)
-> >  		goto out_free_cpus;
-> > +
-> > +	for (i = 0; i < nb_cpu_group; ++i)
-> > +		if (!alloc_cpumask_var(&cpu_groups[i], GFP_KERNEL))
-> > +			goto out_free_cpu_groups;
-> > +
-> >  	page_buf = (char *)__get_free_page(GFP_KERNEL);
-> >  	if (!page_buf)
-> >  		goto out_free_cpu_groups;
-> >  
-> >  	err = 0;
-> > -	nb_cpu_group = find_cpu_groups(cpu_online_mask, cpu_groups);
-> > +	/* second run to populate/copy the cpumask */
-> > +	nb_cpu_group = find_cpu_groups(cpu_groups);
-> >  
-> >  	/*
-> >  	 * Of course the last CPU cannot be powered down and cpu_down() should
-> > @@ -212,6 +220,8 @@ static int hotplug_tests(void)
-> >  
-> >  	free_page((unsigned long)page_buf);
-> >  out_free_cpu_groups:
-> > +	for (i = 0; i < nb_cpu_group; ++i)
-> > +		free_cpumask_var(cpu_groups[i]);
-> >  	kfree(cpu_groups);
-> >  out_free_cpus:
-> >  	free_cpumask_var(offlined_cpus);
-> 
-> Hi Sudeep,
-> 
-> thanks for the patch. I reckon that adding two functions, say,
-> alloc_cpu_groups() and free_cpu_groups() would make the code
-> more readable instead of relying on find_cpu_groups() to first
-> count then copy; it is for readability rather than correctness.
-> 
+Hi Krzysztof,
 
-I agree, I can say I was lazy and started trying to keep delta small.
-I will respin.
+On 18 July 2018 at 15:36, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On 18 July 2018 at 11:24, Anand Moon <linux.amoon@gmail.com> wrote:
+>> Hi Krzysztof
+>>
+>> On 18 July 2018 at 11:47, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>>> On 17 July 2018 at 22:23, Anand Moon <linux.amoon@gmail.com> wrote:
+>>>> Hi Krzysztof
+>>>>
+>>>> On 17 July 2018 at 17:50, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>>>>> Hi Anand,
+>>>>>
+>>>>> Thanks for patch.
+>>>>>
+>>>>> On 17 July 2018 at 12:12, Anand Moon <linux.amoon@gmail.com> wrote:
+>>>>>> clk_summary do not show tmu_apbif clk enable, so replace
+>>>>>> the clk_prepare with clk_prepare_enables to enable tmu clk.
+>>>>>
+>>>>> This is not valid reason to do a change. What is clk_summary does not
+>>>>> really matter. Your change has negative impact on power consumption as
+>>>>> the clock stays enabled all the time. This is not what we want... so
+>>>>> please explain it more - why you need the clock to be enabled all the
+>>>>> time? What is broken (clk_summary is not broken in this case)?
+>>>>>
+>>>>
+>>>> Opps I could not explain some more in my commit message.
+>>>>
+>>>> Actually TMU sensor for Exynos process are controlled by so external clk
+>>>>
+>>>> Exynos4412 have VDD18_TS sensor which controls the CLK_SENSE tmu.
+>>>> Exynos5422 have VDD18_TS01 / VDD18_TS23 / VDD18_TS4 sensor which
+>>>> control the CLK_SENSE tmu.
+>>>>
+>>>> So as per my understanding tmu is clk driver which control the flow  PMIC.
+>>>>
+>>>> clk_prepare_enable combine clk_prepare and clk_enable
+>>>> and clk_disable_unprepare combine clk_disable and clk_unprepare.
+>>>>
+>>>> most of the driver prefer clk_prepare_enable and clk_disable_unprepare.
+>>>>
+>>>> clk_summary is just a reference looking point where we could check the
+>>>> clk is enable/disable.
+>>>>
+>>>> what is broken ?
+>>>> I still few more parameter need to tuned to configure the tmu driver.
+>>>
+>>> I am sorry but I am still unable to see what is broken and what are
+>>> you trying to fix. I asked what is broken and you replied that there
+>>> is a sensor, there is a clock, drivers use clk_prepare_enable and some
+>>> more parameter need to be tuned... None of these are answers to
+>>> question - what is broken. How can I reproduce the problem?
+>>>
+>>> Best regards,
+>>> Krzysztof
+>>
+>> Basically I use thermal testing.
+>>
+>> # git clone https://git.linaro.org/power/pm-qa.git
+>> # cd pm-qa
+>> # make -C thermal check
+>>
+>> most of the testcase failed on Exynos5422 but some pass on Exynos4412.
+>>
+>> Attach is the software overview from Exynos5422 user manual.
+>>
+>> I am not able to explain in deep technically, but I have studied other thermal
+>> driver to draw into conclusion that tmu clk's need to be enabled.
+>
+> That is true in general - the clk has to be enabled in certain cases.
+> However you did not say at all when you want this clock to be
+> enabled... and the your patch enables it for entire lifetime of
+> device.
+>
+>> If you feel the we should not enable these clk, them I will drop the
+>> clk_prepare_enable check
+>> and resubmit the changes with better commit message.
+>
+> I don't know. This was fifth email in this thread and it is the first
+> time some real problem is mentioned. Still the issue is not described
+> entirely so I really do not have a clue whether this patch fixes
+> something or not.
+> What is more, you mentioned falling pm-qa tests here (not in commit
+> msg) but did not say whether this patch fixes anything or not.
+>
+> So let me summarize it:
+> 1. You did not describe the problem you want to fix.
+> 2. The patch looks incorrect because it enables the clock for entire
+> lifetime of device which we do not want.
+> 3. The patch might or not might fix some problem. We even do not know what...
+> 4. The clock not being enabled when not needed... is obviously not a problem.
+>
+> Please start from beginning. Find the problem, tell us how it can be
+> reproduced and deliver a single patch which fixes the problem.
+>
+> This pattern of your code - fixing something without describing the
+> problem - happened many time before. I repeated this some times before
+> as well. I would prefer not to repeat to many times. Therefore I would
+> be happy if you follow the path mentioned in paragraph before always:
+> find the problem, tell how it can be reproduced, deliver single patch
+> which fixes the problem.
+>
+> Best regards,
+> Krzysztof
 
---
-Regards,
-Sudeep
+Yes I will try to improve my self to the point commit message
+and code as per the documentation.
+
+Let me clear my thoughts on clk's turned on for by driver.
+Please correct me If I am wrong.
+
+Exynos support Power domain to control the dynamic power consumption via clk.
+Operating voltage
+Operating frequency
+Toggling ratios of the logic gate
+
+PMU generates power control signal to regulator or PMIC.
+
+To reduce the dynamic power consumption, Exynos SCP uses clock gating
+and frequency scaling.
+
+Exynos process support tmu power domain
+Power Domain         Power Source         Internal Power Gating Method
+           Included Modules
+
+TEMP                     VDD18_TEMP        None
+                       TEMP SENSOR
+
+Exynos TMU is directly co-related to CPU frequency scaling module.
+as their is increase in CPU clk speed with increase in temperature
+TMU will control the flow of cpu speed via clk freq scaling.
+
+It might be a good option to implement pm_runtime for tmu driver.
+
+If you are not satisfied with this series of change lets drop them.
+I will just re-submit err-clean up and e-Fuse changes.
+
+Best Regards
+-Anand
