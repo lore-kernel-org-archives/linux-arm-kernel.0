@@ -1,38 +1,42 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Thu, 19 Jul 2018 23:14:05 +0530
-Subject: [PATCH v5 6/6] MAINTAINERS: Add entry for Actions Semiconductor Owl
- I2C driver
-In-Reply-To: <20180719174405.7210-1-manivannan.sadhasivam@linaro.org>
-References: <20180719174405.7210-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180719174405.7210-7-manivannan.sadhasivam@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Jul 2018 18:47:28 +0100
+Subject: [PATCH 4/5] net: add support for nvmem to
+ eth_platform_get_mac_address()
+In-Reply-To: <20180718161035.7005-5-brgl@bgdev.pl>
+References: <20180718161035.7005-1-brgl@bgdev.pl>
+ <20180718161035.7005-5-brgl@bgdev.pl>
+Message-ID: <20180719174728.GK6920@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add entry for Actions Semiconductor Owl I2C driver under ARM/ACTIONS
+On Wed, Jul 18, 2018 at 06:10:34PM +0200, Bartosz Golaszewski wrote:
+> @@ -544,6 +548,31 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
+>  			from = "arch callback";
+>  	}
+>  
+> +	if (!addr) {
+> +		nvmem = nvmem_cell_get(dev, "mac-address");
+> +		if (IS_ERR(nvmem) && PTR_ERR(nvmem) == -EPROBE_DEFER)
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- MAINTAINERS | 2 ++
- 1 file changed, 2 insertions(+)
+This is way too verbose.  To quote Al Viro from earlier today:
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 09b54e9ebc6f..5084c62712fa 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1145,12 +1145,14 @@ F:	arch/arm/boot/dts/owl-*
- F:	arch/arm64/boot/dts/actions/
- F:	drivers/clk/actions/
- F:	drivers/clocksource/owl-*
-+F:	drivers/i2c/busses/i2c-owl.c
- F:	drivers/pinctrl/actions/*
- F:	drivers/soc/actions/
- F:	include/dt-bindings/power/owl-*
- F:	include/linux/soc/actions/
- F:	Documentation/devicetree/bindings/arm/actions.txt
- F:	Documentation/devicetree/bindings/clock/actions,s900-cmu.txt
-+F:	Documentation/devicetree/bindings/i2c/i2c-owl.txt
- F:	Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
- F:	Documentation/devicetree/bindings/power/actions,owl-sps.txt
- F:	Documentation/devicetree/bindings/timer/actions,owl-timer.txt
+<viro> sigh...
+<viro>         if (IS_ERR(link) && PTR_ERR(link) == -EEXIST)
+<viro> what the hell is wrong with if (link == ERR_PTR(-EEXIST))?
+
+I wonder why so many people haven't heard of pointer comparison... ;)
+
+IS_ERR(ERR_PTR(-EPROBE_DEFER)) is always true - if it wasn't, then
+we'd be in for problems.
+
+So, if you're asserting that nvmem is ERR_PTR(-EPROBE_DEFER) then
+there's no need to do the IS_ERR(nvmem) must also be true.  Hence, a
+simple pointer comparison is sufficient:
+
+		if (nvmem == ERR_PTR(-EPROBE_DEFER))
+			return -EPROBE_DEFER;
+
 -- 
-2.17.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
