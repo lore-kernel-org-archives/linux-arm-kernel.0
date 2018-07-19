@@ -1,212 +1,166 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Jul 2018 12:41:25 +0100
-Subject: [PATCH 2/2] arm64: Clear the stack
-In-Reply-To: <20180718211013.14512-3-labbott@redhat.com>
-References: <20180718211013.14512-1-labbott@redhat.com>
- <20180718211013.14512-3-labbott@redhat.com>
-Message-ID: <20180719114124.fzjkqtpqnhhtxexy@lakrids.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Jul 2018 13:23:46 +0100
+Subject: [PATCH v2 2/3] net: add support for nvmem to
+ eth_platform_get_mac_address()
+In-Reply-To: <20180719084503.tfv6jllsukk2zv3f@mwanda>
+References: <20180719082028.26116-1-brgl@bgdev.pl>
+ <20180719082028.26116-3-brgl@bgdev.pl>
+ <20180719084503.tfv6jllsukk2zv3f@mwanda>
+Message-ID: <20180719122346.GJ6920@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 02:10:13PM -0700, Laura Abbott wrote:
+On Thu, Jul 19, 2018 at 11:48:37AM +0300, Dan Carpenter wrote:
+> On Thu, Jul 19, 2018 at 10:20:27AM +0200, Bartosz Golaszewski wrote:
+> > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> > 
+> > Many non-DT platforms read the MAC address from EEPROM. Usually it's
+> > either done with callbacks defined in board files or from SoC-specific
+> > ethernet drivers.
+> > 
+> > In order to generalize this, try to read the MAC from nvmem in
+> > eth_platform_get_mac_address() using a standard lookup name:
+> > "mac-address".
+> > 
+> > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> > ---
+> >  net/ethernet/eth.c | 27 +++++++++++++++++++++++++++
+> >  1 file changed, 27 insertions(+)
+> > 
+> > diff --git a/net/ethernet/eth.c b/net/ethernet/eth.c
+> > index 39af03894598..af3b4b1b77eb 100644
+> > --- a/net/ethernet/eth.c
+> > +++ b/net/ethernet/eth.c
+> > @@ -54,6 +54,7 @@
+> >  #include <linux/if_ether.h>
+> >  #include <linux/of_net.h>
+> >  #include <linux/pci.h>
+> > +#include <linux/nvmem-consumer.h>
+> >  #include <net/dst.h>
+> >  #include <net/arp.h>
+> >  #include <net/sock.h>
+> > @@ -527,8 +528,11 @@ unsigned char * __weak arch_get_platform_mac_address(void)
+> >  
+> >  int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
+> >  {
+> > +	unsigned char addrbuf[ETH_ALEN];
+> >  	const unsigned char *addr;
+> > +	struct nvmem_cell *nvmem;
+> >  	struct device_node *dp;
+> > +	size_t alen;
+> >  
+> >  	if (dev_is_pci(dev))
+> >  		dp = pci_device_to_OF_node(to_pci_dev(dev));
+> > @@ -541,6 +545,29 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
+> >  	if (!addr)
+> >  		addr = arch_get_platform_mac_address();
+> >  
+> > +	if (!addr) {
+> > +		nvmem = nvmem_cell_get(dev, "mac-address");
+> > +		if (IS_ERR(nvmem) && PTR_ERR(nvmem) == -EPROBE_DEFER)
+> > +			/* We may have a lookup registered for MAC address but
+> > +			 * the corresponding nvmem provider hasn't been
+> > +			 * registered yet.
+> > +			 */
+> > +			return -EPROBE_DEFER;
+> > +
+> > +		if (!IS_ERR(nvmem)) {
+> > +			addr = nvmem_cell_read(nvmem, &alen);
+> > +			if (!IS_ERR(addr)) {
+>                                     ^^^^
+> Never do success handling.  Always error handling.  Otherwise the code
+> is indent a lot and the error handling is far from the call.
 > 
-> Implementation of stackleak based heavily on the x86 version
+> > +				if (alen == ETH_ALEN)
+> > +					ether_addr_copy(addrbuf, addr);
+> > +
+> > +				kfree(addr);
+> > +				addr = alen == ETH_ALEN ? addrbuf : NULL;
+> > +			}
+> > +
+> > +			nvmem_cell_put(nvmem);
+> > +		}
+> > +	}
+> > +
+> >  	if (!addr || !is_valid_ether_addr(addr))
+>                                           ^^^^
+> Instead of handling the error we dereference the error pointer here.
 > 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> Since last time: Minor style cleanups. Re-wrote check_alloca to
-> correctly handle all stack types. While doing that, I also realized
-> current_top_of_stack was incorrect so I fixed that as well.
-> ---
->  arch/arm64/Kconfig                    |  1 +
->  arch/arm64/include/asm/processor.h    | 17 ++++++++++++++
->  arch/arm64/kernel/entry.S             |  7 ++++++
->  arch/arm64/kernel/process.c           | 32 +++++++++++++++++++++++++++
->  arch/arm64/kvm/hyp/Makefile           |  3 ++-
->  drivers/firmware/efi/libstub/Makefile |  3 ++-
->  include/linux/stackleak.h             |  1 +
->  7 files changed, 62 insertions(+), 2 deletions(-)
+> *frowny face*
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 42c090cf0292..216d36a49ab5 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -96,6 +96,7 @@ config ARM64
->  	select HAVE_ARCH_MMAP_RND_BITS
->  	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
->  	select HAVE_ARCH_SECCOMP_FILTER
-> +	select HAVE_ARCH_STACKLEAK
->  	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
->  	select HAVE_ARCH_TRACEHOOK
->  	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index a73ae1e49200..4f3062ee22c6 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -266,5 +266,22 @@ extern void __init minsigstksz_setup(void);
->  #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
->  #define SVE_GET_VL()	sve_get_current_vl()
->  
-> +/*
-> + * For CONFIG_STACKLEAK
-> + *
-> + * These need to be macros because otherwise we get stuck in a nightmare
-> + * of header definitions for the use of task_stack_page.
-> + */
-> +
-> +#define current_top_of_stack()		\
-> +({					\
-> +	unsigned long _low = 0;		\
-> +	unsigned long _high = 0;	\
-> +					\
-> +	current_stack_type(current, current_stack_pointer, &_low, &_high); \
-> +	_high;	\
-> +})
-
-... with the info changes, this could be:
-
-#define current_top_of_stack()						\
-({									\
-	struct stack_info _info;					\
-	BUG_ON(!on_accessible_stack(current_stack_pinter, &_info));	\
-	_info->high;							\
-})
-
-> +#define on_thread_stack()	(on_task_stack(current, current_stack_pointer, NULL, NULL))
-
-... and one fewer NULL here.
-
-> +
->  #endif /* __ASSEMBLY__ */
->  #endif /* __ASM_PROCESSOR_H */
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 28ad8799406f..67d12016063d 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -431,6 +431,11 @@ tsk	.req	x28		// current thread_info
->  
->  	.text
->  
-> +	.macro	stackleak_erase
-> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
-> +	bl	stackleak_erase
-> +#endif
-> +	.endm
->  /*
->   * Exception vectors.
->   */
-> @@ -910,6 +915,7 @@ ret_fast_syscall:
->  	and	x2, x1, #_TIF_WORK_MASK
->  	cbnz	x2, work_pending
->  	enable_step_tsk x1, x2
-> +	stackleak_erase
->  	kernel_exit 0
->  ret_fast_syscall_trace:
->  	enable_daif
-> @@ -936,6 +942,7 @@ ret_to_user:
->  	cbnz	x2, work_pending
->  finish_ret_to_user:
->  	enable_step_tsk x1, x2
-> +	stackleak_erase
->  	kernel_exit 0
->  ENDPROC(ret_to_user)
->  
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index e10bc363f533..904defa36689 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -493,3 +493,35 @@ void arch_setup_new_exec(void)
->  {
->  	current->mm->context.flags = is_compat_task() ? MMCF_AARCH32 : 0;
->  }
-> +
-> +#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
-> +void __used stackleak_check_alloca(unsigned long size)
-> +{
-> +	unsigned long stack_left;
-> +	enum stack_type type;
-> +	unsigned long current_sp = current_stack_pointer;
-> +	unsigned long low, high;
-> +
-> +	type = current_stack_type(current, current_sp, &low, &high);
-> +	BUG_ON(type == STACK_TYPE_UNKNOWN);
-> +
-> +	stack_left = current_sp - low;
-
-... similarly with the info changes, this could be:
-
-	unsigned long current_sp = current_stack_pointer;
-	unsigned long stack_left;
-	struct stack_info info;
-
-	BUG_ON(!on_accessible_stack(current, current_sp, &info));
-
-	stack_lead = current_sp - info->low;
-
-Otherwise, this looks good to me.
-
-Thanks,
-Mark.
-
-> +
-> +	if (size >= stack_left) {
-> +		/*
-> +		 * Kernel stack depth overflow is detected, let's report that.
-> +		 * If CONFIG_VMAP_STACK is enabled, we can safely use BUG().
-> +		 * If CONFIG_VMAP_STACK is disabled, BUG() handling can corrupt
-> +		 * the neighbour memory. CONFIG_SCHED_STACK_END_CHECK calls
-> +		 * panic() in a similar situation, so let's do the same if that
-> +		 * option is on. Otherwise just use BUG() and hope for the best.
-> +		 */
-> +#if !defined(CONFIG_VMAP_STACK) && defined(CONFIG_SCHED_STACK_END_CHECK)
-> +		panic("alloca() over the kernel stack boundary\n");
-> +#else
-> +		BUG();
-> +#endif
-> +	}
-> +}
-> +EXPORT_SYMBOL(stackleak_check_alloca);
-> +#endif
-> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> index 4313f7475333..2fabc2dc1966 100644
-> --- a/arch/arm64/kvm/hyp/Makefile
-> +++ b/arch/arm64/kvm/hyp/Makefile
-> @@ -3,7 +3,8 @@
->  # Makefile for Kernel-based Virtual Machine module, HYP part
->  #
->  
-> -ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
-> +ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING \
-> +		$(DISABLE_STACKLEAK_PLUGIN)
->  
->  KVM=../../../../virt/kvm
->  
-> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-> index a34e9290a699..25dd2a14560d 100644
-> --- a/drivers/firmware/efi/libstub/Makefile
-> +++ b/drivers/firmware/efi/libstub/Makefile
-> @@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
->  KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
->  				   -D__NO_FORTIFY \
->  				   $(call cc-option,-ffreestanding) \
-> -				   $(call cc-option,-fno-stack-protector)
-> +				   $(call cc-option,-fno-stack-protector) \
-> +				   $(DISABLE_STACKLEAK_PLUGIN)
->  
->  GCOV_PROFILE			:= n
->  KASAN_SANITIZE			:= n
-> diff --git a/include/linux/stackleak.h b/include/linux/stackleak.h
-> index b911b973d328..08420ec6b7c3 100644
-> --- a/include/linux/stackleak.h
-> +++ b/include/linux/stackleak.h
-> @@ -5,6 +5,7 @@
->  #include <linux/sched.h>
->  #include <linux/sched/task_stack.h>
->  
-> +#include <asm/stacktrace.h>
->  /*
->   * Check that the poison value points to the unused hole in the
->   * virtual memory map for your platform.
-> -- 
-> 2.17.1
+> >  		return -ENODEV;
+> >  
+> > --
 > 
+> Maybe this?
+> 
+> 	if (!addr) {
+> 		nvmem = nvmem_cell_get(dev, "mac-address");
+> 		if (PTR_ERR(nvmem) == -EPROBE_DEFER)
+> 			return -EPROBE_DEFER;
+> 		if (IS_ERR(nvmem))
+> 			return -ENODEV;
+> 		addr = nvmem_cell_read(nvmem, &alen);
+> 		if (IS_ERR(addr))
+> 			return PTR_ERR(addr);
+
+The problem with doing it this way is... error handling is Hard(tm).
+You missed the call to nvmem_cell_put() here.
+
+> 		if (alen != ETH_ALEN) {
+> 			kfree(addr);
+
+and again here.
+
+> 			return -ENODEV;
+> 		}
+> 		ether_addr_copy(addrbuf, addr);
+> 		kfree(addr);
+> 		addr = addrbuf;
+
+and here.
+
+> 	}
+> 	if (!is_valid_ether_addr(addr))
+> 		return -ENODEV;
+> 	ether_addr_copy(mac_addr, addr);
+> 	return 0;
+
+Without checking the semantics, a possible solution to that could be:
+
+	if (!addr) {
+		nvmem = nvmem_cell_get(dev, "mac-address");
+		if (PTR_ERR(nvmem) == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
+		if (IS_ERR(nvmem))
+			return -ENODEV;
+		addr = nvmem_cell_read(nvmem, &alen);
++		nvmem_cell_put(nvmem);
+		if (IS_ERR(addr))
+			return PTR_ERR(addr);
+		if (alen != ETH_ALEN) {
+			kfree(addr);
+			return -ENODEV;
+		}
+		ether_addr_copy(addrbuf, addr);
+		kfree(addr);
+		addr = addrbuf;
+	}
+	if (!is_valid_ether_addr(addr))
+		return -ENODEV;
+	ether_addr_copy(mac_addr, addr);
+	return 0;
+
+A potential better solution would be to put this code in a separate
+function, and then do:
+
+	if (!addr)
+		addr = eth_platform_get_nvmem_mac_address(dev, addrbuf);
+
+which returns either NULL or addrbuf depending on whether it failed or
+succeeded, which would probably end up with cleaner code.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
