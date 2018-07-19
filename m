@@ -1,38 +1,47 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Thu, 19 Jul 2018 13:27:56 +0000
-Subject: [U-BOOT internal] ARM: dts: stm32: Add clk-lse node's label on
- stm32f429
-In-Reply-To: <1532005842-3264-1-git-send-email-patrice.chotard@st.com>
-References: <1532005842-3264-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <a4472301-1394-3680-079d-b7eab8a6a917@st.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Jul 2018 14:32:22 +0100
+Subject: arm: v4.18-rc5 with cpuidle on TC2 (A7 boot) spectre v2 issue
+In-Reply-To: <20180719100109.GH17271@n2100.armlinux.org.uk>
+References: <2abc6c11-2e8c-a4ea-6911-0f495d90ace6@arm.com>
+ <20180719100109.GH17271@n2100.armlinux.org.uk>
+Message-ID: <20180719133222.GL17271@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, don't take care about this patch, it was send using the wrong script
+On Thu, Jul 19, 2018 at 11:01:10AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 19, 2018 at 11:42:50AM +0200, Dietmar Eggemann wrote:
+> > Hi,
+> > 
+> > running v4.18-rc5 (plus still missing "power: vexpress: fix corruption in
+> > notifier registration", otherwise I get this rcu_sched stall issue) on TC2
+> > (A7 boot) with vanilla multi_v7_defconfig plus
+> > CONFIG_ARM_BIG_LITTLE_CPUIDLE=y gives me continuous:
+> > 
+> > ...
+> >  CPUX: Spectre v2: incorrect context switching function, system vulnerable
+> > ...
+> > 
+> > messages.
+> > 
+> > Work around is to disable CONFIG_HARDEN_BRANCH_PREDICTOR.
+> 
+> or disable big.Little if you want the hardening.
+> 
+> The choices are currently either protection against Spectre or big.Little
+> support since the two are mutually exclusive at the moment.
 
-Patrice
+An alternative would be to give the patches in the attachment a test.
+They're not finished yet, so I haven't sent them out, but still worth
+testing.
 
-On 07/19/2018 03:10 PM, patrice.chotard at st.com wrote:
-> From: Patrice Chotard <patrice.chotard@st.com>
-> 
-> Add missing clk_lse label for node clk-lse.
-> 
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-> ---
->   arch/arm/boot/dts/stm32f429.dtsi | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-> index ede77e0f1c41..64278e81bc08 100644
-> --- a/arch/arm/boot/dts/stm32f429.dtsi
-> +++ b/arch/arm/boot/dts/stm32f429.dtsi
-> @@ -58,7 +58,7 @@
->   			clock-frequency = <0>;
->   		};
->   
-> -		clk-lse {
-> +		clk_lse: clk-lse {
->   			#clock-cells = <0>;
->   			compatible = "fixed-clock";
->   			clock-frequency = <32768>;
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: bl.tar.xz
+Type: application/x-xz
+Size: 4120 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180719/33abc268/attachment.xz>
