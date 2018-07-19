@@ -1,35 +1,68 @@
-From: fabio.berton@ossystems.com.br (Fabio Berton)
-Date: Thu, 19 Jul 2018 10:53:02 -0300
-Subject: Rockchip RV1108 mainline kernel support
-Message-ID: <CAAPZna3aGkUmDeAwM4J6LpeC9m1VA=CUQN_ChiwvTLkaE2zdrw@mail.gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 19 Jul 2018 16:01:02 +0200
+Subject: [RFC PATCH] EDAC, ghes: Enable per-layer error reporting for ARM
+In-Reply-To: <1531762009-15112-1-git-send-email-tbaicar@codeaurora.org>
+References: <1531762009-15112-1-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <20180719140102.GB25185@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all!
+On Mon, Jul 16, 2018 at 01:26:49PM -0400, Tyler Baicar wrote:
+> Enable per-layer error reporting for ARM systems so that the error
+> counters are incremented per-DIMM.
+> 
+> On ARM systems that use firmware first error handling it is understood
+> that card=channel and module=DIMM on that channel. Populate that
+> information and enable per layer error reporting for ARM systems so that
+> the EDAC error counters are incremented based on DIMM number as per the
+> SMBIOS table rather than just incrementing the noinfo counters on the
+> memory controller.
 
-We're adding support to a custom Rockchip RV1108 in mainline kernel.
+I guess.
 
-Currently this custom board runs fine on the Rockchip 3.10 vendor kernel.
+James?
 
-The main problems is that kernel 4.17 can't detect eMMC.
+> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> ---
+>  drivers/edac/ghes_edac.c | 15 ++++++++++++---
+>  1 file changed, 12 insertions(+), 3 deletions(-)
+> diff --git a/drivers/edac/ghes_edac.c b/drivers/edac/ghes_edac.c
+> index 473aeec..e4c8b6e 100644
+> --- a/drivers/edac/ghes_edac.c
+> +++ b/drivers/edac/ghes_edac.c
+> @@ -213,9 +213,18 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
+>  	strcpy(e->label, "unknown label");
+>  	e->msg = pvt->msg;
+>  	e->other_detail = pvt->other_detail;
+> -	e->top_layer = -1;
+> -	e->mid_layer = -1;
+> -	e->low_layer = -1;
 
-I would appreciate any help on how to make the mainline kernel to
-detect eMMC on this board
+<----- newline here.
 
-Here the full log:
-https://gist.github.com/fbertux/df5b55928dcb703a28b990b72aa2e6fc
+> +	if ((IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64))
+> +	    && (mem_err->validation_bits & CPER_MEM_VALID_CARD)
+> +	    && (mem_err->validation_bits & CPER_MEM_VALID_MODULE)) {
+> +		e->top_layer = mem_err->card;
+> +		e->mid_layer = mem_err->module;
+> +		e->low_layer = -1;
+> +		e->enable_per_layer_report = true;
+> +	} else {
+> +		e->top_layer = -1;
+> +		e->mid_layer = -1;
+> +		e->low_layer = -1;
+> +	}
 
-and here the log from Rockchip kernel 3.10:
-https://gist.github.com/fbertux/9a476ca6903c2029d3db4ea53076be17
+ditto.
 
-This is dts file that we're using:
+>  	*pvt->other_detail = '\0';
+>  	*pvt->msg = '\0';
+>  
+> -- 
 
-https://github.com/OSSystems/linux/blob/wip-rockchip/arch/arm/boot/dts/rv1108-minievb-v10.dts
+-- 
+Regards/Gruss,
+    Boris.
 
-Rockchip RV1108; http://rockchip.wikidot.com/rk1108
-Kernel Fork: https://github.com/OSSystems/linux/tree/wip-rockchip
-Rockchip kernel 3.10: https://github.com/rockchip-linux/kernel/tree/release-3.10
-
-Thanks!
-
-Fabio Berton
+ECO tip #101: Trim your mails when you reply.
+--
