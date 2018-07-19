@@ -1,362 +1,85 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 18 Jul 2018 17:59:41 -0700
-Subject: [PATCH] ARM: dts: vf610: Add ZII CFU1 board
-Message-ID: <20180719005941.10458-1-andrew.smirnov@gmail.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Thu, 19 Jul 2018 11:27:13 +0930
+Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc. BMC
+ control fields
+In-Reply-To: <CAL_Jsq+YdcBe+VYBAZPvK-X9gwJyhzP4m6hAx59+2Nz0JzsKug@mail.gmail.com>
+References: <20180711053122.30773-1-andrew@aj.id.au>
+ <20180711053122.30773-2-andrew@aj.id.au>
+ <20180711200450.GB17291@rob-hp-laptop>
+ <1531356830.3551458.1437853280.551CA8C5@webmail.messagingengine.com>
+ <CAL_JsqKpXxR4t_-3BOy-0mFePXkaSck_4PfHRD=OZQ-_-T5P=w@mail.gmail.com>
+ <b6ced4cad4d7ff78330181b2c893855c23103953.camel@kernel.crashing.org>
+ <1531463489.747186.1439263128.075AECE1@webmail.messagingengine.com>
+ <CAL_JsqLZo-=7UkuvvUFYdCR4asBBiWyC=Q1ryH=-HLU6vzf9tA@mail.gmail.com>
+ <ece91112ecfdc7218184c4c4519e455cf9397e11.camel@kernel.crashing.org>
+ <1531870098.3337969.1444201888.2476205D@webmail.messagingengine.com>
+ <CAL_Jsq+YdcBe+VYBAZPvK-X9gwJyhzP4m6hAx59+2Nz0JzsKug@mail.gmail.com>
+Message-ID: <1531965433.2133841.1445577960.5C709A63@webmail.messagingengine.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Zodiac Inflight Innovations CFU1
-board (VF610-based).
+On Thu, 19 Jul 2018, at 04:37, Rob Herring wrote:
+> On Tue, Jul 17, 2018 at 5:28 PM Andrew Jeffery <andrew@aj.id.au> wrote:
+> >
+> > On Tue, 17 Jul 2018, at 14:26, Benjamin Herrenschmidt wrote:
+> > > On Mon, 2018-07-16 at 07:55 -0600, Rob Herring wrote:
+> > > > If that data is one set per SoC, then i'm not that concerned having
+> > > > platform-specific data in the driver. That doesn't mean the driver is
+> > > > not "generic". It's still not clear to me in this thread, how much of
+> > > > this is board specific, but given that you've placed all the data in
+> > > > an SoC dtsi file it seems to be all per SoC.
+> > >
+> > > So Rob, I think that's precisely where the disconnect is.
+> > >
+> > > I think we all (well hopefully) agree that those few tunables don't fit
+> > > in any existing subystem and aren't likely to ever do (famous last
+> > > words...).
+> > >
+> > > Where we disagree is we want to make this parametrized via the DT, and
+> > > you want us to hard wire the list in some kind of SoC driver for a
+> > > given SoC family/version.
+> > >
+> > > The reason I think hard wiring the list in the driver is not a great
+> > > solution is that that list in itself is prone to variations, possibly
+> > > fairly often, between boards, vendors, versions of boards, etc...
+> > >
+> > > We can't know for sure every SoC tunable (out of the gazillions in
+> > > those chips) are going to be needed for a given system. We know which
+> > > ones we do use for ours, and that's a couple of handfuls, but it could
+> > > be that Dell need a slightly different set, and so might Yadro, or so
+> > > might our next board revision for that matter.
+> > >
+> > > Now, updating the device-tree in the board flash with whatever vendor
+> > > specific information is needed is a LOT easier than getting the kernel
+> > > driver constantly updated. The device-tree after all is there to
+> > > reflect among other things system specific ways in which the SoC is
+> > > wired and configured. This is rather close...
+> >
+> > Not sure this helps, but I feel that the proposal pretty closely matches what's described in Documentation/devicetree/bindings/mfd/mfd.txt. It's intended that nodes using the bindings I'm proposing are children of a 'compatible = "syscon", "simple-mfd"' node (this is the case with the features we're hoping to describe for our SoC). I should explicitly call that out.
+> 
+> IMO, any binding that has only those compatibles is not correct and a
+> specific compatible is needed. We should be able identify a specific
+> h/w block.
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: cphealy at gmail.com
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
+I didn't intend for that to get interpreted quite as literally, so apologies for that. We do have h/w-block-specific compatibles in there too. The point was to demonstrate that we're dealing (at this point, only) with mfds/syscons.
 
-Shawn:
+> 
+> > But to go on, "simple-mfd" is effectively an alias of "simple-bus", which means its intended to match child node compatibles to drivers provided by the kernel. If we shouldn't be describing minor features of a SoC in the devicetree, doesn't this invalidate the case for simple-mfd? What is the *correct* use of simple-mfd? When is it not used to expose minor features in set of "miscellaneous system registers"? Why doesn't this proposed case fit?
+> 
+> I'm no fan of simple-mfd either. I think it is abused and often a sign
+> of bad binding design.
 
-Currently this patch is rebase on top of [spu3], if that is
-problematic, let me know and I'll update it accordingly
+Ah, yes, this is a familiar feeling when reflecting on things I've done in the past. Hence trying to understand how to use it right.
 
-Thanks,
-Andrey Smirnov
+> The general problem with MFD bindings is people
+> define child nodes based on what drivers they happen to have for some
+> OS. DT is not the only way to instantiate drivers. Child nodes are
+> really only needed when you have resources per child that need to be
+> defined. For example, if the MFD has an interrupt controller and
+> interrupts to sub-blocks or sub-blocks have their own clocks.
+> "simple-mfd" was for when the parent node has no driver or the child
+> nodes have no dependency on the parent.
 
-[spu3] lkml.kernel.org/r/20180717040651.641-1-andrew.smirnov at gmail.com
+Thanks for the clarification, I'll keep that in mind going forward.
 
- arch/arm/boot/dts/Makefile           |   1 +
- arch/arm/boot/dts/vf610-zii-cfu1.dts | 307 +++++++++++++++++++++++++++
- 2 files changed, 308 insertions(+)
- create mode 100644 arch/arm/boot/dts/vf610-zii-cfu1.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index e331b2c16539..85797819fdd9 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -569,6 +569,7 @@ dtb-$(CONFIG_SOC_VF610) += \
- 	vf610-cosmic.dtb \
- 	vf610m4-cosmic.dtb \
- 	vf610-twr.dtb \
-+	vf610-zii-cfu1.dtb \
- 	vf610-zii-dev-rev-b.dtb \
- 	vf610-zii-dev-rev-c.dtb \
- 	vf610-zii-ssmb-spu3.dtb
-diff --git a/arch/arm/boot/dts/vf610-zii-cfu1.dts b/arch/arm/boot/dts/vf610-zii-cfu1.dts
-new file mode 100644
-index 000000000000..d4f48c48131c
---- /dev/null
-+++ b/arch/arm/boot/dts/vf610-zii-cfu1.dts
-@@ -0,0 +1,307 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+
-+/*
-+ * Copyright (C) 2018 Zodiac Inflight Innovations
-+ */
-+
-+/dts-v1/;
-+#include "vf610.dtsi"
-+
-+/ {
-+	model = "ZII VF610 CFU1 Board";
-+	compatible = "zii,vf610cfu1", "zii,vf610dev", "fsl,vf610";
-+
-+	chosen {
-+		stdout-path = &uart0;
-+	};
-+
-+	memory {
-+		reg = <0x80000000 0x20000000>;
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&pinctrl_leds_debug>;
-+		pinctrl-names = "default";
-+
-+		led-debug {
-+			label = "zii:green:debug1";
-+			gpios = <&gpio2 18 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+			max-brightness = <1>;
-+		};
-+
-+		led-fail {
-+			label = "zii:red:fail";
-+			gpios = <&gpio3 12 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+			max-brightness = <1>;
-+		};
-+
-+		led-status {
-+			label = "zii:green:status";
-+			gpios = <&gpio3 13 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			max-brightness = <1>;
-+		};
-+
-+		led-debug-a {
-+			label = "zii:green:debug_a";
-+			gpios = <&gpio3 14 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			max-brightness = <1>;
-+		};
-+
-+		led-debug-b {
-+			label = "zii:green:debug_b";
-+			gpios = <&gpio3 15 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			max-brightness = <1>;
-+		};
-+	};
-+
-+	reg_vcc_3v3_mcu: regulator-vcc-3v3-mcu {
-+		 compatible = "regulator-fixed";
-+		 regulator-name = "vcc_3v3_mcu";
-+		 regulator-min-microvolt = <3300000>;
-+		 regulator-max-microvolt = <3300000>;
-+	};
-+};
-+
-+&adc0 {
-+	vref-supply = <&reg_vcc_3v3_mcu>;
-+	status = "okay";
-+};
-+
-+&adc1 {
-+	vref-supply = <&reg_vcc_3v3_mcu>;
-+	status = "okay";
-+};
-+
-+&dspi1 {
-+	bus-num = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_dspi1>;
-+	status = "okay";
-+
-+	m25p128 at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "m25p128", "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <50000000>;
-+
-+		partition at 0 {
-+			label = "m25p128-0";
-+			reg = <0x0 0x01000000>;
-+		};
-+	};
-+};
-+
-+&edma0 {
-+	status = "okay";
-+};
-+
-+&edma1 {
-+	status = "okay";
-+};
-+
-+&esdhc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc0>;
-+	bus-width = <8>;
-+	non-removable;
-+	no-1-8-v;
-+	keep-power-in-suspend;
-+	status = "okay";
-+};
-+
-+&esdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_esdhc1>;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
-+&fec1 {
-+	phy-mode = "rmii";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_fec1>;
-+	status = "okay";
-+
-+	fixed-link {
-+		speed = <100>;
-+		full-duplex;
-+	};
-+
-+	mdio1: mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "okay";
-+
-+		switch0: switch0 at 0 {
-+			compatible = "marvell,mv88e6085";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_switch>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+			eeprom-length = <512>;
-+			interrupt-parent = <&gpio3>;
-+			interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			reset-gpios = <&gpio3 11 GPIO_ACTIVE_LOW>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					label = "eth_cu_1000_1";
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+					label = "eth_cu_1000_2";
-+				};
-+
-+				port at 2 {
-+					reg = <2>;
-+					label = "eth_cu_1000_3";
-+				};
-+
-+				port at 6 {
-+					reg = <6>;
-+					label = "cpu";
-+					ethernet = <&fec1>;
-+
-+					fixed-link {
-+						speed = <100>;
-+						full-duplex;
-+					};
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&i2c0 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c0>;
-+	status = "okay";
-+
-+	pca9554 at 22 {
-+		compatible = "nxp,pca9554";
-+		reg = <0x22>;
-+		gpio-controller;
-+	};
-+
-+	lm75 at 48 {
-+		compatible = "national,lm75";
-+		reg = <0x48>;
-+	};
-+
-+	at24c04 at 52 {
-+		compatible = "atmel,24c04";
-+		reg = <0x52>;
-+		label = "nvm";
-+	};
-+
-+	at24c04 at 54 {
-+		compatible = "atmel,24c04";
-+		reg = <0x54>;
-+		label = "nameplate";
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart0>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl_dspi1: dspi1grp {
-+		fsl,pins = <
-+			VF610_PAD_PTD5__DSPI1_CS0		0x1182
-+			VF610_PAD_PTC6__DSPI1_SIN		0x1181
-+			VF610_PAD_PTC7__DSPI1_SOUT		0x1182
-+			VF610_PAD_PTC8__DSPI1_SCK		0x1182
-+		>;
-+	};
-+
-+	pinctrl_esdhc0: esdhc0grp {
-+		fsl,pins = <
-+			VF610_PAD_PTC0__ESDHC0_CLK		0x31ef
-+			VF610_PAD_PTC1__ESDHC0_CMD		0x31ef
-+			VF610_PAD_PTC2__ESDHC0_DAT0		0x31ef
-+			VF610_PAD_PTC3__ESDHC0_DAT1		0x31ef
-+			VF610_PAD_PTC4__ESDHC0_DAT2		0x31ef
-+			VF610_PAD_PTC5__ESDHC0_DAT3		0x31ef
-+			VF610_PAD_PTD23__ESDHC0_DAT4		0x31ef
-+			VF610_PAD_PTD22__ESDHC0_DAT5		0x31ef
-+			VF610_PAD_PTD21__ESDHC0_DAT6		0x31ef
-+			VF610_PAD_PTD20__ESDHC0_DAT7		0x31ef
-+		>;
-+	};
-+
-+	pinctrl_esdhc1: esdhc1grp {
-+		fsl,pins = <
-+			VF610_PAD_PTA24__ESDHC1_CLK		0x31ef
-+			VF610_PAD_PTA25__ESDHC1_CMD		0x31ef
-+			VF610_PAD_PTA26__ESDHC1_DAT0		0x31ef
-+			VF610_PAD_PTA27__ESDHC1_DAT1		0x31ef
-+			VF610_PAD_PTA28__ESDHC1_DATA2		0x31ef
-+			VF610_PAD_PTA29__ESDHC1_DAT3		0x31ef
-+		>;
-+	};
-+
-+	pinctrl_fec1: fec1grp {
-+		fsl,pins = <
-+			VF610_PAD_PTA6__RMII_CLKIN		0x30d1
-+			VF610_PAD_PTC9__ENET_RMII1_MDC		0x30fe
-+			VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
-+			VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
-+			VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
-+			VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
-+			VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
-+			VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
-+			VF610_PAD_PTC16__ENET_RMII1_TXD0	0x30d2
-+			VF610_PAD_PTC17__ENET_RMII1_TXEN	0x30d2
-+		>;
-+	};
-+
-+	pinctrl_i2c0: i2c0grp {
-+		fsl,pins = <
-+			VF610_PAD_PTB14__I2C0_SCL		0x37ff
-+			VF610_PAD_PTB15__I2C0_SDA		0x37ff
-+		>;
-+	};
-+
-+	pinctrl_leds_debug: pinctrl-leds-debug {
-+		fsl,pins = <
-+			VF610_PAD_PTD3__GPIO_82			0x31c2
-+			VF610_PAD_PTE3__GPIO_108		0x31c2
-+			VF610_PAD_PTE4__GPIO_109		0x31c2
-+			VF610_PAD_PTE5__GPIO_110		0x31c2
-+			VF610_PAD_PTE6__GPIO_111		0x31c2
-+		>;
-+	};
-+
-+	pinctrl_switch: switch-grp {
-+		fsl,pins = <
-+			VF610_PAD_PTB28__GPIO_98		0x3061
-+			VF610_PAD_PTE2__GPIO_107		0x1042
-+		>;
-+	};
-+
-+	pinctrl_uart0: uart0grp {
-+		fsl,pins = <
-+			VF610_PAD_PTB10__UART0_TX		0x21a2
-+			VF610_PAD_PTB11__UART0_RX		0x21a1
-+		>;
-+	};
-+};
--- 
-2.17.1
+Andrew
