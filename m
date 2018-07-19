@@ -1,32 +1,48 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 19 Jul 2018 12:47:10 +0200
-Subject: [PATCH v2] dt-bindings: marvell: Add documentation for the Armada
- 3700 AVS binding
-In-Reply-To: <20180711155153.GA13702@rob-hp-laptop>
-References: <20180704132524.23640-1-gregory.clement@bootlin.com>
- <20180711155153.GA13702@rob-hp-laptop>
-Message-ID: <2240650.k8NjxS09G1@aspire.rjw.lan>
+Date: Thu, 19 Jul 2018 12:47:48 +0200
+Subject: [PATCH] cpufreq: armada-37xx: Fix clock leak
+In-Reply-To: <20180405045153.GL3572@vireshk-i7>
+References: <20180404144444.4142-1-gregory.clement@bootlin.com>
+ <20180405045153.GL3572@vireshk-i7>
+Message-ID: <1928207.9cCKXrpt8K@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 11, 2018 5:51:53 PM CEST Rob Herring wrote:
-> On Wed, Jul 04, 2018 at 03:25:24PM +0200, Gregory CLEMENT wrote:
-> > Extend the documentation of the Armada 37xx SoC with the Adaptive Voltage
-> > Scaling (AVS) registers.
+On Thursday, April 5, 2018 6:51:53 AM CEST Viresh Kumar wrote:
+> On 04-04-18, 16:44, Gregory CLEMENT wrote:
+> > There was no clk_put() balancing the clk_get(). This commit fixes it.
 > > 
+> > Fixes: 92ce45fb875d ("cpufreq: Add DVFS support for Armada 37xx")
+> > Cc: <stable@vger.kernel.org>
+> > Reported-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 > > Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 > > ---
-> > Changelog:
-> > v1 -> v2:
-> >  - Add Acked-by: from Viresh Kumar
-> >  - Add the dt mailing list in copy
+> >  drivers/cpufreq/armada-37xx-cpufreq.c | 2 ++
+> >  1 file changed, 2 insertions(+)
 > > 
-> >  .../bindings/arm/marvell/armada-37xx.txt         | 16 ++++++++++++++++
-> >  1 file changed, 16 insertions(+)
+> > diff --git a/drivers/cpufreq/armada-37xx-cpufreq.c b/drivers/cpufreq/armada-37xx-cpufreq.c
+> > index c6ebc88a7d8d..72a2975499db 100644
+> > --- a/drivers/cpufreq/armada-37xx-cpufreq.c
+> > +++ b/drivers/cpufreq/armada-37xx-cpufreq.c
+> > @@ -202,6 +202,7 @@ static int __init armada37xx_cpufreq_driver_init(void)
+> >  	cur_frequency = clk_get_rate(clk);
+> >  	if (!cur_frequency) {
+> >  		dev_err(cpu_dev, "Failed to get clock rate for CPU\n");
+> > +		clk_put(clk);
+> >  		return -EINVAL;
+> >  	}
+> >  
+> > @@ -210,6 +211,7 @@ static int __init armada37xx_cpufreq_driver_init(void)
+> >  		return -EINVAL;
+> >  
+> >  	armada37xx_cpufreq_dvfs_setup(nb_pm_base, clk, dvfs->divider);
+> > +	clk_put(clk);
+> >  
+> >  	for (load_lvl = ARMADA_37XX_DVFS_LOAD_0; load_lvl < LOAD_LEVEL_NR;
+> >  	     load_lvl++) {
 > 
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 > 
 > 
 
-Patch applied, thanks!
+Applied, thanks!
