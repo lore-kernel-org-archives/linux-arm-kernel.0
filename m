@@ -1,94 +1,73 @@
-From: hari.vyas@broadcom.com (Hari Vyas)
-Date: Thu, 19 Jul 2018 19:42:50 +0530
-Subject: [PATCH] arm64: fix for restoring console loglevel after handling
- traps
-In-Reply-To: <20180719103916.g763zmsm7wnngwop@lakrids.cambridge.arm.com>
-References: <1531993734-1463-1-git-send-email-hari.vyas@broadcom.com>
- <1531993734-1463-2-git-send-email-hari.vyas@broadcom.com>
- <20180719100140.GA424@jagdpanzerIV>
- <CAM5rFu_N-=26LddRy1mO010h9yLcGuKqK6=y+h=h3-HbfEP+FQ@mail.gmail.com>
- <20180719103916.g763zmsm7wnngwop@lakrids.cambridge.arm.com>
-Message-ID: <CAM5rFu-MFbH_2Pohmjydy232Rpt7_E84-K=e67wAu3iQzvTLiA@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 19 Jul 2018 15:15:20 +0100
+Subject: [PATCH v8 1/4] arm/arm64: KVM: Add KVM_GET/SET_VCPU_EVENTS
+In-Reply-To: <49bb119c-ec31-34ee-f4e5-9f3e90d7c181@huawei.com>
+References: <20180713154751.18131-1-james.morse@arm.com>
+ <20180713154751.18131-2-james.morse@arm.com>
+ <CAFEAcA-t8U-GmkCtAcAN8tj4UAaynCZhgTi1Cg1RhaarGUOJfg@mail.gmail.com>
+ <49bb119c-ec31-34ee-f4e5-9f3e90d7c181@huawei.com>
+Message-ID: <a840714a-16b3-2da8-c6e2-5be85c73bda2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 4:09 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Jul 19, 2018 at 03:47:46PM +0530, Hari Vyas wrote:
->> On Thu, Jul 19, 2018 at 3:31 PM, Sergey Senozhatsky
->> <sergey.senozhatsky.work@gmail.com> wrote:
->> > On (07/19/18 15:18), Hari Vyas wrote:
->> > [..]
->> >
->> > Not so sure about the patch, sorry.
->> >
->> Mentioned concern in cover letter and commit message. Console loglevel
->> remains maximum after process die which
->> needs to be restored.
->> >> @@ -211,6 +211,8 @@ void die(const char *str, struct pt_regs *regs, int err)
->> >>
->> >>       bust_spinlocks(0);
->> >>       add_taint(TAINT_DIE, LOCKDEP_NOW_UNRELIABLE);
->> >> +
->> >> +     restore_console_loglevel();
->> >>       oops_exit();
->> >
->> > This is *probably* the only place where you can roll-back the
->> > loglevel, but you restore console loglevel too early - a trap
->> > can panic() the system, we need to preserve the console verbose
->> > mode which we set at the start of the trap.
->> >
->> console loglevel is indirectly sets to verbose in oops_enter() so
->> better to restore before oops_exit().
->> More from ARM maintainers.
->
-> If we've hit die(), something has already gone very wrong within the
-> kernel (not userspace), and we're likely to see subsequent issues
-> anyway.
->
-> Rolling back the console loglevel might throw away infromation on
-> subsequent failures, which isn't ideal, so leaving it as-is is probably
-> fine.
->
-This die() is called from so many places i.e. entry.S shows so many ways i.e
-el1_sync_invalid,irq,fiq_invalid,error_invalid.
-This concern was identified in 4.14 kernel and was easy to produce. Now
-after entry.S change,  scenario may not be easy but code perspective, it is
-very much possible as arm64_notify_die(), force_signal_inject(), bug_handler()
-too calls.
->> >> @@ -624,6 +626,7 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
->> >>       die("Oops - bad mode", regs, 0);
->> >>       local_daif_mask();
->> >>       panic("bad mode");
->> >> +     restore_console_loglevel();
->> >
->> > panic()
->> >
->> >> @@ -680,6 +683,7 @@ asmlinkage void handle_bad_stack(struct pt_regs *regs)
->> >>        * to get a better stack trace.
->> >>        */
->> >>       nmi_panic(NULL, "kernel stack overflow");
->> >> +     restore_console_loglevel();
->> >
->> > panic()
->> >
->> >> @@ -694,7 +698,7 @@ void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr)
->> >>               __show_regs(regs);
->> >>
->> >>       nmi_panic(regs, "Asynchronous SError Interrupt");
->> >> -
->> >> +     restore_console_loglevel();
->> >
->> > panic()
->> >
->> > What's the point of restore_console_loglevel() after panic()?
->> >
->> >         -ss
->> Except die(), other places restore call can be avoided but just added
->> for code completeness.
->
-> As Sergey said, panic() is *fatal*. It does not return, so it makes no
-> sense to place code after it.
->
-I too pointed in cover letter. I just too added for code completeness.
-> Thanks,
-> Mark.
+Hi guys,
+
+On 19/07/18 08:39, gengdongjiu wrote:
+> On 2018/7/18 0:33, Peter Maydell wrote:
+>> On 13 July 2018 at 16:47, James Morse <james.morse@arm.com> wrote:
+>>> From: Dongjiu Geng <gengdongjiu@huawei.com>
+>>>
+>>> For the migrating VMs, user space may need to know the exception
+>>> state. For example, in the machine A, KVM make an SError pending,
+>>> when migrate to B, KVM also needs to pend an SError.
+>>>
+>>> This new IOCTL exports user-invisible states related to SError.
+>>> Together with appropriate user space changes, user space can get/set
+>>> the SError exception state to do migrate/snapshot/suspend.
+
+>>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>>> index d10944e619d3..e3940f8715a5 100644
+>>> --- a/Documentation/virtual/kvm/api.txt
+>>> +++ b/Documentation/virtual/kvm/api.txt
+
+
+>>> +Gets currently pending SError exceptions as well as related states of the vcpu.
+>>
+>> Any chance of expanding this to explain what this state actually is?
+>> (ie something you could use to implement or review the userspace
+>> code which has to manipulate it)
+> sure, can expand it.
+> 
+> serror_pending means whether KVM is pending Serror for guest.
+> serror_has_esr means whether KVM or user space can set the SError syndrome for guest.
+> serror_esr means the value of SError syndrome.
+
+I've had a go at something more verbose for this section:
+------------------%<------------------
+If the guest accesses a device that is being emulated by the host kernel in such
+a way that a real device would generate a physical SError, KVM may make a
+virtual SError pending for that VCPU. This system error interrupt remains
+pending until the guest takes the exception by unmasking PSTATE.A.
+
+Running the VCPU may cause it to take a pending SError, or make an access that
+causes an SError to become pending. The event's description is only valid while
+the VPCU is not running.
+
+This API provides a way to read and write the pending 'event' state that is not
+visible to the guest. To save, restore or migrate a VCPU the struct representing
+the state can be read then written using this GET/SET API, along with the other
+guest-visible registers. It is not possible to 'cancel' an SError that has been
+made pending.
+
+A device being emulated in user-space may also wish to generate an SError. To do
+this the events structure can be populated by user-space. The current state
+should be read first, to ensure no existing SError is pending. If an existing
+SError is pending, the architectures 'Multiple SError interrupts' rules should
+be followed. (2.5.3 of DDI0587.a "ARM Reliability, Availability, and
+Serviceability (RAS) Specification").
+------------------%<------------------
+
+
+Thanks,
+
+James
