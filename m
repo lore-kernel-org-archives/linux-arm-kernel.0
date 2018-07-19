@@ -1,168 +1,51 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 19 Jul 2018 16:59:21 +0200
-Subject: [RFC PATCH 16/16] KVM: arm64/sve: Report and enable SVE API
- extensions for userspace
-In-Reply-To: <1529593060-542-17-git-send-email-Dave.Martin@arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-17-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180719145921.oasa3a57at5nnwya@kamzik.brq.redhat.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 19 Jul 2018 17:01:38 +0200
+Subject: [PATCH 5/5] net: add MTD support to eth_platform_get_mac_address()
+In-Reply-To: <CAMRc=Md3oeEktzrA9UZyNPX6pB4bG+Gv0o6cjbs0UUKb3sYTsA@mail.gmail.com>
+References: <20180718161035.7005-1-brgl@bgdev.pl>
+ <20180718161035.7005-6-brgl@bgdev.pl>
+ <20180718164737.GE12477@lunn.ch>
+ <CAMRc=MeRv3_C8_R-Awfr1zjLa3G_CVAACc-2t_ihB+1v+BCTGw@mail.gmail.com>
+ <20180718170352.GF12477@lunn.ch>
+ <CAMRc=Md3oeEktzrA9UZyNPX6pB4bG+Gv0o6cjbs0UUKb3sYTsA@mail.gmail.com>
+Message-ID: <20180719150138.GC9119@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2018 at 03:57:40PM +0100, Dave Martin wrote:
-> This patch reports the availability of KVM SVE support to userspace
-> via a new vcpu feature flag KVM_ARM_VCPU_SVE.  This flag is
-> reported via the KVM_ARM_PREFERRED_TARGET ioctl.
+On Thu, Jul 19, 2018 at 10:14:29AM +0200, Bartosz Golaszewski wrote:
+> 2018-07-18 19:03 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
+> >> >> +#ifdef CONFIG_MTD
+> >> >> +     /* NOTE: this should go away as soon as MTD gets nvmem support. */
+> >> >> +     if (!addr) {
+> >> >> +             struct mtd_info *mtd;
+> >> >> +             int rv;
+> >> >> +
+> >> >> +             mtd = get_mtd_device_nm("MAC-Address");
+> >> >
+> >> > In order for this to go away, you need to keep backwards
+> >> > compatibility. When using nvmem, you look for a cell called
+> >> > "mac-address". Here you are looking for "MAC-Address". That is going
+> >> > to make backwards compatibility harder. How do you plan to do it?
+> >> >
+> >> >    Andrew
+> >>
+> >> I'm trying to adjust to already existing users. The only user of
+> >> get_mtd_device_nm() who calls it to read the MAC address registers a
+> >> partition called "MAC-Address". We can't change it since it's visible
+> >> from user space. In the future we'd just have to have a list of
+> >> supported string that we'd use to do the nvmem lookup.
+> >
+> > Why not have the nvmem cell called "MAC-Address"? When you add nvmem
+> > support to MTD, i assume you are going to map each MTD partition to an
+> > nvmem cell?
 > 
-> Userspace can enable the feature by setting the flag for
-> KVM_ARM_VCPU_INIT.  Without this flag set, SVE-related ioctls and
-> register access extensions are hidden, and SVE remains disabled
-> unconditionally for the guest.  This ensures that non-SVE-aware KVM
-> userspace does not receive a vcpu that it does not understand how
-> to snapshot or restore correctly.
-> 
-> Storage is allocated for the SVE register state at vcpu init time,
-> sufficient for the maximum vector length to be exposed to the vcpu.
-> No attempt is made to allocate the storage lazily for now.  Also,
-> no attempt is made to resize the storage dynamically, since the
-> effective vector length of the vcpu can change at each EL0/EL1
-> transition.  The storage is freed at the vcpu uninit hook.
-> 
-> No particular attempt is made to prevent userspace from creating a
-> mix of vcpus some of which have SVE enabled and some of which have
-> it disabled.  This may or may not be useful, but it reflects the
-> underlying architectural behaviour.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/include/asm/kvm_host.h |  6 +++---
->  arch/arm64/include/uapi/asm/kvm.h |  1 +
->  arch/arm64/kvm/guest.c            | 19 +++++++++++++------
->  arch/arm64/kvm/reset.c            | 14 ++++++++++++++
->  4 files changed, 31 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index d2084ae..d956cf2 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -44,7 +44,7 @@
->  
->  #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
->  
-> -#define KVM_VCPU_MAX_FEATURES 4
-> +#define KVM_VCPU_MAX_FEATURES 5
->  
->  #define KVM_REQ_SLEEP \
->  	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
-> @@ -439,8 +439,8 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
->  static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
->  
-> -static inline int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu) { return 0; }
-> -static inline void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-> +int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu);
-> +void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu);
->  
->  void kvm_arm_init_debug(void);
->  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index f54a9b0..6acf276 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -101,6 +101,7 @@ struct kvm_regs {
->  #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
->  #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
->  #define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
-> +#define KVM_ARM_VCPU_SVE		4 /* Allow SVE for guest */
->  
->  struct kvm_vcpu_init {
->  	__u32 target;
-> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> index 5152362..fb7f6aa 100644
-> --- a/arch/arm64/kvm/guest.c
-> +++ b/arch/arm64/kvm/guest.c
-> @@ -58,6 +58,16 @@ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
->  	return 0;
->  }
->  
-> +int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu)
-> +{
-> +	return 0;
-> +}
+> Because all existing users of nvmem use "mac-address" as the name of
+> this cell already. I guess we will need to live with both in this
+> particular function.
 
-Unused, so could have just left the inline version.
+So i'm not convinced this last patch is making things better. I would
+prefer if it was dropped for the moment. Wait until MTD via nvmem is
+actually implemented and there is a concrete concept of how a MAC
+address would be looked up without having lots of ugly code.
 
-> +
-> +void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
-> +{
-> +	kfree(vcpu->arch.sve_state);
-> +}
-> +
->  static u64 core_reg_offset_from_id(u64 id)
->  {
->  	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
-> @@ -600,12 +610,9 @@ int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
->  
->  	memset(init, 0, sizeof(*init));
->  
-> -	/*
-> -	 * For now, we don't return any features.
-> -	 * In future, we might use features to return target
-> -	 * specific features available for the preferred
-> -	 * target type.
-> -	 */
-> +	/* KVM_ARM_VCPU_SVE understood by KVM_VCPU_INIT */
-> +	init->features[0] = 1 << KVM_ARM_VCPU_SVE;
-> +
-
-We shouldn't need to do this. The "preferred" target type isn't defined
-well (that I know of), but IMO it should probably be the target that
-best matches the host, minus optional features. The best base target. We
-may use these features to convey that the preferred target should enable
-some optional feature if that feature is necessary to workaround a bug,
-i.e. using the "feature" bit as an erratum bit someday, but that'd be
-quite a debatable use, so maybe not even that. Most likely we'll never
-need to add features here.
-
-That said, I think defining the feature bit makes sense. ATM, I'm feeling
-like we'll want to model the user interface for SVE like PMU (using VCPU
-device ioctls).
-
-
->  	init->target = (__u32)target;
->  
->  	return 0;
-> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> index a74311b..f63a791 100644
-> --- a/arch/arm64/kvm/reset.c
-> +++ b/arch/arm64/kvm/reset.c
-> @@ -110,6 +110,20 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
->  			cpu_reset = &default_regs_reset;
->  		}
->  
-> +		if (system_supports_sve() &&
-> +		    test_bit(KVM_ARM_VCPU_SVE, vcpu->arch.features)) {
-> +			vcpu->arch.flags |= KVM_ARM64_GUEST_HAS_SVE;
-> +
-> +			vcpu->arch.sve_max_vl = sve_max_virtualisable_vl;
-> +
-> +			vcpu->arch.sve_state = kzalloc(
-> +				SVE_SIG_REGS_SIZE(
-> +					sve_vq_from_vl(vcpu->arch.sve_max_vl)),
-
-I guess sve_state can be pretty large. Should we allocate it like we
-do the VM with kvm_arch_alloc_vm()? I.e. using vzalloc() on VHE machines?
-
-> +				GFP_KERNEL);
-> +			if (!vcpu->arch.sve_state)
-> +				return -ENOMEM;
-> +		}
-> +
->  		break;
->  	}
->  
-> -- 
-> 2.1.4
-
-Thanks,
-drew
+	Andrew
