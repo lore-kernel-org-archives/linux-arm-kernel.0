@@ -1,126 +1,85 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 19 Jul 2018 12:12:55 +0200
-Subject: [PATCH v8 09/26] kernel/cpu_pm: Manage runtime PM in the idle
- path for CPUs
-In-Reply-To: <2056372.NMt4aPaF4h@aspire.rjw.lan>
+Date: Thu, 19 Jul 2018 12:15:57 +0200
+Subject: [PATCH v8 06/26] timer: Export next wakeup time of a CPU
+In-Reply-To: <20180620172226.15012-7-ulf.hansson@linaro.org>
 References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <20180620172226.15012-10-ulf.hansson@linaro.org>
- <2056372.NMt4aPaF4h@aspire.rjw.lan>
-Message-ID: <2205807.cU2puvubpP@aspire.rjw.lan>
+ <20180620172226.15012-7-ulf.hansson@linaro.org>
+Message-ID: <2046813.qdTUchafZm@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 18, 2018 12:11:06 PM CEST Rafael J. Wysocki wrote:
-> On Wednesday, June 20, 2018 7:22:09 PM CEST Ulf Hansson wrote:
-> > To allow CPUs being power managed by PM domains, let's deploy support for
-> > runtime PM for the CPU's corresponding struct device.
-> > 
-> > More precisely, at the point when the CPU is about to enter an idle state,
-> > decrease the runtime PM usage count for its corresponding struct device,
-> > via calling pm_runtime_put_sync_suspend(). Then, at the point when the CPU
-> > resumes from idle, let's increase the runtime PM usage count, via calling
-> > pm_runtime_get_sync().
-> > 
-> > Cc: Lina Iyer <ilina@codeaurora.org>
-> > Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
-> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+On Wednesday, June 20, 2018 7:22:06 PM CEST Ulf Hansson wrote:
+> From: Lina Iyer <lina.iyer@linaro.org>
 > 
-> I finally got to this one, sorry for the huge delay.
+> Knowing the sleep duration of CPUs, is known to be needed while selecting
+> the most energy efficient idle state for a CPU or a group of CPUs.
 > 
-> Let me confirm that I understand the code flow correctly.
+> However, to be able to compute the sleep duration, we need to know at what
+> time the next expected wakeup is for the CPU. Therefore, let's export this
+> information via a new function, tick_nohz_get_next_wakeup(). Following
+> changes make use of it.
 > 
-> > ---
-> >  kernel/cpu_pm.c | 11 +++++++++++
-> >  1 file changed, 11 insertions(+)
-> > 
-> > diff --git a/kernel/cpu_pm.c b/kernel/cpu_pm.c
-> > index 67b02e138a47..492d4a83dca0 100644
-> > --- a/kernel/cpu_pm.c
-> > +++ b/kernel/cpu_pm.c
-> > @@ -16,9 +16,11 @@
-> >   */
-> >  
-> >  #include <linux/kernel.h>
-> > +#include <linux/cpu.h>
-> >  #include <linux/cpu_pm.h>
-> >  #include <linux/module.h>
-> >  #include <linux/notifier.h>
-> > +#include <linux/pm_runtime.h>
-> >  #include <linux/spinlock.h>
-> >  #include <linux/syscore_ops.h>
-> >  
-> > @@ -91,6 +93,7 @@ int cpu_pm_enter(void)
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Lina Iyer <ilina@codeaurora.org>
+> Cc: Frederic Weisbecker <fweisbec@gmail.com>
+> Cc: Ingo Molnar <mingo@kernel.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  include/linux/tick.h     |  8 ++++++++
+>  kernel/time/tick-sched.c | 10 ++++++++++
+>  2 files changed, 18 insertions(+)
 > 
-> This is called from a cpuidle driver's ->enter callback for the target state
-> selected by the idle governor ->
-> 
-> >  {
-> >  	int nr_calls;
-> >  	int ret = 0;
-> > +	struct device *dev = get_cpu_device(smp_processor_id());
-> >  
-> >  	ret = cpu_pm_notify(CPU_PM_ENTER, -1, &nr_calls);
-> >  	if (ret)
-> > @@ -100,6 +103,9 @@ int cpu_pm_enter(void)
-> >  		 */
-> >  		cpu_pm_notify(CPU_PM_ENTER_FAILED, nr_calls - 1, NULL);
-> >  
-> > +	if (!ret && dev && dev->pm_domain)
-> > +		pm_runtime_put_sync_suspend(dev);
-> 
-> -> so this is going to invoke genpd_runtime_suspend() if the usage
-> counter of dev is 0.
-> 
-> That will cause cpu_power_down_ok() to be called (because this is
-> a CPU domain) and that will walk the domain cpumask and compute the
-> estimated idle duration as the minimum of tick_nohz_get_next_wakeup()
-> values over the CPUs in that cpumask.  [Note that the weight of the
-> cpumask must be seriously limited for that to actually work, as this
-> happens in the idle path.]  Next, it will return "true" if it can
-> find a domain state with residency within the estimated idle
-> duration.  [Note that this sort of overlaps with the idle governor's
-> job.]
-> 
-> Next, __genpd_runtime_suspend() will be invoked to run the device-specific
-> callback if any [Note that this has to be suitable for the idle path if
-> present.] and genpd_stop_dev() runs (which, again, may invoke a callback)
-> and genpd_power_off() runs under the domain lock (which must be a spinlock
-> then).
-> 
-> > +
-> >  	return ret;
-> >  }
-> >  EXPORT_SYMBOL_GPL(cpu_pm_enter);
-> > @@ -118,6 +124,11 @@ EXPORT_SYMBOL_GPL(cpu_pm_enter);
-> >   */
-> >  int cpu_pm_exit(void)
-> >  {
-> > +	struct device *dev = get_cpu_device(smp_processor_id());
-> > +
-> > +	if (dev && dev->pm_domain)
-> > +		pm_runtime_get_sync(dev);
-> > +
-> >  	return cpu_pm_notify(CPU_PM_EXIT, -1, NULL);
-> >  }
-> >  EXPORT_SYMBOL_GPL(cpu_pm_exit);
-> > 
-> 
-> And this is called on wakeup when the cpuidle driver's ->enter callback
-> is about to return and it reverses the suspend flow (except that the
-> governor doesn't need to be called now).
-> 
-> Have I got that right?
+> diff --git a/include/linux/tick.h b/include/linux/tick.h
+> index 55388ab45fd4..e48f6b26b425 100644
+> --- a/include/linux/tick.h
+> +++ b/include/linux/tick.h
+> @@ -125,6 +125,7 @@ extern bool tick_nohz_idle_got_tick(void);
+>  extern ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next);
+>  extern unsigned long tick_nohz_get_idle_calls(void);
+>  extern unsigned long tick_nohz_get_idle_calls_cpu(int cpu);
+> +extern ktime_t tick_nohz_get_next_wakeup(int cpu);
+>  extern u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time);
+>  extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
+>  
+> @@ -151,6 +152,13 @@ static inline ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next)
+>  	*delta_next = TICK_NSEC;
+>  	return *delta_next;
+>  }
+> +
+> +static inline ktime_t tick_nohz_get_next_wakeup(int cpu)
+> +{
+> +	/* Next wake up is the tick period, assume it starts now */
+> +	return ktime_add(ktime_get(), TICK_NSEC);
+> +}
+> +
+>  static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
+>  static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
+>  
+> diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
+> index da9455a6b42b..f380bb4f0744 100644
+> --- a/kernel/time/tick-sched.c
+> +++ b/kernel/time/tick-sched.c
+> @@ -1089,6 +1089,16 @@ unsigned long tick_nohz_get_idle_calls(void)
+>  	return ts->idle_calls;
+>  }
+>  
+> +/**
+> + * tick_nohz_get_next_wakeup - return the next wake up of the CPU
+> + */
 
-Assuming that I have got that right, there are concerns, mostly regarding
-patch [07/26], but I will reply to that directly.
+I'd add to the comment that this is to be invoked for idle CPUs only.
 
-The $subject patch is fine by me by itself, but it obviously depends on the
-previous ones.  Patches [01-02/26] are fine too, but they don't seem to be
-particularly useful without the rest of the series.
-
-As far as patches [10-26/26] go, I'd like to see some review comments and/or
-tags from the people with vested interest in there, in particular from Daniel
-on patch [12/26] and from Sudeep on the PSCI ones.
-
-Thanks,
-Rafael
+> +ktime_t tick_nohz_get_next_wakeup(int cpu)
+> +{
+> +	struct clock_event_device *dev = per_cpu(tick_cpu_device.evtdev, cpu);
+> +
+> +	return dev->next_event;
+> +}
+> +
+>  static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
+>  {
+>  #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
+> 
