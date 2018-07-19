@@ -1,27 +1,51 @@
 From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Thu, 19 Jul 2018 15:23:26 +0900
-Subject: [PATCH 0/3] Add SPI dts node for UniPhier SoCs
-Message-ID: <1531981409-28396-1-git-send-email-hayashibara.keiji@socionext.com>
+Date: Thu, 19 Jul 2018 15:23:27 +0900
+Subject: [PATCH 1/3] ARM: dts: uniphier: add SPI pin-mux node
+In-Reply-To: <1531981409-28396-1-git-send-email-hayashibara.keiji@socionext.com>
+References: <1531981409-28396-1-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <1531981409-28396-2-git-send-email-hayashibara.keiji@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds SPI pin-mux node and SPI node for UniPhier SoCs.
+From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 
-Kunihiko Hayashi (3):
-  ARM: dts: uniphier: add SPI pin-mux node
-  ARM: dts: uniphier: add SPI node for UniPhier 32bit SoCs
-  arm64: dts: uniphier: add SPI node for LD20, LD11 and PXs3
+This commit adds pin-mux nodes for SPI controller.
 
- arch/arm/boot/dts/uniphier-ld4.dtsi              | 11 ++++++
- arch/arm/boot/dts/uniphier-pinctrl.dtsi          | 20 +++++++++++
- arch/arm/boot/dts/uniphier-pro4.dtsi             | 22 ++++++++++++
- arch/arm/boot/dts/uniphier-pro5.dtsi             | 33 ++++++++++++++++++
- arch/arm/boot/dts/uniphier-pxs2.dtsi             | 22 ++++++++++++
- arch/arm/boot/dts/uniphier-sld8.dtsi             | 11 ++++++
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 22 ++++++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 44 ++++++++++++++++++++++++
- arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi | 22 ++++++++++++
- 9 files changed, 207 insertions(+)
+Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+---
+ arch/arm/boot/dts/uniphier-pinctrl.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
+diff --git a/arch/arm/boot/dts/uniphier-pinctrl.dtsi b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
+index 51f0e69..5dc4cf7 100644
+--- a/arch/arm/boot/dts/uniphier-pinctrl.dtsi
++++ b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
+@@ -126,6 +126,26 @@
+ 		function = "sd1";
+ 	};
+ 
++	pinctrl_spi0: spi0 {
++		groups = "spi0";
++		function = "spi0";
++	};
++
++	pinctrl_spi1: spi1 {
++		groups = "spi1";
++		function = "spi1";
++	};
++
++	pinctrl_spi2: spi2 {
++		groups = "spi2";
++		function = "spi2";
++	};
++
++	pinctrl_spi3: spi3 {
++		groups = "spi3";
++		function = "spi3";
++	};
++
+ 	pinctrl_system_bus: system-bus {
+ 		groups = "system_bus", "system_bus_cs1";
+ 		function = "system_bus";
 -- 
 2.7.4
