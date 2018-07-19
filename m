@@ -1,370 +1,168 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 19 Jul 2018 11:55:13 +0100
-Subject: [PATCH v2 09/10] coresight: Cleanup coresight DT bindings
-In-Reply-To: <1531997715-6767-1-git-send-email-suzuki.poulose@arm.com>
-References: <1531997715-6767-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1531997715-6767-10-git-send-email-suzuki.poulose@arm.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Thu, 19 Jul 2018 16:27:56 +0530
+Subject: [PATCH v2 2/2] arm64: dts: Add Mediatek X20 Development Board
+ support
+In-Reply-To: <e60134a3-0bd6-fadb-3ed4-1db28d6543cc@gmail.com>
+References: <20180605163442.4812-1-manivannan.sadhasivam@linaro.org>
+ <20180605163442.4812-3-manivannan.sadhasivam@linaro.org>
+ <d88504b4-409c-c42b-f816-bedefce2a819@gmail.com>
+ <20180717140453.GA19076@mani>
+ <a48b0735-ff75-6228-22ba-c8e868240f0c@gmail.com>
+ <20180718164304.GA4902@Mani-XPS-13-9360>
+ <e60134a3-0bd6-fadb-3ed4-1db28d6543cc@gmail.com>
+Message-ID: <20180719105756.GA6106@mani>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The coresight drivers relied on default bindings for graph
-in DT, while reusing the "reg" field of the "ports" to indicate
-the actual hardware port number for the connections. This can
-cause duplicate ports with same addresses, but different
-direction. However, with the rules getting stricter w.r.t to the
-address mismatch with the label, it is no longer possible to use
-the port address field for the hardware port number.
+On Thu, Jul 19, 2018 at 11:03:54AM +0200, Matthias Brugger wrote:
+> 
+> 
+> On 18/07/18 18:43, Manivannan Sadhasivam wrote:
+> > Hi Matthias,
+> > 
+> > On Wed, Jul 18, 2018 at 05:07:38PM +0200, Matthias Brugger wrote:
+> >>
+> >>
+> >> On 17/07/18 16:04, Manivannan Sadhasivam wrote:
+> >>> Hi Matthias,
+> >>>
+> >>> On Mon, Jul 16, 2018 at 03:24:44PM +0200, Matthias Brugger wrote:
+> >>>> Hi Manivanna,
+> >>>>
+> >>>> On 05/06/18 18:34, Manivannan Sadhasivam wrote:
+> >>>>> Add initial device tree support for Mediatek X20 Development Board
+> >>>>> based on MT6797 Deca core SoC. This board is one of the 96Boards
+> >>>>> Consumer Edition platform.
+> >>>>>
+> >>>>> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> >>>>> ---
+> >>>>>  arch/arm64/boot/dts/mediatek/Makefile         |  1 +
+> >>>>>  .../boot/dts/mediatek/mt6797-x20-dev.dts      | 33 +++++++++++++++++++
+> >>>>>  2 files changed, 34 insertions(+)
+> >>>>>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+> >>>>>
+> >>>>> diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
+> >>>>> index ac17f60f998c..5b7fd6ad96e4 100644
+> >>>>> --- a/arch/arm64/boot/dts/mediatek/Makefile
+> >>>>> +++ b/arch/arm64/boot/dts/mediatek/Makefile
+> >>>>> @@ -3,5 +3,6 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
+> >>>>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
+> >>>>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
+> >>>>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
+> >>>>> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-x20-dev.dtb
+> >>>>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
+> >>>>>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
+> >>>>> diff --git a/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+> >>>>> new file mode 100644
+> >>>>> index 000000000000..2c09ca95d9e2
+> >>>>> --- /dev/null
+> >>>>> +++ b/arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+> >>>>> @@ -0,0 +1,33 @@
+> >>>>> +// SPDX-License-Identifier: GPL-2.0
+> >>>>> +/*
+> >>>>> + * Device Tree Source for MediaTek X20 Development Board
+> >>>>> + *
+> >>>>> + * Copyright (C) 2018, Linaro Ltd.
+> >>>>> + *
+> >>>>> + */
+> >>>>> +
+> >>>>> +/dts-v1/;
+> >>>>> +
+> >>>>> +#include "mt6797.dtsi"
+> >>>>> +
+> >>>>> +/ {
+> >>>>> +	model = "Mediatek X20 Development Board";
+> >>>>> +	compatible = "archermind,mt6797-x20-dev", "mediatek,mt6797";
+> >>>>> +
+> >>>>> +	aliases {
+> >>>>> +		serial0 = &uart1;
+> >>>>> +	};
+> >>>>
+> >>>> Sorry for the late answer.
+> >>>> Why did you use uart1 instead of uart0?
+> >>>> I know that uart0 is used by the bootloader, but because of their exotic flash
+> >>>> procedure I find it quite useful to see this messages in my serial connection.
+> >>>> Of course you can only use 921600 baudrate then.
+> >>>>
+> >>>
+> >>> The reason is, most of the Mezzanine boards use USB to UART bridge on the
+> >>> UART1 port available on the Low Speed Expansion header. Additionally, the
+> >>> convention followed by most of the Consumer Edition 96Boards is to use UART1
+> >>> as the debug serial port. That's why eventhough the bootloader is using UART0,
+> >>> I forced the kernel to use UART1.
+> >>>
+> >>
+> >> Sounds reasonable, I don't have this 96 boards adapter and I forgot about it.
+> >>
+> > 
+> > That's fine :)
+> > 
+> >>>>> +
+> >>>>> +	memory at 40000000 {
+> >>>>> +		device_type = "memory";
+> >>>>> +		reg = <0 0x40000000 0 0x1e605000>;
+> >>>>
+> >>>> How comes this strange number for the memory size?
+> >>>>
+> >>>
+> >>> Actually, the memory size is extracted from the downstream kernel [1].
+> >>>
+> >>
+> >> Hm, Archermind "Helio X20 Development Board Hardware Manual" talks about 2GB
+> >> LPDDR3-SDRAM. Would you mind to check if that is actually true?
+> >>
+> > 
+> > Yes, it is 2GB. Shall I change the size to 0x80000000?
+> > 
+> 
+> Best would be if you boot the machine with this value and see if things look
+> sane. Then resubmit. The other option is to resubmit and I'll check it tomorrow :)
+> 
 
-This patch introduces new DT binding rules for coresight
-components, based on the same generic DT graph bindings, but
-avoiding the address duplication.
+Tested with the modified size, 0x80000000. Board is booting without any issues, so
+pushed out the v3.
 
-- All output ports must be specified under a child node with
-  name "out-ports".
-- All input ports must be specified under a childe node with
-  name "in-ports".
-- Port address should match the hardware port number.
+Thanks,
+Mani
 
-The support for legacy bindings is retained, with a warning.
-
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Rob Herring <robh@kernel.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- .../devicetree/bindings/arm/coresight.txt          | 91 ++++++++++----------
- drivers/hwtracing/coresight/of_coresight.c         | 97 +++++++++++++++++++---
- 2 files changed, 129 insertions(+), 59 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-index 8e21512..f39d2c6 100644
---- a/Documentation/devicetree/bindings/arm/coresight.txt
-+++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -104,19 +104,9 @@ The connections must be described via generic DT graph bindings as described
- by the "bindings/graph.txt", where each "port" along with an "endpoint"
- component represents a hardware port and the connection.
- 
--Since it is possible to have multiple connections for any coresight component
--with a specific direction of data flow, each connection must define the
--following properties to uniquely identify the connection details.
--
-- * Direction of the data flow w.r.t the component :
--   Each input port must have the following property defined at the "endpoint"
--   for the port.
--	"slave-mode"
--
-- * Hardware Port number at the component:
--     -  The hardware port number is assumed to be the address of the "port"
--         component.
--
-+ * All output ports must be listed inside a child node named "out-ports"
-+ * All input ports must be listed inside a child node named "in-ports".
-+ * Port address must match the hardware port number.
- 
- Example:
- 
-@@ -127,10 +117,11 @@ Example:
- 
- 		clocks = <&oscclk6a>;
- 		clock-names = "apb_pclk";
--		port {
--			etb_in_port: endpoint at 0 {
--				slave-mode;
--				remote-endpoint = <&replicator_out_port0>;
-+		in-ports {
-+			port {
-+				etb_in_port: endpoint at 0 {
-+					remote-endpoint = <&replicator_out_port0>;
-+				};
- 			};
- 		};
- 	};
-@@ -141,10 +132,11 @@ Example:
- 
- 		clocks = <&oscclk6a>;
- 		clock-names = "apb_pclk";
--		port {
--			tpiu_in_port: endpoint at 0 {
--				slave-mode;
--				remote-endpoint = <&replicator_out_port1>;
-+		out-ports {
-+			port {
-+				tpiu_in_port: endpoint at 0 {
-+					remote-endpoint = <&replicator_out_port1>;
-+				};
- 			};
- 		};
- 	};
-@@ -185,7 +177,7 @@ Example:
- 		 */
- 		compatible = "arm,coresight-replicator";
- 
--		ports {
-+		out-ports {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 
-@@ -203,12 +195,11 @@ Example:
- 					remote-endpoint = <&tpiu_in_port>;
- 				};
- 			};
-+		};
- 
--			/* replicator input port */
--			port at 2 {
--				reg = <0>;
-+		in-ports {
-+			port {
- 				replicator_in_port0: endpoint {
--					slave-mode;
- 					remote-endpoint = <&funnel_out_port0>;
- 				};
- 			};
-@@ -221,40 +212,36 @@ Example:
- 
- 		clocks = <&oscclk6a>;
- 		clock-names = "apb_pclk";
--		ports {
--			#address-cells = <1>;
--			#size-cells = <0>;
--
--			/* funnel output port */
--			port at 0 {
--				reg = <0>;
-+		out-ports {
-+			port {
- 				funnel_out_port0: endpoint {
- 					remote-endpoint =
- 							<&replicator_in_port0>;
- 				};
- 			};
-+		};
- 
--			/* funnel input ports */
--			port at 1 {
-+		in-ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
- 				reg = <0>;
- 				funnel_in_port0: endpoint {
--					slave-mode;
- 					remote-endpoint = <&ptm0_out_port>;
- 				};
- 			};
- 
--			port at 2 {
-+			port at 1 {
- 				reg = <1>;
- 				funnel_in_port1: endpoint {
--					slave-mode;
- 					remote-endpoint = <&ptm1_out_port>;
- 				};
- 			};
- 
--			port at 3 {
-+			port at 2 {
- 				reg = <2>;
- 				funnel_in_port2: endpoint {
--					slave-mode;
- 					remote-endpoint = <&etm0_out_port>;
- 				};
- 			};
-@@ -270,9 +257,11 @@ Example:
- 		cpu = <&cpu0>;
- 		clocks = <&oscclk6a>;
- 		clock-names = "apb_pclk";
--		port {
--			ptm0_out_port: endpoint {
--				remote-endpoint = <&funnel_in_port0>;
-+		out-ports {
-+			port {
-+				ptm0_out_port: endpoint {
-+					remote-endpoint = <&funnel_in_port0>;
-+				};
- 			};
- 		};
- 	};
-@@ -284,9 +273,11 @@ Example:
- 		cpu = <&cpu1>;
- 		clocks = <&oscclk6a>;
- 		clock-names = "apb_pclk";
--		port {
--			ptm1_out_port: endpoint {
--				remote-endpoint = <&funnel_in_port1>;
-+		out-ports {
-+			port {
-+				ptm1_out_port: endpoint {
-+					remote-endpoint = <&funnel_in_port1>;
-+				};
- 			};
- 		};
- 	};
-@@ -300,9 +291,11 @@ Example:
- 
- 		clocks = <&soc_smc50mhz>;
- 		clock-names = "apb_pclk";
--		port {
--			stm_out_port: endpoint {
--				remote-endpoint = <&main_funnel_in_port2>;
-+		out-ports {
-+			port {
-+				stm_out_port: endpoint {
-+					remote-endpoint = <&main_funnel_in_port2>;
-+				};
- 			};
- 		};
- 	};
-diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-index f9e2169..2178734 100644
---- a/drivers/hwtracing/coresight/of_coresight.c
-+++ b/drivers/hwtracing/coresight/of_coresight.c
-@@ -45,13 +45,13 @@ of_coresight_get_endpoint_device(struct device_node *endpoint)
- 			       endpoint, of_dev_node_match);
- }
- 
--static inline bool of_coresight_ep_is_input(struct device_node *ep)
-+static inline bool of_coresight_legacy_ep_is_input(struct device_node *ep)
- {
- 	return of_property_read_bool(ep, "slave-mode");
- }
- 
--static void of_coresight_get_ports(const struct device_node *node,
--				   int *nr_inport, int *nr_outport)
-+static void of_coresight_get_ports_legacy(const struct device_node *node,
-+					  int *nr_inport, int *nr_outport)
- {
- 	struct device_node *ep = NULL;
- 	int in = 0, out = 0;
-@@ -61,7 +61,7 @@ static void of_coresight_get_ports(const struct device_node *node,
- 		if (!ep)
- 			break;
- 
--		if (of_coresight_ep_is_input(ep))
-+		if (of_coresight_legacy_ep_is_input(ep))
- 			in++;
- 		else
- 			out++;
-@@ -72,6 +72,67 @@ static void of_coresight_get_ports(const struct device_node *node,
- 	*nr_outport = out;
- }
- 
-+static struct device_node *of_coresight_get_port_parent(struct device_node *ep)
-+{
-+	struct device_node *parent = of_graph_get_port_parent(ep);
-+
-+	/*
-+	 * Skip one-level up to the real device node, if we
-+	 * are using the new bindings.
-+	 */
-+	if (!of_node_cmp(parent->name, "in-ports") ||
-+	    !of_node_cmp(parent->name, "out-ports"))
-+		parent = of_get_next_parent(parent);
-+
-+	return parent;
-+}
-+
-+static inline struct device_node *
-+of_coresight_get_input_ports_node(const struct device_node *node)
-+{
-+	return of_get_child_by_name(node, "in-ports");
-+}
-+
-+static inline struct device_node *
-+of_coresight_get_output_ports_node(const struct device_node *node)
-+{
-+	return of_get_child_by_name(node, "out-ports");
-+}
-+
-+static inline int
-+of_coresight_count_ports(struct device_node *port_parent)
-+{
-+	int i = 0;
-+	struct device_node *ep = NULL;
-+
-+	while ((ep = of_graph_get_next_endpoint(port_parent, ep)))
-+		i++;
-+	return i;
-+}
-+
-+static void of_coresight_get_ports(const struct device_node *node,
-+				   int *nr_inport, int *nr_outport)
-+{
-+	struct device_node *input_ports = NULL, *output_ports = NULL;
-+
-+	input_ports = of_coresight_get_input_ports_node(node);
-+	output_ports = of_coresight_get_output_ports_node(node);
-+
-+	if (input_ports || output_ports) {
-+		if (input_ports) {
-+			*nr_inport = of_coresight_count_ports(input_ports);
-+			of_node_put(input_ports);
-+		}
-+		if (output_ports) {
-+			*nr_outport = of_coresight_count_ports(output_ports);
-+			of_node_put(output_ports);
-+		}
-+	} else {
-+		/* Fall back to legacy DT bindings parsing */
-+		of_coresight_get_ports_legacy(node, nr_inport, nr_outport);
-+	}
-+}
-+
- static int of_coresight_alloc_memory(struct device *dev,
- 			struct coresight_platform_data *pdata)
- {
-@@ -136,7 +197,7 @@ static int of_coresight_parse_endpoint(struct device *dev,
- 		rep = of_graph_get_remote_endpoint(ep);
- 		if (!rep)
- 			break;
--		rparent = of_graph_get_port_parent(rep);
-+		rparent = of_coresight_get_port_parent(rep);
- 		if (!rparent)
- 			break;
- 		if (of_graph_parse_endpoint(rep, &rendpoint))
-@@ -176,6 +237,8 @@ of_get_coresight_platform_data(struct device *dev,
- 	struct coresight_platform_data *pdata;
- 	struct coresight_connection *conn;
- 	struct device_node *ep = NULL;
-+	const struct device_node *parent = NULL;
-+	bool legacy_binding = false;
- 
- 	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
- 	if (!pdata)
-@@ -196,14 +259,28 @@ of_get_coresight_platform_data(struct device *dev,
- 	if (ret)
- 		return ERR_PTR(ret);
- 
-+	parent = of_coresight_get_output_ports_node(node);
-+	/*
-+	 * If the DT uses obsoleted bindings, the ports are listed
-+	 * under the device and we need to filter out the input
-+	 * ports.
-+	 */
-+	if (!parent) {
-+		legacy_binding = true;
-+		parent = node;
-+		dev_warn_once(dev, "Uses obsolete Coresight DT bindings\n");
-+	}
-+
- 	conn = pdata->conns;
--	/* Iterate through each port to discover topology */
--	while ((ep = of_graph_get_next_endpoint(node, ep))) {
-+
-+	/* Iterate through each output port to discover topology */
-+	while ((ep = of_graph_get_next_endpoint(parent, ep))) {
- 		/*
--		 * No need to deal with input ports, processing for as
--		 * processing for output ports will deal with them.
-+		 * Legacy binding mixes input/output ports under the
-+		 * same parent. So, skip the input ports if we are dealing
-+		 * with legacy binding.
- 		 */
--		if (of_coresight_ep_is_input(ep))
-+		if (legacy_binding && of_coresight_legacy_ep_is_input(ep))
- 			continue;
- 
- 		ret = of_coresight_parse_endpoint(dev, ep, &conn);
--- 
-2.7.4
+> Let me know if you can't do it for tomorrow morning. I plan to submit the pull
+> requests tomorrow as I'm through nearly all open patches (yes, two days earlier
+> \o/ )
+> 
+> Best regards,
+> Matthias
+> 
+> > Thanks,
+> > Mani
+> > 
+> >>>> BTW do you know the differences between the EVB board and the x20 one?
+> >>>> I used the evb dts for booting up to now.
+> >>>>
+> >>>
+> >>> Sorry, I don't know the difference between both boards!
+> >>
+> >> Sure, no problem :)
+> >>
+> >> Regards,
+> >> Matthias
+> >>
+> >>>
+> >>> Thanks,
+> >>> Mani
+> >>>
+> >>> [1] https://github.com/helio-x20/linux/blob/helio-x20/arch/arm64/boot/dts/amt6797_64_open.dts#L8
+> >>>
+> >>>> Best regards,
+> >>>> Matthias
+> >>>>
+> >>>>> +	};
+> >>>>> +
+> >>>>> +	chosen {
+> >>>>> +		stdout-path = "serial0:115200n8";
+> >>>>> +	};
+> >>>>> +};
+> >>>>> +
+> >>>>> +&uart1 {
+> >>>>> +	status = "okay";
+> >>>>> +};
+> >>>>>
