@@ -1,88 +1,128 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 01:00:17 +0200
-Subject: [PATCH v3 24/33] mtd: rawnand: txx9ndfmc: convert driver to
- nand_scan()
+Date: Fri, 20 Jul 2018 01:00:12 +0200
+Subject: [PATCH v3 19/33] mtd: rawnand: sh_flctl: move all NAND chip related
+ setup in one function
 In-Reply-To: <20180719230026.8741-1-miquel.raynal@bootlin.com>
 References: <20180719230026.8741-1-miquel.raynal@bootlin.com>
-Message-ID: <20180719230026.8741-25-miquel.raynal@bootlin.com>
+Message-ID: <20180719230026.8741-20-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two helpers have been added to the core to make ECC-related
-configuration between the detection phase and the final NAND scan. Use
-these hooks and convert the driver to just use nand_scan() instead of
-both nand_scan_ident() and nand_scan_tail().
+Prepare the conversion of the sh_flctl driver to nand_scan() by moving
+all the configuration that must be made after nand_scan_ident() in one
+single function. Create a pdata entry in the controller structure for
+that.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/txx9ndfmc.c | 29 +++++++++++++++--------------
- 1 file changed, 15 insertions(+), 14 deletions(-)
+ drivers/mtd/nand/raw/sh_flctl.c | 38 +++++++++++++++++++-------------------
+ include/linux/mtd/sh_flctl.h    |  1 +
+ 2 files changed, 20 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/txx9ndfmc.c b/drivers/mtd/nand/raw/txx9ndfmc.c
-index 9019022774f7..4b2d9418d14a 100644
---- a/drivers/mtd/nand/raw/txx9ndfmc.c
-+++ b/drivers/mtd/nand/raw/txx9ndfmc.c
-@@ -254,23 +254,23 @@ static void txx9ndfmc_initialize(struct platform_device *dev)
- #define TXX9NDFMC_NS_TO_CYC(gbusclk, ns) \
- 	DIV_ROUND_UP((ns) * DIV_ROUND_UP(gbusclk, 1000), 1000000)
+diff --git a/drivers/mtd/nand/raw/sh_flctl.c b/drivers/mtd/nand/raw/sh_flctl.c
+index c7abceffcc40..d37d1d3ccbf9 100644
+--- a/drivers/mtd/nand/raw/sh_flctl.c
++++ b/drivers/mtd/nand/raw/sh_flctl.c
+@@ -1007,6 +1007,16 @@ static int flctl_chip_init_tail(struct mtd_info *mtd)
+ 	struct sh_flctl *flctl = mtd_to_flctl(mtd);
+ 	struct nand_chip *chip = &flctl->chip;
  
--static int txx9ndfmc_nand_scan(struct mtd_info *mtd)
-+static int txx9ndfmc_attach_chip(struct nand_chip *chip)
- {
--	struct nand_chip *chip = mtd_to_nand(mtd);
--	int ret;
-+	struct mtd_info *mtd = nand_to_mtd(chip);
++	if (chip->options & NAND_BUSWIDTH_16) {
++		/*
++		 * NAND_BUSWIDTH_16 may have been set by nand_scan_ident().
++		 * Add the SEL_16BIT flag in pdata->flcmncr_val and re-assign
++		 * flctl->flcmncr_base to pdata->flcmncr_val.
++		 */
++		flctl->pdata->flcmncr_val |= SEL_16BIT;
++		flctl->flcmncr_base = flctl->pdata->flcmncr_val;
++	}
++
+ 	if (mtd->writesize == 512) {
+ 		flctl->page_size = 0;
+ 		if (chip->chipsize > (32 << 20)) {
+@@ -1122,7 +1132,6 @@ static int flctl_probe(struct platform_device *pdev)
+ 	struct sh_flctl *flctl;
+ 	struct mtd_info *flctl_mtd;
+ 	struct nand_chip *nand;
+-	struct sh_flctl_platform_data *pdata;
+ 	int ret;
+ 	int irq;
  
--	ret = nand_scan_ident(mtd, 1, NULL);
--	if (!ret) {
--		if (mtd->writesize >= 512) {
--			/* Hardware ECC 6 byte ECC per 512 Byte data */
--			chip->ecc.size = 512;
--			chip->ecc.bytes = 6;
--		}
--		ret = nand_scan_tail(mtd);
-+	if (mtd->writesize >= 512) {
-+		/* Hardware ECC 6 byte ECC per 512 Byte data */
-+		chip->ecc.size = 512;
-+		chip->ecc.bytes = 6;
+@@ -1150,11 +1159,11 @@ static int flctl_probe(struct platform_device *pdev)
  	}
--	return ret;
-+
-+	return 0;
- }
  
-+static struct nand_controller_ops txx9ndfmc_controller_ops = {
-+	.attach_chip = txx9ndfmc_attach_chip,
-+};
-+
- static int __init txx9ndfmc_probe(struct platform_device *dev)
- {
- 	struct txx9ndfmc_platform_data *plat = dev_get_platdata(&dev->dev);
-@@ -304,6 +304,7 @@ static int __init txx9ndfmc_probe(struct platform_device *dev)
- 		 (gbusclk + 500000) / 1000000, hold, spw);
+ 	if (pdev->dev.of_node)
+-		pdata = flctl_parse_dt(&pdev->dev);
++		flctl->pdata = flctl_parse_dt(&pdev->dev);
+ 	else
+-		pdata = dev_get_platdata(&pdev->dev);
++		flctl->pdata = dev_get_platdata(&pdev->dev);
  
- 	nand_controller_init(&drvdata->controller);
-+	drvdata->controller.ops = &txx9ndfmc_controller_ops;
+-	if (!pdata) {
++	if (!flctl->pdata) {
+ 		dev_err(&pdev->dev, "no setup data defined\n");
+ 		return -EINVAL;
+ 	}
+@@ -1165,9 +1174,9 @@ static int flctl_probe(struct platform_device *pdev)
+ 	nand_set_flash_node(nand, pdev->dev.of_node);
+ 	flctl_mtd->dev.parent = &pdev->dev;
+ 	flctl->pdev = pdev;
+-	flctl->hwecc = pdata->has_hwecc;
+-	flctl->holden = pdata->use_holden;
+-	flctl->flcmncr_base = pdata->flcmncr_val;
++	flctl->hwecc = flctl->pdata->has_hwecc;
++	flctl->holden = flctl->pdata->use_holden;
++	flctl->flcmncr_base = flctl->pdata->flcmncr_val;
+ 	flctl->flintdmacr_base = flctl->hwecc ? (STERINTE | ECERB) : STERINTE;
  
- 	platform_set_drvdata(dev, drvdata);
- 	txx9ndfmc_initialize(dev);
-@@ -332,7 +333,7 @@ static int __init txx9ndfmc_probe(struct platform_device *dev)
- 		chip->ecc.correct = txx9ndfmc_correct_data;
- 		chip->ecc.hwctl = txx9ndfmc_enable_hwecc;
- 		chip->ecc.mode = NAND_ECC_HW;
--		/* txx9ndfmc_nand_scan will overwrite ecc.size and ecc.bytes */
-+		/* nand_scan() will overwrite ecc.size and ecc.bytes */
- 		chip->ecc.size = 256;
- 		chip->ecc.bytes = 3;
- 		chip->ecc.strength = 1;
-@@ -359,7 +360,7 @@ static int __init txx9ndfmc_probe(struct platform_device *dev)
- 		if (plat->wide_mask & (1 << i))
- 			chip->options |= NAND_BUSWIDTH_16;
+ 	/* Set address of hardware control function */
+@@ -1183,7 +1192,7 @@ static int flctl_probe(struct platform_device *pdev)
+ 	nand->set_features = nand_get_set_features_notsupp;
+ 	nand->get_features = nand_get_set_features_notsupp;
  
--		if (txx9ndfmc_nand_scan(mtd)) {
-+		if (nand_scan(mtd, 1)) {
- 			kfree(txx9_priv->mtdname);
- 			kfree(txx9_priv);
- 			continue;
+-	if (pdata->flcmncr_val & SEL_16BIT)
++	if (flctl->pdata->flcmncr_val & SEL_16BIT)
+ 		nand->options |= NAND_BUSWIDTH_16;
+ 
+ 	pm_runtime_enable(&pdev->dev);
+@@ -1195,16 +1204,6 @@ static int flctl_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto err_chip;
+ 
+-	if (nand->options & NAND_BUSWIDTH_16) {
+-		/*
+-		 * NAND_BUSWIDTH_16 may have been set by nand_scan_ident().
+-		 * Add the SEL_16BIT flag in pdata->flcmncr_val and re-assign
+-		 * flctl->flcmncr_base to pdata->flcmncr_val.
+-		 */
+-		pdata->flcmncr_val |= SEL_16BIT;
+-		flctl->flcmncr_base = pdata->flcmncr_val;
+-	}
+-
+ 	ret = flctl_chip_init_tail(flctl_mtd);
+ 	if (ret)
+ 		goto err_chip;
+@@ -1213,7 +1212,8 @@ static int flctl_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto err_chip;
+ 
+-	ret = mtd_device_register(flctl_mtd, pdata->parts, pdata->nr_parts);
++	ret = mtd_device_register(flctl_mtd, flctl->pdata->parts,
++				  flctl->pdata->nr_parts);
+ 	if (ret)
+ 		goto cleanup_nand;
+ 
+diff --git a/include/linux/mtd/sh_flctl.h b/include/linux/mtd/sh_flctl.h
+index c759d403cbc0..c9f486c6c019 100644
+--- a/include/linux/mtd/sh_flctl.h
++++ b/include/linux/mtd/sh_flctl.h
+@@ -148,6 +148,7 @@ struct sh_flctl {
+ 	struct dev_pm_qos_request pm_qos;
+ 	void __iomem		*reg;
+ 	resource_size_t		fifo;
++	struct sh_flctl_platform_data *pdata;
+ 
+ 	uint8_t	done_buff[2048 + 64];	/* max size 2048 + 64 */
+ 	int	read_bytes;
 -- 
 2.14.1
