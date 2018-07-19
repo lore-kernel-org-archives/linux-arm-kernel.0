@@ -1,60 +1,126 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Thu, 19 Jul 2018 11:08:13 +0100
-Subject: [GIT PULL v2] arm64: dts: hisilicon dts updates for v4.19
-Message-ID: <5B50630D.7060407@hisilicon.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 19 Jul 2018 12:12:55 +0200
+Subject: [PATCH v8 09/26] kernel/cpu_pm: Manage runtime PM in the idle
+ path for CPUs
+In-Reply-To: <2056372.NMt4aPaF4h@aspire.rjw.lan>
+References: <20180620172226.15012-1-ulf.hansson@linaro.org>
+ <20180620172226.15012-10-ulf.hansson@linaro.org>
+ <2056372.NMt4aPaF4h@aspire.rjw.lan>
+Message-ID: <2205807.cU2puvubpP@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+On Wednesday, July 18, 2018 12:11:06 PM CEST Rafael J. Wysocki wrote:
+> On Wednesday, June 20, 2018 7:22:09 PM CEST Ulf Hansson wrote:
+> > To allow CPUs being power managed by PM domains, let's deploy support for
+> > runtime PM for the CPU's corresponding struct device.
+> > 
+> > More precisely, at the point when the CPU is about to enter an idle state,
+> > decrease the runtime PM usage count for its corresponding struct device,
+> > via calling pm_runtime_put_sync_suspend(). Then, at the point when the CPU
+> > resumes from idle, let's increase the runtime PM usage count, via calling
+> > pm_runtime_get_sync().
+> > 
+> > Cc: Lina Iyer <ilina@codeaurora.org>
+> > Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> 
+> I finally got to this one, sorry for the huge delay.
+> 
+> Let me confirm that I understand the code flow correctly.
+> 
+> > ---
+> >  kernel/cpu_pm.c | 11 +++++++++++
+> >  1 file changed, 11 insertions(+)
+> > 
+> > diff --git a/kernel/cpu_pm.c b/kernel/cpu_pm.c
+> > index 67b02e138a47..492d4a83dca0 100644
+> > --- a/kernel/cpu_pm.c
+> > +++ b/kernel/cpu_pm.c
+> > @@ -16,9 +16,11 @@
+> >   */
+> >  
+> >  #include <linux/kernel.h>
+> > +#include <linux/cpu.h>
+> >  #include <linux/cpu_pm.h>
+> >  #include <linux/module.h>
+> >  #include <linux/notifier.h>
+> > +#include <linux/pm_runtime.h>
+> >  #include <linux/spinlock.h>
+> >  #include <linux/syscore_ops.h>
+> >  
+> > @@ -91,6 +93,7 @@ int cpu_pm_enter(void)
+> 
+> This is called from a cpuidle driver's ->enter callback for the target state
+> selected by the idle governor ->
+> 
+> >  {
+> >  	int nr_calls;
+> >  	int ret = 0;
+> > +	struct device *dev = get_cpu_device(smp_processor_id());
+> >  
+> >  	ret = cpu_pm_notify(CPU_PM_ENTER, -1, &nr_calls);
+> >  	if (ret)
+> > @@ -100,6 +103,9 @@ int cpu_pm_enter(void)
+> >  		 */
+> >  		cpu_pm_notify(CPU_PM_ENTER_FAILED, nr_calls - 1, NULL);
+> >  
+> > +	if (!ret && dev && dev->pm_domain)
+> > +		pm_runtime_put_sync_suspend(dev);
+> 
+> -> so this is going to invoke genpd_runtime_suspend() if the usage
+> counter of dev is 0.
+> 
+> That will cause cpu_power_down_ok() to be called (because this is
+> a CPU domain) and that will walk the domain cpumask and compute the
+> estimated idle duration as the minimum of tick_nohz_get_next_wakeup()
+> values over the CPUs in that cpumask.  [Note that the weight of the
+> cpumask must be seriously limited for that to actually work, as this
+> happens in the idle path.]  Next, it will return "true" if it can
+> find a domain state with residency within the estimated idle
+> duration.  [Note that this sort of overlaps with the idle governor's
+> job.]
+> 
+> Next, __genpd_runtime_suspend() will be invoked to run the device-specific
+> callback if any [Note that this has to be suitable for the idle path if
+> present.] and genpd_stop_dev() runs (which, again, may invoke a callback)
+> and genpd_power_off() runs under the domain lock (which must be a spinlock
+> then).
+> 
+> > +
+> >  	return ret;
+> >  }
+> >  EXPORT_SYMBOL_GPL(cpu_pm_enter);
+> > @@ -118,6 +124,11 @@ EXPORT_SYMBOL_GPL(cpu_pm_enter);
+> >   */
+> >  int cpu_pm_exit(void)
+> >  {
+> > +	struct device *dev = get_cpu_device(smp_processor_id());
+> > +
+> > +	if (dev && dev->pm_domain)
+> > +		pm_runtime_get_sync(dev);
+> > +
+> >  	return cpu_pm_notify(CPU_PM_EXIT, -1, NULL);
+> >  }
+> >  EXPORT_SYMBOL_GPL(cpu_pm_exit);
+> > 
+> 
+> And this is called on wakeup when the cpuidle driver's ->enter callback
+> is about to return and it reverses the suspend flow (except that the
+> governor doesn't need to be called now).
+> 
+> Have I got that right?
 
-Please consider to pull the following changes.
-I rebased the pull on hisi-fixes-for-4.18 since there are
-some fixes for v4.18 have been merged.
+Assuming that I have got that right, there are concerns, mostly regarding
+patch [07/26], but I will reply to that directly.
 
-Thanks!
+The $subject patch is fine by me by itself, but it obviously depends on the
+previous ones.  Patches [01-02/26] are fine too, but they don't seem to be
+particularly useful without the rest of the series.
 
-Best Regards,
-Wei
+As far as patches [10-26/26] go, I'd like to see some review comments and/or
+tags from the people with vested interest in there, in particular from Daniel
+on patch [12/26] and from Sudeep on the PSCI ones.
 
----
-
-The following changes since commit a30449eb3ac908f26b4bc963a58039a5f2725ffa:
-
-  arm64: dts: hikey960: Define wl1837 power capabilities (2018-06-28 17:07:44 +0100)
-
-are available in the Git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.19v2
-
-for you to fetch changes up to 4d4585c21f53c15a10c52b45e0392de79e07127e:
-
-  arm64: dts: hisilicon: Add missing cooling device properties for CPUs (2018-07-17 13:56:45 +0100)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.19v2
-
-- Tidy up MMC properties for hi3660
-- Remove keep-power-in-suspend on hikey and hikey960 to
-  avoid keeping wifi power during suspend and let the
-  user enable it if required
-- Update idle states for hikey960
-- Add missing cooling device properties for cpus on hi6220
-
-----------------------------------------------------------------
-Vincent Guittot (1):
-      arm64: hikey960: update idle-states
-
-Viresh Kumar (1):
-      arm64: dts: hisilicon: Add missing cooling device properties for CPUs
-
-oscardagrach (4):
-      arm64: dts: hikey960: Remove deprecated MMC properties
-      arm64: dts: hikey960: Clean up MMC properties and move to proper file
-      arm64: dts: hikey960: Remove keep-power-in-suspend property
-      arm64: dts: hikey: Remove keep-power-in-suspend property
-
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 26 ++++++--
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 79 +++++++++--------------
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts    |  1 -
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi         | 16 ++++-
- 4 files changed, 67 insertions(+), 55 deletions(-)
+Thanks,
+Rafael
