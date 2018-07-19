@@ -1,35 +1,61 @@
 From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Thu, 19 Jul 2018 23:23:53 +0530
-Subject: [PATCH 0/3] Enable smmu support on sdm845
-Message-ID: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
+Date: Thu, 19 Jul 2018 23:23:56 +0530
+Subject: [PATCH 3/3] iommu/arm-smmu: Error out only if not enough context
+ interrupts
+In-Reply-To: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
+References: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
+Message-ID: <20180719175356.14753-4-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series enables apps-smmu (arm,mmu-500) and gpu-smmu (qcom,smmu-v2)
-on sdm845. gpu-smmu needs one power domain from gpu clock controller
-whose driver was sent by Amit [1].
+Currently we check if the number of context banks is not equal to
+num_context_interrupts. However, there are booloaders such as, one
+on sdm845 that reserves few context banks and thus kernel views
+less than the total available context banks.
+So, although the hardware definition in device tree would mention
+the correct number of context interrupts, this number can be
+greater than the number of context banks visible to smmu in kernel.
+We should therefore error out only when the number of context banks
+is greater than the available number of context interrupts.
 
-This series also contains a patch to split the check for num_context_irqs
-and num_context_banks in two. We now error out only if num_context_irqs
-is greater than num_context_banks.
-There are cases such as on sdm845, in which few of the context banks are
-reserved by the bootloader (secure software), and thus kernel view
-lesser number than the total available context banks.
-So, we shouldn't error out simply when the num_context_irqs is not equal
-to num_context_banks.
+Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+Suggested-by: Tomasz Figa <tfiga@chromium.org>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu.c | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
 
-[1] https://lore.kernel.org/patchwork/cover/962208/
-
-Vivek Gautam (3):
-  dts: arm64/sdm845: Add node for arm,mmu-500
-  dts: arm64/sdm845: Add node for qcom,smmu-v2
-  iommu/arm-smmu: Error out only if not enough context interrupts
-
- arch/arm64/boot/dts/qcom/sdm845-mtp.dts |  8 +++
- arch/arm64/boot/dts/qcom/sdm845.dtsi    | 96 +++++++++++++++++++++++++++++++++
- drivers/iommu/arm-smmu.c                | 19 ++++---
- 3 files changed, 117 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 7c69736a30f8..4cb53bf4f423 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -2229,12 +2229,19 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+ 	if (err)
+ 		return err;
+ 
+-	if (smmu->version == ARM_SMMU_V2 &&
+-	    smmu->num_context_banks != smmu->num_context_irqs) {
+-		dev_err(dev,
+-			"found only %d context interrupt(s) but %d required\n",
+-			smmu->num_context_irqs, smmu->num_context_banks);
+-		return -ENODEV;
++	if (smmu->version == ARM_SMMU_V2) {
++		if (smmu->num_context_banks > smmu->num_context_irqs) {
++			dev_err(dev,
++			      "found only %d context irq(s) but %d required\n",
++			      smmu->num_context_irqs, smmu->num_context_banks);
++			return -ENODEV;
++		} else if (smmu->num_context_banks < smmu->num_context_irqs) {
++			/* loose extra context interrupts */
++			dev_notice(dev,
++			      "found %d context irq(s) but only %d required\n",
++			      smmu->num_context_irqs, smmu->num_context_banks);
++			smmu->num_context_irqs = smmu->num_context_banks;
++		}
+ 	}
+ 
+ 	for (i = 0; i < smmu->num_global_irqs; ++i) {
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
