@@ -1,81 +1,154 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Thu, 19 Jul 2018 10:52:53 +0100
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.19
-In-Reply-To: <5B4F6398.2070608@hisilicon.com>
-References: <5B4F6398.2070608@hisilicon.com>
-Message-ID: <5B505F75.1050200@hisilicon.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Thu, 19 Jul 2018 17:53:24 +0800
+Subject: [PATCH 2/2] mtd: rawnand: meson: add support for Amlogic NAND
+ flash controller
+In-Reply-To: <20180719103953.26164eb6@bbrezillon>
+References: <20180613161314.14894-1-yixun.lan@amlogic.com>
+ <20180613161314.14894-3-yixun.lan@amlogic.com>
+ <20180624213844.2207ca6f@bbrezillon>
+ <76d428ff-376a-dce3-cb51-d238564b7c3e@amlogic.com>
+ <20180718210849.493f0087@bbrezillon>
+ <45c1a96c-0d14-dece-37cf-ac428bb98621@amlogic.com>
+ <20180719103953.26164eb6@bbrezillon>
+Message-ID: <ffa5a2ce-932b-700d-25ee-723db3cbd163@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
 
-Please ignore this pull request since Viresh expected the thermal
-binding patch is going via the thermal core maintainers.
-I will send v2 and drop those 2 patches.
+HI Boris
 
-Sorry for the noise!
 
-Best Regards,
-Wei
+On 07/19/18 16:39, Boris Brezillon wrote:
+> Hi Yixun,
+> 
+> On Thu, 19 Jul 2018 16:13:47 +0800
+> Yixun Lan <yixun.lan@amlogic.com> wrote:
+> 
+>>>>> You're doing DMA on those buffers, and devm_kzalloc() is not
+>>>>> DMA-friendly (returned buffers are not aligned on a cache line). Also,
+>>>>> you don't have to allocate your own buffers because the core already
+>>>>> allocate them (chip->data_buf, chip->oob_poi). All you need to do is
+>>>>> set the NAND_USE_BOUNCE_BUFFER flag in chip->options to make sure
+>>>>> you're always passed a DMA-able buffer.
+>>>>>     
+>>>>
+>>>> thanks for the suggestion, we've migrated to use the
+>>>> dmam_alloc_coherent() API  
+>>>
+>>> kzalloc() should be just fine, no need to alloc a DMA coherent region. 
+>>>   
+>>
+>> we're a little bit confused here, isn't devm_kzalloc (previously we are
+>> using) a variant of kzalloc? and since the NAND controller is doing DMA
+>> here, using DMA coherent API is more proper way?
+> 
+> Well, making buffers DMA coherent might be expensive, especially if you
+> access them a lot (unless you have a coherency unit and the cache is
+> kept enabled).
+> 
+> Regarding the "why is devm_kzalloc() is not DMA-safe?" question, I'd
+> recommend that you read this discussion [1].
+> 
+great, thanks for the info.
 
-On 2018/7/18 16:58, Wei Xu wrote:
-> Hi Olof, Hi Arnd,
+we fixed this in patch v2
+
+>>>>>> +	mtd->name = devm_kasprintf(nfc->dev, GFP_KERNEL,
+>>>>>> +				   "%s:nand", dev_name(dev));
+>>>>>> +	if (!mtd->name) {
+>>>>>> +		dev_err(nfc->dev, "Failed to allocate mtd->name\n");
+>>>>>> +		return -ENOMEM;
+>>>>>> +	}    
+>>>>>
+>>>>> You set the name after nand_scan_ident() and make it conditional (only
+>>>>> if ->name == NULL) so that the label property defined in the DT takes
+>>>>> precedence over the default name.    
+>>>>  
+>> for setting mtd->name conditional, do you mean doing something like this?
+>>
+>> if (!mtd->name)
+>> 	mtd->name = devm_kasprintf(..)
 > 
-> Please consider to pull the following changes.
-> I rebased the pull on hisi-fixes-for-4.18 since there are
-> some fixes for v4.18 have been merged.
+> Yes, that's what I meant.
 > 
-> Thanks!
+>>
+>> but we found mtd->name = "ffe07800.nfc" after function
+>> nand_scan_ident(), which is same value as dev_name(dev)..
+>> and there is no cs information encoded there.
 > 
-> Best Regards,
-> Wei
+> Hm, that shouldn't be the case. Maybe you can add traces to find out
+> who is setting mtd->name to this value.
 > 
-> ---
-> The following changes since commit a30449eb3ac908f26b4bc963a58039a5f2725ffa:
+will trace this, then get back to you
+>>
+>>>>  
+>>>>> Also, I recommend suffixing this name
+>>>>> with the CS id, just in case you ever need to support connecting several
+>>>>> chips to the same controller. 
+>>>>>     
+>>>>
+>>>> we actually didn't get the point here, cs is about chip selection with
+>>>> multiple nand chip? and how to get this information?  
+>>>
+>>> Well, you currently seem to only support one chip per controller, but I
+>>> guess the IP can handle several CS lines. So my recommendation is about
+>>> choosing a name so that you can later easily add support for multiple
+>>> chips without breaking setups where mtdparts is used.
+>>>
+>>> To sum-up, assuming your NAND chip is always connected to CS0 (on the
+>>> controller side), I'd suggest doing:
+>>>   
+>> yes, this is exactly how the hardware connected.
+>>> 	mtd->name = devm_kasprintf(nfc->dev, GFP_KERNEL,
+>>> 				   "%s:nand.%d", dev_name(dev), cs_id);
+>>>
+>>> where cs_id is the value you extracted from the reg property of the
+>>> NAND node.
+>>>   
+>> Ok, you right.
+>> current, the NAND chip is only use one CS (which CE0) for now, what's in
+>> the DT is
+>>
+>> nand at 0 {
+>>  reg = < 0 >;
+>>  ..
+>> };
+>>
+>> so for the multiple chips it would something like this in DT?
+>>
+>> nand at 0 {
+>>   reg = < 0 >;
+>> };
+>>
+>> nand at 1 {
+>>   reg = < 1 >;
+>> };
 > 
->   arm64: dts: hikey960: Define wl1837 power capabilities (2018-06-28 17:07:44 +0100)
+> Yep, that's for 2 single-die chips.
 > 
-> are available in the Git repository at:
+>>
+>> or even
+>> nand at 0 {
+>>   reg = < 0 2 >;
+>> };
+>>
+>> nand at 1 {
 > 
->   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.19
+> nand at 3 {
 > 
-> for you to fetch changes up to 168124aa0b430dce963d9a9e3dba44cb81a8159e:
+>>   reg = < 3 4 >;
+>> };
 > 
->   arm64: dts: hi6220: Add all CPUs in cooling maps (2018-07-17 13:58:17 +0100)
+> And this is describing 2 dual-die chips.
 > 
-> ----------------------------------------------------------------
-> ARM64: DT: Hisilicon SoC DT updates for 4.19
+>>
+>> do we need to encode all the cs information here? not sure if we
+>> understand this correctly, but could send out the patch for review..
 > 
-> - Tidy up MMC properties for hi3660
-> - Remove keep-power-in-suspend on hikey and hikey960 to
->   avoid keeping wifi power during suspend and let the
->   user enable it if required
-> - Update idle states for hikey960
-> - Add missing cooling device properties for cpus on hi6220
-> - Update thermal dt binding to allow multiple devices
->   to share cooling map
-> - Add all cpus in the cooling maps for hi6220
-> 
-> ----------------------------------------------------------------
-> Vincent Guittot (1):
->       arm64: hikey960: update idle-states
-> 
-> Viresh Kumar (3):
->       arm64: dts: hisilicon: Add missing cooling device properties for CPUs
->       dt-bindings: thermal: Allow multiple devices to share cooling map
->       arm64: dts: hi6220: Add all CPUs in cooling maps
-> 
-> oscardagrach (4):
->       arm64: dts: hikey960: Remove deprecated MMC properties
->       arm64: dts: hikey960: Clean up MMC properties and move to proper file
->       arm64: dts: hikey960: Remove keep-power-in-suspend property
->       arm64: dts: hikey: Remove keep-power-in-suspend property
-> 
->  .../devicetree/bindings/thermal/thermal.txt        | 11 +--
->  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  | 26 +++++--
->  arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 79 +++++++++-------------
->  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |  1 -
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi          | 25 ++++++-
->  5 files changed, 78 insertions(+), 64 deletions(-)
-> 
-> 
+> Yes, reg should contain an array of controller-side CS lines used to
+> select the chip (or a specific die in a chip, the index in the reg
+> table being the id of the die).
+>
+much clear about this, thanks
+
+Yixun
