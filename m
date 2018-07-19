@@ -1,44 +1,67 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 19 Jul 2018 10:14:29 +0200
-Subject: [PATCH 5/5] net: add MTD support to eth_platform_get_mac_address()
-In-Reply-To: <20180718170352.GF12477@lunn.ch>
-References: <20180718161035.7005-1-brgl@bgdev.pl>
- <20180718161035.7005-6-brgl@bgdev.pl>
- <20180718164737.GE12477@lunn.ch>
- <CAMRc=MeRv3_C8_R-Awfr1zjLa3G_CVAACc-2t_ihB+1v+BCTGw@mail.gmail.com>
- <20180718170352.GF12477@lunn.ch>
-Message-ID: <CAMRc=Md3oeEktzrA9UZyNPX6pB4bG+Gv0o6cjbs0UUKb3sYTsA@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 19 Jul 2018 17:13:39 +0900
+Subject: [PATCH] reset: uniphier: add reset control support for SPI
+In-Reply-To: <1531981133-25881-1-git-send-email-hayashibara.keiji@socionext.com>
+References: <1531981133-25881-1-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <CAK7LNASajYVUUz0Ggvpco9HhZVwp0Yw_t82Lq6YKXgsN0wLDGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-07-18 19:03 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
->> >> +#ifdef CONFIG_MTD
->> >> +     /* NOTE: this should go away as soon as MTD gets nvmem support. */
->> >> +     if (!addr) {
->> >> +             struct mtd_info *mtd;
->> >> +             int rv;
->> >> +
->> >> +             mtd = get_mtd_device_nm("MAC-Address");
->> >
->> > In order for this to go away, you need to keep backwards
->> > compatibility. When using nvmem, you look for a cell called
->> > "mac-address". Here you are looking for "MAC-Address". That is going
->> > to make backwards compatibility harder. How do you plan to do it?
->> >
->> >    Andrew
->>
->> I'm trying to adjust to already existing users. The only user of
->> get_mtd_device_nm() who calls it to read the MAC address registers a
->> partition called "MAC-Address". We can't change it since it's visible
->> from user space. In the future we'd just have to have a list of
->> supported string that we'd use to do the nvmem lookup.
+2018-07-19 15:18 GMT+09:00 Keiji Hayashibara <hayashibara.keiji@socionext.com>:
+> From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 >
-> Why not have the nvmem cell called "MAC-Address"? When you add nvmem
-> support to MTD, i assume you are going to map each MTD partition to an
-> nvmem cell?
+> Add reset control for SPI controller on UniPhier SoCs.
+>
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> ---
 
-Because all existing users of nvmem use "mac-address" as the name of
-this cell already. I guess we will need to live with both in this
-particular function.
 
-Bart
+Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+
+
+>  drivers/reset/reset-uniphier.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+>
+> diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
+> index e9030ff..5605745 100644
+> --- a/drivers/reset/reset-uniphier.c
+> +++ b/drivers/reset/reset-uniphier.c
+> @@ -202,6 +202,12 @@ static const struct uniphier_reset_data uniphier_pro5_sd_reset_data[] = {
+>  #define UNIPHIER_PERI_RESET_FI2C(id, ch)               \
+>         UNIPHIER_RESETX((id), 0x114, 24 + (ch))
+>
+> +#define UNIPHIER_PERI_RESET_SCSSI(id)                  \
+> +       UNIPHIER_RESETX((id), 0x110, 17)
+> +
+> +#define UNIPHIER_PERI_RESET_MCSSI(id)                  \
+> +       UNIPHIER_RESETX((id), 0x114, 14)
+> +
+>  static const struct uniphier_reset_data uniphier_ld4_peri_reset_data[] = {
+>         UNIPHIER_PERI_RESET_UART(0, 0),
+>         UNIPHIER_PERI_RESET_UART(1, 1),
+> @@ -212,6 +218,7 @@ static const struct uniphier_reset_data uniphier_ld4_peri_reset_data[] = {
+>         UNIPHIER_PERI_RESET_I2C(6, 2),
+>         UNIPHIER_PERI_RESET_I2C(7, 3),
+>         UNIPHIER_PERI_RESET_I2C(8, 4),
+> +       UNIPHIER_PERI_RESET_SCSSI(11),
+>         UNIPHIER_RESET_END,
+>  };
+>
+> @@ -227,6 +234,8 @@ static const struct uniphier_reset_data uniphier_pro4_peri_reset_data[] = {
+>         UNIPHIER_PERI_RESET_FI2C(8, 4),
+>         UNIPHIER_PERI_RESET_FI2C(9, 5),
+>         UNIPHIER_PERI_RESET_FI2C(10, 6),
+> +       UNIPHIER_PERI_RESET_SCSSI(11),
+> +       UNIPHIER_PERI_RESET_MCSSI(12),
+>         UNIPHIER_RESET_END,
+>  };
+>
+> --
+> 2.7.4
+>
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
