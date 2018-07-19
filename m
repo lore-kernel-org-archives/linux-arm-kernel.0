@@ -1,60 +1,32 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 19 Jul 2018 17:07:40 +0200
-Subject: [PATCH 5/5] net: add MTD support to eth_platform_get_mac_address()
-In-Reply-To: <20180719150138.GC9119@lunn.ch>
-References: <20180718161035.7005-1-brgl@bgdev.pl>
- <20180718161035.7005-6-brgl@bgdev.pl>
- <20180718164737.GE12477@lunn.ch>
- <CAMRc=MeRv3_C8_R-Awfr1zjLa3G_CVAACc-2t_ihB+1v+BCTGw@mail.gmail.com>
- <20180718170352.GF12477@lunn.ch>
- <CAMRc=Md3oeEktzrA9UZyNPX6pB4bG+Gv0o6cjbs0UUKb3sYTsA@mail.gmail.com>
- <20180719150138.GC9119@lunn.ch>
-Message-ID: <CAMRc=MfKedvD2OXes02op2ErGR2HKkzJwjHtv5i4NkbJAVg3dw@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 19 Jul 2018 17:09:17 +0200
+Subject: [PATCH RESEND v2 1/2] drm/sun4i: sun4i: Register quirks with the
+ backend structure
+In-Reply-To: <20180719080838.31598-1-paul.kocialkowski@bootlin.com>
+References: <20180719080838.31598-1-paul.kocialkowski@bootlin.com>
+Message-ID: <20180719150917.mzybrbbosjt2i2hm@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-07-19 17:01 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
-> On Thu, Jul 19, 2018 at 10:14:29AM +0200, Bartosz Golaszewski wrote:
->> 2018-07-18 19:03 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
->> >> >> +#ifdef CONFIG_MTD
->> >> >> +     /* NOTE: this should go away as soon as MTD gets nvmem support. */
->> >> >> +     if (!addr) {
->> >> >> +             struct mtd_info *mtd;
->> >> >> +             int rv;
->> >> >> +
->> >> >> +             mtd = get_mtd_device_nm("MAC-Address");
->> >> >
->> >> > In order for this to go away, you need to keep backwards
->> >> > compatibility. When using nvmem, you look for a cell called
->> >> > "mac-address". Here you are looking for "MAC-Address". That is going
->> >> > to make backwards compatibility harder. How do you plan to do it?
->> >> >
->> >> >    Andrew
->> >>
->> >> I'm trying to adjust to already existing users. The only user of
->> >> get_mtd_device_nm() who calls it to read the MAC address registers a
->> >> partition called "MAC-Address". We can't change it since it's visible
->> >> from user space. In the future we'd just have to have a list of
->> >> supported string that we'd use to do the nvmem lookup.
->> >
->> > Why not have the nvmem cell called "MAC-Address"? When you add nvmem
->> > support to MTD, i assume you are going to map each MTD partition to an
->> > nvmem cell?
->>
->> Because all existing users of nvmem use "mac-address" as the name of
->> this cell already. I guess we will need to live with both in this
->> particular function.
->
-> So i'm not convinced this last patch is making things better. I would
-> prefer if it was dropped for the moment. Wait until MTD via nvmem is
-> actually implemented and there is a concrete concept of how a MAC
-> address would be looked up without having lots of ugly code.
->
->         Andrew
+On Thu, Jul 19, 2018 at 10:08:37AM +0200, Paul Kocialkowski wrote:
+> In prevision for introducing a new quirk that will be used at atomic
+> plane check time, register the quirks structure with the backend
+> structure. This way, it can easily be grabbed where needed.
+> 
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
-Unfortunately: this would effectively block me from improving the
-support for older davinci boards. Having a (subjectively) ugly but
-generalized way of reading the MAC address from MTD is still better
-than using the MTD notifier from board files IMO.
+Applied both, thanks
 
-Bart
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180719/945d6d33/attachment.sig>
