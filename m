@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 01:00:19 +0200
-Subject: [PATCH v3 26/33] mtd: rawnand: atmel: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 01:00:15 +0200
+Subject: [PATCH v3 22/33] mtd: rawnand: tango: convert driver to nand_scan()
 In-Reply-To: <20180719230026.8741-1-miquel.raynal@bootlin.com>
 References: <20180719230026.8741-1-miquel.raynal@bootlin.com>
-Message-ID: <20180719230026.8741-27-miquel.raynal@bootlin.com>
+Message-ID: <20180719230026.8741-23-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,173 +14,72 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/atmel/nand-controller.c | 83 ++++++++++++++--------------
- 1 file changed, 40 insertions(+), 43 deletions(-)
+ drivers/mtd/nand/raw/tango_nand.c | 40 +++++++++++++++++++++++----------------
+ 1 file changed, 24 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
-index 855cc7729c43..35cac010e39a 100644
---- a/drivers/mtd/nand/raw/atmel/nand-controller.c
-+++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
-@@ -202,7 +202,7 @@ struct atmel_nand_controller_ops {
- 	int (*remove)(struct atmel_nand_controller *nc);
- 	void (*nand_init)(struct atmel_nand_controller *nc,
- 			  struct atmel_nand *nand);
--	int (*ecc_init)(struct atmel_nand *nand);
-+	int (*ecc_init)(struct nand_chip *chip);
- 	int (*setup_data_interface)(struct atmel_nand *nand, int csline,
- 				    const struct nand_data_interface *conf);
- };
-@@ -1133,9 +1133,8 @@ static int atmel_nand_pmecc_init(struct nand_chip *chip)
+diff --git a/drivers/mtd/nand/raw/tango_nand.c b/drivers/mtd/nand/raw/tango_nand.c
+index dd7a26efdf4f..d06d1aa918ed 100644
+--- a/drivers/mtd/nand/raw/tango_nand.c
++++ b/drivers/mtd/nand/raw/tango_nand.c
+@@ -517,6 +517,28 @@ static int tango_set_timings(struct mtd_info *mtd, int csline,
  	return 0;
  }
  
--static int atmel_nand_ecc_init(struct atmel_nand *nand)
-+static int atmel_nand_ecc_init(struct nand_chip *chip)
- {
--	struct nand_chip *chip = &nand->base;
- 	struct atmel_nand_controller *nc;
- 	int ret;
- 
-@@ -1170,12 +1169,11 @@ static int atmel_nand_ecc_init(struct atmel_nand *nand)
- 	return 0;
- }
- 
--static int atmel_hsmc_nand_ecc_init(struct atmel_nand *nand)
-+static int atmel_hsmc_nand_ecc_init(struct nand_chip *chip)
- {
--	struct nand_chip *chip = &nand->base;
- 	int ret;
- 
--	ret = atmel_nand_ecc_init(nand);
-+	ret = atmel_nand_ecc_init(chip);
- 	if (ret)
- 		return ret;
- 
-@@ -1558,22 +1556,6 @@ static void atmel_hsmc_nand_init(struct atmel_nand_controller *nc,
- 	chip->select_chip = atmel_hsmc_nand_select_chip;
- }
- 
--static int atmel_nand_detect(struct atmel_nand *nand)
--{
--	struct nand_chip *chip = &nand->base;
--	struct mtd_info *mtd = nand_to_mtd(chip);
--	struct atmel_nand_controller *nc;
--	int ret;
--
--	nc = to_nand_controller(chip->controller);
--
--	ret = nand_scan_ident(mtd, nand->numcs, NULL);
--	if (ret)
--		dev_err(nc->dev, "nand_scan_ident() failed: %d\n", ret);
--
--	return ret;
--}
--
- static int atmel_nand_unregister(struct atmel_nand *nand)
- {
- 	struct nand_chip *chip = &nand->base;
-@@ -1595,7 +1577,6 @@ static int atmel_nand_register(struct atmel_nand *nand)
- 	struct nand_chip *chip = &nand->base;
- 	struct mtd_info *mtd = nand_to_mtd(chip);
- 	struct atmel_nand_controller *nc;
--	int ret;
- 
- 	nc = to_nand_controller(chip->controller);
- 
-@@ -1626,21 +1607,6 @@ static int atmel_nand_register(struct atmel_nand *nand)
- 		}
- 	}
- 
--	ret = nand_scan_tail(mtd);
--	if (ret) {
--		dev_err(nc->dev, "nand_scan_tail() failed: %d\n", ret);
--		return ret;
--	}
--
--	ret = mtd_device_register(mtd, NULL, 0);
--	if (ret) {
--		dev_err(nc->dev, "Failed to register mtd device: %d\n", ret);
--		nand_cleanup(chip);
--		return ret;
--	}
--
--	list_add_tail(&nand->node, &nc->chips);
--
- 	return 0;
- }
- 
-@@ -1755,6 +1721,8 @@ static int
- atmel_nand_controller_add_nand(struct atmel_nand_controller *nc,
- 			       struct atmel_nand *nand)
- {
-+	struct nand_chip *chip = &nand->base;
-+	struct mtd_info *mtd = nand_to_mtd(chip);
- 	int ret;
- 
- 	/* No card inserted, skip this NAND. */
-@@ -1765,15 +1733,30 @@ atmel_nand_controller_add_nand(struct atmel_nand_controller *nc,
- 
- 	nc->caps->ops->nand_init(nc, nand);
- 
--	ret = atmel_nand_detect(nand);
--	if (ret)
-+	ret = nand_scan(mtd, nand->numcs);
-+	if (ret) {
-+		dev_err(nc->dev, "NAND scan failed: %d\n", ret);
- 		return ret;
-+	}
- 
--	ret = nc->caps->ops->ecc_init(nand);
-+	ret = atmel_nand_register(nand);
- 	if (ret)
--		return ret;
-+		goto cleanup_nand;
++static int tango_attach_chip(struct nand_chip *chip)
++{
++	struct nand_ecc_ctrl *ecc = &chip->ecc;
 +
-+	ret = mtd_device_register(mtd, NULL, 0);
-+	if (ret) {
-+		dev_err(nc->dev, "Failed to register mtd device: %d\n", ret);
-+		goto cleanup_nand;
-+	}
++	ecc->mode = NAND_ECC_HW;
++	ecc->algo = NAND_ECC_BCH;
++	ecc->bytes = DIV_ROUND_UP(ecc->strength * FIELD_ORDER, BITS_PER_BYTE);
 +
-+	list_add_tail(&nand->node, &nc->chips);
++	ecc->read_page_raw = tango_read_page_raw;
++	ecc->write_page_raw = tango_write_page_raw;
++	ecc->read_page = tango_read_page;
++	ecc->write_page = tango_write_page;
++	ecc->read_oob = tango_read_oob;
++	ecc->write_oob = tango_write_oob;
 +
 +	return 0;
-+
-+cleanup_nand:
-+	nand_cleanup(chip);
- 
--	return atmel_nand_register(nand);
-+	return ret;
- }
- 
- static int
-@@ -1958,6 +1941,19 @@ static const struct of_device_id atmel_matrix_of_ids[] = {
- 	{ /* sentinel */ },
- };
- 
-+static int atmel_nand_attach_chip(struct nand_chip *chip)
-+{
-+	struct atmel_nand_controller *nc;
-+
-+	nc = to_nand_controller(chip->controller);
-+
-+	return nc->caps->ops->ecc_init(chip);
 +}
 +
-+static struct nand_controller_ops atmel_nand_controller_ops = {
-+	.attach_chip = atmel_nand_attach_chip,
++static struct nand_controller_ops tango_controller_ops = {
++	.attach_chip = tango_attach_chip,
 +};
 +
- static int atmel_nand_controller_init(struct atmel_nand_controller *nc,
- 				struct platform_device *pdev,
- 				const struct atmel_nand_controller_caps *caps)
-@@ -1967,6 +1963,7 @@ static int atmel_nand_controller_init(struct atmel_nand_controller *nc,
- 	int ret;
+ static int chip_init(struct device *dev, struct device_node *np)
+ {
+ 	u32 cs;
+@@ -560,28 +582,14 @@ static int chip_init(struct device *dev, struct device_node *np)
+ 			NAND_NO_SUBPAGE_WRITE |
+ 			NAND_WAIT_TCCS;
+ 	chip->controller = &nfc->hw;
++	chip->controller->ops = &tango_controller_ops;
+ 	tchip->base = nfc->pbus_base + (cs * 256);
  
- 	nand_controller_init(&nc->base);
-+	nc->base.ops = &atmel_nand_controller_ops;
- 	INIT_LIST_HEAD(&nc->chips);
- 	nc->dev = dev;
- 	nc->caps = caps;
+ 	nand_set_flash_node(chip, np);
+ 	mtd_set_ooblayout(mtd, &tango_nand_ooblayout_ops);
+ 	mtd->dev.parent = dev;
+ 
+-	err = nand_scan_ident(mtd, 1, NULL);
+-	if (err)
+-		return err;
+-
+-	ecc->mode = NAND_ECC_HW;
+-	ecc->algo = NAND_ECC_BCH;
+-	ecc->bytes = DIV_ROUND_UP(ecc->strength * FIELD_ORDER, BITS_PER_BYTE);
+-
+-	ecc->read_page_raw = tango_read_page_raw;
+-	ecc->write_page_raw = tango_write_page_raw;
+-	ecc->read_page = tango_read_page;
+-	ecc->write_page = tango_write_page;
+-	ecc->read_oob = tango_read_oob;
+-	ecc->write_oob = tango_write_oob;
+-
+-	err = nand_scan_tail(mtd);
++	err = nand_scan(mtd, 1);
+ 	if (err)
+ 		return err;
+ 
 -- 
 2.14.1
