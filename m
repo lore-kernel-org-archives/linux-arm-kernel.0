@@ -1,52 +1,39 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 19 Jul 2018 09:06:39 -0500
-Subject: [PATCH 3/3] clk: meson-g12a: Add EE Clock controller driver
-In-Reply-To: <7e1cce0b-fc86-b900-2019-a85c5e5ba2ae@amlogic.com> (Yixun Lan's
- message of "Tue, 17 Jul 2018 09:24:02 +0800")
-References: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
- <1531134767-29927-4-git-send-email-jian.hu@amlogic.com>
- <CAFBinCBB9N_p6S_-dfiV=zDCf-RYnA3C-ir6oNLC7JAfdOqqiw@mail.gmail.com>
- <ec49c089-bccf-9aac-5d0f-43bc27770ad9@amlogic.com>
- <1531216472.2708.71.camel@baylibre.com> <7hfu0jmhbe.fsf@baylibre.com>
- <7e1cce0b-fc86-b900-2019-a85c5e5ba2ae@amlogic.com>
-Message-ID: <7h601be2vk.fsf@baylibre.com>
+From: yuehaibing@huawei.com (YueHaibing)
+Date: Thu, 19 Jul 2018 22:09:55 +0800
+Subject: [PATCH] net: mediatek: use dma_zalloc_coherent instead of
+ allocator/memset
+Message-ID: <20180719140955.19444-1-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yixun Lan <yixun.lan@amlogic.com> writes:
+Use dma_zalloc_coherent instead of dma_alloc_coherent
+followed by memset 0.
 
-[...]
+Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+---
+ drivers/net/ethernet/mediatek/mtk_eth_soc.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
->> 
->> As Jerome said, I think consistency is an important goal, so leaving off
->> the "meson-" for drivers/clk is fine with me.
->> 
-> ok
->
->> Also for consistency, for the rest of the drivers, keeping "meson-" is
->> probably the right thing to do.
->> 
-> ok, for the above, you are talking about the already exist compatible
-> names? or the patches we will push in the future?
-
-I'm talking about future patches.
-
->> However, patches would be welcome to add compatibles without the "meson"
->> for the rest of the drivers & documentation as well, but please do not
->> remove any compatibles.
->> 
-> I assume you are talking about the patches in the future we will push?
-> to drop the "meson".
->
-> I'm confused here, as the above two paragraphs conflict with each other
-
-Yeah, what I wrote is confusing, sorry about that.
-
-What I mean is that new patches should stay consistent with compatibles
-in their existing drivers/subsystems.  That means keeping the "meson-"
-prefix for everything except drivers/clk.
-
-In addition to that, patches would be welcome for *adding* compatibles
-without "meson" to all the current drivers.
-
-Kevin
+diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+index d8ebf0a..fbdb3e3 100644
+--- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
++++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+@@ -1221,14 +1221,11 @@ static int mtk_tx_alloc(struct mtk_eth *eth)
+ 	if (!ring->buf)
+ 		goto no_tx_mem;
+ 
+-	ring->dma = dma_alloc_coherent(eth->dev,
+-					  MTK_DMA_SIZE * sz,
+-					  &ring->phys,
+-					  GFP_ATOMIC | __GFP_ZERO);
++	ring->dma = dma_zalloc_coherent(eth->dev, MTK_DMA_SIZE * sz,
++					&ring->phys, GFP_ATOMIC | __GFP_ZERO);
+ 	if (!ring->dma)
+ 		goto no_tx_mem;
+ 
+-	memset(ring->dma, 0, MTK_DMA_SIZE * sz);
+ 	for (i = 0; i < MTK_DMA_SIZE; i++) {
+ 		int next = (i + 1) % MTK_DMA_SIZE;
+ 		u32 next_ptr = ring->phys + next * sz;
+-- 
+2.7.0
