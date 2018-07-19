@@ -1,86 +1,116 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 19 Jul 2018 09:53:03 -0500
-Subject: [PATCH 3/3] clk: meson-g12a: Add EE Clock controller driver
-In-Reply-To: <e1f0b672-65de-6afa-cec4-e2d910c58b7c@amlogic.com> (Yixun Lan's
- message of "Thu, 19 Jul 2018 22:27:55 +0800")
-References: <1531134767-29927-1-git-send-email-jian.hu@amlogic.com>
- <1531134767-29927-4-git-send-email-jian.hu@amlogic.com>
- <CAFBinCBB9N_p6S_-dfiV=zDCf-RYnA3C-ir6oNLC7JAfdOqqiw@mail.gmail.com>
- <ec49c089-bccf-9aac-5d0f-43bc27770ad9@amlogic.com>
- <1531216472.2708.71.camel@baylibre.com> <7hfu0jmhbe.fsf@baylibre.com>
- <7e1cce0b-fc86-b900-2019-a85c5e5ba2ae@amlogic.com>
- <7h601be2vk.fsf@baylibre.com>
- <e1f0b672-65de-6afa-cec4-e2d910c58b7c@amlogic.com>
-Message-ID: <7hk1prmg4w.fsf@baylibre.com>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Thu, 19 Jul 2018 20:25:27 +0530
+Subject: [PATCH] arm64, kaslr: export offset in VMCOREINFO ELF notes
+In-Reply-To: <d8959ca1-65a1-f59c-bfc4-b048c75add26@arm.com>
+References: <1531949864-27447-1-git-send-email-bhsharma@redhat.com>
+ <d8959ca1-65a1-f59c-bfc4-b048c75add26@arm.com>
+Message-ID: <CACi5LpOa-BMRSTShS019DDv7MoxNfpnnsqjwR3z13GZC49NrSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yixun Lan <yixun.lan@amlogic.com> writes:
+Hi James,
 
-> On 07/19/2018 10:06 PM, Kevin Hilman wrote:
->> Yixun Lan <yixun.lan@amlogic.com> writes:
->> 
->> [...]
->> 
->>>>
->>>> As Jerome said, I think consistency is an important goal, so leaving off
->>>> the "meson-" for drivers/clk is fine with me.
->>>>
->>> ok
->>>
->>>> Also for consistency, for the rest of the drivers, keeping "meson-" is
->>>> probably the right thing to do.
->>>>
->>> ok, for the above, you are talking about the already exist compatible
->>> names? or the patches we will push in the future?
->> 
->> I'm talking about future patches.
->> 
-> ok
+On Thu, Jul 19, 2018 at 5:01 PM, James Morse <james.morse@arm.com> wrote:
+> Hi Bhupesh,
 >
->>>> However, patches would be welcome to add compatibles without the "meson"
->>>> for the rest of the drivers & documentation as well, but please do not
->>>> remove any compatibles.
->>>>
->>> I assume you are talking about the patches in the future we will push?
->>> to drop the "meson".
->>>
->>> I'm confused here, as the above two paragraphs conflict with each other
->> 
->> Yeah, what I wrote is confusing, sorry about that.
->> 
->> What I mean is that new patches should stay consistent with compatibles
->> in their existing drivers/subsystems.  That means keeping the "meson-"
->> prefix for everything except drivers/clk.
->> 
-> sounds good to me.
+> On 18/07/18 22:37, Bhupesh Sharma wrote:
+>> Include KASLR offset in VMCOREINFO ELF notes to assist in debugging.
+>>
+>> makedumpfile user-space utility will need fixup to use this KASLR offset
+>> to work with cases where we need to find a way to translate symbol
+>> address from vmlinux to kernel run time address in case of KASLR boot on
+>> arm64.
 >
->> In addition to that, patches would be welcome for *adding* compatibles
->> without "meson" to all the current drivers.
->> 
-> not sure if I parse above correctly, so let me rephrase..
+> You need the kernel VA for a symbol. Isn't this what kallsyms is for?
+> | root at frikadeller:~# cat /proc/kallsyms | grep swapper_pg_dir
+> | ffff5404610d0000 B swapper_pg_dir
+
+Its already used by other archs like x86_64. See
+'arch/x86/kernel/machine_kexec_64.c' :
+
+void arch_crash_save_vmcoreinfo(void)
+{
+    <..snip..>
+    vmcoreinfo_append_str("KERNELOFFSET=%lx\n",
+                  kaslr_offset());
+    <..snip..>
+}
+
+Its just that we are enabling this feature for arm64 now that the
+KASLR boot cases are more widely seen on arm64 boards (as newer EFI
+firmware implementations are available which support EFI_RNG_PROTOCOL
+and hence KASLR boot).
+
+And we want existing user-space application(s) to work similarly on
+arm64 distributions as they work historically on other archs like
+x86_64 (in most cases the user-space user is not even aware, if he is
+developing for or using an underlying hardware which is arm64 or
+x86_64)
+
+> This is the KASLR address, the vmlinux has:
+> | root at frikadeller:~/linux/build_arm64# nm -s vmlinux | grep swapper_pg_dir
+> | ffff0000096d0000 B swapper_pg_dir
 >
-> for "all the current drivers", do you mean all the drivers which already
-> accepted at mainline kernel, which are mmc, uart, spi, i2c ..
+>
+> This is in the vmcoreinfo too, so you can work if out from the vmcore too:
+> | root at frikadeller:~# dd if=/proc/kcore bs=8K count=1 2>/dev/null | strings |
+> | grep swapper_pg_dir
+> | SYMBOL(swapper_pg_dir)=ffff5404610d0000
+>
+>
+> I picked swapper_pg_dir, but you could use any of the vmcore:SYMBOL() addresses
+> to work out this offset. (you should expect the kernel to rename these symbols
+> at a whim).
+>
 
-Yes.
+Perhaps you missed what the above makedumpfile command was doing, so
+let me summarize again:
 
-> all of them follow "amlogic,meson-${SOC}-${FUNCTION}", so do you propose
-> to add compatbiles like "amlogic,${SOC}-${FUNCTION}" ?
+The above makedumpfile command is trying to 'split' a vmcore file into
+smaller sub dumpfiles on the basis of some filtering rules. These
+rules are defined via a .conf file (scrub.conf in my example below).
 
-Yes, but that's an optional future cleanup.
+Lets see what MAKEDUMPFILE(8) documents about the '--split' option:
 
-> take i2c for example, there is "amlogic,meson-axg-i2c" already, do you
-> want to add another "amlogic,axg-i2c" ? I feel this will adding more
-> confusion..
+--split
+              Split the dump data to multiple DUMPFILEs in parallel.
+If specifying DUMPFILEs on different  storage  devices,  a  device
+can share I/O load with other devices and it reduces time for saving
+the
+dump data. The file size of each DUMPFILE is smaller than the system
+memory size which is  divided by the number of DUMPFILEs. This feature
+supports only the kdump-compressed format.
 
-Possibly, but it will provide a path to remove the "meson-" prefix in
-the future if we would like.
+So, this use-case expects 'vmlinux' and 'vmcore' as mandatory inputs.
 
-> How about only following the "amlogic,${SOC}-${FUNCTION}" syntax in the
-> new added drivers in the future, for example NAND, PCIE driver which we
-> want to push (those drivers doesn't exist in current mainline kernel).
+Now, coming back to the use-case:
 
-For new drivers, it's fine to not use the "meson-" prefix at all.
+# makedumpfile --split -d 31 -x vmlinux --config scrub.conf vmcore
+dumpfile_{1,2,3}
 
-Kevin
+Here, 'scrub.conf ' is defined to erase symbols 'jiffies',
+'init_task.utime' and 'tsk.utime'
+
+ # cat > scrub.conf << EOF
+   [vmlinux]
+   erase jiffies
+   erase init_task.utime
+   for tsk in init_task.tasks.next within task_struct:tasks
+       erase tsk.utime
+   endfor
+   EOF
+
+This is usually used to erase company-confidential or non-important
+symbols from a vmcore before handing it over to a debugger (which uses
+this vmcore to determine the root-cause of a crash) - as there can be
+some sensitive symbols which a reporter may not want the debugger to
+read.
+
+So, in this use case both vmlinux (which contains the symbols) and
+vmcore are mandatory inputs and we cannot kallsyms. as it breaks the
+existing user-space use-cases and the .conf file can be user-defined
+(and hence he can pick any symbol/functions which might not even be
+present in 'kallsyms'). So no we cannot use 'kallsyms' here.
+
+Thanks,
+Bhupesh
