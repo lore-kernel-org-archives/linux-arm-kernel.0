@@ -1,85 +1,70 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 19 Jul 2018 12:15:57 +0200
-Subject: [PATCH v8 06/26] timer: Export next wakeup time of a CPU
-In-Reply-To: <20180620172226.15012-7-ulf.hansson@linaro.org>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <20180620172226.15012-7-ulf.hansson@linaro.org>
-Message-ID: <2046813.qdTUchafZm@aspire.rjw.lan>
+From: hari.vyas@broadcom.com (Hari Vyas)
+Date: Thu, 19 Jul 2018 15:47:46 +0530
+Subject: [PATCH] arm64: fix for restoring console loglevel after handling
+ traps
+In-Reply-To: <20180719100140.GA424@jagdpanzerIV>
+References: <1531993734-1463-1-git-send-email-hari.vyas@broadcom.com>
+ <1531993734-1463-2-git-send-email-hari.vyas@broadcom.com>
+ <20180719100140.GA424@jagdpanzerIV>
+Message-ID: <CAM5rFu_N-=26LddRy1mO010h9yLcGuKqK6=y+h=h3-HbfEP+FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 20, 2018 7:22:06 PM CEST Ulf Hansson wrote:
-> From: Lina Iyer <lina.iyer@linaro.org>
-> 
-> Knowing the sleep duration of CPUs, is known to be needed while selecting
-> the most energy efficient idle state for a CPU or a group of CPUs.
-> 
-> However, to be able to compute the sleep duration, we need to know at what
-> time the next expected wakeup is for the CPU. Therefore, let's export this
-> information via a new function, tick_nohz_get_next_wakeup(). Following
-> changes make use of it.
-> 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Lina Iyer <ilina@codeaurora.org>
-> Cc: Frederic Weisbecker <fweisbec@gmail.com>
-> Cc: Ingo Molnar <mingo@kernel.org>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  include/linux/tick.h     |  8 ++++++++
->  kernel/time/tick-sched.c | 10 ++++++++++
->  2 files changed, 18 insertions(+)
-> 
-> diff --git a/include/linux/tick.h b/include/linux/tick.h
-> index 55388ab45fd4..e48f6b26b425 100644
-> --- a/include/linux/tick.h
-> +++ b/include/linux/tick.h
-> @@ -125,6 +125,7 @@ extern bool tick_nohz_idle_got_tick(void);
->  extern ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next);
->  extern unsigned long tick_nohz_get_idle_calls(void);
->  extern unsigned long tick_nohz_get_idle_calls_cpu(int cpu);
-> +extern ktime_t tick_nohz_get_next_wakeup(int cpu);
->  extern u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time);
->  extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
->  
-> @@ -151,6 +152,13 @@ static inline ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next)
->  	*delta_next = TICK_NSEC;
->  	return *delta_next;
->  }
-> +
-> +static inline ktime_t tick_nohz_get_next_wakeup(int cpu)
-> +{
-> +	/* Next wake up is the tick period, assume it starts now */
-> +	return ktime_add(ktime_get(), TICK_NSEC);
-> +}
-> +
->  static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
->  static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
->  
-> diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-> index da9455a6b42b..f380bb4f0744 100644
-> --- a/kernel/time/tick-sched.c
-> +++ b/kernel/time/tick-sched.c
-> @@ -1089,6 +1089,16 @@ unsigned long tick_nohz_get_idle_calls(void)
->  	return ts->idle_calls;
->  }
->  
-> +/**
-> + * tick_nohz_get_next_wakeup - return the next wake up of the CPU
-> + */
-
-I'd add to the comment that this is to be invoked for idle CPUs only.
-
-> +ktime_t tick_nohz_get_next_wakeup(int cpu)
-> +{
-> +	struct clock_event_device *dev = per_cpu(tick_cpu_device.evtdev, cpu);
-> +
-> +	return dev->next_event;
-> +}
-> +
->  static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
->  {
->  #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
-> 
+On Thu, Jul 19, 2018 at 3:31 PM, Sergey Senozhatsky
+<sergey.senozhatsky.work@gmail.com> wrote:
+> On (07/19/18 15:18), Hari Vyas wrote:
+> [..]
+>
+> Not so sure about the patch, sorry.
+>
+Mentioned concern in cover letter and commit message. Console loglevel
+remains maximum after process die which
+needs to be restored.
+>> @@ -211,6 +211,8 @@ void die(const char *str, struct pt_regs *regs, int err)
+>>
+>>       bust_spinlocks(0);
+>>       add_taint(TAINT_DIE, LOCKDEP_NOW_UNRELIABLE);
+>> +
+>> +     restore_console_loglevel();
+>>       oops_exit();
+>
+> This is *probably* the only place where you can roll-back the
+> loglevel, but you restore console loglevel too early - a trap
+> can panic() the system, we need to preserve the console verbose
+> mode which we set at the start of the trap.
+>
+console loglevel is indirectly sets to verbose in oops_enter() so
+better to restore before oops_exit().
+More from ARM maintainers.
+>> @@ -624,6 +626,7 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+>>       die("Oops - bad mode", regs, 0);
+>>       local_daif_mask();
+>>       panic("bad mode");
+>> +     restore_console_loglevel();
+>
+> panic()
+>
+>> @@ -680,6 +683,7 @@ asmlinkage void handle_bad_stack(struct pt_regs *regs)
+>>        * to get a better stack trace.
+>>        */
+>>       nmi_panic(NULL, "kernel stack overflow");
+>> +     restore_console_loglevel();
+>
+> panic()
+>
+>> @@ -694,7 +698,7 @@ void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr)
+>>               __show_regs(regs);
+>>
+>>       nmi_panic(regs, "Asynchronous SError Interrupt");
+>> -
+>> +     restore_console_loglevel();
+>
+> panic()
+>
+> What's the point of restore_console_loglevel() after panic()?
+>
+>         -ss
+Except die(), other places restore call can be avoided but just added
+for code completeness.
+Same mentioned in cover letter.
+More from ARM maintainers
