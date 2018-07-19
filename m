@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 01:00:03 +0200
-Subject: [PATCH v3 10/33] mtd: rawnand: jz4780: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 01:00:00 +0200
+Subject: [PATCH v3 07/33] mtd: rawnand: fsmc: convert driver to nand_scan()
 In-Reply-To: <20180719230026.8741-1-miquel.raynal@bootlin.com>
 References: <20180719230026.8741-1-miquel.raynal@bootlin.com>
-Message-ID: <20180719230026.8741-11-miquel.raynal@bootlin.com>
+Message-ID: <20180719230026.8741-8-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,95 +13,175 @@ these hooks and convert the driver to just use nand_scan() instead of
 both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-Acked-by: Harvey Hunt <harveyhuntnexus@gmail.com>
 ---
- drivers/mtd/nand/raw/jz4780_nand.c | 34 ++++++++++++++++------------------
- 1 file changed, 16 insertions(+), 18 deletions(-)
+ drivers/mtd/nand/raw/fsmc_nand.c | 148 +++++++++++++++++++++------------------
+ 1 file changed, 78 insertions(+), 70 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/jz4780_nand.c b/drivers/mtd/nand/raw/jz4780_nand.c
-index 49841dad347c..aca4214a6e18 100644
---- a/drivers/mtd/nand/raw/jz4780_nand.c
-+++ b/drivers/mtd/nand/raw/jz4780_nand.c
-@@ -158,9 +158,8 @@ static int jz4780_nand_ecc_correct(struct mtd_info *mtd, u8 *dat,
- 	return jz4780_bch_correct(nfc->bch, &params, dat, read_ecc);
- }
- 
--static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *dev)
-+static int jz4780_nand_attach_chip(struct nand_chip *chip)
- {
--	struct nand_chip *chip = &nand->chip;
- 	struct mtd_info *mtd = nand_to_mtd(chip);
- 	struct jz4780_nand_controller *nfc = to_jz4780_nand_controller(chip->controller);
- 	int eccbytes;
-@@ -171,7 +170,8 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
- 	switch (chip->ecc.mode) {
- 	case NAND_ECC_HW:
- 		if (!nfc->bch) {
--			dev_err(dev, "HW BCH selected, but BCH controller not found\n");
-+			dev_err(nfc->dev,
-+				"HW BCH selected, but BCH controller not found\n");
- 			return -ENODEV;
- 		}
- 
-@@ -180,15 +180,16 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
- 		chip->ecc.correct = jz4780_nand_ecc_correct;
- 		/* fall through */
- 	case NAND_ECC_SOFT:
--		dev_info(dev, "using %s (strength %d, size %d, bytes %d)\n",
--			(nfc->bch) ? "hardware BCH" : "software ECC",
--			chip->ecc.strength, chip->ecc.size, chip->ecc.bytes);
-+		dev_info(nfc->dev, "using %s (strength %d, size %d, bytes %d)\n",
-+			 (nfc->bch) ? "hardware BCH" : "software ECC",
-+			 chip->ecc.strength, chip->ecc.size, chip->ecc.bytes);
- 		break;
- 	case NAND_ECC_NONE:
--		dev_info(dev, "not using ECC\n");
-+		dev_info(nfc->dev, "not using ECC\n");
- 		break;
- 	default:
--		dev_err(dev, "ECC mode %d not supported\n", chip->ecc.mode);
-+		dev_err(nfc->dev, "ECC mode %d not supported\n",
-+			chip->ecc.mode);
- 		return -EINVAL;
- 	}
- 
-@@ -200,7 +201,7 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
- 	eccbytes = mtd->writesize / chip->ecc.size * chip->ecc.bytes;
- 
- 	if (eccbytes > mtd->oobsize - 2) {
--		dev_err(dev,
-+		dev_err(nfc->dev,
- 			"invalid ECC config: required %d ECC bytes, but only %d are available",
- 			eccbytes, mtd->oobsize - 2);
- 		return -EINVAL;
-@@ -211,6 +212,10 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
+diff --git a/drivers/mtd/nand/raw/fsmc_nand.c b/drivers/mtd/nand/raw/fsmc_nand.c
+index 59524d181bfe..020495e6cd55 100644
+--- a/drivers/mtd/nand/raw/fsmc_nand.c
++++ b/drivers/mtd/nand/raw/fsmc_nand.c
+@@ -919,6 +919,82 @@ static int fsmc_nand_probe_config_dt(struct platform_device *pdev,
  	return 0;
  }
  
-+static struct nand_controller_ops jz4780_nand_controller_ops = {
-+	.attach_chip = jz4780_nand_attach_chip,
++static int fsmc_nand_attach_chip(struct nand_chip *nand)
++{
++	struct mtd_info *mtd = nand_to_mtd(nand);
++	struct fsmc_nand_data *host = mtd_to_fsmc(mtd);
++
++	if (AMBA_REV_BITS(host->pid) >= 8) {
++		switch (mtd->oobsize) {
++		case 16:
++		case 64:
++		case 128:
++		case 224:
++		case 256:
++			break;
++		default:
++			dev_warn(host->dev,
++				 "No oob scheme defined for oobsize %d\n",
++				 mtd->oobsize);
++			return -EINVAL;
++		}
++
++		mtd_set_ooblayout(mtd, &fsmc_ecc4_ooblayout_ops);
++
++		return 0;
++	}
++
++	switch (nand->ecc.mode) {
++	case NAND_ECC_HW:
++		dev_info(host->dev, "Using 1-bit HW ECC scheme\n");
++		nand->ecc.calculate = fsmc_read_hwecc_ecc1;
++		nand->ecc.correct = nand_correct_data;
++		nand->ecc.bytes = 3;
++		nand->ecc.strength = 1;
++		break;
++
++	case NAND_ECC_SOFT:
++		if (nand->ecc.algo == NAND_ECC_BCH) {
++			dev_info(host->dev,
++				 "Using 4-bit SW BCH ECC scheme\n");
++			break;
++		}
++
++	case NAND_ECC_ON_DIE:
++		break;
++
++	default:
++		dev_err(host->dev, "Unsupported ECC mode!\n");
++		return -ENOTSUPP;
++	}
++
++	/*
++	 * Don't set layout for BCH4 SW ECC. This will be
++	 * generated later in nand_bch_init() later.
++	 */
++	if (nand->ecc.mode == NAND_ECC_HW) {
++		switch (mtd->oobsize) {
++		case 16:
++		case 64:
++		case 128:
++			mtd_set_ooblayout(mtd,
++					  &fsmc_ecc1_ooblayout_ops);
++			break;
++		default:
++			dev_warn(host->dev,
++				 "No oob scheme defined for oobsize %d\n",
++				 mtd->oobsize);
++			return -EINVAL;
++		}
++	}
++
++	return 0;
++}
++
++static struct nand_controller_ops fsmc_nand_controller_ops = {
++	.attach_chip = fsmc_nand_attach_chip,
 +};
 +
- static int jz4780_nand_init_chip(struct platform_device *pdev,
- 				struct jz4780_nand_controller *nfc,
- 				struct device_node *np,
-@@ -280,15 +285,8 @@ static int jz4780_nand_init_chip(struct platform_device *pdev,
- 	chip->controller = &nfc->controller;
- 	nand_set_flash_node(chip, np);
- 
+ /*
+  * fsmc_nand_probe - Probe function
+  * @pdev:       platform device structure
+@@ -1048,76 +1124,8 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+ 	/*
+ 	 * Scan to find existence of the device
+ 	 */
 -	ret = nand_scan_ident(mtd, 1, NULL);
--	if (ret)
--		return ret;
+-	if (ret) {
+-		dev_err(&pdev->dev, "No NAND Device found!\n");
+-		goto release_dma_write_chan;
+-	}
 -
--	ret = jz4780_nand_init_ecc(nand, dev);
--	if (ret)
--		return ret;
+-	if (AMBA_REV_BITS(host->pid) >= 8) {
+-		switch (mtd->oobsize) {
+-		case 16:
+-		case 64:
+-		case 128:
+-		case 224:
+-		case 256:
+-			break;
+-		default:
+-			dev_warn(&pdev->dev, "No oob scheme defined for oobsize %d\n",
+-				 mtd->oobsize);
+-			ret = -EINVAL;
+-			goto release_dma_write_chan;
+-		}
 -
+-		mtd_set_ooblayout(mtd, &fsmc_ecc4_ooblayout_ops);
+-	} else {
+-		switch (nand->ecc.mode) {
+-		case NAND_ECC_HW:
+-			dev_info(&pdev->dev, "Using 1-bit HW ECC scheme\n");
+-			nand->ecc.calculate = fsmc_read_hwecc_ecc1;
+-			nand->ecc.correct = nand_correct_data;
+-			nand->ecc.bytes = 3;
+-			nand->ecc.strength = 1;
+-			break;
+-
+-		case NAND_ECC_SOFT:
+-			if (nand->ecc.algo == NAND_ECC_BCH) {
+-				dev_info(&pdev->dev, "Using 4-bit SW BCH ECC scheme\n");
+-				break;
+-			}
+-
+-		case NAND_ECC_ON_DIE:
+-			break;
+-
+-		default:
+-			dev_err(&pdev->dev, "Unsupported ECC mode!\n");
+-			goto release_dma_write_chan;
+-		}
+-
+-		/*
+-		 * Don't set layout for BCH4 SW ECC. This will be
+-		 * generated later in nand_bch_init() later.
+-		 */
+-		if (nand->ecc.mode == NAND_ECC_HW) {
+-			switch (mtd->oobsize) {
+-			case 16:
+-			case 64:
+-			case 128:
+-				mtd_set_ooblayout(mtd,
+-						  &fsmc_ecc1_ooblayout_ops);
+-				break;
+-			default:
+-				dev_warn(&pdev->dev,
+-					 "No oob scheme defined for oobsize %d\n",
+-					 mtd->oobsize);
+-				ret = -EINVAL;
+-				goto release_dma_write_chan;
+-			}
+-		}
+-	}
+-
+-	/* Second stage of scan to fill MTD data-structures */
 -	ret = nand_scan_tail(mtd);
-+	chip->controller->ops = &jz4780_nand_controller_ops;
++	nand->dummy_controller.ops = &fsmc_nand_controller_ops;
 +	ret = nand_scan(mtd, 1);
  	if (ret)
- 		return ret;
+ 		goto release_dma_write_chan;
  
 -- 
 2.14.1
