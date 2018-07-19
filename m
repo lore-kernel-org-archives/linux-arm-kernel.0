@@ -1,51 +1,143 @@
 From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Thu, 19 Jul 2018 15:23:27 +0900
-Subject: [PATCH 1/3] ARM: dts: uniphier: add SPI pin-mux node
+Date: Thu, 19 Jul 2018 15:23:29 +0900
+Subject: [PATCH 3/3] arm64: dts: uniphier: add SPI node for LD20, LD11 and PXs3
 In-Reply-To: <1531981409-28396-1-git-send-email-hayashibara.keiji@socionext.com>
 References: <1531981409-28396-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <1531981409-28396-2-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <1531981409-28396-4-git-send-email-hayashibara.keiji@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 
-This commit adds pin-mux nodes for SPI controller.
+Add nodes of SPI controller for UniPhier SoCs.
 
 Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 ---
- arch/arm/boot/dts/uniphier-pinctrl.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 22 ++++++++++++
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 44 ++++++++++++++++++++++++
+ arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi | 22 ++++++++++++
+ 3 files changed, 88 insertions(+)
 
-diff --git a/arch/arm/boot/dts/uniphier-pinctrl.dtsi b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-index 51f0e69..5dc4cf7 100644
---- a/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-@@ -126,6 +126,26 @@
- 		function = "sd1";
- 	};
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+index d63b56e..0edab17 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+@@ -116,6 +116,28 @@
+ 		#size-cells = <1>;
+ 		ranges = <0 0 0 0xffffffff>;
  
-+	pinctrl_spi0: spi0 {
-+		groups = "spi0";
-+		function = "spi0";
-+	};
++		spi0: spi at 54006000 {
++			compatible = "socionext,uniphier-scssi";
++			status = "disabled";
++			reg = <0x54006000 0x100>;
++			interrupts = <0 39 4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spi0>;
++			clocks = <&peri_clk 11>;
++			resets = <&peri_rst 11>;
++		};
 +
-+	pinctrl_spi1: spi1 {
-+		groups = "spi1";
-+		function = "spi1";
-+	};
++		spi1: spi at 54006100 {
++			compatible = "socionext,uniphier-scssi";
++			status = "disabled";
++			reg = <0x54006100 0x100>;
++			interrupts = <0 216 4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spi1>;
++			clocks = <&peri_clk 11>;
++			resets = <&peri_rst 11>;
++		};
 +
-+	pinctrl_spi2: spi2 {
-+		groups = "spi2";
-+		function = "spi2";
-+	};
+ 		serial0: serial at 54006800 {
+ 			compatible = "socionext,uniphier-uart";
+ 			status = "disabled";
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index 0298bd0..1213101 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -222,6 +222,50 @@
+ 		#size-cells = <1>;
+ 		ranges = <0 0 0 0xffffffff>;
+ 
++		spi0: spi at 54006000 {
++			compatible = "socionext,uniphier-scssi";
++			status = "disabled";
++			reg = <0x54006000 0x100>;
++			interrupts = <0 39 4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spi0>;
++			clocks = <&peri_clk 11>;
++			resets = <&peri_rst 11>;
++		};
 +
-+	pinctrl_spi3: spi3 {
-+		groups = "spi3";
-+		function = "spi3";
-+	};
++		spi1: spi at 54006100 {
++			compatible = "socionext,uniphier-scssi";
++			status = "disabled";
++			reg = <0x54006100 0x100>;
++			interrupts = <0 216 4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spi1>;
++			clocks = <&peri_clk 11>;
++			resets = <&peri_rst 11>;
++		};
 +
- 	pinctrl_system_bus: system-bus {
- 		groups = "system_bus", "system_bus_cs1";
- 		function = "system_bus";
++		spi2: spi at 54006200 {
++			compatible = "socionext,uniphier-scssi";
++			status = "disabled";
++			reg = <0x54006200 0x100>;
++			interrupts = <0 229 4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spi2>;
++			clocks = <&peri_clk 11>;
++			resets = <&peri_rst 11>;
++		};
++
++		spi3: spi at 54006300 {
++			compatible = "socionext,uniphier-scssi";
++			status = "disabled";
++			reg = <0x54006300 0x100>;
++			interrupts = <0 230 4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spi3>;
++			clocks = <&peri_clk 11>;
++			resets = <&peri_rst 11>;
++		};
++
+ 		serial0: serial at 54006800 {
+ 			compatible = "socionext,uniphier-uart";
+ 			status = "disabled";
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi b/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
+index 2a4cf42..5b40ec7 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
+@@ -144,6 +144,28 @@
+ 		#size-cells = <1>;
+ 		ranges = <0 0 0 0xffffffff>;
+ 
++		spi0: spi at 54006000 {
++			compatible = "socionext,uniphier-scssi";
++			status = "disabled";
++			reg = <0x54006000 0x100>;
++			interrupts = <0 39 4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spi0>;
++			clocks = <&peri_clk 11>;
++			resets = <&peri_rst 11>;
++		};
++
++		spi1: spi at 54006100 {
++			compatible = "socionext,uniphier-scssi";
++			status = "disabled";
++			reg = <0x54006100 0x100>;
++			interrupts = <0 216 4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spi1>;
++			clocks = <&peri_clk 11>;
++			resets = <&peri_rst 11>;
++		};
++
+ 		serial0: serial at 54006800 {
+ 			compatible = "socionext,uniphier-uart";
+ 			status = "disabled";
 -- 
 2.7.4
