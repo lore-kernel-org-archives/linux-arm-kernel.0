@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 00:59:54 +0200
-Subject: [PATCH v3 01/33] mtd: rawnand: brcmnand: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 00:59:57 +0200
+Subject: [PATCH v3 04/33] mtd: rawnand: denali: convert to nand_scan()
 In-Reply-To: <20180719230026.8741-1-miquel.raynal@bootlin.com>
 References: <20180719230026.8741-1-miquel.raynal@bootlin.com>
-Message-ID: <20180719230026.8741-2-miquel.raynal@bootlin.com>
+Message-ID: <20180719230026.8741-5-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,87 +14,195 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/brcmnand/brcmnand.c | 47 +++++++++++++++++++-------------
- 1 file changed, 28 insertions(+), 19 deletions(-)
+ drivers/mtd/nand/raw/denali.c | 138 +++++++++++++++++++++++-------------------
+ 1 file changed, 77 insertions(+), 61 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/brcmnand/brcmnand.c b/drivers/mtd/nand/raw/brcmnand/brcmnand.c
-index 2e5efa0f9ea2..4a69c13c83f4 100644
---- a/drivers/mtd/nand/raw/brcmnand/brcmnand.c
-+++ b/drivers/mtd/nand/raw/brcmnand/brcmnand.c
-@@ -2208,6 +2208,32 @@ static int brcmnand_setup_dev(struct brcmnand_host *host)
+diff --git a/drivers/mtd/nand/raw/denali.c b/drivers/mtd/nand/raw/denali.c
+index 4d53f41ada08..8325e5231abc 100644
+--- a/drivers/mtd/nand/raw/denali.c
++++ b/drivers/mtd/nand/raw/denali.c
+@@ -1205,62 +1205,12 @@ static int denali_multidev_fixup(struct denali_nand_info *denali)
  	return 0;
  }
  
-+static int brcmnand_attach_chip(struct nand_chip *chip)
-+{
-+	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct brcmnand_host *host = nand_get_controller_data(chip);
-+	int ret;
+-int denali_init(struct denali_nand_info *denali)
++static int denali_attach_chip(struct nand_chip *chip)
+ {
+-	struct nand_chip *chip = &denali->nand;
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
+-	u32 features = ioread32(denali->reg + FEATURES);
++	struct denali_nand_info *denali = mtd_to_denali(mtd);
+ 	int ret;
+ 
+-	mtd->dev.parent = denali->dev;
+-	denali_hw_init(denali);
+-
+-	init_completion(&denali->complete);
+-	spin_lock_init(&denali->irq_lock);
+-
+-	denali_clear_irq_all(denali);
+-
+-	ret = devm_request_irq(denali->dev, denali->irq, denali_isr,
+-			       IRQF_SHARED, DENALI_NAND_NAME, denali);
+-	if (ret) {
+-		dev_err(denali->dev, "Unable to request IRQ\n");
+-		return ret;
+-	}
+-
+-	denali_enable_irq(denali);
+-	denali_reset_banks(denali);
+-
+-	denali->active_bank = DENALI_INVALID_BANK;
+-
+-	nand_set_flash_node(chip, denali->dev->of_node);
+-	/* Fallback to the default name if DT did not give "label" property */
+-	if (!mtd->name)
+-		mtd->name = "denali-nand";
+-
+-	chip->select_chip = denali_select_chip;
+-	chip->read_byte = denali_read_byte;
+-	chip->write_byte = denali_write_byte;
+-	chip->read_word = denali_read_word;
+-	chip->cmd_ctrl = denali_cmd_ctrl;
+-	chip->dev_ready = denali_dev_ready;
+-	chip->waitfunc = denali_waitfunc;
+-
+-	if (features & FEATURES__INDEX_ADDR) {
+-		denali->host_read = denali_indexed_read;
+-		denali->host_write = denali_indexed_write;
+-	} else {
+-		denali->host_read = denali_direct_read;
+-		denali->host_write = denali_direct_write;
+-	}
+-
+-	/* clk rate info is needed for setup_data_interface */
+-	if (denali->clk_rate && denali->clk_x_rate)
+-		chip->setup_data_interface = denali_setup_data_interface;
+-
+-	ret = nand_scan_ident(mtd, denali->max_banks, NULL);
+-	if (ret)
+-		goto disable_irq;
+-
+ 	if (ioread32(denali->reg + FEATURES) & FEATURES__DMA)
+ 		denali->dma_avail = 1;
+ 
+@@ -1293,7 +1243,7 @@ int denali_init(struct denali_nand_info *denali)
+ 				   mtd->oobsize - denali->oob_skip_bytes);
+ 	if (ret) {
+ 		dev_err(denali->dev, "Failed to setup ECC settings.\n");
+-		goto disable_irq;
++		return ret;
+ 	}
+ 
+ 	dev_dbg(denali->dev,
+@@ -1337,7 +1287,7 @@ int denali_init(struct denali_nand_info *denali)
+ 
+ 	ret = denali_multidev_fixup(denali);
+ 	if (ret)
+-		goto disable_irq;
++		return ret;
+ 
+ 	/*
+ 	 * This buffer is DMA-mapped by denali_{read,write}_page_raw.  Do not
+@@ -1345,26 +1295,92 @@ int denali_init(struct denali_nand_info *denali)
+ 	 * guarantee DMA-safe alignment.
+ 	 */
+ 	denali->buf = kmalloc(mtd->writesize + mtd->oobsize, GFP_KERNEL);
+-	if (!denali->buf) {
+-		ret = -ENOMEM;
+-		goto disable_irq;
++	if (!denali->buf)
++		return -ENOMEM;
 +
-+	if (chip->bbt_options & NAND_BBT_USE_FLASH)
-+		chip->bbt_options |= NAND_BBT_NO_OOB;
-+
-+	if (brcmnand_setup_dev(host))
-+		return -ENXIO;
-+
-+	chip->ecc.size = host->hwcfg.sector_size_1k ? 1024 : 512;
-+
-+	/* only use our internal HW threshold */
-+	mtd->bitflip_threshold = 1;
-+
-+	ret = brcmstb_choose_ecc_layout(host);
-+
-+	return ret;
++	return 0;
 +}
 +
-+static struct nand_controller_ops brcmnand_controller_ops = {
-+	.attach_chip = brcmnand_attach_chip,
++static void denali_detach_chip(struct nand_chip *chip)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct denali_nand_info *denali = mtd_to_denali(mtd);
++
++	kfree(denali->buf);
++}
++
++static struct nand_controller_ops denali_controller_ops = {
++	.attach_chip = denali_attach_chip,
++	.detach_chip = denali_detach_chip,
 +};
 +
- static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
- {
- 	struct brcmnand_controller *ctrl = host->ctrl;
-@@ -2267,10 +2293,6 @@ static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
- 	nand_writereg(ctrl, cfg_offs,
- 		      nand_readreg(ctrl, cfg_offs) & ~CFG_BUS_WIDTH);
++int denali_init(struct denali_nand_info *denali)
++{
++	struct nand_chip *chip = &denali->nand;
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	u32 features = ioread32(denali->reg + FEATURES);
++	int ret;
++
++	mtd->dev.parent = denali->dev;
++	denali_hw_init(denali);
++
++	init_completion(&denali->complete);
++	spin_lock_init(&denali->irq_lock);
++
++	denali_clear_irq_all(denali);
++
++	ret = devm_request_irq(denali->dev, denali->irq, denali_isr,
++			       IRQF_SHARED, DENALI_NAND_NAME, denali);
++	if (ret) {
++		dev_err(denali->dev, "Unable to request IRQ\n");
++		return ret;
++	}
++
++	denali_enable_irq(denali);
++	denali_reset_banks(denali);
++
++	denali->active_bank = DENALI_INVALID_BANK;
++
++	nand_set_flash_node(chip, denali->dev->of_node);
++	/* Fallback to the default name if DT did not give "label" property */
++	if (!mtd->name)
++		mtd->name = "denali-nand";
++
++	chip->select_chip = denali_select_chip;
++	chip->read_byte = denali_read_byte;
++	chip->write_byte = denali_write_byte;
++	chip->read_word = denali_read_word;
++	chip->cmd_ctrl = denali_cmd_ctrl;
++	chip->dev_ready = denali_dev_ready;
++	chip->waitfunc = denali_waitfunc;
++
++	if (features & FEATURES__INDEX_ADDR) {
++		denali->host_read = denali_indexed_read;
++		denali->host_write = denali_indexed_write;
++	} else {
++		denali->host_read = denali_direct_read;
++		denali->host_write = denali_direct_write;
+ 	}
  
--	ret = nand_scan_ident(mtd, 1, NULL);
--	if (ret)
--		return ret;
--
- 	chip->options |= NAND_NO_SUBPAGE_WRITE;
- 	/*
- 	 * Avoid (for instance) kmap()'d buffers from JFFS2, which we can't DMA
-@@ -2279,21 +2301,7 @@ static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
- 	 */
- 	chip->options |= NAND_USE_BOUNCE_BUFFER;
- 
--	if (chip->bbt_options & NAND_BBT_USE_FLASH)
--		chip->bbt_options |= NAND_BBT_NO_OOB;
--
--	if (brcmnand_setup_dev(host))
--		return -ENXIO;
--
--	chip->ecc.size = host->hwcfg.sector_size_1k ? 1024 : 512;
--	/* only use our internal HW threshold */
--	mtd->bitflip_threshold = 1;
--
--	ret = brcmstb_choose_ecc_layout(host);
--	if (ret)
--		return ret;
--
 -	ret = nand_scan_tail(mtd);
-+	ret = nand_scan(mtd, 1);
++	/* clk rate info is needed for setup_data_interface */
++	if (denali->clk_rate && denali->clk_x_rate)
++		chip->setup_data_interface = denali_setup_data_interface;
++
++	chip->dummy_controller.ops = &denali_controller_ops;
++	ret = nand_scan(mtd, denali->max_banks);
  	if (ret)
- 		return ret;
+-		goto free_buf;
++		goto disable_irq;
  
-@@ -2434,6 +2442,7 @@ int brcmnand_probe(struct platform_device *pdev, struct brcmnand_soc *soc)
- 	init_completion(&ctrl->done);
- 	init_completion(&ctrl->dma_done);
- 	nand_controller_init(&ctrl->controller);
-+	ctrl->controller.ops = &brcmnand_controller_ops;
- 	INIT_LIST_HEAD(&ctrl->host_list);
+ 	ret = mtd_device_register(mtd, NULL, 0);
+ 	if (ret) {
+ 		dev_err(denali->dev, "Failed to register MTD: %d\n", ret);
+ 		goto cleanup_nand;
+ 	}
++
+ 	return 0;
  
- 	/* NAND register range */
+ cleanup_nand:
+ 	nand_cleanup(chip);
+-free_buf:
+-	kfree(denali->buf);
+ disable_irq:
+ 	denali_disable_irq(denali);
+ 
 -- 
 2.14.1
