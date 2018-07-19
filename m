@@ -1,45 +1,35 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 19 Jul 2018 10:20:25 +0200
-Subject: [PATCH v2 0/3] net: extend eth_platform_get_mac_address()
-Message-ID: <20180719082028.26116-1-brgl@bgdev.pl>
+Date: Thu, 19 Jul 2018 10:20:26 +0200
+Subject: [PATCH v2 1/3] net: fortify eth_platform_get_mac_address()
+In-Reply-To: <20180719082028.26116-1-brgl@bgdev.pl>
+References: <20180719082028.26116-1-brgl@bgdev.pl>
+Message-ID: <20180719082028.26116-2-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a follow-up to a series I posted a while ago the goal of which
-was to replace the at24 platform data with device properties. To do so
-we need to somehow remove reading the MAC address from relevant board
-files.
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-In my patches I used nvmem and MTD to read the MAC address from within
-the davinci emac driver. It was suggested that we generalize it further
-but since MTD doesn't support nvmem yet, the best we can do is to move
-this code over to net core code.
+We'll soon have more sources from which to read the MAC address in this
+routine. Make sure the address is correct before returning it.
 
-The following patches modify the eth_platform_get_mac_address()
-function which seems to be the best candidate for this code.
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+---
+ net/ethernet/eth.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The first patch calls is_valid_ether_addr() on the read address so
-that we're sure it's correct.
-
-The last two patches add nvmem and MTD support to the function. In
-order to stay compatible with existing users, nvmem and MTD will be
-tried last - after device tree and arch-specific callback.
-
-If this series gets accepted I will modify my previous patches to
-use it instead of handcoding the same operations in davinci_emac.
-
-v1 -> v2:
-- dropped patches 1 & 2
-- improved the MAC address verification and fixed a potential buffer
-  overflow in patch 2/3
-
-Bartosz Golaszewski (3):
-  net: fortify eth_platform_get_mac_address()
-  net: add support for nvmem to eth_platform_get_mac_address()
-  net: add MTD support to eth_platform_get_mac_address()
-
- net/ethernet/eth.c | 47 +++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 46 insertions(+), 1 deletion(-)
-
+diff --git a/net/ethernet/eth.c b/net/ethernet/eth.c
+index ee28440f57c5..39af03894598 100644
+--- a/net/ethernet/eth.c
++++ b/net/ethernet/eth.c
+@@ -541,7 +541,7 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
+ 	if (!addr)
+ 		addr = arch_get_platform_mac_address();
+ 
+-	if (!addr)
++	if (!addr || !is_valid_ether_addr(addr))
+ 		return -ENODEV;
+ 
+ 	ether_addr_copy(mac_addr, addr);
 -- 
 2.17.1
