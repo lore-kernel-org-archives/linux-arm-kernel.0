@@ -1,58 +1,35 @@
-From: sravanhome@gmail.com (Saravanan Sekar)
-Date: Thu, 19 Jul 2018 11:06:48 +0200
-Subject: [PATCH v7 4/5] arm64: dts: actions: Add Clock Management Unit for S700
-In-Reply-To: <20180719090649.12460-1-sravanhome@gmail.com>
-References: <20180719090649.12460-1-sravanhome@gmail.com>
-Message-ID: <20180719090649.12460-5-sravanhome@gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 19 Jul 2018 10:10:23 +0100
+Subject: [PATCH v8 2/4] arm64: KVM: export the capability to set guest
+ SError syndrome
+In-Reply-To: <86da7b47-5026-5ec7-96dc-4d3a14caa2f8@huawei.com>
+References: <20180713154751.18131-1-james.morse@arm.com>
+ <20180713154751.18131-3-james.morse@arm.com>
+ <CAFEAcA9pK7W=gSZXTOTxFEFDmc6kJ8GDYO4a6r_P1FHp+KuT9A@mail.gmail.com>
+ <86da7b47-5026-5ec7-96dc-4d3a14caa2f8@huawei.com>
+Message-ID: <CAFEAcA_Amw6Pr+DmeZXHDWKQPSYf_826hDDwna2fwQvOP1+9og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Clock Management Unit for Actions Semi S700 SoC.
+On 19 July 2018 at 09:54, gengdongjiu <gengdongjiu@huawei.com> wrote:
+> Hi peter,
+>   Thanks for the review.
+>
+> On 2018/7/18 0:36, Peter Maydell wrote:
+>> How does this capability interact with the KVM_CAP_VCPU_EVENTS
+>> API in patch 1? Is it saying "you can specify the ESR via
+>> that API", or talking about something else?
+>
+> The user space will firstly check the  KVM_CAP_VCPU_EVENTS through kvm_has_vcpu_events() to know whether KVM can support get/set vcpu events,
+> If KVM supports get/set vcpu events, it will check KVM_CAP_ARM_SET_SERROR_ESR to know whether can set guest SError ESR, as shown the user space code in [1].
 
-Signed-off-by: Parthiban Nallathambi <pn@denx.de>
-Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
----
- arch/arm64/boot/dts/actions/s700.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+OK, so this capability affects the behaviour of
+KVM_SET_VCPU_EVENTS. Can you make sure the documentation
+of KVM_SET_VCPU_EVENTS clearly explains what happens
+and the effect of whether this capability is present,
+please? People trying to understand the behaviour of
+that ioctl are not going to know that they need to
+look here as well.
 
-diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
-index 66dd5309f0a2..59d29e4ca404 100644
---- a/arch/arm64/boot/dts/actions/s700.dtsi
-+++ b/arch/arm64/boot/dts/actions/s700.dtsi
-@@ -4,6 +4,7 @@
-  */
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/actions,s700-cmu.h>
- 
- / {
- 	compatible = "actions,s700";
-@@ -87,6 +88,12 @@
- 		#clock-cells = <0>;
- 	};
- 
-+	losc: losc {
-+		compatible = "fixed-clock";
-+		clock-frequency = <32768>;
-+		#clock-cells = <0>;
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
-@@ -153,6 +160,13 @@
- 			status = "disabled";
- 		};
- 
-+		cmu: clock-controller at e0168000 {
-+			compatible = "actions,s700-cmu";
-+			reg = <0x0 0xe0168000 0x0 0x1000>;
-+			clocks = <&hosc>, <&losc>;
-+			#clock-cells = <1>;
-+		};
-+
- 		sps: power-controller at e01b0100 {
- 			compatible = "actions,s700-sps";
- 			reg = <0x0 0xe01b0100 0x0 0x100>;
--- 
-2.14.4
+thanks
+-- PMM
