@@ -1,90 +1,33 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 19 Jul 2018 17:32:42 +0200
-Subject: [PATCH v3 2/3] net: add support for nvmem to
- eth_platform_get_mac_address()
-In-Reply-To: <20180719153243.20944-1-brgl@bgdev.pl>
-References: <20180719153243.20944-1-brgl@bgdev.pl>
-Message-ID: <20180719153243.20944-3-brgl@bgdev.pl>
+Date: Thu, 19 Jul 2018 17:35:04 +0200
+Subject: [PATCH 5/5] net: add MTD support to eth_platform_get_mac_address()
+In-Reply-To: <20180719152712.GE9119@lunn.ch>
+References: <20180718161035.7005-1-brgl@bgdev.pl>
+ <20180718161035.7005-6-brgl@bgdev.pl>
+ <20180718164737.GE12477@lunn.ch>
+ <CAMRc=MeRv3_C8_R-Awfr1zjLa3G_CVAACc-2t_ihB+1v+BCTGw@mail.gmail.com>
+ <20180718170352.GF12477@lunn.ch>
+ <CAMRc=Md3oeEktzrA9UZyNPX6pB4bG+Gv0o6cjbs0UUKb3sYTsA@mail.gmail.com>
+ <20180719150138.GC9119@lunn.ch>
+ <CAMRc=MfKedvD2OXes02op2ErGR2HKkzJwjHtv5i4NkbJAVg3dw@mail.gmail.com>
+ <20180719152712.GE9119@lunn.ch>
+Message-ID: <CAMRc=MeqnRXF_R1J5G8ySvCr8pZhZMHiV3WHNFun=d8GjiOT9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+2018-07-19 17:27 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
+>> Unfortunately: this would effectively block me from improving the
+>> support for older davinci boards.
+>
+> Is there something blocking you from converting the board to device
+> tree? This is something i did with a lot of the Marvell boards a few
+> years ago. For a while, we had both DT and board setup files. After a
+> couple of cycles, we killed off the setup files.
+>
+>        Andrew
 
-Many non-DT platforms read the MAC address from EEPROM. Usually it's
-either done with callbacks defined in board files or from SoC-specific
-ethernet drivers.
+Actually some board are supported both in DT and board files
+(da850-evm) right now, but Sekhar wants to keep the support via board
+files in the kernel so that's a no go.
 
-In order to generalize this, try to read the MAC from nvmem in
-eth_platform_get_mac_address() using a standard lookup name:
-"mac-address".
-
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- net/ethernet/eth.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
-
-diff --git a/net/ethernet/eth.c b/net/ethernet/eth.c
-index cf54cdf042b7..98bc280b8a62 100644
---- a/net/ethernet/eth.c
-+++ b/net/ethernet/eth.c
-@@ -54,6 +54,7 @@
- #include <linux/if_ether.h>
- #include <linux/of_net.h>
- #include <linux/pci.h>
-+#include <linux/nvmem-consumer.h>
- #include <net/dst.h>
- #include <net/arp.h>
- #include <net/sock.h>
-@@ -559,6 +560,39 @@ static int mac_address_from_arch(u8 *mac_addr)
- 	return 0;
- }
- 
-+static int mac_address_from_nvmem(struct device *dev, u8 *mac_addr)
-+{
-+	const unsigned char *addr;
-+	struct nvmem_cell *cell;
-+	size_t alen;
-+	int rv = 0;
-+
-+	cell = nvmem_cell_get(dev, "mac-address");
-+	if (IS_ERR(cell))
-+		return PTR_ERR(cell);
-+
-+	addr = nvmem_cell_read(cell, &alen);
-+	if (IS_ERR(addr)) {
-+		rv = PTR_ERR(addr);
-+		goto put_nvmem;
-+	}
-+
-+	if (alen != ETH_ALEN || !is_valid_ether_addr(addr)) {
-+		rv = -ENODEV;
-+		goto free_addr;
-+	}
-+
-+	ether_addr_copy(mac_addr, addr);
-+
-+free_addr:
-+	kfree(addr);
-+
-+put_nvmem:
-+	nvmem_cell_put(cell);
-+
-+	return rv;
-+}
-+
- int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
- {
- 	int rv;
-@@ -571,6 +605,10 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
- 	if (!rv)
- 		return 0;
- 
-+	rv = mac_address_from_nvmem(dev, mac_addr);
-+	if (!rv)
-+		return 0;
-+
- 	return -ENODEV;
- }
- EXPORT_SYMBOL(eth_platform_get_mac_address);
--- 
-2.17.1
+Bart
