@@ -1,29 +1,57 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Thu, 19 Jul 2018 18:08:46 +0200
-Subject: [PATCH v4 01/10] KVM: arm/arm64: vgic: Define GICD_IIDR fields
- for GICv2 and GIv3
-In-Reply-To: <1531746387-7033-2-git-send-email-christoffer.dall@arm.com>
-References: <1531746387-7033-1-git-send-email-christoffer.dall@arm.com>
- <1531746387-7033-2-git-send-email-christoffer.dall@arm.com>
-Message-ID: <20180719160846.gvguydoolpn2olzz@kamzik.brq.redhat.com>
+From: gustavo@embeddedor.com (Gustavo A. R. Silva)
+Date: Thu, 19 Jul 2018 11:09:37 -0500
+Subject: [PATCH] mtd: nuc900_nand: mark expected switch fall-through
+In-Reply-To: <20180718100309.49c5452a@xps13>
+References: <20180710132902.GA13541@embeddedor.com>
+ <20180718100309.49c5452a@xps13>
+Message-ID: <c789531d-809b-a921-252e-7c38c7821b55@embeddedor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2018 at 03:06:18PM +0200, Christoffer Dall wrote:
-> Instead of hardcoding the shifts and masks in the GICD_IIDR register
-> emulation, let's add the definition of these fields to the GIC header
-> files and use them.
+Hi Miquel,
+
+On 07/18/2018 03:03 AM, Miquel Raynal wrote:
+> Hi Gustavo,
 > 
-> This will make things more obvious when we're going to bump the revision
-> in the IIDR when we'll make guest-visible changes to the implementation.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
-> ---
->  include/linux/irqchip/arm-gic-v3.h | 10 ++++++++++
->  include/linux/irqchip/arm-gic.h    | 10 ++++++++++
->  virt/kvm/arm/vgic/vgic-mmio-v2.c   |  3 ++-
->  virt/kvm/arm/vgic/vgic-mmio-v3.c   |  3 ++-
->  4 files changed, 24 insertions(+), 2 deletions(-)
+> Prefix should be "mtd: rawnand: nuc900:"
 > 
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+Oh OK. I'll fix it.
+
+> "Gustavo A. R. Silva" <gustavo@embeddedor.com> wrote on Tue, 10 Jul
+> 2018 08:29:02 -0500:
+> 
+>> In preparation to enabling -Wimplicit-fallthrough, mark switch cases
+>> where we are expecting to fall through.
+>>
+>> Addresses-Coverity-ID: 1471717 ("Missing break in switch")
+>> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+>> ---
+>>  drivers/mtd/nand/raw/nuc900_nand.c | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mtd/nand/raw/nuc900_nand.c b/drivers/mtd/nand/raw/nuc900_nand.c
+>> index af5b32c9..53a9f6c 100644
+>> --- a/drivers/mtd/nand/raw/nuc900_nand.c
+>> +++ b/drivers/mtd/nand/raw/nuc900_nand.c
+>> @@ -191,8 +191,9 @@ static void nuc900_nand_command_lp(struct mtd_info *mtd, unsigned int command,
+>>  		return;
+>>  
+>>  	case NAND_CMD_READ0:
+>> -
+>>  		write_cmd_reg(nand, NAND_CMD_READSTART);
+>> +		/* fall through */
+> 
+> Have you checked this is actually the right thing to do?
+> 
+
+Actually, no. My first impression was that due to the time this code has been
+there, this might be a missing-break false positive. But, now that I'm double
+checking, it may well be that this is an actual missing-break bug.
+
+I can send a patch to fix this, but as I'm not familiar with the code, it'd be
+of great help if someone could help me to verify this.
+
+Thanks for the feedback.
+--
+Gustavo
