@@ -1,10 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 01:00:05 +0200
-Subject: [PATCH v3 12/33] mtd: rawnand: lpc32xx_slc: convert driver to
- nand_scan()
+Date: Fri, 20 Jul 2018 01:00:02 +0200
+Subject: [PATCH v3 09/33] mtd: rawnand: hisi504: convert driver to nand_scan()
 In-Reply-To: <20180719230026.8741-1-miquel.raynal@bootlin.com>
 References: <20180719230026.8741-1-miquel.raynal@bootlin.com>
-Message-ID: <20180719230026.8741-13-miquel.raynal@bootlin.com>
+Message-ID: <20180719230026.8741-10-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,103 +14,109 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/lpc32xx_slc.c | 77 +++++++++++++++++++++-----------------
- 1 file changed, 42 insertions(+), 35 deletions(-)
+ drivers/mtd/nand/raw/hisi504_nand.c | 78 +++++++++++++++++++++----------------
+ 1 file changed, 44 insertions(+), 34 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/lpc32xx_slc.c b/drivers/mtd/nand/raw/lpc32xx_slc.c
-index 42820aa1abab..41c135567e8c 100644
---- a/drivers/mtd/nand/raw/lpc32xx_slc.c
-+++ b/drivers/mtd/nand/raw/lpc32xx_slc.c
-@@ -779,6 +779,46 @@ static struct lpc32xx_nand_cfg_slc *lpc32xx_parse_dt(struct device *dev)
- 	return ncfg;
+diff --git a/drivers/mtd/nand/raw/hisi504_nand.c b/drivers/mtd/nand/raw/hisi504_nand.c
+index a1e009c8e556..34867e91df84 100644
+--- a/drivers/mtd/nand/raw/hisi504_nand.c
++++ b/drivers/mtd/nand/raw/hisi504_nand.c
+@@ -709,9 +709,50 @@ static int hisi_nfc_ecc_probe(struct hinfc_host *host)
+ 	return 0;
  }
  
-+static int lpc32xx_nand_attach_chip(struct nand_chip *chip)
++static int hisi_nfc_attach_chip(struct nand_chip *chip)
 +{
 +	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct lpc32xx_nand_host *host = nand_get_controller_data(chip);
++	struct hinfc_host *host = nand_get_controller_data(chip);
++	int flag;
 +
-+	/* OOB and ECC CPU and DMA work areas */
-+	host->ecc_buf = (uint32_t *)(host->data_buf + LPC32XX_DMA_DATA_SIZE);
++	host->buffer = dmam_alloc_coherent(host->dev,
++					   mtd->writesize + mtd->oobsize,
++					   &host->dma_buffer, GFP_KERNEL);
++	if (!host->buffer)
++		return -ENOMEM;
 +
++	host->dma_oob = host->dma_buffer + mtd->writesize;
++	memset(host->buffer, 0xff, mtd->writesize + mtd->oobsize);
++
++	flag = hinfc_read(host, HINFC504_CON);
++	flag &= ~(HINFC504_CON_PAGESIZE_MASK << HINFC504_CON_PAGEISZE_SHIFT);
++	switch (mtd->writesize) {
++	case 2048:
++		flag |= (0x001 << HINFC504_CON_PAGEISZE_SHIFT);
++		break;
 +	/*
-+	 * Small page FLASH has a unique OOB layout, but large and huge
-+	 * page FLASH use the standard layout. Small page FLASH uses a
-+	 * custom BBT marker layout.
++	 * TODO: add more pagesize support,
++	 * default pagesize has been set in hisi_nfc_host_init
 +	 */
-+	if (mtd->writesize <= 512)
-+		mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
-+
-+	/* These sizes remain the same regardless of page size */
-+	chip->ecc.size = 256;
-+	chip->ecc.bytes = LPC32XX_SLC_DEV_ECC_BYTES;
-+	chip->ecc.prepad = 0;
-+	chip->ecc.postpad = 0;
-+
-+	/*
-+	 * Use a custom BBT marker setup for small page FLASH that
-+	 * won't interfere with the ECC layout. Large and huge page
-+	 * FLASH use the standard layout.
-+	 */
-+	if ((chip->bbt_options & NAND_BBT_USE_FLASH) &&
-+	    mtd->writesize <= 512) {
-+		chip->bbt_td = &bbt_smallpage_main_descr;
-+		chip->bbt_md = &bbt_smallpage_mirror_descr;
++	default:
++		dev_err(host->dev, "NON-2KB page size nand flash\n");
++		return -EINVAL;
 +	}
++	hinfc_write(host, flag, HINFC504_CON);
++
++	if (chip->ecc.mode == NAND_ECC_HW)
++		hisi_nfc_ecc_probe(host);
 +
 +	return 0;
 +}
 +
-+static struct nand_controller_ops lpc32xx_nand_controller_ops = {
-+	.attach_chip = lpc32xx_nand_attach_chip,
++static struct nand_controller_ops hisi_nfc_controller_ops = {
++	.attach_chip = hisi_nfc_attach_chip,
 +};
 +
- /*
-  * Probe for NAND controller
-  */
-@@ -884,41 +924,8 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+ static int hisi_nfc_probe(struct platform_device *pdev)
+ {
+-	int ret = 0, irq, flag, max_chips = HINFC504_MAX_CHIP;
++	int ret = 0, irq, max_chips = HINFC504_MAX_CHIP;
+ 	struct device *dev = &pdev->dev;
+ 	struct hinfc_host *host;
+ 	struct nand_chip  *chip;
+@@ -769,42 +810,11 @@ static int hisi_nfc_probe(struct platform_device *pdev)
+ 		return ret;
  	}
  
- 	/* Find NAND device */
--	res = nand_scan_ident(mtd, 1, NULL);
--	if (res)
--		goto release_dma;
+-	ret = nand_scan_ident(mtd, max_chips, NULL);
++	chip->dummy_controller.ops = &hisi_nfc_controller_ops;
++	ret = nand_scan(mtd, max_chips);
+ 	if (ret)
+ 		return ret;
+ 
+-	host->buffer = dmam_alloc_coherent(dev, mtd->writesize + mtd->oobsize,
+-		&host->dma_buffer, GFP_KERNEL);
+-	if (!host->buffer)
+-		return -ENOMEM;
 -
--	/* OOB and ECC CPU and DMA work areas */
--	host->ecc_buf = (uint32_t *)(host->data_buf + LPC32XX_DMA_DATA_SIZE);
+-	host->dma_oob = host->dma_buffer + mtd->writesize;
+-	memset(host->buffer, 0xff, mtd->writesize + mtd->oobsize);
 -
+-	flag = hinfc_read(host, HINFC504_CON);
+-	flag &= ~(HINFC504_CON_PAGESIZE_MASK << HINFC504_CON_PAGEISZE_SHIFT);
+-	switch (mtd->writesize) {
+-	case 2048:
+-		flag |= (0x001 << HINFC504_CON_PAGEISZE_SHIFT); break;
 -	/*
--	 * Small page FLASH has a unique OOB layout, but large and huge
--	 * page FLASH use the standard layout. Small page FLASH uses a
--	 * custom BBT marker layout.
+-	 * TODO: add more pagesize support,
+-	 * default pagesize has been set in hisi_nfc_host_init
 -	 */
--	if (mtd->writesize <= 512)
--		mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
+-	default:
+-		dev_err(dev, "NON-2KB page size nand flash\n");
+-		return -EINVAL;
+-	}
+-	hinfc_write(host, flag, HINFC504_CON);
 -
--	/* These sizes remain the same regardless of page size */
--	chip->ecc.size = 256;
--	chip->ecc.bytes = LPC32XX_SLC_DEV_ECC_BYTES;
--	chip->ecc.prepad = chip->ecc.postpad = 0;
+-	if (chip->ecc.mode == NAND_ECC_HW)
+-		hisi_nfc_ecc_probe(host);
 -
--	/*
--	 * Use a custom BBT marker setup for small page FLASH that
--	 * won't interfere with the ECC layout. Large and huge page
--	 * FLASH use the standard layout.
--	 */
--	if ((chip->bbt_options & NAND_BBT_USE_FLASH) &&
--	    mtd->writesize <= 512) {
--		chip->bbt_td = &bbt_smallpage_main_descr;
--		chip->bbt_md = &bbt_smallpage_mirror_descr;
+-	ret = nand_scan_tail(mtd);
+-	if (ret) {
+-		dev_err(dev, "nand_scan_tail failed: %d\n", ret);
+-		return ret;
 -	}
 -
--	/*
--	 * Fills out all the uninitialized function pointers with the defaults
--	 */
--	res = nand_scan_tail(mtd);
-+	chip->dummy_controller.ops = &lpc32xx_nand_controller_ops;
-+	res = nand_scan(mtd, 1);
- 	if (res)
- 		goto release_dma;
- 
+ 	ret = mtd_device_register(mtd, NULL, 0);
+ 	if (ret) {
+ 		dev_err(dev, "Err MTD partition=%d\n", ret);
 -- 
 2.14.1
