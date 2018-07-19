@@ -1,50 +1,144 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 19 Jul 2018 10:08:37 +0200
-Subject: [PATCH RESEND v2 1/2] drm/sun4i: sun4i: Register quirks with the
- backend structure
-Message-ID: <20180719080838.31598-1-paul.kocialkowski@bootlin.com>
+Date: Thu, 19 Jul 2018 10:08:38 +0200
+Subject: [PATCH RESEND v2 2/2] drm/sun4i: sun4i: Introduce a quirk for lowest
+ plane alpha support
+In-Reply-To: <20180719080838.31598-1-paul.kocialkowski@bootlin.com>
+References: <20180719080838.31598-1-paul.kocialkowski@bootlin.com>
+Message-ID: <20180719080838.31598-2-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In prevision for introducing a new quirk that will be used at atomic
-plane check time, register the quirks structure with the backend
-structure. This way, it can easily be grabbed where needed.
+Not all sunxi platforms with the first version of the Display Engine
+support an alpha component on the plane with the lowest z position
+(as in: lowest z-pos), that gets blended with the background color.
+
+In particular, the A13 is known to have this limitation. However, it was
+recently discovered that the A20 and A33 are capable of having alpha on
+their lowest plane.
+
+Thus, this introduces a specific quirk to indicate such support,
+per-platform. Since this was not tested on sun4i and sun6i platforms, a
+conservative approach is kept and this feature is not supported.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
 
-Version 2 of this series was resent to include this patch, that was
-missing from the original v2 submission but is still very much needed.
+Changes since v1:
+* reordered backend declaration;
+* updated comment to reflect that not all platforms are affected;
+* used num_alpha_planes_max variable instead of define, since it is now
+  dynamic;
+* reordered check to have quirk first in associated conditional.
 
- drivers/gpu/drm/sun4i/sun4i_backend.c | 2 ++
- drivers/gpu/drm/sun4i/sun4i_backend.h | 2 ++
- 2 files changed, 4 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 40 +++++++++++++++++----------
+ drivers/gpu/drm/sun4i/sun4i_backend.h |  1 -
+ 2 files changed, 26 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index de0a76dfa1a2..075cb0ff56ca 100644
+index 075cb0ff56ca..685fc3840c6d 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -882,6 +882,8 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
- 				    : SUN4I_BACKEND_MODCTL_OUT_LCD0));
- 	}
- 
-+	backend->quirks = quirks;
-+
- 	return 0;
- 
- err_disable_ram_clk:
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index 4caee0392fa4..ad6609323f0e 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -187,6 +187,8 @@ struct sun4i_backend {
- 	/* Protects against races in the frontend teardown */
- 	spinlock_t		frontend_lock;
- 	bool			frontend_teardown;
-+
-+	const struct sun4i_backend_quirks	*quirks;
+@@ -34,6 +34,8 @@
+ struct sun4i_backend_quirks {
+ 	/* backend <-> TCON muxing selection done in backend */
+ 	bool needs_output_muxing;
++	/* alpha at the lowest z position is not always supported */
++	bool supports_lowest_plane_alpha;
  };
  
- static inline struct sun4i_backend *
+ static const u32 sunxi_rgb2yuv_coef[12] = {
+@@ -463,12 +465,14 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 				      struct drm_crtc_state *crtc_state)
+ {
+ 	struct drm_plane_state *plane_states[SUN4I_BACKEND_NUM_LAYERS] = { 0 };
++	struct sun4i_backend *backend = engine_to_sun4i_backend(engine);
+ 	struct drm_atomic_state *state = crtc_state->state;
+ 	struct drm_device *drm = state->dev;
+ 	struct drm_plane *plane;
+ 	unsigned int num_planes = 0;
+ 	unsigned int num_alpha_planes = 0;
+ 	unsigned int num_frontend_planes = 0;
++	unsigned int num_alpha_planes_max = 1;
+ 	unsigned int num_yuv_planes = 0;
+ 	unsigned int current_pipe = 0;
+ 	unsigned int i;
+@@ -532,33 +536,39 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 	 * the layer with the highest priority.
+ 	 *
+ 	 * The second step is the actual alpha blending, that takes
+-	 * the two pipes as input, and uses the eventual alpha
++	 * the two pipes as input, and uses the potential alpha
+ 	 * component to do the transparency between the two.
+ 	 *
+-	 * This two steps scenario makes us unable to guarantee a
++	 * This two-step scenario makes us unable to guarantee a
+ 	 * robust alpha blending between the 4 layers in all
+ 	 * situations, since this means that we need to have one layer
+ 	 * with alpha at the lowest position of our two pipes.
+ 	 *
+-	 * However, we cannot even do that, since the hardware has a
+-	 * bug where the lowest plane of the lowest pipe (pipe 0,
+-	 * priority 0), if it has any alpha, will discard the pixel
+-	 * entirely and just display the pixels in the background
+-	 * color (black by default).
++	 * However, we cannot even do that on every platform, since the
++	 * hardware has a bug where the lowest plane of the lowest pipe
++	 * (pipe 0, priority 0), if it has any alpha, will discard the
++	 * pixel data entirely and just display the pixels in the
++	 * background color (black by default).
+ 	 *
+-	 * This means that we effectively have only three valid
+-	 * configurations with alpha, all of them with the alpha being
+-	 * on pipe1 with the lowest position, which can be 1, 2 or 3
+-	 * depending on the number of planes and their zpos.
++	 * This means that on the affected platforms, we effectively
++	 * have only three valid configurations with alpha, all of them
++	 * with the alpha being on pipe1 with the lowest position, which
++	 * can be 1, 2 or 3 depending on the number of planes and their zpos.
+ 	 */
+-	if (num_alpha_planes > SUN4I_BACKEND_NUM_ALPHA_LAYERS) {
++
++	/* For platforms that are not affected by the issue described above. */
++	if (backend->quirks->supports_lowest_plane_alpha)
++		num_alpha_planes_max++;
++
++	if (num_alpha_planes > num_alpha_planes_max) {
+ 		DRM_DEBUG_DRIVER("Too many planes with alpha, rejecting...\n");
+ 		return -EINVAL;
+ 	}
+ 
+ 	/* We can't have an alpha plane at the lowest position */
+-	if (plane_states[0]->fb->format->has_alpha ||
+-	    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE))
++	if (!backend->quirks->supports_lowest_plane_alpha &&
++	    (plane_states[0]->fb->format->has_alpha ||
++	    (plane_states[0]->alpha != DRM_BLEND_ALPHA_OPAQUE)))
+ 		return -EINVAL;
+ 
+ 	for (i = 1; i < num_planes; i++) {
+@@ -943,9 +953,11 @@ static const struct sun4i_backend_quirks sun6i_backend_quirks = {
+ 
+ static const struct sun4i_backend_quirks sun7i_backend_quirks = {
+ 	.needs_output_muxing = true,
++	.supports_lowest_plane_alpha = true,
+ };
+ 
+ static const struct sun4i_backend_quirks sun8i_a33_backend_quirks = {
++	.supports_lowest_plane_alpha = true,
+ };
+ 
+ static const struct sun4i_backend_quirks sun9i_backend_quirks = {
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
+index ad6609323f0e..e3d4c6035eb2 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.h
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
+@@ -167,7 +167,6 @@
+ #define SUN4I_BACKEND_PIPE_OFF(p)		(0x5000 + (0x400 * (p)))
+ 
+ #define SUN4I_BACKEND_NUM_LAYERS		4
+-#define SUN4I_BACKEND_NUM_ALPHA_LAYERS		1
+ #define SUN4I_BACKEND_NUM_FRONTEND_LAYERS	1
+ #define SUN4I_BACKEND_NUM_YUV_PLANES		1
+ 
 -- 
 2.18.0
