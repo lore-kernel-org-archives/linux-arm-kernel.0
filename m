@@ -1,51 +1,54 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 19 Jul 2018 17:01:38 +0200
-Subject: [PATCH 5/5] net: add MTD support to eth_platform_get_mac_address()
-In-Reply-To: <CAMRc=Md3oeEktzrA9UZyNPX6pB4bG+Gv0o6cjbs0UUKb3sYTsA@mail.gmail.com>
-References: <20180718161035.7005-1-brgl@bgdev.pl>
- <20180718161035.7005-6-brgl@bgdev.pl>
- <20180718164737.GE12477@lunn.ch>
- <CAMRc=MeRv3_C8_R-Awfr1zjLa3G_CVAACc-2t_ihB+1v+BCTGw@mail.gmail.com>
- <20180718170352.GF12477@lunn.ch>
- <CAMRc=Md3oeEktzrA9UZyNPX6pB4bG+Gv0o6cjbs0UUKb3sYTsA@mail.gmail.com>
-Message-ID: <20180719150138.GC9119@lunn.ch>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 19 Jul 2018 17:02:44 +0200
+Subject: [RFC PATCH 10/16] KVM: arm64: Add a vcpu flag to control SVE
+ visibility for the guest
+In-Reply-To: <1529593060-542-11-git-send-email-Dave.Martin@arm.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-11-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180719150244.cybuq65qc6pt7hek@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 10:14:29AM +0200, Bartosz Golaszewski wrote:
-> 2018-07-18 19:03 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
-> >> >> +#ifdef CONFIG_MTD
-> >> >> +     /* NOTE: this should go away as soon as MTD gets nvmem support. */
-> >> >> +     if (!addr) {
-> >> >> +             struct mtd_info *mtd;
-> >> >> +             int rv;
-> >> >> +
-> >> >> +             mtd = get_mtd_device_nm("MAC-Address");
-> >> >
-> >> > In order for this to go away, you need to keep backwards
-> >> > compatibility. When using nvmem, you look for a cell called
-> >> > "mac-address". Here you are looking for "MAC-Address". That is going
-> >> > to make backwards compatibility harder. How do you plan to do it?
-> >> >
-> >> >    Andrew
-> >>
-> >> I'm trying to adjust to already existing users. The only user of
-> >> get_mtd_device_nm() who calls it to read the MAC address registers a
-> >> partition called "MAC-Address". We can't change it since it's visible
-> >> from user space. In the future we'd just have to have a list of
-> >> supported string that we'd use to do the nvmem lookup.
-> >
-> > Why not have the nvmem cell called "MAC-Address"? When you add nvmem
-> > support to MTD, i assume you are going to map each MTD partition to an
-> > nvmem cell?
+On Thu, Jun 21, 2018 at 03:57:34PM +0100, Dave Martin wrote:
+> Since SVE will be enabled or disabled on a per-vcpu basis, a flag
+> is needed in order to track which vcpus have it enabled.
 > 
-> Because all existing users of nvmem use "mac-address" as the name of
-> this cell already. I guess we will need to live with both in this
-> particular function.
+> This patch adds a suitable flag and a helper for checking it.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_host.h | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 9671ddd..609d08b 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -308,6 +308,14 @@ struct kvm_vcpu_arch {
+>  #define KVM_ARM64_FP_HOST		(1 << 2) /* host FP regs loaded */
+>  #define KVM_ARM64_HOST_SVE_IN_USE	(1 << 3) /* backup for host TIF_SVE */
+>  #define KVM_ARM64_HOST_SVE_ENABLED	(1 << 4) /* SVE enabled for EL0 */
+> +#define KVM_ARM64_GUEST_HAS_SVE		(1 << 5) /* SVE exposed to guest */
+> +
+> +static inline bool vcpu_has_sve(struct kvm_vcpu_arch const *vcpu_arch)
 
-So i'm not convinced this last patch is making things better. I would
-prefer if it was dropped for the moment. Wait until MTD via nvmem is
-actually implemented and there is a concrete concept of how a MAC
-address would be looked up without having lots of ugly code.
+Shouldn't this vcpu function take a vcpu instead of a vcpu_arch?
 
-	Andrew
+Thanks,
+drew
+
+> +{
+> +	return system_supports_sve() &&
+> +		(vcpu_arch->flags & KVM_ARM64_GUEST_HAS_SVE);
+> +
+> +}
+>  
+>  #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
+>  
+> -- 
+> 2.1.4
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
