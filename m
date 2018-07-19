@@ -1,72 +1,359 @@
-From: jacopo@jmondi.org (Jacopo Mondi)
-Date: Thu, 19 Jul 2018 21:48:13 +0200
-Subject: [RFC] ARM: imx6q: add ENET_CLK_SEL mux option
-Message-ID: <1532029693-22764-1-git-send-email-jacopo@jmondi.org>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Thu, 19 Jul 2018 12:57:24 -0700
+Subject: [PATCH v2] ARM: dts: vf610: Add ZII CFU1 board
+Message-ID: <20180719195724.15563-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is just an attempt to set IOMUX_GPR1[21] bit...
+Add support for the Zodiac Inflight Innovations CFU1
+board (VF610-based).
 
-Not-Signed-off-by: Jacopo Mondi <jacopo@jmondi.org>
-
----
-Hello imx people (recipients list comes from get_maintainer script)
-
-   I'm very new to this platform, so pardon me if I'm asking a question here,
-more than sending an actual patch.
-
-Context: I have a board that needs bit 21 of register IOMUX_GPR1 set.
-This basically tells the SoC to use an internally generated clock as clock
-reference for the external PHY chip.
-
-I dug a bit in the imx pincontroller driver and in the imx6q/dl device trees,
-and I've found out that mmio-mux is used to control the IOMUX_GPR* registers.
-
-So I've copied what has been done here by Philipp in commit bc97e88ecd and
-added a new entry to the "mux-reg-masks" property and then referenced it with
-a new sub-node of the mmio-mux node.
-
-So far, I think I got it properly.
-
-Question is, how do I trigger the actual writing of that bit? Do I need to
-reference the newly introduced "enet_clk_mux" sub-node from the fec device
-node? Does the fec driver support muxes as the video-mux.c driver does? It
-doesn't seems to me :(
-
-Thanks for your time in replying to this
-    j
-
-also: I know it's wrong adding this to imx6q.dtsi, please bear with it for now.
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: cphealy at gmail.com
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
 
- arch/arm/boot/dts/imx6q.dtsi | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+Changes since [v1]:
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 70483ce..4dd4d42 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -317,6 +317,11 @@
- 			};
- 		};
- 	};
+    - Fixed DT warning when compiling with W=1
+
+    - Collected Reviewed-by from Fabio
+
+[v1] lkml.kernel.org/r/20180719005941.10458-1-andrew.smirnov at gmail.com
+
+ arch/arm/boot/dts/Makefile           |   1 +
+ arch/arm/boot/dts/vf610-zii-cfu1.dts | 305 +++++++++++++++++++++++++++
+ 2 files changed, 306 insertions(+)
+ create mode 100644 arch/arm/boot/dts/vf610-zii-cfu1.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index e331b2c16539..85797819fdd9 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -569,6 +569,7 @@ dtb-$(CONFIG_SOC_VF610) += \
+ 	vf610-cosmic.dtb \
+ 	vf610m4-cosmic.dtb \
+ 	vf610-twr.dtb \
++	vf610-zii-cfu1.dtb \
+ 	vf610-zii-dev-rev-b.dtb \
+ 	vf610-zii-dev-rev-c.dtb \
+ 	vf610-zii-ssmb-spu3.dtb
+diff --git a/arch/arm/boot/dts/vf610-zii-cfu1.dts b/arch/arm/boot/dts/vf610-zii-cfu1.dts
+new file mode 100644
+index 000000000000..37777cf22e67
+--- /dev/null
++++ b/arch/arm/boot/dts/vf610-zii-cfu1.dts
+@@ -0,0 +1,305 @@
++// SPDX-License-Identifier: (GPL-2.0 OR MIT)
 +
-+	enet_clk_mux {
-+		compatible = "enet-mux";
-+		mux-controls = <&mux 7>;
++/*
++ * Copyright (C) 2018 Zodiac Inflight Innovations
++ */
++
++/dts-v1/;
++#include "vf610.dtsi"
++
++/ {
++	model = "ZII VF610 CFU1 Board";
++	compatible = "zii,vf610cfu1", "zii,vf610dev", "fsl,vf610";
++
++	chosen {
++		stdout-path = &uart0;
 +	};
- };
-
- &hdmi {
-@@ -452,7 +457,8 @@
- 			<0x0c 0x000000c0>, /* LVDS0_MUX_CTL */
- 			<0x0c 0x00000300>, /* LVDS1_MUX_CTL */
- 			<0x28 0x00000003>, /* DCIC1_MUX_CTL */
--			<0x28 0x0000000c>; /* DCIC2_MUX_CTL */
-+			<0x28 0x0000000c>, /* DCIC2_MUX_CTL */
-+			<0x04 0x00200000>; /* ENET_CLK_SEL */
- };
-
- &vpu {
---
-2.7.4
++
++	memory at 80000000 {
++		reg = <0x80000000 0x20000000>;
++	};
++
++	gpio-leds {
++		compatible = "gpio-leds";
++		pinctrl-0 = <&pinctrl_leds_debug>;
++		pinctrl-names = "default";
++
++		led-debug {
++			label = "zii:green:debug1";
++			gpios = <&gpio2 18 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++			max-brightness = <1>;
++		};
++
++		led-fail {
++			label = "zii:red:fail";
++			gpios = <&gpio3 12 GPIO_ACTIVE_LOW>;
++			default-state = "off";
++			max-brightness = <1>;
++		};
++
++		led-status {
++			label = "zii:green:status";
++			gpios = <&gpio3 13 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++			max-brightness = <1>;
++		};
++
++		led-debug-a {
++			label = "zii:green:debug_a";
++			gpios = <&gpio3 14 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++			max-brightness = <1>;
++		};
++
++		led-debug-b {
++			label = "zii:green:debug_b";
++			gpios = <&gpio3 15 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++			max-brightness = <1>;
++		};
++	};
++
++	reg_vcc_3v3_mcu: regulator-vcc-3v3-mcu {
++		 compatible = "regulator-fixed";
++		 regulator-name = "vcc_3v3_mcu";
++		 regulator-min-microvolt = <3300000>;
++		 regulator-max-microvolt = <3300000>;
++	};
++};
++
++&adc0 {
++	vref-supply = <&reg_vcc_3v3_mcu>;
++	status = "okay";
++};
++
++&adc1 {
++	vref-supply = <&reg_vcc_3v3_mcu>;
++	status = "okay";
++};
++
++&dspi1 {
++	bus-num = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_dspi1>;
++	status = "okay";
++
++	m25p128 at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "m25p128", "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <50000000>;
++
++		partition at 0 {
++			label = "m25p128-0";
++			reg = <0x0 0x01000000>;
++		};
++	};
++};
++
++&edma0 {
++	status = "okay";
++};
++
++&edma1 {
++	status = "okay";
++};
++
++&esdhc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_esdhc0>;
++	bus-width = <8>;
++	non-removable;
++	no-1-8-v;
++	keep-power-in-suspend;
++	status = "okay";
++};
++
++&esdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_esdhc1>;
++	bus-width = <4>;
++	status = "okay";
++};
++
++&fec1 {
++	phy-mode = "rmii";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec1>;
++	status = "okay";
++
++	fixed-link {
++		speed = <100>;
++		full-duplex;
++	};
++
++	mdio1: mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "okay";
++
++		switch0: switch0 at 0 {
++			compatible = "marvell,mv88e6085";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_switch>;
++			reg = <0>;
++			eeprom-length = <512>;
++			interrupt-parent = <&gpio3>;
++			interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			reset-gpios = <&gpio3 11 GPIO_ACTIVE_LOW>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					label = "eth_cu_1000_1";
++				};
++
++				port at 1 {
++					reg = <1>;
++					label = "eth_cu_1000_2";
++				};
++
++				port at 2 {
++					reg = <2>;
++					label = "eth_cu_1000_3";
++				};
++
++				port at 6 {
++					reg = <6>;
++					label = "cpu";
++					ethernet = <&fec1>;
++
++					fixed-link {
++						speed = <100>;
++						full-duplex;
++					};
++				};
++			};
++		};
++	};
++};
++
++&i2c0 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c0>;
++	status = "okay";
++
++	pca9554 at 22 {
++		compatible = "nxp,pca9554";
++		reg = <0x22>;
++		gpio-controller;
++	};
++
++	lm75 at 48 {
++		compatible = "national,lm75";
++		reg = <0x48>;
++	};
++
++	at24c04 at 52 {
++		compatible = "atmel,24c04";
++		reg = <0x52>;
++		label = "nvm";
++	};
++
++	at24c04 at 54 {
++		compatible = "atmel,24c04";
++		reg = <0x54>;
++		label = "nameplate";
++	};
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart0>;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl_dspi1: dspi1grp {
++		fsl,pins = <
++			VF610_PAD_PTD5__DSPI1_CS0		0x1182
++			VF610_PAD_PTC6__DSPI1_SIN		0x1181
++			VF610_PAD_PTC7__DSPI1_SOUT		0x1182
++			VF610_PAD_PTC8__DSPI1_SCK		0x1182
++		>;
++	};
++
++	pinctrl_esdhc0: esdhc0grp {
++		fsl,pins = <
++			VF610_PAD_PTC0__ESDHC0_CLK		0x31ef
++			VF610_PAD_PTC1__ESDHC0_CMD		0x31ef
++			VF610_PAD_PTC2__ESDHC0_DAT0		0x31ef
++			VF610_PAD_PTC3__ESDHC0_DAT1		0x31ef
++			VF610_PAD_PTC4__ESDHC0_DAT2		0x31ef
++			VF610_PAD_PTC5__ESDHC0_DAT3		0x31ef
++			VF610_PAD_PTD23__ESDHC0_DAT4		0x31ef
++			VF610_PAD_PTD22__ESDHC0_DAT5		0x31ef
++			VF610_PAD_PTD21__ESDHC0_DAT6		0x31ef
++			VF610_PAD_PTD20__ESDHC0_DAT7		0x31ef
++		>;
++	};
++
++	pinctrl_esdhc1: esdhc1grp {
++		fsl,pins = <
++			VF610_PAD_PTA24__ESDHC1_CLK		0x31ef
++			VF610_PAD_PTA25__ESDHC1_CMD		0x31ef
++			VF610_PAD_PTA26__ESDHC1_DAT0		0x31ef
++			VF610_PAD_PTA27__ESDHC1_DAT1		0x31ef
++			VF610_PAD_PTA28__ESDHC1_DATA2		0x31ef
++			VF610_PAD_PTA29__ESDHC1_DAT3		0x31ef
++		>;
++	};
++
++	pinctrl_fec1: fec1grp {
++		fsl,pins = <
++			VF610_PAD_PTA6__RMII_CLKIN		0x30d1
++			VF610_PAD_PTC9__ENET_RMII1_MDC		0x30fe
++			VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
++			VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
++			VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
++			VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
++			VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
++			VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
++			VF610_PAD_PTC16__ENET_RMII1_TXD0	0x30d2
++			VF610_PAD_PTC17__ENET_RMII1_TXEN	0x30d2
++		>;
++	};
++
++	pinctrl_i2c0: i2c0grp {
++		fsl,pins = <
++			VF610_PAD_PTB14__I2C0_SCL		0x37ff
++			VF610_PAD_PTB15__I2C0_SDA		0x37ff
++		>;
++	};
++
++	pinctrl_leds_debug: pinctrl-leds-debug {
++		fsl,pins = <
++			VF610_PAD_PTD3__GPIO_82			0x31c2
++			VF610_PAD_PTE3__GPIO_108		0x31c2
++			VF610_PAD_PTE4__GPIO_109		0x31c2
++			VF610_PAD_PTE5__GPIO_110		0x31c2
++			VF610_PAD_PTE6__GPIO_111		0x31c2
++		>;
++	};
++
++	pinctrl_switch: switch-grp {
++		fsl,pins = <
++			VF610_PAD_PTB28__GPIO_98		0x3061
++			VF610_PAD_PTE2__GPIO_107		0x1042
++		>;
++	};
++
++	pinctrl_uart0: uart0grp {
++		fsl,pins = <
++			VF610_PAD_PTB10__UART0_TX		0x21a2
++			VF610_PAD_PTB11__UART0_RX		0x21a1
++		>;
++	};
++};
+-- 
+2.17.1
