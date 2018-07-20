@@ -1,172 +1,101 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 20 Jul 2018 17:39:16 -0300
-Subject: [PATCH 1/6] ARM: dts: imx28-evk: Move regulators outside simple-bus
-Message-ID: <1532119161-16597-1-git-send-email-festevam@gmail.com>
+Date: Fri, 20 Jul 2018 17:39:17 -0300
+Subject: [PATCH 2/6] ARM: dts: imx28-evk: Convert to the new display bindings
+In-Reply-To: <1532119161-16597-1-git-send-email-festevam@gmail.com>
+References: <1532119161-16597-1-git-send-email-festevam@gmail.com>
+Message-ID: <1532119161-16597-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-It is recommended to place regulators outside simple-bus, so move them
-accordingly.
+imx28-evk board has a Seiko 43WVF1G parallel display.
+
+Instead of hardcoding the display timings in the device tree, use
+the "sii,43wvf1g" compatible instead.
+
+This aligns with the new mxsfb bindings scheme documented at:
+Documentation/devicetree/bindings/display/mxsfb.txt
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx28-evk.dts | 135 ++++++++++++++++++----------------------
- 1 file changed, 61 insertions(+), 74 deletions(-)
+ arch/arm/boot/dts/imx28-evk.dts | 48 ++++++++++++++++++++---------------------
+ 1 file changed, 24 insertions(+), 24 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 6b0ae66..210aee0 100644
+index 210aee0..93ab5bd 100644
 --- a/arch/arm/boot/dts/imx28-evk.dts
 +++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -13,6 +13,67 @@
- 		reg = <0x40000000 0x08000000>;
+@@ -74,6 +74,26 @@
+ 		enable-active-high;
  	};
  
-+
-+	reg_3p3v: regulator-3p3v {
++	reg_lcd_5v: regulator-lcd-5v {
 +		compatible = "regulator-fixed";
-+		regulator-name = "3P3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
-+
-+	reg_vddio_sd0: regulator-vddio-sd0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vddio-sd0";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio3 28 0>;
-+	};
-+
-+	reg_fec_3v3: regulator-fec-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fec-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio2 15 0>;
-+	};
-+
-+	reg_usb0_vbus: regulator-usb0-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb0_vbus";
++		regulator-name = "lcd-5v";
 +		regulator-min-microvolt = <5000000>;
 +		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio3 9 0>;
-+		enable-active-high;
 +	};
 +
-+	reg_usb1_vbus: regulator-usb1-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio3 8 0>;
-+		enable-active-high;
-+	};
++	panel {
++		compatible = "sii,43wvf1g";
++		backlight = <&backlight_display>;
++		dvdd-supply = <&reg_lcd_3v3>;
++		avdd-supply = <&reg_lcd_5v>;
 +
-+	reg_lcd_3v3: regulator-lcd-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "lcd-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio3 30 0>;
-+		enable-active-high;
-+	};
-+
-+	reg_can_3v3: regulator-can-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "can-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio2 13 0>;
-+		enable-active-high;
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&display_out>;
++			};
++		};
 +	};
 +
  	apb at 80000000 {
  		apbh at 80000000 {
  			gpmi-nand at 8000c000 {
-@@ -269,80 +330,6 @@
+@@ -177,31 +197,11 @@
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&lcdif_24bit_pins_a
+ 					     &lcdif_pins_evk>;
+-				lcd-supply = <&reg_lcd_3v3>;
+-				display = <&display0>;
+ 				status = "okay";
+ 
+-				display0: display0 {
+-					bits-per-pixel = <32>;
+-					bus-width = <24>;
+-
+-					display-timings {
+-						native-mode = <&timing0>;
+-						timing0: timing0 {
+-							clock-frequency = <33500000>;
+-							hactive = <800>;
+-							vactive = <480>;
+-							hback-porch = <89>;
+-							hfront-porch = <164>;
+-							vback-porch = <23>;
+-							vfront-porch = <10>;
+-							hsync-len = <10>;
+-							vsync-len = <10>;
+-							hsync-active = <0>;
+-							vsync-active = <0>;
+-							de-active = <1>;
+-							pixelclk-active = <0>;
+-						};
++				port {
++					display_out: endpoint {
++						remote-endpoint = <&panel_in>;
+ 					};
+ 				};
+ 			};
+@@ -350,7 +350,7 @@
  		};
  	};
  
--	regulators {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		reg_3p3v: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "3P3V";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			regulator-always-on;
--		};
--
--		reg_vddio_sd0: regulator at 1 {
--			compatible = "regulator-fixed";
--			reg = <1>;
--			regulator-name = "vddio-sd0";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			gpio = <&gpio3 28 0>;
--		};
--
--		reg_fec_3v3: regulator at 2 {
--			compatible = "regulator-fixed";
--			reg = <2>;
--			regulator-name = "fec-3v3";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			gpio = <&gpio2 15 0>;
--		};
--
--		reg_usb0_vbus: regulator at 3 {
--			compatible = "regulator-fixed";
--			reg = <3>;
--			regulator-name = "usb0_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			gpio = <&gpio3 9 0>;
--			enable-active-high;
--		};
--
--		reg_usb1_vbus: regulator at 4 {
--			compatible = "regulator-fixed";
--			reg = <4>;
--			regulator-name = "usb1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			gpio = <&gpio3 8 0>;
--			enable-active-high;
--		};
--
--		reg_lcd_3v3: regulator at 5 {
--			compatible = "regulator-fixed";
--			reg = <5>;
--			regulator-name = "lcd-3v3";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			gpio = <&gpio3 30 0>;
--			enable-active-high;
--		};
--
--		reg_can_3v3: regulator at 6 {
--			compatible = "regulator-fixed";
--			reg = <6>;
--			regulator-name = "can-3v3";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			gpio = <&gpio2 13 0>;
--			enable-active-high;
--		};
--
--	};
--
- 	sound {
- 		compatible = "fsl,imx28-evk-sgtl5000",
- 			     "fsl,mxs-audio-sgtl5000";
+-	backlight {
++	backlight_display: backlight {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm 2 5000000>;
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
 -- 
 2.7.4
