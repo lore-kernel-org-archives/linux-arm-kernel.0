@@ -1,128 +1,297 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Fri, 20 Jul 2018 09:35:40 +0200
-Subject: [PATCH v3 28/33] mtd: rawnand: docg4: convert driver to
- nand_scan()
-In-Reply-To: <20180720091745.7b1de031@xps13>
-References: <20180719230026.8741-1-miquel.raynal@bootlin.com>
- <20180719230026.8741-29-miquel.raynal@bootlin.com>
- <20180720012732.3753e0ef@bbrezillon>
- <20180720091745.7b1de031@xps13>
-Message-ID: <20180720093540.1fd211dd@bbrezillon>
+From: marcel@ziswiler.com (Marcel Ziswiler)
+Date: Fri, 20 Jul 2018 09:51:48 +0200
+Subject: [PATCH] ASoC: wm9712: fix replace codec to component
+Message-ID: <20180720075148.14648-1-marcel@ziswiler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Jul 2018 09:17:45 +0200
-Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 
-> Hi Boris,
-> 
-> Boris Brezillon <boris.brezillon@bootlin.com> wrote on Fri, 20 Jul 2018
-> 01:27:32 +0200:
-> 
-> > On Fri, 20 Jul 2018 01:00:21 +0200
-> > Miquel Raynal <miquel.raynal@bootlin.com> wrote:
-> >   
-> > > Two helpers have been added to the core to make ECC-related
-> > > configuration between the detection phase and the final NAND scan. Use
-> > > these hooks and convert the driver to just use nand_scan() instead of
-> > > both nand_scan_ident() and nand_scan_tail().
-> > > 
-> > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > > ---
-> > >  drivers/mtd/nand/raw/docg4.c | 55 ++++++++++++++++++++++++++------------------
-> > >  1 file changed, 32 insertions(+), 23 deletions(-)
-> > > 
-> > > diff --git a/drivers/mtd/nand/raw/docg4.c b/drivers/mtd/nand/raw/docg4.c
-> > > index 4dccdfba6140..2f6fcd4efab2 100644
-> > > --- a/drivers/mtd/nand/raw/docg4.c
-> > > +++ b/drivers/mtd/nand/raw/docg4.c
-> > > @@ -1227,10 +1227,9 @@ static void __init init_mtd_structs(struct mtd_info *mtd)
-> > >  	 * required within a nand driver because they are performed by the nand
-> > >  	 * infrastructure code as part of nand_scan().  In this case they need
-> > >  	 * to be initialized here because we skip call to nand_scan_ident() (the
-> > > -	 * first half of nand_scan()).  The call to nand_scan_ident() is skipped
-> > > -	 * because for this device the chip id is not read in the manner of a
-> > > -	 * standard nand device.  Unfortunately, nand_scan_ident() does other
-> > > -	 * things as well, such as call nand_set_defaults().
-> > > +	 * first half of nand_scan()).  The call to nand_scan_ident() could be
-> > > +	 * skipped because for this device the chip id is not read in the manner
-> > > +	 * of a standard nand device.
-> > >  	 */
-> > >  
-> > >  	struct nand_chip *nand = mtd_to_nand(mtd);
-> > > @@ -1315,6 +1314,27 @@ static int __init read_id_reg(struct mtd_info *mtd)
-> > >  
-> > >  static char const *part_probes[] = { "cmdlinepart", "saftlpart", NULL };
-> > >  
-> > > +static int docg4_attach_chip(struct nand_chip *chip)
-> > > +{
-> > > +	struct mtd_info *mtd = nand_to_mtd(chip);
-> > > +	struct docg4_priv *doc = (struct docg4_priv *)(chip + 1);
-> > > +
-> > > +	init_mtd_structs(mtd);
-> > > +
-> > > +	/* Initialize kernel BCH algorithm */
-> > > +	doc->bch = init_bch(DOCG4_M, DOCG4_T, DOCG4_PRIMITIVE_POLY);
-> > > +	if (!doc->bch)
-> > > +		return -EINVAL;
-> > > +
-> > > +	reset(mtd);
-> > > +
-> > > +	return read_id_reg(mtd);
-> > > +}
-> > > +
-> > > +static struct nand_controller_ops docg4_controller_ops = {
-> > > +	.attach_chip = docg4_attach_chip,
-> > > +};
-> > > +
-> > >  static int __init probe_docg4(struct platform_device *pdev)
-> > >  {
-> > >  	struct mtd_info *mtd;
-> > > @@ -1350,26 +1370,16 @@ static int __init probe_docg4(struct platform_device *pdev)
-> > >  	mtd->dev.parent = &pdev->dev;
-> > >  	doc->virtadr = virtadr;
-> > >  	doc->dev = dev;
-> > > -
-> > > -	init_mtd_structs(mtd);
-> > > -
-> > > -	/* initialize kernel bch algorithm */
-> > > -	doc->bch = init_bch(DOCG4_M, DOCG4_T, DOCG4_PRIMITIVE_POLY);
-> > > -	if (doc->bch == NULL) {
-> > > -		retval = -EINVAL;
-> > > -		goto free_nand;
-> > > -	}
-> > > -
-> > >  	platform_set_drvdata(pdev, doc);
-> > >  
-> > > -	reset(mtd);
-> > > -	retval = read_id_reg(mtd);
-> > > -	if (retval == -ENODEV) {
-> > > -		dev_warn(dev, "No diskonchip G4 device found.\n");
-> > > -		goto free_bch;
-> > > -	}
-> > > -
-> > > -	retval = nand_scan_tail(mtd);
-> > > +	/*
-> > > +	 * Asking for 0 chips is useless here but it warns the user that the use
-> > > +	 * of the nand_scan() function is a bit abused here because the
-> > > +	 * initialization is actually a bit specific and re-handled again in the
-> > > +	 * ->attach_chip() hook. It will probably leak some memory though.
-> > > +	 */
-> > > +	nand->dummy_controller.ops = &docg4_controller_ops;
-> > > +	retval = nand_scan(mtd, 0);
-> > >  	if (retval)
-> > >  		goto free_bch;    
-> > 
-> > Hm, not sure this works. The driver only calls nand_scan_tail(), but
-> > you replace that by a call to nand_scan(), which will call both
-> > nand_scan_ident() and nand_scan_tail(), and I'm pretty sure
-> > nand_scan_ident() will fail here.  
-> 
-> I know docg4 is a bit specific and could maybe be moved out of the raw/
-> subdirectory. But in the meantime I don't want to block the series for
-> this. The better I can propose right now (open to other ideas as
-> well) would be to return 0 in nand_scan_ident() if the maxchip parameter
-> is 0 which is the case only in this driver AFAIS.
+Since commit 143b44845d87 ("ASoC: wm9712: replace codec to component")
+"wm9712-codec" got renamed to "wm9712-component", however, this change
+never got propagated down to the actual board/platform drivers. E.g. on
+Colibri T20 this lead to the following spew upon boot with sound/touch
+being broken:
 
-Sounds good. Just document this particular case in nand_scan_ident()
-kernel-doc header.
+[    2.214121] tegra-snd-wm9712 sound: ASoC: CODEC DAI wm9712-hifi not registered
+[    2.222137] tegra-snd-wm9712 sound: snd_soc_register_card failed (-517)
+...
+[    2.344384] tegra-snd-wm9712 sound: ASoC: CODEC DAI wm9712-hifi not registered
+[    2.351885] tegra-snd-wm9712 sound: snd_soc_register_card failed (-517)
+...
+[    2.668339] tegra-snd-wm9712 sound: ASoC: CODEC DAI wm9712-hifi not registered
+[    2.675811] tegra-snd-wm9712 sound: snd_soc_register_card failed (-517)
+...
+[    3.208408] tegra-snd-wm9712 sound: ASoC: CODEC DAI wm9712-hifi not registered
+[    3.216312] tegra-snd-wm9712 sound: snd_soc_register_card failed (-517)
+...
+[    3.235397] tegra-snd-wm9712 sound: ASoC: CODEC DAI wm9712-hifi not registered
+[    3.248938] tegra-snd-wm9712 sound: snd_soc_register_card failed (-517)
+...
+[   14.970443] ALSA device list:
+[   14.996628]   No soundcards found.
+
+This commit finally fixes this again.
+
+Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+
+---
+
+ arch/arm/mach-pxa/tosa.c             | 2 +-
+ arch/mips/alchemy/devboards/db1300.c | 2 +-
+ drivers/mfd/wm97xx-core.c            | 6 +++---
+ sound/soc/au1x/db1200.c              | 4 ++--
+ sound/soc/fsl/pcm030-audio-fabric.c  | 6 +++---
+ sound/soc/fsl/phycore-ac97.c         | 6 +++---
+ sound/soc/pxa/e800_wm9712.c          | 4 ++--
+ sound/soc/pxa/em-x270.c              | 4 ++--
+ sound/soc/pxa/palm27x.c              | 4 ++--
+ sound/soc/pxa/tosa.c                 | 4 ++--
+ sound/soc/tegra/tegra_wm9712.c       | 4 ++--
+ 11 files changed, 23 insertions(+), 23 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
+index cb5cd8e78c94..32011e600496 100644
+--- a/arch/arm/mach-pxa/tosa.c
++++ b/arch/arm/mach-pxa/tosa.c
+@@ -848,7 +848,7 @@ static struct platform_device sharpsl_rom_device = {
+ };
+ 
+ static struct platform_device wm9712_device = {
+-	.name	= "wm9712-codec",
++	.name	= "wm9712-component",
+ 	.id	= -1,
+ };
+ 
+diff --git a/arch/mips/alchemy/devboards/db1300.c b/arch/mips/alchemy/devboards/db1300.c
+index efb318e03e0a..841a27736eb1 100644
+--- a/arch/mips/alchemy/devboards/db1300.c
++++ b/arch/mips/alchemy/devboards/db1300.c
+@@ -638,7 +638,7 @@ static struct platform_device db1300_sd0_dev = {
+ /**********************************************************************/
+ 
+ static struct platform_device db1300_wm9715_dev = {
+-	.name		= "wm9712-codec",
++	.name		= "wm9712-component",
+ 	.id		= 1,	/* ID of PSC for AC97 audio, see asoc glue! */
+ };
+ 
+diff --git a/drivers/mfd/wm97xx-core.c b/drivers/mfd/wm97xx-core.c
+index f5a8347f837f..9fec11fc0410 100644
+--- a/drivers/mfd/wm97xx-core.c
++++ b/drivers/mfd/wm97xx-core.c
+@@ -109,7 +109,7 @@ static const struct regmap_config wm9705_regmap_config = {
+ };
+ 
+ static struct mfd_cell wm9705_cells[] = {
+-	{ .name = "wm9705-codec", },
++	{ .name = "wm9705-component", },
+ 	{ .name = "wm97xx-ts", },
+ };
+ 
+@@ -177,7 +177,7 @@ static const struct regmap_config wm9712_regmap_config = {
+ };
+ 
+ static struct mfd_cell wm9712_cells[] = {
+-	{ .name = "wm9712-codec", },
++	{ .name = "wm9712-component", },
+ 	{ .name = "wm97xx-ts", },
+ };
+ 
+@@ -248,7 +248,7 @@ static const struct regmap_config wm9713_regmap_config = {
+ };
+ 
+ static struct mfd_cell wm9713_cells[] = {
+-	{ .name = "wm9713-codec", },
++	{ .name = "wm9713-component", },
+ 	{ .name = "wm97xx-ts", },
+ };
+ 
+diff --git a/sound/soc/au1x/db1200.c b/sound/soc/au1x/db1200.c
+index 301e1fc9a377..d452478d62b4 100644
+--- a/sound/soc/au1x/db1200.c
++++ b/sound/soc/au1x/db1200.c
+@@ -52,7 +52,7 @@ static struct snd_soc_dai_link db1200_ac97_dai = {
+ 	.codec_dai_name	= "ac97-hifi",
+ 	.cpu_dai_name	= "au1xpsc_ac97.1",
+ 	.platform_name	= "au1xpsc-pcm.1",
+-	.codec_name	= "ac97-codec.1",
++	.codec_name	= "ac97-component.1",
+ };
+ 
+ static struct snd_soc_card db1200_ac97_machine = {
+@@ -68,7 +68,7 @@ static struct snd_soc_dai_link db1300_ac97_dai = {
+ 	.codec_dai_name	= "wm9712-hifi",
+ 	.cpu_dai_name	= "au1xpsc_ac97.1",
+ 	.platform_name	= "au1xpsc-pcm.1",
+-	.codec_name	= "wm9712-codec.1",
++	.codec_name	= "wm9712-component.1",
+ };
+ 
+ static struct snd_soc_card db1300_ac97_machine = {
+diff --git a/sound/soc/fsl/pcm030-audio-fabric.c b/sound/soc/fsl/pcm030-audio-fabric.c
+index ec731223cab3..869f4b226ccd 100644
+--- a/sound/soc/fsl/pcm030-audio-fabric.c
++++ b/sound/soc/fsl/pcm030-audio-fabric.c
+@@ -33,14 +33,14 @@ static struct snd_soc_dai_link pcm030_fabric_dai[] = {
+ 	.stream_name = "AC97 Analog",
+ 	.codec_dai_name = "wm9712-hifi",
+ 	.cpu_dai_name = "mpc5200-psc-ac97.0",
+-	.codec_name = "wm9712-codec",
++	.codec_name = "wm9712-component",
+ },
+ {
+ 	.name = "AC97.1",
+ 	.stream_name = "AC97 IEC958",
+ 	.codec_dai_name = "wm9712-aux",
+ 	.cpu_dai_name = "mpc5200-psc-ac97.1",
+-	.codec_name = "wm9712-codec",
++	.codec_name = "wm9712-component",
+ },
+ };
+ 
+@@ -85,7 +85,7 @@ static int pcm030_fabric_probe(struct platform_device *op)
+ 	if (ret)
+ 		dev_err(&op->dev, "request_module returned: %d\n", ret);
+ 
+-	pdata->codec_device = platform_device_alloc("wm9712-codec", -1);
++	pdata->codec_device = platform_device_alloc("wm9712-component", -1);
+ 	if (!pdata->codec_device)
+ 		dev_err(&op->dev, "platform_device_alloc() failed\n");
+ 
+diff --git a/sound/soc/fsl/phycore-ac97.c b/sound/soc/fsl/phycore-ac97.c
+index 66fb6c4614d2..dbd81d3b7c2c 100644
+--- a/sound/soc/fsl/phycore-ac97.c
++++ b/sound/soc/fsl/phycore-ac97.c
+@@ -30,8 +30,8 @@ static struct snd_soc_dai_link imx_phycore_dai_ac97[] = {
+ 	{
+ 		.name		= "HiFi",
+ 		.stream_name	= "HiFi",
+-		.codec_dai_name		= "wm9712-hifi",
+-		.codec_name	= "wm9712-codec",
++		.codec_dai_name	= "wm9712-hifi",
++		.codec_name	= "wm9712-component",
+ 		.cpu_dai_name	= "imx-ssi.0",
+ 		.platform_name	= "imx-ssi.0",
+ 		.ops		= &imx_phycore_hifi_ops,
+@@ -88,7 +88,7 @@ static int __init imx_phycore_init(void)
+ 	if (ret)
+ 		goto fail1;
+ 
+-	imx_phycore_snd_device = platform_device_alloc("wm9712-codec", -1);
++	imx_phycore_snd_device = platform_device_alloc("wm9712-component", -1);
+ 	if (!imx_phycore_snd_device) {
+ 		ret = -ENOMEM;
+ 		goto fail2;
+diff --git a/sound/soc/pxa/e800_wm9712.c b/sound/soc/pxa/e800_wm9712.c
+index 1ed8aa2348f1..937746d1e23e 100644
+--- a/sound/soc/pxa/e800_wm9712.c
++++ b/sound/soc/pxa/e800_wm9712.c
+@@ -75,7 +75,7 @@ static struct snd_soc_dai_link e800_dai[] = {
+ 		.cpu_dai_name = "pxa2xx-ac97",
+ 		.codec_dai_name = "wm9712-hifi",
+ 		.platform_name = "pxa-pcm-audio",
+-		.codec_name = "wm9712-codec",
++		.codec_name = "wm9712-component",
+ 	},
+ 	{
+ 		.name = "AC97 Aux",
+@@ -83,7 +83,7 @@ static struct snd_soc_dai_link e800_dai[] = {
+ 		.cpu_dai_name = "pxa2xx-ac97-aux",
+ 		.codec_dai_name = "wm9712-aux",
+ 		.platform_name = "pxa-pcm-audio",
+-		.codec_name = "wm9712-codec",
++		.codec_name = "wm9712-component",
+ 	},
+ };
+ 
+diff --git a/sound/soc/pxa/em-x270.c b/sound/soc/pxa/em-x270.c
+index e046770ce70e..e958c4c241f6 100644
+--- a/sound/soc/pxa/em-x270.c
++++ b/sound/soc/pxa/em-x270.c
+@@ -37,7 +37,7 @@ static struct snd_soc_dai_link em_x270_dai[] = {
+ 		.cpu_dai_name = "pxa2xx-ac97",
+ 		.codec_dai_name = "wm9712-hifi",
+ 		.platform_name = "pxa-pcm-audio",
+-		.codec_name = "wm9712-codec",
++		.codec_name = "wm9712-component",
+ 	},
+ 	{
+ 		.name = "AC97 Aux",
+@@ -45,7 +45,7 @@ static struct snd_soc_dai_link em_x270_dai[] = {
+ 		.cpu_dai_name = "pxa2xx-ac97-aux",
+ 		.codec_dai_name = "wm9712-aux",
+ 		.platform_name = "pxa-pcm-audio",
+-		.codec_name = "wm9712-codec",
++		.codec_name = "wm9712-component",
+ 	},
+ };
+ 
+diff --git a/sound/soc/pxa/palm27x.c b/sound/soc/pxa/palm27x.c
+index 97167048572d..040db695270e 100644
+--- a/sound/soc/pxa/palm27x.c
++++ b/sound/soc/pxa/palm27x.c
+@@ -93,7 +93,7 @@ static struct snd_soc_dai_link palm27x_dai[] = {
+ 	.stream_name = "AC97 HiFi",
+ 	.cpu_dai_name = "pxa2xx-ac97",
+ 	.codec_dai_name =  "wm9712-hifi",
+-	.codec_name = "wm9712-codec",
++	.codec_name = "wm9712-component",
+ 	.platform_name = "pxa-pcm-audio",
+ 	.init = palm27x_ac97_init,
+ },
+@@ -102,7 +102,7 @@ static struct snd_soc_dai_link palm27x_dai[] = {
+ 	.stream_name = "AC97 Aux",
+ 	.cpu_dai_name = "pxa2xx-ac97-aux",
+ 	.codec_dai_name = "wm9712-aux",
+-	.codec_name = "wm9712-codec",
++	.codec_name = "wm9712-component",
+ 	.platform_name = "pxa-pcm-audio",
+ },
+ };
+diff --git a/sound/soc/pxa/tosa.c b/sound/soc/pxa/tosa.c
+index ae9c12e1ea2a..af42417ccec5 100644
+--- a/sound/soc/pxa/tosa.c
++++ b/sound/soc/pxa/tosa.c
+@@ -189,7 +189,7 @@ static struct snd_soc_dai_link tosa_dai[] = {
+ 	.cpu_dai_name = "pxa2xx-ac97",
+ 	.codec_dai_name = "wm9712-hifi",
+ 	.platform_name = "pxa-pcm-audio",
+-	.codec_name = "wm9712-codec",
++	.codec_name = "wm9712-component",
+ 	.ops = &tosa_ops,
+ },
+ {
+@@ -198,7 +198,7 @@ static struct snd_soc_dai_link tosa_dai[] = {
+ 	.cpu_dai_name = "pxa2xx-ac97-aux",
+ 	.codec_dai_name = "wm9712-aux",
+ 	.platform_name = "pxa-pcm-audio",
+-	.codec_name = "wm9712-codec",
++	.codec_name = "wm9712-component",
+ 	.ops = &tosa_ops,
+ },
+ };
+diff --git a/sound/soc/tegra/tegra_wm9712.c b/sound/soc/tegra/tegra_wm9712.c
+index 864a3345972e..aa12be76d15a 100644
+--- a/sound/soc/tegra/tegra_wm9712.c
++++ b/sound/soc/tegra/tegra_wm9712.c
+@@ -53,7 +53,7 @@ static struct snd_soc_dai_link tegra_wm9712_dai = {
+ 	.name = "AC97 HiFi",
+ 	.stream_name = "AC97 HiFi",
+ 	.codec_dai_name = "wm9712-hifi",
+-	.codec_name = "wm9712-codec",
++	.codec_name = "wm9712-component",
+ 	.init = tegra_wm9712_init,
+ };
+ 
+@@ -83,7 +83,7 @@ static int tegra_wm9712_driver_probe(struct platform_device *pdev)
+ 	card->dev = &pdev->dev;
+ 	snd_soc_card_set_drvdata(card, machine);
+ 
+-	machine->codec = platform_device_alloc("wm9712-codec", -1);
++	machine->codec = platform_device_alloc("wm9712-component", -1);
+ 	if (!machine->codec) {
+ 		dev_err(&pdev->dev, "Can't allocate wm9712 platform device\n");
+ 		return -ENOMEM;
+-- 
+2.14.4
