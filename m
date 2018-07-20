@@ -1,61 +1,115 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Jul 2018 07:31:56 +0100
-Subject: [PATCH] ARM64: smp: BUG() if smp_send_reschedule() is called for
- an offline cpu
-In-Reply-To: <1532038369-5159-1-git-send-email-vnkgutta@codeaurora.org>
-References: <1532038369-5159-1-git-send-email-vnkgutta@codeaurora.org>
-Message-ID: <20180720063156.ico2wsqc3lr2pesa@salmiak>
+Date: Fri, 20 Jul 2018 07:38:37 +0100
+Subject: [PATCHv2 1/2] arm64: Add stack information to on_accessible_stack
+In-Reply-To: <20180719232806.3397-2-labbott@redhat.com>
+References: <20180719232806.3397-1-labbott@redhat.com>
+ <20180719232806.3397-2-labbott@redhat.com>
+Message-ID: <20180720063837.5c5nxypv4urumz2m@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 03:12:49PM -0700, Venkata Narendra Kumar Gutta wrote:
-> Based on the 'commit <8b775be35e41b9f> ("ARM: smp:
-> BUG() if smp_send_reschedule() is called for an offline cpu")'
-
-This commit does not appear to exist in mainline. Which tree is it in?
-
-> Sending an IPI_RESCHEDULE to an offline CPU is incorrect and potentially
-> bad for both power and stability. On some sub-architectures such as MSM,
-> if a power-collapsed CPU is unexpectedly woken up by an IPI, it will be
-> begin executing without the preparations that would normally happen as
-> part of CPU_UP_PREPARE. If clocks, voltage regulators, or other hardware
-> configuration are not performed, the booting CPU may cause general
-> instability or (at best) poor power performance since the CPU would be
-> powered up but not utilized.
+On Thu, Jul 19, 2018 at 04:28:05PM -0700, Laura Abbott wrote:
 > 
-> One common cause for such issues is misuse of add_timer_on() or APIs
-> such as queue_work_on() which call it. If proper precautions are not
-> taken to block hotplug while these APIs are called then a race may
-> result in IPIs being sent to CPUs that are already offline.
+> In preparation for enabling the stackleak plugin on arm64,
+> we need a way to get the bounds of the current stack. Extend
+> on_accessible_stack to get this information.
 > 
-> This same argument could be applied to other IPIs (with the exception
-> of IPI_WAKEUP), but the others are already restricted to only online
-> CPUs by existing mechanisms, so an explicit assertion is not useful.
-> 
-> Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
-> Signed-off-by: Trilok Soni <tsoni@codeaurora.org>
-> Signed-off-by: Venkata Narendra Kumar Gutta <vnkgutta@codeaurora.org>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
 > ---
->  arch/arm64/kernel/smp.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 2faa986..5e39030 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -898,6 +898,7 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
->  
->  void smp_send_reschedule(int cpu)
+> v2: Switched to using struct stack_info for argument passing.
+> on_accessible_stack is now the primary API. Split STACK_TYPE_SDEI
+> into STACK_TYPE_SDEI_NORMAL and STACK_TYPE_SDEI_CRITICAL.
+
+[...]
+
+> -static inline bool on_irq_stack(unsigned long sp)
+> +static inline bool on_irq_stack(unsigned long sp,
+> +				struct stack_info *info)
 >  {
-> +	BUG_ON(cpu_is_offline(cpu));
->  	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
+>  	unsigned long low = (unsigned long)raw_cpu_read(irq_stack_ptr);
+>  	unsigned long high = low + IRQ_STACK_SIZE;
+> @@ -47,46 +63,79 @@ static inline bool on_irq_stack(unsigned long sp)
+>  	if (!low)
+>  		return false;
+>  
+> -	return (low <= sp && sp < high);
+> +	if (sp < low || sp >= high)
+> +		return false;
+> +
+> +	if (info) {
+> +		info->low = low;
+> +		info->high = high;
+> +		info->type = STACK_TYPE_IRQ;
+> +	}
+> +
+> +	return true;
 >  }
 
-Is BUG_ON() appropriate?
+[...]
 
-Why not WARN_ON() and return?
+> -bool _on_sdei_stack(unsigned long sp)
+> +bool on_sdei_normal_stack(unsigned long sp,
+> +			struct stack_info *info)
+> +{
+> +	unsigned long low = (unsigned long)raw_cpu_read(sdei_stack_normal_ptr);
+> +	unsigned long high = low + SDEI_STACK_SIZE;
+> +
+> +	if (low <= sp && sp < high) {
+> +		if (info) {
+> +			info->low = low;
+> +			info->high = high;
+> +			info->type = STACK_TYPE_SDEI_NORMAL;
+> +		}
+> +		return true;
+> +	}
+> +
+> +	return false;
+> +}
+> +
+> +bool on_sdei_critical_stack(unsigned long sp,
+> +			struct stack_info *info)
+> +{
+> +	unsigned long low = (unsigned long)raw_cpu_read(sdei_stack_critical_ptr);
+> +	unsigned long high = low + SDEI_STACK_SIZE;
+> +
+> +	if (low <= sp && sp < high) {
+> +		if (info) {
+> +			info->low = low;
+> +			info->high = high;
+> +			info->type = STACK_TYPE_SDEI_CRITICAL;
+> +		}
+> +		return true;
+> +	}
+> +
+> +	return false;
+> +}
 
-AFAICT, arm doesn't have this logic today either.
+Minor nit, but it would be good to avoid the nested conditionals for these two
+by bailing out early when the SP is out of bounds, as with the other
+on_<foo>_stack() functions, e.g.
 
-Thanks,
+bool on_sdei_normal_stack(unsigned long sp,
+			struct stack_info *info)
+{
+	unsigned long low = (unsigned long)raw_cpu_read(sdei_stack_normal_ptr);
+	unsigned long high = low + SDEI_STACK_SIZE;
+
+	if (sp < low || sp >= high)
+		return false;
+
+	if (info) {
+		info->low = low;
+		info->high = high;
+		info->type = STACK_TYPE_SDEI_NORMAL;
+	}
+
+	return true;
+}
+
+Otherwise, this all looks good to me. With that:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks for working on this!
+
 Mark.
