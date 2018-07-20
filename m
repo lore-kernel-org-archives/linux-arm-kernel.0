@@ -1,117 +1,113 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 20 Jul 2018 15:14:36 +0900
-Subject: [PATCH v11 10/15] arm64: kexec_file: allow for loading
- Image-format kernel
-In-Reply-To: <bfbb8d3f-6d7b-3ebb-d805-15b89c55aaeb@arm.com>
-References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
- <20180711074203.3019-11-takahiro.akashi@linaro.org>
- <bfbb8d3f-6d7b-3ebb-d805-15b89c55aaeb@arm.com>
-Message-ID: <20180720061434.GK11258@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Jul 2018 07:23:15 +0100
+Subject: [PATCH] ARM64: smp: Fix cpu_up() racing with sys_reboot
+In-Reply-To: <1532038726-3376-1-git-send-email-vnkgutta@codeaurora.org>
+References: <1532038726-3376-1-git-send-email-vnkgutta@codeaurora.org>
+Message-ID: <20180720062314.7qh23yfq2o5jciuh@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 05:47:50PM +0100, James Morse wrote:
-> Hi Akashi,
+On Thu, Jul 19, 2018 at 03:18:46PM -0700, Venkata Narendra Kumar Gutta wrote:
+> Nothing stops a process from hotplugging in a CPU concurrently
+> with a sys_reboot() call. In such a situation we could have
+> ipi_cpu_stop() mark a cpu as 'offline' and _cpu_up() ignore the
+> fact that the CPU is not really offline and call the
+> CPU_UP_PREPARE notifier. When this happens stop_machine code will
+> complain that the cpu thread already exists and BUG_ON().
 > 
-> On 11/07/18 08:41, AKASHI Takahiro wrote:
-> > This patch provides kexec_file_ops for "Image"-format kernel. In this
-> > implementation, a binary is always loaded with a fixed offset identified
-> > in text_offset field of its header.
-> > 
-> > Regarding signature verification for trusted boot, this patch doesn't
-> > contains CONFIG_KEXEC_VERIFY_SIG support, which is to be added later
-> > in this series, but file-attribute-based verification is still a viable
-> > option by enabling IMA security subsystem.
-> > 
-> > You can sign(label) a to-be-kexec'ed kernel image on target file system
-> > with:
-> >     $ evmctl ima_sign --key /path/to/private_key.pem Image
-> > 
-> > On live system, you must have IMA enforced with, at least, the following
-> > security policy:
-> >     "appraise func=KEXEC_KERNEL_CHECK appraise_type=imasig"
-> > 
-> > See more details about IMA here:
-> >     https://sourceforge.net/p/linux-ima/wiki/Home/
+> CPU0                      CPU1
 > 
-> This looks useful to set a keys/signature/policy for a kernel that wasn't built
-> to enforce signatures at compile time, so its a good thing to have from a
-> single-image perspective.
-> 
-> I haven't managed to get IMA working to test this, but its all done by the kexec
-> core code, so I don't think we're missing anything.
-> 
-> 
-> > diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
-> > new file mode 100644
-> > index 000000000000..a47cf9bc699e
-> > --- /dev/null
-> > +++ b/arch/arm64/kernel/kexec_image.c
-> 
-> > +static int image_probe(const char *kernel_buf, unsigned long kernel_len)
-> > +{
-> > +	const struct arm64_image_header *h;
-> > +
-> > +	h = (const struct arm64_image_header *)(kernel_buf);
-> > +
-> > +	if (!h || (kernel_len < sizeof(*h)) ||
-> 
-> > +			!memcmp(&h->magic, ARM64_MAGIC, sizeof(ARM64_MAGIC)))
-> 
-> Doesn't memcmp() return 0 if the memory regions are the same?
-> This would always match the correct magic, rejecting the image.
-> 
-> That's not whats happening, as kexec-file works, so this never matches anything.
-> 
-> sizeof(ARM64_MAGIC) includes the null terminator, but this sequence is output in
-> head.S using '.ascii' which doesn't include the terminator, (otherwise it
-> wouldn't fit in the 4byte magic field). The memcmp() here is also consuming the
-> least significant bytes of the next field.
-> 
-> I think this line should be:
-> | 			memcmp(&h->magic, ARM64_MAGIC, sizeof(h->magic)))
+>  sys_reboot()
+>  kernel_restart()
+>  machine_restart()
+>  machine_shutdown()
+>  smp_send_stop()
 
-Absolutely you're right!
+>From a quick look arm64's machine_restart() disables IRQs, calls
+smp_send_stop(), then calls one of:
 
-> 
-> > +static void *image_load(struct kimage *image,
-> > +				char *kernel, unsigned long kernel_len,
-> > +				char *initrd, unsigned long initrd_len,
-> > +				char *cmdline, unsigned long cmdline_len)
-> 
-> > +	kbuf.buffer = kernel;
-> > +	kbuf.bufsz = kernel_len;
-> > +	kbuf.memsz = le64_to_cpu(h->image_size);
-> > +	text_offset = le64_to_cpu(h->text_offset);
-> > +	kbuf.buf_align = SZ_2M;
-> 
-> Nit: MIN_KIMG_ALIGN ?
+* efi_reboot()
+* arm_pm_restart()
+* do_kernel_restart()
 
-OK.
+... and I can't see any of these calling machine_shutdown() directly.
+
+How does machine_shutdown() get called? Is that somewhere in the restart_list
+associated with do_kernel_restart?
+
+>  ...                   ipi_cpu_stop()
+> 		       set_cpu_online(1, false)
+>                        local_irq_disable()
+>                        while(1)
+>         <PREEMPT>
+
+Given IRQs are disabled in machine_restart(), I don't understand how this
+preemption can occur. Where do they get re-enabled?
+
+>  cpu_up()
+>  _cpu_up()
+>  if (!cpu_online(1))
+>  __cpu_notify(CPU_UP_PREPARE...)
+> 
+>  cpu_stop_cpu_callback()
+>  BUG_ON(stopper->thread)
+> 
+> This is easily reproducible by hotplugging in and out in a tight
+> loop while also rebooting.
+
+Is this reproducible with mainline? e.g. v4.18-rc5?
+
+I've packed away my HW in preparation for an office move, but I might be able
+to give this a go in a VM.
+
+> Since the CPU is not really offline and hasn't gone through the
+> proper steps to be marked as such, let's mark the CPU as inactive.
+> This is just as easily testable as online and avoids any possibility
+> of _cpu_up() trying to bring the CPU back online when it never was
+> offline to begin with. Based on the similar patchset by for arm
+> targets 040c163( "ARM: smp: Fix cpu_up() racing with sys_reboot)"
+
+Is this in mainline?
+
+Looking at v4.18-rc5 I don't see arm's ipi_cpu_stop touching the active mask.
+
+Thanks,
+Mark.
 
 > 
-> > +	/* Adjust kernel segment with TEXT_OFFSET */
-> > +	kbuf.memsz += text_offset;
-> > +
-> > +	ret = kexec_add_buffer(&kbuf);
-> > +	if (ret)
-> > +		goto out;
+> Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
+> Signed-off-by: Venkata Narendra Kumar Gutta <vnkgutta@codeaurora.org>
+> ---
+>  arch/arm64/kernel/smp.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> You just return in the error cases above but here you goto ... the return
-> statement at the end. Seems a bit odd.
-
-Will fix it.
-
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 2faa986..adee4d3 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -790,7 +790,7 @@ void arch_irq_work_raise(void)
+>   */
+>  static void ipi_cpu_stop(unsigned int cpu)
+>  {
+> -	set_cpu_online(cpu, false);
+> +	set_cpu_active(cpu, false);
+>  
+>  	local_daif_mask();
+>  	sdei_mask_local_cpu();
+> @@ -925,10 +925,10 @@ void smp_send_stop(void)
+>  
+>  	/* Wait up to one second for other CPUs to stop */
+>  	timeout = USEC_PER_SEC;
+> -	while (num_online_cpus() > 1 && timeout--)
+> +	while (num_active_cpus() > 1 && timeout--)
+>  		udelay(1);
+>  
+> -	if (num_online_cpus() > 1)
+> +	if (num_active_cpus() > 1)
+>  		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
+>  			   cpumask_pr_args(cpu_online_mask));
+>  
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
 > 
-> With the memcmp() thing fixed:
-> Reviewed-by: James Morse <james.morse@arm.com>
-
-Always appreciate you reviewing.
-
--Takahiro AKASHI
-
-
-> 
-> Thanks,
-> 
-> James
