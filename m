@@ -1,73 +1,74 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 20 Jul 2018 14:56:13 +1000
-Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc.
- BMC control fields
-In-Reply-To: <1532045276.1219110.1446722072.546C1F9D@webmail.messagingengine.com>
-References: <20180711053122.30773-1-andrew@aj.id.au>
- <20180711053122.30773-2-andrew@aj.id.au>
- <20180711200450.GB17291@rob-hp-laptop>
- <1531356830.3551458.1437853280.551CA8C5@webmail.messagingengine.com>
- <CAL_JsqKpXxR4t_-3BOy-0mFePXkaSck_4PfHRD=OZQ-_-T5P=w@mail.gmail.com>
- <b6ced4cad4d7ff78330181b2c893855c23103953.camel@kernel.crashing.org>
- <1531463489.747186.1439263128.075AECE1@webmail.messagingengine.com>
- <CAL_JsqLZo-=7UkuvvUFYdCR4asBBiWyC=Q1ryH=-HLU6vzf9tA@mail.gmail.com>
- <ece91112ecfdc7218184c4c4519e455cf9397e11.camel@kernel.crashing.org>
- <CAL_JsqL_bMXLAA0091-g8PmhXR5g5Pf2y2=ey7Ss5ofHm46sWw@mail.gmail.com>
- <c69d0e7c3a95d83da87b566a62619462671a233b.camel@kernel.crashing.org>
- <1531967302.2140539.1445583600.0F5ED287@webmail.messagingengine.com>
- <9787b471abc49c0b3db60e3471473a7a5b45ade7.camel@kernel.crashing.org>
- <1532045276.1219110.1446722072.546C1F9D@webmail.messagingengine.com>
-Message-ID: <483b76bac7cb8043d9d780d5ffa5e43438279887.camel@kernel.crashing.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 20 Jul 2018 10:34:17 +0530
+Subject: [PATCH v4 08/18] net: davinci_emac: potentially get the MAC
+ address from MTD
+In-Reply-To: <a70aebb0-408c-c61f-897a-227114888585@linaro.org>
+References: <20180629094039.7543-1-brgl@bgdev.pl>
+ <20180629094039.7543-9-brgl@bgdev.pl>
+ <03b77e24-9ab9-fa01-2387-9de0408a9942@gmail.com>
+ <20180704070919.GA14051@lenoch>
+ <CAMRc=McOYG9=naT2=4c4hnhJwxcqBCATEZOGXXv9u9zuvXyDXw@mail.gmail.com>
+ <c0ffc590-8064-3b02-9b5c-fcc24628d390@ti.com>
+ <CAMRc=McO8H9Aw8a7h318a=hJjKBOgeC+9_hreBnOY3Tc3Fh7sg@mail.gmail.com>
+ <d7f03763-982f-5e3e-d0ad-54e024b10f97@ti.com>
+ <a70aebb0-408c-c61f-897a-227114888585@linaro.org>
+Message-ID: <efd9388f-c378-4723-602d-1209c8bae7d3@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-07-20 at 09:37 +0930, Andrew Jeffery wrote:
-> > 
-> > Andrew, can you start with a list that shows what you expect us to need
-> > on our systems ?
-> > 
+On Monday 16 July 2018 02:26 PM, Srinivas Kandagatla wrote:
 > 
-> Okay, our Witherspoon and Romulus platforms containing the ASPEED AST2500 currently need the following tuneables exposed:
 > 
-> > From the SCU:
-> 
-> - Debug UART enable
-> - VGA DAC mux
-> - VGA scratch registers 0-7
-> - LPC SuperIO decode enable
-> - VGA MMIO decode enable
-> 
-> > From the LPC controller:
-> 
-> - iLPC2AHB enable
-> - SuperIO scratch registers 0x20-0x2f
-> 
-> (The LPC controller is just as much of a collection of random bits as the SCU)
-> 
-> Lastly, our Palmetto platform uses an AST2400 which has fewer features compared to the AST2500. Its tuneable list is the same as the above with the exception of "Debug UART enable".
-> 
-> Tuneables that we may need to expose in the future include:
-> 
-> > From the SCU:
-> 
-> - PCI VID/DID for the BMC PCIe device
-> - VGA device enable (may need to be disabled if the platform contains a discrete graphics processor)
+> On 16/07/18 09:50, Sekhar Nori wrote:
+>> On Friday 13 July 2018 11:30 PM, Bartosz Golaszewski wrote:
+>>
+>>> We're getting close to rc5 so I'd like to make a case for this series
+>>> again.
+>>>
+>>> I understand that there's more to do than just the changes introduced
+>>> here, but we shouldn't try to fix several problems in many different
+>>> places at once. There's just too many moving pieces. I'd rather start
+>>> merging small improvements right away.
+>>>
+>>> The idea behind this series is to remove (almost) all users of
+>>> at24_platform_data. The davinci_emac patches are there only because we
+>>> need to remove some MAC adress reading stuff from the board files.
+>>> Having this code there and calling it back from EEPROM/MTD drivers is
+>>> already wrong and we should work towards using nvmem for that anyway.
+>>>
+>>> Currently for MTD the nvmem support series seems to be dead and it's
+>>> going to take some time before anything gets upstream.
+>>>
+>>> So I'd like to again ask you to consider picking up the patches from
+>>> this series to your respective trees or at the very least: I'd like to
+>>> ask Srinivas to pick up the nvmem patches and Sekhar to take the
+>>> first, non-controversial batch of davinci platform changes so that
+>>> we'll have less code to carry for the next release.
+>>
+>> I think those are patches 3-7. I can take those if I get an immutable
+>> commit over v4.18-rc1 from Srinivas with patches 1 & 2 applied.
+> nvmem patches go via Greg KH char-misc tree, if it makes things easy I
+> can provide Ack on nvmem patches, so that you can take these patches via
+> your tree?
 
-Additionally there's a bunch of resigters controlling the mapping of
-various MMIO regions of the BMC PCIe device to portions of the BMC
-address space. I'm not sure what's the best way to handle that.
+There is a lot of follow-up traffic on how exactly to develop the needed
+interfaces for reading mac address in mtd and/or network subsystem.
 
-This specific set might require a dedicated device as a subnode of
-the SCU in the DT that contains all the mappings as properties... 
+But, I don't think any of that negates the need for nvmem lookups that
+work for non-device-tree and populating the lookups in mach-davinci
+board code.
 
-That or we consider them static enough and just whack it in u-boot.
+I am going to send patches 1-7 to ARM-SoC soon, so please do say if
+there is any disagreement on this.
 
-> > From the LPC controller:
+Thanks,
+Sekhar
+
 > 
-> - UART mux
+> Let me know.
 > 
-> Alexander, Eugene, can you chime in with your platforms' needs?
-> 
-> Cheers,
-> 
-> Andrew
+> --srini
+>>
+>> Thanks,
+>> Sekhar
+>>
