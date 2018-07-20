@@ -1,128 +1,190 @@
-From: MNARANI@xilinx.com (Manish Narani)
-Date: Fri, 20 Jul 2018 06:23:16 +0000
-Subject: [RFC PATCH 3/3] sdhci: arasan: Add support to read Tap Delay
- values from DT
-In-Reply-To: <CAPDyKFoGJOE-h4rLqzMO=wzNjkfcuU_oQ3NLK5=OQfSMj3dDHg@mail.gmail.com>
-References: <1528373500-24663-1-git-send-email-manish.narani@xilinx.com>
- <1528373500-24663-3-git-send-email-manish.narani@xilinx.com>
- <CAPDyKFoGJOE-h4rLqzMO=wzNjkfcuU_oQ3NLK5=OQfSMj3dDHg@mail.gmail.com>
-Message-ID: <SN6PR02MB4959F4BE25593EC7589DC34AC1510@SN6PR02MB4959.namprd02.prod.outlook.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 20 Jul 2018 15:25:49 +0900
+Subject: [PATCH v11 03/15] powerpc, kexec_file: factor out memblock-based
+ arch_kexec_walk_mem()
+In-Reply-To: <20180720055727.GA9487@dhcp-128-65.nay.redhat.com>
+References: <2a4ec965-5258-5835-3022-8f403a2f6bdd@arm.com>
+ <20180716122412.GA7160@dhcp-128-65.nay.redhat.com>
+ <20180717053104.GB11258@linaro.org>
+ <20180717074923.GA8591@dhcp-128-65.nay.redhat.com>
+ <20180718053818.GF11258@linaro.org>
+ <20180718061350.GA5086@dhcp-128-65.nay.redhat.com>
+ <20180718064041.GI11258@linaro.org>
+ <20180718064519.GB5324@dhcp-128-65.nay.redhat.com>
+ <20180720053333.GJ11258@linaro.org>
+ <20180720055727.GA9487@dhcp-128-65.nay.redhat.com>
+Message-ID: <20180720062548.GL11258@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uffe,
-
-> -----Original Message-----
-> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
-> Sent: Tuesday, July 10, 2018 2:02 PM
-> To: Manish Narani <MNARANI@xilinx.com>
-> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
-> <mark.rutland@arm.com>; Catalin Marinas <catalin.marinas@arm.com>; Will
-> Deacon <will.deacon@arm.com>; Moritz Fischer <mdf@kernel.org>;
-> stefan.krsmanovic at aggios.com; Linux ARM <linux-arm-
-> kernel at lists.infradead.org>; Linux Kernel Mailing List <linux-
-> kernel at vger.kernel.org>; linux-mmc at vger.kernel.org;
-> devicetree at vger.kernel.org; Adrian Hunter <adrian.hunter@intel.com>;
-> Michal Simek <michals@xilinx.com>
-> Subject: Re: [RFC PATCH 3/3] sdhci: arasan: Add support to read Tap Delay
-> values from DT
-> 
-> On 7 June 2018 at 14:11, Manish Narani <manish.narani@xilinx.com> wrote:
-> > This patch adds support for reading Tap Delay values from Device Tree
-> > and write them via eemi calls. The macros containing these tap delay
-> > values are removed from the driver.
-> >
-> > Signed-off-by: Manish Narani <manish.narani@xilinx.com>
-> > ---
-> >  drivers/mmc/host/sdhci-of-arasan.c | 131
-> > +++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 131 insertions(+)
-> >
-> > diff --git a/drivers/mmc/host/sdhci-of-arasan.c
-> > b/drivers/mmc/host/sdhci-of-arasan.c
-> > index e3332a5..fc0fd01 100644
-> > --- a/drivers/mmc/host/sdhci-of-arasan.c
-> > +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> > @@ -36,6 +36,8 @@
-> >
-> >  #define PHY_CLK_TOO_SLOW_HZ            400000
-> >
-> > +#define MMC_BANK2              0x2
-> > +
-> >  /*
-> >   * On some SoCs the syscon area has a feature where the upper 16-bits of
-> >   * each 32-bit register act as a write mask for the lower 16-bits.
-> > This allows @@ -90,6 +92,10 @@ struct sdhci_arasan_data {
-> >         struct sdhci_host *host;
-> >         struct clk      *clk_ahb;
-> >         struct phy      *phy;
-> > +       u32 mio_bank;
-> > +       u32 device_id;
-> > +       u32 itapdly[MMC_TIMING_MMC_HS400 + 1];
-> > +       u32 otapdly[MMC_TIMING_MMC_HS400 + 1];
-> >         bool            is_phy_on;
-> >
-> >         bool            has_cqe;
-> > @@ -160,11 +166,36 @@ static int sdhci_arasan_syscon_write(struct
-> sdhci_host *host,
-> >         return ret;
-> >  }
-> >
-> > +/**
-> > + * arasan_zynqmp_set_tap_delay - Program the tap delays.
-> > + * @deviceid:          Unique Id of device
-> > + * @itap_delay:                Input Tap Delay
-> > + * @oitap_delay:       Output Tap Delay
-> > + */
-> > +static void arasan_zynqmp_set_tap_delay(u8 deviceid, u8 itap_delay,
-> > +u8 otap_delay) {
-> > +       const struct zynqmp_eemi_ops *eemi_ops =
-> > +zynqmp_pm_get_eemi_ops();
-> 
-> No thanks!
-> 
-> Isn't there a more generic framework we can use to change the tap values,
-> rather than calling SoC specific functions from the driver?
-Yes, Thanks for your suggestion. I will work on the generic framework which will be used to change tap values
-Via SoC drivers.
-> 
-> BTW, what is a tap value, more exactly?
-> What does changing a tap value mean and where does the property belong,
-> really?
-Tap Value is the delay of clock phase which is used to adjust phase to the working value. The auto tuning
-process generally sets tap values internally in controller in SD UHS modes. But for other modes where
-auto tuning is applicable, we are determining tap values via trial & error method for specific SoC.
+On Fri, Jul 20, 2018 at 01:57:27PM +0800, Dave Young wrote:
+> On 07/20/18 at 02:33pm, AKASHI Takahiro wrote:
+> > Dave,
 > > 
-> Of course this doesn't even compile, as you have a dependency to another
-> series. Next time, please clarify that in a cover-letter (maybe you did, but I
-> can't find it).
+> > On Wed, Jul 18, 2018 at 02:45:19PM +0800, Dave Young wrote:
+> > > On 07/18/18 at 03:40pm, AKASHI Takahiro wrote:
+> > > > On Wed, Jul 18, 2018 at 02:13:50PM +0800, Dave Young wrote:
+> > > > > Hi AKASHI,
+> > > > > 
+> > > > > On 07/18/18 at 02:38pm, AKASHI Takahiro wrote:
+> > > > > > Dave,
+> > > > > > 
+> > > > > > On Tue, Jul 17, 2018 at 03:49:23PM +0800, Dave Young wrote:
+> > > > > > > Hi AKASHI,
+> > > > > > > On 07/17/18 at 02:31pm, AKASHI Takahiro wrote:
+> > > > > > > > Hi Dave,
+> > > > > > > > 
+> > > > > > > > On Mon, Jul 16, 2018 at 08:24:12PM +0800, Dave Young wrote:
+> > > > > > > > > On 07/16/18 at 12:04pm, James Morse wrote:
+> > > > > > > > > > Hi Dave,
+> > > > > > > > > > 
+> > > > > > > > > > On 14/07/18 02:52, Dave Young wrote:
+> > > > > > > > > > > On 07/11/18 at 04:41pm, AKASHI Takahiro wrote:
+> > > > > > > > > > >> Memblock list is another source for usable system memory layout.
+> > > > > > > > > > >> So powerpc's arch_kexec_walk_mem() is moved to kexec_file.c so that
+> > > > > > > > > > >> other memblock-based architectures, particularly arm64, can also utilise
+> > > > > > > > > > >> it. A moved function is now renamed to kexec_walk_memblock() and merged
+> > > > > > > > > > >> into the existing arch_kexec_walk_mem() for general use, either resource
+> > > > > > > > > > >> list or memblock list.
+> > > > > > > > > > >>
+> > > > > > > > > > >> A consequent function will not work for kdump with memblock list, but
+> > > > > > > > > > >> this will be fixed in the next patch.
+> > > > > > > > > > 
+> > > > > > > > > > >> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+> > > > > > > > > > 
+> > > > > > > > > > >> @@ -513,6 +563,10 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
+> > > > > > > > > > >>  int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
+> > > > > > > > > > >>  			       int (*func)(struct resource *, void *))
+> > > > > > > > > > >>  {
+> > > > > > > > > > >> +	if (IS_ENABLED(CONFIG_HAVE_MEMBLOCK) &&
+> > > > > > > > > > >> +			!IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK))
+> > > > > > > > > > >> +		return kexec_walk_memblock(kbuf, func);
+> > > > > > > > > > > 
+> > > > > > > > > > > AKASHI, I'm not sure if this works on all arches, for example I chekced
+> > > > > > > > > > > the .config on my Nokia N900 kernel tree, there is HAVE_MEMBLOCK=y and
+> > > > > > > > > > > no CONFIG_ARCH_DISCARD_MEMBLOCK, in 32bit arm code no arch_kexec_walk_mem()
+> > > > > > > > > > By doesn't work you mean it's a change in behaviour?
+> > > > > > > > > > I think this is fine because 32bit arm doesn't support KEXEC_FILE, (this file is
+> > > > > > > > > > kexec_file specific right?).
+> > > > > > > > > 
+> > > > > > > > > Ah, replied on a train, I forgot this is only for kexec_file, sorry
+> > > > > > > > > about that.  Please ignore the comment.
+> > > > > > > > > 
+> > > > > > > > > But since we have a weak function arch_kexec_walk_mem, adding another
+> > > > > > > > > condition branch within this weak function looks not good.
+> > > > > > > > > Something like below would be better:
+> > > > > > > > 
+> > > > > > > > I see your concern here, but
+> > > > > > > > 
+> > > > > > > > 
+> > > > > > > > > int kexec_locate_mem_hole(struct kexec_buf *kbuf)
+> > > > > > > > > {
+> > > > > > > > >         int ret;
+> > > > > > > > > 
+> > > > > > > > > 	+ if use memblock
+> > > > > > > > > 	+	ret = kexec_walk_memblock()
+> > > > > > > > > 	+ else
+> > > > > > > > >         	ret = arch_kexec_walk_mem(kbuf, locate_mem_hole_callback);
+> > > > > > > > > 
+> > > > > > > > >         return ret == 1 ? 0 : -EADDRNOTAVAIL;
+> > > > > > > > > }
+> > > > > > > > 
+> > > > > > > > what if yet another architecture comes to kexec_file and wanna
+> > > > > > > > take a third approach? How can it override those functions?
+> > > > > > > > Depending on kernel configuration, it might re-define either
+> > > > > > > > kexec_walk_memblock() or arch_kexec_walk_mem(). It sounds weird to me.
+> > > > > > > 
+> > > > > > > I also feel this weird, but it is slightly better because currently no
+> > > > > > > user need another overriding requirement, and I feel it is not expected to have in
+> > > > > > > the future for the memblock use.
+> > > > > > > 
+> > > > > > > Rethinking about this issue, we can just remove the weak function and
+> > > > > > > just use general function.
+> > > > > > 
+> > > > > > Do you really want to remove "weak" attribute?
+> > > > > > 
+> > > > > > > Currently with your patch applied only s390 use arch_kexec_walk_mem like
+> > > > > > > below:
+> > > > > > > /*
+> > > > > > >  * The kernel is loaded to a fixed location. Turn off kexec_locate_mem_hole
+> > > > > > >  * and provide kbuf->mem by hand.
+> > > > > > >  */
+> > > > > > > int arch_kexec_walk_mem(struct kexec_buf *kbuf,
+> > > > > > >                         int (*func)(struct resource *, void *))
+> > > > > > > {
+> > > > > > >         return 1;
+> > > > > > > }
+> > > > > > > 
+> > > > > > > AFAIK, all other users initialize kbuf->mem as NULL, so we can check
+> > > > > > 
+> > > > > > As a matter of fact, nobody initializes kbuf->mem before calling
+> > > > > > kexec_add_buffer (in turn, kexec_locate_mem_hole()).
+> > > > > 
+> > > > > Not sure we understand each other..
+> > > > > Let's take an example in arch/x86/kernel/kexec-bzimage64.c:
+> > > > > bzImage64_load() :
+> > > > > 	struct kexec_buf kbuf = { .image = image, .buf_max = ULONG_MAX,
+> > > > > 				.top_down = true };
+> > > > > 
+> > > > > Except the three fields above other members will be initialized as zero
+> > > > > when compiling including the kbuf->mem
+> > > > 
+> > > > Ah, you're right.
+> > > > (My armr64 patch doesn't use struct initializer, though.)
+> > > > 
+> > > > > > 
+> > > > > > > kbuf->mem in int kexec_locate_mem_hole:
+> > > > > > > 
+> > > > > > > if (kbuf->mem)
+> > > > > > > 	return 0;
+> > > > > > > 
+> > > > > > > if use memblock
+> > > > > > > 	kexec_walk_memblock
+> > > > > > > else
+> > > > > > > 	kexec_walk_mem
+> > > > > 
+> > > > > kexec_walk_resource will be better than kexec_walk_mem
+> > > > > 
+> > > > > > 
+> > > > > > I think that your solution will work for existing architectures
+> > > > > > with appropriate patches, but to take your approach, as I said above,
+> > > > > > we will have to modify every call site on all kexec_file-capable architectures.
+> > > > > > 
+> > > > > > If this is what you expect, I will work on it, but I don't think
+> > > > > > that it would be a better idea.
+> > > > 
+> > > > So you would expect me to modify my own arm64 code as well as s390.
+> > > 
+> > > Yes :)  But I had not get time to read all your patches so I was not
+> > > aware the struct initialization in arm64 code so I assumed only s390
+> > > need a change..
+> > 
+> > Okay, but I don't want to mix cross-arch changes into a single patch,
+> > prefer to leave the current patch as it is and add an additional patch
+> > as you suggested here.
+> Hi AKASHI,
 > 
-> > +       u32 node_id = (deviceid == 0) ? NODE_SD_0 : NODE_SD_1;
-> > +
-> > +       if (!eemi_ops || !eemi_ops->ioctl)
-> > +               return;
-> > +
-> > +       if (itap_delay)
-> > +               eemi_ops->ioctl(node_id, IOCTL_SET_SD_TAPDELAY,
-> > +                               PM_TAPDELAY_INPUT, itap_delay, NULL);
-> > +
-> > +       if (otap_delay)
-> > +               eemi_ops->ioctl(node_id, IOCTL_SET_SD_TAPDELAY,
-> > +                               PM_TAPDELAY_OUTPUT, otap_delay, NULL);
-> > +}
+> Maybe add another patch to drop s390 walk function first, then follow
+> with this patch with the modification about common code restructure.
 > 
-> Another overall comment for the series.
-> 
-> I would recommend to change the order of the patches in the series.
-> Let the DT doc change come first, next the driver change and finally the change
-> to the DTS file(s). This makes it easier to follow and review.
-Sure, I will do that.
+> Is this better? For example:
+> 03/15 s390, drop s390 arch_kexec_mem_walk
+> 04/15 powerpc, kexec_file: factor out memblock-based arch_kexec_walk_mem
 
-Thanks & Regards,
-Manish
+That's fine to me, too.
 
+Thanks,
+-Takahiro AKASHI
+
+> > 
+> > Is that OK for you?
+> > 
+> > Thanks,
+> > -Takahiro AKASHI
+> > 
+> > 
+> > > Thanks
+> > > Dave
 > 
-> [...]
-> 
-> Kind regards
-> Uffe
+> Thanks
+> Dave
