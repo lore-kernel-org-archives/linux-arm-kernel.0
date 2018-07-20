@@ -1,128 +1,174 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 17:15:11 +0200
-Subject: [PATCH v4 19/35] mtd: rawnand: sh_flctl: move all NAND chip related
- setup in one function
+Date: Fri, 20 Jul 2018 17:15:03 +0200
+Subject: [PATCH v4 11/35] mtd: rawnand: lpc32xx_mlc: convert driver to
+ nand_scan()
 In-Reply-To: <20180720151527.16038-1-miquel.raynal@bootlin.com>
 References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
-Message-ID: <20180720151527.16038-20-miquel.raynal@bootlin.com>
+Message-ID: <20180720151527.16038-12-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare the conversion of the sh_flctl driver to nand_scan() by moving
-all the configuration that must be made after nand_scan_ident() in one
-single function. Create a pdata entry in the controller structure for
-that.
+Two helpers have been added to the core to make ECC-related
+configuration between the detection phase and the final NAND scan. Use
+these hooks and convert the driver to just use nand_scan() instead of
+both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/sh_flctl.c | 38 +++++++++++++++++++-------------------
- include/linux/mtd/sh_flctl.h    |  1 +
- 2 files changed, 20 insertions(+), 19 deletions(-)
+ drivers/mtd/nand/raw/lpc32xx_mlc.c | 109 ++++++++++++++++++++-----------------
+ 1 file changed, 59 insertions(+), 50 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/sh_flctl.c b/drivers/mtd/nand/raw/sh_flctl.c
-index c7abceffcc40..d37d1d3ccbf9 100644
---- a/drivers/mtd/nand/raw/sh_flctl.c
-+++ b/drivers/mtd/nand/raw/sh_flctl.c
-@@ -1007,6 +1007,16 @@ static int flctl_chip_init_tail(struct mtd_info *mtd)
- 	struct sh_flctl *flctl = mtd_to_flctl(mtd);
- 	struct nand_chip *chip = &flctl->chip;
+diff --git a/drivers/mtd/nand/raw/lpc32xx_mlc.c b/drivers/mtd/nand/raw/lpc32xx_mlc.c
+index 052d123a8304..6f73136fa863 100644
+--- a/drivers/mtd/nand/raw/lpc32xx_mlc.c
++++ b/drivers/mtd/nand/raw/lpc32xx_mlc.c
+@@ -184,6 +184,7 @@ static struct nand_bbt_descr lpc32xx_nand_bbt_mirror = {
+ };
  
-+	if (chip->options & NAND_BUSWIDTH_16) {
-+		/*
-+		 * NAND_BUSWIDTH_16 may have been set by nand_scan_ident().
-+		 * Add the SEL_16BIT flag in pdata->flcmncr_val and re-assign
-+		 * flctl->flcmncr_base to pdata->flcmncr_val.
-+		 */
-+		flctl->pdata->flcmncr_val |= SEL_16BIT;
-+		flctl->flcmncr_base = flctl->pdata->flcmncr_val;
+ struct lpc32xx_nand_host {
++	struct platform_device	*pdev;
+ 	struct nand_chip	nand_chip;
+ 	struct lpc32xx_mlc_platform_data *pdata;
+ 	struct clk		*clk;
+@@ -653,6 +654,58 @@ static struct lpc32xx_nand_cfg_mlc *lpc32xx_parse_dt(struct device *dev)
+ 	return ncfg;
+ }
+ 
++static int lpc32xx_nand_attach_chip(struct nand_chip *chip)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct lpc32xx_nand_host *host = nand_get_controller_data(chip);
++	struct device *dev = &host->pdev->dev;
++
++	host->dma_buf = devm_kzalloc(dev, mtd->writesize, GFP_KERNEL);
++	if (!host->dma_buf)
++		return -ENOMEM;
++
++	host->dummy_buf = devm_kzalloc(dev, mtd->writesize, GFP_KERNEL);
++	if (!host->dummy_buf)
++		return -ENOMEM;
++
++	chip->ecc.mode = NAND_ECC_HW;
++	chip->ecc.size = 512;
++	mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
++	host->mlcsubpages = mtd->writesize / 512;
++
++	/* initially clear interrupt status */
++	readb(MLC_IRQ_SR(host->io_base));
++
++	init_completion(&host->comp_nand);
++	init_completion(&host->comp_controller);
++
++	host->irq = platform_get_irq(host->pdev, 0);
++	if (host->irq < 0) {
++		dev_err(dev, "failed to get platform irq\n");
++		return -EINVAL;
 +	}
 +
- 	if (mtd->writesize == 512) {
- 		flctl->page_size = 0;
- 		if (chip->chipsize > (32 << 20)) {
-@@ -1122,7 +1132,6 @@ static int flctl_probe(struct platform_device *pdev)
- 	struct sh_flctl *flctl;
- 	struct mtd_info *flctl_mtd;
- 	struct nand_chip *nand;
--	struct sh_flctl_platform_data *pdata;
- 	int ret;
- 	int irq;
++	if (request_irq(host->irq, (irq_handler_t)&lpc3xxx_nand_irq,
++			IRQF_TRIGGER_HIGH, DRV_NAME, host)) {
++		dev_err(dev, "Error requesting NAND IRQ\n");
++		return -ENXIO;
++	}
++
++	return 0;
++}
++
++static void lpc32xx_nand_detach_chip(struct nand_chip *chip)
++{
++	struct lpc32xx_nand_host *host = nand_get_controller_data(chip);
++
++	free_irq(host->irq, host);
++}
++
++static const struct nand_controller_ops lpc32xx_nand_controller_ops = {
++	.attach_chip = lpc32xx_nand_attach_chip,
++	.detach_chip = lpc32xx_nand_detach_chip,
++};
++
+ /*
+  * Probe for NAND controller
+  */
+@@ -669,6 +722,8 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+ 	if (!host)
+ 		return -ENOMEM;
  
-@@ -1150,11 +1159,11 @@ static int flctl_probe(struct platform_device *pdev)
++	host->pdev = pdev;
++
+ 	rc = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	host->io_base = devm_ioremap_resource(&pdev->dev, rc);
+ 	if (IS_ERR(host->io_base))
+@@ -749,58 +804,14 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
  	}
  
- 	if (pdev->dev.of_node)
--		pdata = flctl_parse_dt(&pdev->dev);
-+		flctl->pdata = flctl_parse_dt(&pdev->dev);
- 	else
--		pdata = dev_get_platdata(&pdev->dev);
-+		flctl->pdata = dev_get_platdata(&pdev->dev);
+ 	/*
+-	 * Scan to find existance of the device and
+-	 * Get the type of NAND device SMALL block or LARGE block
++	 * Scan to find existence of the device and get the type of NAND device:
++	 * SMALL block or LARGE block.
+ 	 */
+-	res = nand_scan_ident(mtd, 1, NULL);
++	nand_chip->dummy_controller.ops = &lpc32xx_nand_controller_ops;
++	res = nand_scan(mtd, 1);
+ 	if (res)
+ 		goto release_dma_chan;
  
--	if (!pdata) {
-+	if (!flctl->pdata) {
- 		dev_err(&pdev->dev, "no setup data defined\n");
- 		return -EINVAL;
- 	}
-@@ -1165,9 +1174,9 @@ static int flctl_probe(struct platform_device *pdev)
- 	nand_set_flash_node(nand, pdev->dev.of_node);
- 	flctl_mtd->dev.parent = &pdev->dev;
- 	flctl->pdev = pdev;
--	flctl->hwecc = pdata->has_hwecc;
--	flctl->holden = pdata->use_holden;
--	flctl->flcmncr_base = pdata->flcmncr_val;
-+	flctl->hwecc = flctl->pdata->has_hwecc;
-+	flctl->holden = flctl->pdata->use_holden;
-+	flctl->flcmncr_base = flctl->pdata->flcmncr_val;
- 	flctl->flintdmacr_base = flctl->hwecc ? (STERINTE | ECERB) : STERINTE;
- 
- 	/* Set address of hardware control function */
-@@ -1183,7 +1192,7 @@ static int flctl_probe(struct platform_device *pdev)
- 	nand->set_features = nand_get_set_features_notsupp;
- 	nand->get_features = nand_get_set_features_notsupp;
- 
--	if (pdata->flcmncr_val & SEL_16BIT)
-+	if (flctl->pdata->flcmncr_val & SEL_16BIT)
- 		nand->options |= NAND_BUSWIDTH_16;
- 
- 	pm_runtime_enable(&pdev->dev);
-@@ -1195,16 +1204,6 @@ static int flctl_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_chip;
- 
--	if (nand->options & NAND_BUSWIDTH_16) {
--		/*
--		 * NAND_BUSWIDTH_16 may have been set by nand_scan_ident().
--		 * Add the SEL_16BIT flag in pdata->flcmncr_val and re-assign
--		 * flctl->flcmncr_base to pdata->flcmncr_val.
--		 */
--		pdata->flcmncr_val |= SEL_16BIT;
--		flctl->flcmncr_base = pdata->flcmncr_val;
+-	host->dma_buf = devm_kzalloc(&pdev->dev, mtd->writesize, GFP_KERNEL);
+-	if (!host->dma_buf) {
+-		res = -ENOMEM;
+-		goto release_dma_chan;
 -	}
 -
- 	ret = flctl_chip_init_tail(flctl_mtd);
- 	if (ret)
- 		goto err_chip;
-@@ -1213,7 +1212,8 @@ static int flctl_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_chip;
+-	host->dummy_buf = devm_kzalloc(&pdev->dev, mtd->writesize, GFP_KERNEL);
+-	if (!host->dummy_buf) {
+-		res = -ENOMEM;
+-		goto release_dma_chan;
+-	}
+-
+-	nand_chip->ecc.mode = NAND_ECC_HW;
+-	nand_chip->ecc.size = 512;
+-	mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
+-	host->mlcsubpages = mtd->writesize / 512;
+-
+-	/* initially clear interrupt status */
+-	readb(MLC_IRQ_SR(host->io_base));
+-
+-	init_completion(&host->comp_nand);
+-	init_completion(&host->comp_controller);
+-
+-	host->irq = platform_get_irq(pdev, 0);
+-	if (host->irq < 0) {
+-		dev_err(&pdev->dev, "failed to get platform irq\n");
+-		res = -EINVAL;
+-		goto release_dma_chan;
+-	}
+-
+-	if (request_irq(host->irq, (irq_handler_t)&lpc3xxx_nand_irq,
+-			IRQF_TRIGGER_HIGH, DRV_NAME, host)) {
+-		dev_err(&pdev->dev, "Error requesting NAND IRQ\n");
+-		res = -ENXIO;
+-		goto release_dma_chan;
+-	}
+-
+-	/*
+-	 * Fills out all the uninitialized function pointers with the defaults
+-	 * And scans for a bad block table if appropriate.
+-	 */
+-	res = nand_scan_tail(mtd);
+-	if (res)
+-		goto free_irq;
+-
+ 	mtd->name = DRV_NAME;
  
--	ret = mtd_device_register(flctl_mtd, pdata->parts, pdata->nr_parts);
-+	ret = mtd_device_register(flctl_mtd, flctl->pdata->parts,
-+				  flctl->pdata->nr_parts);
- 	if (ret)
- 		goto cleanup_nand;
+ 	res = mtd_device_register(mtd, host->ncfg->parts,
+@@ -812,8 +823,6 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
  
-diff --git a/include/linux/mtd/sh_flctl.h b/include/linux/mtd/sh_flctl.h
-index c759d403cbc0..c9f486c6c019 100644
---- a/include/linux/mtd/sh_flctl.h
-+++ b/include/linux/mtd/sh_flctl.h
-@@ -148,6 +148,7 @@ struct sh_flctl {
- 	struct dev_pm_qos_request pm_qos;
- 	void __iomem		*reg;
- 	resource_size_t		fifo;
-+	struct sh_flctl_platform_data *pdata;
- 
- 	uint8_t	done_buff[2048 + 64];	/* max size 2048 + 64 */
- 	int	read_bytes;
+ cleanup_nand:
+ 	nand_cleanup(nand_chip);
+-free_irq:
+-	free_irq(host->irq, host);
+ release_dma_chan:
+ 	if (use_dma)
+ 		dma_release_channel(host->dma_chan);
 -- 
 2.14.1
