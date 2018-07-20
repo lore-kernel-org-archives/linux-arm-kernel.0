@@ -1,39 +1,35 @@
 From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Fri, 20 Jul 2018 21:29:10 +0200
-Subject: [RFC PATCH 3/8] mtd: rawnand: ams-delta: Set port direction
- once per transfer
-In-Reply-To: <90128326.sKM4evrj8F@z50>
+Date: Fri, 20 Jul 2018 21:29:41 +0200
+Subject: [RFC PATCH 4/8] mtd: rawnand: ams-delta: Optimize pointer
+ resolution on read/write
+In-Reply-To: <9888773.rgnYII6m0f@z50>
 References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
- <20180718235710.18242-4-jmkrzyszt@gmail.com>
- <20180719082318.290abee1@bbrezillon> <90128326.sKM4evrj8F@z50>
-Message-ID: <20180720212910.49bb2a88@bbrezillon>
+ <20180718235710.18242-5-jmkrzyszt@gmail.com>
+ <20180719082538.222396bf@bbrezillon> <9888773.rgnYII6m0f@z50>
+Message-ID: <20180720212941.628600da@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Jul 2018 20:12:05 +0200
+On Fri, 20 Jul 2018 20:14:55 +0200
 Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
 
-> On Thursday, July 19, 2018 8:23:18 AM CEST Boris Brezillon wrote:
-> > On Thu, 19 Jul 2018 01:57:05 +0200
+> On Thursday, July 19, 2018 8:25:38 AM CEST Boris Brezillon wrote:
+> > On Thu, 19 Jul 2018 01:57:06 +0200
 > > Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
 > >   
-> > > In its current shape, the driver sets data port direction before each
-> > > byte read/write operation, even during multi-byte transfers.  Optimize
-> > > that by setting the port direction only on first byte of each transfer.  
-> > 
-> > Sounds like premature optimization for something you'll rework when
-> > fully switching to the GPIO consumer API to control the DATA bus.  
+> > > Further optimize processing speed of read/write callback functions by
+> > > resolving private structure pointer only once per callback and passing
+> > > it to all subfunctions instead of mtd_info.  
 > 
-> Indeed, this optimization was crucial for getting acceptable performance of 
-> data transfers over GPIO.  I'm only not sure if there is any action in 
-> response to your comment expected on my side, e.g., did you want to say I 
-> should modify the patch description, or change the order of patches?
+> OK, I'll call it simplification (the code looks more simple after that, doesn't 
+> it),
 
-I'm just saying that, since you switch to a solution that goes through
-the GPIO framework to control the data bus, making sure the the pin
-direction change is done only once when reading/writing several bytes is
-something you can do after/when transitioning to the new approach.
+Yep.
 
-So yes, I suggest to re-order patches, except that this patch won't
-look the same at all if you move it after the "use the GPIO consumer
-API to control data bus" patch.
+> not optimization if you agree.
+> 
+> Thanks,
+> Janusz
+> 
+> 
+> 
