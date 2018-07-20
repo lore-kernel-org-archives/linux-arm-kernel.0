@@ -1,117 +1,49 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 17:15:04 +0200
-Subject: [PATCH v4 12/35] mtd: rawnand: lpc32xx_slc: convert driver to
- nand_scan()
-In-Reply-To: <20180720151527.16038-1-miquel.raynal@bootlin.com>
-References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
-Message-ID: <20180720151527.16038-13-miquel.raynal@bootlin.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 20 Jul 2018 17:47:54 +0200
+Subject: [PATCH v3 0/2] Add Mediatek X20 Development Board support
+In-Reply-To: <1531997690-6040-1-git-send-email-manivannan.sadhasivam@linaro.org>
+References: <1531997690-6040-1-git-send-email-manivannan.sadhasivam@linaro.org>
+Message-ID: <e0e5575f-345f-47a7-0d37-489fa23d1562@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two helpers have been added to the core to make ECC-related
-configuration between the detection phase and the final NAND scan. Use
-these hooks and convert the driver to just use nand_scan() instead of
-both nand_scan_ident() and nand_scan_tail().
 
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
----
- drivers/mtd/nand/raw/lpc32xx_slc.c | 77 +++++++++++++++++++++-----------------
- 1 file changed, 42 insertions(+), 35 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/lpc32xx_slc.c b/drivers/mtd/nand/raw/lpc32xx_slc.c
-index 42820aa1abab..a4e8b7e75135 100644
---- a/drivers/mtd/nand/raw/lpc32xx_slc.c
-+++ b/drivers/mtd/nand/raw/lpc32xx_slc.c
-@@ -779,6 +779,46 @@ static struct lpc32xx_nand_cfg_slc *lpc32xx_parse_dt(struct device *dev)
- 	return ncfg;
- }
- 
-+static int lpc32xx_nand_attach_chip(struct nand_chip *chip)
-+{
-+	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct lpc32xx_nand_host *host = nand_get_controller_data(chip);
-+
-+	/* OOB and ECC CPU and DMA work areas */
-+	host->ecc_buf = (uint32_t *)(host->data_buf + LPC32XX_DMA_DATA_SIZE);
-+
-+	/*
-+	 * Small page FLASH has a unique OOB layout, but large and huge
-+	 * page FLASH use the standard layout. Small page FLASH uses a
-+	 * custom BBT marker layout.
-+	 */
-+	if (mtd->writesize <= 512)
-+		mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
-+
-+	/* These sizes remain the same regardless of page size */
-+	chip->ecc.size = 256;
-+	chip->ecc.bytes = LPC32XX_SLC_DEV_ECC_BYTES;
-+	chip->ecc.prepad = 0;
-+	chip->ecc.postpad = 0;
-+
-+	/*
-+	 * Use a custom BBT marker setup for small page FLASH that
-+	 * won't interfere with the ECC layout. Large and huge page
-+	 * FLASH use the standard layout.
-+	 */
-+	if ((chip->bbt_options & NAND_BBT_USE_FLASH) &&
-+	    mtd->writesize <= 512) {
-+		chip->bbt_td = &bbt_smallpage_main_descr;
-+		chip->bbt_md = &bbt_smallpage_mirror_descr;
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct nand_controller_ops lpc32xx_nand_controller_ops = {
-+	.attach_chip = lpc32xx_nand_attach_chip,
-+};
-+
- /*
-  * Probe for NAND controller
-  */
-@@ -884,41 +924,8 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Find NAND device */
--	res = nand_scan_ident(mtd, 1, NULL);
--	if (res)
--		goto release_dma;
--
--	/* OOB and ECC CPU and DMA work areas */
--	host->ecc_buf = (uint32_t *)(host->data_buf + LPC32XX_DMA_DATA_SIZE);
--
--	/*
--	 * Small page FLASH has a unique OOB layout, but large and huge
--	 * page FLASH use the standard layout. Small page FLASH uses a
--	 * custom BBT marker layout.
--	 */
--	if (mtd->writesize <= 512)
--		mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
--
--	/* These sizes remain the same regardless of page size */
--	chip->ecc.size = 256;
--	chip->ecc.bytes = LPC32XX_SLC_DEV_ECC_BYTES;
--	chip->ecc.prepad = chip->ecc.postpad = 0;
--
--	/*
--	 * Use a custom BBT marker setup for small page FLASH that
--	 * won't interfere with the ECC layout. Large and huge page
--	 * FLASH use the standard layout.
--	 */
--	if ((chip->bbt_options & NAND_BBT_USE_FLASH) &&
--	    mtd->writesize <= 512) {
--		chip->bbt_td = &bbt_smallpage_main_descr;
--		chip->bbt_md = &bbt_smallpage_mirror_descr;
--	}
--
--	/*
--	 * Fills out all the uninitialized function pointers with the defaults
--	 */
--	res = nand_scan_tail(mtd);
-+	chip->dummy_controller.ops = &lpc32xx_nand_controller_ops;
-+	res = nand_scan(mtd, 1);
- 	if (res)
- 		goto release_dma;
- 
--- 
-2.14.1
+On 19/07/18 12:54, Manivannan Sadhasivam wrote:
+> Add devicetree support for Mediatek X20 Development Board by Archermind.
+> This board is based on the Deca-Core MT6797 SoC from Mediatek and is
+> one of the 96Boards Consumer Edition platform.
+> 
+> With this devicetree change, board can boot into initramfs.
+> 
+> More information about this board can be found in 96Boards product page:
+> https://www.96boards.org/product/mediatek-x20/
+> 
+
+Pushed both to v4.18-next/dts64
+
+Thanks a lot!
+Matthias
+
+> Thanks,
+> Mani
+> 
+> Changes in v3:
+> 
+> * Modified the memory size to 2GB (0x80000000) in board DTS
+> 
+> Changes in v2:
+> 
+> * Added documentation for board compatible
+> * Dropped vendor documetation patch since it got applied
+> 
+> Manivannan Sadhasivam (2):
+>   dt-bindings: arm: mediatek: Document Mediatek X20 Development Board
+>   arm64: dts: Add Mediatek X20 Development Board support
+> 
+>  Documentation/devicetree/bindings/arm/mediatek.txt |  3 ++
+>  arch/arm64/boot/dts/mediatek/Makefile              |  1 +
+>  arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts    | 33 ++++++++++++++++++++++
+>  3 files changed, 37 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+> 
