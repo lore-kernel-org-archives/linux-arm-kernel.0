@@ -1,37 +1,62 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 20 Jul 2018 17:39:21 -0300
-Subject: [PATCH 6/6] ARM: imx_v6_v7_defconfig: Select
- CONFIG_DRM_PANEL_SEIKO_43WVF1G
-In-Reply-To: <1532119161-16597-1-git-send-email-festevam@gmail.com>
-References: <1532119161-16597-1-git-send-email-festevam@gmail.com>
-Message-ID: <1532119161-16597-6-git-send-email-festevam@gmail.com>
+From: alexandru-cosmin.gheorghe@arm.com (Alexandru Gheorghe)
+Date: Fri, 20 Jul 2018 22:14:59 +0100
+Subject: [PATCH 00/10] Add helper for plane reset
+In-Reply-To: <20180713161407.GQ20303@art_vandelay>
+References: <20180713161407.GQ20303@art_vandelay>
+Message-ID: <20180720211509.23605-1-alexandru-cosmin.gheorghe@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+Drivers that subclass drm_plane need to copy the logic for linking the
+drm_plane with its state and to initialize core properties to their
+default values. E.g (alpha and rotation)
 
-imx6sl-evk, imx6sll-evk and imx6sx-sdb boards use a Seiko 43WVF1G panel.
+Having a helper to reset the plane_state makes sense because of multiple
+reasons:
+1. Eliminate code duplication.
+2. Add a single place for initializing core properties to their
+default values, no need for driver to do it if what the helper sets
+makes sense for them.
+3. No need to debug the driver when you enable a core property and
+observe it doesn't have a proper default value.
 
-Now that the DRM mxsfb driver is the one selected by default, let's
-also select CONFIG_DRM_PANEL_SEIKO_43WVF1G so that these boards continue
-to have a working display by default.
+Tested with mali-dp the other drivers are just built-tested.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index e2c1276..7eca43f 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -257,6 +257,7 @@ CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
- CONFIG_DRM_PANEL_LVDS=y
- CONFIG_DRM_PANEL_SIMPLE=y
-+CONFIG_DRM_PANEL_SEIKO_43WVF1G=y
- CONFIG_DRM_DW_HDMI_AHB_AUDIO=m
- CONFIG_DRM_DW_HDMI_CEC=y
- CONFIG_DRM_IMX=y
+Alexandru Gheorghe (10):
+  drm/atomic: Add  __drm_atomic_helper_plane_reset
+  drm/amd/display: Use __drm_atomic_helper_plane_reset instead of
+    copying the logic
+  drm: mali-dp: Use __drm_atomic_helper_plane_reset instead of copying
+    the logic
+  drm: atmel-hlcdc: Use __drm_atomic_helper_plane_reset instead of
+    copying the logic
+  drm/exynos: Use __drm_atomic_helper_plane_reset instead of copying the
+    logic
+  drm/imx: Use __drm_atomic_helper_plane_reset instead of copying the
+    logic
+  drm: rcar-du: Use __drm_atomic_helper_plane_reset instead of copying
+    the logic
+  drm/sun4i: Use __drm_atomic_helper_plane_reset instead of copying the
+    logic
+  drm/vc4: Use __drm_atomic_helper_plane_reset instead of copying the
+    logic
+  drm/vmwgfx: Use __drm_atomic_helper_plane_reset instead of copying the
+    logic
+
+ .../gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c |  7 ++--
+ drivers/gpu/drm/arm/malidp_planes.c           |  7 ++--
+ .../gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c   |  5 +--
+ drivers/gpu/drm/drm_atomic_helper.c           | 32 +++++++++++++------
+ drivers/gpu/drm/exynos/exynos_drm_plane.c     |  3 +-
+ drivers/gpu/drm/imx/ipuv3-plane.c             |  8 ++---
+ drivers/gpu/drm/rcar-du/rcar_du_plane.c       |  4 +--
+ drivers/gpu/drm/rcar-du/rcar_du_vsp.c         |  4 +--
+ drivers/gpu/drm/sun4i/sun4i_layer.c           |  4 +--
+ drivers/gpu/drm/vc4/vc4_plane.c               |  4 +--
+ drivers/gpu/drm/vmwgfx/vmwgfx_kms.c           |  4 +--
+ include/drm/drm_atomic_helper.h               |  2 ++
+ 12 files changed, 39 insertions(+), 45 deletions(-)
+
 -- 
-2.7.4
+2.18.0
