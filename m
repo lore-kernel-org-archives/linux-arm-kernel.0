@@ -1,220 +1,166 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 20 Jul 2018 09:21:17 -0600
-Subject: [PATCH 3/3] arm64: dts: synaptics: add dtsi file for Synaptics
- AS370 SoC
-In-Reply-To: <20180713172626.5ca0e30f@xhacker.debian>
-References: <20180713171712.05f58a74@xhacker.debian>
- <20180713172626.5ca0e30f@xhacker.debian>
-Message-ID: <20180720152117.GB26487@rob-hp-laptop>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Fri, 20 Jul 2018 17:15:17 +0200
+Subject: [PATCH v4 25/35] mtd: rawnand: vf610: convert driver to nand_scan()
+In-Reply-To: <20180720151527.16038-1-miquel.raynal@bootlin.com>
+References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
+Message-ID: <20180720151527.16038-26-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 05:26:26PM +0800, Jisheng Zhang wrote:
-> Add initial dtsi file to support Synaptics AS370 SoC with quad
-> Cortex-A53 CPUs.
-> 
-> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-> ---
->  arch/arm64/boot/dts/synaptics/as370.dtsi | 177 +++++++++++++++++++++++
->  1 file changed, 177 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/synaptics/as370.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/synaptics/as370.dtsi b/arch/arm64/boot/dts/synaptics/as370.dtsi
-> new file mode 100644
-> index 000000000000..20f3d658c566
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/synaptics/as370.dtsi
-> @@ -0,0 +1,177 @@
-> +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> +/*
-> + * Copyright (C) 2018 Synaptics Incorporated
-> + *
-> + * Author: Jisheng Zhang <jszhang@kernel.org>
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +	compatible = "syna,as370";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	aliases {
-> +		serial0 = &uart0;
+Two helpers have been added to the core to make ECC-related
+configuration between the detection phase and the final NAND scan. Use
+these hooks and convert the driver to just use nand_scan() instead of
+both nand_scan_ident() and nand_scan_tail().
 
-This normally goes in the board file. All boards will use this?
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+---
+ drivers/mtd/nand/raw/vf610_nfc.c | 127 ++++++++++++++++++++-------------------
+ 1 file changed, 66 insertions(+), 61 deletions(-)
 
-> +	};
-> +
-> +	psci {
-> +		compatible = "arm,psci-1.0";
-> +		method = "smc";
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu0: cpu at 0 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <0x0>;
-> +			enable-method = "psci";
-> +			next-level-cache = <&l2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0>;
-> +		};
-> +
-> +		cpu1: cpu at 1 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <0x1>;
-> +			enable-method = "psci";
-> +			next-level-cache = <&l2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0>;
-> +		};
-> +
-> +		cpu2: cpu at 2 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <0x2>;
-> +			enable-method = "psci";
-> +			next-level-cache = <&l2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0>;
-> +		};
-> +
-> +		cpu3: cpu at 3 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <0x3>;
-> +			enable-method = "psci";
-> +			next-level-cache = <&l2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0>;
-> +		};
-> +
-> +		l2: cache {
-> +			compatible = "cache";
-
-Why do you need this node? Doesn't define 
-
-> +		};
-> +
-> +		idle-states {
-> +			entry-method = "psci";
-> +			CPU_SLEEP_0: cpu-sleep-0 {
-> +				compatible = "arm,idle-state";
-> +				local-timer-stop;
-> +				arm,psci-suspend-param = <0x0010000>;
-> +				entry-latency-us = <75>;
-> +				exit-latency-us = <155>;
-> +				min-residency-us = <1000>;
-> +			};
-> +		};
-> +	};
-> +
-> +	osc: osc {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <25000000>;
-> +	};
-> +
-> +	pmu {
-> +		compatible = "arm,cortex-a53-pmu";
-> +		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-affinity = <&cpu0>,
-> +				     <&cpu1>,
-> +				     <&cpu2>,
-> +				     <&cpu3>;
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-> +	};
-> +
-> +	soc at f7000000 {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0 0 0xf7000000 0x1000000>;
-> +
-> +		gic: interrupt-controller at 901000 {
-> +			compatible = "arm,gic-400";
-> +			#interrupt-cells = <3>;
-> +			interrupt-controller;
-> +			reg = <0x901000 0x1000>,
-> +			      <0x902000 0x2000>,
-> +			      <0x904000 0x2000>,
-> +			      <0x906000 0x2000>;
-> +			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> +		};
-> +
-> +		apb at e80000 {
-> +			compatible = "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges = <0 0xe80000 0x10000>;
-> +
-> +			uart0: uart at 0c00 {
-
-serial at c00
-
-> +				compatible = "snps,dw-apb-uart";
-> +				reg = <0x0c00 0x100>;
-> +				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&osc>;
-> +				reg-shift = <2>;
-> +				status = "disabled";
-> +			};
-> +
-> +			gpio0: gpio at 1800 {
-> +				compatible = "snps,dw-apb-gpio";
-> +				reg = <0x1800 0x400>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				porta: gpio-port at 0 {
-> +					compatible = "snps,dw-apb-gpio-port";
-> +					gpio-controller;
-> +					#gpio-cells = <2>;
-> +					snps,nr-gpios = <32>;
-> +					reg = <0>;
-> +					interrupt-controller;
-> +					#interrupt-cells = <2>;
-> +					interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-> +				};
-> +			};
-> +
-> +			gpio1: gpio at 2000 {
-> +				compatible = "snps,dw-apb-gpio";
-> +				reg = <0x2000 0x400>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				portb: gpio-port at 1 {
-> +					compatible = "snps,dw-apb-gpio-port";
-> +					gpio-controller;
-> +					#gpio-cells = <2>;
-> +					snps,nr-gpios = <32>;
-> +					reg = <0>;
-> +					interrupt-controller;
-> +					#interrupt-cells = <2>;
-> +					interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +};
-> -- 
-> 2.18.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/mtd/nand/raw/vf610_nfc.c b/drivers/mtd/nand/raw/vf610_nfc.c
+index d5a22fc96878..6f6dcbf9095b 100644
+--- a/drivers/mtd/nand/raw/vf610_nfc.c
++++ b/drivers/mtd/nand/raw/vf610_nfc.c
+@@ -747,6 +747,69 @@ static void vf610_nfc_init_controller(struct vf610_nfc *nfc)
+ 	}
+ }
+ 
++static int vf610_nfc_attach_chip(struct nand_chip *chip)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
++
++	vf610_nfc_init_controller(nfc);
++
++	/* Bad block options. */
++	if (chip->bbt_options & NAND_BBT_USE_FLASH)
++		chip->bbt_options |= NAND_BBT_NO_OOB;
++
++	/* Single buffer only, max 256 OOB minus ECC status */
++	if (mtd->writesize + mtd->oobsize > PAGE_2K + OOB_MAX - 8) {
++		dev_err(nfc->dev, "Unsupported flash page size\n");
++		return -ENXIO;
++	}
++
++	if (chip->ecc.mode != NAND_ECC_HW)
++		return 0;
++
++	if (mtd->writesize != PAGE_2K && mtd->oobsize < 64) {
++		dev_err(nfc->dev, "Unsupported flash with hwecc\n");
++		return -ENXIO;
++	}
++
++	if (chip->ecc.size != mtd->writesize) {
++		dev_err(nfc->dev, "Step size needs to be page size\n");
++		return -ENXIO;
++	}
++
++	/* Only 64 byte ECC layouts known */
++	if (mtd->oobsize > 64)
++		mtd->oobsize = 64;
++
++	/* Use default large page ECC layout defined in NAND core */
++	mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
++	if (chip->ecc.strength == 32) {
++		nfc->ecc_mode = ECC_60_BYTE;
++		chip->ecc.bytes = 60;
++	} else if (chip->ecc.strength == 24) {
++		nfc->ecc_mode = ECC_45_BYTE;
++		chip->ecc.bytes = 45;
++	} else {
++		dev_err(nfc->dev, "Unsupported ECC strength\n");
++		return -ENXIO;
++	}
++
++	chip->ecc.read_page = vf610_nfc_read_page;
++	chip->ecc.write_page = vf610_nfc_write_page;
++	chip->ecc.read_page_raw = vf610_nfc_read_page_raw;
++	chip->ecc.write_page_raw = vf610_nfc_write_page_raw;
++	chip->ecc.read_oob = vf610_nfc_read_oob;
++	chip->ecc.write_oob = vf610_nfc_write_oob;
++
++	chip->ecc.size = PAGE_2K;
++
++	return 0;
++}
++
++static const struct nand_controller_ops vf610_nfc_controller_ops = {
++	.attach_chip = vf610_nfc_attach_chip,
++};
++
+ static int vf610_nfc_probe(struct platform_device *pdev)
+ {
+ 	struct vf610_nfc *nfc;
+@@ -827,67 +890,9 @@ static int vf610_nfc_probe(struct platform_device *pdev)
+ 
+ 	vf610_nfc_preinit_controller(nfc);
+ 
+-	/* first scan to find the device and get the page size */
+-	err = nand_scan_ident(mtd, 1, NULL);
+-	if (err)
+-		goto err_disable_clk;
+-
+-	vf610_nfc_init_controller(nfc);
+-
+-	/* Bad block options. */
+-	if (chip->bbt_options & NAND_BBT_USE_FLASH)
+-		chip->bbt_options |= NAND_BBT_NO_OOB;
+-
+-	/* Single buffer only, max 256 OOB minus ECC status */
+-	if (mtd->writesize + mtd->oobsize > PAGE_2K + OOB_MAX - 8) {
+-		dev_err(nfc->dev, "Unsupported flash page size\n");
+-		err = -ENXIO;
+-		goto err_disable_clk;
+-	}
+-
+-	if (chip->ecc.mode == NAND_ECC_HW) {
+-		if (mtd->writesize != PAGE_2K && mtd->oobsize < 64) {
+-			dev_err(nfc->dev, "Unsupported flash with hwecc\n");
+-			err = -ENXIO;
+-			goto err_disable_clk;
+-		}
+-
+-		if (chip->ecc.size != mtd->writesize) {
+-			dev_err(nfc->dev, "Step size needs to be page size\n");
+-			err = -ENXIO;
+-			goto err_disable_clk;
+-		}
+-
+-		/* Only 64 byte ECC layouts known */
+-		if (mtd->oobsize > 64)
+-			mtd->oobsize = 64;
+-
+-		/* Use default large page ECC layout defined in NAND core */
+-		mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
+-		if (chip->ecc.strength == 32) {
+-			nfc->ecc_mode = ECC_60_BYTE;
+-			chip->ecc.bytes = 60;
+-		} else if (chip->ecc.strength == 24) {
+-			nfc->ecc_mode = ECC_45_BYTE;
+-			chip->ecc.bytes = 45;
+-		} else {
+-			dev_err(nfc->dev, "Unsupported ECC strength\n");
+-			err = -ENXIO;
+-			goto err_disable_clk;
+-		}
+-
+-		chip->ecc.read_page = vf610_nfc_read_page;
+-		chip->ecc.write_page = vf610_nfc_write_page;
+-		chip->ecc.read_page_raw = vf610_nfc_read_page_raw;
+-		chip->ecc.write_page_raw = vf610_nfc_write_page_raw;
+-		chip->ecc.read_oob = vf610_nfc_read_oob;
+-		chip->ecc.write_oob = vf610_nfc_write_oob;
+-
+-		chip->ecc.size = PAGE_2K;
+-	}
+-
+-	/* second phase scan */
+-	err = nand_scan_tail(mtd);
++	/* Scan the NAND chip */
++	chip->dummy_controller.ops = &vf610_nfc_controller_ops;
++	err = nand_scan(mtd, 1);
+ 	if (err)
+ 		goto err_disable_clk;
+ 
+-- 
+2.14.1
