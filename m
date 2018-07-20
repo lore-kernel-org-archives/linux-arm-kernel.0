@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 17:15:02 +0200
-Subject: [PATCH v4 10/35] mtd: rawnand: jz4780: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 17:15:06 +0200
+Subject: [PATCH v4 14/35] mtd: rawnand: mtk: convert driver to nand_scan()
 In-Reply-To: <20180720151527.16038-1-miquel.raynal@bootlin.com>
 References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
-Message-ID: <20180720151527.16038-11-miquel.raynal@bootlin.com>
+Message-ID: <20180720151527.16038-15-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,93 +13,113 @@ these hooks and convert the driver to just use nand_scan() instead of
 both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-Acked-by: Harvey Hunt <harveyhuntnexus@gmail.com>
 ---
- drivers/mtd/nand/raw/jz4780_nand.c | 34 ++++++++++++++++------------------
- 1 file changed, 16 insertions(+), 18 deletions(-)
+ drivers/mtd/nand/raw/mtk_nand.c | 75 ++++++++++++++++++++++++-----------------
+ 1 file changed, 44 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/jz4780_nand.c b/drivers/mtd/nand/raw/jz4780_nand.c
-index 49841dad347c..db4fa60bd52a 100644
---- a/drivers/mtd/nand/raw/jz4780_nand.c
-+++ b/drivers/mtd/nand/raw/jz4780_nand.c
-@@ -158,9 +158,8 @@ static int jz4780_nand_ecc_correct(struct mtd_info *mtd, u8 *dat,
- 	return jz4780_bch_correct(nfc->bch, &params, dat, read_ecc);
- }
- 
--static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *dev)
-+static int jz4780_nand_attach_chip(struct nand_chip *chip)
- {
--	struct nand_chip *chip = &nand->chip;
- 	struct mtd_info *mtd = nand_to_mtd(chip);
- 	struct jz4780_nand_controller *nfc = to_jz4780_nand_controller(chip->controller);
- 	int eccbytes;
-@@ -171,7 +170,8 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
- 	switch (chip->ecc.mode) {
- 	case NAND_ECC_HW:
- 		if (!nfc->bch) {
--			dev_err(dev, "HW BCH selected, but BCH controller not found\n");
-+			dev_err(nfc->dev,
-+				"HW BCH selected, but BCH controller not found\n");
- 			return -ENODEV;
- 		}
- 
-@@ -180,15 +180,16 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
- 		chip->ecc.correct = jz4780_nand_ecc_correct;
- 		/* fall through */
- 	case NAND_ECC_SOFT:
--		dev_info(dev, "using %s (strength %d, size %d, bytes %d)\n",
--			(nfc->bch) ? "hardware BCH" : "software ECC",
--			chip->ecc.strength, chip->ecc.size, chip->ecc.bytes);
-+		dev_info(nfc->dev, "using %s (strength %d, size %d, bytes %d)\n",
-+			 (nfc->bch) ? "hardware BCH" : "software ECC",
-+			 chip->ecc.strength, chip->ecc.size, chip->ecc.bytes);
- 		break;
- 	case NAND_ECC_NONE:
--		dev_info(dev, "not using ECC\n");
-+		dev_info(nfc->dev, "not using ECC\n");
- 		break;
- 	default:
--		dev_err(dev, "ECC mode %d not supported\n", chip->ecc.mode);
-+		dev_err(nfc->dev, "ECC mode %d not supported\n",
-+			chip->ecc.mode);
- 		return -EINVAL;
- 	}
- 
-@@ -200,7 +201,7 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
- 	eccbytes = mtd->writesize / chip->ecc.size * chip->ecc.bytes;
- 
- 	if (eccbytes > mtd->oobsize - 2) {
--		dev_err(dev,
-+		dev_err(nfc->dev,
- 			"invalid ECC config: required %d ECC bytes, but only %d are available",
- 			eccbytes, mtd->oobsize - 2);
- 		return -EINVAL;
-@@ -211,6 +212,10 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
+diff --git a/drivers/mtd/nand/raw/mtk_nand.c b/drivers/mtd/nand/raw/mtk_nand.c
+index 7bc6be3f6ec0..967418f945ea 100644
+--- a/drivers/mtd/nand/raw/mtk_nand.c
++++ b/drivers/mtd/nand/raw/mtk_nand.c
+@@ -1250,13 +1250,54 @@ static int mtk_nfc_ecc_init(struct device *dev, struct mtd_info *mtd)
  	return 0;
  }
  
-+static const struct nand_controller_ops jz4780_nand_controller_ops = {
-+	.attach_chip = jz4780_nand_attach_chip,
++static int mtk_nfc_attach_chip(struct nand_chip *chip)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct device *dev = mtd->dev.parent;
++	struct mtk_nfc *nfc = nand_get_controller_data(chip);
++	struct mtk_nfc_nand_chip *mtk_nand = to_mtk_nand(chip);
++	int len;
++	int ret;
++
++	if (chip->options & NAND_BUSWIDTH_16) {
++		dev_err(dev, "16bits buswidth not supported");
++		return -EINVAL;
++	}
++
++	/* store bbt magic in page, cause OOB is not protected */
++	if (chip->bbt_options & NAND_BBT_USE_FLASH)
++		chip->bbt_options |= NAND_BBT_NO_OOB;
++
++	ret = mtk_nfc_ecc_init(dev, mtd);
++	if (ret)
++		return ret;
++
++	ret = mtk_nfc_set_spare_per_sector(&mtk_nand->spare_per_sector, mtd);
++	if (ret)
++		return ret;
++
++	mtk_nfc_set_fdm(&mtk_nand->fdm, mtd);
++	mtk_nfc_set_bad_mark_ctl(&mtk_nand->bad_mark, mtd);
++
++	len = mtd->writesize + mtd->oobsize;
++	nfc->buffer = devm_kzalloc(dev, len, GFP_KERNEL);
++	if (!nfc->buffer)
++		return  -ENOMEM;
++
++	return 0;
++}
++
++static const struct nand_controller_ops mtk_nfc_controller_ops = {
++	.attach_chip = mtk_nfc_attach_chip,
 +};
 +
- static int jz4780_nand_init_chip(struct platform_device *pdev,
- 				struct jz4780_nand_controller *nfc,
- 				struct device_node *np,
-@@ -280,15 +285,8 @@ static int jz4780_nand_init_chip(struct platform_device *pdev,
- 	chip->controller = &nfc->controller;
- 	nand_set_flash_node(chip, np);
+ static int mtk_nfc_nand_chip_init(struct device *dev, struct mtk_nfc *nfc,
+ 				  struct device_node *np)
+ {
+ 	struct mtk_nfc_nand_chip *chip;
+ 	struct nand_chip *nand;
+ 	struct mtd_info *mtd;
+-	int nsels, len;
++	int nsels;
+ 	u32 tmp;
+ 	int ret;
+ 	int i;
+@@ -1287,6 +1328,7 @@ static int mtk_nfc_nand_chip_init(struct device *dev, struct mtk_nfc *nfc,
  
--	ret = nand_scan_ident(mtd, 1, NULL);
+ 	nand = &chip->nand;
+ 	nand->controller = &nfc->controller;
++	nand->controller->ops = &mtk_nfc_controller_ops;
+ 
+ 	nand_set_flash_node(nand, np);
+ 	nand_set_controller_data(nand, nfc);
+@@ -1324,36 +1366,7 @@ static int mtk_nfc_nand_chip_init(struct device *dev, struct mtk_nfc *nfc,
+ 
+ 	mtk_nfc_hw_init(nfc);
+ 
+-	ret = nand_scan_ident(mtd, nsels, NULL);
 -	if (ret)
 -		return ret;
 -
--	ret = jz4780_nand_init_ecc(nand, dev);
+-	/* store bbt magic in page, cause OOB is not protected */
+-	if (nand->bbt_options & NAND_BBT_USE_FLASH)
+-		nand->bbt_options |= NAND_BBT_NO_OOB;
+-
+-	ret = mtk_nfc_ecc_init(dev, mtd);
+-	if (ret)
+-		return -EINVAL;
+-
+-	if (nand->options & NAND_BUSWIDTH_16) {
+-		dev_err(dev, "16bits buswidth not supported");
+-		return -EINVAL;
+-	}
+-
+-	ret = mtk_nfc_set_spare_per_sector(&chip->spare_per_sector, mtd);
 -	if (ret)
 -		return ret;
+-
+-	mtk_nfc_set_fdm(&chip->fdm, mtd);
+-	mtk_nfc_set_bad_mark_ctl(&chip->bad_mark, mtd);
+-
+-	len = mtd->writesize + mtd->oobsize;
+-	nfc->buffer = devm_kzalloc(dev, len, GFP_KERNEL);
+-	if (!nfc->buffer)
+-		return  -ENOMEM;
 -
 -	ret = nand_scan_tail(mtd);
-+	chip->controller->ops = &jz4780_nand_controller_ops;
-+	ret = nand_scan(mtd, 1);
++	ret = nand_scan(mtd, nsels);
  	if (ret)
  		return ret;
  
