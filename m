@@ -1,85 +1,172 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 20 Jul 2018 15:01:23 -0500
-Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
- reset
-In-Reply-To: <CAK9iUCMMVR114msKiMHu7ik0VK8T5j=LAYAKsEkdnocTqkdMjQ@mail.gmail.com>
-References: <CAK9iUCM=zWexWow9TwkRfO186Hwr5WyGy0NHZF1vtXn3wbbZGQ@mail.gmail.com>
- <12fc8de5-ff03-cb00-52cb-25a43c71d03a@codeaurora.org>
- <20180708171418.GA11476@wunner.de>
- <CAK9iUCMcic5mzGiT20KNxgwPo6AuajHFsoj7GOjSht5SwrQevg@mail.gmail.com>
- <20180709160008.GA1490@wunner.de>
- <CAK9iUCMMVR114msKiMHu7ik0VK8T5j=LAYAKsEkdnocTqkdMjQ@mail.gmail.com>
-Message-ID: <20180720200123.GS128988@bhelgaas-glaptop.roam.corp.google.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 20 Jul 2018 17:39:16 -0300
+Subject: [PATCH 1/6] ARM: dts: imx28-evk: Move regulators outside simple-bus
+Message-ID: <1532119161-16597-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 02:30:11PM -0400, Sinan Kaya wrote:
-> On Mon, Jul 9, 2018 at 12:00 PM, Lukas Wunner <lukas@wunner.de> wrote:
-> > On Mon, Jul 09, 2018 at 08:48:44AM -0600, Sinan Kaya wrote:
-> > > On 7/8/18, Lukas Wunner <lukas@wunner.de> wrote:
-> > > > On Tue, Jul 03, 2018 at 11:43:26AM -0400, Sinan Kaya wrote:
-> > > > > My solution doesn't help if link down interrupt is observed
-> > > > > before the AER or DPC services.
-> > > >
-> > > > If pciehp gets an interrupt quicker than dpc/aer, it will (at
-> > > > least with my patches) remove all devices, check if the
-> > > > presence bit is set, and if so, try to bring the slot up
-> > > > again.
-> > >
-> > > Hotplug driver should only observe a link down interrupt. Link
-> > > would come up in response to a secondary bus reset initiated by
-> > > the AER driver.
-> >
-> > PCIe hotplug doesn't have separate Link Down and Link Up
-> > interrupts, there is only a Link State *Changed* event.
-> >
-> > > Can you point me to the code that would bring up the link in hp
-> > > code?
-> >
-> > I was referring to the situation with my recently posted pciehp
-> > patches applied, in particular patch [21/32] ("PCI: pciehp: Become
-> > resilient to missed events"):
-> > https://patchwork.ozlabs.org/patch/930389/
-> >
-> > When I get a presence or link changed event, I turn the slot off.
-> > That includes removing all devices in the slot.  Because even if
-> > the slot is still occupied or link is up, there was definitely a
-> > change and the safe behavior is to assume that the card in the
-> > slot is now a different one than before.
-> 
-> We do have a bit of mess unfortunately. Error handling and hotplug
-> drivers do not play nicely with each other.
-> 
-> When hotplug driver observes a link down, we are not checking if the
-> link down happened because user really wanted to remove a card or if
-> it was because it was originated by an error handling service such
-> as AER/DPC.
-> 
-> I'm thinking that we could potentially check if a hotplug event is
-> pending at the entrance of fatal error handling. If it is pending,
-> we could poll until the status bit clears. That should flush the
-> link down event.
-> 
-> Even then, link down indication of hotplug seem to turn off slot
-> power and LED.
-> 
-> If AER/DPC service runs after the hotplug driver, link won't come
-> back up as the power to the slot is turned off.
-> 
-> I'd like to hear about Bjorn's opinion before we throw something
-> else into this problem.
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-You guys know way more about this than I do.
+It is recommended to place regulators outside simple-bus, so move them
+accordingly.
 
-I think the separation of AER/DPC/pciehp into separate drivers is
-somewhat artificial because there are many interdependencies.  The
-driver model doesn't apply very well because there's only one
-underlying piece of hardware, which forces us to use the portdrv as
-sort of a multiplexer.  The fact that portdrv claims these bridges
-also means normal drivers (e.g., for performance counters) can't use
-the usual model.
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx28-evk.dts | 135 ++++++++++++++++++----------------------
+ 1 file changed, 61 insertions(+), 74 deletions(-)
 
-All that is to say that if integrating these services more tightly
-would help solve this problem, I'd be open to that.
-
-Bjorn
+diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
+index 6b0ae66..210aee0 100644
+--- a/arch/arm/boot/dts/imx28-evk.dts
++++ b/arch/arm/boot/dts/imx28-evk.dts
+@@ -13,6 +13,67 @@
+ 		reg = <0x40000000 0x08000000>;
+ 	};
+ 
++
++	reg_3p3v: regulator-3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	reg_vddio_sd0: regulator-vddio-sd0 {
++		compatible = "regulator-fixed";
++		regulator-name = "vddio-sd0";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio3 28 0>;
++	};
++
++	reg_fec_3v3: regulator-fec-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "fec-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio2 15 0>;
++	};
++
++	reg_usb0_vbus: regulator-usb0-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb0_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio3 9 0>;
++		enable-active-high;
++	};
++
++	reg_usb1_vbus: regulator-usb1-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio3 8 0>;
++		enable-active-high;
++	};
++
++	reg_lcd_3v3: regulator-lcd-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "lcd-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio3 30 0>;
++		enable-active-high;
++	};
++
++	reg_can_3v3: regulator-can-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "can-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio2 13 0>;
++		enable-active-high;
++	};
++
+ 	apb at 80000000 {
+ 		apbh at 80000000 {
+ 			gpmi-nand at 8000c000 {
+@@ -269,80 +330,6 @@
+ 		};
+ 	};
+ 
+-	regulators {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		reg_3p3v: regulator at 0 {
+-			compatible = "regulator-fixed";
+-			reg = <0>;
+-			regulator-name = "3P3V";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			regulator-always-on;
+-		};
+-
+-		reg_vddio_sd0: regulator at 1 {
+-			compatible = "regulator-fixed";
+-			reg = <1>;
+-			regulator-name = "vddio-sd0";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			gpio = <&gpio3 28 0>;
+-		};
+-
+-		reg_fec_3v3: regulator at 2 {
+-			compatible = "regulator-fixed";
+-			reg = <2>;
+-			regulator-name = "fec-3v3";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			gpio = <&gpio2 15 0>;
+-		};
+-
+-		reg_usb0_vbus: regulator at 3 {
+-			compatible = "regulator-fixed";
+-			reg = <3>;
+-			regulator-name = "usb0_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			gpio = <&gpio3 9 0>;
+-			enable-active-high;
+-		};
+-
+-		reg_usb1_vbus: regulator at 4 {
+-			compatible = "regulator-fixed";
+-			reg = <4>;
+-			regulator-name = "usb1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			gpio = <&gpio3 8 0>;
+-			enable-active-high;
+-		};
+-
+-		reg_lcd_3v3: regulator at 5 {
+-			compatible = "regulator-fixed";
+-			reg = <5>;
+-			regulator-name = "lcd-3v3";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			gpio = <&gpio3 30 0>;
+-			enable-active-high;
+-		};
+-
+-		reg_can_3v3: regulator at 6 {
+-			compatible = "regulator-fixed";
+-			reg = <6>;
+-			regulator-name = "can-3v3";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			gpio = <&gpio2 13 0>;
+-			enable-active-high;
+-		};
+-
+-	};
+-
+ 	sound {
+ 		compatible = "fsl,imx28-evk-sgtl5000",
+ 			     "fsl,mxs-audio-sgtl5000";
+-- 
+2.7.4
