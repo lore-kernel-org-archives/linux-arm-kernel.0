@@ -1,87 +1,59 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Fri, 20 Jul 2018 17:50:08 +0300
-Subject: [PATCH v6 6/8] interconnect: qcom: Add msm8916 interconnect
- provider driver
-In-Reply-To: <CAE=gft4YR27-ZyR5GXVxbiRbGycw=ydHu182LfwaLD=M+a8CNw@mail.gmail.com>
-References: <20180709155104.25528-1-georgi.djakov@linaro.org>
- <20180709155104.25528-7-georgi.djakov@linaro.org>
- <CAE=gft4YR27-ZyR5GXVxbiRbGycw=ydHu182LfwaLD=M+a8CNw@mail.gmail.com>
-Message-ID: <6bc5a4bc-5b66-7cfa-8820-4cd1053c6f8e@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 20 Jul 2018 16:51:43 +0200
+Subject: [PATCH v3 0/7] mmc: sunxi: Add runtime PM support
+In-Reply-To: <20180716171428.ud3zsmeccds545si@core>
+References: <cover.e9b9c0ab5bc9ffcc52a15e1c2f41462729da5b61.1523888566.git-series.maxime.ripard@bootlin.com>
+ <20180716171428.ud3zsmeccds545si@core>
+Message-ID: <20180720145143.qgvlk2gbegxwwcfs@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Ondrej,
 
-On 07/11/2018 01:34 AM, Evan Green wrote:
-> On Mon, Jul 9, 2018 at 8:51 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
->>
->> Add driver for the Qualcomm interconnect buses found in msm8916 based
->> platforms.
->>
->> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->> ---
->>  drivers/interconnect/Kconfig        |   5 +
->>  drivers/interconnect/Makefile       |   1 +
->>  drivers/interconnect/qcom/Kconfig   |  10 +
->>  drivers/interconnect/qcom/Makefile  |   2 +
->>  drivers/interconnect/qcom/msm8916.c | 499 ++++++++++++++++++++++++++++
->>  5 files changed, 517 insertions(+)
->>  create mode 100644 drivers/interconnect/qcom/msm8916.c
->>
->> diff --git a/drivers/interconnect/Kconfig b/drivers/interconnect/Kconfig
->> index a261c7d41deb..07a8276fa35a 100644
->> --- a/drivers/interconnect/Kconfig
->> +++ b/drivers/interconnect/Kconfig
->> @@ -8,3 +8,8 @@ menuconfig INTERCONNECT
->>
->>           If unsure, say no.
->>
->> +if INTERCONNECT
->> +
->> +source "drivers/interconnect/qcom/Kconfig"
->> +
->> +endif
->> diff --git a/drivers/interconnect/Makefile b/drivers/interconnect/Makefile
->> index 97fca2e09d24..7944cbca0527 100644
->> --- a/drivers/interconnect/Makefile
->> +++ b/drivers/interconnect/Makefile
->> @@ -1,2 +1,3 @@
->>  # SPDX-License-Identifier: GPL-2.0
->>  obj-$(CONFIG_INTERCONNECT)             += core.o
->> +obj-$(CONFIG_INTERCONNECT_QCOM)                += qcom/
->> diff --git a/drivers/interconnect/qcom/Kconfig b/drivers/interconnect/qcom/Kconfig
->> index b0c2ff928d88..a87afdef1bf7 100644
->> --- a/drivers/interconnect/qcom/Kconfig
->> +++ b/drivers/interconnect/qcom/Kconfig
->> @@ -2,6 +2,8 @@ config INTERCONNECT_QCOM
->>         bool "Qualcomm Network-on-Chip interconnect drivers"
->>         depends on INTERCONNECT
->>         depends on ARCH_QCOM || COMPILE_TEST
->> +       help
->> +         Support for Qualcomm's Network-on-Chip interconnect hardware.
->>
->>  config INTERCONNECT_QCOM_SMD_RPM
->>         tristate "Qualcomm SMD RPM interconnect driver"
->> @@ -9,3 +11,11 @@ config INTERCONNECT_QCOM_SMD_RPM
->>         help
->>           This is a driver for communicating interconnect related configuration
->>           details with a remote processor (RPM) on Qualcomm platforms.
->> +
->> +config INTERCONNECT_QCOM_MSM8916
->> +       tristate "Qualcomm MSM8916 interconnect driver"
->> +       depends on INTERCONNECT_QCOM
->> +       select INTERCONNECT_QCOM_SMD_RPM
+On Mon, Jul 16, 2018 at 07:14:28PM +0200, Ond?ej Jirman wrote:
+> On Mon, Apr 16, 2018 at 04:22:58PM +0200, Maxime Ripard wrote:
+> > Hi,
+> > 
+> > Since it's introduction, our MMC controller has had its external clocks
+> > running all the time.
+> > 
+> > While that was working great, the power usage and most importantly the EMI
+> > that it generated was pretty bad.
+> > 
+> > Let's implement some runtime_pm hooks with an autosuspend to shut down the
+> > whole block when the MMC is not active.
+> > 
+> > However, some SDIO devices will not probe properly if we keep shutting down
+> > the controller, so the autosuspend is disabled for the SDIO devices.
 > 
-> I'm not a kconfig expert, maybe someone else could chime in. I have
-> this impression that folks don't like select. Is there a way to do
-> this with depends instead? If I'm way off here, ignore me.
+> I've tested your patches on TBS A711 tablet (A83T). I get this in the log:
+> 
+>   sunxi-mmc 1c10000.mmc: fatal err update clk timeout
+> 
+> Interestingly, this only happens after the first boot. If I hard power cycle the
+> tablet (removing/reinserting the battery) the first boot after that, there's no
+> timeout, and WiFi chip connected to the mmc controller works.
+> 
+> Any other reboot (even power cycling via PMIC), it fails with the above error.
+> Maybe there's some unforeseen interaction of runtime PM with mmc-powerseq used
+> for the wifi chip power seuencing? Do you know what's the above error about?
+> I don't know anything about mmc subsystem.
 
-It could be done with depends, but i think that it would be easier for
-the user to choose only the SoC driver, without having to look into what
-dependencies need to be enabled for each. Here we are using select only
-locally and if there are any dependencies on other subsystems (like the
-QCOM_SMD_RPM), they should be put under the interconnect platform
-driver. Of course i am open for other arguments and suggestions.
+It's kind of weird. Do you have an oscilloscope available to look at
+the clock signal (and the reset gpio) and see if there's any
+difference of behaviour?
 
-Thanks,
-Georgi
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180720/476fd7a9/attachment.sig>
