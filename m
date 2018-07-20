@@ -1,22 +1,22 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 20 Jul 2018 10:56:26 -0600
-Subject: [PATCH v1 4/7] Documentation: rockchip-i2s: add description for
- px30
-In-Reply-To: <1531813747-8804-5-git-send-email-cl@rock-chips.com>
+Date: Fri, 20 Jul 2018 10:56:55 -0600
+Subject: [PATCH v1 5/7] Documentation: rockchip: grf: add grf and pmugrf
+ description for px30
+In-Reply-To: <1531814161-8940-1-git-send-email-cl@rock-chips.com>
 References: <1531813747-8804-1-git-send-email-cl@rock-chips.com>
- <1531813747-8804-5-git-send-email-cl@rock-chips.com>
-Message-ID: <20180720165626.GA11848@rob-hp-laptop>
+ <1531814161-8940-1-git-send-email-cl@rock-chips.com>
+Message-ID: <20180720165655.GA12289@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 03:49:04PM +0800, cl at rock-chips.com wrote:
+On Tue, Jul 17, 2018 at 03:56:01PM +0800, cl at rock-chips.com wrote:
 > From: Liang Chen <cl@rock-chips.com>
 > 
-> Add "rockchip,px30-i2s", "rockchip,rk3066-i2s" for i2s on px30 platform.
+> This patch adds the compatible of GRF and PMUGRF for PX30 SoCs.
 > 
 > Signed-off-by: Liang Chen <cl@rock-chips.com>
 > ---
->  Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  Documentation/devicetree/bindings/soc/rockchip/grf.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
