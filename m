@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 17:14:53 +0200
-Subject: [PATCH v4 01/35] mtd: rawnand: brcmnand: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 17:14:57 +0200
+Subject: [PATCH v4 05/35] mtd: rawnand: fsl_elbc: convert driver to nand_scan()
 In-Reply-To: <20180720151527.16038-1-miquel.raynal@bootlin.com>
 References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
-Message-ID: <20180720151527.16038-2-miquel.raynal@bootlin.com>
+Message-ID: <20180720151527.16038-6-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,87 +14,53 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/brcmnand/brcmnand.c | 47 +++++++++++++++++++-------------
- 1 file changed, 28 insertions(+), 19 deletions(-)
+ drivers/mtd/nand/raw/fsl_elbc_nand.c | 19 ++++++++-----------
+ 1 file changed, 8 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/brcmnand/brcmnand.c b/drivers/mtd/nand/raw/brcmnand/brcmnand.c
-index 2e5efa0f9ea2..071f09af56dc 100644
---- a/drivers/mtd/nand/raw/brcmnand/brcmnand.c
-+++ b/drivers/mtd/nand/raw/brcmnand/brcmnand.c
-@@ -2208,6 +2208,32 @@ static int brcmnand_setup_dev(struct brcmnand_host *host)
+diff --git a/drivers/mtd/nand/raw/fsl_elbc_nand.c b/drivers/mtd/nand/raw/fsl_elbc_nand.c
+index 0aa54a949653..44893e49b386 100644
+--- a/drivers/mtd/nand/raw/fsl_elbc_nand.c
++++ b/drivers/mtd/nand/raw/fsl_elbc_nand.c
+@@ -637,9 +637,9 @@ static int fsl_elbc_wait(struct mtd_info *mtd, struct nand_chip *chip)
+ 	return (elbc_fcm_ctrl->mdr & 0xff) | NAND_STATUS_WP;
+ }
+ 
+-static int fsl_elbc_chip_init_tail(struct mtd_info *mtd)
++static int fsl_elbc_attach_chip(struct nand_chip *chip)
+ {
+-	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct mtd_info *mtd = nand_to_mtd(chip);
+ 	struct fsl_elbc_mtd *priv = nand_get_controller_data(chip);
+ 	struct fsl_lbc_ctrl *ctrl = priv->ctrl;
+ 	struct fsl_lbc_regs __iomem *lbc = ctrl->regs;
+@@ -706,6 +706,10 @@ static int fsl_elbc_chip_init_tail(struct mtd_info *mtd)
  	return 0;
  }
  
-+static int brcmnand_attach_chip(struct nand_chip *chip)
-+{
-+	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct brcmnand_host *host = nand_get_controller_data(chip);
-+	int ret;
-+
-+	if (chip->bbt_options & NAND_BBT_USE_FLASH)
-+		chip->bbt_options |= NAND_BBT_NO_OOB;
-+
-+	if (brcmnand_setup_dev(host))
-+		return -ENXIO;
-+
-+	chip->ecc.size = host->hwcfg.sector_size_1k ? 1024 : 512;
-+
-+	/* only use our internal HW threshold */
-+	mtd->bitflip_threshold = 1;
-+
-+	ret = brcmstb_choose_ecc_layout(host);
-+
-+	return ret;
-+}
-+
-+static const struct nand_controller_ops brcmnand_controller_ops = {
-+	.attach_chip = brcmnand_attach_chip,
++static const struct nand_controller_ops fsl_elbc_controller_ops = {
++	.attach_chip = fsl_elbc_attach_chip,
 +};
 +
- static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
+ static int fsl_elbc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
+ 			      uint8_t *buf, int oob_required, int page)
  {
- 	struct brcmnand_controller *ctrl = host->ctrl;
-@@ -2267,10 +2293,6 @@ static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
- 	nand_writereg(ctrl, cfg_offs,
- 		      nand_readreg(ctrl, cfg_offs) & ~CFG_BUS_WIDTH);
+@@ -910,15 +914,8 @@ static int fsl_elbc_nand_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto err;
  
 -	ret = nand_scan_ident(mtd, 1, NULL);
 -	if (ret)
--		return ret;
+-		goto err;
 -
- 	chip->options |= NAND_NO_SUBPAGE_WRITE;
- 	/*
- 	 * Avoid (for instance) kmap()'d buffers from JFFS2, which we can't DMA
-@@ -2279,21 +2301,7 @@ static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
- 	 */
- 	chip->options |= NAND_USE_BOUNCE_BUFFER;
- 
--	if (chip->bbt_options & NAND_BBT_USE_FLASH)
--		chip->bbt_options |= NAND_BBT_NO_OOB;
--
--	if (brcmnand_setup_dev(host))
--		return -ENXIO;
--
--	chip->ecc.size = host->hwcfg.sector_size_1k ? 1024 : 512;
--	/* only use our internal HW threshold */
--	mtd->bitflip_threshold = 1;
--
--	ret = brcmstb_choose_ecc_layout(host);
+-	ret = fsl_elbc_chip_init_tail(mtd);
 -	if (ret)
--		return ret;
+-		goto err;
 -
 -	ret = nand_scan_tail(mtd);
++	priv->chip.controller->ops = &fsl_elbc_controller_ops;
 +	ret = nand_scan(mtd, 1);
  	if (ret)
- 		return ret;
+ 		goto err;
  
-@@ -2434,6 +2442,7 @@ int brcmnand_probe(struct platform_device *pdev, struct brcmnand_soc *soc)
- 	init_completion(&ctrl->done);
- 	init_completion(&ctrl->dma_done);
- 	nand_controller_init(&ctrl->controller);
-+	ctrl->controller.ops = &brcmnand_controller_ops;
- 	INIT_LIST_HEAD(&ctrl->host_list);
- 
- 	/* NAND register range */
 -- 
 2.14.1
