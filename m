@@ -1,72 +1,95 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 20 Jul 2018 12:44:33 +0200
-Subject: [PATCH v3 0/4] Add basic support for Mediatek MT8183 SoC
-In-Reply-To: <1532074769.19148.2.camel@mtksdaap41>
-References: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
- <9ba45353-a6e1-9a6e-f05b-4b1679ae9e52@gmail.com>
- <1532074769.19148.2.camel@mtksdaap41>
-Message-ID: <2ca76468-198b-b764-c974-374e567e0c93@gmail.com>
+From: hari.vyas@broadcom.com (Hari Vyas)
+Date: Fri, 20 Jul 2018 16:27:50 +0530
+Subject: [PATCH] arm64: fix for restoring console loglevel after handling
+ traps
+In-Reply-To: <20180720094453.a64hnqoveojrozha@lakrids.cambridge.arm.com>
+References: <1531993734-1463-1-git-send-email-hari.vyas@broadcom.com>
+ <1531993734-1463-2-git-send-email-hari.vyas@broadcom.com>
+ <20180719100140.GA424@jagdpanzerIV>
+ <CAM5rFu_N-=26LddRy1mO010h9yLcGuKqK6=y+h=h3-HbfEP+FQ@mail.gmail.com>
+ <20180719103916.g763zmsm7wnngwop@lakrids.cambridge.arm.com>
+ <CAM5rFu-MFbH_2Pohmjydy232Rpt7_E84-K=e67wAu3iQzvTLiA@mail.gmail.com>
+ <20180720062609.2haxhf23zyouoxmh@salmiak> <20180720064027.GA3901@jagdpanzerIV>
+ <CAM5rFu8rQaVne22cYxx3YZTaxh9Dnq2wJWNu1uierBxZfogPeA@mail.gmail.com>
+ <20180720094453.a64hnqoveojrozha@lakrids.cambridge.arm.com>
+Message-ID: <CAM5rFu8AiU6dORBGP5tfRp=fyvhNrbK8jpuhm=w4JVvONXgz5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 20/07/18 10:19, Erin Lo wrote:
-> On Mon, 2018-07-16 at 11:28 +0200, Matthias Brugger wrote:
->> Hi Erin,
+On Fri, Jul 20, 2018 at 3:14 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Fri, Jul 20, 2018 at 01:01:39PM +0530, Hari Vyas wrote:
+>> On Fri, Jul 20, 2018 at 12:10 PM, Sergey Senozhatsky
+>> <sergey.senozhatsky.work@gmail.com> wrote:
+>> > On (07/20/18 07:26), Mark Rutland wrote:
+>> >> > >
+>> >> > This die() is called from so many places i.e. entry.S shows so many ways i.e
+>> >> > el1_sync_invalid,irq,fiq_invalid,error_invalid.
+>> >
+>> > [..]
+>> >
+>> >> Indeed, but *none* of these should fire unless something has gone wrong already.
+>> >
+>> > [..]
+>> >
+>> > Agreed.
+>> >
+>> > I see that all those arm64/kernel/entry.S el0_sync_invalid,
+>> > el0_irq_invalid, el0_fiq_invalid, and so on, invoke inv_entry macro
+>> > which calls into bad_mode, which ends up in panic() anyway:
+>> >
+>> > asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+>> > {
+>> >         console_verbose();
+>> >
+>> >         pr_crit("Bad mode in %s handler detected on CPU%d, code 0x%08x -- %s\n",
+>> >                 handler[reason], smp_processor_id(), esr,
+>> >                 esr_get_class_string(esr));
+>> >
+>> >         die("Oops - bad mode", regs, 0);
+>> >         local_daif_mask();
+>> >         panic("bad mode");
+>> > }
+>> >
+>> > bad_mode is always fatal.
+>> >
+>> > When the kernel becomes suicidal and wants to die() we better have
+>> > verbose consoles. So, no, I don't think I'm buying the patch.
+>> >
+>> >         -ss
+>> This was the behavior observed with 4.14 kernel version and proposed
+>> patch. I understand, giving access to system memory access to user is
+>> bad and should be avoided so one may argue
+>> simplest but bad example and unpredictable results may be observed.
+>> For other examples, I may need to work and find out. Please decide.
 >>
->> On 17/05/18 08:22, Erin Lo wrote:
->>> MT8183 is a SoC based on 64bit ARMv8 architecture.
->>> It contains 4 CA53 and 4 CA73 cores.
->>> MT8183 share many HW IP with MT65xx series.
->>> This patchset was tested on MT8183 evaluation board, and boot to shell ok.
->>>
->>> This series contains document bindings, device tree including interrupt, uart.
->>>
->>> Change in v3:
->>> 1. Fill out GICC, GICH, GICV regions
->>> 2. Update Copyright to 2018
->>>
->>> Change in v2:
->>> 1. Split dt-bindings into different patches
->>> 2. Correct bindings for supported SoCs (mtk-uart.txt)
->>>
->>> Ben Ho (1):
->>>   arm64: dts: Add Mediatek SoC MT8183 and evaluation board dts and
->>>     Makefile
->>>
->>> Erin Lo (3):
->>>   dt-bindings: arm: Add bindings for Mediatek MT8183 SoC Platform
->>>   dt-bindings: mtk-sysirq: Add compatible for Mediatek MT8183
->>>   dt-bindings: serial: Add compatible for Mediatek MT8183
->>>
+>> root at bcm958802a8021:~# uname -a
 >>
->> I'm a bit reluctant to take this series, as it will only enable the EVB board to
->> boot into a serial console. Are you planning to add support for other devices of
->> this SoC?
+>> Linux bcm958802a8021 4.14.49+g8f1356a #1 SMP Mon Jul 9 22:37:03 UTC
+>> 2018 aarch64 aarch64 aarch64 GNU/Linux
 >>
->> Apart please take into account that there is an issue with the dts file, as you
->> were told by the kbuild test robot.
+>> root at bcm958802a8021:~# cat /proc/sys/kernel/printk
 >>
->> Regards,
->> Matthias
+>> 7       4       1       7 <==CONSOLE LOGLEVEL IS SET TO 7
 >>
-> 
-> Hi, Matthias
-> Sorry for missing this letter...since mail proxy server.
-> We plan to add support all the devices of MT8183 in serious.
-> We have implemented the clock and pinctrl driver for upstream and they
-> are in internal review right now.
-> 
-
-Nice to hear that :)
-
-> About the dts issue... do you suggest me to send new patch right now or
-> wait for clock and pinctrl driver ready then send them together?
-> 
-
-I would prefer that you send at least the clock controller together, so that we
-don't have any dummy clocks in the basic device tree.
-
-Regards,
-Matthias
+>> root at bcm958802a8021:~# echo 1 > /sys/bus/pci/rescan  <=== NO PRINT
+>>
+>> root at bcm958802a8021:~# devmem 0x0
+>>
+>> [   46.166083] Bad mode in Error handler detected on CPU1, code 0xbf000000 -- SError
+>> [   46.173805] Internal error: Oops - bad mode: 0 [#1] SMP
+>
+> As previously discussed, this case *is not* recoverable, and *must* be
+> handled fatally. The fact that old kernels did not handle this fatally
+> is a *bug*.
+>
+> If you are seeing SError under normal conditions, something is *very*
+> wrong with your system. If you are *deliberately* provoking SError, this
+> is your own fault.
+>
+> Thanks,
+> Mark.
+Yes. As per earlier conversation, it was a bug in earlier kernel
+versions but  fact here is that bad_mode()-->die()-->__die()-->
+probably do_exit() handler is returning (in 4.14 wrongly) and latest
+too if such type of situation arises though looks difficult to create
+in normal scenario.
