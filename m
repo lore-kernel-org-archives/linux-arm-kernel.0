@@ -1,34 +1,55 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 20 Jul 2018 10:35:15 -0600
-Subject: [PATCH 1/2] pinctrl: stm32: fix bank io port number
-In-Reply-To: <1531745857-5561-2-git-send-email-alexandre.torgue@st.com>
-References: <1531745857-5561-1-git-send-email-alexandre.torgue@st.com>
- <1531745857-5561-2-git-send-email-alexandre.torgue@st.com>
-Message-ID: <20180720163515.GA16515@rob-hp-laptop>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 20 Jul 2018 19:38:24 +0300
+Subject: [PATCH 1/9] ARM: dts: porter: Add missing PMIC nodes
+In-Reply-To: <5058a96cb7e8dca97629c48084537fe5def8344f.1532086734.git.horms+renesas@verge.net.au>
+References: <cover.1532086734.git.horms+renesas@verge.net.au>
+ <5058a96cb7e8dca97629c48084537fe5def8344f.1532086734.git.horms+renesas@verge.net.au>
+Message-ID: <8312c88f-9ff8-454e-fad9-7bf403c28207@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2018 at 02:57:36PM +0200, Alexandre Torgue wrote:
-> In case the exti line is not in line with the bank number (that is the case
-> when there is an hole between two banks, for example GPIOK and then GPIOZ),
-> use "st,bank-ioport" DT property to get the right exti line.
-> 
-> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
-> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
-> index 9a06e1f..60c678a 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
-> @@ -55,6 +55,8 @@ Optional properties:
->     NOTE: If "gpio-ranges" is used for a gpio controller, all gpio-controller
->     have to use a "gpio-ranges" entry.
->     More details in Documentation/devicetree/bindings/gpio/gpio.txt.
-> + - st,bank-ioport: should correspond to the EXTI IOport selection (EXTI line
-> +   used to select GPIOs as interrupts).
+On 07/20/2018 03:05 PM, Simon Horman wrote:
 
-ioport sounds like something else. Perhaps '-exti-line'?
-
+> From: Marek Vasut <marek.vasut@gmail.com>
+> 
+> Add PMIC nodes to Porter and connect CPU DVFS supply. There is
+> one DA9063L and one DA9210 on Porter, the only difference from
+> the other boards is that DA9063L is at I2C address 0x5a rather
+> than 0x58 .
+> 
+> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/boot/dts/r8a7791-porter.dts | 33 +++++++++++++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
+> index a01101b49d99..5f77d73d7462 100644
+> --- a/arch/arm/boot/dts/r8a7791-porter.dts
+> +++ b/arch/arm/boot/dts/r8a7791-porter.dts
+> @@ -375,10 +375,43 @@
+>  	clock-frequency = <400000>;
+>  };
 >  
->  Example 1:
->  #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
+> +&i2c6 {
+> +	status = "okay";
+> +	clock-frequency = <100000>;
+> +
+> +	pmic at 5a {
+> +		compatible = "dlg,da9063l";
+> +		reg = <0x5a>;
+> +		interrupt-parent = <&irqc0>;
+> +		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
+> +		interrupt-controller;
+
+   Without a label and #interrupt-cells?
+
+> +
+> +		wdt {
+> +			compatible = "dlg,da9063-watchdog";
+> +		};
+> +	};
+[...]
+
+MBR, Sergei
