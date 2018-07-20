@@ -1,52 +1,102 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 17:15:20 +0200
-Subject: [PATCH v4 28/35] mtd: rawnand: allow exiting immediately
- nand_scan_ident()
+Date: Fri, 20 Jul 2018 17:15:13 +0200
+Subject: [PATCH v4 21/35] mtd: rawnand: sunxi: convert driver to nand_scan()
 In-Reply-To: <20180720151527.16038-1-miquel.raynal@bootlin.com>
 References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
-Message-ID: <20180720151527.16038-29-miquel.raynal@bootlin.com>
+Message-ID: <20180720151527.16038-22-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some driver (eg. docg4) will need to handle themselves the
-identification phase. As part of the migration to use nand_scan()
-everywhere (which will unconditionnaly call nand_scan_ident()), we add
-a condition at the start of nand_scan_ident() to just "do nothing" if
-the maxchips parameters is zero, meaning that the driver does not want
-the core to handle this phase.
+Two helpers have been added to the core to make ECC-related
+configuration between the detection phase and the final NAND scan. Use
+these hooks and convert the driver to just use nand_scan() instead of
+both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/nand_base.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ drivers/mtd/nand/raw/sunxi_nand.c | 43 +++++++++++++++++----------------------
+ 1 file changed, 19 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
-index dea41fa25be1..e7f135c100c2 100644
---- a/drivers/mtd/nand/raw/nand_base.c
-+++ b/drivers/mtd/nand/raw/nand_base.c
-@@ -5926,7 +5926,7 @@ static int nand_dt_init(struct nand_chip *chip)
- /**
-  * nand_scan_ident - [NAND Interface] Scan for the NAND device
-  * @mtd: MTD device structure
-- * @maxchips: number of chips to scan for
-+ * @maxchips: number of chips to scan for, returns immediately if 0
-  * @table: alternative NAND ID table
-  *
-  * This is the first phase of the normal nand_scan() function. It reads the
-@@ -5940,6 +5940,14 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
- 	struct nand_chip *chip = mtd_to_nand(mtd);
+diff --git a/drivers/mtd/nand/raw/sunxi_nand.c b/drivers/mtd/nand/raw/sunxi_nand.c
+index 07f3ff9a28f2..a4d23381003d 100644
+--- a/drivers/mtd/nand/raw/sunxi_nand.c
++++ b/drivers/mtd/nand/raw/sunxi_nand.c
+@@ -1816,12 +1816,21 @@ static void sunxi_nand_ecc_cleanup(struct nand_ecc_ctrl *ecc)
+ 	}
+ }
+ 
+-static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
+-			       struct device_node *np)
++static int sunxi_nand_attach_chip(struct nand_chip *nand)
+ {
+-	struct nand_chip *nand = mtd_to_nand(mtd);
++	struct mtd_info *mtd = nand_to_mtd(nand);
++	struct nand_ecc_ctrl *ecc = &nand->ecc;
++	struct device_node *np = nand_get_flash_node(nand);
  	int ret;
  
-+	/*
-+	 * If the number of chips to scan for is null, just return silently.
-+	 * This is for specific drivers that must handle this part of the
-+	 * probe process themselves (e.g docg4).
-+	 */
-+	if (!maxchips)
-+		return 0;
++	if (nand->bbt_options & NAND_BBT_USE_FLASH)
++		nand->bbt_options |= NAND_BBT_NO_OOB;
 +
- 	/* Enforce the right timings for reset/detection */
- 	onfi_fill_data_interface(chip, NAND_SDR_IFACE, 0);
++	if (nand->options & NAND_NEED_SCRAMBLING)
++		nand->options |= NAND_NO_SUBPAGE_WRITE;
++
++	nand->options |= NAND_SUBPAGE_READ;
++
+ 	if (!ecc->size) {
+ 		ecc->size = nand->ecc_step_ds;
+ 		ecc->strength = nand->ecc_strength_ds;
+@@ -1846,6 +1855,10 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
+ 	return 0;
+ }
  
++static const struct nand_controller_ops sunxi_nand_controller_ops = {
++	.attach_chip = sunxi_nand_attach_chip,
++};
++
+ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+ 				struct device_node *np)
+ {
+@@ -1911,6 +1924,8 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+ 	/* Default tR value specified in the ONFI spec (chapter 4.15.1) */
+ 	nand->chip_delay = 200;
+ 	nand->controller = &nfc->controller;
++	nand->controller->ops = &sunxi_nand_controller_ops;
++
+ 	/*
+ 	 * Set the ECC mode to the default value in case nothing is specified
+ 	 * in the DT.
+@@ -1927,30 +1942,10 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
+ 	mtd = nand_to_mtd(nand);
+ 	mtd->dev.parent = dev;
+ 
+-	ret = nand_scan_ident(mtd, nsels, NULL);
++	ret = nand_scan(mtd, nsels);
+ 	if (ret)
+ 		return ret;
+ 
+-	if (nand->bbt_options & NAND_BBT_USE_FLASH)
+-		nand->bbt_options |= NAND_BBT_NO_OOB;
+-
+-	if (nand->options & NAND_NEED_SCRAMBLING)
+-		nand->options |= NAND_NO_SUBPAGE_WRITE;
+-
+-	nand->options |= NAND_SUBPAGE_READ;
+-
+-	ret = sunxi_nand_ecc_init(mtd, &nand->ecc, np);
+-	if (ret) {
+-		dev_err(dev, "ECC init failed: %d\n", ret);
+-		return ret;
+-	}
+-
+-	ret = nand_scan_tail(mtd);
+-	if (ret) {
+-		dev_err(dev, "nand_scan_tail failed: %d\n", ret);
+-		return ret;
+-	}
+-
+ 	ret = mtd_device_register(mtd, NULL, 0);
+ 	if (ret) {
+ 		dev_err(dev, "failed to register mtd device: %d\n", ret);
 -- 
 2.14.1
