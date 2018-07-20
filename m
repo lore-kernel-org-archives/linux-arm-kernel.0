@@ -1,433 +1,73 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 20 Jul 2018 13:43:33 +0900
-Subject: [PATCH v2] pinctrl: uniphier: add spi pin-mux settings
-In-Reply-To: <1531991136-1179-1-git-send-email-hayashibara.keiji@socionext.com>
-References: <1531991136-1179-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <CAK7LNAQoE7JPn3jJqTknLpngiAYAMGiHT7OgXGVMwQGYqoy5Ng@mail.gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 20 Jul 2018 14:56:13 +1000
+Subject: [RFC PATCH v2 1/4] dt-bindings: misc: Add bindings for misc.
+ BMC control fields
+In-Reply-To: <1532045276.1219110.1446722072.546C1F9D@webmail.messagingengine.com>
+References: <20180711053122.30773-1-andrew@aj.id.au>
+ <20180711053122.30773-2-andrew@aj.id.au>
+ <20180711200450.GB17291@rob-hp-laptop>
+ <1531356830.3551458.1437853280.551CA8C5@webmail.messagingengine.com>
+ <CAL_JsqKpXxR4t_-3BOy-0mFePXkaSck_4PfHRD=OZQ-_-T5P=w@mail.gmail.com>
+ <b6ced4cad4d7ff78330181b2c893855c23103953.camel@kernel.crashing.org>
+ <1531463489.747186.1439263128.075AECE1@webmail.messagingengine.com>
+ <CAL_JsqLZo-=7UkuvvUFYdCR4asBBiWyC=Q1ryH=-HLU6vzf9tA@mail.gmail.com>
+ <ece91112ecfdc7218184c4c4519e455cf9397e11.camel@kernel.crashing.org>
+ <CAL_JsqL_bMXLAA0091-g8PmhXR5g5Pf2y2=ey7Ss5ofHm46sWw@mail.gmail.com>
+ <c69d0e7c3a95d83da87b566a62619462671a233b.camel@kernel.crashing.org>
+ <1531967302.2140539.1445583600.0F5ED287@webmail.messagingengine.com>
+ <9787b471abc49c0b3db60e3471473a7a5b45ade7.camel@kernel.crashing.org>
+ <1532045276.1219110.1446722072.546C1F9D@webmail.messagingengine.com>
+Message-ID: <483b76bac7cb8043d9d780d5ffa5e43438279887.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-07-19 18:05 GMT+09:00 Keiji Hayashibara <hayashibara.keiji@socionext.com>:
-> From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
->
-> Add pin-mux settings for spi controller.
->
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
-> ---
+On Fri, 2018-07-20 at 09:37 +0930, Andrew Jeffery wrote:
+> > 
+> > Andrew, can you start with a list that shows what you expect us to need
+> > on our systems ?
+> > 
+> 
+> Okay, our Witherspoon and Romulus platforms containing the ASPEED AST2500 currently need the following tuneables exposed:
+> 
+> > From the SCU:
+> 
+> - Debug UART enable
+> - VGA DAC mux
+> - VGA scratch registers 0-7
+> - LPC SuperIO decode enable
+> - VGA MMIO decode enable
+> 
+> > From the LPC controller:
+> 
+> - iLPC2AHB enable
+> - SuperIO scratch registers 0x20-0x2f
+> 
+> (The LPC controller is just as much of a collection of random bits as the SCU)
+> 
+> Lastly, our Palmetto platform uses an AST2400 which has fewer features compared to the AST2500. Its tuneable list is the same as the above with the exception of "Debug UART enable".
+> 
+> Tuneables that we may need to expose in the future include:
+> 
+> > From the SCU:
+> 
+> - PCI VID/DID for the BMC PCIe device
+> - VGA device enable (may need to be disabled if the platform contains a discrete graphics processor)
 
+Additionally there's a bunch of resigters controlling the mapping of
+various MMIO regions of the BMC PCIe device to portions of the BMC
+address space. I'm not sure what's the best way to handle that.
 
-Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+This specific set might require a dedicated device as a subnode of
+the SCU in the DT that contains all the mappings as properties... 
 
+That or we consider them static enough and just whack it in u-boot.
 
-
->  Changes since v1:
->  - Fix build error of "pinctrl-uniphier-sld8.c".
->
->  drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c | 10 ++++++++++
->  drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c | 20 ++++++++++++++++++++
->  drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c  |  5 +++++
->  drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c | 10 ++++++++++
->  drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c | 10 ++++++++++
->  drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c | 15 +++++++++++++++
->  drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c | 10 ++++++++++
->  drivers/pinctrl/uniphier/pinctrl-uniphier-pxs3.c | 10 ++++++++++
->  drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c |  5 +++++
->  9 files changed, 95 insertions(+)
->
-> diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-> index 58825f6..bce533f 100644
-> --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-> +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-> @@ -517,6 +517,10 @@ static const int i2c4_muxvals[] = {1, 1};
->  static const unsigned nand_pins[] = {3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
->                                      15, 16, 17};
->  static const int nand_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-> +static const unsigned spi0_pins[] = {56, 57, 58, 59};
-> +static const int spi0_muxvals[] = {0, 0, 0, 0};
-> +static const unsigned spi1_pins[] = {169, 170, 171, 172};
-> +static const int spi1_muxvals[] = {1, 1, 1, 1};
->  static const unsigned system_bus_pins[] = {1, 2, 6, 7, 8, 9, 10, 11, 12, 13,
->                                            14, 15, 16, 17};
->  static const int system_bus_muxvals[] = {0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-> @@ -596,6 +600,8 @@ static const struct uniphier_pinctrl_group uniphier_ld11_groups[] = {
->         UNIPHIER_PINCTRL_GROUP(i2c3),
->         UNIPHIER_PINCTRL_GROUP(i2c4),
->         UNIPHIER_PINCTRL_GROUP(nand),
-> +       UNIPHIER_PINCTRL_GROUP(spi0),
-> +       UNIPHIER_PINCTRL_GROUP(spi1),
->         UNIPHIER_PINCTRL_GROUP(system_bus),
->         UNIPHIER_PINCTRL_GROUP(system_bus_cs1),
->         UNIPHIER_PINCTRL_GROUP(uart0),
-> @@ -632,6 +638,8 @@ static const char * const i2c1_groups[] = {"i2c1"};
->  static const char * const i2c3_groups[] = {"i2c3"};
->  static const char * const i2c4_groups[] = {"i2c4"};
->  static const char * const nand_groups[] = {"nand"};
-> +static const char * const spi0_groups[] = {"spi0"};
-> +static const char * const spi1_groups[] = {"spi1"};
->  static const char * const system_bus_groups[] = {"system_bus",
->                                                  "system_bus_cs1"};
->  static const char * const uart0_groups[] = {"uart0"};
-> @@ -657,6 +665,8 @@ static const struct uniphier_pinmux_function uniphier_ld11_functions[] = {
->         UNIPHIER_PINMUX_FUNCTION(i2c3),
->         UNIPHIER_PINMUX_FUNCTION(i2c4),
->         UNIPHIER_PINMUX_FUNCTION(nand),
-> +       UNIPHIER_PINMUX_FUNCTION(spi0),
-> +       UNIPHIER_PINMUX_FUNCTION(spi1),
->         UNIPHIER_PINMUX_FUNCTION(system_bus),
->         UNIPHIER_PINMUX_FUNCTION(uart0),
->         UNIPHIER_PINMUX_FUNCTION(uart1),
-> diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-> index 9f449b3..99f06fe 100644
-> --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-> +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-> @@ -606,6 +606,14 @@ static const unsigned nand_pins[] = {3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
->  static const int nand_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
->  static const unsigned sd_pins[] = {10, 11, 12, 13, 14, 15, 16, 17};
->  static const int sd_muxvals[] = {3, 3, 3, 3, 3, 3, 3, 3};  /* No SDVOLC */
-> +static const unsigned spi0_pins[] = {56, 57, 58, 59};
-> +static const int spi0_muxvals[] = {0, 0, 0, 0};
-> +static const unsigned spi1_pins[] = {169, 170, 171, 172};
-> +static const int spi1_muxvals[] = {1, 1, 1, 1};
-> +static const unsigned spi2_pins[] = {86, 87, 88, 89};
-> +static const int spi2_muxvals[] = {1, 1, 1, 1};
-> +static const unsigned spi3_pins[] = {74, 75, 76, 77};
-> +static const int spi3_muxvals[] = {1, 1, 1, 1};
->  static const unsigned system_bus_pins[] = {1, 2, 6, 7, 8, 9, 10, 11, 12, 13,
->                                            14, 15, 16, 17};
->  static const int system_bus_muxvals[] = {0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-> @@ -685,6 +693,10 @@ static const struct uniphier_pinctrl_group uniphier_ld20_groups[] = {
->         UNIPHIER_PINCTRL_GROUP(i2c4),
->         UNIPHIER_PINCTRL_GROUP(nand),
->         UNIPHIER_PINCTRL_GROUP(sd),
-> +       UNIPHIER_PINCTRL_GROUP(spi0),
-> +       UNIPHIER_PINCTRL_GROUP(spi1),
-> +       UNIPHIER_PINCTRL_GROUP(spi2),
-> +       UNIPHIER_PINCTRL_GROUP(spi3),
->         UNIPHIER_PINCTRL_GROUP(system_bus),
->         UNIPHIER_PINCTRL_GROUP(system_bus_cs1),
->         UNIPHIER_PINCTRL_GROUP(uart0),
-> @@ -722,6 +734,10 @@ static const char * const i2c3_groups[] = {"i2c3"};
->  static const char * const i2c4_groups[] = {"i2c4"};
->  static const char * const nand_groups[] = {"nand"};
->  static const char * const sd_groups[] = {"sd"};
-> +static const char * const spi0_groups[] = {"spi0"};
-> +static const char * const spi1_groups[] = {"spi1"};
-> +static const char * const spi2_groups[] = {"spi2"};
-> +static const char * const spi3_groups[] = {"spi3"};
->  static const char * const system_bus_groups[] = {"system_bus",
->                                                  "system_bus_cs1"};
->  static const char * const uart0_groups[] = {"uart0"};
-> @@ -751,6 +767,10 @@ static const struct uniphier_pinmux_function uniphier_ld20_functions[] = {
->         UNIPHIER_PINMUX_FUNCTION(i2c4),
->         UNIPHIER_PINMUX_FUNCTION(nand),
->         UNIPHIER_PINMUX_FUNCTION(sd),
-> +       UNIPHIER_PINMUX_FUNCTION(spi0),
-> +       UNIPHIER_PINMUX_FUNCTION(spi1),
-> +       UNIPHIER_PINMUX_FUNCTION(spi2),
-> +       UNIPHIER_PINMUX_FUNCTION(spi3),
->         UNIPHIER_PINMUX_FUNCTION(system_bus),
->         UNIPHIER_PINMUX_FUNCTION(uart0),
->         UNIPHIER_PINMUX_FUNCTION(uart1),
-> diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
-> index 0b10ebc..b247011 100644
-> --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
-> +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
-> @@ -576,6 +576,8 @@ static const unsigned nand_cs1_pins[] = {22, 23};
->  static const int nand_cs1_muxvals[] = {0, 0};
->  static const unsigned sd_pins[] = {44, 45, 46, 47, 48, 49, 50, 51, 52};
->  static const int sd_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-> +static const unsigned spi0_pins[] = {135, 136, 137, 138};
-> +static const int spi0_muxvals[] = {12, 12, 12, 12};
->  static const unsigned system_bus_pins[] = {16, 17, 18, 19, 20, 165, 166, 167,
->                                            168, 169, 170, 171, 172, 173};
->  static const int system_bus_muxvals[] = {0, 0, 0, 0, 0, -1, -1, -1, -1, -1, -1,
-> @@ -640,6 +642,7 @@ static const struct uniphier_pinctrl_group uniphier_ld4_groups[] = {
->         UNIPHIER_PINCTRL_GROUP(nand),
->         UNIPHIER_PINCTRL_GROUP(nand_cs1),
->         UNIPHIER_PINCTRL_GROUP(sd),
-> +       UNIPHIER_PINCTRL_GROUP(spi0),
->         UNIPHIER_PINCTRL_GROUP(system_bus),
->         UNIPHIER_PINCTRL_GROUP(system_bus_cs0),
->         UNIPHIER_PINCTRL_GROUP(system_bus_cs1),
-> @@ -667,6 +670,7 @@ static const char * const i2c2_groups[] = {"i2c2"};
->  static const char * const i2c3_groups[] = {"i2c3"};
->  static const char * const nand_groups[] = {"nand", "nand_cs1"};
->  static const char * const sd_groups[] = {"sd"};
-> +static const char * const spi0_groups[] = {"spi0"};
->  static const char * const system_bus_groups[] = {"system_bus",
->                                                  "system_bus_cs0",
->                                                  "system_bus_cs1",
-> @@ -690,6 +694,7 @@ static const struct uniphier_pinmux_function uniphier_ld4_functions[] = {
->         UNIPHIER_PINMUX_FUNCTION(i2c3),
->         UNIPHIER_PINMUX_FUNCTION(nand),
->         UNIPHIER_PINMUX_FUNCTION(sd),
-> +       UNIPHIER_PINMUX_FUNCTION(spi0),
->         UNIPHIER_PINMUX_FUNCTION(system_bus),
->         UNIPHIER_PINMUX_FUNCTION(uart0),
->         UNIPHIER_PINMUX_FUNCTION(uart1),
-> diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
-> index 8e4d45fe..cb58797 100644
-> --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
-> +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
-> @@ -769,6 +769,10 @@ static const unsigned nand_cs1_pins[] = {37, 38};
->  static const int nand_cs1_muxvals[] = {0, 0};
->  static const unsigned sd_pins[] = {47, 48, 49, 50, 51, 52, 53, 54, 55};
->  static const int sd_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-> +static const unsigned spi0_pins[] = {199, 200, 201, 202};
-> +static const int spi0_muxvals[] = {8, 8, 8, 8};
-> +static const unsigned spi1_pins[] = {93, 94, 95, 96};
-> +static const int spi1_muxvals[] = {1, 1, 1, 1};
->  static const unsigned system_bus_pins[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
->                                            11, 12, 13};
->  static const int system_bus_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-> @@ -851,6 +855,8 @@ static const struct uniphier_pinctrl_group uniphier_ld6b_groups[] = {
->         UNIPHIER_PINCTRL_GROUP(nand),
->         UNIPHIER_PINCTRL_GROUP(nand_cs1),
->         UNIPHIER_PINCTRL_GROUP(sd),
-> +       UNIPHIER_PINCTRL_GROUP(spi0),
-> +       UNIPHIER_PINCTRL_GROUP(spi1),
->         UNIPHIER_PINCTRL_GROUP(system_bus),
->         UNIPHIER_PINCTRL_GROUP(system_bus_cs1),
->         UNIPHIER_PINCTRL_GROUP(system_bus_cs2),
-> @@ -882,6 +888,8 @@ static const char * const i2c2_groups[] = {"i2c2"};
->  static const char * const i2c3_groups[] = {"i2c3"};
->  static const char * const nand_groups[] = {"nand", "nand_cs1"};
->  static const char * const sd_groups[] = {"sd"};
-> +static const char * const spi0_groups[] = {"spi0"};
-> +static const char * const spi1_groups[] = {"spi1"};
->  static const char * const system_bus_groups[] = {"system_bus",
->                                                  "system_bus_cs1",
->                                                  "system_bus_cs2",
-> @@ -907,6 +915,8 @@ static const struct uniphier_pinmux_function uniphier_ld6b_functions[] = {
->         UNIPHIER_PINMUX_FUNCTION(i2c3),
->         UNIPHIER_PINMUX_FUNCTION(nand),
->         UNIPHIER_PINMUX_FUNCTION(sd),
-> +       UNIPHIER_PINMUX_FUNCTION(spi0),
-> +       UNIPHIER_PINMUX_FUNCTION(spi1),
->         UNIPHIER_PINMUX_FUNCTION(system_bus),
->         UNIPHIER_PINMUX_FUNCTION(uart0),
->         UNIPHIER_PINMUX_FUNCTION(uart1),
-> diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-> index 24788a7..89148f8 100644
-> --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-> +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-> @@ -1050,6 +1050,10 @@ static const int sd_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
->  static const unsigned sd1_pins[] = {319, 320, 321, 322, 323, 324, 325, 326,
->                                     327};
->  static const int sd1_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-> +static const unsigned spi0_pins[] = {199, 200, 201, 202};
-> +static const int spi0_muxvals[] = {11, 11, 11, 11};
-> +static const unsigned spi1_pins[] = {195, 196, 197, 198, 235, 238, 239};
-> +static const int spi1_muxvals[] = {11, 11, 11, 11, 11, 11, 11};
->  static const unsigned system_bus_pins[] = {25, 26, 27, 28, 29, 30, 31, 32, 33,
->                                            34, 35, 36, 37, 38};
->  static const int system_bus_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-> @@ -1138,6 +1142,8 @@ static const struct uniphier_pinctrl_group uniphier_pro4_groups[] = {
->         UNIPHIER_PINCTRL_GROUP(nand_cs1),
->         UNIPHIER_PINCTRL_GROUP(sd),
->         UNIPHIER_PINCTRL_GROUP(sd1),
-> +       UNIPHIER_PINCTRL_GROUP(spi0),
-> +       UNIPHIER_PINCTRL_GROUP(spi1),
->         UNIPHIER_PINCTRL_GROUP(system_bus),
->         UNIPHIER_PINCTRL_GROUP(system_bus_cs0),
->         UNIPHIER_PINCTRL_GROUP(system_bus_cs1),
-> @@ -1171,6 +1177,8 @@ static const char * const i2c6_groups[] = {"i2c6"};
->  static const char * const nand_groups[] = {"nand", "nand_cs1"};
->  static const char * const sd_groups[] = {"sd"};
->  static const char * const sd1_groups[] = {"sd1"};
-> +static const char * const spi0_groups[] = {"spi0"};
-> +static const char * const spi1_groups[] = {"spi1"};
->  static const char * const system_bus_groups[] = {"system_bus",
->                                                  "system_bus_cs0",
->                                                  "system_bus_cs1",
-> @@ -1202,6 +1210,8 @@ static const struct uniphier_pinmux_function uniphier_pro4_functions[] = {
->         UNIPHIER_PINMUX_FUNCTION(nand),
->         UNIPHIER_PINMUX_FUNCTION(sd),
->         UNIPHIER_PINMUX_FUNCTION(sd1),
-> +       UNIPHIER_PINMUX_FUNCTION(spi0),
-> +       UNIPHIER_PINMUX_FUNCTION(spi1),
->         UNIPHIER_PINMUX_FUNCTION(system_bus),
->         UNIPHIER_PINMUX_FUNCTION(uart0),
->         UNIPHIER_PINMUX_FUNCTION(uart1),
-> diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
-> index d5d5e57..d77d6b37 100644
-> --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
-> +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
-> @@ -818,6 +818,12 @@ static const unsigned nand_cs1_pins[] = {26, 27};
->  static const int nand_cs1_muxvals[] = {0, 0};
->  static const unsigned sd_pins[] = {250, 251, 252, 253, 254, 255, 256, 257, 258};
->  static const int sd_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-> +static const unsigned spi0_pins[] = {120, 121, 122, 123};
-> +static const int spi0_muxvals[] = {0, 0, 0, 0};
-> +static const unsigned spi1_pins[] = {134, 139, 85, 86};
-> +static const int spi1_muxvals[] = {1, 1, 1, 1};
-> +static const unsigned spi2_pins[] = {55, 56, 57, 58, 82, 83, 84};
-> +static const int spi2_muxvals[] = {0, 0, 0, 0, 1, 1, 1};
->  static const unsigned system_bus_pins[] = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
->                                            14, 15, 16, 17};
->  static const int system_bus_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-> @@ -904,6 +910,9 @@ static const struct uniphier_pinctrl_group uniphier_pro5_groups[] = {
->         UNIPHIER_PINCTRL_GROUP(i2c5c),
->         UNIPHIER_PINCTRL_GROUP(i2c6),
->         UNIPHIER_PINCTRL_GROUP(sd),
-> +       UNIPHIER_PINCTRL_GROUP(spi0),
-> +       UNIPHIER_PINCTRL_GROUP(spi1),
-> +       UNIPHIER_PINCTRL_GROUP(spi2),
->         UNIPHIER_PINCTRL_GROUP(system_bus),
->         UNIPHIER_PINCTRL_GROUP(system_bus_cs0),
->         UNIPHIER_PINCTRL_GROUP(system_bus_cs1),
-> @@ -934,6 +943,9 @@ static const char * const i2c5_groups[] = {"i2c5", "i2c5b", "i2c5c"};
->  static const char * const i2c6_groups[] = {"i2c6"};
->  static const char * const nand_groups[] = {"nand", "nand_cs1"};
->  static const char * const sd_groups[] = {"sd"};
-> +static const char * const spi0_groups[] = {"spi0"};
-> +static const char * const spi1_groups[] = {"spi1"};
-> +static const char * const spi2_groups[] = {"spi2"};
->  static const char * const system_bus_groups[] = {"system_bus",
->                                                  "system_bus_cs0",
->                                                  "system_bus_cs1",
-> @@ -961,6 +973,9 @@ static const struct uniphier_pinmux_function uniphier_pro5_functions[] = {
->         UNIPHIER_PINMUX_FUNCTION(i2c6),
->         UNIPHIER_PINMUX_FUNCTION(nand),
->         UNIPHIER_PINMUX_FUNCTION(sd),
-> +       UNIPHIER_PINMUX_FUNCTION(spi0),
-> +       UNIPHIER_PINMUX_FUNCTION(spi1),
-> +       UNIPHIER_PINMUX_FUNCTION(spi2),
->         UNIPHIER_PINMUX_FUNCTION(system_bus),
->         UNIPHIER_PINMUX_FUNCTION(uart0),
->         UNIPHIER_PINMUX_FUNCTION(uart1),
-> diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
-> index 032619a..90199da 100644
-> --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
-> +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
-> @@ -778,6 +778,10 @@ static const unsigned nand_cs1_pins[] = {37, 38};
->  static const int nand_cs1_muxvals[] = {8, 8};
->  static const unsigned sd_pins[] = {47, 48, 49, 50, 51, 52, 53, 54, 55};
->  static const int sd_muxvals[] = {8, 8, 8, 8, 8, 8, 8, 8, 8};
-> +static const unsigned spi0_pins[] = {199, 200, 201, 202};
-> +static const int spi0_muxvals[] = {8, 8, 8, 8};
-> +static const unsigned spi1_pins[] = {93, 94, 95, 96};
-> +static const int spi1_muxvals[] = {1, 1, 1, 1};
->  static const unsigned system_bus_pins[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
->                                            11, 12, 13};
->  static const int system_bus_muxvals[] = {8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
-> @@ -861,6 +865,8 @@ static const struct uniphier_pinctrl_group uniphier_pxs2_groups[] = {
->         UNIPHIER_PINCTRL_GROUP(nand),
->         UNIPHIER_PINCTRL_GROUP(nand_cs1),
->         UNIPHIER_PINCTRL_GROUP(sd),
-> +       UNIPHIER_PINCTRL_GROUP(spi0),
-> +       UNIPHIER_PINCTRL_GROUP(spi1),
->         UNIPHIER_PINCTRL_GROUP(system_bus),
->         UNIPHIER_PINCTRL_GROUP(system_bus_cs1),
->         UNIPHIER_PINCTRL_GROUP(uart0),
-> @@ -897,6 +903,8 @@ static const char * const i2c5_groups[] = {"i2c5"};
->  static const char * const i2c6_groups[] = {"i2c6"};
->  static const char * const nand_groups[] = {"nand", "nand_cs1"};
->  static const char * const sd_groups[] = {"sd"};
-> +static const char * const spi0_groups[] = {"spi0"};
-> +static const char * const spi1_groups[] = {"spi1"};
->  static const char * const system_bus_groups[] = {"system_bus",
->                                                  "system_bus_cs1"};
->  static const char * const uart0_groups[] = {"uart0", "uart0b", "uart0b_ctsrts"};
-> @@ -928,6 +936,8 @@ static const struct uniphier_pinmux_function uniphier_pxs2_functions[] = {
->         UNIPHIER_PINMUX_FUNCTION(i2c6),
->         UNIPHIER_PINMUX_FUNCTION(nand),
->         UNIPHIER_PINMUX_FUNCTION(sd),
-> +       UNIPHIER_PINMUX_FUNCTION(spi0),
-> +       UNIPHIER_PINMUX_FUNCTION(spi1),
->         UNIPHIER_PINMUX_FUNCTION(system_bus),
->         UNIPHIER_PINMUX_FUNCTION(uart0),
->         UNIPHIER_PINMUX_FUNCTION(uart1),
-> diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs3.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs3.c
-> index 535bb2e..3b860da 100644
-> --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs3.c
-> +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs3.c
-> @@ -808,6 +808,10 @@ static const unsigned int nand_pins[] = {16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
->  static const int nand_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
->  static const unsigned int sd_pins[] = {43, 44, 45, 46, 47, 48, 49, 50, 51};
->  static const int sd_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-> +static const unsigned spi0_pins[] = {100, 101, 102, 103};
-> +static const int spi0_muxvals[] = {0, 0, 0, 0};
-> +static const unsigned spi1_pins[] = {112, 113, 114, 115};
-> +static const int spi1_muxvals[] = {2, 2, 2, 2};
->  static const unsigned int system_bus_pins[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
->                                                11, 12, 13, 14};
->  static const int system_bus_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-> @@ -886,6 +890,8 @@ static const struct uniphier_pinctrl_group uniphier_pxs3_groups[] = {
->         UNIPHIER_PINCTRL_GROUP(i2c3),
->         UNIPHIER_PINCTRL_GROUP(nand),
->         UNIPHIER_PINCTRL_GROUP(sd),
-> +       UNIPHIER_PINCTRL_GROUP(spi0),
-> +       UNIPHIER_PINCTRL_GROUP(spi1),
->         UNIPHIER_PINCTRL_GROUP(system_bus),
->         UNIPHIER_PINCTRL_GROUP(system_bus_cs1),
->         UNIPHIER_PINCTRL_GROUP(uart0),
-> @@ -913,6 +919,8 @@ static const char * const i2c2_groups[] = {"i2c2"};
->  static const char * const i2c3_groups[] = {"i2c3"};
->  static const char * const nand_groups[] = {"nand"};
->  static const char * const sd_groups[] = {"sd"};
-> +static const char * const spi0_groups[] = {"spi0"};
-> +static const char * const spi1_groups[] = {"spi1"};
->  static const char * const system_bus_groups[] = {"system_bus",
->                                                  "system_bus_cs1"};
->  static const char * const uart0_groups[] = {"uart0", "uart0_ctsrts"};
-> @@ -936,6 +944,8 @@ static const struct uniphier_pinmux_function uniphier_pxs3_functions[] = {
->         UNIPHIER_PINMUX_FUNCTION(i2c3),
->         UNIPHIER_PINMUX_FUNCTION(nand),
->         UNIPHIER_PINMUX_FUNCTION(sd),
-> +       UNIPHIER_PINMUX_FUNCTION(spi0),
-> +       UNIPHIER_PINMUX_FUNCTION(spi1),
->         UNIPHIER_PINMUX_FUNCTION(system_bus),
->         UNIPHIER_PINMUX_FUNCTION(uart0),
->         UNIPHIER_PINMUX_FUNCTION(uart1),
-> diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
-> index 0f921a6..f086083 100644
-> --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
-> +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
-> @@ -504,6 +504,8 @@ static const unsigned nand_cs1_pins[] = {22, 23};
->  static const int nand_cs1_muxvals[] = {0, 0};
->  static const unsigned sd_pins[] = {32, 33, 34, 35, 36, 37, 38, 39, 40};
->  static const int sd_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-> +static const unsigned spi0_pins[] = {118, 119, 120, 121};
-> +static const int spi0_muxvals[] = {3, 3, 3, 3};
->  static const unsigned system_bus_pins[] = {136, 137, 138, 139, 140, 141, 142,
->                                            143, 144, 145, 146, 147, 148, 149};
->  static const int system_bus_muxvals[] = {-1, -1, -1, -1, -1, -1, -1, -1, -1,
-> @@ -570,6 +572,7 @@ static const struct uniphier_pinctrl_group uniphier_sld8_groups[] = {
->         UNIPHIER_PINCTRL_GROUP(nand),
->         UNIPHIER_PINCTRL_GROUP(nand_cs1),
->         UNIPHIER_PINCTRL_GROUP(sd),
-> +       UNIPHIER_PINCTRL_GROUP(spi0),
->         UNIPHIER_PINCTRL_GROUP(system_bus),
->         UNIPHIER_PINCTRL_GROUP(system_bus_cs1),
->         UNIPHIER_PINCTRL_GROUP(system_bus_cs2),
-> @@ -598,6 +601,7 @@ static const char * const i2c2_groups[] = {"i2c2"};
->  static const char * const i2c3_groups[] = {"i2c3"};
->  static const char * const nand_groups[] = {"nand", "nand_cs1"};
->  static const char * const sd_groups[] = {"sd"};
-> +static const char * const spi0_groups[] = {"spi0"};
->  static const char * const system_bus_groups[] = {"system_bus",
->                                                  "system_bus_cs1",
->                                                  "system_bus_cs2",
-> @@ -622,6 +626,7 @@ static const struct uniphier_pinmux_function uniphier_sld8_functions[] = {
->         UNIPHIER_PINMUX_FUNCTION(i2c3),
->         UNIPHIER_PINMUX_FUNCTION(nand),
->         UNIPHIER_PINMUX_FUNCTION(sd),
-> +       UNIPHIER_PINMUX_FUNCTION(spi0),
->         UNIPHIER_PINMUX_FUNCTION(system_bus),
->         UNIPHIER_PINMUX_FUNCTION(uart0),
->         UNIPHIER_PINMUX_FUNCTION(uart1),
-> --
-> 2.7.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> > From the LPC controller:
+> 
+> - UART mux
+> 
+> Alexander, Eugene, can you chime in with your platforms' needs?
+> 
+> Cheers,
+> 
+> Andrew
