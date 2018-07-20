@@ -1,53 +1,68 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 20 Jul 2018 17:06:22 +0200
-Subject: [GIT PULL] Reset controller changes for v4.19
-Message-ID: <1532099182.3438.3.camel@pengutronix.de>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 20 Jul 2018 16:09:43 +0100
+Subject: [PATCH v4 00/26] arm64: provide pseudo NMI with GICv3
+In-Reply-To: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
+References: <1527241772-48007-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <20180720150943.i4u2s7wie7falh7p@holly.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear arm-soc maintainers,
+On Fri, May 25, 2018 at 10:49:06AM +0100, Julien Thierry wrote:
+> This series is a continuation of the work started by Daniel [1]. The goal
+> is to use GICv3 interrupt priorities to simulate an NMI.
+> 
+> To achieve this, set two priorities, one for standard interrupts and
+> another, higher priority, for NMIs. Whenever we want to disable interrupts,
+> we mask the standard priority instead so NMIs can still be raised. Some
+> corner cases though still require to actually mask all interrupts
+> effectively disabling the NMI.
+> 
+> Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
+> hardcoded IRQ numbers, there isn't a generic interface to set SGIs as NMI
+> for now. I don't think there is any reason LPIs should be allowed to be set
+> as NMI as they do not have an active state.
+> When an NMI is active on a CPU, no other NMI can be triggered on the CPU.
+> 
+> After the big refactoring I get performances similar to the ones I had
+> in v3[2], reposting old results here:
+> 
+> - "hackbench 200 process 1000" (average over 20 runs)
+> +-----------+----------+------------+------------------+
+> |           | native   | PMR guest  | v4.17-rc6 guest  |
+> +-----------+----------+------------+------------------+
+> | PMR host  | 40.0336s |   39.3039s |         39.2044s |
+> | v4.17-rc6 | 40.4040s |   39.6011s |         39.1147s |
+> +-----------+----------+------------+------------------+
+> 
+> - Kernel build from defconfig:
+> PMR host:  13m45.743s
+> v4.17-rc6: 13m40.400s
+> 
+> I'll try to post more detailed benchmarks later if I find notable
+> differences with the previous version.
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+So... I'm rather late sharing these benchmarks but...
 
-? Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+I ran some kernel build benchmarks on the Developerbox from 96Boards
+(aka Synquacer E-series by Socionext): 24 C-A53 cores running at 1GHz.
+This is obviously a real workload and one that anything called
+Developerbox needs to care about!
 
-are available in the Git repository at:
+The difference in performance is slight but PMR based locking is
+marginally slower than using the I-bit. It varies with the
+parrallel-ness of the build slightly but the slowdown on this platform
+is between 0.2% and 0.6% [1].
 
-? git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.19
+This delta was sufficiently small that I was willing to leave the PMR
+masking in place for a fair amount of my day to day work. On that basis
+these patches could also be described as:
 
-for you to fetch changes up to 6b39fd590aebca1a6a4c827f29f14d2b6df3939d:
+Tested-by: Daniel Thompson <daniel.thompson@linaro.org> 
 
-? reset: uniphier: add reset control support for SPI (2018-07-19 11:19:47 +0200)
 
-----------------------------------------------------------------
-Reset controller changes for v4.19
+Daniel.
 
-This adds new drivers and bindings for the SDM845 AOSS (always on
-subsystem) reset controller and for the Uniphier USB3 core reset.
-SPI controller resets are added to the Uniphier reset driver.
 
-----------------------------------------------------------------
-Kunihiko Hayashi (4):
-??????reset: simple: export reset_simple_ops to be referred from modules
-??????dt-bindings: reset: uniphier: add USB3 core reset support
-??????reset: uniphier: add USB3 core reset control
-??????reset: uniphier: add reset control support for SPI
-
-Sibi Sankar (2):
-??????dt-bindings: reset: Add AOSS reset bindings for SDM845 SoCs
-??????reset: qcom: AOSS (always on subsystem) reset controller
-
-?.../devicetree/bindings/reset/qcom,aoss-reset.txt??|??52 +++++++
-?.../devicetree/bindings/reset/uniphier-reset.txt???|??56 +++++++
-?drivers/reset/Kconfig??????????????????????????????|??19 +++
-?drivers/reset/Makefile?????????????????????????????|???2 +
-?drivers/reset/reset-qcom-aoss.c????????????????????| 133 ++++++++++++++++
-?drivers/reset/reset-simple.c???????????????????????|???1 +
-?drivers/reset/reset-uniphier-usb3.c????????????????| 171 +++++++++++++++++++++
-?drivers/reset/reset-uniphier.c?????????????????????|???9 ++
-?include/dt-bindings/reset/qcom,sdm845-aoss.h???????|??17 ++
-?9 files changed, 460 insertions(+)
-?create mode 100644 Documentation/devicetree/bindings/reset/qcom,aoss-reset.txt
-?create mode 100644 drivers/reset/reset-qcom-aoss.c
-?create mode 100644 drivers/reset/reset-uniphier-usb3.c
-?create mode 100644 include/dt-bindings/reset/qcom,sdm845-aoss.h
+[1] For anyone interested in the raw numbers then the spreadsheet where
+    I checked the results is here:
+https://docs.google.com/spreadsheets/d/1gGxAJd_gL-HjeTF-x0Ut5lWT4JULNRDeTbPvPInZ4H4/edit?usp=sharing
