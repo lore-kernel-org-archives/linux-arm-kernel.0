@@ -1,199 +1,72 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Jul 2018 14:05:11 +0200
-Subject: [PATCH 3/9] ARM: dts: r8a77(43|9[013]): Add missing OPP properties
- for CPUs
-In-Reply-To: <cover.1532086734.git.horms+renesas@verge.net.au>
-References: <cover.1532086734.git.horms+renesas@verge.net.au>
-Message-ID: <422ee8b4c445f4ff545857465514634d21f5d2b2.1532086734.git.horms+renesas@verge.net.au>
+Date: Fri, 20 Jul 2018 14:05:30 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.19
+Message-ID: <cover.1532087129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Viresh Kumar <viresh.kumar@linaro.org>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-The OPP properties, like "operating-points", should either be present
-for all the CPUs of a cluster or none. If these are present only for a
-subset of CPUs of a cluster then things will start falling apart as soon
-as the CPUs are brought online in a different order. For example, this
-will happen because the operating system looks for such properties in
-the CPU node it is trying to bring up, so that it can create an OPP
-table.
+Please consider these second round of Renesas ARM based SoC updates for v4.19.
 
-Add such missing properties.
+This pull request is based on the previous round of
+such requests, tagged as renesas-arm-soc-for-v4.19,
+which I have already sent a pull-request for.
 
-Fix other missing properties (like, clock latency, voltage tolerance,
-etc) as well to make it all work.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7743.dtsi |  9 +++++++++
- arch/arm/boot/dts/r8a7790.dtsi | 34 ++++++++++++++++++++++++++++++++--
- arch/arm/boot/dts/r8a7791.dtsi | 14 ++++++++++++--
- arch/arm/boot/dts/r8a7793.dtsi | 15 +++++++++++++--
- 4 files changed, 66 insertions(+), 6 deletions(-)
+The following changes since commit c44e182e537492baaa37303fc0ee299222fce921:
 
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index 142949d7066f..e4fb31c4f0ee 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -98,8 +98,17 @@
- 			reg = <1>;
- 			clock-frequency = <1500000000>;
- 			clocks = <&cpg CPG_CORE R8A7743_CLK_Z>;
-+			clock-latency = <300000>; /* 300 us */
- 			power-domains = <&sysc R8A7743_PD_CA15_CPU1>;
- 			next-level-cache = <&L2_CA15>;
-+
-+			/* kHz - uV - OPPs unknown yet */
-+			operating-points = <1500000 1000000>,
-+					   <1312500 1000000>,
-+					   <1125000 1000000>,
-+					   < 937500 1000000>,
-+					   < 750000 1000000>,
-+					   < 375000 1000000>;
- 		};
- 
- 		L2_CA15: cache-controller-0 {
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 4d06b154bd7e..c4324b1a2ec4 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -79,12 +79,12 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
- 			clock-frequency = <1300000000>;
--			voltage-tolerance = <1>; /* 1% */
- 			clocks = <&cpg CPG_CORE R8A7790_CLK_Z>;
--			clock-latency = <300000>; /* 300 us */
- 			power-domains = <&sysc R8A7790_PD_CA15_CPU0>;
- 			next-level-cache = <&L2_CA15>;
- 			capacity-dmips-mhz = <1024>;
-+			voltage-tolerance = <1>; /* 1% */
-+			clock-latency = <300000>; /* 300 us */
- 
- 			/* kHz - uV - OPPs unknown yet */
- 			operating-points = <1400000 1000000>,
-@@ -104,6 +104,16 @@
- 			power-domains = <&sysc R8A7790_PD_CA15_CPU1>;
- 			next-level-cache = <&L2_CA15>;
- 			capacity-dmips-mhz = <1024>;
-+			voltage-tolerance = <1>; /* 1% */
-+			clock-latency = <300000>; /* 300 us */
-+
-+			/* kHz - uV - OPPs unknown yet */
-+			operating-points = <1400000 1000000>,
-+					   <1225000 1000000>,
-+					   <1050000 1000000>,
-+					   < 875000 1000000>,
-+					   < 700000 1000000>,
-+					   < 350000 1000000>;
- 		};
- 
- 		cpu2: cpu at 2 {
-@@ -115,6 +125,16 @@
- 			power-domains = <&sysc R8A7790_PD_CA15_CPU2>;
- 			next-level-cache = <&L2_CA15>;
- 			capacity-dmips-mhz = <1024>;
-+			voltage-tolerance = <1>; /* 1% */
-+			clock-latency = <300000>; /* 300 us */
-+
-+			/* kHz - uV - OPPs unknown yet */
-+			operating-points = <1400000 1000000>,
-+					   <1225000 1000000>,
-+					   <1050000 1000000>,
-+					   < 875000 1000000>,
-+					   < 700000 1000000>,
-+					   < 350000 1000000>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -126,6 +146,16 @@
- 			power-domains = <&sysc R8A7790_PD_CA15_CPU3>;
- 			next-level-cache = <&L2_CA15>;
- 			capacity-dmips-mhz = <1024>;
-+			voltage-tolerance = <1>; /* 1% */
-+			clock-latency = <300000>; /* 300 us */
-+
-+			/* kHz - uV - OPPs unknown yet */
-+			operating-points = <1400000 1000000>,
-+					   <1225000 1000000>,
-+					   <1050000 1000000>,
-+					   < 875000 1000000>,
-+					   < 700000 1000000>,
-+					   < 350000 1000000>;
- 		};
- 
- 		cpu4: cpu at 100 {
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 6e1dd7ad7bd6..d1d726a1364a 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -78,11 +78,11 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
- 			clock-frequency = <1500000000>;
--			voltage-tolerance = <1>; /* 1% */
- 			clocks = <&cpg CPG_CORE R8A7791_CLK_Z>;
--			clock-latency = <300000>; /* 300 us */
- 			power-domains = <&sysc R8A7791_PD_CA15_CPU0>;
- 			next-level-cache = <&L2_CA15>;
-+			voltage-tolerance = <1>; /* 1% */
-+			clock-latency = <300000>; /* 300 us */
- 
- 			/* kHz - uV - OPPs unknown yet */
- 			operating-points = <1500000 1000000>,
-@@ -101,6 +101,16 @@
- 			clocks = <&cpg CPG_CORE R8A7791_CLK_Z>;
- 			power-domains = <&sysc R8A7791_PD_CA15_CPU1>;
- 			next-level-cache = <&L2_CA15>;
-+			voltage-tolerance = <1>; /* 1% */
-+			clock-latency = <300000>; /* 300 us */
-+
-+			/* kHz - uV - OPPs unknown yet */
-+			operating-points = <1500000 1000000>,
-+					   <1312500 1000000>,
-+					   <1125000 1000000>,
-+					   < 937500 1000000>,
-+					   < 750000 1000000>,
-+					   < 375000 1000000>;
- 		};
- 
- 		L2_CA15: cache-controller-0 {
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index 4abecfc0ca98..1e6439b85a6b 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -70,10 +70,10 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
- 			clock-frequency = <1500000000>;
--			voltage-tolerance = <1>; /* 1% */
- 			clocks = <&cpg CPG_CORE R8A7793_CLK_Z>;
--			clock-latency = <300000>; /* 300 us */
- 			power-domains = <&sysc R8A7793_PD_CA15_CPU0>;
-+			voltage-tolerance = <1>; /* 1% */
-+			clock-latency = <300000>; /* 300 us */
- 
- 			/* kHz - uV - OPPs unknown yet */
- 			operating-points = <1500000 1000000>,
-@@ -92,6 +92,17 @@
- 			clock-frequency = <1500000000>;
- 			clocks = <&cpg CPG_CORE R8A7793_CLK_Z>;
- 			power-domains = <&sysc R8A7793_PD_CA15_CPU1>;
-+			voltage-tolerance = <1>; /* 1% */
-+			clock-latency = <300000>; /* 300 us */
-+
-+			/* kHz - uV - OPPs unknown yet */
-+			operating-points = <1500000 1000000>,
-+					   <1312500 1000000>,
-+					   <1125000 1000000>,
-+					   < 937500 1000000>,
-+					   < 750000 1000000>,
-+					   < 375000 1000000>;
-+			next-level-cache = <&L2_CA15>;
- 		};
- 
- 		L2_CA15: cache-controller-0 {
--- 
-2.11.0
+  ARM: shmobile: convert to SPDX identifier (2018-06-18 12:00:29 +0200)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-soc2-for-v4.19
+
+for you to fetch changes up to 54f464e0c91f10212fa5699bfef1f104ee7d2213:
+
+  ARM: shmobile: Always enable ARCH_TIMER on SoCs with A7 and/or A15 (2018-07-20 13:44:10 +0200)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Updates for v4.19
+
+* Always enable ARCH_TIMER on SoCs with A7 or A15
+
+  All such SoCs have ARCH_TIMER so there is no need for it to be optional.
+  This allows clean-up which is included in this change.
+
+* Do not compile r8a7779_platform_cpu_kill when it is unused
+
+  This avoids a warning by shuffling code into an existing #ifdef
+  r8a7779 is the R-Car H1 SoC
+
+* Add SMP enabler driver for the RZ/N1D (r9a06g032) SoC
+
+  This is to allow SMP to be enabled via DT on the r9a06g032
+
+* Stop compiling headsmp-apmu for non-SMP configs
+
+  This is a minor clean-up allowing removal of an #ifdef
+
+----------------------------------------------------------------
+Arnd Bergmann (2):
+      soc: r9a06g032: don't build SMP files for non-SMP config
+      ARM: shmobile: r8a7779: hide unused r8a7779_platform_cpu_kill
+
+Geert Uytterhoeven (2):
+      ARM: shmobile: rcar-gen2: Stop compiling headsmp-apmu on !SMP
+      ARM: shmobile: Always enable ARCH_TIMER on SoCs with A7 and/or A15
+
+Michel Pollet (1):
+      ARM: shmobile: Add the R9A06G032 SMP enabler driver
+
+ arch/arm/mach-shmobile/Kconfig           |  2 +
+ arch/arm/mach-shmobile/Makefile          |  2 +-
+ arch/arm/mach-shmobile/headsmp-apmu.S    |  2 -
+ arch/arm/mach-shmobile/setup-r8a73a4.c   |  1 -
+ arch/arm/mach-shmobile/setup-rcar-gen2.c |  4 --
+ arch/arm/mach-shmobile/smp-r8a7779.c     | 22 ++++----
+ arch/arm/mach-shmobile/timer.c           |  8 ---
+ drivers/soc/renesas/Makefile             |  3 +
+ drivers/soc/renesas/r9a06g032-smp.c      | 96 ++++++++++++++++++++++++++++++++
+ 9 files changed, 113 insertions(+), 27 deletions(-)
+ create mode 100644 drivers/soc/renesas/r9a06g032-smp.c
