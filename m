@@ -1,88 +1,85 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 17:15:16 +0200
-Subject: [PATCH v4 24/35] mtd: rawnand: txx9ndfmc: convert driver to
- nand_scan()
+Date: Fri, 20 Jul 2018 17:15:19 +0200
+Subject: [PATCH v4 27/35] mtd: rawnand: sm_common: convert driver to
+ nand_scan_with_ids()
 In-Reply-To: <20180720151527.16038-1-miquel.raynal@bootlin.com>
 References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
-Message-ID: <20180720151527.16038-25-miquel.raynal@bootlin.com>
+Message-ID: <20180720151527.16038-28-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Two helpers have been added to the core to make ECC-related
 configuration between the detection phase and the final NAND scan. Use
-these hooks and convert the driver to just use nand_scan() instead of
+these hooks and convert the driver to just use nand_scan_with_ids()
+(alternative to nand_scan() for passing a flash IDs table) instead of
 both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/txx9ndfmc.c | 29 +++++++++++++++--------------
- 1 file changed, 15 insertions(+), 14 deletions(-)
+ drivers/mtd/nand/raw/sm_common.c | 39 +++++++++++++++++++++++++--------------
+ 1 file changed, 25 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/txx9ndfmc.c b/drivers/mtd/nand/raw/txx9ndfmc.c
-index 9019022774f7..0134beb1136d 100644
---- a/drivers/mtd/nand/raw/txx9ndfmc.c
-+++ b/drivers/mtd/nand/raw/txx9ndfmc.c
-@@ -254,23 +254,23 @@ static void txx9ndfmc_initialize(struct platform_device *dev)
- #define TXX9NDFMC_NS_TO_CYC(gbusclk, ns) \
- 	DIV_ROUND_UP((ns) * DIV_ROUND_UP(gbusclk, 1000), 1000000)
+diff --git a/drivers/mtd/nand/raw/sm_common.c b/drivers/mtd/nand/raw/sm_common.c
+index 7f5044a79f01..d05e3f976a5e 100644
+--- a/drivers/mtd/nand/raw/sm_common.c
++++ b/drivers/mtd/nand/raw/sm_common.c
+@@ -160,19 +160,9 @@ static struct nand_flash_dev nand_xd_flash_ids[] = {
+ 	{NULL}
+ };
  
--static int txx9ndfmc_nand_scan(struct mtd_info *mtd)
-+static int txx9ndfmc_attach_chip(struct nand_chip *chip)
+-int sm_register_device(struct mtd_info *mtd, int smartmedia)
++static int sm_attach_chip(struct nand_chip *chip)
  {
 -	struct nand_chip *chip = mtd_to_nand(mtd);
 -	int ret;
+-
+-	chip->options |= NAND_SKIP_BBTSCAN;
+-
+-	/* Scan for card properties */
+-	ret = nand_scan_ident(mtd, 1, smartmedia ?
+-		nand_smartmedia_flash_ids : nand_xd_flash_ids);
+-
+-	if (ret)
+-		return ret;
 +	struct mtd_info *mtd = nand_to_mtd(chip);
  
--	ret = nand_scan_ident(mtd, 1, NULL);
--	if (!ret) {
--		if (mtd->writesize >= 512) {
--			/* Hardware ECC 6 byte ECC per 512 Byte data */
--			chip->ecc.size = 512;
--			chip->ecc.bytes = 6;
--		}
--		ret = nand_scan_tail(mtd);
-+	if (mtd->writesize >= 512) {
-+		/* Hardware ECC 6 byte ECC per 512 Byte data */
-+		chip->ecc.size = 512;
-+		chip->ecc.bytes = 6;
- 	}
--	return ret;
-+
-+	return 0;
- }
+ 	/* Bad block marker position */
+ 	chip->badblockpos = 0x05;
+@@ -187,12 +177,33 @@ int sm_register_device(struct mtd_info *mtd, int smartmedia)
+ 	else
+ 		return -ENODEV;
  
-+static const struct nand_controller_ops txx9ndfmc_controller_ops = {
-+	.attach_chip = txx9ndfmc_attach_chip,
+-	ret = nand_scan_tail(mtd);
++	return 0;
++}
+ 
++static const struct nand_controller_ops sm_controller_ops = {
++	.attach_chip = sm_attach_chip,
 +};
 +
- static int __init txx9ndfmc_probe(struct platform_device *dev)
- {
- 	struct txx9ndfmc_platform_data *plat = dev_get_platdata(&dev->dev);
-@@ -304,6 +304,7 @@ static int __init txx9ndfmc_probe(struct platform_device *dev)
- 		 (gbusclk + 500000) / 1000000, hold, spw);
++int sm_register_device(struct mtd_info *mtd, int smartmedia)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct nand_flash_dev *flash_ids;
++	int ret;
++
++	chip->options |= NAND_SKIP_BBTSCAN;
++
++	/* Scan for card properties */
++	chip->dummy_controller.ops = &sm_controller_ops;
++	flash_ids = smartmedia ? nand_smartmedia_flash_ids : nand_xd_flash_ids;
++	ret = nand_scan_with_ids(mtd, 1, flash_ids);
+ 	if (ret)
+ 		return ret;
  
- 	nand_controller_init(&drvdata->controller);
-+	drvdata->controller.ops = &txx9ndfmc_controller_ops;
+-	return mtd_device_register(mtd, NULL, 0);
++	ret = mtd_device_register(mtd, NULL, 0);
++	if (ret)
++		nand_release(mtd);
++
++	return ret;
+ }
+ EXPORT_SYMBOL_GPL(sm_register_device);
  
- 	platform_set_drvdata(dev, drvdata);
- 	txx9ndfmc_initialize(dev);
-@@ -332,7 +333,7 @@ static int __init txx9ndfmc_probe(struct platform_device *dev)
- 		chip->ecc.correct = txx9ndfmc_correct_data;
- 		chip->ecc.hwctl = txx9ndfmc_enable_hwecc;
- 		chip->ecc.mode = NAND_ECC_HW;
--		/* txx9ndfmc_nand_scan will overwrite ecc.size and ecc.bytes */
-+		/* nand_scan() will overwrite ecc.size and ecc.bytes */
- 		chip->ecc.size = 256;
- 		chip->ecc.bytes = 3;
- 		chip->ecc.strength = 1;
-@@ -359,7 +360,7 @@ static int __init txx9ndfmc_probe(struct platform_device *dev)
- 		if (plat->wide_mask & (1 << i))
- 			chip->options |= NAND_BUSWIDTH_16;
- 
--		if (txx9ndfmc_nand_scan(mtd)) {
-+		if (nand_scan(mtd, 1)) {
- 			kfree(txx9_priv->mtdname);
- 			kfree(txx9_priv);
- 			continue;
 -- 
 2.14.1
