@@ -1,116 +1,89 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Fri, 20 Jul 2018 09:40:51 +0000
-Subject: [PATCH v2 2/3] dmaengine: imx-sdma: add memcpy interface
-In-Reply-To: <20180713061604.tza3udckmyaoq5wh@pengutronix.de>
-References: <1531487327-21879-1-git-send-email-yibin.gong@nxp.com>
- <1531487327-21879-3-git-send-email-yibin.gong@nxp.com>
- <20180713061604.tza3udckmyaoq5wh@pengutronix.de>
-Message-ID: <DB6PR04MB3223F5A07E59F173D5BD0B6D89510@DB6PR04MB3223.eurprd04.prod.outlook.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Jul 2018 10:44:53 +0100
+Subject: [PATCH] arm64: fix for restoring console loglevel after handling
+ traps
+In-Reply-To: <CAM5rFu8rQaVne22cYxx3YZTaxh9Dnq2wJWNu1uierBxZfogPeA@mail.gmail.com>
+References: <1531993734-1463-1-git-send-email-hari.vyas@broadcom.com>
+ <1531993734-1463-2-git-send-email-hari.vyas@broadcom.com>
+ <20180719100140.GA424@jagdpanzerIV>
+ <CAM5rFu_N-=26LddRy1mO010h9yLcGuKqK6=y+h=h3-HbfEP+FQ@mail.gmail.com>
+ <20180719103916.g763zmsm7wnngwop@lakrids.cambridge.arm.com>
+ <CAM5rFu-MFbH_2Pohmjydy232Rpt7_E84-K=e67wAu3iQzvTLiA@mail.gmail.com>
+ <20180720062609.2haxhf23zyouoxmh@salmiak>
+ <20180720064027.GA3901@jagdpanzerIV>
+ <CAM5rFu8rQaVne22cYxx3YZTaxh9Dnq2wJWNu1uierBxZfogPeA@mail.gmail.com>
+Message-ID: <20180720094453.a64hnqoveojrozha@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> Sent: 2018?7?13? 14:16
-> To: Robin Gong <yibin.gong@nxp.com>
-> Cc: vkoul at kernel.org; dan.j.williams at intel.com; shawnguo at kernel.org; Fabio
-> Estevam <fabio.estevam@nxp.com>; linux at armlinux.org.uk;
-> linux-arm-kernel at lists.infradead.org; kernel at pengutronix.de;
-> dmaengine at vger.kernel.org; linux-kernel at vger.kernel.org; dl-linux-imx
-> <linux-imx@nxp.com>
-> Subject: Re: [PATCH v2 2/3] dmaengine: imx-sdma: add memcpy interface
-> 
-> On Fri, Jul 13, 2018 at 09:08:46PM +0800, Robin Gong wrote:
-> > Add MEMCPY capability for imx-sdma driver.
+On Fri, Jul 20, 2018 at 01:01:39PM +0530, Hari Vyas wrote:
+> On Fri, Jul 20, 2018 at 12:10 PM, Sergey Senozhatsky
+> <sergey.senozhatsky.work@gmail.com> wrote:
+> > On (07/20/18 07:26), Mark Rutland wrote:
+> >> > >
+> >> > This die() is called from so many places i.e. entry.S shows so many ways i.e
+> >> > el1_sync_invalid,irq,fiq_invalid,error_invalid.
 > >
-> > Signed-off-by: Robin Gong <yibin.gong@nxp.com>
-> > ---
-> >  drivers/dma/imx-sdma.c | 95
-> > ++++++++++++++++++++++++++++++++++++++++++++++++--
-> >  1 file changed, 92 insertions(+), 3 deletions(-)
+> > [..]
 > >
-> > @@ -1318,6 +1347,63 @@ static struct sdma_desc
-> *sdma_transfer_init(struct sdma_channel *sdmac,
-> >  	return NULL;
-> >  }
+> >> Indeed, but *none* of these should fire unless something has gone wrong already.
 > >
-> > +static struct dma_async_tx_descriptor *sdma_prep_memcpy(
-> > +		struct dma_chan *chan, dma_addr_t dma_dst,
-> > +		dma_addr_t dma_src, size_t len, unsigned long flags) {
-> > +	struct sdma_channel *sdmac = to_sdma_chan(chan);
-> > +	struct sdma_engine *sdma = sdmac->sdma;
-> > +	int channel = sdmac->channel;
-> > +	size_t count;
-> > +	int i = 0, param;
-> > +	struct sdma_buffer_descriptor *bd;
-> > +	struct sdma_desc *desc;
-> > +
-> > +	if (!chan || !len)
-> > +		return NULL;
-> > +
-> > +	dev_dbg(sdma->dev, "memcpy: %pad->%pad, len=%zu, channel=%d.\n",
-> > +		&dma_src, &dma_dst, len, channel);
-> > +
-> > +	desc = sdma_transfer_init(sdmac, DMA_MEM_TO_MEM,
-> > +					len / SDMA_BD_MAX_CNT + 1);
-> > +	if (!desc)
-> > +		return NULL;
-> > +
-> > +	do {
-> > +		count = min_t(size_t, len, SDMA_BD_MAX_CNT);
-> > +		bd = &desc->bd[i];
-> > +		bd->buffer_addr = dma_src;
-> > +		bd->ext_buffer_addr = dma_dst;
-> > +		bd->mode.count = count;
-> > +		desc->chn_count += count;
-> > +		/* align with sdma->dma_device.copy_align: 4bytes */
-> > +		bd->mode.command = 0;
-> > +
-> > +		dma_src += count;
-> > +		dma_dst += count;
-> > +		len -= count;
-> > +		i++;
+> > [..]
+> >
+> > Agreed.
+> >
+> > I see that all those arm64/kernel/entry.S el0_sync_invalid,
+> > el0_irq_invalid, el0_fiq_invalid, and so on, invoke inv_entry macro
+> > which calls into bad_mode, which ends up in panic() anyway:
+> >
+> > asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+> > {
+> >         console_verbose();
+> >
+> >         pr_crit("Bad mode in %s handler detected on CPU%d, code 0x%08x -- %s\n",
+> >                 handler[reason], smp_processor_id(), esr,
+> >                 esr_get_class_string(esr));
+> >
+> >         die("Oops - bad mode", regs, 0);
+> >         local_daif_mask();
+> >         panic("bad mode");
+> > }
+> >
+> > bad_mode is always fatal.
+> >
+> > When the kernel becomes suicidal and wants to die() we better have
+> > verbose consoles. So, no, I don't think I'm buying the patch.
+> >
+> >         -ss
+> This was the behavior observed with 4.14 kernel version and proposed
+> patch. I understand, giving access to system memory access to user is
+> bad and should be avoided so one may argue
+> simplest but bad example and unpredictable results may be observed.
+> For other examples, I may need to work and find out. Please decide.
 > 
-> NACK.
+> root at bcm958802a8021:~# uname -a
 > 
-> Please actually look at your code and find out where you do unaligned DMA
-> accesses. Hint: What happens when this loop body is executed more than
-> once?
+> Linux bcm958802a8021 4.14.49+g8f1356a #1 SMP Mon Jul 9 22:37:03 UTC
+> 2018 aarch64 aarch64 aarch64 GNU/Linux
 > 
-> Sascha
-Actually internal sdma script has already take such 'align' matter like below:
-Burst with words if source/dest address and data length are all aligned with words, burst with
-Byte if not. So I will remove the comment '/* align with sdma->dma_device.copy_align: 4bytes */'
-In v3. Besides, I have found another bug which introduced by my virt-dma patch. Will send
-V3 later.
+> root at bcm958802a8021:~# cat /proc/sys/kernel/printk
 > 
-> > +
-> > +		param = BD_DONE | BD_EXTD | BD_CONT;
-> > +		/* last bd */
-> > +		if (!len) {
-> > +			param |= BD_INTR;
-> > +			param |= BD_LAST;
-> > +			param &= ~BD_CONT;
-> > +		}
-> > +
-> > +		dev_dbg(sdma->dev, "entry %d: count: %zd dma: 0x%x %s%s\n",
-> > +				i, count, bd->buffer_addr,
-> > +				param & BD_WRAP ? "wrap" : "",
-> > +				param & BD_INTR ? " intr" : "");
-> > +
-> > +		bd->mode.status = param;
-> > +	} while (len);
-> > +
+> 7       4       1       7 <==CONSOLE LOGLEVEL IS SET TO 7
 > 
-> --
-> Pengutronix e.K.                           |
-> |
-> Industrial Linux Solutions                 |
-> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fwww.
-> pengutronix.de%2F&amp;data=02%7C01%7Cyibin.gong%40nxp.com%7Cf78f9
-> 91028e64b45cf7508d5e888310d%7C686ea1d3bc2b4c6fa92cd99c5c301635%7
-> C0%7C0%7C636670594003030732&amp;sdata=zyDkLHVl4VneD05f4VvaY82m
-> ZITkybewrXyCj2YRu%2FI%3D&amp;reserved=0  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:
-> +49-5121-206917-5555 |
+> root at bcm958802a8021:~# echo 1 > /sys/bus/pci/rescan  <=== NO PRINT
+> 
+> root at bcm958802a8021:~# devmem 0x0
+> 
+> [   46.166083] Bad mode in Error handler detected on CPU1, code 0xbf000000 -- SError
+> [   46.173805] Internal error: Oops - bad mode: 0 [#1] SMP
+
+As previously discussed, this case *is not* recoverable, and *must* be
+handled fatally. The fact that old kernels did not handle this fatally
+is a *bug*.
+
+If you are seeing SError under normal conditions, something is *very*
+wrong with your system. If you are *deliberately* provoking SError, this
+is your own fault.
+
+Thanks,
+Mark.
