@@ -1,52 +1,78 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Fri, 20 Jul 2018 10:20:30 +0200
-Subject: [GIT PULL] ARM: at91: SoC for 4.19
-Message-ID: <20180720082030.GA22561@piout.net>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Fri, 20 Jul 2018 13:56:18 +0530
+Subject: [PATCH 1/3] dts: arm64/sdm845: Add node for arm,mmu-500
+In-Reply-To: <CAL_JsqKQgZq23F7gqNoEDzpWj3zVR7Tsok3cZZCpCL=Br_+BeA@mail.gmail.com>
+References: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
+ <20180719175356.14753-2-vivek.gautam@codeaurora.org>
+ <CAL_JsqKQgZq23F7gqNoEDzpWj3zVR7Tsok3cZZCpCL=Br_+BeA@mail.gmail.com>
+Message-ID: <CAFp+6iGg=6Hhxj9-995ZzP=_09Y3kZoXthcyNpUqikHsn97uyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Hi Rob,
 
-Here is the SoC PR for 4.19. It is a cleanup of pm.c and the addition of
-a new low power mode.
+On Fri, Jul 20, 2018 at 4:38 AM, Rob Herring <robh+dt@kernel.org> wrote:
+> On Thu, Jul 19, 2018 at 11:54 AM Vivek Gautam
+> <vivek.gautam@codeaurora.org> wrote:
+>>
+>> Add device node for arm,mmu-500 available on sdm845.
+>> This MMU-500 with single TCU and multiple TBU architecture
+>> is shared among all the peripherals except gpu on sdm845.
+>>
+>> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+>> ---
+>>  arch/arm64/boot/dts/qcom/sdm845-mtp.dts |  4 ++
+>>  arch/arm64/boot/dts/qcom/sdm845.dtsi    | 73 +++++++++++++++++++++++++++++++++
+>>  2 files changed, 77 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+>> index 6d651f314193..13b50dff440f 100644
+>> --- a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+>> +++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+>> @@ -58,3 +58,7 @@
+>>                 bias-pull-up;
+>>         };
+>>  };
+>> +
+>> +&apps_smmu {
+>> +       status = "okay";
+>> +};
+>> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> index 00722b533a92..70ca18ae6cb3 100644
+>> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>> @@ -980,6 +980,79 @@
+>>                         cell-index = <0>;
+>>                 };
+>>
+>> +               apps_smmu: arm,smmu at 15000000 {
+>
+> iommu at ...
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+Thanks for the review.
+Sure, will modify this.
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>
+>> +                       compatible = "arm,mmu-500";
+>
+> Really unmodified by QCom? Would be better to have SoC specific compatible.
 
-are available in the Git repository at:
+Yes, at this point we are able to use the driver as is on 845.
+But, will add a SoC specific compatible as suggested to make bindings
+future proof.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.19-soc
+Best regards
+Vivek
 
-for you to fetch changes up to d7484f5c6b3b0565d2395aece2862f183581e1c1:
+>
+> Rob
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
 
-  ARM: at91: pm: configure wakeup sources for ULP1 mode (2018-07-17 15:08:12 +0200)
 
-----------------------------------------------------------------
-AT91 SoC for 4.19:
-
- - New low power mode for sama5d2: ULP1
-
-----------------------------------------------------------------
-Boris Brezillon (1):
-      MAINTAINERS: Remove the AT91 clk driver entry
-
-Claudiu Beznea (3):
-      ARM: at91: pm: Use ULP0 naming instead of slow clock
-      ARM: at91: pm: add PMC fast startup registers defines
-      ARM: at91: pm: configure wakeup sources for ULP1 mode
-
-Wenyou Yang (1):
-      ARM: at91: pm: Add ULP1 mode support
-
- MAINTAINERS                     |   5 --
- arch/arm/mach-at91/pm.c         | 187 +++++++++++++++++++++++++++++++++-------
- arch/arm/mach-at91/pm.h         |   6 +-
- arch/arm/mach-at91/pm_suspend.S | 142 +++++++++++++++++++++++++-----
- include/linux/clk/at91_pmc.h    |  15 ++++
- 5 files changed, 297 insertions(+), 58 deletions(-)
 
 -- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
