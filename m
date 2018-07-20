@@ -1,206 +1,96 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Fri, 20 Jul 2018 14:32:31 +0100
-Subject: [PATCH 1/4] sched/topology: SD_ASYM_CPUCAPACITY flag detection
-In-Reply-To: <1532093554-30504-1-git-send-email-morten.rasmussen@arm.com>
-References: <1532093554-30504-1-git-send-email-morten.rasmussen@arm.com>
-Message-ID: <1532093554-30504-2-git-send-email-morten.rasmussen@arm.com>
+From: yuehaibing@huawei.com (YueHaibing)
+Date: Fri, 20 Jul 2018 21:33:55 +0800
+Subject: [SPAM]Re: [PATCH] net: mediatek: use dma_zalloc_coherent instead
+ of allocator/memset
+In-Reply-To: <20180720081334.GO17271@n2100.armlinux.org.uk>
+References: <20180719140955.19444-1-yuehaibing@huawei.com>
+ <20180719141723.GM17271@n2100.armlinux.org.uk>
+ <1532019744.8953.248.camel@mtkswgap22>
+ <9a4cdfc6-7487-5908-b584-f3bf6158c4d4@huawei.com>
+ <20180720081334.GO17271@n2100.armlinux.org.uk>
+Message-ID: <a8dfe467-9649-ca48-20e9-38041de6a404@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SD_ASYM_CPUCAPACITY sched_domain flag is supposed to mark the
-sched_domain in the hierarchy where all cpu capacities are visible for
-any cpu's point of view on asymmetric cpu capacity systems. The
-scheduler can then take to take capacity asymmetry into account when
-balancing at this level. It also serves as an indicator for how wide
-task placement heuristics have to search to consider all available cpu
-capacities as asymmetric systems might often appear symmetric at
-smallest level(s) of the sched_domain hierarchy.
+On 2018/7/20 16:13, Russell King - ARM Linux wrote:
+> On Fri, Jul 20, 2018 at 02:30:53PM +0800, YueHaibing wrote:
+>> On 2018/7/20 1:02, Sean Wang wrote:
+>>> On Thu, 2018-07-19 at 15:17 +0100, Russell King - ARM Linux wrote:
+>>>> On Thu, Jul 19, 2018 at 10:09:55PM +0800, YueHaibing wrote:
+>>>>> Use dma_zalloc_coherent instead of dma_alloc_coherent
+>>>>> followed by memset 0.
+>>>>>
+>>>>> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+>>>>> ---
+>>>>>  drivers/net/ethernet/mediatek/mtk_eth_soc.c | 7 ++-----
+>>>>>  1 file changed, 2 insertions(+), 5 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+>>>>> index d8ebf0a..fbdb3e3 100644
+>>>>> --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+>>>>> +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+>>>>> @@ -1221,14 +1221,11 @@ static int mtk_tx_alloc(struct mtk_eth *eth)
+>>>>>  	if (!ring->buf)
+>>>>>  		goto no_tx_mem;
+>>>>>  
+>>>>> -	ring->dma = dma_alloc_coherent(eth->dev,
+>>>>> -					  MTK_DMA_SIZE * sz,
+>>>>> -					  &ring->phys,
+>>>>> -					  GFP_ATOMIC | __GFP_ZERO);
+>>>>> +	ring->dma = dma_zalloc_coherent(eth->dev, MTK_DMA_SIZE * sz,
+>>>>> +					&ring->phys, GFP_ATOMIC | __GFP_ZERO);
+>>>>>  	if (!ring->dma)
+>>>>>  		goto no_tx_mem;
+>>>>>  
+>>>>> -	memset(ring->dma, 0, MTK_DMA_SIZE * sz);
+>>>>
+>>>> I have to wonder whether this code needs two forms of zeroing... in
+>>>> the original code, __GFP_ZERO _and_ a call to memset() just in case
+>>>> __GFP_ZERO failed to do its job, and in the replacement code, just
+>>>> in case dma_zalloc_coherent() hasn't got the idea...
+>>>>
+>>>> I think you can drop the __GFP_ZERO. ;)
+>>>>
+>>>
+>>> Just now I did an experiment on 4.14.56 on armv7. I found that
+>>> dma_zalloc_coherent does not guarantee that the buffer we get
+>>> is all filled with 0.
+>>>
+>>>
+>>> I really think it's a little bit weird OR what was I missing something
+>>> for enabling dma_zalloc_coherent ? The result seems to tell that we
+>>> can't remove freely the memset with 0 at this moment until we get a
+>>> cause.
+>>>
+>>
+>> That means dma_zalloc_coherent doesn't work as expect on armv7?
+> 
+> Can someone work out which underlying allocator is being used - the
+> possibilities are:
+> 
+> - dma_alloc_from_dev_coherent
+> - cma
+> - simple
+> - remap
+> - pool
+> 
+> Looking at the code, I'd guess it's the pool allocator, as I don't see
+> anything which zeros memory there, and it doesn't honor the __GFP_ZERO
+> flag.  This is definitely an allocator bug.
+> 
 
-The flag has been around for while but so far only been set by
-out-of-tree code in Android kernels. One solution is to let each
-architecture provide the flag through a custom sched_domain topology
-array and associated mask and flag functions. However,
-SD_ASYM_CPUCAPACITY is special in the sense that it depends on the
-capacity and presence of all cpus in the system, i.e. when hotplugging
-all cpus out except those with one particular cpu capacity the flag
-should disappear even if the sched_domains don't collapse. Similarly,
-the flag is affected by cpusets where load-balancing is turned off.
-Detecting when the flags should be set therefore depends not only on
-topology information but also the cpuset configuration and hotplug
-state. The arch code doesn't have easy access to the cpuset
-configuration.
+Sean,
 
-Instead, this patch implements the flag detection in generic code where
-cpusets and hotplug state is already taken care of. All the arch is
-responsible for is to implement arch_scale_cpu_capacity() and force a
-full rebuild of the sched_domain hierarchy if capacities are updated,
-e.g. later in the boot process when cpufreq has initialized.
+can you test bellow patch?
 
-cc: Ingo Molnar <mingo@redhat.com>
-cc: Peter Zijlstra <peterz@infradead.org>
 
-Signed-off-by: Morten Rasmussen <morten.rasmussen@arm.com>
----
- include/linux/sched/topology.h |  2 +-
- kernel/sched/topology.c        | 81 ++++++++++++++++++++++++++++++++++++++----
- 2 files changed, 76 insertions(+), 7 deletions(-)
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index be0fa7e..52029bb 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -564,6 +564,7 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
 
-diff --git a/include/linux/sched/topology.h b/include/linux/sched/topology.h
-index 26347741ba50..4fe2e49ab13b 100644
---- a/include/linux/sched/topology.h
-+++ b/include/linux/sched/topology.h
-@@ -23,7 +23,7 @@
- #define SD_BALANCE_FORK		0x0008	/* Balance on fork, clone */
- #define SD_BALANCE_WAKE		0x0010  /* Balance on wakeup */
- #define SD_WAKE_AFFINE		0x0020	/* Wake task to waking CPU */
--#define SD_ASYM_CPUCAPACITY	0x0040  /* Groups have different max cpu capacities */
-+#define SD_ASYM_CPUCAPACITY	0x0040  /* Domain members have different cpu capacities */
- #define SD_SHARE_CPUCAPACITY	0x0080	/* Domain members share cpu capacity */
- #define SD_SHARE_POWERDOMAIN	0x0100	/* Domain members share power domain */
- #define SD_SHARE_PKG_RESOURCES	0x0200	/* Domain members share cpu pkg resources */
-diff --git a/kernel/sched/topology.c b/kernel/sched/topology.c
-index 05a831427bc7..b8f41d557612 100644
---- a/kernel/sched/topology.c
-+++ b/kernel/sched/topology.c
-@@ -1061,7 +1061,6 @@ static struct cpumask		***sched_domains_numa_masks;
-  *   SD_SHARE_PKG_RESOURCES - describes shared caches
-  *   SD_NUMA                - describes NUMA topologies
-  *   SD_SHARE_POWERDOMAIN   - describes shared power domain
-- *   SD_ASYM_CPUCAPACITY    - describes mixed capacity topologies
-  *
-  * Odd one out, which beside describing the topology has a quirk also
-  * prescribes the desired behaviour that goes along with it:
-@@ -1073,13 +1072,12 @@ static struct cpumask		***sched_domains_numa_masks;
- 	 SD_SHARE_PKG_RESOURCES |	\
- 	 SD_NUMA		|	\
- 	 SD_ASYM_PACKING	|	\
--	 SD_ASYM_CPUCAPACITY	|	\
- 	 SD_SHARE_POWERDOMAIN)
- 
- static struct sched_domain *
- sd_init(struct sched_domain_topology_level *tl,
- 	const struct cpumask *cpu_map,
--	struct sched_domain *child, int cpu)
-+	struct sched_domain *child, int dflags, int cpu)
- {
- 	struct sd_data *sdd = &tl->data;
- 	struct sched_domain *sd = *per_cpu_ptr(sdd->sd, cpu);
-@@ -1100,6 +1098,9 @@ sd_init(struct sched_domain_topology_level *tl,
- 			"wrong sd_flags in topology description\n"))
- 		sd_flags &= ~TOPOLOGY_SD_FLAGS;
- 
-+	/* Apply detected topology flags */
-+	sd_flags |= dflags;
-+
- 	*sd = (struct sched_domain){
- 		.min_interval		= sd_weight,
- 		.max_interval		= 2*sd_weight,
-@@ -1607,9 +1608,9 @@ static void __sdt_free(const struct cpumask *cpu_map)
- 
- static struct sched_domain *build_sched_domain(struct sched_domain_topology_level *tl,
- 		const struct cpumask *cpu_map, struct sched_domain_attr *attr,
--		struct sched_domain *child, int cpu)
-+		struct sched_domain *child, int dflags, int cpu)
- {
--	struct sched_domain *sd = sd_init(tl, cpu_map, child, cpu);
-+	struct sched_domain *sd = sd_init(tl, cpu_map, child, dflags, cpu);
- 
- 	if (child) {
- 		sd->level = child->level + 1;
-@@ -1636,6 +1637,65 @@ static struct sched_domain *build_sched_domain(struct sched_domain_topology_leve
- }
- 
- /*
-+ * Find the sched_domain_topology_level where all cpu capacities are visible
-+ * for all cpus.
-+ */
-+static struct sched_domain_topology_level
-+*asym_cpu_capacity_level(const struct cpumask *cpu_map)
-+{
-+	int i, j, asym_level = 0;
-+	bool asym = false;
-+	struct sched_domain_topology_level *tl, *asym_tl = NULL;
-+	unsigned long cap;
-+
-+	/* Is there any asymmetry? */
-+	cap = arch_scale_cpu_capacity(NULL, cpumask_first(cpu_map));
-+
-+	for_each_cpu(i, cpu_map) {
-+		if (arch_scale_cpu_capacity(NULL, i) != cap) {
-+			asym = true;
-+			break;
-+		}
-+	}
-+
-+	if (!asym)
-+		return NULL;
-+
-+	/*
-+	 * Examine topology from all cpu's point of views to detect the lowest
-+	 * sched_domain_topology_level where a highest capacity cpu is visible
-+	 * to everyone.
-+	 */
-+	for_each_cpu(i, cpu_map) {
-+		unsigned long max_capacity = arch_scale_cpu_capacity(NULL, i);
-+		int tl_id = 0;
-+
-+		for_each_sd_topology(tl) {
-+			if (tl_id < asym_level)
-+				goto next_level;
-+
-+			for_each_cpu_and(j, tl->mask(i), cpu_map) {
-+				unsigned long capacity;
-+
-+				capacity = arch_scale_cpu_capacity(NULL, j);
-+
-+				if (capacity <= max_capacity)
-+					continue;
-+
-+				max_capacity = capacity;
-+				asym_level = tl_id;
-+				asym_tl = tl;
-+			}
-+next_level:
-+			tl_id++;
-+		}
-+	}
-+
-+	return asym_tl;
-+}
-+
-+
-+/*
-  * Build sched domains for a given set of CPUs and attach the sched domains
-  * to the individual CPUs
-  */
-@@ -1647,18 +1707,27 @@ build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *att
- 	struct s_data d;
- 	struct rq *rq = NULL;
- 	int i, ret = -ENOMEM;
-+	struct sched_domain_topology_level *tl_asym;
- 
- 	alloc_state = __visit_domain_allocation_hell(&d, cpu_map);
- 	if (alloc_state != sa_rootdomain)
- 		goto error;
- 
-+	tl_asym = asym_cpu_capacity_level(cpu_map);
-+
- 	/* Set up domains for CPUs specified by the cpu_map: */
- 	for_each_cpu(i, cpu_map) {
- 		struct sched_domain_topology_level *tl;
- 
- 		sd = NULL;
- 		for_each_sd_topology(tl) {
--			sd = build_sched_domain(tl, cpu_map, attr, sd, i);
-+			int dflags = 0;
-+
-+			if (tl == tl_asym)
-+				dflags |= SD_ASYM_CPUCAPACITY;
-+
-+			sd = build_sched_domain(tl, cpu_map, attr, sd, dflags, i);
-+
- 			if (tl == sched_domain_topology)
- 				*per_cpu_ptr(d.sd, i) = sd;
- 			if (tl->flags & SDTL_OVERLAP)
--- 
-2.7.4
+*ret_page = phys_to_page(phys);
+ptr = (void *)val;
++ memset(ptr, 0, size);
+}
