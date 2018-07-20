@@ -1,67 +1,52 @@
-From: erin.lo@mediatek.com (Erin Lo)
-Date: Fri, 20 Jul 2018 16:19:29 +0800
-Subject: [PATCH v3 0/4] Add basic support for Mediatek MT8183 SoC
-In-Reply-To: <9ba45353-a6e1-9a6e-f05b-4b1679ae9e52@gmail.com>
-References: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
- <9ba45353-a6e1-9a6e-f05b-4b1679ae9e52@gmail.com>
-Message-ID: <1532074769.19148.2.camel@mtksdaap41>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Fri, 20 Jul 2018 10:20:30 +0200
+Subject: [GIT PULL] ARM: at91: SoC for 4.19
+Message-ID: <20180720082030.GA22561@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-07-16 at 11:28 +0200, Matthias Brugger wrote:
-> Hi Erin,
-> 
-> On 17/05/18 08:22, Erin Lo wrote:
-> > MT8183 is a SoC based on 64bit ARMv8 architecture.
-> > It contains 4 CA53 and 4 CA73 cores.
-> > MT8183 share many HW IP with MT65xx series.
-> > This patchset was tested on MT8183 evaluation board, and boot to shell ok.
-> > 
-> > This series contains document bindings, device tree including interrupt, uart.
-> > 
-> > Change in v3:
-> > 1. Fill out GICC, GICH, GICV regions
-> > 2. Update Copyright to 2018
-> > 
-> > Change in v2:
-> > 1. Split dt-bindings into different patches
-> > 2. Correct bindings for supported SoCs (mtk-uart.txt)
-> > 
-> > Ben Ho (1):
-> >   arm64: dts: Add Mediatek SoC MT8183 and evaluation board dts and
-> >     Makefile
-> > 
-> > Erin Lo (3):
-> >   dt-bindings: arm: Add bindings for Mediatek MT8183 SoC Platform
-> >   dt-bindings: mtk-sysirq: Add compatible for Mediatek MT8183
-> >   dt-bindings: serial: Add compatible for Mediatek MT8183
-> > 
-> 
-> I'm a bit reluctant to take this series, as it will only enable the EVB board to
-> boot into a serial console. Are you planning to add support for other devices of
-> this SoC?
-> 
-> Apart please take into account that there is an issue with the dts file, as you
-> were told by the kbuild test robot.
-> 
-> Regards,
-> Matthias
-> 
+Arnd, Olof,
 
-Hi, Matthias
-Sorry for missing this letter...since mail proxy server.
-We plan to add support all the devices of MT8183 in serious.
-We have implemented the clock and pinctrl driver for upstream and they
-are in internal review right now.
+Here is the SoC PR for 4.19. It is a cleanup of pm.c and the addition of
+a new low power mode.
 
-About the dts issue... do you suggest me to send new patch right now or
-wait for clock and pinctrl driver ready then send them together?
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-Best Regards,
-Erin
+are available in the Git repository at:
 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.19-soc
+
+for you to fetch changes up to d7484f5c6b3b0565d2395aece2862f183581e1c1:
+
+  ARM: at91: pm: configure wakeup sources for ULP1 mode (2018-07-17 15:08:12 +0200)
+
+----------------------------------------------------------------
+AT91 SoC for 4.19:
+
+ - New low power mode for sama5d2: ULP1
+
+----------------------------------------------------------------
+Boris Brezillon (1):
+      MAINTAINERS: Remove the AT91 clk driver entry
+
+Claudiu Beznea (3):
+      ARM: at91: pm: Use ULP0 naming instead of slow clock
+      ARM: at91: pm: add PMC fast startup registers defines
+      ARM: at91: pm: configure wakeup sources for ULP1 mode
+
+Wenyou Yang (1):
+      ARM: at91: pm: Add ULP1 mode support
+
+ MAINTAINERS                     |   5 --
+ arch/arm/mach-at91/pm.c         | 187 +++++++++++++++++++++++++++++++++-------
+ arch/arm/mach-at91/pm.h         |   6 +-
+ arch/arm/mach-at91/pm_suspend.S | 142 +++++++++++++++++++++++++-----
+ include/linux/clk/at91_pmc.h    |  15 ++++
+ 5 files changed, 297 insertions(+), 58 deletions(-)
+
+-- 
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
