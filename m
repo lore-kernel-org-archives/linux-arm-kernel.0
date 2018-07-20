@@ -1,55 +1,111 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 20 Jul 2018 16:15:30 +0200
-Subject: [PATCH 5/5] net: add MTD support to eth_platform_get_mac_address()
-In-Reply-To: <0355bdd8-f544-c462-99e8-da94488067bb@ti.com>
-References: <20180718161035.7005-6-brgl@bgdev.pl>
- <20180718164737.GE12477@lunn.ch>
- <CAMRc=MeRv3_C8_R-Awfr1zjLa3G_CVAACc-2t_ihB+1v+BCTGw@mail.gmail.com>
- <20180718170352.GF12477@lunn.ch>
- <CAMRc=Md3oeEktzrA9UZyNPX6pB4bG+Gv0o6cjbs0UUKb3sYTsA@mail.gmail.com>
- <20180719150138.GC9119@lunn.ch>
- <CAMRc=MfKedvD2OXes02op2ErGR2HKkzJwjHtv5i4NkbJAVg3dw@mail.gmail.com>
- <20180719152712.GE9119@lunn.ch>
- <CAMRc=MeqnRXF_R1J5G8ySvCr8pZhZMHiV3WHNFun=d8GjiOT9A@mail.gmail.com>
- <0355bdd8-f544-c462-99e8-da94488067bb@ti.com>
-Message-ID: <20180720141530.GA1034@lunn.ch>
+From: yuehaibing@huawei.com (YueHaibing)
+Date: Fri, 20 Jul 2018 22:16:05 +0800
+Subject: [SPAM]Re: [PATCH] net: mediatek: use dma_zalloc_coherent instead
+ of allocator/memset
+In-Reply-To: <1532095058.8953.264.camel@mtkswgap22>
+References: <20180719140955.19444-1-yuehaibing@huawei.com>
+ <20180719141723.GM17271@n2100.armlinux.org.uk>
+ <1532019744.8953.248.camel@mtkswgap22>
+ <9a4cdfc6-7487-5908-b584-f3bf6158c4d4@huawei.com>
+ <20180720081334.GO17271@n2100.armlinux.org.uk>
+ <a8dfe467-9649-ca48-20e9-38041de6a404@huawei.com>
+ <1532095058.8953.264.camel@mtkswgap22>
+Message-ID: <4075e2bf-7fb9-a2a1-4f29-b6f492040e1d@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 10:47:51AM +0530, Sekhar Nori wrote:
-> On Thursday 19 July 2018 09:05 PM, Bartosz Golaszewski wrote:
-> > 2018-07-19 17:27 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
-> >>> Unfortunately: this would effectively block me from improving the
-> >>> support for older davinci boards.
-> >>
-> >> Is there something blocking you from converting the board to device
-> >> tree? This is something i did with a lot of the Marvell boards a few
-> >> years ago. For a while, we had both DT and board setup files. After a
-> >> couple of cycles, we killed off the setup files.
-> >>
-> >>        Andrew
-> > 
-> > Actually some board are supported both in DT and board files
-> > (da850-evm) right now, but Sekhar wants to keep the support via board
-> > files in the kernel so that's a no go.
+On 2018/7/20 21:57, Sean Wang wrote:
+> On Fri, 2018-07-20 at 21:33 +0800, YueHaibing wrote:
+>> On 2018/7/20 16:13, Russell King - ARM Linux wrote:
+>>> On Fri, Jul 20, 2018 at 02:30:53PM +0800, YueHaibing wrote:
+>>>> On 2018/7/20 1:02, Sean Wang wrote:
+>>>>> On Thu, 2018-07-19 at 15:17 +0100, Russell King - ARM Linux wrote:
+>>>>>> On Thu, Jul 19, 2018 at 10:09:55PM +0800, YueHaibing wrote:
+>>>>>>> Use dma_zalloc_coherent instead of dma_alloc_coherent
+>>>>>>> followed by memset 0.
+>>>>>>>
+>>>>>>> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+>>>>>>> ---
+>>>>>>>  drivers/net/ethernet/mediatek/mtk_eth_soc.c | 7 ++-----
+>>>>>>>  1 file changed, 2 insertions(+), 5 deletions(-)
+>>>>>>>
+>>>>>>> diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+>>>>>>> index d8ebf0a..fbdb3e3 100644
+>>>>>>> --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+>>>>>>> +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+>>>>>>> @@ -1221,14 +1221,11 @@ static int mtk_tx_alloc(struct mtk_eth *eth)
+>>>>>>>  	if (!ring->buf)
+>>>>>>>  		goto no_tx_mem;
+>>>>>>>  
+>>>>>>> -	ring->dma = dma_alloc_coherent(eth->dev,
+>>>>>>> -					  MTK_DMA_SIZE * sz,
+>>>>>>> -					  &ring->phys,
+>>>>>>> -					  GFP_ATOMIC | __GFP_ZERO);
+>>>>>>> +	ring->dma = dma_zalloc_coherent(eth->dev, MTK_DMA_SIZE * sz,
+>>>>>>> +					&ring->phys, GFP_ATOMIC | __GFP_ZERO);
+>>>>>>>  	if (!ring->dma)
+>>>>>>>  		goto no_tx_mem;
+>>>>>>>  
+>>>>>>> -	memset(ring->dma, 0, MTK_DMA_SIZE * sz);
+>>>>>>
+>>>>>> I have to wonder whether this code needs two forms of zeroing... in
+>>>>>> the original code, __GFP_ZERO _and_ a call to memset() just in case
+>>>>>> __GFP_ZERO failed to do its job, and in the replacement code, just
+>>>>>> in case dma_zalloc_coherent() hasn't got the idea...
+>>>>>>
+>>>>>> I think you can drop the __GFP_ZERO. ;)
+>>>>>>
+>>>>>
+>>>>> Just now I did an experiment on 4.14.56 on armv7. I found that
+>>>>> dma_zalloc_coherent does not guarantee that the buffer we get
+>>>>> is all filled with 0.
+>>>>>
+>>>>>
+>>>>> I really think it's a little bit weird OR what was I missing something
+>>>>> for enabling dma_zalloc_coherent ? The result seems to tell that we
+>>>>> can't remove freely the memset with 0 at this moment until we get a
+>>>>> cause.
+>>>>>
+>>>>
+>>>> That means dma_zalloc_coherent doesn't work as expect on armv7?
+>>>
+>>> Can someone work out which underlying allocator is being used - the
+>>> possibilities are:
+>>>
+>>> - dma_alloc_from_dev_coherent
+>>> - cma
+>>> - simple
+>>> - remap
+>>> - pool
+>>>
+>>> Looking at the code, I'd guess it's the pool allocator, as I don't see
+>>> anything which zeros memory there, and it doesn't honor the __GFP_ZERO
+>>> flag.  This is definitely an allocator bug.
+>>>
+>>
+>> Sean,
+>>
+>> can you test bellow patch?
+>>
+>>
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index be0fa7e..52029bb 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -564,6 +564,7 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
+>>
+>> *ret_page = phys_to_page(phys);
+>> ptr = (void *)val;
+>> + memset(ptr, 0, size);
+>> }
+>>
 > 
-> Its not that I want it that way, but we cannot get rid of board files
-> till DT has equivalent support.
+> it should work. but don't we need to compare gfp against __GFP_ZERO
+> before zeros buffer ?
 > 
-> The bigger issue is not on DA850, but on the 5 older DaVinci SoCs which
-> do not support device-tree based boot today.
 
-The nice thing about board files is they keep any ugly code near to
-where it is needed. The proposal here is to put some 'temporary' code
-in the net core. And it is assumed at some point somebody will write
-nvmem over MTD, which can be used to replace this temporary code, but
-that in itself needs an ugly list of special cases when using board
-files?
-
-I would prefer somebody just did the work to convert these 5 boards to
-DT, with a clean design of how nvmem over MTD would work. Having
-converted a number of Marvell boards to DT, i have an idea of the
-effort required. If most of the drivers already support DT, it can be
-done quickly. So the big job here is probably nvmem over MTD.
-
-     Andrew
+arm64 zero it unconditionally in __alloc_from_pool.
+> 
+> 
+> .
+> 
