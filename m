@@ -1,55 +1,26 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 20 Jul 2018 19:38:24 +0300
-Subject: [PATCH 1/9] ARM: dts: porter: Add missing PMIC nodes
-In-Reply-To: <5058a96cb7e8dca97629c48084537fe5def8344f.1532086734.git.horms+renesas@verge.net.au>
-References: <cover.1532086734.git.horms+renesas@verge.net.au>
- <5058a96cb7e8dca97629c48084537fe5def8344f.1532086734.git.horms+renesas@verge.net.au>
-Message-ID: <8312c88f-9ff8-454e-fad9-7bf403c28207@cogentembedded.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 20 Jul 2018 10:38:30 -0600
+Subject: [PATCH v1 1/7] Documentation: usb: dwc2: add description for px30
+In-Reply-To: <1531813747-8804-2-git-send-email-cl@rock-chips.com>
+References: <1531813747-8804-1-git-send-email-cl@rock-chips.com>
+ <1531813747-8804-2-git-send-email-cl@rock-chips.com>
+Message-ID: <20180720163830.GA23635@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2018 03:05 PM, Simon Horman wrote:
+On Tue, Jul 17, 2018 at 03:49:01PM +0800, cl at rock-chips.com wrote:
+> From: Liang Chen <cl@rock-chips.com>
+> 
+> This patch adds the compatible of dwc2 for PX30 SoCs.
 
-> From: Marek Vasut <marek.vasut@gmail.com>
+'dt-bindings: usb: ...' for the subject.
+
 > 
-> Add PMIC nodes to Porter and connect CPU DVFS supply. There is
-> one DA9063L and one DA9210 on Porter, the only difference from
-> the other boards is that DA9063L is at I2C address 0x5a rather
-> than 0x58 .
-> 
-> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Signed-off-by: Liang Chen <cl@rock-chips.com>
 > ---
->  arch/arm/boot/dts/r8a7791-porter.dts | 33 +++++++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-> index a01101b49d99..5f77d73d7462 100644
-> --- a/arch/arm/boot/dts/r8a7791-porter.dts
-> +++ b/arch/arm/boot/dts/r8a7791-porter.dts
-> @@ -375,10 +375,43 @@
->  	clock-frequency = <400000>;
->  };
->  
-> +&i2c6 {
-> +	status = "okay";
-> +	clock-frequency = <100000>;
-> +
-> +	pmic at 5a {
-> +		compatible = "dlg,da9063l";
-> +		reg = <0x5a>;
-> +		interrupt-parent = <&irqc0>;
-> +		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-> +		interrupt-controller;
+>  Documentation/devicetree/bindings/usb/dwc2.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-   Without a label and #interrupt-cells?
+Otherwise,
 
-> +
-> +		wdt {
-> +			compatible = "dlg,da9063-watchdog";
-> +		};
-> +	};
-[...]
-
-MBR, Sergei
+Acked-by: Rob Herring <robh@kernel.org>
