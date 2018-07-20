@@ -1,121 +1,61 @@
-From: yuehaibing@huawei.com (YueHaibing)
-Date: Fri, 20 Jul 2018 14:30:53 +0800
-Subject: [SPAM]Re: [PATCH] net: mediatek: use dma_zalloc_coherent instead
- of allocator/memset
-In-Reply-To: <1532019744.8953.248.camel@mtkswgap22>
-References: <20180719140955.19444-1-yuehaibing@huawei.com>
- <20180719141723.GM17271@n2100.armlinux.org.uk>
- <1532019744.8953.248.camel@mtkswgap22>
-Message-ID: <9a4cdfc6-7487-5908-b584-f3bf6158c4d4@huawei.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Jul 2018 07:31:56 +0100
+Subject: [PATCH] ARM64: smp: BUG() if smp_send_reschedule() is called for
+ an offline cpu
+In-Reply-To: <1532038369-5159-1-git-send-email-vnkgutta@codeaurora.org>
+References: <1532038369-5159-1-git-send-email-vnkgutta@codeaurora.org>
+Message-ID: <20180720063156.ico2wsqc3lr2pesa@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/7/20 1:02, Sean Wang wrote:
-> On Thu, 2018-07-19 at 15:17 +0100, Russell King - ARM Linux wrote:
->> On Thu, Jul 19, 2018 at 10:09:55PM +0800, YueHaibing wrote:
->>> Use dma_zalloc_coherent instead of dma_alloc_coherent
->>> followed by memset 0.
->>>
->>> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
->>> ---
->>>  drivers/net/ethernet/mediatek/mtk_eth_soc.c | 7 ++-----
->>>  1 file changed, 2 insertions(+), 5 deletions(-)
->>>
->>> diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
->>> index d8ebf0a..fbdb3e3 100644
->>> --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
->>> +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
->>> @@ -1221,14 +1221,11 @@ static int mtk_tx_alloc(struct mtk_eth *eth)
->>>  	if (!ring->buf)
->>>  		goto no_tx_mem;
->>>  
->>> -	ring->dma = dma_alloc_coherent(eth->dev,
->>> -					  MTK_DMA_SIZE * sz,
->>> -					  &ring->phys,
->>> -					  GFP_ATOMIC | __GFP_ZERO);
->>> +	ring->dma = dma_zalloc_coherent(eth->dev, MTK_DMA_SIZE * sz,
->>> +					&ring->phys, GFP_ATOMIC | __GFP_ZERO);
->>>  	if (!ring->dma)
->>>  		goto no_tx_mem;
->>>  
->>> -	memset(ring->dma, 0, MTK_DMA_SIZE * sz);
->>
->> I have to wonder whether this code needs two forms of zeroing... in
->> the original code, __GFP_ZERO _and_ a call to memset() just in case
->> __GFP_ZERO failed to do its job, and in the replacement code, just
->> in case dma_zalloc_coherent() hasn't got the idea...
->>
->> I think you can drop the __GFP_ZERO. ;)
->>
-> 
-> Just now I did an experiment on 4.14.56 on armv7. I found that
-> dma_zalloc_coherent does not guarantee that the buffer we get
-> is all filled with 0.
-> 
-> 
-> I really think it's a little bit weird OR what was I missing something
-> for enabling dma_zalloc_coherent ? The result seems to tell that we
-> can't remove freely the memset with 0 at this moment until we get a
-> cause.
-> 
+On Thu, Jul 19, 2018 at 03:12:49PM -0700, Venkata Narendra Kumar Gutta wrote:
+> Based on the 'commit <8b775be35e41b9f> ("ARM: smp:
+> BUG() if smp_send_reschedule() is called for an offline cpu")'
 
-That means dma_zalloc_coherent doesn't work as expect on armv7?
+This commit does not appear to exist in mainline. Which tree is it in?
 
+> Sending an IPI_RESCHEDULE to an offline CPU is incorrect and potentially
+> bad for both power and stability. On some sub-architectures such as MSM,
+> if a power-collapsed CPU is unexpectedly woken up by an IPI, it will be
+> begin executing without the preparations that would normally happen as
+> part of CPU_UP_PREPARE. If clocks, voltage regulators, or other hardware
+> configuration are not performed, the booting CPU may cause general
+> instability or (at best) poor power performance since the CPU would be
+> powered up but not utilized.
 > 
-> my test code is
+> One common cause for such issues is misuse of add_timer_on() or APIs
+> such as queue_work_on() which call it. If proper precautions are not
+> taken to block hotplug while these APIs are called then a race may
+> result in IPIs being sent to CPUs that are already offline.
 > 
->          ring->dma = dma_zalloc_coherent(eth->dev,
->                                           MTK_DMA_SIZE * sz,
->                                           &ring->phys,
->                                           GFP_ATOMIC);
->         if (!ring->dma)
->                 goto no_tx_mem;
+> This same argument could be applied to other IPIs (with the exception
+> of IPI_WAKEUP), but the others are already restricted to only online
+> CPUs by existing mechanisms, so an explicit assertion is not useful.
 > 
->         print_hex_dump(KERN_INFO, "mtk_tx_alloc:",
->                        DUMP_PREFIX_OFFSET, 16, 1,
->                        ring->dma, MTK_DMA_SIZE * sz, false);
+> Signed-off-by: Matt Wagantall <mattw@codeaurora.org>
+> Signed-off-by: Trilok Soni <tsoni@codeaurora.org>
+> Signed-off-by: Venkata Narendra Kumar Gutta <vnkgutta@codeaurora.org>
+> ---
+>  arch/arm64/kernel/smp.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
->         memset(ring->dma, 0, MTK_DMA_SIZE * sz);
-> 
->         print_hex_dump(KERN_INFO, "mtk_tx_alloc2:",
->                        DUMP_PREFIX_OFFSET, 16, 1,
->                        ring->dma, MTK_DMA_SIZE * sz, false);
-> 
-> 
-> and the output 
-> 
-> ...
-> 
-> [  259.610413] mtk_tx_alloc:00000f40: 00 00 00 00 50 1f 00 bc 00 00 00 c0 00 00 00 00
-> [  259.617934] mtk_tx_alloc:00000f50: 00 00 00 00 60 1f 00 bc 00 00 00 c0 00 00 00 00
-> [  259.625470] mtk_tx_alloc:00000f60: 00 00 00 00 70 1f 00 bc 00 00 00 c0 00 00 00 00
-> [  259.633005] mtk_tx_alloc:00000f70: 00 00 00 00 80 1f 00 bc 00 00 00 c0 00 00 00 00
-> [  259.640539] mtk_tx_alloc:00000f80: 00 00 00 00 90 1f 00 bc 00 00 00 c0 00 00 00 00
-> [  259.648073] mtk_tx_alloc:00000f90: 00 00 00 00 a0 1f 00 bc 00 00 00 c0 00 00 00 00
-> [  259.655590] mtk_tx_alloc:00000fa0: 00 00 00 00 b0 1f 00 bc 00 00 00 c0 00 00 00 00
-> [  259.663124] mtk_tx_alloc:00000fb0: 00 00 00 00 c0 1f 00 bc 00 00 00 c0 00 00 00 00
-> [  259.670660] mtk_tx_alloc:00000fc0: 00 00 00 00 d0 1f 00 bc 00 00 00 c0 00 00 00 00
-> [  259.678196] mtk_tx_alloc:00000fd0: 00 00 00 00 e0 1f 00 bc 00 00 00 c0 00 00 00 00
-> [  259.685713] mtk_tx_alloc:00000fe0: 00 00 00 00 f0 1f 00 bc 00 00 00 c0 00 00 00 00
-> [  259.693247] mtk_tx_alloc:00000ff0: 02 c0 90 ad 00 10 00 bc 00 40 5a c0 00 00 00 02
-> [  259.700782] mtk_tx_alloc2:00000000: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> [  259.708405] mtk_tx_alloc2:00000010: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> [  259.716013] mtk_tx_alloc2:00000020: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> [  259.723634] mtk_tx_alloc2:00000030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> [  259.731253] mtk_tx_alloc2:00000040: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> [  259.738875] mtk_tx_alloc2:00000050: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> [  259.746481] mtk_tx_alloc2:00000060: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> [  259.754103] mtk_tx_alloc2:00000070: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> [  259.761723] mtk_tx_alloc2:00000080: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> [  259.769344] mtk_tx_alloc2:00000090: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> [  259.776951] mtk_tx_alloc2:000000a0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> 
-> ....
-> 
-> 
-> 	Sean
-> 
-> 
-> 
-> .
-> 
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 2faa986..5e39030 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -898,6 +898,7 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+>  
+>  void smp_send_reschedule(int cpu)
+>  {
+> +	BUG_ON(cpu_is_offline(cpu));
+>  	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
+>  }
+
+Is BUG_ON() appropriate?
+
+Why not WARN_ON() and return?
+
+AFAICT, arm doesn't have this logic today either.
+
+Thanks,
+Mark.
