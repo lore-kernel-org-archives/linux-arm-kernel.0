@@ -1,87 +1,67 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Fri, 20 Jul 2018 10:18:59 +0200
-Subject: [GIT PULL] ARM: at91: DT for 4.19
-Message-ID: <20180720081859.GA22228@piout.net>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Fri, 20 Jul 2018 16:19:29 +0800
+Subject: [PATCH v3 0/4] Add basic support for Mediatek MT8183 SoC
+In-Reply-To: <9ba45353-a6e1-9a6e-f05b-4b1679ae9e52@gmail.com>
+References: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
+ <9ba45353-a6e1-9a6e-f05b-4b1679ae9e52@gmail.com>
+Message-ID: <1532074769.19148.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Mon, 2018-07-16 at 11:28 +0200, Matthias Brugger wrote:
+> Hi Erin,
+> 
+> On 17/05/18 08:22, Erin Lo wrote:
+> > MT8183 is a SoC based on 64bit ARMv8 architecture.
+> > It contains 4 CA53 and 4 CA73 cores.
+> > MT8183 share many HW IP with MT65xx series.
+> > This patchset was tested on MT8183 evaluation board, and boot to shell ok.
+> > 
+> > This series contains document bindings, device tree including interrupt, uart.
+> > 
+> > Change in v3:
+> > 1. Fill out GICC, GICH, GICV regions
+> > 2. Update Copyright to 2018
+> > 
+> > Change in v2:
+> > 1. Split dt-bindings into different patches
+> > 2. Correct bindings for supported SoCs (mtk-uart.txt)
+> > 
+> > Ben Ho (1):
+> >   arm64: dts: Add Mediatek SoC MT8183 and evaluation board dts and
+> >     Makefile
+> > 
+> > Erin Lo (3):
+> >   dt-bindings: arm: Add bindings for Mediatek MT8183 SoC Platform
+> >   dt-bindings: mtk-sysirq: Add compatible for Mediatek MT8183
+> >   dt-bindings: serial: Add compatible for Mediatek MT8183
+> > 
+> 
+> I'm a bit reluctant to take this series, as it will only enable the EVB board to
+> boot into a serial console. Are you planning to add support for other devices of
+> this SoC?
+> 
+> Apart please take into account that there is an issue with the dts file, as you
+> were told by the kbuild test robot.
+> 
+> Regards,
+> Matthias
+> 
 
-Here are the unusually large DT PR for AT91. It contains mainly new DTs.
+Hi, Matthias
+Sorry for missing this letter...since mail proxy server.
+We plan to add support all the devices of MT8183 in serious.
+We have implemented the clock and pinctrl driver for upstream and they
+are in internal review right now.
 
-There is a pm.c change that I'm including here so it is along with the
-corresponding DT changes.
+About the dts issue... do you suggest me to send new patch right now or
+wait for clock and pinctrl driver ready then send them together?
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+Best Regards,
+Erin
 
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.19-dt
-
-for you to fetch changes up to c8cbc1c20c29697e7335a5044fe6c60aa5c6e922:
-
-  ARM: dts: at91: fix typos for SSC TD functions (2018-07-20 10:05:14 +0200)
-
-----------------------------------------------------------------
-AT91 DT for 4.19:
-
- - New boards from Laird: WB45N, WB50N, SOM60 modules and DVK, Gatwick
- - fix the PMC compatibles
-
-----------------------------------------------------------------
-Alexandre Belloni (4):
-      dt-bindings: arm: remove PMC bindings
-      dt-bindings: clk: at91: Document all the PMC compatibles
-      ARM: at91: fix USB clock detection handling
-      ARM: dts: fix PMC compatible
-
-Ben Whitten (6):
-      dt-bindings: add laird and giantec vendor prefix
-      ARM: dts: at91: add labels to soc dtsi for derivative boards
-      ARM: dts: add support for Laird WB45N cpu module and DVK
-      ARM: dts: add support for Laird WB50N cpu module and DVK
-      ARM: dts: add support for Gatwick board based on WB50N
-      ARM: dts: add support for Laird SOM60 module and DVK boards
-
-Claudiu Beznea (1):
-      ARM: dts: at91: fix typos for SSC TD functions
-
- .../devicetree/bindings/arm/atmel-pmc.txt          |  14 --
- .../devicetree/bindings/clock/at91-clock.txt       |   9 +-
- .../devicetree/bindings/vendor-prefixes.txt        |   2 +
- arch/arm/boot/dts/Makefile                         |   4 +
- arch/arm/boot/dts/at91-dvk_som60.dts               |  95 +++++++++
- arch/arm/boot/dts/at91-dvk_su60_somc.dtsi          | 159 ++++++++++++++
- arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi      |  90 ++++++++
- arch/arm/boot/dts/at91-gatwick.dts                 | 121 +++++++++++
- arch/arm/boot/dts/at91-som60.dtsi                  | 230 +++++++++++++++++++++
- arch/arm/boot/dts/at91-wb45n.dts                   |  64 ++++++
- arch/arm/boot/dts/at91-wb45n.dtsi                  | 165 +++++++++++++++
- arch/arm/boot/dts/at91-wb50n.dts                   | 112 ++++++++++
- arch/arm/boot/dts/at91-wb50n.dtsi                  | 198 ++++++++++++++++++
- arch/arm/boot/dts/at91sam9261.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9263.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9rl.dtsi                  |   2 +-
- arch/arm/boot/dts/at91sam9x5.dtsi                  |   8 +-
- arch/arm/boot/dts/sama5d2-pinfunc.h                |   4 +-
- arch/arm/boot/dts/sama5d3.dtsi                     |   8 +-
- arch/arm/boot/dts/sama5d4.dtsi                     |   2 +-
- arch/arm/mach-at91/pm.c                            |   5 +
- 21 files changed, 1263 insertions(+), 33 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/atmel-pmc.txt
- create mode 100644 arch/arm/boot/dts/at91-dvk_som60.dts
- create mode 100644 arch/arm/boot/dts/at91-dvk_su60_somc.dtsi
- create mode 100644 arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi
- create mode 100644 arch/arm/boot/dts/at91-gatwick.dts
- create mode 100644 arch/arm/boot/dts/at91-som60.dtsi
- create mode 100644 arch/arm/boot/dts/at91-wb45n.dts
- create mode 100644 arch/arm/boot/dts/at91-wb45n.dtsi
- create mode 100644 arch/arm/boot/dts/at91-wb50n.dts
- create mode 100644 arch/arm/boot/dts/at91-wb50n.dtsi
-
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
