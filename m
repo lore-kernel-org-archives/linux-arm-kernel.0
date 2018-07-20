@@ -1,127 +1,128 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 17:15:06 +0200
-Subject: [PATCH v4 14/35] mtd: rawnand: mtk: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 17:15:11 +0200
+Subject: [PATCH v4 19/35] mtd: rawnand: sh_flctl: move all NAND chip related
+ setup in one function
 In-Reply-To: <20180720151527.16038-1-miquel.raynal@bootlin.com>
 References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
-Message-ID: <20180720151527.16038-15-miquel.raynal@bootlin.com>
+Message-ID: <20180720151527.16038-20-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two helpers have been added to the core to make ECC-related
-configuration between the detection phase and the final NAND scan. Use
-these hooks and convert the driver to just use nand_scan() instead of
-both nand_scan_ident() and nand_scan_tail().
+Prepare the conversion of the sh_flctl driver to nand_scan() by moving
+all the configuration that must be made after nand_scan_ident() in one
+single function. Create a pdata entry in the controller structure for
+that.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/mtk_nand.c | 75 ++++++++++++++++++++++++-----------------
- 1 file changed, 44 insertions(+), 31 deletions(-)
+ drivers/mtd/nand/raw/sh_flctl.c | 38 +++++++++++++++++++-------------------
+ include/linux/mtd/sh_flctl.h    |  1 +
+ 2 files changed, 20 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/mtk_nand.c b/drivers/mtd/nand/raw/mtk_nand.c
-index 7bc6be3f6ec0..967418f945ea 100644
---- a/drivers/mtd/nand/raw/mtk_nand.c
-+++ b/drivers/mtd/nand/raw/mtk_nand.c
-@@ -1250,13 +1250,54 @@ static int mtk_nfc_ecc_init(struct device *dev, struct mtd_info *mtd)
- 	return 0;
- }
+diff --git a/drivers/mtd/nand/raw/sh_flctl.c b/drivers/mtd/nand/raw/sh_flctl.c
+index c7abceffcc40..d37d1d3ccbf9 100644
+--- a/drivers/mtd/nand/raw/sh_flctl.c
++++ b/drivers/mtd/nand/raw/sh_flctl.c
+@@ -1007,6 +1007,16 @@ static int flctl_chip_init_tail(struct mtd_info *mtd)
+ 	struct sh_flctl *flctl = mtd_to_flctl(mtd);
+ 	struct nand_chip *chip = &flctl->chip;
  
-+static int mtk_nfc_attach_chip(struct nand_chip *chip)
-+{
-+	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct device *dev = mtd->dev.parent;
-+	struct mtk_nfc *nfc = nand_get_controller_data(chip);
-+	struct mtk_nfc_nand_chip *mtk_nand = to_mtk_nand(chip);
-+	int len;
-+	int ret;
-+
 +	if (chip->options & NAND_BUSWIDTH_16) {
-+		dev_err(dev, "16bits buswidth not supported");
-+		return -EINVAL;
++		/*
++		 * NAND_BUSWIDTH_16 may have been set by nand_scan_ident().
++		 * Add the SEL_16BIT flag in pdata->flcmncr_val and re-assign
++		 * flctl->flcmncr_base to pdata->flcmncr_val.
++		 */
++		flctl->pdata->flcmncr_val |= SEL_16BIT;
++		flctl->flcmncr_base = flctl->pdata->flcmncr_val;
 +	}
 +
-+	/* store bbt magic in page, cause OOB is not protected */
-+	if (chip->bbt_options & NAND_BBT_USE_FLASH)
-+		chip->bbt_options |= NAND_BBT_NO_OOB;
-+
-+	ret = mtk_nfc_ecc_init(dev, mtd);
-+	if (ret)
-+		return ret;
-+
-+	ret = mtk_nfc_set_spare_per_sector(&mtk_nand->spare_per_sector, mtd);
-+	if (ret)
-+		return ret;
-+
-+	mtk_nfc_set_fdm(&mtk_nand->fdm, mtd);
-+	mtk_nfc_set_bad_mark_ctl(&mtk_nand->bad_mark, mtd);
-+
-+	len = mtd->writesize + mtd->oobsize;
-+	nfc->buffer = devm_kzalloc(dev, len, GFP_KERNEL);
-+	if (!nfc->buffer)
-+		return  -ENOMEM;
-+
-+	return 0;
-+}
-+
-+static const struct nand_controller_ops mtk_nfc_controller_ops = {
-+	.attach_chip = mtk_nfc_attach_chip,
-+};
-+
- static int mtk_nfc_nand_chip_init(struct device *dev, struct mtk_nfc *nfc,
- 				  struct device_node *np)
- {
- 	struct mtk_nfc_nand_chip *chip;
+ 	if (mtd->writesize == 512) {
+ 		flctl->page_size = 0;
+ 		if (chip->chipsize > (32 << 20)) {
+@@ -1122,7 +1132,6 @@ static int flctl_probe(struct platform_device *pdev)
+ 	struct sh_flctl *flctl;
+ 	struct mtd_info *flctl_mtd;
  	struct nand_chip *nand;
- 	struct mtd_info *mtd;
--	int nsels, len;
-+	int nsels;
- 	u32 tmp;
+-	struct sh_flctl_platform_data *pdata;
  	int ret;
- 	int i;
-@@ -1287,6 +1328,7 @@ static int mtk_nfc_nand_chip_init(struct device *dev, struct mtk_nfc *nfc,
+ 	int irq;
  
- 	nand = &chip->nand;
- 	nand->controller = &nfc->controller;
-+	nand->controller->ops = &mtk_nfc_controller_ops;
+@@ -1150,11 +1159,11 @@ static int flctl_probe(struct platform_device *pdev)
+ 	}
  
- 	nand_set_flash_node(nand, np);
- 	nand_set_controller_data(nand, nfc);
-@@ -1324,36 +1366,7 @@ static int mtk_nfc_nand_chip_init(struct device *dev, struct mtk_nfc *nfc,
+ 	if (pdev->dev.of_node)
+-		pdata = flctl_parse_dt(&pdev->dev);
++		flctl->pdata = flctl_parse_dt(&pdev->dev);
+ 	else
+-		pdata = dev_get_platdata(&pdev->dev);
++		flctl->pdata = dev_get_platdata(&pdev->dev);
  
- 	mtk_nfc_hw_init(nfc);
+-	if (!pdata) {
++	if (!flctl->pdata) {
+ 		dev_err(&pdev->dev, "no setup data defined\n");
+ 		return -EINVAL;
+ 	}
+@@ -1165,9 +1174,9 @@ static int flctl_probe(struct platform_device *pdev)
+ 	nand_set_flash_node(nand, pdev->dev.of_node);
+ 	flctl_mtd->dev.parent = &pdev->dev;
+ 	flctl->pdev = pdev;
+-	flctl->hwecc = pdata->has_hwecc;
+-	flctl->holden = pdata->use_holden;
+-	flctl->flcmncr_base = pdata->flcmncr_val;
++	flctl->hwecc = flctl->pdata->has_hwecc;
++	flctl->holden = flctl->pdata->use_holden;
++	flctl->flcmncr_base = flctl->pdata->flcmncr_val;
+ 	flctl->flintdmacr_base = flctl->hwecc ? (STERINTE | ECERB) : STERINTE;
  
--	ret = nand_scan_ident(mtd, nsels, NULL);
--	if (ret)
--		return ret;
--
--	/* store bbt magic in page, cause OOB is not protected */
--	if (nand->bbt_options & NAND_BBT_USE_FLASH)
--		nand->bbt_options |= NAND_BBT_NO_OOB;
--
--	ret = mtk_nfc_ecc_init(dev, mtd);
--	if (ret)
--		return -EINVAL;
--
+ 	/* Set address of hardware control function */
+@@ -1183,7 +1192,7 @@ static int flctl_probe(struct platform_device *pdev)
+ 	nand->set_features = nand_get_set_features_notsupp;
+ 	nand->get_features = nand_get_set_features_notsupp;
+ 
+-	if (pdata->flcmncr_val & SEL_16BIT)
++	if (flctl->pdata->flcmncr_val & SEL_16BIT)
+ 		nand->options |= NAND_BUSWIDTH_16;
+ 
+ 	pm_runtime_enable(&pdev->dev);
+@@ -1195,16 +1204,6 @@ static int flctl_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto err_chip;
+ 
 -	if (nand->options & NAND_BUSWIDTH_16) {
--		dev_err(dev, "16bits buswidth not supported");
--		return -EINVAL;
+-		/*
+-		 * NAND_BUSWIDTH_16 may have been set by nand_scan_ident().
+-		 * Add the SEL_16BIT flag in pdata->flcmncr_val and re-assign
+-		 * flctl->flcmncr_base to pdata->flcmncr_val.
+-		 */
+-		pdata->flcmncr_val |= SEL_16BIT;
+-		flctl->flcmncr_base = pdata->flcmncr_val;
 -	}
 -
--	ret = mtk_nfc_set_spare_per_sector(&chip->spare_per_sector, mtd);
--	if (ret)
--		return ret;
--
--	mtk_nfc_set_fdm(&chip->fdm, mtd);
--	mtk_nfc_set_bad_mark_ctl(&chip->bad_mark, mtd);
--
--	len = mtd->writesize + mtd->oobsize;
--	nfc->buffer = devm_kzalloc(dev, len, GFP_KERNEL);
--	if (!nfc->buffer)
--		return  -ENOMEM;
--
--	ret = nand_scan_tail(mtd);
-+	ret = nand_scan(mtd, nsels);
+ 	ret = flctl_chip_init_tail(flctl_mtd);
  	if (ret)
- 		return ret;
+ 		goto err_chip;
+@@ -1213,7 +1212,8 @@ static int flctl_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto err_chip;
  
+-	ret = mtd_device_register(flctl_mtd, pdata->parts, pdata->nr_parts);
++	ret = mtd_device_register(flctl_mtd, flctl->pdata->parts,
++				  flctl->pdata->nr_parts);
+ 	if (ret)
+ 		goto cleanup_nand;
+ 
+diff --git a/include/linux/mtd/sh_flctl.h b/include/linux/mtd/sh_flctl.h
+index c759d403cbc0..c9f486c6c019 100644
+--- a/include/linux/mtd/sh_flctl.h
++++ b/include/linux/mtd/sh_flctl.h
+@@ -148,6 +148,7 @@ struct sh_flctl {
+ 	struct dev_pm_qos_request pm_qos;
+ 	void __iomem		*reg;
+ 	resource_size_t		fifo;
++	struct sh_flctl_platform_data *pdata;
+ 
+ 	uint8_t	done_buff[2048 + 64];	/* max size 2048 + 64 */
+ 	int	read_bytes;
 -- 
 2.14.1
