@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Jul 2018 14:05:32 +0200
-Subject: [PATCH 2/5] arm: shmobile: Add the R9A06G032 SMP enabler driver
-In-Reply-To: <cover.1532086956.git.horms+renesas@verge.net.au>
-References: <cover.1532086956.git.horms+renesas@verge.net.au>
-Message-ID: <cde4f86f9249be73a31c93df4706b300fba48315.1532086956.git.horms+renesas@verge.net.au>
+Date: Fri, 20 Jul 2018 14:05:33 +0200
+Subject: [PATCH 2/5] ARM: shmobile: Add the R9A06G032 SMP enabler driver
+In-Reply-To: <cover.1532087129.git.horms+renesas@verge.net.au>
+References: <cover.1532087129.git.horms+renesas@verge.net.au>
+Message-ID: <7416d4411361c79e10667c571b15eed18e811f44.1532087129.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
