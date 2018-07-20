@@ -1,51 +1,34 @@
 From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Fri, 20 Jul 2018 16:30:12 +0200
-Subject: [PATCH 6/6] ARM: defconfig: tegra: enable tegra raw nand driver
+Date: Fri, 20 Jul 2018 16:30:09 +0200
+Subject: [PATCH 3/6] ARM: multi_v7_defconfig: enable dynamic debug
 In-Reply-To: <20180720143012.7740-1-marcel@ziswiler.com>
 References: <20180720143012.7740-1-marcel@ziswiler.com>
-Message-ID: <20180720143012.7740-6-marcel@ziswiler.com>
+Message-ID: <20180720143012.7740-3-marcel@ziswiler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 
-Now with everything being merged actually enable it. Also enable
-MTD_OF_PARTS, MTD_BLOCK, MTD_NAND, MTD_UBI and UBIFS without which
-the former would not make much sense and is also in-line with
-multi_v7_defconfig.
+Dynamic debug is really helpful.
 
 Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 
 ---
 
- arch/arm/configs/tegra_defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 24e297659b55..b248e231900f 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -79,8 +79,13 @@ CONFIG_DMA_CMA=y
- CONFIG_CMA_SIZE_MBYTES=64
- CONFIG_TEGRA_GMI=y
- CONFIG_MTD=y
-+CONFIG_MTD_OF_PARTS=y
-+CONFIG_MTD_BLOCK=y
- CONFIG_MTD_M25P80=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_TEGRA=y
- CONFIG_MTD_SPI_NOR=y
-+CONFIG_MTD_UBI=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_AD525X_DPOT=y
- CONFIG_AD525X_DPOT_I2C=y
-@@ -280,6 +285,7 @@ CONFIG_EXT3_FS_SECURITY=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
-+CONFIG_UBIFS_FS=y
- CONFIG_SQUASHFS=y
- CONFIG_SQUASHFS_LZO=y
- CONFIG_SQUASHFS_XZ=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 4a47a9de6a5e..beacb02c734b 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -974,6 +974,7 @@ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_NLS_UTF8=y
+ CONFIG_PRINTK_TIME=y
++CONFIG_DYNAMIC_DEBUG=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_CRYPTO_USER=m
+ CONFIG_CRYPTO_USER_API_HASH=m
 -- 
 2.14.4
