@@ -1,50 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Jul 2018 14:03:50 +0200
-Subject: [PATCH 2/7] ARM: shmobile: defconfig: Drop NET_VENDOR_<FOO>=n
+Date: Fri, 20 Jul 2018 14:03:49 +0200
+Subject: [PATCH 1/7] ARM: shmobile: defconfig: Enable MTD command line
+ partition parsing
 In-Reply-To: <cover.1532086504.git.horms+renesas@verge.net.au>
 References: <cover.1532086504.git.horms+renesas@verge.net.au>
-Message-ID: <c3d33e636b256639a20aed8b38db19a61b07bd54.1532086504.git.horms+renesas@verge.net.au>
+Message-ID: <4fe9c57fc0bea9126e7e764a1d84d0b2fb456ecc.1532086504.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Marek Vasut <marek.vasut@gmail.com>
 
-Enabling NET_VENDOR_* Kconfig options does not directly affect the
-kernel, so there is no need to explicitly disable them.
-The individual network drivers under them are still disabled.
+In preparation for removing MTD partitioning from the DTs and moving
+it over to kernel command line partition parsing, enable the support
+for kernel command line MTD partition parsing.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+The argument for not having MTD partitions in the DT is the same as
+for not having hard drive partitions in DT, neither describes the
+hardware itself, so it shouldn't be in the DT. Furthermore, kernel
+command line MTD partition passing allows greater flexibility in
+case someone decided to repartition the flash, which is well in the
+realm of possibility with these systems.
+
+Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/shmobile_defconfig | 13 -------------
- 1 file changed, 13 deletions(-)
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 4d0d5a00a188..393697a54fb4 100644
+index b49887e86a3d..4d0d5a00a188 100644
 --- a/arch/arm/configs/shmobile_defconfig
 +++ b/arch/arm/configs/shmobile_defconfig
-@@ -73,22 +73,9 @@ CONFIG_BLK_DEV_SD=y
- CONFIG_ATA=y
- CONFIG_SATA_RCAR=y
- CONFIG_NETDEVICES=y
--# CONFIG_NET_VENDOR_ARC is not set
--# CONFIG_NET_CADENCE is not set
--# CONFIG_NET_VENDOR_BROADCOM is not set
--# CONFIG_NET_VENDOR_CIRRUS is not set
--# CONFIG_NET_VENDOR_FARADAY is not set
--# CONFIG_NET_VENDOR_INTEL is not set
--# CONFIG_NET_VENDOR_MARVELL is not set
--# CONFIG_NET_VENDOR_MICREL is not set
--# CONFIG_NET_VENDOR_NATSEMI is not set
- CONFIG_SH_ETH=y
- CONFIG_RAVB=y
--# CONFIG_NET_VENDOR_SEEQ is not set
- CONFIG_SMSC911X=y
--# CONFIG_NET_VENDOR_STMICRO is not set
--# CONFIG_NET_VENDOR_VIA is not set
--# CONFIG_NET_VENDOR_WIZNET is not set
- CONFIG_MICREL_PHY=y
- CONFIG_SMSC_PHY=y
- CONFIG_INPUT_EVDEV=y
+@@ -64,6 +64,7 @@ CONFIG_DMA_CMA=y
+ CONFIG_CMA_SIZE_MBYTES=64
+ CONFIG_SIMPLE_PM_BUS=y
+ CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_M25P80=y
+ CONFIG_MTD_SPI_NOR=y
 -- 
 2.11.0
