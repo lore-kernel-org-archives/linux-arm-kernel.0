@@ -1,34 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Jul 2018 12:22:06 +0100
-Subject: [PATCH] arm64: fix for restoring console loglevel after handling
- traps
-In-Reply-To: <CAM5rFu8AiU6dORBGP5tfRp=fyvhNrbK8jpuhm=w4JVvONXgz5A@mail.gmail.com>
-References: <1531993734-1463-2-git-send-email-hari.vyas@broadcom.com>
- <20180719100140.GA424@jagdpanzerIV>
- <CAM5rFu_N-=26LddRy1mO010h9yLcGuKqK6=y+h=h3-HbfEP+FQ@mail.gmail.com>
- <20180719103916.g763zmsm7wnngwop@lakrids.cambridge.arm.com>
- <CAM5rFu-MFbH_2Pohmjydy232Rpt7_E84-K=e67wAu3iQzvTLiA@mail.gmail.com>
- <20180720062609.2haxhf23zyouoxmh@salmiak>
- <20180720064027.GA3901@jagdpanzerIV>
- <CAM5rFu8rQaVne22cYxx3YZTaxh9Dnq2wJWNu1uierBxZfogPeA@mail.gmail.com>
- <20180720094453.a64hnqoveojrozha@lakrids.cambridge.arm.com>
- <CAM5rFu8AiU6dORBGP5tfRp=fyvhNrbK8jpuhm=w4JVvONXgz5A@mail.gmail.com>
-Message-ID: <20180720112206.ho6kweqg3ffsk5z4@lakrids.cambridge.arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 20 Jul 2018 14:03:18 +0200
+Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.19
+Message-ID: <cover.1532080241.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 04:27:50PM +0530, Hari Vyas wrote:
-> Yes. As per earlier conversation, it was a bug in earlier kernel
-> versions but  fact here is that bad_mode()-->die()-->__die()-->
-> probably do_exit() handler is returning (in 4.14 wrongly) and latest
-> too if such type of situation arises though looks difficult to create
-> in normal scenario.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-The intent is that bad_mode() should always be fatal, so we should fix
-bad_mode() to ensure that this is always the case.
+Please consider these Renesas ARM64 based SoC defconfig updates for v4.19.
 
->From a quick look, it seems that will be rather messy; this code could
-do with a cleanup. :/
 
-Thanks,
-Mark.
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-for-v4.19
+
+for you to fetch changes up to 83c05e98f732bfa77830631e8d4403c76cad9b31:
+
+  arm64: defconfig: Enable BD9571MWV regulator (2018-06-18 12:01:14 +0200)
+
+----------------------------------------------------------------
+Renesas ARM64 Based SoC Defconfig Updates for v4.19
+
+* Enable BD9571MWV regulator in ARM64 defconfig
+
+  This is to allow wider testing of the BD9571 PMIC which is
+  present on boards with Renesas R-Car Gen3 SoCs
+
+----------------------------------------------------------------
+Dien Pham (1):
+      arm64: defconfig: Enable BD9571MWV regulator
+
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
