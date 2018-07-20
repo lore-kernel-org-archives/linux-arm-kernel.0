@@ -1,78 +1,27 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Fri, 20 Jul 2018 13:56:18 +0530
-Subject: [PATCH 1/3] dts: arm64/sdm845: Add node for arm,mmu-500
-In-Reply-To: <CAL_JsqKQgZq23F7gqNoEDzpWj3zVR7Tsok3cZZCpCL=Br_+BeA@mail.gmail.com>
-References: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
- <20180719175356.14753-2-vivek.gautam@codeaurora.org>
- <CAL_JsqKQgZq23F7gqNoEDzpWj3zVR7Tsok3cZZCpCL=Br_+BeA@mail.gmail.com>
-Message-ID: <CAFp+6iGg=6Hhxj9-995ZzP=_09Y3kZoXthcyNpUqikHsn97uyg@mail.gmail.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Fri, 20 Jul 2018 08:30:41 +0000
+Subject: [PATCH] ASoC: wm9712: fix replace codec to component
+In-Reply-To: <20180720075148.14648-1-marcel@ziswiler.com>
+References: <20180720075148.14648-1-marcel@ziswiler.com>
+Message-ID: <87effy48lz.wl-kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
 
-On Fri, Jul 20, 2018 at 4:38 AM, Rob Herring <robh+dt@kernel.org> wrote:
-> On Thu, Jul 19, 2018 at 11:54 AM Vivek Gautam
-> <vivek.gautam@codeaurora.org> wrote:
->>
->> Add device node for arm,mmu-500 available on sdm845.
->> This MMU-500 with single TCU and multiple TBU architecture
->> is shared among all the peripherals except gpu on sdm845.
->>
->> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
->> ---
->>  arch/arm64/boot/dts/qcom/sdm845-mtp.dts |  4 ++
->>  arch/arm64/boot/dts/qcom/sdm845.dtsi    | 73 +++++++++++++++++++++++++++++++++
->>  2 files changed, 77 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
->> index 6d651f314193..13b50dff440f 100644
->> --- a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
->> +++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
->> @@ -58,3 +58,7 @@
->>                 bias-pull-up;
->>         };
->>  };
->> +
->> +&apps_smmu {
->> +       status = "okay";
->> +};
->> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> index 00722b533a92..70ca18ae6cb3 100644
->> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
->> @@ -980,6 +980,79 @@
->>                         cell-index = <0>;
->>                 };
->>
->> +               apps_smmu: arm,smmu at 15000000 {
->
-> iommu at ...
+Hi Marcel
 
-Thanks for the review.
-Sure, will modify this.
+> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> 
+> Since commit 143b44845d87 ("ASoC: wm9712: replace codec to component")
+> "wm9712-codec" got renamed to "wm9712-component", however, this change
+> never got propagated down to the actual board/platform drivers. E.g. on
+> Colibri T20 this lead to the following spew upon boot with sound/touch
+> being broken:
 
->
->> +                       compatible = "arm,mmu-500";
->
-> Really unmodified by QCom? Would be better to have SoC specific compatible.
-
-Yes, at this point we are able to use the driver as is on 845.
-But, will add a SoC specific compatible as suggested to make bindings
-future proof.
+Oops, my bad...
+The platform_driver name is not important,
+how about simply rename back it to "wm9712-codec" ?
 
 Best regards
-Vivek
-
->
-> Rob
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
-
-
-
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+---
+Kuninori Morimoto
