@@ -1,37 +1,34 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 20 Jul 2018 11:30:15 -0500
-Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.19, round 2
-Message-ID: <7hr2jx50q0.fsf@baylibre.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 20 Jul 2018 10:35:15 -0600
+Subject: [PATCH 1/2] pinctrl: stm32: fix bank io port number
+In-Reply-To: <1531745857-5561-2-git-send-email-alexandre.torgue@st.com>
+References: <1531745857-5561-1-git-send-email-alexandre.torgue@st.com>
+ <1531745857-5561-2-git-send-email-alexandre.torgue@st.com>
+Message-ID: <20180720163515.GA16515@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof, Arnd,
+On Mon, Jul 16, 2018 at 02:57:36PM +0200, Alexandre Torgue wrote:
+> In case the exti line is not in line with the bank number (that is the case
+> when there is an hole between two banks, for example GPIOK and then GPIOZ),
+> use "st,bank-ioport" DT property to get the right exti line.
+> 
+> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+> index 9a06e1f..60c678a 100644
+> --- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+> @@ -55,6 +55,8 @@ Optional properties:
+>     NOTE: If "gpio-ranges" is used for a gpio controller, all gpio-controller
+>     have to use a "gpio-ranges" entry.
+>     More details in Documentation/devicetree/bindings/gpio/gpio.txt.
+> + - st,bank-ioport: should correspond to the EXTI IOport selection (EXTI line
+> +   used to select GPIOs as interrupts).
 
-A second round of DT updates for Amlogic, directly on top of the redo of
-the first one.
+ioport sounds like something else. Perhaps '-exti-line'?
 
-This includes a merge of a branch already queued in the clk tree because
-of the dependency on clock headers used in the DT changes here..
-
-Kevin
-
-
-The following changes since commit 89803e8b26569bdf5798f8745a4c708bf9360ee6:
-
-  ARM64: dts: meson-axg: add pdm pins (2018-07-20 08:18:37 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2
-
-for you to fetch changes up to fcf775a1e6717b7157b1ea626028b7e039b3c989:
-
-  Merge branch 'v4.19/dt64' into tmp/aml-rebuild (2018-07-20 09:05:11 -0700)
-
-----------------------------------------------------------------
-Amlogic 64-bit DT changes for v4.19, round 2
-- new SoC: S905W
-- new boards: based on S905W: Amlogic P281, Oranth Tanix TX3 Mini
-- AXG: add DT for new audio clock controller
-
-----------------------------------------------------------------
+>  
+>  Example 1:
+>  #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
