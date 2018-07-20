@@ -1,70 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Jul 2018 14:05:35 +0200
-Subject: [PATCH 4/5] ARM: shmobile: r8a7779: hide unused
- r8a7779_platform_cpu_kill
-In-Reply-To: <cover.1532087129.git.horms+renesas@verge.net.au>
-References: <cover.1532087129.git.horms+renesas@verge.net.au>
-Message-ID: <8fc0d470bc77fa07632b471cec8207baf9704e32.1532087129.git.horms+renesas@verge.net.au>
+Date: Fri, 20 Jul 2018 14:06:04 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v4.19
+Message-ID: <cover.1532081674.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-After the cleanup in r8a7779_smp_prepare_cpus(), the only remaining caller of
-r8a7779_platform_cpu_kill() is in an ifdef, which leads to a build warning
-without CONFIG_HOTPLUG_CPU:
+Please consider these Renesas ARM based SoC DT bindings updates for v4.19.
 
-arch/arm/mach-shmobile/smp-r8a7779.c:26:12: error: 'r8a7779_platform_cpu_kill' defined but not used [-Werror=unused-function]
 
-This moves the function inside of that #ifdef to avoid the warning.
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-Fixes: 62f55ce683e3 ("ARM: shmobile: r8a7779: Stop powering down secondary CPUs during early boot")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/smp-r8a7779.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index b7fe1f489b08..0ed73b650c14 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -23,17 +23,6 @@
- #define AVECR IOMEM(0xfe700040)
- #define R8A7779_SCU_BASE 0xf0000000
- 
--static int r8a7779_platform_cpu_kill(unsigned int cpu)
--{
--	int ret = -EIO;
--
--	cpu = cpu_logical_map(cpu);
--	if (cpu)
--		ret = rcar_sysc_power_down_cpu(cpu);
--
--	return ret ? ret : 1;
--}
--
- static int r8a7779_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	int ret = -EIO;
-@@ -55,6 +44,17 @@ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
- }
- 
- #ifdef CONFIG_HOTPLUG_CPU
-+static int r8a7779_platform_cpu_kill(unsigned int cpu)
-+{
-+	int ret = -EIO;
-+
-+	cpu = cpu_logical_map(cpu);
-+	if (cpu)
-+		ret = rcar_sysc_power_down_cpu(cpu);
-+
-+	return ret ? ret : 1;
-+}
-+
- static int r8a7779_cpu_kill(unsigned int cpu)
- {
- 	if (shmobile_smp_scu_cpu_kill(cpu))
--- 
-2.11.0
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings-for-v4.19
+
+for you to fetch changes up to a7eaad7f7517ba7cdabfeb28fa05bae4e70b4b5a:
+
+  dt-bindings: cpu: Add Renesas R9A06G032 SMP enable method. (2018-06-28 14:07:21 +0200)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC DT Bindings Updates for v4.19
+
+Bindings relating to initial support for RZ/N1D (R9A06G032) SoC and its
+RZN1D-DB board:
+
+* Add Renesas R9A06G032 SMP enable method
+
+  To be used to enable second CA7 CPU
+
+* Document SoC and Board bindings
+
+----------------------------------------------------------------
+Michel Pollet (2):
+      dt-bindings: arm: Document the RZN1D-DB board
+      dt-bindings: cpu: Add Renesas R9A06G032 SMP enable method.
+
+ Documentation/devicetree/bindings/arm/cpus.txt     | 1 +
+ Documentation/devicetree/bindings/arm/shmobile.txt | 5 ++++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
