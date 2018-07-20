@@ -1,74 +1,116 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 20 Jul 2018 10:34:17 +0530
-Subject: [PATCH v4 08/18] net: davinci_emac: potentially get the MAC
- address from MTD
-In-Reply-To: <a70aebb0-408c-c61f-897a-227114888585@linaro.org>
-References: <20180629094039.7543-1-brgl@bgdev.pl>
- <20180629094039.7543-9-brgl@bgdev.pl>
- <03b77e24-9ab9-fa01-2387-9de0408a9942@gmail.com>
- <20180704070919.GA14051@lenoch>
- <CAMRc=McOYG9=naT2=4c4hnhJwxcqBCATEZOGXXv9u9zuvXyDXw@mail.gmail.com>
- <c0ffc590-8064-3b02-9b5c-fcc24628d390@ti.com>
- <CAMRc=McO8H9Aw8a7h318a=hJjKBOgeC+9_hreBnOY3Tc3Fh7sg@mail.gmail.com>
- <d7f03763-982f-5e3e-d0ad-54e024b10f97@ti.com>
- <a70aebb0-408c-c61f-897a-227114888585@linaro.org>
-Message-ID: <efd9388f-c378-4723-602d-1209c8bae7d3@ti.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Fri, 20 Jul 2018 13:08:38 +0800
+Subject: [PATCH] ARM: dts: berlin: Add missing OPP properties for CPUs
+Message-ID: <20180720130838.187becb9@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 July 2018 02:26 PM, Srinivas Kandagatla wrote:
-> 
-> 
-> On 16/07/18 09:50, Sekhar Nori wrote:
->> On Friday 13 July 2018 11:30 PM, Bartosz Golaszewski wrote:
->>
->>> We're getting close to rc5 so I'd like to make a case for this series
->>> again.
->>>
->>> I understand that there's more to do than just the changes introduced
->>> here, but we shouldn't try to fix several problems in many different
->>> places at once. There's just too many moving pieces. I'd rather start
->>> merging small improvements right away.
->>>
->>> The idea behind this series is to remove (almost) all users of
->>> at24_platform_data. The davinci_emac patches are there only because we
->>> need to remove some MAC adress reading stuff from the board files.
->>> Having this code there and calling it back from EEPROM/MTD drivers is
->>> already wrong and we should work towards using nvmem for that anyway.
->>>
->>> Currently for MTD the nvmem support series seems to be dead and it's
->>> going to take some time before anything gets upstream.
->>>
->>> So I'd like to again ask you to consider picking up the patches from
->>> this series to your respective trees or at the very least: I'd like to
->>> ask Srinivas to pick up the nvmem patches and Sekhar to take the
->>> first, non-controversial batch of davinci platform changes so that
->>> we'll have less code to carry for the next release.
->>
->> I think those are patches 3-7. I can take those if I get an immutable
->> commit over v4.18-rc1 from Srinivas with patches 1 & 2 applied.
-> nvmem patches go via Greg KH char-misc tree, if it makes things easy I
-> can provide Ack on nvmem patches, so that you can take these patches via
-> your tree?
+The OPP properties, like "operating-points", should either be present
+for all the CPUs of a cluster or none. If these are present only for a
+subset of CPUs of a cluster then things will start falling apart as soon
+as the CPUs are brought online in a different order. For example, this
+will happen because the operating system looks for such properties in
+the CPU node it is trying to bring up, so that it can create an OPP
+table.
 
-There is a lot of follow-up traffic on how exactly to develop the needed
-interfaces for reading mac address in mtd and/or network subsystem.
+Add such missing properties.
 
-But, I don't think any of that negates the need for nvmem lookups that
-work for non-device-tree and populating the lookups in mach-davinci
-board code.
+Fix other missing properties (clocks, clock latency) as well to
+make it all work.
 
-I am going to send patches 1-7 to ARM-SoC soon, so please do say if
-there is any disagreement on this.
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+---
 
-Thanks,
-Sekhar
+Hi Olof, Arnd,
 
-> 
-> Let me know.
-> 
-> --srini
->>
->> Thanks,
->> Sekhar
->>
+This is a single patch from berlin-dt for 4.19, so I send it directly
+to you, could you please kindly merge it?
+
+Thanks
+
+ arch/arm/boot/dts/berlin2.dtsi  | 10 ++++++++++
+ arch/arm/boot/dts/berlin2q.dtsi | 33 +++++++++++++++++++++++++++++++++
+ 2 files changed, 43 insertions(+)
+
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index db67377af266..d2f7d984bba5 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -50,6 +50,16 @@
+ 			device_type = "cpu";
+ 			next-level-cache = <&l2>;
+ 			reg = <1>;
++
++			clocks = <&chip_clk CLKID_CPU>;
++			clock-latency = <100000>;
++			operating-points = <
++				/* kHz    uV */
++				1200000 1200000
++				1000000 1200000
++				800000  1200000
++				600000  1200000
++			>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 516a7ce25791..99d6872a6dfc 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -45,6 +45,17 @@
+ 			device_type = "cpu";
+ 			next-level-cache = <&l2>;
+ 			reg = <1>;
++
++			clocks = <&chip_clk CLKID_CPU>;
++			clock-latency = <100000>;
++			/* Can be modified by the bootloader */
++			operating-points = <
++				/* kHz    uV */
++				1200000 1200000
++				1000000 1200000
++				800000  1200000
++				600000  1200000
++			>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -52,6 +63,17 @@
+ 			device_type = "cpu";
+ 			next-level-cache = <&l2>;
+ 			reg = <2>;
++
++			clocks = <&chip_clk CLKID_CPU>;
++			clock-latency = <100000>;
++			/* Can be modified by the bootloader */
++			operating-points = <
++				/* kHz    uV */
++				1200000 1200000
++				1000000 1200000
++				800000  1200000
++				600000  1200000
++			>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -59,6 +81,17 @@
+ 			device_type = "cpu";
+ 			next-level-cache = <&l2>;
+ 			reg = <3>;
++
++			clocks = <&chip_clk CLKID_CPU>;
++			clock-latency = <100000>;
++			/* Can be modified by the bootloader */
++			operating-points = <
++				/* kHz    uV */
++				1200000 1200000
++				1000000 1200000
++				800000  1200000
++				600000  1200000
++			>;
+ 		};
+ 	};
+ 
+-- 
+2.18.0
