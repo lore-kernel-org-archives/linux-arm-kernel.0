@@ -1,23 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 20 Jul 2018 11:46:09 -0600
-Subject: [PATCH v5 04/11] soc: mediatek: add MT6765 scpsys support
-In-Reply-To: <1531817552-17221-5-git-send-email-mars.cheng@mediatek.com>
-References: <1531817552-17221-1-git-send-email-mars.cheng@mediatek.com>
- <1531817552-17221-5-git-send-email-mars.cheng@mediatek.com>
-Message-ID: <20180720174609.GA679@rob-hp-laptop>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Fri, 20 Jul 2018 19:55:42 +0200
+Subject: [RFC PATCH 0/8] mtd: rawnand: ams-delta: Use gpio-omap accessors
+ for data I/O
+In-Reply-To: <20180719081508.5dafebde@bbrezillon>
+References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
+ <20180719081508.5dafebde@bbrezillon>
+Message-ID: <6335220.Jscgez8sxx@z50>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 04:52:25PM +0800, Mars Cheng wrote:
-> This adds scpsys support for MT6765
+Hi Boris,
+
+On Thursday, July 19, 2018 8:15:08 AM CEST Boris Brezillon wrote:
+> Hi Janusz,
 > 
-> Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
-> Signed-off-by: Owen Chen <owen.chen@mediatek.com>
-> ---
->  drivers/soc/mediatek/mtk-scpsys.c        |   88 ++++++++++++++++++++++++++++++
->  include/dt-bindings/power/mt6765-power.h |   14 +++++
+> On Thu, 19 Jul 2018 01:57:02 +0200
+> Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
+> 
+> > Implement the idea suggested by Artem Bityutskiy and Tony Lindgren
+> > described in commit b027274d2e3a ("mtd: ams-delta: fix
+> > request_mem_region() failure").
+> 
+> Thanks for doing that. I'll review the patches, but I already have a
+> extra request: can you convert this driver to ->exec_op()? It does not
+> necessarily have to be done in this patchset, but, that'd be great to
+> have one more driver converted to the new interface.
 
-This file goes in the binding patch.
+OK, I'll have a look as my free time permits.
 
->  2 files changed, 102 insertions(+)
->  create mode 100644 include/dt-bindings/power/mt6765-power.h
+> BTW, there seems to be a nand_gpio driver, maybe we should merge
+> ams-delta code into nand_gpio after it's been patched to use the GPIO
+> consumer API.
+
+nand_gpio uses a form of read()/write() on a single bidirectional register for 
+data transfer, not GPIO, and it does not make use of NRE / NWE signals.  Maybe 
+the two drivers could be merged to some extent but not entirely, I think.
+
+Thanks,
+Janusz
