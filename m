@@ -1,81 +1,44 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 20 Jul 2018 22:21:45 +0300
-Subject: [PATCH] arm64: dts: renesas: r8a77980: add RWDT support
-In-Reply-To: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
-References: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
-Message-ID: <175a491f-a827-4a92-1884-2f1490d38a52@cogentembedded.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Fri, 20 Jul 2018 21:25:21 +0200
+Subject: [RFC PATCH 0/8] mtd: rawnand: ams-delta: Use gpio-omap
+ accessors for data I/O
+In-Reply-To: <6335220.Jscgez8sxx@z50>
+References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
+ <20180719081508.5dafebde@bbrezillon> <6335220.Jscgez8sxx@z50>
+Message-ID: <20180720212521.483d27a5@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe RWDT in the R8A77980 SoC device tree.
+On Fri, 20 Jul 2018 19:55:42 +0200
+Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
 
-Enable RWDT on the Condor and V3H Starter Kit boards.
+> Hi Boris,
+> 
+> On Thursday, July 19, 2018 8:15:08 AM CEST Boris Brezillon wrote:
+> > Hi Janusz,
+> > 
+> > On Thu, 19 Jul 2018 01:57:02 +0200
+> > Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
+> >   
+> > > Implement the idea suggested by Artem Bityutskiy and Tony Lindgren
+> > > described in commit b027274d2e3a ("mtd: ams-delta: fix
+> > > request_mem_region() failure").  
+> > 
+> > Thanks for doing that. I'll review the patches, but I already have a
+> > extra request: can you convert this driver to ->exec_op()? It does not
+> > necessarily have to be done in this patchset, but, that'd be great to
+> > have one more driver converted to the new interface.  
+> 
+> OK, I'll have a look as my free time permits.
+> 
+> > BTW, there seems to be a nand_gpio driver, maybe we should merge
+> > ams-delta code into nand_gpio after it's been patched to use the GPIO
+> > consumer API.  
+> 
+> nand_gpio uses a form of read()/write() on a single bidirectional register for 
+> data transfer, not GPIO, and it does not make use of NRE / NWE signals.  Maybe 
+> the two drivers could be merged to some extent but not entirely, I think.
 
-Based on the original (and large) patch by Vladimir Barinov.
-
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
-The patch is against the 'renesas-devel-20180720-v4.18-rc5' of Simon Horman's
-'renesas.git' repo.  It depends on Geert Uytterhoeven's clock driver patches
-(adding the RWDT clock) in order to work...
-
- arch/arm64/boot/dts/renesas/r8a77980-condor.dts |    5 +++++
- arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts  |    5 +++++
- arch/arm64/boot/dts/renesas/r8a77980.dtsi       |   10 ++++++++++
- 3 files changed, 20 insertions(+)
-
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-@@ -262,6 +262,11 @@
- 	};
- };
- 
-+&rwdt {
-+	timeout-sec = <60>;
-+	status = "okay";
-+};
-+
- &scif0 {
- 	pinctrl-0 = <&scif0_pins>, <&scif_clk_pins>;
- 	pinctrl-names = "default";
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-@@ -191,6 +191,11 @@
- 	};
- };
- 
-+&rwdt {
-+	timeout-sec = <60>;
-+	status = "okay";
-+};
-+
- &scif0 {
- 	pinctrl-0 = <&scif0_pins>, <&scif_clk_pins>;
- 	pinctrl-names = "default";
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-@@ -118,6 +118,16 @@
- 		#size-cells = <2>;
- 		ranges;
- 
-+		rwdt: watchdog at e6020000 {
-+			compatible = "renesas,r8a77980-wdt",
-+				     "renesas,rcar-gen3-wdt";
-+			reg = <0 0xe6020000 0 0x0c>;
-+			clocks = <&cpg CPG_MOD 402>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 402>;
-+			status = "disabled";
-+		};
-+
- 		gpio0: gpio at e6050000 {
- 			compatible = "renesas,gpio-r8a77980",
- 				     "renesas,rcar-gen3-gpio";
+Well, yes, right now the nand-gpio driver is assuming the data bus
+is not bit-banged, but that's something we can easily add. Anyway, my
+remark was more a "nice to have" not a hard requirement. 
