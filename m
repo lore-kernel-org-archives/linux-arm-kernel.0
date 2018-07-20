@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 17:15:21 +0200
-Subject: [PATCH v4 29/35] mtd: rawnand: docg4: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 17:15:08 +0200
+Subject: [PATCH v4 16/35] mtd: rawnand: nandsim: convert driver to nand_scan()
 In-Reply-To: <20180720151527.16038-1-miquel.raynal@bootlin.com>
 References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
-Message-ID: <20180720151527.16038-30-miquel.raynal@bootlin.com>
+Message-ID: <20180720151527.16038-17-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,97 +14,109 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/docg4.c | 55 ++++++++++++++++++++++++++------------------
- 1 file changed, 32 insertions(+), 23 deletions(-)
+ drivers/mtd/nand/raw/nandsim.c | 82 +++++++++++++++++++++++-------------------
+ 1 file changed, 45 insertions(+), 37 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/docg4.c b/drivers/mtd/nand/raw/docg4.c
-index 4dccdfba6140..fec4353ff4ef 100644
---- a/drivers/mtd/nand/raw/docg4.c
-+++ b/drivers/mtd/nand/raw/docg4.c
-@@ -1227,10 +1227,9 @@ static void __init init_mtd_structs(struct mtd_info *mtd)
- 	 * required within a nand driver because they are performed by the nand
- 	 * infrastructure code as part of nand_scan().  In this case they need
- 	 * to be initialized here because we skip call to nand_scan_ident() (the
--	 * first half of nand_scan()).  The call to nand_scan_ident() is skipped
--	 * because for this device the chip id is not read in the manner of a
--	 * standard nand device.  Unfortunately, nand_scan_ident() does other
--	 * things as well, such as call nand_set_defaults().
-+	 * first half of nand_scan()).  The call to nand_scan_ident() could be
-+	 * skipped because for this device the chip id is not read in the manner
-+	 * of a standard nand device.
- 	 */
+diff --git a/drivers/mtd/nand/raw/nandsim.c b/drivers/mtd/nand/raw/nandsim.c
+index 8a3b36cfe5ea..71ac034aee9c 100644
+--- a/drivers/mtd/nand/raw/nandsim.c
++++ b/drivers/mtd/nand/raw/nandsim.c
+@@ -2192,6 +2192,48 @@ static void ns_nand_read_buf(struct mtd_info *mtd, u_char *buf, int len)
+ 	return;
+ }
  
- 	struct nand_chip *nand = mtd_to_nand(mtd);
-@@ -1315,6 +1314,27 @@ static int __init read_id_reg(struct mtd_info *mtd)
- 
- static char const *part_probes[] = { "cmdlinepart", "saftlpart", NULL };
- 
-+static int docg4_attach_chip(struct nand_chip *chip)
++static int ns_attach_chip(struct nand_chip *chip)
 +{
-+	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct docg4_priv *doc = (struct docg4_priv *)(chip + 1);
++	unsigned int eccsteps, eccbytes;
 +
-+	init_mtd_structs(mtd);
++	if (!bch)
++		return 0;
 +
-+	/* Initialize kernel BCH algorithm */
-+	doc->bch = init_bch(DOCG4_M, DOCG4_T, DOCG4_PRIMITIVE_POLY);
-+	if (!doc->bch)
++	if (!mtd_nand_has_bch()) {
++		NS_ERR("BCH ECC support is disabled\n");
 +		return -EINVAL;
++	}
 +
-+	reset(mtd);
++	/* Use 512-byte ecc blocks */
++	eccsteps = nsmtd->writesize / 512;
++	eccbytes = ((bch * 13) + 7) / 8;
 +
-+	return read_id_reg(mtd);
++	/* Do not bother supporting small page devices */
++	if (nsmtd->oobsize < 64 || !eccsteps) {
++		NS_ERR("BCH not available on small page devices\n");
++		return -EINVAL;
++	}
++
++	if (((eccbytes * eccsteps) + 2) > nsmtd->oobsize) {
++		NS_ERR("Invalid BCH value %u\n", bch);
++		return -EINVAL;
++	}
++
++	chip->ecc.mode = NAND_ECC_SOFT;
++	chip->ecc.algo = NAND_ECC_BCH;
++	chip->ecc.size = 512;
++	chip->ecc.strength = bch;
++	chip->ecc.bytes = eccbytes;
++
++	NS_INFO("Using %u-bit/%u bytes BCH ECC\n", bch, chip->ecc.size);
++
++	return 0;
 +}
 +
-+static const struct nand_controller_ops docg4_controller_ops = {
-+	.attach_chip = docg4_attach_chip,
++static const struct nand_controller_ops ns_controller_ops = {
++	.attach_chip = ns_attach_chip,
 +};
 +
- static int __init probe_docg4(struct platform_device *pdev)
- {
- 	struct mtd_info *mtd;
-@@ -1350,26 +1370,16 @@ static int __init probe_docg4(struct platform_device *pdev)
- 	mtd->dev.parent = &pdev->dev;
- 	doc->virtadr = virtadr;
- 	doc->dev = dev;
--
--	init_mtd_structs(mtd);
--
--	/* initialize kernel bch algorithm */
--	doc->bch = init_bch(DOCG4_M, DOCG4_T, DOCG4_PRIMITIVE_POLY);
--	if (doc->bch == NULL) {
--		retval = -EINVAL;
--		goto free_nand;
+ /*
+  * Module initialization function
+  */
+@@ -2276,44 +2318,10 @@ static int __init ns_init_module(void)
+ 	if ((retval = parse_gravepages()) != 0)
+ 		goto error;
+ 
+-	retval = nand_scan_ident(nsmtd, 1, NULL);
++	chip->dummy_controller.ops = &ns_controller_ops;
++	retval = nand_scan(nsmtd, 1);
+ 	if (retval) {
+-		NS_ERR("cannot scan NAND Simulator device\n");
+-		goto error;
 -	}
 -
- 	platform_set_drvdata(pdev, doc);
- 
--	reset(mtd);
--	retval = read_id_reg(mtd);
--	if (retval == -ENODEV) {
--		dev_warn(dev, "No diskonchip G4 device found.\n");
--		goto free_bch;
+-	if (bch) {
+-		unsigned int eccsteps, eccbytes;
+-		if (!mtd_nand_has_bch()) {
+-			NS_ERR("BCH ECC support is disabled\n");
+-			retval = -EINVAL;
+-			goto error;
+-		}
+-		/* use 512-byte ecc blocks */
+-		eccsteps = nsmtd->writesize/512;
+-		eccbytes = (bch*13+7)/8;
+-		/* do not bother supporting small page devices */
+-		if ((nsmtd->oobsize < 64) || !eccsteps) {
+-			NS_ERR("bch not available on small page devices\n");
+-			retval = -EINVAL;
+-			goto error;
+-		}
+-		if ((eccbytes*eccsteps+2) > nsmtd->oobsize) {
+-			NS_ERR("invalid bch value %u\n", bch);
+-			retval = -EINVAL;
+-			goto error;
+-		}
+-		chip->ecc.mode = NAND_ECC_SOFT;
+-		chip->ecc.algo = NAND_ECC_BCH;
+-		chip->ecc.size = 512;
+-		chip->ecc.strength = bch;
+-		chip->ecc.bytes = eccbytes;
+-		NS_INFO("using %u-bit/%u bytes BCH ECC\n", bch, chip->ecc.size);
 -	}
 -
--	retval = nand_scan_tail(mtd);
-+	/*
-+	 * Asking for 0 chips is useless here but it warns the user that the use
-+	 * of the nand_scan() function is a bit abused here because the
-+	 * initialization is actually a bit specific and re-handled again in the
-+	 * ->attach_chip() hook. It will probably leak some memory though.
-+	 */
-+	nand->dummy_controller.ops = &docg4_controller_ops;
-+	retval = nand_scan(mtd, 0);
- 	if (retval)
- 		goto free_bch;
+-	retval = nand_scan_tail(nsmtd);
+-	if (retval) {
+-		NS_ERR("can't register NAND Simulator\n");
++		NS_ERR("Could not scan NAND Simulator device\n");
+ 		goto error;
+ 	}
  
-@@ -1389,7 +1399,6 @@ static int __init probe_docg4(struct platform_device *pdev)
- 	nand_cleanup(nand);
- free_bch:
- 	free_bch(doc->bch);
--free_nand:
- 	kfree(nand);
- unmap:
- 	iounmap(virtadr);
 -- 
 2.14.1
