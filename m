@@ -1,9 +1,10 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 17:15:23 +0200
-Subject: [PATCH v4 31/35] mtd: rawnand: jz4740: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 17:15:04 +0200
+Subject: [PATCH v4 12/35] mtd: rawnand: lpc32xx_slc: convert driver to
+ nand_scan()
 In-Reply-To: <20180720151527.16038-1-miquel.raynal@bootlin.com>
 References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
-Message-ID: <20180720151527.16038-32-miquel.raynal@bootlin.com>
+Message-ID: <20180720151527.16038-13-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,122 +15,103 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/jz4740_nand.c | 46 ++++++++++++++++++++++++--------------
- 1 file changed, 29 insertions(+), 17 deletions(-)
+ drivers/mtd/nand/raw/lpc32xx_slc.c | 77 +++++++++++++++++++++-----------------
+ 1 file changed, 42 insertions(+), 35 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/jz4740_nand.c b/drivers/mtd/nand/raw/jz4740_nand.c
-index 9bb8a89e09f9..8f821fdf8a1c 100644
---- a/drivers/mtd/nand/raw/jz4740_nand.c
-+++ b/drivers/mtd/nand/raw/jz4740_nand.c
-@@ -59,6 +59,7 @@
- 
- struct jz_nand {
- 	struct nand_chip chip;
-+	struct platform_device *pdev;
- 	void __iomem *base;
- 	struct resource *mem;
- 
-@@ -329,8 +330,8 @@ static int jz_nand_detect_bank(struct platform_device *pdev,
- 	writel(ctrl, nand->base + JZ_REG_NAND_CTRL);
- 
- 	if (chipnr == 0) {
--		/* Detect first chip. */
--		ret = nand_scan_ident(mtd, 1, NULL);
-+		/* Detect the first chip and register it */
-+		ret = nand_scan(mtd, 1);
- 		if (ret)
- 			goto notfound_id;
- 
-@@ -367,6 +368,25 @@ static int jz_nand_detect_bank(struct platform_device *pdev,
- 	return ret;
+diff --git a/drivers/mtd/nand/raw/lpc32xx_slc.c b/drivers/mtd/nand/raw/lpc32xx_slc.c
+index 42820aa1abab..a4e8b7e75135 100644
+--- a/drivers/mtd/nand/raw/lpc32xx_slc.c
++++ b/drivers/mtd/nand/raw/lpc32xx_slc.c
+@@ -779,6 +779,46 @@ static struct lpc32xx_nand_cfg_slc *lpc32xx_parse_dt(struct device *dev)
+ 	return ncfg;
  }
  
-+static int jz_nand_attach_chip(struct nand_chip *chip)
++static int lpc32xx_nand_attach_chip(struct nand_chip *chip)
 +{
 +	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct jz_nand *nand = mtd_to_jz_nand(mtd);
-+	struct device *dev = mtd->dev.parent;
-+	struct jz_nand_platform_data *pdata = dev_get_platdata(dev);
++	struct lpc32xx_nand_host *host = nand_get_controller_data(chip);
 +
-+	if (pdata && pdata->ident_callback) {
-+		pdata->ident_callback(nand->pdev, mtd, &pdata->partitions,
-+				      &pdata->num_partitions);
++	/* OOB and ECC CPU and DMA work areas */
++	host->ecc_buf = (uint32_t *)(host->data_buf + LPC32XX_DMA_DATA_SIZE);
++
++	/*
++	 * Small page FLASH has a unique OOB layout, but large and huge
++	 * page FLASH use the standard layout. Small page FLASH uses a
++	 * custom BBT marker layout.
++	 */
++	if (mtd->writesize <= 512)
++		mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
++
++	/* These sizes remain the same regardless of page size */
++	chip->ecc.size = 256;
++	chip->ecc.bytes = LPC32XX_SLC_DEV_ECC_BYTES;
++	chip->ecc.prepad = 0;
++	chip->ecc.postpad = 0;
++
++	/*
++	 * Use a custom BBT marker setup for small page FLASH that
++	 * won't interfere with the ECC layout. Large and huge page
++	 * FLASH use the standard layout.
++	 */
++	if ((chip->bbt_options & NAND_BBT_USE_FLASH) &&
++	    mtd->writesize <= 512) {
++		chip->bbt_td = &bbt_smallpage_main_descr;
++		chip->bbt_md = &bbt_smallpage_mirror_descr;
 +	}
 +
 +	return 0;
 +}
 +
-+static const struct nand_controller_ops jz_nand_controller_ops = {
-+	.attach_chip = jz_nand_attach_chip,
++static const struct nand_controller_ops lpc32xx_nand_controller_ops = {
++	.attach_chip = lpc32xx_nand_attach_chip,
 +};
 +
- static int jz_nand_probe(struct platform_device *pdev)
- {
- 	int ret;
-@@ -397,6 +417,7 @@ static int jz_nand_probe(struct platform_device *pdev)
- 	mtd		= nand_to_mtd(chip);
- 	mtd->dev.parent = &pdev->dev;
- 	mtd->name	= "jz4740-nand";
-+	nand->pdev	= pdev;
- 
- 	chip->ecc.hwctl		= jz_nand_hwctl;
- 	chip->ecc.calculate	= jz_nand_calculate_ecc_rs;
-@@ -410,6 +431,7 @@ static int jz_nand_probe(struct platform_device *pdev)
- 	chip->chip_delay = 50;
- 	chip->cmd_ctrl = jz_nand_cmd_ctrl;
- 	chip->select_chip = jz_nand_select_chip;
-+	chip->dummy_controller.ops = &jz_nand_controller_ops;
- 
- 	if (nand->busy_gpio)
- 		chip->dev_ready = jz_nand_dev_ready;
-@@ -450,20 +472,10 @@ static int jz_nand_probe(struct platform_device *pdev)
- 		else
- 			nand->banks[chipnr] = 0;
+ /*
+  * Probe for NAND controller
+  */
+@@ -884,41 +924,8 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
  	}
-+
- 	if (chipnr == 0) {
- 		dev_err(&pdev->dev, "No NAND chips found\n");
--		goto err_iounmap_mmio;
+ 
+ 	/* Find NAND device */
+-	res = nand_scan_ident(mtd, 1, NULL);
+-	if (res)
+-		goto release_dma;
+-
+-	/* OOB and ECC CPU and DMA work areas */
+-	host->ecc_buf = (uint32_t *)(host->data_buf + LPC32XX_DMA_DATA_SIZE);
+-
+-	/*
+-	 * Small page FLASH has a unique OOB layout, but large and huge
+-	 * page FLASH use the standard layout. Small page FLASH uses a
+-	 * custom BBT marker layout.
+-	 */
+-	if (mtd->writesize <= 512)
+-		mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
+-
+-	/* These sizes remain the same regardless of page size */
+-	chip->ecc.size = 256;
+-	chip->ecc.bytes = LPC32XX_SLC_DEV_ECC_BYTES;
+-	chip->ecc.prepad = chip->ecc.postpad = 0;
+-
+-	/*
+-	 * Use a custom BBT marker setup for small page FLASH that
+-	 * won't interfere with the ECC layout. Large and huge page
+-	 * FLASH use the standard layout.
+-	 */
+-	if ((chip->bbt_options & NAND_BBT_USE_FLASH) &&
+-	    mtd->writesize <= 512) {
+-		chip->bbt_td = &bbt_smallpage_main_descr;
+-		chip->bbt_md = &bbt_smallpage_mirror_descr;
 -	}
 -
--	if (pdata && pdata->ident_callback) {
--		pdata->ident_callback(pdev, mtd, &pdata->partitions,
--					&pdata->num_partitions);
--	}
--
--	ret = nand_scan_tail(mtd);
--	if (ret) {
--		dev_err(&pdev->dev,  "Failed to scan NAND\n");
--		goto err_unclaim_banks;
-+		goto err_nand_release;
- 	}
+-	/*
+-	 * Fills out all the uninitialized function pointers with the defaults
+-	 */
+-	res = nand_scan_tail(mtd);
++	chip->dummy_controller.ops = &lpc32xx_nand_controller_ops;
++	res = nand_scan(mtd, 1);
+ 	if (res)
+ 		goto release_dma;
  
- 	ret = mtd_device_register(mtd, pdata ? pdata->partitions : NULL,
-@@ -471,15 +483,13 @@ static int jz_nand_probe(struct platform_device *pdev)
- 
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to add mtd device\n");
--		goto err_nand_release;
-+		goto err_unclaim_banks;
- 	}
- 
- 	dev_info(&pdev->dev, "Successfully registered JZ4740 NAND driver\n");
- 
- 	return 0;
- 
--err_nand_release:
--	nand_release(mtd);
- err_unclaim_banks:
- 	while (chipnr--) {
- 		unsigned char bank = nand->banks[chipnr];
-@@ -487,6 +497,8 @@ static int jz_nand_probe(struct platform_device *pdev)
- 					 nand->bank_base[bank - 1]);
- 	}
- 	writel(0, nand->base + JZ_REG_NAND_CTRL);
-+err_nand_release:
-+	nand_release(mtd);
- err_iounmap_mmio:
- 	jz_nand_iounmap_resource(nand->mem, nand->base);
- err_free:
 -- 
 2.14.1
