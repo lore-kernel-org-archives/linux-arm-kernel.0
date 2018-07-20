@@ -1,82 +1,87 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Jul 2018 09:13:34 +0100
-Subject: [SPAM]Re: [PATCH] net: mediatek: use dma_zalloc_coherent instead
- of allocator/memset
-In-Reply-To: <9a4cdfc6-7487-5908-b584-f3bf6158c4d4@huawei.com>
-References: <20180719140955.19444-1-yuehaibing@huawei.com>
- <20180719141723.GM17271@n2100.armlinux.org.uk>
- <1532019744.8953.248.camel@mtkswgap22>
- <9a4cdfc6-7487-5908-b584-f3bf6158c4d4@huawei.com>
-Message-ID: <20180720081334.GO17271@n2100.armlinux.org.uk>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Fri, 20 Jul 2018 10:18:59 +0200
+Subject: [GIT PULL] ARM: at91: DT for 4.19
+Message-ID: <20180720081859.GA22228@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 02:30:53PM +0800, YueHaibing wrote:
-> On 2018/7/20 1:02, Sean Wang wrote:
-> > On Thu, 2018-07-19 at 15:17 +0100, Russell King - ARM Linux wrote:
-> >> On Thu, Jul 19, 2018 at 10:09:55PM +0800, YueHaibing wrote:
-> >>> Use dma_zalloc_coherent instead of dma_alloc_coherent
-> >>> followed by memset 0.
-> >>>
-> >>> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
-> >>> ---
-> >>>  drivers/net/ethernet/mediatek/mtk_eth_soc.c | 7 ++-----
-> >>>  1 file changed, 2 insertions(+), 5 deletions(-)
-> >>>
-> >>> diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-> >>> index d8ebf0a..fbdb3e3 100644
-> >>> --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-> >>> +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-> >>> @@ -1221,14 +1221,11 @@ static int mtk_tx_alloc(struct mtk_eth *eth)
-> >>>  	if (!ring->buf)
-> >>>  		goto no_tx_mem;
-> >>>  
-> >>> -	ring->dma = dma_alloc_coherent(eth->dev,
-> >>> -					  MTK_DMA_SIZE * sz,
-> >>> -					  &ring->phys,
-> >>> -					  GFP_ATOMIC | __GFP_ZERO);
-> >>> +	ring->dma = dma_zalloc_coherent(eth->dev, MTK_DMA_SIZE * sz,
-> >>> +					&ring->phys, GFP_ATOMIC | __GFP_ZERO);
-> >>>  	if (!ring->dma)
-> >>>  		goto no_tx_mem;
-> >>>  
-> >>> -	memset(ring->dma, 0, MTK_DMA_SIZE * sz);
-> >>
-> >> I have to wonder whether this code needs two forms of zeroing... in
-> >> the original code, __GFP_ZERO _and_ a call to memset() just in case
-> >> __GFP_ZERO failed to do its job, and in the replacement code, just
-> >> in case dma_zalloc_coherent() hasn't got the idea...
-> >>
-> >> I think you can drop the __GFP_ZERO. ;)
-> >>
-> > 
-> > Just now I did an experiment on 4.14.56 on armv7. I found that
-> > dma_zalloc_coherent does not guarantee that the buffer we get
-> > is all filled with 0.
-> > 
-> > 
-> > I really think it's a little bit weird OR what was I missing something
-> > for enabling dma_zalloc_coherent ? The result seems to tell that we
-> > can't remove freely the memset with 0 at this moment until we get a
-> > cause.
-> > 
-> 
-> That means dma_zalloc_coherent doesn't work as expect on armv7?
+Arnd, Olof,
 
-Can someone work out which underlying allocator is being used - the
-possibilities are:
+Here are the unusually large DT PR for AT91. It contains mainly new DTs.
 
-- dma_alloc_from_dev_coherent
-- cma
-- simple
-- remap
-- pool
+There is a pm.c change that I'm including here so it is along with the
+corresponding DT changes.
 
-Looking at the code, I'd guess it's the pool allocator, as I don't see
-anything which zeros memory there, and it doesn't honor the __GFP_ZERO
-flag.  This is definitely an allocator bug.
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.19-dt
+
+for you to fetch changes up to c8cbc1c20c29697e7335a5044fe6c60aa5c6e922:
+
+  ARM: dts: at91: fix typos for SSC TD functions (2018-07-20 10:05:14 +0200)
+
+----------------------------------------------------------------
+AT91 DT for 4.19:
+
+ - New boards from Laird: WB45N, WB50N, SOM60 modules and DVK, Gatwick
+ - fix the PMC compatibles
+
+----------------------------------------------------------------
+Alexandre Belloni (4):
+      dt-bindings: arm: remove PMC bindings
+      dt-bindings: clk: at91: Document all the PMC compatibles
+      ARM: at91: fix USB clock detection handling
+      ARM: dts: fix PMC compatible
+
+Ben Whitten (6):
+      dt-bindings: add laird and giantec vendor prefix
+      ARM: dts: at91: add labels to soc dtsi for derivative boards
+      ARM: dts: add support for Laird WB45N cpu module and DVK
+      ARM: dts: add support for Laird WB50N cpu module and DVK
+      ARM: dts: add support for Gatwick board based on WB50N
+      ARM: dts: add support for Laird SOM60 module and DVK boards
+
+Claudiu Beznea (1):
+      ARM: dts: at91: fix typos for SSC TD functions
+
+ .../devicetree/bindings/arm/atmel-pmc.txt          |  14 --
+ .../devicetree/bindings/clock/at91-clock.txt       |   9 +-
+ .../devicetree/bindings/vendor-prefixes.txt        |   2 +
+ arch/arm/boot/dts/Makefile                         |   4 +
+ arch/arm/boot/dts/at91-dvk_som60.dts               |  95 +++++++++
+ arch/arm/boot/dts/at91-dvk_su60_somc.dtsi          | 159 ++++++++++++++
+ arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi      |  90 ++++++++
+ arch/arm/boot/dts/at91-gatwick.dts                 | 121 +++++++++++
+ arch/arm/boot/dts/at91-som60.dtsi                  | 230 +++++++++++++++++++++
+ arch/arm/boot/dts/at91-wb45n.dts                   |  64 ++++++
+ arch/arm/boot/dts/at91-wb45n.dtsi                  | 165 +++++++++++++++
+ arch/arm/boot/dts/at91-wb50n.dts                   | 112 ++++++++++
+ arch/arm/boot/dts/at91-wb50n.dtsi                  | 198 ++++++++++++++++++
+ arch/arm/boot/dts/at91sam9261.dtsi                 |   2 +-
+ arch/arm/boot/dts/at91sam9263.dtsi                 |   2 +-
+ arch/arm/boot/dts/at91sam9rl.dtsi                  |   2 +-
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |   8 +-
+ arch/arm/boot/dts/sama5d2-pinfunc.h                |   4 +-
+ arch/arm/boot/dts/sama5d3.dtsi                     |   8 +-
+ arch/arm/boot/dts/sama5d4.dtsi                     |   2 +-
+ arch/arm/mach-at91/pm.c                            |   5 +
+ 21 files changed, 1263 insertions(+), 33 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/atmel-pmc.txt
+ create mode 100644 arch/arm/boot/dts/at91-dvk_som60.dts
+ create mode 100644 arch/arm/boot/dts/at91-dvk_su60_somc.dtsi
+ create mode 100644 arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi
+ create mode 100644 arch/arm/boot/dts/at91-gatwick.dts
+ create mode 100644 arch/arm/boot/dts/at91-som60.dtsi
+ create mode 100644 arch/arm/boot/dts/at91-wb45n.dts
+ create mode 100644 arch/arm/boot/dts/at91-wb45n.dtsi
+ create mode 100644 arch/arm/boot/dts/at91-wb50n.dts
+ create mode 100644 arch/arm/boot/dts/at91-wb50n.dtsi
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
