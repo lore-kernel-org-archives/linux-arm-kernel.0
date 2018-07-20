@@ -1,76 +1,55 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 20 Jul 2018 16:56:07 +0200
-Subject: [PATCH RESEND 4/7] of: address: Add support for the dma-parent
- property
-In-Reply-To: <cover.d2aafc48da035aed80793da89079e5da269b45b4.1532098561.git-series.maxime.ripard@bootlin.com>
-References: <cover.d2aafc48da035aed80793da89079e5da269b45b4.1532098561.git-series.maxime.ripard@bootlin.com>
-Message-ID: <70c2bc34aef2006e371de70988dc66926a4f4642.1532098561.git-series.maxime.ripard@bootlin.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Fri, 20 Jul 2018 17:57:02 +0300
+Subject: [PATCH v6 7/8] dt-bindings: Introduce interconnect consumers
+ bindings
+In-Reply-To: <CAE=gft7tDYB172LTMuS4JPPaTFasT22zLBx4XjpYne2PNNz+kQ@mail.gmail.com>
+References: <20180709155104.25528-1-georgi.djakov@linaro.org>
+ <20180709155104.25528-8-georgi.djakov@linaro.org>
+ <CAE=gft7tDYB172LTMuS4JPPaTFasT22zLBx4XjpYne2PNNz+kQ@mail.gmail.com>
+Message-ID: <5081de57-e6f2-1201-a1f3-15e05ea3800b@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SoCs have devices that are using a separate bus from the main bus to
-perform DMA.
+Hi,
 
-These buses might have some restrictions and/or different mapping than from
-the CPU side, so we'd need to express those using the usual dma-ranges, but
-using a different DT node than the node's parent.
+On 07/11/2018 01:34 AM, Evan Green wrote:
+> On Mon, Jul 9, 2018 at 8:51 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+>>
+>> Add documentation for the interconnect consumer bindings, that will allow
+>> to link a device node (consumer) to its interconnect controller hardware.
+>>
+>> Tha aim is to enable drivers to request a framework API to configure an
+>> interconnect path by providing their struct device pointer and a name.
+>>
+>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>> ---
+>>  .../bindings/interconnect/interconnect.txt    | 27 +++++++++++++++++++
+>>  1 file changed, 27 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
+>> index 6e2b2971b094..0ad65dccbe8b 100644
+>> --- a/Documentation/devicetree/bindings/interconnect/interconnect.txt
+>> +++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
+>> @@ -31,3 +31,30 @@ Example:
+>>                         clocks = <&rpmcc RPM_SMD_SNOC_CLK>,
+>>                                  <&rpmcc RPM_SMD_SNOC_A_CLK>;
+>>                 };
+>> +
+>> +
+>> += interconnect consumers =
+>> +
+>> +The interconnect consumers are device nodes which consume the interconnect
+>> +path(s) provided by the interconnect provider. There can be multiple
+> 
+> I wonder if this sentence could be more descriptive. Maybe something like:
+> 
+> The interconnect consumers are device nodes which dynamically express
+> their bandwidth requirements along interconnect paths they are
+> connected to.
+> 
+> ...or choose a better one if this one's a mouthful.
+> 
 
-Add support for a dma-parent property that links to the DMA bus used by the
-device in such a case.
+This sounds much better. Thank you!
 
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
- drivers/of/address.c | 26 ++++++++++++++++++++++----
- 1 file changed, 22 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/of/address.c b/drivers/of/address.c
-index 9e637bf8102c..e4c8207871d1 100644
---- a/drivers/of/address.c
-+++ b/drivers/of/address.c
-@@ -680,10 +680,18 @@ EXPORT_SYMBOL(of_translate_address);
- 
- u64 of_translate_dma_address(struct device_node *dev, const __be32 *in_addr)
- {
-+	struct of_phandle_args args;
-+	struct device_node *parent = NULL;
- 	struct device_node *host;
- 	u64 ret;
- 
--	ret = __of_translate_address(dev, NULL, in_addr, "dma-ranges", &host);
-+	ret = of_parse_phandle_with_args(dev, "dma-parent",
-+					 "#dma-parent-cells",
-+					 0, &args);
-+	if (!ret)
-+		parent = args.np;
-+
-+	ret = __of_translate_address(dev, parent, in_addr, "dma-ranges", &host);
- 
- 	if (host) {
- 		of_node_put(host);
-@@ -909,11 +917,21 @@ int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *siz
- 		return -EINVAL;
- 
- 	while (1) {
-+		struct of_phandle_args args;
-+
- 		naddr = of_n_addr_cells(node);
- 		nsize = of_n_size_cells(node);
--		node = of_get_next_parent(node);
--		if (!node)
--			break;
-+
-+		ret = of_parse_phandle_with_args(node, "dma-parent",
-+						 "#dma-parent-cells",
-+						 0, &args);
-+		if (!ret) {
-+			node = args.np;
-+		} else {
-+			node = of_get_next_parent(node);
-+			if (!node)
-+				break;
-+		}
- 
- 		ranges = of_get_property(node, "dma-ranges", &len);
- 
--- 
-git-series 0.9.1
+Georgi
