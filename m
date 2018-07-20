@@ -1,22 +1,54 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 20 Jul 2018 09:12:05 -0600
-Subject: [PATCH 1/3] dt-bindings: arm: move berlin binding documentation
- to syna.txt
-In-Reply-To: <20180713171859.6c4e5a35@xhacker.debian>
+Date: Fri, 20 Jul 2018 09:15:29 -0600
+Subject: [PATCH 2/3] dt-bindings: arm: syna: add support for the AS370 SoC
+In-Reply-To: <20180713172457.6193a92f@xhacker.debian>
 References: <20180713171712.05f58a74@xhacker.debian>
- <20180713171859.6c4e5a35@xhacker.debian>
-Message-ID: <20180720151205.GA25135@rob-hp-laptop>
+ <20180713172457.6193a92f@xhacker.debian>
+Message-ID: <20180720151529.GA26487@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 05:18:59PM +0800, Jisheng Zhang wrote:
-> Move berlin binding documentation as part of transition from Marvell
-> berlin to Synaptics SoC.
-> 
+On Fri, Jul 13, 2018 at 05:24:57PM +0800, Jisheng Zhang wrote:
+> The AS370 SoC is a new derivative of the berlin family. The only
+> difference is the SoC isn't named as berlin*.
+
+So is it a derivative or just rebranded?
+
 > Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 > ---
->  .../bindings/arm/{marvell/marvell,berlin.txt => syna.txt}         | 0
->  1 file changed, 0 insertions(+), 0 deletions(-)
->  rename Documentation/devicetree/bindings/arm/{marvell/marvell,berlin.txt => syna.txt} (100%)
+>  Documentation/devicetree/bindings/arm/syna.txt | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/syna.txt b/Documentation/devicetree/bindings/arm/syna.txt
+> index 3bab18409b7a..3ba1d7b5ee74 100644
+> --- a/Documentation/devicetree/bindings/arm/syna.txt
+> +++ b/Documentation/devicetree/bindings/arm/syna.txt
+> @@ -1,4 +1,4 @@
+> -Marvell Berlin SoC Family Device Tree Bindings
+> +Synaptics SoC Device Tree Bindings
 
-Acked-by: Rob Herring <robh@kernel.org>
+Perhaps some note about what has happened here. Otherwise it looks 
+strange having "Marvell Berlin" in the document when the title says 
+Synaptics SoC.
+
+>  ---------------------------------------------------------------
+>  
+>  Work in progress statement:
+> @@ -13,6 +13,10 @@ stable binding/ABI.
+>  
+>  ---------------------------------------------------------------
+>  
+> +Boards with the Synaptics AS370 SoC shall have the following properties:
+> +  Required root node property:
+> +    compatible: "syna,as370"
+> +
+>  Boards with a SoC of the Marvell Berlin family, e.g. Armada 1500
+>  shall have the following properties:
+>  
+> -- 
+> 2.18.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
