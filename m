@@ -1,161 +1,36 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Fri, 20 Jul 2018 14:41:54 -0700
-Subject: [PATCHv3 2/2] arm64: Add support for STACKLEAK gcc plugin
-In-Reply-To: <20180720214154.2940-1-labbott@redhat.com>
-References: <20180720214154.2940-1-labbott@redhat.com>
-Message-ID: <20180720214154.2940-3-labbott@redhat.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 21 Jul 2018 00:15:46 +0200
+Subject: [PATCH] i2c: exynos5: Describe the hardware variant for
+ readability
+In-Reply-To: <20180718195404.5095-1-krzk@kernel.org>
+References: <20180718195404.5095-1-krzk@kernel.org>
+Message-ID: <20180720221546.obccridrqavnlzfn@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jul 18, 2018 at 09:54:04PM +0200, Krzysztof Kozlowski wrote:
+> The driver supports multiple hardware variants of Exynos I2C controller
+> which differ in FIFO depth, handling of interrupts and bus recovery in
+> HSI2C_MASTER_ST_LOSE state.
+> 
+> The difference in variant was a single bit set for Exynos7 variants and
+> implicit lack of this bit for other variants.
+> 
+> Make each variant explicit which also fixes the GCC warning about
+> documentation:
+> 
+>     drivers/i2c/busses/i2c-exynos5.c:223: warning: Function parameter or member 'hw' not described in 'exynos_hsi2c_variant'
+> 
+> No change in functionality.
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-This adds support for the STACKLEAK gcc plugin to arm64 by implementing
-stackleak_check_alloca(), based heavily on the x86 version, and adding the
-two helpers used by the stackleak common code: current_top_of_stack() and
-on_thread_stack(). The stack erasure calls are made at syscall returns.
-Additionally, this disables the plugin in hypervisor and EFI stub code,
-which are out of scope for the protection.
+Applied to for-next, thanks!
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Kees Cook <keescook@chromium.org>
-Signed-off-by: Laura Abbott <labbott@redhat.com>
----
-v3: Actual commit text courtesy of Kees. A comment explaining why we
-panic
----
- arch/arm64/Kconfig                    |  1 +
- arch/arm64/include/asm/processor.h    | 15 +++++++++++++++
- arch/arm64/kernel/entry.S             |  7 +++++++
- arch/arm64/kernel/process.c           | 22 ++++++++++++++++++++++
- arch/arm64/kvm/hyp/Makefile           |  3 ++-
- drivers/firmware/efi/libstub/Makefile |  3 ++-
- 6 files changed, 49 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 42c090cf0292..216d36a49ab5 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -96,6 +96,7 @@ config ARM64
- 	select HAVE_ARCH_MMAP_RND_BITS
- 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
- 	select HAVE_ARCH_SECCOMP_FILTER
-+	select HAVE_ARCH_STACKLEAK
- 	select HAVE_ARCH_THREAD_STRUCT_WHITELIST
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index a73ae1e49200..0061450a793b 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -266,5 +266,20 @@ extern void __init minsigstksz_setup(void);
- #define SVE_SET_VL(arg)	sve_set_current_vl(arg)
- #define SVE_GET_VL()	sve_get_current_vl()
- 
-+/*
-+ * For CONFIG_GCC_PLUGIN_STACKLEAK
-+ *
-+ * These need to be macros because otherwise we get stuck in a nightmare
-+ * of header definitions for the use of task_stack_page.
-+ */
-+
-+#define current_top_of_stack()							\
-+({										\
-+	struct stack_info _info;						\
-+	BUG_ON(!on_accessible_stack(current, current_stack_pointer, &_info));	\
-+	_info.high;								\
-+})
-+#define on_thread_stack()	(on_task_stack(current, current_stack_pointer, NULL))
-+
- #endif /* __ASSEMBLY__ */
- #endif /* __ASM_PROCESSOR_H */
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 28ad8799406f..67d12016063d 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -431,6 +431,11 @@ tsk	.req	x28		// current thread_info
- 
- 	.text
- 
-+	.macro	stackleak_erase
-+#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
-+	bl	stackleak_erase
-+#endif
-+	.endm
- /*
-  * Exception vectors.
-  */
-@@ -910,6 +915,7 @@ ret_fast_syscall:
- 	and	x2, x1, #_TIF_WORK_MASK
- 	cbnz	x2, work_pending
- 	enable_step_tsk x1, x2
-+	stackleak_erase
- 	kernel_exit 0
- ret_fast_syscall_trace:
- 	enable_daif
-@@ -936,6 +942,7 @@ ret_to_user:
- 	cbnz	x2, work_pending
- finish_ret_to_user:
- 	enable_step_tsk x1, x2
-+	stackleak_erase
- 	kernel_exit 0
- ENDPROC(ret_to_user)
- 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index e10bc363f533..f0ad00fb6a71 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -493,3 +493,25 @@ void arch_setup_new_exec(void)
- {
- 	current->mm->context.flags = is_compat_task() ? MMCF_AARCH32 : 0;
- }
-+
-+#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
-+void __used stackleak_check_alloca(unsigned long size)
-+{
-+	unsigned long stack_left;
-+	unsigned long current_sp = current_stack_pointer;
-+	struct stack_info info;
-+
-+	BUG_ON(!on_accessible_stack(current, current_sp, &info));
-+
-+	stack_left = current_sp - info.low;
-+
-+	/*
-+	 * There's a good chance we're almost out of stack space if this
-+	 * is true. Using panic() over BUG() is more likely to give
-+	 * reliable debugging output.
-+	 */
-+	if (size >= stack_left)
-+		panic("alloca() over the kernel stack boundary\n");
-+}
-+EXPORT_SYMBOL(stackleak_check_alloca);
-+#endif
-diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index 4313f7475333..2fabc2dc1966 100644
---- a/arch/arm64/kvm/hyp/Makefile
-+++ b/arch/arm64/kvm/hyp/Makefile
-@@ -3,7 +3,8 @@
- # Makefile for Kernel-based Virtual Machine module, HYP part
- #
- 
--ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
-+ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING \
-+		$(DISABLE_STACKLEAK_PLUGIN)
- 
- KVM=../../../../virt/kvm
- 
-diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-index a34e9290a699..25dd2a14560d 100644
---- a/drivers/firmware/efi/libstub/Makefile
-+++ b/drivers/firmware/efi/libstub/Makefile
-@@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
- KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
- 				   -D__NO_FORTIFY \
- 				   $(call cc-option,-ffreestanding) \
--				   $(call cc-option,-fno-stack-protector)
-+				   $(call cc-option,-fno-stack-protector) \
-+				   $(DISABLE_STACKLEAK_PLUGIN)
- 
- GCOV_PROFILE			:= n
- KASAN_SANITIZE			:= n
--- 
-2.17.1
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180721/c25967fc/attachment.sig>
