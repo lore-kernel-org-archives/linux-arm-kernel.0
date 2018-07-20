@@ -1,113 +1,68 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 20 Jul 2018 09:43:06 +0100
-Subject: [PATCH v2 08/10] coresight: perf: Add helper to retrieve sink
- configuration
-In-Reply-To: <20180719200739.GB9421@xps15>
-References: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
- <1531847501-22226-9-git-send-email-suzuki.poulose@arm.com>
- <20180719200739.GB9421@xps15>
-Message-ID: <ed621d62-a1d2-abe1-3763-60ea6e5f615f@arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 20 Jul 2018 17:50:45 +0900
+Subject: [PATCH 2/2] arm64: uniphier: dts: add more clocks to Denali NAND
+ controller node
+In-Reply-To: <1532076645-10769-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1532076645-10769-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1532076645-10769-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/07/18 21:07, Mathieu Poirier wrote:
-> On Tue, Jul 17, 2018 at 06:11:39PM +0100, Suzuki K Poulose wrote:
->> We can always find the sink configuration for a given perf_output_handle.
->> Add a helper to retrieve the sink configuration for a given
->> perf_output_handle. This will be used to get rid of the set_buffer()
->> call back.
->>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   drivers/hwtracing/coresight/coresight-etm-perf.c | 14 -------------
->>   drivers/hwtracing/coresight/coresight-etm-perf.h | 26 ++++++++++++++++++++++++
->>   2 files changed, 26 insertions(+), 14 deletions(-)
->>
->> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
->> index 6a4252b..3cc4a0b 100644
->> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
->> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
->> @@ -23,20 +23,6 @@
->>   static struct pmu etm_pmu;
->>   static bool etm_perf_up;
->>   
->> -/**
->> - * struct etm_event_data - Coresight specifics associated to an event
->> - * @work:		Handle to free allocated memory outside IRQ context.
->> - * @mask:		Hold the CPU(s) this event was set for.
->> - * @snk_config:		The sink configuration.
->> - * @path:		An array of path, each slot for one CPU.
->> - */
->> -struct etm_event_data {
->> -	struct work_struct work;
->> -	cpumask_t mask;
->> -	void *snk_config;
->> -	struct list_head * __percpu *path;
->> -};
->> -
-> 
-> If this is moved to coresight-etm-perf.h, the #include <linux/percpu-defs.h> can
-> be removed.
+Catch up with the new binding of the Denali IP where three clocks,
+"nand", "nand_x", "ecc" are required.
 
-Actually, we do have the PER_CPU variables in the file already, which is why I left
-them there.  See the next line.
-> 
->>   static DEFINE_PER_CPU(struct perf_output_handle, ctx_handle);
->>   static DEFINE_PER_CPU(struct coresight_device *, csdev_src);
->>   
+For UniPhier SoCs, the "nand_x" and "ecc" are tied up because they
+are both 200MHz.
 
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
->> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.h b/drivers/hwtracing/coresight/coresight-etm-perf.h
->> index 4197df4..da7d933 100644
->> --- a/drivers/hwtracing/coresight/coresight-etm-perf.h
->> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.h
->> @@ -7,6 +7,7 @@
->>   #ifndef _CORESIGHT_ETM_PERF_H
->>   #define _CORESIGHT_ETM_PERF_H
->>   
->> +#include <linux/percpu-defs.h>
->>   #include "coresight-priv.h"
->>   
->>   struct coresight_device;
->> @@ -42,14 +43,39 @@ struct etm_filters {
->>   	bool			ssstatus;
->>   };
->>   
->> +/**
->> + * struct etm_event_data - Coresight specifics associated to an event
->> + * @work:		Handle to free allocated memory outside IRQ context.
->> + * @mask:		Hold the CPU(s) this event was set for.
->> + * @snk_config:		The sink configuration.
->> + * @path:		An array of path, each slot for one CPU.
->> + */
->> +struct etm_event_data {
->> +	struct work_struct work;
->> +	cpumask_t mask;
->> +	void *snk_config;
->> +	struct list_head * __percpu *path;
->> +};
->>   
->>   #ifdef CONFIG_CORESIGHT
->>   int etm_perf_symlink(struct coresight_device *csdev, bool link);
->> +static inline void *etm_perf_sink_config(struct perf_output_handle *handle)
->> +{
->> +	struct etm_event_data *data = perf_get_aux(handle);
->>   
->> +	if (data)
->> +		return data->snk_config;
->> +	return NULL;
->> +}
->>   #else
->>   static inline int etm_perf_symlink(struct coresight_device *csdev, bool link)
->>   { return -EINVAL; }
->>   
->> +static inline void *etm_perf_sink_config(struct perf_output_handle *handle)
->> +{
->> +	return NULL;
->> +}
->> +
-> 
-> I think we can do without those... See my comment in the next patch.
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 3 ++-
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 3 ++-
+ arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi | 3 ++-
+ 3 files changed, 6 insertions(+), 3 deletions(-)
 
-Sure
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+index d63b56e..5640dac 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+@@ -571,7 +571,8 @@
+ 			interrupts = <0 65 4>;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_nand>;
+-			clocks = <&sys_clk 2>;
++			clock-names = "nand", "nand_x", "ecc";
++			clocks = <&sys_clk 2>, <&sys_clk 3>, <&sys_clk 3>;
+ 			resets = <&sys_rst 2>;
+ 		};
+ 	};
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index 0298bd0..a8964c0 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -626,7 +626,8 @@
+ 			interrupts = <0 65 4>;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_nand>;
+-			clocks = <&sys_clk 2>;
++			clock-names = "nand", "nand_x", "ecc";
++			clocks = <&sys_clk 2>, <&sys_clk 3>, <&sys_clk 3>;
+ 			resets = <&sys_rst 2>;
+ 		};
+ 	};
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi b/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
+index 2a4cf42..fd2bcd4 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
+@@ -455,7 +455,8 @@
+ 			interrupts = <0 65 4>;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_nand>;
+-			clocks = <&sys_clk 2>;
++			clock-names = "nand", "nand_x", "ecc";
++			clocks = <&sys_clk 2>, <&sys_clk 3>, <&sys_clk 3>;
+ 			resets = <&sys_rst 2>;
+ 		};
+ 	};
+-- 
+2.7.4
