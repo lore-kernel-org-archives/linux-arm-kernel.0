@@ -1,157 +1,187 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 17:15:26 +0200
-Subject: [PATCH v4 34/35] mtd: rawnand: allocate model parameter dynamically
+Date: Fri, 20 Jul 2018 17:14:59 +0200
+Subject: [PATCH v4 07/35] mtd: rawnand: fsmc: convert driver to nand_scan()
 In-Reply-To: <20180720151527.16038-1-miquel.raynal@bootlin.com>
 References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
-Message-ID: <20180720151527.16038-35-miquel.raynal@bootlin.com>
+Message-ID: <20180720151527.16038-8-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks to the migration of all drivers to use nand_scan() and the
-related nand_controller_ops, we can now allocate data during the
-detection phase. Let's do it first for the NAND model parameter which
-is allocated in nand_detect().
+Two helpers have been added to the core to make ECC-related
+configuration between the detection phase and the final NAND scan. Use
+these hooks and convert the driver to just use nand_scan() instead of
+both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/nand_base.c | 52 +++++++++++++++++++++++++++++++---------
- include/linux/mtd/rawnand.h      |  2 +-
- 2 files changed, 42 insertions(+), 12 deletions(-)
+ drivers/mtd/nand/raw/fsmc_nand.c | 148 +++++++++++++++++++++------------------
+ 1 file changed, 78 insertions(+), 70 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
-index da99232702a4..8645f655e5b0 100644
---- a/drivers/mtd/nand/raw/nand_base.c
-+++ b/drivers/mtd/nand/raw/nand_base.c
-@@ -5225,8 +5225,11 @@ static int nand_flash_detect_onfi(struct nand_chip *chip)
- 
- 	sanitize_string(p->manufacturer, sizeof(p->manufacturer));
- 	sanitize_string(p->model, sizeof(p->model));
--	strncpy(chip->parameters.model, p->model,
--		sizeof(chip->parameters.model) - 1);
-+	chip->parameters.model = kstrdup(p->model, GFP_KERNEL);
-+	if (!chip->parameters.model) {
-+		ret = -ENOMEM;
-+		goto free_onfi_param_page;
-+	}
- 
- 	mtd->writesize = le32_to_cpu(p->byte_per_page);
- 
-@@ -5356,8 +5359,11 @@ static int nand_flash_detect_jedec(struct nand_chip *chip)
- 
- 	sanitize_string(p->manufacturer, sizeof(p->manufacturer));
- 	sanitize_string(p->model, sizeof(p->model));
--	strncpy(chip->parameters.model, p->model,
--		sizeof(chip->parameters.model) - 1);
-+	chip->parameters.model = kstrdup(p->model, GFP_KERNEL);
-+	if (!chip->parameters.model) {
-+		ret = -ENOMEM;
-+		goto free_jedec_param_page;
-+	}
- 
- 	mtd->writesize = le32_to_cpu(p->byte_per_page);
- 
-@@ -5546,8 +5552,9 @@ static bool find_full_id_nand(struct nand_chip *chip,
- 		chip->onfi_timing_mode_default =
- 					type->onfi_timing_mode_default;
- 
--		strncpy(chip->parameters.model, type->name,
--			sizeof(chip->parameters.model) - 1);
-+		chip->parameters.model = kstrdup(type->name, GFP_KERNEL);
-+		if (!chip->parameters.model)
-+			return false;
- 
- 		return true;
- 	}
-@@ -5706,8 +5713,9 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
- 	if (!type->name)
- 		return -ENODEV;
- 
--	strncpy(chip->parameters.model, type->name,
--		sizeof(chip->parameters.model) - 1);
-+	chip->parameters.model = kstrdup(type->name, GFP_KERNEL);
-+	if (!chip->parameters.model)
-+		return -ENOMEM;
- 
- 	chip->chipsize = (uint64_t)type->chipsize << 20;
- 
-@@ -5737,7 +5745,9 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
- 			mtd->name);
- 		pr_warn("bus width %d instead of %d bits\n", busw ? 16 : 8,
- 			(chip->options & NAND_BUSWIDTH_16) ? 16 : 8);
--		return -EINVAL;
-+		ret = -EINVAL;
-+
-+		goto free_detect_allocation;
- 	}
- 
- 	nand_decode_bbm_options(chip);
-@@ -5774,6 +5784,11 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
- 		(int)(chip->chipsize >> 20), nand_is_slc(chip) ? "SLC" : "MLC",
- 		mtd->erasesize >> 10, mtd->writesize, mtd->oobsize);
- 	return 0;
-+
-+free_detect_allocation:
-+	kfree(chip->parameters.model);
-+
-+	return ret;
- }
- 
- static const char * const nand_ecc_modes[] = {
-@@ -6021,6 +6036,11 @@ static int nand_scan_ident(struct mtd_info *mtd, int maxchips,
+diff --git a/drivers/mtd/nand/raw/fsmc_nand.c b/drivers/mtd/nand/raw/fsmc_nand.c
+index 59524d181bfe..f418236fa020 100644
+--- a/drivers/mtd/nand/raw/fsmc_nand.c
++++ b/drivers/mtd/nand/raw/fsmc_nand.c
+@@ -919,6 +919,82 @@ static int fsmc_nand_probe_config_dt(struct platform_device *pdev,
  	return 0;
  }
  
-+static void nand_scan_ident_cleanup(struct nand_chip *chip)
++static int fsmc_nand_attach_chip(struct nand_chip *nand)
 +{
-+	kfree(chip->parameters.model);
-+}
++	struct mtd_info *mtd = nand_to_mtd(nand);
++	struct fsmc_nand_data *host = mtd_to_fsmc(mtd);
 +
- static int nand_set_ecc_soft_ops(struct mtd_info *mtd)
- {
- 	struct nand_chip *chip = mtd_to_nand(mtd);
-@@ -6764,11 +6784,18 @@ int nand_scan_with_ids(struct mtd_info *mtd, int maxchips,
- 
- 	ret = nand_attach(chip);
- 	if (ret)
--		return ret;
-+		goto cleanup_ident;
- 
- 	ret = nand_scan_tail(mtd);
- 	if (ret)
--		nand_detach(chip);
-+		goto detach_chip;
++	if (AMBA_REV_BITS(host->pid) >= 8) {
++		switch (mtd->oobsize) {
++		case 16:
++		case 64:
++		case 128:
++		case 224:
++		case 256:
++			break;
++		default:
++			dev_warn(host->dev,
++				 "No oob scheme defined for oobsize %d\n",
++				 mtd->oobsize);
++			return -EINVAL;
++		}
++
++		mtd_set_ooblayout(mtd, &fsmc_ecc4_ooblayout_ops);
++
++		return 0;
++	}
++
++	switch (nand->ecc.mode) {
++	case NAND_ECC_HW:
++		dev_info(host->dev, "Using 1-bit HW ECC scheme\n");
++		nand->ecc.calculate = fsmc_read_hwecc_ecc1;
++		nand->ecc.correct = nand_correct_data;
++		nand->ecc.bytes = 3;
++		nand->ecc.strength = 1;
++		break;
++
++	case NAND_ECC_SOFT:
++		if (nand->ecc.algo == NAND_ECC_BCH) {
++			dev_info(host->dev,
++				 "Using 4-bit SW BCH ECC scheme\n");
++			break;
++		}
++
++	case NAND_ECC_ON_DIE:
++		break;
++
++	default:
++		dev_err(host->dev, "Unsupported ECC mode!\n");
++		return -ENOTSUPP;
++	}
++
++	/*
++	 * Don't set layout for BCH4 SW ECC. This will be
++	 * generated later in nand_bch_init() later.
++	 */
++	if (nand->ecc.mode == NAND_ECC_HW) {
++		switch (mtd->oobsize) {
++		case 16:
++		case 64:
++		case 128:
++			mtd_set_ooblayout(mtd,
++					  &fsmc_ecc1_ooblayout_ops);
++			break;
++		default:
++			dev_warn(host->dev,
++				 "No oob scheme defined for oobsize %d\n",
++				 mtd->oobsize);
++			return -EINVAL;
++		}
++	}
 +
 +	return 0;
++}
 +
-+detach_chip:
-+	nand_detach(chip);
-+cleanup_ident:
-+	nand_scan_ident_cleanup(chip);
- 
- 	return ret;
- }
-@@ -6800,6 +6827,9 @@ void nand_cleanup(struct nand_chip *chip)
- 
- 	/* Free controller specific allocations after chip identification */
- 	nand_detach(chip);
++static const struct nand_controller_ops fsmc_nand_controller_ops = {
++	.attach_chip = fsmc_nand_attach_chip,
++};
 +
-+	/* Free identification phase allocations */
-+	nand_scan_ident_cleanup(chip);
- }
+ /*
+  * fsmc_nand_probe - Probe function
+  * @pdev:       platform device structure
+@@ -1048,76 +1124,8 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
+ 	/*
+ 	 * Scan to find existence of the device
+ 	 */
+-	ret = nand_scan_ident(mtd, 1, NULL);
+-	if (ret) {
+-		dev_err(&pdev->dev, "No NAND Device found!\n");
+-		goto release_dma_write_chan;
+-	}
+-
+-	if (AMBA_REV_BITS(host->pid) >= 8) {
+-		switch (mtd->oobsize) {
+-		case 16:
+-		case 64:
+-		case 128:
+-		case 224:
+-		case 256:
+-			break;
+-		default:
+-			dev_warn(&pdev->dev, "No oob scheme defined for oobsize %d\n",
+-				 mtd->oobsize);
+-			ret = -EINVAL;
+-			goto release_dma_write_chan;
+-		}
+-
+-		mtd_set_ooblayout(mtd, &fsmc_ecc4_ooblayout_ops);
+-	} else {
+-		switch (nand->ecc.mode) {
+-		case NAND_ECC_HW:
+-			dev_info(&pdev->dev, "Using 1-bit HW ECC scheme\n");
+-			nand->ecc.calculate = fsmc_read_hwecc_ecc1;
+-			nand->ecc.correct = nand_correct_data;
+-			nand->ecc.bytes = 3;
+-			nand->ecc.strength = 1;
+-			break;
+-
+-		case NAND_ECC_SOFT:
+-			if (nand->ecc.algo == NAND_ECC_BCH) {
+-				dev_info(&pdev->dev, "Using 4-bit SW BCH ECC scheme\n");
+-				break;
+-			}
+-
+-		case NAND_ECC_ON_DIE:
+-			break;
+-
+-		default:
+-			dev_err(&pdev->dev, "Unsupported ECC mode!\n");
+-			goto release_dma_write_chan;
+-		}
+-
+-		/*
+-		 * Don't set layout for BCH4 SW ECC. This will be
+-		 * generated later in nand_bch_init() later.
+-		 */
+-		if (nand->ecc.mode == NAND_ECC_HW) {
+-			switch (mtd->oobsize) {
+-			case 16:
+-			case 64:
+-			case 128:
+-				mtd_set_ooblayout(mtd,
+-						  &fsmc_ecc1_ooblayout_ops);
+-				break;
+-			default:
+-				dev_warn(&pdev->dev,
+-					 "No oob scheme defined for oobsize %d\n",
+-					 mtd->oobsize);
+-				ret = -EINVAL;
+-				goto release_dma_write_chan;
+-			}
+-		}
+-	}
+-
+-	/* Second stage of scan to fill MTD data-structures */
+-	ret = nand_scan_tail(mtd);
++	nand->dummy_controller.ops = &fsmc_nand_controller_ops;
++	ret = nand_scan(mtd, 1);
+ 	if (ret)
+ 		goto release_dma_write_chan;
  
- EXPORT_SYMBOL_GPL(nand_cleanup);
-diff --git a/include/linux/mtd/rawnand.h b/include/linux/mtd/rawnand.h
-index a928771a7ae4..5723d940a47d 100644
---- a/include/linux/mtd/rawnand.h
-+++ b/include/linux/mtd/rawnand.h
-@@ -482,7 +482,7 @@ struct onfi_params {
-  */
- struct nand_parameters {
- 	/* Generic parameters */
--	char model[100];
-+	const char *model;
- 	bool supports_set_get_features;
- 	DECLARE_BITMAP(set_feature_list, ONFI_FEATURE_NUMBER);
- 	DECLARE_BITMAP(get_feature_list, ONFI_FEATURE_NUMBER);
 -- 
 2.14.1
