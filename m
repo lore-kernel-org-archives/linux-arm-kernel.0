@@ -1,55 +1,53 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Fri, 20 Jul 2018 17:57:02 +0300
-Subject: [PATCH v6 7/8] dt-bindings: Introduce interconnect consumers
- bindings
-In-Reply-To: <CAE=gft7tDYB172LTMuS4JPPaTFasT22zLBx4XjpYne2PNNz+kQ@mail.gmail.com>
-References: <20180709155104.25528-1-georgi.djakov@linaro.org>
- <20180709155104.25528-8-georgi.djakov@linaro.org>
- <CAE=gft7tDYB172LTMuS4JPPaTFasT22zLBx4XjpYne2PNNz+kQ@mail.gmail.com>
-Message-ID: <5081de57-e6f2-1201-a1f3-15e05ea3800b@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 20 Jul 2018 17:06:22 +0200
+Subject: [GIT PULL] Reset controller changes for v4.19
+Message-ID: <1532099182.3438.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear arm-soc maintainers,
 
-On 07/11/2018 01:34 AM, Evan Green wrote:
-> On Mon, Jul 9, 2018 at 8:51 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
->>
->> Add documentation for the interconnect consumer bindings, that will allow
->> to link a device node (consumer) to its interconnect controller hardware.
->>
->> Tha aim is to enable drivers to request a framework API to configure an
->> interconnect path by providing their struct device pointer and a name.
->>
->> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->> ---
->>  .../bindings/interconnect/interconnect.txt    | 27 +++++++++++++++++++
->>  1 file changed, 27 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
->> index 6e2b2971b094..0ad65dccbe8b 100644
->> --- a/Documentation/devicetree/bindings/interconnect/interconnect.txt
->> +++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
->> @@ -31,3 +31,30 @@ Example:
->>                         clocks = <&rpmcc RPM_SMD_SNOC_CLK>,
->>                                  <&rpmcc RPM_SMD_SNOC_A_CLK>;
->>                 };
->> +
->> +
->> += interconnect consumers =
->> +
->> +The interconnect consumers are device nodes which consume the interconnect
->> +path(s) provided by the interconnect provider. There can be multiple
-> 
-> I wonder if this sentence could be more descriptive. Maybe something like:
-> 
-> The interconnect consumers are device nodes which dynamically express
-> their bandwidth requirements along interconnect paths they are
-> connected to.
-> 
-> ...or choose a better one if this one's a mouthful.
-> 
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-This sounds much better. Thank you!
+? Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-Georgi
+are available in the Git repository at:
+
+? git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.19
+
+for you to fetch changes up to 6b39fd590aebca1a6a4c827f29f14d2b6df3939d:
+
+? reset: uniphier: add reset control support for SPI (2018-07-19 11:19:47 +0200)
+
+----------------------------------------------------------------
+Reset controller changes for v4.19
+
+This adds new drivers and bindings for the SDM845 AOSS (always on
+subsystem) reset controller and for the Uniphier USB3 core reset.
+SPI controller resets are added to the Uniphier reset driver.
+
+----------------------------------------------------------------
+Kunihiko Hayashi (4):
+??????reset: simple: export reset_simple_ops to be referred from modules
+??????dt-bindings: reset: uniphier: add USB3 core reset support
+??????reset: uniphier: add USB3 core reset control
+??????reset: uniphier: add reset control support for SPI
+
+Sibi Sankar (2):
+??????dt-bindings: reset: Add AOSS reset bindings for SDM845 SoCs
+??????reset: qcom: AOSS (always on subsystem) reset controller
+
+?.../devicetree/bindings/reset/qcom,aoss-reset.txt??|??52 +++++++
+?.../devicetree/bindings/reset/uniphier-reset.txt???|??56 +++++++
+?drivers/reset/Kconfig??????????????????????????????|??19 +++
+?drivers/reset/Makefile?????????????????????????????|???2 +
+?drivers/reset/reset-qcom-aoss.c????????????????????| 133 ++++++++++++++++
+?drivers/reset/reset-simple.c???????????????????????|???1 +
+?drivers/reset/reset-uniphier-usb3.c????????????????| 171 +++++++++++++++++++++
+?drivers/reset/reset-uniphier.c?????????????????????|???9 ++
+?include/dt-bindings/reset/qcom,sdm845-aoss.h???????|??17 ++
+?9 files changed, 460 insertions(+)
+?create mode 100644 Documentation/devicetree/bindings/reset/qcom,aoss-reset.txt
+?create mode 100644 drivers/reset/reset-qcom-aoss.c
+?create mode 100644 drivers/reset/reset-uniphier-usb3.c
+?create mode 100644 include/dt-bindings/reset/qcom,sdm845-aoss.h
