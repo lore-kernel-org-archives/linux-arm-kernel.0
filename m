@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 17:15:13 +0200
-Subject: [PATCH v4 21/35] mtd: rawnand: sunxi: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 17:15:00 +0200
+Subject: [PATCH v4 08/35] mtd: rawnand: gpmi: convert driver to nand_scan()
 In-Reply-To: <20180720151527.16038-1-miquel.raynal@bootlin.com>
 References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
-Message-ID: <20180720151527.16038-22-miquel.raynal@bootlin.com>
+Message-ID: <20180720151527.16038-9-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,89 +14,89 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/sunxi_nand.c | 43 +++++++++++++++++----------------------
- 1 file changed, 19 insertions(+), 24 deletions(-)
+ drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c | 56 ++++++++++++++++++------------
+ 1 file changed, 33 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/sunxi_nand.c b/drivers/mtd/nand/raw/sunxi_nand.c
-index 07f3ff9a28f2..a4d23381003d 100644
---- a/drivers/mtd/nand/raw/sunxi_nand.c
-+++ b/drivers/mtd/nand/raw/sunxi_nand.c
-@@ -1816,12 +1816,21 @@ static void sunxi_nand_ecc_cleanup(struct nand_ecc_ctrl *ecc)
- 	}
- }
- 
--static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
--			       struct device_node *np)
-+static int sunxi_nand_attach_chip(struct nand_chip *nand)
- {
--	struct nand_chip *nand = mtd_to_nand(mtd);
-+	struct mtd_info *mtd = nand_to_mtd(nand);
-+	struct nand_ecc_ctrl *ecc = &nand->ecc;
-+	struct device_node *np = nand_get_flash_node(nand);
- 	int ret;
- 
-+	if (nand->bbt_options & NAND_BBT_USE_FLASH)
-+		nand->bbt_options |= NAND_BBT_NO_OOB;
-+
-+	if (nand->options & NAND_NEED_SCRAMBLING)
-+		nand->options |= NAND_NO_SUBPAGE_WRITE;
-+
-+	nand->options |= NAND_SUBPAGE_READ;
-+
- 	if (!ecc->size) {
- 		ecc->size = nand->ecc_step_ds;
- 		ecc->strength = nand->ecc_strength_ds;
-@@ -1846,6 +1855,10 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
+diff --git a/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c
+index 6294d018df65..1c1ebbc82824 100644
+--- a/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c
+@@ -744,9 +744,9 @@ static int gpmi_alloc_dma_buffer(struct gpmi_nand_data *this)
+ 	 * [2] Allocate a read/write data buffer.
+ 	 *     The gpmi_alloc_dma_buffer can be called twice.
+ 	 *     We allocate a PAGE_SIZE length buffer if gpmi_alloc_dma_buffer
+-	 *     is called before the nand_scan_ident; and we allocate a buffer
+-	 *     of the real NAND page size when the gpmi_alloc_dma_buffer is
+-	 *     called after the nand_scan_ident.
++	 *     is called before the NAND identification; and we allocate a
++	 *     buffer of the real NAND page size when the gpmi_alloc_dma_buffer
++	 *     is called after.
+ 	 */
+ 	this->data_buffer_dma = kzalloc(mtd->writesize ?: PAGE_SIZE,
+ 					GFP_DMA | GFP_KERNEL);
+@@ -1865,6 +1865,34 @@ static int gpmi_init_last(struct gpmi_nand_data *this)
  	return 0;
  }
  
-+static const struct nand_controller_ops sunxi_nand_controller_ops = {
-+	.attach_chip = sunxi_nand_attach_chip,
++static int gpmi_nand_attach_chip(struct nand_chip *chip)
++{
++	struct gpmi_nand_data *this = nand_get_controller_data(chip);
++	int ret;
++
++	if (chip->bbt_options & NAND_BBT_USE_FLASH) {
++		chip->bbt_options |= NAND_BBT_NO_OOB;
++
++		if (of_property_read_bool(this->dev->of_node,
++					  "fsl,no-blockmark-swap"))
++			this->swap_block_mark = false;
++	}
++	dev_dbg(this->dev, "Blockmark swapping %sabled\n",
++		this->swap_block_mark ? "en" : "dis");
++
++	ret = gpmi_init_last(this);
++	if (ret)
++		return ret;
++
++	chip->options |= NAND_SKIP_BBTSCAN;
++
++	return 0;
++}
++
++static const struct nand_controller_ops gpmi_nand_controller_ops = {
++	.attach_chip = gpmi_nand_attach_chip,
 +};
 +
- static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
- 				struct device_node *np)
+ static int gpmi_nand_init(struct gpmi_nand_data *this)
  {
-@@ -1911,6 +1924,8 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
- 	/* Default tR value specified in the ONFI spec (chapter 4.15.1) */
- 	nand->chip_delay = 200;
- 	nand->controller = &nfc->controller;
-+	nand->controller->ops = &sunxi_nand_controller_ops;
-+
- 	/*
- 	 * Set the ECC mode to the default value in case nothing is specified
- 	 * in the DT.
-@@ -1927,30 +1942,10 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
- 	mtd = nand_to_mtd(nand);
- 	mtd->dev.parent = dev;
- 
--	ret = nand_scan_ident(mtd, nsels, NULL);
-+	ret = nand_scan(mtd, nsels);
+ 	struct nand_chip *chip = &this->nand;
+@@ -1905,26 +1933,8 @@ static int gpmi_nand_init(struct gpmi_nand_data *this)
  	if (ret)
- 		return ret;
+ 		goto err_out;
  
--	if (nand->bbt_options & NAND_BBT_USE_FLASH)
--		nand->bbt_options |= NAND_BBT_NO_OOB;
+-	ret = nand_scan_ident(mtd, GPMI_IS_MX6(this) ? 2 : 1, NULL);
+-	if (ret)
+-		goto err_out;
 -
--	if (nand->options & NAND_NEED_SCRAMBLING)
--		nand->options |= NAND_NO_SUBPAGE_WRITE;
+-	if (chip->bbt_options & NAND_BBT_USE_FLASH) {
+-		chip->bbt_options |= NAND_BBT_NO_OOB;
 -
--	nand->options |= NAND_SUBPAGE_READ;
--
--	ret = sunxi_nand_ecc_init(mtd, &nand->ecc, np);
--	if (ret) {
--		dev_err(dev, "ECC init failed: %d\n", ret);
--		return ret;
+-		if (of_property_read_bool(this->dev->of_node,
+-						"fsl,no-blockmark-swap"))
+-			this->swap_block_mark = false;
 -	}
+-	dev_dbg(this->dev, "Blockmark swapping %sabled\n",
+-		this->swap_block_mark ? "en" : "dis");
 -
+-	ret = gpmi_init_last(this);
+-	if (ret)
+-		goto err_out;
+-
+-	chip->options |= NAND_SKIP_BBTSCAN;
 -	ret = nand_scan_tail(mtd);
--	if (ret) {
--		dev_err(dev, "nand_scan_tail failed: %d\n", ret);
--		return ret;
--	}
--
- 	ret = mtd_device_register(mtd, NULL, 0);
- 	if (ret) {
- 		dev_err(dev, "failed to register mtd device: %d\n", ret);
++	chip->dummy_controller.ops = &gpmi_nand_controller_ops;
++	ret = nand_scan(mtd, GPMI_IS_MX6(this) ? 2 : 1);
+ 	if (ret)
+ 		goto err_out;
+ 
 -- 
 2.14.1
