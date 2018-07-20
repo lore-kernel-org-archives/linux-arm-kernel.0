@@ -1,116 +1,64 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Fri, 20 Jul 2018 13:08:38 +0800
-Subject: [PATCH] ARM: dts: berlin: Add missing OPP properties for CPUs
-Message-ID: <20180720130838.187becb9@xhacker.debian>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Fri, 20 Jul 2018 13:12:27 +0800
+Subject: [PATCH v6 1/4] dt-bindings: net: bluetooth: Add mediatek-bluetooth
+In-Reply-To: <cover.1532060309.git.sean.wang@mediatek.com>
+References: <cover.1532060309.git.sean.wang@mediatek.com>
+Message-ID: <0abe731710734135619bb1291ff2f71e0d5cf5be.1532060309.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OPP properties, like "operating-points", should either be present
-for all the CPUs of a cluster or none. If these are present only for a
-subset of CPUs of a cluster then things will start falling apart as soon
-as the CPUs are brought online in a different order. For example, this
-will happen because the operating system looks for such properties in
-the CPU node it is trying to bring up, so that it can create an OPP
-table.
+From: Sean Wang <sean.wang@mediatek.com>
 
-Add such missing properties.
+Add binding document for a SoC built-in device using MediaTek protocol.
+Which could be found on MT7622 SoC or other similar MediaTek SoCs.
 
-Fix other missing properties (clocks, clock latency) as well to
-make it all work.
-
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
+ .../devicetree/bindings/net/mediatek-bluetooth.txt | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
 
-Hi Olof, Arnd,
-
-This is a single patch from berlin-dt for 4.19, so I send it directly
-to you, could you please kindly merge it?
-
-Thanks
-
- arch/arm/boot/dts/berlin2.dtsi  | 10 ++++++++++
- arch/arm/boot/dts/berlin2q.dtsi | 33 +++++++++++++++++++++++++++++++++
- 2 files changed, 43 insertions(+)
-
-diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-index db67377af266..d2f7d984bba5 100644
---- a/arch/arm/boot/dts/berlin2.dtsi
-+++ b/arch/arm/boot/dts/berlin2.dtsi
-@@ -50,6 +50,16 @@
- 			device_type = "cpu";
- 			next-level-cache = <&l2>;
- 			reg = <1>;
+diff --git a/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
+new file mode 100644
+index 0000000..14ceb2a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
+@@ -0,0 +1,35 @@
++MediaTek SoC built-in Bluetooth Devices
++==================================
 +
-+			clocks = <&chip_clk CLKID_CPU>;
-+			clock-latency = <100000>;
-+			operating-points = <
-+				/* kHz    uV */
-+				1200000 1200000
-+				1000000 1200000
-+				800000  1200000
-+				600000  1200000
-+			>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 516a7ce25791..99d6872a6dfc 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -45,6 +45,17 @@
- 			device_type = "cpu";
- 			next-level-cache = <&l2>;
- 			reg = <1>;
++This device is a serial attached device to BTIF device and thus it must be a
++child node of the serial node with BTIF. The dt-bindings details for BTIF
++device can be known via Documentation/devicetree/bindings/serial/8250.txt.
 +
-+			clocks = <&chip_clk CLKID_CPU>;
-+			clock-latency = <100000>;
-+			/* Can be modified by the bootloader */
-+			operating-points = <
-+				/* kHz    uV */
-+				1200000 1200000
-+				1000000 1200000
-+				800000  1200000
-+				600000  1200000
-+			>;
- 		};
- 
- 		cpu2: cpu at 2 {
-@@ -52,6 +63,17 @@
- 			device_type = "cpu";
- 			next-level-cache = <&l2>;
- 			reg = <2>;
++Required properties:
 +
-+			clocks = <&chip_clk CLKID_CPU>;
-+			clock-latency = <100000>;
-+			/* Can be modified by the bootloader */
-+			operating-points = <
-+				/* kHz    uV */
-+				1200000 1200000
-+				1000000 1200000
-+				800000  1200000
-+				600000  1200000
-+			>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -59,6 +81,17 @@
- 			device_type = "cpu";
- 			next-level-cache = <&l2>;
- 			reg = <3>;
++- compatible:	Must be
++		  "mediatek,mt7622-bluetooth": for MT7622 SoC
++- clocks:	Should be the clock specifiers corresponding to the entry in
++		clock-names property.
++- clock-names:	Should contain "ref" entries.
++- power-domains: Phandle to the power domain that the device is part of
 +
-+			clocks = <&chip_clk CLKID_CPU>;
-+			clock-latency = <100000>;
-+			/* Can be modified by the bootloader */
-+			operating-points = <
-+				/* kHz    uV */
-+				1200000 1200000
-+				1000000 1200000
-+				800000  1200000
-+				600000  1200000
-+			>;
- 		};
- 	};
- 
++Example:
++
++	btif: serial at 1100c000 {
++		compatible = "mediatek,mt7622-btif",
++			     "mediatek,mtk-btif";
++		reg = <0 0x1100c000 0 0x1000>;
++		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_BTIF_PD>;
++		clock-names = "main";
++		reg-shift = <2>;
++		reg-io-width = <4>;
++
++		bluetooth {
++			compatible = "mediatek,mt7622-bluetooth";
++			power-domains = <&scpsys MT7622_POWER_DOMAIN_WB>;
++			clocks = <&clk25m>;
++			clock-names = "ref";
++		};
++	};
 -- 
-2.18.0
+2.7.4
