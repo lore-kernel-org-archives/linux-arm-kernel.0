@@ -1,67 +1,85 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Fri, 20 Jul 2018 21:48:08 +0200
-Subject: [RFC PATCH 8/8] mtd: rawnand: ams-delta: Use GPIO callbacks for
- data I/O
-In-Reply-To: <2165137.iTHcPHRtIn@z50>
-References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
- <20180718235710.18242-9-jmkrzyszt@gmail.com>
- <20180719084749.25ca96a6@bbrezillon> <2165137.iTHcPHRtIn@z50>
-Message-ID: <20180720214808.0c19234e@bbrezillon>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 20 Jul 2018 15:01:23 -0500
+Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
+ reset
+In-Reply-To: <CAK9iUCMMVR114msKiMHu7ik0VK8T5j=LAYAKsEkdnocTqkdMjQ@mail.gmail.com>
+References: <CAK9iUCM=zWexWow9TwkRfO186Hwr5WyGy0NHZF1vtXn3wbbZGQ@mail.gmail.com>
+ <12fc8de5-ff03-cb00-52cb-25a43c71d03a@codeaurora.org>
+ <20180708171418.GA11476@wunner.de>
+ <CAK9iUCMcic5mzGiT20KNxgwPo6AuajHFsoj7GOjSht5SwrQevg@mail.gmail.com>
+ <20180709160008.GA1490@wunner.de>
+ <CAK9iUCMMVR114msKiMHu7ik0VK8T5j=LAYAKsEkdnocTqkdMjQ@mail.gmail.com>
+Message-ID: <20180720200123.GS128988@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Janusz,
-
-On Fri, 20 Jul 2018 20:38:15 +0200
-Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
-
-> On Thursday, July 19, 2018 8:47:49 AM CEST Boris Brezillon wrote:
-> > On Thu, 19 Jul 2018 01:57:10 +0200
-> > Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
-> >   
-> > > Don't readw()/writew() data directly from/to GPIO port which is under
-> > > control of gpio-omap driver, use GPIO chip callbacks instead.
-> > > 
-> > > Thanks to utilization of get/set_multiple() callbacks, performance
-> > > degrade is minor for typical data transfers.  
-> > 
-> > Same comment here, don't use the gpio_chip hooks directly, use the
-> > consumer API instead.  
+On Tue, Jul 10, 2018 at 02:30:11PM -0400, Sinan Kaya wrote:
+> On Mon, Jul 9, 2018 at 12:00 PM, Lukas Wunner <lukas@wunner.de> wrote:
+> > On Mon, Jul 09, 2018 at 08:48:44AM -0600, Sinan Kaya wrote:
+> > > On 7/8/18, Lukas Wunner <lukas@wunner.de> wrote:
+> > > > On Tue, Jul 03, 2018 at 11:43:26AM -0400, Sinan Kaya wrote:
+> > > > > My solution doesn't help if link down interrupt is observed
+> > > > > before the AER or DPC services.
+> > > >
+> > > > If pciehp gets an interrupt quicker than dpc/aer, it will (at
+> > > > least with my patches) remove all devices, check if the
+> > > > presence bit is set, and if so, try to bring the slot up
+> > > > again.
+> > >
+> > > Hotplug driver should only observe a link down interrupt. Link
+> > > would come up in response to a secondary bus reset initiated by
+> > > the AER driver.
+> >
+> > PCIe hotplug doesn't have separate Link Down and Link Up
+> > interrupts, there is only a Link State *Changed* event.
+> >
+> > > Can you point me to the code that would bring up the link in hp
+> > > code?
+> >
+> > I was referring to the situation with my recently posted pciehp
+> > patches applied, in particular patch [21/32] ("PCI: pciehp: Become
+> > resilient to missed events"):
+> > https://patchwork.ozlabs.org/patch/930389/
+> >
+> > When I get a presence or link changed event, I turn the slot off.
+> > That includes removing all devices in the slot.  Because even if
+> > the slot is still occupied or link is up, there was definitely a
+> > change and the safe behavior is to assume that the card in the
+> > slot is now a different one than before.
 > 
-> I tired but performance was not acceptable.
-
-You tried to use gpiod_{get,set}_array_value(), right? Did you
-investigate on where the overhead comes from?
-
+> We do have a bit of mess unfortunately. Error handling and hotplug
+> drivers do not play nicely with each other.
 > 
-> I see your point but please understand, what I'm trying to do here is not to 
-> develop a shiny general purpose fully GPIO based NAND driver, I'm trying to 
-> resolve issues with NAND driver for Amstrad Delta I like to play with, without 
-> loosing much performance.
-
-That's not a reason to violate the consumer/driver separation provided
-by the GPIO framework. I'm not saying the current consumer APIs are
-good enough for what you want to do (bit-bang a parallel data bus in
-an efficient way), but bypassing the GPIO core like you do is
-definitely not a good thing. Maybe you should discuss with Linus the
-possibility of introducing a gpio_bitbang API that would provide you
-some guarantees on the access time by making sure the pins all belong
-to the same bank (and can thus be accessed in an atomic way). And maybe
-provide a way to read/write several bytes by defining a delay between
-each access, the size of the bus and the control pin if any (in
-our case NRE/NWE). 
-
+> When hotplug driver observes a link down, we are not checking if the
+> link down happened because user really wanted to remove a card or if
+> it was because it was originated by an error handling service such
+> as AER/DPC.
 > 
-> I'm going to reconsider all possible options, not only doing data I/O over 
-> GPIO inside the driver, to have the task completed.  Once done,  I can get 
-> back to the GPIO based code I developed so far and create a new generic driver 
-> as my free time permits, or anyone can do that if needed, the code is open 
-> source after all.
+> I'm thinking that we could potentially check if a hotplug event is
+> pending at the entrance of fatal error handling. If it is pending,
+> we could poll until the status bit clears. That should flush the
+> link down event.
+> 
+> Even then, link down indication of hotplug seem to turn off slot
+> power and LED.
+> 
+> If AER/DPC service runs after the hotplug driver, link won't come
+> back up as the power to the slot is turned off.
+> 
+> I'd like to hear about Bjorn's opinion before we throw something
+> else into this problem.
 
-Let's forget the generic nand-gpio driver for now. All I'm asking is
-that you do not bypass the GPIO framework like you intend do in this
-patch.
+You guys know way more about this than I do.
 
-Regards,
+I think the separation of AER/DPC/pciehp into separate drivers is
+somewhat artificial because there are many interdependencies.  The
+driver model doesn't apply very well because there's only one
+underlying piece of hardware, which forces us to use the portdrv as
+sort of a multiplexer.  The fact that portdrv claims these bridges
+also means normal drivers (e.g., for performance counters) can't use
+the usual model.
 
-Boris
+All that is to say that if integrating these services more tightly
+would help solve this problem, I'd be open to that.
+
+Bjorn
