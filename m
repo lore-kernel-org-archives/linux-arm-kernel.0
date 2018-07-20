@@ -1,51 +1,47 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Fri, 20 Jul 2018 17:55:44 +0300
-Subject: [PATCH v6 6/8] interconnect: qcom: Add msm8916 interconnect
- provider driver
-In-Reply-To: <8d2fd280-9cd7-f612-b663-ec4bcdd129cb@baylibre.com>
-References: <20180709155104.25528-1-georgi.djakov@linaro.org>
- <20180709155104.25528-7-georgi.djakov@linaro.org>
- <8d2fd280-9cd7-f612-b663-ec4bcdd129cb@baylibre.com>
-Message-ID: <3f8fa550-f789-ac04-9d9a-186d596c98f7@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 20 Jul 2018 16:56:03 +0200
+Subject: [PATCH RESEND 0/7] sunxi: Add DT representation for the MBUS
+ controller
+Message-ID: <cover.d2aafc48da035aed80793da89079e5da269b45b4.1532098561.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+Hi,
 
-On 07/11/2018 06:42 PM, Alexandre Bailon wrote:
-> On 07/09/2018 05:51 PM, Georgi Djakov wrote:
->> Add driver for the Qualcomm interconnect buses found in msm8916 based
->> platforms.
->>
->> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->> ---
->>  drivers/interconnect/Kconfig        |   5 +
->>  drivers/interconnect/Makefile       |   1 +
->>  drivers/interconnect/qcom/Kconfig   |  10 +
->>  drivers/interconnect/qcom/Makefile  |   2 +
->>  drivers/interconnect/qcom/msm8916.c | 499 ++++++++++++++++++++++++++++
->>  5 files changed, 517 insertions(+)
->>  create mode 100644 drivers/interconnect/qcom/msm8916>>
+We've had for quite some time to hack around in our drivers to take into
+account the fact that our DMA accesses are not done through the parent
+node, but through another bus with a different mapping than the CPU for the
+RAM (0 instead of 0x40000000 for most SoCs).
 
-[..]
+After some discussion after the submission of a camera device suffering of
+the same hacks, I've decided to put together a serie that introduce a
+property called dma-parent that allows to express the DMA relationship
+between a master and its bus, even if they are not direct parents in the DT.
 
->> +static int qcom_icc_set(struct icc_node *src, struct icc_node *dst,
->> +			u32 avg, u32 peak)
->> +{
->> +	struct qcom_icc_provider *qp;
->> +	struct qcom_icc_node *qn;
->> +	struct icc_node *node;
->> +	struct icc_provider *provider;
->> +	u64 avg_bw = icc_units_to_bps(avg);
->> +	u64 peak_bw = icc_units_to_bps(peak);
->> +	u64 rate = 0;
->> +	int ret = 0;
->> +
->> +	if (!src)
-> NIT: I think that src can't be NULL (there is a if statement to avoid it
-> in apply_constraints()).
+This is re-sent, since the previous iteration barely had any feedback.
 
-Yes, true!
+Let me know what you think,
+Maxime
 
-Thanks,
-Georgi
+Maxime Ripard (7):
+  dt-bindings: Add a dma-parent property
+  dt-bindings: bus: Add binding for the Allwinner MBUS controller
+  of: address: Add parent pointer to the __of_translate_address args
+  of: address: Add support for the dma-parent property
+  drm/sun4i: Rely on dma-parent for our RAM offset
+  clk: sunxi-ng: sun5i: Export the MBUS clock
+  ARM: dts: sun5i: Add the MBUS controller
+
+ Documentation/devicetree/bindings/sunxi-mbus.txt | 35 ++++++++++++++-
+ Documentation/devicetree/booting-without-of.txt  | 10 ++++-
+ arch/arm/boot/dts/sun5i.dtsi                     | 11 ++++-
+ drivers/clk/sunxi-ng/ccu-sun5i.h                 |  4 +--
+ drivers/gpu/drm/sun4i/sun4i_backend.c            | 28 ++++++++---
+ drivers/of/address.c                             | 43 ++++++++++++-----
+ include/dt-bindings/clock/sun5i-ccu.h            |  2 +-
+ 7 files changed, 110 insertions(+), 23 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sunxi-mbus.txt
+
+base-commit: ce397d215ccd07b8ae3f71db689aedb85d56ab40
+-- 
+git-series 0.9.1
