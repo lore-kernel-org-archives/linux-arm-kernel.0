@@ -1,33 +1,115 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 Jul 2018 11:13:12 +0100
-Subject: [PATCH v9 0/4] support exception state migration and set
- VSESR_EL2 by user space
-In-Reply-To: <20180719152425.6696-1-james.morse@arm.com>
-References: <20180719152425.6696-1-james.morse@arm.com>
-Message-ID: <c79facd4-0048-1733-1c8a-00fb2cd061b1@arm.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Fri, 20 Jul 2018 18:11:50 +0800
+Subject: [PATCH v2] ARM: dts: berlin: Add missing OPP properties for CPUs
+In-Reply-To: <20180720130838.187becb9@xhacker.debian>
+References: <20180720130838.187becb9@xhacker.debian>
+Message-ID: <20180720181150.15a2aa71@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/07/18 16:24, James Morse wrote:
-> Hi guys,
-> 
-> Changes since v8: expanded the documentation based on feedback.
-> 
-> This series adds the get/set events API to KVM for arm/arm64 so that
-> user-space can migrate pending SError, (which KVM may have made pending
-> as part of its device emulation), and for RAS make a new SError with a
-> specific ESR value pending. (Only systems with the v8.2 RAS Extensions
-> can specify an ESR, KVM advertises this capability with a new cap:
-> KVM_CAP_ARM_INJECT_SERROR_ESR)
-> 
-> User-space can use this for emulation of the v8.2 CPU RAS features
-> (using error nodes backed by mmio) or as part of NOTIFY_SEI which
-> extends a v8.2 RAS SError to also have firmware-first CPER records.
+From: Viresh Kumar <viresh.kumar@linaro.org>
 
-Applied to kvmarm/next.
+The OPP properties, like "operating-points", should either be present
+for all the CPUs of a cluster or none. If these are present only for a
+subset of CPUs of a cluster then things will start falling apart as soon
+as the CPUs are brought online in a different order. For example, this
+will happen because the operating system looks for such properties in
+the CPU node it is trying to bring up, so that it can create an OPP
+table.
 
-Thanks,
+Add such missing properties.
 
-	M.
+Fix other missing properties (clocks, clock latency) as well to
+make it all work.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+---
+Since v1:
+ - fix author, it's from Viresh. Sorry for making this mistake
+
+ arch/arm/boot/dts/berlin2.dtsi  | 10 ++++++++++
+ arch/arm/boot/dts/berlin2q.dtsi | 33 +++++++++++++++++++++++++++++++++
+ 2 files changed, 43 insertions(+)
+
+diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
+index db67377af266..d2f7d984bba5 100644
+--- a/arch/arm/boot/dts/berlin2.dtsi
++++ b/arch/arm/boot/dts/berlin2.dtsi
+@@ -50,6 +50,16 @@
+ 			device_type = "cpu";
+ 			next-level-cache = <&l2>;
+ 			reg = <1>;
++
++			clocks = <&chip_clk CLKID_CPU>;
++			clock-latency = <100000>;
++			operating-points = <
++				/* kHz    uV */
++				1200000 1200000
++				1000000 1200000
++				800000  1200000
++				600000  1200000
++			>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 516a7ce25791..99d6872a6dfc 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -45,6 +45,17 @@
+ 			device_type = "cpu";
+ 			next-level-cache = <&l2>;
+ 			reg = <1>;
++
++			clocks = <&chip_clk CLKID_CPU>;
++			clock-latency = <100000>;
++			/* Can be modified by the bootloader */
++			operating-points = <
++				/* kHz    uV */
++				1200000 1200000
++				1000000 1200000
++				800000  1200000
++				600000  1200000
++			>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -52,6 +63,17 @@
+ 			device_type = "cpu";
+ 			next-level-cache = <&l2>;
+ 			reg = <2>;
++
++			clocks = <&chip_clk CLKID_CPU>;
++			clock-latency = <100000>;
++			/* Can be modified by the bootloader */
++			operating-points = <
++				/* kHz    uV */
++				1200000 1200000
++				1000000 1200000
++				800000  1200000
++				600000  1200000
++			>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -59,6 +81,17 @@
+ 			device_type = "cpu";
+ 			next-level-cache = <&l2>;
+ 			reg = <3>;
++
++			clocks = <&chip_clk CLKID_CPU>;
++			clock-latency = <100000>;
++			/* Can be modified by the bootloader */
++			operating-points = <
++				/* kHz    uV */
++				1200000 1200000
++				1000000 1200000
++				800000  1200000
++				600000  1200000
++			>;
+ 		};
+ 	};
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.18.0
