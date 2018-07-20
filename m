@@ -1,9 +1,9 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 20 Jul 2018 17:15:05 +0200
-Subject: [PATCH v4 13/35] mtd: rawnand: marvell: convert driver to nand_scan()
+Date: Fri, 20 Jul 2018 17:15:21 +0200
+Subject: [PATCH v4 29/35] mtd: rawnand: docg4: convert driver to nand_scan()
 In-Reply-To: <20180720151527.16038-1-miquel.raynal@bootlin.com>
 References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
-Message-ID: <20180720151527.16038-14-miquel.raynal@bootlin.com>
+Message-ID: <20180720151527.16038-30-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,233 +14,97 @@ both nand_scan_ident() and nand_scan_tail().
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/raw/marvell_nand.c | 205 +++++++++++++++++++-----------------
- 1 file changed, 108 insertions(+), 97 deletions(-)
+ drivers/mtd/nand/raw/docg4.c | 55 ++++++++++++++++++++++++++------------------
+ 1 file changed, 32 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_nand.c
-index bd5f9a4b7b16..7e5ffef0da76 100644
---- a/drivers/mtd/nand/raw/marvell_nand.c
-+++ b/drivers/mtd/nand/raw/marvell_nand.c
-@@ -2290,6 +2290,111 @@ static int marvell_nfc_setup_data_interface(struct mtd_info *mtd, int chipnr,
- 	return 0;
- }
+diff --git a/drivers/mtd/nand/raw/docg4.c b/drivers/mtd/nand/raw/docg4.c
+index 4dccdfba6140..fec4353ff4ef 100644
+--- a/drivers/mtd/nand/raw/docg4.c
++++ b/drivers/mtd/nand/raw/docg4.c
+@@ -1227,10 +1227,9 @@ static void __init init_mtd_structs(struct mtd_info *mtd)
+ 	 * required within a nand driver because they are performed by the nand
+ 	 * infrastructure code as part of nand_scan().  In this case they need
+ 	 * to be initialized here because we skip call to nand_scan_ident() (the
+-	 * first half of nand_scan()).  The call to nand_scan_ident() is skipped
+-	 * because for this device the chip id is not read in the manner of a
+-	 * standard nand device.  Unfortunately, nand_scan_ident() does other
+-	 * things as well, such as call nand_set_defaults().
++	 * first half of nand_scan()).  The call to nand_scan_ident() could be
++	 * skipped because for this device the chip id is not read in the manner
++	 * of a standard nand device.
+ 	 */
  
-+static int marvell_nand_attach_chip(struct nand_chip *chip)
+ 	struct nand_chip *nand = mtd_to_nand(mtd);
+@@ -1315,6 +1314,27 @@ static int __init read_id_reg(struct mtd_info *mtd)
+ 
+ static char const *part_probes[] = { "cmdlinepart", "saftlpart", NULL };
+ 
++static int docg4_attach_chip(struct nand_chip *chip)
 +{
 +	struct mtd_info *mtd = nand_to_mtd(chip);
-+	struct marvell_nand_chip *marvell_nand = to_marvell_nand(chip);
-+	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
-+	struct pxa3xx_nand_platform_data *pdata = dev_get_platdata(nfc->dev);
-+	int ret;
++	struct docg4_priv *doc = (struct docg4_priv *)(chip + 1);
 +
-+	if (pdata && pdata->flash_bbt)
-+		chip->bbt_options |= NAND_BBT_USE_FLASH;
++	init_mtd_structs(mtd);
 +
-+	if (chip->bbt_options & NAND_BBT_USE_FLASH) {
-+		/*
-+		 * We'll use a bad block table stored in-flash and don't
-+		 * allow writing the bad block marker to the flash.
-+		 */
-+		chip->bbt_options |= NAND_BBT_NO_OOB_BBM;
-+		chip->bbt_td = &bbt_main_descr;
-+		chip->bbt_md = &bbt_mirror_descr;
-+	}
++	/* Initialize kernel BCH algorithm */
++	doc->bch = init_bch(DOCG4_M, DOCG4_T, DOCG4_PRIMITIVE_POLY);
++	if (!doc->bch)
++		return -EINVAL;
 +
-+	/* Save the chip-specific fields of NDCR */
-+	marvell_nand->ndcr = NDCR_PAGE_SZ(mtd->writesize);
-+	if (chip->options & NAND_BUSWIDTH_16)
-+		marvell_nand->ndcr |= NDCR_DWIDTH_M | NDCR_DWIDTH_C;
++	reset(mtd);
 +
-+	/*
-+	 * On small page NANDs, only one cycle is needed to pass the
-+	 * column address.
-+	 */
-+	if (mtd->writesize <= 512) {
-+		marvell_nand->addr_cyc = 1;
-+	} else {
-+		marvell_nand->addr_cyc = 2;
-+		marvell_nand->ndcr |= NDCR_RA_START;
-+	}
-+
-+	/*
-+	 * Now add the number of cycles needed to pass the row
-+	 * address.
-+	 *
-+	 * Addressing a chip using CS 2 or 3 should also need the third row
-+	 * cycle but due to inconsistance in the documentation and lack of
-+	 * hardware to test this situation, this case is not supported.
-+	 */
-+	if (chip->options & NAND_ROW_ADDR_3)
-+		marvell_nand->addr_cyc += 3;
-+	else
-+		marvell_nand->addr_cyc += 2;
-+
-+	if (pdata) {
-+		chip->ecc.size = pdata->ecc_step_size;
-+		chip->ecc.strength = pdata->ecc_strength;
-+	}
-+
-+	ret = marvell_nand_ecc_init(mtd, &chip->ecc);
-+	if (ret) {
-+		dev_err(nfc->dev, "ECC init failed: %d\n", ret);
-+		return ret;
-+	}
-+
-+	if (chip->ecc.mode == NAND_ECC_HW) {
-+		/*
-+		 * Subpage write not available with hardware ECC, prohibit also
-+		 * subpage read as in userspace subpage access would still be
-+		 * allowed and subpage write, if used, would lead to numerous
-+		 * uncorrectable ECC errors.
-+		 */
-+		chip->options |= NAND_NO_SUBPAGE_WRITE;
-+	}
-+
-+	if (pdata || nfc->caps->legacy_of_bindings) {
-+		/*
-+		 * We keep the MTD name unchanged to avoid breaking platforms
-+		 * where the MTD cmdline parser is used and the bootloader
-+		 * has not been updated to use the new naming scheme.
-+		 */
-+		mtd->name = "pxa3xx_nand-0";
-+	} else if (!mtd->name) {
-+		/*
-+		 * If the new bindings are used and the bootloader has not been
-+		 * updated to pass a new mtdparts parameter on the cmdline, you
-+		 * should define the following property in your NAND node, ie:
-+		 *
-+		 *	label = "main-storage";
-+		 *
-+		 * This way, mtd->name will be set by the core when
-+		 * nand_set_flash_node() is called.
-+		 */
-+		mtd->name = devm_kasprintf(nfc->dev, GFP_KERNEL,
-+					   "%s:nand.%d", dev_name(nfc->dev),
-+					   marvell_nand->sels[0].cs);
-+		if (!mtd->name) {
-+			dev_err(nfc->dev, "Failed to allocate mtd->name\n");
-+			return -ENOMEM;
-+		}
-+	}
-+
-+	return 0;
++	return read_id_reg(mtd);
 +}
 +
-+static const struct nand_controller_ops marvell_nand_controller_ops = {
-+	.attach_chip = marvell_nand_attach_chip,
++static const struct nand_controller_ops docg4_controller_ops = {
++	.attach_chip = docg4_attach_chip,
 +};
 +
- static int marvell_nand_chip_init(struct device *dev, struct marvell_nfc *nfc,
- 				  struct device_node *np)
+ static int __init probe_docg4(struct platform_device *pdev)
  {
-@@ -2432,105 +2537,11 @@ static int marvell_nand_chip_init(struct device *dev, struct marvell_nfc *nfc,
- 	marvell_nand->ndtr1 = readl_relaxed(nfc->regs + NDTR1);
+ 	struct mtd_info *mtd;
+@@ -1350,26 +1370,16 @@ static int __init probe_docg4(struct platform_device *pdev)
+ 	mtd->dev.parent = &pdev->dev;
+ 	doc->virtadr = virtadr;
+ 	doc->dev = dev;
+-
+-	init_mtd_structs(mtd);
+-
+-	/* initialize kernel bch algorithm */
+-	doc->bch = init_bch(DOCG4_M, DOCG4_T, DOCG4_PRIMITIVE_POLY);
+-	if (doc->bch == NULL) {
+-		retval = -EINVAL;
+-		goto free_nand;
+-	}
+-
+ 	platform_set_drvdata(pdev, doc);
  
- 	chip->options |= NAND_BUSWIDTH_AUTO;
--	ret = nand_scan_ident(mtd, marvell_nand->nsels, NULL);
--	if (ret) {
--		dev_err(dev, "could not identify the nand chip\n");
--		return ret;
+-	reset(mtd);
+-	retval = read_id_reg(mtd);
+-	if (retval == -ENODEV) {
+-		dev_warn(dev, "No diskonchip G4 device found.\n");
+-		goto free_bch;
 -	}
 -
--	if (pdata && pdata->flash_bbt)
--		chip->bbt_options |= NAND_BBT_USE_FLASH;
--
--	if (chip->bbt_options & NAND_BBT_USE_FLASH) {
--		/*
--		 * We'll use a bad block table stored in-flash and don't
--		 * allow writing the bad block marker to the flash.
--		 */
--		chip->bbt_options |= NAND_BBT_NO_OOB_BBM;
--		chip->bbt_td = &bbt_main_descr;
--		chip->bbt_md = &bbt_mirror_descr;
--	}
--
--	/* Save the chip-specific fields of NDCR */
--	marvell_nand->ndcr = NDCR_PAGE_SZ(mtd->writesize);
--	if (chip->options & NAND_BUSWIDTH_16)
--		marvell_nand->ndcr |= NDCR_DWIDTH_M | NDCR_DWIDTH_C;
--
--	/*
--	 * On small page NANDs, only one cycle is needed to pass the
--	 * column address.
--	 */
--	if (mtd->writesize <= 512) {
--		marvell_nand->addr_cyc = 1;
--	} else {
--		marvell_nand->addr_cyc = 2;
--		marvell_nand->ndcr |= NDCR_RA_START;
--	}
--
--	/*
--	 * Now add the number of cycles needed to pass the row
--	 * address.
--	 *
--	 * Addressing a chip using CS 2 or 3 should also need the third row
--	 * cycle but due to inconsistance in the documentation and lack of
--	 * hardware to test this situation, this case is not supported.
--	 */
--	if (chip->options & NAND_ROW_ADDR_3)
--		marvell_nand->addr_cyc += 3;
--	else
--		marvell_nand->addr_cyc += 2;
--
--	if (pdata) {
--		chip->ecc.size = pdata->ecc_step_size;
--		chip->ecc.strength = pdata->ecc_strength;
--	}
--
--	ret = marvell_nand_ecc_init(mtd, &chip->ecc);
--	if (ret) {
--		dev_err(dev, "ECC init failed: %d\n", ret);
--		return ret;
--	}
--
--	if (chip->ecc.mode == NAND_ECC_HW) {
--		/*
--		 * Subpage write not available with hardware ECC, prohibit also
--		 * subpage read as in userspace subpage access would still be
--		 * allowed and subpage write, if used, would lead to numerous
--		 * uncorrectable ECC errors.
--		 */
--		chip->options |= NAND_NO_SUBPAGE_WRITE;
--	}
--
--	if (pdata || nfc->caps->legacy_of_bindings) {
--		/*
--		 * We keep the MTD name unchanged to avoid breaking platforms
--		 * where the MTD cmdline parser is used and the bootloader
--		 * has not been updated to use the new naming scheme.
--		 */
--		mtd->name = "pxa3xx_nand-0";
--	} else if (!mtd->name) {
--		/*
--		 * If the new bindings are used and the bootloader has not been
--		 * updated to pass a new mtdparts parameter on the cmdline, you
--		 * should define the following property in your NAND node, ie:
--		 *
--		 *	label = "main-storage";
--		 *
--		 * This way, mtd->name will be set by the core when
--		 * nand_set_flash_node() is called.
--		 */
--		mtd->name = devm_kasprintf(nfc->dev, GFP_KERNEL,
--					   "%s:nand.%d", dev_name(nfc->dev),
--					   marvell_nand->sels[0].cs);
--		if (!mtd->name) {
--			dev_err(nfc->dev, "Failed to allocate mtd->name\n");
--			return -ENOMEM;
--		}
--	}
+-	retval = nand_scan_tail(mtd);
++	/*
++	 * Asking for 0 chips is useless here but it warns the user that the use
++	 * of the nand_scan() function is a bit abused here because the
++	 * initialization is actually a bit specific and re-handled again in the
++	 * ->attach_chip() hook. It will probably leak some memory though.
++	 */
++	nand->dummy_controller.ops = &docg4_controller_ops;
++	retval = nand_scan(mtd, 0);
+ 	if (retval)
+ 		goto free_bch;
  
--	ret = nand_scan_tail(mtd);
-+	chip->controller->ops = &marvell_nand_controller_ops;
-+	ret = nand_scan(mtd, marvell_nand->nsels);
- 	if (ret) {
--		dev_err(dev, "nand_scan_tail failed: %d\n", ret);
-+		dev_err(dev, "could not scan the nand chip\n");
- 		return ret;
- 	}
- 
+@@ -1389,7 +1399,6 @@ static int __init probe_docg4(struct platform_device *pdev)
+ 	nand_cleanup(nand);
+ free_bch:
+ 	free_bch(doc->bch);
+-free_nand:
+ 	kfree(nand);
+ unmap:
+ 	iounmap(virtadr);
 -- 
 2.14.1
