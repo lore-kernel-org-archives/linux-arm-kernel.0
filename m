@@ -1,113 +1,128 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Jul 2018 07:23:15 +0100
-Subject: [PATCH] ARM64: smp: Fix cpu_up() racing with sys_reboot
-In-Reply-To: <1532038726-3376-1-git-send-email-vnkgutta@codeaurora.org>
-References: <1532038726-3376-1-git-send-email-vnkgutta@codeaurora.org>
-Message-ID: <20180720062314.7qh23yfq2o5jciuh@salmiak>
+From: MNARANI@xilinx.com (Manish Narani)
+Date: Fri, 20 Jul 2018 06:23:16 +0000
+Subject: [RFC PATCH 3/3] sdhci: arasan: Add support to read Tap Delay
+ values from DT
+In-Reply-To: <CAPDyKFoGJOE-h4rLqzMO=wzNjkfcuU_oQ3NLK5=OQfSMj3dDHg@mail.gmail.com>
+References: <1528373500-24663-1-git-send-email-manish.narani@xilinx.com>
+ <1528373500-24663-3-git-send-email-manish.narani@xilinx.com>
+ <CAPDyKFoGJOE-h4rLqzMO=wzNjkfcuU_oQ3NLK5=OQfSMj3dDHg@mail.gmail.com>
+Message-ID: <SN6PR02MB4959F4BE25593EC7589DC34AC1510@SN6PR02MB4959.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 03:18:46PM -0700, Venkata Narendra Kumar Gutta wrote:
-> Nothing stops a process from hotplugging in a CPU concurrently
-> with a sys_reboot() call. In such a situation we could have
-> ipi_cpu_stop() mark a cpu as 'offline' and _cpu_up() ignore the
-> fact that the CPU is not really offline and call the
-> CPU_UP_PREPARE notifier. When this happens stop_machine code will
-> complain that the cpu thread already exists and BUG_ON().
+Hi Uffe,
+
+> -----Original Message-----
+> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
+> Sent: Tuesday, July 10, 2018 2:02 PM
+> To: Manish Narani <MNARANI@xilinx.com>
+> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
+> <mark.rutland@arm.com>; Catalin Marinas <catalin.marinas@arm.com>; Will
+> Deacon <will.deacon@arm.com>; Moritz Fischer <mdf@kernel.org>;
+> stefan.krsmanovic at aggios.com; Linux ARM <linux-arm-
+> kernel at lists.infradead.org>; Linux Kernel Mailing List <linux-
+> kernel at vger.kernel.org>; linux-mmc at vger.kernel.org;
+> devicetree at vger.kernel.org; Adrian Hunter <adrian.hunter@intel.com>;
+> Michal Simek <michals@xilinx.com>
+> Subject: Re: [RFC PATCH 3/3] sdhci: arasan: Add support to read Tap Delay
+> values from DT
 > 
-> CPU0                      CPU1
+> On 7 June 2018 at 14:11, Manish Narani <manish.narani@xilinx.com> wrote:
+> > This patch adds support for reading Tap Delay values from Device Tree
+> > and write them via eemi calls. The macros containing these tap delay
+> > values are removed from the driver.
+> >
+> > Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> > ---
+> >  drivers/mmc/host/sdhci-of-arasan.c | 131
+> > +++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 131 insertions(+)
+> >
+> > diff --git a/drivers/mmc/host/sdhci-of-arasan.c
+> > b/drivers/mmc/host/sdhci-of-arasan.c
+> > index e3332a5..fc0fd01 100644
+> > --- a/drivers/mmc/host/sdhci-of-arasan.c
+> > +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> > @@ -36,6 +36,8 @@
+> >
+> >  #define PHY_CLK_TOO_SLOW_HZ            400000
+> >
+> > +#define MMC_BANK2              0x2
+> > +
+> >  /*
+> >   * On some SoCs the syscon area has a feature where the upper 16-bits of
+> >   * each 32-bit register act as a write mask for the lower 16-bits.
+> > This allows @@ -90,6 +92,10 @@ struct sdhci_arasan_data {
+> >         struct sdhci_host *host;
+> >         struct clk      *clk_ahb;
+> >         struct phy      *phy;
+> > +       u32 mio_bank;
+> > +       u32 device_id;
+> > +       u32 itapdly[MMC_TIMING_MMC_HS400 + 1];
+> > +       u32 otapdly[MMC_TIMING_MMC_HS400 + 1];
+> >         bool            is_phy_on;
+> >
+> >         bool            has_cqe;
+> > @@ -160,11 +166,36 @@ static int sdhci_arasan_syscon_write(struct
+> sdhci_host *host,
+> >         return ret;
+> >  }
+> >
+> > +/**
+> > + * arasan_zynqmp_set_tap_delay - Program the tap delays.
+> > + * @deviceid:          Unique Id of device
+> > + * @itap_delay:                Input Tap Delay
+> > + * @oitap_delay:       Output Tap Delay
+> > + */
+> > +static void arasan_zynqmp_set_tap_delay(u8 deviceid, u8 itap_delay,
+> > +u8 otap_delay) {
+> > +       const struct zynqmp_eemi_ops *eemi_ops =
+> > +zynqmp_pm_get_eemi_ops();
 > 
->  sys_reboot()
->  kernel_restart()
->  machine_restart()
->  machine_shutdown()
->  smp_send_stop()
-
->From a quick look arm64's machine_restart() disables IRQs, calls
-smp_send_stop(), then calls one of:
-
-* efi_reboot()
-* arm_pm_restart()
-* do_kernel_restart()
-
-... and I can't see any of these calling machine_shutdown() directly.
-
-How does machine_shutdown() get called? Is that somewhere in the restart_list
-associated with do_kernel_restart?
-
->  ...                   ipi_cpu_stop()
-> 		       set_cpu_online(1, false)
->                        local_irq_disable()
->                        while(1)
->         <PREEMPT>
-
-Given IRQs are disabled in machine_restart(), I don't understand how this
-preemption can occur. Where do they get re-enabled?
-
->  cpu_up()
->  _cpu_up()
->  if (!cpu_online(1))
->  __cpu_notify(CPU_UP_PREPARE...)
+> No thanks!
 > 
->  cpu_stop_cpu_callback()
->  BUG_ON(stopper->thread)
+> Isn't there a more generic framework we can use to change the tap values,
+> rather than calling SoC specific functions from the driver?
+Yes, Thanks for your suggestion. I will work on the generic framework which will be used to change tap values
+Via SoC drivers.
 > 
-> This is easily reproducible by hotplugging in and out in a tight
-> loop while also rebooting.
+> BTW, what is a tap value, more exactly?
+> What does changing a tap value mean and where does the property belong,
+> really?
+Tap Value is the delay of clock phase which is used to adjust phase to the working value. The auto tuning
+process generally sets tap values internally in controller in SD UHS modes. But for other modes where
+auto tuning is applicable, we are determining tap values via trial & error method for specific SoC.
+> > 
+> Of course this doesn't even compile, as you have a dependency to another
+> series. Next time, please clarify that in a cover-letter (maybe you did, but I
+> can't find it).
+> 
+> > +       u32 node_id = (deviceid == 0) ? NODE_SD_0 : NODE_SD_1;
+> > +
+> > +       if (!eemi_ops || !eemi_ops->ioctl)
+> > +               return;
+> > +
+> > +       if (itap_delay)
+> > +               eemi_ops->ioctl(node_id, IOCTL_SET_SD_TAPDELAY,
+> > +                               PM_TAPDELAY_INPUT, itap_delay, NULL);
+> > +
+> > +       if (otap_delay)
+> > +               eemi_ops->ioctl(node_id, IOCTL_SET_SD_TAPDELAY,
+> > +                               PM_TAPDELAY_OUTPUT, otap_delay, NULL);
+> > +}
+> 
+> Another overall comment for the series.
+> 
+> I would recommend to change the order of the patches in the series.
+> Let the DT doc change come first, next the driver change and finally the change
+> to the DTS file(s). This makes it easier to follow and review.
+Sure, I will do that.
 
-Is this reproducible with mainline? e.g. v4.18-rc5?
-
-I've packed away my HW in preparation for an office move, but I might be able
-to give this a go in a VM.
-
-> Since the CPU is not really offline and hasn't gone through the
-> proper steps to be marked as such, let's mark the CPU as inactive.
-> This is just as easily testable as online and avoids any possibility
-> of _cpu_up() trying to bring the CPU back online when it never was
-> offline to begin with. Based on the similar patchset by for arm
-> targets 040c163( "ARM: smp: Fix cpu_up() racing with sys_reboot)"
-
-Is this in mainline?
-
-Looking at v4.18-rc5 I don't see arm's ipi_cpu_stop touching the active mask.
-
-Thanks,
-Mark.
+Thanks & Regards,
+Manish
 
 > 
-> Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
-> Signed-off-by: Venkata Narendra Kumar Gutta <vnkgutta@codeaurora.org>
-> ---
->  arch/arm64/kernel/smp.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> [...]
 > 
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 2faa986..adee4d3 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -790,7 +790,7 @@ void arch_irq_work_raise(void)
->   */
->  static void ipi_cpu_stop(unsigned int cpu)
->  {
-> -	set_cpu_online(cpu, false);
-> +	set_cpu_active(cpu, false);
->  
->  	local_daif_mask();
->  	sdei_mask_local_cpu();
-> @@ -925,10 +925,10 @@ void smp_send_stop(void)
->  
->  	/* Wait up to one second for other CPUs to stop */
->  	timeout = USEC_PER_SEC;
-> -	while (num_online_cpus() > 1 && timeout--)
-> +	while (num_active_cpus() > 1 && timeout--)
->  		udelay(1);
->  
-> -	if (num_online_cpus() > 1)
-> +	if (num_active_cpus() > 1)
->  		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
->  			   cpumask_pr_args(cpu_online_mask));
->  
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> 
+> Kind regards
+> Uffe
