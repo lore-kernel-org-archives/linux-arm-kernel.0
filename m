@@ -1,69 +1,64 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 20 Jul 2018 16:56:10 +0200
-Subject: [PATCH RESEND 7/7] ARM: dts: sun5i: Add the MBUS controller
+Date: Fri, 20 Jul 2018 16:56:05 +0200
+Subject: [PATCH RESEND 2/7] dt-bindings: bus: Add binding for the Allwinner
+ MBUS controller
 In-Reply-To: <cover.d2aafc48da035aed80793da89079e5da269b45b4.1532098561.git-series.maxime.ripard@bootlin.com>
 References: <cover.d2aafc48da035aed80793da89079e5da269b45b4.1532098561.git-series.maxime.ripard@bootlin.com>
-Message-ID: <b4278acafe16d9aba046298f196a8e6bc310956c.1532098561.git-series.maxime.ripard@bootlin.com>
+Message-ID: <0dc202cef44d5b63505e11c979148c4ab80cff81.1532098561.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MBUS (and its associated controller) is the bus in the Allwinner SoCs
-that DMA devices use in the system to access the memory.
-
-Among other things (and depending on the SoC generation), it can also
-enforce priorities or report bandwidth usages on a per-master basis.
-
-One of the most notable thing is that instead of having the same mapping
-for the RAM than the CPU, it maps it at address 0, which means we'll have
-to do address translation thanks to the dma-ranges property.
+The MBUS controller drives the MBUS that other devices in the SoC will
+use to perform DMA. It also has a register interface that allows to
+monitor and control the bandwidth and priorities for masters on that
+bus.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun5i.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ Documentation/devicetree/bindings/sunxi-mbus.txt | 35 +++++++++++++++++-
+ 1 file changed, 35 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sunxi-mbus.txt
 
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index 07f2248ed5f8..acb24e537e0b 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -112,6 +112,7 @@
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-+		dma-ranges;
- 		ranges;
- 
- 		sram-controller at 1c00000 {
-@@ -150,6 +151,14 @@
- 			};
- 		};
- 
-+		mbus: dram-controller at 1c01000 {
-+			compatible = "allwinner,sun5i-a13-mbus";
-+			reg = <0x01c01000 0x1000>;
-+			clocks = <&ccu CLK_MBUS>;
-+			dma-ranges = <0x00000000 0x40000000 0x20000000>;
-+			#dma-parent-cells = <1>;
-+		};
+diff --git a/Documentation/devicetree/bindings/sunxi-mbus.txt b/Documentation/devicetree/bindings/sunxi-mbus.txt
+new file mode 100644
+index 000000000000..436df0cac9d0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sunxi-mbus.txt
+@@ -0,0 +1,35 @@
++Allwinner Memory Bus (MBUS) controller
 +
- 		dma: dma-controller at 1c02000 {
- 			compatible = "allwinner,sun4i-a10-dma";
- 			reg = <0x01c02000 0x1000>;
-@@ -677,6 +686,7 @@
- 			clock-names = "ahb", "mod",
- 				      "ram";
- 			resets = <&ccu RST_DE_FE>;
-+			dma-parent = <&mbus 19>;
- 			status = "disabled";
- 
- 			ports {
-@@ -705,6 +715,7 @@
- 			clock-names = "ahb", "mod",
- 				      "ram";
- 			resets = <&ccu RST_DE_BE>;
-+			dma-parent = <&mbus 18>;
- 			status = "disabled";
- 
- 			assigned-clocks = <&ccu CLK_DE_BE>;
++The MBUS controller drives the MBUS that other devices in the SoC will
++use to perform DMA. It also has a register interface that allows to
++monitor and control the bandwidth and priorities for masters on that
++bus.
++
++Required properties:
++ - compatible: Must be one of:
++	- allwinner,sun5i-a13-mbus
++ - reg: Offset and length of the register set for the controller
++ - clocks: phandle to the clock driving the controller
++ - dma-ranges: see booting-without-of.txt
++ - #dma-parent-cells: Must be one, with the argument being the MBUS port
++   ID
++
++Each device having to perform their DMA through the MBUS must have the
++dma-parent property set to the MBUS controller, as documented in
++booting-without-of.txt.
++
++Example:
++
++mbus: dram-controller at 1c01000 {
++	compatible = "allwinner,sun5i-a13-mbus";
++	reg = <0x01c01000 0x1000>;
++	clocks = <&ccu CLK_MBUS>;
++	dma-ranges = <0x00000000 0x40000000 0x20000000>;
++	#dma-parent-cells = <1>;
++};
++
++fe0: display-frontend at 1e00000 {
++	compatible = "allwinner,sun5i-a13-display-frontend";
++	...
++	dma-parent = <&mbus 19>;
++};
 -- 
 git-series 0.9.1
