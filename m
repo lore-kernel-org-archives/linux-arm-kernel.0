@@ -1,38 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Jul 2018 14:03:18 +0200
-Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.19
-Message-ID: <cover.1532080241.git.horms+renesas@verge.net.au>
+Date: Fri, 20 Jul 2018 14:03:22 +0200
+Subject: [PATCH 1/1] arm64: defconfig: Enable BD9571MWV regulator
+In-Reply-To: <cover.1532080241.git.horms+renesas@verge.net.au>
+References: <cover.1532080241.git.horms+renesas@verge.net.au>
+Message-ID: <83c05e98f732bfa77830631e8d4403c76cad9b31.1532080241.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Dien Pham <dien.pham.ry@renesas.com>
 
-Please consider these Renesas ARM64 based SoC defconfig updates for v4.19.
+The BD9571 PMIC is present on the Renesas Salvator-X(S) and R-Car
+Starter Kit Premier/Pro development boards.
 
-
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-for-v4.19
-
-for you to fetch changes up to 83c05e98f732bfa77830631e8d4403c76cad9b31:
-
-  arm64: defconfig: Enable BD9571MWV regulator (2018-06-18 12:01:14 +0200)
-
-----------------------------------------------------------------
-Renesas ARM64 Based SoC Defconfig Updates for v4.19
-
-* Enable BD9571MWV regulator in ARM64 defconfig
-
-  This is to allow wider testing of the BD9571 PMIC which is
-  present on boards with Renesas R-Car Gen3 SoCs
-
-----------------------------------------------------------------
-Dien Pham (1):
-      arm64: defconfig: Enable BD9571MWV regulator
-
+Signed-off-by: Dien Pham <dien.pham.ry@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm64/configs/defconfig | 2 ++
  1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 3cfa8ca26738..85ce8f24cdbe 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -383,6 +383,7 @@ CONFIG_MESON_WATCHDOG=m
+ CONFIG_RENESAS_WDT=y
+ CONFIG_UNIPHIER_WATCHDOG=y
+ CONFIG_BCM2835_WDT=y
++CONFIG_MFD_BD9571MWV=y
+ CONFIG_MFD_AXP20X_RSB=y
+ CONFIG_MFD_CROS_EC=y
+ CONFIG_MFD_CROS_EC_I2C=y
+@@ -396,6 +397,7 @@ CONFIG_MFD_SPMI_PMIC=y
+ CONFIG_MFD_RK808=y
+ CONFIG_MFD_SEC_CORE=y
+ CONFIG_REGULATOR_AXP20X=y
++CONFIG_REGULATOR_BD9571MWV=y
+ CONFIG_REGULATOR_FAN53555=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_GPIO=y
+-- 
+2.11.0
