@@ -1,34 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 20 Jul 2018 10:15:07 -0600
-Subject: [PATCH 1/3] Docs: dt: arm-smmu: Add optional clock parameter
-In-Reply-To: <1531499278-32132-2-git-send-email-thor.thayer@linux.intel.com>
-References: <1531499278-32132-1-git-send-email-thor.thayer@linux.intel.com>
- <1531499278-32132-2-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <20180720161507.GA24992@rob-hp-laptop>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 20 Jul 2018 11:30:15 -0500
+Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.19, round 2
+Message-ID: <7hr2jx50q0.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 13, 2018 at 11:27:56AM -0500, thor.thayer at linux.intel.com wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
-> 
-> Add a clock to the SMMU node bindings.
-> 
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-> ---
->  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> index 8a6ffce12af5..356fd9f41e1b 100644
-> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> @@ -71,6 +71,8 @@ conditions.
->                    or using stream matching with #iommu-cells = <2>, and
->                    may be ignored if present in such cases.
->  
-> +- clock:          clock provider specifier
-> +
+Olof, Arnd,
 
-The TRM says there is a TCU clock and clock per TBU.
+A second round of DT updates for Amlogic, directly on top of the redo of
+the first one.
 
-Rob
+This includes a merge of a branch already queued in the clk tree because
+of the dependency on clock headers used in the DT changes here..
+
+Kevin
+
+
+The following changes since commit 89803e8b26569bdf5798f8745a4c708bf9360ee6:
+
+  ARM64: dts: meson-axg: add pdm pins (2018-07-20 08:18:37 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2
+
+for you to fetch changes up to fcf775a1e6717b7157b1ea626028b7e039b3c989:
+
+  Merge branch 'v4.19/dt64' into tmp/aml-rebuild (2018-07-20 09:05:11 -0700)
+
+----------------------------------------------------------------
+Amlogic 64-bit DT changes for v4.19, round 2
+- new SoC: S905W
+- new boards: based on S905W: Amlogic P281, Oranth Tanix TX3 Mini
+- AXG: add DT for new audio clock controller
+
+----------------------------------------------------------------
