@@ -1,66 +1,121 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Jul 2018 07:26:10 +0100
-Subject: [PATCH] arm64: fix for restoring console loglevel after handling
- traps
-In-Reply-To: <CAM5rFu-MFbH_2Pohmjydy232Rpt7_E84-K=e67wAu3iQzvTLiA@mail.gmail.com>
-References: <1531993734-1463-1-git-send-email-hari.vyas@broadcom.com>
- <1531993734-1463-2-git-send-email-hari.vyas@broadcom.com>
- <20180719100140.GA424@jagdpanzerIV>
- <CAM5rFu_N-=26LddRy1mO010h9yLcGuKqK6=y+h=h3-HbfEP+FQ@mail.gmail.com>
- <20180719103916.g763zmsm7wnngwop@lakrids.cambridge.arm.com>
- <CAM5rFu-MFbH_2Pohmjydy232Rpt7_E84-K=e67wAu3iQzvTLiA@mail.gmail.com>
-Message-ID: <20180720062609.2haxhf23zyouoxmh@salmiak>
+From: yuehaibing@huawei.com (YueHaibing)
+Date: Fri, 20 Jul 2018 14:30:53 +0800
+Subject: [SPAM]Re: [PATCH] net: mediatek: use dma_zalloc_coherent instead
+ of allocator/memset
+In-Reply-To: <1532019744.8953.248.camel@mtkswgap22>
+References: <20180719140955.19444-1-yuehaibing@huawei.com>
+ <20180719141723.GM17271@n2100.armlinux.org.uk>
+ <1532019744.8953.248.camel@mtkswgap22>
+Message-ID: <9a4cdfc6-7487-5908-b584-f3bf6158c4d4@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 07:42:50PM +0530, Hari Vyas wrote:
-> On Thu, Jul 19, 2018 at 4:09 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Thu, Jul 19, 2018 at 03:47:46PM +0530, Hari Vyas wrote:
-> >> On Thu, Jul 19, 2018 at 3:31 PM, Sergey Senozhatsky
-> >> <sergey.senozhatsky.work@gmail.com> wrote:
-> >> > On (07/19/18 15:18), Hari Vyas wrote:
-> >> > [..]
-> >> >
-> >> > Not so sure about the patch, sorry.
-> >> >
-> >> Mentioned concern in cover letter and commit message. Console loglevel
-> >> remains maximum after process die which
-> >> needs to be restored.
-> >> >> @@ -211,6 +211,8 @@ void die(const char *str, struct pt_regs *regs, int err)
-> >> >>
-> >> >>       bust_spinlocks(0);
-> >> >>       add_taint(TAINT_DIE, LOCKDEP_NOW_UNRELIABLE);
-> >> >> +
-> >> >> +     restore_console_loglevel();
-> >> >>       oops_exit();
-> >> >
-> >> > This is *probably* the only place where you can roll-back the
-> >> > loglevel, but you restore console loglevel too early - a trap
-> >> > can panic() the system, we need to preserve the console verbose
-> >> > mode which we set at the start of the trap.
-> >> >
-> >> console loglevel is indirectly sets to verbose in oops_enter() so
-> >> better to restore before oops_exit().
-> >> More from ARM maintainers.
-> >
-> > If we've hit die(), something has already gone very wrong within the
-> > kernel (not userspace), and we're likely to see subsequent issues
-> > anyway.
-> >
-> > Rolling back the console loglevel might throw away infromation on
-> > subsequent failures, which isn't ideal, so leaving it as-is is probably
-> > fine.
-> >
-> This die() is called from so many places i.e. entry.S shows so many ways i.e
-> el1_sync_invalid,irq,fiq_invalid,error_invalid.
+On 2018/7/20 1:02, Sean Wang wrote:
+> On Thu, 2018-07-19 at 15:17 +0100, Russell King - ARM Linux wrote:
+>> On Thu, Jul 19, 2018 at 10:09:55PM +0800, YueHaibing wrote:
+>>> Use dma_zalloc_coherent instead of dma_alloc_coherent
+>>> followed by memset 0.
+>>>
+>>> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+>>> ---
+>>>  drivers/net/ethernet/mediatek/mtk_eth_soc.c | 7 ++-----
+>>>  1 file changed, 2 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+>>> index d8ebf0a..fbdb3e3 100644
+>>> --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+>>> +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+>>> @@ -1221,14 +1221,11 @@ static int mtk_tx_alloc(struct mtk_eth *eth)
+>>>  	if (!ring->buf)
+>>>  		goto no_tx_mem;
+>>>  
+>>> -	ring->dma = dma_alloc_coherent(eth->dev,
+>>> -					  MTK_DMA_SIZE * sz,
+>>> -					  &ring->phys,
+>>> -					  GFP_ATOMIC | __GFP_ZERO);
+>>> +	ring->dma = dma_zalloc_coherent(eth->dev, MTK_DMA_SIZE * sz,
+>>> +					&ring->phys, GFP_ATOMIC | __GFP_ZERO);
+>>>  	if (!ring->dma)
+>>>  		goto no_tx_mem;
+>>>  
+>>> -	memset(ring->dma, 0, MTK_DMA_SIZE * sz);
+>>
+>> I have to wonder whether this code needs two forms of zeroing... in
+>> the original code, __GFP_ZERO _and_ a call to memset() just in case
+>> __GFP_ZERO failed to do its job, and in the replacement code, just
+>> in case dma_zalloc_coherent() hasn't got the idea...
+>>
+>> I think you can drop the __GFP_ZERO. ;)
+>>
+> 
+> Just now I did an experiment on 4.14.56 on armv7. I found that
+> dma_zalloc_coherent does not guarantee that the buffer we get
+> is all filled with 0.
+> 
+> 
+> I really think it's a little bit weird OR what was I missing something
+> for enabling dma_zalloc_coherent ? The result seems to tell that we
+> can't remove freely the memset with 0 at this moment until we get a
+> cause.
+> 
 
-Indeed, but *none* of these should fire unless something has gone wrong already.
+That means dma_zalloc_coherent doesn't work as expect on armv7?
 
-> This concern was identified in 4.14 kernel and was easy to produce.
-
-Under what circumstances do you see die() being called?
-
-Can you provide a backtrace?
-
-Thanks,
-Mark.
+> 
+> my test code is
+> 
+>          ring->dma = dma_zalloc_coherent(eth->dev,
+>                                           MTK_DMA_SIZE * sz,
+>                                           &ring->phys,
+>                                           GFP_ATOMIC);
+>         if (!ring->dma)
+>                 goto no_tx_mem;
+> 
+>         print_hex_dump(KERN_INFO, "mtk_tx_alloc:",
+>                        DUMP_PREFIX_OFFSET, 16, 1,
+>                        ring->dma, MTK_DMA_SIZE * sz, false);
+> 
+>         memset(ring->dma, 0, MTK_DMA_SIZE * sz);
+> 
+>         print_hex_dump(KERN_INFO, "mtk_tx_alloc2:",
+>                        DUMP_PREFIX_OFFSET, 16, 1,
+>                        ring->dma, MTK_DMA_SIZE * sz, false);
+> 
+> 
+> and the output 
+> 
+> ...
+> 
+> [  259.610413] mtk_tx_alloc:00000f40: 00 00 00 00 50 1f 00 bc 00 00 00 c0 00 00 00 00
+> [  259.617934] mtk_tx_alloc:00000f50: 00 00 00 00 60 1f 00 bc 00 00 00 c0 00 00 00 00
+> [  259.625470] mtk_tx_alloc:00000f60: 00 00 00 00 70 1f 00 bc 00 00 00 c0 00 00 00 00
+> [  259.633005] mtk_tx_alloc:00000f70: 00 00 00 00 80 1f 00 bc 00 00 00 c0 00 00 00 00
+> [  259.640539] mtk_tx_alloc:00000f80: 00 00 00 00 90 1f 00 bc 00 00 00 c0 00 00 00 00
+> [  259.648073] mtk_tx_alloc:00000f90: 00 00 00 00 a0 1f 00 bc 00 00 00 c0 00 00 00 00
+> [  259.655590] mtk_tx_alloc:00000fa0: 00 00 00 00 b0 1f 00 bc 00 00 00 c0 00 00 00 00
+> [  259.663124] mtk_tx_alloc:00000fb0: 00 00 00 00 c0 1f 00 bc 00 00 00 c0 00 00 00 00
+> [  259.670660] mtk_tx_alloc:00000fc0: 00 00 00 00 d0 1f 00 bc 00 00 00 c0 00 00 00 00
+> [  259.678196] mtk_tx_alloc:00000fd0: 00 00 00 00 e0 1f 00 bc 00 00 00 c0 00 00 00 00
+> [  259.685713] mtk_tx_alloc:00000fe0: 00 00 00 00 f0 1f 00 bc 00 00 00 c0 00 00 00 00
+> [  259.693247] mtk_tx_alloc:00000ff0: 02 c0 90 ad 00 10 00 bc 00 40 5a c0 00 00 00 02
+> [  259.700782] mtk_tx_alloc2:00000000: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+> [  259.708405] mtk_tx_alloc2:00000010: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+> [  259.716013] mtk_tx_alloc2:00000020: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+> [  259.723634] mtk_tx_alloc2:00000030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+> [  259.731253] mtk_tx_alloc2:00000040: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+> [  259.738875] mtk_tx_alloc2:00000050: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+> [  259.746481] mtk_tx_alloc2:00000060: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+> [  259.754103] mtk_tx_alloc2:00000070: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+> [  259.761723] mtk_tx_alloc2:00000080: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+> [  259.769344] mtk_tx_alloc2:00000090: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+> [  259.776951] mtk_tx_alloc2:000000a0: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+> 
+> ....
+> 
+> 
+> 	Sean
+> 
+> 
+> 
+> .
+> 
