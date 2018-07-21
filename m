@@ -1,42 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:33:52 -0700
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.19 (#2)
-In-Reply-To: <87sh4e8eym.fsf@bootlin.com>
-References: <87sh4e8eym.fsf@bootlin.com>
-Message-ID: <20180721213352.eborr5dctfk3t7j3@localhost>
+Date: Sat, 21 Jul 2018 14:49:00 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v4.19
+In-Reply-To: <cover.1532081674.git.horms+renesas@verge.net.au>
+References: <cover.1532081674.git.horms+renesas@verge.net.au>
+Message-ID: <20180721214900.pvr57t2t554vzg6u@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 10:54:25AM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Fri, Jul 20, 2018 at 02:06:04PM +0200, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Here is the second pull request for dt64 for mvebu for v4.19.
+> Please consider these Renesas ARM based SoC DT bindings updates for v4.19.
 > 
-> Gregory
 > 
-> The following changes since commit 4436a3711e3249840e0679e92d3c951bcaf25515:
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
->   arm64: dts: marvell: armada-37xx: reserve memory for ATF (2018-06-29 16:39:03 +0200)
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
-> are available in the Git repository at:
+> are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.19-2
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings-for-v4.19
 > 
-> for you to fetch changes up to c462f6c77e72804b72e008a91c4b6fa8d9b4b265:
+> for you to fetch changes up to a7eaad7f7517ba7cdabfeb28fa05bae4e70b4b5a:
 > 
->   arm64: dts: marvell: armada-37xx: update the crypto engine compatible (2018-07-13 13:42:03 +0200)
+>   dt-bindings: cpu: Add Renesas R9A06G032 SMP enable method. (2018-06-28 14:07:21 +0200)
 > 
 > ----------------------------------------------------------------
-> mvebu dt64 for 4.19 (part 2)
+> Renesas ARM Based SoC DT Bindings Updates for v4.19
 > 
-> Use more specific compatible for the Inside Secure SafeXcel on the
-> Armada 37xx and the Armada 7K/8K SoCs.
+> Bindings relating to initial support for RZ/N1D (R9A06G032) SoC and its
+> RZN1D-DB board:
+> 
+> * Add Renesas R9A06G032 SMP enable method
+> 
+>   To be used to enable second CA7 CPU
 
-I'll reply to the patches -- usually compatible should go from specific to
-generic and you're replacing here instead of adding a more specific first. You
-probably want to do the former instead.
+This is sort of redundant.
 
-Not merged, let's settle discussion on the patch first.
+> * Document SoC and Board bindings
+
+Merged, thanks.
 
 
 -Olof
