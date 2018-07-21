@@ -1,85 +1,36 @@
-From: mike.kravetz@oracle.com (Mike Kravetz)
-Date: Fri, 20 Jul 2018 17:24:12 -0700
-Subject: [PATCH v4 00/11] hugetlb: Factorize hugetlb architecture
- primitives
-In-Reply-To: <2173685f-7f85-7acb-4685-2383210c5fa2@ghiti.fr>
-References: <20180705110716.3919-1-alex@ghiti.fr>
- <20180709141621.GD22297@dhcp22.suse.cz>
- <2173685f-7f85-7acb-4685-2383210c5fa2@ghiti.fr>
-Message-ID: <75195a7d-3d0f-4e55-92cc-4ad772683c75@oracle.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat, 21 Jul 2018 10:32:19 +0800
+Subject: [GIT PULL 1/6] i.MX drivers updates for 4.19
+Message-ID: <1532140344-2771-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2018 11:37 AM, Alex Ghiti wrote:
-> Does anyone have any suggestion about those patches ?
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-I only took a quick look.  From the hugetlb perspective, I like the
-idea of moving routines to a common file.  If any of the arch owners
-(or anyone else) agree, I can do a review of the series.
--- 
-Mike Kravetz
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-> On 07/09/2018 02:16 PM, Michal Hocko wrote:
->> [CC hugetlb guys - http://lkml.kernel.org/r/20180705110716.3919-1-alex at ghiti.fr]
->>
->> On Thu 05-07-18 11:07:05, Alexandre Ghiti wrote:
->>> In order to reduce copy/paste of functions across architectures and then
->>> make riscv hugetlb port (and future ports) simpler and smaller, this
->>> patchset intends to factorize the numerous hugetlb primitives that are
->>> defined across all the architectures.
->>>
->>> Except for prepare_hugepage_range, this patchset moves the versions that
->>> are just pass-through to standard pte primitives into
->>> asm-generic/hugetlb.h by using the same #ifdef semantic that can be
->>> found in asm-generic/pgtable.h, i.e. __HAVE_ARCH_***.
->>>
->>> s390 architecture has not been tackled in this serie since it does not
->>> use asm-generic/hugetlb.h at all.
->>> powerpc could be factorized a bit more (cf huge_ptep_set_wrprotect).
->>>
->>> This patchset has been compiled on x86 only.
->>>
->>> Changelog:
->>>
->>> v4:
->>>    Fix powerpc build error due to misplacing of #include
->>>    <asm-generic/hugetlb.h> outside of #ifdef CONFIG_HUGETLB_PAGE, as
->>>    pointed by Christophe Leroy.
->>>
->>> v1, v2, v3:
->>>    Same version, just problems with email provider and misuse of
->>>    --batch-size option of git send-email
->>>
->>> Alexandre Ghiti (11):
->>>    hugetlb: Harmonize hugetlb.h arch specific defines with pgtable.h
->>>    hugetlb: Introduce generic version of hugetlb_free_pgd_range
->>>    hugetlb: Introduce generic version of set_huge_pte_at
->>>    hugetlb: Introduce generic version of huge_ptep_get_and_clear
->>>    hugetlb: Introduce generic version of huge_ptep_clear_flush
->>>    hugetlb: Introduce generic version of huge_pte_none
->>>    hugetlb: Introduce generic version of huge_pte_wrprotect
->>>    hugetlb: Introduce generic version of prepare_hugepage_range
->>>    hugetlb: Introduce generic version of huge_ptep_set_wrprotect
->>>    hugetlb: Introduce generic version of huge_ptep_set_access_flags
->>>    hugetlb: Introduce generic version of huge_ptep_get
->>>
->>>   arch/arm/include/asm/hugetlb-3level.h        | 32 +---------
->>>   arch/arm/include/asm/hugetlb.h               | 33 +----------
->>>   arch/arm64/include/asm/hugetlb.h             | 39 +++---------
->>>   arch/ia64/include/asm/hugetlb.h              | 47 ++-------------
->>>   arch/mips/include/asm/hugetlb.h              | 40 +++----------
->>>   arch/parisc/include/asm/hugetlb.h            | 33 +++--------
->>>   arch/powerpc/include/asm/book3s/32/pgtable.h |  2 +
->>>   arch/powerpc/include/asm/book3s/64/pgtable.h |  1 +
->>>   arch/powerpc/include/asm/hugetlb.h           | 43 ++------------
->>>   arch/powerpc/include/asm/nohash/32/pgtable.h |  2 +
->>>   arch/powerpc/include/asm/nohash/64/pgtable.h |  1 +
->>>   arch/sh/include/asm/hugetlb.h                | 54 ++---------------
->>>   arch/sparc/include/asm/hugetlb.h             | 40 +++----------
->>>   arch/x86/include/asm/hugetlb.h               | 72 +----------------------
->>>   include/asm-generic/hugetlb.h                | 88 +++++++++++++++++++++++++++-
->>>   15 files changed, 143 insertions(+), 384 deletions(-)
->>>
->>> -- 
->>> 2.16.2
-> 
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-drivers-4.19
+
+for you to fetch changes up to 69c04aee3482415cff52061a3ccad4943662e81d:
+
+  soc: imx6qp: Use GENPD_FLAG_ALWAYS_ON for PU errata (2018-07-17 14:12:14 +0800)
+
+----------------------------------------------------------------
+i.MX drivers update for 4.19:
+ - Handle i.MX6SL chip errata ERR006287 in the safest possible way by
+   keeping the DISP domain always-on, because Upon resuming from power
+   gating, the modules in the display power domain (eLCDIF, EPDC, PXP
+   and SPDC) might fail to perform register reads correctly.
+ - Use GENPD_FLAG_ALWAYS_ON flag for i.MX6QP PU ERR009619 handling.
+   It is functionally identical to the exsiting implementation but
+   simpler and slightly faster.
+
+----------------------------------------------------------------
+Leonard Crestez (2):
+      soc: imx: gpc: Disable 6sl display power gating for ERR006287
+      soc: imx6qp: Use GENPD_FLAG_ALWAYS_ON for PU errata
+
+ drivers/soc/imx/gpc.c | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
