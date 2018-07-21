@@ -1,36 +1,47 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:29:24 -0700
-Subject: [PATCH v2] ARM: dts: berlin: Add missing OPP properties for CPUs
-In-Reply-To: <20180720181150.15a2aa71@xhacker.debian>
-References: <20180720130838.187becb9@xhacker.debian>
- <20180720181150.15a2aa71@xhacker.debian>
-Message-ID: <20180721212924.sduyl4dcmz7mzbvz@localhost>
+Date: Sat, 21 Jul 2018 14:31:30 -0700
+Subject: [GIT PULL] ARM: at91: DT for 4.19
+In-Reply-To: <20180720081859.GA22228@piout.net>
+References: <20180720081859.GA22228@piout.net>
+Message-ID: <20180721213130.ec3wmahq5wgyx34v@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 06:11:50PM +0800, Jisheng Zhang wrote:
-> From: Viresh Kumar <viresh.kumar@linaro.org>
+On Fri, Jul 20, 2018 at 10:18:59AM +0200, Alexandre Belloni wrote:
+> Arnd, Olof,
 > 
-> The OPP properties, like "operating-points", should either be present
-> for all the CPUs of a cluster or none. If these are present only for a
-> subset of CPUs of a cluster then things will start falling apart as soon
-> as the CPUs are brought online in a different order. For example, this
-> will happen because the operating system looks for such properties in
-> the CPU node it is trying to bring up, so that it can create an OPP
-> table.
+> Here are the unusually large DT PR for AT91. It contains mainly new DTs.
 > 
-> Add such missing properties.
+> There is a pm.c change that I'm including here so it is along with the
+> corresponding DT changes.
 > 
-> Fix other missing properties (clocks, clock latency) as well to
-> make it all work.
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-> ---
-> Since v1:
->  - fix author, it's from Viresh. Sorry for making this mistake
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.19-dt
+> 
+> for you to fetch changes up to c8cbc1c20c29697e7335a5044fe6c60aa5c6e922:
+> 
+>   ARM: dts: at91: fix typos for SSC TD functions (2018-07-20 10:05:14 +0200)
+> 
+> ----------------------------------------------------------------
+> AT91 DT for 4.19:
+> 
+>  - New boards from Laird: WB45N, WB50N, SOM60 modules and DVK, Gatwick
+>  - fix the PMC compatibles
+> 
+> ----------------------------------------------------------------
+> Alexandre Belloni (4):
+>       dt-bindings: arm: remove PMC bindings
+>       dt-bindings: clk: at91: Document all the PMC compatibles
+>       ARM: at91: fix USB clock detection handling
 
-Applied, thanks.
+I guess this patch should have gone in a soc branch?
+
+Anyway, merged as-is, unlikely to cause conflicts.
 
 
 -Olof
