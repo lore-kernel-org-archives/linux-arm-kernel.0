@@ -1,56 +1,56 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:20:24 -0700
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.19
-In-Reply-To: <cover.1532087129.git.horms+renesas@verge.net.au>
-References: <cover.1532087129.git.horms+renesas@verge.net.au>
-Message-ID: <20180721212024.466rmmvqlg2zvfew@localhost>
+Date: Sat, 21 Jul 2018 14:24:30 -0700
+Subject: [GIT PULL 3/3] ARM: uniphier: UniPhier SoC updates for v4.19
+In-Reply-To: <CAK7LNAShLhWqCRR8RfuJ0xBJAFoj-S6WLcSdh9QShg8dGfq9RA@mail.gmail.com>
+References: <CAK7LNAShLhWqCRR8RfuJ0xBJAFoj-S6WLcSdh9QShg8dGfq9RA@mail.gmail.com>
+Message-ID: <20180721212430.odjwcusbbihffo6l@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 02:05:30PM +0200, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Thu, Jul 19, 2018 at 08:05:03AM +0900, Masahiro Yamada wrote:
+> Hi Arnd, Olof,
 > 
-> Please consider these second round of Renesas ARM based SoC updates for v4.19.
+> Please pull UniPhier SoC changes for the v4.19 MW.
 > 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-arm-soc-for-v4.19,
-> which I have already sent a pull-request for.
+> Thanks!
 > 
 > 
-> The following changes since commit c44e182e537492baaa37303fc0ee299222fce921:
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
->   ARM: shmobile: convert to SPDX identifier (2018-06-18 12:00:29 +0200)
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-soc2-for-v4.19
+>   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+> tags/uniphier-soc-v4.19
 > 
-> for you to fetch changes up to 54f464e0c91f10212fa5699bfef1f104ee7d2213:
+> for you to fetch changes up to ae93e694440a454609fa40725e16619c5a781768:
 > 
->   ARM: shmobile: Always enable ARCH_TIMER on SoCs with A7 and/or A15 (2018-07-20 13:44:10 +0200)
+>   ARM: uniphier: remove empty Makefile (2018-07-19 06:53:16 +0900)
 > 
 > ----------------------------------------------------------------
-> Second Round of Renesas ARM Based SoC Updates for v4.19
+> UniPhier ARM SoC updates for v4.19
 > 
-> * Always enable ARCH_TIMER on SoCs with A7 or A15
+> - enable ethernet and thermal drivers from multi_v7_defconfig
 > 
->   All such SoCs have ARCH_TIMER so there is no need for it to be optional.
->   This allows clean-up which is included in this change.
+> - select RESET_CONTROLLER
 > 
-> * Do not compile r8a7779_platform_cpu_kill when it is unused
+> - remove empty arch/arm/mach-uniphier/Makefile
 > 
->   This avoids a warning by shuffling code into an existing #ifdef
->   r8a7779 is the R-Car H1 SoC
-> 
-> * Add SMP enabler driver for the RZ/N1D (r9a06g032) SoC
-> 
->   This is to allow SMP to be enabled via DT on the r9a06g032
-> 
-> * Stop compiling headsmp-apmu for non-SMP configs
-> 
->   This is a minor clean-up allowing removal of an #ifdef
+> ----------------------------------------------------------------
+> Kunihiko Hayashi (1):
+>       ARM: multi_v7_defconfig: add CONFIG_UNIPHIER_THERMAL and CONFIG_SNI_AVE
 
-Merged, thanks! Nice tag description.
+I renormalied multi_v7_defconfig for 4.18-rc3, so please base your branch
+on that to avoid conflicts.
 
+Also, we separate out defconfig updates to branches on their own. I can
+cherry-pick the branch apart but wanted to check with you before I do
+so in case it messes up your workflow. If it does, send a fresh pull
+request for SoC, and either one for the defconfig or just the patch and
+we can apply it directly.
+
+
+Thanks!
 
 -Olof
