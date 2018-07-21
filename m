@@ -1,43 +1,95 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 21 Jul 2018 19:37:20 +0200
-Subject: [PATCH 2/3] ARM: dts: meson8: add the ARM TWD timer
-In-Reply-To: <20180721173721.31361-1-martin.blumenstingl@googlemail.com>
-References: <20180721173721.31361-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20180721173721.31361-3-martin.blumenstingl@googlemail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Sat, 21 Jul 2018 19:38:40 +0200
+Subject: [PATCH v4 18/35] mtd: rawnand: s3c2410: convert driver to
+ nand_scan()
+In-Reply-To: <20180720151527.16038-19-miquel.raynal@bootlin.com>
+References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
+ <20180720151527.16038-19-miquel.raynal@bootlin.com>
+Message-ID: <20180721193840.05fa4e4f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Meson8 and Meson8m2 SoC are using four ARM Cortex-A9 cores which
-come with a "TWD" (Timer-Watchdog) based timer. This adds support for
-the ARM TWD Timer on these two SoCs.
+On Fri, 20 Jul 2018 17:15:10 +0200
+Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-Suggested-by: Carlo Caione <carlo@endlessm.com>
-[ rebased patch from Carlo, use IRQ_TYPE_EDGE_RISING instead of
-  IRQ_TYPE_LEVEL_LOW to prevent "GIC: PPI13 is secure or misconfigured"
-  message during boot, use pre-processor macros to specify the IRQ,
-  dropped TWD watchdog node since there's no driver for it anymore ]
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- arch/arm/boot/dts/meson8.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+> Two helpers have been added to the core to make ECC-related
+> configuration between the detection phase and the final NAND scan. Use
+> these hooks and convert the driver to just use nand_scan() instead of
+> both nand_scan_ident() and nand_scan_tail().
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 
-diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
-index d77dcf890cfc..4e3406edb61b 100644
---- a/arch/arm/boot/dts/meson8.dtsi
-+++ b/arch/arm/boot/dts/meson8.dtsi
-@@ -134,6 +134,13 @@
- 		compatible = "arm,cortex-a9-scu";
- 		reg = <0xc4300000 0x100>;
- 	};
-+
-+	timer at c4300600 {
-+		compatible = "arm,cortex-a9-twd-timer";
-+		reg = <0xc4300600 0x20>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>;
-+		clocks = <&clkc CLKID_CPU_DIV16>;
-+	};
- }; /* end of / */
- 
- &aobus {
--- 
-2.18.0
+Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
+
+> ---
+>  drivers/mtd/nand/raw/s3c2410.c | 30 +++++++++++++-----------------
+>  1 file changed, 13 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/raw/s3c2410.c b/drivers/mtd/nand/raw/s3c2410.c
+> index e8bf64832213..c21e8892394a 100644
+> --- a/drivers/mtd/nand/raw/s3c2410.c
+> +++ b/drivers/mtd/nand/raw/s3c2410.c
+> @@ -915,20 +915,19 @@ static void s3c2410_nand_init_chip(struct s3c2410_nand_info *info,
+>  }
+>  
+>  /**
+> - * s3c2410_nand_update_chip - post probe update
+> - * @info: The controller instance.
+> - * @nmtd: The driver version of the MTD instance.
+> + * s3c2410_nand_attach_chip - Init the ECC engine after NAND scan
+> + * @chip: The NAND chip
+>   *
+> - * This routine is called after the chip probe has successfully completed
+> - * and the relevant per-chip information updated. This call ensure that
+> + * This hook is called by the core after the identification of the NAND chip,
+> + * once the relevant per-chip information is up to date.. This call ensure that
+>   * we update the internal state accordingly.
+>   *
+>   * The internal state is currently limited to the ECC state information.
+>  */
+> -static int s3c2410_nand_update_chip(struct s3c2410_nand_info *info,
+> -				    struct s3c2410_nand_mtd *nmtd)
+> +static int s3c2410_nand_attach_chip(struct nand_chip *chip)
+>  {
+> -	struct nand_chip *chip = &nmtd->chip;
+> +	struct mtd_info *mtd = nand_to_mtd(chip);
+> +	struct s3c2410_nand_info *info = s3c2410_nand_mtd_toinfo(mtd);
+>  
+>  	switch (chip->ecc.mode) {
+>  
+> @@ -998,6 +997,10 @@ static int s3c2410_nand_update_chip(struct s3c2410_nand_info *info,
+>  	return 0;
+>  }
+>  
+> +static const struct nand_controller_ops s3c24xx_nand_controller_ops = {
+> +	.attach_chip = s3c2410_nand_attach_chip,
+> +};
+> +
+>  static const struct of_device_id s3c24xx_nand_dt_ids[] = {
+>  	{
+>  		.compatible = "samsung,s3c2410-nand",
+> @@ -1095,6 +1098,7 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+>  	platform_set_drvdata(pdev, info);
+>  
+>  	nand_controller_init(&info->controller);
+> +	info->controller.ops = &s3c24xx_nand_controller_ops;
+>  
+>  	/* get the clock source and enable it */
+>  
+> @@ -1166,15 +1170,7 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+>  		mtd->dev.parent = &pdev->dev;
+>  		s3c2410_nand_init_chip(info, nmtd, sets);
+>  
+> -		err = nand_scan_ident(mtd, (sets) ? sets->nr_chips : 1, NULL);
+> -		if (err)
+> -			goto exit_error;
+> -
+> -		err = s3c2410_nand_update_chip(info, nmtd);
+> -		if (err < 0)
+> -			goto exit_error;
+> -
+> -		err = nand_scan_tail(mtd);
+> +		err = nand_scan(mtd, sets ? sets->nr_chips : 1);
+>  		if (err)
+>  			goto exit_error;
+>  
