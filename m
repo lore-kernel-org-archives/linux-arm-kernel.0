@@ -1,132 +1,88 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Sat, 21 Jul 2018 08:59:56 +0200
-Subject: [PATCH v4 09/35] mtd: rawnand: hisi504: convert driver to
- nand_scan()
-In-Reply-To: <20180720151527.16038-10-miquel.raynal@bootlin.com>
-References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
- <20180720151527.16038-10-miquel.raynal@bootlin.com>
-Message-ID: <20180721085956.743ca05d@bbrezillon>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Sat, 21 Jul 2018 15:28:54 +0800
+Subject: [PATCH v3 0/4] Add basic support for Mediatek MT8183 SoC
+In-Reply-To: <2ca76468-198b-b764-c974-374e567e0c93@gmail.com>
+References: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
+ <9ba45353-a6e1-9a6e-f05b-4b1679ae9e52@gmail.com>
+ <1532074769.19148.2.camel@mtksdaap41>
+ <2ca76468-198b-b764-c974-374e567e0c93@gmail.com>
+Message-ID: <1532158134.16009.10.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Jul 2018 17:15:01 +0200
-Miquel Raynal <miquel.raynal@bootlin.com> wrote:
-
-> Two helpers have been added to the core to make ECC-related
-> configuration between the detection phase and the final NAND scan. Use
-> these hooks and convert the driver to just use nand_scan() instead of
-> both nand_scan_ident() and nand_scan_tail().
+On Fri, 2018-07-20 at 12:44 +0200, Matthias Brugger wrote:
 > 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-
-Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
-
-> ---
->  drivers/mtd/nand/raw/hisi504_nand.c | 78 +++++++++++++++++++++----------------
->  1 file changed, 44 insertions(+), 34 deletions(-)
+> On 20/07/18 10:19, Erin Lo wrote:
+> > On Mon, 2018-07-16 at 11:28 +0200, Matthias Brugger wrote:
+> >> Hi Erin,
+> >>
+> >> On 17/05/18 08:22, Erin Lo wrote:
+> >>> MT8183 is a SoC based on 64bit ARMv8 architecture.
+> >>> It contains 4 CA53 and 4 CA73 cores.
+> >>> MT8183 share many HW IP with MT65xx series.
+> >>> This patchset was tested on MT8183 evaluation board, and boot to shell ok.
+> >>>
+> >>> This series contains document bindings, device tree including interrupt, uart.
+> >>>
+> >>> Change in v3:
+> >>> 1. Fill out GICC, GICH, GICV regions
+> >>> 2. Update Copyright to 2018
+> >>>
+> >>> Change in v2:
+> >>> 1. Split dt-bindings into different patches
+> >>> 2. Correct bindings for supported SoCs (mtk-uart.txt)
+> >>>
+> >>> Ben Ho (1):
+> >>>   arm64: dts: Add Mediatek SoC MT8183 and evaluation board dts and
+> >>>     Makefile
+> >>>
+> >>> Erin Lo (3):
+> >>>   dt-bindings: arm: Add bindings for Mediatek MT8183 SoC Platform
+> >>>   dt-bindings: mtk-sysirq: Add compatible for Mediatek MT8183
+> >>>   dt-bindings: serial: Add compatible for Mediatek MT8183
+> >>>
+> >>
+> >> I'm a bit reluctant to take this series, as it will only enable the EVB board to
+> >> boot into a serial console. Are you planning to add support for other devices of
+> >> this SoC?
+> >>
+> >> Apart please take into account that there is an issue with the dts file, as you
+> >> were told by the kbuild test robot.
+> >>
+> >> Regards,
+> >> Matthias
+> >>
+> > 
+> > Hi, Matthias
+> > Sorry for missing this letter...since mail proxy server.
+> > We plan to add support all the devices of MT8183 in serious.
+> > We have implemented the clock and pinctrl driver for upstream and they
+> > are in internal review right now.
+> > 
 > 
-> diff --git a/drivers/mtd/nand/raw/hisi504_nand.c b/drivers/mtd/nand/raw/hisi504_nand.c
-> index a1e009c8e556..950dc7789296 100644
-> --- a/drivers/mtd/nand/raw/hisi504_nand.c
-> +++ b/drivers/mtd/nand/raw/hisi504_nand.c
-> @@ -709,9 +709,50 @@ static int hisi_nfc_ecc_probe(struct hinfc_host *host)
->  	return 0;
->  }
->  
-> +static int hisi_nfc_attach_chip(struct nand_chip *chip)
-> +{
-> +	struct mtd_info *mtd = nand_to_mtd(chip);
-> +	struct hinfc_host *host = nand_get_controller_data(chip);
-> +	int flag;
-> +
-> +	host->buffer = dmam_alloc_coherent(host->dev,
-> +					   mtd->writesize + mtd->oobsize,
-> +					   &host->dma_buffer, GFP_KERNEL);
-> +	if (!host->buffer)
-> +		return -ENOMEM;
-> +
-> +	host->dma_oob = host->dma_buffer + mtd->writesize;
-> +	memset(host->buffer, 0xff, mtd->writesize + mtd->oobsize);
-> +
-> +	flag = hinfc_read(host, HINFC504_CON);
-> +	flag &= ~(HINFC504_CON_PAGESIZE_MASK << HINFC504_CON_PAGEISZE_SHIFT);
-> +	switch (mtd->writesize) {
-> +	case 2048:
-> +		flag |= (0x001 << HINFC504_CON_PAGEISZE_SHIFT);
-> +		break;
-> +	/*
-> +	 * TODO: add more pagesize support,
-> +	 * default pagesize has been set in hisi_nfc_host_init
-> +	 */
-> +	default:
-> +		dev_err(host->dev, "NON-2KB page size nand flash\n");
-> +		return -EINVAL;
+> Nice to hear that :)
+> 
+> > About the dts issue... do you suggest me to send new patch right now or
+> > wait for clock and pinctrl driver ready then send them together?
+> > 
+> 
+> I would prefer that you send at least the clock controller together, so that we
+> don't have any dummy clocks in the basic device tree.
+> 
+> Regards,
+> Matthias
+> 
 
-We should probably return ENOTSUPP, but that's not related to the
-change you do, so let's keep that for later.
+Got it! Next patch, we will send them with clock controller without
+dummy clocks in the basic device tree.
+By the way, the clock controller driver of MT8183 is a little bit
+different from former ICs, so we need more time to prepare them.
+We will send them to public as soon as possible.
 
-> +	}
-> +	hinfc_write(host, flag, HINFC504_CON);
-> +
-> +	if (chip->ecc.mode == NAND_ECC_HW)
-> +		hisi_nfc_ecc_probe(host);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct nand_controller_ops hisi_nfc_controller_ops = {
-> +	.attach_chip = hisi_nfc_attach_chip,
-> +};
-> +
->  static int hisi_nfc_probe(struct platform_device *pdev)
->  {
-> -	int ret = 0, irq, flag, max_chips = HINFC504_MAX_CHIP;
-> +	int ret = 0, irq, max_chips = HINFC504_MAX_CHIP;
->  	struct device *dev = &pdev->dev;
->  	struct hinfc_host *host;
->  	struct nand_chip  *chip;
-> @@ -769,42 +810,11 @@ static int hisi_nfc_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> -	ret = nand_scan_ident(mtd, max_chips, NULL);
-> +	chip->dummy_controller.ops = &hisi_nfc_controller_ops;
-> +	ret = nand_scan(mtd, max_chips);
->  	if (ret)
->  		return ret;
->  
-> -	host->buffer = dmam_alloc_coherent(dev, mtd->writesize + mtd->oobsize,
-> -		&host->dma_buffer, GFP_KERNEL);
-> -	if (!host->buffer)
-> -		return -ENOMEM;
-> -
-> -	host->dma_oob = host->dma_buffer + mtd->writesize;
-> -	memset(host->buffer, 0xff, mtd->writesize + mtd->oobsize);
-> -
-> -	flag = hinfc_read(host, HINFC504_CON);
-> -	flag &= ~(HINFC504_CON_PAGESIZE_MASK << HINFC504_CON_PAGEISZE_SHIFT);
-> -	switch (mtd->writesize) {
-> -	case 2048:
-> -		flag |= (0x001 << HINFC504_CON_PAGEISZE_SHIFT); break;
-> -	/*
-> -	 * TODO: add more pagesize support,
-> -	 * default pagesize has been set in hisi_nfc_host_init
-> -	 */
-> -	default:
-> -		dev_err(dev, "NON-2KB page size nand flash\n");
-> -		return -EINVAL;
-> -	}
-> -	hinfc_write(host, flag, HINFC504_CON);
-> -
-> -	if (chip->ecc.mode == NAND_ECC_HW)
-> -		hisi_nfc_ecc_probe(host);
-> -
-> -	ret = nand_scan_tail(mtd);
-> -	if (ret) {
-> -		dev_err(dev, "nand_scan_tail failed: %d\n", ret);
-> -		return ret;
-> -	}
-> -
->  	ret = mtd_device_register(mtd, NULL, 0);
->  	if (ret) {
->  		dev_err(dev, "Err MTD partition=%d\n", ret);
+Best Regards,
+Erin
+
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
