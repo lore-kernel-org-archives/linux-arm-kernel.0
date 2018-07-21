@@ -1,122 +1,43 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Sat, 21 Jul 2018 17:27:49 +0200
-Subject: [PATCH v4 12/35] mtd: rawnand: lpc32xx_slc: convert driver to
- nand_scan()
-In-Reply-To: <20180720151527.16038-13-miquel.raynal@bootlin.com>
-References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
- <20180720151527.16038-13-miquel.raynal@bootlin.com>
-Message-ID: <20180721172749.05529c8f@bbrezillon>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 21 Jul 2018 17:18:28 +0100
+Subject: [PATCH 1/4] iio: adc: xilinx: Rename 'channels' variable name
+ to 'iio_xadc_channels'
+In-Reply-To: <7c4ee0db-ac33-b093-4dbb-1742fb029012@xilinx.com>
+References: <1531912331-26431-1-git-send-email-manish.narani@xilinx.com>
+ <1531912331-26431-2-git-send-email-manish.narani@xilinx.com>
+ <d2c3ddfd-91da-e500-7b58-917d2da1d540@metafoo.de>
+ <7c4ee0db-ac33-b093-4dbb-1742fb029012@xilinx.com>
+Message-ID: <20180721171828.55395acc@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Jul 2018 17:15:04 +0200
-Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+On Thu, 19 Jul 2018 10:22:07 +0200
+Michal Simek <michal.simek@xilinx.com> wrote:
 
-> Two helpers have been added to the core to make ECC-related
-> configuration between the detection phase and the final NAND scan. Use
-> these hooks and convert the driver to just use nand_scan() instead of
-> both nand_scan_ident() and nand_scan_tail().
+> On 18.7.2018 13:18, Lars-Peter Clausen wrote:
+> > On 07/18/2018 01:12 PM, Manish Narani wrote:  
+> >> This patch fix the following checkpatch warning in xadc driver.
+> >> - Reusing the krealloc arg is almost always a bug.
+> >>
+> >> Renamed the 'channels' variable as 'iio_xadc_channels' to fix the above
+> >> warning.
+> >>  
+> > 
+> > This is a bug in checkpatch and should be fixed in checkpatch. The code is
+> > not actually re-using the parameter. channels and xadc_channels are
+> > independent variables, just checkpatch somehow does not realize this.  
 > 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> I think it should be fine to have this patch in tree. Change in commit
+> message to reflect this should be enough. But that's just view.
 
-Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
+Let's wait and see if Joe has time to take a look at this.  Might be better
+to fix checkpatch if it's not too hard!
 
-> ---
->  drivers/mtd/nand/raw/lpc32xx_slc.c | 77 +++++++++++++++++++++-----------------
->  1 file changed, 42 insertions(+), 35 deletions(-)
+Jonathan
 > 
-> diff --git a/drivers/mtd/nand/raw/lpc32xx_slc.c b/drivers/mtd/nand/raw/lpc32xx_slc.c
-> index 42820aa1abab..a4e8b7e75135 100644
-> --- a/drivers/mtd/nand/raw/lpc32xx_slc.c
-> +++ b/drivers/mtd/nand/raw/lpc32xx_slc.c
-> @@ -779,6 +779,46 @@ static struct lpc32xx_nand_cfg_slc *lpc32xx_parse_dt(struct device *dev)
->  	return ncfg;
->  }
->  
-> +static int lpc32xx_nand_attach_chip(struct nand_chip *chip)
-> +{
-> +	struct mtd_info *mtd = nand_to_mtd(chip);
-> +	struct lpc32xx_nand_host *host = nand_get_controller_data(chip);
-> +
-> +	/* OOB and ECC CPU and DMA work areas */
-> +	host->ecc_buf = (uint32_t *)(host->data_buf + LPC32XX_DMA_DATA_SIZE);
-> +
-> +	/*
-> +	 * Small page FLASH has a unique OOB layout, but large and huge
-> +	 * page FLASH use the standard layout. Small page FLASH uses a
-> +	 * custom BBT marker layout.
-> +	 */
-> +	if (mtd->writesize <= 512)
-> +		mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
-> +
-> +	/* These sizes remain the same regardless of page size */
-> +	chip->ecc.size = 256;
-> +	chip->ecc.bytes = LPC32XX_SLC_DEV_ECC_BYTES;
-> +	chip->ecc.prepad = 0;
-> +	chip->ecc.postpad = 0;
-> +
-> +	/*
-> +	 * Use a custom BBT marker setup for small page FLASH that
-> +	 * won't interfere with the ECC layout. Large and huge page
-> +	 * FLASH use the standard layout.
-> +	 */
-> +	if ((chip->bbt_options & NAND_BBT_USE_FLASH) &&
-> +	    mtd->writesize <= 512) {
-> +		chip->bbt_td = &bbt_smallpage_main_descr;
-> +		chip->bbt_md = &bbt_smallpage_mirror_descr;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct nand_controller_ops lpc32xx_nand_controller_ops = {
-> +	.attach_chip = lpc32xx_nand_attach_chip,
-> +};
-> +
->  /*
->   * Probe for NAND controller
->   */
-> @@ -884,41 +924,8 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
->  	}
->  
->  	/* Find NAND device */
-> -	res = nand_scan_ident(mtd, 1, NULL);
-> -	if (res)
-> -		goto release_dma;
-> -
-> -	/* OOB and ECC CPU and DMA work areas */
-> -	host->ecc_buf = (uint32_t *)(host->data_buf + LPC32XX_DMA_DATA_SIZE);
-> -
-> -	/*
-> -	 * Small page FLASH has a unique OOB layout, but large and huge
-> -	 * page FLASH use the standard layout. Small page FLASH uses a
-> -	 * custom BBT marker layout.
-> -	 */
-> -	if (mtd->writesize <= 512)
-> -		mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
-> -
-> -	/* These sizes remain the same regardless of page size */
-> -	chip->ecc.size = 256;
-> -	chip->ecc.bytes = LPC32XX_SLC_DEV_ECC_BYTES;
-> -	chip->ecc.prepad = chip->ecc.postpad = 0;
-> -
-> -	/*
-> -	 * Use a custom BBT marker setup for small page FLASH that
-> -	 * won't interfere with the ECC layout. Large and huge page
-> -	 * FLASH use the standard layout.
-> -	 */
-> -	if ((chip->bbt_options & NAND_BBT_USE_FLASH) &&
-> -	    mtd->writesize <= 512) {
-> -		chip->bbt_td = &bbt_smallpage_main_descr;
-> -		chip->bbt_md = &bbt_smallpage_mirror_descr;
-> -	}
-> -
-> -	/*
-> -	 * Fills out all the uninitialized function pointers with the defaults
-> -	 */
-> -	res = nand_scan_tail(mtd);
-> +	chip->dummy_controller.ops = &lpc32xx_nand_controller_ops;
-> +	res = nand_scan(mtd, 1);
->  	if (res)
->  		goto release_dma;
->  
+> Thanks,
+> Michal
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
