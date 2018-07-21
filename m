@@ -1,104 +1,73 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 21 Jul 2018 17:24:23 +0100
-Subject: [PATCH 3/4] iio: adc: xilinx: Check for return values in clk
- related functions
-In-Reply-To: <f4b8e687-217f-15b1-b0b1-b95dbc3dcc2a@metafoo.de>
-References: <1531912331-26431-1-git-send-email-manish.narani@xilinx.com>
- <1531912331-26431-4-git-send-email-manish.narani@xilinx.com>
- <f4b8e687-217f-15b1-b0b1-b95dbc3dcc2a@metafoo.de>
-Message-ID: <20180721172423.11efb5ea@archlinux>
+From: vilhelm.gray@gmail.com (William Breathitt Gray)
+Date: Sat, 21 Jul 2018 12:26:10 -0400
+Subject: [PATCH v7 01/10] counter: Introduce the Generic Counter interface
+In-Reply-To: <20180717204954.4b5e371603d0b40b2aaabbb8@linux-foundation.org>
+References: <cover.1529607879.git.vilhelm.gray@gmail.com>
+ <51b75b2b4495d4ad7ed173d91a726379bdae2353.1529607879.git.vilhelm.gray@gmail.com>
+ <20180717204954.4b5e371603d0b40b2aaabbb8@linux-foundation.org>
+Message-ID: <20180721162610.GA15622@sophia>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Jul 2018 18:40:26 +0200
-Lars-Peter Clausen <lars@metafoo.de> wrote:
+On Tue, Jul 17, 2018 at 08:49:54PM -0700, Andrew Morton wrote:
+>On Thu, 21 Jun 2018 17:07:08 -0400 William Breathitt Gray <vilhelm.gray@gmail.com> wrote:
+>
+>> This patch introduces the Generic Counter interface for supporting
+>> counter devices.
+>> 
+>
+>+EXPORT_SYMBOL(count_direction_str);
+>+EXPORT_SYMBOL(count_mode_str);
+>+EXPORT_SYMBOL(counter_signal_enum_read);
+>+EXPORT_SYMBOL(counter_signal_enum_write);
+>+EXPORT_SYMBOL(counter_signal_enum_available_read);
+>+EXPORT_SYMBOL(counter_count_enum_read);
+>+EXPORT_SYMBOL(counter_count_enum_write);
+>+EXPORT_SYMBOL(counter_count_enum_available_read);
+>+EXPORT_SYMBOL(counter_device_enum_read);
+>+EXPORT_SYMBOL(counter_device_enum_write);
+>+EXPORT_SYMBOL(counter_device_enum_available_read);
+>+EXPORT_SYMBOL(signal_read_value_set);
+>+EXPORT_SYMBOL(count_read_value_set);
+>+EXPORT_SYMBOL(count_write_value_get);
+>+EXPORT_SYMBOL(counter_register);
+>+EXPORT_SYMBOL(counter_unregister);
+>+EXPORT_SYMBOL(devm_counter_register);
+>+EXPORT_SYMBOL(devm_counter_unregister);
+>
+>The naming is a bit chaotic.  Most of the symbols start with counter_,
+>which is good.  But a handful do not.
 
-> On 07/18/2018 01:12 PM, Manish Narani wrote:
-> > This patch adds check for return values from clock related functions.
-> > This was reported by static code analysis tool.  
-> 
-> This patch seems to do something else.
-Indeed, definitely doing two things only one of which is mentioned.
-Please break it up and resend.
+I can prefix these exported symbols with "counter_" to help make it
+clear they all belong to the Generic Counter API. I'll keep the devm_*
+symbols the same to match the naming convention in the other subsystems
+I see (watchdog, IIO, GPIO, etc.).
 
-Jonathan
+>
+>Also, symbols called signal_* make my head spin - Linux already has a
+>firmly ingrained notion of what a signal is, and this ain't it ;)
+>Although the kernel tends to use sig_ for signals-as-an-IPC-thing.
+>
+>Also, many many drivers deal with signals-as-an-electrical-thing - is
+>it appropriate for this particular driver to take that namespace?
 
-> 
-> > 
-> > Signed-off-by: Manish Narani <manish.narani@xilinx.com>
-> > ---
-> >  drivers/iio/adc/xilinx-xadc-core.c | 24 ++++++++++++++++++++++--
-> >  1 file changed, 22 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-> > index 248cffa..47eb364 100644
-> > --- a/drivers/iio/adc/xilinx-xadc-core.c
-> > +++ b/drivers/iio/adc/xilinx-xadc-core.c
-> > @@ -322,6 +322,7 @@ static irqreturn_t xadc_zynq_interrupt_handler(int irq, void *devid)
-> >  
-> >  #define XADC_ZYNQ_TCK_RATE_MAX 50000000
-> >  #define XADC_ZYNQ_IGAP_DEFAULT 20
-> > +#define XADC_ZYNQ_PCAP_RATE_MAX 200000000
-> >  
-> >  static int xadc_zynq_setup(struct platform_device *pdev,
-> >  	struct iio_dev *indio_dev, int irq)
-> > @@ -332,6 +333,7 @@ static int xadc_zynq_setup(struct platform_device *pdev,
-> >  	unsigned int div;
-> >  	unsigned int igap;
-> >  	unsigned int tck_rate;
-> > +	int ret;
-> >  
-> >  	/* TODO: Figure out how to make igap and tck_rate configurable */
-> >  	igap = XADC_ZYNQ_IGAP_DEFAULT;
-> > @@ -341,6 +343,13 @@ static int xadc_zynq_setup(struct platform_device *pdev,
-> >  
-> >  	pcap_rate = clk_get_rate(xadc->clk);
-> >  
-> > +	if (pcap_rate > XADC_ZYNQ_PCAP_RATE_MAX) {
-> > +		ret = clk_set_rate(xadc->clk,
-> > +				   (unsigned long)XADC_ZYNQ_PCAP_RATE_MAX);
-> > +		if (ret)
-> > +			return ret;
-> > +	}
-> > +
-> >  	if (tck_rate > pcap_rate / 2) {
-> >  		div = 2;
-> >  	} else {
-> > @@ -366,6 +375,12 @@ static int xadc_zynq_setup(struct platform_device *pdev,
-> >  			XADC_ZYNQ_CFG_REDGE | XADC_ZYNQ_CFG_WEDGE |
-> >  			tck_div | XADC_ZYNQ_CFG_IGAP(igap));
-> >  
-> > +	if (pcap_rate > XADC_ZYNQ_PCAP_RATE_MAX) {
-> > +		ret = clk_set_rate(xadc->clk, pcap_rate);
-> > +		if (ret)
-> > +			return ret;
-> > +	}
-> > +
-> >  	return 0;
-> >  }
-> >  
-> > @@ -887,6 +902,9 @@ static int xadc_write_raw(struct iio_dev *indio_dev,
-> >  	unsigned long clk_rate = xadc_get_dclk_rate(xadc);
-> >  	unsigned int div;
-> >  
-> > +	if (!clk_rate)
-> > +		return -EINVAL;
-> > +
-> >  	if (info != IIO_CHAN_INFO_SAMP_FREQ)
-> >  		return -EINVAL;
-> >  
-> > @@ -1239,8 +1257,10 @@ static int xadc_probe(struct platform_device *pdev)
-> >  		goto err_free_irq;
-> >  
-> >  	/* Disable all alarms */
-> > -	xadc_update_adc_reg(xadc, XADC_REG_CONF1, XADC_CONF1_ALARM_MASK,
-> > -		XADC_CONF1_ALARM_MASK);
-> > +	ret = xadc_update_adc_reg(xadc, XADC_REG_CONF1, XADC_CONF1_ALARM_MASK,
-> > +				  XADC_CONF1_ALARM_MASK);
-> > +	if (ret)
-> > +		goto err_free_irq;
-> >  
-> >  	/* Set thresholds to min/max */
-> >  	for (i = 0; i < 16; i++) {
-> >   
-> 
+In the context of the Generic Counter paradigm, a "Signal" is an
+abstraction for the stream of data that is fed to the counter device for
+evaluation (triggering updates for the readable "Count"). In many cases
+a "Signal" correlates with a physical electrical line (for example the A
+and B electrical lines for a quadrature encoder), but this isn't a hard
+requirement as the paradigm permits more abstract data streams.
+
+I decided on "Signal" to match the naming convention that appears in the
+datasheets of many counter devices, but "Line" may be a decent
+alternative name we could use to indicate a counter device input data
+stream.
+
+I'd like to get some other opinions as well before I make a naming
+change to "Signal" -- whether to stay with "Signal," switch to "Line," or
+rename to something else. For what it's worth, I think it's unlikely for
+a counter device driver author to confuse a Counter Signal with the
+Linux OS signal within the context of the Generic Counter paradigm and
+their respective counter device datasheet.
+
+William Breathitt Gray
