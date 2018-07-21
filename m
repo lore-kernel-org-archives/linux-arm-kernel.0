@@ -1,49 +1,47 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:28:56 -0700
-Subject: [GIT PULL v2] arm64: dts: hisilicon dts updates for v4.19
-In-Reply-To: <5B50630D.7060407@hisilicon.com>
-References: <5B50630D.7060407@hisilicon.com>
-Message-ID: <20180721212856.ekm6fiunfa3jflyk@localhost>
+Date: Sat, 21 Jul 2018 14:28:16 -0700
+Subject: [GIT PULL v2] ARM: dts: zynq: Xilinx DT changes for v4.19
+In-Reply-To: <f36dbbeb-059f-6042-ff83-10ae4187a96f@monstr.eu>
+References: <f36dbbeb-059f-6042-ff83-10ae4187a96f@monstr.eu>
+Message-ID: <20180721212816.f3ulvteudxwfobtq@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 11:08:13AM +0100, Wei Xu wrote:
-> Hi Olof, Hi Arnd,
+On Thu, Jul 19, 2018 at 10:12:30AM +0200, Michal Simek wrote:
+> Hi,
 > 
-> Please consider to pull the following changes.
-> I rebased the pull on hisi-fixes-for-4.18 since there are
-> some fixes for v4.18 have been merged.
+> Based on discussion with Olof all DT patches are using these prefixes.
+> ARM: dts: zynq:. dt-bindings changes were reviewed by Rob.
 > 
-> Thanks!
+> Please pull the following ARM DT patches.
 > 
-> Best Regards,
-> Wei
+> Thanks,
+> Michal
 > 
-> ---
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
-> The following changes since commit a30449eb3ac908f26b4bc963a58039a5f2725ffa:
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
->   arm64: dts: hikey960: Define wl1837 power capabilities (2018-06-28 17:07:44 +0100)
+> are available in the git repository at:
 > 
-> are available in the Git repository at:
+>   https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-v4.19-v2
 > 
->   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.19v2
+> for you to fetch changes up to 9153bf9fb5290cd91deefa99f2983a851f2ca5da:
 > 
-> for you to fetch changes up to 4d4585c21f53c15a10c52b45e0392de79e07127e:
-> 
->   arm64: dts: hisilicon: Add missing cooling device properties for CPUs (2018-07-17 13:56:45 +0100)
+>   ARM: dts: zynq: Remove #address/#size-cells from gpio-keys (2018-07-19
+> 10:08:52 +0200)
 > 
 > ----------------------------------------------------------------
-> ARM64: DT: Hisilicon SoC DT updates for 4.19v2
+> ARM: dts: zynq: DT changes for v4.19
 > 
-> - Tidy up MMC properties for hi3660
-> - Remove keep-power-in-suspend on hikey and hikey960 to
->   avoid keeping wifi power during suspend and let the
->   user enable it if required
-> - Update idle states for hikey960
-> - Add missing cooling device properties for cpus on hi6220
+> - Add Z-turn board
+> - Add mmc aliases
+> - Fix model information
+> - Sort out documentatio
+> - Update Zybo Z7
+> - Fix gpio-keys
 
-Merged, thanks!
+Thanks for respinning -- merged now.
 
 
 -Olof
