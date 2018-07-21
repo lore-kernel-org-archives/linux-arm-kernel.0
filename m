@@ -1,57 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Jul 2018 23:05:16 -0700
-Subject: [GIT PULL] am654 changes for v4.19 merge window
-Message-ID: <pull-1532152828-552759@atomide.com>
+From: okaya@kernel.org (Sinan Kaya)
+Date: Fri, 20 Jul 2018 23:07:20 -0700
+Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
+ reset
+In-Reply-To: <2febe688-f973-5ff5-f61d-0451ad7d36ae@kernel.org>
+References: <CAK9iUCM=zWexWow9TwkRfO186Hwr5WyGy0NHZF1vtXn3wbbZGQ@mail.gmail.com>
+ <12fc8de5-ff03-cb00-52cb-25a43c71d03a@codeaurora.org>
+ <20180708171418.GA11476@wunner.de>
+ <CAK9iUCMcic5mzGiT20KNxgwPo6AuajHFsoj7GOjSht5SwrQevg@mail.gmail.com>
+ <20180709160008.GA1490@wunner.de>
+ <CAK9iUCMMVR114msKiMHu7ik0VK8T5j=LAYAKsEkdnocTqkdMjQ@mail.gmail.com>
+ <20180720200123.GS128988@bhelgaas-glaptop.roam.corp.google.com>
+ <2febe688-f973-5ff5-f61d-0451ad7d36ae@kernel.org>
+Message-ID: <d34eb5da-0ae1-d455-93e2-2432ec7931ea@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+On 7/20/2018 7:58 PM, Sinan Kaya wrote:
+> We need to figure out how to gracefully return inside hotplug driver
+> if link down happened and there is an error pending.
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+How about adding the following into the hotplug ISR?
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/am654-for-v4.19-signed
-
-for you to fetch changes up to d0a064bec75e20a526c7bc0d626912f2660b6e81:
-
-  arm64: dts: ti: Add support for AM654 EVM base board (2018-07-18 11:48:36 -0700)
-
-----------------------------------------------------------------
-TI AM654 support for v4.19 merge window
-
-This branch adds initial support for new Texas Instruments AM654
-quad core A53 ARMv8 SoC. It's the first device for TI K3 multicore SoC
-architecture.
-
-Initially only basic devices are configured, support for more devices
-will follow later on. And many of the internal devices familiar from
-earlier TI SoCs should work with existing kernel device drivers.
-
-----------------------------------------------------------------
-Nishanth Menon (5):
-      dt-bindings: arm: ti: Add bindings for AM654 SoC
-      arm64: Add support for TI's K3 Multicore SoC architecture
-      arm64: dts: ti: Add Support for AM654 SoC
-      soc: ti: Add Support for AM654 SoC config option
-      arm64: dts: ti: Add support for AM654 EVM base board
-
- Documentation/devicetree/bindings/arm/ti/k3.txt |  23 +++++
- MAINTAINERS                                     |   9 ++
- arch/arm64/Kconfig.platforms                    |   7 ++
- arch/arm64/boot/dts/Makefile                    |   1 +
- arch/arm64/boot/dts/ti/Makefile                 |   9 ++
- arch/arm64/boot/dts/ti/k3-am65-main.dtsi        |  31 +++++++
- arch/arm64/boot/dts/ti/k3-am65.dtsi             |  87 ++++++++++++++++++
- arch/arm64/boot/dts/ti/k3-am654-base-board.dts  |  36 ++++++++
- arch/arm64/boot/dts/ti/k3-am654.dtsi            | 115 ++++++++++++++++++++++++
- drivers/soc/ti/Kconfig                          |  14 +++
- 10 files changed, 332 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/ti/k3.txt
- create mode 100644 arch/arm64/boot/dts/ti/Makefile
- create mode 100644 arch/arm64/boot/dts/ti/k3-am65-main.dtsi
- create mode 100644 arch/arm64/boot/dts/ti/k3-am65.dtsi
- create mode 100644 arch/arm64/boot/dts/ti/k3-am654-base-board.dts
- create mode 100644 arch/arm64/boot/dts/ti/k3-am654.dtsi
+1. check if firmware first is disabled
+2. check if there is a fatal error pending in the device_status register
+of the PCI Express capability on the root port.
+3. bail out from hotplug routine if this is the case.
+4. otherwise, existing behavior.
