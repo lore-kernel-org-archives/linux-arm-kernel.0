@@ -1,47 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:28:16 -0700
-Subject: [GIT PULL v2] ARM: dts: zynq: Xilinx DT changes for v4.19
-In-Reply-To: <f36dbbeb-059f-6042-ff83-10ae4187a96f@monstr.eu>
-References: <f36dbbeb-059f-6042-ff83-10ae4187a96f@monstr.eu>
-Message-ID: <20180721212816.f3ulvteudxwfobtq@localhost>
+Date: Sat, 21 Jul 2018 14:29:24 -0700
+Subject: [PATCH v2] ARM: dts: berlin: Add missing OPP properties for CPUs
+In-Reply-To: <20180720181150.15a2aa71@xhacker.debian>
+References: <20180720130838.187becb9@xhacker.debian>
+ <20180720181150.15a2aa71@xhacker.debian>
+Message-ID: <20180721212924.sduyl4dcmz7mzbvz@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 10:12:30AM +0200, Michal Simek wrote:
-> Hi,
+On Fri, Jul 20, 2018 at 06:11:50PM +0800, Jisheng Zhang wrote:
+> From: Viresh Kumar <viresh.kumar@linaro.org>
 > 
-> Based on discussion with Olof all DT patches are using these prefixes.
-> ARM: dts: zynq:. dt-bindings changes were reviewed by Rob.
+> The OPP properties, like "operating-points", should either be present
+> for all the CPUs of a cluster or none. If these are present only for a
+> subset of CPUs of a cluster then things will start falling apart as soon
+> as the CPUs are brought online in a different order. For example, this
+> will happen because the operating system looks for such properties in
+> the CPU node it is trying to bring up, so that it can create an OPP
+> table.
 > 
-> Please pull the following ARM DT patches.
+> Add such missing properties.
 > 
-> Thanks,
-> Michal
+> Fix other missing properties (clocks, clock latency) as well to
+> make it all work.
 > 
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-> 
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-v4.19-v2
-> 
-> for you to fetch changes up to 9153bf9fb5290cd91deefa99f2983a851f2ca5da:
-> 
->   ARM: dts: zynq: Remove #address/#size-cells from gpio-keys (2018-07-19
-> 10:08:52 +0200)
-> 
-> ----------------------------------------------------------------
-> ARM: dts: zynq: DT changes for v4.19
-> 
-> - Add Z-turn board
-> - Add mmc aliases
-> - Fix model information
-> - Sort out documentatio
-> - Update Zybo Z7
-> - Fix gpio-keys
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> ---
+> Since v1:
+>  - fix author, it's from Viresh. Sorry for making this mistake
 
-Thanks for respinning -- merged now.
+Applied, thanks.
 
 
 -Olof
