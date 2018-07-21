@@ -1,49 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:13:49 -0700
-Subject: [GIT PULL] ARM: SoC fixes
-Message-ID: <20180721211349.f43vzd67fm6b5jim@localhost>
+Date: Sat, 21 Jul 2018 14:47:23 -0700
+Subject: [PATCH] ARM: dts: rmobile: Drop MTD partitioning from DT
+In-Reply-To: <20180530101130.3566-1-marek.vasut+renesas@gmail.com>
+References: <20180530101130.3566-1-marek.vasut+renesas@gmail.com>
+Message-ID: <CAOesGMjmz41p5sF_xnC7gdSRNLaowXPW7Sk8HBZww_QSTvXV7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi,
 
-The following changes since commit 13e66ceea1600f1061181acc2d4e0fac1a7d0333:
+On Wed, May 30, 2018 at 3:11 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Drop the MTD partitioning from DT, since it does not describe HW
+> and to give way to a more flexible kernel command line partition
+> passing.
+>
+> To retain the original partitioning, assure you have enabled
+> CONFIG_MTD_CMDLINE_PARTS in your kernel config and add the
+> following to your kernel command line:
+>
+> lager:   mtdparts=spi0.0:256k(loader),4m(user),-(flash)
+> stout:   mtdparts=spi0.0:512k(loader),256k(uboot),256k(uboot-env),-(flash)
+> koelsch: mtdparts=spi0.0:512k(loader),5632k(user),-(flash)
+> porter:  mtdparts=spi0.0:256k(loader_prg),4m(user_prg),-(flash_fs)
+> wheat:   mtdparts=spi0.0:256k(loader),4m(user),-(flash)
+> gose:    mtdparts=spi0.0:256k(loader),4m(user),-(flash)
+> alt:     mtdparts=spi0.0:256k(loader),256k(system),-(user)
+> silk:    mtdparts=spi0.0:256k(loader),4m(user),-(flash)
 
-  Merge tag 'omap-for-v4.18/fixes-rc4-signed' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2018-07-14 15:14:02 -0700)
+Having to specify on command line is such a nasty hack. I wish we
+could remove that, and at the very least not add it for anything new.
 
-are available in the git repository at:
+You end up with user space tools trying to parse the kernel command
+line to figure out what's on the flash, and other really bad habits.
+:(
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
+I'd strongly advice you to keep this in the board files, unless you
+have an actual real motivation for changing it. This patch does not
+provide one.
 
-for you to fetch changes up to 5858610f0dd76151c4e12420fd11801d23737663:
 
-  Merge tag 'imx-fixes-4.18-4' of git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux into fixes (2018-07-20 14:22:11 -0700)
-
-----------------------------------------------------------------
-ARM: SoC fixes for 4.18-rc
-
- - Fix interrupt type on ethernet switch for i.MX-based RDU2
- - GPC on i.MX exposed too large a register window which resulted in
-   userspace being able to crash the machine.
- - Fixup of bad merge resolution moving GPIO DT nodes under pinctrl
-   on droid4.
-
-----------------------------------------------------------------
-Anson Huang (1):
-      soc: imx: gpc: restrict register range for regmap access
-
-Olof Johansson (3):
-      Merge tag 'omap-for-v4.18/fixes-rc5-signed' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'imx-fixes-4.18-3' of git://git.kernel.org/.../shawnguo/linux into fixes
-      Merge tag 'imx-fixes-4.18-4' of git://git.kernel.org/.../shawnguo/linux into fixes
-
-Pavel Machek (1):
-      ARM: dts: omap4-droid4: fix dts w.r.t. pwm
-
-Uwe Kleine-K?nig (1):
-      ARM: dts: imx6: RDU2: fix irq type for mv88e6xxx switch
-
- arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi  |  2 +-
- arch/arm/boot/dts/omap4-droid4-xt894.dts |  9 +++------
- drivers/soc/imx/gpc.c                    | 21 +++++++++++++++++++++
- 3 files changed, 25 insertions(+), 7 deletions(-)
+-Olof
