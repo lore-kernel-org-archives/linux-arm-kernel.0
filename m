@@ -1,39 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:55:28 -0700
-Subject: [GIT PULL 3/6] i.MX DT updates with clock dependency for 4.19
-In-Reply-To: <1532140344-2771-3-git-send-email-shawnguo@kernel.org>
+Date: Sat, 21 Jul 2018 14:56:59 -0700
+Subject: [GIT PULL 5/6] Freescale arm64 device tree updates for 4.19
+In-Reply-To: <1532140671-2869-2-git-send-email-shawnguo@kernel.org>
 References: <1532140344-2771-1-git-send-email-shawnguo@kernel.org>
- <1532140344-2771-3-git-send-email-shawnguo@kernel.org>
-Message-ID: <20180721215528.q6qblk33ulmqwbib@localhost>
+ <1532140671-2869-1-git-send-email-shawnguo@kernel.org>
+ <1532140671-2869-2-git-send-email-shawnguo@kernel.org>
+Message-ID: <20180721215659.uvg3vhmsxxcsrj6f@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 21, 2018 at 10:32:21AM +0800, Shawn Guo wrote:
-> Hi,
+On Sat, Jul 21, 2018 at 10:37:50AM +0800, Shawn Guo wrote:
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
-> This pull request contains a DT patch that depends on clock changes,
-> which has been pulled into here as dependency.  Stephen confirmed that
-> the clock topic branch being merged here is for 4.19 and will be stable.
-> So please consider to pull the request for 4.19.  Thanks.
-> 
-> Shawn
-> 
-> 
-> The following changes since commit 4a2eaa8e2567297d4dc6e2709841a874927c83aa:
-> 
->   clk: imx6ul: remove clks_init_on array (2018-06-29 11:43:56 -0700)
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt-clkdep-4.19
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.19
 > 
-> for you to fetch changes up to bc36b2aac4f5e4accfe642bb51293f3d318312eb:
+> for you to fetch changes up to 346f5976cc3200896d5fb873412a4fe9c0fc611e:
 > 
->   ARM: dts: imx6ul: add GPIO clocks (2018-07-12 08:57:33 +0800)
+>   arm64: dts: freescale: Add missing cooling device properties for CPUs (2018-07-03 15:01:09 +0800)
 > 
 > ----------------------------------------------------------------
-> i.MX device tree changes with clock dependency:
->  - Add clock for i.MX6UL GPIO blocks
+> Freescale arm64 device tree update for 4.19:
+>  - Update device tree sources to use SPDX identifiers for license.
+>  - Add cooling device property '#cooling-cells' for all CPUs of
+>    a cluster.
+> 
+> ----------------------------------------------------------------
+> Li Yang (1):
+>       arm64: dts: freescale: Update to use SPDX identifiers
+> 
+> Viresh Kumar (1):
+>       arm64: dts: freescale: Add missing cooling device properties for CPUs
 
 Merged, thanks.
 
