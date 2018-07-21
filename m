@@ -1,63 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:52:24 -0700
-Subject: [GIT PULL] Amlogic 64-bit DT changes for v4.19 (redo)
-In-Reply-To: <7ha7ql6goi.fsf@baylibre.com>
-References: <7ha7ql6goi.fsf@baylibre.com>
-Message-ID: <20180721215224.oa2rqhg2zexgo7uq@localhost>
+Date: Sat, 21 Jul 2018 14:57:43 -0700
+Subject: [GIT PULL 6/6] i.MX defconfig updates for 4.19
+In-Reply-To: <1532140671-2869-3-git-send-email-shawnguo@kernel.org>
+References: <1532140344-2771-1-git-send-email-shawnguo@kernel.org>
+ <1532140671-2869-1-git-send-email-shawnguo@kernel.org>
+ <1532140671-2869-3-git-send-email-shawnguo@kernel.org>
+Message-ID: <20180721215743.gvdyejag6fere6lp@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 11:00:13AM -0500, Kevin Hilman wrote:
-> Olof,
-> 
-> Here's the re-do of the pull that was missing Signed-off-by tags,
-> pointed out by Stephen Rothwell.
-> 
-> Kevin
-> 
-> 
-> 
+On Sat, Jul 21, 2018 at 10:37:51AM +0800, Shawn Guo wrote:
 > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
 >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.19
 > 
-> for you to fetch changes up to 89803e8b26569bdf5798f8745a4c708bf9360ee6:
+> for you to fetch changes up to eaed0291c62f7b513ad9483b02efdccd4ae4e9fc:
 > 
->   ARM64: dts: meson-axg: add pdm pins (2018-07-20 08:18:37 -0700)
-> 
-> ----------------------------------------------------------------
-> Amlogic 64-bit DT updates for v4.19
-> - new SoC: S805x
-> - new board: S805x-based P241 board from Amlogic
-> - AXG: add ADC support w/buttons, add pins for PDM, SPDIF
-> - AXG: s400 board: preliminary support for audio
-> - GX: nanopi-k2: add HDMI, CEC, CVBS support
+>   ARM: imx_v6_v7_defconfig: add DMATEST support (2018-07-21 09:58:21 +0800)
 > 
 > ----------------------------------------------------------------
-> Jerome Brunet (9):
->       ARM64: dts: meson-axg: add s400 microphone card leds
->       ARM64: dts: meson-axg: add s400 main 12v supply
->       ARM64: dts: meson-axg: add s400 speaker amplifier
->       ARM64: dts: meson-axg: add spdif output pins
->       ARM64: dts: meson-axg: remove vddio_ao18 from SoC dtsi
->       ARM64: dts: meson-axg: add adc buttons the S400
->       ARM64: dts: meson-axg: remove spdif out from gpio a7
->       ARM64: dts: meson-axg: add spdif input pins
->       ARM64: dts: meson-axg: add pdm pins
+> i.MX defconfig update for 4.19:
+>  - Enable ISL29018 sensor and MMA8452 accelerometer driver support for
+>    imx6qdl-sabreauto board.
+>  - Enable DMATEST support which is useful for DMA driver development
+>    testing.
+>  - Use the DRM driver for MXSFB LCD controller found on i.MX23, i.MX28,
+>    i.MX6SX and i.MX7 SoCs.
 
-I've started being a little grumpy with others to keep it consistent, and
-you're consistent internally but not against other platforms: We use "arm64" or
-ARM" as prefixes, not ARM64/arm.
+Should some of these be added in multi_v7 defconfig too?
 
-I think it's time for a checkpatch rule for this, it's a bit silly to have to
-point it out all the time since people seem to get it wrong so often.
+Merged.
 
-I'll merge this for now and look at adding the rules.
 
+Thanks,
 
 
 -Olof
