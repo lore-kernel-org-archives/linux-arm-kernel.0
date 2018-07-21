@@ -1,41 +1,51 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Sat, 21 Jul 2018 19:34:46 +0200
-Subject: [PATCH v4 17/35] mtd: rawnand: omap2: convert driver to
- nand_scan()
-In-Reply-To: <20180720151527.16038-18-miquel.raynal@bootlin.com>
-References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
- <20180720151527.16038-18-miquel.raynal@bootlin.com>
-Message-ID: <20180721193446.499c2d7d@bbrezillon>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sat, 21 Jul 2018 19:37:18 +0200
+Subject: [PATCH 0/3] Meson8/Meson8b: add the ARM TWD timer
+Message-ID: <20180721173721.31361-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Jul 2018 17:15:09 +0200
-Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+Carlo sent a .dts patch for the ARM TWD (timer watchdog) a long time
+ago: [0]
+This patch was never applied. While resurrecting it I found out (by
+trial and error) that the TWD clock is derived from the CPU clock by
+dividing the existing CPU clock by 16. Additionally I found out that
+the interrupt is defined incorrectly, leading to an error message
+during boot: "GIC: PPI13 is secure or misconfigured".
 
->  static int omap_nand_probe(struct platform_device *pdev)
->  {
->  	struct omap_nand_info		*info;
->  	struct mtd_info			*mtd;
->  	struct nand_chip		*nand_chip;
->  	int				err;
-> -	dma_cap_mask_t			mask;
->  	struct resource			*res;
->  	struct device			*dev = &pdev->dev;
-> -	int				min_oobbytes = BADBLOCK_MARKER_LENGTH;
-> -	int				oobbytes_per_step;
->  
->  	info = devm_kzalloc(&pdev->dev, sizeof(struct omap_nand_info),
->  				GFP_KERNEL);
-> @@ -1967,6 +2221,7 @@ static int omap_nand_probe(struct platform_device *pdev)
->  	info->phys_base = res->start;
->  
->  	nand_chip->controller = &omap_gpmc_controller;
-> +	nand_chip->controller->ops = &omap_nand_controller_ops;
+Amlogic's GPL kernel does not use the TWD timer. However, it seems to
+work fine for me and it fixes the following warnings during boot:
+  Clockevents: could not switch to one-shot mode:
+  Clockevents: could not switch to one-shot mode:
+  Clockevents: could not switch to one-shot mode:
+  Clockevents: could not switch to one-shot mode:
+   dummy_timer is not functional.
+   dummy_timer is not functional.
+   dummy_timer is not functional.
+   dummy_timer is not functional.
+  Could not switch to high resolution mode on CPU 0
+  Could not switch to high resolution mode on CPU 2
+  Could not switch to high resolution mode on CPU 3
+  Could not switch to high resolution mode on CPU 1
 
-Move this assignment here [1].
+I chose not to split the interrupt line at 80 chars to make it easier
+to read (in my opinion, other .dts are not splitting it either).
 
->  
->  	nand_chip->IO_ADDR_W = nand_chip->IO_ADDR_R;
->  	nand_chip->cmd_ctrl  = omap_hwcontrol;
+NOTE: This series depends on the following clock driver changes: [1]
 
-[1]https://elixir.bootlin.com/linux/v4.18-rc5/source/drivers/mtd/nand/raw/omap2.c#L148
+
+[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/391928.html
+[1] http://lists.infradead.org/pipermail/linux-amlogic/2018-July/007890.html
+
+Martin Blumenstingl (3):
+  ARM: meson: select HAVE_ARM_TWD when SMP support is enabled
+  ARM: dts: meson8: add the ARM TWD timer
+  ARM: dts: meson8b: add the ARM TWD timer
+
+ arch/arm/boot/dts/meson8.dtsi  | 7 +++++++
+ arch/arm/boot/dts/meson8b.dtsi | 7 +++++++
+ arch/arm/mach-meson/Kconfig    | 1 +
+ 3 files changed, 15 insertions(+)
+
+-- 
+2.18.0
