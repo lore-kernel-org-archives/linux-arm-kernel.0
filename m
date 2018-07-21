@@ -1,73 +1,50 @@
-From: vilhelm.gray@gmail.com (William Breathitt Gray)
-Date: Sat, 21 Jul 2018 12:26:10 -0400
-Subject: [PATCH v7 01/10] counter: Introduce the Generic Counter interface
-In-Reply-To: <20180717204954.4b5e371603d0b40b2aaabbb8@linux-foundation.org>
-References: <cover.1529607879.git.vilhelm.gray@gmail.com>
- <51b75b2b4495d4ad7ed173d91a726379bdae2353.1529607879.git.vilhelm.gray@gmail.com>
- <20180717204954.4b5e371603d0b40b2aaabbb8@linux-foundation.org>
-Message-ID: <20180721162610.GA15622@sophia>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 21 Jul 2018 17:33:30 +0100
+Subject: [PATCH 1/4] iio: adc: xilinx: Rename 'channels' variable name
+ to 'iio_xadc_channels'
+In-Reply-To: <070dda6dd3b140ef5f6dbc965d7f8c1af934ec96.camel@perches.com>
+References: <1531912331-26431-1-git-send-email-manish.narani@xilinx.com>
+ <1531912331-26431-2-git-send-email-manish.narani@xilinx.com>
+ <d2c3ddfd-91da-e500-7b58-917d2da1d540@metafoo.de>
+ <7c4ee0db-ac33-b093-4dbb-1742fb029012@xilinx.com>
+ <20180721171828.55395acc@archlinux>
+ <070dda6dd3b140ef5f6dbc965d7f8c1af934ec96.camel@perches.com>
+Message-ID: <20180721173330.764ede75@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 08:49:54PM -0700, Andrew Morton wrote:
->On Thu, 21 Jun 2018 17:07:08 -0400 William Breathitt Gray <vilhelm.gray@gmail.com> wrote:
->
->> This patch introduces the Generic Counter interface for supporting
->> counter devices.
->> 
->
->+EXPORT_SYMBOL(count_direction_str);
->+EXPORT_SYMBOL(count_mode_str);
->+EXPORT_SYMBOL(counter_signal_enum_read);
->+EXPORT_SYMBOL(counter_signal_enum_write);
->+EXPORT_SYMBOL(counter_signal_enum_available_read);
->+EXPORT_SYMBOL(counter_count_enum_read);
->+EXPORT_SYMBOL(counter_count_enum_write);
->+EXPORT_SYMBOL(counter_count_enum_available_read);
->+EXPORT_SYMBOL(counter_device_enum_read);
->+EXPORT_SYMBOL(counter_device_enum_write);
->+EXPORT_SYMBOL(counter_device_enum_available_read);
->+EXPORT_SYMBOL(signal_read_value_set);
->+EXPORT_SYMBOL(count_read_value_set);
->+EXPORT_SYMBOL(count_write_value_get);
->+EXPORT_SYMBOL(counter_register);
->+EXPORT_SYMBOL(counter_unregister);
->+EXPORT_SYMBOL(devm_counter_register);
->+EXPORT_SYMBOL(devm_counter_unregister);
->
->The naming is a bit chaotic.  Most of the symbols start with counter_,
->which is good.  But a handful do not.
+On Sat, 21 Jul 2018 09:22:05 -0700
+Joe Perches <joe@perches.com> wrote:
 
-I can prefix these exported symbols with "counter_" to help make it
-clear they all belong to the Generic Counter API. I'll keep the devm_*
-symbols the same to match the naming convention in the other subsystems
-I see (watchdog, IIO, GPIO, etc.).
+> On Sat, 2018-07-21 at 17:18 +0100, Jonathan Cameron wrote:
+> > On Thu, 19 Jul 2018 10:22:07 +0200
+> > Michal Simek <michal.simek@xilinx.com> wrote:
+> >   
+> > > On 18.7.2018 13:18, Lars-Peter Clausen wrote:  
+> > > > On 07/18/2018 01:12 PM, Manish Narani wrote:    
+> > > > > This patch fix the following checkpatch warning in xadc driver.
+> > > > > - Reusing the krealloc arg is almost always a bug.
+> > > > > 
+> > > > > Renamed the 'channels' variable as 'iio_xadc_channels' to fix the above
+> > > > > warning.
+> > > > >    
+> > > > 
+> > > > This is a bug in checkpatch and should be fixed in checkpatch. The code is
+> > > > not actually re-using the parameter. channels and xadc_channels are
+> > > > independent variables, just checkpatch somehow does not realize this.    
+> > > 
+> > > I think it should be fine to have this patch in tree. Change in commit
+> > > message to reflect this should be enough. But that's just view.  
+> > 
+> > Let's wait and see if Joe has time to take a look at this.  Might be better
+> > to fix checkpatch if it's not too hard!  
+> 
+> I submitted a proposed patch.
+> I believe it works.
+> 
+> https://patchwork.kernel.org/patch/10533011/
+> 
+Thanks! Should have known you would already have it covered :)
+My perl foo goes no where near figuring out how that magic works!
 
->
->Also, symbols called signal_* make my head spin - Linux already has a
->firmly ingrained notion of what a signal is, and this ain't it ;)
->Although the kernel tends to use sig_ for signals-as-an-IPC-thing.
->
->Also, many many drivers deal with signals-as-an-electrical-thing - is
->it appropriate for this particular driver to take that namespace?
-
-In the context of the Generic Counter paradigm, a "Signal" is an
-abstraction for the stream of data that is fed to the counter device for
-evaluation (triggering updates for the readable "Count"). In many cases
-a "Signal" correlates with a physical electrical line (for example the A
-and B electrical lines for a quadrature encoder), but this isn't a hard
-requirement as the paradigm permits more abstract data streams.
-
-I decided on "Signal" to match the naming convention that appears in the
-datasheets of many counter devices, but "Line" may be a decent
-alternative name we could use to indicate a counter device input data
-stream.
-
-I'd like to get some other opinions as well before I make a naming
-change to "Signal" -- whether to stay with "Signal," switch to "Line," or
-rename to something else. For what it's worth, I think it's unlikely for
-a counter device driver author to confuse a Counter Signal with the
-Linux OS signal within the context of the Generic Counter paradigm and
-their respective counter device datasheet.
-
-William Breathitt Gray
+Jonathan
