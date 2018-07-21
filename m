@@ -1,77 +1,58 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Sat, 21 Jul 2018 13:24:20 +0000
-Subject: [PATCH v5 3/4] ARM: dts: imx7s: add i.MX7 messaging unit support
-In-Reply-To: <20180721130827.944-4-o.rempel@pengutronix.de>
-References: <20180721130827.944-1-o.rempel@pengutronix.de>
- <20180721130827.944-4-o.rempel@pengutronix.de>
-Message-ID: <AM0PR04MB42117F1AE6E55BE5D204E71880500@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: hofrat@osadl.org (Nicholas Mc Guire)
+Date: Sat, 21 Jul 2018 15:20:28 +0200
+Subject: [PATCH] staging: bcm2835-camera: fix timeout handling in
+ wait_for_completion_timeout
+Message-ID: <1532179228-30347-1-git-send-email-hofrat@osadl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+wait_for_completion_timeout returns unsigned long not int so a variable of
+proper type is introduced. Further the check for <= 0 is ambiguous and should
+be == 0 here indicating timeout which is the only error case so no additional
+check needed here.
 
-> -----Original Message-----
-> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
-> Sent: Saturday, July 21, 2018 9:08 PM
-> To: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
-> <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark
-> Rutland <mark.rutland@arm.com>; A.s. Dong <aisheng.dong@nxp.com>;
-> Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> Cc: Oleksij Rempel <o.rempel@pengutronix.de>; kernel at pengutronix.de;
-> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; dl-linux-
-> imx <linux-imx@nxp.com>
-> Subject: [PATCH v5 3/4] ARM: dts: imx7s: add i.MX7 messaging unit support
-> 
-> Define the Messaging Unit (MU) for i.MX7 in the processor's dtsi.
-> The respective driver is added in the next commit.
-> 
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx7s.dtsi | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-> index ce85b3ca1a55..038e0eafc549 100644
-> --- a/arch/arm/boot/dts/imx7s.dtsi
-> +++ b/arch/arm/boot/dts/imx7s.dtsi
-> @@ -1001,6 +1001,25 @@
->  				status = "disabled";
->  			};
-> 
-> +			mu0a: mailbox at 30aa0000 {
-> +				compatible = "fsl,imx7s-mu";
+Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+Fixes: 7b3ad5abf027 ("staging: Import the BCM2835 MMAL-based V4L2 camera driver.")
+---
 
-You probably needs a fallback compatible as well as they're the same one.
-e.g..
-compatible = "fsl,imx7s-mu", "fsl,imx6sx-mu";
+Patch found by experimental coccinell API conformance checker
 
-Otherwise, you can added my tag.
+Patch was compile tested with: bcm2835_defconfig + CONFIG_MEDIA_SUPPORT=y
+CONFIG_MEDIA_CAMERA_SUPPORT=y, CONFIG_VIDEO_BCM2835=m
 
-Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
+Patch is against 4.18-rc5 (localversion-next is next-20180720)
 
-Regards
-Dong Aisheng
+ drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-> +				reg = <0x30aa0000 0x10000>;
-> +				interrupts = <GIC_SPI 88
-> IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_MU_ROOT_CLK>;
-> +				#mbox-cells = <1>;
-> +				status = "disabled";
-> +			};
-> +
-> +			mu0b: mailbox at 30ab0000 {
-> +				compatible = "fsl,imx7s-mu";
-> +				reg = <0x30ab0000 0x10000>;
-> +				interrupts = <GIC_SPI 97
-> IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_MU_ROOT_CLK>;
-> +				#mbox-cells = <1>;
-> +				fsl,mu-side-b;
-> +				status = "disabled";
-> +			};
-> +
->  			usbotg1: usb at 30b10000 {
->  				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
->  				reg = <0x30b10000 0x200>;
-> --
-> 2.18.0
+diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+index f5b5ead..51e5b04 100644
+--- a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
++++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+@@ -630,6 +630,7 @@ static int send_synchronous_mmal_msg(struct vchiq_mmal_instance *instance,
+ {
+ 	struct mmal_msg_context *msg_context;
+ 	int ret;
++	unsigned long timeout;
+ 
+ 	/* payload size must not cause message to exceed max size */
+ 	if (payload_len >
+@@ -668,11 +669,11 @@ static int send_synchronous_mmal_msg(struct vchiq_mmal_instance *instance,
+ 		return ret;
+ 	}
+ 
+-	ret = wait_for_completion_timeout(&msg_context->u.sync.cmplt, 3 * HZ);
+-	if (ret <= 0) {
+-		pr_err("error %d waiting for sync completion\n", ret);
+-		if (ret == 0)
+-			ret = -ETIME;
++	timeout = wait_for_completion_timeout(&msg_context->u.sync.cmplt,
++					      3 * HZ);
++	if (timeout == 0) {
++		pr_err("timed out waiting for sync completion\n");
++		ret = -ETIME;
+ 		/* todo: what happens if the message arrives after aborting */
+ 		release_msg_context(msg_context);
+ 		return ret;
+-- 
+2.1.4
