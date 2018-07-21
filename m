@@ -1,97 +1,113 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Sat, 21 Jul 2018 13:35:51 +0000
-Subject: [PATCH v5 1/4] dt-bindings: arm: fsl: add mu binding doc
-In-Reply-To: <20180721130827.944-2-o.rempel@pengutronix.de>
-References: <20180721130827.944-1-o.rempel@pengutronix.de>
- <20180721130827.944-2-o.rempel@pengutronix.de>
-Message-ID: <AM0PR04MB42114C9A500D344FB9D66A1E80500@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Sat, 21 Jul 2018 17:23:19 +0200
+Subject: [PATCH v4 10/35] mtd: rawnand: jz4780: convert driver to
+ nand_scan()
+In-Reply-To: <20180720151527.16038-11-miquel.raynal@bootlin.com>
+References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
+ <20180720151527.16038-11-miquel.raynal@bootlin.com>
+Message-ID: <20180721172250.723b4fd2@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oleksij,
+On Fri, 20 Jul 2018 17:15:02 +0200
+Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-> -----Original Message-----
-> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
-> Sent: Saturday, July 21, 2018 9:08 PM
-> To: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
-> <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark
-> Rutland <mark.rutland@arm.com>; A.s. Dong <aisheng.dong@nxp.com>;
-> Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>; devicetree at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; dl-linux-imx <linux-imx@nxp.com>
-> Subject: [PATCH v5 1/4] dt-bindings: arm: fsl: add mu binding doc
+> Two helpers have been added to the core to make ECC-related
+> configuration between the detection phase and the final NAND scan. Use
+> these hooks and convert the driver to just use nand_scan() instead of
+> both nand_scan_ident() and nand_scan_tail().
 > 
-> From: Dong Aisheng <aisheng.dong@nxp.com>
-> 
-> The Messaging Unit module enables two processors within the SoC to
-> communicate and coordinate by passing messages (e.g. data, status and
-> control) through the MU interface.
-> 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> Acked-by: Harvey Hunt <harveyhuntnexus@gmail.com>
 
-Just let you know this patch also depends on another one which is already
-Acked by Rob.
-If you resend, would you please help pick that one in this series as well?
-
- [V4,1/5] dt-bindings: mailbox: allow mbox-cells to be equal to 0
-https://patchwork.kernel.org/patch/10513197/
-
-Regards
-Dong Aisheng
+Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
 
 > ---
->  .../devicetree/bindings/mailbox/fsl,mu.txt    | 34 +++++++++++++++++++
->  1 file changed, 34 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+>  drivers/mtd/nand/raw/jz4780_nand.c | 34 ++++++++++++++++------------------
+>  1 file changed, 16 insertions(+), 18 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> new file mode 100644
-> index 000000000000..90e4905dfc69
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> @@ -0,0 +1,34 @@
-> +NXP i.MX Messaging Unit (MU)
-> +--------------------------------------------------------------------
-> +
-> +The Messaging Unit module enables two processors within the SoC to
-> +communicate and coordinate by passing messages (e.g. data, status and
-> +control) through the MU interface. The MU also provides the ability for
-> +one processor to signal the other processor using interrupts.
-> +
-> +Because the MU manages the messaging between processors, the MU
-> uses
-> +different clocks (from each side of the different peripheral buses).
-> +Therefore, the MU must synchronize the accesses from one side to the
-> +other. The MU accomplishes synchronization using two sets of matching
-> +registers (Processor A-facing, Processor B-facing).
-> +
-> +Messaging Unit Device Node:
-> +=============================
-> +
-> +Required properties:
-> +-------------------
-> +- compatible :	should be "fsl,<chip>-mu", the supported chips include
-> +		imx8qxp, imx8qm.
-> +- reg :		Should contain the registers location and length
-> +- interrupts :	Interrupt number. The interrupt specifier format depends
-> +		on the interrupt controller parent.
-> +- #mbox-cells:  Must be 0. Number of cells in a mailbox
-> +
-> +Examples:
-> +--------
-> +lsio_mu0: mailbox at 5d1b0000 {
-> +	compatible = "fsl,imx8qxp-mu";
-> +	reg = <0x0 0x5d1b0000 0x0 0x10000>;
-> +	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
-> +	#mbox-cells = <0>;
+> diff --git a/drivers/mtd/nand/raw/jz4780_nand.c b/drivers/mtd/nand/raw/jz4780_nand.c
+> index 49841dad347c..db4fa60bd52a 100644
+> --- a/drivers/mtd/nand/raw/jz4780_nand.c
+> +++ b/drivers/mtd/nand/raw/jz4780_nand.c
+> @@ -158,9 +158,8 @@ static int jz4780_nand_ecc_correct(struct mtd_info *mtd, u8 *dat,
+>  	return jz4780_bch_correct(nfc->bch, &params, dat, read_ecc);
+>  }
+>  
+> -static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *dev)
+> +static int jz4780_nand_attach_chip(struct nand_chip *chip)
+>  {
+> -	struct nand_chip *chip = &nand->chip;
+>  	struct mtd_info *mtd = nand_to_mtd(chip);
+>  	struct jz4780_nand_controller *nfc = to_jz4780_nand_controller(chip->controller);
+>  	int eccbytes;
+> @@ -171,7 +170,8 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
+>  	switch (chip->ecc.mode) {
+>  	case NAND_ECC_HW:
+>  		if (!nfc->bch) {
+> -			dev_err(dev, "HW BCH selected, but BCH controller not found\n");
+> +			dev_err(nfc->dev,
+> +				"HW BCH selected, but BCH controller not found\n");
+>  			return -ENODEV;
+>  		}
+>  
+> @@ -180,15 +180,16 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
+>  		chip->ecc.correct = jz4780_nand_ecc_correct;
+>  		/* fall through */
+>  	case NAND_ECC_SOFT:
+> -		dev_info(dev, "using %s (strength %d, size %d, bytes %d)\n",
+> -			(nfc->bch) ? "hardware BCH" : "software ECC",
+> -			chip->ecc.strength, chip->ecc.size, chip->ecc.bytes);
+> +		dev_info(nfc->dev, "using %s (strength %d, size %d, bytes %d)\n",
+> +			 (nfc->bch) ? "hardware BCH" : "software ECC",
+> +			 chip->ecc.strength, chip->ecc.size, chip->ecc.bytes);
+>  		break;
+>  	case NAND_ECC_NONE:
+> -		dev_info(dev, "not using ECC\n");
+> +		dev_info(nfc->dev, "not using ECC\n");
+>  		break;
+>  	default:
+> -		dev_err(dev, "ECC mode %d not supported\n", chip->ecc.mode);
+> +		dev_err(nfc->dev, "ECC mode %d not supported\n",
+> +			chip->ecc.mode);
+>  		return -EINVAL;
+>  	}
+>  
+> @@ -200,7 +201,7 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
+>  	eccbytes = mtd->writesize / chip->ecc.size * chip->ecc.bytes;
+>  
+>  	if (eccbytes > mtd->oobsize - 2) {
+> -		dev_err(dev,
+> +		dev_err(nfc->dev,
+>  			"invalid ECC config: required %d ECC bytes, but only %d are available",
+>  			eccbytes, mtd->oobsize - 2);
+>  		return -EINVAL;
+> @@ -211,6 +212,10 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
+>  	return 0;
+>  }
+>  
+> +static const struct nand_controller_ops jz4780_nand_controller_ops = {
+> +	.attach_chip = jz4780_nand_attach_chip,
 > +};
-> --
-> 2.18.0
+> +
+>  static int jz4780_nand_init_chip(struct platform_device *pdev,
+>  				struct jz4780_nand_controller *nfc,
+>  				struct device_node *np,
+> @@ -280,15 +285,8 @@ static int jz4780_nand_init_chip(struct platform_device *pdev,
+>  	chip->controller = &nfc->controller;
+>  	nand_set_flash_node(chip, np);
+>  
+> -	ret = nand_scan_ident(mtd, 1, NULL);
+> -	if (ret)
+> -		return ret;
+> -
+> -	ret = jz4780_nand_init_ecc(nand, dev);
+> -	if (ret)
+> -		return ret;
+> -
+> -	ret = nand_scan_tail(mtd);
+> +	chip->controller->ops = &jz4780_nand_controller_ops;
+> +	ret = nand_scan(mtd, 1);
+>  	if (ret)
+>  		return ret;
+>  
