@@ -1,20 +1,22 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:26:26 -0700
-Subject: [GIT PULL 1/3] ARM: dts: uniphier: UniPhier DT updates for v4.19
-In-Reply-To: <CAK7LNASA08wMtQaEfZy66u-EubV7X-u+z6KcTrtq_yXzWyzPvw@mail.gmail.com>
-References: <CAK7LNASA08wMtQaEfZy66u-EubV7X-u+z6KcTrtq_yXzWyzPvw@mail.gmail.com>
-Message-ID: <20180721212626.p3vth4xry46tlsfg@localhost>
+Date: Sat, 21 Jul 2018 14:27:38 -0700
+Subject: [GIT PULL v2] arm64: zynqmp: Xilinx DT changes for v4.19
+In-Reply-To: <c4c29579-8d05-a290-2d59-638170601849@monstr.eu>
+References: <c4c29579-8d05-a290-2d59-638170601849@monstr.eu>
+Message-ID: <20180721212738.kwsudmrsr64vqbv7@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 08:01:06AM +0900, Masahiro Yamada wrote:
-> Hi Arnd, Olof,
+On Thu, Jul 19, 2018 at 09:52:41AM +0200, Michal Simek wrote:
+> Hi,
 > 
-> Please pull UniPhier DT (32bit) updates for the v4.19 MW.
+> Based on discussion with Olof all patches are using these prefixes.
+> arm64: dts: zynqmp:
 > 
-> Thanks!
+> Please pull the following arm64 DT patches.
 > 
-> 
+> Thanks,
+> Michal
 > 
 > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
@@ -22,15 +24,22 @@ On Thu, Jul 19, 2018 at 08:01:06AM +0900, Masahiro Yamada wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-> tags/uniphier-dt-v4.19
+>   https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-dt-for-v4.19-v2
 > 
-> for you to fetch changes up to 38dc27c85e642cd6229f3a4b2c85128501852158:
+> for you to fetch changes up to 41ee3e3883056f216bc1044c7ab1c8477b3384ad:
 > 
->   ARM: dts: uniphier: Add missing cooling device properties for CPUs
-> (2018-07-19 06:42:16 +0900)
+>   arm64: dts: zynqmp: Add support for Avnet Ultra96 rev1 board
+> (2018-07-19 09:48:30 +0200)
+> 
+> ----------------------------------------------------------------
+> arm: dts: zynqmp: DT changes for v4.19
+> 
+> - Use serdev for BT in zcu100
+> - Remove ep108
+> - Fix gpio-keys binding
+> - Add suport for Ultra96
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
