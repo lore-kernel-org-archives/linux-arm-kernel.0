@@ -1,57 +1,93 @@
 From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Sat, 21 Jul 2018 19:53:14 +0200
-Subject: [PATCH v4 23/35] mtd: rawnand: txx9ndfmc: rename nand
- controller internal structure
-In-Reply-To: <20180720151527.16038-24-miquel.raynal@bootlin.com>
+Date: Sat, 21 Jul 2018 19:54:38 +0200
+Subject: [PATCH v4 24/35] mtd: rawnand: txx9ndfmc: convert driver to
+ nand_scan()
+In-Reply-To: <20180720151527.16038-25-miquel.raynal@bootlin.com>
 References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
- <20180720151527.16038-24-miquel.raynal@bootlin.com>
-Message-ID: <20180721195314.527b12b8@bbrezillon>
+ <20180720151527.16038-25-miquel.raynal@bootlin.com>
+Message-ID: <20180721195438.03e092b1@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Jul 2018 17:15:15 +0200
+On Fri, 20 Jul 2018 17:15:16 +0200
 Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-> As already done in the core, calling a struct nand_controller
-> 'hw_control' is misleading. Use the same name as in nand_base.c:
-> 'controller'.
+> Two helpers have been added to the core to make ECC-related
+> configuration between the detection phase and the final NAND scan. Use
+> these hooks and convert the driver to just use nand_scan() instead of
+> both nand_scan_ident() and nand_scan_tail().
 > 
 > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 
 Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
 
 > ---
->  drivers/mtd/nand/raw/txx9ndfmc.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  drivers/mtd/nand/raw/txx9ndfmc.c | 29 +++++++++++++++--------------
+>  1 file changed, 15 insertions(+), 14 deletions(-)
 > 
 > diff --git a/drivers/mtd/nand/raw/txx9ndfmc.c b/drivers/mtd/nand/raw/txx9ndfmc.c
-> index 8f5bbbac4612..9019022774f7 100644
+> index 9019022774f7..0134beb1136d 100644
 > --- a/drivers/mtd/nand/raw/txx9ndfmc.c
 > +++ b/drivers/mtd/nand/raw/txx9ndfmc.c
-> @@ -73,7 +73,7 @@ struct txx9ndfmc_drvdata {
->  	void __iomem *base;
->  	unsigned char hold;	/* in gbusclock */
->  	unsigned char spw;	/* in gbusclock */
-> -	struct nand_controller hw_control;
-> +	struct nand_controller controller;
->  };
+> @@ -254,23 +254,23 @@ static void txx9ndfmc_initialize(struct platform_device *dev)
+>  #define TXX9NDFMC_NS_TO_CYC(gbusclk, ns) \
+>  	DIV_ROUND_UP((ns) * DIV_ROUND_UP(gbusclk, 1000), 1000000)
 >  
->  static struct platform_device *mtd_to_platdev(struct mtd_info *mtd)
-> @@ -303,7 +303,7 @@ static int __init txx9ndfmc_probe(struct platform_device *dev)
->  	dev_info(&dev->dev, "CLK:%ldMHz HOLD:%d SPW:%d\n",
+> -static int txx9ndfmc_nand_scan(struct mtd_info *mtd)
+> +static int txx9ndfmc_attach_chip(struct nand_chip *chip)
+>  {
+> -	struct nand_chip *chip = mtd_to_nand(mtd);
+> -	int ret;
+> +	struct mtd_info *mtd = nand_to_mtd(chip);
+>  
+> -	ret = nand_scan_ident(mtd, 1, NULL);
+> -	if (!ret) {
+> -		if (mtd->writesize >= 512) {
+> -			/* Hardware ECC 6 byte ECC per 512 Byte data */
+> -			chip->ecc.size = 512;
+> -			chip->ecc.bytes = 6;
+> -		}
+> -		ret = nand_scan_tail(mtd);
+> +	if (mtd->writesize >= 512) {
+> +		/* Hardware ECC 6 byte ECC per 512 Byte data */
+> +		chip->ecc.size = 512;
+> +		chip->ecc.bytes = 6;
+>  	}
+> -	return ret;
+> +
+> +	return 0;
+>  }
+>  
+> +static const struct nand_controller_ops txx9ndfmc_controller_ops = {
+> +	.attach_chip = txx9ndfmc_attach_chip,
+> +};
+> +
+>  static int __init txx9ndfmc_probe(struct platform_device *dev)
+>  {
+>  	struct txx9ndfmc_platform_data *plat = dev_get_platdata(&dev->dev);
+> @@ -304,6 +304,7 @@ static int __init txx9ndfmc_probe(struct platform_device *dev)
 >  		 (gbusclk + 500000) / 1000000, hold, spw);
 >  
-> -	nand_controller_init(&drvdata->hw_control);
-> +	nand_controller_init(&drvdata->controller);
+>  	nand_controller_init(&drvdata->controller);
+> +	drvdata->controller.ops = &txx9ndfmc_controller_ops;
 >  
 >  	platform_set_drvdata(dev, drvdata);
 >  	txx9ndfmc_initialize(dev);
-> @@ -337,7 +337,7 @@ static int __init txx9ndfmc_probe(struct platform_device *dev)
+> @@ -332,7 +333,7 @@ static int __init txx9ndfmc_probe(struct platform_device *dev)
+>  		chip->ecc.correct = txx9ndfmc_correct_data;
+>  		chip->ecc.hwctl = txx9ndfmc_enable_hwecc;
+>  		chip->ecc.mode = NAND_ECC_HW;
+> -		/* txx9ndfmc_nand_scan will overwrite ecc.size and ecc.bytes */
+> +		/* nand_scan() will overwrite ecc.size and ecc.bytes */
+>  		chip->ecc.size = 256;
 >  		chip->ecc.bytes = 3;
 >  		chip->ecc.strength = 1;
->  		chip->chip_delay = 100;
-> -		chip->controller = &drvdata->hw_control;
-> +		chip->controller = &drvdata->controller;
+> @@ -359,7 +360,7 @@ static int __init txx9ndfmc_probe(struct platform_device *dev)
+>  		if (plat->wide_mask & (1 << i))
+>  			chip->options |= NAND_BUSWIDTH_16;
 >  
->  		nand_set_controller_data(chip, txx9_priv);
->  		txx9_priv->dev = dev;
+> -		if (txx9ndfmc_nand_scan(mtd)) {
+> +		if (nand_scan(mtd, 1)) {
+>  			kfree(txx9_priv->mtdname);
+>  			kfree(txx9_priv);
+>  			continue;
