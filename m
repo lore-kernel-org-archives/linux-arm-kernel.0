@@ -1,14 +1,15 @@
 From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Sat, 21 Jul 2018 19:19:04 +0200
-Subject: [PATCH v4 15/35] mtd: rawnand: mxc: convert driver to nand_scan()
-In-Reply-To: <20180720151527.16038-16-miquel.raynal@bootlin.com>
+Date: Sat, 21 Jul 2018 19:21:01 +0200
+Subject: [PATCH v4 16/35] mtd: rawnand: nandsim: convert driver to
+ nand_scan()
+In-Reply-To: <20180720151527.16038-17-miquel.raynal@bootlin.com>
 References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
- <20180720151527.16038-16-miquel.raynal@bootlin.com>
-Message-ID: <20180721191904.541faf4d@bbrezillon>
+ <20180720151527.16038-17-miquel.raynal@bootlin.com>
+Message-ID: <20180721192101.0e0d1860@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Jul 2018 17:15:07 +0200
+On Fri, 20 Jul 2018 17:15:08 +0200
 Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
 > Two helpers have been added to the core to make ECC-related
@@ -21,160 +22,107 @@ Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
 
 > ---
->  drivers/mtd/nand/raw/mxc_nand.c | 136 +++++++++++++++++++++-------------------
->  1 file changed, 71 insertions(+), 65 deletions(-)
+>  drivers/mtd/nand/raw/nandsim.c | 82 +++++++++++++++++++++++-------------------
+>  1 file changed, 45 insertions(+), 37 deletions(-)
 > 
-> diff --git a/drivers/mtd/nand/raw/mxc_nand.c b/drivers/mtd/nand/raw/mxc_nand.c
-> index c6eff61e909d..4c9214dea424 100644
-> --- a/drivers/mtd/nand/raw/mxc_nand.c
-> +++ b/drivers/mtd/nand/raw/mxc_nand.c
-> @@ -1691,6 +1691,74 @@ static int mxcnd_probe_dt(struct mxc_nand_host *host)
+> diff --git a/drivers/mtd/nand/raw/nandsim.c b/drivers/mtd/nand/raw/nandsim.c
+> index 8a3b36cfe5ea..71ac034aee9c 100644
+> --- a/drivers/mtd/nand/raw/nandsim.c
+> +++ b/drivers/mtd/nand/raw/nandsim.c
+> @@ -2192,6 +2192,48 @@ static void ns_nand_read_buf(struct mtd_info *mtd, u_char *buf, int len)
+>  	return;
 >  }
->  #endif
 >  
-> +static int mxcnd_attach_chip(struct nand_chip *chip)
+> +static int ns_attach_chip(struct nand_chip *chip)
 > +{
-> +	struct mtd_info *mtd = nand_to_mtd(chip);
-> +	struct mxc_nand_host *host = nand_get_controller_data(chip);
-> +	struct device *dev = mtd->dev.parent;
+> +	unsigned int eccsteps, eccbytes;
 > +
-> +	switch (chip->ecc.mode) {
-> +	case NAND_ECC_HW:
-> +		chip->ecc.read_page = mxc_nand_read_page;
-> +		chip->ecc.read_page_raw = mxc_nand_read_page_raw;
-> +		chip->ecc.read_oob = mxc_nand_read_oob;
-> +		chip->ecc.write_page = mxc_nand_write_page_ecc;
-> +		chip->ecc.write_page_raw = mxc_nand_write_page_raw;
-> +		chip->ecc.write_oob = mxc_nand_write_oob;
-> +		break;
+> +	if (!bch)
+> +		return 0;
 > +
-> +	case NAND_ECC_SOFT:
-> +		break;
-> +
-> +	default:
+> +	if (!mtd_nand_has_bch()) {
+> +		NS_ERR("BCH ECC support is disabled\n");
 > +		return -EINVAL;
 > +	}
 > +
-> +	if (chip->bbt_options & NAND_BBT_USE_FLASH) {
-> +		chip->bbt_td = &bbt_main_descr;
-> +		chip->bbt_md = &bbt_mirror_descr;
+> +	/* Use 512-byte ecc blocks */
+> +	eccsteps = nsmtd->writesize / 512;
+> +	eccbytes = ((bch * 13) + 7) / 8;
+> +
+> +	/* Do not bother supporting small page devices */
+> +	if (nsmtd->oobsize < 64 || !eccsteps) {
+> +		NS_ERR("BCH not available on small page devices\n");
+> +		return -EINVAL;
 > +	}
 > +
-> +	/* Allocate the right size buffer now */
-> +	devm_kfree(dev, (void *)host->data_buf);
-> +	host->data_buf = devm_kzalloc(dev, mtd->writesize + mtd->oobsize,
-> +				      GFP_KERNEL);
-> +	if (!host->data_buf)
-> +		return -ENOMEM;
-> +
-> +	/* Call preset again, with correct writesize chip time */
-> +	host->devtype_data->preset(mtd);
-> +
-> +	if (!chip->ecc.bytes) {
-> +		if (host->eccsize == 8)
-> +			chip->ecc.bytes = 18;
-> +		else if (host->eccsize == 4)
-> +			chip->ecc.bytes = 9;
+> +	if (((eccbytes * eccsteps) + 2) > nsmtd->oobsize) {
+> +		NS_ERR("Invalid BCH value %u\n", bch);
+> +		return -EINVAL;
 > +	}
 > +
-> +	/*
-> +	 * Experimentation shows that i.MX NFC can only handle up to 218 oob
-> +	 * bytes. Limit used_oobsize to 218 so as to not confuse copy_spare()
-> +	 * into copying invalid data to/from the spare IO buffer, as this
-> +	 * might cause ECC data corruption when doing sub-page write to a
-> +	 * partially written page.
-> +	 */
-> +	host->used_oobsize = min(mtd->oobsize, 218U);
+> +	chip->ecc.mode = NAND_ECC_SOFT;
+> +	chip->ecc.algo = NAND_ECC_BCH;
+> +	chip->ecc.size = 512;
+> +	chip->ecc.strength = bch;
+> +	chip->ecc.bytes = eccbytes;
 > +
-> +	if (chip->ecc.mode == NAND_ECC_HW) {
-> +		if (is_imx21_nfc(host) || is_imx27_nfc(host))
-> +			chip->ecc.strength = 1;
-> +		else
-> +			chip->ecc.strength = (host->eccsize == 4) ? 4 : 8;
-> +	}
+> +	NS_INFO("Using %u-bit/%u bytes BCH ECC\n", bch, chip->ecc.size);
 > +
 > +	return 0;
 > +}
 > +
-> +static const struct nand_controller_ops mxcnd_controller_ops = {
-> +	.attach_chip = mxcnd_attach_chip,
+> +static const struct nand_controller_ops ns_controller_ops = {
+> +	.attach_chip = ns_attach_chip,
 > +};
 > +
->  static int mxcnd_probe(struct platform_device *pdev)
->  {
->  	struct nand_chip *this;
-> @@ -1830,71 +1898,9 @@ static int mxcnd_probe(struct platform_device *pdev)
->  		host->devtype_data->irq_control(host, 1);
->  	}
+>  /*
+>   * Module initialization function
+>   */
+> @@ -2276,44 +2318,10 @@ static int __init ns_init_module(void)
+>  	if ((retval = parse_gravepages()) != 0)
+>  		goto error;
 >  
-> -	/* first scan to find the device and get the page size */
-> -	err = nand_scan_ident(mtd, is_imx25_nfc(host) ? 4 : 1, NULL);
-> -	if (err)
-> -		goto escan;
-> -
-> -	switch (this->ecc.mode) {
-> -	case NAND_ECC_HW:
-> -		this->ecc.read_page = mxc_nand_read_page;
-> -		this->ecc.read_page_raw = mxc_nand_read_page_raw;
-> -		this->ecc.read_oob = mxc_nand_read_oob;
-> -		this->ecc.write_page = mxc_nand_write_page_ecc;
-> -		this->ecc.write_page_raw = mxc_nand_write_page_raw;
-> -		this->ecc.write_oob = mxc_nand_write_oob;
-> -		break;
-> -
-> -	case NAND_ECC_SOFT:
-> -		break;
-> -
-> -	default:
-> -		err = -EINVAL;
-> -		goto escan;
+> -	retval = nand_scan_ident(nsmtd, 1, NULL);
+> +	chip->dummy_controller.ops = &ns_controller_ops;
+> +	retval = nand_scan(nsmtd, 1);
+>  	if (retval) {
+> -		NS_ERR("cannot scan NAND Simulator device\n");
+> -		goto error;
 > -	}
 > -
-> -	if (this->bbt_options & NAND_BBT_USE_FLASH) {
-> -		this->bbt_td = &bbt_main_descr;
-> -		this->bbt_md = &bbt_mirror_descr;
+> -	if (bch) {
+> -		unsigned int eccsteps, eccbytes;
+> -		if (!mtd_nand_has_bch()) {
+> -			NS_ERR("BCH ECC support is disabled\n");
+> -			retval = -EINVAL;
+> -			goto error;
+> -		}
+> -		/* use 512-byte ecc blocks */
+> -		eccsteps = nsmtd->writesize/512;
+> -		eccbytes = (bch*13+7)/8;
+> -		/* do not bother supporting small page devices */
+> -		if ((nsmtd->oobsize < 64) || !eccsteps) {
+> -			NS_ERR("bch not available on small page devices\n");
+> -			retval = -EINVAL;
+> -			goto error;
+> -		}
+> -		if ((eccbytes*eccsteps+2) > nsmtd->oobsize) {
+> -			NS_ERR("invalid bch value %u\n", bch);
+> -			retval = -EINVAL;
+> -			goto error;
+> -		}
+> -		chip->ecc.mode = NAND_ECC_SOFT;
+> -		chip->ecc.algo = NAND_ECC_BCH;
+> -		chip->ecc.size = 512;
+> -		chip->ecc.strength = bch;
+> -		chip->ecc.bytes = eccbytes;
+> -		NS_INFO("using %u-bit/%u bytes BCH ECC\n", bch, chip->ecc.size);
 > -	}
 > -
-> -	/* allocate the right size buffer now */
-> -	devm_kfree(&pdev->dev, (void *)host->data_buf);
-> -	host->data_buf = devm_kzalloc(&pdev->dev, mtd->writesize + mtd->oobsize,
-> -					GFP_KERNEL);
-> -	if (!host->data_buf) {
-> -		err = -ENOMEM;
-> -		goto escan;
-> -	}
-> -
-> -	/* Call preset again, with correct writesize this time */
-> -	host->devtype_data->preset(mtd);
-> -
-> -	if (!this->ecc.bytes) {
-> -		if (host->eccsize == 8)
-> -			this->ecc.bytes = 18;
-> -		else if (host->eccsize == 4)
-> -			this->ecc.bytes = 9;
-> -	}
-> -
-> -	/*
-> -	 * Experimentation shows that i.MX NFC can only handle up to 218 oob
-> -	 * bytes. Limit used_oobsize to 218 so as to not confuse copy_spare()
-> -	 * into copying invalid data to/from the spare IO buffer, as this
-> -	 * might cause ECC data corruption when doing sub-page write to a
-> -	 * partially written page.
-> -	 */
-> -	host->used_oobsize = min(mtd->oobsize, 218U);
-> -
-> -	if (this->ecc.mode == NAND_ECC_HW) {
-> -		if (is_imx21_nfc(host) || is_imx27_nfc(host))
-> -			this->ecc.strength = 1;
-> -		else
-> -			this->ecc.strength = (host->eccsize == 4) ? 4 : 8;
-> -	}
-> -
-> -	/* second phase scan */
-> -	err = nand_scan_tail(mtd);
-> +	/* Scan the NAND device */
-> +	this->dummy_controller.ops = &mxcnd_controller_ops;
-> +	err = nand_scan(mtd, is_imx25_nfc(host) ? 4 : 1);
->  	if (err)
->  		goto escan;
+> -	retval = nand_scan_tail(nsmtd);
+> -	if (retval) {
+> -		NS_ERR("can't register NAND Simulator\n");
+> +		NS_ERR("Could not scan NAND Simulator device\n");
+>  		goto error;
+>  	}
 >  
