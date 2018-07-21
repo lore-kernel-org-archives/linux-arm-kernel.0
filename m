@@ -1,28 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:25:50 -0700
-Subject: [GIT PULL] few new beaglebone variants for v4.19 merge window
-In-Reply-To: <pull-1531986403-289188@atomide.com>
-References: <pull-1531986403-289188@atomide.com>
-Message-ID: <20180721212550.gfwwqfwsgcqucfax@localhost>
+Date: Sat, 21 Jul 2018 14:26:26 -0700
+Subject: [GIT PULL 1/3] ARM: dts: uniphier: UniPhier DT updates for v4.19
+In-Reply-To: <CAK7LNASA08wMtQaEfZy66u-EubV7X-u+z6KcTrtq_yXzWyzPvw@mail.gmail.com>
+References: <CAK7LNASA08wMtQaEfZy66u-EubV7X-u+z6KcTrtq_yXzWyzPvw@mail.gmail.com>
+Message-ID: <20180721212626.p3vth4xry46tlsfg@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 12:47:47AM -0700, Tony Lindgren wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
+On Thu, Jul 19, 2018 at 08:01:06AM +0900, Masahiro Yamada wrote:
+> Hi Arnd, Olof,
 > 
-> The following changes since commit 792f98677d7f777a4f58e567b5b0578191cb986a:
+> Please pull UniPhier DT (32bit) updates for the v4.19 MW.
 > 
->   Merge commit '949bdcc8a97c' into omap-for-v4.19/dt (2018-07-11 05:54:32 -0700)
+> Thanks!
 > 
-> are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/dt-pt2-signed
 > 
-> for you to fetch changes up to 91f6278bfa3966529c61808bd3cb8f05d7ed5dc6:
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
->   ARM: dts: am335x: add am335x-sancloud-bbe board support (2018-07-17 01:05:37 -0700)
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+> tags/uniphier-dt-v4.19
+> 
+> for you to fetch changes up to 38dc27c85e642cd6229f3a4b2c85128501852158:
+> 
+>   ARM: dts: uniphier: Add missing cooling device properties for CPUs
+> (2018-07-19 06:42:16 +0900)
 
-Merged, thanks!
+Merged, thanks.
 
 
 -Olof
