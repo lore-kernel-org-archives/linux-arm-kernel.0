@@ -1,39 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:58:56 -0700
-Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.19
-In-Reply-To: <cover.1532080241.git.horms+renesas@verge.net.au>
-References: <cover.1532080241.git.horms+renesas@verge.net.au>
-Message-ID: <20180721215856.zxtldktfc7ruhx4w@localhost>
+Date: Sat, 21 Jul 2018 14:33:52 -0700
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.19 (#2)
+In-Reply-To: <87sh4e8eym.fsf@bootlin.com>
+References: <87sh4e8eym.fsf@bootlin.com>
+Message-ID: <20180721213352.eborr5dctfk3t7j3@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 02:03:18PM +0200, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Fri, Jul 20, 2018 at 10:54:25AM +0200, Gregory CLEMENT wrote:
+> Hi,
 > 
-> Please consider these Renesas ARM64 based SoC defconfig updates for v4.19.
+> Here is the second pull request for dt64 for mvebu for v4.19.
 > 
+> Gregory
 > 
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> The following changes since commit 4436a3711e3249840e0679e92d3c951bcaf25515:
 > 
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>   arm64: dts: marvell: armada-37xx: reserve memory for ATF (2018-06-29 16:39:03 +0200)
 > 
-> are available in the git repository at:
+> are available in the Git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-for-v4.19
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.19-2
 > 
-> for you to fetch changes up to 83c05e98f732bfa77830631e8d4403c76cad9b31:
+> for you to fetch changes up to c462f6c77e72804b72e008a91c4b6fa8d9b4b265:
 > 
->   arm64: defconfig: Enable BD9571MWV regulator (2018-06-18 12:01:14 +0200)
+>   arm64: dts: marvell: armada-37xx: update the crypto engine compatible (2018-07-13 13:42:03 +0200)
 > 
 > ----------------------------------------------------------------
-> Renesas ARM64 Based SoC Defconfig Updates for v4.19
+> mvebu dt64 for 4.19 (part 2)
 > 
-> * Enable BD9571MWV regulator in ARM64 defconfig
-> 
->   This is to allow wider testing of the BD9571 PMIC which is
->   present on boards with Renesas R-Car Gen3 SoCs
+> Use more specific compatible for the Inside Secure SafeXcel on the
+> Armada 37xx and the Armada 7K/8K SoCs.
 
-Merged, thanks.
+I'll reply to the patches -- usually compatible should go from specific to
+generic and you're replacing here instead of adding a more specific first. You
+probably want to do the former instead.
+
+Not merged, let's settle discussion on the patch first.
 
 
 -Olof
