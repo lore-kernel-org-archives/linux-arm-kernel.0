@@ -1,109 +1,99 @@
-From: okaya@kernel.org (Sinan Kaya)
-Date: Fri, 20 Jul 2018 19:58:20 -0700
-Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
- reset
-In-Reply-To: <20180720200123.GS128988@bhelgaas-glaptop.roam.corp.google.com>
-References: <CAK9iUCM=zWexWow9TwkRfO186Hwr5WyGy0NHZF1vtXn3wbbZGQ@mail.gmail.com>
- <12fc8de5-ff03-cb00-52cb-25a43c71d03a@codeaurora.org>
- <20180708171418.GA11476@wunner.de>
- <CAK9iUCMcic5mzGiT20KNxgwPo6AuajHFsoj7GOjSht5SwrQevg@mail.gmail.com>
- <20180709160008.GA1490@wunner.de>
- <CAK9iUCMMVR114msKiMHu7ik0VK8T5j=LAYAKsEkdnocTqkdMjQ@mail.gmail.com>
- <20180720200123.GS128988@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <2febe688-f973-5ff5-f61d-0451ad7d36ae@kernel.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 21 Jul 2018 12:21:35 +0800
+Subject: [PATCH RESEND 3/7] of: address: Add parent pointer to the
+ __of_translate_address args
+In-Reply-To: <2f1db1ad423dcc845cab311432826da4976d2363.1532098561.git-series.maxime.ripard@bootlin.com>
+References: <2f1db1ad423dcc845cab311432826da4976d2363.1532098561.git-series.maxime.ripard@bootlin.com>
+Message-ID: <201807211245.PUl1H0mX%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/20/2018 1:01 PM, Bjorn Helgaas wrote:
-> On Tue, Jul 10, 2018 at 02:30:11PM -0400, Sinan Kaya wrote:
->> On Mon, Jul 9, 2018 at 12:00 PM, Lukas Wunner <lukas@wunner.de> wrote:
->>> On Mon, Jul 09, 2018 at 08:48:44AM -0600, Sinan Kaya wrote:
->>>> On 7/8/18, Lukas Wunner <lukas@wunner.de> wrote:
->>>>> On Tue, Jul 03, 2018 at 11:43:26AM -0400, Sinan Kaya wrote:
->>>>>> My solution doesn't help if link down interrupt is observed
->>>>>> before the AER or DPC services.
->>>>>
->>>>> If pciehp gets an interrupt quicker than dpc/aer, it will (at
->>>>> least with my patches) remove all devices, check if the
->>>>> presence bit is set, and if so, try to bring the slot up
->>>>> again.
->>>>
->>>> Hotplug driver should only observe a link down interrupt. Link
->>>> would come up in response to a secondary bus reset initiated by
->>>> the AER driver.
->>>
->>> PCIe hotplug doesn't have separate Link Down and Link Up
->>> interrupts, there is only a Link State *Changed* event.
->>>
->>>> Can you point me to the code that would bring up the link in hp
->>>> code?
->>>
->>> I was referring to the situation with my recently posted pciehp
->>> patches applied, in particular patch [21/32] ("PCI: pciehp: Become
->>> resilient to missed events"):
->>> https://patchwork.ozlabs.org/patch/930389/
->>>
->>> When I get a presence or link changed event, I turn the slot off.
->>> That includes removing all devices in the slot.  Because even if
->>> the slot is still occupied or link is up, there was definitely a
->>> change and the safe behavior is to assume that the card in the
->>> slot is now a different one than before.
->>
->> We do have a bit of mess unfortunately. Error handling and hotplug
->> drivers do not play nicely with each other.
->>
->> When hotplug driver observes a link down, we are not checking if the
->> link down happened because user really wanted to remove a card or if
->> it was because it was originated by an error handling service such
->> as AER/DPC.
->>
->> I'm thinking that we could potentially check if a hotplug event is
->> pending at the entrance of fatal error handling. If it is pending,
->> we could poll until the status bit clears. That should flush the
->> link down event.
->>
->> Even then, link down indication of hotplug seem to turn off slot
->> power and LED.
->>
->> If AER/DPC service runs after the hotplug driver, link won't come
->> back up as the power to the slot is turned off.
->>
->> I'd like to hear about Bjorn's opinion before we throw something
->> else into this problem.
-> 
-> You guys know way more about this than I do.
-> 
-> I think the separation of AER/DPC/pciehp into separate drivers is
-> somewhat artificial because there are many interdependencies.  The
-> driver model doesn't apply very well because there's only one
-> underlying piece of hardware, which forces us to use the portdrv as
-> sort of a multiplexer.  The fact that portdrv claims these bridges
-> also means normal drivers (e.g., for performance counters) can't use
-> the usual model.
-> 
-> All that is to say that if integrating these services more tightly
-> would help solve this problem, I'd be open to that.
+Hi Maxime,
 
-I was looking at how to destroy the portdrv for a while. It looks like
-a much more bigger task to be honest. There are multiple levels of
-abstractions in the code as you highlighted.
+I love your patch! Perhaps something to improve:
 
-My patch solves the problem if AER interrupt happens before the hotplug
-interrupt. We are masking the data link layer active interrupt. So,
-AER/DPC can perform their link operations without hotplug driver race.
+[auto build test WARNING on ]
 
-We need to figure out how to gracefully return inside hotplug driver
-if link down happened and there is an error pending.
+url:    https://github.com/0day-ci/linux/commits/Maxime-Ripard/sunxi-Add-DT-representation-for-the-MBUS-controller/20180721-052652
+base:    
+reproduce:
+        # apt-get install sparse
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
 
-My first question is why hotplug driver is reacting to the link event
-if there was not an actual device insertion/removal.
 
-Would it help to keep track of presence changed interrupts since last
-link event?
+sparse warnings: (new ones prefixed by >>)
 
-IF counter is 0 and device is present, hotplug driver bails out
-silently as an example.
+>> drivers/of/address.c:742:45: sparse: incorrect type in argument 2 (different base types) @@    expected struct device_node *[assigned] parent @@    got restrstruct device_node *[assigned] parent @@
+   drivers/of/address.c:742:45:    expected struct device_node *[assigned] parent
+   drivers/of/address.c:742:45:    got restricted __be32 const [usertype] *in_addr
+>> drivers/of/address.c:742:54: sparse: incorrect type in argument 3 (different base types) @@    expected restricted __be32 const [usertype] *in_addr @@    got ype] *in_addr @@
+   drivers/of/address.c:742:54:    expected restricted __be32 const [usertype] *in_addr
+   drivers/of/address.c:742:54:    got char *<noident>
+>> drivers/of/address.c:742:65: sparse: incorrect type in argument 4 (different base types) @@    expected char const *rprop @@    got struct dechar const *rprop @@
+   drivers/of/address.c:742:65:    expected char const *rprop
+   drivers/of/address.c:742:65:    got struct device_node **<noident>
+>> drivers/of/address.c:742:39: sparse: not enough arguments for function __of_translate_address
+   drivers/of/address.c: In function 'of_translate_ioport':
+   drivers/of/address.c:742:38: error: passing argument 2 of '__of_translate_address' from incompatible pointer type [-Werror=incompatible-pointer-types]
+     taddr = __of_translate_address(dev, in_addr, "ranges", &host);
+                                         ^~~~~~~
+   drivers/of/address.c:571:12: note: expected 'struct device_node *' but argument is of type 'const __be32 * {aka const unsigned int *}'
+    static u64 __of_translate_address(struct device_node *dev,
+               ^~~~~~~~~~~~~~~~~~~~~~
+   drivers/of/address.c:742:47: error: passing argument 3 of '__of_translate_address' from incompatible pointer type [-Werror=incompatible-pointer-types]
+     taddr = __of_translate_address(dev, in_addr, "ranges", &host);
+                                                  ^~~~~~~~
+   drivers/of/address.c:571:12: note: expected 'const __be32 * {aka const unsigned int *}' but argument is of type 'char *'
+    static u64 __of_translate_address(struct device_node *dev,
+               ^~~~~~~~~~~~~~~~~~~~~~
+   drivers/of/address.c:742:57: error: passing argument 4 of '__of_translate_address' from incompatible pointer type [-Werror=incompatible-pointer-types]
+     taddr = __of_translate_address(dev, in_addr, "ranges", &host);
+                                                            ^
+   drivers/of/address.c:571:12: note: expected 'const char *' but argument is of type 'struct device_node **'
+    static u64 __of_translate_address(struct device_node *dev,
+               ^~~~~~~~~~~~~~~~~~~~~~
+   drivers/of/address.c:742:10: error: too few arguments to function '__of_translate_address'
+     taddr = __of_translate_address(dev, in_addr, "ranges", &host);
+             ^~~~~~~~~~~~~~~~~~~~~~
+   drivers/of/address.c:571:12: note: declared here
+    static u64 __of_translate_address(struct device_node *dev,
+               ^~~~~~~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
 
-> 
-> Bjorn
-> 
+vim +742 drivers/of/address.c
+
+dbbdee94 Grant Likely  2010-06-08  734  
+65af618d Zhichang Yuan 2018-03-15  735  static u64 of_translate_ioport(struct device_node *dev, const __be32 *in_addr,
+65af618d Zhichang Yuan 2018-03-15  736  			u64 size)
+65af618d Zhichang Yuan 2018-03-15  737  {
+65af618d Zhichang Yuan 2018-03-15  738  	u64 taddr;
+65af618d Zhichang Yuan 2018-03-15  739  	unsigned long port;
+65af618d Zhichang Yuan 2018-03-15  740  	struct device_node *host;
+65af618d Zhichang Yuan 2018-03-15  741  
+65af618d Zhichang Yuan 2018-03-15 @742  	taddr = __of_translate_address(dev, in_addr, "ranges", &host);
+65af618d Zhichang Yuan 2018-03-15  743  	if (host) {
+65af618d Zhichang Yuan 2018-03-15  744  		/* host-specific port access */
+65af618d Zhichang Yuan 2018-03-15  745  		port = logic_pio_trans_hwaddr(&host->fwnode, taddr, size);
+65af618d Zhichang Yuan 2018-03-15  746  		of_node_put(host);
+65af618d Zhichang Yuan 2018-03-15  747  	} else {
+65af618d Zhichang Yuan 2018-03-15  748  		/* memory-mapped I/O range */
+65af618d Zhichang Yuan 2018-03-15  749  		port = pci_address_to_pio(taddr);
+65af618d Zhichang Yuan 2018-03-15  750  	}
+65af618d Zhichang Yuan 2018-03-15  751  
+65af618d Zhichang Yuan 2018-03-15  752  	if (port == (unsigned long)-1)
+65af618d Zhichang Yuan 2018-03-15  753  		return OF_BAD_ADDR;
+65af618d Zhichang Yuan 2018-03-15  754  
+65af618d Zhichang Yuan 2018-03-15  755  	return port;
+65af618d Zhichang Yuan 2018-03-15  756  }
+65af618d Zhichang Yuan 2018-03-15  757  
+
+:::::: The code at line 742 was first introduced by commit
+:::::: 65af618d2c559f8eb19d80d03a23029651a59de4 of: Add missing I/O range exception for indirect-IO devices
+
+:::::: TO: Zhichang Yuan <yuanzhichang@hisilicon.com>
+:::::: CC: Bjorn Helgaas <helgaas@kernel.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
