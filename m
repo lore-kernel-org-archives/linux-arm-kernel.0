@@ -1,45 +1,109 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 21 Jul 2018 10:37:51 +0800
-Subject: [GIT PULL 6/6] i.MX defconfig updates for 4.19
-In-Reply-To: <1532140671-2869-1-git-send-email-shawnguo@kernel.org>
-References: <1532140344-2771-1-git-send-email-shawnguo@kernel.org>
- <1532140671-2869-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1532140671-2869-3-git-send-email-shawnguo@kernel.org>
+From: okaya@kernel.org (Sinan Kaya)
+Date: Fri, 20 Jul 2018 19:58:20 -0700
+Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
+ reset
+In-Reply-To: <20180720200123.GS128988@bhelgaas-glaptop.roam.corp.google.com>
+References: <CAK9iUCM=zWexWow9TwkRfO186Hwr5WyGy0NHZF1vtXn3wbbZGQ@mail.gmail.com>
+ <12fc8de5-ff03-cb00-52cb-25a43c71d03a@codeaurora.org>
+ <20180708171418.GA11476@wunner.de>
+ <CAK9iUCMcic5mzGiT20KNxgwPo6AuajHFsoj7GOjSht5SwrQevg@mail.gmail.com>
+ <20180709160008.GA1490@wunner.de>
+ <CAK9iUCMMVR114msKiMHu7ik0VK8T5j=LAYAKsEkdnocTqkdMjQ@mail.gmail.com>
+ <20180720200123.GS128988@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <2febe688-f973-5ff5-f61d-0451ad7d36ae@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+On 7/20/2018 1:01 PM, Bjorn Helgaas wrote:
+> On Tue, Jul 10, 2018 at 02:30:11PM -0400, Sinan Kaya wrote:
+>> On Mon, Jul 9, 2018 at 12:00 PM, Lukas Wunner <lukas@wunner.de> wrote:
+>>> On Mon, Jul 09, 2018 at 08:48:44AM -0600, Sinan Kaya wrote:
+>>>> On 7/8/18, Lukas Wunner <lukas@wunner.de> wrote:
+>>>>> On Tue, Jul 03, 2018 at 11:43:26AM -0400, Sinan Kaya wrote:
+>>>>>> My solution doesn't help if link down interrupt is observed
+>>>>>> before the AER or DPC services.
+>>>>>
+>>>>> If pciehp gets an interrupt quicker than dpc/aer, it will (at
+>>>>> least with my patches) remove all devices, check if the
+>>>>> presence bit is set, and if so, try to bring the slot up
+>>>>> again.
+>>>>
+>>>> Hotplug driver should only observe a link down interrupt. Link
+>>>> would come up in response to a secondary bus reset initiated by
+>>>> the AER driver.
+>>>
+>>> PCIe hotplug doesn't have separate Link Down and Link Up
+>>> interrupts, there is only a Link State *Changed* event.
+>>>
+>>>> Can you point me to the code that would bring up the link in hp
+>>>> code?
+>>>
+>>> I was referring to the situation with my recently posted pciehp
+>>> patches applied, in particular patch [21/32] ("PCI: pciehp: Become
+>>> resilient to missed events"):
+>>> https://patchwork.ozlabs.org/patch/930389/
+>>>
+>>> When I get a presence or link changed event, I turn the slot off.
+>>> That includes removing all devices in the slot.  Because even if
+>>> the slot is still occupied or link is up, there was definitely a
+>>> change and the safe behavior is to assume that the card in the
+>>> slot is now a different one than before.
+>>
+>> We do have a bit of mess unfortunately. Error handling and hotplug
+>> drivers do not play nicely with each other.
+>>
+>> When hotplug driver observes a link down, we are not checking if the
+>> link down happened because user really wanted to remove a card or if
+>> it was because it was originated by an error handling service such
+>> as AER/DPC.
+>>
+>> I'm thinking that we could potentially check if a hotplug event is
+>> pending at the entrance of fatal error handling. If it is pending,
+>> we could poll until the status bit clears. That should flush the
+>> link down event.
+>>
+>> Even then, link down indication of hotplug seem to turn off slot
+>> power and LED.
+>>
+>> If AER/DPC service runs after the hotplug driver, link won't come
+>> back up as the power to the slot is turned off.
+>>
+>> I'd like to hear about Bjorn's opinion before we throw something
+>> else into this problem.
+> 
+> You guys know way more about this than I do.
+> 
+> I think the separation of AER/DPC/pciehp into separate drivers is
+> somewhat artificial because there are many interdependencies.  The
+> driver model doesn't apply very well because there's only one
+> underlying piece of hardware, which forces us to use the portdrv as
+> sort of a multiplexer.  The fact that portdrv claims these bridges
+> also means normal drivers (e.g., for performance counters) can't use
+> the usual model.
+> 
+> All that is to say that if integrating these services more tightly
+> would help solve this problem, I'd be open to that.
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+I was looking at how to destroy the portdrv for a while. It looks like
+a much more bigger task to be honest. There are multiple levels of
+abstractions in the code as you highlighted.
 
-are available in the git repository at:
+My patch solves the problem if AER interrupt happens before the hotplug
+interrupt. We are masking the data link layer active interrupt. So,
+AER/DPC can perform their link operations without hotplug driver race.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.19
+We need to figure out how to gracefully return inside hotplug driver
+if link down happened and there is an error pending.
 
-for you to fetch changes up to eaed0291c62f7b513ad9483b02efdccd4ae4e9fc:
+My first question is why hotplug driver is reacting to the link event
+if there was not an actual device insertion/removal.
 
-  ARM: imx_v6_v7_defconfig: add DMATEST support (2018-07-21 09:58:21 +0800)
+Would it help to keep track of presence changed interrupts since last
+link event?
 
-----------------------------------------------------------------
-i.MX defconfig update for 4.19:
- - Enable ISL29018 sensor and MMA8452 accelerometer driver support for
-   imx6qdl-sabreauto board.
- - Enable DMATEST support which is useful for DMA driver development
-   testing.
- - Use the DRM driver for MXSFB LCD controller found on i.MX23, i.MX28,
-   i.MX6SX and i.MX7 SoCs.
+IF counter is 0 and device is present, hotplug driver bails out
+silently as an example.
 
-----------------------------------------------------------------
-Leonard Crestez (1):
-      ARM: imx_v6_v7_defconfig: Enable imx6qdl-sabreauto sensors
-
-Robin Gong (1):
-      ARM: imx_v6_v7_defconfig: add DMATEST support
-
-Stefan Agner (2):
-      ARM: mxs_defconfig: use MXSFB DRM driver
-      ARM: imx_v6_v7_defconfig: use MXSFB DRM driver
-
- arch/arm/configs/imx_v6_v7_defconfig | 8 +++++---
- arch/arm/configs/mxs_defconfig       | 5 +++--
- 2 files changed, 8 insertions(+), 5 deletions(-)
+> 
+> Bjorn
+> 
