@@ -1,172 +1,132 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Sat, 21 Jul 2018 20:05:06 +0200
-Subject: [PATCH v4 25/35] mtd: rawnand: vf610: convert driver to
- nand_scan()
-In-Reply-To: <20180720151527.16038-26-miquel.raynal@bootlin.com>
-References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
- <20180720151527.16038-26-miquel.raynal@bootlin.com>
-Message-ID: <20180721200506.069e948a@bbrezillon>
+From: vilhelm.gray@gmail.com (William Breathitt Gray)
+Date: Sat, 21 Jul 2018 14:23:09 -0400
+Subject: [PATCH v8 00/11] Introduce the Counter subsystem
+In-Reply-To: <20180721190134.166e50ab@archlinux>
+References: <cover.1531685024.git.vilhelm.gray@gmail.com>
+ <20180721190134.166e50ab@archlinux>
+Message-ID: <20180721182202.GA17344@sophia>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Jul 2018 17:15:17 +0200
-Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+On Sat, Jul 21, 2018 at 07:01:34PM +0100, Jonathan Cameron wrote:
+>On Sun, 15 Jul 2018 16:44:24 -0400
+>William Breathitt Gray <vilhelm.gray@gmail.com> wrote:
+>
+>> Changes in v8:
+>>  - Add counter_enum.h file
+>>  - Simplify COUNTER Kconfig option help text
+>>  - Rename generic-counter.c to the more straightforward counter.c
+>>  - Update copyright and license boilerplate (use recommended SPDX line)
+>>  - Replace EXPORT_SYMBOL lines with respective EXPORT_SYMBOL_GPL lines
+>>  - Replace scnprintf lines with sprintf since we're dealing with sysfs files
+>>  - Add struct counter_attr_parm to simplify counter_attribute_create parameters
+>>  - Rename *_comp_t suffixes to *_unit in order to avoid *_t suffix implications
+>>  - List sysfs attribute values verbatim in sysfs documentation files
+>>  - Reorganize 104-QUAD-8 driver license boilerplate update to dedicated patch
+>> 
+>> This revision is functionally identical to the last; changes in this version
+>> were made to improve clarity, formatting and whitespace, and organization. I
+>> also took this opportunity to record some of the new ACKs from the last
+>> submission.
+>> 
+>> The counter_enum.h file was created to hold the Generic Counter enum helper
+>> functions required by the Generic Counter enum macros (i.e. COUNTER_SIGNAL_ENUM,
+>> COUNTER_COUNT_ENUM, etc.). These helper functions are not intended to be used
+>> directly by driver authors, so I thought it best to keep them separated. Now the
+>> counter.h file contains only macro, functions, and data structures that are
+>> expected to possibly appear in a counter device driver.
+>> 
+>> The counter_attribute_create function parameter list was large so I reorganized
+>> the parameters into the counter_attr_parm structure, which may be set and passed
+>> by reference to the counter_attribute_create function. Since the show and store
+>> function pointers match with the struct device_attribute show and store function
+>> pointers, I decided to keep them declared as there are here without a typedef --
+>> however, I can typedef them in a future revision if it will improve clarity to
+>> do so.
+>> 
+>> Heads-up for Jonathan Cameron: you may pick-up the "iio: 104-quad-8: Update
+>> license boilerplate" patch independent of this series; it's the SPDX license
+>> boilerplate update for the 104-QUAD-8 IIO driver.
+>> 
+>> Sincerely,
+>> 
+>> William Breathitt Gray
+>> 
+>This crossed with Andrew Morton's good points on this occupying
+>namespace that is rather too generically named.  Hence I'll assume
+>we'll see a v9 with a solution to that (and personally ignore v8
+>to save time ;)
+>
+>Ah I see you just replied to Andrew. Great!
+>
+>
+>Jonathan
 
-> Two helpers have been added to the core to make ECC-related
-> configuration between the detection phase and the final NAND scan. Use
-> these hooks and convert the driver to just use nand_scan() instead of
-> both nand_scan_ident() and nand_scan_tail().
-> 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+That's right: please ignore this v8 release; Andrew Morton's suggestions
+on the v7 thread are quick enough that I should have a v9 tested and
+submitted by tomorrow, so keep an eye out for that one instead.
 
-Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
+Thanks,
 
-> ---
->  drivers/mtd/nand/raw/vf610_nfc.c | 127 ++++++++++++++++++++-------------------
->  1 file changed, 66 insertions(+), 61 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/raw/vf610_nfc.c b/drivers/mtd/nand/raw/vf610_nfc.c
-> index d5a22fc96878..6f6dcbf9095b 100644
-> --- a/drivers/mtd/nand/raw/vf610_nfc.c
-> +++ b/drivers/mtd/nand/raw/vf610_nfc.c
-> @@ -747,6 +747,69 @@ static void vf610_nfc_init_controller(struct vf610_nfc *nfc)
->  	}
->  }
->  
-> +static int vf610_nfc_attach_chip(struct nand_chip *chip)
-> +{
-> +	struct mtd_info *mtd = nand_to_mtd(chip);
-> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
-> +
-> +	vf610_nfc_init_controller(nfc);
-> +
-> +	/* Bad block options. */
-> +	if (chip->bbt_options & NAND_BBT_USE_FLASH)
-> +		chip->bbt_options |= NAND_BBT_NO_OOB;
-> +
-> +	/* Single buffer only, max 256 OOB minus ECC status */
-> +	if (mtd->writesize + mtd->oobsize > PAGE_2K + OOB_MAX - 8) {
-> +		dev_err(nfc->dev, "Unsupported flash page size\n");
-> +		return -ENXIO;
-> +	}
-> +
-> +	if (chip->ecc.mode != NAND_ECC_HW)
-> +		return 0;
-> +
-> +	if (mtd->writesize != PAGE_2K && mtd->oobsize < 64) {
-> +		dev_err(nfc->dev, "Unsupported flash with hwecc\n");
-> +		return -ENXIO;
-> +	}
-> +
-> +	if (chip->ecc.size != mtd->writesize) {
-> +		dev_err(nfc->dev, "Step size needs to be page size\n");
-> +		return -ENXIO;
-> +	}
-> +
-> +	/* Only 64 byte ECC layouts known */
-> +	if (mtd->oobsize > 64)
-> +		mtd->oobsize = 64;
-> +
-> +	/* Use default large page ECC layout defined in NAND core */
-> +	mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
-> +	if (chip->ecc.strength == 32) {
-> +		nfc->ecc_mode = ECC_60_BYTE;
-> +		chip->ecc.bytes = 60;
-> +	} else if (chip->ecc.strength == 24) {
-> +		nfc->ecc_mode = ECC_45_BYTE;
-> +		chip->ecc.bytes = 45;
-> +	} else {
-> +		dev_err(nfc->dev, "Unsupported ECC strength\n");
-> +		return -ENXIO;
-> +	}
-> +
-> +	chip->ecc.read_page = vf610_nfc_read_page;
-> +	chip->ecc.write_page = vf610_nfc_write_page;
-> +	chip->ecc.read_page_raw = vf610_nfc_read_page_raw;
-> +	chip->ecc.write_page_raw = vf610_nfc_write_page_raw;
-> +	chip->ecc.read_oob = vf610_nfc_read_oob;
-> +	chip->ecc.write_oob = vf610_nfc_write_oob;
-> +
-> +	chip->ecc.size = PAGE_2K;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct nand_controller_ops vf610_nfc_controller_ops = {
-> +	.attach_chip = vf610_nfc_attach_chip,
-> +};
-> +
->  static int vf610_nfc_probe(struct platform_device *pdev)
->  {
->  	struct vf610_nfc *nfc;
-> @@ -827,67 +890,9 @@ static int vf610_nfc_probe(struct platform_device *pdev)
->  
->  	vf610_nfc_preinit_controller(nfc);
->  
-> -	/* first scan to find the device and get the page size */
-> -	err = nand_scan_ident(mtd, 1, NULL);
-> -	if (err)
-> -		goto err_disable_clk;
-> -
-> -	vf610_nfc_init_controller(nfc);
-> -
-> -	/* Bad block options. */
-> -	if (chip->bbt_options & NAND_BBT_USE_FLASH)
-> -		chip->bbt_options |= NAND_BBT_NO_OOB;
-> -
-> -	/* Single buffer only, max 256 OOB minus ECC status */
-> -	if (mtd->writesize + mtd->oobsize > PAGE_2K + OOB_MAX - 8) {
-> -		dev_err(nfc->dev, "Unsupported flash page size\n");
-> -		err = -ENXIO;
-> -		goto err_disable_clk;
-> -	}
-> -
-> -	if (chip->ecc.mode == NAND_ECC_HW) {
-> -		if (mtd->writesize != PAGE_2K && mtd->oobsize < 64) {
-> -			dev_err(nfc->dev, "Unsupported flash with hwecc\n");
-> -			err = -ENXIO;
-> -			goto err_disable_clk;
-> -		}
-> -
-> -		if (chip->ecc.size != mtd->writesize) {
-> -			dev_err(nfc->dev, "Step size needs to be page size\n");
-> -			err = -ENXIO;
-> -			goto err_disable_clk;
-> -		}
-> -
-> -		/* Only 64 byte ECC layouts known */
-> -		if (mtd->oobsize > 64)
-> -			mtd->oobsize = 64;
-> -
-> -		/* Use default large page ECC layout defined in NAND core */
-> -		mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
-> -		if (chip->ecc.strength == 32) {
-> -			nfc->ecc_mode = ECC_60_BYTE;
-> -			chip->ecc.bytes = 60;
-> -		} else if (chip->ecc.strength == 24) {
-> -			nfc->ecc_mode = ECC_45_BYTE;
-> -			chip->ecc.bytes = 45;
-> -		} else {
-> -			dev_err(nfc->dev, "Unsupported ECC strength\n");
-> -			err = -ENXIO;
-> -			goto err_disable_clk;
-> -		}
-> -
-> -		chip->ecc.read_page = vf610_nfc_read_page;
-> -		chip->ecc.write_page = vf610_nfc_write_page;
-> -		chip->ecc.read_page_raw = vf610_nfc_read_page_raw;
-> -		chip->ecc.write_page_raw = vf610_nfc_write_page_raw;
-> -		chip->ecc.read_oob = vf610_nfc_read_oob;
-> -		chip->ecc.write_oob = vf610_nfc_write_oob;
-> -
-> -		chip->ecc.size = PAGE_2K;
-> -	}
-> -
-> -	/* second phase scan */
-> -	err = nand_scan_tail(mtd);
-> +	/* Scan the NAND chip */
-> +	chip->dummy_controller.ops = &vf610_nfc_controller_ops;
-> +	err = nand_scan(mtd, 1);
->  	if (err)
->  		goto err_disable_clk;
->  
+William Breathitt Gray
+
+>
+>> Benjamin Gaignard (2):
+>>   counter: Add STM32 Timer quadrature encoder
+>>   dt-bindings: counter: Document stm32 quadrature encoder
+>> 
+>> Fabrice Gasnier (2):
+>>   counter: stm32-lptimer: add counter device
+>>   dt-bindings: counter: Adjust dt-bindings for STM32 lptimer move
+>> 
+>> William Breathitt Gray (7):
+>>   counter: Introduce the Generic Counter interface
+>>   counter: Documentation: Add Generic Counter sysfs documentation
+>>   docs: Add Generic Counter interface documentation
+>>   iio: 104-quad-8: Update license boilerplate
+>>   counter: 104-quad-8: Add Generic Counter interface support
+>>   counter: 104-quad-8: Documentation: Add Generic Counter sysfs
+>>     documentation
+>>   iio: counter: Add deprecation markings for IIO Counter attributes
+>> 
+>>  Documentation/ABI/testing/sysfs-bus-counter   |  230 +++
+>>  .../ABI/testing/sysfs-bus-counter-104-quad-8  |   36 +
+>>  Documentation/ABI/testing/sysfs-bus-iio       |    8 +
+>>  .../testing/sysfs-bus-iio-counter-104-quad-8  |   16 +
+>>  .../{iio => }/counter/stm32-lptimer-cnt.txt   |    0
+>>  .../bindings/counter/stm32-timer-cnt.txt      |   31 +
+>>  .../devicetree/bindings/mfd/stm32-lptimer.txt |    2 +-
+>>  .../devicetree/bindings/mfd/stm32-timers.txt  |    7 +
+>>  Documentation/driver-api/generic-counter.rst  |  342 ++++
+>>  Documentation/driver-api/index.rst            |    1 +
+>>  MAINTAINERS                                   |   15 +-
+>>  drivers/Kconfig                               |    2 +
+>>  drivers/Makefile                              |    1 +
+>>  drivers/{iio => }/counter/104-quad-8.c        |  782 ++++++++-
+>>  drivers/counter/Kconfig                       |   51 +
+>>  drivers/{iio => }/counter/Makefile            |    5 +-
+>>  drivers/counter/counter.c                     | 1561 +++++++++++++++++
+>>  drivers/{iio => }/counter/stm32-lptimer-cnt.c |  361 +++-
+>>  drivers/counter/stm32-timer-cnt.c             |  390 ++++
+>>  drivers/iio/Kconfig                           |    1 -
+>>  drivers/iio/Makefile                          |    1 -
+>>  drivers/iio/counter/Kconfig                   |   34 -
+>>  include/linux/counter.h                       |  505 ++++++
+>>  include/linux/counter_enum.h                  |   45 +
+>>  24 files changed, 4341 insertions(+), 86 deletions(-)
+>>  create mode 100644 Documentation/ABI/testing/sysfs-bus-counter
+>>  create mode 100644 Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
+>>  rename Documentation/devicetree/bindings/{iio => }/counter/stm32-lptimer-cnt.txt (100%)
+>>  create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+>>  create mode 100644 Documentation/driver-api/generic-counter.rst
+>>  rename drivers/{iio => }/counter/104-quad-8.c (44%)
+>>  create mode 100644 drivers/counter/Kconfig
+>>  rename drivers/{iio => }/counter/Makefile (46%)
+>>  create mode 100644 drivers/counter/counter.c
+>>  rename drivers/{iio => }/counter/stm32-lptimer-cnt.c (48%)
+>>  create mode 100644 drivers/counter/stm32-timer-cnt.c
+>>  delete mode 100644 drivers/iio/counter/Kconfig
+>>  create mode 100644 include/linux/counter.h
+>>  create mode 100644 include/linux/counter_enum.h
+>> 
+>
