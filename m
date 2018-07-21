@@ -1,86 +1,68 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:38:13 -0700
-Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates
- for v4.19
-In-Reply-To: <cover.1532087303.git.horms+renesas@verge.net.au>
-References: <cover.1532087303.git.horms+renesas@verge.net.au>
-Message-ID: <20180721213813.mhdvvqgywdd64kce@localhost>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 22 Jul 2018 08:24:15 +0900
+Subject: [GIT PULL 3/3] ARM: uniphier: UniPhier SoC updates for v4.19
+In-Reply-To: <20180721212430.odjwcusbbihffo6l@localhost>
+References: <CAK7LNAShLhWqCRR8RfuJ0xBJAFoj-S6WLcSdh9QShg8dGfq9RA@mail.gmail.com>
+ <20180721212430.odjwcusbbihffo6l@localhost>
+Message-ID: <CAK7LNAQHL16vxv7twzy9PPkLLrbvzuAMa9QtOjSN3Z1KHWKG_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 02:03:40PM +0200, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
-> 
-> Please consider these second round of Renesas ARM64 based SoC DT updates for v4.19.
-> 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-arm64-dt-for-v4.19,
-> which I have already sent a pull-request for.
-> 
-> 
-> The following changes since commit 6b284a81307848b4331453b02cf7a33c09719d4b:
-> 
->   arm64: dts: renesas: r8a77995: Add MSIOF device nodes (2018-06-25 15:30:39 +0200)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt2-for-v4.19
-> 
-> for you to fetch changes up to 9a6c158f62ccdd37c921ec8b1484418bad5f7984:
-> 
->   arm64: dts: renesas: r8a77980: add INTC-EX support (2018-07-20 13:47:34 +0200)
-> 
-> ----------------------------------------------------------------
-> Second Round of Renesas ARM64 Based SoC DT Updates for v4.19
-> 
-> Corrections:
-> 
-> * Remove non-existing STBE region from Ether-AVB node in DT of
->   R-Car E3 (r8a77990) SoC
-> 
->   This region does not exist on this SoC
+Hi Olof,
 
-I think the item is clear, no need for this additional line.
+2018-07-22 6:24 GMT+09:00 Olof Johansson <olof@lixom.net>:
+> On Thu, Jul 19, 2018 at 08:05:03AM +0900, Masahiro Yamada wrote:
+>> Hi Arnd, Olof,
+>>
+>> Please pull UniPhier SoC changes for the v4.19 MW.
+>>
+>> Thanks!
+>>
+>>
+>> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+>>
+>>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+>> tags/uniphier-soc-v4.19
+>>
+>> for you to fetch changes up to ae93e694440a454609fa40725e16619c5a781768:
+>>
+>>   ARM: uniphier: remove empty Makefile (2018-07-19 06:53:16 +0900)
+>>
+>> ----------------------------------------------------------------
+>> UniPhier ARM SoC updates for v4.19
+>>
+>> - enable ethernet and thermal drivers from multi_v7_defconfig
+>>
+>> - select RESET_CONTROLLER
+>>
+>> - remove empty arch/arm/mach-uniphier/Makefile
+>>
+>> ----------------------------------------------------------------
+>> Kunihiko Hayashi (1):
+>>       ARM: multi_v7_defconfig: add CONFIG_UNIPHIER_THERMAL and CONFIG_SNI_AVE
+>
+> I renormalied multi_v7_defconfig for 4.18-rc3, so please base your branch
+> on that to avoid conflicts.
+>
+> Also, we separate out defconfig updates to branches on their own. I can
+> cherry-pick the branch apart but wanted to check with you before I do
+> so in case it messes up your workflow. If it does, send a fresh pull
+> request for SoC, and either one for the defconfig or just the patch and
+> we can apply it directly.
+>
 
-> Cleanups:
-> 
-> * Consistently use rwdt as label for Renesas Watchdog Timer devices
-> 
-> * Add second port to rcar_sound placeholder in DT of R-Car M3-N (r8a77965) SoC
-> 
->   Nodes with #address-cells/#size-cells should have more than one child node
+Can you do cherry-pick please?
 
-Not sure what you mean here -- it's perfectly legal to have only one child
-node.
-
-> * Fix adv7482 decimal unit addresses in DT of Salvator-X and -XS boards
-> 
->   Addresses are assumed to be hex by dtc, thus it is not valid to use
->   decimal
-
-Again, the item is clear enough.
-
-> Enhancements:
-> 
-> * Describe in DT:
->   - INTC-EX of R-Car V3H (r8a77980) SoC
->   - USB3.0 of R-Car E3 (r8a77980) SoC
->   - All SCIF and HSCIF devices of R-Car D3 (r8a77995) SoC.
->     Previously only SCIF2, used as the debug consile, was described.
->   - All IPMMU devicesof R-Car M3-N (r8a77965), V3H (r8a77980) and
->     E3 (r8a77990) SoCs
-> 
-> * Enable USB3.0 in DT of R-Car E3 (r8a77980) based Ebisu board
-> 
-> * Prefer HSCIF1 over SCIF1 in DT of Salvator-X and -XS boards
-> 
->   HSCIF is superior to SCIF (larger FIFOs, more accurate and wider
->   supported range of bitrates).
-
-Sounds good.
+Thanks!
 
 
-Merged the branch with some minor tag tweaks per above.
 
 
--Olof
+
+-- 
+Best Regards
+Masahiro Yamada
