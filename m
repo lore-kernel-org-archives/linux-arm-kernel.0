@@ -1,43 +1,47 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:27:38 -0700
-Subject: [GIT PULL v2] arm64: zynqmp: Xilinx DT changes for v4.19
-In-Reply-To: <c4c29579-8d05-a290-2d59-638170601849@monstr.eu>
-References: <c4c29579-8d05-a290-2d59-638170601849@monstr.eu>
-Message-ID: <20180721212738.kwsudmrsr64vqbv7@localhost>
+Date: Sat, 21 Jul 2018 14:28:56 -0700
+Subject: [GIT PULL v2] arm64: dts: hisilicon dts updates for v4.19
+In-Reply-To: <5B50630D.7060407@hisilicon.com>
+References: <5B50630D.7060407@hisilicon.com>
+Message-ID: <20180721212856.ekm6fiunfa3jflyk@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 09:52:41AM +0200, Michal Simek wrote:
-> Hi,
+On Thu, Jul 19, 2018 at 11:08:13AM +0100, Wei Xu wrote:
+> Hi Olof, Hi Arnd,
 > 
-> Based on discussion with Olof all patches are using these prefixes.
-> arm64: dts: zynqmp:
+> Please consider to pull the following changes.
+> I rebased the pull on hisi-fixes-for-4.18 since there are
+> some fixes for v4.18 have been merged.
 > 
-> Please pull the following arm64 DT patches.
+> Thanks!
 > 
-> Thanks,
-> Michal
+> Best Regards,
+> Wei
 > 
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> ---
 > 
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> The following changes since commit a30449eb3ac908f26b4bc963a58039a5f2725ffa:
 > 
-> are available in the git repository at:
+>   arm64: dts: hikey960: Define wl1837 power capabilities (2018-06-28 17:07:44 +0100)
 > 
->   https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-dt-for-v4.19-v2
+> are available in the Git repository at:
 > 
-> for you to fetch changes up to 41ee3e3883056f216bc1044c7ab1c8477b3384ad:
+>   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.19v2
 > 
->   arm64: dts: zynqmp: Add support for Avnet Ultra96 rev1 board
-> (2018-07-19 09:48:30 +0200)
+> for you to fetch changes up to 4d4585c21f53c15a10c52b45e0392de79e07127e:
+> 
+>   arm64: dts: hisilicon: Add missing cooling device properties for CPUs (2018-07-17 13:56:45 +0100)
 > 
 > ----------------------------------------------------------------
-> arm: dts: zynqmp: DT changes for v4.19
+> ARM64: DT: Hisilicon SoC DT updates for 4.19v2
 > 
-> - Use serdev for BT in zcu100
-> - Remove ep108
-> - Fix gpio-keys binding
-> - Add suport for Ultra96
+> - Tidy up MMC properties for hi3660
+> - Remove keep-power-in-suspend on hikey and hikey960 to
+>   avoid keeping wifi power during suspend and let the
+>   user enable it if required
+> - Update idle states for hikey960
+> - Add missing cooling device properties for cpus on hi6220
 
 Merged, thanks!
 
