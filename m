@@ -1,16 +1,14 @@
 From: simon@lineageos.org (Simon Shields)
-Date: Sat, 21 Jul 2018 22:50:50 +1000
-Subject: [PATCH 2/5] ARM: dts: exynos: add pinctrl config for midas keys
+Date: Sat, 21 Jul 2018 22:50:52 +1000
+Subject: [PATCH 4/5] ARM: dts: exynos: configure max77686 IRQ pin on midas
 In-Reply-To: <20180721125128.31498-1-simon@lineageos.org>
 References: <20180721125128.31498-1-simon@lineageos.org>
-Message-ID: <20180721125128.31498-3-simon@lineageos.org>
+Message-ID: <20180721125128.31498-5-simon@lineageos.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This pins are externally pulled up, and so we should explicitly
-configure them to disable the SoC-internal pull-downs. Previously
-we relied on the bootloader doing this in order to allow the buttons
-to function properly.
+This pin is externally pulled up, so we need to disable the
+SoC's internal pull-down.
 
 Signed-off-by: Simon Shields <simon@lineageos.org>
 ---
@@ -18,24 +16,24 @@ Signed-off-by: Simon Shields <simon@lineageos.org>
  1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos4412-midas.dtsi b/arch/arm/boot/dts/exynos4412-midas.dtsi
-index ee7cda1432f7..6f7b564905ab 100644
+index 6a6364a9debd..d69bc3c2d0ff 100644
 --- a/arch/arm/boot/dts/exynos4412-midas.dtsi
 +++ b/arch/arm/boot/dts/exynos4412-midas.dtsi
-@@ -112,6 +112,8 @@
- 
- 	gpio-keys {
- 		compatible = "gpio-keys";
+@@ -685,6 +685,8 @@
+ 		compatible = "maxim,max77686";
+ 		interrupt-parent = <&gpx0>;
+ 		interrupts = <7 IRQ_TYPE_NONE>;
++		pinctrl-0 = <&max77686_irq>;
 +		pinctrl-names = "default";
-+		pinctrl-0 = <&gpio_keys>;
+ 		reg = <0x09>;
+ 		#clock-cells = <1>;
  
- 		key-down {
- 			gpios = <&gpx3 3 GPIO_ACTIVE_LOW>;
-@@ -1126,6 +1128,11 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sleep1>;
+@@ -1135,6 +1137,11 @@
+ 		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+ 	};
  
-+	gpio_keys: gpio-keys {
-+		samsung,pins = "gpx0-1", "gpx2-2", "gpx2-7", "gpx3-3";
++	max77686_irq: max77686-irq {
++		samsung,pins = "gpx0-7";
 +		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
 +	};
 +
