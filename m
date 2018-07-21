@@ -1,50 +1,30 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 21 Jul 2018 17:33:30 +0100
-Subject: [PATCH 1/4] iio: adc: xilinx: Rename 'channels' variable name
- to 'iio_xadc_channels'
-In-Reply-To: <070dda6dd3b140ef5f6dbc965d7f8c1af934ec96.camel@perches.com>
-References: <1531912331-26431-1-git-send-email-manish.narani@xilinx.com>
- <1531912331-26431-2-git-send-email-manish.narani@xilinx.com>
- <d2c3ddfd-91da-e500-7b58-917d2da1d540@metafoo.de>
- <7c4ee0db-ac33-b093-4dbb-1742fb029012@xilinx.com>
- <20180721171828.55395acc@archlinux>
- <070dda6dd3b140ef5f6dbc965d7f8c1af934ec96.camel@perches.com>
-Message-ID: <20180721173330.764ede75@archlinux>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Sat, 21 Jul 2018 18:57:37 +0200
+Subject: [PATCH v4 13/35] mtd: rawnand: marvell: convert driver to
+ nand_scan()
+In-Reply-To: <20180720151527.16038-14-miquel.raynal@bootlin.com>
+References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
+ <20180720151527.16038-14-miquel.raynal@bootlin.com>
+Message-ID: <20180721185537.01f01362@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 21 Jul 2018 09:22:05 -0700
-Joe Perches <joe@perches.com> wrote:
+On Fri, 20 Jul 2018 17:15:05 +0200
+Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-> On Sat, 2018-07-21 at 17:18 +0100, Jonathan Cameron wrote:
-> > On Thu, 19 Jul 2018 10:22:07 +0200
-> > Michal Simek <michal.simek@xilinx.com> wrote:
-> >   
-> > > On 18.7.2018 13:18, Lars-Peter Clausen wrote:  
-> > > > On 07/18/2018 01:12 PM, Manish Narani wrote:    
-> > > > > This patch fix the following checkpatch warning in xadc driver.
-> > > > > - Reusing the krealloc arg is almost always a bug.
-> > > > > 
-> > > > > Renamed the 'channels' variable as 'iio_xadc_channels' to fix the above
-> > > > > warning.
-> > > > >    
-> > > > 
-> > > > This is a bug in checkpatch and should be fixed in checkpatch. The code is
-> > > > not actually re-using the parameter. channels and xadc_channels are
-> > > > independent variables, just checkpatch somehow does not realize this.    
-> > > 
-> > > I think it should be fine to have this patch in tree. Change in commit
-> > > message to reflect this should be enough. But that's just view.  
-> > 
-> > Let's wait and see if Joe has time to take a look at this.  Might be better
-> > to fix checkpatch if it's not too hard!  
-> 
-> I submitted a proposed patch.
-> I believe it works.
-> 
-> https://patchwork.kernel.org/patch/10533011/
-> 
-Thanks! Should have known you would already have it covered :)
-My perl foo goes no where near figuring out how that magic works!
+>  
+> -	ret = nand_scan_tail(mtd);
+> +	chip->controller->ops = &marvell_nand_controller_ops;
 
-Jonathan
+Assigning ->ops to &marvell_nand_controller_ops should be done only
+once in the probe function (here [1]). With that fixed, you can add
+
+Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
+
+> +	ret = nand_scan(mtd, marvell_nand->nsels);
+>  	if (ret) {
+> -		dev_err(dev, "nand_scan_tail failed: %d\n", ret);
+> +		dev_err(dev, "could not scan the nand chip\n");
+>  		return ret;
+>  	}
+>  
