@@ -1,99 +1,57 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 21 Jul 2018 12:21:35 +0800
-Subject: [PATCH RESEND 3/7] of: address: Add parent pointer to the
- __of_translate_address args
-In-Reply-To: <2f1db1ad423dcc845cab311432826da4976d2363.1532098561.git-series.maxime.ripard@bootlin.com>
-References: <2f1db1ad423dcc845cab311432826da4976d2363.1532098561.git-series.maxime.ripard@bootlin.com>
-Message-ID: <201807211245.PUl1H0mX%fengguang.wu@intel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 20 Jul 2018 23:05:16 -0700
+Subject: [GIT PULL] am654 changes for v4.19 merge window
+Message-ID: <pull-1532152828-552759@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+From: "Tony Lindgren" <tony@atomide.com>
 
-I love your patch! Perhaps something to improve:
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-[auto build test WARNING on ]
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-url:    https://github.com/0day-ci/linux/commits/Maxime-Ripard/sunxi-Add-DT-representation-for-the-MBUS-controller/20180721-052652
-base:    
-reproduce:
-        # apt-get install sparse
-        make ARCH=x86_64 allmodconfig
-        make C=1 CF=-D__CHECK_ENDIAN__
+are available in the Git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/am654-for-v4.19-signed
 
-sparse warnings: (new ones prefixed by >>)
+for you to fetch changes up to d0a064bec75e20a526c7bc0d626912f2660b6e81:
 
->> drivers/of/address.c:742:45: sparse: incorrect type in argument 2 (different base types) @@    expected struct device_node *[assigned] parent @@    got restrstruct device_node *[assigned] parent @@
-   drivers/of/address.c:742:45:    expected struct device_node *[assigned] parent
-   drivers/of/address.c:742:45:    got restricted __be32 const [usertype] *in_addr
->> drivers/of/address.c:742:54: sparse: incorrect type in argument 3 (different base types) @@    expected restricted __be32 const [usertype] *in_addr @@    got ype] *in_addr @@
-   drivers/of/address.c:742:54:    expected restricted __be32 const [usertype] *in_addr
-   drivers/of/address.c:742:54:    got char *<noident>
->> drivers/of/address.c:742:65: sparse: incorrect type in argument 4 (different base types) @@    expected char const *rprop @@    got struct dechar const *rprop @@
-   drivers/of/address.c:742:65:    expected char const *rprop
-   drivers/of/address.c:742:65:    got struct device_node **<noident>
->> drivers/of/address.c:742:39: sparse: not enough arguments for function __of_translate_address
-   drivers/of/address.c: In function 'of_translate_ioport':
-   drivers/of/address.c:742:38: error: passing argument 2 of '__of_translate_address' from incompatible pointer type [-Werror=incompatible-pointer-types]
-     taddr = __of_translate_address(dev, in_addr, "ranges", &host);
-                                         ^~~~~~~
-   drivers/of/address.c:571:12: note: expected 'struct device_node *' but argument is of type 'const __be32 * {aka const unsigned int *}'
-    static u64 __of_translate_address(struct device_node *dev,
-               ^~~~~~~~~~~~~~~~~~~~~~
-   drivers/of/address.c:742:47: error: passing argument 3 of '__of_translate_address' from incompatible pointer type [-Werror=incompatible-pointer-types]
-     taddr = __of_translate_address(dev, in_addr, "ranges", &host);
-                                                  ^~~~~~~~
-   drivers/of/address.c:571:12: note: expected 'const __be32 * {aka const unsigned int *}' but argument is of type 'char *'
-    static u64 __of_translate_address(struct device_node *dev,
-               ^~~~~~~~~~~~~~~~~~~~~~
-   drivers/of/address.c:742:57: error: passing argument 4 of '__of_translate_address' from incompatible pointer type [-Werror=incompatible-pointer-types]
-     taddr = __of_translate_address(dev, in_addr, "ranges", &host);
-                                                            ^
-   drivers/of/address.c:571:12: note: expected 'const char *' but argument is of type 'struct device_node **'
-    static u64 __of_translate_address(struct device_node *dev,
-               ^~~~~~~~~~~~~~~~~~~~~~
-   drivers/of/address.c:742:10: error: too few arguments to function '__of_translate_address'
-     taddr = __of_translate_address(dev, in_addr, "ranges", &host);
-             ^~~~~~~~~~~~~~~~~~~~~~
-   drivers/of/address.c:571:12: note: declared here
-    static u64 __of_translate_address(struct device_node *dev,
-               ^~~~~~~~~~~~~~~~~~~~~~
-   cc1: some warnings being treated as errors
+  arm64: dts: ti: Add support for AM654 EVM base board (2018-07-18 11:48:36 -0700)
 
-vim +742 drivers/of/address.c
+----------------------------------------------------------------
+TI AM654 support for v4.19 merge window
 
-dbbdee94 Grant Likely  2010-06-08  734  
-65af618d Zhichang Yuan 2018-03-15  735  static u64 of_translate_ioport(struct device_node *dev, const __be32 *in_addr,
-65af618d Zhichang Yuan 2018-03-15  736  			u64 size)
-65af618d Zhichang Yuan 2018-03-15  737  {
-65af618d Zhichang Yuan 2018-03-15  738  	u64 taddr;
-65af618d Zhichang Yuan 2018-03-15  739  	unsigned long port;
-65af618d Zhichang Yuan 2018-03-15  740  	struct device_node *host;
-65af618d Zhichang Yuan 2018-03-15  741  
-65af618d Zhichang Yuan 2018-03-15 @742  	taddr = __of_translate_address(dev, in_addr, "ranges", &host);
-65af618d Zhichang Yuan 2018-03-15  743  	if (host) {
-65af618d Zhichang Yuan 2018-03-15  744  		/* host-specific port access */
-65af618d Zhichang Yuan 2018-03-15  745  		port = logic_pio_trans_hwaddr(&host->fwnode, taddr, size);
-65af618d Zhichang Yuan 2018-03-15  746  		of_node_put(host);
-65af618d Zhichang Yuan 2018-03-15  747  	} else {
-65af618d Zhichang Yuan 2018-03-15  748  		/* memory-mapped I/O range */
-65af618d Zhichang Yuan 2018-03-15  749  		port = pci_address_to_pio(taddr);
-65af618d Zhichang Yuan 2018-03-15  750  	}
-65af618d Zhichang Yuan 2018-03-15  751  
-65af618d Zhichang Yuan 2018-03-15  752  	if (port == (unsigned long)-1)
-65af618d Zhichang Yuan 2018-03-15  753  		return OF_BAD_ADDR;
-65af618d Zhichang Yuan 2018-03-15  754  
-65af618d Zhichang Yuan 2018-03-15  755  	return port;
-65af618d Zhichang Yuan 2018-03-15  756  }
-65af618d Zhichang Yuan 2018-03-15  757  
+This branch adds initial support for new Texas Instruments AM654
+quad core A53 ARMv8 SoC. It's the first device for TI K3 multicore SoC
+architecture.
 
-:::::: The code at line 742 was first introduced by commit
-:::::: 65af618d2c559f8eb19d80d03a23029651a59de4 of: Add missing I/O range exception for indirect-IO devices
+Initially only basic devices are configured, support for more devices
+will follow later on. And many of the internal devices familiar from
+earlier TI SoCs should work with existing kernel device drivers.
 
-:::::: TO: Zhichang Yuan <yuanzhichang@hisilicon.com>
-:::::: CC: Bjorn Helgaas <helgaas@kernel.org>
+----------------------------------------------------------------
+Nishanth Menon (5):
+      dt-bindings: arm: ti: Add bindings for AM654 SoC
+      arm64: Add support for TI's K3 Multicore SoC architecture
+      arm64: dts: ti: Add Support for AM654 SoC
+      soc: ti: Add Support for AM654 SoC config option
+      arm64: dts: ti: Add support for AM654 EVM base board
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+ Documentation/devicetree/bindings/arm/ti/k3.txt |  23 +++++
+ MAINTAINERS                                     |   9 ++
+ arch/arm64/Kconfig.platforms                    |   7 ++
+ arch/arm64/boot/dts/Makefile                    |   1 +
+ arch/arm64/boot/dts/ti/Makefile                 |   9 ++
+ arch/arm64/boot/dts/ti/k3-am65-main.dtsi        |  31 +++++++
+ arch/arm64/boot/dts/ti/k3-am65.dtsi             |  87 ++++++++++++++++++
+ arch/arm64/boot/dts/ti/k3-am654-base-board.dts  |  36 ++++++++
+ arch/arm64/boot/dts/ti/k3-am654.dtsi            | 115 ++++++++++++++++++++++++
+ drivers/soc/ti/Kconfig                          |  14 +++
+ 10 files changed, 332 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/ti/k3.txt
+ create mode 100644 arch/arm64/boot/dts/ti/Makefile
+ create mode 100644 arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+ create mode 100644 arch/arm64/boot/dts/ti/k3-am65.dtsi
+ create mode 100644 arch/arm64/boot/dts/ti/k3-am654-base-board.dts
+ create mode 100644 arch/arm64/boot/dts/ti/k3-am654.dtsi
