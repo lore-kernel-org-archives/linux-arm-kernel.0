@@ -1,18 +1,19 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:24:30 -0700
-Subject: [GIT PULL 3/3] ARM: uniphier: UniPhier SoC updates for v4.19
-In-Reply-To: <CAK7LNAShLhWqCRR8RfuJ0xBJAFoj-S6WLcSdh9QShg8dGfq9RA@mail.gmail.com>
-References: <CAK7LNAShLhWqCRR8RfuJ0xBJAFoj-S6WLcSdh9QShg8dGfq9RA@mail.gmail.com>
-Message-ID: <20180721212430.odjwcusbbihffo6l@localhost>
+Date: Sat, 21 Jul 2018 14:26:57 -0700
+Subject: [GIT PULL 2/3] arm64: dts: uniphier: UniPhier DT updates for v4.19
+In-Reply-To: <CAK7LNAStvWBsimKG2uBe9ROAU8dAV2Zi6F=6VrOS4pFnQgNhAg@mail.gmail.com>
+References: <CAK7LNAStvWBsimKG2uBe9ROAU8dAV2Zi6F=6VrOS4pFnQgNhAg@mail.gmail.com>
+Message-ID: <20180721212657.74zgh3apktnu4vqi@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 08:05:03AM +0900, Masahiro Yamada wrote:
+On Thu, Jul 19, 2018 at 08:01:44AM +0900, Masahiro Yamada wrote:
 > Hi Arnd, Olof,
 > 
-> Please pull UniPhier SoC changes for the v4.19 MW.
+> Please pull UniPhier DT (64bit) updates for the v4.19 MW.
 > 
 > Thanks!
+> 
 > 
 > 
 > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
@@ -22,35 +23,14 @@ On Thu, Jul 19, 2018 at 08:05:03AM +0900, Masahiro Yamada wrote:
 > are available in the git repository at:
 > 
 >   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-> tags/uniphier-soc-v4.19
+> tags/uniphier-dt64-v4.19
 > 
-> for you to fetch changes up to ae93e694440a454609fa40725e16619c5a781768:
+> for you to fetch changes up to 1470075d5e354da8f46f5aa2e6956de794eb406a:
 > 
->   ARM: uniphier: remove empty Makefile (2018-07-19 06:53:16 +0900)
-> 
-> ----------------------------------------------------------------
-> UniPhier ARM SoC updates for v4.19
-> 
-> - enable ethernet and thermal drivers from multi_v7_defconfig
-> 
-> - select RESET_CONTROLLER
-> 
-> - remove empty arch/arm/mach-uniphier/Makefile
-> 
-> ----------------------------------------------------------------
-> Kunihiko Hayashi (1):
->       ARM: multi_v7_defconfig: add CONFIG_UNIPHIER_THERMAL and CONFIG_SNI_AVE
+>   arm64: dts: uniphier: add headphone detect gpio for LD11 global
+> board (2018-07-19 06:43:12 +0900)
 
-I renormalied multi_v7_defconfig for 4.18-rc3, so please base your branch
-on that to avoid conflicts.
+Merged, thanks!
 
-Also, we separate out defconfig updates to branches on their own. I can
-cherry-pick the branch apart but wanted to check with you before I do
-so in case it messes up your workflow. If it does, send a fresh pull
-request for SoC, and either one for the defconfig or just the patch and
-we can apply it directly.
-
-
-Thanks!
 
 -Olof
