@@ -1,42 +1,58 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:57:43 -0700
-Subject: [GIT PULL 6/6] i.MX defconfig updates for 4.19
-In-Reply-To: <1532140671-2869-3-git-send-email-shawnguo@kernel.org>
-References: <1532140344-2771-1-git-send-email-shawnguo@kernel.org>
- <1532140671-2869-1-git-send-email-shawnguo@kernel.org>
- <1532140671-2869-3-git-send-email-shawnguo@kernel.org>
-Message-ID: <20180721215743.gvdyejag6fere6lp@localhost>
+Date: Sat, 21 Jul 2018 15:03:43 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.19
+In-Reply-To: <cover.1532086504.git.horms+renesas@verge.net.au>
+References: <cover.1532086504.git.horms+renesas@verge.net.au>
+Message-ID: <20180721220343.yuwrfxz3fo25krzv@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 21, 2018 at 10:37:51AM +0800, Shawn Guo wrote:
+On Fri, Jul 20, 2018 at 02:03:54PM +0200, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these Renesas ARM based SoC defconfig updates for v4.19.
+> 
+> 
 > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
 >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.19
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-defconfig-for-v4.19
 > 
-> for you to fetch changes up to eaed0291c62f7b513ad9483b02efdccd4ae4e9fc:
+> for you to fetch changes up to e82c98d0448c60706a8024d460eadb9d7402dcba:
 > 
->   ARM: imx_v6_v7_defconfig: add DMATEST support (2018-07-21 09:58:21 +0800)
+>   ARM: multi_v7_defconfig: Enable support for RZN1D-DB (2018-07-13 10:15:20 +0200)
 > 
 > ----------------------------------------------------------------
-> i.MX defconfig update for 4.19:
->  - Enable ISL29018 sensor and MMA8452 accelerometer driver support for
->    imx6qdl-sabreauto board.
->  - Enable DMATEST support which is useful for DMA driver development
->    testing.
->  - Use the DRM driver for MXSFB LCD controller found on i.MX23, i.MX28,
->    i.MX6SX and i.MX7 SoCs.
+> Renesas ARM Based SoC Defconfig Updates for v4.19
+> 
+> multi_v7_defconfig and shmobile_defconfig Enhancement:
+> 
+> * Enable support for recently upstreamed RZN1D-DB board
+>   in multi_v7_defconfig and shmobile_defconfig. This is
+>   to give better test coverage.
+> 
+> shmobile_defconfig Clean-Up:
+> 
+> * Drop NET_VENDOR_<FOO>=n
+> 
+>   This reduces the size of the defconfig without any change in the
+>   resulting kernel config.
+> 
+> shmobile_defconfig Enhancements:
+> 
+> * Set CONFIG_LOCALVERSION to shmobile_defconfig
+> 
+>   This follows what appears to be common practice in defconfigs
+>   and allows easier management of the kernel flavour at run-time.
 
-Should some of these be added in multi_v7 defconfig too?
+I replied to the multi-versions of defconfig for this patch -- it's not a good
+way to solve the problem of detecting config at runtime. Please drop this
+patch. See:
 
-Merged.
-
-
-Thanks,
+https://lore.kernel.org/lkml/CAOesGMgkU6yBRpAsED2fPyuAo9Tc=YprndGdkmBVrc+0783VwQ at mail.gmail.com/
 
 
 -Olof
