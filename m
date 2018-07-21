@@ -1,36 +1,25 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 15:05:29 -0700
-Subject: [GIT PULL 1/6] i.MX drivers updates for 4.19
-In-Reply-To: <1532140344-2771-1-git-send-email-shawnguo@kernel.org>
-References: <1532140344-2771-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <20180721220529.mafkyyw2y2dwtt5k@localhost>
+Date: Sat, 21 Jul 2018 15:18:35 -0700
+Subject: [GIT PULL] few new beaglebone variants for v4.19 merge window
+In-Reply-To: <pull-1531986403-289188@atomide.com>
+References: <pull-1531986403-289188@atomide.com>
+Message-ID: <20180721221835.kyzzib5lcavsdpnn@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 21, 2018 at 10:32:19AM +0800, Shawn Guo wrote:
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+On Thu, Jul 19, 2018 at 12:47:47AM -0700, Tony Lindgren wrote:
+> From: "Tony Lindgren" <tony@atomide.com>
 > 
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> The following changes since commit 792f98677d7f777a4f58e567b5b0578191cb986a:
 > 
-> are available in the git repository at:
+>   Merge commit '949bdcc8a97c' into omap-for-v4.19/dt (2018-07-11 05:54:32 -0700)
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-drivers-4.19
+> are available in the Git repository at:
 > 
-> for you to fetch changes up to 69c04aee3482415cff52061a3ccad4943662e81d:
-> 
->   soc: imx6qp: Use GENPD_FLAG_ALWAYS_ON for PU errata (2018-07-17 14:12:14 +0800)
-> 
-> ----------------------------------------------------------------
-> i.MX drivers update for 4.19:
->  - Handle i.MX6SL chip errata ERR006287 in the safest possible way by
->    keeping the DISP domain always-on, because Upon resuming from power
->    gating, the modules in the display power domain (eLCDIF, EPDC, PXP
->    and SPDC) might fail to perform register reads correctly.
->  - Use GENPD_FLAG_ALWAYS_ON flag for i.MX6QP PU ERR009619 handling.
->    It is functionally identical to the exsiting implementation but
->    simpler and slightly faster.
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/dt-pt2-signed
 
-Merged, thanks!
+Btw, this is slightly confusing, you already had a tag
+tags/omap-for-v4.19/dt-signed-v2 with new contents. :)
 
 
 -Olof
