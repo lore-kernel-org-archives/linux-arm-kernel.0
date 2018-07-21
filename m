@@ -1,49 +1,40 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Sat, 21 Jul 2018 15:08:26 +0200
-Subject: [PATCH v5 3/4] ARM: dts: imx7s: add i.MX7 messaging unit support
+Date: Sat, 21 Jul 2018 15:08:25 +0200
+Subject: [PATCH v5 2/4] dt-bindings: mailbox: imx-mu: add generic MU channel
+ support
 In-Reply-To: <20180721130827.944-1-o.rempel@pengutronix.de>
 References: <20180721130827.944-1-o.rempel@pengutronix.de>
-Message-ID: <20180721130827.944-4-o.rempel@pengutronix.de>
+Message-ID: <20180721130827.944-3-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Messaging Unit (MU) for i.MX7 in the processor's dtsi.
-The respective driver is added in the next commit.
+Each MU has four pairs of rx/tx data register with four rx/tx interrupts
+which can also be used as a separate channel.
 
 Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 ---
- arch/arm/boot/dts/imx7s.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ Documentation/devicetree/bindings/mailbox/fsl,mu.txt | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index ce85b3ca1a55..038e0eafc549 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -1001,6 +1001,25 @@
- 				status = "disabled";
- 			};
+diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+index 90e4905dfc69..113d6ab931ef 100644
+--- a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
++++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+@@ -22,7 +22,14 @@ Required properties:
+ - reg :		Should contain the registers location and length
+ - interrupts :	Interrupt number. The interrupt specifier format depends
+ 		on the interrupt controller parent.
+-- #mbox-cells:  Must be 0. Number of cells in a mailbox
++- #mbox-cells:  Must be:
++		0 - for single channel mode. i.MX8* SCU protocol specific.
++		1 - for multichannel (generic) mode.
++
++Optional properties:
++-------------------
++- clocks :	phandle to the input clock.
++- fsl,mu-side-b : Should be set for side B MU.
  
-+			mu0a: mailbox at 30aa0000 {
-+				compatible = "fsl,imx7s-mu";
-+				reg = <0x30aa0000 0x10000>;
-+				interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_MU_ROOT_CLK>;
-+				#mbox-cells = <1>;
-+				status = "disabled";
-+			};
-+
-+			mu0b: mailbox at 30ab0000 {
-+				compatible = "fsl,imx7s-mu";
-+				reg = <0x30ab0000 0x10000>;
-+				interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_MU_ROOT_CLK>;
-+				#mbox-cells = <1>;
-+				fsl,mu-side-b;
-+				status = "disabled";
-+			};
-+
- 			usbotg1: usb at 30b10000 {
- 				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
- 				reg = <0x30b10000 0x200>;
+ Examples:
+ --------
 -- 
 2.18.0
