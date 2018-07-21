@@ -1,42 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 15:07:22 -0700
-Subject: [GIT PULL] am654 changes for v4.19 merge window
-In-Reply-To: <pull-1532152828-552759@atomide.com>
-References: <pull-1532152828-552759@atomide.com>
-Message-ID: <20180721220722.43avzbs6ulpsem37@localhost>
+Date: Sat, 21 Jul 2018 14:54:22 -0700
+Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.19, round 2
+In-Reply-To: <7hr2jx50q0.fsf@baylibre.com>
+References: <7hr2jx50q0.fsf@baylibre.com>
+Message-ID: <20180721215422.vsd34udhkhs7lh3h@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 11:05:16PM -0700, Tony Lindgren wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
+On Fri, Jul 20, 2018 at 11:30:15AM -0500, Kevin Hilman wrote:
+> Olof, Arnd,
 > 
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> A second round of DT updates for Amlogic, directly on top of the redo of
+> the first one.
 > 
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> This includes a merge of a branch already queued in the clk tree because
+> of the dependency on clock headers used in the DT changes here..
 > 
-> are available in the Git repository at:
+> Kevin
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/am654-for-v4.19-signed
 > 
-> for you to fetch changes up to d0a064bec75e20a526c7bc0d626912f2660b6e81:
+> The following changes since commit 89803e8b26569bdf5798f8745a4c708bf9360ee6:
 > 
->   arm64: dts: ti: Add support for AM654 EVM base board (2018-07-18 11:48:36 -0700)
+>   ARM64: dts: meson-axg: add pdm pins (2018-07-20 08:18:37 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2
+> 
+> for you to fetch changes up to fcf775a1e6717b7157b1ea626028b7e039b3c989:
+> 
+>   Merge branch 'v4.19/dt64' into tmp/aml-rebuild (2018-07-20 09:05:11 -0700)
 > 
 > ----------------------------------------------------------------
-> TI AM654 support for v4.19 merge window
+> Amlogic 64-bit DT changes for v4.19, round 2
+> - new SoC: S905W
+> - new boards: based on S905W: Amlogic P281, Oranth Tanix TX3 Mini
+> - AXG: add DT for new audio clock controller
 > 
-> This branch adds initial support for new Texas Instruments AM654
-> quad core A53 ARMv8 SoC. It's the first device for TI K3 multicore SoC
-> architecture.
-> 
-> Initially only basic devices are configured, support for more devices
-> will follow later on. And many of the internal devices familiar from
-> earlier TI SoCs should work with existing kernel device drivers.
+> ----------------------------------------------------------------
 
-I squinted a bit and merged this into next/dt. Might have been a bit cleaner to
-split it in a SoC and a DT branch, but either way it's pretty small changes.
-
-Should the support be enabled in arm64's defconfig?
+Something happened to your diffstat here. It's also based on -rc5?
 
 
 -Olof
