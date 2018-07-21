@@ -1,25 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 15:18:35 -0700
-Subject: [GIT PULL] few new beaglebone variants for v4.19 merge window
-In-Reply-To: <pull-1531986403-289188@atomide.com>
-References: <pull-1531986403-289188@atomide.com>
-Message-ID: <20180721221835.kyzzib5lcavsdpnn@localhost>
+Date: Sat, 21 Jul 2018 15:07:22 -0700
+Subject: [GIT PULL] am654 changes for v4.19 merge window
+In-Reply-To: <pull-1532152828-552759@atomide.com>
+References: <pull-1532152828-552759@atomide.com>
+Message-ID: <20180721220722.43avzbs6ulpsem37@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 12:47:47AM -0700, Tony Lindgren wrote:
+On Fri, Jul 20, 2018 at 11:05:16PM -0700, Tony Lindgren wrote:
 > From: "Tony Lindgren" <tony@atomide.com>
 > 
-> The following changes since commit 792f98677d7f777a4f58e567b5b0578191cb986a:
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
->   Merge commit '949bdcc8a97c' into omap-for-v4.19/dt (2018-07-11 05:54:32 -0700)
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
 > are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/dt-pt2-signed
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/am654-for-v4.19-signed
+> 
+> for you to fetch changes up to d0a064bec75e20a526c7bc0d626912f2660b6e81:
+> 
+>   arm64: dts: ti: Add support for AM654 EVM base board (2018-07-18 11:48:36 -0700)
+> 
+> ----------------------------------------------------------------
+> TI AM654 support for v4.19 merge window
+> 
+> This branch adds initial support for new Texas Instruments AM654
+> quad core A53 ARMv8 SoC. It's the first device for TI K3 multicore SoC
+> architecture.
+> 
+> Initially only basic devices are configured, support for more devices
+> will follow later on. And many of the internal devices familiar from
+> earlier TI SoCs should work with existing kernel device drivers.
 
-Btw, this is slightly confusing, you already had a tag
-tags/omap-for-v4.19/dt-signed-v2 with new contents. :)
+I squinted a bit and merged this into next/dt. Might have been a bit cleaner to
+split it in a SoC and a DT branch, but either way it's pretty small changes.
+
+Should the support be enabled in arm64's defconfig?
 
 
 -Olof
