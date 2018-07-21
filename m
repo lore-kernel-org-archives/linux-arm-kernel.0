@@ -1,17 +1,22 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 21 Jul 2018 14:18:58 -0700
-Subject: [GIT PULL] ARM: at91: SoC for 4.19
-In-Reply-To: <20180720082030.GA22561@piout.net>
-References: <20180720082030.GA22561@piout.net>
-Message-ID: <20180721211858.u6xc7d6ftjrglev6@localhost>
+Date: Sat, 21 Jul 2018 14:16:33 -0700
+Subject: [GIT PULL] ARM: hisi: soc changes for v4.19
+In-Reply-To: <5B4F64EF.6070406@hisilicon.com>
+References: <5B4F64EF.6070406@hisilicon.com>
+Message-ID: <20180721211633.pah7f7a6s6ciqygf@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 10:20:30AM +0200, Alexandre Belloni wrote:
-> Arnd, Olof,
+On Wed, Jul 18, 2018 at 05:03:59PM +0100, Wei Xu wrote:
+> Hi Olof, Hi Arnd,
 > 
-> Here is the SoC PR for 4.19. It is a cleanup of pm.c and the addition of
-> a new low power mode.
+> Please consider to pull the following changes.
+> Thanks!
+> 
+> Best Regards,
+> Wei
+> 
+> ---
 > 
 > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
@@ -19,11 +24,11 @@ On Fri, Jul 20, 2018 at 10:20:30AM +0200, Alexandre Belloni wrote:
 > 
 > are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.19-soc
+>   git://github.com/hisilicon/linux-hisi.git tags/hisi-armv7-soc-for-4.19
 > 
-> for you to fetch changes up to d7484f5c6b3b0565d2395aece2862f183581e1c1:
+> for you to fetch changes up to d396cb185c0337aae5664b250cdd9a73f6eb1503:
 > 
->   ARM: at91: pm: configure wakeup sources for ULP1 mode (2018-07-17 15:08:12 +0200)
+>   ARM: hisi: handle of_iomap and fix missing of_node_put (2018-07-16 17:36:50 +0100)
 
 Merged, thanks!
 
