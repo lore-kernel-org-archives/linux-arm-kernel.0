@@ -1,80 +1,118 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 22 Jul 2018 14:10:33 +0800
-Subject: [linux-sunxi] [PATCH v3 6/9] dt-bindings: phy: add binding for
- Allwinner USB3 PHY
-In-Reply-To: <20180722055739.26464-7-icenowy@aosc.io>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sun, 22 Jul 2018 13:57:33 +0800
+Subject: [PATCH v3 3/9] arm64: allwinner: dts: h6: add USB2-related device
+ nodes
+In-Reply-To: <20180722055739.26464-1-icenowy@aosc.io>
 References: <20180722055739.26464-1-icenowy@aosc.io>
- <20180722055739.26464-7-icenowy@aosc.io>
-Message-ID: <CAGb2v65m6AEW=DO-cqLMyjfnaiZudm38hXufJL6LXdOrJqir_g@mail.gmail.com>
+Message-ID: <20180722055739.26464-4-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 22, 2018 at 1:57 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> The new Allwinner H6 SoC contains a USB3 PHY that is wired to the
-> external USB3 pins of the SoC.
->
-> Add a device tree binding for the PHY.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes in v3:
-> - Added Chen-Yu's Review tag.
->
-> Rob,
-> Although you mentioned that the supply is for the port, not the phy;
-> currently in USB situation "powering on the PHY" also indicates
-> "powering on the port" and nearly all usages of phy-supply is for Vbus.
->
-> Maybe we should change the overall phy-supply to satisfy this.
+Allwinner H6 has two USB2 ports, one OTG and one host-only.
 
-Or maybe change it to vbus-supply, like we have for phy-sun4i-usb,
-until USB port power sequencing is added. (I remember there were
-patches for this. What happened?)
+Add device tree nodes related to them.
 
-ChenYu
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+---
+Changes in v3:
+- Removed the wrongly introduced usb3phy node.
+- Added Chen-Yu's Review tag.
 
-> Thanks,
-> Icenowy
->
->  .../bindings/phy/sun50i-usb3-phy.txt          | 24 +++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
->
-> diff --git a/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt b/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
-> new file mode 100644
-> index 000000000000..912d55f9f69d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
-> @@ -0,0 +1,24 @@
-> +Allwinner sun50i USB3 PHY
-> +-----------------------
-> +
-> +Required properties:
-> +- compatible : should be one of
-> +  * allwinner,sun60i-h6-usb3-phy
-> +- reg : a list of offset + length pairs
-> +- #phy-cells : from the generic phy bindings, must be 0
-> +- clocks : phandle + clock specifier for the phy clock
-> +- resets : phandle + reset specifier for the phy reset
-> +
-> +Optional Properties:
-> +- phy-supply : from the generic phy bindings, a phandle to a regulator that
-> +              provides power to VBUS.
-> +
-> +Example:
-> +       usb3phy: phy at 5210000 {
-> +               compatible = "allwinner,sun50i-h6-usb3-phy";
-> +               reg = <0x5210000 0x10000>;
-> +               clocks = <&ccu CLK_USB_PHY1>;
-> +               resets = <&ccu RST_USB_PHY1>;
-> +               #phy-cells = <0>;
-> +               status = "disabled";
-> +       };
-> --
-> 2.18.0
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 81 ++++++++++++++++++++
+ 1 file changed, 81 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+index cfa5fffcf62b..454844e8b063 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+@@ -235,6 +235,87 @@
+ 			status = "disabled";
+ 		};
+ 
++		usb2otg: usb at 5100000 {
++			compatible = "allwinner,sun8i-a33-musb";
++			reg = <0x05100000 0x0400>;
++			clocks = <&ccu CLK_BUS_OTG>;
++			resets = <&ccu RST_BUS_OTG>;
++			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "mc";
++			phys = <&usb2phy 0>;
++			phy-names = "usb";
++			extcon = <&usb2phy 0>;
++			status = "disabled";
++		};
++
++		usb2phy: phy at 5100400 {
++			compatible = "allwinner,sun50i-h6-usb-phy";
++			reg = <0x05100400 0x14>,
++			      <0x05101800 0x4>,
++			      <0x05311800 0x4>;
++			reg-names = "phy_ctrl",
++				    "pmu0",
++				    "pmu3";
++			clocks = <&ccu CLK_USB_PHY0>,
++				 <&ccu CLK_USB_PHY3>;
++			clock-names = "usb0_phy",
++				      "usb3_phy";
++			resets = <&ccu RST_USB_PHY0>,
++				 <&ccu RST_USB_PHY3>;
++			reset-names = "usb0_reset",
++				      "usb3_reset";
++			status = "disabled";
++			#phy-cells = <1>;
++		};
++
++		ehci0: usb at 5101000 {
++			compatible = "allwinner,sun50i-h6-ehci", "generic-ehci";
++			reg = <0x05101000 0x100>;
++			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_OHCI0>,
++				 <&ccu CLK_BUS_EHCI0>,
++				 <&ccu CLK_USB_OHCI0>;
++			resets = <&ccu RST_BUS_OHCI0>,
++				 <&ccu RST_BUS_EHCI0>;
++			status = "disabled";
++		};
++
++		ohci0: usb at 5101400 {
++			compatible = "allwinner,sun50i-h6-ohci", "generic-ohci";
++			reg = <0x05101400 0x100>;
++			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_OHCI0>,
++				 <&ccu CLK_USB_OHCI0>;
++			resets = <&ccu RST_BUS_OHCI0>;
++			status = "disabled";
++		};
++
++		ehci3: usb at 5311000 {
++			compatible = "allwinner,sun50i-h6-ehci", "generic-ehci";
++			reg = <0x05311000 0x100>;
++			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_OHCI3>,
++				 <&ccu CLK_BUS_EHCI3>,
++				 <&ccu CLK_USB_OHCI3>;
++			resets = <&ccu RST_BUS_OHCI3>,
++				 <&ccu RST_BUS_EHCI3>;
++			phys = <&usb2phy 3>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
++		ohci3: usb at 5311400 {
++			compatible = "allwinner,sun50i-h6-ohci", "generic-ohci";
++			reg = <0x05311400 0x100>;
++			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_OHCI3>,
++				 <&ccu CLK_USB_OHCI3>;
++			resets = <&ccu RST_BUS_OHCI3>;
++			phys = <&usb2phy 3>;
++			phy-names = "usb";
++			status = "disabled";
++		};
++
+ 		r_ccu: clock at 7010000 {
+ 			compatible = "allwinner,sun50i-h6-r-ccu";
+ 			reg = <0x07010000 0x400>;
+-- 
+2.18.0
