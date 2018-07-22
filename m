@@ -1,195 +1,50 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Sun, 22 Jul 2018 08:40:06 +0200
-Subject: [PATCH v4 26/35] mtd: rawnand: atmel: convert driver to
- nand_scan()
-In-Reply-To: <20180720151527.16038-27-miquel.raynal@bootlin.com>
-References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
- <20180720151527.16038-27-miquel.raynal@bootlin.com>
-Message-ID: <20180722084006.513e0e45@bbrezillon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 21 Jul 2018 23:40:42 -0700
+Subject: [GIT PULL] am654 changes for v4.19 merge window
+In-Reply-To: <20180721220722.43avzbs6ulpsem37@localhost>
+References: <pull-1532152828-552759@atomide.com>
+ <20180721220722.43avzbs6ulpsem37@localhost>
+Message-ID: <20180722064041.GM99251@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Jul 2018 17:15:18 +0200
-Miquel Raynal <miquel.raynal@bootlin.com> wrote:
-
-> Two helpers have been added to the core to make ECC-related
-> configuration between the detection phase and the final NAND scan. Use
-> these hooks and convert the driver to just use nand_scan() instead of
-> both nand_scan_ident() and nand_scan_tail().
+* Olof Johansson <olof@lixom.net> [180721 22:28]:
+> On Fri, Jul 20, 2018 at 11:05:16PM -0700, Tony Lindgren wrote:
+> > From: "Tony Lindgren" <tony@atomide.com>
+> > 
+> > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> > 
+> >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> > 
+> > are available in the Git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/am654-for-v4.19-signed
+> > 
+> > for you to fetch changes up to d0a064bec75e20a526c7bc0d626912f2660b6e81:
+> > 
+> >   arm64: dts: ti: Add support for AM654 EVM base board (2018-07-18 11:48:36 -0700)
+> > 
+> > ----------------------------------------------------------------
+> > TI AM654 support for v4.19 merge window
+> > 
+> > This branch adds initial support for new Texas Instruments AM654
+> > quad core A53 ARMv8 SoC. It's the first device for TI K3 multicore SoC
+> > architecture.
+> > 
+> > Initially only basic devices are configured, support for more devices
+> > will follow later on. And many of the internal devices familiar from
+> > earlier TI SoCs should work with existing kernel device drivers.
 > 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> ---
->  drivers/mtd/nand/raw/atmel/nand-controller.c | 83 ++++++++++++++--------------
->  1 file changed, 40 insertions(+), 43 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
-> index 855cc7729c43..0bc7e2abc885 100644
-> --- a/drivers/mtd/nand/raw/atmel/nand-controller.c
-> +++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
-> @@ -202,7 +202,7 @@ struct atmel_nand_controller_ops {
->  	int (*remove)(struct atmel_nand_controller *nc);
->  	void (*nand_init)(struct atmel_nand_controller *nc,
->  			  struct atmel_nand *nand);
-> -	int (*ecc_init)(struct atmel_nand *nand);
-> +	int (*ecc_init)(struct nand_chip *chip);
->  	int (*setup_data_interface)(struct atmel_nand *nand, int csline,
->  				    const struct nand_data_interface *conf);
->  };
-> @@ -1133,9 +1133,8 @@ static int atmel_nand_pmecc_init(struct nand_chip *chip)
->  	return 0;
->  }
->  
-> -static int atmel_nand_ecc_init(struct atmel_nand *nand)
-> +static int atmel_nand_ecc_init(struct nand_chip *chip)
->  {
-> -	struct nand_chip *chip = &nand->base;
->  	struct atmel_nand_controller *nc;
->  	int ret;
->  
-> @@ -1170,12 +1169,11 @@ static int atmel_nand_ecc_init(struct atmel_nand *nand)
->  	return 0;
->  }
->  
-> -static int atmel_hsmc_nand_ecc_init(struct atmel_nand *nand)
-> +static int atmel_hsmc_nand_ecc_init(struct nand_chip *chip)
->  {
-> -	struct nand_chip *chip = &nand->base;
->  	int ret;
->  
-> -	ret = atmel_nand_ecc_init(nand);
-> +	ret = atmel_nand_ecc_init(chip);
->  	if (ret)
->  		return ret;
->  
-> @@ -1558,22 +1556,6 @@ static void atmel_hsmc_nand_init(struct atmel_nand_controller *nc,
->  	chip->select_chip = atmel_hsmc_nand_select_chip;
->  }
->  
-> -static int atmel_nand_detect(struct atmel_nand *nand)
-> -{
-> -	struct nand_chip *chip = &nand->base;
-> -	struct mtd_info *mtd = nand_to_mtd(chip);
-> -	struct atmel_nand_controller *nc;
-> -	int ret;
-> -
-> -	nc = to_nand_controller(chip->controller);
-> -
-> -	ret = nand_scan_ident(mtd, nand->numcs, NULL);
-> -	if (ret)
-> -		dev_err(nc->dev, "nand_scan_ident() failed: %d\n", ret);
-> -
-> -	return ret;
-> -}
-> -
->  static int atmel_nand_unregister(struct atmel_nand *nand)
->  {
->  	struct nand_chip *chip = &nand->base;
-> @@ -1595,7 +1577,6 @@ static int atmel_nand_register(struct atmel_nand *nand)
->  	struct nand_chip *chip = &nand->base;
->  	struct mtd_info *mtd = nand_to_mtd(chip);
->  	struct atmel_nand_controller *nc;
-> -	int ret;
->  
->  	nc = to_nand_controller(chip->controller);
->  
-> @@ -1626,21 +1607,6 @@ static int atmel_nand_register(struct atmel_nand *nand)
->  		}
->  	}
->  
-> -	ret = nand_scan_tail(mtd);
-> -	if (ret) {
-> -		dev_err(nc->dev, "nand_scan_tail() failed: %d\n", ret);
-> -		return ret;
-> -	}
-> -
-> -	ret = mtd_device_register(mtd, NULL, 0);
-> -	if (ret) {
-> -		dev_err(nc->dev, "Failed to register mtd device: %d\n", ret);
-> -		nand_cleanup(chip);
-> -		return ret;
-> -	}
-> -
-> -	list_add_tail(&nand->node, &nc->chips);
-> -
+> I squinted a bit and merged this into next/dt. Might have been a bit cleaner to
+> split it in a SoC and a DT branch, but either way it's pretty small changes.
 
-You can move all the code in atmel_nand_register() directly in
-atmel_nand_controller_add_nand() + rename atmel_nand_unregister() into
-atmel_nand_controller_remove_nand(). This should be done in a separate
-patch so that the transition to nand_scan() is easier to review.
+OK yeah I could have done a separate branch for Kconfig changes.
 
->  	return 0;
->  }
->  
-> @@ -1755,6 +1721,8 @@ static int
->  atmel_nand_controller_add_nand(struct atmel_nand_controller *nc,
->  			       struct atmel_nand *nand)
->  {
-> +	struct nand_chip *chip = &nand->base;
-> +	struct mtd_info *mtd = nand_to_mtd(chip);
->  	int ret;
->  
->  	/* No card inserted, skip this NAND. */
-> @@ -1765,15 +1733,30 @@ atmel_nand_controller_add_nand(struct atmel_nand_controller *nc,
->  
->  	nc->caps->ops->nand_init(nc, nand);
->  
-> -	ret = atmel_nand_detect(nand);
-> -	if (ret)
-> +	ret = nand_scan(mtd, nand->numcs);
-> +	if (ret) {
-> +		dev_err(nc->dev, "NAND scan failed: %d\n", ret);
->  		return ret;
-> +	}
->  
-> -	ret = nc->caps->ops->ecc_init(nand);
-> +	ret = atmel_nand_register(nand);
->  	if (ret)
-> -		return ret;
-> +		goto cleanup_nand;
-> +
-> +	ret = mtd_device_register(mtd, NULL, 0);
-> +	if (ret) {
-> +		dev_err(nc->dev, "Failed to register mtd device: %d\n", ret);
-> +		goto cleanup_nand;
-> +	}
-> +
-> +	list_add_tail(&nand->node, &nc->chips);
-> +
-> +	return 0;
-> +
-> +cleanup_nand:
-> +	nand_cleanup(chip);
->  
-> -	return atmel_nand_register(nand);
-> +	return ret;
->  }
->  
->  static int
-> @@ -1958,6 +1941,19 @@ static const struct of_device_id atmel_matrix_of_ids[] = {
->  	{ /* sentinel */ },
->  };
->  
-> +static int atmel_nand_attach_chip(struct nand_chip *chip)
-> +{
-> +	struct atmel_nand_controller *nc;
-> +
-> +	nc = to_nand_controller(chip->controller);
-> +
-> +	return nc->caps->ops->ecc_init(chip);
-> +}
-> +
-> +static const struct nand_controller_ops atmel_nand_controller_ops = {
-> +	.attach_chip = atmel_nand_attach_chip,
-> +};
-> +
->  static int atmel_nand_controller_init(struct atmel_nand_controller *nc,
->  				struct platform_device *pdev,
->  				const struct atmel_nand_controller_caps *caps)
-> @@ -1967,6 +1963,7 @@ static int atmel_nand_controller_init(struct atmel_nand_controller *nc,
->  	int ret;
->  
->  	nand_controller_init(&nc->base);
-> +	nc->base.ops = &atmel_nand_controller_ops;
->  	INIT_LIST_HEAD(&nc->chips);
->  	nc->dev = dev;
->  	nc->caps = caps;
+> Should the support be enabled in arm64's defconfig?
+
+Yes it should, Nishanth, care to check Linux next once your
+patches are merged and send a patch for that?
+
+Regards,
+
+Tony
