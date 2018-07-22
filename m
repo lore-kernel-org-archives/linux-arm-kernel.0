@@ -1,46 +1,38 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 22 Jul 2018 13:39:52 +0800
-Subject: [PATCH 2/5] dt-bindings: sunxi-sram: add binding for Allwinner H6
- SRAM C
-In-Reply-To: <20180722053955.25266-1-icenowy@aosc.io>
-References: <20180722053955.25266-1-icenowy@aosc.io>
-Message-ID: <20180722053955.25266-3-icenowy@aosc.io>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Sat, 21 Jul 2018 22:41:18 -0700
+Subject: [PATCH v7 01/10] counter: Introduce the Generic Counter interface
+In-Reply-To: <20180721162610.GA15622@sophia>
+References: <cover.1529607879.git.vilhelm.gray@gmail.com>
+ <51b75b2b4495d4ad7ed173d91a726379bdae2353.1529607879.git.vilhelm.gray@gmail.com>
+ <20180717204954.4b5e371603d0b40b2aaabbb8@linux-foundation.org>
+ <20180721162610.GA15622@sophia>
+Message-ID: <20180721224118.ff26734be0f5db552afcbe7c@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner H6 SoC's DE3 needs the SRAM C section being claimed in the
-system controller to work, like A64 DE2.
+On Sat, 21 Jul 2018 12:26:10 -0400 William Breathitt Gray <vilhelm.gray@gmail.com> wrote:
 
-As H6 and A64 system controller are quite similar, code is reused now,
-and the A64 fallback compatible string is added after the H6 compatible
-string.
+> >Also, many many drivers deal with signals-as-an-electrical-thing - is
+> >it appropriate for this particular driver to take that namespace?
+> 
+> In the context of the Generic Counter paradigm, a "Signal" is an
+> abstraction for the stream of data that is fed to the counter device for
+> evaluation (triggering updates for the readable "Count"). In many cases
+> a "Signal" correlates with a physical electrical line (for example the A
+> and B electrical lines for a quadrature encoder), but this isn't a hard
+> requirement as the paradigm permits more abstract data streams.
+> 
+> I decided on "Signal" to match the naming convention that appears in the
+> datasheets of many counter devices, but "Line" may be a decent
+> alternative name we could use to indicate a counter device input data
+> stream.
+> 
+> I'd like to get some other opinions as well before I make a naming
+> change to "Signal" -- whether to stay with "Signal," switch to "Line," or
+> rename to something else. For what it's worth, I think it's unlikely for
+> a counter device driver author to confuse a Counter Signal with the
+> Linux OS signal within the context of the Generic Counter paradigm and
+> their respective counter device datasheet.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- Documentation/devicetree/bindings/sram/sunxi-sram.txt | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-index c51ade86578c..6527a1a535a3 100644
---- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-+++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-@@ -18,6 +18,7 @@ Required properties:
-     - "allwinner,sun8i-h3-system-control"
-     - "allwinner,sun50i-a64-sram-controller" (deprecated)
-     - "allwinner,sun50i-a64-system-control"
-+    - "allwinner,sun50i-h6-system-contorl", "allwinner,sun50i-a64-system-control"
- - reg : sram controller register offset + length
- 
- SRAM nodes
-@@ -54,6 +55,9 @@ The valid sections compatible for H3 are:
- The valid sections compatible for A64 are:
-     - allwinner,sun50i-a64-sram-c
- 
-+The valid sections compatible for H6 are:
-+    - allwinner,sun50i-h6-sram-c, allwinner,sun50i-a64-sram-c
-+
- Devices using SRAM sections
- ---------------------------
- 
--- 
-2.18.0
+gc_signal_* would be better.  That retains "signal", but makes
+it clear that the symbols belong to generic counter.
