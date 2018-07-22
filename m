@@ -1,40 +1,46 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 22 Jul 2018 13:39:51 +0800
-Subject: [PATCH 1/5] dt-binding: dwmac-sun8i: add H6 compatible string (w/ A64
- fallback)
+Date: Sun, 22 Jul 2018 13:39:52 +0800
+Subject: [PATCH 2/5] dt-bindings: sunxi-sram: add binding for Allwinner H6
+ SRAM C
 In-Reply-To: <20180722053955.25266-1-icenowy@aosc.io>
 References: <20180722053955.25266-1-icenowy@aosc.io>
-Message-ID: <20180722053955.25266-2-icenowy@aosc.io>
+Message-ID: <20180722053955.25266-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner H6 SoC features a Ethernet MAC that is similar to the one
-in A64.
+The Allwinner H6 SoC's DE3 needs the SRAM C section being claimed in the
+system controller to work, like A64 DE2.
 
-Add a compatible string for it with A64 fallback compatible string, in
-this case the A64 driver can be used.
-
-The "internal" PHY is not internal from the perspective of the H6 main
-die, instead it's on the co-packaged AC200 chip, and connected to the
-main die with RMII at the in-package Port A PIO bank. So from the SoC
-driver side it needs no special treatment.
+As H6 and A64 system controller are quite similar, code is reused now,
+and the A64 fallback compatible string is added after the H6 compatible
+string.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- Documentation/devicetree/bindings/net/dwmac-sun8i.txt | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/sram/sunxi-sram.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-index 5bb3a18cc38d..54c66d0611cb 100644
---- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-+++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-@@ -10,6 +10,7 @@ Required properties:
- 		"allwinner,sun8i-r40-gmac"
- 		"allwinner,sun8i-v3s-emac"
- 		"allwinner,sun50i-a64-emac"
-+		"allwinner,sun50i-h6-emac", "allwinner-sun50i-a64-emac"
- - reg: address and length of the register for the device.
- - interrupts: interrupt for the device
- - interrupt-names: must be "macirq"
+diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+index c51ade86578c..6527a1a535a3 100644
+--- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
++++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+@@ -18,6 +18,7 @@ Required properties:
+     - "allwinner,sun8i-h3-system-control"
+     - "allwinner,sun50i-a64-sram-controller" (deprecated)
+     - "allwinner,sun50i-a64-system-control"
++    - "allwinner,sun50i-h6-system-contorl", "allwinner,sun50i-a64-system-control"
+ - reg : sram controller register offset + length
+ 
+ SRAM nodes
+@@ -54,6 +55,9 @@ The valid sections compatible for H3 are:
+ The valid sections compatible for A64 are:
+     - allwinner,sun50i-a64-sram-c
+ 
++The valid sections compatible for H6 are:
++    - allwinner,sun50i-h6-sram-c, allwinner,sun50i-a64-sram-c
++
+ Devices using SRAM sections
+ ---------------------------
+ 
 -- 
 2.18.0
