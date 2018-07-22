@@ -1,62 +1,45 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Sun, 22 Jul 2018 07:59:01 +0200
-Subject: [linux-sunxi] [PATCH 4/5] arm64: allwinner: h6: add EMAC device
- nodes
-In-Reply-To: <20180722053955.25266-5-icenowy@aosc.io>
-References: <20180722053955.25266-1-icenowy@aosc.io>
- <20180722053955.25266-5-icenowy@aosc.io>
-Message-ID: <20180722055901.GA8055@Red>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sun, 22 Jul 2018 13:57:34 +0800
+Subject: [PATCH v3 4/9] arm64: allwinner: dts: h6: add USB Vbus regulator
+In-Reply-To: <20180722055739.26464-1-icenowy@aosc.io>
+References: <20180722055739.26464-1-icenowy@aosc.io>
+Message-ID: <20180722055739.26464-5-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 22, 2018 at 01:39:54PM +0800, Icenowy Zheng wrote:
-> Allwinner H6 SoC has an EMAC like the one in A64.
-> 
-> Add device tree nodes for the H6 DTSI file.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 30 ++++++++++++++++++++
->  1 file changed, 30 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> index 3ab6cf0256ca..c65311de301a 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> @@ -149,6 +149,14 @@
->  			interrupt-controller;
->  			#interrupt-cells = <3>;
->  
-> +			ext_rgmii_pins: rgmii_pins {
-> +				pins = "PD0", "PD1", "PD2", "PD3", "PD4",
-> +				       "PD5", "PD7", "PD8", "PD9", "PD10",
-> +				       "PD11", "PD12", "PD13", "PD19", "PD20";
-> +				function = "emac";
-> +				drive-strength = <40>;
-> +			};
-> +
->  			mmc0_pins: mmc0-pins {
->  				pins = "PF0", "PF1", "PF2", "PF3",
->  				       "PF4", "PF5";
-> @@ -258,6 +266,28 @@
->  			status = "disabled";
->  		};
->  
-> +		emac: ethernet at 5020000 {
-> +			compatible = "allwinner,sun50i-a64-emac",
-> +				     "allwinner,sun50i-h6-emac";
-> +			syscon = <&syscon>;
-> +			reg = <0x05020000 0x10000>;
-> +			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-names = "macirq";
-> +			resets = <&ccu RST_BUS_EMAC>;
-> +			reset-names = "stmmaceth";
-> +			clocks = <&ccu CLK_BUS_EMAC>;
-> +			clock-names = "stmmaceth";
-> +			status = "disabled";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
+The 5V output of the USB ports on Pine H64 is controlled via a GPIO.
 
-#address-cells and #size-cells is unnecessary in emac node.
+Add the USB Vbus regulator device tree node.
 
-Regards
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+---
+Changes in v3:
+- Added Chen-Yu's Review tag.
+
+ arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+index ceffc40810ee..f21e18f8ed37 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+@@ -39,6 +39,16 @@
+ 			gpios = <&r_pio 0 7 GPIO_ACTIVE_HIGH>; /* PL7 */
+ 		};
+ 	};
++
++	reg_usb_vbus: vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		startup-delay-us = <100000>;
++		gpio = <&r_pio 0 5 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
+ };
+ 
+ &mmc0 {
+-- 
+2.18.0
