@@ -1,34 +1,60 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 22 Jul 2018 20:54:07 +0800
-Subject: [PATCH] mmc: sunxi: allow 3.3V DDR when DDR is available
-Message-ID: <20180722125407.43107-1-icenowy@aosc.io>
+From: ysato@users.sourceforge.jp (Yoshinori Sato)
+Date: Sun, 22 Jul 2018 22:58:07 +0900
+Subject: [PATCH 1/9] h8300: Don't include linux/kernel.h in asm/atomic.h
+In-Reply-To: <1527159586-8578-2-git-send-email-will.deacon@arm.com>
+References: <1527159586-8578-1-git-send-email-will.deacon@arm.com>
+ <1527159586-8578-2-git-send-email-will.deacon@arm.com>
+Message-ID: <87in57fk40.wl-ysato@users.sourceforge.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Allwinner boards feature an on-board eMMC with fixed 3.3V voltage
-(e.g. Banana Pi M2+), and in this case both the eMMC and the SoC are
-capable of doing 3.3V DDR transmission.
+On Thu, 24 May 2018 19:59:38 +0900,
+Will Deacon wrote:
+> 
+> linux/kernel.h isn't needed by asm/atomic.h and will result in circular
+> dependencies when the asm-generic atomic bitops are built around the
+> tomic_long_t interface.
+> 
+> Remove the broad include and replace it with linux/compiler.h for
+> READ_ONCE etc and asm/irqflags.h for arch_local_irq_save etc.
+> 
+> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/h8300/include/asm/atomic.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/h8300/include/asm/atomic.h b/arch/h8300/include/asm/atomic.h
+> index 941e7554e886..b174dec099bf 100644
+> --- a/arch/h8300/include/asm/atomic.h
+> +++ b/arch/h8300/include/asm/atomic.h
+> @@ -2,8 +2,10 @@
+>  #ifndef __ARCH_H8300_ATOMIC__
+>  #define __ARCH_H8300_ATOMIC__
+>  
+> +#include <linux/compiler.h>
+>  #include <linux/types.h>
+>  #include <asm/cmpxchg.h>
+> +#include <asm/irqflags.h>
+>  
+>  /*
+>   * Atomic operations that C can't guarantee us.  Useful for
+> @@ -15,8 +17,6 @@
+>  #define atomic_read(v)		READ_ONCE((v)->counter)
+>  #define atomic_set(v, i)	WRITE_ONCE(((v)->counter), (i))
+>  
+> -#include <linux/kernel.h>
+> -
+>  #define ATOMIC_OP_RETURN(op, c_op)				\
+>  static inline int atomic_##op##_return(int i, atomic_t *v)	\
+>  {								\
+> -- 
+> 2.1.4
+> 
 
-Add capability of 3.3V DDR when DDR is available (extra clock or new
-timing).
+Sorry too late reply.
+Applied to h8300-next.
+Thanks.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- drivers/mmc/host/sunxi-mmc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 8e7f3e35ee3d..4ea8e2611079 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -1388,7 +1388,7 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
- 				  MMC_CAP_ERASE | MMC_CAP_SDIO_IRQ;
- 
- 	if (host->cfg->clk_delays || host->use_new_timings)
--		mmc->caps      |= MMC_CAP_1_8V_DDR;
-+		mmc->caps      |= MMC_CAP_1_8V_DDR | MMC_CAP_3_3V_DDR;
- 
- 	ret = mmc_of_parse(mmc);
- 	if (ret)
 -- 
-2.18.0
+Yosinori Sato
