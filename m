@@ -1,54 +1,81 @@
-From: gajjar04akash@gmail.com (Akash Gajjar)
-Date: Sun, 22 Jul 2018 21:16:49 +0530
-Subject: [PATCH] arm64: activate spi flash on pine64 LTS board
-In-Reply-To: <Akash_Gajjar@mentor.com>
-References: <Akash_Gajjar@mentor.com>
-Message-ID: <1532274409-9921-1-git-send-email-Akash_Gajjar@mentor.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Sun, 22 Jul 2018 18:53:59 +0300
+Subject: [PATCH v4 02/20] virtio: pci-legacy: Validate queue pfn
+In-Reply-To: <1531905547-25478-3-git-send-email-suzuki.poulose@arm.com>
+References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
+ <1531905547-25478-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180722185335-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This board has a 128M SPI flash. add spi flash support in device tree.
+On Wed, Jul 18, 2018 at 10:18:45AM +0100, Suzuki K Poulose wrote:
+> Legacy PCI over virtio uses a 32bit PFN for the queue. If the
+> queue pfn is too large to fit in 32bits, which we could hit on
+> arm64 systems with 52bit physical addresses (even with 64K page
+> size), we simply miss out a proper link to the other side of
+> the queue.
+> 
+> Add a check to validate the PFN, rather than silently breaking
+> the devices.
+> 
+> Cc: "Michael S. Tsirkin" <mst@redhat.com>
+> Cc: Jason Wang <jasowang@redhat.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Cc: Peter Maydel <peter.maydell@linaro.org>
+> Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Tested on pine64 LTS.
+Acked-by: Michael S. Tsirkin <mst@redhat.com>
 
-Signed-off-by: Akash Gajjar <Akash_Gajjar@mentor.com>
----
- .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+I assume this will be merged through some other tree.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-index abe179d..d54637d 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-@@ -134,6 +134,29 @@
- 	regulator-name = "vcc-wifi";
- };
- 
-+&spi0  {
-+	status = "okay";
-+
-+	m25p80 at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "w25q128";
-+		reg = <0x0>;
-+		linux,modalias = "m25p80", "w25q128";
-+		spi-max-frequency = <40000000>;
-+
-+		uboot at 0 {
-+			label = "uboot";
-+			reg = <0x0 0x100000>;
-+		};
-+
-+		rootfs at 0 {
-+			label = "rootfs";
-+			reg = <0x100000 0x7F00000>;
-+		};
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
--- 
-2.7.4
+> ---
+> Changes since v2:
+>  - Change errno to -E2BIG
+> ---
+>  drivers/virtio/virtio_pci_legacy.c | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/virtio/virtio_pci_legacy.c b/drivers/virtio/virtio_pci_legacy.c
+> index 2780886..de062fb 100644
+> --- a/drivers/virtio/virtio_pci_legacy.c
+> +++ b/drivers/virtio/virtio_pci_legacy.c
+> @@ -122,6 +122,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
+>  	struct virtqueue *vq;
+>  	u16 num;
+>  	int err;
+> +	u64 q_pfn;
+>  
+>  	/* Select the queue we're interested in */
+>  	iowrite16(index, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_SEL);
+> @@ -141,9 +142,17 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
+>  	if (!vq)
+>  		return ERR_PTR(-ENOMEM);
+>  
+> +	q_pfn = virtqueue_get_desc_addr(vq) >> VIRTIO_PCI_QUEUE_ADDR_SHIFT;
+> +	if (q_pfn >> 32) {
+> +		dev_err(&vp_dev->pci_dev->dev,
+> +			"platform bug: legacy virtio-mmio must not be used with RAM above 0x%llxGB\n",
+> +			0x1ULL << (32 + PAGE_SHIFT - 30));
+> +		err = -E2BIG;
+> +		goto out_del_vq;
+> +	}
+> +
+>  	/* activate the queue */
+> -	iowrite32(virtqueue_get_desc_addr(vq) >> VIRTIO_PCI_QUEUE_ADDR_SHIFT,
+> -		  vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
+> +	iowrite32(q_pfn, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
+>  
+>  	vq->priv = (void __force *)vp_dev->ioaddr + VIRTIO_PCI_QUEUE_NOTIFY;
+>  
+> @@ -160,6 +169,7 @@ static struct virtqueue *setup_vq(struct virtio_pci_device *vp_dev,
+>  
+>  out_deactivate:
+>  	iowrite32(0, vp_dev->ioaddr + VIRTIO_PCI_QUEUE_PFN);
+> +out_del_vq:
+>  	vring_del_virtqueue(vq);
+>  	return ERR_PTR(err);
+>  }
+> -- 
+> 2.7.4
