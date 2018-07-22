@@ -1,30 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 21 Jul 2018 23:35:56 -0700
-Subject: [GIT PULL] few new beaglebone variants for v4.19 merge window
-In-Reply-To: <20180721221835.kyzzib5lcavsdpnn@localhost>
-References: <pull-1531986403-289188@atomide.com>
- <20180721221835.kyzzib5lcavsdpnn@localhost>
-Message-ID: <20180722063556.GL99251@atomide.com>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Sun, 22 Jul 2018 08:39:19 +0200
+Subject: [PATCH v6 1/5] dt-bindings: mailbox: allow mbox-cells to be equal to 0
+In-Reply-To: <20180722063923.30222-1-o.rempel@pengutronix.de>
+References: <20180722063923.30222-1-o.rempel@pengutronix.de>
+Message-ID: <20180722063923.30222-2-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [180721 22:28]:
-> On Thu, Jul 19, 2018 at 12:47:47AM -0700, Tony Lindgren wrote:
-> > From: "Tony Lindgren" <tony@atomide.com>
-> > 
-> > The following changes since commit 792f98677d7f777a4f58e567b5b0578191cb986a:
-> > 
-> >   Merge commit '949bdcc8a97c' into omap-for-v4.19/dt (2018-07-11 05:54:32 -0700)
-> > 
-> > are available in the Git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/dt-pt2-signed
-> 
-> Btw, this is slightly confusing, you already had a tag
-> tags/omap-for-v4.19/dt-signed-v2 with new contents. :)
+From: Dong Aisheng <aisheng.dong@nxp.com>
 
-Oh yes, I guess I should have called this one dt-v2-pt2-signed :)
+Mailbox devices may have only one channel which means the mbox-cells
+at least 1 does not make sense for this type devices. Let's remove
+that limitation to allow the mbox-cells to be equal to 0.
 
-Regards,
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+ Documentation/devicetree/bindings/mailbox/mailbox.txt | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Tony
+diff --git a/Documentation/devicetree/bindings/mailbox/mailbox.txt b/Documentation/devicetree/bindings/mailbox/mailbox.txt
+index af8ecee2ac68..c2fcd054141a 100644
+--- a/Documentation/devicetree/bindings/mailbox/mailbox.txt
++++ b/Documentation/devicetree/bindings/mailbox/mailbox.txt
+@@ -6,8 +6,7 @@ assign appropriate mailbox channel to client drivers.
+ * Mailbox Controller
+ 
+ Required property:
+-- #mbox-cells: Must be at least 1. Number of cells in a mailbox
+-		specifier.
++- #mbox-cells: Number of cells in a mailbox specifier.
+ 
+ Example:
+ 	mailbox: mailbox {
+-- 
+2.18.0
