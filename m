@@ -1,88 +1,53 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 22 Jul 2018 12:10:08 +0200
-Subject: [PATCH] ARM: dts: rmobile: Drop MTD partitioning from DT
-In-Reply-To: <CAOesGMhAeRLf2fyw-igPBBCzoehcyT9fckVGuY=r8rjmdy-szg@mail.gmail.com>
-References: <20180530101130.3566-1-marek.vasut+renesas@gmail.com>
- <CAOesGMjmz41p5sF_xnC7gdSRNLaowXPW7Sk8HBZww_QSTvXV7g@mail.gmail.com>
- <3b6f71da-8d63-1a63-dc61-05c12d52a2db@gmail.com>
- <CAOesGMhVbSGmkkF-Va6zwOB4xXxj=HpccKeFYgVLO4D86Vo4ow@mail.gmail.com>
- <5842740e-e652-aa51-ec2b-51f37a011a07@gmail.com>
- <CAOesGMhAeRLf2fyw-igPBBCzoehcyT9fckVGuY=r8rjmdy-szg@mail.gmail.com>
-Message-ID: <9c77d8ae-637f-9713-83e3-3b40288b4b58@gmail.com>
+Date: Sun, 22 Jul 2018 14:07:29 +0200
+Subject: [PATCH 1/9] ARM: dts: porter: Add missing PMIC nodes
+In-Reply-To: <8312c88f-9ff8-454e-fad9-7bf403c28207@cogentembedded.com>
+References: <cover.1532086734.git.horms+renesas@verge.net.au>
+ <5058a96cb7e8dca97629c48084537fe5def8344f.1532086734.git.horms+renesas@verge.net.au>
+ <8312c88f-9ff8-454e-fad9-7bf403c28207@cogentembedded.com>
+Message-ID: <1f7c894a-9ad6-2e4e-c144-de982c2ba4c8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2018 12:23 AM, Olof Johansson wrote:
-[...]
->>>>> You end up with user space tools trying to parse the kernel command
->>>>> line to figure out what's on the flash, and other really bad habits.
->>>>> :(
->>>>
->>>> You should just read /proc/mtd , see
->>>> http://www.linux-mtd.infradead.org/doc/general.html
->>>
->>> Sure, I know that but not everybody does, and they do it in bad ways
->>> if given the opportunity.
+On 07/20/2018 06:38 PM, Sergei Shtylyov wrote:
+> On 07/20/2018 03:05 PM, Simon Horman wrote:
+> 
+>> From: Marek Vasut <marek.vasut@gmail.com>
 >>
->> That's what the documentation is for. I assume whoever is using MTD is
->> also capable of reading the documentation and thus avoiding such basic
->> mistakes.
-> 
-> Why read the docs when the information obviously is there when you grep it?
-
-To do things correctly of course.
-
-> I'm agreeing with you -- I've just seen it done wrong so many times.
-> Making it harder to make mistakes is always a good thing.
-
-If you follow this argument through, you could say we should start
-plucking out random files from /proc because someone might cluelessly
-misuse them. This might lead to a system that's hard to misuse indeed,
-but likely also quite useless.
-
->>>>> I'd strongly advice you to keep this in the board files, unless you
->>>>> have an actual real motivation for changing it. This patch does not
->>>>> provide one.
->>>>
->>>> Partitioning is not hardware description, it should not be in DT.
->>>
->>> Read my reply again. It's part of _platform_ description, and belongs in DT.
+>> Add PMIC nodes to Porter and connect CPU DVFS supply. There is
+>> one DA9063L and one DA9210 on Porter, the only difference from
+>> the other boards is that DA9063L is at I2C address 0x5a rather
+>> than 0x58 .
 >>
->> I can repartition the flash whichever way I want for my purposes, just
->> like I can repartition a harddrive. We don't have harddrive partitioning
->> in the DT, why should we have flash partitioning there ? How do those
->> differ ?
+>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> ---
+>>  arch/arm/boot/dts/r8a7791-porter.dts | 33 +++++++++++++++++++++++++++++++++
+>>  1 file changed, 33 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
+>> index a01101b49d99..5f77d73d7462 100644
+>> --- a/arch/arm/boot/dts/r8a7791-porter.dts
+>> +++ b/arch/arm/boot/dts/r8a7791-porter.dts
+>> @@ -375,10 +375,43 @@
+>>  	clock-frequency = <400000>;
+>>  };
+>>  
+>> +&i2c6 {
+>> +	status = "okay";
+>> +	clock-frequency = <100000>;
+>> +
+>> +	pmic at 5a {
+>> +		compatible = "dlg,da9063l";
+>> +		reg = <0x5a>;
+>> +		interrupt-parent = <&irqc0>;
+>> +		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
+>> +		interrupt-controller;
 > 
-> A drive can be auto-probed. We have partition tables on the disk that
-> self-describes the contents.
-> 
-> That doesn't exist on flashes, at least not usually. This is really
-> unfortunate, I wish we could change _that_ instead of argue here.
+>    Without a label and #interrupt-cells?
 
-Technically it does. Consider the fact that those flashes have between
-4-64 MiB in size and sector size of 256 kiB . If you waste one sector on
-the 4 MiB flash for some sort of partition table, you waste 1/16th of
-the flash, which is a lot.
-
-The bootloader needs to know the flash layout and it must be in sync
-with the kernel, so there has to be some sort of communication channel
-between those two. I don't want to add handler for every possible
-bootloader that can be used on those platforms into the kernel though.
-
-> If you repartition your disk, you need to change the command line
-> arguments to the kernel too. It's definitely not an argument to
-> keeping it on the command line instead.
-
-How so ? /dev/sdxy remains /dev/sdxy . Sure, you can use UUID and change
-it, but that's a specific case.
-
-> Also, you now have a dependencies between hardware description, probe
-> order and stable naming in the kernel, and the command line. With DT,
-> you have it all in one place, right next to the flash part. It doesn't
-> matter what name it gets probed at, and nobody needs to know the
-> mapping to get it right.
-
-In this case it doesn't matter either, since you have only one flash device.
+Just like the other boards do. What's the problem here ?
 
 -- 
 Best regards,
