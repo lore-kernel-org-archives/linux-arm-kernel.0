@@ -1,31 +1,41 @@
-From: martin@kaiser.cx (Martin Kaiser)
-Date: Sun, 22 Jul 2018 20:02:13 +0200
-Subject: [PATCH] irqchip/tango: Set irq handler and data in one go
-Message-ID: <1532282533-26507-1-git-send-email-martin@kaiser.cx>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 22 Jul 2018 21:24:41 +0200
+Subject: Subject: [PATCH 00/22] gpio: xilinx: update driver to match
+ official xilinx version
+In-Reply-To: <5D23E7CAADD3BE4A97642792FFC691C561C7A3D7@MBX215.d.ethz.ch>
+References: <5D23E7CAADD3BE4A97642792FFC691C561C7A3D7@MBX215.d.ethz.ch>
+Message-ID: <CACRpkdan_Fc8E2o69_48OZU-N_4HUBh2uY77Se3qTVvRSny3bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the two separate calls for setting the irq handler and data with
-a single irq_set_chained_handler_and_data() call.
+On Sat, Jul 21, 2018 at 4:14 PM Hedges Alexander
+<ahedges@student.ethz.ch> wrote:
 
-Signed-off-by: Martin Kaiser <martin@kaiser.cx>
----
- drivers/irqchip/irq-tango.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+An overarching question:
 
-diff --git a/drivers/irqchip/irq-tango.c b/drivers/irqchip/irq-tango.c
-index 0c085303a583..580e2d72b9ba 100644
---- a/drivers/irqchip/irq-tango.c
-+++ b/drivers/irqchip/irq-tango.c
-@@ -205,8 +205,7 @@ static int __init tangox_irq_init(void __iomem *base, struct resource *baseres,
- 
- 	tangox_irq_domain_init(dom);
- 
--	irq_set_chained_handler(irq, tangox_irq_handler);
--	irq_set_handler_data(irq, dom);
-+	irq_set_chained_handler_and_data(irq, tangox_irq_handler, dom);
- 
- 	return 0;
- }
--- 
-2.1.4
+the whole patch set contains things like this:
+
+> +#ifdef CONFIG_OF
+(...)
+> +#else
+(...)
+> +#endif
+
+But arch/arm/mach-zynq and the Aarch64 counterpart are
+OF-only.
+
+I.e. these adaptions must have been made for some Xilinx
+platform support codebase that is not upstream, and which does
+not use device tree.
+
+If this is the case, I insist that these non-OF platforms are
+upstreamed *first*, because we are trying to get rid of
+non-OF platforms from the ARM kernel, and the Aarch64
+kernel simply does not allow them (unless they are instead
+using ACPI). It is as far as I can tell code that cannot be
+tested with any machine supported in the upstream kernel
+and the upstream kernel should only contain code that
+can be executed with an unpatched kernel.
+
+Yours,
+Linus Walleij
