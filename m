@@ -1,90 +1,91 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 22 Jul 2018 23:11:24 +0200
-Subject: [PATCH v3 0/4] Add basic support for Mediatek MT8183 SoC
-In-Reply-To: <1532158134.16009.10.camel@mtksdaap41>
-References: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
- <9ba45353-a6e1-9a6e-f05b-4b1679ae9e52@gmail.com>
- <1532074769.19148.2.camel@mtksdaap41>
- <2ca76468-198b-b764-c974-374e567e0c93@gmail.com>
- <1532158134.16009.10.camel@mtksdaap41>
-Message-ID: <1dc23f5f-50f5-e9da-f367-17cd84eace87@gmail.com>
+From: vilhelm.gray@gmail.com (William Breathitt Gray)
+Date: Sun, 22 Jul 2018 18:49:49 -0400
+Subject: [PATCH v9 00/11] Introduce the Counter subsystem
+Message-ID: <cover.1532298882.git.vilhelm.gray@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Changes in v9:
+ - Prefix exported symbols with "counter_" to make counter namespace
+   explicit and clear
+ - Replace scnprintf and snprintf lines with sprintf in 104-quad-8.c
+   since we're dealing with sysfs files
 
+This revision is functionally identical to the last; changes in this
+version were made to improve code clarity. Andrew Morton suggested
+improving the names of the exported symbols to clean up the Counter
+subsytem namespace. This revision adds a "counter_" prefix to the
+exported symbols to keep the namespace tidy and these symbols as
+clearly part of the Counter subsystem.
 
-On 21/07/18 09:28, Erin Lo wrote:
-> On Fri, 2018-07-20 at 12:44 +0200, Matthias Brugger wrote:
->>
->> On 20/07/18 10:19, Erin Lo wrote:
->>> On Mon, 2018-07-16 at 11:28 +0200, Matthias Brugger wrote:
->>>> Hi Erin,
->>>>
->>>> On 17/05/18 08:22, Erin Lo wrote:
->>>>> MT8183 is a SoC based on 64bit ARMv8 architecture.
->>>>> It contains 4 CA53 and 4 CA73 cores.
->>>>> MT8183 share many HW IP with MT65xx series.
->>>>> This patchset was tested on MT8183 evaluation board, and boot to shell ok.
->>>>>
->>>>> This series contains document bindings, device tree including interrupt, uart.
->>>>>
->>>>> Change in v3:
->>>>> 1. Fill out GICC, GICH, GICV regions
->>>>> 2. Update Copyright to 2018
->>>>>
->>>>> Change in v2:
->>>>> 1. Split dt-bindings into different patches
->>>>> 2. Correct bindings for supported SoCs (mtk-uart.txt)
->>>>>
->>>>> Ben Ho (1):
->>>>>   arm64: dts: Add Mediatek SoC MT8183 and evaluation board dts and
->>>>>     Makefile
->>>>>
->>>>> Erin Lo (3):
->>>>>   dt-bindings: arm: Add bindings for Mediatek MT8183 SoC Platform
->>>>>   dt-bindings: mtk-sysirq: Add compatible for Mediatek MT8183
->>>>>   dt-bindings: serial: Add compatible for Mediatek MT8183
->>>>>
->>>>
->>>> I'm a bit reluctant to take this series, as it will only enable the EVB board to
->>>> boot into a serial console. Are you planning to add support for other devices of
->>>> this SoC?
->>>>
->>>> Apart please take into account that there is an issue with the dts file, as you
->>>> were told by the kbuild test robot.
->>>>
->>>> Regards,
->>>> Matthias
->>>>
->>>
->>> Hi, Matthias
->>> Sorry for missing this letter...since mail proxy server.
->>> We plan to add support all the devices of MT8183 in serious.
->>> We have implemented the clock and pinctrl driver for upstream and they
->>> are in internal review right now.
->>>
->>
->> Nice to hear that :)
->>
->>> About the dts issue... do you suggest me to send new patch right now or
->>> wait for clock and pinctrl driver ready then send them together?
->>>
->>
->> I would prefer that you send at least the clock controller together, so that we
->> don't have any dummy clocks in the basic device tree.
->>
->> Regards,
->> Matthias
->>
-> 
-> Got it! Next patch, we will send them with clock controller without
-> dummy clocks in the basic device tree.
-> By the way, the clock controller driver of MT8183 is a little bit
-> different from former ICs, so we need more time to prepare them.
-> We will send them to public as soon as possible.
-> 
+Andrew Morton also brought up a good point that the Generic Counter
+"signal" terminology could conflict with the existing established use of
+the term in other areas of the Linux kernel. I've changed the major
+exported symbols in counter.h that used the "signal_" naming covention
+to now use a "counter_signal_" naming convention in order to help
+prevent this confusion; I've made similar changes to symbols in
+counter.c as well. If this naming still causes trouble, we can consider
+alternative names for this component.
 
-Thanks for the info.
+William Breathitt Gray
 
-Best regards,
-Matthias
+Benjamin Gaignard (2):
+  counter: Add STM32 Timer quadrature encoder
+  dt-bindings: counter: Document stm32 quadrature encoder
+
+Fabrice Gasnier (2):
+  counter: stm32-lptimer: add counter device
+  dt-bindings: counter: Adjust dt-bindings for STM32 lptimer move
+
+William Breathitt Gray (7):
+  counter: Introduce the Generic Counter interface
+  counter: Documentation: Add Generic Counter sysfs documentation
+  docs: Add Generic Counter interface documentation
+  iio: 104-quad-8: Update license boilerplate
+  counter: 104-quad-8: Add Generic Counter interface support
+  counter: 104-quad-8: Documentation: Add Generic Counter sysfs
+    documentation
+  iio: counter: Add deprecation markings for IIO Counter attributes
+
+ Documentation/ABI/testing/sysfs-bus-counter   |  230 +++
+ .../ABI/testing/sysfs-bus-counter-104-quad-8  |   36 +
+ Documentation/ABI/testing/sysfs-bus-iio       |    8 +
+ .../testing/sysfs-bus-iio-counter-104-quad-8  |   16 +
+ .../{iio => }/counter/stm32-lptimer-cnt.txt   |    0
+ .../bindings/counter/stm32-timer-cnt.txt      |   31 +
+ .../devicetree/bindings/mfd/stm32-lptimer.txt |    2 +-
+ .../devicetree/bindings/mfd/stm32-timers.txt  |    7 +
+ Documentation/driver-api/generic-counter.rst  |  342 ++++
+ Documentation/driver-api/index.rst            |    1 +
+ MAINTAINERS                                   |   15 +-
+ drivers/Kconfig                               |    2 +
+ drivers/Makefile                              |    1 +
+ drivers/{iio => }/counter/104-quad-8.c        |  782 +++++++-
+ drivers/counter/Kconfig                       |   51 +
+ drivers/{iio => }/counter/Makefile            |    5 +-
+ drivers/counter/counter.c                     | 1567 +++++++++++++++++
+ drivers/{iio => }/counter/stm32-lptimer-cnt.c |  361 +++-
+ drivers/counter/stm32-timer-cnt.c             |  390 ++++
+ drivers/iio/Kconfig                           |    1 -
+ drivers/iio/Makefile                          |    1 -
+ drivers/iio/counter/Kconfig                   |   34 -
+ include/linux/counter.h                       |  510 ++++++
+ include/linux/counter_enum.h                  |   45 +
+ 24 files changed, 4352 insertions(+), 86 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-counter
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-counter-104-quad-8
+ rename Documentation/devicetree/bindings/{iio => }/counter/stm32-lptimer-cnt.txt (100%)
+ create mode 100644 Documentation/devicetree/bindings/counter/stm32-timer-cnt.txt
+ create mode 100644 Documentation/driver-api/generic-counter.rst
+ rename drivers/{iio => }/counter/104-quad-8.c (44%)
+ create mode 100644 drivers/counter/Kconfig
+ rename drivers/{iio => }/counter/Makefile (46%)
+ create mode 100644 drivers/counter/counter.c
+ rename drivers/{iio => }/counter/stm32-lptimer-cnt.c (48%)
+ create mode 100644 drivers/counter/stm32-timer-cnt.c
+ delete mode 100644 drivers/iio/counter/Kconfig
+ create mode 100644 include/linux/counter.h
+ create mode 100644 include/linux/counter_enum.h
+
+-- 
+2.18.0
