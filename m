@@ -1,29 +1,40 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 22 Jul 2018 13:39:50 +0800
-Subject: [PATCH 0/5] Allwinner H6 Ethernet support
-Message-ID: <20180722053955.25266-1-icenowy@aosc.io>
+Date: Sun, 22 Jul 2018 13:39:51 +0800
+Subject: [PATCH 1/5] dt-binding: dwmac-sun8i: add H6 compatible string (w/ A64
+ fallback)
+In-Reply-To: <20180722053955.25266-1-icenowy@aosc.io>
+References: <20180722053955.25266-1-icenowy@aosc.io>
+Message-ID: <20180722053955.25266-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset introduces Allwinner H6 Ethernet support with code already
-available for A64.
+The Allwinner H6 SoC features a Ethernet MAC that is similar to the one
+in A64.
 
-As the system controller and EMAC on H6 are all similar to A64 ones,
-support for them are directly reused, by using fallback compatible
-strings.
+Add a compatible string for it with A64 fallback compatible string, in
+this case the A64 driver can be used.
 
-Icenowy Zheng (5):
-  dt-binding: dwmac-sun8i: add H6 compatible string (w/ A64 fallback)
-  dt-bindings: sunxi-sram: add binding for Allwinner H6 SRAM C
-  arm64: allwinner: h6: add system controller device tree node
-  arm64: allwinner: h6: add EMAC device nodes
-  arm64: allwinner: h6: add support for the Ethernet on Pine H64
+The "internal" PHY is not internal from the perspective of the H6 main
+die, instead it's on the co-packaged AC200 chip, and connected to the
+main die with RMII at the in-package Port A PIO bank. So from the SoC
+driver side it needs no special treatment.
 
- .../devicetree/bindings/net/dwmac-sun8i.txt   |  1 +
- .../devicetree/bindings/sram/sunxi-sram.txt   |  4 ++
- .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 29 ++++++++++
- arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi  | 53 +++++++++++++++++++
- 4 files changed, 87 insertions(+)
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ Documentation/devicetree/bindings/net/dwmac-sun8i.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+index 5bb3a18cc38d..54c66d0611cb 100644
+--- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
++++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+@@ -10,6 +10,7 @@ Required properties:
+ 		"allwinner,sun8i-r40-gmac"
+ 		"allwinner,sun8i-v3s-emac"
+ 		"allwinner,sun50i-a64-emac"
++		"allwinner,sun50i-h6-emac", "allwinner-sun50i-a64-emac"
+ - reg: address and length of the register for the device.
+ - interrupts: interrupt for the device
+ - interrupt-names: must be "macirq"
 -- 
 2.18.0
