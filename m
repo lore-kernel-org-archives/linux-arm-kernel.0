@@ -1,41 +1,65 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 22 Jul 2018 17:12:47 +0900
-Subject: UG_ON(!may_use_simd()); hit in kernel_neon_begin(); on 4.17.5
-In-Reply-To: <a1494fa6-682d-8a95-ca14-5dd9979b6ae9@babibo.de>
-References: <a1494fa6-682d-8a95-ca14-5dd9979b6ae9@babibo.de>
-Message-ID: <CAKv+Gu_usN_4eR_izonf7+ZeQ32vRdYAxBrNX8E9qdqvYnekzw@mail.gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Sun, 22 Jul 2018 10:49:12 +0200
+Subject: [PATCH v4 28/35] mtd: rawnand: allow exiting immediately
+ nand_scan_ident()
+In-Reply-To: <20180720151527.16038-29-miquel.raynal@bootlin.com>
+References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
+ <20180720151527.16038-29-miquel.raynal@bootlin.com>
+Message-ID: <20180722104912.77e81f8d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 July 2018 at 16:26, Thomas Bach <hacking@babibo.de> wrote:
-> Hi list,
->
-> I reported this bug on NixOS issue tracker:
->
-> https://github.com/NixOS/nixpkgs/issues/43808
->
-> where I was suggested to report this here:
->
-> I want add an additional device to an existing btrfs and convert data
-> and metadata to raid1. The existing btrfs is currently on a plain
-> partition, the added device resides on LUKS. During `btrfs balance` I
-> observe the attached error-log in the journal and the process stalls.
-> This happens on a RaspberryPi 3
->
-> # uname -a
-> Linux host 4.17.5 #1-NixOS SMP PREEMPT Sun Jul 8 13:32:21 UTC 2018
-> aarch64 GNU/Linux
->
-> This is reproducible on my system.
->
+On Fri, 20 Jul 2018 17:15:20 +0200
+Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-Thanks for the report.
+> Some driver (eg. docg4) will need to handle themselves the
+> identification phase. As part of the migration to use nand_scan()
+> everywhere (which will unconditionnaly call nand_scan_ident()), we add
+> a condition at the start of nand_scan_ident() to just "do nothing" if
+> the maxchips parameters is zero, meaning that the driver does not want
+> the core to handle this phase.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  drivers/mtd/nand/raw/nand_base.c | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
+> index dea41fa25be1..e7f135c100c2 100644
+> --- a/drivers/mtd/nand/raw/nand_base.c
+> +++ b/drivers/mtd/nand/raw/nand_base.c
+> @@ -5926,7 +5926,7 @@ static int nand_dt_init(struct nand_chip *chip)
+>  /**
+>   * nand_scan_ident - [NAND Interface] Scan for the NAND device
+>   * @mtd: MTD device structure
+> - * @maxchips: number of chips to scan for
+> + * @maxchips: number of chips to scan for, returns immediately if 0
+>   * @table: alternative NAND ID table
+>   *
+>   * This is the first phase of the normal nand_scan() function. It reads the
+> @@ -5940,6 +5940,14 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
+>  	struct nand_chip *chip = mtd_to_nand(mtd);
+>  	int ret;
+>  
+> +	/*
+> +	 * If the number of chips to scan for is null, just return silently.
 
-Could you please check whether your kernel has this patch
+						 ^ zero
 
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=2fd8eb4ad87104c54800ef3cea498c92eb15c78a
 
-and if it doesn't, whether applying it fixes your issue?
+> +	 * This is for specific drivers that must handle this part of the
+> +	 * probe process themselves (e.g docg4).
+> +	 */
 
-Thanks,
-Ard.
+I think that description of the special case maxchips == 0 should be
+placed in the kernel doc header.
+
+> +	if (!maxchips)
+> +		return 0;
+
+Can we move this check in nand_scan_with_ids()?
+
+> +
+>  	/* Enforce the right timings for reset/detection */
+>  	onfi_fill_data_interface(chip, NAND_SDR_IFACE, 0);
+>  
