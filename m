@@ -1,40 +1,90 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 22 Jul 2018 22:51:53 +0200
-Subject: [GIT PULL] ARM: mediatek: soc commits for v4.19
-Message-ID: <9fdbdba4-c2e0-510d-62bb-e0a604942e19@gmail.com>
+Date: Sun, 22 Jul 2018 23:11:24 +0200
+Subject: [PATCH v3 0/4] Add basic support for Mediatek MT8183 SoC
+In-Reply-To: <1532158134.16009.10.camel@mtksdaap41>
+References: <1526538126-51497-1-git-send-email-erin.lo@mediatek.com>
+ <9ba45353-a6e1-9a6e-f05b-4b1679ae9e52@gmail.com>
+ <1532074769.19148.2.camel@mtksdaap41>
+ <2ca76468-198b-b764-c974-374e567e0c93@gmail.com>
+ <1532158134.16009.10.camel@mtksdaap41>
+Message-ID: <1dc23f5f-50f5-e9da-f367-17cd84eace87@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, hi Olof,
 
-Please don't forget the following commits.
+
+On 21/07/18 09:28, Erin Lo wrote:
+> On Fri, 2018-07-20 at 12:44 +0200, Matthias Brugger wrote:
+>>
+>> On 20/07/18 10:19, Erin Lo wrote:
+>>> On Mon, 2018-07-16 at 11:28 +0200, Matthias Brugger wrote:
+>>>> Hi Erin,
+>>>>
+>>>> On 17/05/18 08:22, Erin Lo wrote:
+>>>>> MT8183 is a SoC based on 64bit ARMv8 architecture.
+>>>>> It contains 4 CA53 and 4 CA73 cores.
+>>>>> MT8183 share many HW IP with MT65xx series.
+>>>>> This patchset was tested on MT8183 evaluation board, and boot to shell ok.
+>>>>>
+>>>>> This series contains document bindings, device tree including interrupt, uart.
+>>>>>
+>>>>> Change in v3:
+>>>>> 1. Fill out GICC, GICH, GICV regions
+>>>>> 2. Update Copyright to 2018
+>>>>>
+>>>>> Change in v2:
+>>>>> 1. Split dt-bindings into different patches
+>>>>> 2. Correct bindings for supported SoCs (mtk-uart.txt)
+>>>>>
+>>>>> Ben Ho (1):
+>>>>>   arm64: dts: Add Mediatek SoC MT8183 and evaluation board dts and
+>>>>>     Makefile
+>>>>>
+>>>>> Erin Lo (3):
+>>>>>   dt-bindings: arm: Add bindings for Mediatek MT8183 SoC Platform
+>>>>>   dt-bindings: mtk-sysirq: Add compatible for Mediatek MT8183
+>>>>>   dt-bindings: serial: Add compatible for Mediatek MT8183
+>>>>>
+>>>>
+>>>> I'm a bit reluctant to take this series, as it will only enable the EVB board to
+>>>> boot into a serial console. Are you planning to add support for other devices of
+>>>> this SoC?
+>>>>
+>>>> Apart please take into account that there is an issue with the dts file, as you
+>>>> were told by the kbuild test robot.
+>>>>
+>>>> Regards,
+>>>> Matthias
+>>>>
+>>>
+>>> Hi, Matthias
+>>> Sorry for missing this letter...since mail proxy server.
+>>> We plan to add support all the devices of MT8183 in serious.
+>>> We have implemented the clock and pinctrl driver for upstream and they
+>>> are in internal review right now.
+>>>
+>>
+>> Nice to hear that :)
+>>
+>>> About the dts issue... do you suggest me to send new patch right now or
+>>> wait for clock and pinctrl driver ready then send them together?
+>>>
+>>
+>> I would prefer that you send at least the clock controller together, so that we
+>> don't have any dummy clocks in the basic device tree.
+>>
+>> Regards,
+>> Matthias
+>>
+> 
+> Got it! Next patch, we will send them with clock controller without
+> dummy clocks in the basic device tree.
+> By the way, the clock controller driver of MT8183 is a little bit
+> different from former ICs, so we need more time to prepare them.
+> We will send them to public as soon as possible.
+> 
+
+Thanks for the info.
 
 Best regards,
 Matthias
-
----
-
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-
-are available in the Git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-v4.18-next/soc
-
-for you to fetch changes up to 00673189b8b971c00417632ffe4c90ba9b4f2568:
-
-  soc: mediatek: pwrap: add mt6351 driver for mt6797 SoCs (2018-07-16 15:50:17
-+0200)
-
-----------------------------------------------------------------
-Argus Lin (4):
-      dt-bindings: pwrap: mediatek: add pwrap support for MT6797
-      soc: mediatek: pwrap: fix cipher init setting error
-      soc: mediatek: pwrap: add pwrap driver for mt6797 SoCs
-      soc: mediatek: pwrap: add mt6351 driver for mt6797 SoCs
-
- .../devicetree/bindings/soc/mediatek/pwrap.txt     |  1 +
- drivers/soc/mediatek/mtk-pmic-wrap.c               | 81 +++++++++++++++++++++-
- 2 files changed, 80 insertions(+), 2 deletions(-)
