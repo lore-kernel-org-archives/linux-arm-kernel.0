@@ -1,61 +1,45 @@
-From: ysato@users.sourceforge.jp (Yoshinori Sato)
-Date: Sun, 22 Jul 2018 23:06:41 +0900
-Subject: [PATCH v2 1/9] h8300: Don't include linux/kernel.h in asm/atomic.h
-In-Reply-To: <1527869189-31512-2-git-send-email-will.deacon@arm.com>
-References: <1527869189-31512-1-git-send-email-will.deacon@arm.com>
- <1527869189-31512-2-git-send-email-will.deacon@arm.com>
-Message-ID: <87fu0bfjpq.wl-ysato@users.sourceforge.jp>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Sun, 22 Jul 2018 16:43:56 +0200
+Subject: [PATCH v2 00/18] Allwinner R40 HDMI refactoring
+In-Reply-To: <20180711083036.7attjq4hm5ay5gmn@flea>
+References: <20180710203511.18454-1-jernej.skrabec@siol.net>
+ <20180711083036.7attjq4hm5ay5gmn@flea>
+Message-ID: <2309112.TTVI9Fv1ar@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 02 Jun 2018 01:06:21 +0900,
-Will Deacon wrote:
-> 
-> linux/kernel.h isn't needed by asm/atomic.h and will result in circular
-> dependencies when the asm-generic atomic bitops are built around the
-> tomic_long_t interface.
-> 
-> Remove the broad include and replace it with linux/compiler.h for
-> READ_ONCE etc and asm/irqflags.h for arch_local_irq_save etc.
-> 
-> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/h8300/include/asm/atomic.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/h8300/include/asm/atomic.h b/arch/h8300/include/asm/atomic.h
-> index 941e7554e886..b174dec099bf 100644
-> --- a/arch/h8300/include/asm/atomic.h
-> +++ b/arch/h8300/include/asm/atomic.h
-> @@ -2,8 +2,10 @@
->  #ifndef __ARCH_H8300_ATOMIC__
->  #define __ARCH_H8300_ATOMIC__
->  
-> +#include <linux/compiler.h>
->  #include <linux/types.h>
->  #include <asm/cmpxchg.h>
-> +#include <asm/irqflags.h>
->  
->  /*
->   * Atomic operations that C can't guarantee us.  Useful for
-> @@ -15,8 +17,6 @@
->  #define atomic_read(v)		READ_ONCE((v)->counter)
->  #define atomic_set(v, i)	WRITE_ONCE(((v)->counter), (i))
->  
-> -#include <linux/kernel.h>
-> -
->  #define ATOMIC_OP_RETURN(op, c_op)				\
->  static inline int atomic_##op##_return(int i, atomic_t *v)	\
->  {								\
-> -- 
-> 2.1.4
-> 
+Hi Maxime,
 
-Please ignore previous mail.
-Applied this fix.
+Dne sreda, 11. julij 2018 ob 10:30:36 CEST je Maxime Ripard napisal(a):
+> On Tue, Jul 10, 2018 at 10:34:53PM +0200, Jernej Skrabec wrote:
+> > This series fixes several issues found in R40 HDMI patch series after
+> > it was applied. Conversation can be found here:
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/586011.htm
+> > l
+> > 
+> > Patches are based on latest linux-next (next-20180710) and are ordered
+> > in such way that they don't break R40 HDMI at any time. Because of that
+> > I suggest that whole series goes through drm-misc to preserve that order.
+> > 
+> > I also tested those patches on H3 to make sure it doesn't break other
+> > platforms. However, it would be nice to test for regressions also on
+> > older SoCs (with DE1).
+> > 
+> > Best regards,
+> > Jernej
+> 
+> Applied all patches but the patch 10, thanks!
+> Maxime
 
-Thanks.
+It seems that you forgot to merge some patches:
 
--- 
-Yosinori Sato
+[PATCH v2 12/18] drm/sun4i: tcon: Add another way for matching mixers with 
+tcon
+[PATCH v2 13/18] drm/sun4i: tcon: Add support for R40 TCON
+
+Without them, R40 display pipeline can't work.
+
+Maybe they are in your spam folder?
+
+Best regards,
+Jernej
