@@ -1,69 +1,43 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 22 Jul 2018 13:39:55 +0800
-Subject: [PATCH 5/5] arm64: allwinner: h6: add support for the Ethernet on
- Pine H64
-In-Reply-To: <20180722053955.25266-1-icenowy@aosc.io>
-References: <20180722053955.25266-1-icenowy@aosc.io>
-Message-ID: <20180722053955.25266-6-icenowy@aosc.io>
+Date: Sun, 22 Jul 2018 13:57:30 +0800
+Subject: [PATCH v3 0/9] Allwinner H6 USB support
+Message-ID: <20180722055739.26464-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Pine H64 board has an Ethernet port, which is connected to a
-RTL8211E PHY, then the PHY is connected to the MAC on H6 SoC.
+This patchset introduces support for the USB ports (both USB2 and USB3)
+on the Allwinner H6 SoC.
 
-Add support for the Ethernet port.
+This revision adds the USB2 support, and places it before the USB3
+support. So only the USB3 part will have changelog in this revision.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 29 +++++++++++++++++++
- 1 file changed, 29 insertions(+)
+The first 5 PATCHes are the USB2 part, and the latter 4 PATCHes are the
+USB3 part.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-index ceffc40810ee..b168b3b8a9ad 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-@@ -14,6 +14,7 @@
- 	compatible = "pine64,pine-h64", "allwinner,sun50i-h6";
- 
- 	aliases {
-+		ethernet0 = &emac;
- 		serial0 = &uart0;
- 	};
- 
-@@ -39,6 +40,34 @@
- 			gpios = <&r_pio 0 7 GPIO_ACTIVE_HIGH>; /* PL7 */
- 		};
- 	};
-+
-+	reg_gmac_3v3: gmac-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc-gmac-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		gpio = <&pio 2 16 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+};
-+
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ext_rgmii_pins>;
-+	phy-mode = "rgmii";
-+	phy-handle = <&ext_rgmii_phy>;
-+	phy-supply = <&reg_gmac_3v3>;
-+	allwinner,rx-delay-ps = <200>;
-+	allwinner,tx-delay-ps = <200>;
-+	status = "okay";
-+};
-+
-+&mdio {
-+	ext_rgmii_phy: ethernet-phy at 1 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
-+	};
- };
- 
- &mmc0 {
+PATCH 1, 2, 6, 7 should go through the PHY tree, and the remaining
+patches should go through the armsoc tree via sunxi tree.
+
+Icenowy Zheng (9):
+  phy: sun4i-usb: add support for missing USB PHY index
+  phy: sun4i-usb: add support for H6 USB2 PHY
+  arm64: allwinner: dts: h6: add USB2-related device nodes
+  arm64: allwinner: dts: h6: add USB Vbus regulator
+  arm64: allwinner: dts: h6: enable USB2 on Pine H64
+  dt-bindings: phy: add binding for Allwinner USB3 PHY
+  phy: allwinner: add phy driver for USB3 PHY on Allwinner H6 SoC
+  arm64: allwinner: dts: h6: add USB3 device nodes
+  arm64: allwinner: dts: h6: enable USB3 port on Pine H64
+
+ .../bindings/phy/sun50i-usb3-phy.txt          |  24 +++
+ .../boot/dts/allwinner/sun50i-h6-pine-h64.dts |  46 +++++
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi  | 113 ++++++++++
+ drivers/phy/allwinner/Kconfig                 |  13 ++
+ drivers/phy/allwinner/Makefile                |   1 +
+ drivers/phy/allwinner/phy-sun4i-usb.c         |  26 ++-
+ drivers/phy/allwinner/phy-sun50i-usb3.c       | 194 ++++++++++++++++++
+ 7 files changed, 415 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/sun50i-usb3-phy.txt
+ create mode 100644 drivers/phy/allwinner/phy-sun50i-usb3.c
+
 -- 
 2.18.0
