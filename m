@@ -1,14 +1,14 @@
 From: ysato@users.sourceforge.jp (Yoshinori Sato)
-Date: Sun, 22 Jul 2018 22:58:07 +0900
-Subject: [PATCH 1/9] h8300: Don't include linux/kernel.h in asm/atomic.h
-In-Reply-To: <1527159586-8578-2-git-send-email-will.deacon@arm.com>
-References: <1527159586-8578-1-git-send-email-will.deacon@arm.com>
- <1527159586-8578-2-git-send-email-will.deacon@arm.com>
-Message-ID: <87in57fk40.wl-ysato@users.sourceforge.jp>
+Date: Sun, 22 Jul 2018 23:06:41 +0900
+Subject: [PATCH v2 1/9] h8300: Don't include linux/kernel.h in asm/atomic.h
+In-Reply-To: <1527869189-31512-2-git-send-email-will.deacon@arm.com>
+References: <1527869189-31512-1-git-send-email-will.deacon@arm.com>
+ <1527869189-31512-2-git-send-email-will.deacon@arm.com>
+Message-ID: <87fu0bfjpq.wl-ysato@users.sourceforge.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 May 2018 19:59:38 +0900,
+On Sat, 02 Jun 2018 01:06:21 +0900,
 Will Deacon wrote:
 > 
 > linux/kernel.h isn't needed by asm/atomic.h and will result in circular
@@ -52,8 +52,9 @@ Will Deacon wrote:
 > 2.1.4
 > 
 
-Sorry too late reply.
-Applied to h8300-next.
+Please ignore previous mail.
+Applied this fix.
+
 Thanks.
 
 -- 
