@@ -1,50 +1,90 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 21 Jul 2018 23:40:42 -0700
-Subject: [GIT PULL] am654 changes for v4.19 merge window
-In-Reply-To: <20180721220722.43avzbs6ulpsem37@localhost>
-References: <pull-1532152828-552759@atomide.com>
- <20180721220722.43avzbs6ulpsem37@localhost>
-Message-ID: <20180722064041.GM99251@atomide.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Sun, 22 Jul 2018 08:44:32 +0200
+Subject: [PATCH v4 27/35] mtd: rawnand: sm_common: convert driver to
+ nand_scan_with_ids()
+In-Reply-To: <20180720151527.16038-28-miquel.raynal@bootlin.com>
+References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
+ <20180720151527.16038-28-miquel.raynal@bootlin.com>
+Message-ID: <20180722084432.61b579b1@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [180721 22:28]:
-> On Fri, Jul 20, 2018 at 11:05:16PM -0700, Tony Lindgren wrote:
-> > From: "Tony Lindgren" <tony@atomide.com>
-> > 
-> > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-> > 
-> >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-> > 
-> > are available in the Git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/am654-for-v4.19-signed
-> > 
-> > for you to fetch changes up to d0a064bec75e20a526c7bc0d626912f2660b6e81:
-> > 
-> >   arm64: dts: ti: Add support for AM654 EVM base board (2018-07-18 11:48:36 -0700)
-> > 
-> > ----------------------------------------------------------------
-> > TI AM654 support for v4.19 merge window
-> > 
-> > This branch adds initial support for new Texas Instruments AM654
-> > quad core A53 ARMv8 SoC. It's the first device for TI K3 multicore SoC
-> > architecture.
-> > 
-> > Initially only basic devices are configured, support for more devices
-> > will follow later on. And many of the internal devices familiar from
-> > earlier TI SoCs should work with existing kernel device drivers.
+On Fri, 20 Jul 2018 17:15:19 +0200
+Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+
+> Two helpers have been added to the core to make ECC-related
+> configuration between the detection phase and the final NAND scan. Use
+> these hooks and convert the driver to just use nand_scan_with_ids()
+> (alternative to nand_scan() for passing a flash IDs table) instead of
+> both nand_scan_ident() and nand_scan_tail().
 > 
-> I squinted a bit and merged this into next/dt. Might have been a bit cleaner to
-> split it in a SoC and a DT branch, but either way it's pretty small changes.
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 
-OK yeah I could have done a separate branch for Kconfig changes.
+Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
 
-> Should the support be enabled in arm64's defconfig?
-
-Yes it should, Nishanth, care to check Linux next once your
-patches are merged and send a patch for that?
-
-Regards,
-
-Tony
+> ---
+>  drivers/mtd/nand/raw/sm_common.c | 39 +++++++++++++++++++++++++--------------
+>  1 file changed, 25 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/raw/sm_common.c b/drivers/mtd/nand/raw/sm_common.c
+> index 7f5044a79f01..d05e3f976a5e 100644
+> --- a/drivers/mtd/nand/raw/sm_common.c
+> +++ b/drivers/mtd/nand/raw/sm_common.c
+> @@ -160,19 +160,9 @@ static struct nand_flash_dev nand_xd_flash_ids[] = {
+>  	{NULL}
+>  };
+>  
+> -int sm_register_device(struct mtd_info *mtd, int smartmedia)
+> +static int sm_attach_chip(struct nand_chip *chip)
+>  {
+> -	struct nand_chip *chip = mtd_to_nand(mtd);
+> -	int ret;
+> -
+> -	chip->options |= NAND_SKIP_BBTSCAN;
+> -
+> -	/* Scan for card properties */
+> -	ret = nand_scan_ident(mtd, 1, smartmedia ?
+> -		nand_smartmedia_flash_ids : nand_xd_flash_ids);
+> -
+> -	if (ret)
+> -		return ret;
+> +	struct mtd_info *mtd = nand_to_mtd(chip);
+>  
+>  	/* Bad block marker position */
+>  	chip->badblockpos = 0x05;
+> @@ -187,12 +177,33 @@ int sm_register_device(struct mtd_info *mtd, int smartmedia)
+>  	else
+>  		return -ENODEV;
+>  
+> -	ret = nand_scan_tail(mtd);
+> +	return 0;
+> +}
+>  
+> +static const struct nand_controller_ops sm_controller_ops = {
+> +	.attach_chip = sm_attach_chip,
+> +};
+> +
+> +int sm_register_device(struct mtd_info *mtd, int smartmedia)
+> +{
+> +	struct nand_chip *chip = mtd_to_nand(mtd);
+> +	struct nand_flash_dev *flash_ids;
+> +	int ret;
+> +
+> +	chip->options |= NAND_SKIP_BBTSCAN;
+> +
+> +	/* Scan for card properties */
+> +	chip->dummy_controller.ops = &sm_controller_ops;
+> +	flash_ids = smartmedia ? nand_smartmedia_flash_ids : nand_xd_flash_ids;
+> +	ret = nand_scan_with_ids(mtd, 1, flash_ids);
+>  	if (ret)
+>  		return ret;
+>  
+> -	return mtd_device_register(mtd, NULL, 0);
+> +	ret = mtd_device_register(mtd, NULL, 0);
+> +	if (ret)
+> +		nand_release(mtd);
+> +
+> +	return ret;
+>  }
+>  EXPORT_SYMBOL_GPL(sm_register_device);
+>  
