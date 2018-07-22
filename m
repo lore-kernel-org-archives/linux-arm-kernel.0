@@ -1,41 +1,73 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Sun, 22 Jul 2018 08:39:21 +0200
-Subject: [PATCH v6 3/5] dt-bindings: mailbox: imx-mu: add generic MU channel
- support
-In-Reply-To: <20180722063923.30222-1-o.rempel@pengutronix.de>
-References: <20180722063923.30222-1-o.rempel@pengutronix.de>
-Message-ID: <20180722063923.30222-4-o.rempel@pengutronix.de>
+Date: Sun, 22 Jul 2018 08:39:18 +0200
+Subject: [PATCH v6 0/5] add mailbox support for i.MX7D
+Message-ID: <20180722063923.30222-1-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each MU has four pairs of rx/tx data register with four rx/tx interrupts
-which can also be used as a separate channel.
+20180622 changes v6:
+- include one more patch provided by Aisheng
+- DT: add fall back compatible fsl,imx6sx-mu
+- imx-mailbox: for now, use only fsl,imx6sx-mu
 
-Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
----
- Documentation/devicetree/bindings/mailbox/fsl,mu.txt | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+20180621 changes v5:
+- DT: revert most of the changes from previous version
+- imx-mailbox: remove struct imx_mu_cfg
+- imx-mailbox: remove !! from imx_mu_last_tx_done()
 
-diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-index 90e4905dfc69..113d6ab931ef 100644
---- a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-+++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-@@ -22,7 +22,14 @@ Required properties:
- - reg :		Should contain the registers location and length
- - interrupts :	Interrupt number. The interrupt specifier format depends
- 		on the interrupt controller parent.
--- #mbox-cells:  Must be 0. Number of cells in a mailbox
-+- #mbox-cells:  Must be:
-+		0 - for single channel mode. i.MX8* SCU protocol specific.
-+		1 - for multichannel (generic) mode.
-+
-+Optional properties:
-+-------------------
-+- clocks :	phandle to the input clock.
-+- fsl,mu-side-b : Should be set for side B MU.
- 
- Examples:
- --------
+20180618 changes v4:
+- DT: change fsl,mu-side-a to fsl,mu-side-b
+- DT: split the patches.
+- DT: add all currently known SoCs.
+- imx-mailbox: free allocated irq name on channel shutdown
+- imx-mailbox: rename *_imx7 functions to *_generic
+
+20180615 changes v3:
+- DT: remove prosaic part of documentation. It describes software
+  or firmware specific usage and not relevant for HW description.
+- DT: use <soc>-mu instead of <soc>-mu-<mu side> and add fsl,mu-side-a
+  parameter.
+- DT: add most of know i.MX variants with MU
+- imx-mailbox: use macros instead of precalculated bit index.
+- imx-mailbox: remove warning message for clk.
+- imx-mailbox: use imx_mu_chan[%idx] for devm_request_irq.
+- imx-mailbox: depend on ARCH_MXC instead of SOX_IMX7
+
+20180615 changes v2:
+- DT: use mailbox@ instead of mu@
+- DT: change interrupts description
+- clk: use imx_clk_gate4 instead of imx_clk_gate2
+- imx-mailbox: remove last_tx_done support
+- imx-mailbox: fix module description 
+
+This patches are providing support for mailbox (Messaging Unit)
+for i.MX7D.
+Functionality was tested on PHYTEC phyBOARD-Zeta i.MX7D with
+Linux running on all cores: ARM Cortex-A7 and ARM Cortex-M4.
+
+Both parts of i.MX messaging Unit are visible for all CPUs available
+on i.MX7D. Communication worked independent of MU side in combination
+with CPU. For example MU-A used on ARM Cortex-A7 and MU-B used on ARM Cortex-M4
+or other ways around.
+
+Dong Aisheng (2):
+  dt-bindings: mailbox: allow mbox-cells to be equal to 0
+  dt-bindings: arm: fsl: add mu binding doc
+
+Oleksij Rempel (3):
+  dt-bindings: mailbox: imx-mu: add generic MU channel support
+  ARM: dts: imx7s: add i.MX7 messaging unit support
+  mailbox: Add support for i.MX7D messaging unit
+
+ .../devicetree/bindings/mailbox/fsl,mu.txt    |  41 +++
+ .../devicetree/bindings/mailbox/mailbox.txt   |   3 +-
+ arch/arm/boot/dts/imx7s.dtsi                  |  19 ++
+ drivers/mailbox/Kconfig                       |   6 +
+ drivers/mailbox/Makefile                      |   2 +
+ drivers/mailbox/imx-mailbox.c                 | 273 ++++++++++++++++++
+ 6 files changed, 342 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+ create mode 100644 drivers/mailbox/imx-mailbox.c
+
 -- 
 2.18.0
