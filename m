@@ -1,15 +1,15 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sun, 22 Jul 2018 22:47:46 +0200
-Subject: [GIT PULL] dts32 commits for v4.19
-Message-ID: <2d918d15-d1d3-b4e0-7427-0b3baa56100a@gmail.com>
+Date: Sun, 22 Jul 2018 22:51:53 +0200
+Subject: [GIT PULL] ARM: mediatek: soc commits for v4.19
+Message-ID: <9fdbdba4-c2e0-510d-62bb-e0a604942e19@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-Hi Arnd,
+Hi Arnd, hi Olof,
 
-Please take into account the following patches.
-Thanks a lot,
+Please don't forget the following commits.
+
+Best regards,
 Matthias
 
 ---
@@ -21,30 +21,20 @@ The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 are available in the Git repository at:
 
   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-v4.18-next/dts32
+v4.18-next/soc
 
-for you to fetch changes up to 11a20c5601c5f0c685fa3a166348b7ffa830e123:
+for you to fetch changes up to 00673189b8b971c00417632ffe4c90ba9b4f2568:
 
-  dt-bindings: arm: mediatek: cleanup MT7623N reference boards (2018-07-16
-15:57:40 +0200)
+  soc: mediatek: pwrap: add mt6351 driver for mt6797 SoCs (2018-07-16 15:50:17
++0200)
 
 ----------------------------------------------------------------
-Frank Wunderlich (1):
-      arm: dts: mediatek: Fix pio-leds for Bananapi-R2
+Argus Lin (4):
+      dt-bindings: pwrap: mediatek: add pwrap support for MT6797
+      soc: mediatek: pwrap: fix cipher init setting error
+      soc: mediatek: pwrap: add pwrap driver for mt6797 SoCs
+      soc: mediatek: pwrap: add mt6351 driver for mt6797 SoCs
 
-Ryder Lee (2):
-      arm: dts: mt7623: cleanup MT7623N NAND dts file
-      dt-bindings: arm: mediatek: cleanup MT7623N reference boards
-
-Viresh Kumar (1):
-      arm: dts: mediatek: Add missing cooling device properties for CPUs
-
- Documentation/devicetree/bindings/arm/mediatek.txt |  3 -
- arch/arm/boot/dts/Makefile                         |  1 -
- arch/arm/boot/dts/mt7623.dtsi                      |  3 +
- arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts      |  6 +-
- arch/arm/boot/dts/mt7623n-rfb-nand.dts             | 73 ------------------
- arch/arm/boot/dts/mt7623n-rfb.dtsi                 | 86 ----------------------
- 6 files changed, 6 insertions(+), 166 deletions(-)
- delete mode 100644 arch/arm/boot/dts/mt7623n-rfb-nand.dts
- delete mode 100644 arch/arm/boot/dts/mt7623n-rfb.dtsi
+ .../devicetree/bindings/soc/mediatek/pwrap.txt     |  1 +
+ drivers/soc/mediatek/mtk-pmic-wrap.c               | 81 +++++++++++++++++++++-
+ 2 files changed, 80 insertions(+), 2 deletions(-)
