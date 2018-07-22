@@ -1,24 +1,54 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 22 Jul 2018 17:08:12 +0200
-Subject: [PATCHv2] ARM: dts: exynos5: add missing interrupts for pwm node
-In-Reply-To: <1531918767-7177-1-git-send-email-linux.amoon@gmail.com>
-References: <1531918767-7177-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <20180722150812.dmk2qmhp3jwejt3b@kozik-lap>
+From: gajjar04akash@gmail.com (Akash Gajjar)
+Date: Sun, 22 Jul 2018 21:16:49 +0530
+Subject: [PATCH] arm64: activate spi flash on pine64 LTS board
+In-Reply-To: <Akash_Gajjar@mentor.com>
+References: <Akash_Gajjar@mentor.com>
+Message-ID: <1532274409-9921-1-git-send-email-Akash_Gajjar@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 12:59:27PM +0000, Anand Moon wrote:
-> Add missing GIC interrupts property for pwm nodes.
-> 
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> ---
-> Fixed the patch indentation issue with all tabs.
-> sorry checkpatch could not figure out the error.
-> ---
->  arch/arm/boot/dts/exynos5.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
+This board has a 128M SPI flash. add spi flash support in device tree.
 
-Thanks, applied with fixed subsystem prefix in subject and indentation.
+Tested on pine64 LTS.
 
-Best regards,
-Krzysztof
+Signed-off-by: Akash Gajjar <Akash_Gajjar@mentor.com>
+---
+ .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+index abe179d..d54637d 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+@@ -134,6 +134,29 @@
+ 	regulator-name = "vcc-wifi";
+ };
+ 
++&spi0  {
++	status = "okay";
++
++	m25p80 at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "w25q128";
++		reg = <0x0>;
++		linux,modalias = "m25p80", "w25q128";
++		spi-max-frequency = <40000000>;
++
++		uboot at 0 {
++			label = "uboot";
++			reg = <0x0 0x100000>;
++		};
++
++		rootfs at 0 {
++			label = "rootfs";
++			reg = <0x100000 0x7F00000>;
++		};
++	};
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+-- 
+2.7.4
