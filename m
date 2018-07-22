@@ -1,97 +1,89 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Sun, 22 Jul 2018 10:44:31 +0000
-Subject: [PATCH v6 0/5] add mailbox support for i.MX7D
-In-Reply-To: <20180722063923.30222-1-o.rempel@pengutronix.de>
-References: <20180722063923.30222-1-o.rempel@pengutronix.de>
-Message-ID: <AM0PR04MB4211B82FD69B41B27465F5E580570@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sun, 22 Jul 2018 12:10:08 +0200
+Subject: [PATCH] ARM: dts: rmobile: Drop MTD partitioning from DT
+In-Reply-To: <CAOesGMhAeRLf2fyw-igPBBCzoehcyT9fckVGuY=r8rjmdy-szg@mail.gmail.com>
+References: <20180530101130.3566-1-marek.vasut+renesas@gmail.com>
+ <CAOesGMjmz41p5sF_xnC7gdSRNLaowXPW7Sk8HBZww_QSTvXV7g@mail.gmail.com>
+ <3b6f71da-8d63-1a63-dc61-05c12d52a2db@gmail.com>
+ <CAOesGMhVbSGmkkF-Va6zwOB4xXxj=HpccKeFYgVLO4D86Vo4ow@mail.gmail.com>
+ <5842740e-e652-aa51-ec2b-51f37a011a07@gmail.com>
+ <CAOesGMhAeRLf2fyw-igPBBCzoehcyT9fckVGuY=r8rjmdy-szg@mail.gmail.com>
+Message-ID: <9c77d8ae-637f-9713-83e3-3b40288b4b58@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oleksij,
+On 07/22/2018 12:23 AM, Olof Johansson wrote:
+[...]
+>>>>> You end up with user space tools trying to parse the kernel command
+>>>>> line to figure out what's on the flash, and other really bad habits.
+>>>>> :(
+>>>>
+>>>> You should just read /proc/mtd , see
+>>>> http://www.linux-mtd.infradead.org/doc/general.html
+>>>
+>>> Sure, I know that but not everybody does, and they do it in bad ways
+>>> if given the opportunity.
+>>
+>> That's what the documentation is for. I assume whoever is using MTD is
+>> also capable of reading the documentation and thus avoiding such basic
+>> mistakes.
+> 
+> Why read the docs when the information obviously is there when you grep it?
 
-Thanks for the work.
+To do things correctly of course.
 
-Hi Jassi,
-Do you think if we can have your tag and let those patches go through
-Shawn's tree as the later QXP support patches depends on them?
+> I'm agreeing with you -- I've just seen it done wrong so many times.
+> Making it harder to make mistakes is always a good thing.
 
-Regards
-Dong Aisheng
+If you follow this argument through, you could say we should start
+plucking out random files from /proc because someone might cluelessly
+misuse them. This might lead to a system that's hard to misuse indeed,
+but likely also quite useless.
 
-> -----Original Message-----
-> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
-> Sent: Sunday, July 22, 2018 2:39 PM
-> To: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
-> <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark
-> Rutland <mark.rutland@arm.com>; A.s. Dong <aisheng.dong@nxp.com>;
-> Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> Cc: Oleksij Rempel <o.rempel@pengutronix.de>; kernel at pengutronix.de;
-> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; dl-linux-
-> imx <linux-imx@nxp.com>
-> Subject: [PATCH v6 0/5] add mailbox support for i.MX7D
+>>>>> I'd strongly advice you to keep this in the board files, unless you
+>>>>> have an actual real motivation for changing it. This patch does not
+>>>>> provide one.
+>>>>
+>>>> Partitioning is not hardware description, it should not be in DT.
+>>>
+>>> Read my reply again. It's part of _platform_ description, and belongs in DT.
+>>
+>> I can repartition the flash whichever way I want for my purposes, just
+>> like I can repartition a harddrive. We don't have harddrive partitioning
+>> in the DT, why should we have flash partitioning there ? How do those
+>> differ ?
 > 
-> 20180622 changes v6:
-> - include one more patch provided by Aisheng
-> - DT: add fall back compatible fsl,imx6sx-mu
-> - imx-mailbox: for now, use only fsl,imx6sx-mu
+> A drive can be auto-probed. We have partition tables on the disk that
+> self-describes the contents.
 > 
-> 20180621 changes v5:
-> - DT: revert most of the changes from previous version
-> - imx-mailbox: remove struct imx_mu_cfg
-> - imx-mailbox: remove !! from imx_mu_last_tx_done()
-> 
-> 20180618 changes v4:
-> - DT: change fsl,mu-side-a to fsl,mu-side-b
-> - DT: split the patches.
-> - DT: add all currently known SoCs.
-> - imx-mailbox: free allocated irq name on channel shutdown
-> - imx-mailbox: rename *_imx7 functions to *_generic
-> 
-> 20180615 changes v3:
-> - DT: remove prosaic part of documentation. It describes software
->   or firmware specific usage and not relevant for HW description.
-> - DT: use <soc>-mu instead of <soc>-mu-<mu side> and add fsl,mu-side-a
->   parameter.
-> - DT: add most of know i.MX variants with MU
-> - imx-mailbox: use macros instead of precalculated bit index.
-> - imx-mailbox: remove warning message for clk.
-> - imx-mailbox: use imx_mu_chan[%idx] for devm_request_irq.
-> - imx-mailbox: depend on ARCH_MXC instead of SOX_IMX7
-> 
-> 20180615 changes v2:
-> - DT: use mailbox@ instead of mu@
-> - DT: change interrupts description
-> - clk: use imx_clk_gate4 instead of imx_clk_gate2
-> - imx-mailbox: remove last_tx_done support
-> - imx-mailbox: fix module description
-> 
-> This patches are providing support for mailbox (Messaging Unit) for i.MX7D.
-> Functionality was tested on PHYTEC phyBOARD-Zeta i.MX7D with Linux
-> running on all cores: ARM Cortex-A7 and ARM Cortex-M4.
-> 
-> Both parts of i.MX messaging Unit are visible for all CPUs available on i.MX7D.
-> Communication worked independent of MU side in combination with CPU.
-> For example MU-A used on ARM Cortex-A7 and MU-B used on ARM Cortex-
-> M4 or other ways around.
-> 
-> Dong Aisheng (2):
->   dt-bindings: mailbox: allow mbox-cells to be equal to 0
->   dt-bindings: arm: fsl: add mu binding doc
-> 
-> Oleksij Rempel (3):
->   dt-bindings: mailbox: imx-mu: add generic MU channel support
->   ARM: dts: imx7s: add i.MX7 messaging unit support
->   mailbox: Add support for i.MX7D messaging unit
-> 
->  .../devicetree/bindings/mailbox/fsl,mu.txt    |  41 +++
->  .../devicetree/bindings/mailbox/mailbox.txt   |   3 +-
->  arch/arm/boot/dts/imx7s.dtsi                  |  19 ++
->  drivers/mailbox/Kconfig                       |   6 +
->  drivers/mailbox/Makefile                      |   2 +
->  drivers/mailbox/imx-mailbox.c                 | 273 ++++++++++++++++++
->  6 files changed, 342 insertions(+), 2 deletions(-)  create mode 100644
-> Documentation/devicetree/bindings/mailbox/fsl,mu.txt
->  create mode 100644 drivers/mailbox/imx-mailbox.c
-> 
-> --
-> 2.18.0
+> That doesn't exist on flashes, at least not usually. This is really
+> unfortunate, I wish we could change _that_ instead of argue here.
+
+Technically it does. Consider the fact that those flashes have between
+4-64 MiB in size and sector size of 256 kiB . If you waste one sector on
+the 4 MiB flash for some sort of partition table, you waste 1/16th of
+the flash, which is a lot.
+
+The bootloader needs to know the flash layout and it must be in sync
+with the kernel, so there has to be some sort of communication channel
+between those two. I don't want to add handler for every possible
+bootloader that can be used on those platforms into the kernel though.
+
+> If you repartition your disk, you need to change the command line
+> arguments to the kernel too. It's definitely not an argument to
+> keeping it on the command line instead.
+
+How so ? /dev/sdxy remains /dev/sdxy . Sure, you can use UUID and change
+it, but that's a specific case.
+
+> Also, you now have a dependencies between hardware description, probe
+> order and stable naming in the kernel, and the command line. With DT,
+> you have it all in one place, right next to the flash part. It doesn't
+> matter what name it gets probed at, and nobody needs to know the
+> mapping to get it right.
+
+In this case it doesn't matter either, since you have only one flash device.
+
+-- 
+Best regards,
+Marek Vasut
