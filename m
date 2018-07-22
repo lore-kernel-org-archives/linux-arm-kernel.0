@@ -1,38 +1,54 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Sat, 21 Jul 2018 22:41:18 -0700
-Subject: [PATCH v7 01/10] counter: Introduce the Generic Counter interface
-In-Reply-To: <20180721162610.GA15622@sophia>
-References: <cover.1529607879.git.vilhelm.gray@gmail.com>
- <51b75b2b4495d4ad7ed173d91a726379bdae2353.1529607879.git.vilhelm.gray@gmail.com>
- <20180717204954.4b5e371603d0b40b2aaabbb8@linux-foundation.org>
- <20180721162610.GA15622@sophia>
-Message-ID: <20180721224118.ff26734be0f5db552afcbe7c@linux-foundation.org>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sun, 22 Jul 2018 13:39:53 +0800
+Subject: [PATCH 3/5] arm64: allwinner: h6: add system controller device tree
+ node
+In-Reply-To: <20180722053955.25266-1-icenowy@aosc.io>
+References: <20180722053955.25266-1-icenowy@aosc.io>
+Message-ID: <20180722053955.25266-4-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 21 Jul 2018 12:26:10 -0400 William Breathitt Gray <vilhelm.gray@gmail.com> wrote:
+As we have already binding for the H6 system controller, add its node
+to the device tree.
 
-> >Also, many many drivers deal with signals-as-an-electrical-thing - is
-> >it appropriate for this particular driver to take that namespace?
-> 
-> In the context of the Generic Counter paradigm, a "Signal" is an
-> abstraction for the stream of data that is fed to the counter device for
-> evaluation (triggering updates for the readable "Count"). In many cases
-> a "Signal" correlates with a physical electrical line (for example the A
-> and B electrical lines for a quadrature encoder), but this isn't a hard
-> requirement as the paradigm permits more abstract data streams.
-> 
-> I decided on "Signal" to match the naming convention that appears in the
-> datasheets of many counter devices, but "Line" may be a decent
-> alternative name we could use to indicate a counter device input data
-> stream.
-> 
-> I'd like to get some other opinions as well before I make a naming
-> change to "Signal" -- whether to stay with "Signal," switch to "Line," or
-> rename to something else. For what it's worth, I think it's unlikely for
-> a counter device driver author to confuse a Counter Signal with the
-> Linux OS signal within the context of the Generic Counter paradigm and
-> their respective counter device datasheet.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 23 ++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-gc_signal_* would be better.  That retains "signal", but makes
-it clear that the symbols belong to generic counter.
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+index cfa5fffcf62b..3ab6cf0256ca 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+@@ -92,6 +92,29 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		syscon: syscon at 3000000 {
++			compatible = "allwinner.sun50i-h6-system-control",
++				     "allwinner,sun50i-a64-system-control";
++			reg = <0x03000000 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			sram_c: sram at 28000 {
++				compatible = "mmio-sram";
++				reg = <0x00028000 0x1e000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x00028000 0x1e000>;
++
++				de2_sram: sram-section at 0 {
++					compatible = "allwinner,sun50i-h6-sram-c",
++						     "allwinner,sun50i-a64-sram-c";
++					reg = <0x0000 0x1e000>;
++				};
++			};
++		};
++
+ 		ccu: clock at 3001000 {
+ 			compatible = "allwinner,sun50i-h6-ccu";
+ 			reg = <0x03001000 0x1000>;
+-- 
+2.18.0
