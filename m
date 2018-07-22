@@ -1,45 +1,41 @@
 From: vilhelm.gray@gmail.com (William Breathitt Gray)
-Date: Sun, 22 Jul 2018 18:51:55 -0400
-Subject: [PATCH v9 10/11] dt-bindings: counter: Adjust dt-bindings for STM32
- lptimer move
+Date: Sun, 22 Jul 2018 18:50:45 -0400
+Subject: [PATCH v9 04/11] iio: 104-quad-8: Update license boilerplate
 In-Reply-To: <cover.1532298882.git.vilhelm.gray@gmail.com>
 References: <cover.1532298882.git.vilhelm.gray@gmail.com>
-Message-ID: <45406263819b9877c8aa8dca32e8f13e79957293.1532298882.git.vilhelm.gray@gmail.com>
+Message-ID: <0dbd90bb4f6e92d263e9e41e12a1662eed16c52c.1532298882.git.vilhelm.gray@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrice Gasnier <fabrice.gasnier@st.com>
+This patch simplifies the boilerplate license text by making use of a
+SPDX license identifier line.
 
-The STM32 LP Timer counter driver now resides under the Counter
-subsystem. This patch adjusts dt-bindings to account for the STM32
-lptimer driver move.
-
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: William Breathitt Gray <vilhelm.gray@gmail.com>
 ---
- .../devicetree/bindings/{iio => }/counter/stm32-lptimer-cnt.txt | 0
- Documentation/devicetree/bindings/mfd/stm32-lptimer.txt         | 2 +-
- 2 files changed, 1 insertion(+), 1 deletion(-)
- rename Documentation/devicetree/bindings/{iio => }/counter/stm32-lptimer-cnt.txt (100%)
+ drivers/iio/counter/104-quad-8.c | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/iio/counter/stm32-lptimer-cnt.txt b/Documentation/devicetree/bindings/counter/stm32-lptimer-cnt.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/iio/counter/stm32-lptimer-cnt.txt
-rename to Documentation/devicetree/bindings/counter/stm32-lptimer-cnt.txt
-diff --git a/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
-index 2a9ff29db9c9..fb54e4dad5b3 100644
---- a/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
-+++ b/Documentation/devicetree/bindings/mfd/stm32-lptimer.txt
-@@ -16,7 +16,7 @@ Required properties:
- 
- Optional subnodes:
- - pwm:			See ../pwm/pwm-stm32-lp.txt
--- counter:		See ../iio/timer/stm32-lptimer-cnt.txt
-+- counter:		See ../counter/stm32-lptimer-cnt.txt
- - trigger:		See ../iio/timer/stm32-lptimer-trigger.txt
- 
- Example:
+diff --git a/drivers/iio/counter/104-quad-8.c b/drivers/iio/counter/104-quad-8.c
+index 92be8d0f7735..72b6352e09f0 100644
+--- a/drivers/iio/counter/104-quad-8.c
++++ b/drivers/iio/counter/104-quad-8.c
+@@ -1,16 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * IIO driver for the ACCES 104-QUAD-8
+  * Copyright (C) 2016 William Breathitt Gray
+  *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License, version 2, as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License for more details.
+- *
+  * This driver supports the ACCES 104-QUAD-8 and ACCES 104-QUAD-4.
+  */
+ #include <linux/bitops.h>
 -- 
 2.18.0
