@@ -1,63 +1,140 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Mon, 23 Jul 2018 15:21:46 -0700
-Subject: [PATCH v7 08/12] mfd: intel-peci-client: Add PECI client MFD
- driver
-In-Reply-To: <20180723214751.1733-9-jae.hyun.yoo@linux.intel.com>
-References: <20180723214751.1733-1-jae.hyun.yoo@linux.intel.com>
- <20180723214751.1733-9-jae.hyun.yoo@linux.intel.com>
-Message-ID: <c1abe3ec-fc26-d8b0-c769-e9295577ac05@infradead.org>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 23 Jul 2018 23:28:07 +0100
+Subject: [PATCH v2 09/10] coresight: perf: Remove set_buffer call back
+In-Reply-To: <CANLsYkyN_+uTJZh7YEBPtMPvb8uQNwXvCwn_N4+D12xOVc=MNg@mail.gmail.com>
+References: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
+ <1531847501-22226-10-git-send-email-suzuki.poulose@arm.com>
+ <20180719203630.GC9421@xps15> <a68cff9d-51d3-7d86-0a73-c1d3cbbaced3@arm.com>
+ <CANLsYkyN_+uTJZh7YEBPtMPvb8uQNwXvCwn_N4+D12xOVc=MNg@mail.gmail.com>
+Message-ID: <2f646ecb-8150-d184-4d94-d2855ddfafd1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2018 02:47 PM, Jae Hyun Yoo wrote:
-> This commit adds PECI client MFD driver.
+Mathieu,
+
+On 07/23/2018 07:22 PM, Mathieu Poirier wrote:
+> On Fri, 20 Jul 2018 at 03:04, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+>>
+>> Mathieu,
+>>
+>> On 19/07/18 21:36, Mathieu Poirier wrote:
+>>> On Tue, Jul 17, 2018 at 06:11:40PM +0100, Suzuki K Poulose wrote:
+>>>> In coresight perf mode, we need to prepare the sink before
+>>>> starting a session, which is done via set_buffer call back.
+>>>> We then proceed to enable the tracing. If we fail to start
+>>>> the session successfully, we leave the sink configuration
+>>>> unchanged. This was fine for the existing backends as they
+>>>> don't have any state associated with the buffers. But with
+>>>> ETR, we need to keep track of the buffer details and need
+>>>> to be cleaned up if we fail. In order to make the operation
+>>>> atomic and to avoid yet another call back, we get rid of
+>>>> the "set_buffer" call back and pass the buffer details
+>>>> via enable() call back to the sink.
+>>>
+>>> Suzuki,
+>>>
+>>> I'm not sure I understand the problem you're trying to fix there.  From the
+>>> implementation of tmc_enable_etr_sink_perf() in the next patch, wouldn't the
+>>> same result been achievable using a callback?
+>>
+>> We can definitely achieve the results using "set_buffer". But for ETR,
+>> we track the "perf_buf" in drvdata->perf_data when we do "set_buffer".
+>> But if we failed to enable_path(), we leave the drvdata->perf_data
+>> and doesn't clean it up. Now when another session is about to set_buf,
+>> we check if perf_data is empty and WARNs otherwise.
+>> Because we can't be sure if it belongs to an abandoned session or
+>> another active session and we completely messed somewhere in the driver.
+>> So, we need a clear_buffer call back if the enable fails, something
+>> not really worth. Anyways, there is no point in separating set_buffer
+>> and enabling the sink, as the error handling becomes cumbersome as explained
+>> above.
+>>
+>>>
+>>> I'm fine with this patch and supportive of getting rid of callbacks if we can, I
+>>> just need to understand the exact problem you're after.  From looking a your
+>>> code (and the current implementation), if we succeed in setting the memory for
+>>> the sink but fail in any of the subsequent steps i.e, enabling the rest of the
+>>> compoment on the path or the source, the sink is left unchanged.
+>>
+>> Yes, thats right. And we should WARN (which I missed in this version) if
+>> there is a perf_data already for a disabled ETR. Please see my response to the
+>> next patch.
 > 
-> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Andrew Jeffery <andrew@aj.id.au>
-> Cc: James Feist <james.feist@linux.intel.com>
-> Cc: Jason M Biils <jason.m.bills@linux.intel.com>
-> Cc: Joel Stanley <joel@jms.id.au>
-> Cc: Vernon Mauery <vernon.mauery@linux.intel.com>
-> ---
->  drivers/mfd/Kconfig                   |  14 ++
->  drivers/mfd/Makefile                  |   1 +
->  drivers/mfd/intel-peci-client.c       | 182 ++++++++++++++++++++++++++
->  include/linux/mfd/intel-peci-client.h |  81 ++++++++++++
->  4 files changed, 278 insertions(+)
->  create mode 100644 drivers/mfd/intel-peci-client.c
->  create mode 100644 include/linux/mfd/intel-peci-client.h
+> The changelog for this patch states the following: "But with ETR, we
+> need to keep track of the buffer details and need to be cleaned up if
+> we fail."
 > 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index f3fa516011ec..e38b591479d4 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -595,6 +595,20 @@ config MFD_INTEL_MSIC
->  	  Passage) chip. This chip embeds audio, battery, GPIO, etc.
->  	  devices used in Intel Medfield platforms.
->  
-> +config MFD_INTEL_PECI_CLIENT
-> +	bool "Intel PECI client"
-> +	depends on (PECI || COMPILE_TEST)
-> +	select MFD_CORE
-> +	help
-> +	  If you say yes to this option, support will be included for the
-> +	  multi-funtional Intel PECI (Platform Environment Control Interface)
+> I did a deep dive in the code and in the current implementation if the
+> source fails to be enabled in etm_event_start() the path and the sink
+> remains unchanged.  With your patchset this get fixed because a goto
+> was added to disable the path when such condition occur.  As such each
+> component in the path will see its ->disable() callback invoked.  In
+> tmc_disable_etr_sink(), drvdata->perf_data is set to NULL in
+> tmc_etr_disable_hw(), so the cleanup on error condition is done
+> properly.  As such we wouldn't need a clean_buffer() callback.
 
-	  multi-functional
+All of this is right. But we still have a case. e.g, if the ETR is
+enabled in sysfs mode, coresight_enable_path() will fail after we
+have set the buffer. And since we don't try to disable the path
+when we fail at SINK (which is the right thing to do, as we could
+be potentially disabling the ETR operated in sysfs mode), we leave
+the perf_data around. And the next session finds a non-empty data.
 
-> +	  client. PECI is a one-wire bus interface that provides a communication
-> +	  channel from PECI clients in Intel processors and chipset components
-> +	  to external monitoring or control devices.
-> +
-> +	  Additional drivers must be enabled in order to use the functionality
-> +	  of the device.
-> +
->  config MFD_IPAQ_MICRO
->  	bool "Atmel Micro ASIC (iPAQ h3100/h3600/h3700) Support"
->  	depends on SA1100_H3100 || SA1100_H3600
+> 
+> As I said I'm in favour of removing the set_buffer() callback but I
+> wouldn't associated it with ETR state cleanup.  If the code can be
+> rearranged in a way that code can be removed then that alone is enough
+> to justify the change.
+> 
+>>
+>>>> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+>>>> index 3cc4a0b..12a247d 100644
+>>>> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+>>>> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+>>>> @@ -269,16 +269,11 @@ static void etm_event_start(struct perf_event *event, int flags)
+>>>>       path = etm_event_cpu_path(event_data, cpu);
+>>>>       /* We need a sink, no need to continue without one */
+>>>>       sink = coresight_get_sink(path);
+>>>> -    if (WARN_ON_ONCE(!sink || !sink_ops(sink)->set_buffer))
+>>>> -            goto fail_end_stop;
+>>>> -
+>>>> -    /* Configure the sink */
+>>>> -    if (sink_ops(sink)->set_buffer(sink, handle,
+>>>> -                                   event_data->snk_config))
+>>>> +    if (WARN_ON_ONCE(!sink))
+>>>>               goto fail_end_stop;
+>>>>
+>>>>       /* Nothing will happen without a path */
+>>>> -    if (coresight_enable_path(path, CS_MODE_PERF))
+>>>> +    if (coresight_enable_path(path, CS_MODE_PERF, handle))
+>>>
+>>> Here we already have a handle on "event_data".  As such I think this is what we
+>>> should feed to coresight_enable_path() rather than the handle.  That way we
+>>> don't need to call etm_perf_sink_config(), we just use the data.
+>>
+>> The advantage of passing on the handle is, we could get all the way upto the
+>> "perf_event" for the given session. Passing the event_data will loose that
+>> information.
+>>
+>> i.e, perf_event-> |perf_ouput_handle | -> |event_data | -> sink_config
+>>                     |  <-event         |    |           |
+>>
+>> The purpose of the wrapper "etm_perf_sink_config()" is to abstract the way we
+>> handle the information under the event_data. i.e, if we decide to make some
+>> changes in the way we store event_data, we need to spill the changes every
+>> where. But the perf_ouput_handle has much more stable ABI than event_data,
+>> hence the choice of passing handle.
+> 
+> I agree that etm_perf_sink_config() has value but it should take a
+> void * as parameter (i.e what gets returned from perf_get_aux())
+> rather than a perf_output_handle *.
+
+Ok, did you mean :
+
+	sink_config = etm_perf_sink_config(perf_get_aux(handle)); ?
+
+Or do you want to change the parameter passed to the enable_sink() as
+well ?
 
 
--- 
-~Randy
+Suzuki
