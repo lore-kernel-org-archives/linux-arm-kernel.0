@@ -1,72 +1,106 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Mon, 23 Jul 2018 15:36:58 -0700
-Subject: [PATCH v7 08/12] mfd: intel-peci-client: Add PECI client MFD
- driver
-In-Reply-To: <c1abe3ec-fc26-d8b0-c769-e9295577ac05@infradead.org>
-References: <20180723214751.1733-1-jae.hyun.yoo@linux.intel.com>
- <20180723214751.1733-9-jae.hyun.yoo@linux.intel.com>
- <c1abe3ec-fc26-d8b0-c769-e9295577ac05@infradead.org>
-Message-ID: <98051293-6b30-af31-a5c6-56b0e1ac964a@linux.intel.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 23 Jul 2018 15:39:26 -0700
+Subject: [PATCH v3 1/3] Input: edt-ft5x06 - Add support for regulator
+In-Reply-To: <20180718224645.ns7nvqxvqc6huxcz@core>
+References: <20180718182719.29663-1-mylene.josserand@bootlin.com>
+ <20180718182719.29663-2-mylene.josserand@bootlin.com>
+ <20180718224645.ns7nvqxvqc6huxcz@core>
+Message-ID: <20180723223926.GL100814@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Randy,
-
-On 7/23/2018 3:21 PM, Randy Dunlap wrote:
-> On 07/23/2018 02:47 PM, Jae Hyun Yoo wrote:
->> This commit adds PECI client MFD driver.
->>
->> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
->> Cc: Lee Jones <lee.jones@linaro.org>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Andrew Jeffery <andrew@aj.id.au>
->> Cc: James Feist <james.feist@linux.intel.com>
->> Cc: Jason M Biils <jason.m.bills@linux.intel.com>
->> Cc: Joel Stanley <joel@jms.id.au>
->> Cc: Vernon Mauery <vernon.mauery@linux.intel.com>
->> ---
->>   drivers/mfd/Kconfig                   |  14 ++
->>   drivers/mfd/Makefile                  |   1 +
->>   drivers/mfd/intel-peci-client.c       | 182 ++++++++++++++++++++++++++
->>   include/linux/mfd/intel-peci-client.h |  81 ++++++++++++
->>   4 files changed, 278 insertions(+)
->>   create mode 100644 drivers/mfd/intel-peci-client.c
->>   create mode 100644 include/linux/mfd/intel-peci-client.h
->>
->> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
->> index f3fa516011ec..e38b591479d4 100644
->> --- a/drivers/mfd/Kconfig
->> +++ b/drivers/mfd/Kconfig
->> @@ -595,6 +595,20 @@ config MFD_INTEL_MSIC
->>   	  Passage) chip. This chip embeds audio, battery, GPIO, etc.
->>   	  devices used in Intel Medfield platforms.
->>   
->> +config MFD_INTEL_PECI_CLIENT
->> +	bool "Intel PECI client"
->> +	depends on (PECI || COMPILE_TEST)
->> +	select MFD_CORE
->> +	help
->> +	  If you say yes to this option, support will be included for the
->> +	  multi-funtional Intel PECI (Platform Environment Control Interface)
+On Thu, Jul 19, 2018 at 12:46:45AM +0200, Ond?ej Jirman wrote:
+> Hello Myl?ne,
 > 
-> 	  multi-functional
+> On Wed, Jul 18, 2018 at 08:27:17PM +0200, Myl?ne Josserand wrote:
+> > Add the support of regulator to use it as VCC source.
+> > 
+> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> > ---
+> >  .../bindings/input/touchscreen/edt-ft5x06.txt      |  1 +
+> >  drivers/input/touchscreen/edt-ft5x06.c             | 29 ++++++++++++++++++++++
+> >  2 files changed, 30 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
+> > index 025cf8c9324a..48e975b9c1aa 100644
+> > --- a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
+> > +++ b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
+> > @@ -30,6 +30,7 @@ Required properties:
+> >  Optional properties:
+> >   - reset-gpios: GPIO specification for the RESET input
+> >   - wake-gpios:  GPIO specification for the WAKE input
+> > + - vcc-supply:  Regulator that supplies the touchscreen
+> >  
+> >   - pinctrl-names: should be "default"
+> >   - pinctrl-0:   a phandle pointing to the pin settings for the
+> > diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
+> > index 1e18ca0d1b4e..aa94494b06b5 100644
+> > --- a/drivers/input/touchscreen/edt-ft5x06.c
+> > +++ b/drivers/input/touchscreen/edt-ft5x06.c
+> > @@ -39,6 +39,7 @@
+> >  #include <linux/input/mt.h>
+> >  #include <linux/input/touchscreen.h>
+> >  #include <linux/of_device.h>
+> > +#include <linux/regulator/consumer.h>
+> >  
+> >  #define WORK_REGISTER_THRESHOLD		0x00
+> >  #define WORK_REGISTER_REPORT_RATE	0x08
+> > @@ -91,6 +92,7 @@ struct edt_ft5x06_ts_data {
+> >  	struct touchscreen_properties prop;
+> >  	u16 num_x;
+> >  	u16 num_y;
+> > +	struct regulator *vcc;
+> >  
+> >  	struct gpio_desc *reset_gpio;
+> >  	struct gpio_desc *wake_gpio;
+> > @@ -991,6 +993,22 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
+> >  
+> >  	tsdata->max_support_points = chip_data->max_support_points;
+> >  
+> > +	tsdata->vcc = devm_regulator_get(&client->dev, "vcc");
+> > +	if (IS_ERR(tsdata->vcc)) {
+> > +		error = PTR_ERR(tsdata->vcc);
+> > +		if (error != -EPROBE_DEFER)
+> > +			dev_err(&client->dev, "failed to request regulator: %d\n",
+> > +				error);
+> > +		return error;
+> > +	}
+> > +
+> > +	error = regulator_enable(tsdata->vcc);
+> > +	if (error < 0) {
+> > +		dev_err(&client->dev, "failed to enable vcc: %d\n",
+> > +			error);
+> > +		return error;
+> > +	}
+> > +
+> >  	tsdata->reset_gpio = devm_gpiod_get_optional(&client->dev,
+> >  						     "reset", GPIOD_OUT_HIGH);
+> >  	if (IS_ERR(tsdata->reset_gpio)) {
+
+You need to disable regulator here. We do not have
+devm_regulator_enable() (and Mark had some concerns about mixing managed
+and unmanaged APIs for regulators so we can't simply introduce it),
+so I'd recommend using devm_add_action_or_reset() and iunstall custom
+action to turn off regulator.
+
+> > @@ -1120,20 +1138,31 @@ static int edt_ft5x06_ts_remove(struct i2c_client *client)
+> >  static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
+> >  {
+> >  	struct i2c_client *client = to_i2c_client(dev);
+> > +	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
+> >  
+> >  	if (device_may_wakeup(dev))
+> >  		enable_irq_wake(client->irq);
+> >  
+> > +	regulator_disable(tsdata->vcc);
+> > +
 > 
+> How will the touchscreen wakeup the system with interrupt if you power it off
+> on suspend? Perhaps guard this with device_may_wakeup() too? 
 
-Thanks for your pointing it out. Will fix it.
+Exactly, it should be in an "else" branch.
 
-Thanks,
+Thanks.
 
-Jae
-
->> +	  client. PECI is a one-wire bus interface that provides a communication
->> +	  channel from PECI clients in Intel processors and chipset components
->> +	  to external monitoring or control devices.
->> +
->> +	  Additional drivers must be enabled in order to use the functionality
->> +	  of the device.
->> +
->>   config MFD_IPAQ_MICRO
->>   	bool "Atmel Micro ASIC (iPAQ h3100/h3600/h3700) Support"
->>   	depends on SA1100_H3100 || SA1100_H3600
-> 
-> 
+-- 
+Dmitry
