@@ -1,35 +1,53 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Mon, 23 Jul 2018 12:41:00 +0000
-Subject: [PATCH v2 1/3] Revert "ARM: dts: imx7d: Invert legacy PCI irq
- mapping"
-In-Reply-To: <CAHQ1cqF6TphuN8Ls54YA6bjty-bJF8twYboaG-RM=jox8CeQPA@mail.gmail.com>
-References: <cover.1532090446.git.leonard.crestez@nxp.com>
- <221deb47d7d38ecd6e0c7636f9a87ab693a3c539.1532090446.git.leonard.crestez@nxp.com>
- <CAHQ1cqF6TphuN8Ls54YA6bjty-bJF8twYboaG-RM=jox8CeQPA@mail.gmail.com>
-Message-ID: <42ff53eeea3067b19e3e16bed8392706502c8f23.camel@nxp.com>
+From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
+Date: Mon, 23 Jul 2018 21:43:38 +0900
+Subject: [PATCH/RFT 3/7] arm64: dts: renesas: r8a77965: Add Sound device
+ node and SSI support
+In-Reply-To: <87pnzi4xyw.wl-kuninori.morimoto.gx@renesas.com>
+References: <1531856883-19645-1-git-send-email-ykaneko0929@gmail.com>
+ <1531856883-19645-4-git-send-email-ykaneko0929@gmail.com>
+ <87pnzi4xyw.wl-kuninori.morimoto.gx@renesas.com>
+Message-ID: <CAH1o70L4bS01VQNtJvg0scXLa7v29_8yJD=0xFYoHOUXEhAijQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-07-20 at 08:33 -0700, Andrey Smirnov wrote:
-> On Fri, Jul 20, 2018 at 5:48 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
-> > 
-> > This reverts commit 1c86c9dd82f859b474474a7fee0d5195da2c9c1d.
-> > 
-> > That commit followed the reference manual but unfortunately the imx7d
-> > manual is incorrect.
-> 
-> I'd also add similar comment to DT file to prevent people from trying
-> to "fix" this in the future.
+Hi Morimoto-san,
 
-I'll try to see if I can follow up internally with docs team to get
-this updated in the next revision of the reference manual.
+Thank you for your review.
 
-> Also, this change is going to break QEMU's mapping found here:
+2018-07-20 8:23 GMT+09:00 Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>:
+>
+> Hi
+>
+>> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>>
+>> Based on several similar patches of the R8A7796 device tree
+>> by Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>.
+>>
+>> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+>> ---
+> (snip)
+>>               rcar_sound: sound at ec500000 {
+>> +                     /*
+>> +                      * #sound-dai-cells is required
+>> +                      *
+>> +                      * Single DAI : #sound-dai-cells = <0>; <&rcar_sound>;
+>> +                      * Multi  DAI : #sound-dai-cells = <1>; <&rcar_sound N>;
+>> +                      */
+>> +                     /*
+>> +                      * #clock-cells is required for audio_clkout0/1/2/3
+>> +                      *
+>> +                      * clkout       : #clock-cells = <0>;   <&rcar_sound>;
+>> +                      * clkout0/1/2/3: #clock-cells = <1>;   <&rcar_sound N>;
+>> +                      */
+>> +                     compatible =  "renesas,rcar_sound-r8a7796", "renesas,rcar_sound-gen3";
+>
+> 77965 ?
 
-I had no idea that existed, I guess somebody needs to fix that as well.
+Will fix.
 
-Do you have an imx7d board using pci or did you just test in emulation?
+>
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
---
-Regards,
-Leonard
+Best regards,
+Kaneko
