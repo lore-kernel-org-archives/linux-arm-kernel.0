@@ -1,64 +1,63 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 23 Jul 2018 23:16:12 +0100
-Subject: [PATCH v2 7/7] OF: Don't set default coherent DMA mask
-In-Reply-To: <cover.1532382222.git.robin.murphy@arm.com>
-References: <cover.1532382222.git.robin.murphy@arm.com>
-Message-ID: <66c08e4df2032fde82a2f97544f41fd3a2f24a94.1532382222.git.robin.murphy@arm.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Mon, 23 Jul 2018 15:21:46 -0700
+Subject: [PATCH v7 08/12] mfd: intel-peci-client: Add PECI client MFD
+ driver
+In-Reply-To: <20180723214751.1733-9-jae.hyun.yoo@linux.intel.com>
+References: <20180723214751.1733-1-jae.hyun.yoo@linux.intel.com>
+ <20180723214751.1733-9-jae.hyun.yoo@linux.intel.com>
+Message-ID: <c1abe3ec-fc26-d8b0-c769-e9295577ac05@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can track upstream DMA constraints properly with
-bus_dma_mask instead of trying (and failing) to maintain it in
-coherent_dma_mask, it doesn't make much sense for the firmware code to
-be touching the latter at all. It's merely papering over bugs wherein a
-driver has failed to call dma_set_coherent_mask() *and* the bus code has
-not initialised any default value.
+On 07/23/2018 02:47 PM, Jae Hyun Yoo wrote:
+> This commit adds PECI client MFD driver.
+> 
+> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Andrew Jeffery <andrew@aj.id.au>
+> Cc: James Feist <james.feist@linux.intel.com>
+> Cc: Jason M Biils <jason.m.bills@linux.intel.com>
+> Cc: Joel Stanley <joel@jms.id.au>
+> Cc: Vernon Mauery <vernon.mauery@linux.intel.com>
+> ---
+>  drivers/mfd/Kconfig                   |  14 ++
+>  drivers/mfd/Makefile                  |   1 +
+>  drivers/mfd/intel-peci-client.c       | 182 ++++++++++++++++++++++++++
+>  include/linux/mfd/intel-peci-client.h |  81 ++++++++++++
+>  4 files changed, 278 insertions(+)
+>  create mode 100644 drivers/mfd/intel-peci-client.c
+>  create mode 100644 include/linux/mfd/intel-peci-client.h
+> 
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index f3fa516011ec..e38b591479d4 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -595,6 +595,20 @@ config MFD_INTEL_MSIC
+>  	  Passage) chip. This chip embeds audio, battery, GPIO, etc.
+>  	  devices used in Intel Medfield platforms.
+>  
+> +config MFD_INTEL_PECI_CLIENT
+> +	bool "Intel PECI client"
+> +	depends on (PECI || COMPILE_TEST)
+> +	select MFD_CORE
+> +	help
+> +	  If you say yes to this option, support will be included for the
+> +	  multi-funtional Intel PECI (Platform Environment Control Interface)
 
-We don't really want to encourage more drivers coercing dma_mask so
-we'll continue to fix that up if necessary, but add a warning to help
-flush out any such buggy bus code that remains.
+	  multi-functional
 
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Frank Rowand <frowand.list@gmail.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/of/device.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+> +	  client. PECI is a one-wire bus interface that provides a communication
+> +	  channel from PECI clients in Intel processors and chipset components
+> +	  to external monitoring or control devices.
+> +
+> +	  Additional drivers must be enabled in order to use the functionality
+> +	  of the device.
+> +
+>  config MFD_IPAQ_MICRO
+>  	bool "Atmel Micro ASIC (iPAQ h3100/h3600/h3700) Support"
+>  	depends on SA1100_H3100 || SA1100_H3600
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 0d39633e8545..5957cd4fa262 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -127,20 +127,20 @@ int of_dma_configure(struct device *dev, struct device_node *np, bool force_dma)
- 	}
- 
- 	/*
--	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
--	 * setup the correct supported mask.
-+	 * If @dev is expected to be DMA-capable then the bus code that created
-+	 * it should have initialised its dma_mask pointer by this point. For
-+	 * now, we'll continue the legacy behaviour of coercing it to the
-+	 * coherent mask if not, but we'll no longer do so quietly.
- 	 */
--	if (!dev->coherent_dma_mask)
--		dev->coherent_dma_mask = DMA_BIT_MASK(32);
--	/*
--	 * Set it to coherent_dma_mask by default if the architecture
--	 * code has not set it.
--	 */
--	if (!dev->dma_mask)
-+	if (!dev->dma_mask) {
-+		dev_warn(dev, "DMA mask not set\n");
- 		dev->dma_mask = &dev->coherent_dma_mask;
-+	}
- 
--	if (!size)
-+	if (!size && dev->coherent_dma_mask)
- 		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
-+	else if (!size)
-+		size = 1ULL << 32;
- 
- 	dev->dma_pfn_offset = offset;
- 
+
 -- 
-2.17.1.dirty
+~Randy
