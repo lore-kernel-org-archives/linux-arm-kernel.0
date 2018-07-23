@@ -1,95 +1,50 @@
-From: alex@ghiti.fr (Alex Ghiti)
-Date: Mon, 23 Jul 2018 17:41:26 +0000
-Subject: [PATCH v4 00/11] hugetlb: Factorize hugetlb architecture
- primitives
-In-Reply-To: <87d0vehx16.fsf@concordia.ellerman.id.au>
-References: <20180705110716.3919-1-alex@ghiti.fr>
- <20180709141621.GD22297@dhcp22.suse.cz>
- <2173685f-7f85-7acb-4685-2383210c5fa2@ghiti.fr>
- <87d0vehx16.fsf@concordia.ellerman.id.au>
-Message-ID: <2d4c19e1-f622-7747-3ba1-ff3243337b93@ghiti.fr>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Mon, 23 Jul 2018 10:42:47 -0700
+Subject: [PATCH V2 0/2] firmware: ti_sci: Add host-id as an optional
+ parameter
+In-Reply-To: <20180723133303.ijekyffgnmesrhhv@kahuna>
+References: <20180716171328.11674-1-nm@ti.com>
+ <20180723133303.ijekyffgnmesrhhv@kahuna>
+Message-ID: <ea7691ab-db22-bea0-9753-b7a2765a22b8@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok will do and report when done.
+On 7/23/2018 6:33 AM, Nishanth Menon wrote:
+> On 17:13-20180716, Nishanth Menon wrote:
+>> Please find attached series to enable host-id as an optional dt property.
+>>
+>> This is a minor update to V1 -> Mostly to pick up Greet's feedback and Rob's Ack.
+>>
+>> V1: https://patchwork.ozlabs.org/cover/931822/
+>>
+>> The series is based on v4.18-rc1 and is available here:
+>> https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.18-rc1/k3-1-am6-tisci
+>>
+>> Consolidated all patches (including all series) are available here:
+>> https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.18-rc1/k3-am6-integ
+>>
+>> Full Boot log (integrated of all series for AM654) is available here:
+>>     https://pastebin.ubuntu.com/p/bBFmnzYtCd/
+>>
+>> Nishanth Menon (2):
+>>    Documentation: dt: keystone: ti-sci: Add optional host-id parameter
+>>    firmware: ti_sci: Provide host-id as an optional dt parameter
+>>
+>>   .../devicetree/bindings/arm/keystone/ti,sci.txt    |  4 ++++
+>>   drivers/firmware/ti_sci.c                          | 24 ++++++++++++++++++----
+>>   2 files changed, 24 insertions(+), 4 deletions(-)
+> 
+> Santosh,
+> 
+> Apologies, I see you have already send your PR for v4.19. Was
+> just wondering if this is something we can consider for rc
+> cycle OR if you'd consider a followup PR for the same.
+> 
+NP. Patch(s) doesn't look RC material so don't plan to send
+it as part of RC. Please let me know if its o.w
 
-Thanks for your feedback,
+This will have to wait for next cycle. Will merge this
+early once v4.19-rc1 comes out.
 
-Alex
-
-On 07/23/2018 02:00 PM, Michael Ellerman wrote:
-> Alex Ghiti <alex@ghiti.fr> writes:
->
->> Does anyone have any suggestion about those patches ?
-> Cross compiling it for some non-x86 arches would be a good start :)
->
-> There are cross compilers available here:
->
->    https://mirrors.edge.kernel.org/pub/tools/crosstool/
->
->
-> cheers
->
->> On 07/09/2018 02:16 PM, Michal Hocko wrote:
->>> [CC hugetlb guys - http://lkml.kernel.org/r/20180705110716.3919-1-alex at ghiti.fr]
->>>
->>> On Thu 05-07-18 11:07:05, Alexandre Ghiti wrote:
->>>> In order to reduce copy/paste of functions across architectures and then
->>>> make riscv hugetlb port (and future ports) simpler and smaller, this
->>>> patchset intends to factorize the numerous hugetlb primitives that are
->>>> defined across all the architectures.
->>>>
->>>> Except for prepare_hugepage_range, this patchset moves the versions that
->>>> are just pass-through to standard pte primitives into
->>>> asm-generic/hugetlb.h by using the same #ifdef semantic that can be
->>>> found in asm-generic/pgtable.h, i.e. __HAVE_ARCH_***.
->>>>
->>>> s390 architecture has not been tackled in this serie since it does not
->>>> use asm-generic/hugetlb.h at all.
->>>> powerpc could be factorized a bit more (cf huge_ptep_set_wrprotect).
->>>>
->>>> This patchset has been compiled on x86 only.
->>>>
->>>> Changelog:
->>>>
->>>> v4:
->>>>     Fix powerpc build error due to misplacing of #include
->>>>     <asm-generic/hugetlb.h> outside of #ifdef CONFIG_HUGETLB_PAGE, as
->>>>     pointed by Christophe Leroy.
->>>>
->>>> v1, v2, v3:
->>>>     Same version, just problems with email provider and misuse of
->>>>     --batch-size option of git send-email
->>>>
->>>> Alexandre Ghiti (11):
->>>>     hugetlb: Harmonize hugetlb.h arch specific defines with pgtable.h
->>>>     hugetlb: Introduce generic version of hugetlb_free_pgd_range
->>>>     hugetlb: Introduce generic version of set_huge_pte_at
->>>>     hugetlb: Introduce generic version of huge_ptep_get_and_clear
->>>>     hugetlb: Introduce generic version of huge_ptep_clear_flush
->>>>     hugetlb: Introduce generic version of huge_pte_none
->>>>     hugetlb: Introduce generic version of huge_pte_wrprotect
->>>>     hugetlb: Introduce generic version of prepare_hugepage_range
->>>>     hugetlb: Introduce generic version of huge_ptep_set_wrprotect
->>>>     hugetlb: Introduce generic version of huge_ptep_set_access_flags
->>>>     hugetlb: Introduce generic version of huge_ptep_get
->>>>
->>>>    arch/arm/include/asm/hugetlb-3level.h        | 32 +---------
->>>>    arch/arm/include/asm/hugetlb.h               | 33 +----------
->>>>    arch/arm64/include/asm/hugetlb.h             | 39 +++---------
->>>>    arch/ia64/include/asm/hugetlb.h              | 47 ++-------------
->>>>    arch/mips/include/asm/hugetlb.h              | 40 +++----------
->>>>    arch/parisc/include/asm/hugetlb.h            | 33 +++--------
->>>>    arch/powerpc/include/asm/book3s/32/pgtable.h |  2 +
->>>>    arch/powerpc/include/asm/book3s/64/pgtable.h |  1 +
->>>>    arch/powerpc/include/asm/hugetlb.h           | 43 ++------------
->>>>    arch/powerpc/include/asm/nohash/32/pgtable.h |  2 +
->>>>    arch/powerpc/include/asm/nohash/64/pgtable.h |  1 +
->>>>    arch/sh/include/asm/hugetlb.h                | 54 ++---------------
->>>>    arch/sparc/include/asm/hugetlb.h             | 40 +++----------
->>>>    arch/x86/include/asm/hugetlb.h               | 72 +----------------------
->>>>    include/asm-generic/hugetlb.h                | 88 +++++++++++++++++++++++++++-
->>>>    15 files changed, 143 insertions(+), 384 deletions(-)
->>>>
->>>> -- 
->>>> 2.16.2
+Regards,
+Santosh
