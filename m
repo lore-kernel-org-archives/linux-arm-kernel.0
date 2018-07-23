@@ -1,49 +1,35 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 24 Jul 2018 06:15:28 +0800
-Subject: [PATCH v5] media: dvb-frontends: add Socionext MN88443x ISDB-S/T
- demodulator driver
-In-Reply-To: <20180723085150.24266-1-suzuki.katsuhiro@socionext.com>
-References: <20180723085150.24266-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <201807240508.gpMy7uIR%fengguang.wu@intel.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 23 Jul 2018 23:16:08 +0100
+Subject: [PATCH v2 3/7] ACPI/IORT: Set bus DMA mask as appropriate
+In-Reply-To: <cover.1532382222.git.robin.murphy@arm.com>
+References: <cover.1532382222.git.robin.murphy@arm.com>
+Message-ID: <07cbf8f77fac552dca9b4c85a9d3bd8ed5a4cd29.1532382222.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Katsuhiro,
+When an explicit DMA limit is described by firmware, we need to remember
+it regardless of how drivers might subsequently update their devices'
+masks. The new bus_dma_mask field does that.
 
-I love your patch! Yet something to improve:
-
-[auto build test ERROR on linuxtv-media/master]
-[also build test ERROR on v4.18-rc6 next-20180723]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Katsuhiro-Suzuki/media-dvb-frontends-add-Socionext-MN88443x-ISDB-S-T-demodulator-driver/20180724-050011
-base:   git://linuxtv.org/media_tree.git master
-config: i386-randconfig-i1-201829 (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All errors (new ones prefixed by >>):
-
->> drivers/media/dvb-frontends/mn88443x.c:15:10: fatal error: sc1501a.h: No such file or directory
-    #include "sc1501a.h"
-             ^~~~~~~~~~~
-   compilation terminated.
-
-vim +15 drivers/media/dvb-frontends/mn88443x.c
-
-    14	
-  > 15	#include "sc1501a.h"
-    16	
-
+CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+CC: Hanjun Guo <hanjun.guo@linaro.org>
+CC: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 27693 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/6fbfffe0/attachment-0001.gz>
+ drivers/acpi/arm64/iort.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 4a66896e2aa3..bc51cff5505e 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -1014,6 +1014,7 @@ void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
+ 		 * Limit coherent and dma mask based on size
+ 		 * retrieved from firmware.
+ 		 */
++		dev->bus_dma_mask = mask;
+ 		dev->coherent_dma_mask = mask;
+ 		*dev->dma_mask = mask;
+ 	}
+-- 
+2.17.1.dirty
