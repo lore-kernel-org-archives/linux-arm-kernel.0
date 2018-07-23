@@ -1,101 +1,89 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon, 23 Jul 2018 18:04:00 +0100
-Subject: [PATCH v11 11/15] arm64: kexec_file: add crash dump support
-In-Reply-To: <20180723053923.GN11258@linaro.org>
-References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
- <20180711074203.3019-12-takahiro.akashi@linaro.org>
- <9efd0567-35dc-7435-74d6-1b540f3e5b9f@arm.com>
- <20180723053923.GN11258@linaro.org>
-Message-ID: <8600c940-158a-f64f-8271-32f8fb40f198@arm.com>
+Date: Mon, 23 Jul 2018 18:05:47 +0100
+Subject: [PATCH] arm64, kaslr: export offset in VMCOREINFO ELF notes
+In-Reply-To: <CACi5LpOa-BMRSTShS019DDv7MoxNfpnnsqjwR3z13GZC49NrSA@mail.gmail.com>
+References: <1531949864-27447-1-git-send-email-bhsharma@redhat.com>
+ <d8959ca1-65a1-f59c-bfc4-b048c75add26@arm.com>
+ <CACi5LpOa-BMRSTShS019DDv7MoxNfpnnsqjwR3z13GZC49NrSA@mail.gmail.com>
+Message-ID: <9c4d7c8d-3f0b-ff2f-68e8-03638a5fe2a4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+Hi Bhupesh,
 
-On 23/07/18 06:39, AKASHI Takahiro wrote:
-> On Wed, Jul 18, 2018 at 05:50:22PM +0100, James Morse wrote:
->> On 11/07/18 08:41, AKASHI Takahiro wrote:
->>> Enabling crash dump (kdump) includes
->>> * prepare contents of ELF header of a core dump file, /proc/vmcore,
->>>   using crash_prepare_elf64_headers(), and
->>> * add two device tree properties, "linux,usable-memory-range" and
->>>   "linux,elfcorehdr", which represent respectively a memory range
->>>   to be used by crash dump kernel and the header's location
+(CC: +mips list, looks like mips is missing vmcore's KERNELOFFSET too.
+Start of this thread: https://lkml.org/lkml/2018/7/18/951 )
+
+On 19/07/18 15:55, Bhupesh Sharma wrote:
+> On Thu, Jul 19, 2018 at 5:01 PM, James Morse <james.morse@arm.com> wrote:
+>> On 18/07/18 22:37, Bhupesh Sharma wrote:
+>>> Include KASLR offset in VMCOREINFO ELF notes to assist in debugging.
+>>>
+>>> makedumpfile user-space utility will need fixup to use this KASLR offset
+>>> to work with cases where we need to find a way to translate symbol
+>>> address from vmlinux to kernel run time address in case of KASLR boot on
+>>> arm64.
 >>
->>> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
->>> index 69333694e3e2..eeb5766928b0 100644
->>> --- a/arch/arm64/include/asm/kexec.h
->>> +++ b/arch/arm64/include/asm/kexec.h
->>> @@ -99,6 +99,10 @@ static inline void crash_post_resume(void) {}
->>>  struct kimage_arch {
->>>  	phys_addr_t dtb_mem;
->>>  	void *dtb_buf;
->>> +	/* Core ELF header buffer */
->>
->>> +	void *elf_headers;
->>
->> Shouldn't this be a phys_addr_t if it comes from kbuf.mem?
+>> You need the kernel VA for a symbol. Isn't this what kallsyms is for?
+>> | root at frikadeller:~# cat /proc/kallsyms | grep swapper_pg_dir
+>> | ffff5404610d0000 B swapper_pg_dir
+
+> Its already used by other archs like x86_64.
+> Its just that we are enabling this feature for arm64 now that the
+> KASLR boot cases are more widely seen on arm64 boards (as newer EFI
+> firmware implementations are available which support EFI_RNG_PROTOCOL
+> and hence KASLR boot).
 > 
-> Do you mean elf_load_addr? You're right.
-> But kexec_buf defined mem as unsigned long and so I'd rather change
-> dtb_mem to unsigned long instead of elf_load_addr, which will also be
-> renamed to elf_headers_mem for clarification.
+> And we want existing user-space application(s) to work similarly on
+> arm64 distributions as they work historically on other archs like
+> x86_64 (in most cases the user-space user is not even aware, if he is
+> developing for or using an underlying hardware which is arm64 or
+> x86_64)
 
->> (dtb_mem is, and they type tells us which way round the runtime/kexec-time
->> pointers are)
+Aha, so its ABI. This is the information that should be in the commit message as
+it describes why this patch should be merged.
 
-My preference would be for physical addresses to always be phys_addr_t, but as
-long as we can easily spot the difference kexec-time versus runtime addresses,
-it will save bugs where we use the wrong one.
+... Ideally core code would do this, that way this information won't be missed
+when an architecture adds KASLR support.
+
+But mips has CONFIG_RANDOMIZE_BASE, and doesn't provide kaslr_offset(),
+and x86 always provides this value, not just if CONFIG_RANDOMIZE_BASE is
+selected. I can't see a way to do this without touching all three architectures.
+(we can try and tidy it up once its clear whether mips needs this too)
 
 
->>> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
->>> index a0b44fe18b95..261564df7210 100644
->>> --- a/arch/arm64/kernel/machine_kexec_file.c
->>> +++ b/arch/arm64/kernel/machine_kexec_file.c
->>> @@ -132,6 +173,45 @@ static int setup_dtb(struct kimage *image,
+I think the patch is fine, but could you re-post it with a commit message that
+describes that vmcore parsing in user-space already expects this value in the
+notes. We're providing it for portability of those existing tools with x86.
 
->>> +		kbuf.buf_min = crashk_res.start;
->>> +		kbuf.buf_max = crashk_res.end + 1;
->>> +		kbuf.top_down = true;
->>> +
->>> +		ret = kexec_add_buffer(&kbuf);
->>> +		if (ret) {
->>> +			vfree(hdrs_addr);
->>> +			goto out_err;
->>> +		}
->>> +		image->arch.elf_headers = hdrs_addr;
->>> +		image->arch.elf_headers_sz = hdrs_sz;
->>> +		image->arch.elf_load_addr = kbuf.mem;
->>> +
->>> +		pr_debug("Loaded elf core header at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
->>> +				 image->arch.elf_load_addr, hdrs_sz, hdrs_sz);
->>> +	}
->>> +
->>>  	kbuf.image = image;
->>>  	/* not allocate anything below the kernel */
->>>  	kbuf.buf_min = kernel_load_addr + kernel_size;
 
->> I think the initramfs can escape the crash kernel range because you add to the
->> buf_max region:
->> |	/* within 1GB-aligned window of up to 32GB in size */
->> |	kbuf.buf_max = round_down(kernel_load_addr, SZ_1G)
->> |				?+ (unsigned long)SZ_1G * 32;
+>> I picked swapper_pg_dir, but you could use any of the vmcore:SYMBOL() addresses
+>> to work out this offset. (you should expect the kernel to rename these symbols
+>> at a whim).
+>>
 > 
-> No worries.
-> kexec_add_buffer() will limit the search only within crashk_res anyway.
+> Perhaps you missed what the above makedumpfile command was doing, so
+> let me summarize again:
 
-via arch_kexec_walk_mem()? Got it.
-
-But strangely the buf_min and buf_max still matter because
-locate_mem_hole_callback() uses them.
+Yes, I glossed over it, all that seemed relevant is you are trying to find the
+kernel-va of a symbol from the value in the vmlinux.
 
 
-> Are you reviewing other patches in my v11?
-> If not, I will post v12 tomorrow.
+> as it breaks the
+> existing user-space use-cases and the .conf file can be user-defined
+> (and hence he can pick any symbol/functions
 
-No, (I try to batch replies to avoid that happening).
-I'm reading up on Secure-boot and trying to test the pe_verification stuff...
+My suggestion was you can calculate the offset between the link-time and
+run-time address from information you already have. You just need one of each.
+This would be better as its independent of how the kernel does the relocation.
+
+But, this is irrelevant as 'KERNELOFFSET=' is already an ABI string.
+
+
+> which might not even be present in 'kallsyms').
+
+Eh? How can that happen? I thought even modules had their symbols added to kallsyms.
+
 
 
 Thanks,
