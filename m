@@ -1,150 +1,85 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Mon, 23 Jul 2018 08:49:53 -0700
-Subject: [PATCH v4 1/3] thermal: qcom-spmi: Allow to disable stage 2
- shutdown
-In-Reply-To: <CAD=FV=V1=P-Vq-VFXDfZGPMTVFvZK5cwaK_-Kxf8MwATJNwQSg@mail.gmail.com>
-References: <20180717210815.245639-1-mka@chromium.org>
- <CAD=FV=V1=P-Vq-VFXDfZGPMTVFvZK5cwaK_-Kxf8MwATJNwQSg@mail.gmail.com>
-Message-ID: <20180723154953.GJ129942@google.com>
+From: qais.yousef@arm.com (Qais Yousef)
+Date: Mon, 23 Jul 2018 17:07:50 +0100
+Subject: [PATCH 1/4] sched/topology: SD_ASYM_CPUCAPACITY flag detection
+In-Reply-To: <20180723152551.GA29978@e105550-lin.cambridge.arm.com>
+References: <1532093554-30504-1-git-send-email-morten.rasmussen@arm.com>
+ <1532093554-30504-2-git-send-email-morten.rasmussen@arm.com>
+ <dbd8deec-a79d-5697-0c50-ea1a9ab7e5c9@arm.com>
+ <20180723152551.GA29978@e105550-lin.cambridge.arm.com>
+Message-ID: <b75f665f-7d60-5d83-eaf6-88c534afe254@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 11:42:40AM -0700, Doug Anderson wrote:
-> Hi,
-> 
-> On Tue, Jul 17, 2018 at 2:08 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
-> > When the temperature reaches stage 2 the PMIC performs by default a
-> > 'partial shutdown', unless software override is enabled. It is not well
-> > defined which peripherals are affected by a 'partial shutdown'. Drivers
-> > might be unhappy when their devices suddenly disappear and prevent an
-> > orderly shutdown.
-> >
-> > Add an optional device tree property that allows to disable stage 2
-> > shutdown.
-> >
-> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-> > ---
-> > Changes in v4:
-> > - patch added to the series
-> > ---
-> >  .../bindings/thermal/qcom-spmi-temp-alarm.txt |  3 ++
-> >  drivers/thermal/qcom-spmi-temp-alarm.c        | 28 +++++++++++++------
-> >  2 files changed, 23 insertions(+), 8 deletions(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/thermal/qcom-spmi-temp-alarm.txt b/Documentation/devicetree/bindings/thermal/qcom-spmi-temp-alarm.txt
-> > index 290ec06fa33a..377c94fa1821 100644
-> > --- a/Documentation/devicetree/bindings/thermal/qcom-spmi-temp-alarm.txt
-> > +++ b/Documentation/devicetree/bindings/thermal/qcom-spmi-temp-alarm.txt
-> > @@ -15,6 +15,8 @@ Optional properties:
-> >  - io-channels:     Should contain IIO channel specifier for the ADC channel,
-> >                     which report chip die temperature.
-> >  - io-channel-names: Should contain "thermal".
-> > +- stage2-shutdown-disabled: boolean to disable a partial shutdown of the PMIC
-> > +                            when the temperature reaches stage 2
-> 
-> With my understanding of device tree I believe that this should be
-> "qcom,stage2-shutdown-disabled".  If something isn't a generic
-> property affecting a whole group of bindings I believe it's supposed
-> to have a company prefix.
-> 
-> From the device tree specification (wow, this exists now?  ...and is public?)
-> 
-> https://github.com/devicetree-org/devicetree-specification/releases/tag/v0.2
-> 
-> I find:
-> 
-> > Nonstandard property names should specify a unique string prefix, such
-> > as a stock ticker symbol, identifying the name of the company or
-> > organization that defined the property. Examples:
->   fsl,channel-fifo-len
->   ibm,ppc-interrupt-server#s
->   linux,network-index
+On 23/07/18 16:27, Morten Rasmussen wrote:
 
-Ok, I'll update the property name in case we keep using one.
+[...]
 
-> =====
-> 
-> I would also perhaps add a bit more verbose justification to your
-> description of this property.  Specifically there should be some
-> indication in the bindings doc of when you'd want this property.  From
-> what David Collins said, I'd maybe write something like:
-> 
-> ---
-> 
-> You want to disable the partial "stage 2" shutdown any time you've
-> properly defined thermal zones in such a way that the OS will try to
-> shut down at that stage anyway.  Said another way, there are three
-> thermal stages defined in the PMIC:
-> 
-> stage 1: warning
-> stage 2: system should shut down
-> stage 3: emergency shut down
-> 
-> By default the PMIC assumes that the OS isn't doing anything and thus
-> at stage 2 it does the partial PMIC shutdown and at stage 3 it kills
-> all power.  If we have thermal zones defined such that the OS will
-> initiate the shutdown at stage 2 then we want to disable the PMIC's
-> automatic mode for stage 2.  That still leaves us with the emergency
-> at stage 3.
+>>> +	/*
+>>> +	 * Examine topology from all cpu's point of views to detect the lowest
+>>> +	 * sched_domain_topology_level where a highest capacity cpu is visible
+>>> +	 * to everyone.
+>>> +	 */
+>>> +	for_each_cpu(i, cpu_map) {
+>>> +		unsigned long max_capacity = arch_scale_cpu_capacity(NULL, i);
+>>> +		int tl_id = 0;
+>>> +
+>>> +		for_each_sd_topology(tl) {
+>>> +			if (tl_id < asym_level)
+>>> +				goto next_level;
+>>> +
+>> I think if you increment and then continue here you might save the extra
+>> branch. I didn't look at any disassembly though to verify the generated
+>> code.
+>>
+>> I wonder if we can introduce for_each_sd_topology_from(tl, starting_level)
+>> so that you can start searching from a provided level - which will make this
+>> skipping logic unnecessary? So the code will look like
+>>
+>>  ??? ??? ??? for_each_sd_topology_from(tl, asymc_level) {
+>>  ??? ??? ??? ??? ...
+>>  ??? ??? ??? }
+> Both options would work. Increment+contrinue instead of goto would be
+> slightly less readable I think since we would still have the increment
+> at the end of the loop, but easy to do. Introducing
+> for_each_sd_topology_from() improve things too, but I wonder if it is
+> worth it.
 
-Thanks, I'll add something along these lines (or bluntly copy them ;-)
+I don't mind the current form to be honest. I agree it's not worth it if 
+it is called infrequent enough.
 
-> ===
-> 
-> Actually, after writing all the above I wonder if perhaps there's a
-> way to do this all automatically.  AKA: if someone has specified a
-> "critical" level can we automatically disable the partial PMIC
-> shutdown and we don't need the extra property?  Bonus points if we can
-> check to see if the thermal zones defined actually match reality and
-> even more bonus points if you can automatically adjust the settings in
-> the PMIC based on the thermal zones...
-> 
-> I did find that in "struct thermal_zone_of_device_ops" there appears
-> to be a "set_trip_temp" function you can fill in.  When I tried that
-> quickly I saw that I got called when I echoed into
-> "/sys/class/thermal/thermal_zone0/trip_point_1_temp" but not at
-> bootup, but I didn't debug more than that...
-> 
-> 
-> >  Example:
-> >
-> > @@ -23,6 +25,7 @@ Example:
-> >                 reg = <0x2400 0x100>;
-> >                 interrupts = <0 0x24 0 IRQ_TYPE_EDGE_RISING>;
-> >                 #thermal-sensor-cells = <0>;
-> > +               stage2-shutdown-disabled;
-> >
-> >                 io-channels = <&pm8941_vadc VADC_DIE_TEMP>;
-> >                 io-channel-names = "thermal";
-> 
-> BTW: can you update the "example" in this file?  Based on the PMIC
-> docs I saw it's likely that it should be:
-> 
-> stage1 {
->   temperature = <1050000>;
->   hysteresis = <2000>;
->   type = "passive";
-> };
-> stage2 {
->   temperature = <125000>;
->   hysteresis = <2000>;
->   type = "critical";
-> };
-> 
-> ...and I guess we don't specify the final one because by that time
-> Linux is kaput.
-> 
-> 
-> > diff --git a/drivers/thermal/qcom-spmi-temp-alarm.c b/drivers/thermal/qcom-spmi-temp-alarm.c
-> > index ad4f3a8d6560..acbb0dbec79e 100644
-> > --- a/drivers/thermal/qcom-spmi-temp-alarm.c
-> > +++ b/drivers/thermal/qcom-spmi-temp-alarm.c
-> 
-> Sometimes people like bindings and code change to be separate patches.
-> Maintainer can specify what's desired in this case, but I find it
-> generally pleases more people to make them separate.
-> 
-> ...though I guess if we can figure out how to do this automatically we
-> will have no bindings change...
+>>> @@ -1647,18 +1707,27 @@ build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *att
+>>>   	struct s_data d;
+>>>   	struct rq *rq = NULL;
+>>>   	int i, ret = -ENOMEM;
+>>> +	struct sched_domain_topology_level *tl_asym;
+>>>   	alloc_state = __visit_domain_allocation_hell(&d, cpu_map);
+>>>   	if (alloc_state != sa_rootdomain)
+>>>   		goto error;
+>>> +	tl_asym = asym_cpu_capacity_level(cpu_map);
+>>> +
+>> Or maybe this is not a hot path and we don't care that much about optimizing
+>> the search since you call it unconditionally here even for systems that
+>> don't care?
+> It does increase the cost of things like hotplug slightly and
+> repartitioning of root_domains a slightly but I don't see how we can
+> avoid it if we want generic code to set this flag. If the costs are not
+> acceptable I think the only option is to make the detection architecture
+> specific.
 
-Thanks for the suggestions, I'll look into them for the next version!
+I think hotplug is already expensive and this overhead would be small in 
+comparison. But this could be called when frequency changes if I 
+understood correctly - this is the one I wasn't sure how 'hot' it could 
+be. I wouldn't expect frequency changes at a very high rate because it's 
+relatively expensive too..
+
+> In any case, AFAIK rebuilding the sched_domain hierarchy shouldn't be a
+> normal and common thing to do. If checking for the flag is not
+> acceptable on SMP-only architectures, I can move it under arch/arm[,64]
+> although it is not as clean.
+>
+
+I like the approach and I think it's nice and clean. If it actually 
+appears in some profiles I think we have room to optimize it.
+
+-- 
+Qais Yousef
