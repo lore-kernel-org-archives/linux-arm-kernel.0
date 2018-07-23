@@ -1,49 +1,58 @@
-From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
-Date: Mon, 23 Jul 2018 15:36:57 -0300
-Subject: [PATCH, libv4l]: Make libv4l2 usable on devices with complex
- pipeline
-In-Reply-To: <20180719205344.GA12098@amd>
-References: <20180708213258.GA18217@amd>
-	<20180719205344.GA12098@amd>
-Message-ID: <20180723153649.73337c0f@coco.lan>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Mon, 23 Jul 2018 11:38:26 -0700
+Subject: [PATCH v2 1/3] Revert "ARM: dts: imx7d: Invert legacy PCI irq
+ mapping"
+In-Reply-To: <42ff53eeea3067b19e3e16bed8392706502c8f23.camel@nxp.com>
+References: <cover.1532090446.git.leonard.crestez@nxp.com>
+ <221deb47d7d38ecd6e0c7636f9a87ab693a3c539.1532090446.git.leonard.crestez@nxp.com>
+ <CAHQ1cqF6TphuN8Ls54YA6bjty-bJF8twYboaG-RM=jox8CeQPA@mail.gmail.com>
+ <42ff53eeea3067b19e3e16bed8392706502c8f23.camel@nxp.com>
+Message-ID: <CAHQ1cqF7u2gjwYt1-16u-uimXHZ2SWsquabZSDftQn_yRurhSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On Mon, Jul 23, 2018 at 5:41 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
+>
+> On Fri, 2018-07-20 at 08:33 -0700, Andrey Smirnov wrote:
+> > On Fri, Jul 20, 2018 at 5:48 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
+> > >
+> > > This reverts commit 1c86c9dd82f859b474474a7fee0d5195da2c9c1d.
+> > >
+> > > That commit followed the reference manual but unfortunately the imx7d
+> > > manual is incorrect.
+> >
+> > I'd also add similar comment to DT file to prevent people from trying
+> > to "fix" this in the future.
+>
+> I'll try to see if I can follow up internally with docs team to get
+> this updated in the next revision of the reference manual.
+>
 
-Em Thu, 19 Jul 2018 22:53:44 +0200
-Pavel Machek <pavel@ucw.cz> escreveu:
+Not sure if we are on the same page here, but what I meant is adding
+the same explanation that is in your commit message to Device Tree
+file as well so that if anyone looks at DT code and goes "Huh?" in the
+future, they wouldn't have to research commit history to see the
+reason why things the way they are.
 
-> On Sun 2018-07-08 23:32:58, Pavel Machek wrote:
-> > 
-> > Add support for opening multiple devices in v4l2_open(), and for
-> > mapping controls between devices.
-> > 
-> > This is necessary for complex devices, such as Nokia N900.
-> > 
-> > Signed-off-by: Pavel Machek <pavel@ucw.cz>  
-> 
-> Ping?
-> 
-> There's a lot of work to do on libv4l2... timely patch handling would
-> be nice.
+> > Also, this change is going to break QEMU's mapping found here:
+>
+> I had no idea that existed, I guess somebody needs to fix that as well.
+>
 
-As we're be start working at the new library in order to support
-complex cameras, and I don't want to prevent you keeping doing your
-work, IMHO the best way to keep doing it would be to create two
-libv4l2 forks:
+I take it it's a no to my "any chance you can fix that as well?" ;-).
+I'll see if I can find time to do that this week.
 
-	- one to be used by you - meant to support N900 camera;
-	- another one to be used by Google/Intel people that will
-	  be working at the Complex camera.
+> Do you have an imx7d board using pci or did you just test in emulation?
+>
 
-This way, we can proceed with the development without causing
-instability to v4l-utils. Once we have the projects done at the
-separate repositories, we can work on merging them back upstream.
+I used real i.MX7D Sabre board with i210 network card, when I was
+porting i.MX7 PCIe patches. However, as per note I made in the
+original submission:
 
-So, please send me, in priv, a .ssh key for me to add you an
-account at linuxtv.org. I'll send you instructions about how to
-use the new account.
+https://lkml.org/lkml/2017/10/9/913
+
+this IRQ swap patch came up as a result of "connecting" emulated ICH4
+in QEMU which was using legacy interrupts.
 
 Thanks,
-Mauro
+Andrey Smirnov
