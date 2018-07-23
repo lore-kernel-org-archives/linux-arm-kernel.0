@@ -1,67 +1,26 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 23 Jul 2018 20:39:36 +0530
-Subject: [RFC PATCH v6 2/2] mailbox: imx-mailbox: add scu protocol support
-In-Reply-To: <20180712070129.tyetqm2yesouiatf@pengutronix.de>
-References: <1531326759-20556-1-git-send-email-aisheng.dong@nxp.com>
- <1531326759-20556-3-git-send-email-aisheng.dong@nxp.com>
- <20180712070129.tyetqm2yesouiatf@pengutronix.de>
-Message-ID: <CABb+yY3N1T_+Lf--OQhXArxDGG9VBSef7j7Qqzh-fUTYYE92Pg@mail.gmail.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Mon, 23 Jul 2018 16:14:36 +0100
+Subject: [PATCH] iommu/arm-smmu-v3: sync the OVACKFLG to PRIQ consumer
+ register
+In-Reply-To: <8CD08B4737CACA4ABE0228F45E441A916382021E@DGGEMM501-MBX.china.huawei.com>
+References: <8CD08B4737CACA4ABE0228F45E441A916382021E@DGGEMM501-MBX.china.huawei.com>
+Message-ID: <69affaf7-096c-da11-0f87-1bfe1840715c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2018 at 12:31 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Thu, Jul 12, 2018 at 12:32:39AM +0800, Dong Aisheng wrote:
->> Add SCU protocol support in the generic mailbox driver.
->>
->> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
->> ---
->>  drivers/mailbox/Kconfig       |   6 +-
->>  drivers/mailbox/imx-mailbox.c | 252 ++++++++++++++++++++++++++++++++++++------
->>  2 files changed, 223 insertions(+), 35 deletions(-)
->>
->> +static bool imx_mu_scu_peek_data(struct mbox_chan *chan)
->> +{
->> +     struct imx_mu_priv *priv = chan->con_priv;
->> +     u8 *raw_data;
->> +     int i, size;
->> +     int ret;
->> +
->> +     ret = imx_mu_scu_receive_msg(chan, 0, priv->msg);
->> +     if (ret)
->> +             return false;
->> +
->> +     raw_data = (u8 *)priv->msg;
->> +     size = raw_data[1];
->> +
->> +     dev_dbg(chan->mbox->dev, "receive data: hdr 0x%x size %d\n",
->> +             *priv->msg, size);
->> +
->> +     for (i = 1; i < size; i++) {
->> +             ret = imx_mu_scu_receive_msg(chan, i % 4, priv->msg + i);
->> +             if (ret)
->> +                     return false;
->> +     }
->> +
->> +     mbox_chan_received_data(chan, (void *)priv->msg);
->> +
->> +     return true;
->> +}
->
-> Receiving data now works by calling mbox_client_peek_data(). I think
-> your plan is not to use rx_callback as triggered by mbox_chan_received_data,
-> but instead exploiting the fact that you have put the receive data into
-> the same buffer that you previously used to send a message. That way the
-> client knows where to find the answer.
->
-> While that should work I don't think this is very clean. That is the
-> point where I mentioned I think that the mailbox framework would need a
-> way to receive messages synchronously.
->
-> Jassi, this is for you probably. Do you have an idea how synchronous
-> receive could be implemented? We'll need some mbox_client_receive_data
-> function.
->
-Most platforms call mbox_chan_received_data() from RX interrupt
-handler. Which is actually calling Client's  rx_callback()
+Hi,
 
-Or I miss your point?
+On 23/07/18 15:43, Zhongmiao wrote:
+> Yeah,    I haven't tested smmu  eventq  overflow ,  so i'm not sure if there is any problem with smmu eventq.  However, the code shows that there is also a problem after the smmu eventq overflows. ^_^??.
+
+There really shouldn't be any problem with the eventq. Handling the
+event overflow in my patch is mostly cosmetic and can be removed. See
+the Event queue overflow section of the SMMUv3 specification (IHI0070B):
+
+"Note: In terms of delivering events, a queue in an unacknowledged
+overflow state does not behave any differently to normal queue state. If
+software were to consume events and free space but leave overflow
+unacknowledged, new events could be recorded."
+
+Thanks,
+Jean
