@@ -1,91 +1,72 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 23 Jul 2018 18:05:47 +0100
-Subject: [PATCH] arm64, kaslr: export offset in VMCOREINFO ELF notes
-In-Reply-To: <CACi5LpOa-BMRSTShS019DDv7MoxNfpnnsqjwR3z13GZC49NrSA@mail.gmail.com>
-References: <1531949864-27447-1-git-send-email-bhsharma@redhat.com>
- <d8959ca1-65a1-f59c-bfc4-b048c75add26@arm.com>
- <CACi5LpOa-BMRSTShS019DDv7MoxNfpnnsqjwR3z13GZC49NrSA@mail.gmail.com>
-Message-ID: <9c4d7c8d-3f0b-ff2f-68e8-03638a5fe2a4@arm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 23 Jul 2018 12:06:30 -0500
+Subject: [Amlogic 64-bit DT updates for v4.19, round 2 (redo)
+Message-ID: <7hy3e13mqx.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bhupesh,
+[ fixes the original round 2 by removing the unnecessary (and wrong)
+  merge of v4.18-rc5.]
 
-(CC: +mips list, looks like mips is missing vmcore's KERNELOFFSET too.
-Start of this thread: https://lkml.org/lkml/2018/7/18/951 )
+Olof, Arnd,
 
-On 19/07/18 15:55, Bhupesh Sharma wrote:
-> On Thu, Jul 19, 2018 at 5:01 PM, James Morse <james.morse@arm.com> wrote:
->> On 18/07/18 22:37, Bhupesh Sharma wrote:
->>> Include KASLR offset in VMCOREINFO ELF notes to assist in debugging.
->>>
->>> makedumpfile user-space utility will need fixup to use this KASLR offset
->>> to work with cases where we need to find a way to translate symbol
->>> address from vmlinux to kernel run time address in case of KASLR boot on
->>> arm64.
->>
->> You need the kernel VA for a symbol. Isn't this what kallsyms is for?
->> | root at frikadeller:~# cat /proc/kallsyms | grep swapper_pg_dir
->> | ffff5404610d0000 B swapper_pg_dir
+A second round of DT updates for Amlogic, directly on top of the redo of
+the first one.
 
-> Its already used by other archs like x86_64.
-> Its just that we are enabling this feature for arm64 now that the
-> KASLR boot cases are more widely seen on arm64 boards (as newer EFI
-> firmware implementations are available which support EFI_RNG_PROTOCOL
-> and hence KASLR boot).
-> 
-> And we want existing user-space application(s) to work similarly on
-> arm64 distributions as they work historically on other archs like
-> x86_64 (in most cases the user-space user is not even aware, if he is
-> developing for or using an underlying hardware which is arm64 or
-> x86_64)
+This includes a merge of a branch already queued in the clk tree because
+of the dependency on clock headers used in the DT changes here..
 
-Aha, so its ABI. This is the information that should be in the commit message as
-it describes why this patch should be merged.
+Kevin
 
-... Ideally core code would do this, that way this information won't be missed
-when an architecture adds KASLR support.
+The following changes since commit 89803e8b26569bdf5798f8745a4c708bf9360ee6:
 
-But mips has CONFIG_RANDOMIZE_BASE, and doesn't provide kaslr_offset(),
-and x86 always provides this value, not just if CONFIG_RANDOMIZE_BASE is
-selected. I can't see a way to do this without touching all three architectures.
-(we can try and tidy it up once its clear whether mips needs this too)
+  ARM64: dts: meson-axg: add pdm pins (2018-07-20 08:18:37 -0700)
 
+are available in the git repository at:
 
-I think the patch is fine, but could you re-post it with a commit message that
-describes that vmcore parsing in user-space already expects this value in the
-notes. We're providing it for portability of those existing tools with x86.
+  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2-1
 
+for you to fetch changes up to aaa080fa7e0f01f7cd8eb22a7385a4d8106c7478:
 
->> I picked swapper_pg_dir, but you could use any of the vmcore:SYMBOL() addresses
->> to work out this offset. (you should expect the kernel to rename these symbols
->> at a whim).
->>
-> 
-> Perhaps you missed what the above makedumpfile command was doing, so
-> let me summarize again:
+  ARM64: dts: meson-gxl: add support for the Oranth Tanix TX3 Mini (2018-07-20 09:02:22 -0700)
 
-Yes, I glossed over it, all that seemed relevant is you are trying to find the
-kernel-va of a symbol from the value in the vmlinux.
+----------------------------------------------------------------
+Amlogic 64-bit DT changes for v4.19, round 2
+- new SoC: S905W
+- new boards: based on S905W: Amlogic P281, Oranth Tanix TX3 Mini
+- AXG: add DT for new audio clock controller
 
+----------------------------------------------------------------
+Jerome Brunet (3):
+      dt-bindings: clock: add meson axg audio clock controller bindings
+      clk: meson: expose GEN_CLK clkid
+      ARM64: dts: meson-axg: add the audio clock controller
 
-> as it breaks the
-> existing user-space use-cases and the .conf file can be user-defined
-> (and hence he can pick any symbol/functions
+Kevin Hilman (1):
+      Merge tag 'meson-clk-dt-for-v4.19' of https://github.com/BayLibre/clk-meson into v4.19/dt64-2
 
-My suggestion was you can calculate the offset between the link-time and
-run-time address from information you already have. You just need one of each.
-This would be better as its independent of how the kernel does the relocation.
+Martin Blumenstingl (5):
+      dt-bindings: add vendor prefix for Shenzhen Oranth Technology Co., Ltd.
+      dt-bindings: arm: amlogic: Add support for GXL S905W and the P281 board
+      dt-bindings: arm: amlogic: Add support for the Oranth Tanix TX3 Mini
+      ARM64: dts: meson-gxl: add support for the S905W SoC and the P281 board
+      ARM64: dts: meson-gxl: add support for the Oranth Tanix TX3 Mini
 
-But, this is irrelevant as 'KERNELOFFSET=' is already an ABI string.
+Yixun Lan (1):
+      clk: meson-axg: add pcie and mipi clock bindings
 
-
-> which might not even be present in 'kallsyms').
-
-Eh? How can that happen? I thought even modules had their symbols added to kallsyms.
-
-
-
-Thanks,
-
-James
+ Documentation/devicetree/bindings/arm/amlogic.txt  |  7 ++
+ .../bindings/clock/amlogic,axg-audio-clkc.txt      | 56 +++++++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm64/boot/dts/amlogic/Makefile               |  2 +
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi         | 36 +++++++++
+ .../boot/dts/amlogic/meson-gxl-s905w-p281.dts      | 22 +++++
+ .../boot/dts/amlogic/meson-gxl-s905w-tx3-mini.dts  | 22 +++++
+ include/dt-bindings/clock/axg-audio-clkc.h         | 94 ++++++++++++++++++++++
+ include/dt-bindings/clock/axg-clkc.h               |  4 +
+ include/dt-bindings/clock/gxbb-clkc.h              |  1 +
+ 10 files changed, 245 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/amlogic,axg-audio-clkc.txt
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905w-p281.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905w-tx3-mini.dts
+ create mode 100644 include/dt-bindings/clock/axg-audio-clkc.h
