@@ -1,109 +1,150 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 Jul 2018 17:35:35 +0200
-Subject: [PATCH 02/10] mm: workingset: tell cache transitions from
- workingset thrashing
-In-Reply-To: <20180723152323.GA3699@cmpxchg.org>
-References: <20180712172942.10094-1-hannes@cmpxchg.org>
- <20180712172942.10094-3-hannes@cmpxchg.org>
- <CAK8P3a3Nsmt54-ed_gWNev3CBS6_Sv5QGOw4G0sY4ZXOi1R4_Q@mail.gmail.com>
- <20180723152323.GA3699@cmpxchg.org>
-Message-ID: <CAK8P3a15K-TXYuFX-ZsJiroqA1GWX2XS4ioZSjcjJYgh1b_xSA@mail.gmail.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Mon, 23 Jul 2018 08:49:53 -0700
+Subject: [PATCH v4 1/3] thermal: qcom-spmi: Allow to disable stage 2
+ shutdown
+In-Reply-To: <CAD=FV=V1=P-Vq-VFXDfZGPMTVFvZK5cwaK_-Kxf8MwATJNwQSg@mail.gmail.com>
+References: <20180717210815.245639-1-mka@chromium.org>
+ <CAD=FV=V1=P-Vq-VFXDfZGPMTVFvZK5cwaK_-Kxf8MwATJNwQSg@mail.gmail.com>
+Message-ID: <20180723154953.GJ129942@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 5:23 PM, Johannes Weiner <hannes@cmpxchg.org> wrote:
-> On Mon, Jul 23, 2018 at 03:36:09PM +0200, Arnd Bergmann wrote:
->> On Thu, Jul 12, 2018 at 7:29 PM, Johannes Weiner <hannes@cmpxchg.org> wrote:
->> In file included from /git/arm-soc/include/linux/kernel.h:10,
->>                  from /git/arm-soc/arch/arm64/mm/init.c:20:
->> /git/arm-soc/arch/arm64/mm/init.c: In function 'mem_init':
->> /git/arm-soc/include/linux/compiler.h:357:38: error: call to
->> '__compiletime_assert_618' declared with attribute error: BUILD_BUG_ON
->> failed: sizeof(struct page) > (1 << STRUCT_PAGE_MAX_SHIFT)
->
-> This BUILD_BUG_ON() is to make sure we're sizing the VMEMMAP struct
-> page array properly (address space divided by struct page size).
->
-> From the code:
->
-> /*
->  * Log2 of the upper bound of the size of a struct page. Used for sizing
->  * the vmemmap region only, does not affect actual memory footprint.
->  * We don't use sizeof(struct page) directly since taking its size here
->  * requires its definition to be available at this point in the inclusion
->  * chain, and it may not be a power of 2 in the first place.
->  */
-> #define STRUCT_PAGE_MAX_SHIFT   6
->
-...
-> However, the check isn't conditional on that config option. And when
-> VMEMMAP is disabled, we need 22 additional bits to identify the sparse
-> memory sections in page->flags as well:
->
->> CONFIG_NODES_SHIFT=2
->> # CONFIG_ARCH_USES_PG_UNCACHED is not set
->> CONFIG_MEMORY_FAILURE=y
->> CONFIG_IDLE_PAGE_TRACKING=y
->>
->> #define MAX_NR_ZONES 3
->> #define ZONES_SHIFT 2
->> #define MAX_PHYSMEM_BITS 52
->> #define SECTION_SIZE_BITS 30
->> #define SECTIONS_WIDTH 22
->
-> ^^^ Those we get back with VMEMMAP enabled.
->
-> So for configs for which the check is intended, it passes. We just
-> need to make it conditional to those.
+On Fri, Jul 20, 2018 at 11:42:40AM -0700, Doug Anderson wrote:
+> Hi,
+> 
+> On Tue, Jul 17, 2018 at 2:08 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
+> > When the temperature reaches stage 2 the PMIC performs by default a
+> > 'partial shutdown', unless software override is enabled. It is not well
+> > defined which peripherals are affected by a 'partial shutdown'. Drivers
+> > might be unhappy when their devices suddenly disappear and prevent an
+> > orderly shutdown.
+> >
+> > Add an optional device tree property that allows to disable stage 2
+> > shutdown.
+> >
+> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+> > ---
+> > Changes in v4:
+> > - patch added to the series
+> > ---
+> >  .../bindings/thermal/qcom-spmi-temp-alarm.txt |  3 ++
+> >  drivers/thermal/qcom-spmi-temp-alarm.c        | 28 +++++++++++++------
+> >  2 files changed, 23 insertions(+), 8 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/thermal/qcom-spmi-temp-alarm.txt b/Documentation/devicetree/bindings/thermal/qcom-spmi-temp-alarm.txt
+> > index 290ec06fa33a..377c94fa1821 100644
+> > --- a/Documentation/devicetree/bindings/thermal/qcom-spmi-temp-alarm.txt
+> > +++ b/Documentation/devicetree/bindings/thermal/qcom-spmi-temp-alarm.txt
+> > @@ -15,6 +15,8 @@ Optional properties:
+> >  - io-channels:     Should contain IIO channel specifier for the ADC channel,
+> >                     which report chip die temperature.
+> >  - io-channel-names: Should contain "thermal".
+> > +- stage2-shutdown-disabled: boolean to disable a partial shutdown of the PMIC
+> > +                            when the temperature reaches stage 2
+> 
+> With my understanding of device tree I believe that this should be
+> "qcom,stage2-shutdown-disabled".  If something isn't a generic
+> property affecting a whole group of bindings I believe it's supposed
+> to have a company prefix.
+> 
+> From the device tree specification (wow, this exists now?  ...and is public?)
+> 
+> https://github.com/devicetree-org/devicetree-specification/releases/tag/v0.2
+> 
+> I find:
+> 
+> > Nonstandard property names should specify a unique string prefix, such
+> > as a stock ticker symbol, identifying the name of the company or
+> > organization that defined the property. Examples:
+>   fsl,channel-fifo-len
+>   ibm,ppc-interrupt-server#s
+>   linux,network-index
 
-Ok, thanks for the analysis, I had missed that and was about to
-send a different patch to increase STRUCT_PAGE_MAX_SHIFT
-in some configurations, which is not as good.
+Ok, I'll update the property name in case we keep using one.
 
-> From 1d24635a6c7cd395bad5c29a3b9e5d2e98d9ab84 Mon Sep 17 00:00:00 2001
-> From: Johannes Weiner <hannes@cmpxchg.org>
-> Date: Mon, 23 Jul 2018 10:18:23 -0400
-> Subject: [PATCH] arm64: fix vmemmap BUILD_BUG_ON() triggering on !vmemmap
->  setups
->
-> Arnd reports the following arm64 randconfig build error with the PSI
-> patches that add another page flag:
->
+> =====
+> 
+> I would also perhaps add a bit more verbose justification to your
+> description of this property.  Specifically there should be some
+> indication in the bindings doc of when you'd want this property.  From
+> what David Collins said, I'd maybe write something like:
+> 
+> ---
+> 
+> You want to disable the partial "stage 2" shutdown any time you've
+> properly defined thermal zones in such a way that the OS will try to
+> shut down at that stage anyway.  Said another way, there are three
+> thermal stages defined in the PMIC:
+> 
+> stage 1: warning
+> stage 2: system should shut down
+> stage 3: emergency shut down
+> 
+> By default the PMIC assumes that the OS isn't doing anything and thus
+> at stage 2 it does the partial PMIC shutdown and at stage 3 it kills
+> all power.  If we have thermal zones defined such that the OS will
+> initiate the shutdown at stage 2 then we want to disable the PMIC's
+> automatic mode for stage 2.  That still leaves us with the emergency
+> at stage 3.
 
-You could add further text here that I had just added to my
-patch description (not sent):
+Thanks, I'll add something along these lines (or bluntly copy them ;-)
 
-    Further experiments show that the build error already existed before,
-    but was only triggered with larger values of CONFIG_NR_CPU and/or
-    CONFIG_NODES_SHIFT that might be used in actual configurations but
-    not in randconfig builds.
+> ===
+> 
+> Actually, after writing all the above I wonder if perhaps there's a
+> way to do this all automatically.  AKA: if someone has specified a
+> "critical" level can we automatically disable the partial PMIC
+> shutdown and we don't need the extra property?  Bonus points if we can
+> check to see if the thermal zones defined actually match reality and
+> even more bonus points if you can automatically adjust the settings in
+> the PMIC based on the thermal zones...
+> 
+> I did find that in "struct thermal_zone_of_device_ops" there appears
+> to be a "set_trip_temp" function you can fill in.  When I tried that
+> quickly I saw that I got called when I echoed into
+> "/sys/class/thermal/thermal_zone0/trip_point_1_temp" but not at
+> bootup, but I didn't debug more than that...
+> 
+> 
+> >  Example:
+> >
+> > @@ -23,6 +25,7 @@ Example:
+> >                 reg = <0x2400 0x100>;
+> >                 interrupts = <0 0x24 0 IRQ_TYPE_EDGE_RISING>;
+> >                 #thermal-sensor-cells = <0>;
+> > +               stage2-shutdown-disabled;
+> >
+> >                 io-channels = <&pm8941_vadc VADC_DIE_TEMP>;
+> >                 io-channel-names = "thermal";
+> 
+> BTW: can you update the "example" in this file?  Based on the PMIC
+> docs I saw it's likely that it should be:
+> 
+> stage1 {
+>   temperature = <1050000>;
+>   hysteresis = <2000>;
+>   type = "passive";
+> };
+> stage2 {
+>   temperature = <125000>;
+>   hysteresis = <2000>;
+>   type = "critical";
+> };
+> 
+> ...and I guess we don't specify the final one because by that time
+> Linux is kaput.
+> 
+> 
+> > diff --git a/drivers/thermal/qcom-spmi-temp-alarm.c b/drivers/thermal/qcom-spmi-temp-alarm.c
+> > index ad4f3a8d6560..acbb0dbec79e 100644
+> > --- a/drivers/thermal/qcom-spmi-temp-alarm.c
+> > +++ b/drivers/thermal/qcom-spmi-temp-alarm.c
+> 
+> Sometimes people like bindings and code change to be separate patches.
+> Maintainer can specify what's desired in this case, but I find it
+> generally pleases more people to make them separate.
+> 
+> ...though I guess if we can figure out how to do this automatically we
+> will have no bindings change...
 
-    With longer CPU and node masks, I could recreate the problem with
-    kernels as old as linux-4.7 when arm64 NUMA support got added.
-
-    Cc: stable at vger.kernel.org
-    Fixes: 1a2db300348b ("arm64, numa: Add NUMA support for arm64 platforms.")
-    Fixes: 3e1907d5bf5a ("arm64: mm: move vmemmap region right below
-the linear region")
-
->  arch/arm64/mm/init.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 1b18b4722420..72c9b6778b0a 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -611,11 +611,13 @@ void __init mem_init(void)
->         BUILD_BUG_ON(TASK_SIZE_32                       > TASK_SIZE_64);
->  #endif
->
-> +#ifndef CONFIG_SPARSEMEM_VMEMMAP
->         /*
-
-I tested it on two broken configurations, and found that you have
-a typo here, it should be 'ifdef', not 'ifndef'. With that change, it
-seems to build fine.
-
-Tested-by: Arnd Bergmann <arnd@arndb.de>
-
-      Arnd
+Thanks for the suggestions, I'll look into them for the next version!
