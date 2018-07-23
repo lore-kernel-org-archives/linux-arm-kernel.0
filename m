@@ -1,43 +1,44 @@
-From: leo.yan@linaro.org (leo.yan at linaro.org)
-Date: Mon, 23 Jul 2018 09:35:07 +0800
-Subject: [PATCH v2 0/6] perf cs-etm: Fix tracing packet handling and
- minor refactoring
-In-Reply-To: <1531295145-596-1-git-send-email-leo.yan@linaro.org>
-References: <1531295145-596-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <20180723013507.GA27713@leoy-ThinkPad-X240s>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 22 Jul 2018 22:40:00 -0300
+Subject: [PATCH 1/1] ARM: dts: imx6ull: keep IMX6UL_ prefix for signals on
+ both i.MX6UL and i.MX6ULL
+In-Reply-To: <20180720102321.23291-1-sebastien.szymanski@armadeus.com>
+References: <20180720102321.23291-1-sebastien.szymanski@armadeus.com>
+Message-ID: <CAOMZO5BMCD8EYFMSuWFyzEOO5L7hgHLfaZ2Hi41Q4X30w21whA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaldo,
+On Fri, Jul 20, 2018 at 7:23 AM, S?bastien Szymanski
+<sebastien.szymanski@armadeus.com> wrote:
+> Signals available on both i.MX6UL and i.MX6ULL should have the same name
+> because it is the case of all others common signals, it avoids to make
+> mistakes (use the wrong ones) and it makes writing device tree files
+> less complicated. For example:
+>
+> imx6ul-imx6ull-board.dtsi:
+>  ...
+>  pinctrl_uart5: uart5grp {
+>         fsl,pins = <
+>                 MX6UL_PAD_UART5_TX_DATA__UART5_DCE_TX   0x1b0b1
+>                 MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX   0x1b0b1
+>          >;
+>  };
+>
+> imx6ul-board.dts:
+>  #include <imx6ul.dtsi>
+>  #include <imx6ul-imx6ull-board.dtsi>
+>  ...
+>
+> imx6ull-board.dts:
+>  #include <imx6ull.dtsi>
+>  #include <imx6ul-imx6ull-board.dtsi>
+>  ...
+>
+> Without this patch, the imx6ull-board.dtb will use
+> MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX instead of
+> MX6ULL_PAD_UART5_RX_DATA__UART5_DCE_RX and the uart5 will be
+> misconfigured.
+>
+> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
 
-On Wed, Jul 11, 2018 at 03:45:39PM +0800, Leo Yan wrote:
-
-Just want to confirm, I saw the first two patches in this serise have
-been merged into perf/core branch [1], but the last 4 patches are
-missed.
-
-Could I know if you have trouble when you apply them?  Or anything
-need me to follow up?  Otherwise you might miss them :)
-
-Thanks,
-Leo Yan
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git/log/?h=perf/core
-
-> Leo Yan (6):
->   perf cs-etm: Introduce invalid address macro
->   perf cs-etm: Bail out immediately for instruction sample failure
->   perf cs-etm: Fix start tracing packet handling
->   perf cs-etm: Support dummy address value for CS_ETM_TRACE_ON packet
->   perf cs-etm: Generate branch sample when receiving a CS_ETM_TRACE_ON
->     packet
->   perf cs-etm: Generate branch sample for CS_ETM_TRACE_ON packet
-> 
->  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 10 ++--
->  tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  1 +
->  tools/perf/util/cs-etm.c                        | 71 +++++++++++++++++++++----
->  3 files changed, 68 insertions(+), 14 deletions(-)
-> 
-> -- 
-> 2.7.4
-> 
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
