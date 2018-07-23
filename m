@@ -1,196 +1,99 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 23 Jul 2018 10:48:33 +0900
-Subject: [PATCH 1/2] ARM: dts: arria10: update NAND clocking
-In-Reply-To: <5a06f316-8251-08b9-491a-912425cf204a@kernel.org>
-References: <1531176063-30140-1-git-send-email-dinguyen@kernel.org>
- <CAK7LNARAVSK5VY=_RfO2PXJCAnXJN3sXoAY=ijSwVojeo=c66w@mail.gmail.com>
- <b33d18b2-1956-50a4-9a3f-6d2a0abd4b81@kernel.org>
- <CAK7LNATNjPuGmzA_mS+yvVC8TpPsvQNvKedJ6emt114xGy7m3Q@mail.gmail.com>
- <CADhT+wfJ2Kq9Lq4_eA9uDgmRLoS8hHaWsr8cskUxWC5xh=vdRw@mail.gmail.com>
- <CAK7LNASpfX8-F9+K_9mvCsafDYPV03NhcA41cdWPZ2HQTqPT1Q@mail.gmail.com>
- <5a06f316-8251-08b9-491a-912425cf204a@kernel.org>
-Message-ID: <CAK7LNAQfcnugbUxJpMyJC5FT0ejtk0iA4+vXZ=UmX5rYRJs2tA@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 23 Jul 2018 10:57:27 +0900
+Subject: [PATCH v4 0/5] arm64: kexec,
+ kdump: fix boot failures on acpi-only system
+Message-ID: <20180723015732.24252-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-07-21 8:16 GMT+09:00 Dinh Nguyen <dinguyen@kernel.org>:
->
->
-> On 07/18/2018 09:22 PM, Masahiro Yamada wrote:
->> 2018-07-11 23:51 GMT+09:00 Dinh Nguyen <dinh.linux@gmail.com>:
->>> Hi Masahiro,
->>>
->>> On Tue, Jul 10, 2018 at 9:45 PM Masahiro Yamada
->>> <yamada.masahiro@socionext.com> wrote:
->>>>
->>>> 2018-07-10 22:35 GMT+09:00 Dinh Nguyen <dinguyen@kernel.org>:
->>>>>
->>>>>
->>>>> On 07/09/2018 08:31 PM, Masahiro Yamada wrote:
->>>>>> 2018-07-10 7:41 GMT+09:00 Dinh Nguyen <dinguyen@kernel.org>:
->>>>>>> The NAND IP needs 2 clocks(nand_x_clk and nand_clk). This patch adds a
->>>>>>> nand_x_clk, which is derived from the nand_clk, but has a fixed divider
->>>>>>> of 4.
->>>>>>>
->>>>>>> Update the NAND node to use the additional clock.
->>>>>>>
->>>>>>> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
->>>>>>> ---
->>>>>>>  arch/arm/boot/dts/socfpga_arria10.dtsi | 13 +++++++++++--
->>>>>>>  1 file changed, 11 insertions(+), 2 deletions(-)
->>>>>>>
->>>>>>> diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
->>>>>>> index a4dcb68..558b5ea 100644
->>>>>>> --- a/arch/arm/boot/dts/socfpga_arria10.dtsi
->>>>>>> +++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
->>>>>>> @@ -377,13 +377,21 @@
->>>>>>>                                                 clk-gate = <0xC8 11>;
->>>>>>>                                         };
->>>>>>>
->>>>>>> -                                       nand_clk: nand_clk {
->>>>>>> +                                       nand_x_clk: nand_x_clk {
->>>>>>>                                                 #clock-cells = <0>;
->>>>>>>                                                 compatible = "altr,socfpga-a10-gate-clk";
->>>>>>>                                                 clocks = <&l4_mp_clk>;
->>>>>>>                                                 clk-gate = <0xC8 10>;
->>>>>>>                                         };
->>>>>>>
->>>>>>> +                                       nand_clk: nand_clk {
->>>>>>> +                                               #clock-cells = <0>;
->>>>>>> +                                               compatible = "altr,socfpga-a10-gate-clk";
->>>>>>> +                                               clocks = <&nand_x_clk>;
->>>>>>> +                                               fixed-divider = <4>;
->>>>>>> +                                               clk-gate = <0xC8 10>;
->>>>>>> +                                       };
->>>>>>> +
->>>>>>>                                         spi_m_clk: spi_m_clk {
->>>>>>>                                                 #clock-cells = <0>;
->>>>>>>                                                 compatible = "altr,socfpga-a10-gate-clk";
->>>>>>> @@ -650,7 +658,8 @@
->>>>>>>                         reg-names = "nand_data", "denali_reg";
->>>>>>>                         interrupts = <0 99 4>;
->>>>>>>                         dma-mask = <0xffffffff>;
->>>>>>> -                       clocks = <&nand_clk>;
->>>>>>> +                       clocks = <&nand_clk>, <&nand_x_clk>;
->>>>>>> +                       clock-names = "nand", "nand_x";
->>>>>>
->>>>>>
->>>>>> Doesn't SOCFPGA really need the ECC clock?
->>>>>>
->>>>>
->>>>> I don't see any mentions of an ECC clock in any of the SoCFPGA
->>>>> documentation for the NAND IP.
->>>>
->>>>
->>>> I'd like you to check the IP documentation
->>>> published by Denali (or Cadence),
->>>> not published by Altera.
->>>>
->>>> Is it available for you?
->>>>
->>>>
->>>>
->>>> In my SoCs, the same clock signal (nand-clk-200m)
->>>> is connected to clk_x and ecc_clk, like this:
->>>>
->>>>                                          -------------
->>>> --------------                           | DENALI IP |
->>>> |            |                           |           |
->>>> | clk        |---(nand-clk-50m)--------->| clk       |
->>>> | controller |                           |           |
->>>> |            |---(nand-clk-200m)-------->| clk_x     |
->>>> --------------?                      |   |           |
->>>>                                      --->| ecc_clk   |
->>>>                                          |           |
->>>>                                          -------------
->
-> Here's a diagram of the clocking for the NAND IP on SOCFPGA.
->
->                                       -------------
-> --------------                        | DENALI IP    |
-> |            |                        |              |
-> | clk        |                        | |-->clk(/4)  |
-> | controller |                        | |            |
-> |            |---(nand_clk)-------------|-->clk_x    |
-> -------------                         | |            |
->                                       | |-->ecc_clk  |
->                                       |              |
->                                       ---------------
->
-> From the clock controller, it provides a single 200MHz clock to the NAND
-> IP. Inside the NAND IP, there is a /4 for the clk. The 200MHz clock is
-> used for the clk_x and ecc_clk.
->
-> The nand-clk is the only clock that can be gated.
+
+This patch series is a set of bug fixes to address kexec/kdump
+failures which are sometimes observed on ACPI-only system and reported
+in LAK-ML before.
+
+In short, the phenomena are:
+1. kexec'ed kernel can fail to boot because some ACPI table is corrupted
+   by a new kernel (or other data) being loaded into System RAM. Currently
+   kexec may possibly allocate space ignoring such "reserved" regions.
+   We will see no messages after "Bye!"
+
+2. crash dump (kdump) kernel can fail to boot and get into panic due to
+   an alignment fault when accessing ACPI tables. This can happen because
+   those tables are not always properly aligned while they are mapped
+   non-cacheable (ioremap'ed) as they are not recognized as part of System
+   RAM under the current implementation.
+
+After discussing several possibilities to address those issues,
+the agreed approach, in my understanding, is
+* to add resource entries for every "reserved", i.e. memblock_reserve(),
+  regions to /proc/iomem.
+  (NOMAP regions, also marked as "reserved," remains at top-level for
+  backward compatibility. User-space can tell the difference between
+  reserved-system-ram and reserved-address-space.)
+* For case (1), user space (kexec-tools) should rule out such regions
+  in searching for free space for loaded data.
+* For case (2), the kernel should access ACPI tables by mapping
+  them with appropriate memory attributes described in UEFI memory map.
+  (This means that it doesn't require any changes in /proc/iomem, and
+  hence user space.)
+
+Please find past discussions about /proc/iomem in [1].
+--- more words from James ---
+Our attempts to fix this just in the kernel reached a dead end, because Kdump
+needs to include reserved-system-ram, whereas kexec has to avoid it. User-space
+needs to be able to tell reserved-system-ram and reserved-address-space apart.
+Hence we need to expose that information, and pick it up in user-space.
+
+Patched-kernel and unpatch-user-space will work the same way it does today, as
+the additional reserved regions are ignored by user-space.
+
+Unpatched-kernel and patched-user-space will also work the same way it does
+today as the additional reserved regions are missing.
+--->8---
+
+Patch#1 addresses kexec case, for which you are also required to update
+user space. See necessary patches in [2]. If you want to review Patch#1,
+please also take a look at and review [2].
+
+Patch#2, #3, #4 and #5 address the kdump case above.
 
 
-The Denali IP does not contain the divisor in it.
+Changes in v4 (2018, July 23, 2018)
+* correct configuration dependency for ACPI (patch#2)
 
-My best guess is Altera implemented a simple
-wrapper with the 1/4 divisor, like this?
+Changes in v3.1 (2018, July 10, 2018)
+* add Ard's patch[4] to this patch set
 
+Changes in v3 (2018, July 9, 2018)
+* drop the v2's patch#3, preferring [4]
 
-               ----------------------------
-               | Wrapper                  |
-               |            ------------- |
-               |            | DENALI IP | |
-               |            |           | |
-               |  |-(1/4)-->| clk       | |
-               |  |         |           | |
----(nand_clk)--|--|-------->| clk_x     | |
-               |  |         |           | |
-               |  |-------->| ecc_clk   | |
-               |            |           | |
-               |            ------------- |
-               ----------------------------
+Changes in v2 (2018, June 19, 2018)
+* re-organise v1's patch#2 and #3 into v2's #2, #3 and #4
+  not to break bisect
 
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-March/565980.html
+[2] https://git.linaro.org/people/takahiro.akashi/kexec-tools.git arm64/resv_mem
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-April/573655.html
+[4] https://marc.info/?l=linux-efi&m=152930773507524&w=2
 
->>>>
->>>>
->>>> Some clock lines are often tied-up,
->>>> but such low-level information does not appear in
->>>> user documents.
->>>> I talked to a hardware engineer to get this information.
->>>>
->>>>
->>>>
->>>> I guess the situation is similar for your case,
->>>> but I do not have information enough to argue this.
->>>>
->>>
->>> I don't disagree with this representation. But after asking around,
->>> I'm getting the impression that the ECC clock is not exposed to the
->>> clock manager. This implies that the clock is always turned on and
->>> there doesn't seem to be any software control for it. I tested ECC
->>> with this patch and it looks to be working correctly, without any ecc
->>> clock representation.
->>>
->>> I'm not sure if I should expose a dummy ecc_clk to satisfy the binding?
->>
->>
->> DT should represent the real HW.
->> If the Denali IP in SOCFPGA needs ecc_clk input,
->> DT should describe it.
->>
->>
->> I do not have knowledge about the SOCFPGA internals.
->> I do not know which is correct:
->>
->>   - The Denali IP in SOCFPGA needs ecc_clk,
->>     but there is no software control for it.
->>
->>   - The Denali IP in SOCFPGA does not need ecc_clk.
->>
->
-> So should I be representing the clocks even though it doesn't come from
-> the clock controller?
+AKASHI Takahiro (3):
+  drivers: acpi: add dependency of EFI for arm64
+  efi/arm: map UEFI memory map even w/o runtime services enabled
+  arm64: acpi: fix alignment fault in accessing ACPI
 
+Ard Biesheuvel (1):
+  efi/arm: preserve early mapping of UEFI memory map longer for BGRT
 
-Anyway, you know the same clock is connected to nand_x to ecc_clk.
+James Morse (1):
+  arm64: export memblock_reserve()d regions via /proc/iomem
 
-So, there is no problem for adding "ecc" as well, right?
-
+ arch/arm64/include/asm/acpi.h      | 23 ++++++++++++------
+ arch/arm64/kernel/acpi.c           | 11 +++------
+ arch/arm64/kernel/setup.c          | 38 ++++++++++++++++++++++++++++++
+ drivers/acpi/Kconfig               |  2 +-
+ drivers/firmware/efi/arm-init.c    |  1 -
+ drivers/firmware/efi/arm-runtime.c | 16 +++++++------
+ 6 files changed, 67 insertions(+), 24 deletions(-)
 
 -- 
-Best Regards
-Masahiro Yamada
+2.18.0
