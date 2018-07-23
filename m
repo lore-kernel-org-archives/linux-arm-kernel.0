@@ -1,86 +1,64 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Mon, 23 Jul 2018 16:27:34 +0100
-Subject: [PATCH 1/4] sched/topology: SD_ASYM_CPUCAPACITY flag detection
-In-Reply-To: <dbd8deec-a79d-5697-0c50-ea1a9ab7e5c9@arm.com>
-References: <1532093554-30504-1-git-send-email-morten.rasmussen@arm.com>
- <1532093554-30504-2-git-send-email-morten.rasmussen@arm.com>
- <dbd8deec-a79d-5697-0c50-ea1a9ab7e5c9@arm.com>
-Message-ID: <20180723152551.GA29978@e105550-lin.cambridge.arm.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Mon, 23 Jul 2018 17:29:56 +0200
+Subject: [Eas-dev] Computing the dynamic-power-coefficient on Exynos5422
+In-Reply-To: <8966420ddb4d4f40bbbc44b58da2881b@MSX-L106.msx.ad.zih.tu-dresden.de>
+References: <8966420ddb4d4f40bbbc44b58da2881b@MSX-L106.msx.ad.zih.tu-dresden.de>
+Message-ID: <d3d0ab5e-4841-6e21-ed0a-8a73486ba927@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 02:25:34PM +0100, Qais Yousef wrote:
-> Hi Morten
-> 
-> On 20/07/18 14:32, Morten Rasmussen wrote:
-> >The SD_ASYM_CPUCAPACITY sched_domain flag is supposed to mark the
-> >sched_domain in the hierarchy where all cpu capacities are visible for
-> >any cpu's point of view on asymmetric cpu capacity systems. The
-> >scheduler can then take to take capacity asymmetry into account when
-> 
-> Did you mean "s/take to take/try to take/"?
+Hi Oliver,
 
-Yes.
+On 07/20/2018 04:15 PM, Oliver Effland wrote:
+> Hello everyone,
+> 
+> I hope this is the right place to ask, otherwise please just point me in the right direction.
+> 
+> I'm currently testing the EAS patches [v4] on an ODROID-XU3 board, which has an Exynos5422 SoC. However, the corresponding DT is missing the "dynamic-power-coefficient" that is needed for an appropriate EM.
+> So I'm trying to compute the dynamic-power-coefficient according to the formula:
+> 
+> Pdyn = dynamic-power-coefficient * V^2 * f
+> 
+> The frequency f is given by the DT.The actual Voltage and Power are determined by means of the on-chip sensors (returns the values for the specific cluster). When using the Voltage given in the DT, the differences for the d-p-coefficient are negligible.
+> 
+> So I'm calculating the d-p-coefficient (mW/MHz/uV^2) by reading out the following SoC sensor values.
+> 
+> For the little cluster (A7):
+> frequency(MHz)  Voltage(V)  Power(mW)	Dynamic-power-coefficient
+>   200		0.9175	     49.470	~2.938*10^-13
+>   400		0.9165	     91.892	~2.736*10^-13
+>   600		0.9638	    149.454	~2.682*10^-13
+>   800		1.0263	    223.453	~2.652*10^-13
+> 1000		1.1000	    327.707	~2.708*10^-13
+> 1200		1.1725	    445.899	~2.703*10^-13
+> 1400		1.2713	    627.010	~2.771*10^-13
+> 
+> For the big cluster (A15):
+> frequency(MHz)  Voltage(V)  Power(mW)	Dynamic-power-coefficient
+>   200		0.9162	     159.676	~9.510*10^-13
+>   500		0.9138	     325.480	~7.797*10^-13
+>   800		0.9288	     511.360	~7.410*10^-13
+> 1100		1.0063	     828.020	~7.434*10^-13
+> 1400		1.0713	    1209.774	~7.530*10^-13
+> 1700		1.1750	    1835.784	~7.822*10^-13
+> 2000		1.2700	    2661.849	~8.252*10^-13
 
+We do support Arm's TC2 platform (2xA15 and 3xA7) with the EAS project. 
+The latest EAS mainline integration includes Quentin's "[RFC PATCH v4 
+00/12] Energy Aware Scheduling" https://lkml.org/lkml/2018/6/28/301 .
+
+You can find the appropriate patch for TC2 dynamic-power-coefficient 
+integration "arm: dts: vexpress-v2p-ca15_a7: Add 
+dynamic-power-coefficient properties" under 
+https://developer.arm.com/open-source/energy-aware-scheduling/eas-mainline-development 
+. Follow the 'eas/next/integration' link. The patch header has a little 
+bit of documentation about how we did it. We used the build-in TC2 
+Energy Meter.
+
+This is all in sync with what Russel and Steve posted on this thread before.
+
+Thanks for taking EAS for a spin on another Arm 32bit machine!
+
+-- Dietmar
 
 [...]
-
-> >+	/*
-> >+	 * Examine topology from all cpu's point of views to detect the lowest
-> >+	 * sched_domain_topology_level where a highest capacity cpu is visible
-> >+	 * to everyone.
-> >+	 */
-> >+	for_each_cpu(i, cpu_map) {
-> >+		unsigned long max_capacity = arch_scale_cpu_capacity(NULL, i);
-> >+		int tl_id = 0;
-> >+
-> >+		for_each_sd_topology(tl) {
-> >+			if (tl_id < asym_level)
-> >+				goto next_level;
-> >+
-> 
-> I think if you increment and then continue here you might save the extra
-> branch. I didn't look at any disassembly though to verify the generated
-> code.
-> 
-> I wonder if we can introduce for_each_sd_topology_from(tl, starting_level)
-> so that you can start searching from a provided level - which will make this
-> skipping logic unnecessary? So the code will look like
-> 
-> ??? ??? ??? for_each_sd_topology_from(tl, asymc_level) {
-> ??? ??? ??? ??? ...
-> ??? ??? ??? }
-
-Both options would work. Increment+contrinue instead of goto would be
-slightly less readable I think since we would still have the increment
-at the end of the loop, but easy to do. Introducing
-for_each_sd_topology_from() improve things too, but I wonder if it is
-worth it.
-
-> >@@ -1647,18 +1707,27 @@ build_sched_domains(const struct cpumask *cpu_map, struct sched_domain_attr *att
-> >  	struct s_data d;
-> >  	struct rq *rq = NULL;
-> >  	int i, ret = -ENOMEM;
-> >+	struct sched_domain_topology_level *tl_asym;
-> >  	alloc_state = __visit_domain_allocation_hell(&d, cpu_map);
-> >  	if (alloc_state != sa_rootdomain)
-> >  		goto error;
-> >+	tl_asym = asym_cpu_capacity_level(cpu_map);
-> >+
-> 
-> Or maybe this is not a hot path and we don't care that much about optimizing
-> the search since you call it unconditionally here even for systems that
-> don't care?
-
-It does increase the cost of things like hotplug slightly and
-repartitioning of root_domains a slightly but I don't see how we can
-avoid it if we want generic code to set this flag. If the costs are not
-acceptable I think the only option is to make the detection architecture
-specific.
-
-In any case, AFAIK rebuilding the sched_domain hierarchy shouldn't be a
-normal and common thing to do. If checking for the flag is not
-acceptable on SMP-only architectures, I can move it under arch/arm[,64]
-although it is not as clean.
-
-Morten
