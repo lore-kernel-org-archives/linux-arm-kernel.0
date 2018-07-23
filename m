@@ -1,51 +1,36 @@
-From: stevenvandenbrandenstift@gmail.com (stevenvandenbrandenstift at gmail.com)
-Date: Mon, 23 Jul 2018 18:09:54 +0200
-Subject: [PATCH] sun4i: dts: add gpu node to sun4i-a10 platform
-Message-ID: <20180723160954.14115-1-stevenvandenbrandenstift@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 23 Jul 2018 19:14:28 +0300
+Subject: [PATCH] arm64: dts: renesas: r8a77980: add RWDT support
+In-Reply-To: <20180723160827.ziuivshq2mtagexq@verge.net.au>
+References: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
+ <175a491f-a827-4a92-1884-2f1490d38a52@cogentembedded.com>
+ <20180723160827.ziuivshq2mtagexq@verge.net.au>
+Message-ID: <4eb91e29-9c2f-6f7c-2b3c-983e41430e26@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steven Vanden Branden <stevenvandenbrandenstift@gmail.com>
+On 07/23/2018 07:08 PM, Simon Horman wrote:
 
-Add mali gpu node to sun4i a10 platforms.
-Tested with offscreen rendering with lima mesa (freedesktop gitlab)
+>> Describe RWDT in the R8A77980 SoC device tree.
+>>
+>> Enable RWDT on the Condor and V3H Starter Kit boards.
+>>
+>> Based on the original (and large) patch by Vladimir Barinov.
+>>
+>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> ---
+>> The patch is against the 'renesas-devel-20180720-v4.18-rc5' of Simon Horman's
+>> 'renesas.git' repo.  It depends on Geert Uytterhoeven's clock driver patches
+>> (adding the RWDT clock) in order to work...
+> 
+> But it is safe to apply without those patches, right?
 
-Signed-off-by: Steven Vanden Branden <stevenvandenbrandenstift@gmail.com>
----
- arch/arm/boot/dts/sun4i-a10.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+   The RWDT driver should just fail to probe with -ENOENT. 
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 3a1c6b45c9a1..be22f18b1462 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -1001,6 +1001,27 @@
- 			status = "disabled";
- 		};
- 
-+		mali: gpu at 1c40000 {
-+			compatible = "allwinner,sun4i-a10-mali", "arm,mali-400";
-+			reg = <0x01c40000 0x10000>;
-+			interrupts = <69>,
-+				     <70>,
-+				     <71>,
-+				     <72>,
-+				     <73>;
-+			interrupt-names = "gp",
-+					  "gpmmu",
-+					  "pp0",
-+					  "ppmmu0",
-+					  "pmu";
-+			clocks = <&ccu CLK_AHB_GPU>, <&ccu CLK_GPU>;
-+			clock-names = "bus", "core";
-+			resets = <&ccu RST_GPU>;
-+
-+			assigned-clocks = <&ccu CLK_GPU>;
-+			assigned-clock-rates = <384000000>;
-+		};
-+
- 		fe0: display-frontend at 1e00000 {
- 			compatible = "allwinner,sun4i-a10-display-frontend";
- 			reg = <0x01e00000 0x20000>;
--- 
-2.17.1
+> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+
+   TY!
+
+MBR, Sergei
