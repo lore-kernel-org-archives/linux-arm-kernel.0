@@ -1,43 +1,56 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 23 Jul 2018 08:33:03 -0500
-Subject: [PATCH V2 0/2] firmware: ti_sci: Add host-id as an optional
- parameter
-In-Reply-To: <20180716171328.11674-1-nm@ti.com>
-References: <20180716171328.11674-1-nm@ti.com>
-Message-ID: <20180723133303.ijekyffgnmesrhhv@kahuna>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 23 Jul 2018 14:35:35 +0100
+Subject: [PATCH v3.1 0/4] arm64: kexec,kdump: fix boot failures on
+ acpi-only system
+In-Reply-To: <20180717051222.GA11258@linaro.org>
+References: <20180709234229.20181-1-takahiro.akashi@linaro.org>
+ <20180712164918.GA26935@arm.com>
+ <20180713003434.GZ28220@linaro.org>
+ <CAKv+Gu9PT75XTXGsh1jc5roRO_d2QYKEamq42mfbsXzmerAUzA@mail.gmail.com>
+ <20180717051222.GA11258@linaro.org>
+Message-ID: <20180723133527.GA9450@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:13-20180716, Nishanth Menon wrote:
-> Please find attached series to enable host-id as an optional dt property.
+On Tue, Jul 17, 2018 at 02:12:23PM +0900, AKASHI Takahiro wrote:
+> On Fri, Jul 13, 2018 at 07:49:45AM +0200, Ard Biesheuvel wrote:
+> > On 13 July 2018 at 02:34, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> > > On Thu, Jul 12, 2018 at 05:49:19PM +0100, Will Deacon wrote:
+> > >> Hi Akashi,
+> > >>
+> > >> On Tue, Jul 10, 2018 at 08:42:25AM +0900, AKASHI Takahiro wrote:
+> > >> > This patch series is a set of bug fixes to address kexec/kdump
+> > >> > failures which are sometimes observed on ACPI-only system and reported
+> > >> > in LAK-ML before.
+> > >>
+> > >> I tried picking this up, along with Ard's fixup, but I'm seeing a build
+> > >> failure for allmodconfig:
+> > >>
+> > >> arch/arm64/kernel/acpi.o: In function `__acpi_get_mem_attribute':
+> > >> acpi.c:(.text+0x60): undefined reference to `efi_mem_attributes'
+> > >>
+> > >> I didn't investigate further. Please can you fix this?
+> > >
+> > > Because CONFIG_ACPI is on and CONFIG_EFI is off.
+> > >
+> > > This can happen in allmodconfig as CONFIG_EFI depends on
+> > > !CONFIG_CPU_BIG_ENDIAN, which is actually on in this case.
+> > >
+> > 
+> > Allowing both CONFIG_ACPI and CONFIG_CPU_BIG_ENDIAN to be configured
+> > makes no sense at all. Things will surely break if you start using BE
+> > memory accesses while parsing ACPI tables.
+> > 
+> > Allowing CONFIG_ACPI without CONFIG_EFI makes no sense either, since
+> > on arm64, the only way to find the ACPI tables is through a UEFI
+> > configuration table.
 > 
-> This is a minor update to V1 -> Mostly to pick up Greet's feedback and Rob's Ack.
 > 
-> V1: https://patchwork.ozlabs.org/cover/931822/
-> 
-> The series is based on v4.18-rc1 and is available here:
-> https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.18-rc1/k3-1-am6-tisci
-> 
-> Consolidated all patches (including all series) are available here:
-> https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.18-rc1/k3-am6-integ
-> 
-> Full Boot log (integrated of all series for AM654) is available here:
->    https://pastebin.ubuntu.com/p/bBFmnzYtCd/
-> 
-> Nishanth Menon (2):
->   Documentation: dt: keystone: ti-sci: Add optional host-id parameter
->   firmware: ti_sci: Provide host-id as an optional dt parameter
-> 
->  .../devicetree/bindings/arm/keystone/ti,sci.txt    |  4 ++++
->  drivers/firmware/ti_sci.c                          | 24 ++++++++++++++++++----
->  2 files changed, 24 insertions(+), 4 deletions(-)
+> Do you agree to this?
 
-Santosh,
+Yes; please post a new series which resolves these dependencies and includes
+Ard's fixup from before.
 
-Apologies, I see you have already send your PR for v4.19. Was
-just wondering if this is something we can consider for rc
-cycle OR if you'd consider a followup PR for the same.
+Thanks,
 
--- 
-Regards,
-Nishanth Menon
+Will
