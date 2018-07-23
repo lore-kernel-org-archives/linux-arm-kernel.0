@@ -1,29 +1,50 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 23 Jul 2018 21:03:21 +0530
-Subject: [PATCH v6 0/5] add mailbox support for i.MX7D
-In-Reply-To: <AM0PR04MB4211B82FD69B41B27465F5E580570@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <20180722063923.30222-1-o.rempel@pengutronix.de>
- <AM0PR04MB4211B82FD69B41B27465F5E580570@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <CABb+yY1r=Sg64t3j45XXSJu-_HYx2Uya0WLDHP82stiQ4vnM5A@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 23 Jul 2018 16:34:31 +0100
+Subject: [PATCH v3] mmc: sunxi: remove output of virtual base address
+Message-ID: <20180723153431.8669-1-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 22, 2018 at 4:14 PM, A.s. Dong <aisheng.dong@nxp.com> wrote:
-> Hi Oleksij,
->
-> Thanks for the work.
->
-> Hi Jassi,
-> Do you think if we can have your tag and let those patches go through
-> Shawn's tree as the later QXP support patches depends on them?
->
-Hmm...  I don't find the 5 patches in my mailbox. Are you sure I was CC'ed?
+Recent Linux versions refuse to print actual virtual kernel addresses,
+to not give a hint about the location of the kernel in a randomized virtual
+address space. This affects the output of the sunxi MMC controller
+driver, which now produces the rather uninformative line:
 
- Dong Aisheng (2):
-   dt-bindings: mailbox: allow mbox-cells to be equal to 0
-   dt-bindings: arm: fsl: add mu binding doc
+[    1.482660] sunxi-mmc 1c0f000.mmc: base:0x(____ptrval____) irq:8
 
- Oleksij Rempel (3):
-   dt-bindings: mailbox: imx-mu: add generic MU channel support
-   ARM: dts: imx7s: add i.MX7 messaging unit support
-   mailbox: Add support for i.MX7D messaging unit
+Since the virtual base address is not really interesting in the first
+place, let's just drop this value. The same applies to Linux' notion of
+the interrupt number, which is independent from the GIC SPI number.
+We have the physical address as part of the DT node name, which is way
+more useful for debugging purposes.
+To keep a success message in the driver, we make this purpose explicit
+with the word "initialized", plus print some information that is not too
+obvious and that we learned while probing the device:
+the maximum request size and whether it uses the new timing mode.
+So the output turns into:
+[    1.750626] sunxi-mmc 1c0f000.mmc: initialized, max. request size: 16384 KB, uses new timings mode
+[    1.786699] sunxi-mmc 1c11000.mmc: initialized, max. request size: 2048 KB
+
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ drivers/mmc/host/sunxi-mmc.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 8e7f3e35ee3d..c18cf035ac00 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -1407,7 +1407,10 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto error_free_dma;
+ 
+-	dev_info(&pdev->dev, "base:0x%p irq:%u\n", host->reg_base, host->irq);
++	dev_info(&pdev->dev, "initialized, max. request size: %u KB%s\n",
++		 mmc->max_req_size >> 10,
++		 host->use_new_timings ? ", uses new timings mode" : "");
++
+ 	return 0;
+ 
+ error_free_dma:
+-- 
+2.14.4
