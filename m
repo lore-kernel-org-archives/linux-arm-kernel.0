@@ -1,76 +1,86 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 23 Jul 2018 19:52:56 +0200
-Subject: [RFT v2 04/10] pinctrl: samsung: Add dedicated compatible for S5Pv210
- wakeup interrupts
+Date: Mon, 23 Jul 2018 19:53:00 +0200
+Subject: [RFT v2 08/10] ARM: s5pv210: Remove legacy setting of external wakeup
+ interrupts
 In-Reply-To: <20180723175302.22535-1-krzk@kernel.org>
 References: <20180723175302.22535-1-krzk@kernel.org>
-Message-ID: <20180723175302.22535-5-krzk@kernel.org>
+Message-ID: <20180723175302.22535-9-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The S5Pv210 external wakeup interrupts differ from Exynos therefore
-separate compatible is needed.  Duplicate existing flavor specific data
-from exynos4210_wkup_irq_chip and add new compatible for S5Pv210.
-At this point this new compatible does not bring anything new and works
-exactly as existing "samsung,exynos4210-wakeup-eint".
+Since Exynos/S5Pv210 pin-controller driver is taking care about setting
+the external wakeup interrupts mask, the legacy code can be removed.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 Cc: Tomasz Figa <tomasz.figa@gmail.com>
 Cc: Sylwester Nawrocki <snawrocki@kernel.org>
 Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- .../devicetree/bindings/pinctrl/samsung-pinctrl.txt    |  2 ++
- drivers/pinctrl/samsung/pinctrl-exynos.c               | 18 ++++++++++++++++++
- 2 files changed, 20 insertions(+)
+ arch/arm/mach-s5pv210/common.h |  1 -
+ arch/arm/mach-s5pv210/pm.c     | 16 ++++++++++++----
+ 2 files changed, 12 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-index f7700c9e0d0b..843a6cbf4774 100644
---- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-@@ -161,6 +161,8 @@ B. External Wakeup Interrupts: For supporting external wakeup interrupts, a
-        found on Samsung S3C2412 and S3C2413 SoCs,
-      - samsung,s3c64xx-wakeup-eint: represents wakeup interrupt controller
-        found on Samsung S3C64xx SoCs,
-+     - samsung,s5pv210-wakeup-eint: represents wakeup interrupt controller
-+       found on Samsung S5Pv210 SoCs,
-      - samsung,exynos4210-wakeup-eint: represents wakeup interrupt controller
-        found on Samsung Exynos4210 and S5PC110/S5PV210 SoCs.
-      - samsung,exynos7-wakeup-eint: represents wakeup interrupt controller
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index a263ddd94945..29d86d704b0c 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -346,6 +346,22 @@ static int exynos_wkup_irq_set_wake(struct irq_data *irqd, unsigned int on)
- /*
-  * irq_chip for wakeup interrupts
-  */
-+static const struct exynos_irq_chip s5pv210_wkup_irq_chip __initconst = {
-+	.chip = {
-+		.name = "s5pv210_wkup_irq_chip",
-+		.irq_unmask = exynos_irq_unmask,
-+		.irq_mask = exynos_irq_mask,
-+		.irq_ack = exynos_irq_ack,
-+		.irq_set_type = exynos_irq_set_type,
-+		.irq_set_wake = exynos_wkup_irq_set_wake,
-+		.irq_request_resources = exynos_irq_request_resources,
-+		.irq_release_resources = exynos_irq_release_resources,
-+	},
-+	.eint_con = EXYNOS_WKUP_ECON_OFFSET,
-+	.eint_mask = EXYNOS_WKUP_EMASK_OFFSET,
-+	.eint_pend = EXYNOS_WKUP_EPEND_OFFSET,
-+};
-+
- static const struct exynos_irq_chip exynos4210_wkup_irq_chip __initconst = {
- 	.chip = {
- 		.name = "exynos4210_wkup_irq_chip",
-@@ -380,6 +396,8 @@ static const struct exynos_irq_chip exynos7_wkup_irq_chip __initconst = {
+diff --git a/arch/arm/mach-s5pv210/common.h b/arch/arm/mach-s5pv210/common.h
+index 0a188134deae..cb36058bc35e 100644
+--- a/arch/arm/mach-s5pv210/common.h
++++ b/arch/arm/mach-s5pv210/common.h
+@@ -10,7 +10,6 @@
+ #define __ARCH_ARM_MACH_S5PV210_COMMON_H
  
- /* list of external wakeup controllers supported */
- static const struct of_device_id exynos_wkup_irq_ids[] = {
-+	{ .compatible = "samsung,s5pv210-wakeup-eint",
-+			.data = &s5pv210_wkup_irq_chip },
- 	{ .compatible = "samsung,exynos4210-wakeup-eint",
- 			.data = &exynos4210_wkup_irq_chip },
- 	{ .compatible = "samsung,exynos7-wakeup-eint",
+ #ifdef CONFIG_PM_SLEEP
+-u32 exynos_get_eint_wake_mask(void);
+ void s5pv210_cpu_resume(void);
+ void s5pv210_pm_init(void);
+ #else
+diff --git a/arch/arm/mach-s5pv210/pm.c b/arch/arm/mach-s5pv210/pm.c
+index f491249ab658..b336df0c57f3 100644
+--- a/arch/arm/mach-s5pv210/pm.c
++++ b/arch/arm/mach-s5pv210/pm.c
+@@ -32,6 +32,11 @@ static struct sleep_save s5pv210_core_save[] = {
+  */
+ static u32 s5pv210_irqwake_intmask = 0xffffffff;
+ 
++static u32 s5pv210_read_eint_wakeup_mask(void)
++{
++	return __raw_readl(S5P_EINT_WAKEUP_MASK);
++}
++
+ /*
+  * Suspend helpers.
+  */
+@@ -59,8 +64,10 @@ static void s5pv210_pm_prepare(void)
+ {
+ 	unsigned int tmp;
+ 
+-	/* Set wake-up mask registers */
+-	__raw_writel(exynos_get_eint_wake_mask(), S5P_EINT_WAKEUP_MASK);
++	/*
++	 * Set wake-up mask registers
++	 * S5P_EINT_WAKEUP_MASK is set by pinctrl driver in late suspend.
++	 */
+ 	__raw_writel(s5pv210_irqwake_intmask, S5P_WAKEUP_MASK);
+ 
+ 	/* ensure at least INFORM0 has the resume address */
+@@ -89,6 +96,7 @@ static void s5pv210_pm_prepare(void)
+  */
+ static int s5pv210_suspend_enter(suspend_state_t state)
+ {
++	u32 eint_wakeup_mask = s5pv210_read_eint_wakeup_mask();
+ 	int ret;
+ 
+ 	s3c_pm_debug_init();
+@@ -96,10 +104,10 @@ static int s5pv210_suspend_enter(suspend_state_t state)
+ 	S3C_PMDBG("%s: suspending the system...\n", __func__);
+ 
+ 	S3C_PMDBG("%s: wakeup masks: %08x,%08x\n", __func__,
+-			s5pv210_irqwake_intmask, exynos_get_eint_wake_mask());
++			s5pv210_irqwake_intmask, eint_wakeup_mask);
+ 
+ 	if (s5pv210_irqwake_intmask == -1U
+-	    && exynos_get_eint_wake_mask() == -1U) {
++	    && eint_wakeup_mask == -1U) {
+ 		pr_err("%s: No wake-up sources!\n", __func__);
+ 		pr_err("%s: Aborting sleep\n", __func__);
+ 		return -EINVAL;
 -- 
 2.14.1
