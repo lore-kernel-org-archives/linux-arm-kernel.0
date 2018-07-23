@@ -1,42 +1,58 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 23 Jul 2018 13:09:05 -0700
-Subject: [PATCH v9 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <56b9d5c38cfe46da1228c54f001a49773c3e31dc.1531531808.git.collinsd@codeaurora.org>
-References: <cover.1531531808.git.collinsd@codeaurora.org>
- <56b9d5c38cfe46da1228c54f001a49773c3e31dc.1531531808.git.collinsd@codeaurora.org>
-Message-ID: <CAD=FV=VmfqWRGRMEn+0dzZ8x4R5vVaHbkthXAN91Lm-XmP9Gqg@mail.gmail.com>
+From: wsa+renesas@sang-engineering.com (Wolfram Sang)
+Date: Mon, 23 Jul 2018 22:26:11 +0200
+Subject: [PATCH 07/12] i2c: stu300: use core to detect 'no zero length' quirk
+In-Reply-To: <20180723202617.15230-1-wsa+renesas@sang-engineering.com>
+References: <20180723202617.15230-1-wsa+renesas@sang-engineering.com>
+Message-ID: <20180723202617.15230-8-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+And don't reimplement in the driver.
 
-On Fri, Jul 13, 2018 at 6:50 PM, David Collins <collinsd@codeaurora.org> wrote:
-> Introduce bindings for RPMh regulator devices found on some
-> Qualcomm Technlogies, Inc. SoCs.  These devices allow a given
-> processor within the SoC to make PMIC regulator requests which
-> are aggregated within the RPMh hardware block along with requests
-> from other processors in the SoC to determine the final PMIC
-> regulator hardware state.
->
-> Signed-off-by: David Collins <collinsd@codeaurora.org>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Reviewed-by: Douglas Anderson <dianders@chromium.org>
-> ---
->  .../bindings/regulator/qcom,rpmh-regulator.txt     | 160 +++++++++++++++++++++
->  .../dt-bindings/regulator/qcom,rpmh-regulator.h    |  36 +++++
->  2 files changed, 196 insertions(+)
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+---
 
-I know you are still looking for time to review the RPMh-regulator
-driver and that's fine.  One idea I had though: if the bindings look
-OK to you and are less controversial, is there any chance they could
-land in the meantime?
+Only build tested.
 
-Specifically it would be very handy to be able to post up device tree
-files that refer to regulators and even get those landed, but they
-can't land without the bindings.
+ drivers/i2c/busses/i2c-stu300.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-If that's not possible then no worries, but I figured I'd check.
-
-
--Doug
+diff --git a/drivers/i2c/busses/i2c-stu300.c b/drivers/i2c/busses/i2c-stu300.c
+index fce52bdab2b7..5503fa171df0 100644
+--- a/drivers/i2c/busses/i2c-stu300.c
++++ b/drivers/i2c/busses/i2c-stu300.c
+@@ -673,12 +673,6 @@ static int stu300_xfer_msg(struct i2c_adapter *adap,
+ 			msg->addr, msg->len, msg->flags, stop);
+ 	}
+ 
+-	/* Zero-length messages are not supported by this hardware */
+-	if (msg->len == 0) {
+-		ret = -EINVAL;
+-		goto exit_disable;
+-	}
+-
+ 	/*
+ 	 * For some reason, sending the address sometimes fails when running
+ 	 * on  the 13 MHz clock. No interrupt arrives. This is a work around,
+@@ -863,6 +857,10 @@ static const struct i2c_algorithm stu300_algo = {
+ 	.functionality	= stu300_func,
+ };
+ 
++static const struct i2c_adapter_quirks stu300_quirks = {
++	.flags = I2C_AQ_NO_ZERO_LEN,
++};
++
+ static int stu300_probe(struct platform_device *pdev)
+ {
+ 	struct stu300_dev *dev;
+@@ -920,6 +918,8 @@ static int stu300_probe(struct platform_device *pdev)
+ 	adap->algo = &stu300_algo;
+ 	adap->dev.parent = &pdev->dev;
+ 	adap->dev.of_node = pdev->dev.of_node;
++	adap->quirks = &stu300_quirks;
++
+ 	i2c_set_adapdata(adap, dev);
+ 
+ 	/* i2c device drivers may be active on return from add_adapter() */
+-- 
+2.11.0
