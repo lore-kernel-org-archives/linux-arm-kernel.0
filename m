@@ -1,97 +1,191 @@
-From: ayan.halder@arm.com (Ayan Halder)
-Date: Mon, 23 Jul 2018 10:37:57 +0100
-Subject: [PATCH 01/10] drm/atomic: Add  __drm_atomic_helper_plane_reset
-In-Reply-To: <20180720211509.23605-2-alexandru-cosmin.gheorghe@arm.com>
-References: <20180713161407.GQ20303@art_vandelay>
- <20180720211509.23605-1-alexandru-cosmin.gheorghe@arm.com>
- <20180720211509.23605-2-alexandru-cosmin.gheorghe@arm.com>
-Message-ID: <20180723093757.GB26447@arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 23 Jul 2018 11:38:05 +0200
+Subject: [PATCH v2 3/3] PCI: imx: Initial imx7d pm support
+In-Reply-To: <e42a6bb8ff0ddd6eaa31fe381875425a3730a73f.1532090446.git.leonard.crestez@nxp.com>
+References: <cover.1532090446.git.leonard.crestez@nxp.com>
+ <e42a6bb8ff0ddd6eaa31fe381875425a3730a73f.1532090446.git.leonard.crestez@nxp.com>
+Message-ID: <1532338685.3163.93.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 10:15:00PM +0100, Alexandru Gheorghe wrote:
-> There are a lot of drivers that subclass drm_plane_state, all of them
-> duplicate the code that links toghether the plane with plane_state.
+Hi Leonard,
+
+Am Freitag, den 20.07.2018, 15:47 +0300 schrieb Leonard Crestez:
+> On imx7d the pcie-phy power domain is turned off in suspend and this can
+> make the system hang after resume when attempting any read from PCI.
 > 
-> On top of that, drivers that enable core properties also have to
-> duplicate the code for initializing the properties to their default
-> values, which in all cases are the same as the defaults from core.
+> Fix this by adding minimal suspend/resume code from the nxp internal
+> tree. This will prepare for powering down on suspend and reset the block
+> on resume.
 > 
-> Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
+> Code is only for imx7d but a very similar sequence can be used for
+> other socs.
+> 
+> > The original author is mostly Richard Zhu <hongxing.zhu@nxp.com>, this
+> patch adjusts the code to the upstream imx7d implemention using reset
+> controls and power domains.
+> 
+> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 > ---
->  drivers/gpu/drm/drm_atomic_helper.c | 32 +++++++++++++++++++++--------
->  include/drm/drm_atomic_helper.h     |  2 ++
->  2 files changed, 25 insertions(+), 9 deletions(-)
+> ?drivers/pci/controller/dwc/pci-imx6.c | 95 +++++++++++++++++++++++++--
+> ?1 file changed, 90 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
-> index 8008a7de2e10..e1c6f101652e 100644
-> --- a/drivers/gpu/drm/drm_atomic_helper.c
-> +++ b/drivers/gpu/drm/drm_atomic_helper.c
-> @@ -3507,6 +3507,28 @@ void drm_atomic_helper_crtc_destroy_state(struct drm_crtc *crtc,
->  }
->  EXPORT_SYMBOL(drm_atomic_helper_crtc_destroy_state);
->  
-> +/**
-> + * __drm_atomic_helper_plane_reset - resets planes state to default values
-> + * @plane: plane object
-> + * @new_state: atomic plane state
-> + *
-> + * Initializes plane state to default. This is useful for drivers that subclass
-> + * the plane state.
-> + */
-> +void __drm_atomic_helper_plane_reset(struct drm_plane *plane,
-> +				     struct drm_plane_state *state)
+> diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+> index 80f604602783..daebee905108 100644
+> --- a/drivers/pci/controller/dwc/pci-imx6.c
+> +++ b/drivers/pci/controller/dwc/pci-imx6.c
+> @@ -540,10 +540,27 @@ static int imx6_pcie_wait_for_speed_change(struct imx6_pcie *imx6_pcie)
+> ?
+> > ?	dev_err(dev, "Speed change timeout\n");
+> > ?	return -EINVAL;
+> ?}
+> ?
+> +static void imx6_pcie_ltssm_enable(struct device *dev)
 > +{
-> +	if (state) {
-> +		state->plane = plane;
-> +		state->rotation = DRM_MODE_ROTATE_0;
-> +		/* Reset the alpha value to fully opaque if it matters */
-> +		if (plane->alpha_property)
-> +			state->alpha = plane->alpha_property->values[1];
-> +	}
-> +	plane->state = state;
-> +}
-> +EXPORT_SYMBOL(__drm_atomic_helper_plane_reset);
+> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
 > +
->  /**
->   * drm_atomic_helper_plane_reset - default &drm_plane_funcs.reset hook for planes
->   * @plane: drm plane
-> @@ -3521,15 +3543,7 @@ void drm_atomic_helper_plane_reset(struct drm_plane *plane)
->  
->  	kfree(plane->state);
->  	plane->state = kzalloc(sizeof(*plane->state), GFP_KERNEL);
-> -
-> -	if (plane->state) {
-> -		plane->state->plane = plane;
-> -		plane->state->rotation = DRM_MODE_ROTATE_0;
-> -
-> -		/* Reset the alpha value to fully opaque if it matters */
-> -		if (plane->alpha_property)
-> -			plane->state->alpha = plane->alpha_property->values[1];
-> -	}
-> +	__drm_atomic_helper_plane_reset(plane, plane->state);
->  }
->  EXPORT_SYMBOL(drm_atomic_helper_plane_reset);
->  
-> diff --git a/include/drm/drm_atomic_helper.h b/include/drm/drm_atomic_helper.h
-> index 26aaba58d6ce..2dd40c761dfd 100644
-> --- a/include/drm/drm_atomic_helper.h
-> +++ b/include/drm/drm_atomic_helper.h
-> @@ -155,6 +155,8 @@ void __drm_atomic_helper_crtc_destroy_state(struct drm_crtc_state *state);
->  void drm_atomic_helper_crtc_destroy_state(struct drm_crtc *crtc,
->  					  struct drm_crtc_state *state);
->  
-> +void __drm_atomic_helper_plane_reset(struct drm_plane *plane,
-> +				     struct drm_plane_state *state);
->  void drm_atomic_helper_plane_reset(struct drm_plane *plane);
->  void __drm_atomic_helper_plane_duplicate_state(struct drm_plane *plane,
->  					       struct drm_plane_state *state);
-> -- 
-> 2.18.0
-> 
-With my limited knowledge on DRM, this looks OK to me:-
-Reviewed-by :- Ayan Kumar halder <ayan.halder@arm.com>
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> > +	switch (imx6_pcie->variant) {
+> > +	case IMX6Q:
+> > +	case IMX6SX:
+> > +	case IMX6QP:
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> > +				???IMX6Q_GPR12_PCIE_CTL_2,
+> > +				???IMX6Q_GPR12_PCIE_CTL_2);
+> > +		break;
+> > +	case IMX7D:
+> > +		reset_control_deassert(imx6_pcie->apps_reset);
+> > +	}
+> +}
+> +
+> ?static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
+> ?{
+> > ?	struct dw_pcie *pci = imx6_pcie->pci;
+> > ?	struct device *dev = pci->dev;
+> > ?	u32 tmp;
+> @@ -558,15 +575,11 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
+> > ?	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
+> > ?	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
+> > ?	dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
+> ?
+> > ?	/* Start LTSSM. */
+> > -	if (imx6_pcie->variant == IMX7D)
+> > -		reset_control_deassert(imx6_pcie->apps_reset);
+> > -	else
+> > -		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> > -				???IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
+> > +	imx6_pcie_ltssm_enable(dev);
+> ?
+> > ?	ret = imx6_pcie_wait_for_link(imx6_pcie);
+> > ?	if (ret)
+> > ?		goto err_reset_phy;
+> ?
+> @@ -681,10 +694,81 @@ static int imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
+> ?
+> ?static const struct dw_pcie_ops dw_pcie_ops = {
+> > ?	.link_up = imx6_pcie_link_up,
+> ?};
+> ?
+> +#ifdef CONFIG_PM_SLEEP
+> +static void imx6_pcie_ltssm_disable(struct device *dev)
+> +{
+> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> +
+> > +	switch (imx6_pcie->variant) {
+> > +	case IMX6Q:
+> > +	case IMX6SX:
+> > +	case IMX6QP:
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> +				???IMX6Q_GPR12_PCIE_CTL_2, 0);
+
+Has this been tested on i.MX6? LTSSM disable requires a more complex
+sequence on this SoC to avoid hanging the system. See commit
+3e3e406e3807 "PCI: imx6: Put LTSSM in "Detect" state before disabling
+it".
+
+Note that implementing the correct sequence requires the core clocks to
+  still be on when disabling LTSSM, so would need to switch ordering of
+the function calls in?imx6_pcie_suspend_noirq.
+
+> +		break;
+> > +	case IMX7D:
+> > +		reset_control_assert(imx6_pcie->apps_reset);
+> > +		break;
+> > +	}
+> +}
+> +
+> +static void imx6_pcie_clk_disable(struct imx6_pcie *imx6_pcie)
+> +{
+> > +	clk_disable_unprepare(imx6_pcie->pcie);
+> > +	clk_disable_unprepare(imx6_pcie->pcie_phy);
+> > +	clk_disable_unprepare(imx6_pcie->pcie_bus);
+> +
+> > +	if (imx6_pcie->variant == IMX7D) {
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> > +				???IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
+> > +				???IMX7D_GPR12_PCIE_PHY_REFCLK_SEL);
+> > +	}
+> +}
+> +
+> +static int imx6_pcie_suspend_noirq(struct device *dev)
+> +{
+> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> +
+> > +	if (imx6_pcie->variant != IMX7D)
+> > +		return 0;
+> +
+> > +	imx6_pcie_clk_disable(imx6_pcie);
+> > +	imx6_pcie_ltssm_disable(dev);
+> +
+> > +	return 0;
+> +}
+> +
+> +static int imx6_pcie_resume_noirq(struct device *dev)
+> +{
+> > +	int ret = 0;
+> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> > +	struct pcie_port *pp = &imx6_pcie->pci->pp;
+> +
+> > +	if (imx6_pcie->variant != IMX7D)
+> > +		return 0;
+> +
+> > +	imx6_pcie_assert_core_reset(imx6_pcie);
+> > +	imx6_pcie_init_phy(imx6_pcie);
+> > +	imx6_pcie_deassert_core_reset(imx6_pcie);
+> > +	dw_pcie_setup_rc(pp);
+> +
+> > +	ret = imx6_pcie_establish_link(imx6_pcie);
+> > +	if (ret < 0)
+> +		pr_err("pcie link is down after resume.\n");
+
+dev_err(), please.
+
+Regards,
+Lucas
+
+> +
+> > +	return 0;
+> +}
+> +#endif
+> +
+> +static const struct dev_pm_ops imx6_pcie_pm_ops = {
+> > +	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(imx6_pcie_suspend_noirq,
+> > +				??????imx6_pcie_resume_noirq)
+> +};
+> +
+> ?static int imx6_pcie_probe(struct platform_device *pdev)
+> ?{
+> > ?	struct device *dev = &pdev->dev;
+> > ?	struct dw_pcie *pci;
+> > ?	struct imx6_pcie *imx6_pcie;
+> @@ -847,10 +931,11 @@ static const struct of_device_id imx6_pcie_of_match[] = {
+> ?static struct platform_driver imx6_pcie_driver = {
+> > ?	.driver = {
+> > > ?		.name	= "imx6q-pcie",
+> > ?		.of_match_table = imx6_pcie_of_match,
+> > ?		.suppress_bind_attrs = true,
+> > +		.pm = &imx6_pcie_pm_ops,
+> > ?	},
+> > ?	.probe????= imx6_pcie_probe,
+> > ?	.shutdown = imx6_pcie_shutdown,
+> ?};
+> ?
