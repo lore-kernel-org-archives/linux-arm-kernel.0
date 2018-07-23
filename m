@@ -1,56 +1,87 @@
 From: manish.narani@xilinx.com (Manish Narani)
-Date: Mon, 23 Jul 2018 20:32:00 +0530
-Subject: [PATCH v2 1/4] iio: adc: xilinx: Check for return values in clk
- related functions
+Date: Mon, 23 Jul 2018 20:32:02 +0530
+Subject: [PATCH v2 3/4] iio: adc: xilinx: Remove platform_get_irq from
+ xadc_remove function
 In-Reply-To: <1532358123-23485-1-git-send-email-manish.narani@xilinx.com>
 References: <1532358123-23485-1-git-send-email-manish.narani@xilinx.com>
-Message-ID: <1532358123-23485-2-git-send-email-manish.narani@xilinx.com>
+Message-ID: <1532358123-23485-4-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds check for return values from clock related functions.
-This was reported by static code analysis tool.
+This patch avoids getting irq number in xadc_remove function. Instead
+store 'irq' in xadc struct and use xadc->irq wherever needed.
+This patch also resolves a warning reported by coverity where it asks to
+check return value of platform_get_irq() for any errors in xadc_remove.
 
 Signed-off-by: Manish Narani <manish.narani@xilinx.com>
 ---
- drivers/iio/adc/xilinx-xadc-core.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ drivers/iio/adc/xilinx-xadc-core.c | 10 +++++-----
+ drivers/iio/adc/xilinx-xadc.h      |  1 +
+ 2 files changed, 6 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-index 0127e85..23395fc 100644
+index 0dd306d..44a2519 100644
 --- a/drivers/iio/adc/xilinx-xadc-core.c
 +++ b/drivers/iio/adc/xilinx-xadc-core.c
-@@ -340,6 +340,8 @@ static int xadc_zynq_setup(struct platform_device *pdev,
- 	xadc->zynq_intmask = ~0;
+@@ -1175,6 +1175,7 @@ static int xadc_probe(struct platform_device *pdev)
  
- 	pcap_rate = clk_get_rate(xadc->clk);
-+	if (!pcap_rate)
-+		return -EINVAL;
+ 	xadc = iio_priv(indio_dev);
+ 	xadc->ops = id->data;
++	xadc->irq = irq;
+ 	init_completion(&xadc->completion);
+ 	mutex_init(&xadc->mutex);
+ 	spin_lock_init(&xadc->lock);
+@@ -1225,11 +1226,11 @@ static int xadc_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto err_free_samplerate_trigger;
  
- 	if (tck_rate > pcap_rate / 2) {
- 		div = 2;
-@@ -887,6 +889,9 @@ static int xadc_write_raw(struct iio_dev *indio_dev,
- 	unsigned long clk_rate = xadc_get_dclk_rate(xadc);
- 	unsigned int div;
+-	ret = xadc->ops->setup(pdev, indio_dev, irq);
++	ret = xadc->ops->setup(pdev, indio_dev, xadc->irq);
+ 	if (ret)
+ 		goto err_clk_disable_unprepare;
  
-+	if (!clk_rate)
-+		return -EINVAL;
-+
- 	if (info != IIO_CHAN_INFO_SAMP_FREQ)
- 		return -EINVAL;
+-	ret = request_irq(irq, xadc->ops->interrupt_handler, 0,
++	ret = request_irq(xadc->irq, xadc->ops->interrupt_handler, 0,
+ 			dev_name(&pdev->dev), indio_dev);
+ 	if (ret)
+ 		goto err_clk_disable_unprepare;
+@@ -1288,7 +1289,7 @@ static int xadc_probe(struct platform_device *pdev)
+ 	return 0;
  
-@@ -1237,8 +1242,10 @@ static int xadc_probe(struct platform_device *pdev)
- 		goto err_free_irq;
+ err_free_irq:
+-	free_irq(irq, indio_dev);
++	free_irq(xadc->irq, indio_dev);
+ err_clk_disable_unprepare:
+ 	clk_disable_unprepare(xadc->clk);
+ err_free_samplerate_trigger:
+@@ -1310,7 +1311,6 @@ static int xadc_remove(struct platform_device *pdev)
+ {
+ 	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+ 	struct xadc *xadc = iio_priv(indio_dev);
+-	int irq = platform_get_irq(pdev, 0);
  
- 	/* Disable all alarms */
--	xadc_update_adc_reg(xadc, XADC_REG_CONF1, XADC_CONF1_ALARM_MASK,
--		XADC_CONF1_ALARM_MASK);
-+	ret = xadc_update_adc_reg(xadc, XADC_REG_CONF1, XADC_CONF1_ALARM_MASK,
-+				  XADC_CONF1_ALARM_MASK);
-+	if (ret)
-+		goto err_free_irq;
+ 	iio_device_unregister(indio_dev);
+ 	if (xadc->ops->flags & XADC_FLAGS_BUFFERED) {
+@@ -1318,7 +1318,7 @@ static int xadc_remove(struct platform_device *pdev)
+ 		iio_trigger_free(xadc->convst_trigger);
+ 		iio_triggered_buffer_cleanup(indio_dev);
+ 	}
+-	free_irq(irq, indio_dev);
++	free_irq(xadc->irq, indio_dev);
+ 	clk_disable_unprepare(xadc->clk);
+ 	cancel_delayed_work(&xadc->zynq_unmask_work);
+ 	kfree(xadc->data);
+diff --git a/drivers/iio/adc/xilinx-xadc.h b/drivers/iio/adc/xilinx-xadc.h
+index 62edbda..8c00095 100644
+--- a/drivers/iio/adc/xilinx-xadc.h
++++ b/drivers/iio/adc/xilinx-xadc.h
+@@ -68,6 +68,7 @@ struct xadc {
+ 	spinlock_t lock;
  
- 	/* Set thresholds to min/max */
- 	for (i = 0; i < 16; i++) {
+ 	struct completion completion;
++	int irq;
+ };
+ 
+ struct xadc_ops {
 -- 
 2.1.1
