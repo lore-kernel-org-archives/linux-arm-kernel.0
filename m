@@ -1,142 +1,130 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 23 Jul 2018 10:03:20 +0200
-Subject: [PATCH v7 1/4] remoteproc/davinci: use the reset framework
-In-Reply-To: <20180621073706.22812-2-brgl@bgdev.pl>
-References: <20180621073706.22812-1-brgl@bgdev.pl>
- <20180621073706.22812-2-brgl@bgdev.pl>
-Message-ID: <CAMRc=Mcqe7VgkckL3e9GmM7fNYe=a7OO1hEv-Nyh1yiMNwfzfw@mail.gmail.com>
+From: michal.vokac@ysoft.com (=?UTF-8?B?TWljaGFsIFZva8OhxI0=?=)
+Date: Mon, 23 Jul 2018 10:29:07 +0200
+Subject: [PATCH 3/5] mfd: dt-bindings: Add RK809 and RK817 device tree
+ bindings document
+In-Reply-To: <1532315945-1094-4-git-send-email-tony.xie@rock-chips.com>
+References: <1532315945-1094-1-git-send-email-tony.xie@rock-chips.com>
+ <1532315945-1094-4-git-send-email-tony.xie@rock-chips.com>
+Message-ID: <4fa3dc0e-13bf-c226-92ba-981296509b3b@ysoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-06-21 9:37 GMT+02:00 Bartosz Golaszewski <brgl@bgdev.pl>:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->
-> Switch to using the reset framework instead of handcoded reset routines
-> we used so far.
->
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
-> Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+On 23.7.2018 05:19, Tony Xie wrote:
+> Add device tree bindings documentation for Rockchip's RK809 & RK817 PMIC.
+> 
+> Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
 > ---
->  drivers/remoteproc/da8xx_remoteproc.c | 34 +++++++++++++++++++++++----
->  1 file changed, 29 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
-> index b668e32996e2..76c06b70a1c6 100644
-> --- a/drivers/remoteproc/da8xx_remoteproc.c
-> +++ b/drivers/remoteproc/da8xx_remoteproc.c
-> @@ -10,6 +10,7 @@
->
->  #include <linux/bitops.h>
->  #include <linux/clk.h>
-> +#include <linux/reset.h>
->  #include <linux/err.h>
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
-> @@ -20,8 +21,6 @@
->  #include <linux/platform_device.h>
->  #include <linux/remoteproc.h>
->
-> -#include <mach/clock.h>   /* for davinci_clk_reset_assert/deassert() */
-> -
->  #include "remoteproc_internal.h"
->
->  static char *da8xx_fw_name;
-> @@ -72,6 +71,7 @@ struct da8xx_rproc {
->         struct da8xx_rproc_mem *mem;
->         int num_mems;
->         struct clk *dsp_clk;
-> +       struct reset_control *dsp_reset;
->         void (*ack_fxn)(struct irq_data *data);
->         struct irq_data *irq_data;
->         void __iomem *chipsig;
-> @@ -138,6 +138,7 @@ static int da8xx_rproc_start(struct rproc *rproc)
->         struct device *dev = rproc->dev.parent;
->         struct da8xx_rproc *drproc = (struct da8xx_rproc *)rproc->priv;
->         struct clk *dsp_clk = drproc->dsp_clk;
-> +       struct reset_control *dsp_reset = drproc->dsp_reset;
->         int ret;
->
->         /* hw requires the start (boot) address be on 1KB boundary */
-> @@ -155,7 +156,12 @@ static int da8xx_rproc_start(struct rproc *rproc)
->                 return ret;
->         }
->
-> -       davinci_clk_reset_deassert(dsp_clk);
-> +       ret = reset_control_deassert(dsp_reset);
-> +       if (ret) {
-> +               dev_err(dev, "reset_control_deassert() failed: %d\n", ret);
-> +               clk_disable_unprepare(dsp_clk);
-> +               return ret;
-> +       }
->
->         return 0;
->  }
-> @@ -163,8 +169,15 @@ static int da8xx_rproc_start(struct rproc *rproc)
->  static int da8xx_rproc_stop(struct rproc *rproc)
->  {
->         struct da8xx_rproc *drproc = rproc->priv;
-> +       struct device *dev = rproc->dev.parent;
-> +       int ret;
-> +
-> +       ret = reset_control_assert(drproc->dsp_reset);
-> +       if (ret) {
-> +               dev_err(dev, "reset_control_assert() failed: %d\n", ret);
-> +               return ret;
-> +       }
->
-> -       davinci_clk_reset_assert(drproc->dsp_clk);
->         clk_disable_unprepare(drproc->dsp_clk);
->
->         return 0;
-> @@ -232,6 +245,7 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
->         struct resource *bootreg_res;
->         struct resource *chipsig_res;
->         struct clk *dsp_clk;
-> +       struct reset_control *dsp_reset;
->         void __iomem *chipsig;
->         void __iomem *bootreg;
->         int irq;
-> @@ -268,6 +282,15 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
->                 return PTR_ERR(dsp_clk);
->         }
->
-> +       dsp_reset = devm_reset_control_get_exclusive(dev, NULL);
-> +       if (IS_ERR(dsp_reset)) {
-> +               if (PTR_ERR(dsp_reset) != -EPROBE_DEFER)
-> +                       dev_err(dev, "unable to get reset control: %ld\n",
-> +                               PTR_ERR(dsp_reset));
-> +
-> +               return PTR_ERR(dsp_reset);
-> +       }
-> +
->         if (dev->of_node) {
->                 ret = of_reserved_mem_device_init(dev);
->                 if (ret) {
-> @@ -287,6 +310,7 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
->         drproc = rproc->priv;
->         drproc->rproc = rproc;
->         drproc->dsp_clk = dsp_clk;
-> +       drproc->dsp_reset = dsp_reset;
->         rproc->has_iommu = false;
->
->         ret = da8xx_rproc_get_internal_memories(pdev, drproc);
-> @@ -309,7 +333,7 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
->          * *not* in reset, but da8xx_rproc_start() needs the DSP to be
->          * held in reset at the time it is called.
->          */
-> -       ret = davinci_clk_reset_assert(drproc->dsp_clk);
-> +       ret = reset_control_assert(dsp_reset);
->         if (ret)
->                 goto free_rproc;
->
-> --
-> 2.17.1
->
+>   Documentation/devicetree/bindings/mfd/rk808.txt | 55 +++++++++++++++++++++++++
+>   1 file changed, 55 insertions(+)
+> 
 
-Hi Bjorn, Sekhar,
+Hi Tony,
+Seems something went wrong with your series. The introductory email can be
+found only in linux-arm-kernel list but nowhere else and I can not find
+the fifth patch at all.
 
-I'm not seeing this patch in next, did you agree on how to pick it up for 4.19?
+Formal notes to this patch.
+- Documentation/binding patches should go first in your series.
+- Subject line should be: "dt-bindings: mfd: ..."
+- Try to avoid the words [documentation, device tree, bindings] in subject.
 
-Thanks in advance,
-Bartosz
+See this patch [1] from Rob and add him to the recipients for v2.
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?id=44acf10587907ff77c28fd97906220b2d8eb4f05
+
+Best regards,
+Michal
+
+> diff --git a/Documentation/devicetree/bindings/mfd/rk808.txt b/Documentation/devicetree/bindings/mfd/rk808.txt
+> index 91b6522..31c9f3d 100644
+> --- a/Documentation/devicetree/bindings/mfd/rk808.txt
+> +++ b/Documentation/devicetree/bindings/mfd/rk808.txt
+> @@ -3,11 +3,15 @@ RK8XX Power Management Integrated Circuit
+>   The rk8xx family current members:
+>   rk805
+>   rk808
+> +rk809
+> +rk817
+>   rk818
+>   
+>   Required properties:
+>   - compatible: "rockchip,rk805"
+>   - compatible: "rockchip,rk808"
+> +- compatible: "rockchip,rk809"
+> +- compatible: "rockchip,rk817"
+>   - compatible: "rockchip,rk818"
+>   - reg: I2C slave address
+>   - interrupt-parent: The parent interrupt controller.
+> @@ -46,6 +50,28 @@ Optional RK808 properties:
+>     the gpio controller. If DVS GPIOs aren't present, voltage changes will happen
+>     very quickly with no slow ramp time.
+>   
+> +Optional RK809 properties:
+> +- vcc1-supply:  The input supply for DCDC_REG1
+> +- vcc2-supply:  The input supply for DCDC_REG2
+> +- vcc3-supply:  The input supply for DCDC_REG3
+> +- vcc4-supply:  The input supply for DCDC_REG4
+> +- vcc5-supply:  The input supply for LDO_REG1, LDO_REG2, LDO_REG3
+> +- vcc6-supply:  The input supply for LDO_REG4, LDO_REG5, LDO_REG6
+> +- vcc7-supply:  The input supply for LDO_REG7, LDO_REG8, LDO_REG9
+> +- vcc8-supply:  The input supply for SWITCH_REG1
+> +- vcc9-supply:  The input supply for DCDC_REG5, SWITCH_REG2
+> +
+> +Optional RK817 properties:
+> +- vcc1-supply:  The input supply for DCDC_REG1
+> +- vcc2-supply:  The input supply for DCDC_REG2
+> +- vcc3-supply:  The input supply for DCDC_REG3
+> +- vcc4-supply:  The input supply for DCDC_REG4
+> +- vcc5-supply:  The input supply for LDO_REG1, LDO_REG2, LDO_REG3
+> +- vcc6-supply:  The input supply for LDO_REG4, LDO_REG5, LDO_REG6
+> +- vcc7-supply:  The input supply for LDO_REG7, LDO_REG8, LDO_REG9
+> +- vcc8-supply:  The input supply for BOOST
+> +- vcc9-supply:  The input supply for OTG_SWITCH
+> +
+>   Optional RK818 properties:
+>   - vcc1-supply:  The input supply for DCDC_REG1
+>   - vcc2-supply:  The input supply for DCDC_REG2
+> @@ -87,6 +113,28 @@ number as described in RK808 datasheet.
+>   	- SWITCH_REGn
+>   		- valid values for n are 1 to 2
+>   
+> +Following regulators of the RK809 PMIC block are supported. Note that
+> +the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
+> +number as described in RK808 datasheet.
+> +
+> +	- DCDC_REGn
+> +		- valid values for n are 1 to 5.
+> +	- LDO_REGn
+> +		- valid values for n are 1 to 9.
+> +	- SWITCH_REGn
+> +		- valid values for n are 1 to 2.
+> +
+> +Following regulators of the RK817 PMIC block are supported. Note that
+> +the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
+> +number as described in RK818 datasheet.
+> +
+> +	- DCDC_REGn
+> +		- valid values for n are 1 to 4.
+> +	- LDO_REGn
+> +		- valid values for n are 1 to 9.
+> +	- BOOST
+> +	- OTG_SWITCH
+> +
+>   Following regulators of the RK818 PMIC block are supported. Note that
+>   the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
+>   number as described in RK818 datasheet.
+> @@ -99,6 +147,13 @@ number as described in RK818 datasheet.
+>   	- HDMI_SWITCH
+>   	- OTG_SWITCH
+>   
+> +There are three pins needed to config, named "gpio_ts" "gpio_gt" "gpio_slp".
+> +	The gpio_gt and gpio_ts pins support the gpio function.
+> +	The gpio_slp pin is for controlling the pmic states, as below:
+> +		- reset
+> +		- power down
+> +		- sleep
+> +
+>   Standard regulator bindings are used inside regulator subnodes. Check
+>     Documentation/devicetree/bindings/regulator/regulator.txt
+>   for more details
+> 
