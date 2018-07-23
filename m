@@ -1,109 +1,99 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jul 2018 14:06:25 +0200
-Subject: [PATCH 7/8] ARM: dts: gr-peach: Add GR-Peach audiocamerashield support
+Date: Mon, 23 Jul 2018 14:06:26 +0200
+Subject: [PATCH 8/8] ARM: dts: r8a77470: Use r8a77470-cpg-mssr binding
+ definitions
 In-Reply-To: <cover.1532345886.git.horms+renesas@verge.net.au>
 References: <cover.1532345886.git.horms+renesas@verge.net.au>
-Message-ID: <c85aabb841f5ed544b492544e8280f2a9c1cc647.1532345886.git.horms+renesas@verge.net.au>
+Message-ID: <c03e2f12a2967f1639ee53299b72922ee3472528.1532345886.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jacopo Mondi <jacopo+renesas@jmondi.org>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add device tree header for GR-Peach's audiocamerashield with MT9V111
-image sensor.
+Replace the hardcoded clock indices by R8A77470_CLK_* symbols.
 
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/gr-peach-audiocamerashield.dtsi | 79 +++++++++++++++++++++++
- 1 file changed, 79 insertions(+)
- create mode 100644 arch/arm/boot/dts/gr-peach-audiocamerashield.dtsi
+ arch/arm/boot/dts/r8a77470.dtsi | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/gr-peach-audiocamerashield.dtsi b/arch/arm/boot/dts/gr-peach-audiocamerashield.dtsi
-new file mode 100644
-index 000000000000..e31a9e3c18a2
---- /dev/null
-+++ b/arch/arm/boot/dts/gr-peach-audiocamerashield.dtsi
-@@ -0,0 +1,79 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Device Tree Source for the GR-Peach audiocamera shield expansion board
-+ *
-+ * Copyright (C) 2017 Jacopo Mondi <jacopo+renesas@jmondi.org>
-+ */
-+
-+#include "r7s72100.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/r7s72100-pinctrl.h>
-+
-+/ {
-+	/* On-board camera clock. */
-+	camera_clk: camera_clk {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <27000000>;
-+	};
-+};
-+
-+&pinctrl {
-+	i2c1_pins: i2c1 {
-+		/* P1_2 as SCL; P1_3 as SDA */
-+		pinmux = <RZA1_PINMUX(1, 2, 1)>, <RZA1_PINMUX(1, 3, 1)>;
-+	};
-+
-+	vio_pins: vio {
-+		/* CEU pins: VIO_D[0-10], VIO_VD, VIO_HD, VIO_CLK */
-+		pinmux = <RZA1_PINMUX(1, 0, 5)>, /* VIO_VD */
-+			 <RZA1_PINMUX(1, 1, 5)>, /* VIO_HD */
-+			 <RZA1_PINMUX(2, 0, 7)>, /* VIO_D0 */
-+			 <RZA1_PINMUX(2, 1, 7)>, /* VIO_D1 */
-+			 <RZA1_PINMUX(2, 2, 7)>, /* VIO_D2 */
-+			 <RZA1_PINMUX(2, 3, 7)>, /* VIO_D3 */
-+			 <RZA1_PINMUX(2, 4, 7)>, /* VIO_D4 */
-+			 <RZA1_PINMUX(2, 5, 7)>, /* VIO_D5 */
-+			 <RZA1_PINMUX(2, 6, 7)>, /* VIO_D6 */
-+			 <RZA1_PINMUX(2, 7, 7)>, /* VIO_D7 */
-+			 <RZA1_PINMUX(10, 0, 6)>; /* VIO_CLK */
-+	};
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+
-+	status = "okay";
-+	clock-frequency = <100000>;
-+
-+	camera at 48 {
-+		compatible = "aptina,mt9v111";
-+		reg = <0x48>;
-+
-+		clocks = <&camera_clk>;
-+
-+		port {
-+			mt9v111_out: endpoint {
-+				remote-endpoint = <&ceu_in>;
-+			};
-+		};
-+	};
-+};
-+
-+&ceu {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&vio_pins>;
-+
-+	status = "okay";
-+
-+	port {
-+		ceu_in: endpoint {
-+			hsync-active = <1>;
-+			vsync-active = <1>;
-+			bus-width = <8>;
-+			pclk-sample = <1>;
-+			remote-endpoint = <&mt9v111_out>;
-+		};
-+	};
-+};
+diff --git a/arch/arm/boot/dts/r8a77470.dtsi b/arch/arm/boot/dts/r8a77470.dtsi
+index c85032f9605b..87d32d3e23de 100644
+--- a/arch/arm/boot/dts/r8a77470.dtsi
++++ b/arch/arm/boot/dts/r8a77470.dtsi
+@@ -7,7 +7,7 @@
+ 
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+-#include <dt-bindings/clock/renesas-cpg-mssr.h>
++#include <dt-bindings/clock/r8a77470-cpg-mssr.h>
+ / {
+ 	compatible = "renesas,r8a77470";
+ 	#address-cells = <2>;
+@@ -22,7 +22,7 @@
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0>;
+ 			clock-frequency = <1000000000>;
+-			clocks = <&cpg CPG_CORE 0>;
++			clocks = <&cpg CPG_CORE R8A77470_CLK_Z2>;
+ 			power-domains = <&sysc 5>;
+ 			next-level-cache = <&L2_CA7>;
+ 		};
+@@ -209,7 +209,7 @@
+ 			reg = <0 0xe6e60000 0 0x40>;
+ 			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 721>,
+-				 <&cpg CPG_CORE 5>, <&scif_clk>;
++				 <&cpg CPG_CORE R8A77470_CLK_ZS>, <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
+ 			dmas = <&dmac0 0x29>, <&dmac0 0x2a>,
+ 			       <&dmac1 0x29>, <&dmac1 0x2a>;
+@@ -225,7 +225,7 @@
+ 			reg = <0 0xe6e68000 0 0x40>;
+ 			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 720>,
+-				 <&cpg CPG_CORE 5>, <&scif_clk>;
++				 <&cpg CPG_CORE R8A77470_CLK_ZS>, <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
+ 			dmas = <&dmac0 0x2d>, <&dmac0 0x2e>,
+ 			       <&dmac1 0x2d>, <&dmac1 0x2e>;
+@@ -241,7 +241,7 @@
+ 			reg = <0 0xe6e58000 0 0x40>;
+ 			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 719>,
+-				 <&cpg CPG_CORE 5>, <&scif_clk>;
++				 <&cpg CPG_CORE R8A77470_CLK_ZS>, <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
+ 			dmas = <&dmac0 0x2b>, <&dmac0 0x2c>,
+ 			       <&dmac1 0x2b>, <&dmac1 0x2c>;
+@@ -257,7 +257,7 @@
+ 			reg = <0 0xe6ea8000 0 0x40>;
+ 			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 718>,
+-				 <&cpg CPG_CORE 5>, <&scif_clk>;
++				 <&cpg CPG_CORE R8A77470_CLK_ZS>, <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
+ 			dmas = <&dmac0 0x2f>, <&dmac0 0x30>,
+ 			       <&dmac1 0x2f>, <&dmac1 0x30>;
+@@ -273,7 +273,7 @@
+ 			reg = <0 0xe6ee0000 0 0x40>;
+ 			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 715>,
+-				 <&cpg CPG_CORE 5>, <&scif_clk>;
++				 <&cpg CPG_CORE R8A77470_CLK_ZS>, <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
+ 			dmas = <&dmac0 0xfb>, <&dmac0 0xfc>,
+ 			       <&dmac1 0xfb>, <&dmac1 0xfc>;
+@@ -289,7 +289,7 @@
+ 			reg = <0 0xe6ee8000 0 0x40>;
+ 			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 714>,
+-				 <&cpg CPG_CORE 5>, <&scif_clk>;
++				 <&cpg CPG_CORE R8A77470_CLK_ZS>, <&scif_clk>;
+ 			clock-names = "fck", "brg_int", "scif_clk";
+ 			dmas = <&dmac0 0xfd>, <&dmac0 0xfe>,
+ 			       <&dmac1 0xfd>, <&dmac1 0xfe>;
 -- 
 2.11.0
