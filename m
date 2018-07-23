@@ -1,51 +1,59 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 23 Jul 2018 09:22:42 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.19
-In-Reply-To: <CAMuHMdVbyUa5PtQf4LZQDv-=aqToahX5Eb4TEDvsJniYm-trNQ@mail.gmail.com>
-References: <cover.1532086504.git.horms+renesas@verge.net.au>
- <20180721220343.yuwrfxz3fo25krzv@localhost>
- <CAMuHMdVbyUa5PtQf4LZQDv-=aqToahX5Eb4TEDvsJniYm-trNQ@mail.gmail.com>
-Message-ID: <CAOesGMh09Do+Yv-C+4hE0KdShajr0hVRfLEPmeoH0AmM5kVAmw@mail.gmail.com>
+Date: Mon, 23 Jul 2018 09:23:53 -0700
+Subject: [GIT PULL] Amlogic 64-bit DT changes for v4.19 (redo)
+In-Reply-To: <1532340120.26720.94.camel@baylibre.com>
+References: <7ha7ql6goi.fsf@baylibre.com>
+ <20180721215224.oa2rqhg2zexgo7uq@localhost>
+ <1532340120.26720.94.camel@baylibre.com>
+Message-ID: <CAOesGMiZzpBPNP+dbJ-xrFHv-wkG9DkkrDfNuKET5NJ+LcnA8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 2:11 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
+On Mon, Jul 23, 2018 at 3:02 AM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> On Sat, 2018-07-21 at 14:52 -0700, Olof Johansson wrote:
+>> > ----------------------------------------------------------------
+>> > Amlogic 64-bit DT updates for v4.19
+>> > - new SoC: S805x
+>> > - new board: S805x-based P241 board from Amlogic
+>> > - AXG: add ADC support w/buttons, add pins for PDM, SPDIF
+>> > - AXG: s400 board: preliminary support for audio
+>> > - GX: nanopi-k2: add HDMI, CEC, CVBS support
+>> >
+>> > ----------------------------------------------------------------
+>> > Jerome Brunet (9):
+>> >        ARM64: dts: meson-axg: add s400 microphone card leds
+>> >        ARM64: dts: meson-axg: add s400 main 12v supply
+>> >        ARM64: dts: meson-axg: add s400 speaker amplifier
+>> >        ARM64: dts: meson-axg: add spdif output pins
+>> >        ARM64: dts: meson-axg: remove vddio_ao18 from SoC dtsi
+>> >        ARM64: dts: meson-axg: add adc buttons the S400
+>> >        ARM64: dts: meson-axg: remove spdif out from gpio a7
+>> >        ARM64: dts: meson-axg: add spdif input pins
+>> >        ARM64: dts: meson-axg: add pdm pins
+>>
+>> I've started being a little grumpy with others to keep it consistent, and
+>> you're consistent internally but not against other platforms: We use "arm64" or
+>> ARM" as prefixes, not ARM64/arm.
+>>
+>> I think it's time for a checkpatch rule for this, it's a bit silly to have to
+>> point it out all the time since people seem to get it wrong so often.
+>>
+>> I'll merge this for now and look at adding the rules.
+>
 > Hi Olof,
 >
-> On Sun, Jul 22, 2018 at 12:27 AM Olof Johansson <olof@lixom.net> wrote:
->> On Fri, Jul 20, 2018 at 02:03:54PM +0200, Simon Horman wrote:
->> > Please consider these Renesas ARM based SoC defconfig updates for v4.19.
+> Just to be clear, from now on, you request that we use 'arm64' as prefix,
+> instead of 'ARM64' ?
 >
->> > * Set CONFIG_LOCALVERSION to shmobile_defconfig
->> >
->> >   This follows what appears to be common practice in defconfigs
->> >   and allows easier management of the kernel flavour at run-time.
->>
->> I replied to the multi-versions of defconfig for this patch -- it's not a good
->> way to solve the problem of detecting config at runtime. Please drop this
->> patch. See:
->>
->> https://lore.kernel.org/lkml/CAOesGMgkU6yBRpAsED2fPyuAo9Tc=YprndGdkmBVrc+0783VwQ at mail.gmail.com/
->
-> One more comment to the rescue: it does complicate regression testing,
-> as the test software running on the DUT has no easy way to distinguish
-> between e.g. shmobile_defconfig and multi_v7_defconfig (and whatever
-> other board-specific configs I use for testing).
-> Yes, I can have these as local patches in my tree (of course I already have ;-),
-> but when bisecting, I have to remember to (un)apply them in every step.
+> And we should continue with 'ARM' for the 32bits arch (and not 'arm'), right ?
 
-Hi,
+Jerome,
 
-It looks like scripts/setlocalversion will look for files named
-localversion* in the directory you build in, git won't touch the file
-so you don't have to re-apply it every time.
+Confirmed; Plesae use 'arm64: dts: meson: ..." on 64-bit, and "ARM:
+dts: meson: ..." on 32-bit, at least until further notice.
 
-I do see the usefulness for bisect and so on, but there's such a high
-chance that people will start changing configs without changing
-localversion that the value of it will diminish immediately for
-downstream trees. Also, the "local" in localversion sort of indicates
-that it shouldn't be set in a central place. :)
+I know, I know, it's not ideal. Getting a fix into checkpatch will help.
+
 
 
 -Olof
