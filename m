@@ -1,135 +1,51 @@
-From: MNARANI@xilinx.com (Manish Narani)
-Date: Mon, 23 Jul 2018 09:34:50 +0000
-Subject: [PATCH 3/4] iio: adc: xilinx: Check for return values in clk
- related functions
-In-Reply-To: <20180721172423.11efb5ea@archlinux>
-References: <1531912331-26431-1-git-send-email-manish.narani@xilinx.com>
- <1531912331-26431-4-git-send-email-manish.narani@xilinx.com>
- <f4b8e687-217f-15b1-b0b1-b95dbc3dcc2a@metafoo.de>
- <20180721172423.11efb5ea@archlinux>
-Message-ID: <SN6PR02MB4959F2ABE80C54242B8BF0C9C1560@SN6PR02MB4959.namprd02.prod.outlook.com>
+From: ayan.halder@arm.com (Ayan Halder)
+Date: Mon, 23 Jul 2018 10:35:51 +0100
+Subject: [PATCH 03/10] drm: mali-dp: Use __drm_atomic_helper_plane_reset
+ instead of copying the logic
+In-Reply-To: <20180720211509.23605-4-alexandru-cosmin.gheorghe@arm.com>
+References: <20180713161407.GQ20303@art_vandelay>
+ <20180720211509.23605-1-alexandru-cosmin.gheorghe@arm.com>
+ <20180720211509.23605-4-alexandru-cosmin.gheorghe@arm.com>
+Message-ID: <20180723093335.GA26447@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
-
-Thanks for your comments.
-
-> -----Original Message-----
-> From: Jonathan Cameron [mailto:jic23 at kernel.org]
-> Sent: Saturday, July 21, 2018 9:54 PM
-> To: Lars-Peter Clausen <lars@metafoo.de>
-> Cc: Manish Narani <MNARANI@xilinx.com>; knaack.h at gmx.de;
-> pmeerw at pmeerw.net; Michal Simek <michals@xilinx.com>; linux-
-> iio at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; Anirudha Sarangi <anirudh@xilinx.com>; Srinivas
-> Goud <sgoud@xilinx.com>
-> Subject: Re: [PATCH 3/4] iio: adc: xilinx: Check for return values in clk related
-> functions
+On Fri, Jul 20, 2018 at 10:15:02PM +0100, Alexandru Gheorghe wrote:
+> Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
+> ---
+>  drivers/gpu/drm/arm/malidp_planes.c | 7 ++-----
+>  1 file changed, 2 insertions(+), 5 deletions(-)
 > 
-> On Thu, 19 Jul 2018 18:40:26 +0200
-> Lars-Peter Clausen <lars@metafoo.de> wrote:
-> 
-> > On 07/18/2018 01:12 PM, Manish Narani wrote:
-> > > This patch adds check for return values from clock related functions.
-> > > This was reported by static code analysis tool.
-> >
-> > This patch seems to do something else.
-> Indeed, definitely doing two things only one of which is mentioned.
-> Please break it up and resend.
-I will break it up and resend.
+> diff --git a/drivers/gpu/drm/arm/malidp_planes.c b/drivers/gpu/drm/arm/malidp_planes.c
+> index 29409a65d864..49c37f6dd63e 100644
+> --- a/drivers/gpu/drm/arm/malidp_planes.c
+> +++ b/drivers/gpu/drm/arm/malidp_planes.c
+> @@ -78,11 +78,8 @@ static void malidp_plane_reset(struct drm_plane *plane)
+>  	kfree(state);
+>  	plane->state = NULL;
+>  	state = kzalloc(sizeof(*state), GFP_KERNEL);
+> -	if (state) {
+> -		state->base.plane = plane;
+> -		state->base.rotation = DRM_MODE_ROTATE_0;
+> -		plane->state = &state->base;
+> -	}
+> +	if (state)
+> +		__drm_atomic_helper_plane_reset(plane, &state->base);
+>  }
+>  
+>  static struct
+> -- 
+> 2.18.0
+>
+A commit description like the following might be useful (though the
+patch is a part of series) :-
+Invoke a newly added drm atomic helper function
+(__drm_atomic_helper_plane_reset) to reset the 'drm_plane_state' to
+its default values for rotation, alpha and plane.
 
-> 
-> Jonathan
-> 
-> >
-> > >
-> > > Signed-off-by: Manish Narani <manish.narani@xilinx.com>
-> > > ---
-> > >  drivers/iio/adc/xilinx-xadc-core.c | 24 ++++++++++++++++++++++--
-> > >  1 file changed, 22 insertions(+), 2 deletions(-)
-> > >
-> > > diff --git a/drivers/iio/adc/xilinx-xadc-core.c
-> > > b/drivers/iio/adc/xilinx-xadc-core.c
-> > > index 248cffa..47eb364 100644
-> > > --- a/drivers/iio/adc/xilinx-xadc-core.c
-> > > +++ b/drivers/iio/adc/xilinx-xadc-core.c
-> > > @@ -322,6 +322,7 @@ static irqreturn_t
-> > > xadc_zynq_interrupt_handler(int irq, void *devid)
-> > >
-> > >  #define XADC_ZYNQ_TCK_RATE_MAX 50000000  #define
-> > > XADC_ZYNQ_IGAP_DEFAULT 20
-> > > +#define XADC_ZYNQ_PCAP_RATE_MAX 200000000
-> > >
-> > >  static int xadc_zynq_setup(struct platform_device *pdev,
-> > >  	struct iio_dev *indio_dev, int irq) @@ -332,6 +333,7 @@ static int
-> > > xadc_zynq_setup(struct platform_device *pdev,
-> > >  	unsigned int div;
-> > >  	unsigned int igap;
-> > >  	unsigned int tck_rate;
-> > > +	int ret;
-> > >
-> > >  	/* TODO: Figure out how to make igap and tck_rate configurable */
-> > >  	igap = XADC_ZYNQ_IGAP_DEFAULT;
-> > > @@ -341,6 +343,13 @@ static int xadc_zynq_setup(struct
-> > > platform_device *pdev,
-> > >
-> > >  	pcap_rate = clk_get_rate(xadc->clk);
-> > >
-> > > +	if (pcap_rate > XADC_ZYNQ_PCAP_RATE_MAX) {
-> > > +		ret = clk_set_rate(xadc->clk,
-> > > +				   (unsigned
-> long)XADC_ZYNQ_PCAP_RATE_MAX);
-> > > +		if (ret)
-> > > +			return ret;
-> > > +	}
-> > > +
-> > >  	if (tck_rate > pcap_rate / 2) {
-> > >  		div = 2;
-> > >  	} else {
-> > > @@ -366,6 +375,12 @@ static int xadc_zynq_setup(struct platform_device
-> *pdev,
-> > >  			XADC_ZYNQ_CFG_REDGE | XADC_ZYNQ_CFG_WEDGE
-> |
-> > >  			tck_div | XADC_ZYNQ_CFG_IGAP(igap));
-> > >
-> > > +	if (pcap_rate > XADC_ZYNQ_PCAP_RATE_MAX) {
-> > > +		ret = clk_set_rate(xadc->clk, pcap_rate);
-> > > +		if (ret)
-> > > +			return ret;
-> > > +	}
-> > > +
-> > >  	return 0;
-> > >  }
-> > >
-> > > @@ -887,6 +902,9 @@ static int xadc_write_raw(struct iio_dev *indio_dev,
-> > >  	unsigned long clk_rate = xadc_get_dclk_rate(xadc);
-> > >  	unsigned int div;
-> > >
-> > > +	if (!clk_rate)
-> > > +		return -EINVAL;
-> > > +
-> > >  	if (info != IIO_CHAN_INFO_SAMP_FREQ)
-> > >  		return -EINVAL;
-> > >
-> > > @@ -1239,8 +1257,10 @@ static int xadc_probe(struct platform_device
-> *pdev)
-> > >  		goto err_free_irq;
-> > >
-> > >  	/* Disable all alarms */
-> > > -	xadc_update_adc_reg(xadc, XADC_REG_CONF1,
-> XADC_CONF1_ALARM_MASK,
-> > > -		XADC_CONF1_ALARM_MASK);
-> > > +	ret = xadc_update_adc_reg(xadc, XADC_REG_CONF1,
-> XADC_CONF1_ALARM_MASK,
-> > > +				  XADC_CONF1_ALARM_MASK);
-> > > +	if (ret)
-> > > +		goto err_free_irq;
-> > >
-> > >  	/* Set thresholds to min/max */
-> > >  	for (i = 0; i < 16; i++) {
-> > >
-> >
-
-Thanks,
-Manish Narani
+Otherwise, with my limited knowledge on DRM, this looks OK to me:-
+Reviewed-by :- Ayan Kumar halder <ayan.halder@arm.com> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
