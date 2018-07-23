@@ -1,57 +1,64 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 23 Jul 2018 10:57:30 +0900
-Subject: [PATCH v4 3/5] efi/arm: preserve early mapping of UEFI memory map
- longer for BGRT
+Date: Mon, 23 Jul 2018 10:57:31 +0900
+Subject: [PATCH v4 4/5] efi/arm: map UEFI memory map even w/o runtime services
+ enabled
 In-Reply-To: <20180723015732.24252-1-takahiro.akashi@linaro.org>
 References: <20180723015732.24252-1-takahiro.akashi@linaro.org>
-Message-ID: <20180723015732.24252-4-takahiro.akashi@linaro.org>
+Message-ID: <20180723015732.24252-5-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Under the current implementation, UEFI memory map will be mapped and made
+available in virtual mappings only if runtime services are enabled.
+But in a later patch, we want to use UEFI memory map in acpi_os_ioremap()
+to create mappings of ACPI tables using memory attributes described in
+UEFI memory map.
+See the following commit:
+    arm64: acpi: fix alignment fault in accessing ACPI tables
 
-The BGRT code validates the contents of the table against the UEFI
-memory map, and so it expects it to be mapped when the code runs.
+So, as a first step, arm_enter_runtime_services() is modified, alongside
+Ard's patch[1], so that UEFI memory map will not be freed even if
+efi=noruntime.
 
-On ARM, this is currently not the case, since we tear down the early
-mapping after efi_init() completes, and only create the permanent
-mapping in arm_enable_runtime_services(), which executes as an early
-initcall, but still leaves a window where the UEFI memory map is not
-mapped.
+[1] https://marc.info/?l=linux-efi&m=152930773507524&w=2
 
-So move the call to efi_memmap_unmap() from efi_init() to
-arm_enable_runtime_services().
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/arm-init.c    | 1 -
- drivers/firmware/efi/arm-runtime.c | 2 ++
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ drivers/firmware/efi/arm-runtime.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-index b5214c143fee..388a929baf95 100644
---- a/drivers/firmware/efi/arm-init.c
-+++ b/drivers/firmware/efi/arm-init.c
-@@ -259,7 +259,6 @@ void __init efi_init(void)
- 
- 	reserve_regions();
- 	efi_esrt_init();
--	efi_memmap_unmap();
- 
- 	memblock_reserve(params.mmap & PAGE_MASK,
- 			 PAGE_ALIGN(params.mmap_size +
 diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-index 5889cbea60b8..59a8c0ec94d5 100644
+index 59a8c0ec94d5..a00934d263c5 100644
 --- a/drivers/firmware/efi/arm-runtime.c
 +++ b/drivers/firmware/efi/arm-runtime.c
-@@ -115,6 +115,8 @@ static int __init arm_enable_runtime_services(void)
- 		return 0;
- 	}
+@@ -117,6 +117,13 @@ static int __init arm_enable_runtime_services(void)
  
-+	efi_memmap_unmap();
+ 	efi_memmap_unmap();
+ 
++	mapsize = efi.memmap.desc_size * efi.memmap.nr_map;
++
++	if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
++		pr_err("Failed to remap EFI memory map\n");
++		return 0;
++	}
 +
  	if (efi_runtime_disabled()) {
  		pr_info("EFI runtime services will be disabled.\n");
  		return 0;
+@@ -129,13 +136,6 @@ static int __init arm_enable_runtime_services(void)
+ 
+ 	pr_info("Remapping and enabling EFI services.\n");
+ 
+-	mapsize = efi.memmap.desc_size * efi.memmap.nr_map;
+-
+-	if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
+-		pr_err("Failed to remap EFI memory map\n");
+-		return -ENOMEM;
+-	}
+-
+ 	if (!efi_virtmap_init()) {
+ 		pr_err("UEFI virtual mapping missing or invalid -- runtime services will not be available\n");
+ 		return -ENOMEM;
 -- 
 2.18.0
