@@ -1,58 +1,167 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon, 23 Jul 2018 11:38:26 -0700
-Subject: [PATCH v2 1/3] Revert "ARM: dts: imx7d: Invert legacy PCI irq
- mapping"
-In-Reply-To: <42ff53eeea3067b19e3e16bed8392706502c8f23.camel@nxp.com>
-References: <cover.1532090446.git.leonard.crestez@nxp.com>
- <221deb47d7d38ecd6e0c7636f9a87ab693a3c539.1532090446.git.leonard.crestez@nxp.com>
- <CAHQ1cqF6TphuN8Ls54YA6bjty-bJF8twYboaG-RM=jox8CeQPA@mail.gmail.com>
- <42ff53eeea3067b19e3e16bed8392706502c8f23.camel@nxp.com>
-Message-ID: <CAHQ1cqF7u2gjwYt1-16u-uimXHZ2SWsquabZSDftQn_yRurhSQ@mail.gmail.com>
+From: gustavo.padovan@collabora.com (Gustavo Padovan)
+Date: Mon, 23 Jul 2018 15:39:06 -0300
+Subject: [RFC RESEND PATCH] drm/rockchip: update cursors asynchronously
+ through atomic.
+In-Reply-To: <20180723143634.GJ20359@art_vandelay>
+References: <20180627211447.20927-1-enric.balletbo@collabora.com>
+ <20180723143634.GJ20359@art_vandelay>
+Message-ID: <621351c6-068e-1317-2571-5c8d1477c2e3@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 5:41 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
->
-> On Fri, 2018-07-20 at 08:33 -0700, Andrey Smirnov wrote:
-> > On Fri, Jul 20, 2018 at 5:48 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
-> > >
-> > > This reverts commit 1c86c9dd82f859b474474a7fee0d5195da2c9c1d.
-> > >
-> > > That commit followed the reference manual but unfortunately the imx7d
-> > > manual is incorrect.
-> >
-> > I'd also add similar comment to DT file to prevent people from trying
-> > to "fix" this in the future.
->
-> I'll try to see if I can follow up internally with docs team to get
-> this updated in the next revision of the reference manual.
->
+Hi Enric,
 
-Not sure if we are on the same page here, but what I meant is adding
-the same explanation that is in your commit message to Device Tree
-file as well so that if anyone looks at DT code and goes "Huh?" in the
-future, they wouldn't have to research commit history to see the
-reason why things the way they are.
+On 07/23/2018 11:36 AM, Sean Paul wrote:
+> On Wed, Jun 27, 2018 at 11:14:47PM +0200, Enric Balletbo i Serra wrote:
+>> Add support to async updates of cursors by using the new atomic
+>> interface for that.
+>>
+>> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> 
+> LGTM. Given rockchip hasn't weighed in on the patch, and that you've tested it
+> on real hardware, let's land it.
+> 
+> Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
-> > Also, this change is going to break QEMU's mapping found here:
->
-> I had no idea that existed, I guess somebody needs to fix that as well.
->
+Your patch don't apply cleanly anymore. Can you rebase it and add the 
+r-b to the patch while at it? Thanks!
 
-I take it it's a no to my "any chance you can fix that as well?" ;-).
-I'll see if I can find time to do that this week.
+Gustavo
 
-> Do you have an imx7d board using pci or did you just test in emulation?
->
+> 
+> 
+>> ---
+>> I am sending this as RFC because I still don't have a deep knowledge of
+>> the hw and I am not sure if the vop_plane_update function can be reused
+>> in both cases, atomic_updates and atomic_async_updates. I think that
+>> someone with more knowledge should take a look. The patch was tested on
+>> a Samsung Chromebook Plus in two ways.
+>>
+>> 1. Running all igt kms_cursor_legacy and kms_atomic at plane_cursor_legacy
+>> tests and see that there is no regression after the patch.
+>>
+>> 2. Running weston using the atomic API.
+>>
+>> Best regards,
+>>    Enric
+>>
+>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 80 ++++++++++++++++-----
+>>   1 file changed, 64 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> index 53d4afe15278..1eb6bda924af 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> @@ -688,8 +688,7 @@ static void vop_plane_atomic_disable(struct drm_plane *plane,
+>>   	spin_unlock(&vop->reg_lock);
+>>   }
+>>   
+>> -static void vop_plane_atomic_update(struct drm_plane *plane,
+>> -		struct drm_plane_state *old_state)
+>> +static void vop_plane_update(struct drm_plane *plane)
+>>   {
+>>   	struct drm_plane_state *state = plane->state;
+>>   	struct drm_crtc *crtc = state->crtc;
+>> @@ -710,20 +709,6 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+>>   	bool rb_swap;
+>>   	int format;
+>>   
+>> -	/*
+>> -	 * can't update plane when vop is disabled.
+>> -	 */
+>> -	if (WARN_ON(!crtc))
+>> -		return;
+>> -
+>> -	if (WARN_ON(!vop->is_enabled))
+>> -		return;
+>> -
+>> -	if (!state->visible) {
+>> -		vop_plane_atomic_disable(plane, old_state);
+>> -		return;
+>> -	}
+>> -
+>>   	obj = rockchip_fb_get_gem_obj(fb, 0);
+>>   	rk_obj = to_rockchip_obj(obj);
+>>   
+>> @@ -794,10 +779,73 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+>>   	spin_unlock(&vop->reg_lock);
+>>   }
+>>   
+>> +static void vop_plane_atomic_update(struct drm_plane *plane,
+>> +				    struct drm_plane_state *old_state)
+>> +{
+>> +	struct drm_plane_state *state = plane->state;
+>> +	struct vop *vop = to_vop(state->crtc);
+>> +
+>> +	/*
+>> +	 * can't update plane when vop is disabled.
+>> +	 */
+>> +	if (WARN_ON(!state->crtc))
+>> +		return;
+>> +
+>> +	if (WARN_ON(!vop->is_enabled))
+>> +		return;
+>> +
+>> +	if (!state->visible) {
+>> +		vop_plane_atomic_disable(plane, old_state);
+>> +		return;
+>> +	}
+>> +
+>> +	vop_plane_update(plane);
+>> +}
+>> +
+>> +static int vop_plane_atomic_async_check(struct drm_plane *plane,
+>> +					struct drm_plane_state *state)
+>> +{
+>> +	struct drm_crtc_state *crtc_state;
+>> +
+>> +	crtc_state = drm_atomic_get_existing_crtc_state(state->state,
+>> +							state->crtc);
+>> +	if (WARN_ON(!crtc_state))
+>> +		return -EINVAL;
+>> +
+>> +	if (!crtc_state->active)
+>> +		return -EINVAL;
+>> +
+>> +	if (plane->state->crtc != state->crtc ||
+>> +	    plane->state->src_w != state->src_w ||
+>> +	    plane->state->src_h != state->src_h ||
+>> +	    plane->state->crtc_w != state->crtc_w ||
+>> +	    plane->state->crtc_h != state->crtc_h ||
+>> +	    !plane->state->fb ||
+>> +	    plane->state->fb != state->fb)
+>> +		return -EINVAL;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static void vop_plane_atomic_async_update(struct drm_plane *plane,
+>> +					  struct drm_plane_state *new_state)
+>> +{
+>> +	plane->state->src_x = new_state->src_x;
+>> +	plane->state->src_y = new_state->src_y;
+>> +	plane->state->crtc_x = new_state->crtc_x;
+>> +	plane->state->crtc_y = new_state->crtc_y;
+>> +	plane->state->fb = new_state->fb;
+>> +	*plane->state = *new_state;
+>> +
+>> +	vop_plane_update(plane);
+>> +}
+>> +
+>>   static const struct drm_plane_helper_funcs plane_helper_funcs = {
+>>   	.atomic_check = vop_plane_atomic_check,
+>>   	.atomic_update = vop_plane_atomic_update,
+>>   	.atomic_disable = vop_plane_atomic_disable,
+>> +	.atomic_async_check = vop_plane_atomic_async_check,
+>> +	.atomic_async_update = vop_plane_atomic_async_update,
+>>   };
+>>   
+>>   static const struct drm_plane_funcs vop_plane_funcs = {
+>> -- 
+>> 2.18.0
+>>
+> 
 
-I used real i.MX7D Sabre board with i210 network card, when I was
-porting i.MX7 PCIe patches. However, as per note I made in the
-original submission:
-
-https://lkml.org/lkml/2017/10/9/913
-
-this IRQ swap patch came up as a result of "connecting" emulated ICH4
-in QEMU which was using legacy interrupts.
-
-Thanks,
-Andrey Smirnov
+-- 
+Gustavo Padovan
+Collabora Ltd
