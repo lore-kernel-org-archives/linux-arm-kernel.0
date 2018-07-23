@@ -1,71 +1,59 @@
-From: megous@megous.com (=?utf-8?Q?Ond=C5=99ej?= Jirman)
-Date: Mon, 23 Jul 2018 18:16:34 +0200
-Subject: [PATCH v3 0/7] mmc: sunxi: Add runtime PM support
-In-Reply-To: <20180720145143.qgvlk2gbegxwwcfs@flea>
-References: <cover.e9b9c0ab5bc9ffcc52a15e1c2f41462729da5b61.1523888566.git-series.maxime.ripard@bootlin.com>
- <20180716171428.ud3zsmeccds545si@core>
- <20180720145143.qgvlk2gbegxwwcfs@flea>
-Message-ID: <20180723161634.j7akxttoothslyhi@core>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 23 Jul 2018 09:17:39 -0700
+Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.19, round 2
+In-Reply-To: <7hk1pm3ym6.fsf@baylibre.com>
+References: <7hr2jx50q0.fsf@baylibre.com>
+ <20180721215422.vsd34udhkhs7lh3h@localhost>
+ <7hk1pm3ym6.fsf@baylibre.com>
+Message-ID: <CAOesGMg5iPtWaP2XOm7+J46kOQfczoc7HstcyM=pAVcMQbCubQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Mon, Jul 23, 2018 at 5:50 AM, Kevin Hilman <khilman@baylibre.com> wrote:
+> Olof Johansson <olof@lixom.net> writes:
+>
+>> On Fri, Jul 20, 2018 at 11:30:15AM -0500, Kevin Hilman wrote:
+>>> Olof, Arnd,
+>>>
+>>> A second round of DT updates for Amlogic, directly on top of the redo of
+>>> the first one.
+>>>
+>>> This includes a merge of a branch already queued in the clk tree because
+>>> of the dependency on clock headers used in the DT changes here..
+>>>
+>>> Kevin
+>>>
+>>>
+>>> The following changes since commit 89803e8b26569bdf5798f8745a4c708bf9360ee6:
+>>>
+>>>   ARM64: dts: meson-axg: add pdm pins (2018-07-20 08:18:37 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2
+>>>
+>>> for you to fetch changes up to fcf775a1e6717b7157b1ea626028b7e039b3c989:
+>>>
+>>>   Merge branch 'v4.19/dt64' into tmp/aml-rebuild (2018-07-20 09:05:11 -0700)
+>>>
+>>> ----------------------------------------------------------------
+>>> Amlogic 64-bit DT changes for v4.19, round 2
+>>> - new SoC: S905W
+>>> - new boards: based on S905W: Amlogic P281, Oranth Tanix TX3 Mini
+>>> - AXG: add DT for new audio clock controller
+>>>
+>>> ----------------------------------------------------------------
+>>
+>> Something happened to your diffstat here. It's also based on -rc5?
+>
+> My branch is/was based on -rc1 but the dependency branch from the clock
+> tree is based on -rc5.  That made the diffstat include -rc5, which was
+> too noisy, so I removed it but then forgot to add the simplified
+> version.
 
-On Fri, Jul 20, 2018 at 04:51:43PM +0200, Maxime Ripard wrote:
-> Hi Ondrej,
-> 
-> On Mon, Jul 16, 2018 at 07:14:28PM +0200, Ond?ej Jirman wrote:
-> > On Mon, Apr 16, 2018 at 04:22:58PM +0200, Maxime Ripard wrote:
-> > > Hi,
-> > > 
-> > > Since it's introduction, our MMC controller has had its external clocks
-> > > running all the time.
-> > > 
-> > > While that was working great, the power usage and most importantly the EMI
-> > > that it generated was pretty bad.
-> > > 
-> > > Let's implement some runtime_pm hooks with an autosuspend to shut down the
-> > > whole block when the MMC is not active.
-> > > 
-> > > However, some SDIO devices will not probe properly if we keep shutting down
-> > > the controller, so the autosuspend is disabled for the SDIO devices.
-> > 
-> > I've tested your patches on TBS A711 tablet (A83T). I get this in the log:
-> > 
-> >   sunxi-mmc 1c10000.mmc: fatal err update clk timeout
-> > 
-> > Interestingly, this only happens after the first boot. If I hard power cycle the
-> > tablet (removing/reinserting the battery) the first boot after that, there's no
-> > timeout, and WiFi chip connected to the mmc controller works.
-> > 
-> > Any other reboot (even power cycling via PMIC), it fails with the above error.
-> > Maybe there's some unforeseen interaction of runtime PM with mmc-powerseq used
-> > for the wifi chip power seuencing? Do you know what's the above error about?
-> > I don't know anything about mmc subsystem.
-> 
-> It's kind of weird. Do you have an oscilloscope available to look at
-> the clock signal (and the reset gpio) and see if there's any
-> difference of behaviour?
+Ah, thanks. It's unfortunate that this brings in a new -rc but not the
+end of the world. Will merge later today or tomorrow depending on
+travel progress.
 
-No, I don't. I can try some printks on the kernel side if it toggles the WiFi
-reset/power enable gpios differntly.
 
-It looks like something's different on initialization when booting the kernel.
-WiFi works fine for extended periods of time after the hard power cycle. But
-when rebooting, it fails.
-
-Adding to the weirdness factor may be the fact that WiFi is not connected via
-PMIC, so it gets power almost directly from the battery. So kernel may not be
-doing the WiFi reset properly on boot (which is fine right after the hard power
-cycle, but leaves the WiFi in unknown state on subsequent reboots).
-
-Thank you and regards,
-  o.
-
-> Thanks!
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Bootlin (formerly Free Electrons)
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+-Olof
