@@ -1,51 +1,38 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 23 Jul 2018 10:44:23 +0100
-Subject: [PATCH v4 02/20] virtio: pci-legacy: Validate queue pfn
-In-Reply-To: <20180722185335-mutt-send-email-mst@kernel.org>
-References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
- <1531905547-25478-3-git-send-email-suzuki.poulose@arm.com>
- <20180722185335-mutt-send-email-mst@kernel.org>
-Message-ID: <5a659490-13ce-87c1-a9bc-d89a8f8ee111@arm.com>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Tue, 24 Jul 2018 01:46:09 +0800
+Subject: [PATCH v3 0/3] add memcpy support for sdma
+Message-ID: <1532367972-29707-1-git-send-email-yibin.gong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2018 04:53 PM, Michael S. Tsirkin wrote:
-> On Wed, Jul 18, 2018 at 10:18:45AM +0100, Suzuki K Poulose wrote:
->> Legacy PCI over virtio uses a 32bit PFN for the queue. If the
->> queue pfn is too large to fit in 32bits, which we could hit on
->> arm64 systems with 52bit physical addresses (even with 64K page
->> size), we simply miss out a proper link to the other side of
->> the queue.
->>
->> Add a check to validate the PFN, rather than silently breaking
->> the devices.
->>
->> Cc: "Michael S. Tsirkin" <mst@redhat.com>
->> Cc: Jason Wang <jasowang@redhat.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Christoffer Dall <cdall@kernel.org>
->> Cc: Peter Maydel <peter.maydell@linaro.org>
->> Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> 
-> Acked-by: Michael S. Tsirkin <mst@redhat.com>
+This patchset is to add memcpy interface for imx-sdma, besides,to
+support dmatest and enable config by default, so that could test dma
+easily without any other device support such as uart/audio/spi...
 
+Change from v2:
+  1. remove 'copy_align' since sdma script for memory_2_memory will handle
+     such align issue. No such align limitation. Also remove bus width
+     description in bd.
+  2. for multi bds case such as in dmatest, should make sure all bds of 
+     single transfer should be consistent, so enlarge allocated size for
+     dma pool to max bds, 20 bds/1.28MB should be enough for all case.Report
+     error if the bd number exceed 20.
 
-Michael,
+Change from v1:
+  1. remove bus_width check for memcpy since only max bus width needed for
+     memcpy case to speedup copy.
+  2. remove DMATEST support patch, since DMATEST is a common memcpy case.
+  3. split to single patch for SDMA_BD_MAX_CNT instead of '0xffff'
+  4. move sdma_config_ownership() from alloc_chan into sdma_prep_memcpy.
+  5. address some minor review comments.
 
-Thanks.
+Robin Gong (3):
+  dmaengine: imx-sdma: add SDMA_BD_MAX_CNT to replace '0xffff'
+  dmaengine: imx-sdma: add memcpy interface
+  dmaengine: imx-sdma: allocate max 20 bds for one transfer
 
-> 
-> I assume this will be merged through some other tree.
->
+ drivers/dma/imx-sdma.c | 121 +++++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 112 insertions(+), 9 deletions(-)
 
-
-As such these two virtio patches do not have any code dependencies with
-the rest of the series. So, if you could pick this up it should be fine.
-Otherwise, may be Marc can push it with the rest of the series.
-
-Marc,
-
-Are you OK with that ?
-
-Suzuki
+-- 
+2.7.4
