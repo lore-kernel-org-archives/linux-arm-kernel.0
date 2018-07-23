@@ -1,36 +1,71 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 23 Jul 2018 19:14:28 +0300
-Subject: [PATCH] arm64: dts: renesas: r8a77980: add RWDT support
-In-Reply-To: <20180723160827.ziuivshq2mtagexq@verge.net.au>
-References: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
- <175a491f-a827-4a92-1884-2f1490d38a52@cogentembedded.com>
- <20180723160827.ziuivshq2mtagexq@verge.net.au>
-Message-ID: <4eb91e29-9c2f-6f7c-2b3c-983e41430e26@cogentembedded.com>
+From: megous@megous.com (=?utf-8?Q?Ond=C5=99ej?= Jirman)
+Date: Mon, 23 Jul 2018 18:16:34 +0200
+Subject: [PATCH v3 0/7] mmc: sunxi: Add runtime PM support
+In-Reply-To: <20180720145143.qgvlk2gbegxwwcfs@flea>
+References: <cover.e9b9c0ab5bc9ffcc52a15e1c2f41462729da5b61.1523888566.git-series.maxime.ripard@bootlin.com>
+ <20180716171428.ud3zsmeccds545si@core>
+ <20180720145143.qgvlk2gbegxwwcfs@flea>
+Message-ID: <20180723161634.j7akxttoothslyhi@core>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2018 07:08 PM, Simon Horman wrote:
+Hi Maxime,
 
->> Describe RWDT in the R8A77980 SoC device tree.
->>
->> Enable RWDT on the Condor and V3H Starter Kit boards.
->>
->> Based on the original (and large) patch by Vladimir Barinov.
->>
->> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->> ---
->> The patch is against the 'renesas-devel-20180720-v4.18-rc5' of Simon Horman's
->> 'renesas.git' repo.  It depends on Geert Uytterhoeven's clock driver patches
->> (adding the RWDT clock) in order to work...
+On Fri, Jul 20, 2018 at 04:51:43PM +0200, Maxime Ripard wrote:
+> Hi Ondrej,
 > 
-> But it is safe to apply without those patches, right?
+> On Mon, Jul 16, 2018 at 07:14:28PM +0200, Ond?ej Jirman wrote:
+> > On Mon, Apr 16, 2018 at 04:22:58PM +0200, Maxime Ripard wrote:
+> > > Hi,
+> > > 
+> > > Since it's introduction, our MMC controller has had its external clocks
+> > > running all the time.
+> > > 
+> > > While that was working great, the power usage and most importantly the EMI
+> > > that it generated was pretty bad.
+> > > 
+> > > Let's implement some runtime_pm hooks with an autosuspend to shut down the
+> > > whole block when the MMC is not active.
+> > > 
+> > > However, some SDIO devices will not probe properly if we keep shutting down
+> > > the controller, so the autosuspend is disabled for the SDIO devices.
+> > 
+> > I've tested your patches on TBS A711 tablet (A83T). I get this in the log:
+> > 
+> >   sunxi-mmc 1c10000.mmc: fatal err update clk timeout
+> > 
+> > Interestingly, this only happens after the first boot. If I hard power cycle the
+> > tablet (removing/reinserting the battery) the first boot after that, there's no
+> > timeout, and WiFi chip connected to the mmc controller works.
+> > 
+> > Any other reboot (even power cycling via PMIC), it fails with the above error.
+> > Maybe there's some unforeseen interaction of runtime PM with mmc-powerseq used
+> > for the wifi chip power seuencing? Do you know what's the above error about?
+> > I don't know anything about mmc subsystem.
+> 
+> It's kind of weird. Do you have an oscilloscope available to look at
+> the clock signal (and the reset gpio) and see if there's any
+> difference of behaviour?
 
-   The RWDT driver should just fail to probe with -ENOENT. 
+No, I don't. I can try some printks on the kernel side if it toggles the WiFi
+reset/power enable gpios differntly.
 
-> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+It looks like something's different on initialization when booting the kernel.
+WiFi works fine for extended periods of time after the hard power cycle. But
+when rebooting, it fails.
 
-   TY!
+Adding to the weirdness factor may be the fact that WiFi is not connected via
+PMIC, so it gets power almost directly from the battery. So kernel may not be
+doing the WiFi reset properly on boot (which is fine right after the hard power
+cycle, but leaves the WiFi in unknown state on subsequent reboots).
 
-MBR, Sergei
+Thank you and regards,
+  o.
+
+> Thanks!
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
