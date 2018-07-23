@@ -1,83 +1,44 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 23 Jul 2018 08:36:42 +0530
-Subject: [PATCH] arm64: dts: hisilicon: Add missing clocks property for CPUs
-Message-ID: <6de0dde994326b3fdc2b746e22fdf1afe18067d2.1532315177.git.viresh.kumar@linaro.org>
+From: pengbo.mu@nxp.com (Pengbo Mu)
+Date: Mon, 23 Jul 2018 11:11:26 +0800
+Subject: [PATCH v6 3/4] arm64: dts: dwc3: description of incr burst type
+In-Reply-To: <1532315487-23137-1-git-send-email-pengbo.mu@nxp.com>
+References: <1532315487-23137-1-git-send-email-pengbo.mu@nxp.com>
+Message-ID: <1532315487-23137-3-git-send-email-pengbo.mu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clocks property should either be present for all the CPUs of a
-cluster or none. If these are present only for a subset of CPUs of a
-cluster then things will start falling apart as soon as the CPUs are
-brought online in a different order. For example, this will happen
-because the operating system looks for such properties in the CPU node
-it is trying to bring up, so that it can register a cooling device.
+Add description of 'snps,incr-burst-type-adjustment'
 
-Add missing clocks property.
-
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+Signed-off-by: Pengbo Mu <pengbo.mu@nxp.com>
 ---
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+Changes in v1:
+ - add description of 'snps,incr-burst-type-adjustment' property
+---
+ Documentation/devicetree/bindings/usb/dwc3.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 919d36b91bf3..aec9e371c2a7 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -99,6 +99,7 @@
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
- 			next-level-cache = <&CLUSTER0_L2>;
-+			clocks = <&stub_clock 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 			#cooling-cells = <2>; /* min followed by max */
-@@ -111,6 +112,7 @@
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
- 			next-level-cache = <&CLUSTER0_L2>;
-+			clocks = <&stub_clock 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 			#cooling-cells = <2>; /* min followed by max */
-@@ -123,6 +125,7 @@
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
- 			next-level-cache = <&CLUSTER0_L2>;
-+			clocks = <&stub_clock 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 			#cooling-cells = <2>; /* min followed by max */
-@@ -135,6 +138,7 @@
- 			reg = <0x0 0x100>;
- 			enable-method = "psci";
- 			next-level-cache = <&CLUSTER1_L2>;
-+			clocks = <&stub_clock 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 			#cooling-cells = <2>; /* min followed by max */
-@@ -147,6 +151,7 @@
- 			reg = <0x0 0x101>;
- 			enable-method = "psci";
- 			next-level-cache = <&CLUSTER1_L2>;
-+			clocks = <&stub_clock 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 			#cooling-cells = <2>; /* min followed by max */
-@@ -159,6 +164,7 @@
- 			reg = <0x0 0x102>;
- 			enable-method = "psci";
- 			next-level-cache = <&CLUSTER1_L2>;
-+			clocks = <&stub_clock 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 			#cooling-cells = <2>; /* min followed by max */
-@@ -171,6 +177,7 @@
- 			reg = <0x0 0x103>;
- 			enable-method = "psci";
- 			next-level-cache = <&CLUSTER1_L2>;
-+			clocks = <&stub_clock 0>;
- 			operating-points-v2 = <&cpu_opp_table>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
- 			#cooling-cells = <2>; /* min followed by max */
+diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt b/Documentation/devicetree/bindings/usb/dwc3.txt
+index 7f13ebe..3e4c38b 100644
+--- a/Documentation/devicetree/bindings/usb/dwc3.txt
++++ b/Documentation/devicetree/bindings/usb/dwc3.txt
+@@ -96,6 +96,11 @@ Optional properties:
+ 			enable periodic ESS TX threshold.
+ 
+  - <DEPRECATED> tx-fifo-resize: determines if the FIFO *has* to be reallocated.
++ - snps,incr-burst-type-adjustment: Value for INCR burst type of GSBUSCFG0
++			register, undefined length INCR burst type enable and INCRx type.
++			When just one value, which means INCRX burst mode enabled. When
++			more than one value, which means undefined length INCR burst type
++			enabled. The values can be 1, 4, 8, 16, 32, 64, 128 and 256.
+ 
+  - in addition all properties from usb-xhci.txt from the current directory are
+    supported as well
+@@ -108,4 +113,5 @@ dwc3 at 4a030000 {
+ 	reg = <0x4a030000 0xcfff>;
+ 	interrupts = <0 92 4>
+ 	usb-phy = <&usb2_phy>, <&usb3,phy>;
++	snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
+ };
 -- 
-2.18.0.rc1.242.g61856ae69a2c
+2.7.4
