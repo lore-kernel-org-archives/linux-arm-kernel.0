@@ -1,131 +1,67 @@
 From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Mon, 23 Jul 2018 14:47:44 -0700
-Subject: [PATCH v7 05/12] ARM: dts: aspeed: peci: Add PECI node
+Date: Mon, 23 Jul 2018 14:47:46 -0700
+Subject: [PATCH v7 07/12] dt-bindings: mfd: Add a document for PECI client MFD
 In-Reply-To: <20180723214751.1733-1-jae.hyun.yoo@linux.intel.com>
 References: <20180723214751.1733-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180723214751.1733-6-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20180723214751.1733-8-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds PECI bus/adapter node of AST24xx/AST25xx into
-aspeed-g4 and aspeed-g5.
+This commit adds a dt-bindings document for PECI client MFD.
 
 Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
-Reviewed-by: Haiyue Wang <haiyue.wang@linux.intel.com>
-Reviewed-by: James Feist <james.feist@linux.intel.com>
-Reviewed-by: Vernon Mauery <vernon.mauery@linux.intel.com>
+Cc: Lee Jones <lee.jones@linaro.org>
 Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Joel Stanley <joel@jms.id.au>
 Cc: Andrew Jeffery <andrew@aj.id.au>
+Cc: James Feist <james.feist@linux.intel.com>
 Cc: Jason M Biils <jason.m.bills@linux.intel.com>
-Cc: Ryan Chen <ryan_chen@aspeedtech.com>
+Cc: Joel Stanley <joel@jms.id.au>
+Cc: Vernon Mauery <vernon.mauery@linux.intel.com>
 ---
- arch/arm/boot/dts/aspeed-g4.dtsi | 26 ++++++++++++++++++++++++++
- arch/arm/boot/dts/aspeed-g5.dtsi | 26 ++++++++++++++++++++++++++
- 2 files changed, 52 insertions(+)
+ .../bindings/mfd/intel-peci-client.txt        | 34 +++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/intel-peci-client.txt
 
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 680336ac06f8..1177c76a8a9d 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -29,6 +29,7 @@
- 		serial3 = &uart4;
- 		serial4 = &uart5;
- 		serial5 = &vuart;
-+		peci0 = &peci0;
- 	};
- 
- 	cpus {
-@@ -311,6 +312,13 @@
- 				};
- 			};
- 
-+			peci: peci at 1e78b000 {
-+				compatible = "simple-bus";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges = <0x0 0x1e78b000 0x60>;
-+			};
+diff --git a/Documentation/devicetree/bindings/mfd/intel-peci-client.txt b/Documentation/devicetree/bindings/mfd/intel-peci-client.txt
+new file mode 100644
+index 000000000000..cb341e363add
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/intel-peci-client.txt
+@@ -0,0 +1,34 @@
++* Intel PECI client bindings
 +
- 			uart2: serial at 1e78d000 {
- 				compatible = "ns16550a";
- 				reg = <0x1e78d000 0x20>;
-@@ -354,6 +362,24 @@
- 	};
- };
- 
-+&peci {
-+	peci0: peci-bus at 0 {
-+		compatible = "aspeed,ast2400-peci";
-+		reg = <0x0 0x60>;
++PECI (Platform Environment Control Interface) is a one-wire bus interface that
++provides a communication channel from PECI clients in Intel processors and
++chipset components to external monitoring or control devices. PECI is designed
++to support the following sideband functions:
++
++- Processor and DRAM thermal management
++- Platform Manageability
++- Processor Interface Tuning and Diagnostics
++- Failure Analysis
++
++Required properties:
++- compatible : Should be "intel,peci-client".
++- reg        : Should contain address of a client CPU. Address range of CPU
++	       clients starts from 0x30 based on PECI specification.
++
++Example:
++	peci-bus at 0 {
++		compatible = "vendor,soc-peci";
++		reg = <0x0 0x1000>;
 +		#address-cells = <1>;
 +		#size-cells = <0>;
-+		interrupts = <15>;
-+		clocks = <&syscon ASPEED_CLK_GATE_REFCLK>;
-+		resets = <&syscon ASPEED_RESET_PECI>;
-+		clock-frequency = <24000000>;
-+		msg-timing = <1>;
-+		addr-timing = <1>;
-+		rd-sampling-point = <8>;
-+		cmd-timeout-ms = <1000>;
-+		status = "disabled";
++
++		peci-client at 30 {
++			compatible = "intel,peci-client";
++			reg = <0x30>;
++		};
++
++		peci-client at 31 {
++			compatible = "intel,peci-client";
++			reg = <0x31>;
++		};
 +	};
-+};
-+
- &i2c {
- 	i2c_ic: interrupt-controller at 0 {
- 		#interrupt-cells = <1>;
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index 02e70ad3ab70..f93f174bc149 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -29,6 +29,7 @@
- 		serial3 = &uart4;
- 		serial4 = &uart5;
- 		serial5 = &vuart;
-+		peci0 = &peci0;
- 	};
- 
- 	cpus {
-@@ -370,6 +371,13 @@
- 				};
- 			};
- 
-+			peci: peci at 1e78b000 {
-+				compatible = "simple-bus";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges = <0x0 0x1e78b000 0x60>;
-+			};
-+
- 			uart2: serial at 1e78d000 {
- 				compatible = "ns16550a";
- 				reg = <0x1e78d000 0x20>;
-@@ -413,6 +421,24 @@
- 	};
- };
- 
-+&peci {
-+	peci0: peci-bus at 0 {
-+		compatible = "aspeed,ast2500-peci";
-+		reg = <0x0 0x60>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		interrupts = <15>;
-+		clocks = <&syscon ASPEED_CLK_GATE_REFCLK>;
-+		resets = <&syscon ASPEED_RESET_PECI>;
-+		clock-frequency = <24000000>;
-+		msg-timing = <1>;
-+		addr-timing = <1>;
-+		rd-sampling-point = <8>;
-+		cmd-timeout-ms = <1000>;
-+		status = "disabled";
-+	};
-+};
-+
- &i2c {
- 	i2c_ic: interrupt-controller at 0 {
- 		#interrupt-cells = <1>;
 -- 
 2.18.0
