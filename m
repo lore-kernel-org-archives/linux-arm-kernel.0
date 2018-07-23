@@ -1,41 +1,91 @@
-From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
-Date: Mon, 23 Jul 2018 21:35:01 +0900
-Subject: [PATCH/RFT 1/7] arm64: dts: renesas: r8a77965: Add Audio-DMAC
- device nodes
-In-Reply-To: <CAMuHMdU9mkaFe_-n2sS6u1Qy4pbczQXWjmBAKtdw90p_-5HiYA@mail.gmail.com>
-References: <1531856883-19645-1-git-send-email-ykaneko0929@gmail.com>
- <1531856883-19645-2-git-send-email-ykaneko0929@gmail.com>
- <CAMuHMdU9mkaFe_-n2sS6u1Qy4pbczQXWjmBAKtdw90p_-5HiYA@mail.gmail.com>
-Message-ID: <CAH1o70+UEUtaoZT4CiDtC0YNh34Zvmjhcch1=7tYOaS6ofkpSA@mail.gmail.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Mon, 23 Jul 2018 12:37:31 +0000
+Subject: [PATCH v2 3/3] PCI: imx: Initial imx7d pm support
+In-Reply-To: <1532338685.3163.93.camel@pengutronix.de>
+References: <cover.1532090446.git.leonard.crestez@nxp.com>
+ <e42a6bb8ff0ddd6eaa31fe381875425a3730a73f.1532090446.git.leonard.crestez@nxp.com>
+ <1532338685.3163.93.camel@pengutronix.de>
+Message-ID: <e8be199b2d5559001a93abb52ba46c283e4454a9.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert-san,
+On Mon, 2018-07-23 at 11:38 +0200, Lucas Stach wrote:
+> Hi Leonard,
+> 
+> Am Freitag, den 20.07.2018, 15:47 +0300 schrieb Leonard Crestez:
+> > On imx7d the pcie-phy power domain is turned off in suspend and this can
+> > make the system hang after resume when attempting any read from PCI.
+> > 
+> > Fix this by adding minimal suspend/resume code from the nxp internal
+> > tree. This will prepare for powering down on suspend and reset the block
+> > on resume.
+> > 
+> > Code is only for imx7d but a very similar sequence can be used for
+> > other socs.
+> > 
+> > +static void imx6_pcie_ltssm_disable(struct device *dev)
+> > +{
+> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> > +
+> > +	switch (imx6_pcie->variant) {
+> > +	case IMX6Q:
+> > +	case IMX6SX:
+> > +	case IMX6QP:
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> > +				   IMX6Q_GPR12_PCIE_CTL_2, 0);
+> 
+> Has this been tested on i.MX6? LTSSM disable requires a more complex
+> sequence on this SoC to avoid hanging the system. See commit
+> 3e3e406e3807 "PCI: imx6: Put LTSSM in "Detect" state before disabling
+> it".
 
-Thank you for your review.
-I will correct the sort order of the audma nodes and  a typo of the commit log.
+This patch only enables suspend/resume for imx7d with other SOCs to
+follow later. The ltssm_disable function is just symmetric with
+ltssm_enable.
 
-Best regards,
-Kaneko
+The 6Q parts are affected by errata "ERR005723 PCIe: PCIe does not
+support L2 power down [i.MX 6Dual/6Quad Only]".
 
-2018-07-18 18:06 GMT+09:00 Geert Uytterhoeven <geert@linux-m68k.org>:
-> On Tue, Jul 17, 2018 at 9:48 PM Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
->> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->>
->> This patch adds Audio-DMAC{0,1} device nodes for the R8A77965 SoC.
->>
->> Based on a similar patch of the R8A7796 device tree
->> by uninori Morimoto <kuninori.morimoto.gx@renesas.com>.
->
-> Kuninori
->
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+This design error seems to have the same root cause as your problem (no
+dedicated reset control) so this works out quite nicely: the solution
+is to never power down pci on affected chips.
+
+> > +static int imx6_pcie_resume_noirq(struct device *dev)
+> > +{
+> > +	int ret = 0;
+> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> > +	struct pcie_port *pp = &imx6_pcie->pci->pp;
+> > +
+> > +	if (imx6_pcie->variant != IMX7D)
+> > +		return 0;
+> > +
+> > +	imx6_pcie_assert_core_reset(imx6_pcie);
+> > +	imx6_pcie_init_phy(imx6_pcie);
+> > +	imx6_pcie_deassert_core_reset(imx6_pcie);
+> > +	dw_pcie_setup_rc(pp);
+> > +
+> > +	ret = imx6_pcie_establish_link(imx6_pcie);
+> > +	if (ret < 0)
+> > +		pr_err("pcie link is down after resume.\n");
+> 
+> dev_err(), please.
+
+The imx6_pcie_establish_link function already seems to link error
+information so the message could be dropped. However it's still helpful
+to know that those pci link errors are specifically related to resume.
+
+Fabio suggested I propagate the return code but I'm not sure that's
+helpful since "link down" is what happens when the slot is empty and
+this is clearly not a "error" or "failure". It's not clear if "slot
+empty" can be distinguished in some way.
+
+I'll switch to dev_info and drop the error code, is this OK?
+
+
+One aspect that I skipped is PME_Turn_Off support: The PCI standard
+mandates that this is sent before entering L2/L3 and the designware
+core supports this but it's not part of this patch.
+
+Is it fine if I post this separately or should it be part of the same
+series? The turnoff bit is in IOMUX gpr for imx6 but SRC for imx7 so it
+would require additional patches in reset, dts and then pci.
