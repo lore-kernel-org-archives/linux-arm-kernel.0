@@ -1,41 +1,57 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 23 Jul 2018 10:57:29 +0900
-Subject: [PATCH v4 2/5] drivers: acpi: add dependency of EFI for arm64
+Date: Mon, 23 Jul 2018 10:57:30 +0900
+Subject: [PATCH v4 3/5] efi/arm: preserve early mapping of UEFI memory map
+ longer for BGRT
 In-Reply-To: <20180723015732.24252-1-takahiro.akashi@linaro.org>
 References: <20180723015732.24252-1-takahiro.akashi@linaro.org>
-Message-ID: <20180723015732.24252-3-takahiro.akashi@linaro.org>
+Message-ID: <20180723015732.24252-4-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As Ard suggested, CONFIG_ACPI && !CONFIG_EFI doesn't make sense on arm64,
-while CONFIG_ACPI and CONFIG_CPU_BIG_ENDIAN doesn't make sense either.
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-As CONFIG_EFI already has a dependency of !CONFIG_CPU_BIG_ENDIAN, it is
-good enough to add a dependency of CONFIG_EFI to avoid any useless
-combination of configuration.
+The BGRT code validates the contents of the table against the UEFI
+memory map, and so it expects it to be mapped when the code runs.
 
-This bug, reported by Will, will be revealed when my patch series,
-"arm64: kexec,kdump: fix boot failures on acpi-only system," is applied
-and the kernel is built under allmodconfig.
+On ARM, this is currently not the case, since we tear down the early
+mapping after efi_init() completes, and only create the permanent
+mapping in arm_enable_runtime_services(), which executes as an early
+initcall, but still leaves a window where the UEFI memory map is not
+mapped.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+So move the call to efi_memmap_unmap() from efi_init() to
+arm_enable_runtime_services().
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/acpi/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/firmware/efi/arm-init.c    | 1 -
+ drivers/firmware/efi/arm-runtime.c | 2 ++
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index b533eeb6139d..15ab1daaa808 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -6,7 +6,7 @@
- menuconfig ACPI
- 	bool "ACPI (Advanced Configuration and Power Interface) Support"
- 	depends on !IA64_HP_SIM
--	depends on IA64 || X86 || ARM64
-+	depends on IA64 || X86 || (ARM64 && EFI)
- 	depends on PCI
- 	select PNP
- 	default y if (IA64 || X86)
+diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+index b5214c143fee..388a929baf95 100644
+--- a/drivers/firmware/efi/arm-init.c
++++ b/drivers/firmware/efi/arm-init.c
+@@ -259,7 +259,6 @@ void __init efi_init(void)
+ 
+ 	reserve_regions();
+ 	efi_esrt_init();
+-	efi_memmap_unmap();
+ 
+ 	memblock_reserve(params.mmap & PAGE_MASK,
+ 			 PAGE_ALIGN(params.mmap_size +
+diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+index 5889cbea60b8..59a8c0ec94d5 100644
+--- a/drivers/firmware/efi/arm-runtime.c
++++ b/drivers/firmware/efi/arm-runtime.c
+@@ -115,6 +115,8 @@ static int __init arm_enable_runtime_services(void)
+ 		return 0;
+ 	}
+ 
++	efi_memmap_unmap();
++
+ 	if (efi_runtime_disabled()) {
+ 		pr_info("EFI runtime services will be disabled.\n");
+ 		return 0;
 -- 
 2.18.0
