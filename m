@@ -1,33 +1,58 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Mon, 23 Jul 2018 09:26:03 -0700
-Subject: [PATCH i2c-next] i2c: aspeed: Add an implicit type casting for
- *get_clk_reg_val
-Message-ID: <20180723162603.3703-1-jae.hyun.yoo@linux.intel.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Mon, 23 Jul 2018 18:26:29 +0200
+Subject: [PATCH v6 3/6] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <20180716084706.28244-4-ravi.bangoria@linux.ibm.com>
+References: <20180716084706.28244-1-ravi.bangoria@linux.ibm.com>
+ <20180716084706.28244-4-ravi.bangoria@linux.ibm.com>
+Message-ID: <20180723162629.GA8584@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit fixes this sparse warning:
-drivers/i2c/busses/i2c-aspeed.c:875:38: warning: incorrect type in assignment (different modifiers)
-drivers/i2c/busses/i2c-aspeed.c:875:38:    expected unsigned int ( *get_clk_reg_val )( ... )
-drivers/i2c/busses/i2c-aspeed.c:875:38:    got void const *const data
+I have a mixed feeling about this series... I'll try to summarise my thinking
+tomorrow, but I do not see any obvious problem so far. Although I have some
+concerns about 5/6, I need to re-read it after sleep.
 
-Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
----
- drivers/i2c/busses/i2c-aspeed.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
-index efb89422d496..a4f956c6d567 100644
---- a/drivers/i2c/busses/i2c-aspeed.c
-+++ b/drivers/i2c/busses/i2c-aspeed.c
-@@ -872,7 +872,7 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
- 	if (!match)
- 		bus->get_clk_reg_val = aspeed_i2c_24xx_get_clk_reg_val;
- 	else
--		bus->get_clk_reg_val = match->data;
-+		bus->get_clk_reg_val = (u32 (*)(u32))match->data;
- 
- 	/* Initialize the I2C adapter */
- 	spin_lock_init(&bus->lock);
--- 
-2.18.0
+On 07/16, Ravi Bangoria wrote:
+>
+> +static int delayed_uprobe_install(struct vm_area_struct *vma)
+> +{
+> +	struct list_head *pos, *q;
+> +	struct delayed_uprobe *du;
+> +	unsigned long vaddr;
+> +	int ret = 0, err = 0;
+> +
+> +	mutex_lock(&delayed_uprobe_lock);
+> +	list_for_each_safe(pos, q, &delayed_uprobe_list) {
+> +		du = list_entry(pos, struct delayed_uprobe, list);
+> +
+> +		if (!du->uprobe->ref_ctr_offset ||
+
+Is it possible to see ->ref_ctr_offset == 0 in delayed_uprobe_list?
+
+> @@ -1072,7 +1282,13 @@ int uprobe_mmap(struct vm_area_struct *vma)
+>  	struct uprobe *uprobe, *u;
+>  	struct inode *inode;
+>  
+> -	if (no_uprobe_events() || !valid_vma(vma, true))
+> +	if (no_uprobe_events())
+> +		return 0;
+> +
+> +	if (vma->vm_flags & VM_WRITE)
+> +		delayed_uprobe_install(vma);
+
+Obviously not nice performance-wise... OK, I do not know if it will actually
+hurt in practice and probably we can use the better data structures if necessary.
+But can't we check MMF_HAS_UPROBES at least? I mean,
+
+	if (vma->vm_flags & VM_WRITE && test_bit(MMF_HAS_UPROBES, &vma->vm_mm->flags))
+		delayed_uprobe_install(vma);
+
+?
+
+
+Perhaps we can even add another flag later, MMF_HAS_DELAYED_UPROBES set by
+delayed_uprobe_add().
+
+Oleg.
