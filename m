@@ -1,373 +1,200 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Mon, 23 Jul 2018 14:47:50 -0700
-Subject: [PATCH v7 11/12] hwmon: Add PECI dimmtemp driver
-In-Reply-To: <20180723214751.1733-1-jae.hyun.yoo@linux.intel.com>
-References: <20180723214751.1733-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180723214751.1733-12-jae.hyun.yoo@linux.intel.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 24 Jul 2018 05:59:31 +0800
+Subject: [PATCH 1/5] mfd: rk808: Add RK817 and RK809 support
+In-Reply-To: <1532315945-1094-2-git-send-email-tony.xie@rock-chips.com>
+References: <1532315945-1094-2-git-send-email-tony.xie@rock-chips.com>
+Message-ID: <201807240507.gtlOvDOH%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds PECI dimmtemp hwmon driver.
+Hi Tony,
 
-Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
-Reviewed-by: Haiyue Wang <haiyue.wang@linux.intel.com>
-Reviewed-by: James Feist <james.feist@linux.intel.com>
-Reviewed-by: Vernon Mauery <vernon.mauery@linux.intel.com>
-Acked-by: Guenter Roeck <linux@roeck-us.net>
-Cc: Jean Delvare <jdelvare@suse.com>
-Cc: Alan Cox <alan@linux.intel.com>
-Cc: Andrew Jeffery <andrew@aj.id.au>
-Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Jason M Biils <jason.m.bills@linux.intel.com>
-Cc: Joel Stanley <joel@jms.id.au>
-Cc: Miguel Ojeda <miguel.ojeda.sandonis@gmail.com>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Stef van Os <stef.van.os@prodrive-technologies.com>
+Thank you for the patch! Perhaps something to improve:
+
+[auto build test WARNING on ljones-mfd/for-mfd-next]
+[also build test WARNING on v4.18-rc6 next-20180723]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Tony-Xie/mfd-rk808-Add-RK817-and-RK809-support/20180724-040547
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git for-mfd-next
+config: xtensa-allyesconfig (attached as .config)
+compiler: xtensa-linux-gcc (GCC) 8.1.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=8.1.0 make.cross ARCH=xtensa 
+
+Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
+http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
+
+All warnings (new ones prefixed by >>):
+
+   drivers//mfd/rk808.c: In function 'rk808_probe':
+>> drivers//mfd/rk808.c:715:16: warning: 'pm_pwroff_fn' may be used uninitialized in this function [-Wmaybe-uninitialized]
+      pm_power_off = pm_pwroff_fn;
+      ~~~~~~~~~~~~~^~~~~~~~~~~~~~
+
+vim +/pm_pwroff_fn +715 drivers//mfd/rk808.c
+
+2eedcbfc0 Wadim Egorov    2016-08-29  581  
+f69a7cf74 Chris Zhong     2014-09-03  582  static int rk808_probe(struct i2c_client *client,
+f69a7cf74 Chris Zhong     2014-09-03  583  		       const struct i2c_device_id *id)
+f69a7cf74 Chris Zhong     2014-09-03  584  {
+f69a7cf74 Chris Zhong     2014-09-03  585  	struct device_node *np = client->dev.of_node;
+f69a7cf74 Chris Zhong     2014-09-03  586  	struct rk808 *rk808;
+2eedcbfc0 Wadim Egorov    2016-08-29  587  	const struct rk808_reg_data *pre_init_reg;
+2eedcbfc0 Wadim Egorov    2016-08-29  588  	const struct mfd_cell *cells;
+b2e2c8509 Jianhong Chen   2016-10-17  589  	void (*pm_pwroff_fn)(void);
+2eedcbfc0 Wadim Egorov    2016-08-29  590  	int nr_pre_init_regs;
+2eedcbfc0 Wadim Egorov    2016-08-29  591  	int nr_cells;
+9d6105e19 Elaine Zhang    2017-08-21  592  	int pm_off = 0, msb, lsb;
+1e99c2e53 Tony Xie        2018-07-23  593  	unsigned char pmic_id_msb = RK808_ID_MSB, pmic_id_lsb = RK808_ID_LSB;
+f69a7cf74 Chris Zhong     2014-09-03  594  	int ret;
+f69a7cf74 Chris Zhong     2014-09-03  595  	int i;
+f69a7cf74 Chris Zhong     2014-09-03  596  
+f69a7cf74 Chris Zhong     2014-09-03  597  	rk808 = devm_kzalloc(&client->dev, sizeof(*rk808), GFP_KERNEL);
+f69a7cf74 Chris Zhong     2014-09-03  598  	if (!rk808)
+f69a7cf74 Chris Zhong     2014-09-03  599  		return -ENOMEM;
+f69a7cf74 Chris Zhong     2014-09-03  600  
+1e99c2e53 Tony Xie        2018-07-23  601  	if (of_device_is_compatible(np, "rockchip,rk817") ||
+1e99c2e53 Tony Xie        2018-07-23  602  	    of_device_is_compatible(np, "rockchip,rk809")) {
+1e99c2e53 Tony Xie        2018-07-23  603  		pmic_id_msb = RK817_ID_MSB;
+1e99c2e53 Tony Xie        2018-07-23  604  		pmic_id_lsb = RK817_ID_LSB;
+1e99c2e53 Tony Xie        2018-07-23  605  	}
+9d6105e19 Elaine Zhang    2017-08-21  606  	/* Read chip variant */
+1e99c2e53 Tony Xie        2018-07-23  607  	msb = i2c_smbus_read_byte_data(client, pmic_id_msb);
+9d6105e19 Elaine Zhang    2017-08-21  608  	if (msb < 0) {
+9d6105e19 Elaine Zhang    2017-08-21  609  		dev_err(&client->dev, "failed to read the chip id at 0x%x\n",
+2eedcbfc0 Wadim Egorov    2016-08-29  610  			RK808_ID_MSB);
+9d6105e19 Elaine Zhang    2017-08-21  611  		return msb;
+2eedcbfc0 Wadim Egorov    2016-08-29  612  	}
+2eedcbfc0 Wadim Egorov    2016-08-29  613  
+1e99c2e53 Tony Xie        2018-07-23  614  	lsb = i2c_smbus_read_byte_data(client, pmic_id_lsb);
+9d6105e19 Elaine Zhang    2017-08-21  615  	if (lsb < 0) {
+9d6105e19 Elaine Zhang    2017-08-21  616  		dev_err(&client->dev, "failed to read the chip id at 0x%x\n",
+9d6105e19 Elaine Zhang    2017-08-21  617  			RK808_ID_LSB);
+9d6105e19 Elaine Zhang    2017-08-21  618  		return lsb;
+9d6105e19 Elaine Zhang    2017-08-21  619  	}
+9d6105e19 Elaine Zhang    2017-08-21  620  
+9d6105e19 Elaine Zhang    2017-08-21  621  	rk808->variant = ((msb << 8) | lsb) & RK8XX_ID_MSK;
+9d6105e19 Elaine Zhang    2017-08-21  622  	dev_info(&client->dev, "chip id: 0x%x\n", (unsigned int)rk808->variant);
+2eedcbfc0 Wadim Egorov    2016-08-29  623  
+2eedcbfc0 Wadim Egorov    2016-08-29  624  	switch (rk808->variant) {
+990f05f6a Elaine Zhang    2017-08-21  625  	case RK805_ID:
+990f05f6a Elaine Zhang    2017-08-21  626  		rk808->regmap_cfg = &rk805_regmap_config;
+990f05f6a Elaine Zhang    2017-08-21  627  		rk808->regmap_irq_chip = &rk805_irq_chip;
+990f05f6a Elaine Zhang    2017-08-21  628  		pre_init_reg = rk805_pre_init_reg;
+990f05f6a Elaine Zhang    2017-08-21  629  		nr_pre_init_regs = ARRAY_SIZE(rk805_pre_init_reg);
+990f05f6a Elaine Zhang    2017-08-21  630  		cells = rk805s;
+990f05f6a Elaine Zhang    2017-08-21  631  		nr_cells = ARRAY_SIZE(rk805s);
+990f05f6a Elaine Zhang    2017-08-21  632  		pm_pwroff_fn = rk805_device_shutdown;
+990f05f6a Elaine Zhang    2017-08-21  633  		break;
+2eedcbfc0 Wadim Egorov    2016-08-29  634  	case RK808_ID:
+2eedcbfc0 Wadim Egorov    2016-08-29  635  		rk808->regmap_cfg = &rk808_regmap_config;
+2eedcbfc0 Wadim Egorov    2016-08-29  636  		rk808->regmap_irq_chip = &rk808_irq_chip;
+2eedcbfc0 Wadim Egorov    2016-08-29  637  		pre_init_reg = rk808_pre_init_reg;
+2eedcbfc0 Wadim Egorov    2016-08-29  638  		nr_pre_init_regs = ARRAY_SIZE(rk808_pre_init_reg);
+2eedcbfc0 Wadim Egorov    2016-08-29  639  		cells = rk808s;
+2eedcbfc0 Wadim Egorov    2016-08-29  640  		nr_cells = ARRAY_SIZE(rk808s);
+b2e2c8509 Jianhong Chen   2016-10-17  641  		pm_pwroff_fn = rk808_device_shutdown;
+2eedcbfc0 Wadim Egorov    2016-08-29  642  		break;
+2eedcbfc0 Wadim Egorov    2016-08-29  643  	case RK818_ID:
+2eedcbfc0 Wadim Egorov    2016-08-29  644  		rk808->regmap_cfg = &rk818_regmap_config;
+2eedcbfc0 Wadim Egorov    2016-08-29  645  		rk808->regmap_irq_chip = &rk818_irq_chip;
+2eedcbfc0 Wadim Egorov    2016-08-29  646  		pre_init_reg = rk818_pre_init_reg;
+2eedcbfc0 Wadim Egorov    2016-08-29  647  		nr_pre_init_regs = ARRAY_SIZE(rk818_pre_init_reg);
+2eedcbfc0 Wadim Egorov    2016-08-29  648  		cells = rk818s;
+2eedcbfc0 Wadim Egorov    2016-08-29  649  		nr_cells = ARRAY_SIZE(rk818s);
+b2e2c8509 Jianhong Chen   2016-10-17  650  		pm_pwroff_fn = rk818_device_shutdown;
+2eedcbfc0 Wadim Egorov    2016-08-29  651  		break;
+1e99c2e53 Tony Xie        2018-07-23  652  	case RK809_ID:
+1e99c2e53 Tony Xie        2018-07-23  653  	case RK817_ID:
+1e99c2e53 Tony Xie        2018-07-23  654  		rk808->regmap_cfg = &rk817_regmap_config;
+1e99c2e53 Tony Xie        2018-07-23  655  		rk808->regmap_irq_chip = &rk817_irq_chip;
+1e99c2e53 Tony Xie        2018-07-23  656  		pre_init_reg = rk817_pre_init_reg;
+1e99c2e53 Tony Xie        2018-07-23  657  		nr_pre_init_regs = ARRAY_SIZE(rk817_pre_init_reg);
+1e99c2e53 Tony Xie        2018-07-23  658  		cells = rk817s;
+1e99c2e53 Tony Xie        2018-07-23  659  		nr_cells = ARRAY_SIZE(rk817s);
+1e99c2e53 Tony Xie        2018-07-23  660  		pm_power_off_prepare = rk8xx_device_shutdown_prepare;
+1e99c2e53 Tony Xie        2018-07-23  661  		break;
+2eedcbfc0 Wadim Egorov    2016-08-29  662  	default:
+2eedcbfc0 Wadim Egorov    2016-08-29  663  		dev_err(&client->dev, "Unsupported RK8XX ID %lu\n",
+2eedcbfc0 Wadim Egorov    2016-08-29  664  			rk808->variant);
+2eedcbfc0 Wadim Egorov    2016-08-29  665  		return -EINVAL;
+2eedcbfc0 Wadim Egorov    2016-08-29  666  	}
+2eedcbfc0 Wadim Egorov    2016-08-29  667  
+2eedcbfc0 Wadim Egorov    2016-08-29  668  	rk808->i2c = client;
+2eedcbfc0 Wadim Egorov    2016-08-29  669  	i2c_set_clientdata(client, rk808);
+2eedcbfc0 Wadim Egorov    2016-08-29  670  
+2eedcbfc0 Wadim Egorov    2016-08-29  671  	rk808->regmap = devm_regmap_init_i2c(client, rk808->regmap_cfg);
+f69a7cf74 Chris Zhong     2014-09-03  672  	if (IS_ERR(rk808->regmap)) {
+f69a7cf74 Chris Zhong     2014-09-03  673  		dev_err(&client->dev, "regmap initialization failed\n");
+f69a7cf74 Chris Zhong     2014-09-03  674  		return PTR_ERR(rk808->regmap);
+f69a7cf74 Chris Zhong     2014-09-03  675  	}
+f69a7cf74 Chris Zhong     2014-09-03  676  
+2eedcbfc0 Wadim Egorov    2016-08-29  677  	if (!client->irq) {
+2eedcbfc0 Wadim Egorov    2016-08-29  678  		dev_err(&client->dev, "No interrupt support, no core IRQ\n");
+2eedcbfc0 Wadim Egorov    2016-08-29  679  		return -EINVAL;
+f69a7cf74 Chris Zhong     2014-09-03  680  	}
+f69a7cf74 Chris Zhong     2014-09-03  681  
+f69a7cf74 Chris Zhong     2014-09-03  682  	ret = regmap_add_irq_chip(rk808->regmap, client->irq,
+f69a7cf74 Chris Zhong     2014-09-03  683  				  IRQF_ONESHOT, -1,
+2eedcbfc0 Wadim Egorov    2016-08-29  684  				  rk808->regmap_irq_chip, &rk808->irq_data);
+f69a7cf74 Chris Zhong     2014-09-03  685  	if (ret) {
+f69a7cf74 Chris Zhong     2014-09-03  686  		dev_err(&client->dev, "Failed to add irq_chip %d\n", ret);
+f69a7cf74 Chris Zhong     2014-09-03  687  		return ret;
+f69a7cf74 Chris Zhong     2014-09-03  688  	}
+f69a7cf74 Chris Zhong     2014-09-03  689  
+2eedcbfc0 Wadim Egorov    2016-08-29  690  	for (i = 0; i < nr_pre_init_regs; i++) {
+2eedcbfc0 Wadim Egorov    2016-08-29  691  		ret = regmap_update_bits(rk808->regmap,
+2eedcbfc0 Wadim Egorov    2016-08-29  692  					pre_init_reg[i].addr,
+2eedcbfc0 Wadim Egorov    2016-08-29  693  					pre_init_reg[i].mask,
+2eedcbfc0 Wadim Egorov    2016-08-29  694  					pre_init_reg[i].value);
+2eedcbfc0 Wadim Egorov    2016-08-29  695  		if (ret) {
+2eedcbfc0 Wadim Egorov    2016-08-29  696  			dev_err(&client->dev,
+2eedcbfc0 Wadim Egorov    2016-08-29  697  				"0x%x write err\n",
+2eedcbfc0 Wadim Egorov    2016-08-29  698  				pre_init_reg[i].addr);
+2eedcbfc0 Wadim Egorov    2016-08-29  699  			return ret;
+2eedcbfc0 Wadim Egorov    2016-08-29  700  		}
+2eedcbfc0 Wadim Egorov    2016-08-29  701  	}
+f69a7cf74 Chris Zhong     2014-09-03  702  
+2eedcbfc0 Wadim Egorov    2016-08-29  703  	ret = devm_mfd_add_devices(&client->dev, PLATFORM_DEVID_NONE,
+2eedcbfc0 Wadim Egorov    2016-08-29  704  			      cells, nr_cells, NULL, 0,
+d5623161a Laxman Dewangan 2016-04-08  705  			      regmap_irq_get_domain(rk808->irq_data));
+f69a7cf74 Chris Zhong     2014-09-03  706  	if (ret) {
+f69a7cf74 Chris Zhong     2014-09-03  707  		dev_err(&client->dev, "failed to add MFD devices %d\n", ret);
+f69a7cf74 Chris Zhong     2014-09-03  708  		goto err_irq;
+f69a7cf74 Chris Zhong     2014-09-03  709  	}
+f69a7cf74 Chris Zhong     2014-09-03  710  
+f69a7cf74 Chris Zhong     2014-09-03  711  	pm_off = of_property_read_bool(np,
+f69a7cf74 Chris Zhong     2014-09-03  712  				"rockchip,system-power-controller");
+f69a7cf74 Chris Zhong     2014-09-03  713  	if (pm_off && !pm_power_off) {
+f69a7cf74 Chris Zhong     2014-09-03  714  		rk808_i2c_client = client;
+b2e2c8509 Jianhong Chen   2016-10-17 @715  		pm_power_off = pm_pwroff_fn;
+f69a7cf74 Chris Zhong     2014-09-03  716  	}
+f69a7cf74 Chris Zhong     2014-09-03  717  
+f69a7cf74 Chris Zhong     2014-09-03  718  	return 0;
+f69a7cf74 Chris Zhong     2014-09-03  719  
+f69a7cf74 Chris Zhong     2014-09-03  720  err_irq:
+f69a7cf74 Chris Zhong     2014-09-03  721  	regmap_del_irq_chip(client->irq, rk808->irq_data);
+f69a7cf74 Chris Zhong     2014-09-03  722  	return ret;
+f69a7cf74 Chris Zhong     2014-09-03  723  }
+f69a7cf74 Chris Zhong     2014-09-03  724  
+
+:::::: The code at line 715 was first introduced by commit
+:::::: b2e2c85091710159b305735d557f4ef4695f5dff mfd: rk808: RK818 uses DEV_OFF to power off supplies
+
+:::::: TO: Jianhong Chen <chenjh@rock-chips.com>
+:::::: CC: Lee Jones <lee.jones@linaro.org>
+
 ---
- drivers/hwmon/Kconfig         |  14 ++
- drivers/hwmon/Makefile        |   1 +
- drivers/hwmon/peci-dimmtemp.c | 295 ++++++++++++++++++++++++++++++++++
- 3 files changed, 310 insertions(+)
- create mode 100644 drivers/hwmon/peci-dimmtemp.c
-
-diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-index f08b4a670ac5..d2299d850508 100644
---- a/drivers/hwmon/Kconfig
-+++ b/drivers/hwmon/Kconfig
-@@ -1320,6 +1320,20 @@ config SENSORS_PECI_CPUTEMP
- 	  This driver can also be built as a module.  If so, the module
- 	  will be called peci-cputemp.
- 
-+config SENSORS_PECI_DIMMTEMP
-+	tristate "PECI DIMM temperature monitoring support"
-+	depends on PECI
-+	select MFD_INTEL_PECI_CLIENT
-+	help
-+	  If you say yes here you get support for the generic Intel PECI hwmon
-+	  driver which provides Digital Thermal Sensor (DTS) thermal readings of
-+	  DIMM components that are accessible using the PECI Client Command
-+	  Suite via the processor PECI client.
-+	  Check Documentation/hwmon/peci-dimmtemp for details.
-+
-+	  This driver can also be built as a module.  If so, the module
-+	  will be called peci-dimmtemp.
-+
- source drivers/hwmon/pmbus/Kconfig
- 
- config SENSORS_PWM_FAN
-diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
-index 13ebde089ad5..b7cf35bcfbaf 100644
---- a/drivers/hwmon/Makefile
-+++ b/drivers/hwmon/Makefile
-@@ -142,6 +142,7 @@ obj-$(CONFIG_SENSORS_PC87360)	+= pc87360.o
- obj-$(CONFIG_SENSORS_PC87427)	+= pc87427.o
- obj-$(CONFIG_SENSORS_PCF8591)	+= pcf8591.o
- obj-$(CONFIG_SENSORS_PECI_CPUTEMP)	+= peci-cputemp.o
-+obj-$(CONFIG_SENSORS_PECI_DIMMTEMP)	+= peci-dimmtemp.o
- obj-$(CONFIG_SENSORS_POWR1220)  += powr1220.o
- obj-$(CONFIG_SENSORS_PWM_FAN)	+= pwm-fan.o
- obj-$(CONFIG_SENSORS_RASPBERRYPI_HWMON)	+= raspberrypi-hwmon.o
-diff --git a/drivers/hwmon/peci-dimmtemp.c b/drivers/hwmon/peci-dimmtemp.c
-new file mode 100644
-index 000000000000..b098cb483b21
---- /dev/null
-+++ b/drivers/hwmon/peci-dimmtemp.c
-@@ -0,0 +1,295 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018 Intel Corporation
-+
-+#include <linux/hwmon.h>
-+#include <linux/jiffies.h>
-+#include <linux/mfd/intel-peci-client.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/workqueue.h>
-+
-+#define DIMM_MASK_CHECK_DELAY_JIFFIES msecs_to_jiffies(5000)
-+#define DIMM_MASK_CHECK_RETRY_MAX     60 /* 60 x 5 secs = 5 minutes */
-+
-+struct peci_dimmtemp {
-+	struct peci_mfd *mfd;
-+	struct device *dev;
-+	char name[PECI_NAME_SIZE];
-+	u8 addr;
-+	const struct cpu_gen_info *gen_info;
-+	struct workqueue_struct *work_queue;
-+	struct delayed_work work_handler;
-+	struct temp_data temp[DIMM_NUMS_MAX];
-+	u32 dimm_mask;
-+	int retry_count;
-+	u32 temp_config[DIMM_NUMS_MAX + 1];
-+	struct hwmon_channel_info temp_info;
-+	const struct hwmon_channel_info *info[2];
-+	struct hwmon_chip_info chip;
-+};
-+
-+static const char *dimmtemp_label[CHAN_RANK_MAX][DIMM_IDX_MAX] = {
-+	{ "DIMM A1", "DIMM A2", "DIMM A3" },
-+	{ "DIMM B1", "DIMM B2", "DIMM B3" },
-+	{ "DIMM C1", "DIMM C2", "DIMM C3" },
-+	{ "DIMM D1", "DIMM D2", "DIMM D3" },
-+	{ "DIMM E1", "DIMM E2", "DIMM E3" },
-+	{ "DIMM F1", "DIMM F2", "DIMM F3" },
-+	{ "DIMM G1", "DIMM G2", "DIMM G3" },
-+	{ "DIMM H1", "DIMM H2", "DIMM H3" },
-+};
-+
-+static int get_dimm_temp(struct peci_dimmtemp *priv, int dimm_no)
-+{
-+	int dimm_order = dimm_no % priv->gen_info->dimm_idx_max;
-+	int chan_rank = dimm_no / priv->gen_info->dimm_idx_max;
-+	u8  cfg_data[4];
-+	int rc;
-+
-+	if (!peci_temp_need_update(&priv->temp[dimm_no]))
-+		return 0;
-+
-+	rc = peci_client_rd_pkg_cfg_cmd(priv->mfd, MBX_INDEX_DDR_DIMM_TEMP,
-+					chan_rank, cfg_data);
-+	if (rc)
-+		return rc;
-+
-+	priv->temp[dimm_no].value = cfg_data[dimm_order] * 1000;
-+
-+	peci_temp_mark_updated(&priv->temp[dimm_no]);
-+
-+	return 0;
-+}
-+
-+static int dimmtemp_read_string(struct device *dev,
-+				enum hwmon_sensor_types type,
-+				u32 attr, int channel, const char **str)
-+{
-+	struct peci_dimmtemp *priv = dev_get_drvdata(dev);
-+	u32 dimm_idx_max = priv->gen_info->dimm_idx_max;
-+	int chan_rank, dimm_idx;
-+
-+	if (attr != hwmon_temp_label)
-+		return -EOPNOTSUPP;
-+
-+	chan_rank = channel / dimm_idx_max;
-+	dimm_idx = channel % dimm_idx_max;
-+	*str = dimmtemp_label[chan_rank][dimm_idx];
-+	return 0;
-+}
-+
-+static int dimmtemp_read(struct device *dev, enum hwmon_sensor_types type,
-+			 u32 attr, int channel, long *val)
-+{
-+	struct peci_dimmtemp *priv = dev_get_drvdata(dev);
-+	int rc;
-+
-+	if (attr != hwmon_temp_input)
-+		return -EOPNOTSUPP;
-+
-+	rc = get_dimm_temp(priv, channel);
-+	if (rc)
-+		return rc;
-+
-+	*val = priv->temp[channel].value;
-+	return 0;
-+}
-+
-+static umode_t dimmtemp_is_visible(const void *data,
-+				   enum hwmon_sensor_types type,
-+				   u32 attr, int channel)
-+{
-+	const struct peci_dimmtemp *priv = data;
-+
-+	if (priv->temp_config[channel] & BIT(attr) &&
-+	    priv->dimm_mask & BIT(channel))
-+		return 0444;
-+
-+	return 0;
-+}
-+
-+static const struct hwmon_ops dimmtemp_ops = {
-+	.is_visible = dimmtemp_is_visible,
-+	.read_string = dimmtemp_read_string,
-+	.read = dimmtemp_read,
-+};
-+
-+static int check_populated_dimms(struct peci_dimmtemp *priv)
-+{
-+	u32 chan_rank_max = priv->gen_info->chan_rank_max;
-+	u32 dimm_idx_max = priv->gen_info->dimm_idx_max;
-+	int chan_rank, dimm_idx, rc;
-+	u8  cfg_data[4];
-+
-+	for (chan_rank = 0; chan_rank < chan_rank_max; chan_rank++) {
-+		rc = peci_client_rd_pkg_cfg_cmd(priv->mfd,
-+						MBX_INDEX_DDR_DIMM_TEMP,
-+						chan_rank, cfg_data);
-+		if (rc) {
-+			priv->dimm_mask = 0;
-+			return rc;
-+		}
-+
-+		for (dimm_idx = 0; dimm_idx < dimm_idx_max; dimm_idx++)
-+			if (cfg_data[dimm_idx])
-+				priv->dimm_mask |= BIT(chan_rank *
-+						       dimm_idx_max +
-+						       dimm_idx);
-+	}
-+
-+	if (!priv->dimm_mask)
-+		return -EAGAIN;
-+
-+	dev_dbg(priv->dev, "Scanned populated DIMMs: 0x%x\n", priv->dimm_mask);
-+	return 0;
-+}
-+
-+static int create_dimm_temp_info(struct peci_dimmtemp *priv)
-+{
-+	int rc, i, config_idx, channels;
-+	struct device *hwmon_dev;
-+
-+	rc = check_populated_dimms(priv);
-+	if (rc) {
-+		if (rc == -EAGAIN) {
-+			if (priv->retry_count < DIMM_MASK_CHECK_RETRY_MAX) {
-+				queue_delayed_work(priv->work_queue,
-+						   &priv->work_handler,
-+						 DIMM_MASK_CHECK_DELAY_JIFFIES);
-+				priv->retry_count++;
-+				dev_dbg(priv->dev,
-+					"Deferred DIMM temp info creation\n");
-+			} else {
-+				dev_err(priv->dev,
-+					"Timeout DIMM temp info creation\n");
-+				rc = -ETIMEDOUT;
-+			}
-+		}
-+
-+		return rc;
-+	}
-+
-+	channels = priv->gen_info->chan_rank_max *
-+		   priv->gen_info->dimm_idx_max;
-+	for (i = 0, config_idx = 0; i < channels; i++)
-+		if (priv->dimm_mask & BIT(i))
-+			while (i >= config_idx)
-+				priv->temp_config[config_idx++] =
-+					HWMON_T_LABEL | HWMON_T_INPUT;
-+
-+	priv->chip.ops = &dimmtemp_ops;
-+	priv->chip.info = priv->info;
-+
-+	priv->info[0] = &priv->temp_info;
-+
-+	priv->temp_info.type = hwmon_temp;
-+	priv->temp_info.config = priv->temp_config;
-+
-+	hwmon_dev = devm_hwmon_device_register_with_info(priv->dev,
-+							 priv->name,
-+							 priv,
-+							 &priv->chip,
-+							 NULL);
-+	rc = PTR_ERR_OR_ZERO(hwmon_dev);
-+	if (!rc)
-+		dev_dbg(priv->dev, "%s: sensor '%s'\n",
-+			dev_name(hwmon_dev), priv->name);
-+
-+	return rc;
-+}
-+
-+static void create_dimm_temp_info_delayed(struct work_struct *work)
-+{
-+	struct delayed_work *dwork = to_delayed_work(work);
-+	struct peci_dimmtemp *priv = container_of(dwork, struct peci_dimmtemp,
-+						  work_handler);
-+	int rc;
-+
-+	rc = create_dimm_temp_info(priv);
-+	if (rc && rc != -EAGAIN)
-+		dev_dbg(priv->dev, "Failed to create DIMM temp info\n");
-+}
-+
-+static int peci_dimmtemp_probe(struct platform_device *pdev)
-+{
-+	struct peci_mfd *mfd = dev_get_drvdata(pdev->dev.parent);
-+	struct device *dev = &pdev->dev;
-+	struct peci_dimmtemp *priv;
-+	int rc;
-+
-+	if ((mfd->adapter->cmd_mask &
-+	    (BIT(PECI_CMD_GET_TEMP) | BIT(PECI_CMD_RD_PKG_CFG))) !=
-+	    (BIT(PECI_CMD_GET_TEMP) | BIT(PECI_CMD_RD_PKG_CFG)))
-+		return -ENODEV;
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	dev_set_drvdata(dev, priv);
-+	priv->mfd = mfd;
-+	priv->dev = dev;
-+	priv->addr = mfd->addr;
-+	priv->gen_info = mfd->gen_info;
-+
-+	snprintf(priv->name, PECI_NAME_SIZE, "peci_dimmtemp.cpu%d",
-+		 priv->mfd->cpu_no);
-+
-+	priv->work_queue = alloc_ordered_workqueue(priv->name, 0);
-+	if (!priv->work_queue)
-+		return -ENOMEM;
-+
-+	INIT_DELAYED_WORK(&priv->work_handler, create_dimm_temp_info_delayed);
-+
-+	rc = create_dimm_temp_info(priv);
-+	if (rc && rc != -EAGAIN) {
-+		dev_err(dev, "Failed to create DIMM temp info\n");
-+		goto err_free_wq;
-+	}
-+
-+	return 0;
-+
-+err_free_wq:
-+	destroy_workqueue(priv->work_queue);
-+	return rc;
-+}
-+
-+static int peci_dimmtemp_remove(struct platform_device *pdev)
-+{
-+	struct peci_dimmtemp *priv = dev_get_drvdata(&pdev->dev);
-+
-+	cancel_delayed_work_sync(&priv->work_handler);
-+	destroy_workqueue(priv->work_queue);
-+
-+	return 0;
-+}
-+
-+#if IS_ENABLED(CONFIG_OF)
-+static const struct of_device_id peci_dimmtemp_of_table[] = {
-+	{ .compatible = "intel,peci-dimmtemp" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, peci_dimmtemp_of_table);
-+#endif
-+
-+static const struct platform_device_id peci_dimmtemp_ids[] = {
-+	{ .name = "peci-dimmtemp", .driver_data = 0 },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(platform, peci_dimmtemp_ids);
-+
-+static struct platform_driver peci_dimmtemp_driver = {
-+	.probe    = peci_dimmtemp_probe,
-+	.remove   = peci_dimmtemp_remove,
-+	.id_table = peci_dimmtemp_ids,
-+	.driver   = {
-+			.name           = "peci-dimmtemp",
-+			.of_match_table = of_match_ptr(peci_dimmtemp_of_table),
-+	},
-+};
-+module_platform_driver(peci_dimmtemp_driver);
-+
-+MODULE_AUTHOR("Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>");
-+MODULE_DESCRIPTION("PECI dimmtemp driver");
-+MODULE_LICENSE("GPL v2");
--- 
-2.18.0
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 54212 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/3d22d6cb/attachment-0001.gz>
