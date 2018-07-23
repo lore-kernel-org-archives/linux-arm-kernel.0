@@ -1,37 +1,90 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 23 Jul 2018 13:02:54 +0200
-Subject: [PATCH v2 2/3] reset: imx7: Fix always writing bits as 0
-In-Reply-To: <1532338865.3163.95.camel@pengutronix.de>
-References: <cover.1532090446.git.leonard.crestez@nxp.com>
- <54f436a1d2a11a379af642a3327312367ef95343.1532090446.git.leonard.crestez@nxp.com>
- <1532338865.3163.95.camel@pengutronix.de>
-Message-ID: <1532343774.3501.8.camel@pengutronix.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 23 Jul 2018 13:17:09 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.19
+In-Reply-To: <20180721214620.ahdwbrdzzcdz4boc@localhost>
+References: <cover.1532086734.git.horms+renesas@verge.net.au>
+ <20180721214620.ahdwbrdzzcdz4boc@localhost>
+Message-ID: <20180723111709.twudvtpf5nl7gope@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-07-23 at 11:41 +0200, Lucas Stach wrote:
-> As this doesn't depend on any other patch in this series, I think it
-> would be fine if Philipp?takes this patch through the reset tree.
+On Sat, Jul 21, 2018 at 02:46:20PM -0700, Olof Johansson wrote:
+> Hi,
 > 
-> Regards,
-> Lucas
+> On Fri, Jul 20, 2018 at 02:04:41PM +0200, Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > Please consider these Renesas ARM based SoC DT updates for v4.19.
+> > 
+> > 
+> > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> > 
+> >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> > 
+> > are available in the git repository at:
+> > 
+> >   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-dt-for-v4.19
+> > 
+> > for you to fetch changes up to 8757b1eb3ff92012be1670a0f0d2cf9f3d9a17ff:
+> > 
+> >   ARM: dts: r8a77470: Use r8a77470-cpg-mssr binding definitions (2018-07-18 10:47:01 +0200)
+> > 
+> > ----------------------------------------------------------------
+> > Renesas ARM Based SoC DT Updates for v4.19
+> > 
+> > * RZ/G1C (r8a77470) SoC
+> > 
+> >   Use r8a77470-cpg-mssr binding definitions, which are now available in
+> >   mainline, instead of numeric indices.
 > 
-> Am Freitag, den 20.07.2018, 15:47 +0300 schrieb Leonard Crestez:
-> > Right now the only user of reset-imx7 is pci-imx6 and the
-> > reset_control_assert and deassert calls on pciephy_reset don't toggle
-> > the PCIEPHY_BTN and PCIEPHY_G_RST bits as expected. Fix this by writing
-> > 1 or 0 respectively.
+> I shorted this up a bit to "RZ/G1C (r8a77470) SoC: Use r8a77470-cpg-mssr
+> binding definitions"
+> 
+> > * Add GR-Peach audio camera shield support with MT9V111 image sensor
 > > 
-> > The reference manual is not very clear regarding SRC_PCIEPHY_RCR but for
-> > other registers like MIPIPHY and HSICPHY the bits are explicitly
-> > documented as "1 means assert, 0 means deassert".
+> >   This allows use of this shield with the RZ/A1 (r7s72100) SoC based
+> >   GR-Peach board.
+> 
+> This second paragraph is redundant.
+> 
+> > * Add initial support for RZ/N1D (r9a06g032) SoC and its RZN1D-DB board
 > > 
-> > The values are still reversed for IMX7_RESET_PCIE_CTRL_APPS_EN.
+> > * Use SPDX identifiers in DT for all SoCs and boards
 > > 
-> > > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> > > Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+> > * Add missing OPP properties for all CPUs on various SoCs
+> > 
+> >   This fixes SoCs where OPP properties were only defined for CPU0
+> >   which allows correct operation regardless of the order in which
+> >   CPUs are brought up.
+> 
+> Pruned this out too, description is clear enough (we've seen a bunch of these
+> patches by now :).
+> 
+> > * Drop MTD partitioning from DT
+> > 
+> >   This does not describe HW and providing partitioning on the kernel
+> >   command line provides a more flexible solution.
+> 
+> I disagree that command line is to be preferred. It's awkward to keep
+> it updated everywhere, and for your product you're unlikely to change
+> the partition scheme very often. But it's up to you, I suppose. Seems
+> like needless churn though.
+> 
+> Device-tree is there to describe the _platform_, and sure, flash partitioning
+> isn't part of the pure hardware, but it is non-probable and we've got the
+> tradition of keeping those things in the DT.
+> 
+> I've also replied to the patch, let's bring the discussion there.
+> 
+> > * Add missing PMIC nodes to R-Car Gen2 M2-W (r8a7791) based porter board
+> > 
+> >   This describes the two PMIC devices present on the porter and
+> >   connects CPU DVS supply.
+> 
+> Again, no need for the paragraph in the tag, I'd say.
+> 
+> 
+> Not merged this branch based on the above MTD comments.
 
-Thank you, applied to reset/fixes.
-
-regards
-Philipp
+Thanks, I'll post a v2 with the MTD change dropped and updates
+to the commit message as per your suggestions.
