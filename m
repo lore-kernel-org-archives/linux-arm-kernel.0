@@ -1,74 +1,155 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Mon, 23 Jul 2018 22:28:36 +0800
-Subject: [PATCH v2 1/3] clk: meson: add DT documentation for emmc clock
- controller
-In-Reply-To: <7hbmay3ut6.fsf@baylibre.com>
-References: <20180710163658.6175-1-yixun.lan@amlogic.com>
- <20180710163658.6175-2-yixun.lan@amlogic.com>
- <20180711194346.GA32414@rob-hp-laptop>
- <f2eb8632-1113-3bb8-506f-ac0d4e838fd4@amlogic.com>
- <CABGGisw64MpYx7Pvp+XGt6gfZzie6EKeHdchqS6CPDjmAHBuVA@mail.gmail.com>
- <5442a2e8-eb49-2aa8-e53e-8db88cd0bd58@amlogic.com>
- <CAL_Jsq+r+7BaJAPBn3L26sdxATVyDiuC=V3xE+yz0-27q0RJhA@mail.gmail.com>
- <8bf565d3-dbfd-e06d-7076-ba78d7a2e766@amlogic.com>
- <7hbmay3ut6.fsf@baylibre.com>
-Message-ID: <405ff057-a14e-f9eb-19e0-8d467dda35a1@amlogic.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 23 Jul 2018 10:36:34 -0400
+Subject: [RFC RESEND PATCH] drm/rockchip: update cursors asynchronously
+ through atomic.
+In-Reply-To: <20180627211447.20927-1-enric.balletbo@collabora.com>
+References: <20180627211447.20927-1-enric.balletbo@collabora.com>
+Message-ID: <20180723143634.GJ20359@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Kevin
+On Wed, Jun 27, 2018 at 11:14:47PM +0200, Enric Balletbo i Serra wrote:
+> Add support to async updates of cursors by using the new atomic
+> interface for that.
+> 
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 
-On 07/23/2018 10:12 PM, Kevin Hilman wrote:
-> Yixun Lan <yixun.lan@amlogic.com> writes:
-> 
-> [...]
-> 
->>>
->>>> Second, we might like to convert eMMC driver to also use mmc-clkc model.
->>>
->>> IMO, this should be done as part of merging this series. Otherwise, we
->>> have duplicated code for the same thing.
->>
->> IMO, I'd leave this out of this series, since this patch series is quite
->> complete as itself. Although, the downside is code duplication.
->>
->> Still, I need to hear Jerome, or Kevin's option, to see if or how we
->> should proceed the eMMC's clock conversion.
->>
->> I could think of three option myself
->> 1) don't do the conversion, downside is code duplication, upside is NO
->> DT change, no compatibility issue
->> 2) add a syscon node into eMMC DT node, then only convert clock part
->> into this mmc-clkc model, while still leave other eMMC register access
->> as the usual iomap way (still no race condition)
->> 3) convert all eMMC register access by using regmap interface.
->>
->> both 2) and 3) need to update the DT.
->>
->> and probably 2) is a compromise way, and 1) is also OK, 3) is probably
->> the worst way due to dramatically change (I think this was already
->> rejected in the previous discussion)
-> 
-> Because the devices (NAND and eMMC_C) are mutually exclusive, taking the
-> step-by-step approach is fine (and preferred) by me.
-> 
-> Phase 1:
-> - add new mmc-clk provider
-> - add NAND driver using new mmc-clk provider
-> - boards using NAND should ensure emmc_c is disabled in DT
-> 
-> This allows us to not touch the MMC driver or existing upstream
-> bindings.  Yes, this means there is duplicate code in the MMC driver and
-> the new mmc-clk provider, but that can be removed in the next phase.
-> 
-Great, the approach to address this issue is reasonable.
-We'd like to focus on phase 1 first, thanks
+LGTM. Given rockchip hasn't weighed in on the patch, and that you've tested it
+on real hardware, let's land it.
 
-> Phase 2:
-> - convert MMC driver to use new mmc-clk provider
-> - update MMC users in DT and bindings
-> 
-Ok.
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
 
-Yixun
+> ---
+> I am sending this as RFC because I still don't have a deep knowledge of
+> the hw and I am not sure if the vop_plane_update function can be reused
+> in both cases, atomic_updates and atomic_async_updates. I think that
+> someone with more knowledge should take a look. The patch was tested on
+> a Samsung Chromebook Plus in two ways.
+> 
+> 1. Running all igt kms_cursor_legacy and kms_atomic at plane_cursor_legacy
+> tests and see that there is no regression after the patch.
+> 
+> 2. Running weston using the atomic API.
+> 
+> Best regards,
+>   Enric
+> 
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 80 ++++++++++++++++-----
+>  1 file changed, 64 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 53d4afe15278..1eb6bda924af 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -688,8 +688,7 @@ static void vop_plane_atomic_disable(struct drm_plane *plane,
+>  	spin_unlock(&vop->reg_lock);
+>  }
+>  
+> -static void vop_plane_atomic_update(struct drm_plane *plane,
+> -		struct drm_plane_state *old_state)
+> +static void vop_plane_update(struct drm_plane *plane)
+>  {
+>  	struct drm_plane_state *state = plane->state;
+>  	struct drm_crtc *crtc = state->crtc;
+> @@ -710,20 +709,6 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+>  	bool rb_swap;
+>  	int format;
+>  
+> -	/*
+> -	 * can't update plane when vop is disabled.
+> -	 */
+> -	if (WARN_ON(!crtc))
+> -		return;
+> -
+> -	if (WARN_ON(!vop->is_enabled))
+> -		return;
+> -
+> -	if (!state->visible) {
+> -		vop_plane_atomic_disable(plane, old_state);
+> -		return;
+> -	}
+> -
+>  	obj = rockchip_fb_get_gem_obj(fb, 0);
+>  	rk_obj = to_rockchip_obj(obj);
+>  
+> @@ -794,10 +779,73 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+>  	spin_unlock(&vop->reg_lock);
+>  }
+>  
+> +static void vop_plane_atomic_update(struct drm_plane *plane,
+> +				    struct drm_plane_state *old_state)
+> +{
+> +	struct drm_plane_state *state = plane->state;
+> +	struct vop *vop = to_vop(state->crtc);
+> +
+> +	/*
+> +	 * can't update plane when vop is disabled.
+> +	 */
+> +	if (WARN_ON(!state->crtc))
+> +		return;
+> +
+> +	if (WARN_ON(!vop->is_enabled))
+> +		return;
+> +
+> +	if (!state->visible) {
+> +		vop_plane_atomic_disable(plane, old_state);
+> +		return;
+> +	}
+> +
+> +	vop_plane_update(plane);
+> +}
+> +
+> +static int vop_plane_atomic_async_check(struct drm_plane *plane,
+> +					struct drm_plane_state *state)
+> +{
+> +	struct drm_crtc_state *crtc_state;
+> +
+> +	crtc_state = drm_atomic_get_existing_crtc_state(state->state,
+> +							state->crtc);
+> +	if (WARN_ON(!crtc_state))
+> +		return -EINVAL;
+> +
+> +	if (!crtc_state->active)
+> +		return -EINVAL;
+> +
+> +	if (plane->state->crtc != state->crtc ||
+> +	    plane->state->src_w != state->src_w ||
+> +	    plane->state->src_h != state->src_h ||
+> +	    plane->state->crtc_w != state->crtc_w ||
+> +	    plane->state->crtc_h != state->crtc_h ||
+> +	    !plane->state->fb ||
+> +	    plane->state->fb != state->fb)
+> +		return -EINVAL;
+> +
+> +	return 0;
+> +}
+> +
+> +static void vop_plane_atomic_async_update(struct drm_plane *plane,
+> +					  struct drm_plane_state *new_state)
+> +{
+> +	plane->state->src_x = new_state->src_x;
+> +	plane->state->src_y = new_state->src_y;
+> +	plane->state->crtc_x = new_state->crtc_x;
+> +	plane->state->crtc_y = new_state->crtc_y;
+> +	plane->state->fb = new_state->fb;
+> +	*plane->state = *new_state;
+> +
+> +	vop_plane_update(plane);
+> +}
+> +
+>  static const struct drm_plane_helper_funcs plane_helper_funcs = {
+>  	.atomic_check = vop_plane_atomic_check,
+>  	.atomic_update = vop_plane_atomic_update,
+>  	.atomic_disable = vop_plane_atomic_disable,
+> +	.atomic_async_check = vop_plane_atomic_async_check,
+> +	.atomic_async_update = vop_plane_atomic_async_update,
+>  };
+>  
+>  static const struct drm_plane_funcs vop_plane_funcs = {
+> -- 
+> 2.18.0
+> 
+
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
