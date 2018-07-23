@@ -1,39 +1,32 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 24 Jul 2018 07:13:35 +0800
-Subject: [PATCH 1/5] mfd: rk808: Add RK817 and RK809 support
-In-Reply-To: <1532315945-1094-2-git-send-email-tony.xie@rock-chips.com>
-References: <1532315945-1094-2-git-send-email-tony.xie@rock-chips.com>
-Message-ID: <201807240750.KeFSxKL9%fengguang.wu@intel.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 23 Jul 2018 18:27:57 -0500
+Subject: [PATCH] remoteproc/davinci: Mark error recovery as disabled
+Message-ID: <20180723232757.9147-1-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+The Davinci remoteproc driver does not support error recovery at
+present, so mark the corresponding remoteproc flag appropriately
+so that the debugfs flag shows the value as 'disabled' by default.
 
-Thank you for the patch! Yet something to improve:
-
-[auto build test ERROR on ljones-mfd/for-mfd-next]
-[also build test ERROR on v4.18-rc6 next-20180723]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Tony-Xie/mfd-rk808-Add-RK817-and-RK809-support/20180724-040547
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git for-mfd-next
-config: i386-randconfig-a0-201829 (attached as .config)
-compiler: gcc-4.9 (Debian 4.9.4-2) 4.9.4
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All errors (new ones prefixed by >>):
-
->> ERROR: "pm_power_off_prepare" [drivers/mfd/rk808.ko] undefined!
-
+Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 28749 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/844019f7/attachment-0001.gz>
+ drivers/remoteproc/da8xx_remoteproc.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
+index b668e32996e2..53160d5ed543 100644
+--- a/drivers/remoteproc/da8xx_remoteproc.c
++++ b/drivers/remoteproc/da8xx_remoteproc.c
+@@ -284,6 +284,9 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+ 		goto free_mem;
+ 	}
+ 
++	/* error recovery is not supported at present */
++	rproc->recovery_disabled = true;
++
+ 	drproc = rproc->priv;
+ 	drproc->rproc = rproc;
+ 	drproc->dsp_clk = dsp_clk;
+-- 
+2.18.0
