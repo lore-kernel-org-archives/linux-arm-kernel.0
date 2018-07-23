@@ -1,120 +1,103 @@
-From: roy.pledge@nxp.com (Roy Pledge)
-Date: Mon, 23 Jul 2018 12:00:25 -0500
-Subject: [PATCH v2 4/4] drivers/soc/fsl/dpio: Convert DPIO documentation to
- .rst
-In-Reply-To: <20180723170025.2259-1-roy.pledge@nxp.com>
-References: <20180723170025.2259-1-roy.pledge@nxp.com>
-Message-ID: <20180723170025.2259-5-roy.pledge@nxp.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 23 Jul 2018 18:04:00 +0100
+Subject: [PATCH v11 11/15] arm64: kexec_file: add crash dump support
+In-Reply-To: <20180723053923.GN11258@linaro.org>
+References: <20180711074203.3019-1-takahiro.akashi@linaro.org>
+ <20180711074203.3019-12-takahiro.akashi@linaro.org>
+ <9efd0567-35dc-7435-74d6-1b540f3e5b9f@arm.com>
+ <20180723053923.GN11258@linaro.org>
+Message-ID: <8600c940-158a-f64f-8271-32f8fb40f198@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the Datapath I/O documentation to .rst format
-and move to the Documation/networking/dpaa2 directory
+Hi Akashi,
 
-Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
----
- .../networking/dpaa2/dpio-driver.rst               | 30 +++++++++++++++++++---
- Documentation/networking/dpaa2/index.rst           |  1 +
- 2 files changed, 28 insertions(+), 3 deletions(-)
- rename drivers/soc/fsl/dpio/dpio-driver.txt => Documentation/networking/dpaa2/dpio-driver.rst (94%)
+On 23/07/18 06:39, AKASHI Takahiro wrote:
+> On Wed, Jul 18, 2018 at 05:50:22PM +0100, James Morse wrote:
+>> On 11/07/18 08:41, AKASHI Takahiro wrote:
+>>> Enabling crash dump (kdump) includes
+>>> * prepare contents of ELF header of a core dump file, /proc/vmcore,
+>>>   using crash_prepare_elf64_headers(), and
+>>> * add two device tree properties, "linux,usable-memory-range" and
+>>>   "linux,elfcorehdr", which represent respectively a memory range
+>>>   to be used by crash dump kernel and the header's location
+>>
+>>> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+>>> index 69333694e3e2..eeb5766928b0 100644
+>>> --- a/arch/arm64/include/asm/kexec.h
+>>> +++ b/arch/arm64/include/asm/kexec.h
+>>> @@ -99,6 +99,10 @@ static inline void crash_post_resume(void) {}
+>>>  struct kimage_arch {
+>>>  	phys_addr_t dtb_mem;
+>>>  	void *dtb_buf;
+>>> +	/* Core ELF header buffer */
+>>
+>>> +	void *elf_headers;
+>>
+>> Shouldn't this be a phys_addr_t if it comes from kbuf.mem?
+> 
+> Do you mean elf_load_addr? You're right.
+> But kexec_buf defined mem as unsigned long and so I'd rather change
+> dtb_mem to unsigned long instead of elf_load_addr, which will also be
+> renamed to elf_headers_mem for clarification.
 
-diff --git a/drivers/soc/fsl/dpio/dpio-driver.txt b/Documentation/networking/dpaa2/dpio-driver.rst
-similarity index 94%
-rename from drivers/soc/fsl/dpio/dpio-driver.txt
-rename to Documentation/networking/dpaa2/dpio-driver.rst
-index 72ba9da..3a33a33 100644
---- a/drivers/soc/fsl/dpio/dpio-driver.txt
-+++ b/Documentation/networking/dpaa2/dpio-driver.rst
-@@ -1,7 +1,16 @@
--Copyright 2016 NXP
-+.. include:: <isonum.txt>
-+
-+DPAA2 DPIO (Data Path I/O) Overview
-+===================================
-+
-+:Copyright: |copy| 2015 Freescale Semiconductor Inc.
-+:Copyright: |copy| 2018 NXP
-+
-+This document provides an overview of the Freescale DPAA2 DPIO
-+drivers
- 
- Introduction
--------------
-+============
- 
- A DPAA2 DPIO (Data Path I/O) is a hardware object that provides
- interfaces to enqueue and dequeue frames to/from network interfaces
-@@ -27,8 +36,11 @@ provides services that:
- 
- The Linux DPIO driver consists of 3 primary components--
-    DPIO object driver-- fsl-mc driver that manages the DPIO object
-+
-    DPIO service-- provides APIs to other Linux drivers for services
-+
-    QBman portal interface-- sends portal commands, gets responses
-+::
- 
-           fsl-mc          other
-            bus           drivers
-@@ -45,8 +57,9 @@ The Linux DPIO driver consists of 3 primary components--
-                             |
-                          hardware
- 
-+
- The diagram below shows how the DPIO driver components fit with the other
--DPAA2 Linux driver components:
-+DPAA2 Linux driver components::
-                                                    +------------+
-                                                    | OS Network |
-                                                    |   Stack    |
-@@ -98,20 +111,29 @@ DPIO service  (dpio-service.c, dpaa2-io.h)
- 
-    Notification handling
-       dpaa2_io_service_register()
-+
-       dpaa2_io_service_deregister()
-+
-       dpaa2_io_service_rearm()
- 
-    Queuing
-       dpaa2_io_service_pull_fq()
-+
-       dpaa2_io_service_pull_channel()
-+
-       dpaa2_io_service_enqueue_fq()
-+
-       dpaa2_io_service_enqueue_qd()
-+
-       dpaa2_io_store_create()
-+
-       dpaa2_io_store_destroy()
-+
-       dpaa2_io_store_next()
- 
-    Buffer pool management
-       dpaa2_io_service_release()
-+
-       dpaa2_io_service_acquire()
- 
- QBman portal interface (qbman-portal.c)
-@@ -120,7 +142,9 @@ QBman portal interface (qbman-portal.c)
-    The qbman-portal component provides APIs to do the low level hardware
-    bit twiddling for operations such as:
-       -initializing Qman software portals
-+
-       -building and sending portal commands
-+
-       -portal interrupt configuration and processing
- 
-    The qbman-portal APIs are not public to other drivers, and are
-diff --git a/Documentation/networking/dpaa2/index.rst b/Documentation/networking/dpaa2/index.rst
-index 4c6586c..10bea11 100644
---- a/Documentation/networking/dpaa2/index.rst
-+++ b/Documentation/networking/dpaa2/index.rst
-@@ -6,3 +6,4 @@ DPAA2 Documentation
-    :maxdepth: 1
- 
-    overview
-+   dpio-driver
--- 
-2.7.4
+>> (dtb_mem is, and they type tells us which way round the runtime/kexec-time
+>> pointers are)
+
+My preference would be for physical addresses to always be phys_addr_t, but as
+long as we can easily spot the difference kexec-time versus runtime addresses,
+it will save bugs where we use the wrong one.
+
+
+>>> diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+>>> index a0b44fe18b95..261564df7210 100644
+>>> --- a/arch/arm64/kernel/machine_kexec_file.c
+>>> +++ b/arch/arm64/kernel/machine_kexec_file.c
+>>> @@ -132,6 +173,45 @@ static int setup_dtb(struct kimage *image,
+
+>>> +		kbuf.buf_min = crashk_res.start;
+>>> +		kbuf.buf_max = crashk_res.end + 1;
+>>> +		kbuf.top_down = true;
+>>> +
+>>> +		ret = kexec_add_buffer(&kbuf);
+>>> +		if (ret) {
+>>> +			vfree(hdrs_addr);
+>>> +			goto out_err;
+>>> +		}
+>>> +		image->arch.elf_headers = hdrs_addr;
+>>> +		image->arch.elf_headers_sz = hdrs_sz;
+>>> +		image->arch.elf_load_addr = kbuf.mem;
+>>> +
+>>> +		pr_debug("Loaded elf core header at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
+>>> +				 image->arch.elf_load_addr, hdrs_sz, hdrs_sz);
+>>> +	}
+>>> +
+>>>  	kbuf.image = image;
+>>>  	/* not allocate anything below the kernel */
+>>>  	kbuf.buf_min = kernel_load_addr + kernel_size;
+
+>> I think the initramfs can escape the crash kernel range because you add to the
+>> buf_max region:
+>> |	/* within 1GB-aligned window of up to 32GB in size */
+>> |	kbuf.buf_max = round_down(kernel_load_addr, SZ_1G)
+>> |				?+ (unsigned long)SZ_1G * 32;
+> 
+> No worries.
+> kexec_add_buffer() will limit the search only within crashk_res anyway.
+
+via arch_kexec_walk_mem()? Got it.
+
+But strangely the buf_min and buf_max still matter because
+locate_mem_hole_callback() uses them.
+
+
+> Are you reviewing other patches in my v11?
+> If not, I will post v12 tomorrow.
+
+No, (I try to batch replies to avoid that happening).
+I'm reading up on Secure-boot and trying to test the pe_verification stuff...
+
+
+Thanks,
+
+James
