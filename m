@@ -1,31 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 23 Jul 2018 19:25:03 +0100
-Subject: next-20180723 build: 2 failures 11 warnings (next-20180723)
-In-Reply-To: <E1fheAy-0003tU-Dq@optimist>
-References: <E1fheAy-0003tU-Dq@optimist>
-Message-ID: <20180723182503.GH13981@sirena.org.uk>
+From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
+Date: Mon, 23 Jul 2018 15:36:57 -0300
+Subject: [PATCH, libv4l]: Make libv4l2 usable on devices with complex
+ pipeline
+In-Reply-To: <20180719205344.GA12098@amd>
+References: <20180708213258.GA18217@amd>
+	<20180719205344.GA12098@amd>
+Message-ID: <20180723153649.73337c0f@coco.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 05:59:12PM +0100, Build bot for Mark Brown wrote:
+Hi Pavel,
 
-Today's -next fails to build an arm allnoconfig (and a bunch of other
-arm configs from the look of some of the other builder reports) with:
+Em Thu, 19 Jul 2018 22:53:44 +0200
+Pavel Machek <pavel@ucw.cz> escreveu:
 
-> 	arm-allnoconfig
-> ../mm/vmacache.c:14:39: error: 'PMD_SHIFT' undeclared (first use in this function)
-> ../mm/vmacache.c:14:39: error: 'PMD_SHIFT' undeclared (first use in this function)
-> ../mm/vmacache.c:127:26: error: 'addr' undeclared (first use in this function)
-> ../mm/vmacache.c:14:39: error: 'PMD_SHIFT' undeclared (first use in this function)
+> On Sun 2018-07-08 23:32:58, Pavel Machek wrote:
+> > 
+> > Add support for opening multiple devices in v4l2_open(), and for
+> > mapping controls between devices.
+> > 
+> > This is necessary for complex devices, such as Nokia N900.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>  
+> 
+> Ping?
+> 
+> There's a lot of work to do on libv4l2... timely patch handling would
+> be nice.
 
-due to 5d2f33872046e (mm, vmacache: hash addresses based on pmd) which
-uses PMD_SHIFT rather than PAGE_SHIFT for VMACACHE_HASH() but that's not
-defined in at least !MMU arm configs.  There is a reference to it in
-arm/pgtable-nommu.h but only in comments with FIXMEs next to them.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180723/3421abd5/attachment.sig>
+As we're be start working at the new library in order to support
+complex cameras, and I don't want to prevent you keeping doing your
+work, IMHO the best way to keep doing it would be to create two
+libv4l2 forks:
+
+	- one to be used by you - meant to support N900 camera;
+	- another one to be used by Google/Intel people that will
+	  be working at the Complex camera.
+
+This way, we can proceed with the development without causing
+instability to v4l-utils. Once we have the projects done at the
+separate repositories, we can work on merging them back upstream.
+
+So, please send me, in priv, a .ssh key for me to add you an
+account at linuxtv.org. I'll send you instructions about how to
+use the new account.
+
+Thanks,
+Mauro
