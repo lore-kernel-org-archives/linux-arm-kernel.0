@@ -1,21 +1,61 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 22 Jul 2018 20:52:19 -0700 (PDT)
-Subject: [PATCH v2 net-next] net: mediatek: use dma_zalloc_coherent
- instead of allocator/memset
-In-Reply-To: <20180723031647.9820-1-yuehaibing@huawei.com>
-References: <20180723031647.9820-1-yuehaibing@huawei.com>
-Message-ID: <20180722.205219.971856341700917090.davem@davemloft.net>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 23 Jul 2018 09:47:39 +0530
+Subject: [PATCH v2 0/4] Add Actions Semi Owl family S900 DMA Controller support
+Message-ID: <20180723041743.32024-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: YueHaibing <yuehaibing@huawei.com>
-Date: Mon, 23 Jul 2018 11:16:47 +0800
+This patchset adds DMA controller support for Actions Semi Owl family
+S900 SoC. This driver has been structured in a way such that there will be only
+one controller driver for the whole Owl family series (S500, S700 and
+S900 SoCs).
 
-> Use dma_zalloc_coherent instead of dma_alloc_coherent
-> followed by memset 0.
-> 
-> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
-> ---
-> v2: remove redundant __GFP_ZERO
+There are 12 physical channels and 46 logical channels supported by the
+DMA controller.
 
-Applied, thank you.
+The DMA controller also supports 4 software configurable interrupt lines for
+the priority based DMA usecase. But the DMA driver supports only 1 interrupt
+for simplification. By default, the driver uses Linked list mode for all
+transfers. Right now only MEMCPY support has been added and the rest
+(SLAVE, CYCLIC) will be added in upcoming patches.
+
+The driver has been tested using dmatest utility on the Bubblegum-96
+board.
+
+The DTS patches in this series depends on the pinctrl DTS patches
+submitted [1], which is yet to be merged by the platform maintainer
+Andreas. Since the DMA driver goes through DMA tree and the relevant
+DTS patches goes through ARM-SoC tree, Andreas will pick it up once
+it has been reviewed.
+
+For the reference, I have queued up all reviewed dts patches so far
+in my repo [2] from which Andreas is picking them for 4.19.
+
+Thanks,
+Mani
+
+[1] https://patchwork.kernel.org/patch/10322937/
+[2] https://git.linaro.org/people/manivannan.sadhasivam/linux.git/log/?h=s900-for-next
+
+Changes in v2:
+
+* Fixed up the multi-line alignments according to `checkpatch --strict`
+
+Manivannan Sadhasivam (4):
+  dt-bindings: dma: Add binding for Actions Semi Owl SoCs
+  arm64: dts: actions: Add Actions Semi S900 DMA Controller
+  dma: Add Actions Semi Owl family S900 DMA driver
+  MAINTAINERS: Add entry for Actions Semi Owl SoCs DMA driver
+
+ .../devicetree/bindings/dma/owl-dma.txt       |   46 +
+ MAINTAINERS                                   |    2 +
+ arch/arm64/boot/dts/actions/s900.dtsi         |   13 +
+ drivers/dma/Kconfig                           |    8 +
+ drivers/dma/Makefile                          |    1 +
+ drivers/dma/owl-dma.c                         | 1023 +++++++++++++++++
+ 6 files changed, 1093 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/owl-dma.txt
+ create mode 100644 drivers/dma/owl-dma.c
+
+-- 
+2.17.1
