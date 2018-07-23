@@ -1,38 +1,66 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 23 Jul 2018 13:48:59 +0200
-Subject: Subject: [PATCH 00/22] gpio: xilinx: update driver to match
- official xilinx version
-In-Reply-To: <CACRpkdan_Fc8E2o69_48OZU-N_4HUBh2uY77Se3qTVvRSny3bA@mail.gmail.com>
-References: <5D23E7CAADD3BE4A97642792FFC691C561C7A3D7@MBX215.d.ethz.ch>
- <CACRpkdan_Fc8E2o69_48OZU-N_4HUBh2uY77Se3qTVvRSny3bA@mail.gmail.com>
-Message-ID: <725e0413-7293-5535-73b9-78c28e56e321@xilinx.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 23 Jul 2018 14:04:13 +0200
+Subject: [GIT PULL v2] Renesas ARM Based SoC Defconfig Updates for v4.19
+Message-ID: <cover.1532346690.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.7.2018 21:24, Linus Walleij wrote:
-> On Sat, Jul 21, 2018 at 4:14 PM Hedges Alexander
-> <ahedges@student.ethz.ch> wrote:
-> 
-> An overarching question:
-> 
-> the whole patch set contains things like this:
-> 
->> +#ifdef CONFIG_OF
-> (...)
->> +#else
-> (...)
->> +#endif
-> 
-> But arch/arm/mach-zynq and the Aarch64 counterpart are
-> OF-only.
-> 
-> I.e. these adaptions must have been made for some Xilinx
-> platform support codebase that is not upstream, and which does
-> not use device tree.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-I was used 10+ years ago when CONFIG_OF doesn't exist.
-All these platforms have been moved to OF long time ago too.
-I don't think there is any reason to keep any support for !OF case.
+Please consider these Renesas ARM based SoC defconfig updates for v4.19.
 
-Thanks,
-Michal
+Changes since v1:
+* Dropped patch to set CONFIG_LOCALVERSION as requested by Olof
+* Dropped patch to Enable MTD command line partition parsing as
+  Olof has asked for more discussion on the related DTS change
+
+
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-defconfig-for-v4.19
+
+for you to fetch changes up to b036e6420b9aed3498cbd0429f12300139cc5a28:
+
+  ARM: multi_v7_defconfig: Enable support for RZN1D-DB (2018-07-23 13:48:02 +0200)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Defconfig Updates for v4.19
+
+multi_v7_defconfig and shmobile_defconfig Enhancement:
+
+* Enable support for recently upstreamed RZN1D-DB board
+  in multi_v7_defconfig and shmobile_defconfig. This is
+  to give better test coverage.
+
+shmobile_defconfig Clean-Up:
+
+* Drop NET_VENDOR_<FOO>=n
+
+  This reduces the size of the defconfig without any change in the
+  resulting kernel config.
+
+shmobile_defconfig Enhancements:
+
+* Disable long deprecated /sbin/hotplug helper
+
+* Enable reset controller support
+
+  This is to give better test coverage.
+  This may be used by reset controller support in the Renesas CPG/MSSR
+  driver when used by R-Car Gen2 and RZ/G1 SoCs.
+
+----------------------------------------------------------------
+Geert Uytterhoeven (5):
+      ARM: shmobile: defconfig: Drop NET_VENDOR_<FOO>=n
+      ARM: shmobile: defconfig: Enable reset controller support
+      ARM: shmobile: defconfig: Enable support for RZN1D-DB
+      ARM: shmobile: defconfig: Disable /sbin/hotplug fork-bomb
+      ARM: multi_v7_defconfig: Enable support for RZN1D-DB
+
+ arch/arm/configs/multi_v7_defconfig |  1 +
+ arch/arm/configs/shmobile_defconfig | 17 +++--------------
+ 2 files changed, 4 insertions(+), 14 deletions(-)
