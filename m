@@ -1,37 +1,43 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Sun, 22 Jul 2018 23:56:16 +0000
-Subject: [PATCH] ASoC: wm9712: fix replace codec to component
-In-Reply-To: <1532078447.19673.8.camel@ziswiler.com>
-References: <20180720075148.14648-1-marcel@ziswiler.com>
- <87effy48lz.wl-kuninori.morimoto.gx@renesas.com>
- <1532078447.19673.8.camel@ziswiler.com>
-Message-ID: <87d0ve7ru7.wl-kuninori.morimoto.gx@renesas.com>
+From: leo.yan@linaro.org (leo.yan at linaro.org)
+Date: Mon, 23 Jul 2018 09:35:07 +0800
+Subject: [PATCH v2 0/6] perf cs-etm: Fix tracing packet handling and
+ minor refactoring
+In-Reply-To: <1531295145-596-1-git-send-email-leo.yan@linaro.org>
+References: <1531295145-596-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <20180723013507.GA27713@leoy-ThinkPad-X240s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnaldo,
 
-Hi Marcel
+On Wed, Jul 11, 2018 at 03:45:39PM +0800, Leo Yan wrote:
 
-> > > Since commit 143b44845d87 ("ASoC: wm9712: replace codec to
-> > > component")
-> > > "wm9712-codec" got renamed to "wm9712-component", however, this
-> > > change
-> > > never got propagated down to the actual board/platform drivers.
-> > > E.g. on
-> > > Colibri T20 this lead to the following spew upon boot with
-> > > sound/touch
-> > > being broken:
-> > 
-> > Oops, my bad...
-> > The platform_driver name is not important,
-> > how about simply rename back it to "wm9712-codec" ?
+Just want to confirm, I saw the first two patches in this serise have
+been merged into perf/core branch [1], but the last 4 patches are
+missed.
+
+Could I know if you have trouble when you apply them?  Or anything
+need me to follow up?  Otherwise you might miss them :)
+
+Thanks,
+Leo Yan
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git/log/?h=perf/core
+
+> Leo Yan (6):
+>   perf cs-etm: Introduce invalid address macro
+>   perf cs-etm: Bail out immediately for instruction sample failure
+>   perf cs-etm: Fix start tracing packet handling
+>   perf cs-etm: Support dummy address value for CS_ETM_TRACE_ON packet
+>   perf cs-etm: Generate branch sample when receiving a CS_ETM_TRACE_ON
+>     packet
+>   perf cs-etm: Generate branch sample for CS_ETM_TRACE_ON packet
 > 
-> Sure, that's your call. After all it was now broken for almost half a
-> year (;-p). Should I cook that up as well or are you gona do it?
-
-Sorry about that.
-I can't test it, you can do it ?
-
-Best regards
----
-Kuninori Morimoto
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 10 ++--
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  1 +
+>  tools/perf/util/cs-etm.c                        | 71 +++++++++++++++++++++----
+>  3 files changed, 68 insertions(+), 14 deletions(-)
+> 
+> -- 
+> 2.7.4
+> 
