@@ -1,11 +1,11 @@
 From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 23 Jul 2018 20:37:18 +0530
+Date: Mon, 23 Jul 2018 20:39:36 +0530
 Subject: [RFC PATCH v6 2/2] mailbox: imx-mailbox: add scu protocol support
 In-Reply-To: <20180712070129.tyetqm2yesouiatf@pengutronix.de>
 References: <1531326759-20556-1-git-send-email-aisheng.dong@nxp.com>
  <1531326759-20556-3-git-send-email-aisheng.dong@nxp.com>
  <20180712070129.tyetqm2yesouiatf@pengutronix.de>
-Message-ID: <CABb+yY30Jhb_bgoS+4ZL8V60C+h2piW6nTwR3gvwMYyQVp6-QQ@mail.gmail.com>
+Message-ID: <CABb+yY3N1T_+Lf--OQhXArxDGG9VBSef7j7Qqzh-fUTYYE92Pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -62,13 +62,6 @@ On Thu, Jul 12, 2018 at 12:31 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 > function.
 >
 Most platforms call mbox_chan_received_data() from RX interrupt
-handler. Which is actually
+handler. Which is actually calling Client's  rx_callback()
 
-
-> Sascha
->
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Or I miss your point?
