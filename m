@@ -1,64 +1,117 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Mon, 23 Jul 2018 17:29:56 +0200
-Subject: [Eas-dev] Computing the dynamic-power-coefficient on Exynos5422
-In-Reply-To: <8966420ddb4d4f40bbbc44b58da2881b@MSX-L106.msx.ad.zih.tu-dresden.de>
-References: <8966420ddb4d4f40bbbc44b58da2881b@MSX-L106.msx.ad.zih.tu-dresden.de>
-Message-ID: <d3d0ab5e-4841-6e21-ed0a-8a73486ba927@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 23 Jul 2018 16:30:53 +0100
+Subject: [PATCH v2] mmc: sunxi: remove output of virtual base address
+In-Reply-To: <20180720141728.6te2ffbqsiisoein@flea>
+References: <20180719133554.30737-1-andre.przywara@arm.com>
+ <20180719144650.hq3rtevp3gjkpvxh@flea>
+ <6d0ade81-c55d-8262-0f78-4d7d55e549cb@arm.com>
+ <20180720141728.6te2ffbqsiisoein@flea>
+Message-ID: <b02c4a6b-a86f-5b31-2ad2-31a436c90977@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oliver,
+Hi,
 
-On 07/20/2018 04:15 PM, Oliver Effland wrote:
-> Hello everyone,
+On 20/07/18 15:17, Maxime Ripard wrote:
+> On Thu, Jul 19, 2018 at 04:10:50PM +0100, Andre Przywara wrote:
+>> Hi,
+>>
+>> On 19/07/18 15:46, Maxime Ripard wrote:
+>>> On Thu, Jul 19, 2018 at 02:35:54PM +0100, Andre Przywara wrote:
+>>>> Recent Linux versions refuse to print actual virtual kernel addresses,
+>>>> to not give a hint about the location of the kernel in a randomized virtual
+>>>> address space. This affects the output of the sunxi MMC controller
+>>>> driver, which now produces the rather uninformative line:
+>>>>
+>>>> [    1.482660] sunxi-mmc 1c0f000.mmc: base:0x(____ptrval____) irq:8
+>>>>
+>>>> Since the virtual base address is not really interesting in the first
+>>>> place, let's just drop this value. The same applies to Linux' notion of
+>>>> the interrupt number, which is independent from the GIC SPI number.
+>>>> We have the physical address as part of the DT node name, which is way
+>>>> more useful for debugging purposes.
+>>>> To keep a success message in the driver, we print some information that
+>>>> is not too obvious and that we learned while probing the device:
+>>>> the maximum request size and whether it uses the new timing mode.
+>>>> So the output turns into:
+>>>> sunxi-mmc 1c0f000.mmc: max request size: 16384 KB, uses new timings mode
+>>>> sunxi-mmc 1c11000.mmc: max request size: 2048 KB
+>>>>
+>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>>> ---
+>>>> Changelog v1 ... v2:
+>>>> - dropped output of Linux interrupt number
+>>>> - added max request size and timings mode output
+>>>>
+>>>>  drivers/mmc/host/sunxi-mmc.c | 5 ++++-
+>>>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+>>>> index 8e7f3e35ee3d..fbbc09d82338 100644
+>>>> --- a/drivers/mmc/host/sunxi-mmc.c
+>>>> +++ b/drivers/mmc/host/sunxi-mmc.c
+>>>> @@ -1407,7 +1407,10 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
+>>>>  	if (ret)
+>>>>  		goto error_free_dma;
+>>>>  
+>>>> -	dev_info(&pdev->dev, "base:0x%p irq:%u\n", host->reg_base, host->irq);
+>>>> +	dev_info(&pdev->dev, "max request size: %u KB%s\n",
+>>>> +		 mmc->max_req_size >> 10,
+>>>> +		 host->use_new_timings ? ", uses new timings mode" : "");
+>>>
+>>> I really don't know how to feel about this one.
+>>>
+>>> This isn't more useful to the regular user wanting to see if the
+>>> driver is probed, which is what this message should be about. 
+>>>
+>>> And this one isn't clearer or more obvious than the previous one
+>>> (which was already pretty bad). I really think having some message
+>>> that basically says "MMC controller initialized" or something along
+>>> those lines would work better.
+>>
+>> I see your point, and am happy to change that.
+>> On the other hand there might be people that complain about chatty
+>> drivers, and printing a line just to says "Success!!!!!" is a bit BSP
+>> kernel like ;-).
 > 
-> I hope this is the right place to ask, otherwise please just point me in the right direction.
+> Well, we're currently printing copyright notices, so I guess we're
+> worse than the BSPs :)
 > 
-> I'm currently testing the EAS patches [v4] on an ODROID-XU3 board, which has an Exynos5422 SoC. However, the corresponding DT is missing the "dynamic-power-coefficient" that is needed for an appropriate EM.
-> So I'm trying to compute the dynamic-power-coefficient according to the formula:
+>> That dmesg line could as well be used to print something useful, and
+>> transport the "success" message along with that.  So basically I
+>> scanned the probe function for some information that would justify
+>> an output (something non-obvious or information probed), to avoid
+>> dropping this at all (as you initially said yesterday).
+>> MMC_CAP_1_8V_DDR was another candidate, btw.
+>>
+>>> However, I can also see value in having this printed, for developers,
+>>> but maybe as dev_dbg?
+>>
+>> I think it's useful to have this in non-debug kernels as well, because
+>> this is what people tend to use. And this would allow developers to much
+>> easier debug user problems, for instance when they create board DTs:
+>> When this line doesn't appear, there might be a regulator missing, for
+>> instance. If it's there, the MMC driver is happy and we have one less
+>> thing to worry about.
+>>
+>> So why not combine the benefit of the success message and the
+>> information for developers, if we have that one line of output anyway?
+>> I think we have way more chattier drivers and way more cryptic messages
+>> in the dmesg, so a single line with some technical details does not
+>> hurt, especially if we have that already.
+>>
+>> But I don't have a strong opinion on that, so leave it up for Ulf and
+>> you to decide: keep this patch (or print some other info); replace the
+>> output with a success message or drop the line at all.
 > 
-> Pdyn = dynamic-power-coefficient * V^2 * f
+> How about both then?
 > 
-> The frequency f is given by the DT.The actual Voltage and Power are determined by means of the on-chip sensors (returns the values for the specific cluster). When using the Voltage given in the DT, the differences for the d-p-coefficient are negligible.
+> Something like "initialized with %d request size and new timings\n" ?
 > 
-> So I'm calculating the d-p-coefficient (mW/MHz/uV^2) by reading out the following SoC sensor values.
-> 
-> For the little cluster (A7):
-> frequency(MHz)  Voltage(V)  Power(mW)	Dynamic-power-coefficient
->   200		0.9175	     49.470	~2.938*10^-13
->   400		0.9165	     91.892	~2.736*10^-13
->   600		0.9638	    149.454	~2.682*10^-13
->   800		1.0263	    223.453	~2.652*10^-13
-> 1000		1.1000	    327.707	~2.708*10^-13
-> 1200		1.1725	    445.899	~2.703*10^-13
-> 1400		1.2713	    627.010	~2.771*10^-13
-> 
-> For the big cluster (A15):
-> frequency(MHz)  Voltage(V)  Power(mW)	Dynamic-power-coefficient
->   200		0.9162	     159.676	~9.510*10^-13
->   500		0.9138	     325.480	~7.797*10^-13
->   800		0.9288	     511.360	~7.410*10^-13
-> 1100		1.0063	     828.020	~7.434*10^-13
-> 1400		1.0713	    1209.774	~7.530*10^-13
-> 1700		1.1750	    1835.784	~7.822*10^-13
-> 2000		1.2700	    2661.849	~8.252*10^-13
+> It makes it obvious enough for someone that doesn't really has an
+> idea, while outputting the proper informations you wanted.
 
-We do support Arm's TC2 platform (2xA15 and 3xA7) with the EAS project. 
-The latest EAS mainline integration includes Quentin's "[RFC PATCH v4 
-00/12] Energy Aware Scheduling" https://lkml.org/lkml/2018/6/28/301 .
+Excellent idea. Changed it in this direction.
 
-You can find the appropriate patch for TC2 dynamic-power-coefficient 
-integration "arm: dts: vexpress-v2p-ca15_a7: Add 
-dynamic-power-coefficient properties" under 
-https://developer.arm.com/open-source/energy-aware-scheduling/eas-mainline-development 
-. Follow the 'eas/next/integration' link. The patch header has a little 
-bit of documentation about how we did it. We used the build-in TC2 
-Energy Meter.
-
-This is all in sync with what Russel and Steve posted on this thread before.
-
-Thanks for taking EAS for a spin on another Arm 32bit machine!
-
--- Dietmar
-
-[...]
+Thanks,
+Andre.
