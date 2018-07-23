@@ -1,99 +1,41 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jul 2018 14:06:26 +0200
-Subject: [PATCH 8/8] ARM: dts: r8a77470: Use r8a77470-cpg-mssr binding
- definitions
-In-Reply-To: <cover.1532345886.git.horms+renesas@verge.net.au>
-References: <cover.1532345886.git.horms+renesas@verge.net.au>
-Message-ID: <c03e2f12a2967f1639ee53299b72922ee3472528.1532345886.git.horms+renesas@verge.net.au>
+From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
+Date: Mon, 23 Jul 2018 21:35:01 +0900
+Subject: [PATCH/RFT 1/7] arm64: dts: renesas: r8a77965: Add Audio-DMAC
+ device nodes
+In-Reply-To: <CAMuHMdU9mkaFe_-n2sS6u1Qy4pbczQXWjmBAKtdw90p_-5HiYA@mail.gmail.com>
+References: <1531856883-19645-1-git-send-email-ykaneko0929@gmail.com>
+ <1531856883-19645-2-git-send-email-ykaneko0929@gmail.com>
+ <CAMuHMdU9mkaFe_-n2sS6u1Qy4pbczQXWjmBAKtdw90p_-5HiYA@mail.gmail.com>
+Message-ID: <CAH1o70+UEUtaoZT4CiDtC0YNh34Zvmjhcch1=7tYOaS6ofkpSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Geert-san,
 
-Replace the hardcoded clock indices by R8A77470_CLK_* symbols.
+Thank you for your review.
+I will correct the sort order of the audma nodes and  a typo of the commit log.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a77470.dtsi | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+Best regards,
+Kaneko
 
-diff --git a/arch/arm/boot/dts/r8a77470.dtsi b/arch/arm/boot/dts/r8a77470.dtsi
-index c85032f9605b..87d32d3e23de 100644
---- a/arch/arm/boot/dts/r8a77470.dtsi
-+++ b/arch/arm/boot/dts/r8a77470.dtsi
-@@ -7,7 +7,7 @@
- 
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
--#include <dt-bindings/clock/renesas-cpg-mssr.h>
-+#include <dt-bindings/clock/r8a77470-cpg-mssr.h>
- / {
- 	compatible = "renesas,r8a77470";
- 	#address-cells = <2>;
-@@ -22,7 +22,7 @@
- 			compatible = "arm,cortex-a7";
- 			reg = <0>;
- 			clock-frequency = <1000000000>;
--			clocks = <&cpg CPG_CORE 0>;
-+			clocks = <&cpg CPG_CORE R8A77470_CLK_Z2>;
- 			power-domains = <&sysc 5>;
- 			next-level-cache = <&L2_CA7>;
- 		};
-@@ -209,7 +209,7 @@
- 			reg = <0 0xe6e60000 0 0x40>;
- 			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 721>,
--				 <&cpg CPG_CORE 5>, <&scif_clk>;
-+				 <&cpg CPG_CORE R8A77470_CLK_ZS>, <&scif_clk>;
- 			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac0 0x29>, <&dmac0 0x2a>,
- 			       <&dmac1 0x29>, <&dmac1 0x2a>;
-@@ -225,7 +225,7 @@
- 			reg = <0 0xe6e68000 0 0x40>;
- 			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 720>,
--				 <&cpg CPG_CORE 5>, <&scif_clk>;
-+				 <&cpg CPG_CORE R8A77470_CLK_ZS>, <&scif_clk>;
- 			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac0 0x2d>, <&dmac0 0x2e>,
- 			       <&dmac1 0x2d>, <&dmac1 0x2e>;
-@@ -241,7 +241,7 @@
- 			reg = <0 0xe6e58000 0 0x40>;
- 			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 719>,
--				 <&cpg CPG_CORE 5>, <&scif_clk>;
-+				 <&cpg CPG_CORE R8A77470_CLK_ZS>, <&scif_clk>;
- 			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac0 0x2b>, <&dmac0 0x2c>,
- 			       <&dmac1 0x2b>, <&dmac1 0x2c>;
-@@ -257,7 +257,7 @@
- 			reg = <0 0xe6ea8000 0 0x40>;
- 			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 718>,
--				 <&cpg CPG_CORE 5>, <&scif_clk>;
-+				 <&cpg CPG_CORE R8A77470_CLK_ZS>, <&scif_clk>;
- 			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac0 0x2f>, <&dmac0 0x30>,
- 			       <&dmac1 0x2f>, <&dmac1 0x30>;
-@@ -273,7 +273,7 @@
- 			reg = <0 0xe6ee0000 0 0x40>;
- 			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 715>,
--				 <&cpg CPG_CORE 5>, <&scif_clk>;
-+				 <&cpg CPG_CORE R8A77470_CLK_ZS>, <&scif_clk>;
- 			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac0 0xfb>, <&dmac0 0xfc>,
- 			       <&dmac1 0xfb>, <&dmac1 0xfc>;
-@@ -289,7 +289,7 @@
- 			reg = <0 0xe6ee8000 0 0x40>;
- 			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 714>,
--				 <&cpg CPG_CORE 5>, <&scif_clk>;
-+				 <&cpg CPG_CORE R8A77470_CLK_ZS>, <&scif_clk>;
- 			clock-names = "fck", "brg_int", "scif_clk";
- 			dmas = <&dmac0 0xfd>, <&dmac0 0xfe>,
- 			       <&dmac1 0xfd>, <&dmac1 0xfe>;
--- 
-2.11.0
+2018-07-18 18:06 GMT+09:00 Geert Uytterhoeven <geert@linux-m68k.org>:
+> On Tue, Jul 17, 2018 at 9:48 PM Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+>> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>>
+>> This patch adds Audio-DMAC{0,1} device nodes for the R8A77965 SoC.
+>>
+>> Based on a similar patch of the R8A7796 device tree
+>> by uninori Morimoto <kuninori.morimoto.gx@renesas.com>.
+>
+> Kuninori
+>
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
