@@ -1,41 +1,54 @@
-From: yuehaibing@huawei.com (YueHaibing)
-Date: Mon, 23 Jul 2018 11:16:47 +0800
-Subject: [PATCH v2 net-next] net: mediatek: use dma_zalloc_coherent instead of
- allocator/memset
-Message-ID: <20180723031647.9820-1-yuehaibing@huawei.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 23 Jul 2018 09:10:20 +0530
+Subject: [PATCH v6 1/6] dt-bindings: i2c: Add binding for Actions
+ Semiconductor Owl I2C controller
+In-Reply-To: <20180723034025.5763-1-manivannan.sadhasivam@linaro.org>
+References: <20180723034025.5763-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180723034025.5763-2-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dma_zalloc_coherent instead of dma_alloc_coherent
-followed by memset 0.
+Add devicetree binding for Actions Semiconductor Owl I2C controller
 
-Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
-v2: remove redundant __GFP_ZERO
----
- drivers/net/ethernet/mediatek/mtk_eth_soc.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ .../devicetree/bindings/i2c/i2c-owl.txt       | 27 +++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-owl.txt
 
-diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-index d8ebf0a..c30aea2 100644
---- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-+++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-@@ -1221,14 +1221,11 @@ static int mtk_tx_alloc(struct mtk_eth *eth)
- 	if (!ring->buf)
- 		goto no_tx_mem;
- 
--	ring->dma = dma_alloc_coherent(eth->dev,
--					  MTK_DMA_SIZE * sz,
--					  &ring->phys,
--					  GFP_ATOMIC | __GFP_ZERO);
-+	ring->dma = dma_zalloc_coherent(eth->dev, MTK_DMA_SIZE * sz,
-+					&ring->phys, GFP_ATOMIC);
- 	if (!ring->dma)
- 		goto no_tx_mem;
- 
--	memset(ring->dma, 0, MTK_DMA_SIZE * sz);
- 	for (i = 0; i < MTK_DMA_SIZE; i++) {
- 		int next = (i + 1) % MTK_DMA_SIZE;
- 		u32 next_ptr = ring->phys + next * sz;
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-owl.txt b/Documentation/devicetree/bindings/i2c/i2c-owl.txt
+new file mode 100644
+index 000000000000..b743fe444e9f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-owl.txt
+@@ -0,0 +1,27 @@
++Actions Semiconductor Owl I2C controller
++
++Required properties:
++
++- compatible        : Should be "actions,s900-i2c".
++- reg               : Offset and length of the register set for the device.
++- #address-cells    : Should be 1.
++- #size-cells       : Should be 0.
++- interrupts        : A single interrupt specifier.
++- clocks            : Phandle of the clock feeding the I2C controller.
++
++Optional properties:
++
++- clock-frequency   : Desired I2C bus clock frequency in Hz. As only Normal and
++                      Fast modes are supported, possible values are 100000 and
++                      400000.
++Examples:
++
++        i2c0: i2c at e0170000 {
++                compatible = "actions,s900-i2c";
++                reg = <0 0xe0170000 0 0x1000>;
++                #address-cells = <1>;
++                #size-cells = <0>;
++                interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
++                clocks = <&clock CLK_I2C0>;
++                clock-frequency = <100000>;
++        };
 -- 
-2.7.0
+2.17.1
