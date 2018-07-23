@@ -1,56 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 23 Jul 2018 19:16:13 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.19
-In-Reply-To: <CAOesGMh09Do+Yv-C+4hE0KdShajr0hVRfLEPmeoH0AmM5kVAmw@mail.gmail.com>
-References: <cover.1532086504.git.horms+renesas@verge.net.au>
- <20180721220343.yuwrfxz3fo25krzv@localhost>
- <CAMuHMdVbyUa5PtQf4LZQDv-=aqToahX5Eb4TEDvsJniYm-trNQ@mail.gmail.com>
- <CAOesGMh09Do+Yv-C+4hE0KdShajr0hVRfLEPmeoH0AmM5kVAmw@mail.gmail.com>
-Message-ID: <CAMuHMdVP6fuA5FkJhMEFv2ncmyr+qLksMHfYsTQ6OaGSKYdJzQ@mail.gmail.com>
+From: drawat@vmware.com (Deepak Singh Rawat)
+Date: Mon, 23 Jul 2018 17:16:31 +0000
+Subject: [PATCH 10/10] drm/vmwgfx: Use __drm_atomic_helper_plane_reset
+ instead of copying the logic
+In-Reply-To: <20180720211509.23605-11-alexandru-cosmin.gheorghe@arm.com>
+References: <20180713161407.GQ20303@art_vandelay>
+ <20180720211509.23605-1-alexandru-cosmin.gheorghe@arm.com>
+ <20180720211509.23605-11-alexandru-cosmin.gheorghe@arm.com>
+Message-ID: <BYAPR05MB4181BDF5EF98126FDDCD3CB6BA560@BYAPR05MB4181.namprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi Alexandru,
 
-On Mon, Jul 23, 2018 at 6:22 PM Olof Johansson <olof@lixom.net> wrote:
-> On Mon, Jul 23, 2018 at 2:11 AM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
-> >> > * Set CONFIG_LOCALVERSION to shmobile_defconfig
-> >> >
-> >> >   This follows what appears to be common practice in defconfigs
-> >> >   and allows easier management of the kernel flavour at run-time.
-> >>
-> >> I replied to the multi-versions of defconfig for this patch -- it's not a good
-> >> way to solve the problem of detecting config at runtime. Please drop this
-> >> patch. See:
-> >>
-> >> https://lore.kernel.org/lkml/CAOesGMgkU6yBRpAsED2fPyuAo9Tc=YprndGdkmBVrc+0783VwQ at mail.gmail.com/
-> >
-> > One more comment to the rescue: it does complicate regression testing,
-> > as the test software running on the DUT has no easy way to distinguish
-> > between e.g. shmobile_defconfig and multi_v7_defconfig (and whatever
-> > other board-specific configs I use for testing).
-> > Yes, I can have these as local patches in my tree (of course I already have ;-),
-> > but when bisecting, I have to remember to (un)apply them in every step.
->
-> It looks like scripts/setlocalversion will look for files named
-> localversion* in the directory you build in, git won't touch the file
-> so you don't have to re-apply it every time.
+Thanks for the patch, for the vmwgfx part:
 
-Thanks a lot, works fine!
-I didn't know about that; I started using CONFIG_LOCALVERSION during the
-version control dark ages.
+Reviewed-by: Deepak Rawat <drawat@vmware.com>
 
-Since I use different output directories for different builds anyway, the
-file won't ever be removed by git.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> Signed-off-by: Alexandru Gheorghe <alexandru-
+> cosmin.gheorghe at arm.com>
+> ---
+>  drivers/gpu/drm/vmwgfx/vmwgfx_kms.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
+> b/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
+> index 466336b34fff..1e0fb3c79b50 100644
+> --- a/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
+> +++ b/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
+> @@ -720,9 +720,7 @@ void vmw_du_plane_reset(struct drm_plane *plane)
+>  		return;
+>  	}
+> 
+> -	plane->state = &vps->base;
+> -	plane->state->plane = plane;
+> -	plane->state->rotation = DRM_MODE_ROTATE_0;
+> +	__drm_atomic_helper_plane_reset(plane, &vps->base);
+>  }
+> 
+> 
+> --
+> 2.18.0
+> 
