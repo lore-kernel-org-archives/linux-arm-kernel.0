@@ -1,101 +1,49 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 23 Jul 2018 23:16:07 +0100
-Subject: [PATCH v2 2/7] dma-mapping: Generalise dma_32bit_limit flag
-In-Reply-To: <cover.1532382222.git.robin.murphy@arm.com>
-References: <cover.1532382222.git.robin.murphy@arm.com>
-Message-ID: <c1720f0181b66f711e4097d85149757b16a7b0a7.1532382222.git.robin.murphy@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 24 Jul 2018 06:15:28 +0800
+Subject: [PATCH v5] media: dvb-frontends: add Socionext MN88443x ISDB-S/T
+ demodulator driver
+In-Reply-To: <20180723085150.24266-1-suzuki.katsuhiro@socionext.com>
+References: <20180723085150.24266-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <201807240508.gpMy7uIR%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whilst the notion of an upstream DMA restriction is most commonly seen
-in PCI host bridges saddled with a 32-bit native interface, a more
-general version of the same issue can exist on complex SoCs where a bus
-or point-to-point interconnect link from a device's DMA master interface
-to another component along the path to memory (often an IOMMU) may carry
-fewer address bits than the interfaces at both ends nominally support.
-In order to properly deal with this, the first step is to expand the
-dma_32bit_limit flag into an arbitrary mask.
+Hi Katsuhiro,
 
-To minimise the impact on existing code, we'll make sure to only
-consider this new mask valid if set. That makes sense anyway, since a
-mask of zero would represent DMA not being wired up at all, and that
-would be better handled by not providing valid ops in the first place.
+I love your patch! Yet something to improve:
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+[auto build test ERROR on linuxtv-media/master]
+[also build test ERROR on v4.18-rc6 next-20180723]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Katsuhiro-Suzuki/media-dvb-frontends-add-Socionext-MN88443x-ISDB-S-T-demodulator-driver/20180724-050011
+base:   git://linuxtv.org/media_tree.git master
+config: i386-randconfig-i1-201829 (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+>> drivers/media/dvb-frontends/mn88443x.c:15:10: fatal error: sc1501a.h: No such file or directory
+    #include "sc1501a.h"
+             ^~~~~~~~~~~
+   compilation terminated.
+
+vim +15 drivers/media/dvb-frontends/mn88443x.c
+
+    14	
+  > 15	#include "sc1501a.h"
+    16	
+
 ---
- arch/x86/kernel/pci-dma.c | 2 +-
- include/linux/device.h    | 6 +++---
- kernel/dma/direct.c       | 6 +++---
- 3 files changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/arch/x86/kernel/pci-dma.c b/arch/x86/kernel/pci-dma.c
-index ab5d9dd668d2..c29b0d453db3 100644
---- a/arch/x86/kernel/pci-dma.c
-+++ b/arch/x86/kernel/pci-dma.c
-@@ -175,7 +175,7 @@ rootfs_initcall(pci_iommu_init);
- 
- static int via_no_dac_cb(struct pci_dev *pdev, void *data)
- {
--	pdev->dev.dma_32bit_limit = true;
-+	pdev->bus_dma_mask = DMA_BIT_MASK(32);
- 	return 0;
- }
- 
-diff --git a/include/linux/device.h b/include/linux/device.h
-index 055a69dbcd18..6d3b000be57e 100644
---- a/include/linux/device.h
-+++ b/include/linux/device.h
-@@ -886,6 +886,8 @@ struct dev_links_info {
-  * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
-  * 		hardware supports 64-bit addresses for consistent allocations
-  * 		such descriptors.
-+ * @bus_dma_mask: Mask of an upstream bridge or bus which imposes a smaller DMA
-+ *		limit than the device itself supports.
-  * @dma_pfn_offset: offset of DMA memory range relatively of RAM
-  * @dma_parms:	A low level driver may set these to teach IOMMU code about
-  * 		segment limitations.
-@@ -912,8 +914,6 @@ struct dev_links_info {
-  * @offline:	Set after successful invocation of bus type's .offline().
-  * @of_node_reused: Set if the device-tree node is shared with an ancestor
-  *              device.
-- * @dma_32bit_limit: bridge limited to 32bit DMA even if the device itself
-- *		indicates support for a higher limit in the dma_mask field.
-  *
-  * At the lowest level, every device in a Linux system is represented by an
-  * instance of struct device. The device structure contains the information
-@@ -967,6 +967,7 @@ struct device {
- 					     not all hardware supports
- 					     64 bit addresses for consistent
- 					     allocations such descriptors. */
-+	u64		bus_dma_mask;	/* upstream dma_mask constraint */
- 	unsigned long	dma_pfn_offset;
- 
- 	struct device_dma_parameters *dma_parms;
-@@ -1002,7 +1003,6 @@ struct device {
- 	bool			offline_disabled:1;
- 	bool			offline:1;
- 	bool			of_node_reused:1;
--	bool			dma_32bit_limit:1;
- };
- 
- static inline struct device *kobj_to_dev(struct kobject *kobj)
-diff --git a/kernel/dma/direct.c b/kernel/dma/direct.c
-index 8be8106270c2..c2860c5a9e96 100644
---- a/kernel/dma/direct.c
-+++ b/kernel/dma/direct.c
-@@ -180,10 +180,10 @@ int dma_direct_supported(struct device *dev, u64 mask)
- 		return 0;
- #endif
- 	/*
--	 * Various PCI/PCIe bridges have broken support for > 32bit DMA even
--	 * if the device itself might support it.
-+	 * Upstream PCI/PCIe bridges or SoC interconnects may not carry
-+	 * as many DMA address bits as the device itself supports.
- 	 */
--	if (dev->dma_32bit_limit && mask > DMA_BIT_MASK(32))
-+	if (dev->bus_dma_mask && mask > dev->bus_dma_mask)
- 		return 0;
- 	return 1;
- }
--- 
-2.17.1.dirty
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 27693 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/6fbfffe0/attachment-0001.gz>
