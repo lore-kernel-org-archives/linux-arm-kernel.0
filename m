@@ -1,36 +1,34 @@
 From: cl@rock-chips.com (cl at rock-chips.com)
-Date: Mon, 23 Jul 2018 17:25:18 +0800
-Subject: [PATCH v2 0/6] arm64: dts: rockchip: add basic dts file for PX30 SoCs
-Message-ID: <1532337924-4185-1-git-send-email-cl@rock-chips.com>
+Date: Mon, 23 Jul 2018 17:25:21 +0800
+Subject: [PATCH v2 3/6] dt-bindings: sound: rockchip-i2s: add description for
+ px30
+In-Reply-To: <1532337924-4185-1-git-send-email-cl@rock-chips.com>
+References: <1532337924-4185-1-git-send-email-cl@rock-chips.com>
+Message-ID: <1532337924-4185-4-git-send-email-cl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Liang Chen <cl@rock-chips.com>
 
-Changes in V2:
-1. change the subject to format "dt-bindings: module: ..." for the documents. 
-2. use new property <num-interpolated-steps> for backlight.
-3. remove pinctrl of rk809, because the driver is not ready.
+Add "rockchip,px30-i2s", "rockchip,rk3066-i2s" for i2s on px30 platform.
 
-Liang Chen (6):
-  dt-bindings: usb: dwc2: add description for px30
-  dt-bindings: mmc: rockchip-dw-mshc: add description for px30
-  dt-bindings: sound: rockchip-i2s: add description for px30
-  dt-bindings: rockchip: grf: add grf and pmugrf description for px30
-  arm64: dts: rockchip: add core dtsi file for PX30 SoCs
-  arm64: dts: rockchip: add PX30 eavluation board devicetree
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Liang Chen <cl@rock-chips.com>
+---
+ Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
- Documentation/devicetree/bindings/arm/rockchip.txt |    4 +
- .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |    1 +
- .../devicetree/bindings/soc/rockchip/grf.txt       |    2 +
- .../devicetree/bindings/sound/rockchip-i2s.txt     |    1 +
- Documentation/devicetree/bindings/usb/dwc2.txt     |    1 +
- arch/arm64/boot/dts/rockchip/Makefile              |    1 +
- arch/arm64/boot/dts/rockchip/px30-evb.dts          |  473 +++++
- arch/arm64/boot/dts/rockchip/px30.dtsi             | 2043 ++++++++++++++++++++
- 8 files changed, 2526 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/px30-evb.dts
- create mode 100644 arch/arm64/boot/dts/rockchip/px30.dtsi
-
+diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+index b208a75..54aefab 100644
+--- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+@@ -7,6 +7,7 @@ Required properties:
+ 
+ - compatible: should be one of the following:
+    - "rockchip,rk3066-i2s": for rk3066
++   - "rockchip,px30-i2s", "rockchip,rk3066-i2s": for px30
+    - "rockchip,rk3036-i2s", "rockchip,rk3066-i2s": for rk3036
+    - "rockchip,rk3188-i2s", "rockchip,rk3066-i2s": for rk3188
+    - "rockchip,rk3228-i2s", "rockchip,rk3066-i2s": for rk3228
 -- 
 1.9.1
