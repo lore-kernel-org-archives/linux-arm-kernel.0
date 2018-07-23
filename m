@@ -1,38 +1,37 @@
 From: baolin.wang@linaro.org (Baolin Wang)
-Date: Mon, 23 Jul 2018 14:10:19 +0800
-Subject: [PATCH 4/5] arm64: dts: sprd: Add SC27XX ADC device
+Date: Mon, 23 Jul 2018 14:10:20 +0800
+Subject: [PATCH 5/5] arm64: dts: sprd: Add one suspend timer
 In-Reply-To: <2531014d066e61063b3d7906e6df55caa028e17c.1531881619.git.baolin.wang@linaro.org>
 References: <2531014d066e61063b3d7906e6df55caa028e17c.1531881619.git.baolin.wang@linaro.org>
-Message-ID: <1b98cf860c86f745a1efea21f39abb2ba4d5493f.1531881619.git.baolin.wang@linaro.org>
+Message-ID: <daf81b1cc8dd6048a9fcb7682a5937b72eb46dfd.1531881619.git.baolin.wang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the Spreadtrum SC27XX PMICs ADC device node which contains 32 channels.
+On Spreadtrum platform, the current clocksource for timekeeping will be
+stopped in suspend state, thus add one always-on timer to calculate the
+suspend time.
 
 Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
 ---
- arch/arm64/boot/dts/sprd/sc2731.dtsi |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/boot/dts/sprd/whale2.dtsi |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/sprd/sc2731.dtsi b/arch/arm64/boot/dts/sprd/sc2731.dtsi
-index fc68076..82bd642 100644
---- a/arch/arm64/boot/dts/sprd/sc2731.dtsi
-+++ b/arch/arm64/boot/dts/sprd/sc2731.dtsi
-@@ -65,6 +65,15 @@
- 			hwlocks = <&hwlock 12>;
- 		};
+diff --git a/arch/arm64/boot/dts/sprd/whale2.dtsi b/arch/arm64/boot/dts/sprd/whale2.dtsi
+index e9db910..eb6be56 100644
+--- a/arch/arm64/boot/dts/sprd/whale2.dtsi
++++ b/arch/arm64/boot/dts/sprd/whale2.dtsi
+@@ -146,6 +146,12 @@
+ 				clocks = <&ext_32k>;
+ 			};
  
-+		pmic_adc: adc at 480 {
-+			compatible = "sprd,sc27xx-adc", "sprd,sc2731-adc";
-+			reg = <0x480>;
-+			interrupt-parent = <&sc2731_pmic>;
-+			interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
-+			#io-channel-cells = <1>;
-+			hwlocks = <&hwlock 4>;
-+		};
++			timer at 40050020 {
++				compatible = "sprd,sc9860-suspend-timer";
++				reg = <0 0x40050020 0 0x20>;
++				clocks = <&ext_32k>;
++			};
 +
- 		vibrator at ec8 {
- 			compatible = "sprd,sc27xx-vibrator", "sprd,sc2731-vibrator";
- 			reg = <0xec8>;
+ 			hwlock: hwspinlock at 40500000 {
+ 				compatible = "sprd,hwspinlock-r3p0";
+ 				reg = <0 0x40500000 0 0x1000>;
 -- 
 1.7.9.5
