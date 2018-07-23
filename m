@@ -1,107 +1,41 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 23 Jul 2018 10:57:28 +0900
-Subject: [PATCH v4 1/5] arm64: export memblock_reserve()d regions via
- /proc/iomem
+Date: Mon, 23 Jul 2018 10:57:29 +0900
+Subject: [PATCH v4 2/5] drivers: acpi: add dependency of EFI for arm64
 In-Reply-To: <20180723015732.24252-1-takahiro.akashi@linaro.org>
 References: <20180723015732.24252-1-takahiro.akashi@linaro.org>
-Message-ID: <20180723015732.24252-2-takahiro.akashi@linaro.org>
+Message-ID: <20180723015732.24252-3-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+As Ard suggested, CONFIG_ACPI && !CONFIG_EFI doesn't make sense on arm64,
+while CONFIG_ACPI and CONFIG_CPU_BIG_ENDIAN doesn't make sense either.
 
-There has been some confusion around what is necessary to prevent kexec
-overwriting important memory regions. memblock: reserve, or nomap?
-Only memblock nomap regions are reported via /proc/iomem, kexec's
-user-space doesn't know about memblock_reserve()d regions.
+As CONFIG_EFI already has a dependency of !CONFIG_CPU_BIG_ENDIAN, it is
+good enough to add a dependency of CONFIG_EFI to avoid any useless
+combination of configuration.
 
-Until commit f56ab9a5b73ca ("efi/arm: Don't mark ACPI reclaim memory
-as MEMBLOCK_NOMAP") the ACPI tables were nomap, now they are reserved
-and thus possible for kexec to overwrite with the new kernel or initrd.
-But this was always broken, as the UEFI memory map is also reserved
-and not marked as nomap.
+This bug, reported by Will, will be revealed when my patch series,
+"arm64: kexec,kdump: fix boot failures on acpi-only system," is applied
+and the kernel is built under allmodconfig.
 
-Exporting both nomap and reserved memblock types is a nuisance as
-they live in different memblock structures which we can't walk at
-the same time.
-
-Take a second walk over memblock.reserved and add new 'reserved'
-subnodes for the memblock_reserved() regions that aren't already
-described by the existing code. (e.g. Kernel Code)
-
-We use reserve_region_with_split() to find the gaps in existing named
-regions. This handles the gap between 'kernel code' and 'kernel data'
-which is memblock_reserve()d, but already partially described by
-request_standard_resources(). e.g.:
-| 80000000-dfffffff : System RAM
-|   80080000-80ffffff : Kernel code
-|   81000000-8158ffff : reserved
-|   81590000-8237efff : Kernel data
-|   a0000000-dfffffff : Crash kernel
-| e00f0000-f949ffff : System RAM
-
-reserve_region_with_split needs kzalloc() which isn't available when
-request_standard_resources() is called, use an initcall.
-
-Reported-by: Bhupesh Sharma <bhsharma@redhat.com>
-Reported-by: Tyler Baicar <tbaicar@codeaurora.org>
-Suggested-by: Akashi Takahiro <takahiro.akashi@linaro.org>
-Signed-off-by: James Morse <james.morse@arm.com>
-Fixes: d28f6df1305a ("arm64/kexec: Add core kexec support")
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-CC: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/setup.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ drivers/acpi/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 30ad2f085d1f..5b4fac434c84 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -241,6 +241,44 @@ static void __init request_standard_resources(void)
- 	}
- }
- 
-+static int __init reserve_memblock_reserved_regions(void)
-+{
-+	phys_addr_t start, end, roundup_end = 0;
-+	struct resource *mem, *res;
-+	u64 i;
-+
-+	for_each_reserved_mem_region(i, &start, &end) {
-+		if (end <= roundup_end)
-+			continue; /* done already */
-+
-+		start = __pfn_to_phys(PFN_DOWN(start));
-+		end = __pfn_to_phys(PFN_UP(end)) - 1;
-+		roundup_end = end;
-+
-+		res = kzalloc(sizeof(*res), GFP_ATOMIC);
-+		if (WARN_ON(!res))
-+			return -ENOMEM;
-+		res->start = start;
-+		res->end = end;
-+		res->name  = "reserved";
-+		res->flags = IORESOURCE_MEM;
-+
-+		mem = request_resource_conflict(&iomem_resource, res);
-+		/*
-+		 * We expected memblock_reserve() regions to conflict with
-+		 * memory created by request_standard_resources().
-+		 */
-+		if (WARN_ON_ONCE(!mem))
-+			continue;
-+		kfree(res);
-+
-+		reserve_region_with_split(mem, start, end, "reserved");
-+	}
-+
-+	return 0;
-+}
-+arch_initcall(reserve_memblock_reserved_regions);
-+
- u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
- 
- void __init setup_arch(char **cmdline_p)
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index b533eeb6139d..15ab1daaa808 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -6,7 +6,7 @@
+ menuconfig ACPI
+ 	bool "ACPI (Advanced Configuration and Power Interface) Support"
+ 	depends on !IA64_HP_SIM
+-	depends on IA64 || X86 || ARM64
++	depends on IA64 || X86 || (ARM64 && EFI)
+ 	depends on PCI
+ 	select PNP
+ 	default y if (IA64 || X86)
 -- 
 2.18.0
