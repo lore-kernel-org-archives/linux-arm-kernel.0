@@ -1,46 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 23 Jul 2018 11:11:12 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.19
-In-Reply-To: <20180721220343.yuwrfxz3fo25krzv@localhost>
-References: <cover.1532086504.git.horms+renesas@verge.net.au>
- <20180721220343.yuwrfxz3fo25krzv@localhost>
-Message-ID: <CAMuHMdVbyUa5PtQf4LZQDv-=aqToahX5Eb4TEDvsJniYm-trNQ@mail.gmail.com>
+From: MNARANI@xilinx.com (Manish Narani)
+Date: Mon, 23 Jul 2018 09:27:03 +0000
+Subject: [PATCH 4/4] iio: adc: xilinx: Use devm_ functions while
+ requesting irq
+In-Reply-To: <32791313-d317-c9c3-0760-34d4a4a691f9@metafoo.de>
+References: <1531912331-26431-1-git-send-email-manish.narani@xilinx.com>
+ <1531912331-26431-5-git-send-email-manish.narani@xilinx.com>
+ <32791313-d317-c9c3-0760-34d4a4a691f9@metafoo.de>
+Message-ID: <SN6PR02MB4959DB7E5C4D148D21F81E42C1560@SN6PR02MB4959.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi Lars,
 
-On Sun, Jul 22, 2018 at 12:27 AM Olof Johansson <olof@lixom.net> wrote:
-> On Fri, Jul 20, 2018 at 02:03:54PM +0200, Simon Horman wrote:
-> > Please consider these Renesas ARM based SoC defconfig updates for v4.19.
-
-> > * Set CONFIG_LOCALVERSION to shmobile_defconfig
+> -----Original Message-----
+> From: Lars-Peter Clausen [mailto:lars at metafoo.de]
+> Sent: Thursday, July 19, 2018 10:08 PM
+> To: Manish Narani <MNARANI@xilinx.com>; jic23 at kernel.org;
+> knaack.h at gmx.de; pmeerw at pmeerw.net; Michal Simek
+> <michals@xilinx.com>; linux-iio at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Cc: Anirudha Sarangi <anirudh@xilinx.com>; Srinivas Goud
+> <sgoud@xilinx.com>
+> Subject: Re: [PATCH 4/4] iio: adc: xilinx: Use devm_ functions while requesting
+> irq
+> 
+> > @@ -1310,7 +1308,6 @@ static int xadc_remove(struct platform_device
+> > *pdev)  {
+> >  	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+> >  	struct xadc *xadc = iio_priv(indio_dev);
+> > -	int irq = platform_get_irq(pdev, 0);
 > >
-> >   This follows what appears to be common practice in defconfigs
-> >   and allows easier management of the kernel flavour at run-time.
->
-> I replied to the multi-versions of defconfig for this patch -- it's not a good
-> way to solve the problem of detecting config at runtime. Please drop this
-> patch. See:
->
-> https://lore.kernel.org/lkml/CAOesGMgkU6yBRpAsED2fPyuAo9Tc=YprndGdkmBVrc+0783VwQ at mail.gmail.com/
+> >  	iio_device_unregister(indio_dev);
+> >  	if (xadc->ops->flags & XADC_FLAGS_BUFFERED) { @@ -1318,7 +1315,6
+> @@
+> > static int xadc_remove(struct platform_device *pdev)
+> >  		iio_trigger_free(xadc->convst_trigger);
+> >  		iio_triggered_buffer_cleanup(indio_dev);
+> >  	}
+> > -	free_irq(irq, indio_dev);
+> 
+> This opens up a race condition. The IRQ needs to be freed before any of these
+> other things below the free_irq() are executed.
+Will look into it and send with taking care of the same.
 
-One more comment to the rescue: it does complicate regression testing,
-as the test software running on the DUT has no easy way to distinguish
-between e.g. shmobile_defconfig and multi_v7_defconfig (and whatever
-other board-specific configs I use for testing).
-Yes, I can have these as local patches in my tree (of course I already have ;-),
-but when bisecting, I have to remember to (un)apply them in every step.
+> 
+> >  	clk_disable_unprepare(xadc->clk);
+> >  	cancel_delayed_work(&xadc->zynq_unmask_work);
+> >  	kfree(xadc->data);
+> >
 
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Manish
