@@ -1,66 +1,118 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 23 Jul 2018 11:46:16 -0500
-Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.19, round 2
-In-Reply-To: <CAOesGMg5iPtWaP2XOm7+J46kOQfczoc7HstcyM=pAVcMQbCubQ@mail.gmail.com>
-References: <7hr2jx50q0.fsf@baylibre.com>
- <20180721215422.vsd34udhkhs7lh3h@localhost>
- <7hk1pm3ym6.fsf@baylibre.com>
- <CAOesGMg5iPtWaP2XOm7+J46kOQfczoc7HstcyM=pAVcMQbCubQ@mail.gmail.com>
-Message-ID: <CAOi56cWvd31ggS6Zo44yrDWVYOWBW6Su=qxG2U92uGU7yjwXzw@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 23 Jul 2018 10:50:41 -0600
+Subject: [PATCH v2 08/10] coresight: perf: Add helper to retrieve sink
+ configuration
+In-Reply-To: <ed621d62-a1d2-abe1-3763-60ea6e5f615f@arm.com>
+References: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
+ <1531847501-22226-9-git-send-email-suzuki.poulose@arm.com>
+ <20180719200739.GB9421@xps15> <ed621d62-a1d2-abe1-3763-60ea6e5f615f@arm.com>
+Message-ID: <CANLsYkyX0AtVQHG4sCMS2uVZR83hFQYKzyBK_RHYAtS+OnyqPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 11:17 AM Olof Johansson <olof@lixom.net> wrote:
+On Fri, 20 Jul 2018 at 02:43, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
 >
-> On Mon, Jul 23, 2018 at 5:50 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> > Olof Johansson <olof@lixom.net> writes:
-> >
-> >> On Fri, Jul 20, 2018 at 11:30:15AM -0500, Kevin Hilman wrote:
-> >>> Olof, Arnd,
-> >>>
-> >>> A second round of DT updates for Amlogic, directly on top of the redo of
-> >>> the first one.
-> >>>
-> >>> This includes a merge of a branch already queued in the clk tree because
-> >>> of the dependency on clock headers used in the DT changes here..
-> >>>
-> >>> Kevin
-> >>>
-> >>>
-> >>> The following changes since commit 89803e8b26569bdf5798f8745a4c708bf9360ee6:
-> >>>
-> >>>   ARM64: dts: meson-axg: add pdm pins (2018-07-20 08:18:37 -0700)
-> >>>
-> >>> are available in the git repository at:
-> >>>
-> >>>   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2
-> >>>
-> >>> for you to fetch changes up to fcf775a1e6717b7157b1ea626028b7e039b3c989:
-> >>>
-> >>>   Merge branch 'v4.19/dt64' into tmp/aml-rebuild (2018-07-20 09:05:11 -0700)
-> >>>
-> >>> ----------------------------------------------------------------
-> >>> Amlogic 64-bit DT changes for v4.19, round 2
-> >>> - new SoC: S905W
-> >>> - new boards: based on S905W: Amlogic P281, Oranth Tanix TX3 Mini
-> >>> - AXG: add DT for new audio clock controller
-> >>>
-> >>> ----------------------------------------------------------------
+> On 19/07/18 21:07, Mathieu Poirier wrote:
+> > On Tue, Jul 17, 2018 at 06:11:39PM +0100, Suzuki K Poulose wrote:
+> >> We can always find the sink configuration for a given perf_output_handle.
+> >> Add a helper to retrieve the sink configuration for a given
+> >> perf_output_handle. This will be used to get rid of the set_buffer()
+> >> call back.
 > >>
-> >> Something happened to your diffstat here. It's also based on -rc5?
+> >> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> >> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> >> ---
+> >>   drivers/hwtracing/coresight/coresight-etm-perf.c | 14 -------------
+> >>   drivers/hwtracing/coresight/coresight-etm-perf.h | 26 ++++++++++++++++++++++++
+> >>   2 files changed, 26 insertions(+), 14 deletions(-)
+> >>
+> >> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> >> index 6a4252b..3cc4a0b 100644
+> >> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> >> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> >> @@ -23,20 +23,6 @@
+> >>   static struct pmu etm_pmu;
+> >>   static bool etm_perf_up;
+> >>
+> >> -/**
+> >> - * struct etm_event_data - Coresight specifics associated to an event
+> >> - * @work:           Handle to free allocated memory outside IRQ context.
+> >> - * @mask:           Hold the CPU(s) this event was set for.
+> >> - * @snk_config:             The sink configuration.
+> >> - * @path:           An array of path, each slot for one CPU.
+> >> - */
+> >> -struct etm_event_data {
+> >> -    struct work_struct work;
+> >> -    cpumask_t mask;
+> >> -    void *snk_config;
+> >> -    struct list_head * __percpu *path;
+> >> -};
+> >> -
 > >
-> > My branch is/was based on -rc1 but the dependency branch from the clock
-> > tree is based on -rc5.  That made the diffstat include -rc5, which was
-> > too noisy, so I removed it but then forgot to add the simplified
-> > version.
+> > If this is moved to coresight-etm-perf.h, the #include <linux/percpu-defs.h> can
+> > be removed.
 >
-> Ah, thanks. It's unfortunate that this brings in a new -rc but not the
-> end of the world. Will merge later today or tomorrow depending on
-> travel progress.
+> Actually, we do have the PER_CPU variables in the file already, which is why I left
+> them there.  See the next line.
 
-Actually, ignore this one and let me respin this tag and PR.
+Of course...
 
-Both my base branch and the clock branch are based on -rc1.  I screwed
-up the tag creation.   A redo is coming shortly.
-
-Kevin
+> >
+> >>   static DEFINE_PER_CPU(struct perf_output_handle, ctx_handle);
+> >>   static DEFINE_PER_CPU(struct coresight_device *, csdev_src);
+> >>
+>
+>
+> >> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.h b/drivers/hwtracing/coresight/coresight-etm-perf.h
+> >> index 4197df4..da7d933 100644
+> >> --- a/drivers/hwtracing/coresight/coresight-etm-perf.h
+> >> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.h
+> >> @@ -7,6 +7,7 @@
+> >>   #ifndef _CORESIGHT_ETM_PERF_H
+> >>   #define _CORESIGHT_ETM_PERF_H
+> >>
+> >> +#include <linux/percpu-defs.h>
+> >>   #include "coresight-priv.h"
+> >>
+> >>   struct coresight_device;
+> >> @@ -42,14 +43,39 @@ struct etm_filters {
+> >>      bool                    ssstatus;
+> >>   };
+> >>
+> >> +/**
+> >> + * struct etm_event_data - Coresight specifics associated to an event
+> >> + * @work:           Handle to free allocated memory outside IRQ context.
+> >> + * @mask:           Hold the CPU(s) this event was set for.
+> >> + * @snk_config:             The sink configuration.
+> >> + * @path:           An array of path, each slot for one CPU.
+> >> + */
+> >> +struct etm_event_data {
+> >> +    struct work_struct work;
+> >> +    cpumask_t mask;
+> >> +    void *snk_config;
+> >> +    struct list_head * __percpu *path;
+> >> +};
+> >>
+> >>   #ifdef CONFIG_CORESIGHT
+> >>   int etm_perf_symlink(struct coresight_device *csdev, bool link);
+> >> +static inline void *etm_perf_sink_config(struct perf_output_handle *handle)
+> >> +{
+> >> +    struct etm_event_data *data = perf_get_aux(handle);
+> >>
+> >> +    if (data)
+> >> +            return data->snk_config;
+> >> +    return NULL;
+> >> +}
+> >>   #else
+> >>   static inline int etm_perf_symlink(struct coresight_device *csdev, bool link)
+> >>   { return -EINVAL; }
+> >>
+> >> +static inline void *etm_perf_sink_config(struct perf_output_handle *handle)
+> >> +{
+> >> +    return NULL;
+> >> +}
+> >> +
+> >
+> > I think we can do without those... See my comment in the next patch.
+>
+> Sure
