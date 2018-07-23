@@ -1,44 +1,74 @@
-From: manish.narani@xilinx.com (Manish Narani)
-Date: Mon, 23 Jul 2018 20:32:03 +0530
-Subject: [PATCH v2 4/4] iio: adc: xilinx: Move request_irq before enabling
- interrupts
-In-Reply-To: <1532358123-23485-1-git-send-email-manish.narani@xilinx.com>
-References: <1532358123-23485-1-git-send-email-manish.narani@xilinx.com>
-Message-ID: <1532358123-23485-5-git-send-email-manish.narani@xilinx.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 23 Jul 2018 20:37:18 +0530
+Subject: [RFC PATCH v6 2/2] mailbox: imx-mailbox: add scu protocol support
+In-Reply-To: <20180712070129.tyetqm2yesouiatf@pengutronix.de>
+References: <1531326759-20556-1-git-send-email-aisheng.dong@nxp.com>
+ <1531326759-20556-3-git-send-email-aisheng.dong@nxp.com>
+ <20180712070129.tyetqm2yesouiatf@pengutronix.de>
+Message-ID: <CABb+yY30Jhb_bgoS+4ZL8V60C+h2piW6nTwR3gvwMYyQVp6-QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling the Interrupts before registering the irq handler is a bad
-idea. This patch corrects the same for XADC driver.
+On Thu, Jul 12, 2018 at 12:31 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Thu, Jul 12, 2018 at 12:32:39AM +0800, Dong Aisheng wrote:
+>> Add SCU protocol support in the generic mailbox driver.
+>>
+>> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+>> ---
+>>  drivers/mailbox/Kconfig       |   6 +-
+>>  drivers/mailbox/imx-mailbox.c | 252 ++++++++++++++++++++++++++++++++++++------
+>>  2 files changed, 223 insertions(+), 35 deletions(-)
+>>
+>> +static bool imx_mu_scu_peek_data(struct mbox_chan *chan)
+>> +{
+>> +     struct imx_mu_priv *priv = chan->con_priv;
+>> +     u8 *raw_data;
+>> +     int i, size;
+>> +     int ret;
+>> +
+>> +     ret = imx_mu_scu_receive_msg(chan, 0, priv->msg);
+>> +     if (ret)
+>> +             return false;
+>> +
+>> +     raw_data = (u8 *)priv->msg;
+>> +     size = raw_data[1];
+>> +
+>> +     dev_dbg(chan->mbox->dev, "receive data: hdr 0x%x size %d\n",
+>> +             *priv->msg, size);
+>> +
+>> +     for (i = 1; i < size; i++) {
+>> +             ret = imx_mu_scu_receive_msg(chan, i % 4, priv->msg + i);
+>> +             if (ret)
+>> +                     return false;
+>> +     }
+>> +
+>> +     mbox_chan_received_data(chan, (void *)priv->msg);
+>> +
+>> +     return true;
+>> +}
+>
+> Receiving data now works by calling mbox_client_peek_data(). I think
+> your plan is not to use rx_callback as triggered by mbox_chan_received_data,
+> but instead exploiting the fact that you have put the receive data into
+> the same buffer that you previously used to send a message. That way the
+> client knows where to find the answer.
+>
+> While that should work I don't think this is very clean. That is the
+> point where I mentioned I think that the mailbox framework would need a
+> way to receive messages synchronously.
+>
+> Jassi, this is for you probably. Do you have an idea how synchronous
+> receive could be implemented? We'll need some mbox_client_receive_data
+> function.
+>
+Most platforms call mbox_chan_received_data() from RX interrupt
+handler. Which is actually
 
-Signed-off-by: Manish Narani <manish.narani@xilinx.com>
----
- drivers/iio/adc/xilinx-xadc-core.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-index 44a2519..3f6be5a 100644
---- a/drivers/iio/adc/xilinx-xadc-core.c
-+++ b/drivers/iio/adc/xilinx-xadc-core.c
-@@ -1226,15 +1226,15 @@ static int xadc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_free_samplerate_trigger;
- 
--	ret = xadc->ops->setup(pdev, indio_dev, xadc->irq);
--	if (ret)
--		goto err_clk_disable_unprepare;
--
- 	ret = request_irq(xadc->irq, xadc->ops->interrupt_handler, 0,
- 			dev_name(&pdev->dev), indio_dev);
- 	if (ret)
- 		goto err_clk_disable_unprepare;
- 
-+	ret = xadc->ops->setup(pdev, indio_dev, xadc->irq);
-+	if (ret)
-+		goto err_free_irq;
-+
- 	for (i = 0; i < 16; i++)
- 		xadc_read_adc_reg(xadc, XADC_REG_THRESHOLD(i),
- 			&xadc->threshold[i]);
--- 
-2.1.1
+> Sascha
+>
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
