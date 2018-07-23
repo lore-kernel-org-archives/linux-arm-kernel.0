@@ -1,45 +1,66 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 23 Jul 2018 09:14:12 -0500
-Subject: [PATCH V2 0/6] mailbox: ti-msgmgr: Add support for AM654 Secure
- Proxy
-In-Reply-To: <CABb+yY1_SBTDPyUNGSr8=tpU4oObz060nJ3NrgR8JyQye23cfg@mail.gmail.com>
-References: <20180716180607.16526-1-nm@ti.com>
- <20180723132956.tcsuxychhlhiwz6v@kahuna>
- <CABb+yY1_SBTDPyUNGSr8=tpU4oObz060nJ3NrgR8JyQye23cfg@mail.gmail.com>
-Message-ID: <20180723141412.7zd6wp6y6pql7bm7@kahuna>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Mon, 23 Jul 2018 17:20:11 +0300
+Subject: [PATCH v4 02/20] virtio: pci-legacy: Validate queue pfn
+In-Reply-To: <db295a96-cf1e-9e8b-9b29-5882084781e1@arm.com>
+References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
+ <1531905547-25478-3-git-send-email-suzuki.poulose@arm.com>
+ <20180722185335-mutt-send-email-mst@kernel.org>
+ <5a659490-13ce-87c1-a9bc-d89a8f8ee111@arm.com>
+ <db295a96-cf1e-9e8b-9b29-5882084781e1@arm.com>
+Message-ID: <20180723171953-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13:56-20180723, Jassi Brar wrote:
-> On Mon, Jul 23, 2018 at 6:59 PM, Nishanth Menon <nm@ti.com> wrote:
-[...]
-> >>  .../bindings/mailbox/ti,secure-proxy.txt           |  50 +++
-> >>  drivers/mailbox/ti-msgmgr.c                        | 353 +++++++++++++++++----
-> >>  2 files changed, 336 insertions(+), 67 deletions(-)
-> >>  create mode 100644 Documentation/devicetree/bindings/mailbox/ti,secure-proxy.txt
-> >
-> >
-> > Jassi,
-> >
-> > I dont see this in next-20180723. You'd asked me to hold off on pings
-> > https://lkml.org/lkml/2017/12/16/353 -> so, held off as much as I could
-> > before wondering on the status.
-> >
-> I didn't ask you to not ping me. I said I didn't miss your patchset. I
-> still didn't.
+On Mon, Jul 23, 2018 at 01:54:10PM +0100, Marc Zyngier wrote:
+> On 23/07/18 10:44, Suzuki K Poulose wrote:
+> > On 07/22/2018 04:53 PM, Michael S. Tsirkin wrote:
+> >> On Wed, Jul 18, 2018 at 10:18:45AM +0100, Suzuki K Poulose wrote:
+> >>> Legacy PCI over virtio uses a 32bit PFN for the queue. If the
+> >>> queue pfn is too large to fit in 32bits, which we could hit on
+> >>> arm64 systems with 52bit physical addresses (even with 64K page
+> >>> size), we simply miss out a proper link to the other side of
+> >>> the queue.
+> >>>
+> >>> Add a check to validate the PFN, rather than silently breaking
+> >>> the devices.
+> >>>
+> >>> Cc: "Michael S. Tsirkin" <mst@redhat.com>
+> >>> Cc: Jason Wang <jasowang@redhat.com>
+> >>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >>> Cc: Christoffer Dall <cdall@kernel.org>
+> >>> Cc: Peter Maydel <peter.maydell@linaro.org>
+> >>> Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> >>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> >>
+> >> Acked-by: Michael S. Tsirkin <mst@redhat.com>
+> > 
+> > 
+> > Michael,
+> > 
+> > Thanks.
+> > 
+> >>
+> >> I assume this will be merged through some other tree.
+> >>
+> > 
+> > 
+> > As such these two virtio patches do not have any code dependencies with
+> > the rest of the series. So, if you could pick this up it should be fine.
+> > Otherwise, may be Marc can push it with the rest of the series.
+> > 
+> > Marc,
+> > 
+> > Are you OK with that ?
 > 
-> Especially for purely platform specific changes, that I don't have
-> knowledge about, I leave them to cook in public as long as possible,
-> before pulling them in around rc7.
+> Given that these two patches completely independent, I think their
+> natural path should be the virtio tree. But if Michael doesn't want to
+> pick them, I'll do it as part of this series.
+> 
+> Thanks,
+> 
+> 	M.
 
-Understood. Thanks.
+It's ok, I can pick them up.
 
-> You submitted V2, 7days ago only and we are at rc6 today. So chill.
-
-v2 is just wording of mailbox node example change recommended by Rob.
-I was hoping to get any further changes prior to reposting a v2.. but
-anyways.. Looks all good..
-
--- 
-Regards,
-Nishanth Menon
+> -- 
+> Jazz is not dead. It just smells funny...
