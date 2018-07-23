@@ -1,42 +1,29 @@
-From: syeh@vmware.com (Sinclair Yeh)
-Date: Mon, 23 Jul 2018 11:02:07 -0700
-Subject: [PATCH 10/10] drm/vmwgfx: Use __drm_atomic_helper_plane_reset
- instead of copying the logic
-In-Reply-To: <20180720211509.23605-11-alexandru-cosmin.gheorghe@arm.com>
-References: <20180713161407.GQ20303@art_vandelay>
- <20180720211509.23605-1-alexandru-cosmin.gheorghe@arm.com>
- <20180720211509.23605-11-alexandru-cosmin.gheorghe@arm.com>
-Message-ID: <20180723180206.GA4877@promb-2n-dhcp82.eng.vmware.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 23 Jul 2018 20:07:22 +0200
+Subject: [PATCH] i2c: davinci: Avoid zero value of CLKH
+In-Reply-To: <20180713152017.2207-1-alexander.sverdlin@nokia.com>
+References: <20180713152017.2207-1-alexander.sverdlin@nokia.com>
+Message-ID: <20180723180722.7b46aw56oqxrwxwj@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alex,
-
-other than adding a brief commit message to this patch,
-
-Reviewed-by: Sinclair Yeh <syeh@vmware.com>
-
-On Fri, Jul 20, 2018 at 10:15:09PM +0100, Alexandru Gheorghe wrote:
-> Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
-> ---
->  drivers/gpu/drm/vmwgfx/vmwgfx_kms.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
+On Fri, Jul 13, 2018 at 05:20:17PM +0200, Alexander Sverdlin wrote:
+> If CLKH is set to 0 I2C clock is not generated at all, so avoid this value
+> and stretch the clock in this case.
 > 
-> diff --git a/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c b/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
-> index 466336b34fff..1e0fb3c79b50 100644
-> --- a/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
-> +++ b/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
-> @@ -720,9 +720,7 @@ void vmw_du_plane_reset(struct drm_plane *plane)
->  		return;
->  	}
->  
-> -	plane->state = &vps->base;
-> -	plane->state->plane = plane;
-> -	plane->state->rotation = DRM_MODE_ROTATE_0;
-> +	__drm_atomic_helper_plane_reset(plane, &vps->base);
->  }
->  
->  
-> -- 
-> 2.18.0
-> 
+> Signed-off-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+
+Applied to for-current, thanks!
+
+I did not add stable because Alexander told me this is very likely not
+to be observed on HW out there. But TI people are investigating more.
+I suggest they resend this patch to stable if they see fit. D'accord
+everyone?
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180723/8ea58ced/attachment.sig>
