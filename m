@@ -1,47 +1,38 @@
-From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Mon, 23 Jul 2018 06:34:31 +0200
-Subject: [PATCH] ARM: dts: spear: fix stmpe811 interrupt properties
-In-Reply-To: <20180723025747.ykxeqogyfn6wskvo@vireshk-i7>
-References: <20180720075356.26156-1-marcel@ziswiler.com>
- <20180723025747.ykxeqogyfn6wskvo@vireshk-i7>
-Message-ID: <883F78E9-45F8-4AA7-9702-330027ADD741@ziswiler.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 23 Jul 2018 09:10:25 +0530
+Subject: [PATCH v6 6/6] MAINTAINERS: Add entry for Actions Semiconductor Owl
+ I2C driver
+In-Reply-To: <20180723034025.5763-1-manivannan.sadhasivam@linaro.org>
+References: <20180723034025.5763-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180723034025.5763-7-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add entry for Actions Semiconductor Owl I2C driver under ARM/ACTIONS
 
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ MAINTAINERS | 2 ++
+ 1 file changed, 2 insertions(+)
 
-On July 23, 2018 4:57:47 AM GMT+02:00, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->On 20-07-18, 09:53, Marcel Ziswiler wrote:
->> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
->> 
->> The property "irq-over-gpio" simply does not exist (this is nowadays
->> actually auto detected) and the property "irq-gpios" is actually
->called
->> "irq-gpios".
->
->  "irq-gpio" ?
-
-Yes, of course. Too many s' (;-p).
-
->> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
->> 
->> ---
->> 
->>  arch/arm/boot/dts/spear320-hmi.dts | 3 +--
->>  1 file changed, 1 insertion(+), 2 deletions(-)
->> 
->> diff --git a/arch/arm/boot/dts/spear320-hmi.dts
->b/arch/arm/boot/dts/spear320-hmi.dts
->> index 0d0da1f65f0e..d2d1fe944407 100644
->> --- a/arch/arm/boot/dts/spear320-hmi.dts
->> +++ b/arch/arm/boot/dts/spear320-hmi.dts
->> @@ -241,8 +241,7 @@
->>  					#address-cells = <1>;
->>  					#size-cells = <0>;
->>  					reg = <0x41>;
->> -					irq-over-gpio;
->> -					irq-gpios = <&gpiopinctrl 29 0x4>;
->> +					irq-gpio = <&gpiopinctrl 29 0x4>;
->>  					id = <0>;
->>  					blocks = <0x5>;
->>  					irq-trigger = <0x1>;
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 09b54e9ebc6f..5084c62712fa 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1145,12 +1145,14 @@ F:	arch/arm/boot/dts/owl-*
+ F:	arch/arm64/boot/dts/actions/
+ F:	drivers/clk/actions/
+ F:	drivers/clocksource/owl-*
++F:	drivers/i2c/busses/i2c-owl.c
+ F:	drivers/pinctrl/actions/*
+ F:	drivers/soc/actions/
+ F:	include/dt-bindings/power/owl-*
+ F:	include/linux/soc/actions/
+ F:	Documentation/devicetree/bindings/arm/actions.txt
+ F:	Documentation/devicetree/bindings/clock/actions,s900-cmu.txt
++F:	Documentation/devicetree/bindings/i2c/i2c-owl.txt
+ F:	Documentation/devicetree/bindings/pinctrl/actions,s900-pinctrl.txt
+ F:	Documentation/devicetree/bindings/power/actions,owl-sps.txt
+ F:	Documentation/devicetree/bindings/timer/actions,owl-timer.txt
+-- 
+2.17.1
