@@ -1,53 +1,36 @@
-From: MNARANI@xilinx.com (Manish Narani)
-Date: Mon, 23 Jul 2018 09:27:03 +0000
-Subject: [PATCH 4/4] iio: adc: xilinx: Use devm_ functions while
- requesting irq
-In-Reply-To: <32791313-d317-c9c3-0760-34d4a4a691f9@metafoo.de>
-References: <1531912331-26431-1-git-send-email-manish.narani@xilinx.com>
- <1531912331-26431-5-git-send-email-manish.narani@xilinx.com>
- <32791313-d317-c9c3-0760-34d4a4a691f9@metafoo.de>
-Message-ID: <SN6PR02MB4959DB7E5C4D148D21F81E42C1560@SN6PR02MB4959.namprd02.prod.outlook.com>
+From: cl@rock-chips.com (cl at rock-chips.com)
+Date: Mon, 23 Jul 2018 17:25:18 +0800
+Subject: [PATCH v2 0/6] arm64: dts: rockchip: add basic dts file for PX30 SoCs
+Message-ID: <1532337924-4185-1-git-send-email-cl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lars,
+From: Liang Chen <cl@rock-chips.com>
 
-> -----Original Message-----
-> From: Lars-Peter Clausen [mailto:lars at metafoo.de]
-> Sent: Thursday, July 19, 2018 10:08 PM
-> To: Manish Narani <MNARANI@xilinx.com>; jic23 at kernel.org;
-> knaack.h at gmx.de; pmeerw at pmeerw.net; Michal Simek
-> <michals@xilinx.com>; linux-iio at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Cc: Anirudha Sarangi <anirudh@xilinx.com>; Srinivas Goud
-> <sgoud@xilinx.com>
-> Subject: Re: [PATCH 4/4] iio: adc: xilinx: Use devm_ functions while requesting
-> irq
-> 
-> > @@ -1310,7 +1308,6 @@ static int xadc_remove(struct platform_device
-> > *pdev)  {
-> >  	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-> >  	struct xadc *xadc = iio_priv(indio_dev);
-> > -	int irq = platform_get_irq(pdev, 0);
-> >
-> >  	iio_device_unregister(indio_dev);
-> >  	if (xadc->ops->flags & XADC_FLAGS_BUFFERED) { @@ -1318,7 +1315,6
-> @@
-> > static int xadc_remove(struct platform_device *pdev)
-> >  		iio_trigger_free(xadc->convst_trigger);
-> >  		iio_triggered_buffer_cleanup(indio_dev);
-> >  	}
-> > -	free_irq(irq, indio_dev);
-> 
-> This opens up a race condition. The IRQ needs to be freed before any of these
-> other things below the free_irq() are executed.
-Will look into it and send with taking care of the same.
+Changes in V2:
+1. change the subject to format "dt-bindings: module: ..." for the documents. 
+2. use new property <num-interpolated-steps> for backlight.
+3. remove pinctrl of rk809, because the driver is not ready.
 
-> 
-> >  	clk_disable_unprepare(xadc->clk);
-> >  	cancel_delayed_work(&xadc->zynq_unmask_work);
-> >  	kfree(xadc->data);
-> >
+Liang Chen (6):
+  dt-bindings: usb: dwc2: add description for px30
+  dt-bindings: mmc: rockchip-dw-mshc: add description for px30
+  dt-bindings: sound: rockchip-i2s: add description for px30
+  dt-bindings: rockchip: grf: add grf and pmugrf description for px30
+  arm64: dts: rockchip: add core dtsi file for PX30 SoCs
+  arm64: dts: rockchip: add PX30 eavluation board devicetree
 
-Thanks,
-Manish
+ Documentation/devicetree/bindings/arm/rockchip.txt |    4 +
+ .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |    1 +
+ .../devicetree/bindings/soc/rockchip/grf.txt       |    2 +
+ .../devicetree/bindings/sound/rockchip-i2s.txt     |    1 +
+ Documentation/devicetree/bindings/usb/dwc2.txt     |    1 +
+ arch/arm64/boot/dts/rockchip/Makefile              |    1 +
+ arch/arm64/boot/dts/rockchip/px30-evb.dts          |  473 +++++
+ arch/arm64/boot/dts/rockchip/px30.dtsi             | 2043 ++++++++++++++++++++
+ 8 files changed, 2526 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rockchip/px30-evb.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/px30.dtsi
+
+-- 
+1.9.1
