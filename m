@@ -1,125 +1,31 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 23 Jul 2018 12:22:21 -0600
-Subject: [PATCH v2 09/10] coresight: perf: Remove set_buffer call back
-In-Reply-To: <a68cff9d-51d3-7d86-0a73-c1d3cbbaced3@arm.com>
-References: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
- <1531847501-22226-10-git-send-email-suzuki.poulose@arm.com>
- <20180719203630.GC9421@xps15> <a68cff9d-51d3-7d86-0a73-c1d3cbbaced3@arm.com>
-Message-ID: <CANLsYkyN_+uTJZh7YEBPtMPvb8uQNwXvCwn_N4+D12xOVc=MNg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 23 Jul 2018 19:25:03 +0100
+Subject: next-20180723 build: 2 failures 11 warnings (next-20180723)
+In-Reply-To: <E1fheAy-0003tU-Dq@optimist>
+References: <E1fheAy-0003tU-Dq@optimist>
+Message-ID: <20180723182503.GH13981@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 Jul 2018 at 03:04, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
->
-> Mathieu,
->
-> On 19/07/18 21:36, Mathieu Poirier wrote:
-> > On Tue, Jul 17, 2018 at 06:11:40PM +0100, Suzuki K Poulose wrote:
-> >> In coresight perf mode, we need to prepare the sink before
-> >> starting a session, which is done via set_buffer call back.
-> >> We then proceed to enable the tracing. If we fail to start
-> >> the session successfully, we leave the sink configuration
-> >> unchanged. This was fine for the existing backends as they
-> >> don't have any state associated with the buffers. But with
-> >> ETR, we need to keep track of the buffer details and need
-> >> to be cleaned up if we fail. In order to make the operation
-> >> atomic and to avoid yet another call back, we get rid of
-> >> the "set_buffer" call back and pass the buffer details
-> >> via enable() call back to the sink.
-> >
-> > Suzuki,
-> >
-> > I'm not sure I understand the problem you're trying to fix there.  From the
-> > implementation of tmc_enable_etr_sink_perf() in the next patch, wouldn't the
-> > same result been achievable using a callback?
->
-> We can definitely achieve the results using "set_buffer". But for ETR,
-> we track the "perf_buf" in drvdata->perf_data when we do "set_buffer".
-> But if we failed to enable_path(), we leave the drvdata->perf_data
-> and doesn't clean it up. Now when another session is about to set_buf,
-> we check if perf_data is empty and WARNs otherwise.
-> Because we can't be sure if it belongs to an abandoned session or
-> another active session and we completely messed somewhere in the driver.
-> So, we need a clear_buffer call back if the enable fails, something
-> not really worth. Anyways, there is no point in separating set_buffer
-> and enabling the sink, as the error handling becomes cumbersome as explained
-> above.
->
-> >
-> > I'm fine with this patch and supportive of getting rid of callbacks if we can, I
-> > just need to understand the exact problem you're after.  From looking a your
-> > code (and the current implementation), if we succeed in setting the memory for
-> > the sink but fail in any of the subsequent steps i.e, enabling the rest of the
-> > compoment on the path or the source, the sink is left unchanged.
->
-> Yes, thats right. And we should WARN (which I missed in this version) if
-> there is a perf_data already for a disabled ETR. Please see my response to the
-> next patch.
+On Mon, Jul 23, 2018 at 05:59:12PM +0100, Build bot for Mark Brown wrote:
 
-The changelog for this patch states the following: "But with ETR, we
-need to keep track of the buffer details and need to be cleaned up if
-we fail."
+Today's -next fails to build an arm allnoconfig (and a bunch of other
+arm configs from the look of some of the other builder reports) with:
 
-I did a deep dive in the code and in the current implementation if the
-source fails to be enabled in etm_event_start() the path and the sink
-remains unchanged.  With your patchset this get fixed because a goto
-was added to disable the path when such condition occur.  As such each
-component in the path will see its ->disable() callback invoked.  In
-tmc_disable_etr_sink(), drvdata->perf_data is set to NULL in
-tmc_etr_disable_hw(), so the cleanup on error condition is done
-properly.  As such we wouldn't need a clean_buffer() callback.
+> 	arm-allnoconfig
+> ../mm/vmacache.c:14:39: error: 'PMD_SHIFT' undeclared (first use in this function)
+> ../mm/vmacache.c:14:39: error: 'PMD_SHIFT' undeclared (first use in this function)
+> ../mm/vmacache.c:127:26: error: 'addr' undeclared (first use in this function)
+> ../mm/vmacache.c:14:39: error: 'PMD_SHIFT' undeclared (first use in this function)
 
-As I said I'm in favour of removing the set_buffer() callback but I
-wouldn't associated it with ETR state cleanup.  If the code can be
-rearranged in a way that code can be removed then that alone is enough
-to justify the change.
-
->
-> >> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> >> index 3cc4a0b..12a247d 100644
-> >> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-> >> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-> >> @@ -269,16 +269,11 @@ static void etm_event_start(struct perf_event *event, int flags)
-> >>      path = etm_event_cpu_path(event_data, cpu);
-> >>      /* We need a sink, no need to continue without one */
-> >>      sink = coresight_get_sink(path);
-> >> -    if (WARN_ON_ONCE(!sink || !sink_ops(sink)->set_buffer))
-> >> -            goto fail_end_stop;
-> >> -
-> >> -    /* Configure the sink */
-> >> -    if (sink_ops(sink)->set_buffer(sink, handle,
-> >> -                                   event_data->snk_config))
-> >> +    if (WARN_ON_ONCE(!sink))
-> >>              goto fail_end_stop;
-> >>
-> >>      /* Nothing will happen without a path */
-> >> -    if (coresight_enable_path(path, CS_MODE_PERF))
-> >> +    if (coresight_enable_path(path, CS_MODE_PERF, handle))
-> >
-> > Here we already have a handle on "event_data".  As such I think this is what we
-> > should feed to coresight_enable_path() rather than the handle.  That way we
-> > don't need to call etm_perf_sink_config(), we just use the data.
->
-> The advantage of passing on the handle is, we could get all the way upto the
-> "perf_event" for the given session. Passing the event_data will loose that
-> information.
->
-> i.e, perf_event-> |perf_ouput_handle | -> |event_data | -> sink_config
->                    |  <-event         |    |           |
->
-> The purpose of the wrapper "etm_perf_sink_config()" is to abstract the way we
-> handle the information under the event_data. i.e, if we decide to make some
-> changes in the way we store event_data, we need to spill the changes every
-> where. But the perf_ouput_handle has much more stable ABI than event_data,
-> hence the choice of passing handle.
-
-I agree that etm_perf_sink_config() has value but it should take a
-void * as parameter (i.e what gets returned from perf_get_aux())
-rather than a perf_output_handle *.
-
-Thanks,
-Mathieu
-
->
-> Cheers
-> Suzuki
+due to 5d2f33872046e (mm, vmacache: hash addresses based on pmd) which
+uses PMD_SHIFT rather than PAGE_SHIFT for VMACACHE_HASH() but that's not
+defined in at least !MMU arm configs.  There is a reference to it in
+arm/pgtable-nommu.h but only in comments with FIXMEs next to them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180723/3421abd5/attachment.sig>
