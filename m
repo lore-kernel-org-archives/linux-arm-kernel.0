@@ -1,66 +1,105 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Mon, 23 Jul 2018 17:20:11 +0300
-Subject: [PATCH v4 02/20] virtio: pci-legacy: Validate queue pfn
-In-Reply-To: <db295a96-cf1e-9e8b-9b29-5882084781e1@arm.com>
-References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
- <1531905547-25478-3-git-send-email-suzuki.poulose@arm.com>
- <20180722185335-mutt-send-email-mst@kernel.org>
- <5a659490-13ce-87c1-a9bc-d89a8f8ee111@arm.com>
- <db295a96-cf1e-9e8b-9b29-5882084781e1@arm.com>
-Message-ID: <20180723171953-mutt-send-email-mst@kernel.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 23 Jul 2018 16:24:53 +0200
+Subject: [RFC] ARM: exynos: Fix imprecise abort during Exynos5422
+ suspend to RAM
+In-Reply-To: <20180718195929.5852-1-krzk@kernel.org>
+References: <CGME20180718200005epcas1p1cb2568c593276849c066b3a53f1e971b@epcas1p1.samsung.com>
+ <20180718195929.5852-1-krzk@kernel.org>
+Message-ID: <20180723142503eucas1p24f8d96f8c4ec25dbdb80e27e2f1444c2~EBZNDRgPc2952429524eucas1p2C@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 01:54:10PM +0100, Marc Zyngier wrote:
-> On 23/07/18 10:44, Suzuki K Poulose wrote:
-> > On 07/22/2018 04:53 PM, Michael S. Tsirkin wrote:
-> >> On Wed, Jul 18, 2018 at 10:18:45AM +0100, Suzuki K Poulose wrote:
-> >>> Legacy PCI over virtio uses a 32bit PFN for the queue. If the
-> >>> queue pfn is too large to fit in 32bits, which we could hit on
-> >>> arm64 systems with 52bit physical addresses (even with 64K page
-> >>> size), we simply miss out a proper link to the other side of
-> >>> the queue.
-> >>>
-> >>> Add a check to validate the PFN, rather than silently breaking
-> >>> the devices.
-> >>>
-> >>> Cc: "Michael S. Tsirkin" <mst@redhat.com>
-> >>> Cc: Jason Wang <jasowang@redhat.com>
-> >>> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> >>> Cc: Christoffer Dall <cdall@kernel.org>
-> >>> Cc: Peter Maydel <peter.maydell@linaro.org>
-> >>> Cc: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> >>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >>
-> >> Acked-by: Michael S. Tsirkin <mst@redhat.com>
-> > 
-> > 
-> > Michael,
-> > 
-> > Thanks.
-> > 
-> >>
-> >> I assume this will be merged through some other tree.
-> >>
-> > 
-> > 
-> > As such these two virtio patches do not have any code dependencies with
-> > the rest of the series. So, if you could pick this up it should be fine.
-> > Otherwise, may be Marc can push it with the rest of the series.
-> > 
-> > Marc,
-> > 
-> > Are you OK with that ?
-> 
-> Given that these two patches completely independent, I think their
-> natural path should be the virtio tree. But if Michael doesn't want to
-> pick them, I'll do it as part of this series.
-> 
-> Thanks,
-> 
-> 	M.
+Hi Krzysztof,
 
-It's ok, I can pick them up.
+On 2018-07-18 21:59, Krzysztof Kozlowski wrote:
+> Suspend to RAM on Odroid XU3/XU4/HC1 family (Exynos5422) causes
+> imprecise abort:
+>
+> 	PM: Syncing filesystems ... done.
+> 	Freezing user space processes ... (elapsed 0.003 seconds) done.
+> 	OOM killer disabled.
+> 	Freezing remaining freezable tasks ... (elapsed 0.003 seconds) done.
+> 	wake enabled for irq 139
+> 	Disabling non-boot CPUs ...
+> 	IRQ51 no longer affine to CPU1
+> 	IRQ52 no longer affine to CPU2
+> 	IRQ53 no longer affine to CPU3
+> 	IRQ54 no longer affine to CPU4
+> 	IRQ55 no longer affine to CPU5
+> 	IRQ56 no longer affine to CPU6
+> 	cpu cpu4: Dropping the link to regulator.40
+> 	IRQ57 no longer affine to CPU7
+> 	Unhandled fault: external abort on non-linefetch (0x1008) at 0xf081a028
+> 	Internal error: : 1008 [#1] PREEMPT SMP ARM
+>
+> with last call trace in exynos_suspend_enter().
+>
+> The abort is caused by writing to register in secure part of sysram.
+> All Exynos5422 devices, including Hardkernel Odroid boards, boot with
+> TrustZone in non-secure mode therefore they should access non-secure
+> sysram.
+>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>
+> ---
+>
+> Comments, whether my understanding is correct, are welcomed!
 
-> -- 
-> Jazz is not dead. It just smells funny...
+The decision, weather to use secure or non-secure sysram depends on the
+enabled TrustZone interface IMHO. Exynos5420 PeachPIT and Exynos5800 PeachPI
+don't use TrustZone and don't have 'firmware' node in dts, thus they should
+keep existing code.
+
+> ---
+>   Documentation/arm/Samsung/Bootloader-interface.txt | 1 +
+>   arch/arm/mach-exynos/suspend.c                     | 6 +++---
+>   2 files changed, 4 insertions(+), 3 deletions(-)
+>
+> diff --git a/Documentation/arm/Samsung/Bootloader-interface.txt b/Documentation/arm/Samsung/Bootloader-interface.txt
+> index ed494ac0beb2..d17ed518a7ea 100644
+> --- a/Documentation/arm/Samsung/Bootloader-interface.txt
+> +++ b/Documentation/arm/Samsung/Bootloader-interface.txt
+> @@ -26,6 +26,7 @@ Offset        Value                                        Purpose
+>   0x20          0xfcba0d10 (Magic cookie)                    AFTR
+>   0x24          exynos_cpu_resume_ns                         AFTR
+>   0x28 + 4*cpu  0x8 (Magic cookie, Exynos3250)               AFTR
+> +0x28          0x0 or last value during resume (Exynos542x) System suspend
+>   
+>   
+>   2. Secure mode
+> diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+> index d3db306a5a70..0ec52f442b97 100644
+> --- a/arch/arm/mach-exynos/suspend.c
+> +++ b/arch/arm/mach-exynos/suspend.c
+> @@ -256,7 +256,7 @@ static int exynos5420_cpu_suspend(unsigned long arg)
+>   	unsigned int cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+>   	unsigned int cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+>   
+> -	writel_relaxed(0x0, sysram_base_addr + EXYNOS5420_CPU_STATE);
+> +	writel_relaxed(0x0, sysram_ns_base_addr + EXYNOS5420_CPU_STATE);
+>   
+>   	if (IS_ENABLED(CONFIG_EXYNOS5420_MCPM)) {
+>   		mcpm_set_entry_vector(cpu, cluster, exynos_cpu_resume);
+> @@ -328,7 +328,7 @@ static void exynos5420_pm_prepare(void)
+>   	 * needs to restore it back in case, the primary cpu fails to
+>   	 * suspend for any reason.
+>   	 */
+> -	exynos5420_cpu_state = readl_relaxed(sysram_base_addr +
+> +	exynos5420_cpu_state = readl_relaxed(sysram_ns_base_addr +
+>   					     EXYNOS5420_CPU_STATE);
+>   
+>   	exynos_pm_enter_sleep_mode();
+> @@ -448,7 +448,7 @@ static void exynos5420_pm_resume(void)
+>   
+>   	/* Restore the sysram cpu state register */
+>   	writel_relaxed(exynos5420_cpu_state,
+> -		       sysram_base_addr + EXYNOS5420_CPU_STATE);
+> +		       sysram_ns_base_addr + EXYNOS5420_CPU_STATE);
+>   
+>   	pmu_raw_writel(EXYNOS5420_USE_STANDBY_WFI_ALL,
+>   			S5P_CENTRAL_SEQ_OPTION);
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
