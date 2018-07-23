@@ -1,335 +1,125 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Mon, 23 Jul 2018 11:13:30 -0700
-Subject: [PATCH i2c-next] i2c: aspeed: Handle master/slave combined irq
- events properly
-In-Reply-To: <58d31319-83c0-969b-e3fd-4273818929fc@linux.intel.com>
-References: <20180723174808.4007-1-jae.hyun.yoo@linux.intel.com>
- <58d31319-83c0-969b-e3fd-4273818929fc@linux.intel.com>
-Message-ID: <6721ef3b-2c74-9f4a-1b67-5335e7878a0c@linux.intel.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 23 Jul 2018 12:22:21 -0600
+Subject: [PATCH v2 09/10] coresight: perf: Remove set_buffer call back
+In-Reply-To: <a68cff9d-51d3-7d86-0a73-c1d3cbbaced3@arm.com>
+References: <1531847501-22226-1-git-send-email-suzuki.poulose@arm.com>
+ <1531847501-22226-10-git-send-email-suzuki.poulose@arm.com>
+ <20180719203630.GC9421@xps15> <a68cff9d-51d3-7d86-0a73-c1d3cbbaced3@arm.com>
+Message-ID: <CANLsYkyN_+uTJZh7YEBPtMPvb8uQNwXvCwn_N4+D12xOVc=MNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks James for the review. Please see my inline answers.
+On Fri, 20 Jul 2018 at 03:04, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+>
+> Mathieu,
+>
+> On 19/07/18 21:36, Mathieu Poirier wrote:
+> > On Tue, Jul 17, 2018 at 06:11:40PM +0100, Suzuki K Poulose wrote:
+> >> In coresight perf mode, we need to prepare the sink before
+> >> starting a session, which is done via set_buffer call back.
+> >> We then proceed to enable the tracing. If we fail to start
+> >> the session successfully, we leave the sink configuration
+> >> unchanged. This was fine for the existing backends as they
+> >> don't have any state associated with the buffers. But with
+> >> ETR, we need to keep track of the buffer details and need
+> >> to be cleaned up if we fail. In order to make the operation
+> >> atomic and to avoid yet another call back, we get rid of
+> >> the "set_buffer" call back and pass the buffer details
+> >> via enable() call back to the sink.
+> >
+> > Suzuki,
+> >
+> > I'm not sure I understand the problem you're trying to fix there.  From the
+> > implementation of tmc_enable_etr_sink_perf() in the next patch, wouldn't the
+> > same result been achievable using a callback?
+>
+> We can definitely achieve the results using "set_buffer". But for ETR,
+> we track the "perf_buf" in drvdata->perf_data when we do "set_buffer".
+> But if we failed to enable_path(), we leave the drvdata->perf_data
+> and doesn't clean it up. Now when another session is about to set_buf,
+> we check if perf_data is empty and WARNs otherwise.
+> Because we can't be sure if it belongs to an abandoned session or
+> another active session and we completely messed somewhere in the driver.
+> So, we need a clear_buffer call back if the enable fails, something
+> not really worth. Anyways, there is no point in separating set_buffer
+> and enabling the sink, as the error handling becomes cumbersome as explained
+> above.
+>
+> >
+> > I'm fine with this patch and supportive of getting rid of callbacks if we can, I
+> > just need to understand the exact problem you're after.  From looking a your
+> > code (and the current implementation), if we succeed in setting the memory for
+> > the sink but fail in any of the subsequent steps i.e, enabling the rest of the
+> > compoment on the path or the source, the sink is left unchanged.
+>
+> Yes, thats right. And we should WARN (which I missed in this version) if
+> there is a perf_data already for a disabled ETR. Please see my response to the
+> next patch.
 
-On 7/23/2018 11:10 AM, James Feist wrote:
-> On 07/23/2018 10:48 AM, Jae Hyun Yoo wrote:
->> In most of cases, interrupt bits are set one by one but there are
->> also a lot of other cases that Aspeed I2C IP sends multiple
->> interrupt bits with combining master and slave events using a
->> single interrupt call. It happens much in multi-master environment
-> 
-> much more
-> 
+The changelog for this patch states the following: "But with ETR, we
+need to keep track of the buffer details and need to be cleaned up if
+we fail."
 
-Thanks! Will fix it.
+I did a deep dive in the code and in the current implementation if the
+source fails to be enabled in etm_event_start() the path and the sink
+remains unchanged.  With your patchset this get fixed because a goto
+was added to disable the path when such condition occur.  As such each
+component in the path will see its ->disable() callback invoked.  In
+tmc_disable_etr_sink(), drvdata->perf_data is set to NULL in
+tmc_etr_disable_hw(), so the cleanup on error condition is done
+properly.  As such we wouldn't need a clean_buffer() callback.
 
->> than single-master. For an example, when master is waiting for a
->> NORMAL_STOP interrupt in its MASTER_STOP state, SLAVE_MATCH and
->> RX_DONE interrupts could come along with the NORMAL_STOP in case of
->> an another master immediately sends data just after acquiring the
->> bus. In this case, the NORMAL_STOP interrupt should be handled
->> by master_irq and the SLAVE_MATCH and RX_DONE interrupts should be
->> handled by slave_irq. This commit modifies irq hadling logic to
->> handle the master/slave combined events properly.
->>
->> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
->> ---
->> ? drivers/i2c/busses/i2c-aspeed.c | 137 ++++++++++++++++++--------------
->> ? 1 file changed, 76 insertions(+), 61 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-aspeed.c 
->> b/drivers/i2c/busses/i2c-aspeed.c
->> index efb89422d496..24d43f143a55 100644
->> --- a/drivers/i2c/busses/i2c-aspeed.c
->> +++ b/drivers/i2c/busses/i2c-aspeed.c
->> @@ -82,6 +82,11 @@
->> ? #define ASPEED_I2CD_INTR_RX_DONE??????????? BIT(2)
->> ? #define ASPEED_I2CD_INTR_TX_NAK??????????????? BIT(1)
->> ? #define ASPEED_I2CD_INTR_TX_ACK??????????????? BIT(0)
->> +#define ASPEED_I2CD_INTR_ERRORS?????????????????????????????? \
->> +??????? (ASPEED_I2CD_INTR_SDA_DL_TIMEOUT |?????????????????? \
->> +???????? ASPEED_I2CD_INTR_SCL_TIMEOUT |?????????????????????? \
->> +???????? ASPEED_I2CD_INTR_ABNORMAL |?????????????????????? \
->> +???????? ASPEED_I2CD_INTR_ARBIT_LOSS)
->> ? #define ASPEED_I2CD_INTR_ALL?????????????????????????????? \
->> ????????? (ASPEED_I2CD_INTR_SDA_DL_TIMEOUT |?????????????????? \
->> ?????????? ASPEED_I2CD_INTR_BUS_RECOVER_DONE |?????????????????? \
->> @@ -150,6 +155,7 @@ struct aspeed_i2c_bus {
->> ????? int??????????????? cmd_err;
->> ????? /* Protected only by i2c_lock_bus */
->> ????? int??????????????? master_xfer_result;
->> +??? u32??????????????? irq_status;
->> ? #if IS_ENABLED(CONFIG_I2C_SLAVE)
->> ????? struct i2c_client??????? *slave;
->> ????? enum aspeed_i2c_slave_state??? slave_state;
->> @@ -229,36 +235,30 @@ static int aspeed_i2c_recover_bus(struct 
->> aspeed_i2c_bus *bus)
->> ? #if IS_ENABLED(CONFIG_I2C_SLAVE)
->> ? static bool aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus)
->> ? {
->> -??? u32 command, irq_status, status_ack = 0;
->> +??? u32 command, status_ack = 0;
->> ????? struct i2c_client *slave = bus->slave;
->> -??? bool irq_handled = true;
->> ????? u8 value;
->> -??? if (!slave) {
->> -??????? irq_handled = false;
->> -??????? goto out;
->> -??? }
->> +??? if (!slave)
->> +??????? return false;
->> ????? command = readl(bus->base + ASPEED_I2C_CMD_REG);
->> -??? irq_status = readl(bus->base + ASPEED_I2C_INTR_STS_REG);
->> ????? /* Slave was requested, restart state machine. */
->> -??? if (irq_status & ASPEED_I2CD_INTR_SLAVE_MATCH) {
->> +??? if (bus->irq_status & ASPEED_I2CD_INTR_SLAVE_MATCH) {
->> ????????? status_ack |= ASPEED_I2CD_INTR_SLAVE_MATCH;
->> ????????? bus->slave_state = ASPEED_I2C_SLAVE_START;
->> ????? }
->> ????? /* Slave is not currently active, irq was for someone else. */
->> -??? if (bus->slave_state == ASPEED_I2C_SLAVE_STOP) {
->> -??????? irq_handled = false;
->> -??????? goto out;
->> -??? }
->> +??? if (bus->slave_state == ASPEED_I2C_SLAVE_STOP)
->> +??????? return false;
->> ????? dev_dbg(bus->dev, "slave irq status 0x%08x, cmd 0x%08x\n",
->> -??????? irq_status, command);
->> +??????? bus->irq_status, command);
->> ????? /* Slave was sent something. */
->> -??? if (irq_status & ASPEED_I2CD_INTR_RX_DONE) {
->> +??? if (bus->irq_status & ASPEED_I2CD_INTR_RX_DONE) {
->> ????????? value = readl(bus->base + ASPEED_I2C_BYTE_BUF_REG) >> 8;
->> ????????? /* Handle address frame. */
->> ????????? if (bus->slave_state == ASPEED_I2C_SLAVE_START) {
->> @@ -273,28 +273,29 @@ static bool aspeed_i2c_slave_irq(struct 
->> aspeed_i2c_bus *bus)
->> ????? }
->> ????? /* Slave was asked to stop. */
->> -??? if (irq_status & ASPEED_I2CD_INTR_NORMAL_STOP) {
->> +??? if (bus->irq_status & ASPEED_I2CD_INTR_NORMAL_STOP) {
->> ????????? status_ack |= ASPEED_I2CD_INTR_NORMAL_STOP;
->> ????????? bus->slave_state = ASPEED_I2C_SLAVE_STOP;
->> ????? }
->> -??? if (irq_status & ASPEED_I2CD_INTR_TX_NAK) {
->> +??? if (bus->irq_status & ASPEED_I2CD_INTR_TX_NAK) {
->> ????????? status_ack |= ASPEED_I2CD_INTR_TX_NAK;
->> ????????? bus->slave_state = ASPEED_I2C_SLAVE_STOP;
->> ????? }
->> +??? if (bus->irq_status & ASPEED_I2CD_INTR_TX_ACK) {
->> +??????? status_ack |= ASPEED_I2CD_INTR_TX_ACK;
->> +??? }
->> ????? switch (bus->slave_state) {
->> ????? case ASPEED_I2C_SLAVE_READ_REQUESTED:
->> -??????? if (irq_status & ASPEED_I2CD_INTR_TX_ACK)
->> +??????? if (bus->irq_status & ASPEED_I2CD_INTR_TX_ACK)
->> ????????????? dev_err(bus->dev, "Unexpected ACK on read request.\n");
->> ????????? bus->slave_state = ASPEED_I2C_SLAVE_READ_PROCESSED;
->> -
->> ????????? i2c_slave_event(slave, I2C_SLAVE_READ_REQUESTED, &value);
->> ????????? writel(value, bus->base + ASPEED_I2C_BYTE_BUF_REG);
->> ????????? writel(ASPEED_I2CD_S_TX_CMD, bus->base + ASPEED_I2C_CMD_REG);
->> ????????? break;
->> ????? case ASPEED_I2C_SLAVE_READ_PROCESSED:
->> -??????? status_ack |= ASPEED_I2CD_INTR_TX_ACK;
->> -??????? if (!(irq_status & ASPEED_I2CD_INTR_TX_ACK))
->> +??????? if (!(bus->irq_status & ASPEED_I2CD_INTR_TX_ACK))
->> ????????????? dev_err(bus->dev,
->> ????????????????? "Expected ACK after processed read.\n");
->> ????????? i2c_slave_event(slave, I2C_SLAVE_READ_PROCESSED, &value);
->> @@ -317,14 +318,8 @@ static bool aspeed_i2c_slave_irq(struct 
->> aspeed_i2c_bus *bus)
->> ????????? break;
->> ????? }
->> -??? if (status_ack != irq_status)
->> -??????? dev_err(bus->dev,
->> -??????????? "irq handled != irq. expected %x, but was %x\n",
->> -??????????? irq_status, status_ack);
->> -??? writel(status_ack, bus->base + ASPEED_I2C_INTR_STS_REG);
->> -
->> -out:
->> -??? return irq_handled;
->> +??? bus->irq_status ^= status_ack;
->> +??? return !bus->irq_status;
->> ? }
->> ? #endif /* CONFIG_I2C_SLAVE */
->> @@ -382,19 +377,19 @@ static int aspeed_i2c_is_irq_error(u32 irq_status)
->> ? static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
->> ? {
->> -??? u32 irq_status, status_ack = 0, command = 0;
->> +??? u32 status_ack = 0, command = 0;
->> ????? struct i2c_msg *msg;
->> ????? u8 recv_byte;
->> ????? int ret;
->> -??? irq_status = readl(bus->base + ASPEED_I2C_INTR_STS_REG);
->> -??? /* Ack all interrupt bits. */
->> -??? writel(irq_status, bus->base + ASPEED_I2C_INTR_STS_REG);
->> -
->> -??? if (irq_status & ASPEED_I2CD_INTR_BUS_RECOVER_DONE) {
->> +??? if (bus->irq_status & ASPEED_I2CD_INTR_BUS_RECOVER_DONE) {
->> ????????? bus->master_state = ASPEED_I2C_MASTER_INACTIVE;
->> ????????? status_ack |= ASPEED_I2CD_INTR_BUS_RECOVER_DONE;
->> ????????? goto out_complete;
->> +??? } else {
->> +??????? /* Master is not currently active, irq was for someone else. */
->> +??????? if (bus->master_state == ASPEED_I2C_MASTER_INACTIVE)
->> +??????????? goto out_no_complete;
->> ????? }
->> ????? /*
->> @@ -402,20 +397,23 @@ static bool aspeed_i2c_master_irq(struct 
->> aspeed_i2c_bus *bus)
->> ?????? * should clear the command queue effectively taking us back to the
->> ?????? * INACTIVE state.
->> ?????? */
->> -??? ret = aspeed_i2c_is_irq_error(irq_status);
->> -??? if (ret < 0) {
->> +??? ret = aspeed_i2c_is_irq_error(bus->irq_status);
->> +??? if (ret) {
->> ????????? dev_dbg(bus->dev, "received error interrupt: 0x%08x\n",
->> -??????????? irq_status);
->> +??????????? bus->irq_status);
->> ????????? bus->cmd_err = ret;
->> ????????? bus->master_state = ASPEED_I2C_MASTER_INACTIVE;
->> +??????? status_ack |= (bus->irq_status & ASPEED_I2CD_INTR_ERRORS);
->> ????????? goto out_complete;
->> ????? }
->> ????? /* We are in an invalid state; reset bus to a known state. */
->> ????? if (!bus->msgs) {
->> -??????? dev_err(bus->dev, "bus in unknown state\n");
->> +??????? dev_err(bus->dev, "bus in unknown state irq_status: 0x%x\n",
->> +??????????? bus->irq_status);
->> ????????? bus->cmd_err = -EIO;
->> -??????? if (bus->master_state != ASPEED_I2C_MASTER_STOP)
->> +??????? if (bus->master_state != ASPEED_I2C_MASTER_STOP &&
->> +??????????? bus->master_state != ASPEED_I2C_MASTER_INACTIVE)
->> ????????????? aspeed_i2c_do_stop(bus);
->> ????????? goto out_no_complete;
->> ????? }
->> @@ -427,8 +425,14 @@ static bool aspeed_i2c_master_irq(struct 
->> aspeed_i2c_bus *bus)
->> ?????? * then update the state and handle the new state below.
->> ?????? */
->> ????? if (bus->master_state == ASPEED_I2C_MASTER_START) {
->> -??????? if (unlikely(!(irq_status & ASPEED_I2CD_INTR_TX_ACK))) {
->> -??????????? pr_devel("no slave present at %02x\n", msg->addr);
->> +??????? if (unlikely(!(bus->irq_status & ASPEED_I2CD_INTR_TX_ACK))) {
->> +??????????? if (unlikely(!(bus->irq_status &
->> +???????????????????? ASPEED_I2CD_INTR_TX_NAK))) {
->> +??????????????? bus->cmd_err = -ENXIO;
->> +??????????????? bus->master_state = ASPEED_I2C_MASTER_INACTIVE;
->> +??????????????? goto out_complete;
->> +??????????? }
->> +??????????? pr_devel("no slave present at %02x", msg->addr);
-> Missing line feed character
+As I said I'm in favour of removing the set_buffer() callback but I
+wouldn't associated it with ETR state cleanup.  If the code can be
+rearranged in a way that code can be removed then that alone is enough
+to justify the change.
 
-Thanks for your pointing it out. Will add '\n' at the end of the
-message.
+>
+> >> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> >> index 3cc4a0b..12a247d 100644
+> >> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> >> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> >> @@ -269,16 +269,11 @@ static void etm_event_start(struct perf_event *event, int flags)
+> >>      path = etm_event_cpu_path(event_data, cpu);
+> >>      /* We need a sink, no need to continue without one */
+> >>      sink = coresight_get_sink(path);
+> >> -    if (WARN_ON_ONCE(!sink || !sink_ops(sink)->set_buffer))
+> >> -            goto fail_end_stop;
+> >> -
+> >> -    /* Configure the sink */
+> >> -    if (sink_ops(sink)->set_buffer(sink, handle,
+> >> -                                   event_data->snk_config))
+> >> +    if (WARN_ON_ONCE(!sink))
+> >>              goto fail_end_stop;
+> >>
+> >>      /* Nothing will happen without a path */
+> >> -    if (coresight_enable_path(path, CS_MODE_PERF))
+> >> +    if (coresight_enable_path(path, CS_MODE_PERF, handle))
+> >
+> > Here we already have a handle on "event_data".  As such I think this is what we
+> > should feed to coresight_enable_path() rather than the handle.  That way we
+> > don't need to call etm_perf_sink_config(), we just use the data.
+>
+> The advantage of passing on the handle is, we could get all the way upto the
+> "perf_event" for the given session. Passing the event_data will loose that
+> information.
+>
+> i.e, perf_event-> |perf_ouput_handle | -> |event_data | -> sink_config
+>                    |  <-event         |    |           |
+>
+> The purpose of the wrapper "etm_perf_sink_config()" is to abstract the way we
+> handle the information under the event_data. i.e, if we decide to make some
+> changes in the way we store event_data, we need to spill the changes every
+> where. But the perf_ouput_handle has much more stable ABI than event_data,
+> hence the choice of passing handle.
 
->> ????????????? status_ack |= ASPEED_I2CD_INTR_TX_NAK;
->> ????????????? bus->cmd_err = -ENXIO;
->> ????????????? aspeed_i2c_do_stop(bus);
->> @@ -447,11 +451,12 @@ static bool aspeed_i2c_master_irq(struct 
->> aspeed_i2c_bus *bus)
->> ????? switch (bus->master_state) {
->> ????? case ASPEED_I2C_MASTER_TX:
->> -??????? if (unlikely(irq_status & ASPEED_I2CD_INTR_TX_NAK)) {
->> +??????? if (unlikely(bus->irq_status & ASPEED_I2CD_INTR_TX_NAK)) {
->> ????????????? dev_dbg(bus->dev, "slave NACKed TX\n");
->> ????????????? status_ack |= ASPEED_I2CD_INTR_TX_NAK;
->> ????????????? goto error_and_stop;
->> -??????? } else if (unlikely(!(irq_status & ASPEED_I2CD_INTR_TX_ACK))) {
->> +??????? } else if (unlikely(!(bus->irq_status &
->> +????????????????????? ASPEED_I2CD_INTR_TX_ACK))) {
->> ????????????? dev_err(bus->dev, "slave failed to ACK TX\n");
->> ????????????? goto error_and_stop;
->> ????????? }
->> @@ -470,11 +475,11 @@ static bool aspeed_i2c_master_irq(struct 
->> aspeed_i2c_bus *bus)
->> ????????? goto out_no_complete;
->> ????? case ASPEED_I2C_MASTER_RX_FIRST:
->> ????????? /* RX may not have completed yet (only address cycle) */
->> -??????? if (!(irq_status & ASPEED_I2CD_INTR_RX_DONE))
->> +??????? if (!(bus->irq_status & ASPEED_I2CD_INTR_RX_DONE))
->> ????????????? goto out_no_complete;
->> ????????? /* fallthrough intended */
->> ????? case ASPEED_I2C_MASTER_RX:
->> -??????? if (unlikely(!(irq_status & ASPEED_I2CD_INTR_RX_DONE))) {
->> +??????? if (unlikely(!(bus->irq_status & ASPEED_I2CD_INTR_RX_DONE))) {
->> ????????????? dev_err(bus->dev, "master failed to RX\n");
->> ????????????? goto error_and_stop;
->> ????????? }
->> @@ -505,8 +510,11 @@ static bool aspeed_i2c_master_irq(struct 
->> aspeed_i2c_bus *bus)
->> ????????? }
->> ????????? goto out_no_complete;
->> ????? case ASPEED_I2C_MASTER_STOP:
->> -??????? if (unlikely(!(irq_status & ASPEED_I2CD_INTR_NORMAL_STOP))) {
->> -??????????? dev_err(bus->dev, "master failed to STOP\n");
->> +??????? if (unlikely(!(bus->irq_status &
->> +?????????????????? ASPEED_I2CD_INTR_NORMAL_STOP))) {
->> +??????????? dev_err(bus->dev,
->> +??????????????? "master failed to STOP irq_status:0x%x\n",
->> +??????????????? bus->irq_status);
->> ????????????? bus->cmd_err = -EIO;
->> ????????????? /* Do not STOP as we have already tried. */
->> ????????? } else {
->> @@ -518,7 +526,7 @@ static bool aspeed_i2c_master_irq(struct 
->> aspeed_i2c_bus *bus)
->> ????? case ASPEED_I2C_MASTER_INACTIVE:
->> ????????? dev_err(bus->dev,
->> ????????????? "master received interrupt 0x%08x, but is inactive\n",
->> -??????????? irq_status);
->> +??????????? bus->irq_status);
->> ????????? bus->cmd_err = -EIO;
->> ????????? /* Do not STOP as we should be inactive. */
->> ????????? goto out_complete;
->> @@ -540,33 +548,40 @@ static bool aspeed_i2c_master_irq(struct 
->> aspeed_i2c_bus *bus)
->> ????????? bus->master_xfer_result = bus->msgs_index + 1;
->> ????? complete(&bus->cmd_complete);
->> ? out_no_complete:
->> -??? if (irq_status != status_ack)
->> -??????? dev_err(bus->dev,
->> -??????????? "irq handled != irq. expected 0x%08x, but was 0x%08x\n",
->> -??????????? irq_status, status_ack);
->> -??? return !!irq_status;
->> +??? bus->irq_status ^= status_ack;
->> +??? return !bus->irq_status;
->> ? }
->> ? static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
->> ? {
->> ????? struct aspeed_i2c_bus *bus = dev_id;
->> -??? bool ret;
->> +??? u32 irq_received;
->> ????? spin_lock(&bus->lock);
->> +??? irq_received = readl(bus->base + ASPEED_I2C_INTR_STS_REG);
->> +??? bus->irq_status = irq_received;
->> ? #if IS_ENABLED(CONFIG_I2C_SLAVE)
->> -??? if (aspeed_i2c_slave_irq(bus)) {
->> -??????? dev_dbg(bus->dev, "irq handled by slave.\n");
->> -??????? ret = true;
->> -??????? goto out;
->> +??? if (bus->master_state != ASPEED_I2C_MASTER_INACTIVE) {
->> +??????? if (!aspeed_i2c_master_irq(bus))
->> +??????????? aspeed_i2c_slave_irq(bus);
->> +??? } else {
->> +??????? if (!aspeed_i2c_slave_irq(bus))
->> +??????????? aspeed_i2c_master_irq(bus);
->> ????? }
->> +#else
->> +??? aspeed_i2c_master_irq(bus);
->> ? #endif /* CONFIG_I2C_SLAVE */
->> -??? ret = aspeed_i2c_master_irq(bus);
->> +??? if (bus->irq_status)
->> +??????? dev_err(bus->dev,
->> +??????????? "irq handled != irq. expected 0x%08x, but was 0x%08x\n",
->> +??????????? irq_received, irq_received ^ bus->irq_status);
->> -out:
->> +??? /* Ack all interrupt bits. */
->> +??? writel(irq_received, bus->base + ASPEED_I2C_INTR_STS_REG);
->> ????? spin_unlock(&bus->lock);
->> -??? return ret ? IRQ_HANDLED : IRQ_NONE;
->> +??? return bus->irq_status ? IRQ_NONE : IRQ_HANDLED;
->> ? }
->> ? static int aspeed_i2c_master_xfer(struct i2c_adapter *adap,
->>
+I agree that etm_perf_sink_config() has value but it should take a
+void * as parameter (i.e what gets returned from perf_get_aux())
+rather than a perf_output_handle *.
+
+Thanks,
+Mathieu
+
+>
+> Cheers
+> Suzuki
