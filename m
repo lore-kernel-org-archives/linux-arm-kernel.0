@@ -1,60 +1,38 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 23 Jul 2018 11:03:28 +0200
-Subject: [PATCH 1/9] ARM: dts: porter: Add missing PMIC nodes
-In-Reply-To: <1f7c894a-9ad6-2e4e-c144-de982c2ba4c8@gmail.com>
-References: <cover.1532086734.git.horms+renesas@verge.net.au>
- <5058a96cb7e8dca97629c48084537fe5def8344f.1532086734.git.horms+renesas@verge.net.au>
- <8312c88f-9ff8-454e-fad9-7bf403c28207@cogentembedded.com>
- <1f7c894a-9ad6-2e4e-c144-de982c2ba4c8@gmail.com>
-Message-ID: <CAMuHMdVVGBtBrZ=0356+ZXDeGwiW=Ayvhy3_+AOE-6P3Q8zR6Q@mail.gmail.com>
+Date: Mon, 23 Jul 2018 11:11:12 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.19
+In-Reply-To: <20180721220343.yuwrfxz3fo25krzv@localhost>
+References: <cover.1532086504.git.horms+renesas@verge.net.au>
+ <20180721220343.yuwrfxz3fo25krzv@localhost>
+Message-ID: <CAMuHMdVbyUa5PtQf4LZQDv-=aqToahX5Eb4TEDvsJniYm-trNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi Olof,
 
-On Sun, Jul 22, 2018 at 2:07 PM Marek Vasut <marek.vasut@gmail.com> wrote:
-> On 07/20/2018 06:38 PM, Sergei Shtylyov wrote:
-> > On 07/20/2018 03:05 PM, Simon Horman wrote:
-> >> From: Marek Vasut <marek.vasut@gmail.com>
-> >>
-> >> Add PMIC nodes to Porter and connect CPU DVFS supply. There is
-> >> one DA9063L and one DA9210 on Porter, the only difference from
-> >> the other boards is that DA9063L is at I2C address 0x5a rather
-> >> than 0x58 .
-> >>
-> >> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> >> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >> ---
-> >>  arch/arm/boot/dts/r8a7791-porter.dts | 33 +++++++++++++++++++++++++++++++++
-> >>  1 file changed, 33 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-> >> index a01101b49d99..5f77d73d7462 100644
-> >> --- a/arch/arm/boot/dts/r8a7791-porter.dts
-> >> +++ b/arch/arm/boot/dts/r8a7791-porter.dts
-> >> @@ -375,10 +375,43 @@
-> >>      clock-frequency = <400000>;
-> >>  };
-> >>
-> >> +&i2c6 {
-> >> +    status = "okay";
-> >> +    clock-frequency = <100000>;
-> >> +
-> >> +    pmic at 5a {
-> >> +            compatible = "dlg,da9063l";
-> >> +            reg = <0x5a>;
-> >> +            interrupt-parent = <&irqc0>;
-> >> +            interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-> >> +            interrupt-controller;
+On Sun, Jul 22, 2018 at 12:27 AM Olof Johansson <olof@lixom.net> wrote:
+> On Fri, Jul 20, 2018 at 02:03:54PM +0200, Simon Horman wrote:
+> > Please consider these Renesas ARM based SoC defconfig updates for v4.19.
+
+> > * Set CONFIG_LOCALVERSION to shmobile_defconfig
 > >
-> >    Without a label and #interrupt-cells?
+> >   This follows what appears to be common practice in defconfigs
+> >   and allows easier management of the kernel flavour at run-time.
 >
-> Just like the other boards do. What's the problem here ?
+> I replied to the multi-versions of defconfig for this patch -- it's not a good
+> way to solve the problem of detecting config at runtime. Please drop this
+> patch. See:
+>
+> https://lore.kernel.org/lkml/CAOesGMgkU6yBRpAsED2fPyuAo9Tc=YprndGdkmBVrc+0783VwQ at mail.gmail.com/
 
-Does it support external interrupt inputs? Or only the internal
-interrupt sources?
-If the former, it needs at  least #interrupt-cells (also in the DT bindings).
+One more comment to the rescue: it does complicate regression testing,
+as the test software running on the DUT has no easy way to distinguish
+between e.g. shmobile_defconfig and multi_v7_defconfig (and whatever
+other board-specific configs I use for testing).
+Yes, I can have these as local patches in my tree (of course I already have ;-),
+but when bisecting, I have to remember to (un)apply them in every step.
+
+Thanks!
 
 Gr{oetje,eeting}s,
 
