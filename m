@@ -1,112 +1,199 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 Jul 2018 14:04:47 +0200
-Subject: [GIT PULL v2] Renesas ARM Based SoC DT Updates for v4.19
-Message-ID: <cover.1532345886.git.horms+renesas@verge.net.au>
+Date: Mon, 23 Jul 2018 14:06:20 +0200
+Subject: [PATCH 2/8] ARM: dts: r8a77(43|9[013]): Add missing OPP properties
+ for CPUs
+In-Reply-To: <cover.1532345886.git.horms+renesas@verge.net.au>
+References: <cover.1532345886.git.horms+renesas@verge.net.au>
+Message-ID: <8199e49ff1f654bbe8bed90fd6710bc097a89d02.1532345886.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Viresh Kumar <viresh.kumar@linaro.org>
 
-Please consider these Renesas ARM based SoC DT updates for v4.19.
+The OPP properties, like "operating-points", should either be present
+for all the CPUs of a cluster or none. If these are present only for a
+subset of CPUs of a cluster then things will start falling apart as soon
+as the CPUs are brought online in a different order. For example, this
+will happen because the operating system looks for such properties in
+the CPU node it is trying to bring up, so that it can create an OPP
+table.
 
-Changes since v1:
-* Dropped patch which removes MTD partitioning from DT,
-  Olof requested more discussion of this
-* Trimmed text in tag, as per suggestions from Olof
+Add such missing properties.
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+Fix other missing properties (like, clock latency, voltage tolerance,
+etc) as well to make it all work.
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7743.dtsi |  9 +++++++++
+ arch/arm/boot/dts/r8a7790.dtsi | 34 ++++++++++++++++++++++++++++++++--
+ arch/arm/boot/dts/r8a7791.dtsi | 14 ++++++++++++--
+ arch/arm/boot/dts/r8a7793.dtsi | 15 +++++++++++++--
+ 4 files changed, 66 insertions(+), 6 deletions(-)
 
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-dt-for-v4.19
-
-for you to fetch changes up to c03e2f12a2967f1639ee53299b72922ee3472528:
-
-  ARM: dts: r8a77470: Use r8a77470-cpg-mssr binding definitions (2018-07-23 13:33:06 +0200)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC DT Updates for v4.19
-
-* RZ/G1C (r8a77470) SoC: Use r8a77470-cpg-mssr binding definitions
-* Add GR-Peach audio camera shield support with MT9V111 image sensor
-* Add initial support for RZ/N1D (r9a06g032) SoC and its RZN1D-DB board
-* Use SPDX identifiers in DT for all SoCs and boards
-* Add missing OPP properties for all CPUs on various SoCs
-* Add missing PMIC nodes to R-Car Gen2 M2-W (r8a7791) based porter board
-
-----------------------------------------------------------------
-Geert Uytterhoeven (1):
-      ARM: dts: r8a77470: Use r8a77470-cpg-mssr binding definitions
-
-Jacopo Mondi (1):
-      ARM: dts: gr-peach: Add GR-Peach audiocamerashield support
-
-Marek Vasut (1):
-      ARM: dts: porter: Add missing PMIC nodes
-
-Michel Pollet (3):
-      ARM: dts: Renesas R9A06G032 base device tree file
-      ARM: dts: Renesas RZN1D-DB Board base file
-      ARM: dts: Renesas R9A06G032 SMP enable method
-
-Viresh Kumar (1):
-      ARM: dts: r8a77(43|9[013]): Add missing OPP properties for CPUs
-
-Wolfram Sang (1):
-      ARM: dts: convert to SPDX identifier for Renesas boards
-
- MAINTAINERS                                        |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/emev2-kzm9d.dts                  |   5 +-
- arch/arm/boot/dts/emev2.dtsi                       |   5 +-
- arch/arm/boot/dts/gr-peach-audiocamerashield.dtsi  |  79 ++++++++++++++
- arch/arm/boot/dts/iwg20d-q7-common.dtsi            |   5 +-
- arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi           |   5 +-
- arch/arm/boot/dts/r7s72100-genmai.dts              |   5 +-
- arch/arm/boot/dts/r7s72100-gr-peach.dts            |   5 +-
- arch/arm/boot/dts/r7s72100-rskrza1.dts             |   5 +-
- arch/arm/boot/dts/r7s72100.dtsi                    |   5 +-
- arch/arm/boot/dts/r8a73a4-ape6evm.dts              |   5 +-
- arch/arm/boot/dts/r8a73a4.dtsi                     |   5 +-
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts      |   5 +-
- arch/arm/boot/dts/r8a7740.dtsi                     |   5 +-
- arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dts    |   5 +-
- arch/arm/boot/dts/r8a7743-iwg20d-q7.dts            |   5 +-
- arch/arm/boot/dts/r8a7743-iwg20m.dtsi              |   5 +-
- arch/arm/boot/dts/r8a7743-sk-rzg1m.dts             |   5 +-
- arch/arm/boot/dts/r8a7743.dtsi                     |  14 ++-
- .../arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts |   5 +-
- arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts        |   5 +-
- arch/arm/boot/dts/r8a7745-iwg22m.dtsi              |   5 +-
- arch/arm/boot/dts/r8a7745-sk-rzg1e.dts             |   5 +-
- arch/arm/boot/dts/r8a7745.dtsi                     |   5 +-
- arch/arm/boot/dts/r8a77470.dtsi                    |  16 +--
- arch/arm/boot/dts/r8a7778-bockw.dts                |   5 +-
- arch/arm/boot/dts/r8a7778.dtsi                     |   5 +-
- arch/arm/boot/dts/r8a7779-marzen.dts               |   5 +-
- arch/arm/boot/dts/r8a7779.dtsi                     |   5 +-
- arch/arm/boot/dts/r8a7790-lager.dts                |   5 +-
- arch/arm/boot/dts/r8a7790.dtsi                     |  39 +++++--
- arch/arm/boot/dts/r8a7791-koelsch.dts              |   5 +-
- arch/arm/boot/dts/r8a7791-porter.dts               |  38 ++++++-
- arch/arm/boot/dts/r8a7791.dtsi                     |  19 ++--
- arch/arm/boot/dts/r8a7792-blanche.dts              |   5 +-
- arch/arm/boot/dts/r8a7792-wheat.dts                |   5 +-
- arch/arm/boot/dts/r8a7792.dtsi                     |   5 +-
- arch/arm/boot/dts/r8a7793-gose.dts                 |   5 +-
- arch/arm/boot/dts/r8a7793.dtsi                     |  20 ++--
- arch/arm/boot/dts/r8a7794-alt.dts                  |   5 +-
- arch/arm/boot/dts/r8a7794-silk.dts                 |   5 +-
- arch/arm/boot/dts/r8a7794.dtsi                     |   5 +-
- arch/arm/boot/dts/r8a77xx-aa104xd12-panel.dtsi     |   5 +-
- arch/arm/boot/dts/r8a77xx-aa121td01-panel.dtsi     |   5 +-
- arch/arm/boot/dts/r9a06g032-rzn1d400-db.dts        |  28 +++++
- arch/arm/boot/dts/r9a06g032.dtsi                   | 115 +++++++++++++++++++++
- arch/arm/boot/dts/sh73a0-kzm9g.dts                 |   5 +-
- arch/arm/boot/dts/sh73a0.dtsi                      |   5 +-
- 49 files changed, 374 insertions(+), 186 deletions(-)
- create mode 100644 arch/arm/boot/dts/gr-peach-audiocamerashield.dtsi
- create mode 100644 arch/arm/boot/dts/r9a06g032-rzn1d400-db.dts
- create mode 100644 arch/arm/boot/dts/r9a06g032.dtsi
+diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+index 142949d7066f..e4fb31c4f0ee 100644
+--- a/arch/arm/boot/dts/r8a7743.dtsi
++++ b/arch/arm/boot/dts/r8a7743.dtsi
+@@ -98,8 +98,17 @@
+ 			reg = <1>;
+ 			clock-frequency = <1500000000>;
+ 			clocks = <&cpg CPG_CORE R8A7743_CLK_Z>;
++			clock-latency = <300000>; /* 300 us */
+ 			power-domains = <&sysc R8A7743_PD_CA15_CPU1>;
+ 			next-level-cache = <&L2_CA15>;
++
++			/* kHz - uV - OPPs unknown yet */
++			operating-points = <1500000 1000000>,
++					   <1312500 1000000>,
++					   <1125000 1000000>,
++					   < 937500 1000000>,
++					   < 750000 1000000>,
++					   < 375000 1000000>;
+ 		};
+ 
+ 		L2_CA15: cache-controller-0 {
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 4d06b154bd7e..c4324b1a2ec4 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -79,12 +79,12 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0>;
+ 			clock-frequency = <1300000000>;
+-			voltage-tolerance = <1>; /* 1% */
+ 			clocks = <&cpg CPG_CORE R8A7790_CLK_Z>;
+-			clock-latency = <300000>; /* 300 us */
+ 			power-domains = <&sysc R8A7790_PD_CA15_CPU0>;
+ 			next-level-cache = <&L2_CA15>;
+ 			capacity-dmips-mhz = <1024>;
++			voltage-tolerance = <1>; /* 1% */
++			clock-latency = <300000>; /* 300 us */
+ 
+ 			/* kHz - uV - OPPs unknown yet */
+ 			operating-points = <1400000 1000000>,
+@@ -104,6 +104,16 @@
+ 			power-domains = <&sysc R8A7790_PD_CA15_CPU1>;
+ 			next-level-cache = <&L2_CA15>;
+ 			capacity-dmips-mhz = <1024>;
++			voltage-tolerance = <1>; /* 1% */
++			clock-latency = <300000>; /* 300 us */
++
++			/* kHz - uV - OPPs unknown yet */
++			operating-points = <1400000 1000000>,
++					   <1225000 1000000>,
++					   <1050000 1000000>,
++					   < 875000 1000000>,
++					   < 700000 1000000>,
++					   < 350000 1000000>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -115,6 +125,16 @@
+ 			power-domains = <&sysc R8A7790_PD_CA15_CPU2>;
+ 			next-level-cache = <&L2_CA15>;
+ 			capacity-dmips-mhz = <1024>;
++			voltage-tolerance = <1>; /* 1% */
++			clock-latency = <300000>; /* 300 us */
++
++			/* kHz - uV - OPPs unknown yet */
++			operating-points = <1400000 1000000>,
++					   <1225000 1000000>,
++					   <1050000 1000000>,
++					   < 875000 1000000>,
++					   < 700000 1000000>,
++					   < 350000 1000000>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -126,6 +146,16 @@
+ 			power-domains = <&sysc R8A7790_PD_CA15_CPU3>;
+ 			next-level-cache = <&L2_CA15>;
+ 			capacity-dmips-mhz = <1024>;
++			voltage-tolerance = <1>; /* 1% */
++			clock-latency = <300000>; /* 300 us */
++
++			/* kHz - uV - OPPs unknown yet */
++			operating-points = <1400000 1000000>,
++					   <1225000 1000000>,
++					   <1050000 1000000>,
++					   < 875000 1000000>,
++					   < 700000 1000000>,
++					   < 350000 1000000>;
+ 		};
+ 
+ 		cpu4: cpu at 100 {
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 6e1dd7ad7bd6..d1d726a1364a 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -78,11 +78,11 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0>;
+ 			clock-frequency = <1500000000>;
+-			voltage-tolerance = <1>; /* 1% */
+ 			clocks = <&cpg CPG_CORE R8A7791_CLK_Z>;
+-			clock-latency = <300000>; /* 300 us */
+ 			power-domains = <&sysc R8A7791_PD_CA15_CPU0>;
+ 			next-level-cache = <&L2_CA15>;
++			voltage-tolerance = <1>; /* 1% */
++			clock-latency = <300000>; /* 300 us */
+ 
+ 			/* kHz - uV - OPPs unknown yet */
+ 			operating-points = <1500000 1000000>,
+@@ -101,6 +101,16 @@
+ 			clocks = <&cpg CPG_CORE R8A7791_CLK_Z>;
+ 			power-domains = <&sysc R8A7791_PD_CA15_CPU1>;
+ 			next-level-cache = <&L2_CA15>;
++			voltage-tolerance = <1>; /* 1% */
++			clock-latency = <300000>; /* 300 us */
++
++			/* kHz - uV - OPPs unknown yet */
++			operating-points = <1500000 1000000>,
++					   <1312500 1000000>,
++					   <1125000 1000000>,
++					   < 937500 1000000>,
++					   < 750000 1000000>,
++					   < 375000 1000000>;
+ 		};
+ 
+ 		L2_CA15: cache-controller-0 {
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 4abecfc0ca98..1e6439b85a6b 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -70,10 +70,10 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0>;
+ 			clock-frequency = <1500000000>;
+-			voltage-tolerance = <1>; /* 1% */
+ 			clocks = <&cpg CPG_CORE R8A7793_CLK_Z>;
+-			clock-latency = <300000>; /* 300 us */
+ 			power-domains = <&sysc R8A7793_PD_CA15_CPU0>;
++			voltage-tolerance = <1>; /* 1% */
++			clock-latency = <300000>; /* 300 us */
+ 
+ 			/* kHz - uV - OPPs unknown yet */
+ 			operating-points = <1500000 1000000>,
+@@ -92,6 +92,17 @@
+ 			clock-frequency = <1500000000>;
+ 			clocks = <&cpg CPG_CORE R8A7793_CLK_Z>;
+ 			power-domains = <&sysc R8A7793_PD_CA15_CPU1>;
++			voltage-tolerance = <1>; /* 1% */
++			clock-latency = <300000>; /* 300 us */
++
++			/* kHz - uV - OPPs unknown yet */
++			operating-points = <1500000 1000000>,
++					   <1312500 1000000>,
++					   <1125000 1000000>,
++					   < 937500 1000000>,
++					   < 750000 1000000>,
++					   < 375000 1000000>;
++			next-level-cache = <&L2_CA15>;
+ 		};
+ 
+ 		L2_CA15: cache-controller-0 {
+-- 
+2.11.0
