@@ -1,7 +1,7 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 24 Jul 2018 15:15:36 +0200
-Subject: [GIT PULL] Allwinner arm64 DT changes for 4.19
-Message-ID: <20180724131536.iompsqlrpjsvf5uy@flea>
+Date: Tue, 24 Jul 2018 15:16:16 +0200
+Subject: [GIT PULL] Allwinner drivers changes for 4.19
+Message-ID: <20180724131616.brtatxqutdjd4oxt@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,77 +18,53 @@ The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
 are available in the Git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt64-for-4.19
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-drivers-for-4.19
 
-for you to fetch changes up to ecbd611882a18cc5e720e752cae92d1198b198ec:
+for you to fetch changes up to 7377330a1ed2e9bb5a97758bdadcdb37e2201b2a:
 
-  arm64: allwinner: h6: enable MMC0/2 on Pine H64 (2018-07-19 16:50:33 +0200)
-
-----------------------------------------------------------------
-Allwinner arm64 DT changes for 4.19
-
-Some interesting changes, especially:
-
-  - MMC support for the H6
-  - PMIC support for the PineH64
-  - HDMI simplefb support for the A64
-  - PWM support for the A64
-  - New board: Pinebook, Amarula A64-Relic
+  soc: sunxi: Add the A13, A23 and H3 system control compatibles (2018-07-19 16:39:12 +0200)
 
 ----------------------------------------------------------------
-Andre Przywara (1):
-      arm64: dts: allwinner: a64: Add PWM controllers
+Allwinner drivers changes for 4.19
 
+There's been work for this release cycles in both the SRAM controller
+driver in order to support more SoCs, as part of our VPU work, but also to
+enable the EMAC on the A64 (that needs to poke at registers within the same
+register space).
+
+Some work has been needed too to represent the bus to the display engine
+controllers that all need an SRAM to be mapped to the CPU to be able to
+access those controllers' registers.
+
+----------------------------------------------------------------
 Chen-Yu Tsai (2):
-      arm64: dts: allwinner: h6: Add LED device nodes for Pine H64
-      arm64: dts: allwinner: h6: Use macros for R_CCU clock and reset indices
+      dt-bindings: sram: Rename A64 SRAM controller compatible
+      soc: sunxi: sram: Add updated compatible string for A64 system control
 
-Corentin Labbe (1):
-      arm64: dts: allwinner: a64: Remove unused address-cells/size-cells of dwmac-sun8i
+Icenowy Zheng (3):
+      soc: sunxi: export a regmap for EMAC clock reg on A64
+      dt-bindings: add binding for the Allwinner A64 DE2 bus
+      bus: add bus driver for accessing Allwinner A64 DE2
 
-Emmanuel Vadot (3):
-      arm64: dts: allwinner: sun50i: a64: Add spi flash node for sopine
-      arm64: dts: allwinner: sun50i: h5: Add spi flash node for OrangePi PC2
-      arm64: allwinner: a64-sopine: Add cd-gpios to mmc0 node
+Maxime Ripard (2):
+      drivers: soc: sunxi: Add support for the C1 SRAM region
+      soc: sunxi: Add the A13, A23 and H3 system control compatibles
 
-Icenowy Zheng (12):
-      arm64: dts: allwinner: a64: add R_I2C controller
-      arm64: dts: allwinner: add support for Pinebook
-      arm64: dts: allwinner: a64: add SRAM controller device tree node
-      arm64: allwinner: a64: change TERES-I DLDO3's name to start with "vdd"
-      arm64: allwinner: a64: allow laptops to wake up from lid
-      arm64: dts: allwinner: a64: add necessary device tree nodes for DE2 CCU
-      arm64: dts: allwinner: a64: add device tree node for HDMI simplefb
-      arm64: dts: allwinner: a64: add HDMI regulator to all DTs' simplefb_hdmi
-      arm64: dts: allwinner: h6: enable AXP805 PMIC on Pine H64
-      dt-binding: mmc: sunxi: add H6 compatible (with A64 fallback)
-      arm64: allwinner: h6: add device tree nodes for MMC controllers
-      arm64: allwinner: h6: enable MMC0/2 on Pine H64
+Paul Kocialkowski (4):
+      dt-bindings: sram: sunxi: Introduce new A10 binding for system-control
+      soc: sunxi: sram: Add dt match for the A10 system-control compatible
+      dt-bindings: sram: sunxi: Add A13, A20, A23 and H3 dedicated bindings
+      dt-bindings: sram: sunxi: Populate valid sections compatibles
 
-Jagan Teki (3):
-      arm64: allwinner: a64: Add Amarula A64-Relic initial support
-      arm64: allwinner: a64: Add RTC clock to phandle 32kHz external oscillator
-      arm64: allwinner: a64-amarula-relic: Enable AP6330 WiFi support
-
- .../devicetree/bindings/mmc/sunxi-mmc.txt          |   2 +
- arch/arm64/boot/dts/allwinner/Makefile             |   2 +
- .../dts/allwinner/sun50i-a64-amarula-relic.dts     | 219 ++++++++++++++++
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts |   4 +
- .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   |   4 +
- .../boot/dts/allwinner/sun50i-a64-olinuxino.dts    |   4 +
- .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts |   4 +
- .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |   4 +
- .../boot/dts/allwinner/sun50i-a64-pinebook.dts     | 285 +++++++++++++++++++++
- .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  |   4 +
- .../boot/dts/allwinner/sun50i-a64-sopine.dtsi      |  15 ++
- .../boot/dts/allwinner/sun50i-a64-teres-i.dts      |   7 +-
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 113 +++++++-
- .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  |  12 +
- .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      | 146 +++++++++++
- arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi       |  67 ++++-
- 16 files changed, 878 insertions(+), 14 deletions(-)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+ .../devicetree/bindings/bus/sun50i-de2-bus.txt     | 37 +++++++++
+ .../devicetree/bindings/sram/sunxi-sram.txt        | 31 +++++++-
+ drivers/bus/Kconfig                                | 10 +++
+ drivers/bus/Makefile                               |  1 +
+ drivers/bus/sun50i-de2.c                           | 48 ++++++++++++
+ drivers/soc/sunxi/sunxi_sram.c                     | 87 +++++++++++++++++++++-
+ 6 files changed, 208 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
+ create mode 100644 drivers/bus/sun50i-de2.c
 
 -- 
 Maxime Ripard, Bootlin (formerly Free Electrons)
@@ -100,4 +76,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/b606249a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/92a3ba20/attachment.sig>
