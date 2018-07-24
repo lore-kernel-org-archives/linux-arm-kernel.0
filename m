@@ -1,64 +1,319 @@
 From: pn@denx.de (Parthiban Nallathambi)
-Date: Tue, 24 Jul 2018 17:02:17 +0200
-Subject: [PATCH 1/3] dt-bindings: interrupt-controller: Actions external
- interrupt controller
+Date: Tue, 24 Jul 2018 17:02:18 +0200
+Subject: [PATCH 2/3] drivers/irqchip: Add Actions external interrupts support
 In-Reply-To: <20180724150219.1807724-1-pn@denx.de>
 References: <20180724150219.1807724-1-pn@denx.de>
-Message-ID: <20180724150219.1807724-2-pn@denx.de>
+Message-ID: <20180724150219.1807724-3-pn@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Actions Semi OWL family SoC's provides support for external interrupt
-controller to be connected and controlled using SIRQ pins. S500, S700
-and S900 provides 3 SIRQ lines and works independently for 3 external
-interrupt controllers.
+Actions Semi Owl family SoC's S500, S700 and S900 provides support
+for 3 external interrupt controllers through SIRQ pins.
+
+Each line can be independently configured as interrupt or wake-up source,
+and triggers either on rising, falling or both edges. Each line can also
+be masked independently.
 
 Signed-off-by: Parthiban Nallathambi <pn@denx.de>
 Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
 ---
- .../interrupt-controller/actions,owl-sirq.txt      | 34 ++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
+ drivers/irqchip/Makefile       |   1 +
+ drivers/irqchip/irq-owl-sirq.c | 275 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 276 insertions(+)
+ create mode 100644 drivers/irqchip/irq-owl-sirq.c
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 15f268f646bf..072c4409e7c4 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -7,6 +7,7 @@ obj-$(CONFIG_ATH79)			+= irq-ath79-misc.o
+ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
+ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
+ obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
++obj-$(CONFIG_ARCH_ACTIONS)		+= irq-owl-sirq.o
+ obj-$(CONFIG_FARADAY_FTINTC010)		+= irq-ftintc010.o
+ obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
+ obj-$(CONFIG_ARCH_LPC32XX)		+= irq-lpc32xx.o
+diff --git a/drivers/irqchip/irq-owl-sirq.c b/drivers/irqchip/irq-owl-sirq.c
 new file mode 100644
-index 000000000000..c5f8a29573c8
+index 000000000000..8605da99d77d
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
-@@ -0,0 +1,34 @@
-+Actions Semi Owl SoCs SIRQ interrupt controller
++++ b/drivers/irqchip/irq-owl-sirq.c
+@@ -0,0 +1,275 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ *
++ * Actions Semi Owl SoCs SIRQ interrupt controller driver
++ *
++ * Copyright (C) 2014 Actions Semi Inc.
++ * David Liu <liuwei@actions-semi.com>
++ *
++ * Author: Parthiban Nallathambi <pn@denx.de>
++ * Author: Saravanan Sekar <sravanhome@gmail.com>
++ */
 +
-+S500, S700 and S900 SoC's from Actions provides interface, in which external
-+interrupt controller can be connected. It has the following properties:
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/of_irq.h>
++#include <linux/irqchip.h>
++#include <linux/spinlock.h>
++#include <linux/interrupt.h>
++#include <linux/irqdomain.h>
++#include <linux/of_address.h>
++#include <linux/irqchip/chained_irq.h>
 +
-+- inputs three interrupt signal from external interrupt controller
++#define OWL_MAX_NR_SIRQS	3
 +
-+Required properties:
++/* INTC_EXTCTL register offset for S900 */
++#define S900_INTC_EXTCTL0	0x200
++#define S900_INTC_EXTCTL1	0x528
++#define S900_INTC_EXTCTL2	0x52C
 +
-+- compatible: should be one of the following
-+	"actions,s700-sirq"
-+	"actions,s900-sirq"
-+- reg: physical base address of the controller and length of memory mapped.
-+- interrupt-controller: identifies the node as an interrupt controller
-+- #interrupt-cells: specifies the number of cells needed to encode an interrupt
-+  source, should be 2.
-+- interrupts: specifies the interrupt line in the interrupt controller and
-+  interrupt type (level or edge triggered)
-+- sampling-rate-24m: this means the external controller's interrupts can be
-+  sampled at 24MHz. Sampling can be specified for each SIRQ lines, as an array
-+  element. By default, all lines are sampled at 32KHz.
++/* INTC_EXTCTL register offset for S700 */
++#define S700_INTC_EXTCTL	0x200
 +
-+Example:
++#define INTC_EXTCTL_PENDING		BIT(0)
++#define INTC_EXTCTL_CLK_SEL		BIT(4)
++#define INTC_EXTCTL_EN			BIT(5)
++#define	INTC_EXTCTL_TYPE_MASK		GENMASK(6, 7)
++#define	INTC_EXTCTL_TYPE_HIGH		0
++#define	INTC_EXTCTL_TYPE_LOW		BIT(6)
++#define	INTC_EXTCTL_TYPE_RISING		BIT(7)
++#define	INTC_EXTCTL_TYPE_FALLING	(BIT(6) | BIT(7))
 +
-+sirq: interrupt-controller at e01b0000 {
-+	compatible = "actions,s700-sirq";
-+	reg = <0 0xe01b0000 0 0x1000>;
-+	interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-+		<GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
-+		<GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-+	interrupt-controller;
-+	#interrupt-cells = <2>;
-+	sampling-rate-24m = <0 0 1>;
++struct owl_sirq_info {
++	void __iomem		*base;
++	struct irq_domain	*irq_domain;
++	unsigned long		reg;
++	unsigned long		hwirq;
++	unsigned int		virq;
++	unsigned int		parent_irq;
++	bool			share_reg;
++	spinlock_t		lock;
 +};
++
++/* s900 has INTC_EXTCTL individual register to handle each line */
++static struct owl_sirq_info s900_sirq_info[OWL_MAX_NR_SIRQS] = {
++	{ .reg = S900_INTC_EXTCTL0, .share_reg = false },
++	{ .reg = S900_INTC_EXTCTL1, .share_reg = false },
++	{ .reg = S900_INTC_EXTCTL2, .share_reg = false },
++};
++
++/* s500 and s700 shares the 32 bit (24 usable) register for each line */
++static struct owl_sirq_info s700_sirq_info[OWL_MAX_NR_SIRQS] = {
++	{ .reg = S700_INTC_EXTCTL, .share_reg = true },
++	{ .reg = S700_INTC_EXTCTL, .share_reg = true },
++	{ .reg = S700_INTC_EXTCTL, .share_reg = true },
++};
++
++static unsigned int sirq_read_extctl(struct owl_sirq_info *sirq)
++{
++	unsigned int val;
++
++	val = readl_relaxed(sirq->base + sirq->reg);
++	if (sirq->share_reg)
++		val = (val >> (2 - sirq->hwirq) * 8) & 0xff;
++
++	return val;
++}
++
++static void sirq_write_extctl(struct owl_sirq_info *sirq, unsigned int extctl)
++{
++	unsigned int val;
++
++	if (sirq->share_reg) {
++		val = readl_relaxed(sirq->base + sirq->reg);
++		val &= ~(0xff << (2 - sirq->hwirq) * 8);
++		extctl &= 0xff;
++		extctl = (extctl << (2 - sirq->hwirq) * 8) | val;
++	}
++
++	writel_relaxed(extctl, sirq->base + sirq->reg);
++}
++
++static void owl_sirq_ack(struct irq_data *d)
++{
++	struct owl_sirq_info *sirq = irq_data_get_irq_chip_data(d);
++	unsigned int extctl;
++	unsigned long flags;
++
++	spin_lock_irqsave(&sirq->lock, flags);
++
++	extctl = sirq_read_extctl(sirq);
++	extctl |= INTC_EXTCTL_PENDING;
++	sirq_write_extctl(sirq, extctl);
++
++	spin_unlock_irqrestore(&sirq->lock, flags);
++}
++
++static void owl_sirq_mask(struct irq_data *d)
++{
++	struct owl_sirq_info *sirq = irq_data_get_irq_chip_data(d);
++	unsigned int extctl;
++	unsigned long flags;
++
++	spin_lock_irqsave(&sirq->lock, flags);
++
++	extctl = sirq_read_extctl(sirq);
++	extctl &= ~(INTC_EXTCTL_EN);
++	sirq_write_extctl(sirq, extctl);
++
++	spin_unlock_irqrestore(&sirq->lock, flags);
++}
++
++static void owl_sirq_unmask(struct irq_data *d)
++{
++	struct owl_sirq_info *sirq = irq_data_get_irq_chip_data(d);
++	unsigned int extctl;
++	unsigned long flags;
++
++	spin_lock_irqsave(&sirq->lock, flags);
++
++	/* we don't hold the irq pending generated before irq enabled */
++	extctl = sirq_read_extctl(sirq);
++	extctl |= INTC_EXTCTL_EN;
++	sirq_write_extctl(sirq, extctl);
++
++	spin_unlock_irqrestore(&sirq->lock, flags);
++}
++
++/* PAD_PULLCTL needs to be defined in pinctrl */
++static int owl_sirq_set_type(struct irq_data *d, unsigned int flow_type)
++{
++	struct owl_sirq_info *sirq = irq_data_get_irq_chip_data(d);
++	unsigned int extctl, type;
++	unsigned long flags;
++
++	switch (flow_type) {
++	case IRQF_TRIGGER_LOW:
++		type = INTC_EXTCTL_TYPE_LOW;
++		break;
++	case IRQF_TRIGGER_HIGH:
++		type = INTC_EXTCTL_TYPE_HIGH;
++		break;
++	case IRQF_TRIGGER_FALLING:
++		type = INTC_EXTCTL_TYPE_FALLING;
++		break;
++	case IRQF_TRIGGER_RISING:
++		type = INTC_EXTCTL_TYPE_RISING;
++		break;
++	default:
++		return  -EINVAL;
++	}
++
++	spin_lock_irqsave(&sirq->lock, flags);
++
++	extctl = sirq_read_extctl(sirq);
++	extctl &= ~(INTC_EXTCTL_PENDING | INTC_EXTCTL_TYPE_MASK);
++	extctl |= type;
++	sirq_write_extctl(sirq, extctl);
++
++	spin_unlock_irqrestore(&sirq->lock, flags);
++
++	return 0;
++}
++
++static void owl_sirq_handler(struct irq_desc *desc)
++{
++	struct owl_sirq_info *sirq = irq_desc_get_handler_data(desc);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	unsigned int extctl;
++
++	chained_irq_enter(chip, desc);
++
++	extctl = sirq_read_extctl(sirq);
++	if (extctl & INTC_EXTCTL_PENDING)
++		generic_handle_irq(sirq->virq);
++
++	chained_irq_exit(chip, desc);
++}
++
++static struct irq_chip owl_irq_chip = {
++	.name = "owl-sirq",
++	.irq_ack = owl_sirq_ack,
++	.irq_mask = owl_sirq_mask,
++	.irq_unmask = owl_sirq_unmask,
++	.irq_set_type = owl_sirq_set_type,
++};
++
++static int __init owl_sirq_init(struct owl_sirq_info *sirq_info, int nr_sirq,
++				struct device_node *np)
++{
++	struct owl_sirq_info *sirq;
++	void __iomem *base;
++	struct irq_domain *irq_domain;
++	int i, irq_base;
++	unsigned int extctl;
++	u8 sample_clk[OWL_MAX_NR_SIRQS];
++
++	base = of_iomap(np, 0);
++	if (!base)
++		return -ENOMEM;
++
++	irq_base = irq_alloc_descs(-1, 32, nr_sirq, 0);
++	if (irq_base < 0) {
++		pr_err("sirq: failed to allocate IRQ numbers\n");
++		goto out_unmap;
++	}
++
++	irq_domain = irq_domain_add_legacy(np, nr_sirq, irq_base, 0,
++					&irq_domain_simple_ops, NULL);
++	if (!irq_domain) {
++		pr_err("sirq: irq domain init failed\n");
++		goto out_free_desc;
++	}
++
++	memset(sample_clk, 0, sizeof(sample_clk));
++	of_property_read_u8_array(np, "sampling-rate-24m", sample_clk,
++				nr_sirq);
++
++	for (i = 0; i < nr_sirq; i++) {
++		sirq = &sirq_info[i];
++
++		sirq->base = base;
++		sirq->irq_domain = irq_domain;
++		sirq->hwirq = i;
++		sirq->virq = irq_base + i;
++
++		sirq->parent_irq = irq_of_parse_and_map(np, i);
++		irq_set_handler_data(sirq->parent_irq, sirq);
++		irq_set_chained_handler_and_data(sirq->parent_irq,
++						owl_sirq_handler, sirq);
++
++		irq_set_chip_and_handler(sirq->virq, &owl_irq_chip,
++				handle_level_irq);
++		irq_set_chip_data(sirq->virq, sirq);
++
++		if (sample_clk[i]) {
++			extctl = sirq_read_extctl(sirq);
++			extctl |= INTC_EXTCTL_CLK_SEL;
++			sirq_write_extctl(sirq, extctl);
++		}
++		spin_lock_init(&sirq->lock);
++	}
++
++	return 0;
++
++out_free_desc:
++	irq_free_descs(irq_base, nr_sirq);
++out_unmap:
++	iounmap(base);
++
++	return -EINVAL;
++}
++
++static int __init s700_sirq_of_init(struct device_node *np,
++					struct device_node *parent)
++{
++	return owl_sirq_init(s700_sirq_info, ARRAY_SIZE(s700_sirq_info), np);
++}
++IRQCHIP_DECLARE(s700_sirq, "actions,s700-sirq", s700_sirq_of_init);
++
++static int __init s900_sirq_of_init(struct device_node *np,
++					struct device_node *parent)
++{
++	return owl_sirq_init(s900_sirq_info, ARRAY_SIZE(s900_sirq_info), np);
++}
++IRQCHIP_DECLARE(s900_sirq, "actions,s900-sirq", s900_sirq_of_init);
 -- 
 2.14.4
