@@ -1,24 +1,73 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 24 Jul 2018 14:24:01 +1000
-Subject: [PATCH 0/5] arm: dts: aspeed DTS updates for OpenPower
-Message-ID: <20180724042406.15374-1-benh@kernel.crashing.org>
+Date: Tue, 24 Jul 2018 14:24:04 +1000
+Subject: [PATCH 3/5] arm: dts: OpenPower Palmetto system can use coprocessor
+ for FSI
+In-Reply-To: <20180724042406.15374-1-benh@kernel.crashing.org>
+References: <20180724042406.15374-1-benh@kernel.crashing.org>
+Message-ID: <20180724042406.15374-4-benh@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are DTS updates for Aspeed SoCs used on OpenPower systems.
+This switches away from userspace bitbanging to kernel FSI
+using the coprocessor.
 
-They should comply with existing bindings either upstream, in
-linux-next or about to be pulled into linux-next, and that have
-been acked by Rob.
+Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+---
+ arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 28 ++++++++++++++-----
+ 1 file changed, 21 insertions(+), 7 deletions(-)
 
- - Add the "cvic" node for the coprocessor interrupt controller
-to the Aspeed G4 and G5 SoC .dtsi files.
-
- - Switch OpenPower Romulus and Palmetto systems from using the
-Linux bitbang GPIO FSI master to using the new ColdFire coprocessor
-based one which is much faster (driver about to hit linux-next)
-
- - Add a basic definition of the POWER8 and POWER9 processors
-as seen on an FSI bus by the BMC. Not every device in there is
-exposed yet. More devices will be added as their drivers and
-bindings get finalized.
+diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+index c7084a819dc6..e6cfdf3c1a67 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+@@ -26,6 +26,11 @@
+ 			no-map;
+ 			reg = <0x5f000000 0x01000000>; /* 16M */
+ 		};
++
++		coldfire_memory: codefire_memory at 5ee00000 {
++			reg = <0x5ee00000 0x00200000>;
++			no-map;
++		};
+ 	};
+ 
+ 	leds {
+@@ -44,6 +49,22 @@
+ 		};
+ 	};
+ 
++	fsi: gpio-fsi {
++		compatible = "aspeed,ast2400-cf-fsi-master", "fsi-master";
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		memory-region = <&coldfire_memory>;
++		aspeed,sram = <&sram>;
++		aspeed,cvic = <&cvic>;
++
++		clock-gpios = <&gpio ASPEED_GPIO(A, 4) GPIO_ACTIVE_HIGH>;
++		data-gpios = <&gpio ASPEED_GPIO(A, 5) GPIO_ACTIVE_HIGH>;
++		mux-gpios = <&gpio ASPEED_GPIO(A, 6) GPIO_ACTIVE_HIGH>;
++		enable-gpios = <&gpio ASPEED_GPIO(D, 0) GPIO_ACTIVE_HIGH>;
++		trans-gpios = <&gpio ASPEED_GPIO(H, 6) GPIO_ACTIVE_HIGH>;
++	};
++
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 
+@@ -303,13 +324,6 @@
+ 		line-name = "SYS_PWROK_BMC";
+ 	};
+ 
+-	pin_gpio_h6 {
+-		gpio-hog;
+-		gpios = <ASPEED_GPIO(H, 6) GPIO_ACTIVE_HIGH>;
+-		output-high;
+-		line-name = "SCM1_FSI0_DATA_EN";
+-	};
+-
+ 	pin_gpio_h7 {
+ 		gpio-hog;
+ 		gpios = <ASPEED_GPIO(H, 7) GPIO_ACTIVE_HIGH>;
+-- 
+2.17.1
