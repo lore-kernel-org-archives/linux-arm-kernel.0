@@ -1,85 +1,338 @@
-From: Alexandru-Cosmin.Gheorghe@arm.com (Alexandru-Cosmin Gheorghe)
-Date: Tue, 24 Jul 2018 10:28:52 +0100
-Subject: [PATCH 01/10] drm/atomic: Add  __drm_atomic_helper_plane_reset
-In-Reply-To: <20180724101656.0f472b0a@bbrezillon>
-References: <20180713161407.GQ20303@art_vandelay>
- <20180720211509.23605-1-alexandru-cosmin.gheorghe@arm.com>
- <20180720211509.23605-2-alexandru-cosmin.gheorghe@arm.com>
- <1532418533.4078.2.camel@pengutronix.de>
- <20180724081402.GB22689@e114479-lin.cambridge.arm.com>
- <20180724101656.0f472b0a@bbrezillon>
-Message-ID: <20180724092852.GA24518@e114479-lin.cambridge.arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 24 Jul 2018 11:28:45 +0200
+Subject: [PATCH v0] arm64: dts: rockchip: add support for ROC-RK3399-PC
+ board
+In-Reply-To: <1532161826-2537-1-git-send-email-djw@t-chip.com.cn>
+References: <1532161826-2537-1-git-send-email-djw@t-chip.com.cn>
+Message-ID: <139327780.KNaNigg5Hs@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 10:16:56AM +0200, Boris Brezillon wrote:
-> On Tue, 24 Jul 2018 09:14:02 +0100
-> Alexandru-Cosmin Gheorghe <Alexandru-Cosmin.Gheorghe@arm.com> wrote:
-> 
-> > On Tue, Jul 24, 2018 at 09:48:53AM +0200, Philipp Zabel wrote:
-> > > Hi Alexandru,
-> > > 
-> > > On Fri, 2018-07-20 at 22:15 +0100, Alexandru Gheorghe wrote:  
-> > > > There are a lot of drivers that subclass drm_plane_state, all of them
-> > > > duplicate the code that links toghether the plane with plane_state.
-> > > > 
-> > > > On top of that, drivers that enable core properties also have to
-> > > > duplicate the code for initializing the properties to their default
-> > > > values, which in all cases are the same as the defaults from core.
-> > > > 
-> > > > Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
-> > > > ---
-> > > >  drivers/gpu/drm/drm_atomic_helper.c | 32 +++++++++++++++++++++--------
-> > > >  include/drm/drm_atomic_helper.h     |  2 ++
-> > > >  2 files changed, 25 insertions(+), 9 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
-> > > > index 8008a7de2e10..e1c6f101652e 100644
-> > > > --- a/drivers/gpu/drm/drm_atomic_helper.c
-> > > > +++ b/drivers/gpu/drm/drm_atomic_helper.c
-> > > > @@ -3507,6 +3507,28 @@ void drm_atomic_helper_crtc_destroy_state(struct drm_crtc *crtc,
-> > > >  }
-> > > >  EXPORT_SYMBOL(drm_atomic_helper_crtc_destroy_state);
-> > > >  
-> > > > +/**
-> > > > + * __drm_atomic_helper_plane_reset - resets planes state to default values
-> > > > + * @plane: plane object
-> > > > + * @new_state: atomic plane state
-> > > > + *
-> > > > + * Initializes plane state to default. This is useful for drivers that subclass
-> > > > + * the plane state.
-> > > > + */
-> > > > +void __drm_atomic_helper_plane_reset(struct drm_plane *plane,
-> > > > +				     struct drm_plane_state *state)
-> > > > +{
-> > > > +	if (state) {
-> > > > +		state->plane = plane;
-> > > > +		state->rotation = DRM_MODE_ROTATE_0;
-> > > > +		/* Reset the alpha value to fully opaque if it matters */
-> > > > +		if (plane->alpha_property)
-> > > > +			state->alpha = plane->alpha_property->values[1];
-> > > > +	}  
-> > > 
-> > > Is this function supposed to be callable with state == NULL ?
-> > >   
-> > > > +	plane->state = state;  
-> > > 
-> > > If so, the comment could mention that this sets plane->state to NULL if
-> > > state == NULL, and a few of the call sites could be simplified.
-> > > 
-> > > If not, I would remove the conditional if (state) {} part and also
-> > > mention this in the comment.  
-> > 
-> > Yes, It's intended to be callable with null.
-> 
-> May I ask why? I'd assume drivers that call this function to pass a
-> non-NULL plane state. What's the use case for passing a NULL state here?
+Hi Levin,
 
-Drivers check it, drm_atomic_helper_plane_reset doesn't.
-Looking at the existing __drm_atomic_helper_plane_* it seems they all
-assume state not null, so I think it probably makes more sense to do
-that for this function as well.
+Am Samstag, 21. Juli 2018, 10:30:26 CEST schrieb djw at t-chip.com.cn:
+> From: Levin Du <djw@t-chip.com.cn>
+> 
+> ROC-RK3399-PC is the first power efficient 4GB DDR4 single board
 
--- 
-Cheers,
-Alex G
+maybe "is a power efficient" instead of "the first" ;-)
+
+[...]
+
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-roc-pc.dts b/arch/arm64/boot/dts/rockchip/rk3399-roc-pc.dts
+> new file mode 100644
+> index 0000000..207f2e3
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-roc-pc.dts
+> @@ -0,0 +1,717 @@
+> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> +/*
+> + * Copyright (c) 2017 T-Chip Intelligent Technology Co., Ltd
+> + */
+> +
+> +/dts-v1/;
+> +#include <dt-bindings/pwm/pwm.h>
+> +#include "rk3399.dtsi"
+> +#include "rk3399-opp.dtsi"
+> +
+> +/ {
+> +	model = "Firefly ROC-RK3399-PC Board";
+> +	compatible = "firefly,roc-rk3399-pc", "rockchip,rk3399";
+> +
+> +	chosen {
+> +		bootargs = "earlycon=uart8250,mmio32,0xff1a0000 swiotlb=1";
+
+I don't think we want to hard-code linux bootargs in the generic devicetree
+
+> +		stdout-path = "serial2:1500000n8";
+> +	};
+> +
+> +	backlight: backlight {
+> +		compatible = "pwm-backlight";
+> +		enable-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_HIGH>;
+> +		pwms = <&pwm0 0 25000 0>;
+> +		brightness-levels = <
+> +			  0   1   2   3   4   5   6   7
+
+As Rob noted in the px30 evb patch, there is now a property helping
+to drop these long lists of brightness levels, see
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=1e5e7cc794b5a332c23216dade0a2e937d694b7f
+
+
+> +			  8   9  10  11  12  13  14  15
+> +			 16  17  18  19  20  21  22  23
+> +			 24  25  26  27  28  29  30  31
+> +			 32  33  34  35  36  37  38  39
+> +			 40  41  42  43  44  45  46  47
+> +			 48  49  50  51  52  53  54  55
+> +			 56  57  58  59  60  61  62  63
+> +			 64  65  66  67  68  69  70  71
+> +			 72  73  74  75  76  77  78  79
+> +			 80  81  82  83  84  85  86  87
+> +			 88  89  90  91  92  93  94  95
+> +			 96  97  98  99 100 101 102 103
+> +			104 105 106 107 108 109 110 111
+> +			112 113 114 115 116 117 118 119
+> +			120 121 122 123 124 125 126 127
+> +			128 129 130 131 132 133 134 135
+> +			136 137 138 139 140 141 142 143
+> +			144 145 146 147 148 149 150 151
+> +			152 153 154 155 156 157 158 159
+> +			160 161 162 163 164 165 166 167
+> +			168 169 170 171 172 173 174 175
+> +			176 177 178 179 180 181 182 183
+> +			184 185 186 187 188 189 190 191
+> +			192 193 194 195 196 197 198 199
+> +			200 201 202 203 204 205 206 207
+> +			208 209 210 211 212 213 214 215
+> +			216 217 218 219 220 221 222 223
+> +			224 225 226 227 228 229 230 231
+> +			232 233 234 235 236 237 238 239
+> +			240 241 242 243 244 245 246 247
+> +			248 249 250 251 252 253 254 255>;
+> +		default-brightness-level = <200>;
+> +	};
+
+[...]
+
+> +	vcc_vbus_typec0: vcc-vbus-typec0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc_vbus_typec0";
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +	};
+> +
+> +	vcc12v_sys: mp8859-dcdc1 {
+
+The mp8859 seems to be an i2c-device, as also shown by the
+nearly empty mp8859 entry below, so shouldn't this regulator
+be defined there?
+
+
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc12v_sys";
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		regulator-min-microvolt = <12000000>;
+> +		regulator-max-microvolt = <12000000>;
+> +		vin-supply = <&vcc_vbus_typec0>;
+> +	};
+
+[...]
+
+> +	vcc_hub_en: vcc_hub_en-regulator {
+> +		compatible = "regulator-fixed";
+> +		enable-active-high;
+> +		gpio = <&gpio2 RK_PA4 GPIO_ACTIVE_HIGH>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&hub_rst>;
+> +		regulator-name = "vcc_hub_en";
+> +		regulator-always-on;
+
+missing vin-supply
+
+> +	};
+> +
+
+[...]
+
+> +	vdd_cpu_b: regulator at 40 {
+> +		compatible = "silergy,syr827";
+> +		reg = <0x40>;
+> +		fcs,suspend-voltage-selector = <1>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&vsel1_gpio>;
+> +		regulator-name = "vdd_cpu_b";
+> +		regulator-min-microvolt = <712500>;
+> +		regulator-max-microvolt = <1500000>;
+> +		regulator-ramp-delay = <1000>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		vsel-gpios = <&gpio1 18 GPIO_ACTIVE_HIGH>;
+
+vsel-gpios is not defined in the mainline dt-binding of the fan5355/syr82*
+
+> +		vin-supply = <&vcc3v3_sys>;
+> +
+> +		regulator-state-mem {
+> +			regulator-off-in-suspend;
+> +		};
+> +	};
+> +
+> +	vdd_gpu: regulator at 41 {
+> +		compatible = "silergy,syr828";
+> +		reg = <0x41>;
+> +		fcs,suspend-voltage-selector = <1>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&vsel2_gpio>;
+> +		regulator-name = "vdd_gpu";
+> +		regulator-min-microvolt = <712500>;
+> +		regulator-max-microvolt = <1500000>;
+> +		regulator-ramp-delay = <1000>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		vsel-gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
+
+same as above
+
+> +		vin-supply = <&vcc3v3_sys>;
+> +
+> +		regulator-state-mem {
+> +			regulator-off-in-suspend;
+> +		};
+> +	};
+> +};
+> +
+> +&i2c1 {
+> +	i2c-scl-rising-time-ns = <300>;
+> +	i2c-scl-falling-time-ns = <15>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c3 {
+> +	i2c-scl-rising-time-ns = <450>;
+> +	i2c-scl-falling-time-ns = <15>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c4 {
+> +	i2c-scl-rising-time-ns = <600>;
+> +	i2c-scl-falling-time-ns = <20>;
+> +	status = "okay";
+> +
+> +	mp8859: mp8859 at 66 {
+> +		compatible = "mps,mp8859";
+
+missing a dt-binding and also a real regulator implementation?
+
+> +		reg = <0x66>;
+> +	};
+> +
+> +	fusb1: usb-typec at 22 {
+> +		compatible = "fcs,fusb302";
+> +		reg = <0x22>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&fusb1_int>;
+> +		fcs,int-n = <&gpio1 RK_PA1 GPIO_ACTIVE_HIGH>;
+
+mainline binding expects an "interrupts" property not the
+fcs,int-n from above
+
+> +		status = "okay";
+> +	};
+> +
+> +};
+> +
+> +&i2c7 {
+> +	i2c-scl-rising-time-ns = <600>;
+> +	i2c-scl-falling-time-ns = <20>;
+> +	status = "okay";
+> +
+> +	fusb0: usb-typec at 22 {
+> +		compatible = "fcs,fusb302";
+> +		reg = <0x22>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&fusb0_int>;
+> +		fcs,int-n = <&gpio1 RK_PA2 GPIO_ACTIVE_HIGH>;
+
+same as above
+
+> +		status = "okay";
+> +	};
+> +};
+> +
+> +&i2s0 {
+> +	rockchip,playback-channels = <8>;
+> +	rockchip,capture-channels = <8>;
+> +	#sound-dai-cells = <0>;
+
+sound-dai-cells are in rk3399.dtsi now ... see
+https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/commit/?id=4486baca66e7a96a6ded3957cb522872a49870ce
+
+> +	status = "okay";
+> +};
+> +
+> +&i2s1 {
+> +	rockchip,playback-channels = <2>;
+> +	rockchip,capture-channels = <2>;
+> +	#sound-dai-cells = <0>;
+
+same as above
+
+> +	status = "okay";
+> +};
+> +
+> +&i2s2 {
+> +	#sound-dai-cells = <0>;
+
+same as above
+
+> +	status = "okay";
+> +};
+> +
+
+> +&tcphy0 {
+> +	extcon = <&fusb0>;
+
+the extcon is not described in the mainline fusb302 binding.
+
+> +	status = "okay";
+> +};
+> +
+> +&tcphy1 {
+> +	extcon = <&fusb1>;
+
+same as above
+
+> +	status = "okay";
+> +};
+> +
+> +&tsadc {
+> +	/* tshut mode 0:CRU 1:GPIO */
+> +	rockchip,hw-tshut-mode = <1>;
+> +	/* tshut polarity 0:LOW 1:HIGH */
+> +	rockchip,hw-tshut-polarity = <1>;
+> +	status = "okay";
+> +};
+> +
+> +&u2phy0 {
+> +	status = "okay";
+> +
+> +	u2phy0_otg: otg-port {
+> +		phy-supply = <&vcc5v0_host>;
+> +		//status = "disabled";
+
+don't leave commented stuff in the dt please.
+
+> +		status = "okay";
+> +	};
+> +
+> +	u2phy0_host: host-port {
+> +		phy-supply = <&vcc5v0_host>;
+> +		status = "okay";
+> +	};
+> +};
+> +
+> +&u2phy1 {
+> +	status = "okay";
+> +
+> +	u2phy1_otg: otg-port {
+> +		phy-supply = <&vcc5v0_host>;
+> +		//status = "disabled";
+
+same as above
+
+> +		status = "okay";
+> +	};
+> +
+> +	u2phy1_host: host-port {
+> +		phy-supply = <&vcc5v0_host>;
+> +		status = "okay";
+> +	};
+> +};
+
+
+Thanks
+Heiko
