@@ -1,60 +1,37 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 24 Jul 2018 08:33:38 +0200
-Subject: [RFC] ARM: exynos: Fix imprecise abort during Exynos5422 suspend
- to RAM
-In-Reply-To: <20180723142503eucas1p24f8d96f8c4ec25dbdb80e27e2f1444c2~EBZNDRgPc2952429524eucas1p2C@eucas1p2.samsung.com>
-References: <CGME20180718200005epcas1p1cb2568c593276849c066b3a53f1e971b@epcas1p1.samsung.com>
- <20180718195929.5852-1-krzk@kernel.org>
- <20180723142503eucas1p24f8d96f8c4ec25dbdb80e27e2f1444c2~EBZNDRgPc2952429524eucas1p2C@eucas1p2.samsung.com>
-Message-ID: <CAJKOXPc=3-q4CXDqcHXgXfhMKvKLJWBzuH1JvXiV5m04TW_qig@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 24 Jul 2018 15:57:44 +0900
+Subject: [PATCH v12 01/16] asm-generic: add kexec_file_load system call to
+ unistd.h
+In-Reply-To: <20180724065759.19186-1-takahiro.akashi@linaro.org>
+References: <20180724065759.19186-1-takahiro.akashi@linaro.org>
+Message-ID: <20180724065759.19186-2-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 July 2018 at 16:24, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Hi Krzysztof,
->
-> On 2018-07-18 21:59, Krzysztof Kozlowski wrote:
->> Suspend to RAM on Odroid XU3/XU4/HC1 family (Exynos5422) causes
->> imprecise abort:
->>
->>       PM: Syncing filesystems ... done.
->>       Freezing user space processes ... (elapsed 0.003 seconds) done.
->>       OOM killer disabled.
->>       Freezing remaining freezable tasks ... (elapsed 0.003 seconds) done.
->>       wake enabled for irq 139
->>       Disabling non-boot CPUs ...
->>       IRQ51 no longer affine to CPU1
->>       IRQ52 no longer affine to CPU2
->>       IRQ53 no longer affine to CPU3
->>       IRQ54 no longer affine to CPU4
->>       IRQ55 no longer affine to CPU5
->>       IRQ56 no longer affine to CPU6
->>       cpu cpu4: Dropping the link to regulator.40
->>       IRQ57 no longer affine to CPU7
->>       Unhandled fault: external abort on non-linefetch (0x1008) at 0xf081a028
->>       Internal error: : 1008 [#1] PREEMPT SMP ARM
->>
->> with last call trace in exynos_suspend_enter().
->>
->> The abort is caused by writing to register in secure part of sysram.
->> All Exynos5422 devices, including Hardkernel Odroid boards, boot with
->> TrustZone in non-secure mode therefore they should access non-secure
->> sysram.
->>
->> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->>
->> ---
->>
->> Comments, whether my understanding is correct, are welcomed!
->
-> The decision, weather to use secure or non-secure sysram depends on the
-> enabled TrustZone interface IMHO. Exynos5420 PeachPIT and Exynos5800 PeachPI
-> don't use TrustZone and don't have 'firmware' node in dts, thus they should
-> keep existing code.
+The initial user of this system call number is arm64.
 
-Ah, you are right. SMDK5420 also would be affected. I'll fix the patch.
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+ include/uapi/asm-generic/unistd.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Thanks for feedback!
-
-Best regards,
-Krzysztof
+diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+index 42990676a55e..c81f4a0df51f 100644
+--- a/include/uapi/asm-generic/unistd.h
++++ b/include/uapi/asm-generic/unistd.h
+@@ -734,9 +734,11 @@ __SYSCALL(__NR_pkey_free,     sys_pkey_free)
+ __SYSCALL(__NR_statx,     sys_statx)
+ #define __NR_io_pgetevents 292
+ __SC_COMP(__NR_io_pgetevents, sys_io_pgetevents, compat_sys_io_pgetevents)
++#define __NR_kexec_file_load 293
++__SYSCALL(__NR_kexec_file_load,     sys_kexec_file_load)
+ 
+ #undef __NR_syscalls
+-#define __NR_syscalls 293
++#define __NR_syscalls 294
+ 
+ /*
+  * 32 bit systems traditionally used different
+-- 
+2.18.0
