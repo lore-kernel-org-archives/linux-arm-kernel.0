@@ -1,37 +1,33 @@
-From: Sven.Schmitt@mixed-mode.de (Sven Schmitt)
-Date: Tue, 24 Jul 2018 07:01:13 +0000
-Subject: AW: [PATCH v2] soc: imx: gpc: fix PDN delay & improve readability
-In-Reply-To: <CAOMZO5COwPurtRvNhAGD-1jTS5FKPgsxV4e-WniMrLpVDHg7Eg@mail.gmail.com>
-References: <1529312474617.59395@mixed-mode.de>
- <1529314029.3684.2.camel@pengutronix.de>
- <1529316704661.7268@mixed-mode.de>,
- <CAOMZO5COwPurtRvNhAGD-1jTS5FKPgsxV4e-WniMrLpVDHg7Eg@mail.gmail.com>
-Message-ID: <1532415669155.59892@mixed-mode.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 24 Jul 2018 09:01:59 +0200
+Subject: [PATCH] arm64: dts: renesas: r8a77980: add RWDT support
+In-Reply-To: <175a491f-a827-4a92-1884-2f1490d38a52@cogentembedded.com>
+References: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
+ <175a491f-a827-4a92-1884-2f1490d38a52@cogentembedded.com>
+Message-ID: <CAMuHMdVeyaU9iKnubhzkjN8Fd-Z-=r+yoF+_jGoFxDzPdwbSpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-> Hi Sven,
+On Fri, Jul 20, 2018 at 9:21 PM Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Describe RWDT in the R8A77980 SoC device tree.
 >
-> On Mon, Jun 18, 2018 at 7:11 AM, Sven Schmitt
-><Sven.Schmitt@mixed-mode.de> wrote:
->> - imx6_pm_domain_power_off(): reads iso and iso2sw
->>   from GPC_PGC_PUPSCR_OFFS which stores the power up delays
->>   => use GPC_PGC_PDNSCR_OFFS for the correct delays
->>
->> - remove unused #defines
->>
->> - GPC_PGC_DOMAIN_*: made consistent use of index defines
->>
->> Signed-off-by: Sven Schmitt <sven.schmitt@mixed-mode.de>
+> Enable RWDT on the Condor and V3H Starter Kit boards.
 >
-> It seems you missed to send it to Shawn Guo, who is the imx maintainer.
+> Based on the original (and large) patch by Vladimir Barinov.
 >
-> Please run ./scripts/get_maintainer.pl 0001-your.patch and resend it
-> to these folks.
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Thanks for the hint. I will resend the patch.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Best regards
-Sven
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
