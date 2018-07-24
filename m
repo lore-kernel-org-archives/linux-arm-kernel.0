@@ -1,55 +1,140 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jul 2018 16:14:59 +0100
-Subject: [PATCH] arm64: enable RapidIO config options in Kconfig
-In-Reply-To: <20180724134513.86796-1-acolin@isi.edu>
-References: <20180724134513.86796-1-acolin@isi.edu>
-Message-ID: <20180724151458.GE25412@arm.com>
+Date: Tue, 24 Jul 2018 16:14:54 +0100
+Subject: [PATCH] Add cap_user_time aarch64
+In-Reply-To: <20180713192451.49280-1-micpof@gmail.com>
+References: <20180713192451.49280-1-micpof@gmail.com>
+Message-ID: <20180724151452.GD25412@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 09:45:14AM -0400, Alexei Colin wrote:
-> ARM64 SoCs with a PCI bus present the RapiodIO options; SoCs with
-> RapidIO IP blocks but without a PCI bus, need to select HAS_RAPIDIO in
-> Kconfig.platforms.
-> 
-> HAS_RAPIDIO was chosen over HAVE_RAPIDIO to be consistent with
-> other architectures which already define this flag (powerpc).
-> 
-> Signed-off-by: Alexei Colin <acolin@isi.edu>
-> ---
-> 
-> Tested that kernel builds with RapidIO subsystem and switch drivers and that
-> modules insert successfully in a custom Qemu hardware model.
-> Maintainers for RapidIO subsystem CCed.
-> Similar patch for ARM has been submitted.
-> 
->  arch/arm64/Kconfig | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 42c090cf0292..8dceaa5b674c 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -293,6 +293,22 @@ config PCI_SYSCALL
->  
->  source "drivers/pci/Kconfig"
->  
-> +config HAS_RAPIDIO
-> +	bool
-> +	default n
-> +
-> +config RAPIDIO
-> +	tristate "RapidIO support"
-> +	depends on HAS_RAPIDIO || PCI
-> +	help
-> +	  This feature enables support for RapidIO high-performance
-> +	  packet-switched interconnect.
-> +
-> +	  If you say Y here, the kernel will include drivers and
-> +	  infrastructure code to support RapidIO interconnect devices.
+Hi Michael,
 
-It feels a bit weird to push this help text into the arch Kconfig files,
-rather than just have them provide the HAS_RAPIDIO symbol, but if that's
-what everybody else is doing then I guess it's fine.
+[adding Peter]
+
+Thanks for the patch. I think the general idea is sound, but I have a few
+questions about the implementation.
+
+On Fri, Jul 13, 2018 at 12:24:51PM -0700, Michael O'Farrell wrote:
+> It is useful to get the running time of a thread.  Doing so in an
+> efficient manner can be important for performance of user applications.
+> Avoiding system calls in `clock_gettime` when handling
+> CLOCK_THREAD_CPUTIME_ID is important.  Other clocks are handled in the
+> VDSO, but CLOCK_THREAD_CPUTIME_ID falls back on the system call.
+> 
+> CLOCK_THREAD_CPUTIME_ID is not handled in the VDSO since it would have
+> costs associated with maintaining updated user space accessible time
+> offsets.  These offsets have to be updated everytime the a thread is
+> scheduled/descheduled.  However, for programs regularly checking the
+> running time of a thread, this is a performance improvement.
+> 
+> This patch takes a middle ground, and adds support for cap_user_time an
+> optional feature of the perf_event API.  This way costs are only
+> incurred when the perf_event api is enabled.  This is done the same way
+> as it is in x86.  This patch also enables the cap_user_time facility of
+> perf_event since it comes free with the stable clock.
+> 
+> Ultimately this allows calculating the thread running time in userspace
+> on aarch64 as follows (adapted from perf_event_open manpage):
+> 
+> u32 seq, time_mult, time_shift;
+> u64 running, count, time_offset, quot, rem, delta;
+> struct perf_event_mmap_page *pc;
+> pc = buf;  // buf is the perf event mmaped page as documented in the API.
+> 
+> if (pc->cap_usr_time) {
+>     do {
+>         seq = pc->lock;
+>         barrier();
+>         running = pc->time_running;
+> 
+>         count = readCNTVCT_EL0();  // Read ARM hardware clock.
+>         time_offset = pc->time_offset;
+>         time_mult   = pc->time_mult;
+>         time_shift  = pc->time_shift;
+> 
+>         barrier();
+>     } while (pc->lock != seq);
+
+Using only compiler barriers here raises my eyebrows a little, but as long
+as this is all in the context of the reader thread, then it should be ok.
+I think it means that the comment in events/core.c is bogus:
+
+	/*
+	 * Disable preemption so as to not let the corresponding user-space
+	 * spin too long if we get preempted.
+	 */
+	preempt_disable();
+	++userpg->lock;
+	barrier();
+
+because user-space won't get stuck spinning unless its running concurrently,
+at which point it's hosed anyway. Hmmm.
+
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index 33147aacdafd..c63f31caf7ac 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -25,6 +25,7 @@
+>  #include <asm/virt.h>
+>  
+>  #include <linux/acpi.h>
+> +#include <linux/clocksource.h>
+>  #include <linux/of.h>
+>  #include <linux/perf/arm_pmu.h>
+>  #include <linux/platform_device.h>
+> @@ -1127,3 +1128,41 @@ static int __init armv8_pmu_driver_init(void)
+>  		return arm_pmu_acpi_probe(armv8_pmuv3_init);
+>  }
+>  device_initcall(armv8_pmu_driver_init)
+> +
+> +#ifndef CONFIG_HAVE_UNSTABLE_SCHED_CLOCK
+
+We never select CONFIG_HAVE_UNSTABLE_SCHED_CLOCK, so you can remove the
+guards.
+
+> +void arch_perf_update_userpage(struct perf_event *event,
+> +			       struct perf_event_mmap_page *userpg, u64 now)
+> +{
+> +	u32 freq;
+> +	u32 shift;
+> +
+> +	/*
+> +	 * Internal timekeeping for enabled/running/stopped times
+> +	 * is always computed with the sched_clock.
+> +	 */
+> +	freq = arch_timer_get_rate();
+> +	userpg->cap_user_time = 1;
+> +
+> +	clocks_calc_mult_shift(&userpg->time_mult, &shift, freq,
+> +			NSEC_PER_SEC, 0);
+> +	/*
+> +	 * time_shift is not expected to be greater than 31 due to
+> +	 * the original published conversion algorithm shifting a
+> +	 * 32-bit value (now specifies a 64-bit value) - refer
+> +	 * perf_event_mmap_page documentation in perf_event.h.
+> +	 */
+> +	if (shift == 32) {
+> +		shift = 31;
+> +		userpg->time_mult >>= 1;
+> +	}
+
+Can you explain this a bit more, please? Given that we've never enabled this
+on arm64, why do we have a problem with a legacy algorithm?
+
+> +	userpg->time_shift = (u16)shift;
+> +	userpg->time_offset = -now;
+> +
+> +	/*
+> +	 * We are always using the sched_clock as the base, so
+> +	 * cap_user_time_zero makes sense.
+> +	 */
+
+How are you enforcing that we're always using sched_clock?
+
+> +	userpg->cap_user_time_zero = 1;
+> +	userpg->time_zero = 0;
+
+I'm not sure we can rely on the architected timer being zero initialised --
+our booting documentation just require it to be consistent between CPUs.
 
 Will
