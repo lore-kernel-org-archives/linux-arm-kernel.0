@@ -1,36 +1,21 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Tue, 24 Jul 2018 13:36:15 -0700
-Subject: [PATCH i2c-next v2] i2c: aspeed: Add an explicit type casting for
- *get_clk_reg_val
-Message-ID: <20180724203615.5770-1-jae.hyun.yoo@linux.intel.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 24 Jul 2018 14:00:10 -0700
+Subject: [PATCH 1/4] treewide: convert ISO_8859-1 text comments to utf-8
+In-Reply-To: <20180724111600.4158975-1-arnd@arndb.de>
+References: <20180724111600.4158975-1-arnd@arndb.de>
+Message-ID: <20180724140010.e24a9964fd340afe2d98a994@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit fixes this sparse warning:
-drivers/i2c/busses/i2c-aspeed.c:875:38: warning: incorrect type in assignment (different modifiers)
-drivers/i2c/busses/i2c-aspeed.c:875:38:    expected unsigned int ( *get_clk_reg_val )( ... )
-drivers/i2c/busses/i2c-aspeed.c:875:38:    got void const *const data
+On Tue, 24 Jul 2018 13:13:25 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
 
-Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
----
-Changes since v1:
-- Fixed title and added Reported-by tag.
+> Almost all files in the kernel are either plain text or UTF-8
+> encoded. A couple however are ISO_8859-1, usually just a few
+> characters in a C comments, for historic reasons.
+> 
+> This converts them all to UTF-8 for consistency.
 
- drivers/i2c/busses/i2c-aspeed.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Was "consistency" the only rationale?  The discussion is now outside my
+memory horizon but I thought there were other reasons.
 
-diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
-index efb89422d496..a4f956c6d567 100644
---- a/drivers/i2c/busses/i2c-aspeed.c
-+++ b/drivers/i2c/busses/i2c-aspeed.c
-@@ -872,7 +872,7 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
- 	if (!match)
- 		bus->get_clk_reg_val = aspeed_i2c_24xx_get_clk_reg_val;
- 	else
--		bus->get_clk_reg_val = match->data;
-+		bus->get_clk_reg_val = (u32 (*)(u32))match->data;
- 
- 	/* Initialize the I2C adapter */
- 	spin_lock_init(&bus->lock);
--- 
-2.18.0
+Will we be getting a checkpatch rule to keep things this way?
