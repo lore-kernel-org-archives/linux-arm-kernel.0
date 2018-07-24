@@ -1,85 +1,20 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 24 Jul 2018 18:49:44 +0200
-Subject: [PATCH v2 2/4] ARM: exynos: Store Exynos5420 register state in one
- variable
-In-Reply-To: <20180724164946.6274-1-krzk@kernel.org>
-References: <20180724164946.6274-1-krzk@kernel.org>
-Message-ID: <20180724164946.6274-2-krzk@kernel.org>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 24 Jul 2018 09:50:26 -0700 (PDT)
+Subject: [PATCH net-next v3 0/8] A fix and a few improvements on mvneta
+In-Reply-To: <87h8ko7ozf.fsf@bootlin.com>
+References: <20180718161057.28704-1-gregory.clement@bootlin.com>
+ <87h8ko7ozf.fsf@bootlin.com>
+Message-ID: <20180724.095026.1142374357536198879.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of keeping two static variables put them into one struct which
-later can grow.  This will reduce number of file-scope symbols.
+From: Gregory CLEMENT <gregory.clement@bootlin.com>
+Date: Tue, 24 Jul 2018 15:16:52 +0200
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> I saw in patchwork, the status was "Accepted" (for example the 1st patch
+> [1]). However the series is not in your git branches and usually you
+> also answered to the series to inform that you have applied it. So I
+> would like to know what is the status of the series.
 
----
-
-Changes since v1:
-New patch.
----
- arch/arm/mach-exynos/suspend.c | 20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index d3db306a5a70..5d4822e5d0ba 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -59,10 +59,14 @@ struct exynos_pm_data {
- 	int (*cpu_suspend)(unsigned long);
- };
- 
--static const struct exynos_pm_data *pm_data __ro_after_init;
-+/* Used only on Exynos542x/5800 */
-+struct exynos_pm_state {
-+	int cpu_state;
-+	unsigned int pmu_spare3;
-+};
- 
--static int exynos5420_cpu_state;
--static unsigned int exynos_pmu_spare3;
-+static const struct exynos_pm_data *pm_data __ro_after_init;
-+static struct exynos_pm_state pm_state;
- 
- /*
-  * GIC wake-up support
-@@ -320,7 +324,7 @@ static void exynos5420_pm_prepare(void)
- 	/* Set wake-up mask registers */
- 	exynos_pm_set_wakeup_mask();
- 
--	exynos_pmu_spare3 = pmu_raw_readl(S5P_PMU_SPARE3);
-+	pm_state.pmu_spare3 = pmu_raw_readl(S5P_PMU_SPARE3);
- 	/*
- 	 * The cpu state needs to be saved and restored so that the
- 	 * secondary CPUs will enter low power start. Though the U-Boot
-@@ -328,8 +332,8 @@ static void exynos5420_pm_prepare(void)
- 	 * needs to restore it back in case, the primary cpu fails to
- 	 * suspend for any reason.
- 	 */
--	exynos5420_cpu_state = readl_relaxed(sysram_base_addr +
--					     EXYNOS5420_CPU_STATE);
-+	pm_state.cpu_state = readl_relaxed(sysram_base_addr +
-+					   EXYNOS5420_CPU_STATE);
- 
- 	exynos_pm_enter_sleep_mode();
- 
-@@ -447,7 +451,7 @@ static void exynos5420_pm_resume(void)
- 		       EXYNOS5_ARM_CORE0_SYS_PWR_REG);
- 
- 	/* Restore the sysram cpu state register */
--	writel_relaxed(exynos5420_cpu_state,
-+	writel_relaxed(pm_state.cpu_state,
- 		       sysram_base_addr + EXYNOS5420_CPU_STATE);
- 
- 	pmu_raw_writel(EXYNOS5420_USE_STANDBY_WFI_ALL,
-@@ -456,7 +460,7 @@ static void exynos5420_pm_resume(void)
- 	if (exynos_pm_central_resume())
- 		goto early_wakeup;
- 
--	pmu_raw_writel(exynos_pmu_spare3, S5P_PMU_SPARE3);
-+	pmu_raw_writel(pm_state.pmu_spare3, S5P_PMU_SPARE3);
- 
- early_wakeup:
- 
--- 
-2.14.1
+Sorry about that, I'll take a look and try to figure out what happened
+and fix it up.
