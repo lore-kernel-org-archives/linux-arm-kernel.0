@@ -1,103 +1,79 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 24 Jul 2018 11:06:54 +0200
-Subject: [PATCH v6 5/5] mailbox: Add support for i.MX7D messaging unit
-In-Reply-To: <eebba930-b3d7-3670-3d96-35cc6c2a6bcb@pengutronix.de>
-References: <20180722063923.30222-1-o.rempel@pengutronix.de>
- <20180722063923.30222-6-o.rempel@pengutronix.de>
- <1532366380.3163.109.camel@pengutronix.de>
- <eebba930-b3d7-3670-3d96-35cc6c2a6bcb@pengutronix.de>
-Message-ID: <1532423214.32306.1.camel@pengutronix.de>
+From: hari.vyas@broadcom.com (Hari Vyas)
+Date: Tue, 24 Jul 2018 14:44:48 +0530
+Subject: [PATCH] arm64: fix for restoring console loglevel after handling
+ traps
+In-Reply-To: <CAM5rFu-_sU1eSryFR-rDF=6BxZuf_E0xBQJ8RizNKYDB+DgWOQ@mail.gmail.com>
+References: <1531993734-1463-1-git-send-email-hari.vyas@broadcom.com>
+ <1531993734-1463-2-git-send-email-hari.vyas@broadcom.com>
+ <20180719100140.GA424@jagdpanzerIV>
+ <CAM5rFu_N-=26LddRy1mO010h9yLcGuKqK6=y+h=h3-HbfEP+FQ@mail.gmail.com>
+ <20180719103916.g763zmsm7wnngwop@lakrids.cambridge.arm.com>
+ <CAM5rFu-MFbH_2Pohmjydy232Rpt7_E84-K=e67wAu3iQzvTLiA@mail.gmail.com>
+ <20180720121321.qgdsdtvvowhphava@pathway.suse.cz>
+ <CAM5rFu-_sU1eSryFR-rDF=6BxZuf_E0xBQJ8RizNKYDB+DgWOQ@mail.gmail.com>
+Message-ID: <CAM5rFu9zVa3H=mqmSknALt-znb2MPwVbuy3atA5Qoi9KvGNXqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 24.07.2018, 07:14 +0200 schrieb Oleksij Rempel:
-> Hi Lucas,
-> 
-> here is more detailed response:
-> 
-> On 23.07.2018 19:19, Lucas Stach wrote:
-[...]
-> > > +};
-> > > +
-> > > +static struct imx_mu_priv *to_imx_mu_priv(struct mbox_controller *mbox)
-> > > +{
-> > > > +	return container_of(mbox, struct imx_mu_priv, mbox);
-> > > 
-> > > +}
-> > > +
-> > > +static void imx_mu_write(struct imx_mu_priv *priv, u32 val, u32 offs)
-> > > +{
-> > > +	iowrite32(val, priv->base + offs);
-> > 
-> > This driver is never going to be used on a device with port based IO,
-> > so iowrite doesn't make much sense here, just use writel. Same comment
-> > applies to the below read function.
-> 
-> As before I don't really understand the difference. I took some time for
-> learning and here are my findings:
-> - historical background of ioread/iowrite functions. What I can find is
-> > this LWN article: https://lwn.net/Articles/102232/ . The main point
-> seems to be "The first of these is a new __iomem annotation used to mark
-> pointers to I/O memory" ... " As with __user, the __iomem marker serves
-> a documentation role in the kernel code;"
-> 
-> In modern kernel the difference between ioread32 and readl seems to be
-> completely disappeared.
-> with this LWN article (2016):
-> https://lwn.net/Articles/698014/
-> the readl and reade32 are always in the same group..
+Hi all,
 
-Okay, as discussed offline this is more a thing of personal preference,
-since this maps to the same thing internally when used on a
-architecture without IO ports. I slightly dislike those as they don't
-have a _relaxed counterpart, but other than that there should be no
-difference. As we don't use any of the relaxed stuff in this driver
-it's really about the color of the bikeshed, so feel free to keep it
-your way.
+On Fri, Jul 20, 2018 at 7:04 PM, Hari Vyas <hari.vyas@broadcom.com> wrote:
+> On Fri, Jul 20, 2018 at 5:43 PM, Petr Mladek <pmladek@suse.com> wrote:
+>> On Thu 2018-07-19 19:42:50, Hari Vyas wrote:
+>>> On Thu, Jul 19, 2018 at 4:09 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> > On Thu, Jul 19, 2018 at 03:47:46PM +0530, Hari Vyas wrote:
+>>> >> On Thu, Jul 19, 2018 at 3:31 PM, Sergey Senozhatsky
+>>> >> <sergey.senozhatsky.work@gmail.com> wrote:
+>>> >> >> @@ -694,7 +698,7 @@ void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr)
+>>> >> >>               __show_regs(regs);
+>>> >> >>
+>>> >> >>       nmi_panic(regs, "Asynchronous SError Interrupt");
+>>> >> >> -
+>>> >> >> +     restore_console_loglevel();
+>>> >> >
+>>> >> > panic()
+>>> >> >
+>>> >> > What's the point of restore_console_loglevel() after panic()?
+>>> >> >
+>>> >> >         -ss
+>>> >> Except die(), other places restore call can be avoided but just added
+>>> >> for code completeness.
+>>> >
+>>> > As Sergey said, panic() is *fatal*. It does not return, so it makes no
+>>> > sense to place code after it.
+>>> >
+>>> I too pointed in cover letter. I just too added for code completeness.
+>>
+>> The code-completeness is not a good reason. It might cause false
+>> expectation that panic() is not fatal. It would cause more harm
+>> than good.
+>>
+>> The same is true also for die(). It should be fatal. I agree with
+>> Sergey and Mark that it does not make sense to restore
+>> the original level there.
+>>
+>> Best Regards,
+>> Petr
+> I can remove restore from not required (3) places.
+>
+> Other than that, based on discussion, bad_mode() should panic so
+> better die() call itself be removed from bad_mode().
+> As this(i.e. cleanup of bad_mode) is not related to raised patch so
+> better one another bug/patch be raised for cleaning
+> bad_mode() and probably die() too.
+>
+> Currently this die() is called from some other places also but not
+> completely sure whether restore_console_loglevel is required
+> there also or not as creating situation will be very difficult in
+> normal scenario.
 
-> If there is some documentation which will say why I should use readl()
-> instead of ioread32() i would really love to read it.
-> 
-> > Also, given that those functions are not really shortening the code in
-> > the user they may also be removed completely IMHO.
-> 
-> Wrong assumption..??I use this functions for tracing. It is just to easy
-> to add two trace points...??From technical perspective I don't see any
-> advantage or disadvantage of having this functions.
-> If it is my personal preference, then I decide to keep it.
+For tracking purpose, I have raised a separate bug for bad_mode() issue i.e.
+Bug 200637 - ARM64: bad_mode() handler may not result in panic always
+due to die() call in the beginning
+Probable fix could be to remove die() from bad_mode() but better other confirms.
 
-That IMHO implies that I'm perfectly fine with you ignoring this
-comment. :)
-
-[...]
-> > > +static int imx_mu_startup(struct mbox_chan *chan)
-> > > +{
-> > > > > > > > +	struct imx_mu_priv *priv = to_imx_mu_priv(chan->mbox);
-> > > > > > > > +	struct imx_mu_con_priv *cp = chan->con_priv;
-> > > > +	int ret;
-> > > 
-> > > +
-> > > > > > > > +	cp->irq_desc = devm_kasprintf(priv->dev, GFP_KERNEL, "imx_mu_chan[%i]",
-> > > > > > > > +				??????cp->idx);
-> > > > > > > > +	if (!cp->irq_desc)
-> > > > +		return -ENOMEM;
-> > > 
-> > > +
-> > > > +	ret = devm_request_irq(priv->dev, cp->irq, imx_mu_isr,
-> > > 
-> > > +			???????IRQF_SHARED, cp->irq_desc, chan);
-> > 
-> > Using the devm_ variants of those functions doesn't make sense when the
-> > resources aren't tied to the device lifetime. As you are tearing them
-> > down manually in imx_mu_shutdown anyways, just use the raw variants of
-> > those functions.
-> 
-> I have nothing against it.
-
-Thanks, as this is something I feel more strongly about. As the devm_
-stuff is meant to tie the lifetime of an object to the device/driver
-lifetime using them in a context where there is no relation at all is
-kind of an API abuse to me.
-
-Regards,
-Lucas
+As stated, die() is called from other places also my feeling and
+logically restoration  is required. Please
+confirm whether to close this issue without any change or proceed with
+only one restore() call in die and discard at
+other 3 places.
