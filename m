@@ -1,26 +1,62 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Tue, 24 Jul 2018 20:36:15 +0200
-Subject: [PATCH] ARM: dts: sun8i: r40/v40: rewrite BPi M2 Berry DTS to
- rebase on M2 Ultra
-In-Reply-To: <20180724163655.61365-1-icenowy@aosc.io>
-References: <20180724163655.61365-1-icenowy@aosc.io>
-Message-ID: <20180724183613.GA10380@gandalf>
+From: atull@kernel.org (Alan Tull)
+Date: Tue, 24 Jul 2018 13:49:02 -0500
+Subject: [PATCH v3 2/2] fpga: zynq-fpga: Add support for readback
+In-Reply-To: <CY1PR02MB169273A09D4E675A7671375CDC550@CY1PR02MB1692.namprd02.prod.outlook.com>
+References: <1532441858-13507-1-git-send-email-appana.durga.rao@xilinx.com>
+ <1532441858-13507-2-git-send-email-appana.durga.rao@xilinx.com>
+ <CAAtXAHeVXw4BT7XF+Mu=nR9U9nK=nR_+x+JKSQU1owwPbt_HPA@mail.gmail.com>
+ <CY1PR02MB169273A09D4E675A7671375CDC550@CY1PR02MB1692.namprd02.prod.outlook.com>
+Message-ID: <CANk1AXRYX+7hkm93r0maHz1e1Uh-gTKzs==1xjd_CZPQqBLSyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2018 at 12:36:55AM +0800, Icenowy Zheng wrote:
-> Banana Pi designs the BPi M2 Berry board to be software compatible with
-> BPi M2 Ultra, so it's based on M2 Ultra with some function cuts,
-> including:
-> 
-> - 2048MiB DRAM -> 1024MiB (this should be proceed by the bootloader);
-> - dropped a LED;
-> - dropped eMMC;
-> - dropped USB2 and connect USB1 to a 4-port HUB.
-> 
-> Thus we can make the M2 Berry device tree based on the M2 Ultra, rather
-> than write one from scratch.
+On Tue, Jul 24, 2018 at 1:31 PM, Appana Durga Kedareswara Rao
+<appanad@xilinx.com> wrote:
+> Hi Moritz,
+>
+>         Thanks for the review...
+>
+> <Snip>
+>> Can you please make the commit message such that you have full sentences?
+>>
+>> "Add support for readback of FPGA configuration data and registers" of
+>> example.
+>
+> Sure will fix in v4.
+>
+>>
+>> >
+>> > Usage:
+>> > Readback of PL configuration registers
+>> >         cat /sys/kernel/debug/fpga/fpga0/image
+>> > Readback of PL configuration data
+>> >         echo 1 > /sys/module/zynqmp_fpga/parameters/readback_type
+>>
+>> The patch below is for Zynq if I'm not mistaken, not ZynqMP?
+>
+> Yes it is for Zynq not ZynqMP by mistake I have kept zynqmp here, thanks for pointing  will fix in v4...
+>
+> <Snip>
+>> > +static bool readback_type;
+>> > +module_param(readback_type, bool, 0644);
+>> > +MODULE_PARM_DESC(readback_type,
+>> > +               "readback_type 0-configuration register read "
+>> > +               "1- configuration data read (default: 0)");
+>>
+>> Not sure a module param is the best solution here.
+>
+> Need to provide flexibility to the user to switch between reading of FPGA registers and configuration data.
 
-Good idea!  I know that Ultra came first and then the cut-down Berry. 
-But from a device tree point of view, wouldn't it make more sense to
-take M2 Berry as the base and just add the hardware for M2 Ultra?
+I suggested calling the attribute 'image' because I thought it would
+always be a read back of the FPGA image information.  I don't think
+that a sysfs attribute's function should change. :)
+
+> One other option is sysfs. Do you want me to implement sysfs path???
+> Any other suggestions???
+
+You could implement another sysfs attribute for reading FPGA registers
+with a separate ops callback.   Please clarify what it is doing (not
+all FPGAs have this function) and what that will look like when the
+user reads the from the sysfs
+
+Alan
