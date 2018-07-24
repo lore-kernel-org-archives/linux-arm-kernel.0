@@ -1,43 +1,37 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 24 Jul 2018 14:52:24 +0200
-Subject: [PATCH 00/14] arm64: dts: meson-axg: add audio support
-Message-ID: <20180724125238.14567-1-jbrunet@baylibre.com>
+Date: Tue, 24 Jul 2018 14:52:28 +0200
+Subject: [PATCH 04/14] arm64: dts: meson-axg: add audio arb reset controller
+In-Reply-To: <20180724125238.14567-1-jbrunet@baylibre.com>
+References: <20180724125238.14567-1-jbrunet@baylibre.com>
+Message-ID: <20180724125238.14567-5-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The main purpose of this patchset is to add the audio devices on amlogic's
-AXG SoCs.
+Add the audio memory arbiter which control the access of the audio
+fifos to the DDR.
 
-Some codecs require some power supplies. This is why the 3 first patches
-deal with the S400 power supplies, even if some are not related to audio.
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-In term of dependency, apart from the clock bindings you have already
-pulled for your second PR to arm-soc, this patchset requires the ARB
-reset bindings [0] for patch 5. I don't know if Philip can make it
-available somewhere ?
-
-Of course, if the dependencies make this patchset too complicated to
-merge in this cycle, I'll resubmit once the next rc1 is out.
-
-Jerome Brunet (14):
-  arm64: dts: meson-axg: improve power supplies description
-  arm64: dts: meson-axg: add vcc 5v regulator on the s400
-  arm64: dts: meson-axg: add usb power regulator
-  arm64: dts: meson-axg: add audio arb reset controller
-  arm64: dts: meson-axg: add audio fifos
-  arm64: dts: meson-axg: add spdifout
-  arm64: dts: meson-axg: add tdmin formatters
-  arm64: dts: meson-axg: add tdmout formatters
-  arm64: dts: meson-axg: add tdm interfaces
-  arm64: dts: meson-axg: add linein codec
-  arm64: dts: meson-axg: add lineout codec
-  arm64: dts: meson-axg: add spdif-dit codec
-  arm64: dts: meson-axg: s400: enable audio devices
-  arm64: dts: meson-axg: add s400 sound card
-
- .../arm64/boot/dts/amlogic/meson-axg-s400.dts | 237 ++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi    | 216 ++++++++++++++++
- 2 files changed, 453 insertions(+)
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index 6adc8d3dbf0a..3893c630d969 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -189,6 +189,13 @@
+ 
+ 				resets = <&reset RESET_AUDIO>;
+ 			};
++
++			arb: reset-controller at 280 {
++				compatible = "amlogic,meson-axg-audio-arb";
++				reg = <0x0 0x280 0x0 0x4>;
++				#reset-cells = <1>;
++				clocks = <&clkc_audio AUD_CLKID_DDR_ARB>;
++			};
+ 		};
+ 
+ 		cbus: bus at ffd00000 {
 -- 
 2.17.1
