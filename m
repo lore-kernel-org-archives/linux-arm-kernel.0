@@ -1,70 +1,44 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 25 Jul 2018 00:04:49 +0800
-Subject: [PATCH v2 00/18] Allwinner R40 HDMI refactoring
-In-Reply-To: <20180724123741.bbkjgy2uwmzsj45k@flea>
-References: <20180710203511.18454-1-jernej.skrabec@siol.net>
- <20180711083036.7attjq4hm5ay5gmn@flea> <2309112.TTVI9Fv1ar@jernej-laptop>
- <20180724123741.bbkjgy2uwmzsj45k@flea>
-Message-ID: <f77bcb551d60e9d5332dad20c1ef1a1e83ddcc5b.camel@aosc.io>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 24 Jul 2018 18:07:48 +0200
+Subject: [PATCH 1/2] pinctrl: stm32: fix bank io port number
+In-Reply-To: <20180720163515.GA16515@rob-hp-laptop>
+References: <1531745857-5561-1-git-send-email-alexandre.torgue@st.com>
+ <1531745857-5561-2-git-send-email-alexandre.torgue@st.com>
+ <20180720163515.GA16515@rob-hp-laptop>
+Message-ID: <ed56c8d3-f354-d311-8407-66268bcdf7a6@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018-07-24?? 14:37 +0200?Maxime Ripard???
-> On Sun, Jul 22, 2018 at 04:43:56PM +0200, Jernej ?krabec wrote:
-> > Hi Maxime,
-> > 
-> > Dne sreda, 11. julij 2018 ob 10:30:36 CEST je Maxime Ripard
-> > napisal(a):
-> > > On Tue, Jul 10, 2018 at 10:34:53PM +0200, Jernej Skrabec wrote:
-> > > > This series fixes several issues found in R40 HDMI patch series
-> > > > after
-> > > > it was applied. Conversation can be found here:
-> > > > 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/586011.htm
-> > > > l
-> > > > 
-> > > > Patches are based on latest linux-next (next-20180710) and are
-> > > > ordered
-> > > > in such way that they don't break R40 HDMI at any time. Because
-> > > > of that
-> > > > I suggest that whole series goes through drm-misc to preserve
-> > > > that order.
-> > > > 
-> > > > I also tested those patches on H3 to make sure it doesn't break
-> > > > other
-> > > > platforms. However, it would be nice to test for regressions
-> > > > also on
-> > > > older SoCs (with DE1).
-> > > > 
-> > > > Best regards,
-> > > > Jernej
-> > > 
-> > > Applied all patches but the patch 10, thanks!
-> > > Maxime
-> > 
-> > It seems that you forgot to merge some patches:
-> > 
-> > [PATCH v2 12/18] drm/sun4i: tcon: Add another way for matching
-> > mixers with 
-> > tcon
-> > [PATCH v2 13/18] drm/sun4i: tcon: Add support for R40 TCON
-> > 
-> > Without them, R40 display pipeline can't work.
-> > 
-> > Maybe they are in your spam folder?
-> 
-> Thanks for telling me, I'm not quite sure what happened.
-> 
-> I've applied them.
+Hi Rob
 
-BTW without them the board cannot boot because of dead loop in
-sun4i_drv_probe().
+On 07/20/2018 06:35 PM, Rob Herring wrote:
+> On Mon, Jul 16, 2018 at 02:57:36PM +0200, Alexandre Torgue wrote:
+>> In case the exti line is not in line with the bank number (that is the case
+>> when there is an hole between two banks, for example GPIOK and then GPIOZ),
+>> use "st,bank-ioport" DT property to get the right exti line.
+>>
+>> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+>> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+>>
+>> diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>> index 9a06e1f..60c678a 100644
+>> --- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>> +++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>> @@ -55,6 +55,8 @@ Optional properties:
+>>      NOTE: If "gpio-ranges" is used for a gpio controller, all gpio-controller
+>>      have to use a "gpio-ranges" entry.
+>>      More details in Documentation/devicetree/bindings/gpio/gpio.txt.
+>> + - st,bank-ioport: should correspond to the EXTI IOport selection (EXTI line
+>> +   used to select GPIOs as interrupts).
+> 
+> ioport sounds like something else. Perhaps '-exti-line'?
 
+IOport is actually what is described in our datasheet. I could change it 
+to -exti-line but I would prefer to match with the datasheet.
+
+Regards
+Alex
 > 
-> Sorry,
-> Maxime
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>   
+>>   Example 1:
+>>   #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
