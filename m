@@ -1,31 +1,33 @@
 From: manu@freebsd.org (Emmanuel Vadot)
-Date: Tue, 24 Jul 2018 12:15:21 +0200
-Subject: [PATCH v2 4/5] nvmem: sunxi-sid: add support for H5's SID controller
-In-Reply-To: <20180724101522.68165-1-manu@freebsd.org>
-References: <20180724101522.68165-1-manu@freebsd.org>
-Message-ID: <20180724101522.68165-4-manu@freebsd.org>
+Date: Tue, 24 Jul 2018 12:15:18 +0200
+Subject: [PATCH v2 1/5] arm64: dts: allwinner: a64: Add SID node
+Message-ID: <20180724101522.68165-1-manu@freebsd.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The H5 SoC have a SID controller that looks like the one in A64, but
-in case we find some difference in the futur at a binding for it.
+The A64 have a SID controller which consist on EFUSE (starting at 0x200)
+and three registers to read/write the efuses.
 
 Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
 ---
- Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-index e319fe5e205a..99c4ba6a3f61 100644
---- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-+++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-@@ -7,6 +7,7 @@ Required properties:
-   "allwinner,sun8i-a83t-sid"
-   "allwinner,sun8i-h3-sid"
-   "allwinner,sun50i-a64-sid"
-+  "allwinner,sun50i-h5-sid"
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 1b2ef28c42bd..69c0d9362553 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -227,6 +227,11 @@
+ 			#size-cells = <0>;
+ 		};
  
- - reg: Should contain registers location and length
- 
++		sid: eeprom at 1c14000 {
++			compatible = "allwinner,sun50i-a64-sid";
++			reg = <0x1c14000 0x400>;
++		};
++
+ 		usb_otg: usb at 1c19000 {
+ 			compatible = "allwinner,sun8i-a33-musb";
+ 			reg = <0x01c19000 0x0400>;
 -- 
 2.17.0
