@@ -1,63 +1,59 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 24 Jul 2018 14:37:41 +0200
-Subject: [PATCH v2 00/18] Allwinner R40 HDMI refactoring
-In-Reply-To: <2309112.TTVI9Fv1ar@jernej-laptop>
-References: <20180710203511.18454-1-jernej.skrabec@siol.net>
- <20180711083036.7attjq4hm5ay5gmn@flea>
- <2309112.TTVI9Fv1ar@jernej-laptop>
-Message-ID: <20180724123741.bbkjgy2uwmzsj45k@flea>
+From: alex.popov@linux.com (Alexander Popov)
+Date: Tue, 24 Jul 2018 15:44:24 +0300
+Subject: [PATCHv3 2/2] arm64: Add support for STACKLEAK gcc plugin
+In-Reply-To: <20180720214154.2940-3-labbott@redhat.com>
+References: <20180720214154.2940-1-labbott@redhat.com>
+ <20180720214154.2940-3-labbott@redhat.com>
+Message-ID: <ee7335aa-d536-7aef-a25e-224462e065b0@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 22, 2018 at 04:43:56PM +0200, Jernej ?krabec wrote:
-> Hi Maxime,
+On 21.07.2018 00:41, Laura Abbott wrote:
+> This adds support for the STACKLEAK gcc plugin to arm64 by implementing
+> stackleak_check_alloca(), based heavily on the x86 version, and adding the
+> two helpers used by the stackleak common code: current_top_of_stack() and
+> on_thread_stack(). The stack erasure calls are made at syscall returns.
+> Additionally, this disables the plugin in hypervisor and EFI stub code,
+> which are out of scope for the protection.
 > 
-> Dne sreda, 11. julij 2018 ob 10:30:36 CEST je Maxime Ripard napisal(a):
-> > On Tue, Jul 10, 2018 at 10:34:53PM +0200, Jernej Skrabec wrote:
-> > > This series fixes several issues found in R40 HDMI patch series after
-> > > it was applied. Conversation can be found here:
-> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/586011.htm
-> > > l
-> > > 
-> > > Patches are based on latest linux-next (next-20180710) and are ordered
-> > > in such way that they don't break R40 HDMI at any time. Because of that
-> > > I suggest that whole series goes through drm-misc to preserve that order.
-> > > 
-> > > I also tested those patches on H3 to make sure it doesn't break other
-> > > platforms. However, it would be nice to test for regressions also on
-> > > older SoCs (with DE1).
-> > > 
-> > > Best regards,
-> > > Jernej
-> > 
-> > Applied all patches but the patch 10, thanks!
-> > Maxime
-> 
-> It seems that you forgot to merge some patches:
-> 
-> [PATCH v2 12/18] drm/sun4i: tcon: Add another way for matching mixers with 
-> tcon
-> [PATCH v2 13/18] drm/sun4i: tcon: Add support for R40 TCON
-> 
-> Without them, R40 display pipeline can't work.
-> 
-> Maybe they are in your spam folder?
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Reviewed-by: Kees Cook <keescook@chromium.org>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> v3: Actual commit text courtesy of Kees. A comment explaining why we
+> panic
+> ---
+>  arch/arm64/Kconfig                    |  1 +
+>  arch/arm64/include/asm/processor.h    | 15 +++++++++++++++
+>  arch/arm64/kernel/entry.S             |  7 +++++++
+>  arch/arm64/kernel/process.c           | 22 ++++++++++++++++++++++
+>  arch/arm64/kvm/hyp/Makefile           |  3 ++-
+>  drivers/firmware/efi/libstub/Makefile |  3 ++-
+>  6 files changed, 49 insertions(+), 2 deletions(-)
 
-Thanks for telling me, I'm not quite sure what happened.
+Laura, thanks for your work!
 
-I've applied them.
+I've reviewed and tested this patch on my LeMaker HiKey board (HiSilicon Kirin
+620 SoC). The lkdtm tests for STACKLEAK work fine.
 
-Sorry,
-Maxime
+Acked-by: Alexander Popov <alex.popov@linux.com>
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/a475a106/attachment.sig>
+For testing I applied your patches above Kees' for-next/kspp:
+https://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git/log/?h=for-next/kspp
+
+I've had one trouble with building CONFIG_STACKLEAK_RUNTIME_DISABLE on arm64.
+Kees, could you please fold this into the 7th patch of the series?
+
+---- >8 ----
+
+diff --git a/kernel/stackleak.c b/kernel/stackleak.c
+index f731c9a..03031f7a 100644
+--- a/kernel/stackleak.c
++++ b/kernel/stackleak.c
+@@ -16,6 +16,7 @@
+
+ #ifdef CONFIG_STACKLEAK_RUNTIME_DISABLE
+ #include <linux/jump_label.h>
++#include <linux/sysctl.h>
+
+ static DEFINE_STATIC_KEY_FALSE(stack_erasing_bypass);
