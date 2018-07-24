@@ -1,126 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jul 2018 16:04:49 +0100
-Subject: [PATCH 02/10] mm: workingset: tell cache transitions from
- workingset thrashing
-In-Reply-To: <20180723162735.GA5980@cmpxchg.org>
-References: <20180712172942.10094-1-hannes@cmpxchg.org>
- <20180712172942.10094-3-hannes@cmpxchg.org>
- <CAK8P3a3Nsmt54-ed_gWNev3CBS6_Sv5QGOw4G0sY4ZXOi1R4_Q@mail.gmail.com>
- <20180723152323.GA3699@cmpxchg.org>
- <CAK8P3a15K-TXYuFX-ZsJiroqA1GWX2XS4ioZSjcjJYgh1b_xSA@mail.gmail.com>
- <20180723162735.GA5980@cmpxchg.org>
-Message-ID: <20180724150448.GA25412@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 24 Jul 2018 16:06:38 +0100
+Subject: [PATCHv4 01/12] atomic/tty: Fix up atomic abuse in ldsem
+In-Reply-To: <20180724134048.GA30682@gmail.com>
+References: <20180716113017.3909-1-mark.rutland@arm.com>
+ <20180716113017.3909-2-mark.rutland@arm.com>
+ <20180724071518.GA7300@gmail.com>
+ <20180724092036.GN2494@hirez.programming.kicks-ass.net>
+ <20180724092324.vnfowffsla4kja5c@lakrids.cambridge.arm.com>
+ <20180724111313.GA14212@gmail.com>
+ <20180724130515.ung6ox2p4rgzn746@lakrids.cambridge.arm.com>
+ <20180724134048.GA30682@gmail.com>
+Message-ID: <20180724150638.a3vw5gn3efzvlwmv@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 12:27:35PM -0400, Johannes Weiner wrote:
-> On Mon, Jul 23, 2018 at 05:35:35PM +0200, Arnd Bergmann wrote:
-> > On Mon, Jul 23, 2018 at 5:23 PM, Johannes Weiner <hannes@cmpxchg.org> wrote:
-> > > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> > > index 1b18b4722420..72c9b6778b0a 100644
-> > > --- a/arch/arm64/mm/init.c
-> > > +++ b/arch/arm64/mm/init.c
-> > > @@ -611,11 +611,13 @@ void __init mem_init(void)
-> > >         BUILD_BUG_ON(TASK_SIZE_32                       > TASK_SIZE_64);
-> > >  #endif
-> > >
-> > > +#ifndef CONFIG_SPARSEMEM_VMEMMAP
-> > >         /*
+On Tue, Jul 24, 2018 at 03:40:48PM +0200, Ingo Molnar wrote:
+> 
+> * Mark Rutland <mark.rutland@arm.com> wrote:
+> 
+> > > Ok, then these bits will have to wait until Greg's tree goes upstream
+> > > in about two weeks.
 > > 
-> > I tested it on two broken configurations, and found that you have
-> > a typo here, it should be 'ifdef', not 'ifndef'. With that change, it
-> > seems to build fine.
+> > Ok.
 > > 
-> > Tested-by: Arnd Bergmann <arnd@arndb.de>
+> > > Which patches can I apply as a preparatory step?
+> > 
+> > Patches 2-6 can be applied now.
 > 
-> Thanks for testing it, I don't have a cross-compile toolchain set up.
-> 
-> ---
+> Ok, will apply those.
 
-Thanks Arnd, Johannes. I can pick this up for -rc7 via the arm64 tree,
-unless it's already queued elsewhere?
+Cheers!
 
-Will
+> > I guess I should rebase and resend the remaining bits once Greg's tree
+> > goes upstream?
+> 
+> Yeah, easiest would be to do that once Greg's and tip:locking/core changes (with 
+> patches 2-6) both got merged by Linus.
 
-> From 34c4c4549f09f971d2d391a8d652d56cb9b05475 Mon Sep 17 00:00:00 2001
-> From: Johannes Weiner <hannes@cmpxchg.org>
-> Date: Mon, 23 Jul 2018 10:18:23 -0400
-> Subject: [PATCH] arm64: fix vmemmap BUILD_BUG_ON() triggering on !vmemmap
->  setups
-> 
-> Arnd reports the following arm64 randconfig build error with the PSI
-> patches that add another page flag:
-> 
->   /git/arm-soc/arch/arm64/mm/init.c: In function 'mem_init':
->   /git/arm-soc/include/linux/compiler.h:357:38: error: call to
->   '__compiletime_assert_618' declared with attribute error: BUILD_BUG_ON
->   failed: sizeof(struct page) > (1 << STRUCT_PAGE_MAX_SHIFT)
-> 
-> The additional page flag causes other information stored in
-> page->flags to get bumped into their own struct page member:
-> 
->   #if SECTIONS_WIDTH+ZONES_WIDTH+NODES_SHIFT+LAST_CPUPID_SHIFT <=
->   BITS_PER_LONG - NR_PAGEFLAGS
->   #define LAST_CPUPID_WIDTH LAST_CPUPID_SHIFT
->   #else
->   #define LAST_CPUPID_WIDTH 0
->   #endif
-> 
->   #if defined(CONFIG_NUMA_BALANCING) && LAST_CPUPID_WIDTH == 0
->   #define LAST_CPUPID_NOT_IN_PAGE_FLAGS
->   #endif
-> 
-> which in turn causes the struct page size to exceed the size set in
-> STRUCT_PAGE_MAX_SHIFT. This value is an an estimate used to size the
-> VMEMMAP page array according to address space and struct page size.
-> 
-> However, the check is performed - and triggers here - on a !VMEMMAP
-> config, which consumes an additional 22 page bits for the sparse
-> section id. When VMEMMAP is enabled, those bits are returned, cpupid
-> doesn't need its own member, and the page passes the VMEMMAP check.
-> 
-> Restrict that check to the situation it was meant to check: that we
-> are sizing the VMEMMAP page array correctly.
-> 
-> Says Arnd:
-> 
->     Further experiments show that the build error already existed before,
->     but was only triggered with larger values of CONFIG_NR_CPU and/or
->     CONFIG_NODES_SHIFT that might be used in actual configurations but
->     not in randconfig builds.
-> 
->     With longer CPU and node masks, I could recreate the problem with
->     kernels as old as linux-4.7 when arm64 NUMA support got added.
-> 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Tested-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: stable at vger.kernel.org
-> Fixes: 1a2db300348b ("arm64, numa: Add NUMA support for arm64 platforms.")
-> Fixes: 3e1907d5bf5a ("arm64: mm: move vmemmap region right below the linear region")
-> Signed-off-by: Johannes Weiner <hannes@cmpxchg.org>
-> ---
->  arch/arm64/mm/init.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 1b18b4722420..86d9f9d303b0 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -611,11 +611,13 @@ void __init mem_init(void)
->  	BUILD_BUG_ON(TASK_SIZE_32			> TASK_SIZE_64);
->  #endif
->  
-> +#ifdef CONFIG_SPARSEMEM_VMEMMAP
->  	/*
->  	 * Make sure we chose the upper bound of sizeof(struct page)
-> -	 * correctly.
-> +	 * correctly when sizing the VMEMMAP array.
->  	 */
->  	BUILD_BUG_ON(sizeof(struct page) > (1 << STRUCT_PAGE_MAX_SHIFT));
-> +#endif
->  
->  	if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
->  		extern int sysctl_overcommit_memory;
-> -- 
-> 2.18.0
-> 
+I'll keep an eye out for both of these.
+
+Thanks,
+Mark.
