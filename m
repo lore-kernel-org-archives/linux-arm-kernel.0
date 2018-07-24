@@ -1,37 +1,41 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 24 Jul 2018 14:52:28 +0200
-Subject: [PATCH 04/14] arm64: dts: meson-axg: add audio arb reset controller
+Date: Tue, 24 Jul 2018 14:52:27 +0200
+Subject: [PATCH 03/14] arm64: dts: meson-axg: add usb power regulator
 In-Reply-To: <20180724125238.14567-1-jbrunet@baylibre.com>
 References: <20180724125238.14567-1-jbrunet@baylibre.com>
-Message-ID: <20180724125238.14567-5-jbrunet@baylibre.com>
+Message-ID: <20180724125238.14567-4-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the audio memory arbiter which control the access of the audio
-fifos to the DDR.
+The usb power regulator is supplied by the vcc 5v regulator and
+controlled by a GPIO. This will be needed to enable usb.
 
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index 6adc8d3dbf0a..3893c630d969 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -189,6 +189,13 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+index 5937d8c3a6ed..7489b88f27d7 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+@@ -115,6 +115,17 @@
+ 		enable-active-high;
+ 	};
  
- 				resets = <&reset RESET_AUDIO>;
- 			};
++	usb_pwr: regulator-usb_pwr {
++		compatible = "regulator-fixed";
++		regulator-name = "USB_PWR";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		vin-supply = <&vcc_5v>;
 +
-+			arb: reset-controller at 280 {
-+				compatible = "amlogic,meson-axg-audio-arb";
-+				reg = <0x0 0x280 0x0 0x4>;
-+				#reset-cells = <1>;
-+				clocks = <&clkc_audio AUD_CLKID_DDR_ARB>;
-+			};
- 		};
- 
- 		cbus: bus at ffd00000 {
++		gpio = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
+ 	emmc_pwrseq: emmc-pwrseq {
+ 		compatible = "mmc-pwrseq-emmc";
+ 		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
 -- 
 2.17.1
