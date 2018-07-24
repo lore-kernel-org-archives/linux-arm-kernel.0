@@ -1,118 +1,128 @@
-From: micpof@gmail.com (Michael O'Farrell)
-Date: Tue, 24 Jul 2018 15:41:38 -0700
-Subject: [PATCH] Add cap_user_time aarch64
-In-Reply-To: <20180724154527.GS2494@hirez.programming.kicks-ass.net>
-References: <20180713192451.49280-1-micpof@gmail.com>
- <20180724151452.GD25412@arm.com>
- <20180724154527.GS2494@hirez.programming.kicks-ass.net>
-Message-ID: <CAOXaDEGhAa2+eFsqpetC3-CFSWO8qR6y52d_XnVx9XD8k=G=SQ@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 24 Jul 2018 23:46:49 +0100
+Subject: [PATCH v3 6/6] iommu/arm-smmu-v3: add bootup option
+ "iommu_strict_mode"
+In-Reply-To: <1531376312-2192-7-git-send-email-thunder.leizhen@huawei.com>
+References: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
+ <1531376312-2192-7-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <33053c8f-3ac3-e1d6-e260-fd36c4af9312@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Will and Peter.
+On 2018-07-12 7:18 AM, Zhen Lei wrote:
+> Because the non-strict mode introduces a vulnerability window, so add a
+> bootup option to make the manager can choose which mode to be used. The
+> default mode is IOMMU_STRICT.
+> 
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>   Documentation/admin-guide/kernel-parameters.txt | 12 ++++++++++
+>   drivers/iommu/arm-smmu-v3.c                     | 32 ++++++++++++++++++++++---
+>   2 files changed, 41 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+> index efc7aa7..0cc80bc 100644
+> --- a/Documentation/admin-guide/kernel-parameters.txt
+> +++ b/Documentation/admin-guide/kernel-parameters.txt
+> @@ -1720,6 +1720,18 @@
+>   		nobypass	[PPC/POWERNV]
+>   			Disable IOMMU bypass, using IOMMU for PCI devices.
+>   
+> +	iommu_strict_mode=	[arm-smmu-v3]
 
-So:
-        - Remove the ifndef for CONFIG_HAVE_UNSTABLE_SCHED_CLOCK
-        - Update the comment in events/core.c to read "Disable preemption to
-          guarantee consistent time stamps are stored to the user page."
+If anything this should belong to iommu-dma, as that's where the actual 
+decision of whether to use a flush queue or not happens. Also it would 
+be nice to stick to the iommu.* option namespace in the hope of 
+maintaining some consistency.
 
-On Tue, Jul 24, 2018 at 8:45 AM, Peter Zijlstra <peterz@infradead.org> wrote:
->
-> On Tue, Jul 24, 2018 at 04:14:54PM +0100, Will Deacon wrote:
-> > Using only compiler barriers here raises my eyebrows a little, but as long
-> > as this is all in the context of the reader thread, then it should be ok.
-> > I think it means that the comment in events/core.c is bogus:
-> >
-> >       /*
-> >        * Disable preemption so as to not let the corresponding user-space
-> >        * spin too long if we get preempted.
-> >        */
-> >       preempt_disable();
-> >       ++userpg->lock;
-> >       barrier();
-> >
-> > because user-space won't get stuck spinning unless its running concurrently,
-> > at which point it's hosed anyway. Hmmm.
->
-> Right, we should fix that. The only reason to keep that
-> preempt_disable() there is so that the various timestamps retain
-> temporal locality.
->
-> > > +void arch_perf_update_userpage(struct perf_event *event,
-> > > +                          struct perf_event_mmap_page *userpg, u64 now)
-> > > +{
-> > > +   u32 freq;
-> > > +   u32 shift;
-> > > +
-> > > +   /*
-> > > +    * Internal timekeeping for enabled/running/stopped times
-> > > +    * is always computed with the sched_clock.
-> > > +    */
-> > > +   freq = arch_timer_get_rate();
-> > > +   userpg->cap_user_time = 1;
-> > > +
-> > > +   clocks_calc_mult_shift(&userpg->time_mult, &shift, freq,
-> > > +                   NSEC_PER_SEC, 0);
-> > > +   /*
-> > > +    * time_shift is not expected to be greater than 31 due to
-> > > +    * the original published conversion algorithm shifting a
-> > > +    * 32-bit value (now specifies a 64-bit value) - refer
-> > > +    * perf_event_mmap_page documentation in perf_event.h.
-> > > +    */
-> > > +   if (shift == 32) {
-> > > +           shift = 31;
-> > > +           userpg->time_mult >>= 1;
-> > > +   }
-> >
-> > Can you explain this a bit more, please? Given that we've never enabled this
-> > on arm64, why do we have a problem with a legacy algorithm?
->
-> The worry is, I suppose, that someone still uses the old algorithm
-> and then ports it to arm64 without checking.
+> +		0 - strict mode
+> +		    Make sure all related TLBs to be invalidated before the
+> +		    memory released.
+> +		1 - non-strict mode
+> +		    Put off TLBs invalidation and release memory first. This mode
+> +		    introduces a vlunerability window, an untrusted device can
+> +		    access the reused memory because the TLBs may still valid.
+> +		    Please take full consideration before choosing this mode.
+> +		    Note that, VFIO is always use strict mode.
+> +		others - strict mode
+> +
+>   	iommu.passthrough=
+>   			[ARM64] Configure DMA to bypass the IOMMU by default.
+>   			Format: { "0" | "1" }
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 4a198a0..9b72fc4 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -631,6 +631,24 @@ struct arm_smmu_option_prop {
+>   	{ 0, NULL},
+>   };
+>   
+> +static u32 iommu_strict_mode __read_mostly = IOMMU_STRICT;
+> +
+> +static int __init setup_iommu_strict_mode(char *str)
+> +{
+> +	u32 strict_mode = IOMMU_STRICT;
+> +
+> +	get_option(&str, &strict_mode);
+> +	if (strict_mode == IOMMU_NON_STRICT) {
+> +		iommu_strict_mode = strict_mode;
+> +		pr_warn("WARNING: iommu non-strict mode is chose.\n"
+> +			"It's good for scatter-gather performance but lacks full isolation\n");
+> +		add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
+> +	}
+> +
+> +	return 0;
+> +}
+> +early_param("iommu_strict_mode", setup_iommu_strict_mode);
+> +
+>   static inline void __iomem *arm_smmu_page1_fixup(unsigned long offset,
+>   						 struct arm_smmu_device *smmu)
+>   {
+> @@ -1441,7 +1459,7 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+>   	case IOMMU_CAP_NOEXEC:
+>   		return true;
+>   	case IOMMU_CAP_NON_STRICT:
+> -		return true;
+> +		return (iommu_strict_mode == IOMMU_NON_STRICT) ? true : false;
 
-Thats exactly what I was thinking.  If we flip this bit, existing user
-code that is
-cross platform may change behavior and break if it relies on the old API.
->
->
-> > > +   userpg->time_shift = (u16)shift;
-> > > +   userpg->time_offset = -now;
-> > > +
-> > > +   /*
-> > > +    * We are always using the sched_clock as the base, so
-> > > +    * cap_user_time_zero makes sense.
-> > > +    */
-> >
-> > How are you enforcing that we're always using sched_clock?
-> >
-> > > +   userpg->cap_user_time_zero = 1;
-> > > +   userpg->time_zero = 0;
-> >
-> > I'm not sure we can rely on the architected timer being zero initialised --
-> > our booting documentation just require it to be consistent between CPUs.
->
-> On x86 the above is:
->
->         /*
->          * cap_user_time_zero doesn't make sense when we're using a different
->          * time base for the records.
->          */
->         if (!event->attr.use_clockid) {
->                 userpg->cap_user_time_zero = 1;
->                 userpg->time_zero = offset;
->         }
-I was under the impression that the updating of the user page was always done
-using perf_clock() which uses the local_clock which is the sched_clock.
-I saw that the use_clockid allows setting the clock to use in other parts of the
-perf event system, but I didn't think it affected the user page update.  This
-comment seems to support my claim:
-        /*
-         * Internal timekeeping for enabled/running/stopped times
-         * is always in the local_clock domain.
-         */
-Why does having a different time base for the records make cap_user_time_zero
-not make sense?
+Ugh. The "completely redundant ternany" idiom hurts my soul :(
 
-I could rework the time_zero offset to be computed using ktime_get_boot_ns, or
-remove cap_user_time_zero from this patch since it is a separate concept from
-cap_user_time.
+Robin.
+
+>   	default:
+>   		return false;
+>   	}
+> @@ -1750,6 +1768,14 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+>   	return ret;
+>   }
+>   
+> +static u32 arm_smmu_strict_mode(struct iommu_domain *domain)
+> +{
+> +	if (iommu_strict_mode == IOMMU_NON_STRICT)
+> +		return IOMMU_DOMAIN_STRICT_MODE(domain);
+> +
+> +	return IOMMU_STRICT;
+> +}
+> +
+>   static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
+>   			phys_addr_t paddr, size_t size, int prot)
+>   {
+> @@ -1769,7 +1795,7 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
+>   	if (!ops)
+>   		return 0;
+>   
+> -	return ops->unmap(ops, iova | IOMMU_DOMAIN_STRICT_MODE(domain), size);
+> +	return ops->unmap(ops, iova | arm_smmu_strict_mode(domain), size);
+>   }
+>   
+>   static void arm_smmu_flush_iotlb_all(struct iommu_domain *domain)
+> @@ -1784,7 +1810,7 @@ static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
+>   {
+>   	struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
+>   
+> -	if (smmu && (IOMMU_DOMAIN_STRICT_MODE(domain) == IOMMU_STRICT))
+> +	if (smmu && (arm_smmu_strict_mode(domain) == IOMMU_STRICT))
+>   		__arm_smmu_tlb_sync(smmu);
+>   }
+>   
+> 
