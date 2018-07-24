@@ -1,75 +1,85 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jul 2018 15:39:29 +0100
-Subject: [PATCH] drivers/perf: hisi: update the sccl_id/ccl_id when MT is
- supported
-In-Reply-To: <e4f0cfe5-0724-1551-01ea-ab26c8aee229@hisilicon.com>
-References: <1531999600-24266-1-git-send-email-zhangshaokun@hisilicon.com>
- <20180723144220.GB9450@arm.com>
- <e4f0cfe5-0724-1551-01ea-ab26c8aee229@hisilicon.com>
-Message-ID: <20180724143929.GA22465@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 24 Jul 2018 16:41:51 +0200
+Subject: [linux-sunxi] Re: [PATCH 3/3] arm64: allwinner: dts: h6: add
+ Wi-Fi support for Pine H64 model A/B
+In-Reply-To: <CAGb2v656oPmAX=_y88b05xqrona3HFtU-VmNQhHxK_n-4gD+aw@mail.gmail.com>
+References: <20180724011551.49603-1-icenowy@aosc.io>
+ <20180724011551.49603-4-icenowy@aosc.io>
+ <CAGb2v67zR-Q9n7L6CaFKDUJFHFEC_h8-RYxkdyeyJb_GbNmkJw@mail.gmail.com>
+ <CEA43CB7-1DA6-4983-BF18-82C4A48FB92B@aosc.io>
+ <CAGb2v64Qae4O430kP30DQNhp0Dt774OHt0nMe35ckp8X=CTFLg@mail.gmail.com>
+ <AC678B03-19B7-4110-B333-72188CE71296@aosc.io>
+ <CAGb2v656oPmAX=_y88b05xqrona3HFtU-VmNQhHxK_n-4gD+aw@mail.gmail.com>
+Message-ID: <20180724144151.myyg7slocsfjjsfi@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 07:06:11PM +0800, Zhangshaokun wrote:
-> On 2018/7/23 22:42, Will Deacon wrote:
-> > On Thu, Jul 19, 2018 at 07:26:40PM +0800, Shaokun Zhang wrote:
-> >> MT bit in MPIDR_EL1 is now supported in certain HiSilicon platforms, so
-> >> the mapping between sccl_id/ccl_id and affinity level needs to be updated
-> >> from the generic encoding we originally used.
+On Tue, Jul 24, 2018 at 10:37:51AM +0800, Chen-Yu Tsai wrote:
+> On Tue, Jul 24, 2018 at 10:28 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> >
+> >
+> > ? 2018?7?24? GMT+08:00 ??10:26:02, Chen-Yu Tsai <wens@csie.org> ??:
+> >>On Tue, Jul 24, 2018 at 10:23 AM, Icenowy Zheng <icenowy@aosc.io>
+> >>wrote:
+> >>>
+> >>>
+> >>> ? 2018?7?24? GMT+08:00 ??10:21:59, Chen-Yu Tsai <wens@csie.org> ??:
+> >>>>On Tue, Jul 24, 2018 at 9:15 AM, Icenowy Zheng <icenowy@aosc.io>
+> >>wrote:
+> >>>>> The Pine H64 model A has a Wi-Fi module connector and the model B
+> >>has
+> >>>>an
+> >>>>> on-board RTL8723BS Wi-Fi module.
+> >>>>>
+> >>>>> Add support for them. For model A, as it's not defaultly present,
+> >>>>keep
+> >>>>> it disabled now.
+> >>>>
+> >>>>Nope. Pine64 actually has two WiFi/BT modules. And they require
+> >>>>different
+> >>>>device tree snippets for both the WiFi and BT side. This is better
+> >>>>resolved
+> >>>>with device tree overlays.
+> >>>>
+> >>>>I have both, though I've yet found time to work on them.
+> >>>
+> >>> I have also both.
+> >>>
+> >>> The skeleton here can get the Wi-Fi of both to work.
 > >>
-> >> Cc: John Garry <john.garry@huawei.com>
-> >> Cc: Will Deacon <will.deacon@arm.com>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
-> >> ---
-> >>  drivers/perf/hisilicon/hisi_uncore_pmu.c | 13 ++++++++-----
-> >>  1 file changed, 8 insertions(+), 5 deletions(-)
-> >>
-> >> diff --git a/drivers/perf/hisilicon/hisi_uncore_pmu.c b/drivers/perf/hisilicon/hisi_uncore_pmu.c
-> >> index 44df613..b3c5ae9 100644
-> >> --- a/drivers/perf/hisilicon/hisi_uncore_pmu.c
-> >> +++ b/drivers/perf/hisilicon/hisi_uncore_pmu.c
-> >> @@ -350,19 +350,22 @@ void hisi_uncore_pmu_disable(struct pmu *pmu)
-> >>  
-> >>  /*
-> >>   * Read Super CPU cluster and CPU cluster ID from MPIDR_EL1.
-> >> - * If multi-threading is supported, SCCL_ID is in MPIDR[aff3] and CCL_ID
-> >> - * is in MPIDR[aff2]; if not, SCCL_ID is in MPIDR[aff2] and CCL_ID is
-> >> - * in MPIDR[aff1]. If this changes in future, this shall be updated.
-> >> + * If multi-threading is supported, CCL_ID is the low 3-bits in MPIDR[Aff2]
-> >> + * and SCCL_ID is the upper 5-bits of Aff2 field; if not, SCCL_ID
-> >> + * is in MPIDR[Aff2] and CCL_ID is in MPIDR[Aff1]. If this changes in
-> >> + * future, this shall be updated.
-> >>   */
-> >>  static void hisi_read_sccl_and_ccl_id(int *sccl_id, int *ccl_id)
-> >>  {
-> >>  	u64 mpidr = read_cpuid_mpidr();
-> >>  
-> >>  	if (mpidr & MPIDR_MT_BITMASK) {
-> > 
-> > So, to be clear, you're saying that the MT bit was not set in any previous
-> > SoC with this PMU, and therefore changing this logic doesn't introduce a
-> > functional regression?
-> > 
+> >>Cool. Then I can put away my RTL module for now. :)
+> >
+> > P.S. SDIO is auto detectable, and for BCM chips, the OOB interrupt
+> > is only a bonus function and it can fall back to standard in-band
+> > interrupt (which doesn't need special binding, and is currently
+> > used by mainline r8723bs driver.)
 > 
-> Yes, you are right. When the driver was developed, the MT bit was not supported
-> and I was told that it may be set later in certain HiSilicon platform, therefore
-> I checked this field in the code.
-> Now the MT bit is set in one platform, but the mapping between sccl_id/ccl_id and
-> affinity level is different from the origin encoding and needs to be updated.
-> Of course, there is no functional regression.
+> Correct. With BT you'll have serdev device nodes with different
+> compatibles. Then you'll have to resort to overlays, and you'd probably
+> end up adding WiFi OOB interrupt bits as well.
 > 
-> > Assuming that's the case, and you now have an SoC with MT set, then I don't
-> > think the comment above which says "If this changes in future, this shall be
-> > updated" can be correct, because changing the mapping will regress an older
-> > platform, won't it?
-> > 
+> So the question remaining is: should we enable the MMC part, along
+> with power sequencing and regulator supplies, by default? Thinking
+> more about it, I'm actually OK with it. The board connectors are
+> clearly marked as being for a WiFi+BT module. The whole space on
+> the board is surrounded by a box in silkscreen. Sorry for the
+> initial nack.
 > 
-> Agree, at the beginning, I am not sure about it in future. I will take this
-> information to the SoC team and drop this comment in next version.
+> Maxime, any thoughts?
 
-It's ok, I can drop the comment when I apply the patch.
+If there's a need for an overlay anyway, there's no real reason to
+enable it by default, especially if not everything is there.
 
-Thanks,
+Maxime
 
-Will
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/826045ec/attachment-0001.sig>
