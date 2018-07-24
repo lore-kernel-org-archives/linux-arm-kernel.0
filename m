@@ -1,41 +1,40 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Tue, 24 Jul 2018 16:17:00 +0800
-Subject: [PATCH v1 00/15] Add RDMA memory mode support for mediatek SOC MT2712
-Message-ID: <1532420235-22268-1-git-send-email-stu.hsieh@mediatek.com>
+Date: Tue, 24 Jul 2018 16:17:03 +0800
+Subject: [PATCH v1 03/15] drm/mediatek: add connection from RDMA1 to DSI0
+In-Reply-To: <1532420235-22268-1-git-send-email-stu.hsieh@mediatek.com>
+References: <1532420235-22268-1-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1532420235-22268-4-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series add RDMA memory mode support for mediatek SOC MT2712.
-MT2712 has three display data path, including three HW engine,
-two OVL and one RDMA.
+This patch add connection from RDMA1 to DSI0
 
-The RDMA used in third ddp and it need to be set memory mode,
-then RDMA could read data from memory and output to panel.
+Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Stu Hsieh (15):
-  drm/mediatek: add connection from RDMA0 to DPI1
-  drm/mediatek: add connection from RDMA0 to DSI1
-  drm/mediatek: add connection from RDMA1 to DSI0
-  drm/mediatek: add connection from RDMA2 to DSI0
-  drm/mediatek: add RDMA memory mode for crtc created
-  drm/mediatek: add memory mode for RDMA
-  drm/mediatek: add layer config to set RDMA for plane setting
-  drm/mediatek: add RGB color format support for RDMA
-  drm/mediatek: add YUYV/UYVY color format support for RDMA
-  drm/mediatek: add drm_device in RDMA for mamory mode to reaquest
-    buffer
-  drm/mediatek: add dummy buffer for RDMA memory mode
-  drm/mediatek: add layer number condition for RDMA to control plane
-  drm/mediatek: Update some variable name from ovl to comp
-  drm/mediatek: fixed the error value for add DSI1 in mutex
-  drm/mediatek: fixed connection from RDMA2 to DSI1
-
- drivers/gpu/drm/mediatek/mtk_disp_rdma.c    | 122 +++++++++++++++++++++++++++-
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |  59 +++++++++-----
- drivers/gpu/drm/mediatek/mtk_drm_crtc.h     |   4 +-
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c      |  20 ++++-
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |   2 +
- 5 files changed, 181 insertions(+), 26 deletions(-)
-
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index 310d8482d5a0..31189fad8d4e 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -124,6 +124,7 @@
+ #define DPI0_SEL_IN_RDMA2		0x3
+ #define DPI1_SEL_IN_RDMA1		(0x1 << 8)
+ #define DPI1_SEL_IN_RDMA2		(0x3 << 8)
++#define DSI0_SEL_IN_RDMA1		0x1
+ #define DSI1_SEL_IN_RDMA1		0x1
+ #define DSI1_SEL_IN_RDMA2		0x4
+ #define DSI2_SEL_IN_RDMA1		(0x1 << 16)
+@@ -290,6 +291,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
+ 	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DPI1) {
+ 		*addr = DISP_REG_CONFIG_DPI_SEL_IN;
+ 		value = DPI1_SEL_IN_RDMA1;
++	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DSI0) {
++		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
++		value = DSI0_SEL_IN_RDMA1;
+ 	} else if (cur == DDP_COMPONENT_RDMA1 && next == DDP_COMPONENT_DSI1) {
+ 		*addr = DISP_REG_CONFIG_DSIO_SEL_IN;
+ 		value = DSI1_SEL_IN_RDMA1;
 -- 
 2.12.5
