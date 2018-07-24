@@ -1,47 +1,37 @@
 From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 24 Jul 2018 11:34:48 +0000
-Subject: [PATCH v2 1/3] Revert "ARM: dts: imx7d: Invert legacy PCI irq
- mapping"
-In-Reply-To: <CAHQ1cqF7u2gjwYt1-16u-uimXHZ2SWsquabZSDftQn_yRurhSQ@mail.gmail.com>
-References: <cover.1532090446.git.leonard.crestez@nxp.com>
- <221deb47d7d38ecd6e0c7636f9a87ab693a3c539.1532090446.git.leonard.crestez@nxp.com>
- <CAHQ1cqF6TphuN8Ls54YA6bjty-bJF8twYboaG-RM=jox8CeQPA@mail.gmail.com>
- <42ff53eeea3067b19e3e16bed8392706502c8f23.camel@nxp.com>
- <CAHQ1cqF7u2gjwYt1-16u-uimXHZ2SWsquabZSDftQn_yRurhSQ@mail.gmail.com>
-Message-ID: <dfad19eec11f7f3affc51f1ecc41d3f6eaa65e7c.camel@nxp.com>
+Date: Tue, 24 Jul 2018 11:45:23 +0000
+Subject: [PATCH v3 2/3] soc: imx: gpc: clean up
+In-Reply-To: <1532425561377.1081@mixed-mode.de>
+References: <1532425561377.1081@mixed-mode.de>
+Message-ID: <73b2d272a68ba6a21c62857733f5333a30323fcc.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-07-23 at 11:38 -0700, Andrey Smirnov wrote:
-> On Mon, Jul 23, 2018 at 5:41 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
-> > On Fri, 2018-07-20 at 08:33 -0700, Andrey Smirnov wrote:
-> > > On Fri, Jul 20, 2018 at 5:48 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
-> > > > 
-> > > > This reverts commit 1c86c9dd82f859b474474a7fee0d5195da2c9c1d.
-> > > > 
-> > > > That commit followed the reference manual but unfortunately the imx7d
-> > > > manual is incorrect.
-> > > 
-> > > I'd also add similar comment to DT file to prevent people from trying
-> > > to "fix" this in the future.
-> > 
-> > I'll try to see if I can follow up internally with docs team to get
-> > this updated in the next revision of the reference manual.
-> 
-> Not sure if we are on the same page here, but what I meant is adding
-> the same explanation that is in your commit message to Device Tree
-> file as well so that if anyone looks at DT code and goes "Huh?" in the
-> future, they wouldn't have to research commit history to see the
-> reason why things the way they are.
+On Tue, 2018-07-24 at 09:46 +0000, Sven Schmitt wrote:
+> Remove unused #defines.
 
-OK, I will add a comment on irq mappings in the next version explaining
-that the reference manual is incorrect.
+This should be the title of the patch, "clean up" is too vague.
 
-> > > Also, this change is going to break QEMU's mapping found here:
-> > 
-> > I had no idea that existed, I guess somebody needs to fix that as well.
-> 
-> I take it it's a no to my "any chance you can fix that as well?" ;-).
-> I'll see if I can find time to do that this week.
+> --- a/drivers/soc/imx/gpc.c
+> +++ b/drivers/soc/imx/gpc.c
+> @@ -24,15 +24,11 @@
+>  #define GPC_PGC_CTRL_OFFS	0x0
+>  #define GPC_PGC_PUPSCR_OFFS	0x4
+>  #define GPC_PGC_PDNSCR_OFFS	0x8
+> -#define GPC_PGC_SW2ISO_SHIFT	0x8
+> -#define GPC_PGC_SW_SHIFT	0x0
 
-Sorry, I'm not familiar with qemu source at all.
+It would be cleaner if you used these defines when reading the sw/iso
+values.
+
+>  
+>  #define GPC_PGC_PCI_PDN		0x200
+>  #define GPC_PGC_PCI_SR		0x20c
+>  
+>  #define GPC_PGC_GPU_PDN		0x260
+> -#define GPC_PGC_GPU_PUPSCR	0x264
+> -#define GPC_PGC_GPU_PDNSCR	0x268
+>  #define GPC_PGC_GPU_SR		0x26c
+
+Each PGC has a fixed size and layout, maybe we could just have defines
+for the offset of the PGC? It would be somewhat similar to gpcv2
