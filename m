@@ -1,547 +1,259 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Tue, 24 Jul 2018 23:21:52 +0900
-Subject: [PATCH v6 3/6] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180716084706.28244-4-ravi.bangoria@linux.ibm.com>
-References: <20180716084706.28244-1-ravi.bangoria@linux.ibm.com>
- <20180716084706.28244-4-ravi.bangoria@linux.ibm.com>
-Message-ID: <20180724232152.3579ab9379ede04f410d315f@kernel.org>
+From: roy.pledge@nxp.com (Roy Pledge)
+Date: Tue, 24 Jul 2018 09:21:29 -0500
+Subject: [PATCH v3 2/4] staging:fsl-mc: Move DPIO from staging to
+ drivers/soc/fsl
+In-Reply-To: <20180724142131.28970-1-roy.pledge@nxp.com>
+References: <20180724142131.28970-1-roy.pledge@nxp.com>
+Message-ID: <20180724142131.28970-3-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ravi,
+Move the NXP DPIO (Datapath I/O Driver) out of the
+drivers/staging directory and into the drivers/soc/fsl directory.
 
-Thank you for updating the series. At least trace_uprobe side,
-it looks good to me ;)
+The DPIO driver enables access to Queue and Buffer Manager (QBMAN)
+hardware on NXP DPAA2 devices. This is a prerequisite to moving the
+DPAA2 Ethernet driver out of staging.
 
-Reviewed-by: Masami Hiramatsu <mhiramat@kernel.org>
+Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
+---
+ MAINTAINERS                                                    |  2 +-
+ drivers/crypto/caam/sg_sw_qm2.h                                |  2 +-
+ drivers/crypto/caam/sg_sw_sec4.h                               |  2 +-
+ drivers/soc/fsl/Kconfig                                        | 10 ++++++++++
+ drivers/soc/fsl/Makefile                                       |  1 +
+ drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/Makefile          |  0
+ drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-cmd.h        |  0
+ drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.c     |  2 +-
+ drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.txt   |  0
+ drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-service.c    |  2 +-
+ drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.c            |  0
+ drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.h            |  0
+ drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.c    |  2 +-
+ drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.h    |  2 +-
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h                 |  4 ++--
+ drivers/staging/fsl-mc/bus/Kconfig                             |  9 ---------
+ drivers/staging/fsl-mc/bus/Makefile                            |  2 --
+ {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-fd.h |  0
+ .../staging/fsl-mc/include => include/soc/fsl}/dpaa2-global.h  |  0
+ {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-io.h |  0
+ 20 files changed, 20 insertions(+), 20 deletions(-)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/Makefile (100%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-cmd.h (100%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.c (99%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.txt (100%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-service.c (99%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.c (100%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.h (100%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.c (99%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.h (99%)
+ rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-fd.h (100%)
+ rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-global.h (100%)
+ rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-io.h (100%)
 
-Thanks!
-
-On Mon, 16 Jul 2018 14:17:03 +0530
-Ravi Bangoria <ravi.bangoria@linux.ibm.com> wrote:
-
-> Userspace Statically Defined Tracepoints[1] are dtrace style markers
-> inside userspace applications. Applications like PostgreSQL, MySQL,
-> Pthread, Perl, Python, Java, Ruby, Node.js, libvirt, QEMU, glib etc
-> have these markers embedded in them. These markers are added by developer
-> at important places in the code. Each marker source expands to a single
-> nop instruction in the compiled code but there may be additional
-> overhead for computing the marker arguments which expands to couple of
-> instructions. In case the overhead is more, execution of it can be
-> omitted by runtime if() condition when no one is tracing on the marker:
-> 
->     if (reference_counter > 0) {
->         Execute marker instructions;
->     }
-> 
-> Default value of reference counter is 0. Tracer has to increment the
-> reference counter before tracing on a marker and decrement it when
-> done with the tracing.
-> 
-> Implement the reference counter logic in core uprobe. User will be
-> able to use it from trace_uprobe as well as from kernel module. New
-> trace_uprobe definition with reference counter will now be:
-> 
->     <path>:<offset>[(ref_ctr_offset)]
-> 
-> where ref_ctr_offset is an optional field. For kernel module, new
-> variant of uprobe_register() has been introduced:
-> 
->     uprobe_register_refctr(inode, offset, ref_ctr_offset, consumer)
-> 
-> No new variant for uprobe_unregister() because it's assumed to have
-> only one reference counter for one uprobe.
-> 
-> [1] https://sourceware.org/systemtap/wiki/UserSpaceProbeImplementation
-> 
-> Note: 'reference counter' is called as 'semaphore' in original Dtrace
-> (or Systemtap, bcc and even in ELF) documentation and code. But the
-> term 'semaphore' is misleading in this context. This is just a counter
-> used to hold number of tracers tracing on a marker. This is not really
-> used for any synchronization. So we are referring it as 'reference
-> counter' in kernel / perf code.
-> 
-> Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
-> ---
->  include/linux/uprobes.h     |   5 +
->  kernel/events/uprobes.c     | 232 ++++++++++++++++++++++++++++++++++++++++++--
->  kernel/trace/trace.c        |   2 +-
->  kernel/trace/trace_uprobe.c |  38 +++++++-
->  4 files changed, 267 insertions(+), 10 deletions(-)
-> 
-> diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-> index bb9d2084af03..103a48a48872 100644
-> --- a/include/linux/uprobes.h
-> +++ b/include/linux/uprobes.h
-> @@ -123,6 +123,7 @@ extern unsigned long uprobe_get_swbp_addr(struct pt_regs *regs);
->  extern unsigned long uprobe_get_trap_addr(struct pt_regs *regs);
->  extern int uprobe_write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr, uprobe_opcode_t);
->  extern int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *uc);
-> +extern int uprobe_register_refctr(struct inode *inode, loff_t offset, loff_t ref_ctr_offset, struct uprobe_consumer *uc);
->  extern int uprobe_apply(struct inode *inode, loff_t offset, struct uprobe_consumer *uc, bool);
->  extern void uprobe_unregister(struct inode *inode, loff_t offset, struct uprobe_consumer *uc);
->  extern int uprobe_mmap(struct vm_area_struct *vma);
-> @@ -160,6 +161,10 @@ uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *uc)
->  {
->  	return -ENOSYS;
->  }
-> +static inline int uprobe_register_refctr(struct inode *inode, loff_t offset, loff_t ref_ctr_offset, struct uprobe_consumer *uc)
-> +{
-> +	return -ENOSYS;
-> +}
->  static inline int
->  uprobe_apply(struct inode *inode, loff_t offset, struct uprobe_consumer *uc, bool add)
->  {
-> diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-> index c0418ba52ba8..84da8512a974 100644
-> --- a/kernel/events/uprobes.c
-> +++ b/kernel/events/uprobes.c
-> @@ -73,6 +73,7 @@ struct uprobe {
->  	struct uprobe_consumer	*consumers;
->  	struct inode		*inode;		/* Also hold a ref to inode */
->  	loff_t			offset;
-> +	loff_t			ref_ctr_offset;
->  	unsigned long		flags;
->  
->  	/*
-> @@ -88,6 +89,15 @@ struct uprobe {
->  	struct arch_uprobe	arch;
->  };
->  
-> +struct delayed_uprobe {
-> +	struct list_head list;
-> +	struct uprobe *uprobe;
-> +	struct mm_struct *mm;
-> +};
-> +
-> +static DEFINE_MUTEX(delayed_uprobe_lock);
-> +static LIST_HEAD(delayed_uprobe_list);
-> +
->  /*
->   * Execute out of line area: anonymous executable mapping installed
->   * by the probed task to execute the copy of the original instruction
-> @@ -282,6 +292,154 @@ static int verify_opcode(struct page *page, unsigned long vaddr, uprobe_opcode_t
->  	return 1;
->  }
->  
-> +static struct delayed_uprobe *
-> +delayed_uprobe_check(struct uprobe *uprobe, struct mm_struct *mm)
-> +{
-> +	struct delayed_uprobe *du;
-> +
-> +	list_for_each_entry(du, &delayed_uprobe_list, list)
-> +		if (du->uprobe == uprobe && du->mm == mm)
-> +			return du;
-> +	return NULL;
-> +}
-> +
-> +static int delayed_uprobe_add(struct uprobe *uprobe, struct mm_struct *mm)
-> +{
-> +	struct delayed_uprobe *du;
-> +
-> +	if (delayed_uprobe_check(uprobe, mm))
-> +		return 0;
-> +
-> +	du  = kzalloc(sizeof(*du), GFP_KERNEL);
-> +	if (!du)
-> +		return -ENOMEM;
-> +
-> +	du->uprobe = uprobe;
-> +	du->mm = mm;
-> +	list_add(&du->list, &delayed_uprobe_list);
-> +	return 0;
-> +}
-> +
-> +static void delayed_uprobe_delete(struct delayed_uprobe *du)
-> +{
-> +	if (!du)
-> +		return;
-> +	list_del(&du->list);
-> +	kfree(du);
-> +}
-> +
-> +static void delayed_uprobe_remove(struct uprobe *uprobe, struct mm_struct *mm)
-> +{
-> +	struct list_head *pos, *q;
-> +	struct delayed_uprobe *du;
-> +
-> +	list_for_each_safe(pos, q, &delayed_uprobe_list) {
-> +		du = list_entry(pos, struct delayed_uprobe, list);
-> +		if (uprobe) {
-> +			if (du->uprobe == uprobe && du->mm == mm)
-> +				delayed_uprobe_delete(du);
-> +		} else if (du->mm == mm) {
-> +			delayed_uprobe_delete(du);
-> +		}
-> +	}
-> +}
-> +
-> +static bool valid_ref_ctr_vma(struct uprobe *uprobe,
-> +			      struct vm_area_struct *vma)
-> +{
-> +	unsigned long vaddr = offset_to_vaddr(vma, uprobe->ref_ctr_offset);
-> +
-> +	return uprobe->ref_ctr_offset &&
-> +		vma->vm_file &&
-> +		file_inode(vma->vm_file) == uprobe->inode &&
-> +		vma->vm_flags & VM_WRITE &&
-> +		!(vma->vm_flags & VM_SHARED) &&
-> +		vma->vm_start <= vaddr &&
-> +		vma->vm_end > vaddr;
-> +}
-> +
-> +static struct vm_area_struct *
-> +find_ref_ctr_vma(struct uprobe *uprobe, struct mm_struct *mm)
-> +{
-> +	struct vm_area_struct *tmp;
-> +
-> +	for (tmp = mm->mmap; tmp; tmp = tmp->vm_next)
-> +		if (valid_ref_ctr_vma(uprobe, tmp))
-> +			return tmp;
-> +
-> +	return NULL;
-> +}
-> +
-> +static int
-> +__update_ref_ctr(struct mm_struct *mm, unsigned long vaddr, short d)
-> +{
-> +	void *kaddr;
-> +	struct page *page;
-> +	struct vm_area_struct *vma;
-> +	int ret = 0;
-> +	short *ptr;
-> +
-> +	if (vaddr == 0 || d == 0)
-> +		return -EINVAL;
-> +
-> +	ret = get_user_pages_remote(NULL, mm, vaddr, 1,
-> +			FOLL_WRITE, &page, &vma, NULL);
-> +	if (unlikely(ret <= 0)) {
-> +		/*
-> +		 * We are asking for 1 page. If get_user_pages_remote() fails,
-> +		 * it may return 0, in that case we have to return error.
-> +		 */
-> +		ret = (ret == 0) ? -EBUSY : ret;
-> +		pr_warn("Failed to %s ref_ctr. (%d)\n",
-> +			d > 0 ? "increment" : "decrement", ret);
-> +		return ret;
-> +	}
-> +
-> +	kaddr = kmap_atomic(page);
-> +	ptr = kaddr + (vaddr & ~PAGE_MASK);
-> +
-> +	if (unlikely(*ptr + d < 0)) {
-> +		pr_warn("ref_ctr going negative. vaddr: 0x%lx, "
-> +			"curr val: %d, delta: %d\n", vaddr, *ptr, d);
-> +		ret = -EINVAL;
-> +		goto out;
-> +	}
-> +
-> +	*ptr += d;
-> +	ret = 0;
-> +out:
-> +	kunmap_atomic(kaddr);
-> +	put_page(page);
-> +	return ret;
-> +}
-> +
-> +static int update_ref_ctr(struct uprobe *uprobe, struct mm_struct *mm,
-> +			  bool is_register)
-> +{
-> +	struct vm_area_struct *rc_vma;
-> +	unsigned long rc_vaddr;
-> +	int ret = 0;
-> +
-> +	rc_vma = find_ref_ctr_vma(uprobe, mm);
-> +
-> +	if (rc_vma) {
-> +		rc_vaddr = offset_to_vaddr(rc_vma, uprobe->ref_ctr_offset);
-> +		ret = __update_ref_ctr(mm, rc_vaddr, is_register ? 1 : -1);
-> +
-> +		if (is_register)
-> +			return ret;
-> +	}
-> +
-> +	mutex_lock(&delayed_uprobe_lock);
-> +	if (is_register)
-> +		ret = delayed_uprobe_add(uprobe, mm);
-> +	else
-> +		delayed_uprobe_remove(uprobe, mm);
-> +	mutex_unlock(&delayed_uprobe_lock);
-> +
-> +	return ret;
-> +}
-> +
->  /*
->   * NOTE:
->   * Expect the breakpoint instruction to be the smallest size instruction for
-> @@ -302,9 +460,13 @@ static int verify_opcode(struct page *page, unsigned long vaddr, uprobe_opcode_t
->  int uprobe_write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm,
->  			unsigned long vaddr, uprobe_opcode_t opcode)
->  {
-> +	struct uprobe *uprobe;
->  	struct page *old_page, *new_page;
->  	struct vm_area_struct *vma;
-> -	int ret;
-> +	int ret, is_register, ref_ctr_updated = 0;
-> +
-> +	is_register = is_swbp_insn(&opcode);
-> +	uprobe = container_of(auprobe, struct uprobe, arch);
->  
->  retry:
->  	/* Read the page with vaddr into memory */
-> @@ -317,6 +479,15 @@ int uprobe_write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm,
->  	if (ret <= 0)
->  		goto put_old;
->  
-> +	/* We are going to replace instruction, update ref_ctr. */
-> +	if (!ref_ctr_updated && uprobe->ref_ctr_offset) {
-> +		ret = update_ref_ctr(uprobe, mm, is_register);
-> +		if (ret)
-> +			goto put_old;
-> +
-> +		ref_ctr_updated = 1;
-> +	}
-> +
->  	ret = anon_vma_prepare(vma);
->  	if (ret)
->  		goto put_old;
-> @@ -337,6 +508,11 @@ int uprobe_write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm,
->  
->  	if (unlikely(ret == -EAGAIN))
->  		goto retry;
-> +
-> +	/* Revert back reference counter if instruction update failed. */
-> +	if (ret && is_register && ref_ctr_updated)
-> +		update_ref_ctr(uprobe, mm, false);
-> +
->  	return ret;
->  }
->  
-> @@ -484,7 +660,8 @@ static struct uprobe *insert_uprobe(struct uprobe *uprobe)
->  	return u;
->  }
->  
-> -static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset)
-> +static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset,
-> +				   loff_t ref_ctr_offset)
->  {
->  	struct uprobe *uprobe, *cur_uprobe;
->  
-> @@ -494,6 +671,7 @@ static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset)
->  
->  	uprobe->inode = inode;
->  	uprobe->offset = offset;
-> +	uprobe->ref_ctr_offset = ref_ctr_offset;
->  	init_rwsem(&uprobe->register_rwsem);
->  	init_rwsem(&uprobe->consumer_rwsem);
->  
-> @@ -895,7 +1073,7 @@ EXPORT_SYMBOL_GPL(uprobe_unregister);
->   * else return 0 (success)
->   */
->  static int __uprobe_register(struct inode *inode, loff_t offset,
-> -			     struct uprobe_consumer *uc)
-> +			     loff_t ref_ctr_offset, struct uprobe_consumer *uc)
->  {
->  	struct uprobe *uprobe;
->  	int ret;
-> @@ -912,7 +1090,7 @@ static int __uprobe_register(struct inode *inode, loff_t offset,
->  		return -EINVAL;
->  
->   retry:
-> -	uprobe = alloc_uprobe(inode, offset);
-> +	uprobe = alloc_uprobe(inode, offset, ref_ctr_offset);
->  	if (!uprobe)
->  		return -ENOMEM;
->  	/*
-> @@ -938,10 +1116,17 @@ static int __uprobe_register(struct inode *inode, loff_t offset,
->  int uprobe_register(struct inode *inode, loff_t offset,
->  		    struct uprobe_consumer *uc)
->  {
-> -	return __uprobe_register(inode, offset, uc);
-> +	return __uprobe_register(inode, offset, 0, uc);
->  }
->  EXPORT_SYMBOL_GPL(uprobe_register);
->  
-> +int uprobe_register_refctr(struct inode *inode, loff_t offset,
-> +			   loff_t ref_ctr_offset, struct uprobe_consumer *uc)
-> +{
-> +	return __uprobe_register(inode, offset, ref_ctr_offset, uc);
-> +}
-> +EXPORT_SYMBOL_GPL(uprobe_register_refctr);
-> +
->  /*
->   * uprobe_apply - unregister a already registered probe.
->   * @inode: the file in which the probe has to be removed.
-> @@ -1060,6 +1245,31 @@ static void build_probe_list(struct inode *inode,
->  	spin_unlock(&uprobes_treelock);
->  }
->  
-> +static int delayed_uprobe_install(struct vm_area_struct *vma)
-> +{
-> +	struct list_head *pos, *q;
-> +	struct delayed_uprobe *du;
-> +	unsigned long vaddr;
-> +	int ret = 0, err = 0;
-> +
-> +	mutex_lock(&delayed_uprobe_lock);
-> +	list_for_each_safe(pos, q, &delayed_uprobe_list) {
-> +		du = list_entry(pos, struct delayed_uprobe, list);
-> +
-> +		if (!du->uprobe->ref_ctr_offset ||
-> +		    !valid_ref_ctr_vma(du->uprobe, vma))
-> +			continue;
-> +
-> +		vaddr = offset_to_vaddr(vma, du->uprobe->ref_ctr_offset);
-> +		ret = __update_ref_ctr(vma->vm_mm, vaddr, 1);
-> +		/* Record an error and continue. */
-> +		err = ret & !err ? ret : err;
-> +		delayed_uprobe_delete(du);
-> +	}
-> +	mutex_unlock(&delayed_uprobe_lock);
-> +	return err;
-> +}
-> +
->  /*
->   * Called from mmap_region/vma_adjust with mm->mmap_sem acquired.
->   *
-> @@ -1072,7 +1282,13 @@ int uprobe_mmap(struct vm_area_struct *vma)
->  	struct uprobe *uprobe, *u;
->  	struct inode *inode;
->  
-> -	if (no_uprobe_events() || !valid_vma(vma, true))
-> +	if (no_uprobe_events())
-> +		return 0;
-> +
-> +	if (vma->vm_flags & VM_WRITE)
-> +		delayed_uprobe_install(vma);
-> +
-> +	if (!valid_vma(vma, true))
->  		return 0;
->  
->  	inode = file_inode(vma->vm_file);
-> @@ -1246,6 +1462,10 @@ void uprobe_clear_state(struct mm_struct *mm)
->  {
->  	struct xol_area *area = mm->uprobes_state.xol_area;
->  
-> +	mutex_lock(&delayed_uprobe_lock);
-> +	delayed_uprobe_remove(NULL, mm);
-> +	mutex_unlock(&delayed_uprobe_lock);
-> +
->  	if (!area)
->  		return;
->  
-> diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
-> index f054bd6a1c66..b431790779f7 100644
-> --- a/kernel/trace/trace.c
-> +++ b/kernel/trace/trace.c
-> @@ -4614,7 +4614,7 @@ static const char readme_msg[] =
->    "place (kretprobe): [<module>:]<symbol>[+<offset>]|<memaddr>\n"
->  #endif
->  #ifdef CONFIG_UPROBE_EVENTS
-> -	"\t    place: <path>:<offset>\n"
-> +  "   place (uprobe): <path>:<offset>[(ref_ctr_offset)]\n"
->  #endif
->  	"\t     args: <name>=fetcharg[:type]\n"
->  	"\t fetcharg: %<register>, @<address>, @<symbol>[+|-<offset>],\n"
-> diff --git a/kernel/trace/trace_uprobe.c b/kernel/trace/trace_uprobe.c
-> index bf89a51e740d..bf2be098eb08 100644
-> --- a/kernel/trace/trace_uprobe.c
-> +++ b/kernel/trace/trace_uprobe.c
-> @@ -59,6 +59,7 @@ struct trace_uprobe {
->  	struct inode			*inode;
->  	char				*filename;
->  	unsigned long			offset;
-> +	unsigned long			ref_ctr_offset;
->  	unsigned long			nhit;
->  	struct trace_probe		tp;
->  };
-> @@ -364,10 +365,10 @@ static int register_trace_uprobe(struct trace_uprobe *tu)
->  static int create_trace_uprobe(int argc, char **argv)
->  {
->  	struct trace_uprobe *tu;
-> -	char *arg, *event, *group, *filename;
-> +	char *arg, *event, *group, *filename, *rctr, *rctr_end;
->  	char buf[MAX_EVENT_NAME_LEN];
->  	struct path path;
-> -	unsigned long offset;
-> +	unsigned long offset, ref_ctr_offset;
->  	bool is_delete, is_return;
->  	int i, ret;
->  
-> @@ -376,6 +377,7 @@ static int create_trace_uprobe(int argc, char **argv)
->  	is_return = false;
->  	event = NULL;
->  	group = NULL;
-> +	ref_ctr_offset = 0;
->  
->  	/* argc must be >= 1 */
->  	if (argv[0][0] == '-')
-> @@ -450,6 +452,26 @@ static int create_trace_uprobe(int argc, char **argv)
->  		goto fail_address_parse;
->  	}
->  
-> +	/* Parse reference counter offset if specified. */
-> +	rctr = strchr(arg, '(');
-> +	if (rctr) {
-> +		rctr_end = strchr(rctr, ')');
-> +		if (rctr > rctr_end || *(rctr_end + 1) != 0) {
-> +			ret = -EINVAL;
-> +			pr_info("Invalid reference counter offset.\n");
-> +			goto fail_address_parse;
-> +		}
-> +
-> +		*rctr++ = '\0';
-> +		*rctr_end = '\0';
-> +		ret = kstrtoul(rctr, 0, &ref_ctr_offset);
-> +		if (ret) {
-> +			pr_info("Invalid reference counter offset.\n");
-> +			goto fail_address_parse;
-> +		}
-> +	}
-> +
-> +	/* Parse uprobe offset. */
->  	ret = kstrtoul(arg, 0, &offset);
->  	if (ret)
->  		goto fail_address_parse;
-> @@ -484,6 +506,7 @@ static int create_trace_uprobe(int argc, char **argv)
->  		goto fail_address_parse;
->  	}
->  	tu->offset = offset;
-> +	tu->ref_ctr_offset = ref_ctr_offset;
->  	tu->path = path;
->  	tu->filename = kstrdup(filename, GFP_KERNEL);
->  
-> @@ -602,6 +625,9 @@ static int probes_seq_show(struct seq_file *m, void *v)
->  			trace_event_name(&tu->tp.call), tu->filename,
->  			(int)(sizeof(void *) * 2), tu->offset);
->  
-> +	if (tu->ref_ctr_offset)
-> +		seq_printf(m, "(0x%lx)", tu->ref_ctr_offset);
-> +
->  	for (i = 0; i < tu->tp.nr_args; i++)
->  		seq_printf(m, " %s=%s", tu->tp.args[i].name, tu->tp.args[i].comm);
->  
-> @@ -917,7 +943,13 @@ probe_event_enable(struct trace_uprobe *tu, struct trace_event_file *file,
->  
->  	tu->consumer.filter = filter;
->  	tu->inode = d_real_inode(tu->path.dentry);
-> -	ret = uprobe_register(tu->inode, tu->offset, &tu->consumer);
-> +	if (tu->ref_ctr_offset) {
-> +		ret = uprobe_register_refctr(tu->inode, tu->offset,
-> +				tu->ref_ctr_offset, &tu->consumer);
-> +	} else {
-> +		ret = uprobe_register(tu->inode, tu->offset, &tu->consumer);
-> +	}
-> +
->  	if (ret)
->  		goto err_buffer;
->  
-> -- 
-> 2.14.4
-> 
-
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 0fe4228..34ce842 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -4418,7 +4418,7 @@ DPAA2 DATAPATH I/O (DPIO) DRIVER
+ M:	Roy Pledge <Roy.Pledge@nxp.com>
+ L:	linux-kernel at vger.kernel.org
+ S:	Maintained
+-F:	drivers/staging/fsl-mc/bus/dpio
++F:	drivers/soc/fsl/dpio
+ 
+ DPAA2 ETHERNET DRIVER
+ M:	Ioana Radulescu <ruxandra.radulescu@nxp.com>
+diff --git a/drivers/crypto/caam/sg_sw_qm2.h b/drivers/crypto/caam/sg_sw_qm2.h
+index 31b4407..b5b4c12 100644
+--- a/drivers/crypto/caam/sg_sw_qm2.h
++++ b/drivers/crypto/caam/sg_sw_qm2.h
+@@ -35,7 +35,7 @@
+ #ifndef _SG_SW_QM2_H_
+ #define _SG_SW_QM2_H_
+ 
+-#include "../../../drivers/staging/fsl-mc/include/dpaa2-fd.h"
++#include <soc/fsl/dpaa2-fd.h>
+ 
+ static inline void dma_to_qm_sg_one(struct dpaa2_sg_entry *qm_sg_ptr,
+ 				    dma_addr_t dma, u32 len, u16 offset)
+diff --git a/drivers/crypto/caam/sg_sw_sec4.h b/drivers/crypto/caam/sg_sw_sec4.h
+index e586ffa..dbfa9fc 100644
+--- a/drivers/crypto/caam/sg_sw_sec4.h
++++ b/drivers/crypto/caam/sg_sw_sec4.h
+@@ -12,7 +12,7 @@
+ #include "ctrl.h"
+ #include "regs.h"
+ #include "sg_sw_qm2.h"
+-#include "../../../drivers/staging/fsl-mc/include/dpaa2-fd.h"
++#include <soc/fsl/dpaa2-fd.h>
+ 
+ struct sec4_sg_entry {
+ 	u64 ptr;
+diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
+index 7a9fb9b..c17bf38 100644
+--- a/drivers/soc/fsl/Kconfig
++++ b/drivers/soc/fsl/Kconfig
+@@ -16,3 +16,13 @@ config FSL_GUTS
+ 	  Initially only reading SVR and registering soc device are supported.
+ 	  Other guts accesses, such as reading RCW, should eventually be moved
+ 	  into this driver as well.
++
++config FSL_MC_DPIO
++        tristate "QorIQ DPAA2 DPIO driver"
++        depends on FSL_MC_BUS
++        help
++	  Driver for the DPAA2 DPIO object.  A DPIO provides queue and
++	  buffer management facilities for software to interact with
++	  other DPAA2 objects. This driver does not expose the DPIO
++	  objects individually, but groups them under a service layer
++	  API.
+diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
+index 44b3beb..803ef1b 100644
+--- a/drivers/soc/fsl/Makefile
++++ b/drivers/soc/fsl/Makefile
+@@ -6,3 +6,4 @@ obj-$(CONFIG_FSL_DPAA)                 += qbman/
+ obj-$(CONFIG_QUICC_ENGINE)		+= qe/
+ obj-$(CONFIG_CPM)			+= qe/
+ obj-$(CONFIG_FSL_GUTS)			+= guts.o
++obj-$(CONFIG_FSL_MC_DPIO) 		+= dpio/
+diff --git a/drivers/staging/fsl-mc/bus/dpio/Makefile b/drivers/soc/fsl/dpio/Makefile
+similarity index 100%
+rename from drivers/staging/fsl-mc/bus/dpio/Makefile
+rename to drivers/soc/fsl/dpio/Makefile
+diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio-cmd.h b/drivers/soc/fsl/dpio/dpio-cmd.h
+similarity index 100%
+rename from drivers/staging/fsl-mc/bus/dpio/dpio-cmd.h
+rename to drivers/soc/fsl/dpio/dpio-cmd.h
+diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c b/drivers/soc/fsl/dpio/dpio-driver.c
+similarity index 99%
+rename from drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
+rename to drivers/soc/fsl/dpio/dpio-driver.c
+index 11a90a9..b60b77b 100644
+--- a/drivers/staging/fsl-mc/bus/dpio/dpio-driver.c
++++ b/drivers/soc/fsl/dpio/dpio-driver.c
+@@ -16,7 +16,7 @@
+ #include <linux/io.h>
+ 
+ #include <linux/fsl/mc.h>
+-#include "../../include/dpaa2-io.h"
++#include <soc/fsl/dpaa2-io.h>
+ 
+ #include "qbman-portal.h"
+ #include "dpio.h"
+diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio-driver.txt b/drivers/soc/fsl/dpio/dpio-driver.txt
+similarity index 100%
+rename from drivers/staging/fsl-mc/bus/dpio/dpio-driver.txt
+rename to drivers/soc/fsl/dpio/dpio-driver.txt
+diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio-service.c b/drivers/soc/fsl/dpio/dpio-service.c
+similarity index 99%
+rename from drivers/staging/fsl-mc/bus/dpio/dpio-service.c
+rename to drivers/soc/fsl/dpio/dpio-service.c
+index 14ed2be..9b17f72 100644
+--- a/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
++++ b/drivers/soc/fsl/dpio/dpio-service.c
+@@ -6,7 +6,7 @@
+  */
+ #include <linux/types.h>
+ #include <linux/fsl/mc.h>
+-#include "../../include/dpaa2-io.h"
++#include <soc/fsl/dpaa2-io.h>
+ #include <linux/init.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio.c b/drivers/soc/fsl/dpio/dpio.c
+similarity index 100%
+rename from drivers/staging/fsl-mc/bus/dpio/dpio.c
+rename to drivers/soc/fsl/dpio/dpio.c
+diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio.h b/drivers/soc/fsl/dpio/dpio.h
+similarity index 100%
+rename from drivers/staging/fsl-mc/bus/dpio/dpio.h
+rename to drivers/soc/fsl/dpio/dpio.h
+diff --git a/drivers/staging/fsl-mc/bus/dpio/qbman-portal.c b/drivers/soc/fsl/dpio/qbman-portal.c
+similarity index 99%
+rename from drivers/staging/fsl-mc/bus/dpio/qbman-portal.c
+rename to drivers/soc/fsl/dpio/qbman-portal.c
+index 116fafb..cf1d448 100644
+--- a/drivers/staging/fsl-mc/bus/dpio/qbman-portal.c
++++ b/drivers/soc/fsl/dpio/qbman-portal.c
+@@ -8,7 +8,7 @@
+ #include <asm/cacheflush.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
+-#include "../../include/dpaa2-global.h"
++#include <soc/fsl/dpaa2-global.h>
+ 
+ #include "qbman-portal.h"
+ 
+diff --git a/drivers/staging/fsl-mc/bus/dpio/qbman-portal.h b/drivers/soc/fsl/dpio/qbman-portal.h
+similarity index 99%
+rename from drivers/staging/fsl-mc/bus/dpio/qbman-portal.h
+rename to drivers/soc/fsl/dpio/qbman-portal.h
+index 69db3c8..89d1dd9 100644
+--- a/drivers/staging/fsl-mc/bus/dpio/qbman-portal.h
++++ b/drivers/soc/fsl/dpio/qbman-portal.h
+@@ -7,7 +7,7 @@
+ #ifndef __FSL_QBMAN_PORTAL_H
+ #define __FSL_QBMAN_PORTAL_H
+ 
+-#include "../../include/dpaa2-fd.h"
++#include <soc/fsl/dpaa2-fd.h>
+ 
+ struct dpaa2_dq;
+ struct qbman_swp;
+diff --git a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+index 9269cb0..f2917b5 100644
+--- a/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
++++ b/drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h
+@@ -37,8 +37,8 @@
+ #include <linux/if_vlan.h>
+ #include <linux/fsl/mc.h>
+ 
+-#include "../../fsl-mc/include/dpaa2-io.h"
+-#include "../../fsl-mc/include/dpaa2-fd.h"
++#include <soc/fsl/dpaa2-io.h>
++#include <soc/fsl/dpaa2-fd.h>
+ #include "dpni.h"
+ #include "dpni-cmd.h"
+ 
+diff --git a/drivers/staging/fsl-mc/bus/Kconfig b/drivers/staging/fsl-mc/bus/Kconfig
+index 3424530..90f234d 100644
+--- a/drivers/staging/fsl-mc/bus/Kconfig
++++ b/drivers/staging/fsl-mc/bus/Kconfig
+@@ -5,12 +5,3 @@
+ # Copyright (C) 2014-2016 Freescale Semiconductor, Inc.
+ #
+ 
+-config FSL_MC_DPIO
+-        tristate "QorIQ DPAA2 DPIO driver"
+-        depends on FSL_MC_BUS
+-        help
+-	  Driver for the DPAA2 DPIO object.  A DPIO provides queue and
+-	  buffer management facilities for software to interact with
+-	  other DPAA2 objects. This driver does not expose the DPIO
+-	  objects individually, but groups them under a service layer
+-	  API.
+diff --git a/drivers/staging/fsl-mc/bus/Makefile b/drivers/staging/fsl-mc/bus/Makefile
+index 21d8ebc..2141e4b 100644
+--- a/drivers/staging/fsl-mc/bus/Makefile
++++ b/drivers/staging/fsl-mc/bus/Makefile
+@@ -5,5 +5,3 @@
+ # Copyright (C) 2014 Freescale Semiconductor, Inc.
+ #
+ 
+-# MC DPIO driver
+-obj-$(CONFIG_FSL_MC_DPIO) += dpio/
+diff --git a/drivers/staging/fsl-mc/include/dpaa2-fd.h b/include/soc/fsl/dpaa2-fd.h
+similarity index 100%
+rename from drivers/staging/fsl-mc/include/dpaa2-fd.h
+rename to include/soc/fsl/dpaa2-fd.h
+diff --git a/drivers/staging/fsl-mc/include/dpaa2-global.h b/include/soc/fsl/dpaa2-global.h
+similarity index 100%
+rename from drivers/staging/fsl-mc/include/dpaa2-global.h
+rename to include/soc/fsl/dpaa2-global.h
+diff --git a/drivers/staging/fsl-mc/include/dpaa2-io.h b/include/soc/fsl/dpaa2-io.h
+similarity index 100%
+rename from drivers/staging/fsl-mc/include/dpaa2-io.h
+rename to include/soc/fsl/dpaa2-io.h
 -- 
-Masami Hiramatsu <mhiramat@kernel.org>
+2.7.4
