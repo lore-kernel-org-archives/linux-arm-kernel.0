@@ -1,87 +1,141 @@
-From: zhangshaokun@hisilicon.com (Zhangshaokun)
-Date: Tue, 24 Jul 2018 19:06:11 +0800
-Subject: [PATCH] drivers/perf: hisi: update the sccl_id/ccl_id when MT is
- supported
-In-Reply-To: <20180723144220.GB9450@arm.com>
-References: <1531999600-24266-1-git-send-email-zhangshaokun@hisilicon.com>
- <20180723144220.GB9450@arm.com>
-Message-ID: <e4f0cfe5-0724-1551-01ea-ab26c8aee229@hisilicon.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Tue, 24 Jul 2018 20:10:39 +0900
+Subject: [PATCH 1/4] dt-bindings: phy: add DT bindings for UniPhier USB3
+ PHY driver
+In-Reply-To: <CAL_JsqKjC3J16uk2GTQyTquMbvO5Aw6kr4BfdNLAfZHD3MuBgQ@mail.gmail.com>
+References: <20180717195531.8587.4A936039@socionext.com>
+ <CAL_JsqKjC3J16uk2GTQyTquMbvO5Aw6kr4BfdNLAfZHD3MuBgQ@mail.gmail.com>
+Message-ID: <20180724201039.F6E6.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Rob,
 
-On 2018/7/23 22:42, Will Deacon wrote:
-> On Thu, Jul 19, 2018 at 07:26:40PM +0800, Shaokun Zhang wrote:
->> MT bit in MPIDR_EL1 is now supported in certain HiSilicon platforms, so
->> the mapping between sccl_id/ccl_id and affinity level needs to be updated
->> from the generic encoding we originally used.
->>
->> Cc: John Garry <john.garry@huawei.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
->> ---
->>  drivers/perf/hisilicon/hisi_uncore_pmu.c | 13 ++++++++-----
->>  1 file changed, 8 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/perf/hisilicon/hisi_uncore_pmu.c b/drivers/perf/hisilicon/hisi_uncore_pmu.c
->> index 44df613..b3c5ae9 100644
->> --- a/drivers/perf/hisilicon/hisi_uncore_pmu.c
->> +++ b/drivers/perf/hisilicon/hisi_uncore_pmu.c
->> @@ -350,19 +350,22 @@ void hisi_uncore_pmu_disable(struct pmu *pmu)
->>  
->>  /*
->>   * Read Super CPU cluster and CPU cluster ID from MPIDR_EL1.
->> - * If multi-threading is supported, SCCL_ID is in MPIDR[aff3] and CCL_ID
->> - * is in MPIDR[aff2]; if not, SCCL_ID is in MPIDR[aff2] and CCL_ID is
->> - * in MPIDR[aff1]. If this changes in future, this shall be updated.
->> + * If multi-threading is supported, CCL_ID is the low 3-bits in MPIDR[Aff2]
->> + * and SCCL_ID is the upper 5-bits of Aff2 field; if not, SCCL_ID
->> + * is in MPIDR[Aff2] and CCL_ID is in MPIDR[Aff1]. If this changes in
->> + * future, this shall be updated.
->>   */
->>  static void hisi_read_sccl_and_ccl_id(int *sccl_id, int *ccl_id)
->>  {
->>  	u64 mpidr = read_cpuid_mpidr();
->>  
->>  	if (mpidr & MPIDR_MT_BITMASK) {
+On Tue, 17 Jul 2018 08:16:23 -0600 <robh@kernel.org> wrote:
+
+> On Tue, Jul 17, 2018 at 4:55 AM Kunihiko Hayashi
+> <hayashi.kunihiko@socionext.com> wrote:
+> >
+> > Hi Rob,
+> > Thank you for your comments.
+> >
+> > On Mon, 16 Jul 2018 14:50:49 -0600 <robh@kernel.org> wrote:
+> >
+> > > On Fri, Jun 29, 2018 at 05:38:58PM +0900, Kunihiko Hayashi wrote:
+> > > > Add DT bindings for PHY interface built into USB3 controller
+> > > > implemented in UniPhier SoCs.
+> > > >
+> > > > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > > > ---
+> > > >  .../devicetree/bindings/phy/uniphier-usb3-phy.txt  | 118 +++++++++++++++++++++
 > 
-> So, to be clear, you're saying that the MT bit was not set in any previous
-> SoC with this PMU, and therefore changing this logic doesn't introduce a
-> functional regression?
+> [...]
 > 
-
-Yes, you are right. When the driver was developed, the MT bit was not supported
-and I was told that it may be set later in certain HiSilicon platform, therefore
-I checked this field in the code.
-Now the MT bit is set in one platform, but the mapping between sccl_id/ccl_id and
-affinity level is different from the origin encoding and needs to be updated.
-Of course, there is no functional regression.
-
-> Assuming that's the case, and you now have an SoC with MT set, then I don't
-> think the comment above which says "If this changes in future, this shall be
-> updated" can be correct, because changing the mapping will regress an older
-> platform, won't it?
+> > > > +Optional properties:
+> > > > +- phy-supply: A phandle to the regulator for USB VBUS.
+> > >
+> > > The phy actually needs Vbus or you just want to control Vbus from the
+> > > phy driver?
+> >
+> > To enable each USB port correspond with phy, we must enable Vbus for each port.
+> > However, the host driver doesn't have the way to control regulators directly,
+> > then I think it is reasonable to control Vbus by using phy regulator.
 > 
+> DT should reflect the h/w. If Vbus rail is powering the phy then it
+> should be in the phy node. If you just happen to want to put Vbus
+> control in the phy driver, that's an OS problem and doesn't belong in
+> DT. In that case, Vbus should be described as part of a USB connector
+> node and any driver can walk the tree or graph and get Vbus regulator.
 
-Agree, at the beginning, I am not sure about it in future. I will take this
-information to the SoC team and drop this comment in next version.
+I think it's difficult to describe port nodes related to connectors that
+has vbus regulator.
 
-> In my opinion, you'd be much better off describing the PMU topology explicitly
-> in firmware tables.
-> 
+This controller has a glue layer, that consists of "reset", "regulator",
+and "phy", and there are their respective drivers and their own nodes,
+but no glue layer driver [1].
 
-Sound good. In driver, we read sccl_id/ccl_id from MPIDR_EL1 and compare the value
-from firmware tables, if both are the same, the cpu is related to PMU. So we still
-need this function.
-I shall pay more attention on the PMU topology for next SoC and make the code will
-not need to be changed in future.
+[1] https://www.spinics.net/lists/linux-usb/msg165060.html
 
-Thanks,
-Shaokun
+For example, when the glue layer node has each port that includes vbus,
+we will describe like that:
 
-> Will
-> 
-> .
-> 
+--------------------------------
+usb {
+	...
+	resets = <&usb_reset>;
+	phys = <&usb_phy0>, <&usb_phy1>;
+};
+
+usb-glue {
+	usb_reset: reset {
+		...
+	};
+	usb_vbus0: regulator {
+		...
+	};
+	usb_vbus1: regulator {
+		...
+	};
+	usb_phy0: phy {
+		...
+	};
+	usb_phy1: phy {
+		...
+	};
+
+	ports {
+		port at 0 {
+			...
+			vbus-supply = <&usb_vbus0>;
+		};
+		port at 1 {
+			...
+			vbus-supply = <&usb_vbus1>;
+		};
+	};
+};
+--------------------------------
+
+However, there is no driver that can walk the tree to get vbus regulator,
+and we can't describe that the vbus and phy are related.
+
+In this controller, each port with vbus corresponds to each phy,
+and we need to enable the phy and control the vbus.
+
+For the above reasons, and since vbus is not phy's power,
+I think it's reasonable to add "vbus-supply" only instead of "phy-supply"
+in the phy node like sun4i-usb-phy, rockchip-usb-phy, etc.
+
+--------------------------------
+usb {
+	...
+	resets = <&usb_reset>;
+	phys = <&usb_phy0>, <&usb_phy1>;
+};
+
+usb-glue {
+	usb_reset: reset {
+		...
+	};
+	usb_vbus0: regulator {
+		...
+	};
+	usb_vbus1: regulator {
+		...
+	};
+	usb_phy0: phy {
+		...
+		vbus-supply = <&usb_vbus0>;
+	};
+	usb_phy1: phy {
+		...
+		vbus-supply = <&usb_vbus1>;
+	};
+};
+--------------------------------
+
+Thank you,
+
+---
+Best Regards,
+Kunihiko Hayashi
