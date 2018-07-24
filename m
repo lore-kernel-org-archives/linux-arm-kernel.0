@@ -1,27 +1,36 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 24 Jul 2018 17:46:59 +0200
-Subject: [PATCH] thermal: samsung: Remove Exynos5440 clock handling
- left-overs
-In-Reply-To: <20180717154617.29913-1-krzk@kernel.org>
-References: <CGME20180717154647epcas2p4285b46d932fbfd04eab2bdf05de8a5b1@epcas2p4.samsung.com>
- <20180717154617.29913-1-krzk@kernel.org>
-Message-ID: <3064664.tE3uuFXtKN@amdc3058>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Tue, 24 Jul 2018 16:47:17 +0100
+Subject: [PATCH 2/3] arm64: Add Renesas R8A774A1 support
+In-Reply-To: <1532447238-13486-1-git-send-email-biju.das@bp.renesas.com>
+References: <1532447238-13486-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <1532447238-13486-3-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 17, 2018 05:46:17 PM Krzysztof Kozlowski wrote:
-> Commit 8014220d48e7 ("thermal: samsung: Remove support for Exynos5440")
-> removed the Exynos5440 specific part of code for accessing TMU interrupt
-> registers but the surrounding clock handling was left.
-> 
-> Clean it up.
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Add configuration option for the RZ/G2M (R8A774A1) SoC.
 
-Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+---
+ arch/arm64/Kconfig.platforms | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index d5aeac3..6b9f487 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -178,6 +178,12 @@ config ARCH_RENESAS
+ 	help
+ 	  This enables support for the ARMv8 based Renesas SoCs.
+ 
++config ARCH_R8A774A1
++	bool "Renesas RZ/G2M SoC Platform"
++	depends on ARCH_RENESAS
++	help
++	  This enables support for the Renesas RZ/G2M SoC.
++
+ config ARCH_R8A7795
+ 	bool "Renesas R-Car H3 SoC Platform"
+ 	depends on ARCH_RENESAS
+-- 
+2.7.4
