@@ -1,74 +1,56 @@
-From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Tue, 24 Jul 2018 09:04:47 +0530
-Subject: [PATCH v6 3/6] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180723162629.GA8584@redhat.com>
-References: <20180716084706.28244-1-ravi.bangoria@linux.ibm.com>
- <20180716084706.28244-4-ravi.bangoria@linux.ibm.com>
- <20180723162629.GA8584@redhat.com>
-Message-ID: <e722ee62-eaba-3abd-7f34-bf38ba3d4f95@linux.ibm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 23 Jul 2018 20:40:03 -0700
+Subject: [GIT PULL] dts changes to use ti-sysc driver for omap4 l4
+Message-ID: <pull-1532403550-185479@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oleg,
+From: "Tony Lindgren" <tony@atomide.com>
 
-On 07/23/2018 09:56 PM, Oleg Nesterov wrote:
-> I have a mixed feeling about this series... I'll try to summarise my thinking
-> tomorrow, but I do not see any obvious problem so far. Although I have some
-> concerns about 5/6, I need to re-read it after sleep.
+The following changes since commit 91f6278bfa3966529c61808bd3cb8f05d7ed5dc6:
 
-Sure.
+  ARM: dts: am335x: add am335x-sancloud-bbe board support (2018-07-17 01:05:37 -0700)
 
-> 
-> 
-> On 07/16, Ravi Bangoria wrote:
->>
->> +static int delayed_uprobe_install(struct vm_area_struct *vma)
->> +{
->> +	struct list_head *pos, *q;
->> +	struct delayed_uprobe *du;
->> +	unsigned long vaddr;
->> +	int ret = 0, err = 0;
->> +
->> +	mutex_lock(&delayed_uprobe_lock);
->> +	list_for_each_safe(pos, q, &delayed_uprobe_list) {
->> +		du = list_entry(pos, struct delayed_uprobe, list);
->> +
->> +		if (!du->uprobe->ref_ctr_offset ||
-> 
-> Is it possible to see ->ref_ctr_offset == 0 in delayed_uprobe_list?
+are available in the Git repository at:
 
-I'll remove this check.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/dt-pt3-signed
 
-> 
->> @@ -1072,7 +1282,13 @@ int uprobe_mmap(struct vm_area_struct *vma)
->>  	struct uprobe *uprobe, *u;
->>  	struct inode *inode;
->>  
->> -	if (no_uprobe_events() || !valid_vma(vma, true))
->> +	if (no_uprobe_events())
->> +		return 0;
->> +
->> +	if (vma->vm_flags & VM_WRITE)
->> +		delayed_uprobe_install(vma);
-> 
-> Obviously not nice performance-wise... OK, I do not know if it will actually
-> hurt in practice and probably we can use the better data structures if necessary.
-> But can't we check MMF_HAS_UPROBES at least? I mean,
-> 
-> 	if (vma->vm_flags & VM_WRITE && test_bit(MMF_HAS_UPROBES, &vma->vm_mm->flags))
-> 		delayed_uprobe_install(vma);
-> 
-> ?
+for you to fetch changes up to ab8b1fdd012f41b27f85a6bb271389fd7ff349ea:
 
-Yes.
+  Merge branch 'omap-for-v4.19/dt-sysc-v2' into omap-for-v4.19/dt (2018-07-20 22:22:08 -0700)
 
-> 
-> 
-> Perhaps we can even add another flag later, MMF_HAS_DELAYED_UPROBES set by
-> delayed_uprobe_add().
+----------------------------------------------------------------
+Start using ti-sysc with device tree data for omap4 l4 devices
 
-Yes, good idea.
+With ti-sysc driver working for most use cases, we can start converting
+the omap variant SoCs to use device tree data for the interconnect target
+modules instead of the legacy hwmod platform data.
 
-Thanks for the review,
-Ravi
+We start with omap4 l4 devices excluding the ones that still depend on
+a reset controller driver like DSP MMU. And we don't yet convert the l4
+ABE instance as that needs a bit more work.
+
+We also add a proper interconnect hierarchy for the devices while at it
+to make further work on genpd easier and to avoid most deferred probe
+issues.
+
+At this point we are not dropping any platform data, and we initially
+still use it to validate the dts data. Then in later merge cycles we
+can start dropping the related platform data.
+
+----------------------------------------------------------------
+Tony Lindgren (6):
+      dt-bindings: Update omap l4 binding for optional registers
+      ARM: dts: omap4: Add l4 interconnect hierarchy and ti-sysc data
+      ARM: dts: omap4: Probe watchdog 3 with ti-sysc
+      ARM: dts: omap4: Move l4 child devices to probe them with ti-sysc
+      ARM: dts: omap4: Add l4 ranges for 4460
+      Merge branch 'omap-for-v4.19/dt-sysc-v2' into omap-for-v4.19/dt
+
+ Documentation/devicetree/bindings/arm/omap/l4.txt |   15 +-
+ arch/arm/boot/dts/omap4-l4.dtsi                   | 2444 +++++++++++++++++++++
+ arch/arm/boot/dts/omap4-panda-es.dts              |    2 +-
+ arch/arm/boot/dts/omap4.dtsi                      |  812 +------
+ arch/arm/boot/dts/omap4460.dtsi                   |   36 +
+ 5 files changed, 2526 insertions(+), 783 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap4-l4.dtsi
