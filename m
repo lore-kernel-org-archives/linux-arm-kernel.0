@@ -1,81 +1,43 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 24 Jul 2018 14:51:51 +0200
-Subject: [PATCH] arm64: activate spi flash on pine64 LTS board
-In-Reply-To: <1532274409-9921-1-git-send-email-Akash_Gajjar@mentor.com>
-References: <Akash_Gajjar@mentor.com>
- <1532274409-9921-1-git-send-email-Akash_Gajjar@mentor.com>
-Message-ID: <20180724125151.plhn5g3x37ah62xu@flea>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue, 24 Jul 2018 14:52:24 +0200
+Subject: [PATCH 00/14] arm64: dts: meson-axg: add audio support
+Message-ID: <20180724125238.14567-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The main purpose of this patchset is to add the audio devices on amlogic's
+AXG SoCs.
 
-On Sun, Jul 22, 2018 at 09:16:49PM +0530, Akash Gajjar wrote:
-> This board has a 128M SPI flash. add spi flash support in device tree.
-> 
-> Tested on pine64 LTS.
-> 
-> Signed-off-by: Akash Gajjar <Akash_Gajjar@mentor.com>
+Some codecs require some power supplies. This is why the 3 first patches
+deal with the S400 power supplies, even if some are not related to audio.
 
-The author email should match the one in the SoB, and the prefix of
-your commit title should be "arm64: dts: allwinner: ..."
+In term of dependency, apart from the clock bindings you have already
+pulled for your second PR to arm-soc, this patchset requires the ARB
+reset bindings [0] for patch 5. I don't know if Philip can make it
+available somewhere ?
 
-> ---
->  .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  | 23 ++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-> index abe179d..d54637d 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-> @@ -134,6 +134,29 @@
->  	regulator-name = "vcc-wifi";
->  };
->  
-> +&spi0  {
-> +	status = "okay";
-> +
-> +	m25p80 at 0 {
+Of course, if the dependencies make this patchset too complicated to
+merge in this cycle, I'll resubmit once the next rc1 is out.
 
-The node-name should be the device class, not the device model
+Jerome Brunet (14):
+  arm64: dts: meson-axg: improve power supplies description
+  arm64: dts: meson-axg: add vcc 5v regulator on the s400
+  arm64: dts: meson-axg: add usb power regulator
+  arm64: dts: meson-axg: add audio arb reset controller
+  arm64: dts: meson-axg: add audio fifos
+  arm64: dts: meson-axg: add spdifout
+  arm64: dts: meson-axg: add tdmin formatters
+  arm64: dts: meson-axg: add tdmout formatters
+  arm64: dts: meson-axg: add tdm interfaces
+  arm64: dts: meson-axg: add linein codec
+  arm64: dts: meson-axg: add lineout codec
+  arm64: dts: meson-axg: add spdif-dit codec
+  arm64: dts: meson-axg: s400: enable audio devices
+  arm64: dts: meson-axg: add s400 sound card
 
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "w25q128";
-
-According to the binding, this should have "jedec,spi-nor", and you
-should put the vendor name before the model name as well.
-
-> +		reg = <0x0>;
-> +		linux,modalias = "m25p80", "w25q128";
-
-This property isn
-
-> +		spi-max-frequency = <40000000>;
-> +
-> +		uboot at 0 {
-> +			label = "uboot";
-> +			reg = <0x0 0x100000>;
-> +		};
-> +
-> +		rootfs at 0 {
-> +			label = "rootfs";
-> +			reg = <0x100000 0x7F00000>;
-> +		};
-
-This forces a partition scheme on users that might feel
-differently. This should be removed.
-
-maxime
+ .../arm64/boot/dts/amlogic/meson-axg-s400.dts | 237 ++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi    | 216 ++++++++++++++++
+ 2 files changed, 453 insertions(+)
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/4a70fe4c/attachment.sig>
+2.17.1
