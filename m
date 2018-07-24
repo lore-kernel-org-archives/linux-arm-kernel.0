@@ -1,54 +1,53 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Tue, 24 Jul 2018 09:26:36 +0100
-Subject: [PATCH 03/10] drm: mali-dp: Use __drm_atomic_helper_plane_reset
- instead of copying the logic
-In-Reply-To: <20180720211509.23605-4-alexandru-cosmin.gheorghe@arm.com>
-References: <20180713161407.GQ20303@art_vandelay>
- <20180720211509.23605-1-alexandru-cosmin.gheorghe@arm.com>
- <20180720211509.23605-4-alexandru-cosmin.gheorghe@arm.com>
-Message-ID: <20180724082636.GD23516@e110455-lin.cambridge.arm.com>
+From: cmaiolino28@gmail.com (Carlos Maiolino)
+Date: Tue, 24 Jul 2018 10:32:17 +0200
+Subject: [PATCH] staging/vc04_services: Use __user annotation for user-space
+ pointers
+Message-ID: <20180724083217.20921-1-cmaiolino28@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 10:15:02PM +0100, Alexandru Gheorghe wrote:
+Fix several sparse warnings regarding different address space
+assignments, like example below, by properly annotating pointers
+expected to carry user space addresses.
 
-With a more detailed commit message:
+warning: incorrect type in argument 1 (different address spaces)
+Signed-off-by: Carlos Maiolino <cmaiolino28@gmail.com>
+---
 
-Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+I'm not subscribed to the list, so, please, CC me on any reply.
+Thanks a lot.
 
-> Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
-> ---
->  drivers/gpu/drm/arm/malidp_planes.c | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/arm/malidp_planes.c b/drivers/gpu/drm/arm/malidp_planes.c
-> index 29409a65d864..49c37f6dd63e 100644
-> --- a/drivers/gpu/drm/arm/malidp_planes.c
-> +++ b/drivers/gpu/drm/arm/malidp_planes.c
-> @@ -78,11 +78,8 @@ static void malidp_plane_reset(struct drm_plane *plane)
->  	kfree(state);
->  	plane->state = NULL;
->  	state = kzalloc(sizeof(*state), GFP_KERNEL);
-> -	if (state) {
-> -		state->base.plane = plane;
-> -		state->base.rotation = DRM_MODE_ROTATE_0;
-> -		plane->state = &state->base;
-> -	}
-> +	if (state)
-> +		__drm_atomic_helper_plane_reset(plane, &state->base);
->  }
->  
->  static struct
-> -- 
-> 2.18.0
-> 
+ drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c   | 4 ++--
+ drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+index bc05c69383b8..42f471471e57 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+@@ -1648,8 +1648,8 @@ vchiq_compat_ioctl_queue_message(struct file *file,
+ 				 unsigned int cmd,
+ 				 unsigned long arg)
+ {
+-	VCHIQ_QUEUE_MESSAGE_T *args;
+-	struct vchiq_element *elements;
++	VCHIQ_QUEUE_MESSAGE_T __user *args;
++	struct vchiq_element __user *elements;
+ 	struct vchiq_queue_message32 args32;
+ 	unsigned int count;
+ 
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h
+index 9f859953f45c..1776fab41e40 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h
+@@ -50,7 +50,7 @@ typedef struct {
+ typedef struct {
+ 	unsigned int handle;
+ 	unsigned int count;
+-	const struct vchiq_element *elements;
++	const struct vchiq_element __user *elements;
+ } VCHIQ_QUEUE_MESSAGE_T;
+ 
+ typedef struct {
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+2.14.3
