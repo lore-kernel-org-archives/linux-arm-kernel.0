@@ -1,67 +1,133 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 24 Jul 2018 15:57:46 +0900
-Subject: [PATCH v12 03/16] s390, kexec_file: drop arch_kexec_mem_walk()
+Date: Tue, 24 Jul 2018 15:57:49 +0900
+Subject: [PATCH v12 06/16] of/fdt: add helper functions for handling properties
 In-Reply-To: <20180724065759.19186-1-takahiro.akashi@linaro.org>
 References: <20180724065759.19186-1-takahiro.akashi@linaro.org>
-Message-ID: <20180724065759.19186-4-takahiro.akashi@linaro.org>
+Message-ID: <20180724065759.19186-7-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since s390 already knows where to locate buffers, calling
-arch_kexec_mem_walk() has no sense. So we can just drop it as kbuf->mem
-indicates this while all other architectures sets it to 0 initially.
-
-This change is a preparatory work for the next patch, where all the
-variant memory walks, either on system resource or memblock, will be
-put in one common place so that it will satisfy all the architectures'
-need.
+These functions will be used later to handle kexec-specific properties
+in arm64's kexec_file implementation.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: Dave Young <dyoung@redhat.com>
-Cc: Vivek Goyal <vgoyal@redhat.com>
-Cc: Baoquan He <bhe@redhat.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Frank Rowand <frowand.list@gmail.com>
 ---
- arch/s390/kernel/machine_kexec_file.c | 10 ----------
- kernel/kexec_file.c                   |  4 ++++
- 2 files changed, 4 insertions(+), 10 deletions(-)
+ drivers/of/fdt.c       | 62 ++++++++++++++++++++++++++++++++++++++++--
+ include/linux/of_fdt.h | 10 +++++--
+ 2 files changed, 68 insertions(+), 4 deletions(-)
 
-diff --git a/arch/s390/kernel/machine_kexec_file.c b/arch/s390/kernel/machine_kexec_file.c
-index f413f57f8d20..32023b4f9dc0 100644
---- a/arch/s390/kernel/machine_kexec_file.c
-+++ b/arch/s390/kernel/machine_kexec_file.c
-@@ -134,16 +134,6 @@ int kexec_file_add_initrd(struct kimage *image, struct s390_load_data *data,
- 	return ret;
- }
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index 6da20b9688f7..f7c9d69ce86c 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -25,6 +25,7 @@
+ #include <linux/debugfs.h>
+ #include <linux/serial_core.h>
+ #include <linux/sysfs.h>
++#include <linux/types.h>
  
--/*
-- * The kernel is loaded to a fixed location. Turn off kexec_locate_mem_hole
-- * and provide kbuf->mem by hand.
-- */
--int arch_kexec_walk_mem(struct kexec_buf *kbuf,
--			int (*func)(struct resource *, void *))
--{
--	return 1;
--}
--
- int arch_kexec_apply_relocations_add(struct purgatory_info *pi,
- 				     Elf_Shdr *section,
- 				     const Elf_Shdr *relsec,
-diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-index 63c7ce1c0c3e..bf39df5e5bb9 100644
---- a/kernel/kexec_file.c
-+++ b/kernel/kexec_file.c
-@@ -534,6 +534,10 @@ int kexec_locate_mem_hole(struct kexec_buf *kbuf)
- {
- 	int ret;
+ #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
+ #include <asm/page.h>
+@@ -537,8 +538,8 @@ void *of_fdt_unflatten_tree(const unsigned long *blob,
+ EXPORT_SYMBOL_GPL(of_fdt_unflatten_tree);
  
-+	/* Arch knows where to place */
-+	if (kbuf->mem)
-+		return 0;
+ /* Everything below here references initial_boot_params directly. */
+-int __initdata dt_root_addr_cells;
+-int __initdata dt_root_size_cells;
++int dt_root_addr_cells;
++int dt_root_size_cells;
+ 
+ void *initial_boot_params;
+ 
+@@ -1330,3 +1331,60 @@ late_initcall(of_fdt_raw_init);
+ #endif
+ 
+ #endif /* CONFIG_OF_EARLY_FLATTREE */
 +
- 	ret = arch_kexec_walk_mem(kbuf, locate_mem_hole_callback);
++bool of_fdt_cells_size_fitted(u64 base, u64 size)
++{
++	/* if *_cells >= 2, cells can hold 64-bit values anyway */
++	if ((dt_root_addr_cells == 1) && (base > U32_MAX))
++		return false;
++
++	if ((dt_root_size_cells == 1) && (size > U32_MAX))
++		return false;
++
++	return true;
++}
++
++size_t of_fdt_reg_cells_size(void)
++{
++	return (dt_root_addr_cells + dt_root_size_cells) * sizeof(u32);
++}
++
++#define FDT_ALIGN(x, a)	(((x) + (a) - 1) & ~((a) - 1))
++#define FDT_TAGALIGN(x)	(FDT_ALIGN((x), FDT_TAGSIZE))
++
++int fdt_prop_len(const char *prop_name, int len)
++{
++	return (strlen(prop_name) + 1) +
++		sizeof(struct fdt_property) +
++		FDT_TAGALIGN(len);
++}
++
++static void fill_property(void *buf, u64 val64, int cells)
++{
++	__be32 val32;
++
++	while (cells) {
++		val32 = cpu_to_fdt32((val64 >> (32 * (--cells))) & U32_MAX);
++		memcpy(buf, &val32, sizeof(val32));
++		buf += sizeof(val32);
++	}
++}
++
++int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
++						u64 addr, u64 size)
++{
++	char buf[sizeof(__be32) * 2 * 2];
++		/* assume dt_root_[addr|size]_cells <= 2 */
++	void *prop;
++	size_t buf_size;
++
++	buf_size = of_fdt_reg_cells_size();
++	prop = buf;
++
++	fill_property(prop, addr, dt_root_addr_cells);
++	prop += dt_root_addr_cells * sizeof(u32);
++
++	fill_property(prop, size, dt_root_size_cells);
++
++	return fdt_setprop(fdt, nodeoffset, name, buf, buf_size);
++}
+diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+index b9cd9ebdf9b9..9615d6142578 100644
+--- a/include/linux/of_fdt.h
++++ b/include/linux/of_fdt.h
+@@ -37,8 +37,8 @@ extern void *of_fdt_unflatten_tree(const unsigned long *blob,
+ 				   struct device_node **mynodes);
  
- 	return ret == 1 ? 0 : -EADDRNOTAVAIL;
+ /* TBD: Temporary export of fdt globals - remove when code fully merged */
+-extern int __initdata dt_root_addr_cells;
+-extern int __initdata dt_root_size_cells;
++extern int dt_root_addr_cells;
++extern int dt_root_size_cells;
+ extern void *initial_boot_params;
+ 
+ extern char __dtb_start[];
+@@ -108,5 +108,11 @@ static inline void unflatten_device_tree(void) {}
+ static inline void unflatten_and_copy_device_tree(void) {}
+ #endif /* CONFIG_OF_EARLY_FLATTREE */
+ 
++bool of_fdt_cells_size_fitted(u64 base, u64 size);
++size_t of_fdt_reg_cells_size(void);
++int fdt_prop_len(const char *prop_name, int len);
++int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
++						u64 addr, u64 size);
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* _LINUX_OF_FDT_H */
 -- 
 2.18.0
