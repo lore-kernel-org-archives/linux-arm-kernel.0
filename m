@@ -1,87 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jul 2018 09:36:34 +0100
-Subject: [PATCH 3/3] iommu/arm-smmu: Error out only if not enough context
- interrupts
-In-Reply-To: <20180719175356.14753-4-vivek.gautam@codeaurora.org>
-References: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
- <20180719175356.14753-4-vivek.gautam@codeaurora.org>
-Message-ID: <20180724083633.GA19324@arm.com>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Tue, 24 Jul 2018 09:37:10 +0100
+Subject: [PATCH 1/4] sched/topology: SD_ASYM_CPUCAPACITY flag detection
+In-Reply-To: <b75f665f-7d60-5d83-eaf6-88c534afe254@arm.com>
+References: <1532093554-30504-1-git-send-email-morten.rasmussen@arm.com>
+ <1532093554-30504-2-git-send-email-morten.rasmussen@arm.com>
+ <dbd8deec-a79d-5697-0c50-ea1a9ab7e5c9@arm.com>
+ <20180723152551.GA29978@e105550-lin.cambridge.arm.com>
+ <b75f665f-7d60-5d83-eaf6-88c534afe254@arm.com>
+Message-ID: <20180724083710.GB29978@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 11:23:56PM +0530, Vivek Gautam wrote:
-> Currently we check if the number of context banks is not equal to
-> num_context_interrupts. However, there are booloaders such as, one
-> on sdm845 that reserves few context banks and thus kernel views
-> less than the total available context banks.
-> So, although the hardware definition in device tree would mention
-> the correct number of context interrupts, this number can be
-> greater than the number of context banks visible to smmu in kernel.
-> We should therefore error out only when the number of context banks
-> is greater than the available number of context interrupts.
+On Mon, Jul 23, 2018 at 05:07:50PM +0100, Qais Yousef wrote:
+> On 23/07/18 16:27, Morten Rasmussen wrote:
+> >It does increase the cost of things like hotplug slightly and
+> >repartitioning of root_domains a slightly but I don't see how we can
+> >avoid it if we want generic code to set this flag. If the costs are not
+> >acceptable I think the only option is to make the detection architecture
+> >specific.
 > 
-> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
-> Suggested-by: Tomasz Figa <tfiga@chromium.org>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  drivers/iommu/arm-smmu.c | 19 +++++++++++++------
->  1 file changed, 13 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 7c69736a30f8..4cb53bf4f423 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -2229,12 +2229,19 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
->  	if (err)
->  		return err;
->  
-> -	if (smmu->version == ARM_SMMU_V2 &&
-> -	    smmu->num_context_banks != smmu->num_context_irqs) {
-> -		dev_err(dev,
-> -			"found only %d context interrupt(s) but %d required\n",
-> -			smmu->num_context_irqs, smmu->num_context_banks);
-> -		return -ENODEV;
-> +	if (smmu->version == ARM_SMMU_V2) {
-> +		if (smmu->num_context_banks > smmu->num_context_irqs) {
-> +			dev_err(dev,
-> +			      "found only %d context irq(s) but %d required\n",
-> +			      smmu->num_context_irqs, smmu->num_context_banks);
-> +			return -ENODEV;
-> +		} else if (smmu->num_context_banks < smmu->num_context_irqs) {
-> +			/* loose extra context interrupts */
-> +			dev_notice(dev,
-> +			      "found %d context irq(s) but only %d required\n",
-> +			      smmu->num_context_irqs, smmu->num_context_banks);
-> +			smmu->num_context_irqs = smmu->num_context_banks;
-> +		}
+> I think hotplug is already expensive and this overhead would be small in
+> comparison. But this could be called when frequency changes if I understood
+> correctly - this is the one I wasn't sure how 'hot' it could be. I wouldn't
+> expect frequency changes at a very high rate because it's relatively
+> expensive too..
 
-I don't see the utility in the new message. Can you simplify with the patch
-below on top? It's a bit weird that we only decide to ignore the extra irqs
-after calling platform_get_irq() on them, but that seems to be harmless.
-
-Will
-
---->8
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index aa46c1ed5bf9..5349e22b5c78 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -2109,13 +2109,10 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
- 			      "found only %d context irq(s) but %d required\n",
- 			      smmu->num_context_irqs, smmu->num_context_banks);
- 			return -ENODEV;
--		} else if (smmu->num_context_banks < smmu->num_context_irqs) {
--			/* loose extra context interrupts */
--			dev_notice(dev,
--			      "found %d context irq(s) but only %d required\n",
--			      smmu->num_context_irqs, smmu->num_context_banks);
--			smmu->num_context_irqs = smmu->num_context_banks;
- 		}
-+
-+		/* Ignore superfluous interrupts */
-+		smmu->num_context_irqs = smmu->num_context_banks;
- 	}
- 
- 	for (i = 0; i < smmu->num_global_irqs; ++i) {
+A frequency change shouldn't lead to a flag change or a rebuild of the
+sched_domain hierarhcy. The situations where the hierarchy should be
+rebuild to update the flag is during boot as we only know the amount of
+asymmetry once cpufreq has been initialized, when cpus are hotplugged
+in/out, and when root_domains change due to cpuset reconfiguration. So
+it should be a relatively rare event.
