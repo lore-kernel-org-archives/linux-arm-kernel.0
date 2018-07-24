@@ -1,36 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Jul 2018 16:25:14 +0100
-Subject: [PATCH v9 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <CAD=FV=Uo8sT72a0gRitOVoK0SfC-_QixsovW94_LnL6H7QdKvA@mail.gmail.com>
-References: <cover.1531531808.git.collinsd@codeaurora.org>
- <56b9d5c38cfe46da1228c54f001a49773c3e31dc.1531531808.git.collinsd@codeaurora.org>
- <CAD=FV=VmfqWRGRMEn+0dzZ8x4R5vVaHbkthXAN91Lm-XmP9Gqg@mail.gmail.com>
- <20180724145755.GF13268@sirena.org.uk>
- <CAD=FV=Uo8sT72a0gRitOVoK0SfC-_QixsovW94_LnL6H7QdKvA@mail.gmail.com>
-Message-ID: <20180724152514.GJ13268@sirena.org.uk>
+From: harry.wentland@amd.com (Harry Wentland)
+Date: Tue, 24 Jul 2018 11:31:26 -0400
+Subject: [PATCH 00/10] Add helper for plane reset
+In-Reply-To: <20180720211509.23605-1-alexandru-cosmin.gheorghe@arm.com>
+References: <20180713161407.GQ20303@art_vandelay>
+ <20180720211509.23605-1-alexandru-cosmin.gheorghe@arm.com>
+Message-ID: <d4079345-8aee-bd00-d7f9-16c84ce3f4fd@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 08:11:30AM -0700, Doug Anderson wrote:
+On 2018-07-20 05:14 PM, Alexandru Gheorghe wrote:
+> Drivers that subclass drm_plane need to copy the logic for linking the
+> drm_plane with its state and to initialize core properties to their
+> default values. E.g (alpha and rotation)
+> 
+> Having a helper to reset the plane_state makes sense because of multiple
+> reasons:
+> 1. Eliminate code duplication.
+> 2. Add a single place for initializing core properties to their
+> default values, no need for driver to do it if what the helper sets
+> makes sense for them.
+> 3. No need to debug the driver when you enable a core property and
+> observe it doesn't have a proper default value.
+> 
+> Tested with mali-dp the other drivers are just built-tested.
+> 
 
-> RPMh itself landed in Andy's tree and he sent a pull request on
-> Saturday.  Feel free to refer to the request ("[GIT PULL] Qualcomm
-> Driver updates for 4.19") AKA
-> <https://patchwork.kernel.org/patch/10539125/>.
+For some reason I lost 02/10 hence I'm replying to the cover letter.
 
-> It doesn't look like arm-soc has picked up Andy's pull request yet
-> though.  If having it in arm-soc is a requirement then I'm happy to
-> monitor arm-soc and ping this thread again when it's there.
+Patches 1 & 2 are
 
-There was also some other thing called command DB as well which was a
-separate series.  Ideally there'd be a branch I could pull as there's a
-build dependency on rpmh so I can't apply until the code has landed in
-my tree, don't know what command DB is exactly.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/a46a2fc2/attachment.sig>
+Reviewed-by: Harry Wentland <harry.wentland@amd.com>
+
+Harry
+
+> 
+> Alexandru Gheorghe (10):
+>   drm/atomic: Add  __drm_atomic_helper_plane_reset
+>   drm/amd/display: Use __drm_atomic_helper_plane_reset instead of
+>     copying the logic
+>   drm: mali-dp: Use __drm_atomic_helper_plane_reset instead of copying
+>     the logic
+>   drm: atmel-hlcdc: Use __drm_atomic_helper_plane_reset instead of
+>     copying the logic
+>   drm/exynos: Use __drm_atomic_helper_plane_reset instead of copying the
+>     logic
+>   drm/imx: Use __drm_atomic_helper_plane_reset instead of copying the
+>     logic
+>   drm: rcar-du: Use __drm_atomic_helper_plane_reset instead of copying
+>     the logic
+>   drm/sun4i: Use __drm_atomic_helper_plane_reset instead of copying the
+>     logic
+>   drm/vc4: Use __drm_atomic_helper_plane_reset instead of copying the
+>     logic
+>   drm/vmwgfx: Use __drm_atomic_helper_plane_reset instead of copying the
+>     logic
+> 
+>  .../gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c |  7 ++--
+>  drivers/gpu/drm/arm/malidp_planes.c           |  7 ++--
+>  .../gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c   |  5 +--
+>  drivers/gpu/drm/drm_atomic_helper.c           | 32 +++++++++++++------
+>  drivers/gpu/drm/exynos/exynos_drm_plane.c     |  3 +-
+>  drivers/gpu/drm/imx/ipuv3-plane.c             |  8 ++---
+>  drivers/gpu/drm/rcar-du/rcar_du_plane.c       |  4 +--
+>  drivers/gpu/drm/rcar-du/rcar_du_vsp.c         |  4 +--
+>  drivers/gpu/drm/sun4i/sun4i_layer.c           |  4 +--
+>  drivers/gpu/drm/vc4/vc4_plane.c               |  4 +--
+>  drivers/gpu/drm/vmwgfx/vmwgfx_kms.c           |  4 +--
+>  include/drm/drm_atomic_helper.h               |  2 ++
+>  12 files changed, 39 insertions(+), 45 deletions(-)
+> 
