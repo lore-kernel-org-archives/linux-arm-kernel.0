@@ -1,108 +1,56 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 24 Jul 2018 13:25:26 -0600
-Subject: RFC: tegra2/tegra3 automotive part changes
-In-Reply-To: <2e51c020-bca4-1e50-f0ad-cd2ece224cf8@codethink.co.uk>
-References: <3916c0ea-964e-42ab-8bfd-8e8edc5110ee@codethink.co.uk>
- <fecd5597-1b04-6409-b87c-5cda54d43ce0@wwwdotorg.org>
- <4f215c76-6539-1130-6c1f-75f0a3df068a@codethink.co.uk>
- <c8d947bb-a790-56f4-8ab4-2259f736d445@wwwdotorg.org>
- <2e51c020-bca4-1e50-f0ad-cd2ece224cf8@codethink.co.uk>
-Message-ID: <676bc8b6-e3de-8e4b-668a-713edcf663b7@wwwdotorg.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 24 Jul 2018 21:40:49 +0200
+Subject: [RFT v2 00/10] pinctrl: samsung: Remove ugly hack for sharing
+ eint_wakeup_mask
+In-Reply-To: <20180724091816eucas1p29790b3c45492b261ff154db8056fbb88~EQ2otAHnr1142511425eucas1p2l@eucas1p2.samsung.com>
+References: <CGME20180723175334epcas5p3e46820b4d356d4f1ea718ec1a6c093a6@epcas5p3.samsung.com>
+ <20180723175302.22535-1-krzk@kernel.org>
+ <20180724091816eucas1p29790b3c45492b261ff154db8056fbb88~EQ2otAHnr1142511425eucas1p2l@eucas1p2.samsung.com>
+Message-ID: <20180724194049.fpp5hi7hfy5w5mjj@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2018 04:25 AM, Ben Dooks wrote:
-> On 13/07/18 17:53, Stephen Warren wrote:
->> On 07/13/2018 03:41 AM, Ben Dooks wrote:
->>> On 12/07/18 16:56, Stephen Warren wrote:
->>>> On 07/12/2018 07:36 AM, Ben Dooks wrote:
->>>>> Hello, we are looking at up-streaming some of the work we have
->>>>> done on the tegra2 and tegra3 automotive devices. The automotive
->>>>> grade devices are close the commercial parts so we would like to
->>>>> discuss the core changes before submitting.
->>>>>
->>>>> The changes are mostly with things like the clock setup and a
->>>>> few peripheral quirks (IIRC these are mostly MMC).
->>>>>
->>>>> We are proposing to change the device-tree properties for the root
->>>>> node and any other affected devices from "nvidia,tegraXX" to a new
->>>>> "nvidia,tegraXXa". We would welcome discussion on whether to update
->>>>> all the devices at the start
->>>>>
->>>>> An example of tegra30a.dtsi:
->>>>>
->>>>> #include "tegra30.dtsi"
->>>>>
->>>>> / {
->>>>> ???????? compatible = "nvidia,tegra30a";
->>>>>
->>>>> ???????? clock at 60006000 {
->>>>> ???????????????? compatible = "nvidia,tegra30a-car";
->>>>> ???????? };
->>>>> }
->>>>
->>>> This doesn't sound right. Auto and commercial parts are identical 
->>>> AFAIK; it's just qualification differences. Hence at most you'd add 
->>>> an extra compatible value and not remove the old one. Better might 
->>>> be to detect this at run-time from the fuses. I think we already do 
->>>> some of that already; search for speedo related code in 
->>>> arch/arm/mach-tegra/.
->>>
->>> The nvidia pdk for the automotive didn't set the clocks up in the
->>> same way and we where told that there are certain clock restrictions
->>> for the automotive parts that the commercial ones do not have. Some of
->>> this came from internal discussions with nvidia and NDA'd datasheets
->>> so I don't know how much actual data I can share.
->>
->> I believe this just changes the *selection* of values to use (clock 
->> rates, clock sources), not *how* to program them (set of registers and 
->> fields, programming algorithm), which is what the DT compatible is 
->> mainly about. In other words, it's mainly a performance/configuration 
->> decision not different HW.
->>
->>> To get the 4.4 kernel to be similar enough to work with the tegra30a
->>> we had to do some changes to the clock initialisation. For things
->>> like the clock I am not sure if leaving a tegra30-car in there would
->>> be a good idea, it may boot but probably won't be stable.
->>>
->>> For the fuses, is the fuse driver up early enough to allow the clock
->>> driver could use this? otherwise I think the device-tree change would
->>> be the only way. I'm not sure if I have the information to hand on
->>> how to differentiate the tegra30 and tegra20.
->>>
->>> PS, we'll want to do the same for the tegra20.
->>
->> As Job mentioned, the fuse driver should/could be available early 
->> enough without issue. It may have to (and probably already does) 
->> hard-code the physical address of the fuses rather than being 
->> configured from DT for this. I think if you read the chip "SKU" value 
->> from fuses, that should indicate which sets of restrictions on 
->> clocks/... are required, and there are many more SKUs than just 
->> "regular" and "automotive", although all the different SKUs may be 
->> bucketed into fewer sets of restriction/configuration data.
->>
->> Briefly looking at drivers/soc/tegra/fuse/speedo-tegra20.c, some (a 
->> very little) of this may already be there
+On Tue, Jul 24, 2018 at 11:18:13AM +0200, Marek Szyprowski wrote:
+> Hi Krzysztof,
 > 
-> Ok, the logs I have from one of the automotive systems has:
+> On 2018-07-23 19:52, Krzysztof Kozlowski wrote:
+> > Hi All,
+> >
+> > Changes since v1
+> > ================
+> > 1. Add Tomasz's ack.
+> > 2. Reword description in patch 6/10.
+> >
+> >
+> > Tests
+> > =====
+> > This is both request for comments and requests for tests. Only basic
+> > tests were done, including suspend to RAM on Odroid U3 (Exynos4412)
+> > with max7768 RTC wakeup. Please kindly test it with devices capable of
+> > suspending and resuming. I am mostly thinking about S5Pv210-based (Aria),
+> > Trats, Trats2 and TM2 (Exynos5433). Existing platforms should not be
+> > broken however changing external interrupt wakeup mask was not done
+> > on Exynos5433.
 > 
-> [] Tegra Revision: A03 SKU: 176 CPU Process: 3 SoC Process: 0
+> Works fine on Exynos5433 TM2 with some additional patches related to
+> suspend/resume handling of the PMU. It handles only EINT0..EINT31 pins
+> for now. Exynos5433 has more external interrupt wakeup lines: EINT32-63
+> located at banks GPF1[0..7], GPF2[0..3], GPF3[0..3], GPF4[0..7] and
+> GPF5[0..7]. They can be configured as wakeup sources in
+> EXYNOS5433_EINT_WAKEUP_MASK1 (0x062C) PMU register. Handling of them
+> can be added later when it will be really needed.
 > 
-> So would a test for:
->  ????sku_info->revision == TEGRA_REVISION_A03 &&
->  ????sku_info->sku_id == 176
-> 
-> be ok, or does that need some sort of mask?
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-I don't know all the automotive SKU numbers, but that seems like it 
-might be a good start. I'm not sure if SKU numbers are subordinate to 
-chip revisions (probably not) or global and apply to all chip revisions 
-(I guess so).
+Thanks for comments and testing. Indeed support for Exynos5433 has to be
+improved.
 
-Let's create a helper function, something like 
-tegra_is_automotive_chip(), to centralize the check so it's easy to add 
-more SKUs/revisions in the future.
+I would like to push 1-6 (which are needed for the rest) through current
+cycle so I applied them to samsung-pinctrl tree.
 
-> I've not tried updating speedo-tegra30.c as I didn't really understand
-> what all the values where (and we didn't use cpufreq-scaling)
-> 
+Since anyway suspend to RAM is mostly broken nowadays... nothing more
+should pop up.
+
+
+Best regards,
+Krzysztof
