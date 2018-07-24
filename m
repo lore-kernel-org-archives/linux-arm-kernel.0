@@ -1,148 +1,103 @@
-From: mylene.josserand@bootlin.com (=?UTF-8?B?TXlsw6huZQ==?= Josserand)
-Date: Tue, 24 Jul 2018 15:13:19 +0200
-Subject: [PATCH v3 1/3] Input: edt-ft5x06 - Add support for regulator
-In-Reply-To: <20180718224645.ns7nvqxvqc6huxcz@core>
-References: <20180718182719.29663-1-mylene.josserand@bootlin.com>
- <20180718182719.29663-2-mylene.josserand@bootlin.com>
- <20180718224645.ns7nvqxvqc6huxcz@core>
-Message-ID: <20180724151319.3139c5ae@dell-desktop.home>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 24 Jul 2018 15:15:36 +0200
+Subject: [GIT PULL] Allwinner arm64 DT changes for 4.19
+Message-ID: <20180724131536.iompsqlrpjsvf5uy@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Arnd, Olof,
 
-Thank you for your review.
+Please pull the following changes for the next merge window.
 
-On Thu, 19 Jul 2018 00:46:45 +0200
-Ond?ej Jirman <megous@megous.com> wrote:
+Thanks!
+Maxime
 
-> Hello Myl?ne,
-> 
-> On Wed, Jul 18, 2018 at 08:27:17PM +0200, Myl?ne Josserand wrote:
-> > Add the support of regulator to use it as VCC source.
-> > 
-> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> > ---
-> >  .../bindings/input/touchscreen/edt-ft5x06.txt      |  1 +
-> >  drivers/input/touchscreen/edt-ft5x06.c             | 29 ++++++++++++++++++++++
-> >  2 files changed, 30 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-> > index 025cf8c9324a..48e975b9c1aa 100644
-> > --- a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-> > +++ b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-> > @@ -30,6 +30,7 @@ Required properties:
-> >  Optional properties:
-> >   - reset-gpios: GPIO specification for the RESET input
-> >   - wake-gpios:  GPIO specification for the WAKE input
-> > + - vcc-supply:  Regulator that supplies the touchscreen
-> >  
-> >   - pinctrl-names: should be "default"
-> >   - pinctrl-0:   a phandle pointing to the pin settings for the
-> > diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
-> > index 1e18ca0d1b4e..aa94494b06b5 100644
-> > --- a/drivers/input/touchscreen/edt-ft5x06.c
-> > +++ b/drivers/input/touchscreen/edt-ft5x06.c
-> > @@ -39,6 +39,7 @@
-> >  #include <linux/input/mt.h>
-> >  #include <linux/input/touchscreen.h>
-> >  #include <linux/of_device.h>
-> > +#include <linux/regulator/consumer.h>
-> >  
-> >  #define WORK_REGISTER_THRESHOLD		0x00
-> >  #define WORK_REGISTER_REPORT_RATE	0x08
-> > @@ -91,6 +92,7 @@ struct edt_ft5x06_ts_data {
-> >  	struct touchscreen_properties prop;
-> >  	u16 num_x;
-> >  	u16 num_y;
-> > +	struct regulator *vcc;
-> >  
-> >  	struct gpio_desc *reset_gpio;
-> >  	struct gpio_desc *wake_gpio;
-> > @@ -991,6 +993,22 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
-> >  
-> >  	tsdata->max_support_points = chip_data->max_support_points;
-> >  
-> > +	tsdata->vcc = devm_regulator_get(&client->dev, "vcc");
-> > +	if (IS_ERR(tsdata->vcc)) {
-> > +		error = PTR_ERR(tsdata->vcc);
-> > +		if (error != -EPROBE_DEFER)
-> > +			dev_err(&client->dev, "failed to request regulator: %d\n",
-> > +				error);
-> > +		return error;
-> > +	}
-> > +
-> > +	error = regulator_enable(tsdata->vcc);
-> > +	if (error < 0) {
-> > +		dev_err(&client->dev, "failed to enable vcc: %d\n",
-> > +			error);
-> > +		return error;
-> > +	}
-> > +
-> >  	tsdata->reset_gpio = devm_gpiod_get_optional(&client->dev,
-> >  						     "reset", GPIOD_OUT_HIGH);
-> >  	if (IS_ERR(tsdata->reset_gpio)) {
-> > @@ -1120,20 +1138,31 @@ static int edt_ft5x06_ts_remove(struct i2c_client *client)
-> >  static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
-> >  {
-> >  	struct i2c_client *client = to_i2c_client(dev);
-> > +	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
-> >  
-> >  	if (device_may_wakeup(dev))
-> >  		enable_irq_wake(client->irq);
-> >  
-> > +	regulator_disable(tsdata->vcc);
-> > +  
-> 
-> How will the touchscreen wakeup the system with interrupt if you power it off
-> on suspend? Perhaps guard this with device_may_wakeup() too? 
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-True, thank you for pointing it out.
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 
-> 
-> >  	return 0;
-> >  }
-> >  
-> >  static int __maybe_unused edt_ft5x06_ts_resume(struct device *dev)
-> >  {
-> >  	struct i2c_client *client = to_i2c_client(dev);
-> > +	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
-> > +	int ret;
-> >  
-> >  	if (device_may_wakeup(dev))
-> >  		disable_irq_wake(client->irq);
-> >  
-> > +	ret = regulator_enable(tsdata->vcc);
-> > +	if (ret < 0) {
-> > +		dev_err(dev, "failed to enable vcc: %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +  
-> 
-> Ditto.
+are available in the Git repository at:
 
-ack
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt64-for-4.19
 
-> 
-> Regards,
->   o.
-> 
-> >  	return 0;
-> >  }
-> >  
-> > -- 
-> > 2.11.0
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel  
+for you to fetch changes up to ecbd611882a18cc5e720e752cae92d1198b198ec:
 
+  arm64: allwinner: h6: enable MMC0/2 on Pine H64 (2018-07-19 16:50:33 +0200)
 
-Best regards,
+----------------------------------------------------------------
+Allwinner arm64 DT changes for 4.19
+
+Some interesting changes, especially:
+
+  - MMC support for the H6
+  - PMIC support for the PineH64
+  - HDMI simplefb support for the A64
+  - PWM support for the A64
+  - New board: Pinebook, Amarula A64-Relic
+
+----------------------------------------------------------------
+Andre Przywara (1):
+      arm64: dts: allwinner: a64: Add PWM controllers
+
+Chen-Yu Tsai (2):
+      arm64: dts: allwinner: h6: Add LED device nodes for Pine H64
+      arm64: dts: allwinner: h6: Use macros for R_CCU clock and reset indices
+
+Corentin Labbe (1):
+      arm64: dts: allwinner: a64: Remove unused address-cells/size-cells of dwmac-sun8i
+
+Emmanuel Vadot (3):
+      arm64: dts: allwinner: sun50i: a64: Add spi flash node for sopine
+      arm64: dts: allwinner: sun50i: h5: Add spi flash node for OrangePi PC2
+      arm64: allwinner: a64-sopine: Add cd-gpios to mmc0 node
+
+Icenowy Zheng (12):
+      arm64: dts: allwinner: a64: add R_I2C controller
+      arm64: dts: allwinner: add support for Pinebook
+      arm64: dts: allwinner: a64: add SRAM controller device tree node
+      arm64: allwinner: a64: change TERES-I DLDO3's name to start with "vdd"
+      arm64: allwinner: a64: allow laptops to wake up from lid
+      arm64: dts: allwinner: a64: add necessary device tree nodes for DE2 CCU
+      arm64: dts: allwinner: a64: add device tree node for HDMI simplefb
+      arm64: dts: allwinner: a64: add HDMI regulator to all DTs' simplefb_hdmi
+      arm64: dts: allwinner: h6: enable AXP805 PMIC on Pine H64
+      dt-binding: mmc: sunxi: add H6 compatible (with A64 fallback)
+      arm64: allwinner: h6: add device tree nodes for MMC controllers
+      arm64: allwinner: h6: enable MMC0/2 on Pine H64
+
+Jagan Teki (3):
+      arm64: allwinner: a64: Add Amarula A64-Relic initial support
+      arm64: allwinner: a64: Add RTC clock to phandle 32kHz external oscillator
+      arm64: allwinner: a64-amarula-relic: Enable AP6330 WiFi support
+
+ .../devicetree/bindings/mmc/sunxi-mmc.txt          |   2 +
+ arch/arm64/boot/dts/allwinner/Makefile             |   2 +
+ .../dts/allwinner/sun50i-a64-amarula-relic.dts     | 219 ++++++++++++++++
+ .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts |   4 +
+ .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   |   4 +
+ .../boot/dts/allwinner/sun50i-a64-olinuxino.dts    |   4 +
+ .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts |   4 +
+ .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |   4 +
+ .../boot/dts/allwinner/sun50i-a64-pinebook.dts     | 285 +++++++++++++++++++++
+ .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  |   4 +
+ .../boot/dts/allwinner/sun50i-a64-sopine.dtsi      |  15 ++
+ .../boot/dts/allwinner/sun50i-a64-teres-i.dts      |   7 +-
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 113 +++++++-
+ .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  |  12 +
+ .../boot/dts/allwinner/sun50i-h6-pine-h64.dts      | 146 +++++++++++
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi       |  67 ++++-
+ 16 files changed, 878 insertions(+), 14 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
 
 -- 
-Myl?ne Josserand, Bootlin (formerly Free Electrons)
+Maxime Ripard, Bootlin (formerly Free Electrons)
 Embedded Linux and Kernel engineering
 https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/b606249a/attachment.sig>
