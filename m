@@ -1,53 +1,112 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jul 2018 10:16:27 +0100
-Subject: next-20180723 build: 2 failures 11 warnings (next-20180723)
-In-Reply-To: <20180723181150.GF13981@sirena.org.uk>
-References: <E1fheAy-0003tU-Dq@optimist> <20180723181150.GF13981@sirena.org.uk>
-Message-ID: <20180724091626.GC19324@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 24 Jul 2018 11:18:13 +0200
+Subject: [RFT v2 00/10] pinctrl: samsung: Remove ugly hack for sharing
+ eint_wakeup_mask
+In-Reply-To: <20180723175302.22535-1-krzk@kernel.org>
+References: <CGME20180723175334epcas5p3e46820b4d356d4f1ea718ec1a6c093a6@epcas5p3.samsung.com>
+ <20180723175302.22535-1-krzk@kernel.org>
+Message-ID: <20180724091816eucas1p29790b3c45492b261ff154db8056fbb88~EQ2otAHnr1142511425eucas1p2l@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 07:11:50PM +0100, Mark Brown wrote:
-> On Mon, Jul 23, 2018 at 05:59:12PM +0100, Build bot for Mark Brown wrote:
-> 
-> Today's -next fails to build an arm64 allmodconfig with:
-> 
-> > 	arm64-allmodconfig
-> > ERROR: "__sync_icache_dcache" [drivers/xen/xen-privcmd.ko] undefined!
-> 
-> using
-> 
->    aarch64-linux-gnu-gcc (Linaro GCC 5.3-2016.05) 5.3.1 20160412
-> 
-> however it builds perfectly fine with
-> 
->    aarch64-linux-gnu-gcc (Linaro GCC 6.2-2016.11) 6.2.1 20161016
-> 
-> which honestly seems like a sensible and worthwhile upgrade at this
-> point anyway given that it's a year and a half old so I'm going to do
-> that for my builder (perhaps even jump on a newer version) but it seemed
-> worth highlighting in case this is considered undesirable.  A similar
-> issue is hitting on KernelCI, we should probably look at upgrading the
-> toolchain there too.
+Hi Krzysztof,
 
-Hmm, it looks to me like this comes about because xen/privcmd.c is being
-built as a module, but contains a call to set_pte_at() with a special pte:
+On 2018-07-23 19:52, Krzysztof Kozlowski wrote:
+> Hi All,
+>
+> Changes since v1
+> ================
+> 1. Add Tomasz's ack.
+> 2. Reword description in patch 6/10.
+>
+>
+> Tests
+> =====
+> This is both request for comments and requests for tests. Only basic
+> tests were done, including suspend to RAM on Odroid U3 (Exynos4412)
+> with max7768 RTC wakeup. Please kindly test it with devices capable of
+> suspending and resuming. I am mostly thinking about S5Pv210-based (Aria),
+> Trats, Trats2 and TM2 (Exynos5433). Existing platforms should not be
+> broken however changing external interrupt wakeup mask was not done
+> on Exynos5433.
 
-	pte_t pte = pte_mkspecial(pfn_pte(page_to_pfn(page), r->prot));
+Works fine on Exynos5433 TM2 with some additional patches related to
+suspend/resume handling of the PMU. It handles only EINT0..EINT31 pins
+for now. Exynos5433 has more external interrupt wakeup lines: EINT32-63
+located at banks GPF1[0..7], GPF2[0..3], GPF3[0..3], GPF4[0..7] and
+GPF5[0..7]. They can be configured as wakeup sources in
+EXYNOS5433_EINT_WAKEUP_MASK1 (0x062C) PMU register. Handling of them
+can be added later when it will be really needed.
 
-	set_pte_at(r->mm, addr, ptep, pte);
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-which on arm64 contains:
+> Description
+> ===========
+> The Exynos/S5Pv210 machine suspend code needs to write the external
+> interrupt mask during suspend.  The mask is controlled by pin controller
+> driver: the exynos_wkup_irq_set_wake() in IRQ chip for these wakeup
+> interrupts.
+>
+> Therefore pinctrl driver code exposed an exynos_get_eint_wake_mask()
+> function which was later used as an extern in machine code.
+>
+> This is quite ugly way of combining driver and machine code,
+> not portable triggering Sparse and GCC warnings.
+>
+>
+> This might break suspend capability S5Pv210 on with older DTBs (thus
+> breaks DTB compatibility), however:
+> 1. just "might" because in case of using older DTB, the wakeup mask
+>     will not be changed during suspend and default reset value (all
+>     interrupts non-masked) should work,
+> 2. mainline support for S5Pv210 with DTB is limited and suspend
+>     to RAM already might be broken.
+>
+>
+> Dependencies
+> ============
+> 1. The first seven patches should be taken through one tree,
+>     preferably samsung-pinctrl,
+> 2. The DTS patch (7/10) for S5Pv210 should go into next cycle,
+> 3. The remaining patches (8-10) should go after all previous,
+>     so probably another release cycle.
+>
+>
+> Best regards,
+> Krzysztof
+>
+> Krzysztof Kozlowski (10):
+>    pinctrl: samsung: Define suspend and resume callbacks for all banks
+>      and SoCs
+>    pinctrl: samsung: Document suspend and resume members
+>    pinctrl: samsung: Document hidden requirement about one external
+>      wakeup
+>    pinctrl: samsung: Add dedicated compatible for S5Pv210 wakeup
+>      interrupts
+>    ARM: exynos: Define EINT_WAKEUP_MASK registers for S5Pv210 and
+>      Exynos5433
+>    pinctrl: samsung: Write external wakeup interrupt mask
+>    ARM: dts: s5pv210: Switch to S5Pv210 specific pinctrl wakeup
+>      compatible
+>    ARM: s5pv210: Remove legacy setting of external wakeup interrupts
+>    ARM: exynos: Remove legacy setting of external wakeup interrupts
+>    pinctrl: samsung: Remove legacy API for handling external wakeup
+>      interrupts mask
+>
+>   .../bindings/pinctrl/samsung-pinctrl.txt           | 11 ++-
+>   arch/arm/boot/dts/s5pv210.dtsi                     |  2 +-
+>   arch/arm/mach-exynos/common.h                      |  2 -
+>   arch/arm/mach-exynos/suspend.c                     | 16 +++--
+>   arch/arm/mach-s5pv210/common.h                     |  1 -
+>   arch/arm/mach-s5pv210/pm.c                         | 16 +++--
+>   drivers/pinctrl/samsung/pinctrl-exynos-arm.c       | 16 +++++
+>   drivers/pinctrl/samsung/pinctrl-exynos.c           | 78 +++++++++++++++++++---
+>   drivers/pinctrl/samsung/pinctrl-samsung.h          | 11 +++
+>   include/linux/soc/samsung/exynos-regs-pmu.h        |  8 ++-
+>   10 files changed, 136 insertions(+), 25 deletions(-)
+>
 
-	if (pte_present(pte) && pte_user_exec(pte) && !pte_special(pte))
-		__sync_icache_dcache(pte);
-
-so GCC 6 can optimise away the call to the non-exported symbol, but GCC 5
-has trouble.
-
-What I don't understand is why this suddenly cropped up. Did GCC 5 build
-linux-next arm64 allmodconfig last week?
-
-Cheers,
-
-Will
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
