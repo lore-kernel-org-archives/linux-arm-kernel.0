@@ -1,58 +1,63 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 24 Jul 2018 15:45:35 +0100
-Subject: [PATCH RT v2] arm64: fpsimd: use a local_lock() in addition to
- local_bh_disable()
-In-Reply-To: <20180718092448.v6j7wdahtsediqhh@linutronix.de>
-References: <20180522172115.fpqguqlsq6bavtxy@linutronix.de>
- <20180522132429.6f1dcf92@gandalf.local.home>
- <20180522173333.aawadhkcekzvrswp@linutronix.de>
- <20180711092555.268adf7f@gandalf.local.home>
- <20180711133157.bvrza5vmthu6lwjd@linutronix.de>
- <20180711093346.782af07a@gandalf.local.home>
- <20180713174937.5ddaqpylalcmc3jq@linutronix.de>
- <20180716151737.GO9486@e103592.cambridge.arm.com>
- <20180718091209.u76gzacanj5avhdl@linutronix.de>
- <20180718092448.v6j7wdahtsediqhh@linutronix.de>
-Message-ID: <20180724144522.GA4240@e103592.cambridge.arm.com>
+From: manu@bidouilliste.com (Emmanuel Vadot)
+Date: Tue, 24 Jul 2018 16:55:01 +0200
+Subject: [PATCH v2 5/5] arm64: dts: allwinner: h5: Add SID for H5
+In-Reply-To: <20180724144218.jdvgrcqkz2kmohqx@flea>
+References: <20180724101522.68165-1-manu@freebsd.org>
+ <20180724101522.68165-5-manu@freebsd.org>
+ <20180724130004.ynaiabshexrrbvo4@flea>
+ <20180724153432.e398bddfe63e51e8dcebfc46@bidouilliste.com>
+ <20180724144218.jdvgrcqkz2kmohqx@flea>
+Message-ID: <20180724165501.d8f01bf20c7cc43e7ed7fc62@bidouilliste.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 11:24:48AM +0200, Sebastian Andrzej Siewior wrote:
-> On 2018-07-18 11:12:10 [+0200], To Dave Martin wrote:
-> > > > -	if (may_use_simd()) {
-> > > > +	if (!IS_ENABLED(CONFIG_PREEMPT_RT_BASE) && may_use_simd()) {
+On Tue, 24 Jul 2018 16:42:18 +0200
+Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+
+> On Tue, Jul 24, 2018 at 03:34:32PM +0200, Emmanuel Vadot wrote:
+> > On Tue, 24 Jul 2018 15:00:04 +0200
+> > Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > 
+> > > On Tue, Jul 24, 2018 at 12:15:22PM +0200, Emmanuel Vadot wrote:
+> > > > The SID controller on H5 look the same as the one present in the A64.
+> > > > But in case we find some difference one day at a compatible string
+> > > > of it's own and a fallback to the A64 one.
+> > > > 
+> > > > Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
+> > > > ---
+> > > >  arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 5 +++++
+> > > >  1 file changed, 5 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+> > > > index 62d646baac3c..28183bf77164 100644
+> > > > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+> > > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+> > > > @@ -129,3 +129,8 @@
+> > > >  		     <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+> > > >  	compatible = "allwinner,sun50i-h5-pinctrl";
+> > > >  };
+> > > > +
+> > > > +&sid {
+> > > > +	compatible = "allwinner,sun50i-h5-sid",
+> > > > +		     "allwinner,sun50i-a64-sid";
+> > > > +};
 > > > 
-> > > I suspect this is wrong -- see comments on the commit message.
+> > > This is still a bit pointless, please remove the common node.
+> > 
+> >  You mean directly declare sid controller in the SoC dtsi and not
+> > have a common node in sunxi-h3-h5.dtsi ?
 > 
-> I'm sorry, I pressed send too early, I was aiming for the draft folder.
-> So yes, based on that EFI that might be interruptible, let me try to
-> look at the initial issue again and maybe I get another idea how to deal
-> with this.
-> One question: If EFI is interruptible that means, we call into EFI - how
-> do we get out? Does EFI enable interrupts and the kernel receives an
-> interrupt and treats this EFI call like a regular context switch?
+> Yep
+> 
+> -- 
+> Maxime Ripard, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
 
-AFAIK the only safe way to get out permanently is for the call to
-return.  Note, I've not gone through the spec in fine detail myself.
+ The reason I've put it in the common file is because I'll send patches
+for the nvmem-cells needed for thermal, and those are common between
+the two. Other nvmem-cells are also common (like the chipid and
+probably other).
 
-The OS may handle interrupts occurring during the EFI call, but we
-still have to return to EFI afterwards to finish off the call.  From
-the Linux perspective, I think this means that EFI calls are non-
-preemptible.
-
-Under RT, I'm pretty sure that we can't safely resume the interrupted
-EFI call on a different cpu from the one it was interrupted on.  Even
-if it doesn't say this explicitly in the UEFI spec, I think it will be
-assumed in implementations.
-
-
-Certain EFI calls are not long-running and may need to be called from
-interrupt context in Linux, which means that there may be live kernel-
-mode NEON state.  This is why there are separate FPSIMD/SVE percpu stash
-buffers for EFI specifically.
-
-Does this make sense?  It's is probably not very clear, but I'm trying
-to hide the fact that I haven't looked at the UEFI spec for ages...
-
-Cheers
----Dave
+-- 
+Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
