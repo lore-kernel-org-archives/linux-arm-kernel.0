@@ -1,90 +1,69 @@
 From: dkos@cadence.com (Damian Kos)
-Date: Tue, 24 Jul 2018 12:13:33 +0100
-Subject: [PATCH v2 2/5] drm/dp: fix link probing for devices supporting DP 1.4+
+Date: Tue, 24 Jul 2018 12:13:35 +0100
+Subject: [PATCH v2 4/5] dt-bindings: drm/bridge Document Cadence MHDP DPI/DP
+ bridge bindings
 In-Reply-To: <1532430824-23477-1-git-send-email-dkos@cadence.com>
 References: <1532430824-23477-1-git-send-email-dkos@cadence.com>
-Message-ID: <1532430824-23477-3-git-send-email-dkos@cadence.com>
+Message-ID: <1532430824-23477-5-git-send-email-dkos@cadence.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Quentin Schulz <quentin.schulz@bootlin.com>
 
-DP 1.4 introduced a DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT bit in
-DP_TRAINING_AUX_RD_INTERVAL register. If set, DPCD registers from DP_DPCD_REV
-to DP_ADAPTER_CAP should be retrieved starting from DP_DPCD_REV_EXTENDED.
-All registers are copied except DP_DPCD_REV, DP_MAX_LINK_RATE and
-DP_DOWNSTREAMPORT_PRESENT which represent the "true capabilities" of DPRX
-device.
-
-Original DP_DPCD_REV, DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT might
-falsely return lower capabilities to "avoid interoperability issues with some
-of the existing DP Source devices that malfunction when they discover the
-higher capabilities within those three registers.".
-
-Before DP 1.4, DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT bit was reserved and read 0
-so it's safe to check against it even if DP revision is <1.4
-
 Signed-off-by: Damian Kos <dkos@cadence.com>
 ---
- drivers/gpu/drm/drm_dp_helper.c | 30 +++++++++++++++++++++++++++++-
- include/drm/drm_dp_helper.h     |  1 +
- 2 files changed, 30 insertions(+), 1 deletion(-)
+ .../bindings/display/bridge/cdns,mhdp.txt     | 43 +++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
 
-diff --git a/drivers/gpu/drm/drm_dp_helper.c b/drivers/gpu/drm/drm_dp_helper.c
-index 0cccbcb2d03e..86a070269c87 100644
---- a/drivers/gpu/drm/drm_dp_helper.c
-+++ b/drivers/gpu/drm/drm_dp_helper.c
-@@ -370,10 +370,38 @@ int drm_dp_link_probe(struct drm_dp_aux *aux, struct drm_dp_link *link)
- {
- 	u8 values[3];
- 	int err;
-+	unsigned int addr;
- 
- 	memset(link, 0, sizeof(*link));
- 
--	err = drm_dp_dpcd_read(aux, DP_DPCD_REV, values, sizeof(values));
-+	/*
-+	 * DP 1.4 introduced a DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT bit in
-+	 * DP_TRAINING_AUX_RD_INTERVAL register. If set, DPCD registers from
-+	 * DP_DPCD_REV to DP_ADAPTER_CAP should be retrieved starting from
-+	 * DP_DPCD_REV_EXTENDED. All registers are copied except DP_DPCD_REV,
-+	 * DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT which represent the
-+	 * "true capabilities" of DPRX device.
-+	 *
-+	 * Original DP_DPCD_REV, DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT
-+	 * might falsely return lower capabilities to "avoid interoperability
-+	 * issues with some of the existing DP Source devices that malfunction
-+	 * when they discover the higher capabilities within those three
-+	 * registers.".
-+	 *
-+	 * Before DP 1.4, DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT bit was reserved
-+	 * and read 0 so it's safe to check against it even if DP revision is
-+	 * <1.4
-+	 */
-+	err = drm_dp_dpcd_readb(aux, DP_TRAINING_AUX_RD_INTERVAL, values);
-+	if (err < 0)
-+		return err;
+diff --git a/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt b/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
+new file mode 100644
+index 000000000000..dc7be7590048
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
+@@ -0,0 +1,43 @@
++Cadence MHDP bridge
++==========================
 +
-+	if (values[0] & DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT)
-+		addr = DP_DP13_DPCD_REV;
-+	else
-+		addr = DP_DPCD_REV;
++The Cadence MHDP bridge is a DPI to DP bridge.
 +
-+	err = drm_dp_dpcd_read(aux, addr, values, sizeof(values));
- 	if (err < 0)
- 		return err;
- 
-diff --git a/include/drm/drm_dp_helper.h b/include/drm/drm_dp_helper.h
-index 05cc31b5db16..92800f2241b1 100644
---- a/include/drm/drm_dp_helper.h
-+++ b/include/drm/drm_dp_helper.h
-@@ -125,6 +125,7 @@
- 
- #define DP_TRAINING_AUX_RD_INTERVAL         0x00e   /* XXX 1.2? */
- # define DP_TRAINING_AUX_RD_MASK            0x7F    /* XXX 1.2? */
-+# define DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT BIT(7) /* 1.3 */
- 
- #define DP_ADAPTER_CAP			    0x00f   /* 1.2 */
- # define DP_FORCE_LOAD_SENSE_CAP	    (1 << 0)
++Required properties:
++- compatible: should be "cdns,mhdp8546",
++- reg: physical base address and length of the controller's registers,
++- clocks: DP bridge clock, it's used by the IP to know how to translate
++	a number of clock cycles into a time (which is used to comply
++	with DP standard timings and delays),
++
++Required subnodes:
++- ports: Ports as described in Documentation/devictree/bindings/graph.txt
++	Port 0 - input port representing the VGA bridge input
++	Port 1 - output port representing the VGA bridge output
++
++Example:
++
++	mhdp: dp-bridge at f0fb000000 {
++		compatible = "cdns,mhdp8546";
++		reg = <0xf0 0xfb000000 0x0 0x1000000>;
++		clocks = <&mhdp_clock>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				vga_bridge_input: endpoint {
++					remote-endpoint = <&xxx_dpi_output>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				vga_bridge_output: endpoint {
++					remote-endpoint = <&xxx_vga_connector_input>;
++				};
++			};
++		};
++	};
 -- 
 2.17.1
