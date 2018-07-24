@@ -1,50 +1,51 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 24 Jul 2018 15:57:45 +0900
-Subject: [PATCH v12 02/16] kexec_file: make
- kexec_image_post_load_cleanup_default() global
-In-Reply-To: <20180724065759.19186-1-takahiro.akashi@linaro.org>
-References: <20180724065759.19186-1-takahiro.akashi@linaro.org>
-Message-ID: <20180724065759.19186-3-takahiro.akashi@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 24 Jul 2018 08:57:20 +0200
+Subject: [PATCH 09/10] drm/vc4: Use __drm_atomic_helper_plane_reset
+ instead of copying the logic
+In-Reply-To: <20180720211509.23605-10-alexandru-cosmin.gheorghe@arm.com>
+References: <20180713161407.GQ20303@art_vandelay>
+ <20180720211509.23605-1-alexandru-cosmin.gheorghe@arm.com>
+ <20180720211509.23605-10-alexandru-cosmin.gheorghe@arm.com>
+Message-ID: <20180724065720.5bhepamdo57it7nl@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change this function from static to global so that arm64 can implement
-its own arch_kimage_file_post_load_cleanup() later using
-kexec_image_post_load_cleanup_default().
+On Fri, Jul 20, 2018 at 10:15:08PM +0100, Alexandru Gheorghe wrote:
+> Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
+> ---
+>  drivers/gpu/drm/vc4/vc4_plane.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/vc4/vc4_plane.c b/drivers/gpu/drm/vc4/vc4_plane.c
+> index 9d7a36f148cf..688ad9bb0f08 100644
+> --- a/drivers/gpu/drm/vc4/vc4_plane.c
+> +++ b/drivers/gpu/drm/vc4/vc4_plane.c
+> @@ -200,9 +200,7 @@ static void vc4_plane_reset(struct drm_plane *plane)
+>  	if (!vc4_state)
+>  		return;
+>  
+> -	plane->state = &vc4_state->base;
+> -	plane->state->alpha = DRM_BLEND_ALPHA_OPAQUE;
+> -	vc4_state->base.plane = plane;
+> +	__drm_atomic_helper_plane_reset(plane, &vc4_state->base);
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Acked-by: Dave Young <dyoung@redhat.com>
-Cc: Vivek Goyal <vgoyal@redhat.com>
-Cc: Baoquan He <bhe@redhat.com>
----
- include/linux/kexec.h | 1 +
- kernel/kexec_file.c   | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+For vc4, rcar-du, atmel-hlcdc and sun4i, you're changing the reset
+value of alpha from DRM_BLEND_ALPHA_OPAQUE to
+plane->alpha_property->values[1].
 
-diff --git a/include/linux/kexec.h b/include/linux/kexec.h
-index 9e4e638fb505..49ab758f4d91 100644
---- a/include/linux/kexec.h
-+++ b/include/linux/kexec.h
-@@ -143,6 +143,7 @@ extern const struct kexec_file_ops * const kexec_file_loaders[];
- 
- int kexec_image_probe_default(struct kimage *image, void *buf,
- 			      unsigned long buf_len);
-+int kexec_image_post_load_cleanup_default(struct kimage *image);
- 
- /**
-  * struct kexec_buf - parameters for finding a place for a buffer in memory
-diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-index c6a3b6851372..63c7ce1c0c3e 100644
---- a/kernel/kexec_file.c
-+++ b/kernel/kexec_file.c
-@@ -78,7 +78,7 @@ void * __weak arch_kexec_kernel_image_load(struct kimage *image)
- 	return kexec_image_load_default(image);
- }
- 
--static int kexec_image_post_load_cleanup_default(struct kimage *image)
-+int kexec_image_post_load_cleanup_default(struct kimage *image)
- {
- 	if (!image->fops || !image->fops->cleanup)
- 		return 0;
+This might or might not be a good idea, but you should definitely
+explain why.
+
+Maxime
+
 -- 
-2.18.0
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/68382632/attachment.sig>
