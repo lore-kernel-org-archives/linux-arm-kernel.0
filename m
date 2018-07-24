@@ -1,128 +1,22 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 24 Jul 2018 23:46:49 +0100
-Subject: [PATCH v3 6/6] iommu/arm-smmu-v3: add bootup option
- "iommu_strict_mode"
-In-Reply-To: <1531376312-2192-7-git-send-email-thunder.leizhen@huawei.com>
-References: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
- <1531376312-2192-7-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <33053c8f-3ac3-e1d6-e260-fd36c4af9312@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 24 Jul 2018 17:19:09 -0600
+Subject: [PATCH v6 3/5] dt-bindings: mailbox: imx-mu: add generic MU
+ channel support
+In-Reply-To: <20180722063923.30222-4-o.rempel@pengutronix.de>
+References: <20180722063923.30222-1-o.rempel@pengutronix.de>
+ <20180722063923.30222-4-o.rempel@pengutronix.de>
+Message-ID: <20180724231909.GA13980@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-12 7:18 AM, Zhen Lei wrote:
-> Because the non-strict mode introduces a vulnerability window, so add a
-> bootup option to make the manager can choose which mode to be used. The
-> default mode is IOMMU_STRICT.
+On Sun, Jul 22, 2018 at 08:39:21AM +0200, Oleksij Rempel wrote:
+> Each MU has four pairs of rx/tx data register with four rx/tx interrupts
+> which can also be used as a separate channel.
 > 
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 > ---
->   Documentation/admin-guide/kernel-parameters.txt | 12 ++++++++++
->   drivers/iommu/arm-smmu-v3.c                     | 32 ++++++++++++++++++++++---
->   2 files changed, 41 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-> index efc7aa7..0cc80bc 100644
-> --- a/Documentation/admin-guide/kernel-parameters.txt
-> +++ b/Documentation/admin-guide/kernel-parameters.txt
-> @@ -1720,6 +1720,18 @@
->   		nobypass	[PPC/POWERNV]
->   			Disable IOMMU bypass, using IOMMU for PCI devices.
->   
-> +	iommu_strict_mode=	[arm-smmu-v3]
+>  Documentation/devicetree/bindings/mailbox/fsl,mu.txt | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
 
-If anything this should belong to iommu-dma, as that's where the actual 
-decision of whether to use a flush queue or not happens. Also it would 
-be nice to stick to the iommu.* option namespace in the hope of 
-maintaining some consistency.
-
-> +		0 - strict mode
-> +		    Make sure all related TLBs to be invalidated before the
-> +		    memory released.
-> +		1 - non-strict mode
-> +		    Put off TLBs invalidation and release memory first. This mode
-> +		    introduces a vlunerability window, an untrusted device can
-> +		    access the reused memory because the TLBs may still valid.
-> +		    Please take full consideration before choosing this mode.
-> +		    Note that, VFIO is always use strict mode.
-> +		others - strict mode
-> +
->   	iommu.passthrough=
->   			[ARM64] Configure DMA to bypass the IOMMU by default.
->   			Format: { "0" | "1" }
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 4a198a0..9b72fc4 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -631,6 +631,24 @@ struct arm_smmu_option_prop {
->   	{ 0, NULL},
->   };
->   
-> +static u32 iommu_strict_mode __read_mostly = IOMMU_STRICT;
-> +
-> +static int __init setup_iommu_strict_mode(char *str)
-> +{
-> +	u32 strict_mode = IOMMU_STRICT;
-> +
-> +	get_option(&str, &strict_mode);
-> +	if (strict_mode == IOMMU_NON_STRICT) {
-> +		iommu_strict_mode = strict_mode;
-> +		pr_warn("WARNING: iommu non-strict mode is chose.\n"
-> +			"It's good for scatter-gather performance but lacks full isolation\n");
-> +		add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
-> +	}
-> +
-> +	return 0;
-> +}
-> +early_param("iommu_strict_mode", setup_iommu_strict_mode);
-> +
->   static inline void __iomem *arm_smmu_page1_fixup(unsigned long offset,
->   						 struct arm_smmu_device *smmu)
->   {
-> @@ -1441,7 +1459,7 @@ static bool arm_smmu_capable(enum iommu_cap cap)
->   	case IOMMU_CAP_NOEXEC:
->   		return true;
->   	case IOMMU_CAP_NON_STRICT:
-> -		return true;
-> +		return (iommu_strict_mode == IOMMU_NON_STRICT) ? true : false;
-
-Ugh. The "completely redundant ternany" idiom hurts my soul :(
-
-Robin.
-
->   	default:
->   		return false;
->   	}
-> @@ -1750,6 +1768,14 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
->   	return ret;
->   }
->   
-> +static u32 arm_smmu_strict_mode(struct iommu_domain *domain)
-> +{
-> +	if (iommu_strict_mode == IOMMU_NON_STRICT)
-> +		return IOMMU_DOMAIN_STRICT_MODE(domain);
-> +
-> +	return IOMMU_STRICT;
-> +}
-> +
->   static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
->   			phys_addr_t paddr, size_t size, int prot)
->   {
-> @@ -1769,7 +1795,7 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
->   	if (!ops)
->   		return 0;
->   
-> -	return ops->unmap(ops, iova | IOMMU_DOMAIN_STRICT_MODE(domain), size);
-> +	return ops->unmap(ops, iova | arm_smmu_strict_mode(domain), size);
->   }
->   
->   static void arm_smmu_flush_iotlb_all(struct iommu_domain *domain)
-> @@ -1784,7 +1810,7 @@ static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
->   {
->   	struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
->   
-> -	if (smmu && (IOMMU_DOMAIN_STRICT_MODE(domain) == IOMMU_STRICT))
-> +	if (smmu && (arm_smmu_strict_mode(domain) == IOMMU_STRICT))
->   		__arm_smmu_tlb_sync(smmu);
->   }
->   
-> 
+Reviewed-by: Rob Herring <robh@kernel.org>
