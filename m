@@ -1,76 +1,86 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 24 Jul 2018 13:13:13 +0200
-Subject: [PATCHv4 01/12] atomic/tty: Fix up atomic abuse in ldsem
-In-Reply-To: <20180724092324.vnfowffsla4kja5c@lakrids.cambridge.arm.com>
-References: <20180716113017.3909-1-mark.rutland@arm.com>
- <20180716113017.3909-2-mark.rutland@arm.com>
- <20180724071518.GA7300@gmail.com>
- <20180724092036.GN2494@hirez.programming.kicks-ass.net>
- <20180724092324.vnfowffsla4kja5c@lakrids.cambridge.arm.com>
-Message-ID: <20180724111313.GA14212@gmail.com>
+From: dkos@cadence.com (Damian Kos)
+Date: Tue, 24 Jul 2018 12:13:31 +0100
+Subject: [PATCH v2 0/5] drm: add support for Cadence MHDP DPI/DP bridge.
+Message-ID: <1532430824-23477-1-git-send-email-dkos@cadence.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello!
 
-* Mark Rutland <mark.rutland@arm.com> wrote:
+This is the series of patches that will add support for the Cadence's DPI/DP
+bridge. Please note that this is a preliminary version of the driver and there
+will be more patches in the future with updates, fixes and improvements.
+Please keep that in mind when looking at FIXME/TODO/XXX comments.
 
-> On Tue, Jul 24, 2018 at 11:20:36AM +0200, Peter Zijlstra wrote:
-> > On Tue, Jul 24, 2018 at 09:15:18AM +0200, Ingo Molnar wrote:
-> > > 
-> > > * Mark Rutland <mark.rutland@arm.com> wrote:
-> > > 
-> > > > From: Peter Zijlstra <peterz@infradead.org>
-> > > > 
-> > > > Mark found ldsem_cmpxchg() needed an (atomic_long_t *) cast to keep
-> > > > working after making the atomic_long interface type safe.
-> > > > 
-> > > > Needing casts is bad form, which made me look at the code. There are no
-> > > > ld_semaphore::count users outside of these functions so there is no
-> > > > reason why it can not be an atomic_long_t in the first place, obviating
-> > > > the need for this cast.
-> > > > 
-> > > > That also ensures the loads use atomic_long_read(), which implies (at
-> > > > least) READ_ONCE() in order to guarantee single-copy-atomic loads.
-> > > > 
-> > > > When using atomic_long_try_cmpxchg() the ldsem_cmpxchg() wrapper gets
-> > > > very thin (the only difference is not changing *old on success, which
-> > > > most callers don't seem to care about).
-> > > > 
-> > > > So rework the whole thing to use atomic_long_t and its accessors
-> > > > directly.
-> > > > 
-> > > > While there, fixup all the horrible comment styles.
-> > > > 
-> > > > Cc: Peter Hurley <peter@hurleysoftware.com>
-> > > > Acked-by: Will Deacon <will.deacon@arm.com>
-> > > > Reported-by: Mark Rutland <mark.rutland@arm.com>
-> > > > Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-> > > > Signed-off-by: Peter Zijlstra (Intel) <peterz@infradead.org>
-> > > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > > Cc: Ingo Molnar <mingo@kernel.org>
-> > > > ---
-> > > >  drivers/tty/tty_ldsem.c   | 82 ++++++++++++++++++++---------------------------
-> > > >  include/linux/tty_ldisc.h |  4 +--
-> > > >  2 files changed, 37 insertions(+), 49 deletions(-)
-> > > > 
-> > > > Note: Greg has queued this via the in the tty tree for v4.19, which can be seen at: 
-> > > > 
-> > > > https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git/commit/?h=tty-next&id=5fd691afdf929061c391d897fa627822c3b2fd5a
-> > > 
-> > > Can this patch be skipped, or do the others depend on it?
-> > 
-> > IIRC it depends on it, without this patch you get build issues due to
-> > atomic_long_cmpxchg() getting picky about it's arguments (type safety
-> > improved).
-> 
-> Yup. Without this patch, there will be a build regression at patch 9,
-> when we move to generated atomic_long_*() wrappers.
+Initially, MHDP driver was developed as a DRM bridge driver and was planed to
+be placed in drivers/gpu/drm/bridge/mhdp.c.  However, there was already
+a driver for Cadence's DP controller developed by RockChip, but that driver
+uses the different DRM framework and looks like a part of a bigger system.
+Both controllers (including firmware) are quite different internally
+(MST/FEC/DSC support, link training done by driver, additional commands, IRQ's
+etc.) but they have similar register map, except for Framer/Streamer (which is
+noticeably different), so they appear similar.
 
-Ok, then these bits will have to wait until Greg's tree goes upstream
-in about two weeks.
+The following patches contain:
+- Moving common code to drivers/gpu/drm/bridge/cdns-mhdp-common.* and
+  modifying it a bit (mostly new prefixes for functions and data types) so it
+  can be used by two, higher level, drivers.
+- Modifying existing RockChip's DP driver to use the common code after changes
+  made to it (use the new cdns_mhdp_device structure and new function names).
+- Modifying DRM helpers a bit. Some are required for new driver, some are
+  updates from DP 1.2 to 1.3 or 1.4.
+- Adding documentation for device tree bindings.
+- Adding preliminary Cadence DPI/DP bridge driver.
 
-Which patches can I apply as a preparatory step?
+Some of the things that will be added later on include (but are not limited
+to):
+- Support for Cadence SD0801 PHY (PHY's driver should be on the way by now)
+- SST audio support
+- MST support
+- DSC support
+- FEC support
+- HDCP support
 
-Thanks,
+Changes in v2:
+- Added actual description of what the patch contains, what is it for and
+  what's going on here in general.
+- New structure. Now we have one common low level driver + two high level
+  drivers - one for RockChip with minimum changes and one, more general, for
+  Cadence.
+- Dropped some changes made to DRM helpers.
+- Updated the device tree bindings document.
 
-	Ingo
+
+Damian Kos (1):
+  drm/rockchip: moved cdns mhdp dpi/dp bridge low driver to a new
+    location
+
+Quentin Schulz (4):
+  drm/dp: fix link probing for devices supporting DP 1.4+
+  drm/dp: make dp_link_status and dp_get_lane_status usable from outside
+    of the core
+  dt-bindings: drm/bridge Document Cadence MHDP DPI/DP bridge bindings
+  drm/bridge: add preliminary driver for cadence dpi/dp bridge
+
+ .../bindings/display/bridge/cdns,mhdp.txt     |   43 +
+ drivers/gpu/drm/bridge/Kconfig                |    7 +
+ drivers/gpu/drm/bridge/Makefile               |    1 +
+ drivers/gpu/drm/bridge/cdns-mhdp-common.c     | 1087 +++++++++++++++
+ .../cdns-mhdp-common.h}                       |  134 +-
+ drivers/gpu/drm/bridge/cdns-mhdp.c            | 1233 +++++++++++++++++
+ drivers/gpu/drm/drm_dp_helper.c               |   50 +-
+ drivers/gpu/drm/rockchip/Kconfig              |    1 +
+ drivers/gpu/drm/rockchip/Makefile             |    4 +-
+ drivers/gpu/drm/rockchip/cdn-dp-core.c        |  220 +--
+ drivers/gpu/drm/rockchip/cdn-dp-core.h        |   40 +-
+ drivers/gpu/drm/rockchip/cdn-dp-reg.c         |  969 -------------
+ include/drm/drm_dp_helper.h                   |    4 +
+ 13 files changed, 2648 insertions(+), 1145 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
+ create mode 100644 drivers/gpu/drm/bridge/cdns-mhdp-common.c
+ rename drivers/gpu/drm/{rockchip/cdn-dp-reg.h => bridge/cdns-mhdp-common.h} (80%)
+ create mode 100644 drivers/gpu/drm/bridge/cdns-mhdp.c
+ delete mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.c
+
+-- 
+2.17.1
