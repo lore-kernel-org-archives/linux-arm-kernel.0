@@ -1,112 +1,29 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 24 Jul 2018 11:54:25 +0200
-Subject: [PATCH] [SUBMITTED 20180724] arm64: fix ACPI dependencies
-In-Reply-To: <20180724094957.1967541-1-arnd@arndb.de>
-References: <20180724094957.1967541-1-arnd@arndb.de>
-Message-ID: <CAJZ5v0jMtWDZePW=mu_cO2PjHVGp1hQThSveq9+=2aNozESENQ@mail.gmail.com>
+From: jbrunet@baylibre.com (jbrunet at baylibre.com)
+Date: Tue, 24 Jul 2018 12:03:10 +0200
+Subject: [PATCH] ASoC: meson: axg-spdifout: select SND_PCM_IEC958
+In-Reply-To: <20180724093705.1691747-1-arnd@arndb.de>
+References: <20180724093705.1691747-1-arnd@arndb.de>
+Message-ID: <59fdcf671ffd0ef60e4d982ba269f853089ee7da.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 11:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Kconfig reports a warning on x86 builds after the ARM64 dependency
-> was added.
->
-> drivers/acpi/Kconfig:6:error: recursive dependency detected!
-> drivers/acpi/Kconfig:6:       symbol ACPI depends on EFI
->
-> This rephrases the dependency to keep the ARM64 details out of the
-> shared Kconfig file, so Kconfig no longer gets confused by it.
->
-> For consistency, all three architectures that support ACPI now
-> select ARCH_SUPPORTS_ACPI in exactly the configuration in which
-> they allow it. We still need the 'default x86', as each one
-> wants a different default: default-y on x86, default-n on arm64,
-> and always-y on ia64.
->
-> Fixes: 5bcd44083a08 ("drivers: acpi: add dependency of EFI for arm64")
+On Tue, 2018-07-24 at 11:36 +0200, Arnd Bergmann wrote:
+> When CONFIG_SND_PCM_IEC958 is disabled, we get a link error for the
+> new driver:
+> 
+> sound/soc/meson/axg-spdifout.o: In function `axg_spdifout_hw_params':
+> axg-spdifout.c:(.text+0x650): undefined reference to
+> `snd_pcm_create_iec958_consumer_hw_params'
+
+I used arm64 defconfig to do all my test and this symbol was selected
+by the HDMI codec driver, which is probably why missed it. 
+
+Thanks a lot for fixing the problem Arnd.
+
+> 
+> The other users use 'select', so we should do the same here.
+> 
+> Fixes: 53eb4b7aaa04 ("ASoC: meson: add axg spdif output")
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> v2: use 'select ARCH_SUPPORTS_ACPI' for all three.
 
-LGTM
-
-Reviewed-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-
-> ---
->  arch/arm64/Kconfig   | 1 +
->  arch/ia64/Kconfig    | 1 +
->  arch/x86/Kconfig     | 1 +
->  drivers/acpi/Kconfig | 8 +++++---
->  4 files changed, 8 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index cdcaa6a798b2..2f987a938405 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1267,6 +1267,7 @@ config EFI
->         bool "UEFI runtime support"
->         depends on OF && !CPU_BIG_ENDIAN
->         depends on KERNEL_MODE_NEON
-> +       select ARCH_SUPPORTS_ACPI
->         select LIBFDT
->         select UCS2_STRING
->         select EFI_PARAMS_FROM_FDT
-> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-> index ff861420b8f5..02eb68d5d1c0 100644
-> --- a/arch/ia64/Kconfig
-> +++ b/arch/ia64/Kconfig
-> @@ -16,6 +16,7 @@ config IA64
->         select ARCH_MIGHT_HAVE_PC_SERIO
->         select PCI if (!IA64_HP_SIM)
->         select ACPI if (!IA64_HP_SIM)
-> +       select ARCH_SUPPORTS_ACPI if (!IA64_HP_SIM)
->         select ACPI_SYSTEM_POWER_STATES_SUPPORT if ACPI
->         select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
->         select HAVE_UNSTABLE_SCHED_CLOCK
-> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> index 088b719bc5d1..442575220708 100644
-> --- a/arch/x86/Kconfig
-> +++ b/arch/x86/Kconfig
-> @@ -76,6 +76,7 @@ config X86
->         select ARCH_MIGHT_HAVE_ACPI_PDC         if ACPI
->         select ARCH_MIGHT_HAVE_PC_PARPORT
->         select ARCH_MIGHT_HAVE_PC_SERIO
-> +       select ARCH_SUPPORTS_ACPI
->         select ARCH_SUPPORTS_ATOMIC_RMW
->         select ARCH_SUPPORTS_NUMA_BALANCING     if X86_64
->         select ARCH_USE_BUILTIN_BSWAP
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index a8da730fabc6..1edca05ee0ae 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -5,11 +5,10 @@
->
->  menuconfig ACPI
->         bool "ACPI (Advanced Configuration and Power Interface) Support"
-> -       depends on !IA64_HP_SIM
-> -       depends on IA64 || X86 || (ARM64 && EFI)
-> +       depends on ARCH_SUPPORTS_ACPI
->         depends on PCI
->         select PNP
-> -       default y if (IA64 || X86)
-> +       default y if X86
->         help
->           Advanced Configuration and Power Interface (ACPI) support for
->           Linux requires an ACPI-compliant platform (hardware/firmware),
-> @@ -41,6 +40,9 @@ menuconfig ACPI
->           <http://www.acpi.info>
->           <http://www.uefi.org/acpi/specs>
->
-> +config ARCH_SUPPORTS_ACPI
-> +       bool
-> +
->  if ACPI
->
->  config ACPI_LEGACY_TABLES_LOOKUP
-> --
-> 2.18.0
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Acked-by: Jerome Brunet <jbrunet@baylibre.com>
