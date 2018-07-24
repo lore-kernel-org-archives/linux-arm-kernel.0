@@ -1,58 +1,53 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 24 Jul 2018 08:11:30 -0700
-Subject: [PATCH v9 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <20180724145755.GF13268@sirena.org.uk>
-References: <cover.1531531808.git.collinsd@codeaurora.org>
- <56b9d5c38cfe46da1228c54f001a49773c3e31dc.1531531808.git.collinsd@codeaurora.org>
- <CAD=FV=VmfqWRGRMEn+0dzZ8x4R5vVaHbkthXAN91Lm-XmP9Gqg@mail.gmail.com>
- <20180724145755.GF13268@sirena.org.uk>
-Message-ID: <CAD=FV=Uo8sT72a0gRitOVoK0SfC-_QixsovW94_LnL6H7QdKvA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 24 Jul 2018 16:14:37 +0100
+Subject: [PATCH] [SUBMITTED 20180724] arm64: fix ACPI dependencies
+In-Reply-To: <CAJZ5v0h1zGHrMo6HLtSMWE4kM9YK-3QvgHnBaRrEpMHAJrrMtg@mail.gmail.com>
+References: <20180724094957.1967541-1-arnd@arndb.de>
+ <CAJZ5v0jMtWDZePW=mu_cO2PjHVGp1hQThSveq9+=2aNozESENQ@mail.gmail.com>
+ <20180724102102.GI19324@arm.com>
+ <CAJZ5v0h1zGHrMo6HLtSMWE4kM9YK-3QvgHnBaRrEpMHAJrrMtg@mail.gmail.com>
+Message-ID: <20180724151435.GB25412@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jul 24, 2018 at 12:23:48PM +0200, Rafael J. Wysocki wrote:
+> On Tue, Jul 24, 2018 at 12:21 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Jul 24, 2018 at 11:54:25AM +0200, Rafael J. Wysocki wrote:
+> >> On Tue, Jul 24, 2018 at 11:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > Kconfig reports a warning on x86 builds after the ARM64 dependency
+> >> > was added.
+> >> >
+> >> > drivers/acpi/Kconfig:6:error: recursive dependency detected!
+> >> > drivers/acpi/Kconfig:6:       symbol ACPI depends on EFI
+> >> >
+> >> > This rephrases the dependency to keep the ARM64 details out of the
+> >> > shared Kconfig file, so Kconfig no longer gets confused by it.
+> >> >
+> >> > For consistency, all three architectures that support ACPI now
+> >> > select ARCH_SUPPORTS_ACPI in exactly the configuration in which
+> >> > they allow it. We still need the 'default x86', as each one
+> >> > wants a different default: default-y on x86, default-n on arm64,
+> >> > and always-y on ia64.
+> >> >
+> >> > Fixes: 5bcd44083a08 ("drivers: acpi: add dependency of EFI for arm64")
+> >> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >> > ---
+> >> > v2: use 'select ARCH_SUPPORTS_ACPI' for all three.
+> >>
+> >> LGTM
+> >>
+> >> Reviewed-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> >
+> > Same here:
+> >
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> >
+> > Would it be ok if I take this via the arm64 tree, since that's where the
+> > warning was introduced?
+> 
+> Yes, it would, from the ACPI side.
 
-On Tue, Jul 24, 2018 at 7:57 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, Jul 23, 2018 at 01:09:05PM -0700, Doug Anderson wrote:
->
->> I know you are still looking for time to review the RPMh-regulator
->> driver and that's fine.  One idea I had though: if the bindings look
->> OK to you and are less controversial, is there any chance they could
->> land in the meantime?
->
-> This appears to have a bunch of dependencies which I've got no idea
-> what's going on with the merging of and no idea if they'll affect the
-> bindings or anything, nobody's said anything and last I looked it was
-> unclear what was going on.
+Ok, I'll stick this into next tomorrow pending any objections from the x86
+maintainers.
 
-RPMh itself landed in Andy's tree and he sent a pull request on
-Saturday.  Feel free to refer to the request ("[GIT PULL] Qualcomm
-Driver updates for 4.19") AKA
-<https://patchwork.kernel.org/patch/10539125/>.
-
-It doesn't look like arm-soc has picked up Andy's pull request yet
-though.  If having it in arm-soc is a requirement then I'm happy to
-monitor arm-soc and ping this thread again when it's there.
-
-
-> I'm kind of hoping that things might have
-> sorted themselves out of the merge window.
->
-> Some of the decisions in the code have flowed out into the bindings
-> before so I'm not keen to merge the bindings separately,
-
-Fair point.  I was thinking that we had pared the driver down enough
-now that the bindings were no longer anything other than just
-boilerplate bits describing the hardware, but it's obviously your
-decision when you're happy to land them.
-
-
-> and if the
-> driver for the thing used to communicate with the device is still in
-> review then that's definitely a red flag.
-
-As per above it's been landed, so hopefully this red flag is removed?
-
-
--Doug
+Will
