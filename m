@@ -1,58 +1,61 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 24 Jul 2018 18:46:35 +0200
-Subject: [PATCH] dt-bindings: thermal: samsung: Add SPDX license identifier
-In-Reply-To: <20180718200250.6478-1-krzk@kernel.org>
-References: <CGME20180718200318epcas3p16aed6c1725d6c1e63ea6b1ad209c5756@epcas3p1.samsung.com>
- <20180718200250.6478-1-krzk@kernel.org>
-Message-ID: <2442216.oppRSGRAaL@amdc3058>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Tue, 24 Jul 2018 09:49:51 -0700
+Subject: [PATCH] arm64: enable RapidIO config options in Kconfig
+In-Reply-To: <20180724151458.GE25412@arm.com>
+References: <20180724134513.86796-1-acolin@isi.edu>
+ <20180724151458.GE25412@arm.com>
+Message-ID: <71f6f129-4151-1603-10aa-9e600d6389ed@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Wednesday, July 18, 2018 10:02:50 PM Krzysztof Kozlowski wrote:
-> Replace GPL license statement with SPDX license identifier (GPL-2.0+).
+On 07/24/2018 08:14 AM, Will Deacon wrote:
+> On Tue, Jul 24, 2018 at 09:45:14AM -0400, Alexei Colin wrote:
+>> ARM64 SoCs with a PCI bus present the RapiodIO options; SoCs with
+>> RapidIO IP blocks but without a PCI bus, need to select HAS_RAPIDIO in
+>> Kconfig.platforms.
+>>
+>> HAS_RAPIDIO was chosen over HAVE_RAPIDIO to be consistent with
+>> other architectures which already define this flag (powerpc).
+>>
+>> Signed-off-by: Alexei Colin <acolin@isi.edu>
+>> ---
+>>
+>> Tested that kernel builds with RapidIO subsystem and switch drivers and that
+>> modules insert successfully in a custom Qemu hardware model.
+>> Maintainers for RapidIO subsystem CCed.
+>> Similar patch for ARM has been submitted.
+>>
+>>  arch/arm64/Kconfig | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 42c090cf0292..8dceaa5b674c 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -293,6 +293,22 @@ config PCI_SYSCALL
+>>  
+>>  source "drivers/pci/Kconfig"
+>>  
+>> +config HAS_RAPIDIO
+>> +	bool
+>> +	default n
+>> +
+>> +config RAPIDIO
+>> +	tristate "RapidIO support"
+>> +	depends on HAS_RAPIDIO || PCI
+>> +	help
+>> +	  This feature enables support for RapidIO high-performance
+>> +	  packet-switched interconnect.
+>> +
+>> +	  If you say Y here, the kernel will include drivers and
+>> +	  infrastructure code to support RapidIO interconnect devices.
 > 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  include/dt-bindings/thermal/thermal_exynos.h | 12 +-----------
->  1 file changed, 1 insertion(+), 11 deletions(-)
-> 
-> diff --git a/include/dt-bindings/thermal/thermal_exynos.h b/include/dt-bindings/thermal/thermal_exynos.h
-> index 0646500bca69..642e4e7f4084 100644
-> --- a/include/dt-bindings/thermal/thermal_exynos.h
-> +++ b/include/dt-bindings/thermal/thermal_exynos.h
-> @@ -1,19 +1,9 @@
-> +/* SPDX-License-Identifier: GPL-2.0+ */
+> It feels a bit weird to push this help text into the arch Kconfig files,
+> rather than just have them provide the HAS_RAPIDIO symbol, but if that's
+> what everybody else is doing then I guess it's fine.
 
-This code should be GPL-2.0 only, original license statement is most
-likely result of using wrong file as the source of copy-paste. So I
-would like to have the license fixed first before doing conversion to
-SPDX.
+Both Arnd and Russell King asked for moving CONFIG_RAPIDIO to drivers/rapidio/Kconfig,
+and I also think that would be better.
 
->  /*
->   * thermal_exynos.h - Samsung EXYNOS TMU device tree definitions
->   *
->   *  Copyright (C) 2014 Samsung Electronics
->   *  Lukasz Majewski <l.majewski@samsung.com>
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> - *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> - *
->   */
->  
->  #ifndef _EXYNOS_THERMAL_TMU_DT_H
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+-- 
+~Randy
