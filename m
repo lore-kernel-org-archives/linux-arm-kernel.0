@@ -1,130 +1,79 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 24 Jul 2018 11:22:16 +0200
-Subject: [PATCH v3 3/3] dmaengine: imx-sdma: allocate max 20 bds for one
- transfer
-In-Reply-To: <DB6PR04MB322323354B2184421502FC5889560@DB6PR04MB3223.eurprd04.prod.outlook.com>
-References: <1532367972-29707-1-git-send-email-yibin.gong@nxp.com>
- <1532367972-29707-4-git-send-email-yibin.gong@nxp.com>
- <1532343252.3163.99.camel@pengutronix.de>
- <DB6PR04MB322323354B2184421502FC5889560@DB6PR04MB3223.eurprd04.prod.outlook.com>
-Message-ID: <1532424136.32306.3.camel@pengutronix.de>
+From: prudo@linux.ibm.com (Philipp Rudo)
+Date: Tue, 24 Jul 2018 11:23:06 +0200
+Subject: [PATCH v12 03/16] s390, kexec_file: drop arch_kexec_mem_walk()
+In-Reply-To: <20180724065759.19186-4-takahiro.akashi@linaro.org>
+References: <20180724065759.19186-1-takahiro.akashi@linaro.org>
+ <20180724065759.19186-4-takahiro.akashi@linaro.org>
+Message-ID: <20180724112306.299540b5@ThinkPad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 23.07.2018, 13:55 +0000 schrieb Robin Gong:
-> > -----Original Message-----
-> > From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> > Sent: 2018?7?23? 18:54
-> > To: Robin Gong <yibin.gong@nxp.com>; vkoul at kernel.org;
-> > dan.j.williams at intel.com; s.hauer at pengutronix.de; linux at armlinux.or
-> > g.uk
-> > Cc: dmaengine at vger.kernel.org; dl-linux-imx <linux-imx@nxp.com>;
-> > kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
-> > linux-kernel at vger.kernel.org
-> > Subject: Re: [PATCH v3 3/3] dmaengine: imx-sdma: allocate max 20
-> > bds for one
-> > transfer
-> > 
-> > Am Dienstag, den 24.07.2018, 01:46 +0800 schrieb Robin Gong:
-> > > If multi-bds used in one transfer, all bds should be consisten
-> > > memory.To easily follow it, enlarge the dma pool size into 20
-> > > bds, and
-> > > it will report error if the number of bds is over than 20. For
-> > > dmatest, the max count for single transfer is NUM_BD *
-> > 
-> > SDMA_BD_MAX_CNT
-> > > = 20 * 65535 = ~1.28MB.
-> > 
-> > Both the commit message and the comment need a lot more care to
-> > actually
-> > tell what this commit is trying to achieve. Currently I don't
-> > follow at all. What
-> > does "consisten" mean? Do you mean BDs should be contiguous in
-> > memory?
+Hi AKASHI,
+
+the patch looks good to me.
+
+Reviewed-by: Philipp Rudo <prudo@linux.ibm.com>
+
+Thanks
+Philipp
+
+
+On Tue, 24 Jul 2018 15:57:46 +0900
+AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+
+> Since s390 already knows where to locate buffers, calling
+> arch_kexec_mem_walk() has no sense. So we can just drop it as kbuf->mem
+> indicates this while all other architectures sets it to 0 initially.
 > 
-> Yes, BDs should be contiguous??one by one in memory.
-
-Okay, but this isn't what the code change does. By increasing the size
-parameter of the dma pool you just allocate 20 times as much memory as
-needed for each BD. So actually the BDs end up being very non-
-contiguous in memory as there are now holes of 19 BD sizes between the
-start of each BD.
-
-So something isn't right with this change.
-
-Regards,
-Lucas
-
-> > 
-> > What do you gain by over-allocating each BD by a factor of 20?
+> This change is a preparatory work for the next patch, where all the
+> variant memory walks, either on system resource or memblock, will be
+> put in one common place so that it will satisfy all the architectures'
+> need.
 > 
-> I guess dma_pool_alloc will return error in such case, and then cause
-> dma setup
-> transfer failure.
-> > 
-> > Regards,
-> > Lucas
-> > 
-> > > Signed-off-by: Robin Gong <yibin.gong@nxp.com>
-> > > ---
-> > > ?drivers/dma/imx-sdma.c | 17 ++++++++++++++++-
-> > > ?1 file changed, 16 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> > > index
-> > > b4ec2d2..5973489 100644
-> > > --- a/drivers/dma/imx-sdma.c
-> > > +++ b/drivers/dma/imx-sdma.c
-> > > @@ -298,6 +298,15 @@ struct sdma_context_data {
-> > > > ?	u32??scratch7;
-> > > 
-> > > ?} __attribute__ ((packed));
-> > > 
-> > > +/*
-> > > + * All bds in one transfer should be consitent on SDMA. To
-> > > easily
-> > > +follow it,just
-> > > + * set the dma pool size as the enough bds. For example, in
-> > > dmatest
-> > > +case, the
-> > > + * max 20 bds means the max for single transfer is NUM_BD *
-> > > +SDMA_BD_MAX_CNT = 20
-> > > + * * 65535 = ~1.28MB. 20 bds supposed to be enough basically.If
-> > > it's
-> > > +still not
-> > > + * enough in some specific cases, enlarge it here.Warning
-> > > message
-> > > +would also
-> > > + * appear if the bd numbers is over than 20.
-> > > + */
-> > > +#define NUM_BD 20
-> > > 
-> > > ?struct sdma_engine;
-> > > 
-> > > @@ -1273,7 +1282,7 @@ static int sdma_alloc_chan_resources(struct
-> > > dma_chan *chan)
-> > > > ?		goto disable_clk_ahb;
-> > > > ?	sdmac->bd_pool = dma_pool_create("bd_pool", chan-
-> > > > >device->dev,
-> > > > -				sizeof(struct
-> > > > sdma_buffer_descriptor),
-> > > > +				NUM_BD * sizeof(struct
-> > > > sdma_buffer_descriptor),
-> > > > ?				32, 0);
-> > > > ?	return 0;
-> > > 
-> > > @@ -1314,6 +1323,12 @@ static struct sdma_desc
-> > > *sdma_transfer_init(struct sdma_channel *sdmac,
-> > > ?{
-> > > > ?	struct sdma_desc *desc;
-> > > > +	if (bds > NUM_BD) {
-> > > > +		dev_err(sdmac->sdma->dev, "%d bds exceed the
-> > > > max %d\n",
-> > > > +			bds, NUM_BD);
-> > > > +		goto err_out;
-> > > > +	}
-> > > 
-> > > +
-> > > > ?	desc = kzalloc((sizeof(*desc)), GFP_NOWAIT);
-> > > > ?	if (!desc)
-> > > > ?		goto err_out;
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+> Cc: Dave Young <dyoung@redhat.com>
+> Cc: Vivek Goyal <vgoyal@redhat.com>
+> Cc: Baoquan He <bhe@redhat.com>
+> ---
+>  arch/s390/kernel/machine_kexec_file.c | 10 ----------
+>  kernel/kexec_file.c                   |  4 ++++
+>  2 files changed, 4 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/s390/kernel/machine_kexec_file.c b/arch/s390/kernel/machine_kexec_file.c
+> index f413f57f8d20..32023b4f9dc0 100644
+> --- a/arch/s390/kernel/machine_kexec_file.c
+> +++ b/arch/s390/kernel/machine_kexec_file.c
+> @@ -134,16 +134,6 @@ int kexec_file_add_initrd(struct kimage *image, struct s390_load_data *data,
+>  	return ret;
+>  }
+>  
+> -/*
+> - * The kernel is loaded to a fixed location. Turn off kexec_locate_mem_hole
+> - * and provide kbuf->mem by hand.
+> - */
+> -int arch_kexec_walk_mem(struct kexec_buf *kbuf,
+> -			int (*func)(struct resource *, void *))
+> -{
+> -	return 1;
+> -}
+> -
+>  int arch_kexec_apply_relocations_add(struct purgatory_info *pi,
+>  				     Elf_Shdr *section,
+>  				     const Elf_Shdr *relsec,
+> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+> index 63c7ce1c0c3e..bf39df5e5bb9 100644
+> --- a/kernel/kexec_file.c
+> +++ b/kernel/kexec_file.c
+> @@ -534,6 +534,10 @@ int kexec_locate_mem_hole(struct kexec_buf *kbuf)
+>  {
+>  	int ret;
+>  
+> +	/* Arch knows where to place */
+> +	if (kbuf->mem)
+> +		return 0;
+> +
+>  	ret = arch_kexec_walk_mem(kbuf, locate_mem_hole_callback);
+>  
+>  	return ret == 1 ? 0 : -EADDRNOTAVAIL;
