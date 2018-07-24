@@ -1,66 +1,85 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 24 Jul 2018 10:23:24 +0100
-Subject: [PATCHv4 01/12] atomic/tty: Fix up atomic abuse in ldsem
-In-Reply-To: <20180724092036.GN2494@hirez.programming.kicks-ass.net>
-References: <20180716113017.3909-1-mark.rutland@arm.com>
- <20180716113017.3909-2-mark.rutland@arm.com>
- <20180724071518.GA7300@gmail.com>
- <20180724092036.GN2494@hirez.programming.kicks-ass.net>
-Message-ID: <20180724092324.vnfowffsla4kja5c@lakrids.cambridge.arm.com>
+From: Alexandru-Cosmin.Gheorghe@arm.com (Alexandru-Cosmin Gheorghe)
+Date: Tue, 24 Jul 2018 10:28:52 +0100
+Subject: [PATCH 01/10] drm/atomic: Add  __drm_atomic_helper_plane_reset
+In-Reply-To: <20180724101656.0f472b0a@bbrezillon>
+References: <20180713161407.GQ20303@art_vandelay>
+ <20180720211509.23605-1-alexandru-cosmin.gheorghe@arm.com>
+ <20180720211509.23605-2-alexandru-cosmin.gheorghe@arm.com>
+ <1532418533.4078.2.camel@pengutronix.de>
+ <20180724081402.GB22689@e114479-lin.cambridge.arm.com>
+ <20180724101656.0f472b0a@bbrezillon>
+Message-ID: <20180724092852.GA24518@e114479-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 11:20:36AM +0200, Peter Zijlstra wrote:
-> On Tue, Jul 24, 2018 at 09:15:18AM +0200, Ingo Molnar wrote:
-> > 
-> > * Mark Rutland <mark.rutland@arm.com> wrote:
-> > 
-> > > From: Peter Zijlstra <peterz@infradead.org>
-> > > 
-> > > Mark found ldsem_cmpxchg() needed an (atomic_long_t *) cast to keep
-> > > working after making the atomic_long interface type safe.
-> > > 
-> > > Needing casts is bad form, which made me look at the code. There are no
-> > > ld_semaphore::count users outside of these functions so there is no
-> > > reason why it can not be an atomic_long_t in the first place, obviating
-> > > the need for this cast.
-> > > 
-> > > That also ensures the loads use atomic_long_read(), which implies (at
-> > > least) READ_ONCE() in order to guarantee single-copy-atomic loads.
-> > > 
-> > > When using atomic_long_try_cmpxchg() the ldsem_cmpxchg() wrapper gets
-> > > very thin (the only difference is not changing *old on success, which
-> > > most callers don't seem to care about).
-> > > 
-> > > So rework the whole thing to use atomic_long_t and its accessors
-> > > directly.
-> > > 
-> > > While there, fixup all the horrible comment styles.
-> > > 
-> > > Cc: Peter Hurley <peter@hurleysoftware.com>
-> > > Acked-by: Will Deacon <will.deacon@arm.com>
-> > > Reported-by: Mark Rutland <mark.rutland@arm.com>
-> > > Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-> > > Signed-off-by: Peter Zijlstra (Intel) <peterz@infradead.org>
-> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > Cc: Ingo Molnar <mingo@kernel.org>
-> > > ---
-> > >  drivers/tty/tty_ldsem.c   | 82 ++++++++++++++++++++---------------------------
-> > >  include/linux/tty_ldisc.h |  4 +--
-> > >  2 files changed, 37 insertions(+), 49 deletions(-)
-> > > 
-> > > Note: Greg has queued this via the in the tty tree for v4.19, which can be seen at: 
-> > > 
-> > > https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git/commit/?h=tty-next&id=5fd691afdf929061c391d897fa627822c3b2fd5a
-> > 
-> > Can this patch be skipped, or do the others depend on it?
+On Tue, Jul 24, 2018 at 10:16:56AM +0200, Boris Brezillon wrote:
+> On Tue, 24 Jul 2018 09:14:02 +0100
+> Alexandru-Cosmin Gheorghe <Alexandru-Cosmin.Gheorghe@arm.com> wrote:
 > 
-> IIRC it depends on it, without this patch you get build issues due to
-> atomic_long_cmpxchg() getting picky about it's arguments (type safety
-> improved).
+> > On Tue, Jul 24, 2018 at 09:48:53AM +0200, Philipp Zabel wrote:
+> > > Hi Alexandru,
+> > > 
+> > > On Fri, 2018-07-20 at 22:15 +0100, Alexandru Gheorghe wrote:  
+> > > > There are a lot of drivers that subclass drm_plane_state, all of them
+> > > > duplicate the code that links toghether the plane with plane_state.
+> > > > 
+> > > > On top of that, drivers that enable core properties also have to
+> > > > duplicate the code for initializing the properties to their default
+> > > > values, which in all cases are the same as the defaults from core.
+> > > > 
+> > > > Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
+> > > > ---
+> > > >  drivers/gpu/drm/drm_atomic_helper.c | 32 +++++++++++++++++++++--------
+> > > >  include/drm/drm_atomic_helper.h     |  2 ++
+> > > >  2 files changed, 25 insertions(+), 9 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
+> > > > index 8008a7de2e10..e1c6f101652e 100644
+> > > > --- a/drivers/gpu/drm/drm_atomic_helper.c
+> > > > +++ b/drivers/gpu/drm/drm_atomic_helper.c
+> > > > @@ -3507,6 +3507,28 @@ void drm_atomic_helper_crtc_destroy_state(struct drm_crtc *crtc,
+> > > >  }
+> > > >  EXPORT_SYMBOL(drm_atomic_helper_crtc_destroy_state);
+> > > >  
+> > > > +/**
+> > > > + * __drm_atomic_helper_plane_reset - resets planes state to default values
+> > > > + * @plane: plane object
+> > > > + * @new_state: atomic plane state
+> > > > + *
+> > > > + * Initializes plane state to default. This is useful for drivers that subclass
+> > > > + * the plane state.
+> > > > + */
+> > > > +void __drm_atomic_helper_plane_reset(struct drm_plane *plane,
+> > > > +				     struct drm_plane_state *state)
+> > > > +{
+> > > > +	if (state) {
+> > > > +		state->plane = plane;
+> > > > +		state->rotation = DRM_MODE_ROTATE_0;
+> > > > +		/* Reset the alpha value to fully opaque if it matters */
+> > > > +		if (plane->alpha_property)
+> > > > +			state->alpha = plane->alpha_property->values[1];
+> > > > +	}  
+> > > 
+> > > Is this function supposed to be callable with state == NULL ?
+> > >   
+> > > > +	plane->state = state;  
+> > > 
+> > > If so, the comment could mention that this sets plane->state to NULL if
+> > > state == NULL, and a few of the call sites could be simplified.
+> > > 
+> > > If not, I would remove the conditional if (state) {} part and also
+> > > mention this in the comment.  
+> > 
+> > Yes, It's intended to be callable with null.
+> 
+> May I ask why? I'd assume drivers that call this function to pass a
+> non-NULL plane state. What's the use case for passing a NULL state here?
 
-Yup. Without this patch, there will be a build regression at patch 9,
-when we move to generated atomic_long_*() wrappers.
+Drivers check it, drm_atomic_helper_plane_reset doesn't.
+Looking at the existing __drm_atomic_helper_plane_* it seems they all
+assume state not null, so I think it probably makes more sense to do
+that for this function as well.
 
-Thanks,
-Mark.
+-- 
+Cheers,
+Alex G
