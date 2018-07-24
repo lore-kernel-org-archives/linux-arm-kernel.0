@@ -1,79 +1,53 @@
-From: hari.vyas@broadcom.com (Hari Vyas)
-Date: Tue, 24 Jul 2018 14:44:48 +0530
-Subject: [PATCH] arm64: fix for restoring console loglevel after handling
- traps
-In-Reply-To: <CAM5rFu-_sU1eSryFR-rDF=6BxZuf_E0xBQJ8RizNKYDB+DgWOQ@mail.gmail.com>
-References: <1531993734-1463-1-git-send-email-hari.vyas@broadcom.com>
- <1531993734-1463-2-git-send-email-hari.vyas@broadcom.com>
- <20180719100140.GA424@jagdpanzerIV>
- <CAM5rFu_N-=26LddRy1mO010h9yLcGuKqK6=y+h=h3-HbfEP+FQ@mail.gmail.com>
- <20180719103916.g763zmsm7wnngwop@lakrids.cambridge.arm.com>
- <CAM5rFu-MFbH_2Pohmjydy232Rpt7_E84-K=e67wAu3iQzvTLiA@mail.gmail.com>
- <20180720121321.qgdsdtvvowhphava@pathway.suse.cz>
- <CAM5rFu-_sU1eSryFR-rDF=6BxZuf_E0xBQJ8RizNKYDB+DgWOQ@mail.gmail.com>
-Message-ID: <CAM5rFu9zVa3H=mqmSknALt-znb2MPwVbuy3atA5Qoi9KvGNXqQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 24 Jul 2018 10:16:27 +0100
+Subject: next-20180723 build: 2 failures 11 warnings (next-20180723)
+In-Reply-To: <20180723181150.GF13981@sirena.org.uk>
+References: <E1fheAy-0003tU-Dq@optimist> <20180723181150.GF13981@sirena.org.uk>
+Message-ID: <20180724091626.GC19324@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, Jul 23, 2018 at 07:11:50PM +0100, Mark Brown wrote:
+> On Mon, Jul 23, 2018 at 05:59:12PM +0100, Build bot for Mark Brown wrote:
+> 
+> Today's -next fails to build an arm64 allmodconfig with:
+> 
+> > 	arm64-allmodconfig
+> > ERROR: "__sync_icache_dcache" [drivers/xen/xen-privcmd.ko] undefined!
+> 
+> using
+> 
+>    aarch64-linux-gnu-gcc (Linaro GCC 5.3-2016.05) 5.3.1 20160412
+> 
+> however it builds perfectly fine with
+> 
+>    aarch64-linux-gnu-gcc (Linaro GCC 6.2-2016.11) 6.2.1 20161016
+> 
+> which honestly seems like a sensible and worthwhile upgrade at this
+> point anyway given that it's a year and a half old so I'm going to do
+> that for my builder (perhaps even jump on a newer version) but it seemed
+> worth highlighting in case this is considered undesirable.  A similar
+> issue is hitting on KernelCI, we should probably look at upgrading the
+> toolchain there too.
 
-On Fri, Jul 20, 2018 at 7:04 PM, Hari Vyas <hari.vyas@broadcom.com> wrote:
-> On Fri, Jul 20, 2018 at 5:43 PM, Petr Mladek <pmladek@suse.com> wrote:
->> On Thu 2018-07-19 19:42:50, Hari Vyas wrote:
->>> On Thu, Jul 19, 2018 at 4:09 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->>> > On Thu, Jul 19, 2018 at 03:47:46PM +0530, Hari Vyas wrote:
->>> >> On Thu, Jul 19, 2018 at 3:31 PM, Sergey Senozhatsky
->>> >> <sergey.senozhatsky.work@gmail.com> wrote:
->>> >> >> @@ -694,7 +698,7 @@ void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr)
->>> >> >>               __show_regs(regs);
->>> >> >>
->>> >> >>       nmi_panic(regs, "Asynchronous SError Interrupt");
->>> >> >> -
->>> >> >> +     restore_console_loglevel();
->>> >> >
->>> >> > panic()
->>> >> >
->>> >> > What's the point of restore_console_loglevel() after panic()?
->>> >> >
->>> >> >         -ss
->>> >> Except die(), other places restore call can be avoided but just added
->>> >> for code completeness.
->>> >
->>> > As Sergey said, panic() is *fatal*. It does not return, so it makes no
->>> > sense to place code after it.
->>> >
->>> I too pointed in cover letter. I just too added for code completeness.
->>
->> The code-completeness is not a good reason. It might cause false
->> expectation that panic() is not fatal. It would cause more harm
->> than good.
->>
->> The same is true also for die(). It should be fatal. I agree with
->> Sergey and Mark that it does not make sense to restore
->> the original level there.
->>
->> Best Regards,
->> Petr
-> I can remove restore from not required (3) places.
->
-> Other than that, based on discussion, bad_mode() should panic so
-> better die() call itself be removed from bad_mode().
-> As this(i.e. cleanup of bad_mode) is not related to raised patch so
-> better one another bug/patch be raised for cleaning
-> bad_mode() and probably die() too.
->
-> Currently this die() is called from some other places also but not
-> completely sure whether restore_console_loglevel is required
-> there also or not as creating situation will be very difficult in
-> normal scenario.
+Hmm, it looks to me like this comes about because xen/privcmd.c is being
+built as a module, but contains a call to set_pte_at() with a special pte:
 
-For tracking purpose, I have raised a separate bug for bad_mode() issue i.e.
-Bug 200637 - ARM64: bad_mode() handler may not result in panic always
-due to die() call in the beginning
-Probable fix could be to remove die() from bad_mode() but better other confirms.
+	pte_t pte = pte_mkspecial(pfn_pte(page_to_pfn(page), r->prot));
 
-As stated, die() is called from other places also my feeling and
-logically restoration  is required. Please
-confirm whether to close this issue without any change or proceed with
-only one restore() call in die and discard at
-other 3 places.
+	set_pte_at(r->mm, addr, ptep, pte);
+
+which on arm64 contains:
+
+	if (pte_present(pte) && pte_user_exec(pte) && !pte_special(pte))
+		__sync_icache_dcache(pte);
+
+so GCC 6 can optimise away the call to the non-exported symbol, but GCC 5
+has trouble.
+
+What I don't understand is why this suddenly cropped up. Did GCC 5 build
+linux-next arm64 allmodconfig last week?
+
+Cheers,
+
+Will
