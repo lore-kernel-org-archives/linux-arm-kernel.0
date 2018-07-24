@@ -1,79 +1,83 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 24 Jul 2018 15:16:16 +0200
-Subject: [GIT PULL] Allwinner drivers changes for 4.19
-Message-ID: <20180724131616.brtatxqutdjd4oxt@flea>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Tue, 24 Jul 2018 15:16:52 +0200
+Subject: [PATCH net-next v3 0/8] A fix and a few improvements on mvneta
+In-Reply-To: <20180718161057.28704-1-gregory.clement@bootlin.com> (Gregory
+ CLEMENT's message of "Wed, 18 Jul 2018 18:10:49 +0200")
+References: <20180718161057.28704-1-gregory.clement@bootlin.com>
+Message-ID: <87h8ko7ozf.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi David,
+ 
+ On mer., juil. 18 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
 
-Please pull the following changes for the next merge window.
+> Hello,
+>
+> This series brings some improvements for the mvneta driver and also
+> adds a fix.
+>
+> Compared to the v2, the main change is another patch fixing a bug
+> in mtu_change.
+>
 
-Thanks!
-Maxime
+I saw in patchwork, the status was "Accepted" (for example the 1st patch
+[1]). However the series is not in your git branches and usually you
+also answered to the series to inform that you have applied it. So I
+would like to know what is the status of the series.
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+Thanks,
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+Gregory
 
-are available in the Git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-drivers-for-4.19
+[1]: https://patchwork.ozlabs.org/patch/945807/
 
-for you to fetch changes up to 7377330a1ed2e9bb5a97758bdadcdb37e2201b2a:
-
-  soc: sunxi: Add the A13, A23 and H3 system control compatibles (2018-07-19 16:39:12 +0200)
-
-----------------------------------------------------------------
-Allwinner drivers changes for 4.19
-
-There's been work for this release cycles in both the SRAM controller
-driver in order to support more SoCs, as part of our VPU work, but also to
-enable the EMAC on the A64 (that needs to poke at registers within the same
-register space).
-
-Some work has been needed too to represent the bus to the display engine
-controllers that all need an SRAM to be mapped to the CPU to be able to
-access those controllers' registers.
-
-----------------------------------------------------------------
-Chen-Yu Tsai (2):
-      dt-bindings: sram: Rename A64 SRAM controller compatible
-      soc: sunxi: sram: Add updated compatible string for A64 system control
-
-Icenowy Zheng (3):
-      soc: sunxi: export a regmap for EMAC clock reg on A64
-      dt-bindings: add binding for the Allwinner A64 DE2 bus
-      bus: add bus driver for accessing Allwinner A64 DE2
-
-Maxime Ripard (2):
-      drivers: soc: sunxi: Add support for the C1 SRAM region
-      soc: sunxi: Add the A13, A23 and H3 system control compatibles
-
-Paul Kocialkowski (4):
-      dt-bindings: sram: sunxi: Introduce new A10 binding for system-control
-      soc: sunxi: sram: Add dt match for the A10 system-control compatible
-      dt-bindings: sram: sunxi: Add A13, A20, A23 and H3 dedicated bindings
-      dt-bindings: sram: sunxi: Populate valid sections compatibles
-
- .../devicetree/bindings/bus/sun50i-de2-bus.txt     | 37 +++++++++
- .../devicetree/bindings/sram/sunxi-sram.txt        | 31 +++++++-
- drivers/bus/Kconfig                                | 10 +++
- drivers/bus/Makefile                               |  1 +
- drivers/bus/sun50i-de2.c                           | 48 ++++++++++++
- drivers/soc/sunxi/sunxi_sram.c                     | 87 +++++++++++++++++++++-
- 6 files changed, 208 insertions(+), 6 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
- create mode 100644 drivers/bus/sun50i-de2.c
+> Gregory
+>
+> Changelog:
+> v1 -> v2
+>
+>  - In patch 2, use EXPORT_SYMBOL_GPL for mvneta_bm_get and
+>    mvneta_bm_put to be used in module, reported by kbuild test robot.
+>
+>  - In patch 4, add the counter to the driver's ethtool state,
+>    suggested by David Miller.
+>
+>  - In patch 6, use a single if, suggested by Marcin Wojtas
+>
+> v2 -> v3
+>
+>  - Adding a patch fixing the mtu change issue
+>
+>  - Removing the inline keyword for mvneta_rx_refill() and let the
+>    comiler decided, suggested by David Miller.
+>
+> Andrew Lunn (1):
+>   net: ethernet: mvneta: Fix napi structure mixup on armada 3700
+>
+> Gregory CLEMENT (3):
+>   net: mvneta: remove data pointer usage from device_node structure
+>   net: mvneta: discriminate error cause for missed packet
+>   net: mvneta: Allocate page for the descriptor
+>
+> Yelena Krivosheev (4):
+>   net: mvneta: fix mtu change on port without link
+>   net: mvneta: increase number of buffers in RX and TX queue
+>   net: mvneta: Verify hardware checksum only when offload checksum
+>     feature is set
+>   net: mvneta: Improve the buffer allocation method for SWBM
+>
+>  drivers/net/ethernet/marvell/mvneta.c    | 409 ++++++++++++++---------
+>  drivers/net/ethernet/marvell/mvneta_bm.c |  15 +
+>  drivers/net/ethernet/marvell/mvneta_bm.h |   8 +-
+>  3 files changed, 272 insertions(+), 160 deletions(-)
+>
+> -- 
+> 2.18.0
+>
 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
+Gregory Clement, Bootlin (formerly Free Electrons)
 Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/92a3ba20/attachment.sig>
+http://bootlin.com
