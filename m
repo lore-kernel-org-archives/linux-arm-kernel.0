@@ -1,76 +1,49 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 24 Jul 2018 16:41:51 +0200
-Subject: [linux-sunxi] Re: [PATCH 3/3] arm64: allwinner: dts: h6: add
- Wi-Fi support for Pine H64 model A/B
-In-Reply-To: <CAGb2v656oPmAX=_y88b05xqrona3HFtU-VmNQhHxK_n-4gD+aw@mail.gmail.com>
-References: <20180724011551.49603-1-icenowy@aosc.io>
- <20180724011551.49603-4-icenowy@aosc.io>
- <CAGb2v67zR-Q9n7L6CaFKDUJFHFEC_h8-RYxkdyeyJb_GbNmkJw@mail.gmail.com>
- <CEA43CB7-1DA6-4983-BF18-82C4A48FB92B@aosc.io>
- <CAGb2v64Qae4O430kP30DQNhp0Dt774OHt0nMe35ckp8X=CTFLg@mail.gmail.com>
- <AC678B03-19B7-4110-B333-72188CE71296@aosc.io>
- <CAGb2v656oPmAX=_y88b05xqrona3HFtU-VmNQhHxK_n-4gD+aw@mail.gmail.com>
-Message-ID: <20180724144151.myyg7slocsfjjsfi@flea>
+Date: Tue, 24 Jul 2018 16:42:18 +0200
+Subject: [PATCH v2 5/5] arm64: dts: allwinner: h5: Add SID for H5
+In-Reply-To: <20180724153432.e398bddfe63e51e8dcebfc46@bidouilliste.com>
+References: <20180724101522.68165-1-manu@freebsd.org>
+ <20180724101522.68165-5-manu@freebsd.org>
+ <20180724130004.ynaiabshexrrbvo4@flea>
+ <20180724153432.e398bddfe63e51e8dcebfc46@bidouilliste.com>
+Message-ID: <20180724144218.jdvgrcqkz2kmohqx@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 10:37:51AM +0800, Chen-Yu Tsai wrote:
-> On Tue, Jul 24, 2018 at 10:28 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> >
-> >
-> > ? 2018?7?24? GMT+08:00 ??10:26:02, Chen-Yu Tsai <wens@csie.org> ??:
-> >>On Tue, Jul 24, 2018 at 10:23 AM, Icenowy Zheng <icenowy@aosc.io>
-> >>wrote:
-> >>>
-> >>>
-> >>> ? 2018?7?24? GMT+08:00 ??10:21:59, Chen-Yu Tsai <wens@csie.org> ??:
-> >>>>On Tue, Jul 24, 2018 at 9:15 AM, Icenowy Zheng <icenowy@aosc.io>
-> >>wrote:
-> >>>>> The Pine H64 model A has a Wi-Fi module connector and the model B
-> >>has
-> >>>>an
-> >>>>> on-board RTL8723BS Wi-Fi module.
-> >>>>>
-> >>>>> Add support for them. For model A, as it's not defaultly present,
-> >>>>keep
-> >>>>> it disabled now.
-> >>>>
-> >>>>Nope. Pine64 actually has two WiFi/BT modules. And they require
-> >>>>different
-> >>>>device tree snippets for both the WiFi and BT side. This is better
-> >>>>resolved
-> >>>>with device tree overlays.
-> >>>>
-> >>>>I have both, though I've yet found time to work on them.
-> >>>
-> >>> I have also both.
-> >>>
-> >>> The skeleton here can get the Wi-Fi of both to work.
-> >>
-> >>Cool. Then I can put away my RTL module for now. :)
-> >
-> > P.S. SDIO is auto detectable, and for BCM chips, the OOB interrupt
-> > is only a bonus function and it can fall back to standard in-band
-> > interrupt (which doesn't need special binding, and is currently
-> > used by mainline r8723bs driver.)
+On Tue, Jul 24, 2018 at 03:34:32PM +0200, Emmanuel Vadot wrote:
+> On Tue, 24 Jul 2018 15:00:04 +0200
+> Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 > 
-> Correct. With BT you'll have serdev device nodes with different
-> compatibles. Then you'll have to resort to overlays, and you'd probably
-> end up adding WiFi OOB interrupt bits as well.
+> > On Tue, Jul 24, 2018 at 12:15:22PM +0200, Emmanuel Vadot wrote:
+> > > The SID controller on H5 look the same as the one present in the A64.
+> > > But in case we find some difference one day at a compatible string
+> > > of it's own and a fallback to the A64 one.
+> > > 
+> > > Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
+> > > ---
+> > >  arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 5 +++++
+> > >  1 file changed, 5 insertions(+)
+> > > 
+> > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+> > > index 62d646baac3c..28183bf77164 100644
+> > > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+> > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+> > > @@ -129,3 +129,8 @@
+> > >  		     <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+> > >  	compatible = "allwinner,sun50i-h5-pinctrl";
+> > >  };
+> > > +
+> > > +&sid {
+> > > +	compatible = "allwinner,sun50i-h5-sid",
+> > > +		     "allwinner,sun50i-a64-sid";
+> > > +};
+> > 
+> > This is still a bit pointless, please remove the common node.
 > 
-> So the question remaining is: should we enable the MMC part, along
-> with power sequencing and regulator supplies, by default? Thinking
-> more about it, I'm actually OK with it. The board connectors are
-> clearly marked as being for a WiFi+BT module. The whole space on
-> the board is surrounded by a box in silkscreen. Sorry for the
-> initial nack.
-> 
-> Maxime, any thoughts?
+>  You mean directly declare sid controller in the SoC dtsi and not
+> have a common node in sunxi-h3-h5.dtsi ?
 
-If there's a need for an overlay anyway, there's no real reason to
-enable it by default, especially if not everything is there.
-
-Maxime
+Yep
 
 -- 
 Maxime Ripard, Bootlin (formerly Free Electrons)
@@ -82,4 +55,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/826045ec/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/ef92eeff/attachment.sig>
