@@ -1,61 +1,43 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Tue, 24 Jul 2018 09:49:51 -0700
-Subject: [PATCH] arm64: enable RapidIO config options in Kconfig
-In-Reply-To: <20180724151458.GE25412@arm.com>
-References: <20180724134513.86796-1-acolin@isi.edu>
- <20180724151458.GE25412@arm.com>
-Message-ID: <71f6f129-4151-1603-10aa-9e600d6389ed@infradead.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 24 Jul 2018 18:49:45 +0200
+Subject: [PATCH v2 3/4] ARM: exynos: Clear global variable on init error path
+In-Reply-To: <20180724164946.6274-1-krzk@kernel.org>
+References: <20180724164946.6274-1-krzk@kernel.org>
+Message-ID: <20180724164946.6274-3-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2018 08:14 AM, Will Deacon wrote:
-> On Tue, Jul 24, 2018 at 09:45:14AM -0400, Alexei Colin wrote:
->> ARM64 SoCs with a PCI bus present the RapiodIO options; SoCs with
->> RapidIO IP blocks but without a PCI bus, need to select HAS_RAPIDIO in
->> Kconfig.platforms.
->>
->> HAS_RAPIDIO was chosen over HAVE_RAPIDIO to be consistent with
->> other architectures which already define this flag (powerpc).
->>
->> Signed-off-by: Alexei Colin <acolin@isi.edu>
->> ---
->>
->> Tested that kernel builds with RapidIO subsystem and switch drivers and that
->> modules insert successfully in a custom Qemu hardware model.
->> Maintainers for RapidIO subsystem CCed.
->> Similar patch for ARM has been submitted.
->>
->>  arch/arm64/Kconfig | 16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 42c090cf0292..8dceaa5b674c 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -293,6 +293,22 @@ config PCI_SYSCALL
->>  
->>  source "drivers/pci/Kconfig"
->>  
->> +config HAS_RAPIDIO
->> +	bool
->> +	default n
->> +
->> +config RAPIDIO
->> +	tristate "RapidIO support"
->> +	depends on HAS_RAPIDIO || PCI
->> +	help
->> +	  This feature enables support for RapidIO high-performance
->> +	  packet-switched interconnect.
->> +
->> +	  If you say Y here, the kernel will include drivers and
->> +	  infrastructure code to support RapidIO interconnect devices.
-> 
-> It feels a bit weird to push this help text into the arch Kconfig files,
-> rather than just have them provide the HAS_RAPIDIO symbol, but if that's
-> what everybody else is doing then I guess it's fine.
+For most of Exynos SoCs, Power Management Unit (PMU) address space is
+mapped into global variable 'pmu_base_addr' very early when initializing
+PMU interrupt controller.  A lot of other machine code depends on it so
+when doing iounmap() on this address, clear the global as well to avoid
+usage of invalid value (pointing to unmapped memory region).
 
-Both Arnd and Russell King asked for moving CONFIG_RAPIDIO to drivers/rapidio/Kconfig,
-and I also think that would be better.
+Properly mapped PMU address space is a requirement for all other machine
+code so this fix is purely theoretical.  Boot will fail immediately in
+many other places after following this error path.
 
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+
+---
+
+Changes since v1:
+New patch.
+---
+ arch/arm/mach-exynos/suspend.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index 5d4822e5d0ba..d42ef1be2c70 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -207,6 +207,7 @@ static int __init exynos_pmu_irq_init(struct device_node *node,
+ 					  NULL);
+ 	if (!domain) {
+ 		iounmap(pmu_base_addr);
++		pmu_base_addr = NULL;
+ 		return -ENOMEM;
+ 	}
+ 
 -- 
-~Randy
+2.14.1
