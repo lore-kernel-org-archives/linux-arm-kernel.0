@@ -1,162 +1,150 @@
-From: JOLLYS@xilinx.com (Jolly Shah)
-Date: Tue, 24 Jul 2018 18:14:54 +0000
-Subject: [PATCH v10 00/10] drivers: Introduce firmware dnd clock river for
- ZynqMP core
-In-Reply-To: <2c3aad45-37ce-2446-4b90-bddb477286ed@xilinx.com>
-References: <1531857547-16652-1-git-send-email-jollys@xilinx.com>
- <2c3aad45-37ce-2446-4b90-bddb477286ed@xilinx.com>
-Message-ID: <CY1PR02MB2138E21A3FFBD5FEEAA7D6D4B8550@CY1PR02MB2138.namprd02.prod.outlook.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 24 Jul 2018 21:17:38 +0300
+Subject: [RFC] PCI: imx: Add multi-pd support
+Message-ID: <8018069bc772376caef29e76280e4d0facffdb68.1532455922.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+On some chips the PCIE and PCIE_PHY blocks are in separate power domains
+which can be power-gated independently. The driver needs to handle this
+by keeping both domain active.
 
-> -----Original Message-----
-> From: Michal Simek [mailto:michal.simek at xilinx.com]
-> Sent: Thursday, July 19, 2018 3:33 AM
-> To: Jolly Shah <JOLLYS@xilinx.com>; ard.biesheuvel at linaro.org;
-> mingo at kernel.org; gregkh at linuxfoundation.org; matt at codeblueprint.co.uk;
-> sudeep.holla at arm.com; hkallweit1 at gmail.com; keescook at chromium.org;
-> dmitry.torokhov at gmail.com; mturquette at baylibre.com;
-> sboyd at codeaurora.org; Michal Simek <michals@xilinx.com>;
-> robh+dt at kernel.org; mark.rutland at arm.com; linux-clk at vger.kernel.org
-> Cc: Rajan Vaja <RAJANV@xilinx.com>; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Jolly Shah
-> <JOLLYS@xilinx.com>
-> Subject: Re: [PATCH v10 00/10] drivers: Introduce firmware dnd clock river for
-> ZynqMP core
-> 
-> On 17.7.2018 21:58, Jolly Shah wrote:
-> > This patchset is adding communication layer with firmware and clock
-> > driver who uses those APIs to communicate with PMU.
-> > Firmware driver provides an interface to firmware APIs.Interface APIs
-> > can be used by any driver to communicate to PMUFW(Platform Management
-> Unit). All requests go through ATF.
-> > This patchset adds CCF compliant clock driver for ZynqMP.Clock driver
-> > queries supported clock information from firmware and regiters pll and output
-> clocks with CCF.
-> > v10:
-> >  - Incorporated code review comments from v9 patch series. Discussed below:
-> > 	https://patchwork.kernel.org/patch/10478575/
-> > 	https://patchwork.kernel.org/patch/10478457/
-> > 	https://patchwork.kernel.org/patch/10478461/
-> > 	https://patchwork.kernel.org/patch/10478463/
-> >
-> > v9:
-> >  - Fixed minor typo comments
-> >
-> > v8:
-> >  - Corrected typo in clk Kconfig
-> >
-> > v7:
-> >  - Removed xilinx specific clock debugfs API support
-> >  - Added reviewed-by tags for FW and clock bindings
-> >  - Updated clock node name to clock-controller
-> >
-> > v6:
-> >  - Broke patch series to have base FW driver and Clock driver user
-> >  - Incorporated code review comments from last FW and Clock driver patch
-> series. Discussed below:
-> > 	https://patchwork.kernel.org/patch/10230759/
-> > 	https://patchwork.kernel.org/patch/10250047/
-> >
-> > v5:
-> >  - Added ATF version check support
-> >  - Updated some functions to be static
-> >  - Minor function name corrections
-> >
-> > v4:
-> >  - Changed clock setrate/getrate API prototype to support 64 bit rate
-> >  - Defined macros for get_node_status return values
-> >  - Moved DT node as a child of firmware
-> >  - Changed debugfs APIs to return data to debugfs buffer instead of
-> > dumping to kernel log
-> >  - Minor changes to incorporate other review comments from v3 patch
-> > series
-> >
-> > v3:
-> >  - added some fixes to firmware-ggs.c
-> >  - updated pinmux get/set function argument names to specify function
-> > id instead of node id
-> >  - added new pinctrl query macros
-> >  - incorporated review comments from v2 patch series
-> >
-> > v2:
-> >  - change SPDX-License-Identifier license text style
-> >  - split patch into multiple patches
-> >  - Updated copyrights
-> >  - Added ABI documentation
-> >  - incorporated logical review comments from previuos patch. Discussed
-> below:
-> > 	https://patchwork.kernel.org/patch/10150665/
-> >
-> > Jolly Shah (1):
-> >   drivers: clk: Add ZynqMP clock driver
-> >
-> > Rajan Vaja (9):
-> >   dt-bindings: firmware: Add bindings for ZynqMP firmware
-> >   firmware: xilinx: Add Zynqmp firmware driver
-> >   firmware: xilinx: Add zynqmp IOCTL API for device control
-> >   firmware: xilinx: Add query data API
-> >   firmware: xilinx: Add clock APIs
-> >   firmware: xilinx: Add debugfs interface
-> >   firmware: xilinx: Add debugfs for IOCTL API
-> >   firmware: xilinx: Add debugfs for query data API
-> >   dt-bindings: clock: Add bindings for ZynqMP clock driver
-> >
-> >  .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |  82 +++
-> >  arch/arm64/Kconfig.platforms                       |   1 +
-> >  drivers/clk/Kconfig                                |   1 +
-> >  drivers/clk/Makefile                               |   1 +
-> >  drivers/clk/zynqmp/Kconfig                         |  10 +
-> >  drivers/clk/zynqmp/Makefile                        |   4 +
-> >  drivers/clk/zynqmp/clk-gate-zynqmp.c               | 144 +++++
-> >  drivers/clk/zynqmp/clk-mux-zynqmp.c                | 141 ++++
-> >  drivers/clk/zynqmp/clk-zynqmp.h                    |  68 ++
-> >  drivers/clk/zynqmp/clkc.c                          | 719 +++++++++++++++++++++
-> >  drivers/clk/zynqmp/divider.c                       | 217 +++++++
-> >  drivers/clk/zynqmp/pll.c                           | 335 ++++++++++
-> >  drivers/firmware/Kconfig                           |   1 +
-> >  drivers/firmware/Makefile                          |   1 +
-> >  drivers/firmware/xilinx/Kconfig                    |  23 +
-> >  drivers/firmware/xilinx/Makefile                   |   5 +
-> >  drivers/firmware/xilinx/zynqmp-debug.c             | 249 +++++++
-> >  drivers/firmware/xilinx/zynqmp-debug.h             |  22 +
-> >  drivers/firmware/xilinx/zynqmp.c                   | 562 ++++++++++++++++
-> >  include/dt-bindings/clock/xlnx,zynqmp-clk.h        | 116 ++++
-> >  include/linux/firmware/xlnx-zynqmp.h               | 116 ++++
-> >  21 files changed, 2818 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware
-> > .txt  create mode 100644 drivers/clk/zynqmp/Kconfig  create mode
-> > 100644 drivers/clk/zynqmp/Makefile  create mode 100644
-> > drivers/clk/zynqmp/clk-gate-zynqmp.c
-> >  create mode 100644 drivers/clk/zynqmp/clk-mux-zynqmp.c
-> >  create mode 100644 drivers/clk/zynqmp/clk-zynqmp.h  create mode
-> > 100644 drivers/clk/zynqmp/clkc.c  create mode 100644
-> > drivers/clk/zynqmp/divider.c  create mode 100644
-> > drivers/clk/zynqmp/pll.c  create mode 100644
-> > drivers/firmware/xilinx/Kconfig  create mode 100644
-> > drivers/firmware/xilinx/Makefile  create mode 100644
-> > drivers/firmware/xilinx/zynqmp-debug.c
-> >  create mode 100644 drivers/firmware/xilinx/zynqmp-debug.h
-> >  create mode 100644 drivers/firmware/xilinx/zynqmp.c  create mode
-> > 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
-> >  create mode 100644 include/linux/firmware/xlnx-zynqmp.h
-> >
-> 
-> It looks pretty calm over the last several series that's why when I get an answer
-> from Stephen or Mike I will take this series via my tree and arm-soc tree.
-> 
-> I have applied 01-08 here
->  https://github.com/Xilinx/linux-xlnx/commits/zynqmp/soc
-> 
-> Thanks,
-> Michal
+This is intended for imx6sx where PCIE is in DISPMIX and PCIE_PHY in
+it's own domain. Defining the DISPMIX domain requires a way for pcie to
+keep it active or it will break when displays are off.
 
+The power-domains on imx6sx are meant to look like this:
+	power-domains = <&pd_disp>, <&pd_pci>;
+	power-domain-names = "pcie", "pcie_phy";
 
-Thanks for merging the patches. 
-By mistake I added ?Reviewed-by: Stephen Boyd sboyd at kernel.org? for firmware bindings (Patch01).  Stephen had reviewed clock bindings only.  Please suggest if I should send a new version with that fix.
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+---
 
-Thanks,
-Jolly Shah
+Right now if a device has a single power domain it will be activated
+before probe but if it has multiple domains they need to be explicitly
+"attached" to and controlled. Supporting both is a bit awkward, this
+patch makes the distinction based on (dev->pm_domain != NULL).
+
+Maybe the PM core should make this distinction based on a flag in struct
+device_driver instead of number of power-domains? So by default when a
+device has multiple power domains they would would be activated
+together and this patch would be unnecessary.
+
+This is marked as "RFC" mostly because I believe it should be handled
+inside PM core, without driver code. Does this make sense to anyone else?
+
+This is independent of recent patches adding suspend/resume support to
+imx pci, but supporting suspend with multi-pd requires adding device
+links, not just activating pds at probe time.
+
+The device_link is marked as "STATELESS" because otherwise a warning is
+triggered in device_links_driver_bound. This seems to happen because the
+pd devices are always marked as "DL_DEV_NO_DRIVER". Maybe they should be
+instead always be marked as DL_DEV_DRIVER_BOUND?
+
+The imx pci driver doesn't support unbind or removal anyway so this is
+not handled for multi-pd either.
+
+Previously: https://lkml.org/lkml/2018/7/10/230
+---
+ drivers/pci/controller/dwc/pci-imx6.c | 48 +++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index fc9529619469..7403918010e9 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -25,10 +25,12 @@
+ #include <linux/resource.h>
+ #include <linux/signal.h>
+ #include <linux/types.h>
+ #include <linux/interrupt.h>
+ #include <linux/reset.h>
++#include <linux/pm_domain.h>
++#include <linux/pm_runtime.h>
+ 
+ #include "pcie-designware.h"
+ 
+ #define to_imx6_pcie(x)	dev_get_drvdata((x)->dev)
+ 
+@@ -57,10 +59,15 @@ struct imx6_pcie {
+ 	u32			tx_deemph_gen2_6db;
+ 	u32			tx_swing_full;
+ 	u32			tx_swing_low;
+ 	int			link_gen;
+ 	struct regulator	*vpcie;
++
++	/* power domain for pcie itself (dispmix) */
++	struct device		*pd_pcie;
++	/* power domain for pcie phy */
++	struct device		*pd_pcie_phy;
+ };
+ 
+ /* Parameters for the waiting for PCIe PHY PLL to lock on i.MX7 */
+ #define PHY_PLL_LOCK_WAIT_MAX_RETRIES	2000
+ #define PHY_PLL_LOCK_WAIT_USLEEP_MIN	50
+@@ -805,10 +812,47 @@ static int imx6_pcie_resume_noirq(struct device *dev)
+ static const struct dev_pm_ops imx6_pcie_pm_ops = {
+ 	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(imx6_pcie_suspend_noirq,
+ 				      imx6_pcie_resume_noirq)
+ };
+ 
++static int imx6_pcie_attach_pd(struct device *dev)
++{
++	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
++	struct device_link *link;
++
++	/* Do nothing when in a single power domain */
++	if (dev->pm_domain)
++		return 0;
++
++	imx6_pcie->pd_pcie = dev_pm_domain_attach_by_name(dev, "pcie");
++	if (IS_ERR(imx6_pcie->pd_pcie))
++		return PTR_ERR(imx6_pcie->pd_pcie);
++	link = device_link_add(dev, imx6_pcie->pd_pcie,
++			DL_FLAG_STATELESS |
++			DL_FLAG_PM_RUNTIME |
++			DL_FLAG_RPM_ACTIVE);
++	if (IS_ERR(link)) {
++		dev_err(dev, "Failed to add device_link to pcie pd: %ld\n", PTR_ERR(link));
++		return PTR_ERR(link);
++	}
++
++	imx6_pcie->pd_pcie_phy = dev_pm_domain_attach_by_name(dev, "pcie_phy");
++	if (IS_ERR(imx6_pcie->pd_pcie_phy))
++		return PTR_ERR(imx6_pcie->pd_pcie_phy);
++
++	device_link_add(dev, imx6_pcie->pd_pcie_phy,
++			DL_FLAG_STATELESS |
++			DL_FLAG_PM_RUNTIME |
++			DL_FLAG_RPM_ACTIVE);
++	if (IS_ERR(link)) {
++		dev_err(dev, "Failed to add device_link to pcie_phy pd: %ld\n", PTR_ERR(link));
++		return PTR_ERR(link);
++	}
++
++	return 0;
++}
++
+ static int imx6_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct dw_pcie *pci;
+ 	struct imx6_pcie *imx6_pcie;
+@@ -945,10 +989,14 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 		imx6_pcie->vpcie = NULL;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, imx6_pcie);
+ 
++	ret = imx6_pcie_attach_pd(dev);
++	if (ret)
++		return ret;
++
+ 	ret = imx6_add_pcie_port(imx6_pcie, pdev);
+ 	if (ret < 0)
+ 		return ret;
+ 
+ 	return 0;
+-- 
+2.17.1
