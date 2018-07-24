@@ -1,54 +1,30 @@
-From: acolin@isi.edu (Alexei Colin)
-Date: Tue, 24 Jul 2018 09:45:14 -0400
-Subject: [PATCH] arm64: enable RapidIO config options in Kconfig
-Message-ID: <20180724134513.86796-1-acolin@isi.edu>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Jul 2018 15:48:39 +0200
+Subject: [PATCH] arm: enable RapidIO config options in Kconfig
+In-Reply-To: <20180724134122.86718-1-acolin@isi.edu>
+References: <20180724134122.86718-1-acolin@isi.edu>
+Message-ID: <CAK8P3a1sA5tw1oZ+vM_BgR3jU2ww0g6_QDn6sxF2SC4PtrP0Sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 SoCs with a PCI bus present the RapiodIO options; SoCs with
-RapidIO IP blocks but without a PCI bus, need to select HAS_RAPIDIO in
-Kconfig.platforms.
+On Tue, Jul 24, 2018 at 3:41 PM, Alexei Colin <acolin@isi.edu> wrote:
+> ARM SoCs with a PCI bus offer the RapiodIO config menu; SoCs with
+> RapidIO IP blocks but without a PCI bus, need to add "select
+> HAS_RAPIDIO" to the Kconfig entry for that SoC (e.g. ARCH_*).
+>
+> HAS_RAPIDIO was chosen over HAVE_RAPIDIO to be consistent with
+> other architectures which already define this flag (powerpc).
+>
+> Signed-off-by: Alexei Colin <acolin@isi.edu>
+> ---
+>
+> Tested that kernel builds with RapidIO subsystem and switch drivers enabled.
+> Maintainers for RapidIO subsystem CCed.
+> Sending a similar patch to ARM64 maintainers shortly.
 
-HAS_RAPIDIO was chosen over HAVE_RAPIDIO to be consistent with
-other architectures which already define this flag (powerpc).
 
-Signed-off-by: Alexei Colin <acolin@isi.edu>
----
+Could you move CONFIG_RAPIDIO to drivers/rapidio? That
+would avoid repeating it for each of the five architectures, and
+make it more consistent with other subsystems.
 
-Tested that kernel builds with RapidIO subsystem and switch drivers and that
-modules insert successfully in a custom Qemu hardware model.
-Maintainers for RapidIO subsystem CCed.
-Similar patch for ARM has been submitted.
-
- arch/arm64/Kconfig | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 42c090cf0292..8dceaa5b674c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -293,6 +293,22 @@ config PCI_SYSCALL
- 
- source "drivers/pci/Kconfig"
- 
-+config HAS_RAPIDIO
-+	bool
-+	default n
-+
-+config RAPIDIO
-+	tristate "RapidIO support"
-+	depends on HAS_RAPIDIO || PCI
-+	help
-+	  This feature enables support for RapidIO high-performance
-+	  packet-switched interconnect.
-+
-+	  If you say Y here, the kernel will include drivers and
-+	  infrastructure code to support RapidIO interconnect devices.
-+
-+source "drivers/rapidio/Kconfig"
-+
- endmenu
- 
- menu "Kernel Features"
--- 
-2.18.0
+       Arnd
