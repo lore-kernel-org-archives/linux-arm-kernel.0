@@ -1,151 +1,54 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 24 Jul 2018 09:46:23 -0400
-Subject: [PATCH RT v2] arm64: fpsimd: use a local_lock() in addition to
- local_bh_disable()
-In-Reply-To: <20180718091209.u76gzacanj5avhdl@linutronix.de>
-References: <20180517124006.ohygrrpg7z2moqqt@linutronix.de>
- <20180522131004.3012953c@gandalf.local.home>
- <20180522172115.fpqguqlsq6bavtxy@linutronix.de>
- <20180522132429.6f1dcf92@gandalf.local.home>
- <20180522173333.aawadhkcekzvrswp@linutronix.de>
- <20180711092555.268adf7f@gandalf.local.home>
- <20180711133157.bvrza5vmthu6lwjd@linutronix.de>
- <20180711093346.782af07a@gandalf.local.home>
- <20180713174937.5ddaqpylalcmc3jq@linutronix.de>
- <20180716151737.GO9486@e103592.cambridge.arm.com>
- <20180718091209.u76gzacanj5avhdl@linutronix.de>
-Message-ID: <20180724094623.37430032@gandalf.local.home>
+From: acolin@isi.edu (Alexei Colin)
+Date: Tue, 24 Jul 2018 09:45:14 -0400
+Subject: [PATCH] arm64: enable RapidIO config options in Kconfig
+Message-ID: <20180724134513.86796-1-acolin@isi.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Jul 2018 11:12:10 +0200
-Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
+ARM64 SoCs with a PCI bus present the RapiodIO options; SoCs with
+RapidIO IP blocks but without a PCI bus, need to select HAS_RAPIDIO in
+Kconfig.platforms.
 
-> > > @@ -1115,7 +1116,7 @@ void kernel_neon_begin(void)
-> > >  
-> > >  	BUG_ON(!may_use_simd());
-> > >  
-> > > -	local_bh_disable();
-> > > +	local_lock_bh(fpsimd_lock);
-> > >  
-> > >  	__this_cpu_write(kernel_neon_busy, true);
-> > >  
-> > > @@ -1129,8 +1130,14 @@ void kernel_neon_begin(void)
-> > >  	fpsimd_flush_cpu_state();
-> > >  
-> > >  	preempt_disable();
-> > > -
-> > > -	local_bh_enable();
-> > > +	/*
-> > > +	 * ballance atomic vs !atomic context of migrate_disable().
-> > > +	 * local_lock_bh = get_local_var() + spin_lock_bh (2x migrate_disable)
-> > > +	 */
-> > > +	migrate_disable();
-> > > +	migrate_disable();
-> > > +	migrate_disable();
-> > > +	local_unlock_bh(fpsimd_lock);  
-> > 
-> > This looks fragile.
-> > 
-> > Do we really need to do it 3 times?  
-> 
-> Unfortunately yes.
+HAS_RAPIDIO was chosen over HAVE_RAPIDIO to be consistent with
+other architectures which already define this flag (powerpc).
 
-Then we need to find another solution, because this is way too ugly and
-as Dave said, fragile to keep.
+Signed-off-by: Alexei Colin <acolin@isi.edu>
+---
 
+Tested that kernel builds with RapidIO subsystem and switch drivers and that
+modules insert successfully in a custom Qemu hardware model.
+Maintainers for RapidIO subsystem CCed.
+Similar patch for ARM has been submitted.
 
-> 
-> > Showing my ignorance here, but I'd naively expect that the migrate-
-> > disableness changes as follows:
-> > 
-> > 	/* 0 */
-> > 	local_lock_bh(); /* +3 */
-> > 
-> > 	...
-> > 
-> > 	preempt_disable(); /* +3 */
-> > 
-> > 	migrate_disable(); /* +4 */
-> > 	migrate_disable(); /* +5 */
-> > 	migrate_disable(); /* +6 */
-> > 
-> > 	local_unlock_bh(); /* +3 */
-> > 
-> > 
-> > If so, I don't understand why it's not OK to call migrate_disable()
-> > just once, leaving the count at +1  (?)
-> > 
-> > I'm making assumptions about the relationship between preempt_disable()
-> > and migrate_disable() here.  
-> 
-> Exactly. So local_lock_bh() does +3 which I try to explain why it is 3.
+ arch/arm64/Kconfig | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-How does local_lock_bh() do a +3 (not seeing it in the code). And
-leaking internal implementation of local_lock_bh() into other parts of
-the kernel is a no no.
-
-> Now migrate_disable() has two counters: One for atomic context (irq or
-> preemption disabled) and on for non-atomic context. The difference is
-> that in atomic context migrate_disable() does nothing and in !atomic
-> context it does other things which can't be done in atomic context
-> anyway (I can explain this in full detail but you may lose interest so I
-> keep it short). To update your example:
-> 
-> 	/* ATOMIC COUNTER | non-ATOMIC COUNTER  | change */
-> 			 /* 0 | 0 | - */
-> 	local_lock_bh(); /* 0 | 3 | N+3 */
->  
->  	...
->  
-> 	preempt_disable(); /* atomic context */
->  
-> 	migrate_disable(); /* 1 | 3 | A+1 */
-> 	migrate_disable(); /* 2 | 3 | A+1 */
-> 	migrate_disable(); /* 3 | 3 | A+1 */
->  
-> 	local_unlock_bh(); /* 0 | 3 | A-3 */
-> 
-> /* later */
-> 	preempt_enable();  /* non-atomic context */
-> 	migrate_enable();  /* 0 | 2 | N-1 */
-> 	migrate_enable();  /* 0 | 1 | N-1 */
-> 	migrate_enable();  /* 0 | 0 | N-1 */
-
-If anything, this needs a wrapper. local_lock_preempt_fixup() ?
-
--- Steve
-
-> 
-> > >  }
-> > >  EXPORT_SYMBOL(kernel_neon_begin);
-> > >  
-> > > @@ -1154,6 +1161,10 @@ void kernel_neon_end(void)
-> > >  	WARN_ON(!busy);	/* No matching kernel_neon_begin()? */
-> > >  
-> > >  	preempt_enable();
-> > > +	/* balance migrate_disable(). See kernel_neon_begin() */
-> > > +	migrate_enable();
-> > > +	migrate_enable();
-> > > +	migrate_enable();
-> > >  }
-> > >  EXPORT_SYMBOL(kernel_neon_end);
-> > >  
-> > > @@ -1185,9 +1196,7 @@ void __efi_fpsimd_begin(void)
-> > >  	if (!system_supports_fpsimd())
-> > >  		return;
-> > >  
-> > > -	WARN_ON(preemptible());
-> > > -
-> > > -	if (may_use_simd()) {
-> > > +	if (!IS_ENABLED(CONFIG_PREEMPT_RT_BASE) && may_use_simd()) {  
-> > 
-> > I suspect this is wrong -- see comments on the commit message.
-> >   
-> > >  		kernel_neon_begin();
-> > >  	} else {  
-> > 
-> > [...]
-> > 
-> > Cheers
-> > ---Dave  
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 42c090cf0292..8dceaa5b674c 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -293,6 +293,22 @@ config PCI_SYSCALL
+ 
+ source "drivers/pci/Kconfig"
+ 
++config HAS_RAPIDIO
++	bool
++	default n
++
++config RAPIDIO
++	tristate "RapidIO support"
++	depends on HAS_RAPIDIO || PCI
++	help
++	  This feature enables support for RapidIO high-performance
++	  packet-switched interconnect.
++
++	  If you say Y here, the kernel will include drivers and
++	  infrastructure code to support RapidIO interconnect devices.
++
++source "drivers/rapidio/Kconfig"
++
+ endmenu
+ 
+ menu "Kernel Features"
+-- 
+2.18.0
