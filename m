@@ -1,108 +1,94 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Tue, 24 Jul 2018 15:13:37 +0530
-Subject: [PATCH 1/1] iommu/arm-smmu: Add support to use Last level cache
-In-Reply-To: <20180627163749.GA8729@arm.com>
-References: <20180615105329.26800-1-vivek.gautam@codeaurora.org>
- <20180615165232.GE2202@arm.com>
- <CAFp+6iFm29ufb2Pr7Gb-2O_aN3GQLH4rcyWhbQGZ3QiwCC8vPg@mail.gmail.com>
- <20180627163749.GA8729@arm.com>
-Message-ID: <CAFp+6iHnA1Jj8wKO08YYEBKVF2_3oEuOQOcW2boL=AYZ9+b=UA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 24 Jul 2018 10:44:07 +0100
+Subject: [PATCH] arm64: fix ACPI dependencies
+In-Reply-To: <CAJZ5v0jTowUW6myVf0B2Gyq0ZA2ATqPNnaeOgFS01ce8A=FBpA@mail.gmail.com>
+References: <20180724093345.1575921-1-arnd@arndb.de>
+ <CAJZ5v0jTowUW6myVf0B2Gyq0ZA2ATqPNnaeOgFS01ce8A=FBpA@mail.gmail.com>
+Message-ID: <20180724094406.GF19324@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Tue, Jul 24, 2018 at 11:37:10AM +0200, Rafael J. Wysocki wrote:
+> On Tue, Jul 24, 2018 at 11:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > Kconfig reports a warning on x86 builds after the ARM64 dependency
+> > was added.
+> >
+> > drivers/acpi/Kconfig:6:error: recursive dependency detected!
+> > drivers/acpi/Kconfig:6:       symbol ACPI depends on EFI
+> >
+> > This rephrases the dependency to keep the ARM64 details out of the
+> > shared Kconfig file, so Kconfig no longer gets confused by it.
+> >
+> > Fixes: 5bcd44083a08 ("drivers: acpi: add dependency of EFI for arm64")
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> >  arch/arm64/Kconfig   | 1 +
+> >  drivers/acpi/Kconfig | 5 ++++-
+> >  2 files changed, 5 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index cdcaa6a798b2..2f987a938405 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -1267,6 +1267,7 @@ config EFI
+> >         bool "UEFI runtime support"
+> >         depends on OF && !CPU_BIG_ENDIAN
+> >         depends on KERNEL_MODE_NEON
+> > +       select ARCH_SUPPORTS_ACPI
+> >         select LIBFDT
+> >         select UCS2_STRING
+> >         select EFI_PARAMS_FROM_FDT
+> > diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> > index a8da730fabc6..0cda51c5d433 100644
+> > --- a/drivers/acpi/Kconfig
+> > +++ b/drivers/acpi/Kconfig
+> > @@ -6,7 +6,7 @@
+> >  menuconfig ACPI
+> >         bool "ACPI (Advanced Configuration and Power Interface) Support"
+> >         depends on !IA64_HP_SIM
+> > -       depends on IA64 || X86 || (ARM64 && EFI)
+> > +       depends on IA64 || X86 || ARCH_SUPPORTS_ACPI
+> 
+> That doesn't look particularly consistent to me.
+> 
+> It should be either "depends on ARCH_SUPPORTS_ACPI" alone or mention
+> ARM64 somehow IMO
 
+How about something along the lines of what Ard suggested? Untested diff
+below.
 
-On Wed, Jun 27, 2018 at 10:07 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Vivek,
->
-> On Tue, Jun 19, 2018 at 02:04:44PM +0530, Vivek Gautam wrote:
->> On Fri, Jun 15, 2018 at 10:22 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Fri, Jun 15, 2018 at 04:23:29PM +0530, Vivek Gautam wrote:
->> >> Qualcomm SoCs have an additional level of cache called as
->> >> System cache or Last level cache[1]. This cache sits right
->> >> before the DDR, and is tightly coupled with the memory
->> >> controller.
->> >> The cache is available to all the clients present in the
->> >> SoC system. The clients request their slices from this system
->> >> cache, make it active, and can then start using it. For these
->> >> clients with smmu, to start using the system cache for
->> >> dma buffers and related page tables [2], few of the memory
->> >> attributes need to be set accordingly.
->> >> This change makes the related memory Outer-Shareable, and
->> >> updates the MAIR with necessary protection.
->> >>
->> >> The MAIR attribute requirements are:
->> >>     Inner Cacheablity = 0
->> >>     Outer Cacheablity = 1, Write-Back Write Allocate
->> >>     Outer Shareablity = 1
->> >
->> > Hmm, so is this cache coherent with the CPU or not?
->>
->> Thanks for reviewing.
->> Yes, this LLC is cache coherent with CPU, so we mark for Outer-cacheable.
->> The different masters such as GPU as able to allocated and activate a slice
->> in this Last Level Cache.
->
-> What I mean is, for example, if the CPU writes some data using Normal, Inner
-> Shareable, Inner/Outer Cacheable, Inner/Outer Write-back, Non-transient
-> Read/Write-allocate and a device reads that data using your MAIR encoding
-> above, is the device guaranteed to see the CPU writes after the CPU has
-> executed a DSB instruction?
->
-> I don't think so, because the ARM ARM would say that there's a mismatch on
-> the Inner Cacheability attribute.
->
->> > Why don't normal
->> > non-cacheable mappings allocated in the LLC by default?
->>
->> Sorry, I couldn't fully understand your question here.
->> Few of the masters on qcom socs are not io-coherent, so for them
->> the IC has to be marked as 0.
->
-> By IC you mean Inner Cacheability? In your MAIR encoding above, it is zero
-> so I don't understand the problem. What goes wrong if non-coherent devices
-> use your MAIR encoding for their DMA buffers?
->
->> But they are able to use the LLC with OC marked as 1.
->
-> The issue here is that whatever attributes we put in the SMMU need to align
-> with the attributes used by the CPU in order to avoid introducing mismatched
-> aliases. Currently, we support three types of mapping in the SMMU:
->
-> 1. DMA non-coherent (e.g. "dma-coherent" is not set on the device)
->         Normal, Inner Shareable, Inner/Outer Non-Cacheable
->
-> 2. DMA coherent (e.g. "dma-coherent" is set on the device) [IOMMU_CACHE]
->         Normal, Inner Shareable, Inner/Outer Cacheable, Inner/Outer
->         Write-back, Non-transient Read/Write-allocate
->
-> 3. MMIO (e.g. MSI doorbell) [IOMMU_MMIO]
->         Device-nGnRE (Outer Shareable)
->
-> So either you override one of these types (I was suggesting (1)) or you need
-> to create a new memory type, along with the infrastructure for it to be
-> recognised on a per-device basis and used by the DMA API so that we don't
-> get mismatched aliases on the CPU.
+Will
 
-My apologies for delay in responding to this thread.
-I have been digging and getting in touch with internal tech teams
-to get more information on this. I will update as soon as I have enough
-details.
-Thanks.
+--->8
 
-Best regards
-Vivek
-
->
-> Will
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
-
-
-
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 303809c6..ec78d4d 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -56,6 +56,7 @@ config ARM64
+        select ARCH_USE_CMPXCHG_LOCKREF
+        select ARCH_USE_QUEUED_RWLOCKS
+        select ARCH_USE_QUEUED_SPINLOCKS
++       select ARCH_SUPPORTS_ACPI
+        select ARCH_SUPPORTS_MEMORY_FAILURE
+        select ARCH_SUPPORTS_ATOMIC_RMW
+        select ARCH_SUPPORTS_INT128 if GCC_VERSION >= 50000 || CC_IS_CLANG
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index 15ab1da..198db2d 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -3,10 +3,12 @@
+ # ACPI Configuration
+ #
+ 
++config ARCH_SUPPORTS_ACPI
++       def_bool (IA64 && !IA64_HP_SIM) || X86
++
+ menuconfig ACPI
+        bool "ACPI (Advanced Configuration and Power Interface) Support"
+-       depends on !IA64_HP_SIM
+-       depends on IA64 || X86 || (ARM64 && EFI)
++       depends on ARCH_SUPPORTS_ACPI
+        depends on PCI
+        select PNP
+        default y if (IA64 || X86)
