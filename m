@@ -1,73 +1,75 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 24 Jul 2018 14:24:04 +1000
-Subject: [PATCH 3/5] arm: dts: OpenPower Palmetto system can use coprocessor
- for FSI
+Date: Tue, 24 Jul 2018 14:24:05 +1000
+Subject: [PATCH 4/5] arm: dts: Add power8 CFAM dtsi and use it on palmetto
 In-Reply-To: <20180724042406.15374-1-benh@kernel.crashing.org>
 References: <20180724042406.15374-1-benh@kernel.crashing.org>
-Message-ID: <20180724042406.15374-4-benh@kernel.crashing.org>
+Message-ID: <20180724042406.15374-5-benh@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This switches away from userspace bitbanging to kernel FSI
-using the coprocessor.
+So we get proper chip-id
 
 Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 ---
- arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 28 ++++++++++++++-----
- 1 file changed, 21 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 10 ++++++
+ arch/arm/boot/dts/ibm-power8-cfam.dtsi        | 31 +++++++++++++++++++
+ 2 files changed, 41 insertions(+)
+ create mode 100644 arch/arm/boot/dts/ibm-power8-cfam.dtsi
 
 diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-index c7084a819dc6..e6cfdf3c1a67 100644
+index e6cfdf3c1a67..e264d817978c 100644
 --- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
 +++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-@@ -26,6 +26,11 @@
- 			no-map;
- 			reg = <0x5f000000 0x01000000>; /* 16M */
- 		};
-+
-+		coldfire_memory: codefire_memory at 5ee00000 {
-+			reg = <0x5ee00000 0x00200000>;
-+			no-map;
-+		};
+@@ -331,3 +331,13 @@
+ 		line-name = "BMC_TPM_INT_N";
  	};
- 
- 	leds {
-@@ -44,6 +49,22 @@
- 		};
- 	};
- 
-+	fsi: gpio-fsi {
-+		compatible = "aspeed,ast2400-cf-fsi-master", "fsi-master";
-+		#address-cells = <2>;
-+		#size-cells = <0>;
+ };
 +
-+		memory-region = <&coldfire_memory>;
-+		aspeed,sram = <&sram>;
-+		aspeed,cvic = <&cvic>;
-+
-+		clock-gpios = <&gpio ASPEED_GPIO(A, 4) GPIO_ACTIVE_HIGH>;
-+		data-gpios = <&gpio ASPEED_GPIO(A, 5) GPIO_ACTIVE_HIGH>;
-+		mux-gpios = <&gpio ASPEED_GPIO(A, 6) GPIO_ACTIVE_HIGH>;
-+		enable-gpios = <&gpio ASPEED_GPIO(D, 0) GPIO_ACTIVE_HIGH>;
-+		trans-gpios = <&gpio ASPEED_GPIO(H, 6) GPIO_ACTIVE_HIGH>;
++/* Instantiate chip 0 */
++#define CFAM_CHIP_ID 0
++&fsi {
++	cfam at 0,0 {
++		reg = <0 0>;
++		#include "ibm-power8-cfam.dtsi"
 +	};
++};
++#undef CFAM_CHIP_ID
+diff --git a/arch/arm/boot/dts/ibm-power8-cfam.dtsi b/arch/arm/boot/dts/ibm-power8-cfam.dtsi
+new file mode 100644
+index 000000000000..a07e9509d9bd
+--- /dev/null
++++ b/arch/arm/boot/dts/ibm-power8-cfam.dtsi
+@@ -0,0 +1,31 @@
++// SPDX-License-Identifier: GPL-2.0+
++// Copyright 2018 IBM Corp
 +
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 
-@@ -303,13 +324,6 @@
- 		line-name = "SYS_PWROK_BMC";
- 	};
- 
--	pin_gpio_h6 {
--		gpio-hog;
--		gpios = <ASPEED_GPIO(H, 6) GPIO_ACTIVE_HIGH>;
--		output-high;
--		line-name = "SCM1_FSI0_DATA_EN";
--	};
--
- 	pin_gpio_h7 {
- 		gpio-hog;
- 		gpios = <ASPEED_GPIO(H, 7) GPIO_ACTIVE_HIGH>;
++#define __MAKE_LABEL(p,i)	p##i
++#define _MAKE_LABEL(p,i)	__MAKE_LABEL(p,i)
++#define HUB_LABEL		_MAKE_LABEL(fsi_hub,CFAM_CHIP_ID)
++#define OCC_LABEL		_MAKE_LABEL(fsi_occ,CFAM_CHIP_ID)
++#define I2C_LABEL(n)		_MAKE_LABEL(_MAKE_LABEL(cfam,CFAM_CHIP_ID),_i2c##n)
++
++#address-cells = <1>;
++#size-cells = <1>;
++chip-id = <CFAM_CHIP_ID>;
++
++scom at 1000 {
++	compatible = "ibm,fsi2pib";
++	reg = <0x1000 0x400>;
++};
++
++HUB_LABEL: hub at 3400 {
++	compatible = "ibm,fsi-master-hub";
++	reg = <0x3400 0x400>;
++	#address-cells = <2>;
++	#size-cells = <0>;
++	no-scan-on-init;
++};
++
++#undef __MAKE_LABEL
++#undef _MAKE_LABEL
++#undef HUB_LABEL
++#undef OCC_LABEL
++#undef I2C_LABEL
 -- 
 2.17.1
