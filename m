@@ -1,65 +1,103 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 24 Jul 2018 11:02:47 +0200
-Subject: [PATCH 4/4] arm64: dts: allwinner: h5: Add SID for H5
-In-Reply-To: <20180723104255.94244-4-manu@freebsd.org>
-References: <20180723104255.94244-1-manu@freebsd.org>
- <20180723104255.94244-4-manu@freebsd.org>
-Message-ID: <20180724090247.uhvtnukrr5cevv2j@flea>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 24 Jul 2018 11:06:54 +0200
+Subject: [PATCH v6 5/5] mailbox: Add support for i.MX7D messaging unit
+In-Reply-To: <eebba930-b3d7-3670-3d96-35cc6c2a6bcb@pengutronix.de>
+References: <20180722063923.30222-1-o.rempel@pengutronix.de>
+ <20180722063923.30222-6-o.rempel@pengutronix.de>
+ <1532366380.3163.109.camel@pengutronix.de>
+ <eebba930-b3d7-3670-3d96-35cc6c2a6bcb@pengutronix.de>
+Message-ID: <1532423214.32306.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 12:42:55PM +0200, Emmanuel Vadot wrote:
-> The SID controller on H5 look the same as the one present in the A64.
-> But in case we find some difference one day at a compatible string
-> of it's own and a fallback to the A64 one.
+Am Dienstag, den 24.07.2018, 07:14 +0200 schrieb Oleksij Rempel:
+> Hi Lucas,
 > 
-> Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
-> ---
->  .../devicetree/bindings/nvmem/allwinner,sunxi-sid.txt        | 1 +
->  arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi                 | 5 +++++
->  2 files changed, 6 insertions(+)
+> here is more detailed response:
 > 
-> diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-> index e319fe5e205a..99c4ba6a3f61 100644
-> --- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-> +++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-> @@ -7,6 +7,7 @@ Required properties:
->    "allwinner,sun8i-a83t-sid"
->    "allwinner,sun8i-h3-sid"
->    "allwinner,sun50i-a64-sid"
-> +  "allwinner,sun50i-h5-sid"
->  
->  - reg: Should contain registers location and length
+> On 23.07.2018 19:19, Lucas Stach wrote:
+[...]
+> > > +};
+> > > +
+> > > +static struct imx_mu_priv *to_imx_mu_priv(struct mbox_controller *mbox)
+> > > +{
+> > > > +	return container_of(mbox, struct imx_mu_priv, mbox);
+> > > 
+> > > +}
+> > > +
+> > > +static void imx_mu_write(struct imx_mu_priv *priv, u32 val, u32 offs)
+> > > +{
+> > > +	iowrite32(val, priv->base + offs);
+> > 
+> > This driver is never going to be used on a device with port based IO,
+> > so iowrite doesn't make much sense here, just use writel. Same comment
+> > applies to the below read function.
+> 
+> As before I don't really understand the difference. I took some time for
+> learning and here are my findings:
+> - historical background of ioread/iowrite functions. What I can find is
+> > this LWN article: https://lwn.net/Articles/102232/ . The main point
+> seems to be "The first of these is a new __iomem annotation used to mark
+> pointers to I/O memory" ... " As with __user, the __iomem marker serves
+> a documentation role in the kernel code;"
+> 
+> In modern kernel the difference between ioread32 and readl seems to be
+> completely disappeared.
+> with this LWN article (2016):
+> https://lwn.net/Articles/698014/
+> the readl and reade32 are always in the same group..
 
-Bindings patches should be separate.
+Okay, as discussed offline this is more a thing of personal preference,
+since this maps to the same thing internally when used on a
+architecture without IO ports. I slightly dislike those as they don't
+have a _relaxed counterpart, but other than that there should be no
+difference. As we don't use any of the relaxed stuff in this driver
+it's really about the color of the bikeshed, so feel free to keep it
+your way.
 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> index 62d646baac3c..28183bf77164 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> @@ -129,3 +129,8 @@
->  		     <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
->  	compatible = "allwinner,sun50i-h5-pinctrl";
->  };
-> +
-> +&sid {
-> +	compatible = "allwinner,sun50i-h5-sid",
-> +		     "allwinner,sun50i-a64-sid";
-> +};
+> If there is some documentation which will say why I should use readl()
+> instead of ioread32() i would really love to read it.
+> 
+> > Also, given that those functions are not really shortening the code in
+> > the user they may also be removed completely IMHO.
+> 
+> Wrong assumption..??I use this functions for tracing. It is just to easy
+> to add two trace points...??From technical perspective I don't see any
+> advantage or disadvantage of having this functions.
+> If it is my personal preference, then I decide to keep it.
 
-I'm not sure doing a split similar to what you're doing here just to
-save the reg line is worth it.
+That IMHO implies that I'm perfectly fine with you ignoring this
+comment. :)
 
-Maxime
+[...]
+> > > +static int imx_mu_startup(struct mbox_chan *chan)
+> > > +{
+> > > > > > > > +	struct imx_mu_priv *priv = to_imx_mu_priv(chan->mbox);
+> > > > > > > > +	struct imx_mu_con_priv *cp = chan->con_priv;
+> > > > +	int ret;
+> > > 
+> > > +
+> > > > > > > > +	cp->irq_desc = devm_kasprintf(priv->dev, GFP_KERNEL, "imx_mu_chan[%i]",
+> > > > > > > > +				??????cp->idx);
+> > > > > > > > +	if (!cp->irq_desc)
+> > > > +		return -ENOMEM;
+> > > 
+> > > +
+> > > > +	ret = devm_request_irq(priv->dev, cp->irq, imx_mu_isr,
+> > > 
+> > > +			???????IRQF_SHARED, cp->irq_desc, chan);
+> > 
+> > Using the devm_ variants of those functions doesn't make sense when the
+> > resources aren't tied to the device lifetime. As you are tearing them
+> > down manually in imx_mu_shutdown anyways, just use the raw variants of
+> > those functions.
+> 
+> I have nothing against it.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/368c7667/attachment.sig>
+Thanks, as this is something I feel more strongly about. As the devm_
+stuff is meant to tie the lifetime of an object to the device/driver
+lifetime using them in a context where there is no relation at all is
+kind of an API abuse to me.
+
+Regards,
+Lucas
