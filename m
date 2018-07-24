@@ -1,43 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 24 Jul 2018 16:06:38 +0100
-Subject: [PATCHv4 01/12] atomic/tty: Fix up atomic abuse in ldsem
-In-Reply-To: <20180724134048.GA30682@gmail.com>
-References: <20180716113017.3909-1-mark.rutland@arm.com>
- <20180716113017.3909-2-mark.rutland@arm.com>
- <20180724071518.GA7300@gmail.com>
- <20180724092036.GN2494@hirez.programming.kicks-ass.net>
- <20180724092324.vnfowffsla4kja5c@lakrids.cambridge.arm.com>
- <20180724111313.GA14212@gmail.com>
- <20180724130515.ung6ox2p4rgzn746@lakrids.cambridge.arm.com>
- <20180724134048.GA30682@gmail.com>
-Message-ID: <20180724150638.a3vw5gn3efzvlwmv@lakrids.cambridge.arm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 24 Jul 2018 08:11:30 -0700
+Subject: [PATCH v9 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+ bindings
+In-Reply-To: <20180724145755.GF13268@sirena.org.uk>
+References: <cover.1531531808.git.collinsd@codeaurora.org>
+ <56b9d5c38cfe46da1228c54f001a49773c3e31dc.1531531808.git.collinsd@codeaurora.org>
+ <CAD=FV=VmfqWRGRMEn+0dzZ8x4R5vVaHbkthXAN91Lm-XmP9Gqg@mail.gmail.com>
+ <20180724145755.GF13268@sirena.org.uk>
+Message-ID: <CAD=FV=Uo8sT72a0gRitOVoK0SfC-_QixsovW94_LnL6H7QdKvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 03:40:48PM +0200, Ingo Molnar wrote:
-> 
-> * Mark Rutland <mark.rutland@arm.com> wrote:
-> 
-> > > Ok, then these bits will have to wait until Greg's tree goes upstream
-> > > in about two weeks.
-> > 
-> > Ok.
-> > 
-> > > Which patches can I apply as a preparatory step?
-> > 
-> > Patches 2-6 can be applied now.
-> 
-> Ok, will apply those.
+Hi,
 
-Cheers!
+On Tue, Jul 24, 2018 at 7:57 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Mon, Jul 23, 2018 at 01:09:05PM -0700, Doug Anderson wrote:
+>
+>> I know you are still looking for time to review the RPMh-regulator
+>> driver and that's fine.  One idea I had though: if the bindings look
+>> OK to you and are less controversial, is there any chance they could
+>> land in the meantime?
+>
+> This appears to have a bunch of dependencies which I've got no idea
+> what's going on with the merging of and no idea if they'll affect the
+> bindings or anything, nobody's said anything and last I looked it was
+> unclear what was going on.
 
-> > I guess I should rebase and resend the remaining bits once Greg's tree
-> > goes upstream?
-> 
-> Yeah, easiest would be to do that once Greg's and tip:locking/core changes (with 
-> patches 2-6) both got merged by Linus.
+RPMh itself landed in Andy's tree and he sent a pull request on
+Saturday.  Feel free to refer to the request ("[GIT PULL] Qualcomm
+Driver updates for 4.19") AKA
+<https://patchwork.kernel.org/patch/10539125/>.
 
-I'll keep an eye out for both of these.
+It doesn't look like arm-soc has picked up Andy's pull request yet
+though.  If having it in arm-soc is a requirement then I'm happy to
+monitor arm-soc and ping this thread again when it's there.
 
-Thanks,
-Mark.
+
+> I'm kind of hoping that things might have
+> sorted themselves out of the merge window.
+>
+> Some of the decisions in the code have flowed out into the bindings
+> before so I'm not keen to merge the bindings separately,
+
+Fair point.  I was thinking that we had pared the driver down enough
+now that the bindings were no longer anything other than just
+boilerplate bits describing the hardware, but it's obviously your
+decision when you're happy to land them.
+
+
+> and if the
+> driver for the thing used to communicate with the device is still in
+> review then that's definitely a red flag.
+
+As per above it's been landed, so hopefully this red flag is removed?
+
+
+-Doug
