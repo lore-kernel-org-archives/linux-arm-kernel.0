@@ -1,38 +1,53 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 24 Jul 2018 15:40:48 +0200
-Subject: [PATCHv4 01/12] atomic/tty: Fix up atomic abuse in ldsem
-In-Reply-To: <20180724130515.ung6ox2p4rgzn746@lakrids.cambridge.arm.com>
-References: <20180716113017.3909-1-mark.rutland@arm.com>
- <20180716113017.3909-2-mark.rutland@arm.com>
- <20180724071518.GA7300@gmail.com>
- <20180724092036.GN2494@hirez.programming.kicks-ass.net>
- <20180724092324.vnfowffsla4kja5c@lakrids.cambridge.arm.com>
- <20180724111313.GA14212@gmail.com>
- <20180724130515.ung6ox2p4rgzn746@lakrids.cambridge.arm.com>
-Message-ID: <20180724134048.GA30682@gmail.com>
+From: acolin@isi.edu (Alexei Colin)
+Date: Tue, 24 Jul 2018 09:41:26 -0400
+Subject: [PATCH] arm: enable RapidIO config options in Kconfig
+Message-ID: <20180724134122.86718-1-acolin@isi.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ARM SoCs with a PCI bus offer the RapiodIO config menu; SoCs with
+RapidIO IP blocks but without a PCI bus, need to add "select
+HAS_RAPIDIO" to the Kconfig entry for that SoC (e.g. ARCH_*).
 
-* Mark Rutland <mark.rutland@arm.com> wrote:
+HAS_RAPIDIO was chosen over HAVE_RAPIDIO to be consistent with
+other architectures which already define this flag (powerpc).
 
-> > Ok, then these bits will have to wait until Greg's tree goes upstream
-> > in about two weeks.
-> 
-> Ok.
-> 
-> > Which patches can I apply as a preparatory step?
-> 
-> Patches 2-6 can be applied now.
+Signed-off-by: Alexei Colin <acolin@isi.edu>
+---
 
-Ok, will apply those.
+Tested that kernel builds with RapidIO subsystem and switch drivers enabled.
+Maintainers for RapidIO subsystem CCed.
+Sending a similar patch to ARM64 maintainers shortly.
 
-> I guess I should rebase and resend the remaining bits once Greg's tree
-> goes upstream?
+ arch/arm/Kconfig | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Yeah, easiest would be to do that once Greg's and tip:locking/core changes (with 
-patches 2-6) both got merged by Linus.
-
-Thanks,
-
-	Ingo
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 843edfd000be..d6267ab33cb5 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1274,6 +1274,22 @@ config PCI_HOST_ITE8152
+ 
+ source "drivers/pci/Kconfig"
+ 
++config HAS_RAPIDIO
++	bool
++	default n
++
++config RAPIDIO
++	tristate "RapidIO support"
++	depends on HAS_RAPIDIO || PCI
++	help
++	  This feature enables support for RapidIO high-performance
++	  packet-switched interconnect.
++
++	  If you say Y here, the kernel will include drivers and
++	  infrastructure code to support RapidIO interconnect devices.
++
++source "drivers/rapidio/Kconfig"
++
+ source "drivers/pcmcia/Kconfig"
+ 
+ endmenu
+-- 
+2.18.0
