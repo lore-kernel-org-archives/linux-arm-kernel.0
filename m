@@ -1,53 +1,55 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jul 2018 16:14:37 +0100
-Subject: [PATCH] [SUBMITTED 20180724] arm64: fix ACPI dependencies
-In-Reply-To: <CAJZ5v0h1zGHrMo6HLtSMWE4kM9YK-3QvgHnBaRrEpMHAJrrMtg@mail.gmail.com>
-References: <20180724094957.1967541-1-arnd@arndb.de>
- <CAJZ5v0jMtWDZePW=mu_cO2PjHVGp1hQThSveq9+=2aNozESENQ@mail.gmail.com>
- <20180724102102.GI19324@arm.com>
- <CAJZ5v0h1zGHrMo6HLtSMWE4kM9YK-3QvgHnBaRrEpMHAJrrMtg@mail.gmail.com>
-Message-ID: <20180724151435.GB25412@arm.com>
+Date: Tue, 24 Jul 2018 16:14:59 +0100
+Subject: [PATCH] arm64: enable RapidIO config options in Kconfig
+In-Reply-To: <20180724134513.86796-1-acolin@isi.edu>
+References: <20180724134513.86796-1-acolin@isi.edu>
+Message-ID: <20180724151458.GE25412@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 12:23:48PM +0200, Rafael J. Wysocki wrote:
-> On Tue, Jul 24, 2018 at 12:21 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, Jul 24, 2018 at 11:54:25AM +0200, Rafael J. Wysocki wrote:
-> >> On Tue, Jul 24, 2018 at 11:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > Kconfig reports a warning on x86 builds after the ARM64 dependency
-> >> > was added.
-> >> >
-> >> > drivers/acpi/Kconfig:6:error: recursive dependency detected!
-> >> > drivers/acpi/Kconfig:6:       symbol ACPI depends on EFI
-> >> >
-> >> > This rephrases the dependency to keep the ARM64 details out of the
-> >> > shared Kconfig file, so Kconfig no longer gets confused by it.
-> >> >
-> >> > For consistency, all three architectures that support ACPI now
-> >> > select ARCH_SUPPORTS_ACPI in exactly the configuration in which
-> >> > they allow it. We still need the 'default x86', as each one
-> >> > wants a different default: default-y on x86, default-n on arm64,
-> >> > and always-y on ia64.
-> >> >
-> >> > Fixes: 5bcd44083a08 ("drivers: acpi: add dependency of EFI for arm64")
-> >> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >> > ---
-> >> > v2: use 'select ARCH_SUPPORTS_ACPI' for all three.
-> >>
-> >> LGTM
-> >>
-> >> Reviewed-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> >
-> > Same here:
-> >
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> >
-> > Would it be ok if I take this via the arm64 tree, since that's where the
-> > warning was introduced?
+On Tue, Jul 24, 2018 at 09:45:14AM -0400, Alexei Colin wrote:
+> ARM64 SoCs with a PCI bus present the RapiodIO options; SoCs with
+> RapidIO IP blocks but without a PCI bus, need to select HAS_RAPIDIO in
+> Kconfig.platforms.
 > 
-> Yes, it would, from the ACPI side.
+> HAS_RAPIDIO was chosen over HAVE_RAPIDIO to be consistent with
+> other architectures which already define this flag (powerpc).
+> 
+> Signed-off-by: Alexei Colin <acolin@isi.edu>
+> ---
+> 
+> Tested that kernel builds with RapidIO subsystem and switch drivers and that
+> modules insert successfully in a custom Qemu hardware model.
+> Maintainers for RapidIO subsystem CCed.
+> Similar patch for ARM has been submitted.
+> 
+>  arch/arm64/Kconfig | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 42c090cf0292..8dceaa5b674c 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -293,6 +293,22 @@ config PCI_SYSCALL
+>  
+>  source "drivers/pci/Kconfig"
+>  
+> +config HAS_RAPIDIO
+> +	bool
+> +	default n
+> +
+> +config RAPIDIO
+> +	tristate "RapidIO support"
+> +	depends on HAS_RAPIDIO || PCI
+> +	help
+> +	  This feature enables support for RapidIO high-performance
+> +	  packet-switched interconnect.
+> +
+> +	  If you say Y here, the kernel will include drivers and
+> +	  infrastructure code to support RapidIO interconnect devices.
 
-Ok, I'll stick this into next tomorrow pending any objections from the x86
-maintainers.
+It feels a bit weird to push this help text into the arch Kconfig files,
+rather than just have them provide the HAS_RAPIDIO symbol, but if that's
+what everybody else is doing then I guess it's fine.
 
 Will
