@@ -1,25 +1,41 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 24 Jul 2018 14:53:57 +0200
-Subject: [PATCH] sun4i: dts: add gpu node to sun4i-a10 platform
-In-Reply-To: <20180723160954.14115-1-stevenvandenbrandenstift@gmail.com>
-References: <20180723160954.14115-1-stevenvandenbrandenstift@gmail.com>
-Message-ID: <20180724125357.g7dddqwjouwv2dnj@flea>
+Date: Tue, 24 Jul 2018 15:00:04 +0200
+Subject: [PATCH v2 5/5] arm64: dts: allwinner: h5: Add SID for H5
+In-Reply-To: <20180724101522.68165-5-manu@freebsd.org>
+References: <20180724101522.68165-1-manu@freebsd.org>
+ <20180724101522.68165-5-manu@freebsd.org>
+Message-ID: <20180724130004.ynaiabshexrrbvo4@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 06:09:54PM +0200, stevenvandenbrandenstift at gmail.com wrote:
-> From: Steven Vanden Branden <stevenvandenbrandenstift@gmail.com>
+On Tue, Jul 24, 2018 at 12:15:22PM +0200, Emmanuel Vadot wrote:
+> The SID controller on H5 look the same as the one present in the A64.
+> But in case we find some difference one day at a compatible string
+> of it's own and a fallback to the A64 one.
 > 
-> Add mali gpu node to sun4i a10 platforms.
-> Tested with offscreen rendering with lima mesa (freedesktop gitlab)
+> Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> Signed-off-by: Steven Vanden Branden <stevenvandenbrandenstift@gmail.com>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+> index 62d646baac3c..28183bf77164 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+> @@ -129,3 +129,8 @@
+>  		     <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+>  	compatible = "allwinner,sun50i-h5-pinctrl";
+>  };
+> +
+> +&sid {
+> +	compatible = "allwinner,sun50i-h5-sid",
+> +		     "allwinner,sun50i-a64-sid";
+> +};
 
-Applied (while slighly changing your commit title, the prefix should
-be "ARM: dts: sun4i: ..")
+This is still a bit pointless, please remove the common node.
 
-Thanks!
 Maxime
+
 -- 
 Maxime Ripard, Bootlin (formerly Free Electrons)
 Embedded Linux and Kernel engineering
@@ -30,4 +46,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/086c5ee2/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/b4713889/attachment.sig>
