@@ -1,53 +1,87 @@
-From: cmaiolino28@gmail.com (Carlos Maiolino)
-Date: Tue, 24 Jul 2018 10:32:17 +0200
-Subject: [PATCH] staging/vc04_services: Use __user annotation for user-space
- pointers
-Message-ID: <20180724083217.20921-1-cmaiolino28@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 24 Jul 2018 09:36:34 +0100
+Subject: [PATCH 3/3] iommu/arm-smmu: Error out only if not enough context
+ interrupts
+In-Reply-To: <20180719175356.14753-4-vivek.gautam@codeaurora.org>
+References: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
+ <20180719175356.14753-4-vivek.gautam@codeaurora.org>
+Message-ID: <20180724083633.GA19324@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix several sparse warnings regarding different address space
-assignments, like example below, by properly annotating pointers
-expected to carry user space addresses.
+On Thu, Jul 19, 2018 at 11:23:56PM +0530, Vivek Gautam wrote:
+> Currently we check if the number of context banks is not equal to
+> num_context_interrupts. However, there are booloaders such as, one
+> on sdm845 that reserves few context banks and thus kernel views
+> less than the total available context banks.
+> So, although the hardware definition in device tree would mention
+> the correct number of context interrupts, this number can be
+> greater than the number of context banks visible to smmu in kernel.
+> We should therefore error out only when the number of context banks
+> is greater than the available number of context interrupts.
+> 
+> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> Suggested-by: Tomasz Figa <tfiga@chromium.org>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 19 +++++++++++++------
+>  1 file changed, 13 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 7c69736a30f8..4cb53bf4f423 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -2229,12 +2229,19 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+>  	if (err)
+>  		return err;
+>  
+> -	if (smmu->version == ARM_SMMU_V2 &&
+> -	    smmu->num_context_banks != smmu->num_context_irqs) {
+> -		dev_err(dev,
+> -			"found only %d context interrupt(s) but %d required\n",
+> -			smmu->num_context_irqs, smmu->num_context_banks);
+> -		return -ENODEV;
+> +	if (smmu->version == ARM_SMMU_V2) {
+> +		if (smmu->num_context_banks > smmu->num_context_irqs) {
+> +			dev_err(dev,
+> +			      "found only %d context irq(s) but %d required\n",
+> +			      smmu->num_context_irqs, smmu->num_context_banks);
+> +			return -ENODEV;
+> +		} else if (smmu->num_context_banks < smmu->num_context_irqs) {
+> +			/* loose extra context interrupts */
+> +			dev_notice(dev,
+> +			      "found %d context irq(s) but only %d required\n",
+> +			      smmu->num_context_irqs, smmu->num_context_banks);
+> +			smmu->num_context_irqs = smmu->num_context_banks;
+> +		}
 
-warning: incorrect type in argument 1 (different address spaces)
-Signed-off-by: Carlos Maiolino <cmaiolino28@gmail.com>
----
+I don't see the utility in the new message. Can you simplify with the patch
+below on top? It's a bit weird that we only decide to ignore the extra irqs
+after calling platform_get_irq() on them, but that seems to be harmless.
 
-I'm not subscribed to the list, so, please, CC me on any reply.
-Thanks a lot.
+Will
 
- drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c   | 4 ++--
- drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+--->8
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-index bc05c69383b8..42f471471e57 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-@@ -1648,8 +1648,8 @@ vchiq_compat_ioctl_queue_message(struct file *file,
- 				 unsigned int cmd,
- 				 unsigned long arg)
- {
--	VCHIQ_QUEUE_MESSAGE_T *args;
--	struct vchiq_element *elements;
-+	VCHIQ_QUEUE_MESSAGE_T __user *args;
-+	struct vchiq_element __user *elements;
- 	struct vchiq_queue_message32 args32;
- 	unsigned int count;
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index aa46c1ed5bf9..5349e22b5c78 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -2109,13 +2109,10 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+ 			      "found only %d context irq(s) but %d required\n",
+ 			      smmu->num_context_irqs, smmu->num_context_banks);
+ 			return -ENODEV;
+-		} else if (smmu->num_context_banks < smmu->num_context_irqs) {
+-			/* loose extra context interrupts */
+-			dev_notice(dev,
+-			      "found %d context irq(s) but only %d required\n",
+-			      smmu->num_context_irqs, smmu->num_context_banks);
+-			smmu->num_context_irqs = smmu->num_context_banks;
+ 		}
++
++		/* Ignore superfluous interrupts */
++		smmu->num_context_irqs = smmu->num_context_banks;
+ 	}
  
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h
-index 9f859953f45c..1776fab41e40 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h
-@@ -50,7 +50,7 @@ typedef struct {
- typedef struct {
- 	unsigned int handle;
- 	unsigned int count;
--	const struct vchiq_element *elements;
-+	const struct vchiq_element __user *elements;
- } VCHIQ_QUEUE_MESSAGE_T;
- 
- typedef struct {
--- 
-2.14.3
+ 	for (i = 0; i < smmu->num_global_irqs; ++i) {
