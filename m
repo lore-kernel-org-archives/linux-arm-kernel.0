@@ -1,60 +1,65 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Tue, 24 Jul 2018 10:49:05 +0530
-Subject: [PATCH v3.1 0/4] arm64: kexec,kdump: fix boot failures on
- acpi-only system
-In-Reply-To: <20180723133527.GA9450@arm.com>
-References: <20180709234229.20181-1-takahiro.akashi@linaro.org>
- <20180712164918.GA26935@arm.com> <20180713003434.GZ28220@linaro.org>
- <CAKv+Gu9PT75XTXGsh1jc5roRO_d2QYKEamq42mfbsXzmerAUzA@mail.gmail.com>
- <20180717051222.GA11258@linaro.org> <20180723133527.GA9450@arm.com>
-Message-ID: <CACi5LpO=ObREcWfr6Y+7+bv3c1VkOEkw80CLELHDO6QD4xbeow@mail.gmail.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Tue, 24 Jul 2018 13:40:04 +0800
+Subject: [PATCH 2/3] dt-bindings: arm: syna: add support for the AS370 SoC
+In-Reply-To: <20180720151529.GA26487@rob-hp-laptop>
+References: <20180713171712.05f58a74@xhacker.debian>
+ <20180713172457.6193a92f@xhacker.debian>
+ <20180720151529.GA26487@rob-hp-laptop>
+Message-ID: <20180724134004.4fc660d6@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Rob
 
-On Mon, Jul 23, 2018 at 7:05 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Jul 17, 2018 at 02:12:23PM +0900, AKASHI Takahiro wrote:
->> On Fri, Jul 13, 2018 at 07:49:45AM +0200, Ard Biesheuvel wrote:
->> > On 13 July 2018 at 02:34, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
->> > > On Thu, Jul 12, 2018 at 05:49:19PM +0100, Will Deacon wrote:
->> > >> Hi Akashi,
->> > >>
->> > >> On Tue, Jul 10, 2018 at 08:42:25AM +0900, AKASHI Takahiro wrote:
->> > >> > This patch series is a set of bug fixes to address kexec/kdump
->> > >> > failures which are sometimes observed on ACPI-only system and reported
->> > >> > in LAK-ML before.
->> > >>
->> > >> I tried picking this up, along with Ard's fixup, but I'm seeing a build
->> > >> failure for allmodconfig:
->> > >>
->> > >> arch/arm64/kernel/acpi.o: In function `__acpi_get_mem_attribute':
->> > >> acpi.c:(.text+0x60): undefined reference to `efi_mem_attributes'
->> > >>
->> > >> I didn't investigate further. Please can you fix this?
->> > >
->> > > Because CONFIG_ACPI is on and CONFIG_EFI is off.
->> > >
->> > > This can happen in allmodconfig as CONFIG_EFI depends on
->> > > !CONFIG_CPU_BIG_ENDIAN, which is actually on in this case.
->> > >
->> >
->> > Allowing both CONFIG_ACPI and CONFIG_CPU_BIG_ENDIAN to be configured
->> > makes no sense at all. Things will surely break if you start using BE
->> > memory accesses while parsing ACPI tables.
->> >
->> > Allowing CONFIG_ACPI without CONFIG_EFI makes no sense either, since
->> > on arm64, the only way to find the ACPI tables is through a UEFI
->> > configuration table.
->>
->>
->> Do you agree to this?
->
-> Yes; please post a new series which resolves these dependencies and includes
-> Ard's fixup from before.
+On Fri, 20 Jul 2018 09:15:29 -0600 Rob Herring wrote:
 
-I see that Akashi has already posted a v4 here with the suggested fixes:
-https://lkml.org/lkml/2018/7/22/321
+> On Fri, Jul 13, 2018 at 05:24:57PM +0800, Jisheng Zhang wrote:
+> > The AS370 SoC is a new derivative of the berlin family. The only
+> > difference is the SoC isn't named as berlin*.  
+> 
+> So is it a derivative or just rebranded?
 
-Thanks,
-Bhupesh
+A derivative new generation SoC.
+
+> 
+> > Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> > ---
+> >  Documentation/devicetree/bindings/arm/syna.txt | 6 +++++-
+> >  1 file changed, 5 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/syna.txt b/Documentation/devicetree/bindings/arm/syna.txt
+> > index 3bab18409b7a..3ba1d7b5ee74 100644
+> > --- a/Documentation/devicetree/bindings/arm/syna.txt
+> > +++ b/Documentation/devicetree/bindings/arm/syna.txt
+> > @@ -1,4 +1,4 @@
+> > -Marvell Berlin SoC Family Device Tree Bindings
+> > +Synaptics SoC Device Tree Bindings  
+> 
+> Perhaps some note about what has happened here. Otherwise it looks 
+> strange having "Marvell Berlin" in the document when the title says 
+> Synaptics SoC.
+
+Good idea. will do in v2
+
+> 
+> >  ---------------------------------------------------------------
+> >  
+> >  Work in progress statement:
+> > @@ -13,6 +13,10 @@ stable binding/ABI.
+> >  
+> >  ---------------------------------------------------------------
+> >  
+> > +Boards with the Synaptics AS370 SoC shall have the following properties:
+> > +  Required root node property:
+> > +    compatible: "syna,as370"
+> > +
+> >  Boards with a SoC of the Marvell Berlin family, e.g. Armada 1500
+> >  shall have the following properties:
+> >  
+> > -- 
+> > 2.18.0
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html  
