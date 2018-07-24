@@ -1,73 +1,199 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 24 Jul 2018 09:35:55 -0700
-Subject: [PATCHv3 2/2] arm64: Add support for STACKLEAK gcc plugin
-In-Reply-To: <ee7335aa-d536-7aef-a25e-224462e065b0@linux.com>
-References: <20180720214154.2940-1-labbott@redhat.com>
- <20180720214154.2940-3-labbott@redhat.com>
- <ee7335aa-d536-7aef-a25e-224462e065b0@linux.com>
-Message-ID: <CAGXu5jL3=o9U-pLcX7Abe-nUZ0VftpPcSR3Ho3-gBv-AnS_M1A@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 25 Jul 2018 00:36:55 +0800
+Subject: [PATCH] ARM: dts: sun8i: r40/v40: rewrite BPi M2 Berry DTS to rebase
+ on M2 Ultra
+Message-ID: <20180724163655.61365-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 5:44 AM, Alexander Popov <alex.popov@linux.com> wrote:
-> On 21.07.2018 00:41, Laura Abbott wrote:
->> This adds support for the STACKLEAK gcc plugin to arm64 by implementing
->> stackleak_check_alloca(), based heavily on the x86 version, and adding the
->> two helpers used by the stackleak common code: current_top_of_stack() and
->> on_thread_stack(). The stack erasure calls are made at syscall returns.
->> Additionally, this disables the plugin in hypervisor and EFI stub code,
->> which are out of scope for the protection.
->>
->> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
->> Reviewed-by: Kees Cook <keescook@chromium.org>
->> Signed-off-by: Laura Abbott <labbott@redhat.com>
->> ---
->> v3: Actual commit text courtesy of Kees. A comment explaining why we
->> panic
->> ---
->>  arch/arm64/Kconfig                    |  1 +
->>  arch/arm64/include/asm/processor.h    | 15 +++++++++++++++
->>  arch/arm64/kernel/entry.S             |  7 +++++++
->>  arch/arm64/kernel/process.c           | 22 ++++++++++++++++++++++
->>  arch/arm64/kvm/hyp/Makefile           |  3 ++-
->>  drivers/firmware/efi/libstub/Makefile |  3 ++-
->>  6 files changed, 49 insertions(+), 2 deletions(-)
->
-> Laura, thanks for your work!
->
-> I've reviewed and tested this patch on my LeMaker HiKey board (HiSilicon Kirin
-> 620 SoC). The lkdtm tests for STACKLEAK work fine.
->
-> Acked-by: Alexander Popov <alex.popov@linux.com>
->
-> For testing I applied your patches above Kees' for-next/kspp:
-> https://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git/log/?h=for-next/kspp
->
-> I've had one trouble with building CONFIG_STACKLEAK_RUNTIME_DISABLE on arm64.
-> Kees, could you please fold this into the 7th patch of the series?
+Banana Pi designs the BPi M2 Berry board to be software compatible with
+BPi M2 Ultra, so it's based on M2 Ultra with some function cuts,
+including:
 
-Sure thing!
+- 2048MiB DRAM -> 1024MiB (this should be proceed by the bootloader);
+- dropped a LED;
+- dropped eMMC;
+- dropped USB2 and connect USB1 to a 4-port HUB.
 
--Kees
+Thus we can make the M2 Berry device tree based on the M2 Ultra, rather
+than write one from scratch.
 
->
-> ---- >8 ----
->
-> diff --git a/kernel/stackleak.c b/kernel/stackleak.c
-> index f731c9a..03031f7a 100644
-> --- a/kernel/stackleak.c
-> +++ b/kernel/stackleak.c
-> @@ -16,6 +16,7 @@
->
->  #ifdef CONFIG_STACKLEAK_RUNTIME_DISABLE
->  #include <linux/jump_label.h>
-> +#include <linux/sysctl.h>
->
->  static DEFINE_STATIC_KEY_FALSE(stack_erasing_bypass);
->
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ .../boot/dts/sun8i-v40-bananapi-m2-berry.dts  | 141 +++---------------
+ 1 file changed, 24 insertions(+), 117 deletions(-)
 
-
-
+diff --git a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
+index 35859d8f3267..b740c659e623 100644
+--- a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
++++ b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
+@@ -40,143 +40,50 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
+-/dts-v1/;
+-#include "sun8i-r40.dtsi"
+-
+-#include <dt-bindings/gpio/gpio.h>
++#include "sun8i-r40-bananapi-m2-ultra.dts"
+ 
+ / {
+ 	model = "Banana Pi M2 Berry";
+ 	compatible = "sinovoip,bpi-m2-berry", "allwinner,sun8i-r40";
+ 
+-	aliases {
+-		serial0 = &uart0;
+-	};
+-
+-	chosen {
+-		stdout-path = "serial0:115200n8";
+-	};
+-
+ 	leds {
+-		compatible = "gpio-leds";
+-
+-		pwr-led {
+-			label = "bananapi:red:pwr";
+-			gpios = <&pio 7 20 GPIO_ACTIVE_HIGH>;
+-			default-state = "on";
+-		};
+-
+-		user-led {
+-			label = "bananapi:green:user";
+-			gpios = <&pio 7 21 GPIO_ACTIVE_HIGH>;
+-		};
+-	};
+-
+-	reg_vcc5v0: vcc5v0 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "vcc5v0";
+-		regulator-min-microvolt = <5000000>;
+-		regulator-max-microvolt = <5000000>;
+-		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>; /* PH23 */
+-		enable-active-high;
+-	};
+-
+-	wifi_pwrseq: wifi_pwrseq {
+-		compatible = "mmc-pwrseq-simple";
+-		reset-gpios = <&pio 6 10 GPIO_ACTIVE_LOW>; /* PG10 WIFI_EN */
++		/* M2 Berry dropped blue LED due to size */
++		/delete-node/ user-led-blue;
+ 	};
+ };
+ 
+ &ehci1 {
+ 	/* Terminus Tech FE 1.1s 4-port USB 2.0 hub here */
+-	status = "okay";
+-};
+-
+-&i2c0 {
+-	status = "okay";
+-
+-	axp22x: pmic at 68 {
+-		compatible = "x-powers,axp221";
+-		reg = <0x34>;
+-		interrupt-parent = <&nmi_intc>;
+-		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+-	};
+-};
+-
+-#include "axp22x.dtsi"
+-
+-&reg_aldo3 {
+-	regulator-always-on;
+-	regulator-min-microvolt = <2700000>;
+-	regulator-max-microvolt = <3300000>;
+-	regulator-name = "avcc";
+-};
+-
+-&reg_dcdc1 {
+-	regulator-always-on;
+-	regulator-min-microvolt = <3000000>;
+-	regulator-max-microvolt = <3000000>;
+-	regulator-name = "vcc-3v0";
+-};
+-
+-&reg_dcdc2 {
+-	regulator-always-on;
+-	regulator-min-microvolt = <1000000>;
+-	regulator-max-microvolt = <1300000>;
+-	regulator-name = "vdd-cpu";
+-};
+-
+-&reg_dcdc3 {
+-	regulator-always-on;
+-	regulator-min-microvolt = <1000000>;
+-	regulator-max-microvolt = <1300000>;
+-	regulator-name = "vdd-sys";
+-};
+-
+-&reg_dcdc5 {
+-	regulator-always-on;
+-	regulator-min-microvolt = <1500000>;
+-	regulator-max-microvolt = <1500000>;
+-	regulator-name = "vcc-dram";
+-};
+-
+-&reg_dldo1 {
+-	regulator-min-microvolt = <1800000>;
+-	regulator-max-microvolt = <3300000>;
+-	regulator-name = "vcc-wifi-io";
+ };
+ 
+-&reg_dldo2 {
+-	regulator-min-microvolt = <3300000>;
+-	regulator-max-microvolt = <3300000>;
+-	regulator-name = "vcc-wifi";
++&ehci2 {
++	/*
++	 * M2 Berry dropped wiring out USB2, due to all USB port is
++	 * from a hub at USB1.
++	 */
++	status = "disabled";
+ };
+ 
+-&mmc0 {
+-	vmmc-supply = <&reg_dcdc1>;
+-	bus-width = <4>;
+-	cd-gpios = <&pio 7 13 GPIO_ACTIVE_LOW>; /* PH13 */
+-	status = "okay";
++&mmc2 {
++	/* M2 Berry has no eMMC */
++	status = "disabled";
+ };
+ 
+-&mmc1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc1_pg_pins>;
+-	vmmc-supply = <&reg_dldo2>;
+-	vqmmc-supply = <&reg_dldo1>;
+-	mmc-pwrseq = <&wifi_pwrseq>;
+-	bus-width = <4>;
+-	non-removable;
+-	status = "okay";
++&ohci1 {
++	/*
++	 * M2 Berry have a Hub connected to the USB1 pins, so no USB1.1 device
++	 * can be directly connected to the USB1 port, thus the OHCI controller
++	 * can be disabled.
++	 */
++	status = "disabled";
+ };
+ 
+-&uart0 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&uart0_pb_pins>;
+-	status = "okay";
++&ohci2 {
++	/* See comments at &ehci2 */
++	status = "disabled";
+ };
+ 
+ &usbphy {
+-	usb1_vbus-supply = <&reg_vcc5v0>;
+-	status = "okay";
++	/* See comments at &ehci2 */
++	/delete-property/ usb2_vbus-supply;
+ };
 -- 
-Kees Cook
-Pixel Security
+2.18.0
