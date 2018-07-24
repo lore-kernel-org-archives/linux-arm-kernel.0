@@ -1,54 +1,178 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 24 Jul 2018 18:52:32 +0200
-Subject: [PATCH v3 1/2] Revert "ARM: dts: imx7d: Invert legacy PCI irq
- mapping"
-In-Reply-To: <ed0ceaa10da805bc79e85ec7d60fcce9d4327066.1532448745.git.leonard.crestez@nxp.com>
+Date: Tue, 24 Jul 2018 18:55:41 +0200
+Subject: [PATCH v3 2/2] PCI: imx: Initial imx7d pm support
+In-Reply-To: <acafccc294f15a281cf1d253c15a3eec2d1c8cc5.1532448745.git.leonard.crestez@nxp.com>
 References: <cover.1532448745.git.leonard.crestez@nxp.com>
- <ed0ceaa10da805bc79e85ec7d60fcce9d4327066.1532448745.git.leonard.crestez@nxp.com>
-Message-ID: <1532451152.32306.8.camel@pengutronix.de>
+ <acafccc294f15a281cf1d253c15a3eec2d1c8cc5.1532448745.git.leonard.crestez@nxp.com>
+Message-ID: <1532451341.32306.9.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Am Dienstag, den 24.07.2018, 19:14 +0300 schrieb Leonard Crestez:
-> This reverts commit 1c86c9dd82f859b474474a7fee0d5195da2c9c1d.
+> On imx7d the pcie-phy power domain is turned off in suspend and this can
+> make the system hang after resume when attempting any read from PCI.
 > 
-> That commit followed the reference manual but unfortunately the imx7d
-> manual is incorrect.
+> Fix this by adding minimal suspend/resume code from the nxp internal
+> tree. This will prepare for powering down on suspend and reset the block
+> on resume.
 > 
-> Tested with ath9k pcie card and confirmed internally.
+> Code is only for imx7d but a very similar sequence can be used for
+> other socs.
+> 
+> > The original author is mostly Richard Zhu <hongxing.zhu@nxp.com>, this
+> patch adjusts the code to the upstream imx7d implemention using reset
+> controls and power domains.
 > 
 > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-Acked-by: Lucas Stach <l.stach@pengutronix.de>
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
 > ---
-> ?arch/arm/boot/dts/imx7d.dtsi | 12 ++++++++----
-> ?1 file changed, 8 insertions(+), 4 deletions(-)
+> ?drivers/pci/controller/dwc/pci-imx6.c | 97 +++++++++++++++++++++++++--
+> ?1 file changed, 92 insertions(+), 5 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-> index 7cbc2ffa4b3a..7234e8330a57 100644
-> --- a/arch/arm/boot/dts/imx7d.dtsi
-> +++ b/arch/arm/boot/dts/imx7d.dtsi
-> @@ -124,14 +124,18 @@
-> > ?		num-lanes = <1>;
-> > ?		interrupts = <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
-> > ?		interrupt-names = "msi";
-> > ?		#interrupt-cells = <1>;
-> > ?		interrupt-map-mask = <0 0 0 0x7>;
-> > -		interrupt-map = <0 0 0 1 &intc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
-> > -				<0 0 0 2 &intc GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
-> > -				<0 0 0 3 &intc GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
-> > -				<0 0 0 4 &intc GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>;
-> > +		/*
-> > +		?* Reference manual lists pci irqs incorrectly
-> > +		?* Real hardware ordering is same as imx6: D+MSI, C, B, A
-> > +		?*/
-> > +		interrupt-map = <0 0 0 1 &intc GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
-> > +				<0 0 0 2 &intc GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
-> > +				<0 0 0 3 &intc GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
-> > +				<0 0 0 4 &intc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
-> > ?		clocks = <&clks IMX7D_PCIE_CTRL_ROOT_CLK>,
-> > ?			?<&clks IMX7D_PLL_ENET_MAIN_100M_CLK>,
-> > ?			?<&clks IMX7D_PCIE_PHY_ROOT_CLK>;
-> > ?		clock-names = "pcie", "pcie_bus", "pcie_phy";
-> > ?		assigned-clocks = <&clks IMX7D_PCIE_CTRL_ROOT_SRC>,
+> diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+> index 4a9a673b4777..65b6d1015723 100644
+> --- a/drivers/pci/controller/dwc/pci-imx6.c
+> +++ b/drivers/pci/controller/dwc/pci-imx6.c
+> @@ -540,10 +540,28 @@ static int imx6_pcie_wait_for_speed_change(struct imx6_pcie *imx6_pcie)
+> ?
+> > ?	dev_err(dev, "Speed change timeout\n");
+> > ?	return -EINVAL;
+> ?}
+> ?
+> +static void imx6_pcie_ltssm_enable(struct device *dev)
+> +{
+> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> +
+> > +	switch (imx6_pcie->variant) {
+> > +	case IMX6Q:
+> > +	case IMX6SX:
+> > +	case IMX6QP:
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> > +				???IMX6Q_GPR12_PCIE_CTL_2,
+> > +				???IMX6Q_GPR12_PCIE_CTL_2);
+> > +		break;
+> > +	case IMX7D:
+> > +		reset_control_deassert(imx6_pcie->apps_reset);
+> > +		break;
+> > +	}
+> +}
+> +
+> ?static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
+> ?{
+> > ?	struct dw_pcie *pci = imx6_pcie->pci;
+> > ?	struct device *dev = pci->dev;
+> > ?	u32 tmp;
+> @@ -558,15 +576,11 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
+> > ?	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
+> > ?	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
+> > ?	dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
+> ?
+> > ?	/* Start LTSSM. */
+> > -	if (imx6_pcie->variant == IMX7D)
+> > -		reset_control_deassert(imx6_pcie->apps_reset);
+> > -	else
+> > -		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> > -				???IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
+> > +	imx6_pcie_ltssm_enable(dev);
+> ?
+> > ?	ret = imx6_pcie_wait_for_link(imx6_pcie);
+> > ?	if (ret)
+> > ?		goto err_reset_phy;
+> ?
+> @@ -680,10 +694,82 @@ static int imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
+> ?
+> ?static const struct dw_pcie_ops dw_pcie_ops = {
+> > ?	.link_up = imx6_pcie_link_up,
+> ?};
+> ?
+> +#ifdef CONFIG_PM_SLEEP
+> +static void imx6_pcie_ltssm_disable(struct device *dev)
+> +{
+> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> +
+> > +	switch (imx6_pcie->variant) {
+> > +	case IMX6SX:
+> > +	case IMX6QP:
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> > +				???IMX6Q_GPR12_PCIE_CTL_2, 0);
+> > +		break;
+> > +	case IMX7D:
+> > +		reset_control_assert(imx6_pcie->apps_reset);
+> > +		break;
+> > +	default:
+> > +		dev_err(dev, "ltssm_disable not supported\n");
+> > +	}
+> +}
+> +
+> +static void imx6_pcie_clk_disable(struct imx6_pcie *imx6_pcie)
+> +{
+> > +	clk_disable_unprepare(imx6_pcie->pcie);
+> > +	clk_disable_unprepare(imx6_pcie->pcie_phy);
+> > +	clk_disable_unprepare(imx6_pcie->pcie_bus);
+> +
+> > +	if (imx6_pcie->variant == IMX7D) {
+> > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> > +				???IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
+> > +				???IMX7D_GPR12_PCIE_PHY_REFCLK_SEL);
+> > +	}
+> +}
+> +
+> +static int imx6_pcie_suspend_noirq(struct device *dev)
+> +{
+> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> +
+> > +	if (imx6_pcie->variant != IMX7D)
+> > +		return 0;
+> +
+> > +	imx6_pcie_clk_disable(imx6_pcie);
+> > +	imx6_pcie_ltssm_disable(dev);
+> +
+> > +	return 0;
+> +}
+> +
+> +static int imx6_pcie_resume_noirq(struct device *dev)
+> +{
+> > +	int ret;
+> > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> > +	struct pcie_port *pp = &imx6_pcie->pci->pp;
+> +
+> > +	if (imx6_pcie->variant != IMX7D)
+> > +		return 0;
+> +
+> > +	imx6_pcie_assert_core_reset(imx6_pcie);
+> > +	imx6_pcie_init_phy(imx6_pcie);
+> > +	imx6_pcie_deassert_core_reset(imx6_pcie);
+> > +	dw_pcie_setup_rc(pp);
+> +
+> > +	ret = imx6_pcie_establish_link(imx6_pcie);
+> > +	if (ret < 0)
+> > +		dev_info(dev, "pcie link is down after resume.\n");
+> +
+> > +	return 0;
+> +}
+> +#endif
+> +
+> +static const struct dev_pm_ops imx6_pcie_pm_ops = {
+> > +	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(imx6_pcie_suspend_noirq,
+> > +				??????imx6_pcie_resume_noirq)
+> +};
+> +
+> ?static int imx6_pcie_probe(struct platform_device *pdev)
+> ?{
+> > ?	struct device *dev = &pdev->dev;
+> > ?	struct dw_pcie *pci;
+> > ?	struct imx6_pcie *imx6_pcie;
+> @@ -846,10 +932,11 @@ static const struct of_device_id imx6_pcie_of_match[] = {
+> ?static struct platform_driver imx6_pcie_driver = {
+> > ?	.driver = {
+> > > ?		.name	= "imx6q-pcie",
+> > ?		.of_match_table = imx6_pcie_of_match,
+> > ?		.suppress_bind_attrs = true,
+> > +		.pm = &imx6_pcie_pm_ops,
+> > ?	},
+> > ?	.probe????= imx6_pcie_probe,
+> > ?	.shutdown = imx6_pcie_shutdown,
+> ?};
+> ?
