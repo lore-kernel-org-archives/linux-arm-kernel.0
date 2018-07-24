@@ -1,86 +1,58 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 24 Jul 2018 22:42:32 +0800
-Subject: [linux-sunxi] Re: [PATCH 3/3] arm64: allwinner: dts: h6: add
- Wi-Fi support for Pine H64 model A/B
-In-Reply-To: <20180724144151.myyg7slocsfjjsfi@flea>
-References: <20180724011551.49603-1-icenowy@aosc.io>
- <20180724011551.49603-4-icenowy@aosc.io>
- <CAGb2v67zR-Q9n7L6CaFKDUJFHFEC_h8-RYxkdyeyJb_GbNmkJw@mail.gmail.com>
- <CEA43CB7-1DA6-4983-BF18-82C4A48FB92B@aosc.io>
- <CAGb2v64Qae4O430kP30DQNhp0Dt774OHt0nMe35ckp8X=CTFLg@mail.gmail.com>
- <AC678B03-19B7-4110-B333-72188CE71296@aosc.io>
- <CAGb2v656oPmAX=_y88b05xqrona3HFtU-VmNQhHxK_n-4gD+aw@mail.gmail.com>
- <20180724144151.myyg7slocsfjjsfi@flea>
-Message-ID: <198DB486-4789-4777-9596-2BD6FAFFB741@aosc.io>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 24 Jul 2018 15:45:35 +0100
+Subject: [PATCH RT v2] arm64: fpsimd: use a local_lock() in addition to
+ local_bh_disable()
+In-Reply-To: <20180718092448.v6j7wdahtsediqhh@linutronix.de>
+References: <20180522172115.fpqguqlsq6bavtxy@linutronix.de>
+ <20180522132429.6f1dcf92@gandalf.local.home>
+ <20180522173333.aawadhkcekzvrswp@linutronix.de>
+ <20180711092555.268adf7f@gandalf.local.home>
+ <20180711133157.bvrza5vmthu6lwjd@linutronix.de>
+ <20180711093346.782af07a@gandalf.local.home>
+ <20180713174937.5ddaqpylalcmc3jq@linutronix.de>
+ <20180716151737.GO9486@e103592.cambridge.arm.com>
+ <20180718091209.u76gzacanj5avhdl@linutronix.de>
+ <20180718092448.v6j7wdahtsediqhh@linutronix.de>
+Message-ID: <20180724144522.GA4240@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jul 18, 2018 at 11:24:48AM +0200, Sebastian Andrzej Siewior wrote:
+> On 2018-07-18 11:12:10 [+0200], To Dave Martin wrote:
+> > > > -	if (may_use_simd()) {
+> > > > +	if (!IS_ENABLED(CONFIG_PREEMPT_RT_BASE) && may_use_simd()) {
+> > > 
+> > > I suspect this is wrong -- see comments on the commit message.
+> 
+> I'm sorry, I pressed send too early, I was aiming for the draft folder.
+> So yes, based on that EFI that might be interruptible, let me try to
+> look at the initial issue again and maybe I get another idea how to deal
+> with this.
+> One question: If EFI is interruptible that means, we call into EFI - how
+> do we get out? Does EFI enable interrupts and the kernel receives an
+> interrupt and treats this EFI call like a regular context switch?
+
+AFAIK the only safe way to get out permanently is for the call to
+return.  Note, I've not gone through the spec in fine detail myself.
+
+The OS may handle interrupts occurring during the EFI call, but we
+still have to return to EFI afterwards to finish off the call.  From
+the Linux perspective, I think this means that EFI calls are non-
+preemptible.
+
+Under RT, I'm pretty sure that we can't safely resume the interrupted
+EFI call on a different cpu from the one it was interrupted on.  Even
+if it doesn't say this explicitly in the UEFI spec, I think it will be
+assumed in implementations.
 
 
-? 2018?7?24? GMT+08:00 ??10:41:51, Maxime Ripard <maxime.ripard@bootlin.com> ??:
->On Tue, Jul 24, 2018 at 10:37:51AM +0800, Chen-Yu Tsai wrote:
->> On Tue, Jul 24, 2018 at 10:28 AM, Icenowy Zheng <icenowy@aosc.io>
->wrote:
->> >
->> >
->> > ? 2018?7?24? GMT+08:00 ??10:26:02, Chen-Yu Tsai <wens@csie.org> ??:
->> >>On Tue, Jul 24, 2018 at 10:23 AM, Icenowy Zheng <icenowy@aosc.io>
->> >>wrote:
->> >>>
->> >>>
->> >>> ? 2018?7?24? GMT+08:00 ??10:21:59, Chen-Yu Tsai <wens@csie.org>
->??:
->> >>>>On Tue, Jul 24, 2018 at 9:15 AM, Icenowy Zheng <icenowy@aosc.io>
->> >>wrote:
->> >>>>> The Pine H64 model A has a Wi-Fi module connector and the model
->B
->> >>has
->> >>>>an
->> >>>>> on-board RTL8723BS Wi-Fi module.
->> >>>>>
->> >>>>> Add support for them. For model A, as it's not defaultly
->present,
->> >>>>keep
->> >>>>> it disabled now.
->> >>>>
->> >>>>Nope. Pine64 actually has two WiFi/BT modules. And they require
->> >>>>different
->> >>>>device tree snippets for both the WiFi and BT side. This is
->better
->> >>>>resolved
->> >>>>with device tree overlays.
->> >>>>
->> >>>>I have both, though I've yet found time to work on them.
->> >>>
->> >>> I have also both.
->> >>>
->> >>> The skeleton here can get the Wi-Fi of both to work.
->> >>
->> >>Cool. Then I can put away my RTL module for now. :)
->> >
->> > P.S. SDIO is auto detectable, and for BCM chips, the OOB interrupt
->> > is only a bonus function and it can fall back to standard in-band
->> > interrupt (which doesn't need special binding, and is currently
->> > used by mainline r8723bs driver.)
->> 
->> Correct. With BT you'll have serdev device nodes with different
->> compatibles. Then you'll have to resort to overlays, and you'd
->probably
->> end up adding WiFi OOB interrupt bits as well.
->> 
->> So the question remaining is: should we enable the MMC part, along
->> with power sequencing and regulator supplies, by default? Thinking
->> more about it, I'm actually OK with it. The board connectors are
->> clearly marked as being for a WiFi+BT module. The whole space on
->> the board is surrounded by a box in silkscreen. Sorry for the
->> initial nack.
->> 
->> Maxime, any thoughts?
->
->If there's a need for an overlay anyway, there's no real reason to
->enable it by default, especially if not everything is there.
+Certain EFI calls are not long-running and may need to be called from
+interrupt context in Linux, which means that there may be live kernel-
+mode NEON state.  This is why there are separate FPSIMD/SVE percpu stash
+buffers for EFI specifically.
 
-Everything is there, for model B support.
+Does this make sense?  It's is probably not very clear, but I'm trying
+to hide the fact that I haven't looked at the UEFI spec for ages...
 
->
->Maxime
+Cheers
+---Dave
