@@ -1,50 +1,128 @@
-From: thor.thayer@linux.intel.com (Thor Thayer)
-Date: Tue, 24 Jul 2018 17:25:22 -0500
-Subject: [PATCH 1/3] Docs: dt: arm-smmu: Add optional clock parameter
-In-Reply-To: <20180720161507.GA24992@rob-hp-laptop>
-References: <1531499278-32132-1-git-send-email-thor.thayer@linux.intel.com>
- <1531499278-32132-2-git-send-email-thor.thayer@linux.intel.com>
- <20180720161507.GA24992@rob-hp-laptop>
-Message-ID: <7a8041ff-ce54-6640-9c9b-d018b0534ff8@linux.intel.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 24 Jul 2018 23:25:14 +0100
+Subject: [PATCH v3 4/6] iommu/io-pgtable-arm: add support for non-strict
+ mode
+In-Reply-To: <1531376312-2192-5-git-send-email-thunder.leizhen@huawei.com>
+References: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
+ <1531376312-2192-5-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <89cc2201-99ab-3f3b-a2d1-1766515d4375@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On 07/20/2018 11:15 AM, Rob Herring wrote:
-> On Fri, Jul 13, 2018 at 11:27:56AM -0500, thor.thayer at linux.intel.com wrote:
->> From: Thor Thayer <thor.thayer@linux.intel.com>
->>
->> Add a clock to the SMMU node bindings.
->>
->> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
->> ---
->>   Documentation/devicetree/bindings/iommu/arm,smmu.txt | 16 ++++++++++++++++
->>   1 file changed, 16 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> index 8a6ffce12af5..356fd9f41e1b 100644
->> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->> @@ -71,6 +71,8 @@ conditions.
->>                     or using stream matching with #iommu-cells = <2>, and
->>                     may be ignored if present in such cases.
->>   
->> +- clock:          clock provider specifier
->> +
+On 2018-07-12 7:18 AM, Zhen Lei wrote:
+> To support the non-strict mode, now we only tlbi and sync for the strict
+> mode. But for the non-leaf case, always follow strict mode.
 > 
-> The TRM says there is a TCU clock and clock per TBU.
+> Use the lowest bit of the iova parameter to pass the strict mode:
+> 0, IOMMU_STRICT;
+> 1, IOMMU_NON_STRICT;
+> Treat 0 as IOMMU_STRICT, so that the unmap operation can compatible with
+> other IOMMUs which still use strict mode.
 > 
-> Rob
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>   drivers/iommu/io-pgtable-arm.c | 23 ++++++++++++++---------
+>   1 file changed, 14 insertions(+), 9 deletions(-)
 > 
-Yes, good point. I'm abandoning this review and will use the bulk clock 
-suggested in [1].
+> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+> index 010a254..9234db3 100644
+> --- a/drivers/iommu/io-pgtable-arm.c
+> +++ b/drivers/iommu/io-pgtable-arm.c
+> @@ -292,7 +292,7 @@ static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
+>   
+>   static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+>   			       unsigned long iova, size_t size, int lvl,
+> -			       arm_lpae_iopte *ptep);
+> +			       arm_lpae_iopte *ptep, int strict);
+>   
+>   static void __arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
+>   				phys_addr_t paddr, arm_lpae_iopte prot,
+> @@ -334,7 +334,7 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
+>   		size_t sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
+>   
+>   		tblp = ptep - ARM_LPAE_LVL_IDX(iova, lvl, data);
+> -		if (WARN_ON(__arm_lpae_unmap(data, iova, sz, lvl, tblp) != sz))
+> +		if (WARN_ON(__arm_lpae_unmap(data, iova, sz, lvl, tblp, IOMMU_STRICT) != sz))
+>   			return -EINVAL;
+>   	}
+>   
+> @@ -531,7 +531,7 @@ static void arm_lpae_free_pgtable(struct io_pgtable *iop)
+>   static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
+>   				       unsigned long iova, size_t size,
+>   				       arm_lpae_iopte blk_pte, int lvl,
+> -				       arm_lpae_iopte *ptep)
+> +				       arm_lpae_iopte *ptep, int strict)
 
-In our case, the TCU clock is always on and we have 1 clock for the
-TBU masters.
+DMA code should never ever be splitting blocks anyway, and frankly the 
+TLB maintenance here is dodgy enough (since we can't reasonably do 
+break-before make as VMSA says we should) that I *really* don't want to 
+introduce any possibility of making it more asynchronous. I'd much 
+rather just hard-code the expectation of strict == true for this.
 
-Thanks for reviewing!
+Robin.
 
-Thor
-
-[1] https://patchwork.kernel.org/patch/10534089/
+>   {
+>   	struct io_pgtable_cfg *cfg = &data->iop.cfg;
+>   	arm_lpae_iopte pte, *tablep;
+> @@ -576,15 +576,18 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
+>   	}
+>   
+>   	if (unmap_idx < 0)
+> -		return __arm_lpae_unmap(data, iova, size, lvl, tablep);
+> +		return __arm_lpae_unmap(data, iova, size, lvl, tablep, strict);
+>   
+>   	io_pgtable_tlb_add_flush(&data->iop, iova, size, size, true);
+> +	if (!strict)
+> +		io_pgtable_tlb_sync(&data->iop);
+> +
+>   	return size;
+>   }
+>   
+>   static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+>   			       unsigned long iova, size_t size, int lvl,
+> -			       arm_lpae_iopte *ptep)
+> +			       arm_lpae_iopte *ptep, int strict)
+>   {
+>   	arm_lpae_iopte pte;
+>   	struct io_pgtable *iop = &data->iop;
+> @@ -609,7 +612,7 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+>   			io_pgtable_tlb_sync(iop);
+>   			ptep = iopte_deref(pte, data);
+>   			__arm_lpae_free_pgtable(data, lvl + 1, ptep);
+> -		} else {
+> +		} else if (strict) {
+>   			io_pgtable_tlb_add_flush(iop, iova, size, size, true);
+>   		}
+>   
+> @@ -620,25 +623,27 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+>   		 * minus the part we want to unmap
+>   		 */
+>   		return arm_lpae_split_blk_unmap(data, iova, size, pte,
+> -						lvl + 1, ptep);
+> +						lvl + 1, ptep, strict);
+>   	}
+>   
+>   	/* Keep on walkin' */
+>   	ptep = iopte_deref(pte, data);
+> -	return __arm_lpae_unmap(data, iova, size, lvl + 1, ptep);
+> +	return __arm_lpae_unmap(data, iova, size, lvl + 1, ptep, strict);
+>   }
+>   
+>   static size_t arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
+>   			     size_t size)
+>   {
+> +	int strict = ((iova & IOMMU_STRICT_MODE_MASK) == IOMMU_STRICT);
+>   	struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
+>   	arm_lpae_iopte *ptep = data->pgd;
+>   	int lvl = ARM_LPAE_START_LVL(data);
+>   
+> +	iova &= ~IOMMU_STRICT_MODE_MASK;
+>   	if (WARN_ON(iova >= (1ULL << data->iop.cfg.ias)))
+>   		return 0;
+>   
+> -	return __arm_lpae_unmap(data, iova, size, lvl, ptep);
+> +	return __arm_lpae_unmap(data, iova, size, lvl, ptep, strict);
+>   }
+>   
+>   static phys_addr_t arm_lpae_iova_to_phys(struct io_pgtable_ops *ops,
+> 
