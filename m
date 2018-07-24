@@ -1,109 +1,110 @@
 From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue, 24 Jul 2018 14:22:48 +0930
-Subject: [PATCH 2/3] ARM: config: multi_v5: Refresh configuration
-In-Reply-To: <20180718135302.4927-3-joel@jms.id.au>
+Date: Tue, 24 Jul 2018 14:26:41 +0930
+Subject: [PATCH 3/3] ARM: config: multi_v5: Enable ASPEED drivers
+In-Reply-To: <20180718135302.4927-4-joel@jms.id.au>
 References: <20180718135302.4927-1-joel@jms.id.au>
- <20180718135302.4927-3-joel@jms.id.au>
-Message-ID: <1532407968.2609927.1450746232.17F91A54@webmail.messagingengine.com>
+ <20180718135302.4927-4-joel@jms.id.au>
+Message-ID: <1532408201.2611907.1450747808.5F518C30@webmail.messagingengine.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
+
 On Wed, 18 Jul 2018, at 23:23, Joel Stanley wrote:
-> This is the result of a make mutli_v5_defconfig && make savedefconfig.
-
-Typo: s/mutli/multi/
-
-Otherwise,
-
-Acked-by: Andrew Jeffery <andrew@aj.id.au>
-
+> This enables the devices used in the AST2400 family of BMC SoCs:
+> 
+>  - VUART
+>  - SPI NOR
+>  - LPC controller
+>  - LPC snoop (port 80)
+>  - Ethernet
+>  - GPIO
+>  - ADC
+>  - I2C
+>  - Random number generator
+>  - IPMI KCS
+>  - IPMI BT
+>  - Fan/Tach
 > 
 > Signed-off-by: Joel Stanley <joel@jms.id.au>
 > ---
->  arch/arm/configs/multi_v5_defconfig | 16 +++++-----------
->  1 file changed, 5 insertions(+), 11 deletions(-)
+>  arch/arm/configs/multi_v5_defconfig | 14 +++++++++++++-
+>  1 file changed, 13 insertions(+), 1 deletion(-)
 > 
 > diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/
 > multi_v5_defconfig
-> index 7c41bee28463..b647e249908e 100644
+> index b647e249908e..318b76fa26d1 100644
 > --- a/arch/arm/configs/multi_v5_defconfig
 > +++ b/arch/arm/configs/multi_v5_defconfig
-> @@ -1,5 +1,4 @@
->  CONFIG_SYSVIPC=y
-> -CONFIG_FHANDLE=y
->  CONFIG_NO_HZ=y
->  CONFIG_HIGH_RES_TIMERS=y
->  CONFIG_LOG_BUF_SHIFT=19
-> @@ -11,12 +10,10 @@ CONFIG_KPROBES=y
->  CONFIG_MODULES=y
->  CONFIG_MODULE_UNLOAD=y
->  # CONFIG_ARCH_MULTI_V7 is not set
-> -CONFIG_ARCH_MVEBU=y
-> -CONFIG_MACH_KIRKWOOD=y
-> -CONFIG_ARCH_AT91=y
-> -CONFIG_SOC_AT91SAM9=y
->  CONFIG_ARCH_ASPEED=y
->  CONFIG_MACH_ASPEED_G4=y
-> +CONFIG_ARCH_AT91=y
-> +CONFIG_SOC_AT91SAM9=y
->  CONFIG_ARCH_MXC=y
->  CONFIG_MACH_MX21ADS=y
->  CONFIG_MACH_MX27ADS=y
-> @@ -25,6 +22,8 @@ CONFIG_MACH_IMX27_VISSTRIM_M10=y
->  CONFIG_MACH_PCA100=y
->  CONFIG_MACH_IMX27_DT=y
->  CONFIG_SOC_IMX25=y
-> +CONFIG_ARCH_MVEBU=y
-> +CONFIG_MACH_KIRKWOOD=y
->  CONFIG_ARCH_ORION5X=y
->  CONFIG_MACH_DB88F5281=y
->  CONFIG_MACH_RD88F5182=y
-> @@ -34,7 +33,6 @@ CONFIG_MACH_DNS323=y
->  CONFIG_MACH_TS209=y
->  CONFIG_MACH_TERASTATION_PRO2=y
->  CONFIG_MACH_LINKSTATION_PRO=y
-> -CONFIG_MACH_LINKSTATION_LSCHL=y
->  CONFIG_MACH_LINKSTATION_MINI=y
->  CONFIG_MACH_LINKSTATION_LS_HGL=y
->  CONFIG_MACH_TS409=y
-> @@ -71,7 +69,6 @@ CONFIG_IP_PNP=y
->  CONFIG_IP_PNP_DHCP=y
->  CONFIG_IP_PNP_BOOTP=y
->  CONFIG_NET_DSA=y
-> -CONFIG_NET_SWITCHDEV=y
->  CONFIG_NET_PKTGEN=m
->  CONFIG_CFG80211=y
->  CONFIG_MAC80211=y
-> @@ -112,8 +109,8 @@ CONFIG_MACB=y
+> @@ -90,10 +90,14 @@ CONFIG_MTD_PHYSMAP=y
+>  CONFIG_MTD_NAND=y
+>  CONFIG_MTD_NAND_ATMEL=y
+>  CONFIG_MTD_NAND_ORION=y
+> +CONFIG_MTD_SPI_NOR=y
+> +CONFIG_SPI_ASPEED_SMC=y
+>  CONFIG_MTD_UBI=y
+>  CONFIG_BLK_DEV_LOOP=y
+>  CONFIG_ATMEL_TCLIB=y
+>  CONFIG_ATMEL_SSC=m
+> +CONFIG_ASPEED_LPC_CTRL=m
+> +CONFIG_ASPEED_LPC_SNOOP=m
+
+Any reason that you switch between module and built-in throughout? It's not clear from the commit message.
+
+>  CONFIG_EEPROM_AT24=y
+>  # CONFIG_SCSI_PROC_FS is not set
+>  CONFIG_BLK_DEV_SD=y
+> @@ -107,6 +111,7 @@ CONFIG_NET_DSA_MV88E6060=y
+>  CONFIG_NET_DSA_MV88E6XXX=y
+>  CONFIG_MACB=y
 >  CONFIG_DM9000=y
+> +CONFIG_FTGMAC100=m
 >  CONFIG_MV643XX_ETH=y
 >  CONFIG_R8169=y
-> -CONFIG_MARVELL_PHY=y
 >  CONFIG_DAVICOM_PHY=y
-> +CONFIG_MARVELL_PHY=y
->  CONFIG_MICREL_PHY=y
->  CONFIG_LIBERTAS=y
->  CONFIG_LIBERTAS_SDIO=y
-> @@ -125,7 +122,6 @@ CONFIG_KEYBOARD_GPIO=y
->  CONFIG_INPUT_TOUCHSCREEN=y
->  CONFIG_TOUCHSCREEN_ADS7846=m
->  CONFIG_LEGACY_PTY_COUNT=16
-> -# CONFIG_DEVKMEM is not set
->  CONFIG_SERIAL_8250=y
->  CONFIG_SERIAL_8250_CONSOLE=y
->  CONFIG_SERIAL_8250_NR_UARTS=6
-> @@ -172,11 +168,9 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
->  CONFIG_V4L_PLATFORM_DRIVERS=y
->  CONFIG_SOC_CAMERA=y
->  CONFIG_VIDEO_ATMEL_ISI=m
-> -CONFIG_SOC_CAMERA_OV2640=m
->  CONFIG_DRM=y
->  CONFIG_DRM_ATMEL_HLCDC=m
->  CONFIG_DRM_PANEL_SIMPLE=y
-> -CONFIG_FB=y
->  CONFIG_FB_IMX=y
->  CONFIG_FB_ATMEL=y
->  CONFIG_BACKLIGHT_ATMEL_LCDC=y
+> @@ -128,16 +133,20 @@ CONFIG_SERIAL_8250_NR_UARTS=6
+>  CONFIG_SERIAL_8250_RUNTIME_UARTS=6
+>  CONFIG_SERIAL_8250_EXTENDED=y
+>  CONFIG_SERIAL_8250_MANY_PORTS=y
+> +CONFIG_SERIAL_8250_ASPEED_VUART=m
+>  CONFIG_SERIAL_OF_PLATFORM=y
+>  CONFIG_SERIAL_ATMEL=y
+>  CONFIG_SERIAL_ATMEL_CONSOLE=y
+>  CONFIG_SERIAL_ATMEL_TTYAT=y
+>  CONFIG_SERIAL_IMX=y
+>  CONFIG_SERIAL_IMX_CONSOLE=y
+> +CONFIG_ASPEED_KCS_IPMI_BMC=m
+> +CONFIG_ASPEED_BT_IPMI_BMC=m
+>  CONFIG_HW_RANDOM=y
+> -CONFIG_I2C=y
+> +CONFIG_HW_RANDOM_TIMERIOMEM=m
+>  # CONFIG_I2C_COMPAT is not set
+>  CONFIG_I2C_CHARDEV=y
+> +CONFIG_I2C_ASPEED=m
+>  CONFIG_I2C_AT91=y
+>  CONFIG_I2C_IMX=y
+>  CONFIG_I2C_MV64XXX=y
+> @@ -146,10 +155,12 @@ CONFIG_SPI=y
+>  CONFIG_SPI_ATMEL=y
+>  CONFIG_SPI_IMX=y
+>  CONFIG_SPI_ORION=y
+> +CONFIG_GPIO_ASPEED=m
+>  CONFIG_POWER_RESET=y
+>  CONFIG_POWER_RESET_GPIO=y
+>  CONFIG_POWER_RESET_QNAP=y
+>  CONFIG_SENSORS_ADT7475=y
+> +CONFIG_SENSORS_ASPEED=y
+>  CONFIG_SENSORS_G762=y
+>  CONFIG_SENSORS_LM63=y
+>  CONFIG_SENSORS_LM75=y
+> @@ -240,6 +251,7 @@ CONFIG_MV_XOR=y
+>  CONFIG_STAGING=y
+>  CONFIG_FB_XGI=y
+>  CONFIG_IIO=m
+> +CONFIG_ASPEED_ADC=m
+>  CONFIG_AT91_ADC=m
+>  CONFIG_PWM=y
+>  CONFIG_PWM_ATMEL=m
 > -- 
 > 2.17.1
 > 
