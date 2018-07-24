@@ -1,80 +1,35 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 24 Jul 2018 14:28:34 +0200
-Subject: [PATCH v2 3/3] PCI: imx: Initial imx7d pm support
-In-Reply-To: <24ba42f6028a90836c73317af1f9e9be2d27ba03.camel@nxp.com>
-References: <cover.1532090446.git.leonard.crestez@nxp.com>
- <e42a6bb8ff0ddd6eaa31fe381875425a3730a73f.1532090446.git.leonard.crestez@nxp.com>
- <1532338685.3163.93.camel@pengutronix.de>
- <e8be199b2d5559001a93abb52ba46c283e4454a9.camel@nxp.com>
- <1532426953.32306.5.camel@pengutronix.de>
- <24ba42f6028a90836c73317af1f9e9be2d27ba03.camel@nxp.com>
-Message-ID: <1532435314.32306.7.camel@pengutronix.de>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 24 Jul 2018 14:35:07 +0200
+Subject: [PATCH] drm/sun4i: Use (struct drm_format_info) fields to
+ determine if a format is yuv and multi planar or not.
+In-Reply-To: <1532336220-3791-1-git-send-email-ayan.halder@arm.com>
+References: <1532336220-3791-1-git-send-email-ayan.halder@arm.com>
+Message-ID: <20180724123507.rqnq4dkjjvk24w4t@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 24.07.2018, 12:04 +0000 schrieb Leonard Crestez:
-> On Tue, 2018-07-24 at 12:09 +0200, Lucas Stach wrote:
-> > Am Montag, den 23.07.2018, 12:37 +0000 schrieb Leonard Crestez:
-> > > On Mon, 2018-07-23 at 11:38 +0200, Lucas Stach wrote:
-> > > > Am Freitag, den 20.07.2018, 15:47 +0300 schrieb Leonard Crestez:
-> > > > > On imx7d the pcie-phy power domain is turned off in suspend and this can
-> > > > > make the system hang after resume when attempting any read from PCI.
-> > > > > 
-> > > > > Fix this by adding minimal suspend/resume code from the nxp internal
-> > > > > tree. This will prepare for powering down on suspend and reset the block
-> > > > > on resume.
-> > > > > 
-> > > > > Code is only for imx7d but a very similar sequence can be used for
-> > > > > other socs.
-> > > > > 
-> > > > > +static void imx6_pcie_ltssm_disable(struct device *dev)
-> > > > > +{
-> > > > > > > > > > +	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-> > > > > +
-> > > > > > > > > > +	switch (imx6_pcie->variant) {
-> > > > > > > > > > +	case IMX6Q:
-> > > > > > > > > > +	case IMX6SX:
-> > > > > > > > > > +	case IMX6QP:
-> > > > > > > > > > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-> > > > > +				???IMX6Q_GPR12_PCIE_CTL_2, 0);
-> > > > 
-> > > > Has this been tested on i.MX6? LTSSM disable requires a more complex
-> > > > sequence on this SoC to avoid hanging the system. See commit
-> > > > 3e3e406e3807 "PCI: imx6: Put LTSSM in "Detect" state before disabling
-> > > > it".
-> > > 
-> > > This patch only enables suspend/resume for imx7d with other SOCs to
-> > > follow later. The ltssm_disable function is just symmetric with
-> > > ltssm_enable.
-> > > 
-> > > The 6Q parts are affected by errata "ERR005723 PCIe: PCIe does not
-> > > support L2 power down [i.MX 6Dual/6Quad Only]".
-> > > 
-> > > This design error seems to have the same root cause as your problem (no
-> > > dedicated reset control) so this works out quite nicely: the solution
-> > > is to never power down pci on affected chips.
-> > 
-> > I don't quite like code that looks like it is doing the right thing,
-> > but then doesn't. Can we at least emit a warning that there might be
-> > dragons if anyone tries to call this on i.MX6?
+On Mon, Jul 23, 2018 at 09:57:00AM +0100, Ayan Kumar Halder wrote:
+> We do not need sun4i_backend_format_is_packed_yuv422() /
+> sun4i_backend_format_is_planar_yuv() to determine if the format is yuv multi planar
+> or not. (struct drm_format_info *)->is_yuv tells if the format is yuv or not.
+> And (struct drm_format_info *)->num_planes denotes the number of planes.
 > 
-> But the function will indeed toggle the right bits to initiate ltssm
-> disabling. If this is not useful or can't be used right then it's the
-> caller's problem :)
+> This issue was identified during a review on a previous patch:-
+> https://lists.freedesktop.org/archives/dri-devel/2018-July/183840.html
+> 
+> Signed-off-by: Ayan Kumar halder <ayan.halder@arm.com>
 
-I don't agree with that. I would expect a function that is called
-ltssm_disable to do so in a way that is safe on the hardware that it
-claims to handle, which in case of i.MX6 means bashing the LTSSM into
-detect state before toggling the GPR bit.
+Applied, thanks!
+Maxime
 
-> I can add a default: clause to the switch which returns -ENOSYS and let
-> IMX6Q fall that way, would that be OK? This would also help when adding
-> new variants.
-
-Yes, given that there is currently no way to test this on i.MX6,
-returning -ENOSYS sound much better. This at least tells anyone who
-intends to use this function that there is indeed missing functionality
-there.
-
-Regards,
-Lucas
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/4e7a4103/attachment-0001.sig>
