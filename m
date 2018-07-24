@@ -1,36 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Jul 2018 15:57:55 +0100
-Subject: [PATCH v9 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <CAD=FV=VmfqWRGRMEn+0dzZ8x4R5vVaHbkthXAN91Lm-XmP9Gqg@mail.gmail.com>
-References: <cover.1531531808.git.collinsd@codeaurora.org>
- <56b9d5c38cfe46da1228c54f001a49773c3e31dc.1531531808.git.collinsd@codeaurora.org>
- <CAD=FV=VmfqWRGRMEn+0dzZ8x4R5vVaHbkthXAN91Lm-XmP9Gqg@mail.gmail.com>
-Message-ID: <20180724145755.GF13268@sirena.org.uk>
+From: pn@denx.de (Parthiban Nallathambi)
+Date: Tue, 24 Jul 2018 17:02:19 +0200
+Subject: [PATCH 3/3] arm64: dts: actions: Add sirq node for Actions Semi S700
+In-Reply-To: <20180724150219.1807724-1-pn@denx.de>
+References: <20180724150219.1807724-1-pn@denx.de>
+Message-ID: <20180724150219.1807724-4-pn@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 01:09:05PM -0700, Doug Anderson wrote:
+Add sirq node for Actions Semi S700 SoC with 3 SIRQ pins support,
+in which external interrupt controllers can be connected.
 
-> I know you are still looking for time to review the RPMh-regulator
-> driver and that's fine.  One idea I had though: if the bindings look
-> OK to you and are less controversial, is there any chance they could
-> land in the meantime?
+Example:
+atc260x: atc2603c at 65 {
+	interrupt-parent = <&sirq>;
+	interrupts = <2 IRQ_TYPE_LEVEL_HIGH>;
+};
 
-This appears to have a bunch of dependencies which I've got no idea
-what's going on with the merging of and no idea if they'll affect the
-bindings or anything, nobody's said anything and last I looked it was
-unclear what was going on.  I'm kind of hoping that things might have
-sorted themselves out of the merge window.
+Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+---
+ arch/arm64/boot/dts/actions/s700.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Some of the decisions in the code have flowed out into the bindings
-before so I'm not keen to merge the bindings separately, and if the
-driver for the thing used to communicate with the device is still in
-review then that's definitely a red flag.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/df661b4c/attachment-0001.sig>
+diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
+index 66dd5309f0a2..6f16eb081579 100644
+--- a/arch/arm64/boot/dts/actions/s700.dtsi
++++ b/arch/arm64/boot/dts/actions/s700.dtsi
+@@ -153,6 +153,17 @@
+ 			status = "disabled";
+ 		};
+ 
++		sirq: interrupt-controller at e01b0000 {
++			compatible = "actions,s700-sirq";
++			reg = <0 0xe01b0000 0 0x1000>;
++			interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			sampling-rate-24m = <0 0 0>;
++		};
++
+ 		sps: power-controller at e01b0100 {
+ 			compatible = "actions,s700-sps";
+ 			reg = <0x0 0xe01b0100 0x0 0x100>;
+-- 
+2.14.4
