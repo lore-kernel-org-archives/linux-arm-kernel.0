@@ -1,25 +1,53 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 24 Jul 2018 14:35:07 +0200
-Subject: [PATCH] drm/sun4i: Use (struct drm_format_info) fields to
- determine if a format is yuv and multi planar or not.
-In-Reply-To: <1532336220-3791-1-git-send-email-ayan.halder@arm.com>
-References: <1532336220-3791-1-git-send-email-ayan.halder@arm.com>
-Message-ID: <20180724123507.rqnq4dkjjvk24w4t@flea>
+Date: Tue, 24 Jul 2018 14:37:41 +0200
+Subject: [PATCH v2 00/18] Allwinner R40 HDMI refactoring
+In-Reply-To: <2309112.TTVI9Fv1ar@jernej-laptop>
+References: <20180710203511.18454-1-jernej.skrabec@siol.net>
+ <20180711083036.7attjq4hm5ay5gmn@flea>
+ <2309112.TTVI9Fv1ar@jernej-laptop>
+Message-ID: <20180724123741.bbkjgy2uwmzsj45k@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 09:57:00AM +0100, Ayan Kumar Halder wrote:
-> We do not need sun4i_backend_format_is_packed_yuv422() /
-> sun4i_backend_format_is_planar_yuv() to determine if the format is yuv multi planar
-> or not. (struct drm_format_info *)->is_yuv tells if the format is yuv or not.
-> And (struct drm_format_info *)->num_planes denotes the number of planes.
+On Sun, Jul 22, 2018 at 04:43:56PM +0200, Jernej ?krabec wrote:
+> Hi Maxime,
 > 
-> This issue was identified during a review on a previous patch:-
-> https://lists.freedesktop.org/archives/dri-devel/2018-July/183840.html
+> Dne sreda, 11. julij 2018 ob 10:30:36 CEST je Maxime Ripard napisal(a):
+> > On Tue, Jul 10, 2018 at 10:34:53PM +0200, Jernej Skrabec wrote:
+> > > This series fixes several issues found in R40 HDMI patch series after
+> > > it was applied. Conversation can be found here:
+> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/586011.htm
+> > > l
+> > > 
+> > > Patches are based on latest linux-next (next-20180710) and are ordered
+> > > in such way that they don't break R40 HDMI at any time. Because of that
+> > > I suggest that whole series goes through drm-misc to preserve that order.
+> > > 
+> > > I also tested those patches on H3 to make sure it doesn't break other
+> > > platforms. However, it would be nice to test for regressions also on
+> > > older SoCs (with DE1).
+> > > 
+> > > Best regards,
+> > > Jernej
+> > 
+> > Applied all patches but the patch 10, thanks!
+> > Maxime
 > 
-> Signed-off-by: Ayan Kumar halder <ayan.halder@arm.com>
+> It seems that you forgot to merge some patches:
+> 
+> [PATCH v2 12/18] drm/sun4i: tcon: Add another way for matching mixers with 
+> tcon
+> [PATCH v2 13/18] drm/sun4i: tcon: Add support for R40 TCON
+> 
+> Without them, R40 display pipeline can't work.
+> 
+> Maybe they are in your spam folder?
 
-Applied, thanks!
+Thanks for telling me, I'm not quite sure what happened.
+
+I've applied them.
+
+Sorry,
 Maxime
 
 -- 
@@ -32,4 +60,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/4e7a4103/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180724/a475a106/attachment.sig>
