@@ -1,110 +1,64 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue, 24 Jul 2018 14:26:41 +0930
+From: joel@jms.id.au (Joel Stanley)
+Date: Tue, 24 Jul 2018 14:29:52 +0930
 Subject: [PATCH 3/3] ARM: config: multi_v5: Enable ASPEED drivers
-In-Reply-To: <20180718135302.4927-4-joel@jms.id.au>
+In-Reply-To: <1532408201.2611907.1450747808.5F518C30@webmail.messagingengine.com>
 References: <20180718135302.4927-1-joel@jms.id.au>
  <20180718135302.4927-4-joel@jms.id.au>
-Message-ID: <1532408201.2611907.1450747808.5F518C30@webmail.messagingengine.com>
+ <1532408201.2611907.1450747808.5F518C30@webmail.messagingengine.com>
+Message-ID: <CACPK8Xd0ViuVAHgD4Nem5e_th0pf=4hmC=3d0XbLRGGzcDTMDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 24 July 2018 at 14:26, Andrew Jeffery <andrew@aj.id.au> wrote:
+>
+>
+> On Wed, 18 Jul 2018, at 23:23, Joel Stanley wrote:
+>> This enables the devices used in the AST2400 family of BMC SoCs:
+>>
+>>  - VUART
+>>  - SPI NOR
+>>  - LPC controller
+>>  - LPC snoop (port 80)
+>>  - Ethernet
+>>  - GPIO
+>>  - ADC
+>>  - I2C
+>>  - Random number generator
+>>  - IPMI KCS
+>>  - IPMI BT
+>>  - Fan/Tach
+>>
+>> Signed-off-by: Joel Stanley <joel@jms.id.au>
+>> ---
+>>  arch/arm/configs/multi_v5_defconfig | 14 +++++++++++++-
+>>  1 file changed, 13 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/
+>> multi_v5_defconfig
+>> index b647e249908e..318b76fa26d1 100644
+>> --- a/arch/arm/configs/multi_v5_defconfig
+>> +++ b/arch/arm/configs/multi_v5_defconfig
+>> @@ -90,10 +90,14 @@ CONFIG_MTD_PHYSMAP=y
+>>  CONFIG_MTD_NAND=y
+>>  CONFIG_MTD_NAND_ATMEL=y
+>>  CONFIG_MTD_NAND_ORION=y
+>> +CONFIG_MTD_SPI_NOR=y
+>> +CONFIG_SPI_ASPEED_SMC=y
+>>  CONFIG_MTD_UBI=y
+>>  CONFIG_BLK_DEV_LOOP=y
+>>  CONFIG_ATMEL_TCLIB=y
+>>  CONFIG_ATMEL_SSC=m
+>> +CONFIG_ASPEED_LPC_CTRL=m
+>> +CONFIG_ASPEED_LPC_SNOOP=m
+>
+> Any reason that you switch between module and built-in throughout? It's not clear from the commit message.
 
+I tried to follow what the existing config did. Some things are
+modules, but some subsystems aren't.
 
-On Wed, 18 Jul 2018, at 23:23, Joel Stanley wrote:
-> This enables the devices used in the AST2400 family of BMC SoCs:
-> 
->  - VUART
->  - SPI NOR
->  - LPC controller
->  - LPC snoop (port 80)
->  - Ethernet
->  - GPIO
->  - ADC
->  - I2C
->  - Random number generator
->  - IPMI KCS
->  - IPMI BT
->  - Fan/Tach
-> 
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
-> ---
->  arch/arm/configs/multi_v5_defconfig | 14 +++++++++++++-
->  1 file changed, 13 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/
-> multi_v5_defconfig
-> index b647e249908e..318b76fa26d1 100644
-> --- a/arch/arm/configs/multi_v5_defconfig
-> +++ b/arch/arm/configs/multi_v5_defconfig
-> @@ -90,10 +90,14 @@ CONFIG_MTD_PHYSMAP=y
->  CONFIG_MTD_NAND=y
->  CONFIG_MTD_NAND_ATMEL=y
->  CONFIG_MTD_NAND_ORION=y
-> +CONFIG_MTD_SPI_NOR=y
-> +CONFIG_SPI_ASPEED_SMC=y
->  CONFIG_MTD_UBI=y
->  CONFIG_BLK_DEV_LOOP=y
->  CONFIG_ATMEL_TCLIB=y
->  CONFIG_ATMEL_SSC=m
-> +CONFIG_ASPEED_LPC_CTRL=m
-> +CONFIG_ASPEED_LPC_SNOOP=m
+I figured there's no harm in getting some build coverage of our
+drivers being modules.
 
-Any reason that you switch between module and built-in throughout? It's not clear from the commit message.
+Cheers,
 
->  CONFIG_EEPROM_AT24=y
->  # CONFIG_SCSI_PROC_FS is not set
->  CONFIG_BLK_DEV_SD=y
-> @@ -107,6 +111,7 @@ CONFIG_NET_DSA_MV88E6060=y
->  CONFIG_NET_DSA_MV88E6XXX=y
->  CONFIG_MACB=y
->  CONFIG_DM9000=y
-> +CONFIG_FTGMAC100=m
->  CONFIG_MV643XX_ETH=y
->  CONFIG_R8169=y
->  CONFIG_DAVICOM_PHY=y
-> @@ -128,16 +133,20 @@ CONFIG_SERIAL_8250_NR_UARTS=6
->  CONFIG_SERIAL_8250_RUNTIME_UARTS=6
->  CONFIG_SERIAL_8250_EXTENDED=y
->  CONFIG_SERIAL_8250_MANY_PORTS=y
-> +CONFIG_SERIAL_8250_ASPEED_VUART=m
->  CONFIG_SERIAL_OF_PLATFORM=y
->  CONFIG_SERIAL_ATMEL=y
->  CONFIG_SERIAL_ATMEL_CONSOLE=y
->  CONFIG_SERIAL_ATMEL_TTYAT=y
->  CONFIG_SERIAL_IMX=y
->  CONFIG_SERIAL_IMX_CONSOLE=y
-> +CONFIG_ASPEED_KCS_IPMI_BMC=m
-> +CONFIG_ASPEED_BT_IPMI_BMC=m
->  CONFIG_HW_RANDOM=y
-> -CONFIG_I2C=y
-> +CONFIG_HW_RANDOM_TIMERIOMEM=m
->  # CONFIG_I2C_COMPAT is not set
->  CONFIG_I2C_CHARDEV=y
-> +CONFIG_I2C_ASPEED=m
->  CONFIG_I2C_AT91=y
->  CONFIG_I2C_IMX=y
->  CONFIG_I2C_MV64XXX=y
-> @@ -146,10 +155,12 @@ CONFIG_SPI=y
->  CONFIG_SPI_ATMEL=y
->  CONFIG_SPI_IMX=y
->  CONFIG_SPI_ORION=y
-> +CONFIG_GPIO_ASPEED=m
->  CONFIG_POWER_RESET=y
->  CONFIG_POWER_RESET_GPIO=y
->  CONFIG_POWER_RESET_QNAP=y
->  CONFIG_SENSORS_ADT7475=y
-> +CONFIG_SENSORS_ASPEED=y
->  CONFIG_SENSORS_G762=y
->  CONFIG_SENSORS_LM63=y
->  CONFIG_SENSORS_LM75=y
-> @@ -240,6 +251,7 @@ CONFIG_MV_XOR=y
->  CONFIG_STAGING=y
->  CONFIG_FB_XGI=y
->  CONFIG_IIO=m
-> +CONFIG_ASPEED_ADC=m
->  CONFIG_AT91_ADC=m
->  CONFIG_PWM=y
->  CONFIG_PWM_ATMEL=m
-> -- 
-> 2.17.1
-> 
+Joel
