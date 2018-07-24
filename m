@@ -1,140 +1,91 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jul 2018 16:14:54 +0100
-Subject: [PATCH] Add cap_user_time aarch64
-In-Reply-To: <20180713192451.49280-1-micpof@gmail.com>
-References: <20180713192451.49280-1-micpof@gmail.com>
-Message-ID: <20180724151452.GD25412@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 24 Jul 2018 17:15:20 +0200
+Subject: [PATCH RT v2] arm64: fpsimd: use a local_lock() in addition to
+ local_bh_disable()
+In-Reply-To: <20180724144522.GA4240@e103592.cambridge.arm.com>
+References: <20180522172115.fpqguqlsq6bavtxy@linutronix.de>
+ <20180522132429.6f1dcf92@gandalf.local.home>
+ <20180522173333.aawadhkcekzvrswp@linutronix.de>
+ <20180711092555.268adf7f@gandalf.local.home>
+ <20180711133157.bvrza5vmthu6lwjd@linutronix.de>
+ <20180711093346.782af07a@gandalf.local.home>
+ <20180713174937.5ddaqpylalcmc3jq@linutronix.de>
+ <20180716151737.GO9486@e103592.cambridge.arm.com>
+ <20180718091209.u76gzacanj5avhdl@linutronix.de>
+ <20180718092448.v6j7wdahtsediqhh@linutronix.de>
+ <20180724144522.GA4240@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu_WdooOKAvqBJCespZmYYNLcmYsy2cxJ-MP4pjKhPaqrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+On 24 July 2018 at 16:45, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Wed, Jul 18, 2018 at 11:24:48AM +0200, Sebastian Andrzej Siewior wrote:
+>> On 2018-07-18 11:12:10 [+0200], To Dave Martin wrote:
+>> > > > -       if (may_use_simd()) {
+>> > > > +       if (!IS_ENABLED(CONFIG_PREEMPT_RT_BASE) && may_use_simd()) {
+>> > >
+>> > > I suspect this is wrong -- see comments on the commit message.
+>>
+>> I'm sorry, I pressed send too early, I was aiming for the draft folder.
+>> So yes, based on that EFI that might be interruptible, let me try to
+>> look at the initial issue again and maybe I get another idea how to deal
+>> with this.
+>> One question: If EFI is interruptible that means, we call into EFI - how
+>> do we get out? Does EFI enable interrupts and the kernel receives an
+>> interrupt and treats this EFI call like a regular context switch?
+>
+> AFAIK the only safe way to get out permanently is for the call to
+> return.  Note, I've not gone through the spec in fine detail myself.
+>
+> The OS may handle interrupts occurring during the EFI call, but we
+> still have to return to EFI afterwards to finish off the call.  From
+> the Linux perspective, I think this means that EFI calls are non-
+> preemptible.
+>
+> Under RT, I'm pretty sure that we can't safely resume the interrupted
+> EFI call on a different cpu from the one it was interrupted on.  Even
+> if it doesn't say this explicitly in the UEFI spec, I think it will be
+> assumed in implementations.
+>
 
-[adding Peter]
+This is a can of worms I would rather not open, although I don't think
+the UEFI spec makes it explicit that you cannot migrate runtime
+service calls while in progress.
 
-Thanks for the patch. I think the general idea is sound, but I have a few
-questions about the implementation.
+Also, I don't think EFI calls are worth obsessing about, given that
+they shouldn't be that common under normal operation. I know that RT
+is not about the common case but about the worst case, though. What
+problem is migrating a non-preemptible task intended to solve?
 
-On Fri, Jul 13, 2018 at 12:24:51PM -0700, Michael O'Farrell wrote:
-> It is useful to get the running time of a thread.  Doing so in an
-> efficient manner can be important for performance of user applications.
-> Avoiding system calls in `clock_gettime` when handling
-> CLOCK_THREAD_CPUTIME_ID is important.  Other clocks are handled in the
-> VDSO, but CLOCK_THREAD_CPUTIME_ID falls back on the system call.
-> 
-> CLOCK_THREAD_CPUTIME_ID is not handled in the VDSO since it would have
-> costs associated with maintaining updated user space accessible time
-> offsets.  These offsets have to be updated everytime the a thread is
-> scheduled/descheduled.  However, for programs regularly checking the
-> running time of a thread, this is a performance improvement.
-> 
-> This patch takes a middle ground, and adds support for cap_user_time an
-> optional feature of the perf_event API.  This way costs are only
-> incurred when the perf_event api is enabled.  This is done the same way
-> as it is in x86.  This patch also enables the cap_user_time facility of
-> perf_event since it comes free with the stable clock.
-> 
-> Ultimately this allows calculating the thread running time in userspace
-> on aarch64 as follows (adapted from perf_event_open manpage):
-> 
-> u32 seq, time_mult, time_shift;
-> u64 running, count, time_offset, quot, rem, delta;
-> struct perf_event_mmap_page *pc;
-> pc = buf;  // buf is the perf event mmaped page as documented in the API.
-> 
-> if (pc->cap_usr_time) {
->     do {
->         seq = pc->lock;
->         barrier();
->         running = pc->time_running;
-> 
->         count = readCNTVCT_EL0();  // Read ARM hardware clock.
->         time_offset = pc->time_offset;
->         time_mult   = pc->time_mult;
->         time_shift  = pc->time_shift;
-> 
->         barrier();
->     } while (pc->lock != seq);
+>
+> Certain EFI calls are not long-running and may need to be called from
+> interrupt context in Linux,
 
-Using only compiler barriers here raises my eyebrows a little, but as long
-as this is all in the context of the reader thread, then it should be ok.
-I think it means that the comment in events/core.c is bogus:
+This suggests that the need to be called in interrupt context is a
+property of the firmware implementation but it is not.
 
-	/*
-	 * Disable preemption so as to not let the corresponding user-space
-	 * spin too long if we get preempted.
-	 */
-	preempt_disable();
-	++userpg->lock;
-	barrier();
+In the kernel, we have efi-pstore which may attempt to invoke runtime
+services to record the kernel's dying gasp into a EFI variable. Other
+than that, I don't think there are any reasons to call EFI services
+from non-process context.
 
-because user-space won't get stuck spinning unless its running concurrently,
-at which point it's hosed anyway. Hmmm.
+> which means that there may be live kernel-
+> mode NEON state.  This is why there are separate FPSIMD/SVE percpu stash
+> buffers for EFI specifically.
+>
 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 33147aacdafd..c63f31caf7ac 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -25,6 +25,7 @@
->  #include <asm/virt.h>
->  
->  #include <linux/acpi.h>
-> +#include <linux/clocksource.h>
->  #include <linux/of.h>
->  #include <linux/perf/arm_pmu.h>
->  #include <linux/platform_device.h>
-> @@ -1127,3 +1128,41 @@ static int __init armv8_pmu_driver_init(void)
->  		return arm_pmu_acpi_probe(armv8_pmuv3_init);
->  }
->  device_initcall(armv8_pmu_driver_init)
-> +
-> +#ifndef CONFIG_HAVE_UNSTABLE_SCHED_CLOCK
+So given the above, and the fact that you can panic() in an interrupt
+handler, we needed those buffers, although I wonder if we'd ever reach
+the point where we end up resuming execution of the code that uses the
+restored contents of those buffers.
 
-We never select CONFIG_HAVE_UNSTABLE_SCHED_CLOCK, so you can remove the
-guards.
-
-> +void arch_perf_update_userpage(struct perf_event *event,
-> +			       struct perf_event_mmap_page *userpg, u64 now)
-> +{
-> +	u32 freq;
-> +	u32 shift;
-> +
-> +	/*
-> +	 * Internal timekeeping for enabled/running/stopped times
-> +	 * is always computed with the sched_clock.
-> +	 */
-> +	freq = arch_timer_get_rate();
-> +	userpg->cap_user_time = 1;
-> +
-> +	clocks_calc_mult_shift(&userpg->time_mult, &shift, freq,
-> +			NSEC_PER_SEC, 0);
-> +	/*
-> +	 * time_shift is not expected to be greater than 31 due to
-> +	 * the original published conversion algorithm shifting a
-> +	 * 32-bit value (now specifies a 64-bit value) - refer
-> +	 * perf_event_mmap_page documentation in perf_event.h.
-> +	 */
-> +	if (shift == 32) {
-> +		shift = 31;
-> +		userpg->time_mult >>= 1;
-> +	}
-
-Can you explain this a bit more, please? Given that we've never enabled this
-on arm64, why do we have a problem with a legacy algorithm?
-
-> +	userpg->time_shift = (u16)shift;
-> +	userpg->time_offset = -now;
-> +
-> +	/*
-> +	 * We are always using the sched_clock as the base, so
-> +	 * cap_user_time_zero makes sense.
-> +	 */
-
-How are you enforcing that we're always using sched_clock?
-
-> +	userpg->cap_user_time_zero = 1;
-> +	userpg->time_zero = 0;
-
-I'm not sure we can rely on the architected timer being zero initialised --
-our booting documentation just require it to be consistent between CPUs.
-
-Will
+> Does this make sense?  It's is probably not very clear, but I'm trying
+> to hide the fact that I haven't looked at the UEFI spec for ages...
+>
+> Cheers
+> ---Dave
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
