@@ -1,30 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Jul 2018 15:48:39 +0200
-Subject: [PATCH] arm: enable RapidIO config options in Kconfig
-In-Reply-To: <20180724134122.86718-1-acolin@isi.edu>
-References: <20180724134122.86718-1-acolin@isi.edu>
-Message-ID: <CAK8P3a1sA5tw1oZ+vM_BgR3jU2ww0g6_QDn6sxF2SC4PtrP0Sg@mail.gmail.com>
+From: horia.geanta@nxp.com (Horia Geanta)
+Date: Tue, 24 Jul 2018 13:52:01 +0000
+Subject: [PATCH v2 4/4] drivers/soc/fsl/dpio: Convert DPIO documentation
+ to .rst
+References: <20180723170025.2259-1-roy.pledge@nxp.com>
+ <20180723170025.2259-5-roy.pledge@nxp.com>
+Message-ID: <VI1PR0402MB348590E265D062CFC83F7FDF98550@VI1PR0402MB3485.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 3:41 PM, Alexei Colin <acolin@isi.edu> wrote:
-> ARM SoCs with a PCI bus offer the RapiodIO config menu; SoCs with
-> RapidIO IP blocks but without a PCI bus, need to add "select
-> HAS_RAPIDIO" to the Kconfig entry for that SoC (e.g. ARCH_*).
->
-> HAS_RAPIDIO was chosen over HAVE_RAPIDIO to be consistent with
-> other architectures which already define this flag (powerpc).
->
-> Signed-off-by: Alexei Colin <acolin@isi.edu>
+On 7/23/2018 8:00 PM, Roy Pledge wrote:
+> Convert the Datapath I/O documentation to .rst format
+> and move to the Documation/networking/dpaa2 directory
+typo:             ^^^ Documentation
+
+> 
+> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 > ---
->
-> Tested that kernel builds with RapidIO subsystem and switch drivers enabled.
-> Maintainers for RapidIO subsystem CCed.
-> Sending a similar patch to ARM64 maintainers shortly.
+>  .../networking/dpaa2/dpio-driver.rst               | 30 +++++++++++++++++++---
+>  Documentation/networking/dpaa2/index.rst           |  1 +
+>  2 files changed, 28 insertions(+), 3 deletions(-)
+>  rename drivers/soc/fsl/dpio/dpio-driver.txt => Documentation/networking/dpaa2/dpio-driver.rst (94%)
+> 
+> diff --git a/drivers/soc/fsl/dpio/dpio-driver.txt b/Documentation/networking/dpaa2/dpio-driver.rst
+> similarity index 94%
+> rename from drivers/soc/fsl/dpio/dpio-driver.txt
+> rename to Documentation/networking/dpaa2/dpio-driver.rst
+> index 72ba9da..3a33a33 100644
+> --- a/drivers/soc/fsl/dpio/dpio-driver.txt
+> +++ b/Documentation/networking/dpaa2/dpio-driver.rst
+> @@ -1,7 +1,16 @@
+> -Copyright 2016 NXP
+> +.. include:: <isonum.txt>
+> +
+> +DPAA2 DPIO (Data Path I/O) Overview
+> +===================================
+> +
+> +:Copyright: |copy| 2015 Freescale Semiconductor Inc.
+> +:Copyright: |copy| 2018 NXP
+> +
+Existing copyright should be kept.
+2018 could be appended if needed.
 
-
-Could you move CONFIG_RAPIDIO to drivers/rapidio? That
-would avoid repeating it for each of the five architectures, and
-make it more consistent with other subsystems.
-
-       Arnd
+Regards,
+Horia
