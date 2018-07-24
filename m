@@ -1,31 +1,39 @@
-From: Sven.Schmitt@mixed-mode.de (Sven Schmitt)
-Date: Tue, 24 Jul 2018 09:46:03 +0000
-Subject: [PATCH v3 1/3] soc: imx: gpc: fix PDN delay
-Message-ID: <1532425558626.11533@mixed-mode.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Jul 2018 11:46:23 +0200
+Subject: [PATCH] arm64: fix ACPI dependencies
+In-Reply-To: <20180724094406.GF19324@arm.com>
+References: <20180724093345.1575921-1-arnd@arndb.de>
+ <CAJZ5v0jTowUW6myVf0B2Gyq0ZA2ATqPNnaeOgFS01ce8A=FBpA@mail.gmail.com>
+ <20180724094406.GF19324@arm.com>
+Message-ID: <CAK8P3a12WfW9GmUW+=cW+2ZfUzSw3c-71KkiT_1UxxxivgFedw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx6_pm_domain_power_off() reads iso and iso2sw from GPC_PGC_PUPSCR_OFFS 
-which stores the power up delays. 
-So use GPC_PGC_PDNSCR_OFFS for the correct delays.
+On Tue, Jul 24, 2018 at 11:44 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Jul 24, 2018 at 11:37:10AM +0200, Rafael J. Wysocki wrote:
+>> On Tue, Jul 24, 2018 at 11:33 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Signed-off-by: Sven Schmitt <sven.schmitt@mixed-mode.de>
----
- drivers/soc/imx/gpc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> How about something along the lines of what Ard suggested? Untested diff
+> below.
+>
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 303809c6..ec78d4d 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -56,6 +56,7 @@ config ARM64
+>         select ARCH_USE_CMPXCHG_LOCKREF
+>         select ARCH_USE_QUEUED_RWLOCKS
+>         select ARCH_USE_QUEUED_SPINLOCKS
+> +       select ARCH_SUPPORTS_ACPI
+>         select ARCH_SUPPORTS_MEMORY_FAILURE
+>         select ARCH_SUPPORTS_ATOMIC_RMW
+>         select ARCH_SUPPORTS_INT128 if GCC_VERSION >= 50000 || CC_IS_CLANG
 
-diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index 0097a939487f..5126185e68c6 100644
---- a/drivers/soc/imx/gpc.c
-+++ b/drivers/soc/imx/gpc.c
-@@ -73,7 +73,7 @@ static int imx6_pm_domain_power_off(struct generic_pm_domain *genpd)
- 		return -EBUSY;
- 
- 	/* Read ISO and ISO2SW power down delays */
--	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PUPSCR_OFFS, &val);
-+	regmap_read(pd->regmap, pd->reg_offs + GPC_PGC_PDNSCR_OFFS, &val);
- 	iso = val & 0x3f;
- 	iso2sw = (val >> 8) & 0x3f;
- 
--- 
-2.17.1
+I'd prefer Rafael's suggestion of just leaving out the architecture names from
+the dependency, and making all three 'select ARCH_SUPPORTS_ACPI'.
+
+I'll send a v2.
+
+      Arnd
