@@ -1,95 +1,257 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 24 Jul 2018 15:57:56 +0900
-Subject: [PATCH v12 13/16] arm64: kexec_file: invoke the kernel without
- purgatory
+Date: Tue, 24 Jul 2018 15:57:53 +0900
+Subject: [PATCH v12 10/16] arm64: kexec_file: load initrd and device-tree
 In-Reply-To: <20180724065759.19186-1-takahiro.akashi@linaro.org>
 References: <20180724065759.19186-1-takahiro.akashi@linaro.org>
-Message-ID: <20180724065759.19186-14-takahiro.akashi@linaro.org>
+Message-ID: <20180724065759.19186-11-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm64, purgatory would do almost nothing. So just invoke secondary
-kernel directly by jumping into its entry code.
+load_other_segments() is expected to allocate and place all the necessary
+memory segments other than kernel, including initrd and device-tree
+blob (and elf core header for crash).
+While most of the code was borrowed from kexec-tools' counterpart,
+users may not be allowed to specify dtb explicitly, instead, the dtb
+presented by the original boot loader is reused.
 
-While, in this case, cpu_soft_restart() must be called with dtb address
-in the fifth argument, the behavior still stays compatible with kexec_load
-case as long as the argument is null.
+arch_kimage_kernel_post_load_cleanup() is responsible for freeing arm64-
+specific data allocated in load_other_segments().
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Reviewed-by: James Morse <james.morse@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
+Reviewed-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/kernel/cpu-reset.S       |  8 ++++----
- arch/arm64/kernel/machine_kexec.c   | 12 ++++++++++--
- arch/arm64/kernel/relocate_kernel.S |  3 ++-
- 3 files changed, 16 insertions(+), 7 deletions(-)
+ arch/arm64/include/asm/kexec.h         |  17 +++
+ arch/arm64/kernel/machine_kexec_file.c | 182 +++++++++++++++++++++++++
+ 2 files changed, 199 insertions(+)
 
-diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
-index 8021b46c9743..a2be30275a73 100644
---- a/arch/arm64/kernel/cpu-reset.S
-+++ b/arch/arm64/kernel/cpu-reset.S
-@@ -22,11 +22,11 @@
-  * __cpu_soft_restart(el2_switch, entry, arg0, arg1, arg2) - Helper for
-  * cpu_soft_restart.
-  *
-- * @el2_switch: Flag to indicate a swich to EL2 is needed.
-+ * @el2_switch: Flag to indicate a switch to EL2 is needed.
-  * @entry: Location to jump to for soft reset.
-- * arg0: First argument passed to @entry.
-- * arg1: Second argument passed to @entry.
-- * arg2: Third argument passed to @entry.
-+ * arg0: First argument passed to @entry. (relocation list)
-+ * arg1: Second argument passed to @entry.(physical kernel entry)
-+ * arg2: Third argument passed to @entry. (physical dtb address)
-  *
-  * Put the CPU into the same state as it would be if it had been reset, and
-  * branch to what would be the reset vector. It must be executed with the
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index f76ea92dff91..830a5063e09d 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -205,10 +205,18 @@ void machine_kexec(struct kimage *kimage)
- 	 * uses physical addressing to relocate the new image to its final
- 	 * position and transfers control to the image entry point when the
- 	 * relocation is complete.
-+	 * In kexec case, kimage->start points to purgatory assuming that
-+	 * kernel entry and dtb address are embedded in purgatory by
-+	 * userspace (kexec-tools).
-+	 * In kexec_file case, the kernel starts directly without purgatory.
- 	 */
--
- 	cpu_soft_restart(kimage != kexec_crash_image,
--		reboot_code_buffer_phys, kimage->head, kimage->start, 0);
-+		reboot_code_buffer_phys, kimage->head, kimage->start,
+diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+index e17f0529a882..026f7e408f0c 100644
+--- a/arch/arm64/include/asm/kexec.h
++++ b/arch/arm64/include/asm/kexec.h
+@@ -93,6 +93,23 @@ static inline void crash_prepare_suspend(void) {}
+ static inline void crash_post_resume(void) {}
+ #endif
+ 
 +#ifdef CONFIG_KEXEC_FILE
-+						kimage->arch.dtb_mem);
-+#else
-+						0);
++#define ARCH_HAS_KIMAGE_ARCH
++
++struct kimage_arch {
++	void *dtb_buf;
++	unsigned long dtb_mem;
++};
++
++struct kimage;
++
++extern int arch_kimage_file_post_load_cleanup(struct kimage *image);
++extern int load_other_segments(struct kimage *image,
++		unsigned long kernel_load_addr, unsigned long kernel_size,
++		char *initrd, unsigned long initrd_len,
++		char *cmdline, unsigned long cmdline_len);
 +#endif
++
+ #endif /* __ASSEMBLY__ */
  
- 	BUG(); /* Should never get here. */
- }
-diff --git a/arch/arm64/kernel/relocate_kernel.S b/arch/arm64/kernel/relocate_kernel.S
-index f407e422a720..95fd94209aae 100644
---- a/arch/arm64/kernel/relocate_kernel.S
-+++ b/arch/arm64/kernel/relocate_kernel.S
-@@ -32,6 +32,7 @@
- ENTRY(arm64_relocate_new_kernel)
+ #endif
+diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+index c38a8048ed00..b28fbb0659c9 100644
+--- a/arch/arm64/kernel/machine_kexec_file.c
++++ b/arch/arm64/kernel/machine_kexec_file.c
+@@ -5,12 +5,194 @@
+  * Copyright (C) 2018 Linaro Limited
+  * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
+  *
++ * Most code is derived from arm64 port of kexec-tools
+  */
  
- 	/* Setup the list loop variables. */
-+	mov	x18, x2				/* x18 = dtb address */
- 	mov	x17, x1				/* x17 = kimage_start */
- 	mov	x16, x0				/* x16 = kimage_head */
- 	raw_dcache_line_size x15, x0		/* x15 = dcache line size */
-@@ -107,7 +108,7 @@ ENTRY(arm64_relocate_new_kernel)
- 	isb
+ #define pr_fmt(fmt) "kexec_file: " fmt
  
- 	/* Start new image. */
--	mov	x0, xzr
-+	mov	x0, x18
- 	mov	x1, xzr
- 	mov	x2, xzr
- 	mov	x3, xzr
++#include <linux/ioport.h>
++#include <linux/kernel.h>
+ #include <linux/kexec.h>
++#include <linux/libfdt.h>
++#include <linux/memblock.h>
++#include <linux/of_fdt.h>
++#include <linux/types.h>
++#include <asm/byteorder.h>
+ 
+ const struct kexec_file_ops * const kexec_file_loaders[] = {
+ 	NULL
+ };
++
++int arch_kimage_file_post_load_cleanup(struct kimage *image)
++{
++	vfree(image->arch.dtb);
++	image->arch.dtb = NULL;
++
++	return kexec_image_post_load_cleanup_default(image);
++}
++
++static int setup_dtb(struct kimage *image,
++		unsigned long initrd_load_addr, unsigned long initrd_len,
++		char *cmdline, unsigned long cmdline_len,
++		void **dtb_buf, unsigned long *dtb_buf_len)
++{
++	void *buf = NULL;
++	size_t buf_size;
++	int nodeoffset;
++	int ret;
++
++	/* duplicate dt blob */
++	buf_size = fdt_totalsize(initial_boot_params);
++
++	if (initrd_load_addr) {
++		/* can be redundant, but trimmed at the end */
++		buf_size += fdt_prop_len("linux,initrd-start", sizeof(u64));
++		buf_size += fdt_prop_len("linux,initrd-end", sizeof(u64));
++	}
++
++	if (cmdline)
++		/* can be redundant, but trimmed at the end */
++		buf_size += fdt_prop_len("bootargs", cmdline_len);
++
++	buf = vmalloc(buf_size);
++	if (!buf) {
++		ret = -ENOMEM;
++		goto out_err;
++	}
++
++	ret = fdt_open_into(initial_boot_params, buf, buf_size);
++	if (ret) {
++		ret = -EINVAL;
++		goto out_err;
++	}
++
++	nodeoffset = fdt_path_offset(buf, "/chosen");
++	if (nodeoffset < 0) {
++		ret = -EINVAL;
++		goto out_err;
++	}
++
++	/* add bootargs */
++	if (cmdline) {
++		ret = fdt_setprop_string(buf, nodeoffset, "bootargs", cmdline);
++		if (ret) {
++			ret = -EINVAL;
++			goto out_err;
++		}
++	} else {
++		ret = fdt_delprop(buf, nodeoffset, "bootargs");
++		if (ret && (ret != -FDT_ERR_NOTFOUND)) {
++			ret = -EINVAL;
++			goto out_err;
++		}
++	}
++
++	/* add initrd-* */
++	if (initrd_load_addr) {
++		ret = fdt_setprop_u64(buf, nodeoffset, "linux,initrd-start",
++							initrd_load_addr);
++		if (ret) {
++			ret = -EINVAL;
++			goto out_err;
++		}
++
++		ret = fdt_setprop_u64(buf, nodeoffset, "linux,initrd-end",
++						initrd_load_addr + initrd_len);
++		if (ret) {
++			ret = -EINVAL;
++			goto out_err;
++		}
++	} else {
++		ret = fdt_delprop(buf, nodeoffset, "linux,initrd-start");
++		if (ret && (ret != -FDT_ERR_NOTFOUND)) {
++			ret = -EINVAL;
++			goto out_err;
++		}
++
++		ret = fdt_delprop(buf, nodeoffset, "linux,initrd-end");
++		if (ret && (ret != -FDT_ERR_NOTFOUND)) {
++			ret = -EINVAL;
++			goto out_err;
++		}
++	}
++
++	/* trim a buffer */
++	fdt_pack(buf);
++	*dtb_buf = buf;
++	*dtb_buf_len = fdt_totalsize(buf);
++
++	return 0;
++
++out_err:
++	vfree(buf);
++	return ret;
++}
++
++int load_other_segments(struct kimage *image,
++			unsigned long kernel_load_addr,
++			unsigned long kernel_size,
++			char *initrd, unsigned long initrd_len,
++			char *cmdline, unsigned long cmdline_len)
++{
++	struct kexec_buf kbuf;
++	void *dtb = NULL;
++	unsigned long initrd_load_addr = 0, dtb_len;
++	int ret = 0;
++
++	kbuf.image = image;
++	/* not allocate anything below the kernel */
++	kbuf.buf_min = kernel_load_addr + kernel_size;
++
++	/* load initrd */
++	if (initrd) {
++		kbuf.buffer = initrd;
++		kbuf.bufsz = initrd_len;
++		kbuf.mem = 0;
++		kbuf.memsz = initrd_len;
++		kbuf.buf_align = 0;
++		/* within 1GB-aligned window of up to 32GB in size */
++		kbuf.buf_max = round_down(kernel_load_addr, SZ_1G)
++						+ (unsigned long)SZ_1G * 32;
++		kbuf.top_down = false;
++
++		ret = kexec_add_buffer(&kbuf);
++		if (ret)
++			goto out_err;
++		initrd_load_addr = kbuf.mem;
++
++		pr_debug("Loaded initrd@0x%lx bufsz=0x%lx memsz=0x%lx\n",
++				initrd_load_addr, initrd_len, initrd_len);
++	}
++
++	/* load dtb blob */
++	ret = setup_dtb(image, initrd_load_addr, initrd_len,
++				cmdline, cmdline_len, &dtb, &dtb_len);
++	if (ret) {
++		pr_err("Preparing for new dtb failed\n");
++		goto out_err;
++	}
++
++	kbuf.buffer = dtb;
++	kbuf.bufsz = dtb_len;
++	kbuf.mem = 0;
++	kbuf.memsz = dtb_len;
++	/* not across 2MB boundary */
++	kbuf.buf_align = SZ_2M;
++	kbuf.buf_max = ULONG_MAX;
++	kbuf.top_down = true;
++
++	ret = kexec_add_buffer(&kbuf);
++	if (ret)
++		goto out_err;
++	image->arch.dtb = dtb;
++	image->arch.dtb_mem = kbuf.mem;
++
++	pr_debug("Loaded dtb at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
++			kbuf.mem, dtb_len, dtb_len);
++
++	return 0;
++
++out_err:
++	vfree(dtb);
++	return ret;
++}
 -- 
 2.18.0
