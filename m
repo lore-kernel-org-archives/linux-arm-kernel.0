@@ -1,120 +1,168 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Tue, 24 Jul 2018 17:10:04 +0900
-Subject: [PATCH v3 2/9] drm/exynos: move connector creation to attach
- callback
-In-Reply-To: <5B56DD97.3030508@samsung.com>
-References: <1529396370-18761-1-git-send-email-m.purski@samsung.com>
- <CGME20180619081958eucas1p16911ee9962441735d929dc588e70ce70@eucas1p1.samsung.com>
- <1529396370-18761-3-git-send-email-m.purski@samsung.com>
- <5B56DD97.3030508@samsung.com>
-Message-ID: <20180724081004epcas1p2d5a43c556b831d6fe8cde9a24b284507~EP7F_T9mK0982409824epcas1p2Z@epcas1p2.samsung.com>
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Tue, 24 Jul 2018 13:40:31 +0530
+Subject: [PATCH] gpu/drm/exynos: Convert drm_atomic_helper_suspend/resume()
+In-Reply-To: <20180724062459epcas1p1bf9f47eaccd54be8a8f9e18a18d23550~EOfVjI_Gy1414414144epcas1p1q@epcas1p1.samsung.com>
+References: <CGME20180718204725epcas3p1b98f118ad386fbb551ba1f4c10ac2531@epcas3p1.samsung.com>
+ <20180718204957.GA14132@jordon-HP-15-Notebook-PC>
+ <20180724062459epcas1p1bf9f47eaccd54be8a8f9e18a18d23550~EOfVjI_Gy1414414144epcas1p1q@epcas1p1.samsung.com>
+Message-ID: <CAFqt6zbd74zDwTn4ipSBjqsPyTZMMw7_EL_qbLkFohQWA1KVEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-2018? 07? 24? 17:04? Inki Dae ?(?) ? ?:
+On Tue, Jul 24, 2018 at 11:54 AM, Inki Dae <inki.dae@samsung.com> wrote:
 > Hi,
-> 
-> 2018? 06? 19? 17:19? Maciej Purski ?(?) ? ?:
->> The current implementation assumes that the only possible peripheral
->> device for DSIM is a panel. Using an output bridge child device
->> should also be possible.
+>
+> 2018? 07? 19? 05:49? Souptick Joarder ?(?) ? ?:
+>> convert drm_atomic_helper_suspend/resume() to use
+>> drm_mode_config_helper_suspend/resume().
 >>
->> If an output bridge is available, don't create a new connector.
->> Instead, call drm_bridge_attach() and set encoder's bridge to NULL
->> in order to avoid an out bridge from being visible by the framework, as
->> the DSI bus needs control on enabling its child output bridge.
+>> exynos_drm_fbdev_suspend/resume can be removed
+>> as drm_mode_config_helper_suspend/resume has
+>> implement the same in generic way.
 >>
->> Such sequence is required by Toshiba TC358764 bridge, which is a DSI
->> peripheral bridge device.
-> 
-> Right, we should consider DSI to LVDS bridge.
+>> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+>> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
+>> ---
+>>  drivers/gpu/drm/exynos/exynos_drm_drv.c   | 32 ++++++++++---------------------
+>>  drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 17 ----------------
+>>  drivers/gpu/drm/exynos/exynos_drm_fbdev.h | 10 ----------
+>>  3 files changed, 10 insertions(+), 49 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+>> index a81b4a5..1996ff7 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
+>> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+>> @@ -151,39 +151,27 @@ static void exynos_drm_postclose(struct drm_device *dev, struct drm_file *file)
+>>  static int exynos_drm_suspend(struct device *dev)
+>>  {
+>>       struct drm_device *drm_dev = dev_get_drvdata(dev);
+>> -     struct exynos_drm_private *private;
+>> +     int ret = 0;
+>>
+>> -     if (pm_runtime_suspended(dev) || !drm_dev)
+>> -             return 0;
+>
+> You removes '!drm_dev' not related to this patch.
 
-In addition, could you update below binding document?
-Documentation/devicetree/bindings/display/exynos/exynos_dsim.txt
+The same has been checked inside drm_mode_config_helper_suspend(),
+so we should avoid double check.
 
-Thanks,
-Inki Dae
+>
+>> +     if (pm_runtime_suspended(dev))
+>> +             return ret;
+>>
+>> -     private = drm_dev->dev_private;
+>> +     ret = drm_mode_config_helper_suspend(drm_dev);
+>
+> Just return drm_mode_config_helper_suspend(drm_dev);
 
-> 
+ Ok
+
+>
+>>
+>> -     drm_kms_helper_poll_disable(drm_dev);
+>> -     exynos_drm_fbdev_suspend(drm_dev);
+>> -     private->suspend_state = drm_atomic_helper_suspend(drm_dev);
+>> -     if (IS_ERR(private->suspend_state)) {
+>> -             exynos_drm_fbdev_resume(drm_dev);
+>> -             drm_kms_helper_poll_enable(drm_dev);
+>> -             return PTR_ERR(private->suspend_state);
+>> -     }
+>> -
+>> -     return 0;
+>> +     return ret;
+>>  }
+>>
+>>  static int exynos_drm_resume(struct device *dev)
+>>  {
+>>       struct drm_device *drm_dev = dev_get_drvdata(dev);
+>> -     struct exynos_drm_private *private;
+>> +     int ret = 0;
+>>
+>> -     if (pm_runtime_suspended(dev) || !drm_dev)
+>> -             return 0;
+>> +     if (pm_runtime_suspended(dev))
+>> +             return ret;
+>
+> Ditto. You removes '!drm_dev' not related to this patch.
+
+Same reason mentioned above to remove '!drm_dev'
+
+>
+>>
+>> -     private = drm_dev->dev_private;
+>> -     drm_atomic_helper_resume(drm_dev, private->suspend_state);
+>> -     exynos_drm_fbdev_resume(drm_dev);
+>> -     drm_kms_helper_poll_enable(drm_dev);
+>> +     ret = drm_mode_config_helper_resume(drm_dev);
+>
+> Ditto. return drm_mode_config_helper_resume(drm_dev);
+>
+> With this patch, you could remove 'int ret' declaration including one from exynos_drm_suspend.
+
+Ok, I will add this in v2.
+
+>
 > Thanks,
 > Inki Dae
-> 
+>
 >>
->> Signed-off-by: Maciej Purski <m.purski@samsung.com>
->> ---
->>  drivers/gpu/drm/exynos/exynos_drm_dsi.c | 38 ++++++++++++++++++++++-----------
->>  1 file changed, 25 insertions(+), 13 deletions(-)
+>> -     return 0;
+>> +     return ret;
+>>  }
+>>  #endif
 >>
->> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
->> index 9599e6b..c0408c0 100644
->> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
->> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
->> @@ -255,6 +255,7 @@ struct exynos_dsi {
->>  	struct mipi_dsi_host dsi_host;
->>  	struct drm_connector connector;
->>  	struct drm_panel *panel;
->> +	struct drm_bridge *out_bridge;
->>  	struct device *dev;
->>  
->>  	void __iomem *reg_base;
->> @@ -1499,7 +1500,30 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
->>  				  struct mipi_dsi_device *device)
->>  {
->>  	struct exynos_dsi *dsi = host_to_dsi(host);
->> -	struct drm_device *drm = dsi->connector.dev;
->> +	struct drm_encoder *encoder = &dsi->encoder;
->> +	struct drm_device *drm = encoder->dev;
->> +	struct drm_bridge *out_bridge;
->> +
->> +	out_bridge  = of_drm_find_bridge(device->dev.of_node);
->> +	if (out_bridge) {
->> +		drm_bridge_attach(encoder, out_bridge, NULL);
->> +		dsi->out_bridge = out_bridge;
->> +		encoder->bridge = NULL;
->> +	} else {
->> +		int ret = exynos_dsi_create_connector(encoder);
->> +
->> +		if (ret) {
->> +			DRM_ERROR("failed to create connector ret = %d\n", ret);
->> +			drm_encoder_cleanup(encoder);
->> +			return ret;
->> +		}
->> +
->> +		dsi->panel = of_drm_find_panel(device->dev.of_node);
->> +		if (dsi->panel) {
->> +			drm_panel_attach(dsi->panel, &dsi->connector);
->> +			dsi->connector.status = connector_status_connected;
->> +		}
->> +	}
->>  
->>  	/*
->>  	 * This is a temporary solution and should be made by more generic way.
->> @@ -1518,11 +1542,6 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
->>  	dsi->lanes = device->lanes;
->>  	dsi->format = device->format;
->>  	dsi->mode_flags = device->mode_flags;
->> -	dsi->panel = of_drm_find_panel(device->dev.of_node);
->> -	if (dsi->panel) {
->> -		drm_panel_attach(dsi->panel, &dsi->connector);
->> -		dsi->connector.status = connector_status_connected;
->> -	}
->>  	exynos_drm_crtc_get_by_type(drm, EXYNOS_DISPLAY_TYPE_LCD)->i80_mode =
->>  			!(dsi->mode_flags & MIPI_DSI_MODE_VIDEO);
->>  
->> @@ -1654,13 +1673,6 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
->>  	if (ret < 0)
->>  		return ret;
->>  
->> -	ret = exynos_dsi_create_connector(encoder);
->> -	if (ret) {
->> -		DRM_ERROR("failed to create connector ret = %d\n", ret);
->> -		drm_encoder_cleanup(encoder);
->> -		return ret;
->> -	}
+>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+>> index 132dd52..918dd2c 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+>> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+>> @@ -270,20 +270,3 @@ void exynos_drm_fbdev_fini(struct drm_device *dev)
+>>       private->fb_helper = NULL;
+>>  }
+>>
+>> -void exynos_drm_fbdev_suspend(struct drm_device *dev)
+>> -{
+>> -     struct exynos_drm_private *private = dev->dev_private;
 >> -
->>  	if (dsi->mic_bridge_node) {
->>  		mic_bridge = of_drm_find_bridge(dsi->mic_bridge_node);
->>  		if (mic_bridge)
+>> -     console_lock();
+>> -     drm_fb_helper_set_suspend(private->fb_helper, 1);
+>> -     console_unlock();
+>> -}
+>> -
+>> -void exynos_drm_fbdev_resume(struct drm_device *dev)
+>> -{
+>> -     struct exynos_drm_private *private = dev->dev_private;
+>> -
+>> -     console_lock();
+>> -     drm_fb_helper_set_suspend(private->fb_helper, 0);
+>> -     console_unlock();
+>> -}
+>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+>> index b338472..6840b6a 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+>> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+>> @@ -19,8 +19,6 @@
+>>
+>>  int exynos_drm_fbdev_init(struct drm_device *dev);
+>>  void exynos_drm_fbdev_fini(struct drm_device *dev);
+>> -void exynos_drm_fbdev_suspend(struct drm_device *drm);
+>> -void exynos_drm_fbdev_resume(struct drm_device *drm);
+>>
+>>  #else
+>>
+>> @@ -39,14 +37,6 @@ static inline void exynos_drm_fbdev_restore_mode(struct drm_device *dev)
+>>
+>>  #define exynos_drm_output_poll_changed (NULL)
+>>
+>> -static inline void exynos_drm_fbdev_suspend(struct drm_device *drm)
+>> -{
+>> -}
+>> -
+>> -static inline void exynos_drm_fbdev_resume(struct drm_device *drm)
+>> -{
+>> -}
+>> -
+>>  #endif
+>>
+>>  #endif
 >>
