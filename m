@@ -1,104 +1,96 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 24 Jul 2018 22:51:58 +0100
-Subject: [PATCH v3 0/6] add non-strict mode support for arm-smmu-v3
-In-Reply-To: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <aace9ec9-a36a-79a8-98eb-bbedd06f11a4@arm.com>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Tue, 24 Jul 2018 16:59:55 -0500
+Subject: [GIT PULL] updates to soc/fsl drivers for v4.19
+Message-ID: <1532469595-12060-1-git-send-email-leoyang.li@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-12 7:18 AM, Zhen Lei wrote:
-> v2 -> v3:
-> Add a bootup option "iommu_strict_mode" to make the manager can choose which
-> mode to be used. The first 5 patches have not changed.
-> +	iommu_strict_mode=	[arm-smmu-v3]
-> +		0 - strict mode (default)
-> +		1 - non-strict mode
-> 
-> v1 -> v2:
-> Use the lowest bit of the io_pgtable_ops.unmap's iova parameter to pass the strict mode:
-> 0, IOMMU_STRICT;
-> 1, IOMMU_NON_STRICT;
-> Treat 0 as IOMMU_STRICT, so that the unmap operation can compatible with
-> other IOMMUs which still use strict mode. In other words, this patch series
-> will not impact other IOMMU drivers. I tried add a new quirk IO_PGTABLE_QUIRK_NON_STRICT
-> in io_pgtable_cfg.quirks, but it can not pass the strict mode of the domain from SMMUv3
-> driver to io-pgtable module.
+Hi arm-soc maintainers,
 
-What exactly is the issue there? We don't have any problem with other 
-quirks like NO_DMA, and as I said before, by the time we're allocating 
-the io-pgtable in arm_smmu_domain_finalise() we already know everything 
-there is to know about the domain.
+Please merge the following tag to get updates to the soc/fsl drivers:
+  Moves DPAA2 DPIO driver from staging to fsl/soc
+  Adds multiple-pin support to QE gpio driver
 
-> Add a new member domain_non_strict in struct iommu_dma_cookie, this member will only be
-> initialized when the related domain and IOMMU driver support non-strict mode.
-> 
-> v1:
-> In common, a IOMMU unmap operation follow the below steps:
-> 1. remove the mapping in page table of the specified iova range
-> 2. execute tlbi command to invalid the mapping which is cached in TLB
-> 3. wait for the above tlbi operation to be finished
-> 4. free the IOVA resource
-> 5. free the physical memory resource
-> 
-> This maybe a problem when unmap is very frequently, the combination of tlbi
-> and wait operation will consume a lot of time. A feasible method is put off
-> tlbi and iova-free operation, when accumulating to a certain number or
-> reaching a specified time, execute only one tlbi_all command to clean up
-> TLB, then free the backup IOVAs. Mark as non-strict mode.
-> 
-> But it must be noted that, although the mapping has already been removed in
-> the page table, it maybe still exist in TLB. And the freed physical memory
-> may also be reused for others. So a attacker can persistent access to memory
-> based on the just freed IOVA, to obtain sensible data or corrupt memory. So
-> the VFIO should always choose the strict mode.
-> 
-> Some may consider put off physical memory free also, that will still follow
-> strict mode. But for the map_sg cases, the memory allocation is not controlled
-> by IOMMU APIs, so it is not enforceable.
-> 
-> Fortunately, Intel and AMD have already applied the non-strict mode, and put
-> queue_iova() operation into the common file dma-iommu.c., and my work is based
-> on it. The difference is that arm-smmu-v3 driver will call IOMMU common APIs to
-> unmap, but Intel and AMD IOMMU drivers are not.
-> 
-> Below is the performance data of strict vs non-strict for NVMe device:
-> Randomly Read  IOPS: 146K(strict) vs 573K(non-strict)
-> Randomly Write IOPS: 143K(strict) vs 513K(non-strict)
-
-How does that compare to passthrough performance? One thing I'm not 
-entirely clear about is what the realistic use-case for this is - even 
-if invalidation were infinitely fast, enabling translation still 
-typically has a fair impact on overall system performance in terms of 
-latency, power, memory bandwidth, etc., so I can't help wonder what 
-devices exist today for which performance is critical and robustness* is 
-unimportant, yet have crippled addressing capabilities such that they 
-can't just use passthrough.
-
-Robin.
+Regards,
+Leo
 
 
-* I don't want to say "security" here, since I'm actually a lot less 
-concerned about the theoretical malicious endpoint/wild write scenarios 
-than the the much more straightforward malfunctioning device and/or 
-buggy driver causing use-after-free style memory corruption. Also, I'm 
-sick of the word "security"...
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 
-> 
-> Zhen Lei (6):
->    iommu/arm-smmu-v3: fix the implementation of flush_iotlb_all hook
->    iommu/dma: add support for non-strict mode
->    iommu/amd: use default branch to deal with all non-supported
->      capabilities
->    iommu/io-pgtable-arm: add support for non-strict mode
->    iommu/arm-smmu-v3: add support for non-strict mode
->    iommu/arm-smmu-v3: add bootup option "iommu_strict_mode"
-> 
->   Documentation/admin-guide/kernel-parameters.txt | 12 +++++++
->   drivers/iommu/amd_iommu.c                       |  4 +--
->   drivers/iommu/arm-smmu-v3.c                     | 42 +++++++++++++++++++++++--
->   drivers/iommu/dma-iommu.c                       | 25 +++++++++++++++
->   drivers/iommu/io-pgtable-arm.c                  | 23 ++++++++------
->   include/linux/iommu.h                           |  7 +++++
->   6 files changed, 98 insertions(+), 15 deletions(-)
-> 
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git tags/soc-fsl-for-4.19
+
+for you to fetch changes up to 4625210899095195600062ff8542f37a1c9f5dd4:
+
+  soc: fsl: cleanup Kconfig menu (2018-07-24 16:19:16 -0500)
+
+----------------------------------------------------------------
+Various updates to soc/fsl for 4.19
+
+Moves DPAA2 DPIO driver from staging to fsl/soc
+Adds multiple-pin support to QE gpio driver
+
+----------------------------------------------------------------
+Horia Geant? (1):
+      staging: fsl-dpaa2: eth: move generic FD defines to DPIO
+
+Joakim Tjernlund (1):
+      soc: fsl: qe: gpio: Add qe_gpio_set_multiple
+
+Li Yang (1):
+      soc: fsl: cleanup Kconfig menu
+
+Roy Pledge (3):
+      staging: fsl-mc: Move DPIO from staging to drivers/soc/fsl
+      staging: fsl-mc: Remove remaining files
+      soc: fsl: dpio: Convert DPIO documentation to .rst
+
+ .../networking/dpaa2/dpio-driver.rst               | 29 +++++++++++++++++++---
+ Documentation/networking/dpaa2/index.rst           |  1 +
+ MAINTAINERS                                        |  2 +-
+ drivers/crypto/caam/sg_sw_qm2.h                    |  2 +-
+ drivers/crypto/caam/sg_sw_sec4.h                   |  2 +-
+ drivers/soc/fsl/Kconfig                            | 15 ++++++++++-
+ drivers/soc/fsl/Makefile                           |  1 +
+ .../{staging/fsl-mc/bus => soc/fsl}/dpio/Makefile  |  0
+ .../fsl-mc/bus => soc/fsl}/dpio/dpio-cmd.h         |  0
+ .../fsl-mc/bus => soc/fsl}/dpio/dpio-driver.c      |  2 +-
+ .../fsl-mc/bus => soc/fsl}/dpio/dpio-service.c     |  2 +-
+ .../{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.c    |  0
+ .../{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.h    |  0
+ .../fsl-mc/bus => soc/fsl}/dpio/qbman-portal.c     |  2 +-
+ .../fsl-mc/bus => soc/fsl}/dpio/qbman-portal.h     |  2 +-
+ drivers/soc/fsl/qbman/Kconfig                      |  2 +-
+ drivers/soc/fsl/qe/Kconfig                         |  2 +-
+ drivers/soc/fsl/qe/gpio.c                          | 28 +++++++++++++++++++++
+ drivers/staging/Kconfig                            |  2 --
+ drivers/staging/Makefile                           |  1 -
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c     |  4 +--
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h     | 22 ++++++----------
+ drivers/staging/fsl-mc/Kconfig                     |  2 --
+ drivers/staging/fsl-mc/Makefile                    |  3 ---
+ drivers/staging/fsl-mc/bus/Kconfig                 | 16 ------------
+ drivers/staging/fsl-mc/bus/Makefile                |  9 -------
+ .../fsl-mc/include => include/soc/fsl}/dpaa2-fd.h  | 12 +++++++++
+ .../include => include/soc/fsl}/dpaa2-global.h     |  0
+ .../fsl-mc/include => include/soc/fsl}/dpaa2-io.h  |  0
+ 29 files changed, 100 insertions(+), 63 deletions(-)
+ rename drivers/staging/fsl-mc/bus/dpio/dpio-driver.txt => Documentation/networking/dpaa2/dpio-driver.rst (95%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/Makefile (100%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-cmd.h (100%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-driver.c (99%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio-service.c (99%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.c (100%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/dpio.h (100%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.c (99%)
+ rename drivers/{staging/fsl-mc/bus => soc/fsl}/dpio/qbman-portal.h (99%)
+ delete mode 100644 drivers/staging/fsl-mc/Kconfig
+ delete mode 100644 drivers/staging/fsl-mc/Makefile
+ delete mode 100644 drivers/staging/fsl-mc/bus/Kconfig
+ delete mode 100644 drivers/staging/fsl-mc/bus/Makefile
+ rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-fd.h (97%)
+ rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-global.h (100%)
+ rename {drivers/staging/fsl-mc/include => include/soc/fsl}/dpaa2-io.h (100%)
