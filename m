@@ -1,79 +1,66 @@
-From: prudo@linux.ibm.com (Philipp Rudo)
-Date: Tue, 24 Jul 2018 11:23:06 +0200
-Subject: [PATCH v12 03/16] s390, kexec_file: drop arch_kexec_mem_walk()
-In-Reply-To: <20180724065759.19186-4-takahiro.akashi@linaro.org>
-References: <20180724065759.19186-1-takahiro.akashi@linaro.org>
- <20180724065759.19186-4-takahiro.akashi@linaro.org>
-Message-ID: <20180724112306.299540b5@ThinkPad>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 24 Jul 2018 10:23:24 +0100
+Subject: [PATCHv4 01/12] atomic/tty: Fix up atomic abuse in ldsem
+In-Reply-To: <20180724092036.GN2494@hirez.programming.kicks-ass.net>
+References: <20180716113017.3909-1-mark.rutland@arm.com>
+ <20180716113017.3909-2-mark.rutland@arm.com>
+ <20180724071518.GA7300@gmail.com>
+ <20180724092036.GN2494@hirez.programming.kicks-ass.net>
+Message-ID: <20180724092324.vnfowffsla4kja5c@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi AKASHI,
-
-the patch looks good to me.
-
-Reviewed-by: Philipp Rudo <prudo@linux.ibm.com>
-
-Thanks
-Philipp
-
-
-On Tue, 24 Jul 2018 15:57:46 +0900
-AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-
-> Since s390 already knows where to locate buffers, calling
-> arch_kexec_mem_walk() has no sense. So we can just drop it as kbuf->mem
-> indicates this while all other architectures sets it to 0 initially.
+On Tue, Jul 24, 2018 at 11:20:36AM +0200, Peter Zijlstra wrote:
+> On Tue, Jul 24, 2018 at 09:15:18AM +0200, Ingo Molnar wrote:
+> > 
+> > * Mark Rutland <mark.rutland@arm.com> wrote:
+> > 
+> > > From: Peter Zijlstra <peterz@infradead.org>
+> > > 
+> > > Mark found ldsem_cmpxchg() needed an (atomic_long_t *) cast to keep
+> > > working after making the atomic_long interface type safe.
+> > > 
+> > > Needing casts is bad form, which made me look at the code. There are no
+> > > ld_semaphore::count users outside of these functions so there is no
+> > > reason why it can not be an atomic_long_t in the first place, obviating
+> > > the need for this cast.
+> > > 
+> > > That also ensures the loads use atomic_long_read(), which implies (at
+> > > least) READ_ONCE() in order to guarantee single-copy-atomic loads.
+> > > 
+> > > When using atomic_long_try_cmpxchg() the ldsem_cmpxchg() wrapper gets
+> > > very thin (the only difference is not changing *old on success, which
+> > > most callers don't seem to care about).
+> > > 
+> > > So rework the whole thing to use atomic_long_t and its accessors
+> > > directly.
+> > > 
+> > > While there, fixup all the horrible comment styles.
+> > > 
+> > > Cc: Peter Hurley <peter@hurleysoftware.com>
+> > > Acked-by: Will Deacon <will.deacon@arm.com>
+> > > Reported-by: Mark Rutland <mark.rutland@arm.com>
+> > > Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> > > Signed-off-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: Ingo Molnar <mingo@kernel.org>
+> > > ---
+> > >  drivers/tty/tty_ldsem.c   | 82 ++++++++++++++++++++---------------------------
+> > >  include/linux/tty_ldisc.h |  4 +--
+> > >  2 files changed, 37 insertions(+), 49 deletions(-)
+> > > 
+> > > Note: Greg has queued this via the in the tty tree for v4.19, which can be seen at: 
+> > > 
+> > > https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git/commit/?h=tty-next&id=5fd691afdf929061c391d897fa627822c3b2fd5a
+> > 
+> > Can this patch be skipped, or do the others depend on it?
 > 
-> This change is a preparatory work for the next patch, where all the
-> variant memory walks, either on system resource or memblock, will be
-> put in one common place so that it will satisfy all the architectures'
-> need.
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-> Cc: Dave Young <dyoung@redhat.com>
-> Cc: Vivek Goyal <vgoyal@redhat.com>
-> Cc: Baoquan He <bhe@redhat.com>
-> ---
->  arch/s390/kernel/machine_kexec_file.c | 10 ----------
->  kernel/kexec_file.c                   |  4 ++++
->  2 files changed, 4 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/s390/kernel/machine_kexec_file.c b/arch/s390/kernel/machine_kexec_file.c
-> index f413f57f8d20..32023b4f9dc0 100644
-> --- a/arch/s390/kernel/machine_kexec_file.c
-> +++ b/arch/s390/kernel/machine_kexec_file.c
-> @@ -134,16 +134,6 @@ int kexec_file_add_initrd(struct kimage *image, struct s390_load_data *data,
->  	return ret;
->  }
->  
-> -/*
-> - * The kernel is loaded to a fixed location. Turn off kexec_locate_mem_hole
-> - * and provide kbuf->mem by hand.
-> - */
-> -int arch_kexec_walk_mem(struct kexec_buf *kbuf,
-> -			int (*func)(struct resource *, void *))
-> -{
-> -	return 1;
-> -}
-> -
->  int arch_kexec_apply_relocations_add(struct purgatory_info *pi,
->  				     Elf_Shdr *section,
->  				     const Elf_Shdr *relsec,
-> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> index 63c7ce1c0c3e..bf39df5e5bb9 100644
-> --- a/kernel/kexec_file.c
-> +++ b/kernel/kexec_file.c
-> @@ -534,6 +534,10 @@ int kexec_locate_mem_hole(struct kexec_buf *kbuf)
->  {
->  	int ret;
->  
-> +	/* Arch knows where to place */
-> +	if (kbuf->mem)
-> +		return 0;
-> +
->  	ret = arch_kexec_walk_mem(kbuf, locate_mem_hole_callback);
->  
->  	return ret == 1 ? 0 : -EADDRNOTAVAIL;
+> IIRC it depends on it, without this patch you get build issues due to
+> atomic_long_cmpxchg() getting picky about it's arguments (type safety
+> improved).
+
+Yup. Without this patch, there will be a build regression at patch 9,
+when we move to generated atomic_long_*() wrappers.
+
+Thanks,
+Mark.
