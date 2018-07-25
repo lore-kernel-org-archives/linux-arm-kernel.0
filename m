@@ -1,71 +1,59 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 25 Jul 2018 17:14:03 +0100
-Subject: [PATCH v2 09/10] coresight: Cleanup coresight DT bindings
-In-Reply-To: <20180725160939.GA24323@rob-hp-laptop>
-References: <1531997715-6767-1-git-send-email-suzuki.poulose@arm.com>
- <1531997715-6767-10-git-send-email-suzuki.poulose@arm.com>
- <20180725160939.GA24323@rob-hp-laptop>
-Message-ID: <e96b9bda-8a58-a817-5580-7771af7c9e28@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 25 Jul 2018 18:18:52 +0200
+Subject: [GIT PULL] pinctrl: samsung: Stuff for v4.19
+Message-ID: <20180725161852.6963-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2018 05:09 PM, Rob Herring wrote:
-> On Thu, Jul 19, 2018 at 11:55:13AM +0100, Suzuki K Poulose wrote:
->> The coresight drivers relied on default bindings for graph
->> in DT, while reusing the "reg" field of the "ports" to indicate
->> the actual hardware port number for the connections. This can
->> cause duplicate ports with same addresses, but different
->> direction. However, with the rules getting stricter w.r.t to the
->> address mismatch with the label, it is no longer possible to use
->> the port address field for the hardware port number.
->>
->> This patch introduces new DT binding rules for coresight
->> components, based on the same generic DT graph bindings, but
->> avoiding the address duplication.
->>
->> - All output ports must be specified under a child node with
->>    name "out-ports".
->> - All input ports must be specified under a childe node with
->>    name "in-ports".
->> - Port address should match the hardware port number.
->>
->> The support for legacy bindings is retained, with a warning.
->>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Cc: Sudeep Holla <sudeep.holla@arm.com>
->> Cc: Rob Herring <robh@kernel.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   .../devicetree/bindings/arm/coresight.txt          | 91 ++++++++++----------
->>   drivers/hwtracing/coresight/of_coresight.c         | 97 +++++++++++++++++++---
->>   2 files changed, 129 insertions(+), 59 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
->> index 8e21512..f39d2c6 100644
->> --- a/Documentation/devicetree/bindings/arm/coresight.txt
->> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
->> @@ -104,19 +104,9 @@ The connections must be described via generic DT graph bindings as described
->>   by the "bindings/graph.txt", where each "port" along with an "endpoint"
->>   component represents a hardware port and the connection.
->>   
->> -Since it is possible to have multiple connections for any coresight component
->> -with a specific direction of data flow, each connection must define the
->> -following properties to uniquely identify the connection details.
->> -
->> - * Direction of the data flow w.r.t the component :
->> -   Each input port must have the following property defined at the "endpoint"
->> -   for the port.
->> -	"slave-mode"
->> -
->> - * Hardware Port number at the component:
->> -     -  The hardware port number is assumed to be the address of the "port"
->> -         component.
->> -
-> 
-> Why do you add this in the previous patch and then remove it here?
 
-The only use case I can think of it is for someone to look back on the
-legacy bindings, which were never documented. I could skip the parts 
-that are being removed.
 
-Suzuki
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/samsung.git tags/samsung-pinctrl-4.19
+
+for you to fetch changes up to b3793159249bb091efce4b1515ce18cdfc4c6e41:
+
+  dt-bindings: pinctrl: samsung: Add SPDX license identifier (2018-07-24 21:59:17 +0200)
+
+----------------------------------------------------------------
+Samsung pinctrl drivers changes for v4.19
+
+1. Add handling of external wakeup interrupts mask inside the pin
+   controller driver.
+
+   Existing solution is spread between the driver and machine code.  The
+   machine code writes the mask but its value is taken from pin
+   controller driver.
+
+   This moves everything into pin controller driver allowing later to
+   remove the cross-subsystem interaction.  Also this is a necessary
+   step for implementing later Suspend to RAM on ARMv8 Exynos5433.
+
+2. Bring necessary suspend/resume callbacks for Exynos542x and
+   Exynos5260.
+3. Document hidden requirement about one external wakeup interrupts
+   device node.
+4. Minor documentation cleanups.
+
+----------------------------------------------------------------
+Krzysztof Kozlowski (7):
+      pinctrl: samsung: Define suspend and resume callbacks for all banks and SoCs
+      pinctrl: samsung: Document suspend and resume members
+      pinctrl: samsung: Document hidden requirement about one external wakeup
+      pinctrl: samsung: Add dedicated compatible for S5Pv210 wakeup interrupts
+      ARM: exynos: Define EINT_WAKEUP_MASK registers for S5Pv210 and Exynos5433
+      pinctrl: samsung: Write external wakeup interrupt mask
+      dt-bindings: pinctrl: samsung: Add SPDX license identifier
+
+ .../bindings/pinctrl/samsung-pinctrl.txt           | 11 +++-
+ arch/arm/mach-exynos/suspend.c                     |  2 +-
+ drivers/pinctrl/samsung/pinctrl-exynos-arm.c       | 16 +++++
+ drivers/pinctrl/samsung/pinctrl-exynos.c           | 68 +++++++++++++++++++++-
+ drivers/pinctrl/samsung/pinctrl-samsung.h          | 11 ++++
+ include/dt-bindings/pinctrl/samsung.h              |  7 +--
+ include/linux/soc/samsung/exynos-regs-pmu.h        |  8 ++-
+ 7 files changed, 113 insertions(+), 10 deletions(-)
