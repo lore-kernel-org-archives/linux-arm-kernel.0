@@ -1,58 +1,42 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Wed, 25 Jul 2018 14:20:25 +1000
-Subject: [PATCH 1/4] treewide: convert ISO_8859-1 text comments to utf-8
-In-Reply-To: <20180724111600.4158975-1-arnd@arndb.de>
-References: <20180724111600.4158975-1-arnd@arndb.de>
-Message-ID: <87o9ewx7xy.fsf@concordia.ellerman.id.au>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 25 Jul 2018 13:10:45 +0800
+Subject: [PATCH v1 14/15] drm/mediatek: fixed the error value for add
+ DSI1 in mutex
+In-Reply-To: <1532420235-22268-15-git-send-email-stu.hsieh@mediatek.com>
+References: <1532420235-22268-1-git-send-email-stu.hsieh@mediatek.com>
+ <1532420235-22268-15-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1532495445.9280.22.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Hi, Stu:
 
-> Almost all files in the kernel are either plain text or UTF-8
-> encoded. A couple however are ISO_8859-1, usually just a few
-> characters in a C comments, for historic reasons.
->
-> This converts them all to UTF-8 for consistency.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+On Tue, 2018-07-24 at 16:17 +0800, Stu Hsieh wrote:
+> This patch fixed the error value for add DSI1 in mutex
+> 
+
+English is not my mother language, but should it be 'fix' rather than
+'fixed'?
+
+Regards,
+CK
+
+> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 > ---
-...
->  drivers/crypto/vmx/ghashp8-ppc.pl             |  12 +-
-...
-> diff --git a/drivers/crypto/vmx/ghashp8-ppc.pl b/drivers/crypto/vmx/ghashp8-ppc.pl
-> index f746af271460..38b06503ede0 100644
-> --- a/drivers/crypto/vmx/ghashp8-ppc.pl
-> +++ b/drivers/crypto/vmx/ghashp8-ppc.pl
-> @@ -129,9 +129,9 @@ $code=<<___;
->  	 le?vperm	$IN,$IN,$IN,$lemask
->  	vxor		$zero,$zero,$zero
->  
-> -	vpmsumd		$Xl,$IN,$Hl		# H.loXi.lo
-> -	vpmsumd		$Xm,$IN,$H		# H.hiXi.lo+H.loXi.hi
-> -	vpmsumd		$Xh,$IN,$Hh		# H.hiXi.hi
-> +	vpmsumd		$Xl,$IN,$Hl		# H.lo?Xi.lo
-> +	vpmsumd		$Xm,$IN,$H		# H.hi?Xi.lo+H.lo?Xi.hi
-> +	vpmsumd		$Xh,$IN,$Hh		# H.hi?Xi.hi
->  
->  	vpmsumd		$t2,$Xl,$xC2		# 1st phase
->  
-> @@ -187,11 +187,11 @@ $code=<<___;
->  .align	5
->  Loop:
->  	 subic		$len,$len,16
-> -	vpmsumd		$Xl,$IN,$Hl		# H.loXi.lo
-> +	vpmsumd		$Xl,$IN,$Hl		# H.lo?Xi.lo
->  	 subfe.		r0,r0,r0		# borrow?-1:0
-> -	vpmsumd		$Xm,$IN,$H		# H.hiXi.lo+H.loXi.hi
-> +	vpmsumd		$Xm,$IN,$H		# H.hi?Xi.lo+H.lo?Xi.hi
->  	 and		r0,r0,$len
-> -	vpmsumd		$Xh,$IN,$Hh		# H.hiXi.hi
-> +	vpmsumd		$Xh,$IN,$Hh		# H.hi?Xi.hi
->  	 add		$inp,$inp,r0
->  
->  	vpmsumd		$t2,$Xl,$xC2		# 1st phase
-
-Acked-by: Michael Ellerman <mpe@ellerman.id.au> (powerpc)
-
-cheers
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> index 3239f22785fd..ac047fdb1a2b 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> @@ -437,7 +437,7 @@ void mtk_disp_mutex_add_comp(struct mtk_disp_mutex *mutex,
+>  		reg = MUTEX_SOF_DSI0;
+>  		break;
+>  	case DDP_COMPONENT_DSI1:
+> -		reg = MUTEX_SOF_DSI0;
+> +		reg = MUTEX_SOF_DSI1;
+>  		break;
+>  	case DDP_COMPONENT_DSI2:
+>  		reg = MUTEX_SOF_DSI2;
