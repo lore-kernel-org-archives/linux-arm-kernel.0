@@ -1,96 +1,223 @@
-From: cyrille.pitchen@microchip.com (Cyrille Pitchen)
-Date: Wed, 25 Jul 2018 14:26:36 +0200
-Subject: [PATCH 1/3] mtd: spi-nor: add Global Block Unlock support
-In-Reply-To: <20180717162831.17947-1-tudor.ambarus@microchip.com>
-References: <20180717162831.17947-1-tudor.ambarus@microchip.com>
-Message-ID: <8e0ff8be-34d1-7de9-6120-a067540a75d2@microchip.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Wed, 25 Jul 2018 20:31:29 +0800
+Subject: [PATCH v12 04/16] powerpc, kexec_file: factor out memblock-based
+ arch_kexec_walk_mem()
+In-Reply-To: <20180724065759.19186-5-takahiro.akashi@linaro.org>
+References: <20180724065759.19186-1-takahiro.akashi@linaro.org>
+ <20180724065759.19186-5-takahiro.akashi@linaro.org>
+Message-ID: <20180725123129.GA2361@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tudor,
-
-Le 17/07/2018 ? 18:28, Tudor Ambarus a ?crit?:
-> We can't determine this purely by manufacturer type and it's not
-> autodetectable by anything like SFDP, so make a new flag for it:
-> UNLOCK_GLOBAL_BLOCK.
+On 07/24/18 at 03:57pm, AKASHI Takahiro wrote:
+> Memblock list is another source for usable system memory layout.
+> So move powerpc's arch_kexec_walk_mem() to common code so that other
+> memblock-based architectures, particularly arm64, can also utilise it.
+> A moved function is now renamed to kexec_walk_memblock() and integrated
+> into kexec_locate_mem_hole(), which will now be usable for all
+> architectures with no need for overriding arch_kexec_walk_mem().
 > 
-> Note that the Global Block Unlock command has different names
-> depending on the manufacturer, but always the same command value:
-> 0x98. Macronix's MX25U12835F names it Gang Block Unlock,
-> Winbound's W25Q128FV names it Global Block Unlock and
-> Microchip's SST26VF064B names it Global Block Protection Unlock.
+> kexec_walk_memblock() will not work for kdump in this form, this will be
+> fixed in the next patch.
 > 
-> Based on initial work done by Anurag Kumar Vulisha:
-> https://patchwork.kernel.org/patch/7611271/
-> 
-> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
-
-Reviewed-by: Cyrille Pitchen <cyrille.pitchen@microchip.com>
-
-Best regards,
-
-Cyrille
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: "Eric W. Biederman" <ebiederm@xmission.com>
+> Cc: Dave Young <dyoung@redhat.com>
+> Cc: Vivek Goyal <vgoyal@redhat.com>
+> Cc: Baoquan He <bhe@redhat.com>
+> Acked-by: James Morse <james.morse@arm.com>
 > ---
->  drivers/mtd/spi-nor/spi-nor.c | 21 +++++++++++++++++++++
->  include/linux/mtd/spi-nor.h   |  1 +
->  2 files changed, 22 insertions(+)
+>  arch/powerpc/kernel/machine_kexec_file_64.c | 54 -------------------
+>  include/linux/kexec.h                       |  2 -
+>  kernel/kexec_file.c                         | 58 ++++++++++++++++++++-
+>  3 files changed, 56 insertions(+), 58 deletions(-)
 > 
-> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-> index d9c368c..6648251 100644
-> --- a/drivers/mtd/spi-nor/spi-nor.c
-> +++ b/drivers/mtd/spi-nor/spi-nor.c
-> @@ -89,6 +89,7 @@ struct flash_info {
->  #define NO_CHIP_ERASE		BIT(12) /* Chip does not support chip erase */
->  #define SPI_NOR_SKIP_SFDP	BIT(13)	/* Skip parsing of SFDP tables */
->  #define USE_CLSR		BIT(14)	/* use CLSR command */
-> +#define UNLOCK_GLOBAL_BLOCK	BIT(15)	/* Unlock global block protection */
+> diff --git a/arch/powerpc/kernel/machine_kexec_file_64.c b/arch/powerpc/kernel/machine_kexec_file_64.c
+> index 0bd23dc789a4..5357b09902c5 100644
+> --- a/arch/powerpc/kernel/machine_kexec_file_64.c
+> +++ b/arch/powerpc/kernel/machine_kexec_file_64.c
+> @@ -24,7 +24,6 @@
 >  
->  	int	(*quad_enable)(struct spi_nor *nor);
->  };
-> @@ -2730,6 +2731,17 @@ static int spi_nor_setup(struct spi_nor *nor, const struct flash_info *info,
->  	return 0;
+>  #include <linux/slab.h>
+>  #include <linux/kexec.h>
+> -#include <linux/memblock.h>
+>  #include <linux/of_fdt.h>
+>  #include <linux/libfdt.h>
+>  #include <asm/ima.h>
+> @@ -46,59 +45,6 @@ int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+>  	return kexec_image_probe_default(image, buf, buf_len);
 >  }
 >  
-> +static int spi_nor_unlock_global_block_protection(struct spi_nor *nor)
-> +{
-> +	int ret;
-> +
-> +	write_enable(nor);
-> +	ret = nor->write_reg(nor, SPINOR_OP_GBULK, NULL, 0);
-> +	if (ret < 0)
-> +		return ret;
-> +	return spi_nor_wait_till_ready(nor);
-> +}
-> +
->  static int spi_nor_init(struct spi_nor *nor)
->  {
->  	int err;
-> @@ -2747,6 +2759,15 @@ static int spi_nor_init(struct spi_nor *nor)
->  		spi_nor_wait_till_ready(nor);
->  	}
+> -/**
+> - * arch_kexec_walk_mem - call func(data) for each unreserved memory block
+> - * @kbuf:	Context info for the search. Also passed to @func.
+> - * @func:	Function to call for each memory block.
+> - *
+> - * This function is used by kexec_add_buffer and kexec_locate_mem_hole
+> - * to find unreserved memory to load kexec segments into.
+> - *
+> - * Return: The memory walk will stop when func returns a non-zero value
+> - * and that value will be returned. If all free regions are visited without
+> - * func returning non-zero, then zero will be returned.
+> - */
+> -int arch_kexec_walk_mem(struct kexec_buf *kbuf,
+> -			int (*func)(struct resource *, void *))
+> -{
+> -	int ret = 0;
+> -	u64 i;
+> -	phys_addr_t mstart, mend;
+> -	struct resource res = { };
+> -
+> -	if (kbuf->top_down) {
+> -		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
+> -						&mstart, &mend, NULL) {
+> -			/*
+> -			 * In memblock, end points to the first byte after the
+> -			 * range while in kexec, end points to the last byte
+> -			 * in the range.
+> -			 */
+> -			res.start = mstart;
+> -			res.end = mend - 1;
+> -			ret = func(&res, kbuf);
+> -			if (ret)
+> -				break;
+> -		}
+> -	} else {
+> -		for_each_free_mem_range(i, NUMA_NO_NODE, 0, &mstart, &mend,
+> -					NULL) {
+> -			/*
+> -			 * In memblock, end points to the first byte after the
+> -			 * range while in kexec, end points to the last byte
+> -			 * in the range.
+> -			 */
+> -			res.start = mstart;
+> -			res.end = mend - 1;
+> -			ret = func(&res, kbuf);
+> -			if (ret)
+> -				break;
+> -		}
+> -	}
+> -
+> -	return ret;
+> -}
+> -
+>  /**
+>   * setup_purgatory - initialize the purgatory's global variables
+>   * @image:		kexec image.
+> diff --git a/include/linux/kexec.h b/include/linux/kexec.h
+> index 49ab758f4d91..c196bfd11bee 100644
+> --- a/include/linux/kexec.h
+> +++ b/include/linux/kexec.h
+> @@ -184,8 +184,6 @@ int __weak arch_kexec_apply_relocations(struct purgatory_info *pi,
+>  					const Elf_Shdr *relsec,
+>  					const Elf_Shdr *symtab);
 >  
-> +	if (nor->info->flags & UNLOCK_GLOBAL_BLOCK) {
-> +		err = spi_nor_unlock_global_block_protection(nor);
-> +		if (err) {
-> +			dev_err(nor->dev,
-> +				"Cannot unlock the global block protection\n");
-> +			return err;
+> -int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
+> -			       int (*func)(struct resource *, void *));
+>  extern int kexec_add_buffer(struct kexec_buf *kbuf);
+>  int kexec_locate_mem_hole(struct kexec_buf *kbuf);
+>  
+> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+> index bf39df5e5bb9..2f0691b0f8ad 100644
+> --- a/kernel/kexec_file.c
+> +++ b/kernel/kexec_file.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/file.h>
+>  #include <linux/slab.h>
+>  #include <linux/kexec.h>
+> +#include <linux/memblock.h>
+>  #include <linux/mutex.h>
+>  #include <linux/list.h>
+>  #include <linux/fs.h>
+> @@ -501,6 +502,55 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
+>  	return locate_mem_hole_bottom_up(start, end, kbuf);
+>  }
+>  
+> +#if defined(CONFIG_HAVE_MEMBLOCK) && !defined(CONFIG_ARCH_DISCARD_MEMBLOCK)
+> +static int kexec_walk_memblock(struct kexec_buf *kbuf,
+> +			       int (*func)(struct resource *, void *))
+> +{
+> +	int ret = 0;
+> +	u64 i;
+> +	phys_addr_t mstart, mend;
+> +	struct resource res = { };
+> +
+> +	if (kbuf->top_down) {
+> +		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
+> +						&mstart, &mend, NULL) {
+> +			/*
+> +			 * In memblock, end points to the first byte after the
+> +			 * range while in kexec, end points to the last byte
+> +			 * in the range.
+> +			 */
+> +			res.start = mstart;
+> +			res.end = mend - 1;
+> +			ret = func(&res, kbuf);
+> +			if (ret)
+> +				break;
+> +		}
+> +	} else {
+> +		for_each_free_mem_range(i, NUMA_NO_NODE, 0, &mstart, &mend,
+> +					NULL) {
+> +			/*
+> +			 * In memblock, end points to the first byte after the
+> +			 * range while in kexec, end points to the last byte
+> +			 * in the range.
+> +			 */
+> +			res.start = mstart;
+> +			res.end = mend - 1;
+> +			ret = func(&res, kbuf);
+> +			if (ret)
+> +				break;
 > +		}
 > +	}
 > +
->  	if (nor->quad_enable) {
->  		err = nor->quad_enable(nor);
->  		if (err) {
-> diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
-> index e60da0d..e8dd11d 100644
-> --- a/include/linux/mtd/spi-nor.h
-> +++ b/include/linux/mtd/spi-nor.h
-> @@ -64,6 +64,7 @@
->  #define SPINOR_OP_CLFSR		0x50	/* Clear flag status register */
->  #define SPINOR_OP_RDEAR		0xc8	/* Read Extended Address Register */
->  #define SPINOR_OP_WREAR		0xc5	/* Write Extended Address Register */
-> +#define SPINOR_OP_GBULK		0x98	/* Global Block Unlock Protection */
+> +	return ret;
+> +}
+> +#else
+> +static int kexec_walk_memblock(struct kexec_buf *kbuf,
+> +			       int (*func)(struct resource *, void *))
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +
+>  /**
+>   * arch_kexec_walk_mem - call func(data) on free memory regions
+>   * @kbuf:	Context info for the search. Also passed to @func.
+> @@ -510,7 +560,7 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
+>   * and that value will be returned. If all free regions are visited without
+>   * func returning non-zero, then zero will be returned.
+>   */
+> -int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
+> +static int arch_kexec_walk_mem(struct kexec_buf *kbuf,
+>  			       int (*func)(struct resource *, void *))
+>  {
+>  	if (kbuf->image->type == KEXEC_TYPE_CRASH)
+> @@ -538,7 +588,11 @@ int kexec_locate_mem_hole(struct kexec_buf *kbuf)
+>  	if (kbuf->mem)
+>  		return 0;
 >  
->  /* 4-byte address opcodes - used on Spansion and some Macronix flashes. */
->  #define SPINOR_OP_READ_4B	0x13	/* Read data bytes (low frequency) */
+> -	ret = arch_kexec_walk_mem(kbuf, locate_mem_hole_callback);
+> +	if (IS_ENABLED(CONFIG_HAVE_MEMBLOCK) &&
+> +			!IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK))
+> +		ret = kexec_walk_memblock(kbuf, locate_mem_hole_callback);
+> +	else
+> +		ret = arch_kexec_walk_mem(kbuf, locate_mem_hole_callback);
+
+AKASHI, since it is not weak function now, it would be better to rename
+the function for example name it as kexec_walk_resource()
+
+Other than this,
+
+Acked-by: Dave Young <dyoung@redhat.com>
+
+>  
+>  	return ret == 1 ? 0 : -EADDRNOTAVAIL;
+>  }
+> -- 
+> 2.18.0
 > 
+
+Thanks
+Dave
