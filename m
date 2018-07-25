@@ -1,112 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Jul 2018 15:27:38 +0100
-Subject: [PATCH v2 1/1] iommu/arm-smmu-v3: Set GBPA to abort all
- transactions
-In-Reply-To: <1529980239-1950-1-git-send-email-sgoel@codeaurora.org>
-References: <1529980239-1950-1-git-send-email-sgoel@codeaurora.org>
-Message-ID: <20180725142737.GA6866@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 25 Jul 2018 15:36:14 +0100
+Subject: [RFC PATCH 08/16] KVM: arm64: Support dynamically hideable
+ system registers
+In-Reply-To: <878t5ztneo.fsf@linaro.org>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-9-git-send-email-Dave.Martin@arm.com>
+ <878t5ztneo.fsf@linaro.org>
+Message-ID: <20180725143613.GM4240@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sameer,
-
-On Mon, Jun 25, 2018 at 08:30:39PM -0600, Sameer Goel wrote:
-> Set SMMU_GBPA to abort all incoming translations during the SMMU reset
-> when SMMUEN==0.
+On Wed, Jul 25, 2018 at 03:12:15PM +0100, Alex Benn?e wrote:
 > 
-> This prevents a race condition where a stray DMA from the crashed primary
-> kernel can try to access an IOVA address as an invalid PA when SMMU is
-> disabled during reset in the crash kernel.
+> Dave Martin <Dave.Martin@arm.com> writes:
 > 
-> Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+> > Some system registers may or may not logically exist for a vcpu
+> > depending on whether certain architectural features are enabled for
+> > the vcpu.
+> >
+> > In order to avoid spuriously emulating access to these registers
+> > when they should not exist, or allowing the registers to be
+> > spuriously enumerated or saved/restored through the ioctl
+> > interface, a means is needed to allow registers to be hidden
+> > depending on the vcpu configuration.
+> >
+> > In order to support this in a flexible way, this patch adds a
+> > check_present() method to struct sys_reg_desc, and updates the
+> > generic system register access and enumeration code to be aware of
+> > it:  if check_present() returns false, the code behaves as if the
+> > register did not exist.
+> >
+> > For convenience, the complete check is wrapped up in a new helper
+> > sys_reg_present().
+> >
+> > An attempt has been made to hook the new check into the generic
+> > accessors for trapped system registers.  This should reduce the
+> > potential for future surprises, although the redundant check will
+> > add a small cost.  No system register depends on this functionality
+> > yet, and some paths needing the check may also need attention.
+> >
+> > Naturally, this facility makes sense only for registers that are
+> > trapped.
+> >
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > ---
+> >  arch/arm64/kvm/sys_regs.c | 20 +++++++++++++++-----
+> >  arch/arm64/kvm/sys_regs.h | 11 +++++++++++
+> >  2 files changed, 26 insertions(+), 5 deletions(-)
+
+[...]
+
+> > diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+> > index cd710f8..dfbb342 100644
+> > --- a/arch/arm64/kvm/sys_regs.h
+> > +++ b/arch/arm64/kvm/sys_regs.h
+> > @@ -22,6 +22,9 @@
+> >  #ifndef __ARM64_KVM_SYS_REGS_LOCAL_H__
+> >  #define __ARM64_KVM_SYS_REGS_LOCAL_H__
+> >
+> > +#include <linux/compiler.h>
+> > +#include <linux/types.h>
 > 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 1d64710..5fedb8e 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -2395,6 +2395,20 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
->  	if (reg & CR0_SMMUEN)
->  		dev_warn(smmu->dev, "SMMU currently enabled! Resetting...\n");
->  
-> +	/*
-> +	 * Abort all incoming translations. This can happen in a kdump case
-> +	 * where SMMU is initialized when a prior DMA is pending. Just
-> +	 * disabling the SMMU in this case might result in writes to invalid
-> +	 * PAs. Do this only if bypass is not set.
-> +	 */
-> +	if(!bypass || disable_bypass) {
-> +		ret = arm_smmu_update_gbpa(smmu, 1, GBPA_ABORT);
+> I can see why you want compiler.h, but why types.h?
 
-I really don't understand what this is trying to accomplish!
+For bool (though it felt a bit pedantic).
 
-As far as I understood, the problem you're trying to solve is when we
-kexec a crash kernel without cleanly shutting down the SMMU. In this case,
-we want to avoid resetting the SMMU when we find it enabled, because doing
-so would put it into bypass and any ongoing DMA could corrupt memory being
-uses by the crash kernel. Is that correct? If so, how about the diff below
-instead of this patch?
-
-Cheers,
-
-Will
-
---->8
-
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 7fb5230cd145..3ce841c5cae3 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -24,6 +24,7 @@
- #include <linux/acpi_iort.h>
- #include <linux/bitfield.h>
- #include <linux/bitops.h>
-+#include <linux/crash_dump.h>
- #include <linux/delay.h>
- #include <linux/dma-iommu.h>
- #include <linux/err.h>
-@@ -2212,8 +2213,12 @@ static int arm_smmu_update_gbpa(struct arm_smmu_device *smmu, u32 set, u32 clr)
- 	reg &= ~clr;
- 	reg |= set;
- 	writel_relaxed(reg | GBPA_UPDATE, gbpa);
--	return readl_relaxed_poll_timeout(gbpa, reg, !(reg & GBPA_UPDATE),
--					  1, ARM_SMMU_POLL_TIMEOUT_US);
-+	ret = readl_relaxed_poll_timeout(gbpa, reg, !(reg & GBPA_UPDATE),
-+					 1, ARM_SMMU_POLL_TIMEOUT_US);
-+
-+	if (ret)
-+		dev_err(smmu->dev, "GBPA not responding to update\n");
-+	return ret;
- }
- 
- static void arm_smmu_free_msis(void *data)
-@@ -2393,8 +2398,14 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
- 
- 	/* Clear CR0 and sync (disables SMMU and queue processing) */
- 	reg = readl_relaxed(smmu->base + ARM_SMMU_CR0);
--	if (reg & CR0_SMMUEN)
-+	if (reg & CR0_SMMUEN) {
-+		if (is_kdump_kernel()) {
-+			arm_smmu_update_gbpa(smmu, GBPA_ABORT, 0);
-+			return -EBUSY;
-+		}
-+
- 		dev_warn(smmu->dev, "SMMU currently enabled! Resetting...\n");
-+	}
- 
- 	ret = arm_smmu_device_disable(smmu);
- 	if (ret)
-@@ -2492,10 +2503,8 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
- 		enables |= CR0_SMMUEN;
- 	} else {
- 		ret = arm_smmu_update_gbpa(smmu, 0, GBPA_ABORT);
--		if (ret) {
--			dev_err(smmu->dev, "GBPA not responding to update\n");
-+		if (ret)
- 			return ret;
--		}
- 	}
- 	ret = arm_smmu_write_reg_sync(smmu, enables, ARM_SMMU_CR0,
- 				      ARM_SMMU_CR0ACK);
+Cheers
+---Dave
