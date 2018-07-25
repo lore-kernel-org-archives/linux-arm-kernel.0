@@ -1,57 +1,37 @@
-From: npiggin@gmail.com (Nicholas Piggin)
-Date: Thu, 26 Jul 2018 00:06:40 +1000
-Subject: [RFC PATCH 3/4] mm: allow arch to have tlb_flush caled on an empty
- TLB range
-In-Reply-To: <20180725140641.30372-1-npiggin@gmail.com>
-References: <20180725140641.30372-1-npiggin@gmail.com>
-Message-ID: <20180725140641.30372-4-npiggin@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 25 Jul 2018 15:12:12 +0100
+Subject: [RFC PATCH 12/16] KVM: arm64/sve: Context switch the SVE registers
+In-Reply-To: <20180725135733.wx4eqrp7cyghcigq@kamzik.brq.redhat.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-13-git-send-email-Dave.Martin@arm.com>
+ <20180719131338.jsgezassnjhdbotd@kamzik.brq.redhat.com>
+ <20180725115045.GJ4240@e103592.cambridge.arm.com>
+ <20180725135733.wx4eqrp7cyghcigq@kamzik.brq.redhat.com>
+Message-ID: <20180725141212.GL4240@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-powerpc wants to de-couple page table caching structure flushes
-from TLB flushes, which will make it possible to have mmu_gather
-with freed page table pages but no TLB range. These must be sent
-to tlb_flush, so allow the arch to specify when mmu_gather with
-empty ranges should have tlb_flush called.
+On Wed, Jul 25, 2018 at 03:57:33PM +0200, Andrew Jones wrote:
+> On Wed, Jul 25, 2018 at 12:50:45PM +0100, Dave Martin wrote:
+> > > > +	if (system_supports_sve() && guest_has_sve)
+> > 
+> > As elsewhere, the system_supports_sve() check uses a static key and
+> > should be very cheap (or free in a CONFIG_ARM64_SVE=n kernel).
+> >
+> 
+> Yup, I'm clear on that now. Thanks again for explaining. It might
+> be nice for a small helper function in this case in order to avoid
+> the 'system_supports_sve() &&' everywhere and the chance that the
+> order of the checks gets swapped during some code refactoring someday.
 
-Signed-off-by: Nicholas Piggin <npiggin@gmail.com>
----
- include/asm-generic/tlb.h | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
+This is what guest_has_sve() is for.
 
-diff --git a/include/asm-generic/tlb.h b/include/asm-generic/tlb.h
-index b3353e21f3b3..b320c0cc8996 100644
---- a/include/asm-generic/tlb.h
-+++ b/include/asm-generic/tlb.h
-@@ -139,14 +139,27 @@ static inline void __tlb_reset_range(struct mmu_gather *tlb)
- 	}
- }
- 
-+/*
-+ * arch_tlb_mustflush specifies if tlb_flush is to be called even if the
-+ * TLB range is empty (this can be the case for freeing page table pages
-+ * if the arch does not adjust TLB range to cover them).
-+ */
-+#ifndef arch_tlb_mustflush
-+#define arch_tlb_mustflush(tlb) false
-+#endif
-+
- static inline void tlb_flush_mmu_tlbonly(struct mmu_gather *tlb)
- {
--	if (!tlb->end)
-+	unsigned long start = tlb->start;
-+	unsigned long end = tlb->end;
-+
-+	if (!(end || arch_tlb_mustflush(tlb)))
- 		return;
- 
- 	tlb_flush(tlb);
--	mmu_notifier_invalidate_range(tlb->mm, tlb->start, tlb->end);
- 	__tlb_reset_range(tlb);
-+	if (end)
-+		mmu_notifier_invalidate_range(tlb->mm, start, end);
- }
- 
- static inline void tlb_remove_page_size(struct mmu_gather *tlb,
--- 
-2.17.0
+In hyp_switch_fpsimd() I wanted to avoid runtime checks wherever
+possible, but it may be overkill to keep checking system_supports_sve()
+like this.
+
+It might take some benchmarking to figure out whether the extra checks
+have any merit here...
+
+Cheers
+---Dave
