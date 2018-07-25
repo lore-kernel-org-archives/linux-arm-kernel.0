@@ -1,27 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 25 Jul 2018 22:49:50 +0200
-Subject: [GIT PULL] pinctrl: samsung: Stuff for v4.19
-In-Reply-To: <20180725161852.6963-1-krzk@kernel.org>
-References: <20180725161852.6963-1-krzk@kernel.org>
-Message-ID: <CACRpkdaDsVdQDZzZBdAznE96WRovOGu9pTio7Ez=fA-T1hvQTA@mail.gmail.com>
+Date: Wed, 25 Jul 2018 22:52:46 +0200
+Subject: [PATCH 07/12] i2c: stu300: use core to detect 'no zero length'
+ quirk
+In-Reply-To: <20180723202617.15230-8-wsa+renesas@sang-engineering.com>
+References: <20180723202617.15230-1-wsa+renesas@sang-engineering.com>
+ <20180723202617.15230-8-wsa+renesas@sang-engineering.com>
+Message-ID: <CACRpkda26LhGi3_LBqMjA+oHNNdNa5NHkpvE4Sk6OdP_uH9-gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2018 at 6:19 PM Krzysztof Kozlowski <krzk@kernel.org> wrote:
+On Mon, Jul 23, 2018 at 10:26 PM Wolfram Sang
+<wsa+renesas@sang-engineering.com> wrote:
 
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> And don't reimplement in the driver.
 >
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
->
-> are available in the git repository at:
->
->   https://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/samsung.git tags/samsung-pinctrl-4.19
->
-> for you to fetch changes up to b3793159249bb091efce4b1515ce18cdfc4c6e41:
->
->   dt-bindings: pinctrl: samsung: Add SPDX license identifier (2018-07-24 21:59:17 +0200)
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Pulled to my devel branch for v4.19, thanks!
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
