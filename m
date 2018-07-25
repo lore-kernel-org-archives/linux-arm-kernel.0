@@ -1,55 +1,25 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 25 Jul 2018 16:21:28 -0700
-Subject: [PATCH v5 3/3] arm64: dts: qcom: pm8998: Add pm8998 thermal zone
-In-Reply-To: <20180724234636.57137-3-mka@chromium.org>
-References: <20180724234636.57137-1-mka@chromium.org>
- <20180724234636.57137-3-mka@chromium.org>
-Message-ID: <CAD=FV=UATTxDxjtL7keOV9RDcPaT00+D8VXMFFaUixeKopJnmg@mail.gmail.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 25 Jul 2018 16:23:04 -0700
+Subject: [PATCH 1/2] clk: uniphier: add NAND 200MHz clock
+In-Reply-To: <1532075856-1723-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1532075856-1723-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <153256098433.48062.7081577175619627994@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jul 24, 2018 at 4:46 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
-> The thermal zone uses spmi-temp-alarm as sensor, the trip points
-> correspond to the PMIC thermal stages 1 and 2. The critical trip
-> point at 125?C disables the partial PMIC shutdown at stage 2.
->
-> Without an IIO input the sensor only reports a limited number of
-> temperatures:
->
-> - 37?C for temperatures below 105?C
-> - 107?C for temperatures >= 105?C and < 125?C
-> - 127?C for temperatures >= 125?C
->
-> (the numbers correspond to a stage 1 threshold of 105?C)
->
-> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+Quoting Masahiro Yamada (2018-07-20 01:37:35)
+> The Denali NAND controller IP needs three clocks:
+> 
+>  - clk: controller core clock
+> 
+>  - clk_x: bus interface clock
+> 
+>  - ecc_clk: clock at which ECC circuitry is run
+> 
+> Currently, only the first one (50MHz) is provided.  The rest of the
+> two clock ports must be connected to the 200MHz clock line.  Add this.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
-> Changes in v5:
-> - removed 'stage2-shutdown-disabled' property from spmi-temp-alarm
-> - updated commit message
->
-> Changes in v4:
-> - updated trip point temperatures to match stage 1 and 2 ones
-> - disabled stage 2 shutdown
-> - updated commit message
->
-> Changes in v3:
-> - moved 'thermal-zones' node to the beginning of the .dtsi
->
-> Changes in v2:
-> - defined 'thermal-zones' node in pm8998.dtsi instead of using a label
->   to refer to it
-> - use 105?C hardware trip point as critical trip point
-> - reduced number of trip points to 2
-> - lowered temperature of passive trip point
-> - updated trip point names and added labels
-> - updated commit message
-> ---
->  arch/arm64/boot/dts/qcom/pm8998.dtsi | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
 
-Looks great!
-
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Applied to clk-next
