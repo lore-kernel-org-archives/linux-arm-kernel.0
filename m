@@ -1,52 +1,56 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 25 Jul 2018 18:23:39 +0200
-Subject: [GIT PULL 2/3] ARM: dts: exynos: Second round for v4.19
-In-Reply-To: <20180725162340.7488-1-krzk@kernel.org>
-References: <20180725162340.7488-1-krzk@kernel.org>
-Message-ID: <20180725162340.7488-2-krzk@kernel.org>
+Date: Wed, 25 Jul 2018 18:27:59 +0200
+Subject: [PATCH] dt-bindings: thermal: samsung: Add SPDX license identifier
+In-Reply-To: <2385592.z8yee4uxt4@amdc3058>
+References: <CGME20180718200318epcas3p16aed6c1725d6c1e63ea6b1ad209c5756@epcas3p1.samsung.com>
+ <2442216.oppRSGRAaL@amdc3058> <20180724200312.xs6u4nvhjckukkig@kozik-lap>
+ <2385592.z8yee4uxt4@amdc3058>
+Message-ID: <CAJKOXPfTBE-tW81tocCfObb-pAwNmDjjv-BY6kHNkEuazm0pAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 25 July 2018 at 16:43, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+> On Tuesday, July 24, 2018 10:03:12 PM Krzysztof Kozlowski wrote:
+>> On Tue, Jul 24, 2018 at 06:46:35PM +0200, Bartlomiej Zolnierkiewicz wrote:
+>> >
+>> > Hi,
+>> >
+>> > On Wednesday, July 18, 2018 10:02:50 PM Krzysztof Kozlowski wrote:
+>> > > Replace GPL license statement with SPDX license identifier (GPL-2.0+).
+>> > >
+>> > > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> > > ---
+>> > >  include/dt-bindings/thermal/thermal_exynos.h | 12 +-----------
+>> > >  1 file changed, 1 insertion(+), 11 deletions(-)
+>> > >
+>> > > diff --git a/include/dt-bindings/thermal/thermal_exynos.h b/include/dt-bindings/thermal/thermal_exynos.h
+>> > > index 0646500bca69..642e4e7f4084 100644
+>> > > --- a/include/dt-bindings/thermal/thermal_exynos.h
+>> > > +++ b/include/dt-bindings/thermal/thermal_exynos.h
+>> > > @@ -1,19 +1,9 @@
+>> > > +/* SPDX-License-Identifier: GPL-2.0+ */
+>> >
+>> > This code should be GPL-2.0 only, original license statement is most
+>> > likely result of using wrong file as the source of copy-paste. So I
+>> > would like to have the license fixed first before doing conversion to
+>> > SPDX.
+>>
+>> If you think that's the case, then it makes sense and please go ahead.
+>> As fair as I remember this required signed-off from all contributors...
+>> so probably just Lukasz and Eduardo?
+>
+> git blame shows just Lukasz so his Ack should be enough.
+>
+> I'm also fine with doing it in one patch like i.e. in commit a80ea4cb944e
+> ("pata_bk3710: clarify license version and use SPDX header"), if you are
+> also fine with it could you please re-spin the patch (+Cc: Lukasz)?
 
-On top of previous pull request.
+I do not have interest in changing the license, I do not want to deal
+with possible legal issues so I'll skip it.
 
+I am fine however with abandoning this patch if you or someone else
+sends license change + SPDX.
 
 Best regards,
 Krzysztof
-
-
-The following changes since commit 57f4e8bc1c3ebbd06a278107edeb6af95b53e5bf:
-
-  dt-bindings: samsung: Document bindings for SGH-T959P board (2018-07-07 12:28:07 +0200)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.19-2
-
-for you to fetch changes up to 965228d33cd2b47adb493bb1864761420c632e41:
-
-  ARM: dts: exynos: Configure Midas SD card CD pin (2018-07-23 19:12:01 +0200)
-
-----------------------------------------------------------------
-Samsung DTS ARM changes for v4.19, part 2
-
-1. Add missing interrupts to PWM nodes on Exynos5.
-2. Add missing interrupt pin pull up/down configuration on Exynos4412
-   Midas boards.  The interrupts were mostly working thanks to initial
-   configuration by bootloader.
-
-----------------------------------------------------------------
-Anand Moon (1):
-      ARM: dts: exynos: Add missing interrupts for pwm node on Exynos5
-
-Simon Shields (5):
-      ARM: dts: exynos: Add max77693 pinctrl config for Midas
-      ARM: dts: exynos: Add pinctrl config for Midas keys
-      ARM: dts: exynos: Add pinctrl for Midas fuelgauge IRQ pin
-      ARM: dts: exynos: Configure max77686 IRQ pin on Midas
-      ARM: dts: exynos: Configure Midas SD card CD pin
-
- arch/arm/boot/dts/exynos4412-midas.dtsi | 35 ++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/exynos5.dtsi          |  5 +++++
- 2 files changed, 39 insertions(+), 1 deletion(-)
