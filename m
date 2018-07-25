@@ -1,141 +1,73 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 25 Jul 2018 08:38:09 -0600
-Subject: [PATCH v2 02/10] coresight: platform: Refactor graph endpoint
- parsing
-In-Reply-To: <ea1a6672-0cbb-86b7-c8cd-0759edb94f85@arm.com>
-References: <1531997715-6767-1-git-send-email-suzuki.poulose@arm.com>
- <1531997715-6767-3-git-send-email-suzuki.poulose@arm.com>
- <20180724213031.GA22451@xps15>
- <CANLsYkwDTM2pT0JCCnLdetKoYe6xsmj48Gyb5OJFxJMmRLrZ_g@mail.gmail.com>
- <ea1a6672-0cbb-86b7-c8cd-0759edb94f85@arm.com>
-Message-ID: <CANLsYkxcTPWbM75wHgiy8tC6FNhELsMcK=fu2TfvXG-3rM=hCA@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 25 Jul 2018 15:39:15 +0100
+Subject: [RFC PATCH 07/16] arm64/sve: Enable SVE state tracking for
+ non-task contexts
+In-Reply-To: <87a7qfto1m.fsf@linaro.org>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-8-git-send-email-Dave.Martin@arm.com>
+ <87a7qfto1m.fsf@linaro.org>
+Message-ID: <20180725143914.GN4240@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Jul 2018 at 03:01, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->
-> On 07/24/2018 10:34 PM, Mathieu Poirier wrote:
-> > On Tue, 24 Jul 2018 at 15:30, Mathieu Poirier
-> > <mathieu.poirier@linaro.org> wrote:
-> >>
-> >> Good afternoon,
-> >>
-> >> On Thu, Jul 19, 2018 at 11:55:06AM +0100, Suzuki K Poulose wrote:
-> >>> Refactor the of graph endpoint parsing code, to make the error
-> >>> handling easier.
-> >>>
-> >>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> >>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >>> ---
-> >>> Changes since v1:
-> >>>   - Splitted from the of_node refcounting fix, part1
-> >>> ---
-> >>>   drivers/hwtracing/coresight/of_coresight.c | 129 +++++++++++++++++------------
-> >>>   1 file changed, 75 insertions(+), 54 deletions(-)
-> >>>
-> >>> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-> >>> index 6880bee..68faaf8 100644
-> >>> --- a/drivers/hwtracing/coresight/of_coresight.c
-> >>> +++ b/drivers/hwtracing/coresight/of_coresight.c
-> >>> @@ -114,17 +114,69 @@ int of_coresight_get_cpu(const struct device_node *node)
-> >>>   }
-> >>>   EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
-> >>>
-> >>> +/*
-> >>> + * of_coresight_parse_endpoint : Parse the given output endpoint @ep
-> >>> + * and fill the connection information in @pdata[*@i].
-> >>> + *
-> >>> + * Parses the local port, remote device name and the remote port. Also
-> >>> + * updates *@i to point to the next index, when an entry is added.
-> >>> + *
-> >>> + * Returns :
-> >>> + *    0      - If the parsing completed without any fatal errors.
-> >>> + *   -Errno  - Fatal error, abort the scanning.
-> >>> + */
-> >>> +static int of_coresight_parse_endpoint(struct device *dev,
-> >>> +                                    struct device_node *ep,
-> >>> +                                    struct coresight_platform_data *pdata,
-> >>> +                                    int *i)
-> >>> +{
-> >>> +     int ret = 0;
-> >>> +     struct of_endpoint endpoint, rendpoint;
-> >>> +     struct device_node *rparent = NULL;
-> >>> +     struct device_node *rport = NULL;
-> >>> +     struct device *rdev = NULL;
-> >>> +
-> >>> +     do {
-> >>> +             /* Parse the local port details */
-> >>> +             if (of_graph_parse_endpoint(ep, &endpoint))
-> >>> +                     break;
-> >>> +             /*
-> >>> +              * Get a handle on the remote port and parent
-> >>> +              * attached to it.
-> >>> +              */
-> >>> +             rparent = of_graph_get_remote_port_parent(ep);
-> >>> +             if (!rparent)
-> >>> +                     break;
-> >>> +             rport = of_graph_get_remote_port(ep);
-> >>> +             if (!rport)
-> >>> +                     break;
-> >>> +             if (of_graph_parse_endpoint(rport, &rendpoint))
-> >>> +                     break;
-> >>> +
-> >>> +             /* If the remote device is not available, defer probing */
-> >>> +             rdev = of_coresight_get_endpoint_device(rparent);
-> >>> +             if (!rdev) {
-> >>> +                     ret = -EPROBE_DEFER;
-> >>> +                     break;
-> >>> +             }
-> >>> +
-> >>> +             pdata->outports[*i] = endpoint.port;
-> >>> +             pdata->child_names[*i] = dev_name(rdev);
-> >>> +             pdata->child_ports[*i] = rendpoint.id;
-> >>> +             /* Move the index */
-> >>> +             (*i)++;
-> >>
-> >> Not a big fan, makes the code needlessly complex.  Incrementation of the index
-> >> can be done in the while loop of of_get_coresight_platform_data().  See below.
->
-> Me neither..
->
+On Wed, Jul 25, 2018 at 02:58:29PM +0100, Alex Benn?e wrote:
+> 
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > The current FPSIMD/SVE context handling support for non-task (i.e.,
+> > KVM vcpu) contexts does not take SVE into account.  This means that
+> > only task contexts can safely use SVE at present.
 > >
-> > Void that - it properly deals with the first of_parse_endpoint().
->
-> Or may be we could do something with the return value :
->
->           1 - Successfully parsed and populated a connection entry
->           0 - No errors in parsing
->         < 0 - Errors in parsing
+> > In preparation for enabling KVM guests to use SVE, it is necessary
+> > to keep track of SVE state for non-task contexts too.
+> >
+> > This patch adds the necessary support, removing assumptions from
+> > the context switch code about the location of the SVE context
+> > storage.
+> >
+> > When binding a vcpu context, its vector length is arbitrarily
+> > specified as sve_max_vl for now.  In any case, because TIF_SVE is
+> > presently cleared at vcpu context bind time, the specified vector
+> > length will not be used for anything yet.  In later patches TIF_SVE
+> > will be set here as appropriate, and the appropriate maximum vector
+> > length for the vcpu will be passed when binding.
+> <snip>
+> > --- a/arch/arm64/kernel/fpsimd.c
+> > +++ b/arch/arm64/kernel/fpsimd.c
+> > @@ -121,6 +121,8 @@
+> >   */
+> >  struct fpsimd_last_state_struct {
+> >  	struct user_fpsimd_state *st;
+> > +	void *sve_state;
+> > +	unsigned int sve_vl;
+> >  };
+> 
+> > -	struct user_fpsimd_state *st = __this_cpu_read(fpsimd_last_state.st);
+> > +	struct fpsimd_last_state_struct const *last =
+> > +		this_cpu_ptr(&fpsimd_last_state);
+> <snip>
+> > @@ -1074,6 +1082,8 @@ void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
+> >  	WARN_ON(!in_softirq() && !irqs_disabled());
+> >
+> >  	last->st = st;
+> > +	last->sve_state = sve_state;
+> > +	last->sve_vl = sve_vl;
+> >  }
+> 
+> I'm suffering a little cognitive dissonance with the use of last here
+> because isn't it really the state as it is now - as we bind to the cpu?
 
-Right, that is another solution.  I usually try to avoid those but I
-think it is better than what we currently have.
+Yes, but it _will_ be the last state ;)
 
->
-> >>> @@ -132,64 +184,33 @@ of_get_coresight_platform_data(struct device *dev,
->
->
-> >>> +     while ((ep = of_graph_get_next_endpoint(node, ep))) {
-> >>> +             /*
-> >>> +              * No need to deal with input ports, processing for as
-> >>> +              * processing for output ports will deal with them.
-> >>> +              */
-> >>
-> >> This comment has been broken for a while... It should read:
-> >>
-> >>                  /*
-> >>                   * No need to deal with input ports, as processing
-> >>                   * for output ports will deal with them.
-> >>                   */
->
-> Sure, will fix it.
+It could have been named along the lines of "current", which would have
+been less confusing in some respects.  Anyway, the name crept in a while
+ago (pre-SVE) and I'm not sure it's really worth fixing.
 
-Thanks,
-Mathieu
+> 
+> Anyway not super relevant to this patch as the name has already been
+> chosen so:
+> 
+> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 
->
->
-> Suzuki
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks
+---Dave
