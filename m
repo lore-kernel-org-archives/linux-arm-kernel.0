@@ -1,30 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 25 Jul 2018 13:13:07 -0600
-Subject: [PATCH] dt-bindings: clock: samsung: Add SPDX license identifiers
-In-Reply-To: <20180718200216.6389-1-krzk@kernel.org>
-References: <20180718200216.6389-1-krzk@kernel.org>
-Message-ID: <20180725191307.GA32217@rob-hp-laptop>
+Date: Wed, 25 Jul 2018 13:17:59 -0600
+Subject: [PATCH 1/2] dt-bindings: spi: add DT bindings for UniPhier SPI
+ controller
+In-Reply-To: <1531983117-9443-2-git-send-email-hayashibara.keiji@socionext.com>
+References: <1531983117-9443-1-git-send-email-hayashibara.keiji@socionext.com>
+ <1531983117-9443-2-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <20180725191759.GA5573@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 10:02:16PM +0200, Krzysztof Kozlowski wrote:
-> Replace GPL license statements with SPDX license identifiers (GPL-2.0).
+On Thu, Jul 19, 2018 at 03:51:56PM +0900, Keiji Hayashibara wrote:
+> From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 > 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Add DT bindings for SPI controller implemented in UniPhier SoCs.
+> 
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
 > ---
->  include/dt-bindings/clock/exynos3250.h            | 5 +----
->  include/dt-bindings/clock/exynos4.h               | 7 ++-----
->  include/dt-bindings/clock/exynos5250.h            | 7 ++-----
->  include/dt-bindings/clock/exynos5260-clk.h        | 7 ++-----
->  include/dt-bindings/clock/exynos5410.h            | 7 ++-----
->  include/dt-bindings/clock/exynos5420.h            | 7 ++-----
->  include/dt-bindings/clock/exynos5433.h            | 5 +----
->  include/dt-bindings/clock/exynos7-clk.h           | 7 ++-----
->  include/dt-bindings/clock/s3c2410.h               | 5 +----
->  include/dt-bindings/clock/s3c2412.h               | 5 +----
->  include/dt-bindings/clock/s3c2443.h               | 5 +----
->  include/dt-bindings/clock/samsung,s2mps11.h       | 5 +----
->  include/dt-bindings/clock/samsung,s3c64xx-clock.h | 7 ++-----
->  13 files changed, 20 insertions(+), 59 deletions(-)
+>  .../devicetree/bindings/spi/spi-uniphier.txt       | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/spi/spi-uniphier.txt
 
 Reviewed-by: Rob Herring <robh@kernel.org>
