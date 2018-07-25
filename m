@@ -1,46 +1,47 @@
-From: alex@ghiti.fr (Alexandre Ghiti)
-Date: Wed, 25 Jul 2018 09:38:57 +0200
-Subject: [PATCH v4 00/11] hugetlb: Factorize hugetlb architecture
- primitives
-In-Reply-To: <20180725003428.jsklz7pj4m7lj3m4@pburton-laptop>
-References: <20180705110716.3919-1-alex@ghiti.fr>
- <20180725003428.jsklz7pj4m7lj3m4@pburton-laptop>
-Message-ID: <7c187058-12c7-ee2d-3ceb-d17ba94875b8@ghiti.fr>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Wed, 25 Jul 2018 09:52:22 +0200
+Subject: [PATCH v3 00/23] Add multi-channel support to Armada thermal
+ driver
+In-Reply-To: <20180718172849.30b7cec0@xps13>
+References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
+ <20180718172849.30b7cec0@xps13>
+Message-ID: <20180725095222.054f1e80@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Eduardo, Zhang,
 
-Thanks for having tested it, I remove mips from my list.
+Miquel Raynal <miquel.raynal@bootlin.com> wrote on Wed, 18 Jul 2018
+17:28:49 +0200:
 
-Thanks again,
+> Hi Eduardo,
+> 
+> Miquel Raynal <miquel.raynal@bootlin.com> wrote on Mon, 16 Jul 2018
+> 16:41:43 +0200:
+> 
+> > The only capability of the Armada thermal driver is currently just to
+> > read one sensor (the default one) per AP and one per CP. Actually,
+> > there is one sensor per core in the AP806 plus one sensor in the
+> > thermal IP itself. The CP110 just features one thermal sensor in its
+> > own thermal IP.
+> > 
+> > This series first improves the readability of this driver, then adds
+> > support for multi-channel thermal IPs. The bindings and the
+> > device-trees are updated accordingly.
+> > 
+> > Thank you,
+> > Miqu?l  
+> 
+> I know I sent this series on monday but there was almost no change on
+> it (see below), do you think you will have the time to look at it
+> before it's too late for the merge window?
 
-Alex
+I know a little bit what it is to be on the maintainer side of a
+subsystem but these changes are laying since April, 21st and I really
+expect to get them merged. Zhang, as Eduardo seems to be overloaded
+this release, could you please take the series?
 
+Of course if there are things to address I'll be happy to do so.
 
-On 07/25/2018 02:34 AM, Paul Burton wrote:
-> Hi Alexandre,
->
-> On Thu, Jul 05, 2018 at 11:07:05AM +0000, Alexandre Ghiti wrote:
->> In order to reduce copy/paste of functions across architectures and then
->> make riscv hugetlb port (and future ports) simpler and smaller, this
->> patchset intends to factorize the numerous hugetlb primitives that are
->> defined across all the architectures.
->>
->> Except for prepare_hugepage_range, this patchset moves the versions that
->> are just pass-through to standard pte primitives into
->> asm-generic/hugetlb.h by using the same #ifdef semantic that can be
->> found in asm-generic/pgtable.h, i.e. __HAVE_ARCH_***.
->>
->> s390 architecture has not been tackled in this serie since it does not
->> use asm-generic/hugetlb.h at all.
->> powerpc could be factorized a bit more (cf huge_ptep_set_wrprotect).
->>
->> This patchset has been compiled on x86 only.
-> For MIPS these look good - I don't see any issues & they pass a build
-> test (using cavium_octeon_defconfig which enables huge pages), so:
->
->      Acked-by: Paul Burton <paul.burton@mips.com> # MIPS parts
->
-> Thanks,
->      Paul
+Thanks,
+Miqu?l
