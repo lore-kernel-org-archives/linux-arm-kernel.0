@@ -1,57 +1,19 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 25 Jul 2018 22:34:16 +0200
-Subject: [GIT PULL 00/27] perf/core improvements and fixes
-In-Reply-To: <20180725180001.15108-1-acme@kernel.org>
-References: <20180725180001.15108-1-acme@kernel.org>
-Message-ID: <20180725203416.GA3142@gmail.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 25 Jul 2018 13:34:33 -0700
+Subject: [PATCH] clk: imx6sll: fix missing of_node_put()
+In-Reply-To: <1531500004-23175-1-git-send-email-hofrat@osadl.org>
+References: <1531500004-23175-1-git-send-email-hofrat@osadl.org>
+Message-ID: <153255087367.48062.13238305772137420591@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
-
-> Hi Ingo,
+Quoting Nicholas Mc Guire (2018-07-13 09:40:04)
+> of_find_compatible_node() is returning a device node with refcount
+> incremented and must be explicitly decremented after the last use
+> which is right after the us in of_iomap() here.
 > 
-> 	Please consider pulling, I'm now investigating why these failed:
-> 
->   38: LLVM search and compile                               :
->   38.1: Basic BPF llvm compile                              : Ok
->   38.2: kbuild searching                                    : Ok
->   38.3: Compile source for BPF prologue generation          : Ok
->   38.4: Compile source for BPF relocation                   : FAILED!
->   40: BPF filter                                            :
->   40.1: Basic BPF filtering                                 : Ok
->   40.2: BPF pinning                                         : Ok
->   40.3: BPF prologue generation                             : Ok
->   40.4: BPF relocation checker                              : FAILED!
-> 
-> 	I think these failures are not related to changes in this patch
-> kit. Details about the test environment, versions, etc.
+> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+> Fixes: commit 4a5f720b6542 ("clk: imx: add clock driver for imx6sll")
+> ---
 
-Ok!
-
-> The following changes since commit 1d59d16e9b4d5be80c9786a8b129c0f2af0e9522:
-> 
->   Merge remote-tracking branch 'tip/perf/urgent' into perf/core (2018-07-24 14:34:32 -0300)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-core-for-mingo-4.19-20180725
-
->  52 files changed, 1456 insertions(+), 109 deletions(-)
-
-Pulled, thanks a lot Arnaldo!
-
-Could we please also fix these before v4.18 is released, which trigger in 
-perf/urgent:
-
-Warning: Kernel ABI header at 'tools/include/uapi/linux/perf_event.h' differs from latest version at 'include/uapi/linux/perf_event.h'
-Warning: Kernel ABI header at 'tools/arch/powerpc/include/uapi/asm/unistd.h' differs from latest version at 'arch/powerpc/include/uapi/asm/unistd.h'
-Warning: Kernel ABI header at 'tools/arch/x86/lib/memcpy_64.S' differs from latest version at 'arch/x86/lib/memcpy_64.S'
-Warning: Kernel ABI header at 'tools/include/uapi/linux/bpf.h' differs from latest version at 'include/uapi/linux/bpf.h'
-
-?
-
-Thanks!
-
-	Ingo
+Applied to clk-next
