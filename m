@@ -1,48 +1,108 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Jul 2018 16:16:41 +0100
-Subject: [RFC V4 0/3] arm_pmu: acpi: variant support and QCOM Falkor
- extensions
-In-Reply-To: <CAGbRU0QLSpNEtcryuPPZE98zAo7peEmcDqcQiLi1zO6cfKML2A@mail.gmail.com>
-References: <1530822201-5890-1-git-send-email-agustinv@codeaurora.org>
- <20180713153318.GB3049@arm.com>
- <CAGbRU0QLSpNEtcryuPPZE98zAo7peEmcDqcQiLi1zO6cfKML2A@mail.gmail.com>
-Message-ID: <20180725151641.GC6866@arm.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Wed, 25 Jul 2018 20:53:58 +0530
+Subject: [PATCH v2 1/4] dt-bindings: dma: Add binding for Actions Semi
+ Owl SoCs
+In-Reply-To: <20180724121604.GA2587@vkoul-mobl>
+References: <20180723041743.32024-1-manivannan.sadhasivam@linaro.org>
+ <20180723041743.32024-2-manivannan.sadhasivam@linaro.org>
+ <20180724121604.GA2587@vkoul-mobl>
+Message-ID: <20180725152358.GA14686@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 15, 2018 at 03:35:45PM -0500, J. Agust?n Vega-Fr?as wrote:
-> On Fri, Jul 13, 2018 at 10:33 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > I'm mostly ok with this approach, but I have a concern with the way in which
-> > the sysfs interface for carving up the config fields is implemented. If this
-> > is intended to be a strict extension to the armv8 pmu architecture, then I
-> > don't think you should be overriding the attr_groups entirely. Rather, you
-> > should be taking the attr_groups from pmuv3 and then extending them in a way
-> > which avoids overlapping field allocations by construction.
-> >
-> > As it stands, you already have an overlap between the pcc bit and the
-> > chained counter bit which Suzuki has implemented and it will be very easy to
-> > introduce API breakage if we don't enforce this as part of the design.
-> >
-> > Will
-> 
-> FYI, I left Qualcomm on July 6, one of my former colleagues will submit
-> new iterations of this series. I will continue to comment on this and future
-> patchsets as a courtesy to my former colleagues and the community.
-> 
-> Thanks for pointing out the sysfs issue. My suggestion on how to address it is:
-> 
-> 1. Reserve config and config1 for architectural format attributes and
->    config2 for extension format attributes.
-> 2. Add a struct attribute ** parameter to the extension init function so
->    extensions can return the new attributes.
-> 3. The extension framework code in arm_pmu_acpi.c can then allocate a new
->    attribute array to contain the base and extension attributes and ensure
->    all the new attributes are on config2.
-> 
-> Though a more elaborate approach can be implemented to find conflicts in
-> bit usage within config fields, it would require much more code for a
-> relatively simple problem. Thoughts?
+Hi Vinod,
 
-As long as you're happy to live inside config2, that sounds sensible to me.
+On Tue, Jul 24, 2018 at 05:46:04PM +0530, Vinod wrote:
+> Hi Mani,
+> 
+> Patch title should be dmaengine: ... Please always use the apt tags and
+> one can find them using git log <subsystem>
+> 
 
-Will
+Did you mean, dt-bindings: dmaengine? If yes, then I will use it for the
+future patches.
+
+> On 23-07-18, 09:47, Manivannan Sadhasivam wrote:
+> > Add devicetree binding for Actions Semi Owl SoCs DMA controller.
+> 
+> 
+> It would help for review to describe the controller here
+> 
+
+Okay.
+
+> > 
+> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> > ---
+> >  .../devicetree/bindings/dma/owl-dma.txt       | 46 +++++++++++++++++++
+> >  1 file changed, 46 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/dma/owl-dma.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/dma/owl-dma.txt b/Documentation/devicetree/bindings/dma/owl-dma.txt
+> > new file mode 100644
+> > index 000000000000..dd6ce237b216
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/dma/owl-dma.txt
+> > @@ -0,0 +1,46 @@
+> > +* Actions Semi Owl SoCs DMA controller
+> > +
+> > +This binding follows the generic DMA bindings defined in dma.txt.
+> > +
+> > +Required properties:
+> > +- compatible: Should be "actions,s900-dma".
+> > +- reg: Should contain DMA registers location and length.
+> > +- interrupts: Should contain 4 interrupts shared by all channel.
+> > +- #dma-cells: Must be <1>. Used to represent the number of integer
+> > +              cells in the dmas property of client device.
+> > +- dma-channels: Physical channels supported.
+> > +- dma-requests: Virtual channels supported.
+> 
+> not really, virtual channel is a software concepts. On the other hand
+> you may have request lines in hw and you can describe that, if not skip
+> this one
+> 
+
+Okay. Will change the property description to request signals.
+
+Thanks,
+Mani
+
+> > +- clocks: Phandle and Specifier of the clock feeding the DMA controller.
+> > +
+> > +Example:
+> > +
+> > +Controller:
+> > +                dma: dma-controller at e0260000 {
+> > +                        compatible = "actions,s900-dma";
+> > +                        reg = <0x0 0xe0260000 0x0 0x1000>;
+> > +                        interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+> > +                        #dma-cells = <1>;
+> > +                        dma-channels = <12>;
+> > +                        dma-requests = <46>;
+> > +                        clocks = <&clock CLK_DMAC>;
+> > +                };
+> > +
+> > +Client:
+> > +
+> > +DMA clients connected to the Actions Semi Owl SoCs DMA controller must
+> > +use the format described in the dma.txt file, using a two-cell specifier
+> > +for each channel.
+> > +
+> > +The two cells in order are:
+> > +1. A phandle pointing to the DMA controller.
+> > +2. The channel id.
+> > +
+> > +uart5: serial at e012a000 {
+> > +        ...
+> > +        dma-names = "tx", "rx";
+> > +        dmas = <&dma 26>, <&dma 27>;
+> > +        ...
+> > +};
+> > -- 
+> > 2.17.1
+> 
+> -- 
+> ~Vinod
