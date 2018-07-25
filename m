@@ -1,105 +1,96 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 25 Jul 2018 20:20:36 +0800
-Subject: [linux-sunxi] Re: [PATCH 3/3] arm64: allwinner: dts: h6: add
- Wi-Fi support for Pine H64 model A/B
-In-Reply-To: <20180725121947.ox4zykod6jjadvfw@flea>
-References: <20180724011551.49603-1-icenowy@aosc.io>
- <20180724011551.49603-4-icenowy@aosc.io>
- <CAGb2v67zR-Q9n7L6CaFKDUJFHFEC_h8-RYxkdyeyJb_GbNmkJw@mail.gmail.com>
- <CEA43CB7-1DA6-4983-BF18-82C4A48FB92B@aosc.io>
- <CAGb2v64Qae4O430kP30DQNhp0Dt774OHt0nMe35ckp8X=CTFLg@mail.gmail.com>
- <AC678B03-19B7-4110-B333-72188CE71296@aosc.io>
- <CAGb2v656oPmAX=_y88b05xqrona3HFtU-VmNQhHxK_n-4gD+aw@mail.gmail.com>
- <20180724144151.myyg7slocsfjjsfi@flea>
- <198DB486-4789-4777-9596-2BD6FAFFB741@aosc.io>
- <20180725121947.ox4zykod6jjadvfw@flea>
-Message-ID: <5562781F-ADDF-4289-9B74-1E445FDE04F0@aosc.io>
+From: cyrille.pitchen@microchip.com (Cyrille Pitchen)
+Date: Wed, 25 Jul 2018 14:26:36 +0200
+Subject: [PATCH 1/3] mtd: spi-nor: add Global Block Unlock support
+In-Reply-To: <20180717162831.17947-1-tudor.ambarus@microchip.com>
+References: <20180717162831.17947-1-tudor.ambarus@microchip.com>
+Message-ID: <8e0ff8be-34d1-7de9-6120-a067540a75d2@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tudor,
 
+Le 17/07/2018 ? 18:28, Tudor Ambarus a ?crit?:
+> We can't determine this purely by manufacturer type and it's not
+> autodetectable by anything like SFDP, so make a new flag for it:
+> UNLOCK_GLOBAL_BLOCK.
+> 
+> Note that the Global Block Unlock command has different names
+> depending on the manufacturer, but always the same command value:
+> 0x98. Macronix's MX25U12835F names it Gang Block Unlock,
+> Winbound's W25Q128FV names it Global Block Unlock and
+> Microchip's SST26VF064B names it Global Block Protection Unlock.
+> 
+> Based on initial work done by Anurag Kumar Vulisha:
+> https://patchwork.kernel.org/patch/7611271/
+> 
+> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
 
-? 2018?7?25? GMT+08:00 ??8:19:47, Maxime Ripard <maxime.ripard@bootlin.com> ??:
->On Tue, Jul 24, 2018 at 10:42:32PM +0800, Icenowy Zheng wrote:
->> 
->> 
->> ? 2018?7?24? GMT+08:00 ??10:41:51, Maxime Ripard
-><maxime.ripard@bootlin.com> ??:
->> >On Tue, Jul 24, 2018 at 10:37:51AM +0800, Chen-Yu Tsai wrote:
->> >> On Tue, Jul 24, 2018 at 10:28 AM, Icenowy Zheng <icenowy@aosc.io>
->> >wrote:
->> >> >
->> >> >
->> >> > ? 2018?7?24? GMT+08:00 ??10:26:02, Chen-Yu Tsai <wens@csie.org>
->??:
->> >> >>On Tue, Jul 24, 2018 at 10:23 AM, Icenowy Zheng
-><icenowy@aosc.io>
->> >> >>wrote:
->> >> >>>
->> >> >>>
->> >> >>> ? 2018?7?24? GMT+08:00 ??10:21:59, Chen-Yu Tsai
-><wens@csie.org>
->> >??:
->> >> >>>>On Tue, Jul 24, 2018 at 9:15 AM, Icenowy Zheng
-><icenowy@aosc.io>
->> >> >>wrote:
->> >> >>>>> The Pine H64 model A has a Wi-Fi module connector and the
->model
->> >B
->> >> >>has
->> >> >>>>an
->> >> >>>>> on-board RTL8723BS Wi-Fi module.
->> >> >>>>>
->> >> >>>>> Add support for them. For model A, as it's not defaultly
->> >present,
->> >> >>>>keep
->> >> >>>>> it disabled now.
->> >> >>>>
->> >> >>>>Nope. Pine64 actually has two WiFi/BT modules. And they
->require
->> >> >>>>different
->> >> >>>>device tree snippets for both the WiFi and BT side. This is
->> >better
->> >> >>>>resolved
->> >> >>>>with device tree overlays.
->> >> >>>>
->> >> >>>>I have both, though I've yet found time to work on them.
->> >> >>>
->> >> >>> I have also both.
->> >> >>>
->> >> >>> The skeleton here can get the Wi-Fi of both to work.
->> >> >>
->> >> >>Cool. Then I can put away my RTL module for now. :)
->> >> >
->> >> > P.S. SDIO is auto detectable, and for BCM chips, the OOB
->interrupt
->> >> > is only a bonus function and it can fall back to standard
->in-band
->> >> > interrupt (which doesn't need special binding, and is currently
->> >> > used by mainline r8723bs driver.)
->> >> 
->> >> Correct. With BT you'll have serdev device nodes with different
->> >> compatibles. Then you'll have to resort to overlays, and you'd
->> >probably
->> >> end up adding WiFi OOB interrupt bits as well.
->> >> 
->> >> So the question remaining is: should we enable the MMC part, along
->> >> with power sequencing and regulator supplies, by default? Thinking
->> >> more about it, I'm actually OK with it. The board connectors are
->> >> clearly marked as being for a WiFi+BT module. The whole space on
->> >> the board is surrounded by a box in silkscreen. Sorry for the
->> >> initial nack.
->> >> 
->> >> Maxime, any thoughts?
->> >
->> >If there's a need for an overlay anyway, there's no real reason to
->> >enable it by default, especially if not everything is there.
->> 
->> Everything is there, for model B support.
->
->Except BT?
+Reviewed-by: Cyrille Pitchen <cyrille.pitchen@microchip.com>
 
-Yes, not checked BT yet.
+Best regards,
 
->
->Maxime
+Cyrille
+> ---
+>  drivers/mtd/spi-nor/spi-nor.c | 21 +++++++++++++++++++++
+>  include/linux/mtd/spi-nor.h   |  1 +
+>  2 files changed, 22 insertions(+)
+> 
+> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+> index d9c368c..6648251 100644
+> --- a/drivers/mtd/spi-nor/spi-nor.c
+> +++ b/drivers/mtd/spi-nor/spi-nor.c
+> @@ -89,6 +89,7 @@ struct flash_info {
+>  #define NO_CHIP_ERASE		BIT(12) /* Chip does not support chip erase */
+>  #define SPI_NOR_SKIP_SFDP	BIT(13)	/* Skip parsing of SFDP tables */
+>  #define USE_CLSR		BIT(14)	/* use CLSR command */
+> +#define UNLOCK_GLOBAL_BLOCK	BIT(15)	/* Unlock global block protection */
+>  
+>  	int	(*quad_enable)(struct spi_nor *nor);
+>  };
+> @@ -2730,6 +2731,17 @@ static int spi_nor_setup(struct spi_nor *nor, const struct flash_info *info,
+>  	return 0;
+>  }
+>  
+> +static int spi_nor_unlock_global_block_protection(struct spi_nor *nor)
+> +{
+> +	int ret;
+> +
+> +	write_enable(nor);
+> +	ret = nor->write_reg(nor, SPINOR_OP_GBULK, NULL, 0);
+> +	if (ret < 0)
+> +		return ret;
+> +	return spi_nor_wait_till_ready(nor);
+> +}
+> +
+>  static int spi_nor_init(struct spi_nor *nor)
+>  {
+>  	int err;
+> @@ -2747,6 +2759,15 @@ static int spi_nor_init(struct spi_nor *nor)
+>  		spi_nor_wait_till_ready(nor);
+>  	}
+>  
+> +	if (nor->info->flags & UNLOCK_GLOBAL_BLOCK) {
+> +		err = spi_nor_unlock_global_block_protection(nor);
+> +		if (err) {
+> +			dev_err(nor->dev,
+> +				"Cannot unlock the global block protection\n");
+> +			return err;
+> +		}
+> +	}
+> +
+>  	if (nor->quad_enable) {
+>  		err = nor->quad_enable(nor);
+>  		if (err) {
+> diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+> index e60da0d..e8dd11d 100644
+> --- a/include/linux/mtd/spi-nor.h
+> +++ b/include/linux/mtd/spi-nor.h
+> @@ -64,6 +64,7 @@
+>  #define SPINOR_OP_CLFSR		0x50	/* Clear flag status register */
+>  #define SPINOR_OP_RDEAR		0xc8	/* Read Extended Address Register */
+>  #define SPINOR_OP_WREAR		0xc5	/* Write Extended Address Register */
+> +#define SPINOR_OP_GBULK		0x98	/* Global Block Unlock Protection */
+>  
+>  /* 4-byte address opcodes - used on Spansion and some Macronix flashes. */
+>  #define SPINOR_OP_READ_4B	0x13	/* Read data bytes (low frequency) */
+> 
