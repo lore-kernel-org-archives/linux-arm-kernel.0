@@ -1,77 +1,76 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 25 Jul 2018 15:43:59 +0200
-Subject: [RFC PATCH 10/16] KVM: arm64: Add a vcpu flag to control SVE
- visibility for the guest
-In-Reply-To: <20180725114103.GG4240@e103592.cambridge.arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-11-git-send-email-Dave.Martin@arm.com>
- <20180719110810.2edkoz53b6vrafum@kamzik.brq.redhat.com>
- <20180725114103.GG4240@e103592.cambridge.arm.com>
-Message-ID: <20180725134359.rebcjfsigkvbs2n5@kamzik.brq.redhat.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 25 Jul 2018 14:34:42 +0100
+Subject: [PATCH 3/3] arm64: dts: stratix10: Add SMMU Node
+In-Reply-To: <847f8f94-5108-47a3-bb08-c5f50b64e6e6@linux.intel.com>
+References: <1531499278-32132-1-git-send-email-thor.thayer@linux.intel.com>
+ <1531499278-32132-4-git-send-email-thor.thayer@linux.intel.com>
+ <2d17b3b1-96a1-8a0a-521e-134de9df72d0@arm.com>
+ <847f8f94-5108-47a3-bb08-c5f50b64e6e6@linux.intel.com>
+Message-ID: <ac809d43-7c70-6a3f-1139-5e0cb6ebfae6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2018 at 12:41:06PM +0100, Dave Martin wrote:
-> On Thu, Jul 19, 2018 at 01:08:10PM +0200, Andrew Jones wrote:
-> > On Thu, Jun 21, 2018 at 03:57:34PM +0100, Dave Martin wrote:
-> > > Since SVE will be enabled or disabled on a per-vcpu basis, a flag
-> > > is needed in order to track which vcpus have it enabled.
-> > > 
-> > > This patch adds a suitable flag and a helper for checking it.
-> > > 
-> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > > ---
-> > >  arch/arm64/include/asm/kvm_host.h | 8 ++++++++
-> > >  1 file changed, 8 insertions(+)
-> > > 
-> > > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> > > index 9671ddd..609d08b 100644
-> > > --- a/arch/arm64/include/asm/kvm_host.h
-> > > +++ b/arch/arm64/include/asm/kvm_host.h
-> > > @@ -308,6 +308,14 @@ struct kvm_vcpu_arch {
-> > >  #define KVM_ARM64_FP_HOST		(1 << 2) /* host FP regs loaded */
-> > >  #define KVM_ARM64_HOST_SVE_IN_USE	(1 << 3) /* backup for host TIF_SVE */
-> > >  #define KVM_ARM64_HOST_SVE_ENABLED	(1 << 4) /* SVE enabled for EL0 */
-> > > +#define KVM_ARM64_GUEST_HAS_SVE		(1 << 5) /* SVE exposed to guest */
-> > > +
-> > > +static inline bool vcpu_has_sve(struct kvm_vcpu_arch const *vcpu_arch)
-> > > +{
-> > > +	return system_supports_sve() &&
-> > 
-> > system_supports_sve() checks cpus_have_const_cap(), not
-> > this_cpu_has_cap(), so, iiuc, the result of this check won't
-> > change, regardless of which cpu it's run on at the time.
+On 16/07/18 19:56, Thor Thayer wrote:
+[...]
+>>> @@ -332,6 +342,36 @@
+>>> ????????????? altr,modrst-offset = <0x20>;
+>>> ????????? };
+>>> +??????? smmu: iommu at fa000000 {
+>>> +??????????? compatible = "arm,mmu-500", "arm,smmu-v2";
+>>> +??????????? reg = <0xfa000000 0x40000>;
+>>> +??????????? #global-interrupts = <9>;
+>>> +??????????? #iommu-cells = <1>;
+>>> +??????????? clocks = <&clkmgr STRATIX10_L4_MAIN_CLK>;
+>>> +??????????? clock-names = "smmu_clk";
+>>> +??????????? interrupt-parent = <&intc>;
+>>> +??????????? interrupts = <0 128 4>,??? /* Global Secure Fault */
+>>> +??????????????? <0 129 4>, /* Global Non-secure Fault */
+>>> +??????????????? <0 130 4>, /* FPGA Performance Counter */
+>>> +??????????????? <0 131 4>, /* DMA Performance Counter */
+>>> +??????????????? <0 132 4>, /* EMAC Performance Counter */
+>>> +??????????????? <0 133 4>, /* IO Performance Counter */
+>>> +??????????????? <0 134 4>, /* SDM Performance Counter */
+>>
+>> Note that there isn't much benefit to adding the secure or PMU 
+>> interrupts here other than to document the hardware - FWIW I have 
+>> actually been working on a PMU driver, and needless to say it turns 
+>> out not to be sufficient just having those munged into the SMMU global 
+>> fault handler.
+>>
+> Thanks for pointing this out. I was following other SMMU-500 device 
+> trees. Just to clarify, how should I simplify this? Should I replace all 
+> the above with the following?
 > 
-> That's correct: this is intentional.
+>  ????<0 129 4>, /* Global Non-secure Fault */
 > 
-> If any physical cpu doesn't have SVE, we treat it is absent from the
-> whole system, and we don't permit its use.  This ensures that any task
-> or vcpu can always be migrated to any physical cpu.
-> > 
-> > > +		(vcpu_arch->flags & KVM_ARM64_GUEST_HAS_SVE);
-> > 
-> > Since this flag can only be set if system_supports_sve() is
-> > true at vcpu init time, then it isn't necessary to always check
-> > system_supports_sve() in this function. Or, should
-> > system_supports_sve() be changed to use this_cpu_has_cap()?
-> 
-> The main purpose of system_supports_sve() here is to shadow the check on
-> vcpu_arch->flags with a static branch.  If the system doesn't support
-> SVE, we don't pay the runtime cost of the dynamic check on
-> vcpu_arch->flags.
-> 
-> If the kernel is built with CONFIG_ARM64_SVE=n, the dynamic check should
-> be entirely optimised away by the compiler.
+> Or will your upcoming PMU driver need the PMU units? It sounded like 
+> using the just Global fault was not sufficient.
 
-Ah, that makes sense. Thanks for clarifying it.
+No, you had it right - what I meant was it's only worth including the 
+actual global fault signals themselves here (there's no harm in leaving 
+the secure one in if you like, it just won't do anything if the GIC is 
+configured correctly). What I found was that the current SMMU binding 
+leaves no reasonable way to encode the PMU interrupts in this interrupt 
+list that doesn't break at least one of the possible old/new driver/DT 
+combinations, so whatever happens they will need to be specified 
+separately once a PMU binding is defined.
 
-> 
-> I'd rather not add an explicit comment for this because the same
-> convention is followed elsewhere -- thus for consistency the comment
-> would need to be added in a lot of places.
+>>> +??????????????? <0 136 4>, /* Non-secure Combined Interrupt */
+>>> +??????????????? <0 137 4>, /* Secure Combined Interrupt */
+>>
+>> Similarly the combined interrupt; that's literally just all these 
+>> other interrupt lines ORed together at the SMMU end, and would 
+>> generally only be useful if you *didn't* have the individual lines 
+>> wired up. As it stands with everything listed, any event will also 
+>> generate a spurious global fault IRQ, which isn't ideal (not that you 
+>> should get many interrupts during normal operation, but still...)
+>>
+> And I'd remove both of these then, right?
 
-Agreed that we don't need a comment. A note in the commit message might
-have been nice though.
+Indeed.
 
-Thanks,
-drew
+> Thanks for the review and helpful comments (and also pointing out the 
+> existing clock patch in my patch series summary)!
+
+Cheers,
+Robin.
