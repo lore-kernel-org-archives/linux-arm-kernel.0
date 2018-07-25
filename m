@@ -1,20 +1,21 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 25 Jul 2018 16:23:07 -0700
-Subject: [PATCH 2/2] clk: uniphier: add more USB3 PHY clocks
-In-Reply-To: <1532075856-1723-2-git-send-email-yamada.masahiro@socionext.com>
-References: <1532075856-1723-1-git-send-email-yamada.masahiro@socionext.com>
- <1532075856-1723-2-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <153256098739.48062.2834824594130786288@swboyd.mtv.corp.google.com>
+Date: Wed, 25 Jul 2018 16:26:54 -0700
+Subject: [PATCH] clk: uniphier: add clock frequency support for SPI
+In-Reply-To: <1531977828-8276-1-git-send-email-hayashibara.keiji@socionext.com>
+References: <1531977828-8276-1-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <153256121422.48062.5510017035047863302@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Masahiro Yamada (2018-07-20 01:37:36)
-> Add USB3 PHY clocks where missing.  Use fixed-factor clocks for those
-> without gating.
+Quoting Keiji Hayashibara (2018-07-18 22:23:48)
+> From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 > 
-> For clarification, prefix clock names with 'ss' or 'hs'.
+> Add clock control for SPI controller on UniPhier SoCs.
 > 
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
+
+Signed-off-by chain is a little weird, but I'll go with it.
 
 Applied to clk-next
