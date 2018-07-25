@@ -1,78 +1,86 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 25 Jul 2018 17:55:15 +0200
-Subject: [PATCH 1/3] clk: s2mps11: Fix matching when built as module and DT
- node contains compatible
-In-Reply-To: <20180725155517.4872-1-krzk@kernel.org>
-References: <20180725155517.4872-1-krzk@kernel.org>
-Message-ID: <20180725155517.4872-2-krzk@kernel.org>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Wed, 25 Jul 2018 16:58:30 +0100
+Subject: [RFC PATCH 13/16] KVM: Allow 2048-bit register access via
+ KVM_{GET, SET}_ONE_REG
+In-Reply-To: <1529593060-542-14-git-send-email-Dave.Martin@arm.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-14-git-send-email-Dave.Martin@arm.com>
+Message-ID: <874lgntihl.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When driver is built as module and DT node contains clocks compatible
-(e.g. "samsung,s2mps11-clk"), the module will not be autoloaded because
-module aliases won't match.
 
-The modalias from uevent: of:NclocksT<NULL>Csamsung,s2mps11-clk
-The modalias from driver: platform:s2mps11-clk
+Dave Martin <Dave.Martin@arm.com> writes:
 
-The devices are instantiated by parent's MFD.  However both Device Tree
-bindings and parent define the compatible for clocks devices.  In case
-of module matching this DT compatible will be used.
+> The Arm SVE architecture defines registers that are up to 2048 bits
+> in size (with some possibility of further future expansion).
+>
+> In order to avoid the need for an excessively large number of
+> ioctls when saving and restoring a vcpu's registers, this patch
+> adds a #define to make support for individual 2048-bit registers
+> through the KVM_{GET,SET}_ONE_REG ioctl interface official.  This
+> will allow each SVE register to be accessed in a single call.
+>
+> There are sufficient spare bits in the register id size field for
+> this change, so there is no ABI impact providing that
+> KVM_GET_REG_LIST does not enumerate any 2048-bit register unless
+> userspace explicitly opts in to the relevant architecture-specific
+> features.
 
-The issue will not happen if this is built-in (no need for module
-matching) or when clocks DT node does not contain compatible (not
-correct from bindings perspective but working for driver).
+Does it? It's not in this patch and looking at the final tree:
 
-Note when backporting to stable kernels: adjust the list of device ID
-entries.
+  unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
+  {
+          unsigned long res = 0;
 
-Cc: <stable@vger.kernel.org>
-Fixes: 53c31b3437a6 ("mfd: sec-core: Add of_compatible strings for clock MFD cells")
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- drivers/clk/clk-s2mps11.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+          res += num_core_regs();
+          res += num_sve_regs(vcpu);
+          res += kvm_arm_num_sys_reg_descs(vcpu);
+          res += kvm_arm_get_fw_num_regs(vcpu);
+          res += NUM_TIMER_REGS;
 
-diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
-index d44e0eea31ec..11a1e83ff805 100644
---- a/drivers/clk/clk-s2mps11.c
-+++ b/drivers/clk/clk-s2mps11.c
-@@ -245,6 +245,36 @@ static const struct platform_device_id s2mps11_clk_id[] = {
- };
- MODULE_DEVICE_TABLE(platform, s2mps11_clk_id);
- 
-+#ifdef CONFIG_OF
-+/*
-+ * Device is instantiated through parent MFD device and device matching is done
-+ * through platform_device_id.
-+ *
-+ * However if device's DT node contains proper clock compatible and it is built
-+ * as a module, then the module matching will be done trough DT aliases.  This
-+ * requires of_device_id table.  In the same time this will not change the
-+ * actual device matching so do not add .of_match_table.
-+ */
-+static const struct of_device_id s2mps11_dt_match[] = {
-+	{
-+		.compatible = "samsung,s2mps11-clk",
-+		.data = (void *)S2MPS11X,
-+	}, {
-+		.compatible = "samsung,s2mps13-clk",
-+		.data = (void *)S2MPS13X,
-+	}, {
-+		.compatible = "samsung,s2mps14-clk",
-+		.data = (void *)S2MPS14X,
-+	}, {
-+		.compatible = "samsung,s5m8767-clk",
-+		.data = (void *)S5M8767X,
-+	}, {
-+		/* Sentinel */
-+	},
-+};
-+MODULE_DEVICE_TABLE(of, s2mps11_dt_match);
-+#endif
-+
- static struct platform_driver s2mps11_clk_driver = {
- 	.driver = {
- 		.name  = "s2mps11-clk",
--- 
-2.14.1
+          return res;
+  }
+
+
+which leads to:
+
+  static int enumerate_sve_regs(const struct kvm_vcpu *vcpu, u64 __user **uind)
+  {
+          unsigned int n, i;
+          int err = 0;
+          int total = 0;
+          unsigned int slices;
+
+          if (!vcpu_has_sve(&vcpu->arch))
+                  return 0;
+
+Which enumerates the SVE regs if vcpu_has_sve() which AFAICT is true if
+the host supports it, not if the user has requested it.
+
+I'll have to check what but given the indirection of kvm_one_reg I
+wonder if existing binaries might end up spamming a badly sized array
+when run on a new SVE supporting kernel?
+
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> ---
+>  include/uapi/linux/kvm.h | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index b6270a3..345be88 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -1106,6 +1106,7 @@ struct kvm_dirty_tlb {
+>  #define KVM_REG_SIZE_U256	0x0050000000000000ULL
+>  #define KVM_REG_SIZE_U512	0x0060000000000000ULL
+>  #define KVM_REG_SIZE_U1024	0x0070000000000000ULL
+> +#define KVM_REG_SIZE_U2048	0x0080000000000000ULL
+>
+>  struct kvm_reg_list {
+>  	__u64 n; /* number of regs */
+
+
+--
+Alex Benn?e
