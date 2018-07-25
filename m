@@ -1,44 +1,57 @@
-From: npiggin@gmail.com (Nicholas Piggin)
-Date: Thu, 26 Jul 2018 00:06:38 +1000
-Subject: [RFC PATCH 1/4] mm: move tlb_table_flush to tlb_flush_mmu_free
-In-Reply-To: <20180725140641.30372-1-npiggin@gmail.com>
-References: <20180725140641.30372-1-npiggin@gmail.com>
-Message-ID: <20180725140641.30372-2-npiggin@gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 25 Jul 2018 23:16:40 +0900
+Subject: [PATCH v4 04/35] mtd: rawnand: denali: convert to nand_scan()
+In-Reply-To: <20180725144717.604d3197@xps13>
+References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
+ <20180720151527.16038-5-miquel.raynal@bootlin.com>
+ <CAK7LNASmJRWM7Gj9qqqZqwenPkoRFeA8tupx+3PKPXC6OxD_eA@mail.gmail.com>
+ <20180725115116.1fb38fe3@bbrezillon> <20180725144717.604d3197@xps13>
+Message-ID: <CAK7LNASmSOi9mygxD2PLmYJ=br2qdK_UtECYZXFNavmUc4OA1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to call this from tlb_flush_mmu_tlbonly, it
-logically belongs with tlb_flush_mmu_free. This allows some
-code consolidation with a subsequent fix.
+2018-07-25 21:47 GMT+09:00 Miquel Raynal <miquel.raynal@bootlin.com>:
+> Hi Boris,
+>
+> Boris Brezillon <boris.brezillon@bootlin.com> wrote on Wed, 25 Jul 2018
+> 11:51:16 +0200:
+>
+>> On Wed, 25 Jul 2018 18:42:44 +0900
+>> Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+>>
+>> >
+>> > You need to remove kfree(denali->buf)
+>> > from denali_remove(), right?
+>>
+>> Absolutely.
+>>
+>> >
+>> > void denali_remove(struct denali_nand_info *denali)
+>> > {
+>> >         struct mtd_info *mtd = nand_to_mtd(&denali->nand);
+>> >
+>> >         nand_release(mtd);
+>> >         kfree(denali->buf);       <---- REMOVE !!
+>> >         denali_disable_irq(denali);
+>> > }
+>> >
+>> >
+>> > Otherwise, denali_remove() will free denali->buf twice
+>> > because kfree(denali->buf) is called from denali_detach_chip().
+>>
+>
+> Absolutely, thanks for reviewing!
+>
+> I'll apply with this changed.
+>
+> Miqu?l
 
-Signed-off-by: Nicholas Piggin <npiggin@gmail.com>
----
- mm/memory.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/mm/memory.c b/mm/memory.c
-index 7206a634270b..bc053d5e9d41 100644
---- a/mm/memory.c
-+++ b/mm/memory.c
-@@ -245,9 +245,6 @@ static void tlb_flush_mmu_tlbonly(struct mmu_gather *tlb)
- 
- 	tlb_flush(tlb);
- 	mmu_notifier_invalidate_range(tlb->mm, tlb->start, tlb->end);
--#ifdef CONFIG_HAVE_RCU_TABLE_FREE
--	tlb_table_flush(tlb);
--#endif
- 	__tlb_reset_range(tlb);
- }
- 
-@@ -255,6 +252,9 @@ static void tlb_flush_mmu_free(struct mmu_gather *tlb)
- {
- 	struct mmu_gather_batch *batch;
- 
-+#ifdef CONFIG_HAVE_RCU_TABLE_FREE
-+	tlb_table_flush(tlb);
-+#endif
- 	for (batch = &tlb->local; batch && batch->nr; batch = batch->next) {
- 		free_pages_and_swap_cache(batch->pages, batch->nr);
- 		batch->nr = 0;
+Assuming you will fix this,
+
+Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+
+
 -- 
-2.17.0
+Best Regards
+Masahiro Yamada
