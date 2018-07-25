@@ -1,67 +1,47 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 25 Jul 2018 09:20:50 +0200
-Subject: [PATCH 3/3] microblaze: add endianness options to LDFLAGS instead
- of LD
-In-Reply-To: <1530580921-23340-4-git-send-email-yamada.masahiro@socionext.com>
-References: <1530580921-23340-1-git-send-email-yamada.masahiro@socionext.com>
- <1530580921-23340-4-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <542827d9-38fe-b145-234b-764ab6b7f612@monstr.eu>
+From: mylene.josserand@bootlin.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
+Date: Wed, 25 Jul 2018 09:34:10 +0200
+Subject: [PATCH v4 3/3] arm: dts: sun8i: a83t: a711: Add touchscreen node
+In-Reply-To: <20180725073410.730-1-mylene.josserand@bootlin.com>
+References: <20180725073410.730-1-mylene.josserand@bootlin.com>
+Message-ID: <20180725073410.730-4-mylene.josserand@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3.7.2018 03:22, Masahiro Yamada wrote:
-> With the recent syntax extension, Kconfig is now able to evaluate the
-> compiler / toolchain capability.
-> 
-> However, accumulating flags to 'LD' is not compatible with the way
-> it works; 'LD' must be passed to Kconfig to call $(ld-option,...)
-> from Kconfig files.  If you tweak 'LD' in arch Makefile depending on
-> CONFIG_CPU_BIG_ENDIAN, this would end up with circular dependency
-> between Makefile and Kconfig.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
->  arch/microblaze/Makefile | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/microblaze/Makefile b/arch/microblaze/Makefile
-> index d269dd4b..7333036 100644
-> --- a/arch/microblaze/Makefile
-> +++ b/arch/microblaze/Makefile
-> @@ -40,11 +40,11 @@ CPUFLAGS-$(CONFIG_XILINX_MICROBLAZE0_USE_PCMP_INSTR) += -mxl-pattern-compare
->  ifdef CONFIG_CPU_BIG_ENDIAN
->  KBUILD_CFLAGS += -mbig-endian
->  KBUILD_AFLAGS += -mbig-endian
-> -LD += -EB
-> +LDFLAGS += -EB
->  else
->  KBUILD_CFLAGS += -mlittle-endian
->  KBUILD_AFLAGS += -mlittle-endian
-> -LD += -EL
-> +LDFLAGS += -EL
->  endif
->  
->  CPUFLAGS-1 += $(call cc-option,-mcpu=v$(CPU_VER))
-> 
+Tha A711 tablet has a FocalTech EDT-FT5x06 Polytouch touchscreen.
+It is connected via I2C0. The reset line is PD5, the interrupt
+line is PL7 and the VCC supply is the ldo_io0 regulator.
 
-Applied to next.
+Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+---
+ arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Thanks,
-Michal
-
+diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+index 1537ce148cc1..dc7b94a6c068 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+@@ -156,6 +156,22 @@
+ 	status = "okay";
+ };
+ 
++&i2c0 {
++	clock-frequency = <400000>;
++	status = "okay";
++
++	touchscreen at 38 {
++		compatible = "edt,edt-ft5x06";
++		reg = <0x38>;
++		interrupt-parent = <&r_pio>;
++		interrupts = <0 7 IRQ_TYPE_EDGE_FALLING>;
++		reset-gpios = <&pio 3 5 GPIO_ACTIVE_LOW>;
++		vcc-supply = <&reg_ldo_io0>;
++		touchscreen-size-x = <1024>;
++		touchscreen-size-y = <600>;
++	};
++};
++
+ &mmc0 {
+ 	vmmc-supply = <&reg_dcdc1>;
+ 	pinctrl-names = "default";
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180725/12f8c158/attachment.sig>
+2.11.0
