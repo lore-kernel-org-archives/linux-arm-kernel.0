@@ -1,106 +1,77 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Jul 2018 14:45:11 +0100
-Subject: [PATCH 1/2] signal: Introduce COMPAT_SIGMINSTKSZ for use in
- compat_sys_sigaltstack
-In-Reply-To: <1532526312-26993-1-git-send-email-will.deacon@arm.com>
-References: <1532526312-26993-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1532526312-26993-2-git-send-email-will.deacon@arm.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Wed, 25 Jul 2018 15:43:59 +0200
+Subject: [RFC PATCH 10/16] KVM: arm64: Add a vcpu flag to control SVE
+ visibility for the guest
+In-Reply-To: <20180725114103.GG4240@e103592.cambridge.arm.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-11-git-send-email-Dave.Martin@arm.com>
+ <20180719110810.2edkoz53b6vrafum@kamzik.brq.redhat.com>
+ <20180725114103.GG4240@e103592.cambridge.arm.com>
+Message-ID: <20180725134359.rebcjfsigkvbs2n5@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sigaltstack(2) system call fails with -ENOMEM if the new alternative
-signal stack is found to be smaller than SIGMINSTKSZ. On architectures
-such as arm64, where the native value for SIGMINSTKSZ is larger than
-the compat value, this can result in an unexpected error being reported
-to a compat task. See, for example:
+On Wed, Jul 25, 2018 at 12:41:06PM +0100, Dave Martin wrote:
+> On Thu, Jul 19, 2018 at 01:08:10PM +0200, Andrew Jones wrote:
+> > On Thu, Jun 21, 2018 at 03:57:34PM +0100, Dave Martin wrote:
+> > > Since SVE will be enabled or disabled on a per-vcpu basis, a flag
+> > > is needed in order to track which vcpus have it enabled.
+> > > 
+> > > This patch adds a suitable flag and a helper for checking it.
+> > > 
+> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > > ---
+> > >  arch/arm64/include/asm/kvm_host.h | 8 ++++++++
+> > >  1 file changed, 8 insertions(+)
+> > > 
+> > > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> > > index 9671ddd..609d08b 100644
+> > > --- a/arch/arm64/include/asm/kvm_host.h
+> > > +++ b/arch/arm64/include/asm/kvm_host.h
+> > > @@ -308,6 +308,14 @@ struct kvm_vcpu_arch {
+> > >  #define KVM_ARM64_FP_HOST		(1 << 2) /* host FP regs loaded */
+> > >  #define KVM_ARM64_HOST_SVE_IN_USE	(1 << 3) /* backup for host TIF_SVE */
+> > >  #define KVM_ARM64_HOST_SVE_ENABLED	(1 << 4) /* SVE enabled for EL0 */
+> > > +#define KVM_ARM64_GUEST_HAS_SVE		(1 << 5) /* SVE exposed to guest */
+> > > +
+> > > +static inline bool vcpu_has_sve(struct kvm_vcpu_arch const *vcpu_arch)
+> > > +{
+> > > +	return system_supports_sve() &&
+> > 
+> > system_supports_sve() checks cpus_have_const_cap(), not
+> > this_cpu_has_cap(), so, iiuc, the result of this check won't
+> > change, regardless of which cpu it's run on at the time.
+> 
+> That's correct: this is intentional.
+> 
+> If any physical cpu doesn't have SVE, we treat it is absent from the
+> whole system, and we don't permit its use.  This ensures that any task
+> or vcpu can always be migrated to any physical cpu.
+> > 
+> > > +		(vcpu_arch->flags & KVM_ARM64_GUEST_HAS_SVE);
+> > 
+> > Since this flag can only be set if system_supports_sve() is
+> > true at vcpu init time, then it isn't necessary to always check
+> > system_supports_sve() in this function. Or, should
+> > system_supports_sve() be changed to use this_cpu_has_cap()?
+> 
+> The main purpose of system_supports_sve() here is to shadow the check on
+> vcpu_arch->flags with a static branch.  If the system doesn't support
+> SVE, we don't pay the runtime cost of the dynamic check on
+> vcpu_arch->flags.
+> 
+> If the kernel is built with CONFIG_ARM64_SVE=n, the dynamic check should
+> be entirely optimised away by the compiler.
 
-  https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=904385
+Ah, that makes sense. Thanks for clarifying it.
 
-This patch fixes the problem by extending do_sigaltstack to take the
-minimum signal stack size as an additional parameter, allowing the
-native and compat system call entry code to pass in their respective
-values. COMPAT_SIGMINSTKSZ is just defined as SIGMINSTKSZ if it has not
-been defined by the architecture.
+> 
+> I'd rather not add an explicit comment for this because the same
+> convention is followed elsewhere -- thus for consistency the comment
+> would need to be added in a lot of places.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Dominik Brodowski <linux@dominikbrodowski.net>
-Cc: "Eric W. Biederman" <ebiederm@xmission.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Al Viro <viro@zeniv.linux.org.uk>
-Cc: Oleg Nesterov <oleg@redhat.com>
-Reported-by: Steve McIntyre <steve.mcintyre@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- include/linux/compat.h |  3 +++
- kernel/signal.c        | 14 +++++++++-----
- 2 files changed, 12 insertions(+), 5 deletions(-)
+Agreed that we don't need a comment. A note in the commit message might
+have been nice though.
 
-diff --git a/include/linux/compat.h b/include/linux/compat.h
-index c68acc47da57..47041c7fed28 100644
---- a/include/linux/compat.h
-+++ b/include/linux/compat.h
-@@ -103,6 +103,9 @@ typedef struct compat_sigaltstack {
- 	compat_size_t			ss_size;
- } compat_stack_t;
- #endif
-+#ifndef COMPAT_MINSIGSTKSZ
-+#define COMPAT_MINSIGSTKSZ	MINSIGSTKSZ
-+#endif
- 
- #define compat_jiffies_to_clock_t(x)	\
- 		(((unsigned long)(x) * COMPAT_USER_HZ) / HZ)
-diff --git a/kernel/signal.c b/kernel/signal.c
-index 8d8a940422a8..41a5dd2df27d 100644
---- a/kernel/signal.c
-+++ b/kernel/signal.c
-@@ -3417,7 +3417,8 @@ int do_sigaction(int sig, struct k_sigaction *act, struct k_sigaction *oact)
- }
- 
- static int
--do_sigaltstack (const stack_t *ss, stack_t *oss, unsigned long sp)
-+do_sigaltstack (const stack_t *ss, stack_t *oss, unsigned long sp,
-+		size_t min_ss_size)
- {
- 	struct task_struct *t = current;
- 
-@@ -3447,7 +3448,7 @@ do_sigaltstack (const stack_t *ss, stack_t *oss, unsigned long sp)
- 			ss_size = 0;
- 			ss_sp = NULL;
- 		} else {
--			if (unlikely(ss_size < MINSIGSTKSZ))
-+			if (unlikely(ss_size < min_ss_size))
- 				return -ENOMEM;
- 		}
- 
-@@ -3465,7 +3466,8 @@ SYSCALL_DEFINE2(sigaltstack,const stack_t __user *,uss, stack_t __user *,uoss)
- 	if (uss && copy_from_user(&new, uss, sizeof(stack_t)))
- 		return -EFAULT;
- 	err = do_sigaltstack(uss ? &new : NULL, uoss ? &old : NULL,
--			      current_user_stack_pointer());
-+			      current_user_stack_pointer(),
-+			      MINSIGSTKSZ);
- 	if (!err && uoss && copy_to_user(uoss, &old, sizeof(stack_t)))
- 		err = -EFAULT;
- 	return err;
-@@ -3476,7 +3478,8 @@ int restore_altstack(const stack_t __user *uss)
- 	stack_t new;
- 	if (copy_from_user(&new, uss, sizeof(stack_t)))
- 		return -EFAULT;
--	(void)do_sigaltstack(&new, NULL, current_user_stack_pointer());
-+	(void)do_sigaltstack(&new, NULL, current_user_stack_pointer(),
-+			     MINSIGSTKSZ);
- 	/* squash all but EFAULT for now */
- 	return 0;
- }
-@@ -3510,7 +3513,8 @@ static int do_compat_sigaltstack(const compat_stack_t __user *uss_ptr,
- 		uss.ss_size = uss32.ss_size;
- 	}
- 	ret = do_sigaltstack(uss_ptr ? &uss : NULL, &uoss,
--			     compat_user_stack_pointer());
-+			     compat_user_stack_pointer(),
-+			     COMPAT_MINSIGSTKSZ);
- 	if (ret >= 0 && uoss_ptr)  {
- 		compat_stack_t old;
- 		memset(&old, 0, sizeof(old));
--- 
-2.1.4
+Thanks,
+drew
