@@ -1,49 +1,52 @@
-From: poza@codeaurora.org (poza at codeaurora.org)
-Date: Wed, 25 Jul 2018 13:59:16 +0530
-Subject: [PATCH V5 3/3] PCI: Mask and unmask hotplug interrupts during
- reset
-In-Reply-To: <d34eb5da-0ae1-d455-93e2-2432ec7931ea@kernel.org>
-References: <CAK9iUCM=zWexWow9TwkRfO186Hwr5WyGy0NHZF1vtXn3wbbZGQ@mail.gmail.com>
- <12fc8de5-ff03-cb00-52cb-25a43c71d03a@codeaurora.org>
- <20180708171418.GA11476@wunner.de>
- <CAK9iUCMcic5mzGiT20KNxgwPo6AuajHFsoj7GOjSht5SwrQevg@mail.gmail.com>
- <20180709160008.GA1490@wunner.de>
- <CAK9iUCMMVR114msKiMHu7ik0VK8T5j=LAYAKsEkdnocTqkdMjQ@mail.gmail.com>
- <20180720200123.GS128988@bhelgaas-glaptop.roam.corp.google.com>
- <2febe688-f973-5ff5-f61d-0451ad7d36ae@kernel.org>
- <d34eb5da-0ae1-d455-93e2-2432ec7931ea@kernel.org>
-Message-ID: <5cdaf58f3c848b2a5097484cd703acae@codeaurora.org>
+From: dmueller@suse.com (Dirk Mueller)
+Date: Wed, 25 Jul 2018 10:35:04 +0200
+Subject: [PATCH] arm64: Check for errata before evaluating cpu features
+Message-ID: <20180725083504.25836-1-dmueller@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-21 11:37, Sinan Kaya wrote:
-> On 7/20/2018 7:58 PM, Sinan Kaya wrote:
->> We need to figure out how to gracefully return inside hotplug driver
->> if link down happened and there is an error pending.
-> 
-> How about adding the following into the hotplug ISR?
-> 
-> 1. check if firmware first is disabled
-> 2. check if there is a fatal error pending in the device_status 
-> register
-> of the PCI Express capability on the root port.
-> 3. bail out from hotplug routine if this is the case.
-> 4. otherwise, existing behavior.
+Since commit d3aec8a28be3b8 ("arm64: capabilities: Restrict KPTI
+detection to boot-time CPUs") we rely on errata flags being already
+populated during feature enumeration. The order of errata and
+features was flipped as part of commit ed478b3f9e4a ("arm64:
+capabilities: Group handling of features and errata workarounds").
 
-This makes sense.
+Return to the orginal order of errata and feature evaluation to
+ensure errata flags are present during feature evaluation.
 
-from Lukas's text
+Fixes: d3aec8a28be3b8 ("arm64: capabilities: Restrict KPTI
+detection to boot-time CPUs")
+CC: Suzuki K Poulose <suzuki.poulose@arm.com>
+CC: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Dirk Mueller <dmueller@suse.com>
+---
+ arch/arm64/kernel/cpufeature.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-"
-The user may turn the slot on/off via sysfs.  If an Attention Button
-is present, the user may also press that button to turn the slot on/off
-after 5 seconds.  Either way, it may cause pciehp's IRQ thread to run
-concurrently to a reset initiated by the AER driver, independently of
-any events signalled by the slot.
-"
-
-so if device gets removed and re-enumerated other than hotplug ISR,
-or any other similar path has to take care of checking ERR_FATAL status.
-
-Regards,
-Oza.
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index f24892a40d2c..c6d80743f4ed 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1351,9 +1351,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 
+ static void update_cpu_capabilities(u16 scope_mask)
+ {
+-	__update_cpu_capabilities(arm64_features, scope_mask, "detected:");
+ 	__update_cpu_capabilities(arm64_errata, scope_mask,
+ 				  "enabling workaround for");
++	__update_cpu_capabilities(arm64_features, scope_mask, "detected:");
+ }
+ 
+ static int __enable_cpu_capability(void *arg)
+@@ -1408,8 +1408,8 @@ __enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 
+ static void __init enable_cpu_capabilities(u16 scope_mask)
+ {
+-	__enable_cpu_capabilities(arm64_features, scope_mask);
+ 	__enable_cpu_capabilities(arm64_errata, scope_mask);
++	__enable_cpu_capabilities(arm64_features, scope_mask);
+ }
+ 
+ /*
+-- 
+2.18.0
