@@ -1,33 +1,57 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 25 Jul 2018 10:19:57 +0100
-Subject: [PATCH v3 0/2] kvm: arm/arm64: Fix emulated physical timer IRQ
- injection
-Message-ID: <20180725091959.11475-1-andre.przywara@arm.com>
+Date: Wed, 25 Jul 2018 10:21:28 +0100
+Subject: [PATCH v3 2/2] KVM: arm/arm64: Fix lost IRQs from emulated physcial
+ timer when blocked
+In-Reply-To: <20180725092128.11534-1-andre.przywara@arm.com>
+References: <20180725092128.11534-1-andre.przywara@arm.com>
+Message-ID: <20180725092128.11534-3-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Christoffer Dall <christoffer.dall@arm.com>
 
-those two patches fix the (physical EL1) arch timer emulation in KVM,
-which missed to inject the timer IRQ if the vCPU was asleep when the
-timer expired. This can be checked by a new kvm-unit-tests test [1].
+When the VCPU is blocked (for example from WFI) we don't inject the
+physical timer interrupt if it should fire while the CPU is blocked, but
+instead we just wake up the VCPU and expect kvm_timer_vcpu_load to take
+care of injecting the interrupt.
 
-I am now taking Christoffer's approach, which keeps phys_timer_emulate()
-mostly as it is, and adds the explicit IRQ injection check in the caller.
-This turned out to fit better into the upcoming arch timer rework.
+Unfortunately, kvm_timer_vcpu_load() doesn't actually do that, it only
+has support to schedule a soft timer if the emulated phys timer is
+expected to fire in the future.
 
-Cheers,
-Andre.
+Follow the same pattern as kvm_timer_update_state() and update the irq
+state after potentially scheduling a soft timer.
 
-[1] https://lists.cs.columbia.edu/pipermail/kvmarm/2018-July/032220.html
+Reported-by: Andre Przywara <andre.przywara@arm.com>
+Cc: Stable <stable@vger.kernel.org> # 4.15+
+Fixes: bbdd52cfcba29 ("KVM: arm/arm64: Avoid phys timer emulation in vcpu entry/exit")
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+---
+ virt/kvm/arm/arch_timer.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Christoffer Dall (2):
-  KVM: arm/arm64: Fix potential loss of ptimer interrupts
-  KVM: arm/arm64: Fix lost IRQs from emulated physcial timer when
-    blocked
-
- virt/kvm/arm/arch_timer.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
-
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 18ff6203079d..17cecc96f735 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -487,6 +487,7 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
++	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 
+ 	if (unlikely(!timer->enabled))
+ 		return;
+@@ -502,6 +503,10 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
+ 
+ 	/* Set the background timer for the physical timer emulation. */
+ 	phys_timer_emulate(vcpu);
++
++	/* If the timer fired while we weren't running, inject it now */
++	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
++		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
+ }
+ 
+ bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu)
 -- 
 2.14.4
