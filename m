@@ -1,170 +1,126 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 25 Jul 2018 10:57:29 +0200
-Subject: [PATCH v4 25/35] mtd: rawnand: vf610: convert driver to
- nand_scan()
-In-Reply-To: <20180720151527.16038-26-miquel.raynal@bootlin.com>
-References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
- <20180720151527.16038-26-miquel.raynal@bootlin.com>
-Message-ID: <5a2276ee7a79e7258234f553167bf469@agner.ch>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 25 Jul 2018 10:01:53 +0100
+Subject: [PATCH v2 02/10] coresight: platform: Refactor graph endpoint
+ parsing
+In-Reply-To: <CANLsYkwDTM2pT0JCCnLdetKoYe6xsmj48Gyb5OJFxJMmRLrZ_g@mail.gmail.com>
+References: <1531997715-6767-1-git-send-email-suzuki.poulose@arm.com>
+ <1531997715-6767-3-git-send-email-suzuki.poulose@arm.com>
+ <20180724213031.GA22451@xps15>
+ <CANLsYkwDTM2pT0JCCnLdetKoYe6xsmj48Gyb5OJFxJMmRLrZ_g@mail.gmail.com>
+Message-ID: <ea1a6672-0cbb-86b7-c8cd-0759edb94f85@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.07.2018 17:15, Miquel Raynal wrote:
-> Two helpers have been added to the core to make ECC-related
-> configuration between the detection phase and the final NAND scan. Use
-> these hooks and convert the driver to just use nand_scan() instead of
-> both nand_scan_ident() and nand_scan_tail().
+On 07/24/2018 10:34 PM, Mathieu Poirier wrote:
+> On Tue, 24 Jul 2018 at 15:30, Mathieu Poirier
+> <mathieu.poirier@linaro.org> wrote:
+>>
+>> Good afternoon,
+>>
+>> On Thu, Jul 19, 2018 at 11:55:06AM +0100, Suzuki K Poulose wrote:
+>>> Refactor the of graph endpoint parsing code, to make the error
+>>> handling easier.
+>>>
+>>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> ---
+>>> Changes since v1:
+>>>   - Splitted from the of_node refcounting fix, part1
+>>> ---
+>>>   drivers/hwtracing/coresight/of_coresight.c | 129 +++++++++++++++++------------
+>>>   1 file changed, 75 insertions(+), 54 deletions(-)
+>>>
+>>> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+>>> index 6880bee..68faaf8 100644
+>>> --- a/drivers/hwtracing/coresight/of_coresight.c
+>>> +++ b/drivers/hwtracing/coresight/of_coresight.c
+>>> @@ -114,17 +114,69 @@ int of_coresight_get_cpu(const struct device_node *node)
+>>>   }
+>>>   EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
+>>>
+>>> +/*
+>>> + * of_coresight_parse_endpoint : Parse the given output endpoint @ep
+>>> + * and fill the connection information in @pdata[*@i].
+>>> + *
+>>> + * Parses the local port, remote device name and the remote port. Also
+>>> + * updates *@i to point to the next index, when an entry is added.
+>>> + *
+>>> + * Returns :
+>>> + *    0      - If the parsing completed without any fatal errors.
+>>> + *   -Errno  - Fatal error, abort the scanning.
+>>> + */
+>>> +static int of_coresight_parse_endpoint(struct device *dev,
+>>> +                                    struct device_node *ep,
+>>> +                                    struct coresight_platform_data *pdata,
+>>> +                                    int *i)
+>>> +{
+>>> +     int ret = 0;
+>>> +     struct of_endpoint endpoint, rendpoint;
+>>> +     struct device_node *rparent = NULL;
+>>> +     struct device_node *rport = NULL;
+>>> +     struct device *rdev = NULL;
+>>> +
+>>> +     do {
+>>> +             /* Parse the local port details */
+>>> +             if (of_graph_parse_endpoint(ep, &endpoint))
+>>> +                     break;
+>>> +             /*
+>>> +              * Get a handle on the remote port and parent
+>>> +              * attached to it.
+>>> +              */
+>>> +             rparent = of_graph_get_remote_port_parent(ep);
+>>> +             if (!rparent)
+>>> +                     break;
+>>> +             rport = of_graph_get_remote_port(ep);
+>>> +             if (!rport)
+>>> +                     break;
+>>> +             if (of_graph_parse_endpoint(rport, &rendpoint))
+>>> +                     break;
+>>> +
+>>> +             /* If the remote device is not available, defer probing */
+>>> +             rdev = of_coresight_get_endpoint_device(rparent);
+>>> +             if (!rdev) {
+>>> +                     ret = -EPROBE_DEFER;
+>>> +                     break;
+>>> +             }
+>>> +
+>>> +             pdata->outports[*i] = endpoint.port;
+>>> +             pdata->child_names[*i] = dev_name(rdev);
+>>> +             pdata->child_ports[*i] = rendpoint.id;
+>>> +             /* Move the index */
+>>> +             (*i)++;
+>>
+>> Not a big fan, makes the code needlessly complex.  Incrementation of the index
+>> can be done in the while loop of of_get_coresight_platform_data().  See below.
 
-Reviewed-by: Stefan Agner <stefan@agner.ch>
+Me neither..
 
 > 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> ---
->  drivers/mtd/nand/raw/vf610_nfc.c | 127 ++++++++++++++++++++-------------------
->  1 file changed, 66 insertions(+), 61 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/raw/vf610_nfc.c b/drivers/mtd/nand/raw/vf610_nfc.c
-> index d5a22fc96878..6f6dcbf9095b 100644
-> --- a/drivers/mtd/nand/raw/vf610_nfc.c
-> +++ b/drivers/mtd/nand/raw/vf610_nfc.c
-> @@ -747,6 +747,69 @@ static void vf610_nfc_init_controller(struct
-> vf610_nfc *nfc)
->  	}
->  }
->  
-> +static int vf610_nfc_attach_chip(struct nand_chip *chip)
-> +{
-> +	struct mtd_info *mtd = nand_to_mtd(chip);
-> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
-> +
-> +	vf610_nfc_init_controller(nfc);
-> +
-> +	/* Bad block options. */
-> +	if (chip->bbt_options & NAND_BBT_USE_FLASH)
-> +		chip->bbt_options |= NAND_BBT_NO_OOB;
-> +
-> +	/* Single buffer only, max 256 OOB minus ECC status */
-> +	if (mtd->writesize + mtd->oobsize > PAGE_2K + OOB_MAX - 8) {
-> +		dev_err(nfc->dev, "Unsupported flash page size\n");
-> +		return -ENXIO;
-> +	}
-> +
-> +	if (chip->ecc.mode != NAND_ECC_HW)
-> +		return 0;
-> +
-> +	if (mtd->writesize != PAGE_2K && mtd->oobsize < 64) {
-> +		dev_err(nfc->dev, "Unsupported flash with hwecc\n");
-> +		return -ENXIO;
-> +	}
-> +
-> +	if (chip->ecc.size != mtd->writesize) {
-> +		dev_err(nfc->dev, "Step size needs to be page size\n");
-> +		return -ENXIO;
-> +	}
-> +
-> +	/* Only 64 byte ECC layouts known */
-> +	if (mtd->oobsize > 64)
-> +		mtd->oobsize = 64;
-> +
-> +	/* Use default large page ECC layout defined in NAND core */
-> +	mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
-> +	if (chip->ecc.strength == 32) {
-> +		nfc->ecc_mode = ECC_60_BYTE;
-> +		chip->ecc.bytes = 60;
-> +	} else if (chip->ecc.strength == 24) {
-> +		nfc->ecc_mode = ECC_45_BYTE;
-> +		chip->ecc.bytes = 45;
-> +	} else {
-> +		dev_err(nfc->dev, "Unsupported ECC strength\n");
-> +		return -ENXIO;
-> +	}
-> +
-> +	chip->ecc.read_page = vf610_nfc_read_page;
-> +	chip->ecc.write_page = vf610_nfc_write_page;
-> +	chip->ecc.read_page_raw = vf610_nfc_read_page_raw;
-> +	chip->ecc.write_page_raw = vf610_nfc_write_page_raw;
-> +	chip->ecc.read_oob = vf610_nfc_read_oob;
-> +	chip->ecc.write_oob = vf610_nfc_write_oob;
-> +
-> +	chip->ecc.size = PAGE_2K;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct nand_controller_ops vf610_nfc_controller_ops = {
-> +	.attach_chip = vf610_nfc_attach_chip,
-> +};
-> +
->  static int vf610_nfc_probe(struct platform_device *pdev)
->  {
->  	struct vf610_nfc *nfc;
-> @@ -827,67 +890,9 @@ static int vf610_nfc_probe(struct platform_device *pdev)
->  
->  	vf610_nfc_preinit_controller(nfc);
->  
-> -	/* first scan to find the device and get the page size */
-> -	err = nand_scan_ident(mtd, 1, NULL);
-> -	if (err)
-> -		goto err_disable_clk;
-> -
-> -	vf610_nfc_init_controller(nfc);
-> -
-> -	/* Bad block options. */
-> -	if (chip->bbt_options & NAND_BBT_USE_FLASH)
-> -		chip->bbt_options |= NAND_BBT_NO_OOB;
-> -
-> -	/* Single buffer only, max 256 OOB minus ECC status */
-> -	if (mtd->writesize + mtd->oobsize > PAGE_2K + OOB_MAX - 8) {
-> -		dev_err(nfc->dev, "Unsupported flash page size\n");
-> -		err = -ENXIO;
-> -		goto err_disable_clk;
-> -	}
-> -
-> -	if (chip->ecc.mode == NAND_ECC_HW) {
-> -		if (mtd->writesize != PAGE_2K && mtd->oobsize < 64) {
-> -			dev_err(nfc->dev, "Unsupported flash with hwecc\n");
-> -			err = -ENXIO;
-> -			goto err_disable_clk;
-> -		}
-> -
-> -		if (chip->ecc.size != mtd->writesize) {
-> -			dev_err(nfc->dev, "Step size needs to be page size\n");
-> -			err = -ENXIO;
-> -			goto err_disable_clk;
-> -		}
-> -
-> -		/* Only 64 byte ECC layouts known */
-> -		if (mtd->oobsize > 64)
-> -			mtd->oobsize = 64;
-> -
-> -		/* Use default large page ECC layout defined in NAND core */
-> -		mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
-> -		if (chip->ecc.strength == 32) {
-> -			nfc->ecc_mode = ECC_60_BYTE;
-> -			chip->ecc.bytes = 60;
-> -		} else if (chip->ecc.strength == 24) {
-> -			nfc->ecc_mode = ECC_45_BYTE;
-> -			chip->ecc.bytes = 45;
-> -		} else {
-> -			dev_err(nfc->dev, "Unsupported ECC strength\n");
-> -			err = -ENXIO;
-> -			goto err_disable_clk;
-> -		}
-> -
-> -		chip->ecc.read_page = vf610_nfc_read_page;
-> -		chip->ecc.write_page = vf610_nfc_write_page;
-> -		chip->ecc.read_page_raw = vf610_nfc_read_page_raw;
-> -		chip->ecc.write_page_raw = vf610_nfc_write_page_raw;
-> -		chip->ecc.read_oob = vf610_nfc_read_oob;
-> -		chip->ecc.write_oob = vf610_nfc_write_oob;
-> -
-> -		chip->ecc.size = PAGE_2K;
-> -	}
-> -
-> -	/* second phase scan */
-> -	err = nand_scan_tail(mtd);
-> +	/* Scan the NAND chip */
-> +	chip->dummy_controller.ops = &vf610_nfc_controller_ops;
-> +	err = nand_scan(mtd, 1);
->  	if (err)
->  		goto err_disable_clk;
+> Void that - it properly deals with the first of_parse_endpoint().
+
+Or may be we could do something with the return value :
+
+	  1 - Successfully parsed and populated a connection entry
+	  0 - No errors in parsing
+	< 0 - Errors in parsing
+
+>>> @@ -132,64 +184,33 @@ of_get_coresight_platform_data(struct device *dev,
+
+
+>>> +     while ((ep = of_graph_get_next_endpoint(node, ep))) {
+>>> +             /*
+>>> +              * No need to deal with input ports, processing for as
+>>> +              * processing for output ports will deal with them.
+>>> +              */
+>>
+>> This comment has been broken for a while... It should read:
+>>
+>>                  /*
+>>                   * No need to deal with input ports, as processing
+>>                   * for output ports will deal with them.
+>>                   */
+
+Sure, will fix it.
+
+
+Suzuki
