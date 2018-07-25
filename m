@@ -1,76 +1,220 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 25 Jul 2018 16:27:47 +0100
-Subject: [PATCH v2 6/7] ACPI/IORT: Don't set default coherent DMA mask
-In-Reply-To: <3525869e8e7530128bf9718ae8af7d7564b3c684.1532382222.git.robin.murphy@arm.com>
-References: <cover.1532382222.git.robin.murphy@arm.com>
- <3525869e8e7530128bf9718ae8af7d7564b3c684.1532382222.git.robin.murphy@arm.com>
-Message-ID: <20180725152747.GA5080@red-moon>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 25 Jul 2018 16:27:49 +0100
+Subject: [RFC PATCH 16/16] KVM: arm64/sve: Report and enable SVE API
+ extensions for userspace
+In-Reply-To: <20180719145921.oasa3a57at5nnwya@kamzik.brq.redhat.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-17-git-send-email-Dave.Martin@arm.com>
+ <20180719145921.oasa3a57at5nnwya@kamzik.brq.redhat.com>
+Message-ID: <20180725152749.GQ4240@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 11:16:11PM +0100, Robin Murphy wrote:
-> Now that we can track upstream DMA constraints properly with
-> bus_dma_mask instead of trying (and failing) to maintain it in
-> coherent_dma_mask, it doesn't make much sense for the firmware code to
-> be touching the latter at all. It's merely papering over bugs wherein a
-> driver has failed to call dma_set_coherent_mask() *and* the bus code has
-> not initialised any default value.
-
-Nit: I do not think the driver had a chance to probe and therefore call
-dma_set_coherent_mask() before iort_dma_setup() is executed, right ?
-
-Anyway, the patch makes perfect sense:
-
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-> We don't really want to encourage more drivers coercing dma_mask so
-> we'll continue to fix that up if necessary, but add a warning to help
-> flush out any such buggy bus code that remains.
+On Thu, Jul 19, 2018 at 04:59:21PM +0200, Andrew Jones wrote:
+> On Thu, Jun 21, 2018 at 03:57:40PM +0100, Dave Martin wrote:
+> > This patch reports the availability of KVM SVE support to userspace
+> > via a new vcpu feature flag KVM_ARM_VCPU_SVE.  This flag is
+> > reported via the KVM_ARM_PREFERRED_TARGET ioctl.
+> > 
+> > Userspace can enable the feature by setting the flag for
+> > KVM_ARM_VCPU_INIT.  Without this flag set, SVE-related ioctls and
+> > register access extensions are hidden, and SVE remains disabled
+> > unconditionally for the guest.  This ensures that non-SVE-aware KVM
+> > userspace does not receive a vcpu that it does not understand how
+> > to snapshot or restore correctly.
+> > 
+> > Storage is allocated for the SVE register state at vcpu init time,
+> > sufficient for the maximum vector length to be exposed to the vcpu.
+> > No attempt is made to allocate the storage lazily for now.  Also,
+> > no attempt is made to resize the storage dynamically, since the
+> > effective vector length of the vcpu can change at each EL0/EL1
+> > transition.  The storage is freed at the vcpu uninit hook.
+> > 
+> > No particular attempt is made to prevent userspace from creating a
+> > mix of vcpus some of which have SVE enabled and some of which have
+> > it disabled.  This may or may not be useful, but it reflects the
+> > underlying architectural behaviour.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > ---
+> >  arch/arm64/include/asm/kvm_host.h |  6 +++---
+> >  arch/arm64/include/uapi/asm/kvm.h |  1 +
+> >  arch/arm64/kvm/guest.c            | 19 +++++++++++++------
+> >  arch/arm64/kvm/reset.c            | 14 ++++++++++++++
+> >  4 files changed, 31 insertions(+), 9 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> > index d2084ae..d956cf2 100644
+> > --- a/arch/arm64/include/asm/kvm_host.h
+> > +++ b/arch/arm64/include/asm/kvm_host.h
+> > @@ -44,7 +44,7 @@
+> >  
+> >  #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
+> >  
+> > -#define KVM_VCPU_MAX_FEATURES 4
+> > +#define KVM_VCPU_MAX_FEATURES 5
+> >  
+> >  #define KVM_REQ_SLEEP \
+> >  	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
+> > @@ -439,8 +439,8 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+> >  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+> >  static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
+> >  
+> > -static inline int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu) { return 0; }
+> > -static inline void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+> > +int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu);
+> > +void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu);
+> >  
+> >  void kvm_arm_init_debug(void);
+> >  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+> > diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> > index f54a9b0..6acf276 100644
+> > --- a/arch/arm64/include/uapi/asm/kvm.h
+> > +++ b/arch/arm64/include/uapi/asm/kvm.h
+> > @@ -101,6 +101,7 @@ struct kvm_regs {
+> >  #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+> >  #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
+> >  #define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
+> > +#define KVM_ARM_VCPU_SVE		4 /* Allow SVE for guest */
+> >  
+> >  struct kvm_vcpu_init {
+> >  	__u32 target;
+> > diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> > index 5152362..fb7f6aa 100644
+> > --- a/arch/arm64/kvm/guest.c
+> > +++ b/arch/arm64/kvm/guest.c
+> > @@ -58,6 +58,16 @@ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
+> >  	return 0;
+> >  }
+> >  
+> > +int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+> > +{
+> > +	return 0;
+> > +}
 > 
-> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> CC: Hanjun Guo <hanjun.guo@linaro.org>
-> CC: Sudeep Holla <sudeep.holla@arm.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/acpi/arm64/iort.c | 22 +++++++++++-----------
->  1 file changed, 11 insertions(+), 11 deletions(-)
+> Unused, so could have just left the inline version.
 > 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index bc51cff5505e..08f26db2da7e 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -978,20 +978,20 @@ void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
->  	int ret, msb;
->  
->  	/*
-> -	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
-> -	 * setup the correct supported mask.
-> +	 * If @dev is expected to be DMA-capable then the bus code that created
-> +	 * it should have initialised its dma_mask pointer by this point. For
-> +	 * now, we'll continue the legacy behaviour of coercing it to the
-> +	 * coherent mask if not, but we'll no longer do so quietly.
->  	 */
-> -	if (!dev->coherent_dma_mask)
-> -		dev->coherent_dma_mask = DMA_BIT_MASK(32);
-> -
-> -	/*
-> -	 * Set it to coherent_dma_mask by default if the architecture
-> -	 * code has not set it.
-> -	 */
-> -	if (!dev->dma_mask)
-> +	if (!dev->dma_mask) {
-> +		dev_warn(dev, "DMA mask not set\n");
->  		dev->dma_mask = &dev->coherent_dma_mask;
-> +	}
->  
-> -	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
-> +	if (dev->coherent_dma_mask)
-> +		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
-> +	else
-> +		size = 1ULL << 32;
->  
->  	if (dev_is_pci(dev)) {
->  		ret = acpi_dma_get_range(dev, &dmaaddr, &offset, &size);
-> -- 
-> 2.17.1.dirty
+> > +
+> > +void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
+> > +{
+> > +	kfree(vcpu->arch.sve_state);
+> > +}
+> > +
+> >  static u64 core_reg_offset_from_id(u64 id)
+> >  {
+> >  	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
+> > @@ -600,12 +610,9 @@ int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
+> >  
+> >  	memset(init, 0, sizeof(*init));
+> >  
+> > -	/*
+> > -	 * For now, we don't return any features.
+> > -	 * In future, we might use features to return target
+> > -	 * specific features available for the preferred
+> > -	 * target type.
+> > -	 */
+> > +	/* KVM_ARM_VCPU_SVE understood by KVM_VCPU_INIT */
+> > +	init->features[0] = 1 << KVM_ARM_VCPU_SVE;
+> > +
 > 
+> We shouldn't need to do this. The "preferred" target type isn't defined
+> well (that I know of), but IMO it should probably be the target that
+> best matches the host, minus optional features. The best base target. We
+> may use these features to convey that the preferred target should enable
+> some optional feature if that feature is necessary to workaround a bug,
+> i.e. using the "feature" bit as an erratum bit someday, but that'd be
+> quite a debatable use, so maybe not even that. Most likely we'll never
+> need to add features here.
+
+init->features[] has no semantics yet so we can define it how we like,
+but I agree that the way I use it here is not necessarily the most
+natural.
+
+OTOH, we cannot use features[] for "mandatory" features like erratum
+workarounds, because current userspace just ignores these bits.
+
+Rather, these bits would be for features that are considered beneficial
+but must be off by default (due to incompatibility risks across nodes,
+or due to ABI impacts).  Just blindly using the preferred target
+already risks configuring a vcpu that won't work across all nodes in
+your cluster.
+
+So I'm not convinced that there is any useful interpretation of
+features[] unless we interpret it as suggested in this patch.
+
+Can you elaborate why you think it should be used with a more
+concrete example?
+
+> That said, I think defining the feature bit makes sense. ATM, I'm feeling
+> like we'll want to model the user interface for SVE like PMU (using VCPU
+> device ioctls).
+
+Some people expressed concerns about the ioctls becoming order-sensitive.
+
+In the SVE case we don't want people enabling/disabling/reconfiguring
+"silicon" features like SVE after the vcpu starts executing.
+
+We will need an extra ioctl() for configuring the allowed SVE vector
+lengths though.  I don't see a way around that.  So maybe we have to
+solve the ordering problem anyway.
+
+
+By current approach (not in this series) was to have VCPU_INIT return
+-EINPROGRESS or similar if SVE is enabled in features[]: this indicates
+that certain setup ioctls are required before the vcpu can run.
+
+This may be overkill / not the best approach though.  I can look at
+vcpu device ioctls as an alternative.
+
+> >  	init->target = (__u32)target;
+> >  
+> >  	return 0;
+> > diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> > index a74311b..f63a791 100644
+> > --- a/arch/arm64/kvm/reset.c
+> > +++ b/arch/arm64/kvm/reset.c
+> > @@ -110,6 +110,20 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+> >  			cpu_reset = &default_regs_reset;
+> >  		}
+> >  
+> > +		if (system_supports_sve() &&
+> > +		    test_bit(KVM_ARM_VCPU_SVE, vcpu->arch.features)) {
+> > +			vcpu->arch.flags |= KVM_ARM64_GUEST_HAS_SVE;
+> > +
+> > +			vcpu->arch.sve_max_vl = sve_max_virtualisable_vl;
+> > +
+> > +			vcpu->arch.sve_state = kzalloc(
+> > +				SVE_SIG_REGS_SIZE(
+> > +					sve_vq_from_vl(vcpu->arch.sve_max_vl)),
+> 
+> I guess sve_state can be pretty large. Should we allocate it like we
+> do the VM with kvm_arch_alloc_vm()? I.e. using vzalloc() on VHE machines?
+
+Hmmm, dunno.
+
+Historically (i.e., on 32-bit) vmalloc addresses could be a somewhat
+scarce resource so I tend not to think of it by default, but allocations
+of this kind of size would probably not pose a problem -- certainly
+not on 64-bit.
+
+Currently we allocate the sve_state storage for each host task with
+kzalloc(), so it would be nice to stay consistent unless there's a
+reason to deviate.
+
+
+With vmalloc() we might waste half a page of memory per vcpu on a
+typical system, though that probably isn't the end of the world.
+It would be worse with 64K pages though.
+
+The total size is not likely to be more than a few pages, so
+it probably doesn't matter too much if we grab physically
+contiguous memory for it.
+
+The size of the sve state seems comparable to the size of struct kvm.
+
+I'm not sure what the correct answer is here, to be honest.
+
+Thoughts?
+
+Cheers
+---Dave
