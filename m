@@ -1,72 +1,107 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 25 Jul 2018 12:45:01 +0100
-Subject: [RFC PATCH 11/16] KVM: arm64/sve: System register context switch
- and access support
-In-Reply-To: <20180719111117.qztdqqhco7klvfhz@kamzik.brq.redhat.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-12-git-send-email-Dave.Martin@arm.com>
- <20180719111117.qztdqqhco7klvfhz@kamzik.brq.redhat.com>
-Message-ID: <20180725114501.GH4240@e103592.cambridge.arm.com>
+From: sakari.ailus@linux.intel.com (Sakari Ailus)
+Date: Wed, 25 Jul 2018 14:43:44 +0300
+Subject: [PATCH v10 2/2] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20180725184224.cab5172f8558162cc74bde9e@magewell.com>
+References: <1525417745-37964-1-git-send-email-yong.deng@magewell.com>
+ <20180626110821.wkal6fcnoncsze6y@valkosipuli.retiisi.org.uk>
+ <20180705154802.03604f156709be11892b19c0@magewell.com>
+ <20180718095513.4cm77g2iuilvfmd6@paasikivi.fi.intel.com>
+ <20180725184224.cab5172f8558162cc74bde9e@magewell.com>
+Message-ID: <20180725114344.eyra7g52xwagqkcv@paasikivi.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 01:11:17PM +0200, Andrew Jones wrote:
-> On Thu, Jun 21, 2018 at 03:57:35PM +0100, Dave Martin wrote:
-> > This patch adds the necessary support for context switching ZCR_EL1
-> > for each vcpu.
-> > 
-> > The ID_AA64PFR0_EL1 emulation code is updated to expose the
-> > presence of SVE to the guest if appropriate, and ioctl() access to
-> > ZCR_EL1 is also added.
-> > 
-> > In the context switch code itself, ZCR_EL1 is context switched if
-> > the host is SVE-capable, irrespectively for now of whether SVE is
-> > exposed to the guest or not.  Adding a dynamic vcpu_has_sve() check
-> > may lose as much performance as would be gained in this simple
-> > case.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Hi Yong,
 
-[...]
-
-> >  #define SCTLR_ELx_IESB	(1 << 21)
-> > diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-> > index 35bc168..0f4046a 100644
-> > --- a/arch/arm64/kvm/hyp/sysreg-sr.c
-> > +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-> > @@ -21,6 +21,7 @@
-> >  #include <asm/kvm_asm.h>
-> >  #include <asm/kvm_emulate.h>
-> >  #include <asm/kvm_hyp.h>
-> > +#include <asm/sysreg.h>
-> >  
-> >  /*
-> >   * Non-VHE: Both host and guest must save everything.
-> > @@ -57,6 +58,8 @@ static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
-> >  	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg_el1(sctlr);
-> >  	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
-> >  	ctxt->sys_regs[CPACR_EL1]	= read_sysreg_el1(cpacr);
-> > +	if (system_supports_sve()) /* implies has_vhe() */
-> > +		ctxt->sys_regs[ZCR_EL1]	= read_sysreg_s(SYS_ZCR_EL12);
-> >  	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg_el1(ttbr0);
-> >  	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg_el1(ttbr1);
-> >  	ctxt->sys_regs[TCR_EL1]		= read_sysreg_el1(tcr);
-> > @@ -129,6 +132,8 @@ static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
-> >  	write_sysreg_el1(ctxt->sys_regs[SCTLR_EL1],	sctlr);
-> >  	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  	actlr_el1);
-> >  	write_sysreg_el1(ctxt->sys_regs[CPACR_EL1],	cpacr);
-> > +	if (system_supports_sve()) /* implies has_vhe() */
-> > +		write_sysreg_s(ctxt->sys_regs[ZCR_EL1],	SYS_ZCR_EL12);
+On Wed, Jul 25, 2018 at 06:42:24PM +0800, Yong wrote:
+> Hi Sakari,
 > 
-> I feel like the ZCR_EL12 save/restores are out of place, as these
-> functions are shared by non-VHE and VHE. Maybe they should be
-> moved to the VHE callers?
+> On Wed, 18 Jul 2018 12:55:14 +0300
+> Sakari Ailus <sakari.ailus@linux.intel.com> wrote:
+> 
+> > Hi Yong,
+> > 
+> > On Thu, Jul 05, 2018 at 03:48:02PM +0800, Yong wrote:
+> > > > > +
+> > > > > +/* -----------------------------------------------------------------------------
+> > > > > + * Media Operations
+> > > > > + */
+> > > > > +static int sun6i_video_formats_init(struct sun6i_video *video,
+> > > > > +				    const struct media_pad *remote)
+> > > > > +{
+> > > > > +	struct v4l2_subdev_mbus_code_enum mbus_code = { 0 };
+> > > > > +	struct sun6i_csi *csi = video->csi;
+> > > > > +	struct v4l2_format format;
+> > > > > +	struct v4l2_subdev *subdev;
+> > > > > +	u32 pad;
+> > > > > +	const u32 *pixformats;
+> > > > > +	int pixformat_count = 0;
+> > > > > +	u32 subdev_codes[32]; /* subdev format codes, 32 should be enough */
+> > > > > +	int codes_count = 0;
+> > > > > +	int num_fmts = 0;
+> > > > > +	int i, j;
+> > > > > +
+> > > > > +	pad = remote->index;
+> > > > > +	subdev = media_entity_to_v4l2_subdev(remote->entity);
+> > > > > +	if (subdev == NULL)
+> > > > > +		return -ENXIO;
+> > > > > +
+> > > > > +	/* Get supported pixformats of CSI */
+> > > > > +	pixformat_count = sun6i_csi_get_supported_pixformats(csi, &pixformats);
+> > > > > +	if (pixformat_count <= 0)
+> > > > > +		return -ENXIO;
+> > > > > +
+> > > > > +	/* Get subdev formats codes */
+> > > > > +	mbus_code.pad = pad;
+> > > > > +	mbus_code.which = V4L2_SUBDEV_FORMAT_ACTIVE;
+> > > > > +	while (!v4l2_subdev_call(subdev, pad, enum_mbus_code, NULL,
+> > > > > +				 &mbus_code)) {
+> > > > 
+> > > > The formats supported by the external sub-device may depend on horizontal
+> > > > and vertical flipping. You shouldn't assume any particular configuration
+> > > > here: instead, bridge drivers generally just need to make sure the formats
+> > > > match in link validation when streaming is started. At least the CSI-2
+> > > > receiver driver and the DMA engine driver (video device) should check the
+> > > > configuration is valid. See e.g. the IPU3 driver:
+> > > > drivers/media/pci/intel/ipu3/ipu3-cio2.c .
+> > > 
+> > > Can mbus_code be added dynamically ?
+> > > The code here only enum the mbus code and get the possible supported
+> > > pairs of pixformat and mbus by SoC. Not try to check if the formats
+> > > (width height ...) is valid or not. The formats validation will be 
+> > > in link validation when streaming is started as per your advise. 
+> > 
+> > The formats that can be enumerated from the sensor here are those settable
+> > using SUBDEV_S_FMT. The enumeration will change on raw sensors if you use
+> > the flipping controls. As the bridge driver implements MC as well as subdev
+> > APIs, generally the sensor configuration is out of scope of this driver
+> > since it's directly configured from the user space.
+> > 
+> > Just check that the pipeline is valid before starting streaming in your
+> > driver.
+> 
+> Sorry. I am still confused.
+> As the CSI driver does not enum the formats supported by sensor.
+> How to get a valid format if I do not want to open the subdev? 
 
-Hmmm, you're right -- it did look a bit odd at the time.
+For MC-enabled drivers that expose the pipeline, the user is responsible
+for configuring the pipeline.
 
-I think they should move to the vhe-specific paths as you suggest.
+There are bridge drivers that do not expose the pipeline but that will
+exclude the use of e.g. some sensor drivers with those bridge drivers.
 
-I'll change this for the next spin of the series.
+> Many applications still only open /dev/video*.
 
-Cheers
----Dave
+That's true, and this is indeed a known gap:
+
+<URL:https://www.spinics.net/lists/linux-media/msg137668.html>
+
+So in other words, there is no solution for that issue right now, but this
+is in no way specific to your driver, and it is known that this needs to be
+addressed.
+
+-- 
+Kind regards,
+
+Sakari Ailus
+sakari.ailus at linux.intel.com
