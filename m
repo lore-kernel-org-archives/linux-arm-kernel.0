@@ -1,40 +1,55 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Wed, 25 Jul 2018 23:26:27 +0200
-Subject: [PATCH 00/14] arm64: dts: meson-axg: add audio support
-In-Reply-To: <705e31bf0d978b7d356b2f077179ab0e3db6f092.camel@baylibre.com>
-References: <20180724125238.14567-1-jbrunet@baylibre.com>
- <CAFBinCBh-b=ie4hBMWdHG8KoLQ7qiRfo8vXfJ1PRcN4UPtg+uA@mail.gmail.com>
- <705e31bf0d978b7d356b2f077179ab0e3db6f092.camel@baylibre.com>
-Message-ID: <CAFBinCB_fULnmrpyzNwnfAiL9QGco_6QW957Wroj8o6ZhNwmWA@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 25 Jul 2018 23:28:53 +0200
+Subject: Droid 4: suspend to RAM?
+In-Reply-To: <CAOf5uwkyPoDT8TZe9V24p+nQMiee9XfD=943xwx0ThGi9_cPng@mail.gmail.com>
+References: <20180725200205.GA29594@amd>
+ <CAOf5uwkyPoDT8TZe9V24p+nQMiee9XfD=943xwx0ThGi9_cPng@mail.gmail.com>
+Message-ID: <20180725212853.GA1965@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jerome,
+HI!
+> >
+> > I have two big problems with droid 4. #1 is that it lost 2 SMS.. and I
+> > have no idea why. Second is power consumption -- it seems to be rather
+> 
+> Depend how do you set the SMS buffering using CNMI if I remember. Modem
+> has 1024bytes of memory most of the time that can buffer more then 1 sms.
+> Modem rise a irq when they receive a call or sms, or you an use the serial but
+> omap family can loose the first char coming from the serial so you can lost the
+> sms because parsing fail
 
-On Wed, Jul 25, 2018 at 11:19 PM <jbrunet@baylibre.com> wrote:
->
-> On Wed, 2018-07-25 at 21:11 +0200, Martin Blumenstingl wrote:
-> > nit-pick: one patch uses "arm64: dts: meson-axg: s400" in the subject
-> > while other patches that are touching the s400 board aren't
-> > if you have to re-send this series: can you please use the "arm64:
-> > dts: meson-axg: s400:" prefix for all patches touching the s400 board?
->
-> hum, do we really have such rule, or do you think we should add one ?
-looking at the git history in arch/arm64/boot/dts/amlogic: it seems
-that we don't have a rule yet, even though some (some of
-your's/Neil's/my) patches were using that naming schema in the past
+I am using USB connection to the modem. And yes, I'm using rather
+strange CNMI settings (but other did not work).
 
-> Kevin, do you have opinion ?
->
-> Not that I really mind either way, but prefixes rules are usually there to help
-> maintainer filter the patches. Will such rule help in any way ?
-maybe it's just a problem of a false initial impression
-I read "arm64: dts: meson-axg: add usb power regulator" in the
-cover-letter and came to the conclusion that this patch must be wrong
-since meson-axg.dtsi should not have any regulators (unless they're
-built into the SoC). only when looking at the patch itself I realized
-that it's fine because it patches the s400.dts
+> > high even before modem (and thus USB) is enabled.
+> >
+> > Interestingly, CyanogenMod and Jolla seem to have higher power
+> > consumption than stock operating system.
+> >
+> > (My Linux can survive for 10 hours, stock system could survive for 4
+> > days if I'm not mistaken).
+> >
+> > I thought I would experiment with suspend to RAM.. and it indeed
+> > seemed to suspend ok, but I could not wake it up. Do I need to set up
+> > wakeup with button somehow? Is suspend to RAM required for good power
+> > consumption?
+> 
+> Sorry but pm subsystem has debug mode that you can test in a easy way.
+> You can even wakeup by any rtc alarm easily.
 
+Yes, that is how it works on PC (but there power button works,
+too). Is it expected to work on Droid in v4.18?
 
-Regards
-Martin
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180725/7630565b/attachment.sig>
