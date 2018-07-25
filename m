@@ -1,75 +1,74 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 25 Jul 2018 10:21:27 +0100
-Subject: [PATCH v3 1/2] KVM: arm/arm64: Fix potential loss of ptimer interrupts
-In-Reply-To: <20180725092128.11534-1-andre.przywara@arm.com>
-References: <20180725092128.11534-1-andre.przywara@arm.com>
-Message-ID: <20180725092128.11534-2-andre.przywara@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 25 Jul 2018 10:28:17 +0100
+Subject: [PATCH] arm64: Check for errata before evaluating cpu features
+In-Reply-To: <20180725085604.GB4240@e103592.cambridge.arm.com>
+References: <20180725083504.25836-1-dmueller@suse.com>
+ <aea2daa9-40ef-2066-0da9-0770c3c50dfb@arm.com>
+ <20180725085604.GB4240@e103592.cambridge.arm.com>
+Message-ID: <3d26391a-afbe-621e-90d0-80c4dbc4e2f6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@arm.com>
 
-kvm_timer_update_state() is called when changing the phys timer
-configuration registers, either via vcpu reset, as a result of a trap
-from the guest, or when userspace programs the registers.
+Dave,
 
-phys_timer_emulate() is in turn called by kvm_timer_update_state() to
-either cancel an existing software timer, or program a new software
-timer, to emulate the behavior of a real phys timer, based on the change
-in configuration registers.
+On 07/25/2018 09:56 AM, Dave Martin wrote:
+> On Wed, Jul 25, 2018 at 09:51:53AM +0100, Suzuki K Poulose wrote:
+>> On 07/25/2018 09:35 AM, Dirk Mueller wrote:
+>>> Since commit d3aec8a28be3b8 ("arm64: capabilities: Restrict KPTI
+>>> detection to boot-time CPUs") we rely on errata flags being already
+>>> populated during feature enumeration. The order of errata and
+>>> features was flipped as part of commit ed478b3f9e4a ("arm64:
+>>> capabilities: Group handling of features and errata workarounds").
+>>>
+>>> Return to the orginal order of errata and feature evaluation to
+>>> ensure errata flags are present during feature evaluation.
+>>>
+>>> Fixes: d3aec8a28be3b8 ("arm64: capabilities: Restrict KPTI
+>>> detection to boot-time CPUs")
+>>> CC: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> CC: Marc Zyngier <marc.zyngier@arm.com>
+>>> Signed-off-by: Dirk Mueller <dmueller@suse.com>
+>>
+>> It would be good to add "Fixes: ed478b3f9e4a" (instead), just to make
+>> sure this gets fixed everywhere the original problem appears.
+>>
 
-Unfortunately, the interaction between these two functions left a small
-race; if the conceptual emulated phys timer should actually fire, but
-the soft timer hasn't executed its callback yet, we cancel the timer in
-phys_timer_emulate without injecting an irq.  This only happens if the
-check in kvm_timer_update_state is called before the timer should fire,
-which is relatively unlikely, but possible.
+> 
+> I forget why these were originally reordered in ed478b3f9e4a.
+> Was there any real reason for it?
 
-The solution is to update the state of the phys timer after calling
-phys_timer_emulate, which will pick up the pending timer state and
-update the interrupt value.
+No, there was no real reason for it. We have always detected the cpu
+local errata first and all features were system wide. So that ensured
+that the errata are detected before features. With the introduction
+of cpu local features, it was a random order until we realised this
+issue.
 
-Note that this leaves the opportunity of raising the interrupt twice,
-once in the just-programmed soft timer, and once in
-kvm_timer_update_state.  Since this always happens synchronously with
-the VCPU execution, there is no harm in this, and the guest ever only
-sees a single timer interrupt.
+That said, this exposes a problem with the current infrastructure
+where, if there are local capabilities that depend on other local
+capabilities. On a heterogeneous system, there is no guarantee on the
+order in which the CPUs turn up and thus detect the capabilities. In
+this case, this patch wouldn't work if we were dealing with a
+heterogeneous system.
 
-Cc: Stable <stable@vger.kernel.org> # 4.15+
-Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
----
- virt/kvm/arm/arch_timer.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+The solution would be to use cpu local and system wide versions
+of the same capability and use the cpu-local capabilities to
+decide the system capability.
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index bd3d57f40f1b..18ff6203079d 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -295,9 +295,9 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
- 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
- 
- 	/*
--	 * If the timer can fire now we have just raised the IRQ line and we
--	 * don't need to have a soft timer scheduled for the future.  If the
--	 * timer cannot fire at all, then we also don't need a soft timer.
-+	 * If the timer can fire now, we don't need to have a soft timer
-+	 * scheduled for the future.  If the timer cannot fire at all,
-+	 * then we also don't need a soft timer.
- 	 */
- 	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
- 		soft_timer_cancel(&timer->phys_timer, NULL);
-@@ -332,10 +332,10 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	level = kvm_timer_should_fire(vtimer);
- 	kvm_timer_update_irq(vcpu, level, vtimer);
- 
-+	phys_timer_emulate(vcpu);
-+
- 	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
- 		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
--
--	phys_timer_emulate(vcpu);
- }
- 
- static void vtimer_save_state(struct kvm_vcpu *vcpu)
--- 
-2.14.4
+i.e, here KPTI needs two caps :
+
+a) CPU_NEEDS_KPTI - Local CPU capability to detect the local CPU
+which needs KPTRI
+
+b) SYSTEM_NEEDS_KPTI - System wide capability, which can be turned
+on iff we have CPU_NEEDS_KPTI && !CAVIUM_ERRATA.
+
+> 
+> I also notice in that commit that after the detection pass, we set
+> things up (in update_cpu_capabilities(), enable_cpu_capabilities()) in
+> the order errata, features.  Does this matter for anything?
+
+None that I am aware of. But logically that sounds like a better option.
+
+
+Suzuki
