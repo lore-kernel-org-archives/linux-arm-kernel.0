@@ -1,132 +1,55 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 25 Jul 2018 13:42:59 +0800
-Subject: [PATCH v1 11/15] drm/mediatek: add dummy buffer for RDMA memory
- mode
-In-Reply-To: <1532420235-22268-12-git-send-email-stu.hsieh@mediatek.com>
-References: <1532420235-22268-1-git-send-email-stu.hsieh@mediatek.com>
- <1532420235-22268-12-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1532497379.9280.32.camel@mtksdaap41>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 25 Jul 2018 08:18:01 +0200
+Subject: [PATCH] crypto: arm/chacha20 - always use vrev for 16-bit rotates
+In-Reply-To: <20180725012907.1614-1-ebiggers3@gmail.com>
+References: <20180725012907.1614-1-ebiggers3@gmail.com>
+Message-ID: <CAKv+Gu8dhOHRV9RTk3X7f=51yZF1nhhCvteLDjc-+aoYvzJJFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stu:
+On 25 July 2018 at 03:29, Eric Biggers <ebiggers3@gmail.com> wrote:
+> From: Eric Biggers <ebiggers@google.com>
+>
+> The 4-way ChaCha20 NEON code implements 16-bit rotates with vrev32.16,
+> but the one-way code (used on remainder blocks) implements it with
+> vshl + vsri, which is slower.  Switch the one-way code to vrev32.16 too.
+>
+> Signed-off-by: Eric Biggers <ebiggers@google.com>
 
-On Tue, 2018-07-24 at 16:17 +0800, Stu Hsieh wrote:
-> This patch add dummy buffer for RDMA memory mode
-> 
-> When display power on, the drm frame work would modeset and
-> set up the display HW.
-> 
-> In this time, the RDMA would start wroking and read the data from memory.
-> But, user space not send the data to drm yet.
-> 
-> For this case, if user space not send data to display hw(RDMA) yet,
-> RDMA would read the wrong address to show garbage.
-> 
-> Therefore, we create dummy buffer for RDMA reading memory
-> when userspace not send the data yet.
-> 
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Is this the only solution? If panel resolution is 1920x1080, the buffer
-size is 8294400 bytes. How large it is. If we have another solution,
-I'll not accept this one. As far as I know, DSI or DPI could output
-single color even though there is no input data. If this is true, when
-encoder is enabled, it output the single color. When crtc enable, config
-all setting except 'start'. When receive the buffer, 'start' the
-pipeline which include encoder. When encoder 'start', it disable the
-single color function and output the data from input.
-
-Regards,
-CK
-
-
-> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 > ---
->  drivers/gpu/drm/mediatek/mtk_disp_rdma.c    | 23 +++++++++++++++++++++++
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |  1 +
->  2 files changed, 24 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> index 8d41f5cd485b..e28f368728cd 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> @@ -20,6 +20,7 @@
->  
->  #include "mtk_drm_crtc.h"
->  #include "mtk_drm_ddp_comp.h"
-> +#include "mtk_drm_gem.h"
->  
->  #define DISP_REG_RDMA_INT_ENABLE		0x0000
->  #define DISP_REG_RDMA_INT_STATUS		0x0004
-> @@ -59,6 +60,9 @@
->  #define MEM_MODE_INPUT_FORMAT_UYVY		(0x004 << 4)
->  #define MEM_MODE_INPUT_FORMAT_YUYV		(0x005 << 4)
->  
-> +#define RDMA_DUMMY_BUFFER_SIZE(h, v)		((h) * (v) * 4)
-> +#define RDMA_DUMMY_BUFFER_PITCH(h)		((h) * 4)
-> +
->  struct mtk_disp_rdma_data {
->  	unsigned int fifo_size;
->  };
-> @@ -74,6 +78,7 @@ struct mtk_disp_rdma {
->  	const struct mtk_disp_rdma_data	*data;
->  	struct drm_device *drm_dev;
->  	bool rdma_memory_mode;
-> +	unsigned int dummy_size;
->  };
->  
->  static inline struct mtk_disp_rdma *comp_to_rdma(struct mtk_ddp_comp *comp)
-> @@ -126,14 +131,29 @@ static void mtk_rdma_disable_vblank(struct mtk_ddp_comp *comp)
->  
->  static void mtk_rdma_start(struct mtk_ddp_comp *comp)
->  {
-> +	struct mtk_disp_rdma *rdma = comp_to_rdma(comp);
-> +	bool *rdma_memory_mode = comp->comp_mode;
-> +
-> +	if (*rdma_memory_mode == true) {
-> +		comp->mtk_gem = mtk_drm_gem_create(rdma->drm_dev,
-> +						   rdma->dummy_size, false);
-> +		writel(comp->mtk_gem->dma_addr & 0xFFFFFFFF,
-> +		       comp->regs + DISP_RDMA_MEM_START_ADDR);
-> +	}
-> +
->  	rdma_update_bits(comp, DISP_REG_RDMA_GLOBAL_CON, RDMA_ENGINE_EN,
->  			 RDMA_ENGINE_EN);
->  }
->  
->  static void mtk_rdma_stop(struct mtk_ddp_comp *comp)
->  {
-> +	bool *rdma_memory_mode = comp->comp_mode;
-> +
->  	writel(RDMA_SOFT_RESET, comp->regs + DISP_REG_RDMA_GLOBAL_CON);
->  	writel(0, comp->regs + DISP_REG_RDMA_GLOBAL_CON);
-> +
-> +	if (*rdma_memory_mode == true)
-> +		mtk_drm_gem_free_object(&comp->mtk_gem->base);
->  }
->  
->  static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
-> @@ -149,8 +169,11 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
->  	rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_1, 0xfffff, height);
->  
->  	if (*rdma_memory_mode == true) {
-> +		rdma->dummy_size = RDMA_DUMMY_BUFFER_SIZE(width, height);
->  		rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0, 0xff0000,
->  				 MATRIX_INT_MTX_SEL_DEFAULT);
-> +		writel(RDMA_DUMMY_BUFFER_PITCH(width),
-> +		       comp->regs + DISP_RDMA_MEM_SRC_PITCH);
->  		rdma_update_bits(comp, DISP_REG_RDMA_GLOBAL_CON,
->  				 RDMA_MODE_MEMORY, RDMA_MODE_MEMORY);
->  	}
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> index a1988ce15141..6dbb83144a74 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-> @@ -92,6 +92,7 @@ struct mtk_ddp_comp {
->  	int irq;
->  	struct device *larb_dev;
->  	enum mtk_ddp_comp_id id;
-> +	struct mtk_drm_gem_obj *mtk_gem;
->  	const struct mtk_ddp_comp_funcs *funcs;
->  	void *comp_mode;
->  };
+>  arch/arm/crypto/chacha20-neon-core.S | 10 ++++------
+>  1 file changed, 4 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/crypto/chacha20-neon-core.S b/arch/arm/crypto/chacha20-neon-core.S
+> index 3fecb2124c35..451a849ad518 100644
+> --- a/arch/arm/crypto/chacha20-neon-core.S
+> +++ b/arch/arm/crypto/chacha20-neon-core.S
+> @@ -51,9 +51,8 @@ ENTRY(chacha20_block_xor_neon)
+>  .Ldoubleround:
+>         // x0 += x1, x3 = rotl32(x3 ^ x0, 16)
+>         vadd.i32        q0, q0, q1
+> -       veor            q4, q3, q0
+> -       vshl.u32        q3, q4, #16
+> -       vsri.u32        q3, q4, #16
+> +       veor            q3, q3, q0
+> +       vrev32.16       q3, q3
+>
+>         // x2 += x3, x1 = rotl32(x1 ^ x2, 12)
+>         vadd.i32        q2, q2, q3
+> @@ -82,9 +81,8 @@ ENTRY(chacha20_block_xor_neon)
+>
+>         // x0 += x1, x3 = rotl32(x3 ^ x0, 16)
+>         vadd.i32        q0, q0, q1
+> -       veor            q4, q3, q0
+> -       vshl.u32        q3, q4, #16
+> -       vsri.u32        q3, q4, #16
+> +       veor            q3, q3, q0
+> +       vrev32.16       q3, q3
+>
+>         // x2 += x3, x1 = rotl32(x1 ^ x2, 12)
+>         vadd.i32        q2, q2, q3
+> --
+> 2.18.0
+>
