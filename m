@@ -1,107 +1,44 @@
-From: sakari.ailus@linux.intel.com (Sakari Ailus)
-Date: Wed, 25 Jul 2018 14:43:44 +0300
-Subject: [PATCH v10 2/2] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20180725184224.cab5172f8558162cc74bde9e@magewell.com>
-References: <1525417745-37964-1-git-send-email-yong.deng@magewell.com>
- <20180626110821.wkal6fcnoncsze6y@valkosipuli.retiisi.org.uk>
- <20180705154802.03604f156709be11892b19c0@magewell.com>
- <20180718095513.4cm77g2iuilvfmd6@paasikivi.fi.intel.com>
- <20180725184224.cab5172f8558162cc74bde9e@magewell.com>
-Message-ID: <20180725114344.eyra7g52xwagqkcv@paasikivi.fi.intel.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 25 Jul 2018 12:48:12 +0100
+Subject: [RFC PATCH 10/16] KVM: arm64: Add a vcpu flag to control SVE
+ visibility for the guest
+In-Reply-To: <20180719150244.cybuq65qc6pt7hek@kamzik.brq.redhat.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-11-git-send-email-Dave.Martin@arm.com>
+ <20180719150244.cybuq65qc6pt7hek@kamzik.brq.redhat.com>
+Message-ID: <20180725114812.GI4240@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
-
-On Wed, Jul 25, 2018 at 06:42:24PM +0800, Yong wrote:
-> Hi Sakari,
-> 
-> On Wed, 18 Jul 2018 12:55:14 +0300
-> Sakari Ailus <sakari.ailus@linux.intel.com> wrote:
-> 
-> > Hi Yong,
+On Thu, Jul 19, 2018 at 05:02:44PM +0200, Andrew Jones wrote:
+> On Thu, Jun 21, 2018 at 03:57:34PM +0100, Dave Martin wrote:
+> > Since SVE will be enabled or disabled on a per-vcpu basis, a flag
+> > is needed in order to track which vcpus have it enabled.
 > > 
-> > On Thu, Jul 05, 2018 at 03:48:02PM +0800, Yong wrote:
-> > > > > +
-> > > > > +/* -----------------------------------------------------------------------------
-> > > > > + * Media Operations
-> > > > > + */
-> > > > > +static int sun6i_video_formats_init(struct sun6i_video *video,
-> > > > > +				    const struct media_pad *remote)
-> > > > > +{
-> > > > > +	struct v4l2_subdev_mbus_code_enum mbus_code = { 0 };
-> > > > > +	struct sun6i_csi *csi = video->csi;
-> > > > > +	struct v4l2_format format;
-> > > > > +	struct v4l2_subdev *subdev;
-> > > > > +	u32 pad;
-> > > > > +	const u32 *pixformats;
-> > > > > +	int pixformat_count = 0;
-> > > > > +	u32 subdev_codes[32]; /* subdev format codes, 32 should be enough */
-> > > > > +	int codes_count = 0;
-> > > > > +	int num_fmts = 0;
-> > > > > +	int i, j;
-> > > > > +
-> > > > > +	pad = remote->index;
-> > > > > +	subdev = media_entity_to_v4l2_subdev(remote->entity);
-> > > > > +	if (subdev == NULL)
-> > > > > +		return -ENXIO;
-> > > > > +
-> > > > > +	/* Get supported pixformats of CSI */
-> > > > > +	pixformat_count = sun6i_csi_get_supported_pixformats(csi, &pixformats);
-> > > > > +	if (pixformat_count <= 0)
-> > > > > +		return -ENXIO;
-> > > > > +
-> > > > > +	/* Get subdev formats codes */
-> > > > > +	mbus_code.pad = pad;
-> > > > > +	mbus_code.which = V4L2_SUBDEV_FORMAT_ACTIVE;
-> > > > > +	while (!v4l2_subdev_call(subdev, pad, enum_mbus_code, NULL,
-> > > > > +				 &mbus_code)) {
-> > > > 
-> > > > The formats supported by the external sub-device may depend on horizontal
-> > > > and vertical flipping. You shouldn't assume any particular configuration
-> > > > here: instead, bridge drivers generally just need to make sure the formats
-> > > > match in link validation when streaming is started. At least the CSI-2
-> > > > receiver driver and the DMA engine driver (video device) should check the
-> > > > configuration is valid. See e.g. the IPU3 driver:
-> > > > drivers/media/pci/intel/ipu3/ipu3-cio2.c .
-> > > 
-> > > Can mbus_code be added dynamically ?
-> > > The code here only enum the mbus code and get the possible supported
-> > > pairs of pixformat and mbus by SoC. Not try to check if the formats
-> > > (width height ...) is valid or not. The formats validation will be 
-> > > in link validation when streaming is started as per your advise. 
+> > This patch adds a suitable flag and a helper for checking it.
 > > 
-> > The formats that can be enumerated from the sensor here are those settable
-> > using SUBDEV_S_FMT. The enumeration will change on raw sensors if you use
-> > the flipping controls. As the bridge driver implements MC as well as subdev
-> > APIs, generally the sensor configuration is out of scope of this driver
-> > since it's directly configured from the user space.
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > ---
+> >  arch/arm64/include/asm/kvm_host.h | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
 > > 
-> > Just check that the pipeline is valid before starting streaming in your
-> > driver.
+> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> > index 9671ddd..609d08b 100644
+> > --- a/arch/arm64/include/asm/kvm_host.h
+> > +++ b/arch/arm64/include/asm/kvm_host.h
+> > @@ -308,6 +308,14 @@ struct kvm_vcpu_arch {
+> >  #define KVM_ARM64_FP_HOST		(1 << 2) /* host FP regs loaded */
+> >  #define KVM_ARM64_HOST_SVE_IN_USE	(1 << 3) /* backup for host TIF_SVE */
+> >  #define KVM_ARM64_HOST_SVE_ENABLED	(1 << 4) /* SVE enabled for EL0 */
+> > +#define KVM_ARM64_GUEST_HAS_SVE		(1 << 5) /* SVE exposed to guest */
+> > +
+> > +static inline bool vcpu_has_sve(struct kvm_vcpu_arch const *vcpu_arch)
 > 
-> Sorry. I am still confused.
-> As the CSI driver does not enum the formats supported by sensor.
-> How to get a valid format if I do not want to open the subdev? 
+> Shouldn't this vcpu function take a vcpu instead of a vcpu_arch?
 
-For MC-enabled drivers that expose the pipeline, the user is responsible
-for configuring the pipeline.
+Logically it could.  There was some circular include issue that made it
+tricky to get the definition of struct kvm_vcpu here, but I may have
+another go at it.
 
-There are bridge drivers that do not expose the pipeline but that will
-exclude the use of e.g. some sensor drivers with those bridge drivers.
-
-> Many applications still only open /dev/video*.
-
-That's true, and this is indeed a known gap:
-
-<URL:https://www.spinics.net/lists/linux-media/msg137668.html>
-
-So in other words, there is no solution for that issue right now, but this
-is in no way specific to your driver, and it is known that this needs to be
-addressed.
-
--- 
-Kind regards,
-
-Sakari Ailus
-sakari.ailus at linux.intel.com
+Cheers
+---Dave
