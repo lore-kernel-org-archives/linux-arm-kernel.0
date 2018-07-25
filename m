@@ -1,110 +1,79 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 25 Jul 2018 19:20:57 +0200
-Subject: [RFC PATCH 14/16] KVM: arm64/sve: Add SVE support to register
- access ioctl interface
-In-Reply-To: <20180725140621.GK4240@e103592.cambridge.arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-15-git-send-email-Dave.Martin@arm.com>
- <20180719130433.mfqqnxxlmvhduqri@kamzik.brq.redhat.com>
- <20180725140621.GK4240@e103592.cambridge.arm.com>
-Message-ID: <20180725172057.tvesmvfjtwe6sxla@kamzik.brq.redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 25 Jul 2018 11:24:59 -0600
+Subject: [PATCH v2 09/10] coresight: Cleanup coresight DT bindings
+In-Reply-To: <e96b9bda-8a58-a817-5580-7771af7c9e28@arm.com>
+References: <1531997715-6767-1-git-send-email-suzuki.poulose@arm.com>
+ <1531997715-6767-10-git-send-email-suzuki.poulose@arm.com>
+ <20180725160939.GA24323@rob-hp-laptop>
+ <e96b9bda-8a58-a817-5580-7771af7c9e28@arm.com>
+Message-ID: <CAL_JsqKhiA=Yr3gWhxaQxT56NUai77Lg5iVfQUaTtBW=a5-kFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2018 at 03:06:21PM +0100, Dave Martin wrote:
-> On Thu, Jul 19, 2018 at 03:04:33PM +0200, Andrew Jones wrote:
-> > On Thu, Jun 21, 2018 at 03:57:38PM +0100, Dave Martin wrote:
-> > > +
-> > > +	if (usize % sizeof(u32))
-> > > +		return -EINVAL;
-> > 
-> 
-> Currently we don't enforce the register size to be a multiple of 32 bits,
-> but I'm trying to establish a stronger position.  Passing different
-> register sizes feels like an abuse of the API and there is no evidence
-> that qemu or kvmtool is relying on this so far.  The ability to pass
-> a misaligned register ID and/or slurp multiple vcpu registers (or parts
-> of registers) is once call really seems like it works by accident today
-> and seems not to be intentional design.  Rather, it exposes kernel
-> implementation details, which is best avoided.
-> 
-> It would be better to make this a global check for usize % 32 == 0
-> though, rather than burying it in fpsimd_vreg_bounds().
-> 
-> Opinions?
-
-There's only one reason to not start enforcing it globally on arm/arm64,
-and that's that it's not documented that way. Changing it would be an API
-change, rather than just an API fix. It's probably a safe change, but...
-
-> 
-> > > +
-> > > +	usize /= sizeof(u32);
-> > > +
-> > > +	if ((uoffset <= start && usize <= start - uoffset) ||
-> > > +	    uoffset >= limit)
-> > > +		return -ENOENT;	/* not a vreg */
-> > > +
-> > > +	BUILD_BUG_ON(uoffset > limit);
-> > 
-> > Hmm, a build bug on uoffset can't be right, it's not a constant.
-> > 
-> > > +	if (uoffset < start || usize > limit - uoffset)
-> > > +		return -EINVAL;	/* overlaps vregs[] bounds */
-> 
-> uoffset is not compile-time constant, but (uoffset > limit) is compile-
-> time constant, because the previous if() returns from the function
-> otherwise.
-> 
-> gcc seems to do the right thing here: the code compiles as-is, but
-> if the prior if() is commented out then the BUILD_BUG_ON() fires
-> because (uoffset > limit) is no longer compile-time constant.
-
-Oh, interesting.
-
-> 
-> 
-> This is a defensively-coded bounds check, where
-> 
-> 	if (A + B > C)
-> 
-> is transformed to
-> 
-> 	if (C >= B && A > C - B)
-> 
-> The former is susceptible to overflow in (A + B), whereas the latter is
-> not.  We might be able to hide the risk with type casts, but that trades
-> one kind of fragility for another IMHO.
-> 
-> In this patch, the C >= B part is subsumed into the previous if(), but
-> because this is non-obvious I dropped the BUILD_BUG_ON() in as a hint
-> to maintainers that we really do depend on a property of the previous
-> check, so although it may look like the checks could be swapped over
-> with no ill effects, really that is not safe.
-
-I'm glad our maintainers can pick up on hints like that :-) Maybe you can
-add a comment for mortals like me though.
-
-> 
-> 
-> Maybe the BUILD_BUG_ON() is superfluous, but I would prefer at least
-> to keep a comment here.
-> 
-> What do you think.
+On Wed, Jul 25, 2018 at 10:13 AM Suzuki K Poulose
+<suzuki.poulose@arm.com> wrote:
 >
+> On 07/25/2018 05:09 PM, Rob Herring wrote:
+> > On Thu, Jul 19, 2018 at 11:55:13AM +0100, Suzuki K Poulose wrote:
+> >> The coresight drivers relied on default bindings for graph
+> >> in DT, while reusing the "reg" field of the "ports" to indicate
+> >> the actual hardware port number for the connections. This can
+> >> cause duplicate ports with same addresses, but different
+> >> direction. However, with the rules getting stricter w.r.t to the
+> >> address mismatch with the label, it is no longer possible to use
+> >> the port address field for the hardware port number.
+> >>
+> >> This patch introduces new DT binding rules for coresight
+> >> components, based on the same generic DT graph bindings, but
+> >> avoiding the address duplication.
+> >>
+> >> - All output ports must be specified under a child node with
+> >>    name "out-ports".
+> >> - All input ports must be specified under a childe node with
+> >>    name "in-ports".
+> >> - Port address should match the hardware port number.
+> >>
+> >> The support for legacy bindings is retained, with a warning.
+> >>
+> >> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> >> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> >> Cc: Rob Herring <robh@kernel.org>
+> >> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> >> ---
+> >>   .../devicetree/bindings/arm/coresight.txt          | 91 ++++++++++----------
+> >>   drivers/hwtracing/coresight/of_coresight.c         | 97 +++++++++++++++++++---
+> >>   2 files changed, 129 insertions(+), 59 deletions(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+> >> index 8e21512..f39d2c6 100644
+> >> --- a/Documentation/devicetree/bindings/arm/coresight.txt
+> >> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
+> >> @@ -104,19 +104,9 @@ The connections must be described via generic DT graph bindings as described
+> >>   by the "bindings/graph.txt", where each "port" along with an "endpoint"
+> >>   component represents a hardware port and the connection.
+> >>
+> >> -Since it is possible to have multiple connections for any coresight component
+> >> -with a specific direction of data flow, each connection must define the
+> >> -following properties to uniquely identify the connection details.
+> >> -
+> >> - * Direction of the data flow w.r.t the component :
+> >> -   Each input port must have the following property defined at the "endpoint"
+> >> -   for the port.
+> >> -    "slave-mode"
+> >> -
+> >> - * Hardware Port number at the component:
+> >> -     -  The hardware port number is assumed to be the address of the "port"
+> >> -         component.
+> >> -
+> >
+> > Why do you add this in the previous patch and then remove it here?
+>
+> The only use case I can think of it is for someone to look back on the
+> legacy bindings, which were never documented. I could skip the parts
+> that are being removed.
 
-Comment plus build-bug or just comment works for me.
+Yeah, I'd just remove it. Finding the text that exists for 1 commit is
+a little hard. Now that we've discussed it here, googling for it will
+be easier.
 
-> 
-> OTOH, if we can show conclusively that we can avoid overflow here
-> then the code can be simplified.  But I would want to be confident
-> that this is really safe not just now but also under future maintenance.
-> 
-
-I agree with thoroughly checking user input. Maybe we can create/use
-some helper functions to do it. Those helpers can then get reused
-elsewhere, helping to keep ourselves sane the next time we need to
-do similar sanity checks.
-
-Thanks,
-drew
+Rob
