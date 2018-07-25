@@ -1,137 +1,119 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 25 Jul 2018 15:12:15 +0100
-Subject: [RFC PATCH 08/16] KVM: arm64: Support dynamically hideable system
- registers
-In-Reply-To: <1529593060-542-9-git-send-email-Dave.Martin@arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-9-git-send-email-Dave.Martin@arm.com>
-Message-ID: <878t5ztneo.fsf@linaro.org>
+From: npiggin@gmail.com (Nicholas Piggin)
+Date: Thu, 26 Jul 2018 00:06:41 +1000
+Subject: [RFC PATCH 4/4] powerpc/64s/radix: optimise TLB flush with precise
+ TLB ranges in mmu_gather
+In-Reply-To: <20180725140641.30372-1-npiggin@gmail.com>
+References: <20180725140641.30372-1-npiggin@gmail.com>
+Message-ID: <20180725140641.30372-5-npiggin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The mmu_gather APIs keep track of the invalidated address range, and
+the generic page table freeing accessors expand the invalidated range
+to cover the addresses corresponding to the page tables even if there
+are no ptes and therefore no TLB entries to invalidate. This is done
+for architectures that have paging structure caches that are
+invalidated with their TLB invalidate instructions (e.g., x86).
 
-Dave Martin <Dave.Martin@arm.com> writes:
+powerpc/64s/radix does have a "page walk cache" (PWC), but it is
+invalidated with a specific instruction and tracked independently in
+the mmu_gather (using the need_flush_all flag to indicate PWC must be
+flushed). Therefore TLB invalidation does not have to be expanded to
+cover freed page tables.
 
-> Some system registers may or may not logically exist for a vcpu
-> depending on whether certain architectural features are enabled for
-> the vcpu.
->
-> In order to avoid spuriously emulating access to these registers
-> when they should not exist, or allowing the registers to be
-> spuriously enumerated or saved/restored through the ioctl
-> interface, a means is needed to allow registers to be hidden
-> depending on the vcpu configuration.
->
-> In order to support this in a flexible way, this patch adds a
-> check_present() method to struct sys_reg_desc, and updates the
-> generic system register access and enumeration code to be aware of
-> it:  if check_present() returns false, the code behaves as if the
-> register did not exist.
->
-> For convenience, the complete check is wrapped up in a new helper
-> sys_reg_present().
->
-> An attempt has been made to hook the new check into the generic
-> accessors for trapped system registers.  This should reduce the
-> potential for future surprises, although the redundant check will
-> add a small cost.  No system register depends on this functionality
-> yet, and some paths needing the check may also need attention.
->
-> Naturally, this facility makes sense only for registers that are
-> trapped.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/kvm/sys_regs.c | 20 +++++++++++++++-----
->  arch/arm64/kvm/sys_regs.h | 11 +++++++++++
->  2 files changed, 26 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index a436373..31a351a 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -1840,7 +1840,7 @@ static int emulate_cp(struct kvm_vcpu *vcpu,
->
->  	r = find_reg(params, table, num);
->
-> -	if (r) {
-> +	if (likely(r) && sys_reg_present(vcpu, r)) {
->  		perform_access(vcpu, params, r);
->  		return 0;
->  	}
-> @@ -2016,7 +2016,7 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
->  	if (!r)
->  		r = find_reg(params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
->
-> -	if (likely(r)) {
-> +	if (likely(r) && sys_reg_present(vcpu, r)) {
->  		perform_access(vcpu, params, r);
->  	} else {
->  		kvm_err("Unsupported guest sys_reg access at: %lx\n",
-> @@ -2313,6 +2313,9 @@ int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
->  	if (!r)
->  		return get_invariant_sys_reg(reg->id, uaddr);
->
-> +	if (!sys_reg_present(vcpu, r))
-> +		return -ENOENT;
-> +
->  	if (r->get_user)
->  		return (r->get_user)(vcpu, r, reg, uaddr);
->
-> @@ -2334,6 +2337,9 @@ int kvm_arm_sys_reg_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
->  	if (!r)
->  		return set_invariant_sys_reg(reg->id, uaddr);
->
-> +	if (!sys_reg_present(vcpu, r))
-> +		return -ENOENT;
-> +
->  	if (r->set_user)
->  		return (r->set_user)(vcpu, r, reg, uaddr);
->
-> @@ -2390,7 +2396,8 @@ static bool copy_reg_to_user(const struct sys_reg_desc *reg, u64 __user **uind)
->  	return true;
->  }
->
-> -static int walk_one_sys_reg(const struct sys_reg_desc *rd,
-> +static int walk_one_sys_reg(struct kvm_vcpu *vcpu,
-> +			    const struct sys_reg_desc *rd,
->  			    u64 __user **uind,
->  			    unsigned int *total)
->  {
-> @@ -2401,6 +2408,9 @@ static int walk_one_sys_reg(const struct sys_reg_desc *rd,
->  	if (!(rd->reg || rd->get_user))
->  		return 0;
->
-> +	if (!sys_reg_present(vcpu, rd))
-> +		return 0;
-> +
->  	if (!copy_reg_to_user(rd, uind))
->  		return -EFAULT;
->
-> @@ -2429,9 +2439,9 @@ static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
->  		int cmp = cmp_sys_reg(i1, i2);
->  		/* target-specific overrides generic entry. */
->  		if (cmp <= 0)
-> -			err = walk_one_sys_reg(i1, &uind, &total);
-> +			err = walk_one_sys_reg(vcpu, i1, &uind, &total);
->  		else
-> -			err = walk_one_sys_reg(i2, &uind, &total);
-> +			err = walk_one_sys_reg(vcpu, i2, &uind, &total);
->
->  		if (err)
->  			return err;
-> diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
-> index cd710f8..dfbb342 100644
-> --- a/arch/arm64/kvm/sys_regs.h
-> +++ b/arch/arm64/kvm/sys_regs.h
-> @@ -22,6 +22,9 @@
->  #ifndef __ARM64_KVM_SYS_REGS_LOCAL_H__
->  #define __ARM64_KVM_SYS_REGS_LOCAL_H__
->
-> +#include <linux/compiler.h>
-> +#include <linux/types.h>
+This patch defines p??_free_tlb functions for 64s, which do not expand
+the TLB flush range over page table pages. This brings the number of
+tlbiel instructions required by a kernel compile from 33M to 25M, most
+avoided from exec => shift_arg_pages().
 
-I can see why you want compiler.h, but why types.h?
+Signed-off-by: Nicholas Piggin <npiggin@gmail.com>
+---
+ arch/powerpc/include/asm/tlb.h | 34 ++++++++++++++++++++++++++++++++++
+ arch/powerpc/mm/tlb-radix.c    | 10 ++++++++++
+ include/asm-generic/tlb.h      |  5 +++++
+ 3 files changed, 49 insertions(+)
 
---
-Alex Benn?e
+diff --git a/arch/powerpc/include/asm/tlb.h b/arch/powerpc/include/asm/tlb.h
+index 9138baccebb0..5d3107f2b014 100644
+--- a/arch/powerpc/include/asm/tlb.h
++++ b/arch/powerpc/include/asm/tlb.h
+@@ -30,6 +30,40 @@
+ #define __tlb_remove_tlb_entry	__tlb_remove_tlb_entry
+ #define tlb_remove_check_page_size_change tlb_remove_check_page_size_change
+ 
++#ifdef CONFIG_PPC_BOOK3S_64
++/*
++ * powerpc book3s hash does not have page table structure caches, and
++ * radix requires explicit management with PWC invalidate tlb type, so
++ * there is no need to expand the mmu_gather range over invalidated page
++ * table pages like the generic code does.
++ */
++
++#define pte_free_tlb(tlb, ptep, address)			\
++	do {							\
++		__pte_free_tlb(tlb, ptep, address);		\
++	} while (0)
++
++#define pmd_free_tlb(tlb, pmdp, address)			\
++	do {							\
++		__pmd_free_tlb(tlb, pmdp, address);		\
++	} while (0)
++
++#define pud_free_tlb(tlb, pudp, address)			\
++	do {							\
++		__pud_free_tlb(tlb, pudp, address);		\
++	} while (0)
++
++/*
++ * Radix sets need_flush_all when page table pages have been unmapped
++ * and the PWC needs flushing. Generic code must call our tlb_flush
++ * even on empty ranges in this case.
++ *
++ * This will always be false for hash.
++ */
++#define arch_tlb_mustflush(tlb) (tlb->need_flush_all)
++
++#endif
++
+ extern void tlb_flush(struct mmu_gather *tlb);
+ 
+ /* Get the generic bits... */
+diff --git a/arch/powerpc/mm/tlb-radix.c b/arch/powerpc/mm/tlb-radix.c
+index 1135b43a597c..238b20a513e7 100644
+--- a/arch/powerpc/mm/tlb-radix.c
++++ b/arch/powerpc/mm/tlb-radix.c
+@@ -862,6 +862,16 @@ void radix__tlb_flush(struct mmu_gather *tlb)
+ 	unsigned long start = tlb->start;
+ 	unsigned long end = tlb->end;
+ 
++	/*
++	 * This can happen if need_flush_all is set due to a page table
++	 * invalidate, but no ptes under it freed (see arch_tlb_mustflush).
++	 * Set end = start to prevent any TLB flushing here (only PWC).
++	 */
++	if (!end) {
++		WARN_ON_ONCE(!tlb->need_flush_all);
++		end = start;
++	}
++
+ 	/*
+ 	 * if page size is not something we understand, do a full mm flush
+ 	 *
+diff --git a/include/asm-generic/tlb.h b/include/asm-generic/tlb.h
+index b320c0cc8996..a55ef1425f0d 100644
+--- a/include/asm-generic/tlb.h
++++ b/include/asm-generic/tlb.h
+@@ -285,6 +285,11 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
+  * http://lkml.kernel.org/r/CA+55aFzBggoXtNXQeng5d_mRoDnaMBE5Y+URs+PHR67nUpMtaw at mail.gmail.com
+  *
+  * For now w.r.t page table cache, mark the range_size as PAGE_SIZE
++ *
++ * Update: powerpc (Book3S 64-bit, radix MMU) has an architected page table
++ * cache (called PWC), and invalidates it specifically. It sets the
++ * need_flush_all flag to indicate the PWC requires flushing, so it defines
++ * its own p??_free_tlb functions which do not expand the TLB range.
+  */
+ 
+ #ifndef pte_free_tlb
+-- 
+2.17.0
