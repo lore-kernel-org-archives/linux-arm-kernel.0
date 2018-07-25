@@ -1,29 +1,82 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 25 Jul 2018 11:39:30 -0600
-Subject: [RFT v2 04/10] pinctrl: samsung: Add dedicated compatible for
- S5Pv210 wakeup interrupts
-In-Reply-To: <20180723175302.22535-5-krzk@kernel.org>
-References: <20180723175302.22535-1-krzk@kernel.org>
- <20180723175302.22535-5-krzk@kernel.org>
-Message-ID: <20180725173930.GA27860@rob-hp-laptop>
+Date: Wed, 25 Jul 2018 11:43:30 -0600
+Subject: [PATCH v2 4/5] dt-bindings: drm/bridge Document Cadence MHDP
+ DPI/DP bridge bindings
+In-Reply-To: <1532430824-23477-5-git-send-email-dkos@cadence.com>
+References: <1532430824-23477-1-git-send-email-dkos@cadence.com>
+ <1532430824-23477-5-git-send-email-dkos@cadence.com>
+Message-ID: <20180725174330.GA31540@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 07:52:56PM +0200, Krzysztof Kozlowski wrote:
-> The S5Pv210 external wakeup interrupts differ from Exynos therefore
-> separate compatible is needed.  Duplicate existing flavor specific data
-> from exynos4210_wkup_irq_chip and add new compatible for S5Pv210.
-> At this point this new compatible does not bring anything new and works
-> exactly as existing "samsung,exynos4210-wakeup-eint".
+On Tue, Jul 24, 2018 at 12:13:35PM +0100, Damian Kos wrote:
+> From: Quentin Schulz <quentin.schulz@bootlin.com>
 > 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Sylwester Nawrocki <snawrocki@kernel.org>
-> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Signed-off-by: Damian Kos <dkos@cadence.com>
 > ---
->  .../devicetree/bindings/pinctrl/samsung-pinctrl.txt    |  2 ++
+>  .../bindings/display/bridge/cdns,mhdp.txt     | 43 +++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt b/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
+> new file mode 100644
+> index 000000000000..dc7be7590048
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
+> @@ -0,0 +1,43 @@
+> +Cadence MHDP bridge
+> +==========================
+> +
+> +The Cadence MHDP bridge is a DPI to DP bridge.
+> +
+> +Required properties:
+> +- compatible: should be "cdns,mhdp8546",
+> +- reg: physical base address and length of the controller's registers,
+> +- clocks: DP bridge clock, it's used by the IP to know how to translate
+> +	a number of clock cycles into a time (which is used to comply
+> +	with DP standard timings and delays),
+> +
+> +Required subnodes:
+> +- ports: Ports as described in Documentation/devictree/bindings/graph.txt
+> +	Port 0 - input port representing the VGA bridge input
+> +	Port 1 - output port representing the VGA bridge output
 
-Acked-by: Rob Herring <robh@kernel.org>
+VGA?
 
->  drivers/pinctrl/samsung/pinctrl-exynos.c               | 18 ++++++++++++++++++
->  2 files changed, 20 insertions(+)
+> +
+> +Example:
+> +
+> +	mhdp: dp-bridge at f0fb000000 {
+> +		compatible = "cdns,mhdp8546";
+> +		reg = <0xf0 0xfb000000 0x0 0x1000000>;
+> +		clocks = <&mhdp_clock>;
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				reg = <0>;
+> +				vga_bridge_input: endpoint {
+> +					remote-endpoint = <&xxx_dpi_output>;
+> +				};
+> +			};
+> +
+> +			port at 1 {
+> +				reg = <1>;
+> +				vga_bridge_output: endpoint {
+> +					remote-endpoint = <&xxx_vga_connector_input>;
+
+vga?
+
+> +				};
+> +			};
+> +		};
+> +	};
+> -- 
+> 2.17.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
