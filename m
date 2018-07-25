@@ -1,44 +1,73 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 25 Jul 2018 12:48:12 +0100
-Subject: [RFC PATCH 10/16] KVM: arm64: Add a vcpu flag to control SVE
- visibility for the guest
-In-Reply-To: <20180719150244.cybuq65qc6pt7hek@kamzik.brq.redhat.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-11-git-send-email-Dave.Martin@arm.com>
- <20180719150244.cybuq65qc6pt7hek@kamzik.brq.redhat.com>
-Message-ID: <20180725114812.GI4240@e103592.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Jul 2018 12:49:54 +0100
+Subject: [PATCHv3 0/2] Stackleak for arm64
+In-Reply-To: <20180724163807.GE25888@arm.com>
+References: <1531341400-12077-1-git-send-email-alex.popov@linux.com>
+ <20180720214154.2940-1-labbott@redhat.com>
+ <20180724163807.GE25888@arm.com>
+Message-ID: <20180725114954.GD30289@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 05:02:44PM +0200, Andrew Jones wrote:
-> On Thu, Jun 21, 2018 at 03:57:34PM +0100, Dave Martin wrote:
-> > Since SVE will be enabled or disabled on a per-vcpu basis, a flag
-> > is needed in order to track which vcpus have it enabled.
-> > 
-> > This patch adds a suitable flag and a helper for checking it.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > ---
-> >  arch/arm64/include/asm/kvm_host.h | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> > 
-> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> > index 9671ddd..609d08b 100644
-> > --- a/arch/arm64/include/asm/kvm_host.h
-> > +++ b/arch/arm64/include/asm/kvm_host.h
-> > @@ -308,6 +308,14 @@ struct kvm_vcpu_arch {
-> >  #define KVM_ARM64_FP_HOST		(1 << 2) /* host FP regs loaded */
-> >  #define KVM_ARM64_HOST_SVE_IN_USE	(1 << 3) /* backup for host TIF_SVE */
-> >  #define KVM_ARM64_HOST_SVE_ENABLED	(1 << 4) /* SVE enabled for EL0 */
-> > +#define KVM_ARM64_GUEST_HAS_SVE		(1 << 5) /* SVE exposed to guest */
-> > +
-> > +static inline bool vcpu_has_sve(struct kvm_vcpu_arch const *vcpu_arch)
+Hi Laura,
+
+On Tue, Jul 24, 2018 at 05:38:07PM +0100, Will Deacon wrote:
+> On Fri, Jul 20, 2018 at 02:41:52PM -0700, Laura Abbott wrote:
+> > This is the version of stackleak for arm64, hopefully ready for queueing
 > 
-> Shouldn't this vcpu function take a vcpu instead of a vcpu_arch?
+> Thanks. I'll push these into linux-next tomorrow, once I've had a chance
+> to test my conflict resolution in entry.S.
 
-Logically it could.  There was some circular include issue that made it
-tricky to get the definition of struct kvm_vcpu here, but I may have
-another go at it.
+I've run into a couple of issues with this series:
 
-Cheers
----Dave
+1. I had to install libmpc-dev to get GCC_PLUGINS to appear, otherwise the
+   hostcc check would silently fail. I guess that's a general observation,
+   but it might be nice to print a message about the missing dependencies.
+
+2. It breaks arm64 allmodconfig build. Log below.
+
+Please can you take a look at the build failure? Otherwise, the patches
+look good to me.
+
+Cheers,
+
+Will
+
+--->8
+
+arch/arm64/kernel/sdei.c: In function ?on_sdei_normal_stack?:
+arch/arm64/kernel/sdei.c:101:7: error: dereferencing pointer to incomplete type ?struct stack_info?
+   info->low = low;
+       ^~
+arch/arm64/kernel/sdei.c:103:16: error: ?STACK_TYPE_SDEI_NORMAL? undeclared (first use in this function); did you mean ?SCHED_NORMAL??
+   info->type = STACK_TYPE_SDEI_NORMAL;
+                ^~~~~~~~~~~~~~~~~~~~~~
+                SCHED_NORMAL
+arch/arm64/kernel/sdei.c:103:16: note: each undeclared identifier is reported only once for each function it appears in
+arch/arm64/kernel/sdei.c: In function ?on_sdei_critical_stack?:
+arch/arm64/kernel/sdei.c:121:16: error: ?STACK_TYPE_SDEI_CRITICAL? undeclared (first use in this function)
+   info->type = STACK_TYPE_SDEI_CRITICAL;
+                ^~~~~~~~~~~~~~~~~~~~~~~~
+arch/arm64/kernel/sdei.c: At top level:
+arch/arm64/kernel/sdei.c:127:6: error: conflicting types for ?_on_sdei_stack?
+ bool _on_sdei_stack(unsigned long sp,
+      ^~~~~~~~~~~~~~
+In file included from ./include/linux/arm_sdei.h:14:0,
+                 from arch/arm64/kernel/sdei.c:5:
+./arch/arm64/include/asm/sdei.h:45:6: note: previous declaration of ?_on_sdei_stack? was here
+ bool _on_sdei_stack(unsigned long sp, struct stack_info *info);
+      ^~~~~~~~~~~~~~
+arch/arm64/kernel/sdei.c: In function ?_on_sdei_stack?:
+arch/arm64/kernel/sdei.c:136:33: error: ?info? undeclared (first use in this function); did you mean ?int??
+  if (on_sdei_critical_stack(sp, info))
+                                 ^~~~
+                                 int
+arch/arm64/kernel/sdei.c:131:21: warning: unused variable ?high? [-Wunused-variable]
+  unsigned long low, high;
+                     ^~~~
+arch/arm64/kernel/sdei.c:131:16: warning: unused variable ?low? [-Wunused-variable]
+  unsigned long low, high;
+                ^~~
+make[1]: *** [arch/arm64/kernel/sdei.o] Error 1
+make[1]: *** Waiting for unfinished jobs....
+make: *** [arch/arm64/kernel] Error 2
