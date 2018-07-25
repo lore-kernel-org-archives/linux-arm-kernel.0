@@ -1,61 +1,33 @@
-From: appanad@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Wed, 25 Jul 2018 09:13:57 +0000
-Subject: [PATCH v3 2/2] fpga: zynq-fpga: Add support for readback
-In-Reply-To: <CANk1AXQ7RH6gwjNMQSXJZ=wCrwTGZ+T6uVgOsb6N+YJ2Y6zR8g@mail.gmail.com>
-References: <1532441858-13507-1-git-send-email-appana.durga.rao@xilinx.com>
- <1532441858-13507-2-git-send-email-appana.durga.rao@xilinx.com>
- <CANk1AXQ7RH6gwjNMQSXJZ=wCrwTGZ+T6uVgOsb6N+YJ2Y6zR8g@mail.gmail.com>
-Message-ID: <CY1PR02MB16921C8D66930128BAF104B4DC540@CY1PR02MB1692.namprd02.prod.outlook.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 25 Jul 2018 10:19:57 +0100
+Subject: [PATCH v3 0/2] kvm: arm/arm64: Fix emulated physical timer IRQ
+ injection
+Message-ID: <20180725091959.11475-1-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+Hi,
 
-	Thanks for the review...
+those two patches fix the (physical EL1) arch timer emulation in KVM,
+which missed to inject the timer IRQ if the vCPU was asleep when the
+timer expired. This can be checked by a new kvm-unit-tests test [1].
 
-<Snip> 
-> Another minor thing.
-> 
-> > +
-> >
-> +/**************************************************************
-> ******
-> > +********/
-> 
-> Let's keep the coding style consistent by not having
+I am now taking Christoffer's approach, which keeps phys_timer_emulate()
+mostly as it is, and adds the explicit IRQ injection check in the caller.
+This turned out to fit better into the upcoming arch timer rework.
 
-Sure will fix in v4...
+Cheers,
+Andre.
 
-> '***************************'
-> 
-> > +/**
-> > + *
-> 
-> Also, you don't need /** followed by '*', just take out the essentially blank
-> line here, please.
+[1] https://lists.cs.columbia.edu/pipermail/kvmarm/2018-July/032220.html
 
-Sure will fix in v4...
+Christoffer Dall (2):
+  KVM: arm/arm64: Fix potential loss of ptimer interrupts
+  KVM: arm/arm64: Fix lost IRQs from emulated physcial timer when
+    blocked
 
-Regards,
-Kedar.
+ virt/kvm/arm/arch_timer.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
 
-> 
-> > + * Generates a Type 2 packet header that reads back the requested
-> > +Configuration
-> > + * register.
-> > + *
-> > + * @param        OpCode is the read/write operation code.
-> > + * @param        Size is the size of the word to be read.
-> > + *
-> > + * @return       Type 2 packet header to read the specified register
-> > + *
-> > + * @note         None.
-> > + *
-> > +
-> >
-> +***************************************************************
-> ******
-> > +********/ static int zynq_type2_pkt(u8 OpCode, u32 Size) {
-> 
-> Thanks,
-> Alan
+-- 
+2.14.4
