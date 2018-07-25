@@ -1,43 +1,30 @@
-From: hari.vyas@broadcom.com (Hari Vyas)
-Date: Wed, 25 Jul 2018 16:43:30 +0530
-Subject: [PATCH] arm64: fix for restoring console loglevel after handling
- traps
-In-Reply-To: <20180724094804.e5hzljkn3twcmbd3@lakrids.cambridge.arm.com>
-References: <1531993734-1463-1-git-send-email-hari.vyas@broadcom.com>
- <1531993734-1463-2-git-send-email-hari.vyas@broadcom.com>
- <20180719100140.GA424@jagdpanzerIV>
- <CAM5rFu_N-=26LddRy1mO010h9yLcGuKqK6=y+h=h3-HbfEP+FQ@mail.gmail.com>
- <20180719103916.g763zmsm7wnngwop@lakrids.cambridge.arm.com>
- <CAM5rFu-MFbH_2Pohmjydy232Rpt7_E84-K=e67wAu3iQzvTLiA@mail.gmail.com>
- <20180720121321.qgdsdtvvowhphava@pathway.suse.cz>
- <CAM5rFu-_sU1eSryFR-rDF=6BxZuf_E0xBQJ8RizNKYDB+DgWOQ@mail.gmail.com>
- <CAM5rFu9zVa3H=mqmSknALt-znb2MPwVbuy3atA5Qoi9KvGNXqQ@mail.gmail.com>
- <20180724094804.e5hzljkn3twcmbd3@lakrids.cambridge.arm.com>
-Message-ID: <CAM5rFu-Yr3G7U3FidqK3-dDhNZqeSwPOv3AR08b4P0Wi-3iC9Q@mail.gmail.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Wed, 25 Jul 2018 13:29:29 +0200
+Subject: [PATCH v2 2/7] dma-mapping: Generalise dma_32bit_limit flag
+In-Reply-To: <c1720f0181b66f711e4097d85149757b16a7b0a7.1532382222.git.robin.murphy@arm.com>
+References: <cover.1532382222.git.robin.murphy@arm.com>
+ <c1720f0181b66f711e4097d85149757b16a7b0a7.1532382222.git.robin.murphy@arm.com>
+Message-ID: <20180725112929.GA24736@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 3:18 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Jul 24, 2018 at 02:44:48PM +0530, Hari Vyas wrote:
->> For tracking purpose, I have raised a separate bug for bad_mode() issue i.e.
->> Bug 200637 - ARM64: bad_mode() handler may not result in panic always
->> due to die() call in the beginning
->> Probable fix could be to remove die() from bad_mode() but better other confirms.
->>
->> As stated, die() is called from other places also my feeling and
->> logically restoration  is required. Please
->> confirm whether to close this issue without any change or proceed with
->> only one restore() call in die and discard at
->> other 3 places.
->
-> I think that if we've encountered a die(), leaving the loglevel up is
-> fine. Something has gone very wrong, regardless of whether we try to
-> continue.
->
-Traps/exception will not happen in normal scenario any how. Just
-re-checked code, die() is not a static function currently and
-it is being called from do_page_fault() and do_kernel_fault() defined
-in mm/fault.c Probably those calls also shouldn't happen in normal
-scenario.
-In that case, better to reject issue then.
-> Mark.
+On Mon, Jul 23, 2018 at 11:16:07PM +0100, Robin Murphy wrote:
+> Whilst the notion of an upstream DMA restriction is most commonly seen
+> in PCI host bridges saddled with a 32-bit native interface, a more
+> general version of the same issue can exist on complex SoCs where a bus
+> or point-to-point interconnect link from a device's DMA master interface
+> to another component along the path to memory (often an IOMMU) may carry
+> fewer address bits than the interfaces at both ends nominally support.
+> In order to properly deal with this, the first step is to expand the
+> dma_32bit_limit flag into an arbitrary mask.
+> 
+> To minimise the impact on existing code, we'll make sure to only
+> consider this new mask valid if set. That makes sense anyway, since a
+> mask of zero would represent DMA not being wired up at all, and that
+> would be better handled by not providing valid ops in the first place.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+
+Looks good,
+
+Reviewed-by: Christoph Hellwig <hch@lst.de>
