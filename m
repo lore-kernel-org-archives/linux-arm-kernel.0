@@ -1,61 +1,82 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 25 Jul 2018 23:38:06 +0800
-Subject: [linux-sunxi] [PATCH v3 6/9] dt-bindings: phy: add binding for
- Allwinner USB3 PHY
-In-Reply-To: <20180725153126.GA8350@rob-hp-laptop>
-References: <20180722055739.26464-1-icenowy@aosc.io>
- <20180722055739.26464-7-icenowy@aosc.io>
- <CAGb2v65m6AEW=DO-cqLMyjfnaiZudm38hXufJL6LXdOrJqir_g@mail.gmail.com>
- <20180725153126.GA8350@rob-hp-laptop>
-Message-ID: <75A6FEBC-FDCE-459E-93C5-60F4B0E6D44D@aosc.io>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Wed, 25 Jul 2018 16:41:44 +0100
+Subject: [RFC PATCH 08/16] KVM: arm64: Support dynamically hideable system
+ registers
+In-Reply-To: <20180725143613.GM4240@e103592.cambridge.arm.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-9-git-send-email-Dave.Martin@arm.com>
+ <878t5ztneo.fsf@linaro.org> <20180725143613.GM4240@e103592.cambridge.arm.com>
+Message-ID: <877eljtj9j.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Dave Martin <Dave.Martin@arm.com> writes:
 
-? 2018?7?25? GMT+08:00 ??11:31:26, Rob Herring <robh@kernel.org> ??:
->On Sun, Jul 22, 2018 at 02:10:33PM +0800, Chen-Yu Tsai wrote:
->> On Sun, Jul 22, 2018 at 1:57 PM, Icenowy Zheng <icenowy@aosc.io>
->wrote:
->> > The new Allwinner H6 SoC contains a USB3 PHY that is wired to the
->> > external USB3 pins of the SoC.
+> On Wed, Jul 25, 2018 at 03:12:15PM +0100, Alex Benn?e wrote:
+>>
+>> Dave Martin <Dave.Martin@arm.com> writes:
+>>
+>> > Some system registers may or may not logically exist for a vcpu
+>> > depending on whether certain architectural features are enabled for
+>> > the vcpu.
 >> >
->> > Add a device tree binding for the PHY.
+>> > In order to avoid spuriously emulating access to these registers
+>> > when they should not exist, or allowing the registers to be
+>> > spuriously enumerated or saved/restored through the ioctl
+>> > interface, a means is needed to allow registers to be hidden
+>> > depending on the vcpu configuration.
 >> >
->> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+>> > In order to support this in a flexible way, this patch adds a
+>> > check_present() method to struct sys_reg_desc, and updates the
+>> > generic system register access and enumeration code to be aware of
+>> > it:  if check_present() returns false, the code behaves as if the
+>> > register did not exist.
+>> >
+>> > For convenience, the complete check is wrapped up in a new helper
+>> > sys_reg_present().
+>> >
+>> > An attempt has been made to hook the new check into the generic
+>> > accessors for trapped system registers.  This should reduce the
+>> > potential for future surprises, although the redundant check will
+>> > add a small cost.  No system register depends on this functionality
+>> > yet, and some paths needing the check may also need attention.
+>> >
+>> > Naturally, this facility makes sense only for registers that are
+>> > trapped.
+>> >
+>> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 >> > ---
->> > Changes in v3:
->> > - Added Chen-Yu's Review tag.
+>> >  arch/arm64/kvm/sys_regs.c | 20 +++++++++++++++-----
+>> >  arch/arm64/kvm/sys_regs.h | 11 +++++++++++
+>> >  2 files changed, 26 insertions(+), 5 deletions(-)
+>
+> [...]
+>
+>> > diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+>> > index cd710f8..dfbb342 100644
+>> > --- a/arch/arm64/kvm/sys_regs.h
+>> > +++ b/arch/arm64/kvm/sys_regs.h
+>> > @@ -22,6 +22,9 @@
+>> >  #ifndef __ARM64_KVM_SYS_REGS_LOCAL_H__
+>> >  #define __ARM64_KVM_SYS_REGS_LOCAL_H__
 >> >
->> > Rob,
->> > Although you mentioned that the supply is for the port, not the
->phy;
->> > currently in USB situation "powering on the PHY" also indicates
->> > "powering on the port" and nearly all usages of phy-supply is for
->Vbus.
->> >
->> > Maybe we should change the overall phy-supply to satisfy this.
->> 
->> Or maybe change it to vbus-supply, like we have for phy-sun4i-usb,
->> until USB port power sequencing is added. (I remember there were
->> patches for this. What happened?)
+>> > +#include <linux/compiler.h>
+>> > +#include <linux/types.h>
+>>
+>> I can see why you want compiler.h, but why types.h?
 >
->Once it is in the binding, we are stuck with it.
->
->Connector bindings have landed. We should add vbus-supply to that. You 
->don't have to have a property in the node associated with a driver. The
+> For bool (though it felt a bit pedantic).
 
-How should the phy DT node reference the connector?
+It must be picked up elsewhere because it didn't fail when I rebuilt
+without it - and the header has been happily using bool up to that
+point.
+
 
 >
->phy driver can walk the tree and get the Vbus supply.
->
->UniPhier has the same issue.
->
->Rob
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Cheers
+> ---Dave
+
+
+--
+Alex Benn?e
