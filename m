@@ -1,47 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 25 Jul 2018 17:11:51 +0100
-Subject: next/master boot: 171 boots: 6 failed, 162 passed with 3 offline
- (next-20180724)
-In-Reply-To: <5b5757ee.1c69fb81.411a5.52e2@mx.google.com>
-References: <5b5757ee.1c69fb81.411a5.52e2@mx.google.com>
-Message-ID: <20180725161151.GA340@sirena.org.uk>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 25 Jul 2018 17:14:03 +0100
+Subject: [PATCH v2 09/10] coresight: Cleanup coresight DT bindings
+In-Reply-To: <20180725160939.GA24323@rob-hp-laptop>
+References: <1531997715-6767-1-git-send-email-suzuki.poulose@arm.com>
+ <1531997715-6767-10-git-send-email-suzuki.poulose@arm.com>
+ <20180725160939.GA24323@rob-hp-laptop>
+Message-ID: <e96b9bda-8a58-a817-5580-7771af7c9e28@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 09:46:38AM -0700, kernelci.org bot wrote:
+On 07/25/2018 05:09 PM, Rob Herring wrote:
+> On Thu, Jul 19, 2018 at 11:55:13AM +0100, Suzuki K Poulose wrote:
+>> The coresight drivers relied on default bindings for graph
+>> in DT, while reusing the "reg" field of the "ports" to indicate
+>> the actual hardware port number for the connections. This can
+>> cause duplicate ports with same addresses, but different
+>> direction. However, with the rules getting stricter w.r.t to the
+>> address mismatch with the label, it is no longer possible to use
+>> the port address field for the hardware port number.
+>>
+>> This patch introduces new DT binding rules for coresight
+>> components, based on the same generic DT graph bindings, but
+>> avoiding the address duplication.
+>>
+>> - All output ports must be specified under a child node with
+>>    name "out-ports".
+>> - All input ports must be specified under a childe node with
+>>    name "in-ports".
+>> - Port address should match the hardware port number.
+>>
+>> The support for legacy bindings is retained, with a warning.
+>>
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>
+>> Cc: Rob Herring <robh@kernel.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>   .../devicetree/bindings/arm/coresight.txt          | 91 ++++++++++----------
+>>   drivers/hwtracing/coresight/of_coresight.c         | 97 +++++++++++++++++++---
+>>   2 files changed, 129 insertions(+), 59 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+>> index 8e21512..f39d2c6 100644
+>> --- a/Documentation/devicetree/bindings/arm/coresight.txt
+>> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
+>> @@ -104,19 +104,9 @@ The connections must be described via generic DT graph bindings as described
+>>   by the "bindings/graph.txt", where each "port" along with an "endpoint"
+>>   component represents a hardware port and the connection.
+>>   
+>> -Since it is possible to have multiple connections for any coresight component
+>> -with a specific direction of data flow, each connection must define the
+>> -following properties to uniquely identify the connection details.
+>> -
+>> - * Direction of the data flow w.r.t the component :
+>> -   Each input port must have the following property defined at the "endpoint"
+>> -   for the port.
+>> -	"slave-mode"
+>> -
+>> - * Hardware Port number at the component:
+>> -     -  The hardware port number is assumed to be the address of the "port"
+>> -         component.
+>> -
+> 
+> Why do you add this in the previous patch and then remove it here?
 
-For a little while now the RPi B has been failing to boot using the
-bcm2835 defconfig in -next:
+The only use case I can think of it is for someone to look back on the
+legacy bindings, which were never documented. I could skip the parts 
+that are being removed.
 
->     bcm2835_defconfig:
->         bcm2835-rpi-b:
->             lab-baylibre-seattle: failing since 5 days (last pass: next-20180718 - first fail: next-20180719)
->         bcm2837-rpi-3-b:
->             lab-baylibre: failing since 5 days (last pass: next-20180718 - first fail: next-20180719)
-
-It's working fine on arm64, whatever's going on appears to be specific
-to this config (it's not getting booted with any other 32 bit configs).
-Full info and boot logs for one of the boards here:
-
-   https://kernelci.org/boot/id/5b58416759b514139596baae/
-
-it looks like it hangs somewhere shortly after or during initializing
-MMC so never makes it to the console, the tail of the failing logs looks
-like:
-
-| 09:18:36.332120  [    1.459801] mmc1: queuing unknown CIS tuple 0x80 (7 bytes)
-| 09:18:36.345711  [    1.467585] mmcblk0: mmc0:59b4 USD   7.51 GiB 
-| 09:18:36.346169  [    1.474834]  mmcblk0: p1
-| 09:18:36.410184  [    1.539600] random: fast init done
-| 09:18:36.458065  [    1.578056] mmc1: new high speed SDIO card at address 0001
-| 09:20:39.745370  ShellCommand command timed out.: Sending # in case of corruption. Connection timeout 00:04:10, retry in 00:02:05
-| 09:20:39.846848  #
-
-but like I say the same -next boots with arm64 defconfig.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180725/a6cd393a/attachment.sig>
+Suzuki
