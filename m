@@ -1,47 +1,108 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Wed, 25 Jul 2018 09:52:22 +0200
-Subject: [PATCH v3 00/23] Add multi-channel support to Armada thermal
- driver
-In-Reply-To: <20180718172849.30b7cec0@xps13>
-References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
- <20180718172849.30b7cec0@xps13>
-Message-ID: <20180725095222.054f1e80@xps13>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Wed, 25 Jul 2018 10:11:29 +0200
+Subject: [PATCH v3 1/9] drm/exynos: rename "bridge_node" to
+ "mic_bridge_node"
+In-Reply-To: <20180724074912epcas1p2e47dba6793b91a90b183e6cd809200bb~EPo3hWbma0369303693epcas1p2F@epcas1p2.samsung.com>
+References: <1529396370-18761-1-git-send-email-m.purski@samsung.com>
+ <CGME20180619081957eucas1p2d2b9075a9b7a90837b40e4529ab31888@eucas1p2.samsung.com>
+ <1529396370-18761-2-git-send-email-m.purski@samsung.com>
+ <20180724074912epcas1p2e47dba6793b91a90b183e6cd809200bb~EPo3hWbma0369303693epcas1p2F@epcas1p2.samsung.com>
+Message-ID: <20180725081131eucas1p1a5a7f7e19d8ef3254dfe89049ea6d7c7~EjlpXj7zz1467114671eucas1p1f@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo, Zhang,
+On 24.07.2018 09:49, Inki Dae wrote:
+> Hi,
+>
+> 2018? 06? 19? 17:19? Maciej Purski ?(?) ? ?:
+>> When adding support for peripheral out bridges, the "bridge" name
+>> becomes imprecise as it refers to a different device than the
+>> "out_bridge".
+> Could you give me more details? I'm afriad that I don't understand what you say.
 
-Miquel Raynal <miquel.raynal@bootlin.com> wrote on Wed, 18 Jul 2018
-17:28:49 +0200:
+The problem is that MIC is an input bridge and now we will have also
+output bridge (Toshiba DSI/LVDS converter).
+So we will have to distinguish them.
 
-> Hi Eduardo,
-> 
-> Miquel Raynal <miquel.raynal@bootlin.com> wrote on Mon, 16 Jul 2018
-> 16:41:43 +0200:
-> 
-> > The only capability of the Armada thermal driver is currently just to
-> > read one sensor (the default one) per AP and one per CP. Actually,
-> > there is one sensor per core in the AP806 plus one sensor in the
-> > thermal IP itself. The CP110 just features one thermal sensor in its
-> > own thermal IP.
-> > 
-> > This series first improves the readability of this driver, then adds
-> > support for multi-channel thermal IPs. The bindings and the
-> > device-trees are updated accordingly.
-> > 
-> > Thank you,
-> > Miqu?l  
-> 
-> I know I sent this series on monday but there was almost no change on
-> it (see below), do you think you will have the time to look at it
-> before it's too late for the merge window?
+>
+> And in case of Exynos5433 SoC, SMIES(Samsung Mobile Image Enhancement System) can be located between DECON and MIPI-DSI devices also.
+> Therefore, having specific name isn't reasonable.
 
-I know a little bit what it is to be on the maintainer side of a
-subsystem but these changes are laying since April, 21st and I really
-expect to get them merged. Zhang, as Eduardo seems to be overloaded
-this release, could you please take the series?
+So probably in_bridge would be a better name. I will rephrase message
+and bridge name.
 
-Of course if there are things to address I'll be happy to do so.
+Regars
+Andrzej
 
-Thanks,
-Miqu?l
+
+>
+> Thanks,
+> Inki Dae
+>
+>> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+>> ---
+>>  drivers/gpu/drm/exynos/exynos_drm_dsi.c | 16 ++++++++--------
+>>  1 file changed, 8 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>> index eae44fd..9599e6b 100644
+>> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+>> @@ -279,7 +279,7 @@ struct exynos_dsi {
+>>  	struct list_head transfer_list;
+>>  
+>>  	const struct exynos_dsi_driver_data *driver_data;
+>> -	struct device_node *bridge_node;
+>> +	struct device_node *mic_bridge_node;
+>>  };
+>>  
+>>  #define host_to_dsi(host) container_of(host, struct exynos_dsi, dsi_host)
+>> @@ -1631,7 +1631,7 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
+>>  	if (ret < 0)
+>>  		return ret;
+>>  
+>> -	dsi->bridge_node = of_graph_get_remote_node(node, DSI_PORT_IN, 0);
+>> +	dsi->mic_bridge_node = of_graph_get_remote_node(node, DSI_PORT_IN, 0);
+>>  
+>>  	return 0;
+>>  }
+>> @@ -1642,7 +1642,7 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
+>>  	struct drm_encoder *encoder = dev_get_drvdata(dev);
+>>  	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
+>>  	struct drm_device *drm_dev = data;
+>> -	struct drm_bridge *bridge;
+>> +	struct drm_bridge *mic_bridge;
+>>  	int ret;
+>>  
+>>  	drm_encoder_init(drm_dev, encoder, &exynos_dsi_encoder_funcs,
+>> @@ -1661,10 +1661,10 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
+>>  		return ret;
+>>  	}
+>>  
+>> -	if (dsi->bridge_node) {
+>> -		bridge = of_drm_find_bridge(dsi->bridge_node);
+>> -		if (bridge)
+>> -			drm_bridge_attach(encoder, bridge, NULL);
+>> +	if (dsi->mic_bridge_node) {
+>> +		mic_bridge = of_drm_find_bridge(dsi->mic_bridge_node);
+>> +		if (mic_bridge)
+>> +			drm_bridge_attach(encoder, mic_bridge, NULL);
+>>  	}
+>>  
+>>  	return mipi_dsi_host_register(&dsi->dsi_host);
+>> @@ -1783,7 +1783,7 @@ static int exynos_dsi_remove(struct platform_device *pdev)
+>>  {
+>>  	struct exynos_dsi *dsi = platform_get_drvdata(pdev);
+>>  
+>> -	of_node_put(dsi->bridge_node);
+>> +	of_node_put(dsi->mic_bridge_node);
+>>  
+>>  	pm_runtime_disable(&pdev->dev);
+>>  
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
