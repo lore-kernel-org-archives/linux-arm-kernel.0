@@ -1,30 +1,101 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Jul 2018 13:17:46 +0100
-Subject: [PATCH v2 0/7] Stop losing firmware-set DMA masks
-In-Reply-To: <5e036ade-db0b-f628-a4a0-6d014d1d76c8@arm.com>
-References: <cover.1532382222.git.robin.murphy@arm.com>
- <20180725113122.GD24736@lst.de>
- <5e036ade-db0b-f628-a4a0-6d014d1d76c8@arm.com>
-Message-ID: <20180725121746.GD31576@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 25 Jul 2018 14:19:47 +0200
+Subject: [linux-sunxi] Re: [PATCH 3/3] arm64: allwinner: dts: h6: add
+ Wi-Fi support for Pine H64 model A/B
+In-Reply-To: <198DB486-4789-4777-9596-2BD6FAFFB741@aosc.io>
+References: <20180724011551.49603-1-icenowy@aosc.io>
+ <20180724011551.49603-4-icenowy@aosc.io>
+ <CAGb2v67zR-Q9n7L6CaFKDUJFHFEC_h8-RYxkdyeyJb_GbNmkJw@mail.gmail.com>
+ <CEA43CB7-1DA6-4983-BF18-82C4A48FB92B@aosc.io>
+ <CAGb2v64Qae4O430kP30DQNhp0Dt774OHt0nMe35ckp8X=CTFLg@mail.gmail.com>
+ <AC678B03-19B7-4110-B333-72188CE71296@aosc.io>
+ <CAGb2v656oPmAX=_y88b05xqrona3HFtU-VmNQhHxK_n-4gD+aw@mail.gmail.com>
+ <20180724144151.myyg7slocsfjjsfi@flea>
+ <198DB486-4789-4777-9596-2BD6FAFFB741@aosc.io>
+Message-ID: <20180725121947.ox4zykod6jjadvfw@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2018 at 01:12:56PM +0100, Robin Murphy wrote:
-> On 25/07/18 12:31, Christoph Hellwig wrote:
-> >Hi Robin,
-> >
-> >this series looks fine to me.  Do you want me to pull this into the
-> >dma-mapping tree?  I'd like to see a few more ACKs from the ACPI/OF/
-> >IOMMU maintainers though.
+On Tue, Jul 24, 2018 at 10:42:32PM +0800, Icenowy Zheng wrote:
 > 
-> Thanks, I was indeed assuming that the dma-mapping tree would be the best
-> route to keep this lot together, hence including patch #1 even though it's
-> not functionally related (having spoken to Will offline I think he's happy
-> for that one to go through you rather than via arm64 this time around, even
-> if #2-#7 don't make it).
+> 
+> ? 2018?7?24? GMT+08:00 ??10:41:51, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+> >On Tue, Jul 24, 2018 at 10:37:51AM +0800, Chen-Yu Tsai wrote:
+> >> On Tue, Jul 24, 2018 at 10:28 AM, Icenowy Zheng <icenowy@aosc.io>
+> >wrote:
+> >> >
+> >> >
+> >> > ? 2018?7?24? GMT+08:00 ??10:26:02, Chen-Yu Tsai <wens@csie.org> ??:
+> >> >>On Tue, Jul 24, 2018 at 10:23 AM, Icenowy Zheng <icenowy@aosc.io>
+> >> >>wrote:
+> >> >>>
+> >> >>>
+> >> >>> ? 2018?7?24? GMT+08:00 ??10:21:59, Chen-Yu Tsai <wens@csie.org>
+> >??:
+> >> >>>>On Tue, Jul 24, 2018 at 9:15 AM, Icenowy Zheng <icenowy@aosc.io>
+> >> >>wrote:
+> >> >>>>> The Pine H64 model A has a Wi-Fi module connector and the model
+> >B
+> >> >>has
+> >> >>>>an
+> >> >>>>> on-board RTL8723BS Wi-Fi module.
+> >> >>>>>
+> >> >>>>> Add support for them. For model A, as it's not defaultly
+> >present,
+> >> >>>>keep
+> >> >>>>> it disabled now.
+> >> >>>>
+> >> >>>>Nope. Pine64 actually has two WiFi/BT modules. And they require
+> >> >>>>different
+> >> >>>>device tree snippets for both the WiFi and BT side. This is
+> >better
+> >> >>>>resolved
+> >> >>>>with device tree overlays.
+> >> >>>>
+> >> >>>>I have both, though I've yet found time to work on them.
+> >> >>>
+> >> >>> I have also both.
+> >> >>>
+> >> >>> The skeleton here can get the Wi-Fi of both to work.
+> >> >>
+> >> >>Cool. Then I can put away my RTL module for now. :)
+> >> >
+> >> > P.S. SDIO is auto detectable, and for BCM chips, the OOB interrupt
+> >> > is only a bonus function and it can fall back to standard in-band
+> >> > interrupt (which doesn't need special binding, and is currently
+> >> > used by mainline r8723bs driver.)
+> >> 
+> >> Correct. With BT you'll have serdev device nodes with different
+> >> compatibles. Then you'll have to resort to overlays, and you'd
+> >probably
+> >> end up adding WiFi OOB interrupt bits as well.
+> >> 
+> >> So the question remaining is: should we enable the MMC part, along
+> >> with power sequencing and regulator supplies, by default? Thinking
+> >> more about it, I'm actually OK with it. The board connectors are
+> >> clearly marked as being for a WiFi+BT module. The whole space on
+> >> the board is surrounded by a box in silkscreen. Sorry for the
+> >> initial nack.
+> >> 
+> >> Maxime, any thoughts?
+> >
+> >If there's a need for an overlay anyway, there's no real reason to
+> >enable it by default, especially if not everything is there.
+> 
+> Everything is there, for model B support.
 
-Yes, that's right. Here's my ack if it helps:
+Except BT?
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Maxime
 
-Will
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180725/29cdba53/attachment.sig>
