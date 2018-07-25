@@ -1,72 +1,86 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 25 Jul 2018 09:56:04 +0100
-Subject: [PATCH] arm64: Check for errata before evaluating cpu features
-In-Reply-To: <aea2daa9-40ef-2066-0da9-0770c3c50dfb@arm.com>
-References: <20180725083504.25836-1-dmueller@suse.com>
- <aea2daa9-40ef-2066-0da9-0770c3c50dfb@arm.com>
-Message-ID: <20180725085604.GB4240@e103592.cambridge.arm.com>
+From: ylefloch@online.net (Yves Lefloch)
+Date: Wed, 25 Jul 2018 10:56:02 +0200
+Subject: arm: mach-mvebu: dts: enable-method is always overwritten
+In-Reply-To: <c26a750dbd25440bb9c3f669f757c491@svr-chch-ex1.atlnz.lc>
+References: <a2d4701e-28b3-07ee-6b2f-588b2e9a75c4@online.net>
+ <20180608155858.GB19702@lunn.ch>
+ <c26a750dbd25440bb9c3f669f757c491@svr-chch-ex1.atlnz.lc>
+Message-ID: <63a47bee-d550-fc05-a1f7-32d2a0d01d4f@online.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2018 at 09:51:53AM +0100, Suzuki K Poulose wrote:
-> On 07/25/2018 09:35 AM, Dirk Mueller wrote:
-> >Since commit d3aec8a28be3b8 ("arm64: capabilities: Restrict KPTI
-> >detection to boot-time CPUs") we rely on errata flags being already
-> >populated during feature enumeration. The order of errata and
-> >features was flipped as part of commit ed478b3f9e4a ("arm64:
-> >capabilities: Group handling of features and errata workarounds").
-> >
-> >Return to the orginal order of errata and feature evaluation to
-> >ensure errata flags are present during feature evaluation.
-> >
-> >Fixes: d3aec8a28be3b8 ("arm64: capabilities: Restrict KPTI
-> >detection to boot-time CPUs")
-> >CC: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >CC: Marc Zyngier <marc.zyngier@arm.com>
-> >Signed-off-by: Dirk Mueller <dmueller@suse.com>
-> 
-> It would be good to add "Fixes: ed478b3f9e4a" (instead), just to make
-> sure this gets fixed everywhere the original problem appears.
-> 
-> >---
-> >  arch/arm64/kernel/cpufeature.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> >
-> >diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> >index f24892a40d2c..c6d80743f4ed 100644
-> >--- a/arch/arm64/kernel/cpufeature.c
-> >+++ b/arch/arm64/kernel/cpufeature.c
-> >@@ -1351,9 +1351,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-> >  static void update_cpu_capabilities(u16 scope_mask)
-> >  {
-> >-	__update_cpu_capabilities(arm64_features, scope_mask, "detected:");
-> >  	__update_cpu_capabilities(arm64_errata, scope_mask,
-> >  				  "enabling workaround for");
-> >+	__update_cpu_capabilities(arm64_features, scope_mask, "detected:");
-> >  }
-> >  static int __enable_cpu_capability(void *arg)
-> >@@ -1408,8 +1408,8 @@ __enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-> >  static void __init enable_cpu_capabilities(u16 scope_mask)
-> >  {
-> >-	__enable_cpu_capabilities(arm64_features, scope_mask);
-> >  	__enable_cpu_capabilities(arm64_errata, scope_mask);
-> >+	__enable_cpu_capabilities(arm64_features, scope_mask);
 
-I forget why these were originally reordered in ed478b3f9e4a.
-Was there any real reason for it?
 
-I also notice in that commit that after the detection pass, we set
-things up (in update_cpu_capabilities(), enable_cpu_capabilities()) in
-the order errata, features.  Does this matter for anything?
+On 11/06/2018 02:48, Chris Packham wrote:
+> Hi Yves,
+> 
+> On 09/06/18 03:59, Andrew Lunn wrote:
+>> On Fri, Jun 08, 2018 at 05:43:11PM +0200, Yves Lefloch wrote:
+>>> Hello everybody,
+>>
+>> Adding Chris Packham. He did some work in this area.
+>>
+>>          Andrew
+>>
+>>>
+>>> I'm facing an issue that I believe to be a conflict between device-tree and
+>>> machine_desc.
+>>>
+>>> My platform is arm/mach-mvebu. I have a DT based on "armada-xp-db-dxbc2.dts"
+>>> (I just included it and added a few okays), my CPU is a Marvell Bobcat2
+>>> switching chip. My kernel is a vanilla 4.16.
+>>>
+>>> Everything works fine except that my second core won't boot: `CPU1: failed
+>>> to come online'.
+>>> I tracked down the problem to arch/arm/mach-mvebu/platsmp.c: in this file is
+>>> defined a machine_desc that hardcodes the SMP ops to `marvell,armada-xp-smp'
+>>> whereas my device tree (by including armada-xp-98dx3236.dtsi) attempts to
+>>> set the ops to `marvell,98dx3236-smp' through enable-method. In setup_arch()
+>>> the machine_desc's ops overwrites the enable-method's ops, causing the wrong
+>>> smp_boot_secondary() call to be issued.
+>>>
+>>> Now there is a note from 2014 saying that this machine_desc's `smp' field is
+>>> hardcoded like that because of "old Device Trees that were not specifying
+>>> the cpus enable-method property". As far as I can tell, this is still the
+>>> case, for instance "armada-370-db.dts" doesn't have any enable-method
+>>> property.
+>>>
+>>> I have worked around this by commenting out `armada_xp_smp_ops.smp' but
+>>> obviously I would prefer to keep a vanilla kernel.
+>>>
+>>> So I propose to:
+>>> - Add `enable-method = "marvell,armada-xp-smp"' to armada-370-xp.dtsi,
+>>> because it seems that all Armada 370/XP include it;
+>>> - Remove the `smp' field of `armada_xp_smp_ops'.
+>>>
+>>> If you agree with the diagnosis and the proposed fix I will write a patch.
+> 
+> Personally my preferred option is to not set .smp at all and let the
+> device tree do it's thing.
+> 
+> I'm not sure if things have changed w.r.t. backwards compatibility in
+> the 3.5 years since I initially suggested that, assuming that we still
+> want backwards compatibility with these older device trees this patch
+> might help
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303899.html
+> 
+> I was pretty happy with that approach at the time but I obviously never
+> followed up to get that delivered. If someone has some spare cycles to
+> spend on it I wouldn't object to it being taken over.
+> 
+> I'll see if I can find some time to resurrect it myself. I don't have an
+> Armada-370 board but I can test BC2 and A38x.
+> 
 
-Cheers
----Dave
+Hi Chris,
 
-> 
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I've tried the patch that is on your link above. It does solve my issue, and it 
+is neater than what I suggested because it indeed preserves backward compatibility.
+
+I could only test on BC2 though, because it's the only platform that I have.
+
+How would you like to proceed to carry this thing further? Do you have time to 
+post the patch again or do you want me to do it?
+
+Yves
