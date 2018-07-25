@@ -1,21 +1,40 @@
-From: jbrunet@baylibre.com (jbrunet at baylibre.com)
-Date: Wed, 25 Jul 2018 23:19:05 +0200
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Wed, 25 Jul 2018 23:26:27 +0200
 Subject: [PATCH 00/14] arm64: dts: meson-axg: add audio support
-In-Reply-To: <CAFBinCBh-b=ie4hBMWdHG8KoLQ7qiRfo8vXfJ1PRcN4UPtg+uA@mail.gmail.com>
+In-Reply-To: <705e31bf0d978b7d356b2f077179ab0e3db6f092.camel@baylibre.com>
 References: <20180724125238.14567-1-jbrunet@baylibre.com>
  <CAFBinCBh-b=ie4hBMWdHG8KoLQ7qiRfo8vXfJ1PRcN4UPtg+uA@mail.gmail.com>
-Message-ID: <705e31bf0d978b7d356b2f077179ab0e3db6f092.camel@baylibre.com>
+ <705e31bf0d978b7d356b2f077179ab0e3db6f092.camel@baylibre.com>
+Message-ID: <CAFBinCB_fULnmrpyzNwnfAiL9QGco_6QW957Wroj8o6ZhNwmWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-07-25 at 21:11 +0200, Martin Blumenstingl wrote:
-> nit-pick: one patch uses "arm64: dts: meson-axg: s400" in the subject
-> while other patches that are touching the s400 board aren't
-> if you have to re-send this series: can you please use the "arm64:
-> dts: meson-axg: s400:" prefix for all patches touching the s400 board?
+Hi Jerome,
 
-hum, do we really have such rule, or do you think we should add one ?
-Kevin, do you have opinion ?
+On Wed, Jul 25, 2018 at 11:19 PM <jbrunet@baylibre.com> wrote:
+>
+> On Wed, 2018-07-25 at 21:11 +0200, Martin Blumenstingl wrote:
+> > nit-pick: one patch uses "arm64: dts: meson-axg: s400" in the subject
+> > while other patches that are touching the s400 board aren't
+> > if you have to re-send this series: can you please use the "arm64:
+> > dts: meson-axg: s400:" prefix for all patches touching the s400 board?
+>
+> hum, do we really have such rule, or do you think we should add one ?
+looking at the git history in arch/arm64/boot/dts/amlogic: it seems
+that we don't have a rule yet, even though some (some of
+your's/Neil's/my) patches were using that naming schema in the past
 
-Not that I really mind either way, but prefixes rules are usually there to help
-maintainer filter the patches. Will such rule help in any way ?
+> Kevin, do you have opinion ?
+>
+> Not that I really mind either way, but prefixes rules are usually there to help
+> maintainer filter the patches. Will such rule help in any way ?
+maybe it's just a problem of a false initial impression
+I read "arm64: dts: meson-axg: add usb power regulator" in the
+cover-letter and came to the conclusion that this patch must be wrong
+since meson-axg.dtsi should not have any regulators (unless they're
+built into the SoC). only when looking at the patch itself I realized
+that it's fine because it patches the s400.dts
+
+
+Regards
+Martin
