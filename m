@@ -1,148 +1,51 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 25 Jul 2018 12:50:45 +0100
-Subject: [RFC PATCH 12/16] KVM: arm64/sve: Context switch the SVE registers
-In-Reply-To: <20180719131338.jsgezassnjhdbotd@kamzik.brq.redhat.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-13-git-send-email-Dave.Martin@arm.com>
- <20180719131338.jsgezassnjhdbotd@kamzik.brq.redhat.com>
-Message-ID: <20180725115045.GJ4240@e103592.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Jul 2018 12:57:30 +0100
+Subject: [PATCH 3/3] iommu/arm-smmu: Error out only if not enough context
+ interrupts
+In-Reply-To: <d6796a00-17da-c03e-ca7f-7a67139ad99a@codeaurora.org>
+References: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
+ <20180719175356.14753-4-vivek.gautam@codeaurora.org>
+ <20180724083633.GA19324@arm.com>
+ <d6796a00-17da-c03e-ca7f-7a67139ad99a@codeaurora.org>
+Message-ID: <20180725115729.GA31576@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 03:13:38PM +0200, Andrew Jones wrote:
-> On Thu, Jun 21, 2018 at 03:57:36PM +0100, Dave Martin wrote:
-> > In order to give each vcpu its own view of the SVE registers, this
-> > patch adds context storage via a new sve_state pointer in struct
-> > vcpu_arch.  An additional member sve_max_vl is also added for each
-> > vcpu, to determine the maximum vector length visible to the guest
-> > and thus the value to be configured in ZCR_EL2.LEN while the is
-> > active.  This also determines the layout and size of the storage in
-> > sve_state, which is read and written by the same backend functions
-> > that are used for context-switching the SVE state for host tasks.
-> > 
-> > On SVE-enabled vcpus, SVE access traps are now handled by switching
-> > in the vcpu's SVE context and disabling the trap before returning
-> > to the guest.  On other vcpus, the trap is not handled and an exit
-> > back to the host occurs, where the handle_sve() fallback path
-> > reflects an undefined instruction exception back to the guest,
-> > consistently with the behaviour of non-SVE-capable hardware (as was
-> > done unconditionally prior to this patch).
-> > 
-> > No SVE handling is added on non-VHE-only paths, since VHE is an
-> > architectural and Kconfig prerequisite of SVE.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > ---
-> >  arch/arm64/include/asm/kvm_host.h |  2 ++
-> >  arch/arm64/kvm/fpsimd.c           |  5 +++--
-> >  arch/arm64/kvm/hyp/switch.c       | 43 ++++++++++++++++++++++++++++++---------
-> >  3 files changed, 38 insertions(+), 12 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> > index f331abf..d2084ae 100644
-> > --- a/arch/arm64/include/asm/kvm_host.h
-> > +++ b/arch/arm64/include/asm/kvm_host.h
-> > @@ -211,6 +211,8 @@ typedef struct kvm_cpu_context kvm_cpu_context_t;
-> >  
-> >  struct kvm_vcpu_arch {
-> >  	struct kvm_cpu_context ctxt;
-> > +	void *sve_state;
-> > +	unsigned int sve_max_vl;
-> >  
-> >  	/* HYP configuration */
-> >  	u64 hcr_el2;
-> > diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
-> > index 872008c..44cf783 100644
-> > --- a/arch/arm64/kvm/fpsimd.c
-> > +++ b/arch/arm64/kvm/fpsimd.c
-> > @@ -86,10 +86,11 @@ void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu)
-> >  
-> >  	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED) {
-> >  		fpsimd_bind_state_to_cpu(&vcpu->arch.ctxt.gp_regs.fp_regs,
-> > -					 NULL, sve_max_vl);
-> > +					 vcpu->arch.sve_state,
-> > +					 vcpu->arch.sve_max_vl);
-> >  
-> >  		clear_thread_flag(TIF_FOREIGN_FPSTATE);
-> > -		clear_thread_flag(TIF_SVE);
-> > +		update_thread_flag(TIF_SVE, vcpu_has_sve(&vcpu->arch));
-> >  	}
-> >  }
-> >  
-> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> > index d496ef5..98df5c1 100644
-> > --- a/arch/arm64/kvm/hyp/switch.c
-> > +++ b/arch/arm64/kvm/hyp/switch.c
-> > @@ -98,8 +98,13 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
-> >  	val = read_sysreg(cpacr_el1);
-> >  	val |= CPACR_EL1_TTA;
-> >  	val &= ~CPACR_EL1_ZEN;
-> > -	if (!update_fp_enabled(vcpu))
-> > +
-> > +	if (update_fp_enabled(vcpu)) {
-> > +		if (vcpu_has_sve(&vcpu->arch))
-> > +			val |= CPACR_EL1_ZEN;
-> > +	} else {
-> >  		val &= ~CPACR_EL1_FPEN;
-> > +	}
-> >  
-> >  	write_sysreg(val, cpacr_el1);
-> >  
-> > @@ -114,6 +119,7 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
-> >  
-> >  	val = CPTR_EL2_DEFAULT;
-> >  	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
-> > +
-> >  	if (!update_fp_enabled(vcpu))
-> >  		val |= CPTR_EL2_TFP;
-> >  
-> > @@ -329,16 +335,22 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
-> >  	}
-> >  }
-> >  
-> > -static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
-> > +static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu,
-> > +					   bool guest_has_sve)
-> >  {
-> >  	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
-> >  
-> > -	if (has_vhe())
-> > -		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
-> > -			     cpacr_el1);
-> > -	else
-> > +	if (has_vhe()) {
-> > +		u64 reg = read_sysreg(cpacr_el1) | CPACR_EL1_FPEN;
-> > +
-> > +		if (system_supports_sve() && guest_has_sve)
+On Tue, Jul 24, 2018 at 03:09:41PM +0530, Vivek Gautam wrote:
+> On 7/24/2018 2:06 PM, Will Deacon wrote:
+> >On Thu, Jul 19, 2018 at 11:23:56PM +0530, Vivek Gautam wrote:
+> >>diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> >>index 7c69736a30f8..4cb53bf4f423 100644
+> >>--- a/drivers/iommu/arm-smmu.c
+> >>+++ b/drivers/iommu/arm-smmu.c
+> >>@@ -2229,12 +2229,19 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+> >>  	if (err)
+> >>  		return err;
+> >>-	if (smmu->version == ARM_SMMU_V2 &&
+> >>-	    smmu->num_context_banks != smmu->num_context_irqs) {
+> >>-		dev_err(dev,
+> >>-			"found only %d context interrupt(s) but %d required\n",
+> >>-			smmu->num_context_irqs, smmu->num_context_banks);
+> >>-		return -ENODEV;
+> >>+	if (smmu->version == ARM_SMMU_V2) {
+> >>+		if (smmu->num_context_banks > smmu->num_context_irqs) {
+> >>+			dev_err(dev,
+> >>+			      "found only %d context irq(s) but %d required\n",
+> >>+			      smmu->num_context_irqs, smmu->num_context_banks);
+> >>+			return -ENODEV;
+> >>+		} else if (smmu->num_context_banks < smmu->num_context_irqs) {
+> >>+			/* loose extra context interrupts */
+> >>+			dev_notice(dev,
+> >>+			      "found %d context irq(s) but only %d required\n",
+> >>+			      smmu->num_context_irqs, smmu->num_context_banks);
+> >>+			smmu->num_context_irqs = smmu->num_context_banks;
+> >>+		}
+> >I don't see the utility in the new message. Can you simplify with the patch
+> >below on top? It's a bit weird that we only decide to ignore the extra irqs
+> >after calling platform_get_irq() on them, but that seems to be harmless.
 > 
-> guest_has_sve is only true when vcpu_arch->flags & KVM_ARM64_GUEST_HAS_SVE
-> is true, which can only be true when system_supports_sve() is true. So
-> I don't think we need system_supports_sve() here. guest_has_sve should be
-> enough.
-> 
-> > +			reg |= CPACR_EL1_ZEN;
-> > +
-> > +		write_sysreg(reg, cpacr_el1);
-> > +	} else {
-> >  		write_sysreg(read_sysreg(cptr_el2) & ~(u64)CPTR_EL2_TFP,
-> >  			     cptr_el2);
-> > +	}
-> >  
-> >  	isb();
-> >  
-> > @@ -361,7 +373,13 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
-> >  		vcpu->arch.flags &= ~KVM_ARM64_FP_HOST;
-> >  	}
-> >  
-> > -	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
-> > +	if (system_supports_sve() && guest_has_sve)
-> 
-> here too
+> Thanks. I will modify as suggested below and respin.
 
-As elsewhere, the system_supports_sve() check uses a static key and
-should be very cheap (or free in a CONFIG_ARM64_SVE=n kernel).
+It's ok, I can make the change locally.
 
-The aim here is to reduce wasted effort on non-SVE systems.
-
-Cheers
----Dave
+Will
