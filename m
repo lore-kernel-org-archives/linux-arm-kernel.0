@@ -1,21 +1,19 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 25 Jul 2018 16:26:54 -0700
-Subject: [PATCH] clk: uniphier: add clock frequency support for SPI
-In-Reply-To: <1531977828-8276-1-git-send-email-hayashibara.keiji@socionext.com>
-References: <1531977828-8276-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <153256121422.48062.5510017035047863302@swboyd.mtv.corp.google.com>
+Date: Wed, 25 Jul 2018 16:42:15 -0700
+Subject: [PATCH v7 3/5] clk: actions: Add S700 SoC clock support
+In-Reply-To: <20180719090649.12460-4-sravanhome@gmail.com>
+References: <20180719090649.12460-1-sravanhome@gmail.com>
+ <20180719090649.12460-4-sravanhome@gmail.com>
+Message-ID: <153256213520.48062.5943585068946301775@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Keiji Hayashibara (2018-07-18 22:23:48)
-> From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+Quoting Saravanan Sekar (2018-07-19 02:06:47)
+> Add Actions Semi S700 SoC clock support
 > 
-> Add clock control for SPI controller on UniPhier SoCs.
-> 
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+> Reviewed-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 > ---
-
-Signed-off-by chain is a little weird, but I'll go with it.
 
 Applied to clk-next
