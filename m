@@ -1,50 +1,36 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 25 Jul 2018 16:55:13 +0100
-Subject: [PATCH 2/2] arm64: compat: Provide definition for
- COMPAT_SIGMINSTKSZ
-In-Reply-To: <1532526312-26993-3-git-send-email-will.deacon@arm.com>
-References: <1532526312-26993-1-git-send-email-will.deacon@arm.com>
- <1532526312-26993-3-git-send-email-will.deacon@arm.com>
-Message-ID: <20180725155513.GS4240@e103592.cambridge.arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 25 Jul 2018 17:55:17 +0200
+Subject: [PATCH 3/3] ARM: dts: exynos: Add compatible for s5m8767 clocks node
+ on Itop Core
+In-Reply-To: <20180725155517.4872-1-krzk@kernel.org>
+References: <20180725155517.4872-1-krzk@kernel.org>
+Message-ID: <20180725155517.4872-4-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2018 at 02:45:12PM +0100, Will Deacon wrote:
-> arch/arm/ defines a SIGMINSTKSZ of 2k, so we should use the same value
-> for compat tasks.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Dominik Brodowski <linux@dominikbrodowski.net>
-> Cc: "Eric W. Biederman" <ebiederm@xmission.com>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Al Viro <viro@zeniv.linux.org.uk>
-> Cc: Oleg Nesterov <oleg@redhat.com>
-> Reported-by: Steve McIntyre <steve.mcintyre@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+The bindings for s2mps11/s5m8767 clocks driver require a compatible for
+clocks node.  Parent MFD sec-core driver will also use it when
+instantiating children.
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+The compatible is not needed for proper working because device will be
+anyway created by parent MFD device.  Add it for correctness.
 
-> ---
->  arch/arm64/include/asm/compat.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-> index 1a037b94eba1..cee28a05ee98 100644
-> --- a/arch/arm64/include/asm/compat.h
-> +++ b/arch/arm64/include/asm/compat.h
-> @@ -159,6 +159,7 @@ static inline compat_uptr_t ptr_to_compat(void __user *uptr)
->  }
->  
->  #define compat_user_stack_pointer() (user_stack_pointer(task_pt_regs(current)))
-> +#define COMPAT_MINSIGSTKSZ	2048
->  
->  static inline void __user *arch_compat_alloc_user_space(long len)
->  {
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi b/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
+index ab7affab7f1c..8fdfd80c3acc 100644
+--- a/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
++++ b/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
+@@ -446,6 +446,7 @@
+ 		};
+ 
+ 		s5m8767_osc: clocks {
++			compatible = "samsung,s5m8767-clk";
+ 			#clock-cells = <1>;
+ 			clock-output-names = "s5m8767_ap",
+ 					"s5m8767_cp", "s5m8767_bt";
+-- 
+2.14.1
