@@ -1,55 +1,43 @@
-From: dirk@dmllr.de (Dirk Mueller)
-Date: Wed, 25 Jul 2018 13:10:28 +0200
-Subject: [PATCH] arm64: Check for errata before evaluating cpu features
-Message-ID: <20180725111028.5222-1-dirk@dmllr.de>
+From: hari.vyas@broadcom.com (Hari Vyas)
+Date: Wed, 25 Jul 2018 16:43:30 +0530
+Subject: [PATCH] arm64: fix for restoring console loglevel after handling
+ traps
+In-Reply-To: <20180724094804.e5hzljkn3twcmbd3@lakrids.cambridge.arm.com>
+References: <1531993734-1463-1-git-send-email-hari.vyas@broadcom.com>
+ <1531993734-1463-2-git-send-email-hari.vyas@broadcom.com>
+ <20180719100140.GA424@jagdpanzerIV>
+ <CAM5rFu_N-=26LddRy1mO010h9yLcGuKqK6=y+h=h3-HbfEP+FQ@mail.gmail.com>
+ <20180719103916.g763zmsm7wnngwop@lakrids.cambridge.arm.com>
+ <CAM5rFu-MFbH_2Pohmjydy232Rpt7_E84-K=e67wAu3iQzvTLiA@mail.gmail.com>
+ <20180720121321.qgdsdtvvowhphava@pathway.suse.cz>
+ <CAM5rFu-_sU1eSryFR-rDF=6BxZuf_E0xBQJ8RizNKYDB+DgWOQ@mail.gmail.com>
+ <CAM5rFu9zVa3H=mqmSknALt-znb2MPwVbuy3atA5Qoi9KvGNXqQ@mail.gmail.com>
+ <20180724094804.e5hzljkn3twcmbd3@lakrids.cambridge.arm.com>
+Message-ID: <CAM5rFu-Yr3G7U3FidqK3-dDhNZqeSwPOv3AR08b4P0Wi-3iC9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dirk Mueller <dmueller@suse.com>
-
-Since commit d3aec8a28be3b8 ("arm64: capabilities: Restrict KPTI
-detection to boot-time CPUs") we rely on errata flags being already
-populated during feature enumeration. The order of errata and
-features was flipped as part of commit ed478b3f9e4a ("arm64:
-capabilities: Group handling of features and errata workarounds").
-
-Return to the orginal order of errata and feature evaluation to
-ensure errata flags are present during feature evaluation.
-
-Fixes: ed478b3f9e4a ("arm64: capabilities: Group handling of
-    features and errata workarounds")
-CC: Suzuki K Poulose <suzuki.poulose@arm.com>
-CC: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Dirk Mueller <dmueller@suse.com>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/kernel/cpufeature.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index f24892a40d2c..c6d80743f4ed 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1351,9 +1351,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 
- static void update_cpu_capabilities(u16 scope_mask)
- {
--	__update_cpu_capabilities(arm64_features, scope_mask, "detected:");
- 	__update_cpu_capabilities(arm64_errata, scope_mask,
- 				  "enabling workaround for");
-+	__update_cpu_capabilities(arm64_features, scope_mask, "detected:");
- }
- 
- static int __enable_cpu_capability(void *arg)
-@@ -1408,8 +1408,8 @@ __enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 
- static void __init enable_cpu_capabilities(u16 scope_mask)
- {
--	__enable_cpu_capabilities(arm64_features, scope_mask);
- 	__enable_cpu_capabilities(arm64_errata, scope_mask);
-+	__enable_cpu_capabilities(arm64_features, scope_mask);
- }
- 
- /*
--- 
-2.18.0
+On Tue, Jul 24, 2018 at 3:18 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Jul 24, 2018 at 02:44:48PM +0530, Hari Vyas wrote:
+>> For tracking purpose, I have raised a separate bug for bad_mode() issue i.e.
+>> Bug 200637 - ARM64: bad_mode() handler may not result in panic always
+>> due to die() call in the beginning
+>> Probable fix could be to remove die() from bad_mode() but better other confirms.
+>>
+>> As stated, die() is called from other places also my feeling and
+>> logically restoration  is required. Please
+>> confirm whether to close this issue without any change or proceed with
+>> only one restore() call in die and discard at
+>> other 3 places.
+>
+> I think that if we've encountered a die(), leaving the loglevel up is
+> fine. Something has gone very wrong, regardless of whether we try to
+> continue.
+>
+Traps/exception will not happen in normal scenario any how. Just
+re-checked code, die() is not a static function currently and
+it is being called from do_page_fault() and do_kernel_fault() defined
+in mm/fault.c Probably those calls also shouldn't happen in normal
+scenario.
+In that case, better to reject issue then.
+> Mark.
