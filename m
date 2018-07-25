@@ -1,69 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Jul 2018 15:12:11 +0200
-Subject: [PATCH 1/4] treewide: convert ISO_8859-1 text comments to utf-8
-In-Reply-To: <20180724175531.75276cf4e539124aa9e27177@linux-foundation.org>
-References: <20180724111600.4158975-1-arnd@arndb.de>
- <20180724140010.e24a9964fd340afe2d98a994@linux-foundation.org>
- <aa39b6d15f44555cb79d5ebdef74aeab19003d6a.camel@perches.com>
- <20180724175531.75276cf4e539124aa9e27177@linux-foundation.org>
-Message-ID: <CAK8P3a3tOuP1FVS7oD1UhO5s4C+fLkL8VT3eCpRnSxBZxKzf6A@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 25 Jul 2018 14:16:16 +0100
+Subject: [PATCH v2 3/7] ACPI/IORT: Set bus DMA mask as appropriate
+In-Reply-To: <07cbf8f77fac552dca9b4c85a9d3bd8ed5a4cd29.1532382222.git.robin.murphy@arm.com>
+References: <cover.1532382222.git.robin.murphy@arm.com>
+ <07cbf8f77fac552dca9b4c85a9d3bd8ed5a4cd29.1532382222.git.robin.murphy@arm.com>
+Message-ID: <20180725131616.GA15301@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tools/perf/tests/.gitignore:
-                            LLVM byte-codes, uncompressed
-On Wed, Jul 25, 2018 at 2:55 AM, Andrew Morton
-<akpm@linux-foundation.org> wrote:
-> On Tue, 24 Jul 2018 17:13:20 -0700 Joe Perches <joe@perches.com> wrote:
->
->> On Tue, 2018-07-24 at 14:00 -0700, Andrew Morton wrote:
->> > On Tue, 24 Jul 2018 13:13:25 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
->> > > Almost all files in the kernel are either plain text or UTF-8
->> > > encoded. A couple however are ISO_8859-1, usually just a few
->> > > characters in a C comments, for historic reasons.
->> > > This converts them all to UTF-8 for consistency.
->> []
->> > Will we be getting a checkpatch rule to keep things this way?
->>
->> How would that be done?
->
-> I'm using this, seems to work.
->
->         if ! file $p | grep -q -P ", ASCII text|, UTF-8 Unicode text"
->         then
->                 echo $p: weird charset
->         fi
+On Mon, Jul 23, 2018 at 11:16:08PM +0100, Robin Murphy wrote:
+> When an explicit DMA limit is described by firmware, we need to remember
+> it regardless of how drivers might subsequently update their devices'
+> masks. The new bus_dma_mask field does that.
+> 
+> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> CC: Hanjun Guo <hanjun.guo@linaro.org>
+> CC: Sudeep Holla <sudeep.holla@arm.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/acpi/arm64/iort.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-There are a couple of files that my version of 'find' incorrectly identified as
-something completely different, like:
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Documentation/devicetree/bindings/pinctrl/pinctrl-sx150x.txt:
-            SemOne archive data
-Documentation/devicetree/bindings/rtc/epson,rtc7301.txt:
-            Microsoft Document Imaging Format
-Documentation/filesystems/nfs/pnfs-block-server.txt:
-            PPMN archive data
-arch/arm/boot/dts/bcm283x-rpi-usb-host.dtsi:
-        Sendmail frozen configuration  - version = "host";
-Documentation/networking/segmentation-offloads.txt:
-        StuffIt Deluxe Segment (data) : gmentation Offloads in the
-Linux Networking Stack
-arch/sparc/include/asm/visasm.h:                              SAS 7+
-arch/xtensa/kernel/setup.c:                                         ,
-init=0x454c, stat=0x090a, dev=0x2009, bas=0x2020
-drivers/cpufreq/powernow-k8.c:
-TI-XX Graphing Calculator (FLASH)
-tools/testing/selftests/net/forwarding/tc_shblocks.sh:
-                            Minix filesystem, V2 (big endian)
-tools/perf/tests/.gitignore:
-                            LLVM byte-codes, uncompressed
-
-All of the above seem to be valid ASCII or UTF-8 files, so the check
-above will lead
-to false-positives, but it may be good enough as they are the
-exception, and may be
-bugs in 'file'.
-
-Not sure if we need to worry about 'file' not being installed.
-
-       Arnd
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index 4a66896e2aa3..bc51cff5505e 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -1014,6 +1014,7 @@ void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
+>  		 * Limit coherent and dma mask based on size
+>  		 * retrieved from firmware.
+>  		 */
+> +		dev->bus_dma_mask = mask;
+>  		dev->coherent_dma_mask = mask;
+>  		*dev->dma_mask = mask;
+>  	}
+> -- 
+> 2.17.1.dirty
+> 
