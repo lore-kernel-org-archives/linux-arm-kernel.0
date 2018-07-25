@@ -1,62 +1,78 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 25 Jul 2018 17:55:16 +0200
-Subject: [PATCH 2/3] ARM: dts: exynos: Add compatible for s2mps11 clocks node
- on Exynos542x
+Date: Wed, 25 Jul 2018 17:55:15 +0200
+Subject: [PATCH 1/3] clk: s2mps11: Fix matching when built as module and DT
+ node contains compatible
 In-Reply-To: <20180725155517.4872-1-krzk@kernel.org>
 References: <20180725155517.4872-1-krzk@kernel.org>
-Message-ID: <20180725155517.4872-3-krzk@kernel.org>
+Message-ID: <20180725155517.4872-2-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bindings for s2mps11/s5m8767 clocks driver require a compatible for
-clocks node.  Parent MFD sec-core driver will also use it when
-instantiating children.
+When driver is built as module and DT node contains clocks compatible
+(e.g. "samsung,s2mps11-clk"), the module will not be autoloaded because
+module aliases won't match.
 
-The compatible is not needed for proper working because device will be
-anyway created by parent MFD device.  Add it for correctness.
+The modalias from uevent: of:NclocksT<NULL>Csamsung,s2mps11-clk
+The modalias from driver: platform:s2mps11-clk
 
+The devices are instantiated by parent's MFD.  However both Device Tree
+bindings and parent define the compatible for clocks devices.  In case
+of module matching this DT compatible will be used.
+
+The issue will not happen if this is built-in (no need for module
+matching) or when clocks DT node does not contain compatible (not
+correct from bindings perspective but working for driver).
+
+Note when backporting to stable kernels: adjust the list of device ID
+entries.
+
+Cc: <stable@vger.kernel.org>
+Fixes: 53c31b3437a6 ("mfd: sec-core: Add of_compatible strings for clock MFD cells")
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/boot/dts/exynos5420-arndale-octa.dts | 1 +
- arch/arm/boot/dts/exynos5420-smdk5420.dts     | 1 +
- arch/arm/boot/dts/exynos5422-odroid-core.dtsi | 1 +
- 3 files changed, 3 insertions(+)
+ drivers/clk/clk-s2mps11.c | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-index cdda614e417e..3447160e1fbf 100644
---- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-+++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
-@@ -89,6 +89,7 @@
- 		pinctrl-0 = <&s2mps11_irq>;
+diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
+index d44e0eea31ec..11a1e83ff805 100644
+--- a/drivers/clk/clk-s2mps11.c
++++ b/drivers/clk/clk-s2mps11.c
+@@ -245,6 +245,36 @@ static const struct platform_device_id s2mps11_clk_id[] = {
+ };
+ MODULE_DEVICE_TABLE(platform, s2mps11_clk_id);
  
- 		s2mps11_osc: clocks {
-+			compatible = "samsung,s2mps11-clk";
- 			#clock-cells = <1>;
- 			clock-output-names = "s2mps11_ap",
- 					"s2mps11_cp", "s2mps11_bt";
-diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-index 831c7336f237..3cf905047893 100644
---- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-+++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-@@ -141,6 +141,7 @@
- 		reg = <0x66>;
- 
- 		s2mps11_osc: clocks {
-+			compatible = "samsung,s2mps11-clk";
- 			#clock-cells = <1>;
- 			clock-output-names = "s2mps11_ap",
- 					"s2mps11_cp", "s2mps11_bt";
-diff --git a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-index 2f4f40882dab..a368c73a1e48 100644
---- a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-@@ -141,6 +141,7 @@
- 		pinctrl-0 = <&s2mps11_irq>;
- 
- 		s2mps11_osc: clocks {
-+			compatible = "samsung,s2mps11-clk";
- 			#clock-cells = <1>;
- 			clock-output-names = "s2mps11_ap",
- 					"s2mps11_cp", "s2mps11_bt";
++#ifdef CONFIG_OF
++/*
++ * Device is instantiated through parent MFD device and device matching is done
++ * through platform_device_id.
++ *
++ * However if device's DT node contains proper clock compatible and it is built
++ * as a module, then the module matching will be done trough DT aliases.  This
++ * requires of_device_id table.  In the same time this will not change the
++ * actual device matching so do not add .of_match_table.
++ */
++static const struct of_device_id s2mps11_dt_match[] = {
++	{
++		.compatible = "samsung,s2mps11-clk",
++		.data = (void *)S2MPS11X,
++	}, {
++		.compatible = "samsung,s2mps13-clk",
++		.data = (void *)S2MPS13X,
++	}, {
++		.compatible = "samsung,s2mps14-clk",
++		.data = (void *)S2MPS14X,
++	}, {
++		.compatible = "samsung,s5m8767-clk",
++		.data = (void *)S5M8767X,
++	}, {
++		/* Sentinel */
++	},
++};
++MODULE_DEVICE_TABLE(of, s2mps11_dt_match);
++#endif
++
+ static struct platform_driver s2mps11_clk_driver = {
+ 	.driver = {
+ 		.name  = "s2mps11-clk",
 -- 
 2.14.1
