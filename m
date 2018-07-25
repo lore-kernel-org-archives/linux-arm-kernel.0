@@ -1,86 +1,170 @@
-From: ylefloch@online.net (Yves Lefloch)
-Date: Wed, 25 Jul 2018 10:56:02 +0200
-Subject: arm: mach-mvebu: dts: enable-method is always overwritten
-In-Reply-To: <c26a750dbd25440bb9c3f669f757c491@svr-chch-ex1.atlnz.lc>
-References: <a2d4701e-28b3-07ee-6b2f-588b2e9a75c4@online.net>
- <20180608155858.GB19702@lunn.ch>
- <c26a750dbd25440bb9c3f669f757c491@svr-chch-ex1.atlnz.lc>
-Message-ID: <63a47bee-d550-fc05-a1f7-32d2a0d01d4f@online.net>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 25 Jul 2018 10:57:29 +0200
+Subject: [PATCH v4 25/35] mtd: rawnand: vf610: convert driver to
+ nand_scan()
+In-Reply-To: <20180720151527.16038-26-miquel.raynal@bootlin.com>
+References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
+ <20180720151527.16038-26-miquel.raynal@bootlin.com>
+Message-ID: <5a2276ee7a79e7258234f553167bf469@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 20.07.2018 17:15, Miquel Raynal wrote:
+> Two helpers have been added to the core to make ECC-related
+> configuration between the detection phase and the final NAND scan. Use
+> these hooks and convert the driver to just use nand_scan() instead of
+> both nand_scan_ident() and nand_scan_tail().
 
+Reviewed-by: Stefan Agner <stefan@agner.ch>
 
-On 11/06/2018 02:48, Chris Packham wrote:
-> Hi Yves,
 > 
-> On 09/06/18 03:59, Andrew Lunn wrote:
->> On Fri, Jun 08, 2018 at 05:43:11PM +0200, Yves Lefloch wrote:
->>> Hello everybody,
->>
->> Adding Chris Packham. He did some work in this area.
->>
->>          Andrew
->>
->>>
->>> I'm facing an issue that I believe to be a conflict between device-tree and
->>> machine_desc.
->>>
->>> My platform is arm/mach-mvebu. I have a DT based on "armada-xp-db-dxbc2.dts"
->>> (I just included it and added a few okays), my CPU is a Marvell Bobcat2
->>> switching chip. My kernel is a vanilla 4.16.
->>>
->>> Everything works fine except that my second core won't boot: `CPU1: failed
->>> to come online'.
->>> I tracked down the problem to arch/arm/mach-mvebu/platsmp.c: in this file is
->>> defined a machine_desc that hardcodes the SMP ops to `marvell,armada-xp-smp'
->>> whereas my device tree (by including armada-xp-98dx3236.dtsi) attempts to
->>> set the ops to `marvell,98dx3236-smp' through enable-method. In setup_arch()
->>> the machine_desc's ops overwrites the enable-method's ops, causing the wrong
->>> smp_boot_secondary() call to be issued.
->>>
->>> Now there is a note from 2014 saying that this machine_desc's `smp' field is
->>> hardcoded like that because of "old Device Trees that were not specifying
->>> the cpus enable-method property". As far as I can tell, this is still the
->>> case, for instance "armada-370-db.dts" doesn't have any enable-method
->>> property.
->>>
->>> I have worked around this by commenting out `armada_xp_smp_ops.smp' but
->>> obviously I would prefer to keep a vanilla kernel.
->>>
->>> So I propose to:
->>> - Add `enable-method = "marvell,armada-xp-smp"' to armada-370-xp.dtsi,
->>> because it seems that all Armada 370/XP include it;
->>> - Remove the `smp' field of `armada_xp_smp_ops'.
->>>
->>> If you agree with the diagnosis and the proposed fix I will write a patch.
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  drivers/mtd/nand/raw/vf610_nfc.c | 127 ++++++++++++++++++++-------------------
+>  1 file changed, 66 insertions(+), 61 deletions(-)
 > 
-> Personally my preferred option is to not set .smp at all and let the
-> device tree do it's thing.
-> 
-> I'm not sure if things have changed w.r.t. backwards compatibility in
-> the 3.5 years since I initially suggested that, assuming that we still
-> want backwards compatibility with these older device trees this patch
-> might help
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303899.html
-> 
-> I was pretty happy with that approach at the time but I obviously never
-> followed up to get that delivered. If someone has some spare cycles to
-> spend on it I wouldn't object to it being taken over.
-> 
-> I'll see if I can find some time to resurrect it myself. I don't have an
-> Armada-370 board but I can test BC2 and A38x.
-> 
-
-Hi Chris,
-
-I've tried the patch that is on your link above. It does solve my issue, and it 
-is neater than what I suggested because it indeed preserves backward compatibility.
-
-I could only test on BC2 though, because it's the only platform that I have.
-
-How would you like to proceed to carry this thing further? Do you have time to 
-post the patch again or do you want me to do it?
-
-Yves
+> diff --git a/drivers/mtd/nand/raw/vf610_nfc.c b/drivers/mtd/nand/raw/vf610_nfc.c
+> index d5a22fc96878..6f6dcbf9095b 100644
+> --- a/drivers/mtd/nand/raw/vf610_nfc.c
+> +++ b/drivers/mtd/nand/raw/vf610_nfc.c
+> @@ -747,6 +747,69 @@ static void vf610_nfc_init_controller(struct
+> vf610_nfc *nfc)
+>  	}
+>  }
+>  
+> +static int vf610_nfc_attach_chip(struct nand_chip *chip)
+> +{
+> +	struct mtd_info *mtd = nand_to_mtd(chip);
+> +	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
+> +
+> +	vf610_nfc_init_controller(nfc);
+> +
+> +	/* Bad block options. */
+> +	if (chip->bbt_options & NAND_BBT_USE_FLASH)
+> +		chip->bbt_options |= NAND_BBT_NO_OOB;
+> +
+> +	/* Single buffer only, max 256 OOB minus ECC status */
+> +	if (mtd->writesize + mtd->oobsize > PAGE_2K + OOB_MAX - 8) {
+> +		dev_err(nfc->dev, "Unsupported flash page size\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	if (chip->ecc.mode != NAND_ECC_HW)
+> +		return 0;
+> +
+> +	if (mtd->writesize != PAGE_2K && mtd->oobsize < 64) {
+> +		dev_err(nfc->dev, "Unsupported flash with hwecc\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	if (chip->ecc.size != mtd->writesize) {
+> +		dev_err(nfc->dev, "Step size needs to be page size\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	/* Only 64 byte ECC layouts known */
+> +	if (mtd->oobsize > 64)
+> +		mtd->oobsize = 64;
+> +
+> +	/* Use default large page ECC layout defined in NAND core */
+> +	mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
+> +	if (chip->ecc.strength == 32) {
+> +		nfc->ecc_mode = ECC_60_BYTE;
+> +		chip->ecc.bytes = 60;
+> +	} else if (chip->ecc.strength == 24) {
+> +		nfc->ecc_mode = ECC_45_BYTE;
+> +		chip->ecc.bytes = 45;
+> +	} else {
+> +		dev_err(nfc->dev, "Unsupported ECC strength\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	chip->ecc.read_page = vf610_nfc_read_page;
+> +	chip->ecc.write_page = vf610_nfc_write_page;
+> +	chip->ecc.read_page_raw = vf610_nfc_read_page_raw;
+> +	chip->ecc.write_page_raw = vf610_nfc_write_page_raw;
+> +	chip->ecc.read_oob = vf610_nfc_read_oob;
+> +	chip->ecc.write_oob = vf610_nfc_write_oob;
+> +
+> +	chip->ecc.size = PAGE_2K;
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct nand_controller_ops vf610_nfc_controller_ops = {
+> +	.attach_chip = vf610_nfc_attach_chip,
+> +};
+> +
+>  static int vf610_nfc_probe(struct platform_device *pdev)
+>  {
+>  	struct vf610_nfc *nfc;
+> @@ -827,67 +890,9 @@ static int vf610_nfc_probe(struct platform_device *pdev)
+>  
+>  	vf610_nfc_preinit_controller(nfc);
+>  
+> -	/* first scan to find the device and get the page size */
+> -	err = nand_scan_ident(mtd, 1, NULL);
+> -	if (err)
+> -		goto err_disable_clk;
+> -
+> -	vf610_nfc_init_controller(nfc);
+> -
+> -	/* Bad block options. */
+> -	if (chip->bbt_options & NAND_BBT_USE_FLASH)
+> -		chip->bbt_options |= NAND_BBT_NO_OOB;
+> -
+> -	/* Single buffer only, max 256 OOB minus ECC status */
+> -	if (mtd->writesize + mtd->oobsize > PAGE_2K + OOB_MAX - 8) {
+> -		dev_err(nfc->dev, "Unsupported flash page size\n");
+> -		err = -ENXIO;
+> -		goto err_disable_clk;
+> -	}
+> -
+> -	if (chip->ecc.mode == NAND_ECC_HW) {
+> -		if (mtd->writesize != PAGE_2K && mtd->oobsize < 64) {
+> -			dev_err(nfc->dev, "Unsupported flash with hwecc\n");
+> -			err = -ENXIO;
+> -			goto err_disable_clk;
+> -		}
+> -
+> -		if (chip->ecc.size != mtd->writesize) {
+> -			dev_err(nfc->dev, "Step size needs to be page size\n");
+> -			err = -ENXIO;
+> -			goto err_disable_clk;
+> -		}
+> -
+> -		/* Only 64 byte ECC layouts known */
+> -		if (mtd->oobsize > 64)
+> -			mtd->oobsize = 64;
+> -
+> -		/* Use default large page ECC layout defined in NAND core */
+> -		mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
+> -		if (chip->ecc.strength == 32) {
+> -			nfc->ecc_mode = ECC_60_BYTE;
+> -			chip->ecc.bytes = 60;
+> -		} else if (chip->ecc.strength == 24) {
+> -			nfc->ecc_mode = ECC_45_BYTE;
+> -			chip->ecc.bytes = 45;
+> -		} else {
+> -			dev_err(nfc->dev, "Unsupported ECC strength\n");
+> -			err = -ENXIO;
+> -			goto err_disable_clk;
+> -		}
+> -
+> -		chip->ecc.read_page = vf610_nfc_read_page;
+> -		chip->ecc.write_page = vf610_nfc_write_page;
+> -		chip->ecc.read_page_raw = vf610_nfc_read_page_raw;
+> -		chip->ecc.write_page_raw = vf610_nfc_write_page_raw;
+> -		chip->ecc.read_oob = vf610_nfc_read_oob;
+> -		chip->ecc.write_oob = vf610_nfc_write_oob;
+> -
+> -		chip->ecc.size = PAGE_2K;
+> -	}
+> -
+> -	/* second phase scan */
+> -	err = nand_scan_tail(mtd);
+> +	/* Scan the NAND chip */
+> +	chip->dummy_controller.ops = &vf610_nfc_controller_ops;
+> +	err = nand_scan(mtd, 1);
+>  	if (err)
+>  		goto err_disable_clk;
