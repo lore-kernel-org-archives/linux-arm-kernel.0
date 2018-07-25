@@ -1,37 +1,44 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 24 Jul 2018 23:21:03 -0700
-Subject: [PATCH v1 01/04] clk: actions: Add Actions Semi S500 SoC clock
- support
-In-Reply-To: <CADHB5bAns1PmTvq=fG8Rc2S6orEh7wf5XYAGQONTKMsoYv-UTg@mail.gmail.com>
-References: <CADHB5bAns1PmTvq=fG8Rc2S6orEh7wf5XYAGQONTKMsoYv-UTg@mail.gmail.com>
-Message-ID: <153249966379.48062.8866967540355341765@swboyd.mtv.corp.google.com>
+From: yuehaibing@huawei.com (YueHaibing)
+Date: Wed, 25 Jul 2018 15:07:06 +0800
+Subject: [PATCH v2] ARM: dma-mapping: always clear allocated buffers
+Message-ID: <20180725070706.19576-1-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Edgar Bernardi Righi (2018-07-18 08:32:34)
-> Add Actions Semi S500 SoC clock support.
-> Basic clock support for S500 SoC was implemented using the Actions
-> Semi Owl clock driver.
-> Tested on a Lemaker Guitar board.
-> 
-> This patch depends on patch "[PATCH v6 1/5] clk: actions: Add missing
-> REGMAP_MMIO dependency" by Saravanan Sekar.
-> This patch depends on patch "[PATCH] clk: actions: Add custom delay
-> option to Actions Semi OWL pll clock driver" by Edgar Bernardi Righi.
+Sean Wang reported dma_zalloc_coherent doesn't work as expect on his
+armv7,the allocated mem is not zeroed.The reason is __alloc_from_pool
+doesn't honor __GFP_ZERO.
 
-The depends list can be left out of the commit text and go below a
-triple dash '---' after the sign-off chain.
+As commit 6829e274a623 ("arm64: dma-mapping: always clear allocated buffers")
+has pointed out,buffers allocated by dma_alloc_coherent() are always zeroed
+on most architectures. some drivers rely on this 'feature'. Allocated buffer
+might be also exposed to userspace with dma_mmap() call,so clearing it is
+desired from security point of view to avoid exposing random memory to userspace.
 
-> 
-> File(s) created: "/drivers/clk/actions/owl-s500.c"
-> File(s) updated: "/drivers/clk/actions/Makefile", "/drivers/clk/actions/Kconfig"
+This patch unifies dma_alloc_coherent() behavior on ARM architecture with other
+implementations by unconditionally zeroing allocated buffer.Also to fix
+dma_zalloc_coherent behavior.
 
-Please remove these "Files created" messages from your patches.
-Preferably use git to format your patches before sending too, but using
-diff is OK too I guess.
+Reported-by: Sean Wang <sean.wang@mediatek.com>
+Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+Reviewed-by: zhong jiang <zhongjiang@huawei.com>
+---
+v2: reference more argument from arm64 commit as Christoph suggested
+---
+ arch/arm/mm/dma-mapping.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-> 
-> Signed-off-by: Edgar Bernardi Righi <edgar.righi@lsitec.org.br>
-> 
-> diff -uprN -X vanilla/Documentation/dontdiff
-> vanilla/drivers/clk/actions/Kconfig linux/drivers/clk/actions/Kconfig
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 6656647..cf5882f 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -564,6 +564,7 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
+ 
+ 		*ret_page = phys_to_page(phys);
+ 		ptr = (void *)val;
++		memset(ptr, 0, size);
+ 	}
+ 
+ 	return ptr;
+-- 
+2.7.0
