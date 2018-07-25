@@ -1,40 +1,41 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 25 Jul 2018 14:16:16 +0100
-Subject: [PATCH v2 3/7] ACPI/IORT: Set bus DMA mask as appropriate
-In-Reply-To: <07cbf8f77fac552dca9b4c85a9d3bd8ed5a4cd29.1532382222.git.robin.murphy@arm.com>
-References: <cover.1532382222.git.robin.murphy@arm.com>
- <07cbf8f77fac552dca9b4c85a9d3bd8ed5a4cd29.1532382222.git.robin.murphy@arm.com>
-Message-ID: <20180725131616.GA15301@e107981-ln.cambridge.arm.com>
+From: vincenzo.frascino@arm.com (Vincenzo Frascino@Foss)
+Date: Wed, 25 Jul 2018 14:44:10 +0100
+Subject: [PATCH v4 13/17] khwasan: add hooks implementation
+In-Reply-To: <a2a93370d43ec85b02abaf8d007a15b464212221.1530018818.git.andreyknvl@google.com>
+References: <cover.1530018818.git.andreyknvl@google.com>
+ <a2a93370d43ec85b02abaf8d007a15b464212221.1530018818.git.andreyknvl@google.com>
+Message-ID: <09cb5553-d84a-0e62-5174-315c14b88833@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 11:16:08PM +0100, Robin Murphy wrote:
-> When an explicit DMA limit is described by firmware, we need to remember
-> it regardless of how drivers might subsequently update their devices'
-> masks. The new bus_dma_mask field does that.
-> 
-> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> CC: Hanjun Guo <hanjun.guo@linaro.org>
-> CC: Sudeep Holla <sudeep.holla@arm.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/acpi/arm64/iort.c | 1 +
->  1 file changed, 1 insertion(+)
+On 06/26/2018 02:15 PM, Andrey Konovalov wrote:
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> @@ -325,18 +341,41 @@ void kasan_init_slab_obj(struct kmem_cache *cache, const void *object)
+>   
+>   void *kasan_slab_alloc(struct kmem_cache *cache, void *object, gfp_t flags)
+>   {
+> -	return kasan_kmalloc(cache, object, cache->object_size, flags);
+> +	object = kasan_kmalloc(cache, object, cache->object_size, flags);
+> +	if (IS_ENABLED(CONFIG_KASAN_HW) && unlikely(cache->ctor)) {
+> +		/*
+> +		 * Cache constructor might use object's pointer value to
+> +		 * initialize some of its fields.
+> +		 */
+> +		cache->ctor(object);
+>
+This seams breaking the kmem_cache_create() contract: "The @ctor is run 
+when new pages are allocated by the cache." 
+(https://elixir.bootlin.com/linux/v3.7/source/mm/slab_common.c#L83)
 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index 4a66896e2aa3..bc51cff5505e 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -1014,6 +1014,7 @@ void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
->  		 * Limit coherent and dma mask based on size
->  		 * retrieved from firmware.
->  		 */
-> +		dev->bus_dma_mask = mask;
->  		dev->coherent_dma_mask = mask;
->  		*dev->dma_mask = mask;
->  	}
-> -- 
-> 2.17.1.dirty
-> 
+Since there might be preexisting code relying on it, this could lead to 
+global side effects. Did you verify that this is not the case?
+
+Another concern is performance related if we consider this solution 
+suitable for "near-production", since with the current implementation 
+you call the ctor (where present) on an object multiple times and this 
+ends up memsetting and repopulating the memory every time (i.e. inode.c: 
+inode_init_once). Do you know what is the performance impact?
+
+-- 
+Regards,
+Vincenzo
