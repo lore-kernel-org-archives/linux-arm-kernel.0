@@ -1,24 +1,52 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 25 Jul 2018 13:17:59 -0600
-Subject: [PATCH 1/2] dt-bindings: spi: add DT bindings for UniPhier SPI
- controller
-In-Reply-To: <1531983117-9443-2-git-send-email-hayashibara.keiji@socionext.com>
-References: <1531983117-9443-1-git-send-email-hayashibara.keiji@socionext.com>
- <1531983117-9443-2-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <20180725191759.GA5573@rob-hp-laptop>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Wed, 25 Jul 2018 21:18:27 +0200
+Subject: [PATCH 10/14] arm64: dts: meson-axg: add linein codec
+In-Reply-To: <20180724125238.14567-11-jbrunet@baylibre.com>
+References: <20180724125238.14567-1-jbrunet@baylibre.com>
+ <20180724125238.14567-11-jbrunet@baylibre.com>
+Message-ID: <CAFBinCAgMhVOpCipV2D_UPqX7z0bcT=qnfRXTWpO7zigzS_TAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 03:51:56PM +0900, Keiji Hayashibara wrote:
-> From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> 
-> Add DT bindings for SPI controller implemented in UniPhier SoCs.
-> 
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
-> ---
->  .../devicetree/bindings/spi/spi-uniphier.txt       | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/spi/spi-uniphier.txt
+Hi Jerome,
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+On Tue, Jul 24, 2018 at 3:09 PM Jerome Brunet <jbrunet@baylibre.com> wrote:
+>
+> Add the es7241 analog to digital converter which is fed by the
+> lienin jack of the s400
+>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> index 7489b88f27d7..fb101a1c6660 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> @@ -178,6 +178,16 @@
+>                         gpios = <&gpio_speaker 2 0>;
+>                 };
+>         };
+> +
+> +       linein: audio-codec at 0 {
+there is a unit-address but no reg property - I am wondering if this is allowed?
+for the regulators we're using regulator-<unique-name> instead of
+regulator@<unique number>
+
+(this applies to other patches in this series as well)
+
+> +               #sound-dai-cells = <0>;
+> +               compatible = "everest,es7241";
+> +               VDDA-supply = <&vcc_3v3>;
+> +               VDDP-supply = <&vcc_3v3>;
+> +               VDDD-supply = <&vcc_3v3>;
+> +               status = "okay";
+> +               sound-name-prefix = "Linein";
+SPDIF output uses capital letters "SPDIFOUT"
+I am not familiar with the sound subsystem (thus I'm not sure where
+this shows up) so I am wondering if the naming should be consistent?
+
+
+Regards
+Martin
