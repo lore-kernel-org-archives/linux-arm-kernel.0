@@ -1,59 +1,47 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 25 Jul 2018 18:18:52 +0200
-Subject: [GIT PULL] pinctrl: samsung: Stuff for v4.19
-Message-ID: <20180725161852.6963-1-krzk@kernel.org>
+Date: Wed, 25 Jul 2018 18:23:40 +0200
+Subject: [GIT PULL 3/3] ARM: samsung: Mach/soc for v4.19
+In-Reply-To: <20180725162340.7488-1-krzk@kernel.org>
+References: <20180725162340.7488-1-krzk@kernel.org>
+Message-ID: <20180725162340.7488-3-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+Rebased on v4.18-rc2, because at v4.18-rc1 the NFS root boot, which I use at my
+testing setup (https://krzk.eu), was broken.
+
+Best regards,
+Krzysztof
 
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+The following changes since commit 7daf201d7fe8334e2d2364d4e8ed3394ec9af819:
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+  Linux 4.18-rc2 (2018-06-24 20:54:29 +0800)
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/samsung.git tags/samsung-pinctrl-4.19
+  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.19
 
-for you to fetch changes up to b3793159249bb091efce4b1515ce18cdfc4c6e41:
+for you to fetch changes up to cd4806911cee3901bc2b5eb95603cf1958720b57:
 
-  dt-bindings: pinctrl: samsung: Add SPDX license identifier (2018-07-24 21:59:17 +0200)
-
-----------------------------------------------------------------
-Samsung pinctrl drivers changes for v4.19
-
-1. Add handling of external wakeup interrupts mask inside the pin
-   controller driver.
-
-   Existing solution is spread between the driver and machine code.  The
-   machine code writes the mask but its value is taken from pin
-   controller driver.
-
-   This moves everything into pin controller driver allowing later to
-   remove the cross-subsystem interaction.  Also this is a necessary
-   step for implementing later Suspend to RAM on ARMv8 Exynos5433.
-
-2. Bring necessary suspend/resume callbacks for Exynos542x and
-   Exynos5260.
-3. Document hidden requirement about one external wakeup interrupts
-   device node.
-4. Minor documentation cleanups.
+  ARM: exynos: Clear global variable on init error path (2018-07-24 18:52:14 +0200)
 
 ----------------------------------------------------------------
-Krzysztof Kozlowski (7):
-      pinctrl: samsung: Define suspend and resume callbacks for all banks and SoCs
-      pinctrl: samsung: Document suspend and resume members
-      pinctrl: samsung: Document hidden requirement about one external wakeup
-      pinctrl: samsung: Add dedicated compatible for S5Pv210 wakeup interrupts
-      ARM: exynos: Define EINT_WAKEUP_MASK registers for S5Pv210 and Exynos5433
-      pinctrl: samsung: Write external wakeup interrupt mask
-      dt-bindings: pinctrl: samsung: Add SPDX license identifier
+Samsung mach/soc changes for v4.19
 
- .../bindings/pinctrl/samsung-pinctrl.txt           | 11 +++-
- arch/arm/mach-exynos/suspend.c                     |  2 +-
- drivers/pinctrl/samsung/pinctrl-exynos-arm.c       | 16 +++++
- drivers/pinctrl/samsung/pinctrl-exynos.c           | 68 +++++++++++++++++++++-
- drivers/pinctrl/samsung/pinctrl-samsung.h          | 11 ++++
- include/dt-bindings/pinctrl/samsung.h              |  7 +--
- include/linux/soc/samsung/exynos-regs-pmu.h        |  8 ++-
- 7 files changed, 113 insertions(+), 10 deletions(-)
+Minor cleanups and fixes.
+
+----------------------------------------------------------------
+Denis Efremov (1):
+      ARM: s3c24xx: Fix typo in guard macro of s3c2412.h
+
+Krzysztof Kozlowski (2):
+      ARM: exynos: Remove outdated maintainer information
+      ARM: exynos: Clear global variable on init error path
+
+ arch/arm/mach-exynos/exynos.c                | 2 --
+ arch/arm/mach-exynos/suspend.c               | 1 +
+ arch/arm/mach-s3c24xx/include/mach/s3c2412.h | 2 +-
+ 3 files changed, 2 insertions(+), 3 deletions(-)
