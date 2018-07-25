@@ -1,73 +1,148 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Jul 2018 12:49:54 +0100
-Subject: [PATCHv3 0/2] Stackleak for arm64
-In-Reply-To: <20180724163807.GE25888@arm.com>
-References: <1531341400-12077-1-git-send-email-alex.popov@linux.com>
- <20180720214154.2940-1-labbott@redhat.com>
- <20180724163807.GE25888@arm.com>
-Message-ID: <20180725114954.GD30289@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 25 Jul 2018 12:50:45 +0100
+Subject: [RFC PATCH 12/16] KVM: arm64/sve: Context switch the SVE registers
+In-Reply-To: <20180719131338.jsgezassnjhdbotd@kamzik.brq.redhat.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-13-git-send-email-Dave.Martin@arm.com>
+ <20180719131338.jsgezassnjhdbotd@kamzik.brq.redhat.com>
+Message-ID: <20180725115045.GJ4240@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
-
-On Tue, Jul 24, 2018 at 05:38:07PM +0100, Will Deacon wrote:
-> On Fri, Jul 20, 2018 at 02:41:52PM -0700, Laura Abbott wrote:
-> > This is the version of stackleak for arm64, hopefully ready for queueing
+On Thu, Jul 19, 2018 at 03:13:38PM +0200, Andrew Jones wrote:
+> On Thu, Jun 21, 2018 at 03:57:36PM +0100, Dave Martin wrote:
+> > In order to give each vcpu its own view of the SVE registers, this
+> > patch adds context storage via a new sve_state pointer in struct
+> > vcpu_arch.  An additional member sve_max_vl is also added for each
+> > vcpu, to determine the maximum vector length visible to the guest
+> > and thus the value to be configured in ZCR_EL2.LEN while the is
+> > active.  This also determines the layout and size of the storage in
+> > sve_state, which is read and written by the same backend functions
+> > that are used for context-switching the SVE state for host tasks.
+> > 
+> > On SVE-enabled vcpus, SVE access traps are now handled by switching
+> > in the vcpu's SVE context and disabling the trap before returning
+> > to the guest.  On other vcpus, the trap is not handled and an exit
+> > back to the host occurs, where the handle_sve() fallback path
+> > reflects an undefined instruction exception back to the guest,
+> > consistently with the behaviour of non-SVE-capable hardware (as was
+> > done unconditionally prior to this patch).
+> > 
+> > No SVE handling is added on non-VHE-only paths, since VHE is an
+> > architectural and Kconfig prerequisite of SVE.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > ---
+> >  arch/arm64/include/asm/kvm_host.h |  2 ++
+> >  arch/arm64/kvm/fpsimd.c           |  5 +++--
+> >  arch/arm64/kvm/hyp/switch.c       | 43 ++++++++++++++++++++++++++++++---------
+> >  3 files changed, 38 insertions(+), 12 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> > index f331abf..d2084ae 100644
+> > --- a/arch/arm64/include/asm/kvm_host.h
+> > +++ b/arch/arm64/include/asm/kvm_host.h
+> > @@ -211,6 +211,8 @@ typedef struct kvm_cpu_context kvm_cpu_context_t;
+> >  
+> >  struct kvm_vcpu_arch {
+> >  	struct kvm_cpu_context ctxt;
+> > +	void *sve_state;
+> > +	unsigned int sve_max_vl;
+> >  
+> >  	/* HYP configuration */
+> >  	u64 hcr_el2;
+> > diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+> > index 872008c..44cf783 100644
+> > --- a/arch/arm64/kvm/fpsimd.c
+> > +++ b/arch/arm64/kvm/fpsimd.c
+> > @@ -86,10 +86,11 @@ void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu)
+> >  
+> >  	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED) {
+> >  		fpsimd_bind_state_to_cpu(&vcpu->arch.ctxt.gp_regs.fp_regs,
+> > -					 NULL, sve_max_vl);
+> > +					 vcpu->arch.sve_state,
+> > +					 vcpu->arch.sve_max_vl);
+> >  
+> >  		clear_thread_flag(TIF_FOREIGN_FPSTATE);
+> > -		clear_thread_flag(TIF_SVE);
+> > +		update_thread_flag(TIF_SVE, vcpu_has_sve(&vcpu->arch));
+> >  	}
+> >  }
+> >  
+> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > index d496ef5..98df5c1 100644
+> > --- a/arch/arm64/kvm/hyp/switch.c
+> > +++ b/arch/arm64/kvm/hyp/switch.c
+> > @@ -98,8 +98,13 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
+> >  	val = read_sysreg(cpacr_el1);
+> >  	val |= CPACR_EL1_TTA;
+> >  	val &= ~CPACR_EL1_ZEN;
+> > -	if (!update_fp_enabled(vcpu))
+> > +
+> > +	if (update_fp_enabled(vcpu)) {
+> > +		if (vcpu_has_sve(&vcpu->arch))
+> > +			val |= CPACR_EL1_ZEN;
+> > +	} else {
+> >  		val &= ~CPACR_EL1_FPEN;
+> > +	}
+> >  
+> >  	write_sysreg(val, cpacr_el1);
+> >  
+> > @@ -114,6 +119,7 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+> >  
+> >  	val = CPTR_EL2_DEFAULT;
+> >  	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
+> > +
+> >  	if (!update_fp_enabled(vcpu))
+> >  		val |= CPTR_EL2_TFP;
+> >  
+> > @@ -329,16 +335,22 @@ static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+> >  	}
+> >  }
+> >  
+> > -static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+> > +static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu,
+> > +					   bool guest_has_sve)
+> >  {
+> >  	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
+> >  
+> > -	if (has_vhe())
+> > -		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+> > -			     cpacr_el1);
+> > -	else
+> > +	if (has_vhe()) {
+> > +		u64 reg = read_sysreg(cpacr_el1) | CPACR_EL1_FPEN;
+> > +
+> > +		if (system_supports_sve() && guest_has_sve)
 > 
-> Thanks. I'll push these into linux-next tomorrow, once I've had a chance
-> to test my conflict resolution in entry.S.
+> guest_has_sve is only true when vcpu_arch->flags & KVM_ARM64_GUEST_HAS_SVE
+> is true, which can only be true when system_supports_sve() is true. So
+> I don't think we need system_supports_sve() here. guest_has_sve should be
+> enough.
+> 
+> > +			reg |= CPACR_EL1_ZEN;
+> > +
+> > +		write_sysreg(reg, cpacr_el1);
+> > +	} else {
+> >  		write_sysreg(read_sysreg(cptr_el2) & ~(u64)CPTR_EL2_TFP,
+> >  			     cptr_el2);
+> > +	}
+> >  
+> >  	isb();
+> >  
+> > @@ -361,7 +373,13 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+> >  		vcpu->arch.flags &= ~KVM_ARM64_FP_HOST;
+> >  	}
+> >  
+> > -	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
+> > +	if (system_supports_sve() && guest_has_sve)
+> 
+> here too
 
-I've run into a couple of issues with this series:
+As elsewhere, the system_supports_sve() check uses a static key and
+should be very cheap (or free in a CONFIG_ARM64_SVE=n kernel).
 
-1. I had to install libmpc-dev to get GCC_PLUGINS to appear, otherwise the
-   hostcc check would silently fail. I guess that's a general observation,
-   but it might be nice to print a message about the missing dependencies.
+The aim here is to reduce wasted effort on non-SVE systems.
 
-2. It breaks arm64 allmodconfig build. Log below.
-
-Please can you take a look at the build failure? Otherwise, the patches
-look good to me.
-
-Cheers,
-
-Will
-
---->8
-
-arch/arm64/kernel/sdei.c: In function ?on_sdei_normal_stack?:
-arch/arm64/kernel/sdei.c:101:7: error: dereferencing pointer to incomplete type ?struct stack_info?
-   info->low = low;
-       ^~
-arch/arm64/kernel/sdei.c:103:16: error: ?STACK_TYPE_SDEI_NORMAL? undeclared (first use in this function); did you mean ?SCHED_NORMAL??
-   info->type = STACK_TYPE_SDEI_NORMAL;
-                ^~~~~~~~~~~~~~~~~~~~~~
-                SCHED_NORMAL
-arch/arm64/kernel/sdei.c:103:16: note: each undeclared identifier is reported only once for each function it appears in
-arch/arm64/kernel/sdei.c: In function ?on_sdei_critical_stack?:
-arch/arm64/kernel/sdei.c:121:16: error: ?STACK_TYPE_SDEI_CRITICAL? undeclared (first use in this function)
-   info->type = STACK_TYPE_SDEI_CRITICAL;
-                ^~~~~~~~~~~~~~~~~~~~~~~~
-arch/arm64/kernel/sdei.c: At top level:
-arch/arm64/kernel/sdei.c:127:6: error: conflicting types for ?_on_sdei_stack?
- bool _on_sdei_stack(unsigned long sp,
-      ^~~~~~~~~~~~~~
-In file included from ./include/linux/arm_sdei.h:14:0,
-                 from arch/arm64/kernel/sdei.c:5:
-./arch/arm64/include/asm/sdei.h:45:6: note: previous declaration of ?_on_sdei_stack? was here
- bool _on_sdei_stack(unsigned long sp, struct stack_info *info);
-      ^~~~~~~~~~~~~~
-arch/arm64/kernel/sdei.c: In function ?_on_sdei_stack?:
-arch/arm64/kernel/sdei.c:136:33: error: ?info? undeclared (first use in this function); did you mean ?int??
-  if (on_sdei_critical_stack(sp, info))
-                                 ^~~~
-                                 int
-arch/arm64/kernel/sdei.c:131:21: warning: unused variable ?high? [-Wunused-variable]
-  unsigned long low, high;
-                     ^~~~
-arch/arm64/kernel/sdei.c:131:16: warning: unused variable ?low? [-Wunused-variable]
-  unsigned long low, high;
-                ^~~
-make[1]: *** [arch/arm64/kernel/sdei.o] Error 1
-make[1]: *** Waiting for unfinished jobs....
-make: *** [arch/arm64/kernel] Error 2
+Cheers
+---Dave
