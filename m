@@ -1,91 +1,116 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 25 Jul 2018 16:46:55 +0100
-Subject: [RFC PATCH 09/16] KVM: arm64: Allow ID registers to by
- dynamically read-as-zero
-In-Reply-To: <1529593060-542-10-git-send-email-Dave.Martin@arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-10-git-send-email-Dave.Martin@arm.com>
-Message-ID: <876013tj0w.fsf@linaro.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 25 Jul 2018 16:54:27 +0100
+Subject: [PATCH 1/2] signal: Introduce COMPAT_SIGMINSTKSZ for use in
+ compat_sys_sigaltstack
+In-Reply-To: <1532526312-26993-2-git-send-email-will.deacon@arm.com>
+References: <1532526312-26993-1-git-send-email-will.deacon@arm.com>
+ <1532526312-26993-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20180725155427.GR4240@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Dave Martin <Dave.Martin@arm.com> writes:
-
-> When a feature-dependent ID register is hidden from the guest, it
-> needs to exhibit read-as-zero behaviour as defined by the Arm
-> architecture, rather than appearing to be entirely absent.
->
-> This patch updates the ID register emulation logic to make use of
-> the new check_present() method to determine whether the register
-> should read as zero instead of yielding the host's sanitised
-> value.  Because currently a false result from this method truncates
-> the trap call chain before the sysreg's emulate method() is called,
-> a flag is added to distinguish this special case, and helpers are
-> refactored appropriately.
->
-> This invloves some trivial updates to pass the vcpu pointer down
-> into the ID register emulation/access functions.
->
-> A new ID_SANITISED_IF() macro is defined for declaring
-> conditionally visible ID registers.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+On Wed, Jul 25, 2018 at 02:45:11PM +0100, Will Deacon wrote:
+> The sigaltstack(2) system call fails with -ENOMEM if the new alternative
+> signal stack is found to be smaller than SIGMINSTKSZ. On architectures
+> such as arm64, where the native value for SIGMINSTKSZ is larger than
+> the compat value, this can result in an unexpected error being reported
+> to a compat task. See, for example:
+> 
+>   https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=904385
+> 
+> This patch fixes the problem by extending do_sigaltstack to take the
+> minimum signal stack size as an additional parameter, allowing the
+> native and compat system call entry code to pass in their respective
+> values. COMPAT_SIGMINSTKSZ is just defined as SIGMINSTKSZ if it has not
+> been defined by the architecture.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Dominik Brodowski <linux@dominikbrodowski.net>
+> Cc: "Eric W. Biederman" <ebiederm@xmission.com>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Al Viro <viro@zeniv.linux.org.uk>
+> Cc: Oleg Nesterov <oleg@redhat.com>
+> Reported-by: Steve McIntyre <steve.mcintyre@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
-<snip>
-> @@ -2337,7 +2352,7 @@ int kvm_arm_sys_reg_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
->  	if (!r)
->  		return set_invariant_sys_reg(reg->id, uaddr);
->
-> -	if (!sys_reg_present(vcpu, r))
-> +	if (!sys_reg_present_or_raz(vcpu, r))
->  		return -ENOENT;
-
-It's all very well being raz, but shouldn't you catch this further down
-and not attempt to write the register that doesn't exist?
-
->
->  	if (r->set_user)
-> @@ -2408,7 +2423,7 @@ static int walk_one_sys_reg(struct kvm_vcpu *vcpu,
->  	if (!(rd->reg || rd->get_user))
->  		return 0;
->
-> -	if (!sys_reg_present(vcpu, rd))
-> +	if (!sys_reg_present_or_raz(vcpu, rd))
->  		return 0;
->
->  	if (!copy_reg_to_user(rd, uind))
-> diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
-> index dfbb342..304928f 100644
-> --- a/arch/arm64/kvm/sys_regs.h
-> +++ b/arch/arm64/kvm/sys_regs.h
-> @@ -66,14 +66,25 @@ struct sys_reg_desc {
->  			const struct kvm_one_reg *reg, void __user *uaddr);
->  	bool (*check_present)(const struct kvm_vcpu *vpcu,
->  			      const struct sys_reg_desc *rd);
-> +
-> +	/* OR of SR_* flags */
-> +	unsigned int flags;
->  };
->
-> +#define SR_RAZ_IF_ABSENT	(1 << 0)
-> +
->  static inline bool sys_reg_present(const struct kvm_vcpu *vcpu,
->  				   const struct sys_reg_desc *rd)
->  {
->  	return likely(!rd->check_present) || rd->check_present(vcpu, rd);
+>  include/linux/compat.h |  3 +++
+>  kernel/signal.c        | 14 +++++++++-----
+>  2 files changed, 12 insertions(+), 5 deletions(-)
+> 
+> diff --git a/include/linux/compat.h b/include/linux/compat.h
+> index c68acc47da57..47041c7fed28 100644
+> --- a/include/linux/compat.h
+> +++ b/include/linux/compat.h
+> @@ -103,6 +103,9 @@ typedef struct compat_sigaltstack {
+>  	compat_size_t			ss_size;
+>  } compat_stack_t;
+>  #endif
+> +#ifndef COMPAT_MINSIGSTKSZ
+> +#define COMPAT_MINSIGSTKSZ	MINSIGSTKSZ
+> +#endif
+>  
+>  #define compat_jiffies_to_clock_t(x)	\
+>  		(((unsigned long)(x) * COMPAT_USER_HZ) / HZ)
+> diff --git a/kernel/signal.c b/kernel/signal.c
+> index 8d8a940422a8..41a5dd2df27d 100644
+> --- a/kernel/signal.c
+> +++ b/kernel/signal.c
+> @@ -3417,7 +3417,8 @@ int do_sigaction(int sig, struct k_sigaction *act, struct k_sigaction *oact)
 >  }
->
-> +static inline bool sys_reg_present_or_raz(const struct kvm_vcpu *vcpu,
-> +					  const struct sys_reg_desc *rd)
-> +{
-> +	return sys_reg_present(vcpu, rd) || (rd->flags & SR_RAZ_IF_ABSENT);
-> +}
-> +
->  static inline void print_sys_reg_instr(const struct sys_reg_params *p)
+>  
+>  static int
+> -do_sigaltstack (const stack_t *ss, stack_t *oss, unsigned long sp)
+> +do_sigaltstack (const stack_t *ss, stack_t *oss, unsigned long sp,
+> +		size_t min_ss_size)
 >  {
->  	/* Look, we even formatted it for you to paste into the table! */
+>  	struct task_struct *t = current;
+>  
+> @@ -3447,7 +3448,7 @@ do_sigaltstack (const stack_t *ss, stack_t *oss, unsigned long sp)
+>  			ss_size = 0;
+>  			ss_sp = NULL;
+>  		} else {
+> -			if (unlikely(ss_size < MINSIGSTKSZ))
+> +			if (unlikely(ss_size < min_ss_size))
+>  				return -ENOMEM;
+>  		}
+>  
+> @@ -3465,7 +3466,8 @@ SYSCALL_DEFINE2(sigaltstack,const stack_t __user *,uss, stack_t __user *,uoss)
+>  	if (uss && copy_from_user(&new, uss, sizeof(stack_t)))
+>  		return -EFAULT;
+>  	err = do_sigaltstack(uss ? &new : NULL, uoss ? &old : NULL,
+> -			      current_user_stack_pointer());
+> +			      current_user_stack_pointer(),
+> +			      MINSIGSTKSZ);
+>  	if (!err && uoss && copy_to_user(uoss, &old, sizeof(stack_t)))
+>  		err = -EFAULT;
+>  	return err;
+> @@ -3476,7 +3478,8 @@ int restore_altstack(const stack_t __user *uss)
+>  	stack_t new;
+>  	if (copy_from_user(&new, uss, sizeof(stack_t)))
+>  		return -EFAULT;
+> -	(void)do_sigaltstack(&new, NULL, current_user_stack_pointer());
+> +	(void)do_sigaltstack(&new, NULL, current_user_stack_pointer(),
+> +			     MINSIGSTKSZ);
 
+Why can't this fail?
 
---
-Alex Benn?e
+If this fails here we silently go wrong, but...
+
+>  	/* squash all but EFAULT for now */
+>  	return 0;
+>  }
+> @@ -3510,7 +3513,8 @@ static int do_compat_sigaltstack(const compat_stack_t __user *uss_ptr,
+>  		uss.ss_size = uss32.ss_size;
+>  	}
+>  	ret = do_sigaltstack(uss_ptr ? &uss : NULL, &uoss,
+> -			     compat_user_stack_pointer());
+> +			     compat_user_stack_pointer(),
+> +			     COMPAT_MINSIGSTKSZ);
+
+If this fails on arm64, we seem to SEGV (see compat_sys_rt_sigreturn()).
+
+This patch doesn't introduce this inconsistency, this might be a good
+opportunity to clean it up.
+
+Cheers
+---Dave
