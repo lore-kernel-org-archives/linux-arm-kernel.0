@@ -1,14 +1,26 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Jul 2018 14:45:12 +0100
-Subject: [PATCH 2/2] arm64: compat: Provide definition for COMPAT_SIGMINSTKSZ
+Date: Wed, 25 Jul 2018 14:45:11 +0100
+Subject: [PATCH 1/2] signal: Introduce COMPAT_SIGMINSTKSZ for use in
+ compat_sys_sigaltstack
 In-Reply-To: <1532526312-26993-1-git-send-email-will.deacon@arm.com>
 References: <1532526312-26993-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1532526312-26993-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1532526312-26993-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/ defines a SIGMINSTKSZ of 2k, so we should use the same value
-for compat tasks.
+The sigaltstack(2) system call fails with -ENOMEM if the new alternative
+signal stack is found to be smaller than SIGMINSTKSZ. On architectures
+such as arm64, where the native value for SIGMINSTKSZ is larger than
+the compat value, this can result in an unexpected error being reported
+to a compat task. See, for example:
+
+  https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=904385
+
+This patch fixes the problem by extending do_sigaltstack to take the
+minimum signal stack size as an additional parameter, allowing the
+native and compat system call entry code to pass in their respective
+values. COMPAT_SIGMINSTKSZ is just defined as SIGMINSTKSZ if it has not
+been defined by the architecture.
 
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Dominik Brodowski <linux@dominikbrodowski.net>
@@ -19,20 +31,76 @@ Cc: Oleg Nesterov <oleg@redhat.com>
 Reported-by: Steve McIntyre <steve.mcintyre@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/compat.h | 1 +
- 1 file changed, 1 insertion(+)
+ include/linux/compat.h |  3 +++
+ kernel/signal.c        | 14 +++++++++-----
+ 2 files changed, 12 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-index 1a037b94eba1..cee28a05ee98 100644
---- a/arch/arm64/include/asm/compat.h
-+++ b/arch/arm64/include/asm/compat.h
-@@ -159,6 +159,7 @@ static inline compat_uptr_t ptr_to_compat(void __user *uptr)
+diff --git a/include/linux/compat.h b/include/linux/compat.h
+index c68acc47da57..47041c7fed28 100644
+--- a/include/linux/compat.h
++++ b/include/linux/compat.h
+@@ -103,6 +103,9 @@ typedef struct compat_sigaltstack {
+ 	compat_size_t			ss_size;
+ } compat_stack_t;
+ #endif
++#ifndef COMPAT_MINSIGSTKSZ
++#define COMPAT_MINSIGSTKSZ	MINSIGSTKSZ
++#endif
+ 
+ #define compat_jiffies_to_clock_t(x)	\
+ 		(((unsigned long)(x) * COMPAT_USER_HZ) / HZ)
+diff --git a/kernel/signal.c b/kernel/signal.c
+index 8d8a940422a8..41a5dd2df27d 100644
+--- a/kernel/signal.c
++++ b/kernel/signal.c
+@@ -3417,7 +3417,8 @@ int do_sigaction(int sig, struct k_sigaction *act, struct k_sigaction *oact)
  }
  
- #define compat_user_stack_pointer() (user_stack_pointer(task_pt_regs(current)))
-+#define COMPAT_MINSIGSTKSZ	2048
- 
- static inline void __user *arch_compat_alloc_user_space(long len)
+ static int
+-do_sigaltstack (const stack_t *ss, stack_t *oss, unsigned long sp)
++do_sigaltstack (const stack_t *ss, stack_t *oss, unsigned long sp,
++		size_t min_ss_size)
  {
+ 	struct task_struct *t = current;
+ 
+@@ -3447,7 +3448,7 @@ do_sigaltstack (const stack_t *ss, stack_t *oss, unsigned long sp)
+ 			ss_size = 0;
+ 			ss_sp = NULL;
+ 		} else {
+-			if (unlikely(ss_size < MINSIGSTKSZ))
++			if (unlikely(ss_size < min_ss_size))
+ 				return -ENOMEM;
+ 		}
+ 
+@@ -3465,7 +3466,8 @@ SYSCALL_DEFINE2(sigaltstack,const stack_t __user *,uss, stack_t __user *,uoss)
+ 	if (uss && copy_from_user(&new, uss, sizeof(stack_t)))
+ 		return -EFAULT;
+ 	err = do_sigaltstack(uss ? &new : NULL, uoss ? &old : NULL,
+-			      current_user_stack_pointer());
++			      current_user_stack_pointer(),
++			      MINSIGSTKSZ);
+ 	if (!err && uoss && copy_to_user(uoss, &old, sizeof(stack_t)))
+ 		err = -EFAULT;
+ 	return err;
+@@ -3476,7 +3478,8 @@ int restore_altstack(const stack_t __user *uss)
+ 	stack_t new;
+ 	if (copy_from_user(&new, uss, sizeof(stack_t)))
+ 		return -EFAULT;
+-	(void)do_sigaltstack(&new, NULL, current_user_stack_pointer());
++	(void)do_sigaltstack(&new, NULL, current_user_stack_pointer(),
++			     MINSIGSTKSZ);
+ 	/* squash all but EFAULT for now */
+ 	return 0;
+ }
+@@ -3510,7 +3513,8 @@ static int do_compat_sigaltstack(const compat_stack_t __user *uss_ptr,
+ 		uss.ss_size = uss32.ss_size;
+ 	}
+ 	ret = do_sigaltstack(uss_ptr ? &uss : NULL, &uoss,
+-			     compat_user_stack_pointer());
++			     compat_user_stack_pointer(),
++			     COMPAT_MINSIGSTKSZ);
+ 	if (ret >= 0 && uoss_ptr)  {
+ 		compat_stack_t old;
+ 		memset(&old, 0, sizeof(old));
 -- 
 2.1.4
