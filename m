@@ -1,108 +1,76 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 25 Jul 2018 20:53:58 +0530
-Subject: [PATCH v2 1/4] dt-bindings: dma: Add binding for Actions Semi
- Owl SoCs
-In-Reply-To: <20180724121604.GA2587@vkoul-mobl>
-References: <20180723041743.32024-1-manivannan.sadhasivam@linaro.org>
- <20180723041743.32024-2-manivannan.sadhasivam@linaro.org>
- <20180724121604.GA2587@vkoul-mobl>
-Message-ID: <20180725152358.GA14686@Mani-XPS-13-9360>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 25 Jul 2018 16:27:47 +0100
+Subject: [PATCH v2 6/7] ACPI/IORT: Don't set default coherent DMA mask
+In-Reply-To: <3525869e8e7530128bf9718ae8af7d7564b3c684.1532382222.git.robin.murphy@arm.com>
+References: <cover.1532382222.git.robin.murphy@arm.com>
+ <3525869e8e7530128bf9718ae8af7d7564b3c684.1532382222.git.robin.murphy@arm.com>
+Message-ID: <20180725152747.GA5080@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On Mon, Jul 23, 2018 at 11:16:11PM +0100, Robin Murphy wrote:
+> Now that we can track upstream DMA constraints properly with
+> bus_dma_mask instead of trying (and failing) to maintain it in
+> coherent_dma_mask, it doesn't make much sense for the firmware code to
+> be touching the latter at all. It's merely papering over bugs wherein a
+> driver has failed to call dma_set_coherent_mask() *and* the bus code has
+> not initialised any default value.
 
-On Tue, Jul 24, 2018 at 05:46:04PM +0530, Vinod wrote:
-> Hi Mani,
-> 
-> Patch title should be dmaengine: ... Please always use the apt tags and
-> one can find them using git log <subsystem>
-> 
+Nit: I do not think the driver had a chance to probe and therefore call
+dma_set_coherent_mask() before iort_dma_setup() is executed, right ?
 
-Did you mean, dt-bindings: dmaengine? If yes, then I will use it for the
-future patches.
+Anyway, the patch makes perfect sense:
 
-> On 23-07-18, 09:47, Manivannan Sadhasivam wrote:
-> > Add devicetree binding for Actions Semi Owl SoCs DMA controller.
-> 
-> 
-> It would help for review to describe the controller here
-> 
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Okay.
-
-> > 
-> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> > ---
-> >  .../devicetree/bindings/dma/owl-dma.txt       | 46 +++++++++++++++++++
-> >  1 file changed, 46 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/dma/owl-dma.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/dma/owl-dma.txt b/Documentation/devicetree/bindings/dma/owl-dma.txt
-> > new file mode 100644
-> > index 000000000000..dd6ce237b216
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/dma/owl-dma.txt
-> > @@ -0,0 +1,46 @@
-> > +* Actions Semi Owl SoCs DMA controller
-> > +
-> > +This binding follows the generic DMA bindings defined in dma.txt.
-> > +
-> > +Required properties:
-> > +- compatible: Should be "actions,s900-dma".
-> > +- reg: Should contain DMA registers location and length.
-> > +- interrupts: Should contain 4 interrupts shared by all channel.
-> > +- #dma-cells: Must be <1>. Used to represent the number of integer
-> > +              cells in the dmas property of client device.
-> > +- dma-channels: Physical channels supported.
-> > +- dma-requests: Virtual channels supported.
+> We don't really want to encourage more drivers coercing dma_mask so
+> we'll continue to fix that up if necessary, but add a warning to help
+> flush out any such buggy bus code that remains.
 > 
-> not really, virtual channel is a software concepts. On the other hand
-> you may have request lines in hw and you can describe that, if not skip
-> this one
+> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> CC: Hanjun Guo <hanjun.guo@linaro.org>
+> CC: Sudeep Holla <sudeep.holla@arm.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/acpi/arm64/iort.c | 22 +++++++++++-----------
+>  1 file changed, 11 insertions(+), 11 deletions(-)
 > 
-
-Okay. Will change the property description to request signals.
-
-Thanks,
-Mani
-
-> > +- clocks: Phandle and Specifier of the clock feeding the DMA controller.
-> > +
-> > +Example:
-> > +
-> > +Controller:
-> > +                dma: dma-controller at e0260000 {
-> > +                        compatible = "actions,s900-dma";
-> > +                        reg = <0x0 0xe0260000 0x0 0x1000>;
-> > +                        interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
-> > +                                     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
-> > +                                     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
-> > +                                     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
-> > +                        #dma-cells = <1>;
-> > +                        dma-channels = <12>;
-> > +                        dma-requests = <46>;
-> > +                        clocks = <&clock CLK_DMAC>;
-> > +                };
-> > +
-> > +Client:
-> > +
-> > +DMA clients connected to the Actions Semi Owl SoCs DMA controller must
-> > +use the format described in the dma.txt file, using a two-cell specifier
-> > +for each channel.
-> > +
-> > +The two cells in order are:
-> > +1. A phandle pointing to the DMA controller.
-> > +2. The channel id.
-> > +
-> > +uart5: serial at e012a000 {
-> > +        ...
-> > +        dma-names = "tx", "rx";
-> > +        dmas = <&dma 26>, <&dma 27>;
-> > +        ...
-> > +};
-> > -- 
-> > 2.17.1
-> 
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index bc51cff5505e..08f26db2da7e 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -978,20 +978,20 @@ void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
+>  	int ret, msb;
+>  
+>  	/*
+> -	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
+> -	 * setup the correct supported mask.
+> +	 * If @dev is expected to be DMA-capable then the bus code that created
+> +	 * it should have initialised its dma_mask pointer by this point. For
+> +	 * now, we'll continue the legacy behaviour of coercing it to the
+> +	 * coherent mask if not, but we'll no longer do so quietly.
+>  	 */
+> -	if (!dev->coherent_dma_mask)
+> -		dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> -
+> -	/*
+> -	 * Set it to coherent_dma_mask by default if the architecture
+> -	 * code has not set it.
+> -	 */
+> -	if (!dev->dma_mask)
+> +	if (!dev->dma_mask) {
+> +		dev_warn(dev, "DMA mask not set\n");
+>  		dev->dma_mask = &dev->coherent_dma_mask;
+> +	}
+>  
+> -	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+> +	if (dev->coherent_dma_mask)
+> +		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+> +	else
+> +		size = 1ULL << 32;
+>  
+>  	if (dev_is_pci(dev)) {
+>  		ret = acpi_dma_get_range(dev, &dmaaddr, &offset, &size);
 > -- 
-> ~Vinod
+> 2.17.1.dirty
+> 
