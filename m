@@ -1,82 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 25 Jul 2018 11:43:30 -0600
-Subject: [PATCH v2 4/5] dt-bindings: drm/bridge Document Cadence MHDP
- DPI/DP bridge bindings
-In-Reply-To: <1532430824-23477-5-git-send-email-dkos@cadence.com>
-References: <1532430824-23477-1-git-send-email-dkos@cadence.com>
- <1532430824-23477-5-git-send-email-dkos@cadence.com>
-Message-ID: <20180725174330.GA31540@rob-hp-laptop>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 25 Jul 2018 17:53:35 +0100
+Subject: [RFC] mm: Do not look up the next level table when large page
+ exist.
+In-Reply-To: <1532532119-59955-1-git-send-email-zhongjiang@huawei.com>
+References: <1532532119-59955-1-git-send-email-zhongjiang@huawei.com>
+Message-ID: <20180725165334.4zjsenp6p3cdureq@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 12:13:35PM +0100, Damian Kos wrote:
-> From: Quentin Schulz <quentin.schulz@bootlin.com>
+On Wed, Jul 25, 2018 at 11:21:59PM +0800, zhong jiang wrote:
+> show_pte can show the kernel page table and user page table. user
+> page table is totally four level table.
+
+Well, you can have huge pages in user space.
+
+> but kernel page table can
+> be a large page. Therefore, it need to check the page table.
 > 
-> Signed-off-by: Damian Kos <dkos@cadence.com>
+> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
 > ---
->  .../bindings/display/bridge/cdns,mhdp.txt     | 43 +++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
+>  arch/arm64/mm/fault.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt b/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
-> new file mode 100644
-> index 000000000000..dc7be7590048
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
-> @@ -0,0 +1,43 @@
-> +Cadence MHDP bridge
-> +==========================
-> +
-> +The Cadence MHDP bridge is a DPI to DP bridge.
-> +
-> +Required properties:
-> +- compatible: should be "cdns,mhdp8546",
-> +- reg: physical base address and length of the controller's registers,
-> +- clocks: DP bridge clock, it's used by the IP to know how to translate
-> +	a number of clock cycles into a time (which is used to comply
-> +	with DP standard timings and delays),
-> +
-> +Required subnodes:
-> +- ports: Ports as described in Documentation/devictree/bindings/graph.txt
-> +	Port 0 - input port representing the VGA bridge input
-> +	Port 1 - output port representing the VGA bridge output
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 1b40676..a397a54 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -169,13 +169,13 @@ void show_pte(unsigned long addr)
+>  		pudp = pud_offset(pgdp, addr);
+>  		pud = READ_ONCE(*pudp);
+>  		pr_cont(", pud=%016llx", pud_val(pud));
+> -		if (pud_none(pud) || pud_bad(pud))
+> +		if (pud_none(pud) || pud_bad(pud) || pud_sect(pud))
 
-VGA?
+Have you actually hit a problem with this code?
 
-> +
-> +Example:
-> +
-> +	mhdp: dp-bridge at f0fb000000 {
-> +		compatible = "cdns,mhdp8546";
-> +		reg = <0xf0 0xfb000000 0x0 0x1000000>;
-> +		clocks = <&mhdp_clock>;
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +				vga_bridge_input: endpoint {
-> +					remote-endpoint = <&xxx_dpi_output>;
-> +				};
-> +			};
-> +
-> +			port at 1 {
-> +				reg = <1>;
-> +				vga_bridge_output: endpoint {
-> +					remote-endpoint = <&xxx_vga_connector_input>;
+pud_sect() checks that the bottom two bits of the pud are 0b01.
+pud_bad() is true when bit 1 is 0, which is the case with a section
+mapping.
 
-vga?
-
-> +				};
-> +			};
-> +		};
-> +	};
-> -- 
-> 2.17.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Catalin
