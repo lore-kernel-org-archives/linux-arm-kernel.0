@@ -1,41 +1,36 @@
-From: vincenzo.frascino@arm.com (Vincenzo Frascino@Foss)
-Date: Wed, 25 Jul 2018 14:44:10 +0100
-Subject: [PATCH v4 13/17] khwasan: add hooks implementation
-In-Reply-To: <a2a93370d43ec85b02abaf8d007a15b464212221.1530018818.git.andreyknvl@google.com>
-References: <cover.1530018818.git.andreyknvl@google.com>
- <a2a93370d43ec85b02abaf8d007a15b464212221.1530018818.git.andreyknvl@google.com>
-Message-ID: <09cb5553-d84a-0e62-5174-315c14b88833@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Jul 2018 14:45:10 +0100
+Subject: [PATCH 0/2] Don't use SIGMINSTKSZ when enforcing alternative signal
+ stack size for compat tasks
+Message-ID: <1532526312-26993-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/26/2018 02:15 PM, Andrey Konovalov wrote:
+Hi all,
 
-> @@ -325,18 +341,41 @@ void kasan_init_slab_obj(struct kmem_cache *cache, const void *object)
->   
->   void *kasan_slab_alloc(struct kmem_cache *cache, void *object, gfp_t flags)
->   {
-> -	return kasan_kmalloc(cache, object, cache->object_size, flags);
-> +	object = kasan_kmalloc(cache, object, cache->object_size, flags);
-> +	if (IS_ENABLED(CONFIG_KASAN_HW) && unlikely(cache->ctor)) {
-> +		/*
-> +		 * Cache constructor might use object's pointer value to
-> +		 * initialize some of its fields.
-> +		 */
-> +		cache->ctor(object);
->
-This seams breaking the kmem_cache_create() contract: "The @ctor is run 
-when new pages are allocated by the cache." 
-(https://elixir.bootlin.com/linux/v3.7/source/mm/slab_common.c#L83)
+The Debian folks have observed a failure in the 32-bit arm glibc testsuite
+when running under a 64-bit kernel. They tracked this down to sigaltstack(2)
+enforcing the alternative signal stack to be at least SIGMINSTKSZ bytes,
+which is higher for native arm64 tasks than compat 32-bit tasks.
 
-Since there might be preexisting code relying on it, this could lead to 
-global side effects. Did you verify that this is not the case?
+These patches resolve the issue by allowing an architecture to define
+COMPAT_SIGMINSTKSZ for compat tasks, which is then used by the sigaltstack
+checking code.
 
-Another concern is performance related if we consider this solution 
-suitable for "near-production", since with the current implementation 
-you call the ctor (where present) on an object multiple times and this 
-ends up memsetting and repopulating the memory every time (i.e. inode.c: 
-inode_init_once). Do you know what is the performance impact?
+Feedback welcome,
+
+Will
+
+--->8
+
+Will Deacon (2):
+  signal: Introduce COMPAT_SIGMINSTKSZ for use in compat_sys_sigaltstack
+  arm64: compat: Provide definition for COMPAT_SIGMINSTKSZ
+
+ arch/arm64/include/asm/compat.h |  1 +
+ include/linux/compat.h          |  3 +++
+ kernel/signal.c                 | 14 +++++++++-----
+ 3 files changed, 13 insertions(+), 5 deletions(-)
 
 -- 
-Regards,
-Vincenzo
+2.1.4
