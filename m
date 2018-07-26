@@ -1,38 +1,72 @@
-From: deller@gmx.de (Helge Deller)
-Date: Thu, 26 Jul 2018 23:08:13 +0200
-Subject: [PATCH v4 00/11] hugetlb: Factorize hugetlb architecture
- primitives
-In-Reply-To: <6ec7c5dc-feb1-86ff-b7d9-7794c92eaf0f@ghiti.fr>
-References: <20180705110716.3919-1-alex@ghiti.fr>
- <20180709141621.GD22297@dhcp22.suse.cz>
- <2173685f-7f85-7acb-4685-2383210c5fa2@ghiti.fr>
- <87d0vehx16.fsf@concordia.ellerman.id.au>
- <67aba0f0-c0d4-b06f-5fbc-f4d113ce5033@ghiti.fr>
- <20180726125940.GA15033@ls3530>
- <de188e2f-99ab-53fa-20df-4fec00a935e9@ghiti.fr>
- <6ec7c5dc-feb1-86ff-b7d9-7794c92eaf0f@ghiti.fr>
-Message-ID: <91e66af2-9f59-624e-6839-eeadb47b9bee@gmx.de>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Thu, 26 Jul 2018 14:14:43 -0700
+Subject: [PATCH v3 00/23] Add multi-channel support to Armada thermal
+ driver
+In-Reply-To: <1532570441.2358.27.camel@intel.com>
+References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
+ <20180718172849.30b7cec0@xps13> <20180725095222.054f1e80@xps13>
+ <1532570441.2358.27.camel@intel.com>
+Message-ID: <20180726211442.GB3487@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+Hello,
 
-On 26.07.2018 21:13, Alex Ghiti wrote:
-> $ make ARCH=parisc O=build_parisc generic-64bit_defconfig
-> $ PATH=/home/alex/wip/toolchain/gcc-8.1.0-nolibc/hppa64-linux/bin:$PATH make ARCH=parisc CROSS_COMPILE=hppa64-linux-
+On Thu, Jul 26, 2018 at 10:00:41AM +0800, Zhang Rui wrote:
+> On ?, 2018-07-25 at 09:52 +0200, Miquel Raynal wrote:
+> > Hi Eduardo, Zhang,
+> > 
+> > Miquel Raynal <miquel.raynal@bootlin.com> wrote on Wed, 18 Jul 2018
+> > 17:28:49 +0200:
+> > 
+> > > 
+> > > Hi Eduardo,
+> > > 
+> > > Miquel Raynal <miquel.raynal@bootlin.com> wrote on Mon, 16 Jul 2018
+> > > 16:41:43 +0200:
+> > > 
+> > > > 
+> > > > The only capability of the Armada thermal driver is currently
+> > > > just to
+> > > > read one sensor (the default one) per AP and one per CP.
+> > > > Actually,
+> > > > there is one sensor per core in the AP806 plus one sensor in the
+> > > > thermal IP itself. The CP110 just features one thermal sensor in
+> > > > its
+> > > > own thermal IP.
+> > > > 
+> > > > This series first improves the readability of this driver, then
+> > > > adds
+> > > > support for multi-channel thermal IPs. The bindings and the
+> > > > device-trees are updated accordingly.
+> > > > 
+> > > > Thank you,
+> > > > Miqu?l??
+> > > I know I sent this series on monday but there was almost no change
+> > > on
+> > > it (see below), do you think you will have the time to look at it
+> > > before it's too late for the merge window?
+> > I know a little bit what it is to be on the maintainer side of a
+> > subsystem but these changes are laying since April, 21st and I really
+> > expect to get them merged. Zhang, as Eduardo seems to be overloaded
+> > this release, could you please take the series?
+> > 
+> > Of course if there are things to address I'll be happy to do so.
+> > 
+> I had a sync with Eduardo during last merge window, and we agreed to
+> send separate git pull requests to Linus since this release and see how
+> it works.
+> This means that all the soc thermal driver patches should go to
+> Eduardo' tree and then Linus' tree directly.
 > 
->> ...
->> ?LD????? vmlinux.o
->> ?MODPOST vmlinux.o
->> hppa64-linux-ld: init/main.o(.text+0x98): cannot reach strreplace
->> init/main.o: In function `initcall_blacklisted':
->> init/.tmp_main.o:(.text+0x98): relocation truncated to fit: R_PARISC_PCREL22F against symbol `strreplace' defined in .text section in lib/string.o
->> hppa64-linux-ld: init/main.o(.text+0xbc): cannot reach strcmp
+> Anyway, let's ping Eduardo and see if he can review/take the patches.
 
-In order to be able to link vmlinux, we need to enable 
-CONFIG_MLONGCALLS=y in the defconfig.
+Sorry fellows, but I was off camping in a place with no electricity/no
+internet. I looked at this series before, and I do not remember anything
+that could block it to go. Let me restart on working on it.
 
-Nevertheless, I see some modversion issues too which I still need 
-to analyze (but that's a completely off-topic issue here).
-
-Helge
+> 
+> thanks,
+> rui
+> > Thanks,
+> > Miqu?l
