@@ -1,73 +1,54 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 26 Jul 2018 14:00:49 +0930
-Subject: [GIT PULL] ARM: aspeed: dts changes for 4.19
-Message-ID: <CACPK8Xeu2JAVBTyiUtyso1egbe3X+r5a--Cx30YDJV-JmK==DQ@mail.gmail.com>
+Date: Thu, 26 Jul 2018 14:03:11 +0930
+Subject: [GIT PULL] ARM: aspeed: defconfig changes for 4.19
+Message-ID: <CACPK8XdcAANiSwsvCnu249W8QcFfjP616ce-YOW=UohgpTHtVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello ARM Maintainers,
 
-Here are the ASPEED device tree updates for 4.19. No new machines this time
-around, but we now have some FSI (the bus between the BMC and the PowerPC host)
-descriptions, and USB support.
+Here are the ASPEED defconfig updates for 4.19. It's been a while since I sent
+one, so this contains a lot of goodies.
 
-The following changes since commit 7daf201d7fe8334e2d2364d4e8ed3394ec9af819:
+The following changes since commit 021c91791a5e7e85c567452f1be3e4c2c6cb6063:
 
-  Linux 4.18-rc2 (2018-06-24 20:54:29 +0800)
+  Linux 4.18-rc3 (2018-07-01 16:04:53 -0700)
 
 are available in the Git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
-tags/aspeed-4.19-devicetree
+tags/aspeed-4.19-defconfig
 
-for you to fetch changes up to 19617a35b08379b3e6da0a4ee0d2d62645bf1b9e:
+for you to fetch changes up to 90708adcd3ead258d4c2185da6acbe748eb0cc32:
 
-  ARM: dts: aspeed: Add Power9 CFAM description (2018-07-25 17:43:36 +0930)
-
-----------------------------------------------------------------
-ASPEED device tree updates for 4.19
-
- - New support for the ASPEED USB host controller and USB vhub (device)
- support
-
- - Descriptions for the FSI bus and hardware inside the Power8/Power9
- processors that are accessed over this bus. This includes the ColdFire
- processor that is part of the ASPEED SoC and is used to offload the FSI
- bit-banging
-
- - Small fixes:
-  * pwm/tach clock
-  * Romulus framebuffer location
+  ARM: config: aspeed: Enable new FSI drivers (2018-07-26 13:27:27 +0930)
 
 ----------------------------------------------------------------
-Benjamin Herrenschmidt (11):
-      ARM: dts: aspeed: Add G4 USB pinmux
-      ARM: dts: aspeed: Add G5 USB host pinmux
-      ARM: dts: aspeed: Add G4 USB Virtual Hub
-      ARM: dts: aspeed: Add G5 USB Virtual Hub
-      ARM: dts: aspeed: Enable vhub on port A of AST2500 EVB
-      ARM: dts: aspeed: Fix Romulus VGA frame buffer
-      ARM: dts: aspeed: Add coprocessor interrupt controller
-      ARM: dts: aspeed: Romulus system can use coprocessor for FSI
-      ARM: dts: aspeed: Palmetto system can use coprocessor for FSI
-      ARM: dts: aspeed: Add Power8 CFAM description for use by Palmetto
-      ARM: dts: aspeed: Add Power9 CFAM description
+ASPEED defconfig updates for 4.19
 
-Lei YU (1):
-      ARM: dts: aspeed: Use 24MHz fixed clock for pwm
+ - Refresh the multi ARMv5 defconfig, and add AST2400 related drivers
 
- arch/arm/boot/dts/aspeed-ast2500-evb.dts         |  14 +--
- arch/arm/boot/dts/aspeed-bmc-opp-lanyang.dts     |   1 +
- arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts    |  38 +++++++--
- arch/arm/boot/dts/aspeed-bmc-opp-romulus.dts     |  17 +++-
- arch/arm/boot/dts/aspeed-bmc-opp-witherspoon.dts |   2 +
- arch/arm/boot/dts/aspeed-bmc-opp-zaius.dts       |   2 +
- arch/arm/boot/dts/aspeed-g4.dtsi                 |  26 +++++-
- arch/arm/boot/dts/aspeed-g5.dtsi                 |  34 +++++++-
- arch/arm/boot/dts/ibm-power8-cfam.dtsi           |  31 +++++++
- arch/arm/boot/dts/ibm-power9-cfam.dtsi           | 104 +++++++++++++++++++++++
- arch/arm/boot/dts/ibm-power9-dual.dtsi           |  57 +++++++++++++
- 11 files changed, 305 insertions(+), 21 deletions(-)
- create mode 100644 arch/arm/boot/dts/ibm-power8-cfam.dtsi
- create mode 100644 arch/arm/boot/dts/ibm-power9-cfam.dtsi
- create mode 100644 arch/arm/boot/dts/ibm-power9-dual.dtsi
+ - Enable new ASPEED hardware that we've merged in the past few cycles.
+ There are about 14 different drivers since we last refreshed the
+ defconfig
+
+ - Turn on features required by systemd, and other bits of OpenBMC
+ userspace
+
+ - Enable security related options
+
+----------------------------------------------------------------
+Benjamin Herrenschmidt (2):
+      arm: configs: Add USB gadget to Aspeed G4 defconfig
+      arm: configs: Add USB gadget to Aspeed G5 defconfig
+
+Joel Stanley (4):
+      ARM: config: aspeed: Update defconfig
+      ARM: config: multi_v5: Refresh configuration
+      ARM: config: multi_v5: Enable ASPEED drivers
+      ARM: config: aspeed: Enable new FSI drivers
+
+ arch/arm/configs/aspeed_g4_defconfig | 113 ++++++++++++++++++++++++++++-----
+ arch/arm/configs/aspeed_g5_defconfig | 117 +++++++++++++++++++++++++++++------
+ arch/arm/configs/multi_v5_defconfig  |  30 +++++----
+ 3 files changed, 213 insertions(+), 47 deletions(-)
