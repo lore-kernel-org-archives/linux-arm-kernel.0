@@ -1,50 +1,68 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 26 Jul 2018 14:13:48 +0000
-Subject: [PATCH v7 3/6] dt-bindings: mailbox: imx-mu: add generic MU
- channel support
-In-Reply-To: <CABb+yY2XCStT3oRWjPVTT10KY164nhJyGGn3tvjquXM_Xca4Yw@mail.gmail.com>
-References: <20180726065331.6186-1-o.rempel@pengutronix.de>
- <20180726065331.6186-4-o.rempel@pengutronix.de>
- <CABb+yY0kVFvQRBrU4j9t=_JcSUkcXMMSK5u=XSufM6XcmKiv-g@mail.gmail.com>
- <AM0PR04MB42116C756EC78AD12EB254D6802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <CABb+yY2XCStT3oRWjPVTT10KY164nhJyGGn3tvjquXM_Xca4Yw@mail.gmail.com>
-Message-ID: <AM0PR04MB4211EA909389F2FE12A0BCCD802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 26 Jul 2018 16:13:58 +0200
+Subject: [PATCH] arm64: dts: meson: Switch simple-mfd and syscon order
+Message-ID: <1532614438-7207-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
-> Sent: Thursday, July 26, 2018 9:50 PM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-> Cc: Oleksij Rempel <o.rempel@pengutronix.de>; Shawn Guo
-> <shawnguo@kernel.org>; Fabio Estevam <fabio.estevam@nxp.com>; Rob
-> Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
-> Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>; , Sascha Hauer
-> <kernel@pengutronix.de>; , linux-arm-kernel at lists.infradead.org, linux-
-> mediatek at lists.infradead.org, srv_heupstream <linux-arm-
-> kernel at lists.infradead.org>; Devicetree List <devicetree@vger.kernel.org>;
-> dl-linux-imx <linux-imx@nxp.com>
-> Subject: Re: [PATCH v7 3/6] dt-bindings: mailbox: imx-mu: add generic MU
-> channel support
-> 
-> On Thu, Jul 26, 2018 at 5:21 PM, A.s. Dong <aisheng.dong@nxp.com> wrote:
-> >
-> > The reference manual is at here: (Chapter 42 Messaging Unit (MU)
-> >
-> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fw
-> ww.nxp.com%2Fdocs%2Fen%2Freference-
-> manual%2FIMX6ULRM.pdf&amp;data=02%7C01%7Caisheng.dong%40nxp.co
-> m%7Ca1e872436611497795bb08d5f2fe9feb%7C686ea1d3bc2b4c6fa92cd99c5c
-> 301635%7C0%7C0%7C636682097774333065&amp;sdata=Zqf9kgJrutPtQE8OP
-> %2BDu1%2BvULXWSQcgHbszwIWkTNS0%3D&amp;reserved=0
-> >
-> You seem to have shared a wrong link. It has
->        Chapter 42  Synchronous Audio Interface (SAI)
-> 
-> and finding "Messaging Unit" shows no result.
+The order between "syscon" and "simple-mfd" is important because in these
+particular cases, the node needs to be first a "simple-mfd" to expose
+it's sub-nodes, and later on a "syscon" to permit other nodes to access
+this register space through the "syscon" mechanism.
 
-Sorry, it should be:
-https://www.nxp.com/docs/en/reference-manual/IMX6SXRM.pdf
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+This also has a consequence for U-Boot since the U-Boot DM is much simpler
+and can only associate a single device to a node, thus here we want these
+nodes to be an mfd bus to be able to probe the sub-nodes.
 
-Regards
-Dong Aisheng
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi  | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index 6adc8d3..3f0de9d 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -342,7 +342,7 @@
+ 			ranges = <0x0 0x0 0x0 0xff63c000 0x0 0x1c00>;
+ 
+ 			sysctrl: system-controller at 0 {
+-				compatible = "amlogic,meson-axg-hhi-sysctrl", "syscon", "simple-mfd";
++				compatible = "amlogic,meson-axg-hhi-sysctrl", "simple-mfd", "syscon";
+ 				reg = <0 0 0 0x400>;
+ 
+ 				clkc: clock-controller {
+@@ -1180,7 +1180,7 @@
+ 			ranges = <0x0 0x0 0x0 0xff800000 0x0 0x100000>;
+ 
+ 			sysctrl_AO: sys-ctrl at 0 {
+-				compatible = "amlogic,meson-axg-ao-sysctrl", "syscon", "simple-mfd";
++				compatible = "amlogic,meson-axg-ao-sysctrl", "simple-mfd", "syscon";
+ 				reg =  <0x0 0x0 0x0 0x100>;
+ 
+ 				clkc_AO: clock-controller {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+index b8dc4db..d88699f 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+@@ -344,7 +344,7 @@
+ 			ranges = <0x0 0x0 0x0 0xc8100000 0x0 0x100000>;
+ 
+ 			sysctrl_AO: sys-ctrl at 0 {
+-				compatible = "amlogic,meson-gx-ao-sysctrl", "syscon", "simple-mfd";
++				compatible = "amlogic,meson-gx-ao-sysctrl", "simple-mfd", "syscon";
+ 				reg =  <0x0 0x0 0x0 0x100>;
+ 
+ 				pwrc_vpu: power-controller-vpu {
+@@ -431,7 +431,7 @@
+ 			ranges = <0x0 0x0 0x0 0xc883c000 0x0 0x2000>;
+ 
+ 			sysctrl: system-controller at 0 {
+-				compatible = "amlogic,meson-gx-hhi-sysctrl", "syscon", "simple-mfd";
++				compatible = "amlogic,meson-gx-hhi-sysctrl", "simple-mfd", "syscon";
+ 				reg = <0 0 0 0x400>;
+ 			};
+ 
+-- 
+2.7.4
