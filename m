@@ -1,121 +1,151 @@
-From: alex@ghiti.fr (Alex Ghiti)
-Date: Thu, 26 Jul 2018 05:41:03 +0000
-Subject: [PATCH v4 00/11] hugetlb: Factorize hugetlb architecture
- primitives
-In-Reply-To: <87d0vehx16.fsf@concordia.ellerman.id.au>
-References: <20180705110716.3919-1-alex@ghiti.fr>
- <20180709141621.GD22297@dhcp22.suse.cz>
- <2173685f-7f85-7acb-4685-2383210c5fa2@ghiti.fr>
- <87d0vehx16.fsf@concordia.ellerman.id.au>
-Message-ID: <67aba0f0-c0d4-b06f-5fbc-f4d113ce5033@ghiti.fr>
+From: xiaolei.li@mediatek.com (xiaolei li)
+Date: Thu, 26 Jul 2018 14:06:41 +0800
+Subject: [PATCH v4 14/35] mtd: rawnand: mtk: convert driver to nand_scan()
+In-Reply-To: <20180721191004.26fc9290@bbrezillon>
+References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
+ <20180720151527.16038-15-miquel.raynal@bootlin.com>
+ <20180721191004.26fc9290@bbrezillon>
+Message-ID: <1532585201.10234.9.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On Sat, 2018-07-21 at 19:10 +0200, Boris Brezillon wrote:
+> On Fri, 20 Jul 2018 17:15:06 +0200
+> Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+> 
+> > Two helpers have been added to the core to make ECC-related
+> > configuration between the detection phase and the final NAND scan. Use
+> > these hooks and convert the driver to just use nand_scan() instead of
+> > both nand_scan_ident() and nand_scan_tail().
+> > 
+> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > ---
+> >  drivers/mtd/nand/raw/mtk_nand.c | 75 ++++++++++++++++++++++++-----------------
+> >  1 file changed, 44 insertions(+), 31 deletions(-)
+> > 
+> > diff --git a/drivers/mtd/nand/raw/mtk_nand.c b/drivers/mtd/nand/raw/mtk_nand.c
+> > index 7bc6be3f6ec0..967418f945ea 100644
+> > --- a/drivers/mtd/nand/raw/mtk_nand.c
+> > +++ b/drivers/mtd/nand/raw/mtk_nand.c
+> > @@ -1250,13 +1250,54 @@ static int mtk_nfc_ecc_init(struct device *dev, struct mtd_info *mtd)
+> >  	return 0;
+> >  }
+> >  
+> > +static int mtk_nfc_attach_chip(struct nand_chip *chip)
+> > +{
+> > +	struct mtd_info *mtd = nand_to_mtd(chip);
+> > +	struct device *dev = mtd->dev.parent;
+> > +	struct mtk_nfc *nfc = nand_get_controller_data(chip);
+> > +	struct mtk_nfc_nand_chip *mtk_nand = to_mtk_nand(chip);
+> > +	int len;
+> > +	int ret;
+> > +
+> > +	if (chip->options & NAND_BUSWIDTH_16) {
+> > +		dev_err(dev, "16bits buswidth not supported");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	/* store bbt magic in page, cause OOB is not protected */
+> > +	if (chip->bbt_options & NAND_BBT_USE_FLASH)
+> > +		chip->bbt_options |= NAND_BBT_NO_OOB;
+> > +
+> > +	ret = mtk_nfc_ecc_init(dev, mtd);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	ret = mtk_nfc_set_spare_per_sector(&mtk_nand->spare_per_sector, mtd);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	mtk_nfc_set_fdm(&mtk_nand->fdm, mtd);
+> > +	mtk_nfc_set_bad_mark_ctl(&mtk_nand->bad_mark, mtd);
+> > +
+> > +	len = mtd->writesize + mtd->oobsize;
+> > +	nfc->buffer = devm_kzalloc(dev, len, GFP_KERNEL);
+> > +	if (!nfc->buffer)
+> > +		return  -ENOMEM;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct nand_controller_ops mtk_nfc_controller_ops = {
+> > +	.attach_chip = mtk_nfc_attach_chip,
+> > +};
+> > +
+> >  static int mtk_nfc_nand_chip_init(struct device *dev, struct mtk_nfc *nfc,
+> >  				  struct device_node *np)
+> >  {
+> >  	struct mtk_nfc_nand_chip *chip;
+> >  	struct nand_chip *nand;
+> >  	struct mtd_info *mtd;
+> > -	int nsels, len;
+> > +	int nsels;
+> >  	u32 tmp;
+> >  	int ret;
+> >  	int i;
+> > @@ -1287,6 +1328,7 @@ static int mtk_nfc_nand_chip_init(struct device *dev, struct mtk_nfc *nfc,
+> >  
+> >  	nand = &chip->nand;
+> >  	nand->controller = &nfc->controller;
+> > +	nand->controller->ops = &mtk_nfc_controller_ops;
+> 
+> Just like for the marvell driver, this assignment should be moved here
+> [1]. 
+Agree to this.
 
-This is the result of the build for all arches tackled in this series 
-rebased on 4.18-rc6:
+> Also, it looks like this driver is open-coding
+> nand_controller_init(), probably something we should fix (in a separate
+> patch).
+May I ask if you mean driver should use nand_hw_control_init helper to
+do controller_init?
 
-arm:
- ??????? versatile_defconfig: without huge page OK
- ??????? keystone_defconfig: with huge page OK
-arm64:
- ??????? defconfig: with huge page OK
-ia64:
- ??????? generic_defconfig: with huge page OK
-mips:
- ??????? Paul Burton tested cavium octeon with huge page OK
-parisc:
- ??????? generic-64bit_defconfig: with huge page does not link
- ??????? generic-64bit_defconfig: without huge page does not link
- ??????? BUT not because of this series, any feedback welcome.
-powerpc:
- ??????? ppc64_defconfig: without huge page OK
- ??????? ppc64_defconfig: with huge page OK
-sh:
- ??????? dreamcast_defconfig: with huge page OK
-sparc:
- ??????? sparc32_defconfig: without huge page OK
-sparc64:
- ??????? sparc64_defconfig: with huge page OK
-x86:
- ??????? with huge page OK
+Thanks,
+Xiaolei
 
-Alex
-
-On 07/23/2018 02:00 PM, Michael Ellerman wrote:
-> Alex Ghiti <alex@ghiti.fr> writes:
->
->> Does anyone have any suggestion about those patches ?
-> Cross compiling it for some non-x86 arches would be a good start :)
->
-> There are cross compilers available here:
->
->    https://mirrors.edge.kernel.org/pub/tools/crosstool/
->
->
-> cheers
->
->> On 07/09/2018 02:16 PM, Michal Hocko wrote:
->>> [CC hugetlb guys - http://lkml.kernel.org/r/20180705110716.3919-1-alex at ghiti.fr]
->>>
->>> On Thu 05-07-18 11:07:05, Alexandre Ghiti wrote:
->>>> In order to reduce copy/paste of functions across architectures and then
->>>> make riscv hugetlb port (and future ports) simpler and smaller, this
->>>> patchset intends to factorize the numerous hugetlb primitives that are
->>>> defined across all the architectures.
->>>>
->>>> Except for prepare_hugepage_range, this patchset moves the versions that
->>>> are just pass-through to standard pte primitives into
->>>> asm-generic/hugetlb.h by using the same #ifdef semantic that can be
->>>> found in asm-generic/pgtable.h, i.e. __HAVE_ARCH_***.
->>>>
->>>> s390 architecture has not been tackled in this serie since it does not
->>>> use asm-generic/hugetlb.h at all.
->>>> powerpc could be factorized a bit more (cf huge_ptep_set_wrprotect).
->>>>
->>>> This patchset has been compiled on x86 only.
->>>>
->>>> Changelog:
->>>>
->>>> v4:
->>>>     Fix powerpc build error due to misplacing of #include
->>>>     <asm-generic/hugetlb.h> outside of #ifdef CONFIG_HUGETLB_PAGE, as
->>>>     pointed by Christophe Leroy.
->>>>
->>>> v1, v2, v3:
->>>>     Same version, just problems with email provider and misuse of
->>>>     --batch-size option of git send-email
->>>>
->>>> Alexandre Ghiti (11):
->>>>     hugetlb: Harmonize hugetlb.h arch specific defines with pgtable.h
->>>>     hugetlb: Introduce generic version of hugetlb_free_pgd_range
->>>>     hugetlb: Introduce generic version of set_huge_pte_at
->>>>     hugetlb: Introduce generic version of huge_ptep_get_and_clear
->>>>     hugetlb: Introduce generic version of huge_ptep_clear_flush
->>>>     hugetlb: Introduce generic version of huge_pte_none
->>>>     hugetlb: Introduce generic version of huge_pte_wrprotect
->>>>     hugetlb: Introduce generic version of prepare_hugepage_range
->>>>     hugetlb: Introduce generic version of huge_ptep_set_wrprotect
->>>>     hugetlb: Introduce generic version of huge_ptep_set_access_flags
->>>>     hugetlb: Introduce generic version of huge_ptep_get
->>>>
->>>>    arch/arm/include/asm/hugetlb-3level.h        | 32 +---------
->>>>    arch/arm/include/asm/hugetlb.h               | 33 +----------
->>>>    arch/arm64/include/asm/hugetlb.h             | 39 +++---------
->>>>    arch/ia64/include/asm/hugetlb.h              | 47 ++-------------
->>>>    arch/mips/include/asm/hugetlb.h              | 40 +++----------
->>>>    arch/parisc/include/asm/hugetlb.h            | 33 +++--------
->>>>    arch/powerpc/include/asm/book3s/32/pgtable.h |  2 +
->>>>    arch/powerpc/include/asm/book3s/64/pgtable.h |  1 +
->>>>    arch/powerpc/include/asm/hugetlb.h           | 43 ++------------
->>>>    arch/powerpc/include/asm/nohash/32/pgtable.h |  2 +
->>>>    arch/powerpc/include/asm/nohash/64/pgtable.h |  1 +
->>>>    arch/sh/include/asm/hugetlb.h                | 54 ++---------------
->>>>    arch/sparc/include/asm/hugetlb.h             | 40 +++----------
->>>>    arch/x86/include/asm/hugetlb.h               | 72 +----------------------
->>>>    include/asm-generic/hugetlb.h                | 88 +++++++++++++++++++++++++++-
->>>>    15 files changed, 143 insertions(+), 384 deletions(-)
->>>>
->>>> -- 
->>>> 2.16.2
+> 
+> With this fixed:
+> 
+> Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
+> 
+> >  
+> >  	nand_set_flash_node(nand, np);
+> >  	nand_set_controller_data(nand, nfc);
+> > @@ -1324,36 +1366,7 @@ static int mtk_nfc_nand_chip_init(struct device *dev, struct mtk_nfc *nfc,
+> >  
+> >  	mtk_nfc_hw_init(nfc);
+> >  
+> > -	ret = nand_scan_ident(mtd, nsels, NULL);
+> > -	if (ret)
+> > -		return ret;
+> > -
+> > -	/* store bbt magic in page, cause OOB is not protected */
+> > -	if (nand->bbt_options & NAND_BBT_USE_FLASH)
+> > -		nand->bbt_options |= NAND_BBT_NO_OOB;
+> > -
+> > -	ret = mtk_nfc_ecc_init(dev, mtd);
+> > -	if (ret)
+> > -		return -EINVAL;
+> > -
+> > -	if (nand->options & NAND_BUSWIDTH_16) {
+> > -		dev_err(dev, "16bits buswidth not supported");
+> > -		return -EINVAL;
+> > -	}
+> > -
+> > -	ret = mtk_nfc_set_spare_per_sector(&chip->spare_per_sector, mtd);
+> > -	if (ret)
+> > -		return ret;
+> > -
+> > -	mtk_nfc_set_fdm(&chip->fdm, mtd);
+> > -	mtk_nfc_set_bad_mark_ctl(&chip->bad_mark, mtd);
+> > -
+> > -	len = mtd->writesize + mtd->oobsize;
+> > -	nfc->buffer = devm_kzalloc(dev, len, GFP_KERNEL);
+> > -	if (!nfc->buffer)
+> > -		return  -ENOMEM;
+> > -
+> > -	ret = nand_scan_tail(mtd);
+> > +	ret = nand_scan(mtd, nsels);
+> >  	if (ret)
+> >  		return ret;
+> >  
+> 
