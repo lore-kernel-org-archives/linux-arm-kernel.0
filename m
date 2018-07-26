@@ -1,50 +1,50 @@
-From: arun.parameswaran@broadcom.com (Arun Parameswaran)
-Date: Thu, 26 Jul 2018 12:51:01 -0700
-Subject: [PATCH 7/7] net: phy: Add pm support for scan ctrl register to
- bcm mdio mux
-In-Reply-To: <20180726193634.GM10686@lunn.ch>
-References: <1532630184-29450-1-git-send-email-arun.parameswaran@broadcom.com>
- <1532630184-29450-8-git-send-email-arun.parameswaran@broadcom.com>
- <20180726192050.GJ10686@lunn.ch>
- <170a4731-b091-aef4-2d66-2950114e41fc@broadcom.com>
- <20180726193634.GM10686@lunn.ch>
-Message-ID: <f2521267-c774-6a56-ac5f-f777346b779c@broadcom.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 26 Jul 2018 12:51:27 -0700
+Subject: [GIT PULL] ARM: aspeed: dts changes for 4.19
+In-Reply-To: <CACPK8Xeu2JAVBTyiUtyso1egbe3X+r5a--Cx30YDJV-JmK==DQ@mail.gmail.com>
+References: <CACPK8Xeu2JAVBTyiUtyso1egbe3X+r5a--Cx30YDJV-JmK==DQ@mail.gmail.com>
+Message-ID: <20180726195127.jukxvbydddlwui4k@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi,
 
-On 18-07-26 12:36 PM, Andrew Lunn wrote:
-> On Thu, Jul 26, 2018 at 12:33:05PM -0700, Arun Parameswaran wrote:
->>
->>
->> On 18-07-26 12:20 PM, Andrew Lunn wrote:
->>> On Thu, Jul 26, 2018 at 11:36:24AM -0700, Arun Parameswaran wrote:
->>>> Add support for saving and restoring the 'scan control' register
->>>> in the Broadcom iProc mdio mux driver.
->>>
->>> Hi Arun
->>>
->>> I don't see anything setting this register. So why is it necessary to
->>> save it over suspend/resume?
->>>
->>>      Andrew
->>>
->> Hi Andrew
->> In the Omega SoC (only), this register was defaulted incorrectly (to use
->> a test mode) by the hardware. So we added the setup of the register to
->> the early bootloader (ATF).
->>
->> We still need to restore this register while resuming from sleep.
+On Thu, Jul 26, 2018 at 02:00:49PM +0930, Joel Stanley wrote:
+> Hello ARM Maintainers,
 > 
-> Hi Arun
+> Here are the ASPEED device tree updates for 4.19. No new machines this time
+> around, but we now have some FSI (the bus between the BMC and the PowerPC host)
+> descriptions, and USB support.
 > 
-> It is better to not rely on the bootloader and have the driver do it.
-> That makes it easier for people to swap to alternative bootloaders.
+> The following changes since commit 7daf201d7fe8334e2d2364d4e8ed3394ec9af819:
 > 
->      Andrew
+>   Linux 4.18-rc2 (2018-06-24 20:54:29 +0800)
 > 
-I will make the change to set the register in the driver.
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
+> tags/aspeed-4.19-devicetree
+> 
+> for you to fetch changes up to 19617a35b08379b3e6da0a4ee0d2d62645bf1b9e:
+> 
+>   ARM: dts: aspeed: Add Power9 CFAM description (2018-07-25 17:43:36 +0930)
+> 
+> ----------------------------------------------------------------
+> ASPEED device tree updates for 4.19
+> 
+>  - New support for the ASPEED USB host controller and USB vhub (device)
+>  support
+> 
+>  - Descriptions for the FSI bus and hardware inside the Power8/Power9
+>  processors that are accessed over this bus. This includes the ColdFire
+>  processor that is part of the ASPEED SoC and is used to offload the FSI
+>  bit-banging
 
-Thanks
-Arun
+I had some feedback on one of these patches, it should be reworked before we
+merge it. See separate email as reply to the actual patch.
+
+If you prefer, you can send a branch without that contents for merging now, so
+the rest of it isn't held up.
+
+
+-Olof
