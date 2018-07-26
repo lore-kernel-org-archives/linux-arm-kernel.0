@@ -1,90 +1,77 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 26 Jul 2018 12:15:24 +0200
-Subject: [PATCH 1/7] clocksource/drivers: Set clockevent device cpumask to
- cpu_possible_mask
-In-Reply-To: <014f94f9-54d4-1ee0-aa89-67ca5d221989@free.fr>
+Date: Thu, 26 Jul 2018 12:15:25 +0200
+Subject: [PATCH 2/7] clocksource/drivers/timer-mediatek: Add system timer
+ bindings
+In-Reply-To: <1532600131-28168-1-git-send-email-daniel.lezcano@linaro.org>
 References: <014f94f9-54d4-1ee0-aa89-67ca5d221989@free.fr>
-Message-ID: <1532600131-28168-1-git-send-email-daniel.lezcano@linaro.org>
+ <1532600131-28168-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1532600131-28168-2-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep Holla <sudeep.holla@arm.com>
+From: Stanley Chu <stanley.chu@mediatek.com>
 
-Currently, quite a few clockevent devices have cpumask set to
-cpu_all_mask which should be fine. However, cpu_possible_mask is more
-accurate and if there are any other clockevent devices in the system
-which have cpumask set to cpu_possible_mask, then having cpu_all_mask
-may result in issues (mostly boot hang with forever loops in
-clockevents_notify_released).
+This patch adds bindings of new "System Timer" on Mediatek SoCs.
 
-So, lets replace all the clockevent device cpu_all_mask to
-cpu_possible_mask in order to prevent above mentioned possible issue.
+Remove RTC clock in the same time because it is not used by
+both "General Purpose Timer" and "System Timer" now.
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Jonathan Hunter <jonathanh@nvidia.com>
-Cc: Santosh Shilimkar <ssantosh@kernel.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Stanley Chu <stanley.chu@mediatek.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/tegra20_timer.c   | 2 +-
- drivers/clocksource/timer-atcpit100.c | 2 +-
- drivers/clocksource/timer-keystone.c  | 2 +-
- drivers/clocksource/zevio-timer.c     | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+ .../bindings/timer/mediatek,mtk-timer.txt          | 34 +++++++++++++---------
+ 1 file changed, 20 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
-index c337a81..dabf0a1 100644
---- a/drivers/clocksource/tegra20_timer.c
-+++ b/drivers/clocksource/tegra20_timer.c
-@@ -230,7 +230,7 @@ static int __init tegra20_init_timer(struct device_node *np)
- 		return ret;
- 	}
+diff --git a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+index b1fe7e9..18d4d01 100644
+--- a/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
++++ b/Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+@@ -1,19 +1,25 @@
+-Mediatek MT6577, MT6572 and MT6589 Timers
+----------------------------------------
++Mediatek Timers
++---------------
++
++Mediatek SoCs have two different timers on different platforms,
++- GPT (General Purpose Timer)
++- SYST (System Timer)
++
++The proper timer will be selected automatically by driver.
  
--	tegra_clockevent.cpumask = cpu_all_mask;
-+	tegra_clockevent.cpumask = cpu_possible_mask;
- 	tegra_clockevent.irq = tegra_timer_irq.irq;
- 	clockevents_config_and_register(&tegra_clockevent, 1000000,
- 					0x1, 0x1fffffff);
-diff --git a/drivers/clocksource/timer-atcpit100.c b/drivers/clocksource/timer-atcpit100.c
-index 5e23d7b..b4bd2f5 100644
---- a/drivers/clocksource/timer-atcpit100.c
-+++ b/drivers/clocksource/timer-atcpit100.c
-@@ -185,7 +185,7 @@ static struct timer_of to = {
- 		.set_state_oneshot = atcpit100_clkevt_set_oneshot,
- 		.tick_resume = atcpit100_clkevt_shutdown,
- 		.set_next_event = atcpit100_clkevt_next_event,
--		.cpumask = cpu_all_mask,
-+		.cpumask = cpu_possible_mask,
- 	},
+ Required properties:
+ - compatible should contain:
+-	* "mediatek,mt2701-timer" for MT2701 compatible timers
+-	* "mediatek,mt6580-timer" for MT6580 compatible timers
+-	* "mediatek,mt6589-timer" for MT6589 compatible timers
+-	* "mediatek,mt7623-timer" for MT7623 compatible timers
+-	* "mediatek,mt8127-timer" for MT8127 compatible timers
+-	* "mediatek,mt8135-timer" for MT8135 compatible timers
+-	* "mediatek,mt8173-timer" for MT8173 compatible timers
+-	* "mediatek,mt6577-timer" for MT6577 and all above compatible timers
+-- reg: Should contain location and length for timers register.
+-- clocks: Clocks driving the timer hardware. This list should include two
+-	clocks. The order is system clock and as second clock the RTC clock.
++	* "mediatek,mt2701-timer" for MT2701 compatible timers (GPT)
++	* "mediatek,mt6580-timer" for MT6580 compatible timers (GPT)
++	* "mediatek,mt6589-timer" for MT6589 compatible timers (GPT)
++	* "mediatek,mt7623-timer" for MT7623 compatible timers (GPT)
++	* "mediatek,mt8127-timer" for MT8127 compatible timers (GPT)
++	* "mediatek,mt8135-timer" for MT8135 compatible timers (GPT)
++	* "mediatek,mt8173-timer" for MT8173 compatible timers (GPT)
++	* "mediatek,mt6577-timer" for MT6577 and all above compatible timers (GPT)
++	* "mediatek,mt6765-timer" for MT6765 compatible timers (SYST)
++- reg: Should contain location and length for timer register.
++- clocks: Should contain system clock.
  
- 	.of_irq = {
-diff --git a/drivers/clocksource/timer-keystone.c b/drivers/clocksource/timer-keystone.c
-index 0eee032..f5b2eda 100644
---- a/drivers/clocksource/timer-keystone.c
-+++ b/drivers/clocksource/timer-keystone.c
-@@ -211,7 +211,7 @@ static int __init keystone_timer_init(struct device_node *np)
- 	event_dev->set_state_shutdown = keystone_shutdown;
- 	event_dev->set_state_periodic = keystone_set_periodic;
- 	event_dev->set_state_oneshot = keystone_shutdown;
--	event_dev->cpumask = cpu_all_mask;
-+	event_dev->cpumask = cpu_possible_mask;
- 	event_dev->owner = THIS_MODULE;
- 	event_dev->name = TIMER_NAME;
- 	event_dev->irq = irq;
-diff --git a/drivers/clocksource/zevio-timer.c b/drivers/clocksource/zevio-timer.c
-index a6a0338..f746893 100644
---- a/drivers/clocksource/zevio-timer.c
-+++ b/drivers/clocksource/zevio-timer.c
-@@ -162,7 +162,7 @@ static int __init zevio_timer_add(struct device_node *node)
- 		timer->clkevt.set_state_oneshot = zevio_timer_set_oneshot;
- 		timer->clkevt.tick_resume	= zevio_timer_set_oneshot;
- 		timer->clkevt.rating		= 200;
--		timer->clkevt.cpumask		= cpu_all_mask;
-+		timer->clkevt.cpumask		= cpu_possible_mask;
- 		timer->clkevt.features		= CLOCK_EVT_FEAT_ONESHOT;
- 		timer->clkevt.irq		= irqnr;
+ Examples:
  
+@@ -21,5 +27,5 @@ Examples:
+ 		compatible = "mediatek,mt6577-timer";
+ 		reg = <0x10008000 0x80>;
+ 		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>;
+-		clocks = <&system_clk>, <&rtc_clk>;
++		clocks = <&system_clk>;
+ 	};
 -- 
 2.7.4
