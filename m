@@ -1,72 +1,114 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Thu, 26 Jul 2018 11:22:16 +0200
-Subject: [PATCH v8 2/6] ARM: imx6: register pm_power_off handler if "fsl,
- pmic-stby-poweroff" is set
-In-Reply-To: <20180726092220.17250-1-o.rempel@pengutronix.de>
-References: <20180726092220.17250-1-o.rempel@pengutronix.de>
-Message-ID: <20180726092220.17250-3-o.rempel@pengutronix.de>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 26 Jul 2018 11:32:47 +0200
+Subject: [linux-sunxi] Re: [PATCH v2 06/18] arm64: dts: allwinner: a64:
+ Orange Pi Win: Add UARTs
+In-Reply-To: <71e5f296-a8f6-062c-6e55-86c8b07ed0a6@arm.com>
+References: <20180726003532.18751-1-andre.przywara@arm.com>
+ <20180726003532.18751-7-andre.przywara@arm.com>
+ <20180726073911.ualwgf3t2bboeuy5@flea>
+ <E978AF7E-4802-4429-99A2-4724EB68FFA9@aosc.io>
+ <71e5f296-a8f6-062c-6e55-86c8b07ed0a6@arm.com>
+Message-ID: <20180726093247.3hesukln2n3fhqeg@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the Freescale recommended sequences for power off with external
-PMIC is the following:
-...
-3.  SoC is programming PMIC for power off when standby is asserted.
-4.  In CCM STOP mode, Standby is asserted, PMIC gates SoC supplies.
+On Thu, Jul 26, 2018 at 09:30:14AM +0100, Andre Przywara wrote:
+> Hi,
+> 
+> On 26/07/18 08:42, Icenowy Zheng wrote:
+> > 
+> > 
+> > ? 2018?7?26? GMT+08:00 ??3:39:11, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+> >> On Thu, Jul 26, 2018 at 01:35:20AM +0100, Andre Przywara wrote:
+> >>> From: Samuel Holland <samuel@sholland.org>
+> >>>
+> >>> The Orange Pi Win exposes several UARTs on header pin, and connects
+> >> one
+> >>> to the on-board WiFi/Bluetooth chip.
+> >>> Add the pinmux definitions to the UART nodes, but keep them disabled.
+> >>>
+> >>> Signed-off-by: Samuel Holland <samuel@sholland.org>
+> >>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >>> ---
+> >>>  .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 33
+> >> ++++++++++++++++++++++
+> >>>  1 file changed, 33 insertions(+)
+> >>>
+> >>> diff --git
+> >> a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+> >> b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+> >>> index 0cadcd59edd9..10f63d0b99cb 100644
+> >>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+> >>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+> >>> @@ -54,6 +54,10 @@
+> >>>  	aliases {
+> >>>  		ethernet0 = &emac;
+> >>>  		serial0 = &uart0;
+> >>> +		serial1 = &uart1;
+> >>> +		serial2 = &uart2;
+> >>> +		serial3 = &uart3;
+> >>> +		serial4 = &uart4;
+> >>>  	};
+> >>>  
+> >>>  	chosen {
+> >>> @@ -237,12 +241,41 @@
+> >>>  	vcc-hdmi-supply = <&reg_dldo1>;
+> >>>  };
+> >>>  
+> >>> +/* On debug connector */
+> >>>  &uart0 {
+> >>>  	pinctrl-names = "default";
+> >>>  	pinctrl-0 = <&uart0_pins_a>;
+> >>>  	status = "okay";
+> >>>  };
+> >>>  
+> >>> +/* Wi-Fi/BT */
+> >>> +&uart1 {
+> >>> +	pinctrl-names = "default";
+> >>> +	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
+> >>> +	status = "okay";
+> >>> +};
+> >>
+> >> What BT chip is there? Does it have serdev support? If so, that should
+> >> be enabled here.
+> > 
+> > RTL8723BS, no serdev.
 
-See:
-http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6DQRM.pdf
-page 5083
+https://www.spinics.net/lists/linux-bluetooth/msg76376.html
 
-This patch implements step 4. of this sequence.
+Not very far off though.
 
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
----
- arch/arm/mach-imx/pm-imx6.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+> Yes. A while ago I managed to enable Bluetooth (on the Pine64 with the
+> same chip), but that involved a lot of hacking with a special userland
+> tool (not hciattach and no serdev).
+> 
+> What this node means to say is: The UART1 is hardwired to some on-board
+> device and those pins are not available for GPIO, for instance.
+> 
+> At least that was my understanding when it comes to enabling devices in
+> the DT. Is that correct?
 
-diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-index 017539dd712b..2f5c643f62fb 100644
---- a/arch/arm/mach-imx/pm-imx6.c
-+++ b/arch/arm/mach-imx/pm-imx6.c
-@@ -601,6 +601,28 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
- 				   IMX6Q_GPR1_GINT);
- }
- 
-+static void imx6_pm_stby_poweroff(void)
-+{
-+	imx6_set_lpm(STOP_POWER_OFF);
-+	imx6q_suspend_finish(0);
-+
-+	mdelay(1000);
-+
-+	pr_emerg("Unable to poweroff system\n");
-+}
-+
-+static int imx6_pm_stby_poweroff_probe(void)
-+{
-+	if (pm_power_off) {
-+		pr_warn("%s: pm_power_off already claimed  %p %pf!\n",
-+			__func__, pm_power_off, pm_power_off);
-+		return -EBUSY;
-+	}
-+
-+	pm_power_off = imx6_pm_stby_poweroff;
-+	return 0;
-+}
-+
- void __init imx6_pm_ccm_init(const char *ccm_compat)
- {
- 	struct device_node *np;
-@@ -617,6 +639,9 @@ void __init imx6_pm_ccm_init(const char *ccm_compat)
- 	val = readl_relaxed(ccm_base + CLPCR);
- 	val &= ~BM_CLPCR_LPM;
- 	writel_relaxed(val, ccm_base + CLPCR);
-+
-+	if (of_property_read_bool(np, "fsl,pmic-stby-poweroff"))
-+		imx6_pm_stby_poweroff_probe();
- }
- 
- void __init imx6q_pm_init(void)
+Well, yes and no. Arguably, any device connected to the other side of
+the serial bus should have been there from the beginning. However,
+there wasn't any way to do that in Linux before serdev was introduced,
+so we weren't doing that. That resulted in hacky userspace tools to
+work around that, and other work arounds in the DT to for example
+tying BT resources (clock, regulators, resets) to the WiFi chip hoping
+that someone would use both all the time.
+
+Now that it's just around the corner, we don't have any excuse to do
+these kind of hacks anymore.
+
+Maxime
+
 -- 
-2.18.0
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180726/1af98e30/attachment.sig>
