@@ -1,77 +1,261 @@
 From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 26 Jul 2018 14:35:18 -0700
-Subject: [PATCH v3 00/23] Add multi-channel support to Armada thermal
- driver
-In-Reply-To: <20180726211442.GB3487@localhost.localdomain>
+Date: Thu, 26 Jul 2018 14:37:38 -0700
+Subject: [PATCH v3 08/23] thermal: armada: use the resource managed
+ registration helper alternative
+In-Reply-To: <20180716144206.30985-9-miquel.raynal@bootlin.com>
 References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
- <20180718172849.30b7cec0@xps13> <20180725095222.054f1e80@xps13>
- <1532570441.2358.27.camel@intel.com>
- <20180726211442.GB3487@localhost.localdomain>
-Message-ID: <20180726213517.GA15690@localhost.localdomain>
+ <20180716144206.30985-9-miquel.raynal@bootlin.com>
+Message-ID: <20180726213737.GB15690@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 02:14:43PM -0700, Eduardo Valentin wrote:
-> Hello,
-> 
-> On Thu, Jul 26, 2018 at 10:00:41AM +0800, Zhang Rui wrote:
-> > On ?, 2018-07-25 at 09:52 +0200, Miquel Raynal wrote:
-> > > Hi Eduardo, Zhang,
-> > > 
-> > > Miquel Raynal <miquel.raynal@bootlin.com> wrote on Wed, 18 Jul 2018
-> > > 17:28:49 +0200:
-> > > 
-> > > > 
-> > > > Hi Eduardo,
-> > > > 
-> > > > Miquel Raynal <miquel.raynal@bootlin.com> wrote on Mon, 16 Jul 2018
-> > > > 16:41:43 +0200:
-> > > > 
-> > > > > 
-> > > > > The only capability of the Armada thermal driver is currently
-> > > > > just to
-> > > > > read one sensor (the default one) per AP and one per CP.
-> > > > > Actually,
-> > > > > there is one sensor per core in the AP806 plus one sensor in the
-> > > > > thermal IP itself. The CP110 just features one thermal sensor in
-> > > > > its
-> > > > > own thermal IP.
-> > > > > 
-> > > > > This series first improves the readability of this driver, then
-> > > > > adds
-> > > > > support for multi-channel thermal IPs. The bindings and the
-> > > > > device-trees are updated accordingly.
-> > > > > 
-> > > > > Thank you,
-> > > > > Miqu?l??
-> > > > I know I sent this series on monday but there was almost no change
-> > > > on
-> > > > it (see below), do you think you will have the time to look at it
-> > > > before it's too late for the merge window?
-> > > I know a little bit what it is to be on the maintainer side of a
-> > > subsystem but these changes are laying since April, 21st and I really
-> > > expect to get them merged. Zhang, as Eduardo seems to be overloaded
-> > > this release, could you please take the series?
-> > > 
-> > > Of course if there are things to address I'll be happy to do so.
-> > > 
-> > I had a sync with Eduardo during last merge window, and we agreed to
-> > send separate git pull requests to Linus since this release and see how
-> > it works.
-> > This means that all the soc thermal driver patches should go to
-> > Eduardo' tree and then Linus' tree directly.
-> > 
-> > Anyway, let's ping Eduardo and see if he can review/take the patches.
-> 
-> Sorry fellows, but I was off camping in a place with no electricity/no
-> internet. I looked at this series before, and I do not remember anything
-> that could block it to go. Let me restart on working on it.
+Hey,
 
-Let me take that back. I got some compilation error.
-
+On Mon, Jul 16, 2018 at 04:41:51PM +0200, Miquel Raynal wrote:
+> Current use of thermal_zone_device_register() triggers a warning at boot
+> and should be replaced by devm_thermal_zone_of_sensor_register(). This
+> allows better handling of multiple thermal zones for later multi-sensors
+> support.
 > 
-> > 
-> > thanks,
-> > rui
-> > > Thanks,
-> > > Miqu?l
+> Also change the driver data to embed a new structure to make the
+> difference between legacy data (which needs to be cleaned) and
+> syscon-related data.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  drivers/thermal/armada_thermal.c | 123 ++++++++++++++++++++++++++++++++-------
+>  1 file changed, 101 insertions(+), 22 deletions(-)
+> 
+> diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+> index be346c6afde2..dd894312dedf 100644
+> --- a/drivers/thermal/armada_thermal.c
+> +++ b/drivers/thermal/armada_thermal.c
+> @@ -64,6 +64,7 @@ struct armada_thermal_data;
+>  
+>  /* Marvell EBU Thermal Sensor Dev Structure */
+>  struct armada_thermal_priv {
+> +	struct device *dev;
+>  	struct regmap *syscon;
+>  	char zone_name[THERMAL_NAME_LENGTH];
+>  	struct armada_thermal_data *data;
+> @@ -95,6 +96,26 @@ struct armada_thermal_data {
+>  	unsigned int syscon_status_off;
+>  };
+>  
+> +struct armada_drvdata {
+> +	enum drvtype {
+> +		LEGACY,
+> +		SYSCON
+> +	} type;
+> +	union {
+> +		struct armada_thermal_priv *priv;
+> +		struct thermal_zone_device *tz;
+> +	} data;
+> +};
+> +
+> +/*
+> + * struct armada_thermal_sensor - hold the information of one thermal sensor
+> + * @thermal: pointer to the local private structure
+> + * @tzd: pointer to the thermal zone device
+> + */
+> +struct armada_thermal_sensor {
+> +	struct armada_thermal_priv *priv;
+> +};
+> +
+>  static void armadaxp_init(struct platform_device *pdev,
+>  			  struct armada_thermal_priv *priv)
+>  {
+> @@ -243,16 +264,14 @@ static bool armada_is_valid(struct armada_thermal_priv *priv)
+>  	return reg & priv->data->is_valid_bit;
+>  }
+>  
+> -static int armada_get_temp(struct thermal_zone_device *thermal,
+> -			   int *temp)
+> +static int armada_read_sensor(struct armada_thermal_priv *priv, int *temp)
+>  {
+> -	struct armada_thermal_priv *priv = thermal->devdata;
+>  	u32 reg, div;
+>  	s64 sample, b, m;
+>  
+>  	/* Valid check */
+>  	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
+> -		dev_err(&thermal->device,
+> +		dev_err(priv->dev,
+>  			"Temperature sensor reading not valid\n");
+>  		return -EIO;
+>  	}
+> @@ -278,7 +297,33 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
+>  	return 0;
+>  }
+>  
+> -static struct thermal_zone_device_ops ops = {
+> +static int armada_get_temp_legacy(struct thermal_zone_device *thermal,
+> +				  int *temp)
+> +{
+> +	struct armada_thermal_priv *priv = thermal->devdata;
+> +	int ret;
+> +
+> +	/* Do the actual reading */
+> +	ret = armada_read_sensor(priv, temp);
+> +
+> +	return ret;
+> +}
+> +
+> +static struct thermal_zone_device_ops legacy_ops = {
+> +	.get_temp = armada_get_temp_legacy,
+> +};
+> +
+> +static int armada_get_temp(void *_sensor, int *temp)
+> +{
+> +	struct armada_thermal_sensor *sensor = _sensor;
+> +	struct armada_thermal_priv *priv = sensor->priv;
+> +	int ret;
+
+
+The above variable:
+drivers/thermal/armada_thermal.c:320:6: warning: unused variable ?ret? [-Wunused-variable]
+  int ret;
+      ^~~
+cc1: some warnings being treated as errors
+scripts/Makefile.build:323: recipe for target 'drivers/thermal/armada_thermal.o' failed
+
+
+> +
+> +	/* Do the actual reading */
+> +	return armada_read_sensor(priv, &temp);
+
+I think you meant 
+
++	return armada_read_sensor(priv, temp);
+
+here right?
+
+
+I obviously get:
+
+  CC [M]  drivers/thermal/armada_thermal.o
+drivers/thermal/armada_thermal.c: In function ?armada_get_temp?:
+drivers/thermal/armada_thermal.c:323:34: error: passing argument 2 of ?armada_read_sensor? from incompatible pointer type [-Werror=incompatible-pointer-types]
+  return armada_read_sensor(priv, &temp);
+                                  ^
+drivers/thermal/armada_thermal.c:267:12: note: expected ?int *? but argument is of type ?int **?
+ static int armada_read_sensor(struct armada_thermal_priv *priv, int *temp)
+            ^~~~~~~~~~~~~~~~~~
+
+
+> +}
+> +
+> +static struct thermal_zone_of_device_ops of_ops = {
+>  	.get_temp = armada_get_temp,
+>  };
+>  
+> @@ -480,7 +525,9 @@ static void armada_set_sane_name(struct platform_device *pdev,
+>  
+>  static int armada_thermal_probe(struct platform_device *pdev)
+>  {
+> -	struct thermal_zone_device *thermal;
+> +	struct thermal_zone_device *tz;
+> +	struct armada_thermal_sensor *sensors;
+> +	struct armada_drvdata *drvdata;
+>  	const struct of_device_id *match;
+>  	struct armada_thermal_priv *priv;
+>  	int ret;
+> @@ -493,11 +540,13 @@ static int armada_thermal_probe(struct platform_device *pdev)
+>  	if (!priv)
+>  		return -ENOMEM;
+>  
+> +	drvdata = devm_kzalloc(&pdev->dev, sizeof(*drvdata), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	priv->dev = &pdev->dev;
+>  	priv->data = (struct armada_thermal_data *)match->data;
+>  
+> -	/* Ensure device name is correct for the thermal core */
+> -	armada_set_sane_name(pdev, priv);
+> -
+>  	/*
+>  	 * Legacy DT bindings only described "control1" register (also referred
+>  	 * as "control MSB" on old documentation). Then, bindings moved to cover
+> @@ -510,35 +559,65 @@ static int armada_thermal_probe(struct platform_device *pdev)
+>  	 * is to define an overall system controller and put the thermal node
+>  	 * into it, which requires the use of regmaps across all the driver.
+>  	 */
+> -	if (IS_ERR(syscon_node_to_regmap(pdev->dev.parent->of_node)))
+> +	if (IS_ERR(syscon_node_to_regmap(pdev->dev.parent->of_node))) {
+> +		/* Ensure device name is correct for the thermal core */
+> +		armada_set_sane_name(pdev, priv);
+> +
+>  		ret = armada_thermal_probe_legacy(pdev, priv);
+> -	else
+> -		ret = armada_thermal_probe_syscon(pdev, priv);
+> +		if (ret)
+> +			return ret;
+>  
+> +		priv->data->init(pdev, priv);
+> +
+> +		tz = thermal_zone_device_register(priv->zone_name, 0, 0, priv,
+> +						  &legacy_ops, NULL, 0, 0);
+> +		if (IS_ERR(tz)) {
+> +			dev_err(&pdev->dev,
+> +				"Failed to register thermal zone device\n");
+> +			return PTR_ERR(tz);
+> +		}
+> +
+> +		drvdata->type = LEGACY;
+> +		drvdata->data.tz = tz;
+> +		platform_set_drvdata(pdev, drvdata);
+> +
+> +		return 0;
+> +	}
+> +
+> +	ret = armada_thermal_probe_syscon(pdev, priv);
+>  	if (ret)
+>  		return ret;
+>  
+>  	priv->data->init(pdev, priv);
+> +	drvdata->type = SYSCON;
+> +	drvdata->data.priv = priv;
+> +	platform_set_drvdata(pdev, drvdata);
+>  
+> -	thermal = thermal_zone_device_register(priv->zone_name, 0, 0, priv,
+> -					       &ops, NULL, 0, 0);
+> -	if (IS_ERR(thermal)) {
+> +	sensors = devm_kzalloc(&pdev->dev, sizeof(struct armada_thermal_sensor),
+> +			       GFP_KERNEL);
+> +	if (!sensors)
+> +		return -ENOMEM;
+> +
+> +	sensors->priv = priv;
+> +
+> +	tz = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, sensors,
+> +						  &of_ops);
+> +	if (IS_ERR(tz)) {
+>  		dev_err(&pdev->dev,
+> -			"Failed to register thermal zone device\n");
+> -		return PTR_ERR(thermal);
+> +			"Failed to register thermal sensor (err: %ld)\n",
+> +			PTR_ERR(tz));
+> +		return PTR_ERR(tz);
+>  	}
+>  
+> -	platform_set_drvdata(pdev, thermal);
+> -
+>  	return 0;
+>  }
+>  
+>  static int armada_thermal_exit(struct platform_device *pdev)
+>  {
+> -	struct thermal_zone_device *armada_thermal =
+> -		platform_get_drvdata(pdev);
+> +	struct armada_drvdata *drvdata = platform_get_drvdata(pdev);
+>  
+> -	thermal_zone_device_unregister(armada_thermal);
+> +	if (drvdata->type == LEGACY)
+> +		thermal_zone_device_unregister(drvdata->data.tz);
+>  
+>  	return 0;
+>  }
+> -- 
+> 2.14.1
+> 
