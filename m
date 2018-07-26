@@ -1,128 +1,48 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Wed, 25 Jul 2018 18:12:28 -0700
-Subject: [PATCH v5 1/3] thermal: qcom-spmi: Use PMIC thermal stage 2 for
- critical trip points
-In-Reply-To: <CAD=FV=VODGOE=qvJVeLGBs8xXQvbHZu7S9rqSpMY4AetUjd3fQ@mail.gmail.com>
-References: <20180724234636.57137-1-mka@chromium.org>
- <CAD=FV=VODGOE=qvJVeLGBs8xXQvbHZu7S9rqSpMY4AetUjd3fQ@mail.gmail.com>
-Message-ID: <20180726011228.GV129942@google.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 26 Jul 2018 09:14:26 +0800
+Subject: [PATCH v2 1/3] dt-binding: mmc: sunxi: add H6 compatible (with
+ A64 fallback)
+In-Reply-To: <20180719042810.6546-2-icenowy@aosc.io>
+References: <20180719042810.6546-1-icenowy@aosc.io>
+ <20180719042810.6546-2-icenowy@aosc.io>
+Message-ID: <8520892860b672631ffc99f6318c2aeba251dc2e.camel@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
-
-On Wed, Jul 25, 2018 at 04:19:56PM -0700, Doug Anderson wrote:
-
-> On Tue, Jul 24, 2018 at 4:46 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
-> > +static int qpnp_tm_update_critical_trip_temp(struct qpnp_tm_chip *chip,
-> > +                                            int temp)
-> > +{
-> > +       u8 reg;
-> > +       bool disable_s2_shutdown = false;
-> > +       int ret;
-> > +
-> > +       WARN_ON(!mutex_is_locked(&chip->lock));
-> > +
-> > +       /*
-> > +        * Default: S2 and S3 shutdown enabled, thresholds at
-> > +        * 105C/125C/145C, monitoring at 25Hz
-> > +        */
-> > +       reg = SHUTDOWN_CTRL1_RATE_25HZ;
-> > +
-> > +       if ((temp == THERMAL_TEMP_INVALID) ||
-> > +           (temp < STAGE2_THRESHOLD_MIN)) {
-> > +               chip->thresh = THRESH_MIN;
-> > +               goto skip;
-> > +       }
-> > +
-> > +       if (temp <= STAGE2_THRESHOLD_MAX) {
-> > +               chip->thresh = THRESH_MAX -
-> > +                       ((STAGE2_THRESHOLD_MAX - temp) /
-> > +                        TEMP_THRESH_STEP);
-> > +               disable_s2_shutdown = true;
-> > +       } else {
-> > +               chip->thresh = THRESH_MAX;
-> > +
-> > +               if (!IS_ERR(chip->adc))
-> > +                       disable_s2_shutdown = true;
-> > +               else
-> > +                       dev_warn(chip->dev,
-> > +                                "No ADC is configured and critical temperature is above the maximum stage 2 threshold of 140?C! Configuring stage 2 shutdown at 140?C.\n");
+? 2018-07-19?? 12:28 +0800?Icenowy Zheng???
+> The MMC controllers on H6 is similar to the ones on A64, but with
+> some
+> new features.
 > 
-> Putting a non-ASCII character (the degree symbol) in your commit
-> message is one thing, but are you sure it's wise to put it in the
-> kernel logs?
-
-A few other drivers also do this
-(drivers/gpu/drm/nouveau/nvkm/subdev/clk/base.c,
-drivers/macintosh/windfarm_pm121.c), however that doesn't mean it's a
-good idea. Will change to degC or C.
-
-> > +       }
-> > +
-> > +skip:
-> > +       reg |= chip->thresh;
-> > +       if (disable_s2_shutdown)
-> > +               reg |= SHUTDOWN_CTRL1_OVERRIDE_S2;
-> > +
-> > +       ret = qpnp_tm_write(chip, QPNP_TM_REG_SHUTDOWN_CTRL1, reg);
-> > +       if (ret < 0)
-> > +               return ret;
-> > +
-> > +       return ret;
+> Add compatible strings for them (with the A64 compatible strings as
+> fallback, in order to make them to work with A64 drivers).
 > 
-> Simplify the above lines to:
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+> Changes in v2:
+> - Add A64 fallback.
 > 
-> return qpnp_tm_write(chip, QPNP_TM_REG_SHUTDOWN_CTRL1, reg);
-
-Ouch, my code is indeed dumb ...
-
-> > @@ -313,12 +441,7 @@ static int qpnp_tm_probe(struct platform_device *pdev)
-> >         if (ret < 0)
-> >                 return ret;
-> >
-> > -       chip->tz_dev = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, chip,
-> > -                                                       &qpnp_tm_sensor_ops);
-> > -       if (IS_ERR(chip->tz_dev)) {
-> > -               dev_err(&pdev->dev, "failed to register sensor\n");
-> > -               return PTR_ERR(chip->tz_dev);
-> > -       }
-> > +       chip->initialized = true;
+>  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> Should we add "thermal_zone_device_update(chip->tz_dev,
-> THERMAL_EVENT_UNSPECIFIED);" here
+> diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> index 132e0007d7d6..e9cb3ec5e502 100644
+> --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> @@ -16,6 +16,8 @@ Required properties:
+>     * "allwinner,sun9i-a80-mmc"
+>     * "allwinner,sun50i-a64-emmc"
+>     * "allwinner,sun50i-a64-mmc"
+> +   * "allwinner,sun50i-h6-emmc", "allwinner.sun50i-a64-emmc"
+> +   * "allwinner,sun50i-h6-mmc", "allwinner.sun50i-a64-mmc"
 
-Seems reasonable, will do.
+BTW it seems that the driver performs quite bad on H6 when dealing it
+as an A64.
 
-> ...also: do we care about any type of locking for chip->initialized?
-> Technically we can be running on weakly ordered memory so if
-> qpnp_tm_update_temp_no_adc() is running on a different processor then
-> possibly it could still keep returning the default temperature for a
-> little while.  We could try to analyze whether there's some sort of
-> implicit barrier or we could add manual memory barriers, but generally
-> I try to avoid that and just do the simple locking...  What about just
-> setting chip-Initialized = true at the end of qpnp_tm_init() while the
-> mutex is still held?
+I get 1.5MB/s on a card, although the card can reach 20MB/s read speed
+(testing on BSP).
 
-Thanks for pointing that out. I agree that we should keep things
-simple, chip->initialized to true at the end of qpnp_tm_init() sounds
-good to me.
-
-> I'd also love to hear from someone with more thermal framework
-> experience to make sure it's legit to return a default value if
-> someone calls us while we're initting.  It seems sane to me but nice
-> to confirm it's OK.
-
-An alternative could be to return THERMAL_TEMP_INVALID, however I
-don't see this handled outside of thermal_core.c, not sure if it could
-throw some other code off.
-
-Comments from thermal folks on either approach (or alternatives) are
-definitely welcome :)
-
-> Overall I like the idea of this patch so hopefully others do too.
-> Thanks for sending it out!
-
-Thanks for the review!
-
-Matthias
+>   - reg : mmc controller base registers
+>   - clocks : a list with 4 phandle + clock specifier pairs
+>   - clock-names : must contain "ahb", "mmc", "output" and "sample"
