@@ -1,49 +1,99 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 26 Jul 2018 17:47:34 +0530
-Subject: [PATCH v7 6/6] mailbox: Add support for i.MX7D messaging unit
-In-Reply-To: <e224cff8-0b47-9221-72fa-5db19d531492@pengutronix.de>
-References: <20180726065331.6186-1-o.rempel@pengutronix.de>
- <20180726065331.6186-7-o.rempel@pengutronix.de>
- <CABb+yY1Fbj2GiO_zjwnvNFutjX_fRpxnuEoeu6Z3s4NAv2ugbg@mail.gmail.com>
- <a988e8b4-28be-f598-82de-421017409368@pengutronix.de>
- <CABb+yY2=mFr+gFuWyE+VyG6dWj3gKhTs6X+U9UjFu5N=4zU5uA@mail.gmail.com>
- <e224cff8-0b47-9221-72fa-5db19d531492@pengutronix.de>
-Message-ID: <CABb+yY0NAw3Ymtpq6tiN_g1zy=fum6O_wtcuig=Y4Dx9Ue70KA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 26 Jul 2018 13:23:50 +0100
+Subject: [PATCH 1/6] ARM: signal: copy registers using __copy_from_user()
+In-Reply-To: <E1fctOl-0005ul-69@rmk-PC.armlinux.org.uk>
+References: <20180710141322.GL17271@n2100.armlinux.org.uk>
+ <E1fctOl-0005ul-69@rmk-PC.armlinux.org.uk>
+Message-ID: <20180726122350.qtf7h6qekru23bv2@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 5:12 PM, Oleksij Rempel <o.rempel@pengutronix.de> wrote:
->
->
-> On 26.07.2018 13:09, Jassi Brar wrote:
->> On Thu, Jul 26, 2018 at 4:21 PM, Oleksij Rempel <o.rempel@pengutronix.de> wrote:
->>
->>>>
->>>>> +struct imx_mu_con_priv {
->>>>> +       int                     irq;
->>>>> +       unsigned int            idx;
->>>>> +       char                    *irq_desc;
->>>>>
->>>> Having      char  irq_desc[16];    seems simpler than free/kfree upon
->>>> each startup/shutdown. Simply use snprintf() in probe().
->>>
->>> Currently all known configurations use one or two channels. I don't see
->>> any sense to allocate all at the probe.
->>>
->> Just because only 2 out of 4 channels are being used, it doesn't make sense?
->>
->> What is the concern?  "wasting" 16x2 bytes of memory?  How many bytes,
->> LOC and execution time does kasprintf() waste?
->
-> Startup or shutdown is not speed critical path in this driver, or do i
-> miss some thing?
->
-No they are not.
+On Tue, Jul 10, 2018 at 03:13:47PM +0100, Russell King wrote:
+> When restoring the ARM integer registers, use __copy_from_user() to
+> copy them into kernel space before restoring them, rather than
+> __get_user_error().
 
-> Speed vs size is not valid argumentation here.
->
-If the code looks cleaner and smaller and lesser expensive execution
-wise, at least I see that as a valid enough argument.
+I assume that this is so that we only have to pay the cost of sanitizing
+the user pointer once in __copy_from_user(), rather than in each
+__get_user_error()?
 
-But OK, if you insist.  If someone sends a "cleanup" patch tomorrow, I
-am going to thank and apply.
+Can we mention that in the commit message? e.g. something like:
+
+  In subsequent patches, each uaccess will sanitize the __user pointer
+  to prevent speculative accesses to kernel memory.
+  
+  To amortize the cost of this sanitization when restoring the integer
+  registers, we can use __copy_from_user() rather than a sequence of
+  __get_user_error() calls.
+ 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  arch/arm/kernel/signal.c | 38 +++++++++++++++++++++-----------------
+>  1 file changed, 21 insertions(+), 17 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> index bd8810d4acb3..0ae74207e43e 100644
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -176,6 +176,7 @@ static int restore_vfp_context(char __user **auxp)
+>  
+>  static int restore_sigframe(struct pt_regs *regs, struct sigframe __user *sf)
+>  {
+> +	struct sigcontext context;
+>  	char __user *aux;
+>  	sigset_t set;
+>  	int err;
+> @@ -184,23 +185,26 @@ static int restore_sigframe(struct pt_regs *regs, struct sigframe __user *sf)
+>  	if (err == 0)
+>  		set_current_blocked(&set);
+>  
+> -	__get_user_error(regs->ARM_r0, &sf->uc.uc_mcontext.arm_r0, err);
+> -	__get_user_error(regs->ARM_r1, &sf->uc.uc_mcontext.arm_r1, err);
+> -	__get_user_error(regs->ARM_r2, &sf->uc.uc_mcontext.arm_r2, err);
+> -	__get_user_error(regs->ARM_r3, &sf->uc.uc_mcontext.arm_r3, err);
+> -	__get_user_error(regs->ARM_r4, &sf->uc.uc_mcontext.arm_r4, err);
+> -	__get_user_error(regs->ARM_r5, &sf->uc.uc_mcontext.arm_r5, err);
+> -	__get_user_error(regs->ARM_r6, &sf->uc.uc_mcontext.arm_r6, err);
+> -	__get_user_error(regs->ARM_r7, &sf->uc.uc_mcontext.arm_r7, err);
+> -	__get_user_error(regs->ARM_r8, &sf->uc.uc_mcontext.arm_r8, err);
+> -	__get_user_error(regs->ARM_r9, &sf->uc.uc_mcontext.arm_r9, err);
+> -	__get_user_error(regs->ARM_r10, &sf->uc.uc_mcontext.arm_r10, err);
+> -	__get_user_error(regs->ARM_fp, &sf->uc.uc_mcontext.arm_fp, err);
+> -	__get_user_error(regs->ARM_ip, &sf->uc.uc_mcontext.arm_ip, err);
+> -	__get_user_error(regs->ARM_sp, &sf->uc.uc_mcontext.arm_sp, err);
+> -	__get_user_error(regs->ARM_lr, &sf->uc.uc_mcontext.arm_lr, err);
+> -	__get_user_error(regs->ARM_pc, &sf->uc.uc_mcontext.arm_pc, err);
+> -	__get_user_error(regs->ARM_cpsr, &sf->uc.uc_mcontext.arm_cpsr, err);
+> +	err |= __copy_from_user(&context, &sf->uc.uc_mcontext, sizeof(context));
+
+IIUC, this means that we'll also copy the (unused) fault_address field,
+but I assume that's ok.
+
+Thanks,
+Mark.
+
+> +	if (err == 0) {
+> +		regs->ARM_r0 = context.arm_r0;
+> +		regs->ARM_r1 = context.arm_r1;
+> +		regs->ARM_r2 = context.arm_r2;
+> +		regs->ARM_r3 = context.arm_r3;
+> +		regs->ARM_r4 = context.arm_r4;
+> +		regs->ARM_r5 = context.arm_r5;
+> +		regs->ARM_r6 = context.arm_r6;
+> +		regs->ARM_r7 = context.arm_r7;
+> +		regs->ARM_r8 = context.arm_r8;
+> +		regs->ARM_r9 = context.arm_r9;
+> +		regs->ARM_r10 = context.arm_r10;
+> +		regs->ARM_fp = context.arm_fp;
+> +		regs->ARM_ip = context.arm_ip;
+> +		regs->ARM_sp = context.arm_sp;
+> +		regs->ARM_lr = context.arm_lr;
+> +		regs->ARM_pc = context.arm_pc;
+> +		regs->ARM_cpsr = context.arm_cpsr;
+> +	}
+>  
+>  	err |= !valid_user_regs(regs);
+>  
+> -- 
+> 2.7.4
+> 
