@@ -1,100 +1,42 @@
-From: ssuloev@orpaltech.com (Sergey Suloev)
-Date: Thu, 26 Jul 2018 18:25:19 +0300
-Subject: [PATCH v2 16/18] arm64: dts: allwinner: a64: NanoPi-A64: Add
- Ethernet
-In-Reply-To: <e2f98352-30f5-d162-5bf9-46c7f15e8a80@arm.com>
-References: <20180726003532.18751-1-andre.przywara@arm.com>
- <20180726003532.18751-17-andre.przywara@arm.com>
- <f2380842-2c7a-13d3-fa0f-ed23afb89e30@orpaltech.com>
- <B1F768E3-0C8E-4DBE-92AE-1CFA57BFE7F5@aosc.io>
- <e2f98352-30f5-d162-5bf9-46c7f15e8a80@arm.com>
-Message-ID: <b2519ce5-eadf-79b6-5eb7-fefe6bb0ab72@orpaltech.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 26 Jul 2018 23:26:19 +0800
+Subject: [PATCH] ARM: dts: sun8i: r40/v40: rewrite BPi M2 Berry DTS to
+ rebase on M2 Ultra
+In-Reply-To: <20180726152427.cjji4ymwfjifja4q@flea>
+References: <20180724163655.61365-1-icenowy@aosc.io>
+ <20180726124119.dwne2sncws2p3sdi@flea>
+ <BA51039A-02DD-42C2-A7A9-E1B866074CA6@aosc.io>
+ <20180726152427.cjji4ymwfjifja4q@flea>
+Message-ID: <7A9506F1-7052-4801-B735-296370EBBA7C@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2018 05:06 PM, Andre Przywara wrote:
-> Hi,
+
+
+? 2018?7?26? GMT+08:00 ??11:24:27, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+>On Thu, Jul 26, 2018 at 08:47:34PM +0800, Icenowy Zheng wrote:
+>> 
+>> 
+>> ? 2018?7?26? GMT+08:00 ??8:41:19, Maxime Ripard
+><maxime.ripard@bootlin.com> ??:
+>> >On Wed, Jul 25, 2018 at 12:36:55AM +0800, Icenowy Zheng wrote:
+>> >> Banana Pi designs the BPi M2 Berry board to be software compatible
+>> >with
+>> >> BPi M2 Ultra,
+>> >
+>> >Do you have a reference for this?
+>> 
+>> See [1], it says "BPI-M2U and BPI-M2 Berry share the same image".
+>> 
+>> [1] http://www.banana-pi.org/download.html
 >
-> On 26/07/18 14:41, Icenowy Zheng wrote:
->>
->> ? 2018?7?26? GMT+08:00 ??9:39:56, Sergey Suloev <ssuloev@orpaltech.com> ??:
->>> Hi,
->>>
->>> On 07/26/2018 03:35 AM, Andre Przywara wrote:
->>>> The NanoPi-A64 has the usual Realtek Gbit PHY connected to the EMAC,
->>>> so add the respective nodes to the DT. The PHY is powered by the
->>>> VDD_SYS_3.3V line, which is always on.
->>>>
->>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>>> ---
->>>>    arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts | 17
->>> +++++++++++++++++
->>>>    1 file changed, 17 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->>>> index 5caba225b4f7..bd35a093e6cd 100644
->>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
->>>> @@ -51,6 +51,7 @@
->>>>    	compatible = "friendlyarm,nanopi-a64", "allwinner,sun50i-a64";
->>>>    
->>>>    	aliases {
->>>> +		ethernet0 = &emac;
->>>>    		serial0 = &uart0;
->>>>    	};
->>>>    
->>>> @@ -67,6 +68,15 @@
->>>>    	status = "okay";
->>>>    };
->>>>    
->>>> +&emac {
->>>> +	pinctrl-names = "default";
->>>> +	pinctrl-0 = <&rgmii_pins>;
->>>> +	phy-mode = "rgmii";
->>>> +	phy-handle = <&ext_rgmii_phy>;
->>>> +	phy-supply = <&reg_dcdc1>;
->>>> +	status = "okay";
->>>> +};
->>>> +
->>>>    /* i2c1 connected with gpio headers like pine64, bananapi */
->>>>    &i2c1 {
->>>>    	pinctrl-names = "default";
->>>> @@ -78,6 +88,13 @@
->>>>    	bias-pull-up;
->>>>    };
->>>>    
->>>> +&mdio {
->>>> +	ext_rgmii_phy: ethernet-phy at 1 {
->>>> +		compatible = "ethernet-phy-ieee802.3-c22";
->>>> +		reg = <1>;
->>>> +	};
->>>> +};
->>>> +
->>>>    &mmc0 {
->>>>    	pinctrl-names = "default";
->>>>    	pinctrl-0 = <&mmc0_pins>;
->>> did you test? "reg = <1>" on a real hardware ?
-> No, thanks for pointing this out.
+>Debian supports different SoC from different vendor using the same
+>image, so it's not really a good argument to share the device tree. I
+>mean, you can even boot an H3 to a shell using an A33 device tree.
+
+Please note that the vendor image is fully functional BSP
+image, neither a function limited one nor one without
+HW configuration.
+
 >
-> According to the PHY's datasheet the PHY address is configured by the
-> three pins also used for the LEDs. By looking at the schematics back
-> then I somehow managed to convince myself that it should be 1, as most
-> other boards use, but from looking again it indeed looks more like 7
-> (the other LED pin connected to 3.3V).
->
-> Can you please try with reg = <7> and confirm that it works that way?
->
-> Many thanks,
-> Andre.
-ok, let me check this. And what data sheet are you talking about ? Can 
-you provide a link, please.
->>> I have? "reg = <0>" in my dts? and? it has been working on my board for
->> 0 is a wildcard address.
->>
->> For nano pi, if 1 doesn't work, then it should be 7. 0 can work,
->> but it won't be accepted by DT maintainers.
->>
->>> ages.
->>>
->>> Thanks
+>Maxime
