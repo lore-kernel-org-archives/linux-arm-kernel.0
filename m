@@ -1,73 +1,39 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 27 Jul 2018 01:12:50 +0800
-Subject: [PATCH v3.1 03/10] drm/sun4i: Add support for A64 mixers
+Date: Fri, 27 Jul 2018 01:12:55 +0800
+Subject: [PATCH v3.1 08/10] dt-bindings: sun4i-drm: add HDMI VCC supply
+ property for sun8i-dw-hdmi
 In-Reply-To: <20180726171257.6688-1-icenowy@aosc.io>
 References: <20180726171257.6688-1-icenowy@aosc.io>
-Message-ID: <20180726171257.6688-4-icenowy@aosc.io>
+Message-ID: <20180726171257.6688-9-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jagan Teki <jagan@amarulasolutions.com>
+Allwiner SoCs with DesignWare HDMI controller all come with a "HVCC"
+pin, which is the VCC of HDMI part.
 
-Mixers in Allwinner have similar capabilities as others SoCs with DE2.
+Add a supply property to specify HVCC's regulator in the device tree.
 
-Add support for them.
-
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-[Icenowy: Add mixer0]
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
-Changes for v3.1:
-- Add mixer0
-Changes for v3:
-- none 
-Changes for v2:
-- New patch
+Changes in v3.1:
+- New patch.
 
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index fc3713608f78..8b3d02b146b7 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -569,6 +569,22 @@ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
- 	.mod_rate = 150000000,
- };
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index fdb8fb29033f..cb4769913e89 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -97,6 +97,9 @@ Required properties:
+     first port should be the input endpoint. The second should be the
+     output, usually to an HDMI connector.
  
-+static const struct sun8i_mixer_cfg sun50i_a64_mixer0_cfg = {
-+	.ccsc		= 0,
-+	.mod_rate	= 297000000,
-+	.scaler_mask	= 0xf,
-+	.ui_num		= 3,
-+	.vi_num		= 1,
-+};
++Optional properties:
++  - hdmi-supply: the VCC power supply of the controller
 +
-+static const struct sun8i_mixer_cfg sun50i_a64_mixer1_cfg = {
-+	.ccsc		= 1,
-+	.mod_rate	= 297000000,
-+	.scaler_mask	= 0x3,
-+	.ui_num		= 1,
-+	.vi_num		= 1,
-+};
-+
- static const struct of_device_id sun8i_mixer_of_table[] = {
- 	{
- 		.compatible = "allwinner,sun8i-a83t-de2-mixer-0",
-@@ -594,6 +610,14 @@ static const struct of_device_id sun8i_mixer_of_table[] = {
- 		.compatible = "allwinner,sun8i-v3s-de2-mixer",
- 		.data = &sun8i_v3s_mixer_cfg,
- 	},
-+	{
-+		.compatible = "allwinner,sun50i-a64-de2-mixer-0",
-+		.data = &sun50i_a64_mixer0_cfg,
-+	},
-+	{
-+		.compatible = "allwinner,sun50i-a64-de2-mixer-1",
-+		.data = &sun50i_a64_mixer1_cfg,
-+	},
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, sun8i_mixer_of_table);
+ DWC HDMI PHY
+ ------------
+ 
 -- 
 2.18.0
