@@ -1,57 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 26 Jul 2018 00:16:35 -0700
-Subject: [GIT PULL] updates to soc/fsl drivers for v4.19
-In-Reply-To: <1532469595-12060-1-git-send-email-leoyang.li@nxp.com>
-References: <1532469595-12060-1-git-send-email-leoyang.li@nxp.com>
-Message-ID: <20180726071635.whbiz5onokhvcjb4@localhost>
+Date: Thu, 26 Jul 2018 00:12:34 -0700
+Subject: [GIT PULL] Allwinner drivers changes for 4.19
+In-Reply-To: <20180724131616.brtatxqutdjd4oxt@flea>
+References: <20180724131616.brtatxqutdjd4oxt@flea>
+Message-ID: <20180726071234.tzhxtarbmlsysz65@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 04:59:55PM -0500, Li Yang wrote:
-> Hi arm-soc maintainers,
+On Tue, Jul 24, 2018 at 03:16:16PM +0200, Maxime Ripard wrote:
+> Hi Arnd, Olof,
 > 
-> Please merge the following tag to get updates to the soc/fsl drivers:
->   Moves DPAA2 DPIO driver from staging to fsl/soc
->   Adds multiple-pin support to QE gpio driver
+> Please pull the following changes for the next merge window.
 > 
-> Regards,
-> Leo
-> 
+> Thanks!
+> Maxime
 > 
 > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
 >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
-> are available in the git repository at:
+> are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git tags/soc-fsl-for-4.19
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-drivers-for-4.19
 > 
-> for you to fetch changes up to 4625210899095195600062ff8542f37a1c9f5dd4:
+> for you to fetch changes up to 7377330a1ed2e9bb5a97758bdadcdb37e2201b2a:
 > 
->   soc: fsl: cleanup Kconfig menu (2018-07-24 16:19:16 -0500)
-> 
-> ----------------------------------------------------------------
-> Various updates to soc/fsl for 4.19
-> 
-> Moves DPAA2 DPIO driver from staging to fsl/soc
-> Adds multiple-pin support to QE gpio driver
+>   soc: sunxi: Add the A13, A23 and H3 system control compatibles (2018-07-19 16:39:12 +0200)
 > 
 > ----------------------------------------------------------------
-> Horia Geant? (1):
->       staging: fsl-dpaa2: eth: move generic FD defines to DPIO
+> Allwinner drivers changes for 4.19
 > 
-> Joakim Tjernlund (1):
->       soc: fsl: qe: gpio: Add qe_gpio_set_multiple
+> There's been work for this release cycles in both the SRAM controller
+> driver in order to support more SoCs, as part of our VPU work, but also to
+> enable the EMAC on the A64 (that needs to poke at registers within the same
+> register space).
 > 
-> Li Yang (1):
->       soc: fsl: cleanup Kconfig menu
-> 
-> Roy Pledge (3):
->       staging: fsl-mc: Move DPIO from staging to drivers/soc/fsl
->       staging: fsl-mc: Remove remaining files
->       soc: fsl: dpio: Convert DPIO documentation to .rst
+> Some work has been needed too to represent the bus to the display engine
+> controllers that all need an SRAM to be mapped to the CPU to be able to
+> access those controllers' registers.
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
