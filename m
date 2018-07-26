@@ -1,65 +1,41 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 27 Jul 2018 01:12:49 +0800
-Subject: [PATCH v3.1 02/10] dt-bindings: display: Add compatible for A64 DE2
- display pipeline
+Date: Fri, 27 Jul 2018 01:12:51 +0800
+Subject: [PATCH v3.1 04/10] drm/sun4i: Add support for A64 display engine
 In-Reply-To: <20180726171257.6688-1-icenowy@aosc.io>
 References: <20180726171257.6688-1-icenowy@aosc.io>
-Message-ID: <20180726171257.6688-3-icenowy@aosc.io>
+Message-ID: <20180726171257.6688-5-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-Allwinner A64 has a DE2 display pipeline. The TCONs are similar to the
-ones in A83T, but the mixers are new (similar to the later R40 SoC).
+Display Engine(DE2) in Allwinner A64 has two mixers and tcons.
 
-This patch adds dt-binding documentation for A64 DE2 display pipeline.
+The routing for mixer0 is through tcon0 and connected to
+LVDS/RGB/MIPI-DSI controller.
+
+The routing for mixer1 is through tcon1 and connected to HDMI.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-[Icenowy: Refactor and also cover TCON0]
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
-Changes for v3.1:
-- added mixer0 and TCON0
-Changes for v3:
-- collect Rob r-w-b tag
-Changes for v2:
-- Add fallback compatible for tcon1
-- Add separate compatible for mixer1 
+Changes for v3.1, v3, v2:
+- none
 
- .../devicetree/bindings/display/sunxi/sun4i-drm.txt          | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index f8773ecb7525..7b79c5e3dffc 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -151,6 +151,8 @@ Required properties:
-    * allwinner,sun8i-v3s-tcon
-    * allwinner,sun9i-a80-tcon-lcd
-    * allwinner,sun9i-a80-tcon-tv
-+   * "allwinner,sun50i-a64-tcon-lcd", "allwinner,sun8i-a83t-tcon-lcd"
-+   * "allwinner,sun50i-a64-tcon-tv", "allwinner,sun8i-a83t-tcon-tv"
-  - reg: base address and size of memory-mapped region
-  - interrupts: interrupt associated to this IP
-  - clocks: phandles to the clocks feeding the TCON.
-@@ -370,6 +372,8 @@ Required properties:
-     * allwinner,sun8i-a83t-de2-mixer-1
-     * allwinner,sun8i-h3-de2-mixer-0
-     * allwinner,sun8i-v3s-de2-mixer
-+    * allwinner,sun50i-a64-de2-mixer-0
-+    * allwinner,sun50i-a64-de2-mixer-1
-   - reg: base address and size of the memory-mapped region.
-   - clocks: phandles to the clocks feeding the mixer
-     * bus: the mixer interface clock
-@@ -403,6 +407,7 @@ Required properties:
-     * allwinner,sun8i-r40-display-engine
-     * allwinner,sun8i-v3s-display-engine
-     * allwinner,sun9i-a80-display-engine
-+    * allwinner,sun50i-a64-display-engine
- 
-   - allwinner,pipelines: list of phandle to the display engine
-     frontends (DE 1.0) or mixers (DE 2.0) available.
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index dd19d674055c..e3c1c436b9d5 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -421,6 +421,7 @@ static const struct of_device_id sun4i_drv_of_table[] = {
+ 	{ .compatible = "allwinner,sun8i-r40-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
+ 	{ .compatible = "allwinner,sun9i-a80-display-engine" },
++	{ .compatible = "allwinner,sun50i-a64-display-engine" },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, sun4i_drv_of_table);
 -- 
 2.18.0
