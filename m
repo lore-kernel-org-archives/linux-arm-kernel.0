@@ -1,55 +1,42 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 26 Jul 2018 01:35:27 +0100
-Subject: [PATCH v2 13/18] arm64: dts: allwinner: a64: Olinuxino: add Ethernet
- nodes
+Date: Thu, 26 Jul 2018 01:35:32 +0100
+Subject: [PATCH v2 18/18] arm64: dts: allwinner: a64: NanoPi-A64: Add blue
+ status LED
 In-Reply-To: <20180726003532.18751-1-andre.przywara@arm.com>
 References: <20180726003532.18751-1-andre.przywara@arm.com>
-Message-ID: <20180726003532.18751-14-andre.przywara@arm.com>
+Message-ID: <20180726003532.18751-19-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the DT nodes required to enable the Gigabit Ethernet on the board.
-The PHY is powered by the always-on power rail VDD_SYS_3.3V (DCDC1).
+Beside the non-controllable green power LED, the NanoPi-A64 features a
+blue "status" LED, connected to PD24.
+
+Add the device tree node to make it usable.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-index b3f186434f36..26075b9a76e3 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
-@@ -51,6 +51,7 @@
- 	compatible = "olimex,a64-olinuxino", "allwinner,sun50i-a64";
- 
- 	aliases {
-+		ethernet0 = &emac;
- 		serial0 = &uart0;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+index 705e0b23589e..d75d4d5cbf73 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+@@ -60,6 +60,15 @@
+ 		stdout-path = "serial0:115200n8";
  	};
  
-@@ -64,6 +65,22 @@
- 	};
- };
- 
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	phy-mode = "rgmii";
-+	phy-handle = <&ext_rgmii_phy>;
-+	phy-supply = <&reg_dcdc1>;
-+	status = "okay";
-+};
++	leds {
++		compatible = "gpio-leds";
 +
-+&mdio {
-+	ext_rgmii_phy: ethernet-phy at 1 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
++		blue {
++			label = "nanopi-a64:blue:status";
++			gpios = <&pio 3 24 GPIO_ACTIVE_LOW>; /* PD24 */
++		};
 +	};
-+};
 +
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
+ 	wifi_pwrseq: wifi_pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
 -- 
 2.14.4
