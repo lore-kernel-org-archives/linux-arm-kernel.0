@@ -1,67 +1,91 @@
 From: alexandru-cosmin.gheorghe@arm.com (Alexandru Gheorghe)
-Date: Thu, 26 Jul 2018 17:17:46 +0100
-Subject: [PATCH v2 00/10] Add helper for plane reset
-Message-ID: <20180726161756.1794-1-alexandru-cosmin.gheorghe@arm.com>
+Date: Thu, 26 Jul 2018 17:17:47 +0100
+Subject: [PATCH v2 01/10] drm/atomic: Add  __drm_atomic_helper_plane_reset
+In-Reply-To: <20180726161756.1794-1-alexandru-cosmin.gheorghe@arm.com>
+References: <20180726161756.1794-1-alexandru-cosmin.gheorghe@arm.com>
+Message-ID: <20180726161756.1794-2-alexandru-cosmin.gheorghe@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v1: 
- - Make __drm_atomic_helper_plane_reset consistent with the other
-   helpers and require that both plane and state not be NULL,
-   suggested by Boris Brezillon and Philipp Zabel. Drivers already
-   check for that.
- - Add a proper commit message for driver changes.
+There are a lot of drivers that subclass drm_plane_state, all of them
+duplicate the code that links toghether the plane with plane_state.
 
-Drivers that subclass drm_plane need to copy the logic for linking the
-drm_plane with its state and to initialize core properties to their
-default values. E.g (alpha and rotation)
+On top of that, drivers that enable core properties also have to
+duplicate the code for initializing the properties to their default
+values, which in all cases are the same as the defaults from core.
 
-Having a helper to reset the plane_state makes sense because of multiple
-reasons:
-1. Eliminate code duplication.
-2. Add a single place for initializing core properties to their
-default values, no need for driver to do it if what the helper sets
-makes sense for them.
-3. No need to debug the driver when you enable a core property and
-observe it doesn't have a proper default value.
+Change since v1:
+- Make it consistent with the other helpers and require that both
+  plane and state not be NULL, suggested by Boris Brezillon and
+  Philipp Zabel.
 
-Tested with mali-dp the other drivers are just built-tested.
+Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
+---
+ drivers/gpu/drm/drm_atomic_helper.c | 31 ++++++++++++++++++++---------
+ include/drm/drm_atomic_helper.h     |  2 ++
+ 2 files changed, 24 insertions(+), 9 deletions(-)
 
-
-Alexandru Gheorghe (10):
-  drm/atomic: Add  __drm_atomic_helper_plane_reset
-  drm/amd/display: Use __drm_atomic_helper_plane_reset instead of
-    copying the logic
-  drm: mali-dp: Use __drm_atomic_helper_plane_reset instead of copying
-    the logic
-  drm: atmel-hlcdc: Use __drm_atomic_helper_plane_reset instead of
-    copying the logic
-  drm/exynos: Use __drm_atomic_helper_plane_reset instead of copying the
-    logic
-  drm/imx: Use __drm_atomic_helper_plane_reset instead of copying the
-    logic
-  drm: rcar-du: Use __drm_atomic_helper_plane_reset instead of copying
-    the logic
-  drm/sun4i: Use __drm_atomic_helper_plane_reset instead of copying the
-    logic
-  drm/vc4: Use __drm_atomic_helper_plane_reset instead of copying the
-    logic
-  drm/vmwgfx: Use __drm_atomic_helper_plane_reset instead of copying the
-    logic
-
- .../gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c |  7 ++---
- drivers/gpu/drm/arm/malidp_planes.c           |  7 ++---
- .../gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c   |  5 +--
- drivers/gpu/drm/drm_atomic_helper.c           | 31 +++++++++++++------
- drivers/gpu/drm/exynos/exynos_drm_plane.c     |  3 +-
- drivers/gpu/drm/imx/ipuv3-plane.c             |  8 ++---
- drivers/gpu/drm/rcar-du/rcar_du_plane.c       |  4 +--
- drivers/gpu/drm/rcar-du/rcar_du_vsp.c         |  4 +--
- drivers/gpu/drm/sun4i/sun4i_layer.c           |  4 +--
- drivers/gpu/drm/vc4/vc4_plane.c               |  4 +--
- drivers/gpu/drm/vmwgfx/vmwgfx_kms.c           |  4 +--
- include/drm/drm_atomic_helper.h               |  2 ++
- 12 files changed, 38 insertions(+), 45 deletions(-)
-
+diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
+index 866a2cc72ef6..7f5aafc5b1a0 100644
+--- a/drivers/gpu/drm/drm_atomic_helper.c
++++ b/drivers/gpu/drm/drm_atomic_helper.c
+@@ -3552,6 +3552,26 @@ void drm_atomic_helper_crtc_destroy_state(struct drm_crtc *crtc,
+ }
+ EXPORT_SYMBOL(drm_atomic_helper_crtc_destroy_state);
+ 
++/**
++ * __drm_atomic_helper_plane_reset - resets planes state to default values
++ * @plane: plane object, must not be NULL
++ * @state: atomic plane state, must not be NULL
++ *
++ * Initializes plane state to default. This is useful for drivers that subclass
++ * the plane state.
++ */
++void __drm_atomic_helper_plane_reset(struct drm_plane *plane,
++				     struct drm_plane_state *state)
++{
++	state->plane = plane;
++	state->rotation = DRM_MODE_ROTATE_0;
++	/* Reset the alpha value to fully opaque if it matters */
++	if (plane->alpha_property)
++		state->alpha = plane->alpha_property->values[1];
++	plane->state = state;
++}
++EXPORT_SYMBOL(__drm_atomic_helper_plane_reset);
++
+ /**
+  * drm_atomic_helper_plane_reset - default &drm_plane_funcs.reset hook for planes
+  * @plane: drm plane
+@@ -3566,15 +3586,8 @@ void drm_atomic_helper_plane_reset(struct drm_plane *plane)
+ 
+ 	kfree(plane->state);
+ 	plane->state = kzalloc(sizeof(*plane->state), GFP_KERNEL);
+-
+-	if (plane->state) {
+-		plane->state->plane = plane;
+-		plane->state->rotation = DRM_MODE_ROTATE_0;
+-
+-		/* Reset the alpha value to fully opaque if it matters */
+-		if (plane->alpha_property)
+-			plane->state->alpha = plane->alpha_property->values[1];
+-	}
++	if (plane->state)
++		__drm_atomic_helper_plane_reset(plane, plane->state);
+ }
+ EXPORT_SYMBOL(drm_atomic_helper_plane_reset);
+ 
+diff --git a/include/drm/drm_atomic_helper.h b/include/drm/drm_atomic_helper.h
+index 99e2a5297c69..f4c7ed876c97 100644
+--- a/include/drm/drm_atomic_helper.h
++++ b/include/drm/drm_atomic_helper.h
+@@ -156,6 +156,8 @@ void __drm_atomic_helper_crtc_destroy_state(struct drm_crtc_state *state);
+ void drm_atomic_helper_crtc_destroy_state(struct drm_crtc *crtc,
+ 					  struct drm_crtc_state *state);
+ 
++void __drm_atomic_helper_plane_reset(struct drm_plane *plane,
++				     struct drm_plane_state *state);
+ void drm_atomic_helper_plane_reset(struct drm_plane *plane);
+ void __drm_atomic_helper_plane_duplicate_state(struct drm_plane *plane,
+ 					       struct drm_plane_state *state);
 -- 
 2.18.0
