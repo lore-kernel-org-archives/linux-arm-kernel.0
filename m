@@ -1,54 +1,112 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 26 Jul 2018 08:40:12 +0200
-Subject: [PATCH v2 4/4] ARM: exynos: Fix imprecise abort during Exynos5422
- suspend to RAM
-In-Reply-To: <CANAwSgSChhEzDf5oSqZ2Srt62n16Z+ppFnupT=0pGkaSCv90vw@mail.gmail.com>
-References: <20180724164946.6274-1-krzk@kernel.org>
- <20180724164946.6274-4-krzk@kernel.org>
- <CANAwSgSChhEzDf5oSqZ2Srt62n16Z+ppFnupT=0pGkaSCv90vw@mail.gmail.com>
-Message-ID: <CAJKOXPc1csipQsmtJ77uZOwUgchPwGoA_+xxzmCjx97dLU5cyg@mail.gmail.com>
+From: xiaolei.li@mediatek.com (xiaolei li)
+Date: Thu, 26 Jul 2018 14:46:29 +0800
+Subject: [PATCH v4 14/35] mtd: rawnand: mtk: convert driver to nand_scan()
+In-Reply-To: <20180726081402.1fa86ec5@bbrezillon>
+References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
+ <20180720151527.16038-15-miquel.raynal@bootlin.com>
+ <20180721191004.26fc9290@bbrezillon>	<1532585201.10234.9.camel@mhfsdcap03>
+ <20180726081402.1fa86ec5@bbrezillon>
+Message-ID: <1532587589.10234.14.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 July 2018 at 08:22, Anand Moon <linux.amoon@gmail.com> wrote:
-> Hi Krzysztof,
->
-> On 24 July 2018 at 22:19, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> Suspend to RAM on Odroid XU3/XU4/HC1 family (Exynos5422) causes
->> imprecise abort:
->>
->>         PM: Syncing filesystems ... done.
->>         Freezing user space processes ... (elapsed 0.003 seconds) done.
->>         OOM killer disabled.
->>         Freezing remaining freezable tasks ... (elapsed 0.003 seconds) done.
->>         wake enabled for irq 139
->>         Disabling non-boot CPUs ...
->>         IRQ51 no longer affine to CPU1
->>         IRQ52 no longer affine to CPU2
->>         IRQ53 no longer affine to CPU3
->>         IRQ54 no longer affine to CPU4
->>         IRQ55 no longer affine to CPU5
->>         IRQ56 no longer affine to CPU6
->>         cpu cpu4: Dropping the link to regulator.40
->>         IRQ57 no longer affine to CPU7
->>         Unhandled fault: external abort on non-linefetch (0x1008) at 0xf081a028
->>         Internal error: : 1008 [#1] PREEMPT SMP ARM
->>
->> with last call trace in exynos_suspend_enter().
->>
->> The abort is caused by writing to register in secure part of sysram.
->> Boards booted under secure firmware (e.g. Hardkernel Odroid boards)
->> should access non-secure sysram.
->>
->> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->>
->
-> I could not get the suspend to ram working on my Odroid-XU4.
+On Thu, 2018-07-26 at 08:14 +0200, Boris Brezillon wrote:
+> On Thu, 26 Jul 2018 14:06:41 +0800
+> xiaolei li <xiaolei.li@mediatek.com> wrote:
+> 
+> > On Sat, 2018-07-21 at 19:10 +0200, Boris Brezillon wrote:
+> > > On Fri, 20 Jul 2018 17:15:06 +0200
+> > > Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+> > >   
+> > > > Two helpers have been added to the core to make ECC-related
+> > > > configuration between the detection phase and the final NAND scan. Use
+> > > > these hooks and convert the driver to just use nand_scan() instead of
+> > > > both nand_scan_ident() and nand_scan_tail().
+> > > > 
+> > > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > > > ---
+> > > >  drivers/mtd/nand/raw/mtk_nand.c | 75 ++++++++++++++++++++++++-----------------
+> > > >  1 file changed, 44 insertions(+), 31 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/mtd/nand/raw/mtk_nand.c b/drivers/mtd/nand/raw/mtk_nand.c
+> > > > index 7bc6be3f6ec0..967418f945ea 100644
+> > > > --- a/drivers/mtd/nand/raw/mtk_nand.c
+> > > > +++ b/drivers/mtd/nand/raw/mtk_nand.c
+> > > > @@ -1250,13 +1250,54 @@ static int mtk_nfc_ecc_init(struct device *dev, struct mtd_info *mtd)
+> > > >  	return 0;
+> > > >  }
+> > > >  
+> > > > +static int mtk_nfc_attach_chip(struct nand_chip *chip)
+> > > > +{
+> > > > +	struct mtd_info *mtd = nand_to_mtd(chip);
+> > > > +	struct device *dev = mtd->dev.parent;
+> > > > +	struct mtk_nfc *nfc = nand_get_controller_data(chip);
+> > > > +	struct mtk_nfc_nand_chip *mtk_nand = to_mtk_nand(chip);
+> > > > +	int len;
+> > > > +	int ret;
+> > > > +
+> > > > +	if (chip->options & NAND_BUSWIDTH_16) {
+> > > > +		dev_err(dev, "16bits buswidth not supported");
+> > > > +		return -EINVAL;
+> > > > +	}
+> > > > +
+> > > > +	/* store bbt magic in page, cause OOB is not protected */
+> > > > +	if (chip->bbt_options & NAND_BBT_USE_FLASH)
+> > > > +		chip->bbt_options |= NAND_BBT_NO_OOB;
+> > > > +
+> > > > +	ret = mtk_nfc_ecc_init(dev, mtd);
+> > > > +	if (ret)
+> > > > +		return ret;
+> > > > +
+> > > > +	ret = mtk_nfc_set_spare_per_sector(&mtk_nand->spare_per_sector, mtd);
+> > > > +	if (ret)
+> > > > +		return ret;
+> > > > +
+> > > > +	mtk_nfc_set_fdm(&mtk_nand->fdm, mtd);
+> > > > +	mtk_nfc_set_bad_mark_ctl(&mtk_nand->bad_mark, mtd);
+> > > > +
+> > > > +	len = mtd->writesize + mtd->oobsize;
+> > > > +	nfc->buffer = devm_kzalloc(dev, len, GFP_KERNEL);
+> > > > +	if (!nfc->buffer)
+> > > > +		return  -ENOMEM;
+> > > > +
+> > > > +	return 0;
+> > > > +}
+> > > > +
+> > > > +static const struct nand_controller_ops mtk_nfc_controller_ops = {
+> > > > +	.attach_chip = mtk_nfc_attach_chip,
+> > > > +};
+> > > > +
+> > > >  static int mtk_nfc_nand_chip_init(struct device *dev, struct mtk_nfc *nfc,
+> > > >  				  struct device_node *np)
+> > > >  {
+> > > >  	struct mtk_nfc_nand_chip *chip;
+> > > >  	struct nand_chip *nand;
+> > > >  	struct mtd_info *mtd;
+> > > > -	int nsels, len;
+> > > > +	int nsels;
+> > > >  	u32 tmp;
+> > > >  	int ret;
+> > > >  	int i;
+> > > > @@ -1287,6 +1328,7 @@ static int mtk_nfc_nand_chip_init(struct device *dev, struct mtk_nfc *nfc,
+> > > >  
+> > > >  	nand = &chip->nand;
+> > > >  	nand->controller = &nfc->controller;
+> > > > +	nand->controller->ops = &mtk_nfc_controller_ops;  
+> > > 
+> > > Just like for the marvell driver, this assignment should be moved here
+> > > [1].   
+> > Agree to this.
+> >
+>  
+> > > Also, it looks like this driver is open-coding
+> > > nand_controller_init(), probably something we should fix (in a separate
+> > > patch).  
+> > May I ask if you mean driver should use nand_hw_control_init helper to
+> > do controller_init?
+> 
+> Well, now it's named nand_controller_init(), but yes, that's what I
+> meant.
 
-Correct, resuming from suspend to RAM does not work on Exynos5422
-(yet). The patch does not add support for it. I did not write that it
-works. The only thing patch does, is fixing the imprecise abort during
-suspend.
-
-Best regards,
-Krzysztof
+OK. I will fix it base on this patch series later.
+Thanks!
