@@ -1,61 +1,65 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 26 Jul 2018 01:35:16 +0100
-Subject: [PATCH v2 02/18] arm64: dts: allwinner: a64: Add Pine64-LTS device
- tree file
+Date: Thu, 26 Jul 2018 01:35:15 +0100
+Subject: [PATCH v2 01/18] arm64: dts: allwinner: a64: Add L2 cache nodes
 In-Reply-To: <20180726003532.18751-1-andre.przywara@arm.com>
 References: <20180726003532.18751-1-andre.przywara@arm.com>
-Message-ID: <20180726003532.18751-3-andre.przywara@arm.com>
+Message-ID: <20180726003532.18751-2-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Pine64-LTS is a variant of the Pine64 board, from the software
-visible side resembling a SoPine module on a baseboard, though the
-board has the SoC and DRAM integrated on one PCB.
-Due to this it basically shares the DT with the SoPine baseboard, which
-we mimic in our DT by inclucing the boardboard .dts into the new file,
-just overwriting the model name.
-Having a separate .dts for this seems useful, since we don't know yet if
-there are subtle differences between the two. Also the SoC on the LTS
-board is technically an "R18" instead of the original "A64", although as
-far as we know this is just a relabelled version of the original SoC.
+Current kernels complain when booting on an A64 Soc:
+....
+[    1.904297] cacheinfo: Unable to detect cache hierarchy for CPU 0
+....
+Not a real biggie on this flat topology, but also easy enough to fix.
+
+Add the L2 cache node and let each CPU point to it.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/boot/dts/allwinner/Makefile                  |  1 +
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts | 13 +++++++++++++
- 2 files changed, 14 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 9ffa7a038791..b7034327b28b 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-lts.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pinebook.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
-new file mode 100644
-index 000000000000..72d6961dc312
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
-@@ -0,0 +1,13 @@
-+/*
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ *
-+ * Copyright (c) 2018 ARM Ltd.
-+ */
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index d3daf90a8715..934d7e87fa08 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -88,6 +88,7 @@
+ 			device_type = "cpu";
+ 			reg = <0>;
+ 			enable-method = "psci";
++			next-level-cache = <&L2>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+@@ -95,6 +96,7 @@
+ 			device_type = "cpu";
+ 			reg = <1>;
+ 			enable-method = "psci";
++			next-level-cache = <&L2>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -102,6 +104,7 @@
+ 			device_type = "cpu";
+ 			reg = <2>;
+ 			enable-method = "psci";
++			next-level-cache = <&L2>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -109,6 +112,12 @@
+ 			device_type = "cpu";
+ 			reg = <3>;
+ 			enable-method = "psci";
++			next-level-cache = <&L2>;
++		};
 +
-+#include "sun50i-a64-sopine-baseboard.dts"
-+
-+/ {
-+	model = "Pine64 LTS";
-+	compatible = "pine64,pine64-lts", "allwinner,sun50i-r18",
-+		     "allwinner,sun50i-a64";
-+};
++		L2: l2-cache {
++			compatible = "cache";
++			cache-level = <2>;
+ 		};
+ 	};
+ 
 -- 
 2.14.4
