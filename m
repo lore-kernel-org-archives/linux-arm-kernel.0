@@ -1,32 +1,144 @@
-From: tpiepho@impinj.com (Trent Piepho)
-Date: Thu, 26 Jul 2018 17:01:36 +0000
-Subject: [PATCH v2 2/2] spi: add SPI controller driver for UniPhier SoC
-In-Reply-To: <CAHp75VcEdxDEo0T5_9BzOPaeaqjbmbrWmaE9+ZuUDYhjh6jpVw@mail.gmail.com>
-References: <1532588943-19481-1-git-send-email-hayashibara.keiji@socionext.com>
- <1532588943-19481-3-git-send-email-hayashibara.keiji@socionext.com>
- <CAHp75VcEdxDEo0T5_9BzOPaeaqjbmbrWmaE9+ZuUDYhjh6jpVw@mail.gmail.com>
-Message-ID: <1532624495.2283.197.camel@impinj.com>
+From: alex@ghiti.fr (Alex Ghiti)
+Date: Thu, 26 Jul 2018 17:01:57 +0000
+Subject: [PATCH v4 00/11] hugetlb: Factorize hugetlb architecture
+ primitives
+In-Reply-To: <20180726125940.GA15033@ls3530>
+References: <20180705110716.3919-1-alex@ghiti.fr>
+ <20180709141621.GD22297@dhcp22.suse.cz>
+ <2173685f-7f85-7acb-4685-2383210c5fa2@ghiti.fr>
+ <87d0vehx16.fsf@concordia.ellerman.id.au>
+ <67aba0f0-c0d4-b06f-5fbc-f4d113ce5033@ghiti.fr>
+ <20180726125940.GA15033@ls3530>
+Message-ID: <de188e2f-99ab-53fa-20df-4fec00a935e9@ghiti.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-07-26 at 11:46 +0300, Andy Shevchenko wrote:
-> > +
-> > +       /*
-> > +        * the supported rates are even numbers from 4 to 254. (4,6,8...254)
-> > +        * round up as we look for equal or less speed
-> > +        */
-> > +       ckrat = DIV_ROUND_UP(clk_get_rate(priv->clk), speed);
-> > +       ckrat = roundup(ckrat, 2);
-> 
-> ckrat += ckrat & 1;
+Hi Helge,
 
-Either way, the compiler produces the same code:
+Thanks for your tests.
+In case it can help you, this is what I get when I try to build 
+generic-64bit_defconfig (I truncated the output):
 
- add r0, r0, #1
- bic r0, r0, #1
+...
 
-I.e., ckrat = (ckrat + 1) & ~1, one "add" and one "and".
+ ?LD????? vmlinux.o
+ ?MODPOST vmlinux.o
+hppa64-linux-ld: init/main.o(.text+0x98): cannot reach strreplace
+init/main.o: In function `initcall_blacklisted':
+init/.tmp_main.o:(.text+0x98): relocation truncated to fit: 
+R_PARISC_PCREL22F against symbol `strreplace' defined in .text section 
+in lib/string.o
+hppa64-linux-ld: init/main.o(.text+0xbc): cannot reach strcmp
+init/.tmp_main.o:(.text+0xbc): relocation truncated to fit: 
+R_PARISC_PCREL22F against symbol `strcmp' defined in .text section in 
+lib/string.o
+hppa64-linux-ld: init/main.o(.text+0x21c): cannot reach strcpy
+init/main.o: In function `do_one_initcall':
+(.text+0x21c): relocation truncated to fit: R_PARISC_PCREL22F against 
+symbol `strcpy' defined in .text section in lib/string.o
+hppa64-linux-ld: init/main.o(.text+0x250): cannot reach strlcat
+(.text+0x250): relocation truncated to fit: R_PARISC_PCREL22F against 
+symbol `strlcat' defined in .text section in lib/string.o
+hppa64-linux-ld: init/main.o(.init.text+0x1d4): cannot reach strcmp
+init/main.o: In function `do_early_param':
+init/.tmp_main.o:(.init.text+0x1d4): relocation truncated to fit: 
+R_PARISC_PCREL22F against symbol `strcmp' defined in .text section in 
+lib/string.o
+hppa64-linux-ld: init/main.o(.init.text+0x250): cannot reach strcmp
+init/.tmp_main.o:(.init.text+0x250): relocation truncated to fit: 
+R_PARISC_PCREL22F against symbol `strcmp' defined in .text section in 
+lib/string.o
+hppa64-linux-ld: init/main.o(.init.text+0x294): cannot reach strlen
+init/main.o: In function `repair_env_string':
+init/.tmp_main.o:(.init.text+0x294): relocation truncated to fit: 
+R_PARISC_PCREL22F against symbol `strlen' defined in .text section in 
+lib/string.o
+hppa64-linux-ld: init/main.o(.init.text+0x2f0): cannot reach strlen
+init/.tmp_main.o:(.init.text+0x2f0): relocation truncated to fit: 
+R_PARISC_PCREL22F against symbol `strlen' defined in .text section in 
+lib/string.o
+hppa64-linux-ld: init/main.o(.init.text+0x308): cannot reach memmove
+init/.tmp_main.o:(.init.text+0x308): relocation truncated to fit: 
+R_PARISC_PCREL22F against symbol `memmove' defined in .text section in 
+lib/string.o
+hppa64-linux-ld: init/main.o(.init.text+0x454): cannot reach strlen
+init/main.o: In function `unknown_bootoption':
+init/.tmp_main.o:(.init.text+0x454): relocation truncated to fit: 
+R_PARISC_PCREL22F against symbol `strlen' defined in .text section in 
+lib/string.o
+hppa64-linux-ld: init/main.o(.init.text+0x4dc): cannot reach strchr
+init/.tmp_main.o:(.init.text+0x4dc): additional relocation overflows 
+omitted from the output
+hppa64-linux-ld: init/main.o(.init.text+0x638): cannot reach strncmp
+hppa64-linux-ld: init/main.o(.init.text+0x694): cannot reach get_option
+hppa64-linux-ld: init/main.o(.init.text+0x744): cannot reach strsep
+hppa64-linux-ld: init/main.o(.init.text+0x798): cannot reach strlen
+hppa64-linux-ld: init/main.o(.init.text+0x7d0): cannot reach strcpy
+hppa64-linux-ld: init/main.o(.init.text+0x954): cannot reach strlcpy
+hppa64-linux-ld: init/main.o(.init.text+0xab8): cannot reach strlen
+hppa64-linux-ld: init/main.o(.init.text+0xafc): cannot reach strlen
+hppa64-linux-ld: init/main.o(.init.text+0xb40): cannot reach strlen
+hppa64-linux-ld: init/main.o(.init.text+0xb84): cannot reach strlen
+hppa64-linux-ld: init/main.o(.init.text+0xbd0): cannot reach strcpy
+hppa64-linux-ld: init/main.o(.init.text+0xbe8): cannot reach strcpy
+hppa64-linux-ld: init/main.o(.init.text+0xc3c): cannot reach 
+build_all_zonelists
+hppa64-linux-ld: init/main.o(.init.text+0x1200): cannot reach unknown
+hppa64-linux-ld: init/main.o(.init.text+0x1278): cannot reach 
+wait_for_completion
+hppa64-linux-ld: init/main.o(.init.text+0x12b0): cannot reach _raw_spin_lock
+hppa64-linux-ld: init/main.o(.init.text+0x147c): cannot reach strcpy
+hppa64-linux-ld: init/main.o(.ref.text+0x40): cannot reach kernel_thread
+hppa64-linux-ld: init/main.o(.ref.text+0x60): cannot reach 
+find_task_by_pid_ns
+hppa64-linux-ld: init/main.o(.ref.text+0x98): cannot reach 
+set_cpus_allowed_ptr
+hppa64-linux-ld: init/main.o(.ref.text+0xbc): cannot reach kernel_thread
+hppa64-linux-ld: init/main.o(.ref.text+0xd4): cannot reach 
+find_task_by_pid_ns
+hppa64-linux-ld: init/main.o(.ref.text+0x108): cannot reach complete
+hppa64-linux-ld: init/main.o(.ref.text+0x128): cannot reach 
+cpu_startup_entry
+hppa64-linux-ld: init/main.o(.ref.text+0x164): cannot reach unknown
+hppa64-linux-ld: init/main.o(.ref.text+0x174): cannot reach 
+async_synchronize_full
+hppa64-linux-ld: init/main.o(.ref.text+0x1a4): cannot reach 
+rcu_barrier_sched
+hppa64-linux-ld: init/main.o(.ref.text+0x1b4): cannot reach mark_rodata_ro
+hppa64-linux-ld: init/main.o(.ref.text+0x1d4): cannot reach 
+rcu_end_inkernel_boot
+hppa64-linux-ld: init/main.o(.ref.text+0x1f4): cannot reach unknown
+hppa64-linux-ld: init/main.o(.ref.text+0x218): cannot reach printk
+hppa64-linux-ld: init/main.o(.ref.text+0x238): cannot reach unknown
+hppa64-linux-ld: init/main.o(.ref.text+0x258): cannot reach panic
+hppa64-linux-ld: init/main.o(.ref.text+0x268): cannot reach printk
+hppa64-linux-ld: init/main.o(.ref.text+0x280): cannot reach unknown
+hppa64-linux-ld: init/main.o(.ref.text+0x29c): cannot reach unknown
+hppa64-linux-ld: init/main.o(.ref.text+0x2b8): cannot reach unknown
+hppa64-linux-ld: init/main.o(.ref.text+0x2d4): cannot reach unknown
+hppa64-linux-ld: init/main.o(.ref.text+0x2f0): cannot reach panic
+hppa64-linux-ld: init/do_mounts.o(.text+0x30): cannot reach strncasecmp
+hppa64-linux-ld: init/do_mounts.o(.text+0x158): cannot reach strncmp
+hppa64-linux-ld: init/do_mounts.o(.text+0x180): cannot reach strchr
 
-Might as well use the macro so it's clear. There is also round_up(x,y),
-which I believe is intended to be used only with power of 2 values of
-y.
+...
+
+
+On 07/26/2018 12:59 PM, Helge Deller wrote:
+> * Alex Ghiti <alex@ghiti.fr>:
+>> This is the result of the build for all arches tackled in this series
+>> rebased on 4.18-rc6:
+>> ...
+>> parisc:
+>>  ??????? generic-64bit_defconfig: with huge page does not link
+>>  ??????? generic-64bit_defconfig: without huge page does not link
+>>  ??????? BUT not because of this series, any feedback welcome.
+> Strange, but I will check that later....
+>
+> Anyway, I applied your v4-patch to my parisc64 tree, built the kernel,
+> started it and ran some hugetlb LTP testcases sucessfully.
+> So, please add:
+>
+> Tested-by: Helge Deller <deller@gmx.de> # parisc
+>
+> Helge
