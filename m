@@ -1,99 +1,91 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 26 Jul 2018 13:23:50 +0100
-Subject: [PATCH 1/6] ARM: signal: copy registers using __copy_from_user()
-In-Reply-To: <E1fctOl-0005ul-69@rmk-PC.armlinux.org.uk>
-References: <20180710141322.GL17271@n2100.armlinux.org.uk>
- <E1fctOl-0005ul-69@rmk-PC.armlinux.org.uk>
-Message-ID: <20180726122350.qtf7h6qekru23bv2@lakrids.cambridge.arm.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 26 Jul 2018 17:56:49 +0530
+Subject: [PATCH v7 3/6] dt-bindings: mailbox: imx-mu: add generic MU
+ channel support
+In-Reply-To: <AM0PR04MB42116C756EC78AD12EB254D6802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <20180726065331.6186-1-o.rempel@pengutronix.de>
+ <20180726065331.6186-4-o.rempel@pengutronix.de>
+ <CABb+yY0kVFvQRBrU4j9t=_JcSUkcXMMSK5u=XSufM6XcmKiv-g@mail.gmail.com>
+ <AM0PR04MB42116C756EC78AD12EB254D6802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <CABb+yY3OdXGair6hdLH_jb54O09y=rhUMfbG1-LSa=pHvDz+sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 10, 2018 at 03:13:47PM +0100, Russell King wrote:
-> When restoring the ARM integer registers, use __copy_from_user() to
-> copy them into kernel space before restoring them, rather than
-> __get_user_error().
+On Thu, Jul 26, 2018 at 5:21 PM, A.s. Dong <aisheng.dong@nxp.com> wrote:
+> Hi Jassi,
+>
+>> -----Original Message-----
+>> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
+>> Sent: Thursday, July 26, 2018 5:50 PM
+>> To: Oleksij Rempel <o.rempel@pengutronix.de>
+>> Cc: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
+>> <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark
+>> Rutland <mark.rutland@arm.com>; A.s. Dong <aisheng.dong@nxp.com>;
+>> Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>; , Sascha Hauer
+>> <kernel@pengutronix.de>; , linux-arm-kernel at lists.infradead.org, linux-
+>> mediatek at lists.infradead.org, srv_heupstream <linux-arm-
+>> kernel at lists.infradead.org>; Devicetree List <devicetree@vger.kernel.org>;
+>> dl-linux-imx <linux-imx@nxp.com>
+>> Subject: Re: [PATCH v7 3/6] dt-bindings: mailbox: imx-mu: add generic MU
+>> channel support
+>>
+>> On Thu, Jul 26, 2018 at 12:23 PM, Oleksij Rempel <o.rempel@pengutronix.de>
+>> wrote:
+>>
+>> > Each MU has four pairs of rx/tx data register with four rx/tx
+>> > interrupts which can also be used as a separate channel.
+>> >
+>> So the hardware actually supports 4 channels.
+>>
+>> > -- #mbox-cells:  Must be 0. Number of cells in a mailbox
+>> > +- #mbox-cells:  Must be:
+>> > +               0 - for single channel mode. i.MX8* SCU protocol specific.
+>> > +               1 - for multichannel (generic) mode.
+>> > +
+>> No, please.
+>> DT bindings should reflect the real hardware, and not the software mode we
+>> want the driver to work in.
+>> Please define mbox-cells=1  and have the i.MX8* platform always ask for
+>> channel-0.
+>
+> The reality is that MU hardware does not define channels in reference manual.
+> However, it does have four separate data tx/rx register which can be used
+> as 'virtual' channels which is supported by this current driver.
+>
+> See below HW description from the reference manual:
+> For messaging, the MU has four, 32-bit write-only transmit registers and four, 32-bit
+> read-only receive registers on the Processor B and Processor A-sides. These registers are
+> used for sending messages to each other.
+>
+> Passing short messages
+> Transmit register(s) can be used to pass short messages
+> from one to four words in length. For example, when a four-word message is desired,
+> only one of the registers needs to have its corresponding interrupt enable bit set at the
+> receiver side; the message?s first three words are written to the registers whose
+> interrupt is masked, and the fourth word is written to the other register (which
+> triggers an interrupt at the receiver side).
+>
+> The reference manual is at here: (Chapter 42 Messaging Unit (MU)
+> https://www.nxp.com/docs/en/reference-manual/IMX6ULRM.pdf
+>
+Thanks. That makes life much easier.
 
-I assume that this is so that we only have to pay the cost of sanitizing
-the user pointer once in __copy_from_user(), rather than in each
-__get_user_error()?
+> And SCU firmware does use MU in above way specified by reference manual.
+> Even from HW point of view, it's still one channel only mailbox.
+> That's why we change the mbox-cells to 0 accordingly to avoid confusing
+> the multi channels users supported in this driver.
+>
+> As per Sasha's request, we're going to support both protocol (SCU and generic M4)
+> in one mailbox driver, that means we need deal with this two case property.
+>
+> If we use mbox-cells 1 case for SCU, then the using would be like:
+> mboxes = <&mailbox 0> which is mixed with the normal multi channel
+> users. And we also must state clearly in binding doc that for mbox-cells
+>  1 case for SCU, the cell value must be 0 which is also confusing with
+> Multi channel users.
+>
+> How do you suggest for such case?
+>
+Let me read the spec and try to see/shine the light :)
 
-Can we mention that in the commit message? e.g. something like:
-
-  In subsequent patches, each uaccess will sanitize the __user pointer
-  to prevent speculative accesses to kernel memory.
-  
-  To amortize the cost of this sanitization when restoring the integer
-  registers, we can use __copy_from_user() rather than a sequence of
-  __get_user_error() calls.
- 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  arch/arm/kernel/signal.c | 38 +++++++++++++++++++++-----------------
->  1 file changed, 21 insertions(+), 17 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-> index bd8810d4acb3..0ae74207e43e 100644
-> --- a/arch/arm/kernel/signal.c
-> +++ b/arch/arm/kernel/signal.c
-> @@ -176,6 +176,7 @@ static int restore_vfp_context(char __user **auxp)
->  
->  static int restore_sigframe(struct pt_regs *regs, struct sigframe __user *sf)
->  {
-> +	struct sigcontext context;
->  	char __user *aux;
->  	sigset_t set;
->  	int err;
-> @@ -184,23 +185,26 @@ static int restore_sigframe(struct pt_regs *regs, struct sigframe __user *sf)
->  	if (err == 0)
->  		set_current_blocked(&set);
->  
-> -	__get_user_error(regs->ARM_r0, &sf->uc.uc_mcontext.arm_r0, err);
-> -	__get_user_error(regs->ARM_r1, &sf->uc.uc_mcontext.arm_r1, err);
-> -	__get_user_error(regs->ARM_r2, &sf->uc.uc_mcontext.arm_r2, err);
-> -	__get_user_error(regs->ARM_r3, &sf->uc.uc_mcontext.arm_r3, err);
-> -	__get_user_error(regs->ARM_r4, &sf->uc.uc_mcontext.arm_r4, err);
-> -	__get_user_error(regs->ARM_r5, &sf->uc.uc_mcontext.arm_r5, err);
-> -	__get_user_error(regs->ARM_r6, &sf->uc.uc_mcontext.arm_r6, err);
-> -	__get_user_error(regs->ARM_r7, &sf->uc.uc_mcontext.arm_r7, err);
-> -	__get_user_error(regs->ARM_r8, &sf->uc.uc_mcontext.arm_r8, err);
-> -	__get_user_error(regs->ARM_r9, &sf->uc.uc_mcontext.arm_r9, err);
-> -	__get_user_error(regs->ARM_r10, &sf->uc.uc_mcontext.arm_r10, err);
-> -	__get_user_error(regs->ARM_fp, &sf->uc.uc_mcontext.arm_fp, err);
-> -	__get_user_error(regs->ARM_ip, &sf->uc.uc_mcontext.arm_ip, err);
-> -	__get_user_error(regs->ARM_sp, &sf->uc.uc_mcontext.arm_sp, err);
-> -	__get_user_error(regs->ARM_lr, &sf->uc.uc_mcontext.arm_lr, err);
-> -	__get_user_error(regs->ARM_pc, &sf->uc.uc_mcontext.arm_pc, err);
-> -	__get_user_error(regs->ARM_cpsr, &sf->uc.uc_mcontext.arm_cpsr, err);
-> +	err |= __copy_from_user(&context, &sf->uc.uc_mcontext, sizeof(context));
-
-IIUC, this means that we'll also copy the (unused) fault_address field,
-but I assume that's ok.
-
-Thanks,
-Mark.
-
-> +	if (err == 0) {
-> +		regs->ARM_r0 = context.arm_r0;
-> +		regs->ARM_r1 = context.arm_r1;
-> +		regs->ARM_r2 = context.arm_r2;
-> +		regs->ARM_r3 = context.arm_r3;
-> +		regs->ARM_r4 = context.arm_r4;
-> +		regs->ARM_r5 = context.arm_r5;
-> +		regs->ARM_r6 = context.arm_r6;
-> +		regs->ARM_r7 = context.arm_r7;
-> +		regs->ARM_r8 = context.arm_r8;
-> +		regs->ARM_r9 = context.arm_r9;
-> +		regs->ARM_r10 = context.arm_r10;
-> +		regs->ARM_fp = context.arm_fp;
-> +		regs->ARM_ip = context.arm_ip;
-> +		regs->ARM_sp = context.arm_sp;
-> +		regs->ARM_lr = context.arm_lr;
-> +		regs->ARM_pc = context.arm_pc;
-> +		regs->ARM_cpsr = context.arm_cpsr;
-> +	}
->  
->  	err |= !valid_user_regs(regs);
->  
-> -- 
-> 2.7.4
-> 
+Cheers!
