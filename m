@@ -1,38 +1,42 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 26 Jul 2018 01:35:24 +0100
-Subject: [PATCH v2 10/18] arm64: dts: allwinner: a64: Orange Pi Win: Mark CPU
- supply regulator
+Date: Thu, 26 Jul 2018 01:35:21 +0100
+Subject: [PATCH v2 07/18] arm64: dts: allwinner: a64: Orange Pi Win: Add LED
+ node
 In-Reply-To: <20180726003532.18751-1-andre.przywara@arm.com>
 References: <20180726003532.18751-1-andre.przywara@arm.com>
-Message-ID: <20180726003532.18751-11-andre.przywara@arm.com>
+Message-ID: <20180726003532.18751-8-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Samuel Holland <samuel@sholland.org>
 
-DCDC2 (polyphased with DCDC3) is supplying the power to the CPU.
-Add a property to the CPU node to mark this connection.
+The Orange Pi Win has a green status LED, add the DT node for it.
 
 Signed-off-by: Samuel Holland <samuel@sholland.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-index 6f85a05d2f4b..ec24b7379d6d 100644
+index 10f63d0b99cb..55eea0b077d0 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-@@ -101,6 +101,10 @@
+@@ -64,6 +64,15 @@
+ 		stdout-path = "serial0:115200n8";
  	};
- };
  
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc2>;
-+};
++	leds {
++		compatible = "gpio-leds";
 +
- &ehci1 {
- 	status = "okay";
- };
++		status {
++			label = "orangepi:green:status";
++			gpios = <&pio 7 11 GPIO_ACTIVE_HIGH>; /* PH11 */
++		};
++	};
++
+ 	reg_gmac_3v3: gmac-3v3 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "gmac-3v3";
 -- 
 2.14.4
