@@ -1,45 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 25 Jul 2018 23:53:07 -0700
-Subject: [GIT PULL v2] Renesas ARM Based SoC DT Updates for v4.19
-In-Reply-To: <cover.1532345886.git.horms+renesas@verge.net.au>
-References: <cover.1532345886.git.horms+renesas@verge.net.au>
-Message-ID: <20180726065307.2e7txeva44uxegfj@localhost>
+Date: Wed, 25 Jul 2018 23:53:53 -0700
+Subject: [Amlogic 64-bit DT updates for v4.19, round 2 (redo)
+In-Reply-To: <7hy3e13mqx.fsf@baylibre.com>
+References: <7hy3e13mqx.fsf@baylibre.com>
+Message-ID: <20180726065353.5jn42f5m73g6hmrx@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 02:04:47PM +0200, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Mon, Jul 23, 2018 at 12:06:30PM -0500, Kevin Hilman wrote:
+> [ fixes the original round 2 by removing the unnecessary (and wrong)
+>   merge of v4.18-rc5.]
 > 
-> Please consider these Renesas ARM based SoC DT updates for v4.19.
+> Olof, Arnd,
 > 
-> Changes since v1:
-> * Dropped patch which removes MTD partitioning from DT,
->   Olof requested more discussion of this
-> * Trimmed text in tag, as per suggestions from Olof
+> A second round of DT updates for Amlogic, directly on top of the redo of
+> the first one.
 > 
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> This includes a merge of a branch already queued in the clk tree because
+> of the dependency on clock headers used in the DT changes here..
 > 
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> Kevin
+> 
+> The following changes since commit 89803e8b26569bdf5798f8745a4c708bf9360ee6:
+> 
+>   ARM64: dts: meson-axg: add pdm pins (2018-07-20 08:18:37 -0700)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-dt-for-v4.19
+>   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2-1
 > 
-> for you to fetch changes up to c03e2f12a2967f1639ee53299b72922ee3472528:
+> for you to fetch changes up to aaa080fa7e0f01f7cd8eb22a7385a4d8106c7478:
 > 
->   ARM: dts: r8a77470: Use r8a77470-cpg-mssr binding definitions (2018-07-23 13:33:06 +0200)
+>   ARM64: dts: meson-gxl: add support for the Oranth Tanix TX3 Mini (2018-07-20 09:02:22 -0700)
 > 
 > ----------------------------------------------------------------
-> Renesas ARM Based SoC DT Updates for v4.19
-> 
-> * RZ/G1C (r8a77470) SoC: Use r8a77470-cpg-mssr binding definitions
-> * Add GR-Peach audio camera shield support with MT9V111 image sensor
-> * Add initial support for RZ/N1D (r9a06g032) SoC and its RZN1D-DB board
-> * Use SPDX identifiers in DT for all SoCs and boards
-> * Add missing OPP properties for all CPUs on various SoCs
-> * Add missing PMIC nodes to R-Car Gen2 M2-W (r8a7791) based porter board
+> Amlogic 64-bit DT changes for v4.19, round 2
+> - new SoC: S905W
+> - new boards: based on S905W: Amlogic P281, Oranth Tanix TX3 Mini
+> - AXG: add DT for new audio clock controller
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
