@@ -1,51 +1,93 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 26 Jul 2018 00:18:04 -0700
-Subject: [GIT PULL 1/3] drivers: samsung: Cleanup for v4.19
-In-Reply-To: <20180725162340.7488-1-krzk@kernel.org>
-References: <20180725162340.7488-1-krzk@kernel.org>
-Message-ID: <20180726071804.pqmz4467lekt73xl@localhost>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 26 Jul 2018 15:48:09 +0800
+Subject: [PATCH v2 17/18] arm64: dts: allwinner: a64: NanoPi-A64: Add
+ Wifi/Bluetooth chip
+In-Reply-To: <20180726003532.18751-18-andre.przywara@arm.com>
+References: <20180726003532.18751-1-andre.przywara@arm.com>
+ <20180726003532.18751-18-andre.przywara@arm.com>
+Message-ID: <CAGb2v64UKUj6EkiqT5pnY28vZQjwS+bPmgZAce8O=vNmKDmWHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2018 at 06:23:38PM +0200, Krzysztof Kozlowski wrote:
-> Hi,
-> 
-> Rebased on v4.18-rc2, because at v4.18-rc1 the NFS root boot, which I use at my
-> testing setup (https://krzk.eu), was broken.
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-> The following changes since commit 7daf201d7fe8334e2d2364d4e8ed3394ec9af819:
-> 
->   Linux 4.18-rc2 (2018-06-24 20:54:29 +0800)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-exynos5440-4.19
-> 
-> for you to fetch changes up to c708e462e90e04afb7634e1f27f60cd6869936db:
-> 
->   usb: host: exynos: Remove support for Exynos5440 (2018-07-24 18:44:00 +0200)
-> 
-> ----------------------------------------------------------------
-> Exynos5440 drivers removal
-> 
-> The Exynos5440 (quad-core A15 with GMAC, PCIe, SATA) was targeting
-> server platforms but it did not make it to the market really.  There are
-> no development boards with it and probably there are no real products
-> neither.  The development for Exynos5440 ended in 2013 and since then
-> the platform is in maintenance mode.
-> 
-> Removing Exynos5440 makes our life slightly easier: less maintenance,
-> smaller code, reduced number of quirks, no need to preserve DTB
-> backward-compatibility.
-> 
-> The Device Tree sources and some of the drivers for Exynos5440 were
-> already removed.  This removes remaining drivers.
+On Thu, Jul 26, 2018 at 8:35 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> The NanoPi-A64 has an on-board WiFi/Bluetooth combo chip, connected
 
-Merged, thanks!
+The NanoPi A64 uses the RTL8189, which does _not_ have Bluetooth.
+Something is seriously wrong here.
 
-
--Olof
+> to the usual MMC1 and UART1. The AXP power line is the always-on
+> VDD_SYS_3.3V, but it uses pin L2 to enable the regulator.
+> As the actual WiFi driver is not in mainline Linux, it doesn't have a
+> compatible string, so we omit this from the node.
+>
+> Add the respective nodes to the DT to make it usable.
+>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   | 31 ++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+> index bd35a093e6cd..705e0b23589e 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+> @@ -53,11 +53,17 @@
+>         aliases {
+>                 ethernet0 = &emac;
+>                 serial0 = &uart0;
+> +               serial1 = &uart1;
+>         };
+>
+>         chosen {
+>                 stdout-path = "serial0:115200n8";
+>         };
+> +
+> +       wifi_pwrseq: wifi_pwrseq {
+> +               compatible = "mmc-pwrseq-simple";
+> +               reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+> +       };
+>  };
+>
+>  &ehci0 {
+> @@ -105,6 +111,24 @@
+>         status = "okay";
+>  };
+>
+> +&mmc1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&mmc1_pins>;
+> +       vmmc-supply = <&reg_dcdc1>;
+> +       vqmmc-supply = <&reg_dldo4>;
+> +       mmc-pwrseq = <&wifi_pwrseq>;
+> +       bus-width = <4>;
+> +       non-removable;
+> +       status = "okay";
+> +
+> +       rtl8189etv: wifi at 1 {
+> +               reg = <1>;
+> +               interrupt-parent = <&r_pio>;
+> +               interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
+> +               interrupt-names = "host-wake";
+> +       };
+> +};
+> +
+>  &ohci0 {
+>         status = "okay";
+>  };
+> @@ -222,6 +246,13 @@
+>         status = "okay";
+>  };
+>
+> +/* Connected to the Bluetooth UART, with hardware handshake pins */
+> +&uart1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
+> +       status = "okay";
+> +};
+> +
+>  &usbphy {
+>         status = "okay";
+>  };
+> --
+> 2.14.4
+>
