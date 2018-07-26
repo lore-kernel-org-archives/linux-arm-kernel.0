@@ -1,181 +1,133 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 26 Jul 2018 17:06:34 +0200
-Subject: [PATCH RT v3] arm64: fpsimd: use preemp_disable in addition to
- local_bh_disable()
-In-Reply-To: <20180724094623.37430032@gandalf.local.home>
-References: <20180522172115.fpqguqlsq6bavtxy@linutronix.de>
- <20180522132429.6f1dcf92@gandalf.local.home>
- <20180522173333.aawadhkcekzvrswp@linutronix.de>
- <20180711092555.268adf7f@gandalf.local.home>
- <20180711133157.bvrza5vmthu6lwjd@linutronix.de>
- <20180711093346.782af07a@gandalf.local.home>
- <20180713174937.5ddaqpylalcmc3jq@linutronix.de>
- <20180716151737.GO9486@e103592.cambridge.arm.com>
- <20180718091209.u76gzacanj5avhdl@linutronix.de>
- <20180724094623.37430032@gandalf.local.home>
-Message-ID: <20180726150634.cl3wccqur6qhle6p@linutronix.de>
+From: christophe.leroy@c-s.fr (LEROY Christophe)
+Date: Thu, 26 Jul 2018 17:13:55 +0200
+Subject: [PATCH v4 00/11] hugetlb: Factorize hugetlb architecture
+ primitives
+In-Reply-To: <67aba0f0-c0d4-b06f-5fbc-f4d113ce5033@ghiti.fr>
+References: <20180705110716.3919-1-alex@ghiti.fr>
+ <20180709141621.GD22297@dhcp22.suse.cz>
+ <2173685f-7f85-7acb-4685-2383210c5fa2@ghiti.fr>
+ <87d0vehx16.fsf@concordia.ellerman.id.au>
+ <67aba0f0-c0d4-b06f-5fbc-f4d113ce5033@ghiti.fr>
+Message-ID: <20180726171355.Horde.KlFUG9wXmbRDCiyhk5bHsw8@messagerie.si.c-s.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In v4.16-RT I noticed a number of warnings from task_fpsimd_load(). The
-code disables BH and expects that it is not preemptible. On -RT the
-task remains preemptible but remains the same CPU. This may corrupt the
-content of the SIMD registers if the task is preempted during
-saving/restoring those registers.
+Alex Ghiti <alex@ghiti.fr> a ?crit?:
 
-Add preempt_disable()/enable() to enfore the required semantic on -RT.
+> Hi everyone,
+>
+> This is the result of the build for all arches tackled in this  
+> series rebased on 4.18-rc6:
+>
+> arm:
+> ??????? versatile_defconfig: without huge page OK
+> ??????? keystone_defconfig: with huge page OK
+> arm64:
+> ??????? defconfig: with huge page OK
+> ia64:
+> ??????? generic_defconfig: with huge page OK
+> mips:
+> ??????? Paul Burton tested cavium octeon with huge page OK
+> parisc:
+> ??????? generic-64bit_defconfig: with huge page does not link
+> ??????? generic-64bit_defconfig: without huge page does not link
+> ??????? BUT not because of this series, any feedback welcome.
+> powerpc:
+> ??????? ppc64_defconfig: without huge page OK
+> ??????? ppc64_defconfig: with huge page OK
 
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
-This should work. Compiling currently gcc-6 on the box to see what
-happens. Since the crypto disables preemption "frequently" and I don't
-expect or see anything to worry about.
+Can you also test ppc32 both with and without hugepage (mpc885_ads_defconfig)
 
- arch/arm64/kernel/fpsimd.c |   30 ++++++++++++++++++++++++++++--
- 1 file changed, 28 insertions(+), 2 deletions(-)
+Thanks
+Christophe
 
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -157,6 +157,15 @@ static void sve_free(struct task_struct
- 	__sve_free(task);
- }
- 
-+static void *sve_free_atomic(struct task_struct *task)
-+{
-+	void *sve_state = task->thread.sve_state;
-+
-+	WARN_ON(test_tsk_thread_flag(task, TIF_SVE));
-+
-+	task->thread.sve_state = NULL;
-+	return sve_state;
-+}
- 
- /* Offset of FFR in the SVE register dump */
- static size_t sve_ffr_offset(int vl)
-@@ -594,6 +603,7 @@ int sve_set_vector_length(struct task_st
- 	 * non-SVE thread.
- 	 */
- 	if (task == current) {
-+		preempt_disable();
- 		local_bh_disable();
- 
- 		task_fpsimd_save();
-@@ -604,8 +614,10 @@ int sve_set_vector_length(struct task_st
- 	if (test_and_clear_tsk_thread_flag(task, TIF_SVE))
- 		sve_to_fpsimd(task);
- 
--	if (task == current)
-+	if (task == current) {
- 		local_bh_enable();
-+		preempt_enable();
-+	}
- 
- 	/*
- 	 * Force reallocation of task SVE state to the correct size
-@@ -837,6 +849,7 @@ asmlinkage void do_sve_acc(unsigned int
- 
- 	sve_alloc(current);
- 
-+	preempt_disable();
- 	local_bh_disable();
- 
- 	task_fpsimd_save();
-@@ -850,6 +863,7 @@ asmlinkage void do_sve_acc(unsigned int
- 		WARN_ON(1); /* SVE access shouldn't have trapped */
- 
- 	local_bh_enable();
-+	preempt_enable();
- }
- 
- /*
-@@ -921,10 +935,12 @@ void fpsimd_thread_switch(struct task_st
- void fpsimd_flush_thread(void)
- {
- 	int vl, supported_vl;
-+	void *mem = NULL;
- 
- 	if (!system_supports_fpsimd())
- 		return;
- 
-+	preempt_disable();
- 	local_bh_disable();
- 
- 	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
-@@ -932,7 +948,7 @@ void fpsimd_flush_thread(void)
- 
- 	if (system_supports_sve()) {
- 		clear_thread_flag(TIF_SVE);
--		sve_free(current);
-+		mem = sve_free_atomic(current);
- 
- 		/*
- 		 * Reset the task vector length as required.
-@@ -968,6 +984,8 @@ void fpsimd_flush_thread(void)
- 	set_thread_flag(TIF_FOREIGN_FPSTATE);
- 
- 	local_bh_enable();
-+	preempt_enable();
-+	kfree(mem);
- }
- 
- /*
-@@ -979,9 +997,11 @@ void fpsimd_preserve_current_state(void)
- 	if (!system_supports_fpsimd())
- 		return;
- 
-+	preempt_disable();
- 	local_bh_disable();
- 	task_fpsimd_save();
- 	local_bh_enable();
-+	preempt_enable();
- }
- 
- /*
-@@ -1021,6 +1041,7 @@ void fpsimd_restore_current_state(void)
- 	if (!system_supports_fpsimd())
- 		return;
- 
-+	preempt_disable();
- 	local_bh_disable();
- 
- 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
-@@ -1029,6 +1050,7 @@ void fpsimd_restore_current_state(void)
- 	}
- 
- 	local_bh_enable();
-+	preempt_enable();
- }
- 
- /*
-@@ -1041,6 +1063,7 @@ void fpsimd_update_current_state(struct
- 	if (!system_supports_fpsimd())
- 		return;
- 
-+	preempt_disable();
- 	local_bh_disable();
- 
- 	current->thread.fpsimd_state.user_fpsimd = *state;
-@@ -1053,6 +1076,7 @@ void fpsimd_update_current_state(struct
- 		fpsimd_bind_to_cpu();
- 
- 	local_bh_enable();
-+	preempt_enable();
- }
- 
- /*
-@@ -1115,6 +1139,7 @@ void kernel_neon_begin(void)
- 
- 	BUG_ON(!may_use_simd());
- 
-+	preempt_disable();
- 	local_bh_disable();
- 
- 	__this_cpu_write(kernel_neon_busy, true);
-@@ -1131,6 +1156,7 @@ void kernel_neon_begin(void)
- 	preempt_disable();
- 
- 	local_bh_enable();
-+	preempt_enable();
- }
- EXPORT_SYMBOL(kernel_neon_begin);
- 
+> sh:
+> ??????? dreamcast_defconfig: with huge page OK
+> sparc:
+> ??????? sparc32_defconfig: without huge page OK
+> sparc64:
+> ??????? sparc64_defconfig: with huge page OK
+> x86:
+> ??????? with huge page OK
+>
+> Alex
+>
+> On 07/23/2018 02:00 PM, Michael Ellerman wrote:
+>> Alex Ghiti <alex@ghiti.fr> writes:
+>>
+>>> Does anyone have any suggestion about those patches ?
+>> Cross compiling it for some non-x86 arches would be a good start :)
+>>
+>> There are cross compilers available here:
+>>
+>>   https://mirrors.edge.kernel.org/pub/tools/crosstool/
+>>
+>>
+>> cheers
+>>
+>>> On 07/09/2018 02:16 PM, Michal Hocko wrote:
+>>>> [CC hugetlb guys -  
+>>>> http://lkml.kernel.org/r/20180705110716.3919-1-alex at ghiti.fr]
+>>>>
+>>>> On Thu 05-07-18 11:07:05, Alexandre Ghiti wrote:
+>>>>> In order to reduce copy/paste of functions across architectures and then
+>>>>> make riscv hugetlb port (and future ports) simpler and smaller, this
+>>>>> patchset intends to factorize the numerous hugetlb primitives that are
+>>>>> defined across all the architectures.
+>>>>>
+>>>>> Except for prepare_hugepage_range, this patchset moves the versions that
+>>>>> are just pass-through to standard pte primitives into
+>>>>> asm-generic/hugetlb.h by using the same #ifdef semantic that can be
+>>>>> found in asm-generic/pgtable.h, i.e. __HAVE_ARCH_***.
+>>>>>
+>>>>> s390 architecture has not been tackled in this serie since it does not
+>>>>> use asm-generic/hugetlb.h at all.
+>>>>> powerpc could be factorized a bit more (cf huge_ptep_set_wrprotect).
+>>>>>
+>>>>> This patchset has been compiled on x86 only.
+>>>>>
+>>>>> Changelog:
+>>>>>
+>>>>> v4:
+>>>>>    Fix powerpc build error due to misplacing of #include
+>>>>>    <asm-generic/hugetlb.h> outside of #ifdef CONFIG_HUGETLB_PAGE, as
+>>>>>    pointed by Christophe Leroy.
+>>>>>
+>>>>> v1, v2, v3:
+>>>>>    Same version, just problems with email provider and misuse of
+>>>>>    --batch-size option of git send-email
+>>>>>
+>>>>> Alexandre Ghiti (11):
+>>>>>    hugetlb: Harmonize hugetlb.h arch specific defines with pgtable.h
+>>>>>    hugetlb: Introduce generic version of hugetlb_free_pgd_range
+>>>>>    hugetlb: Introduce generic version of set_huge_pte_at
+>>>>>    hugetlb: Introduce generic version of huge_ptep_get_and_clear
+>>>>>    hugetlb: Introduce generic version of huge_ptep_clear_flush
+>>>>>    hugetlb: Introduce generic version of huge_pte_none
+>>>>>    hugetlb: Introduce generic version of huge_pte_wrprotect
+>>>>>    hugetlb: Introduce generic version of prepare_hugepage_range
+>>>>>    hugetlb: Introduce generic version of huge_ptep_set_wrprotect
+>>>>>    hugetlb: Introduce generic version of huge_ptep_set_access_flags
+>>>>>    hugetlb: Introduce generic version of huge_ptep_get
+>>>>>
+>>>>>   arch/arm/include/asm/hugetlb-3level.h        | 32 +---------
+>>>>>   arch/arm/include/asm/hugetlb.h               | 33 +----------
+>>>>>   arch/arm64/include/asm/hugetlb.h             | 39 +++---------
+>>>>>   arch/ia64/include/asm/hugetlb.h              | 47 ++-------------
+>>>>>   arch/mips/include/asm/hugetlb.h              | 40 +++----------
+>>>>>   arch/parisc/include/asm/hugetlb.h            | 33 +++--------
+>>>>>   arch/powerpc/include/asm/book3s/32/pgtable.h |  2 +
+>>>>>   arch/powerpc/include/asm/book3s/64/pgtable.h |  1 +
+>>>>>   arch/powerpc/include/asm/hugetlb.h           | 43 ++------------
+>>>>>   arch/powerpc/include/asm/nohash/32/pgtable.h |  2 +
+>>>>>   arch/powerpc/include/asm/nohash/64/pgtable.h |  1 +
+>>>>>   arch/sh/include/asm/hugetlb.h                | 54 ++---------------
+>>>>>   arch/sparc/include/asm/hugetlb.h             | 40 +++----------
+>>>>>   arch/x86/include/asm/hugetlb.h               | 72  
+>>>>> +----------------------
+>>>>>   include/asm-generic/hugetlb.h                | 88  
+>>>>> +++++++++++++++++++++++++++-
+>>>>>   15 files changed, 143 insertions(+), 384 deletions(-)
+>>>>>
+>>>>> -- 
+>>>>> 2.16.2
