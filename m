@@ -1,39 +1,49 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 26 Jul 2018 15:25:15 +0530
-Subject: [PATCH v7 4/6] dt-bindings: mailbox: imx-mu: add i.MX6SX and
- i.MX7S SoCs.
-In-Reply-To: <20180726065331.6186-5-o.rempel@pengutronix.de>
-References: <20180726065331.6186-1-o.rempel@pengutronix.de>
- <20180726065331.6186-5-o.rempel@pengutronix.de>
-Message-ID: <CABb+yY32vBy5qVYsQ6u45=rV6gEggqKy3Jqn1B4oWHaGfTyQ8Q@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Jul 2018 10:55:48 +0100
+Subject: [PATCHv3 0/2] Stackleak for arm64
+In-Reply-To: <fbf890f6-7424-362e-95dd-223262e5f19e@redhat.com>
+References: <1531341400-12077-1-git-send-email-alex.popov@linux.com>
+ <20180720214154.2940-1-labbott@redhat.com>
+ <20180724163807.GE25888@arm.com> <20180725114954.GD30289@arm.com>
+ <fbf890f6-7424-362e-95dd-223262e5f19e@redhat.com>
+Message-ID: <20180726095548.GB28088@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 12:23 PM, Oleksij Rempel
-<o.rempel@pengutronix.de> wrote:
-> This are currently tested SoCs with imx-mailbox driver.
->
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> ---
->  Documentation/devicetree/bindings/mailbox/fsl,mu.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> index 113d6ab931ef..5616d2afca45 100644
-> --- a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> +++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> @@ -18,7 +18,7 @@ Messaging Unit Device Node:
->  Required properties:
->  -------------------
->  - compatible : should be "fsl,<chip>-mu", the supported chips include
-> -               imx8qxp, imx8qm.
-> +               imx6sx, imx7s, imx8qxp, imx8qm.
->
-This is not scalable. Do we add every new SoC that contains the same controller?
-I think the controller name, if it has one or create a new one like
-'imx-mu',  should be used here.
-So,
-    compatible : should be "fsl,imx-mu"
+Hi Laura,
 
-BTW, the driver doesn't even probe anything other than
-'fsl,imx6sx-mu', unlike what the binding says.
+On Wed, Jul 25, 2018 at 03:05:58PM -0700, Laura Abbott wrote:
+> On 07/25/2018 04:49 AM, Will Deacon wrote:
+> >arch/arm64/kernel/sdei.c: At top level:
+> >arch/arm64/kernel/sdei.c:127:6: error: conflicting types for ?_on_sdei_stack?
+> >  bool _on_sdei_stack(unsigned long sp,
+> >       ^~~~~~~~~~~~~~
+> >In file included from ./include/linux/arm_sdei.h:14:0,
+> >                  from arch/arm64/kernel/sdei.c:5:
+> >./arch/arm64/include/asm/sdei.h:45:6: note: previous declaration of ?_on_sdei_stack? was here
+> >  bool _on_sdei_stack(unsigned long sp, struct stack_info *info);
+> >       ^~~~~~~~~~~~~~
+> >arch/arm64/kernel/sdei.c: In function ?_on_sdei_stack?:
+> >arch/arm64/kernel/sdei.c:136:33: error: ?info? undeclared (first use in this function); did you mean ?int??
+> >   if (on_sdei_critical_stack(sp, info))
+> >                                  ^~~~
+> >                                  int
+> >arch/arm64/kernel/sdei.c:131:21: warning: unused variable ?high? [-Wunused-variable]
+> >   unsigned long low, high;
+> >                      ^~~~
+> >arch/arm64/kernel/sdei.c:131:16: warning: unused variable ?low? [-Wunused-variable]
+> >   unsigned long low, high;
+> >                 ^~~
+> >make[1]: *** [arch/arm64/kernel/sdei.o] Error 1
+> >make[1]: *** Waiting for unfinished jobs....
+> >make: *** [arch/arm64/kernel] Error 2
+> >
+> 
+> Ugh this was a failure that I missed folding in, sorry about that
+
+That's ok, thanks for the quick fixup. I'll fold it in and push this out
+later on.
+
+Cheers,
+
+Will
