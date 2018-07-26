@@ -1,45 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 26 Jul 2018 00:12:34 -0700
-Subject: [GIT PULL] Allwinner drivers changes for 4.19
-In-Reply-To: <20180724131616.brtatxqutdjd4oxt@flea>
-References: <20180724131616.brtatxqutdjd4oxt@flea>
-Message-ID: <20180726071234.tzhxtarbmlsysz65@localhost>
+Date: Wed, 25 Jul 2018 23:58:19 -0700
+Subject: [GIT PULL] Qualcomm ARM64 Defconfig updates for 4.19
+In-Reply-To: <1532232622-18275-1-git-send-email-andy.gross@linaro.org>
+References: <1532232622-18275-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <20180726065819.kc3rm4264flx75j6@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 03:16:16PM +0200, Maxime Ripard wrote:
-> Hi Arnd, Olof,
-> 
-> Please pull the following changes for the next merge window.
-> 
-> Thanks!
-> Maxime
-> 
+On Sat, Jul 21, 2018 at 11:10:18PM -0500, Andy Gross wrote:
 > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
 >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
-> are available in the Git repository at:
+> are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-drivers-for-4.19
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-defconfig-for-4.19
 > 
-> for you to fetch changes up to 7377330a1ed2e9bb5a97758bdadcdb37e2201b2a:
+> for you to fetch changes up to f8120d61ceb7c016e5a450a98b8d08ae69d82e22:
 > 
->   soc: sunxi: Add the A13, A23 and H3 system control compatibles (2018-07-19 16:39:12 +0200)
+>   arm64: defconfig: Enable CONFIG_MTD_NAND_QCOM for IPQ8074 (2018-07-21 15:19:09 -0500)
 > 
 > ----------------------------------------------------------------
-> Allwinner drivers changes for 4.19
+> Qualcomm ARM64 Based defconfig Updates for v4.19
 > 
-> There's been work for this release cycles in both the SRAM controller
-> driver in order to support more SoCs, as part of our VPU work, but also to
-> enable the EMAC on the A64 (that needs to poke at registers within the same
-> register space).
-> 
-> Some work has been needed too to represent the bus to the display engine
-> controllers that all need an SRAM to be mapped to the CPU to be able to
-> access those controllers' registers.
+> * Enable Qualcomm NAND driver
 
 Merged, thanks!
-
 
 -Olof
