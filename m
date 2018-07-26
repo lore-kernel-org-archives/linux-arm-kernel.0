@@ -1,64 +1,97 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 26 Jul 2018 15:53:29 +0200
-Subject: [PATCH] arm64: dts: renesas: r8a77980: add Cortex-A53 PMU support
-In-Reply-To: <CAMuHMdV-6s+NizKhszaY8f2=L2QS8KgCBcKEjR_qvyrrV04uXw@mail.gmail.com>
-References: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
- <d8e355fd-46f5-3798-fe43-811471a75ab6@cogentembedded.com>
- <CAMuHMdXPYwC5pmY+HmT0TYTXpmy152pVtdanSPCZMX1xp0r76g@mail.gmail.com>
- <CAMuHMdV-6s+NizKhszaY8f2=L2QS8KgCBcKEjR_qvyrrV04uXw@mail.gmail.com>
-Message-ID: <20180726135328.zmqanet4dns4vk5m@verge.net.au>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 26 Jul 2018 14:55:44 +0100
+Subject: [RFC PATCH 13/16] KVM: Allow 2048-bit register access via
+ KVM_{GET, SET}_ONE_REG
+In-Reply-To: <20180726125834.GV4240@e103592.cambridge.arm.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-14-git-send-email-Dave.Martin@arm.com>
+ <874lgntihl.fsf@linaro.org> <20180726125834.GV4240@e103592.cambridge.arm.com>
+Message-ID: <871sbqt82n.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 02:33:55PM +0200, Geert Uytterhoeven wrote:
-> On Wed, Jul 25, 2018 at 7:34 PM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> > On Wed, Jul 25, 2018 at 6:44 PM Sergei Shtylyov
-> > <sergei.shtylyov@cogentembedded.com> wrote:
-> > > Describe the performance monitor unit (PMU) for the Cortex-A53 cores in
-> > > the R8A77970 SoC's device tree.
-> >
-> > 8?
-> 
-> With that fixes:
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks, I have applied the following for v4.20.
+Dave Martin <Dave.Martin@arm.com> writes:
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Subject: [PATCH] arm64: dts: renesas: r8a77980: add Cortex-A53 PMU support
+> On Wed, Jul 25, 2018 at 04:58:30PM +0100, Alex Benn?e wrote:
+>>
+>> Dave Martin <Dave.Martin@arm.com> writes:
+>>
+>> > The Arm SVE architecture defines registers that are up to 2048 bits
+>> > in size (with some possibility of further future expansion).
+>> >
+>> > In order to avoid the need for an excessively large number of
+>> > ioctls when saving and restoring a vcpu's registers, this patch
+>> > adds a #define to make support for individual 2048-bit registers
+>> > through the KVM_{GET,SET}_ONE_REG ioctl interface official.  This
+>> > will allow each SVE register to be accessed in a single call.
+>> >
+>> > There are sufficient spare bits in the register id size field for
+>> > this change, so there is no ABI impact providing that
+>> > KVM_GET_REG_LIST does not enumerate any 2048-bit register unless
+>> > userspace explicitly opts in to the relevant architecture-specific
+>> > features.
+>>
+>> Does it? It's not in this patch and looking at the final tree:
+>>
+>>   unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
+>>   {
+>>           unsigned long res = 0;
+>>
+>>           res += num_core_regs();
+>>           res += num_sve_regs(vcpu);
+>>           res += kvm_arm_num_sys_reg_descs(vcpu);
+>>           res += kvm_arm_get_fw_num_regs(vcpu);
+>>           res += NUM_TIMER_REGS;
+>>
+>>           return res;
+>>   }
+>>
+>>
+>> which leads to:
+>>
+>>   static int enumerate_sve_regs(const struct kvm_vcpu *vcpu, u64 __user **uind)
+>>   {
+>>           unsigned int n, i;
+>>           int err = 0;
+>>           int total = 0;
+>>           unsigned int slices;
+>>
+>>           if (!vcpu_has_sve(&vcpu->arch))
+>>                   return 0;
+>>
+>> Which enumerates the SVE regs if vcpu_has_sve() which AFAICT is true if
+>> the host supports it, not if the user has requested it.
+>>
+>> I'll have to check what but given the indirection of kvm_one_reg I
+>> wonder if existing binaries might end up spamming a badly sized array
+>> when run on a new SVE supporting kernel?
+>
+> That shouldn't be the case: vcpu_has_sve() checks for the
+> KVM_ARM64_GUEST_HAS_SVE flag, which should only be set if userspace asks
+> for it.
+>
+> Give me a shout if this doesn't seem to be the case...
 
-Describe the performance monitor unit (PMU) for the Cortex-A53 cores in
-the R8A77980 SoC's device tree.
+Ahh I missed it the first time:
 
-Based on the original (and large) patch by Vladimir Barinov.
+		if (system_supports_sve() &&
+		    test_bit(KVM_ARM_VCPU_SVE, vcpu->arch.features)) {
+			vcpu->arch.flags |= KVM_ARM64_GUEST_HAS_SVE;
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a77980.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+And vcpu->arch.features is set by the user. However it will be set as
+unless you specify otherwise we use the results of probed:
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-index d3532fd4c94a..1013da3e2ec4 100644
---- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-@@ -98,6 +98,15 @@
- 		clock-frequency = <0>;
- 	};
- 
-+	pmu_a53 {
-+		compatible = "arm,cortex-a53-pmu";
-+		interrupts-extended = <&gic GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
-+				      <&gic GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
-+				      <&gic GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>,
-+				      <&gic GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&a53_0>, <&a53_1>, <&a53_2>, <&a53_3>;
-+	};
-+
- 	psci {
- 		compatible = "arm,psci-1.0", "arm,psci-0.2";
- 		method = "smc";
--- 
-2.11.0
+  ret = ioctl(vmfd, KVM_ARM_PREFERRED_TARGET, init);
+
+so the user will get it by definition when they first run on SVE capable
+hardware.
+
+
+>
+> Cheers
+> ---Dave
+
+
+--
+Alex Benn?e
