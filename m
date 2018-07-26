@@ -1,41 +1,57 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 26 Jul 2018 00:18:47 -0700
-Subject: [GIT PULL 3/3] ARM: samsung: Mach/soc for v4.19
-In-Reply-To: <20180725162340.7488-3-krzk@kernel.org>
-References: <20180725162340.7488-1-krzk@kernel.org>
- <20180725162340.7488-3-krzk@kernel.org>
-Message-ID: <20180726071847.oamagjrd2mjvvqu5@localhost>
+Date: Thu, 26 Jul 2018 00:16:35 -0700
+Subject: [GIT PULL] updates to soc/fsl drivers for v4.19
+In-Reply-To: <1532469595-12060-1-git-send-email-leoyang.li@nxp.com>
+References: <1532469595-12060-1-git-send-email-leoyang.li@nxp.com>
+Message-ID: <20180726071635.whbiz5onokhvcjb4@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2018 at 06:23:40PM +0200, Krzysztof Kozlowski wrote:
-> Hi,
+On Tue, Jul 24, 2018 at 04:59:55PM -0500, Li Yang wrote:
+> Hi arm-soc maintainers,
 > 
-> Rebased on v4.18-rc2, because at v4.18-rc1 the NFS root boot, which I use at my
-> testing setup (https://krzk.eu), was broken.
+> Please merge the following tag to get updates to the soc/fsl drivers:
+>   Moves DPAA2 DPIO driver from staging to fsl/soc
+>   Adds multiple-pin support to QE gpio driver
 > 
-> Best regards,
-> Krzysztof
+> Regards,
+> Leo
 > 
 > 
-> The following changes since commit 7daf201d7fe8334e2d2364d4e8ed3394ec9af819:
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
->   Linux 4.18-rc2 (2018-06-24 20:54:29 +0800)
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.19
+>   git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git tags/soc-fsl-for-4.19
 > 
-> for you to fetch changes up to cd4806911cee3901bc2b5eb95603cf1958720b57:
+> for you to fetch changes up to 4625210899095195600062ff8542f37a1c9f5dd4:
 > 
->   ARM: exynos: Clear global variable on init error path (2018-07-24 18:52:14 +0200)
+>   soc: fsl: cleanup Kconfig menu (2018-07-24 16:19:16 -0500)
 > 
 > ----------------------------------------------------------------
-> Samsung mach/soc changes for v4.19
+> Various updates to soc/fsl for 4.19
 > 
-> Minor cleanups and fixes.
+> Moves DPAA2 DPIO driver from staging to fsl/soc
+> Adds multiple-pin support to QE gpio driver
+> 
+> ----------------------------------------------------------------
+> Horia Geant? (1):
+>       staging: fsl-dpaa2: eth: move generic FD defines to DPIO
+> 
+> Joakim Tjernlund (1):
+>       soc: fsl: qe: gpio: Add qe_gpio_set_multiple
+> 
+> Li Yang (1):
+>       soc: fsl: cleanup Kconfig menu
+> 
+> Roy Pledge (3):
+>       staging: fsl-mc: Move DPIO from staging to drivers/soc/fsl
+>       staging: fsl-mc: Remove remaining files
+>       soc: fsl: dpio: Convert DPIO documentation to .rst
 
-Merged, thanks!
+Merged, thanks.
 
 
 -Olof
