@@ -1,30 +1,37 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 26 Jul 2018 16:39:34 +0530
-Subject: [PATCH v7 6/6] mailbox: Add support for i.MX7D messaging unit
-In-Reply-To: <a988e8b4-28be-f598-82de-421017409368@pengutronix.de>
-References: <20180726065331.6186-1-o.rempel@pengutronix.de>
- <20180726065331.6186-7-o.rempel@pengutronix.de>
- <CABb+yY1Fbj2GiO_zjwnvNFutjX_fRpxnuEoeu6Z3s4NAv2ugbg@mail.gmail.com>
- <a988e8b4-28be-f598-82de-421017409368@pengutronix.de>
-Message-ID: <CABb+yY2=mFr+gFuWyE+VyG6dWj3gKhTs6X+U9UjFu5N=4zU5uA@mail.gmail.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Thu, 26 Jul 2018 14:10:07 +0300
+Subject: [PATCH v6 4/4] arm: arm64: dts: add property snps incr burst type
+ adjustment
+In-Reply-To: <1532341959-3478-4-git-send-email-pengbo.mu@nxp.com>
+References: <1532341959-3478-1-git-send-email-pengbo.mu@nxp.com>
+ <1532341959-3478-4-git-send-email-pengbo.mu@nxp.com>
+Message-ID: <87a7qe1cds.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 4:21 PM, Oleksij Rempel <o.rempel@pengutronix.de> wrote:
+Pengbo Mu <pengbo.mu@nxp.com> writes:
 
->>
->>> +struct imx_mu_con_priv {
->>> +       int                     irq;
->>> +       unsigned int            idx;
->>> +       char                    *irq_desc;
->>>
->> Having      char  irq_desc[16];    seems simpler than free/kfree upon
->> each startup/shutdown. Simply use snprintf() in probe().
+> Property "snps,incr-burst-type-adjustment = <x>, <y>..." for USB3.0
+> DWC3.When only one value means INCRx mode with fix burst type.
+> When more than one value, means undefined length burst mode, USB
+> controller can use the length less than or equal to the largest
+> enabled burst length.
 >
-> Currently all known configurations use one or two channels. I don't see
-> any sense to allocate all at the probe.
+> While enabling undefined length INCR burst type and INCR16 burst type,
+> get better write performance on NXP Layerscape platforms: around 3%
+> improvement (from 364MB/s to 375MB/s).
 >
-Just because only 2 out of 4 channels are being used, it doesn't make sense?
+> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+> Signed-off-by: Pengbo Mu <pengbo.mu@nxp.com>
 
-What is the concern?  "wasting" 16x2 bytes of memory?  How many bytes,
-LOC and execution time does kasprintf() waste?
+will this go through arm64 tree or do you need me to pick it up?
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180726/0c6f0cba/attachment.sig>
