@@ -1,97 +1,86 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 26 Jul 2018 14:55:44 +0100
-Subject: [RFC PATCH 13/16] KVM: Allow 2048-bit register access via
- KVM_{GET, SET}_ONE_REG
-In-Reply-To: <20180726125834.GV4240@e103592.cambridge.arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-14-git-send-email-Dave.Martin@arm.com>
- <874lgntihl.fsf@linaro.org> <20180726125834.GV4240@e103592.cambridge.arm.com>
-Message-ID: <871sbqt82n.fsf@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Jul 2018 14:56:32 +0100
+Subject: [PATCH 1/6] ARM: signal: copy registers using __copy_from_user()
+In-Reply-To: <20180726122350.qtf7h6qekru23bv2@lakrids.cambridge.arm.com>
+References: <20180710141322.GL17271@n2100.armlinux.org.uk>
+ <E1fctOl-0005ul-69@rmk-PC.armlinux.org.uk>
+ <20180726122350.qtf7h6qekru23bv2@lakrids.cambridge.arm.com>
+Message-ID: <20180726135632.GZ17271@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jul 26, 2018 at 01:23:50PM +0100, Mark Rutland wrote:
+> On Tue, Jul 10, 2018 at 03:13:47PM +0100, Russell King wrote:
+> > When restoring the ARM integer registers, use __copy_from_user() to
+> > copy them into kernel space before restoring them, rather than
+> > __get_user_error().
+> 
+> I assume that this is so that we only have to pay the cost of sanitizing
+> the user pointer once in __copy_from_user(), rather than in each
+> __get_user_error()?
+> 
+> Can we mention that in the commit message? e.g. something like:
+> 
+>   In subsequent patches, each uaccess will sanitize the __user pointer
+>   to prevent speculative accesses to kernel memory.
+>   
+>   To amortize the cost of this sanitization when restoring the integer
+>   registers, we can use __copy_from_user() rather than a sequence of
+>   __get_user_error() calls.
 
-Dave Martin <Dave.Martin@arm.com> writes:
+It's not only that, it's also the overhead of the software PAN support
+as well, and it's a change I've been thinking has been worth doing
+for some time.
 
-> On Wed, Jul 25, 2018 at 04:58:30PM +0100, Alex Benn?e wrote:
->>
->> Dave Martin <Dave.Martin@arm.com> writes:
->>
->> > The Arm SVE architecture defines registers that are up to 2048 bits
->> > in size (with some possibility of further future expansion).
->> >
->> > In order to avoid the need for an excessively large number of
->> > ioctls when saving and restoring a vcpu's registers, this patch
->> > adds a #define to make support for individual 2048-bit registers
->> > through the KVM_{GET,SET}_ONE_REG ioctl interface official.  This
->> > will allow each SVE register to be accessed in a single call.
->> >
->> > There are sufficient spare bits in the register id size field for
->> > this change, so there is no ABI impact providing that
->> > KVM_GET_REG_LIST does not enumerate any 2048-bit register unless
->> > userspace explicitly opts in to the relevant architecture-specific
->> > features.
->>
->> Does it? It's not in this patch and looking at the final tree:
->>
->>   unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
->>   {
->>           unsigned long res = 0;
->>
->>           res += num_core_regs();
->>           res += num_sve_regs(vcpu);
->>           res += kvm_arm_num_sys_reg_descs(vcpu);
->>           res += kvm_arm_get_fw_num_regs(vcpu);
->>           res += NUM_TIMER_REGS;
->>
->>           return res;
->>   }
->>
->>
->> which leads to:
->>
->>   static int enumerate_sve_regs(const struct kvm_vcpu *vcpu, u64 __user **uind)
->>   {
->>           unsigned int n, i;
->>           int err = 0;
->>           int total = 0;
->>           unsigned int slices;
->>
->>           if (!vcpu_has_sve(&vcpu->arch))
->>                   return 0;
->>
->> Which enumerates the SVE regs if vcpu_has_sve() which AFAICT is true if
->> the host supports it, not if the user has requested it.
->>
->> I'll have to check what but given the indirection of kvm_one_reg I
->> wonder if existing binaries might end up spamming a badly sized array
->> when run on a new SVE supporting kernel?
->
-> That shouldn't be the case: vcpu_has_sve() checks for the
-> KVM_ARM64_GUEST_HAS_SVE flag, which should only be set if userspace asks
-> for it.
->
-> Give me a shout if this doesn't seem to be the case...
+>  
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > ---
+> >  arch/arm/kernel/signal.c | 38 +++++++++++++++++++++-----------------
+> >  1 file changed, 21 insertions(+), 17 deletions(-)
+> > 
+> > diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> > index bd8810d4acb3..0ae74207e43e 100644
+> > --- a/arch/arm/kernel/signal.c
+> > +++ b/arch/arm/kernel/signal.c
+> > @@ -176,6 +176,7 @@ static int restore_vfp_context(char __user **auxp)
+> >  
+> >  static int restore_sigframe(struct pt_regs *regs, struct sigframe __user *sf)
+> >  {
+> > +	struct sigcontext context;
+> >  	char __user *aux;
+> >  	sigset_t set;
+> >  	int err;
+> > @@ -184,23 +185,26 @@ static int restore_sigframe(struct pt_regs *regs, struct sigframe __user *sf)
+> >  	if (err == 0)
+> >  		set_current_blocked(&set);
+> >  
+> > -	__get_user_error(regs->ARM_r0, &sf->uc.uc_mcontext.arm_r0, err);
+> > -	__get_user_error(regs->ARM_r1, &sf->uc.uc_mcontext.arm_r1, err);
+> > -	__get_user_error(regs->ARM_r2, &sf->uc.uc_mcontext.arm_r2, err);
+> > -	__get_user_error(regs->ARM_r3, &sf->uc.uc_mcontext.arm_r3, err);
+> > -	__get_user_error(regs->ARM_r4, &sf->uc.uc_mcontext.arm_r4, err);
+> > -	__get_user_error(regs->ARM_r5, &sf->uc.uc_mcontext.arm_r5, err);
+> > -	__get_user_error(regs->ARM_r6, &sf->uc.uc_mcontext.arm_r6, err);
+> > -	__get_user_error(regs->ARM_r7, &sf->uc.uc_mcontext.arm_r7, err);
+> > -	__get_user_error(regs->ARM_r8, &sf->uc.uc_mcontext.arm_r8, err);
+> > -	__get_user_error(regs->ARM_r9, &sf->uc.uc_mcontext.arm_r9, err);
+> > -	__get_user_error(regs->ARM_r10, &sf->uc.uc_mcontext.arm_r10, err);
+> > -	__get_user_error(regs->ARM_fp, &sf->uc.uc_mcontext.arm_fp, err);
+> > -	__get_user_error(regs->ARM_ip, &sf->uc.uc_mcontext.arm_ip, err);
+> > -	__get_user_error(regs->ARM_sp, &sf->uc.uc_mcontext.arm_sp, err);
+> > -	__get_user_error(regs->ARM_lr, &sf->uc.uc_mcontext.arm_lr, err);
+> > -	__get_user_error(regs->ARM_pc, &sf->uc.uc_mcontext.arm_pc, err);
+> > -	__get_user_error(regs->ARM_cpsr, &sf->uc.uc_mcontext.arm_cpsr, err);
+> > +	err |= __copy_from_user(&context, &sf->uc.uc_mcontext, sizeof(context));
+> 
+> IIUC, this means that we'll also copy the (unused) fault_address field,
+> but I assume that's ok.
 
-Ahh I missed it the first time:
+It is completely fine, because the stack contains everything in
+sf->uc.uc_mcontext - this is a member in the middle of the parent
+struct sigframe, and we access both before and after that member.
 
-		if (system_supports_sve() &&
-		    test_bit(KVM_ARM_VCPU_SVE, vcpu->arch.features)) {
-			vcpu->arch.flags |= KVM_ARM64_GUEST_HAS_SVE;
-
-And vcpu->arch.features is set by the user. However it will be set as
-unless you specify otherwise we use the results of probed:
-
-  ret = ioctl(vmfd, KVM_ARM_PREFERRED_TARGET, init);
-
-so the user will get it by definition when they first run on SVE capable
-hardware.
-
-
->
-> Cheers
-> ---Dave
-
-
---
-Alex Benn?e
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
