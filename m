@@ -1,76 +1,43 @@
-From: drivshin@awxrd.com (David Rivshin)
-Date: Thu, 26 Jul 2018 16:37:05 -0400
-Subject: [PATCH v2] pwm: pwm-omap-dmtimer: return -EPROBE_DEFER if no
- dmtimer platform data
-In-Reply-To: <20180726185426.GA3546@lenoch>
-References: <20180726133658.23902-1-drivshin@awxrd.com>
- <20180726185426.GA3546@lenoch>
-Message-ID: <20180726163705.4981d44a.drivshin@awxrd.com>
+From: gustavo@embeddedor.com (Gustavo A. R. Silva)
+Date: Thu, 26 Jul 2018 15:49:10 -0500
+Subject: [PATCH] ASoC: sirf: Fix potential NULL pointer dereference
+Message-ID: <20180726204910.GA1635@embeddedor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Jul 2018 20:54:26 +0200
-Ladislav Michl <ladis@linux-mips.org> wrote:
+There is a potential execution path in which function
+platform_get_resource() returns NULL. If this happens,
+we will end up having a NULL pointer dereference.
 
-> On Thu, Jul 26, 2018 at 09:36:58AM -0400, David Rivshin wrote:
-> > From: David Rivshin <DRivshin@allworx.com>
-> > 
-> > If a pwm-omap-dmtimer is probed before the dmtimer it uses, the platform
-> > data won't be set yet.
-> > 
-> > Fixes: ac30751df953 ("ARM: OMAP: pdata-quirks: Remove unused timer pdata")
-> > Cc: <stable@vger.kernel.org> # 4.17+
-> > Signed-off-by: David Rivshin <drivshin@allworx.com>
-> > Acked-by: Pavel Machek <pavel@ucw.cz>
-> > Tested-by: Pavel Machek <pavel@ucw.cz>
-> > ---
-> > Changes in v2:
-> > * Added Pavel's Acked-by/Tested-by [1]
-> > 
-> > [1] https://lkml.org/lkml/2018/7/16/346
-> > 
-> >  drivers/pwm/pwm-omap-dmtimer.c | 5 +++--
-> >  1 file changed, 3 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
-> > index 665da3c8fbceb..d3d7ea7a53146 100644
-> > --- a/drivers/pwm/pwm-omap-dmtimer.c
-> > +++ b/drivers/pwm/pwm-omap-dmtimer.c
-> > @@ -264,8 +264,9 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
-> >  
-> >  	timer_pdata = dev_get_platdata(&timer_pdev->dev);
-> >  	if (!timer_pdata) {
-> > -		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
-> > -		ret = -EINVAL;
-> > +		dev_info(&pdev->dev,
-> > +			 "dmtimer pdata structure NULL, deferring probe\n");  
-> 
-> This seems to be a bit verbose for EPROBE_DEFER case. Could we either remove
-> it as it is done later in pdata->request_by_node(timer) failure case or at
-> least make it dev_dbg? Otherwise thank you and with mentioned change
-> Acked-by: Ladislav Michl <ladis@linux-mips.org>
+Fix this by replacing devm_ioremap with devm_ioremap_resource,
+which has the NULL check and the memory region request.
 
-Hi Ladislav, thanks for the review.
+This code was detected with the help of Coccinelle.
 
-I had grepped through other drivers and found no consistent pattern. Some
-places used dev_err still, others reduced to one of dev_{warn,info,dbg}, 
-and others no message at all. Some messages mentioned they are deferring 
-the probe, other didn't. I was already getting a couple of dev_info from 
-the pinctrl core code, so I went that way. I figured the message might be
-useful to someone, but I don't feel strongly.
+Cc: stable at vger.kernel.org
+Fixes: 2bd8d1d5cf89 ("ASoC: sirf: Add audio usp interface driver")
+Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+---
+ sound/soc/sirf/sirf-usp.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-I personally would lean to dev_dbg if you think dev_info is too harsh, 
-just in case someone's board suddenly isn't working after upgrade. But 
-I'm certainly willing to remove the message entirely if you feel strongly,
-or anyone else cares to weigh in.
-
-
-> 
-> > +		ret = -EPROBE_DEFER;
-> >  		goto put;
-> >  	}
-> >  
-> > 
-> > base-commit: d72e90f33aa4709ebecc5005562f52335e106a60
-> > -- 
-> > 2.17.1  
+diff --git a/sound/soc/sirf/sirf-usp.c b/sound/soc/sirf/sirf-usp.c
+index 77e7dcf..d70fcd4 100644
+--- a/sound/soc/sirf/sirf-usp.c
++++ b/sound/soc/sirf/sirf-usp.c
+@@ -370,10 +370,9 @@ static int sirf_usp_pcm_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, usp);
+ 
+ 	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	base = devm_ioremap(&pdev->dev, mem_res->start,
+-		resource_size(mem_res));
+-	if (base == NULL)
+-		return -ENOMEM;
++	base = devm_ioremap_resource(&pdev->dev, mem_res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
+ 	usp->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+ 					    &sirf_usp_regmap_config);
+ 	if (IS_ERR(usp->regmap))
+-- 
+2.7.4
