@@ -1,61 +1,123 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 26 Jul 2018 10:31:09 +0200
-Subject: [GIT PULL] ARM: mediatek: 32-bit DT updates for v4.19
-In-Reply-To: <2d918d15-d1d3-b4e0-7427-0b3baa56100a@gmail.com>
-References: <2d918d15-d1d3-b4e0-7427-0b3baa56100a@gmail.com>
-Message-ID: <3ee3ccfb-8fd6-34b0-c03d-67532067e707@gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Thu, 26 Jul 2018 11:46:12 +0300
+Subject: [PATCH v2 2/2] spi: add SPI controller driver for UniPhier SoC
+In-Reply-To: <1532588943-19481-3-git-send-email-hayashibara.keiji@socionext.com>
+References: <1532588943-19481-1-git-send-email-hayashibara.keiji@socionext.com>
+ <1532588943-19481-3-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <CAHp75VcEdxDEo0T5_9BzOPaeaqjbmbrWmaE9+ZuUDYhjh6jpVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-Hi Arnd,
+On Thu, Jul 26, 2018 at 10:09 AM, Keiji Hayashibara
+<hayashibara.keiji@socionext.com> wrote:
+> Add SPI controller driver implemented in Socionext UniPhier SoCs.
+>
+> UniPhier SoCs have two types SPI controllers; SCSSI supports a
+> single channel, and MCSSI supports multiple channels.
+> This driver supports SCSSI only.
+>
+> This controller has 32bit TX/RX FIFO with depth of eight entry,
+> and supports the SPI master mode only.
+>
+> This commit is implemented in PIO transfer mode, not DMA transfer.
 
-This is the second attempt to send the pull request, as in the first one I sent
-the branch instead of the tag.
+Few style realted comments.
 
-Please have a look.
-Regards,
-Matthias
+> +#include <asm/unaligned.h>
+> +#include <linux/kernel.h>
+> +#include <linux/bitfield.h>
+> +#include <linux/bitops.h>
+> +#include <linux/clk.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/spi/spi.h>
 
----
+Slightly better to keep them in order and put asm/* at the last.
 
-The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> +#define SSI_TIMEOUT            2000    /* ms */
 
-  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+SSI_TIMEOUT_MS ?
 
-are available in the Git repository at:
+> +#define SSI_CTL                        0x0
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-tags/v4.18-next-dts32
+Slightly better to keep same width for the addresses, like 0x00 here.
 
-for you to fetch changes up to 11a20c5601c5f0c685fa3a166348b7ffa830e123:
+> +#define SSI_CKS                        0x4
 
-  dt-bindings: arm: mediatek: cleanup MT7623N reference boards (2018-07-16
-15:57:40 +0200)
+> +#define SSI_TXWDS              0x8
 
-----------------------------------------------------------------
-- mt7623
-- delete unsupported reference board
-- fix pio leds
-- add missing cooling device
+> +#define SSI_RXWDS              0xc
 
-----------------------------------------------------------------
-Frank Wunderlich (1):
-      arm: dts: mediatek: Fix pio-leds for Bananapi-R2
+Ditto.
 
-Ryder Lee (2):
-      arm: dts: mt7623: cleanup MT7623N NAND dts file
-      dt-bindings: arm: mediatek: cleanup MT7623N reference boards
 
-Viresh Kumar (1):
-      arm: dts: mediatek: Add missing cooling device properties for CPUs
+> +static int uniphier_spi_set_baudrate(struct spi_device *spi, unsigned int speed)
+> +{
+> +       struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
+> +       u32 val, ckrat;
+> +
+> +       /*
+> +        * the supported rates are even numbers from 4 to 254. (4,6,8...254)
+> +        * round up as we look for equal or less speed
+> +        */
+> +       ckrat = DIV_ROUND_UP(clk_get_rate(priv->clk), speed);
 
- Documentation/devicetree/bindings/arm/mediatek.txt |  3 -
- arch/arm/boot/dts/Makefile                         |  1 -
- arch/arm/boot/dts/mt7623.dtsi                      |  3 +
- arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts      |  6 +-
- arch/arm/boot/dts/mt7623n-rfb-nand.dts             | 73 ------------------
- arch/arm/boot/dts/mt7623n-rfb.dtsi                 | 86 ----------------------
- 6 files changed, 6 insertions(+), 166 deletions(-)
- delete mode 100644 arch/arm/boot/dts/mt7623n-rfb-nand.dts
- delete mode 100644 arch/arm/boot/dts/mt7623n-rfb.dtsi
+> +       ckrat = roundup(ckrat, 2);
+
+ckrat += ckrat & 1;
+
+?
+
+> +       /* check if requested speed is too small */
+> +       if (ckrat > SSI_MAX_CLK_DIVIDER)
+
+> +               return -EINVAL;
+
+So, does this critical?
+
+> +
+> +       if (ckrat < SSI_MIN_CLK_DIVIDER)
+> +               ckrat = SSI_MIN_CLK_DIVIDER;
+
+clamp_val()  / max() ?
+
+> +       val = readl(priv->base + SSI_CKS);
+> +       val &= ~SSI_CKS_CKRAT_MASK;
+> +       val |= ckrat & SSI_CKS_CKRAT_MASK;
+> +       writel(val, priv->base + SSI_CKS);
+> +
+> +       return 0;
+> +}
+
+> +       priv->irq = platform_get_irq(pdev, 0);
+> +       if (priv->irq < 0) {
+> +               dev_err(&pdev->dev, "failed to get IRQ\n");
+
+> +               ret = -ENXIO;
+
+What's wrong with
+
+ret = priv->irq;
+
+?
+
+> +               goto out_disable_clk;
+> +       }
+
+> +static const struct of_device_id uniphier_spi_match[] = {
+> +       { .compatible = "socionext,uniphier-scssi", },
+
+> +       { /* sentinel */ },
+
+Slightly better without comma.
+
+> +};
+> +MODULE_DEVICE_TABLE(of, uniphier_spi_match);
+
+-- 
+With Best Regards,
+Andy Shevchenko
