@@ -1,54 +1,40 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 26 Jul 2018 14:03:11 +0930
-Subject: [GIT PULL] ARM: aspeed: defconfig changes for 4.19
-Message-ID: <CACPK8XdcAANiSwsvCnu249W8QcFfjP616ce-YOW=UohgpTHtVw@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 26 Jul 2018 12:48:05 +0800
+Subject: [PATCH] arm64: allwinner: dts: h6: fix Pine H64 MMC bus width
+Message-ID: <20180726044805.55888-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello ARM Maintainers,
+Currently the enabled MMC controllers on Pine H64 do not have bus-width
+set, which make them fall back to 1-bit mode and become quite slow.
 
-Here are the ASPEED defconfig updates for 4.19. It's been a while since I sent
-one, so this contains a lot of goodies.
+Fix this by add the corresponding bus-width properties.
 
-The following changes since commit 021c91791a5e7e85c567452f1be3e4c2c6cb6063:
+Fixes: ecbd611882a1 ("arm64: allwinner: h6: enable MMC0/2 on Pine H64")
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-  Linux 4.18-rc3 (2018-07-01 16:04:53 -0700)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
-tags/aspeed-4.19-defconfig
-
-for you to fetch changes up to 90708adcd3ead258d4c2185da6acbe748eb0cc32:
-
-  ARM: config: aspeed: Enable new FSI drivers (2018-07-26 13:27:27 +0930)
-
-----------------------------------------------------------------
-ASPEED defconfig updates for 4.19
-
- - Refresh the multi ARMv5 defconfig, and add AST2400 related drivers
-
- - Enable new ASPEED hardware that we've merged in the past few cycles.
- There are about 14 different drivers since we last refreshed the
- defconfig
-
- - Turn on features required by systemd, and other bits of OpenBMC
- userspace
-
- - Enable security related options
-
-----------------------------------------------------------------
-Benjamin Herrenschmidt (2):
-      arm: configs: Add USB gadget to Aspeed G4 defconfig
-      arm: configs: Add USB gadget to Aspeed G5 defconfig
-
-Joel Stanley (4):
-      ARM: config: aspeed: Update defconfig
-      ARM: config: multi_v5: Refresh configuration
-      ARM: config: multi_v5: Enable ASPEED drivers
-      ARM: config: aspeed: Enable new FSI drivers
-
- arch/arm/configs/aspeed_g4_defconfig | 113 ++++++++++++++++++++++++++++-----
- arch/arm/configs/aspeed_g5_defconfig | 117 +++++++++++++++++++++++++++++------
- arch/arm/configs/multi_v5_defconfig  |  30 +++++----
- 3 files changed, 213 insertions(+), 47 deletions(-)
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+index ceffc40810ee..48daec7f78ba 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+@@ -46,6 +46,7 @@
+ 	pinctrl-0 = <&mmc0_pins>;
+ 	vmmc-supply = <&reg_cldo1>;
+ 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
++	bus-width = <4>;
+ 	status = "okay";
+ };
+ 
+@@ -56,6 +57,7 @@
+ 	vqmmc-supply = <&reg_bldo2>;
+ 	non-removable;
+ 	cap-mmc-hw-reset;
++	bus-width = <8>;
+ 	status = "okay";
+ };
+ 
+-- 
+2.18.0
