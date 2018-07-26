@@ -1,10 +1,10 @@
 From: alexandru-cosmin.gheorghe@arm.com (Alexandru Gheorghe)
-Date: Thu, 26 Jul 2018 17:17:51 +0100
-Subject: [PATCH v2 05/10] drm/exynos: Use __drm_atomic_helper_plane_reset
- instead of copying the logic
+Date: Thu, 26 Jul 2018 17:17:52 +0100
+Subject: [PATCH v2 06/10] drm/imx: Use __drm_atomic_helper_plane_reset instead
+ of copying the logic
 In-Reply-To: <20180726161756.1794-1-alexandru-cosmin.gheorghe@arm.com>
 References: <20180726161756.1794-1-alexandru-cosmin.gheorghe@arm.com>
-Message-ID: <20180726161756.1794-6-alexandru-cosmin.gheorghe@arm.com>
+Message-ID: <20180726161756.1794-7-alexandru-cosmin.gheorghe@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,22 +15,32 @@ Use that instead of duplicating the logic.
 
 Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
 ---
- drivers/gpu/drm/exynos/exynos_drm_plane.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/gpu/drm/imx/ipuv3-plane.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_plane.c b/drivers/gpu/drm/exynos/exynos_drm_plane.c
-index eb9915da7dec..681328fbe7de 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_plane.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_plane.c
-@@ -139,8 +139,7 @@ static void exynos_drm_plane_reset(struct drm_plane *plane)
- 
- 	exynos_state = kzalloc(sizeof(*exynos_state), GFP_KERNEL);
- 	if (exynos_state) {
--		plane->state = &exynos_state->base;
--		plane->state->plane = plane;
-+		__drm_atomic_helper_plane_reset(plane, &exynos_state->base);
- 		plane->state->zpos = exynos_plane->config->zpos;
+diff --git a/drivers/gpu/drm/imx/ipuv3-plane.c b/drivers/gpu/drm/imx/ipuv3-plane.c
+index 203f247d4854..1bd4de03ce9e 100644
+--- a/drivers/gpu/drm/imx/ipuv3-plane.c
++++ b/drivers/gpu/drm/imx/ipuv3-plane.c
+@@ -281,16 +281,14 @@ static void ipu_plane_state_reset(struct drm_plane *plane)
+ 		ipu_state = to_ipu_plane_state(plane->state);
+ 		__drm_atomic_helper_plane_destroy_state(plane->state);
+ 		kfree(ipu_state);
++		plane->state = NULL;
  	}
+ 
+ 	ipu_state = kzalloc(sizeof(*ipu_state), GFP_KERNEL);
+ 
+-	if (ipu_state) {
+-		ipu_state->base.plane = plane;
+-		ipu_state->base.rotation = DRM_MODE_ROTATE_0;
+-	}
++	if (ipu_state)
++		__drm_atomic_helper_plane_reset(plane, &ipu_state->base);
+ 
+-	plane->state = &ipu_state->base;
  }
+ 
+ static struct drm_plane_state *
 -- 
 2.18.0
