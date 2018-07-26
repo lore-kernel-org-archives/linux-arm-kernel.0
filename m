@@ -1,86 +1,37 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Thu, 26 Jul 2018 11:22:14 +0200
-Subject: [PATCH v8 0/6] provide power off support for iMX6 with external PMIC
-Message-ID: <20180726092220.17250-1-o.rempel@pengutronix.de>
+Date: Thu, 26 Jul 2018 11:22:15 +0200
+Subject: [PATCH v8 1/6] ARM: imx6q: provide documentation for new fsl,
+ pmic-stby-poweroff property
+In-Reply-To: <20180726092220.17250-1-o.rempel@pengutronix.de>
+References: <20180726092220.17250-1-o.rempel@pengutronix.de>
+Message-ID: <20180726092220.17250-2-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018.07.26:
-v8 is a rebase against kernel v4.18-rc6. No other changes are made.
-Added: linux-imx at nxp.com and yibin.gong at nxp.com to the CC.
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/clock/imx6q-clock.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-2018.05.17:
-update patches to version v7
-
-This patch series is providing power off support for Freescale/NXP iMX6 based
-boards with external power management integrated circuit (PMIC).
-As a first step the PMIC is configured to turn off the system if the
-standby pin is asserted. On second step we assert the standby pin.
-For this reason we need to use pm_power_off_prepare.
-
-Usage of stnadby pin for power off is described in official iMX6
-documentation.
-
-2018.03.05:
-As this patch set touches multiple subsystems I think it would make
-sense for Shawn Guo to take the all patch set.
-The only part which didn't receive an ACK is regulator stuff. So I would
-hope that Mark Brown can ACK it.
-
-Kind regards,
-Oleksij Rempel
-
-2017.12.06:
-Adding Linus. Probably there is no maintainer for this patch set.
-No changes are made, tested on v4.15-rc1.
-
-2017.10.27:
-Last version of this patch set was send at 20 Jun 2017, this is a rebase against
-kernel v4.14-rc6. Probably this set got lost. If I forgot to address some comments,
-please point me.
-
-changes:
-v7:
- - use EXPORT_SYMBOL_GPL(pm_power_off_prepare) instead of EXPORT_SYMBOL
- - call imx6q_suspend_finish() directly without cpu_suspend()
-
-v6:
- - rename imx6_pm_poweroff to imx6_pm_stby_poweroff
- - fix "MPIC_STBY_REQ" typo in the comment.
-
-v5:
- - remove useless includes from pm-imx6.c patch
- - add Acked-by to "regulator: pfuze100: add fsl,pmic-stby-poweroff property"
-   patch
-
-v4:
- - update comment in "regulator: pfuze100: add fsl,pmic-stby-poweroff ..."
-   patch
- - add Acked-by to "ARM: imx6q: provide documentation for new ..."
-   patch
-
-v3:
- - set pm_power_off_prepare = NULL on .remove.
- - documentation and spelling fixes.
- - use %pf instead of lookup_symbol_name.
-
-Oleksij Rempel (6):
-  ARM: imx6q: provide documentation for new fsl,pmic-stby-poweroff
-    property
-  ARM: imx6: register pm_power_off handler if "fsl,pmic-stby-poweroff"
-    is set
-  kernel/reboot.c: export pm_power_off_prepare
-  regulator: pfuze100: add fsl,pmic-stby-poweroff property
-  regulator: pfuze100-regulator: provide pm_power_off_prepare handler
-  ARM: dts: imx6: RIoTboard provide standby on power off option
-
- .../devicetree/bindings/clock/imx6q-clock.txt |  8 ++
- .../bindings/regulator/pfuze100.txt           |  7 ++
- arch/arm/boot/dts/imx6dl-riotboard.dts        |  5 +
- arch/arm/mach-imx/pm-imx6.c                   | 25 +++++
- drivers/regulator/pfuze100-regulator.c        | 92 +++++++++++++++++++
- kernel/reboot.c                               |  1 +
- 6 files changed, 138 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+index a45ca67a9d5f..e1308346e00d 100644
+--- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
++++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+@@ -6,6 +6,14 @@ Required properties:
+ - interrupts: Should contain CCM interrupt
+ - #clock-cells: Should be <1>
+ 
++Optional properties:
++- fsl,pmic-stby-poweroff: Configure CCM to assert PMIC_STBY_REQ signal
++  on power off.
++  Use this property if the SoC should be powered off by external power
++  management IC (PMIC) triggered via PMIC_STBY_REQ signal.
++  Boards that are designed to initiate poweroff on PMIC_ON_REQ signal should
++  be using "syscon-poweroff" driver instead.
++
+ The clock consumer should specify the desired clock by having the clock
+ ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx6qdl-clock.h
+ for the full list of i.MX6 Quad and DualLite clock IDs.
 -- 
 2.18.0
