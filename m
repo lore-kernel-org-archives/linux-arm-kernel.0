@@ -1,71 +1,31 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 26 Jul 2018 15:48:56 +1200
-Subject: [PATCH v5] ARM: mvebu: use dt_fixup to provide fallback for
- enable-method
-Message-ID: <20180726034856.20743-1-chris.packham@alliedtelesis.co.nz>
+Date: Thu, 26 Jul 2018 16:02:53 +1200
+Subject: [PATCH 0/4] ARM: dts: mvebu: updates and new board
+Message-ID: <20180726040257.22285-1-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to maintain backwards compatibility with device trees that don't
-define an enable method. At the same time we want the device tree to be
-able to specify an enable-method and have it stick.
+This series updates the armada-xp-98dx3236 SoC and related boards to use the
+new style dts bindings for nand.
 
-Previously by having smp assigned in the DT_MACHINE definition this
-would be picked up by setup_arch() and override whatever
-arm_dt_init_cpu_maps() had configured. Now we move the initial
-assignment of default smp_ops to a dt_fixup and let
-arm_dt_init_cpu_maps() override that if the device tree defines an
-enable-method.
+I've also added a new db-88f6820-amc board which is an Armada-385 based
+reference board from Marvell's switch team. It's a plugin card for either the
+db-dxbc2 or db-xc3-24g4 which can be used if you disable the internal CPU on
+those platforms.
 
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
----
-Pervious versions
+Chris Packham (4):
+  ARM: dts: mvebu: 98dx3236: Rename nand controller node
+  ARM: dts: mvebu: db-dxbc2: use new style nand binding
+  ARM: dts: mvebu: db-xc3-24g4: use new style nand binding
+  ARM: dts: mvebu: Add device tree for db-88f6820-amc board
 
-v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/300182.html
-v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/300480.html
-v3: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/302945.html
-v4: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303899.html
+ arch/arm/boot/dts/Makefile                    |   1 +
+ .../boot/dts/armada-385-db-88f6820-amc.dts    | 184 ++++++++++++++++++
+ arch/arm/boot/dts/armada-xp-98dx3236.dtsi     |   2 +-
+ arch/arm/boot/dts/armada-xp-db-dxbc2.dts      |  18 +-
+ arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts |  18 +-
+ 5 files changed, 208 insertions(+), 15 deletions(-)
+ create mode 100644 arch/arm/boot/dts/armada-385-db-88f6820-amc.dts
 
-Changes since v4:
-- drop "RFC"
-
- arch/arm/mach-mvebu/board-v7.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index ccca95173e17..5bbde5e5258e 100644
---- a/arch/arm/mach-mvebu/board-v7.c
-+++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -145,6 +145,11 @@ static void __init mvebu_dt_init(void)
- 		i2c_quirk();
- }
- 
-+static void __init armada_370_xp_dt_fixup(void)
-+{
-+	smp_set_ops(smp_ops(armada_xp_smp_ops));
-+}
-+
- static const char * const armada_370_xp_dt_compat[] __initconst = {
- 	"marvell,armada-370-xp",
- 	NULL,
-@@ -153,17 +158,12 @@ static const char * const armada_370_xp_dt_compat[] __initconst = {
- DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
--/*
-- * The following field (.smp) is still needed to ensure backward
-- * compatibility with old Device Trees that were not specifying the
-- * cpus enable-method property.
-- */
--	.smp		= smp_ops(armada_xp_smp_ops),
- 	.init_machine	= mvebu_dt_init,
- 	.init_irq       = mvebu_init_irq,
- 	.restart	= mvebu_restart,
- 	.reserve        = mvebu_memblock_reserve,
- 	.dt_compat	= armada_370_xp_dt_compat,
-+	.dt_fixup	= armada_370_xp_dt_fixup,
- MACHINE_END
- 
- static const char * const armada_375_dt_compat[] __initconst = {
 -- 
 2.18.0
