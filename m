@@ -1,261 +1,49 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 26 Jul 2018 14:37:38 -0700
-Subject: [PATCH v3 08/23] thermal: armada: use the resource managed
- registration helper alternative
-In-Reply-To: <20180716144206.30985-9-miquel.raynal@bootlin.com>
-References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
- <20180716144206.30985-9-miquel.raynal@bootlin.com>
-Message-ID: <20180726213737.GB15690@localhost.localdomain>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 26 Jul 2018 16:38:10 -0500
+Subject: [PATCH 00/14] arm64: dts: meson-axg: add audio support
+In-Reply-To: <CAFBinCB_fULnmrpyzNwnfAiL9QGco_6QW957Wroj8o6ZhNwmWA@mail.gmail.com>
+ (Martin Blumenstingl's message of "Wed, 25 Jul 2018 23:26:27 +0200")
+References: <20180724125238.14567-1-jbrunet@baylibre.com>
+ <CAFBinCBh-b=ie4hBMWdHG8KoLQ7qiRfo8vXfJ1PRcN4UPtg+uA@mail.gmail.com>
+ <705e31bf0d978b7d356b2f077179ab0e3db6f092.camel@baylibre.com>
+ <CAFBinCB_fULnmrpyzNwnfAiL9QGco_6QW957Wroj8o6ZhNwmWA@mail.gmail.com>
+Message-ID: <7hfu051xvh.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey,
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-On Mon, Jul 16, 2018 at 04:41:51PM +0200, Miquel Raynal wrote:
-> Current use of thermal_zone_device_register() triggers a warning at boot
-> and should be replaced by devm_thermal_zone_of_sensor_register(). This
-> allows better handling of multiple thermal zones for later multi-sensors
-> support.
-> 
-> Also change the driver data to embed a new structure to make the
-> difference between legacy data (which needs to be cleaned) and
-> syscon-related data.
-> 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> ---
->  drivers/thermal/armada_thermal.c | 123 ++++++++++++++++++++++++++++++++-------
->  1 file changed, 101 insertions(+), 22 deletions(-)
-> 
-> diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-> index be346c6afde2..dd894312dedf 100644
-> --- a/drivers/thermal/armada_thermal.c
-> +++ b/drivers/thermal/armada_thermal.c
-> @@ -64,6 +64,7 @@ struct armada_thermal_data;
->  
->  /* Marvell EBU Thermal Sensor Dev Structure */
->  struct armada_thermal_priv {
-> +	struct device *dev;
->  	struct regmap *syscon;
->  	char zone_name[THERMAL_NAME_LENGTH];
->  	struct armada_thermal_data *data;
-> @@ -95,6 +96,26 @@ struct armada_thermal_data {
->  	unsigned int syscon_status_off;
->  };
->  
-> +struct armada_drvdata {
-> +	enum drvtype {
-> +		LEGACY,
-> +		SYSCON
-> +	} type;
-> +	union {
-> +		struct armada_thermal_priv *priv;
-> +		struct thermal_zone_device *tz;
-> +	} data;
-> +};
-> +
-> +/*
-> + * struct armada_thermal_sensor - hold the information of one thermal sensor
-> + * @thermal: pointer to the local private structure
-> + * @tzd: pointer to the thermal zone device
-> + */
-> +struct armada_thermal_sensor {
-> +	struct armada_thermal_priv *priv;
-> +};
-> +
->  static void armadaxp_init(struct platform_device *pdev,
->  			  struct armada_thermal_priv *priv)
->  {
-> @@ -243,16 +264,14 @@ static bool armada_is_valid(struct armada_thermal_priv *priv)
->  	return reg & priv->data->is_valid_bit;
->  }
->  
-> -static int armada_get_temp(struct thermal_zone_device *thermal,
-> -			   int *temp)
-> +static int armada_read_sensor(struct armada_thermal_priv *priv, int *temp)
->  {
-> -	struct armada_thermal_priv *priv = thermal->devdata;
->  	u32 reg, div;
->  	s64 sample, b, m;
->  
->  	/* Valid check */
->  	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
-> -		dev_err(&thermal->device,
-> +		dev_err(priv->dev,
->  			"Temperature sensor reading not valid\n");
->  		return -EIO;
->  	}
-> @@ -278,7 +297,33 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
->  	return 0;
->  }
->  
-> -static struct thermal_zone_device_ops ops = {
-> +static int armada_get_temp_legacy(struct thermal_zone_device *thermal,
-> +				  int *temp)
-> +{
-> +	struct armada_thermal_priv *priv = thermal->devdata;
-> +	int ret;
-> +
-> +	/* Do the actual reading */
-> +	ret = armada_read_sensor(priv, temp);
-> +
-> +	return ret;
-> +}
-> +
-> +static struct thermal_zone_device_ops legacy_ops = {
-> +	.get_temp = armada_get_temp_legacy,
-> +};
-> +
-> +static int armada_get_temp(void *_sensor, int *temp)
-> +{
-> +	struct armada_thermal_sensor *sensor = _sensor;
-> +	struct armada_thermal_priv *priv = sensor->priv;
-> +	int ret;
+> Hi Jerome,
+>
+> On Wed, Jul 25, 2018 at 11:19 PM <jbrunet@baylibre.com> wrote:
+>>
+>> On Wed, 2018-07-25 at 21:11 +0200, Martin Blumenstingl wrote:
+>> > nit-pick: one patch uses "arm64: dts: meson-axg: s400" in the subject
+>> > while other patches that are touching the s400 board aren't
+>> > if you have to re-send this series: can you please use the "arm64:
+>> > dts: meson-axg: s400:" prefix for all patches touching the s400 board?
+>>
+>> hum, do we really have such rule, or do you think we should add one ?
+> looking at the git history in arch/arm64/boot/dts/amlogic: it seems
+> that we don't have a rule yet, even though some (some of
+> your's/Neil's/my) patches were using that naming schema in the past
+>
+>> Kevin, do you have opinion ?
+>>
+>> Not that I really mind either way, but prefixes rules are usually there to help
+>> maintainer filter the patches. Will such rule help in any way ?
+> maybe it's just a problem of a false initial impression
+> I read "arm64: dts: meson-axg: add usb power regulator" in the
+> cover-letter and came to the conclusion that this patch must be wrong
+> since meson-axg.dtsi should not have any regulators (unless they're
+> built into the SoC). only when looking at the patch itself I realized
+> that it's fine because it patches the s400.dts
 
+I actually had the same first impression problem.  At first glance, it
+looks like all the patches are AXG-generic, and only the 2 that mention
+s400 apply to the board.
 
-The above variable:
-drivers/thermal/armada_thermal.c:320:6: warning: unused variable ?ret? [-Wunused-variable]
-  int ret;
-      ^~~
-cc1: some warnings being treated as errors
-scripts/Makefile.build:323: recipe for target 'drivers/thermal/armada_thermal.o' failed
+So, if this needs a respin, I'd prefer the board name where appropriate,
+but it's not something I'm going to be picky about.
 
-
-> +
-> +	/* Do the actual reading */
-> +	return armada_read_sensor(priv, &temp);
-
-I think you meant 
-
-+	return armada_read_sensor(priv, temp);
-
-here right?
-
-
-I obviously get:
-
-  CC [M]  drivers/thermal/armada_thermal.o
-drivers/thermal/armada_thermal.c: In function ?armada_get_temp?:
-drivers/thermal/armada_thermal.c:323:34: error: passing argument 2 of ?armada_read_sensor? from incompatible pointer type [-Werror=incompatible-pointer-types]
-  return armada_read_sensor(priv, &temp);
-                                  ^
-drivers/thermal/armada_thermal.c:267:12: note: expected ?int *? but argument is of type ?int **?
- static int armada_read_sensor(struct armada_thermal_priv *priv, int *temp)
-            ^~~~~~~~~~~~~~~~~~
-
-
-> +}
-> +
-> +static struct thermal_zone_of_device_ops of_ops = {
->  	.get_temp = armada_get_temp,
->  };
->  
-> @@ -480,7 +525,9 @@ static void armada_set_sane_name(struct platform_device *pdev,
->  
->  static int armada_thermal_probe(struct platform_device *pdev)
->  {
-> -	struct thermal_zone_device *thermal;
-> +	struct thermal_zone_device *tz;
-> +	struct armada_thermal_sensor *sensors;
-> +	struct armada_drvdata *drvdata;
->  	const struct of_device_id *match;
->  	struct armada_thermal_priv *priv;
->  	int ret;
-> @@ -493,11 +540,13 @@ static int armada_thermal_probe(struct platform_device *pdev)
->  	if (!priv)
->  		return -ENOMEM;
->  
-> +	drvdata = devm_kzalloc(&pdev->dev, sizeof(*drvdata), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	priv->dev = &pdev->dev;
->  	priv->data = (struct armada_thermal_data *)match->data;
->  
-> -	/* Ensure device name is correct for the thermal core */
-> -	armada_set_sane_name(pdev, priv);
-> -
->  	/*
->  	 * Legacy DT bindings only described "control1" register (also referred
->  	 * as "control MSB" on old documentation). Then, bindings moved to cover
-> @@ -510,35 +559,65 @@ static int armada_thermal_probe(struct platform_device *pdev)
->  	 * is to define an overall system controller and put the thermal node
->  	 * into it, which requires the use of regmaps across all the driver.
->  	 */
-> -	if (IS_ERR(syscon_node_to_regmap(pdev->dev.parent->of_node)))
-> +	if (IS_ERR(syscon_node_to_regmap(pdev->dev.parent->of_node))) {
-> +		/* Ensure device name is correct for the thermal core */
-> +		armada_set_sane_name(pdev, priv);
-> +
->  		ret = armada_thermal_probe_legacy(pdev, priv);
-> -	else
-> -		ret = armada_thermal_probe_syscon(pdev, priv);
-> +		if (ret)
-> +			return ret;
->  
-> +		priv->data->init(pdev, priv);
-> +
-> +		tz = thermal_zone_device_register(priv->zone_name, 0, 0, priv,
-> +						  &legacy_ops, NULL, 0, 0);
-> +		if (IS_ERR(tz)) {
-> +			dev_err(&pdev->dev,
-> +				"Failed to register thermal zone device\n");
-> +			return PTR_ERR(tz);
-> +		}
-> +
-> +		drvdata->type = LEGACY;
-> +		drvdata->data.tz = tz;
-> +		platform_set_drvdata(pdev, drvdata);
-> +
-> +		return 0;
-> +	}
-> +
-> +	ret = armada_thermal_probe_syscon(pdev, priv);
->  	if (ret)
->  		return ret;
->  
->  	priv->data->init(pdev, priv);
-> +	drvdata->type = SYSCON;
-> +	drvdata->data.priv = priv;
-> +	platform_set_drvdata(pdev, drvdata);
->  
-> -	thermal = thermal_zone_device_register(priv->zone_name, 0, 0, priv,
-> -					       &ops, NULL, 0, 0);
-> -	if (IS_ERR(thermal)) {
-> +	sensors = devm_kzalloc(&pdev->dev, sizeof(struct armada_thermal_sensor),
-> +			       GFP_KERNEL);
-> +	if (!sensors)
-> +		return -ENOMEM;
-> +
-> +	sensors->priv = priv;
-> +
-> +	tz = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, sensors,
-> +						  &of_ops);
-> +	if (IS_ERR(tz)) {
->  		dev_err(&pdev->dev,
-> -			"Failed to register thermal zone device\n");
-> -		return PTR_ERR(thermal);
-> +			"Failed to register thermal sensor (err: %ld)\n",
-> +			PTR_ERR(tz));
-> +		return PTR_ERR(tz);
->  	}
->  
-> -	platform_set_drvdata(pdev, thermal);
-> -
->  	return 0;
->  }
->  
->  static int armada_thermal_exit(struct platform_device *pdev)
->  {
-> -	struct thermal_zone_device *armada_thermal =
-> -		platform_get_drvdata(pdev);
-> +	struct armada_drvdata *drvdata = platform_get_drvdata(pdev);
->  
-> -	thermal_zone_device_unregister(armada_thermal);
-> +	if (drvdata->type == LEGACY)
-> +		thermal_zone_device_unregister(drvdata->data.tz);
->  
->  	return 0;
->  }
-> -- 
-> 2.14.1
-> 
+Kevin
