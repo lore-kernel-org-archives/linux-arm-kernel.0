@@ -1,144 +1,251 @@
-From: alex@ghiti.fr (Alex Ghiti)
-Date: Thu, 26 Jul 2018 17:01:57 +0000
-Subject: [PATCH v4 00/11] hugetlb: Factorize hugetlb architecture
- primitives
-In-Reply-To: <20180726125940.GA15033@ls3530>
-References: <20180705110716.3919-1-alex@ghiti.fr>
- <20180709141621.GD22297@dhcp22.suse.cz>
- <2173685f-7f85-7acb-4685-2383210c5fa2@ghiti.fr>
- <87d0vehx16.fsf@concordia.ellerman.id.au>
- <67aba0f0-c0d4-b06f-5fbc-f4d113ce5033@ghiti.fr>
- <20180726125940.GA15033@ls3530>
-Message-ID: <de188e2f-99ab-53fa-20df-4fec00a935e9@ghiti.fr>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 26 Jul 2018 18:03:05 +0100
+Subject: [PATCH v4] iommu/arm-smmu-v3: Poll for CMD_SYNC outside cmdq lock
+Message-ID: <836061e0a114270be92da2e4d16a70859c2c840e.1532622539.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Helge,
+Even without the MSI trick, we can still do a lot better than hogging
+the entire queue while it drains. All we actually need to do for the
+necessary guarantee of completion is wait for our particular command to
+have been consumed - as long as we keep track of where we inserted it,
+there is no need to block other CPUs from adding further commands in the
+meantime. There is one theoretical (but incredibly unlikely) edge case
+to avoid, where cons has wrapped twice to still appear 'behind' the sync
+position - this is easily disambiguated by adding a generation count to
+the queue to indicate when prod wraps, since cons cannot wrap twice
+without prod having wrapped at least once.
 
-Thanks for your tests.
-In case it can help you, this is what I get when I try to build 
-generic-64bit_defconfig (I truncated the output):
+This also makes it reasonable to separate the two conceptually different
+modes of polling such that command insertion - which really wants to be
+fair and have minimal latency - is not subject to exponential backoff,
+and returns to its original implementation.
 
-...
+Tested-by: Zhen Lei <thunder.leizhen@huawei.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
- ?LD????? vmlinux.o
- ?MODPOST vmlinux.o
-hppa64-linux-ld: init/main.o(.text+0x98): cannot reach strreplace
-init/main.o: In function `initcall_blacklisted':
-init/.tmp_main.o:(.text+0x98): relocation truncated to fit: 
-R_PARISC_PCREL22F against symbol `strreplace' defined in .text section 
-in lib/string.o
-hppa64-linux-ld: init/main.o(.text+0xbc): cannot reach strcmp
-init/.tmp_main.o:(.text+0xbc): relocation truncated to fit: 
-R_PARISC_PCREL22F against symbol `strcmp' defined in .text section in 
-lib/string.o
-hppa64-linux-ld: init/main.o(.text+0x21c): cannot reach strcpy
-init/main.o: In function `do_one_initcall':
-(.text+0x21c): relocation truncated to fit: R_PARISC_PCREL22F against 
-symbol `strcpy' defined in .text section in lib/string.o
-hppa64-linux-ld: init/main.o(.text+0x250): cannot reach strlcat
-(.text+0x250): relocation truncated to fit: R_PARISC_PCREL22F against 
-symbol `strlcat' defined in .text section in lib/string.o
-hppa64-linux-ld: init/main.o(.init.text+0x1d4): cannot reach strcmp
-init/main.o: In function `do_early_param':
-init/.tmp_main.o:(.init.text+0x1d4): relocation truncated to fit: 
-R_PARISC_PCREL22F against symbol `strcmp' defined in .text section in 
-lib/string.o
-hppa64-linux-ld: init/main.o(.init.text+0x250): cannot reach strcmp
-init/.tmp_main.o:(.init.text+0x250): relocation truncated to fit: 
-R_PARISC_PCREL22F against symbol `strcmp' defined in .text section in 
-lib/string.o
-hppa64-linux-ld: init/main.o(.init.text+0x294): cannot reach strlen
-init/main.o: In function `repair_env_string':
-init/.tmp_main.o:(.init.text+0x294): relocation truncated to fit: 
-R_PARISC_PCREL22F against symbol `strlen' defined in .text section in 
-lib/string.o
-hppa64-linux-ld: init/main.o(.init.text+0x2f0): cannot reach strlen
-init/.tmp_main.o:(.init.text+0x2f0): relocation truncated to fit: 
-R_PARISC_PCREL22F against symbol `strlen' defined in .text section in 
-lib/string.o
-hppa64-linux-ld: init/main.o(.init.text+0x308): cannot reach memmove
-init/.tmp_main.o:(.init.text+0x308): relocation truncated to fit: 
-R_PARISC_PCREL22F against symbol `memmove' defined in .text section in 
-lib/string.o
-hppa64-linux-ld: init/main.o(.init.text+0x454): cannot reach strlen
-init/main.o: In function `unknown_bootoption':
-init/.tmp_main.o:(.init.text+0x454): relocation truncated to fit: 
-R_PARISC_PCREL22F against symbol `strlen' defined in .text section in 
-lib/string.o
-hppa64-linux-ld: init/main.o(.init.text+0x4dc): cannot reach strchr
-init/.tmp_main.o:(.init.text+0x4dc): additional relocation overflows 
-omitted from the output
-hppa64-linux-ld: init/main.o(.init.text+0x638): cannot reach strncmp
-hppa64-linux-ld: init/main.o(.init.text+0x694): cannot reach get_option
-hppa64-linux-ld: init/main.o(.init.text+0x744): cannot reach strsep
-hppa64-linux-ld: init/main.o(.init.text+0x798): cannot reach strlen
-hppa64-linux-ld: init/main.o(.init.text+0x7d0): cannot reach strcpy
-hppa64-linux-ld: init/main.o(.init.text+0x954): cannot reach strlcpy
-hppa64-linux-ld: init/main.o(.init.text+0xab8): cannot reach strlen
-hppa64-linux-ld: init/main.o(.init.text+0xafc): cannot reach strlen
-hppa64-linux-ld: init/main.o(.init.text+0xb40): cannot reach strlen
-hppa64-linux-ld: init/main.o(.init.text+0xb84): cannot reach strlen
-hppa64-linux-ld: init/main.o(.init.text+0xbd0): cannot reach strcpy
-hppa64-linux-ld: init/main.o(.init.text+0xbe8): cannot reach strcpy
-hppa64-linux-ld: init/main.o(.init.text+0xc3c): cannot reach 
-build_all_zonelists
-hppa64-linux-ld: init/main.o(.init.text+0x1200): cannot reach unknown
-hppa64-linux-ld: init/main.o(.init.text+0x1278): cannot reach 
-wait_for_completion
-hppa64-linux-ld: init/main.o(.init.text+0x12b0): cannot reach _raw_spin_lock
-hppa64-linux-ld: init/main.o(.init.text+0x147c): cannot reach strcpy
-hppa64-linux-ld: init/main.o(.ref.text+0x40): cannot reach kernel_thread
-hppa64-linux-ld: init/main.o(.ref.text+0x60): cannot reach 
-find_task_by_pid_ns
-hppa64-linux-ld: init/main.o(.ref.text+0x98): cannot reach 
-set_cpus_allowed_ptr
-hppa64-linux-ld: init/main.o(.ref.text+0xbc): cannot reach kernel_thread
-hppa64-linux-ld: init/main.o(.ref.text+0xd4): cannot reach 
-find_task_by_pid_ns
-hppa64-linux-ld: init/main.o(.ref.text+0x108): cannot reach complete
-hppa64-linux-ld: init/main.o(.ref.text+0x128): cannot reach 
-cpu_startup_entry
-hppa64-linux-ld: init/main.o(.ref.text+0x164): cannot reach unknown
-hppa64-linux-ld: init/main.o(.ref.text+0x174): cannot reach 
-async_synchronize_full
-hppa64-linux-ld: init/main.o(.ref.text+0x1a4): cannot reach 
-rcu_barrier_sched
-hppa64-linux-ld: init/main.o(.ref.text+0x1b4): cannot reach mark_rodata_ro
-hppa64-linux-ld: init/main.o(.ref.text+0x1d4): cannot reach 
-rcu_end_inkernel_boot
-hppa64-linux-ld: init/main.o(.ref.text+0x1f4): cannot reach unknown
-hppa64-linux-ld: init/main.o(.ref.text+0x218): cannot reach printk
-hppa64-linux-ld: init/main.o(.ref.text+0x238): cannot reach unknown
-hppa64-linux-ld: init/main.o(.ref.text+0x258): cannot reach panic
-hppa64-linux-ld: init/main.o(.ref.text+0x268): cannot reach printk
-hppa64-linux-ld: init/main.o(.ref.text+0x280): cannot reach unknown
-hppa64-linux-ld: init/main.o(.ref.text+0x29c): cannot reach unknown
-hppa64-linux-ld: init/main.o(.ref.text+0x2b8): cannot reach unknown
-hppa64-linux-ld: init/main.o(.ref.text+0x2d4): cannot reach unknown
-hppa64-linux-ld: init/main.o(.ref.text+0x2f0): cannot reach panic
-hppa64-linux-ld: init/do_mounts.o(.text+0x30): cannot reach strncasecmp
-hppa64-linux-ld: init/do_mounts.o(.text+0x158): cannot reach strncmp
-hppa64-linux-ld: init/do_mounts.o(.text+0x180): cannot reach strchr
+v4: rebase to 4.18-rc3, add tested-by
 
-...
+Fairly sure this isn't actually the fourth version of this particular
+patch, but the previous posting[1] was part of a v3 series...
 
+Robin.
 
-On 07/26/2018 12:59 PM, Helge Deller wrote:
-> * Alex Ghiti <alex@ghiti.fr>:
->> This is the result of the build for all arches tackled in this series
->> rebased on 4.18-rc6:
->> ...
->> parisc:
->>  ??????? generic-64bit_defconfig: with huge page does not link
->>  ??????? generic-64bit_defconfig: without huge page does not link
->>  ??????? BUT not because of this series, any feedback welcome.
-> Strange, but I will check that later....
->
-> Anyway, I applied your v4-patch to my parisc64 tree, built the kernel,
-> started it and ran some hugetlb LTP testcases sucessfully.
-> So, please add:
->
-> Tested-by: Helge Deller <deller@gmx.de> # parisc
->
-> Helge
+[1] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg20576.html
+
+ drivers/iommu/arm-smmu-v3.c | 137 +++++++++++++++++++++---------------
+ 1 file changed, 80 insertions(+), 57 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 1d647104bccc..09abf3da2d62 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -474,6 +474,7 @@ struct arm_smmu_queue {
+ struct arm_smmu_cmdq {
+ 	struct arm_smmu_queue		q;
+ 	spinlock_t			lock;
++	int				generation;
+ };
+ 
+ struct arm_smmu_evtq {
+@@ -673,6 +674,17 @@ static bool queue_empty(struct arm_smmu_queue *q)
+ 	       Q_WRP(q, q->prod) == Q_WRP(q, q->cons);
+ }
+ 
++static bool queue_behind(struct arm_smmu_queue *q, u32 idx)
++{
++	return Q_IDX(q, q->cons) < Q_IDX(q, idx);
++}
++
++static bool queue_ahead_not_wrapped(struct arm_smmu_queue *q, u32 idx)
++{
++	return Q_IDX(q, q->cons) >= Q_IDX(q, idx) &&
++	       Q_WRP(q, q->cons) == Q_WRP(q, idx);
++}
++
+ static void queue_sync_cons(struct arm_smmu_queue *q)
+ {
+ 	q->cons = readl_relaxed(q->cons_reg);
+@@ -706,33 +718,19 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
+ 	writel(q->prod, q->prod_reg);
+ }
+ 
+-/*
+- * Wait for the SMMU to consume items. If drain is true, wait until the queue
+- * is empty. Otherwise, wait until there is at least one free slot.
+- */
+-static int queue_poll_cons(struct arm_smmu_queue *q, bool sync, bool wfe)
++static int queue_poll_cons(struct arm_smmu_queue *q, bool wfe)
+ {
+-	ktime_t timeout;
+-	unsigned int delay = 1, spin_cnt = 0;
++	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
+ 
+-	/* Wait longer if it's a CMD_SYNC */
+-	timeout = ktime_add_us(ktime_get(), sync ?
+-					    ARM_SMMU_CMDQ_SYNC_TIMEOUT_US :
+-					    ARM_SMMU_POLL_TIMEOUT_US);
+-
+-	while (queue_sync_cons(q), (sync ? !queue_empty(q) : queue_full(q))) {
++	while (queue_sync_cons(q), queue_full(q)) {
+ 		if (ktime_compare(ktime_get(), timeout) > 0)
+ 			return -ETIMEDOUT;
+ 
+ 		if (wfe) {
+ 			wfe();
+-		} else if (++spin_cnt < ARM_SMMU_CMDQ_SYNC_SPIN_COUNT) {
+-			cpu_relax();
+-			continue;
+ 		} else {
+-			udelay(delay);
+-			delay *= 2;
+-			spin_cnt = 0;
++			cpu_relax();
++			udelay(1);
+ 		}
+ 	}
+ 
+@@ -895,15 +893,20 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
+ 	queue_write(Q_ENT(q, cons), cmd, q->ent_dwords);
+ }
+ 
+-static void arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
++static u32 arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
+ {
+ 	struct arm_smmu_queue *q = &smmu->cmdq.q;
+ 	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+ 
++	if (Q_IDX(q, q->prod + 1) == 0)
++		WRITE_ONCE(smmu->cmdq.generation, smmu->cmdq.generation + 1);
++
+ 	while (queue_insert_raw(q, cmd) == -ENOSPC) {
+-		if (queue_poll_cons(q, false, wfe))
++		if (queue_poll_cons(q, wfe))
+ 			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
+ 	}
++
++	return q->prod;
+ }
+ 
+ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+@@ -927,7 +930,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+  * The difference between val and sync_idx is bounded by the maximum size of
+  * a queue at 2^20 entries, so 32 bits is plenty for wrap-safe arithmetic.
+  */
+-static int __arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
++static int arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
+ {
+ 	ktime_t timeout;
+ 	u32 val;
+@@ -940,53 +943,73 @@ static int __arm_smmu_sync_poll_msi(struct arm_smmu_device *smmu, u32 sync_idx)
+ 	return (int)(val - sync_idx) < 0 ? -ETIMEDOUT : 0;
+ }
+ 
+-static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
++static int arm_smmu_sync_poll_cons(struct arm_smmu_device *smmu, u32 sync_idx,
++				   int sync_gen)
+ {
+-	u64 cmd[CMDQ_ENT_DWORDS];
+-	unsigned long flags;
+-	struct arm_smmu_cmdq_ent ent = {
+-		.opcode = CMDQ_OP_CMD_SYNC,
+-		.sync	= {
+-			.msidata = atomic_inc_return_relaxed(&smmu->sync_nr),
+-			.msiaddr = virt_to_phys(&smmu->sync_count),
+-		},
+-	};
+-
+-	arm_smmu_cmdq_build_cmd(cmd, &ent);
+-
+-	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+-	arm_smmu_cmdq_insert_cmd(smmu, cmd);
+-	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+-
+-	return __arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
+-}
+-
+-static int __arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+-{
+-	u64 cmd[CMDQ_ENT_DWORDS];
+-	unsigned long flags;
++	struct arm_smmu_queue *q = &smmu->cmdq.q;
+ 	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+-	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
+-	int ret;
++	unsigned int delay = 1, spin_cnt = 0;
++	ktime_t timeout;
+ 
+-	arm_smmu_cmdq_build_cmd(cmd, &ent);
++	timeout = ktime_add_us(ktime_get(), ARM_SMMU_CMDQ_SYNC_TIMEOUT_US);
++	do {
++		queue_sync_cons(q);
++		/*
++		 * If we see updates quickly enough, cons has passed sync_idx,
++		 * but not yet wrapped. At worst, cons might have actually
++		 * wrapped an even number of times, but that still guarantees
++		 * the original sync must have been consumed.
++		 */
++		if (queue_ahead_not_wrapped(q, sync_idx))
++			return 0;
++		/*
++		 * Otherwise, cons may have passed sync_idx and wrapped one or
++		 * more times to appear behind it again, but in that case prod
++		 * must also be one or more generations ahead.
++		 */
++		if (queue_behind(q, sync_idx) &&
++		    READ_ONCE(smmu->cmdq.generation) != sync_gen)
++			return 0;
+ 
+-	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+-	arm_smmu_cmdq_insert_cmd(smmu, cmd);
+-	ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
+-	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
++		if (wfe) {
++			wfe();
++		} else if (++spin_cnt < ARM_SMMU_CMDQ_SYNC_SPIN_COUNT) {
++			cpu_relax();
++			continue;
++		} else {
++			udelay(delay);
++			delay *= 2;
++			spin_cnt = 0;
++		}
++	} while (ktime_before(ktime_get(), timeout));
+ 
+-	return ret;
++	return -ETIMEDOUT;
+ }
+ 
+ static void arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+ {
+-	int ret;
++	u64 cmd[CMDQ_ENT_DWORDS];
++	unsigned long flags;
+ 	bool msi = (smmu->features & ARM_SMMU_FEAT_MSI) &&
+ 		   (smmu->features & ARM_SMMU_FEAT_COHERENCY);
++	struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
++	int ret, sync_idx, sync_gen;
+ 
+-	ret = msi ? __arm_smmu_cmdq_issue_sync_msi(smmu)
+-		  : __arm_smmu_cmdq_issue_sync(smmu);
++	if (msi) {
++		ent.sync.msidata = atomic_inc_return_relaxed(&smmu->sync_nr);
++		ent.sync.msiaddr = virt_to_phys(&smmu->sync_count);
++	}
++	arm_smmu_cmdq_build_cmd(cmd, &ent);
++
++	spin_lock_irqsave(&smmu->cmdq.lock, flags);
++	sync_idx = arm_smmu_cmdq_insert_cmd(smmu, cmd);
++	sync_gen = READ_ONCE(smmu->cmdq.generation);
++	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
++
++	if (msi)
++		ret = arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
++	else
++		ret = arm_smmu_sync_poll_cons(smmu, sync_idx, sync_gen);
+ 	if (ret)
+ 		dev_err_ratelimited(smmu->dev, "CMD_SYNC timeout\n");
+ }
+-- 
+2.17.1.dirty
