@@ -1,33 +1,36 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 26 Jul 2018 09:29:24 +0200
-Subject: [PATCH] arm64: dts: allwinner: activate spi flash on pine64 LTS
- board
-In-Reply-To: <1532587906-5415-1-git-send-email-Akash_Gajjar@mentor.com>
-References: <Akash_Gajjar@mentor.com>
- <1532587906-5415-1-git-send-email-Akash_Gajjar@mentor.com>
-Message-ID: <20180726072924.bnvljmd2sf6bf5ae@flea>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 25 Jul 2018 23:40:32 -0700
+Subject: [GIT PULL] Qualcomm ARM64 DT updates for 4.19
+In-Reply-To: <1532232622-18275-2-git-send-email-andy.gross@linaro.org>
+References: <1532232622-18275-1-git-send-email-andy.gross@linaro.org>
+ <1532232622-18275-2-git-send-email-andy.gross@linaro.org>
+Message-ID: <20180726064032.ypwakfxvl5k4gw2r@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1;5202;0c
-On Thu, Jul 26, 2018 at 12:21:46PM +0530, Akash Gajjar wrote:
-> This board has SPI flash. add spi flash support in device tree.
-> Tested on pine64 LTS.
+On Sat, Jul 21, 2018 at 11:10:19PM -0500, Andy Gross wrote:
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
-> Signed-off-by: Akash Gajjar <Akash_Gajjar@mentor.com>
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.19
+> 
+> for you to fetch changes up to e53db018315b7660bb7000a29e79faff2496c2c2:
+> 
+>   arm64: dts: qcom: db410c: Fix Bluetooth LED trigger (2018-07-21 15:31:02 -0500)
+> 
+> ----------------------------------------------------------------
+> Qualcomm ARM64 Updates for v4.19
+> 
+> * Add support for PM8005/PM8998 and related nodes
+> * Add/fix nodes on SDM845 for I2c, SPI, UART, and RPMH
+> * Fix BT LED trigger on DB410c
+> * Drop legacy clock names on MSM8916
+> * Add gpio line names on DB820c
 
-Queued for 4.20, thanks!
+Merged, thanks!
 
-Maxime
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180726/f62fcc52/attachment.sig>
+-Olof
