@@ -1,88 +1,24 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 26 Jul 2018 09:44:32 +0200
-Subject: [PATCH v2 17/18] arm64: dts: allwinner: a64: NanoPi-A64: Add
- Wifi/Bluetooth chip
-In-Reply-To: <20180726003532.18751-18-andre.przywara@arm.com>
+Date: Thu, 26 Jul 2018 09:43:02 +0200
+Subject: [PATCH v2 11/18] arm64: dts: allwinner: a64: Orange Pi Win: Add
+ missing power rails
+In-Reply-To: <20180726003532.18751-12-andre.przywara@arm.com>
 References: <20180726003532.18751-1-andre.przywara@arm.com>
- <20180726003532.18751-18-andre.przywara@arm.com>
-Message-ID: <20180726074432.ewkncrohmofpywji@flea>
+ <20180726003532.18751-12-andre.przywara@arm.com>
+Message-ID: <20180726074302.c53cprwxweakykok@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 01:35:31AM +0100, Andre Przywara wrote:
-> The NanoPi-A64 has an on-board WiFi/Bluetooth combo chip, connected
-> to the usual MMC1 and UART1. The AXP power line is the always-on
-> VDD_SYS_3.3V, but it uses pin L2 to enable the regulator.
-> As the actual WiFi driver is not in mainline Linux, it doesn't have a
-> compatible string, so we omit this from the node.
+On Thu, Jul 26, 2018 at 01:35:25AM +0100, Andre Przywara wrote:
+> From: Samuel Holland <samuel@sholland.org>
 > 
-> Add the respective nodes to the DT to make it usable.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   | 31 ++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-> index bd35a093e6cd..705e0b23589e 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-> @@ -53,11 +53,17 @@
->  	aliases {
->  		ethernet0 = &emac;
->  		serial0 = &uart0;
-> +		serial1 = &uart1;
->  	};
->  
->  	chosen {
->  		stdout-path = "serial0:115200n8";
->  	};
-> +
-> +	wifi_pwrseq: wifi_pwrseq {
-> +		compatible = "mmc-pwrseq-simple";
-> +		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
-> +	};
->  };
->  
->  &ehci0 {
-> @@ -105,6 +111,24 @@
->  	status = "okay";
->  };
->  
-> +&mmc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc1_pins>;
-> +	vmmc-supply = <&reg_dcdc1>;
-> +	vqmmc-supply = <&reg_dldo4>;
-> +	mmc-pwrseq = <&wifi_pwrseq>;
-> +	bus-width = <4>;
-> +	non-removable;
-> +	status = "okay";
-> +
-> +	rtl8189etv: wifi at 1 {
-> +		reg = <1>;
-> +		interrupt-parent = <&r_pio>;
-> +		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
-> +		interrupt-names = "host-wake";
-> +	};
-> +};
-> +
->  &ohci0 {
->  	status = "okay";
->  };
-> @@ -222,6 +246,13 @@
->  	status = "okay";
->  };
->  
-> +/* Connected to the Bluetooth UART, with hardware handshake pins */
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
-> +	status = "okay";
-> +};
+> The Orange Pi Win board has some of the AXP's power rails connected
+> on the board. Name them and adjust the voltage ranges.
 
-Same thing here, if it has serdev support, then it should have a real
-node here.
+They are already named, so you'd need to explain why that name needs
+to be changed.
+
+Same thing for the voltage range, a citation would be useful.
 
 Maxime
 
@@ -96,4 +32,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180726/78506723/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180726/3f66814b/attachment.sig>
