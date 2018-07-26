@@ -1,114 +1,158 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 26 Jul 2018 11:32:47 +0200
-Subject: [linux-sunxi] Re: [PATCH v2 06/18] arm64: dts: allwinner: a64:
- Orange Pi Win: Add UARTs
-In-Reply-To: <71e5f296-a8f6-062c-6e55-86c8b07ed0a6@arm.com>
-References: <20180726003532.18751-1-andre.przywara@arm.com>
- <20180726003532.18751-7-andre.przywara@arm.com>
- <20180726073911.ualwgf3t2bboeuy5@flea>
- <E978AF7E-4802-4429-99A2-4724EB68FFA9@aosc.io>
- <71e5f296-a8f6-062c-6e55-86c8b07ed0a6@arm.com>
-Message-ID: <20180726093247.3hesukln2n3fhqeg@flea>
+From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
+Date: Thu, 26 Jul 2018 18:38:25 +0900
+Subject: [PATCH v2 2/2] spi: add SPI controller driver for UniPhier SoC
+In-Reply-To: <CAHp75VcEdxDEo0T5_9BzOPaeaqjbmbrWmaE9+ZuUDYhjh6jpVw@mail.gmail.com>
+References: <1532588943-19481-1-git-send-email-hayashibara.keiji@socionext.com>
+ <1532588943-19481-3-git-send-email-hayashibara.keiji@socionext.com>
+ <CAHp75VcEdxDEo0T5_9BzOPaeaqjbmbrWmaE9+ZuUDYhjh6jpVw@mail.gmail.com>
+Message-ID: <001b01d424c4$66e04230$34a0c690$@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 09:30:14AM +0100, Andre Przywara wrote:
-> Hi,
+Hello Andy,
+
+Thank you for your check!
+
+
+> From: Andy Shevchenko [mailto:andy.shevchenko at gmail.com]
+> Sent: Thursday, July 26, 2018 5:46 PM
+> To: Hayashibara, Keiji/?? ?? <hayashibara.keiji@socionext.com>
+> Subject: Re: [PATCH v2 2/2] spi: add SPI controller driver for UniPhier SoC
 > 
-> On 26/07/18 08:42, Icenowy Zheng wrote:
-> > 
-> > 
-> > ? 2018?7?26? GMT+08:00 ??3:39:11, Maxime Ripard <maxime.ripard@bootlin.com> ??:
-> >> On Thu, Jul 26, 2018 at 01:35:20AM +0100, Andre Przywara wrote:
-> >>> From: Samuel Holland <samuel@sholland.org>
-> >>>
-> >>> The Orange Pi Win exposes several UARTs on header pin, and connects
-> >> one
-> >>> to the on-board WiFi/Bluetooth chip.
-> >>> Add the pinmux definitions to the UART nodes, but keep them disabled.
-> >>>
-> >>> Signed-off-by: Samuel Holland <samuel@sholland.org>
-> >>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >>> ---
-> >>>  .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 33
-> >> ++++++++++++++++++++++
-> >>>  1 file changed, 33 insertions(+)
-> >>>
-> >>> diff --git
-> >> a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> >> b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> >>> index 0cadcd59edd9..10f63d0b99cb 100644
-> >>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> >>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> >>> @@ -54,6 +54,10 @@
-> >>>  	aliases {
-> >>>  		ethernet0 = &emac;
-> >>>  		serial0 = &uart0;
-> >>> +		serial1 = &uart1;
-> >>> +		serial2 = &uart2;
-> >>> +		serial3 = &uart3;
-> >>> +		serial4 = &uart4;
-> >>>  	};
-> >>>  
-> >>>  	chosen {
-> >>> @@ -237,12 +241,41 @@
-> >>>  	vcc-hdmi-supply = <&reg_dldo1>;
-> >>>  };
-> >>>  
-> >>> +/* On debug connector */
-> >>>  &uart0 {
-> >>>  	pinctrl-names = "default";
-> >>>  	pinctrl-0 = <&uart0_pins_a>;
-> >>>  	status = "okay";
-> >>>  };
-> >>>  
-> >>> +/* Wi-Fi/BT */
-> >>> +&uart1 {
-> >>> +	pinctrl-names = "default";
-> >>> +	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
-> >>> +	status = "okay";
-> >>> +};
-> >>
-> >> What BT chip is there? Does it have serdev support? If so, that should
-> >> be enabled here.
-> > 
-> > RTL8723BS, no serdev.
-
-https://www.spinics.net/lists/linux-bluetooth/msg76376.html
-
-Not very far off though.
-
-> Yes. A while ago I managed to enable Bluetooth (on the Pine64 with the
-> same chip), but that involved a lot of hacking with a special userland
-> tool (not hciattach and no serdev).
+> On Thu, Jul 26, 2018 at 10:09 AM, Keiji Hayashibara <hayashibara.keiji@socionext.com> wrote:
+> > Add SPI controller driver implemented in Socionext UniPhier SoCs.
+> >
+> > UniPhier SoCs have two types SPI controllers; SCSSI supports a single
+> > channel, and MCSSI supports multiple channels.
+> > This driver supports SCSSI only.
+> >
+> > This controller has 32bit TX/RX FIFO with depth of eight entry, and
+> > supports the SPI master mode only.
+> >
+> > This commit is implemented in PIO transfer mode, not DMA transfer.
 > 
-> What this node means to say is: The UART1 is hardwired to some on-board
-> device and those pins are not available for GPIO, for instance.
+> Few style realted comments.
 > 
-> At least that was my understanding when it comes to enabling devices in
-> the DT. Is that correct?
+> > +#include <asm/unaligned.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/bitfield.h>
+> > +#include <linux/bitops.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/io.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_platform.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/spi/spi.h>
+> 
+> Slightly better to keep them in order and put asm/* at the last.
 
-Well, yes and no. Arguably, any device connected to the other side of
-the serial bus should have been there from the beginning. However,
-there wasn't any way to do that in Linux before serdev was introduced,
-so we weren't doing that. That resulted in hacky userspace tools to
-work around that, and other work arounds in the DT to for example
-tying BT resources (clock, regulators, resets) to the WiFi chip hoping
-that someone would use both all the time.
+I see. I will modify this.
 
-Now that it's just around the corner, we don't have any excuse to do
-these kind of hacks anymore.
 
-Maxime
+> > +#define SSI_TIMEOUT            2000    /* ms */
+> 
+> SSI_TIMEOUT_MS ?
+> 
+> > +#define SSI_CTL                        0x0
+> 
+> Slightly better to keep same width for the addresses, like 0x00 here.
+> 
+> > +#define SSI_CKS                        0x4
+> 
+> > +#define SSI_TXWDS              0x8
+> 
+> > +#define SSI_RXWDS              0xc
+> 
+> Ditto.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180726/1af98e30/attachment.sig>
+I will modify about above.
+
+> 
+> > +static int uniphier_spi_set_baudrate(struct spi_device *spi, unsigned
+> > +int speed) {
+> > +       struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
+> > +       u32 val, ckrat;
+> > +
+> > +       /*
+> > +        * the supported rates are even numbers from 4 to 254. (4,6,8...254)
+> > +        * round up as we look for equal or less speed
+> > +        */
+> > +       ckrat = DIV_ROUND_UP(clk_get_rate(priv->clk), speed);
+> 
+> > +       ckrat = roundup(ckrat, 2);
+> 
+> ckrat += ckrat & 1;
+> 
+> ?
+
+It's simple. I will modify.
+
+
+> > +       /* check if requested speed is too small */
+> > +       if (ckrat > SSI_MAX_CLK_DIVIDER)
+> 
+> > +               return -EINVAL;
+> 
+> So, does this critical?
+
+If set the value to SSI_MAX_CLK_DIVIDER, the clock frequency will be set high.
+I don't change it to high frequency, and it is daringly an error.
+On the other hand, when changing to low frequency, I will change it automatically.
+
+> > +
+> > +       if (ckrat < SSI_MIN_CLK_DIVIDER)
+> > +               ckrat = SSI_MIN_CLK_DIVIDER;
+> 
+> clamp_val()  / max() ?
+
+I will modify it to use max().
+
+> 
+> > +       val = readl(priv->base + SSI_CKS);
+> > +       val &= ~SSI_CKS_CKRAT_MASK;
+> > +       val |= ckrat & SSI_CKS_CKRAT_MASK;
+> > +       writel(val, priv->base + SSI_CKS);
+> > +
+> > +       return 0;
+> > +}
+> 
+> > +       priv->irq = platform_get_irq(pdev, 0);
+> > +       if (priv->irq < 0) {
+> > +               dev_err(&pdev->dev, "failed to get IRQ\n");
+> 
+> > +               ret = -ENXIO;
+> 
+> What's wrong with
+> 
+> ret = priv->irq;
+> 
+> ?
+
+I will modify it.
+
+> > +               goto out_disable_clk;
+> > +       }
+> 
+> > +static const struct of_device_id uniphier_spi_match[] = {
+> > +       { .compatible = "socionext,uniphier-scssi", },
+> 
+> > +       { /* sentinel */ },
+> 
+> Slightly better without comma.
+
+OK. I will modify this.
+
+-----------------
+Best Regards,
+Keiji Hayashibara
+
+
+
+> > +};
+> > +MODULE_DEVICE_TABLE(of, uniphier_spi_match);
+> 
+> --
+> With Best Regards,
+> Andy Shevchenko
