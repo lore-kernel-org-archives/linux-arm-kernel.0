@@ -1,303 +1,121 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 26 Jul 2018 13:54:47 +0100
-Subject: [PATCH v3 09/13] coresight: Convert driver messages to dev_dbg
+Date: Thu, 26 Jul 2018 13:54:43 +0100
+Subject: [PATCH v3 05/13] coresight: perf: Allow tracing on hotplugged CPUs
 In-Reply-To: <1532609691-16863-1-git-send-email-suzuki.poulose@arm.com>
 References: <1532609691-16863-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1532609691-16863-10-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1532609691-16863-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert component enable/disable messages from dev_info to dev_dbg.
-When used with perf, the components in the paths are enabled/disabled
-during each schedule of the run, which can flood the dmesg with these
-messages. Moreover, they are only useful for debug purposes. So,
-convert such messages to dev_dbg() which can be turned on as
-needed.
+At the moment, if there is no CPU specified for a given
+event, we use cpu_online_mask and try to build path for
+each of the CPUs in the mask. This could prevent any CPU
+that is turned online later to be used for the tracing.
+
+This patch changes to use the cpu_present_mask and tries
+to build path for as much CPUs as possible ignoring the
+failures in building path for some of the CPUs. If ever
+we try to trace on those CPUs, we fail the operation.
+
+Based on a patch from Mathieu Poirier.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-dynamic-replicator.c | 4 ++--
- drivers/hwtracing/coresight/coresight-etb10.c              | 6 +++---
- drivers/hwtracing/coresight/coresight-etm3x.c              | 4 ++--
- drivers/hwtracing/coresight/coresight-etm4x.c              | 4 ++--
- drivers/hwtracing/coresight/coresight-funnel.c             | 4 ++--
- drivers/hwtracing/coresight/coresight-replicator.c         | 4 ++--
- drivers/hwtracing/coresight/coresight-stm.c                | 4 ++--
- drivers/hwtracing/coresight/coresight-tmc-etf.c            | 8 ++++----
- drivers/hwtracing/coresight/coresight-tmc-etr.c            | 4 ++--
- drivers/hwtracing/coresight/coresight-tmc.c                | 4 ++--
- drivers/hwtracing/coresight/coresight-tpiu.c               | 4 ++--
- 11 files changed, 25 insertions(+), 25 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 46 +++++++++++++++---------
+ 1 file changed, 30 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-index f6d0571..ebb8043 100644
---- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-@@ -56,7 +56,7 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index 6beb662..afe7e7f 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -127,11 +127,9 @@ static void free_event_data(struct work_struct *work)
  
- 	CS_LOCK(drvdata->base);
+ 	event_data = container_of(work, struct etm_event_data, work);
+ 	mask = &event_data->mask;
+-	/*
+-	 * First deal with the sink configuration.  See comment in
+-	 * etm_setup_aux() about why we take the first available path.
+-	 */
+-	if (event_data->snk_config) {
++
++	/* Free the sink buffers, if there are any */
++	if (event_data->snk_config && !WARN_ON(cpumask_empty(mask))) {
+ 		cpu = cpumask_first(mask);
+ 		sink = coresight_get_sink(etm_event_cpu_path(event_data, cpu));
+ 		if (sink_ops(sink)->free_buffer)
+@@ -166,7 +164,7 @@ static void *alloc_event_data(int cpu)
+ 	if (cpu != -1)
+ 		cpumask_set_cpu(cpu, mask);
+ 	else
+-		cpumask_copy(mask, cpu_online_mask);
++		cpumask_copy(mask, cpu_present_mask);
  
--	dev_info(drvdata->dev, "REPLICATOR enabled\n");
-+	dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
- 	return 0;
- }
+ 	/*
+ 	 * Each CPU has a single path between source and destination.  As such
+@@ -218,19 +216,32 @@ static void *etm_setup_aux(int event_cpu, void **pages,
+ 	 * on the cmd line.  As such the "enable_sink" flag in sysFS is reset.
+ 	 */
+ 	sink = coresight_get_enabled_sink(true);
+-	if (!sink)
++	if (!sink || !sink_ops(sink)->alloc_buffer)
+ 		goto err;
  
-@@ -75,7 +75,7 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
+ 	mask = &event_data->mask;
  
- 	CS_LOCK(drvdata->base);
+-	/* Setup the path for each CPU in a trace session */
++	/*
++	 * Setup the path for each CPU in a trace session. We try to build
++	 * trace path for each CPU in the mask. If we don't find an ETM
++	 * for the CPU or fail to build a path, we clear the CPU from the
++	 * mask and continue with the rest. If ever we try to trace on those
++	 * CPUs, we can handle it and fail the session.
++	 */
+ 	for_each_cpu(cpu, mask) {
+ 		struct list_head *path;
+ 		struct coresight_device *csdev;
  
--	dev_info(drvdata->dev, "REPLICATOR disabled\n");
-+	dev_dbg(drvdata->dev, "REPLICATOR disabled\n");
- }
+ 		csdev = per_cpu(csdev_src, cpu);
+-		if (!csdev)
+-			goto err;
++		/*
++		 * If there is no ETM associated with this CPU clear it from
++		 * the mask and continue with the rest. If ever we try to trace
++		 * on this CPU, we handle it accordingly.
++		 */
++		if (!csdev) {
++			cpumask_clear_cpu(cpu, mask);
++			continue;
++		}
  
- static const struct coresight_ops_link replicator_link_ops = {
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index e5808fd..474c247 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -160,7 +160,7 @@ static int etb_enable(struct coresight_device *csdev, u32 mode)
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 		/*
+ 		 * Building a path doesn't enable it, it simply builds a
+@@ -238,17 +249,20 @@ static void *etm_setup_aux(int event_cpu, void **pages,
+ 		 * referenced later when the path is actually needed.
+ 		 */
+ 		path = coresight_build_path(csdev, sink);
+-		if (IS_ERR(path))
+-			goto err;
++		if (IS_ERR(path)) {
++			cpumask_clear_cpu(cpu, mask);
++			continue;
++		}
  
- out:
--	dev_info(drvdata->dev, "ETB enabled\n");
-+	dev_dbg(drvdata->dev, "ETB enabled\n");
- 	return 0;
- }
- 
-@@ -266,7 +266,7 @@ static void etb_disable(struct coresight_device *csdev)
- 
- 	local_set(&drvdata->mode, CS_MODE_DISABLED);
- 
--	dev_info(drvdata->dev, "ETB disabled\n");
-+	dev_dbg(drvdata->dev, "ETB disabled\n");
- }
- 
- static void *etb_alloc_buffer(struct coresight_device *csdev, int cpu,
-@@ -509,7 +509,7 @@ static void etb_dump(struct etb_drvdata *drvdata)
- 	}
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_info(drvdata->dev, "ETB dumped\n");
-+	dev_dbg(drvdata->dev, "ETB dumped\n");
- }
- 
- static int etb_open(struct inode *inode, struct file *file)
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 7c74263..9ce8fba 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -501,7 +501,7 @@ static int etm_enable_sysfs(struct coresight_device *csdev)
- 	drvdata->sticky_enable = true;
- 	spin_unlock(&drvdata->spinlock);
- 
--	dev_info(drvdata->dev, "ETM tracing enabled\n");
-+	dev_dbg(drvdata->dev, "ETM tracing enabled\n");
- 	return 0;
- 
- err:
-@@ -604,7 +604,7 @@ static void etm_disable_sysfs(struct coresight_device *csdev)
- 	spin_unlock(&drvdata->spinlock);
- 	cpus_read_unlock();
- 
--	dev_info(drvdata->dev, "ETM tracing disabled\n");
-+	dev_dbg(drvdata->dev, "ETM tracing disabled\n");
- }
- 
- static void etm_disable(struct coresight_device *csdev,
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 1d94ebe..c1dcc7c 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -267,7 +267,7 @@ static int etm4_enable_sysfs(struct coresight_device *csdev)
- 	drvdata->sticky_enable = true;
- 	spin_unlock(&drvdata->spinlock);
- 
--	dev_info(drvdata->dev, "ETM tracing enabled\n");
-+	dev_dbg(drvdata->dev, "ETM tracing enabled\n");
- 	return 0;
- 
- err:
-@@ -380,7 +380,7 @@ static void etm4_disable_sysfs(struct coresight_device *csdev)
- 	spin_unlock(&drvdata->spinlock);
- 	cpus_read_unlock();
- 
--	dev_info(drvdata->dev, "ETM tracing disabled\n");
-+	dev_dbg(drvdata->dev, "ETM tracing disabled\n");
- }
- 
- static void etm4_disable(struct coresight_device *csdev,
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index 448145a..ee7a30b 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -65,7 +65,7 @@ static int funnel_enable(struct coresight_device *csdev, int inport,
- 
- 	funnel_enable_hw(drvdata, inport);
- 
--	dev_info(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
-+	dev_dbg(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
- 	return 0;
- }
- 
-@@ -89,7 +89,7 @@ static void funnel_disable(struct coresight_device *csdev, int inport,
- 
- 	funnel_disable_hw(drvdata, inport);
- 
--	dev_info(drvdata->dev, "FUNNEL inport %d disabled\n", inport);
-+	dev_dbg(drvdata->dev, "FUNNEL inport %d disabled\n", inport);
- }
- 
- static const struct coresight_ops_link funnel_link_ops = {
-diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
-index 8d2eaaa..feac983 100644
---- a/drivers/hwtracing/coresight/coresight-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-replicator.c
-@@ -35,7 +35,7 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
- {
- 	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
--	dev_info(drvdata->dev, "REPLICATOR enabled\n");
-+	dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
- 	return 0;
- }
- 
-@@ -44,7 +44,7 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
- {
- 	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
--	dev_info(drvdata->dev, "REPLICATOR disabled\n");
-+	dev_dbg(drvdata->dev, "REPLICATOR disabled\n");
- }
- 
- static const struct coresight_ops_link replicator_link_ops = {
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index c46c70a..35d6f97 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -211,7 +211,7 @@ static int stm_enable(struct coresight_device *csdev,
- 	stm_enable_hw(drvdata);
- 	spin_unlock(&drvdata->spinlock);
- 
--	dev_info(drvdata->dev, "STM tracing enabled\n");
-+	dev_dbg(drvdata->dev, "STM tracing enabled\n");
- 	return 0;
- }
- 
-@@ -274,7 +274,7 @@ static void stm_disable(struct coresight_device *csdev,
- 		pm_runtime_put(drvdata->dev);
- 
- 		local_set(&drvdata->mode, CS_MODE_DISABLED);
--		dev_info(drvdata->dev, "STM tracing disabled\n");
-+		dev_dbg(drvdata->dev, "STM tracing disabled\n");
- 	}
- }
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index 0549249..434003a 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -233,7 +233,7 @@ static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
- 	if (ret)
- 		return ret;
- 
--	dev_info(drvdata->dev, "TMC-ETB/ETF enabled\n");
-+	dev_dbg(drvdata->dev, "TMC-ETB/ETF enabled\n");
- 	return 0;
- }
- 
-@@ -256,7 +256,7 @@ static void tmc_disable_etf_sink(struct coresight_device *csdev)
- 
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_info(drvdata->dev, "TMC-ETB/ETF disabled\n");
-+	dev_dbg(drvdata->dev, "TMC-ETB/ETF disabled\n");
- }
- 
- static int tmc_enable_etf_link(struct coresight_device *csdev,
-@@ -275,7 +275,7 @@ static int tmc_enable_etf_link(struct coresight_device *csdev,
- 	drvdata->mode = CS_MODE_SYSFS;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_info(drvdata->dev, "TMC-ETF enabled\n");
-+	dev_dbg(drvdata->dev, "TMC-ETF enabled\n");
- 	return 0;
- }
- 
-@@ -295,7 +295,7 @@ static void tmc_disable_etf_link(struct coresight_device *csdev,
- 	drvdata->mode = CS_MODE_DISABLED;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_info(drvdata->dev, "TMC-ETF disabled\n");
-+	dev_dbg(drvdata->dev, "TMC-ETF disabled\n");
- }
- 
- static void *tmc_alloc_etf_buffer(struct coresight_device *csdev, int cpu,
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 671a2ba..85a3f59 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -1098,7 +1098,7 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
- 		tmc_etr_free_sysfs_buf(free_buf);
- 
- 	if (!ret)
--		dev_info(drvdata->dev, "TMC-ETR enabled\n");
-+		dev_dbg(drvdata->dev, "TMC-ETR enabled\n");
- 
- 	return ret;
- }
-@@ -1141,7 +1141,7 @@ static void tmc_disable_etr_sink(struct coresight_device *csdev)
- 
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_info(drvdata->dev, "TMC-ETR disabled\n");
-+	dev_dbg(drvdata->dev, "TMC-ETR disabled\n");
- }
- 
- static const struct coresight_ops_sink tmc_etr_sink_ops = {
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 1b817ec..ea249f0 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -81,7 +81,7 @@ static int tmc_read_prepare(struct tmc_drvdata *drvdata)
+ 		*etm_event_cpu_path_ptr(event_data, cpu) = path;
  	}
  
- 	if (!ret)
--		dev_info(drvdata->dev, "TMC read start\n");
-+		dev_dbg(drvdata->dev, "TMC read start\n");
- 
- 	return ret;
- }
-@@ -103,7 +103,7 @@ static int tmc_read_unprepare(struct tmc_drvdata *drvdata)
- 	}
- 
- 	if (!ret)
--		dev_info(drvdata->dev, "TMC read end\n");
-+		dev_dbg(drvdata->dev, "TMC read end\n");
- 
- 	return ret;
- }
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index 01b7457..7daeb084 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -73,7 +73,7 @@ static int tpiu_enable(struct coresight_device *csdev, u32 mode)
- 
- 	tpiu_enable_hw(drvdata);
- 
--	dev_info(drvdata->dev, "TPIU enabled\n");
-+	dev_dbg(drvdata->dev, "TPIU enabled\n");
- 	return 0;
- }
- 
-@@ -99,7 +99,7 @@ static void tpiu_disable(struct coresight_device *csdev)
- 
- 	tpiu_disable_hw(drvdata);
- 
--	dev_info(drvdata->dev, "TPIU disabled\n");
-+	dev_dbg(drvdata->dev, "TPIU disabled\n");
- }
- 
- static const struct coresight_ops_sink tpiu_sink_ops = {
+-	if (!sink_ops(sink)->alloc_buffer)
+-		goto err;
+-
++	/* If we don't have any CPUs ready for tracing, abort */
+ 	cpu = cpumask_first(mask);
+-	/* Get the AUX specific data from the sink buffer */
++	if (cpu >= nr_cpu_ids)
++		goto err;
++
++	/* Allocate the sink buffer for this session */
+ 	event_data->snk_config =
+ 			sink_ops(sink)->alloc_buffer(sink, cpu, pages,
+ 						     nr_pages, overwrite);
 -- 
 2.7.4
