@@ -1,86 +1,112 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 26 Jul 2018 11:51:15 +0000
-Subject: [PATCH v7 3/6] dt-bindings: mailbox: imx-mu: add generic MU
- channel support
-In-Reply-To: <CABb+yY0kVFvQRBrU4j9t=_JcSUkcXMMSK5u=XSufM6XcmKiv-g@mail.gmail.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Thu, 26 Jul 2018 14:51:58 +0300
+Subject: [PATCH v7 4/6] dt-bindings: mailbox: imx-mu: add i.MX6SX and
+ i.MX7S SoCs.
+In-Reply-To: <CABb+yY0LbLfK2SEdTeuDmaGc+PsVn0AREQ=E=c4UZgxa5K95qQ@mail.gmail.com>
 References: <20180726065331.6186-1-o.rempel@pengutronix.de>
- <20180726065331.6186-4-o.rempel@pengutronix.de>
- <CABb+yY0kVFvQRBrU4j9t=_JcSUkcXMMSK5u=XSufM6XcmKiv-g@mail.gmail.com>
-Message-ID: <AM0PR04MB42116C756EC78AD12EB254D6802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180726065331.6186-5-o.rempel@pengutronix.de>
+ <CABb+yY32vBy5qVYsQ6u45=rV6gEggqKy3Jqn1B4oWHaGfTyQ8Q@mail.gmail.com>
+ <1532601691.32306.28.camel@pengutronix.de>
+ <CABb+yY1GEmw_8q2HaF8y5VfFJX_c_0_MbWtPUE_j_o-zS8iZ_g@mail.gmail.com>
+ <1532604937.32306.30.camel@pengutronix.de>
+ <CABb+yY0LbLfK2SEdTeuDmaGc+PsVn0AREQ=E=c4UZgxa5K95qQ@mail.gmail.com>
+Message-ID: <b5e54dce-582d-15d9-5f33-0f27fd1a256c@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
-
-> -----Original Message-----
-> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
-> Sent: Thursday, July 26, 2018 5:50 PM
-> To: Oleksij Rempel <o.rempel@pengutronix.de>
-> Cc: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
-> <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark
-> Rutland <mark.rutland@arm.com>; A.s. Dong <aisheng.dong@nxp.com>;
-> Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>; , Sascha Hauer
-> <kernel@pengutronix.de>; , linux-arm-kernel at lists.infradead.org, linux-
-> mediatek at lists.infradead.org, srv_heupstream <linux-arm-
-> kernel at lists.infradead.org>; Devicetree List <devicetree@vger.kernel.org>;
-> dl-linux-imx <linux-imx@nxp.com>
-> Subject: Re: [PATCH v7 3/6] dt-bindings: mailbox: imx-mu: add generic MU
-> channel support
+On 07/26/2018 02:46 PM, Jassi Brar wrote:
+> On Thu, Jul 26, 2018 at 5:05 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+>> Am Donnerstag, den 26.07.2018, 16:45 +0530 schrieb Jassi Brar:
+>>> On Thu, Jul 26, 2018 at 4:11 PM, Lucas Stach <l.stach@pengutronix.de>
+>>> wrote:
+>>>> Hi Jassi,
+>>>>
+>>>> Am Donnerstag, den 26.07.2018, 15:25 +0530 schrieb Jassi Brar:
+>>>>> On Thu, Jul 26, 2018 at 12:23 PM, Oleksij Rempel
+>>>>>> <o.rempel@pengutronix.de> wrote:
+>>>>>> This are currently tested SoCs with imx-mailbox driver.
+>>>>>>
+>>>>>>>> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+>>>>>>
+>>>>>> ---
+>>>>>>  Documentation/devicetree/bindings/mailbox/fsl,mu.txt | 2 +-
+>>>>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>>>
+>>>>>> diff --git
+>>>>>> a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+>>>>>> b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+>>>>>> index 113d6ab931ef..5616d2afca45 100644
+>>>>>> --- a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+>>>>>> +++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+>>>>>> @@ -18,7 +18,7 @@ Messaging Unit Device Node:
+>>>>>>  Required properties:
+>>>>>>  -------------------
+>>>>>>  - compatible : should be "fsl,<chip>-mu", the supported chips
+>>>>>> include
+>>>>>> -               imx8qxp, imx8qm.
+>>>>>> +               imx6sx, imx7s, imx8qxp, imx8qm.
+>>>>>>
+>>>>>
+>>>>> This is not scalable. Do we add every new SoC that contains the
+>>>>> same controller?
+>>>>
+>>>> Yes, we do. This is a policy direction from the DT maintainers.
+>>>>
+>>>
+>>> I would love to read the post/documentation.
+>>>
+>>> Consider the same h/w - controller and platforms, but only the the MU
+>>> chapter said the controller name is, say, 'MU121'. I am sure now you
+>>> will see it correct to call it "fsl,mu121" compatible.
+>>> What changed? just the name, right?
+>>>
+>>>
+>>>> If we
+>>>> ever going to want to validate DTs against the binding, all
+>>>> compatibles
+>>>> used in the DTs must be specified in the binding.
+>>>>
+>>>> As we can't really tell if the controller is exactly the same or
+>>>> even
+>>>> has some SoC integration bugs, we generally add a new compatible
+>>>> for
+>>>> each SoC to key off any workarounds necessary in the driver without
+>>>> the
+>>>> need to change the DTs, breaking compatibility.
+>>>>
+>>>
+>>> I think if the h/w resources and behaviour remain the same and the
+>>> documentation does not call it by a different name -- it is safe to
+>>> assume its the same IP. Especially when the driver is absolutely
+>>> indifferent to the 5 SoC names.
+>>
+>> Even if it is the same IP core, the SoC integration might have bugs
+>> that need different behavior from the driver. We've already had that
+>> case with the i.MX6 SPI controller.
+>>
+> For h/w quirks/bugs, a new "has-that-bug" property makes better sense.
+> Or, if you insist, a new compatible based on the first soc that has
+> the buggy block.
 > 
-> On Thu, Jul 26, 2018 at 12:23 PM, Oleksij Rempel <o.rempel@pengutronix.de>
-> wrote:
+
+How do you propose to handle this property in the driver, if once flashed
+DTB does not contain it?
+
+>>> If/when we find the controller changes, we could revisit the binding
+>>> and add another compatible option and modify the driver to catch that
+>>> and adapt.
+>>
+>> That's way too late. If we want to keep DTs stable
+>>
+> How do you keep the DT stable by explicitly defining every new SoC to
+> the compatible list in DT, _add_ to the driver.... only to have the
+> driver absolutely not care which SoC is it?
+> Which is the situation right now with this patchset.
 > 
-> > Each MU has four pairs of rx/tx data register with four rx/tx
-> > interrupts which can also be used as a separate channel.
-> >
-> So the hardware actually supports 4 channels.
-> 
-> > -- #mbox-cells:  Must be 0. Number of cells in a mailbox
-> > +- #mbox-cells:  Must be:
-> > +               0 - for single channel mode. i.MX8* SCU protocol specific.
-> > +               1 - for multichannel (generic) mode.
-> > +
-> No, please.
-> DT bindings should reflect the real hardware, and not the software mode we
-> want the driver to work in.
-> Please define mbox-cells=1  and have the i.MX8* platform always ask for
-> channel-0.
 
-The reality is that MU hardware does not define channels in reference manual.
-However, it does have four separate data tx/rx register which can be used
-as 'virtual' channels which is supported by this current driver.
+For sake of simplicity you can assume that a driver can be changed in
+future, and SoC/board device tree bindings can not be changed ever.
 
-See below HW description from the reference manual:
-For messaging, the MU has four, 32-bit write-only transmit registers and four, 32-bit
-read-only receive registers on the Processor B and Processor A-sides. These registers are
-used for sending messages to each other.
-
-Passing short messages
-Transmit register(s) can be used to pass short messages
-from one to four words in length. For example, when a four-word message is desired,
-only one of the registers needs to have its corresponding interrupt enable bit set at the
-receiver side; the message?s first three words are written to the registers whose
-interrupt is masked, and the fourth word is written to the other register (which
-triggers an interrupt at the receiver side).
-
-The reference manual is at here: (Chapter 42 Messaging Unit (MU)
-https://www.nxp.com/docs/en/reference-manual/IMX6ULRM.pdf
-
-And SCU firmware does use MU in above way specified by reference manual.
-Even from HW point of view, it's still one channel only mailbox.
-That's why we change the mbox-cells to 0 accordingly to avoid confusing
-the multi channels users supported in this driver.
-
-As per Sasha's request, we're going to support both protocol (SCU and generic M4)
-in one mailbox driver, that means we need deal with this two case property.
-
-If we use mbox-cells 1 case for SCU, then the using would be like:
-mboxes = <&mailbox 0> which is mixed with the normal multi channel
-users. And we also must state clearly in binding doc that for mbox-cells
- 1 case for SCU, the cell value must be 0 which is also confusing with
-Multi channel users.
-
-How do you suggest for such case?
-
-Regards
-Dong Aisheng
+--
+Best wishes,
+Vladimir
