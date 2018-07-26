@@ -1,198 +1,52 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 26 Jul 2018 13:54:41 +0100
-Subject: [PATCH v3 03/13] coresight: perf: Fix per cpu path management
+Date: Thu, 26 Jul 2018 13:54:46 +0100
+Subject: [PATCH v3 08/13] coresight: tmc-etr: Relax collection of trace from
+ sysfs mode
 In-Reply-To: <1532609691-16863-1-git-send-email-suzuki.poulose@arm.com>
 References: <1532609691-16863-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1532609691-16863-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1532609691-16863-9-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We create a coresight trace path for each online CPU when
-we start the event. We rely on the number of online CPUs
-and then go on to allocate an array matching the "number of
-online CPUs" for holding the path and then uses normal
-CPU id as the index to the array. This is problematic as
-we could have some offline CPUs causing us to access beyond
-the actual array size (e.g, on a dual SMP system, if CPU0 is
-offline, CPU1 could be really accessing beyond the array).
-The solution is to switch to per-cpu array for holding the path.
+Since the ETR now uses mode specific buffers, we can reliably
+provide the trace data captured in sysfs mode, even when the ETR
+is operating in PERF mode.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-etm-perf.c | 55 +++++++++++++++++-------
- 1 file changed, 40 insertions(+), 15 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index 6776956..6338dd1 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -12,6 +12,7 @@
- #include <linux/mm.h>
- #include <linux/init.h>
- #include <linux/perf_event.h>
-+#include <linux/percpu-defs.h>
- #include <linux/slab.h>
- #include <linux/types.h>
- #include <linux/workqueue.h>
-@@ -33,7 +34,7 @@ struct etm_event_data {
- 	struct work_struct work;
- 	cpumask_t mask;
- 	void *snk_config;
--	struct list_head **path;
-+	struct list_head * __percpu *path;
- };
- 
- static DEFINE_PER_CPU(struct perf_output_handle, ctx_handle);
-@@ -61,6 +62,18 @@ static const struct attribute_group *etm_pmu_attr_groups[] = {
- 	NULL,
- };
- 
-+static inline struct list_head **
-+etm_event_cpu_path_ptr(struct etm_event_data *data, int cpu)
-+{
-+	return per_cpu_ptr(data->path, cpu);
-+}
-+
-+static inline struct list_head *
-+etm_event_cpu_path(struct etm_event_data *data, int cpu)
-+{
-+	return *etm_event_cpu_path_ptr(data, cpu);
-+}
-+
- static void etm_event_read(struct perf_event *event) {}
- 
- static int etm_addr_filters_alloc(struct perf_event *event)
-@@ -120,23 +133,26 @@ static void free_event_data(struct work_struct *work)
- 	 */
- 	if (event_data->snk_config) {
- 		cpu = cpumask_first(mask);
--		sink = coresight_get_sink(event_data->path[cpu]);
-+		sink = coresight_get_sink(etm_event_cpu_path(event_data, cpu));
- 		if (sink_ops(sink)->free_buffer)
- 			sink_ops(sink)->free_buffer(event_data->snk_config);
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 58c7935..671a2ba 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -1168,19 +1168,17 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
+ 		goto out;
  	}
  
- 	for_each_cpu(cpu, mask) {
--		if (!(IS_ERR_OR_NULL(event_data->path[cpu])))
--			coresight_release_path(event_data->path[cpu]);
-+		struct list_head **ppath;
-+
-+		ppath = etm_event_cpu_path_ptr(event_data, cpu);
-+		if (!(IS_ERR_OR_NULL(*ppath)))
-+			coresight_release_path(*ppath);
-+		*ppath = NULL;
+-	/* Don't interfere if operated from Perf */
+-	if (drvdata->mode == CS_MODE_PERF) {
+-		ret = -EINVAL;
+-		goto out;
+-	}
+-
+-	/* If sysfs_buf is NULL the trace data has been read already */
++	/*
++	 * We can safely allow reads even if the ETR is operating in PERF mode,
++	 * since the sysfs session is captured in mode specific data.
++	 * If drvdata::sysfs_data is NULL the trace data has been read already.
++	 */
+ 	if (!drvdata->sysfs_buf) {
+ 		ret = -EINVAL;
+ 		goto out;
  	}
  
--	kfree(event_data->path);
-+	free_percpu(event_data->path);
- 	kfree(event_data);
- }
+-	/* Disable the TMC if we are trying to read from a running session */
++	/* Disable the TMC if we are trying to read from a running session. */
+ 	if (drvdata->mode == CS_MODE_SYSFS)
+ 		tmc_etr_disable_hw(drvdata);
  
- static void *alloc_event_data(int cpu)
- {
--	int size;
- 	cpumask_t *mask;
- 	struct etm_event_data *event_data;
- 
-@@ -147,7 +163,6 @@ static void *alloc_event_data(int cpu)
- 
- 	/* Make sure nothing disappears under us */
- 	get_online_cpus();
--	size = num_online_cpus();
- 
- 	mask = &event_data->mask;
- 	if (cpu != -1)
-@@ -164,8 +179,8 @@ static void *alloc_event_data(int cpu)
- 	 * unused memory when dealing with single CPU trace scenarios is small
- 	 * compared to the cost of searching through an optimized array.
- 	 */
--	event_data->path = kcalloc(size,
--				   sizeof(struct list_head *), GFP_KERNEL);
-+	event_data->path = alloc_percpu(struct list_head *);
-+
- 	if (!event_data->path) {
- 		kfree(event_data);
- 		return NULL;
-@@ -213,6 +228,7 @@ static void *etm_setup_aux(int event_cpu, void **pages,
- 
- 	/* Setup the path for each CPU in a trace session */
- 	for_each_cpu(cpu, mask) {
-+		struct list_head *path;
- 		struct coresight_device *csdev;
- 
- 		csdev = per_cpu(csdev_src, cpu);
-@@ -224,9 +240,11 @@ static void *etm_setup_aux(int event_cpu, void **pages,
- 		 * list of devices from source to sink that can be
- 		 * referenced later when the path is actually needed.
- 		 */
--		event_data->path[cpu] = coresight_build_path(csdev, sink);
--		if (IS_ERR(event_data->path[cpu]))
-+		path = coresight_build_path(csdev, sink);
-+		if (IS_ERR(path))
- 			goto err;
-+
-+		*etm_event_cpu_path_ptr(event_data, cpu) = path;
- 	}
- 
- 	if (!sink_ops(sink)->alloc_buffer)
-@@ -255,6 +273,7 @@ static void etm_event_start(struct perf_event *event, int flags)
- 	struct etm_event_data *event_data;
- 	struct perf_output_handle *handle = this_cpu_ptr(&ctx_handle);
- 	struct coresight_device *sink, *csdev = per_cpu(csdev_src, cpu);
-+	struct list_head *path;
- 
- 	if (!csdev)
- 		goto fail;
-@@ -267,8 +286,9 @@ static void etm_event_start(struct perf_event *event, int flags)
- 	if (!event_data)
- 		goto fail;
- 
-+	path = etm_event_cpu_path(event_data, cpu);
- 	/* We need a sink, no need to continue without one */
--	sink = coresight_get_sink(event_data->path[cpu]);
-+	sink = coresight_get_sink(path);
- 	if (WARN_ON_ONCE(!sink || !sink_ops(sink)->set_buffer))
- 		goto fail_end_stop;
- 
-@@ -278,7 +298,7 @@ static void etm_event_start(struct perf_event *event, int flags)
- 		goto fail_end_stop;
- 
- 	/* Nothing will happen without a path */
--	if (coresight_enable_path(event_data->path[cpu], CS_MODE_PERF))
-+	if (coresight_enable_path(path, CS_MODE_PERF))
- 		goto fail_end_stop;
- 
- 	/* Tell the perf core the event is alive */
-@@ -306,6 +326,7 @@ static void etm_event_stop(struct perf_event *event, int mode)
- 	struct coresight_device *sink, *csdev = per_cpu(csdev_src, cpu);
- 	struct perf_output_handle *handle = this_cpu_ptr(&ctx_handle);
- 	struct etm_event_data *event_data = perf_get_aux(handle);
-+	struct list_head *path;
- 
- 	if (event->hw.state == PERF_HES_STOPPED)
- 		return;
-@@ -313,7 +334,11 @@ static void etm_event_stop(struct perf_event *event, int mode)
- 	if (!csdev)
- 		return;
- 
--	sink = coresight_get_sink(event_data->path[cpu]);
-+	path = etm_event_cpu_path(event_data, cpu);
-+	if (!path)
-+		return;
-+
-+	sink = coresight_get_sink(path);
- 	if (!sink)
- 		return;
- 
-@@ -344,7 +369,7 @@ static void etm_event_stop(struct perf_event *event, int mode)
- 	}
- 
- 	/* Disabling the path make its elements available to other sessions */
--	coresight_disable_path(event_data->path[cpu]);
-+	coresight_disable_path(path);
- }
- 
- static int etm_event_add(struct perf_event *event, int mode)
 -- 
 2.7.4
