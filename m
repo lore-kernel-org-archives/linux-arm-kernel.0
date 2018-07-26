@@ -1,73 +1,32 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 26 Jul 2018 09:39:11 +0200
-Subject: [PATCH v2 06/18] arm64: dts: allwinner: a64: Orange Pi Win: Add
- UARTs
-In-Reply-To: <20180726003532.18751-7-andre.przywara@arm.com>
-References: <20180726003532.18751-1-andre.przywara@arm.com>
- <20180726003532.18751-7-andre.przywara@arm.com>
-Message-ID: <20180726073911.ualwgf3t2bboeuy5@flea>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 26 Jul 2018 09:40:27 +0200
+Subject: [GIT PULL] dts32 commits for v4.19
+In-Reply-To: <20180726064433.nhc3rdj2tnqtsskt@localhost>
+References: <2d918d15-d1d3-b4e0-7427-0b3baa56100a@gmail.com>
+ <20180726064433.nhc3rdj2tnqtsskt@localhost>
+Message-ID: <ae075dc1-b483-c7c2-f8ec-147c80485fe1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 01:35:20AM +0100, Andre Przywara wrote:
-> From: Samuel Holland <samuel@sholland.org>
-> 
-> The Orange Pi Win exposes several UARTs on header pin, and connects one
-> to the on-board WiFi/Bluetooth chip.
-> Add the pinmux definitions to the UART nodes, but keep them disabled.
-> 
-> Signed-off-by: Samuel Holland <samuel@sholland.org>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 33 ++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> index 0cadcd59edd9..10f63d0b99cb 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> @@ -54,6 +54,10 @@
->  	aliases {
->  		ethernet0 = &emac;
->  		serial0 = &uart0;
-> +		serial1 = &uart1;
-> +		serial2 = &uart2;
-> +		serial3 = &uart3;
-> +		serial4 = &uart4;
->  	};
->  
->  	chosen {
-> @@ -237,12 +241,41 @@
->  	vcc-hdmi-supply = <&reg_dldo1>;
->  };
->  
-> +/* On debug connector */
->  &uart0 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&uart0_pins_a>;
->  	status = "okay";
->  };
->  
-> +/* Wi-Fi/BT */
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
-> +	status = "okay";
-> +};
+Hi Olof,
 
-What BT chip is there? Does it have serdev support? If so, that should
-be enabled here.
+On 26/07/18 08:44, Olof Johansson wrote:
+> Hi Matthias,
+> 
+> On Sun, Jul 22, 2018 at 10:47:46PM +0200, Matthias Brugger wrote:
+>> Hi Olof,
+>> Hi Arnd,
+>>
+>> Please take into account the following patches.
+>> Thanks a lot,
+>> Matthias
+> 
+> Not sure what's going on with these pull requests -- they've got somewhat
+> unusual subject lines, and they're not using signed tags.
+> 
+> Would you mind respinning with tags? Thanks!
+> 
 
-Maxime
+Sure, will do. Sorry for the inconvenience.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180726/8bf0de18/attachment.sig>
+Matthias
