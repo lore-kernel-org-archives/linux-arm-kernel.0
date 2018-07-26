@@ -1,87 +1,44 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 26 Jul 2018 15:14:24 -0700
-Subject: [PATCH v3 00/23] Add multi-channel support to Armada thermal
- driver
-In-Reply-To: <20180726213517.GA15690@localhost.localdomain>
-References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
- <20180718172849.30b7cec0@xps13> <20180725095222.054f1e80@xps13>
- <1532570441.2358.27.camel@intel.com>
- <20180726211442.GB3487@localhost.localdomain>
- <20180726213517.GA15690@localhost.localdomain>
-Message-ID: <20180726221423.GA3569@localhost.localdomain>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 26 Jul 2018 23:33:17 +0800
+Subject: [arm-soc:qcom/arm64 5/10]
+ arch/arm64/boot/dts/qcom/sdm845.dtsi:10:10: fatal error:
+ dt-bindings/soc/qcom,rpmh-rsc.h: No such file or directory
+Message-ID: <201807262312.blW4meoN%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 02:35:18PM -0700, Eduardo Valentin wrote:
-> On Thu, Jul 26, 2018 at 02:14:43PM -0700, Eduardo Valentin wrote:
-> > Hello,
-> > 
-> > On Thu, Jul 26, 2018 at 10:00:41AM +0800, Zhang Rui wrote:
-> > > On ?, 2018-07-25 at 09:52 +0200, Miquel Raynal wrote:
-> > > > Hi Eduardo, Zhang,
-> > > > 
-> > > > Miquel Raynal <miquel.raynal@bootlin.com> wrote on Wed, 18 Jul 2018
-> > > > 17:28:49 +0200:
-> > > > 
-> > > > > 
-> > > > > Hi Eduardo,
-> > > > > 
-> > > > > Miquel Raynal <miquel.raynal@bootlin.com> wrote on Mon, 16 Jul 2018
-> > > > > 16:41:43 +0200:
-> > > > > 
-> > > > > > 
-> > > > > > The only capability of the Armada thermal driver is currently
-> > > > > > just to
-> > > > > > read one sensor (the default one) per AP and one per CP.
-> > > > > > Actually,
-> > > > > > there is one sensor per core in the AP806 plus one sensor in the
-> > > > > > thermal IP itself. The CP110 just features one thermal sensor in
-> > > > > > its
-> > > > > > own thermal IP.
-> > > > > > 
-> > > > > > This series first improves the readability of this driver, then
-> > > > > > adds
-> > > > > > support for multi-channel thermal IPs. The bindings and the
-> > > > > > device-trees are updated accordingly.
-> > > > > > 
-> > > > > > Thank you,
-> > > > > > Miqu?l??
-> > > > > I know I sent this series on monday but there was almost no change
-> > > > > on
-> > > > > it (see below), do you think you will have the time to look at it
-> > > > > before it's too late for the merge window?
-> > > > I know a little bit what it is to be on the maintainer side of a
-> > > > subsystem but these changes are laying since April, 21st and I really
-> > > > expect to get them merged. Zhang, as Eduardo seems to be overloaded
-> > > > this release, could you please take the series?
-> > > > 
-> > > > Of course if there are things to address I'll be happy to do so.
-> > > > 
-> > > I had a sync with Eduardo during last merge window, and we agreed to
-> > > send separate git pull requests to Linus since this release and see how
-> > > it works.
-> > > This means that all the soc thermal driver patches should go to
-> > > Eduardo' tree and then Linus' tree directly.
-> > > 
-> > > Anyway, let's ping Eduardo and see if he can review/take the patches.
-> > 
-> > Sorry fellows, but I was off camping in a place with no electricity/no
-> > internet. I looked at this series before, and I do not remember anything
-> > that could block it to go. Let me restart on working on it.
-> 
-> Let me take that back. I got some compilation error.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git qcom/arm64
+head:   e53db018315b7660bb7000a29e79faff2496c2c2
+commit: c83545d95376c2249c7990ce2dd76f387ce68bef [5/10] arm64: dts: sdm845: Add rpmh-rsc node
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout c83545d95376c2249c7990ce2dd76f387ce68bef
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
 
+All errors (new ones prefixed by >>):
 
-Given that I let this one fall into the cracks and that these are minor
-issues, I fixed them manually, and applied up to patch 19. But next at
-least compile test your series and run checkpatch on them.
+   In file included from arch/arm64/boot/dts/qcom/sdm845-mtp.dts:10:0:
+>> arch/arm64/boot/dts/qcom/sdm845.dtsi:10:10: fatal error: dt-bindings/soc/qcom,rpmh-rsc.h: No such file or directory
+    #include <dt-bindings/soc/qcom,rpmh-rsc.h>
+             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   compilation terminated.
 
-Patches 20-23 need to go via your arch tree.
+vim +10 arch/arm64/boot/dts/qcom/sdm845.dtsi
 
-> 
-> > 
-> > > 
-> > > thanks,
-> > > rui
-> > > > Thanks,
-> > > > Miqu?l
+  > 10	#include <dt-bindings/soc/qcom,rpmh-rsc.h>
+    11	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 38873 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180726/1c8dda88/attachment-0001.gz>
