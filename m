@@ -1,48 +1,60 @@
-From: drivshin@awxrd.com (David Rivshin)
-Date: Thu, 26 Jul 2018 09:36:58 -0400
-Subject: [PATCH v2] pwm: pwm-omap-dmtimer: return -EPROBE_DEFER if no dmtimer
- platform data
-Message-ID: <20180726133658.23902-1-drivshin@awxrd.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 26 Jul 2018 14:39:25 +0100
+Subject: [PATCH v12 15/16] arm64: kexec_file: add kernel signature
+ verification support
+In-Reply-To: <20180724065759.19186-16-takahiro.akashi@linaro.org>
+References: <20180724065759.19186-1-takahiro.akashi@linaro.org>
+ <20180724065759.19186-16-takahiro.akashi@linaro.org>
+Message-ID: <d3704585-9404-a56b-883a-30c123084ada@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Rivshin <DRivshin@allworx.com>
+Hi Akashi,
+
+On 24/07/18 07:57, AKASHI Takahiro wrote:
+> With this patch, kernel verification can be done without IMA security
+> subsystem enabled. Turn on CONFIG_KEXEC_VERIFY_SIG instead.
+> 
+> On x86, a signature is embedded into a PE file (Microsoft's format) header
+> of binary. Since arm64's "Image" can also be seen as a PE file as far as
+> CONFIG_EFI is enabled, we adopt this format for kernel signing.
+> 
+> You can create a signed kernel image with:
+>     $ sbsign --key ${KEY} --cert ${CERT} Image
+
+Reviewed-by: James Morse <james.morse@arm.com>
 
 
-If a pwm-omap-dmtimer is probed before the dmtimer it uses, the platform
-data won't be set yet.
+> diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
+> index d64f5e9f9d22..578d358632d0 100644
+> --- a/arch/arm64/kernel/kexec_image.c
+> +++ b/arch/arm64/kernel/kexec_image.c
+> @@ -102,7 +106,18 @@ static void *image_load(struct kimage *image,
+>  	return ERR_PTR(ret);
+>  }
+>  
+> +#ifdef CONFIG_KEXEC_IMAGE_VERIFY_SIG
+> +static int image_verify_sig(const char *kernel, unsigned long kernel_len)
+> +{
+> +	return verify_pefile_signature(kernel, kernel_len, NULL,
+> +				       VERIFYING_KEXEC_PE_SIGNATURE);
+> +}
+> +#endif
 
-Fixes: ac30751df953 ("ARM: OMAP: pdata-quirks: Remove unused timer pdata")
-Cc: <stable@vger.kernel.org> # 4.17+
-Signed-off-by: David Rivshin <drivshin@allworx.com>
-Acked-by: Pavel Machek <pavel@ucw.cz>
-Tested-by: Pavel Machek <pavel@ucw.cz>
----
-Changes in v2:
-* Added Pavel's Acked-by/Tested-by [1]
+This is identical to x86's PE image verification helper. We can clean this up
+later by providing some kexec_image_verify_pe() in the core kexec_file code. Its
+not worth doing now.
 
-[1] https://lkml.org/lkml/2018/7/16/346
 
- drivers/pwm/pwm-omap-dmtimer.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+>  const struct kexec_file_ops kexec_image_ops = {
+>  	.probe = image_probe,
+>  	.load = image_load,
+> +#ifdef CONFIG_KEXEC_IMAGE_VERIFY_SIG
+> +	.verify_sig = image_verify_sig,
+> +#endif
+>  };
 
-diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
-index 665da3c8fbceb..d3d7ea7a53146 100644
---- a/drivers/pwm/pwm-omap-dmtimer.c
-+++ b/drivers/pwm/pwm-omap-dmtimer.c
-@@ -264,8 +264,9 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
- 
- 	timer_pdata = dev_get_platdata(&timer_pdev->dev);
- 	if (!timer_pdata) {
--		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
--		ret = -EINVAL;
-+		dev_info(&pdev->dev,
-+			 "dmtimer pdata structure NULL, deferring probe\n");
-+		ret = -EPROBE_DEFER;
- 		goto put;
- 	}
- 
 
-base-commit: d72e90f33aa4709ebecc5005562f52335e106a60
--- 
-2.17.1
+Thanks,
+
+James
