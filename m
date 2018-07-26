@@ -1,121 +1,45 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 26 Jul 2018 15:59:16 +0200
-Subject: [PATCH] firmware: meson_sm: Add serial number sysfs entry
-Message-ID: <1532613556-5398-1-git-send-email-narmstrong@baylibre.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 26 Jul 2018 15:02:39 +0100
+Subject: [PATCH 1/6] ARM: signal: copy registers using __copy_from_user()
+In-Reply-To: <20180726135632.GZ17271@n2100.armlinux.org.uk>
+References: <20180710141322.GL17271@n2100.armlinux.org.uk>
+ <E1fctOl-0005ul-69@rmk-PC.armlinux.org.uk>
+ <20180726122350.qtf7h6qekru23bv2@lakrids.cambridge.arm.com>
+ <20180726135632.GZ17271@n2100.armlinux.org.uk>
+Message-ID: <20180726140239.kuswswnsgyd3uisv@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Amlogic Meson SoC Secure Monitor implements a call to retrieve an unique
-SoC ID starting from the GX Family and all new families.
+On Thu, Jul 26, 2018 at 02:56:32PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 26, 2018 at 01:23:50PM +0100, Mark Rutland wrote:
+> > On Tue, Jul 10, 2018 at 03:13:47PM +0100, Russell King wrote:
+> > > When restoring the ARM integer registers, use __copy_from_user() to
+> > > copy them into kernel space before restoring them, rather than
+> > > __get_user_error().
+> > 
+> > I assume that this is so that we only have to pay the cost of sanitizing
+> > the user pointer once in __copy_from_user(), rather than in each
+> > __get_user_error()?
+> > 
+> > Can we mention that in the commit message? e.g. something like:
+> > 
+> >   In subsequent patches, each uaccess will sanitize the __user pointer
+> >   to prevent speculative accesses to kernel memory.
+> >   
+> >   To amortize the cost of this sanitization when restoring the integer
+> >   registers, we can use __copy_from_user() rather than a sequence of
+> >   __get_user_error() calls.
+> 
+> It's not only that, it's also the overhead of the software PAN support
+> as well, and it's a change I've been thinking has been worth doing
+> for some time.
 
-The serial number is simply exposed as a sysfs entry under the firmware
-sysfs directory.
+Makes sense.
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/firmware/meson/meson_sm.c       | 56 +++++++++++++++++++++++++++++++++
- include/linux/firmware/meson/meson_sm.h |  1 +
- 2 files changed, 57 insertions(+)
+If you can put something in the commit message to cover all of that:
 
-diff --git a/drivers/firmware/meson/meson_sm.c b/drivers/firmware/meson/meson_sm.c
-index 0ec2ca8..29fbc81 100644
---- a/drivers/firmware/meson/meson_sm.c
-+++ b/drivers/firmware/meson/meson_sm.c
-@@ -24,6 +24,7 @@
- #include <linux/printk.h>
- #include <linux/types.h>
- #include <linux/sizes.h>
-+ #include <linux/slab.h>
- 
- #include <linux/firmware/meson/meson_sm.h>
- 
-@@ -48,6 +49,7 @@ struct meson_sm_chip gxbb_chip = {
- 		CMD(SM_EFUSE_READ,	0x82000030),
- 		CMD(SM_EFUSE_WRITE,	0x82000031),
- 		CMD(SM_EFUSE_USER_MAX,	0x82000033),
-+		CMD(SM_GET_CHIP_ID,	0x82000044),
- 		{ /* sentinel */ },
- 	},
- };
-@@ -214,6 +216,57 @@ int meson_sm_call_write(void *buffer, unsigned int size, unsigned int cmd_index,
- }
- EXPORT_SYMBOL(meson_sm_call_write);
- 
-+#define SM_CHIP_ID_LENGTH	119
-+#define SM_CHIP_ID_OFFSET	4
-+#define SM_CHIP_ID_SIZE		12
-+
-+static ssize_t serial_show(struct device *dev, struct device_attribute *attr,
-+			 char *buf)
-+{
-+	uint8_t *id_buf;
-+	int ret;
-+
-+	id_buf = kmalloc(SM_CHIP_ID_LENGTH, GFP_KERNEL);
-+	if (!id_buf)
-+		return -ENOMEM;
-+
-+	ret = meson_sm_call_read(id_buf, SM_CHIP_ID_LENGTH, SM_GET_CHIP_ID,
-+				 0, 0, 0, 0, 0);
-+	if (ret < 0) {
-+		kfree(id_buf);
-+		return ret;
-+	}
-+
-+	ret = sprintf(buf, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\n",
-+			id_buf[SM_CHIP_ID_OFFSET + 0],
-+			id_buf[SM_CHIP_ID_OFFSET + 1],
-+			id_buf[SM_CHIP_ID_OFFSET + 2],
-+			id_buf[SM_CHIP_ID_OFFSET + 3],
-+			id_buf[SM_CHIP_ID_OFFSET + 4],
-+			id_buf[SM_CHIP_ID_OFFSET + 5],
-+			id_buf[SM_CHIP_ID_OFFSET + 6],
-+			id_buf[SM_CHIP_ID_OFFSET + 7],
-+			id_buf[SM_CHIP_ID_OFFSET + 8],
-+			id_buf[SM_CHIP_ID_OFFSET + 9],
-+			id_buf[SM_CHIP_ID_OFFSET + 10],
-+			id_buf[SM_CHIP_ID_OFFSET + 11]);
-+
-+	kfree(id_buf);
-+
-+	return ret;
-+}
-+
-+static DEVICE_ATTR_RO(serial);
-+
-+static struct attribute *meson_sm_sysfs_attributes[] = {
-+	&dev_attr_serial.attr,
-+	NULL,
-+};
-+
-+static const struct attribute_group meson_sm_sysfs_attr_group = {
-+	.attrs = meson_sm_sysfs_attributes,
-+};
-+
- static const struct of_device_id meson_sm_ids[] = {
- 	{ .compatible = "amlogic,meson-gxbb-sm", .data = &gxbb_chip },
- 	{ /* sentinel */ },
-@@ -242,6 +295,9 @@ static int __init meson_sm_probe(struct platform_device *pdev)
- 	fw.chip = chip;
- 	pr_info("secure-monitor enabled\n");
- 
-+	if (sysfs_create_group(&pdev->dev.kobj, &meson_sm_sysfs_attr_group))
-+		goto out_in_base;
-+
- 	return 0;
- 
- out_in_base:
-diff --git a/include/linux/firmware/meson/meson_sm.h b/include/linux/firmware/meson/meson_sm.h
-index 37a5eae..f98c20d 100644
---- a/include/linux/firmware/meson/meson_sm.h
-+++ b/include/linux/firmware/meson/meson_sm.h
-@@ -17,6 +17,7 @@ enum {
- 	SM_EFUSE_READ,
- 	SM_EFUSE_WRITE,
- 	SM_EFUSE_USER_MAX,
-+	SM_GET_CHIP_ID,
- };
- 
- struct meson_sm_firmware;
--- 
-2.7.4
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+... applying to patches 2 and 3, too.
+
+Mark.
