@@ -1,50 +1,57 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Fri, 27 Jul 2018 00:10:48 +0530
-Subject: [PATCH 5/5] arm64: dts: actions: Add pinctrl node for Actions
- Semi S700
-In-Reply-To: <20180722163601.28346-6-sravanhome@gmail.com>
-References: <20180722163601.28346-1-sravanhome@gmail.com>
- <20180722163601.28346-6-sravanhome@gmail.com>
-Message-ID: <20180726184048.GG5220@Mani-XPS-13-9360>
+From: mike.kravetz@oracle.com (Mike Kravetz)
+Date: Thu, 26 Jul 2018 11:40:49 -0700
+Subject: [PATCH v4 01/11] hugetlb: Harmonize hugetlb.h arch specific
+ defines with pgtable.h
+In-Reply-To: <20180705110716.3919-2-alex@ghiti.fr>
+References: <20180705110716.3919-1-alex@ghiti.fr>
+ <20180705110716.3919-2-alex@ghiti.fr>
+Message-ID: <1f95fdc7-378b-9c2a-15ae-da78578a27bf@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Jul 22, 2018 at 06:36:01PM +0200, Saravanan Sekar wrote:
-> Add pinctrl nodes for Actions Semi S700 SoC
+On 07/05/2018 04:07 AM, Alexandre Ghiti wrote:
+> asm-generic/hugetlb.h proposes generic implementations of hugetlb
+> related functions: use __HAVE_ARCH_HUGE* defines in order to make arch
+> specific implementations of hugetlb functions consistent with pgtable.h
+> scheme.
 > 
-> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
-> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+
+Reviewed-by: Mike Kravetz <mike.kravetz@oracle.com>
+-- 
+Mike Kravetz
+
+> Signed-off-by: Alexandre Ghiti <alex@ghiti.fr>
 > ---
->  arch/arm64/boot/dts/actions/s700.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  arch/arm64/include/asm/hugetlb.h | 2 +-
+>  include/asm-generic/hugetlb.h    | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
-> index 59d29e4ca404..88edac21e03f 100644
-> --- a/arch/arm64/boot/dts/actions/s700.dtsi
-> +++ b/arch/arm64/boot/dts/actions/s700.dtsi
-> @@ -179,5 +179,11 @@
->  			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
->  			interrupt-names = "timer1";
->  		};
-> +
-> +		pinctrl: pinctrl at e01b0000 {
-> +			compatible = "actions,s700-pinctrl";
-> +			reg = <0x0 0xe01b0000 0x0 0x1000>;
-> +			clocks = <&cmu CLK_GPIO>;
-> +		};
-
-Driver/binding/dts are inconsistent. Driver seems to support pinctrl +
-gpio + irq but there is no gpio/irq property in dts patch.
-
-Please correct it.
-
-Thanks,
-Mani
-
->  	};
->  };
-> -- 
-> 2.18.0
+> diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
+> index e73f68569624..3fcf14663dfa 100644
+> --- a/arch/arm64/include/asm/hugetlb.h
+> +++ b/arch/arm64/include/asm/hugetlb.h
+> @@ -81,9 +81,9 @@ extern void huge_ptep_set_wrprotect(struct mm_struct *mm,
+>  				    unsigned long addr, pte_t *ptep);
+>  extern void huge_ptep_clear_flush(struct vm_area_struct *vma,
+>  				  unsigned long addr, pte_t *ptep);
+> +#define __HAVE_ARCH_HUGE_PTE_CLEAR
+>  extern void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
+>  			   pte_t *ptep, unsigned long sz);
+> -#define huge_pte_clear huge_pte_clear
+>  extern void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
+>  				 pte_t *ptep, pte_t pte, unsigned long sz);
+>  #define set_huge_swap_pte_at set_huge_swap_pte_at
+> diff --git a/include/asm-generic/hugetlb.h b/include/asm-generic/hugetlb.h
+> index 9d0cde8ab716..3da7cff52360 100644
+> --- a/include/asm-generic/hugetlb.h
+> +++ b/include/asm-generic/hugetlb.h
+> @@ -32,7 +32,7 @@ static inline pte_t huge_pte_modify(pte_t pte, pgprot_t newprot)
+>  	return pte_modify(pte, newprot);
+>  }
+>  
+> -#ifndef huge_pte_clear
+> +#ifndef __HAVE_ARCH_HUGE_PTE_CLEAR
+>  static inline void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
+>  		    pte_t *ptep, unsigned long sz)
+>  {
 > 
