@@ -1,67 +1,56 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Thu, 26 Jul 2018 12:25:24 -0700
-Subject: [PATCH 2/7] net: phy: Fix the register offsets in Broadcom iProc
- mdio mux driver
-In-Reply-To: <6188441f-670d-7644-361b-7a5e8e06c9c2@broadcom.com>
-References: <1532630184-29450-1-git-send-email-arun.parameswaran@broadcom.com>
- <1532630184-29450-3-git-send-email-arun.parameswaran@broadcom.com>
- <20180726190636.GG10686@lunn.ch>
- <6188441f-670d-7644-361b-7a5e8e06c9c2@broadcom.com>
-Message-ID: <eeaf777f-e0ea-fb41-5a5e-4ab42a35e10f@broadcom.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 26 Jul 2018 12:25:32 -0700
+Subject: [GIT PULL] ARM: aspeed: defconfig changes for 4.19
+In-Reply-To: <CACPK8XdcAANiSwsvCnu249W8QcFfjP616ce-YOW=UohgpTHtVw@mail.gmail.com>
+References: <CACPK8XdcAANiSwsvCnu249W8QcFfjP616ce-YOW=UohgpTHtVw@mail.gmail.com>
+Message-ID: <20180726192532.emdjzyaekz74ldqf@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 7/26/2018 12:16 PM, Arun Parameswaran wrote:
+On Thu, Jul 26, 2018 at 02:03:11PM +0930, Joel Stanley wrote:
+> Hello ARM Maintainers,
 > 
+> Here are the ASPEED defconfig updates for 4.19. It's been a while since I sent
+> one, so this contains a lot of goodies.
 > 
-> On 18-07-26 12:06 PM, Andrew Lunn wrote:
->> On Thu, Jul 26, 2018 at 11:36:19AM -0700, Arun Parameswaran wrote:
->>> Modify the register offsets in the Broadcom iProc mdio mux to start
->>> from the top of the register address space.
->>>
->>> Earlier the base address specified was from the middle of the block's
->>> register space. The base address will now point to the start of the
->>> mdio's address space. The offsets have been fixed to match this.
->>
->> Hi Arun
->>
->> Did you consider a change something like:
-> That looks good. I will make this change to the patch.
+> The following changes since commit 021c91791a5e7e85c567452f1be3e4c2c6cb6063:
 > 
-> Thanks
-> Arun
+>   Linux 4.18-rc3 (2018-07-01 16:04:53 -0700)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
+> tags/aspeed-4.19-defconfig
+> 
+> for you to fetch changes up to 90708adcd3ead258d4c2185da6acbe748eb0cc32:
+> 
+>   ARM: config: aspeed: Enable new FSI drivers (2018-07-26 13:27:27 +0930)
+> 
+> ----------------------------------------------------------------
+> ASPEED defconfig updates for 4.19
+> 
+>  - Refresh the multi ARMv5 defconfig, and add AST2400 related drivers
+> 
+>  - Enable new ASPEED hardware that we've merged in the past few cycles.
+>  There are about 14 different drivers since we last refreshed the
+>  defconfig
+> 
+>  - Turn on features required by systemd, and other bits of OpenBMC
+>  userspace
+> 
+>  - Enable security related options
 
-To make it backward compatible, then length of the resource also needs 
-to be adjusted from 0x14 to 0x250 in the driver?
+Merged, two minor pieces of feedback:
 
-Otherwise you will end up accessing areas out of 0x14 defined in old DT 
-that is not mapped?
+1) I think you've cut-and-pasted the pull request into a mailer that line
+   breaks between the URL and the tag. That's fine, but it means two copy and
+   pastes at my end. Feel free to add a " \" at the end of the first line when
+   you remember. We usually don't ask people to do it, it's purely for extra
+   credit. :)
 
-Thanks,
+2) Please try to get these merge requests in before -rc6, or send what you have
+   at that time even if you end up following up with just a few more patches
+   later.
 
-Ray
 
->>
->> diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
->> index 0831b7142df7..2d53e609498c 100644
->> --- a/drivers/net/phy/mdio-mux-bcm-iproc.c
->> +++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
->> @@ -169,6 +169,12 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
->>          md->dev = &pdev->dev;
->>   
->>          res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +
->> +       if (res->start & 0xfff != 0) {
->> +               dev_info(&pdev->dev, "Please upgrade your device tree blob.\n");
->> +               res->start &= ~0xfff;
->> +       }
->> +
->>          md->base = devm_ioremap_resource(&pdev->dev, res);
->>          if (IS_ERR(md->base)) {
->>                  dev_err(&pdev->dev, "failed to ioremap register\n");
->>
->>
->> 	Andrew
->>
+-Olof
