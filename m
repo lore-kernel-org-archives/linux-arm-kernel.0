@@ -1,100 +1,102 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 27 Jul 2018 00:59:28 +0200
-Subject: [PATCH v3 00/23] Add multi-channel support to Armada thermal
- driver
-In-Reply-To: <20180726221423.GA3569@localhost.localdomain>
-References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
- <20180718172849.30b7cec0@xps13> <20180725095222.054f1e80@xps13>
- <1532570441.2358.27.camel@intel.com>
- <20180726211442.GB3487@localhost.localdomain>
- <20180726213517.GA15690@localhost.localdomain>
- <20180726221423.GA3569@localhost.localdomain>
-Message-ID: <20180727005928.6bbe021f@xps13>
+Date: Fri, 27 Jul 2018 01:13:46 +0200
+Subject: [PATCH v4 27/35] mtd: rawnand: sm_common: convert driver to
+ nand_scan_with_ids()
+In-Reply-To: <20180726210655.03eca681@bbrezillon>
+References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
+ <20180720151527.16038-28-miquel.raynal@bootlin.com>
+ <20180722084432.61b579b1@bbrezillon>
+ <20180726210655.03eca681@bbrezillon>
+Message-ID: <20180727011346.3931dbe9@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
+Hi Boris,
 
-Eduardo Valentin <edubezval@gmail.com> wrote on Thu, 26 Jul 2018
-15:14:24 -0700:
+Boris Brezillon <boris.brezillon@bootlin.com> wrote on Thu, 26 Jul 2018
+21:06:55 +0200:
 
-> On Thu, Jul 26, 2018 at 02:35:18PM -0700, Eduardo Valentin wrote:
-> > On Thu, Jul 26, 2018 at 02:14:43PM -0700, Eduardo Valentin wrote:  
-> > > Hello,
+> On Sun, 22 Jul 2018 08:44:32 +0200
+> Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+> 
+> > On Fri, 20 Jul 2018 17:15:19 +0200
+> > Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+> >   
+> > > Two helpers have been added to the core to make ECC-related
+> > > configuration between the detection phase and the final NAND scan. Use
+> > > these hooks and convert the driver to just use nand_scan_with_ids()
+> > > (alternative to nand_scan() for passing a flash IDs table) instead of
+> > > both nand_scan_ident() and nand_scan_tail().
 > > > 
-> > > On Thu, Jul 26, 2018 at 10:00:41AM +0800, Zhang Rui wrote:  
-> > > > On ?, 2018-07-25 at 09:52 +0200, Miquel Raynal wrote:  
-> > > > > Hi Eduardo, Zhang,
-> > > > > 
-> > > > > Miquel Raynal <miquel.raynal@bootlin.com> wrote on Wed, 18 Jul 2018
-> > > > > 17:28:49 +0200:
-> > > > >   
-> > > > > > 
-> > > > > > Hi Eduardo,
-> > > > > > 
-> > > > > > Miquel Raynal <miquel.raynal@bootlin.com> wrote on Mon, 16 Jul 2018
-> > > > > > 16:41:43 +0200:
-> > > > > >   
-> > > > > > > 
-> > > > > > > The only capability of the Armada thermal driver is currently
-> > > > > > > just to
-> > > > > > > read one sensor (the default one) per AP and one per CP.
-> > > > > > > Actually,
-> > > > > > > there is one sensor per core in the AP806 plus one sensor in the
-> > > > > > > thermal IP itself. The CP110 just features one thermal sensor in
-> > > > > > > its
-> > > > > > > own thermal IP.
-> > > > > > > 
-> > > > > > > This series first improves the readability of this driver, then
-> > > > > > > adds
-> > > > > > > support for multi-channel thermal IPs. The bindings and the
-> > > > > > > device-trees are updated accordingly.
-> > > > > > > 
-> > > > > > > Thank you,
-> > > > > > > Miqu?l??  
-> > > > > > I know I sent this series on monday but there was almost no change
-> > > > > > on
-> > > > > > it (see below), do you think you will have the time to look at it
-> > > > > > before it's too late for the merge window?  
-> > > > > I know a little bit what it is to be on the maintainer side of a
-> > > > > subsystem but these changes are laying since April, 21st and I really
-> > > > > expect to get them merged. Zhang, as Eduardo seems to be overloaded
-> > > > > this release, could you please take the series?
-> > > > > 
-> > > > > Of course if there are things to address I'll be happy to do so.
-> > > > >   
-> > > > I had a sync with Eduardo during last merge window, and we agreed to
-> > > > send separate git pull requests to Linus since this release and see how
-> > > > it works.
-> > > > This means that all the soc thermal driver patches should go to
-> > > > Eduardo' tree and then Linus' tree directly.
-> > > > 
-> > > > Anyway, let's ping Eduardo and see if he can review/take the patches.  
-> > > 
-> > > Sorry fellows, but I was off camping in a place with no electricity/no
-> > > internet. I looked at this series before, and I do not remember anything
-> > > that could block it to go. Let me restart on working on it.  
-
-No problem.
-
+> > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>    
 > > 
-> > Let me take that back. I got some compilation error.  
+> > Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
+> >   
+> > > ---
+> > >  drivers/mtd/nand/raw/sm_common.c | 39 +++++++++++++++++++++++++--------------
+> > >  1 file changed, 25 insertions(+), 14 deletions(-)
+> > > 
+> > > diff --git a/drivers/mtd/nand/raw/sm_common.c b/drivers/mtd/nand/raw/sm_common.c
+> > > index 7f5044a79f01..d05e3f976a5e 100644
+> > > --- a/drivers/mtd/nand/raw/sm_common.c
+> > > +++ b/drivers/mtd/nand/raw/sm_common.c
+> > > @@ -160,19 +160,9 @@ static struct nand_flash_dev nand_xd_flash_ids[] = {
+> > >  	{NULL}
+> > >  };
+> > >  
+> > > -int sm_register_device(struct mtd_info *mtd, int smartmedia)
+> > > +static int sm_attach_chip(struct nand_chip *chip)
+> > >  {
+> > > -	struct nand_chip *chip = mtd_to_nand(mtd);
+> > > -	int ret;
+> > > -
+> > > -	chip->options |= NAND_SKIP_BBTSCAN;
+> > > -
+> > > -	/* Scan for card properties */
+> > > -	ret = nand_scan_ident(mtd, 1, smartmedia ?
+> > > -		nand_smartmedia_flash_ids : nand_xd_flash_ids);
+> > > -
+> > > -	if (ret)
+> > > -		return ret;
+> > > +	struct mtd_info *mtd = nand_to_mtd(chip);
+> > >  
+> > >  	/* Bad block marker position */
+> > >  	chip->badblockpos = 0x05;
+> > > @@ -187,12 +177,33 @@ int sm_register_device(struct mtd_info *mtd, int smartmedia)
+> > >  	else
+> > >  		return -ENODEV;
+> > >  
+> > > -	ret = nand_scan_tail(mtd);
+> > > +	return 0;
+> > > +}
+> > >  
+> > > +static const struct nand_controller_ops sm_controller_ops = {
+> > > +	.attach_chip = sm_attach_chip,
+> > > +};
+> > > +
+> > > +int sm_register_device(struct mtd_info *mtd, int smartmedia)
+> > > +{
+> > > +	struct nand_chip *chip = mtd_to_nand(mtd);
+> > > +	struct nand_flash_dev *flash_ids;
+> > > +	int ret;
+> > > +
+> > > +	chip->options |= NAND_SKIP_BBTSCAN;
+> > > +
+> > > +	/* Scan for card properties */
+> > > +	chip->dummy_controller.ops = &sm_controller_ops;
+> > > +	flash_ids = smartmedia ? nand_smartmedia_flash_ids : nand_xd_flash_ids;
+> > > +	ret = nand_scan_with_ids(mtd, 1, flash_ids);
+> > >  	if (ret)
+> > >  		return ret;
+> > >  
+> > > -	return mtd_device_register(mtd, NULL, 0);
+> > > +	ret = mtd_device_register(mtd, NULL, 0);
+> > > +	if (ret)
+> > > +		nand_release(mtd);  
 > 
-> 
-> Given that I let this one fall into the cracks and that these are minor
-> issues, I fixed them manually, and applied up to patch 19. But next at
-> least compile test your series and run checkpatch on them.
+> Didn't notice that while reviewing, but it would have been better to
+> use nand_cleanup() and do this change separately.
 
-I was really surprised of your remark but indeed there was a build
-issue in the middle of the series that I did not see because I always
-test with a last patch fixing it (this patch adds interrupt support, I
-plan to send it for the next release). I'm very sorry for this
-mistake, thanks for fixing it by yourself.
+Indeed, will fix it.
 
-> 
-> Patches 20-23 need to go via your arch tree.
-
-Sure, they will enter in the next release now.
-
-Thanks,
 Miqu?l
