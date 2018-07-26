@@ -1,42 +1,32 @@
-From: Akash_Gajjar@mentor.com (Akash Gajjar)
-Date: Thu, 26 Jul 2018 12:21:46 +0530
-Subject: [PATCH] arm64: dts: allwinner: activate spi flash on pine64 LTS board
-In-Reply-To: <Akash_Gajjar@mentor.com>
-References: <Akash_Gajjar@mentor.com>
-Message-ID: <1532587906-5415-1-git-send-email-Akash_Gajjar@mentor.com>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Thu, 26 Jul 2018 08:53:29 +0200
+Subject: [PATCH v7 4/6] dt-bindings: mailbox: imx-mu: add i.MX6SX and i.MX7S
+ SoCs.
+In-Reply-To: <20180726065331.6186-1-o.rempel@pengutronix.de>
+References: <20180726065331.6186-1-o.rempel@pengutronix.de>
+Message-ID: <20180726065331.6186-5-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This board has SPI flash. add spi flash support in device tree.
-Tested on pine64 LTS.
+This are currently tested SoCs with imx-mailbox driver.
 
-Signed-off-by: Akash Gajjar <Akash_Gajjar@mentor.com>
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 ---
- .../arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ Documentation/devicetree/bindings/mailbox/fsl,mu.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-index abe179d..9af07db 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-@@ -134,6 +134,18 @@
- 	regulator-name = "vcc-wifi";
- };
- 
-+&spi0  {
-+	status = "okay";
-+
-+	flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "winbond,w25q128", "jedec,spi-nor";
-+		reg = <0x0>;
-+		spi-max-frequency = <40000000>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
+diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+index 113d6ab931ef..5616d2afca45 100644
+--- a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
++++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+@@ -18,7 +18,7 @@ Messaging Unit Device Node:
+ Required properties:
+ -------------------
+ - compatible :	should be "fsl,<chip>-mu", the supported chips include
+-		imx8qxp, imx8qm.
++		imx6sx, imx7s, imx8qxp, imx8qm.
+ - reg :		Should contain the registers location and length
+ - interrupts :	Interrupt number. The interrupt specifier format depends
+ 		on the interrupt controller parent.
 -- 
-2.7.4
+2.18.0
