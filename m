@@ -1,63 +1,43 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 26 Jul 2018 15:26:33 +0530
-Subject: [PATCH v7 2/6] dt-bindings: arm: fsl: add mu binding doc
-In-Reply-To: <20180726065331.6186-3-o.rempel@pengutronix.de>
-References: <20180726065331.6186-1-o.rempel@pengutronix.de>
- <20180726065331.6186-3-o.rempel@pengutronix.de>
-Message-ID: <CABb+yY3+8+-popsTx2n-bNeBEVAdJrG_b4GmZm9DHr_L=abQ=A@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 26 Jul 2018 11:57:59 +0200
+Subject: [PATCH v2] Documentation: dt-bindings: Explicitly mark Samsung
+ Exynos SoC bindings as unstable
+In-Reply-To: <20180528191327.23772-1-krzk@kernel.org>
+References: <CGME20180528191404epcas3p241196d099756ea7e310cff70d298c4c9@epcas3p2.samsung.com>
+ <20180528191327.23772-1-krzk@kernel.org>
+Message-ID: <9466376.zSd3pI8yRi@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 12:23 PM, Oleksij Rempel
-<o.rempel@pengutronix.de> wrote:
-> From: Dong Aisheng <aisheng.dong@nxp.com>
->
-> The Messaging Unit module enables two processors within
-> the SoC to communicate and coordinate by passing messages
-> (e.g. data, status and control) through the MU interface.
->
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
->  .../devicetree/bindings/mailbox/fsl,mu.txt    | 34 +++++++++++++++++++
->  1 file changed, 34 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/fsl,mu.txt
->
-> diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> new file mode 100644
-> index 000000000000..90e4905dfc69
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> @@ -0,0 +1,34 @@
-> +NXP i.MX Messaging Unit (MU)
-> +--------------------------------------------------------------------
-> +
-> +The Messaging Unit module enables two processors within the SoC to
-> +communicate and coordinate by passing messages (e.g. data, status
-> +and control) through the MU interface. The MU also provides the ability
-> +for one processor to signal the other processor using interrupts.
-> +
-> +Because the MU manages the messaging between processors, the MU uses
-> +different clocks (from each side of the different peripheral buses).
-> +Therefore, the MU must synchronize the accesses from one side to the
-> +other. The MU accomplishes synchronization using two sets of matching
-> +registers (Processor A-facing, Processor B-facing).
-> +
-> +Messaging Unit Device Node:
-> +=============================
-> +
-> +Required properties:
-> +-------------------
-> +- compatible : should be "fsl,<chip>-mu", the supported chips include
-> +               imx8qxp, imx8qm.
-> +- reg :                Should contain the registers location and length
-> +- interrupts : Interrupt number. The interrupt specifier format depends
-> +               on the interrupt controller parent.
-> +- #mbox-cells:  Must be 0. Number of cells in a mailbox
->
-Please consider my reply to patch-3
+On Monday, May 28, 2018 09:13:27 PM Krzysztof Kozlowski wrote:
+> From: Marek Szyprowski <m.szyprowski@samsung.com>
+> 
+> Samsung Exynos SoCs and boards related bindings evolved since the initial
+> introduction, but initially the bindings were minimal and a bit incomplete
+> (they never described all the hardware modules available in the SoCs).
+> Since then some significant (not fully compatible) changes have been
+> already committed a few times (like gpio replaced by pinctrl, display ddc,
+> mfc reserved memory, some core clocks added to various hardware modules,
+> added more required nodes).
+> 
+> On the other side there are no boards which have device tree embedded in
+> the bootloader. Device tree blob is always compiled from the kernel tree
+> and updated together with the kernel image.
+> 
+> Thus to avoid further adding a bunch of workarounds for old/missing
+> bindings, make development of new platforms easier and allow to make
+> cleanup of the existing code and device tree files, lets mark some
+> Samsung Exynos SoC platform bindings as unstable. This means that
+> bindings can may change at any time and users should use the dtb file
+> compiled from the same kernel source tree as the kernel image.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+
+Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
