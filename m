@@ -1,85 +1,67 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 26 Jul 2018 08:20:02 -0700
-Subject: [PATCH v3 2/2] clk: meson: add sub MMC clock controller driver
-In-Reply-To: <20180712211244.11428-3-yixun.lan@amlogic.com>
-References: <20180712211244.11428-1-yixun.lan@amlogic.com>
- <20180712211244.11428-3-yixun.lan@amlogic.com>
-Message-ID: <153261840298.48062.2497103873681297587@swboyd.mtv.corp.google.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 26 Jul 2018 17:24:09 +0200
+Subject: [PATCH] clk: meson-gxbb: set fclk_div2 as CLK_IS_CRITICAL
+In-Reply-To: <1528892421-12180-1-git-send-email-narmstrong@baylibre.com>
+References: <1528892421-12180-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <5153040b-1f38-a17a-d78d-fec833c1c223@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Yixun Lan (2018-07-12 14:12:44)
-> diff --git a/drivers/clk/meson/mmc-clkc.c b/drivers/clk/meson/mmc-clkc.c
-> new file mode 100644
-> index 000000000000..36c4c7cd69a6
-> --- /dev/null
-> +++ b/drivers/clk/meson/mmc-clkc.c
-> @@ -0,0 +1,367 @@
-> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> +/*
-> + * Amlogic Meson MMC Sub Clock Controller Driver
-> + *
-> + * Copyright (c) 2017 Baylibre SAS.
-> + * Author: Jerome Brunet <jbrunet@baylibre.com>
-> + *
-> + * Copyright (c) 2018 Amlogic, inc.
-> + * Author: Yixun Lan <yixun.lan@amlogic.com>
-> + */
-> +
-> +#include <linux/clk.h>
+Hi Stable Team,
 
-Is this include used?
+On 13/06/2018 14:20, Neil Armstrong wrote:
+> On Amlogic Meson GXBB & GXL platforms, the SCPI Cortex-M4 Co-Processor
+> seems to be dependent on the FCLK_DIV2 to be operationnal.
+> 
+> The issue occured since v4.17-rc1 by freezing the kernel boot when
+> the 'schedutil' cpufreq governor was selected as default :
+> 
+>   [   12.071837] scpi_protocol scpi: SCP Protocol 0.0 Firmware 0.0.0 version
+>   domain-0 init dvfs: 4
+>   [   12.087757] hctosys: unable to open rtc device (rtc0)
+>   [   12.087907] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+>   [   12.102241] cfg80211: Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+> 
+> But when disabling the MMC driver, the boot finished but cpufreq failed to
+> change the CPU frequency :
+> 
+>   [   12.153045] cpufreq: __target_index: Failed to change cpu frequency: -5
+> 
+> A bisect between v4.16 and v4.16-rc1 gave the 05f814402d61 commit to be
+> the first bad commit.
+> This commit added support for the missing clock gates before the fixed PLL
+> fixed dividers (FCLK_DIVx) and the clock framework basically disabled
+> all the unused fixed dividers, thus disabled a critical clock path for
+> the SCPI Co-Processor.
+> 
+> This patch simply sets the FCLK_DIV2 gate as critical to ensure
+> nobody can disable it.
+> 
+> Fixes: 05f814402d61 ("clk: meson: add fdiv clock gates")
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-> +#include <linux/clk-provider.h>
-> +#include <linux/module.h>
-> +#include <linux/regmap.h>
-> +#include <linux/slab.h>
-> +#include <linux/of_device.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/platform_device.h>
-> +#include <dt-bindings/clock/amlogic,meson-mmc-clkc.h>
-> +
-> +#include "clkc.h"
-> +
-> +
-> +static struct clk_regmap *
-> +mmc_clkc_register_other_clk(struct device *dev, struct regmap *map,
-> +                           char *suffix, char *parent_suffix,
-> +                           unsigned long flags,
-> +                           const struct clk_ops *ops, void *data)
-> +{
-> +       struct clk_init_data init;
-> +       struct clk_regmap *clk;
-> +       char *parent;
-> +
-> +       parent = kasprintf(GFP_KERNEL, "%s#%s", dev_name(dev), parent_suffix);
-> +       if (!parent)
-> +               return ERR_PTR(-ENOMEM);
-> +
-> +       init.ops = ops;
-> +       init.flags = flags;
-> +       init.parent_names = (const char* const []){ parent, };
 
-Can't this just be &parent?
+This patch hit linux master with commit id c987ac6f1f088663b6dad39281071aeb31d450a8
 
-> +       init.num_parents = 1;
-> +
-> +       clk = mmc_clkc_register_clk(dev, map, &init, suffix, data);
-> +       if (IS_ERR(clk))
-> +               dev_err(dev, "Core %s clock registration failed\n", suffix);
-> +
-> +       kfree(parent);
-> +       return clk;
-> +}
-> +
-> +static int mmc_clkc_probe(struct platform_device *pdev)
-> +{
-> +       struct clk_hw_onecell_data *onecell_data;
-> +       struct device *dev = &pdev->dev;
-> +       struct mmc_clkc_data *data;
-> +       struct regmap *map;
-> +       struct clk_regmap *mux, *div, *core, *rx, *tx;
-> +
-> +       data = (struct mmc_clkc_data *)of_device_get_match_data(dev);
+Could this be backported to the next 4.17 stable release ?
 
-This cast is unnecessary. Pleas remove.
+Thanks,
+Neil
+
+> ---
+>  drivers/clk/meson/gxbb.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+> index b1e4d95..0e053c1 100644
+> --- a/drivers/clk/meson/gxbb.c
+> +++ b/drivers/clk/meson/gxbb.c
+> @@ -511,6 +511,7 @@ static struct clk_regmap gxbb_fclk_div2 = {
+>  		.ops = &clk_regmap_gate_ops,
+>  		.parent_names = (const char *[]){ "fclk_div2_div" },
+>  		.num_parents = 1,
+> +		.flags = CLK_IS_CRITICAL,
+>  	},
+>  };
+>  
+> 
