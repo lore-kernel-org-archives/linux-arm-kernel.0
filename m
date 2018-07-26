@@ -1,51 +1,31 @@
 From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Thu, 26 Jul 2018 16:09:58 +0900
-Subject: [PATCH v2 1/3] ARM: dts: uniphier: add SPI pin-mux node
-In-Reply-To: <1532589000-19602-1-git-send-email-hayashibara.keiji@socionext.com>
-References: <1532589000-19602-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <1532589000-19602-2-git-send-email-hayashibara.keiji@socionext.com>
+Date: Thu, 26 Jul 2018 16:09:57 +0900
+Subject: [PATCH v2 0/3] Add SPI dts node for UniPhier SoCs
+Message-ID: <1532589000-19602-1-git-send-email-hayashibara.keiji@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+This series adds SPI pin-mux node and SPI node for UniPhier SoCs.
 
-This commit adds pin-mux nodes for SPI controller.
+Changes since v1:
+- remove the node for MCSSI which support multiple channels.
+  Since the current driver doesn't support MCSSI, it deletes this node.
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
----
- arch/arm/boot/dts/uniphier-pinctrl.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Kunihiko Hayashi (3):
+  ARM: dts: uniphier: add SPI pin-mux node
+  ARM: dts: uniphier: add SPI node for UniPhier 32bit SoCs
+  arm64: dts: uniphier: add SPI node for LD20, LD11 and PXs3
 
-diff --git a/arch/arm/boot/dts/uniphier-pinctrl.dtsi b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-index 51f0e69..5dc4cf7 100644
---- a/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-@@ -126,6 +126,26 @@
- 		function = "sd1";
- 	};
- 
-+	pinctrl_spi0: spi0 {
-+		groups = "spi0";
-+		function = "spi0";
-+	};
-+
-+	pinctrl_spi1: spi1 {
-+		groups = "spi1";
-+		function = "spi1";
-+	};
-+
-+	pinctrl_spi2: spi2 {
-+		groups = "spi2";
-+		function = "spi2";
-+	};
-+
-+	pinctrl_spi3: spi3 {
-+		groups = "spi3";
-+		function = "spi3";
-+	};
-+
- 	pinctrl_system_bus: system-bus {
- 		groups = "system_bus", "system_bus_cs1";
- 		function = "system_bus";
+ arch/arm/boot/dts/uniphier-ld4.dtsi              | 11 ++++++
+ arch/arm/boot/dts/uniphier-pinctrl.dtsi          | 20 +++++++++++
+ arch/arm/boot/dts/uniphier-pro4.dtsi             | 11 ++++++
+ arch/arm/boot/dts/uniphier-pro5.dtsi             | 22 ++++++++++++
+ arch/arm/boot/dts/uniphier-pxs2.dtsi             | 22 ++++++++++++
+ arch/arm/boot/dts/uniphier-sld8.dtsi             | 11 ++++++
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 22 ++++++++++++
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 44 ++++++++++++++++++++++++
+ arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi | 22 ++++++++++++
+ 9 files changed, 185 insertions(+)
+
 -- 
 2.7.4
