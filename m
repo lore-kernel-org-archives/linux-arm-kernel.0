@@ -1,179 +1,50 @@
-From: radu.pirea@microchip.com (Radu Pirea)
-Date: Thu, 26 Jul 2018 13:57:35 +0300
-Subject: [PATCH v2 2/2] spi: add SPI controller driver for UniPhier SoC
-In-Reply-To: <001b01d424c4$66e04230$34a0c690$@socionext.com>
-References: <1532588943-19481-1-git-send-email-hayashibara.keiji@socionext.com>
- <1532588943-19481-3-git-send-email-hayashibara.keiji@socionext.com>
- <CAHp75VcEdxDEo0T5_9BzOPaeaqjbmbrWmaE9+ZuUDYhjh6jpVw@mail.gmail.com>
- <001b01d424c4$66e04230$34a0c690$@socionext.com>
-Message-ID: <ab87c6a7-4ead-6492-9e47-42e6ab701d1c@microchip.com>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Thu, 26 Jul 2018 12:57:25 +0200
+Subject: [PATCH v7 3/6] dt-bindings: mailbox: imx-mu: add generic MU
+ channel support
+In-Reply-To: <CABb+yY0kVFvQRBrU4j9t=_JcSUkcXMMSK5u=XSufM6XcmKiv-g@mail.gmail.com>
+References: <20180726065331.6186-1-o.rempel@pengutronix.de>
+ <20180726065331.6186-4-o.rempel@pengutronix.de>
+ <CABb+yY0kVFvQRBrU4j9t=_JcSUkcXMMSK5u=XSufM6XcmKiv-g@mail.gmail.com>
+Message-ID: <ddd25683-d7a6-e900-461f-9bbac3100579@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 07/26/2018 12:38 PM, Keiji Hayashibara wrote:
-> Hello Andy,
+On 26.07.2018 11:49, Jassi Brar wrote:
+> On Thu, Jul 26, 2018 at 12:23 PM, Oleksij Rempel
+> <o.rempel@pengutronix.de> wrote:
 > 
-> Thank you for your check!
+>> Each MU has four pairs of rx/tx data register with four rx/tx interrupts
+>> which can also be used as a separate channel.
+>>
+> So the hardware actually supports 4 channels.
 > 
-> 
->> From: Andy Shevchenko [mailto:andy.shevchenko at gmail.com]
->> Sent: Thursday, July 26, 2018 5:46 PM
->> To: Hayashibara, Keiji/?? ?? <hayashibara.keiji@socionext.com>
->> Subject: Re: [PATCH v2 2/2] spi: add SPI controller driver for UniPhier SoC
->>
->> On Thu, Jul 26, 2018 at 10:09 AM, Keiji Hayashibara <hayashibara.keiji@socionext.com> wrote:
->>> Add SPI controller driver implemented in Socionext UniPhier SoCs.
->>>
->>> UniPhier SoCs have two types SPI controllers; SCSSI supports a single
->>> channel, and MCSSI supports multiple channels.
->>> This driver supports SCSSI only.
->>>
->>> This controller has 32bit TX/RX FIFO with depth of eight entry, and
->>> supports the SPI master mode only.
->>>
->>> This commit is implemented in PIO transfer mode, not DMA transfer.
->>
->> Few style realted comments.
->>
->>> +#include <asm/unaligned.h>
->>> +#include <linux/kernel.h>
->>> +#include <linux/bitfield.h>
->>> +#include <linux/bitops.h>
->>> +#include <linux/clk.h>
->>> +#include <linux/interrupt.h>
->>> +#include <linux/io.h>
->>> +#include <linux/module.h>
->>> +#include <linux/of.h>
->>> +#include <linux/of_platform.h>
->>> +#include <linux/platform_device.h>
->>> +#include <linux/spi/spi.h>
->>
->> Slightly better to keep them in order and put asm/* at the last.
-> 
-> I see. I will modify this.
-> 
-> 
->>> +#define SSI_TIMEOUT            2000    /* ms */
->>
->> SSI_TIMEOUT_MS ?
->>
->>> +#define SSI_CTL                        0x0
->>
->> Slightly better to keep same width for the addresses, like 0x00 here.
->>
->>> +#define SSI_CKS                        0x4
->>
->>> +#define SSI_TXWDS              0x8
->>
->>> +#define SSI_RXWDS              0xc
->>
->> Ditto.
-> 
-> I will modify about above.
-> 
->>
->>> +static int uniphier_spi_set_baudrate(struct spi_device *spi, unsigned
->>> +int speed) {
->>> +       struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
->>> +       u32 val, ckrat;
->>> +
->>> +       /*
->>> +        * the supported rates are even numbers from 4 to 254. (4,6,8...254)
->>> +        * round up as we look for equal or less speed
->>> +        */
->>> +       ckrat = DIV_ROUND_UP(clk_get_rate(priv->clk), speed);
->>
->>> +       ckrat = roundup(ckrat, 2);
->>
->> ckrat += ckrat & 1;
->>
->> ?
-> 
-> It's simple. I will modify.
-> 
-> 
->>> +       /* check if requested speed is too small */
->>> +       if (ckrat > SSI_MAX_CLK_DIVIDER)
->>
->>> +               return -EINVAL;
->>
->> So, does this critical?
-> 
-> If set the value to SSI_MAX_CLK_DIVIDER, the clock frequency will be set high.
-> I don't change it to high frequency, and it is daringly an error.
-> On the other hand, when changing to low frequency, I will change it automatically.
-> 
->>> +
->>> +       if (ckrat < SSI_MIN_CLK_DIVIDER)
->>> +               ckrat = SSI_MIN_CLK_DIVIDER;
+>> -- #mbox-cells:  Must be 0. Number of cells in a mailbox
+>> +- #mbox-cells:  Must be:
+>> +               0 - for single channel mode. i.MX8* SCU protocol specific.
+>> +               1 - for multichannel (generic) mode.
+>> +
+> No, please.
+> DT bindings should reflect the real hardware, and not the software
+> mode we want the driver to work in.
+> Please define mbox-cells=1  and have the i.MX8* platform always ask
+> for channel-0.
 
-In fact you don't need this checks. You already set in probe function this.
-master->max_speed_hz = DIV_ROUND_UP(clksrc, SSI_MIN_CLK_DIVIDER);
-master->min_speed_hz = DIV_ROUND_UP(clksrc, SSI_MAX_CLK_DIVIDER);
+We spend already some week to publicly talk about this..
+The problem is, imx8 has multiple MUs, only some of them communicate
+directly with SCU. SCU has some well defined protocol and
+MU should be used and configured in some SCU specific way. From NXP
+perspective, SCU firmware should not be replaceable and from Linux side
+seen as part of the HW.
 
-The SPI core will check if transfer speed is higher than controller 
-speed and if is, will set the transfer speed to master->max_speed_hz. In 
-case of master->min_speed_hz, if transfer speed is lower than 
-master->min_speed_hz __spi_validate(drivers/spi/spi.c) will return -EINVAL.
+@Dong, is it correct description?
 
->>
->> clamp_val()  / max() ?
-> 
-> I will modify it to use max().
-> 
->>
->>> +       val = readl(priv->base + SSI_CKS);
->>> +       val &= ~SSI_CKS_CKRAT_MASK;
->>> +       val |= ckrat & SSI_CKS_CKRAT_MASK;
->>> +       writel(val, priv->base + SSI_CKS);
->>> +
->>> +       return 0;
->>> +}
->>
->>> +       priv->irq = platform_get_irq(pdev, 0);
->>> +       if (priv->irq < 0) {
->>> +               dev_err(&pdev->dev, "failed to get IRQ\n");
->>
->>> +               ret = -ENXIO;
->>
->> What's wrong with
->>
->> ret = priv->irq;
->>
->> ?
-> 
-> I will modify it.
-> 
->>> +               goto out_disable_clk;
->>> +       }
->>
->>> +static const struct of_device_id uniphier_spi_match[] = {
->>> +       { .compatible = "socionext,uniphier-scssi", },
->>
->>> +       { /* sentinel */ },
->>
->> Slightly better without comma.
-> 
-> OK. I will modify this.
-> 
-> -----------------
-> Best Regards,
-> Keiji Hayashibara
-> 
-> 
-> 
->>> +};
->>> +MODULE_DEVICE_TABLE(of, uniphier_spi_match);
->>
->> --
->> With Best Regards,
->> Andy Shevchenko
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-spi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180726/300c4146/attachment.sig>
