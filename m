@@ -1,22 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 25 Jul 2018 23:52:08 -0700
-Subject: [PATCH 1/5] arm64: dts: sprd: Add SC27XX breathing light
- controller device
-In-Reply-To: <2531014d066e61063b3d7906e6df55caa028e17c.1531881619.git.baolin.wang@linaro.org>
-References: <2531014d066e61063b3d7906e6df55caa028e17c.1531881619.git.baolin.wang@linaro.org>
-Message-ID: <20180726065208.yalawbgabym3evzy@localhost>
+Date: Wed, 25 Jul 2018 23:44:33 -0700
+Subject: [GIT PULL] dts32 commits for v4.19
+In-Reply-To: <2d918d15-d1d3-b4e0-7427-0b3baa56100a@gmail.com>
+References: <2d918d15-d1d3-b4e0-7427-0b3baa56100a@gmail.com>
+Message-ID: <20180726064433.nhc3rdj2tnqtsskt@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 02:10:16PM +0800, Baolin Wang wrote:
-> The SC27xx breathing light controller can support 3 outputs:
-> red LED, green LED and blue LED.
-> 
-> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+Hi Matthias,
 
-Applied 1-5, thanks. If you send a series like this, feel free to send a cover
-letter as well, to let us know what you want done to them. I'm presuming you
-wanted them applied in this case.
+On Sun, Jul 22, 2018 at 10:47:46PM +0200, Matthias Brugger wrote:
+> Hi Olof,
+> Hi Arnd,
+> 
+> Please take into account the following patches.
+> Thanks a lot,
+> Matthias
+
+Not sure what's going on with these pull requests -- they've got somewhat
+unusual subject lines, and they're not using signed tags.
+
+Would you mind respinning with tags? Thanks!
 
 
 -Olof
