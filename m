@@ -1,60 +1,72 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 26 Jul 2018 14:39:25 +0100
-Subject: [PATCH v12 15/16] arm64: kexec_file: add kernel signature
- verification support
-In-Reply-To: <20180724065759.19186-16-takahiro.akashi@linaro.org>
-References: <20180724065759.19186-1-takahiro.akashi@linaro.org>
- <20180724065759.19186-16-takahiro.akashi@linaro.org>
-Message-ID: <d3704585-9404-a56b-883a-30c123084ada@arm.com>
+From: ssuloev@orpaltech.com (Sergey Suloev)
+Date: Thu, 26 Jul 2018 16:39:56 +0300
+Subject: [PATCH v2 16/18] arm64: dts: allwinner: a64: NanoPi-A64: Add
+ Ethernet
+In-Reply-To: <20180726003532.18751-17-andre.przywara@arm.com>
+References: <20180726003532.18751-1-andre.przywara@arm.com>
+ <20180726003532.18751-17-andre.przywara@arm.com>
+Message-ID: <f2380842-2c7a-13d3-fa0f-ed23afb89e30@orpaltech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi,
+Hi,
 
-On 24/07/18 07:57, AKASHI Takahiro wrote:
-> With this patch, kernel verification can be done without IMA security
-> subsystem enabled. Turn on CONFIG_KEXEC_VERIFY_SIG instead.
-> 
-> On x86, a signature is embedded into a PE file (Microsoft's format) header
-> of binary. Since arm64's "Image" can also be seen as a PE file as far as
-> CONFIG_EFI is enabled, we adopt this format for kernel signing.
-> 
-> You can create a signed kernel image with:
->     $ sbsign --key ${KEY} --cert ${CERT} Image
+On 07/26/2018 03:35 AM, Andre Przywara wrote:
+> The NanoPi-A64 has the usual Realtek Gbit PHY connected to the EMAC,
+> so add the respective nodes to the DT. The PHY is powered by the
+> VDD_SYS_3.3V line, which is always on.
+>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>   arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts | 17 +++++++++++++++++
+>   1 file changed, 17 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+> index 5caba225b4f7..bd35a093e6cd 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+> @@ -51,6 +51,7 @@
+>   	compatible = "friendlyarm,nanopi-a64", "allwinner,sun50i-a64";
+>   
+>   	aliases {
+> +		ethernet0 = &emac;
+>   		serial0 = &uart0;
+>   	};
+>   
+> @@ -67,6 +68,15 @@
+>   	status = "okay";
+>   };
+>   
+> +&emac {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&rgmii_pins>;
+> +	phy-mode = "rgmii";
+> +	phy-handle = <&ext_rgmii_phy>;
+> +	phy-supply = <&reg_dcdc1>;
+> +	status = "okay";
+> +};
+> +
+>   /* i2c1 connected with gpio headers like pine64, bananapi */
+>   &i2c1 {
+>   	pinctrl-names = "default";
+> @@ -78,6 +88,13 @@
+>   	bias-pull-up;
+>   };
+>   
+> +&mdio {
+> +	ext_rgmii_phy: ethernet-phy at 1 {
+> +		compatible = "ethernet-phy-ieee802.3-c22";
+> +		reg = <1>;
+> +	};
+> +};
+> +
+>   &mmc0 {
+>   	pinctrl-names = "default";
+>   	pinctrl-0 = <&mmc0_pins>;
 
-Reviewed-by: James Morse <james.morse@arm.com>
+did you test? "reg = <1>" on a real hardware ?
 
+I have? "reg = <0>" in my dts? and? it has been working on my board for 
+ages.
 
-> diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
-> index d64f5e9f9d22..578d358632d0 100644
-> --- a/arch/arm64/kernel/kexec_image.c
-> +++ b/arch/arm64/kernel/kexec_image.c
-> @@ -102,7 +106,18 @@ static void *image_load(struct kimage *image,
->  	return ERR_PTR(ret);
->  }
->  
-> +#ifdef CONFIG_KEXEC_IMAGE_VERIFY_SIG
-> +static int image_verify_sig(const char *kernel, unsigned long kernel_len)
-> +{
-> +	return verify_pefile_signature(kernel, kernel_len, NULL,
-> +				       VERIFYING_KEXEC_PE_SIGNATURE);
-> +}
-> +#endif
-
-This is identical to x86's PE image verification helper. We can clean this up
-later by providing some kexec_image_verify_pe() in the core kexec_file code. Its
-not worth doing now.
-
-
->  const struct kexec_file_ops kexec_image_ops = {
->  	.probe = image_probe,
->  	.load = image_load,
-> +#ifdef CONFIG_KEXEC_IMAGE_VERIFY_SIG
-> +	.verify_sig = image_verify_sig,
-> +#endif
->  };
-
-
-Thanks,
-
-James
+Thanks
