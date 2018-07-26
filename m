@@ -1,45 +1,48 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 26 Jul 2018 01:35:23 +0100
-Subject: [PATCH v2 09/18] arm64: dts: allwinner: a64: Orange Pi Win: Add SPI
- flash node
+Date: Thu, 26 Jul 2018 01:35:26 +0100
+Subject: [PATCH v2 12/18] arm64: dts: allwinner: a64: Olinuxino: fix DRAM
+ voltage
 In-Reply-To: <20180726003532.18751-1-andre.przywara@arm.com>
 References: <20180726003532.18751-1-andre.przywara@arm.com>
-Message-ID: <20180726003532.18751-10-andre.przywara@arm.com>
+Message-ID: <20180726003532.18751-13-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Samuel Holland <samuel@sholland.org>
+The Olinuxino board uses DDR3L chips which are supposed to be driven
+with 1.35V. The reset default of the AXP is properly set to 1.36V.
 
-The Orange Pi Win comes with 2 MB SPI flash, add the node.
+While technically the chips can also run at 1.5 volts, changing the
+voltage on the fly while booting Linux is asking for trouble. Also
+running at a lower voltage saves power.
 
-Signed-off-by: Samuel Holland <samuel@sholland.org>
+So fix the DCDC5 value to match the actual board design.
+
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Tested-by: Martin Lucina <martin@lucina.net>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-index a368f51399e6..6f85a05d2f4b 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-@@ -266,6 +266,18 @@
- 	vcc-hdmi-supply = <&reg_dldo1>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+index 3f531393eaee..b3f186434f36 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+@@ -142,10 +142,14 @@
+ 
+ /* DCDC3 is polyphased with DCDC2 */
+ 
++/*
++ * The board uses DDR3L DRAM chips. 1.36V is the closest to the nominal
++ * 1.35V that the PMIC can drive.
++ */
+ &reg_dcdc5 {
+ 	regulator-always-on;
+-	regulator-min-microvolt = <1500000>;
+-	regulator-max-microvolt = <1500000>;
++	regulator-min-microvolt = <1360000>;
++	regulator-max-microvolt = <1360000>;
+ 	regulator-name = "vcc-ddr3";
  };
  
-+&spi0 {
-+	status = "okay";
-+
-+	spi-flash at 0 {
-+		compatible = "mxicy,mx25l1606e", "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <80000000>;
-+		m25p,fast-read;
-+		status = "okay";
-+	};
-+};
-+
- /* On debug connector */
- &uart0 {
- 	pinctrl-names = "default";
 -- 
 2.14.4
