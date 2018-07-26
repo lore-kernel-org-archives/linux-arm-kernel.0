@@ -1,39 +1,37 @@
 From: arun.parameswaran@broadcom.com (Arun Parameswaran)
-Date: Thu, 26 Jul 2018 11:36:17 -0700
-Subject: [PATCH 0/7] Add clock config and pm support to bcm iProc mdio mux
-Message-ID: <1532630184-29450-1-git-send-email-arun.parameswaran@broadcom.com>
+Date: Thu, 26 Jul 2018 11:36:18 -0700
+Subject: [PATCH 1/7] dt-bindings: net: Fix Broadcom iProc mdio mux driver base
+ address
+In-Reply-To: <1532630184-29450-1-git-send-email-arun.parameswaran@broadcom.com>
+References: <1532630184-29450-1-git-send-email-arun.parameswaran@broadcom.com>
+Message-ID: <1532630184-29450-2-git-send-email-arun.parameswaran@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-The patchset is based on David Miller's "net" repo.
+Modify the base address passed to the Broadcom iProc MDIO mux driver
+to point to the start of the block's register address space.
 
-The patchset extends the Broadcom iProc mdio mux to add support for
-suspend/resume and the ability to configure the internal clock
-divider.
+Fixes: ce8d5dbfd64f ("Add DT binding doc for Broadcom MDIO bus multiplexer")
+Signed-off-by: Arun Parameswaran <arun.parameswaran@broadcom.com>
+---
+ Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-The base address of the mdio-mux-bcm-iproc is modified to point to the
-start of the mdio block's address space, to be able to access all the
-mdio's registers. The missing registers are required to configure the
-internal clock divider registers in some of the Broadcom SoC's.
-
-Thanks
-Arun
-
-Arun Parameswaran (7):
-  dt-bindings: net: Fix Broadcom iProc mdio mux driver base address
-  net: phy: Fix the register offsets in Broadcom iProc mdio mux driver
-  arm64: dts: Fix the base address of the Broadcom iProc mdio mux
-  dt-bindings: net: Add clock handle to Broadcom iProc mdio mux
-  net: phy: Add support to configure clock in Broadcom iProc mdio mux
-  net: phy: Add pm support to Broadcom iProc mdio mux driver
-  net: phy: Add pm support for scan ctrl register to bcm mdio mux
-
- .../bindings/net/brcm,mdio-mux-iproc.txt           |  7 +-
- arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi   |  4 +-
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi |  4 +-
- drivers/net/phy/mdio-mux-bcm-iproc.c               | 89 ++++++++++++++++++++--
- 4 files changed, 92 insertions(+), 12 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
+index dfe287a..dc8aa68 100644
+--- a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
++++ b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
+@@ -18,9 +18,9 @@ at- Documentation/devicetree/bindings/net/mdio-mux.txt
+ 
+ 
+ for example:
+-		mdio_mux_iproc: mdio-mux at 6602023c {
++		mdio_mux_iproc: mdio-mux at 66020000 {
+ 			compatible = "brcm,mdio-mux-iproc";
+-			reg = <0x6602023c 0x14>;
++			reg = <0x66020000 0x250>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
 -- 
 1.9.1
