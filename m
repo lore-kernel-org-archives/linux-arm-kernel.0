@@ -1,67 +1,63 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 26 Jul 2018 09:09:18 +0200
-Subject: next/master boot: 171 boots: 6 failed, 162 passed with 3 offline
- (next-20180724)
-In-Reply-To: <20180725161151.GA340@sirena.org.uk>
-References: <5b5757ee.1c69fb81.411a5.52e2@mx.google.com>
- <20180725161151.GA340@sirena.org.uk>
-Message-ID: <6b5a8c5c-8483-22f1-cc09-e12bd7740f10@i2se.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Thu, 26 Jul 2018 12:39:59 +0530
+Subject: [PATCH v2 4/4] ARM: exynos: Fix imprecise abort during Exynos5422
+ suspend to RAM
+In-Reply-To: <CAJKOXPc1csipQsmtJ77uZOwUgchPwGoA_+xxzmCjx97dLU5cyg@mail.gmail.com>
+References: <20180724164946.6274-1-krzk@kernel.org>
+ <20180724164946.6274-4-krzk@kernel.org>
+ <CANAwSgSChhEzDf5oSqZ2Srt62n16Z+ppFnupT=0pGkaSCv90vw@mail.gmail.com>
+ <CAJKOXPc1csipQsmtJ77uZOwUgchPwGoA_+xxzmCjx97dLU5cyg@mail.gmail.com>
+Message-ID: <CANAwSgS+JNAbiX3=c+OtDBMXgrKcwgC4uRukHG90oCiJcrOxwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Krzysztof,
 
-thanks for forwarding. Unfortunately i don't have the time for real 
-investigation until next week, so here some remote diagnostics.
-
-
-Am 25.07.2018 um 18:11 schrieb Mark Brown:
-> On Tue, Jul 24, 2018 at 09:46:38AM -0700, kernelci.org bot wrote:
+On 26 July 2018 at 12:10, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On 26 July 2018 at 08:22, Anand Moon <linux.amoon@gmail.com> wrote:
+>> Hi Krzysztof,
+>>
+>> On 24 July 2018 at 22:19, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>>> Suspend to RAM on Odroid XU3/XU4/HC1 family (Exynos5422) causes
+>>> imprecise abort:
+>>>
+>>>         PM: Syncing filesystems ... done.
+>>>         Freezing user space processes ... (elapsed 0.003 seconds) done.
+>>>         OOM killer disabled.
+>>>         Freezing remaining freezable tasks ... (elapsed 0.003 seconds) done.
+>>>         wake enabled for irq 139
+>>>         Disabling non-boot CPUs ...
+>>>         IRQ51 no longer affine to CPU1
+>>>         IRQ52 no longer affine to CPU2
+>>>         IRQ53 no longer affine to CPU3
+>>>         IRQ54 no longer affine to CPU4
+>>>         IRQ55 no longer affine to CPU5
+>>>         IRQ56 no longer affine to CPU6
+>>>         cpu cpu4: Dropping the link to regulator.40
+>>>         IRQ57 no longer affine to CPU7
+>>>         Unhandled fault: external abort on non-linefetch (0x1008) at 0xf081a028
+>>>         Internal error: : 1008 [#1] PREEMPT SMP ARM
+>>>
+>>> with last call trace in exynos_suspend_enter().
+>>>
+>>> The abort is caused by writing to register in secure part of sysram.
+>>> Boards booted under secure firmware (e.g. Hardkernel Odroid boards)
+>>> should access non-secure sysram.
+>>>
+>>> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>>>
+>>
+>> I could not get the suspend to ram working on my Odroid-XU4.
 >
-> For a little while now the RPi B has been failing to boot using the
-> bcm2835 defconfig in -next:
+> Correct, resuming from suspend to RAM does not work on Exynos5422
+> (yet). The patch does not add support for it. I did not write that it
+> works. The only thing patch does, is fixing the imprecise abort during
+> suspend.
 >
->>      bcm2835_defconfig:
->>          bcm2835-rpi-b:
->>              lab-baylibre-seattle: failing since 5 days (last pass: next-20180718 - first fail: next-20180719)
->>          bcm2837-rpi-3-b:
->>              lab-baylibre: failing since 5 days (last pass: next-20180718 - first fail: next-20180719)
-> It's working fine on arm64, whatever's going on appears to be specific
-> to this config (it's not getting booted with any other 32 bit configs).
-> Full info and boot logs for one of the boards here:
->
->     https://kernelci.org/boot/id/5b58416759b514139596baae/
->
-> it looks like it hangs somewhere shortly after or during initializing
-> MMC so never makes it to the console, the tail of the failing logs looks
-> like:
->
-> | 09:18:36.332120  [    1.459801] mmc1: queuing unknown CIS tuple 0x80 (7 bytes)
-> | 09:18:36.345711  [    1.467585] mmcblk0: mmc0:59b4 USD   7.51 GiB
-> | 09:18:36.346169  [    1.474834]  mmcblk0: p1
-> | 09:18:36.410184  [    1.539600] random: fast init done
-> | 09:18:36.458065  [    1.578056] mmc1: new high speed SDIO card at address 0001
-> | 09:20:39.745370  ShellCommand command timed out.: Sending # in case of corruption. Connection timeout 00:04:10, retry in 00:02:05
-> | 09:20:39.846848  #
->
-> but like I say the same -next boots with arm64 defconfig.
->
+> Best regards,
+> Krzysztof
 
-There is at least 1 difference between bcm2835_defconfig and arm64 
-defconfig. bcm2835_defconfig uses DMA
+Ok thanks for the input.
 
-[ 1.265671] sdhost-bcm2835 3f202000.mmc: loaded - DMA enabled (>1)
-
-while arm64 defconfig uses PIO mode for SD interface mmc0 (please ignore 
-mmc1 since it's the onboard wifi and it uses a different driver):
-
-[ 1.907766] sdhost-bcm2835 3f202000.mmc: unable to initialise DMA 
-channel. Falling back to PIO
-[ 1.995407] sdhost-bcm2835 3f202000.mmc: loaded - DMA disabled
-
-The reason for this output is expected, because the DMA driver isn't 
-build-in for this config.
-
-I think this issue is DMA related.
-
-Regards Stefan
+Best Regards
+-Anand
