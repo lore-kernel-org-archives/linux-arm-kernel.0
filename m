@@ -1,40 +1,152 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 26 Jul 2018 09:36:55 -0700
-Subject: [PATCH v10 00/10] drivers: Introduce firmware dnd clock river for
- ZynqMP core
-In-Reply-To: <19376df2-fdd4-12e3-da4c-37106fffed19@xilinx.com>
-References: <1531857547-16652-1-git-send-email-jollys@xilinx.com>
- <2c3aad45-37ce-2446-4b90-bddb477286ed@xilinx.com>
- <CY1PR02MB2138E21A3FFBD5FEEAA7D6D4B8550@CY1PR02MB2138.namprd02.prod.outlook.com>
- <19376df2-fdd4-12e3-da4c-37106fffed19@xilinx.com>
-Message-ID: <153262301567.48062.15432354725863055071@swboyd.mtv.corp.google.com>
+From: alex@ghiti.fr (Alex Ghiti)
+Date: Thu, 26 Jul 2018 16:46:20 +0000
+Subject: [PATCH v4 00/11] hugetlb: Factorize hugetlb architecture
+ primitives
+In-Reply-To: <20180726171355.Horde.KlFUG9wXmbRDCiyhk5bHsw8@messagerie.si.c-s.fr>
+References: <20180705110716.3919-1-alex@ghiti.fr>
+ <20180709141621.GD22297@dhcp22.suse.cz>
+ <2173685f-7f85-7acb-4685-2383210c5fa2@ghiti.fr>
+ <87d0vehx16.fsf@concordia.ellerman.id.au>
+ <67aba0f0-c0d4-b06f-5fbc-f4d113ce5033@ghiti.fr>
+ <20180726171355.Horde.KlFUG9wXmbRDCiyhk5bHsw8@messagerie.si.c-s.fr>
+Message-ID: <58887adf-1852-4291-08aa-a1dd2007326b@ghiti.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Michal Simek (2018-07-25 02:51:14)
-> On 24.7.2018 20:14, Jolly Shah wrote:
-> >>>  create mode 100644 drivers/firmware/xilinx/zynqmp-debug.h
-> >>>  create mode 100644 drivers/firmware/xilinx/zynqmp.c  create mode
-> >>> 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
-> >>>  create mode 100644 include/linux/firmware/xlnx-zynqmp.h
-> >>>
-> >>
-> >> It looks pretty calm over the last several series that's why when I get an answer
-> >> from Stephen or Mike I will take this series via my tree and arm-soc tree.
-> >>
-> >> I have applied 01-08 here
-> >>  https://github.com/Xilinx/linux-xlnx/commits/zynqmp/soc
-> >>
-> >> Thanks,
-> >> Michal
-> > 
-> > 
-> > Thanks for merging the patches. 
-> > By mistake I added ?Reviewed-by: Stephen Boyd sboyd at kernel.org? for firmware bindings (Patch01).  Stephen had reviewed clock bindings only.  Please suggest if I should send a new version with that fix.
-> 
-> I have fixed that in my branch and I have asked Shephen to look at clk
-> over chat.
-> 
+Hi Christophe,
 
-I have some unresolved review comments on v9. I'll give reviewed-by when
-that discussion is resolved.
+Sorry, I should have done it already: with and without huge page 
+activated, the build for mpc885_ads_defconfig is OK.
+
+Thanks,
+
+Alex
+
+On 07/26/2018 03:13 PM, LEROY Christophe wrote:
+> Alex Ghiti <alex@ghiti.fr> a ?crit?:
+>
+>> Hi everyone,
+>>
+>> This is the result of the build for all arches tackled in this series 
+>> rebased on 4.18-rc6:
+>>
+>> arm:
+>> ??????? versatile_defconfig: without huge page OK
+>> ??????? keystone_defconfig: with huge page OK
+>> arm64:
+>> ??????? defconfig: with huge page OK
+>> ia64:
+>> ??????? generic_defconfig: with huge page OK
+>> mips:
+>> ??????? Paul Burton tested cavium octeon with huge page OK
+>> parisc:
+>> ??????? generic-64bit_defconfig: with huge page does not link
+>> ??????? generic-64bit_defconfig: without huge page does not link
+>> ??????? BUT not because of this series, any feedback welcome.
+>> powerpc:
+>> ??????? ppc64_defconfig: without huge page OK
+>> ??????? ppc64_defconfig: with huge page OK
+>
+> Can you also test ppc32 both with and without hugepage 
+> (mpc885_ads_defconfig)
+>
+> Thanks
+> Christophe
+>
+>> sh:
+>> ??????? dreamcast_defconfig: with huge page OK
+>> sparc:
+>> ??????? sparc32_defconfig: without huge page OK
+>> sparc64:
+>> ??????? sparc64_defconfig: with huge page OK
+>> x86:
+>> ??????? with huge page OK
+>>
+>> Alex
+>>
+>> On 07/23/2018 02:00 PM, Michael Ellerman wrote:
+>>> Alex Ghiti <alex@ghiti.fr> writes:
+>>>
+>>>> Does anyone have any suggestion about those patches ?
+>>> Cross compiling it for some non-x86 arches would be a good start :)
+>>>
+>>> There are cross compilers available here:
+>>>
+>>> ? https://mirrors.edge.kernel.org/pub/tools/crosstool/
+>>>
+>>>
+>>> cheers
+>>>
+>>>> On 07/09/2018 02:16 PM, Michal Hocko wrote:
+>>>>> [CC hugetlb guys - 
+>>>>> http://lkml.kernel.org/r/20180705110716.3919-1-alex at ghiti.fr]
+>>>>>
+>>>>> On Thu 05-07-18 11:07:05, Alexandre Ghiti wrote:
+>>>>>> In order to reduce copy/paste of functions across architectures 
+>>>>>> and then
+>>>>>> make riscv hugetlb port (and future ports) simpler and smaller, this
+>>>>>> patchset intends to factorize the numerous hugetlb primitives 
+>>>>>> that are
+>>>>>> defined across all the architectures.
+>>>>>>
+>>>>>> Except for prepare_hugepage_range, this patchset moves the 
+>>>>>> versions that
+>>>>>> are just pass-through to standard pte primitives into
+>>>>>> asm-generic/hugetlb.h by using the same #ifdef semantic that can be
+>>>>>> found in asm-generic/pgtable.h, i.e. __HAVE_ARCH_***.
+>>>>>>
+>>>>>> s390 architecture has not been tackled in this serie since it 
+>>>>>> does not
+>>>>>> use asm-generic/hugetlb.h at all.
+>>>>>> powerpc could be factorized a bit more (cf huge_ptep_set_wrprotect).
+>>>>>>
+>>>>>> This patchset has been compiled on x86 only.
+>>>>>>
+>>>>>> Changelog:
+>>>>>>
+>>>>>> v4:
+>>>>>> ?? Fix powerpc build error due to misplacing of #include
+>>>>>> ?? <asm-generic/hugetlb.h> outside of #ifdef CONFIG_HUGETLB_PAGE, as
+>>>>>> ?? pointed by Christophe Leroy.
+>>>>>>
+>>>>>> v1, v2, v3:
+>>>>>> ?? Same version, just problems with email provider and misuse of
+>>>>>> ?? --batch-size option of git send-email
+>>>>>>
+>>>>>> Alexandre Ghiti (11):
+>>>>>> ?? hugetlb: Harmonize hugetlb.h arch specific defines with pgtable.h
+>>>>>> ?? hugetlb: Introduce generic version of hugetlb_free_pgd_range
+>>>>>> ?? hugetlb: Introduce generic version of set_huge_pte_at
+>>>>>> ?? hugetlb: Introduce generic version of huge_ptep_get_and_clear
+>>>>>> ?? hugetlb: Introduce generic version of huge_ptep_clear_flush
+>>>>>> ?? hugetlb: Introduce generic version of huge_pte_none
+>>>>>> ?? hugetlb: Introduce generic version of huge_pte_wrprotect
+>>>>>> ?? hugetlb: Introduce generic version of prepare_hugepage_range
+>>>>>> ?? hugetlb: Introduce generic version of huge_ptep_set_wrprotect
+>>>>>> ?? hugetlb: Introduce generic version of huge_ptep_set_access_flags
+>>>>>> ?? hugetlb: Introduce generic version of huge_ptep_get
+>>>>>>
+>>>>>> ? arch/arm/include/asm/hugetlb-3level.h??????? | 32 +---------
+>>>>>> ? arch/arm/include/asm/hugetlb.h?????????????? | 33 +----------
+>>>>>> ? arch/arm64/include/asm/hugetlb.h???????????? | 39 +++---------
+>>>>>> ? arch/ia64/include/asm/hugetlb.h????????????? | 47 ++-------------
+>>>>>> ? arch/mips/include/asm/hugetlb.h????????????? | 40 +++----------
+>>>>>> ? arch/parisc/include/asm/hugetlb.h??????????? | 33 +++--------
+>>>>>> ? arch/powerpc/include/asm/book3s/32/pgtable.h |? 2 +
+>>>>>> ? arch/powerpc/include/asm/book3s/64/pgtable.h |? 1 +
+>>>>>> ? arch/powerpc/include/asm/hugetlb.h?????????? | 43 ++------------
+>>>>>> ? arch/powerpc/include/asm/nohash/32/pgtable.h |? 2 +
+>>>>>> ? arch/powerpc/include/asm/nohash/64/pgtable.h |? 1 +
+>>>>>> ? arch/sh/include/asm/hugetlb.h??????????????? | 54 
+>>>>>> ++---------------
+>>>>>> ? arch/sparc/include/asm/hugetlb.h???????????? | 40 +++----------
+>>>>>> ? arch/x86/include/asm/hugetlb.h?????????????? | 72 
+>>>>>> +----------------------
+>>>>>> ? include/asm-generic/hugetlb.h??????????????? | 88 
+>>>>>> +++++++++++++++++++++++++++-
+>>>>>> ? 15 files changed, 143 insertions(+), 384 deletions(-)
+>>>>>>
+>>>>>> -- 
+>>>>>> 2.16.2
+>
+>
