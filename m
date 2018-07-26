@@ -1,49 +1,59 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 26 Jul 2018 12:41:31 +0200
-Subject: [PATCH v7 4/6] dt-bindings: mailbox: imx-mu: add i.MX6SX and
- i.MX7S SoCs.
-In-Reply-To: <CABb+yY32vBy5qVYsQ6u45=rV6gEggqKy3Jqn1B4oWHaGfTyQ8Q@mail.gmail.com>
-References: <20180726065331.6186-1-o.rempel@pengutronix.de>
- <20180726065331.6186-5-o.rempel@pengutronix.de>
- <CABb+yY32vBy5qVYsQ6u45=rV6gEggqKy3Jqn1B4oWHaGfTyQ8Q@mail.gmail.com>
-Message-ID: <1532601691.32306.28.camel@pengutronix.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 26 Jul 2018 11:44:58 +0100
+Subject: [PATCH 1/2] signal: Introduce COMPAT_SIGMINSTKSZ for use in
+ compat_sys_sigaltstack
+In-Reply-To: <20180725163726.GE6866@arm.com>
+References: <1532526312-26993-1-git-send-email-will.deacon@arm.com>
+ <1532526312-26993-2-git-send-email-will.deacon@arm.com>
+ <20180725155427.GR4240@e103592.cambridge.arm.com>
+ <20180725163726.GE6866@arm.com>
+Message-ID: <20180726104456.GT4240@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
-
-Am Donnerstag, den 26.07.2018, 15:25 +0530 schrieb Jassi Brar:
-> On Thu, Jul 26, 2018 at 12:23 PM, Oleksij Rempel
-> > <o.rempel@pengutronix.de> wrote:
-> > This are currently tested SoCs with imx-mailbox driver.
+On Wed, Jul 25, 2018 at 05:37:26PM +0100, Will Deacon wrote:
+> On Wed, Jul 25, 2018 at 04:54:27PM +0100, Dave Martin wrote:
+> > On Wed, Jul 25, 2018 at 02:45:11PM +0100, Will Deacon wrote:
+> > > @@ -3476,7 +3478,8 @@ int restore_altstack(const stack_t __user *uss)
+> > >  	stack_t new;
+> > >  	if (copy_from_user(&new, uss, sizeof(stack_t)))
+> > >  		return -EFAULT;
+> > > -	(void)do_sigaltstack(&new, NULL, current_user_stack_pointer());
+> > > +	(void)do_sigaltstack(&new, NULL, current_user_stack_pointer(),
+> > > +			     MINSIGSTKSZ);
 > > 
-> > > > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> > ---
-> > ?Documentation/devicetree/bindings/mailbox/fsl,mu.txt | 2 +-
-> > ?1 file changed, 1 insertion(+), 1 deletion(-)
+> > Why can't this fail?
 > > 
-> > diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> > index 113d6ab931ef..5616d2afca45 100644
-> > --- a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> > +++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> > @@ -18,7 +18,7 @@ Messaging Unit Device Node:
-> > ?Required properties:
-> > ?-------------------
-> > ?- compatible : should be "fsl,<chip>-mu", the supported chips include
-> > -???????????????imx8qxp, imx8qm.
-> > +???????????????imx6sx, imx7s, imx8qxp, imx8qm.
+> > If this fails here we silently go wrong, but...
 > > 
+> > >  	/* squash all but EFAULT for now */
+> > >  	return 0;
+> > >  }
+> > > @@ -3510,7 +3513,8 @@ static int do_compat_sigaltstack(const compat_stack_t __user *uss_ptr,
+> > >  		uss.ss_size = uss32.ss_size;
+> > >  	}
+> > >  	ret = do_sigaltstack(uss_ptr ? &uss : NULL, &uoss,
+> > > -			     compat_user_stack_pointer());
+> > > +			     compat_user_stack_pointer(),
+> > > +			     COMPAT_MINSIGSTKSZ);
+> > 
+> > If this fails on arm64, we seem to SEGV (see compat_sys_rt_sigreturn()).
+> > 
+> > This patch doesn't introduce this inconsistency, this might be a good
+> > opportunity to clean it up.
 > 
-> This is not scalable. Do we add every new SoC that contains the same controller?
+> I don't think there's an inconsistency here -- both restore_altstack and
+> compat_restore_altstack suppress all non--EFAULT errors (remember that uoss
+> is NULL in both cases, so the copy_from_user() immediately before the
+> do_sigaltstack() call for the native path is all we care about). I think the
+> behaviour is: on a sigreturn, if you set the altstack to be an unmapped
+> address then you get a SEGV, otherwise if you make it invalid in some other
+> way (e.g. too small) then it's ignored and the old altstack remains intact.
 
-Yes, we do. This is a policy direction from the DT maintainers. If we
-ever going to want to validate DTs against the binding, all compatibles
-used in the DTs must be specified in the binding.
+OK, I think I've satisfied myself that they do the same thing for now.
 
-As we can't really tell if the controller is exactly the same or even
-has some SoC integration bugs, we generally add a new compatible for
-each SoC to key off any workarounds necessary in the driver without the
-need to change the DTs, breaking compatibility.
+The code for the paths is a bit different, so it's not trivial to see
+that they have the same effect...
 
-Regards,
-Lucas
+Cheers
+---Dave
