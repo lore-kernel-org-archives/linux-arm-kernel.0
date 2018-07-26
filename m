@@ -1,48 +1,100 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 26 Jul 2018 09:14:26 +0800
-Subject: [PATCH v2 1/3] dt-binding: mmc: sunxi: add H6 compatible (with
- A64 fallback)
-In-Reply-To: <20180719042810.6546-2-icenowy@aosc.io>
-References: <20180719042810.6546-1-icenowy@aosc.io>
- <20180719042810.6546-2-icenowy@aosc.io>
-Message-ID: <8520892860b672631ffc99f6318c2aeba251dc2e.camel@aosc.io>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Thu, 26 Jul 2018 01:50:35 +0000
+Subject: [PATCH V4 0/9] clk: add imx7ulp clk support
+In-Reply-To: <1531921023-18497-1-git-send-email-aisheng.dong@nxp.com>
+References: <1531921023-18497-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <AM0PR04MB421169829CFE1A6A32DCC209802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018-07-19?? 12:28 +0800?Icenowy Zheng???
-> The MMC controllers on H6 is similar to the ones on A64, but with
-> some
-> new features.
-> 
-> Add compatible strings for them (with the A64 compatible strings as
-> fallback, in order to make them to work with A64 drivers).
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> Changes in v2:
-> - Add A64 fallback.
-> 
->  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> index 132e0007d7d6..e9cb3ec5e502 100644
-> --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> @@ -16,6 +16,8 @@ Required properties:
->     * "allwinner,sun9i-a80-mmc"
->     * "allwinner,sun50i-a64-emmc"
->     * "allwinner,sun50i-a64-mmc"
-> +   * "allwinner,sun50i-h6-emmc", "allwinner.sun50i-a64-emmc"
-> +   * "allwinner,sun50i-h6-mmc", "allwinner.sun50i-a64-mmc"
+Hi Stephen,
 
-BTW it seems that the driver performs quite bad on H6 when dealing it
-as an A64.
+Do you have a chance to look at it?
+This patch series has been pending for quite a long time without much comments.
 
-I get 1.5MB/s on a card, although the card can reach 20MB/s read speed
-(testing on BSP).
+Regards
+Dong Aisheng
 
->   - reg : mmc controller base registers
->   - clocks : a list with 4 phandle + clock specifier pairs
->   - clock-names : must contain "ahb", "mmc", "output" and "sample"
+> -----Original Message-----
+> From: A.s. Dong
+> Sent: Wednesday, July 18, 2018 9:37 PM
+> To: linux-clk at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org;
+> Anson Huang <anson.huang@nxp.com>; Jacky Bai <ping.bai@nxp.com>; dl-
+> linux-imx <linux-imx@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
+> Subject: [PATCH V4 0/9] clk: add imx7ulp clk support
+> 
+> This is a rebased version of below patch series against latest clk tree.
+> [PATCH RESEND V3 0/9] clk: add imx7ulp clk support
+> https://lkml.org/lkml/2018/3/16/310
+> 
+> This patch series intends to add imx7ulp clk support.
+> 
+> i.MX7ULP Clock functions are under joint control of the System Clock
+> Generation (SCG) modules, Peripheral Clock Control (PCC) modules, and
+> Core Mode Controller (CMC)1 blocks
+> 
+> The clocking scheme provides clear separation between M4 domain and A7
+> domain. Except for a few clock sources shared between two domains, such
+> as the System Oscillator clock, the Slow IRC (SIRC), and and the Fast IRC clock
+> (FIRCLK), clock sources and clock management are separated and contained
+> within each domain.
+> 
+> M4 clock management consists of SCG0, PCC0, PCC1, and CMC0 modules.
+> A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
+> 
+> Note: this series only adds A7 clock domain support as M4 clock domain will
+> be handled by M4 seperately.
+> 
+> Change Log:
+> v3->v4:
+>  * rebased to latest kernel
+>  * make scg and pcc separate nodes according to Rob's suggestion
+> 
+> v2->v3:
+>  * Patch 1 changed on: 1) split normal and gate ops 2) fix the possible racy
+>    Others no changes.
+> 
+> v1->v2:
+>  * add enable/disable for the type of CLK_DIVIDER_ZERO_GATE dividers
+>  * use clk_hw apis to register clocks
+>  * use of_clk_add_hw_provider
+>  * split the clocks register process into two parts: early part for possible
+>    timers clocks registered by CLK_OF_DECLARE_DRIVER and the later part for
+>    the left normal peripheral clocks registered by a platform driver.
+> 
+> Dong Aisheng (9):
+>   clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk support
+>   clk: fractional-divider: add CLK_FRAC_DIVIDER_ZERO_BASED flag support
+>   clk: imx: add pllv4 support
+>   clk: imx: add pfdv2 support
+>   clk: imx: add composite clk support
+>   dt-bindings: clock: add imx7ulp clock binding doc
+>   clk: imx: make mux parent strings const
+>   clk: imx: implement new clk_hw based APIs
+>   clk: imx: add imx7ulp clk driver
+> 
+>  .../devicetree/bindings/clock/imx7ulp-clock.txt    |  87 +++++++++
+>  drivers/clk/clk-divider.c                          | 152 +++++++++++++++
+>  drivers/clk/clk-fractional-divider.c               |  10 +
+>  drivers/clk/imx/Makefile                           |   6 +-
+>  drivers/clk/imx/clk-busy.c                         |   2 +-
+>  drivers/clk/imx/clk-composite.c                    |  85 +++++++++
+>  drivers/clk/imx/clk-fixup-mux.c                    |   2 +-
+>  drivers/clk/imx/clk-imx7ulp.c                      | 209 +++++++++++++++++++++
+>  drivers/clk/imx/clk-pfdv2.c                        | 201 ++++++++++++++++++++
+>  drivers/clk/imx/clk-pllv4.c                        | 182 ++++++++++++++++++
+>  drivers/clk/imx/clk.c                              |  22 +++
+>  drivers/clk/imx/clk.h                              |  92 ++++++++-
+>  include/dt-bindings/clock/imx7ulp-clock.h          | 109 +++++++++++
+>  include/linux/clk-provider.h                       |  17 ++
+>  14 files changed, 1166 insertions(+), 10 deletions(-)  create mode 100644
+> Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
+>  create mode 100644 drivers/clk/imx/clk-composite.c  create mode 100644
+> drivers/clk/imx/clk-imx7ulp.c  create mode 100644 drivers/clk/imx/clk-
+> pfdv2.c  create mode 100644 drivers/clk/imx/clk-pllv4.c  create mode 100644
+> include/dt-bindings/clock/imx7ulp-clock.h
+> 
+> --
+> 2.7.4
