@@ -1,53 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 26 Jul 2018 10:13:23 +0200
-Subject: [PATCH] [stable 4.4] ARM: fix put_user() for gcc-8
-In-Reply-To: <20180726081358.3829157-1-arnd@arndb.de>
-References: <20180726081358.3829157-1-arnd@arndb.de>
-Message-ID: <20180726081358.3829157-2-arnd@arndb.de>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Thu, 26 Jul 2018 08:16:07 +0000
+Subject: [PATCH v7 4/6] dt-bindings: mailbox: imx-mu: add i.MX6SX and
+ i.MX7S SoCs.
+In-Reply-To: <20180726065331.6186-5-o.rempel@pengutronix.de>
+References: <20180726065331.6186-1-o.rempel@pengutronix.de>
+ <20180726065331.6186-5-o.rempel@pengutronix.de>
+Message-ID: <AM0PR04MB4211DA52A4902A9F7C99A77C802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building kernels before linux-4.7 with gcc-8 results in many build failures
-when gcc triggers a check that was meant to catch broken compilers:
+> -----Original Message-----
+> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
+> Sent: Thursday, July 26, 2018 2:53 PM
+> To: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
+> <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark
+> Rutland <mark.rutland@arm.com>; A.s. Dong <aisheng.dong@nxp.com>;
+> Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>; Jassi Brar
+> <jassisinghbrar@gmail.com>
+> Cc: Oleksij Rempel <o.rempel@pengutronix.de>; kernel at pengutronix.de;
+> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; dl-linux-
+> imx <linux-imx@nxp.com>
+> Subject: [PATCH v7 4/6] dt-bindings: mailbox: imx-mu: add i.MX6SX and
+> i.MX7S SoCs.
+> 
+> This are currently tested SoCs with imx-mailbox driver.
+> 
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 
-/tmp/ccCGMQmS.s:648: Error: .err encountered
+Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-According to the discussion in the gcc bugzilla, a local "register
-asm()" variable is still supposed to be the correct way to force an
-inline assembly to use a particular register, but marking it 'const'
-lets the compiler do optimizations that break that, i.e the compiler is
-free to treat the variable as either 'const' or 'register' in that case.
-
-Upstream commit 9f73bd8bb445 ("ARM: uaccess: remove put_user() code
-duplication") fixed this problem in linux-4.8 as part of a larger change,
-but seems a little too big to be backported to 4.4.
-
-Let's take the simplest fix and change only the one broken line in the
-same way as newer kernels.
-
-Suggested-by: Bernd Edlinger <bernd.edlinger@hotmail.de>
-Link: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85745
-Link: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=86673
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-This should also apply to older kernels before 4.4, but I did not try that.
-Presumably they have additional problems with modern compilers anyway.
-
- arch/arm/include/asm/uaccess.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 35c9db857ebe..cd8b589111ba 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -251,7 +251,7 @@ extern int __put_user_8(void *, unsigned long long);
- 	({								\
- 		unsigned long __limit = current_thread_info()->addr_limit - 1; \
- 		const typeof(*(p)) __user *__tmp_p = (p);		\
--		register const typeof(*(p)) __r2 asm("r2") = (x);	\
-+		register typeof(*(p)) __r2 asm("r2") = (x);	\
- 		register const typeof(*(p)) __user *__p asm("r0") = __tmp_p; \
- 		register unsigned long __l asm("r1") = __limit;		\
- 		register int __e asm("r0");				\
--- 
-2.18.0
+Regards
+Dong Aisheng
