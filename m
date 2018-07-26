@@ -1,101 +1,38 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 26 Jul 2018 11:14:56 +0200
-Subject: [PATCH v8 07/26] PM / Domains: Add genpd governor for CPUs
-In-Reply-To: <3574880.GjmnMm1lMq@aspire.rjw.lan>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <20180620172226.15012-8-ulf.hansson@linaro.org>
- <3574880.GjmnMm1lMq@aspire.rjw.lan>
-Message-ID: <10360149.m4MlxDWZY5@aspire.rjw.lan>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Thu, 26 Jul 2018 11:22:18 +0200
+Subject: [PATCH v8 4/6] regulator: pfuze100: add fsl,
+ pmic-stby-poweroff property
+In-Reply-To: <20180726092220.17250-1-o.rempel@pengutronix.de>
+References: <20180726092220.17250-1-o.rempel@pengutronix.de>
+Message-ID: <20180726092220.17250-5-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 19, 2018 12:32:52 PM CEST Rafael J. Wysocki wrote:
-> On Wednesday, June 20, 2018 7:22:07 PM CEST Ulf Hansson wrote:
-> > As it's now perfectly possible that a PM domain managed by genpd contains
-> > devices belonging to CPUs, we should start to take into account the
-> > residency values for the idle states during the state selection process.
-> > The residency value specifies the minimum duration of time, the CPU or a
-> > group of CPUs, needs to spend in an idle state to not waste energy entering
-> > it.
-> > 
-> > To deal with this, let's add a new genpd governor, pm_domain_cpu_gov, that
-> > may be used for a PM domain that have CPU devices attached or if the CPUs
-> > are attached through subdomains.
-> > 
-> > The new governor computes the minimum expected idle duration time for the
-> > online CPUs being attached to the PM domain and its subdomains. Then in the
-> > state selection process, trying the deepest state first, it verifies that
-> > the idle duration time satisfies the state's residency value.
-> > 
-> > It should be noted that, when computing the minimum expected idle duration
-> > time, we use the information from tick_nohz_get_next_wakeup(), to find the
-> > next wakeup for the related CPUs. Future wise, this may deserve to be
-> > improved, as there are more reasons to why a CPU may be woken up from idle.
-> > 
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > Cc: Lina Iyer <ilina@codeaurora.org>
-> > Cc: Frederic Weisbecker <fweisbec@gmail.com>
-> > Cc: Ingo Molnar <mingo@kernel.org>
-> > Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
-> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> > ---
-> >  drivers/base/power/domain_governor.c | 58 ++++++++++++++++++++++++++++
-> >  include/linux/pm_domain.h            |  2 +
-> >  2 files changed, 60 insertions(+)
-> > 
-> > diff --git a/drivers/base/power/domain_governor.c b/drivers/base/power/domain_governor.c
-> > index 99896fbf18e4..1aad55719537 100644
-> > --- a/drivers/base/power/domain_governor.c
-> > +++ b/drivers/base/power/domain_governor.c
-> > @@ -10,6 +10,9 @@
-> >  #include <linux/pm_domain.h>
-> >  #include <linux/pm_qos.h>
-> >  #include <linux/hrtimer.h>
-> > +#include <linux/cpumask.h>
-> > +#include <linux/ktime.h>
-> > +#include <linux/tick.h>
-> >  
-> >  static int dev_update_qos_constraint(struct device *dev, void *data)
-> >  {
-> > @@ -245,6 +248,56 @@ static bool always_on_power_down_ok(struct dev_pm_domain *domain)
-> >  	return false;
-> >  }
-> >  
-> > +static bool cpu_power_down_ok(struct dev_pm_domain *pd)
-> > +{
-> > +	struct generic_pm_domain *genpd = pd_to_genpd(pd);
-> > +	ktime_t domain_wakeup, cpu_wakeup;
-> > +	s64 idle_duration_ns;
-> > +	int cpu, i;
-> > +
-> > +	if (!(genpd->flags & GENPD_FLAG_CPU_DOMAIN))
-> > +		return true;
-> > +
-> > +	/*
-> > +	 * Find the next wakeup for any of the online CPUs within the PM domain
-> > +	 * and its subdomains. Note, we only need the genpd->cpus, as it already
-> > +	 * contains a mask of all CPUs from subdomains.
-> > +	 */
-> > +	domain_wakeup = ktime_set(KTIME_SEC_MAX, 0);
-> > +	for_each_cpu_and(cpu, genpd->cpus, cpu_online_mask) {
-> > +		cpu_wakeup = tick_nohz_get_next_wakeup(cpu);
-> > +		if (ktime_before(cpu_wakeup, domain_wakeup))
-> > +			domain_wakeup = cpu_wakeup;
-> > +	}
+Document the new optional "fsl,pmic-stby-poweroff" property.
 
-Here's a concern I have missed before. :-/
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/regulator/pfuze100.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Say, one of the CPUs you're walking here is woken up in the meantime.
-
-I don't think it is valid to evaluate tick_nohz_get_next_wakeup() for it then
-to update domain_wakeup.  We really should just avoid the domain power off in
-that case at all IMO.
-
-Sure enough, if the domain power off is already started and one of the CPUs
-in the domain is woken up then, too bad, it will suffer the latency (but in
-that case the hardware should be able to help somewhat), but otherwise CPU
-wakeup should prevent domain power off from being carried out.
-
-Thanks,
-Rafael
+diff --git a/Documentation/devicetree/bindings/regulator/pfuze100.txt b/Documentation/devicetree/bindings/regulator/pfuze100.txt
+index f0ada3b14d70..f3b922f5a11f 100644
+--- a/Documentation/devicetree/bindings/regulator/pfuze100.txt
++++ b/Documentation/devicetree/bindings/regulator/pfuze100.txt
+@@ -4,6 +4,13 @@ Required properties:
+ - compatible: "fsl,pfuze100", "fsl,pfuze200", "fsl,pfuze3000"
+ - reg: I2C slave address
+ 
++Optional properties:
++- fsl,pmic-stby-poweroff: if present, configure the PMIC to shutdown all
++  power rails when PMIC_STBY_REQ line is asserted during the power off sequence.
++  Use this option if the SoC should be powered off by external power
++  management IC (PMIC) on PMIC_STBY_REQ signal.
++  As opposite to PMIC_STBY_REQ boards can implement PMIC_ON_REQ signal.
++
+ Required child node:
+ - regulators: This is the list of child nodes that specify the regulator
+   initialization data for defined regulators. Please refer to below doc
+-- 
+2.18.0
