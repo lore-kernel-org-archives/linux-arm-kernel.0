@@ -1,45 +1,63 @@
-From: zhongjiang@huawei.com (zhong jiang)
-Date: Thu, 26 Jul 2018 09:51:30 +0800
-Subject: [RFC] mm: Do not look up the next level table when large page
- exist.
-In-Reply-To: <20180725165334.4zjsenp6p3cdureq@armageddon.cambridge.arm.com>
-References: <1532532119-59955-1-git-send-email-zhongjiang@huawei.com>
- <20180725165334.4zjsenp6p3cdureq@armageddon.cambridge.arm.com>
-Message-ID: <5B592922.1030204@huawei.com>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Thu, 26 Jul 2018 10:00:41 +0800
+Subject: [PATCH v3 00/23] Add multi-channel support to Armada thermal
+ driver
+In-Reply-To: <20180725095222.054f1e80@xps13>
+References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
+ <20180718172849.30b7cec0@xps13> <20180725095222.054f1e80@xps13>
+Message-ID: <1532570441.2358.27.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/7/26 0:53, Catalin Marinas wrote:
-> On Wed, Jul 25, 2018 at 11:21:59PM +0800, zhong jiang wrote:
->> show_pte can show the kernel page table and user page table. user
->> page table is totally four level table.
-> Well, you can have huge pages in user space.
- No, I have not.
->> but kernel page table can
->> be a large page. Therefore, it need to check the page table.
->>
->> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
->> ---
->>  arch/arm64/mm/fault.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->> index 1b40676..a397a54 100644
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -169,13 +169,13 @@ void show_pte(unsigned long addr)
->>  		pudp = pud_offset(pgdp, addr);
->>  		pud = READ_ONCE(*pudp);
->>  		pr_cont(", pud=%016llx", pud_val(pud));
->> -		if (pud_none(pud) || pud_bad(pud))
->> +		if (pud_none(pud) || pud_bad(pud) || pud_sect(pud))
-> Have you actually hit a problem with this code?
-  Not yet.  Maybe I use the function mistake.  It is only used for user and vmalloc
- pagefault.  It should be not handled with large level table.  thank you for time.
+On ?, 2018-07-25 at 09:52 +0200, Miquel Raynal wrote:
+> Hi Eduardo, Zhang,
+> 
+> Miquel Raynal <miquel.raynal@bootlin.com> wrote on Wed, 18 Jul 2018
+> 17:28:49 +0200:
+> 
+> > 
+> > Hi Eduardo,
+> > 
+> > Miquel Raynal <miquel.raynal@bootlin.com> wrote on Mon, 16 Jul 2018
+> > 16:41:43 +0200:
+> > 
+> > > 
+> > > The only capability of the Armada thermal driver is currently
+> > > just to
+> > > read one sensor (the default one) per AP and one per CP.
+> > > Actually,
+> > > there is one sensor per core in the AP806 plus one sensor in the
+> > > thermal IP itself. The CP110 just features one thermal sensor in
+> > > its
+> > > own thermal IP.
+> > > 
+> > > This series first improves the readability of this driver, then
+> > > adds
+> > > support for multi-channel thermal IPs. The bindings and the
+> > > device-trees are updated accordingly.
+> > > 
+> > > Thank you,
+> > > Miqu?l??
+> > I know I sent this series on monday but there was almost no change
+> > on
+> > it (see below), do you think you will have the time to look at it
+> > before it's too late for the merge window?
+> I know a little bit what it is to be on the maintainer side of a
+> subsystem but these changes are laying since April, 21st and I really
+> expect to get them merged. Zhang, as Eduardo seems to be overloaded
+> this release, could you please take the series?
+> 
+> Of course if there are things to address I'll be happy to do so.
+> 
+I had a sync with Eduardo during last merge window, and we agreed to
+send separate git pull requests to Linus since this release and see how
+it works.
+This means that all the soc thermal driver patches should go to
+Eduardo' tree and then Linus' tree directly.
 
- Thanks,
- zhong jiang
-> pud_sect() checks that the bottom two bits of the pud are 0b01.
-> pud_bad() is true when bit 1 is 0, which is the case with a section
-> mapping.
->
+Anyway, let's ping Eduardo and see if he can review/take the patches.
+
+thanks,
+rui
+> Thanks,
+> Miqu?l
