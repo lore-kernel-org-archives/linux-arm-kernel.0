@@ -1,116 +1,76 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 26 Jul 2018 23:20:52 +0300
-Subject: [PATCH v2 01/10] drm/atomic: Add __drm_atomic_helper_plane_reset
-In-Reply-To: <20180726161756.1794-2-alexandru-cosmin.gheorghe@arm.com>
-References: <20180726161756.1794-1-alexandru-cosmin.gheorghe@arm.com>
- <20180726161756.1794-2-alexandru-cosmin.gheorghe@arm.com>
-Message-ID: <2271754.L0ZicdVV5V@avalon>
+From: drivshin@awxrd.com (David Rivshin)
+Date: Thu, 26 Jul 2018 16:37:05 -0400
+Subject: [PATCH v2] pwm: pwm-omap-dmtimer: return -EPROBE_DEFER if no
+ dmtimer platform data
+In-Reply-To: <20180726185426.GA3546@lenoch>
+References: <20180726133658.23902-1-drivshin@awxrd.com>
+ <20180726185426.GA3546@lenoch>
+Message-ID: <20180726163705.4981d44a.drivshin@awxrd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandru,
+On Thu, 26 Jul 2018 20:54:26 +0200
+Ladislav Michl <ladis@linux-mips.org> wrote:
 
-Thank you for the patch.
-
-On Thursday, 26 July 2018 19:17:47 EEST Alexandru Gheorghe wrote:
-> There are a lot of drivers that subclass drm_plane_state, all of them
-> duplicate the code that links toghether the plane with plane_state.
-
-s/toghether/together/
-
-> On top of that, drivers that enable core properties also have to
-> duplicate the code for initializing the properties to their default
-> values, which in all cases are the same as the defaults from core.
+> On Thu, Jul 26, 2018 at 09:36:58AM -0400, David Rivshin wrote:
+> > From: David Rivshin <DRivshin@allworx.com>
+> > 
+> > If a pwm-omap-dmtimer is probed before the dmtimer it uses, the platform
+> > data won't be set yet.
+> > 
+> > Fixes: ac30751df953 ("ARM: OMAP: pdata-quirks: Remove unused timer pdata")
+> > Cc: <stable@vger.kernel.org> # 4.17+
+> > Signed-off-by: David Rivshin <drivshin@allworx.com>
+> > Acked-by: Pavel Machek <pavel@ucw.cz>
+> > Tested-by: Pavel Machek <pavel@ucw.cz>
+> > ---
+> > Changes in v2:
+> > * Added Pavel's Acked-by/Tested-by [1]
+> > 
+> > [1] https://lkml.org/lkml/2018/7/16/346
+> > 
+> >  drivers/pwm/pwm-omap-dmtimer.c | 5 +++--
+> >  1 file changed, 3 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+> > index 665da3c8fbceb..d3d7ea7a53146 100644
+> > --- a/drivers/pwm/pwm-omap-dmtimer.c
+> > +++ b/drivers/pwm/pwm-omap-dmtimer.c
+> > @@ -264,8 +264,9 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+> >  
+> >  	timer_pdata = dev_get_platdata(&timer_pdev->dev);
+> >  	if (!timer_pdata) {
+> > -		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+> > -		ret = -EINVAL;
+> > +		dev_info(&pdev->dev,
+> > +			 "dmtimer pdata structure NULL, deferring probe\n");  
 > 
-> Change since v1:
-> - Make it consistent with the other helpers and require that both
->   plane and state not be NULL, suggested by Boris Brezillon and
->   Philipp Zabel.
+> This seems to be a bit verbose for EPROBE_DEFER case. Could we either remove
+> it as it is done later in pdata->request_by_node(timer) failure case or at
+> least make it dev_dbg? Otherwise thank you and with mentioned change
+> Acked-by: Ladislav Michl <ladis@linux-mips.org>
+
+Hi Ladislav, thanks for the review.
+
+I had grepped through other drivers and found no consistent pattern. Some
+places used dev_err still, others reduced to one of dev_{warn,info,dbg}, 
+and others no message at all. Some messages mentioned they are deferring 
+the probe, other didn't. I was already getting a couple of dev_info from 
+the pinctrl core code, so I went that way. I figured the message might be
+useful to someone, but I don't feel strongly.
+
+I personally would lean to dev_dbg if you think dev_info is too harsh, 
+just in case someone's board suddenly isn't working after upgrade. But 
+I'm certainly willing to remove the message entirely if you feel strongly,
+or anyone else cares to weigh in.
+
+
 > 
-> Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
-> ---
->  drivers/gpu/drm/drm_atomic_helper.c | 31 ++++++++++++++++++++---------
->  include/drm/drm_atomic_helper.h     |  2 ++
->  2 files changed, 24 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/drm_atomic_helper.c
-> b/drivers/gpu/drm/drm_atomic_helper.c index 866a2cc72ef6..7f5aafc5b1a0
-> 100644
-> --- a/drivers/gpu/drm/drm_atomic_helper.c
-> +++ b/drivers/gpu/drm/drm_atomic_helper.c
-> @@ -3552,6 +3552,26 @@ void drm_atomic_helper_crtc_destroy_state(struct
-> drm_crtc *crtc, }
->  EXPORT_SYMBOL(drm_atomic_helper_crtc_destroy_state);
-> 
-> +/**
-> + * __drm_atomic_helper_plane_reset - resets planes state to default values
-> + * @plane: plane object, must not be NULL
-> + * @state: atomic plane state, must not be NULL
-> + *
-> + * Initializes plane state to default. This is useful for drivers that
-> subclass
-> + * the plane state.
-> + */
-> +void __drm_atomic_helper_plane_reset(struct drm_plane *plane,
-> +				     struct drm_plane_state *state)
-> +{
-> +	state->plane = plane;
-> +	state->rotation = DRM_MODE_ROTATE_0;
-
-Nitpicking, I'd keep the blank line here to make the code a bit easier to read
-
-> +	/* Reset the alpha value to fully opaque if it matters */
-> +	if (plane->alpha_property)
-> +		state->alpha = plane->alpha_property->values[1];
-
-And here too.
-
-Apart from that,
-
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> +	plane->state = state;
-> +}
-> +EXPORT_SYMBOL(__drm_atomic_helper_plane_reset);
-> +
->  /**
->   * drm_atomic_helper_plane_reset - default &drm_plane_funcs.reset hook for
-> planes * @plane: drm plane
-> @@ -3566,15 +3586,8 @@ void drm_atomic_helper_plane_reset(struct drm_plane
-> *plane)
-> 
->  	kfree(plane->state);
->  	plane->state = kzalloc(sizeof(*plane->state), GFP_KERNEL);
-> -
-> -	if (plane->state) {
-> -		plane->state->plane = plane;
-> -		plane->state->rotation = DRM_MODE_ROTATE_0;
-> -
-> -		/* Reset the alpha value to fully opaque if it matters */
-> -		if (plane->alpha_property)
-> -			plane->state->alpha = plane->alpha_property->values[1];
-> -	}
-> +	if (plane->state)
-> +		__drm_atomic_helper_plane_reset(plane, plane->state);
->  }
->  EXPORT_SYMBOL(drm_atomic_helper_plane_reset);
-> 
-> diff --git a/include/drm/drm_atomic_helper.h
-> b/include/drm/drm_atomic_helper.h index 99e2a5297c69..f4c7ed876c97 100644
-> --- a/include/drm/drm_atomic_helper.h
-> +++ b/include/drm/drm_atomic_helper.h
-> @@ -156,6 +156,8 @@ void __drm_atomic_helper_crtc_destroy_state(struct
-> drm_crtc_state *state); void drm_atomic_helper_crtc_destroy_state(struct
-> drm_crtc *crtc,
->  					  struct drm_crtc_state *state);
-> 
-> +void __drm_atomic_helper_plane_reset(struct drm_plane *plane,
-> +				     struct drm_plane_state *state);
->  void drm_atomic_helper_plane_reset(struct drm_plane *plane);
->  void __drm_atomic_helper_plane_duplicate_state(struct drm_plane *plane,
->  					       struct drm_plane_state *state);
-
--- 
-Regards,
-
-Laurent Pinchart
+> > +		ret = -EPROBE_DEFER;
+> >  		goto put;
+> >  	}
+> >  
+> > 
+> > base-commit: d72e90f33aa4709ebecc5005562f52335e106a60
+> > -- 
+> > 2.17.1  
