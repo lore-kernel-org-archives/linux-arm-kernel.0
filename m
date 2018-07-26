@@ -1,86 +1,149 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Jul 2018 14:20:06 +0100
-Subject: [PATCH 6/6] ARM: spectre-v1: mitigate user accesses
-In-Reply-To: <20180726124900.syqvsltidm4c2oud@lakrids.cambridge.arm.com>
-References: <20180710141322.GL17271@n2100.armlinux.org.uk>
- <E1fctPA-0005vT-QX@rmk-PC.armlinux.org.uk>
- <20180726124900.syqvsltidm4c2oud@lakrids.cambridge.arm.com>
-Message-ID: <20180726132006.GY17271@n2100.armlinux.org.uk>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 26 Jul 2018 14:23:07 +0100
+Subject: [RFC PATCH 16/16] KVM: arm64/sve: Report and enable SVE API
+ extensions for userspace
+In-Reply-To: <20180719152420.mvzd5zjkm47ujdlj@kamzik.brq.redhat.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-17-git-send-email-Dave.Martin@arm.com>
+ <20180719152420.mvzd5zjkm47ujdlj@kamzik.brq.redhat.com>
+Message-ID: <20180726132307.GY4240@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 01:49:00PM +0100, Mark Rutland wrote:
-> On Tue, Jul 10, 2018 at 03:14:12PM +0100, Russell King wrote:
-> > Spectre variant 1 attacks are about this sequence of pseudo-code:
+On Thu, Jul 19, 2018 at 05:24:20PM +0200, Andrew Jones wrote:
+> On Thu, Jun 21, 2018 at 03:57:40PM +0100, Dave Martin wrote:
+> > This patch reports the availability of KVM SVE support to userspace
+> > via a new vcpu feature flag KVM_ARM_VCPU_SVE.  This flag is
+> > reported via the KVM_ARM_PREFERRED_TARGET ioctl.
 > > 
-> > 	index = load(user-manipulated pointer);
-> > 	access(base + index * stride);
+> > Userspace can enable the feature by setting the flag for
+> > KVM_ARM_VCPU_INIT.  Without this flag set, SVE-related ioctls and
+> > register access extensions are hidden, and SVE remains disabled
+> > unconditionally for the guest.  This ensures that non-SVE-aware KVM
+> > userspace does not receive a vcpu that it does not understand how
+> > to snapshot or restore correctly.
 > > 
-> > In order for the cache side-channel to work, the access() must me made
-> > to memory which userspace can detect whether cache lines have been
-> > loaded.  On 32-bit ARM, this must be either user accessible memory, or
-> > a kernel mapping of that same user accessible memory.
+> > Storage is allocated for the SVE register state at vcpu init time,
+> > sufficient for the maximum vector length to be exposed to the vcpu.
+> > No attempt is made to allocate the storage lazily for now.  Also,
+> > no attempt is made to resize the storage dynamically, since the
+> > effective vector length of the vcpu can change at each EL0/EL1
+> > transition.  The storage is freed at the vcpu uninit hook.
 > > 
-> > The problem occurs when the load() speculatively loads privileged data,
-> > and the subsequent access() is made to user accessible memory.
+> > No particular attempt is made to prevent userspace from creating a
+> > mix of vcpus some of which have SVE enabled and some of which have
+> > it disabled.  This may or may not be useful, but it reflects the
+> > underlying architectural behaviour.
 > > 
-> > Any load() which makes use of a user-maniplated pointer is a potential
-> > problem if the data it has loaded is used in a subsequent access.  This
-> > also applies for the access() if the data loaded by that access is used
-> > by a subsequent access.
-> > 
-> > Harden the get_user() accessors against Spectre attaacks by forcing out
-> > of bounds addresses to a NULL pointer.  This prevents get_user() being
-> > used as the load() step above.  As a side effect, put_user() will also
-> > be affected even though it isn't implicated.
-> > 
-> > Also harden copy_from_user() by redoing the bounds check within the
-> > arm_copy_from_user() code, and NULLing the pointer if out of bounds.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > > ---
-> >  arch/arm/include/asm/assembler.h | 4 ++++
-> >  arch/arm/lib/copy_from_user.S    | 7 +++++++
-> >  2 files changed, 11 insertions(+)
+> >  arch/arm64/include/asm/kvm_host.h |  6 +++---
+> >  arch/arm64/include/uapi/asm/kvm.h |  1 +
+> >  arch/arm64/kvm/guest.c            | 19 +++++++++++++------
+> >  arch/arm64/kvm/reset.c            | 14 ++++++++++++++
+> >  4 files changed, 31 insertions(+), 9 deletions(-)
 > > 
-> > diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> > index ef1386b1af9b..f0515f60cff5 100644
-> > --- a/arch/arm/include/asm/assembler.h
-> > +++ b/arch/arm/include/asm/assembler.h
-> > @@ -460,6 +460,10 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
-> >  	adds	\tmp, \addr, #\size - 1
-> >  	sbcccs	\tmp, \tmp, \limit
-> >  	bcs	\bad
-> > +#ifdef CONFIG_CPU_SPECTRE
-> > +	movcs	\addr, #0
-> > +	csdb
-> > +#endif
-> >  #endif
-> >  	.endm
+> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> > index d2084ae..d956cf2 100644
+> > --- a/arch/arm64/include/asm/kvm_host.h
+> > +++ b/arch/arm64/include/asm/kvm_host.h
+> > @@ -44,7 +44,7 @@
 > >  
-> > diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
-> > index 7a4b06049001..ebf292e9478f 100644
-> > --- a/arch/arm/lib/copy_from_user.S
-> > +++ b/arch/arm/lib/copy_from_user.S
-> > @@ -90,6 +90,13 @@
-> >  	.text
+> >  #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
 > >  
-> >  ENTRY(arm_copy_from_user)
-> > +	get_thread_info r3
-> > +	ldr	r3, [r3, #TI_ADDR_LIMIT]
-> > +	adds	ip, r1, r2	@ ip=addr+size
-> > +	sub	r3, r3, #1	@ addr_limit - 1
-> > +	cmpcc	ip, r3		@ if (addr+size > addr_limit - 1)
-> > +	movcs	r1, #0		@ addr = NULL
-> > +	csdb
+> > -#define KVM_VCPU_MAX_FEATURES 4
+> > +#define KVM_VCPU_MAX_FEATURES 5
+> >  
+> >  #define KVM_REQ_SLEEP \
+> >  	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
+> > @@ -439,8 +439,8 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+> >  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+> >  static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
+> >  
+> > -static inline int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu) { return 0; }
+> > -static inline void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+> > +int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu);
+> > +void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu);
+> >  
+> >  void kvm_arm_init_debug(void);
+> >  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+> > diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> > index f54a9b0..6acf276 100644
+> > --- a/arch/arm64/include/uapi/asm/kvm.h
+> > +++ b/arch/arm64/include/uapi/asm/kvm.h
+> > @@ -101,6 +101,7 @@ struct kvm_regs {
+> >  #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+> >  #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
+> >  #define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
+> > +#define KVM_ARM_VCPU_SVE		4 /* Allow SVE for guest */
+> >  
+> >  struct kvm_vcpu_init {
+> >  	__u32 target;
+> > diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> > index 5152362..fb7f6aa 100644
+> > --- a/arch/arm64/kvm/guest.c
+> > +++ b/arch/arm64/kvm/guest.c
+> > @@ -58,6 +58,16 @@ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
+> >  	return 0;
+> >  }
+> >  
+> > +int kvm_arm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+> > +{
+> > +	return 0;
+> > +}
+> > +
+> > +void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
+> > +{
+> > +	kfree(vcpu->arch.sve_state);
+> > +}
+> > +
+> >  static u64 core_reg_offset_from_id(u64 id)
+> >  {
+> >  	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
+> > @@ -600,12 +610,9 @@ int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
+> >  
+> >  	memset(init, 0, sizeof(*init));
+> >  
+> > -	/*
+> > -	 * For now, we don't return any features.
+> > -	 * In future, we might use features to return target
+> > -	 * specific features available for the preferred
+> > -	 * target type.
+> > -	 */
+> > +	/* KVM_ARM_VCPU_SVE understood by KVM_VCPU_INIT */
+> > +	init->features[0] = 1 << KVM_ARM_VCPU_SVE;
+> > +
+> >  	init->target = (__u32)target;
+> >  
+> >  	return 0;
+> > diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> > index a74311b..f63a791 100644
+> > --- a/arch/arm64/kvm/reset.c
+> > +++ b/arch/arm64/kvm/reset.c
+> > @@ -110,6 +110,20 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+> >  			cpu_reset = &default_regs_reset;
+> >  		}
+> >  
+> > +		if (system_supports_sve() &&
+> > +		    test_bit(KVM_ARM_VCPU_SVE, vcpu->arch.features)) {
+> > +			vcpu->arch.flags |= KVM_ARM64_GUEST_HAS_SVE;
+> > +
+> > +			vcpu->arch.sve_max_vl = sve_max_virtualisable_vl;
+> > +
 > 
-> Given spectre-v1.1, I believe we need to do the same for
-> arm_copy_to_user().
+> The allocation below needs to be guarded by an if (!vcpu->arch.sve_state),
+> otherwise every time the guest does a PSCI-off/PSCI-on cycle of the vcpu
+> we'll have a memory leak. Or, we need to move this allocation into the new
+> kvm_arm_arch_vcpu_init() function. Why did you opt for kvm_reset_vcpu()?
 
-Spectre v1.1 is not covered by this patch series and is a subject for
-future work.
+I think I failed to find another suitable init function that gets called
+at the right time.  I may have got confused though.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+Good spot on the PSCI interaction.  In light of that, I agree: the SVE
+buffer allocation should not be done here.
+
+
+I'll have a think about how to refactor this in light of the discussion.
+
+Cheers
+---Dave
