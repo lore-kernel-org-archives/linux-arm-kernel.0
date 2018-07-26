@@ -1,47 +1,50 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 26 Jul 2018 11:39:22 -0700
-Subject: [PATCH v9 1/2] regulator: dt-bindings: add QCOM RPMh regulator
- bindings
-In-Reply-To: <20180724165942.GP13268@sirena.org.uk>
-References: <cover.1531531808.git.collinsd@codeaurora.org>
- <56b9d5c38cfe46da1228c54f001a49773c3e31dc.1531531808.git.collinsd@codeaurora.org>
- <CAD=FV=VmfqWRGRMEn+0dzZ8x4R5vVaHbkthXAN91Lm-XmP9Gqg@mail.gmail.com>
- <20180724145755.GF13268@sirena.org.uk>
- <CAD=FV=Uo8sT72a0gRitOVoK0SfC-_QixsovW94_LnL6H7QdKvA@mail.gmail.com>
- <20180724152514.GJ13268@sirena.org.uk>
- <CAD=FV=WHJcAoR7Y_uhi7_GbVzy6K8FnovVFVRz8js0REONox=w@mail.gmail.com>
- <20180724165942.GP13268@sirena.org.uk>
-Message-ID: <20180726183922.GA4402@hector.mosconeconnections.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Fri, 27 Jul 2018 00:10:48 +0530
+Subject: [PATCH 5/5] arm64: dts: actions: Add pinctrl node for Actions
+ Semi S700
+In-Reply-To: <20180722163601.28346-6-sravanhome@gmail.com>
+References: <20180722163601.28346-1-sravanhome@gmail.com>
+ <20180722163601.28346-6-sravanhome@gmail.com>
+Message-ID: <20180726184048.GG5220@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ olof
+Hi,
 
-On Tue, Jul 24, 2018 at 05:59:42PM +0100, Mark Brown wrote:
-> On Tue, Jul 24, 2018 at 08:43:46AM -0700, Doug Anderson wrote:
-> > On Tue, Jul 24, 2018 at 8:25 AM, Mark Brown <broonie@kernel.org> wrote:
+On Sun, Jul 22, 2018 at 06:36:01PM +0200, Saravanan Sekar wrote:
+> Add pinctrl nodes for Actions Semi S700 SoC
 > 
-> > > There was also some other thing called command DB as well which was a
-> > > separate series.  Ideally there'd be a branch I could pull as there's a
-> > > build dependency on rpmh so I can't apply until the code has landed in
-> > > my tree, don't know what command DB is exactly.
+> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+> ---
+>  arch/arm64/boot/dts/actions/s700.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> > Yup.  That one landed in May and is already in mainline Linux.  Refer
-> > to commit 312416d9171a ("drivers: qcom: add command DB driver").
-> 
-> That's good at least - the cover letter said it was still under review,
-> guess it just hadn't been updated.
-> 
-> > Adding Andy to this thread (I guess he wasn't on it?).  Hopefully he
-> > can provide you with the branch.
-> 
-Mark,
+> diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
+> index 59d29e4ca404..88edac21e03f 100644
+> --- a/arch/arm64/boot/dts/actions/s700.dtsi
+> +++ b/arch/arm64/boot/dts/actions/s700.dtsi
+> @@ -179,5 +179,11 @@
+>  			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+>  			interrupt-names = "timer1";
+>  		};
+> +
+> +		pinctrl: pinctrl at e01b0000 {
+> +			compatible = "actions,s700-pinctrl";
+> +			reg = <0x0 0xe01b0000 0x0 0x1000>;
+> +			clocks = <&cmu CLK_GPIO>;
+> +		};
 
-The arm-soc guys merged the Qualcomm pull requests.  So you can just use my
-qcom-drivers-for-4.19 tag.  That won't change at this point.
+Driver/binding/dts are inconsistent. Driver seems to support pinctrl +
+gpio + irq but there is no gpio/irq property in dts patch.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git
-qcom-drivers-for-4.19
+Please correct it.
 
-Regards,
-Andy
+Thanks,
+Mani
+
+>  	};
+>  };
+> -- 
+> 2.18.0
+> 
