@@ -1,49 +1,87 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 26 Jul 2018 16:38:10 -0500
-Subject: [PATCH 00/14] arm64: dts: meson-axg: add audio support
-In-Reply-To: <CAFBinCB_fULnmrpyzNwnfAiL9QGco_6QW957Wroj8o6ZhNwmWA@mail.gmail.com>
- (Martin Blumenstingl's message of "Wed, 25 Jul 2018 23:26:27 +0200")
-References: <20180724125238.14567-1-jbrunet@baylibre.com>
- <CAFBinCBh-b=ie4hBMWdHG8KoLQ7qiRfo8vXfJ1PRcN4UPtg+uA@mail.gmail.com>
- <705e31bf0d978b7d356b2f077179ab0e3db6f092.camel@baylibre.com>
- <CAFBinCB_fULnmrpyzNwnfAiL9QGco_6QW957Wroj8o6ZhNwmWA@mail.gmail.com>
-Message-ID: <7hfu051xvh.fsf@baylibre.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Thu, 26 Jul 2018 15:14:24 -0700
+Subject: [PATCH v3 00/23] Add multi-channel support to Armada thermal
+ driver
+In-Reply-To: <20180726213517.GA15690@localhost.localdomain>
+References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
+ <20180718172849.30b7cec0@xps13> <20180725095222.054f1e80@xps13>
+ <1532570441.2358.27.camel@intel.com>
+ <20180726211442.GB3487@localhost.localdomain>
+ <20180726213517.GA15690@localhost.localdomain>
+Message-ID: <20180726221423.GA3569@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+On Thu, Jul 26, 2018 at 02:35:18PM -0700, Eduardo Valentin wrote:
+> On Thu, Jul 26, 2018 at 02:14:43PM -0700, Eduardo Valentin wrote:
+> > Hello,
+> > 
+> > On Thu, Jul 26, 2018 at 10:00:41AM +0800, Zhang Rui wrote:
+> > > On ?, 2018-07-25 at 09:52 +0200, Miquel Raynal wrote:
+> > > > Hi Eduardo, Zhang,
+> > > > 
+> > > > Miquel Raynal <miquel.raynal@bootlin.com> wrote on Wed, 18 Jul 2018
+> > > > 17:28:49 +0200:
+> > > > 
+> > > > > 
+> > > > > Hi Eduardo,
+> > > > > 
+> > > > > Miquel Raynal <miquel.raynal@bootlin.com> wrote on Mon, 16 Jul 2018
+> > > > > 16:41:43 +0200:
+> > > > > 
+> > > > > > 
+> > > > > > The only capability of the Armada thermal driver is currently
+> > > > > > just to
+> > > > > > read one sensor (the default one) per AP and one per CP.
+> > > > > > Actually,
+> > > > > > there is one sensor per core in the AP806 plus one sensor in the
+> > > > > > thermal IP itself. The CP110 just features one thermal sensor in
+> > > > > > its
+> > > > > > own thermal IP.
+> > > > > > 
+> > > > > > This series first improves the readability of this driver, then
+> > > > > > adds
+> > > > > > support for multi-channel thermal IPs. The bindings and the
+> > > > > > device-trees are updated accordingly.
+> > > > > > 
+> > > > > > Thank you,
+> > > > > > Miqu?l??
+> > > > > I know I sent this series on monday but there was almost no change
+> > > > > on
+> > > > > it (see below), do you think you will have the time to look at it
+> > > > > before it's too late for the merge window?
+> > > > I know a little bit what it is to be on the maintainer side of a
+> > > > subsystem but these changes are laying since April, 21st and I really
+> > > > expect to get them merged. Zhang, as Eduardo seems to be overloaded
+> > > > this release, could you please take the series?
+> > > > 
+> > > > Of course if there are things to address I'll be happy to do so.
+> > > > 
+> > > I had a sync with Eduardo during last merge window, and we agreed to
+> > > send separate git pull requests to Linus since this release and see how
+> > > it works.
+> > > This means that all the soc thermal driver patches should go to
+> > > Eduardo' tree and then Linus' tree directly.
+> > > 
+> > > Anyway, let's ping Eduardo and see if he can review/take the patches.
+> > 
+> > Sorry fellows, but I was off camping in a place with no electricity/no
+> > internet. I looked at this series before, and I do not remember anything
+> > that could block it to go. Let me restart on working on it.
+> 
+> Let me take that back. I got some compilation error.
 
-> Hi Jerome,
->
-> On Wed, Jul 25, 2018 at 11:19 PM <jbrunet@baylibre.com> wrote:
->>
->> On Wed, 2018-07-25 at 21:11 +0200, Martin Blumenstingl wrote:
->> > nit-pick: one patch uses "arm64: dts: meson-axg: s400" in the subject
->> > while other patches that are touching the s400 board aren't
->> > if you have to re-send this series: can you please use the "arm64:
->> > dts: meson-axg: s400:" prefix for all patches touching the s400 board?
->>
->> hum, do we really have such rule, or do you think we should add one ?
-> looking at the git history in arch/arm64/boot/dts/amlogic: it seems
-> that we don't have a rule yet, even though some (some of
-> your's/Neil's/my) patches were using that naming schema in the past
->
->> Kevin, do you have opinion ?
->>
->> Not that I really mind either way, but prefixes rules are usually there to help
->> maintainer filter the patches. Will such rule help in any way ?
-> maybe it's just a problem of a false initial impression
-> I read "arm64: dts: meson-axg: add usb power regulator" in the
-> cover-letter and came to the conclusion that this patch must be wrong
-> since meson-axg.dtsi should not have any regulators (unless they're
-> built into the SoC). only when looking at the patch itself I realized
-> that it's fine because it patches the s400.dts
 
-I actually had the same first impression problem.  At first glance, it
-looks like all the patches are AXG-generic, and only the 2 that mention
-s400 apply to the board.
+Given that I let this one fall into the cracks and that these are minor
+issues, I fixed them manually, and applied up to patch 19. But next at
+least compile test your series and run checkpatch on them.
 
-So, if this needs a respin, I'd prefer the board name where appropriate,
-but it's not something I'm going to be picky about.
+Patches 20-23 need to go via your arch tree.
 
-Kevin
+> 
+> > 
+> > > 
+> > > thanks,
+> > > rui
+> > > > Thanks,
+> > > > Miqu?l
