@@ -1,45 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 26 Jul 2018 00:17:21 -0700
-Subject: [PATCH v4] drivers/firmware: psci_checker: stash and use
- topology_core_cpumask for hotplug tests
-In-Reply-To: <1532515689-31806-1-git-send-email-sudeep.holla@arm.com>
-References: <1532515689-31806-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20180726071721.mjv4qn7di4zoay2h@localhost>
+Date: Wed, 25 Jul 2018 23:57:41 -0700
+Subject: [GIT PULL 2/3] ARM: dts: exynos: Second round for v4.19
+In-Reply-To: <20180725162340.7488-2-krzk@kernel.org>
+References: <20180725162340.7488-1-krzk@kernel.org>
+ <20180725162340.7488-2-krzk@kernel.org>
+Message-ID: <20180726065741.2j66wexoeehb3wcy@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2018 at 11:48:09AM +0100, Sudeep Holla wrote:
-> Commit 7f9545aa1a91 ("arm64: smp: remove cpu and numa topology
-> information when hotplugging out CPU") updates the cpu topology when
-> the CPU is hotplugged out. However the PSCI checker code uses the
-> topology_core_cpumask pointers for some of the cpu hotplug testing.
-> Since the pointer to the core_cpumask of the first CPU in the group
-> is used, which when that CPU itself is hotpugged out is just set to
-> itself, the testing terminates after that particular CPU is tested out.
-> But the intention of this tests is to cover all the CPU in the group.
+On Wed, Jul 25, 2018 at 06:23:39PM +0200, Krzysztof Kozlowski wrote:
+> Hi,
 > 
-> In order to support that, we need to stash the topology_core_cpumask
-> before the start of the test and use that value instead of pointer to
-> a cpumask which will be updated on CPU hotplug.
+> On top of previous pull request.
 > 
-> Fixes: 7f9545aa1a91a9a4 ("arm64: smp: remove cpu and numa topology
-> 	information when hotplugging out CPU")
-> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  drivers/firmware/psci_checker.c | 83 ++++++++++++++++++++++++-----------------
->  1 file changed, 49 insertions(+), 34 deletions(-)
 > 
-> Hi ARM SoC,
+> Best regards,
+> Krzysztof
 > 
-> Though the fixes tag points to a commit in arm64/for-next/core,
-> it shouldn't be any issue to take this via ARM SoC for v4.19
-> Will suggested the same.
+> 
+> The following changes since commit 57f4e8bc1c3ebbd06a278107edeb6af95b53e5bf:
+> 
+>   dt-bindings: samsung: Document bindings for SGH-T959P board (2018-07-07 12:28:07 +0200)
+> 
+> are available in the git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.19-2
+> 
+> for you to fetch changes up to 965228d33cd2b47adb493bb1864761420c632e41:
+> 
+>   ARM: dts: exynos: Configure Midas SD card CD pin (2018-07-23 19:12:01 +0200)
+> 
+> ----------------------------------------------------------------
+> Samsung DTS ARM changes for v4.19, part 2
+> 
+> 1. Add missing interrupts to PWM nodes on Exynos5.
+> 2. Add missing interrupt pin pull up/down configuration on Exynos4412
+>    Midas boards.  The interrupts were mostly working thanks to initial
+>    configuration by bootloader.
 
-Ok, applied to our next/drivers branch now. Thanks!
+Merged, thanks!
 
 
 -Olof
