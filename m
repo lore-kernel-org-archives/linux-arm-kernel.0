@@ -1,196 +1,43 @@
-From: mike.kravetz@oracle.com (Mike Kravetz)
-Date: Thu, 26 Jul 2018 12:05:17 -0700
-Subject: [PATCH v4 07/11] hugetlb: Introduce generic version of
- huge_pte_wrprotect
-In-Reply-To: <20180705110716.3919-8-alex@ghiti.fr>
-References: <20180705110716.3919-1-alex@ghiti.fr>
- <20180705110716.3919-8-alex@ghiti.fr>
-Message-ID: <8a8f0608-ff9a-04ea-7c63-2b3bb99b7966@oracle.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 26 Jul 2018 21:06:36 +0200
+Subject: [PATCH 2/7] net: phy: Fix the register offsets in Broadcom iProc
+ mdio mux driver
+In-Reply-To: <1532630184-29450-3-git-send-email-arun.parameswaran@broadcom.com>
+References: <1532630184-29450-1-git-send-email-arun.parameswaran@broadcom.com>
+ <1532630184-29450-3-git-send-email-arun.parameswaran@broadcom.com>
+Message-ID: <20180726190636.GG10686@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2018 04:07 AM, Alexandre Ghiti wrote:
-> arm, arm64, ia64, mips, parisc, powerpc, sh, sparc, x86
-> architectures use the same version of huge_pte_wrprotect, so move
-> this generic implementation into asm-generic/hugetlb.h.
+On Thu, Jul 26, 2018 at 11:36:19AM -0700, Arun Parameswaran wrote:
+> Modify the register offsets in the Broadcom iProc mdio mux to start
+> from the top of the register address space.
 > 
+> Earlier the base address specified was from the middle of the block's
+> register space. The base address will now point to the start of the
+> mdio's address space. The offsets have been fixed to match this.
 
-Reviewed-by: Mike Kravetz <mike.kravetz@oracle.com>
--- 
-Mike Kravetz
+Hi Arun
 
-> Signed-off-by: Alexandre Ghiti <alex@ghiti.fr>
-> ---
->  arch/arm/include/asm/hugetlb.h     | 5 -----
->  arch/arm64/include/asm/hugetlb.h   | 5 -----
->  arch/ia64/include/asm/hugetlb.h    | 5 -----
->  arch/mips/include/asm/hugetlb.h    | 5 -----
->  arch/parisc/include/asm/hugetlb.h  | 5 -----
->  arch/powerpc/include/asm/hugetlb.h | 5 -----
->  arch/sh/include/asm/hugetlb.h      | 5 -----
->  arch/sparc/include/asm/hugetlb.h   | 5 -----
->  arch/x86/include/asm/hugetlb.h     | 5 -----
->  include/asm-generic/hugetlb.h      | 7 +++++++
->  10 files changed, 7 insertions(+), 45 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/hugetlb.h b/arch/arm/include/asm/hugetlb.h
-> index 3d2ce4dbc145..1e718a626ef9 100644
-> --- a/arch/arm/include/asm/hugetlb.h
-> +++ b/arch/arm/include/asm/hugetlb.h
-> @@ -43,11 +43,6 @@ static inline int prepare_hugepage_range(struct file *file,
->  	return 0;
->  }
->  
-> -static inline pte_t huge_pte_wrprotect(pte_t pte)
-> -{
-> -	return pte_wrprotect(pte);
-> -}
-> -
->  static inline void arch_clear_hugepage_flags(struct page *page)
->  {
->  	clear_bit(PG_dcache_clean, &page->flags);
-> diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
-> index 49247c6f94db..1fd64ebf0cd7 100644
-> --- a/arch/arm64/include/asm/hugetlb.h
-> +++ b/arch/arm64/include/asm/hugetlb.h
-> @@ -42,11 +42,6 @@ static inline int prepare_hugepage_range(struct file *file,
->  	return 0;
->  }
->  
-> -static inline pte_t huge_pte_wrprotect(pte_t pte)
-> -{
-> -	return pte_wrprotect(pte);
-> -}
-> -
->  static inline void arch_clear_hugepage_flags(struct page *page)
->  {
->  	clear_bit(PG_dcache_clean, &page->flags);
-> diff --git a/arch/ia64/include/asm/hugetlb.h b/arch/ia64/include/asm/hugetlb.h
-> index bf573500b3c4..82fe3d7a38d9 100644
-> --- a/arch/ia64/include/asm/hugetlb.h
-> +++ b/arch/ia64/include/asm/hugetlb.h
-> @@ -26,11 +26,6 @@ static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
->  {
->  }
->  
-> -static inline pte_t huge_pte_wrprotect(pte_t pte)
-> -{
-> -	return pte_wrprotect(pte);
-> -}
-> -
->  static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
->  					   unsigned long addr, pte_t *ptep)
->  {
-> diff --git a/arch/mips/include/asm/hugetlb.h b/arch/mips/include/asm/hugetlb.h
-> index 1c9c4531376c..b3d6bb53ee6e 100644
-> --- a/arch/mips/include/asm/hugetlb.h
-> +++ b/arch/mips/include/asm/hugetlb.h
-> @@ -62,11 +62,6 @@ static inline int huge_pte_none(pte_t pte)
->  	return !val || (val == (unsigned long)invalid_pte_table);
->  }
->  
-> -static inline pte_t huge_pte_wrprotect(pte_t pte)
-> -{
-> -	return pte_wrprotect(pte);
-> -}
-> -
->  static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
->  					   unsigned long addr, pte_t *ptep)
->  {
-> diff --git a/arch/parisc/include/asm/hugetlb.h b/arch/parisc/include/asm/hugetlb.h
-> index c09d8c74553c..5a102d7251e4 100644
-> --- a/arch/parisc/include/asm/hugetlb.h
-> +++ b/arch/parisc/include/asm/hugetlb.h
-> @@ -38,11 +38,6 @@ static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
->  {
->  }
->  
-> -static inline pte_t huge_pte_wrprotect(pte_t pte)
-> -{
-> -	return pte_wrprotect(pte);
-> -}
-> -
->  void huge_ptep_set_wrprotect(struct mm_struct *mm,
->  					   unsigned long addr, pte_t *ptep);
->  
-> diff --git a/arch/powerpc/include/asm/hugetlb.h b/arch/powerpc/include/asm/hugetlb.h
-> index 3562d46585ba..7123599089c6 100644
-> --- a/arch/powerpc/include/asm/hugetlb.h
-> +++ b/arch/powerpc/include/asm/hugetlb.h
-> @@ -152,11 +152,6 @@ static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
->  	flush_hugetlb_page(vma, addr);
->  }
->  
-> -static inline pte_t huge_pte_wrprotect(pte_t pte)
-> -{
-> -	return pte_wrprotect(pte);
-> -}
-> -
->  extern int huge_ptep_set_access_flags(struct vm_area_struct *vma,
->  				      unsigned long addr, pte_t *ptep,
->  				      pte_t pte, int dirty);
-> diff --git a/arch/sh/include/asm/hugetlb.h b/arch/sh/include/asm/hugetlb.h
-> index a9f8266f33cf..54f65094efe6 100644
-> --- a/arch/sh/include/asm/hugetlb.h
-> +++ b/arch/sh/include/asm/hugetlb.h
-> @@ -31,11 +31,6 @@ static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
->  {
->  }
->  
-> -static inline pte_t huge_pte_wrprotect(pte_t pte)
-> -{
-> -	return pte_wrprotect(pte);
-> -}
-> -
->  static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
->  					   unsigned long addr, pte_t *ptep)
->  {
-> diff --git a/arch/sparc/include/asm/hugetlb.h b/arch/sparc/include/asm/hugetlb.h
-> index 11115bbd712e..f661362376e0 100644
-> --- a/arch/sparc/include/asm/hugetlb.h
-> +++ b/arch/sparc/include/asm/hugetlb.h
-> @@ -48,11 +48,6 @@ static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
->  {
->  }
->  
-> -static inline pte_t huge_pte_wrprotect(pte_t pte)
-> -{
-> -	return pte_wrprotect(pte);
-> -}
-> -
->  static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
->  					   unsigned long addr, pte_t *ptep)
->  {
-> diff --git a/arch/x86/include/asm/hugetlb.h b/arch/x86/include/asm/hugetlb.h
-> index c5fdc53b6e41..19668672ab37 100644
-> --- a/arch/x86/include/asm/hugetlb.h
-> +++ b/arch/x86/include/asm/hugetlb.h
-> @@ -27,11 +27,6 @@ static inline int prepare_hugepage_range(struct file *file,
->  	return 0;
->  }
->  
-> -static inline pte_t huge_pte_wrprotect(pte_t pte)
-> -{
-> -	return pte_wrprotect(pte);
-> -}
-> -
->  static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
->  					   unsigned long addr, pte_t *ptep)
->  {
-> diff --git a/include/asm-generic/hugetlb.h b/include/asm-generic/hugetlb.h
-> index 2fc3d68424e9..cd9697672b79 100644
-> --- a/include/asm-generic/hugetlb.h
-> +++ b/include/asm-generic/hugetlb.h
-> @@ -80,4 +80,11 @@ static inline int huge_pte_none(pte_t pte)
->  }
->  #endif
->  
-> +#ifndef __HAVE_ARCH_HUGE_PTE_WRPROTECT
-> +static inline pte_t huge_pte_wrprotect(pte_t pte)
-> +{
-> +	return pte_wrprotect(pte);
-> +}
-> +#endif
-> +
->  #endif /* _ASM_GENERIC_HUGETLB_H */
-> 
+Did you consider a change something like:
+
+diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
+index 0831b7142df7..2d53e609498c 100644
+--- a/drivers/net/phy/mdio-mux-bcm-iproc.c
++++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
+@@ -169,6 +169,12 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
+        md->dev = &pdev->dev;
+ 
+        res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++
++       if (res->start & 0xfff != 0) {
++               dev_info(&pdev->dev, "Please upgrade your device tree blob.\n");
++               res->start &= ~0xfff;
++       }
++
+        md->base = devm_ioremap_resource(&pdev->dev, res);
+        if (IS_ERR(md->base)) {
+                dev_err(&pdev->dev, "failed to ioremap register\n");
+
+
+	Andrew
