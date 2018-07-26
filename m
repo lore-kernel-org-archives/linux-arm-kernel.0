@@ -1,40 +1,101 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 26 Jul 2018 13:54:44 +0100
-Subject: [PATCH v3 06/13] coresight: perf: Disable trace path upon source error
+Date: Thu, 26 Jul 2018 13:54:49 +0100
+Subject: [PATCH v3 11/13] coresight: perf: Add helper to retrieve sink
+ configuration
 In-Reply-To: <1532609691-16863-1-git-send-email-suzuki.poulose@arm.com>
 References: <1532609691-16863-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1532609691-16863-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1532609691-16863-12-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We enable the trace path, before activating the source.
-If we fail to enable the source, we must disable the path
-to make sure it is available for another session.
+We can always find the sink configuration for a given perf_output_handle.
+Add a helper to retrieve the sink configuration for a given
+perf_output_handle. This will be used to get rid of the set_buffer()
+call back.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-etm-perf.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 14 -------------
+ drivers/hwtracing/coresight/coresight-etm-perf.h | 26 ++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index afe7e7f..6db76ce 100644
+index ad87441..16b83d8 100644
 --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
 +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -317,11 +317,13 @@ static void etm_event_start(struct perf_event *event, int flags)
+@@ -23,20 +23,6 @@
+ static struct pmu etm_pmu;
+ static bool etm_perf_up;
  
- 	/* Finally enable the tracer */
- 	if (source_ops(csdev)->enable(csdev, event, CS_MODE_PERF))
--		goto fail_end_stop;
-+		goto fail_disable_path;
+-/**
+- * struct etm_event_data - Coresight specifics associated to an event
+- * @work:		Handle to free allocated memory outside IRQ context.
+- * @mask:		Hold the CPU(s) this event was set for.
+- * @snk_config:		The sink configuration.
+- * @path:		An array of path, each slot for one CPU.
+- */
+-struct etm_event_data {
+-	struct work_struct work;
+-	cpumask_t mask;
+-	void *snk_config;
+-	struct list_head * __percpu *path;
+-};
+-
+ static DEFINE_PER_CPU(struct perf_output_handle, ctx_handle);
+ static DEFINE_PER_CPU(struct coresight_device *, csdev_src);
  
- out:
- 	return;
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.h b/drivers/hwtracing/coresight/coresight-etm-perf.h
+index 4197df4..da7d933 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.h
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.h
+@@ -7,6 +7,7 @@
+ #ifndef _CORESIGHT_ETM_PERF_H
+ #define _CORESIGHT_ETM_PERF_H
  
-+fail_disable_path:
-+	coresight_disable_path(path);
- fail_end_stop:
- 	perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
- 	perf_aux_output_end(handle, 0);
++#include <linux/percpu-defs.h>
+ #include "coresight-priv.h"
+ 
+ struct coresight_device;
+@@ -42,14 +43,39 @@ struct etm_filters {
+ 	bool			ssstatus;
+ };
+ 
++/**
++ * struct etm_event_data - Coresight specifics associated to an event
++ * @work:		Handle to free allocated memory outside IRQ context.
++ * @mask:		Hold the CPU(s) this event was set for.
++ * @snk_config:		The sink configuration.
++ * @path:		An array of path, each slot for one CPU.
++ */
++struct etm_event_data {
++	struct work_struct work;
++	cpumask_t mask;
++	void *snk_config;
++	struct list_head * __percpu *path;
++};
+ 
+ #ifdef CONFIG_CORESIGHT
+ int etm_perf_symlink(struct coresight_device *csdev, bool link);
++static inline void *etm_perf_sink_config(struct perf_output_handle *handle)
++{
++	struct etm_event_data *data = perf_get_aux(handle);
+ 
++	if (data)
++		return data->snk_config;
++	return NULL;
++}
+ #else
+ static inline int etm_perf_symlink(struct coresight_device *csdev, bool link)
+ { return -EINVAL; }
+ 
++static inline void *etm_perf_sink_config(struct perf_output_handle *handle)
++{
++	return NULL;
++}
++
+ #endif /* CONFIG_CORESIGHT */
+ 
+ #endif
 -- 
 2.7.4
