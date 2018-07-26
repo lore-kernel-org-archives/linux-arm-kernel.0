@@ -1,93 +1,65 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 27 Jul 2018 01:12:48 +0800
-Subject: [PATCH v3.1 01/10] clk: sunxi-ng: a64: Add minimal rate for video PLLs
+Date: Fri, 27 Jul 2018 01:12:49 +0800
+Subject: [PATCH v3.1 02/10] dt-bindings: display: Add compatible for A64 DE2
+ display pipeline
 In-Reply-To: <20180726171257.6688-1-icenowy@aosc.io>
 References: <20180726171257.6688-1-icenowy@aosc.io>
-Message-ID: <20180726171257.6688-2-icenowy@aosc.io>
+Message-ID: <20180726171257.6688-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-According to documentation and experience with other similar SoCs, video
-PLLs don't work stable if their output frequency is set below 192 MHz.
+Allwinner A64 has a DE2 display pipeline. The TCONs are similar to the
+ones in A83T, but the mixers are new (similar to the later R40 SoC).
 
-Because of that, set minimal rate to both A64 video PLLs to 192 MHz.
+This patch adds dt-binding documentation for A64 DE2 display pipeline.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+[Icenowy: Refactor and also cover TCON0]
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
-Changes for v3.1, v3:
-- none 
+Changes for v3.1:
+- added mixer0 and TCON0
+Changes for v3:
+- collect Rob r-w-b tag
 Changes for v2:
-- New patch
+- Add fallback compatible for tcon1
+- Add separate compatible for mixer1 
 
- drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 46 ++++++++++++++-------------
- 1 file changed, 24 insertions(+), 22 deletions(-)
+ .../devicetree/bindings/display/sunxi/sun4i-drm.txt          | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-index ee9c12cf3f08..d0e30192f0cf 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-@@ -64,17 +64,18 @@ static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
- 				   BIT(28),	/* lock */
- 				   CLK_SET_RATE_UNGATE);
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index f8773ecb7525..7b79c5e3dffc 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -151,6 +151,8 @@ Required properties:
+    * allwinner,sun8i-v3s-tcon
+    * allwinner,sun9i-a80-tcon-lcd
+    * allwinner,sun9i-a80-tcon-tv
++   * "allwinner,sun50i-a64-tcon-lcd", "allwinner,sun8i-a83t-tcon-lcd"
++   * "allwinner,sun50i-a64-tcon-tv", "allwinner,sun8i-a83t-tcon-tv"
+  - reg: base address and size of memory-mapped region
+  - interrupts: interrupt associated to this IP
+  - clocks: phandles to the clocks feeding the TCON.
+@@ -370,6 +372,8 @@ Required properties:
+     * allwinner,sun8i-a83t-de2-mixer-1
+     * allwinner,sun8i-h3-de2-mixer-0
+     * allwinner,sun8i-v3s-de2-mixer
++    * allwinner,sun50i-a64-de2-mixer-0
++    * allwinner,sun50i-a64-de2-mixer-1
+   - reg: base address and size of the memory-mapped region.
+   - clocks: phandles to the clocks feeding the mixer
+     * bus: the mixer interface clock
+@@ -403,6 +407,7 @@ Required properties:
+     * allwinner,sun8i-r40-display-engine
+     * allwinner,sun8i-v3s-display-engine
+     * allwinner,sun9i-a80-display-engine
++    * allwinner,sun50i-a64-display-engine
  
--static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video0_clk, "pll-video0",
--					"osc24M", 0x010,
--					8, 7,		/* N */
--					0, 4,		/* M */
--					BIT(24),	/* frac enable */
--					BIT(25),	/* frac select */
--					270000000,	/* frac rate 0 */
--					297000000,	/* frac rate 1 */
--					BIT(31),	/* gate */
--					BIT(28),	/* lock */
--					CLK_SET_RATE_UNGATE);
-+static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN(pll_video0_clk, "pll-video0",
-+					    "osc24M", 0x010,
-+					    192000000,	/* Minimum rate */
-+					    8, 7,		/* N */
-+					    0, 4,		/* M */
-+					    BIT(24),	/* frac enable */
-+					    BIT(25),	/* frac select */
-+					    270000000,	/* frac rate 0 */
-+					    297000000,	/* frac rate 1 */
-+					    BIT(31),	/* gate */
-+					    BIT(28),	/* lock */
-+					    CLK_SET_RATE_UNGATE);
- 
- static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_ve_clk, "pll-ve",
- 					"osc24M", 0x018,
-@@ -125,17 +126,18 @@ static struct ccu_nk pll_periph1_clk = {
- 	},
- };
- 
--static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video1_clk, "pll-video1",
--					"osc24M", 0x030,
--					8, 7,		/* N */
--					0, 4,		/* M */
--					BIT(24),	/* frac enable */
--					BIT(25),	/* frac select */
--					270000000,	/* frac rate 0 */
--					297000000,	/* frac rate 1 */
--					BIT(31),	/* gate */
--					BIT(28),	/* lock */
--					CLK_SET_RATE_UNGATE);
-+static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN(pll_video1_clk, "pll-video1",
-+					    "osc24M", 0x030,
-+					    192000000,	/* Minimum rate */
-+					    8, 7,		/* N */
-+					    0, 4,		/* M */
-+					    BIT(24),	/* frac enable */
-+					    BIT(25),	/* frac select */
-+					    270000000,	/* frac rate 0 */
-+					    297000000,	/* frac rate 1 */
-+					    BIT(31),	/* gate */
-+					    BIT(28),	/* lock */
-+					    CLK_SET_RATE_UNGATE);
- 
- static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_gpu_clk, "pll-gpu",
- 					"osc24M", 0x038,
+   - allwinner,pipelines: list of phandle to the display engine
+     frontends (DE 1.0) or mixers (DE 2.0) available.
 -- 
 2.18.0
