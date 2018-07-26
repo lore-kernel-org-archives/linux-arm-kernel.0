@@ -1,50 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 26 Jul 2018 12:51:27 -0700
-Subject: [GIT PULL] ARM: aspeed: dts changes for 4.19
-In-Reply-To: <CACPK8Xeu2JAVBTyiUtyso1egbe3X+r5a--Cx30YDJV-JmK==DQ@mail.gmail.com>
-References: <CACPK8Xeu2JAVBTyiUtyso1egbe3X+r5a--Cx30YDJV-JmK==DQ@mail.gmail.com>
-Message-ID: <20180726195127.jukxvbydddlwui4k@localhost>
+From: arun.parameswaran@broadcom.com (Arun Parameswaran)
+Date: Thu, 26 Jul 2018 13:00:05 -0700
+Subject: [PATCH 5/7] net: phy: Add support to configure clock in Broadcom
+ iProc mdio mux
+In-Reply-To: <20180726192651.GK10686@lunn.ch>
+References: <1532630184-29450-1-git-send-email-arun.parameswaran@broadcom.com>
+ <1532630184-29450-6-git-send-email-arun.parameswaran@broadcom.com>
+ <20180726192651.GK10686@lunn.ch>
+Message-ID: <609726a2-e5ec-fe1d-4ee6-39db3d71b1f2@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Andrew
 
-On Thu, Jul 26, 2018 at 02:00:49PM +0930, Joel Stanley wrote:
-> Hello ARM Maintainers,
+On 18-07-26 12:26 PM, Andrew Lunn wrote:
+>> +static void mdio_mux_iproc_config_clk(struct iproc_mdiomux_desc *md)
+>> +{
+>> +	u32 val;
+>> +	u32 divisor;
+>> +
+>> +	if (md->core_clk) {
+>> +		divisor = clk_get_rate(md->core_clk) / MDIO_OPERATING_FREQUENCY;
 > 
-> Here are the ASPEED device tree updates for 4.19. No new machines this time
-> around, but we now have some FSI (the bus between the BMC and the PowerPC host)
-> descriptions, and USB support.
+> /**
+>  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
+>  * 		  This is only valid once the clock source has been enabled.
+>  * @clk: clock source
+>  */
+> unsigned long clk_get_rate(struct clk *clk);
 > 
-> The following changes since commit 7daf201d7fe8334e2d2364d4e8ed3394ec9af819:
-> 
->   Linux 4.18-rc2 (2018-06-24 20:54:29 +0800)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
-> tags/aspeed-4.19-devicetree
-> 
-> for you to fetch changes up to 19617a35b08379b3e6da0a4ee0d2d62645bf1b9e:
-> 
->   ARM: dts: aspeed: Add Power9 CFAM description (2018-07-25 17:43:36 +0930)
-> 
-> ----------------------------------------------------------------
-> ASPEED device tree updates for 4.19
-> 
->  - New support for the ASPEED USB host controller and USB vhub (device)
->  support
-> 
->  - Descriptions for the FSI bus and hardware inside the Power8/Power9
->  processors that are accessed over this bus. This includes the ColdFire
->  processor that is part of the ASPEED SoC and is used to offload the FSI
->  bit-banging
+> It is generally good practice to call clk_prepare_enable() sometime
+> before clk_get_rate() to ensure the clock is ticking, and to show this
+> driver is making use of the clock, so it does not get turned off.
 
-I had some feedback on one of these patches, it should be reworked before we
-merge it. See separate email as reply to the actual patch.
+Will add 'clk_prepare_enable()' to the probe.
 
-If you prefer, you can send a branch without that contents for merging now, so
-the rest of it isn't held up.
+Thanks
+Arun
 
-
--Olof
+> 
+>> +		divisor = divisor / (MDIO_RATE_ADJ_DIVIDENT + 1);
+>> +		val = divisor;
+>> +		val |= MDIO_RATE_ADJ_DIVIDENT << MDIO_RATE_ADJ_DIVIDENT_SHIFT;
+>> +		writel(val, md->base + MDIO_RATE_ADJ_EXT_OFFSET);
+>> +		writel(val, md->base + MDIO_RATE_ADJ_INT_OFFSET);
+>> +	}
+>> +}
