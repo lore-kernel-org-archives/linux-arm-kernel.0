@@ -1,43 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 25 Jul 2018 23:53:53 -0700
-Subject: [Amlogic 64-bit DT updates for v4.19, round 2 (redo)
-In-Reply-To: <7hy3e13mqx.fsf@baylibre.com>
-References: <7hy3e13mqx.fsf@baylibre.com>
-Message-ID: <20180726065353.5jn42f5m73g6hmrx@localhost>
+Date: Wed, 25 Jul 2018 23:55:51 -0700
+Subject: [GIT PULL] Allwinner DT changes for 4.19
+In-Reply-To: <20180724130816.mrqr42l2ph2tme2k@flea>
+References: <20180724130816.mrqr42l2ph2tme2k@flea>
+Message-ID: <20180726065551.jjsdbyd3v6nli5d6@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 12:06:30PM -0500, Kevin Hilman wrote:
-> [ fixes the original round 2 by removing the unnecessary (and wrong)
->   merge of v4.18-rc5.]
+On Tue, Jul 24, 2018 at 03:08:16PM +0200, Maxime Ripard wrote:
+> Hi Arnd, Olof,
 > 
-> Olof, Arnd,
+> Please pull the following changes for the next merge window.
 > 
-> A second round of DT updates for Amlogic, directly on top of the redo of
-> the first one.
+> Thanks!
+> Maxime
 > 
-> This includes a merge of a branch already queued in the clk tree because
-> of the dependency on clock headers used in the DT changes here..
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
-> Kevin
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
-> The following changes since commit 89803e8b26569bdf5798f8745a4c708bf9360ee6:
+> are available in the Git repository at:
 > 
->   ARM64: dts: meson-axg: add pdm pins (2018-07-20 08:18:37 -0700)
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt-for-4.19
 > 
-> are available in the git repository at:
+> for you to fetch changes up to c0476a31fb381e02637549bfe45632a4140dd201:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-2-1
-> 
-> for you to fetch changes up to aaa080fa7e0f01f7cd8eb22a7385a4d8106c7478:
-> 
->   ARM64: dts: meson-gxl: add support for the Oranth Tanix TX3 Mini (2018-07-20 09:02:22 -0700)
+>   ARM: dts: sun4i: Add GPU node (2018-07-24 14:52:44 +0200)
 > 
 > ----------------------------------------------------------------
-> Amlogic 64-bit DT changes for v4.19, round 2
-> - new SoC: S905W
-> - new boards: based on S905W: Amlogic P281, Oranth Tanix TX3 Mini
-> - AXG: add DT for new audio clock controller
+> Allwinner DT changes for 4.19
+> 
+> There's a number of additions for the ARMv7 SoCs for this merge window, and
+> especially:
+> 
+>   - Addition of the system controller for a number of SoCs, as part of the
+>     VPU effort
+>   - Addition of the R40 HDMI support
+>   - Addition of the Mali GPU node for the A10
 
 Merged, thanks!
 
