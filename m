@@ -1,69 +1,50 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Thu, 26 Jul 2018 08:53:27 +0200
-Subject: [PATCH v7 2/6] dt-bindings: arm: fsl: add mu binding doc
+Date: Thu, 26 Jul 2018 08:53:30 +0200
+Subject: [PATCH v7 5/6] ARM: dts: imx7s: add i.MX7 messaging unit support
 In-Reply-To: <20180726065331.6186-1-o.rempel@pengutronix.de>
 References: <20180726065331.6186-1-o.rempel@pengutronix.de>
-Message-ID: <20180726065331.6186-3-o.rempel@pengutronix.de>
+Message-ID: <20180726065331.6186-6-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dong Aisheng <aisheng.dong@nxp.com>
+Define the Messaging Unit (MU) for i.MX7 in the processor's dtsi.
+The respective driver is added in the next commit.
 
-The Messaging Unit module enables two processors within
-the SoC to communicate and coordinate by passing messages
-(e.g. data, status and control) through the MU interface.
-
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: devicetree at vger.kernel.org
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 ---
- .../devicetree/bindings/mailbox/fsl,mu.txt    | 34 +++++++++++++++++++
- 1 file changed, 34 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+ arch/arm/boot/dts/imx7s.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-new file mode 100644
-index 000000000000..90e4905dfc69
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-@@ -0,0 +1,34 @@
-+NXP i.MX Messaging Unit (MU)
-+--------------------------------------------------------------------
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index ce85b3ca1a55..191a0286fa3b 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -1001,6 +1001,25 @@
+ 				status = "disabled";
+ 			};
+ 
++			mu0a: mailbox at 30aa0000 {
++				compatible = "fsl,imx7s-mu", "fsl,imx6sx-mu";
++				reg = <0x30aa0000 0x10000>;
++				interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_MU_ROOT_CLK>;
++				#mbox-cells = <1>;
++				status = "disabled";
++			};
 +
-+The Messaging Unit module enables two processors within the SoC to
-+communicate and coordinate by passing messages (e.g. data, status
-+and control) through the MU interface. The MU also provides the ability
-+for one processor to signal the other processor using interrupts.
++			mu0b: mailbox at 30ab0000 {
++				compatible = "fsl,imx7s-mu", "fsl,imx6sx-mu";
++				reg = <0x30ab0000 0x10000>;
++				interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_MU_ROOT_CLK>;
++				#mbox-cells = <1>;
++				fsl,mu-side-b;
++				status = "disabled";
++			};
 +
-+Because the MU manages the messaging between processors, the MU uses
-+different clocks (from each side of the different peripheral buses).
-+Therefore, the MU must synchronize the accesses from one side to the
-+other. The MU accomplishes synchronization using two sets of matching
-+registers (Processor A-facing, Processor B-facing).
-+
-+Messaging Unit Device Node:
-+=============================
-+
-+Required properties:
-+-------------------
-+- compatible :	should be "fsl,<chip>-mu", the supported chips include
-+		imx8qxp, imx8qm.
-+- reg :		Should contain the registers location and length
-+- interrupts :	Interrupt number. The interrupt specifier format depends
-+		on the interrupt controller parent.
-+- #mbox-cells:  Must be 0. Number of cells in a mailbox
-+
-+Examples:
-+--------
-+lsio_mu0: mailbox at 5d1b0000 {
-+	compatible = "fsl,imx8qxp-mu";
-+	reg = <0x0 0x5d1b0000 0x0 0x10000>;
-+	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
-+	#mbox-cells = <0>;
-+};
+ 			usbotg1: usb at 30b10000 {
+ 				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
+ 				reg = <0x30b10000 0x200>;
 -- 
 2.18.0
