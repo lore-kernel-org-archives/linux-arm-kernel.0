@@ -1,141 +1,217 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 25 Jul 2018 17:47:32 -0700
-Subject: [PATCH v4 1/3] Input: edt-ft5x06 - Add support for regulator
-In-Reply-To: <20180725073410.730-2-mylene.josserand@bootlin.com>
-References: <20180725073410.730-1-mylene.josserand@bootlin.com>
- <20180725073410.730-2-mylene.josserand@bootlin.com>
-Message-ID: <20180726004732.GD80336@dtor-ws>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Wed, 25 Jul 2018 17:47:38 -0700
+Subject: [PATCH v1] arm64: dts: sdm845: enable tsens thermal zones
+In-Reply-To: <b3c25cedfa3a9b8a4b481e714992afe62b84ca3b.1531899325.git.amit.kucheria@linaro.org>
+References: <cover.1531899325.git.amit.kucheria@linaro.org>
+ <b3c25cedfa3a9b8a4b481e714992afe62b84ca3b.1531899325.git.amit.kucheria@linaro.org>
+Message-ID: <20180726004738.GU129942@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Myl?ne,
+Hi Amit,
 
-On Wed, Jul 25, 2018 at 09:34:08AM +0200, Myl?ne Josserand wrote:
-> Add the support of regulator to use it as VCC source.
+On Wed, Jul 18, 2018 at 01:19:17PM +0530, Amit Kucheria wrote:
+> One thermal zone per cpu is defined
 > 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
 > ---
->  .../bindings/input/touchscreen/edt-ft5x06.txt      |  1 +
->  drivers/input/touchscreen/edt-ft5x06.c             | 43 ++++++++++++++++++++++
->  2 files changed, 44 insertions(+)
+>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 170 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 170 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-> index 025cf8c9324a..48e975b9c1aa 100644
-> --- a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-> @@ -30,6 +30,7 @@ Required properties:
->  Optional properties:
->   - reset-gpios: GPIO specification for the RESET input
->   - wake-gpios:  GPIO specification for the WAKE input
-> + - vcc-supply:  Regulator that supplies the touchscreen
->  
->   - pinctrl-names: should be "default"
->   - pinctrl-0:   a phandle pointing to the pin settings for the
-> diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
-> index 1e18ca0d1b4e..dcde719094f7 100644
-> --- a/drivers/input/touchscreen/edt-ft5x06.c
-> +++ b/drivers/input/touchscreen/edt-ft5x06.c
-> @@ -39,6 +39,7 @@
->  #include <linux/input/mt.h>
->  #include <linux/input/touchscreen.h>
->  #include <linux/of_device.h>
-> +#include <linux/regulator/consumer.h>
->  
->  #define WORK_REGISTER_THRESHOLD		0x00
->  #define WORK_REGISTER_REPORT_RATE	0x08
-> @@ -91,6 +92,7 @@ struct edt_ft5x06_ts_data {
->  	struct touchscreen_properties prop;
->  	u16 num_x;
->  	u16 num_y;
-> +	struct regulator *vcc;
->  
->  	struct gpio_desc *reset_gpio;
->  	struct gpio_desc *wake_gpio;
-> @@ -963,6 +965,13 @@ edt_ft5x06_ts_set_regs(struct edt_ft5x06_ts_data *tsdata)
->  	}
->  }
->  
-> +static void edt_ft5x06_disable_regulator(void *arg)
-> +{
-> +	struct edt_ft5x06_ts_data *data = arg;
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> index 01ff146..a75be7c 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -340,4 +340,174 @@
+>  			};
+>  		};
+>  	};
 > +
-> +	regulator_disable(data->vcc);
-> +}
+> +	thermal-zones {
+> +		cpu0-thermal {
+> +			polling-delay-passive = <250>;
+> +			polling-delay = <1000>;
+
+In the context of the TSENS patches you mentioned that you are working
+on interrupt support. Can the polling delays be removed once that is merged?
+
+> +			thermal-sensors = <&tsens0 1>;
 > +
->  static int edt_ft5x06_ts_probe(struct i2c_client *client,
->  					 const struct i2c_device_id *id)
->  {
-> @@ -991,6 +1000,28 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
->  
->  	tsdata->max_support_points = chip_data->max_support_points;
->  
-> +	tsdata->vcc = devm_regulator_get(&client->dev, "vcc");
-> +	if (IS_ERR(tsdata->vcc)) {
-> +		error = PTR_ERR(tsdata->vcc);
-> +		if (error != -EPROBE_DEFER)
-> +			dev_err(&client->dev, "failed to request regulator: %d\n",
-> +				error);
-> +		return error;
-> +	}
+> +			trips {
+> +				cpu_alert0: trip0 {
+> +					temperature = <75000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
 > +
-> +	error = regulator_enable(tsdata->vcc);
-> +	if (error < 0) {
-> +		dev_err(&client->dev, "failed to enable vcc: %d\n",
-> +			error);
-> +		return error;
-> +	}
-
-It is better to put the chip into reset and then power up the regulatori
-and take it out of the reset, rather than power up and then toggle reset
-on and off.
-
+> +				cpu_crit0: trip1 {
+> +					temperature = <110000>;
+> +					hysteresis = <1000>;
+> +					type = "critical";
+> +				};
+> +			};
+> +		};
 > +
-> +	error = devm_add_action_or_reset(&client->dev,
-> +					 edt_ft5x06_disable_regulator,
-> +					 tsdata);
-> +	if (error)
-> +		return error;
+> +		cpu1-thermal {
+> +			polling-delay-passive = <250>;
+> +			polling-delay = <1000>;
 > +
->  	tsdata->reset_gpio = devm_gpiod_get_optional(&client->dev,
->  						     "reset", GPIOD_OUT_HIGH);
->  	if (IS_ERR(tsdata->reset_gpio)) {
-> @@ -1120,9 +1151,12 @@ static int edt_ft5x06_ts_remove(struct i2c_client *client)
->  static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
->  {
->  	struct i2c_client *client = to_i2c_client(dev);
-> +	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
->  
->  	if (device_may_wakeup(dev))
->  		enable_irq_wake(client->irq);
-> +	else
-> +		regulator_disable(tsdata->vcc);
->  
->  	return 0;
->  }
-> @@ -1130,9 +1164,18 @@ static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
->  static int __maybe_unused edt_ft5x06_ts_resume(struct device *dev)
->  {
->  	struct i2c_client *client = to_i2c_client(dev);
-> +	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
-> +	int ret;
->  
->  	if (device_may_wakeup(dev))
->  		disable_irq_wake(client->irq);
-> +	else {
-> +		ret = regulator_enable(tsdata->vcc);
-> +		if (ret < 0) {
-> +			dev_err(dev, "failed to enable vcc: %d\n", ret);
-> +			return ret;
-> +		}
-> +	}
+> +			thermal-sensors = <&tsens0 2>;
+> +
+> +			trips {
+> +				cpu_alert1: trip0 {
+> +					temperature = <75000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
+> +
+> +				cpu_crit1: trip1 {
+> +					temperature = <110000>;
+> +					hysteresis = <1000>;
+> +					type = "critical";
+> +				};
+> +			};
+> +		};
+> +
+> +		cpu2-thermal {
+> +			polling-delay-passive = <250>;
+> +			polling-delay = <1000>;
+> +
+> +			thermal-sensors = <&tsens0 3>;
+> +
+> +			trips {
+> +				cpu_alert2: trip0 {
+> +					temperature = <75000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
+> +
+> +				cpu_crit2: trip1 {
+> +					temperature = <110000>;
+> +					hysteresis = <1000>;
+> +					type = "critical";
+> +				};
+> +			};
+> +		};
+> +
+> +		cpu3-thermal {
+> +			polling-delay-passive = <250>;
+> +			polling-delay = <1000>;
+> +
+> +			thermal-sensors = <&tsens0 4>;
+> +
+> +			trips {
+> +				cpu_alert3: trip0 {
+> +					temperature = <75000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
+> +
+> +				cpu_crit3: trip1 {
+> +					temperature = <110000>;
+> +					hysteresis = <1000>;
+> +					type = "critical";
+> +				};
+> +			};
+> +		};
+> +
+> +		cpu4-thermal {
+> +			polling-delay-passive = <250>;
+> +			polling-delay = <1000>;
+> +
+> +			thermal-sensors = <&tsens0 7>;
+> +
+> +			trips {
+> +				cpu_alert4: trip0 {
+> +					temperature = <75000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
+> +
+> +				cpu_crit4: trip1 {
+> +					temperature = <110000>;
+> +					hysteresis = <1000>;
+> +					type = "critical";
+> +				};
+> +			};
+> +		};
+> +
+> +		cpu5-thermal {
+> +			polling-delay-passive = <250>;
+> +			polling-delay = <1000>;
+> +
+> +			thermal-sensors = <&tsens0 8>;
+> +
+> +			trips {
+> +				cpu_alert5: trip0 {
+> +					temperature = <75000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
+> +
+> +				cpu_crit5: trip1 {
+> +					temperature = <110000>;
+> +					hysteresis = <1000>;
+> +					type = "critical";
+> +				};
+> +			};
+> +		};
+> +
+> +		cpu6-thermal {
+> +			polling-delay-passive = <250>;
+> +			polling-delay = <1000>;
+> +
+> +			thermal-sensors = <&tsens0 9>;
+> +
+> +			trips {
+> +				cpu_alert6: trip0 {
+> +					temperature = <75000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
+> +
+> +				cpu_crit6: trip1 {
+> +					temperature = <110000>;
+> +					hysteresis = <1000>;
+> +					type = "critical";
+> +				};
+> +			};
+> +		};
+> +
+> +		cpu7-thermal {
+> +			polling-delay-passive = <250>;
+> +			polling-delay = <1000>;
+> +
+> +			thermal-sensors = <&tsens0 10>;
+> +
+> +			trips {
+> +				cpu_alert7: trip0 {
+> +					temperature = <75000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
+> +
+> +				cpu_crit7: trip1 {
+> +					temperature = <110000>;
+> +					hysteresis = <1000>;
+> +					type = "critical";
+> +				};
+> +			};
 
-I believe I mentioned in other review that once you powered up the
-device, you need to restore its settings, include switching to factory
-mode, if it was in factory mode, and restoring threshold/gain/offset
-settings.
+Dumb DT question: the trip information is the same for all CPUs. Would
+it be possible to have a single node and refer to it with a phandle?
 
-Thanks.
+I suppose the anwer is no and even if it was possible we probably
+wouldn't want it, since it would complicate overriding settings for a
+specific CPU (should that ever be needed ...) or cluster. Just wondering.
 
--- 
-Dmitry
+> +		};
+> +	};
+>  };
+
+I don't have documentation to verify that the sensors and CPUs match,
+but it is in line with what I've seen in some Android tree, so it
+seems alright ;-)
+
+Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+Tested-by: Matthias Kaehlcke <mka@chromium.org>
