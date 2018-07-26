@@ -1,104 +1,119 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 26 Jul 2018 16:50:46 +0200
-Subject: [PATCH] arm64: dts: meson: Switch simple-mfd and syscon order
-In-Reply-To: <494ff778-1888-7743-3a91-62364431d82e@amlogic.com>
-References: <1532614438-7207-1-git-send-email-narmstrong@baylibre.com>
- <494ff778-1888-7743-3a91-62364431d82e@amlogic.com>
-Message-ID: <c1d08bc7-b868-7781-e69a-0e6bacde5b40@baylibre.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu, 26 Jul 2018 22:59:58 +0800
+Subject: [PATCH v2 16/18] arm64: dts: allwinner: a64: NanoPi-A64: Add
+ Ethernet
+In-Reply-To: <e2f98352-30f5-d162-5bf9-46c7f15e8a80@arm.com>
+References: <20180726003532.18751-1-andre.przywara@arm.com>
+ <20180726003532.18751-17-andre.przywara@arm.com>
+ <f2380842-2c7a-13d3-fa0f-ed23afb89e30@orpaltech.com>
+ <B1F768E3-0C8E-4DBE-92AE-1CFA57BFE7F5@aosc.io>
+ <e2f98352-30f5-d162-5bf9-46c7f15e8a80@arm.com>
+Message-ID: <822CCD9A-FA51-4AC9-A2AE-2011B0CAADA1@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 26/07/2018 16:41, Yixun Lan wrote:
-> HI Neil
-> 
-> On 07/26/2018 10:13 PM, Neil Armstrong wrote:
->> The order between "syscon" and "simple-mfd" is important because in these
->> particular cases, the node needs to be first a "simple-mfd" to expose
->> it's sub-nodes, and later on a "syscon" to permit other nodes to access
->> this register space through the "syscon" mechanism.
->>
-> 
-> could you explain a bit which specific case that it need compatible
-> "simple-mfd" come first? is this a problem in kernel side? because I see
-> you have a comment below about problem in U-Boot..
 
-It's not a problem for Linux, but Linux is just an implementation, the device tree
-should work on multiple OSs like U-Boot or BSD kernels. We should base ourselves on
-the bindings documentation and the Device tree specification to specify the HW.
+? 2018?7?26? GMT+08:00 ??10:06:44, Andre Przywara <andre.przywara@arm.com> ??:
+>Hi,
+>
+>On 26/07/18 14:41, Icenowy Zheng wrote:
+>> 
+>> 
+>> ? 2018?7?26? GMT+08:00 ??9:39:56, Sergey Suloev
+><ssuloev@orpaltech.com> ??:
+>>> Hi,
+>>>
+>>> On 07/26/2018 03:35 AM, Andre Przywara wrote:
+>>>> The NanoPi-A64 has the usual Realtek Gbit PHY connected to the
+>EMAC,
+>>>> so add the respective nodes to the DT. The PHY is powered by the
+>>>> VDD_SYS_3.3V line, which is always on.
+>>>>
+>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>>> ---
+>>>>   arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts | 17
+>>> +++++++++++++++++
+>>>>   1 file changed, 17 insertions(+)
+>>>>
+>>>> diff --git
+>a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>>>> index 5caba225b4f7..bd35a093e6cd 100644
+>>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>>>> @@ -51,6 +51,7 @@
+>>>>   	compatible = "friendlyarm,nanopi-a64", "allwinner,sun50i-a64";
+>>>>   
+>>>>   	aliases {
+>>>> +		ethernet0 = &emac;
+>>>>   		serial0 = &uart0;
+>>>>   	};
+>>>>   
+>>>> @@ -67,6 +68,15 @@
+>>>>   	status = "okay";
+>>>>   };
+>>>>   
+>>>> +&emac {
+>>>> +	pinctrl-names = "default";
+>>>> +	pinctrl-0 = <&rgmii_pins>;
+>>>> +	phy-mode = "rgmii";
+>>>> +	phy-handle = <&ext_rgmii_phy>;
+>>>> +	phy-supply = <&reg_dcdc1>;
+>>>> +	status = "okay";
+>>>> +};
+>>>> +
+>>>>   /* i2c1 connected with gpio headers like pine64, bananapi */
+>>>>   &i2c1 {
+>>>>   	pinctrl-names = "default";
+>>>> @@ -78,6 +88,13 @@
+>>>>   	bias-pull-up;
+>>>>   };
+>>>>   
+>>>> +&mdio {
+>>>> +	ext_rgmii_phy: ethernet-phy at 1 {
+>>>> +		compatible = "ethernet-phy-ieee802.3-c22";
+>>>> +		reg = <1>;
+>>>> +	};
+>>>> +};
+>>>> +
+>>>>   &mmc0 {
+>>>>   	pinctrl-names = "default";
+>>>>   	pinctrl-0 = <&mmc0_pins>;
+>>>
+>>> did you test? "reg = <1>" on a real hardware ?
+>
+>No, thanks for pointing this out.
+>
+>According to the PHY's datasheet the PHY address is configured by the
+>three pins also used for the LEDs. By looking at the schematics back
+>then I somehow managed to convince myself that it should be 1, as most
+>other boards use, but from looking again it indeed looks more like 7
+>(the other LED pin connected to 3.3V).
+>
+>Can you please try with reg = <7> and confirm that it works that way?
 
-In this case, we need to switch the order to specify it correctly.
+In my memory many nanopi's use 7.
 
-> 
-> 
-> also while Rob review the mmc-clkc patch, he raise a suggestion to  drop
-> "syscon" in drivers/mfd/syscon.c, see [1], will that solve or affect
-> your problem?
-
-Rob wants us to drop the "syscon" because he wants us to move all nodes
-depending of HHI as subnode, which is impossible for HDMI and the VPU power controller,
-they are only "syscon" clients, their own registers are not in HHI.
-
-Neil
-
-> 
-> [1]
-> https://lkml.kernel.org/r/CAL_Jsq+r+7BaJAPBn3L26sdxATVyDiuC=V3xE+yz0-27q0RJhA at mail.gmail.com
-> 
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->> This also has a consequence for U-Boot since the U-Boot DM is much simpler
->> and can only associate a single device to a node, thus here we want these
->> nodes to be an mfd bus to be able to probe the sub-nodes.
->>
->>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 4 ++--
->>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi  | 4 ++--
->>  2 files changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
->> index 6adc8d3..3f0de9d 100644
->> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
->> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
->> @@ -342,7 +342,7 @@
->>  			ranges = <0x0 0x0 0x0 0xff63c000 0x0 0x1c00>;
->>  
->>  			sysctrl: system-controller at 0 {
->> -				compatible = "amlogic,meson-axg-hhi-sysctrl", "syscon", "simple-mfd";
->> +				compatible = "amlogic,meson-axg-hhi-sysctrl", "simple-mfd", "syscon";
->>  				reg = <0 0 0 0x400>;
->>  
->>  				clkc: clock-controller {
->> @@ -1180,7 +1180,7 @@
->>  			ranges = <0x0 0x0 0x0 0xff800000 0x0 0x100000>;
->>  
->>  			sysctrl_AO: sys-ctrl at 0 {
->> -				compatible = "amlogic,meson-axg-ao-sysctrl", "syscon", "simple-mfd";
->> +				compatible = "amlogic,meson-axg-ao-sysctrl", "simple-mfd", "syscon";
->>  				reg =  <0x0 0x0 0x0 0x100>;
->>  
->>  				clkc_AO: clock-controller {
->> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
->> index b8dc4db..d88699f 100644
->> --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
->> +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
->> @@ -344,7 +344,7 @@
->>  			ranges = <0x0 0x0 0x0 0xc8100000 0x0 0x100000>;
->>  
->>  			sysctrl_AO: sys-ctrl at 0 {
->> -				compatible = "amlogic,meson-gx-ao-sysctrl", "syscon", "simple-mfd";
->> +				compatible = "amlogic,meson-gx-ao-sysctrl", "simple-mfd", "syscon";
->>  				reg =  <0x0 0x0 0x0 0x100>;
->>  
->>  				pwrc_vpu: power-controller-vpu {
->> @@ -431,7 +431,7 @@
->>  			ranges = <0x0 0x0 0x0 0xc883c000 0x0 0x2000>;
->>  
->>  			sysctrl: system-controller at 0 {
->> -				compatible = "amlogic,meson-gx-hhi-sysctrl", "syscon", "simple-mfd";
->> +				compatible = "amlogic,meson-gx-hhi-sysctrl", "simple-mfd", "syscon";
->>  				reg = <0 0 0 0x400>;
->>  			};
->>  
->>
-> 
+>
+>Many thanks,
+>Andre.
+>
+>>>
+>>> I have? "reg = <0>" in my dts? and? it has been working on my board
+>for
+>> 
+>> 0 is a wildcard address.
+>> 
+>> For nano pi, if 1 doesn't work, then it should be 7. 0 can work,
+>> but it won't be accepted by DT maintainers.
+>> 
+>>>
+>>> ages.
+>>>
+>>> Thanks
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
