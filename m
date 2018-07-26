@@ -1,36 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 26 Jul 2018 00:08:56 -0700
-Subject: [GIT PULL] Qualcomm Driver updates for 4.19
-In-Reply-To: <1532232622-18275-4-git-send-email-andy.gross@linaro.org>
-References: <1532232622-18275-1-git-send-email-andy.gross@linaro.org>
- <1532232622-18275-4-git-send-email-andy.gross@linaro.org>
-Message-ID: <20180726070856.ciavcu6m7jc63uk2@localhost>
+Date: Thu, 26 Jul 2018 00:17:21 -0700
+Subject: [PATCH v4] drivers/firmware: psci_checker: stash and use
+ topology_core_cpumask for hotplug tests
+In-Reply-To: <1532515689-31806-1-git-send-email-sudeep.holla@arm.com>
+References: <1532515689-31806-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20180726071721.mjv4qn7di4zoay2h@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 21, 2018 at 11:10:21PM -0500, Andy Gross wrote:
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+On Wed, Jul 25, 2018 at 11:48:09AM +0100, Sudeep Holla wrote:
+> Commit 7f9545aa1a91 ("arm64: smp: remove cpu and numa topology
+> information when hotplugging out CPU") updates the cpu topology when
+> the CPU is hotplugged out. However the PSCI checker code uses the
+> topology_core_cpumask pointers for some of the cpu hotplug testing.
+> Since the pointer to the core_cpumask of the first CPU in the group
+> is used, which when that CPU itself is hotpugged out is just set to
+> itself, the testing terminates after that particular CPU is tested out.
+> But the intention of this tests is to cover all the CPU in the group.
 > 
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> In order to support that, we need to stash the topology_core_cpumask
+> before the start of the test and use that value instead of pointer to
+> a cpumask which will be updated on CPU hotplug.
 > 
-> are available in the git repository at:
+> Fixes: 7f9545aa1a91a9a4 ("arm64: smp: remove cpu and numa topology
+> 	information when hotplugging out CPU")
+> Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/firmware/psci_checker.c | 83 ++++++++++++++++++++++++-----------------
+>  1 file changed, 49 insertions(+), 34 deletions(-)
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.19
+> Hi ARM SoC,
 > 
-> for you to fetch changes up to 78ee559d7fc65e37670a46cfbeaaa62cb014af67:
-> 
->   soc: qcom: rmtfs-mem: fix memleak in probe error paths (2018-07-21 14:53:47 -0500)
-> 
-> ----------------------------------------------------------------
-> Qualcomm ARM Based Driver Updates for v4.19
-> 
-> * Add Qualcomm LLCC driver
-> * Add Qualcomm RPMH controller
-> * Fix memleak in Qualcomm RMTFS
-> * Add dummy qcom_scm_assign_mem()
-> * Fix check for global partition in SMEM
+> Though the fixes tag points to a commit in arm64/for-next/core,
+> it shouldn't be any issue to take this via ARM SoC for v4.19
+> Will suggested the same.
 
-Merged, thanks!
+Ok, applied to our next/drivers branch now. Thanks!
 
 
 -Olof
