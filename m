@@ -1,103 +1,67 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu, 26 Jul 2018 21:06:55 +0200
-Subject: [PATCH v4 27/35] mtd: rawnand: sm_common: convert driver to
- nand_scan_with_ids()
-In-Reply-To: <20180722084432.61b579b1@bbrezillon>
-References: <20180720151527.16038-1-miquel.raynal@bootlin.com>
- <20180720151527.16038-28-miquel.raynal@bootlin.com>
- <20180722084432.61b579b1@bbrezillon>
-Message-ID: <20180726210655.03eca681@bbrezillon>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Thu, 26 Jul 2018 12:25:24 -0700
+Subject: [PATCH 2/7] net: phy: Fix the register offsets in Broadcom iProc
+ mdio mux driver
+In-Reply-To: <6188441f-670d-7644-361b-7a5e8e06c9c2@broadcom.com>
+References: <1532630184-29450-1-git-send-email-arun.parameswaran@broadcom.com>
+ <1532630184-29450-3-git-send-email-arun.parameswaran@broadcom.com>
+ <20180726190636.GG10686@lunn.ch>
+ <6188441f-670d-7644-361b-7a5e8e06c9c2@broadcom.com>
+Message-ID: <eeaf777f-e0ea-fb41-5a5e-4ab42a35e10f@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 22 Jul 2018 08:44:32 +0200
-Boris Brezillon <boris.brezillon@bootlin.com> wrote:
 
-> On Fri, 20 Jul 2018 17:15:19 +0200
-> Miquel Raynal <miquel.raynal@bootlin.com> wrote:
-> 
-> > Two helpers have been added to the core to make ECC-related
-> > configuration between the detection phase and the final NAND scan. Use
-> > these hooks and convert the driver to just use nand_scan_with_ids()
-> > (alternative to nand_scan() for passing a flash IDs table) instead of
-> > both nand_scan_ident() and nand_scan_tail().
-> > 
-> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>  
-> 
-> Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
-> 
-> > ---
-> >  drivers/mtd/nand/raw/sm_common.c | 39 +++++++++++++++++++++++++--------------
-> >  1 file changed, 25 insertions(+), 14 deletions(-)
-> > 
-> > diff --git a/drivers/mtd/nand/raw/sm_common.c b/drivers/mtd/nand/raw/sm_common.c
-> > index 7f5044a79f01..d05e3f976a5e 100644
-> > --- a/drivers/mtd/nand/raw/sm_common.c
-> > +++ b/drivers/mtd/nand/raw/sm_common.c
-> > @@ -160,19 +160,9 @@ static struct nand_flash_dev nand_xd_flash_ids[] = {
-> >  	{NULL}
-> >  };
-> >  
-> > -int sm_register_device(struct mtd_info *mtd, int smartmedia)
-> > +static int sm_attach_chip(struct nand_chip *chip)
-> >  {
-> > -	struct nand_chip *chip = mtd_to_nand(mtd);
-> > -	int ret;
-> > -
-> > -	chip->options |= NAND_SKIP_BBTSCAN;
-> > -
-> > -	/* Scan for card properties */
-> > -	ret = nand_scan_ident(mtd, 1, smartmedia ?
-> > -		nand_smartmedia_flash_ids : nand_xd_flash_ids);
-> > -
-> > -	if (ret)
-> > -		return ret;
-> > +	struct mtd_info *mtd = nand_to_mtd(chip);
-> >  
-> >  	/* Bad block marker position */
-> >  	chip->badblockpos = 0x05;
-> > @@ -187,12 +177,33 @@ int sm_register_device(struct mtd_info *mtd, int smartmedia)
-> >  	else
-> >  		return -ENODEV;
-> >  
-> > -	ret = nand_scan_tail(mtd);
-> > +	return 0;
-> > +}
-> >  
-> > +static const struct nand_controller_ops sm_controller_ops = {
-> > +	.attach_chip = sm_attach_chip,
-> > +};
-> > +
-> > +int sm_register_device(struct mtd_info *mtd, int smartmedia)
-> > +{
-> > +	struct nand_chip *chip = mtd_to_nand(mtd);
-> > +	struct nand_flash_dev *flash_ids;
-> > +	int ret;
-> > +
-> > +	chip->options |= NAND_SKIP_BBTSCAN;
-> > +
-> > +	/* Scan for card properties */
-> > +	chip->dummy_controller.ops = &sm_controller_ops;
-> > +	flash_ids = smartmedia ? nand_smartmedia_flash_ids : nand_xd_flash_ids;
-> > +	ret = nand_scan_with_ids(mtd, 1, flash_ids);
-> >  	if (ret)
-> >  		return ret;
-> >  
-> > -	return mtd_device_register(mtd, NULL, 0);
-> > +	ret = mtd_device_register(mtd, NULL, 0);
-> > +	if (ret)
-> > +		nand_release(mtd);
 
-Didn't notice that while reviewing, but it would have been better to
-use nand_cleanup() and do this change separately.
+On 7/26/2018 12:16 PM, Arun Parameswaran wrote:
+> 
+> 
+> On 18-07-26 12:06 PM, Andrew Lunn wrote:
+>> On Thu, Jul 26, 2018 at 11:36:19AM -0700, Arun Parameswaran wrote:
+>>> Modify the register offsets in the Broadcom iProc mdio mux to start
+>>> from the top of the register address space.
+>>>
+>>> Earlier the base address specified was from the middle of the block's
+>>> register space. The base address will now point to the start of the
+>>> mdio's address space. The offsets have been fixed to match this.
+>>
+>> Hi Arun
+>>
+>> Did you consider a change something like:
+> That looks good. I will make this change to the patch.
+> 
+> Thanks
+> Arun
 
-> > +
-> > +	return ret;
-> >  }
-> >  EXPORT_SYMBOL_GPL(sm_register_device);
-> >    
-> 
-> 
-> ______________________________________________________
-> Linux MTD discussion mailing list
-> http://lists.infradead.org/mailman/listinfo/linux-mtd/
+To make it backward compatible, then length of the resource also needs 
+to be adjusted from 0x14 to 0x250 in the driver?
+
+Otherwise you will end up accessing areas out of 0x14 defined in old DT 
+that is not mapped?
+
+Thanks,
+
+Ray
+
+>>
+>> diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
+>> index 0831b7142df7..2d53e609498c 100644
+>> --- a/drivers/net/phy/mdio-mux-bcm-iproc.c
+>> +++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
+>> @@ -169,6 +169,12 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
+>>          md->dev = &pdev->dev;
+>>   
+>>          res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +
+>> +       if (res->start & 0xfff != 0) {
+>> +               dev_info(&pdev->dev, "Please upgrade your device tree blob.\n");
+>> +               res->start &= ~0xfff;
+>> +       }
+>> +
+>>          md->base = devm_ioremap_resource(&pdev->dev, res);
+>>          if (IS_ERR(md->base)) {
+>>                  dev_err(&pdev->dev, "failed to ioremap register\n");
+>>
+>>
+>> 	Andrew
+>>
