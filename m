@@ -1,42 +1,141 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 26 Jul 2018 01:35:32 +0100
-Subject: [PATCH v2 18/18] arm64: dts: allwinner: a64: NanoPi-A64: Add blue
- status LED
-In-Reply-To: <20180726003532.18751-1-andre.przywara@arm.com>
-References: <20180726003532.18751-1-andre.przywara@arm.com>
-Message-ID: <20180726003532.18751-19-andre.przywara@arm.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 25 Jul 2018 17:47:32 -0700
+Subject: [PATCH v4 1/3] Input: edt-ft5x06 - Add support for regulator
+In-Reply-To: <20180725073410.730-2-mylene.josserand@bootlin.com>
+References: <20180725073410.730-1-mylene.josserand@bootlin.com>
+ <20180725073410.730-2-mylene.josserand@bootlin.com>
+Message-ID: <20180726004732.GD80336@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Beside the non-controllable green power LED, the NanoPi-A64 features a
-blue "status" LED, connected to PD24.
+Hi Myl?ne,
 
-Add the device tree node to make it usable.
+On Wed, Jul 25, 2018 at 09:34:08AM +0200, Myl?ne Josserand wrote:
+> Add the support of regulator to use it as VCC source.
+> 
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> ---
+>  .../bindings/input/touchscreen/edt-ft5x06.txt      |  1 +
+>  drivers/input/touchscreen/edt-ft5x06.c             | 43 ++++++++++++++++++++++
+>  2 files changed, 44 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
+> index 025cf8c9324a..48e975b9c1aa 100644
+> --- a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
+> +++ b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
+> @@ -30,6 +30,7 @@ Required properties:
+>  Optional properties:
+>   - reset-gpios: GPIO specification for the RESET input
+>   - wake-gpios:  GPIO specification for the WAKE input
+> + - vcc-supply:  Regulator that supplies the touchscreen
+>  
+>   - pinctrl-names: should be "default"
+>   - pinctrl-0:   a phandle pointing to the pin settings for the
+> diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
+> index 1e18ca0d1b4e..dcde719094f7 100644
+> --- a/drivers/input/touchscreen/edt-ft5x06.c
+> +++ b/drivers/input/touchscreen/edt-ft5x06.c
+> @@ -39,6 +39,7 @@
+>  #include <linux/input/mt.h>
+>  #include <linux/input/touchscreen.h>
+>  #include <linux/of_device.h>
+> +#include <linux/regulator/consumer.h>
+>  
+>  #define WORK_REGISTER_THRESHOLD		0x00
+>  #define WORK_REGISTER_REPORT_RATE	0x08
+> @@ -91,6 +92,7 @@ struct edt_ft5x06_ts_data {
+>  	struct touchscreen_properties prop;
+>  	u16 num_x;
+>  	u16 num_y;
+> +	struct regulator *vcc;
+>  
+>  	struct gpio_desc *reset_gpio;
+>  	struct gpio_desc *wake_gpio;
+> @@ -963,6 +965,13 @@ edt_ft5x06_ts_set_regs(struct edt_ft5x06_ts_data *tsdata)
+>  	}
+>  }
+>  
+> +static void edt_ft5x06_disable_regulator(void *arg)
+> +{
+> +	struct edt_ft5x06_ts_data *data = arg;
+> +
+> +	regulator_disable(data->vcc);
+> +}
+> +
+>  static int edt_ft5x06_ts_probe(struct i2c_client *client,
+>  					 const struct i2c_device_id *id)
+>  {
+> @@ -991,6 +1000,28 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
+>  
+>  	tsdata->max_support_points = chip_data->max_support_points;
+>  
+> +	tsdata->vcc = devm_regulator_get(&client->dev, "vcc");
+> +	if (IS_ERR(tsdata->vcc)) {
+> +		error = PTR_ERR(tsdata->vcc);
+> +		if (error != -EPROBE_DEFER)
+> +			dev_err(&client->dev, "failed to request regulator: %d\n",
+> +				error);
+> +		return error;
+> +	}
+> +
+> +	error = regulator_enable(tsdata->vcc);
+> +	if (error < 0) {
+> +		dev_err(&client->dev, "failed to enable vcc: %d\n",
+> +			error);
+> +		return error;
+> +	}
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+It is better to put the chip into reset and then power up the regulatori
+and take it out of the reset, rather than power up and then toggle reset
+on and off.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-index 705e0b23589e..d75d4d5cbf73 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-@@ -60,6 +60,15 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		blue {
-+			label = "nanopi-a64:blue:status";
-+			gpios = <&pio 3 24 GPIO_ACTIVE_LOW>; /* PD24 */
-+		};
-+	};
-+
- 	wifi_pwrseq: wifi_pwrseq {
- 		compatible = "mmc-pwrseq-simple";
- 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+> +
+> +	error = devm_add_action_or_reset(&client->dev,
+> +					 edt_ft5x06_disable_regulator,
+> +					 tsdata);
+> +	if (error)
+> +		return error;
+> +
+>  	tsdata->reset_gpio = devm_gpiod_get_optional(&client->dev,
+>  						     "reset", GPIOD_OUT_HIGH);
+>  	if (IS_ERR(tsdata->reset_gpio)) {
+> @@ -1120,9 +1151,12 @@ static int edt_ft5x06_ts_remove(struct i2c_client *client)
+>  static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
+>  {
+>  	struct i2c_client *client = to_i2c_client(dev);
+> +	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
+>  
+>  	if (device_may_wakeup(dev))
+>  		enable_irq_wake(client->irq);
+> +	else
+> +		regulator_disable(tsdata->vcc);
+>  
+>  	return 0;
+>  }
+> @@ -1130,9 +1164,18 @@ static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
+>  static int __maybe_unused edt_ft5x06_ts_resume(struct device *dev)
+>  {
+>  	struct i2c_client *client = to_i2c_client(dev);
+> +	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
+> +	int ret;
+>  
+>  	if (device_may_wakeup(dev))
+>  		disable_irq_wake(client->irq);
+> +	else {
+> +		ret = regulator_enable(tsdata->vcc);
+> +		if (ret < 0) {
+> +			dev_err(dev, "failed to enable vcc: %d\n", ret);
+> +			return ret;
+> +		}
+> +	}
+
+I believe I mentioned in other review that once you powered up the
+device, you need to restore its settings, include switching to factory
+mode, if it was in factory mode, and restoring threshold/gain/offset
+settings.
+
+Thanks.
+
 -- 
-2.14.4
+Dmitry
