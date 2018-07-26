@@ -1,74 +1,114 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 26 Jul 2018 13:54:09 +0200
-Subject: [PATCH v2 5/5] arm64: dts: allwinner: h5: Add SID for H5
-In-Reply-To: <20180724165501.d8f01bf20c7cc43e7ed7fc62@bidouilliste.com>
-References: <20180724101522.68165-1-manu@freebsd.org>
- <20180724101522.68165-5-manu@freebsd.org>
- <20180724130004.ynaiabshexrrbvo4@flea>
- <20180724153432.e398bddfe63e51e8dcebfc46@bidouilliste.com>
- <20180724144218.jdvgrcqkz2kmohqx@flea>
- <20180724165501.d8f01bf20c7cc43e7ed7fc62@bidouilliste.com>
-Message-ID: <20180726115409.7hqtvx4rdqcqdjrq@flea>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 26 Jul 2018 13:54:25 +0200
+Subject: [PATCH v7 4/6] dt-bindings: mailbox: imx-mu: add i.MX6SX and
+ i.MX7S SoCs.
+In-Reply-To: <CABb+yY0LbLfK2SEdTeuDmaGc+PsVn0AREQ=E=c4UZgxa5K95qQ@mail.gmail.com>
+References: <20180726065331.6186-1-o.rempel@pengutronix.de>
+ <20180726065331.6186-5-o.rempel@pengutronix.de>
+ <CABb+yY32vBy5qVYsQ6u45=rV6gEggqKy3Jqn1B4oWHaGfTyQ8Q@mail.gmail.com>
+ <1532601691.32306.28.camel@pengutronix.de>
+ <CABb+yY1GEmw_8q2HaF8y5VfFJX_c_0_MbWtPUE_j_o-zS8iZ_g@mail.gmail.com>
+ <1532604937.32306.30.camel@pengutronix.de>
+ <CABb+yY0LbLfK2SEdTeuDmaGc+PsVn0AREQ=E=c4UZgxa5K95qQ@mail.gmail.com>
+Message-ID: <1532606065.32306.34.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 04:55:01PM +0200, Emmanuel Vadot wrote:
-> On Tue, 24 Jul 2018 16:42:18 +0200
-> Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> 
-> > On Tue, Jul 24, 2018 at 03:34:32PM +0200, Emmanuel Vadot wrote:
-> > > On Tue, 24 Jul 2018 15:00:04 +0200
-> > > Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > 
-> > > > On Tue, Jul 24, 2018 at 12:15:22PM +0200, Emmanuel Vadot wrote:
-> > > > > The SID controller on H5 look the same as the one present in the A64.
-> > > > > But in case we find some difference one day at a compatible string
-> > > > > of it's own and a fallback to the A64 one.
-> > > > > 
-> > > > > Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
-> > > > > ---
-> > > > >  arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 5 +++++
-> > > > >  1 file changed, 5 insertions(+)
-> > > > > 
-> > > > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> > > > > index 62d646baac3c..28183bf77164 100644
-> > > > > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> > > > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> > > > > @@ -129,3 +129,8 @@
-> > > > >  		     <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-> > > > >  	compatible = "allwinner,sun50i-h5-pinctrl";
-> > > > >  };
-> > > > > +
-> > > > > +&sid {
-> > > > > +	compatible = "allwinner,sun50i-h5-sid",
-> > > > > +		     "allwinner,sun50i-a64-sid";
-> > > > > +};
+Am Donnerstag, den 26.07.2018, 17:16 +0530 schrieb Jassi Brar:
+> > On Thu, Jul 26, 2018 at 5:05 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> > Am Donnerstag, den 26.07.2018, 16:45 +0530 schrieb Jassi Brar:
+> > > On Thu, Jul 26, 2018 at 4:11 PM, Lucas Stach <l.stach@pengutronix.de>
+> > > wrote:
+> > > > Hi Jassi,
 > > > > 
-> > > > This is still a bit pointless, please remove the common node.
+> > > > Am Donnerstag, den 26.07.2018, 15:25 +0530 schrieb Jassi Brar:
+> > > > > On Thu, Jul 26, 2018 at 12:23 PM, Oleksij Rempel
+> > > > > > > > > > > > <o.rempel@pengutronix.de> wrote:
+> > > > > > This are currently tested SoCs with imx-mailbox driver.
+> > > > > > 
+> > > > > > > > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> > > > > > 
+> > > > > > ---
+> > > > > > ?Documentation/devicetree/bindings/mailbox/fsl,mu.txt | 2 +-
+> > > > > > ?1 file changed, 1 insertion(+), 1 deletion(-)
+> > > > > > 
+> > > > > > diff --git
+> > > > > > a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> > > > > > b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> > > > > > index 113d6ab931ef..5616d2afca45 100644
+> > > > > > --- a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> > > > > > +++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> > > > > > @@ -18,7 +18,7 @@ Messaging Unit Device Node:
+> > > > > > ?Required properties:
+> > > > > > ?-------------------
+> > > > > > ?- compatible : should be "fsl,<chip>-mu", the supported chips
+> > > > > > include
+> > > > > > -???????????????imx8qxp, imx8qm.
+> > > > > > +???????????????imx6sx, imx7s, imx8qxp, imx8qm.
+> > > > > > 
+> > > > > 
+> > > > > This is not scalable. Do we add every new SoC that contains the
+> > > > > same controller?
+> > > > 
+> > > > Yes, we do. This is a policy direction from the DT maintainers.
+> > > > 
 > > > 
-> > >  You mean directly declare sid controller in the SoC dtsi and not
-> > > have a common node in sunxi-h3-h5.dtsi ?
+> > > I would love to read the post/documentation.
+> > > 
+> > > Consider the same h/w - controller and platforms, but only the the MU
+> > > chapter said the controller name is, say, 'MU121'. I am sure now you
+> > > will see it correct to call it "fsl,mu121" compatible.
+> > > What changed? just the name, right?
+> > > 
+> > > 
+> > > > If we
+> > > > ever going to want to validate DTs against the binding, all
+> > > > compatibles
+> > > > used in the DTs must be specified in the binding.
+> > > > 
+> > > > As we can't really tell if the controller is exactly the same or
+> > > > even
+> > > > has some SoC integration bugs, we generally add a new compatible
+> > > > for
+> > > > each SoC to key off any workarounds necessary in the driver without
+> > > > the
+> > > > need to change the DTs, breaking compatibility.
+> > > > 
+> > > 
+> > > I think if the h/w resources and behaviour remain the same and the
+> > > documentation does not call it by a different name -- it is safe to
+> > > assume its the same IP. Especially when the driver is absolutely
+> > > indifferent to the 5 SoC names.
 > > 
-> > Yep
+> > Even if it is the same IP core, the SoC integration might have bugs
+> > that need different behavior from the driver. We've already had that
+> > case with the i.MX6 SPI controller.
+> > 
 > 
->  The reason I've put it in the common file is because I'll send patches
-> for the nvmem-cells needed for thermal, and those are common between
-> the two. Other nvmem-cells are also common (like the chipid and
-> probably other).
+> For h/w quirks/bugs, a new "has-that-bug" property makes better sense.
+> Or, if you insist, a new compatible based on the first soc that has
+> the buggy block.
+> 
 
-Then we'll see what we can have in common and what not when we'll have
-something in common?
+Hardware bugs might not be known at the the time the DT is deployed.
+The DT is not part of the kernel, but might be part of a fixed device
+firmware.
 
-Maxime
+> > > If/when we find the controller changes, we could revisit the binding
+> > > and add another compatible option and modify the driver to catch that
+> > > and adapt.
+> > 
+> > That's way too late. If we want to keep DTs stable
+> > 
+> 
+> How do you keep the DT stable by explicitly defining every new SoC to
+> the compatible list in DT, _add_ to the driver.... only to have the
+> driver absolutely not care which SoC is it?
+> Which is the situation right now with this patchset.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180726/94f8de9c/attachment.sig>
+It means we can later, in a newer kernel change the driver to use the
+compatible to change behavior without the need to update the DT at that
+point.
+
+Regards,
+Lucas
