@@ -1,40 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 26 Jul 2018 00:03:03 -0700
-Subject: [GIT PULL] Allwinner H3/H5 changes for 4.19
-In-Reply-To: <20180724130908.lbxaibjov4u223y4@flea>
-References: <20180724130908.lbxaibjov4u223y4@flea>
-Message-ID: <20180726070303.4httlf57r3cp47jp@localhost>
+Date: Thu, 26 Jul 2018 00:08:56 -0700
+Subject: [GIT PULL] Qualcomm Driver updates for 4.19
+In-Reply-To: <1532232622-18275-4-git-send-email-andy.gross@linaro.org>
+References: <1532232622-18275-1-git-send-email-andy.gross@linaro.org>
+ <1532232622-18275-4-git-send-email-andy.gross@linaro.org>
+Message-ID: <20180726070856.ciavcu6m7jc63uk2@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 03:09:08PM +0200, Maxime Ripard wrote:
-> Hi Arnd, Olof,
-> 
-> Please pull the following changes for the next merge window.
-> 
-> Thanks!
-> Maxime
-> 
+On Sat, Jul 21, 2018 at 11:10:21PM -0500, Andy Gross wrote:
 > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
 > 
 >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
 > 
-> are available in the Git repository at:
+> are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-h3-h5-for-4.19
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.19
 > 
-> for you to fetch changes up to 8fb147322a8fdec96852d537affe9623d307edfb:
+> for you to fetch changes up to 78ee559d7fc65e37670a46cfbeaaa62cb014af67:
 > 
->   ARM: dts: sunxi-h3-h5: Remove unused address-cells/size-cells of dwmac-sun8i (2018-07-19 16:31:04 +0200)
+>   soc: qcom: rmtfs-mem: fix memleak in probe error paths (2018-07-21 14:53:47 -0500)
 > 
 > ----------------------------------------------------------------
-> Allwinner H3/H5 changes for 4.19
+> Qualcomm ARM Based Driver Updates for v4.19
 > 
-> Our usual bunch of changes shared between arm and arm64.
-> 
-> This time, we have:
->   - eMMC support for the ALL-H3-CC boards
->   - EMAC support for the Beelink X2
+> * Add Qualcomm LLCC driver
+> * Add Qualcomm RPMH controller
+> * Fix memleak in Qualcomm RMTFS
+> * Add dummy qcom_scm_assign_mem()
+> * Fix check for global partition in SMEM
 
 Merged, thanks!
 
