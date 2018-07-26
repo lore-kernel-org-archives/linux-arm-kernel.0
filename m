@@ -1,56 +1,37 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 26 Jul 2018 12:25:32 -0700
-Subject: [GIT PULL] ARM: aspeed: defconfig changes for 4.19
-In-Reply-To: <CACPK8XdcAANiSwsvCnu249W8QcFfjP616ce-YOW=UohgpTHtVw@mail.gmail.com>
-References: <CACPK8XdcAANiSwsvCnu249W8QcFfjP616ce-YOW=UohgpTHtVw@mail.gmail.com>
-Message-ID: <20180726192532.emdjzyaekz74ldqf@localhost>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 26 Jul 2018 21:26:51 +0200
+Subject: [PATCH 5/7] net: phy: Add support to configure clock in Broadcom
+ iProc mdio mux
+In-Reply-To: <1532630184-29450-6-git-send-email-arun.parameswaran@broadcom.com>
+References: <1532630184-29450-1-git-send-email-arun.parameswaran@broadcom.com>
+ <1532630184-29450-6-git-send-email-arun.parameswaran@broadcom.com>
+Message-ID: <20180726192651.GK10686@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 02:03:11PM +0930, Joel Stanley wrote:
-> Hello ARM Maintainers,
-> 
-> Here are the ASPEED defconfig updates for 4.19. It's been a while since I sent
-> one, so this contains a lot of goodies.
-> 
-> The following changes since commit 021c91791a5e7e85c567452f1be3e4c2c6cb6063:
-> 
->   Linux 4.18-rc3 (2018-07-01 16:04:53 -0700)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
-> tags/aspeed-4.19-defconfig
-> 
-> for you to fetch changes up to 90708adcd3ead258d4c2185da6acbe748eb0cc32:
-> 
->   ARM: config: aspeed: Enable new FSI drivers (2018-07-26 13:27:27 +0930)
-> 
-> ----------------------------------------------------------------
-> ASPEED defconfig updates for 4.19
-> 
->  - Refresh the multi ARMv5 defconfig, and add AST2400 related drivers
-> 
->  - Enable new ASPEED hardware that we've merged in the past few cycles.
->  There are about 14 different drivers since we last refreshed the
->  defconfig
-> 
->  - Turn on features required by systemd, and other bits of OpenBMC
->  userspace
-> 
->  - Enable security related options
+> +static void mdio_mux_iproc_config_clk(struct iproc_mdiomux_desc *md)
+> +{
+> +	u32 val;
+> +	u32 divisor;
+> +
+> +	if (md->core_clk) {
+> +		divisor = clk_get_rate(md->core_clk) / MDIO_OPERATING_FREQUENCY;
 
-Merged, two minor pieces of feedback:
+/**
+ * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
+ * 		  This is only valid once the clock source has been enabled.
+ * @clk: clock source
+ */
+unsigned long clk_get_rate(struct clk *clk);
 
-1) I think you've cut-and-pasted the pull request into a mailer that line
-   breaks between the URL and the tag. That's fine, but it means two copy and
-   pastes at my end. Feel free to add a " \" at the end of the first line when
-   you remember. We usually don't ask people to do it, it's purely for extra
-   credit. :)
+It is generally good practice to call clk_prepare_enable() sometime
+before clk_get_rate() to ensure the clock is ticking, and to show this
+driver is making use of the clock, so it does not get turned off.
 
-2) Please try to get these merge requests in before -rc6, or send what you have
-   at that time even if you end up following up with just a few more patches
-   later.
-
-
--Olof
+> +		divisor = divisor / (MDIO_RATE_ADJ_DIVIDENT + 1);
+> +		val = divisor;
+> +		val |= MDIO_RATE_ADJ_DIVIDENT << MDIO_RATE_ADJ_DIVIDENT_SHIFT;
+> +		writel(val, md->base + MDIO_RATE_ADJ_EXT_OFFSET);
+> +		writel(val, md->base + MDIO_RATE_ADJ_INT_OFFSET);
+> +	}
+> +}
