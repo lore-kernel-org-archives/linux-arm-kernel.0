@@ -1,14 +1,14 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 26 Jul 2018 22:05:51 +0200
-Subject: [GIT PULL] ARM: mediatek: 32-bit DT updates for v4.19
-In-Reply-To: <3ee3ccfb-8fd6-34b0-c03d-67532067e707@gmail.com>
-References: <2d918d15-d1d3-b4e0-7427-0b3baa56100a@gmail.com>
- <3ee3ccfb-8fd6-34b0-c03d-67532067e707@gmail.com>
-Message-ID: <CAOesGMjyag+aq7kRgUhMAtxa5d45Uv0aCB=0m9k2jdFg9atcJA@mail.gmail.com>
+Date: Thu, 26 Jul 2018 22:07:28 +0200
+Subject: [GIT PULL] ARM: mediatek: 64-bit DT updates for v4.19
+In-Reply-To: <3d66f9bc-48b5-00f2-c8eb-838f0ded5d90@gmail.com>
+References: <02b45906-ace0-bf49-7ccc-c9827e919d7c@gmail.com>
+ <3d66f9bc-48b5-00f2-c8eb-838f0ded5d90@gmail.com>
+Message-ID: <CAOesGMjADOD77fSmFbughh8eiGTnpgMCggAkndAa2Rpzy9-nag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 10:31 AM, Matthias Brugger
+On Thu, Jul 26, 2018 at 10:19 AM, Matthias Brugger
 <matthias.bgg@gmail.com> wrote:
 > Hi Olof,
 > Hi Arnd,
@@ -29,35 +29,26 @@ On Thu, Jul 26, 2018 at 10:31 AM, Matthias Brugger
 > are available in the Git repository at:
 >
 >   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-> tags/v4.18-next-dts32
+> tags/v4.18-next-dts64
 >
-> for you to fetch changes up to 11a20c5601c5f0c685fa3a166348b7ffa830e123:
+> for you to fetch changes up to a873996921296ad74941017bf00884f14e10dffd:
 >
->   dt-bindings: arm: mediatek: cleanup MT7623N reference boards (2018-07-16
-> 15:57:40 +0200)
->
-> ----------------------------------------------------------------
-> - mt7623
-> - delete unsupported reference board
-> - fix pio leds
-> - add missing cooling device
+>   arm64: dts: Add Mediatek X20 Development Board support (2018-07-20 17:46:46 +0200)
 >
 > ----------------------------------------------------------------
-> Frank Wunderlich (1):
->       arm: dts: mediatek: Fix pio-leds for Bananapi-R2
+> - mt7622:
+> - add EINT support
+> - add gpio-ranges property to pinctrl
+> - add earlycon to rfb1 to find boot errros more easily
+> - fix uart clock
+> - add iommu and smi bindings
 >
-> Ryder Lee (2):
->       arm: dts: mt7623: cleanup MT7623N NAND dts file
->       dt-bindings: arm: mediatek: cleanup MT7623N reference boards
+> - mt6797:
+> - add support for the 96 board x20 development board
 >
-> Viresh Kumar (1):
->       arm: dts: mediatek: Add missing cooling device properties for CPUs
+> - fix cooling-cells of mt7622 and mt8173
 
-Merged, but a friendly reminder that 32-bit uses ARM: while 64-bit
-uses arm64: as prefix. I've nagged a few other maintainers about it,
-and will post checkpatch patches for it.
+Merged, thanks!
 
-
-Thanks!
 
 -Olof
