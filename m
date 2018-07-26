@@ -1,79 +1,40 @@
-From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
-Date: Thu, 26 Jul 2018 11:27:25 -0500
-Subject: [PATCHv8 8/9] Documentation: driver-api: add stratix10 service layer
-In-Reply-To: <1532622446-19663-1-git-send-email-richard.gong@linux.intel.com>
-References: <1532622446-19663-1-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <1532622446-19663-9-git-send-email-richard.gong@linux.intel.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Thu, 26 Jul 2018 09:36:55 -0700
+Subject: [PATCH v10 00/10] drivers: Introduce firmware dnd clock river for
+ ZynqMP core
+In-Reply-To: <19376df2-fdd4-12e3-da4c-37106fffed19@xilinx.com>
+References: <1531857547-16652-1-git-send-email-jollys@xilinx.com>
+ <2c3aad45-37ce-2446-4b90-bddb477286ed@xilinx.com>
+ <CY1PR02MB2138E21A3FFBD5FEEAA7D6D4B8550@CY1PR02MB2138.namprd02.prod.outlook.com>
+ <19376df2-fdd4-12e3-da4c-37106fffed19@xilinx.com>
+Message-ID: <153262301567.48062.15432354725863055071@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Gong <richard.gong@intel.com>
+Quoting Michal Simek (2018-07-25 02:51:14)
+> On 24.7.2018 20:14, Jolly Shah wrote:
+> >>>  create mode 100644 drivers/firmware/xilinx/zynqmp-debug.h
+> >>>  create mode 100644 drivers/firmware/xilinx/zynqmp.c  create mode
+> >>> 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
+> >>>  create mode 100644 include/linux/firmware/xlnx-zynqmp.h
+> >>>
+> >>
+> >> It looks pretty calm over the last several series that's why when I get an answer
+> >> from Stephen or Mike I will take this series via my tree and arm-soc tree.
+> >>
+> >> I have applied 01-08 here
+> >>  https://github.com/Xilinx/linux-xlnx/commits/zynqmp/soc
+> >>
+> >> Thanks,
+> >> Michal
+> > 
+> > 
+> > Thanks for merging the patches. 
+> > By mistake I added ?Reviewed-by: Stephen Boyd sboyd at kernel.org? for firmware bindings (Patch01).  Stephen had reviewed clock bindings only.  Please suggest if I should send a new version with that fix.
+> 
+> I have fixed that in my branch and I have asked Shephen to look at clk
+> over chat.
+> 
 
-Add new file stratix10-svc.rst
-Add stratix10-svc.rst to driver-api/index.rst
-
-Signed-off-by: Richard Gong <richard.gong@intel.com>
-Signed-off-by: Alan Tull <atull@kernel.org>
----
-v5: this patch is added in patch set version 5
-v6: no change
-v7: no change
-v8: no change
----
- Documentation/driver-api/index.rst         |  1 +
- Documentation/driver-api/stratix10-svc.rst | 32 ++++++++++++++++++++++++++++++
- 2 files changed, 33 insertions(+)
- create mode 100644 Documentation/driver-api/stratix10-svc.rst
-
-diff --git a/Documentation/driver-api/index.rst b/Documentation/driver-api/index.rst
-index 6d9f2f9..d4d2671 100644
---- a/Documentation/driver-api/index.rst
-+++ b/Documentation/driver-api/index.rst
-@@ -53,6 +53,7 @@ available subsections can be seen below.
-    slimbus
-    soundwire/index
-    fpga/index
-+   stratix10-svc
- 
- .. only::  subproject and html
- 
-diff --git a/Documentation/driver-api/stratix10-svc.rst b/Documentation/driver-api/stratix10-svc.rst
-new file mode 100644
-index 0000000..ed361d8
---- /dev/null
-+++ b/Documentation/driver-api/stratix10-svc.rst
-@@ -0,0 +1,32 @@
-+
-+Intel Stratix10 SoC Service Layer
-+=================================
-+
-+Some features of the Intel Stratix10 SoC require a level of privilege
-+higher than the kernel is granted. Such secure features include
-+FPGA programming. In terms of the ARMv8 architecture, the kernel runs
-+at Exception Level 1 (EL1), access to the features requires
-+Exception Level 3 (EL3).
-+
-+The Intel Stratix10 SoC service layer provides an in kernel API for
-+drivers to request access to the secure features. The requests are queued
-+and processed one by one. ARM?s SMCCC is used to pass the execution
-+of the requests on to a secure monitor (EL3).
-+
-+.. kernel-doc:: include/linux/stratix10-svc-client.h
-+   :functions: stratix10_svc_command_code
-+
-+.. kernel-doc:: include/linux/stratix10-svc-client.h
-+   :functions: stratix10_svc_client_msg
-+
-+.. kernel-doc:: include/linux/stratix10-svc-client.h
-+   :functions: stratix10_svc_command_reconfig_payload
-+
-+.. kernel-doc:: include/linux/stratix10-svc-client.h
-+   :functions: stratix10_svc_cb_data
-+
-+.. kernel-doc:: include/linux/stratix10-svc-client.h
-+   :functions: stratix10_svc_client
-+
-+.. kernel-doc:: drivers/misc/stratix10-svc.c
-+   :export:
--- 
-2.7.4
+I have some unresolved review comments on v9. I'll give reviewed-by when
+that discussion is resolved.
