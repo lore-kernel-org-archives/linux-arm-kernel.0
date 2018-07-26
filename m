@@ -1,9 +1,9 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 26 Jul 2018 16:02:55 +1200
-Subject: [PATCH 2/4] ARM: dts: mvebu: db-dxbc2: use new style nand binding
+Date: Thu, 26 Jul 2018 16:02:56 +1200
+Subject: [PATCH 3/4] ARM: dts: mvebu: db-xc3-24g4: use new style nand binding
 In-Reply-To: <20180726040257.22285-1-chris.packham@alliedtelesis.co.nz>
 References: <20180726040257.22285-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20180726040257.22285-3-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20180726040257.22285-4-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,14 +11,14 @@ Update the nand flash binding to the new style.
 
 Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 ---
- arch/arm/boot/dts/armada-xp-db-dxbc2.dts | 16 ++++++++++------
+ arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts | 16 ++++++++++------
  1 file changed, 10 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-xp-db-dxbc2.dts b/arch/arm/boot/dts/armada-xp-db-dxbc2.dts
-index 944e0a9c9dac..8a3aa616bbd0 100644
---- a/arch/arm/boot/dts/armada-xp-db-dxbc2.dts
-+++ b/arch/arm/boot/dts/armada-xp-db-dxbc2.dts
-@@ -70,12 +70,16 @@
+diff --git a/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts b/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
+index d58ea48cb151..df048050615f 100644
+--- a/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
++++ b/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
+@@ -69,12 +69,16 @@
  
  &nand_controller {
  	status = "okay";
@@ -40,6 +40,6 @@ index 944e0a9c9dac..8a3aa616bbd0 100644
 +	};
  };
  
- &sdio {
+ &spi0 {
 -- 
 2.18.0
