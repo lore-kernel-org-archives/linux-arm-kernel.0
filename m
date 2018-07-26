@@ -1,117 +1,128 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 26 Jul 2018 14:04:48 +0100
-Subject: [linux-sunxi] Re: [PATCH v2 06/18] arm64: dts: allwinner: a64:
- Orange Pi Win: Add UARTs
-In-Reply-To: <20180726093247.3hesukln2n3fhqeg@flea>
-References: <20180726003532.18751-1-andre.przywara@arm.com>
- <20180726003532.18751-7-andre.przywara@arm.com>
- <20180726073911.ualwgf3t2bboeuy5@flea>
- <E978AF7E-4802-4429-99A2-4724EB68FFA9@aosc.io>
- <71e5f296-a8f6-062c-6e55-86c8b07ed0a6@arm.com>
- <20180726093247.3hesukln2n3fhqeg@flea>
-Message-ID: <8d309202-05f1-d024-ae98-6a6baf03e888@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 26 Jul 2018 14:10:06 +0100
+Subject: [RFC PATCH 14/16] KVM: arm64/sve: Add SVE support to register
+ access ioctl interface
+In-Reply-To: <20180725172057.tvesmvfjtwe6sxla@kamzik.brq.redhat.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-15-git-send-email-Dave.Martin@arm.com>
+ <20180719130433.mfqqnxxlmvhduqri@kamzik.brq.redhat.com>
+ <20180725140621.GK4240@e103592.cambridge.arm.com>
+ <20180725172057.tvesmvfjtwe6sxla@kamzik.brq.redhat.com>
+Message-ID: <20180726131006.GW4240@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jul 25, 2018 at 07:20:57PM +0200, Andrew Jones wrote:
+> On Wed, Jul 25, 2018 at 03:06:21PM +0100, Dave Martin wrote:
+> > On Thu, Jul 19, 2018 at 03:04:33PM +0200, Andrew Jones wrote:
+> > > On Thu, Jun 21, 2018 at 03:57:38PM +0100, Dave Martin wrote:
+> > > > +
+> > > > +	if (usize % sizeof(u32))
+> > > > +		return -EINVAL;
+> > > 
+> > 
+> > Currently we don't enforce the register size to be a multiple of 32 bits,
+> > but I'm trying to establish a stronger position.  Passing different
+> > register sizes feels like an abuse of the API and there is no evidence
+> > that qemu or kvmtool is relying on this so far.  The ability to pass
+> > a misaligned register ID and/or slurp multiple vcpu registers (or parts
+> > of registers) is once call really seems like it works by accident today
+> > and seems not to be intentional design.  Rather, it exposes kernel
+> > implementation details, which is best avoided.
+> > 
+> > It would be better to make this a global check for usize % 32 == 0
+> > though, rather than burying it in fpsimd_vreg_bounds().
+> > 
+> > Opinions?
+> 
+> There's only one reason to not start enforcing it globally on arm/arm64,
+> and that's that it's not documented that way. Changing it would be an API
+> change, rather than just an API fix. It's probably a safe change, but...
 
-On 26/07/18 10:32, Maxime Ripard wrote:
-> On Thu, Jul 26, 2018 at 09:30:14AM +0100, Andre Przywara wrote:
->> Hi,
->>
->> On 26/07/18 08:42, Icenowy Zheng wrote:
->>>
->>>
->>> ? 2018?7?26? GMT+08:00 ??3:39:11, Maxime Ripard <maxime.ripard@bootlin.com> ??:
->>>> On Thu, Jul 26, 2018 at 01:35:20AM +0100, Andre Przywara wrote:
->>>>> From: Samuel Holland <samuel@sholland.org>
->>>>>
->>>>> The Orange Pi Win exposes several UARTs on header pin, and connects
->>>> one
->>>>> to the on-board WiFi/Bluetooth chip.
->>>>> Add the pinmux definitions to the UART nodes, but keep them disabled.
->>>>>
->>>>> Signed-off-by: Samuel Holland <samuel@sholland.org>
->>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>>>> ---
->>>>>  .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 33
->>>> ++++++++++++++++++++++
->>>>>  1 file changed, 33 insertions(+)
->>>>>
->>>>> diff --git
->>>> a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
->>>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
->>>>> index 0cadcd59edd9..10f63d0b99cb 100644
->>>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
->>>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
->>>>> @@ -54,6 +54,10 @@
->>>>>  	aliases {
->>>>>  		ethernet0 = &emac;
->>>>>  		serial0 = &uart0;
->>>>> +		serial1 = &uart1;
->>>>> +		serial2 = &uart2;
->>>>> +		serial3 = &uart3;
->>>>> +		serial4 = &uart4;
->>>>>  	};
->>>>>  
->>>>>  	chosen {
->>>>> @@ -237,12 +241,41 @@
->>>>>  	vcc-hdmi-supply = <&reg_dldo1>;
->>>>>  };
->>>>>  
->>>>> +/* On debug connector */
->>>>>  &uart0 {
->>>>>  	pinctrl-names = "default";
->>>>>  	pinctrl-0 = <&uart0_pins_a>;
->>>>>  	status = "okay";
->>>>>  };
->>>>>  
->>>>> +/* Wi-Fi/BT */
->>>>> +&uart1 {
->>>>> +	pinctrl-names = "default";
->>>>> +	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
->>>>> +	status = "okay";
->>>>> +};
->>>>
->>>> What BT chip is there? Does it have serdev support? If so, that should
->>>> be enabled here.
->>>
->>> RTL8723BS, no serdev.
-> 
-> https://www.spinics.net/lists/linux-bluetooth/msg76376.html
-> 
-> Not very far off though.
-> 
->> Yes. A while ago I managed to enable Bluetooth (on the Pine64 with the
->> same chip), but that involved a lot of hacking with a special userland
->> tool (not hciattach and no serdev).
->>
->> What this node means to say is: The UART1 is hardwired to some on-board
->> device and those pins are not available for GPIO, for instance.
->>
->> At least that was my understanding when it comes to enabling devices in
->> the DT. Is that correct?
-> 
-> Well, yes and no. Arguably, any device connected to the other side of
-> the serial bus should have been there from the beginning. However,
-> there wasn't any way to do that in Linux before serdev was introduced,
-> so we weren't doing that. That resulted in hacky userspace tools to
-> work around that, and other work arounds in the DT to for example
-> tying BT resources (clock, regulators, resets) to the WiFi chip hoping
-> that someone would use both all the time.
-> 
-> Now that it's just around the corner, we don't have any excuse to do
-> these kind of hacks anymore.
+I agree, though there are few direct users of this API, and I couldn't
+come up with a scenario where anyone in their right mind would access
+the core regs struct with access sizes <= 16 bits, and I've seen no
+evidence so far of the API being used in this way.
 
-That's true. Also I see that the serdev binding itself is not serdev
-specific, it just puts the Bluetooth node as a child of an UART node.
-But we would still need a compatible string for that child, wouldn't we?
-I guess we can't autodetect this? From what I can see from Hans' series
-there is no DT compatible string defined?
+So it would be nice to close this hole before it springs a leak.
 
-So do we just put a node there, specifying the resources it needs? Like
-the wake-up interrupt or regulators, if any? And leave out the
-compatible string, at least for now?
+I'll keep if for now, but flag it up for attention in the repost.
+I'm happy to drop it if people care strongly enough.
 
-Cheers,
-Andre.
+> > > > +
+> > > > +	usize /= sizeof(u32);
+> > > > +
+> > > > +	if ((uoffset <= start && usize <= start - uoffset) ||
+> > > > +	    uoffset >= limit)
+> > > > +		return -ENOENT;	/* not a vreg */
+> > > > +
+> > > > +	BUILD_BUG_ON(uoffset > limit);
+> > > 
+> > > Hmm, a build bug on uoffset can't be right, it's not a constant.
+> > > 
+> > > > +	if (uoffset < start || usize > limit - uoffset)
+> > > > +		return -EINVAL;	/* overlaps vregs[] bounds */
+> > 
+> > uoffset is not compile-time constant, but (uoffset > limit) is compile-
+> > time constant, because the previous if() returns from the function
+> > otherwise.
+> > 
+> > gcc seems to do the right thing here: the code compiles as-is, but
+> > if the prior if() is commented out then the BUILD_BUG_ON() fires
+> > because (uoffset > limit) is no longer compile-time constant.
+> 
+> Oh, interesting.
+> 
+> > 
+> > 
+> > This is a defensively-coded bounds check, where
+> > 
+> > 	if (A + B > C)
+> > 
+> > is transformed to
+> > 
+> > 	if (C >= B && A > C - B)
+> > 
+> > The former is susceptible to overflow in (A + B), whereas the latter is
+> > not.  We might be able to hide the risk with type casts, but that trades
+> > one kind of fragility for another IMHO.
+> > 
+> > In this patch, the C >= B part is subsumed into the previous if(), but
+> > because this is non-obvious I dropped the BUILD_BUG_ON() in as a hint
+> > to maintainers that we really do depend on a property of the previous
+> > check, so although it may look like the checks could be swapped over
+> > with no ill effects, really that is not safe.
+> 
+> I'm glad our maintainers can pick up on hints like that :-) Maybe you can
+> add a comment for mortals like me though.
+
+Hint taken...  I'll add a comment.  No doubt I'd eventually forget why 
+the BUILD_BUG_ON() was there too.
+
+> > Maybe the BUILD_BUG_ON() is superfluous, but I would prefer at least
+> > to keep a comment here.
+> > 
+> > What do you think.
+> >
+> 
+> Comment plus build-bug or just comment works for me.
+> 
+> > 
+> > OTOH, if we can show conclusively that we can avoid overflow here
+> > then the code can be simplified.  But I would want to be confident
+> > that this is really safe not just now but also under future maintenance.
+> > 
+> 
+> I agree with thoroughly checking user input. Maybe we can create/use
+> some helper functions to do it. Those helpers can then get reused
+> elsewhere, helping to keep ourselves sane the next time we need to
+> do similar sanity checks.
+
+It's a bit tricky to get right, because it all depends on the
+combination of types being used in the expression.
+
+I might have a think about how to do this, but for now I don't want to
+introduce more churn.
+
+Cheers
+---Dave
