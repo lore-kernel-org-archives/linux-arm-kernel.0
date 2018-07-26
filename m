@@ -1,30 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 25 Jul 2018 23:58:19 -0700
-Subject: [GIT PULL] Qualcomm ARM64 Defconfig updates for 4.19
-In-Reply-To: <1532232622-18275-1-git-send-email-andy.gross@linaro.org>
-References: <1532232622-18275-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <20180726065819.kc3rm4264flx75j6@localhost>
+From: baolin.wang@linaro.org (Baolin Wang)
+Date: Thu, 26 Jul 2018 15:57:21 +0800
+Subject: [PATCH 1/5] arm64: dts: sprd: Add SC27XX breathing light
+ controller device
+In-Reply-To: <20180726065208.yalawbgabym3evzy@localhost>
+References: <2531014d066e61063b3d7906e6df55caa028e17c.1531881619.git.baolin.wang@linaro.org>
+ <20180726065208.yalawbgabym3evzy@localhost>
+Message-ID: <CAMz4kuJ7e45xDe=aBc-m9dQczu+hdVH-SHCjnFSRmdjs-5BPZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 21, 2018 at 11:10:18PM -0500, Andy Gross wrote:
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-> 
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-defconfig-for-4.19
-> 
-> for you to fetch changes up to f8120d61ceb7c016e5a450a98b8d08ae69d82e22:
-> 
->   arm64: defconfig: Enable CONFIG_MTD_NAND_QCOM for IPQ8074 (2018-07-21 15:19:09 -0500)
-> 
-> ----------------------------------------------------------------
-> Qualcomm ARM64 Based defconfig Updates for v4.19
-> 
-> * Enable Qualcomm NAND driver
+Hi Olof,
 
-Merged, thanks!
+On 26 July 2018 at 14:52, Olof Johansson <olof@lixom.net> wrote:
+> On Mon, Jul 23, 2018 at 02:10:16PM +0800, Baolin Wang wrote:
+>> The SC27xx breathing light controller can support 3 outputs:
+>> red LED, green LED and blue LED.
+>>
+>> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+>
+> Applied 1-5, thanks. If you send a series like this, feel free to send a cover
+> letter as well, to let us know what you want done to them. I'm presuming you
+> wanted them applied in this case.
 
--Olof
+Sure, I will add one cover letter next time. Thanks.
+
+-- 
+Baolin Wang
+Best Regards
