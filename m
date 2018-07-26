@@ -1,72 +1,132 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 26 Jul 2018 14:14:43 -0700
-Subject: [PATCH v3 00/23] Add multi-channel support to Armada thermal
- driver
-In-Reply-To: <1532570441.2358.27.camel@intel.com>
-References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
- <20180718172849.30b7cec0@xps13> <20180725095222.054f1e80@xps13>
- <1532570441.2358.27.camel@intel.com>
-Message-ID: <20180726211442.GB3487@localhost.localdomain>
+From: sunnyliangjy@gmail.com (Wendy Liang)
+Date: Thu, 26 Jul 2018 14:31:02 -0700
+Subject: [PATCH v3 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
+In-Reply-To: <CABb+yY1VxNCskPK4LJ=JnxyKPBid2SEEgRLK3M1Csbu2xMRn8g@mail.gmail.com>
+References: <1515109891-17133-1-git-send-email-jliang@xilinx.com>
+ <1515109891-17133-3-git-send-email-jliang@xilinx.com>
+ <CABb+yY00n6fLiQXftj-TMhT6q=KopZMkLYr6DpYE8CvxH-gz8Q@mail.gmail.com>
+ <BY1PR0201MB0885F2BCD9FE353171B54888B0110@BY1PR0201MB0885.namprd02.prod.outlook.com>
+ <CABb+yY1VxNCskPK4LJ=JnxyKPBid2SEEgRLK3M1Csbu2xMRn8g@mail.gmail.com>
+Message-ID: <CAA07jV-K5x0TFvVDE4SyFqCztJsjiMbns=h=dQ4_EPRa+p7jfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Jan 9, 2018 at 8:42 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Wed, Jan 10, 2018 at 6:52 AM, Jiaying Liang <jliang@xilinx.com> wrote:
+>>> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
+>
+>>> > +
+>>> > +Controller Device Node:
+>>> > +===========================
+>>> > +Required properties:
+>>> > +--------------------
+>>> > +- compatible:          Shall be: "xlnx,zynqmp-ipi-mailbox"
+>>> > +- reg:                 IPI buffers address ranges
+>>> > +- reg-names:           Names of the reg resources. It should have:
+>>> > +                       * local_request_region
+>>> > +                         - IPI request msg buffer written by local and read
+>>> > +                           by remote
+>>> > +                       * local_response_region
+>>> > +                         - IPI response msg buffer written by local and read
+>>> > +                           by remote
+>>> > +                       * remote_request_region
+>>> > +                         - IPI request msg buffer written by remote and read
+>>> > +                           by local
+>>> > +                       * remote_response_region
+>>> > +                         - IPI response msg buffer written by remote and read
+>>> > +                           by local
+>>> >
+>>> shmem is option and external to the controller. It should be passed via
+>>> client's binding.
+>>> Please have a look at Sudeep's proposed patch
+>>> https://www.spinics.net/lists/arm-kernel/msg626120.html
+>> [Wendy] thanks for the link, but those 'buffers" are registers in the hardware
+>> but not memory.
+>>
+> No, that is for memory, not registers.
+> Please have a more careful look at the patch.
 
-On Thu, Jul 26, 2018 at 10:00:41AM +0800, Zhang Rui wrote:
-> On ?, 2018-07-25 at 09:52 +0200, Miquel Raynal wrote:
-> > Hi Eduardo, Zhang,
-> > 
-> > Miquel Raynal <miquel.raynal@bootlin.com> wrote on Wed, 18 Jul 2018
-> > 17:28:49 +0200:
-> > 
-> > > 
-> > > Hi Eduardo,
-> > > 
-> > > Miquel Raynal <miquel.raynal@bootlin.com> wrote on Mon, 16 Jul 2018
-> > > 16:41:43 +0200:
-> > > 
-> > > > 
-> > > > The only capability of the Armada thermal driver is currently
-> > > > just to
-> > > > read one sensor (the default one) per AP and one per CP.
-> > > > Actually,
-> > > > there is one sensor per core in the AP806 plus one sensor in the
-> > > > thermal IP itself. The CP110 just features one thermal sensor in
-> > > > its
-> > > > own thermal IP.
-> > > > 
-> > > > This series first improves the readability of this driver, then
-> > > > adds
-> > > > support for multi-channel thermal IPs. The bindings and the
-> > > > device-trees are updated accordingly.
-> > > > 
-> > > > Thank you,
-> > > > Miqu?l??
-> > > I know I sent this series on monday but there was almost no change
-> > > on
-> > > it (see below), do you think you will have the time to look at it
-> > > before it's too late for the merge window?
-> > I know a little bit what it is to be on the maintainer side of a
-> > subsystem but these changes are laying since April, 21st and I really
-> > expect to get them merged. Zhang, as Eduardo seems to be overloaded
-> > this release, could you please take the series?
-> > 
-> > Of course if there are things to address I'll be happy to do so.
-> > 
-> I had a sync with Eduardo during last merge window, and we agreed to
-> send separate git pull requests to Linus since this release and see how
-> it works.
-> This means that all the soc thermal driver patches should go to
-> Eduardo' tree and then Linus' tree directly.
-> 
-> Anyway, let's ping Eduardo and see if he can review/take the patches.
+Sorry for very late response.
 
-Sorry fellows, but I was off camping in a place with no electricity/no
-internet. I looked at this series before, and I do not remember anything
-that could block it to go. Let me restart on working on it.
+Those are not the normal memory but device memories,
+they are 32bytes fixed request buffers and response buffers per
+channel. They come
+from the IPI hardware block.
 
-> 
-> thanks,
-> rui
-> > Thanks,
-> > Miqu?l
+The mailbox framework API "mbox_send_message()" allows users to send message
+to the mailbox. in this case, just not clear on why we cannot have the
+buffer in the
+controller? These memories are not for sharing data, but just for
+short notification
+messages.
+
+>
+>>>
+>>> > +- #mbox-cells:         Shall be 1. It contains:
+>>> > +                       * tx(0) or rx(1) channel
+>>> > +- xlnx,ipi-ids:                Xilinx IPI agent IDs of the two peers of the
+>>> > +                       Xilinx IPI communication channel.
+>>> > +- interrupt-parent:    Phandle for the interrupt controller
+>>> > +- interrupts:          Interrupt information corresponding to the
+>>> > +                       interrupt-names property.
+>>> > +
+>>> > +Optional properties:
+>>> > +--------------------
+>>> > +- method:              The method of accessing the IPI agent registers.
+>>> > +                       Permitted values are: "smc" and "hvc". Default is
+>>> > +                       "smc".
+>>> > +
+>>> Andre almost implemented the generic driver. Can you please have a look at
+>>> https://www.spinics.net/lists/arm-kernel/msg595416.html
+>>> and see if you can just finish it off?
+>> [Wendy] This mailbox controller is about to use Xilinx IPI hardware as mailbox.
+>>
+> I couldn't find anything specific to Xilinx h/w
+> zynqmp_ipi_fw_call() is same as arm_smc_send_data() in Andre's driver
+> (though it needs to pass on [R2,R7] as I suggested in reply to him).
+>
+>> We use it to send notification/short request to firmware (usually running on
+>> another core on SoC),
+>>
+> So does Andre's driver. Which is precise and generic, so I much prefer that.
+>
+>> and also to receive notification/short request from firmware.
+>> Interrupt is used in the receiving direction. It looks different to the usage of
+>> mailbox driver from the link.
+>>
+> Yes, there is some difference. But nothing related to your h/w.
+> Andre's driver assume synchronous transmits where the response is
+> filled in the regs upon return.
+> What kind of calls do you make to your remote firmware? I would expect
+> them to be 'fast'.
+
+The reason to have this mailbox driver is because, we have an hardware block
+for IPI, this hardware block has registers and buffers and we want to
+to use Linux
+kernel mailbox framework APIs such as mbox_send_message() and rx_callback in
+client drivers to send notification or short request to other
+processors and receive
+response and request.
+
+The reason to use SMC calls to access the registers is because we have the case
+that both the ATF and Linux kernel drive will need to access the same registers.
+
+I have looked at the arm_smc patch, it looks like it is for
+synchronous request, and only
+allow 32bit message. In our case, we need to:
+* besides synchronous request, we also need to handle asynchronous request.
+  The driver will monitor the interrupt to see if there is a message
+from the other core.
+   If yes, it will notify the client from rx_callback.
+* put 32bytes short message to the mailbox.
+
+Thanks,
+Wendy
+
+>
+>> Is there a plan to extend the ARM SMC mailbox driver
+>> to both trigger firmware actions and receive request from firmware?
+>>
+> Sure if we have a genuine requirement we can support RX path as well.
+>
+> Thanks.
