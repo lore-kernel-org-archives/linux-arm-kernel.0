@@ -1,126 +1,71 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Thu, 26 Jul 2018 11:44:25 +0800
-Subject: [PATCH v3 0/6] add non-strict mode support for arm-smmu-v3
-In-Reply-To: <aace9ec9-a36a-79a8-98eb-bbedd06f11a4@arm.com>
-References: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
- <aace9ec9-a36a-79a8-98eb-bbedd06f11a4@arm.com>
-Message-ID: <5B594399.1080404@huawei.com>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Thu, 26 Jul 2018 15:48:56 +1200
+Subject: [PATCH v5] ARM: mvebu: use dt_fixup to provide fallback for
+ enable-method
+Message-ID: <20180726034856.20743-1-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+We need to maintain backwards compatibility with device trees that don't
+define an enable method. At the same time we want the device tree to be
+able to specify an enable-method and have it stick.
 
+Previously by having smp assigned in the DT_MACHINE definition this
+would be picked up by setup_arch() and override whatever
+arm_dt_init_cpu_maps() had configured. Now we move the initial
+assignment of default smp_ops to a dt_fixup and let
+arm_dt_init_cpu_maps() override that if the device tree defines an
+enable-method.
 
-On 2018/7/25 5:51, Robin Murphy wrote:
-> On 2018-07-12 7:18 AM, Zhen Lei wrote:
->> v2 -> v3:
->> Add a bootup option "iommu_strict_mode" to make the manager can choose which
->> mode to be used. The first 5 patches have not changed.
->> +    iommu_strict_mode=    [arm-smmu-v3]
->> +        0 - strict mode (default)
->> +        1 - non-strict mode
->>
->> v1 -> v2:
->> Use the lowest bit of the io_pgtable_ops.unmap's iova parameter to pass the strict mode:
->> 0, IOMMU_STRICT;
->> 1, IOMMU_NON_STRICT;
->> Treat 0 as IOMMU_STRICT, so that the unmap operation can compatible with
->> other IOMMUs which still use strict mode. In other words, this patch series
->> will not impact other IOMMU drivers. I tried add a new quirk IO_PGTABLE_QUIRK_NON_STRICT
->> in io_pgtable_cfg.quirks, but it can not pass the strict mode of the domain from SMMUv3
->> driver to io-pgtable module.
-> 
-> What exactly is the issue there? We don't have any problem with other quirks like NO_DMA, and as I said before, by the time we're allocating the io-pgtable in arm_smmu_domain_finalise() we already know everything there is to know about the domain.
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+---
+Pervious versions
 
-Because userspace can map/unamp and start devices to access memory through VFIO.
-So that, the attacker can:
-1. alloc memory
-2. map
-3. unmap
-4. free memory
-5. repeatedly accesssing the just freed memory base on the just unmapped iova,
-   this attack may success if the freed memory is reused by others and the mapping still staying in TLB
+v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/300182.html
+v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/300480.html
+v3: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/302945.html
+v4: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303899.html
 
-But if only root user can use VFIO, this is an unnecessary worry. Then both normal and VFIO will use the
-same strict mode, so that the new quirk IO_PGTABLE_QUIRK_NON_STRICT can easily be applied.
+Changes since v4:
+- drop "RFC"
 
-> 
->> Add a new member domain_non_strict in struct iommu_dma_cookie, this member will only be
->> initialized when the related domain and IOMMU driver support non-strict mode.
->>
->> v1:
->> In common, a IOMMU unmap operation follow the below steps:
->> 1. remove the mapping in page table of the specified iova range
->> 2. execute tlbi command to invalid the mapping which is cached in TLB
->> 3. wait for the above tlbi operation to be finished
->> 4. free the IOVA resource
->> 5. free the physical memory resource
->>
->> This maybe a problem when unmap is very frequently, the combination of tlbi
->> and wait operation will consume a lot of time. A feasible method is put off
->> tlbi and iova-free operation, when accumulating to a certain number or
->> reaching a specified time, execute only one tlbi_all command to clean up
->> TLB, then free the backup IOVAs. Mark as non-strict mode.
->>
->> But it must be noted that, although the mapping has already been removed in
->> the page table, it maybe still exist in TLB. And the freed physical memory
->> may also be reused for others. So a attacker can persistent access to memory
->> based on the just freed IOVA, to obtain sensible data or corrupt memory. So
->> the VFIO should always choose the strict mode.
->>
->> Some may consider put off physical memory free also, that will still follow
->> strict mode. But for the map_sg cases, the memory allocation is not controlled
->> by IOMMU APIs, so it is not enforceable.
->>
->> Fortunately, Intel and AMD have already applied the non-strict mode, and put
->> queue_iova() operation into the common file dma-iommu.c., and my work is based
->> on it. The difference is that arm-smmu-v3 driver will call IOMMU common APIs to
->> unmap, but Intel and AMD IOMMU drivers are not.
->>
->> Below is the performance data of strict vs non-strict for NVMe device:
->> Randomly Read  IOPS: 146K(strict) vs 573K(non-strict)
->> Randomly Write IOPS: 143K(strict) vs 513K(non-strict)
-> 
-> How does that compare to passthrough performance? One thing I'm not entirely clear about is what the realistic use-case for this is - even if invalidation were infinitely fast, enabling translation still typically has a fair impact on overall system performance in terms of latency, power, memory bandwidth, etc., so I can't help wonder what devices exist today for which performance is critical and robustness* is unimportant, yet have crippled addressing capabilities such that they can't just use passthrough.
-I have no passthrough performance data yet, I will ask my team to do it. But we have tested the Global bypass:
-Randomly Read IOPS: 744K, and Randomly Write IOPS: is the same to non-strict.
+ arch/arm/mach-mvebu/board-v7.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-I'm also not clear. But I think in most cases, the system does not need to run at full capacity, but the system
-should have that ability. For example, a system's daily load may only 30-50%, but the load may increase to 80%+
-on festival day.
-
-Passthrough is not enough to support VFIO, and virtualization need the later.
-
-> 
-> Robin.
-> 
-> 
-> * I don't want to say "security" here, since I'm actually a lot less concerned about the theoretical malicious endpoint/wild write scenarios than the the much more straightforward malfunctioning device and/or buggy driver causing use-after-free style memory corruption. Also, I'm sick of the word "security"...
-
-OK?We really have no need to consider buggy devices.
-
-> 
->>
->> Zhen Lei (6):
->>    iommu/arm-smmu-v3: fix the implementation of flush_iotlb_all hook
->>    iommu/dma: add support for non-strict mode
->>    iommu/amd: use default branch to deal with all non-supported
->>      capabilities
->>    iommu/io-pgtable-arm: add support for non-strict mode
->>    iommu/arm-smmu-v3: add support for non-strict mode
->>    iommu/arm-smmu-v3: add bootup option "iommu_strict_mode"
->>
->>   Documentation/admin-guide/kernel-parameters.txt | 12 +++++++
->>   drivers/iommu/amd_iommu.c                       |  4 +--
->>   drivers/iommu/arm-smmu-v3.c                     | 42 +++++++++++++++++++++++--
->>   drivers/iommu/dma-iommu.c                       | 25 +++++++++++++++
->>   drivers/iommu/io-pgtable-arm.c                  | 23 ++++++++------
->>   include/linux/iommu.h                           |  7 +++++
->>   6 files changed, 98 insertions(+), 15 deletions(-)
->>
-> 
-> .
-> 
-
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index ccca95173e17..5bbde5e5258e 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -145,6 +145,11 @@ static void __init mvebu_dt_init(void)
+ 		i2c_quirk();
+ }
+ 
++static void __init armada_370_xp_dt_fixup(void)
++{
++	smp_set_ops(smp_ops(armada_xp_smp_ops));
++}
++
+ static const char * const armada_370_xp_dt_compat[] __initconst = {
+ 	"marvell,armada-370-xp",
+ 	NULL,
+@@ -153,17 +158,12 @@ static const char * const armada_370_xp_dt_compat[] __initconst = {
+ DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
+ 	.l2c_aux_val	= 0,
+ 	.l2c_aux_mask	= ~0,
+-/*
+- * The following field (.smp) is still needed to ensure backward
+- * compatibility with old Device Trees that were not specifying the
+- * cpus enable-method property.
+- */
+-	.smp		= smp_ops(armada_xp_smp_ops),
+ 	.init_machine	= mvebu_dt_init,
+ 	.init_irq       = mvebu_init_irq,
+ 	.restart	= mvebu_restart,
+ 	.reserve        = mvebu_memblock_reserve,
+ 	.dt_compat	= armada_370_xp_dt_compat,
++	.dt_fixup	= armada_370_xp_dt_fixup,
+ MACHINE_END
+ 
+ static const char * const armada_375_dt_compat[] __initconst = {
 -- 
-Thanks!
-BestRegards
+2.18.0
