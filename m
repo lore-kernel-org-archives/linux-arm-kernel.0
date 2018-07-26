@@ -1,106 +1,93 @@
 From: arun.parameswaran@broadcom.com (Arun Parameswaran)
-Date: Thu, 26 Jul 2018 11:36:22 -0700
-Subject: [PATCH 5/7] net: phy: Add support to configure clock in Broadcom
- iProc mdio mux
+Date: Thu, 26 Jul 2018 11:36:23 -0700
+Subject: [PATCH 6/7] net: phy: Add pm support to Broadcom iProc mdio mux driver
 In-Reply-To: <1532630184-29450-1-git-send-email-arun.parameswaran@broadcom.com>
 References: <1532630184-29450-1-git-send-email-arun.parameswaran@broadcom.com>
-Message-ID: <1532630184-29450-6-git-send-email-arun.parameswaran@broadcom.com>
+Message-ID: <1532630184-29450-7-git-send-email-arun.parameswaran@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to configure the internal rate adjust register based on the
-core clock supplied through device tree in the Broadcom iProc mdio mux.
-
-The operating frequency of the mdio mux block is 11MHz. This is derrived
-by dividing the clock to the mdio mux with the rate adjust register.
-
-In some SoC's the default values of the rate adjust register do not yield
-11MHz. These SoC's are required to specify the clock via the device tree
-for proper operation.
+Add support for suspend and resume to the Broadcom iProc mdio
+mux driver.
 
 Signed-off-by: Arun Parameswaran <arun.parameswaran@broadcom.com>
 ---
- drivers/net/phy/mdio-mux-bcm-iproc.c | 33 ++++++++++++++++++++++++++++++++-
- 1 file changed, 32 insertions(+), 1 deletion(-)
+ drivers/net/phy/mdio-mux-bcm-iproc.c | 42 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
 diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
-index dc65e95..6b400dd 100644
+index 6b400dd..89c18d6 100644
 --- a/drivers/net/phy/mdio-mux-bcm-iproc.c
 +++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
-@@ -13,7 +13,7 @@
-  * You should have received a copy of the GNU General Public License
-  * version 2 (GPLv2) along with this source code.
-  */
--
-+#include <linux/clk.h>
- #include <linux/platform_device.h>
- #include <linux/device.h>
- #include <linux/of_mdio.h>
-@@ -22,6 +22,10 @@
- #include <linux/mdio-mux.h>
- #include <linux/delay.h>
+@@ -51,13 +51,25 @@
+ #define MDIO_OPERATING_FREQUENCY	11000000
+ #define MDIO_RATE_ADJ_DIVIDENT		1
  
-+#define MDIO_RATE_ADJ_EXT_OFFSET	0x000
-+#define MDIO_RATE_ADJ_INT_OFFSET	0x004
-+#define MDIO_RATE_ADJ_DIVIDENT_SHIFT	16
-+
- #define MDIO_PARAM_OFFSET		0x23c
- #define MDIO_PARAM_MIIM_CYCLE		29
- #define MDIO_PARAM_INTERNAL_SEL		25
-@@ -44,13 +48,32 @@
- #define BUS_MAX_ADDR			32
- #define EXT_BUS_START_ADDR		16
- 
-+#define MDIO_OPERATING_FREQUENCY	11000000
-+#define MDIO_RATE_ADJ_DIVIDENT		1
++#define MDIO_NUM_OF_REGS_TO_RESTORE	2
 +
  struct iproc_mdiomux_desc {
  	void *mux_handle;
  	void __iomem *base;
  	struct device *dev;
  	struct mii_bus *mii_bus;
-+	struct clk *core_clk;
- };
- 
-+static void mdio_mux_iproc_config_clk(struct iproc_mdiomux_desc *md)
-+{
-+	u32 val;
-+	u32 divisor;
+ 	struct clk *core_clk;
++#ifdef CONFIG_PM_SLEEP
++	u32 restore_regs[MDIO_NUM_OF_REGS_TO_RESTORE];
++#endif
++};
 +
-+	if (md->core_clk) {
-+		divisor = clk_get_rate(md->core_clk) / MDIO_OPERATING_FREQUENCY;
-+		divisor = divisor / (MDIO_RATE_ADJ_DIVIDENT + 1);
-+		val = divisor;
-+		val |= MDIO_RATE_ADJ_DIVIDENT << MDIO_RATE_ADJ_DIVIDENT_SHIFT;
-+		writel(val, md->base + MDIO_RATE_ADJ_EXT_OFFSET);
-+		writel(val, md->base + MDIO_RATE_ADJ_INT_OFFSET);
-+	}
++#ifdef CONFIG_PM_SLEEP
++static const u16 restore_reg_offsets[MDIO_NUM_OF_REGS_TO_RESTORE] = {
++	MDIO_RATE_ADJ_EXT_OFFSET,
++	MDIO_RATE_ADJ_INT_OFFSET,
+ };
++#endif
+ 
+ static void mdio_mux_iproc_config_clk(struct iproc_mdiomux_desc *md)
+ {
+@@ -258,6 +270,35 @@ static int mdio_mux_iproc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int mdio_mux_iproc_suspend(struct device *dev)
++{
++	int i;
++	struct iproc_mdiomux_desc *md = dev_get_drvdata(dev);
++
++	for (i = 0; i < MDIO_NUM_OF_REGS_TO_RESTORE; i++)
++		md->restore_regs[i] = readl(md->base +
++					    restore_reg_offsets[i]);
++
++	return 0;
 +}
 +
- static int iproc_mdio_wait_for_idle(void __iomem *base, bool result)
- {
- 	unsigned int timeout = 1000; /* loop for 1s */
-@@ -175,6 +198,12 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
- 		return PTR_ERR(md->base);
- 	}
- 
-+	md->core_clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(md->core_clk)) {
-+		dev_info(&pdev->dev, "core_clk not specified\n");
-+		md->core_clk = NULL;
-+	}
++static int mdio_mux_iproc_resume(struct device *dev)
++{
++	int i;
++	struct iproc_mdiomux_desc *md = dev_get_drvdata(dev);
 +
- 	md->mii_bus = mdiobus_alloc();
- 	if (!md->mii_bus) {
- 		dev_err(&pdev->dev, "mdiomux bus alloc failed\n");
-@@ -206,6 +235,8 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
- 		goto out_register;
- 	}
- 
-+	mdio_mux_iproc_config_clk(md);
++	for (i = 0; i < MDIO_NUM_OF_REGS_TO_RESTORE; i++)
++		writel(md->restore_regs[i],
++		       md->base + restore_reg_offsets[i]);
 +
- 	dev_info(md->dev, "iProc mdiomux registered\n");
- 	return 0;
- 
++	return 0;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(mdio_mux_iproc_pm_ops,
++		mdio_mux_iproc_suspend, mdio_mux_iproc_resume);
++
+ static const struct of_device_id mdio_mux_iproc_match[] = {
+ 	{
+ 		.compatible = "brcm,mdio-mux-iproc",
+@@ -270,6 +311,7 @@ static int mdio_mux_iproc_remove(struct platform_device *pdev)
+ 	.driver = {
+ 		.name		= "mdio-mux-iproc",
+ 		.of_match_table = mdio_mux_iproc_match,
++		.pm		= &mdio_mux_iproc_pm_ops,
+ 	},
+ 	.probe		= mdio_mux_iproc_probe,
+ 	.remove		= mdio_mux_iproc_remove,
 -- 
 1.9.1
