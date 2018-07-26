@@ -1,52 +1,40 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 26 Jul 2018 13:54:46 +0100
-Subject: [PATCH v3 08/13] coresight: tmc-etr: Relax collection of trace from
- sysfs mode
+Date: Thu, 26 Jul 2018 13:54:44 +0100
+Subject: [PATCH v3 06/13] coresight: perf: Disable trace path upon source error
 In-Reply-To: <1532609691-16863-1-git-send-email-suzuki.poulose@arm.com>
 References: <1532609691-16863-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1532609691-16863-9-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1532609691-16863-7-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the ETR now uses mode specific buffers, we can reliably
-provide the trace data captured in sysfs mode, even when the ETR
-is operating in PERF mode.
+We enable the trace path, before activating the source.
+If we fail to enable the source, we must disable the path
+to make sure it is available for another session.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 58c7935..671a2ba 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -1168,19 +1168,17 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
- 		goto out;
- 	}
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index afe7e7f..6db76ce 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -317,11 +317,13 @@ static void etm_event_start(struct perf_event *event, int flags)
  
--	/* Don't interfere if operated from Perf */
--	if (drvdata->mode == CS_MODE_PERF) {
--		ret = -EINVAL;
--		goto out;
--	}
--
--	/* If sysfs_buf is NULL the trace data has been read already */
-+	/*
-+	 * We can safely allow reads even if the ETR is operating in PERF mode,
-+	 * since the sysfs session is captured in mode specific data.
-+	 * If drvdata::sysfs_data is NULL the trace data has been read already.
-+	 */
- 	if (!drvdata->sysfs_buf) {
- 		ret = -EINVAL;
- 		goto out;
- 	}
+ 	/* Finally enable the tracer */
+ 	if (source_ops(csdev)->enable(csdev, event, CS_MODE_PERF))
+-		goto fail_end_stop;
++		goto fail_disable_path;
  
--	/* Disable the TMC if we are trying to read from a running session */
-+	/* Disable the TMC if we are trying to read from a running session. */
- 	if (drvdata->mode == CS_MODE_SYSFS)
- 		tmc_etr_disable_hw(drvdata);
+ out:
+ 	return;
  
++fail_disable_path:
++	coresight_disable_path(path);
+ fail_end_stop:
+ 	perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
+ 	perf_aux_output_end(handle, 0);
 -- 
 2.7.4
