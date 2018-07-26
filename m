@@ -1,67 +1,44 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 26 Jul 2018 17:24:09 +0200
-Subject: [PATCH] clk: meson-gxbb: set fclk_div2 as CLK_IS_CRITICAL
-In-Reply-To: <1528892421-12180-1-git-send-email-narmstrong@baylibre.com>
-References: <1528892421-12180-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <5153040b-1f38-a17a-d78d-fec833c1c223@baylibre.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 26 Jul 2018 17:24:27 +0200
+Subject: [PATCH] ARM: dts: sun8i: r40/v40: rewrite BPi M2 Berry DTS to
+ rebase on M2 Ultra
+In-Reply-To: <BA51039A-02DD-42C2-A7A9-E1B866074CA6@aosc.io>
+References: <20180724163655.61365-1-icenowy@aosc.io>
+ <20180726124119.dwne2sncws2p3sdi@flea>
+ <BA51039A-02DD-42C2-A7A9-E1B866074CA6@aosc.io>
+Message-ID: <20180726152427.cjji4ymwfjifja4q@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stable Team,
+On Thu, Jul 26, 2018 at 08:47:34PM +0800, Icenowy Zheng wrote:
+> 
+> 
+> ? 2018?7?26? GMT+08:00 ??8:41:19, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+> >On Wed, Jul 25, 2018 at 12:36:55AM +0800, Icenowy Zheng wrote:
+> >> Banana Pi designs the BPi M2 Berry board to be software compatible
+> >with
+> >> BPi M2 Ultra,
+> >
+> >Do you have a reference for this?
+> 
+> See [1], it says "BPI-M2U and BPI-M2 Berry share the same image".
+> 
+> [1] http://www.banana-pi.org/download.html
 
-On 13/06/2018 14:20, Neil Armstrong wrote:
-> On Amlogic Meson GXBB & GXL platforms, the SCPI Cortex-M4 Co-Processor
-> seems to be dependent on the FCLK_DIV2 to be operationnal.
-> 
-> The issue occured since v4.17-rc1 by freezing the kernel boot when
-> the 'schedutil' cpufreq governor was selected as default :
-> 
->   [   12.071837] scpi_protocol scpi: SCP Protocol 0.0 Firmware 0.0.0 version
->   domain-0 init dvfs: 4
->   [   12.087757] hctosys: unable to open rtc device (rtc0)
->   [   12.087907] cfg80211: Loading compiled-in X.509 certificates for regulatory database
->   [   12.102241] cfg80211: Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
-> 
-> But when disabling the MMC driver, the boot finished but cpufreq failed to
-> change the CPU frequency :
-> 
->   [   12.153045] cpufreq: __target_index: Failed to change cpu frequency: -5
-> 
-> A bisect between v4.16 and v4.16-rc1 gave the 05f814402d61 commit to be
-> the first bad commit.
-> This commit added support for the missing clock gates before the fixed PLL
-> fixed dividers (FCLK_DIVx) and the clock framework basically disabled
-> all the unused fixed dividers, thus disabled a critical clock path for
-> the SCPI Co-Processor.
-> 
-> This patch simply sets the FCLK_DIV2 gate as critical to ensure
-> nobody can disable it.
-> 
-> Fixes: 05f814402d61 ("clk: meson: add fdiv clock gates")
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Debian supports different SoC from different vendor using the same
+image, so it's not really a good argument to share the device tree. I
+mean, you can even boot an H3 to a shell using an A33 device tree.
 
+Maxime
 
-This patch hit linux master with commit id c987ac6f1f088663b6dad39281071aeb31d450a8
-
-Could this be backported to the next 4.17 stable release ?
-
-Thanks,
-Neil
-
-> ---
->  drivers/clk/meson/gxbb.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-> index b1e4d95..0e053c1 100644
-> --- a/drivers/clk/meson/gxbb.c
-> +++ b/drivers/clk/meson/gxbb.c
-> @@ -511,6 +511,7 @@ static struct clk_regmap gxbb_fclk_div2 = {
->  		.ops = &clk_regmap_gate_ops,
->  		.parent_names = (const char *[]){ "fclk_div2_div" },
->  		.num_parents = 1,
-> +		.flags = CLK_IS_CRITICAL,
->  	},
->  };
->  
-> 
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180726/d89ae51e/attachment.sig>
