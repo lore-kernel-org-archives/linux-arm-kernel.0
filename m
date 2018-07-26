@@ -1,63 +1,61 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 26 Jul 2018 01:35:18 +0100
-Subject: [PATCH v2 04/18] arm64: dts: allwinner: a64: Orange Pi Win: Fix USB
+Date: Thu, 26 Jul 2018 01:35:16 +0100
+Subject: [PATCH v2 02/18] arm64: dts: allwinner: a64: Add Pine64-LTS device
+ tree file
 In-Reply-To: <20180726003532.18751-1-andre.przywara@arm.com>
 References: <20180726003532.18751-1-andre.przywara@arm.com>
-Message-ID: <20180726003532.18751-5-andre.przywara@arm.com>
+Message-ID: <20180726003532.18751-3-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Samuel Holland <samuel@sholland.org>
+The Pine64-LTS is a variant of the Pine64 board, from the software
+visible side resembling a SoPine module on a baseboard, though the
+board has the SoC and DRAM integrated on one PCB.
+Due to this it basically shares the DT with the SoPine baseboard, which
+we mimic in our DT by inclucing the boardboard .dts into the new file,
+just overwriting the model name.
+Having a separate .dts for this seems useful, since we don't know yet if
+there are subtle differences between the two. Also the SoC on the LTS
+board is technically an "R18" instead of the original "A64", although as
+far as we know this is just a relabelled version of the original SoC.
 
-The Orange Pi Win has 5 USB ports:
-Four are standard A sockets, connected to an on-board HUB. The hub's and
-socket's power regulators are enabled by GPIO PD7.
-Also it features a microB socket, connected to the SoC's USB-OTG port.
-It's power is supplied by the AXP PMIC, and the ID pin is connected to
-GPIO PH9. It can serve both as a host or a client port.
-
-Signed-off-by: Samuel Holland <samuel@sholland.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts    | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/allwinner/Makefile                  |  1 +
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts | 13 +++++++++++++
+ 2 files changed, 14 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-index 667016815cf3..c9cabe987c19 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-@@ -57,6 +57,17 @@
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index 9ffa7a038791..b7034327b28b 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-lts.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pinebook.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
+new file mode 100644
+index 000000000000..72d6961dc312
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
+@@ -0,0 +1,13 @@
++/*
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ *
++ * Copyright (c) 2018 ARM Ltd.
++ */
 +
-+	reg_usb1_vbus: usb1-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb1-vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-boot-on;
-+		enable-active-high;
-+		gpio = <&pio 3 7 GPIO_ACTIVE_HIGH>; /* PD7 */
-+		status = "okay";
-+	};
- };
- 
- &ehci1 {
-@@ -203,7 +214,13 @@
- 	status = "okay";
- };
- 
--&usbphy {
-+&usb_otg {
-+	dr_mode = "otg";
- 	status = "okay";
- };
- 
-+&usbphy {
-+	usb0_id_det-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	status = "okay";
++#include "sun50i-a64-sopine-baseboard.dts"
++
++/ {
++	model = "Pine64 LTS";
++	compatible = "pine64,pine64-lts", "allwinner,sun50i-r18",
++		     "allwinner,sun50i-a64";
 +};
 -- 
 2.14.4
