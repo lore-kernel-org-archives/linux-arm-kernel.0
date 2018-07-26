@@ -1,27 +1,161 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 26 Jul 2018 21:13:40 +0200
-Subject: [PATCH 5/7] net: phy: Add support to configure clock in Broadcom
- iProc mdio mux
-In-Reply-To: <1532630184-29450-6-git-send-email-arun.parameswaran@broadcom.com>
-References: <1532630184-29450-1-git-send-email-arun.parameswaran@broadcom.com>
- <1532630184-29450-6-git-send-email-arun.parameswaran@broadcom.com>
-Message-ID: <20180726191340.GH10686@lunn.ch>
+From: alex@ghiti.fr (Alex Ghiti)
+Date: Thu, 26 Jul 2018 19:13:59 +0000
+Subject: [PATCH v4 00/11] hugetlb: Factorize hugetlb architecture
+ primitives
+In-Reply-To: <de188e2f-99ab-53fa-20df-4fec00a935e9@ghiti.fr>
+References: <20180705110716.3919-1-alex@ghiti.fr>
+ <20180709141621.GD22297@dhcp22.suse.cz>
+ <2173685f-7f85-7acb-4685-2383210c5fa2@ghiti.fr>
+ <87d0vehx16.fsf@concordia.ellerman.id.au>
+ <67aba0f0-c0d4-b06f-5fbc-f4d113ce5033@ghiti.fr>
+ <20180726125940.GA15033@ls3530>
+ <de188e2f-99ab-53fa-20df-4fec00a935e9@ghiti.fr>
+Message-ID: <6ec7c5dc-feb1-86ff-b7d9-7794c92eaf0f@ghiti.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> @@ -175,6 +198,12 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
->  		return PTR_ERR(md->base);
->  	}
->  
-> +	md->core_clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(md->core_clk)) {
-> +		dev_info(&pdev->dev, "core_clk not specified\n");
-> +		md->core_clk = NULL;
-> +	}
-> +
+Actually, I went back to v4.17, and I have the same errors.
 
-In the binding, you say the clock is optional. This is a rather strong
-message for something which is optional. I think it would be better to
-not output anything.
+I used:
 
-    Andrew
+$ make ARCH=parisc O=build_parisc generic-64bit_defconfig
+$ PATH=/home/alex/wip/toolchain/gcc-8.1.0-nolibc/hppa64-linux/bin:$PATH 
+make ARCH=parisc CROSS_COMPILE=hppa64-linux-
+
+I downloaded the crosscompiler here: 
+https://mirrors.edge.kernel.org/pub/tools/crosstool/files/bin/x86_64/8.1.0/
+
+
+On 07/26/2018 05:01 PM, Alex Ghiti wrote:
+> Hi Helge,
+>
+> Thanks for your tests.
+> In case it can help you, this is what I get when I try to build 
+> generic-64bit_defconfig (I truncated the output):
+>
+> ...
+>
+> ?LD????? vmlinux.o
+> ?MODPOST vmlinux.o
+> hppa64-linux-ld: init/main.o(.text+0x98): cannot reach strreplace
+> init/main.o: In function `initcall_blacklisted':
+> init/.tmp_main.o:(.text+0x98): relocation truncated to fit: 
+> R_PARISC_PCREL22F against symbol `strreplace' defined in .text section 
+> in lib/string.o
+> hppa64-linux-ld: init/main.o(.text+0xbc): cannot reach strcmp
+> init/.tmp_main.o:(.text+0xbc): relocation truncated to fit: 
+> R_PARISC_PCREL22F against symbol `strcmp' defined in .text section in 
+> lib/string.o
+> hppa64-linux-ld: init/main.o(.text+0x21c): cannot reach strcpy
+> init/main.o: In function `do_one_initcall':
+> (.text+0x21c): relocation truncated to fit: R_PARISC_PCREL22F against 
+> symbol `strcpy' defined in .text section in lib/string.o
+> hppa64-linux-ld: init/main.o(.text+0x250): cannot reach strlcat
+> (.text+0x250): relocation truncated to fit: R_PARISC_PCREL22F against 
+> symbol `strlcat' defined in .text section in lib/string.o
+> hppa64-linux-ld: init/main.o(.init.text+0x1d4): cannot reach strcmp
+> init/main.o: In function `do_early_param':
+> init/.tmp_main.o:(.init.text+0x1d4): relocation truncated to fit: 
+> R_PARISC_PCREL22F against symbol `strcmp' defined in .text section in 
+> lib/string.o
+> hppa64-linux-ld: init/main.o(.init.text+0x250): cannot reach strcmp
+> init/.tmp_main.o:(.init.text+0x250): relocation truncated to fit: 
+> R_PARISC_PCREL22F against symbol `strcmp' defined in .text section in 
+> lib/string.o
+> hppa64-linux-ld: init/main.o(.init.text+0x294): cannot reach strlen
+> init/main.o: In function `repair_env_string':
+> init/.tmp_main.o:(.init.text+0x294): relocation truncated to fit: 
+> R_PARISC_PCREL22F against symbol `strlen' defined in .text section in 
+> lib/string.o
+> hppa64-linux-ld: init/main.o(.init.text+0x2f0): cannot reach strlen
+> init/.tmp_main.o:(.init.text+0x2f0): relocation truncated to fit: 
+> R_PARISC_PCREL22F against symbol `strlen' defined in .text section in 
+> lib/string.o
+> hppa64-linux-ld: init/main.o(.init.text+0x308): cannot reach memmove
+> init/.tmp_main.o:(.init.text+0x308): relocation truncated to fit: 
+> R_PARISC_PCREL22F against symbol `memmove' defined in .text section in 
+> lib/string.o
+> hppa64-linux-ld: init/main.o(.init.text+0x454): cannot reach strlen
+> init/main.o: In function `unknown_bootoption':
+> init/.tmp_main.o:(.init.text+0x454): relocation truncated to fit: 
+> R_PARISC_PCREL22F against symbol `strlen' defined in .text section in 
+> lib/string.o
+> hppa64-linux-ld: init/main.o(.init.text+0x4dc): cannot reach strchr
+> init/.tmp_main.o:(.init.text+0x4dc): additional relocation overflows 
+> omitted from the output
+> hppa64-linux-ld: init/main.o(.init.text+0x638): cannot reach strncmp
+> hppa64-linux-ld: init/main.o(.init.text+0x694): cannot reach get_option
+> hppa64-linux-ld: init/main.o(.init.text+0x744): cannot reach strsep
+> hppa64-linux-ld: init/main.o(.init.text+0x798): cannot reach strlen
+> hppa64-linux-ld: init/main.o(.init.text+0x7d0): cannot reach strcpy
+> hppa64-linux-ld: init/main.o(.init.text+0x954): cannot reach strlcpy
+> hppa64-linux-ld: init/main.o(.init.text+0xab8): cannot reach strlen
+> hppa64-linux-ld: init/main.o(.init.text+0xafc): cannot reach strlen
+> hppa64-linux-ld: init/main.o(.init.text+0xb40): cannot reach strlen
+> hppa64-linux-ld: init/main.o(.init.text+0xb84): cannot reach strlen
+> hppa64-linux-ld: init/main.o(.init.text+0xbd0): cannot reach strcpy
+> hppa64-linux-ld: init/main.o(.init.text+0xbe8): cannot reach strcpy
+> hppa64-linux-ld: init/main.o(.init.text+0xc3c): cannot reach 
+> build_all_zonelists
+> hppa64-linux-ld: init/main.o(.init.text+0x1200): cannot reach unknown
+> hppa64-linux-ld: init/main.o(.init.text+0x1278): cannot reach 
+> wait_for_completion
+> hppa64-linux-ld: init/main.o(.init.text+0x12b0): cannot reach 
+> _raw_spin_lock
+> hppa64-linux-ld: init/main.o(.init.text+0x147c): cannot reach strcpy
+> hppa64-linux-ld: init/main.o(.ref.text+0x40): cannot reach kernel_thread
+> hppa64-linux-ld: init/main.o(.ref.text+0x60): cannot reach 
+> find_task_by_pid_ns
+> hppa64-linux-ld: init/main.o(.ref.text+0x98): cannot reach 
+> set_cpus_allowed_ptr
+> hppa64-linux-ld: init/main.o(.ref.text+0xbc): cannot reach kernel_thread
+> hppa64-linux-ld: init/main.o(.ref.text+0xd4): cannot reach 
+> find_task_by_pid_ns
+> hppa64-linux-ld: init/main.o(.ref.text+0x108): cannot reach complete
+> hppa64-linux-ld: init/main.o(.ref.text+0x128): cannot reach 
+> cpu_startup_entry
+> hppa64-linux-ld: init/main.o(.ref.text+0x164): cannot reach unknown
+> hppa64-linux-ld: init/main.o(.ref.text+0x174): cannot reach 
+> async_synchronize_full
+> hppa64-linux-ld: init/main.o(.ref.text+0x1a4): cannot reach 
+> rcu_barrier_sched
+> hppa64-linux-ld: init/main.o(.ref.text+0x1b4): cannot reach 
+> mark_rodata_ro
+> hppa64-linux-ld: init/main.o(.ref.text+0x1d4): cannot reach 
+> rcu_end_inkernel_boot
+> hppa64-linux-ld: init/main.o(.ref.text+0x1f4): cannot reach unknown
+> hppa64-linux-ld: init/main.o(.ref.text+0x218): cannot reach printk
+> hppa64-linux-ld: init/main.o(.ref.text+0x238): cannot reach unknown
+> hppa64-linux-ld: init/main.o(.ref.text+0x258): cannot reach panic
+> hppa64-linux-ld: init/main.o(.ref.text+0x268): cannot reach printk
+> hppa64-linux-ld: init/main.o(.ref.text+0x280): cannot reach unknown
+> hppa64-linux-ld: init/main.o(.ref.text+0x29c): cannot reach unknown
+> hppa64-linux-ld: init/main.o(.ref.text+0x2b8): cannot reach unknown
+> hppa64-linux-ld: init/main.o(.ref.text+0x2d4): cannot reach unknown
+> hppa64-linux-ld: init/main.o(.ref.text+0x2f0): cannot reach panic
+> hppa64-linux-ld: init/do_mounts.o(.text+0x30): cannot reach strncasecmp
+> hppa64-linux-ld: init/do_mounts.o(.text+0x158): cannot reach strncmp
+> hppa64-linux-ld: init/do_mounts.o(.text+0x180): cannot reach strchr
+>
+> ...
+>
+>
+> On 07/26/2018 12:59 PM, Helge Deller wrote:
+>> * Alex Ghiti <alex@ghiti.fr>:
+>>> This is the result of the build for all arches tackled in this series
+>>> rebased on 4.18-rc6:
+>>> ...
+>>> parisc:
+>>> ???????? generic-64bit_defconfig: with huge page does not link
+>>> ???????? generic-64bit_defconfig: without huge page does not link
+>>> ???????? BUT not because of this series, any feedback welcome.
+>> Strange, but I will check that later....
+>>
+>> Anyway, I applied your v4-patch to my parisc64 tree, built the kernel,
+>> started it and ran some hugetlb LTP testcases sucessfully.
+>> So, please add:
+>>
+>> Tested-by: Helge Deller <deller@gmx.de> # parisc
+>>
+>> Helge
+>
