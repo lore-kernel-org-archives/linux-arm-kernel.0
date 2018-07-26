@@ -1,33 +1,79 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 26 Jul 2018 08:16:07 +0000
-Subject: [PATCH v7 4/6] dt-bindings: mailbox: imx-mu: add i.MX6SX and
- i.MX7S SoCs.
-In-Reply-To: <20180726065331.6186-5-o.rempel@pengutronix.de>
-References: <20180726065331.6186-1-o.rempel@pengutronix.de>
- <20180726065331.6186-5-o.rempel@pengutronix.de>
-Message-ID: <AM0PR04MB4211DA52A4902A9F7C99A77C802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 26 Jul 2018 10:19:00 +0200
+Subject: [GIT PULL] ARM: mediatek: 64-bit DT updates for v4.19
+In-Reply-To: <02b45906-ace0-bf49-7ccc-c9827e919d7c@gmail.com>
+References: <02b45906-ace0-bf49-7ccc-c9827e919d7c@gmail.com>
+Message-ID: <3d66f9bc-48b5-00f2-c8eb-838f0ded5d90@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
-> Sent: Thursday, July 26, 2018 2:53 PM
-> To: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
-> <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark
-> Rutland <mark.rutland@arm.com>; A.s. Dong <aisheng.dong@nxp.com>;
-> Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>; Jassi Brar
-> <jassisinghbrar@gmail.com>
-> Cc: Oleksij Rempel <o.rempel@pengutronix.de>; kernel at pengutronix.de;
-> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; dl-linux-
-> imx <linux-imx@nxp.com>
-> Subject: [PATCH v7 4/6] dt-bindings: mailbox: imx-mu: add i.MX6SX and
-> i.MX7S SoCs.
-> 
-> This are currently tested SoCs with imx-mailbox driver.
-> 
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+Hi Olof,
+Hi Arnd,
 
-Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
+This is the second attempt to send the pull request, as in the first one I sent
+the branch instead of the tag.
 
-Regards
-Dong Aisheng
+Please have a look.
+Regards,
+Matthias
+
+---
+
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the Git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
+tags/v4.18-next-dts64
+
+for you to fetch changes up to a873996921296ad74941017bf00884f14e10dffd:
+
+  arm64: dts: Add Mediatek X20 Development Board support (2018-07-20 17:46:46 +0200)
+
+----------------------------------------------------------------
+- mt7622:
+- add EINT support
+- add gpio-ranges property to pinctrl
+- add earlycon to rfb1 to find boot errros more easily
+- fix uart clock
+- add iommu and smi bindings
+
+- mt6797:
+- add support for the 96 board x20 development board
+
+- fix cooling-cells of mt7622 and mt8173
+
+----------------------------------------------------------------
+Manivannan Sadhasivam (2):
+      dt-bindings: arm: mediatek: Document Mediatek X20 Development Board
+      arm64: dts: Add Mediatek X20 Development Board support
+
+Ryder Lee (1):
+      arm64: dts: mt7622: update a clock property for UART0
+
+Sean Wang (3):
+      arm64: dts: mt7622: add EINT support to pinctrl
+      arm64: dts: mt7622: use gpio-ranges to pinctrl device
+      arm64: dts: mt7622: add earlycon to mt7622-rfb1 board
+
+Viresh Kumar (1):
+      arm64: dts: mediatek: Add missing cooling device properties for CPUs
+
+Yong Wu (1):
+      dt-bindings: mediatek: Add binding for mt2712 IOMMU and SMI
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |  3 +
+ .../devicetree/bindings/iommu/mediatek,iommu.txt   |  6 +-
+ .../memory-controllers/mediatek,smi-common.txt     |  6 +-
+ .../memory-controllers/mediatek,smi-larb.txt       |  5 +-
+ arch/arm64/boot/dts/mediatek/Makefile              |  1 +
+ arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts    | 33 ++++++++
+ arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts       |  4 +-
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi           | 12 ++-
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  2 +
+ include/dt-bindings/memory/mt2712-larb-port.h      | 95 ++++++++++++++++++++++
+ 10 files changed, 157 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt6797-x20-dev.dts
+ create mode 100644 include/dt-bindings/memory/mt2712-larb-port.h
