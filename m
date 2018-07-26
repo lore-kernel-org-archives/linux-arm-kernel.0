@@ -1,14 +1,14 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 26 Jul 2018 22:07:28 +0200
-Subject: [GIT PULL] ARM: mediatek: 64-bit DT updates for v4.19
-In-Reply-To: <3d66f9bc-48b5-00f2-c8eb-838f0ded5d90@gmail.com>
-References: <02b45906-ace0-bf49-7ccc-c9827e919d7c@gmail.com>
- <3d66f9bc-48b5-00f2-c8eb-838f0ded5d90@gmail.com>
-Message-ID: <CAOesGMjADOD77fSmFbughh8eiGTnpgMCggAkndAa2Rpzy9-nag@mail.gmail.com>
+Date: Thu, 26 Jul 2018 22:08:32 +0200
+Subject: [GIT PULL] ARM: mediatek: soc updates for v4.19
+In-Reply-To: <97140b0d-ebc7-4fc2-e953-0709da22264b@gmail.com>
+References: <9fdbdba4-c2e0-510d-62bb-e0a604942e19@gmail.com>
+ <97140b0d-ebc7-4fc2-e953-0709da22264b@gmail.com>
+Message-ID: <CAOesGMiGQSTNBPuSuhhm1mT2eKxXNujRFk_KjtCOg_oTbOthsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 10:19 AM, Matthias Brugger
+On Thu, Jul 26, 2018 at 10:20 AM, Matthias Brugger
 <matthias.bgg@gmail.com> wrote:
 > Hi Olof,
 > Hi Arnd,
@@ -29,24 +29,17 @@ On Thu, Jul 26, 2018 at 10:19 AM, Matthias Brugger
 > are available in the Git repository at:
 >
 >   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-> tags/v4.18-next-dts64
+> tags/v4.18-next-soc
 >
-> for you to fetch changes up to a873996921296ad74941017bf00884f14e10dffd:
+> for you to fetch changes up to 00673189b8b971c00417632ffe4c90ba9b4f2568:
 >
->   arm64: dts: Add Mediatek X20 Development Board support (2018-07-20 17:46:46 +0200)
+>   soc: mediatek: pwrap: add mt6351 driver for mt6797 SoCs (2018-07-16 15:50:17
+> +0200)
 >
 > ----------------------------------------------------------------
-> - mt7622:
-> - add EINT support
-> - add gpio-ranges property to pinctrl
-> - add earlycon to rfb1 to find boot errros more easily
-> - fix uart clock
-> - add iommu and smi bindings
->
-> - mt6797:
-> - add support for the 96 board x20 development board
->
-> - fix cooling-cells of mt7622 and mt8173
+> - add pmic wrapper support for mt6797
+> - pmic wrapper fix chiper init
+> - add support for pmic mt6351
 
 Merged, thanks!
 
