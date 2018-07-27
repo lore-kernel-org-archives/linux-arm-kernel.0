@@ -1,41 +1,123 @@
-From: alex@ghiti.fr (Alexandre Ghiti)
-Date: Fri, 27 Jul 2018 08:51:51 +0200
-Subject: [PATCH v4 00/11] hugetlb: Factorize hugetlb architecture
- primitives
-In-Reply-To: <99473e0d-12d8-bbea-fe9c-4e3738ab7f5a@oracle.com>
-References: <20180705110716.3919-1-alex@ghiti.fr>
- <20180709141621.GD22297@dhcp22.suse.cz>
- <2173685f-7f85-7acb-4685-2383210c5fa2@ghiti.fr>
- <75195a7d-3d0f-4e55-92cc-4ad772683c75@oracle.com>
- <87tvomgqyv.fsf@concordia.ellerman.id.au>
- <99473e0d-12d8-bbea-fe9c-4e3738ab7f5a@oracle.com>
-Message-ID: <a6d158b6-965d-7473-677d-13a9b7d46ba1@ghiti.fr>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 27 Jul 2018 16:00:31 +0900
+Subject: [PATCH v12 12/16] arm64: kexec_file: add crash dump support
+In-Reply-To: <e7605411-c54f-c744-43a7-aecc0e36e3f3@arm.com>
+References: <20180724065759.19186-1-takahiro.akashi@linaro.org>
+ <20180724065759.19186-13-takahiro.akashi@linaro.org>
+ <e7605411-c54f-c744-43a7-aecc0e36e3f3@arm.com>
+Message-ID: <20180727070030.GG11258@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+On Thu, Jul 26, 2018 at 02:36:58PM +0100, James Morse wrote:
+> Hi Akashi,
+> 
+> On 24/07/18 07:57, AKASHI Takahiro wrote:
+> > Enabling crash dump (kdump) includes
+> > * prepare contents of ELF header of a core dump file, /proc/vmcore,
+> >   using crash_prepare_elf64_headers(), and
+> > * add two device tree properties, "linux,usable-memory-range" and
+> >   "linux,elfcorehdr", which represent respectively a memory range
+> >   to be used by crash dump kernel and the header's location
+> 
+> > diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+> > index 5d102a1054b3..1b2c27026ae0 100644
+> > --- a/arch/arm64/include/asm/kexec.h
+> > +++ b/arch/arm64/include/asm/kexec.h
+> > @@ -97,8 +97,12 @@ static inline void crash_post_resume(void) {}
+> >  #define ARCH_HAS_KIMAGE_ARCH
+> >  
+> >  struct kimage_arch {
+> 
+> > -	void *dtb_buf;
+> > +	void *dtb;
+> 
+> This change should be in an earlier patch, otherwise this series doesn't build
+> during bisect.
 
-Thanks for your review. I'm going to fix the 2nd patch as you said, 
-you're right, no need to move the #include at the bottom of the file.
-I'm going to post a v5, add -mm in cc and ask for inclusion in their tree.
+Will fix.
 
-Thanks again for your time,
+> With the build-issues fixed:
+> Reviewed-by: James Morse <james.morse@arm.com>
+> 
+> Some boring Nits:
+> 
+> >  	unsigned long dtb_mem;
+> > +	/* Core ELF header buffer */
+> > +	void *elf_headers;
+> > +	unsigned long elf_headers_mem;
+> > +	unsigned long elf_headers_sz;
+> >  };
+> > diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+> > index b8297f10e2ef..7356da5a53d5 100644
+> > --- a/arch/arm64/kernel/machine_kexec_file.c
+> > +++ b/arch/arm64/kernel/machine_kexec_file.c
+> > @@ -38,12 +44,30 @@ static int setup_dtb(struct kimage *image,
+> >  		void **dtb_buf, unsigned long *dtb_buf_len)
+> >  {
+> >  	void *buf = NULL;
+> > -	size_t buf_size;
+> > +	size_t buf_size, range_size;
+> >  	int nodeoffset;
+> >  	int ret;
+> >  
+> >  	/* duplicate dt blob */
+> >  	buf_size = fdt_totalsize(initial_boot_params);
+> > +	range_size = of_fdt_reg_cells_size();
+> > +
+> > +	if (image->type == KEXEC_TYPE_CRASH) {
+> > +		buf_size += fdt_prop_len("linux,elfcorehdr", range_size);
+> > +		buf_size += fdt_prop_len("linux,usable-memory-range",
+> > +								range_size);
+> > +	}
+> 
+> Nit: it would be better if these strings were defined in a header file somewhere
+> so we don't risk a typo if this gets refactored.
 
-Alex
+Nit??
+Well, I do understand your concern, but it's a bit headache.
+If we handle them in such a way, we may want to handle others, such as
+linux,initrd-start/end, chosen and bootargs, as well in this file.
+They are not kexec specific and should go into a common header. This will
+end up propagating similar changes to other no-kexec-related occurrences
+under drivers/of.
+
+So I want to keep the following def's local in this file for easy
+maintenance.
+#define FDT_PSTR_KEXEC_ELFHDR  "linux,elfcorehdr"
+#define FDT_PSTR_MEM_RANGE     "linux,usable-memory-range"
+#define FDT_PSTR_INITRD_ST     "linux,initrd-start"
+#define FDT_PSTR_INITRD_END    "linux,initrd-end"
+#define FDT_PSTR_BOOTARGS       "bootargs"
+#define FDT_PSTR_KASLR_SEED     "kaslr-seed"
+
+> 
+> 
+> > @@ -129,6 +170,43 @@ static int setup_dtb(struct kimage *image,
+> >  	return ret;
+> >  }
+> >  
+> > +static int prepare_elf_headers(void **addr, unsigned long *sz)
+> > +{
+> > +	struct crash_mem *cmem;
+> > +	unsigned int nr_ranges;
+> > +	int ret;
+> > +	u64 i;
+> > +	phys_addr_t start, end;
+> > +
+> > +	nr_ranges = 1; /* for exclusion of crashkernel region */
+> 
+> > +	for_each_mem_range(i, &memblock.memory, NULL, NUMA_NO_NODE, 0,
+> > +							&start, &end, NULL)
+> 
+> Nit: MEMBLOCK_NONE
+
+OK
+
+-Takahiro AKASHI
 
 
-On 07/26/2018 09:16 PM, Mike Kravetz wrote:
-> On 07/26/2018 04:46 AM, Michael Ellerman wrote:
->> Mike Kravetz <mike.kravetz@oracle.com> writes:
->>
->>> On 07/20/2018 11:37 AM, Alex Ghiti wrote:
->>>> Does anyone have any suggestion about those patches ?
->>> I only took a quick look.  From the hugetlb perspective, I like the
->>> idea of moving routines to a common file.  If any of the arch owners
->>> (or anyone else) agree, I can do a review of the series.
->> The conversions look pretty good to me. If you want to give it a review
->> then from my point of view it could go in -mm to shake out any bugs.
-> Nothing of significance found in a review.  As others have suggested,
-> the (cross)compiler may be better at finding issues than human eyes.
->
-> I also suggest it be added to -mm.
+> 
+> Thanks,
+> 
+> James
