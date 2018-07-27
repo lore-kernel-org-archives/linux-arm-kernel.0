@@ -1,27 +1,79 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 27 Jul 2018 14:54:49 +0200
-Subject: [PATCH v2 08/10] drm/sun4i: Use __drm_atomic_helper_plane_reset
- instead of copying the logic
-In-Reply-To: <20180726161756.1794-9-alexandru-cosmin.gheorghe@arm.com>
-References: <20180726161756.1794-1-alexandru-cosmin.gheorghe@arm.com>
- <20180726161756.1794-9-alexandru-cosmin.gheorghe@arm.com>
-Message-ID: <20180727125449.iyoocim6s3sniyf7@flea>
+Date: Fri, 27 Jul 2018 14:56:15 +0200
+Subject: [PATCH v3.1 10/10] arm64: dts: allwinner: a64: Enable HDMI
+ output on A64 boards w/ HDMI
+In-Reply-To: <20180726171257.6688-11-icenowy@aosc.io>
+References: <20180726171257.6688-1-icenowy@aosc.io>
+ <20180726171257.6688-11-icenowy@aosc.io>
+Message-ID: <20180727125615.ju23ecgm6y4rz7p5@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 05:17:54PM +0100, Alexandru Gheorghe wrote:
-> A new helper function(__drm_atomic_helper_plane_reset) has been added
-> for linking a plane with its state and resetting the core
-> properties(alpha, rotation, etc.) to their default values.
-> Use that instead of duplicating the logic.
-> 
-> __drm_atomic_helper_plane_reset initializes the alpha property to its
-> max value, which is defined by the drm core as DRM_BLEND_ALPHA_OPAQUE,
-> so nothing changes regarding the alpha value.
-> 
-> Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
+On Fri, Jul 27, 2018 at 01:12:57AM +0800, Icenowy Zheng wrote:
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> index 1b9b92e541d2..1b972bade9f6 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> @@ -62,6 +62,21 @@
+>  	chosen {
+>  		stdout-path = "serial0:115200n8";
+>  	};
+> +
+> +	connector {
+> +		compatible = "hdmi-connector";
+> +		type = "a";
+> +
+> +		port {
+> +			hdmi_con_in: endpoint {
+> +				remote-endpoint = <&hdmi_out_con>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&de {
+> +	status = "okay";
+>  };
+>  
+>  &ehci0 {
+> @@ -82,6 +97,17 @@
+>  
+>  };
+>  
+> +&hdmi {
+> +	hdmi-supply = <&reg_dldo1>;
+> +	status = "okay";
+> +};
+> +
+> +&hdmi_out {
+> +	hdmi_out_con: endpoint {
+> +		remote-endpoint = <&hdmi_con_in>;
+> +	};
+> +};
+> +
+>  &i2c1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&i2c1_pins>;
+> @@ -99,6 +125,10 @@
+>  	};
+>  };
+>  
+> +&mixer1 {
+> +	status = "okay";
+> +};
+> +
+>  &mmc0 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&mmc0_pins>;
+> @@ -238,6 +268,10 @@
+>  	status = "disabled";
+>  };
+>  
+> +&tcon1 {
+> +	status = "okay";
+> +};
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Is it working or not on the pine64?
 
 Maxime
 
@@ -35,4 +87,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180727/b0c4557b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180727/9441978f/attachment.sig>
