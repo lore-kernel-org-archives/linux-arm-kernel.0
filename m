@@ -1,37 +1,33 @@
 From: manu@freebsd.org (Emmanuel Vadot)
-Date: Fri, 27 Jul 2018 13:52:05 +0200
-Subject: [PATCH v3 4/4] arm64: dts: allwinner: h5: Add SID for H5
-In-Reply-To: <20180727115205.20955-1-manu@freebsd.org>
-References: <20180727115205.20955-1-manu@freebsd.org>
-Message-ID: <20180727115205.20955-4-manu@freebsd.org>
+Date: Fri, 27 Jul 2018 13:52:02 +0200
+Subject: [PATCH v3 1/4] arm64: dts: allwinner: a64: Add SID node
+Message-ID: <20180727115205.20955-1-manu@freebsd.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The H5 SoC have a SID controller like the others Allwinner SoC.
-Add a node for it.
+The A64 have a SID controller which consist of EFUSE (starting at 0x200)
+and three registers to read/write some of the protected efuses.
 
 Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-index 62d646baac3c..9838acaeea58 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-@@ -92,6 +92,13 @@
- 			     <GIC_PPI 10
- 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
-+
-+	soc {
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 1b2ef28c42bd..69c0d9362553 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -227,6 +227,11 @@
+ 			#size-cells = <0>;
+ 		};
+ 
 +		sid: eeprom at 1c14000 {
-+			compatible = "allwinner,sun50i-h5-sid";
++			compatible = "allwinner,sun50i-a64-sid";
 +			reg = <0x1c14000 0x400>;
 +		};
-+	};
- };
- 
- &ccu {
++
+ 		usb_otg: usb at 1c19000 {
+ 			compatible = "allwinner,sun8i-a33-musb";
+ 			reg = <0x01c19000 0x0400>;
 -- 
 2.18.0
