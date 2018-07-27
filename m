@@ -1,105 +1,85 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Fri, 27 Jul 2018 01:51:35 +0000
-Subject: [PATCH v8 1/6] ARM: imx6q: provide documentation for new
- fsl,pmic-stby-poweroff property
-In-Reply-To: <84c1921c-922e-4b5d-b688-db89047fa1db@pengutronix.de>
-References: <20180726092220.17250-1-o.rempel@pengutronix.de>
- <20180726092220.17250-2-o.rempel@pengutronix.de>
- <DB6PR04MB3223605CB1F5E06D4A278B3C892B0@DB6PR04MB3223.eurprd04.prod.outlook.com>
- <84c1921c-922e-4b5d-b688-db89047fa1db@pengutronix.de>
-Message-ID: <DB6PR04MB32236EA307DCD070771B1D4D892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
+From: realmz6@gmail.com (Steven Miao)
+Date: Fri, 27 Jul 2018 10:06:49 +0800
+Subject: [Eas-dev] Computing the dynamic-power-coefficient on Exynos5422
+In-Reply-To: <6eebf48cdf26496a9c53892549a99ed8@MSX-L106.msx.ad.zih.tu-dresden.de>
+References: <6eebf48cdf26496a9c53892549a99ed8@MSX-L106.msx.ad.zih.tu-dresden.de>
+Message-ID: <CAMk6uBmv0X2A69dJ8tqLLCLbsD1V4pzSkrxhdyThF_OV-6AM7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Oliver,
 
-
-> -----Original Message-----
-> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
-> Sent: 2018?7?26? 19:38
-> To: Robin Gong <yibin.gong@nxp.com>; Shawn Guo <shawnguo@kernel.org>;
-> Mark Brown <broonie@kernel.org>; Rafael J. Wysocki
-> <rafael.j.wysocki@intel.com>
-> Cc: kernel at pengutronix.de; devicetree at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; linux-clk at vger.kernel.org;
-> linux-kernel at vger.kernel.org; Andrew Morton <akpm@linux-foundation.org>;
-> Liam Girdwood <lgirdwood@gmail.com>; Leonard Crestez
-> <leonard.crestez@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark
-> Rutland <mark.rutland@arm.com>; Michael Turquette
-> <mturquette@baylibre.com>; Stephen Boyd <sboyd@codeaurora.org>; Fabio
-> Estevam <fabio.estevam@nxp.com>; Russell King <linux@armlinux.org.uk>;
-> dl-linux-imx <linux-imx@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
-> Subject: Re: [PATCH v8 1/6] ARM: imx6q: provide documentation for new
-> fsl,pmic-stby-poweroff property
-> 
+On Thu, Jul 26, 2018 at 4:05 PM Oliver Effland
+<s5770874@msx.tu-dresden.de> wrote:
+>
 > Hi,
-> 
-> On 26.07.2018 11:51, Robin Gong wrote:
+>
+> First of all: thanks for all the valuable input! @(Russell, Dietmar & Steven)
+>
+> On 07/23/2018 08:51 AM, Steven Miao wrote:
+> > Hi  Oliver,
 > >
+> > Generally these dynamic co-efficiency and static leakage power comes
+> > from hardware design team by running power estimation tool, however
+> > you can tun these co-efficiency and parameters for better performance.
 > >
-> >> -----Original Message-----
-> >> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
-> >> Sent: 2018?7?26? 17:22
-> >> To: Shawn Guo <shawnguo@kernel.org>; Mark Brown
-> <broonie@kernel.org>;
-> >> Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> >> Cc: Oleksij Rempel <o.rempel@pengutronix.de>; kernel at pengutronix.de;
-> >> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> >> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org; Andrew
-> >> Morton <akpm@linux-foundation.org>; Liam Girdwood
-> >> <lgirdwood@gmail.com>; Leonard Crestez <leonard.crestez@nxp.com>;
-> Rob
-> >> Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
-> >> Michael Turquette <mturquette@baylibre.com>; Stephen Boyd
-> >> <sboyd@codeaurora.org>; Fabio Estevam <fabio.estevam@nxp.com>;
-> >> Russell King <linux@armlinux.org.uk>; dl-linux-imx
-> >> <linux-imx@nxp.com>; Robin Gong <yibin.gong@nxp.com>; A.s. Dong
-> >> <aisheng.dong@nxp.com>
-> >> Subject: [PATCH v8 1/6] ARM: imx6q: provide documentation for new
-> >> fsl,pmic-stby-poweroff property
-> >>
-> >> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> >> Acked-by: Rob Herring <robh@kernel.org>
-> >> ---
-> >>  Documentation/devicetree/bindings/clock/imx6q-clock.txt | 8 ++++++++
-> >>  1 file changed, 8 insertions(+)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-> >> b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-> >> index a45ca67a9d5f..e1308346e00d 100644
-> >> --- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-> >> +++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-> >> @@ -6,6 +6,14 @@ Required properties:
-> >>  - interrupts: Should contain CCM interrupt
-> >>  - #clock-cells: Should be <1>
-> >>
-> >> +Optional properties:
-> >> +- fsl,pmic-stby-poweroff: Configure CCM to assert PMIC_STBY_REQ
-> >> +signal
-> >> +  on power off.
-> >> +  Use this property if the SoC should be powered off by external
-> >> +power
-> >> +  management IC (PMIC) triggered via PMIC_STBY_REQ signal.
-> > PMIC_ON_REQ didn't connect to any pin of PMIC in your case?
-> 
-> No. First, it was only one customer specific issue. After some research I found
-> even publicly available boards (for example RioTboard) which has same/similar
-> design. After seeing this in imx6 documentation as valid power off way, I have
-> no doubts - there should be even more devices doin this in the wild.
-Not sure why the customer didn't follow reference design, since PMIC_ON_REQ can
-provide power off/on feature by pressing ONOFF key which connected ONOFF
-pin of i.mx6(ONOFF will toggle PMIC_ON_REQ to power off/on PMIC). The official
-power off/on way (PMIC_ON_REQ) can also power off all power rails of PFUZE except
-snvs as your patch did on PMIC_STBY_REQ.  PMIC_STBY_REQ is used to notify pmic
-switch power mode (PFM/APS) or decrease voltage to save power in kernel suspend,
-not power off....I am not sure if we need this patchset to 'workaround' the board issue.
-> 
-> > Don't understand
-> > why not follow normal board design guide to power off pmic by
-> PMIC_ON_REQ.
-> > How to power on board again then?
-> 
-> Power cycle. Without this patch, power of is not real power off. So, power cycle,
-> is expected behavior for user interaction. On usual PC, reset button will not
-> enable PC as well.
-Your board can't support wakeup by RTC alarm if not use PMIC_ON_REQ to power off.
-Again, why your board not follow the design guide?
+> > How did you get A7 or A15 power? Get Soc power or there's separate
+> > sensor for A7/A15?
+> Yes indeed, there are 2 seperate sensors for the A7 and A15.
+>
+> > If you want to create cpu busy power model manually, you can:
+> > 1 leave 1 A7 + 1 A15 core online, keep other cores offline, disable
+> > thermal zone, disable idle state for all cores
+> > 2 set A7 frequency to 200Mhz, move all the task to A15, run cpu
+> > intensive task on A7(dhrystone, sysbench cpu test), read sensor to get
+> > 1 A7 power P1(read from A7 cluster sensor)
+> > 3 online 2 A7 core, run dhrystone on each core, and get power P2
+> >
+> > we can get 1 A7 core power at 200Mhz ~= P2 - P1 (A7 power X 2 + static
+> > power - A7 power X 1 - static power
+> I followed your manual steps (using a busy loop for 10s, instead of a benchmark) and corrected my calculations (with the static
+> power in mind):
+>
+> A7:
+> freq(MHz) voltage(mV) Power(mW) A7_Power(mW)  Stat_Power(mW) DPC
+> 200       918.750     34.768    12.203        10.362         72.283955
+> 400       920.000     60.805    21.25         18.305         62.765831
+> 600       968.750     98.046    35.084        27.878         62.306652
+> 800       1042.500    148.095   52.285        43.525         60.136063
+> 1000      1116.250    212.214   76.112        59.99          61.084382
+> 1200      1190.000    288.958   99.993        88.972         58.842948
+> 1400      1288.750    411.936   144.807       122.322        62.276495
+>
+>                                                         mean: 62
+>
+> A15:
+> freq(MHz) voltage(mV) Power(mW) A15_Power(mW) Stat_Power(mW) DPC
+> 200       916250      122.584   31.139        60.306         185.458477
+> 500       916250      225.101   68.774        87.553         163.842401
+> 800       942500      349.158   112.432       124.294        158.211202
+> 1100      1016250     540.78    169.556       201.668        149.251725
+> 1400      1078750     779.19    258.214       262.762        158.493016
+> 1700      1180000     1179.344  392.107       395.13         165.650083
+> 2000      1320000     1969.764  648.768       672.228        186.170798
+>
+>                                                         mean: 164
+>
+> The ratio between A15 and A7 is now 164/62 = 2.645
+>
+> I hope the dynamic-power-coefficient's are more accurate now?
+>
+> > dynamic-power-coefficient ~= 400 - 500 is reasonable for big core
+> > dynamic-power-coefficient  ~= 100 is reasonable for LITTLE core.
+> > For IPA it can work effectively with a poor power model(not so
+> > accurate), for EAS it just need power model of LITTLE core and big
+> > core is proportional.
+>
+> I'm guessing my values differ from your suggested values, because it's 32bit ARM?
+Yes, the ratio bit and LITTLE ~= 400/100 ~= 4.x is from A73 and A53 @
+16nm process, it could vary from 32bit core or different process.
+>
+> Best regards,
+> Oliver
+
+Cheers,
+Steven
