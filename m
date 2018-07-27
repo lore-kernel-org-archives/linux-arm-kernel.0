@@ -1,36 +1,18 @@
 From: radhey.shyam.pandey@xilinx.com (Radhey Shyam Pandey)
-Date: Fri, 27 Jul 2018 16:20:38 +0530
-Subject: [PATCH 2/3] dmaengine: xilinx_dma: Refactor axidma channel validation
-In-Reply-To: <1532688639-32230-1-git-send-email-radhey.shyam.pandey@xilinx.com>
-References: <1532688639-32230-1-git-send-email-radhey.shyam.pandey@xilinx.com>
-Message-ID: <1532688639-32230-3-git-send-email-radhey.shyam.pandey@xilinx.com>
+Date: Fri, 27 Jul 2018 16:20:36 +0530
+Subject: [PATCH 0/3] dmaengine: xilinx_dma: Minor fix and refactoring
+Message-ID: <1532688639-32230-1-git-send-email-radhey.shyam.pandey@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In axidma start_transfer, prefer checking channel states before
-other params i.e pending_list.
+This patchset fixes 64-bit simple CDMA transfer.
+It also does some trivial code refactoring.
 
-Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
----
- drivers/dma/xilinx/xilinx_dma.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index 06d1632..a37871e 100644
---- a/drivers/dma/xilinx/xilinx_dma.c
-+++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -1271,10 +1271,10 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
- 	if (chan->err)
- 		return;
- 
--	if (list_empty(&chan->pending_list))
-+	if (!chan->idle)
- 		return;
- 
--	if (!chan->idle)
-+	if (list_empty(&chan->pending_list))
- 		return;
- 
- 	head_desc = list_first_entry(&chan->pending_list,
--- 
-1.7.1
+Radhey Shyam Pandey (3):
+  dmaengine: xilinx_dma: Refactor axidma channel allocation
+  dmaengine: xilinx_dma: Refactor axidma channel validation
+  dmaengine: xilinx_dma: Fix 64-bit simple CDMA transfer
+
+ drivers/dma/xilinx/xilinx_dma.c |   46 ++++++++++++++++++++------------------
+ 1 files changed, 24 insertions(+), 22 deletions(-)
