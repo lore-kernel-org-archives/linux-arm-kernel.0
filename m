@@ -1,31 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Jul 2018 12:43:44 +0100
-Subject: [PATCH v5 3/3] arm64: Introduce command line parameter to
- disable CNP
-In-Reply-To: <1529403502-2843-4-git-send-email-vladimir.murzin@arm.com>
-References: <1529403502-2843-1-git-send-email-vladimir.murzin@arm.com>
- <1529403502-2843-4-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20180727114343.ied4vfi2ljdgli2s@armageddon.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jul 2018 12:51:42 +0100
+Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.19
+Message-ID: <20180727115141.GE25592@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 19, 2018 at 11:18:22AM +0100, Vladimir Murzin wrote:
-> --- a/Documentation/admin-guide/kernel-parameters.txt
-> +++ b/Documentation/admin-guide/kernel-parameters.txt
-> @@ -2648,6 +2648,10 @@
->  
->  	noclflush	[BUGS=X86] Don't use the CLFLUSH instruction
->  
-> +	nocnp		[ARM64]
-> +			Disable CNP (Common not Private translations)
-> +			even if it is supported by processor.
-> +
->  	nodelayacct	[KNL] Disable per-task delay accounting
->  
->  	nodsp		[SH] Disable hardware DSP at boot time.
+Hi Joerg,
 
-I'll leave the decision to Will here. As I commented on a previous
-version, I'm not particularly fond of new command like options.
+Please pull these ARM SMMU updates for 4.19. Most of these are non-critical
+fixes, but the main change is switching our default behaviour so that we
+now abort transactions originating from unknown devices (i.e. those which
+are not attached to an iommu domain) rather than silently let them bypass
+the SMMU.
 
--- 
-Catalin
+Cheers,
+
+Will
+
+--->8
+
+The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+
+  Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
+
+for you to fetch changes up to b63b3439b85609338e4faabd5d2588dbda137e5c:
+
+  iommu/arm-smmu-v3: Abort all transactions if SMMU is enabled in kdump kernel (2018-07-27 11:12:37 +0100)
+
+----------------------------------------------------------------
+Jean-Philippe Brucker (2):
+      iommu/io-pgtable-arm: Fix pgtable allocation in selftest
+      iommu/io-pgtable-arm-v7s: Abort allocation when table address overflows the PTE
+
+Miao Zhong (1):
+      iommu/arm-smmu-v3: sync the OVACKFLG to PRIQ consumer register
+
+Vivek Gautam (1):
+      iommu/arm-smmu: Error out only if not enough context interrupts
+
+Will Deacon (1):
+      iommu/arm-smmu-v3: Abort all transactions if SMMU is enabled in kdump kernel
+
+Zhen Lei (1):
+      iommu/arm-smmu-v3: Prevent any devices access to memory without registration
+
+ drivers/iommu/arm-smmu-v3.c        | 25 ++++++++++++++++++-------
+ drivers/iommu/arm-smmu.c           | 16 ++++++++++------
+ drivers/iommu/io-pgtable-arm-v7s.c |  7 ++++++-
+ drivers/iommu/io-pgtable-arm.c     |  3 ++-
+ 4 files changed, 36 insertions(+), 15 deletions(-)
