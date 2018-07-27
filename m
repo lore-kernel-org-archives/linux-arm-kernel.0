@@ -1,27 +1,30 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 27 Jul 2018 18:03:08 +0200
-Subject: [PATCH v3 03/23] thermal: armada: remove misleading comments
-In-Reply-To: <20180716144206.30985-4-miquel.raynal@bootlin.com>
-References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
- <20180716144206.30985-4-miquel.raynal@bootlin.com>
-Message-ID: <ed966280-9200-4993-268d-61096ed41807@linaro.org>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sat, 28 Jul 2018 00:05:29 +0800
+Subject: [PATCH] crypto: arm64/sha256 - increase cra_priority of scalar
+ implementations
+In-Reply-To: <20180717170926.90689-1-ebiggers3@gmail.com>
+References: <20180717170926.90689-1-ebiggers3@gmail.com>
+Message-ID: <20180727160529.hvqcpaw432edqpt3@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/07/2018 16:41, Miquel Raynal wrote:
-> On older versions of this thermal IP, TSEN referred as the internal
-> sensor in the thermal IP while EXT_TSEN referred as sensors outside of
-> this IP, ie in the CPUs most of the time. The bit names in the
-> specifications do not follow this rule anymore, so remove these comments
-> that are misleading.
+On Tue, Jul 17, 2018 at 10:09:26AM -0700, Eric Biggers wrote:
+> From: Eric Biggers <ebiggers@google.com>
 > 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> Commit b73b7ac0a774 ("crypto: sha256_generic - add cra_priority") gave
+> sha256-generic and sha224-generic a cra_priority of 100, to match the
+> convention for generic implementations.  But sha256-arm64 and
+> sha224-arm64 also have priority 100, so their order relative to the
+> generic implementations became ambiguous.
+> 
+> Therefore, increase their priority to 125 so that they have higher
+> priority than the generic implementations but lower priority than the
+> NEON implementations which have priority 150.
+> 
+> Signed-off-by: Eric Biggers <ebiggers@google.com>
 
-Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-
+Patch applied.  Thanks.
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
