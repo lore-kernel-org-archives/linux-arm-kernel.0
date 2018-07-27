@@ -1,47 +1,86 @@
-From: djw@t-chip.com.cn (djw at t-chip.com.cn)
-Date: Fri, 27 Jul 2018 15:10:32 +0800
-Subject: [PATCH v1] arm64: dts: rockchip: add support for ROC-RK3399-PC
- board
-In-Reply-To: <cd4706970b40b49373ad169e3f9651f29508194a.camel@collabora.com>
- (Ezequiel Garcia's message of "Thu, 26 Jul 2018 10:41:58 -0300")
-References: <1532589205-10153-1-git-send-email-djw@t-chip.com.cn>
- <cd4706970b40b49373ad169e3f9651f29508194a.camel@collabora.com>
-Message-ID: <871sbpm9w7.fsf@archiso.i-did-not-set--mail-host-address--so-tickle-me>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Fri, 27 Jul 2018 09:19:01 +0200
+Subject: [PATCH v2] pwm: pwm-omap-dmtimer: return -EPROBE_DEFER if no
+ dmtimer platform data
+In-Reply-To: <20180726163705.4981d44a.drivshin@awxrd.com>
+References: <20180726133658.23902-1-drivshin@awxrd.com>
+ <20180726185426.GA3546@lenoch>
+ <20180726163705.4981d44a.drivshin@awxrd.com>
+Message-ID: <20180727071901.GA10846@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ezequiel Garcia <ezequiel@collabora.com> writes:
+On Thu, Jul 26, 2018 at 04:37:05PM -0400, David Rivshin wrote:
+> On Thu, 26 Jul 2018 20:54:26 +0200
+> Ladislav Michl <ladis@linux-mips.org> wrote:
+> 
+> > On Thu, Jul 26, 2018 at 09:36:58AM -0400, David Rivshin wrote:
+> > > From: David Rivshin <DRivshin@allworx.com>
+> > > 
+> > > If a pwm-omap-dmtimer is probed before the dmtimer it uses, the platform
+> > > data won't be set yet.
+> > > 
+> > > Fixes: ac30751df953 ("ARM: OMAP: pdata-quirks: Remove unused timer pdata")
+> > > Cc: <stable@vger.kernel.org> # 4.17+
+> > > Signed-off-by: David Rivshin <drivshin@allworx.com>
+> > > Acked-by: Pavel Machek <pavel@ucw.cz>
+> > > Tested-by: Pavel Machek <pavel@ucw.cz>
+> > > ---
+> > > Changes in v2:
+> > > * Added Pavel's Acked-by/Tested-by [1]
+> > > 
+> > > [1] https://lkml.org/lkml/2018/7/16/346
+> > > 
+> > >  drivers/pwm/pwm-omap-dmtimer.c | 5 +++--
+> > >  1 file changed, 3 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+> > > index 665da3c8fbceb..d3d7ea7a53146 100644
+> > > --- a/drivers/pwm/pwm-omap-dmtimer.c
+> > > +++ b/drivers/pwm/pwm-omap-dmtimer.c
+> > > @@ -264,8 +264,9 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+> > >  
+> > >  	timer_pdata = dev_get_platdata(&timer_pdev->dev);
+> > >  	if (!timer_pdata) {
+> > > -		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+> > > -		ret = -EINVAL;
+> > > +		dev_info(&pdev->dev,
+> > > +			 "dmtimer pdata structure NULL, deferring probe\n");  
+> > 
+> > This seems to be a bit verbose for EPROBE_DEFER case. Could we either remove
+> > it as it is done later in pdata->request_by_node(timer) failure case or at
+> > least make it dev_dbg? Otherwise thank you and with mentioned change
+> > Acked-by: Ladislav Michl <ladis@linux-mips.org>
+> 
+> Hi Ladislav, thanks for the review.
+> 
+> I had grepped through other drivers and found no consistent pattern. Some
+> places used dev_err still, others reduced to one of dev_{warn,info,dbg}, 
+> and others no message at all. Some messages mentioned they are deferring 
+> the probe, other didn't. I was already getting a couple of dev_info from 
+> the pinctrl core code, so I went that way. I figured the message might be
+> useful to someone, but I don't feel strongly.
 
-> On Thu, 2018-07-26 at 15:13 +0800, djw at t-chip.com.cn wrote:
->> From: Levin Du <djw@t-chip.com.cn>
->> 
->> ROC-RK3399-PC is a power efficient 4GB LPDDR4 single board
->> computer with USB 3.0 and Gigabit Ethernet in a form factor
->> compatible with the Raspberry Pi. It is based on the Rockchip
->> RK3399 SoC, powered by the Type-C port.
->> 
->> The devicetree currently supports peripherals of:
->> 
->> - Ethernet
->> - HDMI
->> - SD Card
->> - UART2 debug
->> - TYPE-C
->
-> Hi Levin,
->
-> Last time I tried to make the mainline fusb driver work, it really didn't.
-> Is USB 3.0 Type-C actually working with mainline on this board?
->
-> Thanks!
-> Eze
+Well, pinctrl probe deferal message is a bit annoying. It really does not
+tell us much as long as pins are correctly configured and in case they are
+not it is useless as well :)
 
-That's what I added in the end:
+> I personally would lean to dev_dbg if you think dev_info is too harsh, 
+> just in case someone's board suddenly isn't working after upgrade. But 
+> I'm certainly willing to remove the message entirely if you feel strongly,
+> or anyone else cares to weigh in.
 
-  USB3 in type-c port currently only works with normal orientation,
-  not flip one.
+I'm fine with dev_dbg as well.
 
-Adding 'extcon=<&fusb0>' to make the dwc3 core failed to initialize.
+Thank you,
+	ladis
 
-Regards,
-Levin
+> > 
+> > > +		ret = -EPROBE_DEFER;
+> > >  		goto put;
+> > >  	}
+> > >  
+> > > 
+> > > base-commit: d72e90f33aa4709ebecc5005562f52335e106a60
+> > > -- 
+> > > 2.17.1  
