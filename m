@@ -1,36 +1,63 @@
-From: manu@freebsd.org (Emmanuel Vadot)
-Date: Fri, 27 Jul 2018 13:52:03 +0200
-Subject: [PATCH v3 2/4] ARM: dts: sun8i: h3: Add SID compatible string
-In-Reply-To: <20180727115205.20955-1-manu@freebsd.org>
-References: <20180727115205.20955-1-manu@freebsd.org>
-Message-ID: <20180727115205.20955-2-manu@freebsd.org>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Fri, 27 Jul 2018 13:52:30 +0200
+Subject: [PATCH v3 01/23] thermal: armada: add a function that sanitizes
+ the thermal zone name
+In-Reply-To: <84f97022-a470-f314-ee75-e5afb733bea5@linaro.org>
+References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
+ <20180716144206.30985-2-miquel.raynal@bootlin.com>
+ <84f97022-a470-f314-ee75-e5afb733bea5@linaro.org>
+Message-ID: <20180727135230.3c7102c7@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SID controller on H3 already have a binding but isn't present in the
-dtsi file.
-Add a node for it.
+Hi Daniel,
 
-Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
----
- arch/arm/boot/dts/sun8i-h3.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+Daniel Lezcano <daniel.lezcano@linaro.org> wrote on Fri, 27 Jul 2018
+13:34:19 +0200:
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 41d57c76f290..614e2c2154c8 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -111,6 +111,11 @@
- 	};
- 
- 	soc {
-+		sid: eeprom at 1c14000 {
-+			compatible = "allwinner,sun8i-h3-sid";
-+			reg = <0x1c14000 0x400>;
-+		};
-+
- 		mali: gpu at 1c40000 {
- 			compatible = "allwinner,sun8i-h3-mali", "arm,mali-400";
- 			reg = <0x01c40000 0x10000>;
--- 
-2.18.0
+> On 16/07/2018 16:41, Miquel Raynal wrote:
+> > Thermal zone names must follow certain rules imposed by the framework.
+> > They are limited in length and shall not have any hyphen '-'.
+> > 
+> > This is done in a separate function for future use in another location.
+> > 
+> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>  
+> 
+> Why do you have to provide a function to test that?
+> 
+> Logically, the one who did the change to add a thermal name, should
+> check its code works. Without a proper name that won't work.
+
+What do you mean "the one who did the change"?
+I think the thermal core should not care that much to what is given as
+name and should probably not be so strict.
+
+Also, I don't choose what dev_name() returns, it's in the device tree
+and the device tree do not care about the implementation, it's just a
+descriptive file.
+
+> 
+> So this function is testing something which should be already tested, no?
+
+I don't think it is. Without this function the probe will simply fail.
+
+The explanation of what fails is in the code:
+
+> > +		/*
+> > +		 * When inside a system controller, the device name has the
+> > +		 * form: f06f8000.system-controller:ap-thermal so stripping
+> > +		 * after the ':' should give us a shorter but meaningful name.
+> > +		 */
+> > +		name = strrchr(name, ':');
+> > +		if (!name)
+> > +			name = "armada_thermal";
+> > +		else
+> > +			name++;
+
+[...]
+
+> > +
+> > +	/* Then check there are no '-' or hwmon core will complain */
+
+Thanks,
+Miqu?l
