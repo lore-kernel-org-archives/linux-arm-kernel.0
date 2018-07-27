@@ -1,23 +1,36 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 27 Jul 2018 15:04:28 +0200
-Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.19
-In-Reply-To: <20180727115141.GE25592@arm.com>
-References: <20180727115141.GE25592@arm.com>
-Message-ID: <20180727130428.GB6738@8bytes.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jul 2018 14:22:44 +0100
+Subject: [RFC PATCH] arm64: mm: Export __sync_icache_dcache() for
+ xen-privcmd
+In-Reply-To: <20180727120633.bjpfqswuxcy2ibqu@armageddon.cambridge.arm.com>
+References: <20180711231822.GG14131@decadent.org.uk>
+ <20180727120633.bjpfqswuxcy2ibqu@armageddon.cambridge.arm.com>
+Message-ID: <20180727132243.GA28549@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2018 at 12:51:42PM +0100, Will Deacon wrote:
-> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+On Fri, Jul 27, 2018 at 01:06:33PM +0100, Catalin Marinas wrote:
+> On Thu, Jul 12, 2018 at 12:18:22AM +0100, Ben Hutchings wrote:
+> > The xen-privcmd driver, which can be modular, calls set_pte_at()
+> > which in turn may call __sync_icache_dcache().
+> > 
+> > The call to __sync_icache_dcache() may be optimised out because it is
+> > conditional on !pte_special(), and xen-privcmd calls pte_mkspecial().
+> > But it seems unwise to rely on this optimisation.
+> > 
+> > Fixes: 3ad0876554ca ("xen/privcmd: add IOCTL_PRIVCMD_MMAP_RESOURCE")
+> > Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+> > ---
+> > This is an RFC since I haven't found an actual build failure.  Using
+> > Debian's gcc 7.3 with either CC_OPTIMIZE_FOR_PERFORMANCE or
+> > CC_OPTIMIZE_FOR_SIZE, the call *is* optimised away.
 > 
->   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> Since apply_to_page_range() is EXPORT_SYMBOL_GPL() and a
+> pte_fn_t function would likely use set_pte_at(), I'm fine with this
+> patch for consistency.
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
-> 
-> for you to fetch changes up to b63b3439b85609338e4faabd5d2588dbda137e5c:
-> 
->   iommu/arm-smmu-v3: Abort all transactions if SMMU is enabled in kdump kernel (2018-07-27 11:12:37 +0100)
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Pulled, thanks Will.
+Okey doke, I'll pick this up for 4.19.
+
+Will
