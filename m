@@ -1,42 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Jul 2018 10:37:58 +0100
-Subject: [PATCH v3 0/6] add non-strict mode support for arm-smmu-v3
-In-Reply-To: <5B5A8857.9040907@huawei.com>
-References: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
- <aace9ec9-a36a-79a8-98eb-bbedd06f11a4@arm.com>
- <5B594399.1080404@huawei.com>
- <f54dd9e0-6d4b-5daa-f6f6-be610393b487@arm.com>
- <5B5A8857.9040907@huawei.com>
-Message-ID: <20180727093758.GL28088@arm.com>
+From: zhangshaokun@hisilicon.com (Zhangshaokun)
+Date: Fri, 27 Jul 2018 17:41:46 +0800
+Subject: [PATCH] iommu/arm-smmu-v3: sync the OVACKFLG to PRIQ consumer
+ register
+In-Reply-To: <1532350618-16486-1-git-send-email-zhangshaokun@hisilicon.com>
+References: <1532350618-16486-1-git-send-email-zhangshaokun@hisilicon.com>
+Message-ID: <dfeaf347-afd4-b3f2-eb01-2781028371e8@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2018 at 10:49:59AM +0800, Leizhen (ThunderTown) wrote:
-> On 2018/7/26 22:16, Robin Murphy wrote:
-> > On 2018-07-26 4:44 AM, Leizhen (ThunderTown) wrote:
-> >> Passthrough is not enough to support VFIO, and virtualization need
-> >> the later.
-> > 
-> > Huh? The whole point of passthrough mode is that the IOMMU can still be
-> > used for VFIO, but without imposing the overhead of dynamic mapping on
-> > host DMA.
-> 
-> I said that from my experience. Userspace do not known the PA, so I think
-> the user can not fill dma_map.iova correctly.
-> 
-> 	/* Allocate some space and setup a DMA mapping */
-> 	dma_map.vaddr = (__u64)mmap(0, 0x1000, PROT_READ | PROT_WRITE,
-> 			     MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
-> 	dma_map.size = 0x1000;
-> 	dma_map.iova = 0x2f00000000UL;						/* user specified */
-> 	dma_map.flags = VFIO_DMA_MAP_FLAG_READ | VFIO_DMA_MAP_FLAG_WRITE;
-> 
-> 	ioctl(container, VFIO_IOMMU_MAP_DMA, &dma_map);
+Hi Will,
 
-Hmm, I'm pretty sure that's not the case. When passthrough is configured
-via iommu.passthrough, it only applies to the default domain and therefore
-won't affect the unmanaged domain that VFIO manages explicitly. So VFIO
-will continue to use translation and userspace can't pass whatever it likes
-for the iova.
+I saw it in your trees, is it necessary to Cc stable version?
 
-Will
+Cheers,
+Shaokun
+
+On 2018/7/23 20:56, Shaokun Zhang wrote:
+> From: Miao Zhong <zhongmiao@hisilicon.com>
+> 
+> When PRI queue occurs overflow, driver should update the OVACKFLG to
+> the PRIQ consumer register, otherwise subsequent PRI requests will not
+> be processed.
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Robin Murphy <robin.murphy@arm.com> 
+> Signed-off-by: Miao Zhong <zhongmiao@hisilicon.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 1d64710..deacc15 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -1301,6 +1301,7 @@ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
+>  
+>  	/* Sync our overflow flag, as we believe we're up to speed */
+>  	q->cons = Q_OVF(q, q->prod) | Q_WRP(q, q->cons) | Q_IDX(q, q->cons);
+> +	writel(q->cons, q->cons_reg);
+>  	return IRQ_HANDLED;
+>  }
+>  
+> 
