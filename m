@@ -1,106 +1,139 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 27 Jul 2018 10:26:59 +0100
-Subject: [RFC PATCH 13/16] KVM: Allow 2048-bit register access via
- KVM_{GET, SET}_ONE_REG
-In-Reply-To: <871sbqt82n.fsf@linaro.org>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-14-git-send-email-Dave.Martin@arm.com>
- <874lgntihl.fsf@linaro.org>
- <20180726125834.GV4240@e103592.cambridge.arm.com>
- <871sbqt82n.fsf@linaro.org>
-Message-ID: <20180727092656.GZ4240@e103592.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 27 Jul 2018 11:28:41 +0200
+Subject: [PATCH v12 16/16] arm64: kexec_file: add kaslr support
+In-Reply-To: <405b6708-4518-d81e-3938-39032c2b487e@arm.com>
+References: <20180724065759.19186-1-takahiro.akashi@linaro.org>
+ <20180724065759.19186-17-takahiro.akashi@linaro.org>
+ <50b31f17-fc85-aa72-06f5-d3b62060a91f@arm.com>
+ <20180727083104.GI11258@linaro.org>
+ <405b6708-4518-d81e-3938-39032c2b487e@arm.com>
+Message-ID: <CAKv+Gu9jw9rFx5P3vO8Frq5=LCWugScRiNHfb2ceHkgtS9opLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 02:55:44PM +0100, Alex Benn?e wrote:
-> 
-> Dave Martin <Dave.Martin@arm.com> writes:
-> 
-> > On Wed, Jul 25, 2018 at 04:58:30PM +0100, Alex Benn?e wrote:
-> >>
-> >> Dave Martin <Dave.Martin@arm.com> writes:
-> >>
-> >> > The Arm SVE architecture defines registers that are up to 2048 bits
-> >> > in size (with some possibility of further future expansion).
-> >> >
-> >> > In order to avoid the need for an excessively large number of
-> >> > ioctls when saving and restoring a vcpu's registers, this patch
-> >> > adds a #define to make support for individual 2048-bit registers
-> >> > through the KVM_{GET,SET}_ONE_REG ioctl interface official.  This
-> >> > will allow each SVE register to be accessed in a single call.
-> >> >
-> >> > There are sufficient spare bits in the register id size field for
-> >> > this change, so there is no ABI impact providing that
-> >> > KVM_GET_REG_LIST does not enumerate any 2048-bit register unless
-> >> > userspace explicitly opts in to the relevant architecture-specific
-> >> > features.
-> >>
-> >> Does it? It's not in this patch and looking at the final tree:
-> >>
-> >>   unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
-> >>   {
-> >>           unsigned long res = 0;
-> >>
-> >>           res += num_core_regs();
-> >>           res += num_sve_regs(vcpu);
-> >>           res += kvm_arm_num_sys_reg_descs(vcpu);
-> >>           res += kvm_arm_get_fw_num_regs(vcpu);
-> >>           res += NUM_TIMER_REGS;
-> >>
-> >>           return res;
-> >>   }
-> >>
-> >>
-> >> which leads to:
-> >>
-> >>   static int enumerate_sve_regs(const struct kvm_vcpu *vcpu, u64 __user **uind)
-> >>   {
-> >>           unsigned int n, i;
-> >>           int err = 0;
-> >>           int total = 0;
-> >>           unsigned int slices;
-> >>
-> >>           if (!vcpu_has_sve(&vcpu->arch))
-> >>                   return 0;
-> >>
-> >> Which enumerates the SVE regs if vcpu_has_sve() which AFAICT is true if
-> >> the host supports it, not if the user has requested it.
-> >>
-> >> I'll have to check what but given the indirection of kvm_one_reg I
-> >> wonder if existing binaries might end up spamming a badly sized array
-> >> when run on a new SVE supporting kernel?
-> >
-> > That shouldn't be the case: vcpu_has_sve() checks for the
-> > KVM_ARM64_GUEST_HAS_SVE flag, which should only be set if userspace asks
-> > for it.
-> >
-> > Give me a shout if this doesn't seem to be the case...
-> 
-> Ahh I missed it the first time:
-> 
-> 		if (system_supports_sve() &&
-> 		    test_bit(KVM_ARM_VCPU_SVE, vcpu->arch.features)) {
-> 			vcpu->arch.flags |= KVM_ARM64_GUEST_HAS_SVE;
-> 
-> And vcpu->arch.features is set by the user. However it will be set as
-> unless you specify otherwise we use the results of probed:
-> 
->   ret = ioctl(vmfd, KVM_ARM_PREFERRED_TARGET, init);
-> 
-> so the user will get it by definition when they first run on SVE capable
-> hardware.
+On 27 July 2018 at 11:22, James Morse <james.morse@arm.com> wrote:
+> Hi Akashi,
+>
+>
+> On 07/27/2018 09:31 AM, AKASHI Takahiro wrote:
+>
+> On Thu, Jul 26, 2018 at 02:40:49PM +0100, James Morse wrote:
+>
+> On 24/07/18 07:57, AKASHI Takahiro wrote:
+>
+> Adding "kaslr-seed" to dtb enables triggering kaslr, or kernel virtual
+> address randomization, at secondary kernel boot.
+>
+> Hmm, there are three things that get moved by CONFIG_RANDOMIZE_BASE. The
+> kernel
+> physical placement when booted via the EFIstub, the kernel-text VAs and the
+> location of memory in the linear-map region. Adding the kaslr-seed only does
+> the
+> last two.
+>
+> Yes, but I think that I and Mark has agreed that "kaslr" meant
+> "virtual" randomisation, not including "physical" randomisation.
+>
+> Okay, I'll update my terminology!
+>
+>
+> This means the physical placement of the new kernel is predictable from
+> /proc/iomem ... but this also tells you the physical placement of the
+> current
+> kernel, so I don't think this is a problem.
+>
+>
+> We always do this as it will have no harm on kaslr-incapable kernel.
+>
+> We don't have any "switch" to turn off this feature directly, but still
+> can suppress it by passing "nokaslr" as a kernel boot argument.
+>
+> diff --git a/arch/arm64/kernel/machine_kexec_file.c
+> b/arch/arm64/kernel/machine_kexec_file.c
+> index 7356da5a53d5..47a4fbd0dc34 100644
+> --- a/arch/arm64/kernel/machine_kexec_file.c
+> +++ b/arch/arm64/kernel/machine_kexec_file.c
+> @@ -158,6 +160,12 @@ static int setup_dtb(struct kimage *image,
+>
+> Don't you need to reserve some space in the area you vmalloc()d for the DT?
+>
+> No, I don't think so.
+> All the data to be loaded are temporarily saved in kexec buffers,
+> which will eventually be copied to target locations in machine_kexec
+> (arm64_relocate_new_kernel, which, unlike its name, will handle
+> not only kernel but also other data as well).
+>
+>
+> I think we're speaking at cross purposes. Don't you need:
+>
+> | buf_size += fdt_prop_len("kaslr?seed", sizeof(u64));
+>
+>
+> You can't assume the existing DTB had a kaslr-seed property, and the
+> difference may take us over a PAGE_SIZE boundary.
+>
+>
+>
+>
+> + /* add kaslr-seed */
+> + get_random_bytes(&value, sizeof(value));
+>
+> What happens if the crng isn't ready?
+>
+> It looks like this will print a warning that these random-bytes aren't
+> really up
+> to standard, but the new kernel doesn't know this happened.
+>
+> crng_ready() isn't exposed, all we could do now is
+> wait_for_random_bytes(), but that may wait forever because we do this
+> unconditionally.
+>
+> I'd prefer to leave this feature until we can check crng_ready(), and skip
+> adding a dodgy-seed if its not-ready. This avoids polluting the
+> next-kernel's
+> entropy pool.
+>
+> OK. I would try to follow the same way as Bhupesh's userspace patch
+> does for kaslr-seed:
+> http://lists.infradead.org/pipermail/kexec/2018-April/020564.html
+>
+>
+> (I really don't understand this 'copying code from user-space' that happens
+> with kexec_file_load)
+>
+>
+>   if (not found kaslr-seed in 1st kernel's dtb)
+>      don't care; go ahead
+>
+>
+> Don' t bother. As you say in the commit-message its harmless if the new
+> kernel doesn't support it.
+> Always having this would let you use kexec_file_load as a bootloader that
+> can get the crng to
+> provide decent entropy even if the platform bootloader can't.
+>
+>
+>   else
+>      if (current kaslr-seed != 0)
+>         error
+>
+>
+> Don't bother. If this happens its a bug in another part of the kernel that
+> doesn't affect this one. We aren't second-guessing the file-system when we
+> read the kernel-fd, lets keep this simple.
+>
+>      if (crng_ready()) ; FIXME, it's a local macro
+>         get_random_bytes(non-blocking)
+>         set new kaslr-seed
+>      else
+>         error
+>
+> error? Something like pr_warn_once().
+>
+> I thought the kaslr-seed was added to the entropy pool, but now I look again
+> I see its a separate EFI table. So the new kernel will add the same entropy
+> ... that doesn't sound clever. (I can't see where its zero'd or
+> re-initialised)
+>
 
-AFAIK qemu and kvmtool don't currently propagate the feature flags from
-KVM_ARM_PREFERRED_TARGET to KVM_VCPU_INIT.  That would probably not be
-the right thing to do, because if you don't know what a feature flag
-means then you can't safely turn it on.
-
-But in light of Andrew's comments I will need to review how this works.
-
-The semantics of the feature bits are not well defined, so it may be
-safer not to use them for enabling SVE.  I was hoping we could choose
-a meaning for them since they weren't previously used for anything,
-but that may be optimistic.
-
-Cheers
----Dave
+We do have a hook for that: grep for update_efi_random_seed()
