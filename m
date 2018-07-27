@@ -1,154 +1,86 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 27 Jul 2018 15:24:53 +0200
-Subject: [linux-sunxi] Re: [PATCH v2 06/18] arm64: dts: allwinner: a64:
- Orange Pi Win: Add UARTs
-In-Reply-To: <e4af10fb-6f3b-7693-28db-ca155dcd807a@arm.com>
-References: <20180726003532.18751-1-andre.przywara@arm.com>
- <20180726003532.18751-7-andre.przywara@arm.com>
- <20180726073911.ualwgf3t2bboeuy5@flea>
- <E978AF7E-4802-4429-99A2-4724EB68FFA9@aosc.io>
- <71e5f296-a8f6-062c-6e55-86c8b07ed0a6@arm.com>
- <20180726093247.3hesukln2n3fhqeg@flea>
- <8d309202-05f1-d024-ae98-6a6baf03e888@arm.com>
- <e4af10fb-6f3b-7693-28db-ca155dcd807a@arm.com>
-Message-ID: <20180727132453.qucmc2254wpi23vt@flea>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 27 Jul 2018 21:26:11 +0800
+Subject: [PATCH v3.1 10/10] arm64: dts: allwinner: a64: Enable HDMI output
+ on A64 boards w/ HDMI
+In-Reply-To: <20180727125615.ju23ecgm6y4rz7p5@flea>
+References: <20180726171257.6688-1-icenowy@aosc.io>
+ <20180726171257.6688-11-icenowy@aosc.io>
+ <20180727125615.ju23ecgm6y4rz7p5@flea>
+Message-ID: <8DF4600E-DFE4-47CD-B541-FFDD903A65FB@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2018 at 11:33:51AM +0100, Andre Przywara wrote:
-> On 26/07/18 14:04, Andre Przywara wrote:
-> > Hi,
-> > 
-> > On 26/07/18 10:32, Maxime Ripard wrote:
-> >> On Thu, Jul 26, 2018 at 09:30:14AM +0100, Andre Przywara wrote:
-> >>> Hi,
-> >>>
-> >>> On 26/07/18 08:42, Icenowy Zheng wrote:
-> >>>>
-> >>>>
-> >>>> ? 2018?7?26? GMT+08:00 ??3:39:11, Maxime Ripard <maxime.ripard@bootlin.com> ??:
-> >>>>> On Thu, Jul 26, 2018 at 01:35:20AM +0100, Andre Przywara wrote:
-> >>>>>> From: Samuel Holland <samuel@sholland.org>
-> >>>>>>
-> >>>>>> The Orange Pi Win exposes several UARTs on header pin, and connects
-> >>>>> one
-> >>>>>> to the on-board WiFi/Bluetooth chip.
-> >>>>>> Add the pinmux definitions to the UART nodes, but keep them disabled.
-> >>>>>>
-> >>>>>> Signed-off-by: Samuel Holland <samuel@sholland.org>
-> >>>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >>>>>> ---
-> >>>>>>  .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 33
-> >>>>> ++++++++++++++++++++++
-> >>>>>>  1 file changed, 33 insertions(+)
-> >>>>>>
-> >>>>>> diff --git
-> >>>>> a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> >>>>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> >>>>>> index 0cadcd59edd9..10f63d0b99cb 100644
-> >>>>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> >>>>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-> >>>>>> @@ -54,6 +54,10 @@
-> >>>>>>  	aliases {
-> >>>>>>  		ethernet0 = &emac;
-> >>>>>>  		serial0 = &uart0;
-> >>>>>> +		serial1 = &uart1;
-> >>>>>> +		serial2 = &uart2;
-> >>>>>> +		serial3 = &uart3;
-> >>>>>> +		serial4 = &uart4;
-> >>>>>>  	};
-> >>>>>>  
-> >>>>>>  	chosen {
-> >>>>>> @@ -237,12 +241,41 @@
-> >>>>>>  	vcc-hdmi-supply = <&reg_dldo1>;
-> >>>>>>  };
-> >>>>>>  
-> >>>>>> +/* On debug connector */
-> >>>>>>  &uart0 {
-> >>>>>>  	pinctrl-names = "default";
-> >>>>>>  	pinctrl-0 = <&uart0_pins_a>;
-> >>>>>>  	status = "okay";
-> >>>>>>  };
-> >>>>>>  
-> >>>>>> +/* Wi-Fi/BT */
-> >>>>>> +&uart1 {
-> >>>>>> +	pinctrl-names = "default";
-> >>>>>> +	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
-> >>>>>> +	status = "okay";
-> >>>>>> +};
-> >>>>>
-> >>>>> What BT chip is there? Does it have serdev support? If so, that should
-> >>>>> be enabled here.
-> >>>>
-> >>>> RTL8723BS, no serdev.
-> >>
-> >> https://www.spinics.net/lists/linux-bluetooth/msg76376.html
-> >>
-> >> Not very far off though.
-> >>
-> >>> Yes. A while ago I managed to enable Bluetooth (on the Pine64 with the
-> >>> same chip), but that involved a lot of hacking with a special userland
-> >>> tool (not hciattach and no serdev).
-> >>>
-> >>> What this node means to say is: The UART1 is hardwired to some on-board
-> >>> device and those pins are not available for GPIO, for instance.
-> >>>
-> >>> At least that was my understanding when it comes to enabling devices in
-> >>> the DT. Is that correct?
-> >>
-> >> Well, yes and no. Arguably, any device connected to the other side of
-> >> the serial bus should have been there from the beginning. However,
-> >> there wasn't any way to do that in Linux before serdev was introduced,
-> >> so we weren't doing that. That resulted in hacky userspace tools to
-> >> work around that, and other work arounds in the DT to for example
-> >> tying BT resources (clock, regulators, resets) to the WiFi chip hoping
-> >> that someone would use both all the time.
-> >>
-> >> Now that it's just around the corner, we don't have any excuse to do
-> >> these kind of hacks anymore.
-> > 
-> > That's true. Also I see that the serdev binding itself is not serdev
-> > specific, it just puts the Bluetooth node as a child of an UART node.
-> > But we would still need a compatible string for that child, wouldn't we?
-> > I guess we can't autodetect this? From what I can see from Hans' series
-> > there is no DT compatible string defined?
-> > 
-> > So do we just put a node there, specifying the resources it needs? Like
-> > the wake-up interrupt or regulators, if any? And leave out the
-> > compatible string, at least for now?
-> 
-> So I tried this:
-> https://github.com/apritzel/linux/commit/da8e1beadd2737067c#diff-1c31e6cad6646026007c68fe9d4a5079R257
-> 
-> but wasn't really happy with it. Without a proper binding we can't
-> describe all the resources yet: what's the prefix for -supply, is the
-> wake-up line a GPIO or an interrupt, is the reset line a GPIO or a reset
-> property, and so on.
-> 
-> So I can use either an empty node, which would more serve as
-> documentation, or at least put the wakeup line as an interrupt there.
-> 
-> Was there at least a proposed binding? I tried to look for other BT
-> chips, but they don't seem to agree on some common properties.
 
-A partially empty binding isn't worth anything, since you cannot be
-sure it won't change during the review cycle, and you would have to
-change it anyway when adding the compatible.
 
-I guess it's fine. I would have liked to postpone this and that we'd
-wait for that serie to be merged to create a binding and merge that
-patch, but I'm not that reluctant to merge it either.
+? 2018?7?27? GMT+08:00 ??8:56:15, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+>On Fri, Jul 27, 2018 at 01:12:57AM +0800, Icenowy Zheng wrote:
+>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+>b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+>> index 1b9b92e541d2..1b972bade9f6 100644
+>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+>> @@ -62,6 +62,21 @@
+>>  	chosen {
+>>  		stdout-path = "serial0:115200n8";
+>>  	};
+>> +
+>> +	connector {
+>> +		compatible = "hdmi-connector";
+>> +		type = "a";
+>> +
+>> +		port {
+>> +			hdmi_con_in: endpoint {
+>> +				remote-endpoint = <&hdmi_out_con>;
+>> +			};
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +&de {
+>> +	status = "okay";
+>>  };
+>>  
+>>  &ehci0 {
+>> @@ -82,6 +97,17 @@
+>>  
+>>  };
+>>  
+>> +&hdmi {
+>> +	hdmi-supply = <&reg_dldo1>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&hdmi_out {
+>> +	hdmi_out_con: endpoint {
+>> +		remote-endpoint = <&hdmi_con_in>;
+>> +	};
+>> +};
+>> +
+>>  &i2c1 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&i2c1_pins>;
+>> @@ -99,6 +125,10 @@
+>>  	};
+>>  };
+>>  
+>> +&mixer1 {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &mmc0 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&mmc0_pins>;
+>> @@ -238,6 +268,10 @@
+>>  	status = "disabled";
+>>  };
+>>  
+>> +&tcon1 {
+>> +	status = "okay";
+>> +};
+>
+>Is it working or not on the pine64?
 
-Maxime
+Not tested yet, as my main A64 device is Pine A64-LTS now.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180727/d6a7c50c/attachment.sig>
+>
+>Maxime
