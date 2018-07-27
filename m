@@ -1,69 +1,42 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Fri, 27 Jul 2018 09:33:28 +0000
-Subject: [PATCH v8 6/6] ARM: dts: imx6: RIoTboard provide standby on power
- off option
-In-Reply-To: <20180726092220.17250-7-o.rempel@pengutronix.de>
-References: <20180726092220.17250-1-o.rempel@pengutronix.de>
- <20180726092220.17250-7-o.rempel@pengutronix.de>
-Message-ID: <DB6PR04MB3223FA7B91D0D43B2EC1EE2A892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jul 2018 10:37:58 +0100
+Subject: [PATCH v3 0/6] add non-strict mode support for arm-smmu-v3
+In-Reply-To: <5B5A8857.9040907@huawei.com>
+References: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
+ <aace9ec9-a36a-79a8-98eb-bbedd06f11a4@arm.com>
+ <5B594399.1080404@huawei.com>
+ <f54dd9e0-6d4b-5daa-f6f6-be610393b487@arm.com>
+ <5B5A8857.9040907@huawei.com>
+Message-ID: <20180727093758.GL28088@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jul 27, 2018 at 10:49:59AM +0800, Leizhen (ThunderTown) wrote:
+> On 2018/7/26 22:16, Robin Murphy wrote:
+> > On 2018-07-26 4:44 AM, Leizhen (ThunderTown) wrote:
+> >> Passthrough is not enough to support VFIO, and virtualization need
+> >> the later.
+> > 
+> > Huh? The whole point of passthrough mode is that the IOMMU can still be
+> > used for VFIO, but without imposing the overhead of dynamic mapping on
+> > host DMA.
+> 
+> I said that from my experience. Userspace do not known the PA, so I think
+> the user can not fill dma_map.iova correctly.
+> 
+> 	/* Allocate some space and setup a DMA mapping */
+> 	dma_map.vaddr = (__u64)mmap(0, 0x1000, PROT_READ | PROT_WRITE,
+> 			     MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+> 	dma_map.size = 0x1000;
+> 	dma_map.iova = 0x2f00000000UL;						/* user specified */
+> 	dma_map.flags = VFIO_DMA_MAP_FLAG_READ | VFIO_DMA_MAP_FLAG_WRITE;
+> 
+> 	ioctl(container, VFIO_IOMMU_MAP_DMA, &dma_map);
 
+Hmm, I'm pretty sure that's not the case. When passthrough is configured
+via iommu.passthrough, it only applies to the default domain and therefore
+won't affect the unmanaged domain that VFIO manages explicitly. So VFIO
+will continue to use translation and userspace can't pass whatever it likes
+for the iova.
 
-> -----Original Message-----
-> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
-> Sent: 2018?7?26? 17:22
-> To: Shawn Guo <shawnguo@kernel.org>; Mark Brown <broonie@kernel.org>;
-> Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> Cc: Oleksij Rempel <o.rempel@pengutronix.de>; kernel at pengutronix.de;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org; Andrew Morton
-> <akpm@linux-foundation.org>; Liam Girdwood <lgirdwood@gmail.com>;
-> Leonard Crestez <leonard.crestez@nxp.com>; Rob Herring
-> <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Michael
-> Turquette <mturquette@baylibre.com>; Stephen Boyd
-> <sboyd@codeaurora.org>; Fabio Estevam <fabio.estevam@nxp.com>; Russell
-> King <linux@armlinux.org.uk>; dl-linux-imx <linux-imx@nxp.com>; Robin Gong
-> <yibin.gong@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
-> Subject: [PATCH v8 6/6] ARM: dts: imx6: RIoTboard provide standby on power
-> off option
-> 
-> This board, as well as some other boards with i.MX6 and a PMIC, uses a
-> "PMIC_STBY_REQ" line to notify the PMIC about a state change.
-> The PMIC is programmed for a specific state change before triggering the line.
-> In this case, PMIC_STBY_REQ can be used for stand by, sleep and power off
-> modes.
-> 
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx6dl-riotboard.dts | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts
-> b/arch/arm/boot/dts/imx6dl-riotboard.dts
-> index 2e98c92adff7..a0e9753ee767 100644
-> --- a/arch/arm/boot/dts/imx6dl-riotboard.dts
-> +++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
-> @@ -90,6 +90,10 @@
->  	status = "okay";
->  };
-> 
-> +&clks {
-> +	fsl,pmic-stby-poweroff;
-> +};
-It's better remove the default "syscon-poweroff" power off node.
-> +
->  &fec {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_enet>;
-> @@ -170,6 +174,7 @@
->  		reg = <0x08>;
->  		interrupt-parent = <&gpio5>;
->  		interrupts = <16 8>;
-> +		fsl,pmic-stby-poweroff;
-> 
->  		regulators {
->  			reg_vddcore: sw1ab {				/* VDDARM_IN */
-> --
-> 2.18.0
+Will
