@@ -1,111 +1,98 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Jul 2018 09:26:11 +0100
-Subject: [PATCH v7 08/12] mfd: intel-peci-client: Add PECI client MFD
- driver
-In-Reply-To: <20180723214751.1733-9-jae.hyun.yoo@linux.intel.com>
-References: <20180723214751.1733-1-jae.hyun.yoo@linux.intel.com>
- <20180723214751.1733-9-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180727082611.GE4628@dell>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 27 Jul 2018 17:31:06 +0900
+Subject: [PATCH v12 16/16] arm64: kexec_file: add kaslr support
+In-Reply-To: <50b31f17-fc85-aa72-06f5-d3b62060a91f@arm.com>
+References: <20180724065759.19186-1-takahiro.akashi@linaro.org>
+ <20180724065759.19186-17-takahiro.akashi@linaro.org>
+ <50b31f17-fc85-aa72-06f5-d3b62060a91f@arm.com>
+Message-ID: <20180727083104.GI11258@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Jul 2018, Jae Hyun Yoo wrote:
-
-> This commit adds PECI client MFD driver.
+On Thu, Jul 26, 2018 at 02:40:49PM +0100, James Morse wrote:
+> Hi Akashi,
 > 
-> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Andrew Jeffery <andrew@aj.id.au>
-> Cc: James Feist <james.feist@linux.intel.com>
-> Cc: Jason M Biils <jason.m.bills@linux.intel.com>
-> Cc: Joel Stanley <joel@jms.id.au>
-> Cc: Vernon Mauery <vernon.mauery@linux.intel.com>
-> ---
->  drivers/mfd/Kconfig                   |  14 ++
->  drivers/mfd/Makefile                  |   1 +
->  drivers/mfd/intel-peci-client.c       | 182 ++++++++++++++++++++++++++
->  include/linux/mfd/intel-peci-client.h |  81 ++++++++++++
->  4 files changed, 278 insertions(+)
->  create mode 100644 drivers/mfd/intel-peci-client.c
->  create mode 100644 include/linux/mfd/intel-peci-client.h
+> On 24/07/18 07:57, AKASHI Takahiro wrote:
+> > Adding "kaslr-seed" to dtb enables triggering kaslr, or kernel virtual
+> > address randomization, at secondary kernel boot.
 > 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index f3fa516011ec..e38b591479d4 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -595,6 +595,20 @@ config MFD_INTEL_MSIC
->  	  Passage) chip. This chip embeds audio, battery, GPIO, etc.
->  	  devices used in Intel Medfield platforms.
->  
-> +config MFD_INTEL_PECI_CLIENT
-> +	bool "Intel PECI client"
-> +	depends on (PECI || COMPILE_TEST)
-> +	select MFD_CORE
-> +	help
-> +	  If you say yes to this option, support will be included for the
-> +	  multi-funtional Intel PECI (Platform Environment Control Interface)
-> +	  client. PECI is a one-wire bus interface that provides a communication
-> +	  channel from PECI clients in Intel processors and chipset components
-> +	  to external monitoring or control devices.
-> +
-> +	  Additional drivers must be enabled in order to use the functionality
-> +	  of the device.
-> +
->  config MFD_IPAQ_MICRO
->  	bool "Atmel Micro ASIC (iPAQ h3100/h3600/h3700) Support"
->  	depends on SA1100_H3100 || SA1100_H3600
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index 2852a6042ecf..29e2cacc58bd 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -203,6 +203,7 @@ obj-$(CONFIG_MFD_INTEL_LPSS)	+= intel-lpss.o
->  obj-$(CONFIG_MFD_INTEL_LPSS_PCI)	+= intel-lpss-pci.o
->  obj-$(CONFIG_MFD_INTEL_LPSS_ACPI)	+= intel-lpss-acpi.o
->  obj-$(CONFIG_MFD_INTEL_MSIC)	+= intel_msic.o
-> +obj-$(CONFIG_MFD_INTEL_PECI_CLIENT)	+= intel-peci-client.o
->  obj-$(CONFIG_MFD_PALMAS)	+= palmas.o
->  obj-$(CONFIG_MFD_VIPERBOARD)    += viperboard.o
->  obj-$(CONFIG_MFD_RC5T583)	+= rc5t583.o rc5t583-irq.o
-> diff --git a/drivers/mfd/intel-peci-client.c b/drivers/mfd/intel-peci-client.c
-> new file mode 100644
-> index 000000000000..d7702cf1ea50
-> --- /dev/null
-> +++ b/drivers/mfd/intel-peci-client.c
-> @@ -0,0 +1,182 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +// Copyright (c) 2018 Intel Corporation
-> +
-> +#include <linux/bitfield.h>
-> +#include <linux/mfd/core.h>
-> +#include <linux/mfd/intel-peci-client.h>
-> +#include <linux/module.h>
-> +#include <linux/peci.h>
-> +#include <linux/of_device.h>
-> +
-> +enum cpu_gens {
-> +	CPU_GEN_HSX = 0, /* Haswell Xeon */
-> +	CPU_GEN_BRX,     /* Broadwell Xeon */
-> +	CPU_GEN_SKX,     /* Skylake Xeon */
-> +};
-> +
-> +static struct mfd_cell peci_functions[] = {
-> +	{
-> +		.name = "peci-cputemp",
-> +		.of_compatible = "intel,peci-cputemp",
-> +	},
-> +	{
-> +		.name = "peci-dimmtemp",
-> +		.of_compatible = "intel,peci-dimmtemp",
-> +	},
-> +};
+> Hmm, there are three things that get moved by CONFIG_RANDOMIZE_BASE. The kernel
+> physical placement when booted via the EFIstub, the kernel-text VAs and the
+> location of memory in the linear-map region. Adding the kaslr-seed only does the
+> last two.
 
-The more I look at this driver, the less I think it fits into MFD.
+Yes, but I think that I and Mark has agreed that "kaslr" meant
+"virtual" randomisation, not including "physical" randomisation.
 
-What's stopping you from registering these devices directly from DT?
+> This means the physical placement of the new kernel is predictable from
+> /proc/iomem ... but this also tells you the physical placement of the current
+> kernel, so I don't think this is a problem.
+> 
+> 
+> > We always do this as it will have no harm on kaslr-incapable kernel.
+> 
+> > We don't have any "switch" to turn off this feature directly, but still
+> > can suppress it by passing "nokaslr" as a kernel boot argument.
+> 
+> 
+> > diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+> > index 7356da5a53d5..47a4fbd0dc34 100644
+> > --- a/arch/arm64/kernel/machine_kexec_file.c
+> > +++ b/arch/arm64/kernel/machine_kexec_file.c
+> > @@ -158,6 +160,12 @@ static int setup_dtb(struct kimage *image,
+> 
+> Don't you need to reserve some space in the area you vmalloc()d for the DT?
 
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+No, I don't think so.
+All the data to be loaded are temporarily saved in kexec buffers,
+which will eventually be copied to target locations in machine_kexec
+(arm64_relocate_new_kernel, which, unlike its name, will handle
+not only kernel but also other data as well).
+
+> 
+> > +	/* add kaslr-seed */
+> > +	get_random_bytes(&value, sizeof(value));
+> 
+> What happens if the crng isn't ready?
+> 
+> It looks like this will print a warning that these random-bytes aren't really up
+> to standard, but the new kernel doesn't know this happened.
+> 
+> crng_ready() isn't exposed, all we could do now is
+> wait_for_random_bytes(), but that may wait forever because we do this
+> unconditionally.
+> 
+> I'd prefer to leave this feature until we can check crng_ready(), and skip
+> adding a dodgy-seed if its not-ready. This avoids polluting the next-kernel's
+> entropy pool.
+
+OK. I would try to follow the same way as Bhupesh's userspace patch
+does for kaslr-seed:
+http://lists.infradead.org/pipermail/kexec/2018-April/020564.html
+
+  if (not found kaslr-seed in 1st kernel's dtb)
+     don't care; go ahead
+  else
+     if (current kaslr-seed != 0)
+        error
+     if (crng_ready()) ; FIXME, it's a local macro
+        get_random_bytes(non-blocking)
+        set new kaslr-seed
+     else
+        error
+
+> 
+> > +	ret = fdt_setprop(buf, nodeoffset, "kaslr-seed", &value, sizeof(value));
+> 
+> Nit: It would be nice if this string were in a header file somewhere, to void
+> future refactoring typos.
+
+OK. (but in this file for now as I mentioned in my previous reply)
+
+Thanks,
+-Takahiro AKASHI
+
+> 
+> Thanks,
+> 
+> James
