@@ -1,96 +1,46 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Fri, 27 Jul 2018 13:34:39 +0200
-Subject: [PATCH v2 5/5] arm64: dts: allwinner: h5: Add SID for H5
-In-Reply-To: <20180727125654.ec813df71b492201aea2ca5f@bidouilliste.com>
-References: <20180724101522.68165-1-manu@freebsd.org>
- <20180724101522.68165-5-manu@freebsd.org>
- <20180724130004.ynaiabshexrrbvo4@flea>
- <20180724153432.e398bddfe63e51e8dcebfc46@bidouilliste.com>
- <20180724144218.jdvgrcqkz2kmohqx@flea>
- <20180724165501.d8f01bf20c7cc43e7ed7fc62@bidouilliste.com>
- <20180726115409.7hqtvx4rdqcqdjrq@flea>
- <20180727125654.ec813df71b492201aea2ca5f@bidouilliste.com>
-Message-ID: <20180727133439.2f54a1a06d7a80560027cda3@bidouilliste.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 Jul 2018 12:35:02 +0100
+Subject: [PATCH v5 1/3] arm64: mm: Support Common Not Private translations
+In-Reply-To: <1529403502-2843-2-git-send-email-vladimir.murzin@arm.com>
+References: <1529403502-2843-1-git-send-email-vladimir.murzin@arm.com>
+ <1529403502-2843-2-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20180727113502.3qdbyffuvysva6bz@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Jul 2018 12:56:54 +0200
-Emmanuel Vadot <manu@bidouilliste.com> wrote:
+Hi Vladimir,
 
-> On Thu, 26 Jul 2018 13:54:09 +0200
-> Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> 
-> > On Tue, Jul 24, 2018 at 04:55:01PM +0200, Emmanuel Vadot wrote:
-> > > On Tue, 24 Jul 2018 16:42:18 +0200
-> > > Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > 
-> > > > On Tue, Jul 24, 2018 at 03:34:32PM +0200, Emmanuel Vadot wrote:
-> > > > > On Tue, 24 Jul 2018 15:00:04 +0200
-> > > > > Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > > > 
-> > > > > > On Tue, Jul 24, 2018 at 12:15:22PM +0200, Emmanuel Vadot wrote:
-> > > > > > > The SID controller on H5 look the same as the one present in the A64.
-> > > > > > > But in case we find some difference one day at a compatible string
-> > > > > > > of it's own and a fallback to the A64 one.
-> > > > > > > 
-> > > > > > > Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
-> > > > > > > ---
-> > > > > > >  arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 5 +++++
-> > > > > > >  1 file changed, 5 insertions(+)
-> > > > > > > 
-> > > > > > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> > > > > > > index 62d646baac3c..28183bf77164 100644
-> > > > > > > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> > > > > > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> > > > > > > @@ -129,3 +129,8 @@
-> > > > > > >  		     <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-> > > > > > >  	compatible = "allwinner,sun50i-h5-pinctrl";
-> > > > > > >  };
-> > > > > > > +
-> > > > > > > +&sid {
-> > > > > > > +	compatible = "allwinner,sun50i-h5-sid",
-> > > > > > > +		     "allwinner,sun50i-a64-sid";
-> > > > > > > +};
-> > > > > > 
-> > > > > > This is still a bit pointless, please remove the common node.
-> > > > > 
-> > > > >  You mean directly declare sid controller in the SoC dtsi and not
-> > > > > have a common node in sunxi-h3-h5.dtsi ?
-> > > > 
-> > > > Yep
-> > > 
-> > >  The reason I've put it in the common file is because I'll send patches
-> > > for the nvmem-cells needed for thermal, and those are common between
-> > > the two. Other nvmem-cells are also common (like the chipid and
-> > > probably other).
-> > 
-> > Then we'll see what we can have in common and what not when we'll have
-> > something in common?
-> 
->  Will it make more sense that I just send a new series with nvmem-cells
-> now along with thermal bindings ?
+On Tue, Jun 19, 2018 at 11:18:20AM +0100, Vladimir Murzin wrote:
+> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+> index 39ec0b8..c506fb7 100644
+> --- a/arch/arm64/include/asm/mmu_context.h
+> +++ b/arch/arm64/include/asm/mmu_context.h
+> @@ -149,6 +149,18 @@ static inline void cpu_replace_ttbr1(pgd_t *pgdp)
+>  
+>  	phys_addr_t pgd_phys = virt_to_phys(pgdp);
+>  
+> +	if (system_supports_cnp() && !WARN_ON(pgdp != lm_alias(swapper_pg_dir))) {
+> +		/*
+> +		 * cpu_replace_ttbr1() is used when there's a boot CPU
+> +		 * up (i.e. cpufeature framework is not up yet) and
+> +		 * latter only when we enable CNP via cpufeature's
+> +		 * enable() callback.
+> +		 * Also we rely on the cpu_hwcap bit being set before
+> +		 * calling the enable() function.
+> +		 */
+> +		pgd_phys |= TTBR_CNP_BIT;
+> +	}
+> +
+>  	replace_phys = (void *)__pa_symbol(idmap_cpu_replace_ttbr1);
 
- My bad, I remembered H5 thermal sensor being the same as H3 but I was
-wrong.
- I'll send a v3 with your changes suggestion and we'll see later for
-thermal sensor.
+So the above code sets the TTBR_CNP_BIT (bit 0) in pgd_phys and calls
+the idmap_cpu_replace_ttbr1() with this value. Looking at the latter, it
+performs a phys_to_ttbr transformation of pgd_phys which masks out the
+bottom 2 bits when CONFIG_ARM64_PA_BITS_52 is enabled. I think we need
+to tweak TTBR_BADDR_MASK_52 to start from bit 0.
 
-> > Maxime
-> > 
-> > -- 
-> > Maxime Ripard, Bootlin (formerly Free Electrons)
-> > Embedded Linux and Kernel engineering
-> > https://bootlin.com
-> 
-> 
-> -- 
-> Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+(cc'ing Kristina as she added this code, in case there is any issue with
+extending the mask)
 
 -- 
-Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+Catalin
