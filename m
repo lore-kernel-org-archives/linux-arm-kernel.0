@@ -1,30 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Jul 2018 13:06:33 +0100
-Subject: [RFC PATCH] arm64: mm: Export __sync_icache_dcache() for
- xen-privcmd
-In-Reply-To: <20180711231822.GG14131@decadent.org.uk>
-References: <20180711231822.GG14131@decadent.org.uk>
-Message-ID: <20180727120633.bjpfqswuxcy2ibqu@armageddon.cambridge.arm.com>
+From: manu@freebsd.org (Emmanuel Vadot)
+Date: Fri, 27 Jul 2018 13:52:05 +0200
+Subject: [PATCH v3 4/4] arm64: dts: allwinner: h5: Add SID for H5
+In-Reply-To: <20180727115205.20955-1-manu@freebsd.org>
+References: <20180727115205.20955-1-manu@freebsd.org>
+Message-ID: <20180727115205.20955-4-manu@freebsd.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 12, 2018 at 12:18:22AM +0100, Ben Hutchings wrote:
-> The xen-privcmd driver, which can be modular, calls set_pte_at()
-> which in turn may call __sync_icache_dcache().
-> 
-> The call to __sync_icache_dcache() may be optimised out because it is
-> conditional on !pte_special(), and xen-privcmd calls pte_mkspecial().
-> But it seems unwise to rely on this optimisation.
-> 
-> Fixes: 3ad0876554ca ("xen/privcmd: add IOCTL_PRIVCMD_MMAP_RESOURCE")
-> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
-> ---
-> This is an RFC since I haven't found an actual build failure.  Using
-> Debian's gcc 7.3 with either CC_OPTIMIZE_FOR_PERFORMANCE or
-> CC_OPTIMIZE_FOR_SIZE, the call *is* optimised away.
+The H5 SoC have a SID controller like the others Allwinner SoC.
+Add a node for it.
 
-Since apply_to_page_range() is EXPORT_SYMBOL_GPL() and a
-pte_fn_t function would likely use set_pte_at(), I'm fine with this
-patch for consistency.
+Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+index 62d646baac3c..9838acaeea58 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+@@ -92,6 +92,13 @@
+ 			     <GIC_PPI 10
+ 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+ 	};
++
++	soc {
++		sid: eeprom at 1c14000 {
++			compatible = "allwinner,sun50i-h5-sid";
++			reg = <0x1c14000 0x400>;
++		};
++	};
+ };
+ 
+ &ccu {
+-- 
+2.18.0
