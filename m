@@ -1,33 +1,33 @@
 From: manu@freebsd.org (Emmanuel Vadot)
-Date: Fri, 27 Jul 2018 13:52:02 +0200
-Subject: [PATCH v3 1/4] arm64: dts: allwinner: a64: Add SID node
-Message-ID: <20180727115205.20955-1-manu@freebsd.org>
+Date: Fri, 27 Jul 2018 13:52:04 +0200
+Subject: [PATCH v3 3/4] nvmem: sunxi-sid: add support for H5's SID controller
+In-Reply-To: <20180727115205.20955-1-manu@freebsd.org>
+References: <20180727115205.20955-1-manu@freebsd.org>
+Message-ID: <20180727115205.20955-3-manu@freebsd.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 have a SID controller which consist of EFUSE (starting at 0x200)
-and three registers to read/write some of the protected efuses.
+The H5 SoC have a SID controller that looks like the one in A64, the
+cells are in the same offset but doesn't contain the same data (thermal
+sensor calibration for example).
+Add a binding for it.
 
 Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 1b2ef28c42bd..69c0d9362553 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -227,6 +227,11 @@
- 			#size-cells = <0>;
- 		};
+diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+index e319fe5e205a..99c4ba6a3f61 100644
+--- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
++++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+@@ -7,6 +7,7 @@ Required properties:
+   "allwinner,sun8i-a83t-sid"
+   "allwinner,sun8i-h3-sid"
+   "allwinner,sun50i-a64-sid"
++  "allwinner,sun50i-h5-sid"
  
-+		sid: eeprom at 1c14000 {
-+			compatible = "allwinner,sun50i-a64-sid";
-+			reg = <0x1c14000 0x400>;
-+		};
-+
- 		usb_otg: usb at 1c19000 {
- 			compatible = "allwinner,sun8i-a33-musb";
- 			reg = <0x01c19000 0x0400>;
+ - reg: Should contain registers location and length
+ 
 -- 
 2.18.0
