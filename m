@@ -1,69 +1,31 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sat, 28 Jul 2018 00:05:13 +0800
-Subject: [PATCH 0/6] lib/crc32: treewide: Use existing define with
- polynomial
-In-Reply-To: <20180717160541.3843-1-krzk@kernel.org>
-References: <20180717160541.3843-1-krzk@kernel.org>
-Message-ID: <20180727160513.fluthoaj24co2khr@gondor.apana.org.au>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 27 Jul 2018 18:09:18 +0200
+Subject: [PATCH v3 05/23] thermal: armada: dissociate a380 and cp110
+ ->init() hooks
+In-Reply-To: <20180716144206.30985-6-miquel.raynal@bootlin.com>
+References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
+ <20180716144206.30985-6-miquel.raynal@bootlin.com>
+Message-ID: <6b0ea6bf-df0b-94d2-c931-8fed66d5d3eb@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 06:05:35PM +0200, Krzysztof Kozlowski wrote:
-> Hi,
+On 16/07/2018 16:41, Miquel Raynal wrote:
+> Until now, Armada 380 and CP110 could share the same ->init() function
+> because their use was identical.
 > 
-> Kernel defines same polynomial for CRC-32 in few places.
-> This is unnecessary duplication of the same value. Also this might
-> be error-prone for future code - every driver will define the
-> polynomial again.
+> Prepare the support of multi-sensors support and overheat interrupt
+> feature by separating the initialization paths before they actually
+> diverge.
 > 
-> This is an attempt to unify definition of polynomial.  Few obvious
-> hard-coded locations are fixed with define.
-> 
-> All series depend on each 1/6 and 2/6.
-> 
-> This could be merged in two different merge windows (1st lib/crc and then
-> the rest) or taken through one tree.
-> 
-> It would be nice to get some testing. Only generic lib/crc, bunzip, xz_crc32
-> and Freescale's Ethernet driver were tested on HW.  Rest got just different
-> builds.
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-> 
-> 
-> Krzysztof Kozlowski (6):
->   lib/crc: Move polynomial definition to separate header
->   lib/crc: Use consistent naming for CRC-32 polynomials
->   crypto: stm32_crc32 - Use existing define with polynomial
->   net: ethernet: Use existing define with polynomial
->   staging: rtl: Use existing define with polynomial
->   lib: Use existing define with polynomial
-> 
->  drivers/crypto/stm32/stm32_crc32.c               | 11 ++++-------
->  drivers/net/ethernet/amd/xgbe/xgbe-dev.c         |  4 ++--
->  drivers/net/ethernet/apple/bmac.c                |  8 ++------
->  drivers/net/ethernet/broadcom/tg3.c              |  3 ++-
->  drivers/net/ethernet/freescale/fec_main.c        |  4 ++--
->  drivers/net/ethernet/freescale/fs_enet/fec.h     |  3 ---
->  drivers/net/ethernet/freescale/fs_enet/mac-fec.c |  3 ++-
->  drivers/net/ethernet/micrel/ks8851_mll.c         |  3 ++-
->  drivers/net/ethernet/synopsys/dwc-xlgmac-hw.c    |  4 ++--
->  drivers/staging/rtl8712/rtl871x_security.c       |  5 ++---
->  drivers/staging/rtl8723bs/core/rtw_security.c    |  5 ++---
->  include/linux/crc32poly.h                        | 20 ++++++++++++++++++++
->  lib/crc32.c                                      | 11 ++++++-----
->  lib/crc32defs.h                                  | 14 --------------
->  lib/decompress_bunzip2.c                         |  3 ++-
->  lib/gen_crc32table.c                             |  5 +++--
->  lib/xz/xz_crc32.c                                |  3 ++-
->  17 files changed, 55 insertions(+), 54 deletions(-)
->  create mode 100644 include/linux/crc32poly.h
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
 
-All applied.  Thanks.
+Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
