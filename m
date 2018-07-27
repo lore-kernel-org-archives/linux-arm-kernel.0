@@ -1,38 +1,60 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 27 Jul 2018 15:22:33 +0530
-Subject: [PATCH v4 08/18] net: davinci_emac: potentially get the MAC
- address from MTD
-In-Reply-To: <efd9388f-c378-4723-602d-1209c8bae7d3@ti.com>
-References: <20180629094039.7543-1-brgl@bgdev.pl>
- <20180629094039.7543-9-brgl@bgdev.pl>
- <03b77e24-9ab9-fa01-2387-9de0408a9942@gmail.com>
- <20180704070919.GA14051@lenoch>
- <CAMRc=McOYG9=naT2=4c4hnhJwxcqBCATEZOGXXv9u9zuvXyDXw@mail.gmail.com>
- <c0ffc590-8064-3b02-9b5c-fcc24628d390@ti.com>
- <CAMRc=McO8H9Aw8a7h318a=hJjKBOgeC+9_hreBnOY3Tc3Fh7sg@mail.gmail.com>
- <d7f03763-982f-5e3e-d0ad-54e024b10f97@ti.com>
- <a70aebb0-408c-c61f-897a-227114888585@linaro.org>
- <efd9388f-c378-4723-602d-1209c8bae7d3@ti.com>
-Message-ID: <e98a0d1b-a587-cf6e-9b95-726701241331@ti.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Fri, 27 Jul 2018 15:27:33 +0530
+Subject: [PATCH 3/3] iommu/arm-smmu: Error out only if not enough context
+ interrupts
+In-Reply-To: <20180725115729.GA31576@arm.com>
+References: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
+ <20180719175356.14753-4-vivek.gautam@codeaurora.org>
+ <20180724083633.GA19324@arm.com>
+ <d6796a00-17da-c03e-ca7f-7a67139ad99a@codeaurora.org>
+ <20180725115729.GA31576@arm.com>
+Message-ID: <CAFp+6iEwS1xHYz2eptO1p2hzw+cb6WOvohDkx1SGmthzV0SbyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 July 2018 10:34 AM, Sekhar Nori wrote:
+On Wed, Jul 25, 2018 at 5:27 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Jul 24, 2018 at 03:09:41PM +0530, Vivek Gautam wrote:
+>> On 7/24/2018 2:06 PM, Will Deacon wrote:
+>> >On Thu, Jul 19, 2018 at 11:23:56PM +0530, Vivek Gautam wrote:
+>> >>diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> >>index 7c69736a30f8..4cb53bf4f423 100644
+>> >>--- a/drivers/iommu/arm-smmu.c
+>> >>+++ b/drivers/iommu/arm-smmu.c
+>> >>@@ -2229,12 +2229,19 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+>> >>    if (err)
+>> >>            return err;
+>> >>-   if (smmu->version == ARM_SMMU_V2 &&
+>> >>-       smmu->num_context_banks != smmu->num_context_irqs) {
+>> >>-           dev_err(dev,
+>> >>-                   "found only %d context interrupt(s) but %d required\n",
+>> >>-                   smmu->num_context_irqs, smmu->num_context_banks);
+>> >>-           return -ENODEV;
+>> >>+   if (smmu->version == ARM_SMMU_V2) {
+>> >>+           if (smmu->num_context_banks > smmu->num_context_irqs) {
+>> >>+                   dev_err(dev,
+>> >>+                         "found only %d context irq(s) but %d required\n",
+>> >>+                         smmu->num_context_irqs, smmu->num_context_banks);
+>> >>+                   return -ENODEV;
+>> >>+           } else if (smmu->num_context_banks < smmu->num_context_irqs) {
+>> >>+                   /* loose extra context interrupts */
+>> >>+                   dev_notice(dev,
+>> >>+                         "found %d context irq(s) but only %d required\n",
+>> >>+                         smmu->num_context_irqs, smmu->num_context_banks);
+>> >>+                   smmu->num_context_irqs = smmu->num_context_banks;
+>> >>+           }
+>> >I don't see the utility in the new message. Can you simplify with the patch
+>> >below on top? It's a bit weird that we only decide to ignore the extra irqs
+>> >after calling platform_get_irq() on them, but that seems to be harmless.
+>>
+>> Thanks. I will modify as suggested below and respin.
+>
+> It's ok, I can make the change locally.
 
-> There is a lot of follow-up traffic on how exactly to develop the needed
-> interfaces for reading mac address in mtd and/or network subsystem.
-> 
-> But, I don't think any of that negates the need for nvmem lookups that
-> work for non-device-tree and populating the lookups in mach-davinci
-> board code.
-> 
-> I am going to send patches 1-7 to ARM-SoC soon, so please do say if
-> there is any disagreement on this.
+Thanks Will for making the changes, and picking this.
 
-I owed a response on this. After thinking over some and discussing with
-Bartosz as well, I decided not to merge any patches from  this series.
-Its better to merge anything after the actual path we are talking is
-fully clear.
+Best regards
+Vivek
 
-Thanks,
-Sekhar
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
