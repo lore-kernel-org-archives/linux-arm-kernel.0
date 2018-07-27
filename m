@@ -1,87 +1,474 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 27 Jul 2018 11:15:33 +0100
-Subject: [PATCH v3 5/9] coresight: Fix remote endpoint parsing
+Date: Fri, 27 Jul 2018 11:15:37 +0100
+Subject: [PATCH v3 9/9] dts: juno: Update coresight bindings
 In-Reply-To: <1532686537-12380-1-git-send-email-suzuki.poulose@arm.com>
 References: <1532686537-12380-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1532686537-12380-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1532686537-12380-10-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When parsing the remote endpoint of an output port, we do :
-     rport = of_graph_get_remote_port(ep);
-     rparent = of_graph_get_remote_port_parent(ep);
+Switch to updated coresight bindings for Juno platforms.
 
-and then parse the "remote_port" as if it was the remote endpoint,
-which is wrong. The code worked fine because we used endpoint number
-as the port number. Let us fix it and optimise a bit as:
-
-     remote_ep = of_graph_get_remote_endpoint(ep);
-     if (remote_ep)
-        remote_parent = of_graph_get_port_parent(remote_ep);
-
-and then, parse the remote_ep for the port/endpoint details.
-
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Liviu Dudau <liviu.dudau@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/of_coresight.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+Changes since V2:
+  - Update to new format.
+---
+ arch/arm64/boot/dts/arm/juno-base.dtsi    | 161 +++++++++++++++---------------
+ arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi |  52 ++++------
+ arch/arm64/boot/dts/arm/juno.dts          |  13 +--
+ 3 files changed, 105 insertions(+), 121 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-index 4b279f8..2ecdd14 100644
---- a/drivers/hwtracing/coresight/of_coresight.c
-+++ b/drivers/hwtracing/coresight/of_coresight.c
-@@ -134,7 +134,7 @@ static int of_coresight_parse_endpoint(struct device *dev,
- 	int ret = 0;
- 	struct of_endpoint endpoint, rendpoint;
- 	struct device_node *rparent = NULL;
--	struct device_node *rport = NULL;
-+	struct device_node *rep = NULL;
- 	struct device *rdev = NULL;
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index ce56a4a..a418193 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -115,22 +115,17 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
  
- 	do {
-@@ -142,16 +142,16 @@ static int of_coresight_parse_endpoint(struct device *dev,
- 		if (of_graph_parse_endpoint(ep, &endpoint))
- 			break;
- 		/*
--		 * Get a handle on the remote port and parent
--		 * attached to it.
-+		 * Get a handle on the remote endpoint and the device it is
-+		 * attached to.
- 		 */
--		rparent = of_graph_get_remote_port_parent(ep);
-+		rep = of_graph_get_remote_endpoint(ep);
-+		if (!rep)
-+			break;
-+		rparent = of_graph_get_port_parent(rep);
- 		if (!rparent)
- 			break;
--		rport = of_graph_get_remote_port(ep);
--		if (!rport)
--			break;
--		if (of_graph_parse_endpoint(rport, &rendpoint))
-+		if (of_graph_parse_endpoint(rep, &rendpoint))
- 			break;
+-			/* input port */
+-			port at 0 {
+-				reg = <0>;
++		in-ports {
++			port {
+ 				etf0_in_port: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&main_funnel_out_port>;
+ 				};
+ 			};
++		};
  
- 		/* If the remote device is not available, defer probing */
-@@ -165,15 +165,15 @@ static int of_coresight_parse_endpoint(struct device *dev,
- 		pdata->child_names[i] = devm_kstrdup(dev,
- 						     dev_name(rdev),
- 						     GFP_KERNEL);
--		pdata->child_ports[i] = rendpoint.id;
-+		pdata->child_ports[i] = rendpoint.port;
- 		/* Connection record updated */
- 		ret = 1;
- 	} while (0);
+-			/* output port */
+-			port at 1 {
+-				reg = <0>;
++		out-ports {
++			port {
+ 				etf0_out_port: endpoint {
+ 				};
+ 			};
+@@ -144,10 +139,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			tpiu_in_port: endpoint {
+-				slave-mode;
+-				remote-endpoint = <&replicator_out_port0>;
++		in-ports {
++			port {
++				tpiu_in_port: endpoint {
++					remote-endpoint = <&replicator_out_port0>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -160,31 +156,29 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
  
- 	if (rparent)
- 		of_node_put(rparent);
--	if (rport)
--		of_node_put(rport);
-+	if (rep)
-+		of_node_put(rep);
- 	if (rdev)
- 		put_device(rdev);
+-			/* output port */
+-			port at 0 {
+-				reg = <0>;
++		out-ports {
++			port {
+ 				main_funnel_out_port: endpoint {
+ 					remote-endpoint = <&etf0_in_port>;
+ 				};
+ 			};
++		};
  
+-			/* input ports */
+-			port at 1 {
++		main_funnel_in_ports: in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
+ 				reg = <0>;
+ 				main_funnel_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster0_funnel_out_port>;
+ 				};
+ 			};
+ 
+-			port at 2 {
++			port at 1 {
+ 				reg = <1>;
+ 				main_funnel_in_port1: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster1_funnel_out_port>;
+ 				};
+ 			};
+@@ -199,10 +193,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			etr_in_port: endpoint {
+-				slave-mode;
+-				remote-endpoint = <&replicator_out_port1>;
++		in-ports {
++			port {
++				etr_in_port: endpoint {
++					remote-endpoint = <&replicator_out_port1>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -216,8 +211,10 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			stm_out_port: endpoint {
++		out-ports {
++			port {
++				stm_out_port: endpoint {
++				};
+ 			};
+ 		};
+ 	};
+@@ -238,9 +235,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			cluster0_etm0_out_port: endpoint {
+-				remote-endpoint = <&cluster0_funnel_in_port0>;
++		out-ports {
++			port {
++				cluster0_etm0_out_port: endpoint {
++					remote-endpoint = <&cluster0_funnel_in_port0>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -252,29 +251,28 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			port at 0 {
+-				reg = <0>;
++		out-ports {
++			port {
+ 				cluster0_funnel_out_port: endpoint {
+ 					remote-endpoint = <&main_funnel_in_port0>;
+ 				};
+ 			};
++		};
+ 
+-			port at 1 {
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
+ 				reg = <0>;
+ 				cluster0_funnel_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster0_etm0_out_port>;
+ 				};
+ 			};
+ 
+-			port at 2 {
++			port at 1 {
+ 				reg = <1>;
+ 				cluster0_funnel_in_port1: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster0_etm1_out_port>;
+ 				};
+ 			};
+@@ -297,9 +295,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			cluster0_etm1_out_port: endpoint {
+-				remote-endpoint = <&cluster0_funnel_in_port1>;
++		out-ports {
++			port {
++				cluster0_etm1_out_port: endpoint {
++					remote-endpoint = <&cluster0_funnel_in_port1>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -320,9 +320,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			cluster1_etm0_out_port: endpoint {
+-				remote-endpoint = <&cluster1_funnel_in_port0>;
++		out-ports {
++			port {
++				cluster1_etm0_out_port: endpoint {
++					remote-endpoint = <&cluster1_funnel_in_port0>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -334,43 +336,40 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			port at 0 {
+-				reg = <0>;
++		out-ports {
++			port {
+ 				cluster1_funnel_out_port: endpoint {
+ 					remote-endpoint = <&main_funnel_in_port1>;
+ 				};
+ 			};
++		};
+ 
+-			port at 1 {
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
+ 				reg = <0>;
+ 				cluster1_funnel_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster1_etm0_out_port>;
+ 				};
+ 			};
+ 
+-			port at 2 {
++			port at 1 {
+ 				reg = <1>;
+ 				cluster1_funnel_in_port1: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster1_etm1_out_port>;
+ 				};
+ 			};
+-			port at 3 {
++			port at 2 {
+ 				reg = <2>;
+ 				cluster1_funnel_in_port2: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster1_etm2_out_port>;
+ 				};
+ 			};
+-			port at 4 {
++			port at 3 {
+ 				reg = <3>;
+ 				cluster1_funnel_in_port3: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&cluster1_etm3_out_port>;
+ 				};
+ 			};
+@@ -393,9 +392,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			cluster1_etm1_out_port: endpoint {
+-				remote-endpoint = <&cluster1_funnel_in_port1>;
++		out-ports {
++			port {
++				cluster1_etm1_out_port: endpoint {
++					remote-endpoint = <&cluster1_funnel_in_port1>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -416,9 +417,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			cluster1_etm2_out_port: endpoint {
+-				remote-endpoint = <&cluster1_funnel_in_port2>;
++		out-ports {
++			port {
++				cluster1_etm2_out_port: endpoint {
++					remote-endpoint = <&cluster1_funnel_in_port2>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -439,9 +442,11 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		port {
+-			cluster1_etm3_out_port: endpoint {
+-				remote-endpoint = <&cluster1_funnel_in_port3>;
++		out-ports {
++			port {
++				cluster1_etm3_out_port: endpoint {
++					remote-endpoint = <&cluster1_funnel_in_port3>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -454,7 +459,7 @@
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+ 
+-		ports {
++		out-ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
+@@ -472,12 +477,10 @@
+ 					remote-endpoint = <&etr_in_port>;
+ 				};
+ 			};
+-
+-			/* replicator input port */
+-			port at 2 {
+-				reg = <0>;
++		};
++		in-ports {
++			port {
+ 				replicator_in_port0: endpoint {
+-					slave-mode;
+ 				};
+ 			};
+ 		};
+diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+index 0c43fb3..cf28515 100644
+--- a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+@@ -7,23 +7,16 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			/* output port */
+-			port at 0 {
+-				reg = <0>;
++		out-ports {
++			port {
+ 				csys1_funnel_out_port: endpoint {
+ 					remote-endpoint = <&etf1_in_port>;
+ 				};
+ 			};
+-
+-			/* input port */
+-			port at 1 {
+-				reg = <0>;
++		};
++		in-ports {
++			port {
+ 				csys1_funnel_in_port0: endpoint {
+-					slave-mode;
+ 				};
+ 			};
+ 
+@@ -37,22 +30,15 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			/* input port */
+-			port at 0 {
+-				reg = <0>;
++		in-ports {
++			port {
+ 				etf1_in_port: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&csys1_funnel_out_port>;
+ 				};
+ 			};
+-
+-			/* output port */
+-			port at 1 {
+-				reg = <0>;
++		};
++		out-ports {
++			port {
+ 				etf1_out_port: endpoint {
+ 					remote-endpoint = <&csys2_funnel_in_port1>;
+ 				};
+@@ -67,20 +53,18 @@
+ 		clocks = <&soc_smc50mhz>;
+ 		clock-names = "apb_pclk";
+ 		power-domains = <&scpi_devpd 0>;
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			/* output port */
+-			port at 0 {
+-				reg = <0>;
++		out-ports {
++			port {
+ 				csys2_funnel_out_port: endpoint {
+ 					remote-endpoint = <&replicator_in_port0>;
+ 				};
+ 			};
++		};
+ 
+-			/* input ports */
+-			port at 1 {
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			port at 0 {
+ 				reg = <0>;
+ 				csys2_funnel_in_port0: endpoint {
+ 					slave-mode;
+@@ -88,7 +72,7 @@
+ 				};
+ 			};
+ 
+-			port at 2 {
++			port at 1 {
+ 				reg = <1>;
+ 				csys2_funnel_in_port1: endpoint {
+ 					slave-mode;
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index 2b2bf39..eb55c2f 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -257,14 +257,11 @@
+ 	remote-endpoint = <&main_funnel_in_port2>;
+ };
+ 
+-&main_funnel {
+-	ports {
+-		port at 3 {
+-			reg = <2>;
+-			main_funnel_in_port2: endpoint {
+-				slave-mode;
+-				remote-endpoint = <&stm_out_port>;
+-			};
++&main_funnel_in_ports {
++	port at 2 {
++		reg = <2>;
++		main_funnel_in_port2: endpoint {
++			remote-endpoint = <&stm_out_port>;
+ 		};
+ 	};
+ };
 -- 
 2.7.4
