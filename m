@@ -1,45 +1,60 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Fri, 27 Jul 2018 22:02:17 +0200
-Subject: [PATCH 00/16] clk: at91: Rework DT bindings
-In-Reply-To: <153271100280.48062.2538655794734424353@swboyd.mtv.corp.google.com>
-References: <20180717222757.10253-1-alexandre.belloni@bootlin.com>
- <153271100280.48062.2538655794734424353@swboyd.mtv.corp.google.com>
-Message-ID: <20180727200217.GF7701@piout.net>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 27 Jul 2018 21:11:17 +0100
+Subject: [PATCH v2 2/7] dma-mapping: Generalise dma_32bit_limit flag
+In-Reply-To: <7872d914-8ea7-06e4-4a0c-489023e098d6@ti.com>
+References: <cover.1532382222.git.robin.murphy@arm.com>
+ <c1720f0181b66f711e4097d85149757b16a7b0a7.1532382222.git.robin.murphy@arm.com>
+ <7872d914-8ea7-06e4-4a0c-489023e098d6@ti.com>
+Message-ID: <5354ef69-c54e-170b-62d4-5110dc60aa8f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/07/2018 10:03:22-0700, Stephen Boyd wrote:
-> Quoting Alexandre Belloni (2018-07-17 15:27:41)
-> > This is the promised rework of the at91 PMC clocks driver. It is mainly
-> > necessary to remove the DTC warnings but it also complies with the CCF
-> > rule that there should be one node per controller instead of one node
-> > per clock.
-> > 
-> > This only handles the PMC, I'm planning to also rework the SCKC bindings
-> > later (without breaking the DT ABI).
-> > 
-> > The series is based on top of clk-next plus at91-dt so I don't think it
-> > is convenient to have it this cycle. However, I would really like to
-> > ensure we agree on the new bindings this cycle before converting all the
-> > other platforms as this is a bit tedious.
-> > 
-> > The first two patches are actually fixes and may be considered for this
-> > cycle.
-> > 
-> > One nice note:
-> > at91-sama5d2_xplained.dtb goes from 29351 bytes to 22082 bytes
+On 2018-07-27 6:45 PM, Grygorii Strashko wrote:
+> On 07/23/2018 05:16 PM, Robin Murphy wrote:
+>> Whilst the notion of an upstream DMA restriction is most commonly seen
+>> in PCI host bridges saddled with a 32-bit native interface, a more
+>> general version of the same issue can exist on complex SoCs where a bus
+>> or point-to-point interconnect link from a device's DMA master interface
+>> to another component along the path to memory (often an IOMMU) may carry
+>> fewer address bits than the interfaces at both ends nominally support.
+>> In order to properly deal with this, the first step is to expand the
+>> dma_32bit_limit flag into an arbitrary mask.
+>>
+>> To minimise the impact on existing code, we'll make sure to only
+>> consider this new mask valid if set. That makes sense anyway, since a
+>> mask of zero would represent DMA not being wired up at all, and that
+>> would be better handled by not providing valid ops in the first place.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 > 
-> Patches look mostly good. Rob is happy with the bindings and so am I.
+> I'd like to note about some possible issue related to this change.
 > 
-> One general question is why the drivers can't be moved to real platform
-> drivers instead of using OF_CLK_DECLARE?
+> There are some places in kernel where parent DMA configuration is copied 
+> to the manually created child devices, like:
+> mfd-core.c
+> mfd_add_device()
+>  ????pdev->dev.parent = parent;
+>  ????pdev->dev.type = &mfd_dev_type;
+>  ????pdev->dev.dma_mask = parent->dma_mask;
+>  ????pdev->dev.dma_parms = parent->dma_parms;
+>  ????pdev->dev.coherent_dma_mask = parent->coherent_dma_mask;
 > 
+> Adding or changing generic DMA device properties might affect on such
+> subsystems/drivers. Have you considered such cases?
 
-I actually didn't try. I'll do it early next week. I'm not sure how this
-will work with the PM handling on sama5d2 but I'll probably figure
-something out.
+Yes, that's a lovely example of what I class as "bus code" creating a 
+child device and initialising its DMA parameters appropriately. The 
+subdevice goes on to get associated with an OF node or ACPI companion, 
+so when the subdriver for that function binds it should go through its 
+own dma_configure() process and pick up any further properties accordingly.
 
--- 
-Alexandre Belloni, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Code which just tries to copy the DMA configuration from an existing 
+device to a new one has never worked properly, because there is often 
+additional DMA configuration in archdata and other places it cannot 
+possibly know about. Last time I looked there were still some specific 
+hacks in the USB layer in order to interact correctly with the block 
+layer bounce limit, but I think anything truly wrong has been more or 
+less flushed out by now (the DMA ops changes for arm64 ACPI support 
+caught a fair few IIRC).
+
+Robin.
