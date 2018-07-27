@@ -1,57 +1,66 @@
-From: zhangshaokun@hisilicon.com (Zhangshaokun)
-Date: Fri, 27 Jul 2018 17:59:07 +0800
-Subject: [PATCH] iommu/arm-smmu-v3: sync the OVACKFLG to PRIQ consumer
- register
-In-Reply-To: <20180727094816.GM28088@arm.com>
-References: <1532350618-16486-1-git-send-email-zhangshaokun@hisilicon.com>
- <dfeaf347-afd4-b3f2-eb01-2781028371e8@hisilicon.com>
- <20180727094816.GM28088@arm.com>
-Message-ID: <4df3ba75-6fb2-3d2d-b29a-de46d28bade1@hisilicon.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jul 2018 11:06:18 +0100
+Subject: [PATCH] arm64: clean the additional checks before calling
+ ghes_notify_sea()
+In-Reply-To: <1532638907-46129-1-git-send-email-gengdongjiu@huawei.com>
+References: <1532638907-46129-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <20180727100617.GB25592@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 2018/7/27 17:48, Will Deacon wrote:
-> On Fri, Jul 27, 2018 at 05:41:46PM +0800, Zhangshaokun wrote:
->> I saw it in your trees, is it necessary to Cc stable version?
+On Thu, Jul 26, 2018 at 05:01:47PM -0400, Dongjiu Geng wrote:
+> In order to remove the additional check before calling the
+> ghes_notify_sea(), make stub definition when !CONFIG_ACPI_APEI_SEA.
 > 
-> I don't think so, given that we don't actually support PRI upstream.
-> 
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> ---
 
-Got it, thanks your reply.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Shaokun
+Will
 
-> Will
+> This cleanup is ever mentioned by Mark Rutland in [1]
 > 
->> On 2018/7/23 20:56, Shaokun Zhang wrote:
->>> From: Miao Zhong <zhongmiao@hisilicon.com>
->>>
->>> When PRI queue occurs overflow, driver should update the OVACKFLG to
->>> the PRIQ consumer register, otherwise subsequent PRI requests will not
->>> be processed.
->>>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Cc: Robin Murphy <robin.murphy@arm.com> 
->>> Signed-off-by: Miao Zhong <zhongmiao@hisilicon.com>
->>> ---
->>>  drivers/iommu/arm-smmu-v3.c | 1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->>> index 1d64710..deacc15 100644
->>> --- a/drivers/iommu/arm-smmu-v3.c
->>> +++ b/drivers/iommu/arm-smmu-v3.c
->>> @@ -1301,6 +1301,7 @@ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
->>>  
->>>  	/* Sync our overflow flag, as we believe we're up to speed */
->>>  	q->cons = Q_OVF(q, q->prod) | Q_WRP(q, q->cons) | Q_IDX(q, q->cons);
->>> +	writel(q->cons, q->cons_reg);
->>>  	return IRQ_HANDLED;
->>>  }
->>>  
->>>
->>
+> [1]:
+> https://lkml.org/lkml/2018/5/31/289
+> ---
+>  arch/arm64/mm/fault.c | 7 +------
+>  include/acpi/ghes.h   | 4 ++++
+>  2 files changed, 5 insertions(+), 6 deletions(-)
 > 
-> .
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index b8eecc7..9ffe01d 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -727,12 +727,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>  
+>  int handle_guest_sea(phys_addr_t addr, unsigned int esr)
+>  {
+> -	int ret = -ENOENT;
+> -
+> -	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA))
+> -		ret = ghes_notify_sea();
+> -
+> -	return ret;
+> +	return ghes_notify_sea();
+>  }
+>  
+>  asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+> index 1624e2b..82cb4eb 100644
+> --- a/include/acpi/ghes.h
+> +++ b/include/acpi/ghes.h
+> @@ -118,6 +118,10 @@ static inline void *acpi_hest_get_next(struct acpi_hest_generic_data *gdata)
+>  	     (void *)section - (void *)(estatus + 1) < estatus->data_length; \
+>  	     section = acpi_hest_get_next(section))
+>  
+> +#ifdef CONFIG_ACPI_APEI_SEA
+>  int ghes_notify_sea(void);
+> +#else
+> +static inline int ghes_notify_sea(void) { return -ENOENT; }
+> +#endif
+>  
+>  #endif /* GHES_H */
+> -- 
+> 1.9.1
 > 
