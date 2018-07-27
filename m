@@ -1,263 +1,123 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 27 Jul 2018 23:42:30 +0800
-Subject: [PATCH v3.1 07/10] arm64: dts: allwinner: a64: Add display
- pipeline
-In-Reply-To: <20180726171257.6688-8-icenowy@aosc.io>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Fri, 27 Jul 2018 17:44:59 +0200
+Subject: [linux-sunxi] Re: [PATCH v3.1 10/10] arm64: dts: allwinner: a64:
+ Enable HDMI output on A64 boards w/ HDMI
+In-Reply-To: <7e1dcd8796e417924072f14b2a50af73@aosc.io>
 References: <20180726171257.6688-1-icenowy@aosc.io>
- <20180726171257.6688-8-icenowy@aosc.io>
-Message-ID: <16929adfe068302187af72b0ed0f1d472b6b02e2.camel@aosc.io>
+ <20180727140032.go6f3dwzxrzfstzj@flea>
+ <7e1dcd8796e417924072f14b2a50af73@aosc.io>
+Message-ID: <2190272.845Jehz4jH@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018-07-27?? 01:12 +0800?Icenowy Zheng???
-> From: Jagan Teki <jagan@amarulasolutions.com>
+Dne petek, 27. julij 2018 ob 17:42:08 CEST je Icenowy Zheng napisal(a):
+> ? 2018-07-27 22:00?Maxime Ripard ???
 > 
-> Allwinner A64 have a display pipeline with 2 mixers/TCONs, the first
-> TCON is connected to LCD and the second is to HDMI.
+> > On Fri, Jul 27, 2018 at 09:26:11PM +0800, Icenowy Zheng wrote:
+> >> ? 2018?7?27? GMT+08:00 ??8:56:15, Maxime Ripard
+> >> 
+> >> <maxime.ripard@bootlin.com> ??:
+> >> >On Fri, Jul 27, 2018 at 01:12:57AM +0800, Icenowy Zheng wrote:
+> >> >> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> >> >
+> >> >b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> >> >
+> >> >> index 1b9b92e541d2..1b972bade9f6 100644
+> >> >> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> >> >> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> >> >> @@ -62,6 +62,21 @@
+> >> >> 
+> >> >>  	chosen {
+> >> >>  	
+> >> >>  		stdout-path = "serial0:115200n8";
+> >> >>  	
+> >> >>  	};
+> >> >> 
+> >> >> +
+> >> >> +	connector {
+> >> >> +		compatible = "hdmi-connector";
+> >> >> +		type = "a";
+> >> >> +
+> >> >> +		port {
+> >> >> +			hdmi_con_in: endpoint {
+> >> >> +				remote-endpoint = <&hdmi_out_con>;
+> >> >> +			};
+> >> >> +		};
+> >> >> +	};
+> >> >> +};
+> >> >> +
+> >> >> +&de {
+> >> >> +	status = "okay";
+> >> >> 
+> >> >>  };
+> >> >>  
+> >> >>  &ehci0 {
+> >> >> 
+> >> >> @@ -82,6 +97,17 @@
+> >> >> 
+> >> >>  };
+> >> >> 
+> >> >> +&hdmi {
+> >> >> +	hdmi-supply = <&reg_dldo1>;
+> >> >> +	status = "okay";
+> >> >> +};
+> >> >> +
+> >> >> +&hdmi_out {
+> >> >> +	hdmi_out_con: endpoint {
+> >> >> +		remote-endpoint = <&hdmi_con_in>;
+> >> >> +	};
+> >> >> +};
+> >> >> +
+> >> >> 
+> >> >>  &i2c1 {
+> >> >>  
+> >> >>  	pinctrl-names = "default";
+> >> >>  	pinctrl-0 = <&i2c1_pins>;
+> >> >> 
+> >> >> @@ -99,6 +125,10 @@
+> >> >> 
+> >> >>  	};
+> >> >>  
+> >> >>  };
+> >> >> 
+> >> >> +&mixer1 {
+> >> >> +	status = "okay";
+> >> >> +};
+> >> >> +
+> >> >> 
+> >> >>  &mmc0 {
+> >> >>  
+> >> >>  	pinctrl-names = "default";
+> >> >>  	pinctrl-0 = <&mmc0_pins>;
+> >> >> 
+> >> >> @@ -238,6 +268,10 @@
+> >> >> 
+> >> >>  	status = "disabled";
+> >> >>  
+> >> >>  };
+> >> >> 
+> >> >> +&tcon1 {
+> >> >> +	status = "okay";
+> >> >> +};
+> >> >
+> >> >Is it working or not on the pine64?
+> >> 
+> >> Not tested yet, as my main A64 device is Pine A64-LTS now.
+> > 
+> > It was last reported as broken, so it's better to leave it out of that
+> > patch until someone figures it out.
 > 
-> The HDMI controller/PHY pair is similar to the one on H3/H5, but have
-> two video PLLs selectable.
+> Sorry, I did find a bug. Although after fixing it HDMI on Pine A64+
+> works fine.
 > 
-> Add all required device tree nodes of the display pipeline, including
-> the TCON0 LCD one and the TCON1 HDMI one.
-> 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> [Icenowy: refactor commit message and add 1st pipeline]
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
-> Changes for v3.1:
-> - Refactor commit message to make it more clear.
-> - Added first pipeline (mixer0 -> tcon0)
-> Changes for v3:
-> - Squash all pipeline components in one patch
-> - Add status for mixer1 and tcon1
-> Changes for v2:
-> - Change compatibles and other based on previous patch changes
-> 
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 169
-> ++++++++++++++++++
->  1 file changed, 169 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index d3daf90a8715..fe9cc673fe07 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -112,6 +112,12 @@
->  		};
->  	};
->  
-> +	de: display-engine {
-> +		compatible = "allwinner,sun50i-a64-display-engine";
-> +		allwinner,pipelines = <&mixer1>;
-> +		status = "disabled";
-> +	};
-> +
->  	osc24M: osc24M_clk {
->  		#clock-cells = <0>;
->  		compatible = "fixed-clock";
-> @@ -194,6 +200,55 @@
->  				#clock-cells = <1>;
->  				#reset-cells = <1>;
->  			};
-> +
-> +			mixer0: mixer at 100000 {
-> +				compatible = "allwinner,sun50i-a64-de2-
-> mixer-0";
-> +				reg = <0x100000 0x100000>;
-> +				clocks = <&display_clocks
-> CLK_BUS_MIXER0>,
-> +					 <&display_clocks CLK_MIXER0>;
-> +				clock-names = "bus",
-> +					      "mod";
-> +				resets = <&display_clocks RST_MIXER0>;
-> +				status = "disabled";
-> +
-> +				ports {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +
-> +					mixer0_out: port at 1 {
-> +						reg = <1>;
-> +
-> +						mixer0_out_tcon0:
-> endpoint {
-> +							remote-endpoint 
-> = <&tcon0_in_mixer0>;
-> +						};
-> +					};
-> +				};
-> +			};
-> +
-> +			mixer1: mixer at 200000 {
-> +				compatible = "allwinner,sun50i-a64-de2-
-> mixer-1";
-> +				reg = <0x200000 0x100000>;
-> +				clocks = <&display_clocks
-> CLK_BUS_MIXER1>,
-> +					 <&display_clocks CLK_MIXER1>;
-> +				clock-names = "bus",
-> +					      "mod";
-> +				/* The reset line is shared */
-> +				resets = <&display_clocks RST_WB>;
+> Will fix the bug when sending v3.2 (resending after rc1).
 
-Sorry here the reset line is not shared, and should be RST_MIXER1.
+Why don't you simply send v4, with all patches and changelogs? It would be 
+easier to comprehend.
 
-> +				status = "disabled";
-> +
-> +				ports {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +
-> +					mixer1_out: port at 1 {
-> +						reg = <1>;
-> +
-> +						mixer1_out_tcon1:
-> endpoint {
-> +							remote-endpoint 
-> = <&tcon1_in_mixer1>;
-> +						};
-> +					};
-> +				};
-> +			};
->  		};
->  
->  		syscon: syscon at 1c00000 {
-> @@ -228,6 +283,76 @@
->  			#dma-cells = <1>;
->  		};
->  
-> +		tcon0: lcd-controller at 1c0c000 {
-> +			compatible = "allwinner,sun50i-a64-tcon-lcd",
-> +				     "allwinner,sun8i-a83t-tcon-lcd";
-> +			reg = <0x01c0c000 0x1000>;
-> +			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&ccu CLK_BUS_TCON0>, <&ccu
-> CLK_TCON0>;
-> +			clock-names = "ahb", "tcon-ch0";
-> +			clock-output-names = "tcon-pixel-clock";
-> +			resets = <&ccu RST_BUS_TCON0>, <&ccu
-> RST_BUS_LVDS>;
-> +			reset-names = "lcd", "lvds";
-> +
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				tcon0_in: port at 0 {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					reg = <0>;
-> +
-> +					tcon0_in_mixer0: endpoint at 0 {
-> +						reg = <0>;
-> +						remote-endpoint =
-> <&mixer0_out_tcon0>;
-> +					};
-> +				};
-> +
-> +				tcon0_out: port at 1 {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					reg = <1>;
-> +				};
-> +			};
-> +		};
-> +
-> +		tcon1: lcd-controller at 1c0d000 {
-> +			compatible = "allwinner,sun50i-a64-tcon-tv",
-> +				     "allwinner,sun8i-a83t-tcon-tv";
-> +			reg = <0x01c0d000 0x1000>;
-> +			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&ccu CLK_BUS_TCON1>, <&ccu
-> CLK_TCON1>;
-> +			clock-names = "ahb", "tcon-ch1";
-> +			resets = <&ccu RST_BUS_TCON1>;
-> +			reset-names = "lcd";
-> +			status = "disabled";
-> +
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				tcon1_in: port at 0 {
-> +					reg = <0>;
-> +
-> +					tcon1_in_mixer1: endpoint {
-> +						remote-endpoint =
-> <&mixer1_out_tcon1>;
-> +					};
-> +				};
-> +
-> +				tcon1_out: port at 1 {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					reg = <1>;
-> +
-> +					tcon1_out_hdmi: endpoint at 1 {
-> +						reg = <1>;
-> +						remote-endpoint =
-> <&hdmi_in_tcon1>;
-> +					};
-> +				};
-> +			};
-> +		};
-> +
->  		mmc0: mmc at 1c0f000 {
->  			compatible = "allwinner,sun50i-a64-mmc";
->  			reg = <0x01c0f000 0x1000>;
-> @@ -686,6 +811,50 @@
->  			status = "disabled";
->  		};
->  
-> +		hdmi: hdmi at 1ee0000 {
-> +			compatible = "allwinner,sun50i-a64-dw-hdmi",
-> +				     "allwinner,sun8i-a83t-dw-hdmi";
-> +			reg = <0x01ee0000 0x10000>;
-> +			reg-io-width = <1>;
-> +			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&ccu CLK_BUS_HDMI>, <&ccu
-> CLK_HDMI_DDC>,
-> +				 <&ccu CLK_HDMI>;
-> +			clock-names = "iahb", "isfr", "tmds";
-> +			resets = <&ccu RST_BUS_HDMI1>;
-> +			reset-names = "ctrl";
-> +			phys = <&hdmi_phy>;
-> +			phy-names = "hdmi-phy";
-> +			status = "disabled";
-> +
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				hdmi_in: port at 0 {
-> +					reg = <0>;
-> +
-> +					hdmi_in_tcon1: endpoint {
-> +						remote-endpoint =
-> <&tcon1_out_hdmi>;
-> +					};
-> +				};
-> +
-> +				hdmi_out: port at 1 {
-> +					reg = <1>;
-> +				};
-> +			};
-> +		};
-> +
-> +		hdmi_phy: hdmi-phy at 1ef0000 {
-> +			compatible = "allwinner,sun50i-a64-hdmi-phy";
-> +			reg = <0x01ef0000 0x10000>;
-> +			clocks = <&ccu CLK_BUS_HDMI>, <&ccu
-> CLK_HDMI_DDC>,
-> +				 <&ccu CLK_PLL_VIDEO0>, <&ccu
-> CLK_PLL_VIDEO1>;
-> +			clock-names = "bus", "mod", "pll-0", "pll-1";
-> +			resets = <&ccu RST_BUS_HDMI0>;
-> +			reset-names = "phy";
-> +			#phy-cells = <0>;
-> +		};
-> +
->  		rtc: rtc at 1f00000 {
->  			compatible = "allwinner,sun6i-a31-rtc";
->  			reg = <0x01f00000 0x54>;
+Best regards,
+Jernej
+
+> 
+> > Thanks!
+> > Maxime
