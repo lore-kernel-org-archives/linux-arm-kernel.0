@@ -1,101 +1,139 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 27 Jul 2018 21:42:14 +0100
-Subject: [PATCH v2 7/7] OF: Don't set default coherent DMA mask
-In-Reply-To: <affa2718-5f3a-7439-db25-ce171a99414a@ti.com>
-References: <cover.1532382222.git.robin.murphy@arm.com>
- <66c08e4df2032fde82a2f97544f41fd3a2f24a94.1532382222.git.robin.murphy@arm.com>
- <4ed75bc9-1694-2bcb-2ea9-3f2a04f33f54@ti.com>
- <92d6b010-b5c0-fc59-0668-5b455e26c912@ti.com>
- <c7a9c7ae-1f4a-af9d-df78-1f48bb5c28a5@arm.com>
- <20180727181302.GC17271@n2100.armlinux.org.uk>
- <affa2718-5f3a-7439-db25-ce171a99414a@ti.com>
-Message-ID: <6d18c0fb-58ed-e4a7-32a4-8bcfa4dc3761@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 28 Jul 2018 04:53:47 +0800
+Subject: [PATCH v4 2/2] fpga: zynq-fpga: Add support for readback of FPGA
+ configuration data and registers
+In-Reply-To: <1532672551-22146-2-git-send-email-appana.durga.rao@xilinx.com>
+References: <1532672551-22146-2-git-send-email-appana.durga.rao@xilinx.com>
+Message-ID: <201807280410.sCpMAPxV%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-27 7:45 PM, Grygorii Strashko wrote:
-[...]
-> But I have a question to all:
-> - The patch [1] sets default DMA mask to DMA_BIT_MASK(32)
-> +	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-> +	if (!dev->dev.dma_mask)
-> +		dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
-> 
-> this will also work the same way for ARM64
-> 
-> - But of_dma_configure() still have code which does:
-> 	dev->coherent_dma_mask &= mask;
-> 	*dev->dma_mask &= mask;
-> 
-> As result, DMA mask supplied from DT will always be truncated
->   to 32 bit for platform devices. for example:
-> 
-> soc0: soc0 {
->          compatible = "simple-bus";
->          #address-cells = <2>;
->          #size-cells = <2>;
->          ranges;
-> +        dma-ranges = <0 0 0 0 0x10000 0>;
-> 
-> ^ 48 bit DMA mask expected to be generated and assigned.
-> 
-> But real mask will be DMA_BIT_MASK(32). As result, any
-> DMA capable driver will have be modified to do dma_set_xxx_mask(),
-> which disregards DT DMA configuration (especially for HW modules
-> which are used on ARM32 and ARM64).
+Hi Appana,
 
-That has always been the case. Drivers which want to use 
-larger-than-32-bit masks *must* explicitly say so. The issue that the DT 
-dma-ranges (and ACPI equivalents) cannot be preserved in the device DMA 
-masks is the entire purpose of this series. At the moment there's only a 
-couple of point fixes for specific places with known problems, but this 
-is just the start of some ongoing work.
+Thank you for the patch! Perhaps something to improve:
 
-> Could it be considered to do one the changes below?
-> 
-> 1) assign mask in case of dt
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 5957cd4..f7dc121 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -150,8 +150,8 @@ int of_dma_configure(struct device *dev, struct device_node *np, bool force_dma)
->           */
->          mask = DMA_BIT_MASK(ilog2(dma_addr + size - 1) + 1);
->          dev->bus_dma_mask = mask;
-> -       dev->coherent_dma_mask &= mask;
-> -       *dev->dma_mask &= mask;
-> +       dev->coherent_dma_mask = mask;
-> +       *dev->dma_mask = mask;
->   
->          coherent = of_dma_is_coherent(np);
+[auto build test WARNING on sof-driver-fuweitax/master]
+[cannot apply to v4.18-rc6 next-20180727]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-No, because that leads to a risk of DMA address truncation in hardware 
-(and thus at worst random memory corruption) when drivers expect the 
-default mask to be 32-bit and fail to explicitly set it as such.
+url:    https://github.com/0day-ci/linux/commits/Appana-Durga-Kedareswara-rao/fpga-fpga-mgr-Add-readback-support/20180728-034920
+base:   https://github.com/fuweitax/linux master
+config: xtensa-allyesconfig (attached as .config)
+compiler: xtensa-linux-gcc (GCC) 8.1.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=8.1.0 make.cross ARCH=xtensa 
 
-> 2) use BITS_PER_LONG for default DMA mask for of_platform devices
-> 
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 7ba90c2..3f326e2 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -185,7 +185,7 @@ static struct platform_device *of_platform_device_create_pdata(
->          if (!dev)
->                  goto err_clear_flag;
->   
-> -       dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-> +       dev->dev.coherent_dma_mask = DMA_BIT_MASK(BITS_PER_LONG);
->          if (!dev->dev.dma_mask)
->                  dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
+All warnings (new ones prefixed by >>):
 
-No, because that leads to a risk of DMA address truncation in hardware 
-(and thus at worst random memory corruption) when drivers expect the 
-default mask to be 32-bit and fail to explicitly set it as such.
+   drivers/fpga/zynq-fpga.c: In function 'zynq_fpga_probe':
+>> drivers/fpga/zynq-fpga.c:1032:2: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
+     struct dentry *d;
+     ^~~~~~
 
-> 3) ...
+vim +1032 drivers/fpga/zynq-fpga.c
 
-Remember when we found out how many drivers expect the default mask to 
-be 32-bit and fail to explicitly set it as such, because they all broke 
-when some chump set it to 0 in linux-next for a day? ;)
+   963	
+   964	static int zynq_fpga_probe(struct platform_device *pdev)
+   965	{
+   966		struct device *dev = &pdev->dev;
+   967		struct zynq_fpga_priv *priv;
+   968		struct resource *res;
+   969		int err;
+   970	
+   971		priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+   972		if (!priv)
+   973			return -ENOMEM;
+   974		spin_lock_init(&priv->dma_lock);
+   975	
+   976		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+   977		priv->io_base = devm_ioremap_resource(dev, res);
+   978		if (IS_ERR(priv->io_base))
+   979			return PTR_ERR(priv->io_base);
+   980	
+   981		priv->slcr = syscon_regmap_lookup_by_phandle(dev->of_node,
+   982			"syscon");
+   983		if (IS_ERR(priv->slcr)) {
+   984			dev_err(dev, "unable to get zynq-slcr regmap\n");
+   985			return PTR_ERR(priv->slcr);
+   986		}
+   987	
+   988		init_completion(&priv->dma_done);
+   989	
+   990		priv->irq = platform_get_irq(pdev, 0);
+   991		if (priv->irq < 0) {
+   992			dev_err(dev, "No IRQ available\n");
+   993			return priv->irq;
+   994		}
+   995	
+   996		priv->clk = devm_clk_get(dev, "ref_clk");
+   997		if (IS_ERR(priv->clk)) {
+   998			dev_err(dev, "input clock not found\n");
+   999			return PTR_ERR(priv->clk);
+  1000		}
+  1001	
+  1002		err = clk_prepare_enable(priv->clk);
+  1003		if (err) {
+  1004			dev_err(dev, "unable to enable clock\n");
+  1005			return err;
+  1006		}
+  1007	
+  1008		/* unlock the device */
+  1009		zynq_fpga_write(priv, UNLOCK_OFFSET, UNLOCK_MASK);
+  1010	
+  1011		zynq_fpga_set_irq(priv, 0);
+  1012		zynq_fpga_write(priv, INT_STS_OFFSET, IXR_ALL_MASK);
+  1013		err = devm_request_irq(dev, priv->irq, zynq_fpga_isr, 0, dev_name(dev),
+  1014				       priv);
+  1015		if (err) {
+  1016			dev_err(dev, "unable to request IRQ\n");
+  1017			clk_disable_unprepare(priv->clk);
+  1018			return err;
+  1019		}
+  1020	
+  1021		clk_disable(priv->clk);
+  1022	
+  1023		err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
+  1024					&zynq_fpga_ops, priv);
+  1025		if (err) {
+  1026			dev_err(dev, "unable to register FPGA manager\n");
+  1027			clk_unprepare(priv->clk);
+  1028			return err;
+  1029		}
+  1030	
+  1031	#ifdef CONFIG_FPGA_MGR_DEBUG_FS
+> 1032		struct dentry *d;
+  1033		struct fpga_manager *mgr;
+  1034	
+  1035		mgr = platform_get_drvdata(pdev);
+  1036		mutex_init(&priv->ref_mutex);
+  1037	
+  1038		d = debugfs_create_dir(pdev->dev.kobj.name, mgr->dir);
+  1039		if (!d)
+  1040			return err;
+  1041	
+  1042		priv->dir = d;
+  1043		d = debugfs_create_file("cfg_reg", 0644, priv->dir, mgr,
+  1044					&zynq_fpga_ops_cfg_reg);
+  1045		if (!d) {
+  1046			debugfs_remove_recursive(mgr->dir);
+  1047			return err;
+  1048		}
+  1049	#endif
+  1050	
+  1051		return 0;
+  1052	}
+  1053	
 
-Robin.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 52967 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180728/721d0696/attachment-0001.gz>
