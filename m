@@ -1,55 +1,38 @@
-From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
-Date: Fri, 27 Jul 2018 09:47:08 -0300
-Subject: [PATCH, libv4l]: Make libv4l2 usable on devices with complex
- pipeline
-In-Reply-To: <20180708213258.GA18217@amd>
-References: <20180708213258.GA18217@amd>
-Message-ID: <20180727094708.18ef4e4e@coco.lan>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 27 Jul 2018 14:54:49 +0200
+Subject: [PATCH v2 08/10] drm/sun4i: Use __drm_atomic_helper_plane_reset
+ instead of copying the logic
+In-Reply-To: <20180726161756.1794-9-alexandru-cosmin.gheorghe@arm.com>
+References: <20180726161756.1794-1-alexandru-cosmin.gheorghe@arm.com>
+ <20180726161756.1794-9-alexandru-cosmin.gheorghe@arm.com>
+Message-ID: <20180727125449.iyoocim6s3sniyf7@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Sun, 8 Jul 2018 23:32:58 +0200
-Pavel Machek <pavel@ucw.cz> escreveu:
-
-> Add support for opening multiple devices in v4l2_open(), and for
-> mapping controls between devices.
+On Thu, Jul 26, 2018 at 05:17:54PM +0100, Alexandru Gheorghe wrote:
+> A new helper function(__drm_atomic_helper_plane_reset) has been added
+> for linking a plane with its state and resetting the core
+> properties(alpha, rotation, etc.) to their default values.
+> Use that instead of duplicating the logic.
 > 
-> This is necessary for complex devices, such as Nokia N900.
+> __drm_atomic_helper_plane_reset initializes the alpha property to its
+> max value, which is defined by the drm core as DRM_BLEND_ALPHA_OPAQUE,
+> so nothing changes regarding the alpha value.
+> 
+> Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
 
-Hi Pavel,
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-I tried to apply it here, but it seems that there are something
-wrong with the patch:
+Maxime
 
-$ quilt push -f --merge
-Applying patch patches/lmml_50901_libv4l_make_libv4l2_usable_on_devices_with_complex_pipeline.patch
-patching file lib/include/libv4l2.h
-patching file lib/libv4l2/libv4l2-priv.h
-patching file lib/libv4l2/libv4l2.c
-Hunk #6 NOT MERGED at 1830-1857.
-misordered hunks! output would be garbled
-Hunk #7 FAILED at 1224.
-Hunk #8 NOT MERGED at 1858-2057.
-1 out of 8 hunks FAILED -- saving rejects to file lib/libv4l2/libv4l2.c.rej
-patching file lib/libv4lconvert/control/libv4lcontrol.c
-Applied patch patches/lmml_50901_libv4l_make_libv4l2_usable_on_devices_with_complex_pipeline.patch (forced; needs refresh)
-
-I even tried to reset the tree to a patchset earlier than July, 8.
-Same issue.
-
-I could manually try to fix it, but that misordered hunks
-warning is weird. Makes me wonder if the patch is not mangled.
-
-Could you please re-send it on the top of upstream? Better to use
-git send-email, as it won't mangle your patch.
-
-Alternatively, please send me a ssh public key in private, and I'll
-give you access to the repository where you can store those patches.
-
-Thanks!
-Mauro
-
-
-
-Thanks,
-Mauro
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180727/b0c4557b/attachment.sig>
