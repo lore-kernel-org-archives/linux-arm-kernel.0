@@ -1,99 +1,106 @@
-From: yibin.gong@nxp.com (Robin Gong)
-Date: Fri, 27 Jul 2018 09:15:40 +0000
-Subject: [PATCH v8 2/6] ARM: imx6: register pm_power_off handler if
- "fsl,pmic-stby-poweroff" is set
-In-Reply-To: <20180726092220.17250-3-o.rempel@pengutronix.de>
-References: <20180726092220.17250-1-o.rempel@pengutronix.de>
- <20180726092220.17250-3-o.rempel@pengutronix.de>
-Message-ID: <DB6PR04MB3223A62E5609BF6431ABEA40892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 27 Jul 2018 10:26:59 +0100
+Subject: [RFC PATCH 13/16] KVM: Allow 2048-bit register access via
+ KVM_{GET, SET}_ONE_REG
+In-Reply-To: <871sbqt82n.fsf@linaro.org>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-14-git-send-email-Dave.Martin@arm.com>
+ <874lgntihl.fsf@linaro.org>
+ <20180726125834.GV4240@e103592.cambridge.arm.com>
+ <871sbqt82n.fsf@linaro.org>
+Message-ID: <20180727092656.GZ4240@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jul 26, 2018 at 02:55:44PM +0100, Alex Benn?e wrote:
+> 
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > On Wed, Jul 25, 2018 at 04:58:30PM +0100, Alex Benn?e wrote:
+> >>
+> >> Dave Martin <Dave.Martin@arm.com> writes:
+> >>
+> >> > The Arm SVE architecture defines registers that are up to 2048 bits
+> >> > in size (with some possibility of further future expansion).
+> >> >
+> >> > In order to avoid the need for an excessively large number of
+> >> > ioctls when saving and restoring a vcpu's registers, this patch
+> >> > adds a #define to make support for individual 2048-bit registers
+> >> > through the KVM_{GET,SET}_ONE_REG ioctl interface official.  This
+> >> > will allow each SVE register to be accessed in a single call.
+> >> >
+> >> > There are sufficient spare bits in the register id size field for
+> >> > this change, so there is no ABI impact providing that
+> >> > KVM_GET_REG_LIST does not enumerate any 2048-bit register unless
+> >> > userspace explicitly opts in to the relevant architecture-specific
+> >> > features.
+> >>
+> >> Does it? It's not in this patch and looking at the final tree:
+> >>
+> >>   unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
+> >>   {
+> >>           unsigned long res = 0;
+> >>
+> >>           res += num_core_regs();
+> >>           res += num_sve_regs(vcpu);
+> >>           res += kvm_arm_num_sys_reg_descs(vcpu);
+> >>           res += kvm_arm_get_fw_num_regs(vcpu);
+> >>           res += NUM_TIMER_REGS;
+> >>
+> >>           return res;
+> >>   }
+> >>
+> >>
+> >> which leads to:
+> >>
+> >>   static int enumerate_sve_regs(const struct kvm_vcpu *vcpu, u64 __user **uind)
+> >>   {
+> >>           unsigned int n, i;
+> >>           int err = 0;
+> >>           int total = 0;
+> >>           unsigned int slices;
+> >>
+> >>           if (!vcpu_has_sve(&vcpu->arch))
+> >>                   return 0;
+> >>
+> >> Which enumerates the SVE regs if vcpu_has_sve() which AFAICT is true if
+> >> the host supports it, not if the user has requested it.
+> >>
+> >> I'll have to check what but given the indirection of kvm_one_reg I
+> >> wonder if existing binaries might end up spamming a badly sized array
+> >> when run on a new SVE supporting kernel?
+> >
+> > That shouldn't be the case: vcpu_has_sve() checks for the
+> > KVM_ARM64_GUEST_HAS_SVE flag, which should only be set if userspace asks
+> > for it.
+> >
+> > Give me a shout if this doesn't seem to be the case...
+> 
+> Ahh I missed it the first time:
+> 
+> 		if (system_supports_sve() &&
+> 		    test_bit(KVM_ARM_VCPU_SVE, vcpu->arch.features)) {
+> 			vcpu->arch.flags |= KVM_ARM64_GUEST_HAS_SVE;
+> 
+> And vcpu->arch.features is set by the user. However it will be set as
+> unless you specify otherwise we use the results of probed:
+> 
+>   ret = ioctl(vmfd, KVM_ARM_PREFERRED_TARGET, init);
+> 
+> so the user will get it by definition when they first run on SVE capable
+> hardware.
 
+AFAIK qemu and kvmtool don't currently propagate the feature flags from
+KVM_ARM_PREFERRED_TARGET to KVM_VCPU_INIT.  That would probably not be
+the right thing to do, because if you don't know what a feature flag
+means then you can't safely turn it on.
 
-> -----Original Message-----
-> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
-> Sent: 2018?7?26? 17:22
-> To: Shawn Guo <shawnguo@kernel.org>; Mark Brown <broonie@kernel.org>;
-> Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> Cc: Oleksij Rempel <o.rempel@pengutronix.de>; kernel at pengutronix.de;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org; Andrew Morton
-> <akpm@linux-foundation.org>; Liam Girdwood <lgirdwood@gmail.com>;
-> Leonard Crestez <leonard.crestez@nxp.com>; Rob Herring
-> <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Michael
-> Turquette <mturquette@baylibre.com>; Stephen Boyd
-> <sboyd@codeaurora.org>; Fabio Estevam <fabio.estevam@nxp.com>; Russell
-> King <linux@armlinux.org.uk>; dl-linux-imx <linux-imx@nxp.com>; Robin Gong
-> <yibin.gong@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
-> Subject: [PATCH v8 2/6] ARM: imx6: register pm_power_off handler if
-> "fsl,pmic-stby-poweroff" is set
-> 
-> One of the Freescale recommended sequences for power off with external
-> PMIC is the following:
-> ...
-> 3.  SoC is programming PMIC for power off when standby is asserted.
-> 4.  In CCM STOP mode, Standby is asserted, PMIC gates SoC supplies.
-> 
-> See:
-> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fwww.
-> nxp.com%2Fassets%2Fdocuments%2Fdata%2Fen%2Freference-manuals%2FIM
-> X6DQRM.pdf&amp;data=02%7C01%7Cyibin.gong%40nxp.com%7C193fd19e3a
-> 40416ffa4a08d5f2d9583c%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C1
-> %7C636681937661914076&amp;sdata=lICAelYpUh4%2Ft%2Fs7N9mdk2cLQMi
-> cHcOqQ07vTOUoyNY%3D&amp;reserved=0
-> page 5083
-> 
-> This patch implements step 4. of this sequence.
-> 
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> ---
->  arch/arm/mach-imx/pm-imx6.c | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-> index 017539dd712b..2f5c643f62fb 100644
-> --- a/arch/arm/mach-imx/pm-imx6.c
-> +++ b/arch/arm/mach-imx/pm-imx6.c
-> @@ -601,6 +601,28 @@ static void __init imx6_pm_common_init(const struct
-> imx6_pm_socdata
->  				   IMX6Q_GPR1_GINT);
->  }
-> 
-> +static void imx6_pm_stby_poweroff(void) {
-> +	imx6_set_lpm(STOP_POWER_OFF);
-> +	imx6q_suspend_finish(0);
-> +
-> +	mdelay(1000);
-> +
-> +	pr_emerg("Unable to poweroff system\n"); }
-> +
-> +static int imx6_pm_stby_poweroff_probe(void) {
-> +	if (pm_power_off) {
-> +		pr_warn("%s: pm_power_off already claimed  %p %pf!\n",
-> +			__func__, pm_power_off, pm_power_off);
-'syscon-poweroff' and 'pmic-stby-poweroff ' should be chosen as a single
-Poweroff way for any i.mx6 board. Why not delete directly 'syscon-poweroff' in dts 
-to avoid such two power off ways coexist?
-> +		return -EBUSY;
-> +	}
-> +
-> +	pm_power_off = imx6_pm_stby_poweroff;
-> +	return 0;
-> +}
-> +
->  void __init imx6_pm_ccm_init(const char *ccm_compat)  {
->  	struct device_node *np;
-> @@ -617,6 +639,9 @@ void __init imx6_pm_ccm_init(const char
-> *ccm_compat)
->  	val = readl_relaxed(ccm_base + CLPCR);
->  	val &= ~BM_CLPCR_LPM;
->  	writel_relaxed(val, ccm_base + CLPCR);
-> +
-> +	if (of_property_read_bool(np, "fsl,pmic-stby-poweroff"))
-> +		imx6_pm_stby_poweroff_probe();
->  }
-> 
->  void __init imx6q_pm_init(void)
-> --
-> 2.18.0
+But in light of Andrew's comments I will need to review how this works.
+
+The semantics of the feature bits are not well defined, so it may be
+safer not to use them for enabling SVE.  I was hoping we could choose
+a meaning for them since they weren't previously used for anything,
+but that may be optimistic.
+
+Cheers
+---Dave
