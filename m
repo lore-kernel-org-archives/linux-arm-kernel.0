@@ -1,49 +1,111 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Fri, 27 Jul 2018 09:56:44 +0200
-Subject: [PATCH RT v3] arm64: fpsimd: use preemp_disable in addition to
- local_bh_disable()
-In-Reply-To: <1532661443.10554.5.camel@gmx.de>
-References: <20180522173333.aawadhkcekzvrswp@linutronix.de>
- <20180711092555.268adf7f@gandalf.local.home>
- <20180711133157.bvrza5vmthu6lwjd@linutronix.de>
- <20180711093346.782af07a@gandalf.local.home>
- <20180713174937.5ddaqpylalcmc3jq@linutronix.de>
- <20180716151737.GO9486@e103592.cambridge.arm.com>
- <20180718091209.u76gzacanj5avhdl@linutronix.de>
- <20180724094623.37430032@gandalf.local.home>
- <20180726150634.cl3wccqur6qhle6p@linutronix.de>
- <1532661443.10554.5.camel@gmx.de>
-Message-ID: <20180727075644.lapmhyxxdb6jbaqr@linutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 27 Jul 2018 09:26:11 +0100
+Subject: [PATCH v7 08/12] mfd: intel-peci-client: Add PECI client MFD
+ driver
+In-Reply-To: <20180723214751.1733-9-jae.hyun.yoo@linux.intel.com>
+References: <20180723214751.1733-1-jae.hyun.yoo@linux.intel.com>
+ <20180723214751.1733-9-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20180727082611.GE4628@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-27 05:17:23 [+0200], Mike Galbraith wrote:
-> On Thu, 2018-07-26 at 17:06 +0200, Sebastian Andrzej Siewior wrote:
-> > 
-> > @@ -1115,6 +1139,7 @@ void kernel_neon_begin(void)
-> >  
-> >  	BUG_ON(!may_use_simd());
-> >  
-> > +	preempt_disable();
-> >  	local_bh_disable();
-> >  
-> >  	__this_cpu_write(kernel_neon_busy, true);
-> > @@ -1131,6 +1156,7 @@ void kernel_neon_begin(void)
-> >  	preempt_disable();
+On Mon, 23 Jul 2018, Jae Hyun Yoo wrote:
+
+> This commit adds PECI client MFD driver.
 > 
-> Nit: this preempt_disable() could be removed...
+> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Andrew Jeffery <andrew@aj.id.au>
+> Cc: James Feist <james.feist@linux.intel.com>
+> Cc: Jason M Biils <jason.m.bills@linux.intel.com>
+> Cc: Joel Stanley <joel@jms.id.au>
+> Cc: Vernon Mauery <vernon.mauery@linux.intel.com>
+> ---
+>  drivers/mfd/Kconfig                   |  14 ++
+>  drivers/mfd/Makefile                  |   1 +
+>  drivers/mfd/intel-peci-client.c       | 182 ++++++++++++++++++++++++++
+>  include/linux/mfd/intel-peci-client.h |  81 ++++++++++++
+>  4 files changed, 278 insertions(+)
+>  create mode 100644 drivers/mfd/intel-peci-client.c
+>  create mode 100644 include/linux/mfd/intel-peci-client.h
+> 
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index f3fa516011ec..e38b591479d4 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -595,6 +595,20 @@ config MFD_INTEL_MSIC
+>  	  Passage) chip. This chip embeds audio, battery, GPIO, etc.
+>  	  devices used in Intel Medfield platforms.
 >  
-> >  	local_bh_enable();
-> > +	preempt_enable();
-> >  }
-> >  EXPORT_SYMBOL(kernel_neon_begin);
-> 
-> ...instead of adding this one.
+> +config MFD_INTEL_PECI_CLIENT
+> +	bool "Intel PECI client"
+> +	depends on (PECI || COMPILE_TEST)
+> +	select MFD_CORE
+> +	help
+> +	  If you say yes to this option, support will be included for the
+> +	  multi-funtional Intel PECI (Platform Environment Control Interface)
+> +	  client. PECI is a one-wire bus interface that provides a communication
+> +	  channel from PECI clients in Intel processors and chipset components
+> +	  to external monitoring or control devices.
+> +
+> +	  Additional drivers must be enabled in order to use the functionality
+> +	  of the device.
+> +
+>  config MFD_IPAQ_MICRO
+>  	bool "Atmel Micro ASIC (iPAQ h3100/h3600/h3700) Support"
+>  	depends on SA1100_H3100 || SA1100_H3600
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index 2852a6042ecf..29e2cacc58bd 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -203,6 +203,7 @@ obj-$(CONFIG_MFD_INTEL_LPSS)	+= intel-lpss.o
+>  obj-$(CONFIG_MFD_INTEL_LPSS_PCI)	+= intel-lpss-pci.o
+>  obj-$(CONFIG_MFD_INTEL_LPSS_ACPI)	+= intel-lpss-acpi.o
+>  obj-$(CONFIG_MFD_INTEL_MSIC)	+= intel_msic.o
+> +obj-$(CONFIG_MFD_INTEL_PECI_CLIENT)	+= intel-peci-client.o
+>  obj-$(CONFIG_MFD_PALMAS)	+= palmas.o
+>  obj-$(CONFIG_MFD_VIPERBOARD)    += viperboard.o
+>  obj-$(CONFIG_MFD_RC5T583)	+= rc5t583.o rc5t583-irq.o
+> diff --git a/drivers/mfd/intel-peci-client.c b/drivers/mfd/intel-peci-client.c
+> new file mode 100644
+> index 000000000000..d7702cf1ea50
+> --- /dev/null
+> +++ b/drivers/mfd/intel-peci-client.c
+> @@ -0,0 +1,182 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2018 Intel Corporation
+> +
+> +#include <linux/bitfield.h>
+> +#include <linux/mfd/core.h>
+> +#include <linux/mfd/intel-peci-client.h>
+> +#include <linux/module.h>
+> +#include <linux/peci.h>
+> +#include <linux/of_device.h>
+> +
+> +enum cpu_gens {
+> +	CPU_GEN_HSX = 0, /* Haswell Xeon */
+> +	CPU_GEN_BRX,     /* Broadwell Xeon */
+> +	CPU_GEN_SKX,     /* Skylake Xeon */
+> +};
+> +
+> +static struct mfd_cell peci_functions[] = {
+> +	{
+> +		.name = "peci-cputemp",
+> +		.of_compatible = "intel,peci-cputemp",
+> +	},
+> +	{
+> +		.name = "peci-dimmtemp",
+> +		.of_compatible = "intel,peci-dimmtemp",
+> +	},
+> +};
 
-It could. I have currently no idea for the long term solution and this
-keeps track what is intended to do. It might get replaced with
-preempt_.*_rt()?
+The more I look at this driver, the less I think it fits into MFD.
 
-> 	-Mike
+What's stopping you from registering these devices directly from DT?
 
-Sebastian
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
