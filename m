@@ -1,61 +1,92 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sat, 28 Jul 2018 00:15:21 +0530
-Subject: [PATCH 3/9] dt-bindings: reset: Add binding constants for Actions
- Semi S700 RMU
+Date: Sat, 28 Jul 2018 00:15:22 +0530
+Subject: [PATCH 4/9] dt-bindings: reset: Add binding constants for Actions
+ Semi S900 RMU
 In-Reply-To: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
 References: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180727184527.13287-4-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180727184527.13287-5-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree binding constants for Actions Semi S700 SoC Reset
+Add device tree binding constants for Actions Semi S900 SoC Reset
 Management Unit (RMU).
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- .../dt-bindings/reset/actions,s700-reset.h    | 34 +++++++++++++++++++
- 1 file changed, 34 insertions(+)
- create mode 100644 include/dt-bindings/reset/actions,s700-reset.h
+ .../dt-bindings/reset/actions,s900-reset.h    | 65 +++++++++++++++++++
+ 1 file changed, 65 insertions(+)
+ create mode 100644 include/dt-bindings/reset/actions,s900-reset.h
 
-diff --git a/include/dt-bindings/reset/actions,s700-reset.h b/include/dt-bindings/reset/actions,s700-reset.h
+diff --git a/include/dt-bindings/reset/actions,s900-reset.h b/include/dt-bindings/reset/actions,s900-reset.h
 new file mode 100644
-index 000000000000..5e3b16b8ef53
+index 000000000000..42c19d02e43b
 --- /dev/null
-+++ b/include/dt-bindings/reset/actions,s700-reset.h
-@@ -0,0 +1,34 @@
++++ b/include/dt-bindings/reset/actions,s900-reset.h
+@@ -0,0 +1,65 @@
 +// SPDX-License-Identifier: (GPL-2.0-or-later OR MIT)
 +//
-+// Device Tree binding constants for Actions Semi S700 Reset Management Unit
++// Device Tree binding constants for Actions Semi S900 Reset Management Unit
 +//
 +// Copyright (c) 2018 Linaro Ltd.
 +
-+#ifndef __DT_BINDINGS_ACTIONS_S700_RESET_H
-+#define __DT_BINDINGS_ACTIONS_S700_RESET_H
++#ifndef __DT_BINDINGS_ACTIONS_S900_RESET_H
++#define __DT_BINDINGS_ACTIONS_S900_RESET_H
 +
-+#define RESET_AUDIO				0
-+#define RESET_CSI				1
-+#define RESET_DE				2
-+#define RESET_DSI				3
-+#define RESET_GPIO				4
-+#define RESET_I2C0				5
-+#define RESET_I2C1				6
-+#define RESET_I2C2				7
-+#define RESET_I2C3				8
-+#define RESET_KEY				9
-+#define RESET_LCD0				10
-+#define RESET_SI				11
-+#define RESET_SPI0				12
-+#define RESET_SPI1				13
-+#define RESET_SPI2				14
-+#define RESET_SPI3				15
-+#define RESET_UART0				16
-+#define RESET_UART1				17
-+#define RESET_UART2				18
-+#define RESET_UART3				19
-+#define RESET_UART4				20
-+#define RESET_UART5				21
-+#define RESET_UART6				22
++#define RESET_CHIPID				0
++#define RESET_CPU_SCNT				1
++#define RESET_SRAMI				2
++#define RESET_DDR_CTL_PHY			3
++#define RESET_DMAC				4
++#define RESET_GPIO				5
++#define RESET_BISP_AXI				6
++#define RESET_CSI0				7
++#define RESET_CSI1				8
++#define RESET_DE				9
++#define RESET_DSI				10
++#define RESET_GPU3D_PA				11
++#define RESET_GPU3D_PB				12
++#define RESET_HDE				13
++#define RESET_I2C0				14
++#define RESET_I2C1				15
++#define RESET_I2C2				16
++#define RESET_I2C3				17
++#define RESET_I2C4				18
++#define RESET_I2C5				19
++#define RESET_IMX				20
++#define RESET_NANDC0				21
++#define RESET_NANDC1				22
++#define RESET_SD0				23
++#define RESET_SD1				24
++#define RESET_SD2				25
++#define RESET_SD3				26
++#define RESET_SPI0				27
++#define RESET_SPI1				28
++#define RESET_SPI2				29
++#define RESET_SPI3				30
++#define RESET_UART0				31
++#define RESET_UART1				32
++#define RESET_UART2				33
++#define RESET_UART3				34
++#define RESET_UART4				35
++#define RESET_UART5				36
++#define RESET_UART6				37
++#define RESET_HDMI				38
++#define RESET_LVDS				39
++#define RESET_EDP				40
++#define RESET_USB2HUB				41
++#define RESET_USB2HSIC				42
++#define RESET_USB3				43
++#define RESET_PCM1				44
++#define RESET_AUDIO				45
++#define RESET_PCM0				46
++#define RESET_SE				47
++#define RESET_GIC				48
++#define RESET_DDR_CTL_PHY_AXI			49
++#define RESET_CMU_DDR				50
++#define RESET_DMM				51
++#define RESET_HDCP2TX				52
++#define RESET_ETHERNET				53
 +
-+#endif /* __DT_BINDINGS_ACTIONS_S700_RESET_H */
++#endif /* __DT_BINDINGS_ACTIONS_S900_RESET_H */
 -- 
 2.17.1
