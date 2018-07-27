@@ -1,46 +1,91 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Jul 2018 12:35:02 +0100
-Subject: [PATCH v5 1/3] arm64: mm: Support Common Not Private translations
-In-Reply-To: <1529403502-2843-2-git-send-email-vladimir.murzin@arm.com>
-References: <1529403502-2843-1-git-send-email-vladimir.murzin@arm.com>
- <1529403502-2843-2-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20180727113502.3qdbyffuvysva6bz@armageddon.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 27 Jul 2018 12:36:00 +0100
+Subject: [PATCH v2 7/7] OF: Don't set default coherent DMA mask
+In-Reply-To: <92d6b010-b5c0-fc59-0668-5b455e26c912@ti.com>
+References: <cover.1532382222.git.robin.murphy@arm.com>
+ <66c08e4df2032fde82a2f97544f41fd3a2f24a94.1532382222.git.robin.murphy@arm.com>
+ <4ed75bc9-1694-2bcb-2ea9-3f2a04f33f54@ti.com>
+ <92d6b010-b5c0-fc59-0668-5b455e26c912@ti.com>
+Message-ID: <c7a9c7ae-1f4a-af9d-df78-1f48bb5c28a5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+On 27/07/18 01:22, Grygorii Strashko wrote:
+[...]
+>> the result of this change is pretty strange as for me :(
+>> Resulted code:
+>>
+>> 	/*
+>> 	 * If @dev is expected to be DMA-capable then the bus code that created
+>> 	 * it should have initialised its dma_mask pointer by this point. For
+>> 	 * now, we'll continue the legacy behaviour of coercing it to the
+>> 	 * coherent mask if not, but we'll no longer do so quietly.
+>> 	 */
+>> 	if (!dev->dma_mask) {
+>> 		dev_warn(dev, "DMA mask not set\n");
+>> 		dev->dma_mask = &dev->coherent_dma_mask;
+>> ^this will always produce warning in case of platform-bus or if there are no bus driver.
+>> even if DT contains correct definition of dma-range
+>> 	}
+>>
+>> 	if (!size && dev->coherent_dma_mask)
+>>
+>> ^ coherent_dma_mask is zero, so size will not be calculated
+> pls, ignore this particular comment
+> 
+>> 		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+>> 	else if (!size)
+>> 		size = 1ULL << 32;
+>>
+>> 	dev->dma_pfn_offset = offset;
+>>
+>> 	/*
+>> 	 * Limit coherent and dma mask based on size and default mask
+>> 	 * set by the driver.
+>> 	 */
+>> 	mask = DMA_BIT_MASK(ilog2(dma_addr + size - 1) + 1);
+>> 	dev->bus_dma_mask = mask;
+>> 	dev->coherent_dma_mask &= mask;
+>>
+>> ^^ if nobody set coherent_dma_mask before it will stay null forever unless drivers
+>> will overwrite it. Again even if DT has correct definition for dma-range.
 
-On Tue, Jun 19, 2018 at 11:18:20AM +0100, Vladimir Murzin wrote:
-> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-> index 39ec0b8..c506fb7 100644
-> --- a/arch/arm64/include/asm/mmu_context.h
-> +++ b/arch/arm64/include/asm/mmu_context.h
-> @@ -149,6 +149,18 @@ static inline void cpu_replace_ttbr1(pgd_t *pgdp)
->  
->  	phys_addr_t pgd_phys = virt_to_phys(pgdp);
->  
-> +	if (system_supports_cnp() && !WARN_ON(pgdp != lm_alias(swapper_pg_dir))) {
-> +		/*
-> +		 * cpu_replace_ttbr1() is used when there's a boot CPU
-> +		 * up (i.e. cpufeature framework is not up yet) and
-> +		 * latter only when we enable CNP via cpufeature's
-> +		 * enable() callback.
-> +		 * Also we rely on the cpu_hwcap bit being set before
-> +		 * calling the enable() function.
-> +		 */
-> +		pgd_phys |= TTBR_CNP_BIT;
-> +	}
-> +
->  	replace_phys = (void *)__pa_symbol(idmap_cpu_replace_ttbr1);
+That is intentional. Consider a 32-bit device on a bus with an upstream 
+DMA range of 40 bits (which could easily happen with e.g. PCI). If the 
+firmware code gives that device 40-bit DMA masks and the driver doesn't 
+change them, then DMA is not going to work correctly. Therefore the 
+firmware code cannot safely make {coherent_}dma_mask larger than the 
+default value passed in, and if the default is 0 then that should be 
+fixed in whatever code created the device, not worked around later.
 
-So the above code sets the TTBR_CNP_BIT (bit 0) in pgd_phys and calls
-the idmap_cpu_replace_ttbr1() with this value. Looking at the latter, it
-performs a phys_to_ttbr transformation of pgd_phys which masks out the
-bottom 2 bits when CONFIG_ARM64_PA_BITS_52 is enabled. I think we need
-to tweak TTBR_BADDR_MASK_52 to start from bit 0.
+Robin.
 
-(cc'ing Kristina as she added this code, in case there is any issue with
-extending the mask)
-
--- 
-Catalin
+>>
+>> 	*dev->dma_mask &= mask;
+>>
+>> 	coherent = of_dma_is_coherent(np);
+>> 	dev_dbg(dev, "device is%sdma coherent\n",
+>> 		coherent ? " " : " not ");
+>>
+>>
+> 
+> FYI, with below diff i can boot at least:
+> 
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index 5957cd4..f7dc121 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -150,8 +150,8 @@ int of_dma_configure(struct device *dev, struct device_node *np, bool force_dma)
+>           */
+>          mask = DMA_BIT_MASK(ilog2(dma_addr + size - 1) + 1);
+>          dev->bus_dma_mask = mask;
+> -       dev->coherent_dma_mask &= mask;
+> -       *dev->dma_mask &= mask;
+> +       dev->coherent_dma_mask = mask;
+> +       *dev->dma_mask = mask;
+>   
+>          coherent = of_dma_is_coherent(np);
+>          dev_dbg(dev, "device is%sdma coherent\n",
+> 
+> 
+> 
