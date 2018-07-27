@@ -1,57 +1,105 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Fri, 27 Jul 2018 10:52:24 +0930
-Subject: [GIT PULL] ARM: aspeed: dts changes for 4.19
-In-Reply-To: <20180726195127.jukxvbydddlwui4k@localhost>
-References: <CACPK8Xeu2JAVBTyiUtyso1egbe3X+r5a--Cx30YDJV-JmK==DQ@mail.gmail.com>
- <20180726195127.jukxvbydddlwui4k@localhost>
-Message-ID: <CACPK8Xc6qvtooRbMfXO84Uq_90OQ81QjEthMS6DBgtdmYOQpmw@mail.gmail.com>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Fri, 27 Jul 2018 01:51:35 +0000
+Subject: [PATCH v8 1/6] ARM: imx6q: provide documentation for new
+ fsl,pmic-stby-poweroff property
+In-Reply-To: <84c1921c-922e-4b5d-b688-db89047fa1db@pengutronix.de>
+References: <20180726092220.17250-1-o.rempel@pengutronix.de>
+ <20180726092220.17250-2-o.rempel@pengutronix.de>
+ <DB6PR04MB3223605CB1F5E06D4A278B3C892B0@DB6PR04MB3223.eurprd04.prod.outlook.com>
+ <84c1921c-922e-4b5d-b688-db89047fa1db@pengutronix.de>
+Message-ID: <DB6PR04MB32236EA307DCD070771B1D4D892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 July 2018 at 05:21, Olof Johansson <olof@lixom.net> wrote:
+
+
+> -----Original Message-----
+> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
+> Sent: 2018?7?26? 19:38
+> To: Robin Gong <yibin.gong@nxp.com>; Shawn Guo <shawnguo@kernel.org>;
+> Mark Brown <broonie@kernel.org>; Rafael J. Wysocki
+> <rafael.j.wysocki@intel.com>
+> Cc: kernel at pengutronix.de; devicetree at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; linux-clk at vger.kernel.org;
+> linux-kernel at vger.kernel.org; Andrew Morton <akpm@linux-foundation.org>;
+> Liam Girdwood <lgirdwood@gmail.com>; Leonard Crestez
+> <leonard.crestez@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark
+> Rutland <mark.rutland@arm.com>; Michael Turquette
+> <mturquette@baylibre.com>; Stephen Boyd <sboyd@codeaurora.org>; Fabio
+> Estevam <fabio.estevam@nxp.com>; Russell King <linux@armlinux.org.uk>;
+> dl-linux-imx <linux-imx@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
+> Subject: Re: [PATCH v8 1/6] ARM: imx6q: provide documentation for new
+> fsl,pmic-stby-poweroff property
+> 
 > Hi,
->
-> On Thu, Jul 26, 2018 at 02:00:49PM +0930, Joel Stanley wrote:
->> Hello ARM Maintainers,
->>
->> Here are the ASPEED device tree updates for 4.19. No new machines this time
->> around, but we now have some FSI (the bus between the BMC and the PowerPC host)
->> descriptions, and USB support.
->>
->> The following changes since commit 7daf201d7fe8334e2d2364d4e8ed3394ec9af819:
->>
->>   Linux 4.18-rc2 (2018-06-24 20:54:29 +0800)
->>
->> are available in the Git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
->> tags/aspeed-4.19-devicetree
->>
->> for you to fetch changes up to 19617a35b08379b3e6da0a4ee0d2d62645bf1b9e:
->>
->>   ARM: dts: aspeed: Add Power9 CFAM description (2018-07-25 17:43:36 +0930)
->>
->> ----------------------------------------------------------------
->> ASPEED device tree updates for 4.19
->>
->>  - New support for the ASPEED USB host controller and USB vhub (device)
->>  support
->>
->>  - Descriptions for the FSI bus and hardware inside the Power8/Power9
->>  processors that are accessed over this bus. This includes the ColdFire
->>  processor that is part of the ASPEED SoC and is used to offload the FSI
->>  bit-banging
->
-> I had some feedback on one of these patches, it should be reworked before we
-> merge it. See separate email as reply to the actual patch.
->
-> If you prefer, you can send a branch without that contents for merging now, so
-> the rest of it isn't held up.
-
-No worries. I have sent a pull request without the FSI changes.
-
-Thanks for taking a close look!
-
-Cheers,
-
-Joel
+> 
+> On 26.07.2018 11:51, Robin Gong wrote:
+> >
+> >
+> >> -----Original Message-----
+> >> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
+> >> Sent: 2018?7?26? 17:22
+> >> To: Shawn Guo <shawnguo@kernel.org>; Mark Brown
+> <broonie@kernel.org>;
+> >> Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> >> Cc: Oleksij Rempel <o.rempel@pengutronix.de>; kernel at pengutronix.de;
+> >> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> >> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org; Andrew
+> >> Morton <akpm@linux-foundation.org>; Liam Girdwood
+> >> <lgirdwood@gmail.com>; Leonard Crestez <leonard.crestez@nxp.com>;
+> Rob
+> >> Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
+> >> Michael Turquette <mturquette@baylibre.com>; Stephen Boyd
+> >> <sboyd@codeaurora.org>; Fabio Estevam <fabio.estevam@nxp.com>;
+> >> Russell King <linux@armlinux.org.uk>; dl-linux-imx
+> >> <linux-imx@nxp.com>; Robin Gong <yibin.gong@nxp.com>; A.s. Dong
+> >> <aisheng.dong@nxp.com>
+> >> Subject: [PATCH v8 1/6] ARM: imx6q: provide documentation for new
+> >> fsl,pmic-stby-poweroff property
+> >>
+> >> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> >> Acked-by: Rob Herring <robh@kernel.org>
+> >> ---
+> >>  Documentation/devicetree/bindings/clock/imx6q-clock.txt | 8 ++++++++
+> >>  1 file changed, 8 insertions(+)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> >> b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> >> index a45ca67a9d5f..e1308346e00d 100644
+> >> --- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> >> +++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+> >> @@ -6,6 +6,14 @@ Required properties:
+> >>  - interrupts: Should contain CCM interrupt
+> >>  - #clock-cells: Should be <1>
+> >>
+> >> +Optional properties:
+> >> +- fsl,pmic-stby-poweroff: Configure CCM to assert PMIC_STBY_REQ
+> >> +signal
+> >> +  on power off.
+> >> +  Use this property if the SoC should be powered off by external
+> >> +power
+> >> +  management IC (PMIC) triggered via PMIC_STBY_REQ signal.
+> > PMIC_ON_REQ didn't connect to any pin of PMIC in your case?
+> 
+> No. First, it was only one customer specific issue. After some research I found
+> even publicly available boards (for example RioTboard) which has same/similar
+> design. After seeing this in imx6 documentation as valid power off way, I have
+> no doubts - there should be even more devices doin this in the wild.
+Not sure why the customer didn't follow reference design, since PMIC_ON_REQ can
+provide power off/on feature by pressing ONOFF key which connected ONOFF
+pin of i.mx6(ONOFF will toggle PMIC_ON_REQ to power off/on PMIC). The official
+power off/on way (PMIC_ON_REQ) can also power off all power rails of PFUZE except
+snvs as your patch did on PMIC_STBY_REQ.  PMIC_STBY_REQ is used to notify pmic
+switch power mode (PFM/APS) or decrease voltage to save power in kernel suspend,
+not power off....I am not sure if we need this patchset to 'workaround' the board issue.
+> 
+> > Don't understand
+> > why not follow normal board design guide to power off pmic by
+> PMIC_ON_REQ.
+> > How to power on board again then?
+> 
+> Power cycle. Without this patch, power of is not real power off. So, power cycle,
+> is expected behavior for user interaction. On usual PC, reset button will not
+> enable PC as well.
+Your board can't support wakeup by RTC alarm if not use PMIC_ON_REQ to power off.
+Again, why your board not follow the design guide?
