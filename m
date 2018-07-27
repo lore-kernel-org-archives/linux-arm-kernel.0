@@ -1,73 +1,111 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 27 Jul 2018 12:22:11 -0500
-Subject: [PATCH v2 0/7] Stop losing firmware-set DMA masks
-In-Reply-To: <8b8ac841-5c4c-ae27-21d5-d7aaaf4c277c@arm.com>
+Date: Fri, 27 Jul 2018 12:34:00 -0500
+Subject: [PATCH v2 7/7] OF: Don't set default coherent DMA mask
+In-Reply-To: <c7a9c7ae-1f4a-af9d-df78-1f48bb5c28a5@arm.com>
 References: <cover.1532382222.git.robin.murphy@arm.com>
- <c73bc8d2-b745-ff31-1949-7a59ab04ede6@ti.com>
- <8b8ac841-5c4c-ae27-21d5-d7aaaf4c277c@arm.com>
-Message-ID: <a8e85416-9a58-703a-26fa-f130befadf0d@ti.com>
+ <66c08e4df2032fde82a2f97544f41fd3a2f24a94.1532382222.git.robin.murphy@arm.com>
+ <4ed75bc9-1694-2bcb-2ea9-3f2a04f33f54@ti.com>
+ <92d6b010-b5c0-fc59-0668-5b455e26c912@ti.com>
+ <c7a9c7ae-1f4a-af9d-df78-1f48bb5c28a5@arm.com>
+Message-ID: <108a6254-1257-5daf-deaa-69bc4db2ec77@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 07/27/2018 05:55 AM, Robin Murphy wrote:
-> Hi Grygorii,
-> 
-> Thanks for the report.
-> 
-> On 27/07/18 00:45, Grygorii Strashko wrote:
+On 07/27/2018 06:36 AM, Robin Murphy wrote:
+> On 27/07/18 01:22, Grygorii Strashko wrote:
 > [...]
->> With this series applied I can't boot TI ARM32 am574x-idk any more.
+>>> the result of this change is pretty strange as for me :(
+>>> Resulted code:
+>>>
+>>> ????/*
+>>> ???? * If @dev is expected to be DMA-capable then the bus code that 
+>>> created
+>>> ???? * it should have initialised its dma_mask pointer by this point. 
+>>> For
+>>> ???? * now, we'll continue the legacy behaviour of coercing it to the
+>>> ???? * coherent mask if not, but we'll no longer do so quietly.
+>>> ???? */
+>>> ????if (!dev->dma_mask) {
+>>> ??????? dev_warn(dev, "DMA mask not set\n");
+>>> ??????? dev->dma_mask = &dev->coherent_dma_mask;
+>>> ^this will always produce warning in case of platform-bus or if there 
+>>> are no bus driver.
+>>> even if DT contains correct definition of dma-range
+>>> ????}
+>>>
+>>> ????if (!size && dev->coherent_dma_mask)
+>>>
+>>> ^ coherent_dma_mask is zero, so size will not be calculated
+>> pls, ignore this particular comment
 >>
->> And log output is full of "DMA mask not set" -
+>>> ??????? size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+>>> ????else if (!size)
+>>> ??????? size = 1ULL << 32;
+>>>
+>>> ????dev->dma_pfn_offset = offset;
+>>>
+>>> ????/*
+>>> ???? * Limit coherent and dma mask based on size and default mask
+>>> ???? * set by the driver.
+>>> ???? */
+>>> ????mask = DMA_BIT_MASK(ilog2(dma_addr + size - 1) + 1);
+>>> ????dev->bus_dma_mask = mask;
+>>> ????dev->coherent_dma_mask &= mask;
+>>>
+>>> ^^ if nobody set coherent_dma_mask before it will stay null forever 
+>>> unless drivers
+>>> will overwrite it. Again even if DT has correct definition for 
+>>> dma-range.
 > 
-> That's somewhat expected - as the relevant commit message mentions, 
-> there will be bugs flushed out by this change, but the point is to fix 
-> them :)
+> That is intentional. Consider a 32-bit device on a bus with an upstream 
+> DMA range of 40 bits (which could easily happen with e.g. PCI). If the 
+> firmware code gives that device 40-bit DMA masks and the driver doesn't 
+> change them, then DMA is not going to work correctly. Therefore the 
+> firmware code cannot safely make {coherent_}dma_mask larger than the 
+> default value passed in, and if the default is 0 then that should be 
+> fixed in whatever code created the device, not worked around later.
+
+Could you clarify what do you mean "firmware" here?
+
+On most ARM32 platforms there is only DT + kernel.
+And DT is usually only one source of information about DT configuration.
+Sry, but seems this changes makes impossible using DT for DMA parameters 
+configuration any more.
+
 > 
->> nobody sets dma_mask for platform bus in case of OF boot :(
-> 
-> Right, after a brief investigation, that one turns out to be nice and 
-> straightforward to explain and fix; I'll write up the patch shortly.
-> 
-> [...]
->> [??? 3.793493] ti-qspi 4b300000.qspi: dma_alloc_coherent failed, using 
->> PIO mode
->> [??? 3.801088] Unable to handle kernel NULL pointer dereference at 
->> virtual address 00000080
-> [...]
->> [??? 4.602777] [<c04d87a4>] (omap_dma_write) from [<c04d8dc0>] 
->> (omap_dma_start_desc+0x78/0x150)
->> [??? 4.611258] [<c04d8d48>] (omap_dma_start_desc) from [<c04d9028>] 
->> (omap_dma_issue_pending+0x90/0x98)
->> [??? 4.620347]? r9:ed002780 r8:00000000 r7:00000010 r6:ee2bdd00 
->> r5:ee2bdd4c r4:ee2bdd00
->> [??? 4.628130] [<c04d8f98>] (omap_dma_issue_pending) from [<c0608d1c>] 
->> (ti_qspi_dma_xfer+0x8c/0x13c)
->> [??? 4.637039]? r5:00000000 r4:ee7e1b28
->> [??? 4.640636] [<c0608c90>] (ti_qspi_dma_xfer) from [<c06090b0>] 
->> (ti_qspi_exec_mem_op+0x2e4/0x32c)
-> 
-> Hooray, a real bug! Since dma_alloc_coherent() could have failed due to 
-> lack of memory or any other reason, that's not even directly related to 
-> this change, we've simply helped uncover it. I guess that PIO fallback 
-> path hasn't been tested recently, because it clearly doesn't work. It 
-> would be good if someone who knows the ti-qspi driver and has the means 
-> to test it could figure that one out before also adding the missing 
-> dma_set_coherent_mask() call.
-
-yes. ti-qspi has an issues with PIO mode. 
-
-But, reason of failure is this warning:
-
-[    3.482502] WARNING: CPU: 0 PID: 1 at ./include/linux/dma-mapping.h:516 ti_qspi_probe+0x4a4/0x50c
-
-which is caused by this series - which makes coherent_dma_mask constantly 0 by default,
-so dma_alloc_coherent() - fails.
-
-
 > Robin.
+> 
+>>>
+>>> ????*dev->dma_mask &= mask;
+>>>
+>>> ????coherent = of_dma_is_coherent(np);
+>>> ????dev_dbg(dev, "device is%sdma coherent\n",
+>>> ??????? coherent ? " " : " not ");
+>>>
+>>>
+>>
+>> FYI, with below diff i can boot at least:
+>>
+>> diff --git a/drivers/of/device.c b/drivers/of/device.c
+>> index 5957cd4..f7dc121 100644
+>> --- a/drivers/of/device.c
+>> +++ b/drivers/of/device.c
+>> @@ -150,8 +150,8 @@ int of_dma_configure(struct device *dev, struct 
+>> device_node *np, bool force_dma)
+>> ????????? */
+>> ???????? mask = DMA_BIT_MASK(ilog2(dma_addr + size - 1) + 1);
+>> ???????? dev->bus_dma_mask = mask;
+>> -?????? dev->coherent_dma_mask &= mask;
+>> -?????? *dev->dma_mask &= mask;
+>> +?????? dev->coherent_dma_mask = mask;
+>> +?????? *dev->dma_mask = mask;
+>> ???????? coherent = of_dma_is_coherent(np);
+>> ???????? dev_dbg(dev, "device is%sdma coherent\n",
+>>
+>>
+>>
 
 -- 
 regards,
