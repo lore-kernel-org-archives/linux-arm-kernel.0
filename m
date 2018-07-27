@@ -1,104 +1,178 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sat, 28 Jul 2018 00:15:26 +0530
-Subject: [PATCH 8/9] clk: actions: Add Actions Semi S700 SoC Reset Management
+Date: Sat, 28 Jul 2018 00:15:25 +0530
+Subject: [PATCH 7/9] clk: actions: Add Actions Semi Owl SoCs Reset Management
  Unit support
 In-Reply-To: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
 References: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180727184527.13287-9-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180727184527.13287-8-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Reset Management Unit (RMU) support for Actions Semi S700 SoC.
+Add Reset Management Unit (RMU) support for Actions Semi Owl SoCs.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- drivers/clk/actions/owl-s700.c | 51 ++++++++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+ drivers/clk/actions/Kconfig      |  1 +
+ drivers/clk/actions/Makefile     |  1 +
+ drivers/clk/actions/owl-common.h |  2 +
+ drivers/clk/actions/owl-reset.c  | 72 ++++++++++++++++++++++++++++++++
+ drivers/clk/actions/owl-reset.h  | 32 ++++++++++++++
+ 5 files changed, 108 insertions(+)
+ create mode 100644 drivers/clk/actions/owl-reset.c
+ create mode 100644 drivers/clk/actions/owl-reset.h
 
-diff --git a/drivers/clk/actions/owl-s700.c b/drivers/clk/actions/owl-s700.c
-index e7cacd677275..d9c0c7870135 100644
---- a/drivers/clk/actions/owl-s700.c
-+++ b/drivers/clk/actions/owl-s700.c
-@@ -20,8 +20,10 @@
- #include "owl-gate.h"
- #include "owl-mux.h"
- #include "owl-pll.h"
-+#include "owl-reset.h"
+diff --git a/drivers/clk/actions/Kconfig b/drivers/clk/actions/Kconfig
+index dc38c85a4833..04f0a6355726 100644
+--- a/drivers/clk/actions/Kconfig
++++ b/drivers/clk/actions/Kconfig
+@@ -2,6 +2,7 @@ config CLK_ACTIONS
+ 	bool "Clock driver for Actions Semi SoCs"
+ 	depends on ARCH_ACTIONS || COMPILE_TEST
+ 	select REGMAP_MMIO
++	select RESET_CONTROLLER
+ 	default ARCH_ACTIONS
  
- #include <dt-bindings/clock/actions,s700-cmu.h>
-+#include <dt-bindings/reset/actions,s700-reset.h>
+ if CLK_ACTIONS
+diff --git a/drivers/clk/actions/Makefile b/drivers/clk/actions/Makefile
+index 78c17d56f991..ccfdf9781cef 100644
+--- a/drivers/clk/actions/Makefile
++++ b/drivers/clk/actions/Makefile
+@@ -7,6 +7,7 @@ clk-owl-y			+= owl-divider.o
+ clk-owl-y			+= owl-factor.o
+ clk-owl-y			+= owl-composite.o
+ clk-owl-y			+= owl-pll.o
++clk-owl-y			+= owl-reset.o
  
- #define CMU_COREPLL		(0x0000)
- #define CMU_DEVPLL		(0x0004)
-@@ -569,20 +571,69 @@ static struct clk_hw_onecell_data s700_hw_clks = {
- 		.num    = CLK_NR_CLKS,
+ # SoC support
+ obj-$(CONFIG_CLK_OWL_S700)	+= owl-s700.o
+diff --git a/drivers/clk/actions/owl-common.h b/drivers/clk/actions/owl-common.h
+index 56f01f7774aa..4dc7f286831f 100644
+--- a/drivers/clk/actions/owl-common.h
++++ b/drivers/clk/actions/owl-common.h
+@@ -26,6 +26,8 @@ struct owl_clk_desc {
+ 	struct owl_clk_common		**clks;
+ 	unsigned long			num_clks;
+ 	struct clk_hw_onecell_data	*hw_clks;
++	struct owl_reset_map		*resets;
++	unsigned long			num_resets;
+ 	struct regmap			*regmap;
  };
  
-+static struct owl_reset_map s700_resets[] = {
-+	[RESET_DE]	= { CMU_DEVRST0, BIT(0) },
-+	[RESET_LCD0]	= { CMU_DEVRST0, BIT(1) },
-+	[RESET_DSI]	= { CMU_DEVRST0, BIT(2) },
-+	[RESET_CSI]	= { CMU_DEVRST0, BIT(13) },
-+	[RESET_SI]	= { CMU_DEVRST0, BIT(14) },
-+	[RESET_I2C0]	= { CMU_DEVRST1, BIT(0) },
-+	[RESET_I2C1]	= { CMU_DEVRST1, BIT(1) },
-+	[RESET_I2C2]	= { CMU_DEVRST1, BIT(2) },
-+	[RESET_I2C3]	= { CMU_DEVRST1, BIT(3) },
-+	[RESET_SPI0]	= { CMU_DEVRST1, BIT(4) },
-+	[RESET_SPI1]	= { CMU_DEVRST1, BIT(5) },
-+	[RESET_SPI2]	= { CMU_DEVRST1, BIT(6) },
-+	[RESET_SPI3]	= { CMU_DEVRST1, BIT(7) },
-+	[RESET_UART0]	= { CMU_DEVRST1, BIT(8) },
-+	[RESET_UART1]	= { CMU_DEVRST1, BIT(9) },
-+	[RESET_UART2]	= { CMU_DEVRST1, BIT(10) },
-+	[RESET_UART3]	= { CMU_DEVRST1, BIT(11) },
-+	[RESET_UART4]	= { CMU_DEVRST1, BIT(12) },
-+	[RESET_UART5]	= { CMU_DEVRST1, BIT(13) },
-+	[RESET_UART6]	= { CMU_DEVRST1, BIT(14) },
-+	[RESET_KEY]	= { CMU_DEVRST1, BIT(24) },
-+	[RESET_GPIO]	= { CMU_DEVRST1, BIT(25) },
-+	[RESET_AUDIO]	= { CMU_DEVRST1, BIT(29) },
+diff --git a/drivers/clk/actions/owl-reset.c b/drivers/clk/actions/owl-reset.c
+new file mode 100644
+index 000000000000..91b161cc68de
+--- /dev/null
++++ b/drivers/clk/actions/owl-reset.c
+@@ -0,0 +1,72 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++//
++// Actions Semi Owl SoCs Reset Management Unit driver
++//
++// Copyright (c) 2018 Linaro Ltd.
++// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
++
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/regmap.h>
++#include <linux/reset-controller.h>
++
++#include "owl-reset.h"
++
++static int owl_reset_assert(struct reset_controller_dev *rcdev,
++			    unsigned long id)
++{
++	struct owl_reset *reset = to_owl_reset(rcdev);
++	const struct owl_reset_map *map = &reset->reset_map[id];
++	u32 reg;
++
++	regmap_read(reset->regmap, map->reg, &reg);
++	regmap_write(reset->regmap, map->reg, reg & ~map->bit);
++
++	return 0;
++}
++
++static int owl_reset_deassert(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	struct owl_reset *reset = to_owl_reset(rcdev);
++	const struct owl_reset_map *map = &reset->reset_map[id];
++	u32 reg;
++
++	regmap_read(reset->regmap, map->reg, &reg);
++	regmap_write(reset->regmap, map->reg, reg | map->bit);
++
++	return 0;
++}
++
++static int owl_reset_reset(struct reset_controller_dev *rcdev,
++			   unsigned long id)
++{
++	owl_reset_assert(rcdev, id);
++	udelay(1);
++	owl_reset_deassert(rcdev, id);
++
++	return 0;
++}
++
++static int owl_reset_status(struct reset_controller_dev *rcdev,
++			    unsigned long id)
++{
++	struct owl_reset *reset = to_owl_reset(rcdev);
++	const struct owl_reset_map *map = &reset->reset_map[id];
++	u32 reg;
++
++	regmap_read(reset->regmap, map->reg, &reg);
++
++	/*
++	 * The reset control API expects 0 if reset is not asserted,
++	 * which is the opposite of what our hardware uses.
++	 */
++	return !(map->bit & reg);
++}
++
++const struct reset_control_ops owl_reset_ops = {
++	.assert		= owl_reset_assert,
++	.deassert	= owl_reset_deassert,
++	.reset		= owl_reset_reset,
++	.status		= owl_reset_status,
++};
+diff --git a/drivers/clk/actions/owl-reset.h b/drivers/clk/actions/owl-reset.h
+new file mode 100644
+index 000000000000..1a5e987ba99b
+--- /dev/null
++++ b/drivers/clk/actions/owl-reset.h
+@@ -0,0 +1,32 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++//
++// Actions Semi Owl SoCs Reset Management Unit driver
++//
++// Copyright (c) 2018 Linaro Ltd.
++// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
++
++#ifndef _OWL_RESET_H_
++#define _OWL_RESET_H_
++
++#include <linux/reset-controller.h>
++#include <linux/spinlock.h>
++
++struct owl_reset_map {
++	u16	reg;
++	u32	bit;
 +};
 +
- static struct owl_clk_desc s700_clk_desc = {
- 	.clks       = s700_clks,
- 	.num_clks   = ARRAY_SIZE(s700_clks),
- 
- 	.hw_clks    = &s700_hw_clks,
++struct owl_reset {
++	struct reset_controller_dev	rcdev;
++	struct owl_reset_map		*reset_map;
++	struct regmap			*regmap;
++};
 +
-+	.resets     = s700_resets,
-+	.num_resets = ARRAY_SIZE(s700_resets),
- };
- 
- static int s700_clk_probe(struct platform_device *pdev)
- {
- 	struct owl_clk_desc *desc;
-+	struct owl_reset *reset;
-+	int ret;
- 
- 	desc = &s700_clk_desc;
- 	owl_clk_regmap_init(pdev, desc);
- 
-+	/*
-+	 * FIXME: Reset controller registration should be moved to
-+	 * common code, once all SoCs of Owl family supports it.
-+	 */
-+	reset = devm_kzalloc(&pdev->dev, sizeof(*reset), GFP_KERNEL);
-+	if (!reset)
-+		return -ENOMEM;
++static inline struct owl_reset *to_owl_reset(struct reset_controller_dev *rcdev)
++{
++	return container_of(rcdev, struct owl_reset, rcdev);
++}
 +
-+	reset->rcdev.of_node = pdev->dev.of_node;
-+	reset->rcdev.ops = &owl_reset_ops;
-+	reset->rcdev.nr_resets = desc->num_resets;
-+	reset->reset_map = desc->resets;
-+	reset->regmap = desc->regmap;
++extern const struct reset_control_ops owl_reset_ops;
 +
-+	ret = devm_reset_controller_register(&pdev->dev, &reset->rcdev);
-+	if (ret)
-+		dev_err(&pdev->dev, "Failed to register reset controller\n");
-+
- 	return owl_clk_probe(&pdev->dev, desc->hw_clks);
- }
- 
++#endif /* _OWL_RESET_H_ */
 -- 
 2.17.1
