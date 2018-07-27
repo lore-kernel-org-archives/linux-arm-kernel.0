@@ -1,135 +1,63 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sat, 28 Jul 2018 00:15:27 +0530
-Subject: [PATCH 9/9] clk: actions: Add Actions Semi S900 SoC Reset Management
- Unit support
-In-Reply-To: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
-References: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180727184527.13287-10-manivannan.sadhasivam@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 27 Jul 2018 20:29:18 +0100
+Subject: [PATCH v2 7/7] OF: Don't set default coherent DMA mask
+In-Reply-To: <20180727181302.GC17271@n2100.armlinux.org.uk>
+References: <cover.1532382222.git.robin.murphy@arm.com>
+ <66c08e4df2032fde82a2f97544f41fd3a2f24a94.1532382222.git.robin.murphy@arm.com>
+ <4ed75bc9-1694-2bcb-2ea9-3f2a04f33f54@ti.com>
+ <92d6b010-b5c0-fc59-0668-5b455e26c912@ti.com>
+ <c7a9c7ae-1f4a-af9d-df78-1f48bb5c28a5@arm.com>
+ <20180727181302.GC17271@n2100.armlinux.org.uk>
+Message-ID: <5b64c3c1-f18d-4db1-e764-d0cbdc8fa326@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Reset Management Unit (RMU) support for Actions Semi S900 SoC.
+On 2018-07-27 7:13 PM, Russell King - ARM Linux wrote:
+> On Fri, Jul 27, 2018 at 12:36:00PM +0100, Robin Murphy wrote:
+>> That is intentional. Consider a 32-bit device on a bus with an upstream DMA
+>> range of 40 bits (which could easily happen with e.g. PCI). If the firmware
+>> code gives that device 40-bit DMA masks and the driver doesn't change them,
+>> then DMA is not going to work correctly. Therefore the firmware code cannot
+>> safely make {coherent_}dma_mask larger than the default value passed in, and
+>> if the default is 0 then that should be fixed in whatever code created the
+>> device, not worked around later.
+> 
+> I think you're missing the point.
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- drivers/clk/actions/owl-s900.c | 82 ++++++++++++++++++++++++++++++++++
- 1 file changed, 82 insertions(+)
+No, I'm just failing to make it clearly enough. Sorry about that.
 
-diff --git a/drivers/clk/actions/owl-s900.c b/drivers/clk/actions/owl-s900.c
-index bb7ee872d316..4d38b1265cc3 100644
---- a/drivers/clk/actions/owl-s900.c
-+++ b/drivers/clk/actions/owl-s900.c
-@@ -19,8 +19,10 @@
- #include "owl-gate.h"
- #include "owl-mux.h"
- #include "owl-pll.h"
-+#include "owl-reset.h"
- 
- #include <dt-bindings/clock/actions,s900-cmu.h>
-+#include <dt-bindings/reset/actions,s900-reset.h>
- 
- #define CMU_COREPLL		(0x0000)
- #define CMU_DEVPLL		(0x0004)
-@@ -684,20 +686,100 @@ static struct clk_hw_onecell_data s900_hw_clks = {
- 	.num	= CLK_NR_CLKS,
- };
- 
-+static struct owl_reset_map s900_resets[] = {
-+	[RESET_DMAC]		= { CMU_DEVRST0, BIT(0) },
-+	[RESET_SRAMI]		= { CMU_DEVRST0, BIT(1) },
-+	[RESET_DDR_CTL_PHY]	= { CMU_DEVRST0, BIT(2) },
-+	[RESET_NANDC0]		= { CMU_DEVRST0, BIT(3) },
-+	[RESET_SD0]		= { CMU_DEVRST0, BIT(4) },
-+	[RESET_SD1]		= { CMU_DEVRST0, BIT(5) },
-+	[RESET_PCM1]		= { CMU_DEVRST0, BIT(6) },
-+	[RESET_DE]		= { CMU_DEVRST0, BIT(7) },
-+	[RESET_LVDS]		= { CMU_DEVRST0, BIT(8) },
-+	[RESET_SD2]		= { CMU_DEVRST0, BIT(9) },
-+	[RESET_DSI]		= { CMU_DEVRST0, BIT(10) },
-+	[RESET_CSI0]		= { CMU_DEVRST0, BIT(11) },
-+	[RESET_BISP_AXI]	= { CMU_DEVRST0, BIT(12) },
-+	[RESET_CSI1]		= { CMU_DEVRST0, BIT(13) },
-+	[RESET_GPIO]		= { CMU_DEVRST0, BIT(15) },
-+	[RESET_EDP]		= { CMU_DEVRST0, BIT(16) },
-+	[RESET_AUDIO]		= { CMU_DEVRST0, BIT(17) },
-+	[RESET_PCM0]		= { CMU_DEVRST0, BIT(18) },
-+	[RESET_HDE]		= { CMU_DEVRST0, BIT(21) },
-+	[RESET_GPU3D_PA]	= { CMU_DEVRST0, BIT(22) },
-+	[RESET_IMX]		= { CMU_DEVRST0, BIT(23) },
-+	[RESET_SE]		= { CMU_DEVRST0, BIT(24) },
-+	[RESET_NANDC1]		= { CMU_DEVRST0, BIT(25) },
-+	[RESET_SD3]		= { CMU_DEVRST0, BIT(26) },
-+	[RESET_GIC]		= { CMU_DEVRST0, BIT(27) },
-+	[RESET_GPU3D_PB]	= { CMU_DEVRST0, BIT(28) },
-+	[RESET_DDR_CTL_PHY_AXI]	= { CMU_DEVRST0, BIT(29) },
-+	[RESET_CMU_DDR]		= { CMU_DEVRST0, BIT(30) },
-+	[RESET_DMM]		= { CMU_DEVRST0, BIT(31) },
-+	[RESET_USB2HUB]		= { CMU_DEVRST1, BIT(0) },
-+	[RESET_USB2HSIC]	= { CMU_DEVRST1, BIT(1) },
-+	[RESET_HDMI]		= { CMU_DEVRST1, BIT(2) },
-+	[RESET_HDCP2TX]		= { CMU_DEVRST1, BIT(3) },
-+	[RESET_UART6]		= { CMU_DEVRST1, BIT(4) },
-+	[RESET_UART0]		= { CMU_DEVRST1, BIT(5) },
-+	[RESET_UART1]		= { CMU_DEVRST1, BIT(6) },
-+	[RESET_UART2]		= { CMU_DEVRST1, BIT(7) },
-+	[RESET_SPI0]		= { CMU_DEVRST1, BIT(8) },
-+	[RESET_SPI1]		= { CMU_DEVRST1, BIT(9) },
-+	[RESET_SPI2]		= { CMU_DEVRST1, BIT(10) },
-+	[RESET_SPI3]		= { CMU_DEVRST1, BIT(11) },
-+	[RESET_I2C0]		= { CMU_DEVRST1, BIT(12) },
-+	[RESET_I2C1]		= { CMU_DEVRST1, BIT(13) },
-+	[RESET_USB3]		= { CMU_DEVRST1, BIT(14) },
-+	[RESET_UART3]		= { CMU_DEVRST1, BIT(15) },
-+	[RESET_UART4]		= { CMU_DEVRST1, BIT(16) },
-+	[RESET_UART5]		= { CMU_DEVRST1, BIT(17) },
-+	[RESET_I2C2]		= { CMU_DEVRST1, BIT(18) },
-+	[RESET_I2C3]		= { CMU_DEVRST1, BIT(19) },
-+	[RESET_ETHERNET]	= { CMU_DEVRST1, BIT(20) },
-+	[RESET_CHIPID]		= { CMU_DEVRST1, BIT(21) },
-+	[RESET_I2C4]		= { CMU_DEVRST1, BIT(22) },
-+	[RESET_I2C5]		= { CMU_DEVRST1, BIT(23) },
-+	[RESET_CPU_SCNT]	= { CMU_DEVRST1, BIT(30) }
-+};
-+
- static struct owl_clk_desc s900_clk_desc = {
- 	.clks	    = s900_clks,
- 	.num_clks   = ARRAY_SIZE(s900_clks),
- 
- 	.hw_clks    = &s900_hw_clks,
-+
-+	.resets     = s900_resets,
-+	.num_resets = ARRAY_SIZE(s900_resets),
- };
- 
- static int s900_clk_probe(struct platform_device *pdev)
- {
- 	struct owl_clk_desc *desc;
-+	struct owl_reset *reset;
-+	int ret;
- 
- 	desc = &s900_clk_desc;
- 	owl_clk_regmap_init(pdev, desc);
- 
-+	/*
-+	 * FIXME: Reset controller registration should be moved to
-+	 * common code, once all SoCs of Owl family supports it.
-+	 */
-+	reset = devm_kzalloc(&pdev->dev, sizeof(*reset), GFP_KERNEL);
-+	if (!reset)
-+		return -ENOMEM;
-+
-+	reset->rcdev.of_node = pdev->dev.of_node;
-+	reset->rcdev.ops = &owl_reset_ops;
-+	reset->rcdev.nr_resets = desc->num_resets;
-+	reset->reset_map = desc->resets;
-+	reset->regmap = desc->regmap;
-+
-+	ret = devm_reset_controller_register(&pdev->dev, &reset->rcdev);
-+	if (ret)
-+		dev_err(&pdev->dev, "Failed to register reset controller\n");
-+
- 	return owl_clk_probe(&pdev->dev, desc->hw_clks);
- }
- 
--- 
-2.17.1
+> When OF creates platform devices, they are created without any DMA masks
+> what so ever.  It is only during device probe that dma_configure() gets
+> called, which then calls of_dma_configure(), where the DMA mask for any
+> DT declared device is setup.
+
+Indeed, because the DMA mask initialisation which was originally part of 
+OF platform device creation got factored out into of_dma_configure(), 
+then of_dma_configure() got repurposed into a 
+non-platform-device-specific helper, then DMA configuration got 
+generalised more and moved from device creation to probe time, and it 
+now transpires that what looked like an unnecessary vestigial leftover 
+was in fact some OF-platform-specific code all along. Which, having now 
+made that realisitaion, I've put back where it originally was and 
+conceptually should be.
+
+> What this means is that your change has broken all existing DT devices
+> that are trying to use DMA, because they now end up with a zero coherent
+> DMA mask and/or streaming DMA mask.
+
+All existing DT devices that are trying to use DMA *without first 
+calling dma_set_mask() etc. as the API expects* - I could point you at 
+lines 166-171 of DMA-API-HOWTO.txt, but given that the last person to 
+touch half this stuff was you, that feels almost impolite. It appears 
+all the drivers on the machines I boot-tested are well-behaved and do do 
+that. In a few hours we'll have a useful datapoint from the kernelci.org 
+boot logs about how many aren't and don't. Happy accidents 'n'all...
+
+> Your original idea behind the patch may be a sound one, but since the
+> implementation has caused a regression, the implementation is obviously
+> broken, and that needs fixing or reworking in some way.
+
+Already done: 
+http://git.infradead.org/users/hch/dma-mapping.git/commitdiff/a5516219b10218a87abb3352c82248ce3088e94a
+
+Robin.
