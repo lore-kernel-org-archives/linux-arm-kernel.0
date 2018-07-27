@@ -1,36 +1,154 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Jul 2018 14:22:44 +0100
-Subject: [RFC PATCH] arm64: mm: Export __sync_icache_dcache() for
- xen-privcmd
-In-Reply-To: <20180727120633.bjpfqswuxcy2ibqu@armageddon.cambridge.arm.com>
-References: <20180711231822.GG14131@decadent.org.uk>
- <20180727120633.bjpfqswuxcy2ibqu@armageddon.cambridge.arm.com>
-Message-ID: <20180727132243.GA28549@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 27 Jul 2018 15:24:53 +0200
+Subject: [linux-sunxi] Re: [PATCH v2 06/18] arm64: dts: allwinner: a64:
+ Orange Pi Win: Add UARTs
+In-Reply-To: <e4af10fb-6f3b-7693-28db-ca155dcd807a@arm.com>
+References: <20180726003532.18751-1-andre.przywara@arm.com>
+ <20180726003532.18751-7-andre.przywara@arm.com>
+ <20180726073911.ualwgf3t2bboeuy5@flea>
+ <E978AF7E-4802-4429-99A2-4724EB68FFA9@aosc.io>
+ <71e5f296-a8f6-062c-6e55-86c8b07ed0a6@arm.com>
+ <20180726093247.3hesukln2n3fhqeg@flea>
+ <8d309202-05f1-d024-ae98-6a6baf03e888@arm.com>
+ <e4af10fb-6f3b-7693-28db-ca155dcd807a@arm.com>
+Message-ID: <20180727132453.qucmc2254wpi23vt@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2018 at 01:06:33PM +0100, Catalin Marinas wrote:
-> On Thu, Jul 12, 2018 at 12:18:22AM +0100, Ben Hutchings wrote:
-> > The xen-privcmd driver, which can be modular, calls set_pte_at()
-> > which in turn may call __sync_icache_dcache().
+On Fri, Jul 27, 2018 at 11:33:51AM +0100, Andre Przywara wrote:
+> On 26/07/18 14:04, Andre Przywara wrote:
+> > Hi,
 > > 
-> > The call to __sync_icache_dcache() may be optimised out because it is
-> > conditional on !pte_special(), and xen-privcmd calls pte_mkspecial().
-> > But it seems unwise to rely on this optimisation.
+> > On 26/07/18 10:32, Maxime Ripard wrote:
+> >> On Thu, Jul 26, 2018 at 09:30:14AM +0100, Andre Przywara wrote:
+> >>> Hi,
+> >>>
+> >>> On 26/07/18 08:42, Icenowy Zheng wrote:
+> >>>>
+> >>>>
+> >>>> ? 2018?7?26? GMT+08:00 ??3:39:11, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+> >>>>> On Thu, Jul 26, 2018 at 01:35:20AM +0100, Andre Przywara wrote:
+> >>>>>> From: Samuel Holland <samuel@sholland.org>
+> >>>>>>
+> >>>>>> The Orange Pi Win exposes several UARTs on header pin, and connects
+> >>>>> one
+> >>>>>> to the on-board WiFi/Bluetooth chip.
+> >>>>>> Add the pinmux definitions to the UART nodes, but keep them disabled.
+> >>>>>>
+> >>>>>> Signed-off-by: Samuel Holland <samuel@sholland.org>
+> >>>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >>>>>> ---
+> >>>>>>  .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 33
+> >>>>> ++++++++++++++++++++++
+> >>>>>>  1 file changed, 33 insertions(+)
+> >>>>>>
+> >>>>>> diff --git
+> >>>>> a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+> >>>>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+> >>>>>> index 0cadcd59edd9..10f63d0b99cb 100644
+> >>>>>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+> >>>>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+> >>>>>> @@ -54,6 +54,10 @@
+> >>>>>>  	aliases {
+> >>>>>>  		ethernet0 = &emac;
+> >>>>>>  		serial0 = &uart0;
+> >>>>>> +		serial1 = &uart1;
+> >>>>>> +		serial2 = &uart2;
+> >>>>>> +		serial3 = &uart3;
+> >>>>>> +		serial4 = &uart4;
+> >>>>>>  	};
+> >>>>>>  
+> >>>>>>  	chosen {
+> >>>>>> @@ -237,12 +241,41 @@
+> >>>>>>  	vcc-hdmi-supply = <&reg_dldo1>;
+> >>>>>>  };
+> >>>>>>  
+> >>>>>> +/* On debug connector */
+> >>>>>>  &uart0 {
+> >>>>>>  	pinctrl-names = "default";
+> >>>>>>  	pinctrl-0 = <&uart0_pins_a>;
+> >>>>>>  	status = "okay";
+> >>>>>>  };
+> >>>>>>  
+> >>>>>> +/* Wi-Fi/BT */
+> >>>>>> +&uart1 {
+> >>>>>> +	pinctrl-names = "default";
+> >>>>>> +	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
+> >>>>>> +	status = "okay";
+> >>>>>> +};
+> >>>>>
+> >>>>> What BT chip is there? Does it have serdev support? If so, that should
+> >>>>> be enabled here.
+> >>>>
+> >>>> RTL8723BS, no serdev.
+> >>
+> >> https://www.spinics.net/lists/linux-bluetooth/msg76376.html
+> >>
+> >> Not very far off though.
+> >>
+> >>> Yes. A while ago I managed to enable Bluetooth (on the Pine64 with the
+> >>> same chip), but that involved a lot of hacking with a special userland
+> >>> tool (not hciattach and no serdev).
+> >>>
+> >>> What this node means to say is: The UART1 is hardwired to some on-board
+> >>> device and those pins are not available for GPIO, for instance.
+> >>>
+> >>> At least that was my understanding when it comes to enabling devices in
+> >>> the DT. Is that correct?
+> >>
+> >> Well, yes and no. Arguably, any device connected to the other side of
+> >> the serial bus should have been there from the beginning. However,
+> >> there wasn't any way to do that in Linux before serdev was introduced,
+> >> so we weren't doing that. That resulted in hacky userspace tools to
+> >> work around that, and other work arounds in the DT to for example
+> >> tying BT resources (clock, regulators, resets) to the WiFi chip hoping
+> >> that someone would use both all the time.
+> >>
+> >> Now that it's just around the corner, we don't have any excuse to do
+> >> these kind of hacks anymore.
 > > 
-> > Fixes: 3ad0876554ca ("xen/privcmd: add IOCTL_PRIVCMD_MMAP_RESOURCE")
-> > Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
-> > ---
-> > This is an RFC since I haven't found an actual build failure.  Using
-> > Debian's gcc 7.3 with either CC_OPTIMIZE_FOR_PERFORMANCE or
-> > CC_OPTIMIZE_FOR_SIZE, the call *is* optimised away.
+> > That's true. Also I see that the serdev binding itself is not serdev
+> > specific, it just puts the Bluetooth node as a child of an UART node.
+> > But we would still need a compatible string for that child, wouldn't we?
+> > I guess we can't autodetect this? From what I can see from Hans' series
+> > there is no DT compatible string defined?
+> > 
+> > So do we just put a node there, specifying the resources it needs? Like
+> > the wake-up interrupt or regulators, if any? And leave out the
+> > compatible string, at least for now?
 > 
-> Since apply_to_page_range() is EXPORT_SYMBOL_GPL() and a
-> pte_fn_t function would likely use set_pte_at(), I'm fine with this
-> patch for consistency.
+> So I tried this:
+> https://github.com/apritzel/linux/commit/da8e1beadd2737067c#diff-1c31e6cad6646026007c68fe9d4a5079R257
 > 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> but wasn't really happy with it. Without a proper binding we can't
+> describe all the resources yet: what's the prefix for -supply, is the
+> wake-up line a GPIO or an interrupt, is the reset line a GPIO or a reset
+> property, and so on.
+> 
+> So I can use either an empty node, which would more serve as
+> documentation, or at least put the wakeup line as an interrupt there.
+> 
+> Was there at least a proposed binding? I tried to look for other BT
+> chips, but they don't seem to agree on some common properties.
 
-Okey doke, I'll pick this up for 4.19.
+A partially empty binding isn't worth anything, since you cannot be
+sure it won't change during the review cycle, and you would have to
+change it anyway when adding the compatible.
 
-Will
+I guess it's fine. I would have liked to postpone this and that we'd
+wait for that serie to be merged to create a binding and merge that
+patch, but I'm not that reluctant to merge it either.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180727/d6a7c50c/attachment.sig>
