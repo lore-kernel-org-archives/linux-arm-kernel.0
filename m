@@ -1,91 +1,104 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 27 Jul 2018 20:46:06 +0100
-Subject: [PATCH v2 7/7] OF: Don't set default coherent DMA mask
-In-Reply-To: <108a6254-1257-5daf-deaa-69bc4db2ec77@ti.com>
-References: <cover.1532382222.git.robin.murphy@arm.com>
- <66c08e4df2032fde82a2f97544f41fd3a2f24a94.1532382222.git.robin.murphy@arm.com>
- <4ed75bc9-1694-2bcb-2ea9-3f2a04f33f54@ti.com>
- <92d6b010-b5c0-fc59-0668-5b455e26c912@ti.com>
- <c7a9c7ae-1f4a-af9d-df78-1f48bb5c28a5@arm.com>
- <108a6254-1257-5daf-deaa-69bc4db2ec77@ti.com>
-Message-ID: <d3a4e0c3-a2cf-ec29-bfad-10b86e2e071c@arm.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Sat, 28 Jul 2018 00:15:26 +0530
+Subject: [PATCH 8/9] clk: actions: Add Actions Semi S700 SoC Reset Management
+ Unit support
+In-Reply-To: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
+References: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180727184527.13287-9-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-27 6:34 PM, Grygorii Strashko wrote:
-> On 07/27/2018 06:36 AM, Robin Murphy wrote:
->> On 27/07/18 01:22, Grygorii Strashko wrote:
->> [...]
->>>> the result of this change is pretty strange as for me :(
->>>> Resulted code:
->>>>
->>>> ????/*
->>>> ???? * If @dev is expected to be DMA-capable then the bus code that 
->>>> created
->>>> ???? * it should have initialised its dma_mask pointer by this 
->>>> point. For
->>>> ???? * now, we'll continue the legacy behaviour of coercing it to the
->>>> ???? * coherent mask if not, but we'll no longer do so quietly.
->>>> ???? */
->>>> ????if (!dev->dma_mask) {
->>>> ??????? dev_warn(dev, "DMA mask not set\n");
->>>> ??????? dev->dma_mask = &dev->coherent_dma_mask;
->>>> ^this will always produce warning in case of platform-bus or if 
->>>> there are no bus driver.
->>>> even if DT contains correct definition of dma-range
->>>> ????}
->>>>
->>>> ????if (!size && dev->coherent_dma_mask)
->>>>
->>>> ^ coherent_dma_mask is zero, so size will not be calculated
->>> pls, ignore this particular comment
->>>
->>>> ??????? size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
->>>> ????else if (!size)
->>>> ??????? size = 1ULL << 32;
->>>>
->>>> ????dev->dma_pfn_offset = offset;
->>>>
->>>> ????/*
->>>> ???? * Limit coherent and dma mask based on size and default mask
->>>> ???? * set by the driver.
->>>> ???? */
->>>> ????mask = DMA_BIT_MASK(ilog2(dma_addr + size - 1) + 1);
->>>> ????dev->bus_dma_mask = mask;
->>>> ????dev->coherent_dma_mask &= mask;
->>>>
->>>> ^^ if nobody set coherent_dma_mask before it will stay null forever 
->>>> unless drivers
->>>> will overwrite it. Again even if DT has correct definition for 
->>>> dma-range.
->>
->> That is intentional. Consider a 32-bit device on a bus with an 
->> upstream DMA range of 40 bits (which could easily happen with e.g. 
->> PCI). If the firmware code gives that device 40-bit DMA masks and the 
->> driver doesn't change them, then DMA is not going to work correctly. 
->> Therefore the firmware code cannot safely make {coherent_}dma_mask 
->> larger than the default value passed in, and if the default is 0 then 
->> that should be fixed in whatever code created the device, not worked 
->> around later.
-> 
-> Could you clarify what do you mean "firmware" here?
+Add Reset Management Unit (RMU) support for Actions Semi S700 SoC.
 
-By "firmware code" in this context I mean of_dma_configure(), 
-acpi_dma_configure() and anything else which may also do the equivalent 
-in future, i.e. the code which processes dma coherency attributes and 
-addressing restrictions from the firmware-provided machine description. 
-DT is conceptually firmware, regardless of how embedded ARM bootloaders 
-might provide it.
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ drivers/clk/actions/owl-s700.c | 51 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
 
-> On most ARM32 platforms there is only DT + kernel.
-> And DT is usually only one source of information about DT configuration.
-> Sry, but seems this changes makes impossible using DT for DMA parameters 
-> configuration any more.
-
-Well, it was also impossible in general before. of_dma_configure() has 
-in practice never been able to set device masks to wider than 32 bits. 
-Even if it did, that would just lead to breakage elsewhere, as above. 
-There'll doubtless be a few more rounds of whack-a-mole until *all*B the 
-brokenness has been flushed out.
-
-Robin.
+diff --git a/drivers/clk/actions/owl-s700.c b/drivers/clk/actions/owl-s700.c
+index e7cacd677275..d9c0c7870135 100644
+--- a/drivers/clk/actions/owl-s700.c
++++ b/drivers/clk/actions/owl-s700.c
+@@ -20,8 +20,10 @@
+ #include "owl-gate.h"
+ #include "owl-mux.h"
+ #include "owl-pll.h"
++#include "owl-reset.h"
+ 
+ #include <dt-bindings/clock/actions,s700-cmu.h>
++#include <dt-bindings/reset/actions,s700-reset.h>
+ 
+ #define CMU_COREPLL		(0x0000)
+ #define CMU_DEVPLL		(0x0004)
+@@ -569,20 +571,69 @@ static struct clk_hw_onecell_data s700_hw_clks = {
+ 		.num    = CLK_NR_CLKS,
+ };
+ 
++static struct owl_reset_map s700_resets[] = {
++	[RESET_DE]	= { CMU_DEVRST0, BIT(0) },
++	[RESET_LCD0]	= { CMU_DEVRST0, BIT(1) },
++	[RESET_DSI]	= { CMU_DEVRST0, BIT(2) },
++	[RESET_CSI]	= { CMU_DEVRST0, BIT(13) },
++	[RESET_SI]	= { CMU_DEVRST0, BIT(14) },
++	[RESET_I2C0]	= { CMU_DEVRST1, BIT(0) },
++	[RESET_I2C1]	= { CMU_DEVRST1, BIT(1) },
++	[RESET_I2C2]	= { CMU_DEVRST1, BIT(2) },
++	[RESET_I2C3]	= { CMU_DEVRST1, BIT(3) },
++	[RESET_SPI0]	= { CMU_DEVRST1, BIT(4) },
++	[RESET_SPI1]	= { CMU_DEVRST1, BIT(5) },
++	[RESET_SPI2]	= { CMU_DEVRST1, BIT(6) },
++	[RESET_SPI3]	= { CMU_DEVRST1, BIT(7) },
++	[RESET_UART0]	= { CMU_DEVRST1, BIT(8) },
++	[RESET_UART1]	= { CMU_DEVRST1, BIT(9) },
++	[RESET_UART2]	= { CMU_DEVRST1, BIT(10) },
++	[RESET_UART3]	= { CMU_DEVRST1, BIT(11) },
++	[RESET_UART4]	= { CMU_DEVRST1, BIT(12) },
++	[RESET_UART5]	= { CMU_DEVRST1, BIT(13) },
++	[RESET_UART6]	= { CMU_DEVRST1, BIT(14) },
++	[RESET_KEY]	= { CMU_DEVRST1, BIT(24) },
++	[RESET_GPIO]	= { CMU_DEVRST1, BIT(25) },
++	[RESET_AUDIO]	= { CMU_DEVRST1, BIT(29) },
++};
++
+ static struct owl_clk_desc s700_clk_desc = {
+ 	.clks       = s700_clks,
+ 	.num_clks   = ARRAY_SIZE(s700_clks),
+ 
+ 	.hw_clks    = &s700_hw_clks,
++
++	.resets     = s700_resets,
++	.num_resets = ARRAY_SIZE(s700_resets),
+ };
+ 
+ static int s700_clk_probe(struct platform_device *pdev)
+ {
+ 	struct owl_clk_desc *desc;
++	struct owl_reset *reset;
++	int ret;
+ 
+ 	desc = &s700_clk_desc;
+ 	owl_clk_regmap_init(pdev, desc);
+ 
++	/*
++	 * FIXME: Reset controller registration should be moved to
++	 * common code, once all SoCs of Owl family supports it.
++	 */
++	reset = devm_kzalloc(&pdev->dev, sizeof(*reset), GFP_KERNEL);
++	if (!reset)
++		return -ENOMEM;
++
++	reset->rcdev.of_node = pdev->dev.of_node;
++	reset->rcdev.ops = &owl_reset_ops;
++	reset->rcdev.nr_resets = desc->num_resets;
++	reset->reset_map = desc->resets;
++	reset->regmap = desc->regmap;
++
++	ret = devm_reset_controller_register(&pdev->dev, &reset->rcdev);
++	if (ret)
++		dev_err(&pdev->dev, "Failed to register reset controller\n");
++
+ 	return owl_clk_probe(&pdev->dev, desc->hw_clks);
+ }
+ 
+-- 
+2.17.1
