@@ -1,36 +1,171 @@
-From: arun.parameswaran@broadcom.com (Arun Parameswaran)
-Date: Fri, 27 Jul 2018 14:23:27 -0700
-Subject: [PATCH v2 1/7] dt-bindings: net: Fix Broadcom iProc mdio mux driver
- base address
-In-Reply-To: <1532726613-6483-1-git-send-email-arun.parameswaran@broadcom.com>
-References: <1532726613-6483-1-git-send-email-arun.parameswaran@broadcom.com>
-Message-ID: <1532726613-6483-2-git-send-email-arun.parameswaran@broadcom.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Fri, 27 Jul 2018 15:40:52 -0700
+Subject: [PATCH v5 1/3] thermal: qcom-spmi: Use PMIC thermal stage 2 for
+ critical trip points
+In-Reply-To: <20180726011228.GV129942@google.com>
+References: <20180724234636.57137-1-mka@chromium.org>
+ <CAD=FV=VODGOE=qvJVeLGBs8xXQvbHZu7S9rqSpMY4AetUjd3fQ@mail.gmail.com>
+ <20180726011228.GV129942@google.com>
+Message-ID: <20180727224050.GC4450@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modify the base address of the Broadcom iProc MDIO mux driver to
-point to the start of the block's register address space.
+On Wed, Jul 25, 2018 at 06:12:28PM -0700, Matthias Kaehlcke wrote:
+> Hi Doug,
+> 
+> On Wed, Jul 25, 2018 at 04:19:56PM -0700, Doug Anderson wrote:
+> 
+> > On Tue, Jul 24, 2018 at 4:46 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
+> > > +static int qpnp_tm_update_critical_trip_temp(struct qpnp_tm_chip *chip,
+> > > +                                            int temp)
+> > > +{
+> > > +       u8 reg;
+> > > +       bool disable_s2_shutdown = false;
+> > > +       int ret;
+> > > +
+> > > +       WARN_ON(!mutex_is_locked(&chip->lock));
+> > > +
+> > > +       /*
+> > > +        * Default: S2 and S3 shutdown enabled, thresholds at
+> > > +        * 105C/125C/145C, monitoring at 25Hz
+> > > +        */
+> > > +       reg = SHUTDOWN_CTRL1_RATE_25HZ;
+> > > +
+> > > +       if ((temp == THERMAL_TEMP_INVALID) ||
+> > > +           (temp < STAGE2_THRESHOLD_MIN)) {
+> > > +               chip->thresh = THRESH_MIN;
+> > > +               goto skip;
+> > > +       }
+> > > +
+> > > +       if (temp <= STAGE2_THRESHOLD_MAX) {
+> > > +               chip->thresh = THRESH_MAX -
+> > > +                       ((STAGE2_THRESHOLD_MAX - temp) /
+> > > +                        TEMP_THRESH_STEP);
+> > > +               disable_s2_shutdown = true;
+> > > +       } else {
+> > > +               chip->thresh = THRESH_MAX;
+> > > +
+> > > +               if (!IS_ERR(chip->adc))
+> > > +                       disable_s2_shutdown = true;
+> > > +               else
+> > > +                       dev_warn(chip->dev,
+> > > +                                "No ADC is configured and critical temperature is above the maximum stage 2 threshold of 140?C! Configuring stage 2 shutdown at 140?C.\n");
+> > 
+> > Putting a non-ASCII character (the degree symbol) in your commit
+> > message is one thing, but are you sure it's wise to put it in the
+> > kernel logs?
+> 
+> A few other drivers also do this
+> (drivers/gpu/drm/nouveau/nvkm/subdev/clk/base.c,
+> drivers/macintosh/windfarm_pm121.c), however that doesn't mean it's a
+> good idea. Will change to degC or C.
+> 
+> > > +       }
+> > > +
+> > > +skip:
+> > > +       reg |= chip->thresh;
+> > > +       if (disable_s2_shutdown)
+> > > +               reg |= SHUTDOWN_CTRL1_OVERRIDE_S2;
+> > > +
+> > > +       ret = qpnp_tm_write(chip, QPNP_TM_REG_SHUTDOWN_CTRL1, reg);
+> > > +       if (ret < 0)
+> > > +               return ret;
+> > > +
+> > > +       return ret;
+> > 
+> > Simplify the above lines to:
+> > 
+> > return qpnp_tm_write(chip, QPNP_TM_REG_SHUTDOWN_CTRL1, reg);
+> 
+> Ouch, my code is indeed dumb ...
+> 
+> > > @@ -313,12 +441,7 @@ static int qpnp_tm_probe(struct platform_device *pdev)
+> > >         if (ret < 0)
+> > >                 return ret;
+> > >
+> > > -       chip->tz_dev = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, chip,
+> > > -                                                       &qpnp_tm_sensor_ops);
+> > > -       if (IS_ERR(chip->tz_dev)) {
+> > > -               dev_err(&pdev->dev, "failed to register sensor\n");
+> > > -               return PTR_ERR(chip->tz_dev);
+> > > -       }
+> > > +       chip->initialized = true;
+> > 
+> > Should we add "thermal_zone_device_update(chip->tz_dev,
+> > THERMAL_EVENT_UNSPECIFIED);" here
+> 
+> Seems reasonable, will do.
+> 
+> > ...also: do we care about any type of locking for chip->initialized?
+> > Technically we can be running on weakly ordered memory so if
+> > qpnp_tm_update_temp_no_adc() is running on a different processor then
+> > possibly it could still keep returning the default temperature for a
+> > little while.  We could try to analyze whether there's some sort of
+> > implicit barrier or we could add manual memory barriers, but generally
+> > I try to avoid that and just do the simple locking...  What about just
+> > setting chip-Initialized = true at the end of qpnp_tm_init() while the
+> > mutex is still held?
+> 
+> Thanks for pointing that out. I agree that we should keep things
+> simple, chip->initialized to true at the end of qpnp_tm_init() sounds
+> good to me.
+> 
+> > I'd also love to hear from someone with more thermal framework
+> > experience to make sure it's legit to return a default value if
+> > someone calls us while we're initting.  It seems sane to me but nice
+> > to confirm it's OK.
+> 
+> An alternative could be to return THERMAL_TEMP_INVALID, however I
+> don't see this handled outside of thermal_core.c, not sure if it could
+> throw some other code off.
+> 
+> Comments from thermal folks on either approach (or alternatives) are
+> definitely welcome :)
+> 
+> > Overall I like the idea of this patch so hopefully others do too.
+> > Thanks for sending it out!
+> 
 
-Signed-off-by: Arun Parameswaran <arun.parameswaran@broadcom.com>
----
- Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+minor ask for next version
 
-diff --git a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-index dfe287a..dc8aa68 100644
---- a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-+++ b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-@@ -18,9 +18,9 @@ at- Documentation/devicetree/bindings/net/mdio-mux.txt
- 
- 
- for example:
--		mdio_mux_iproc: mdio-mux at 6602023c {
-+		mdio_mux_iproc: mdio-mux at 66020000 {
- 			compatible = "brcm,mdio-mux-iproc";
--			reg = <0x6602023c 0x14>;
-+			reg = <0x66020000 0x250>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 
--- 
-1.9.1
+
+WARNING: line over 80 characters
+#159: FILE: drivers/thermal/qcom-spmi-temp-alarm.c:65:
++#define STAGE2_THRESHOLD_MIN		125000	/* Stage 2 Threshold
+Min: 125 C */
+
+WARNING: line over 80 characters
+#160: FILE: drivers/thermal/qcom-spmi-temp-alarm.c:66:
++#define STAGE2_THRESHOLD_MAX		140000	/* Stage 2 Threshold
+Max: 140 C */
+
+ERROR: trailing statements should be on next line
+#201: FILE: drivers/thermal/qcom-spmi-temp-alarm.c:186:
++	if (!chip->adc)) {
+
+CHECK: Unnecessary parentheses around 'temp == THERMAL_TEMP_INVALID'
+#227: FILE: drivers/thermal/qcom-spmi-temp-alarm.c:220:
++	if ((temp == THERMAL_TEMP_INVALID) ||
++	    (temp < STAGE2_THRESHOLD_MIN)) {
+
+CHECK: Unnecessary parentheses around 'temp < STAGE2_THRESHOLD_MIN'
+#227: FILE: drivers/thermal/qcom-spmi-temp-alarm.c:220:
++	if ((temp == THERMAL_TEMP_INVALID) ||
++	    (temp < STAGE2_THRESHOLD_MIN)) {
+
+CHECK: Unnecessary parentheses around 'trips[i].type ==
+THERMAL_TRIP_CRITICAL'
+#305: FILE: drivers/thermal/qcom-spmi-temp-alarm.c:302:
++		if (of_thermal_is_trip_valid(chip->tz_dev, i) &&
++		    (trips[i].type == THERMAL_TRIP_CRITICAL))
+
+CHECK: Alignment should match open parenthesis
+#386: FILE: drivers/thermal/qcom-spmi-temp-alarm.c:427:
++	chip->tz_dev = devm_thermal_zone_of_sensor_register(&pdev->dev,
+0, chip,
++
+&qpnp_tm_sensor_ops);
+
+> Thanks for the review!
+> 
+> Matthias
