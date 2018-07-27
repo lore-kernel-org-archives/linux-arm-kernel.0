@@ -1,38 +1,43 @@
-From: radhey.shyam.pandey@xilinx.com (Radhey Shyam Pandey)
-Date: Fri, 27 Jul 2018 16:20:39 +0530
-Subject: [PATCH 3/3] dmaengine: xilinx_dma: Fix 64-bit simple CDMA transfer
-In-Reply-To: <1532688639-32230-1-git-send-email-radhey.shyam.pandey@xilinx.com>
-References: <1532688639-32230-1-git-send-email-radhey.shyam.pandey@xilinx.com>
-Message-ID: <1532688639-32230-4-git-send-email-radhey.shyam.pandey@xilinx.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 27 Jul 2018 11:51:36 +0100
+Subject: [PATCH 5/6] ARM: spectre-v1: use get_user() for __get_user()
+In-Reply-To: <20180726131937.GX17271@n2100.armlinux.org.uk>
+References: <20180710141322.GL17271@n2100.armlinux.org.uk>
+ <E1fctP5-0005vM-MA@rmk-PC.armlinux.org.uk>
+ <20180726124401.3gsvqk244753u72g@lakrids.cambridge.arm.com>
+ <20180726131937.GX17271@n2100.armlinux.org.uk>
+Message-ID: <20180727105135.iwgrsf2in4dzcygw@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In AXI CDMA simple mode also pass MSB bits of source and destination
-address to xilinx_write function. This fixes simple CDMA operation
-mode using 64-bit addressing.
+On Thu, Jul 26, 2018 at 02:19:37PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 26, 2018 at 01:44:01PM +0100, Mark Rutland wrote:
+> > On Tue, Jul 10, 2018 at 03:14:07PM +0100, Russell King wrote:
+> > > Fixing __get_user() for spectre variant 1 is not sane: we would have to
+> > > add address space bounds checking in order to validate that the location
+> > > should be accessed, and then zero the address if found to be invalid.
+> > > 
+> > > Since __get_user() is supposed to avoid the bounds check, and this is
+> > > exactly what get_user() does, there's no point having two different
+> > > implementations that are doing the same thing.  So, when the Spectre
+> > > workarounds are required, make __get_user() an alias of get_user().
+> > > 
+> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > 
+> > I believe that we need to do likewise for __put_user(), given
+> > spectre-v1.1.
+> 
+> Spectre v1.1 is not covered by this patch series.
 
-Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
- drivers/dma/xilinx/xilinx_dma.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+Ok; given that:
 
-diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-index a37871e..2e15d86 100644
---- a/drivers/dma/xilinx/xilinx_dma.c
-+++ b/drivers/dma/xilinx/xilinx_dma.c
-@@ -1245,8 +1245,10 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
- 
- 		hw = &segment->hw;
- 
--		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR, hw->src_addr);
--		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR, hw->dest_addr);
-+		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR, (dma_addr_t)
-+			     ((u64)hw->src_addr_msb << 32 | hw->src_addr));
-+		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR, (dma_addr_t)
-+			     ((u64)hw->dest_addr_msb << 32 | hw->dest_addr));
- 
- 		/* Start the transfer */
- 		dma_ctrl_write(chan, XILINX_DMA_REG_BTT,
--- 
-1.7.1
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+As an aside, on arm64 we always do the full checks in __*_user() since
+this also hardens against missing/bad access_ok() checks when PAN is not
+in use.
+
+As a future thing, it might be worth having the option to always perform
+the full checks.
+
+Mark.
