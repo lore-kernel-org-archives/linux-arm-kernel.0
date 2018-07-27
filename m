@@ -1,85 +1,166 @@
-From: realmz6@gmail.com (Steven Miao)
-Date: Fri, 27 Jul 2018 10:06:49 +0800
-Subject: [Eas-dev] Computing the dynamic-power-coefficient on Exynos5422
-In-Reply-To: <6eebf48cdf26496a9c53892549a99ed8@MSX-L106.msx.ad.zih.tu-dresden.de>
-References: <6eebf48cdf26496a9c53892549a99ed8@MSX-L106.msx.ad.zih.tu-dresden.de>
-Message-ID: <CAMk6uBmv0X2A69dJ8tqLLCLbsD1V4pzSkrxhdyThF_OV-6AM7w@mail.gmail.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Fri, 27 Jul 2018 11:37:28 +0900
+Subject: [PATCH] ASoC: uniphier: add support for multichannel output
+Message-ID: <20180727023728.7810-1-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oliver,
+This patch adds multichannel PCM output support for LD11/LD20.
+Currently driver tested and supported only 2ch, 6ch, and 8ch.
 
-On Thu, Jul 26, 2018 at 4:05 PM Oliver Effland
-<s5770874@msx.tu-dresden.de> wrote:
->
-> Hi,
->
-> First of all: thanks for all the valuable input! @(Russell, Dietmar & Steven)
->
-> On 07/23/2018 08:51 AM, Steven Miao wrote:
-> > Hi  Oliver,
-> >
-> > Generally these dynamic co-efficiency and static leakage power comes
-> > from hardware design team by running power estimation tool, however
-> > you can tun these co-efficiency and parameters for better performance.
-> >
-> > How did you get A7 or A15 power? Get Soc power or there's separate
-> > sensor for A7/A15?
-> Yes indeed, there are 2 seperate sensors for the A7 and A15.
->
-> > If you want to create cpu busy power model manually, you can:
-> > 1 leave 1 A7 + 1 A15 core online, keep other cores offline, disable
-> > thermal zone, disable idle state for all cores
-> > 2 set A7 frequency to 200Mhz, move all the task to A15, run cpu
-> > intensive task on A7(dhrystone, sysbench cpu test), read sensor to get
-> > 1 A7 power P1(read from A7 cluster sensor)
-> > 3 online 2 A7 core, run dhrystone on each core, and get power P2
-> >
-> > we can get 1 A7 core power at 200Mhz ~= P2 - P1 (A7 power X 2 + static
-> > power - A7 power X 1 - static power
-> I followed your manual steps (using a busy loop for 10s, instead of a benchmark) and corrected my calculations (with the static
-> power in mind):
->
-> A7:
-> freq(MHz) voltage(mV) Power(mW) A7_Power(mW)  Stat_Power(mW) DPC
-> 200       918.750     34.768    12.203        10.362         72.283955
-> 400       920.000     60.805    21.25         18.305         62.765831
-> 600       968.750     98.046    35.084        27.878         62.306652
-> 800       1042.500    148.095   52.285        43.525         60.136063
-> 1000      1116.250    212.214   76.112        59.99          61.084382
-> 1200      1190.000    288.958   99.993        88.972         58.842948
-> 1400      1288.750    411.936   144.807       122.322        62.276495
->
->                                                         mean: 62
->
-> A15:
-> freq(MHz) voltage(mV) Power(mW) A15_Power(mW) Stat_Power(mW) DPC
-> 200       916250      122.584   31.139        60.306         185.458477
-> 500       916250      225.101   68.774        87.553         163.842401
-> 800       942500      349.158   112.432       124.294        158.211202
-> 1100      1016250     540.78    169.556       201.668        149.251725
-> 1400      1078750     779.19    258.214       262.762        158.493016
-> 1700      1180000     1179.344  392.107       395.13         165.650083
-> 2000      1320000     1969.764  648.768       672.228        186.170798
->
->                                                         mean: 164
->
-> The ratio between A15 and A7 is now 164/62 = 2.645
->
-> I hope the dynamic-power-coefficient's are more accurate now?
->
-> > dynamic-power-coefficient ~= 400 - 500 is reasonable for big core
-> > dynamic-power-coefficient  ~= 100 is reasonable for LITTLE core.
-> > For IPA it can work effectively with a poor power model(not so
-> > accurate), for EAS it just need power model of LITTLE core and big
-> > core is proportional.
->
-> I'm guessing my values differ from your suggested values, because it's 32bit ARM?
-Yes, the ratio bit and LITTLE ~= 400/100 ~= 4.x is from A73 and A53 @
-16nm process, it could vary from 32bit core or different process.
->
-> Best regards,
-> Oliver
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+---
+ sound/soc/uniphier/aio-core.c | 78 ++++++++++++++++++++++++++++++++---
+ sound/soc/uniphier/aio-ld11.c |  2 +-
+ sound/soc/uniphier/aio-reg.h  |  1 +
+ sound/soc/uniphier/aio.h      |  3 ++
+ 4 files changed, 78 insertions(+), 6 deletions(-)
 
-Cheers,
-Steven
+diff --git a/sound/soc/uniphier/aio-core.c b/sound/soc/uniphier/aio-core.c
+index 638cb3fc5f7b..8b09bbb0f8d0 100644
+--- a/sound/soc/uniphier/aio-core.c
++++ b/sound/soc/uniphier/aio-core.c
+@@ -264,6 +264,57 @@ void aio_port_reset(struct uniphier_aio_sub *sub)
+ 	}
+ }
+ 
++/**
++ * aio_port_set_ch - set channels of LPCM
++ * @sub: the AIO substream pointer, PCM substream only
++ * @ch : count of channels
++ *
++ * Set suitable slot selecting to input/output port block of AIO.
++ *
++ * This function may return error if non-PCM substream.
++ *
++ * Return: Zero if successful, otherwise a negative value on error.
++ */
++static int aio_port_set_ch(struct uniphier_aio_sub *sub)
++{
++	struct regmap *r = sub->aio->chip->regmap;
++	u32 slotsel_2ch[] = {
++		0, 0, 0, 0, 0,
++	};
++	u32 slotsel_multi[] = {
++		OPORTMXTYSLOTCTR_SLOTSEL_SLOT0,
++		OPORTMXTYSLOTCTR_SLOTSEL_SLOT1,
++		OPORTMXTYSLOTCTR_SLOTSEL_SLOT2,
++		OPORTMXTYSLOTCTR_SLOTSEL_SLOT3,
++		OPORTMXTYSLOTCTR_SLOTSEL_SLOT4,
++	};
++	u32 mode, *slotsel;
++	int i;
++
++	switch (params_channels(&sub->params)) {
++	case 8:
++	case 6:
++		mode = OPORTMXTYSLOTCTR_MODE;
++		slotsel = slotsel_multi;
++		break;
++	case 2:
++		mode = 0;
++		slotsel = slotsel_2ch;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	for (i = 0; i < AUD_MAX_SLOTSEL; i++) {
++		regmap_update_bits(r, OPORTMXTYSLOTCTR(sub->swm->oport.map, i),
++				   OPORTMXTYSLOTCTR_MODE, mode);
++		regmap_update_bits(r, OPORTMXTYSLOTCTR(sub->swm->oport.map, i),
++				   OPORTMXTYSLOTCTR_SLOTSEL_MASK, slotsel[i]);
++	}
++
++	return 0;
++}
++
+ /**
+  * aio_port_set_rate - set sampling rate of LPCM
+  * @sub: the AIO substream pointer, PCM substream only
+@@ -575,6 +626,10 @@ int aio_port_set_param(struct uniphier_aio_sub *sub, int pass_through,
+ 			rate = params_rate(params);
+ 		}
+ 
++		ret = aio_port_set_ch(sub);
++		if (ret)
++			return ret;
++
+ 		ret = aio_port_set_rate(sub, rate);
+ 		if (ret)
+ 			return ret;
+@@ -731,15 +786,28 @@ void aio_port_set_volume(struct uniphier_aio_sub *sub, int vol)
+ int aio_if_set_param(struct uniphier_aio_sub *sub, int pass_through)
+ {
+ 	struct regmap *r = sub->aio->chip->regmap;
+-	u32 v;
++	u32 memfmt, v;
+ 
+ 	if (sub->swm->dir == PORT_DIR_OUTPUT) {
+-		if (pass_through)
++		if (pass_through) {
+ 			v = PBOUTMXCTR0_ENDIAN_0123 |
+ 				PBOUTMXCTR0_MEMFMT_STREAM;
+-		else
+-			v = PBOUTMXCTR0_ENDIAN_3210 |
+-				PBOUTMXCTR0_MEMFMT_2CH;
++		} else {
++			switch (params_channels(&sub->params)) {
++			case 2:
++				memfmt = PBOUTMXCTR0_MEMFMT_2CH;
++				break;
++			case 6:
++				memfmt = PBOUTMXCTR0_MEMFMT_6CH;
++				break;
++			case 8:
++				memfmt = PBOUTMXCTR0_MEMFMT_8CH;
++				break;
++			default:
++				return -EINVAL;
++			}
++			v = PBOUTMXCTR0_ENDIAN_3210 | memfmt;
++		}
+ 
+ 		regmap_write(r, PBOUTMXCTR0(sub->swm->oif.map), v);
+ 		regmap_write(r, PBOUTMXCTR1(sub->swm->oif.map), 0);
+diff --git a/sound/soc/uniphier/aio-ld11.c b/sound/soc/uniphier/aio-ld11.c
+index ab04d3331be9..de962df245ba 100644
+--- a/sound/soc/uniphier/aio-ld11.c
++++ b/sound/soc/uniphier/aio-ld11.c
+@@ -286,7 +286,7 @@ static struct snd_soc_dai_driver uniphier_aio_dai_ld11[] = {
+ 			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
+ 			.rates       = SNDRV_PCM_RATE_48000,
+ 			.channels_min = 2,
+-			.channels_max = 2,
++			.channels_max = 8,
+ 		},
+ 		.ops = &uniphier_aio_i2s_ops,
+ 	},
+diff --git a/sound/soc/uniphier/aio-reg.h b/sound/soc/uniphier/aio-reg.h
+index 45fdc6ae358a..734395dbcffb 100644
+--- a/sound/soc/uniphier/aio-reg.h
++++ b/sound/soc/uniphier/aio-reg.h
+@@ -374,6 +374,7 @@
+ #define OPORTMXTYVOLGAINSTATUS(n, m)     (0x42108 + 0x400 * (n) + 0x20 * (m))
+ #define   OPORTMXTYVOLGAINSTATUS_CUR_MASK  GENMASK(15, 0)
+ #define OPORTMXTYSLOTCTR(n, m)           (0x42114 + 0x400 * (n) + 0x20 * (m))
++#define   OPORTMXTYSLOTCTR_MODE            BIT(15)
+ #define   OPORTMXTYSLOTCTR_SLOTSEL_MASK    GENMASK(11, 8)
+ #define   OPORTMXTYSLOTCTR_SLOTSEL_SLOT0   (0x8 << 8)
+ #define   OPORTMXTYSLOTCTR_SLOTSEL_SLOT1   (0x9 << 8)
+diff --git a/sound/soc/uniphier/aio.h b/sound/soc/uniphier/aio.h
+index aa89c2f6fa24..23a5c3c68658 100644
+--- a/sound/soc/uniphier/aio.h
++++ b/sound/soc/uniphier/aio.h
+@@ -141,6 +141,9 @@ enum IEC61937_PC {
+ #define AUD_MIN_FRAGMENT_SIZE    (4 * 1024)
+ #define AUD_MAX_FRAGMENT_SIZE    (16 * 1024)
+ 
++/* max 5 slots, 10 channels, 2 channel in 1 slot */
++#define AUD_MAX_SLOTSEL    5
++
+ /*
+  * This is a selector for virtual register map of AIO.
+  *
+-- 
+2.18.0
