@@ -1,33 +1,28 @@
-From: vasilyev@ispras.ru (Anton Vasilyev)
-Date: Fri, 27 Jul 2018 18:57:47 +0300
-Subject: [PATCH] net: mdio-mux: bcm-iproc: fix wrong getter and setter pair
-Message-ID: <20180727155747.24978-1-vasilyev@ispras.ru>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 27 Jul 2018 18:02:33 +0200
+Subject: [PATCH v3 04/23] thermal: armada: rename the initialization
+ routine
+In-Reply-To: <20180716144206.30985-5-miquel.raynal@bootlin.com>
+References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
+ <20180716144206.30985-5-miquel.raynal@bootlin.com>
+Message-ID: <e371e6c4-7c74-f749-73cd-cc44434c9a6d@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mdio_mux_iproc_probe() uses platform_set_drvdata() to store md pointer
-in device, whereas mdio_mux_iproc_remove() restores md pointer by
-dev_get_platdata(&pdev->dev). This leads to wrong resources release.
+On 16/07/2018 16:41, Miquel Raynal wrote:
+> Calling a hook ->init_sensor() while what is initialized is the IP
+> itself and not the sensors is misleading. Rename the hook ->init() to
+> avoid any confusion in later work bringing multi-sensors support.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 
-The patch replaces getter to platform_get_drvdata.
 
-Signed-off-by: Anton Vasilyev <vasilyev@ispras.ru>
----
- drivers/net/phy/mdio-mux-bcm-iproc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
-index 0831b7142df7..0c5b68e7da51 100644
---- a/drivers/net/phy/mdio-mux-bcm-iproc.c
-+++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
-@@ -218,7 +218,7 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
- 
- static int mdio_mux_iproc_remove(struct platform_device *pdev)
- {
--	struct iproc_mdiomux_desc *md = dev_get_platdata(&pdev->dev);
-+	struct iproc_mdiomux_desc *md = platform_get_drvdata(pdev);
- 
- 	mdio_mux_uninit(md->mux_handle);
- 	mdiobus_unregister(md->mii_bus);
+
 -- 
-2.18.0
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
