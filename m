@@ -1,53 +1,37 @@
 From: arun.parameswaran@broadcom.com (Arun Parameswaran)
-Date: Fri, 27 Jul 2018 14:23:29 -0700
-Subject: [PATCH v2 3/7] arm64: dts: Fix the base address of the Broadcom iProc
+Date: Fri, 27 Jul 2018 14:23:31 -0700
+Subject: [PATCH v2 5/7] dt-bindings: net: Add clock handle to Broadcom iProc
  mdio mux
 In-Reply-To: <1532726613-6483-1-git-send-email-arun.parameswaran@broadcom.com>
 References: <1532726613-6483-1-git-send-email-arun.parameswaran@broadcom.com>
-Message-ID: <1532726613-6483-4-git-send-email-arun.parameswaran@broadcom.com>
+Message-ID: <1532726613-6483-6-git-send-email-arun.parameswaran@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modify the base address of the mdio mux driver to point to the
-start of the mdio mux block's register address space.
+Add clock phandle, of the core clock driving the mdio block, as an
+optional property to the Broadcom iProc mdio mux.
+
+The clock, when specified, will be used to setup the rate adjust registers
+in the mdio to derrive the mdio's operating frequency.
 
 Signed-off-by: Arun Parameswaran <arun.parameswaran@broadcom.com>
 ---
- arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi    | 4 ++--
- arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi b/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi
-index 4057197..1a406a7 100644
---- a/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi
-@@ -482,9 +482,9 @@
- 			status = "disabled";
- 		};
+diff --git a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
+index dc8aa68..b58843f 100644
+--- a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
++++ b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
+@@ -13,6 +13,9 @@ MDIO multiplexer node:
+ Every non-ethernet PHY requires a compatible so that it could be probed based
+ on this compatible string.
  
--		mdio_mux_iproc: mdio-mux at 6602023c {
-+		mdio_mux_iproc: mdio-mux at 66020000 {
- 			compatible = "brcm,mdio-mux-iproc";
--			reg = <0x6602023c 0x14>;
-+			reg = <0x66020000 0x250>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-index b203152..a70e8dd 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-@@ -278,9 +278,9 @@
- 
- 		#include "stingray-pinctrl.dtsi"
- 
--		mdio_mux_iproc: mdio-mux at 2023c {
-+		mdio_mux_iproc: mdio-mux at 20000 {
- 			compatible = "brcm,mdio-mux-iproc";
--			reg = <0x0002023c 0x14>;
-+			reg = <0x00020000 0x250>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
++Optional properties:
++- clocks: phandle of the core clock which drives the mdio block.
++
+ Additional information regarding generic multiplexer properties can be found
+ at- Documentation/devicetree/bindings/net/mdio-mux.txt
  
 -- 
 1.9.1
