@@ -1,141 +1,462 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 26 Jul 2018 19:22:35 -0500
-Subject: [PATCH v2 7/7] OF: Don't set default coherent DMA mask
-In-Reply-To: <4ed75bc9-1694-2bcb-2ea9-3f2a04f33f54@ti.com>
-References: <cover.1532382222.git.robin.murphy@arm.com>
- <66c08e4df2032fde82a2f97544f41fd3a2f24a94.1532382222.git.robin.murphy@arm.com>
- <4ed75bc9-1694-2bcb-2ea9-3f2a04f33f54@ti.com>
-Message-ID: <92d6b010-b5c0-fc59-0668-5b455e26c912@ti.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 27 Jul 2018 08:44:00 +0800
+Subject: [linux-sunxi] [PATCH v3.1 10/10] arm64: dts: allwinner: a64:
+ Enable HDMI output on A64 boards w/ HDMI
+In-Reply-To: <1571011.jY5lUBhtiX@jernej-laptop>
+References: <20180726171257.6688-1-icenowy@aosc.io>
+ <20180726171257.6688-11-icenowy@aosc.io> <1571011.jY5lUBhtiX@jernej-laptop>
+Message-ID: <615A272A-A739-4EDE-9AF4-4FC2822F3E3F@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 07/26/2018 06:52 PM, Grygorii Strashko wrote:
-> 
-> 
-> On 07/23/2018 05:16 PM, Robin Murphy wrote:
->> Now that we can track upstream DMA constraints properly with
->> bus_dma_mask instead of trying (and failing) to maintain it in
->> coherent_dma_mask, it doesn't make much sense for the firmware code to
->> be touching the latter at all. It's merely papering over bugs wherein a
->> driver has failed to call dma_set_coherent_mask() *and* the bus code has
->> not initialised any default value.
->>
->> We don't really want to encourage more drivers coercing dma_mask so
->> we'll continue to fix that up if necessary, but add a warning to help
->> flush out any such buggy bus code that remains.
->>
->> CC: Rob Herring <robh+dt@kernel.org>
->> CC: Frank Rowand <frowand.list@gmail.com>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+? 2018?7?27? GMT+08:00 ??2:03:00, "Jernej ?krabec" <jernej.skrabec@siol.net> ??:
+>Dne ?etrtek, 26. julij 2018 ob 19:12:57 CEST je Icenowy Zheng
+>napisal(a):
+>> From: Jagan Teki <jagan@amarulasolutions.com>
+>> 
+>> Enable all necessary device tree nodes and add connector node to
+>device
+>> trees for all supported A64 boards with HDMI.
+>> 
+>> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+>> [Icenowy: squash all board patches altogether and change supply name]
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 >> ---
->>    drivers/of/device.c | 20 ++++++++++----------
->>    1 file changed, 10 insertions(+), 10 deletions(-)
->>
->> diff --git a/drivers/of/device.c b/drivers/of/device.c
->> index 0d39633e8545..5957cd4fa262 100644
->> --- a/drivers/of/device.c
->> +++ b/drivers/of/device.c
->> @@ -127,20 +127,20 @@ int of_dma_configure(struct device *dev, struct device_node *np, bool force_dma)
->>    	}
->>    
->>    	/*
->> -	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
->> -	 * setup the correct supported mask.
->> +	 * If @dev is expected to be DMA-capable then the bus code that created
->> +	 * it should have initialised its dma_mask pointer by this point. For
->> +	 * now, we'll continue the legacy behaviour of coercing it to the
->> +	 * coherent mask if not, but we'll no longer do so quietly.
->>    	 */
->> -	if (!dev->coherent_dma_mask)
->> -		dev->coherent_dma_mask = DMA_BIT_MASK(32);
->> -	/*
->> -	 * Set it to coherent_dma_mask by default if the architecture
->> -	 * code has not set it.
->> -	 */
->> -	if (!dev->dma_mask)
->> +	if (!dev->dma_mask) {
->> +		dev_warn(dev, "DMA mask not set\n");
->>    		dev->dma_mask = &dev->coherent_dma_mask;
->> +	}
->>    
->> -	if (!size)
->> +	if (!size && dev->coherent_dma_mask)
->>    		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
->> +	else if (!size)
->> +		size = 1ULL << 32;
->>    
->>    	dev->dma_pfn_offset = offset;
->>    
->>
-> 
-> the result of this change is pretty strange as for me :(
-> Resulted code:
-> 
-> 	/*
-> 	 * If @dev is expected to be DMA-capable then the bus code that created
-> 	 * it should have initialised its dma_mask pointer by this point. For
-> 	 * now, we'll continue the legacy behaviour of coercing it to the
-> 	 * coherent mask if not, but we'll no longer do so quietly.
-> 	 */
-> 	if (!dev->dma_mask) {
-> 		dev_warn(dev, "DMA mask not set\n");
-> 		dev->dma_mask = &dev->coherent_dma_mask;
-> ^this will always produce warning in case of platform-bus or if there are no bus driver.
-> even if DT contains correct definition of dma-range
-> 	}
-> 
-> 	if (!size && dev->coherent_dma_mask)
-> 
-> ^ coherent_dma_mask is zero, so size will not be calculated
-pls, ignore this particular comment 
+>> Changes in v3,1:
+>> - Squash all enablement patches altogether.
+>> - Change supply name to match DT binding & driver change.
+>> Changes for v3:
+>> - Enable all pipeline components
+>> Changes for v2:
+>> - none
+>> 
+>>  .../dts/allwinner/sun50i-a64-bananapi-m64.dts | 34
+>+++++++++++++++++++
+>>  .../dts/allwinner/sun50i-a64-nanopi-a64.dts   | 34
+>+++++++++++++++++++
+>>  .../dts/allwinner/sun50i-a64-olinuxino.dts    | 34
+>+++++++++++++++++++
+>>  .../dts/allwinner/sun50i-a64-orangepi-win.dts | 34
+>+++++++++++++++++++
+>>  .../boot/dts/allwinner/sun50i-a64-pine64.dts  | 34
+>+++++++++++++++++++
+>>  .../allwinner/sun50i-a64-sopine-baseboard.dts | 34
+>+++++++++++++++++++
+>>  6 files changed, 204 insertions(+)
+>> 
+>> diff --git
+>a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts index
+>> 094cfed13df9..0d8f5571d574 100644
+>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+>> @@ -60,6 +60,17 @@
+>>  		stdout-path = "serial0:115200n8";
+>>  	};
+>> 
+>> +	connector {
+>> +		compatible = "hdmi-connector";
+>> +		type = "a";
+>> +
+>> +		port {
+>> +			hdmi_con_in: endpoint {
+>> +				remote-endpoint = <&hdmi_out_con>;
+>> +			};
+>> +		};
+>> +	};
+>> +
+>>  	leds {
+>>  		compatible = "gpio-leds";
+>> 
+>> @@ -86,6 +97,10 @@
+>>  	};
+>>  };
+>> 
+>> +&de {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &ehci0 {
+>>  	status = "okay";
+>>  };
+>> @@ -103,6 +118,17 @@
+>>  	status = "okay";
+>>  };
+>> 
+>> +&hdmi {
+>> +	hdmi-supply = <&reg_dldo1>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&hdmi_out {
+>> +	hdmi_out_con: endpoint {
+>> +		remote-endpoint = <&hdmi_con_in>;
+>> +	};
+>> +};
+>> +
+>>  &i2c1 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&i2c1_pins>;
+>> @@ -120,6 +146,10 @@
+>>  	};
+>>  };
+>> 
+>> +&mixer1 {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &mmc0 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&mmc0_pins>;
+>> @@ -300,6 +330,10 @@
+>>  	vcc-hdmi-supply = <&reg_dldo1>;
+>>  };
+>> 
+>> +&tcon1 {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &uart0 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&uart0_pins_a>;
+>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts index
+>> 98dbff19f5cc..2bcf02f46366 100644
+>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+>> @@ -57,6 +57,21 @@
+>>  	chosen {
+>>  		stdout-path = "serial0:115200n8";
+>>  	};
+>> +
+>> +	connector {
+>> +		compatible = "hdmi-connector";
+>> +		type = "a";
+>> +
+>> +		port {
+>> +			hdmi_con_in: endpoint {
+>> +				remote-endpoint = <&hdmi_out_con>;
+>> +			};
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +&de {
+>> +	status = "okay";
+>>  };
+>> 
+>>  &ehci0 {
+>> @@ -67,6 +82,17 @@
+>>  	status = "okay";
+>>  };
+>> 
+>> +&hdmi {
+>> +	hdmi-supply = <&reg_dldo1>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&hdmi_out {
+>> +	hdmi_out_con: endpoint {
+>> +		remote-endpoint = <&hdmi_con_in>;
+>> +	};
+>> +};
+>> +
+>>  /* i2c1 connected with gpio headers like pine64, bananapi */
+>>  &i2c1 {
+>>  	pinctrl-names = "default";
+>> @@ -78,6 +104,10 @@
+>>  	bias-pull-up;
+>>  };
+>> 
+>> +&mixer1 {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &mmc0 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&mmc0_pins>;
+>> @@ -199,6 +229,10 @@
+>>  	vcc-hdmi-supply = <&reg_dldo1>;
+>>  };
+>> 
+>> +&tcon1 {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &uart0 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&uart0_pins_a>;
+>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts index
+>> 3f531393eaee..5445a7a1db51 100644
+>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+>> @@ -58,12 +58,42 @@
+>>  		stdout-path = "serial0:115200n8";
+>>  	};
+>> 
+>> +	connector {
+>> +		compatible = "hdmi-connector";
+>> +		type = "a";
+>> +
+>> +		port {
+>> +			hdmi_con_in: endpoint {
+>> +				remote-endpoint = <&hdmi_out_con>;
+>> +			};
+>> +		};
+>> +	};
+>> +
+>>  	wifi_pwrseq: wifi_pwrseq {
+>>  		compatible = "mmc-pwrseq-simple";
+>>  		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+>>  	};
+>>  };
+>> 
+>> +&de {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&hdmi {
+>> +	hdmi-supply = <&reg_dldo1>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&hdmi_out {
+>> +	hdmi_out_con: endpoint {
+>> +		remote-endpoint = <&hdmi_con_in>;
+>> +	};
+>> +};
+>> +
+>> +&mixer1 {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &mmc0 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&mmc0_pins>;
+>> @@ -218,6 +248,10 @@
+>>  	vcc-hdmi-supply = <&reg_dldo1>;
+>>  };
+>> 
+>> +&tcon1 {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &uart0 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&uart0_pins_a>;
+>> diff --git
+>a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts index
+>> 1221764f5719..81a8f92c6c35 100644
+>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+>> @@ -57,12 +57,42 @@
+>>  	chosen {
+>>  		stdout-path = "serial0:115200n8";
+>>  	};
+>> +
+>> +	connector {
+>> +		compatible = "hdmi-connector";
+>> +		type = "a";
+>> +
+>> +		port {
+>> +			hdmi_con_in: endpoint {
+>> +				remote-endpoint = <&hdmi_out_con>;
+>> +			};
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +&de {
+>> +	status = "okay";
+>>  };
+>> 
+>>  &ehci1 {
+>>  	status = "okay";
+>>  };
+>> 
+>> +&hdmi {
+>> +	hdmi-supply = <&reg_dldo1>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&hdmi_out {
+>> +	hdmi_out_con: endpoint {
+>> +		remote-endpoint = <&hdmi_con_in>;
+>> +	};
+>> +};
+>> +
+>> +&mixer1 {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &mmc0 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&mmc0_pins>;
+>> @@ -195,6 +225,10 @@
+>>  	vcc-hdmi-supply = <&reg_dldo1>;
+>>  };
+>> 
+>> +&tcon1 {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &uart0 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&uart0_pins_a>;
+>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts index
+>> 1b9b92e541d2..1b972bade9f6 100644
+>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+>> @@ -62,6 +62,21 @@
+>>  	chosen {
+>>  		stdout-path = "serial0:115200n8";
+>>  	};
+>> +
+>> +	connector {
+>> +		compatible = "hdmi-connector";
+>> +		type = "a";
+>> +
+>> +		port {
+>> +			hdmi_con_in: endpoint {
+>> +				remote-endpoint = <&hdmi_out_con>;
+>> +			};
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +&de {
+>> +	status = "okay";
+>>  };
+>> 
+>>  &ehci0 {
+>> @@ -82,6 +97,17 @@
+>> 
+>>  };
+>> 
+>> +&hdmi {
+>> +	hdmi-supply = <&reg_dldo1>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&hdmi_out {
+>> +	hdmi_out_con: endpoint {
+>> +		remote-endpoint = <&hdmi_con_in>;
+>> +	};
+>> +};
+>> +
+>>  &i2c1 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&i2c1_pins>;
+>> @@ -99,6 +125,10 @@
+>>  	};
+>>  };
+>> 
+>> +&mixer1 {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &mmc0 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&mmc0_pins>;
+>> @@ -238,6 +268,10 @@
+>>  	status = "disabled";
+>>  };
+>> 
+>> +&tcon1 {
+>> +	status = "okay";
+>> +};
+>> +
+>>  /* On Exp and Euler connectors */
+>>  &uart0 {
+>>  	pinctrl-names = "default";
+>> diff --git
+>a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+>> b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts index
+>> c21f2331add6..eff44b069b1d 100644
+>> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+>> @@ -61,6 +61,17 @@
+>>  		stdout-path = "serial0:115200n8";
+>>  	};
+>> 
+>> +	connector {
+>> +		compatible = "hdmi-connector";
+>> +		type = "a";
+>> +
+>> +		port {
+>> +			hdmi_con_in: endpoint {
+>> +				remote-endpoint = <&hdmi_out_con>;
+>> +			};
+>> +		};
+>> +	};
+>> +
+>>  	reg_vcc1v8: vcc1v8 {
+>>  		compatible = "regulator-fixed";
+>>  		regulator-name = "vcc1v8";
+>> @@ -69,6 +80,10 @@
+>>  	};
+>>  };
+>> 
+>> +&de {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &ehci0 {
+>>  	status = "okay";
+>>  };
+>> @@ -86,6 +101,17 @@
+>>  	status = "okay";
+>>  };
+>> 
+>> +&hdmi {
+>> +	hdmi-supply = <&reg_dldo1>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&hdmi_out {
+>> +	hdmi_out_con: endpoint {
+>> +		remote-endpoint = <&hdmi_con_in>;
+>> +	};
+>> +};
+>> +
+>>  &mdio {
+>>  	ext_rgmii_phy: ethernet-phy at 1 {
+>>  		compatible = "ethernet-phy-ieee802.3-c22";
+>> @@ -93,6 +119,10 @@
+>>  	};
+>>  };
+>> 
+>> +&mixer1 {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &mmc2 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&mmc2_pins>;
+>> @@ -138,6 +168,10 @@
+>>  	vcc-hdmi-supply = <&reg_dldo1>;
+>
+>How is it possible to have vcc-hdmi-supply already defined? Did I miss
 
-> 		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
-> 	else if (!size)
-> 		size = 1ULL << 32;
-> 
-> 	dev->dma_pfn_offset = offset;
-> 
-> 	/*
-> 	 * Limit coherent and dma mask based on size and default mask
-> 	 * set by the driver.
-> 	 */
-> 	mask = DMA_BIT_MASK(ilog2(dma_addr + size - 1) + 1);
-> 	dev->bus_dma_mask = mask;
-> 	dev->coherent_dma_mask &= mask;
-> 
-> ^^ if nobody set coherent_dma_mask before it will stay null forever unless drivers
-> will overwrite it. Again even if DT has correct definition for dma-range.
-> 
-> 	*dev->dma_mask &= mask;
-> 
-> 	coherent = of_dma_is_coherent(np);
-> 	dev_dbg(dev, "device is%sdma coherent\n",
-> 		coherent ? " " : " not ");
-> 
-> 
+It's for simplefb.
 
-FYI, with below diff i can boot at least:
-
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index 5957cd4..f7dc121 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -150,8 +150,8 @@ int of_dma_configure(struct device *dev, struct device_node *np, bool force_dma)
-         */
-        mask = DMA_BIT_MASK(ilog2(dma_addr + size - 1) + 1);
-        dev->bus_dma_mask = mask;
--       dev->coherent_dma_mask &= mask;
--       *dev->dma_mask &= mask;
-+       dev->coherent_dma_mask = mask;
-+       *dev->dma_mask = mask;
- 
-        coherent = of_dma_is_coherent(np);
-        dev_dbg(dev, "device is%sdma coherent\n",
-
-
-
--- 
-regards,
--grygorii
+>some 
+>patch?
+>
+>Best regards,
+>Jernej
+>
+>>  };
+>> 
+>> +&tcon1 {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &uart0 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&uart0_pins_a>;
