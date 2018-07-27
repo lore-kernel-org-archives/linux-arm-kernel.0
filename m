@@ -1,48 +1,109 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 27 Jul 2018 13:32:15 +0200
-Subject: Droid 4: suspend to RAM?
-In-Reply-To: <20180725212853.GA1965@amd>
-References: <20180725200205.GA29594@amd>
- <CAOf5uwkyPoDT8TZe9V24p+nQMiee9XfD=943xwx0ThGi9_cPng@mail.gmail.com>
- <20180725212853.GA1965@amd>
-Message-ID: <20180727113214.GA32069@amd>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 27 Jul 2018 13:34:19 +0200
+Subject: [PATCH v3 01/23] thermal: armada: add a function that sanitizes
+ the thermal zone name
+In-Reply-To: <20180716144206.30985-2-miquel.raynal@bootlin.com>
+References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
+ <20180716144206.30985-2-miquel.raynal@bootlin.com>
+Message-ID: <84f97022-a470-f314-ee75-e5afb733bea5@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-> > > high even before modem (and thus USB) is enabled.
-> > >
-> > > Interestingly, CyanogenMod and Jolla seem to have higher power
-> > > consumption than stock operating system.
-> > >
-> > > (My Linux can survive for 10 hours, stock system could survive for 4
-> > > days if I'm not mistaken).
-> > >
-> > > I thought I would experiment with suspend to RAM.. and it indeed
-> > > seemed to suspend ok, but I could not wake it up. Do I need to set up
-> > > wakeup with button somehow? Is suspend to RAM required for good power
-> > > consumption?
-> > 
-> > Sorry but pm subsystem has debug mode that you can test in a easy way.
-> > You can even wakeup by any rtc alarm easily.
+On 16/07/2018 16:41, Miquel Raynal wrote:
+> Thermal zone names must follow certain rules imposed by the framework.
+> They are limited in length and shall not have any hyphen '-'.
 > 
-> Yes, that is how it works on PC (but there power button works,
-> too). Is it expected to work on Droid in v4.18?
+> This is done in a separate function for future use in another location.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 
-I tried setting up wakeup using RTC, but no, it does not seem to work:
+Why do you have to provide a function to test that?
 
-root at devuan:/my/tui/d4# rtcwake -m no -s 5
-rtcwake: wakeup using /dev/rtc0 at Fri Jul 27 11:28:44 2018
-root at devuan:/my/tui/d4# echo mem > /sys/power/state
+Logically, the one who did the change to add a thermal name, should
+check its code works. Without a proper name that won't work.
 
-									Pavel
+So this function is testing something which should be already tested, no?
+
+
+
+> ---
+>  drivers/thermal/armada_thermal.c | 36 +++++++++++++++++++++++++++++++++++-
+>  1 file changed, 35 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+> index 4c275ec10ac5..077e8e562306 100644
+> --- a/drivers/thermal/armada_thermal.c
+> +++ b/drivers/thermal/armada_thermal.c
+> @@ -70,6 +70,7 @@ struct armada_thermal_priv {
+>  	void __iomem *status;
+>  	void __iomem *control0;
+>  	void __iomem *control1;
+> +	char zone_name[THERMAL_NAME_LENGTH];
+>  	struct armada_thermal_data *data;
+>  };
+>  
+> @@ -353,6 +354,36 @@ static const struct of_device_id armada_thermal_id_table[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, armada_thermal_id_table);
+>  
+> +static void armada_set_sane_name(struct platform_device *pdev,
+> +				 struct armada_thermal_priv *priv)
+> +{
+> +	const char *name = dev_name(&pdev->dev);
+> +	char *insane_char;
+> +
+> +	if (strlen(name) > THERMAL_NAME_LENGTH) {
+> +		/*
+> +		 * When inside a system controller, the device name has the
+> +		 * form: f06f8000.system-controller:ap-thermal so stripping
+> +		 * after the ':' should give us a shorter but meaningful name.
+> +		 */
+> +		name = strrchr(name, ':');
+> +		if (!name)
+> +			name = "armada_thermal";
+> +		else
+> +			name++;
+> +	}
+> +
+> +	/* Save the name locally */
+> +	strncpy(priv->zone_name, name, THERMAL_NAME_LENGTH);
+> +
+> +	/* Then check there are no '-' or hwmon core will complain */
+> +	do {
+> +		insane_char = strpbrk(priv->zone_name, "-");
+> +		if (insane_char)
+> +			*insane_char = '_';
+> +	} while (insane_char);
+> +}
+> +
+>  static int armada_thermal_probe(struct platform_device *pdev)
+>  {
+>  	void __iomem *control = NULL;
+> @@ -381,6 +412,9 @@ static int armada_thermal_probe(struct platform_device *pdev)
+>  
+>  	priv->data = (struct armada_thermal_data *)match->data;
+>  
+> +	/* Ensure device name is correct for the thermal core */
+> +	armada_set_sane_name(pdev, priv);
+> +
+>  	/*
+>  	 * Legacy DT bindings only described "control1" register (also referred
+>  	 * as "control MSB" on old documentation). New bindings cover
+> @@ -402,7 +436,7 @@ static int armada_thermal_probe(struct platform_device *pdev)
+>  
+>  	priv->data->init_sensor(pdev, priv);
+>  
+> -	thermal = thermal_zone_device_register(dev_name(&pdev->dev), 0, 0, priv,
+> +	thermal = thermal_zone_device_register(priv->zone_name, 0, 0, priv,
+>  					       &ops, NULL, 0, 0);
+>  	if (IS_ERR(thermal)) {
+>  		dev_err(&pdev->dev,
+> 
+
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180727/970666f8/attachment.sig>
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
