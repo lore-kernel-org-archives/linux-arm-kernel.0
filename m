@@ -1,49 +1,78 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 27 Jul 2018 11:55:35 +0100
-Subject: [PATCH v2 0/7] Stop losing firmware-set DMA masks
-In-Reply-To: <c73bc8d2-b745-ff31-1949-7a59ab04ede6@ti.com>
-References: <cover.1532382222.git.robin.murphy@arm.com>
- <c73bc8d2-b745-ff31-1949-7a59ab04ede6@ti.com>
-Message-ID: <8b8ac841-5c4c-ae27-21d5-d7aaaf4c277c@arm.com>
+From: manu@bidouilliste.com (Emmanuel Vadot)
+Date: Fri, 27 Jul 2018 12:56:54 +0200
+Subject: [PATCH v2 5/5] arm64: dts: allwinner: h5: Add SID for H5
+In-Reply-To: <20180726115409.7hqtvx4rdqcqdjrq@flea>
+References: <20180724101522.68165-1-manu@freebsd.org>
+ <20180724101522.68165-5-manu@freebsd.org>
+ <20180724130004.ynaiabshexrrbvo4@flea>
+ <20180724153432.e398bddfe63e51e8dcebfc46@bidouilliste.com>
+ <20180724144218.jdvgrcqkz2kmohqx@flea>
+ <20180724165501.d8f01bf20c7cc43e7ed7fc62@bidouilliste.com>
+ <20180726115409.7hqtvx4rdqcqdjrq@flea>
+Message-ID: <20180727125654.ec813df71b492201aea2ca5f@bidouilliste.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grygorii,
+On Thu, 26 Jul 2018 13:54:09 +0200
+Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 
-Thanks for the report.
-
-On 27/07/18 00:45, Grygorii Strashko wrote:
-[...]
-> With this series applied I can't boot TI ARM32 am574x-idk any more.
+> On Tue, Jul 24, 2018 at 04:55:01PM +0200, Emmanuel Vadot wrote:
+> > On Tue, 24 Jul 2018 16:42:18 +0200
+> > Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > 
+> > > On Tue, Jul 24, 2018 at 03:34:32PM +0200, Emmanuel Vadot wrote:
+> > > > On Tue, 24 Jul 2018 15:00:04 +0200
+> > > > Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > > > 
+> > > > > On Tue, Jul 24, 2018 at 12:15:22PM +0200, Emmanuel Vadot wrote:
+> > > > > > The SID controller on H5 look the same as the one present in the A64.
+> > > > > > But in case we find some difference one day at a compatible string
+> > > > > > of it's own and a fallback to the A64 one.
+> > > > > > 
+> > > > > > Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
+> > > > > > ---
+> > > > > >  arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 5 +++++
+> > > > > >  1 file changed, 5 insertions(+)
+> > > > > > 
+> > > > > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+> > > > > > index 62d646baac3c..28183bf77164 100644
+> > > > > > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+> > > > > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+> > > > > > @@ -129,3 +129,8 @@
+> > > > > >  		     <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+> > > > > >  	compatible = "allwinner,sun50i-h5-pinctrl";
+> > > > > >  };
+> > > > > > +
+> > > > > > +&sid {
+> > > > > > +	compatible = "allwinner,sun50i-h5-sid",
+> > > > > > +		     "allwinner,sun50i-a64-sid";
+> > > > > > +};
+> > > > > 
+> > > > > This is still a bit pointless, please remove the common node.
+> > > > 
+> > > >  You mean directly declare sid controller in the SoC dtsi and not
+> > > > have a common node in sunxi-h3-h5.dtsi ?
+> > > 
+> > > Yep
+> > 
+> >  The reason I've put it in the common file is because I'll send patches
+> > for the nvmem-cells needed for thermal, and those are common between
+> > the two. Other nvmem-cells are also common (like the chipid and
+> > probably other).
 > 
-> And log output is full of "DMA mask not set" -
+> Then we'll see what we can have in common and what not when we'll have
+> something in common?
 
-That's somewhat expected - as the relevant commit message mentions, 
-there will be bugs flushed out by this change, but the point is to fix 
-them :)
+ Will it make more sense that I just send a new series with nvmem-cells
+now along with thermal bindings ?
 
-> nobody sets dma_mask for platform bus in case of OF boot :(
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Bootlin (formerly Free Electrons)
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
 
-Right, after a brief investigation, that one turns out to be nice and 
-straightforward to explain and fix; I'll write up the patch shortly.
 
-[...]
-> [    3.793493] ti-qspi 4b300000.qspi: dma_alloc_coherent failed, using PIO mode
-> [    3.801088] Unable to handle kernel NULL pointer dereference at virtual address 00000080
-[...]
-> [    4.602777] [<c04d87a4>] (omap_dma_write) from [<c04d8dc0>] (omap_dma_start_desc+0x78/0x150)
-> [    4.611258] [<c04d8d48>] (omap_dma_start_desc) from [<c04d9028>] (omap_dma_issue_pending+0x90/0x98)
-> [    4.620347]  r9:ed002780 r8:00000000 r7:00000010 r6:ee2bdd00 r5:ee2bdd4c r4:ee2bdd00
-> [    4.628130] [<c04d8f98>] (omap_dma_issue_pending) from [<c0608d1c>] (ti_qspi_dma_xfer+0x8c/0x13c)
-> [    4.637039]  r5:00000000 r4:ee7e1b28
-> [    4.640636] [<c0608c90>] (ti_qspi_dma_xfer) from [<c06090b0>] (ti_qspi_exec_mem_op+0x2e4/0x32c)
-
-Hooray, a real bug! Since dma_alloc_coherent() could have failed due to 
-lack of memory or any other reason, that's not even directly related to 
-this change, we've simply helped uncover it. I guess that PIO fallback 
-path hasn't been tested recently, because it clearly doesn't work. It 
-would be good if someone who knows the ti-qspi driver and has the means 
-to test it could figure that one out before also adding the missing 
-dma_set_coherent_mask() call.
-
-Robin.
+-- 
+Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
