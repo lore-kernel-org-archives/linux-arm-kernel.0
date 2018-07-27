@@ -1,123 +1,72 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Fri, 27 Jul 2018 17:44:59 +0200
-Subject: [linux-sunxi] Re: [PATCH v3.1 10/10] arm64: dts: allwinner: a64:
- Enable HDMI output on A64 boards w/ HDMI
-In-Reply-To: <7e1dcd8796e417924072f14b2a50af73@aosc.io>
-References: <20180726171257.6688-1-icenowy@aosc.io>
- <20180727140032.go6f3dwzxrzfstzj@flea>
- <7e1dcd8796e417924072f14b2a50af73@aosc.io>
-Message-ID: <2190272.845Jehz4jH@jernej-laptop>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 27 Jul 2018 17:56:21 +0200
+Subject: [PATCH v3 02/23] thermal: armada: remove useless register accesses
+In-Reply-To: <20180716144206.30985-3-miquel.raynal@bootlin.com>
+References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
+ <20180716144206.30985-3-miquel.raynal@bootlin.com>
+Message-ID: <8b241e12-f7fe-1992-d634-0d38d956014f@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne petek, 27. julij 2018 ob 17:42:08 CEST je Icenowy Zheng napisal(a):
-> ? 2018-07-27 22:00?Maxime Ripard ???
+On 16/07/2018 16:41, Miquel Raynal wrote:
+> Prepare the migration to use regmaps by first simplifying the
+> initialization functions: avoid unnecessary write/read cycles on
+> configuration registers.
 > 
-> > On Fri, Jul 27, 2018 at 09:26:11PM +0800, Icenowy Zheng wrote:
-> >> ? 2018?7?27? GMT+08:00 ??8:56:15, Maxime Ripard
-> >> 
-> >> <maxime.ripard@bootlin.com> ??:
-> >> >On Fri, Jul 27, 2018 at 01:12:57AM +0800, Icenowy Zheng wrote:
-> >> >> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> >> >
-> >> >b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> >> >
-> >> >> index 1b9b92e541d2..1b972bade9f6 100644
-> >> >> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> >> >> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> >> >> @@ -62,6 +62,21 @@
-> >> >> 
-> >> >>  	chosen {
-> >> >>  	
-> >> >>  		stdout-path = "serial0:115200n8";
-> >> >>  	
-> >> >>  	};
-> >> >> 
-> >> >> +
-> >> >> +	connector {
-> >> >> +		compatible = "hdmi-connector";
-> >> >> +		type = "a";
-> >> >> +
-> >> >> +		port {
-> >> >> +			hdmi_con_in: endpoint {
-> >> >> +				remote-endpoint = <&hdmi_out_con>;
-> >> >> +			};
-> >> >> +		};
-> >> >> +	};
-> >> >> +};
-> >> >> +
-> >> >> +&de {
-> >> >> +	status = "okay";
-> >> >> 
-> >> >>  };
-> >> >>  
-> >> >>  &ehci0 {
-> >> >> 
-> >> >> @@ -82,6 +97,17 @@
-> >> >> 
-> >> >>  };
-> >> >> 
-> >> >> +&hdmi {
-> >> >> +	hdmi-supply = <&reg_dldo1>;
-> >> >> +	status = "okay";
-> >> >> +};
-> >> >> +
-> >> >> +&hdmi_out {
-> >> >> +	hdmi_out_con: endpoint {
-> >> >> +		remote-endpoint = <&hdmi_con_in>;
-> >> >> +	};
-> >> >> +};
-> >> >> +
-> >> >> 
-> >> >>  &i2c1 {
-> >> >>  
-> >> >>  	pinctrl-names = "default";
-> >> >>  	pinctrl-0 = <&i2c1_pins>;
-> >> >> 
-> >> >> @@ -99,6 +125,10 @@
-> >> >> 
-> >> >>  	};
-> >> >>  
-> >> >>  };
-> >> >> 
-> >> >> +&mixer1 {
-> >> >> +	status = "okay";
-> >> >> +};
-> >> >> +
-> >> >> 
-> >> >>  &mmc0 {
-> >> >>  
-> >> >>  	pinctrl-names = "default";
-> >> >>  	pinctrl-0 = <&mmc0_pins>;
-> >> >> 
-> >> >> @@ -238,6 +268,10 @@
-> >> >> 
-> >> >>  	status = "disabled";
-> >> >>  
-> >> >>  };
-> >> >> 
-> >> >> +&tcon1 {
-> >> >> +	status = "okay";
-> >> >> +};
-> >> >
-> >> >Is it working or not on the pine64?
-> >> 
-> >> Not tested yet, as my main A64 device is Pine A64-LTS now.
-> > 
-> > It was last reported as broken, so it's better to leave it out of that
-> > patch until someone figures it out.
-> 
-> Sorry, I did find a bug. Although after fixing it HDMI on Pine A64+
-> works fine.
-> 
-> Will fix the bug when sending v3.2 (resending after rc1).
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 
-Why don't you simply send v4, with all patches and changelogs? It would be 
-easier to comprehend.
+Good catch. I'm wondering why it was done this way ...
 
-Best regards,
-Jernej
+Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
+> ---
+>  drivers/thermal/armada_thermal.c | 8 ++------
+>  1 file changed, 2 insertions(+), 6 deletions(-)
 > 
-> > Thanks!
-> > Maxime
+> diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+> index 077e8e562306..6fdb90b3c001 100644
+> --- a/drivers/thermal/armada_thermal.c
+> +++ b/drivers/thermal/armada_thermal.c
+> @@ -103,16 +103,13 @@ static void armadaxp_init_sensor(struct platform_device *pdev,
+>  
+>  	reg = readl_relaxed(priv->control1);
+>  	reg |= PMU_TDC0_OTF_CAL_MASK;
+> -	writel(reg, priv->control1);
+>  
+>  	/* Reference calibration value */
+>  	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
+>  	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
+> -	writel(reg, priv->control1);
+>  
+>  	/* Reset the sensor */
+> -	reg = readl_relaxed(priv->control1);
+> -	writel((reg | PMU_TDC0_SW_RST_MASK), priv->control1);
+> +	reg |= PMU_TDC0_SW_RST_MASK;
+>  
+>  	writel(reg, priv->control1);
+>  
+> @@ -129,14 +126,13 @@ static void armada370_init_sensor(struct platform_device *pdev,
+>  
+>  	reg = readl_relaxed(priv->control1);
+>  	reg |= PMU_TDC0_OTF_CAL_MASK;
+> -	writel(reg, priv->control1);
+>  
+>  	/* Reference calibration value */
+>  	reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
+>  	reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
+> -	writel(reg, priv->control1);
+>  
+>  	reg &= ~PMU_TDC0_START_CAL_MASK;
+> +
+>  	writel(reg, priv->control1);
+>  
+>  	msleep(10);
+> 
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
