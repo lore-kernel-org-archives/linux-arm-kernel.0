@@ -1,83 +1,101 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 27 Jul 2018 17:29:52 +0200
-Subject: [PATCH v3 01/23] thermal: armada: add a function that sanitizes
- the thermal zone name
-In-Reply-To: <20180727135230.3c7102c7@xps13>
-References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
- <20180716144206.30985-2-miquel.raynal@bootlin.com>
- <84f97022-a470-f314-ee75-e5afb733bea5@linaro.org>
- <20180727135230.3c7102c7@xps13>
-Message-ID: <f1d7e8bd-329f-0c9d-c296-0afbe871058f@linaro.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 27 Jul 2018 16:35:59 +0100
+Subject: [PATCH RT v3] arm64: fpsimd: use preemp_disable in addition to
+ local_bh_disable()
+In-Reply-To: <20180726150634.cl3wccqur6qhle6p@linutronix.de>
+References: <20180522132429.6f1dcf92@gandalf.local.home>
+ <20180522173333.aawadhkcekzvrswp@linutronix.de>
+ <20180711092555.268adf7f@gandalf.local.home>
+ <20180711133157.bvrza5vmthu6lwjd@linutronix.de>
+ <20180711093346.782af07a@gandalf.local.home>
+ <20180713174937.5ddaqpylalcmc3jq@linutronix.de>
+ <20180716151737.GO9486@e103592.cambridge.arm.com>
+ <20180718091209.u76gzacanj5avhdl@linutronix.de>
+ <20180724094623.37430032@gandalf.local.home>
+ <20180726150634.cl3wccqur6qhle6p@linutronix.de>
+Message-ID: <20180727153559.GA4240@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/07/2018 13:52, Miquel Raynal wrote:
-> Hi Daniel,
+On Thu, Jul 26, 2018 at 05:06:34PM +0200, Sebastian Andrzej Siewior wrote:
+> In v4.16-RT I noticed a number of warnings from task_fpsimd_load(). The
+> code disables BH and expects that it is not preemptible. On -RT the
+> task remains preemptible but remains the same CPU. This may corrupt the
+> content of the SIMD registers if the task is preempted during
+> saving/restoring those registers.
 > 
-> Daniel Lezcano <daniel.lezcano@linaro.org> wrote on Fri, 27 Jul 2018
-> 13:34:19 +0200:
+> Add preempt_disable()/enable() to enfore the required semantic on -RT.
+
+Does this supersede the local_lock based approach?
+
+That would have been nice to have, but if there are open questions about
+how to do it then I guess something like this patch makes sense as a
+stopgap solution.
+
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> ---
+> This should work. Compiling currently gcc-6 on the box to see what
+> happens. Since the crypto disables preemption "frequently" and I don't
+> expect or see anything to worry about.
 > 
->> On 16/07/2018 16:41, Miquel Raynal wrote:
->>> Thermal zone names must follow certain rules imposed by the framework.
->>> They are limited in length and shall not have any hyphen '-'.
->>>
->>> This is done in a separate function for future use in another location.
->>>
->>> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>  
->>
->> Why do you have to provide a function to test that?
->>
->> Logically, the one who did the change to add a thermal name, should
->> check its code works. Without a proper name that won't work.
+>  arch/arm64/kernel/fpsimd.c |   30 ++++++++++++++++++++++++++++--
+>  1 file changed, 28 insertions(+), 2 deletions(-)
 > 
-> What do you mean "the one who did the change"?
-> I think the thermal core should not care that much to what is given as
-> name and should probably not be so strict.
-> 
-> Also, I don't choose what dev_name() returns, it's in the device tree
-> and the device tree do not care about the implementation, it's just a
-> descriptive file.
-> 
->>
->> So this function is testing something which should be already tested, no?
-> 
-> I don't think it is. Without this function the probe will simply fail.
-> 
-> The explanation of what fails is in the code:
-> 
->>> +		/*
->>> +		 * When inside a system controller, the device name has the
->>> +		 * form: f06f8000.system-controller:ap-thermal so stripping
->>> +		 * after the ':' should give us a shorter but meaningful name.
->>> +		 */
->>> +		name = strrchr(name, ':');
->>> +		if (!name)
->>> +			name = "armada_thermal";
->>> +		else
->>> +			name++;
-> 
-> [...]
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -157,6 +157,15 @@ static void sve_free(struct task_struct
+>  	__sve_free(task);
+>  }
+>  
+> +static void *sve_free_atomic(struct task_struct *task)
+> +{
+> +	void *sve_state = task->thread.sve_state;
+> +
+> +	WARN_ON(test_tsk_thread_flag(task, TIF_SVE));
+> +
+> +	task->thread.sve_state = NULL;
+> +	return sve_state;
+> +}
 
-I'm not in favor of this, potentially it can introduce a break which can
-be exploited later.
+This feels a bit excessive.  Since there's only one call site, I'd
+prefer if the necessary code were simply inlined.  We wouldn't need the
+WARN either in that case, since (IIUC) it's only there to check for
+accidental misuse of this helper.
 
-You are creating the thermal zones manually from the driver but want to
-rely on the temperature controller name to give a name to the thermal zone.
+>  /* Offset of FFR in the SVE register dump */
+>  static size_t sve_ffr_offset(int vl)
+> @@ -594,6 +603,7 @@ int sve_set_vector_length(struct task_st
+>  	 * non-SVE thread.
+>  	 */
+>  	if (task == current) {
+> +		preempt_disable();
+>  		local_bh_disable();
+>  
+>  		task_fpsimd_save();
+> @@ -604,8 +614,10 @@ int sve_set_vector_length(struct task_st
+>  	if (test_and_clear_tsk_thread_flag(task, TIF_SVE))
+>  		sve_to_fpsimd(task);
+>  
+> -	if (task == current)
+> +	if (task == current) {
+>  		local_bh_enable();
+> +		preempt_enable();
+> +	}
+>  
+>  	/*
+>  	 * Force reallocation of task SVE state to the correct size
+> @@ -837,6 +849,7 @@ asmlinkage void do_sve_acc(unsigned int
+>  
+>  	sve_alloc(current);
+>  
+> +	preempt_disable();
+>  	local_bh_disable();
 
-Why not create the thermal zone in the DT with the correct name and use
-devm_thermal_zone_of_sensor_register ?
+I think we should have local helpers for the preempt+local_bh
+maintenance, since they're needed all over the place in this
+file.
 
-Or alternatively hardcode the thermal zone name ?
+[...]
 
-
-
-
-
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Cheers
+---Dave
