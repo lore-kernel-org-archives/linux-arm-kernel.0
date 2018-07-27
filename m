@@ -1,112 +1,117 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 27 Jul 2018 12:34:00 -0500
-Subject: [PATCH v2 7/7] OF: Don't set default coherent DMA mask
-In-Reply-To: <c7a9c7ae-1f4a-af9d-df78-1f48bb5c28a5@arm.com>
-References: <cover.1532382222.git.robin.murphy@arm.com>
- <66c08e4df2032fde82a2f97544f41fd3a2f24a94.1532382222.git.robin.murphy@arm.com>
- <4ed75bc9-1694-2bcb-2ea9-3f2a04f33f54@ti.com>
- <92d6b010-b5c0-fc59-0668-5b455e26c912@ti.com>
- <c7a9c7ae-1f4a-af9d-df78-1f48bb5c28a5@arm.com>
-Message-ID: <108a6254-1257-5daf-deaa-69bc4db2ec77@ti.com>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Fri, 27 Jul 2018 10:36:15 -0700
+Subject: [PATCH v7 08/12] mfd: intel-peci-client: Add PECI client MFD
+ driver
+In-Reply-To: <20180727082611.GE4628@dell>
+References: <20180723214751.1733-1-jae.hyun.yoo@linux.intel.com>
+ <20180723214751.1733-9-jae.hyun.yoo@linux.intel.com>
+ <20180727082611.GE4628@dell>
+Message-ID: <acffdfef-cb20-4208-5297-d94bac5ecb1b@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Lee,
 
-
-On 07/27/2018 06:36 AM, Robin Murphy wrote:
-> On 27/07/18 01:22, Grygorii Strashko wrote:
-> [...]
->>> the result of this change is pretty strange as for me :(
->>> Resulted code:
->>>
->>> ????/*
->>> ???? * If @dev is expected to be DMA-capable then the bus code that 
->>> created
->>> ???? * it should have initialised its dma_mask pointer by this point. 
->>> For
->>> ???? * now, we'll continue the legacy behaviour of coercing it to the
->>> ???? * coherent mask if not, but we'll no longer do so quietly.
->>> ???? */
->>> ????if (!dev->dma_mask) {
->>> ??????? dev_warn(dev, "DMA mask not set\n");
->>> ??????? dev->dma_mask = &dev->coherent_dma_mask;
->>> ^this will always produce warning in case of platform-bus or if there 
->>> are no bus driver.
->>> even if DT contains correct definition of dma-range
->>> ????}
->>>
->>> ????if (!size && dev->coherent_dma_mask)
->>>
->>> ^ coherent_dma_mask is zero, so size will not be calculated
->> pls, ignore this particular comment
->>
->>> ??????? size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
->>> ????else if (!size)
->>> ??????? size = 1ULL << 32;
->>>
->>> ????dev->dma_pfn_offset = offset;
->>>
->>> ????/*
->>> ???? * Limit coherent and dma mask based on size and default mask
->>> ???? * set by the driver.
->>> ???? */
->>> ????mask = DMA_BIT_MASK(ilog2(dma_addr + size - 1) + 1);
->>> ????dev->bus_dma_mask = mask;
->>> ????dev->coherent_dma_mask &= mask;
->>>
->>> ^^ if nobody set coherent_dma_mask before it will stay null forever 
->>> unless drivers
->>> will overwrite it. Again even if DT has correct definition for 
->>> dma-range.
+On 7/27/2018 1:26 AM, Lee Jones wrote:
+> On Mon, 23 Jul 2018, Jae Hyun Yoo wrote:
 > 
-> That is intentional. Consider a 32-bit device on a bus with an upstream 
-> DMA range of 40 bits (which could easily happen with e.g. PCI). If the 
-> firmware code gives that device 40-bit DMA masks and the driver doesn't 
-> change them, then DMA is not going to work correctly. Therefore the 
-> firmware code cannot safely make {coherent_}dma_mask larger than the 
-> default value passed in, and if the default is 0 then that should be 
-> fixed in whatever code created the device, not worked around later.
-
-Could you clarify what do you mean "firmware" here?
-
-On most ARM32 platforms there is only DT + kernel.
-And DT is usually only one source of information about DT configuration.
-Sry, but seems this changes makes impossible using DT for DMA parameters 
-configuration any more.
-
+>> This commit adds PECI client MFD driver.
+>>
+>> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+>> Cc: Lee Jones <lee.jones@linaro.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Andrew Jeffery <andrew@aj.id.au>
+>> Cc: James Feist <james.feist@linux.intel.com>
+>> Cc: Jason M Biils <jason.m.bills@linux.intel.com>
+>> Cc: Joel Stanley <joel@jms.id.au>
+>> Cc: Vernon Mauery <vernon.mauery@linux.intel.com>
+>> ---
+>>   drivers/mfd/Kconfig                   |  14 ++
+>>   drivers/mfd/Makefile                  |   1 +
+>>   drivers/mfd/intel-peci-client.c       | 182 ++++++++++++++++++++++++++
+>>   include/linux/mfd/intel-peci-client.h |  81 ++++++++++++
+>>   4 files changed, 278 insertions(+)
+>>   create mode 100644 drivers/mfd/intel-peci-client.c
+>>   create mode 100644 include/linux/mfd/intel-peci-client.h
+>>
+>> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+>> index f3fa516011ec..e38b591479d4 100644
+>> --- a/drivers/mfd/Kconfig
+>> +++ b/drivers/mfd/Kconfig
+>> @@ -595,6 +595,20 @@ config MFD_INTEL_MSIC
+>>   	  Passage) chip. This chip embeds audio, battery, GPIO, etc.
+>>   	  devices used in Intel Medfield platforms.
+>>   
+>> +config MFD_INTEL_PECI_CLIENT
+>> +	bool "Intel PECI client"
+>> +	depends on (PECI || COMPILE_TEST)
+>> +	select MFD_CORE
+>> +	help
+>> +	  If you say yes to this option, support will be included for the
+>> +	  multi-funtional Intel PECI (Platform Environment Control Interface)
+>> +	  client. PECI is a one-wire bus interface that provides a communication
+>> +	  channel from PECI clients in Intel processors and chipset components
+>> +	  to external monitoring or control devices.
+>> +
+>> +	  Additional drivers must be enabled in order to use the functionality
+>> +	  of the device.
+>> +
+>>   config MFD_IPAQ_MICRO
+>>   	bool "Atmel Micro ASIC (iPAQ h3100/h3600/h3700) Support"
+>>   	depends on SA1100_H3100 || SA1100_H3600
+>> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+>> index 2852a6042ecf..29e2cacc58bd 100644
+>> --- a/drivers/mfd/Makefile
+>> +++ b/drivers/mfd/Makefile
+>> @@ -203,6 +203,7 @@ obj-$(CONFIG_MFD_INTEL_LPSS)	+= intel-lpss.o
+>>   obj-$(CONFIG_MFD_INTEL_LPSS_PCI)	+= intel-lpss-pci.o
+>>   obj-$(CONFIG_MFD_INTEL_LPSS_ACPI)	+= intel-lpss-acpi.o
+>>   obj-$(CONFIG_MFD_INTEL_MSIC)	+= intel_msic.o
+>> +obj-$(CONFIG_MFD_INTEL_PECI_CLIENT)	+= intel-peci-client.o
+>>   obj-$(CONFIG_MFD_PALMAS)	+= palmas.o
+>>   obj-$(CONFIG_MFD_VIPERBOARD)    += viperboard.o
+>>   obj-$(CONFIG_MFD_RC5T583)	+= rc5t583.o rc5t583-irq.o
+>> diff --git a/drivers/mfd/intel-peci-client.c b/drivers/mfd/intel-peci-client.c
+>> new file mode 100644
+>> index 000000000000..d7702cf1ea50
+>> --- /dev/null
+>> +++ b/drivers/mfd/intel-peci-client.c
+>> @@ -0,0 +1,182 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +// Copyright (c) 2018 Intel Corporation
+>> +
+>> +#include <linux/bitfield.h>
+>> +#include <linux/mfd/core.h>
+>> +#include <linux/mfd/intel-peci-client.h>
+>> +#include <linux/module.h>
+>> +#include <linux/peci.h>
+>> +#include <linux/of_device.h>
+>> +
+>> +enum cpu_gens {
+>> +	CPU_GEN_HSX = 0, /* Haswell Xeon */
+>> +	CPU_GEN_BRX,     /* Broadwell Xeon */
+>> +	CPU_GEN_SKX,     /* Skylake Xeon */
+>> +};
+>> +
+>> +static struct mfd_cell peci_functions[] = {
+>> +	{
+>> +		.name = "peci-cputemp",
+>> +		.of_compatible = "intel,peci-cputemp",
+>> +	},
+>> +	{
+>> +		.name = "peci-dimmtemp",
+>> +		.of_compatible = "intel,peci-dimmtemp",
+>> +	},
+>> +};
 > 
-> Robin.
+> The more I look at this driver, the less I think it fits into MFD.
 > 
->>>
->>> ????*dev->dma_mask &= mask;
->>>
->>> ????coherent = of_dma_is_coherent(np);
->>> ????dev_dbg(dev, "device is%sdma coherent\n",
->>> ??????? coherent ? " " : " not ");
->>>
->>>
->>
->> FYI, with below diff i can boot at least:
->>
->> diff --git a/drivers/of/device.c b/drivers/of/device.c
->> index 5957cd4..f7dc121 100644
->> --- a/drivers/of/device.c
->> +++ b/drivers/of/device.c
->> @@ -150,8 +150,8 @@ int of_dma_configure(struct device *dev, struct 
->> device_node *np, bool force_dma)
->> ????????? */
->> ???????? mask = DMA_BIT_MASK(ilog2(dma_addr + size - 1) + 1);
->> ???????? dev->bus_dma_mask = mask;
->> -?????? dev->coherent_dma_mask &= mask;
->> -?????? *dev->dma_mask &= mask;
->> +?????? dev->coherent_dma_mask = mask;
->> +?????? *dev->dma_mask = mask;
->> ???????? coherent = of_dma_is_coherent(np);
->> ???????? dev_dbg(dev, "device is%sdma coherent\n",
->>
->>
->>
+> What's stopping you from registering these devices directly from DT?
+> 
 
--- 
-regards,
--grygorii
+Because DT doesn't allow 2 nodes at the same address so Rob suggested
+MFD for this case.
+
+Thanks,
+
+Jae
