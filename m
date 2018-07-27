@@ -1,33 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Jul 2018 13:02:44 +0100
-Subject: [PATCH v5 2/3] arm64: KVM: Enable Common Not Private translations
-In-Reply-To: <20180727114142.2llrh6gcotlvs6lk@armageddon.cambridge.arm.com>
-References: <1529403502-2843-1-git-send-email-vladimir.murzin@arm.com>
- <1529403502-2843-3-git-send-email-vladimir.murzin@arm.com>
- <20180727114142.2llrh6gcotlvs6lk@armageddon.cambridge.arm.com>
-Message-ID: <72c743b4-cdc1-6645-22ca-0efcb1ca420a@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 Jul 2018 13:06:33 +0100
+Subject: [RFC PATCH] arm64: mm: Export __sync_icache_dcache() for
+ xen-privcmd
+In-Reply-To: <20180711231822.GG14131@decadent.org.uk>
+References: <20180711231822.GG14131@decadent.org.uk>
+Message-ID: <20180727120633.bjpfqswuxcy2ibqu@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/07/18 12:41, Catalin Marinas wrote:
-> On Tue, Jun 19, 2018 at 11:18:21AM +0100, Vladimir Murzin wrote:
->> We rely on cpufeature framework to detect and enable CNP so for KVM we
->> need to patch hyp to set CNP bit just before TTBR0_EL2 gets written.
->>
->> For the guest we encode CNP bit while building vttbr, so we don't need
->> to bother with that in a world switch.
->>
->> Reviewed-by: James Morse <james.morse@arm.com>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+On Thu, Jul 12, 2018 at 12:18:22AM +0100, Ben Hutchings wrote:
+> The xen-privcmd driver, which can be modular, calls set_pte_at()
+> which in turn may call __sync_icache_dcache().
 > 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> The call to __sync_icache_dcache() may be optimised out because it is
+> conditional on !pte_special(), and xen-privcmd calls pte_mkspecial().
+> But it seems unwise to rely on this optimisation.
 > 
-> (but you should get an ack from the kvm maintainers)
+> Fixes: 3ad0876554ca ("xen/privcmd: add IOCTL_PRIVCMD_MMAP_RESOURCE")
+> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+> ---
+> This is an RFC since I haven't found an actual build failure.  Using
+> Debian's gcc 7.3 with either CC_OPTIMIZE_FOR_PERFORMANCE or
+> CC_OPTIMIZE_FOR_SIZE, the call *is* optimised away.
 
-This is absolutely fine by me:
+Since apply_to_page_range() is EXPORT_SYMBOL_GPL() and a
+pte_fn_t function would likely use set_pte_at(), I'm fine with this
+patch for consistency.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
