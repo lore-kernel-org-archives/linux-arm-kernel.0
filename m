@@ -1,33 +1,74 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 27 Jul 2018 10:03:22 -0700
-Subject: [PATCH 00/16] clk: at91: Rework DT bindings
-In-Reply-To: <20180717222757.10253-1-alexandre.belloni@bootlin.com>
-References: <20180717222757.10253-1-alexandre.belloni@bootlin.com>
-Message-ID: <153271100280.48062.2538655794734424353@swboyd.mtv.corp.google.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 27 Jul 2018 12:22:11 -0500
+Subject: [PATCH v2 0/7] Stop losing firmware-set DMA masks
+In-Reply-To: <8b8ac841-5c4c-ae27-21d5-d7aaaf4c277c@arm.com>
+References: <cover.1532382222.git.robin.murphy@arm.com>
+ <c73bc8d2-b745-ff31-1949-7a59ab04ede6@ti.com>
+ <8b8ac841-5c4c-ae27-21d5-d7aaaf4c277c@arm.com>
+Message-ID: <a8e85416-9a58-703a-26fa-f130befadf0d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alexandre Belloni (2018-07-17 15:27:41)
-> This is the promised rework of the at91 PMC clocks driver. It is mainly
-> necessary to remove the DTC warnings but it also complies with the CCF
-> rule that there should be one node per controller instead of one node
-> per clock.
-> 
-> This only handles the PMC, I'm planning to also rework the SCKC bindings
-> later (without breaking the DT ABI).
-> 
-> The series is based on top of clk-next plus at91-dt so I don't think it
-> is convenient to have it this cycle. However, I would really like to
-> ensure we agree on the new bindings this cycle before converting all the
-> other platforms as this is a bit tedious.
-> 
-> The first two patches are actually fixes and may be considered for this
-> cycle.
-> 
-> One nice note:
-> at91-sama5d2_xplained.dtb goes from 29351 bytes to 22082 bytes
 
-Patches look mostly good. Rob is happy with the bindings and so am I.
 
-One general question is why the drivers can't be moved to real platform
-drivers instead of using OF_CLK_DECLARE?
+On 07/27/2018 05:55 AM, Robin Murphy wrote:
+> Hi Grygorii,
+> 
+> Thanks for the report.
+> 
+> On 27/07/18 00:45, Grygorii Strashko wrote:
+> [...]
+>> With this series applied I can't boot TI ARM32 am574x-idk any more.
+>>
+>> And log output is full of "DMA mask not set" -
+> 
+> That's somewhat expected - as the relevant commit message mentions, 
+> there will be bugs flushed out by this change, but the point is to fix 
+> them :)
+> 
+>> nobody sets dma_mask for platform bus in case of OF boot :(
+> 
+> Right, after a brief investigation, that one turns out to be nice and 
+> straightforward to explain and fix; I'll write up the patch shortly.
+> 
+> [...]
+>> [??? 3.793493] ti-qspi 4b300000.qspi: dma_alloc_coherent failed, using 
+>> PIO mode
+>> [??? 3.801088] Unable to handle kernel NULL pointer dereference at 
+>> virtual address 00000080
+> [...]
+>> [??? 4.602777] [<c04d87a4>] (omap_dma_write) from [<c04d8dc0>] 
+>> (omap_dma_start_desc+0x78/0x150)
+>> [??? 4.611258] [<c04d8d48>] (omap_dma_start_desc) from [<c04d9028>] 
+>> (omap_dma_issue_pending+0x90/0x98)
+>> [??? 4.620347]? r9:ed002780 r8:00000000 r7:00000010 r6:ee2bdd00 
+>> r5:ee2bdd4c r4:ee2bdd00
+>> [??? 4.628130] [<c04d8f98>] (omap_dma_issue_pending) from [<c0608d1c>] 
+>> (ti_qspi_dma_xfer+0x8c/0x13c)
+>> [??? 4.637039]? r5:00000000 r4:ee7e1b28
+>> [??? 4.640636] [<c0608c90>] (ti_qspi_dma_xfer) from [<c06090b0>] 
+>> (ti_qspi_exec_mem_op+0x2e4/0x32c)
+> 
+> Hooray, a real bug! Since dma_alloc_coherent() could have failed due to 
+> lack of memory or any other reason, that's not even directly related to 
+> this change, we've simply helped uncover it. I guess that PIO fallback 
+> path hasn't been tested recently, because it clearly doesn't work. It 
+> would be good if someone who knows the ti-qspi driver and has the means 
+> to test it could figure that one out before also adding the missing 
+> dma_set_coherent_mask() call.
+
+yes. ti-qspi has an issues with PIO mode. 
+
+But, reason of failure is this warning:
+
+[    3.482502] WARNING: CPU: 0 PID: 1 at ./include/linux/dma-mapping.h:516 ti_qspi_probe+0x4a4/0x50c
+
+which is caused by this series - which makes coherent_dma_mask constantly 0 by default,
+so dma_alloc_coherent() - fails.
+
+
+> Robin.
+
+-- 
+regards,
+-grygorii
