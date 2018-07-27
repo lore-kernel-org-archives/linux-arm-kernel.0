@@ -1,139 +1,209 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 27 Jul 2018 11:28:41 +0200
-Subject: [PATCH v12 16/16] arm64: kexec_file: add kaslr support
-In-Reply-To: <405b6708-4518-d81e-3938-39032c2b487e@arm.com>
-References: <20180724065759.19186-1-takahiro.akashi@linaro.org>
- <20180724065759.19186-17-takahiro.akashi@linaro.org>
- <50b31f17-fc85-aa72-06f5-d3b62060a91f@arm.com>
- <20180727083104.GI11258@linaro.org>
- <405b6708-4518-d81e-3938-39032c2b487e@arm.com>
-Message-ID: <CAKv+Gu9jw9rFx5P3vO8Frq5=LCWugScRiNHfb2ceHkgtS9opLA@mail.gmail.com>
+From: yibin.gong@nxp.com (Robin Gong)
+Date: Fri, 27 Jul 2018 09:32:02 +0000
+Subject: [PATCH v8 5/6] regulator: pfuze100-regulator: provide
+ pm_power_off_prepare handler
+In-Reply-To: <20180726092220.17250-6-o.rempel@pengutronix.de>
+References: <20180726092220.17250-1-o.rempel@pengutronix.de>
+ <20180726092220.17250-6-o.rempel@pengutronix.de>
+Message-ID: <DB6PR04MB32233832762D02F1023861A1892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 July 2018 at 11:22, James Morse <james.morse@arm.com> wrote:
-> Hi Akashi,
->
->
-> On 07/27/2018 09:31 AM, AKASHI Takahiro wrote:
->
-> On Thu, Jul 26, 2018 at 02:40:49PM +0100, James Morse wrote:
->
-> On 24/07/18 07:57, AKASHI Takahiro wrote:
->
-> Adding "kaslr-seed" to dtb enables triggering kaslr, or kernel virtual
-> address randomization, at secondary kernel boot.
->
-> Hmm, there are three things that get moved by CONFIG_RANDOMIZE_BASE. The
-> kernel
-> physical placement when booted via the EFIstub, the kernel-text VAs and the
-> location of memory in the linear-map region. Adding the kaslr-seed only does
-> the
-> last two.
->
-> Yes, but I think that I and Mark has agreed that "kaslr" meant
-> "virtual" randomisation, not including "physical" randomisation.
->
-> Okay, I'll update my terminology!
->
->
-> This means the physical placement of the new kernel is predictable from
-> /proc/iomem ... but this also tells you the physical placement of the
-> current
-> kernel, so I don't think this is a problem.
->
->
-> We always do this as it will have no harm on kaslr-incapable kernel.
->
-> We don't have any "switch" to turn off this feature directly, but still
-> can suppress it by passing "nokaslr" as a kernel boot argument.
->
-> diff --git a/arch/arm64/kernel/machine_kexec_file.c
-> b/arch/arm64/kernel/machine_kexec_file.c
-> index 7356da5a53d5..47a4fbd0dc34 100644
-> --- a/arch/arm64/kernel/machine_kexec_file.c
-> +++ b/arch/arm64/kernel/machine_kexec_file.c
-> @@ -158,6 +160,12 @@ static int setup_dtb(struct kimage *image,
->
-> Don't you need to reserve some space in the area you vmalloc()d for the DT?
->
-> No, I don't think so.
-> All the data to be loaded are temporarily saved in kexec buffers,
-> which will eventually be copied to target locations in machine_kexec
-> (arm64_relocate_new_kernel, which, unlike its name, will handle
-> not only kernel but also other data as well).
->
->
-> I think we're speaking at cross purposes. Don't you need:
->
-> | buf_size += fdt_prop_len("kaslr?seed", sizeof(u64));
->
->
-> You can't assume the existing DTB had a kaslr-seed property, and the
-> difference may take us over a PAGE_SIZE boundary.
->
->
->
->
-> + /* add kaslr-seed */
-> + get_random_bytes(&value, sizeof(value));
->
-> What happens if the crng isn't ready?
->
-> It looks like this will print a warning that these random-bytes aren't
-> really up
-> to standard, but the new kernel doesn't know this happened.
->
-> crng_ready() isn't exposed, all we could do now is
-> wait_for_random_bytes(), but that may wait forever because we do this
-> unconditionally.
->
-> I'd prefer to leave this feature until we can check crng_ready(), and skip
-> adding a dodgy-seed if its not-ready. This avoids polluting the
-> next-kernel's
-> entropy pool.
->
-> OK. I would try to follow the same way as Bhupesh's userspace patch
-> does for kaslr-seed:
-> http://lists.infradead.org/pipermail/kexec/2018-April/020564.html
->
->
-> (I really don't understand this 'copying code from user-space' that happens
-> with kexec_file_load)
->
->
->   if (not found kaslr-seed in 1st kernel's dtb)
->      don't care; go ahead
->
->
-> Don' t bother. As you say in the commit-message its harmless if the new
-> kernel doesn't support it.
-> Always having this would let you use kexec_file_load as a bootloader that
-> can get the crng to
-> provide decent entropy even if the platform bootloader can't.
->
->
->   else
->      if (current kaslr-seed != 0)
->         error
->
->
-> Don't bother. If this happens its a bug in another part of the kernel that
-> doesn't affect this one. We aren't second-guessing the file-system when we
-> read the kernel-fd, lets keep this simple.
->
->      if (crng_ready()) ; FIXME, it's a local macro
->         get_random_bytes(non-blocking)
->         set new kaslr-seed
->      else
->         error
->
-> error? Something like pr_warn_once().
->
-> I thought the kaslr-seed was added to the entropy pool, but now I look again
-> I see its a separate EFI table. So the new kernel will add the same entropy
-> ... that doesn't sound clever. (I can't see where its zero'd or
-> re-initialised)
->
 
-We do have a hook for that: grep for update_efi_random_seed()
+
+> -----Original Message-----
+> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
+> Sent: 2018?7?26? 17:22
+> To: Shawn Guo <shawnguo@kernel.org>; Mark Brown <broonie@kernel.org>;
+> Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> Cc: Oleksij Rempel <o.rempel@pengutronix.de>; kernel at pengutronix.de;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org; Andrew Morton
+> <akpm@linux-foundation.org>; Liam Girdwood <lgirdwood@gmail.com>;
+> Leonard Crestez <leonard.crestez@nxp.com>; Rob Herring
+> <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Michael
+> Turquette <mturquette@baylibre.com>; Stephen Boyd
+> <sboyd@codeaurora.org>; Fabio Estevam <fabio.estevam@nxp.com>; Russell
+> King <linux@armlinux.org.uk>; dl-linux-imx <linux-imx@nxp.com>; Robin Gong
+> <yibin.gong@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
+> Subject: [PATCH v8 5/6] regulator: pfuze100-regulator: provide
+> pm_power_off_prepare handler
+> 
+> On some boards the SoC can use one pin "PMIC_STBY_REQ" to notify th PMIC
+> about state changes. In this case internal state of PMIC must be preconfigured
+> for upcomming state change.
+> It works fine with the current regulator framework, except with the power-off
+> case.
+> 
+> This patch is providing an optional pm_power_off_prepare handler which will
+> configure standby state of the PMIC to disable all power lines.
+> 
+> In my power consumption test on RIoTBoard, I got the following results:
+> power off without this patch:	320 mA
+> power off with this patch:	2   mA
+> suspend to ram:			40  mA
+> 
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> ---
+>  drivers/regulator/pfuze100-regulator.c | 92 ++++++++++++++++++++++++++
+>  1 file changed, 92 insertions(+)
+> 
+> diff --git a/drivers/regulator/pfuze100-regulator.c
+> b/drivers/regulator/pfuze100-regulator.c
+> index 8d9dbcc775ea..e386e9acb3f7 100644
+> --- a/drivers/regulator/pfuze100-regulator.c
+> +++ b/drivers/regulator/pfuze100-regulator.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/regulator/pfuze100.h>
+>  #include <linux/i2c.h>
+>  #include <linux/slab.h>
+> +#include <linux/kallsyms.h>
+Is it necessary?
+>  #include <linux/regmap.h>
+> 
+>  #define PFUZE_NUMREGS		128
+> @@ -29,11 +30,17 @@
+> 
+>  #define PFUZE100_COINVOL	0x1a
+>  #define PFUZE100_SW1ABVOL	0x20
+> +#define PFUZE100_SW1ABMODE	0x23
+>  #define PFUZE100_SW1CVOL	0x2e
+> +#define PFUZE100_SW1CMODE	0x31
+>  #define PFUZE100_SW2VOL		0x35
+> +#define PFUZE100_SW2MODE	0x38
+>  #define PFUZE100_SW3AVOL	0x3c
+> +#define PFUZE100_SW3AMODE	0x3f
+>  #define PFUZE100_SW3BVOL	0x43
+> +#define PFUZE100_SW3BMODE	0x46
+>  #define PFUZE100_SW4VOL		0x4a
+> +#define PFUZE100_SW4MODE	0x4d
+>  #define PFUZE100_SWBSTCON1	0x66
+>  #define PFUZE100_VREFDDRCON	0x6a
+>  #define PFUZE100_VSNVSVOL	0x6b
+> @@ -44,6 +51,13 @@
+>  #define PFUZE100_VGEN5VOL	0x70
+>  #define PFUZE100_VGEN6VOL	0x71
+> 
+> +#define PFUZE100_SWxMODE_MASK	0xf
+> +#define PFUZE100_SWxMODE_APS_APS	0x8
+> +#define PFUZE100_SWxMODE_APS_OFF	0x4
+> +
+> +#define PFUZE100_VGENxLPWR	BIT(6)
+> +#define PFUZE100_VGENxSTBY	BIT(5)
+> +
+>  enum chips { PFUZE100, PFUZE200, PFUZE3000 = 3 };
+> 
+>  struct pfuze_regulator {
+> @@ -492,6 +506,69 @@ static inline struct device_node *match_of_node(int
+> index)  }  #endif
+> 
+> +static struct pfuze_chip *syspm_pfuze_chip;
+> +
+> +static void pfuze_power_off_prepare(void) 
+> +	dev_info(syspm_pfuze_chip->dev, "Configure standy mode for power
+> +off");
+Add 'if (syspm_pfuze_chip ->chip_id == PFUZE100))' here is easy for extend 
+Support on pfuze200/3000.. in the feature.
+> +
+> +	/* Switch from default mode: APS/APS to APS/Off */
+> +	regmap_update_bits(syspm_pfuze_chip->regmap,
+> PFUZE100_SW1ABMODE,
+> +			   PFUZE100_SWxMODE_MASK,
+> PFUZE100_SWxMODE_APS_OFF);
+> +	regmap_update_bits(syspm_pfuze_chip->regmap,
+> PFUZE100_SW1CMODE,
+> +			   PFUZE100_SWxMODE_MASK,
+> PFUZE100_SWxMODE_APS_OFF);
+> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW2MODE,
+> +			   PFUZE100_SWxMODE_MASK,
+> PFUZE100_SWxMODE_APS_OFF);
+> +	regmap_update_bits(syspm_pfuze_chip->regmap,
+> PFUZE100_SW3AMODE,
+> +			   PFUZE100_SWxMODE_MASK,
+> PFUZE100_SWxMODE_APS_OFF);
+> +	regmap_update_bits(syspm_pfuze_chip->regmap,
+> PFUZE100_SW3BMODE,
+> +			   PFUZE100_SWxMODE_MASK,
+> PFUZE100_SWxMODE_APS_OFF);
+> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW4MODE,
+> +			   PFUZE100_SWxMODE_MASK,
+> PFUZE100_SWxMODE_APS_OFF);
+> +
+> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN1VOL,
+> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
+> +			   PFUZE100_VGENxSTBY);
+> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN2VOL,
+> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
+> +			   PFUZE100_VGENxSTBY);
+> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN3VOL,
+> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
+> +			   PFUZE100_VGENxSTBY);
+> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN4VOL,
+> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
+> +			   PFUZE100_VGENxSTBY);
+> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN5VOL,
+> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
+> +			   PFUZE100_VGENxSTBY);
+> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN6VOL,
+> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
+> +			   PFUZE100_VGENxSTBY);
+> +}
+> +
+> +static int pfuze_power_off_prepare_init(struct pfuze_chip *pfuze_chip)
+> +{
+> +	if (pfuze_chip->chip_id != PFUZE100) {
+> +		dev_warn(pfuze_chip->dev, "Requested pm_power_off_prepare
+> handler for not supported chip\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	if (pm_power_off_prepare) {
+> +		dev_warn(pfuze_chip->dev, "pm_power_off_prepare is already
+> registered.\n");
+> +		return -EBUSY;
+> +	}
+> +
+> +	if (syspm_pfuze_chip) {
+> +		dev_warn(pfuze_chip->dev, "syspm_pfuze_chip is already set.\n");
+> +		return -EBUSY;
+> +	}
+> +
+> +	syspm_pfuze_chip = pfuze_chip;
+> +	pm_power_off_prepare = pfuze_power_off_prepare;
+> +
+> +	return 0;
+> +}
+> +
+>  static int pfuze_identify(struct pfuze_chip *pfuze_chip)  {
+>  	unsigned int value;
+> @@ -661,6 +738,20 @@ static int pfuze100_regulator_probe(struct i2c_client
+> *client,
+>  		}
+>  	}
+> 
+> +	if (of_property_read_bool(client->dev.of_node,
+> +				  "fsl,pmic-stby-poweroff"))
+> +		return pfuze_power_off_prepare_init(pfuze_chip);
+> +
+> +	return 0;
+> +}
+> +
+> +static int pfuze100_regulator_remove(struct i2c_client *client) {
+> +	if (syspm_pfuze_chip) {
+> +		syspm_pfuze_chip = NULL;
+> +		pm_power_off_prepare = NULL;
+> +	}
+> +
+>  	return 0;
+>  }
+> 
+> @@ -671,6 +762,7 @@ static struct i2c_driver pfuze_driver = {
+>  		.of_match_table = pfuze_dt_ids,
+>  	},
+>  	.probe = pfuze100_regulator_probe,
+> +	.remove = pfuze100_regulator_remove,
+>  };
+>  module_i2c_driver(pfuze_driver);
+> 
+> --
+> 2.18.0
