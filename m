@@ -1,178 +1,45 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sat, 28 Jul 2018 00:15:25 +0530
-Subject: [PATCH 7/9] clk: actions: Add Actions Semi Owl SoCs Reset Management
- Unit support
-In-Reply-To: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
-References: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180727184527.13287-8-manivannan.sadhasivam@linaro.org>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Fri, 27 Jul 2018 22:02:17 +0200
+Subject: [PATCH 00/16] clk: at91: Rework DT bindings
+In-Reply-To: <153271100280.48062.2538655794734424353@swboyd.mtv.corp.google.com>
+References: <20180717222757.10253-1-alexandre.belloni@bootlin.com>
+ <153271100280.48062.2538655794734424353@swboyd.mtv.corp.google.com>
+Message-ID: <20180727200217.GF7701@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Reset Management Unit (RMU) support for Actions Semi Owl SoCs.
+On 27/07/2018 10:03:22-0700, Stephen Boyd wrote:
+> Quoting Alexandre Belloni (2018-07-17 15:27:41)
+> > This is the promised rework of the at91 PMC clocks driver. It is mainly
+> > necessary to remove the DTC warnings but it also complies with the CCF
+> > rule that there should be one node per controller instead of one node
+> > per clock.
+> > 
+> > This only handles the PMC, I'm planning to also rework the SCKC bindings
+> > later (without breaking the DT ABI).
+> > 
+> > The series is based on top of clk-next plus at91-dt so I don't think it
+> > is convenient to have it this cycle. However, I would really like to
+> > ensure we agree on the new bindings this cycle before converting all the
+> > other platforms as this is a bit tedious.
+> > 
+> > The first two patches are actually fixes and may be considered for this
+> > cycle.
+> > 
+> > One nice note:
+> > at91-sama5d2_xplained.dtb goes from 29351 bytes to 22082 bytes
+> 
+> Patches look mostly good. Rob is happy with the bindings and so am I.
+> 
+> One general question is why the drivers can't be moved to real platform
+> drivers instead of using OF_CLK_DECLARE?
+> 
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- drivers/clk/actions/Kconfig      |  1 +
- drivers/clk/actions/Makefile     |  1 +
- drivers/clk/actions/owl-common.h |  2 +
- drivers/clk/actions/owl-reset.c  | 72 ++++++++++++++++++++++++++++++++
- drivers/clk/actions/owl-reset.h  | 32 ++++++++++++++
- 5 files changed, 108 insertions(+)
- create mode 100644 drivers/clk/actions/owl-reset.c
- create mode 100644 drivers/clk/actions/owl-reset.h
+I actually didn't try. I'll do it early next week. I'm not sure how this
+will work with the PM handling on sama5d2 but I'll probably figure
+something out.
 
-diff --git a/drivers/clk/actions/Kconfig b/drivers/clk/actions/Kconfig
-index dc38c85a4833..04f0a6355726 100644
---- a/drivers/clk/actions/Kconfig
-+++ b/drivers/clk/actions/Kconfig
-@@ -2,6 +2,7 @@ config CLK_ACTIONS
- 	bool "Clock driver for Actions Semi SoCs"
- 	depends on ARCH_ACTIONS || COMPILE_TEST
- 	select REGMAP_MMIO
-+	select RESET_CONTROLLER
- 	default ARCH_ACTIONS
- 
- if CLK_ACTIONS
-diff --git a/drivers/clk/actions/Makefile b/drivers/clk/actions/Makefile
-index 78c17d56f991..ccfdf9781cef 100644
---- a/drivers/clk/actions/Makefile
-+++ b/drivers/clk/actions/Makefile
-@@ -7,6 +7,7 @@ clk-owl-y			+= owl-divider.o
- clk-owl-y			+= owl-factor.o
- clk-owl-y			+= owl-composite.o
- clk-owl-y			+= owl-pll.o
-+clk-owl-y			+= owl-reset.o
- 
- # SoC support
- obj-$(CONFIG_CLK_OWL_S700)	+= owl-s700.o
-diff --git a/drivers/clk/actions/owl-common.h b/drivers/clk/actions/owl-common.h
-index 56f01f7774aa..4dc7f286831f 100644
---- a/drivers/clk/actions/owl-common.h
-+++ b/drivers/clk/actions/owl-common.h
-@@ -26,6 +26,8 @@ struct owl_clk_desc {
- 	struct owl_clk_common		**clks;
- 	unsigned long			num_clks;
- 	struct clk_hw_onecell_data	*hw_clks;
-+	struct owl_reset_map		*resets;
-+	unsigned long			num_resets;
- 	struct regmap			*regmap;
- };
- 
-diff --git a/drivers/clk/actions/owl-reset.c b/drivers/clk/actions/owl-reset.c
-new file mode 100644
-index 000000000000..91b161cc68de
---- /dev/null
-+++ b/drivers/clk/actions/owl-reset.c
-@@ -0,0 +1,72 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later
-+//
-+// Actions Semi Owl SoCs Reset Management Unit driver
-+//
-+// Copyright (c) 2018 Linaro Ltd.
-+// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-+
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/regmap.h>
-+#include <linux/reset-controller.h>
-+
-+#include "owl-reset.h"
-+
-+static int owl_reset_assert(struct reset_controller_dev *rcdev,
-+			    unsigned long id)
-+{
-+	struct owl_reset *reset = to_owl_reset(rcdev);
-+	const struct owl_reset_map *map = &reset->reset_map[id];
-+	u32 reg;
-+
-+	regmap_read(reset->regmap, map->reg, &reg);
-+	regmap_write(reset->regmap, map->reg, reg & ~map->bit);
-+
-+	return 0;
-+}
-+
-+static int owl_reset_deassert(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct owl_reset *reset = to_owl_reset(rcdev);
-+	const struct owl_reset_map *map = &reset->reset_map[id];
-+	u32 reg;
-+
-+	regmap_read(reset->regmap, map->reg, &reg);
-+	regmap_write(reset->regmap, map->reg, reg | map->bit);
-+
-+	return 0;
-+}
-+
-+static int owl_reset_reset(struct reset_controller_dev *rcdev,
-+			   unsigned long id)
-+{
-+	owl_reset_assert(rcdev, id);
-+	udelay(1);
-+	owl_reset_deassert(rcdev, id);
-+
-+	return 0;
-+}
-+
-+static int owl_reset_status(struct reset_controller_dev *rcdev,
-+			    unsigned long id)
-+{
-+	struct owl_reset *reset = to_owl_reset(rcdev);
-+	const struct owl_reset_map *map = &reset->reset_map[id];
-+	u32 reg;
-+
-+	regmap_read(reset->regmap, map->reg, &reg);
-+
-+	/*
-+	 * The reset control API expects 0 if reset is not asserted,
-+	 * which is the opposite of what our hardware uses.
-+	 */
-+	return !(map->bit & reg);
-+}
-+
-+const struct reset_control_ops owl_reset_ops = {
-+	.assert		= owl_reset_assert,
-+	.deassert	= owl_reset_deassert,
-+	.reset		= owl_reset_reset,
-+	.status		= owl_reset_status,
-+};
-diff --git a/drivers/clk/actions/owl-reset.h b/drivers/clk/actions/owl-reset.h
-new file mode 100644
-index 000000000000..1a5e987ba99b
---- /dev/null
-+++ b/drivers/clk/actions/owl-reset.h
-@@ -0,0 +1,32 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later
-+//
-+// Actions Semi Owl SoCs Reset Management Unit driver
-+//
-+// Copyright (c) 2018 Linaro Ltd.
-+// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-+
-+#ifndef _OWL_RESET_H_
-+#define _OWL_RESET_H_
-+
-+#include <linux/reset-controller.h>
-+#include <linux/spinlock.h>
-+
-+struct owl_reset_map {
-+	u16	reg;
-+	u32	bit;
-+};
-+
-+struct owl_reset {
-+	struct reset_controller_dev	rcdev;
-+	struct owl_reset_map		*reset_map;
-+	struct regmap			*regmap;
-+};
-+
-+static inline struct owl_reset *to_owl_reset(struct reset_controller_dev *rcdev)
-+{
-+	return container_of(rcdev, struct owl_reset, rcdev);
-+}
-+
-+extern const struct reset_control_ops owl_reset_ops;
-+
-+#endif /* _OWL_RESET_H_ */
 -- 
-2.17.1
+Alexandre Belloni, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
