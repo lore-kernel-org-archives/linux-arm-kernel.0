@@ -1,63 +1,33 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 27 Jul 2018 13:52:30 +0200
-Subject: [PATCH v3 01/23] thermal: armada: add a function that sanitizes
- the thermal zone name
-In-Reply-To: <84f97022-a470-f314-ee75-e5afb733bea5@linaro.org>
-References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
- <20180716144206.30985-2-miquel.raynal@bootlin.com>
- <84f97022-a470-f314-ee75-e5afb733bea5@linaro.org>
-Message-ID: <20180727135230.3c7102c7@xps13>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Jul 2018 13:02:44 +0100
+Subject: [PATCH v5 2/3] arm64: KVM: Enable Common Not Private translations
+In-Reply-To: <20180727114142.2llrh6gcotlvs6lk@armageddon.cambridge.arm.com>
+References: <1529403502-2843-1-git-send-email-vladimir.murzin@arm.com>
+ <1529403502-2843-3-git-send-email-vladimir.murzin@arm.com>
+ <20180727114142.2llrh6gcotlvs6lk@armageddon.cambridge.arm.com>
+Message-ID: <72c743b4-cdc1-6645-22ca-0efcb1ca420a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-Daniel Lezcano <daniel.lezcano@linaro.org> wrote on Fri, 27 Jul 2018
-13:34:19 +0200:
-
-> On 16/07/2018 16:41, Miquel Raynal wrote:
-> > Thermal zone names must follow certain rules imposed by the framework.
-> > They are limited in length and shall not have any hyphen '-'.
-> > 
-> > This is done in a separate function for future use in another location.
-> > 
-> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>  
+On 27/07/18 12:41, Catalin Marinas wrote:
+> On Tue, Jun 19, 2018 at 11:18:21AM +0100, Vladimir Murzin wrote:
+>> We rely on cpufeature framework to detect and enable CNP so for KVM we
+>> need to patch hyp to set CNP bit just before TTBR0_EL2 gets written.
+>>
+>> For the guest we encode CNP bit while building vttbr, so we don't need
+>> to bother with that in a world switch.
+>>
+>> Reviewed-by: James Morse <james.morse@arm.com>
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 > 
-> Why do you have to provide a function to test that?
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 > 
-> Logically, the one who did the change to add a thermal name, should
-> check its code works. Without a proper name that won't work.
+> (but you should get an ack from the kvm maintainers)
 
-What do you mean "the one who did the change"?
-I think the thermal core should not care that much to what is given as
-name and should probably not be so strict.
+This is absolutely fine by me:
 
-Also, I don't choose what dev_name() returns, it's in the device tree
-and the device tree do not care about the implementation, it's just a
-descriptive file.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> 
-> So this function is testing something which should be already tested, no?
-
-I don't think it is. Without this function the probe will simply fail.
-
-The explanation of what fails is in the code:
-
-> > +		/*
-> > +		 * When inside a system controller, the device name has the
-> > +		 * form: f06f8000.system-controller:ap-thermal so stripping
-> > +		 * after the ':' should give us a shorter but meaningful name.
-> > +		 */
-> > +		name = strrchr(name, ':');
-> > +		if (!name)
-> > +			name = "armada_thermal";
-> > +		else
-> > +			name++;
-
-[...]
-
-> > +
-> > +	/* Then check there are no '-' or hwmon core will complain */
-
-Thanks,
-Miqu?l
+	M.
+-- 
+Jazz is not dead. It just smells funny...
