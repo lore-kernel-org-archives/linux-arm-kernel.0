@@ -1,26 +1,103 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Fri, 27 Jul 2018 15:59:30 +0200
-Subject: [PATCH v6 3/6] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <e722ee62-eaba-3abd-7f34-bf38ba3d4f95@linux.ibm.com>
-References: <20180716084706.28244-1-ravi.bangoria@linux.ibm.com>
- <20180716084706.28244-4-ravi.bangoria@linux.ibm.com>
- <20180723162629.GA8584@redhat.com>
- <e722ee62-eaba-3abd-7f34-bf38ba3d4f95@linux.ibm.com>
-Message-ID: <20180727135929.GB3618@redhat.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 27 Jul 2018 16:00:32 +0200
+Subject: [PATCH v3.1 10/10] arm64: dts: allwinner: a64: Enable HDMI
+ output on A64 boards w/ HDMI
+In-Reply-To: <8DF4600E-DFE4-47CD-B541-FFDD903A65FB@aosc.io>
+References: <20180726171257.6688-1-icenowy@aosc.io>
+ <20180726171257.6688-11-icenowy@aosc.io>
+ <20180727125615.ju23ecgm6y4rz7p5@flea>
+ <8DF4600E-DFE4-47CD-B541-FFDD903A65FB@aosc.io>
+Message-ID: <20180727140032.go6f3dwzxrzfstzj@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24, Ravi Bangoria wrote:
->
-> > Perhaps we can even add another flag later, MMF_HAS_DELAYED_UPROBES set by
-> > delayed_uprobe_add().
->
-> Yes, good idea.
+On Fri, Jul 27, 2018 at 09:26:11PM +0800, Icenowy Zheng wrote:
+> 
+> 
+> ? 2018?7?27? GMT+08:00 ??8:56:15, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+> >On Fri, Jul 27, 2018 at 01:12:57AM +0800, Icenowy Zheng wrote:
+> >> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> >b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> >> index 1b9b92e541d2..1b972bade9f6 100644
+> >> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> >> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> >> @@ -62,6 +62,21 @@
+> >>  	chosen {
+> >>  		stdout-path = "serial0:115200n8";
+> >>  	};
+> >> +
+> >> +	connector {
+> >> +		compatible = "hdmi-connector";
+> >> +		type = "a";
+> >> +
+> >> +		port {
+> >> +			hdmi_con_in: endpoint {
+> >> +				remote-endpoint = <&hdmi_out_con>;
+> >> +			};
+> >> +		};
+> >> +	};
+> >> +};
+> >> +
+> >> +&de {
+> >> +	status = "okay";
+> >>  };
+> >>  
+> >>  &ehci0 {
+> >> @@ -82,6 +97,17 @@
+> >>  
+> >>  };
+> >>  
+> >> +&hdmi {
+> >> +	hdmi-supply = <&reg_dldo1>;
+> >> +	status = "okay";
+> >> +};
+> >> +
+> >> +&hdmi_out {
+> >> +	hdmi_out_con: endpoint {
+> >> +		remote-endpoint = <&hdmi_con_in>;
+> >> +	};
+> >> +};
+> >> +
+> >>  &i2c1 {
+> >>  	pinctrl-names = "default";
+> >>  	pinctrl-0 = <&i2c1_pins>;
+> >> @@ -99,6 +125,10 @@
+> >>  	};
+> >>  };
+> >>  
+> >> +&mixer1 {
+> >> +	status = "okay";
+> >> +};
+> >> +
+> >>  &mmc0 {
+> >>  	pinctrl-names = "default";
+> >>  	pinctrl-0 = <&mmc0_pins>;
+> >> @@ -238,6 +268,10 @@
+> >>  	status = "disabled";
+> >>  };
+> >>  
+> >> +&tcon1 {
+> >> +	status = "okay";
+> >> +};
+> >
+> >Is it working or not on the pine64?
+> 
+> Not tested yet, as my main A64 device is Pine A64-LTS now.
 
-But let me repeat, lets do this later. We can do even better I think, say,
-move this delaed-list into uprobes_state. But imo the 1st version can just
-check MMF_HAS_UPROBES because this is simple, obviously correct, and can
-actually help.
+It was last reported as broken, so it's better to leave it out of that
+patch until someone figures it out.
 
-Oleg.
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180727/63d4de8a/attachment.sig>
