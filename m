@@ -1,56 +1,79 @@
 From: arun.parameswaran@broadcom.com (Arun Parameswaran)
-Date: Fri, 27 Jul 2018 14:23:26 -0700
-Subject: [PATCH v2 0/7] Add clock config and pm support to bcm iProc mdio mux
-Message-ID: <1532726613-6483-1-git-send-email-arun.parameswaran@broadcom.com>
+Date: Fri, 27 Jul 2018 14:23:28 -0700
+Subject: [PATCH v2 2/7] net: phy: Fix the register offsets in Broadcom iProc
+ mdio mux driver
+In-Reply-To: <1532726613-6483-1-git-send-email-arun.parameswaran@broadcom.com>
+References: <1532726613-6483-1-git-send-email-arun.parameswaran@broadcom.com>
+Message-ID: <1532726613-6483-3-git-send-email-arun.parameswaran@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-The patchset is based on David Miller's "net-next" repo.
+Modify the register offsets in the Broadcom iProc mdio mux to start
+from the top of the register address space.
 
-The patchset extends the Broadcom iProc mdio mux to add support for
-suspend/resume and the ability to configure the internal clock
-divider. The patchset also sets the scan control register to
-disable external master access.
+Earlier, the base address pointed to the end of the block's register
+space. The base address will now point to the start of the mdio's
+address space. The offsets have been fixed to match this.
 
-The base address of the mdio-mux-bcm-iproc is modified to point to the
-start of the mdio block's address space, to be able to access all the
-mdio's registers. The missing registers are required to configure the
-internal clock divider registers in some of the Broadcom SoC's.
+Signed-off-by: Arun Parameswaran <arun.parameswaran@broadcom.com>
+---
+ drivers/net/phy/mdio-mux-bcm-iproc.c | 20 +++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
 
-Changes from v1:
- - Addressed Andrew's comments.
-   - Reworked the patches to be based on 'net-next'
-   - Removed 'fixes' from the commit messages, the changes are related
-     to the new features being added.
-   - Maintained backward compatibility to older dt-blob's specifying
-     base addresse with an offset. The correction is applied in the
-     driver and a message is printed to update the dt-blob.
-   - Re-worked and re-ordered the last four patches (4-7).
-     - Added setting of the scan control register as a new patch
-     - Added a call to 'clk_prepare_enable()' in the patch that adds
-       the clock config support, removed the debug message when clock
-       is not passed.
-     - Simplified the pm support patch (removed the array used for the
-       save/restore logic).
-
-Thanks
-Arun
-
-Arun Parameswaran (7):
-  dt-bindings: net: Fix Broadcom iProc mdio mux driver base address
-  net: phy: Fix the register offsets in Broadcom iProc mdio mux driver
-  arm64: dts: Fix the base address of the Broadcom iProc mdio mux
-  net: phy: Disable external master access in bcm mdio mux driver
-  dt-bindings: net: Add clock handle to Broadcom iProc mdio mux
-  net: phy: Add support to configure clock in Broadcom iProc mdio mux
-  net: phy: Add pm support to Broadcom iProc mdio mux driver
-
- .../bindings/net/brcm,mdio-mux-iproc.txt           |   7 +-
- arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi   |   4 +-
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi |   4 +-
- drivers/net/phy/mdio-mux-bcm-iproc.c               | 109 +++++++++++++++++++--
- 4 files changed, 109 insertions(+), 15 deletions(-)
-
+diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
+index 0831b71..48bb74a 100644
+--- a/drivers/net/phy/mdio-mux-bcm-iproc.c
++++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
+@@ -22,7 +22,7 @@
+ #include <linux/mdio-mux.h>
+ #include <linux/delay.h>
+ 
+-#define MDIO_PARAM_OFFSET		0x00
++#define MDIO_PARAM_OFFSET		0x23c
+ #define MDIO_PARAM_MIIM_CYCLE		29
+ #define MDIO_PARAM_INTERNAL_SEL		25
+ #define MDIO_PARAM_BUS_ID		22
+@@ -30,20 +30,22 @@
+ #define MDIO_PARAM_PHY_ID		16
+ #define MDIO_PARAM_PHY_DATA		0
+ 
+-#define MDIO_READ_OFFSET		0x04
++#define MDIO_READ_OFFSET		0x240
+ #define MDIO_READ_DATA_MASK		0xffff
+-#define MDIO_ADDR_OFFSET		0x08
++#define MDIO_ADDR_OFFSET		0x244
+ 
+-#define MDIO_CTRL_OFFSET		0x0C
++#define MDIO_CTRL_OFFSET		0x248
+ #define MDIO_CTRL_WRITE_OP		0x1
+ #define MDIO_CTRL_READ_OP		0x2
+ 
+-#define MDIO_STAT_OFFSET		0x10
++#define MDIO_STAT_OFFSET		0x24c
+ #define MDIO_STAT_DONE			1
+ 
+ #define BUS_MAX_ADDR			32
+ #define EXT_BUS_START_ADDR		16
+ 
++#define MDIO_REG_ADDR_SPACE_SIZE	0x250
++
+ struct iproc_mdiomux_desc {
+ 	void *mux_handle;
+ 	void __iomem *base;
+@@ -169,6 +171,14 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
+ 	md->dev = &pdev->dev;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (res->start & 0xfff) {
++		/* For backward compatibility in case the
++		 * base address is specified with an offset.
++		 */
++		dev_info(&pdev->dev, "fix base address in dt-blob\n");
++		res->start &= ~0xfff;
++		res->end = res->start + MDIO_REG_ADDR_SPACE_SIZE - 1;
++	}
+ 	md->base = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(md->base)) {
+ 		dev_err(&pdev->dev, "failed to ioremap register\n");
 -- 
 1.9.1
