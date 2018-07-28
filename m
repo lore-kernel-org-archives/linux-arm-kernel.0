@@ -1,193 +1,34 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Sat, 28 Jul 2018 23:56:15 +0530
-Subject: [PATCH] arm64: allwinner: h6: Add OrangePi One Plus initial support
-Message-ID: <20180728182615.20845-1-jagan@amarulasolutions.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 28 Jul 2018 20:53:58 +0200
+Subject: [PATCH 0/2] crypto/arm64: aes-ce-gcm - switch to 2-way aggregation
+Message-ID: <20180728185400.8237-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OrangePi One Plus is Allwinner H6 based open-source SBC,
-which support:
-- Allwinner H6 Quad-core 64-bit ARM Cortex-A53
-- GPU Mali-T720
-- 1GB LPDDR3 RAM
-- AXP805 PMIC
-- 1Gbps GMAC via RTL8211
-- USB 2.0 Host, OTG
-- HDMI port
-- 5V/2A DC power supply
+Update the combined AES-GCM AEAD implementation to process two blocks
+at a time, allowing us to switch to a faster version of the GHASH
+implementation.
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
- arch/arm64/boot/dts/allwinner/Makefile        |   1 +
- .../allwinner/sun50i-h6-orangepi-one-plus.dts | 150 ++++++++++++++++++
- 2 files changed, 151 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi-one-plus.dts
+Note that this does not update the core GHASH transform, only the
+combined AES-GCM AEAD mode. GHASH is mostly used with AES anyway, and
+the ARMv8 architecture mandates support for AES instructions if
+64-bit polynomial multiplication instructions are implemented. This
+means that mosts users of the pmull.p64 based GHASH routines are better
+off using the combined AES-GCM code anyway. Users of the pmull.p8 based
+GHASH implementation are unlikely to benefit substantially from aggregation,
+given that the multiplication phase is much more dominant in this case
+(and it is only the reduction phase that is amortized over multiple
+blocks)
 
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 9ffa7a038791..c38f326e7fec 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -15,4 +15,5 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h6-orangepi-one-plus.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h6-pine-h64.dtb
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi-one-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi-one-plus.dts
-new file mode 100644
-index 000000000000..0612c19cd994
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi-one-plus.dts
-@@ -0,0 +1,150 @@
-+// SPDX-License-Identifier: (GPL-2.0+ or MIT)
-+/*
-+ * Copyright (C) 2018 Amarula Solutions
-+ * Author: Jagan Teki <jagan@amarulasolutions.com>
-+ */
-+
-+/dts-v1/;
-+
-+#include "sun50i-h6.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "OrangePi One Plus";
-+	compatible = "xunlong,orangepi-one-plus", "allwinner,sun50i-h6";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins>;
-+	vmmc-supply = <&reg_cldo1>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
-+&r_i2c {
-+	status = "okay";
-+
-+	axp805: pmic at 36 {
-+		compatible = "x-powers,axp805", "x-powers,axp806";
-+		reg = <0x36>;
-+		interrupt-parent = <&r_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+		x-powers,self-working-mode;
-+
-+		regulators {
-+			reg_aldo1: aldo1 {
-+				regulator-always-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc-pl";
-+			};
-+
-+			reg_aldo2: aldo2 {
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc-ac200";
-+			};
-+
-+			reg_aldo3: aldo3 {
-+				regulator-always-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc25-dram";
-+			};
-+
-+			reg_bldo1: bldo1 {
-+				regulator-always-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc-bias-pll";
-+			};
-+
-+			reg_bldo2: bldo2 {
-+				regulator-always-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc-efuse-pcie-hdmi-io";
-+			};
-+
-+			reg_bldo3: bldo3 {
-+				regulator-always-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc-dcxoio";
-+			};
-+
-+			bldo4 {
-+				/* unused */
-+			};
-+
-+			reg_cldo1: cldo1 {
-+				regulator-always-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc-3v3";
-+			};
-+
-+			reg_cldo2: cldo2 {
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc-wifi-1";
-+			};
-+
-+			reg_cldo3: cldo3 {
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc-wifi-2";
-+			};
-+
-+			reg_dcdca: dcdca {
-+				regulator-always-on;
-+				regulator-min-microvolt = <810000>;
-+				regulator-max-microvolt = <1080000>;
-+				regulator-name = "vdd-cpu";
-+			};
-+
-+			reg_dcdcc: dcdcc {
-+				regulator-min-microvolt = <810000>;
-+				regulator-max-microvolt = <1080000>;
-+				regulator-name = "vdd-gpu";
-+			};
-+
-+			reg_dcdcd: dcdcd {
-+				regulator-always-on;
-+				regulator-min-microvolt = <960000>;
-+				regulator-max-microvolt = <960000>;
-+				regulator-name = "vdd-sys";
-+			};
-+
-+			reg_dcdce: dcdce {
-+				regulator-always-on;
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-name = "vcc-dram";
-+			};
-+
-+			sw {
-+				/* unused */
-+			};
-+		};
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_ph_pins>;
-+	status = "okay";
-+};
+Performance numbers for Cortex-A53 can be found after patch #2.
+
+Ard Biesheuvel (2):
+  crypto/arm64: aes-ce-gcm - operate on two input blocks at a time
+  crypto/arm64: aes-ce-gcm - implement 2-way aggregation
+
+ arch/arm64/crypto/ghash-ce-core.S | 128 +++++++++++++-------
+ arch/arm64/crypto/ghash-ce-glue.c | 117 ++++++++++++------
+ 2 files changed, 165 insertions(+), 80 deletions(-)
+
 -- 
-2.17.1
+2.18.0
