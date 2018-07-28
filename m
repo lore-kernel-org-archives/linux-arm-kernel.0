@@ -1,80 +1,63 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 29 Jul 2018 03:27:45 +0800
-Subject: [PATCH mmc-next v2 3/3] mmc: sdhci-of-dwcmshc: solve 128MB DMA
- boundary limitation
-In-Reply-To: <20180726151424.4bcecf41@xhacker.debian>
-References: <20180726151424.4bcecf41@xhacker.debian>
-Message-ID: <201807290313.14xizaiA%fengguang.wu@intel.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 28 Jul 2018 21:36:32 +0200
+Subject: [PATCH, libv4l]: Make libv4l2 usable on devices with complex
+ pipeline
+In-Reply-To: <20180723153649.73337c0f@coco.lan>
+References: <20180708213258.GA18217@amd> <20180719205344.GA12098@amd>
+ <20180723153649.73337c0f@coco.lan>
+Message-ID: <20180728193632.GB29593@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
+Hi!
 
-I love your patch! Yet something to improve:
+> > > Add support for opening multiple devices in v4l2_open(), and for
+> > > mapping controls between devices.
+> > > 
+> > > This is necessary for complex devices, such as Nokia N900.
+> > > 
+> > > Signed-off-by: Pavel Machek <pavel@ucw.cz>  
+> > 
+> > Ping?
+> > 
+> > There's a lot of work to do on libv4l2... timely patch handling would
+> > be nice.
+> 
+> As we're be start working at the new library in order to support
+> complex cameras, and I don't want to prevent you keeping doing your
+> work, IMHO the best way to keep doing it would be to create two
+> libv4l2 forks:
+> 
+> 	- one to be used by you - meant to support N900 camera;
+> 	- another one to be used by Google/Intel people that will
+> 	  be working at the Complex camera.
 
-[auto build test ERROR on ulf.hansson-mmc/next]
-[also build test ERROR on next-20180727]
-[cannot apply to v4.18-rc6]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Actually, I guess it would be better to share branches. N900 really
+has Complex camera :-). Yes, there are some details that are different
+(IPU3 will need to pass data between sensor and processing pipeline),
+but it
 
-url:    https://github.com/0day-ci/linux/commits/Jisheng-Zhang/solve-SDHCI-DWC-MSHC-128MB-DMA-boundary-limitation/20180728-234650
-base:   git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc.git next
-config: mips-allmodconfig (attached as .config)
-compiler: mips-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=mips 
+1) will probably need to "propagate controls"
+2) will need autofocus
+3) would benefit from same autogain improvements
+4) [probably most difficult] figure out how to support more than
+8-bits depth.
 
-All errors (new ones prefixed by >>):
+> So, please send me, in priv, a .ssh key for me to add you an
+> account at linuxtv.org. I'll send you instructions about how to
+> use the new account.
 
-   drivers/mmc/host/sdhci-of-dwcmshc.c: In function 'dwcmshc_adma_write_desc':
->> drivers/mmc/host/sdhci-of-dwcmshc.c:18:12: error: 'SZ_128M' undeclared (first use in this function); did you mean 'PM_128K'?
-     ((addr | (SZ_128M - 1)) == ((addr + len - 1) | (SZ_128M - 1)))
-               ^
-   drivers/mmc/host/sdhci-of-dwcmshc.c:34:6: note: in expansion of macro 'BOUNDARY_OK'
-     if (BOUNDARY_OK(addr, len) || !len)
-         ^~~~~~~~~~~
-   drivers/mmc/host/sdhci-of-dwcmshc.c:18:12: note: each undeclared identifier is reported only once for each function it appears in
-     ((addr | (SZ_128M - 1)) == ((addr + len - 1) | (SZ_128M - 1)))
-               ^
-   drivers/mmc/host/sdhci-of-dwcmshc.c:34:6: note: in expansion of macro 'BOUNDARY_OK'
-     if (BOUNDARY_OK(addr, len) || !len)
-         ^~~~~~~~~~~
-   In file included from include/linux/cache.h:5:0,
-                    from arch/mips/include/asm/cpu-info.h:15,
-                    from arch/mips/include/asm/cpu-features.h:13,
-                    from arch/mips/include/asm/bitops.h:21,
-                    from include/linux/bitops.h:38,
-                    from include/linux/kernel.h:11,
-                    from include/linux/clk.h:16,
-                    from drivers/mmc/host/sdhci-of-dwcmshc.c:10:
-   drivers/mmc/host/sdhci-of-dwcmshc.c: In function 'dwcmshc_probe':
-   drivers/mmc/host/sdhci-of-dwcmshc.c:82:39: error: 'SZ_128M' undeclared (first use in this function); did you mean 'PM_128K'?
-     extra = DIV_ROUND_UP(totalram_pages, SZ_128M / PAGE_SIZE);
-                                          ^
-   include/uapi/linux/kernel.h:13:46: note: in definition of macro '__KERNEL_DIV_ROUND_UP'
-    #define __KERNEL_DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
-                                                 ^
-   drivers/mmc/host/sdhci-of-dwcmshc.c:82:10: note: in expansion of macro 'DIV_ROUND_UP'
-     extra = DIV_ROUND_UP(totalram_pages, SZ_128M / PAGE_SIZE);
-             ^~~~~~~~~~~~
+Done, you should have key in your inbox.
 
-vim +18 drivers/mmc/host/sdhci-of-dwcmshc.c
-
-    16	
-    17	#define BOUNDARY_OK(addr, len) \
-  > 18		((addr | (SZ_128M - 1)) == ((addr + len - 1) | (SZ_128M - 1)))
-    19	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Best regards,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 56337 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180729/cb0f27e0/attachment-0001.gz>
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180728/d2bbd727/attachment.sig>
