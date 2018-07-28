@@ -1,28 +1,20 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 28 Jul 2018 23:02:41 +0200
-Subject: [PATCH, libv4l]: Make libv4l2 usable on devices with complex
- pipeline
-In-Reply-To: <20180727094708.18ef4e4e@coco.lan>
-References: <20180708213258.GA18217@amd>
- <20180727094708.18ef4e4e@coco.lan>
-Message-ID: <20180728210241.GA1152@amd>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 28 Jul 2018 23:09:22 +0200
+Subject: [PATCH v2 1/7] dt-bindings: net: Fix Broadcom iProc mdio mux
+ driver base address
+In-Reply-To: <1532726613-6483-2-git-send-email-arun.parameswaran@broadcom.com>
+References: <1532726613-6483-1-git-send-email-arun.parameswaran@broadcom.com>
+ <1532726613-6483-2-git-send-email-arun.parameswaran@broadcom.com>
+Message-ID: <20180728210922.GA4792@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Fri, Jul 27, 2018 at 02:23:27PM -0700, Arun Parameswaran wrote:
+> Modify the base address of the Broadcom iProc MDIO mux driver to
+> point to the start of the block's register address space.
+> 
+> Signed-off-by: Arun Parameswaran <arun.parameswaran@broadcom.com>
 
-> Alternatively, please send me a ssh public key in private, and I'll
-> give you access to the repository where you can store those patches.
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-Lets do it that way. Sorry for the confusion.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180728/195afb7f/attachment.sig>
+    Andrew
