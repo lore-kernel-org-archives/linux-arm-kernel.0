@@ -1,74 +1,179 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Sat, 28 Jul 2018 12:08:18 +0200
-Subject: Patch "EDAC,
- altera: Fix ARM64 build warning" has been added to the 4.9-stable tree
-Message-ID: <153277249814156@kroah.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Sat, 28 Jul 2018 14:13:57 +0200
+Subject: [PATCH] ARM: dts: BCM5301X: Specify flash partitions
+Message-ID: <20180728121357.13172-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-This is a note to let you know that I've just added the patch titled
+Most devices use Broadcom standard partitions which allows them to be
+described with the "brcm,bcm947xx-cfe-partitions". Exceptions are:
+1) TP-LINK devices which use "os-image" partition with TRX containing
+   kernel only + separated rootfs partition.
+2) Asus RT-AC87U with custom "asus" partition.
 
-    EDAC, altera: Fix ARM64 build warning
+This commit also removes undocumented and unsupported linux,part-probe
+binding which got accidentally upstreamed while describing SPI
+controller.
 
-to the 4.9-stable tree which can be found at:
-    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
-
-The filename of the patch is:
-     edac-altera-fix-arm64-build-warning.patch
-and it can be found in the queue-4.9 subdirectory.
-
-If you, or anyone else, feels it should not be added to the stable tree,
-please let <stable@vger.kernel.org> know about it.
-
-
->From foo at baz Sat Jul 28 10:48:22 CEST 2018
-From: Thor Thayer <thor.thayer@linux.intel.com>
-Date: Mon, 14 May 2018 12:04:01 -0500
-Subject: EDAC, altera: Fix ARM64 build warning
-
-From: Thor Thayer <thor.thayer@linux.intel.com>
-
-[ Upstream commit 9ef20753e044f7468c4113e5aecd785419b0b3cc ]
-
-The kbuild test robot reported the following warning:
-
-  drivers/edac/altera_edac.c: In function 'ocram_free_mem':
-  drivers/edac/altera_edac.c:1410:42: warning: cast from pointer to integer
-	of different size [-Wpointer-to-int-cast]
-    gen_pool_free((struct gen_pool *)other, (u32)p, size);
-                                             ^
-
-After adding support for ARM64 architectures, the unsigned long
-parameter is 64 bits and causes a build warning on 64-bit configs. Fix
-by casting to the correct size (unsigned long) instead of u32.
-
-Reported-by: kbuild test robot <lkp@intel.com>
-Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-edac <linux-edac@vger.kernel.org>
-Fixes: c3eea1942a16 ("EDAC, altera: Add Altera L2 cache and OCRAM support")
-Link: http://lkml.kernel.org/r/1526317441-4996-1-git-send-email-thor.thayer at linux.intel.com
-Signed-off-by: Borislav Petkov <bp@suse.de>
-Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 ---
- drivers/edac/altera_edac.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts | 28 +++++++++++++++++++
+ arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts        | 31 ++++++++++++++++++++++
+ arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts  | 28 +++++++++++++++++++
+ arch/arm/boot/dts/bcm5301x-nand-cs0.dtsi           |  4 +++
+ arch/arm/boot/dts/bcm5301x.dtsi                    |  5 +++-
+ 5 files changed, 95 insertions(+), 1 deletion(-)
 
---- a/drivers/edac/altera_edac.c
-+++ b/drivers/edac/altera_edac.c
-@@ -1111,7 +1111,7 @@ static void *ocram_alloc_mem(size_t size
+diff --git a/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts b/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
+index 5f663f848db1..189cc3dcd6ef 100644
+--- a/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
++++ b/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
+@@ -94,6 +94,34 @@
  
- static void ocram_free_mem(void *p, size_t size, void *other)
- {
--	gen_pool_free((struct gen_pool *)other, (u32)p, size);
-+	gen_pool_free((struct gen_pool *)other, (unsigned long)p, size);
- }
+ &spi_nor {
+ 	status = "okay";
++
++	partitions {
++		compatible = "fixed-partitions";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		boot at 0 {
++			label = "boot";
++			reg = <0x000000 0x040000>;
++			read-only;
++		};
++
++		os-image at 100000 {
++			label = "os-image";
++			reg = <0x040000 0x200000>;
++			compatible = "brcm,trx";
++		};
++
++		rootfs at 240000 {
++			label = "rootfs";
++			reg = <0x240000 0xc00000>;
++		};
++
++		nvram at ff0000 {
++			label = "nvram";
++			reg = <0xff0000 0x010000>;
++		};
++	};
+ };
  
- static const struct edac_device_prv_data ocramecc_data = {
-
-
-Patches currently in stable-queue which might be from thor.thayer at linux.intel.com are
-
-queue-4.9/edac-altera-fix-arm64-build-warning.patch
+ &usb2 {
+diff --git a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
+index 2033411240c7..4cb10f88a95e 100644
+--- a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
++++ b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
+@@ -66,3 +66,34 @@
+ &usb3_phy {
+ 	status = "okay";
+ };
++
++&nandcs {
++	partitions {
++		compatible = "fixed-partitions";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		boot at 0 {
++			label = "boot";
++			reg = <0x00000000 0x00080000>;
++			read-only;
++		};
++
++		nvram at 80000 {
++			label = "nvram";
++			reg = <0x00080000 0x00180000>;
++		};
++
++		firmware at 200000 {
++			label = "firmware";
++			reg = <0x00200000 0x07cc0000>;
++			compatible = "brcm,trx";
++		};
++
++		asus at 7ec0000 {
++			label = "asus";
++			reg = <0x07ec0000 0x00140000>;
++			read-only;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+index c7143a9daa1a..b527d2ff987e 100644
+--- a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
++++ b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
+@@ -103,6 +103,34 @@
+ 
+ &spi_nor {
+ 	status = "okay";
++
++	partitions {
++		compatible = "fixed-partitions";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		boot at 0 {
++			label = "boot";
++			reg = <0x000000 0x040000>;
++			read-only;
++		};
++
++		os-image at 100000 {
++			label = "os-image";
++			reg = <0x040000 0x200000>;
++			compatible = "brcm,trx";
++		};
++
++		rootfs at 240000 {
++			label = "rootfs";
++			reg = <0x240000 0xc00000>;
++		};
++
++		nvram at ff0000 {
++			label = "nvram";
++			reg = <0xff0000 0x010000>;
++		};
++	};
+ };
+ 
+ &usb3_phy {
+diff --git a/arch/arm/boot/dts/bcm5301x-nand-cs0.dtsi b/arch/arm/boot/dts/bcm5301x-nand-cs0.dtsi
+index e5a2d62daf92..925a7c9ce5b7 100644
+--- a/arch/arm/boot/dts/bcm5301x-nand-cs0.dtsi
++++ b/arch/arm/boot/dts/bcm5301x-nand-cs0.dtsi
+@@ -12,6 +12,10 @@
+ 			reg = <0>;
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
++
++			partitions {
++				compatible = "brcm,bcm947xx-cfe-partitions";
++			};
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+index 096fb7681fa2..c6f3ef5e523b 100644
+--- a/arch/arm/boot/dts/bcm5301x.dtsi
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -475,8 +475,11 @@
+ 			compatible = "jedec,spi-nor";
+ 			reg = <0>;
+ 			spi-max-frequency = <20000000>;
+-			linux,part-probe = "ofpart", "bcm47xxpart";
+ 			status = "disabled";
++
++			partitions {
++				compatible = "brcm,bcm947xx-cfe-partitions";
++			};
+ 		};
+ 	};
+ 
+-- 
+2.13.7
