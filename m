@@ -1,47 +1,107 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 28 Jul 2018 18:32:47 +0800
-Subject: [GIT PULL 6/6] i.MX defconfig updates for 4.19
-In-Reply-To: <20180721215743.gvdyejag6fere6lp@localhost>
-References: <1532140344-2771-1-git-send-email-shawnguo@kernel.org>
- <1532140671-2869-1-git-send-email-shawnguo@kernel.org>
- <1532140671-2869-3-git-send-email-shawnguo@kernel.org>
- <20180721215743.gvdyejag6fere6lp@localhost>
-Message-ID: <20180728103245.GA3481@dragon>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Sat, 28 Jul 2018 12:08:09 +0200
+Subject: Patch "soc: imx: gpcv2: Do not pass static memory as platform data"
+ has been added to the 4.17-stable tree
+Message-ID: <153277248922674@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 21, 2018 at 02:57:43PM -0700, Olof Johansson wrote:
-> On Sat, Jul 21, 2018 at 10:37:51AM +0800, Shawn Guo wrote:
-> > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
-> > 
-> >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.19
-> > 
-> > for you to fetch changes up to eaed0291c62f7b513ad9483b02efdccd4ae4e9fc:
-> > 
-> >   ARM: imx_v6_v7_defconfig: add DMATEST support (2018-07-21 09:58:21 +0800)
-> > 
-> > ----------------------------------------------------------------
-> > i.MX defconfig update for 4.19:
-> >  - Enable ISL29018 sensor and MMA8452 accelerometer driver support for
-> >    imx6qdl-sabreauto board.
-> >  - Enable DMATEST support which is useful for DMA driver development
-> >    testing.
-> >  - Use the DRM driver for MXSFB LCD controller found on i.MX23, i.MX28,
-> >    i.MX6SX and i.MX7 SoCs.
-> 
-> Should some of these be added in multi_v7 defconfig too?
 
->From what I have seen, multi_v7_defconfig is usually used for booting
-test on i.MX platforms, and for full feature build imx_v6_v7_defconfig
-is used more often.  But we are happy to add things into
-multi_v7_defconfig when we see need from people.
+This is a note to let you know that I've just added the patch titled
 
-> Merged.
+    soc: imx: gpcv2: Do not pass static memory as platform data
 
-Thanks.
+to the 4.17-stable tree which can be found at:
+    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
-Shawn
+The filename of the patch is:
+     soc-imx-gpcv2-do-not-pass-static-memory-as-platform-data.patch
+and it can be found in the queue-4.17 subdirectory.
+
+If you, or anyone else, feels it should not be added to the stable tree,
+please let <stable@vger.kernel.org> know about it.
+
+
+>From foo at baz Sat Jul 28 10:14:31 CEST 2018
+From: Andrey Smirnov <andrew.smirnov@gmail.com>
+Date: Tue, 10 Apr 2018 11:32:09 -0700
+Subject: soc: imx: gpcv2: Do not pass static memory as platform data
+
+From: Andrey Smirnov <andrew.smirnov@gmail.com>
+
+[ Upstream commit 050f810e238f268670f14a8f8b793ba2dbf2e92f ]
+
+Platform device core assumes the ownership of dev.platform_data as
+well as that it is dynamically allocated and it will try to kfree it
+as a part of platform_device_release(). Change the code to use
+platform_device_add_data() n instead of a pointer to a static memory
+to avoid causing a BUG() when calling platform_device_put().
+
+The problem can be reproduced by artificially enabling the error path
+of platform_device_add() call (around line 357).
+
+Note that this change also allows us to constify imx7_pgc_domains,
+since we no longer need to be able to modify it.
+
+Cc: Stefan Agner <stefan@agner.ch>
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+ drivers/soc/imx/gpcv2.c |   22 +++++++++++++++-------
+ 1 file changed, 15 insertions(+), 7 deletions(-)
+
+--- a/drivers/soc/imx/gpcv2.c
++++ b/drivers/soc/imx/gpcv2.c
+@@ -155,7 +155,7 @@ static int imx7_gpc_pu_pgc_sw_pdn_req(st
+ 	return imx7_gpc_pu_pgc_sw_pxx_req(genpd, false);
+ }
+ 
+-static struct imx7_pgc_domain imx7_pgc_domains[] = {
++static const struct imx7_pgc_domain imx7_pgc_domains[] = {
+ 	[IMX7_POWER_DOMAIN_MIPI_PHY] = {
+ 		.genpd = {
+ 			.name      = "mipi-phy",
+@@ -321,11 +321,6 @@ static int imx_gpcv2_probe(struct platfo
+ 			continue;
+ 		}
+ 
+-		domain = &imx7_pgc_domains[domain_index];
+-		domain->regmap = regmap;
+-		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
+-		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
+-
+ 		pd_pdev = platform_device_alloc("imx7-pgc-domain",
+ 						domain_index);
+ 		if (!pd_pdev) {
+@@ -334,7 +329,20 @@ static int imx_gpcv2_probe(struct platfo
+ 			return -ENOMEM;
+ 		}
+ 
+-		pd_pdev->dev.platform_data = domain;
++		ret = platform_device_add_data(pd_pdev,
++					       &imx7_pgc_domains[domain_index],
++					       sizeof(imx7_pgc_domains[domain_index]));
++		if (ret) {
++			platform_device_put(pd_pdev);
++			of_node_put(np);
++			return ret;
++		}
++
++		domain = pd_pdev->dev.platform_data;
++		domain->regmap = regmap;
++		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
++		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
++
+ 		pd_pdev->dev.parent = dev;
+ 		pd_pdev->dev.of_node = np;
+ 
+
+
+Patches currently in stable-queue which might be from andrew.smirnov at gmail.com are
+
+queue-4.17/soc-imx-gpcv2-do-not-pass-static-memory-as-platform-data.patch
