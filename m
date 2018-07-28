@@ -1,21 +1,22 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Sat, 28 Jul 2018 12:07:43 +0200
-Subject: Patch "bpf, arm32: fix inconsistent naming about emit_a32_lsr_{r64,
- i64}" has been added to the 4.17-stable tree
-Message-ID: <1532772463049@kroah.com>
+Date: Sat, 28 Jul 2018 12:07:49 +0200
+Subject: Patch "EDAC,
+ altera: Fix ARM64 build warning" has been added to the 4.17-stable
+ tree
+Message-ID: <153277246924975@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 This is a note to let you know that I've just added the patch titled
 
-    bpf, arm32: fix inconsistent naming about emit_a32_lsr_{r64,i64}
+    EDAC, altera: Fix ARM64 build warning
 
 to the 4.17-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
-     bpf-arm32-fix-inconsistent-naming-about-emit_a32_lsr_-r64-i64.patch
+     edac-altera-fix-arm64-build-warning.patch
 and it can be found in the queue-4.17 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
@@ -23,84 +24,52 @@ please let <stable@vger.kernel.org> know about it.
 
 
 >From foo at baz Sat Jul 28 10:14:30 CEST 2018
-From: Wang YanQing <udknight@gmail.com>
-Date: Fri, 11 May 2018 10:52:17 +0800
-Subject: bpf, arm32: fix inconsistent naming about emit_a32_lsr_{r64,i64}
+From: Thor Thayer <thor.thayer@linux.intel.com>
+Date: Mon, 14 May 2018 12:04:01 -0500
+Subject: EDAC, altera: Fix ARM64 build warning
 
-From: Wang YanQing <udknight@gmail.com>
+From: Thor Thayer <thor.thayer@linux.intel.com>
 
-[ Upstream commit 68565a1af9f7012e6f2fe2bdd612f67d2d830c28 ]
+[ Upstream commit 9ef20753e044f7468c4113e5aecd785419b0b3cc ]
 
-The names for BPF_ALU64 | BPF_ARSH are emit_a32_arsh_*,
-the names for BPF_ALU64 | BPF_LSH are emit_a32_lsh_*, but
-the names for BPF_ALU64 | BPF_RSH are emit_a32_lsr_*.
+The kbuild test robot reported the following warning:
 
-For consistence reason, let's rename emit_a32_lsr_* to
-emit_a32_rsh_*.
+  drivers/edac/altera_edac.c: In function 'ocram_free_mem':
+  drivers/edac/altera_edac.c:1410:42: warning: cast from pointer to integer
+	of different size [-Wpointer-to-int-cast]
+    gen_pool_free((struct gen_pool *)other, (u32)p, size);
+                                             ^
 
-This patch also corrects a wrong comment.
+After adding support for ARM64 architectures, the unsigned long
+parameter is 64 bits and causes a build warning on 64-bit configs. Fix
+by casting to the correct size (unsigned long) instead of u32.
 
-Fixes: 39c13c204bb1 ("arm: eBPF JIT compiler")
-Signed-off-by: Wang YanQing <udknight@gmail.com>
-Cc: Shubham Bansal <illusionist.neo@gmail.com>
+Reported-by: kbuild test robot <lkp@intel.com>
+Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux at armlinux.org.uk
-Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
+Cc: linux-edac <linux-edac@vger.kernel.org>
+Fixes: c3eea1942a16 ("EDAC, altera: Add Altera L2 cache and OCRAM support")
+Link: http://lkml.kernel.org/r/1526317441-4996-1-git-send-email-thor.thayer at linux.intel.com
+Signed-off-by: Borislav Petkov <bp@suse.de>
 Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- arch/arm/net/bpf_jit_32.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/edac/altera_edac.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -708,7 +708,7 @@ static inline void emit_a32_arsh_r64(con
+--- a/drivers/edac/altera_edac.c
++++ b/drivers/edac/altera_edac.c
+@@ -1106,7 +1106,7 @@ static void *ocram_alloc_mem(size_t size
+ 
+ static void ocram_free_mem(void *p, size_t size, void *other)
+ {
+-	gen_pool_free((struct gen_pool *)other, (u32)p, size);
++	gen_pool_free((struct gen_pool *)other, (unsigned long)p, size);
  }
  
- /* dst = dst >> src */
--static inline void emit_a32_lsr_r64(const u8 dst[], const u8 src[], bool dstk,
-+static inline void emit_a32_rsh_r64(const u8 dst[], const u8 src[], bool dstk,
- 				     bool sstk, struct jit_ctx *ctx) {
- 	const u8 *tmp = bpf2a32[TMP_REG_1];
- 	const u8 *tmp2 = bpf2a32[TMP_REG_2];
-@@ -724,7 +724,7 @@ static inline void emit_a32_lsr_r64(cons
- 		emit(ARM_LDR_I(rm, ARM_SP, STACK_VAR(dst_hi)), ctx);
- 	}
- 
--	/* Do LSH operation */
-+	/* Do RSH operation */
- 	emit(ARM_RSB_I(ARM_IP, rt, 32), ctx);
- 	emit(ARM_SUBS_I(tmp2[0], rt, 32), ctx);
- 	emit(ARM_MOV_SR(ARM_LR, rd, SRTYPE_LSR, rt), ctx);
-@@ -774,7 +774,7 @@ static inline void emit_a32_lsh_i64(cons
- }
- 
- /* dst = dst >> val */
--static inline void emit_a32_lsr_i64(const u8 dst[], bool dstk,
-+static inline void emit_a32_rsh_i64(const u8 dst[], bool dstk,
- 				    const u32 val, struct jit_ctx *ctx) {
- 	const u8 *tmp = bpf2a32[TMP_REG_1];
- 	const u8 *tmp2 = bpf2a32[TMP_REG_2];
-@@ -1330,7 +1330,7 @@ static int build_insn(const struct bpf_i
- 	case BPF_ALU64 | BPF_RSH | BPF_K:
- 		if (unlikely(imm > 63))
- 			return -EINVAL;
--		emit_a32_lsr_i64(dst, dstk, imm, ctx);
-+		emit_a32_rsh_i64(dst, dstk, imm, ctx);
- 		break;
- 	/* dst = dst << src */
- 	case BPF_ALU64 | BPF_LSH | BPF_X:
-@@ -1338,7 +1338,7 @@ static int build_insn(const struct bpf_i
- 		break;
- 	/* dst = dst >> src */
- 	case BPF_ALU64 | BPF_RSH | BPF_X:
--		emit_a32_lsr_r64(dst, src, dstk, sstk, ctx);
-+		emit_a32_rsh_r64(dst, src, dstk, sstk, ctx);
- 		break;
- 	/* dst = dst >> src (signed) */
- 	case BPF_ALU64 | BPF_ARSH | BPF_X:
+ static const struct edac_device_prv_data ocramecc_data = {
 
 
-Patches currently in stable-queue which might be from udknight at gmail.com are
+Patches currently in stable-queue which might be from thor.thayer at linux.intel.com are
 
-queue-4.17/bpf-arm32-fix-inconsistent-naming-about-emit_a32_lsr_-r64-i64.patch
+queue-4.17/edac-altera-fix-arm64-build-warning.patch
