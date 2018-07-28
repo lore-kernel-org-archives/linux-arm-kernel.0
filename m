@@ -1,75 +1,47 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Sat, 28 Jul 2018 12:07:49 +0200
-Subject: Patch "EDAC,
- altera: Fix ARM64 build warning" has been added to the 4.17-stable
- tree
-Message-ID: <153277246924975@kroah.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat, 28 Jul 2018 18:32:47 +0800
+Subject: [GIT PULL 6/6] i.MX defconfig updates for 4.19
+In-Reply-To: <20180721215743.gvdyejag6fere6lp@localhost>
+References: <1532140344-2771-1-git-send-email-shawnguo@kernel.org>
+ <1532140671-2869-1-git-send-email-shawnguo@kernel.org>
+ <1532140671-2869-3-git-send-email-shawnguo@kernel.org>
+ <20180721215743.gvdyejag6fere6lp@localhost>
+Message-ID: <20180728103245.GA3481@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Jul 21, 2018 at 02:57:43PM -0700, Olof Johansson wrote:
+> On Sat, Jul 21, 2018 at 10:37:51AM +0800, Shawn Guo wrote:
+> > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> > 
+> >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.19
+> > 
+> > for you to fetch changes up to eaed0291c62f7b513ad9483b02efdccd4ae4e9fc:
+> > 
+> >   ARM: imx_v6_v7_defconfig: add DMATEST support (2018-07-21 09:58:21 +0800)
+> > 
+> > ----------------------------------------------------------------
+> > i.MX defconfig update for 4.19:
+> >  - Enable ISL29018 sensor and MMA8452 accelerometer driver support for
+> >    imx6qdl-sabreauto board.
+> >  - Enable DMATEST support which is useful for DMA driver development
+> >    testing.
+> >  - Use the DRM driver for MXSFB LCD controller found on i.MX23, i.MX28,
+> >    i.MX6SX and i.MX7 SoCs.
+> 
+> Should some of these be added in multi_v7 defconfig too?
 
-This is a note to let you know that I've just added the patch titled
+>From what I have seen, multi_v7_defconfig is usually used for booting
+test on i.MX platforms, and for full feature build imx_v6_v7_defconfig
+is used more often.  But we are happy to add things into
+multi_v7_defconfig when we see need from people.
 
-    EDAC, altera: Fix ARM64 build warning
+> Merged.
 
-to the 4.17-stable tree which can be found at:
-    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
+Thanks.
 
-The filename of the patch is:
-     edac-altera-fix-arm64-build-warning.patch
-and it can be found in the queue-4.17 subdirectory.
-
-If you, or anyone else, feels it should not be added to the stable tree,
-please let <stable@vger.kernel.org> know about it.
-
-
->From foo at baz Sat Jul 28 10:14:30 CEST 2018
-From: Thor Thayer <thor.thayer@linux.intel.com>
-Date: Mon, 14 May 2018 12:04:01 -0500
-Subject: EDAC, altera: Fix ARM64 build warning
-
-From: Thor Thayer <thor.thayer@linux.intel.com>
-
-[ Upstream commit 9ef20753e044f7468c4113e5aecd785419b0b3cc ]
-
-The kbuild test robot reported the following warning:
-
-  drivers/edac/altera_edac.c: In function 'ocram_free_mem':
-  drivers/edac/altera_edac.c:1410:42: warning: cast from pointer to integer
-	of different size [-Wpointer-to-int-cast]
-    gen_pool_free((struct gen_pool *)other, (u32)p, size);
-                                             ^
-
-After adding support for ARM64 architectures, the unsigned long
-parameter is 64 bits and causes a build warning on 64-bit configs. Fix
-by casting to the correct size (unsigned long) instead of u32.
-
-Reported-by: kbuild test robot <lkp@intel.com>
-Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-edac <linux-edac@vger.kernel.org>
-Fixes: c3eea1942a16 ("EDAC, altera: Add Altera L2 cache and OCRAM support")
-Link: http://lkml.kernel.org/r/1526317441-4996-1-git-send-email-thor.thayer at linux.intel.com
-Signed-off-by: Borislav Petkov <bp@suse.de>
-Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
----
- drivers/edac/altera_edac.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
---- a/drivers/edac/altera_edac.c
-+++ b/drivers/edac/altera_edac.c
-@@ -1106,7 +1106,7 @@ static void *ocram_alloc_mem(size_t size
- 
- static void ocram_free_mem(void *p, size_t size, void *other)
- {
--	gen_pool_free((struct gen_pool *)other, (u32)p, size);
-+	gen_pool_free((struct gen_pool *)other, (unsigned long)p, size);
- }
- 
- static const struct edac_device_prv_data ocramecc_data = {
-
-
-Patches currently in stable-queue which might be from thor.thayer at linux.intel.com are
-
-queue-4.17/edac-altera-fix-arm64-build-warning.patch
+Shawn
