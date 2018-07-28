@@ -1,107 +1,74 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Sat, 28 Jul 2018 12:08:09 +0200
-Subject: Patch "soc: imx: gpcv2: Do not pass static memory as platform data"
- has been added to the 4.17-stable tree
-Message-ID: <153277248922674@kroah.com>
+Date: Sat, 28 Jul 2018 12:08:18 +0200
+Subject: Patch "EDAC,
+ altera: Fix ARM64 build warning" has been added to the 4.9-stable tree
+Message-ID: <153277249814156@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 This is a note to let you know that I've just added the patch titled
 
-    soc: imx: gpcv2: Do not pass static memory as platform data
+    EDAC, altera: Fix ARM64 build warning
 
-to the 4.17-stable tree which can be found at:
+to the 4.9-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
-     soc-imx-gpcv2-do-not-pass-static-memory-as-platform-data.patch
-and it can be found in the queue-4.17 subdirectory.
+     edac-altera-fix-arm64-build-warning.patch
+and it can be found in the queue-4.9 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
 
 
->From foo at baz Sat Jul 28 10:14:31 CEST 2018
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
-Date: Tue, 10 Apr 2018 11:32:09 -0700
-Subject: soc: imx: gpcv2: Do not pass static memory as platform data
+>From foo at baz Sat Jul 28 10:48:22 CEST 2018
+From: Thor Thayer <thor.thayer@linux.intel.com>
+Date: Mon, 14 May 2018 12:04:01 -0500
+Subject: EDAC, altera: Fix ARM64 build warning
 
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
+From: Thor Thayer <thor.thayer@linux.intel.com>
 
-[ Upstream commit 050f810e238f268670f14a8f8b793ba2dbf2e92f ]
+[ Upstream commit 9ef20753e044f7468c4113e5aecd785419b0b3cc ]
 
-Platform device core assumes the ownership of dev.platform_data as
-well as that it is dynamically allocated and it will try to kfree it
-as a part of platform_device_release(). Change the code to use
-platform_device_add_data() n instead of a pointer to a static memory
-to avoid causing a BUG() when calling platform_device_put().
+The kbuild test robot reported the following warning:
 
-The problem can be reproduced by artificially enabling the error path
-of platform_device_add() call (around line 357).
+  drivers/edac/altera_edac.c: In function 'ocram_free_mem':
+  drivers/edac/altera_edac.c:1410:42: warning: cast from pointer to integer
+	of different size [-Wpointer-to-int-cast]
+    gen_pool_free((struct gen_pool *)other, (u32)p, size);
+                                             ^
 
-Note that this change also allows us to constify imx7_pgc_domains,
-since we no longer need to be able to modify it.
+After adding support for ARM64 architectures, the unsigned long
+parameter is 64 bits and causes a build warning on 64-bit configs. Fix
+by casting to the correct size (unsigned long) instead of u32.
 
-Cc: Stefan Agner <stefan@agner.ch>
-Cc: Lucas Stach <l.stach@pengutronix.de>
+Reported-by: kbuild test robot <lkp@intel.com>
+Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+Cc: linux-edac <linux-edac@vger.kernel.org>
+Fixes: c3eea1942a16 ("EDAC, altera: Add Altera L2 cache and OCRAM support")
+Link: http://lkml.kernel.org/r/1526317441-4996-1-git-send-email-thor.thayer at linux.intel.com
+Signed-off-by: Borislav Petkov <bp@suse.de>
 Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- drivers/soc/imx/gpcv2.c |   22 +++++++++++++++-------
- 1 file changed, 15 insertions(+), 7 deletions(-)
+ drivers/edac/altera_edac.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
---- a/drivers/soc/imx/gpcv2.c
-+++ b/drivers/soc/imx/gpcv2.c
-@@ -155,7 +155,7 @@ static int imx7_gpc_pu_pgc_sw_pdn_req(st
- 	return imx7_gpc_pu_pgc_sw_pxx_req(genpd, false);
+--- a/drivers/edac/altera_edac.c
++++ b/drivers/edac/altera_edac.c
+@@ -1111,7 +1111,7 @@ static void *ocram_alloc_mem(size_t size
+ 
+ static void ocram_free_mem(void *p, size_t size, void *other)
+ {
+-	gen_pool_free((struct gen_pool *)other, (u32)p, size);
++	gen_pool_free((struct gen_pool *)other, (unsigned long)p, size);
  }
  
--static struct imx7_pgc_domain imx7_pgc_domains[] = {
-+static const struct imx7_pgc_domain imx7_pgc_domains[] = {
- 	[IMX7_POWER_DOMAIN_MIPI_PHY] = {
- 		.genpd = {
- 			.name      = "mipi-phy",
-@@ -321,11 +321,6 @@ static int imx_gpcv2_probe(struct platfo
- 			continue;
- 		}
- 
--		domain = &imx7_pgc_domains[domain_index];
--		domain->regmap = regmap;
--		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
--		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
--
- 		pd_pdev = platform_device_alloc("imx7-pgc-domain",
- 						domain_index);
- 		if (!pd_pdev) {
-@@ -334,7 +329,20 @@ static int imx_gpcv2_probe(struct platfo
- 			return -ENOMEM;
- 		}
- 
--		pd_pdev->dev.platform_data = domain;
-+		ret = platform_device_add_data(pd_pdev,
-+					       &imx7_pgc_domains[domain_index],
-+					       sizeof(imx7_pgc_domains[domain_index]));
-+		if (ret) {
-+			platform_device_put(pd_pdev);
-+			of_node_put(np);
-+			return ret;
-+		}
-+
-+		domain = pd_pdev->dev.platform_data;
-+		domain->regmap = regmap;
-+		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
-+		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
-+
- 		pd_pdev->dev.parent = dev;
- 		pd_pdev->dev.of_node = np;
- 
+ static const struct edac_device_prv_data ocramecc_data = {
 
 
-Patches currently in stable-queue which might be from andrew.smirnov at gmail.com are
+Patches currently in stable-queue which might be from thor.thayer at linux.intel.com are
 
-queue-4.17/soc-imx-gpcv2-do-not-pass-static-memory-as-platform-data.patch
+queue-4.9/edac-altera-fix-arm64-build-warning.patch
