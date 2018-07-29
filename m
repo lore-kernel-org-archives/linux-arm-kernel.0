@@ -1,44 +1,47 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 30 Jul 2018 05:26:37 +0800
-Subject: [PATCH v2 5/5] arm64: dts: actions: Add pinctrl node for Actions
- Semi S700
-In-Reply-To: <20180729182551.19383-6-sravanhome@gmail.com>
-References: <20180729182551.19383-6-sravanhome@gmail.com>
-Message-ID: <201807300528.JISc4gyI%fengguang.wu@intel.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Mon, 30 Jul 2018 06:00:45 +0800
+Subject: [RFC PATCH] pinctrl: actions: s700_pads[] can be static
+In-Reply-To: <20180729200038.11795-5-sravanhome@gmail.com>
+References: <20180729200038.11795-5-sravanhome@gmail.com>
+Message-ID: <20180729220045.GA5007@lkp-ib03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Saravanan,
 
-Thank you for the patch! Yet something to improve:
-
-[auto build test ERROR on pinctrl/devel]
-[also build test ERROR on next-20180727]
-[cannot apply to v4.18-rc6]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Saravanan-Sekar/Add-Actions-Semi-S700-pinctrl-support/20180730-022827
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git devel
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
-
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm64/boot/dts/actions/s700.dtsi:172.19-20 syntax error
-   FATAL ERROR: Unable to parse input tree
-
+Fixes: e96a1c4b279a ("pinctrl: actions: Add Actions Semi S700 pinctrl driver")
+Signed-off-by: kbuild test robot <fengguang.wu@intel.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 38745 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180730/c1d6c49b/attachment-0001.gz>
+ pinctrl-s700.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pinctrl/actions/pinctrl-s700.c b/drivers/pinctrl/actions/pinctrl-s700.c
+index 7e9d23a..df69827 100644
+--- a/drivers/pinctrl/actions/pinctrl-s700.c
++++ b/drivers/pinctrl/actions/pinctrl-s700.c
+@@ -225,7 +225,7 @@
+ #define NUM_PADS		(_LASTPAD - _FIRSTPAD + 1)
+ 
+ /* Pad names for the pinmux subsystem */
+-const struct pinctrl_pin_desc s700_pads[] = {
++static const struct pinctrl_pin_desc s700_pads[] = {
+ 	PINCTRL_PIN(ETH_TXD0, "eth_txd0"),
+ 	PINCTRL_PIN(ETH_TXD1, "eth_txd1"),
+ 	PINCTRL_PIN(ETH_TXD2, "eth_txd2"),
+@@ -1549,7 +1549,7 @@ static const char * const sirq2_groups[] = {
+ 	"sirq2_dummy",
+ };
+ 
+-const struct owl_pinmux_func s700_functions[] = {
++static const struct owl_pinmux_func s700_functions[] = {
+ 	[S700_MUX_NOR] = FUNCTION(nor),
+ 	[S700_MUX_ETH_RGMII] = FUNCTION(eth_rmii),
+ 	[S700_MUX_ETH_SGMII] = FUNCTION(eth_smii),
+@@ -1697,7 +1697,7 @@ static PAD_PULLCTL_CONF(I2C2_SCLK, 2, 7, 1);
+ /********PAD INFOS*****************************/
+ 
+ /* Pad info table for the pinmux subsystem */
+-struct owl_padinfo s700_padinfo[NUM_PADS] = {
++static struct owl_padinfo s700_padinfo[NUM_PADS] = {
+ 	[ETH_TXD0] = PAD_INFO_ST(ETH_TXD0),
+ 	[ETH_TXD1] = PAD_INFO_ST(ETH_TXD1),
+ 	[ETH_TXEN] = PAD_INFO_ST(ETH_TXEN),
