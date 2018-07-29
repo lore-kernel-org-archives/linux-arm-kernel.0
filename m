@@ -1,10 +1,10 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Mon, 30 Jul 2018 03:06:46 +0800
+Date: Mon, 30 Jul 2018 03:12:45 +0800
 Subject: [PATCH v2 1/5] pinctrl: actions: define constructor generic to
  Actions Semi SoC's
 In-Reply-To: <20180729182551.19383-2-sravanhome@gmail.com>
 References: <20180729182551.19383-2-sravanhome@gmail.com>
-Message-ID: <201807300303.hxjXtEe1%fengguang.wu@intel.com>
+Message-ID: <201807300323.a9ci7ngQ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,13 +19,13 @@ Thank you for the patch! Yet something to improve:
 
 url:    https://github.com/0day-ci/linux/commits/Saravanan-Sekar/Add-Actions-Semi-S700-pinctrl-support/20180730-022827
 base:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git devel
-config: ia64-allmodconfig (attached as .config)
-compiler: ia64-linux-gcc (GCC) 8.1.0
+config: sparc64-allmodconfig (attached as .config)
+compiler: sparc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
 reproduce:
         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
-        GCC_VERSION=8.1.0 make.cross ARCH=ia64 
+        GCC_VERSION=7.2.0 make.cross ARCH=sparc64 
 
 Note: the linux-review/Saravanan-Sekar/Add-Actions-Semi-S700-pinctrl-support/20180730-022827 HEAD edc8b81de011f2413aa90b738a8fad302e281785 builds fine.
       It only hurts bisectibility.
@@ -33,42 +33,42 @@ Note: the linux-review/Saravanan-Sekar/Add-Actions-Semi-S700-pinctrl-support/201
 All errors (new ones prefixed by >>):
 
    drivers/pinctrl/actions/pinctrl-owl.c: In function 'owl_pad_pinconf_arg2val':
-   drivers/pinctrl/actions/pinctrl-owl.c:255:10: error: 'OWL_PINCONF_PULL_HOLD' undeclared (first use in this function); did you mean 'OWL_PINCONF_DRV_12MA'?
+>> drivers/pinctrl/actions/pinctrl-owl.c:255:10: error: 'OWL_PINCONF_PULL_HOLD' undeclared (first use in this function); did you mean 'OWL_PINCONF_DRV_12MA'?
       *arg = OWL_PINCONF_PULL_HOLD;
              ^~~~~~~~~~~~~~~~~~~~~
              OWL_PINCONF_DRV_12MA
    drivers/pinctrl/actions/pinctrl-owl.c:255:10: note: each undeclared identifier is reported only once for each function it appears in
->> drivers/pinctrl/actions/pinctrl-owl.c:258:10: error: 'OWL_PINCONF_PULL_HIZ' undeclared (first use in this function); did you mean 'OWL_PINCONF_DRV_8MA'?
+>> drivers/pinctrl/actions/pinctrl-owl.c:258:10: error: 'OWL_PINCONF_PULL_HIZ' undeclared (first use in this function); did you mean 'OWL_PINCONF_PULL_HOLD'?
       *arg = OWL_PINCONF_PULL_HIZ;
              ^~~~~~~~~~~~~~~~~~~~
-             OWL_PINCONF_DRV_8MA
->> drivers/pinctrl/actions/pinctrl-owl.c:261:10: error: 'OWL_PINCONF_PULL_DOWN' undeclared (first use in this function); did you mean 'OWL_PINCONF_SLEW_SLOW'?
+             OWL_PINCONF_PULL_HOLD
+>> drivers/pinctrl/actions/pinctrl-owl.c:261:10: error: 'OWL_PINCONF_PULL_DOWN' undeclared (first use in this function); did you mean 'OWL_PINCONF_PULL_HOLD'?
       *arg = OWL_PINCONF_PULL_DOWN;
              ^~~~~~~~~~~~~~~~~~~~~
-             OWL_PINCONF_SLEW_SLOW
->> drivers/pinctrl/actions/pinctrl-owl.c:264:10: error: 'OWL_PINCONF_PULL_UP' undeclared (first use in this function); did you mean 'OWL_PINCONF_DRV_8MA'?
+             OWL_PINCONF_PULL_HOLD
+>> drivers/pinctrl/actions/pinctrl-owl.c:264:10: error: 'OWL_PINCONF_PULL_UP' undeclared (first use in this function); did you mean 'OWL_PINCONF_PULL_HIZ'?
       *arg = OWL_PINCONF_PULL_UP;
              ^~~~~~~~~~~~~~~~~~~
-             OWL_PINCONF_DRV_8MA
+             OWL_PINCONF_PULL_HIZ
    drivers/pinctrl/actions/pinctrl-owl.c: In function 'owl_pad_pinconf_val2arg':
    drivers/pinctrl/actions/pinctrl-owl.c:282:18: error: 'OWL_PINCONF_PULL_HOLD' undeclared (first use in this function); did you mean 'OWL_PINCONF_DRV_12MA'?
       *arg = *arg == OWL_PINCONF_PULL_HOLD;
                      ^~~~~~~~~~~~~~~~~~~~~
                      OWL_PINCONF_DRV_12MA
-   drivers/pinctrl/actions/pinctrl-owl.c:285:18: error: 'OWL_PINCONF_PULL_HIZ' undeclared (first use in this function); did you mean 'OWL_PINCONF_DRV_8MA'?
+   drivers/pinctrl/actions/pinctrl-owl.c:285:18: error: 'OWL_PINCONF_PULL_HIZ' undeclared (first use in this function); did you mean 'OWL_PINCONF_PULL_HOLD'?
       *arg = *arg == OWL_PINCONF_PULL_HIZ;
                      ^~~~~~~~~~~~~~~~~~~~
-                     OWL_PINCONF_DRV_8MA
-   drivers/pinctrl/actions/pinctrl-owl.c:288:18: error: 'OWL_PINCONF_PULL_DOWN' undeclared (first use in this function); did you mean 'OWL_PINCONF_SLEW_SLOW'?
+                     OWL_PINCONF_PULL_HOLD
+   drivers/pinctrl/actions/pinctrl-owl.c:288:18: error: 'OWL_PINCONF_PULL_DOWN' undeclared (first use in this function); did you mean 'OWL_PINCONF_PULL_HOLD'?
       *arg = *arg == OWL_PINCONF_PULL_DOWN;
                      ^~~~~~~~~~~~~~~~~~~~~
-                     OWL_PINCONF_SLEW_SLOW
-   drivers/pinctrl/actions/pinctrl-owl.c:291:18: error: 'OWL_PINCONF_PULL_UP' undeclared (first use in this function); did you mean 'OWL_PINCONF_DRV_8MA'?
+                     OWL_PINCONF_PULL_HOLD
+   drivers/pinctrl/actions/pinctrl-owl.c:291:18: error: 'OWL_PINCONF_PULL_UP' undeclared (first use in this function); did you mean 'OWL_PINCONF_PULL_HIZ'?
       *arg = *arg == OWL_PINCONF_PULL_UP;
                      ^~~~~~~~~~~~~~~~~~~
-                     OWL_PINCONF_DRV_8MA
+                     OWL_PINCONF_PULL_HIZ
 
-vim +258 drivers/pinctrl/actions/pinctrl-owl.c
+vim +255 drivers/pinctrl/actions/pinctrl-owl.c
 
 2242ddfb Manivannan Sadhasivam 2018-04-04  248  
 2242ddfb Manivannan Sadhasivam 2018-04-04  249  static int owl_pad_pinconf_arg2val(const struct owl_padinfo *info,
@@ -99,7 +99,7 @@ vim +258 drivers/pinctrl/actions/pinctrl-owl.c
 2242ddfb Manivannan Sadhasivam 2018-04-04  274  }
 2242ddfb Manivannan Sadhasivam 2018-04-04  275  
 
-:::::: The code at line 258 was first introduced by commit
+:::::: The code at line 255 was first introduced by commit
 :::::: 2242ddfbf4d699b58d12467bbebae167d7563700 pinctrl: actions: Add Actions S900 pinctrl driver
 
 :::::: TO: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
@@ -112,6 +112,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 50918 bytes
+Size: 54284 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180730/b65c8fbc/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180730/2b0b1bcd/attachment-0001.gz>
