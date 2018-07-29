@@ -1,92 +1,100 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Sun, 29 Jul 2018 21:27:44 +0200
-Subject: [PATCH v3 01/23] thermal: armada: add a function that sanitizes
- the thermal zone name
-In-Reply-To: <f1d7e8bd-329f-0c9d-c296-0afbe871058f@linaro.org>
+Date: Sun, 29 Jul 2018 21:30:55 +0200
+Subject: [PATCH v3 06/23] thermal: armada: average over samples to avoid
+ glitches
+In-Reply-To: <2ab1a1f6-e0c3-3eed-a088-9b04e88fce12@linaro.org>
 References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
- <20180716144206.30985-2-miquel.raynal@bootlin.com>
- <84f97022-a470-f314-ee75-e5afb733bea5@linaro.org>
- <20180727135230.3c7102c7@xps13>
- <f1d7e8bd-329f-0c9d-c296-0afbe871058f@linaro.org>
-Message-ID: <20180729212744.31cf0747@xps13>
+ <20180716144206.30985-7-miquel.raynal@bootlin.com>
+ <2ab1a1f6-e0c3-3eed-a088-9b04e88fce12@linaro.org>
+Message-ID: <20180729213055.2215bd53@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Daniel,
 
 Daniel Lezcano <daniel.lezcano@linaro.org> wrote on Fri, 27 Jul 2018
-17:29:52 +0200:
+18:29:01 +0200:
 
-> On 27/07/2018 13:52, Miquel Raynal wrote:
-> > Hi Daniel,
+> On 16/07/2018 16:41, Miquel Raynal wrote:
+> > Configure the sample frequency and number of averaged samples.
 > > 
-> > Daniel Lezcano <daniel.lezcano@linaro.org> wrote on Fri, 27 Jul 2018
-> > 13:34:19 +0200:
-> >   
-> >> On 16/07/2018 16:41, Miquel Raynal wrote:  
-> >>> Thermal zone names must follow certain rules imposed by the framework.
-> >>> They are limited in length and shall not have any hyphen '-'.
-> >>>
-> >>> This is done in a separate function for future use in another location.
-> >>>
-> >>> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>    
-> >>
-> >> Why do you have to provide a function to test that?
-> >>
-> >> Logically, the one who did the change to add a thermal name, should
-> >> check its code works. Without a proper name that won't work.  
+> > This is needed for two reasons:
+> > 1/ To be bootloader independent.
+> > 2/ To prepare the introduction of multi-sensors support by preventing
+> >    inconsistencies when reading temperatures that could be a mean of
+> >    samples took from different sensors.
 > > 
-> > What do you mean "the one who did the change"?
-> > I think the thermal core should not care that much to what is given as
-> > name and should probably not be so strict.
+> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > ---
+> >  drivers/thermal/armada_thermal.c | 25 +++++++++++++++++++++++++
+> >  1 file changed, 25 insertions(+)
 > > 
-> > Also, I don't choose what dev_name() returns, it's in the device tree
-> > and the device tree do not care about the implementation, it's just a
-> > descriptive file.
-> >   
-> >>
-> >> So this function is testing something which should be already tested, no?  
-> > 
-> > I don't think it is. Without this function the probe will simply fail.
-> > 
-> > The explanation of what fails is in the code:
-> >   
-> >>> +		/*
-> >>> +		 * When inside a system controller, the device name has the
-> >>> +		 * form: f06f8000.system-controller:ap-thermal so stripping
-> >>> +		 * after the ':' should give us a shorter but meaningful name.
-> >>> +		 */
-> >>> +		name = strrchr(name, ':');
-> >>> +		if (!name)
-> >>> +			name = "armada_thermal";
-> >>> +		else
-> >>> +			name++;  
-> > 
-> > [...]  
+> > diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+> > index 9291ea3ad2f7..1f9706d96a0d 100644
+> > --- a/drivers/thermal/armada_thermal.c
+> > +++ b/drivers/thermal/armada_thermal.c
+> > @@ -54,7 +54,12 @@
+> >  #define CONTROL0_TSEN_START		BIT(0)
+> >  #define CONTROL0_TSEN_RESET		BIT(1)
+> >  #define CONTROL0_TSEN_ENABLE		BIT(2)
+> > +#define CONTROL0_TSEN_AVG_BYPASS	BIT(6)
+> > +#define CONTROL0_TSEN_OSR_SHIFT		24
+> > +#define CONTROL0_TSEN_OSR_MAX		0x3
+> >  
+> > +#define CONTROL1_TSEN_AVG_SHIFT		0  
 > 
-> I'm not in favor of this, potentially it can introduce a break which can
-> be exploited later.
+> Why shift by zero ?
+> 
 
-I know, I don't like this neither but that was the best way IMHO to
-handle the core's limitations.
+I know some people do not like it, it's a matter of taste, as this IP
+registers documentation is a bit fuzzy, I wanted to make it clear that
+it was the first region in the CONTROL1 register. It's optimized out by
+the compiler anyway.
 
 > 
-> You are creating the thermal zones manually from the driver but want to
-> rely on the temperature controller name to give a name to the thermal zone.
 > 
-> Why not create the thermal zone in the DT with the correct name and use
-> devm_thermal_zone_of_sensor_register ?
+> > +#define CONTROL1_TSEN_AVG_MASK		0x7
+> >  #define CONTROL1_EXT_TSEN_SW_RESET	BIT(7)
+> >  #define CONTROL1_EXT_TSEN_HW_RESETn	BIT(8)
+> >  
+> > @@ -194,6 +199,13 @@ static void armada_ap806_init(struct platform_device *pdev,
+> >  	reg = readl_relaxed(priv->control0);
+> >  	reg &= ~CONTROL0_TSEN_RESET;
+> >  	reg |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
+> > +
+> > +	/* Sample every ~2ms */
+> > +	reg |= CONTROL0_TSEN_OSR_MAX << CONTROL0_TSEN_OSR_SHIFT;
+> > +
+> > +	/* Enable average (2 samples by default) */
+> > +	reg &= ~CONTROL0_TSEN_AVG_BYPASS;
+> > +
+> >  	writel(reg, priv->control0);
+> >  
+> >  	/* Wait the sensors to be valid or the core will warn the user */
+> > @@ -203,7 +215,20 @@ static void armada_ap806_init(struct platform_device *pdev,
+> >  static void armada_cp110_init(struct platform_device *pdev,
+> >  			      struct armada_thermal_priv *priv)
+> >  {
+> > +	u32 reg;
+> > +
+> >  	armada380_init(pdev, priv);
+> > +
+> > +	/* Sample every ~2ms */
+> > +	reg = readl_relaxed(priv->control0);
+> > +	reg |= CONTROL0_TSEN_OSR_MAX << CONTROL0_TSEN_OSR_SHIFT;
+> > +	writel(reg, priv->control0);
+> > +
+> > +	/* Average the output value over 2^1 = 2 samples */
+> > +	reg = readl_relaxed(priv->control1);
+> > +	reg &= ~CONTROL1_TSEN_AVG_MASK << CONTROL1_TSEN_AVG_SHIFT;
+> > +	reg |= 1 << CONTROL1_TSEN_AVG_SHIFT;
+> > +	writel(reg, priv->control1);
+> >  }
+> >  
+> >  static bool armada_is_valid(struct armada_thermal_priv *priv)
+> >   
+> 
+> 
 
-That's exactly what is done later in the series actually, but for DT
-backward compatibility and in order to continue adding feature to this
-driver, we must ensure there won't be any drawback for people using old
-DT with deprecated thermal representation.
-
-
-Thanks for reviewing, if you don't mind I could copy you in future
-changes? Unfortunately for this series it's already been applied and I
-would like not to do any deep changes before it's merged, but for sure
-this function could be enhanced.
-
-Kind regards,
+Thanks
 Miqu?l
