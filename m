@@ -1,84 +1,95 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 29 Jul 2018 12:51:06 +0100
-Subject: [PATCH v2 2/4] iio: adc: xilinx: limit pcap clock frequency value
-In-Reply-To: <1532358123-23485-3-git-send-email-manish.narani@xilinx.com>
+Date: Sun, 29 Jul 2018 13:29:35 +0100
+Subject: [PATCH v2 3/4] iio: adc: xilinx: Remove platform_get_irq from
+ xadc_remove function
+In-Reply-To: <1532358123-23485-4-git-send-email-manish.narani@xilinx.com>
 References: <1532358123-23485-1-git-send-email-manish.narani@xilinx.com>
- <1532358123-23485-3-git-send-email-manish.narani@xilinx.com>
-Message-ID: <20180729125106.05692a44@archlinux>
+ <1532358123-23485-4-git-send-email-manish.narani@xilinx.com>
+Message-ID: <20180729132935.28996ab6@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Jul 2018 20:32:01 +0530
+On Mon, 23 Jul 2018 20:32:02 +0530
 Manish Narani <manish.narani@xilinx.com> wrote:
 
-> This patch limits the xadc pcap clock frequency value to be less than
-> 200MHz. This fixes the issue when zynq is booted at higher frequency
-> values, pcap crosses the maximum limit of 200MHz(Fmax) as it is derived
-> from IOPLL.
-> If this limit is crossed it is required to alter the WEDGE and REDGE
-> bits of XADC_CFG register to make timings better in the interface. So to
-> avoid alteration of these bits every time, the pcap value should not
-> cross the Fmax limit.
+> This patch avoids getting irq number in xadc_remove function. Instead
+> store 'irq' in xadc struct and use xadc->irq wherever needed.
+> This patch also resolves a warning reported by coverity where it asks to
+> check return value of platform_get_irq() for any errors in xadc_remove.
 > 
 > Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+Applied. 
 
-Applied, to the togreg branch of iio.git.  If you want this backported
-to stable, then request it once this patch is upstream.  It may be
-sometime given we've probably just missed the coming merge window.
-
-If you do need it faster then let me know and I'll look at moving
-it over to the branch of fixes during the RC phases.
+Thanks,
 
 Jonathan
 
 > ---
->  drivers/iio/adc/xilinx-xadc-core.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
+>  drivers/iio/adc/xilinx-xadc-core.c | 10 +++++-----
+>  drivers/iio/adc/xilinx-xadc.h      |  1 +
+>  2 files changed, 6 insertions(+), 5 deletions(-)
 > 
 > diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-> index 23395fc..0dd306d 100644
+> index 0dd306d..44a2519 100644
 > --- a/drivers/iio/adc/xilinx-xadc-core.c
 > +++ b/drivers/iio/adc/xilinx-xadc-core.c
-> @@ -322,6 +322,7 @@ static irqreturn_t xadc_zynq_interrupt_handler(int irq, void *devid)
+> @@ -1175,6 +1175,7 @@ static int xadc_probe(struct platform_device *pdev)
 >  
->  #define XADC_ZYNQ_TCK_RATE_MAX 50000000
->  #define XADC_ZYNQ_IGAP_DEFAULT 20
-> +#define XADC_ZYNQ_PCAP_RATE_MAX 200000000
+>  	xadc = iio_priv(indio_dev);
+>  	xadc->ops = id->data;
+> +	xadc->irq = irq;
+>  	init_completion(&xadc->completion);
+>  	mutex_init(&xadc->mutex);
+>  	spin_lock_init(&xadc->lock);
+> @@ -1225,11 +1226,11 @@ static int xadc_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		goto err_free_samplerate_trigger;
 >  
->  static int xadc_zynq_setup(struct platform_device *pdev,
->  	struct iio_dev *indio_dev, int irq)
-> @@ -332,6 +333,7 @@ static int xadc_zynq_setup(struct platform_device *pdev,
->  	unsigned int div;
->  	unsigned int igap;
->  	unsigned int tck_rate;
-> +	int ret;
+> -	ret = xadc->ops->setup(pdev, indio_dev, irq);
+> +	ret = xadc->ops->setup(pdev, indio_dev, xadc->irq);
+>  	if (ret)
+>  		goto err_clk_disable_unprepare;
 >  
->  	/* TODO: Figure out how to make igap and tck_rate configurable */
->  	igap = XADC_ZYNQ_IGAP_DEFAULT;
-> @@ -343,6 +345,13 @@ static int xadc_zynq_setup(struct platform_device *pdev,
->  	if (!pcap_rate)
->  		return -EINVAL;
->  
-> +	if (pcap_rate > XADC_ZYNQ_PCAP_RATE_MAX) {
-> +		ret = clk_set_rate(xadc->clk,
-> +				   (unsigned long)XADC_ZYNQ_PCAP_RATE_MAX);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
->  	if (tck_rate > pcap_rate / 2) {
->  		div = 2;
->  	} else {
-> @@ -368,6 +377,12 @@ static int xadc_zynq_setup(struct platform_device *pdev,
->  			XADC_ZYNQ_CFG_REDGE | XADC_ZYNQ_CFG_WEDGE |
->  			tck_div | XADC_ZYNQ_CFG_IGAP(igap));
->  
-> +	if (pcap_rate > XADC_ZYNQ_PCAP_RATE_MAX) {
-> +		ret = clk_set_rate(xadc->clk, pcap_rate);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
+> -	ret = request_irq(irq, xadc->ops->interrupt_handler, 0,
+> +	ret = request_irq(xadc->irq, xadc->ops->interrupt_handler, 0,
+>  			dev_name(&pdev->dev), indio_dev);
+>  	if (ret)
+>  		goto err_clk_disable_unprepare;
+> @@ -1288,7 +1289,7 @@ static int xadc_probe(struct platform_device *pdev)
 >  	return 0;
->  }
 >  
+>  err_free_irq:
+> -	free_irq(irq, indio_dev);
+> +	free_irq(xadc->irq, indio_dev);
+>  err_clk_disable_unprepare:
+>  	clk_disable_unprepare(xadc->clk);
+>  err_free_samplerate_trigger:
+> @@ -1310,7 +1311,6 @@ static int xadc_remove(struct platform_device *pdev)
+>  {
+>  	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+>  	struct xadc *xadc = iio_priv(indio_dev);
+> -	int irq = platform_get_irq(pdev, 0);
+>  
+>  	iio_device_unregister(indio_dev);
+>  	if (xadc->ops->flags & XADC_FLAGS_BUFFERED) {
+> @@ -1318,7 +1318,7 @@ static int xadc_remove(struct platform_device *pdev)
+>  		iio_trigger_free(xadc->convst_trigger);
+>  		iio_triggered_buffer_cleanup(indio_dev);
+>  	}
+> -	free_irq(irq, indio_dev);
+> +	free_irq(xadc->irq, indio_dev);
+>  	clk_disable_unprepare(xadc->clk);
+>  	cancel_delayed_work(&xadc->zynq_unmask_work);
+>  	kfree(xadc->data);
+> diff --git a/drivers/iio/adc/xilinx-xadc.h b/drivers/iio/adc/xilinx-xadc.h
+> index 62edbda..8c00095 100644
+> --- a/drivers/iio/adc/xilinx-xadc.h
+> +++ b/drivers/iio/adc/xilinx-xadc.h
+> @@ -68,6 +68,7 @@ struct xadc {
+>  	spinlock_t lock;
+>  
+>  	struct completion completion;
+> +	int irq;
+>  };
+>  
+>  struct xadc_ops {
