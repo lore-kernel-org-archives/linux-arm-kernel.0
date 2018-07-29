@@ -1,42 +1,44 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Sun, 29 Jul 2018 23:16:19 +0200
-Subject: [RFC PATCH 7/8] mtd: rawnand: ams-delta: Check sanity of data
- GPIO resource
-In-Reply-To: <CACRpkdZfiCN3U57s-7hGnbO9W-=pOjt0mL0w=Jv_+5WBdkEuig@mail.gmail.com>
-References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
- <20180718235710.18242-8-jmkrzyszt@gmail.com>
- <20180719084447.239a1b92@bbrezillon>
- <CACRpkdZfiCN3U57s-7hGnbO9W-=pOjt0mL0w=Jv_+5WBdkEuig@mail.gmail.com>
-Message-ID: <20180729231422.0264f971@bbrezillon>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 30 Jul 2018 05:26:37 +0800
+Subject: [PATCH v2 5/5] arm64: dts: actions: Add pinctrl node for Actions
+ Semi S700
+In-Reply-To: <20180729182551.19383-6-sravanhome@gmail.com>
+References: <20180729182551.19383-6-sravanhome@gmail.com>
+Message-ID: <201807300528.JISc4gyI%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 29 Jul 2018 22:36:49 +0200
-Linus Walleij <linus.walleij@linaro.org> wrote:
+Hi Saravanan,
 
-> On Thu, Jul 19, 2018 at 8:44 AM Boris Brezillon
-> <boris.brezillon@bootlin.com> wrote:
-> 
-> > I guess you'd prefer to have the pin values in a bitmap instead of an
-> > array of integers. That's probably something you can discuss with
-> > Linus, see if he would accept to change the prototype of
-> > gpiod_get_raw_array_value().  
-> 
-> I am not so smart as to see the overall effects but if what
-> you're saying is that we shouldn't have designed these functions
-> and callbacks using arrays of integers (or longs) and instead
-> pass bitmaps, you may be just right. It intuitively sounds better.
+Thank you for the patch! Yet something to improve:
 
-Maybe, maybe not. Only an real evaluation of where the overhead is can
-tell us. So I'd suggest trying to use the existing interface and doing
-the int_array -> u8 conversion in the NAND driver first, and see how
-much moving to a bitmap imprsoves things.
+[auto build test ERROR on pinctrl/devel]
+[also build test ERROR on next-20180727]
+[cannot apply to v4.18-rc6]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> But I'm not good with bitmaps.
-> 
-> We would have to refactor the world though.
+url:    https://github.com/0day-ci/linux/commits/Saravanan-Sekar/Add-Actions-Semi-S700-pinctrl-support/20180730-022827
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git devel
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
 
-I checked and, AFAICT, there are no external users of this API (only
-core code is using those funcs, for ioctls I guess). Anyway, I think
-we should wait for real numbers before we consider doing this change
-(It's not unusual to get this sort of things wrong).
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm64/boot/dts/actions/s700.dtsi:172.19-20 syntax error
+   FATAL ERROR: Unable to parse input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 38745 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180730/c1d6c49b/attachment-0001.gz>
