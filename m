@@ -1,100 +1,58 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Sun, 29 Jul 2018 21:30:55 +0200
-Subject: [PATCH v3 06/23] thermal: armada: average over samples to avoid
- glitches
-In-Reply-To: <2ab1a1f6-e0c3-3eed-a088-9b04e88fce12@linaro.org>
-References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
- <20180716144206.30985-7-miquel.raynal@bootlin.com>
- <2ab1a1f6-e0c3-3eed-a088-9b04e88fce12@linaro.org>
-Message-ID: <20180729213055.2215bd53@xps13>
+From: sravanhome@gmail.com (Saravanan Sekar)
+Date: Sun, 29 Jul 2018 22:00:33 +0200
+Subject: [PATCH v3 0/5] Add Actions Semi S700 pinctrl support
+In-Reply-To: <20180729182551.19383-1-sravanhome@gmail.com>
+References: <20180729182551.19383-1-sravanhome@gmail.com>
+Message-ID: <20180729200038.11795-1-sravanhome@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+This patchset adds pinctrl support for Actions Semi S700 SoC.
+Pinmux functions are only accessible for pin groups while pinconf
+parameters are available for both pin groups and individual pins.
 
-Daniel Lezcano <daniel.lezcano@linaro.org> wrote on Fri, 27 Jul 2018
-18:29:01 +0200:
+pinctrl driver is verified using the Cubieboard7.
 
-> On 16/07/2018 16:41, Miquel Raynal wrote:
-> > Configure the sample frequency and number of averaged samples.
-> > 
-> > This is needed for two reasons:
-> > 1/ To be bootloader independent.
-> > 2/ To prepare the introduction of multi-sensors support by preventing
-> >    inconsistencies when reading temperatures that could be a mean of
-> >    samples took from different sensors.
-> > 
-> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > ---
-> >  drivers/thermal/armada_thermal.c | 25 +++++++++++++++++++++++++
-> >  1 file changed, 25 insertions(+)
-> > 
-> > diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-> > index 9291ea3ad2f7..1f9706d96a0d 100644
-> > --- a/drivers/thermal/armada_thermal.c
-> > +++ b/drivers/thermal/armada_thermal.c
-> > @@ -54,7 +54,12 @@
-> >  #define CONTROL0_TSEN_START		BIT(0)
-> >  #define CONTROL0_TSEN_RESET		BIT(1)
-> >  #define CONTROL0_TSEN_ENABLE		BIT(2)
-> > +#define CONTROL0_TSEN_AVG_BYPASS	BIT(6)
-> > +#define CONTROL0_TSEN_OSR_SHIFT		24
-> > +#define CONTROL0_TSEN_OSR_MAX		0x3
-> >  
-> > +#define CONTROL1_TSEN_AVG_SHIFT		0  
-> 
-> Why shift by zero ?
-> 
+common functionalities from s900 is moved for all Actions Semi
+SoC's usage.
+Common pad control configurations are moved to SoC specific
 
-I know some people do not like it, it's a matter of taste, as this IP
-registers documentation is a bit fuzzy, I wanted to make it clear that
-it was the first region in the CONTROL1 register. It's optimized out by
-the compiler anyway.
+dts entry for pinctrl depends on clock driver which is still under review:
+https://patchwork.kernel.org/patch/10533959/
 
-> 
-> 
-> > +#define CONTROL1_TSEN_AVG_MASK		0x7
-> >  #define CONTROL1_EXT_TSEN_SW_RESET	BIT(7)
-> >  #define CONTROL1_EXT_TSEN_HW_RESETn	BIT(8)
-> >  
-> > @@ -194,6 +199,13 @@ static void armada_ap806_init(struct platform_device *pdev,
-> >  	reg = readl_relaxed(priv->control0);
-> >  	reg &= ~CONTROL0_TSEN_RESET;
-> >  	reg |= CONTROL0_TSEN_START | CONTROL0_TSEN_ENABLE;
-> > +
-> > +	/* Sample every ~2ms */
-> > +	reg |= CONTROL0_TSEN_OSR_MAX << CONTROL0_TSEN_OSR_SHIFT;
-> > +
-> > +	/* Enable average (2 samples by default) */
-> > +	reg &= ~CONTROL0_TSEN_AVG_BYPASS;
-> > +
-> >  	writel(reg, priv->control0);
-> >  
-> >  	/* Wait the sensors to be valid or the core will warn the user */
-> > @@ -203,7 +215,20 @@ static void armada_ap806_init(struct platform_device *pdev,
-> >  static void armada_cp110_init(struct platform_device *pdev,
-> >  			      struct armada_thermal_priv *priv)
-> >  {
-> > +	u32 reg;
-> > +
-> >  	armada380_init(pdev, priv);
-> > +
-> > +	/* Sample every ~2ms */
-> > +	reg = readl_relaxed(priv->control0);
-> > +	reg |= CONTROL0_TSEN_OSR_MAX << CONTROL0_TSEN_OSR_SHIFT;
-> > +	writel(reg, priv->control0);
-> > +
-> > +	/* Average the output value over 2^1 = 2 samples */
-> > +	reg = readl_relaxed(priv->control1);
-> > +	reg &= ~CONTROL1_TSEN_AVG_MASK << CONTROL1_TSEN_AVG_SHIFT;
-> > +	reg |= 1 << CONTROL1_TSEN_AVG_SHIFT;
-> > +	writel(reg, priv->control1);
-> >  }
-> >  
-> >  static bool armada_is_valid(struct armada_thermal_priv *priv)
-> >   
-> 
-> 
+Thanks,
+Saravanan
+Parthiban
 
-Thanks
-Miqu?l
+Changelog in v2
+- GPIO Interrupt support is added
+- Device tree entry for GPIO and Interrupt configured
+- GPIO and pinctrl define reorder, commit message findings fixed
+
+depends on owl GPIO Interrupt support
+https://patchwork.kernel.org/patch/10483477/
+
+Chnagelog in v3
+- Fixed 0-DAY bisectibility error
+
+Saravanan Sekar (5):
+  pinctrl: actions: define constructor generic to Actions Semi SoC's
+  pinctrl: actions: define pad control configurtion to SoC specific
+  dt-bindings: pinctrl: Add bindings for Actions Semi S700 SoC
+  pinctrl: actions: Add Actions Semi S700 pinctrl driver
+  arm64: dts: actions: Add pinctrl node for Actions Semi S700
+
+ .../bindings/pinctrl/actions,s700-pinctrl.txt |  170 ++
+ arch/arm64/boot/dts/actions/s700.dtsi         |   16 +
+ drivers/pinctrl/actions/Kconfig               |    6 +
+ drivers/pinctrl/actions/Makefile              |    1 +
+ drivers/pinctrl/actions/pinctrl-owl.c         |   71 +-
+ drivers/pinctrl/actions/pinctrl-owl.h         |  142 +-
+ drivers/pinctrl/actions/pinctrl-s700.c        | 1925 +++++++++++++++++
+ drivers/pinctrl/actions/pinctrl-s900.c        |  205 +-
+ 8 files changed, 2337 insertions(+), 199 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/actions,s700-pinctrl.txt
+ create mode 100644 drivers/pinctrl/actions/pinctrl-s700.c
+
+-- 
+2.18.0
