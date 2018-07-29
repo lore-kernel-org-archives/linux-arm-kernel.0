@@ -1,58 +1,47 @@
 From: sravanhome@gmail.com (Saravanan Sekar)
-Date: Sun, 29 Jul 2018 22:00:33 +0200
-Subject: [PATCH v3 0/5] Add Actions Semi S700 pinctrl support
-In-Reply-To: <20180729182551.19383-1-sravanhome@gmail.com>
+Date: Sun, 29 Jul 2018 22:00:38 +0200
+Subject: [PATCH v3 5/5] arm64: dts: actions: Add pinctrl node for Actions Semi
+ S700
+In-Reply-To: <20180729200038.11795-1-sravanhome@gmail.com>
 References: <20180729182551.19383-1-sravanhome@gmail.com>
-Message-ID: <20180729200038.11795-1-sravanhome@gmail.com>
+ <20180729200038.11795-1-sravanhome@gmail.com>
+Message-ID: <20180729200038.11795-6-sravanhome@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds pinctrl support for Actions Semi S700 SoC.
-Pinmux functions are only accessible for pin groups while pinconf
-parameters are available for both pin groups and individual pins.
+Add pinctrl nodes for Actions Semi S700 SoC
 
-pinctrl driver is verified using the Cubieboard7.
+Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+---
+ arch/arm64/boot/dts/actions/s700.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-common functionalities from s900 is moved for all Actions Semi
-SoC's usage.
-Common pad control configurations are moved to SoC specific
-
-dts entry for pinctrl depends on clock driver which is still under review:
-https://patchwork.kernel.org/patch/10533959/
-
-Thanks,
-Saravanan
-Parthiban
-
-Changelog in v2
-- GPIO Interrupt support is added
-- Device tree entry for GPIO and Interrupt configured
-- GPIO and pinctrl define reorder, commit message findings fixed
-
-depends on owl GPIO Interrupt support
-https://patchwork.kernel.org/patch/10483477/
-
-Chnagelog in v3
-- Fixed 0-DAY bisectibility error
-
-Saravanan Sekar (5):
-  pinctrl: actions: define constructor generic to Actions Semi SoC's
-  pinctrl: actions: define pad control configurtion to SoC specific
-  dt-bindings: pinctrl: Add bindings for Actions Semi S700 SoC
-  pinctrl: actions: Add Actions Semi S700 pinctrl driver
-  arm64: dts: actions: Add pinctrl node for Actions Semi S700
-
- .../bindings/pinctrl/actions,s700-pinctrl.txt |  170 ++
- arch/arm64/boot/dts/actions/s700.dtsi         |   16 +
- drivers/pinctrl/actions/Kconfig               |    6 +
- drivers/pinctrl/actions/Makefile              |    1 +
- drivers/pinctrl/actions/pinctrl-owl.c         |   71 +-
- drivers/pinctrl/actions/pinctrl-owl.h         |  142 +-
- drivers/pinctrl/actions/pinctrl-s700.c        | 1925 +++++++++++++++++
- drivers/pinctrl/actions/pinctrl-s900.c        |  205 +-
- 8 files changed, 2337 insertions(+), 199 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/actions,s700-pinctrl.txt
- create mode 100644 drivers/pinctrl/actions/pinctrl-s700.c
-
+diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
+index 66dd5309f0a2..8fbd7b1570a7 100644
+--- a/arch/arm64/boot/dts/actions/s700.dtsi
++++ b/arch/arm64/boot/dts/actions/s700.dtsi
+@@ -165,5 +165,21 @@
+ 			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "timer1";
+ 		};
++
++		pinctrl: pinctrl at e01b0000 {
++			compatible = "actions,s700-pinctrl";
++			reg = <0x0 0xe01b0000 0x0 0x1000>;
++			clocks = <&cmu CLK_GPIO>;
++			gpio-controller;
++			gpio-ranges = <&pinctrl 0 0 136>;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
++		};
+ 	};
+ };
 -- 
 2.18.0
