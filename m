@@ -1,57 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 29 Jul 2018 14:32:10 +0200
-Subject: [PATCH v2 0/7] Stop losing firmware-set DMA masks
-In-Reply-To: <cover.1532382222.git.robin.murphy@arm.com>
-References: <cover.1532382222.git.robin.murphy@arm.com>
-Message-ID: <CAK8P3a3HDJ6svNN_cwvegxu20yNv8+tvc0D1A6Ooeq8agawbFg@mail.gmail.com>
+From: sravanhome@gmail.com (Saravanan Sekar)
+Date: Sun, 29 Jul 2018 20:25:51 +0200
+Subject: [PATCH v2 5/5] arm64: dts: actions: Add pinctrl node for Actions Semi
+ S700
+In-Reply-To: <20180729182551.19383-1-sravanhome@gmail.com>
+References: <20180729182551.19383-1-sravanhome@gmail.com>
+Message-ID: <20180729182551.19383-6-sravanhome@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 12:16 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> Whilst the common firmware code invoked by dma_configure() initialises
-> devices' DMA masks according to limitations described by the respective
-> properties ("dma-ranges" for OF and _DMA/IORT for ACPI), the nature of
-> the dma_set_mask() API leads to that information getting lost when
-> well-behaved drivers probe and set a 64-bit mask, since in general
-> there's no way to tell the difference between a firmware-described mask
-> (which should be respected) and whatever default may have come from the
-> bus code (which should be replaced outright). This can break DMA on
-> systems with certain IOMMU topologies (e.g. [1]) where the IOMMU driver
-> only knows its maximum supported address size, not how many of those
-> address bits might actually be wired up between any of its input
-> interfaces and the associated DMA master devices. Similarly, some PCIe
-> root complexes only have a 32-bit native interface on their host bridge,
-> which leads to the same DMA-address-truncation problem in systems with a
-> larger physical memory map and RAM above 4GB (e.g. [2]).
->
-> These patches attempt to deal with this in the simplest way possible by
-> generalising the specific quirk for 32-bit bridges into an arbitrary
-> mask which can then also be plumbed into the firmware code. In the
-> interest of being minimally invasive, I've only included a point fix
-> for the IOMMU issue as seen on arm64 - there may be further tweaks
-> needed in DMA ops (e.g. in arch/arm/ and other OF users) to catch all
-> possible incarnations of this problem, but at least any that I'm not
-> fixing here have always been broken. It is also noteworthy that
-> of_dma_get_range() has never worked properly for the way PCI host
-> bridges are passed into of_dma_configure() - I'll be working on
-> further patches to sort that out once this part is done.
+Add pinctrl nodes for Actions Semi S700 SoC
 
-Thanks a lot for working on this, this has bugged me for many years,
-and I've discussed possible solutions with lots of people over time.
+Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+---
+ arch/arm64/boot/dts/actions/s700.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-I /think/ all your patches are good, but I'm currently travelling and don't
-have a chance to review the resulting overall implementation.
-Could you summarize what happens in the following corner cases of
-DT dma-ranges after your changes (with a driver not setting a mask,
-setting a 64-bit mask and setting a 24-bit mask, respectively)?
-
-a) a device with no dma-ranges property anywhere in its parents
-b) a device with with a 64-bit dma-ranges translation in its parent
-   but none in its grandparent
-c) a device with no dma-ranges in its parent but a 64-bit mask
-   in its grandparent
-d) a device with a 24-bit mask in its parent.
-
-Thanks,
-
-      Arnd
+diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
+index 66dd5309f0a2..8fbd7b1570a7 100644
+--- a/arch/arm64/boot/dts/actions/s700.dtsi
++++ b/arch/arm64/boot/dts/actions/s700.dtsi
+@@ -165,5 +165,21 @@
+ 			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "timer1";
+ 		};
++
++		pinctrl: pinctrl at e01b0000 {
++			compatible = "actions,s700-pinctrl";
++			reg = <0x0 0xe01b0000 0x0 0x1000>;
++			clocks = <&cmu CLK_GPIO>;
++			gpio-controller;
++			gpio-ranges = <&pinctrl 0 0 136>;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
++		};
+ 	};
+ };
+-- 
+2.18.0
