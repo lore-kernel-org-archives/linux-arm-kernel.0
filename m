@@ -1,65 +1,84 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 29 Jul 2018 12:48:26 +0100
-Subject: [PATCH v2 1/4] iio: adc: xilinx: Check for return values in clk
- related functions
-In-Reply-To: <1532358123-23485-2-git-send-email-manish.narani@xilinx.com>
+Date: Sun, 29 Jul 2018 12:51:06 +0100
+Subject: [PATCH v2 2/4] iio: adc: xilinx: limit pcap clock frequency value
+In-Reply-To: <1532358123-23485-3-git-send-email-manish.narani@xilinx.com>
 References: <1532358123-23485-1-git-send-email-manish.narani@xilinx.com>
- <1532358123-23485-2-git-send-email-manish.narani@xilinx.com>
-Message-ID: <20180729124826.74784bf2@archlinux>
+ <1532358123-23485-3-git-send-email-manish.narani@xilinx.com>
+Message-ID: <20180729125106.05692a44@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 Jul 2018 20:32:00 +0530
+On Mon, 23 Jul 2018 20:32:01 +0530
 Manish Narani <manish.narani@xilinx.com> wrote:
 
-> This patch adds check for return values from clock related functions.
-> This was reported by static code analysis tool.
+> This patch limits the xadc pcap clock frequency value to be less than
+> 200MHz. This fixes the issue when zynq is booted at higher frequency
+> values, pcap crosses the maximum limit of 200MHz(Fmax) as it is derived
+> from IOPLL.
+> If this limit is crossed it is required to alter the WEDGE and REDGE
+> bits of XADC_CFG register to make timings better in the interface. So to
+> avoid alteration of these bits every time, the pcap value should not
+> cross the Fmax limit.
 > 
 > Signed-off-by: Manish Narani <manish.narani@xilinx.com>
-Applied to the togreg branch of iio.git and pushed out as testing for
-the autobuilders to play with it.
 
-Thanks,
+Applied, to the togreg branch of iio.git.  If you want this backported
+to stable, then request it once this patch is upstream.  It may be
+sometime given we've probably just missed the coming merge window.
+
+If you do need it faster then let me know and I'll look at moving
+it over to the branch of fixes during the RC phases.
 
 Jonathan
 
 > ---
->  drivers/iio/adc/xilinx-xadc-core.c | 11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
+>  drivers/iio/adc/xilinx-xadc-core.c | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
 > 
 > diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-> index 0127e85..23395fc 100644
+> index 23395fc..0dd306d 100644
 > --- a/drivers/iio/adc/xilinx-xadc-core.c
 > +++ b/drivers/iio/adc/xilinx-xadc-core.c
-> @@ -340,6 +340,8 @@ static int xadc_zynq_setup(struct platform_device *pdev,
->  	xadc->zynq_intmask = ~0;
+> @@ -322,6 +322,7 @@ static irqreturn_t xadc_zynq_interrupt_handler(int irq, void *devid)
 >  
->  	pcap_rate = clk_get_rate(xadc->clk);
-> +	if (!pcap_rate)
-> +		return -EINVAL;
+>  #define XADC_ZYNQ_TCK_RATE_MAX 50000000
+>  #define XADC_ZYNQ_IGAP_DEFAULT 20
+> +#define XADC_ZYNQ_PCAP_RATE_MAX 200000000
 >  
->  	if (tck_rate > pcap_rate / 2) {
->  		div = 2;
-> @@ -887,6 +889,9 @@ static int xadc_write_raw(struct iio_dev *indio_dev,
->  	unsigned long clk_rate = xadc_get_dclk_rate(xadc);
+>  static int xadc_zynq_setup(struct platform_device *pdev,
+>  	struct iio_dev *indio_dev, int irq)
+> @@ -332,6 +333,7 @@ static int xadc_zynq_setup(struct platform_device *pdev,
 >  	unsigned int div;
+>  	unsigned int igap;
+>  	unsigned int tck_rate;
+> +	int ret;
 >  
-> +	if (!clk_rate)
-> +		return -EINVAL;
-> +
->  	if (info != IIO_CHAN_INFO_SAMP_FREQ)
+>  	/* TODO: Figure out how to make igap and tck_rate configurable */
+>  	igap = XADC_ZYNQ_IGAP_DEFAULT;
+> @@ -343,6 +345,13 @@ static int xadc_zynq_setup(struct platform_device *pdev,
+>  	if (!pcap_rate)
 >  		return -EINVAL;
 >  
-> @@ -1237,8 +1242,10 @@ static int xadc_probe(struct platform_device *pdev)
->  		goto err_free_irq;
+> +	if (pcap_rate > XADC_ZYNQ_PCAP_RATE_MAX) {
+> +		ret = clk_set_rate(xadc->clk,
+> +				   (unsigned long)XADC_ZYNQ_PCAP_RATE_MAX);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+>  	if (tck_rate > pcap_rate / 2) {
+>  		div = 2;
+>  	} else {
+> @@ -368,6 +377,12 @@ static int xadc_zynq_setup(struct platform_device *pdev,
+>  			XADC_ZYNQ_CFG_REDGE | XADC_ZYNQ_CFG_WEDGE |
+>  			tck_div | XADC_ZYNQ_CFG_IGAP(igap));
 >  
->  	/* Disable all alarms */
-> -	xadc_update_adc_reg(xadc, XADC_REG_CONF1, XADC_CONF1_ALARM_MASK,
-> -		XADC_CONF1_ALARM_MASK);
-> +	ret = xadc_update_adc_reg(xadc, XADC_REG_CONF1, XADC_CONF1_ALARM_MASK,
-> +				  XADC_CONF1_ALARM_MASK);
-> +	if (ret)
-> +		goto err_free_irq;
+> +	if (pcap_rate > XADC_ZYNQ_PCAP_RATE_MAX) {
+> +		ret = clk_set_rate(xadc->clk, pcap_rate);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+>  	return 0;
+>  }
 >  
->  	/* Set thresholds to min/max */
->  	for (i = 0; i < 16; i++) {
