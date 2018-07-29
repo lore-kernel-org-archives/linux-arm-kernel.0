@@ -1,117 +1,84 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 30 Jul 2018 03:12:45 +0800
-Subject: [PATCH v2 1/5] pinctrl: actions: define constructor generic to
- Actions Semi SoC's
-In-Reply-To: <20180729182551.19383-2-sravanhome@gmail.com>
-References: <20180729182551.19383-2-sravanhome@gmail.com>
-Message-ID: <201807300323.a9ci7ngQ%fengguang.wu@intel.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Sun, 29 Jul 2018 21:23:04 +0200
+Subject: [PATCH v3 02/23] thermal: armada: remove useless register accesses
+In-Reply-To: <CAAEAJfDZZbsg6UrknYV+6jH-2QeGaTQaazHuZyWo3Zv06J9C+Q@mail.gmail.com>
+References: <20180716144206.30985-1-miquel.raynal@bootlin.com>
+ <20180716144206.30985-3-miquel.raynal@bootlin.com>
+ <CAAEAJfDZZbsg6UrknYV+6jH-2QeGaTQaazHuZyWo3Zv06J9C+Q@mail.gmail.com>
+Message-ID: <20180729212304.00987920@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Saravanan,
+Hi Ezequiel,
 
-Thank you for the patch! Yet something to improve:
+Ezequiel Garcia <ezequiel@vanguardiasur.com.ar> wrote on Fri, 27 Jul
+2018 13:13:20 -0300:
 
-[auto build test ERROR on pinctrl/devel]
-[also build test ERROR on next-20180727]
-[cannot apply to v4.18-rc6]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> Hi Miquel,
+> 
+> You know, it is usually useful to Cc the author of the lines a patch touches :-)
 
-url:    https://github.com/0day-ci/linux/commits/Saravanan-Sekar/Add-Actions-Semi-S700-pinctrl-support/20180730-022827
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git devel
-config: sparc64-allmodconfig (attached as .config)
-compiler: sparc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=sparc64 
+I have to admit I limited the CC list to the get_maintainers.pl output.
+But for sure I can add you for further changes :)
 
-Note: the linux-review/Saravanan-Sekar/Add-Actions-Semi-S700-pinctrl-support/20180730-022827 HEAD edc8b81de011f2413aa90b738a8fad302e281785 builds fine.
-      It only hurts bisectibility.
+> 
+> On 16 July 2018 at 11:41, Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+> > Prepare the migration to use regmaps by first simplifying the
+> > initialization functions: avoid unnecessary write/read cycles on
+> > configuration registers.
+> >
+> > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > ---
+> >  drivers/thermal/armada_thermal.c | 8 ++------
+> >  1 file changed, 2 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+> > index 077e8e562306..6fdb90b3c001 100644
+> > --- a/drivers/thermal/armada_thermal.c
+> > +++ b/drivers/thermal/armada_thermal.c
+> > @@ -103,16 +103,13 @@ static void armadaxp_init_sensor(struct platform_device *pdev,
+> >
+> >         reg = readl_relaxed(priv->control1);
+> >         reg |= PMU_TDC0_OTF_CAL_MASK;
+> > -       writel(reg, priv->control1);
+> >
+> >         /* Reference calibration value */
+> >         reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
+> >         reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
+> > -       writel(reg, priv->control1);
+> >
+> >         /* Reset the sensor */
+> > -       reg = readl_relaxed(priv->control1);
+> > -       writel((reg | PMU_TDC0_SW_RST_MASK), priv->control1);
+> > +       reg |= PMU_TDC0_SW_RST_MASK;
+> >
+> >         writel(reg, priv->control1);
+> >
+> > @@ -129,14 +126,13 @@ static void armada370_init_sensor(struct platform_device *pdev,
+> >
+> >         reg = readl_relaxed(priv->control1);
+> >         reg |= PMU_TDC0_OTF_CAL_MASK;
+> > -       writel(reg, priv->control1);
+> >
+> >         /* Reference calibration value */
+> >         reg &= ~PMU_TDC0_REF_CAL_CNT_MASK;
+> >         reg |= (0xf1 << PMU_TDC0_REF_CAL_CNT_OFFS);
+> > -       writel(reg, priv->control1);
+> >
+> >         reg &= ~PMU_TDC0_START_CAL_MASK;
+> > +
+> >         writel(reg, priv->control1);
+> >  
+> 
+> IIRC, the documentation for this hardware block was a meager.
+> 
+> Are you sure there isn't any requirement for the calibration
+> start to be issued separately or something like that?
 
-All errors (new ones prefixed by >>):
+I didn't find any info about this, I don't think it will be a problem
+if my understanding of this IP is correct (had a lot of interactions
+with Marvell engineers) but cannot be 100% sure, if someone has a
+problem we'll know where to look at.
 
-   drivers/pinctrl/actions/pinctrl-owl.c: In function 'owl_pad_pinconf_arg2val':
->> drivers/pinctrl/actions/pinctrl-owl.c:255:10: error: 'OWL_PINCONF_PULL_HOLD' undeclared (first use in this function); did you mean 'OWL_PINCONF_DRV_12MA'?
-      *arg = OWL_PINCONF_PULL_HOLD;
-             ^~~~~~~~~~~~~~~~~~~~~
-             OWL_PINCONF_DRV_12MA
-   drivers/pinctrl/actions/pinctrl-owl.c:255:10: note: each undeclared identifier is reported only once for each function it appears in
->> drivers/pinctrl/actions/pinctrl-owl.c:258:10: error: 'OWL_PINCONF_PULL_HIZ' undeclared (first use in this function); did you mean 'OWL_PINCONF_PULL_HOLD'?
-      *arg = OWL_PINCONF_PULL_HIZ;
-             ^~~~~~~~~~~~~~~~~~~~
-             OWL_PINCONF_PULL_HOLD
->> drivers/pinctrl/actions/pinctrl-owl.c:261:10: error: 'OWL_PINCONF_PULL_DOWN' undeclared (first use in this function); did you mean 'OWL_PINCONF_PULL_HOLD'?
-      *arg = OWL_PINCONF_PULL_DOWN;
-             ^~~~~~~~~~~~~~~~~~~~~
-             OWL_PINCONF_PULL_HOLD
->> drivers/pinctrl/actions/pinctrl-owl.c:264:10: error: 'OWL_PINCONF_PULL_UP' undeclared (first use in this function); did you mean 'OWL_PINCONF_PULL_HIZ'?
-      *arg = OWL_PINCONF_PULL_UP;
-             ^~~~~~~~~~~~~~~~~~~
-             OWL_PINCONF_PULL_HIZ
-   drivers/pinctrl/actions/pinctrl-owl.c: In function 'owl_pad_pinconf_val2arg':
-   drivers/pinctrl/actions/pinctrl-owl.c:282:18: error: 'OWL_PINCONF_PULL_HOLD' undeclared (first use in this function); did you mean 'OWL_PINCONF_DRV_12MA'?
-      *arg = *arg == OWL_PINCONF_PULL_HOLD;
-                     ^~~~~~~~~~~~~~~~~~~~~
-                     OWL_PINCONF_DRV_12MA
-   drivers/pinctrl/actions/pinctrl-owl.c:285:18: error: 'OWL_PINCONF_PULL_HIZ' undeclared (first use in this function); did you mean 'OWL_PINCONF_PULL_HOLD'?
-      *arg = *arg == OWL_PINCONF_PULL_HIZ;
-                     ^~~~~~~~~~~~~~~~~~~~
-                     OWL_PINCONF_PULL_HOLD
-   drivers/pinctrl/actions/pinctrl-owl.c:288:18: error: 'OWL_PINCONF_PULL_DOWN' undeclared (first use in this function); did you mean 'OWL_PINCONF_PULL_HOLD'?
-      *arg = *arg == OWL_PINCONF_PULL_DOWN;
-                     ^~~~~~~~~~~~~~~~~~~~~
-                     OWL_PINCONF_PULL_HOLD
-   drivers/pinctrl/actions/pinctrl-owl.c:291:18: error: 'OWL_PINCONF_PULL_UP' undeclared (first use in this function); did you mean 'OWL_PINCONF_PULL_HIZ'?
-      *arg = *arg == OWL_PINCONF_PULL_UP;
-                     ^~~~~~~~~~~~~~~~~~~
-                     OWL_PINCONF_PULL_HIZ
-
-vim +255 drivers/pinctrl/actions/pinctrl-owl.c
-
-2242ddfb Manivannan Sadhasivam 2018-04-04  248  
-2242ddfb Manivannan Sadhasivam 2018-04-04  249  static int owl_pad_pinconf_arg2val(const struct owl_padinfo *info,
-2242ddfb Manivannan Sadhasivam 2018-04-04  250  				unsigned int param,
-2242ddfb Manivannan Sadhasivam 2018-04-04  251  				u32 *arg)
-2242ddfb Manivannan Sadhasivam 2018-04-04  252  {
-2242ddfb Manivannan Sadhasivam 2018-04-04  253  	switch (param) {
-2242ddfb Manivannan Sadhasivam 2018-04-04  254  	case PIN_CONFIG_BIAS_BUS_HOLD:
-2242ddfb Manivannan Sadhasivam 2018-04-04 @255  		*arg = OWL_PINCONF_PULL_HOLD;
-2242ddfb Manivannan Sadhasivam 2018-04-04  256  		break;
-2242ddfb Manivannan Sadhasivam 2018-04-04  257  	case PIN_CONFIG_BIAS_HIGH_IMPEDANCE:
-2242ddfb Manivannan Sadhasivam 2018-04-04 @258  		*arg = OWL_PINCONF_PULL_HIZ;
-2242ddfb Manivannan Sadhasivam 2018-04-04  259  		break;
-2242ddfb Manivannan Sadhasivam 2018-04-04  260  	case PIN_CONFIG_BIAS_PULL_DOWN:
-2242ddfb Manivannan Sadhasivam 2018-04-04 @261  		*arg = OWL_PINCONF_PULL_DOWN;
-2242ddfb Manivannan Sadhasivam 2018-04-04  262  		break;
-2242ddfb Manivannan Sadhasivam 2018-04-04  263  	case PIN_CONFIG_BIAS_PULL_UP:
-2242ddfb Manivannan Sadhasivam 2018-04-04 @264  		*arg = OWL_PINCONF_PULL_UP;
-2242ddfb Manivannan Sadhasivam 2018-04-04  265  		break;
-2242ddfb Manivannan Sadhasivam 2018-04-04  266  	case PIN_CONFIG_INPUT_SCHMITT_ENABLE:
-2242ddfb Manivannan Sadhasivam 2018-04-04  267  		*arg = (*arg >= 1 ? 1 : 0);
-2242ddfb Manivannan Sadhasivam 2018-04-04  268  		break;
-2242ddfb Manivannan Sadhasivam 2018-04-04  269  	default:
-2242ddfb Manivannan Sadhasivam 2018-04-04  270  		return -ENOTSUPP;
-2242ddfb Manivannan Sadhasivam 2018-04-04  271  	}
-2242ddfb Manivannan Sadhasivam 2018-04-04  272  
-2242ddfb Manivannan Sadhasivam 2018-04-04  273  	return 0;
-2242ddfb Manivannan Sadhasivam 2018-04-04  274  }
-2242ddfb Manivannan Sadhasivam 2018-04-04  275  
-
-:::::: The code at line 255 was first introduced by commit
-:::::: 2242ddfbf4d699b58d12467bbebae167d7563700 pinctrl: actions: Add Actions S900 pinctrl driver
-
-:::::: TO: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-:::::: CC: Linus Walleij <linus.walleij@linaro.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 54284 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180730/2b0b1bcd/attachment-0001.gz>
+Thanks,
+Miqu?l
