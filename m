@@ -1,26 +1,34 @@
 From: davem@davemloft.net (David Miller)
-Date: Sat, 28 Jul 2018 19:08:09 -0700 (PDT)
-Subject: [PATCH] net: mdio-mux: bcm-iproc: fix wrong getter and setter pair
-In-Reply-To: <20180727161707.GP10686@lunn.ch>
-References: <20180727155747.24978-1-vasilyev@ispras.ru>
- <20180727161707.GP10686@lunn.ch>
-Message-ID: <20180728.190809.1376213313357548269.davem@davemloft.net>
+Date: Sat, 28 Jul 2018 22:14:11 -0700 (PDT)
+Subject: [PATCH net-next v3 0/8] A fix and a few improvements on mvneta
+In-Reply-To: <87h8ko7ozf.fsf@bootlin.com>
+References: <20180718161057.28704-1-gregory.clement@bootlin.com>
+ <87h8ko7ozf.fsf@bootlin.com>
+Message-ID: <20180728.221411.871884033416188094.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Lunn <andrew@lunn.ch>
-Date: Fri, 27 Jul 2018 18:17:07 +0200
+From: Gregory CLEMENT <gregory.clement@bootlin.com>
+Date: Tue, 24 Jul 2018 15:16:52 +0200
 
-> On Fri, Jul 27, 2018 at 06:57:47PM +0300, Anton Vasilyev wrote:
->> mdio_mux_iproc_probe() uses platform_set_drvdata() to store md pointer
->> in device, whereas mdio_mux_iproc_remove() restores md pointer by
->> dev_get_platdata(&pdev->dev). This leads to wrong resources release.
->> 
->> The patch replaces getter to platform_get_drvdata.
->> 
->> Signed-off-by: Anton Vasilyev <vasilyev@ispras.ru>
+> Hi David,
+>  
+>  On mer., juil. 18 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
 > 
-> Fixes: 98bc865a1ec8 ("net: mdio-mux: Add MDIO mux driver for iProc SoCs")
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+>> Hello,
+>>
+>> This series brings some improvements for the mvneta driver and also
+>> adds a fix.
+>>
+>> Compared to the v2, the main change is another patch fixing a bug
+>> in mtu_change.
+>>
+> 
+> I saw in patchwork, the status was "Accepted" (for example the 1st patch
+> [1]). However the series is not in your git branches and usually you
+> also answered to the series to inform that you have applied it. So I
+> would like to know what is the status of the series.
 
-Applied and queued up for -stable, thanks.
+This series should now really be in net-next.
+
+Sorry about that!
