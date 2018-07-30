@@ -1,37 +1,44 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 30 Jul 2018 17:42:05 +0100
-Subject: [PATCH v2 1/7] drm/i2c: tda998x: find the drm_device via the
- drm_connector
-In-Reply-To: <20180730164137.GD17271@n2100.armlinux.org.uk>
-References: <20180730164137.GD17271@n2100.armlinux.org.uk>
-Message-ID: <E1fkBFF-00048Q-Tk@rmk-PC.armlinux.org.uk>
+From: dave.kleikamp@oracle.com (Dave Kleikamp)
+Date: Mon, 30 Jul 2018 11:46:24 -0500
+Subject: [PATCH 1/1] arm64: kexec: machine_kexec should call
+ __flush_icache_range
+In-Reply-To: <20180730162235.GC4276@arm.com>
+References: <faf6c7cb-d9da-9a9c-cc0f-43c95e864ca2@oracle.com>
+ <e07fc674-2a71-29ae-2212-46ee5f79593d@oracle.com>
+ <20180730161641.6zxxy3lxp27tznck@armageddon.cambridge.arm.com>
+ <20180730162235.GC4276@arm.com>
+Message-ID: <2651847f-79ea-fe2a-c1d7-efe4d11702b4@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Rosin <peda@axentia.se>
+On 07/30/2018 11:22 AM, Will Deacon wrote:
+> On Mon, Jul 30, 2018 at 05:16:42PM +0100, Catalin Marinas wrote:
+>> On Mon, Jul 30, 2018 at 10:29:21AM -0500, Dave Kleikamp wrote:
+>>> machine_kexec flushes the reboot_code_buffer from the icache
+>>> after stopping the other cpus.
+>>>
+>>> Commit 3b8c9f1cdfc5 ("arm64: IPI each CPU after invalidating the I-cache
+>>> for kernel mappings") added an IPI call to flush_icache_range, which
+>>> causes a hang here, so replace the call with __flush_icache_range
+>>
+>> While machine_kexec() may be called with interrupts disabled (IIUC) and
+>> we shouldn't IPI other CPUs, I don't understand why it hangs here. Are
+>> there any other CPUs online at this point?
+> 
+> The BUG_ON and WARN_ON at the start of machine_kexec() suggest to me that
+> this should only happen if we're kexec'ing a crash kernel and
+> smp_crash_stop_failed(). Is that something we need to care about?
 
-This prepares for being a drm_bridge which will not register the
-encoder. That makes the connector the better choice.
+I observed the hang trying to kexec a crash kernel and I did not see the
+warning that smp_crash_stop_failed(). I'm not exactly sure why
+flush_icache_range() hung (but it did), but I think that
+__flush_icache_range() makes more sense here anyway.
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Peter Rosin <peda@axentia.se>
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- drivers/gpu/drm/i2c/tda998x_drv.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index c3ebb9c4fc26..b05f54c8585b 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -753,7 +753,7 @@ static void tda998x_detect_work(struct work_struct *work)
- {
- 	struct tda998x_priv *priv =
- 		container_of(work, struct tda998x_priv, detect_work);
--	struct drm_device *dev = priv->encoder.dev;
-+	struct drm_device *dev = priv->connector.dev;
- 
- 	if (dev)
- 		drm_kms_helper_hotplug_event(dev);
--- 
-2.7.4
+> 
+> Will
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
