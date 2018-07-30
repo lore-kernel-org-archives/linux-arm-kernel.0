@@ -1,44 +1,30 @@
-From: dave.kleikamp@oracle.com (Dave Kleikamp)
-Date: Mon, 30 Jul 2018 11:46:24 -0500
-Subject: [PATCH 1/1] arm64: kexec: machine_kexec should call
- __flush_icache_range
-In-Reply-To: <20180730162235.GC4276@arm.com>
-References: <faf6c7cb-d9da-9a9c-cc0f-43c95e864ca2@oracle.com>
- <e07fc674-2a71-29ae-2212-46ee5f79593d@oracle.com>
- <20180730161641.6zxxy3lxp27tznck@armageddon.cambridge.arm.com>
- <20180730162235.GC4276@arm.com>
-Message-ID: <2651847f-79ea-fe2a-c1d7-efe4d11702b4@oracle.com>
+From: arun.parameswaran@broadcom.com (Arun Parameswaran)
+Date: Mon, 30 Jul 2018 09:47:29 -0700
+Subject: [PATCH v2 6/7] net: phy: Add support to configure clock in
+ Broadcom iProc mdio mux
+In-Reply-To: <20180728000303.GA23816@lunn.ch>
+References: <1532726613-6483-1-git-send-email-arun.parameswaran@broadcom.com>
+ <1532726613-6483-7-git-send-email-arun.parameswaran@broadcom.com>
+ <20180728000303.GA23816@lunn.ch>
+Message-ID: <b7b62b2f-2936-c8d0-3443-66d00713db20@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2018 11:22 AM, Will Deacon wrote:
-> On Mon, Jul 30, 2018 at 05:16:42PM +0100, Catalin Marinas wrote:
->> On Mon, Jul 30, 2018 at 10:29:21AM -0500, Dave Kleikamp wrote:
->>> machine_kexec flushes the reboot_code_buffer from the icache
->>> after stopping the other cpus.
->>>
->>> Commit 3b8c9f1cdfc5 ("arm64: IPI each CPU after invalidating the I-cache
->>> for kernel mappings") added an IPI call to flush_icache_range, which
->>> causes a hang here, so replace the call with __flush_icache_range
->>
->> While machine_kexec() may be called with interrupts disabled (IIUC) and
->> we shouldn't IPI other CPUs, I don't understand why it hangs here. Are
->> there any other CPUs online at this point?
-> 
-> The BUG_ON and WARN_ON at the start of machine_kexec() suggest to me that
-> this should only happen if we're kexec'ing a crash kernel and
-> smp_crash_stop_failed(). Is that something we need to care about?
+Hi Andrew
 
-I observed the hang trying to kexec a crash kernel and I did not see the
-warning that smp_crash_stop_failed(). I'm not exactly sure why
-flush_icache_range() hung (but it did), but I think that
-__flush_icache_range() makes more sense here anyway.
+On 18-07-27 05:03 PM, Andrew Lunn wrote:
+>>  static void mdio_mux_iproc_config(struct iproc_mdiomux_desc *md)
+>>  {
+>>  	u32 val;
+>> +	u32 divisor;
+> 
+> Hi Arun
+> 
+> Reverse Christmas tree please.
+> 
+> 	Andrew
+> 
+Ok, will send out an updated patch.
 
-> 
-> Will
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Thanks
+Arun
