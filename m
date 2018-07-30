@@ -1,18 +1,18 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Mon, 30 Jul 2018 09:57:51 +0200
-Subject: [PATCH v8 2/6] ARM: imx6: register pm_power_off handler if
- "fsl,pmic-stby-poweroff" is set
-In-Reply-To: <DB6PR04MB3223A62E5609BF6431ABEA40892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
+Date: Mon, 30 Jul 2018 09:58:32 +0200
+Subject: [PATCH v8 6/6] ARM: dts: imx6: RIoTboard provide standby on power
+ off option
+In-Reply-To: <DB6PR04MB3223FA7B91D0D43B2EC1EE2A892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
 References: <20180726092220.17250-1-o.rempel@pengutronix.de>
- <20180726092220.17250-3-o.rempel@pengutronix.de>
- <DB6PR04MB3223A62E5609BF6431ABEA40892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
-Message-ID: <86871e56-2d1a-50e0-fe36-f008deb80dad@pengutronix.de>
+ <20180726092220.17250-7-o.rempel@pengutronix.de>
+ <DB6PR04MB3223FA7B91D0D43B2EC1EE2A892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
+Message-ID: <afe757dd-d2e7-8bf5-dca0-17a69a36f7c3@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 27.07.2018 11:15, Robin Gong wrote:
+On 27.07.2018 11:33, Robin Gong wrote:
 > 
 > 
 >> -----Original Message-----
@@ -30,83 +30,47 @@ On 27.07.2018 11:15, Robin Gong wrote:
 >> <sboyd@codeaurora.org>; Fabio Estevam <fabio.estevam@nxp.com>; Russell
 >> King <linux@armlinux.org.uk>; dl-linux-imx <linux-imx@nxp.com>; Robin Gong
 >> <yibin.gong@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
->> Subject: [PATCH v8 2/6] ARM: imx6: register pm_power_off handler if
->> "fsl,pmic-stby-poweroff" is set
+>> Subject: [PATCH v8 6/6] ARM: dts: imx6: RIoTboard provide standby on power
+>> off option
 >>
->> One of the Freescale recommended sequences for power off with external
->> PMIC is the following:
->> ...
->> 3.  SoC is programming PMIC for power off when standby is asserted.
->> 4.  In CCM STOP mode, Standby is asserted, PMIC gates SoC supplies.
->>
->> See:
->> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fwww.
->> nxp.com%2Fassets%2Fdocuments%2Fdata%2Fen%2Freference-manuals%2FIM
->> X6DQRM.pdf&amp;data=02%7C01%7Cyibin.gong%40nxp.com%7C193fd19e3a
->> 40416ffa4a08d5f2d9583c%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C1
->> %7C636681937661914076&amp;sdata=lICAelYpUh4%2Ft%2Fs7N9mdk2cLQMi
->> cHcOqQ07vTOUoyNY%3D&amp;reserved=0
->> page 5083
->>
->> This patch implements step 4. of this sequence.
+>> This board, as well as some other boards with i.MX6 and a PMIC, uses a
+>> "PMIC_STBY_REQ" line to notify the PMIC about a state change.
+>> The PMIC is programmed for a specific state change before triggering the line.
+>> In this case, PMIC_STBY_REQ can be used for stand by, sleep and power off
+>> modes.
 >>
 >> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 >> ---
->>  arch/arm/mach-imx/pm-imx6.c | 25 +++++++++++++++++++++++++
->>  1 file changed, 25 insertions(+)
+>>  arch/arm/boot/dts/imx6dl-riotboard.dts | 5 +++++
+>>  1 file changed, 5 insertions(+)
 >>
->> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
->> index 017539dd712b..2f5c643f62fb 100644
->> --- a/arch/arm/mach-imx/pm-imx6.c
->> +++ b/arch/arm/mach-imx/pm-imx6.c
->> @@ -601,6 +601,28 @@ static void __init imx6_pm_common_init(const struct
->> imx6_pm_socdata
->>  				   IMX6Q_GPR1_GINT);
->>  }
+>> diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts
+>> b/arch/arm/boot/dts/imx6dl-riotboard.dts
+>> index 2e98c92adff7..a0e9753ee767 100644
+>> --- a/arch/arm/boot/dts/imx6dl-riotboard.dts
+>> +++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
+>> @@ -90,6 +90,10 @@
+>>  	status = "okay";
+>>  };
 >>
->> +static void imx6_pm_stby_poweroff(void) {
->> +	imx6_set_lpm(STOP_POWER_OFF);
->> +	imx6q_suspend_finish(0);
->> +
->> +	mdelay(1000);
->> +
->> +	pr_emerg("Unable to poweroff system\n"); }
->> +
->> +static int imx6_pm_stby_poweroff_probe(void) {
->> +	if (pm_power_off) {
->> +		pr_warn("%s: pm_power_off already claimed  %p %pf!\n",
->> +			__func__, pm_power_off, pm_power_off);
+>> +&clks {
+>> +	fsl,pmic-stby-poweroff;
+>> +};
+> It's better remove the default "syscon-poweroff" power off node.
 
-> 'syscon-poweroff' and 'pmic-stby-poweroff ' should be chosen as a single
-> Poweroff way for any i.mx6 board. Why not delete directly 'syscon-poweroff' in dts 
-> to avoid such two power off ways coexist?
+ok
 
-pm_power_off can be registred by any part of the kernel. So, we need it
-to avoid conflicts or at least to be able see them.
-
-On other hand, you are right. syscon-poweroff should be disabled for
-this board.
-
->> +		return -EBUSY;
->> +	}
->> +
->> +	pm_power_off = imx6_pm_stby_poweroff;
->> +	return 0;
->> +}
->> +
->>  void __init imx6_pm_ccm_init(const char *ccm_compat)  {
->>  	struct device_node *np;
->> @@ -617,6 +639,9 @@ void __init imx6_pm_ccm_init(const char
->> *ccm_compat)
->>  	val = readl_relaxed(ccm_base + CLPCR);
->>  	val &= ~BM_CLPCR_LPM;
->>  	writel_relaxed(val, ccm_base + CLPCR);
->> +
->> +	if (of_property_read_bool(np, "fsl,pmic-stby-poweroff"))
->> +		imx6_pm_stby_poweroff_probe();
->>  }
+>>  &fec {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&pinctrl_enet>;
+>> @@ -170,6 +174,7 @@
+>>  		reg = <0x08>;
+>>  		interrupt-parent = <&gpio5>;
+>>  		interrupts = <16 8>;
+>> +		fsl,pmic-stby-poweroff;
 >>
->>  void __init imx6q_pm_init(void)
+>>  		regulators {
+>>  			reg_vddcore: sw1ab {				/* VDDARM_IN */
 >> --
 >> 2.18.0
 > 
@@ -117,4 +81,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 488 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180730/aaa2e745/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180730/bb08d822/attachment.sig>
