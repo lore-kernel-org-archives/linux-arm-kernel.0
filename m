@@ -1,46 +1,66 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Mon, 30 Jul 2018 11:11:33 +0800
-Subject: [PATCH mmc-next v3 3/3] mmc: sdhci-of-dwcmshc: solve 128MB DMA
- boundary limitation
-In-Reply-To: <01010164e92bcc1a-c3ac69eb-f6e5-4420-ac87-de1a0ffd0ac5-000000@us-west-2.amazonses.com>
-References: <20180730104228.28b58bd0@xhacker.debian>
- <20180730104636.1a3e6c81@xhacker.debian>
- <01010164e91d7bda-aa616cbf-7bb2-4fe4-85e5-a18e16433fde-000000@us-west-2.amazonses.com>
- <20180730105954.6c365a7b@xhacker.debian>
- <01010164e92bcc1a-c3ac69eb-f6e5-4420-ac87-de1a0ffd0ac5-000000@us-west-2.amazonses.com>
-Message-ID: <20180730111133.0b4e8b2d@xhacker.debian>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 30 Jul 2018 11:53:06 +0800
+Subject: [PATCH] drm/mediatek: Convert drm_atomic_helper_suspend/resume()
+In-Reply-To: <20180728133845.GA15261@jordon-HP-15-Notebook-PC>
+References: <20180728133845.GA15261@jordon-HP-15-Notebook-PC>
+Message-ID: <1532922786.3723.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Jul 2018 03:11:59 +0000
-Matthew Leon <matthewleon@linux.com> wrote:
+Hi, Souptick:
 
->  >> Hey Jisheng,  
-> 
-> >Hi,  
-> 
-> >>  
-> 
-> >In LKML, we'd better not top post.  
-> 
-> Noted. My apologies.
-> 
-> >> Shouldn't we be splitting until all DMA blocks are less than 128M  
-> boundary?
-> >> I am a noob, but I think we should be prepared for boundaries that when
-> >> split in two, will still be greater than 128M. Feel free to disagree but
-> >> please explain why I may be wrong. Thank-you.  
-> 
-> >the limitation is "DMA addr can't span 128MB boundary" rather than "must be
-> >less than 128MB", they are different.  
-> 
-> >And the max transfer size of one DMA desc is 64KB.  
-> 
-> >thanks  
-> 
-> I have misspoken. What if the DMA transfer size is 1024M? If we split in
-> two, then we have 2 transfers, each of which span 512M. So wouldn't we need
-> to split again to have 4 transfers, each of which span 128M?
+On Sat, 2018-07-28 at 19:08 +0530, Souptick Joarder wrote:
+> convert drm_atomic_helper_suspend/resume() to use
+> drm_mode_config_helper_suspend/resume().
 > 
 
-the max transfer size of each desc is 64KB, how could it be 1024MB?
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
+
+> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 21 ++++++++-------------
+>  1 file changed, 8 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> index a2ca90f..1fcda2de 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> @@ -520,29 +520,24 @@ static int mtk_drm_sys_suspend(struct device *dev)
+>  {
+>  	struct mtk_drm_private *private = dev_get_drvdata(dev);
+>  	struct drm_device *drm = private->drm;
+> +	int ret;
+>  
+> -	drm_kms_helper_poll_disable(drm);
+> -
+> -	private->suspend_state = drm_atomic_helper_suspend(drm);
+> -	if (IS_ERR(private->suspend_state)) {
+> -		drm_kms_helper_poll_enable(drm);
+> -		return PTR_ERR(private->suspend_state);
+> -	}
+> -
+> +	ret = drm_mode_config_helper_suspend(drm);
+>  	DRM_DEBUG_DRIVER("mtk_drm_sys_suspend\n");
+> -	return 0;
+> +
+> +	return ret;
+>  }
+>  
+>  static int mtk_drm_sys_resume(struct device *dev)
+>  {
+>  	struct mtk_drm_private *private = dev_get_drvdata(dev);
+>  	struct drm_device *drm = private->drm;
+> +	int ret;
+>  
+> -	drm_atomic_helper_resume(drm, private->suspend_state);
+> -	drm_kms_helper_poll_enable(drm);
+> -
+> +	ret = drm_mode_config_helper_resume(drm);
+>  	DRM_DEBUG_DRIVER("mtk_drm_sys_resume\n");
+> -	return 0;
+> +
+> +	return ret;
+>  }
+>  #endif
+>  
