@@ -1,95 +1,50 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Mon, 30 Jul 2018 11:54:43 +0530
-Subject: [PATCH v2] arm64, kaslr: export offset in VMCOREINFO ELF notes
-Message-ID: <1532931883-16132-1-git-send-email-bhsharma@redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 30 Jul 2018 08:46:21 +0200
+Subject: [RFC PATCH] arm64: mm: Export __sync_icache_dcache() for
+ xen-privcmd
+In-Reply-To: <20180727132243.GA28549@arm.com>
+References: <20180711231822.GG14131@decadent.org.uk>
+ <20180727120633.bjpfqswuxcy2ibqu@armageddon.cambridge.arm.com>
+ <20180727132243.GA28549@arm.com>
+Message-ID: <CAMuHMdVZHiqi9Wex05v6fLcndfN7oDuJK3ft7O=itEM4DwfP2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include KASLR offset in arm64 VMCOREINFO ELF notes to assist in
-debugging. vmcore parsing in user-space already expects this value in
-the notes and we are providing it for portability of those existing
-tools with x86.
+On Fri, Jul 27, 2018 at 3:23 PM Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Jul 27, 2018 at 01:06:33PM +0100, Catalin Marinas wrote:
+> > On Thu, Jul 12, 2018 at 12:18:22AM +0100, Ben Hutchings wrote:
+> > > The xen-privcmd driver, which can be modular, calls set_pte_at()
+> > > which in turn may call __sync_icache_dcache().
+> > >
+> > > The call to __sync_icache_dcache() may be optimised out because it is
+> > > conditional on !pte_special(), and xen-privcmd calls pte_mkspecial().
+> > > But it seems unwise to rely on this optimisation.
+> > >
+> > > Fixes: 3ad0876554ca ("xen/privcmd: add IOCTL_PRIVCMD_MMAP_RESOURCE")
+> > > Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+> > > ---
+> > > This is an RFC since I haven't found an actual build failure.  Using
+> > > Debian's gcc 7.3 with either CC_OPTIMIZE_FOR_PERFORMANCE or
+> > > CC_OPTIMIZE_FOR_SIZE, the call *is* optimised away.
+> >
+> > Since apply_to_page_range() is EXPORT_SYMBOL_GPL() and a
+> > pte_fn_t function would likely use set_pte_at(), I'm fine with this
+> > patch for consistency.
+> >
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>
+> Okey doke, I'll pick this up for 4.19.
 
-Ideally we would like core code to do this (so that way this
-information won't be missed when an architecture adds KASLR support),
-but mips has CONFIG_RANDOMIZE_BASE, and doesn't provide kaslr_offset(),
-so I am not sure if this is needed for mips (and other such similar arch
-cases in future). So, lets keep this architecture specific for now.
+Note that this is a build regression in v4.18-rc4 and later:
+http://kisskb.ellerman.id.au/kisskb/buildresult/13450058/
 
-As an example of a user-space use-case, consider the
-makedumpfile user-space utility which will need fixup to use this
-KASLR offset to work with cases where we need to find a way to
-translate symbol address from vmlinux to kernel run time address
-in case of KASLR boot on arm64.
+Gr{oetje,eeting}s,
 
-I have already submitted the makedumpfile user-space patch upstream
-and the maintainer has suggested to wait for the kernel changes to be
-included (see [0]).
+                        Geert
 
-I tested this on my qualcomm amberwing board both for KASLR and
-non-KASLR boot cases:
-
-Without this patch:
-   # cat > scrub.conf << EOF
-   [vmlinux]
-   erase jiffies
-   erase init_task.utime
-   for tsk in init_task.tasks.next within task_struct:tasks
-       erase tsk.utime
-   endfor
-   EOF
-
-  # makedumpfile --split -d 31 -x vmlinux --config scrub.conf vmcore dumpfile_{1,2,3}
-  readpage_elf: Attempt to read non-existent page at 0xffffa8a5bf180000.
-  readmem: type_addr: 1, addr:ffffa8a5bf180000, size:8
-  vaddr_to_paddr_arm64: Can't read pgd
-  readmem: Can't convert a virtual address(ffff0000092a542c) to physical
-  address.
-  readmem: type_addr: 0, addr:ffff0000092a542c, size:390
-  check_release: Can't get the address of system_utsname
-
-After this patch check_release() is ok, and also we are able to erase
-symbol from vmcore (I checked this with kernel 4.18.0-rc4+):
-
-  # makedumpfile --split -d 31 -x vmlinux --config scrub.conf vmcore dumpfile_{1,2,3}
-  The kernel version is not supported.
-  The makedumpfile operation may be incomplete.
-  Checking for memory holes                         : [100.0 %] \
-  Checking for memory holes                         : [100.0 %] |
-  Checking foExcluding unnecessary pages                       : [100.0 %]
-  \
-  Excluding unnecessary pages                       : [100.0 %] \
-
-  The dumpfiles are saved to dumpfile_1, dumpfile_2, and dumpfile_3.
-
-  makedumpfile Completed.
-
-[0] https://www.spinics.net/lists/kexec/msg21195.html
-
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Signed-off-by: Bhupesh Sharma <bhsharma@redhat.com>
----
-Changes since v1:
- - Addressed review comments from James regarding commit log
- - v1 can be viewed here: https://lkml.org/lkml/2018/7/18/951
- - v2 is rebased against linux-next/master
-
- arch/arm64/kernel/machine_kexec.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index f62effc6e064..028df356a5fd 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -360,4 +360,5 @@ void arch_crash_save_vmcoreinfo(void)
- 						kimage_voffset);
- 	vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
- 						PHYS_OFFSET);
-+	vmcoreinfo_append_str("KERNELOFFSET=%lx\n", kaslr_offset());
- }
 -- 
-2.7.4
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
