@@ -1,21 +1,17 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 30 Jul 2018 15:50:04 -0700
-Subject: [PATCH v2 2/7] net: phy: Fix the register offsets in Broadcom
- iProc mdio mux driver
-In-Reply-To: <1532726613-6483-3-git-send-email-arun.parameswaran@broadcom.com>
+From: florian.fainelli@broadcom.com (Florian Fainelli)
+Date: Mon, 30 Jul 2018 15:50:25 -0700
+Subject: [PATCH v2 3/7] arm64: dts: Fix the base address of the Broadcom
+ iProc mdio mux
+In-Reply-To: <1532726613-6483-4-git-send-email-arun.parameswaran@broadcom.com>
 References: <1532726613-6483-1-git-send-email-arun.parameswaran@broadcom.com>
- <1532726613-6483-3-git-send-email-arun.parameswaran@broadcom.com>
-Message-ID: <eac0f689-a7b6-69f2-2f96-e7a959b283ce@gmail.com>
+ <1532726613-6483-4-git-send-email-arun.parameswaran@broadcom.com>
+Message-ID: <6139b5ad-32a9-4a63-1d6c-4a986c48fad4@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/27/2018 02:23 PM, Arun Parameswaran wrote:
-> Modify the register offsets in the Broadcom iProc mdio mux to start
-> from the top of the register address space.
-> 
-> Earlier, the base address pointed to the end of the block's register
-> space. The base address will now point to the start of the mdio's
-> address space. The offsets have been fixed to match this.
+> Modify the base address of the mdio mux driver to point to the
+> start of the mdio mux block's register address space.
 > 
 > Signed-off-by: Arun Parameswaran <arun.parameswaran@broadcom.com>
 
