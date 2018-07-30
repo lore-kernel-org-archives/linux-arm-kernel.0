@@ -1,26 +1,37 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jul 2018 17:41:37 +0100
-Subject: [PATCH v2 0/7] tda998x: allow use with bridge based devices
-Message-ID: <20180730164137.GD17271@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Mon, 30 Jul 2018 17:42:05 +0100
+Subject: [PATCH v2 1/7] drm/i2c: tda998x: find the drm_device via the
+ drm_connector
+In-Reply-To: <20180730164137.GD17271@n2100.armlinux.org.uk>
+References: <20180730164137.GD17271@n2100.armlinux.org.uk>
+Message-ID: <E1fkBFF-00048Q-Tk@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Peter Rosin <peda@axentia.se>
 
-This is a re-posting of the series I responded to Peter Rosin's May
-posting, with a few bugs fixed, and the bridge registered outside of
-the component helper.  This should allow Peter to use the driver
-while maintaining armada drm and tilcdc support.
+This prepares for being a drm_bridge which will not register the
+encoder. That makes the connector the better choice.
 
-No comments (other than 0-day test results) were received on the
-previous posting.
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Peter Rosin <peda@axentia.se>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ drivers/gpu/drm/i2c/tda998x_drv.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This is independent of the component helper vs bridge safety issues.
-
- drivers/gpu/drm/i2c/tda998x_drv.c | 288 ++++++++++++++++++++------------------
- 1 file changed, 151 insertions(+), 137 deletions(-)
-
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index c3ebb9c4fc26..b05f54c8585b 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -753,7 +753,7 @@ static void tda998x_detect_work(struct work_struct *work)
+ {
+ 	struct tda998x_priv *priv =
+ 		container_of(work, struct tda998x_priv, detect_work);
+-	struct drm_device *dev = priv->encoder.dev;
++	struct drm_device *dev = priv->connector.dev;
+ 
+ 	if (dev)
+ 		drm_kms_helper_hotplug_event(dev);
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+2.7.4
