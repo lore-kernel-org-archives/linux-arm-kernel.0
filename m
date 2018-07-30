@@ -1,26 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 30 Jul 2018 17:14:40 -0600
-Subject: [PATCH v3 9/9] dts: juno: Update coresight bindings
-In-Reply-To: <1532686537-12380-10-git-send-email-suzuki.poulose@arm.com>
-References: <1532686537-12380-1-git-send-email-suzuki.poulose@arm.com>
- <1532686537-12380-10-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180730231440.GA7782@rob-hp-laptop>
+Date: Mon, 30 Jul 2018 17:15:06 -0600
+Subject: [PATCH v3 3/4] nvmem: sunxi-sid: add support for H5's SID
+ controller
+In-Reply-To: <20180727115205.20955-3-manu@freebsd.org>
+References: <20180727115205.20955-1-manu@freebsd.org>
+ <20180727115205.20955-3-manu@freebsd.org>
+Message-ID: <20180730231506.GA8608@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2018 at 11:15:37AM +0100, Suzuki K Poulose wrote:
-> Switch to updated coresight bindings for Juno platforms.
+On Fri, Jul 27, 2018 at 01:52:04PM +0200, Emmanuel Vadot wrote:
+> The H5 SoC have a SID controller that looks like the one in A64, the
+> cells are in the same offset but doesn't contain the same data (thermal
+> sensor calibration for example).
+> Add a binding for it.
 > 
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
 > ---
-> Changes since V2:
->   - Update to new format.
-> ---
->  arch/arm64/boot/dts/arm/juno-base.dtsi    | 161 +++++++++++++++---------------
->  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi |  52 ++++------
->  arch/arm64/boot/dts/arm/juno.dts          |  13 +--
->  3 files changed, 105 insertions(+), 121 deletions(-)
+>  Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
