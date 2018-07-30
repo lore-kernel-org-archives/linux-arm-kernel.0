@@ -1,60 +1,48 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 30 Jul 2018 17:06:39 +0200
-Subject: [PATCH v3] mmc: sunxi: remove output of virtual base address
-In-Reply-To: <20180723153431.8669-1-andre.przywara@arm.com>
-References: <20180723153431.8669-1-andre.przywara@arm.com>
-Message-ID: <CAPDyKFpa=BHDQfBFxc6LUjq1fBuC2=rqYp28xWS3QBc=rTOYjQ@mail.gmail.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 30 Jul 2018 20:41:31 +0530
+Subject: [PATCH 0/9] Add Reset Controller support for Actions Semi Owl SoCs
+In-Reply-To: <c3ae668a-6bcc-a0eb-1e00-14ef9d607316@suse.de>
+References: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
+ <c3ae668a-6bcc-a0eb-1e00-14ef9d607316@suse.de>
+Message-ID: <20180730151131.GA28633@mani>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 July 2018 at 17:34, Andre Przywara <andre.przywara@arm.com> wrote:
-> Recent Linux versions refuse to print actual virtual kernel addresses,
-> to not give a hint about the location of the kernel in a randomized virtual
-> address space. This affects the output of the sunxi MMC controller
-> driver, which now produces the rather uninformative line:
->
-> [    1.482660] sunxi-mmc 1c0f000.mmc: base:0x(____ptrval____) irq:8
->
-> Since the virtual base address is not really interesting in the first
-> place, let's just drop this value. The same applies to Linux' notion of
-> the interrupt number, which is independent from the GIC SPI number.
-> We have the physical address as part of the DT node name, which is way
-> more useful for debugging purposes.
-> To keep a success message in the driver, we make this purpose explicit
-> with the word "initialized", plus print some information that is not too
-> obvious and that we learned while probing the device:
-> the maximum request size and whether it uses the new timing mode.
-> So the output turns into:
-> [    1.750626] sunxi-mmc 1c0f000.mmc: initialized, max. request size: 16384 KB, uses new timings mode
-> [    1.786699] sunxi-mmc 1c11000.mmc: initialized, max. request size: 2048 KB
->
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Hi Andreas,
 
-Thanks, applied for next!
+On Mon, Jul 30, 2018 at 12:26:07PM +0200, Andreas F?rber wrote:
+> Hi Mani,
+> 
+> Am 27.07.2018 um 20:45 schrieb Manivannan Sadhasivam:
+> > This patchset adds Reset Controller (RMU) support for Actions Semi
+> > Owl SoCs, S900 and S700. For the Owl SoCs, RMU has been integrated into
+> > the clock subsystem in hardware. Hence, in software we integrate RMU
+> > support into common clock driver inorder to maintain compatibility.
+> 
+> Can this not be placed into drivers/reset/ by using mfd-simple with a
+> sub-node in DT?
+> 
 
-Kind regards
-Uffe
+Actually I was not sure where to place this reset controller driver. When I
+looked into other similar ones such as sunxi, they just integrated into the
+clk subsystem. So I just chose that path. But yeah, this is hacky!
 
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 8e7f3e35ee3d..c18cf035ac00 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -1407,7 +1407,10 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
->         if (ret)
->                 goto error_free_dma;
->
-> -       dev_info(&pdev->dev, "base:0x%p irq:%u\n", host->reg_base, host->irq);
-> +       dev_info(&pdev->dev, "initialized, max. request size: %u KB%s\n",
-> +                mmc->max_req_size >> 10,
-> +                host->use_new_timings ? ", uses new timings mode" : "");
-> +
->         return 0;
->
->  error_free_dma:
-> --
-> 2.14.4
->
+But this RMU is not MFD by any means. Since the CMU (Clock) and RMU (Reset)
+are two separate IPs inside SoC, we shouldn't describe it as a MFD driver. Since
+RMU has only 2 registers, the HW designers decided to use up the CMU memory
+map. So, maybe syscon would be best option I think. What is your opinion?
+
+Even if we go for syscon, we should place the reset driver within clk
+framework as I can see other SoCs like Mediatek are doing the same. But again
+I'm not sure!
+
+Thanks,
+Mani
+
+> Regards,
+> Andreas
+> 
+> -- 
+> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+> HRB 21284 (AG N?rnberg)
