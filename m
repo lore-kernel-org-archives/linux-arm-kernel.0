@@ -1,74 +1,80 @@
-From: cmaiolino28@gmail.com (Carlos Maiolino)
-Date: Mon, 30 Jul 2018 11:25:54 +0200
-Subject: [PATCH] staging/vc04_services: Use __user annotation for
- user-space pointers
-In-Reply-To: <f6a7405a-4251-c6b8-470f-d50137fb9b00@i2se.com>
-References: <20180724083217.20921-1-cmaiolino28@gmail.com>
- <20180730085811.GA30820@kroah.com>
- <CAGR7KeoDrp8FBX_H1a8h9hVFF_w9mLXGkvCT6jJAacG7-morRg@mail.gmail.com>
- <f6a7405a-4251-c6b8-470f-d50137fb9b00@i2se.com>
-Message-ID: <CAGR7Keo6zD_M+KHMkK8dDm=oujkwxM7Dv7weT11+oKtJNOZpFA@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 30 Jul 2018 17:27:43 +0800
+Subject: [PATCH] mmc: sunxi: Use new timing mode for A64 eMMC controller
+In-Reply-To: <20180718152203.svrt6wmr2vwh4rb5@flea>
+References: <20180712030225.15681-1-wens@csie.org>
+ <20180712071959.fi4rhgwv2iuoelbl@flea>
+ <CAGb2v65rE2nQbyeiSPAyTzw-n-EQsUwQABx3nrvXTu4JogFPBQ@mail.gmail.com>
+ <20180717151558.wn7v33whtljqt53w@flea>
+ <CAGb2v64NRVaWpbDqiX0JX7_6uvypUpNEecPUj-sSjaK5X-hdQA@mail.gmail.com>
+ <20180718152203.svrt6wmr2vwh4rb5@flea>
+Message-ID: <CAGb2v67XaWoBGX2Tn_J8LfBJiJja0yfRbM+QyHPLnXvQtBuGGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2018 at 11:13 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> Hi Carlos,
->
->
-> Am 30.07.2018 um 11:08 schrieb Carlos Maiolino:
+On Wed, Jul 18, 2018 at 11:22 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> On Tue, Jul 17, 2018 at 11:43:03PM +0800, Chen-Yu Tsai wrote:
+>> On Tue, Jul 17, 2018 at 11:15 PM, Maxime Ripard
+>> <maxime.ripard@bootlin.com> wrote:
+>> > On Thu, Jul 12, 2018 at 06:17:23PM +0800, Chen-Yu Tsai wrote:
+>> >> On Thu, Jul 12, 2018 at 3:19 PM, Maxime Ripard
+>> >> <maxime.ripard@bootlin.com> wrote:
+>> >> > Hi,
+>> >> >
+>> >> > On Thu, Jul 12, 2018 at 11:02:25AM +0800, Chen-Yu Tsai wrote:
+>> >> >> The eMMC controller is also a new timing mode controller, but it doesn't
+>> >> >> have the timing mode switch. It does however have signal delay and
+>> >> >> calibration controls, typical of Allwinner MMC controllers that support
+>> >> >> the new timing mode.
+>> >> >>
+>> >> >> Enable the new timing mode setting for the A64 eMMC controller. This
+>> >> >> also enables MMC HS-DDR modes, which gives higher throughput for eMMC
+>> >> >> chips that support it, and can deliver such throughput.
+>> >> >>
+>> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> >> >
+>> >> > That doesn't look right. The datasheet explicitly mentions that this
+>> >> > bit doesn't apply to the eMMC controller, and the BSP is doing the same:
+>> >> > https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-1.c
+>> >> >
+>> >> > vs
+>> >> > https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-2.c
+>> >>
+>> >> You mean the bit in SDXC_REG_SD_NTSR? Yes I know that doesn't exist
+>> >> for the eMMC controller. I mentioned this in the commit message. It
+>> >> doesn't exist, and writes to it become a no-op.
+>> >>
+>> >> Would a comment, or comments, help with making this clear?
+>> >
+>> > Ah right. Maybe we should move the calibration under can_calibrate
+>> > though, or create another boolean for this?
+>> >
+>> > Putting it under has_new_timings while the SoC doesn't use it looks
+>> > very confusing.
 >>
->> On Mon, Jul 30, 2018 at 10:58 AM, Greg KH <greg@kroah.com> wrote:
->>>
->>> On Tue, Jul 24, 2018 at 10:32:17AM +0200, Carlos Maiolino wrote:
->>>>
->>>> Fix several sparse warnings regarding different address space
->>>> assignments, like example below, by properly annotating pointers
->>>> expected to carry user space addresses.
->>>>
->>>> warning: incorrect type in argument 1 (different address spaces)
->>>> Signed-off-by: Carlos Maiolino <cmaiolino28@gmail.com>
->>>> ---
->>>
->>> We need a blank line befor your signed-off-by line please.
->>>
->> Thanks, I'll resend, or do you prefer me to way until this get a review
->> from
->> the maintainer, and I resend the fixed description with the reviewed-by?
+>> IIRC we don't support calibration anyway. This boolean simply signals
+>> the usage of the new timing mode, whether by choice, or because it is
+>> the only mode the controller supports.
 >
->
-> did you test your patch via vchiq_test or something else?
->
+> This is not the semantic I had in mind when I introduced it. The
+> original intent was to set the new timing bit all the time for
+> SoCs. If we want to change that semantic, then we also need to make
+> sure what this bit means is documented properly.
 
-Hi, no. Can you please point me where I can get it?
+In the driver:
 
+    /* hardware only supports new timing mode */
+    bool needs_new_timings;
 
-> Please add Eric Anholt
+    /* hardware can switch between old and new timing modes */
+    bool has_timings_switch;
 
-Sure, will do
+So if the A64 / H6 eMMC controller only supports / is stuck with the new
+timing mode, that surely fits the description of the first one, right?
+As for setting the new timing bit all the time, yes it is set, but it's
+a no-op. Would a comment clarifying this at the point the hardware bit
+is set suffice?
 
->and fix my mail address in the second version, i only
-> received this via mailing list.
->
-
-Meh, I shall use copy/paste next time :P
-> Stefan
->
->>
->>
->>>> +     const struct vchiq_element __user *elements;
->>>>   } VCHIQ_QUEUE_MESSAGE_T;
->>>>
->>>>   typedef struct {
->>>
->>> It would be great to have an ack from the maintainers here :)
->>>
->>> thanks,
->>>
->>> greg k-h
->>
->> _______________________________________________
->> linux-rpi-kernel mailing list
->> linux-rpi-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
->
->
+Thanks
+ChenYu
