@@ -1,214 +1,145 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 30 Jul 2018 14:02:32 -0600
-Subject: [PATCH v3 0/9] coresight: Update device tree bindings
-In-Reply-To: <1532686537-12380-1-git-send-email-suzuki.poulose@arm.com>
-References: <1532686537-12380-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180730200232.GA31755@xps15>
+From: micpof@gmail.com (Michael O'Farrell)
+Date: Mon, 30 Jul 2018 13:14:34 -0700
+Subject: [PATCH v2] Add cap_user_time aarch64
+Message-ID: <20180730201434.2862809-1-micpof@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2018 at 11:15:28AM +0100, Suzuki K Poulose wrote:
-> Coresight uses DT graph bindings to describe the connections of the
-> components. However we have some undocumented usage of the bindings
-> to describe some of the properties of the connections.
-> 
-> The coresight driver needs to know the hardware ports invovled
-> in the connection and the direction of data flow to effectively
-> manage the trace sessions. So far we have relied on the "port"
-> address (as described by the generic graph bindings) to represent
-> the hardware port of the component for a connection.
-> 
-> The hardware uses separate numbering scheme for input and output
-> ports, which implies, we could have two different (input and output)
-> ports with the same port number. This could create problems in the
-> graph bindings where the label of the port wouldn't match the address.
-> 
-> e.g, with the existing bindings we get :
-> 
-> 	port at 0{				// Output port 0
-> 		reg = <0>;
-> 		...
-> 	};
-> 
-> 	port at 1{
-> 		reg = <0>;		// Input port 0
-> 		endpoint {
-> 			slave-mode;
-> 			...
-> 		};
-> 	};
-> 
-> With the new enforcement in the DT rules, mismatches in label and address
-> are not allowed (as see in the case for port at 1). So, we need a new mechanism
-> to describe the hardware port number reliably.
-> 
-> Also, we relied on an undocumented "slave-mode" property (see the above
-> example) to indicate if the port is an input port. Let us formalise and
-> switch to a new property to describe the direction of data flow.
-> 
-> There were three options considered for the hardware port number scheme:
-> 
->  1) Use natural ordering in the DT to infer the hardware port number.
->   i.e, Mandate that the all ports are listed in the DT and in the ascending
->   order for each class (input and output respectively).
->    Pros :
->       - We don't need new properties and if the existing DTS list them in
->         order (which most of them do), they work out of the box.
->    Cons :
->       - We must list all the ports even if the system cannot/shouldn't use
->         it.
->       - It is prone to human errors (if the order is not kept).
-> 
->  2) Use an explicit property to list both the direction and the hw port
->     number and direction. Define "coresight,hwid" as 2 member array of u32,
->     where the members are port number and the direction respectively.
-> 	e.g
-> 
-> 	port at 0{
-> 		reg = <0>;
-> 		endpoint {
-> 			coresight,hwid = <0 1>;	// Port # 0, Output
-> 		}
-> 	};
-> 
-> 	port at 1{
-> 		reg = <1>;
-> 		endpoint {
-> 			coresight,hwid = <0 0>;	// Port # 0, Input
-> 		};
-> 	};
-> 
-> 	Pros:
-> 	  - The bindings are formal but not so reader friendly and could
-> 	    potentially lead to human errors.
-> 	Cons:
-> 	  - Backward compatiblity is lost.
->  3) Use explicit properties (implemented in the series) for the hardware
->     port id and direction. We define a new property "coresight,hwid" for
->     each endpoint in coresight devices to specify the hardware port number
->     explicitly. Also use a separate property "direction" to specify the
->     direction of the data flow.
-> 
-> 	e.g,
-> 
-> 	port at 0{
-> 		reg = <0>;
-> 		endpoint {
-> 			direction = <1>;	// Output
-> 			coresight,hwid = <0>;	// Port # 0
-> 		}
-> 	};
-> 
-> 	port at 1{
-> 		reg = <1>;
-> 		endpoint {
-> 			direction = <0>;	// Input
-> 			coresight,hwid = <0>;	// Port # 0
-> 		};
-> 	};
-> 
->     Pros:
->        - The bindings are formal and reader friendly, and less prone to errors.
->     Cons:
->        - Backward compatibility is lost.
-> 
-> After a round of discussions [1], the following option (4) is adopted :
-> 
->  4) Group ports based on the directions under a dedicated node. This has been
->     checked with the upstream DTC tool to resolve the "address mismatch" issue.
-> 
-> 	e.g,
-> 
-> 	out-ports {				// Output ports for this component
-> 
-> 		port at 0 {			// Outport 0
-> 		  reg = 0;
-> 		  endpoint { ... };
-> 		};
-> 
-> 		port at 1 {			// Outport 1
-> 		  reg = 1;
-> 		  endpoint { ... };
-> 		};
-> 
-> 	};
-> 
-> 	in-ports {				// Input ports for this component
-> 		port at 0 {			// Inport 0
-> 		  reg = 0;
-> 		  endpoint { ... };
-> 		};
-> 
-> 		port at 1 {			// Inport 1
-> 		  reg = 1;
-> 		  endpoint { ... };
-> 		};
-> 
-> 	};
-> 
-> 
-> This series implements Option (4) listed above and falls back to the old
-> bindings if the new bindings are not available. This allows the systems
-> with old bindings work with the new driver. The driver now issues a warning
-> (once) when it encounters the old bindings. The series contains DT update
-> for Juno platform. The remaining in-kernel sources could be updated once
-> we are fine with the proposal.
-> 
-> It also cleans up the platform parsing code to reduce the memory usage by
-> reusing the platform description.
-> 
-> Applies on coresight/next
-> 
-> Changes since V2:
->   - Clean of_coresight_parse_endpoint() to return 1 to indicate a connection
->     record was updated.
->   - Drop documentation for old bindings
-> 
-> Changes since V1:
->   - Implement the proposal by Rob.
->   - Drop the DTS updates for all platforms except Juno
->   - Drop the incorrect fix in coresight_register. Instead document the code
->     to prevent people trying to un-fix it again.
->   - Add a patch to drop remote device references in DT graph parsing
->   - Split of_node refcount fixing patch, fix a typo in the comment.
->   - Add Reviewed-by tags from Mathieu.
->   - Drop patches picked up for 4.18-rc series
-> 
-> Changes since RFC:
->  - Fixed style issues
->  - Fix an existing memory leak coresight_register (Found in code update)
->  - Fix missing of_node_put() in the existing driver (Reported-by Mathieu)
->  - Update the existing dts in kernel tree.
-> 
-> Suzuki K Poulose (9):
->   coresight: Document error handling in coresight_register
->   coresight: platform: Refactor graph endpoint parsing
->   coresight: platform: Fix refcounting for graph nodes
->   coresight: platform: Fix leaking device reference
->   coresight: Fix remote endpoint parsing
->   coresight: Add helper to check if the endpoint is input
->   coresight: platform: Cleanup coresight connection handling
->   coresight: Cleanup coresight DT bindings
->   dts: juno: Update coresight bindings
-> 
->  .../devicetree/bindings/arm/coresight.txt          |  95 +++++---
->  arch/arm64/boot/dts/arm/juno-base.dtsi             | 161 ++++++------
->  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi          |  52 ++--
->  arch/arm64/boot/dts/arm/juno.dts                   |  13 +-
->  drivers/hwtracing/coresight/coresight.c            |  35 +--
->  drivers/hwtracing/coresight/of_coresight.c         | 269 ++++++++++++++-------
->  include/linux/coresight.h                          |   9 +-
->  7 files changed, 359 insertions(+), 275 deletions(-)
->
+It is useful to get the running time of a thread.  Doing so in an
+efficient manner can be important for performance of user applications.
+Avoiding system calls in `clock_gettime` when handling
+CLOCK_THREAD_CPUTIME_ID is important.  Other clocks are handled in the
+VDSO, but CLOCK_THREAD_CPUTIME_ID falls back on the system call.
 
-Good day,
+CLOCK_THREAD_CPUTIME_ID is not handled in the VDSO since it would have
+costs associated with maintaining updated user space accessible time
+offsets.  These offsets have to be updated everytime the a thread is
+scheduled/descheduled.  However, for programs regularly checking the
+running time of a thread, this is a performance improvement.
 
-I have applied patches 1 to 7.  I will wait for Rob's ACK before doing the same
-with 8 and 9. 
+This patch takes a middle ground, and adds support for cap_user_time an
+optional feature of the perf_event API.  This way costs are only
+incurred when the perf_event api is enabled.  This is done the same way
+as it is in x86.
 
-Thanks,
-Mathieu
+Ultimately this allows calculating the thread running time in userspace
+on aarch64 as follows (adapted from perf_event_open manpage):
+
+u32 seq, time_mult, time_shift;
+u64 running, count, time_offset, quot, rem, delta;
+struct perf_event_mmap_page *pc;
+pc = buf;  // buf is the perf event mmaped page as documented in the API.
+
+if (pc->cap_usr_time) {
+    do {
+        seq = pc->lock;
+        barrier();
+        running = pc->time_running;
+
+        count = readCNTVCT_EL0();  // Read ARM hardware clock.
+        time_offset = pc->time_offset;
+        time_mult   = pc->time_mult;
+        time_shift  = pc->time_shift;
+
+        barrier();
+    } while (pc->lock != seq);
+
+    quot = (count >> time_shift);
+    rem = count & (((u64)1 << time_shift) - 1);
+    delta = time_offset + quot * time_mult +
+            ((rem * time_mult) >> time_shift);
+
+    running += delta;
+    // running now has the current nanosecond level thread time.
+}
+
+Summary of changes in the patch:
+
+For aarch64 systems, make arch_perf_update_userpage update the timing
+information stored in the perf_event page.  Requiring the following
+calculations:
+  - Calculate the appropriate time_mult, and time_shift factors to convert
+    ticks to nano seconds for the current clock frequency.
+  - Adjust the mult and shift factors to avoid shift factors of 32 bits.
+    (possibly unnecessary)
+  - The time_offset userspace should apply when doing calculations:
+    negative the current sched time (now), because time_running and
+    time_enabled fields of the perf_event page have just been updated.
+Toggle bits to appropriate values:
+  - Enable cap_user_time
+
+Signed-off-by: Michael O'Farrell <micpof@gmail.com>
+---
+Changes in v2:
+	- Remove the ifndef for CONFIG_HAVE_UNSTABLE_SCHED_CLOCK
+	- Update the comment in events/core.c
+	- Stop setting cap_user_time_zero bit.  Leaving this to be
+	  addresed separately.
+	- Update commit message to reflect changes.
+---
+ arch/arm64/kernel/perf_event.c | 30 ++++++++++++++++++++++++++++++
+ kernel/events/core.c           |  4 ++--
+ 2 files changed, 32 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 33147aacdafd..9a8f243953cf 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -25,6 +25,7 @@
+ #include <asm/virt.h>
  
-> -- 
-> 2.7.4
-> 
+ #include <linux/acpi.h>
++#include <linux/clocksource.h>
+ #include <linux/of.h>
+ #include <linux/perf/arm_pmu.h>
+ #include <linux/platform_device.h>
+@@ -1127,3 +1128,32 @@ static int __init armv8_pmu_driver_init(void)
+ 		return arm_pmu_acpi_probe(armv8_pmuv3_init);
+ }
+ device_initcall(armv8_pmu_driver_init)
++
++void arch_perf_update_userpage(struct perf_event *event,
++			       struct perf_event_mmap_page *userpg, u64 now)
++{
++	u32 freq;
++	u32 shift;
++
++	/*
++	 * Internal timekeeping for enabled/running/stopped times
++	 * is always computed with the sched_clock.
++	 */
++	freq = arch_timer_get_rate();
++	userpg->cap_user_time = 1;
++
++	clocks_calc_mult_shift(&userpg->time_mult, &shift, freq,
++			NSEC_PER_SEC, 0);
++	/*
++	 * time_shift is not expected to be greater than 31 due to
++	 * the original published conversion algorithm shifting a
++	 * 32-bit value (now specifies a 64-bit value) - refer
++	 * perf_event_mmap_page documentation in perf_event.h.
++	 */
++	if (shift == 32) {
++		shift = 31;
++		userpg->time_mult >>= 1;
++	}
++	userpg->time_shift = (u16)shift;
++	userpg->time_offset = -now;
++}
+diff --git a/kernel/events/core.c b/kernel/events/core.c
+index 8f0434a9951a..1a16dcca0da2 100644
+--- a/kernel/events/core.c
++++ b/kernel/events/core.c
+@@ -5246,8 +5246,8 @@ void perf_event_update_userpage(struct perf_event *event)
+ 
+ 	userpg = rb->user_page;
+ 	/*
+-	 * Disable preemption so as to not let the corresponding user-space
+-	 * spin too long if we get preempted.
++	 * Disable preemption to guarantee consistent time stamps are stored to
++	 * the user page.
+ 	 */
+ 	preempt_disable();
+ 	++userpg->lock;
+-- 
+2.17.1
