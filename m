@@ -1,57 +1,51 @@
-From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
-Date: Mon, 30 Jul 2018 06:31:30 -0300
-Subject: new libv4l2 (was Re: [PATCH, libv4l]: Make libv4l2 usable on
- devices with complex pipeline)
-In-Reply-To: <20180728211110.GB1152@amd>
-References: <20180708213258.GA18217@amd> <20180719205344.GA12098@amd>
- <20180723153649.73337c0f@coco.lan> <20180728211110.GB1152@amd>
-Message-ID: <20180730063122.73a20c55@coco.lan>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 30 Jul 2018 11:34:28 +0200
+Subject: [PATCH] staging/vc04_services: Use __user annotation for
+ user-space pointers
+In-Reply-To: <CAGR7Keo6zD_M+KHMkK8dDm=oujkwxM7Dv7weT11+oKtJNOZpFA@mail.gmail.com>
+References: <20180724083217.20921-1-cmaiolino28@gmail.com>
+ <20180730085811.GA30820@kroah.com>
+ <CAGR7KeoDrp8FBX_H1a8h9hVFF_w9mLXGkvCT6jJAacG7-morRg@mail.gmail.com>
+ <f6a7405a-4251-c6b8-470f-d50137fb9b00@i2se.com>
+ <CAGR7Keo6zD_M+KHMkK8dDm=oujkwxM7Dv7weT11+oKtJNOZpFA@mail.gmail.com>
+Message-ID: <46f35184-fbb5-985c-a5b1-d6ab27ced8bc@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Sat, 28 Jul 2018 23:11:10 +0200
-Pavel Machek <pavel@ucw.cz> escreveu:
+Hi Carlos,
 
-> Hi!
-> 
-> > > > Add support for opening multiple devices in v4l2_open(), and for
-> > > > mapping controls between devices.
-> > > > 
-> > > > This is necessary for complex devices, such as Nokia N900.
-> > > > 
-> > > > Signed-off-by: Pavel Machek <pavel@ucw.cz>    
-> > > 
-> > > Ping?
-> > > 
-> > > There's a lot of work to do on libv4l2... timely patch handling would
-> > > be nice.  
-> > 
-> > As we're be start working at the new library in order to support
-> > complex cameras, and I don't want to prevent you keeping doing your
-> > work, IMHO the best way to keep doing it would be to create two
-> > libv4l2 forks:  
-> 
-> BTW.. new library. Was there decision what langauge to use? I know C
-> is obvious choice, but while working on libv4l2, I wished it would be
-> Rust...
-> 
-> Rewriting same routine over and over, with slightly different types
-> was not too much fun, and it looked like textbook example for
-> generics...
+Am 30.07.2018 um 11:25 schrieb Carlos Maiolino:
+> On Mon, Jul 30, 2018 at 11:13 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>> Hi Carlos,
+>>
+>>
+>> Am 30.07.2018 um 11:08 schrieb Carlos Maiolino:
+>>> On Mon, Jul 30, 2018 at 10:58 AM, Greg KH <greg@kroah.com> wrote:
+>>>> On Tue, Jul 24, 2018 at 10:32:17AM +0200, Carlos Maiolino wrote:
+>>>>> Fix several sparse warnings regarding different address space
+>>>>> assignments, like example below, by properly annotating pointers
+>>>>> expected to carry user space addresses.
+>>>>>
+>>>>> warning: incorrect type in argument 1 (different address spaces)
+>>>>> Signed-off-by: Carlos Maiolino <cmaiolino28@gmail.com>
+>>>>> ---
+>>>> We need a blank line befor your signed-off-by line please.
+>>>>
+>>> Thanks, I'll resend, or do you prefer me to way until this get a review
+>>> from
+>>> the maintainer, and I resend the fixed description with the reviewed-by?
+>>
+>> did you test your patch via vchiq_test or something else?
+>>
+> Hi, no. Can you please point me where I can get it?
+>
+>
 
-Whatever language it uses, the library should provide a standard C API
-interface and avoid using libraries that may not be available on
-the systems supported by the v4l-utils package, as other packages
-and a libv4l-compatible interface should be linked using it.
+i think easiest the way would be to get a recent Raspbian Lite ( 
+https://www.raspberrypi.org/downloads/raspbian/ ),
+build the kernel with bcm2835_defconfig, modify config.txt to use the 
+upstream DTB, add the upstream kernel and DTB to boot partition.
 
-It should also be something that the existing v4l-utils developers are
-familiar with. Right now, we have only C and C++ code inside v4l-utils.
+The following command must be successful:
 
-So, I'd say that the language should be either C (the obvious choice)
-or C++.
-
-It should also be licensed using the same terms as v4l-utils libraries,
-e. g. LGPL 2.1+.
-
-Thanks,
-Mauro
+vchiq_test -f 1
