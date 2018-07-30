@@ -1,21 +1,52 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 30 Jul 2018 12:36:52 +0100
-Subject: [PATCH] clk: scmi: Fix the rounding of clock rate
-In-Reply-To: <1532700112-11852-1-git-send-email-amit.kachhap@arm.com>
-References: <1532700112-11852-1-git-send-email-amit.kachhap@arm.com>
-Message-ID: <20180730113652.GA16266@e107155-lin>
+From: codrin.ciubotariu@microchip.com (Codrin Ciubotariu)
+Date: Mon, 30 Jul 2018 14:40:06 +0300
+Subject: [PATCH v6 1/3] ARM: dts: at91: sama5d2: add I2S clock muxing nodes
+In-Reply-To: <20180730114008.30464-1-codrin.ciubotariu@microchip.com>
+References: <20180730114008.30464-1-codrin.ciubotariu@microchip.com>
+Message-ID: <20180730114008.30464-2-codrin.ciubotariu@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2018 at 07:31:52PM +0530, Amit Daniel Kachhap wrote:
-> This fix rounds the clock rate properly by using quotient and not
-> remainder in the calculation. This issue was found while testing HDMI
-> in the Juno platform.
->
-Good find, thanks.
+This patch adds two clock muxes for the two I2S
+buses present on sama5d2 platforms.
 
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
+---
 
---
-Regards,
-Sudeep
+Changes in v6:
+	- none
+
+ arch/arm/boot/dts/sama5d2.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index 61f68e5c48e9..eeb6afa1cda7 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -992,6 +992,24 @@
+ 						atmel,clk-output-range = <0 100000000>;
+ 					};
+ 				};
++
++				i2s_clkmux {
++					compatible = "atmel,sama5d2-clk-i2s-mux";
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					i2s0muxck: i2s0_muxclk {
++						clocks = <&i2s0_clk>, <&i2s0_gclk>;
++						#clock-cells = <0>;
++						reg = <0>;
++					};
++
++					i2s1muxck: i2s1_muxclk {
++						clocks = <&i2s1_clk>, <&i2s1_gclk>;
++						#clock-cells = <0>;
++						reg = <1>;
++					};
++				};
+ 			};
+ 
+ 			qspi0: spi at f0020000 {
+-- 
+2.17.1
