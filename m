@@ -1,19 +1,22 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 30 Jul 2018 10:26:31 +0200
-Subject: [PATCH v3 1/4] arm64: dts: allwinner: a64: Add SID node
-In-Reply-To: <20180727115205.20955-1-manu@freebsd.org>
-References: <20180727115205.20955-1-manu@freebsd.org>
-Message-ID: <20180730082631.es2fbqce5uabi5jc@flea>
+Date: Mon, 30 Jul 2018 10:27:12 +0200
+Subject: [PATCH] arm64: allwinner: dts: h6: fix Pine H64 MMC bus width
+In-Reply-To: <20180726044805.55888-1-icenowy@aosc.io>
+References: <20180726044805.55888-1-icenowy@aosc.io>
+Message-ID: <20180730082712.koiaej6dxjnnk6lb@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2018 at 01:52:02PM +0200, Emmanuel Vadot wrote:
-> The A64 have a SID controller which consist of EFUSE (starting at 0x200)
-> and three registers to read/write some of the protected efuses.
+On Thu, Jul 26, 2018 at 12:48:05PM +0800, Icenowy Zheng wrote:
+> Currently the enabled MMC controllers on Pine H64 do not have bus-width
+> set, which make them fall back to 1-bit mode and become quite slow.
 > 
-> Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
+> Fix this by add the corresponding bus-width properties.
+> 
+> Fixes: ecbd611882a1 ("arm64: allwinner: h6: enable MMC0/2 on Pine H64")
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Queued all 4 for 4.20, thanks!
+Applied, thanks!
 Maxime
 
 -- 
@@ -26,4 +29,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180730/01a13c7d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180730/78660ce4/attachment.sig>
