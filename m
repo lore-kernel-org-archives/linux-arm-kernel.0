@@ -1,83 +1,39 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 30 Jul 2018 13:31:24 +0100
-Subject: [PATCH v3 06/19] arm64: dts: allwinner: a64: Orange Pi Win: Add
- Ethernet node
+Date: Mon, 30 Jul 2018 13:31:26 +0100
+Subject: [PATCH v3 08/19] arm64: dts: allwinner: a64: Orange Pi Win: Add
+ serdev BT node
 In-Reply-To: <20180730123137.923-1-andre.przywara@arm.com>
 References: <20180730123137.923-1-andre.przywara@arm.com>
-Message-ID: <20180730123137.923-7-andre.przywara@arm.com>
+Message-ID: <20180730123137.923-9-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Samuel Holland <samuel@sholland.org>
+The Orange Pi Win has the RTL8723BS WiFi/Bluetooth chip soldered on the
+board, with the Bluetooth part connected to UART1.
 
-The Orange Pi Win has the usual Gigabit PHY connected to the EMAC.
-Its power is controlled by GPIO PD14.
+At the moment there is no mainline driver for the BT part yet, although
+there is one in development. However as this does not include a DT binding,
+we just go with an empty stub for now to denote that the BT chip is on
+that UART. This can later be filled with the right properties.
 
-Signed-off-by: Samuel Holland <samuel@sholland.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-index c9cabe987c19..0cadcd59edd9 100644
+index e9a5640076ad..87c32635085b 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-@@ -1,5 +1,6 @@
- /*
-  * Copyright (C) 2017 Jagan Teki <jteki@openedev.com>
-+ * Copyright (C) 2017-2018 Samuel Holland <samuel@sholland.org>
-  *
-  * This file is dual-licensed: you can use it either under the terms
-  * of the GPL or the X11 license, at your option. Note that this dual
-@@ -51,6 +52,7 @@
- 	compatible = "xunlong,orangepi-win", "allwinner,sun50i-a64";
- 
- 	aliases {
-+		ethernet0 = &emac;
- 		serial0 = &uart0;
- 	};
- 
-@@ -58,6 +60,17 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	reg_gmac_3v3: gmac-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "gmac-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		enable-active-high;
-+		gpio = <&pio 3 14 GPIO_ACTIVE_HIGH>; /* PD14 */
-+		status = "okay";
-+	};
-+
- 	reg_usb1_vbus: usb1-vbus {
- 		compatible = "regulator-fixed";
- 		regulator-name = "usb1-vbus";
-@@ -74,6 +87,22 @@
+@@ -253,6 +253,9 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
  	status = "okay";
++
++	rtl8723bs-bt {
++	};
  };
  
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	phy-mode = "rgmii";
-+	phy-handle = <&ext_rgmii_phy>;
-+	phy-supply = <&reg_gmac_3v3>;
-+	status = "okay";
-+};
-+
-+&mdio {
-+	ext_rgmii_phy: ethernet-phy at 1 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
-+	};
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
+ /* On Pi-2 connector, RTS/CTS optional */
 -- 
 2.14.4
