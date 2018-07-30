@@ -1,47 +1,50 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 30 Jul 2018 13:19:25 +0200
-Subject: [PATCH V5] ARM: shmobile: Rework the PMIC IRQ line quirk
-In-Reply-To: <CAMuHMdUsBNU-1y+_UfX6GKSC11pOB_BUhPKO-axUiO+BfgqVmw@mail.gmail.com>
-References: <20180611121513.9673-1-marek.vasut+renesas@gmail.com>
- <20180613110647.ygg66nu36pcf6kpn@verge.net.au>
- <CAMuHMdUsBNU-1y+_UfX6GKSC11pOB_BUhPKO-axUiO+BfgqVmw@mail.gmail.com>
-Message-ID: <a12bfba7-a7ff-413e-799c-f10e8dac78f5@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 30 Jul 2018 13:29:49 +0200
+Subject: [PATCH v2 1/2] clk: Add of_clk_get_by_name_optional() function
+In-Reply-To: <c82487a125591c14e66ba56dc3202aa0093f0aba.camel@linux.intel.com>
+References: <1532939768-7018-1-git-send-email-phil.edworthy@renesas.com>
+ <1532939768-7018-2-git-send-email-phil.edworthy@renesas.com>
+ <CAMuHMdUWWb7uyiG6NdRaJxM0X4JfioWx=o9J7jD18rgiTz1m4w@mail.gmail.com>
+ <c82487a125591c14e66ba56dc3202aa0093f0aba.camel@linux.intel.com>
+Message-ID: <CAMuHMdWXfS9gFxOq5nvJWx2KMOae5_c8Lb0omeE3P9yjyYZ7gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2018 01:21 PM, Geert Uytterhoeven wrote:
-> Hi Simon,
+Hi Andy,
 
-Hi,
+On Mon, Jul 30, 2018 at 12:57 PM Andy Shevchenko
+<andriy.shevchenko@linux.intel.com> wrote:
+> On Mon, 2018-07-30 at 10:55 +0200, Geert Uytterhoeven wrote:
+> > On Mon, Jul 30, 2018 at 10:36 AM Phil Edworthy
+> > <phil.edworthy@renesas.com> wrote:
+>
+> > > +struct clk *of_clk_get_by_name_optional(struct device_node *np,
+> > > +                                       const char *name)
+> > > +{
+> > > +       if (!np)
+> > > +               return ERR_PTR(-ENOENT);
+> >
+> > Shouldn't this return NULL?
+> > Or let __of_clk_get_by_name() handle that (cfr. above)?
+> >
+> > Hmm, of_clk_get_by_name() has a similar check, while the current
+> > __of_clk_get_by_name() already handle np == NULL, too.
+>
+> This check is needed to prevent NULL pointer dereference below.
 
-> On Wed, Jun 13, 2018 at 1:06 PM Simon Horman <horms@verge.net.au> wrote:
->> On Mon, Jun 11, 2018 at 02:15:13PM +0200, Marek Vasut wrote:
->>> Rather than hard-coding the quirk topology, which stopped scaling,
->>> parse the information from DT. The code looks for all compatible
->>> PMICs -- da9063 and da9210 -- and checks if their IRQ line is tied
->>> to the same pin. If so, the code sends a matching sequence to the
->>> PMIC to deassert the IRQ.
->>>
->>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
->>> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
->>> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->>> Cc: Simon Horman <horms+renesas@verge.net.au>
->>> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
->>> Cc: linux-renesas-soc at vger.kernel.org
->>> Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
->>> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be> (on Koelsch)
->>
->> This looks fine to me but I will wait to see if there are other reviews
->> before applying.
->>
->> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Note that applying it now will break gose, as its DTS doesn't describe all
-> regulators yet.
+Thank, I had missed that unexpected detail.
 
-https://patchwork.kernel.org/patch/10548919/ should fix this.
-https://patchwork.kernel.org/patch/10548923/ for Silk.
+> > > +
+> > > +       return __of_clk_get_by_name(np, np->full_name, name, true);
+> > > +}
+
+Gr{oetje,eeting}s,
+
+                        Geert
 
 -- 
-Best regards,
-Marek Vasut
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
