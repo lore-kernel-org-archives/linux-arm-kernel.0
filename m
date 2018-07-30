@@ -1,51 +1,111 @@
-From: dave.kleikamp@oracle.com (Dave Kleikamp)
-Date: Mon, 30 Jul 2018 11:59:20 -0500
-Subject: [PATCH 1/1] arm64: kexec: machine_kexec should call
- __flush_icache_range
-In-Reply-To: <20180730165757.GF4276@arm.com>
-References: <faf6c7cb-d9da-9a9c-cc0f-43c95e864ca2@oracle.com>
- <e07fc674-2a71-29ae-2212-46ee5f79593d@oracle.com>
- <20180730161641.6zxxy3lxp27tznck@armageddon.cambridge.arm.com>
- <20180730162235.GC4276@arm.com>
- <2651847f-79ea-fe2a-c1d7-efe4d11702b4@oracle.com>
- <20180730165757.GF4276@arm.com>
-Message-ID: <8ef8f860-3acf-5738-879c-a02e7c873ad2@oracle.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 30 Jul 2018 18:03:37 +0100
+Subject: [PATCH v5 1/3] arm64: mm: Support Common Not Private translations
+In-Reply-To: <16344e26-6cd2-5e55-d34e-fd2a48bef733@arm.com>
+References: <1529403502-2843-1-git-send-email-vladimir.murzin@arm.com>
+ <1529403502-2843-2-git-send-email-vladimir.murzin@arm.com>
+ <20180727113502.3qdbyffuvysva6bz@armageddon.cambridge.arm.com>
+ <f3da236e-504d-66ab-19da-9f89eba253f1@arm.com>
+ <20180730154209.2tawriqxgxub7paa@armageddon.cambridge.arm.com>
+ <16344e26-6cd2-5e55-d34e-fd2a48bef733@arm.com>
+Message-ID: <20180730170337.rycf34urt7n2fptq@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2018 11:57 AM, Will Deacon wrote:
-> On Mon, Jul 30, 2018 at 11:46:24AM -0500, Dave Kleikamp wrote:
->> On 07/30/2018 11:22 AM, Will Deacon wrote:
->>> On Mon, Jul 30, 2018 at 05:16:42PM +0100, Catalin Marinas wrote:
->>>> On Mon, Jul 30, 2018 at 10:29:21AM -0500, Dave Kleikamp wrote:
->>>>> machine_kexec flushes the reboot_code_buffer from the icache
->>>>> after stopping the other cpus.
->>>>>
->>>>> Commit 3b8c9f1cdfc5 ("arm64: IPI each CPU after invalidating the I-cache
->>>>> for kernel mappings") added an IPI call to flush_icache_range, which
->>>>> causes a hang here, so replace the call with __flush_icache_range
->>>>
->>>> While machine_kexec() may be called with interrupts disabled (IIUC) and
->>>> we shouldn't IPI other CPUs, I don't understand why it hangs here. Are
->>>> there any other CPUs online at this point?
->>>
->>> The BUG_ON and WARN_ON at the start of machine_kexec() suggest to me that
->>> this should only happen if we're kexec'ing a crash kernel and
->>> smp_crash_stop_failed(). Is that something we need to care about?
->>
->> I observed the hang trying to kexec a crash kernel and I did not see the
->> warning that smp_crash_stop_failed(). I'm not exactly sure why
->> flush_icache_range() hung (but it did), but I think that
->> __flush_icache_range() makes more sense here anyway.
+On Mon, Jul 30, 2018 at 05:29:35PM +0100, Robin Murphy wrote:
+> On 30/07/18 16:42, Catalin Marinas wrote:
+> > On Mon, Jul 30, 2018 at 11:08:27AM +0100, Vladimir Murzin wrote:
+> > > On 27/07/18 12:35, Catalin Marinas wrote:
+> > > > On Tue, Jun 19, 2018 at 11:18:20AM +0100, Vladimir Murzin wrote:
+> > > > > diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+> > > > > index 39ec0b8..c506fb7 100644
+> > > > > --- a/arch/arm64/include/asm/mmu_context.h
+> > > > > +++ b/arch/arm64/include/asm/mmu_context.h
+> > > > > @@ -149,6 +149,18 @@ static inline void cpu_replace_ttbr1(pgd_t *pgdp)
+> > > > >   	phys_addr_t pgd_phys = virt_to_phys(pgdp);
+> > > > > +	if (system_supports_cnp() && !WARN_ON(pgdp != lm_alias(swapper_pg_dir))) {
+> > > > > +		/*
+> > > > > +		 * cpu_replace_ttbr1() is used when there's a boot CPU
+> > > > > +		 * up (i.e. cpufeature framework is not up yet) and
+> > > > > +		 * latter only when we enable CNP via cpufeature's
+> > > > > +		 * enable() callback.
+> > > > > +		 * Also we rely on the cpu_hwcap bit being set before
+> > > > > +		 * calling the enable() function.
+> > > > > +		 */
+> > > > > +		pgd_phys |= TTBR_CNP_BIT;
+> > > > > +	}
+> > > > > +
+> > > > >   	replace_phys = (void *)__pa_symbol(idmap_cpu_replace_ttbr1);
+> > > > 
+> > > > So the above code sets the TTBR_CNP_BIT (bit 0) in pgd_phys and calls
+> > > > the idmap_cpu_replace_ttbr1() with this value. Looking at the latter, it
+> > > > performs a phys_to_ttbr transformation of pgd_phys which masks out the
+> > > > bottom 2 bits when CONFIG_ARM64_PA_BITS_52 is enabled. I think we need
+> > > > to tweak TTBR_BADDR_MASK_52 to start from bit 0.
+> > > 
+> > > Something like bellow?
+> > > 
+> > > diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> > > index 0bcc98d..e0b4b2f 100644
+> > > --- a/arch/arm64/include/asm/assembler.h
+> > > +++ b/arch/arm64/include/asm/assembler.h
+> > > @@ -524,11 +524,10 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
+> > >    * 	ttbr:	returns the TTBR value
+> > >    */
+> > >   	.macro	phys_to_ttbr, ttbr, phys
+> > > -#ifdef CONFIG_ARM64_PA_BITS_52
+> > > -	orr	\ttbr, \phys, \phys, lsr #46
+> > > -	and	\ttbr, \ttbr, #TTBR_BADDR_MASK_52
+> > > -#else
+> > >   	mov	\ttbr, \phys
+> > > +#ifdef CONFIG_ARM64_PA_BITS_52
+> > > +	ubfx	\ttbr, \ttbr, #48, #4
+> > > +	orr	\ttbr, \phys, \ttbr, lsl #2
+> > >   #endif
+> > >   	.endm
+> > 
+> > This would do, I don't have a better idea on how to write it. But I'd
+> > like a comment to say that this is moving bits 51:48 of the address to
+> > bits 5:2 of TTBR_ELx.
 > 
-> Yeah, I'll pick the patch up, but it would be nice to understand the
-> failure case you observed.
+> The diff above is *copying* 51:48 into 5:2; it doesn't *move* it like the
+> existing code does. That's pretty crucial, because without the BADDR masking
+> operation it's going to leave the upper address bits in the ASID/VMID field,
+> which looks like a recipe for disaster if the reserved TTBR1 happens to be
+> at a high enough address (at least cpu_switch_mm might just be OK by virtue
+> of using BFI rather than ORR for the ASID).
 
-I'll dig a little deeper.
+Oh, very good point.
 
-Thanks,
-Dave
-
+> > > diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> > > index 1bdeca8..1b9d0e9 100644
+> > > --- a/arch/arm64/include/asm/pgtable.h
+> > > +++ b/arch/arm64/include/asm/pgtable.h
+> > > @@ -770,7 +770,7 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
+> > >   #define kc_offset_to_vaddr(o)	((o) | VA_START)
+> > >   #ifdef CONFIG_ARM64_PA_BITS_52
+> > > -#define phys_to_ttbr(addr)	(((addr) | ((addr) >> 46)) & TTBR_BADDR_MASK_52)
+> > > +#define phys_to_ttbr(addr)	((addr) | (((addr) >> 46) & TTBR_BADDR_MASK_52))
 > 
-> Will
+> Ditto - by the look of things, this definitely stands to corrupt the VMID in
+> update_vttbr(). If we really have no choice but to smuggle the CnP value in
+> something which is logically an address, then I think we'd need to handle it
+> more like this:
 > 
+> #define TTBR_CNP (1)
+> #define phys_to_ttbr(addr) \
+> ((((addr) | ((addr) >> 46)) & TTBR_BADDR_MASK_52) | (addr & TTBR_CNP))
+> 
+> Although in patch #2 we're only applying CnP *after* the BADDR conversion,
+> so is changing this one even necessary? If I've understood the intent
+> correctly, all that might be needed is something like the below (untested,
+> of course).
+
+Or we could keep phys_to_ttbr() as it is for both the asm and C and
+apply the CNP bit afterwards (as you've already noticed in patch 2). For
+cpu_replace_ttbr1(), we'd also need to change idmap_cpu_replace_ttbr1 to
+actually take the TTBR1_EL1 value directly so that it doesn't have to
+invoke phys_to_ttbr().
+
+-- 
+Catalin
