@@ -1,18 +1,18 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Mon, 30 Jul 2018 09:50:55 +0200
-Subject: [PATCH v8 5/6] regulator: pfuze100-regulator: provide
- pm_power_off_prepare handler
-In-Reply-To: <DB6PR04MB32233832762D02F1023861A1892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
+Date: Mon, 30 Jul 2018 09:57:51 +0200
+Subject: [PATCH v8 2/6] ARM: imx6: register pm_power_off handler if
+ "fsl,pmic-stby-poweroff" is set
+In-Reply-To: <DB6PR04MB3223A62E5609BF6431ABEA40892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
 References: <20180726092220.17250-1-o.rempel@pengutronix.de>
- <20180726092220.17250-6-o.rempel@pengutronix.de>
- <DB6PR04MB32233832762D02F1023861A1892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
-Message-ID: <06313062-70db-9c10-048e-78ca267da959@pengutronix.de>
+ <20180726092220.17250-3-o.rempel@pengutronix.de>
+ <DB6PR04MB3223A62E5609BF6431ABEA40892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
+Message-ID: <86871e56-2d1a-50e0-fe36-f008deb80dad@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 27.07.2018 11:32, Robin Gong wrote:
+On 27.07.2018 11:15, Robin Gong wrote:
 > 
 > 
 >> -----Original Message-----
@@ -30,191 +30,83 @@ On 27.07.2018 11:32, Robin Gong wrote:
 >> <sboyd@codeaurora.org>; Fabio Estevam <fabio.estevam@nxp.com>; Russell
 >> King <linux@armlinux.org.uk>; dl-linux-imx <linux-imx@nxp.com>; Robin Gong
 >> <yibin.gong@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
->> Subject: [PATCH v8 5/6] regulator: pfuze100-regulator: provide
->> pm_power_off_prepare handler
+>> Subject: [PATCH v8 2/6] ARM: imx6: register pm_power_off handler if
+>> "fsl,pmic-stby-poweroff" is set
 >>
->> On some boards the SoC can use one pin "PMIC_STBY_REQ" to notify th PMIC
->> about state changes. In this case internal state of PMIC must be preconfigured
->> for upcomming state change.
->> It works fine with the current regulator framework, except with the power-off
->> case.
+>> One of the Freescale recommended sequences for power off with external
+>> PMIC is the following:
+>> ...
+>> 3.  SoC is programming PMIC for power off when standby is asserted.
+>> 4.  In CCM STOP mode, Standby is asserted, PMIC gates SoC supplies.
 >>
->> This patch is providing an optional pm_power_off_prepare handler which will
->> configure standby state of the PMIC to disable all power lines.
+>> See:
+>> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fwww.
+>> nxp.com%2Fassets%2Fdocuments%2Fdata%2Fen%2Freference-manuals%2FIM
+>> X6DQRM.pdf&amp;data=02%7C01%7Cyibin.gong%40nxp.com%7C193fd19e3a
+>> 40416ffa4a08d5f2d9583c%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C1
+>> %7C636681937661914076&amp;sdata=lICAelYpUh4%2Ft%2Fs7N9mdk2cLQMi
+>> cHcOqQ07vTOUoyNY%3D&amp;reserved=0
+>> page 5083
 >>
->> In my power consumption test on RIoTBoard, I got the following results:
->> power off without this patch:	320 mA
->> power off with this patch:	2   mA
->> suspend to ram:			40  mA
+>> This patch implements step 4. of this sequence.
 >>
 >> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 >> ---
->>  drivers/regulator/pfuze100-regulator.c | 92 ++++++++++++++++++++++++++
->>  1 file changed, 92 insertions(+)
+>>  arch/arm/mach-imx/pm-imx6.c | 25 +++++++++++++++++++++++++
+>>  1 file changed, 25 insertions(+)
 >>
->> diff --git a/drivers/regulator/pfuze100-regulator.c
->> b/drivers/regulator/pfuze100-regulator.c
->> index 8d9dbcc775ea..e386e9acb3f7 100644
->> --- a/drivers/regulator/pfuze100-regulator.c
->> +++ b/drivers/regulator/pfuze100-regulator.c
->> @@ -15,6 +15,7 @@
->>  #include <linux/regulator/pfuze100.h>
->>  #include <linux/i2c.h>
->>  #include <linux/slab.h>
->> +#include <linux/kallsyms.h>
-> Is it necessary?
-
-yes, for pm_power_off_prepare
-
->>  #include <linux/regmap.h>
->>
->>  #define PFUZE_NUMREGS		128
->> @@ -29,11 +30,17 @@
->>
->>  #define PFUZE100_COINVOL	0x1a
->>  #define PFUZE100_SW1ABVOL	0x20
->> +#define PFUZE100_SW1ABMODE	0x23
->>  #define PFUZE100_SW1CVOL	0x2e
->> +#define PFUZE100_SW1CMODE	0x31
->>  #define PFUZE100_SW2VOL		0x35
->> +#define PFUZE100_SW2MODE	0x38
->>  #define PFUZE100_SW3AVOL	0x3c
->> +#define PFUZE100_SW3AMODE	0x3f
->>  #define PFUZE100_SW3BVOL	0x43
->> +#define PFUZE100_SW3BMODE	0x46
->>  #define PFUZE100_SW4VOL		0x4a
->> +#define PFUZE100_SW4MODE	0x4d
->>  #define PFUZE100_SWBSTCON1	0x66
->>  #define PFUZE100_VREFDDRCON	0x6a
->>  #define PFUZE100_VSNVSVOL	0x6b
->> @@ -44,6 +51,13 @@
->>  #define PFUZE100_VGEN5VOL	0x70
->>  #define PFUZE100_VGEN6VOL	0x71
->>
->> +#define PFUZE100_SWxMODE_MASK	0xf
->> +#define PFUZE100_SWxMODE_APS_APS	0x8
->> +#define PFUZE100_SWxMODE_APS_OFF	0x4
->> +
->> +#define PFUZE100_VGENxLPWR	BIT(6)
->> +#define PFUZE100_VGENxSTBY	BIT(5)
->> +
->>  enum chips { PFUZE100, PFUZE200, PFUZE3000 = 3 };
->>
->>  struct pfuze_regulator {
->> @@ -492,6 +506,69 @@ static inline struct device_node *match_of_node(int
->> index)  }  #endif
->>
->> +static struct pfuze_chip *syspm_pfuze_chip;
->> +
->> +static void pfuze_power_off_prepare(void) 
->> +	dev_info(syspm_pfuze_chip->dev, "Configure standy mode for power
->> +off");
-> Add 'if (syspm_pfuze_chip ->chip_id == PFUZE100))' here is easy for extend 
-> Support on pfuze200/3000.. in the feature.
-
-ok.
-
->> +
->> +	/* Switch from default mode: APS/APS to APS/Off */
->> +	regmap_update_bits(syspm_pfuze_chip->regmap,
->> PFUZE100_SW1ABMODE,
->> +			   PFUZE100_SWxMODE_MASK,
->> PFUZE100_SWxMODE_APS_OFF);
->> +	regmap_update_bits(syspm_pfuze_chip->regmap,
->> PFUZE100_SW1CMODE,
->> +			   PFUZE100_SWxMODE_MASK,
->> PFUZE100_SWxMODE_APS_OFF);
->> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW2MODE,
->> +			   PFUZE100_SWxMODE_MASK,
->> PFUZE100_SWxMODE_APS_OFF);
->> +	regmap_update_bits(syspm_pfuze_chip->regmap,
->> PFUZE100_SW3AMODE,
->> +			   PFUZE100_SWxMODE_MASK,
->> PFUZE100_SWxMODE_APS_OFF);
->> +	regmap_update_bits(syspm_pfuze_chip->regmap,
->> PFUZE100_SW3BMODE,
->> +			   PFUZE100_SWxMODE_MASK,
->> PFUZE100_SWxMODE_APS_OFF);
->> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW4MODE,
->> +			   PFUZE100_SWxMODE_MASK,
->> PFUZE100_SWxMODE_APS_OFF);
->> +
->> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN1VOL,
->> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
->> +			   PFUZE100_VGENxSTBY);
->> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN2VOL,
->> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
->> +			   PFUZE100_VGENxSTBY);
->> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN3VOL,
->> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
->> +			   PFUZE100_VGENxSTBY);
->> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN4VOL,
->> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
->> +			   PFUZE100_VGENxSTBY);
->> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN5VOL,
->> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
->> +			   PFUZE100_VGENxSTBY);
->> +	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN6VOL,
->> +			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
->> +			   PFUZE100_VGENxSTBY);
->> +}
->> +
->> +static int pfuze_power_off_prepare_init(struct pfuze_chip *pfuze_chip)
->> +{
->> +	if (pfuze_chip->chip_id != PFUZE100) {
->> +		dev_warn(pfuze_chip->dev, "Requested pm_power_off_prepare
->> handler for not supported chip\n");
->> +		return -ENODEV;
->> +	}
->> +
->> +	if (pm_power_off_prepare) {
->> +		dev_warn(pfuze_chip->dev, "pm_power_off_prepare is already
->> registered.\n");
->> +		return -EBUSY;
->> +	}
->> +
->> +	if (syspm_pfuze_chip) {
->> +		dev_warn(pfuze_chip->dev, "syspm_pfuze_chip is already set.\n");
->> +		return -EBUSY;
->> +	}
->> +
->> +	syspm_pfuze_chip = pfuze_chip;
->> +	pm_power_off_prepare = pfuze_power_off_prepare;
->> +
->> +	return 0;
->> +}
->> +
->>  static int pfuze_identify(struct pfuze_chip *pfuze_chip)  {
->>  	unsigned int value;
->> @@ -661,6 +738,20 @@ static int pfuze100_regulator_probe(struct i2c_client
->> *client,
->>  		}
->>  	}
->>
->> +	if (of_property_read_bool(client->dev.of_node,
->> +				  "fsl,pmic-stby-poweroff"))
->> +		return pfuze_power_off_prepare_init(pfuze_chip);
->> +
->> +	return 0;
->> +}
->> +
->> +static int pfuze100_regulator_remove(struct i2c_client *client) {
->> +	if (syspm_pfuze_chip) {
->> +		syspm_pfuze_chip = NULL;
->> +		pm_power_off_prepare = NULL;
->> +	}
->> +
->>  	return 0;
+>> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+>> index 017539dd712b..2f5c643f62fb 100644
+>> --- a/arch/arm/mach-imx/pm-imx6.c
+>> +++ b/arch/arm/mach-imx/pm-imx6.c
+>> @@ -601,6 +601,28 @@ static void __init imx6_pm_common_init(const struct
+>> imx6_pm_socdata
+>>  				   IMX6Q_GPR1_GINT);
 >>  }
 >>
->> @@ -671,6 +762,7 @@ static struct i2c_driver pfuze_driver = {
->>  		.of_match_table = pfuze_dt_ids,
->>  	},
->>  	.probe = pfuze100_regulator_probe,
->> +	.remove = pfuze100_regulator_remove,
->>  };
->>  module_i2c_driver(pfuze_driver);
+>> +static void imx6_pm_stby_poweroff(void) {
+>> +	imx6_set_lpm(STOP_POWER_OFF);
+>> +	imx6q_suspend_finish(0);
+>> +
+>> +	mdelay(1000);
+>> +
+>> +	pr_emerg("Unable to poweroff system\n"); }
+>> +
+>> +static int imx6_pm_stby_poweroff_probe(void) {
+>> +	if (pm_power_off) {
+>> +		pr_warn("%s: pm_power_off already claimed  %p %pf!\n",
+>> +			__func__, pm_power_off, pm_power_off);
+
+> 'syscon-poweroff' and 'pmic-stby-poweroff ' should be chosen as a single
+> Poweroff way for any i.mx6 board. Why not delete directly 'syscon-poweroff' in dts 
+> to avoid such two power off ways coexist?
+
+pm_power_off can be registred by any part of the kernel. So, we need it
+to avoid conflicts or at least to be able see them.
+
+On other hand, you are right. syscon-poweroff should be disabled for
+this board.
+
+>> +		return -EBUSY;
+>> +	}
+>> +
+>> +	pm_power_off = imx6_pm_stby_poweroff;
+>> +	return 0;
+>> +}
+>> +
+>>  void __init imx6_pm_ccm_init(const char *ccm_compat)  {
+>>  	struct device_node *np;
+>> @@ -617,6 +639,9 @@ void __init imx6_pm_ccm_init(const char
+>> *ccm_compat)
+>>  	val = readl_relaxed(ccm_base + CLPCR);
+>>  	val &= ~BM_CLPCR_LPM;
+>>  	writel_relaxed(val, ccm_base + CLPCR);
+>> +
+>> +	if (of_property_read_bool(np, "fsl,pmic-stby-poweroff"))
+>> +		imx6_pm_stby_poweroff_probe();
+>>  }
 >>
+>>  void __init imx6q_pm_init(void)
 >> --
 >> 2.18.0
 > 
@@ -225,4 +117,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 488 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180730/83e11652/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180730/aaa2e745/attachment-0001.sig>
