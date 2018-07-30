@@ -1,5 +1,5 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Mon, 30 Jul 2018 14:14:17 +0000
+Date: Mon, 30 Jul 2018 14:17:03 +0000
 Subject: [PATCH v7 3/6] dt-bindings: mailbox: imx-mu: add generic MU
  channel support
 In-Reply-To: <CABb+yY3PLcjduxm7uJ9xZpPP2zkcQ5Qngs4PjnhGAXp43QVzFA@mail.gmail.com>
@@ -16,7 +16,7 @@ References: <20180726065331.6186-1-o.rempel@pengutronix.de>
  <CABb+yY1MSSQKZ6BOQXC-x=qy4VZ5HqDBjmh_BJTXSkAm3+P8mA@mail.gmail.com>
  <bf7aca98-7ec8-bcf3-b1a8-d86a7cf28d31@pengutronix.de>
  <CABb+yY3PLcjduxm7uJ9xZpPP2zkcQ5Qngs4PjnhGAXp43QVzFA@mail.gmail.com>
-Message-ID: <AM0PR04MB4211EF3D479D6B8A093ACCB2802F0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <AM0PR04MB4211FBB1856C007E0F1DE2DA802F0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -49,86 +49,16 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > 
 > We just can't have protocol specific s/w modes in the controller drivers.
 > 
-
-Do you think implement "Passing short messages" defined in reference
-manual in controller driver is protocol specific?
-That seems like our most argument before.
-
 > The best solution is to fix the SCU firmware. If that is _really_ impossible, I
 > provided a solution (3 cells work around). If you have a better idea please
 > feel free to propose and implement that.
 > 
-
-That's out of our control.
-SCU firmware is not using Linux and there's no mailbox framework.
-It's simply follow "passing short messages" way to send multi words with 4 data
-Registers.
- 
 > It will also help if you could share the user code of "scu-mode". If there is no
 > such code (and we know the driver doesn't respect the "scu-mode" property)
 > why do we even have that binding? Maybe drop it.
 
-You can refer to this patch for the user code of "scu-mode".
-[RFC PATCH v6 2/2] mailbox: imx-mailbox: add scu protocol support
-https://www.spinics.net/lists/arm-kernel/msg665135.html
-
-And I do admit that there're two protocol specific bits in the driver.
-1. Unlike TI message header, SCU size is in the second u8.
-Ti message header:
-struct ti_msgmgr_message {
-        size_t len;
-        u8 *buf;
-};
-Controller get the size from the first u32.
-
-SCU message header:
-struct sc_rpc_msg {
-        uint8_t ver;
-        uint8_t size;
-        uint8_t svc; 
-        uint8_t func;
-};
-Controller get the size from the second u8.
-
-And a full SCU message is like:
-struct imx_sc_msg_req_set_clock_rate {
-        struct sc_rpc_msg hdr;
-        u32 rate;
-        u16 resource;
-        u8 clk;
-} __packed;
-
-2. There's no synchronous read function in mailbox framework,
-So we use mbox_client_peek_data to read data which can't return
-the read data. In order to save a mem copy from read data to the
-data buffer, the controller driver saves the tx data buffer in itself. 
-(Anyway to improve? Maybe we should implement a synchronous
-mbox_client_read_data()?)
-
-And for SCU IPC client, it's something like:
-int sc_call_rpc(sc_ipc_t ipc, void *msg, bool no_resp)
-{
-        ...
-        mbox_send_message(sc_ipc->chan, msg);
-
-        if (!no_resp) 
-                ret = mbox_client_peek_data(sc_ipc->chan);
-
-        mbox_client_txdone(sc_ipc->chan, ret);
-        ...
-}
-
-int sc_ipc_open(sc_ipc_t *ipc, struct device *dev)
-{
-        sc_ipc->cl.dev = dev; 
-        sc_ipc->cl.tx_block = false;
-        sc_ipc->cl.knows_txdone = true;
-
-        sc_ipc->chan = mbox_request_channel(&sc_ipc->cl, 0);
-        ...
-}
-
-Any better ideas?
+The initial idea is using mbox-cells value to distinguish which MU mode is used
+(single chan or multi chans).
 
 Regards
 Dong Aisheng
