@@ -1,44 +1,136 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 30 Jul 2018 10:48:58 +0800
-Subject: [PATCH v3 5/5] arm64: dts: actions: Add pinctrl node for Actions
- Semi S700
-In-Reply-To: <20180729200038.11795-6-sravanhome@gmail.com>
-References: <20180729200038.11795-6-sravanhome@gmail.com>
-Message-ID: <201807301032.EiMuF85V%fengguang.wu@intel.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Mon, 30 Jul 2018 10:59:54 +0800
+Subject: [PATCH mmc-next v3 3/3] mmc: sdhci-of-dwcmshc: solve 128MB DMA
+ boundary limitation
+In-Reply-To: <01010164e91d7bda-aa616cbf-7bb2-4fe4-85e5-a18e16433fde-000000@us-west-2.amazonses.com>
+References: <20180730104228.28b58bd0@xhacker.debian>
+ <20180730104636.1a3e6c81@xhacker.debian>
+ <01010164e91d7bda-aa616cbf-7bb2-4fe4-85e5-a18e16433fde-000000@us-west-2.amazonses.com>
+Message-ID: <20180730105954.6c365a7b@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Saravanan,
+On Mon, 30 Jul 2018 02:56:20 +0000 Matthew Leon <matthewleon@linux.com> wrote:
 
-Thank you for the patch! Yet something to improve:
+> Hey Jisheng,
 
-[auto build test ERROR on pinctrl/devel]
-[also build test ERROR on next-20180727]
-[cannot apply to v4.18-rc7]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Hi,
 
-url:    https://github.com/0day-ci/linux/commits/Saravanan-Sekar/Add-Actions-Semi-S700-pinctrl-support/20180730-040252
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git devel
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
+> 
 
-All errors (new ones prefixed by >>):
+In LKML, we'd better not top post.
 
-   Error: arch/arm64/boot/dts/actions/s700.dtsi:172.19-20 syntax error
->> FATAL ERROR: Unable to parse input tree
+> Shouldn't we be splitting until all DMA blocks are less than 128M boundary?
+> I am a noob, but I think we should be prepared for boundaries that when
+> split in two, will still be greater than 128M. Feel free to disagree but
+> please explain why I may be wrong. Thank-you.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 60370 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180730/8054baf1/attachment-0001.gz>
+the limitation is "DMA addr can't span 128MB boundary" rather than "must be
+less than 128MB", they are different.
+
+And the max transfer size of one DMA desc is 64KB.
+
+thanks
+
+> 
+> Sincerely,
+> Matthew Leon
+> 
+> On Sun, Jul 29, 2018 at 10:46 PM, Jisheng Zhang <Jisheng.Zhang@synaptics.com
+> > wrote:  
+> 
+> > When using DMA, if the DMA addr spans 128MB boundary, we have to split
+> > the DMA transfer into two so that each one doesn't exceed the boundary.
+> >
+> > Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> > ---
+> >  drivers/mmc/host/sdhci-of-dwcmshc.c | 43 +++++++++++++++++++++++++++++
+> >  1 file changed, 43 insertions(+)
+> >
+> > diff --git a/drivers/mmc/host/sdhci-of-dwcmshc.c
+> > b/drivers/mmc/host/sdhci-of-dwcmshc.c
+> > index 1b7cd144fb01..e890fc8f5284 100644
+> > --- a/drivers/mmc/host/sdhci-of-dwcmshc.c
+> > +++ b/drivers/mmc/host/sdhci-of-dwcmshc.c
+> > @@ -8,21 +8,52 @@
+> >   */
+> >
+> >  #include <linux/clk.h>
+> > +#include <linux/mm.h>
+> >  #include <linux/module.h>
+> >  #include <linux/of.h>
+> > +#include <linux/sizes.h>
+> >
+> >  #include "sdhci-pltfm.h"
+> >
+> > +#define BOUNDARY_OK(addr, len) \
+> > +       ((addr | (SZ_128M - 1)) == ((addr + len - 1) | (SZ_128M - 1)))
+> > +
+> >  struct dwcmshc_priv {
+> >         struct clk      *bus_clk;
+> >  };
+> >
+> > +/*
+> > + * if DMA addr spans 128MB boundary, we split the DMA transfer into two
+> > + * so that the DMA transfer doesn't exceed the boundary.
+> > + */
+> > +static unsigned int dwcmshc_adma_write_desc(struct sdhci_host *host,
+> > +                                           void *desc, dma_addr_t addr,
+> > +                                           int len, unsigned int cmd)
+> > +{
+> > +       int tmplen, offset;
+> > +
+> > +       if (likely(!len || BOUNDARY_OK(addr, len)))
+> > +               return _sdhci_adma_write_desc(host, desc, addr, len, cmd);
+> > +
+> > +       offset = addr & (SZ_128M - 1);
+> > +       tmplen = SZ_128M - offset;
+> > +       _sdhci_adma_write_desc(host, desc, addr, tmplen, cmd);
+> > +
+> > +       addr += tmplen;
+> > +       len -= tmplen;
+> > +       desc += host->desc_sz;
+> > +       _sdhci_adma_write_desc(host, desc, addr, len, cmd);
+> > +
+> > +       return host->desc_sz * 2;
+> > +}
+> > +
+> >  static const struct sdhci_ops sdhci_dwcmshc_ops = {
+> >         .set_clock              = sdhci_set_clock,
+> >         .set_bus_width          = sdhci_set_bus_width,
+> >         .set_uhs_signaling      = sdhci_set_uhs_signaling,
+> >         .get_max_clock          = sdhci_pltfm_clk_get_max_clock,
+> >         .reset                  = sdhci_reset,
+> > +       .adma_write_desc        = dwcmshc_adma_write_desc,
+> >  };
+> >
+> >  static const struct sdhci_pltfm_data sdhci_dwcmshc_pdata = {
+> > @@ -36,12 +67,24 @@ static int dwcmshc_probe(struct platform_device *pdev)
+> >         struct sdhci_host *host;
+> >         struct dwcmshc_priv *priv;
+> >         int err;
+> > +       u32 extra;
+> >
+> >         host = sdhci_pltfm_init(pdev, &sdhci_dwcmshc_pdata,
+> >                                 sizeof(struct dwcmshc_priv));
+> >         if (IS_ERR(host))
+> >                 return PTR_ERR(host);
+> >
+> > +       /*
+> > +        * The DMA descriptor table number is calculated as the maximum
+> > +        * number of segments times 2, to allow for an alignment
+> > +        * descriptor for each segment, plus 1 for a nop end descriptor,
+> > +        * plus extra number for cross 128M boundary handling.
+> > +        */
+> > +       extra = DIV_ROUND_UP(totalram_pages, SZ_128M / PAGE_SIZE);
+> > +       if (extra > SDHCI_MAX_SEGS)
+> > +               extra = SDHCI_MAX_SEGS;
+> > +       host->adma_table_num = SDHCI_MAX_SEGS * 2 + 1 + extra;
+> > +
+> >         pltfm_host = sdhci_priv(host);
+> >         priv = sdhci_pltfm_priv(pltfm_host);
+> >
+> > --
+> > 2.18.0
+> >
+> >  
