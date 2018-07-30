@@ -1,219 +1,222 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Mon, 30 Jul 2018 18:01:54 +0800
-Subject: [PATCH 3/3] ptp_qoriq: convert to use module parameters for
- initialization
-In-Reply-To: <20180730100154.27906-1-yangbo.lu@nxp.com>
-References: <20180730100154.27906-1-yangbo.lu@nxp.com>
-Message-ID: <20180730100154.27906-3-yangbo.lu@nxp.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 30 Jul 2018 12:21:52 +0200
+Subject: [PATCH 7/9] clk: actions: Add Actions Semi Owl SoCs Reset
+ Management Unit support
+In-Reply-To: <20180727184527.13287-8-manivannan.sadhasivam@linaro.org>
+References: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
+ <20180727184527.13287-8-manivannan.sadhasivam@linaro.org>
+Message-ID: <1532946112.3471.2.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ptp_qoriq driver initialized the 1588 timer with the
-configurations provided by the properties of device tree
-node. For example,
+Hi Manivannan,
 
-  fsl,tclk-period = <5>;
-  fsl,tmr-prsc    = <2>;
-  fsl,tmr-add     = <0xaaaaaaab>;
-  fsl,tmr-fiper1  = <999999995>;
-  fsl,tmr-fiper2  = <99990>;
-  fsl,max-adj     = <499999999>;
+Thank you for the patch, a few small comments below:
 
-These things actually were runtime configurations which
-were not proper to be put into dts. This patch is to convert
-to use module parameters for 1588 timer initialization, and
-to support initial register values calculation.
-If the parameters are not provided, the driver will calculate
-register values with a set of default parameters. With this
-patch, those dts properties are no longer needed for new
-platform to support 1588 timer, and many QorIQ DPAA platforms
-(some P series and T series platforms of PowerPC, and some
-LS series platforms of ARM64) could use this driver for their
-fman ptp timer with default module parameters. However, this
-patch didn't remove the dts method. Because there were still
-many old platforms using the dts method. We need to clean up
-their dts files, verify module parameters on them, and convert
-them to the new method gradually in case of breaking any
-function.
+On Sat, 2018-07-28 at 00:15 +0530, Manivannan Sadhasivam wrote:
+> Add Reset Management Unit (RMU) support for Actions Semi Owl SoCs.
+> 
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> ---
+>  drivers/clk/actions/Kconfig      |  1 +
+>  drivers/clk/actions/Makefile     |  1 +
+>  drivers/clk/actions/owl-common.h |  2 +
+>  drivers/clk/actions/owl-reset.c  | 72 ++++++++++++++++++++++++++++++++
+>  drivers/clk/actions/owl-reset.h  | 32 ++++++++++++++
+>  5 files changed, 108 insertions(+)
+>  create mode 100644 drivers/clk/actions/owl-reset.c
+>  create mode 100644 drivers/clk/actions/owl-reset.h
+> 
+> diff --git a/drivers/clk/actions/Kconfig b/drivers/clk/actions/Kconfig
+> index dc38c85a4833..04f0a6355726 100644
+> --- a/drivers/clk/actions/Kconfig
+> +++ b/drivers/clk/actions/Kconfig
+> @@ -2,6 +2,7 @@ config CLK_ACTIONS
+>  	bool "Clock driver for Actions Semi SoCs"
+>  	depends on ARCH_ACTIONS || COMPILE_TEST
+>  	select REGMAP_MMIO
+> +	select RESET_CONTROLLER
+>  	default ARCH_ACTIONS
+>  
+>  if CLK_ACTIONS
+> diff --git a/drivers/clk/actions/Makefile b/drivers/clk/actions/Makefile
+> index 78c17d56f991..ccfdf9781cef 100644
+> --- a/drivers/clk/actions/Makefile
+> +++ b/drivers/clk/actions/Makefile
+> @@ -7,6 +7,7 @@ clk-owl-y			+= owl-divider.o
+>  clk-owl-y			+= owl-factor.o
+>  clk-owl-y			+= owl-composite.o
+>  clk-owl-y			+= owl-pll.o
+> +clk-owl-y			+= owl-reset.o
+>  
+>  # SoC support
+>  obj-$(CONFIG_CLK_OWL_S700)	+= owl-s700.o
+> diff --git a/drivers/clk/actions/owl-common.h b/drivers/clk/actions/owl-common.h
+> index 56f01f7774aa..4dc7f286831f 100644
+> --- a/drivers/clk/actions/owl-common.h
+> +++ b/drivers/clk/actions/owl-common.h
+> @@ -26,6 +26,8 @@ struct owl_clk_desc {
+>  	struct owl_clk_common		**clks;
+>  	unsigned long			num_clks;
+>  	struct clk_hw_onecell_data	*hw_clks;
+> +	struct owl_reset_map		*resets;
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
----
- drivers/ptp/ptp_qoriq.c       |  117 +++++++++++++++++++++++++++++++++++++++-
- include/linux/fsl/ptp_qoriq.h |    1 +
- 2 files changed, 115 insertions(+), 3 deletions(-)
+Could this be:
+	const struct owl_reset_map	*resets;
+?
 
-diff --git a/drivers/ptp/ptp_qoriq.c b/drivers/ptp/ptp_qoriq.c
-index a14c317..22baf83 100644
---- a/drivers/ptp/ptp_qoriq.c
-+++ b/drivers/ptp/ptp_qoriq.c
-@@ -29,9 +29,30 @@
- #include <linux/of_platform.h>
- #include <linux/timex.h>
- #include <linux/slab.h>
-+#include <linux/clk.h>
- 
- #include <linux/fsl/ptp_qoriq.h>
- 
-+static unsigned int cksel = DEFAULT_CKSEL;
-+module_param(cksel, uint, 0644);
-+MODULE_PARM_DESC(cksel, "Select reference clock");
-+
-+static unsigned int clk_src;
-+module_param(clk_src, uint, 0644);
-+MODULE_PARM_DESC(clk_src, "Reference clock frequency (if clocks property not provided in dts)");
-+
-+static unsigned int tmr_prsc = 2;
-+module_param(tmr_prsc, uint, 0644);
-+MODULE_PARM_DESC(tmr_prsc, "Output clock division/prescale factor");
-+
-+static unsigned int tmr_fiper1 = 1000000000;
-+module_param(tmr_fiper1, uint, 0644);
-+MODULE_PARM_DESC(tmr_fiper1, "Desired fixed interval pulse period (ns)");
-+
-+static unsigned int tmr_fiper2 = 100000;
-+module_param(tmr_fiper2, uint, 0644);
-+MODULE_PARM_DESC(tmr_fiper2, "Desired fixed interval pulse period (ns)");
-+
- /*
-  * Register access functions
-  */
-@@ -317,6 +338,91 @@ static int ptp_qoriq_enable(struct ptp_clock_info *ptp,
- 	.enable		= ptp_qoriq_enable,
- };
- 
-+/**
-+ * qoriq_ptp_nominal_freq - calculate nominal frequency by reference clock
-+ *			    frequency
-+ *
-+ * @clk_src: reference clock frequency
-+ *
-+ * The nominal frequency is the desired clock frequency.
-+ * It should be less than the reference clock frequency.
-+ * It should be a factor of 1000MHz.
-+ *
-+ * Return the nominal frequency
-+ */
-+static u32 qoriq_ptp_nominal_freq(u32 clk_src)
-+{
-+	u32 remainder = 0;
-+
-+	clk_src /= 1000000;
-+	remainder = clk_src % 100;
-+	if (remainder) {
-+		clk_src -= remainder;
-+		clk_src += 100;
-+	}
-+
-+	do {
-+		clk_src -= 100;
-+
-+	} while (1000 % clk_src);
-+
-+	return clk_src * 1000000;
-+}
-+
-+static int qoriq_ptp_config(struct qoriq_ptp *qoriq_ptp,
-+			    struct device_node *node)
-+{
-+	struct clk *clk;
-+	u64 freq_comp;
-+	u64 max_adj;
-+	u32 nominal_freq;
-+
-+	qoriq_ptp->cksel = cksel;
-+
-+	if (clk_src) {
-+		qoriq_ptp->clk_src = clk_src;
-+	} else {
-+		clk = of_clk_get(node, 0);
-+		if (!IS_ERR(clk)) {
-+			qoriq_ptp->clk_src = clk_get_rate(clk);
-+			clk_put(clk);
-+		}
-+	}
-+
-+	if (qoriq_ptp->clk_src <= 100000000UL) {
-+		pr_err("error reference clock value, or lower than 100MHz\n");
-+		return -EINVAL;
-+	}
-+
-+	nominal_freq = qoriq_ptp_nominal_freq(qoriq_ptp->clk_src);
-+	if (!nominal_freq)
-+		return -EINVAL;
-+
-+	qoriq_ptp->tclk_period = 1000000000UL / nominal_freq;
-+	qoriq_ptp->tmr_prsc = tmr_prsc;
-+
-+	/* Calculate initial frequency compensation value for TMR_ADD register.
-+	 * freq_comp = ceil(2^32 / freq_ratio)
-+	 * freq_ratio = reference_clock_freq / nominal_freq
-+	 */
-+	freq_comp = ((u64)1 << 32) * nominal_freq;
-+	if (do_div(freq_comp, qoriq_ptp->clk_src))
-+		freq_comp++;
-+
-+	qoriq_ptp->tmr_add = freq_comp;
-+	qoriq_ptp->tmr_fiper1 = tmr_fiper1 - qoriq_ptp->tclk_period;
-+	qoriq_ptp->tmr_fiper2 = tmr_fiper2 - qoriq_ptp->tclk_period;
-+
-+	/* max_adj = 1000000000 * (freq_ratio - 1.0) - 1
-+	 * freq_ratio = reference_clock_freq / nominal_freq
-+	 */
-+	max_adj = 1000000000ULL * (qoriq_ptp->clk_src - nominal_freq);
-+	max_adj = max_adj / nominal_freq - 1;
-+	qoriq_ptp->caps.max_adj = max_adj;
-+
-+	return 0;
-+}
-+
- static int qoriq_ptp_probe(struct platform_device *dev)
- {
- 	struct device_node *node = dev->dev.of_node;
-@@ -332,7 +438,7 @@ static int qoriq_ptp_probe(struct platform_device *dev)
- 	if (!qoriq_ptp)
- 		goto no_memory;
- 
--	err = -ENODEV;
-+	err = -EINVAL;
- 
- 	qoriq_ptp->caps = ptp_qoriq_caps;
- 
-@@ -351,10 +457,14 @@ static int qoriq_ptp_probe(struct platform_device *dev)
- 				 "fsl,tmr-fiper2", &qoriq_ptp->tmr_fiper2) ||
- 	    of_property_read_u32(node,
- 				 "fsl,max-adj", &qoriq_ptp->caps.max_adj)) {
--		pr_err("device tree node missing required elements\n");
--		goto no_node;
-+		pr_warn("device tree node missing required elements, try module param\n");
-+
-+		if (qoriq_ptp_config(qoriq_ptp, node))
-+			goto no_param;
- 	}
- 
-+	err = -ENODEV;
-+
- 	qoriq_ptp->irq = platform_get_irq(dev, 0);
- 
- 	if (qoriq_ptp->irq < 0) {
-@@ -436,6 +546,7 @@ static int qoriq_ptp_probe(struct platform_device *dev)
- 	release_resource(qoriq_ptp->rsrc);
- no_resource:
- 	free_irq(qoriq_ptp->irq, qoriq_ptp);
-+no_param:
- no_node:
- 	kfree(qoriq_ptp);
- no_memory:
-diff --git a/include/linux/fsl/ptp_qoriq.h b/include/linux/fsl/ptp_qoriq.h
-index dc3dac4..586d430 100644
---- a/include/linux/fsl/ptp_qoriq.h
-+++ b/include/linux/fsl/ptp_qoriq.h
-@@ -147,6 +147,7 @@ struct qoriq_ptp {
- 	u32 cksel;
- 	u32 tmr_fiper1;
- 	u32 tmr_fiper2;
-+	u32 clk_src;
- };
- 
- static inline u32 qoriq_read(unsigned __iomem *addr)
--- 
-1.7.1
+> +	unsigned long			num_resets;
+>  	struct regmap			*regmap;
+>  };
+>  
+> diff --git a/drivers/clk/actions/owl-reset.c b/drivers/clk/actions/owl-reset.c
+> new file mode 100644
+> index 000000000000..91b161cc68de
+> --- /dev/null
+> +++ b/drivers/clk/actions/owl-reset.c
+> @@ -0,0 +1,72 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later
+> +//
+> +// Actions Semi Owl SoCs Reset Management Unit driver
+> +//
+> +// Copyright (c) 2018 Linaro Ltd.
+> +// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> +
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+
+This seems unnecessary, since register access is done via regmap.
+
+> +#include <linux/regmap.h>
+> +#include <linux/reset-controller.h>
+> +
+> +#include "owl-reset.h"
+> +
+> +static int owl_reset_assert(struct reset_controller_dev *rcdev,
+> +			    unsigned long id)
+> +{
+> +	struct owl_reset *reset = to_owl_reset(rcdev);
+> +	const struct owl_reset_map *map = &reset->reset_map[id];
+> +	u32 reg;
+> +
+> +	regmap_read(reset->regmap, map->reg, &reg);
+> +	regmap_write(reset->regmap, map->reg, reg & ~map->bit);
+
+This read-modify-write sequence needs locking against concurrent
+register access. Better use regmap_update_bits():
+
+	return regmap_update_bits(reset->regmap, map->reg, map->bit, 0);
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int owl_reset_deassert(struct reset_controller_dev *rcdev,
+> +			      unsigned long id)
+> +{
+> +	struct owl_reset *reset = to_owl_reset(rcdev);
+> +	const struct owl_reset_map *map = &reset->reset_map[id];
+> +	u32 reg;
+> +
+> +	regmap_read(reset->regmap, map->reg, &reg);
+> +	regmap_write(reset->regmap, map->reg, reg | map->bit);
+
+Better:
+
+	return regmap_update_bits(reset->regmap, map->reg, map->bit, map->bit);
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int owl_reset_reset(struct reset_controller_dev *rcdev,
+> +			   unsigned long id)
+> +{
+> +	owl_reset_assert(rcdev, id);
+> +	udelay(1);
+
+Is the delay valid for all IP cores on all SoCs variants?
+
+> +	owl_reset_deassert(rcdev, id);
+> +
+> +	return 0;
+> +}
+> +
+> +static int owl_reset_status(struct reset_controller_dev *rcdev,
+> +			    unsigned long id)
+> +{
+> +	struct owl_reset *reset = to_owl_reset(rcdev);
+> +	const struct owl_reset_map *map = &reset->reset_map[id];
+> +	u32 reg;
+> +
+> +	regmap_read(reset->regmap, map->reg, &reg);
+
+If this could return an error, better report it.
+
+> +
+> +	/*
+> +	 * The reset control API expects 0 if reset is not asserted,
+> +	 * which is the opposite of what our hardware uses.
+> +	 */
+> +	return !(map->bit & reg);
+> +}
+> +
+> +const struct reset_control_ops owl_reset_ops = {
+> +	.assert		= owl_reset_assert,
+> +	.deassert	= owl_reset_deassert,
+> +	.reset		= owl_reset_reset,
+> +	.status		= owl_reset_status,
+> +};
+> diff --git a/drivers/clk/actions/owl-reset.h b/drivers/clk/actions/owl-reset.h
+> new file mode 100644
+> index 000000000000..1a5e987ba99b
+> --- /dev/null
+> +++ b/drivers/clk/actions/owl-reset.h
+> @@ -0,0 +1,32 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later
+> +//
+> +// Actions Semi Owl SoCs Reset Management Unit driver
+> +//
+> +// Copyright (c) 2018 Linaro Ltd.
+> +// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> +
+> +#ifndef _OWL_RESET_H_
+> +#define _OWL_RESET_H_
+> +
+> +#include <linux/reset-controller.h>
+> +#include <linux/spinlock.h>
+
+spinlock?
+
+> +
+> +struct owl_reset_map {
+> +	u16	reg;
+
+Note that this will be aligned to 32-bits. If the intention was to save
+space, consider storing an u8 bit index instead of the mask.
+
+> +	u32	bit;
+> +};
+> +
+> +struct owl_reset {
+> +	struct reset_controller_dev	rcdev;
+> +	struct owl_reset_map		*reset_map;
+
+Could this be
+	const struct owl_reset_map	*reset_map;
+?
+
+> +	struct regmap			*regmap;
+> +};
+> +
+> +static inline struct owl_reset *to_owl_reset(struct reset_controller_dev *rcdev)
+> +{
+> +	return container_of(rcdev, struct owl_reset, rcdev);
+> +}
+> +
+> +extern const struct reset_control_ops owl_reset_ops;
+> +
+> +#endif /* _OWL_RESET_H_ */
+
+regards
+Philipp
