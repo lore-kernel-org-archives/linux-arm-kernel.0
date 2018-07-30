@@ -1,55 +1,93 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Mon, 30 Jul 2018 09:14:43 +0200
-Subject: [PATCH v3 0/3] i2c: at91: slave mode support
-In-Reply-To: <20180720224141.lawanibd7v4hmbym@ninjato>
-References: <20180716094037.1843-1-ludovic.desroches@microchip.com>
- <20180720224141.lawanibd7v4hmbym@ninjato>
-Message-ID: <20180730071443.clib3swtsommj7jk@M43218.corp.atmel.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 30 Jul 2018 15:29:30 +0800
+Subject: [SPAM]Re: [PATCH] drm/mediatek: Convert
+ drm_atomic_helper_suspend/resume()
+In-Reply-To: <CAFqt6zbbVMagJeM53g79RoeYt7edmAZiF8r0_HpyxnS9123vQg@mail.gmail.com>
+References: <20180728133845.GA15261@jordon-HP-15-Notebook-PC>
+ <1532922786.3723.1.camel@mtksdaap41>
+ <CAFqt6zbbVMagJeM53g79RoeYt7edmAZiF8r0_HpyxnS9123vQg@mail.gmail.com>
+Message-ID: <1532935770.22708.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 21, 2018 at 12:41:41AM +0200, Wolfram Sang wrote:
-> > [Ludovic Desroches]
-> > Changes in v3:
-> >  - rebase (cherry-pick was enough)
+Hi, Souptick:
+
+
+On Mon, 2018-07-30 at 10:21 +0530, Souptick Joarder wrote:
+> On Mon, Jul 30, 2018 at 9:23 AM, CK Hu <ck.hu@mediatek.com> wrote:
+> > Hi, Souptick:
+> >
+> > On Sat, 2018-07-28 at 19:08 +0530, Souptick Joarder wrote:
+> >> convert drm_atomic_helper_suspend/resume() to use
+> >> drm_mode_config_helper_suspend/resume().
+> >>
+> >
+> > Reviewed-by: CK Hu <ck.hu@mediatek.com>
 > 
-> Thanks for the rebase. I wonder, though, I recall to had more
-> complicated issues. However...
-> 
-> >  - fix checkpatch errors
-> >  - tests:
-> >    - hangs with a SAMA5D4 (master and slave on different busses) after about
-> >    100 transfers. It's the firs time I do this test.
-> >    - some mismatches with a SAMA5D4 as slave and a SAMA5D2 as master
-> >    I don't know if it's a regression. I don't remember having seen this
-> >    behavior previously.
-> >    I think it's worth taking those patches even if there are some possible
-> >    bugs. It'll allow to get more people using it and so to consolidate the
-> >    slave mode support.
-> 
-> I really want to see those patches go upstream, too. But I am also not a
-> big fan of delivering the user something with known issues. Especially
-> not when they affect the main feature to be added. My rationale here is
-> that someone who is able to fix the issues remaining will also be able
-> to pick up and apply patches.
-> 
-> Maybe, maybe if it was to be enabled by a special
-> I2C_AT91_SLAVE_EXPERIMANTEL symbol with lots of explanations. I need to
-> think twice about that, though.
+> Thank CK, can we get this patch in queue for 4.19 ?
 > 
 
-I understand your point. The experimental mentionning could be a good
-trade-off. Let me know once you make up your mind.
+Applied to mediatek-drm-fixes-4.19 [1].
 
-> Speaking of Kconfig, I think this series needs to place a
+[1]
+https://github.com/ckhu-mediatek/linux.git-tags/commits/mediatek-drm-fixes-4.19
+
+Regards,
+CK
+
+> >
+> >> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> >> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
+> >> ---
+> >>  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 21 ++++++++-------------
+> >>  1 file changed, 8 insertions(+), 13 deletions(-)
+> >>
+> >> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> >> index a2ca90f..1fcda2de 100644
+> >> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> >> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> >> @@ -520,29 +520,24 @@ static int mtk_drm_sys_suspend(struct device *dev)
+> >>  {
+> >>       struct mtk_drm_private *private = dev_get_drvdata(dev);
+> >>       struct drm_device *drm = private->drm;
+> >> +     int ret;
+> >>
+> >> -     drm_kms_helper_poll_disable(drm);
+> >> -
+> >> -     private->suspend_state = drm_atomic_helper_suspend(drm);
+> >> -     if (IS_ERR(private->suspend_state)) {
+> >> -             drm_kms_helper_poll_enable(drm);
+> >> -             return PTR_ERR(private->suspend_state);
+> >> -     }
+> >> -
+> >> +     ret = drm_mode_config_helper_suspend(drm);
+> >>       DRM_DEBUG_DRIVER("mtk_drm_sys_suspend\n");
+> >> -     return 0;
+> >> +
+> >> +     return ret;
+> >>  }
+> >>
+> >>  static int mtk_drm_sys_resume(struct device *dev)
+> >>  {
+> >>       struct mtk_drm_private *private = dev_get_drvdata(dev);
+> >>       struct drm_device *drm = private->drm;
+> >> +     int ret;
+> >>
+> >> -     drm_atomic_helper_resume(drm, private->suspend_state);
+> >> -     drm_kms_helper_poll_enable(drm);
+> >> -
+> >> +     ret = drm_mode_config_helper_resume(drm);
+> >>       DRM_DEBUG_DRIVER("mtk_drm_sys_resume\n");
+> >> -     return 0;
+> >> +
+> >> +     return ret;
+> >>  }
+> >>  #endif
+> >>
+> >
+> >
 > 
-> 	select I2C_SLAVE
-> 
-> somewhere.
-> 
-
-Ok I'll update it if we go further with this set of patches.
-
-Regards
-
-Ludovic
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
