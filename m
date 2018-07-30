@@ -1,111 +1,136 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 30 Jul 2018 18:03:37 +0100
-Subject: [PATCH v5 1/3] arm64: mm: Support Common Not Private translations
-In-Reply-To: <16344e26-6cd2-5e55-d34e-fd2a48bef733@arm.com>
-References: <1529403502-2843-1-git-send-email-vladimir.murzin@arm.com>
- <1529403502-2843-2-git-send-email-vladimir.murzin@arm.com>
- <20180727113502.3qdbyffuvysva6bz@armageddon.cambridge.arm.com>
- <f3da236e-504d-66ab-19da-9f89eba253f1@arm.com>
- <20180730154209.2tawriqxgxub7paa@armageddon.cambridge.arm.com>
- <16344e26-6cd2-5e55-d34e-fd2a48bef733@arm.com>
-Message-ID: <20180730170337.rycf34urt7n2fptq@armageddon.cambridge.arm.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 30 Jul 2018 22:37:25 +0530
+Subject: [PATCH v7 0/6] Add Actions Semiconductor Owl S900 I2C support
+In-Reply-To: <20180726154603.5089-1-manivannan.sadhasivam@linaro.org>
+References: <20180726154603.5089-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180730170725.GB2511@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2018 at 05:29:35PM +0100, Robin Murphy wrote:
-> On 30/07/18 16:42, Catalin Marinas wrote:
-> > On Mon, Jul 30, 2018 at 11:08:27AM +0100, Vladimir Murzin wrote:
-> > > On 27/07/18 12:35, Catalin Marinas wrote:
-> > > > On Tue, Jun 19, 2018 at 11:18:20AM +0100, Vladimir Murzin wrote:
-> > > > > diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-> > > > > index 39ec0b8..c506fb7 100644
-> > > > > --- a/arch/arm64/include/asm/mmu_context.h
-> > > > > +++ b/arch/arm64/include/asm/mmu_context.h
-> > > > > @@ -149,6 +149,18 @@ static inline void cpu_replace_ttbr1(pgd_t *pgdp)
-> > > > >   	phys_addr_t pgd_phys = virt_to_phys(pgdp);
-> > > > > +	if (system_supports_cnp() && !WARN_ON(pgdp != lm_alias(swapper_pg_dir))) {
-> > > > > +		/*
-> > > > > +		 * cpu_replace_ttbr1() is used when there's a boot CPU
-> > > > > +		 * up (i.e. cpufeature framework is not up yet) and
-> > > > > +		 * latter only when we enable CNP via cpufeature's
-> > > > > +		 * enable() callback.
-> > > > > +		 * Also we rely on the cpu_hwcap bit being set before
-> > > > > +		 * calling the enable() function.
-> > > > > +		 */
-> > > > > +		pgd_phys |= TTBR_CNP_BIT;
-> > > > > +	}
-> > > > > +
-> > > > >   	replace_phys = (void *)__pa_symbol(idmap_cpu_replace_ttbr1);
-> > > > 
-> > > > So the above code sets the TTBR_CNP_BIT (bit 0) in pgd_phys and calls
-> > > > the idmap_cpu_replace_ttbr1() with this value. Looking at the latter, it
-> > > > performs a phys_to_ttbr transformation of pgd_phys which masks out the
-> > > > bottom 2 bits when CONFIG_ARM64_PA_BITS_52 is enabled. I think we need
-> > > > to tweak TTBR_BADDR_MASK_52 to start from bit 0.
-> > > 
-> > > Something like bellow?
-> > > 
-> > > diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> > > index 0bcc98d..e0b4b2f 100644
-> > > --- a/arch/arm64/include/asm/assembler.h
-> > > +++ b/arch/arm64/include/asm/assembler.h
-> > > @@ -524,11 +524,10 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
-> > >    * 	ttbr:	returns the TTBR value
-> > >    */
-> > >   	.macro	phys_to_ttbr, ttbr, phys
-> > > -#ifdef CONFIG_ARM64_PA_BITS_52
-> > > -	orr	\ttbr, \phys, \phys, lsr #46
-> > > -	and	\ttbr, \ttbr, #TTBR_BADDR_MASK_52
-> > > -#else
-> > >   	mov	\ttbr, \phys
-> > > +#ifdef CONFIG_ARM64_PA_BITS_52
-> > > +	ubfx	\ttbr, \ttbr, #48, #4
-> > > +	orr	\ttbr, \phys, \ttbr, lsl #2
-> > >   #endif
-> > >   	.endm
-> > 
-> > This would do, I don't have a better idea on how to write it. But I'd
-> > like a comment to say that this is moving bits 51:48 of the address to
-> > bits 5:2 of TTBR_ELx.
+On Thu, Jul 26, 2018 at 09:15:57PM +0530, Manivannan Sadhasivam wrote:
+> This patchset adds I2C controller support for Actions Semiconductor S900 SoC.
+> This driver has been structured in a way such that there will be only
+> one controller driver for the whole Owl family series (S500, S700 and
+> S900 SoCs).
 > 
-> The diff above is *copying* 51:48 into 5:2; it doesn't *move* it like the
-> existing code does. That's pretty crucial, because without the BADDR masking
-> operation it's going to leave the upper address bits in the ASID/VMID field,
-> which looks like a recipe for disaster if the reserved TTBR1 happens to be
-> at a high enough address (at least cpu_switch_mm might just be OK by virtue
-> of using BFI rather than ORR for the ASID).
-
-Oh, very good point.
-
-> > > diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> > > index 1bdeca8..1b9d0e9 100644
-> > > --- a/arch/arm64/include/asm/pgtable.h
-> > > +++ b/arch/arm64/include/asm/pgtable.h
-> > > @@ -770,7 +770,7 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
-> > >   #define kc_offset_to_vaddr(o)	((o) | VA_START)
-> > >   #ifdef CONFIG_ARM64_PA_BITS_52
-> > > -#define phys_to_ttbr(addr)	(((addr) | ((addr) >> 46)) & TTBR_BADDR_MASK_52)
-> > > +#define phys_to_ttbr(addr)	((addr) | (((addr) >> 46) & TTBR_BADDR_MASK_52))
+> There are 6 I2C controllers with separate memory mapped register space.
+> The I2C controller can handle atmost two messages concatenated by a
+> repeated start via its internal address feature. Hence the driver
+> uses this feature for messages of length greater than 1. In those cases,
+> the first message of the combined message should be a `write` with maximum
+> message length 6 and the second message's maximum length should be 240 bytes.
 > 
-> Ditto - by the look of things, this definitely stands to corrupt the VMID in
-> update_vttbr(). If we really have no choice but to smuggle the CnP value in
-> something which is logically an address, then I think we'd need to handle it
-> more like this:
+> As far as the bus speed is concerned, this driver only supports
+> Standard (100KHz) and High speed (400KHz) for now.
 > 
-> #define TTBR_CNP (1)
-> #define phys_to_ttbr(addr) \
-> ((((addr) | ((addr) >> 46)) & TTBR_BADDR_MASK_52) | (addr & TTBR_CNP))
+> The pinctrl definitions are only available for I2C0, I2C1 and I2C2.
+> With the mux option available only for I2C0.
 > 
-> Although in patch #2 we're only applying CnP *after* the BADDR conversion,
-> so is changing this one even necessary? If I've understood the intent
-> correctly, all that might be needed is something like the below (untested,
-> of course).
+> For Bubblegum-96 board utilizing the S900 SoC, only I2C1 and I2C2 which
+> are exposed on the Low speed expansion connector are enabled.
+> 
+> This series depends on the pinctrl patch [1] is still not merged by the
+> platform maintainer Andreas but it has been reviewed by the pinctrl maintainer
+> Linus Walleij. For the reference, I have queued up all reviewed dts patches
+> in my tree [2] from which Andreas is picking them for 4.19.
+> 
+> For this series, since the dts patches will go through the ARM SoC tree,
+> Andreas will pick it up once it is reviewed.
+> 
+> Thanks,
+> Mani
+>
 
-Or we could keep phys_to_ttbr() as it is for both the asm and C and
-apply the CNP bit afterwards (as you've already noticed in patch 2). For
-cpu_replace_ttbr1(), we'd also need to change idmap_cpu_replace_ttbr1 to
-actually take the TTBR1_EL1 value directly so that it doesn't have to
-invoke phys_to_ttbr().
+Hi Wolfram,
 
--- 
-Catalin
+Is there any update on this series?
+
+Thanks,
+Mani
+
+> [1] https://patchwork.kernel.org/patch/10322937/
+> [2] https://git.linaro.org/people/manivannan.sadhasivam/linux.git/log/?h=s900-for-next
+> 
+> Changes in v7:
+> 
+> * Fixed a multi line misalignment spotted by Peter
+> 
+> Changes in v6:
+> 
+> As per Peter's review:
+> 
+> * Added missing newlines for error and debug outputs
+> * Fixed further multi-line misalignments
+> 
+> Changes in v5:
+> 
+> * Cleaned up the multi-line codes and reordered the error paths
+>   as per Peter's review
+> * Added Acked-by tag from Peter for driver patch
+> * Added Reviewed-by tag from Rob for bindings patch
+> 
+> Changes in v4:
+> 
+> As per Andy and Peter review:
+> 
+> * Used spinlock for accessing most of the register access (only parts
+>   involved sleep/long-busy-wait has been excluded)
+> * Removed returning 0 and added -ENXIO if the msg_ptr not equals to
+>   message length
+> * Added DIV_ROUND_UP for setting clock frequency
+> * Changed one non-atomic mdelay instance to usleep_range
+> * Moved pinctrl definition patch before dts patch
+> * Fixed the driver to support only 100KHz and 400KHz frequencies
+> 
+> Changes in v3:
+> 
+> As per Peter, Andy and Andreas review:
+> 
+> * Removed owl_i2c_reset function from interrupt handler since it
+>   involves the use of delays.
+> * Fixed the return path in owl_i2c_master_xfer and added a note
+> * Changed "base" parameter to "reg" in owl_i2c_update_reg for better
+>   understandability
+> * Ordered the includes in alphabetical order
+> * Small changes to defines and added comma at the end of struct members
+> * Removed rendundant 0 assignment in owl_i2c_master_xfer
+> * Changed all OWL naming convention to Owl and also changed Actions Semi
+>   naming to Actions Semiconductor
+> 
+> Changes in v2:
+> 
+> As per Andy's review:
+> * Modified infinite loops to fixed number of retries
+> * Used i2c_8bit_addr_from_msg for constructing the slave address
+> * Removed unnecessary parenthesis around defines
+> * Modified certain dev_warn to dev_dbg
+> * Modified the error handling to more generic pattern
+> * Fixed the return value in owl_i2c_master_xfer
+> * Added MAINTAINERS patch for I2C driver and its binding
+> 
+> Manivannan Sadhasivam (6):
+>   dt-bindings: i2c: Add binding for Actions Semiconductor Owl I2C
+>     controller
+>   arm64: dts: actions: Add pinctrl definition for S900 I2C controller
+>   arm64: dts: actions: Add Actions Semiconductor S900 I2C controller
+>     nodes
+>   arm64: dts: actions: Enable I2C1 and I2C2 in Bubblegum-96 board
+>   i2c: Add Actions Semiconductor Owl family S900 I2C driver
+>   MAINTAINERS: Add entry for Actions Semiconductor Owl I2C driver
+> 
+>  .../devicetree/bindings/i2c/i2c-owl.txt       |  27 +
+>  MAINTAINERS                                   |   2 +
+>  .../dts/actions/s900-bubblegum-96-pins.dtsi   |  29 +
+>  .../boot/dts/actions/s900-bubblegum-96.dts    |  11 +
+>  arch/arm64/boot/dts/actions/s900.dtsi         |  60 +++
+>  drivers/i2c/busses/Kconfig                    |   7 +
+>  drivers/i2c/busses/Makefile                   |   1 +
+>  drivers/i2c/busses/i2c-owl.c                  | 495 ++++++++++++++++++
+>  8 files changed, 632 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-owl.txt
+>  create mode 100644 arch/arm64/boot/dts/actions/s900-bubblegum-96-pins.dtsi
+>  create mode 100644 drivers/i2c/busses/i2c-owl.c
+> 
+> -- 
+> 2.17.1
+> 
