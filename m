@@ -1,32 +1,27 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 30 Jul 2018 11:24:52 +0100
-Subject: [PATCH v8 5/6] regulator: pfuze100-regulator: provide
- pm_power_off_prepare handler
-In-Reply-To: <06313062-70db-9c10-048e-78ca267da959@pengutronix.de>
-References: <20180726092220.17250-1-o.rempel@pengutronix.de>
- <20180726092220.17250-6-o.rempel@pengutronix.de>
- <DB6PR04MB32233832762D02F1023861A1892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
- <06313062-70db-9c10-048e-78ca267da959@pengutronix.de>
-Message-ID: <20180730102452.GH5789@sirena.org.uk>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 30 Jul 2018 12:26:07 +0200
+Subject: [PATCH 0/9] Add Reset Controller support for Actions Semi Owl SoCs
+In-Reply-To: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
+References: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <c3ae668a-6bcc-a0eb-1e00-14ef9d607316@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2018 at 09:50:55AM +0200, Oleksij Rempel wrote:
-> On 27.07.2018 11:32, Robin Gong wrote:
+Hi Mani,
 
-> >>  #include <linux/slab.h>
-> >> +#include <linux/kallsyms.h>
+Am 27.07.2018 um 20:45 schrieb Manivannan Sadhasivam:
+> This patchset adds Reset Controller (RMU) support for Actions Semi
+> Owl SoCs, S900 and S700. For the Owl SoCs, RMU has been integrated into
+> the clock subsystem in hardware. Hence, in software we integrate RMU
+> support into common clock driver inorder to maintain compatibility.
 
-> > Is it necessary?
+Can this not be placed into drivers/reset/ by using mfd-simple with a
+sub-node in DT?
 
-> yes, for pm_power_off_prepare
+Regards,
+Andreas
 
-That's a *weird* header to have to use for that symbol, are you sure
-there isn't something more specific - if there isn't there should be.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180730/82a8afad/attachment.sig>
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
