@@ -1,42 +1,40 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 30 Jul 2018 17:31:22 +0200
-Subject: [PATCH 2/2] pinctrl: stm32: check node status before new gpio
- bank registering
-In-Reply-To: <CACRpkdaDy5MGPMxh3GYFHL9VqTv44=t6J=xu_0sdXc4OHFo84g@mail.gmail.com>
-References: <1531745857-5561-1-git-send-email-alexandre.torgue@st.com>
- <1531745857-5561-3-git-send-email-alexandre.torgue@st.com>
- <CACRpkdaDy5MGPMxh3GYFHL9VqTv44=t6J=xu_0sdXc4OHFo84g@mail.gmail.com>
-Message-ID: <2f76dbc9-16f1-ddb6-be11-bf0c383b83c6@st.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 30 Jul 2018 15:36:00 +0000
+Subject: [PATCH v7 3/6] dt-bindings: mailbox: imx-mu: add generic MU
+ channel support
+In-Reply-To: <CABb+yY0sUxGatozwdQVM55z7ACtpK8HCepnfvQNunQ=r5y_kVw@mail.gmail.com>
+References: <AM0PR04MB42116C756EC78AD12EB254D6802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <CABb+yY0yn9os6nqH8eUfAr3Q3ev4=TfpTp=5ZDBR7FN67eb-wg@mail.gmail.com>
+ <VI1PR04MB4222672B8F7B6AF2B11A4442802A0@VI1PR04MB4222.eurprd04.prod.outlook.com>
+ <CABb+yY1EkHk85H72xYoYA3JbQL03+-o3UcRVdA_Zub-Q+D=OHw@mail.gmail.com>
+ <VI1PR04MB422216469EE5F3ED8E53A4F1802A0@VI1PR04MB4222.eurprd04.prod.outlook.com>
+ <CABb+yY0SfdFr8TMOMosTVb5+LFWqB8nQkKj3ze8usi-s7Cko4g@mail.gmail.com>
+ <VI1PR04MB4222B4877B341C0FA07A6A8D802A0@VI1PR04MB4222.eurprd04.prod.outlook.com>
+ <CABb+yY1MSSQKZ6BOQXC-x=qy4VZ5HqDBjmh_BJTXSkAm3+P8mA@mail.gmail.com>
+ <bf7aca98-7ec8-bcf3-b1a8-d86a7cf28d31@pengutronix.de>
+ <CABb+yY3PLcjduxm7uJ9xZpPP2zkcQ5Qngs4PjnhGAXp43QVzFA@mail.gmail.com>
+ <20180730144435.srxgohwgdhrmw2rz@pengutronix.de>
+ <CABb+yY0sUxGatozwdQVM55z7ACtpK8HCepnfvQNunQ=r5y_kVw@mail.gmail.com>
+Message-ID: <AM0PR04MB4211DA01F485B35093EA09B2802F0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus
+Hi Jassi,
 
-On 07/29/2018 10:11 PM, Linus Walleij wrote:
-> On Mon, Jul 16, 2018 at 2:57 PM Alexandre Torgue
-> <alexandre.torgue@st.com> wrote:
-> 
->> Register a new GPIO bank only if GPIO bank node is enabled. This patch also
->> adds checks on ranges which are defined only if a bank is registered.
->>
->> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
-> 
-> Patch applied.
-> 
-Thanks
+> > If yes, how should it be reflected in DT?
+> > - 1 cell: &mu [0-15]
+> > - 2 cells: &mu [0-7] [TX,RX]
+> > - 3 cells: &mu [0-4] [FIFO,NOFIFO] [TX,RX]
+> >
+> It may be possible for a device binding to have variable cells, but I haven't
+> seen any. And I am not sure that would look neat either.
 
-> Alexandre can you check the discussion we've had about using
-> GPIOLIB_IRQCHIP for multi-bank GPIOs with several IRQ
-> lines as per drivers/gpio/gpio-tegra186.c?
-> 
-> Is this approach applicable for STM32 so we can pull
-> more stuff in under GPIOLIB_IRQCHIP?
-> 
-Ok. I'm going to check what's possible to do. I let you know soon.
+Please refer to 
+Documentation/devicetree/bindings/interrupt-controller/arm,gic-v3.txt
+- #interrupt-cells : Specifies the number of cells needed to encode an
+  interrupt source. Must be a single cell with a value of at least 3.
+  If the system requires describing PPI affinity, then the value must
+  be at least 4.
 
-regards
-Alex
-
-> Yours,
-> Linus Walleij
-> 
+Regards
+Dong Aisheng
