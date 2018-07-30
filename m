@@ -1,11 +1,11 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 30 Jul 2018 13:17:26 +0200
-Subject: [PATCH] ARM: shmobile: gose: Add DA9210 node for CPU DVFS
-Message-ID: <20180730111726.5526-1-marek.vasut+renesas@gmail.com>
+Date: Mon, 30 Jul 2018 13:18:17 +0200
+Subject: [PATCH] ARM: shmobile: silk: Add DA9063 PMIC node
+Message-ID: <20180730111817.5636-1-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DA9210 DVFS node to the I2C bus and link it to CPU0 for DVFS.
+Add DA9063 PMIC node to the I2C bus.
 
 Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
 Cc: Geert Uytterhoeven <geert+renesas@glider.be>
@@ -14,42 +14,31 @@ Cc: Simon Horman <horms+renesas@verge.net.au>
 Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Cc: linux-renesas-soc at vger.kernel.org
 ---
- arch/arm/boot/dts/r8a7793-gose.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/r8a7794-silk.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index 6b2f3a4fd13d..f51601af89a2 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -596,6 +596,10 @@
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
+index daec965889d3..bf7e8ffd1e69 100644
+--- a/arch/arm/boot/dts/r8a7794-silk.dts
++++ b/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -403,6 +403,18 @@
+ 	pinctrl-names = "i2c-hdmi";
  
-+&cpu0 {
-+	cpu0-supply = <&vdd_dvfs>;
-+};
+ 	clock-frequency = <400000>;
 +
- &rwdt {
- 	timeout-sec = <60>;
- 	status = "okay";
-@@ -725,6 +729,18 @@
- 			compatible = "dlg,da9063-watchdog";
- 		};
- 	};
-+
-+	vdd_dvfs: regulator at 68 {
-+		compatible = "dlg,da9210";
-+		reg = <0x68>;
++	pmic at 5a {
++		compatible = "dlg,da9063";
++		reg = <0x5a>;
 +		interrupt-parent = <&irqc0>;
 +		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-controller;
 +
-+		regulator-min-microvolt = <1000000>;
-+		regulator-max-microvolt = <1000000>;
-+		regulator-boot-on;
-+		regulator-always-on;
++		wdt {
++			compatible = "dlg,da9063-watchdog";
++		};
 +	};
  };
  
- &i2c4 {
+ &mmcif0 {
 -- 
 2.16.2
