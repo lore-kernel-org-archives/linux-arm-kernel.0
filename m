@@ -1,40 +1,42 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 30 Jul 2018 17:12:44 -0600
-Subject: [PATCH v3.1 08/10] dt-bindings: sun4i-drm: add HDMI VCC supply
- property for sun8i-dw-hdmi
-In-Reply-To: <20180726171257.6688-9-icenowy@aosc.io>
-References: <20180726171257.6688-1-icenowy@aosc.io>
- <20180726171257.6688-9-icenowy@aosc.io>
-Message-ID: <20180730231244.GA3966@rob-hp-laptop>
+Date: Mon, 30 Jul 2018 17:13:56 -0600
+Subject: [PATCH v3 8/9] coresight: Cleanup coresight DT bindings
+In-Reply-To: <1532686537-12380-9-git-send-email-suzuki.poulose@arm.com>
+References: <1532686537-12380-1-git-send-email-suzuki.poulose@arm.com>
+ <1532686537-12380-9-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180730231356.GA6353@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2018 at 01:12:55AM +0800, Icenowy Zheng wrote:
-> Allwiner SoCs with DesignWare HDMI controller all come with a "HVCC"
-> pin, which is the VCC of HDMI part.
+On Fri, Jul 27, 2018 at 11:15:36AM +0100, Suzuki K Poulose wrote:
+> The coresight drivers relied on default bindings for graph
+> in DT, while reusing the "reg" field of the "ports" to indicate
+> the actual hardware port number for the connections. This can
+> cause duplicate ports with same addresses, but different
+> direction. However, with the rules getting stricter for the
+> address mismatch with the label, it is no longer possible to use
+> the port address field for the hardware port number.
 > 
-> Add a supply property to specify HVCC's regulator in the device tree.
+> This patch introduces new DT binding rules for coresight
+> components, based on the same generic DT graph bindings, but
+> avoiding the address duplication.
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> - All output ports must be specified under a child node with
+>   name "out-ports".
+> - All input ports must be specified under a childe node with
+>   name "in-ports".
+> - Port address should match the hardware port number.
+> 
+> The support for legacy bindings is retained, with a warning.
+> 
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
-> Changes in v3.1:
-> - New patch.
-> 
->  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> index fdb8fb29033f..cb4769913e89 100644
-> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> @@ -97,6 +97,9 @@ Required properties:
->      first port should be the input endpoint. The second should be the
->      output, usually to an HDMI connector.
->  
-> +Optional properties:
-> +  - hdmi-supply: the VCC power supply of the controller
+>  .../devicetree/bindings/arm/coresight.txt          | 95 ++++++++++++---------
 
-"hdmi" doesn't sound like the name of the supply. "hvcc" or just "vcc" 
-would be more appropriate.
+Reviewed-by: Rob Herring <robh@kernel.org>
 
-Rob
+>  drivers/hwtracing/coresight/of_coresight.c         | 98 +++++++++++++++++++---
+>  2 files changed, 143 insertions(+), 50 deletions(-)
