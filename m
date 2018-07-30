@@ -1,41 +1,36 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 30 Jul 2018 09:25:45 -0700 (PDT)
-Subject: [PATCH 3/3] ptp_qoriq: convert to use module parameters for
- initialization
-In-Reply-To: <20180730100154.27906-3-yangbo.lu@nxp.com>
-References: <20180730100154.27906-1-yangbo.lu@nxp.com>
- <20180730100154.27906-3-yangbo.lu@nxp.com>
-Message-ID: <20180730.092545.225621578249887012.davem@davemloft.net>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Mon, 30 Jul 2018 09:26:13 -0700
+Subject: [PATCH] clk: scmi: Fix the rounding of clock rate
+In-Reply-To: <20180730114056.GA17362@e107155-lin>
+References: <1532700112-11852-1-git-send-email-amit.kachhap@arm.com>
+ <153270946725.48062.11195853363758024681@swboyd.mtv.corp.google.com>
+ <CADGdYn5T2-B2UE9DX3wFHdvqfF85n0NAbKDBf2KHOQreRi=H+g@mail.gmail.com>
+ <20180730114056.GA17362@e107155-lin>
+Message-ID: <153296797329.17365.14490424418553594815@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yangbo Lu <yangbo.lu@nxp.com>
-Date: Mon, 30 Jul 2018 18:01:54 +0800
+Quoting Sudeep Holla (2018-07-30 04:40:56)
+> On Mon, Jul 30, 2018 at 11:03:51AM +0530, Amit Daniel Kachhap wrote:
+> > Hi,
+> > 
+> > On Fri, Jul 27, 2018 at 10:07 PM, Stephen Boyd <sboyd@kernel.org> wrote:
+> > > Quoting Amit Daniel Kachhap (2018-07-27 07:01:52)
+> > >> This fix rounds the clock rate properly by using quotient and not
+> > >> remainder in the calculation. This issue was found while testing HDMI
+> > >> in the Juno platform.
+> > >>
+> > >> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@arm.com>
+> > >
+> > > Any Fixes: tag here?
+> > Yes, This patch is tested with Linux v4.18-rc6 tag.
+> >
+> 
+> No Stephen meant the commit that this fixes, something like below:
+> 
+> Fixes: 6d6a1d82eaef ("clk: add support for clocks provided by SCMI")
+> 
+> so that it can get backported if required.
+> 
 
-> +static unsigned int cksel = DEFAULT_CKSEL;
-> +module_param(cksel, uint, 0644);
-> +MODULE_PARM_DESC(cksel, "Select reference clock");
-> +
-> +static unsigned int clk_src;
-> +module_param(clk_src, uint, 0644);
-> +MODULE_PARM_DESC(clk_src, "Reference clock frequency (if clocks property not provided in dts)");
-> +
-> +static unsigned int tmr_prsc = 2;
-> +module_param(tmr_prsc, uint, 0644);
-> +MODULE_PARM_DESC(tmr_prsc, "Output clock division/prescale factor");
-> +
-> +static unsigned int tmr_fiper1 = 1000000000;
-> +module_param(tmr_fiper1, uint, 0644);
-> +MODULE_PARM_DESC(tmr_fiper1, "Desired fixed interval pulse period (ns)");
-> +
-> +static unsigned int tmr_fiper2 = 100000;
-> +module_param(tmr_fiper2, uint, 0644);
-> +MODULE_PARM_DESC(tmr_fiper2, "Desired fixed interval pulse period (ns)");
-
-Sorry, there is no way I am every applying something like this.  Module
-parameters are to be avoided at all costs.
-
-And you don't need it here, you have DTS, please use it.
-
-You are required to support the existing DTS cases, in order to
-avoid breaking things, anyways.
+Yep! Thanks!
