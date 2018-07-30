@@ -1,105 +1,111 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Mon, 30 Jul 2018 10:03:29 +0200
-Subject: [PATCH v8 1/6] ARM: imx6q: provide documentation for new
- fsl,pmic-stby-poweroff property
-In-Reply-To: <DB6PR04MB32239840E3DF12328A3E7E47892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
-References: <20180726092220.17250-1-o.rempel@pengutronix.de>
- <20180726092220.17250-2-o.rempel@pengutronix.de>
- <DB6PR04MB3223605CB1F5E06D4A278B3C892B0@DB6PR04MB3223.eurprd04.prod.outlook.com>
- <84c1921c-922e-4b5d-b688-db89047fa1db@pengutronix.de>
- <DB6PR04MB32236EA307DCD070771B1D4D892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
- <1532680211.32306.36.camel@pengutronix.de>
- <DB6PR04MB32239840E3DF12328A3E7E47892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
-Message-ID: <02f4b642-14a8-f2db-ea23-c42a4f6f1652@pengutronix.de>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Mon, 30 Jul 2018 10:11:17 +0200
+Subject: [PATCH 1/8] devfreq: rockchip-dfi: Move GRF definitions to a common
+ place.
+In-Reply-To: <20180730081124.30698-1-enric.balletbo@collabora.com>
+References: <20180730081124.30698-1-enric.balletbo@collabora.com>
+Message-ID: <20180730081124.30698-2-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Some rk3399 GRF (Generic Register Files) definitions can be used for
+different drivers. Move these definitions to a common include so we
+don't need to duplicate these definitions.
 
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
 
-On 27.07.2018 10:58, Robin Gong wrote:
-> 
-> 
->> -----Original Message-----
->> From: Lucas Stach [mailto:l.stach at pengutronix.de]
->> Sent: 2018?7?27? 16:30
->> To: Robin Gong <yibin.gong@nxp.com>; Oleksij Rempel
->> <o.rempel@pengutronix.de>; Shawn Guo <shawnguo@kernel.org>; Mark
->> Brown <broonie@kernel.org>; Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>; devicetree at vger.kernel.org;
->> Michael Turquette <mturquette@baylibre.com>; Stephen Boyd
->> <sboyd@codeaurora.org>; linux-kernel at vger.kernel.org; Liam Girdwood
->> <lgirdwood@gmail.com>; Rob Herring <robh+dt@kernel.org>; dl-linux-imx
->> <linux-imx@nxp.com>; kernel at pengutronix.de; A.s. Dong
->> <aisheng.dong@nxp.com>; Fabio Estevam <fabio.estevam@nxp.com>; Russell
->> King <linux@armlinux.org.uk>; Andrew Morton <akpm@linux-foundation.org>;
->> Leonard Crestez <leonard.crestez@nxp.com>; linux-clk at vger.kernel.org;
->> linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH v8 1/6] ARM: imx6q: provide documentation for new
->> fsl,pmic-stby-poweroff property
->>
->> Hi Robin,
->>
->> Am Freitag, den 27.07.2018, 01:51 +0000 schrieb Robin Gong:
->> [...]
->>>>>> ---
->>>>>> ?Documentation/devicetree/bindings/clock/imx6q-clock.txt | 8
->>>>>> ++++++++
->>>>>> ?1 file changed, 8 insertions(+)
->>>>>>
->>>>>> diff --git
->>>>>> a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
->>>>>> b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
->>>>>> index a45ca67a9d5f..e1308346e00d 100644
->>>>>> --- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
->>>>>> +++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
->>>>>> @@ -6,6 +6,14 @@ Required properties:
->>>>>> ?- interrupts: Should contain CCM interrupt
->>>>>> ?- #clock-cells: Should be <1>
->>>>>>
->>>>>> +Optional properties:
->>>>>> +- fsl,pmic-stby-poweroff: Configure CCM to assert PMIC_STBY_REQ
->>>>>> +signal
->>>>>> +??on power off.
->>>>>> +??Use this property if the SoC should be powered off by
->>>>>> +external power
->>>>>> +??management IC (PMIC) triggered via PMIC_STBY_REQ signal.
->>>>>
->>>>> PMIC_ON_REQ didn't connect to any pin of PMIC in your case?
->>>>
->>>> No. First, it was only one customer specific issue. After some
->>>> research I found even publicly available boards (for example
->>>> RioTboard) which has same/similar design. After seeing this in imx6
->>>> documentation as valid power off way, I have no doubts - there should be
->> even more devices doin this in the wild.
->>>
->>> Not sure why the customer didn't follow reference design, since
->>> PMIC_ON_REQ can provide power off/on feature by pressing ONOFF key
->>> which connected ONOFF pin of i.mx6(ONOFF will toggle PMIC_ON_REQ to
->>> power off/on PMIC). The official power off/on way (PMIC_ON_REQ) can
->>> also power off all power rails of PFUZE except snvs as your patch did
->>> on PMIC_STBY_REQ.??PMIC_STBY_REQ is used to notify pmic switch power
->>> mode (PFM/APS) or decrease voltage to save power in kernel suspend, not
->> power off....I am not sure if we need this patchset to 'workaround' the board
->> issue.
->>>
->> Not all boards follow the reference design, that's a fact of life.
->>
->> Please look at the i.MX6Q reference manual. The sequence implemented in this
->> patchset can be found as a valid way to power off the system in
->> "60.4.3 Power mode transitions" "Normal ON to OFF with external PMIC", so
->> there is hardly any way to argue that this is a board specific quirk. This is one of
->> the Freescale/NXP recommended sequences to turn off the system.
+Changes in v1:
+- [RFC 1/10] Add Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+- [RFC 1/10] s/Generic/General/ (Robin Murphy)
+- [RFC 4/10] Removed from the series. I did not found a use case where not holding the mutex causes the issue.
+- [RFC 7/10] Removed from the series. I did not found a use case where this matters.
 
-> Okay, but could you add one more comment for this solution? RTC alarm and ONOFF
-> Button wakeup feature can't be support in this case.
+ drivers/devfreq/event/rockchip-dfi.c | 23 +++++++----------------
+ include/soc/rockchip/rk3399_grf.h    | 21 +++++++++++++++++++++
+ 2 files changed, 28 insertions(+), 16 deletions(-)
+ create mode 100644 include/soc/rockchip/rk3399_grf.h
 
-Enough to add it in to changelog? or should it go to the binding
-documentation?
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180730/20996431/attachment.sig>
+diff --git a/drivers/devfreq/event/rockchip-dfi.c b/drivers/devfreq/event/rockchip-dfi.c
+index 22b113363ffc..2fbbcbeb644f 100644
+--- a/drivers/devfreq/event/rockchip-dfi.c
++++ b/drivers/devfreq/event/rockchip-dfi.c
+@@ -26,6 +26,8 @@
+ #include <linux/list.h>
+ #include <linux/of.h>
+ 
++#include <soc/rockchip/rk3399_grf.h>
++
+ #define RK3399_DMC_NUM_CH	2
+ 
+ /* DDRMON_CTRL */
+@@ -43,18 +45,6 @@
+ #define DDRMON_CH1_COUNT_NUM		0x3c
+ #define DDRMON_CH1_DFI_ACCESS_NUM	0x40
+ 
+-/* pmu grf */
+-#define PMUGRF_OS_REG2	0x308
+-#define DDRTYPE_SHIFT	13
+-#define DDRTYPE_MASK	7
+-
+-enum {
+-	DDR3 = 3,
+-	LPDDR3 = 6,
+-	LPDDR4 = 7,
+-	UNUSED = 0xFF
+-};
+-
+ struct dmc_usage {
+ 	u32 access;
+ 	u32 total;
+@@ -83,16 +73,17 @@ static void rockchip_dfi_start_hardware_counter(struct devfreq_event_dev *edev)
+ 	u32 ddr_type;
+ 
+ 	/* get ddr type */
+-	regmap_read(info->regmap_pmu, PMUGRF_OS_REG2, &val);
+-	ddr_type = (val >> DDRTYPE_SHIFT) & DDRTYPE_MASK;
++	regmap_read(info->regmap_pmu, RK3399_PMUGRF_OS_REG2, &val);
++	ddr_type = (val >> RK3399_PMUGRF_DDRTYPE_SHIFT) &
++		    RK3399_PMUGRF_DDRTYPE_MASK;
+ 
+ 	/* clear DDRMON_CTRL setting */
+ 	writel_relaxed(CLR_DDRMON_CTRL, dfi_regs + DDRMON_CTRL);
+ 
+ 	/* set ddr type to dfi */
+-	if (ddr_type == LPDDR3)
++	if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR3)
+ 		writel_relaxed(LPDDR3_EN, dfi_regs + DDRMON_CTRL);
+-	else if (ddr_type == LPDDR4)
++	else if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR4)
+ 		writel_relaxed(LPDDR4_EN, dfi_regs + DDRMON_CTRL);
+ 
+ 	/* enable count, use software mode */
+diff --git a/include/soc/rockchip/rk3399_grf.h b/include/soc/rockchip/rk3399_grf.h
+new file mode 100644
+index 000000000000..3eebabcb2812
+--- /dev/null
++++ b/include/soc/rockchip/rk3399_grf.h
+@@ -0,0 +1,21 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Rockchip General Register Files definitions
++ *
++ * Copyright (c) 2018, Collabora Ltd.
++ * Author: Enric Balletbo i Serra <enric.balletbo@collabora.com>
++ */
++
++#ifndef __SOC_RK3399_GRF_H
++#define __SOC_RK3399_GRF_H
++
++/* PMU GRF Registers */
++#define RK3399_PMUGRF_OS_REG2		0x308
++#define RK3399_PMUGRF_DDRTYPE_SHIFT	13
++#define RK3399_PMUGRF_DDRTYPE_MASK	7
++#define RK3399_PMUGRF_DDRTYPE_DDR3	3
++#define RK3399_PMUGRF_DDRTYPE_LPDDR2	5
++#define RK3399_PMUGRF_DDRTYPE_LPDDR3	6
++#define RK3399_PMUGRF_DDRTYPE_LPDDR4	7
++
++#endif
+-- 
+2.18.0
