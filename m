@@ -1,84 +1,50 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 30 Jul 2018 11:08:27 +0100
-Subject: [PATCH v5 1/3] arm64: mm: Support Common Not Private translations
-In-Reply-To: <20180727113502.3qdbyffuvysva6bz@armageddon.cambridge.arm.com>
-References: <1529403502-2843-1-git-send-email-vladimir.murzin@arm.com>
- <1529403502-2843-2-git-send-email-vladimir.murzin@arm.com>
- <20180727113502.3qdbyffuvysva6bz@armageddon.cambridge.arm.com>
-Message-ID: <f3da236e-504d-66ab-19da-9f89eba253f1@arm.com>
+From: MNARANI@xilinx.com (Manish Narani)
+Date: Mon, 30 Jul 2018 10:13:26 +0000
+Subject: [PATCH v2 2/4] iio: adc: xilinx: limit pcap clock frequency value
+In-Reply-To: <20180729125106.05692a44@archlinux>
+References: <1532358123-23485-1-git-send-email-manish.narani@xilinx.com>
+ <1532358123-23485-3-git-send-email-manish.narani@xilinx.com>
+ <20180729125106.05692a44@archlinux>
+Message-ID: <SN6PR02MB495915F6DDEC42F4F44DB13BC12F0@SN6PR02MB4959.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/07/18 12:35, Catalin Marinas wrote:
-> Hi Vladimir,
-> 
-> On Tue, Jun 19, 2018 at 11:18:20AM +0100, Vladimir Murzin wrote:
->> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
->> index 39ec0b8..c506fb7 100644
->> --- a/arch/arm64/include/asm/mmu_context.h
->> +++ b/arch/arm64/include/asm/mmu_context.h
->> @@ -149,6 +149,18 @@ static inline void cpu_replace_ttbr1(pgd_t *pgdp)
->>  
->>  	phys_addr_t pgd_phys = virt_to_phys(pgdp);
->>  
->> +	if (system_supports_cnp() && !WARN_ON(pgdp != lm_alias(swapper_pg_dir))) {
->> +		/*
->> +		 * cpu_replace_ttbr1() is used when there's a boot CPU
->> +		 * up (i.e. cpufeature framework is not up yet) and
->> +		 * latter only when we enable CNP via cpufeature's
->> +		 * enable() callback.
->> +		 * Also we rely on the cpu_hwcap bit being set before
->> +		 * calling the enable() function.
->> +		 */
->> +		pgd_phys |= TTBR_CNP_BIT;
->> +	}
->> +
->>  	replace_phys = (void *)__pa_symbol(idmap_cpu_replace_ttbr1);
-> 
-> So the above code sets the TTBR_CNP_BIT (bit 0) in pgd_phys and calls
-> the idmap_cpu_replace_ttbr1() with this value. Looking at the latter, it
-> performs a phys_to_ttbr transformation of pgd_phys which masks out the
-> bottom 2 bits when CONFIG_ARM64_PA_BITS_52 is enabled. I think we need
-> to tweak TTBR_BADDR_MASK_52 to start from bit 0.
-> 
-> (cc'ing Kristina as she added this code, in case there is any issue with
-> extending the mask)
-> 
-
-Something like bellow?
-
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 0bcc98d..e0b4b2f 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -524,11 +524,10 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
-  * 	ttbr:	returns the TTBR value
-  */
- 	.macro	phys_to_ttbr, ttbr, phys
--#ifdef CONFIG_ARM64_PA_BITS_52
--	orr	\ttbr, \phys, \phys, lsr #46
--	and	\ttbr, \ttbr, #TTBR_BADDR_MASK_52
--#else
- 	mov	\ttbr, \phys
-+#ifdef CONFIG_ARM64_PA_BITS_52
-+	ubfx	\ttbr, \ttbr, #48, #4
-+	orr	\ttbr, \phys, \ttbr, lsl #2
- #endif
- 	.endm
- 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 1bdeca8..1b9d0e9 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -770,7 +770,7 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
- #define kc_offset_to_vaddr(o)	((o) | VA_START)
- 
- #ifdef CONFIG_ARM64_PA_BITS_52
--#define phys_to_ttbr(addr)	(((addr) | ((addr) >> 46)) & TTBR_BADDR_MASK_52)
-+#define phys_to_ttbr(addr)	((addr) | (((addr) >> 46) & TTBR_BADDR_MASK_52))
- #else
- #define phys_to_ttbr(addr)	(addr)
- #endif
+Hi Jonathan,
 
 
-Vladimir
+> -----Original Message-----
+> From: Jonathan Cameron [mailto:jic23 at kernel.org]
+> Sent: Sunday, July 29, 2018 5:21 PM
+> To: Manish Narani <MNARANI@xilinx.com>
+> Cc: Sai Krishna Potthuri <lakshmis@xilinx.com>; Michal Simek
+> <michals@xilinx.com>; pmeerw at pmeerw.net; lars at metafoo.de;
+> knaack.h at gmx.de; Anirudha Sarangi <anirudh@xilinx.com>; Srinivas Goud
+> <sgoud@xilinx.com>; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-iio at vger.kernel.org
+> Subject: Re: [PATCH v2 2/4] iio: adc: xilinx: limit pcap clock frequency value
+> 
+> On Mon, 23 Jul 2018 20:32:01 +0530
+> Manish Narani <manish.narani@xilinx.com> wrote:
+> 
+> > This patch limits the xadc pcap clock frequency value to be less than
+> > 200MHz. This fixes the issue when zynq is booted at higher frequency
+> > values, pcap crosses the maximum limit of 200MHz(Fmax) as it is
+> > derived from IOPLL.
+> > If this limit is crossed it is required to alter the WEDGE and REDGE
+> > bits of XADC_CFG register to make timings better in the interface. So
+> > to avoid alteration of these bits every time, the pcap value should
+> > not cross the Fmax limit.
+> >
+> > Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> 
+> Applied, to the togreg branch of iio.git.  If you want this backported to stable,
+> then request it once this patch is upstream.  It may be sometime given we've
+> probably just missed the coming merge window.
+> 
+> If you do need it faster then let me know and I'll look at moving it over to the
+> branch of fixes during the RC phases.
+Thanks for getting this applied. There is no concern for this to be in the stable
+ASAP. I can wait.
+
+Thanks & Regards,
+Manish Narani
