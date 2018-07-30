@@ -1,61 +1,41 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 30 Jul 2018 13:31:20 +0100
-Subject: [PATCH v3 02/19] arm64: dts: allwinner: a64: Add Pine64-LTS device
- tree file
+Date: Mon, 30 Jul 2018 13:31:21 +0100
+Subject: [PATCH v3 03/19] arm64: dts: allwinner: a64: Orange Pi Win: Fix SD
+ card node
 In-Reply-To: <20180730123137.923-1-andre.przywara@arm.com>
 References: <20180730123137.923-1-andre.przywara@arm.com>
-Message-ID: <20180730123137.923-3-andre.przywara@arm.com>
+Message-ID: <20180730123137.923-4-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Pine64-LTS is a variant of the Pine64 board, from the software
-visible side resembling a SoPine module on a baseboard, though the
-board has the SoC and DRAM integrated on one PCB.
-Due to this it basically shares the DT with the SoPine baseboard, which
-we mimic in our DT by inclucing the boardboard .dts into the new file,
-just overwriting the model name.
-Having a separate .dts for this seems useful, since we don't know yet if
-there are subtle differences between the two. Also the SoC on the LTS
-board is technically an "R18" instead of the original "A64", although as
-far as we know this is just a relabelled version of the original SoC.
+From: Samuel Holland <samuel@sholland.org>
 
+The Orange Pi Win has a microSD card slot which is connected via all
+four SD data lines. As the DT was not mentioning this fact, we got the
+default single bit transfers, losing out on performance.
+Also, as microSD does not have a write protect switch, we disable this
+feature in the DT node.
+
+Signed-off-by: Samuel Holland <samuel@sholland.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/boot/dts/allwinner/Makefile                  |  1 +
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts | 13 +++++++++++++
- 2 files changed, 14 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
+ arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 9ffa7a038791..b7034327b28b 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-lts.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pinebook.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
-new file mode 100644
-index 000000000000..72d6961dc312
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
-@@ -0,0 +1,13 @@
-+/*
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ *
-+ * Copyright (c) 2018 ARM Ltd.
-+ */
-+
-+#include "sun50i-a64-sopine-baseboard.dts"
-+
-+/ {
-+	model = "Pine64 LTS";
-+	compatible = "pine64,pine64-lts", "allwinner,sun50i-r18",
-+		     "allwinner,sun50i-a64";
-+};
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+index 1221764f5719..667016815cf3 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
+@@ -67,7 +67,9 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+ 	vmmc-supply = <&reg_dcdc1>;
+-	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
++	disable-wp;
++	bus-width = <4>;
+ 	status = "okay";
+ };
+ 
 -- 
 2.14.4
