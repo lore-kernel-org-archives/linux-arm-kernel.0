@@ -1,55 +1,26 @@
-From: dave.kleikamp@oracle.com (Dave Kleikamp)
-Date: Mon, 30 Jul 2018 16:36:28 -0500
-Subject: [PATCH 1/1] arm64: kexec: machine_kexec should call
- __flush_icache_range
-In-Reply-To: <20180730165757.GF4276@arm.com>
-References: <faf6c7cb-d9da-9a9c-cc0f-43c95e864ca2@oracle.com>
- <e07fc674-2a71-29ae-2212-46ee5f79593d@oracle.com>
- <20180730161641.6zxxy3lxp27tznck@armageddon.cambridge.arm.com>
- <20180730162235.GC4276@arm.com>
- <2651847f-79ea-fe2a-c1d7-efe4d11702b4@oracle.com>
- <20180730165757.GF4276@arm.com>
-Message-ID: <d9bac115-794c-4225-bcaa-91b6847604a2@oracle.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 30 Jul 2018 15:47:05 -0600
+Subject: [PATCH v2 1/2] dt-bindings: spi: add DT bindings for UniPhier
+ SPI controller
+In-Reply-To: <1532588943-19481-2-git-send-email-hayashibara.keiji@socionext.com>
+References: <1532588943-19481-1-git-send-email-hayashibara.keiji@socionext.com>
+ <1532588943-19481-2-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <20180730214705.GA25882@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2018 11:57 AM, Will Deacon wrote:
-> On Mon, Jul 30, 2018 at 11:46:24AM -0500, Dave Kleikamp wrote:
->> On 07/30/2018 11:22 AM, Will Deacon wrote:
->>> On Mon, Jul 30, 2018 at 05:16:42PM +0100, Catalin Marinas wrote:
->>>> On Mon, Jul 30, 2018 at 10:29:21AM -0500, Dave Kleikamp wrote:
->>>>> machine_kexec flushes the reboot_code_buffer from the icache
->>>>> after stopping the other cpus.
->>>>>
->>>>> Commit 3b8c9f1cdfc5 ("arm64: IPI each CPU after invalidating the I-cache
->>>>> for kernel mappings") added an IPI call to flush_icache_range, which
->>>>> causes a hang here, so replace the call with __flush_icache_range
->>>>
->>>> While machine_kexec() may be called with interrupts disabled (IIUC) and
->>>> we shouldn't IPI other CPUs, I don't understand why it hangs here. Are
->>>> there any other CPUs online at this point?
->>>
->>> The BUG_ON and WARN_ON at the start of machine_kexec() suggest to me that
->>> this should only happen if we're kexec'ing a crash kernel and
->>> smp_crash_stop_failed(). Is that something we need to care about?
->>
->> I observed the hang trying to kexec a crash kernel and I did not see the
->> warning that smp_crash_stop_failed(). I'm not exactly sure why
->> flush_icache_range() hung (but it did), but I think that
->> __flush_icache_range() makes more sense here anyway.
+On Thu, Jul 26, 2018 at 04:09:02PM +0900, Keiji Hayashibara wrote:
+> From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 > 
-> Yeah, I'll pick the patch up, but it would be nice to understand the
-> failure case you observed.
-
-I see why it failed. ipi_cpu_crash_stop() does not call
-set_cpu_online(cpu, false) the way ipi_cpu_stop() does. So
-cpu_online_mask is still populated with the stopped cpus.
-
-Any reason why it isn't called there?
-
-Thanks,
-Dave
-
+> Add DT bindings for SPI controller implemented in UniPhier SoCs.
 > 
-> Will
-> 
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+> ---
+>  .../devicetree/bindings/spi/spi-uniphier.txt       | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/spi/spi-uniphier.txt
+
+Please add acks/reviewed-bys when posting new versions.
+
+Rob
