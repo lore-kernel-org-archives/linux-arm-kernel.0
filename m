@@ -1,90 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 30 Jul 2018 16:42:10 +0100
-Subject: [PATCH v5 1/3] arm64: mm: Support Common Not Private translations
-In-Reply-To: <f3da236e-504d-66ab-19da-9f89eba253f1@arm.com>
-References: <1529403502-2843-1-git-send-email-vladimir.murzin@arm.com>
- <1529403502-2843-2-git-send-email-vladimir.murzin@arm.com>
- <20180727113502.3qdbyffuvysva6bz@armageddon.cambridge.arm.com>
- <f3da236e-504d-66ab-19da-9f89eba253f1@arm.com>
-Message-ID: <20180730154209.2tawriqxgxub7paa@armageddon.cambridge.arm.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 30 Jul 2018 19:03:42 +0300
+Subject: [PATCH v3 1/2] clk: Add of_clk_get_by_name_optional() function
+In-Reply-To: <1532957509-14541-2-git-send-email-phil.edworthy@renesas.com>
+References: <1532957509-14541-1-git-send-email-phil.edworthy@renesas.com>
+ <1532957509-14541-2-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <884376f1fd82a99e5d47eeba1fd1aaa3b19bc604.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2018 at 11:08:27AM +0100, Vladimir Murzin wrote:
-> On 27/07/18 12:35, Catalin Marinas wrote:
-> > On Tue, Jun 19, 2018 at 11:18:20AM +0100, Vladimir Murzin wrote:
-> >> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-> >> index 39ec0b8..c506fb7 100644
-> >> --- a/arch/arm64/include/asm/mmu_context.h
-> >> +++ b/arch/arm64/include/asm/mmu_context.h
-> >> @@ -149,6 +149,18 @@ static inline void cpu_replace_ttbr1(pgd_t *pgdp)
-> >>  
-> >>  	phys_addr_t pgd_phys = virt_to_phys(pgdp);
-> >>  
-> >> +	if (system_supports_cnp() && !WARN_ON(pgdp != lm_alias(swapper_pg_dir))) {
-> >> +		/*
-> >> +		 * cpu_replace_ttbr1() is used when there's a boot CPU
-> >> +		 * up (i.e. cpufeature framework is not up yet) and
-> >> +		 * latter only when we enable CNP via cpufeature's
-> >> +		 * enable() callback.
-> >> +		 * Also we rely on the cpu_hwcap bit being set before
-> >> +		 * calling the enable() function.
-> >> +		 */
-> >> +		pgd_phys |= TTBR_CNP_BIT;
-> >> +	}
-> >> +
-> >>  	replace_phys = (void *)__pa_symbol(idmap_cpu_replace_ttbr1);
-> > 
-> > So the above code sets the TTBR_CNP_BIT (bit 0) in pgd_phys and calls
-> > the idmap_cpu_replace_ttbr1() with this value. Looking at the latter, it
-> > performs a phys_to_ttbr transformation of pgd_phys which masks out the
-> > bottom 2 bits when CONFIG_ARM64_PA_BITS_52 is enabled. I think we need
-> > to tweak TTBR_BADDR_MASK_52 to start from bit 0.
+On Mon, 2018-07-30 at 14:31 +0100, Phil Edworthy wrote:
+> Quite a few drivers get an optional clock, e.g. a clock required
+> to access peripheral's registers that is always enabled on some
+> devices.
 > 
-> Something like bellow?
-> 
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index 0bcc98d..e0b4b2f 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -524,11 +524,10 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
->   * 	ttbr:	returns the TTBR value
->   */
->  	.macro	phys_to_ttbr, ttbr, phys
-> -#ifdef CONFIG_ARM64_PA_BITS_52
-> -	orr	\ttbr, \phys, \phys, lsr #46
-> -	and	\ttbr, \ttbr, #TTBR_BADDR_MASK_52
-> -#else
->  	mov	\ttbr, \phys
-> +#ifdef CONFIG_ARM64_PA_BITS_52
-> +	ubfx	\ttbr, \ttbr, #48, #4
-> +	orr	\ttbr, \phys, \ttbr, lsl #2
->  #endif
->  	.endm
+> This function behaves the same as of_clk_get_by_name() except that
+> it will return NULL instead of -EINVAL.
 
-This would do, I don't have a better idea on how to write it. But I'd
-like a comment to say that this is moving bits 51:48 of the address to
-bits 5:2 of TTBR_ELx.
+I'm puzzled a bit.
 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 1bdeca8..1b9d0e9 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -770,7 +770,7 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
->  #define kc_offset_to_vaddr(o)	((o) | VA_START)
->  
->  #ifdef CONFIG_ARM64_PA_BITS_52
-> -#define phys_to_ttbr(addr)	(((addr) | ((addr) >> 46)) & TTBR_BADDR_MASK_52)
-> +#define phys_to_ttbr(addr)	((addr) | (((addr) >> 46) & TTBR_BADDR_MASK_52))
+__of_clk_get() may return few error codes, and to me ENOENT sounds
+correct when clock is not found. Other error codes should be passed to
+the caller even for optional clocks.
 
-With these changes:
+If above is not true, we need to understand what circumstances for each
+possible returned code are, and fix / act accordingly.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+P.S. Possible way like regulator framework does is to return -ENODEV.
 
-Please repost the updated patches and cc Will as he's handling the
-upcoming merging window.
+So, basically what I'm asking here is to be sure that single error code
+(for now supposed -EINVAL) in this case is _the_ error code for absent /
+can't be found clock.
 
-Thanks.
+>  - Fix check for clock not present. __of_clk_get() returns -EINVAL
+>    if it's not there. Cover case of when there is no clock name.
 
 -- 
-Catalin
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
