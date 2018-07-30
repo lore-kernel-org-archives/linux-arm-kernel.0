@@ -1,67 +1,73 @@
-From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Mon, 30 Jul 2018 13:09:14 +0900
-Subject: [PATCH] pinctrl: uniphier: add spi pin-mux settings
-In-Reply-To: <CACRpkdYD6FT9k50kc4kSx_nzv91wTeBYgJ1jHVrbFDY-XMaB9w@mail.gmail.com>
-References: <1531981249-26329-1-git-send-email-hayashibara.keiji@socionext.com>
- <CACRpkdYD6FT9k50kc4kSx_nzv91wTeBYgJ1jHVrbFDY-XMaB9w@mail.gmail.com>
-Message-ID: <002801d427bb$13b8e900$3b2abb00$@socionext.com>
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Mon, 30 Jul 2018 10:21:23 +0530
+Subject: [PATCH] drm/mediatek: Convert drm_atomic_helper_suspend/resume()
+In-Reply-To: <1532922786.3723.1.camel@mtksdaap41>
+References: <20180728133845.GA15261@jordon-HP-15-Notebook-PC>
+ <1532922786.3723.1.camel@mtksdaap41>
+Message-ID: <CAFqt6zbbVMagJeM53g79RoeYt7edmAZiF8r0_HpyxnS9123vQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linus,
+On Mon, Jul 30, 2018 at 9:23 AM, CK Hu <ck.hu@mediatek.com> wrote:
+> Hi, Souptick:
+>
+> On Sat, 2018-07-28 at 19:08 +0530, Souptick Joarder wrote:
+>> convert drm_atomic_helper_suspend/resume() to use
+>> drm_mode_config_helper_suspend/resume().
+>>
+>
+> Reviewed-by: CK Hu <ck.hu@mediatek.com>
 
-I have sent modified patch for this bag as v2.
-Please refer to the following.
+Thank CK, can we get this patch in queue for 4.19 ?
 
-[PATCH v2]
-https://patchwork.kernel.org/patch/10533929/
-
-[Changes since v1]
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
--index 0f921a6..f912999 100644
-+index 0f921a6..f086083 100644
- --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
- +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
- @@ -504,6 +504,8 @@ static const unsigned nand_cs1_pins[] = {22, 23};
-@@ -390,7 +393,7 @@
-  static const char * const i2c3_groups[] = {"i2c3"};
-  static const char * const nand_groups[] = {"nand", "nand_cs1"};
-  static const char * const sd_groups[] = {"sd"};
--+static const char * const spi_groups[] = {"spi0"};
-++static const char * const spi0_groups[] = {"spi0"};
-  static const char * const system_bus_groups[] = {"system_bus",
-                                                 "system_bus_cs1",
-                                                 "system_bus_cs2",
-
-
-I mistook "spi0_groups" with " spi_groups",
-so there was an undeclared error.
-
------------------
-Best Regards,
-Keiji Hayashibara
-
-
-> -----Original Message-----
-> From: Linus Walleij [mailto:linus.walleij at linaro.org]
-> Sent: Monday, July 30, 2018 5:47 AM
-> To: Hayashibara, Keiji/?? ?? <hayashibara.keiji@socionext.com>
-> Cc: Yamada, Masahiro/?? ?? <yamada.masahiro@socionext.com>; open list:GPIO SUBSYSTEM
-> <linux-gpio@vger.kernel.org>; Linux ARM <linux-arm-kernel@lists.infradead.org>; Masami Hiramatsu
-> <masami.hiramatsu@linaro.org>; Jassi Brar <jaswinder.singh@linaro.org>; linux-kernel at vger.kernel.org; Hayashi,
-> Kunihiko/? ?? <hayashi.kunihiko@socionext.com>
-> Subject: Re: [PATCH] pinctrl: uniphier: add spi pin-mux settings
-> 
-> On Thu, Jul 19, 2018 at 8:21 AM Keiji Hayashibara <hayashibara.keiji@socionext.com> wrote:
-> 
-> > From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> >
-> > Add pin-mux settings for spi controller.
-> >
-> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
-> 
-> There is some problem with the test robot, can you comment/followup?
-> 
-> Yours,
-> Linus Walleij
+>
+>> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+>> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
+>> ---
+>>  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 21 ++++++++-------------
+>>  1 file changed, 8 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+>> index a2ca90f..1fcda2de 100644
+>> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+>> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+>> @@ -520,29 +520,24 @@ static int mtk_drm_sys_suspend(struct device *dev)
+>>  {
+>>       struct mtk_drm_private *private = dev_get_drvdata(dev);
+>>       struct drm_device *drm = private->drm;
+>> +     int ret;
+>>
+>> -     drm_kms_helper_poll_disable(drm);
+>> -
+>> -     private->suspend_state = drm_atomic_helper_suspend(drm);
+>> -     if (IS_ERR(private->suspend_state)) {
+>> -             drm_kms_helper_poll_enable(drm);
+>> -             return PTR_ERR(private->suspend_state);
+>> -     }
+>> -
+>> +     ret = drm_mode_config_helper_suspend(drm);
+>>       DRM_DEBUG_DRIVER("mtk_drm_sys_suspend\n");
+>> -     return 0;
+>> +
+>> +     return ret;
+>>  }
+>>
+>>  static int mtk_drm_sys_resume(struct device *dev)
+>>  {
+>>       struct mtk_drm_private *private = dev_get_drvdata(dev);
+>>       struct drm_device *drm = private->drm;
+>> +     int ret;
+>>
+>> -     drm_atomic_helper_resume(drm, private->suspend_state);
+>> -     drm_kms_helper_poll_enable(drm);
+>> -
+>> +     ret = drm_mode_config_helper_resume(drm);
+>>       DRM_DEBUG_DRIVER("mtk_drm_sys_resume\n");
+>> -     return 0;
+>> +
+>> +     return ret;
+>>  }
+>>  #endif
+>>
+>
+>
