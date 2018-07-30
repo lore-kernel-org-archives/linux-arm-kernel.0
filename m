@@ -1,62 +1,47 @@
-From: greg@kroah.com (Greg KH)
-Date: Mon, 30 Jul 2018 10:58:11 +0200
-Subject: [PATCH] staging/vc04_services: Use __user annotation for
- user-space pointers
-In-Reply-To: <20180724083217.20921-1-cmaiolino28@gmail.com>
-References: <20180724083217.20921-1-cmaiolino28@gmail.com>
-Message-ID: <20180730085811.GA30820@kroah.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 30 Jul 2018 10:59:21 +0200
+Subject: [PATCH v2] firmware/psci: add support for SYSTEM_RESET2
+In-Reply-To: <74f80458-2d04-c161-c82d-55739e46e661@arm.com>
+References: <1525186288-536-1-git-send-email-sudeep.holla@arm.com>
+ <1525257003-8608-1-git-send-email-sudeep.holla@arm.com>
+ <34a420e1-9d2a-b838-dce2-71de408043da@xilinx.com>
+ <3e7235c7-d2c2-29f6-6bec-ae21cb841731@arm.com>
+ <0fce3ee6-873e-154f-b61e-546d9da338df@xilinx.com>
+ <8b08583c-121f-347a-700a-17b5d7784309@arm.com>
+ <d2eaaf6d-01f9-2daa-ea1f-3396e3b93104@xilinx.com>
+ <74f80458-2d04-c161-c82d-55739e46e661@arm.com>
+Message-ID: <d73d3580-4ec1-a281-4585-5c776fc08c79@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 10:32:17AM +0200, Carlos Maiolino wrote:
-> Fix several sparse warnings regarding different address space
-> assignments, like example below, by properly annotating pointers
-> expected to carry user space addresses.
+Hi Sudeep,
+
+On 26.7.2018 15:29, Sudeep Holla wrote:
+> Hi Michal,
 > 
-> warning: incorrect type in argument 1 (different address spaces)
-> Signed-off-by: Carlos Maiolino <cmaiolino28@gmail.com>
-> ---
-
-We need a blank line befor your signed-off-by line please.
-
-> I'm not subscribed to the list, so, please, CC me on any reply.
-> Thanks a lot.
+> Sorry somehow missed this email.
 > 
->  drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c   | 4 ++--
->  drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h | 2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
+> On 19/07/18 11:47, Michal Simek wrote:
+>> On 9.7.2018 15:21, Sudeep Holla wrote:
 > 
-> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-> index bc05c69383b8..42f471471e57 100644
-> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-> @@ -1648,8 +1648,8 @@ vchiq_compat_ioctl_queue_message(struct file *file,
->  				 unsigned int cmd,
->  				 unsigned long arg)
->  {
-> -	VCHIQ_QUEUE_MESSAGE_T *args;
-> -	struct vchiq_element *elements;
-> +	VCHIQ_QUEUE_MESSAGE_T __user *args;
-> +	struct vchiq_element __user *elements;
->  	struct vchiq_queue_message32 args32;
->  	unsigned int count;
->  
-> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h
-> index 9f859953f45c..1776fab41e40 100644
-> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h
-> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h
-> @@ -50,7 +50,7 @@ typedef struct {
->  typedef struct {
->  	unsigned int handle;
->  	unsigned int count;
-> -	const struct vchiq_element *elements;
-> +	const struct vchiq_element __user *elements;
->  } VCHIQ_QUEUE_MESSAGE_T;
->  
->  typedef struct {
+> [...]
+> 
+>>>
+>>> I think with efi_reboot, if user execute the command "reboot warm", it
+>>> will set REBOOT_WARM. I was thinking something similar for psci too. I
+>>> can drop REBOOT_SOFT if that's not correct.
+>>
+>> Have you found more details about efi_reboot and passing information in
+>> case of reboot warm?
+>>
+> 
+> I was just referring to drivers/firmware/efi/reboot.c- function efi_reboot.
+> 
+> Anyways the function reboot_setup in kernel/reboot.c sets the reboot
+> mode parsing the string passed by the user(e.g.: warm, cold, hard, gpio,
+> soft,..etc it just scans the first character TBH)
 
-It would be great to have an ack from the maintainers here :)
+ok. I see. It is just reusing that reboot=X passed via kernel command line.
 
-thanks,
-
-greg k-h
+Thanks,
+Michal
