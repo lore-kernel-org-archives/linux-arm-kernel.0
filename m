@@ -1,80 +1,57 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 30 Jul 2018 17:27:43 +0800
-Subject: [PATCH] mmc: sunxi: Use new timing mode for A64 eMMC controller
-In-Reply-To: <20180718152203.svrt6wmr2vwh4rb5@flea>
-References: <20180712030225.15681-1-wens@csie.org>
- <20180712071959.fi4rhgwv2iuoelbl@flea>
- <CAGb2v65rE2nQbyeiSPAyTzw-n-EQsUwQABx3nrvXTu4JogFPBQ@mail.gmail.com>
- <20180717151558.wn7v33whtljqt53w@flea>
- <CAGb2v64NRVaWpbDqiX0JX7_6uvypUpNEecPUj-sSjaK5X-hdQA@mail.gmail.com>
- <20180718152203.svrt6wmr2vwh4rb5@flea>
-Message-ID: <CAGb2v67XaWoBGX2Tn_J8LfBJiJja0yfRbM+QyHPLnXvQtBuGGw@mail.gmail.com>
+From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
+Date: Mon, 30 Jul 2018 06:31:30 -0300
+Subject: new libv4l2 (was Re: [PATCH, libv4l]: Make libv4l2 usable on
+ devices with complex pipeline)
+In-Reply-To: <20180728211110.GB1152@amd>
+References: <20180708213258.GA18217@amd> <20180719205344.GA12098@amd>
+ <20180723153649.73337c0f@coco.lan> <20180728211110.GB1152@amd>
+Message-ID: <20180730063122.73a20c55@coco.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 11:22 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Tue, Jul 17, 2018 at 11:43:03PM +0800, Chen-Yu Tsai wrote:
->> On Tue, Jul 17, 2018 at 11:15 PM, Maxime Ripard
->> <maxime.ripard@bootlin.com> wrote:
->> > On Thu, Jul 12, 2018 at 06:17:23PM +0800, Chen-Yu Tsai wrote:
->> >> On Thu, Jul 12, 2018 at 3:19 PM, Maxime Ripard
->> >> <maxime.ripard@bootlin.com> wrote:
->> >> > Hi,
->> >> >
->> >> > On Thu, Jul 12, 2018 at 11:02:25AM +0800, Chen-Yu Tsai wrote:
->> >> >> The eMMC controller is also a new timing mode controller, but it doesn't
->> >> >> have the timing mode switch. It does however have signal delay and
->> >> >> calibration controls, typical of Allwinner MMC controllers that support
->> >> >> the new timing mode.
->> >> >>
->> >> >> Enable the new timing mode setting for the A64 eMMC controller. This
->> >> >> also enables MMC HS-DDR modes, which gives higher throughput for eMMC
->> >> >> chips that support it, and can deliver such throughput.
->> >> >>
->> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> >> >
->> >> > That doesn't look right. The datasheet explicitly mentions that this
->> >> > bit doesn't apply to the eMMC controller, and the BSP is doing the same:
->> >> > https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-1.c
->> >> >
->> >> > vs
->> >> > https://github.com/longsleep/linux-pine64/blob/lichee-dev-v3.10.65/drivers/mmc/host/sunxi-mmc-sun50iw1p1-2.c
->> >>
->> >> You mean the bit in SDXC_REG_SD_NTSR? Yes I know that doesn't exist
->> >> for the eMMC controller. I mentioned this in the commit message. It
->> >> doesn't exist, and writes to it become a no-op.
->> >>
->> >> Would a comment, or comments, help with making this clear?
->> >
->> > Ah right. Maybe we should move the calibration under can_calibrate
->> > though, or create another boolean for this?
->> >
->> > Putting it under has_new_timings while the SoC doesn't use it looks
->> > very confusing.
->>
->> IIRC we don't support calibration anyway. This boolean simply signals
->> the usage of the new timing mode, whether by choice, or because it is
->> the only mode the controller supports.
->
-> This is not the semantic I had in mind when I introduced it. The
-> original intent was to set the new timing bit all the time for
-> SoCs. If we want to change that semantic, then we also need to make
-> sure what this bit means is documented properly.
+Em Sat, 28 Jul 2018 23:11:10 +0200
+Pavel Machek <pavel@ucw.cz> escreveu:
 
-In the driver:
+> Hi!
+> 
+> > > > Add support for opening multiple devices in v4l2_open(), and for
+> > > > mapping controls between devices.
+> > > > 
+> > > > This is necessary for complex devices, such as Nokia N900.
+> > > > 
+> > > > Signed-off-by: Pavel Machek <pavel@ucw.cz>    
+> > > 
+> > > Ping?
+> > > 
+> > > There's a lot of work to do on libv4l2... timely patch handling would
+> > > be nice.  
+> > 
+> > As we're be start working at the new library in order to support
+> > complex cameras, and I don't want to prevent you keeping doing your
+> > work, IMHO the best way to keep doing it would be to create two
+> > libv4l2 forks:  
+> 
+> BTW.. new library. Was there decision what langauge to use? I know C
+> is obvious choice, but while working on libv4l2, I wished it would be
+> Rust...
+> 
+> Rewriting same routine over and over, with slightly different types
+> was not too much fun, and it looked like textbook example for
+> generics...
 
-    /* hardware only supports new timing mode */
-    bool needs_new_timings;
+Whatever language it uses, the library should provide a standard C API
+interface and avoid using libraries that may not be available on
+the systems supported by the v4l-utils package, as other packages
+and a libv4l-compatible interface should be linked using it.
 
-    /* hardware can switch between old and new timing modes */
-    bool has_timings_switch;
+It should also be something that the existing v4l-utils developers are
+familiar with. Right now, we have only C and C++ code inside v4l-utils.
 
-So if the A64 / H6 eMMC controller only supports / is stuck with the new
-timing mode, that surely fits the description of the first one, right?
-As for setting the new timing bit all the time, yes it is set, but it's
-a no-op. Would a comment clarifying this at the point the hardware bit
-is set suffice?
+So, I'd say that the language should be either C (the obvious choice)
+or C++.
 
-Thanks
-ChenYu
+It should also be licensed using the same terms as v4l-utils libraries,
+e. g. LGPL 2.1+.
+
+Thanks,
+Mauro
