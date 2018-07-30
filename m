@@ -1,48 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 30 Jul 2018 17:16:42 +0100
-Subject: [PATCH 1/1] arm64: kexec: machine_kexec should call
- __flush_icache_range
-In-Reply-To: <e07fc674-2a71-29ae-2212-46ee5f79593d@oracle.com>
-References: <faf6c7cb-d9da-9a9c-cc0f-43c95e864ca2@oracle.com>
- <e07fc674-2a71-29ae-2212-46ee5f79593d@oracle.com>
-Message-ID: <20180730161641.6zxxy3lxp27tznck@armageddon.cambridge.arm.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 30 Jul 2018 21:48:35 +0530
+Subject: [PATCH v7 3/6] dt-bindings: mailbox: imx-mu: add generic MU
+ channel support
+In-Reply-To: <CABb+yY0sUxGatozwdQVM55z7ACtpK8HCepnfvQNunQ=r5y_kVw@mail.gmail.com>
+References: <AM0PR04MB42116C756EC78AD12EB254D6802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <CABb+yY0yn9os6nqH8eUfAr3Q3ev4=TfpTp=5ZDBR7FN67eb-wg@mail.gmail.com>
+ <VI1PR04MB4222672B8F7B6AF2B11A4442802A0@VI1PR04MB4222.eurprd04.prod.outlook.com>
+ <CABb+yY1EkHk85H72xYoYA3JbQL03+-o3UcRVdA_Zub-Q+D=OHw@mail.gmail.com>
+ <VI1PR04MB422216469EE5F3ED8E53A4F1802A0@VI1PR04MB4222.eurprd04.prod.outlook.com>
+ <CABb+yY0SfdFr8TMOMosTVb5+LFWqB8nQkKj3ze8usi-s7Cko4g@mail.gmail.com>
+ <VI1PR04MB4222B4877B341C0FA07A6A8D802A0@VI1PR04MB4222.eurprd04.prod.outlook.com>
+ <CABb+yY1MSSQKZ6BOQXC-x=qy4VZ5HqDBjmh_BJTXSkAm3+P8mA@mail.gmail.com>
+ <bf7aca98-7ec8-bcf3-b1a8-d86a7cf28d31@pengutronix.de>
+ <CABb+yY3PLcjduxm7uJ9xZpPP2zkcQ5Qngs4PjnhGAXp43QVzFA@mail.gmail.com>
+ <20180730144435.srxgohwgdhrmw2rz@pengutronix.de>
+ <CABb+yY0sUxGatozwdQVM55z7ACtpK8HCepnfvQNunQ=r5y_kVw@mail.gmail.com>
+Message-ID: <CABb+yY04dm_N1Ud2Mhi-g-eFdNVkxJKE8ONOqntZjN_QKwgLcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2018 at 10:29:21AM -0500, Dave Kleikamp wrote:
-> machine_kexec flushes the reboot_code_buffer from the icache
-> after stopping the other cpus.
-> 
-> Commit 3b8c9f1cdfc5 ("arm64: IPI each CPU after invalidating the I-cache
-> for kernel mappings") added an IPI call to flush_icache_range, which
-> causes a hang here, so replace the call with __flush_icache_range
+On Mon, Jul 30, 2018 at 8:32 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Mon, Jul 30, 2018 at 8:14 PM, Oleksij Rempel <o.rempel@pengutronix.de> wrote:
+>> On Mon, Jul 30, 2018 at 06:34:56PM +0530, Jassi Brar wrote:
+>>> On Mon, Jul 30, 2018 at 1:05 PM, Oleksij Rempel <o.rempel@pengutronix.de> wrote:
+>>> > Hi Aishen, Jassie,
+>>> >
+>>> > i'm lost in this discussion. Please, as soon as I need to add some
+>>> > changes to my patches, notify me. Preferably on top for email.
+>>> >
+>>> I am ok with however you choose to implement, 8 unidirectional or 4
+>>> bidirectional channels or whatever.
+>>>
+>>> We just can't have protocol specific s/w modes in the controller drivers.
+>>>
+>>> The best solution is to fix the SCU firmware. If that is _really_
+>>> impossible, I provided a solution (3 cells work around). If you have a
+>>> better idea please feel free to propose and implement that.
+>>>
+>>> It will also help if you could share the user code of "scu-mode". If
+>>> there is no such code (and we know the driver doesn't respect the
+>>> "scu-mode" property) why do we even have that binding? Maybe drop it.
+>>
+>> Tomorrow I have a time slot to address your generic iMX MU suggestions.
+>> So, what is better, uni- or bi-directional channels?
+>>
+> The datasheet indicates there are 4 tx and 4 rx channels. So 8
+> uni-directional channels (which allow more fine-grained/efficient
+> resource allocation btw).
+>
+>> Should I implement
+>> *all* (4TX+FIFO, 4RX+FIFO, 4TX-simple, 4RX-simple) channels in this run?
+>>
+> From datasheet, each of 8 channels should be defined as signal+data
+> i.e, IRQ + TX/RX_Reg.
+> The rest 4 GP channels are doorbells (irq only).
+>
+> So we can have 2-cells.
+>     First cell is 0->Tx, 1->RX, 2->Doorbell
+>     Second cell is index of the channel {0,3}
+>
+> Now you may implement only RX+TX, and leave 'doorbell' out for future.
+> Thats ok, because we wouldn't have to change bindings then.
+>
+> However, if SCU (in its current form) must be supported. We may need
+> to add the third cell (irq enable or not) or some better way, right
+> now.
+>
+Looking at imx_mu_scu_send_data(), which simply polls on the tx, I
+think we don't even need third cell for scu client. A simple 2-cell, 8
+uni-dir channel setup should work.
+If I see the scu client driver, I could confirm how it would work.
 
-While machine_kexec() may be called with interrupts disabled (IIUC) and
-we shouldn't IPI other CPUs, I don't understand why it hangs here. Are
-there any other CPUs online at this point?
+So, lets please do the 8 uni-directional, 2 cells implementation.
 
-> Signed-off-by: Dave Kleikamp <dave.kleikamp@oracle.com>
-> Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/machine_kexec.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> index f62effc..e8c0283 100644
-> --- a/arch/arm64/kernel/machine_kexec.c
-> +++ b/arch/arm64/kernel/machine_kexec.c
-> @@ -184,7 +184,7 @@ void machine_kexec(struct kimage *kimage)
->  
->  	/* Flush the reboot_code_buffer in preparation for its execution. */
->  	__flush_dcache_area(reboot_code_buffer, arm64_relocate_new_kernel_size);
-> -	flush_icache_range((uintptr_t)reboot_code_buffer,
-> +	__flush_icache_range((uintptr_t)reboot_code_buffer,
->  		arm64_relocate_new_kernel_size);
-
-That's probably needed, at least to avoid a WARN_ON(irqs_disabled()) via
-smp_call_function_many().
-
--- 
-Catalin
+Regards.
