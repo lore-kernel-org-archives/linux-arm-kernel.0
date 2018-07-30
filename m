@@ -1,14 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 30 Jul 2018 12:03:01 +0100 (BST)
-Subject: Applied "ASoC: uniphier: change functions to static" to the asoc tree
-In-Reply-To: <20180727023744.7865-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <20180730110301.72F1F1124216@debutante.sirena.org.uk>
+Date: Mon, 30 Jul 2018 12:03:21 +0100 (BST)
+Subject: Applied "ASoC: sirf: Fix potential NULL pointer dereference" to the
+ asoc tree
+In-Reply-To: <20180726204910.GA1635@embeddedor.com>
+Message-ID: <20180730110321.388881124216@debutante.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: uniphier: change functions to static
+   ASoC: sirf: Fix potential NULL pointer dereference
 
 has been applied to the asoc tree at
 
@@ -33,65 +34,45 @@ to this mail.
 Thanks,
 Mark
 
->From d8504acca759ae672c6d34d49a33d54ace094cbb Mon Sep 17 00:00:00 2001
-From: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-Date: Fri, 27 Jul 2018 11:37:44 +0900
-Subject: [PATCH] ASoC: uniphier: change functions to static
+>From ae1c696a480c67c45fb23b35162183f72c6be0e1 Mon Sep 17 00:00:00 2001
+From: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+Date: Thu, 26 Jul 2018 15:49:10 -0500
+Subject: [PATCH] ASoC: sirf: Fix potential NULL pointer dereference
 
-This patch changes some functions that are not used by other objects
-to static.
+There is a potential execution path in which function
+platform_get_resource() returns NULL. If this happens,
+we will end up having a NULL pointer dereference.
 
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Fix this by replacing devm_ioremap with devm_ioremap_resource,
+which has the NULL check and the memory region request.
+
+This code was detected with the help of Coccinelle.
+
+Cc: stable at vger.kernel.org
+Fixes: 2bd8d1d5cf89 ("ASoC: sirf: Add audio usp interface driver")
+Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/uniphier/aio-core.c | 6 +++---
- sound/soc/uniphier/aio.h      | 3 ---
- 2 files changed, 3 insertions(+), 6 deletions(-)
+ sound/soc/sirf/sirf-usp.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/sound/soc/uniphier/aio-core.c b/sound/soc/uniphier/aio-core.c
-index 8b09bbb0f8d0..9bcba06ba52e 100644
---- a/sound/soc/uniphier/aio-core.c
-+++ b/sound/soc/uniphier/aio-core.c
-@@ -327,7 +327,7 @@ static int aio_port_set_ch(struct uniphier_aio_sub *sub)
-  *
-  * Return: Zero if successful, otherwise a negative value on error.
-  */
--int aio_port_set_rate(struct uniphier_aio_sub *sub, int rate)
-+static int aio_port_set_rate(struct uniphier_aio_sub *sub, int rate)
- {
- 	struct regmap *r = sub->aio->chip->regmap;
- 	struct device *dev = &sub->aio->chip->pdev->dev;
-@@ -446,7 +446,7 @@ int aio_port_set_rate(struct uniphier_aio_sub *sub, int rate)
-  *
-  * Return: Zero if successful, otherwise a negative value on error.
-  */
--int aio_port_set_fmt(struct uniphier_aio_sub *sub)
-+static int aio_port_set_fmt(struct uniphier_aio_sub *sub)
- {
- 	struct regmap *r = sub->aio->chip->regmap;
- 	struct device *dev = &sub->aio->chip->pdev->dev;
-@@ -511,7 +511,7 @@ int aio_port_set_fmt(struct uniphier_aio_sub *sub)
-  *
-  * Return: Zero if successful, otherwise a negative value on error.
-  */
--int aio_port_set_clk(struct uniphier_aio_sub *sub)
-+static int aio_port_set_clk(struct uniphier_aio_sub *sub)
- {
- 	struct uniphier_aio_chip *chip = sub->aio->chip;
- 	struct device *dev = &sub->aio->chip->pdev->dev;
-diff --git a/sound/soc/uniphier/aio.h b/sound/soc/uniphier/aio.h
-index 23a5c3c68658..ca6ccbae0ee8 100644
---- a/sound/soc/uniphier/aio.h
-+++ b/sound/soc/uniphier/aio.h
-@@ -325,9 +325,6 @@ int aio_chip_set_pll(struct uniphier_aio_chip *chip, int pll_id,
- void aio_chip_init(struct uniphier_aio_chip *chip);
- int aio_init(struct uniphier_aio_sub *sub);
- void aio_port_reset(struct uniphier_aio_sub *sub);
--int aio_port_set_rate(struct uniphier_aio_sub *sub, int rate);
--int aio_port_set_fmt(struct uniphier_aio_sub *sub);
--int aio_port_set_clk(struct uniphier_aio_sub *sub);
- int aio_port_set_param(struct uniphier_aio_sub *sub, int pass_through,
- 		       const struct snd_pcm_hw_params *params);
- void aio_port_set_enable(struct uniphier_aio_sub *sub, int enable);
+diff --git a/sound/soc/sirf/sirf-usp.c b/sound/soc/sirf/sirf-usp.c
+index 77e7dcf969d0..d70fcd4a1adf 100644
+--- a/sound/soc/sirf/sirf-usp.c
++++ b/sound/soc/sirf/sirf-usp.c
+@@ -370,10 +370,9 @@ static int sirf_usp_pcm_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, usp);
+ 
+ 	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	base = devm_ioremap(&pdev->dev, mem_res->start,
+-		resource_size(mem_res));
+-	if (base == NULL)
+-		return -ENOMEM;
++	base = devm_ioremap_resource(&pdev->dev, mem_res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
+ 	usp->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+ 					    &sirf_usp_regmap_config);
+ 	if (IS_ERR(usp->regmap))
 -- 
 2.18.0
