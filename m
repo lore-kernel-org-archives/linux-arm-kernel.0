@@ -1,54 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 30 Jul 2018 08:50:21 +0200
-Subject: [RFC PATCH] arm64: mm: Export __sync_icache_dcache() for
- xen-privcmd
-In-Reply-To: <CAMuHMdVZHiqi9Wex05v6fLcndfN7oDuJK3ft7O=itEM4DwfP2w@mail.gmail.com>
-References: <20180711231822.GG14131@decadent.org.uk>
- <20180727120633.bjpfqswuxcy2ibqu@armageddon.cambridge.arm.com>
- <20180727132243.GA28549@arm.com>
- <CAMuHMdVZHiqi9Wex05v6fLcndfN7oDuJK3ft7O=itEM4DwfP2w@mail.gmail.com>
-Message-ID: <CAMuHMdU1b2QfmdqNV0jWwsTHwbv5QB=L8WrzY5G4bV=+_JCOjQ@mail.gmail.com>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Mon, 30 Jul 2018 09:14:43 +0200
+Subject: [PATCH v3 0/3] i2c: at91: slave mode support
+In-Reply-To: <20180720224141.lawanibd7v4hmbym@ninjato>
+References: <20180716094037.1843-1-ludovic.desroches@microchip.com>
+ <20180720224141.lawanibd7v4hmbym@ninjato>
+Message-ID: <20180730071443.clib3swtsommj7jk@M43218.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2018 at 8:46 AM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> On Fri, Jul 27, 2018 at 3:23 PM Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Jul 27, 2018 at 01:06:33PM +0100, Catalin Marinas wrote:
-> > > On Thu, Jul 12, 2018 at 12:18:22AM +0100, Ben Hutchings wrote:
-> > > > The xen-privcmd driver, which can be modular, calls set_pte_at()
-> > > > which in turn may call __sync_icache_dcache().
-> > > >
-> > > > The call to __sync_icache_dcache() may be optimised out because it is
-> > > > conditional on !pte_special(), and xen-privcmd calls pte_mkspecial().
-> > > > But it seems unwise to rely on this optimisation.
-> > > >
-> > > > Fixes: 3ad0876554ca ("xen/privcmd: add IOCTL_PRIVCMD_MMAP_RESOURCE")
-> > > > Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
-> > > > ---
-> > > > This is an RFC since I haven't found an actual build failure.  Using
-> > > > Debian's gcc 7.3 with either CC_OPTIMIZE_FOR_PERFORMANCE or
-> > > > CC_OPTIMIZE_FOR_SIZE, the call *is* optimised away.
-> > >
-> > > Since apply_to_page_range() is EXPORT_SYMBOL_GPL() and a
-> > > pte_fn_t function would likely use set_pte_at(), I'm fine with this
-> > > patch for consistency.
-> > >
-> > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> >
-> > Okey doke, I'll pick this up for 4.19.
->
-> Note that this is a build regression in v4.18-rc4 and later:
-> http://kisskb.ellerman.id.au/kisskb/buildresult/13450058/
+On Sat, Jul 21, 2018 at 12:41:41AM +0200, Wolfram Sang wrote:
+> > [Ludovic Desroches]
+> > Changes in v3:
+> >  - rebase (cherry-pick was enough)
+> 
+> Thanks for the rebase. I wonder, though, I recall to had more
+> complicated issues. However...
+> 
+> >  - fix checkpatch errors
+> >  - tests:
+> >    - hangs with a SAMA5D4 (master and slave on different busses) after about
+> >    100 transfers. It's the firs time I do this test.
+> >    - some mismatches with a SAMA5D4 as slave and a SAMA5D2 as master
+> >    I don't know if it's a regression. I don't remember having seen this
+> >    behavior previously.
+> >    I think it's worth taking those patches even if there are some possible
+> >    bugs. It'll allow to get more people using it and so to consolidate the
+> >    slave mode support.
+> 
+> I really want to see those patches go upstream, too. But I am also not a
+> big fan of delivering the user something with known issues. Especially
+> not when they affect the main feature to be added. My rationale here is
+> that someone who is able to fix the issues remaining will also be able
+> to pick up and apply patches.
+> 
+> Maybe, maybe if it was to be enabled by a special
+> I2C_AT91_SLAVE_EXPERIMANTEL symbol with lots of explanations. I need to
+> think twice about that, though.
+> 
 
-s/is/fixes (presumably)/
+I understand your point. The experimental mentionning could be a good
+trade-off. Let me know once you make up your mind.
 
-Gr{oetje,eeting}s,
+> Speaking of Kconfig, I think this series needs to place a
+> 
+> 	select I2C_SLAVE
+> 
+> somewhere.
+> 
 
-                        Geert
+Ok I'll update it if we go further with this set of patches.
 
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Regards
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Ludovic
