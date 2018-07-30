@@ -1,51 +1,46 @@
-From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Mon, 30 Jul 2018 14:30:25 +0900
-Subject: [PATCH v2 2/2] spi: add SPI controller driver for UniPhier SoC
-In-Reply-To: <1532624495.2283.197.camel@impinj.com>
-References: <1532588943-19481-1-git-send-email-hayashibara.keiji@socionext.com>	
- <1532588943-19481-3-git-send-email-hayashibara.keiji@socionext.com>	
- <CAHp75VcEdxDEo0T5_9BzOPaeaqjbmbrWmaE9+ZuUDYhjh6jpVw@mail.gmail.com>
- <1532624495.2283.197.camel@impinj.com>
-Message-ID: <002901d427c6$6b9a4ff0$42ceefd0$@socionext.com>
+From: amit.kachhap@arm.com (Amit Daniel Kachhap)
+Date: Mon, 30 Jul 2018 11:03:51 +0530
+Subject: [PATCH] clk: scmi: Fix the rounding of clock rate
+In-Reply-To: <153270946725.48062.11195853363758024681@swboyd.mtv.corp.google.com>
+References: <1532700112-11852-1-git-send-email-amit.kachhap@arm.com>
+ <153270946725.48062.11195853363758024681@swboyd.mtv.corp.google.com>
+Message-ID: <CADGdYn5T2-B2UE9DX3wFHdvqfF85n0NAbKDBf2KHOQreRi=H+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Trent and Andy,
+Hi,
 
-> From: Trent Piepho [mailto:tpiepho at impinj.com]
-> Sent: Friday, July 27, 2018 2:02 AM
-> To: andy.shevchenko at gmail.com; Hayashibara, Keiji/?? ?? <hayashibara.keiji@socionext.com>
-> Subject: Re: [PATCH v2 2/2] spi: add SPI controller driver for UniPhier SoC
-> 
-> On Thu, 2018-07-26 at 11:46 +0300, Andy Shevchenko wrote:
-> > > +
-> > > +       /*
-> > > +        * the supported rates are even numbers from 4 to 254. (4,6,8...254)
-> > > +        * round up as we look for equal or less speed
-> > > +        */
-> > > +       ckrat = DIV_ROUND_UP(clk_get_rate(priv->clk), speed);
-> > > +       ckrat = roundup(ckrat, 2);
-> >
-> > ckrat += ckrat & 1;
-> 
-> Either way, the compiler produces the same code:
-> 
->  add r0, r0, #1 
->  bic r0, r0, #1
-> 
-> I.e., ckrat = (ckrat + 1) & ~1, one "add" and one "and".
-> 
-> Might as well use the macro so it's clear. There is also round_up(x,y), which I believe is intended to be used
-> only with power of 2 values of y.
-
-I confirmed round_up() macro.
-This macro is optimized to power of 2 argument,
-and it matches to this case and clear.
-
-I will replace to round_up() macro.
-
-Thank you.
-
------------------
-Best Regards,
-Keiji Hayashibara
+On Fri, Jul 27, 2018 at 10:07 PM, Stephen Boyd <sboyd@kernel.org> wrote:
+> Quoting Amit Daniel Kachhap (2018-07-27 07:01:52)
+>> This fix rounds the clock rate properly by using quotient and not
+>> remainder in the calculation. This issue was found while testing HDMI
+>> in the Juno platform.
+>>
+>> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@arm.com>
+>
+> Any Fixes: tag here?
+Yes, This patch is tested with Linux v4.18-rc6 tag.
+>
+>> ---
+>>  drivers/clk/clk-scmi.c | 5 ++---
+>>  1 file changed, 2 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/clk/clk-scmi.c b/drivers/clk/clk-scmi.c
+>> index bb2a6f2..a985bf5 100644
+>> --- a/drivers/clk/clk-scmi.c
+>> +++ b/drivers/clk/clk-scmi.c
+>> @@ -60,9 +59,9 @@ static long scmi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+>>
+>>         ftmp = rate - fmin;
+>>         ftmp += clk->info->range.step_size - 1; /* to round up */
+>> -       step = do_div(ftmp, clk->info->range.step_size);
+>> +       do_div(ftmp, clk->info->range.step_size);
+>>
+>> -       return step * clk->info->range.step_size + fmin;
+>> +       return ftmp * clk->info->range.step_size + fmin;
+>
+> Good catch.
+Thanks.
+>
+Regards,
+Amit
