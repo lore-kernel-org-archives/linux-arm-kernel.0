@@ -1,50 +1,90 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 30 Jul 2018 17:38:31 +0200
-Subject: [PATCH 0/9] Add Reset Controller support for Actions Semi Owl SoCs
-In-Reply-To: <20180730151131.GA28633@mani>
-References: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
- <c3ae668a-6bcc-a0eb-1e00-14ef9d607316@suse.de>
- <20180730151131.GA28633@mani>
-Message-ID: <1532965111.3471.14.camel@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 30 Jul 2018 16:42:10 +0100
+Subject: [PATCH v5 1/3] arm64: mm: Support Common Not Private translations
+In-Reply-To: <f3da236e-504d-66ab-19da-9f89eba253f1@arm.com>
+References: <1529403502-2843-1-git-send-email-vladimir.murzin@arm.com>
+ <1529403502-2843-2-git-send-email-vladimir.murzin@arm.com>
+ <20180727113502.3qdbyffuvysva6bz@armageddon.cambridge.arm.com>
+ <f3da236e-504d-66ab-19da-9f89eba253f1@arm.com>
+Message-ID: <20180730154209.2tawriqxgxub7paa@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-07-30 at 20:41 +0530, Manivannan Sadhasivam wrote:
-> Hi Andreas,
-> 
-> On Mon, Jul 30, 2018 at 12:26:07PM +0200, Andreas F?rber wrote:
-> > Hi Mani,
+On Mon, Jul 30, 2018 at 11:08:27AM +0100, Vladimir Murzin wrote:
+> On 27/07/18 12:35, Catalin Marinas wrote:
+> > On Tue, Jun 19, 2018 at 11:18:20AM +0100, Vladimir Murzin wrote:
+> >> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+> >> index 39ec0b8..c506fb7 100644
+> >> --- a/arch/arm64/include/asm/mmu_context.h
+> >> +++ b/arch/arm64/include/asm/mmu_context.h
+> >> @@ -149,6 +149,18 @@ static inline void cpu_replace_ttbr1(pgd_t *pgdp)
+> >>  
+> >>  	phys_addr_t pgd_phys = virt_to_phys(pgdp);
+> >>  
+> >> +	if (system_supports_cnp() && !WARN_ON(pgdp != lm_alias(swapper_pg_dir))) {
+> >> +		/*
+> >> +		 * cpu_replace_ttbr1() is used when there's a boot CPU
+> >> +		 * up (i.e. cpufeature framework is not up yet) and
+> >> +		 * latter only when we enable CNP via cpufeature's
+> >> +		 * enable() callback.
+> >> +		 * Also we rely on the cpu_hwcap bit being set before
+> >> +		 * calling the enable() function.
+> >> +		 */
+> >> +		pgd_phys |= TTBR_CNP_BIT;
+> >> +	}
+> >> +
+> >>  	replace_phys = (void *)__pa_symbol(idmap_cpu_replace_ttbr1);
 > > 
-> > Am 27.07.2018 um 20:45 schrieb Manivannan Sadhasivam:
-> > > This patchset adds Reset Controller (RMU) support for Actions Semi
-> > > Owl SoCs, S900 and S700. For the Owl SoCs, RMU has been integrated into
-> > > the clock subsystem in hardware. Hence, in software we integrate RMU
-> > > support into common clock driver inorder to maintain compatibility.
-> > 
-> > Can this not be placed into drivers/reset/ by using mfd-simple with a
-> > sub-node in DT?
-> > 
+> > So the above code sets the TTBR_CNP_BIT (bit 0) in pgd_phys and calls
+> > the idmap_cpu_replace_ttbr1() with this value. Looking at the latter, it
+> > performs a phys_to_ttbr transformation of pgd_phys which masks out the
+> > bottom 2 bits when CONFIG_ARM64_PA_BITS_52 is enabled. I think we need
+> > to tweak TTBR_BADDR_MASK_52 to start from bit 0.
 > 
-> Actually I was not sure where to place this reset controller driver. When I
-> looked into other similar ones such as sunxi, they just integrated into the
-> clk subsystem. So I just chose that path. But yeah, this is hacky!
+> Something like bellow?
 > 
-> But this RMU is not MFD by any means. Since the CMU (Clock) and RMU (Reset)
-> are two separate IPs inside SoC, we shouldn't describe it as a MFD driver. Since
-> RMU has only 2 registers, the HW designers decided to use up the CMU memory
-> map. So, maybe syscon would be best option I think. What is your opinion?
+> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> index 0bcc98d..e0b4b2f 100644
+> --- a/arch/arm64/include/asm/assembler.h
+> +++ b/arch/arm64/include/asm/assembler.h
+> @@ -524,11 +524,10 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
+>   * 	ttbr:	returns the TTBR value
+>   */
+>  	.macro	phys_to_ttbr, ttbr, phys
+> -#ifdef CONFIG_ARM64_PA_BITS_52
+> -	orr	\ttbr, \phys, \phys, lsr #46
+> -	and	\ttbr, \ttbr, #TTBR_BADDR_MASK_52
+> -#else
+>  	mov	\ttbr, \phys
+> +#ifdef CONFIG_ARM64_PA_BITS_52
+> +	ubfx	\ttbr, \ttbr, #48, #4
+> +	orr	\ttbr, \phys, \ttbr, lsl #2
+>  #endif
+>  	.endm
 
-Using syscon seems cleaner than stuffing the regmap into owl_clk_desc.
+This would do, I don't have a better idea on how to write it. But I'd
+like a comment to say that this is moving bits 51:48 of the address to
+bits 5:2 of TTBR_ELx.
 
-> Even if we go for syscon, we should place the reset driver within clk
-> framework as I can see other SoCs like Mediatek are doing the same. But again
-> I'm not sure!
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 1bdeca8..1b9d0e9 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -770,7 +770,7 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
+>  #define kc_offset_to_vaddr(o)	((o) | VA_START)
+>  
+>  #ifdef CONFIG_ARM64_PA_BITS_52
+> -#define phys_to_ttbr(addr)	(((addr) | ((addr) >> 46)) & TTBR_BADDR_MASK_52)
+> +#define phys_to_ttbr(addr)	((addr) | (((addr) >> 46) & TTBR_BADDR_MASK_52))
 
-Me neither. If the CMU and RMU are really separate and only share the
-memory map, a syscon driver could live in drivers/reset without
-problems.
-It's only when there are interactions between clocks and resets that you
-really want to have the reset driver integrated with clk.
+With these changes:
 
-regards
-Philipp
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+
+Please repost the updated patches and cc Will as he's handling the
+upcoming merging window.
+
+Thanks.
+
+-- 
+Catalin
