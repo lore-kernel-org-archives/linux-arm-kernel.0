@@ -1,78 +1,111 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 30 Jul 2018 12:03:21 +0100 (BST)
-Subject: Applied "ASoC: sirf: Fix potential NULL pointer dereference" to the
- asoc tree
-In-Reply-To: <20180726204910.GA1635@embeddedor.com>
-Message-ID: <20180730110321.388881124216@debutante.sirena.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 30 Jul 2018 12:06:08 +0100
+Subject: [PATCH mmc-next v2 3/3] mmc: sdhci-of-dwcmshc: solve 128MB DMA
+ boundary limitation
+In-Reply-To: <20180726151424.4bcecf41@xhacker.debian>
+References: <20180726151017.4da1e336@xhacker.debian>
+ <20180726151424.4bcecf41@xhacker.debian>
+Message-ID: <edaa7605-e0e0-b17a-8403-c3d7d60d7989@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hi Jisheng,
 
-   ASoC: sirf: Fix potential NULL pointer dereference
+On 26/07/18 08:14, Jisheng Zhang wrote:
+> When using DMA, if the DMA addr spans 128MB boundary, we have to split
+> the DMA transfer into two so that each one doesn't exceed the boundary.
 
-has been applied to the asoc tree at
+Out of interest, is the driver already setting its segment boundary mask 
+appropriately? This sounds like the exact kind of hardware restriction 
+that dma_parms is intended to describe, which scatterlist-generating 
+code is *supposed* to already respect.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+Robin.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From ae1c696a480c67c45fb23b35162183f72c6be0e1 Mon Sep 17 00:00:00 2001
-From: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
-Date: Thu, 26 Jul 2018 15:49:10 -0500
-Subject: [PATCH] ASoC: sirf: Fix potential NULL pointer dereference
-
-There is a potential execution path in which function
-platform_get_resource() returns NULL. If this happens,
-we will end up having a NULL pointer dereference.
-
-Fix this by replacing devm_ioremap with devm_ioremap_resource,
-which has the NULL check and the memory region request.
-
-This code was detected with the help of Coccinelle.
-
-Cc: stable at vger.kernel.org
-Fixes: 2bd8d1d5cf89 ("ASoC: sirf: Add audio usp interface driver")
-Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/sirf/sirf-usp.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
-
-diff --git a/sound/soc/sirf/sirf-usp.c b/sound/soc/sirf/sirf-usp.c
-index 77e7dcf969d0..d70fcd4a1adf 100644
---- a/sound/soc/sirf/sirf-usp.c
-+++ b/sound/soc/sirf/sirf-usp.c
-@@ -370,10 +370,9 @@ static int sirf_usp_pcm_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, usp);
- 
- 	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	base = devm_ioremap(&pdev->dev, mem_res->start,
--		resource_size(mem_res));
--	if (base == NULL)
--		return -ENOMEM;
-+	base = devm_ioremap_resource(&pdev->dev, mem_res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
- 	usp->regmap = devm_regmap_init_mmio(&pdev->dev, base,
- 					    &sirf_usp_regmap_config);
- 	if (IS_ERR(usp->regmap))
--- 
-2.18.0
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> ---
+>   drivers/mmc/host/sdhci-of-dwcmshc.c | 42 +++++++++++++++++++++++++++++
+>   1 file changed, 42 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/sdhci-of-dwcmshc.c b/drivers/mmc/host/sdhci-of-dwcmshc.c
+> index 1b7cd144fb01..7e189514bc83 100644
+> --- a/drivers/mmc/host/sdhci-of-dwcmshc.c
+> +++ b/drivers/mmc/host/sdhci-of-dwcmshc.c
+> @@ -8,21 +8,51 @@
+>    */
+>   
+>   #include <linux/clk.h>
+> +#include <linux/mm.h>
+>   #include <linux/module.h>
+>   #include <linux/of.h>
+>   
+>   #include "sdhci-pltfm.h"
+>   
+> +#define BOUNDARY_OK(addr, len) \
+> +	((addr | (SZ_128M - 1)) == ((addr + len - 1) | (SZ_128M - 1)))
+> +
+>   struct dwcmshc_priv {
+>   	struct clk	*bus_clk;
+>   };
+>   
+> +/*
+> + * if DMA addr spans 128MB boundary, we split the DMA transfer into two
+> + * so that the DMA transfer doesn't exceed the boundary.
+> + */
+> +static unsigned int dwcmshc_adma_write_desc(struct sdhci_host *host,
+> +					    void *desc, dma_addr_t addr,
+> +					    int len, unsigned int cmd)
+> +{
+> +	int tmplen, offset;
+> +
+> +	if (BOUNDARY_OK(addr, len) || !len)
+> +		return _sdhci_adma_write_desc(host, desc, addr, len, cmd);
+> +
+> +	offset = addr & (SZ_128M - 1);
+> +	tmplen = SZ_128M - offset;
+> +	_sdhci_adma_write_desc(host, desc, addr, tmplen, cmd);
+> +
+> +	addr += tmplen;
+> +	len -= tmplen;
+> +	desc += host->desc_sz;
+> +	_sdhci_adma_write_desc(host, desc, addr, len, cmd);
+> +
+> +	return host->desc_sz * 2;
+> +}
+> +
+>   static const struct sdhci_ops sdhci_dwcmshc_ops = {
+>   	.set_clock		= sdhci_set_clock,
+>   	.set_bus_width		= sdhci_set_bus_width,
+>   	.set_uhs_signaling	= sdhci_set_uhs_signaling,
+>   	.get_max_clock		= sdhci_pltfm_clk_get_max_clock,
+>   	.reset			= sdhci_reset,
+> +	.adma_write_desc	= dwcmshc_adma_write_desc,
+>   };
+>   
+>   static const struct sdhci_pltfm_data sdhci_dwcmshc_pdata = {
+> @@ -36,12 +66,24 @@ static int dwcmshc_probe(struct platform_device *pdev)
+>   	struct sdhci_host *host;
+>   	struct dwcmshc_priv *priv;
+>   	int err;
+> +	u32 extra;
+>   
+>   	host = sdhci_pltfm_init(pdev, &sdhci_dwcmshc_pdata,
+>   				sizeof(struct dwcmshc_priv));
+>   	if (IS_ERR(host))
+>   		return PTR_ERR(host);
+>   
+> +	/*
+> +	 * The DMA descriptor table number is calculated as the maximum
+> +	 * number of segments times 2, to allow for an alignment
+> +	 * descriptor for each segment, plus 1 for a nop end descriptor,
+> +	 * plus extra number for cross 128M boundary handling.
+> +	 */
+> +	extra = DIV_ROUND_UP(totalram_pages, SZ_128M / PAGE_SIZE);
+> +	if (extra > SDHCI_MAX_SEGS)
+> +		extra = SDHCI_MAX_SEGS;
+> +	host->adma_table_num = SDHCI_MAX_SEGS * 2 + 1 + extra;
+> +
+>   	pltfm_host = sdhci_priv(host);
+>   	priv = sdhci_pltfm_priv(pltfm_host);
+>   
+> 
