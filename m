@@ -1,34 +1,42 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 31 Jul 2018 00:37:01 +0200
-Subject: [GIT PULL 2/2] Rockchip defconfig64 updates for 4.19
-In-Reply-To: <1809430.FkQi5Ue9ae@phil>
-References: <2000491.bLgWuj0xar@phil> <1809430.FkQi5Ue9ae@phil>
-Message-ID: <6710740.gS0PWvgRmW@phil>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Mon, 30 Jul 2018 15:45:05 -0700
+Subject: [PATCH v7 11/12] hwmon: Add PECI dimmtemp driver
+In-Reply-To: <CAL_JsqK4k=c6k-BJT5fWQH_DCqGhr13fq6M_iZZehaveE-z5Hg@mail.gmail.com>
+References: <20180723214751.1733-1-jae.hyun.yoo@linux.intel.com>
+ <20180723214751.1733-12-jae.hyun.yoo@linux.intel.com>
+ <CAL_JsqK4k=c6k-BJT5fWQH_DCqGhr13fq6M_iZZehaveE-z5Hg@mail.gmail.com>
+Message-ID: <f3056c4d-1cc6-5fcd-f185-f6b0878e6326@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This time with less granularity, as requested by Olof during the last pull.
+Hi Rob,
 
+On 7/30/2018 3:06 PM, Rob Herring wrote:
+> On Mon, Jul 23, 2018 at 3:49 PM Jae Hyun Yoo
+> <jae.hyun.yoo@linux.intel.com> wrote:
+>>
+>> This commit adds PECI dimmtemp hwmon driver.
+>>
+> 
+>> +#if IS_ENABLED(CONFIG_OF)
+>> +static const struct of_device_id peci_dimmtemp_of_table[] = {
+>> +       { .compatible = "intel,peci-dimmtemp" },
+>> +       { }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, peci_dimmtemp_of_table);
+>> +#endif
+> 
+> This should be removed. Same for cpu temp driver I'm guessing.
+> 
 
-The following changes since commit 021c91791a5e7e85c567452f1be3e4c2c6cb6063:
+Yes, you are right. This isn't needed anymore because MFD driver
+loads this module. I'll remove this code from here and from cpu temp
+driver. Also, I'll remove 'of_compatible' setting of 'struct mfd_cell
+peci_functions' in intel-peci-client.c code.
 
-  Linux 4.18-rc3 (2018-07-01 16:04:53 -0700)
+Thanks a lot for your pointing it out!
 
-are available in the Git repository at:
+Jae
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.19-rockchip-defconfig64-1
-
-for you to fetch changes up to 365e660fc88d6b8bbff13e61114cfb7b57e8a23d:
-
-  arm64: defconfig: Enable more peripherals for Samsung Chromebook Plus. (2018-07-23 12:36:03 +0200)
-
-----------------------------------------------------------------
-Enablement of some more features relevant to rk3399-kevin
-(Chromebook Plus)
-
-----------------------------------------------------------------
-Enric Balletbo i Serra (1):
-      arm64: defconfig: Enable more peripherals for Samsung Chromebook Plus.
-
- arch/arm64/configs/defconfig | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+> Rob
+> 
