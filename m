@@ -1,42 +1,22 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Mon, 30 Jul 2018 15:45:05 -0700
-Subject: [PATCH v7 11/12] hwmon: Add PECI dimmtemp driver
-In-Reply-To: <CAL_JsqK4k=c6k-BJT5fWQH_DCqGhr13fq6M_iZZehaveE-z5Hg@mail.gmail.com>
-References: <20180723214751.1733-1-jae.hyun.yoo@linux.intel.com>
- <20180723214751.1733-12-jae.hyun.yoo@linux.intel.com>
- <CAL_JsqK4k=c6k-BJT5fWQH_DCqGhr13fq6M_iZZehaveE-z5Hg@mail.gmail.com>
-Message-ID: <f3056c4d-1cc6-5fcd-f185-f6b0878e6326@linux.intel.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 30 Jul 2018 15:48:33 -0700
+Subject: [PATCH v2 1/7] dt-bindings: net: Fix Broadcom iProc mdio mux
+ driver base address
+In-Reply-To: <1532726613-6483-2-git-send-email-arun.parameswaran@broadcom.com>
+References: <1532726613-6483-1-git-send-email-arun.parameswaran@broadcom.com>
+ <1532726613-6483-2-git-send-email-arun.parameswaran@broadcom.com>
+Message-ID: <a0968023-297f-c2c8-76f8-fa0911f29a17@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On 7/30/2018 3:06 PM, Rob Herring wrote:
-> On Mon, Jul 23, 2018 at 3:49 PM Jae Hyun Yoo
-> <jae.hyun.yoo@linux.intel.com> wrote:
->>
->> This commit adds PECI dimmtemp hwmon driver.
->>
+On 07/27/2018 02:23 PM, Arun Parameswaran wrote:
+> Modify the base address of the Broadcom iProc MDIO mux driver to
+> point to the start of the block's register address space.
 > 
->> +#if IS_ENABLED(CONFIG_OF)
->> +static const struct of_device_id peci_dimmtemp_of_table[] = {
->> +       { .compatible = "intel,peci-dimmtemp" },
->> +       { }
->> +};
->> +MODULE_DEVICE_TABLE(of, peci_dimmtemp_of_table);
->> +#endif
-> 
-> This should be removed. Same for cpu temp driver I'm guessing.
-> 
+> Signed-off-by: Arun Parameswaran <arun.parameswaran@broadcom.com>
 
-Yes, you are right. This isn't needed anymore because MFD driver
-loads this module. I'll remove this code from here and from cpu temp
-driver. Also, I'll remove 'of_compatible' setting of 'struct mfd_cell
-peci_functions' in intel-peci-client.c code.
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Thanks a lot for your pointing it out!
 
-Jae
-
-> Rob
-> 
+-- 
+Florian
