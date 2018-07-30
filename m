@@ -1,26 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 30 Jul 2018 11:07:02 +0200
-Subject: [PATCH v2] pinctrl: uniphier: add spi pin-mux settings
-In-Reply-To: <1531991136-1179-1-git-send-email-hayashibara.keiji@socionext.com>
-References: <1531991136-1179-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <CACRpkdY_DkBSZAkaXgz1p7x13_qkEcUQCcenaYnrTHJG-AY3sA@mail.gmail.com>
+From: cmaiolino28@gmail.com (Carlos Maiolino)
+Date: Mon, 30 Jul 2018 11:08:06 +0200
+Subject: [PATCH] staging/vc04_services: Use __user annotation for
+ user-space pointers
+In-Reply-To: <20180730085811.GA30820@kroah.com>
+References: <20180724083217.20921-1-cmaiolino28@gmail.com>
+ <20180730085811.GA30820@kroah.com>
+Message-ID: <CAGR7KeoDrp8FBX_H1a8h9hVFF_w9mLXGkvCT6jJAacG7-morRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 11:06 AM Keiji Hayashibara
-<hayashibara.keiji@socionext.com> wrote:
-
-> From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+On Mon, Jul 30, 2018 at 10:58 AM, Greg KH <greg@kroah.com> wrote:
+> On Tue, Jul 24, 2018 at 10:32:17AM +0200, Carlos Maiolino wrote:
+>> Fix several sparse warnings regarding different address space
+>> assignments, like example below, by properly annotating pointers
+>> expected to carry user space addresses.
+>>
+>> warning: incorrect type in argument 1 (different address spaces)
+>> Signed-off-by: Carlos Maiolino <cmaiolino28@gmail.com>
+>> ---
 >
-> Add pin-mux settings for spi controller.
+> We need a blank line befor your signed-off-by line please.
 >
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
-> ---
->  Changes since v1:
->  - Fix build error of "pinctrl-uniphier-sld8.c".
 
-This v2 version applied!
+Thanks, I'll resend, or do you prefer me to way until this get a review from
+the maintainer, and I resend the fixed description with the reviewed-by?
 
-Yours,
-Linus Walleij
+
+>> +     const struct vchiq_element __user *elements;
+>>  } VCHIQ_QUEUE_MESSAGE_T;
+>>
+>>  typedef struct {
+>
+> It would be great to have an ack from the maintainers here :)
+>
+> thanks,
+>
+> greg k-h
