@@ -1,42 +1,35 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 30 Jul 2018 15:53:06 -0700
-Subject: [PATCH v2 7/7] net: phy: Add pm support to Broadcom iProc mdio
- mux driver
-In-Reply-To: <1532726613-6483-8-git-send-email-arun.parameswaran@broadcom.com>
-References: <1532726613-6483-1-git-send-email-arun.parameswaran@broadcom.com>
- <1532726613-6483-8-git-send-email-arun.parameswaran@broadcom.com>
-Message-ID: <8d732031-c5e8-d6ea-5b61-3b9baf79796f@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Jul 2018 23:59:22 +0100
+Subject: [PATCH 0/6] rapidio: move Kconfig menu definition to subsystem
+In-Reply-To: <20180730225035.28365-1-acolin@isi.edu>
+References: <20180730225035.28365-1-acolin@isi.edu>
+Message-ID: <20180730225921.GE17271@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/27/2018 02:23 PM, Arun Parameswaran wrote:
-> Add support for suspend and resume to the Broadcom iProc mdio
-> mux driver.
-> 
-> Signed-off-by: Arun Parameswaran <arun.parameswaran@broadcom.com>
-> ---
->  drivers/net/phy/mdio-mux-bcm-iproc.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
-> index 51d1003..d89dce0 100644
-> --- a/drivers/net/phy/mdio-mux-bcm-iproc.c
-> +++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
-> @@ -290,6 +290,33 @@ static int mdio_mux_iproc_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM_SLEEP
-> +static int mdio_mux_iproc_suspend(struct device *dev)
-> +{
-> +	struct iproc_mdiomux_desc *md = dev_get_drvdata(dev);
-> +
-> +	if (md->core_clk)
-> +		clk_disable_unprepare(md->core_clk);
+I only have this message, and patches 5 and 6.  This is meaningless
+for me to review - I can't tell what you've done as far as my comments
+on your previous iteration.
 
-Since you are assigning md->core_clk to NULL in case clk_get() returned
-an error, checking for md->core_clk is not necessary since the Linux
-common clock framework perform that NULL check already.
+Please arrange to _at least_ copy all patches the appropriate mailing
+lists for the set with your complete patch set if you aren't going to
+copy everyone on all patches in the set.
+
+On Mon, Jul 30, 2018 at 06:50:28PM -0400, Alexei Colin wrote:
+> In the current patchset, I took the approach of adding '|| PCI' to the
+> depends in the subsystem. I did try the alterantive approach mentioned
+> in the reviews for v1 of this patch, where the subsystem Kconfig does
+> not add a '|| PCI' and each per-architecture Kconfig has to add a
+> 'select HAS_RAPIDIO if PCI' and SoCs with IP blocks have to also add
+> 'select HAS_RAPIDIO'. This works too but requires each architecture's
+> Kconfig to add the line for RapidIO (whereas current approach does not
+> require that involvement) and also may create a false impression that
+> the dependency on PCI is strict.
+
+... which means, as it stands, I've no idea what you actually came up
+with for this.
+
 -- 
--- 
-Florian
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
