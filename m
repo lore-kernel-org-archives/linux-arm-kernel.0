@@ -1,91 +1,56 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 31 Jul 2018 17:39:42 +0900
-Subject: [GIT PULL 3/3] ARM: uniphier: UniPhier SoC updates for v4.19
-In-Reply-To: <CAK7LNAQHL16vxv7twzy9PPkLLrbvzuAMa9QtOjSN3Z1KHWKG_Q@mail.gmail.com>
-References: <CAK7LNAShLhWqCRR8RfuJ0xBJAFoj-S6WLcSdh9QShg8dGfq9RA@mail.gmail.com>
- <20180721212430.odjwcusbbihffo6l@localhost>
- <CAK7LNAQHL16vxv7twzy9PPkLLrbvzuAMa9QtOjSN3Z1KHWKG_Q@mail.gmail.com>
-Message-ID: <CAK7LNARSx1hSLQNCzAQyD74dvnHzVqkTFoWj6GL7_5+vZau7Uw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 31 Jul 2018 09:41:43 +0100
+Subject: [PATCH 6/6] arm64: enable RapidIO menu in Kconfig
+In-Reply-To: <20180730225035.28365-7-acolin@isi.edu>
+References: <20180730225035.28365-1-acolin@isi.edu>
+ <20180730225035.28365-7-acolin@isi.edu>
+Message-ID: <20180731084143.GA4680@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Mon, Jul 30, 2018 at 06:50:34PM -0400, Alexei Colin wrote:
+> Platforms with a PCI bus will be offered the RapidIO menu since they may
+> be want support for a RapidIO PCI device. Platforms without a PCI bus
+> that might include a RapidIO IP block will need to "select HAS_RAPIDIO"
+> in the platform-/machine-specific "config ARCH_*" Kconfig entry.
+> 
+> Tested that kernel builds for arm64 with RapidIO subsystem and
+> switch drivers enabled, also that the modules load successfully
+> on a custom Aarch64 Qemu model.
+> 
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: John Paul Walters <jwalters@isi.edu>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org,
+> Signed-off-by: Alexei Colin <acolin@isi.edu>
+> ---
+>  arch/arm64/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 
+Thanks, this looks much cleaner than before:
 
-2018-07-22 8:24 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Hi Olof,
->
-> 2018-07-22 6:24 GMT+09:00 Olof Johansson <olof@lixom.net>:
->> On Thu, Jul 19, 2018 at 08:05:03AM +0900, Masahiro Yamada wrote:
->>> Hi Arnd, Olof,
->>>
->>> Please pull UniPhier SoC changes for the v4.19 MW.
->>>
->>> Thanks!
->>>
->>>
->>> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
->>>
->>>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
->>>
->>> are available in the git repository at:
->>>
->>>   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
->>> tags/uniphier-soc-v4.19
->>>
->>> for you to fetch changes up to ae93e694440a454609fa40725e16619c5a781768:
->>>
->>>   ARM: uniphier: remove empty Makefile (2018-07-19 06:53:16 +0900)
->>>
->>> ----------------------------------------------------------------
->>> UniPhier ARM SoC updates for v4.19
->>>
->>> - enable ethernet and thermal drivers from multi_v7_defconfig
->>>
->>> - select RESET_CONTROLLER
->>>
->>> - remove empty arch/arm/mach-uniphier/Makefile
->>>
->>> ----------------------------------------------------------------
->>> Kunihiko Hayashi (1):
->>>       ARM: multi_v7_defconfig: add CONFIG_UNIPHIER_THERMAL and CONFIG_SNI_AVE
->>
->> I renormalied multi_v7_defconfig for 4.18-rc3, so please base your branch
->> on that to avoid conflicts.
->>
->> Also, we separate out defconfig updates to branches on their own. I can
->> cherry-pick the branch apart but wanted to check with you before I do
->> so in case it messes up your workflow. If it does, send a fresh pull
->> request for SoC, and either one for the defconfig or just the patch and
->> we can apply it directly.
->>
->
-> Can you do cherry-pick please?
->
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Ping?
+The only thing I'm not sure about is why we don't just select HAS_RAPIDIO
+unconditionally in the arm64 Kconfig. Does selecting only that option
+actually pull in new code to the build?
 
-You offered to cherry-pick the patches directly to your tree,
-and I asked you to do so.
+Will
 
-
-
-We do not have much time until the MW opens.
-Please cherry-pick the following four:
-
-
-Kunihiko Hayashi (1):
-      ARM: multi_v7_defconfig: add CONFIG_UNIPHIER_THERMAL and CONFIG_SNI_AVE
-
-Masahiro Yamada (3):
-      ARM: uniphier: select RESET_CONTROLLER
-      arm64: uniphier: select RESET_CONTROLLER
-      ARM: uniphier: remove empty Makefile
-
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index a8f0c74e6f7f..5e8cf90505ec 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -308,6 +308,8 @@ config PCI_SYSCALL
+>  
+>  source "drivers/pci/Kconfig"
+>  
+> +source "drivers/rapidio/Kconfig"
+> +
+>  endmenu
+>  
+>  menu "Kernel Features"
+> -- 
+> 2.18.0
+> 
