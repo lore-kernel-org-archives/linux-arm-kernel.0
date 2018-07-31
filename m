@@ -1,102 +1,33 @@
 From: erin.lo@mediatek.com (Erin Lo)
-Date: Tue, 31 Jul 2018 13:37:57 +0800
-Subject: [PATCH v4 00/10] Add basic and clock support for Mediatek MT8183 SoC
-Message-ID: <1533015487-60189-1-git-send-email-erin.lo@mediatek.com>
+Date: Tue, 31 Jul 2018 13:37:59 +0800
+Subject: [PATCH v4 02/10] dt-bindings: mtk-sysirq: Add compatible for Mediatek
+ MT8183
+In-Reply-To: <1533015487-60189-1-git-send-email-erin.lo@mediatek.com>
+References: <1533015487-60189-1-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1533015487-60189-3-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MT8183 is a SoC based on 64bit ARMv8 architecture.
-It contains 4 CA53 and 4 CA73 cores.
-MT8183 share many HW IP with MT65xx series.
-This patchset was tested on MT8183 evaluation board and use correct clock to shell.
+This adds dt-binding documentation of SYSIRQ for Mediatek MT8183 SoC
+Platform.
 
-This series contains document bindings, device tree including interrupt, uart, clock.
+Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/interrupt-controller/mediatek,sysirq.txt         | 1 +
+ 1 file changed, 1 insertion(+)
 
-Based on v4.18-rc1 and https://patchwork.kernel.org/patch/10528515/
-Composed of clock control (PATCH 5-8) and device tree (PATCH 9-10)
-
-Change in v4:
-1. Correct syntax error in dtsi
-2. Add MT8183 clock support
-
-Change in v3:
-1. Fill out GICC, GICH, GICV regions
-2. Update Copyright to 2018
-
-Change in v2:
-1. Split dt-bindings into different patches
-2. Correct bindings for supported SoCs (mtk-uart.txt)
-
-Ben Ho (1):
-  arm64: dts: Add Mediatek SoC MT8183 and evaluation board dts and
-    Makefile
-
-Erin Lo (3):
-  dt-bindings: arm: Add bindings for Mediatek MT8183 SoC Platform
-  dt-bindings: mtk-sysirq: Add compatible for Mediatek MT8183
-  dt-bindings: serial: Add compatible for Mediatek MT8183
-
-Weiyi Lu (6):
-  dt-bindings: ARM: Mediatek: Document bindings for MT8183
-  clk: mediatek: Add dt-bindings for MT8183 clocks
-  clk: mediatek: Add flags support for mtk_gate data
-  clk: mediatek: Add MT8183 clock support
-  arm64: dts: mt8183: Add clock controller device nodes
-  dts: arm64: mt8183: add uart node
-
- Documentation/devicetree/bindings/arm/mediatek.txt |    4 +
- .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |    1 +
- .../bindings/arm/mediatek/mediatek,audsys.txt      |    1 +
- .../bindings/arm/mediatek/mediatek,camsys.txt      |    1 +
- .../bindings/arm/mediatek/mediatek,imgsys.txt      |    1 +
- .../bindings/arm/mediatek/mediatek,infracfg.txt    |    1 +
- .../bindings/arm/mediatek/mediatek,ipu.txt         |   43 +
- .../bindings/arm/mediatek/mediatek,mfgcfg.txt      |    1 +
- .../bindings/arm/mediatek/mediatek,mmsys.txt       |    1 +
- .../bindings/arm/mediatek/mediatek,topckgen.txt    |    1 +
- .../bindings/arm/mediatek/mediatek,vdecsys.txt     |    1 +
- .../bindings/arm/mediatek/mediatek,vencsys.txt     |    1 +
- .../interrupt-controller/mediatek,sysirq.txt       |    1 +
- .../devicetree/bindings/serial/mtk-uart.txt        |    1 +
- arch/arm64/boot/dts/mediatek/Makefile              |    1 +
- arch/arm64/boot/dts/mediatek/mt8183-evb.dts        |   31 +
- arch/arm64/boot/dts/mediatek/mt8183.dtsi           |  268 +++++
- drivers/clk/mediatek/Kconfig                       |   74 ++
- drivers/clk/mediatek/Makefile                      |   12 +
- drivers/clk/mediatek/clk-gate.c                    |    5 +-
- drivers/clk/mediatek/clk-gate.h                    |    3 +-
- drivers/clk/mediatek/clk-mt8183-audio.c            |  112 ++
- drivers/clk/mediatek/clk-mt8183-cam.c              |   75 ++
- drivers/clk/mediatek/clk-mt8183-img.c              |   75 ++
- drivers/clk/mediatek/clk-mt8183-ipu0.c             |   68 ++
- drivers/clk/mediatek/clk-mt8183-ipu1.c             |   68 ++
- drivers/clk/mediatek/clk-mt8183-ipu_adl.c          |   66 ++
- drivers/clk/mediatek/clk-mt8183-ipu_conn.c         |  155 +++
- drivers/clk/mediatek/clk-mt8183-mfgcfg.c           |   66 ++
- drivers/clk/mediatek/clk-mt8183-mm.c               |  128 ++
- drivers/clk/mediatek/clk-mt8183-vdec.c             |   84 ++
- drivers/clk/mediatek/clk-mt8183-venc.c             |   71 ++
- drivers/clk/mediatek/clk-mt8183.c                  | 1230 ++++++++++++++++++++
- drivers/clk/mediatek/clk-mtk.c                     |    3 +-
- drivers/clk/mediatek/clk-mtk.h                     |    1 +
- include/dt-bindings/clock/mt8183-clk.h             |  413 +++++++
- 36 files changed, 3064 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,ipu.txt
- create mode 100644 arch/arm64/boot/dts/mediatek/mt8183-evb.dts
- create mode 100644 arch/arm64/boot/dts/mediatek/mt8183.dtsi
- create mode 100644 drivers/clk/mediatek/clk-mt8183-audio.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-cam.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-img.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-ipu0.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-ipu1.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-ipu_adl.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-ipu_conn.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-mfgcfg.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-mm.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-vdec.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183-venc.c
- create mode 100644 drivers/clk/mediatek/clk-mt8183.c
- create mode 100644 include/dt-bindings/clock/mt8183-clk.h
-
---
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
+index 07bf0b9..5ff48a8 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
+@@ -5,6 +5,7 @@ interrupt.
+ 
+ Required properties:
+ - compatible: should be
++	"mediatek,mt8183-sysirq", "mediatek,mt6577-sysirq": for MT8183
+ 	"mediatek,mt8173-sysirq", "mediatek,mt6577-sysirq": for MT8173
+ 	"mediatek,mt8135-sysirq", "mediatek,mt6577-sysirq": for MT8135
+ 	"mediatek,mt8127-sysirq", "mediatek,mt6577-sysirq": for MT8127
+-- 
 1.9.1
