@@ -1,48 +1,53 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue, 31 Jul 2018 15:05:59 +0200
-Subject: [PATCH v4 13/17] khwasan: add hooks implementation
-In-Reply-To: <09cb5553-d84a-0e62-5174-315c14b88833@arm.com>
-References: <cover.1530018818.git.andreyknvl@google.com>
- <a2a93370d43ec85b02abaf8d007a15b464212221.1530018818.git.andreyknvl@google.com>
- <09cb5553-d84a-0e62-5174-315c14b88833@arm.com>
-Message-ID: <CAAeHK+yC3XRPoTByhH1QPrX45pG3QY_2Q4gz=dfDgxfzu1Fyfw@mail.gmail.com>
+From: navam@xilinx.com (Nava kishore Manne)
+Date: Tue, 31 Jul 2018 13:07:55 +0000
+Subject: [RFC PATCH 1/2] ARM: dt: fpga: Added binding docs for Xilinx
+ zynqmp FPGA manager
+In-Reply-To: <20180801100457.25614-1-nava.manne@xilinx.com>
+References: <20180801100457.25614-1-nava.manne@xilinx.com>
+Message-ID: <MWHPR0201MB34813A97EC92F8DC6E3F9CA6C22E0@MWHPR0201MB3481.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 25, 2018 at 3:44 PM, Vincenzo Frascino at Foss
-<vincenzo.frascino@arm.com> wrote:
-> On 06/26/2018 02:15 PM, Andrey Konovalov wrote:
->
->> @@ -325,18 +341,41 @@ void kasan_init_slab_obj(struct kmem_cache *cache,
->> const void *object)
->>     void *kasan_slab_alloc(struct kmem_cache *cache, void *object, gfp_t
->> flags)
->>   {
->> -       return kasan_kmalloc(cache, object, cache->object_size, flags);
->> +       object = kasan_kmalloc(cache, object, cache->object_size, flags);
->> +       if (IS_ENABLED(CONFIG_KASAN_HW) && unlikely(cache->ctor)) {
->> +               /*
->> +                * Cache constructor might use object's pointer value to
->> +                * initialize some of its fields.
->> +                */
->> +               cache->ctor(object);
->>
-> This seams breaking the kmem_cache_create() contract: "The @ctor is run when
-> new pages are allocated by the cache."
-> (https://elixir.bootlin.com/linux/v3.7/source/mm/slab_common.c#L83)
->
-> Since there might be preexisting code relying on it, this could lead to
-> global side effects. Did you verify that this is not the case?
->
-> Another concern is performance related if we consider this solution suitable
-> for "near-production", since with the current implementation you call the
-> ctor (where present) on an object multiple times and this ends up memsetting
-> and repopulating the memory every time (i.e. inode.c: inode_init_once). Do
-> you know what is the performance impact?
++Alan Tull
 
-We can assign tags to objects with constructors when a slab is
-allocated and call constructors once as usual. The downside is that
-such object would always have the same tag when it is reallocated, so
-we won't catch use-after-frees. But that is probably something we'll
-have to deal with if we're aiming for "near-production". I'll add this
-change to v5, thanks!
+> -----Original Message-----
+> From: Nava kishore Manne [mailto:nava.manne at xilinx.com]
+> Sent: Wednesday, August 1, 2018 3:35 PM
+> To: robh+dt at kernel.org; mark.rutland at arm.com; Michal Simek
+> <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>;
+> atull at opensource.altera.com; moritz.fischer at ettus.com; Nava kishore Manne
+> <navam@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Appana Durga
+> Kedareswara Rao <appanad@xilinx.com>; chinnikishore369 at gmail.com
+> Cc: Nava kishore Manne <navam@xilinx.com>
+> Subject: [RFC PATCH 1/2] ARM: dt: fpga: Added binding docs for Xilinx zynqmp
+> FPGA manager
+> 
+> New bindings document for zynqmp fpga manager.
+> 
+> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+> ---
+>  .../devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt   | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/fpga/xlnx,zynqmp-
+> pcap-fpga.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-
+> fpga.txt b/Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-
+> fpga.txt
+> new file mode 100644
+> index 000000000000..0eac747747f5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
+> @@ -0,0 +1,9 @@
+> +Xilinx Zynqmp FPGA Manager
+> +
+> +Required properties:
+> +- compatible:		should contain "xlnx,zynqmp-pcap-fpga"
+> +
+> +Example:
+> +	pcap: pcap at 00 {
+> +		compatible = "xlnx,zynqmp-pcap-fpga";
+> +	};
+> --
+> 2.18.0
