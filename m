@@ -1,104 +1,38 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Tue, 31 Jul 2018 18:08:54 +0200
-Subject: [PATCH v4 13/17] khwasan: add hooks implementation
-In-Reply-To: <b6b58786-85c9-e831-5571-58b5580c84ba@virtuozzo.com>
-References: <cover.1530018818.git.andreyknvl@google.com>
- <a2a93370d43ec85b02abaf8d007a15b464212221.1530018818.git.andreyknvl@google.com>
- <09cb5553-d84a-0e62-5174-315c14b88833@arm.com>
- <CAAeHK+yC3XRPoTByhH1QPrX45pG3QY_2Q4gz=dfDgxfzu1Fyfw@mail.gmail.com>
- <8240d4f9-c8df-cfe9-119d-6e933f8b13df@virtuozzo.com>
- <CACT4Y+Y=61VwwETQP3FwAN16ompSNJOCyDCG6Ew1Bm5f_Fe1Lw@mail.gmail.com>
- <b6b58786-85c9-e831-5571-58b5580c84ba@virtuozzo.com>
-Message-ID: <CACT4Y+aUs0YMTaQx4x9QiQsMjFNZ5gUFNuMkG_hneDPTb3Nu=Q@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 31 Jul 2018 17:11:14 +0100
+Subject: next/master boot: 179 boots: 11 failed, 167 passed with 1
+ offline (next-20180731)
+In-Reply-To: <5b607cc4.1c69fb81.6c1d6.6534@mx.google.com>
+References: <5b607cc4.1c69fb81.6c1d6.6534@mx.google.com>
+Message-ID: <20180731161114.GI5719@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 6:04 PM, Andrey Ryabinin
-<aryabinin@virtuozzo.com> wrote:
->>>>>> @@ -325,18 +341,41 @@ void kasan_init_slab_obj(struct kmem_cache *cache,
->>>>>> const void *object)
->>>>>>     void *kasan_slab_alloc(struct kmem_cache *cache, void *object, gfp_t
->>>>>> flags)
->>>>>>   {
->>>>>> -       return kasan_kmalloc(cache, object, cache->object_size, flags);
->>>>>> +       object = kasan_kmalloc(cache, object, cache->object_size, flags);
->>>>>> +       if (IS_ENABLED(CONFIG_KASAN_HW) && unlikely(cache->ctor)) {
->>>>>> +               /*
->>>>>> +                * Cache constructor might use object's pointer value to
->>>>>> +                * initialize some of its fields.
->>>>>> +                */
->>>>>> +               cache->ctor(object);
->>>>>>
->>>>> This seams breaking the kmem_cache_create() contract: "The @ctor is run when
->>>>> new pages are allocated by the cache."
->>>>> (https://elixir.bootlin.com/linux/v3.7/source/mm/slab_common.c#L83)
->>>>>
->>>>> Since there might be preexisting code relying on it, this could lead to
->>>>> global side effects. Did you verify that this is not the case?
->>>>>
->>>>> Another concern is performance related if we consider this solution suitable
->>>>> for "near-production", since with the current implementation you call the
->>>>> ctor (where present) on an object multiple times and this ends up memsetting
->>>>> and repopulating the memory every time (i.e. inode.c: inode_init_once). Do
->>>>> you know what is the performance impact?
->>>>
->>>> We can assign tags to objects with constructors when a slab is
->>>> allocated and call constructors once as usual. The downside is that
->>>> such object would always have the same tag when it is reallocated, so
->>>> we won't catch use-after-frees.
->>>
->>> Actually you should do this for SLAB_TYPESAFE_BY_RCU slabs. Usually they are with ->ctors but there
->>> are few without constructors.
->>> We can't reinitialize or even retag them. The latter will definitely cause false-positive use-after-free reports.
->>
->> Somewhat offtopic, but I can't understand how SLAB_TYPESAFE_BY_RCU
->> slabs can be useful without ctors or at least memset(0). Objects in
->> such slabs need to be type-stable, but I can't understand how it's
->> possible to establish type stability without a ctor... Are these bugs?
->
-> Yeah, I puzzled by this too. However, I think it's hard but possible to make it work, at least in theory.
-> There must be an initializer, which consists of two parts:
-> a) initilize objects fields
-> b) expose object to the world (add it to list or something like that)
->
-> (a) part must somehow to be ok to race with another cpu which might already use the object.
-> (b) part must must use e.g. barriers to make sure that racy users will see previously inilized fields.
-> Racy users must have parring barrier of course.
->
-> But it sound fishy, and very easy to fuck up.
+On Tue, Jul 31, 2018 at 08:14:12AM -0700, kernelci.org bot wrote:
 
+Today's -next fails to boot on db820c:
 
-Agree on both fronts: theoretically possible but easy to fuck up. Even
-if it works, complexity of the code should be brain damaging and there
-are unlikely good reasons to just not be more explicit and use a ctor.
+> arm64:
 
+>     defconfig:
+>         apq8096-db820c:
+>             lab-bjorn: new failure (last pass: next-20180730)
 
-> I won't be surprised if every single one SLAB_TYPESAFE_BY_RCU user
-> without ->ctor is bogus. It certainly would be better to convert those to use ->ctor.
+There's nothing immediately obvious as the boot failure cause in the
+logs, the last output is a failure to load the ath10k_pci firmware:
 
-I have another hypothesis: they are not bogus, just don't need
-SLAB_TYPESAFE_BY_RCU :)
+04:02:53.750283  [    4.503980] ath10k_pci 0000:01:00.0: Failed to find firmware-N.bin (N between 2 and 6) from ath10k/QCA6174/hw3.0: -2
+04:02:53.756384  [    4.504010] ath10k_pci 0000:01:00.0: could not fetch firmware files (-2)
+04:02:53.760522  [    4.513736] ath10k_pci 0000:01:00.0: could not probe fw (-2)
 
+but I'm not sure that's the actual cause.  More details, including the
+full boot log, here:
 
-> Such caches seems used by networking subsystem in proto_register():
->
->                 prot->slab = kmem_cache_create_usercopy(prot->name,
->                                         prot->obj_size, 0,
->                                         SLAB_HWCACHE_ALIGN | SLAB_ACCOUNT |
->                                         prot->slab_flags,
->                                         prot->useroffset, prot->usersize,
->                                         NULL);
->
-> And certain protocols specify SLAB_TYPESAFE_BY_RCU in ->slab_flags, such as:
-> llc_proto, smc_proto, smc_proto6, tcp_prot, tcpv6_prot, dccp_v6_prot, dccp_v4_prot.
->
->
-> Also nf_conntrack_cachep, kernfs_node_cache, jbd2_journal_head_cache and i915_request cache.
->
->
-> --
-> You received this message because you are subscribed to the Google Groups "kasan-dev" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to kasan-dev+unsubscribe at googlegroups.com.
-> To post to this group, send email to kasan-dev at googlegroups.com.
-> To view this discussion on the web visit https://groups.google.com/d/msgid/kasan-dev/b6b58786-85c9-e831-5571-58b5580c84ba%40virtuozzo.com.
-> For more options, visit https://groups.google.com/d/optout.
+   https://kernelci.org/boot/id/5b6042b559b514136096babf/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180731/ef582ea2/attachment.sig>
