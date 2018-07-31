@@ -1,105 +1,53 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jul 2018 16:52:28 +0100
-Subject: [PATCH 6/6] arm64: enable RapidIO menu in Kconfig
-In-Reply-To: <d09cb4f5-768b-acd8-f9b1-d1d320a93564@gmail.com>
-References: <20180730225035.28365-1-acolin@isi.edu>
- <20180730225035.28365-7-acolin@isi.edu>
- <20180731084143.GA4680@arm.com>
- <d09cb4f5-768b-acd8-f9b1-d1d320a93564@gmail.com>
-Message-ID: <20180731155228.GN17271@n2100.armlinux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 31 Jul 2018 16:52:46 +0100
+Subject: next/master boot: 171 boots: 6 failed, 162 passed with 3 offline
+ (next-20180724)
+In-Reply-To: <20180725161151.GA340@sirena.org.uk>
+References: <5b5757ee.1c69fb81.411a5.52e2@mx.google.com>
+ <20180725161151.GA340@sirena.org.uk>
+Message-ID: <20180731155246.GG5719@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 08:54:14AM -0400, Alex Bounine wrote:
-> On 2018-07-31 04:41 AM, Will Deacon wrote:
-> >On Mon, Jul 30, 2018 at 06:50:34PM -0400, Alexei Colin wrote:
-> >>Platforms with a PCI bus will be offered the RapidIO menu since they may
-> >>be want support for a RapidIO PCI device. Platforms without a PCI bus
-> >>that might include a RapidIO IP block will need to "select HAS_RAPIDIO"
-> >>in the platform-/machine-specific "config ARCH_*" Kconfig entry.
-> >>
-> >>Tested that kernel builds for arm64 with RapidIO subsystem and
-> >>switch drivers enabled, also that the modules load successfully
-> >>on a custom Aarch64 Qemu model.
-> >>
-> >>Cc: Andrew Morton <akpm@linux-foundation.org>
-> >>Cc: Russell King <linux@armlinux.org.uk>
-> >>Cc: John Paul Walters <jwalters@isi.edu>
-> >>Cc: linux-arm-kernel at lists.infradead.org
-> >>Cc: linux-kernel at vger.kernel.org,
-> >>Signed-off-by: Alexei Colin <acolin@isi.edu>
-> >>---
-> >>  arch/arm64/Kconfig | 2 ++
-> >>  1 file changed, 2 insertions(+)
-> >
-> >Thanks, this looks much cleaner than before:
-> >
-> >Acked-by: Will Deacon <will.deacon@arm.com>
-> >
-> >The only thing I'm not sure about is why we don't just select HAS_RAPIDIO
-> >unconditionally in the arm64 Kconfig. Does selecting only that option
-> >actually pull in new code to the build?
-> >
-> HAS_RAPIDIO option is intended for SOCs that have built in SRIO controllers,
-> like TI KeyStoneII or FPGAs. Because RapidIO subsystem core is required
-> during RapidIO port driver initialization, having separate option allows us
-> to control available build options for RapidIO core and port driver (bool
-> vs. tristate) and disable module option if port driver is configured as
-> built-in.
+On Wed, Jul 25, 2018 at 05:11:51PM +0100, Mark Brown wrote:
+> On Tue, Jul 24, 2018 at 09:46:38AM -0700, kernelci.org bot wrote:
 
-Your explanation doesn't make much sense to me.
+> For a little while now the RPi B has been failing to boot using the
+> bcm2835 defconfig in -next:
 
-RAPIDIO is the bus-level support, right?  So drivers that depend on
-the bus-level support should depend on RAPIDIO, and so, if RAPIDIO
-is configured as a module, they will also be allowed to be disabled
-or a module, but not built-in if tristate.  If it is boolean, and
-causes the driver to be built-in to the kernel, then you need to use
-"RAPIDIO=y" so that it's dependency is only satisfied when the core
-is built-in.
+...
 
-HAS_RAPIDIO gives the impression that it defines whether or not
-the rapidio core code is allowable or not - it doesn't suggest that
-it has anything to do with drivers.  However, reading the PowerPC
-Kconfig files, it seems to be used that way.  That's confusing, and
-ought to be fixed.  From what I can tell, it's only used for FSL_RIO,
-so I suggest that gets converted to:
+> It's working fine on arm64, whatever's going on appears to be specific
+> to this config (it's not getting booted with any other 32 bit configs).
+> Full info and boot logs for one of the boards here:
 
-config HAS_RAPIDIO
-	bool PCI
+>    https://kernelci.org/boot/id/5b58416759b514139596baae/
 
-config RAPIDIO
-	tristate "RapidIO support"
-	depends on HAS_RAPIDIO
+> it looks like it hangs somewhere shortly after or during initializing
+> MMC so never makes it to the console, the tail of the failing logs looks
+> like:
 
-config HAS_FSL_RIO
-	bool
-	select HAS_RAPIDIO
+This went away for a day or two but it looks like it's back again I'm
+afraid:
 
-config FSL_RIO
-	bool "Freescale Embedded SRIO Controller support"
-	depends on RAPIDIO = y && HAS_FSL_RIO
+    https://kernelci.org/boot/id/5b604cd259b514364696baaa/
 
-This frees up HAS_RAPIDIO to operate as one would expect - to define
-whether or not RAPIDIO should be offered.  This also allows:
+> 
+> | 09:18:36.332120  [    1.459801] mmc1: queuing unknown CIS tuple 0x80 (7 bytes)
+> | 09:18:36.345711  [    1.467585] mmcblk0: mmc0:59b4 USD   7.51 GiB 
+> | 09:18:36.346169  [    1.474834]  mmcblk0: p1
+> | 09:18:36.410184  [    1.539600] random: fast init done
+> | 09:18:36.458065  [    1.578056] mmc1: new high speed SDIO card at address 0001
+> | 09:20:39.745370  ShellCommand command timed out.: Sending # in case of corruption. Connection timeout 00:04:10, retry in 00:02:05
+> | 09:20:39.846848  #
+> 
+> but like I say the same -next boots with arm64 defconfig.
 
-config ARM
-	select HAS_RAPIDIO if PCI
 
-to be added to arch/arm/Kconfig if appropriate.  However, I'm not yet
-convinced that _just because_ we have PCI does not mean that RAPIDIO
-should be offered.  I stated a series of questions about that last
-Tuesday in response to an individual patch adding rapidio to arch/arm,
-and that email seems to have been ignored - at least as far as the
-questions go.
-
-Please ensure that you respond to your reviewers questions, otherwise
-you will start receiving plain NAKs to your patches instead (since
-it becomes a waste of time for reviewers to put any further effort
-in to explain why they don't like the patch.)
-
-Thanks.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180731/54d82109/attachment.sig>
