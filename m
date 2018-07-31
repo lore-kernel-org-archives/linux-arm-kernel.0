@@ -1,60 +1,59 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 31 Jul 2018 10:26:50 +0100
-Subject: [PATCH 3/4] drm/i2c: tda998x: correct PLL divider calculation
-In-Reply-To: <20180731092343.GH17271@n2100.armlinux.org.uk>
-References: <20180731092343.GH17271@n2100.armlinux.org.uk>
-Message-ID: <E1fkQva-0003nO-3u@rmk-PC.armlinux.org.uk>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Tue, 31 Jul 2018 11:32:53 +0200
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.19 (#2)
+In-Reply-To: <20180721213352.eborr5dctfk3t7j3@localhost> (Olof Johansson's
+ message of "Sat, 21 Jul 2018 14:33:52 -0700")
+References: <87sh4e8eym.fsf@bootlin.com>
+ <20180721213352.eborr5dctfk3t7j3@localhost>
+Message-ID: <87h8kfda2i.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The serializer PLL divider is a power-of-two divider, so our calculation
-which assumes that it's a numerical divider is incorrect.  Replace it
-with one that results in a power-of-two divider value instead.
-
-Tested with all supported modes with a Samsung S24C750.
-
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- drivers/gpu/drm/i2c/tda998x_drv.c | 20 ++++++++++++++------
- 1 file changed, 14 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 98ec91a55a6a..a31809ce30e2 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -1334,6 +1334,7 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
- 				    struct drm_display_mode *adjusted_mode)
- {
- 	struct tda998x_priv *priv = bridge_to_tda998x_priv(bridge);
-+	unsigned long tmds_clock;
- 	u16 ref_pix, ref_line, n_pix, n_line;
- 	u16 hs_pix_s, hs_pix_e;
- 	u16 vs1_pix_s, vs1_pix_e, vs1_line_s, vs1_line_e;
-@@ -1404,12 +1405,19 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
- 			       (mode->vsync_end - mode->vsync_start)/2;
- 	}
+Hi Olof,
  
--	div = 148500 / mode->clock;
--	if (div != 0) {
--		div--;
--		if (div > 3)
--			div = 3;
--	}
-+	tmds_clock = mode->clock;
-+
-+	/*
-+	 * The divisor is power-of-2. The TDA9983B datasheet gives
-+	 * this as ranges of Msample/s, which is 10x the TMDS clock:
-+	 *   0 - 800 to 1500 Msample/s
-+	 *   1 - 400 to 800 Msample/s
-+	 *   2 - 200 to 400 Msample/s
-+	 *   3 - as 2 above
-+	 */
-+	for (div = 0; div < 3; div++)
-+		if (80000 >> div <= tmds_clock)
-+			break;
- 
- 	mutex_lock(&priv->audio_mutex);
- 
+ On sam., juil. 21 2018, Olof Johansson <olof@lixom.net> wrote:
+
+> On Fri, Jul 20, 2018 at 10:54:25AM +0200, Gregory CLEMENT wrote:
+>> Hi,
+>> 
+>> Here is the second pull request for dt64 for mvebu for v4.19.
+>> 
+>> Gregory
+>> 
+>> The following changes since commit 4436a3711e3249840e0679e92d3c951bcaf25515:
+>> 
+>>   arm64: dts: marvell: armada-37xx: reserve memory for ATF (2018-06-29 16:39:03 +0200)
+>> 
+>> are available in the Git repository at:
+>> 
+>>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.19-2
+>> 
+>> for you to fetch changes up to c462f6c77e72804b72e008a91c4b6fa8d9b4b265:
+>> 
+>>   arm64: dts: marvell: armada-37xx: update the crypto engine compatible (2018-07-13 13:42:03 +0200)
+>> 
+>> ----------------------------------------------------------------
+>> mvebu dt64 for 4.19 (part 2)
+>> 
+>> Use more specific compatible for the Inside Secure SafeXcel on the
+>> Armada 37xx and the Armada 7K/8K SoCs.
+>
+> I'll reply to the patches -- usually compatible should go from specific to
+> generic and you're replacing here instead of adding a more specific first. You
+> probably want to do the former instead.
+>
+> Not merged, let's settle discussion on the patch first.
+
+Now that Antoine explained the reason for replacing the compatible, will
+you pull the branch?
+
+Gregory
+
+>
+>
+> -Olof
+
 -- 
-2.7.4
+Gregory Clement, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+http://bootlin.com
