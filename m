@@ -1,59 +1,52 @@
-From: radhey.shyam.pandey@xilinx.com (Radhey Shyam Pandey)
-Date: Tue, 31 Jul 2018 23:16:12 +0530
-Subject: [RFC PATCH 1/2] dt-bindings: dmaengine: xilinx_dma: Add binding for
- Xilinx MCDMA IP
-In-Reply-To: <1533059173-21405-1-git-send-email-radhey.shyam.pandey@xilinx.com>
-References: <1533059173-21405-1-git-send-email-radhey.shyam.pandey@xilinx.com>
-Message-ID: <1533059173-21405-2-git-send-email-radhey.shyam.pandey@xilinx.com>
+From: arun.parameswaran@broadcom.com (Arun Parameswaran)
+Date: Tue, 31 Jul 2018 10:51:48 -0700
+Subject: [PATCH v2 7/7] net: phy: Add pm support to Broadcom iProc mdio
+ mux driver
+In-Reply-To: <8d732031-c5e8-d6ea-5b61-3b9baf79796f@gmail.com>
+References: <1532726613-6483-1-git-send-email-arun.parameswaran@broadcom.com>
+ <1532726613-6483-8-git-send-email-arun.parameswaran@broadcom.com>
+ <8d732031-c5e8-d6ea-5b61-3b9baf79796f@gmail.com>
+Message-ID: <f298c64e-d8de-0e6d-3c4d-f62b257329f9@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree binding for Xilinx AXI Multichannel Direct Memory Access
-(AXI MCDMA) IP. The AXI MCDMA provides high-bandwidth direct memory
-access between memory and AXI4-Stream target peripherals. The AXI MCDMA
-core provides scatter-gather interface with multiple channel support.
+Hi Florian,
 
-Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
----
- Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+On 18-07-30 03:53 PM, Florian Fainelli wrote:
+> On 07/27/2018 02:23 PM, Arun Parameswaran wrote:
+>> Add support for suspend and resume to the Broadcom iProc mdio
+>> mux driver.
+>>
+>> Signed-off-by: Arun Parameswaran <arun.parameswaran@broadcom.com>
+>> ---
+>>  drivers/net/phy/mdio-mux-bcm-iproc.c | 28 ++++++++++++++++++++++++++++
+>>  1 file changed, 28 insertions(+)
+>>
+>> diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
+>> index 51d1003..d89dce0 100644
+>> --- a/drivers/net/phy/mdio-mux-bcm-iproc.c
+>> +++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
+>> @@ -290,6 +290,33 @@ static int mdio_mux_iproc_remove(struct platform_device *pdev)
+>>  	return 0;
+>>  }
+>>  
+>> +#ifdef CONFIG_PM_SLEEP
+>> +static int mdio_mux_iproc_suspend(struct device *dev)
+>> +{
+>> +	struct iproc_mdiomux_desc *md = dev_get_drvdata(dev);
+>> +
+>> +	if (md->core_clk)
+>> +		clk_disable_unprepare(md->core_clk);
+> 
+> Since you are assigning md->core_clk to NULL in case clk_get() returned
+> an error, checking for md->core_clk is not necessary since the Linux
+> common clock framework perform that NULL check already.
+> 
+Will remove the check.
 
-diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-index 174af2c..57bb02e 100644
---- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-+++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-@@ -11,9 +11,13 @@ is to receive from the device.
- Xilinx AXI CDMA engine, it does transfers between memory-mapped source
- address and a memory-mapped destination address.
- 
-+Xilinx AXI MCDMA engine, it does transfer between memory and AXI4 stream
-+target devices. It can be configured to have up to 16 independent transmit
-+and receive channels.
-+
- Required properties:
- - compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a" or
--	      "xlnx,axi-cdma-1.00.a""
-+	      "xlnx,axi-cdma-1.00.a" or "xlnx,axi-mcdma-1.00.a".
- - #dma-cells: Should be <1>, see "dmas" property below
- - reg: Should contain VDMA registers location and length.
- - xlnx,addrwidth: Should be the vdma addressing size in bits(ex: 32 bits).
-@@ -56,6 +60,8 @@ Required child node properties:
- 	For CDMA: It should be "xlnx,axi-cdma-channel".
- 	For AXIDMA: It should be either "xlnx,axi-dma-mm2s-channel" or
- 	"xlnx,axi-dma-s2mm-channel".
-+	For MCDMA: It should be either "xlnx,axi-mcdma-mm2s-channel" or
-+	"xlnx,axi-mcdma-s2mm-channel".
- - interrupts: Should contain per channel VDMA interrupts.
- - xlnx,datawidth: Should contain the stream data width, take values
- 	{32,64...1024}.
-@@ -68,7 +74,7 @@ Optional child node properties for VDMA:
- 	enabled/disabled in hardware.
- - xlnx,enable-vert-flip: Tells vertical flip is
- 	enabled/disabled in hardware(S2MM path).
--Optional child node properties for AXI DMA:
-+Optional child node properties for AXI DMA and MCDMA:
- -dma-channels: Number of dma channels in child node.
- 
- Example:
--- 
-2.7.4
+I am working on Andrew's comments (which will add one more patch to the series).
+I will send the whole patchset again, with reviewed-by tags (From Florian
+and Andrew on the ones that apply).
+
+Thanks
+Arun
