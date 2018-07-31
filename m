@@ -1,33 +1,40 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 31 Jul 2018 10:21:51 +0530
-Subject: [PATCH 0/2] dt: thermal: Fix broken cooling-maps
-In-Reply-To: <cover.1530766981.git.viresh.kumar@linaro.org>
-References: <cover.1530766981.git.viresh.kumar@linaro.org>
-Message-ID: <20180731045151.gqsgsm6l3gwr5m4z@vireshk-i7>
+From: amit.kachhap@arm.com (Amit Daniel Kachhap)
+Date: Tue, 31 Jul 2018 10:51:07 +0530
+Subject: [PATCH] clk: scmi: Fix the rounding of clock rate
+In-Reply-To: <20180730114056.GA17362@e107155-lin>
+References: <1532700112-11852-1-git-send-email-amit.kachhap@arm.com>
+ <153270946725.48062.11195853363758024681@swboyd.mtv.corp.google.com>
+ <CADGdYn5T2-B2UE9DX3wFHdvqfF85n0NAbKDBf2KHOQreRi=H+g@mail.gmail.com>
+ <20180730114056.GA17362@e107155-lin>
+Message-ID: <CADGdYn4RDqoNdTnj-975S4GhSkO7Nk75z0h5oJXqo5qdK0zC+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05-07-18, 10:39, Viresh Kumar wrote:
-> Hi,
-> 
-> This is an attempt to fix the broken or partially defined DT bindings
-> for cooling-maps. We should list every device that participates in
-> cooling down at a certain trip point, instead of just the first in the
-> list as that depends on certain ordering of events to work properly.
-> 
-> The first patch extends the binding to allow a list of phandles in
-> "cooling-device" property and the second patch fixes one of the
-> platform's DT.
-> 
-> This will be followed up by fixing all platform DT bindings that have
-> these issues after this set is accepted.
-> 
-> The kernel also requires some changes to handle the phandle list, but
-> wouldn't break with these changes as it reads the first phandle in the
-> list for now. We can update that separately.
+On Mon, Jul 30, 2018 at 5:10 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On Mon, Jul 30, 2018 at 11:03:51AM +0530, Amit Daniel Kachhap wrote:
+>> Hi,
+>>
+>> On Fri, Jul 27, 2018 at 10:07 PM, Stephen Boyd <sboyd@kernel.org> wrote:
+>> > Quoting Amit Daniel Kachhap (2018-07-27 07:01:52)
+>> >> This fix rounds the clock rate properly by using quotient and not
+>> >> remainder in the calculation. This issue was found while testing HDMI
+>> >> in the Juno platform.
+>> >>
+>> >> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@arm.com>
+>> >
+>> > Any Fixes: tag here?
+>> Yes, This patch is tested with Linux v4.18-rc6 tag.
+>>
+>
+> No Stephen meant the commit that this fixes, something like below:
+>
+> Fixes: 6d6a1d82eaef ("clk: add support for clocks provided by SCMI")
+>
+> so that it can get backported if required.
 
-@Zhang: Are you going to apply this for 4.19-rc1 ? There are lot of patches that
-I am holding up until this gets merged.
+ok my mistake. Thanks for the clarification.
 
--- 
-viresh
+>
+> --
+> Regards,
+> Sudeep
