@@ -1,99 +1,51 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Tue, 31 Jul 2018 07:46:01 +0200
-Subject: [PATCH v2 2/7] drm/i2c: tda998x: split tda998x_encoder_dpms into
- enable/disable
-In-Reply-To: <E1fkBFL-00048X-1P@rmk-PC.armlinux.org.uk>
-References: <20180730164137.GD17271@n2100.armlinux.org.uk>
- <E1fkBFL-00048X-1P@rmk-PC.armlinux.org.uk>
-Message-ID: <1f5fdfa8-4ed2-d0b5-0b45-3c0273bef1f0@axentia.se>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Tue, 31 Jul 2018 13:52:57 +0800
+Subject: [PATCH mmc-next v2 3/3] mmc: sdhci-of-dwcmshc: solve 128MB DMA
+ boundary limitation
+In-Reply-To: <20180731112924.6a1e8388@xhacker.debian>
+References: <20180726151017.4da1e336@xhacker.debian>
+ <20180726151424.4bcecf41@xhacker.debian>
+ <edaa7605-e0e0-b17a-8403-c3d7d60d7989@arm.com>
+ <20180731112924.6a1e8388@xhacker.debian>
+Message-ID: <20180731135257.268924f3@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-30 18:42, Russell King wrote:
-> From: Peter Rosin <peda@axentia.se>
-> 
-> This fits better with the drm_bridge callbacks for when this
-> driver becomes a drm_bridge.
-> 
-> Suggested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Signed-off-by: Peter Rosin <peda@axentia.se>
-> [edited by rmk to just split the tda998x_encoder_dpms() function
->  and restore the double-disable protection we originally had,
->  preserving original behaviour.]
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  drivers/gpu/drm/i2c/tda998x_drv.c | 37 +++++++++++++++++++++++++------------
->  1 file changed, 25 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-> index b05f54c8585b..1c2f5dac1886 100644
-> --- a/drivers/gpu/drm/i2c/tda998x_drv.c
-> +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-> @@ -1299,18 +1299,9 @@ static int tda998x_connector_init(struct tda998x_priv *priv,
->  
->  /* DRM encoder functions */
->  
-> -static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
-> +static void tda998x_enable(struct tda998x_priv *priv)
->  {
-> -	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
-> -	bool on;
-> -
-> -	/* we only care about on or off: */
-> -	on = mode == DRM_MODE_DPMS_ON;
-> -
-> -	if (on == priv->is_on)
-> -		return;
-> -
-> -	if (on) {
-> +	if (!priv->is_on) {
->  		/* enable video ports, audio will be enabled later */
->  		reg_write(priv, REG_ENA_VP_0, 0xff);
->  		reg_write(priv, REG_ENA_VP_1, 0xff);
-> @@ -1321,7 +1312,12 @@ static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
->  		reg_write(priv, REG_VIP_CNTRL_2, priv->vip_cntrl_2);
->  
->  		priv->is_on = true;
-> -	} else {
-> +	}
-> +}
-> +
-> +static void tda998x_disable(struct tda998x_priv *priv)
-> +{
-> +	if (!priv->is_on) {
+On Tue, 31 Jul 2018 11:29:24 +0800
+Jisheng Zhang <Jisheng.Zhang@synaptics.com> wrote:
 
-	if (priv->is_on) {
-
-I'm pretty sure that one's on you... :-)
-
-Cheers,
-Peter
-
->  		/* disable video ports */
->  		reg_write(priv, REG_ENA_VP_0, 0x00);
->  		reg_write(priv, REG_ENA_VP_1, 0x00);
-> @@ -1331,6 +1327,23 @@ static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
->  	}
->  }
->  
-> +static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
-> +{
-> +	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
-> +	bool on;
-> +
-> +	/* we only care about on or off: */
-> +	on = mode == DRM_MODE_DPMS_ON;
-> +
-> +	if (on == priv->is_on)
-> +		return;
-> +
-> +	if (on)
-> +		tda998x_enable(priv);
-> +	else
-> +		tda998x_disable(priv);
-> +}
-> +
->  static void
->  tda998x_encoder_mode_set(struct drm_encoder *encoder,
->  			 struct drm_display_mode *mode,
+> Hi Robin,
 > 
+> On Mon, 30 Jul 2018 12:06:08 +0100 Robin Murphy wrote:
+> 
+> > Hi Jisheng,
+> > 
+> > On 26/07/18 08:14, Jisheng Zhang wrote:  
+> > > When using DMA, if the DMA addr spans 128MB boundary, we have to split
+> > > the DMA transfer into two so that each one doesn't exceed the boundary.    
+> > 
+> > Out of interest, is the driver already setting its segment boundary mask 
+> > appropriately? This sounds like the exact kind of hardware restriction 
+> > that dma_parms is intended to describe, which scatterlist-generating 
+> > code is *supposed* to already respect.  
+> 
+> Thanks for the nice input. It may provide an elegant solution for this
+> limitation. 
+> 
+> To simplify the situation, let's assume no iommu, only swiotlb. And
+> the DDR is less than 4GB so swiotlb on arm64 doesn't init.
+> 
+> There's no dma range limitation with the HW, the only limitation
+> is boundary, while dma_capable() doesn't check the boundary mask, so if
+> we taking this solution, we need to teach dma_capable() about the boundary
+> mask, I'm not sure whether this is acceptable.
+> 
+> Another problem is swiotlb initialization. When to init swiotlb, we dunno
+> there's such boundary limitation HW. Is there any elegant solution for
+> this problem?
+> 
+
+One more problem is: swiotlb isn't available on all platforms, e.g arm?
+How to solve this SDHCI HW's limitation on arm soc w/o iommu?
+
+Thanks
