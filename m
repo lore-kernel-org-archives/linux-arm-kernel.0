@@ -1,51 +1,46 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Tue, 31 Jul 2018 13:52:57 +0800
-Subject: [PATCH mmc-next v2 3/3] mmc: sdhci-of-dwcmshc: solve 128MB DMA
- boundary limitation
-In-Reply-To: <20180731112924.6a1e8388@xhacker.debian>
-References: <20180726151017.4da1e336@xhacker.debian>
- <20180726151424.4bcecf41@xhacker.debian>
- <edaa7605-e0e0-b17a-8403-c3d7d60d7989@arm.com>
- <20180731112924.6a1e8388@xhacker.debian>
-Message-ID: <20180731135257.268924f3@xhacker.debian>
+From: amit.kachhap@arm.com (Amit Daniel Kachhap)
+Date: Tue, 31 Jul 2018 11:25:55 +0530
+Subject: [PATCH] clk: scmi: Fix the rounding of clock rate
+In-Reply-To: <153296797329.17365.14490424418553594815@swboyd.mtv.corp.google.com>
+References: <153296797329.17365.14490424418553594815@swboyd.mtv.corp.google.com>
+Message-ID: <1533016555-3731-1-git-send-email-amit.kachhap@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 Jul 2018 11:29:24 +0800
-Jisheng Zhang <Jisheng.Zhang@synaptics.com> wrote:
+This fix rounds the clock rate properly by using quotient and not
+remainder in the calculation. This issue was found while testing HDMI
+in the Juno platform.
 
-> Hi Robin,
-> 
-> On Mon, 30 Jul 2018 12:06:08 +0100 Robin Murphy wrote:
-> 
-> > Hi Jisheng,
-> > 
-> > On 26/07/18 08:14, Jisheng Zhang wrote:  
-> > > When using DMA, if the DMA addr spans 128MB boundary, we have to split
-> > > the DMA transfer into two so that each one doesn't exceed the boundary.    
-> > 
-> > Out of interest, is the driver already setting its segment boundary mask 
-> > appropriately? This sounds like the exact kind of hardware restriction 
-> > that dma_parms is intended to describe, which scatterlist-generating 
-> > code is *supposed* to already respect.  
-> 
-> Thanks for the nice input. It may provide an elegant solution for this
-> limitation. 
-> 
-> To simplify the situation, let's assume no iommu, only swiotlb. And
-> the DDR is less than 4GB so swiotlb on arm64 doesn't init.
-> 
-> There's no dma range limitation with the HW, the only limitation
-> is boundary, while dma_capable() doesn't check the boundary mask, so if
-> we taking this solution, we need to teach dma_capable() about the boundary
-> mask, I'm not sure whether this is acceptable.
-> 
-> Another problem is swiotlb initialization. When to init swiotlb, we dunno
-> there's such boundary limitation HW. Is there any elegant solution for
-> this problem?
-> 
+Fixes: 6d6a1d82eaef7 ("clk: add support for clocks provided by SCMI")
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Amit Daniel Kachhap <amit.kachhap@arm.com>
+---
+ drivers/clk/clk-scmi.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-One more problem is: swiotlb isn't available on all platforms, e.g arm?
-How to solve this SDHCI HW's limitation on arm soc w/o iommu?
-
-Thanks
+diff --git a/drivers/clk/clk-scmi.c b/drivers/clk/clk-scmi.c
+index bb2a6f2..a985bf5 100644
+--- a/drivers/clk/clk-scmi.c
++++ b/drivers/clk/clk-scmi.c
+@@ -38,7 +38,6 @@ static unsigned long scmi_clk_recalc_rate(struct clk_hw *hw,
+ static long scmi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+ 				unsigned long *parent_rate)
+ {
+-	int step;
+ 	u64 fmin, fmax, ftmp;
+ 	struct scmi_clk *clk = to_scmi_clk(hw);
+ 
+@@ -60,9 +59,9 @@ static long scmi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 	ftmp = rate - fmin;
+ 	ftmp += clk->info->range.step_size - 1; /* to round up */
+-	step = do_div(ftmp, clk->info->range.step_size);
++	do_div(ftmp, clk->info->range.step_size);
+ 
+-	return step * clk->info->range.step_size + fmin;
++	return ftmp * clk->info->range.step_size + fmin;
+ }
+ 
+ static int scmi_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+-- 
+2.7.4
