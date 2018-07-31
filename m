@@ -1,33 +1,39 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Tue, 31 Jul 2018 11:22:58 +0200
-Subject: [PATCH v6 4/4] ARM: dts: sun8i: h3-h5: ir register size should be the
- whole memory block
+Date: Tue, 31 Jul 2018 11:22:57 +0200
+Subject: [PATCH v6 3/4] ARM: dts: sun8i: a83t: bananapi-m3: Enable IR
+ controller
 In-Reply-To: <20180731092258.2279-1-embed3d@gmail.com>
 References: <20180731092258.2279-1-embed3d@gmail.com>
-Message-ID: <20180731092258.2279-5-embed3d@gmail.com>
+Message-ID: <20180731092258.2279-4-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The size of the register should be the size of the whole memory block,
-not just the registers, that are needed.
+The Bananapi M3 has an onboard IR receiver.
+This enables the onboard IR receiver subnode.
+Unlike the other IR receivers this one needs a base clock frequency
+of 3000000 Hz (3 MHz), to be able to work.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index c3bff1105e5d..2f4d93de836e 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -818,7 +818,7 @@
- 			clock-names = "apb", "ir";
- 			resets = <&r_ccu RST_APB0_IR>;
- 			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
--			reg = <0x01f02000 0x40>;
-+			reg = <0x01f02000 0x400>;
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+index 3b579d7567c8..ea23ff821166 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
+@@ -183,6 +183,11 @@
+ 	status = "okay";
+ };
+ 
++&r_cir {
++	clock-frequency = <3000000>;
++	status = "okay";
++};
++
+ &r_rsb {
+ 	status = "okay";
  
 -- 
 2.11.0
