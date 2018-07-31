@@ -1,100 +1,98 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Tue, 31 Jul 2018 12:32:45 +0200
-Subject: [PATCH v6 3/4] Bluetooth: mediatek: Add protocol support for
- MediaTek serial devices
-In-Reply-To: <1533028552.3472.95.camel@mtkswgap22>
-References: <cover.1532060309.git.sean.wang@mediatek.com>
- <f3a064f86c1da4664a231a40c6cf038cccc758da.1532060309.git.sean.wang@mediatek.com>
- <60024004-779E-4E1A-8E1B-799339595A27@holtmann.org>
- <1532966985.3472.54.camel@mtkswgap22>
- <F83B6E35-B0D7-4050-A112-251BDFB9C998@holtmann.org>
- <1533028552.3472.95.camel@mtkswgap22>
-Message-ID: <F3DB341C-1C80-49EA-A99E-836C34C5DC06@holtmann.org>
+From: peda@axentia.se (Peter Rosin)
+Date: Tue, 31 Jul 2018 12:43:34 +0200
+Subject: [PATCH v2 0/7] tda998x: allow use with bridge based devices
+In-Reply-To: <20180731092343.GH17271@n2100.armlinux.org.uk>
+References: <20180730164137.GD17271@n2100.armlinux.org.uk>
+ <73adc630-21cd-5b14-cb47-f1a58ee3bc83@axentia.se>
+ <20180731074114.GF17271@n2100.armlinux.org.uk>
+ <9d48e374-be2f-fbc0-ca92-1b7e1b68e358@axentia.se>
+ <20180731092343.GH17271@n2100.armlinux.org.uk>
+Message-ID: <9bf5e0e9-c1e8-5af2-7fea-40f9618d4d52@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+On 2018-07-31 11:23, Russell King - ARM Linux wrote:
+> On Tue, Jul 31, 2018 at 09:53:57AM +0200, Peter Rosin wrote:
+>> On 2018-07-31 09:41, Russell King - ARM Linux wrote:
+>>> On Tue, Jul 31, 2018 at 07:44:24AM +0200, Peter Rosin wrote:
+>>>> On 2018-07-30 18:41, Russell King - ARM Linux wrote:
+>>>>> Hi,
+>>>>>
+>>>>> This is a re-posting of the series I responded to Peter Rosin's May
+>>>>> posting, with a few bugs fixed, and the bridge registered outside of
+>>>>> the component helper.  This should allow Peter to use the driver
+>>>>> while maintaining armada drm and tilcdc support.
+>>>>>
+>>>>> No comments (other than 0-day test results) were received on the
+>>>>> previous posting.
+>>>>
+>>>> I of course meant to comment on this! I didn't because there was a rush
+>>>> before vacation, then vacation, then a heap of important stuff that had
+>>>> piled up. This one simply had too low priority to make a significant bleep
+>>>> on the radar. Sorry for the silence...
+>>>>
+>>>> However, now that I do try to test, I get conflicts as I try to apply the
+>>>> patches. I'm wondering what this was based on? I've tried next-20180730
+>>>> drm-misc/drm-misc-next from some minutes ago.
+>>>
+>>> They're based on 4.17.
+>>
+>> Right, meanwhile I massaged the patches into a combo of some local patches,
+>> next-20180730 and drm-misc-next, and tested that. The conflict was trivial
+>> once I had a closer look...
+>>
+>> And it seems to work (with atmel-hlcdc), so you can add
+>>
+>> Tested-by: Peter Rosin <peda@axentia.se>
+> 
+> Thanks, I've added your attributation, and fixed patch 2 as you pointed
+> out.
+> 
+> I have a four more tda998x patches if you're willing to test.  These
+> follow on from this set - I've tweaked patch 2 in this follow on set to
+> cater for the removal of "_mode_" in
+> drm_mode_connector_update_edid_property.
 
->>> All suggestions seem reasonable for me in order to make code style aligned with the other drivers and code better to read,
->>> and it looks like no any big problem, so I'll start to work on the next version immediately.
->> 
->> no rush, but if you can get this back to me quickly, we might be still able to get this driver included.
->> 
->>> And I also add a few explanations inline about questions about the diagnostic packet and how hci->shutdown is being made.
->>> 
->>> On Mon, 2018-07-30 at 15:40 +0200, Marcel Holtmann wrote:
-> 
-> 
-> [ ... ]
-> 
->>>> Do we want these as HCI vendor events. Or actually as vendor / diagnostic packets. There is a hci_recv_diag.
->>>> 
->>> 
->>> These are actually Hci vendor events. not for diagnostic purpose. They hdr->evt == 0xe4 are all the part of chip initialization.
->> 
->> Ok, then leave it as is.
->> 
->>> 
->>>> So let me ask this a different way, do you have support for LMP / LL tracing in your chips? If yes, then how is that enabled and how does it work? Or any general debug data that can be switched on. That is what we have a diagnostic channel for that is also fed into btmon.
->>>> 
->>> 
->>> I'm not really sure about them because I didn't see any diagnostic packets handling in vendor driver.
->> 
->> You can see examples for this in btusb.c, hci_bcm.c and bpa10x.c where the hardware has a side channel. In case of Broadcom, they are LL or LMP trace packets, but it could be also debug messages or something else. Other vendors use HCI vendor events for that which is also fine. Just wanted to know what it is.
->> 
->> And if your hardware supports LL or LMP traces to be enabled, then implement hdev->set_diag() callback. You can then enable it via /sys/kernel/debug/bluetooth/hci0/vendor_diag
->> 
-> 
-> Thanks for sharing the information to me.
-> 
-> If I get the permission and details about adding support for these debug trace packets, I am willing to add them.
-> 
->>> 
->>>>> +
->>>>> +	/* Each HCI event would go through the core. */
->>>>> +	return hci_recv_frame(hdev, skb);
->>>>> +}
->>>>> +
-> 
-> [ ... ]
-> 
->>>>> +
->>>>> +static int mtk_btuart_shutdown(struct hci_dev *hdev)
->>>>> +{
->>>>> +	struct mtk_btuart_dev *bdev = hci_get_drvdata(hdev);
->>>>> +	struct device *dev = &bdev->serdev->dev;
->>>>> +	u8 param = 0x0;
->>>>> +
->>>>> +	/* Disable the device. */
->>>>> +	mtk_hci_wmt_sync(hdev, MTK_WMT_FUNC_CTRL, 0x0, sizeof(param), &param);
->>>>> +
->>>>> +	/* Shutdown the clock and power domain the device requires. */
->>>>> +	clk_disable_unprepare(bdev->clk);
->>>>> +	pm_runtime_put_sync(dev);
->>>>> +	pm_runtime_disable(dev);
->>>> 
->>>> Don?t these belong into ->close method? And the enable ones into ->open? I really think that ->setup and ->shutdown should just do HCI commands and leave the others to ->open and ->close. Since ->open and ->close are suppose to set up and terminate the transport.
->>>> 
->>> 
->>> Yes, ->open and ->close are already done just for setup and terminate the transport. I've noted the part during earlier version discussion. 
->>> 
->>> Because mt7622 is a SoC integrating Bluetooth hardware inside, these operations for clk* and pm clk_* and pm_*  you saw here are all for controlling clocks and powers Bluetooth circuits requires on the SoC, not for the transports.
->>> 
->>> As for clocks for the transport, they're already being taken care of by the serial driver.
->> 
->> With transport, I meant the Bluetooth transport. So I really thing they belong into ->open and ->close. Within ->setup and ->shutdown, I would just expect HCI commands.
->> 
-> 
-> At the moment, it's not easy that clk_* and pm_*  are moved to ->open and ->close
-> 
-> because firmware download would depend on the full cycle of hardware power down and then up.
-> 
-> And another advantage is that when users call hdev down and the up, the device can do the real hardware reset, not just the software reset via hci command.
+Sure thing. Those patches work for me too. So, feel free to add
 
-But when you call down/up cycle, then you will go through ->close and ->open. So I don?t see the problem here.
+Tested-by: Peter Rosin <peda@axentia.se>
 
-With the quirk for always calling ->setup, you get the ->open + ->setup on hdev up and ->shutdown + ->close on hdev down.
+However, a couple of notes:
 
-Regards
+1) I never succeeded in reading the edid, so I'm using a built-in edid.
 
-Marcel
+I noticed the patch adding the nxp,calib gpio and got my hopes up, but
+if I just add that to the DT I get
+
+tda998x 2-0070: found TDA19988
+gpio-21 (nxp,calib): gpiod_direction_output: tried to set a GPIO tied to an IRQ as output
+tda9950 2-0034: TDA9950 CEC interface, hardware version 3.3
+
+Grepping the source, that comes from gpiod_direction_output, which
+fails with -EIO after that message, so that can't be working...
+
+(Side note on that gpio; the way I read the patch I should specify
+the gpio as GPIO_ACTIVE_HIGH, but that seems backwards? Isn't the
+INT pin on the tda19988 active low?)
+
+...and if I try to evade that by commenting out the interrupt stuff
+from the DT, I instead get
+
+tda998x 2-0070: found TDA19988
+tda9950 2-0034: driver requires an interrupt
+
+Are we supposed to wire the INT pin to two different pins on the CPU, or
+what?
+
+Is edid reading know to work on 19988? The code suggests so, but maybe
+it hasn't been tested? Or maybe it regressed?
+
+2) The lowest resolution on my monitor is 800x600, so I suppose I
+can't really test 4/4?
+
+Cheers,
+Peter
+
+>  drivers/gpu/drm/i2c/tda998x_drv.c | 106 ++++++++++++++++++--------------------
+>  1 file changed, 51 insertions(+), 55 deletions(-)
+> 
