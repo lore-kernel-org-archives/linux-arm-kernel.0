@@ -1,23 +1,31 @@
 From: acolin@isi.edu (Alexei Colin)
-Date: Tue, 31 Jul 2018 10:29:52 -0400
-Subject: [RESEND PATCH 4/6] mips: factor out RapidIO Kconfig entry
+Date: Tue, 31 Jul 2018 10:29:49 -0400
+Subject: [RESEND PATCH 1/6] rapidio: define top Kconfig menu in driver subtree
 In-Reply-To: <20180731142954.30345-1-acolin@isi.edu>
 References: <20180731142954.30345-1-acolin@isi.edu>
-Message-ID: <20180731142954.30345-5-acolin@isi.edu>
+Message-ID: <20180731142954.30345-2-acolin@isi.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The menu entry is now defined in the rapidio subtree.
-
-Platforms with a PCI bus will be offered the RapidIO menu since they may
-be want support for a RapidIO PCI device. Platforms without a PCI bus
-that might include a RapidIO IP block will need to "select HAS_RAPIDIO"
-in the platform-/machine-specific "config ARCH_*" Kconfig entry.
+The top-level Kconfig entry for RapidIO subsystem is currently
+duplicated in several architecture-specific Kconfigs. This
+commit re-defines it in the driver subtree, and subsequent
+commits, one per architecture, will remove the duplicated
+definitions from respective per-architecture Kconfigs.
 
 Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Alexander Sverdlin <alexander.sverdlin@nokia.com>
 Cc: John Paul Walters <jwalters@isi.edu>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Ralf Baechle <ralf@linux-mips.org>
+Cc: Paul Burton <paul.burton@mips.com>
+Cc: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Peter Anvin <hpa@zytor.com>
 Cc: x86 at kernel.org
 Cc: linuxppc-dev at lists.ozlabs.org
 Cc: linux-mips at linux-mips.org
@@ -25,30 +33,34 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Alexei Colin <acolin@isi.edu>
 ---
- arch/mips/Kconfig | 11 -----------
- 1 file changed, 11 deletions(-)
+ drivers/rapidio/Kconfig | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
-index 10256056647c..92b9262ee731 100644
---- a/arch/mips/Kconfig
-+++ b/arch/mips/Kconfig
-@@ -3106,17 +3106,6 @@ config ZONE_DMA32
+diff --git a/drivers/rapidio/Kconfig b/drivers/rapidio/Kconfig
+index d6d2f20c4597..98e301847584 100644
+--- a/drivers/rapidio/Kconfig
++++ b/drivers/rapidio/Kconfig
+@@ -1,6 +1,21 @@
+ #
+ # RapidIO configuration
+ #
++
++config HAS_RAPIDIO
++	bool
++	default n
++
++config RAPIDIO
++	tristate "RapidIO support"
++	depends on HAS_RAPIDIO || PCI
++	help
++	  This feature enables support for RapidIO high-performance
++	  packet-switched interconnect.
++
++	  If you say Y here, the kernel will include drivers and
++	  infrastructure code to support RapidIO interconnect devices.
++
+ source "drivers/rapidio/devices/Kconfig"
  
- source "drivers/pcmcia/Kconfig"
- 
--config HAS_RAPIDIO
--	bool
--	default n
--
--config RAPIDIO
--	tristate "RapidIO support"
--	depends on HAS_RAPIDIO || PCI
--	help
--	  If you say Y here, the kernel will include drivers and
--	  infrastructure code to support RapidIO interconnect devices.
--
- source "drivers/rapidio/Kconfig"
- 
- endmenu
+ config RAPIDIO_DISC_TIMEOUT
 -- 
 2.18.0
