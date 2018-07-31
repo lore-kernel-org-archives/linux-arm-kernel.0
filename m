@@ -1,47 +1,49 @@
-From: sravanhome@gmail.com (Saravanan Sekar)
-Date: Tue, 31 Jul 2018 21:47:43 +0200
-Subject: [PATCH v4 5/5] arm64: dts: actions: Add pinctrl node for Actions Semi
- S700
-In-Reply-To: <20180731194743.13678-1-sravanhome@gmail.com>
-References: <0180729200038.11795-1-sravanhome@gmail.com>
- <20180731194743.13678-1-sravanhome@gmail.com>
-Message-ID: <20180731194743.13678-6-sravanhome@gmail.com>
+From: niklas.cassel@linaro.org (Niklas Cassel)
+Date: Tue, 31 Jul 2018 21:50:37 +0200
+Subject: next/master boot: 179 boots: 11 failed, 167 passed with 1
+ offline (next-20180731)
+In-Reply-To: <20180731161114.GI5719@sirena.org.uk>
+References: <5b607cc4.1c69fb81.6c1d6.6534@mx.google.com>
+ <20180731161114.GI5719@sirena.org.uk>
+Message-ID: <20180731195037.GA6737@centauri.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl nodes for Actions Semi S700 SoC
+On Tue, Jul 31, 2018 at 05:11:14PM +0100, Mark Brown wrote:
+> On Tue, Jul 31, 2018 at 08:14:12AM -0700, kernelci.org bot wrote:
+> 
+> Today's -next fails to boot on db820c:
+> 
+> > arm64:
+> 
+> >     defconfig:
+> >         apq8096-db820c:
+> >             lab-bjorn: new failure (last pass: next-20180730)
+> 
+> There's nothing immediately obvious as the boot failure cause in the
+> logs, the last output is a failure to load the ath10k_pci firmware:
+> 
+> 04:02:53.750283  [    4.503980] ath10k_pci 0000:01:00.0: Failed to find firmware-N.bin (N between 2 and 6) from ath10k/QCA6174/hw3.0: -2
+> 04:02:53.756384  [    4.504010] ath10k_pci 0000:01:00.0: could not fetch firmware files (-2)
+> 04:02:53.760522  [    4.513736] ath10k_pci 0000:01:00.0: could not probe fw (-2)
+> 
+> but I'm not sure that's the actual cause.  More details, including the
+> full boot log, here:
+> 
+>    https://kernelci.org/boot/id/5b6042b559b514136096babf/
 
-Signed-off-by: Parthiban Nallathambi <pn@denx.de>
-Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
----
- arch/arm64/boot/dts/actions/s700.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+I tried booting today's -next on db820c, using arm64 defconfig,
+and it booted correctly:
 
-diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
-index 59d29e4ca404..9a2c617703e5 100644
---- a/arch/arm64/boot/dts/actions/s700.dtsi
-+++ b/arch/arm64/boot/dts/actions/s700.dtsi
-@@ -179,5 +179,21 @@
- 			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-names = "timer1";
- 		};
-+
-+		pinctrl: pinctrl at e01b0000 {
-+			compatible = "actions,s700-pinctrl";
-+			reg = <0x0 0xe01b0000 0x0 0x1000>;
-+			clocks = <&cmu CLK_GPIO>;
-+			gpio-controller;
-+			gpio-ranges = <&pinctrl 0 0 136>;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-+		};
- 	};
- };
--- 
-2.18.0
+I also tried removing the ath10k firmware from my initrd, but it still booted
+correctly.
+
+# cat /proc/version
+Linux version 4.18.0-rc7-next-20180731-00001-g47055e3ba913 (nks at centauri) (gcc version 7.2.1 20171011 (Linaro GCC 7.2-2017.11)) #9 SMP PREEMPT Tue Jul 31 21:34:43 CEST 2018
+
+I guess it could be a bug that does not trigger on every boot,
+or it could be a problem in the kernelci infrastructure.
+
+
+Kind regards,
+Niklas
