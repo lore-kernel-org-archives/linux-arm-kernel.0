@@ -1,49 +1,209 @@
-From: niklas.cassel@linaro.org (Niklas Cassel)
-Date: Tue, 31 Jul 2018 21:50:37 +0200
-Subject: next/master boot: 179 boots: 11 failed, 167 passed with 1
- offline (next-20180731)
-In-Reply-To: <20180731161114.GI5719@sirena.org.uk>
-References: <5b607cc4.1c69fb81.6c1d6.6534@mx.google.com>
- <20180731161114.GI5719@sirena.org.uk>
-Message-ID: <20180731195037.GA6737@centauri.lan>
+From: alex.bou9@gmail.com (Alex Bounine)
+Date: Tue, 31 Jul 2018 16:01:27 -0400
+Subject: [PATCH 6/6] arm64: enable RapidIO menu in Kconfig
+In-Reply-To: <20180731181834.GA30658@n2100.armlinux.org.uk>
+References: <20180730225035.28365-1-acolin@isi.edu>
+ <20180730225035.28365-7-acolin@isi.edu> <20180731084143.GA4680@arm.com>
+ <d09cb4f5-768b-acd8-f9b1-d1d320a93564@gmail.com>
+ <20180731155228.GN17271@n2100.armlinux.org.uk>
+ <044af717-3883-a7a6-c346-18fa8cebce76@gmail.com>
+ <20180731181834.GA30658@n2100.armlinux.org.uk>
+Message-ID: <570ad147-3c58-8911-0111-29e21087ca7a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 05:11:14PM +0100, Mark Brown wrote:
-> On Tue, Jul 31, 2018 at 08:14:12AM -0700, kernelci.org bot wrote:
+On 2018-07-31 02:18 PM, Russell King - ARM Linux wrote:
+> On Tue, Jul 31, 2018 at 01:59:27PM -0400, Alex Bounine wrote:
+>> On 2018-07-31 11:52 AM, Russell King - ARM Linux wrote:
+>>> On Tue, Jul 31, 2018 at 08:54:14AM -0400, Alex Bounine wrote:
+>>>> On 2018-07-31 04:41 AM, Will Deacon wrote:
+>>>>> On Mon, Jul 30, 2018 at 06:50:34PM -0400, Alexei Colin wrote:
+>>>>>> Platforms with a PCI bus will be offered the RapidIO menu since they may
+>>>>>> be want support for a RapidIO PCI device. Platforms without a PCI bus
+>>>>>> that might include a RapidIO IP block will need to "select HAS_RAPIDIO"
+>>>>>> in the platform-/machine-specific "config ARCH_*" Kconfig entry.
+>>>>>>
+>>>>>> Tested that kernel builds for arm64 with RapidIO subsystem and
+>>>>>> switch drivers enabled, also that the modules load successfully
+>>>>>> on a custom Aarch64 Qemu model.
+>>>>>>
+>>>>>> Cc: Andrew Morton <akpm@linux-foundation.org>
+>>>>>> Cc: Russell King <linux@armlinux.org.uk>
+>>>>>> Cc: John Paul Walters <jwalters@isi.edu>
+>>>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>>>> Cc: linux-kernel at vger.kernel.org,
+>>>>>> Signed-off-by: Alexei Colin <acolin@isi.edu>
+>>>>>> ---
+>>>>>>   arch/arm64/Kconfig | 2 ++
+>>>>>>   1 file changed, 2 insertions(+)
+>>>>>
+>>>>> Thanks, this looks much cleaner than before:
+>>>>>
+>>>>> Acked-by: Will Deacon <will.deacon@arm.com>
+>>>>>
+>>>>> The only thing I'm not sure about is why we don't just select HAS_RAPIDIO
+>>>>> unconditionally in the arm64 Kconfig. Does selecting only that option
+>>>>> actually pull in new code to the build?
+>>>>>
+>>>> HAS_RAPIDIO option is intended for SOCs that have built in SRIO controllers,
+>>>> like TI KeyStoneII or FPGAs. Because RapidIO subsystem core is required
+>>>> during RapidIO port driver initialization, having separate option allows us
+>>>> to control available build options for RapidIO core and port driver (bool
+>>>> vs. tristate) and disable module option if port driver is configured as
+>>>> built-in.
+>>>
+>>> Your explanation doesn't make much sense to me.
+>>>
+>>> RAPIDIO is the bus-level support, right?  So drivers that depend on
+>>> the bus-level support should depend on RAPIDIO, and so, if RAPIDIO
+>>> is configured as a module, they will also be allowed to be disabled
+>>> or a module, but not built-in if tristate.  If it is boolean, and
+>>> causes the driver to be built-in to the kernel, then you need to use
+>>> "RAPIDIO=y" so that it's dependency is only satisfied when the core
+>>> is built-in.
+>>>
+>>
+>> RapidIO host controllers (on local bus like SoC internal or PCIe) are
+>> serviced by MPORT device drivers that are subsystem specific and communicate
+>> with RapidIO core using set of callbacks. Depending on HW architecture these
+>> drivers may be defined as built-in or module.
 > 
-> Today's -next fails to boot on db820c:
+> Why does hardware architecture define whether something has to be built
+> in or can be modular?
 > 
-> > arm64:
-> 
-> >     defconfig:
-> >         apq8096-db820c:
-> >             lab-bjorn: new failure (last pass: next-20180730)
-> 
-> There's nothing immediately obvious as the boot failure cause in the
-> logs, the last output is a failure to load the ath10k_pci firmware:
-> 
-> 04:02:53.750283  [    4.503980] ath10k_pci 0000:01:00.0: Failed to find firmware-N.bin (N between 2 and 6) from ath10k/QCA6174/hw3.0: -2
-> 04:02:53.756384  [    4.504010] ath10k_pci 0000:01:00.0: could not fetch firmware files (-2)
-> 04:02:53.760522  [    4.513736] ath10k_pci 0000:01:00.0: could not probe fw (-2)
-> 
-> but I'm not sure that's the actual cause.  More details, including the
-> full boot log, here:
-> 
->    https://kernelci.org/boot/id/5b6042b559b514136096babf/
+> It is the case today that (eg) on-SoC hardware _can_ be built as a module
+> if desired - just because it's on the SoC does not mean it has to be
+> built in to the kernel.  Why is RapidIO any different?
+>
 
-I tried booting today's -next on db820c, using arm64 defconfig,
-and it booted correctly:
+Not HW architecture - legacy can be blamed as well. Freescale's FSL_RIO 
+driver still exist as built-in so far. Intent of this patch set is to 
+allow RapidIO support in more architectures without reworking old stuff.
+I do not think that anyone will be updating FSL_RIO driver soon.
 
-I also tried removing the ath10k firmware from my initrd, but it still booted
-correctly.
+Also we cannot dictate to developers of future drivers which method to 
+use - they may have built-in option only for the first release.
 
-# cat /proc/version
-Linux version 4.18.0-rc7-next-20180731-00001-g47055e3ba913 (nks at centauri) (gcc version 7.2.1 20171011 (Linaro GCC 7.2-2017.11)) #9 SMP PREEMPT Tue Jul 31 21:34:43 CEST 2018
-
-I guess it could be a bug that does not trigger on every boot,
-or it could be a problem in the kernelci infrastructure.
+Unfortunately we have on hands dependency between mport driver build 
+mode and  RapidIO core which we need to respect.
 
 
-Kind regards,
-Niklas
+>> Built-in driver will require presence of the RapidIO core during its
+>> initialization time and therefore we have to set CONFIG_RAPIDIO=y.
+>> Also we have PCIe based host controllers and their drivers are OK to be
+>> built as module like for any other PCI device.
+>>
+>> Based on requirements and available resources/HW_configuration the platform
+>> can have on-chip host controller enabled or disabled (or simply not
+>> implemented in case of FPGA). This leads us to combination of on-chip and
+>> PCIe host controllers. For example, if PCIe bus is required for other
+>> devices, we may have to use PCIe-to_SRIO bridge because all available
+>> on-chip SerDes lines are assigned to PCIe.
+>>
+>> If we use CONFIG_RAPIDIO as a single indicator of possible configuration, we
+>> can make visible config menu entry for on-chip controller that is not
+>> available on given platform due to HW setup. For example on KeystoneII or
+>> MPC85xx/86xx. The option HAS_RAPIDIO tells us that given platform really
+>> uses on-chip RapidIO host controller. This is why FSL_RIO depends on
+>> HAS_RAPIDIO.
+>>
+>> Also having PCIe enabled in any form is not a good option to control support
+>> for on-chip controller.
+> 
+> I'm not saying that - can you please read my suggestion below and
+> respond to that.  I'm giving you technical feedback, but it seems
+> all I'm getting back is "this is how we're doing it" rather than a
+> constructive discussion.
+
+I am trying to explain why we are doing it this way, not how.
+
+> 
+> For example, can you point out why my idea I present below would not
+> work?
+
+See below.
+
+> 
+>> For peripheral devices attached to the RapidIO fabric such dependency on
+>> local mport implementation does not exist and therefore they all can be
+>> treated as tristate.
+>>
+>>> HAS_RAPIDIO gives the impression that it defines whether or not
+>>> the rapidio core code is allowable or not - it doesn't suggest that
+>>> it has anything to do with drivers. However, reading the PowerPC
+>>> Kconfig files, it seems to be used that way.  That's confusing, and
+>>> ought to be fixed.  From what I can tell, it's only used for FSL_RIO,
+>>> so I suggest that gets converted to:
+>>>
+>>> config HAS_RAPIDIO
+>>> 	bool PCI
+
+PCI and RAPIDIO can be mutually exclusive.
+
+>>>
+>>> config RAPIDIO
+>>> 	tristate "RapidIO support"
+>>> 	depends on HAS_RAPIDIO
+>>>
+>>> config HAS_FSL_RIO
+>>> 	bool
+>>> 	select HAS_RAPIDIO
+
+Introducing new variable HAS_FSL_RIO here. Do you suggest having one for 
+each ARM-based board that has on-chip RIO?
+
+>>>
+>>> config FSL_RIO
+>>> 	bool "Freescale Embedded SRIO Controller support"
+>>> 	depends on RAPIDIO = y && HAS_FSL_RIO
+>>>
+>>> This frees up HAS_RAPIDIO to operate as one would expect - to define
+>>> whether or not RAPIDIO should be offered.  This also allows:
+>>>
+>>> config ARM
+>>> 	select HAS_RAPIDIO if PCI
+
+Some SOCs can be configured without PCI. We have confusing action here - 
+we have to enable PCI on platform that does not have it.
+
+Above, you had to introduce HAS_FSL_RIO. The same will be needed for 
+each ARM-based platform that supports RapidIO. E.g. HAS_KS2_RIO or 
+HAS_XZINQ_RIO.
+
+How this improves things? Right now HAS_RAPIDIO is single option that 
+has to be selected for given board (plus enabling specific mport option).
+
+Why we cannot use "select HAS_RAPIDIO" HW-specific Kconfig file 
+(mach-*/Kconfig)? And have on-chip port selection in the same 
+board-specific place.
+
+This is the right place because chips like Keystone have an internal 
+RapidIO controller specific to them. If you got with any type of global
+
+The same for Xilinx. Other platforms unlock RAPIDIO selection if they 
+have PCI.
+
+Having HAS_RAPIDIO directly in the board-specific Kconfig looks to me 
+more descriptive for end user as well.
+
+>>>
+>>> to be added to arch/arm/Kconfig if appropriate.  However, I'm not yet
+>>> convinced that _just because_ we have PCI does not mean that RAPIDIO
+>>> should be offered.  I stated a series of questions about that last
+>>> Tuesday in response to an individual patch adding rapidio to arch/arm,
+>>> and that email seems to have been ignored - at least as far as the
+>>> questions go.
+>>>
+>>> Please ensure that you respond to your reviewers questions, otherwise
+>>> you will start receiving plain NAKs to your patches instead (since
+>>> it becomes a waste of time for reviewers to put any further effort
+>>> in to explain why they don't like the patch.)
+>>>
+>>> Thanks.
+>>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
