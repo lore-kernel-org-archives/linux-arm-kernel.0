@@ -1,56 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 31 Jul 2018 09:41:43 +0100
-Subject: [PATCH 6/6] arm64: enable RapidIO menu in Kconfig
-In-Reply-To: <20180730225035.28365-7-acolin@isi.edu>
-References: <20180730225035.28365-1-acolin@isi.edu>
- <20180730225035.28365-7-acolin@isi.edu>
-Message-ID: <20180731084143.GA4680@arm.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Tue, 31 Jul 2018 16:43:53 +0800
+Subject: [PATCH v1 1/2] arm64: dts: mt7622: add some misc device nodes
+In-Reply-To: <2839886f07dc47afb9a05d06fb1acc84@mtkmbs08n1.mediatek.inc>
+References: <2ff39c40ef6bc3054667e63c785a1d28527b5ddf.1531753039.git.ryder.lee@mediatek.com>
+ <864955d5-26c4-a5f3-ec1a-420acba50880@gmail.com>
+ <2839886f07dc47afb9a05d06fb1acc84@mtkmbs08n1.mediatek.inc>
+Message-ID: <1533026633.10540.20.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2018 at 06:50:34PM -0400, Alexei Colin wrote:
-> Platforms with a PCI bus will be offered the RapidIO menu since they may
-> be want support for a RapidIO PCI device. Platforms without a PCI bus
-> that might include a RapidIO IP block will need to "select HAS_RAPIDIO"
-> in the platform-/machine-specific "config ARCH_*" Kconfig entry.
+Hi Matthias,
+
+Sorry for the late reply.
+
+On Tue, 2018-07-31 at 16:17 +0800, Ryder Lee (???) wrote:
+> Hi Ryder,
 > 
-> Tested that kernel builds for arm64 with RapidIO subsystem and
-> switch drivers enabled, also that the modules load successfully
-> on a custom Aarch64 Qemu model.
+> On 16/07/18 16:59, Ryder Lee wrote:
+> > Add some misc nodes support - timer and ARM CCI-400.
+> > 
+> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> > ---
+> >  arch/arm64/boot/dts/mediatek/mt7622.dtsi | 36 
+> > ++++++++++++++++++++++++++++++++
+> >  1 file changed, 36 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi 
+> > b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> > index 9213c96..8cdec52 100644
+> > --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> > +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> > @@ -217,6 +217,16 @@
+> >  		#reset-cells = <1>;
+> >  	};
+> >  
+> > +	timer: timer at 10004000 {
+> > +		compatible = "mediatek,mt7622-timer",
+> > +			     "mediatek,mt6577-timer";
+> > +		reg = <0 0x10004000 0 0x80>;
+> > +		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
+> > +		clocks = <&infracfg CLK_INFRA_APXGPT_PD>,
+> > +			 <&topckgen CLK_TOP_RTC>;
+> > +		clock-names = "system-clk", "rtc-clk";
+> > +	};
+> > +
+> >  	scpsys: scpsys at 10006000 {
+> >  		compatible = "mediatek,mt7622-scpsys",
+> >  			     "syscon";
+> > @@ -317,6 +327,32 @@
+> >  		      <0 0x10360000 0 0x2000>;
+> >  	};
+> >  
+> > +	cci: cci at 10390000 {
+> > +		compatible = "arm,cci-400";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		reg = <0 0x10390000 0 0x1000>;
+> > +		ranges = <0 0 0x10390000 0x10000>;
 > 
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: John Paul Walters <jwalters@isi.edu>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org,
-> Signed-off-by: Alexei Colin <acolin@isi.edu>
-> ---
->  arch/arm64/Kconfig | 2 ++
->  1 file changed, 2 insertions(+)
-
-Thanks, this looks much cleaner than before:
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-The only thing I'm not sure about is why we don't just select HAS_RAPIDIO
-unconditionally in the arm64 Kconfig. Does selecting only that option
-actually pull in new code to the build?
-
-Will
-
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index a8f0c74e6f7f..5e8cf90505ec 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -308,6 +308,8 @@ config PCI_SYSCALL
->  
->  source "drivers/pci/Kconfig"
->  
-> +source "drivers/rapidio/Kconfig"
-> +
->  endmenu
->  
->  menu "Kernel Features"
-> -- 
-> 2.18.0
+> From my understanding of the binding description ranges should hold child address, parent address and size of the region in the child address space. I can see in arch/arm64 two different variants using 4 ranges values (like here) and using three values.
 > 
+> @Rob + Will what is the preferred way to describe this?
+
+Hmmm... it's just a copy-paste (I take zynqmp.dtsi as an example).
+> > +
+> > +		cci_control0: slave-if at 1000 {
+> > +			compatible = "arm,cci-400-ctrl-if";
+> > +			interface-type = "ace-lite";
+> > +			reg = <0x1000 0x1000>;
+> > +		};
+> 
+> Don't we need to add phandles to the cci-control-port property in the cpu nodes?
+> 
+> Regards,
+> Matthias
+
+MT7622 use cci-400 to improve performance (DMA IO coherence) for
+high-speed IPs. (i.e., ETH/WIFI/SATA/...)
+
+I added it early but actually the related features have not supported in
+mainline yet.
+
+Ryder
