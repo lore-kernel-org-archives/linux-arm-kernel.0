@@ -1,108 +1,105 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 1 Aug 2018 01:20:28 +0800
-Subject: [PATCH v6 3/4] Bluetooth: mediatek: Add protocol support for
- MediaTek serial devices
-In-Reply-To: <F3DB341C-1C80-49EA-A99E-836C34C5DC06@holtmann.org>
-References: <cover.1532060309.git.sean.wang@mediatek.com>
- <f3a064f86c1da4664a231a40c6cf038cccc758da.1532060309.git.sean.wang@mediatek.com>
- <60024004-779E-4E1A-8E1B-799339595A27@holtmann.org>
- <1532966985.3472.54.camel@mtkswgap22>
- <F83B6E35-B0D7-4050-A112-251BDFB9C998@holtmann.org>
- <1533028552.3472.95.camel@mtkswgap22>
- <F3DB341C-1C80-49EA-A99E-836C34C5DC06@holtmann.org>
-Message-ID: <1533057628.3472.99.camel@mtkswgap22>
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Wed, 1 Aug 2018 02:04:30 +0530
+Subject: [PATCH] drm/rockchip: Convert drm_atomic_helper_suspend/resume()
+Message-ID: <20180731203430.GA30136@jordon-HP-15-Notebook-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-07-31 at 12:32 +0200, Marcel Holtmann wrote:
-> Hi Sean,
-> 
-> >>> All suggestions seem reasonable for me in order to make code style aligned with the other drivers and code better to read,
-> >>> and it looks like no any big problem, so I'll start to work on the next version immediately.
-> >> 
-> >> no rush, but if you can get this back to me quickly, we might be still able to get this driver included.
-> >> 
-> >>> And I also add a few explanations inline about questions about the diagnostic packet and how hci->shutdown is being made.
-> >>> 
-> >>> On Mon, 2018-07-30 at 15:40 +0200, Marcel Holtmann wrote:
-> > 
-> > 
-> > [ ... ]
-> > 
-> >>>> Do we want these as HCI vendor events. Or actually as vendor / diagnostic packets. There is a hci_recv_diag.
-> >>>> 
-> >>> 
-> >>> These are actually Hci vendor events. not for diagnostic purpose. They hdr->evt == 0xe4 are all the part of chip initialization.
-> >> 
-> >> Ok, then leave it as is.
-> >> 
-> >>> 
-> >>>> So let me ask this a different way, do you have support for LMP / LL tracing in your chips? If yes, then how is that enabled and how does it work? Or any general debug data that can be switched on. That is what we have a diagnostic channel for that is also fed into btmon.
-> >>>> 
-> >>> 
-> >>> I'm not really sure about them because I didn't see any diagnostic packets handling in vendor driver.
-> >> 
-> >> You can see examples for this in btusb.c, hci_bcm.c and bpa10x.c where the hardware has a side channel. In case of Broadcom, they are LL or LMP trace packets, but it could be also debug messages or something else. Other vendors use HCI vendor events for that which is also fine. Just wanted to know what it is.
-> >> 
-> >> And if your hardware supports LL or LMP traces to be enabled, then implement hdev->set_diag() callback. You can then enable it via /sys/kernel/debug/bluetooth/hci0/vendor_diag
-> >> 
-> > 
-> > Thanks for sharing the information to me.
-> > 
-> > If I get the permission and details about adding support for these debug trace packets, I am willing to add them.
-> > 
-> >>> 
-> >>>>> +
-> >>>>> +	/* Each HCI event would go through the core. */
-> >>>>> +	return hci_recv_frame(hdev, skb);
-> >>>>> +}
-> >>>>> +
-> > 
-> > [ ... ]
-> > 
-> >>>>> +
-> >>>>> +static int mtk_btuart_shutdown(struct hci_dev *hdev)
-> >>>>> +{
-> >>>>> +	struct mtk_btuart_dev *bdev = hci_get_drvdata(hdev);
-> >>>>> +	struct device *dev = &bdev->serdev->dev;
-> >>>>> +	u8 param = 0x0;
-> >>>>> +
-> >>>>> +	/* Disable the device. */
-> >>>>> +	mtk_hci_wmt_sync(hdev, MTK_WMT_FUNC_CTRL, 0x0, sizeof(param), &param);
-> >>>>> +
-> >>>>> +	/* Shutdown the clock and power domain the device requires. */
-> >>>>> +	clk_disable_unprepare(bdev->clk);
-> >>>>> +	pm_runtime_put_sync(dev);
-> >>>>> +	pm_runtime_disable(dev);
-> >>>> 
-> >>>> Don?t these belong into ->close method? And the enable ones into ->open? I really think that ->setup and ->shutdown should just do HCI commands and leave the others to ->open and ->close. Since ->open and ->close are suppose to set up and terminate the transport.
-> >>>> 
-> >>> 
-> >>> Yes, ->open and ->close are already done just for setup and terminate the transport. I've noted the part during earlier version discussion. 
-> >>> 
-> >>> Because mt7622 is a SoC integrating Bluetooth hardware inside, these operations for clk* and pm clk_* and pm_*  you saw here are all for controlling clocks and powers Bluetooth circuits requires on the SoC, not for the transports.
-> >>> 
-> >>> As for clocks for the transport, they're already being taken care of by the serial driver.
-> >> 
-> >> With transport, I meant the Bluetooth transport. So I really thing they belong into ->open and ->close. Within ->setup and ->shutdown, I would just expect HCI commands.
-> >> 
-> > 
-> > At the moment, it's not easy that clk_* and pm_*  are moved to ->open and ->close
-> > 
-> > because firmware download would depend on the full cycle of hardware power down and then up.
-> > 
-> > And another advantage is that when users call hdev down and the up, the device can do the real hardware reset, not just the software reset via hci command.
-> 
-> But when you call down/up cycle, then you will go through ->close and ->open. So I don?t see the problem here.
-> 
-> With the quirk for always calling ->setup, you get the ->open + ->setup on hdev up and ->shutdown + ->close on hdev down.
-> 
+convert drm_atomic_helper_suspend/resume() to use
+drm_mode_config_helper_suspend/resume().
 
-Yes, it seems no any problem. really thanks point out me with patience
+With this conversion, rockchip_drm_fb_resume() and
+rockchip_drm_fb_suspend() will not be used anymore.
+Both of these functions can be removed.
 
-So I've moved these clk_* and pm_* operations into ->open and ->close in newer v7.
+Also, in struct rockchip_drm_private state will not be
+used anymore. So this can be removed forever.
 
-> Regards
-> 
-> Marcel
-> 
+Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 46 ++---------------------------
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h |  1 -
+ 2 files changed, 2 insertions(+), 45 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index f814d37..dd12390 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -243,60 +243,18 @@ static void rockchip_drm_unbind(struct device *dev)
+ };
+ 
+ #ifdef CONFIG_PM_SLEEP
+-static void rockchip_drm_fb_suspend(struct drm_device *drm)
+-{
+-	struct rockchip_drm_private *priv = drm->dev_private;
+-
+-	console_lock();
+-	drm_fb_helper_set_suspend(&priv->fbdev_helper, 1);
+-	console_unlock();
+-}
+-
+-static void rockchip_drm_fb_resume(struct drm_device *drm)
+-{
+-	struct rockchip_drm_private *priv = drm->dev_private;
+-
+-	console_lock();
+-	drm_fb_helper_set_suspend(&priv->fbdev_helper, 0);
+-	console_unlock();
+-}
+-
+ static int rockchip_drm_sys_suspend(struct device *dev)
+ {
+ 	struct drm_device *drm = dev_get_drvdata(dev);
+-	struct rockchip_drm_private *priv;
+-
+-	if (!drm)
+-		return 0;
+-
+-	drm_kms_helper_poll_disable(drm);
+-	rockchip_drm_fb_suspend(drm);
+ 
+-	priv = drm->dev_private;
+-	priv->state = drm_atomic_helper_suspend(drm);
+-	if (IS_ERR(priv->state)) {
+-		rockchip_drm_fb_resume(drm);
+-		drm_kms_helper_poll_enable(drm);
+-		return PTR_ERR(priv->state);
+-	}
+-
+-	return 0;
++	return drm_mode_config_helper_suspend(drm);
+ }
+ 
+ static int rockchip_drm_sys_resume(struct device *dev)
+ {
+ 	struct drm_device *drm = dev_get_drvdata(dev);
+-	struct rockchip_drm_private *priv;
+ 
+-	if (!drm)
+-		return 0;
+-
+-	priv = drm->dev_private;
+-	drm_atomic_helper_resume(drm, priv->state);
+-	rockchip_drm_fb_resume(drm);
+-	drm_kms_helper_poll_enable(drm);
+-
+-	return 0;
++	return drm_mode_config_helper_resume(drm);
+ }
+ #endif
+ 
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+index 3a6ebfc..d67ad0a 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+@@ -51,7 +51,6 @@ struct rockchip_crtc_state {
+ struct rockchip_drm_private {
+ 	struct drm_fb_helper fbdev_helper;
+ 	struct drm_gem_object *fbdev_bo;
+-	struct drm_atomic_state *state;
+ 	struct iommu_domain *domain;
+ 	struct mutex mm_lock;
+ 	struct drm_mm mm;
+-- 
+1.9.1
