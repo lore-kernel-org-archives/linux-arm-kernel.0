@@ -1,136 +1,45 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Tue, 31 Jul 2018 11:28:35 -0300
-Subject: [PATCH] perf vendor events arm64: Update ThunderX2
- implementation defined pmu core events
-In-Reply-To: <20180731100251.23575-1-ganapatrao.kulkarni@cavium.com>
-References: <20180731100251.23575-1-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20180731142835.GC4909@kernel.org>
+From: acolin@isi.edu (Alexei Colin)
+Date: Tue, 31 Jul 2018 10:29:50 -0400
+Subject: [RESEND PATCH 2/6] x86: factor out RapidIO Kconfig menu
+In-Reply-To: <20180731142954.30345-1-acolin@isi.edu>
+References: <20180731142954.30345-1-acolin@isi.edu>
+Message-ID: <20180731142954.30345-3-acolin@isi.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue, Jul 31, 2018 at 03:32:51PM +0530, Ganapatrao Kulkarni escreveu:
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+The menu entry is now defined in the rapidio subtree.
 
-Can you please consider to provide an example of such counters being
-used, i.e. with a simple C synthetic test that causes these events to
-take place, then run it via 'perf stat' to show that indeed, they are
-being programmed and read correctly?
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: John Paul Walters <jwalters@isi.edu>
+Cc: x86 at kernel.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: linux-mips at linux-mips.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Alexei Colin <acolin@isi.edu>
+---
+ arch/x86/Kconfig | 8 --------
+ 1 file changed, 8 deletions(-)
 
-Ideally for all of them, but if that becomes too burdensome, for a few
-of them?
-
-Thanks,
-
-- Arnaldo
-
-> ---
->  .../arch/arm64/cavium/thunderx2/core-imp-def.json  | 87 +++++++++++++++++++++-
->  1 file changed, 84 insertions(+), 3 deletions(-)
-> 
-> diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
-> index bc03c06..752e47e 100644
-> --- a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
-> +++ b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
-> @@ -12,6 +12,21 @@
->          "ArchStdEvent": "L1D_CACHE_REFILL_WR",
->      },
->      {
-> +        "ArchStdEvent": "L1D_CACHE_REFILL_INNER",
-> +    },
-> +    {
-> +        "ArchStdEvent": "L1D_CACHE_REFILL_OUTER",
-> +    },
-> +    {
-> +        "ArchStdEvent": "L1D_CACHE_WB_VICTIM",
-> +    },
-> +    {
-> +        "ArchStdEvent": "L1D_CACHE_WB_CLEAN",
-> +    },
-> +    {
-> +        "ArchStdEvent": "L1D_CACHE_INVAL",
-> +    },
-> +    {
->          "ArchStdEvent": "L1D_TLB_REFILL_RD",
->      },
->      {
-> @@ -24,9 +39,75 @@
->          "ArchStdEvent": "L1D_TLB_WR",
->      },
->      {
-> +        "ArchStdEvent": "L2D_TLB_REFILL_RD",
-> +    },
-> +    {
-> +        "ArchStdEvent": "L2D_TLB_REFILL_WR",
-> +    },
-> +    {
-> +        "ArchStdEvent": "L2D_TLB_RD",
-> +    },
-> +    {
-> +        "ArchStdEvent": "L2D_TLB_WR",
-> +    },
-> +    {
->          "ArchStdEvent": "BUS_ACCESS_RD",
-> -   },
-> -   {
-> +    },
-> +    {
->          "ArchStdEvent": "BUS_ACCESS_WR",
-> -   }
-> +    },
-> +    {
-> +        "ArchStdEvent": "MEM_ACCESS_RD",
-> +    },
-> +    {
-> +        "ArchStdEvent": "MEM_ACCESS_WR",
-> +    },
-> +    {
-> +        "ArchStdEvent": "UNALIGNED_LD_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "UNALIGNED_ST_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "UNALIGNED_LDST_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_UNDEF",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_SVC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_PABORT",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_DABORT",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_IRQ",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_FIQ",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_SMC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_HVC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_TRAP_PABORT",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_TRAP_DABORT",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_TRAP_OTHER",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_TRAP_IRQ",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_TRAP_FIQ",
-> +    }
->  ]
-> -- 
-> 2.9.4
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 27fce7e84357..6f057000e486 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -2828,14 +2828,6 @@ config AMD_NB
+ 
+ source "drivers/pcmcia/Kconfig"
+ 
+-config RAPIDIO
+-	tristate "RapidIO support"
+-	depends on PCI
+-	default n
+-	help
+-	  If enabled this option will include drivers and the core
+-	  infrastructure code to support RapidIO interconnect devices.
+-
+ source "drivers/rapidio/Kconfig"
+ 
+ config X86_SYSFB
+-- 
+2.18.0
