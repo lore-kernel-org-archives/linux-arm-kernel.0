@@ -1,75 +1,77 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 31 Jul 2018 12:24:07 +0100
-Subject: [PATCH v2 0/7] Stop losing firmware-set DMA masks
-In-Reply-To: <CAK8P3a3HDJ6svNN_cwvegxu20yNv8+tvc0D1A6Ooeq8agawbFg@mail.gmail.com>
-References: <cover.1532382222.git.robin.murphy@arm.com>
- <CAK8P3a3HDJ6svNN_cwvegxu20yNv8+tvc0D1A6Ooeq8agawbFg@mail.gmail.com>
-Message-ID: <1ccccc4b-7d4c-a3ee-23a2-f108916705e9@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 31 Jul 2018 12:29:31 +0100
+Subject: [PATCH v5 1/3] arm64: mm: Support Common Not Private translations
+In-Reply-To: <a6a0ad8a-7962-9775-2924-a6f3b2724bcb@arm.com>
+References: <1529403502-2843-1-git-send-email-vladimir.murzin@arm.com>
+ <1529403502-2843-2-git-send-email-vladimir.murzin@arm.com>
+ <20180727113502.3qdbyffuvysva6bz@armageddon.cambridge.arm.com>
+ <f3da236e-504d-66ab-19da-9f89eba253f1@arm.com>
+ <20180730154209.2tawriqxgxub7paa@armageddon.cambridge.arm.com>
+ <16344e26-6cd2-5e55-d34e-fd2a48bef733@arm.com>
+ <20180730170337.rycf34urt7n2fptq@armageddon.cambridge.arm.com>
+ <a6a0ad8a-7962-9775-2924-a6f3b2724bcb@arm.com>
+Message-ID: <20180731112930.i7dxahzvw2p3rqph@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 29/07/18 13:32, Arnd Bergmann wrote:
-> On Tue, Jul 24, 2018 at 12:16 AM, Robin Murphy <robin.murphy@arm.com> wrote:
->> Whilst the common firmware code invoked by dma_configure() initialises
->> devices' DMA masks according to limitations described by the respective
->> properties ("dma-ranges" for OF and _DMA/IORT for ACPI), the nature of
->> the dma_set_mask() API leads to that information getting lost when
->> well-behaved drivers probe and set a 64-bit mask, since in general
->> there's no way to tell the difference between a firmware-described mask
->> (which should be respected) and whatever default may have come from the
->> bus code (which should be replaced outright). This can break DMA on
->> systems with certain IOMMU topologies (e.g. [1]) where the IOMMU driver
->> only knows its maximum supported address size, not how many of those
->> address bits might actually be wired up between any of its input
->> interfaces and the associated DMA master devices. Similarly, some PCIe
->> root complexes only have a 32-bit native interface on their host bridge,
->> which leads to the same DMA-address-truncation problem in systems with a
->> larger physical memory map and RAM above 4GB (e.g. [2]).
->>
->> These patches attempt to deal with this in the simplest way possible by
->> generalising the specific quirk for 32-bit bridges into an arbitrary
->> mask which can then also be plumbed into the firmware code. In the
->> interest of being minimally invasive, I've only included a point fix
->> for the IOMMU issue as seen on arm64 - there may be further tweaks
->> needed in DMA ops (e.g. in arch/arm/ and other OF users) to catch all
->> possible incarnations of this problem, but at least any that I'm not
->> fixing here have always been broken. It is also noteworthy that
->> of_dma_get_range() has never worked properly for the way PCI host
->> bridges are passed into of_dma_configure() - I'll be working on
->> further patches to sort that out once this part is done.
+On Tue, Jul 31, 2018 at 11:17:30AM +0100, Vladimir Murzin wrote:
+> Does it represent your idea correctly?
 > 
-> Thanks a lot for working on this, this has bugged me for many years,
-> and I've discussed possible solutions with lots of people over time.
-> 
-> I /think/ all your patches are good, but I'm currently travelling and don't
-> have a chance to review the resulting overall implementation.
-> Could you summarize what happens in the following corner cases of
-> DT dma-ranges after your changes (with a driver not setting a mask,
-> setting a 64-bit mask and setting a 24-bit mask, respectively)?
-> 
-> a) a device with no dma-ranges property anywhere in its parents
-> b) a device with with a 64-bit dma-ranges translation in its parent
->     but none in its grandparent
-> c) a device with no dma-ranges in its parent but a 64-bit mask
->     in its grandparent
-> d) a device with a 24-bit mask in its parent.
+> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+> index c506fb7..b6ba2f0 100644
+> --- a/arch/arm64/include/asm/mmu_context.h
+> +++ b/arch/arm64/include/asm/mmu_context.h
+> @@ -147,7 +147,8 @@ static inline void cpu_replace_ttbr1(pgd_t *pgdp)
+>  	extern ttbr_replace_func idmap_cpu_replace_ttbr1;
+>  	ttbr_replace_func *replace_phys;
+>  
+> -	phys_addr_t pgd_phys = virt_to_phys(pgdp);
+> +	/* phys_to_ttbr() zeros lower 2 bits of ttbr with 52-bit PA */
+> +	phys_addr_t ttbr1 = phys_to_ttbr(virt_to_phys(pgdp));
+>  
+>  	if (system_supports_cnp() && !WARN_ON(pgdp != lm_alias(swapper_pg_dir))) {
+>  		/*
+> @@ -158,13 +159,13 @@ static inline void cpu_replace_ttbr1(pgd_t *pgdp)
+>  		 * Also we rely on the cpu_hwcap bit being set before
+>  		 * calling the enable() function.
+>  		 */
+> -		pgd_phys |= TTBR_CNP_BIT;
+> +		ttbr1 |= TTBR_CNP_BIT;
+>  	}
+>  
+>  	replace_phys = (void *)__pa_symbol(idmap_cpu_replace_ttbr1);
+>  
+>  	cpu_install_idmap();
+> -	replace_phys(pgd_phys);
+> +	replace_phys(ttbr1);
+>  	cpu_uninstall_idmap();
+>  }
+>  
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index bde3a3b..2c75b0b 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -190,7 +190,7 @@ ENDPROC(cpu_do_switch_mm)
+>  .endm
+>  
+>  /*
+> - * void idmap_cpu_replace_ttbr1(phys_addr_t new_pgd)
+> + * void idmap_cpu_replace_ttbr1(phys_addr_t ttbr1)
+>   *
+>   * This is the low-level counterpart to cpu_replace_ttbr1, and should not be
+>   * called by anything else. It can only be executed from a TTBR0 mapping.
+> @@ -200,8 +200,7 @@ ENTRY(idmap_cpu_replace_ttbr1)
+>  
+>  	__idmap_cpu_set_reserved_ttbr1 x1, x3
+>  
+> -	phys_to_ttbr x3, x0
+> -	msr	ttbr1_el1, x3
+> +	msr	ttbr1_el1, x0
+>  	isb
+>  
+>  	restore_daif x2
 
-In terms of the actual dma-ranges parsing, nothing should be changed by 
-these patches, so the weirdness and inconsistency that I'm pretty sure 
-exists for some of those cases will still be there for the moment - I'm 
-starting on actually fixing of_dma_get_range() now.
+It looks fine. Thanks.
 
-The effect after these patches is that a device with a "valid" (per the 
-current of_dma_get_range() implementation) dma-ranges translation gets 
-it bus_dma_mask set to cover the given range, whereas a device with no 
-valid dma-ranges effectively gets a 32-bit bus_dma_mask. That's slightly 
-different from the ACPI default behaviour, due to subtle spec 
-differences, but I think it's in line with what you've proposed before 
-for DT, and it's certainly still flexible if anyone has a different 
-view. The bus_dma_mask in itself should also be low-impact, since it 
-will only currently be enforced in the generic dma-direct and iommu-dma 
-paths, so the likes of powerpc shouldn't see any change at all just yet.
-
-Robin.
+-- 
+Catalin
