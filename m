@@ -1,85 +1,71 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue, 31 Jul 2018 15:22:13 +0200
-Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <CAAeHK+wTcH+2hgm_BTkLLdn1GkjBtkhQ=vPWZCncJ6KenqgKpg@mail.gmail.com>
-References: <cover.1530018818.git.andreyknvl@google.com>
- <20180628105057.GA26019@e103592.cambridge.arm.com>
- <CAAeHK+w0T43+h3xqU4a-qutxd-qiEhsvk0eaZpmAn-T0hpaLZQ@mail.gmail.com>
- <20180629110709.GA17859@arm.com>
- <CAAeHK+wHd8B2nhat-Z2Y2=s4NVobPG7vjr2CynjFhqPTwQRepQ@mail.gmail.com>
- <20180703173608.GF27243@arm.com>
- <CAAeHK+wTcH+2hgm_BTkLLdn1GkjBtkhQ=vPWZCncJ6KenqgKpg@mail.gmail.com>
-Message-ID: <CAAeHK+xc1E64tXEEHoXqOuUNZ7E_kVyho3_mNZTCc+LTGHYFdA@mail.gmail.com>
+Date: Tue, 31 Jul 2018 15:23:21 +0200
+Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
+In-Reply-To: <CAAeHK+yWF05XoU+0iuJoXAL3cWgdtxbeLoBz169yP12W4LkcQw@mail.gmail.com>
+References: <cover.1529507994.git.andreyknvl@google.com>
+ <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
+ <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
+ <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
+ <CAAeHK+wJbbCZd+-X=9oeJgsqQJiq8h+Aagz3SQMPaAzCD+pvFw@mail.gmail.com>
+ <CAAeHK+yWF05XoU+0iuJoXAL3cWgdtxbeLoBz169yP12W4LkcQw@mail.gmail.com>
+Message-ID: <CAAeHK+y95YJZ6yEw0icsz7ScFYP=x5V+__8J0BG9T3vyB1J1xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 7:16 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> On Tue, Jul 3, 2018 at 7:36 PM, Will Deacon <will.deacon@arm.com> wrote:
->> Hmm, but elsewhere in this thread, Evgenii is motivating the need for this
->> patch set precisely because the lower overhead means it's suitable for
->> "near-production" use. So I don't think writing this off as a debugging
->> feature is the right approach, and we instead need to put effort into
->> analysing the impact of address tags on the kernel as a whole. Playing
->> whack-a-mole with subtle tag issues sounds like the worst possible outcome
->> for the long-term.
+On Mon, Jul 16, 2018 at 1:25 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+> So the checker reports ~100 different places where a __user pointer
+> being casted. I've looked through them and found 3 places where we
+> need to add untagging. Source code lines below come from 4.18-rc2+
+> (6f0d349d).
 >
-> I don't see a way to find cases where pointer tags would matter
-> statically, so I've implemented the dynamic approach that I mentioned
-> above. I've instrumented all pointer comparisons/subtractions in an
-> LLVM compiler pass and used a kernel module that would print a bug
-> report whenever two pointers with different tags are being
-> compared/subtracted (ignoring comparisons with NULL pointers and with
-> pointers obtained by casting an error code to a pointer type). Then I
-> tried booting the kernel in QEMU and on an Odroid C2 board and I ran
-> syzkaller overnight.
+> Place 1:
 >
-> This yielded the following results.
+> arch/arm64/mm/fault.c:302:34: warning: user pointer cast
+> current->thread.fault_address = (unsigned long)info->si_addr;
 >
-> ======
+> Compare a pointer with TASK_SIZE (1 << 48) to check whether it lies in
+> the kernel or in user space. Need to untag the address before
+> performing a comparison.
 >
-> The two places that look interesting are:
+> Place 2:
 >
-> is_vmalloc_addr in include/linux/mm.h (already mentioned by Catalin)
-> is_kernel_rodata in mm/util.c
+> fs/namespace.c:2736:21: warning: user pointer cast
+> size = TASK_SIZE - (unsigned long)data;
 >
-> Here we compare a pointer with some fixed untagged values to make sure
-> that the pointer lies in a particular part of the kernel address
-> space. Since KWHASAN doesn't add tags to pointers that belong to
-> rodata or vmalloc regions, this should work as is. To make sure I've
-> added debug checks to those two functions that check that the result
-> doesn't change whether we operate on pointers with or without
-> untagging.
+> A similar check performed by subtracting a pointer from TASK_SIZE.
+> Need to untag before subtracting.
 >
-> ======
+> Place 3:
 >
-> A few other cases that don't look that interesting:
+> drivers/usb/core/devio.c:1407:29: warning: user pointer cast
+> unsigned long uurb_start = (unsigned long)uurb->buffer;
+> drivers/usb/core/devio.c:1636:31: warning: user pointer cast
+> unsigned long uurb_start = (unsigned long)uurb->buffer;
+> drivers/usb/core/devio.c:1715:30: warning: user pointer cast
+> unsigned long uurb_start = (unsigned long)uurb->buffer;
 >
-> Comparing pointers to achieve unique sorting order of pointee objects
-> (e.g. sorting locks addresses before performing a double lock):
+> The device keeps list of mmapped areas and searches them for provided
+> __user pointer. Need to untag before searching.
 >
-> tty_ldisc_lock_pair_timeout in drivers/tty/tty_ldisc.c
-> pipe_double_lock in fs/pipe.c
-> unix_state_double_lock in net/unix/af_unix.c
-> lock_two_nondirectories in fs/inode.c
-> mutex_lock_double in kernel/events/core.c
+> There are also a few cases of memory syscalls operating on __user
+> pointers instead of unsigned longs like mmap:
 >
-> ep_cmp_ffd in fs/eventpoll.c
-> fsnotify_compare_groups fs/notify/mark.c
+> ipc/shm.c:1355:23: warning: user pointer cast
+> unsigned long addr = (unsigned long)shmaddr;
+> ipc/shm.c:1566:23: warning: user pointer cast
+> unsigned long addr = (unsigned long)shmaddr;
+> mm/migrate.c:1586:10: warning: user pointer cast
+> addr = (unsigned long)p;
+> mm/migrate.c:1660:24: warning: user pointer cast
+> unsigned long addr = (unsigned long)(*pages);
 >
-> Nothing needs to be done here, since the tags embedded into pointers
-> don't change, so the sorting order would still be unique.
+> If we don't add untagging to mmap, we probably don't need it here.
 >
-> Check that a pointer belongs to some particular allocation:
+> The rest of reported places look fine as is. Full annotated results of
+> running the checker are here [2].
 >
-> is_sibling_entry lib/radix-tree.c
-> object_is_on_stack in include/linux/sched/task_stack.h
+> I'll add the 3 patches with fixes to v5 of this patchset.
 >
-> Nothing needs to be here either, since two pointers can only belong to
-> the same allocation if they have the same tag.
->
-> ======
->
-> Will, Catalin, WDYT?
+> Catalin, WDYT?
 
 ping
