@@ -1,56 +1,43 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 31 Jul 2018 10:19:35 +0100
-Subject: [PATCH v2] arm64, kaslr: export offset in VMCOREINFO ELF notes
-In-Reply-To: <1532931883-16132-1-git-send-email-bhsharma@redhat.com>
-References: <1532931883-16132-1-git-send-email-bhsharma@redhat.com>
-Message-ID: <303e32f7-ff47-ea9b-d5a0-45a22e44d0a9@arm.com>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Tue, 31 Jul 2018 11:22:56 +0200
+Subject: [PATCH v6 2/4] ARM: dts: sun8i: a83t: Add support for the cir
+ interface
+In-Reply-To: <20180731092258.2279-1-embed3d@gmail.com>
+References: <20180731092258.2279-1-embed3d@gmail.com>
+Message-ID: <20180731092258.2279-3-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bhupesh,
+The cir interface is like on the H3 located at 0x01f02000 and is exactly
+the same. This patch adds support for the ir interface on the A83T.
 
-On 30/07/18 07:24, Bhupesh Sharma wrote:
-> Include KASLR offset in arm64 VMCOREINFO ELF notes to assist in
-> debugging. vmcore parsing in user-space already expects this value in
-> the notes and we are providing it for portability of those existing
-> tools with x86.
-> 
-> Ideally we would like core code to do this (so that way this
-> information won't be missed when an architecture adds KASLR support),
-> but mips has CONFIG_RANDOMIZE_BASE, and doesn't provide kaslr_offset(),
-> so I am not sure if this is needed for mips (and other such similar arch
-> cases in future). So, lets keep this architecture specific for now.
+Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+---
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-(heh, I assumed you would rewrite my train-of-thought, but I guess this works!)
-
-
-> As an example of a user-space use-case, consider the
-> makedumpfile user-space utility which will need fixup to use this
-> KASLR offset to work with cases where we need to find a way to
-> translate symbol address from vmlinux to kernel run time address
-> in case of KASLR boot on arm64.
-
-Acked-by: James Morse <james.morse@arm.com>
-
-If we want to send this to stable, it looks like it should have been part of the
-KASLR series, f80fb3a3d5084 ("arm64: add support for kernel ASLR") was merged
-for v4.6.
-CC: <stable@vger.kernel.org> # 4.6.x
-
-
-Thanks,
-
-James
-
-
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> index f62effc6e064..028df356a5fd 100644
-> --- a/arch/arm64/kernel/machine_kexec.c
-> +++ b/arch/arm64/kernel/machine_kexec.c
-> @@ -360,4 +360,5 @@ void arch_crash_save_vmcoreinfo(void)
->  						kimage_voffset);
->  	vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
->  						PHYS_OFFSET);
-> +	vmcoreinfo_append_str("KERNELOFFSET=%lx\n", kaslr_offset());
->  }
-> 
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index afed6c0dea6f..31222a05a8f1 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -992,6 +992,18 @@
+ 			reg = <0x1f01c00 0x400>;
+ 		};
+ 
++		r_cir: ir at 1f02000 {
++			compatible = "allwinner,sun5i-a13-ir";
++			clocks = <&r_ccu CLK_APB0_IR>, <&r_ccu CLK_IR>;
++			clock-names = "apb", "ir";
++			resets = <&r_ccu RST_APB0_IR>;
++			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++			reg = <0x01f02000 0x400>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&r_cir_pin>;
++			status = "disabled";
++		};
++
+ 		r_pio: pinctrl at 1f02c00 {
+ 			compatible = "allwinner,sun8i-a83t-r-pinctrl";
+ 			reg = <0x01f02c00 0x400>;
+-- 
+2.11.0
