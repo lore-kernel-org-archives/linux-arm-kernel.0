@@ -1,73 +1,85 @@
-From: dave.kleikamp@oracle.com (Dave Kleikamp)
-Date: Mon, 30 Jul 2018 19:31:16 -0500
-Subject: [PATCH 1/1] arm64: kexec: machine_kexec should call
- __flush_icache_range
-In-Reply-To: <20180731002830.GJ11258@linaro.org>
-References: <faf6c7cb-d9da-9a9c-cc0f-43c95e864ca2@oracle.com>
- <e07fc674-2a71-29ae-2212-46ee5f79593d@oracle.com>
- <20180730161641.6zxxy3lxp27tznck@armageddon.cambridge.arm.com>
- <20180730162235.GC4276@arm.com>
- <2651847f-79ea-fe2a-c1d7-efe4d11702b4@oracle.com>
- <20180730165757.GF4276@arm.com>
- <d9bac115-794c-4225-bcaa-91b6847604a2@oracle.com>
- <20180731002830.GJ11258@linaro.org>
-Message-ID: <86e4ea58-a9d7-c4ab-97e4-b8be256fc954@oracle.com>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Mon, 30 Jul 2018 18:08:42 -0700
+Subject: [PATCH 0/6] rapidio: move Kconfig menu definition to subsystem
+In-Reply-To: <20180730225035.28365-1-acolin@isi.edu>
+References: <20180730225035.28365-1-acolin@isi.edu>
+Message-ID: <db90c65d-b6da-1f57-43c6-e105fc6f1704@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2018 07:28 PM, AKASHI Takahiro wrote:
-> On Mon, Jul 30, 2018 at 04:36:28PM -0500, Dave Kleikamp wrote:
->> On 07/30/2018 11:57 AM, Will Deacon wrote:
->>> On Mon, Jul 30, 2018 at 11:46:24AM -0500, Dave Kleikamp wrote:
->>>> On 07/30/2018 11:22 AM, Will Deacon wrote:
->>>>> On Mon, Jul 30, 2018 at 05:16:42PM +0100, Catalin Marinas wrote:
->>>>>> On Mon, Jul 30, 2018 at 10:29:21AM -0500, Dave Kleikamp wrote:
->>>>>>> machine_kexec flushes the reboot_code_buffer from the icache
->>>>>>> after stopping the other cpus.
->>>>>>>
->>>>>>> Commit 3b8c9f1cdfc5 ("arm64: IPI each CPU after invalidating the I-cache
->>>>>>> for kernel mappings") added an IPI call to flush_icache_range, which
->>>>>>> causes a hang here, so replace the call with __flush_icache_range
->>>>>>
->>>>>> While machine_kexec() may be called with interrupts disabled (IIUC) and
->>>>>> we shouldn't IPI other CPUs, I don't understand why it hangs here. Are
->>>>>> there any other CPUs online at this point?
->>>>>
->>>>> The BUG_ON and WARN_ON at the start of machine_kexec() suggest to me that
->>>>> this should only happen if we're kexec'ing a crash kernel and
->>>>> smp_crash_stop_failed(). Is that something we need to care about?
->>>>
->>>> I observed the hang trying to kexec a crash kernel and I did not see the
->>>> warning that smp_crash_stop_failed(). I'm not exactly sure why
->>>> flush_icache_range() hung (but it did), but I think that
->>>> __flush_icache_range() makes more sense here anyway.
->>>
->>> Yeah, I'll pick the patch up, but it would be nice to understand the
->>> failure case you observed.
->>
->> I see why it failed. ipi_cpu_crash_stop() does not call
->> set_cpu_online(cpu, false) the way ipi_cpu_stop() does. So
->> cpu_online_mask is still populated with the stopped cpus.
->>
->> Any reason why it isn't called there?
+On 07/30/2018 03:50 PM, Alexei Colin wrote:
+> The top-level Kconfig entry for RapidIO subsystem is currently
+> duplicated in several architecture-specific Kconfig files. This set of
+> patches does two things:
 > 
-> Because I wanted that saved cpu-related state be as close to as it was
-> at panic.
-> If cpus go offline, the core dump would show that all the cores but
-> a panicked one be offline whether or not they actually were.
-
-That makes sense.
-
-Thanks,
-Dave
-
+> 1. Move the Kconfig menu definition into the RapidIO subsystem and
+> remove the duplicate definitions from arch Kconfig files.
 > 
-> Thanks,
-> -Takahiro AKASHI
+> 2. Enable RapidIO Kconfig menu entry for arm and arm64 architectures,
+> where it was not enabled before. I tested that subsystem and drivers
+> build successfully for both architectures, and tested that the modules
+> load on a custom arm64 Qemu model.
 > 
->> Thanks,
->> Dave
->>
->>>
->>> Will
->>>
+> For all architectures, RapidIO menu should be offered when either:
+> (1) The platform has a PCI bus (which host a RapidIO module on the bus).
+> (2) The platform has a RapidIO IP block (connected to a system bus, e.g.
+> AXI on ARM). In this case, 'select HAS_RAPIDIO' should be added to the
+> 'config ARCH_*' menu entry for the SoCs that offer the IP block.
+> 
+> Prior to this patchset, different architectures used different criteria:
+> * powerpc: (1) and (2)
+> * mips: (1) and (2) after recent commit into next that added (2):
+>   https://www.linux-mips.org/archives/linux-mips/2018-07/msg00596.html
+>   fc5d988878942e9b42a4de5204bdd452f3f1ce47
+>   491ec1553e0075f345fbe476a93775eabcbc40b6
+> * x86: (1)
+> * arm,arm64: none (RapidIO menus never offered)
+> 
+> Responses to feedback from prior submission (thanks for the reviews!):
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-July/593347.html
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-July/593349.html
+> 
+> Changelog:
+>   * Moved Kconfig entry into RapidIO subsystem instead of duplicating
+> 
+> In the current patchset, I took the approach of adding '|| PCI' to the
+> depends in the subsystem. I did try the alterantive approach mentioned
+> in the reviews for v1 of this patch, where the subsystem Kconfig does
+> not add a '|| PCI' and each per-architecture Kconfig has to add a
+> 'select HAS_RAPIDIO if PCI' and SoCs with IP blocks have to also add
+> 'select HAS_RAPIDIO'. This works too but requires each architecture's
+> Kconfig to add the line for RapidIO (whereas current approach does not
+> require that involvement) and also may create a false impression that
+> the dependency on PCI is strict.
+> 
+> We appreciate the suggestion for also selecting the RapdiIO subsystem for
+> compilation with COMPILE_TEST, but hope to address it in a separate
+> patchset, localized to the subsystem, since it will need to change
+> depends on all drivers, not just on the top level, and since this
+> patch now spans multiple architectures.
+> 
+> 
+> Alexei Colin (6):
+>   rapidio: define top Kconfig menu in driver subtree
+>   x86: factor out RapidIO Kconfig menu
+>   powerpc: factor out RapidIO Kconfig menu entry
+>   mips: factor out RapidIO Kconfig entry
+>   arm: enable RapidIO menu in Kconfig
+>   arm64: enable RapidIO menu in Kconfig
+> 
+>  arch/arm/Kconfig        |  2 ++
+>  arch/arm64/Kconfig      |  2 ++
+>  arch/mips/Kconfig       | 11 -----------
+>  arch/powerpc/Kconfig    | 13 +------------
+>  arch/x86/Kconfig        |  8 --------
+>  drivers/rapidio/Kconfig | 15 +++++++++++++++
+>  6 files changed, 20 insertions(+), 31 deletions(-)
+> 
+
+LGTM.
+
+Acked-by: Randy Dunlap <rdunlap@infradead.org> # for the series
+
+thanks,
+-- 
+~Randy
