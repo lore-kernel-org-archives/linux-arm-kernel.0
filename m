@@ -1,66 +1,49 @@
-From: acolin@isi.edu (Alexei Colin)
-Date: Tue, 31 Jul 2018 10:29:49 -0400
-Subject: [RESEND PATCH 1/6] rapidio: define top Kconfig menu in driver subtree
-In-Reply-To: <20180731142954.30345-1-acolin@isi.edu>
-References: <20180731142954.30345-1-acolin@isi.edu>
-Message-ID: <20180731142954.30345-2-acolin@isi.edu>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 31 Jul 2018 15:41:40 +0100
+Subject: [PATCH v6 1/3] arm64: mm: Support Common Not Private translations
+In-Reply-To: <1533042538-26184-2-git-send-email-vladimir.murzin@arm.com>
+References: <1533042538-26184-1-git-send-email-vladimir.murzin@arm.com>
+ <1533042538-26184-2-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20180731144140.m4gtxlny22hqjo55@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The top-level Kconfig entry for RapidIO subsystem is currently
-duplicated in several architecture-specific Kconfigs. This
-commit re-defines it in the driver subtree, and subsequent
-commits, one per architecture, will remove the duplicated
-definitions from respective per-architecture Kconfigs.
+On Tue, Jul 31, 2018 at 02:08:56PM +0100, Vladimir Murzin wrote:
+> Common Not Private (CNP) is a feature of ARMv8.2 extension which
+> allows translation table entries to be shared between different PEs in
+> the same inner shareable domain, so the hardware can use this fact to
+> optimise the caching of such entries in the TLB.
+> 
+> CNP occupies one bit in TTBRx_ELy and VTTBR_EL2, which advertises to
+> the hardware that the translation table entries pointed to by this
+> TTBR are the same as every PE in the same inner shareable domain for
+> which the equivalent TTBR also has CNP bit set. In case CNP bit is set
+> but TTBR does not point at the same translation table entries for a
+> given ASID and VMID, then the system is mis-configured, so the results
+> of translations are UNPREDICTABLE.
+> 
+> For kernel we postpone setting CNP till all cpus are up and rely on
+> cpufeature framework to 1) patch the code which is sensitive to CNP
+> and 2) update TTBR1_EL1 with CNP bit set. TTBR1_EL1 can be
+> reprogrammed as result of hibernation or cpuidle (via __enable_mmu).
+> For these two cases we restore CnP bit via __cpu_suspend_exit().
+> 
+> There are a few cases we need to care of changes in TTBR0_EL1:
+>   - a switch to idmap
+>   - software emulated PAN
+> 
+> we rule out latter via Kconfig options and for the former we make
+> sure that CNP is set for non-zero ASIDs only.
+> 
+> Reviewed-by: James Morse <james.morse@arm.com>
+> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: John Paul Walters <jwalters@isi.edu>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Ralf Baechle <ralf@linux-mips.org>
-Cc: Paul Burton <paul.burton@mips.com>
-Cc: Alexander Sverdlin <alexander.sverdlin@nokia.com>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Peter Anvin <hpa@zytor.com>
-Cc: x86 at kernel.org
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: linux-mips at linux-mips.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Alexei Colin <acolin@isi.edu>
----
- drivers/rapidio/Kconfig | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
-diff --git a/drivers/rapidio/Kconfig b/drivers/rapidio/Kconfig
-index d6d2f20c4597..98e301847584 100644
---- a/drivers/rapidio/Kconfig
-+++ b/drivers/rapidio/Kconfig
-@@ -1,6 +1,21 @@
- #
- # RapidIO configuration
- #
-+
-+config HAS_RAPIDIO
-+	bool
-+	default n
-+
-+config RAPIDIO
-+	tristate "RapidIO support"
-+	depends on HAS_RAPIDIO || PCI
-+	help
-+	  This feature enables support for RapidIO high-performance
-+	  packet-switched interconnect.
-+
-+	  If you say Y here, the kernel will include drivers and
-+	  infrastructure code to support RapidIO interconnect devices.
-+
- source "drivers/rapidio/devices/Kconfig"
- 
- config RAPIDIO_DISC_TIMEOUT
+However, I think it's pretty late for 4.19 and the changes are not
+trivial. I'll pick it up after the merging window so that it sits in
+linux-next for a while.
+
 -- 
-2.18.0
+Catalin
