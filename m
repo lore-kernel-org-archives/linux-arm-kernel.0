@@ -1,84 +1,55 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 31 Jul 2018 16:43:53 +0800
-Subject: [PATCH v1 1/2] arm64: dts: mt7622: add some misc device nodes
-In-Reply-To: <2839886f07dc47afb9a05d06fb1acc84@mtkmbs08n1.mediatek.inc>
-References: <2ff39c40ef6bc3054667e63c785a1d28527b5ddf.1531753039.git.ryder.lee@mediatek.com>
- <864955d5-26c4-a5f3-ec1a-420acba50880@gmail.com>
- <2839886f07dc47afb9a05d06fb1acc84@mtkmbs08n1.mediatek.inc>
-Message-ID: <1533026633.10540.20.camel@mtkswgap22>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 31 Jul 2018 10:10:59 +0100
+Subject: [PATCH] arm64: drop unused kernel_neon_begin_partial() macro
+In-Reply-To: <20180731073545.32607-1-ard.biesheuvel@linaro.org>
+References: <20180731073545.32607-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180731091057.GB4240@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
-
-Sorry for the late reply.
-
-On Tue, 2018-07-31 at 16:17 +0800, Ryder Lee (???) wrote:
-> Hi Ryder,
+On Tue, Jul 31, 2018 at 09:35:45AM +0200, Ard Biesheuvel wrote:
+> When kernel mode NEON was first introduced to the arm64 kernel,
+> every call to kernel_neon_begin()/_end() stacked resp. unstacked
+> the entire NEON register file, making it worthwile to reduce the
+> number of used NEON registers to a bare minimum, and only stack
+> those. kernel_neon_begin_partial() was introduced for this purpose,
+> but after the refactoring for SVE and other changes, it no longer
+> exists and was simply #define'd to kernel_neon_begin() directly.
 > 
-> On 16/07/18 16:59, Ryder Lee wrote:
-> > Add some misc nodes support - timer and ARM CCI-400.
-> > 
-> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> > ---
-> >  arch/arm64/boot/dts/mediatek/mt7622.dtsi | 36 
-> > ++++++++++++++++++++++++++++++++
-> >  1 file changed, 36 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi 
-> > b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> > index 9213c96..8cdec52 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> > +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
-> > @@ -217,6 +217,16 @@
-> >  		#reset-cells = <1>;
-> >  	};
-> >  
-> > +	timer: timer at 10004000 {
-> > +		compatible = "mediatek,mt7622-timer",
-> > +			     "mediatek,mt6577-timer";
-> > +		reg = <0 0x10004000 0 0x80>;
-> > +		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
-> > +		clocks = <&infracfg CLK_INFRA_APXGPT_PD>,
-> > +			 <&topckgen CLK_TOP_RTC>;
-> > +		clock-names = "system-clk", "rtc-clk";
-> > +	};
-> > +
-> >  	scpsys: scpsys at 10006000 {
-> >  		compatible = "mediatek,mt7622-scpsys",
-> >  			     "syscon";
-> > @@ -317,6 +327,32 @@
-> >  		      <0 0x10360000 0 0x2000>;
-> >  	};
-> >  
-> > +	cci: cci at 10390000 {
-> > +		compatible = "arm,cci-400";
-> > +		#address-cells = <1>;
-> > +		#size-cells = <1>;
-> > +		reg = <0 0x10390000 0 0x1000>;
-> > +		ranges = <0 0 0x10390000 0x10000>;
+> In the mean time, all users have been updated, so let's remove
+> the fallback macro.
 > 
-> From my understanding of the binding description ranges should hold child address, parent address and size of the region in the child address space. I can see in arch/arm64 two different variants using 4 ranges values (like here) and using three values.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Makes sense, and nobody seems to use it any more.
+
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+
+> ---
+>  arch/arm64/include/asm/neon.h | 7 -------
+>  1 file changed, 7 deletions(-)
 > 
-> @Rob + Will what is the preferred way to describe this?
-
-Hmmm... it's just a copy-paste (I take zynqmp.dtsi as an example).
-> > +
-> > +		cci_control0: slave-if at 1000 {
-> > +			compatible = "arm,cci-400-ctrl-if";
-> > +			interface-type = "ace-lite";
-> > +			reg = <0x1000 0x1000>;
-> > +		};
+> diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
+> index f922eaf780f9..fb9d137256a6 100644
+> --- a/arch/arm64/include/asm/neon.h
+> +++ b/arch/arm64/include/asm/neon.h
+> @@ -19,11 +19,4 @@
+>  void kernel_neon_begin(void);
+>  void kernel_neon_end(void);
+>  
+> -/*
+> - * Temporary macro to allow the crypto code to compile. Note that the
+> - * semantics of kernel_neon_begin_partial() are now different from the
+> - * original as it does not allow being called in an interrupt context.
+> - */
+> -#define kernel_neon_begin_partial(num_regs)	kernel_neon_begin()
+> -
+>  #endif /* ! __ASM_NEON_H */
+> -- 
+> 2.18.0
 > 
-> Don't we need to add phandles to the cci-control-port property in the cpu nodes?
 > 
-> Regards,
-> Matthias
-
-MT7622 use cci-400 to improve performance (DMA IO coherence) for
-high-speed IPs. (i.e., ETH/WIFI/SATA/...)
-
-I added it early but actually the related features have not supported in
-mainline yet.
-
-Ryder
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
