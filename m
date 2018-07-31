@@ -1,76 +1,148 @@
-From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
-Date: Tue, 31 Jul 2018 17:09:10 +0200
-Subject: [RESEND PATCH 1/6] rapidio: define top Kconfig menu in driver
- subtree
-In-Reply-To: <20180731142954.30345-2-acolin@isi.edu>
-References: <20180731142954.30345-1-acolin@isi.edu>
- <20180731142954.30345-2-acolin@isi.edu>
-Message-ID: <053432eb-1f24-a763-0bfe-e67373e7ea82@nokia.com>
+From: gklkml16@gmail.com (Ganapatrao Kulkarni)
+Date: Tue, 31 Jul 2018 20:40:51 +0530
+Subject: [PATCH] perf vendor events arm64: Update ThunderX2 implementation
+ defined pmu core events
+In-Reply-To: <20180731142835.GC4909@kernel.org>
+References: <20180731100251.23575-1-ganapatrao.kulkarni@cavium.com>
+ <20180731142835.GC4909@kernel.org>
+Message-ID: <CAKTKpr7ZLru2wvtarq01p6PqJKQLEhCFtoo=tw45Svh-V_vFag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Arnaldo,
 
-On 31/07/18 16:29, Alexei Colin wrote:
-> The top-level Kconfig entry for RapidIO subsystem is currently
-> duplicated in several architecture-specific Kconfigs. This
-> commit re-defines it in the driver subtree, and subsequent
-> commits, one per architecture, will remove the duplicated
-> definitions from respective per-architecture Kconfigs.
-> 
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: John Paul Walters <jwalters@isi.edu>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Cc: Paul Burton <paul.burton@mips.com>
-> Cc: Alexander Sverdlin <alexander.sverdlin@nokia.com>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Peter Anvin <hpa@zytor.com>
-> Cc: x86 at kernel.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-mips at linux-mips.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Alexei Colin <acolin@isi.edu>
+On Tue, Jul 31, 2018 at 7:58 PM, Arnaldo Carvalho de Melo
+<arnaldo.melo@gmail.com> wrote:
+> Em Tue, Jul 31, 2018 at 03:32:51PM +0530, Ganapatrao Kulkarni escreveu:
+>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>
+> Can you please consider to provide an example of such counters being
+> used, i.e. with a simple C synthetic test that causes these events to
+> take place, then run it via 'perf stat' to show that indeed, they are
+> being programmed and read correctly?
+>
+> Ideally for all of them, but if that becomes too burdensome, for a few
+> of them?
 
-Reviewed-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+It may be tedious for all, certainly I will provide the test
+results/log for some of them(as many as possible).
 
-> ---
->  drivers/rapidio/Kconfig | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/drivers/rapidio/Kconfig b/drivers/rapidio/Kconfig
-> index d6d2f20c4597..98e301847584 100644
-> --- a/drivers/rapidio/Kconfig
-> +++ b/drivers/rapidio/Kconfig
-> @@ -1,6 +1,21 @@
->  #
->  # RapidIO configuration
->  #
-> +
-> +config HAS_RAPIDIO
-> +	bool
-> +	default n
-> +
-> +config RAPIDIO
-> +	tristate "RapidIO support"
-> +	depends on HAS_RAPIDIO || PCI
-> +	help
-> +	  This feature enables support for RapidIO high-performance
-> +	  packet-switched interconnect.
-> +
-> +	  If you say Y here, the kernel will include drivers and
-> +	  infrastructure code to support RapidIO interconnect devices.
-> +
->  source "drivers/rapidio/devices/Kconfig"
->  
->  config RAPIDIO_DISC_TIMEOUT
+>
+> Thanks,
+>
+> - Arnaldo
+>
+>> ---
+>>  .../arch/arm64/cavium/thunderx2/core-imp-def.json  | 87 +++++++++++++++++++++-
+>>  1 file changed, 84 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+>> index bc03c06..752e47e 100644
+>> --- a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+>> +++ b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+>> @@ -12,6 +12,21 @@
+>>          "ArchStdEvent": "L1D_CACHE_REFILL_WR",
+>>      },
+>>      {
+>> +        "ArchStdEvent": "L1D_CACHE_REFILL_INNER",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "L1D_CACHE_REFILL_OUTER",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "L1D_CACHE_WB_VICTIM",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "L1D_CACHE_WB_CLEAN",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "L1D_CACHE_INVAL",
+>> +    },
+>> +    {
+>>          "ArchStdEvent": "L1D_TLB_REFILL_RD",
+>>      },
+>>      {
+>> @@ -24,9 +39,75 @@
+>>          "ArchStdEvent": "L1D_TLB_WR",
+>>      },
+>>      {
+>> +        "ArchStdEvent": "L2D_TLB_REFILL_RD",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "L2D_TLB_REFILL_WR",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "L2D_TLB_RD",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "L2D_TLB_WR",
+>> +    },
+>> +    {
+>>          "ArchStdEvent": "BUS_ACCESS_RD",
+>> -   },
+>> -   {
+>> +    },
+>> +    {
+>>          "ArchStdEvent": "BUS_ACCESS_WR",
+>> -   }
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "MEM_ACCESS_RD",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "MEM_ACCESS_WR",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "UNALIGNED_LD_SPEC",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "UNALIGNED_ST_SPEC",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "UNALIGNED_LDST_SPEC",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "EXC_UNDEF",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "EXC_SVC",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "EXC_PABORT",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "EXC_DABORT",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "EXC_IRQ",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "EXC_FIQ",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "EXC_SMC",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "EXC_HVC",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "EXC_TRAP_PABORT",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "EXC_TRAP_DABORT",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "EXC_TRAP_OTHER",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "EXC_TRAP_IRQ",
+>> +    },
+>> +    {
+>> +        "ArchStdEvent": "EXC_TRAP_FIQ",
+>> +    }
+>>  ]
+>> --
+>> 2.9.4
 
--- 
-Best regards,
-Alexander Sverdlin.
+thanks
+Ganapat
