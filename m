@@ -1,48 +1,33 @@
-From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
-Date: Tue, 31 Jul 2018 17:18:11 +0200
-Subject: [PATCH v3 3/3] Input: atmel_mxt_ts: Document optional voltage
- regulators
-In-Reply-To: <1533050291-11502-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-References: <1533050291-11502-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-Message-ID: <1533050291-11502-4-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Tue, 31 Jul 2018 17:21:35 +0200
+Subject: [PATCH v4 13/17] khwasan: add hooks implementation
+In-Reply-To: <8240d4f9-c8df-cfe9-119d-6e933f8b13df@virtuozzo.com>
+References: <cover.1530018818.git.andreyknvl@google.com>
+ <a2a93370d43ec85b02abaf8d007a15b464212221.1530018818.git.andreyknvl@google.com>
+ <09cb5553-d84a-0e62-5174-315c14b88833@arm.com>
+ <CAAeHK+yC3XRPoTByhH1QPrX45pG3QY_2Q4gz=dfDgxfzu1Fyfw@mail.gmail.com>
+ <8240d4f9-c8df-cfe9-119d-6e933f8b13df@virtuozzo.com>
+Message-ID: <CAAeHK+wUu4c5MwknrJkw=22y5cWuZNsyd+-QJ3v0Z48Xj-Hqng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document new optional voltage regulators, which can be used
-to power down/up touchscreen.
+On Tue, Jul 31, 2018 at 4:50 PM, Andrey Ryabinin
+<aryabinin@virtuozzo.com> wrote:
+> On 07/31/2018 04:05 PM, Andrey Konovalov wrote:
+>> We can assign tags to objects with constructors when a slab is
+>> allocated and call constructors once as usual. The downside is that
+>> such object would always have the same tag when it is reallocated, so
+>> we won't catch use-after-frees.
+>
+> Actually you should do this for SLAB_TYPESAFE_BY_RCU slabs. Usually they are with ->ctors but there
+> are few without constructors.
+> We can't reinitialize or even retag them. The latter will definitely cause false-positive use-after-free reports.
+>
+> As for non-SLAB_TYPESAFE_BY_RCU caches with constructors, it's probably ok to reinitialize and retag such objects.
+> I don't see how could any code rely on the current ->ctor() behavior in non-SLAB_TYPESAFE_BY_RCU case,
+> unless it does something extremely stupid or weird.
+> But let's not do it now. If you care, you cand do it later, with a separate patch, so we could just revert
+> it if anything goes wrong.
 
-Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
-Changes from v1:
-  - Added reviewed-by
----
- Documentation/devicetree/bindings/input/atmel,maxtouch.txt | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
-index c88919480d37..17930ecadad3 100644
---- a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
-+++ b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
-@@ -31,6 +31,12 @@ Optional properties for main touchpad device:
- 
- - reset-gpios: GPIO specifier for the touchscreen's reset pin (active low)
- 
-+- avdd-supply: Analog power supply. It powers up the analog channel block
-+    of the controller to detect the touches.
-+
-+- vdd-supply: Digital power supply. It powers up the digital block
-+    of the controller to enable i2c communication.
-+
- Example:
- 
- 	touch at 4b {
-@@ -38,4 +44,6 @@ Example:
- 		reg = <0x4b>;
- 		interrupt-parent = <&gpio>;
- 		interrupts = <TEGRA_GPIO(W, 3) IRQ_TYPE_LEVEL_LOW>;
-+		avdd-supply = <&atsp_reg>;
-+		vdd-supply = <&tsp_reg>;
- 	};
--- 
-2.7.4
+OK, will do it then when there's either a constructor or the slab is
+SLAB_TYPESAFE_BY_RCU.
