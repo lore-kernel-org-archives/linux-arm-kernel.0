@@ -1,82 +1,67 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Tue, 31 Jul 2018 16:11:42 +0200
-Subject: [PATCH v8 0/4] add mailbox support for i.MX7D
-Message-ID: <20180731141146.10788-1-o.rempel@pengutronix.de>
+Date: Tue, 31 Jul 2018 16:11:44 +0200
+Subject: [PATCH v8 2/4] dt-bindings: mailbox: imx-mu: add generic MU channel
+ support
+In-Reply-To: <20180731141146.10788-1-o.rempel@pengutronix.de>
+References: <20180731141146.10788-1-o.rempel@pengutronix.de>
+Message-ID: <20180731141146.10788-3-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-20180731 changes v7:
-- imx-mailbox & DT: rework driver from 4 channel bidirectional mode to
-  16 channel unidirectional mode. 8 extra channels are implemented on
-  top of General Purpose Interrupt bits provided by this MU.
+Each MU has four pairs of rx/tx data register with four rx/tx interrupts
+which can also be used as a separate channel.
 
-20180726 changes v7:
-- DT: add i.MX6SX and i.MX7S to the documentation.
-- imx-mailbox: don't use devm_ functions for startup and shutdown.
-- imx-mailbox: rename imx_mu_rmw to imx_mu_xcr_rmw and add locks
-- imx-mailbox: pass of_property_read_bool directly to side_b
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+---
+ .../devicetree/bindings/mailbox/fsl,mu.txt    | 28 +++++++++++++++++--
+ 1 file changed, 25 insertions(+), 3 deletions(-)
 
-20180722 changes v6:
-- include one more patch provided by Aisheng
-- DT: add fall back compatible fsl,imx6sx-mu
-- imx-mailbox: for now, use only fsl,imx6sx-mu
-
-20180721 changes v5:
-- DT: revert most of the changes from previous version
-- imx-mailbox: remove struct imx_mu_cfg
-- imx-mailbox: remove !! from imx_mu_last_tx_done()
-
-20180718 changes v4:
-- DT: change fsl,mu-side-a to fsl,mu-side-b
-- DT: split the patches.
-- DT: add all currently known SoCs.
-- imx-mailbox: free allocated irq name on channel shutdown
-- imx-mailbox: rename *_imx7 functions to *_generic
-
-20180715 changes v3:
-- DT: remove prosaic part of documentation. It describes software
-  or firmware specific usage and not relevant for HW description.
-- DT: use <soc>-mu instead of <soc>-mu-<mu side> and add fsl,mu-side-a
-  parameter.
-- DT: add most of know i.MX variants with MU
-- imx-mailbox: use macros instead of precalculated bit index.
-- imx-mailbox: remove warning message for clk.
-- imx-mailbox: use imx_mu_chan[%idx] for devm_request_irq.
-- imx-mailbox: depend on ARCH_MXC instead of SOX_IMX7
-
-20180615 changes v2:
-- DT: use mailbox@ instead of mu@
-- DT: change interrupts description
-- clk: use imx_clk_gate4 instead of imx_clk_gate2
-- imx-mailbox: remove last_tx_done support
-- imx-mailbox: fix module description 
-
-This patches are providing support for mailbox (Messaging Unit)
-for i.MX7D.
-Functionality was tested on PHYTEC phyBOARD-Zeta i.MX7D with
-Linux running on all cores: ARM Cortex-A7 and ARM Cortex-M4.
-
-Both parts of i.MX messaging Unit are visible for all CPUs available
-on i.MX7D. Communication worked independent of MU side in combination
-with CPU. For example MU-A used on ARM Cortex-A7 and MU-B used on ARM Cortex-M4
-or other ways around.
-
-Dong Aisheng (1):
-  dt-bindings: arm: fsl: add mu binding doc
-
-Oleksij Rempel (3):
-  dt-bindings: mailbox: imx-mu: add generic MU channel support
-  ARM: dts: imx7s: add i.MX7 messaging unit support
-  mailbox: Add support for i.MX7D messaging unit
-
- .../devicetree/bindings/mailbox/fsl,mu.txt    |  56 +++
- arch/arm/boot/dts/imx7s.dtsi                  |  19 +
- drivers/mailbox/Kconfig                       |   6 +
- drivers/mailbox/Makefile                      |   2 +
- drivers/mailbox/imx-mailbox.c                 | 371 ++++++++++++++++++
- 5 files changed, 454 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/fsl,mu.txt
- create mode 100644 drivers/mailbox/imx-mailbox.c
-
+diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+index 90e4905dfc69..9efd3a9ade44 100644
+--- a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
++++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+@@ -18,11 +18,33 @@ Messaging Unit Device Node:
+ Required properties:
+ -------------------
+ - compatible :	should be "fsl,<chip>-mu", the supported chips include
+-		imx8qxp, imx8qm.
++		imx6sx, imx7s, imx8qxp, imx8qm.
++		The "fsl,imx6sx-mu" compatible is seen as generic and should
++		be included together with SoC specific compatible.
+ - reg :		Should contain the registers location and length
+ - interrupts :	Interrupt number. The interrupt specifier format depends
+ 		on the interrupt controller parent.
+-- #mbox-cells:  Must be 0. Number of cells in a mailbox
++- #mbox-cells:  Must be 2.
++			  <&phandle type channel>
++			    phandle   : Label name of controller
++			    type      : Channel type
++			    channel   : Channel number
++
++		This MU support 4 type of unidirectional channels, each type
++		has 4 channels. A total of 16 channels. Following types are
++		supported:
++		0 - TX channel with 32bit transmit register and IRQ transmit
++		acknowledgment support.
++		1 - RX channel with 32bit receive register and IRQ support
++		2 - TX doorbell channel. Without own register and no ACK support.
++		3 - RX doorbell channel.
++		The doorbell channels should be used with shared memory and protocol
++		level acknowledgment if needed.
++
++Optional properties:
++-------------------
++- clocks :	phandle to the input clock.
++- fsl,mu-side-b : Should be set for side B MU.
+ 
+ Examples:
+ --------
+@@ -30,5 +52,5 @@ lsio_mu0: mailbox at 5d1b0000 {
+ 	compatible = "fsl,imx8qxp-mu";
+ 	reg = <0x0 0x5d1b0000 0x0 0x10000>;
+ 	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
+-	#mbox-cells = <0>;
++	#mbox-cells = <2>;
+ };
 -- 
 2.18.0
