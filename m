@@ -1,259 +1,212 @@
 From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Tue, 31 Jul 2018 19:13:37 +0300
-Subject: [PATCH v7 5/8] dt-bindings: interconnect: Document qcom,
- msm8916 NoC bindings
-In-Reply-To: <20180731161340.13000-1-georgi.djakov@linaro.org>
-References: <20180731161340.13000-1-georgi.djakov@linaro.org>
-Message-ID: <20180731161340.13000-6-georgi.djakov@linaro.org>
+Date: Tue, 31 Jul 2018 19:13:32 +0300
+Subject: [PATCH v7 0/8] Introduce on-chip interconnect API
+Message-ID: <20180731161340.13000-1-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device-tree bindings Network-On-Chip interconnect driver
-for Qualcomm msm8916 platforms.
+Modern SoCs have multiple processors and various dedicated cores (video, gpu,
+graphics, modem). These cores are talking to each other and can generate a
+lot of data flowing through the on-chip interconnects. These interconnect
+buses could form different topologies such as crossbar, point to point buses,
+hierarchical buses or use the network-on-chip concept.
 
-Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
----
- .../bindings/interconnect/qcom-msm8916.txt    |  39 ++++
- include/dt-bindings/interconnect/qcom.h       | 187 ++++++++++++++++++
- 2 files changed, 226 insertions(+)
+These buses have been sized usually to handle use cases with high data
+throughput but it is not necessary all the time and consume a lot of power.
+Furthermore, the priority between masters can vary depending on the running
+use case like video playback or CPU intensive tasks.
+
+Having an API to control the requirement of the system in terms of bandwidth
+and QoS, so we can adapt the interconnect configuration to match those by
+scaling the frequencies, setting link priority and tuning QoS parameters.
+This configuration can be a static, one-time operation done at boot for some
+platforms or a dynamic set of operations that happen at run-time.
+
+This patchset introduce a new API to get the requirement and configure the
+interconnect buses across the entire chipset to fit with the current demand.
+The API is NOT for changing the performance of the endpoint devices, but only
+the interconnect path in between them.
+
+The API is using a consumer/provider-based model, where the providers are
+the interconnect buses and the consumers could be various drivers.
+The consumers request interconnect resources (path) to an endpoint and set
+the desired constraints on this data flow path. The provider(s) receive
+requests from consumers and aggregate these requests for all master-slave
+pairs on that path. Then the providers configure each participating in the
+topology node according to the requested data flow path, physical links and
+constraints. The topology could be complicated and multi-tiered and is SoC
+specific.
+
+Below is a simplified diagram of a real-world SoC topology. The interconnect
+providers are the NoCs.
+
++----------------+    +----------------+
+| HW Accelerator |--->|      M NoC     |<---------------+
++----------------+    +----------------+                |
+                        |      |                    +------------+
+ +-----+  +-------------+      V       +------+     |            |
+ | DDR |  |                +--------+  | PCIe |     |            |
+ +-----+  |                | Slaves |  +------+     |            |
+   ^ ^    |                +--------+     |         |   C NoC    |
+   | |    V                               V         |            |
++------------------+   +------------------------+   |            |   +-----+
+|                  |-->|                        |-->|            |-->| CPU |
+|                  |-->|                        |<--|            |   +-----+
+|     Mem NoC      |   |         S NoC          |   +------------+
+|                  |<--|                        |---------+    |
+|                  |<--|                        |<------+ |    |   +--------+
++------------------+   +------------------------+       | |    +-->| Slaves |
+  ^  ^    ^    ^          ^                             | |        +--------+
+  |  |    |    |          |                             | V
++------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
+| CPUs |  |  | GPU |   | DSP |  | Masters |-->|       P NoC    |-->| Slaves |
++------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
+          |
+      +-------+
+      | Modem |
+      +-------+
+
+TODO:
+* Create icc_set_extended() to handle parameters such as latency and other
+  QoS values.
+* Convert from using global node identifiers to local per provider ids.
+* Cache the path between the nodes instead of walking the graph on each get().
+* Sync interconnect requests with the idle state of the device.
+
+Changes since patchset v6 (https://lkml.org/lkml/2018/7/9/698)
+* [patches 1,6]: Move the aggregation within the provider from the framework to
+  the platform driver's set() callback, as the aggregation point could be SoC
+  specific.
+* [patch 1]: Include missing header, reset state only of the traversed nodes,
+  move more code into path_init(), add more asserts, move misplaced mutex,
+  simplify icc_link_destroy() (Evan)
+* [patch 1]: Fix the order of requests to go from source to destination. (Alex)
+* [patch 7]: Use better wording in the documentation. (Evan)
+* [patch 6]: Reorder struct members, sort nodes alphabetically, improve naming
+  of variables , add missing clk_disable_unprepare() in error paths. (Matthias)
+* [patch 6]: Remove redundant NULL pointer check in msm8916 driver. (Alex)
+* [patch 6]: Add missing depend on QCOM_SMD_RPM in Kconfig. (Evan)
+* [patch 3]: Don't check for errors on debugfs calls, remove debugfs directory
+  when module is unloaded (Greg)
+
+Changes since patchset v5 (https://lkml.org/lkml/2018/6/20/453)
+* Fix the modular build, make rpm-smd driver a module.
+* Optimize locking and move to higher level. (Evan)
+* Code cleanups. Fix typos. (Evan, Matthias)
+* Add the source node to the path. (Evan)
+* Rename path_allocate() to path_init() with minor refactoring. (Evan)
+* Rename *_remove() functions to *_destroy().
+* Return fixed errors in icc_link_destroy(). (Evan)
+* Fix krealloc() usage in icc_link_destroy(). (Evan)
+* Add missing kfree() in icc_node_create(). (Matthias)
+* Make icc_node_add() return void. (Matthias)
+* Change mutex_init to mutex_lock in icc_provider_add(). (Matthias)
+* Add new icc_node_del() function to delete nodes from provider.
+* Fix the header guard to reflect the path in smd-rpm.h. (Evan)
+* Check for errors returned by qcom_icc_rpm_smd_send(). (Evan)
+* Propagate the error of icc_provider_del(). (Evan)
+
+Changes since patchset v4 (https://lkml.org/lkml/2018/3/9/856)
+* Simplified locking by using a single global mutex. (Evan)
+* Changed the aggregation function interface.
+* Implemented functions for node, link, provider removal. (Evan)
+* Naming changes on variables and functions, removed redundant code. (Evan)
+* Fixes and clarifications in the docs. (Matthias, Evan, Amit, Alexandre)
+* Removed mandatory reg DT property, made interconnect-names optional. (Bjorn)
+* Made interconnect-cells property required to align with other bindings. (Neil)
+* Moved msm8916 specific bindings into a separate file and patch. (Bjorn)
+* Use the names, instead of the hardcoded ids for topology. (Matthias)
+* Init the node before creating the links. (Evan)
+* Added icc_units_to_bps macro. (Amit)
+
+Changes since patchset v3 (https://lkml.org/lkml/2017/9/8/544)
+* Refactored the constraints aggregation.
+* Use the IDR API.
+* Split the provider and consumer bindings into separate patches and propose
+  new bindings for consumers, which allows to specify the local source port.
+* Adopted the icc_ prefix for API functions.
+* Introduced separate API functions for creating interconnect nodes and links.
+* Added DT lookup support in addition to platform data.
+* Dropped the event tracing patch for now.
+* Added a patch to provide summary via debugfs.
+* Use macro for the list of topology definitions in the platform driver.
+* Various minor changes.
+
+Changes since patchset v2 (https://lkml.org/lkml/2017/7/20/825)
+* Split the aggregation into per node and per provider. Cache the
+  aggregated values.
+* Various small refactorings and cleanups in the framework.
+* Added a patch introducing basic tracepoint support for monitoring
+  the time required to update the interconnect nodes.
+
+Changes since patchset v1 (https://lkml.org/lkml/2017/6/27/890)
+* Updates in the documentation.
+* Changes in request aggregation, locking.
+* Dropped the aggregate() callback and use the default as it currently
+  sufficient for the single vendor driver. Will add it later when needed.
+* Dropped the dt-bindings draft patch for now.
+
+Changes since RFC v2 (https://lkml.org/lkml/2017/6/12/316)
+* Converted documentation to rst format.
+* Fixed an incorrect call to mutex_lock. Renamed max_bw to peak_bw.
+
+Changes since RFC v1 (https://lkml.org/lkml/2017/5/15/605)
+* Refactored code into shorter functions.
+* Added a new aggregate() API function.
+* Rearranged some structs to reduce padding bytes.
+
+Changes since RFC v0 (https://lkml.org/lkml/2017/3/1/599)
+* Removed DT support and added optional Patch 3 with new bindings proposal.
+* Converted the topology into internal driver data.
+* Made the framework modular.
+* interconnect_get() now takes (src and dst ports as arguments).
+* Removed public declarations of some structs.
+* Now passing prev/next nodes to the vendor driver.
+* Properly remove requests on _put().
+* Added refcounting.
+* Updated documentation.
+* Changed struct interconnect_path to use array instead of linked list.
+
+Georgi Djakov (8):
+  interconnect: Add generic on-chip interconnect API
+  dt-bindings: Introduce interconnect provider bindings
+  interconnect: Add debugfs support
+  interconnect: qcom: Add RPM communication
+  dt-bindings: interconnect: Document qcom,msm8916 NoC bindings
+  interconnect: qcom: Add msm8916 interconnect provider driver
+  dt-bindings: Introduce interconnect consumers bindings
+  interconnect: Allow endpoints translation via DT
+
+ .../bindings/interconnect/interconnect.txt    |  60 ++
+ .../bindings/interconnect/qcom-msm8916.txt    |  39 +
+ .../bindings/interconnect/qcom-smd.txt        |  32 +
+ Documentation/interconnect/interconnect.rst   |  96 +++
+ drivers/Kconfig                               |   2 +
+ drivers/Makefile                              |   1 +
+ drivers/interconnect/Kconfig                  |  15 +
+ drivers/interconnect/Makefile                 |   3 +
+ drivers/interconnect/core.c                   | 709 ++++++++++++++++++
+ drivers/interconnect/qcom/Kconfig             |  23 +
+ drivers/interconnect/qcom/Makefile            |   4 +
+ drivers/interconnect/qcom/msm8916.c           | 510 +++++++++++++
+ drivers/interconnect/qcom/smd-rpm.c           |  91 +++
+ drivers/interconnect/qcom/smd-rpm.h           |  16 +
+ include/dt-bindings/interconnect/qcom.h       | 187 +++++
+ include/linux/interconnect-provider.h         | 125 +++
+ include/linux/interconnect.h                  |  49 ++
+ 17 files changed, 1962 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
  create mode 100644 Documentation/devicetree/bindings/interconnect/qcom-msm8916.txt
+ create mode 100644 Documentation/devicetree/bindings/interconnect/qcom-smd.txt
+ create mode 100644 Documentation/interconnect/interconnect.rst
+ create mode 100644 drivers/interconnect/Kconfig
+ create mode 100644 drivers/interconnect/Makefile
+ create mode 100644 drivers/interconnect/core.c
+ create mode 100644 drivers/interconnect/qcom/Kconfig
+ create mode 100644 drivers/interconnect/qcom/Makefile
+ create mode 100644 drivers/interconnect/qcom/msm8916.c
+ create mode 100644 drivers/interconnect/qcom/smd-rpm.c
+ create mode 100644 drivers/interconnect/qcom/smd-rpm.h
  create mode 100644 include/dt-bindings/interconnect/qcom.h
-
-diff --git a/Documentation/devicetree/bindings/interconnect/qcom-msm8916.txt b/Documentation/devicetree/bindings/interconnect/qcom-msm8916.txt
-new file mode 100644
-index 000000000000..f309eaed3d19
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interconnect/qcom-msm8916.txt
-@@ -0,0 +1,39 @@
-+Qualcomm MSM8916 Network-On-Chip interconnect driver binding
-+----------------------------------------------------
-+
-+Required properties :
-+- compatible : shall contain only one of the following:
-+			"qcom,msm8916-bimc"
-+			"qcom,msm8916-pnoc"
-+			"qcom,msm8916-snoc"
-+- #interconnect-cells : should contain 1
-+- reg : shall contain base register location and length
-+
-+Optional properties :
-+clocks : list of phandles and specifiers to all interconnect bus clocks
-+clock-names : clock names should include both "bus_clk" and "bus_a_clk"
-+
-+Examples:
-+
-+		snoc: snoc at 580000 {
-+			compatible = "qcom,msm8916-snoc";
-+			#interconnect-cells = <1>;
-+			reg = <0x580000 0x14000>;
-+			clock-names = "bus_clk", "bus_a_clk";
-+			clocks = <&rpmcc RPM_SMD_SNOC_CLK>, <&rpmcc RPM_SMD_SNOC_A_CLK>;
-+		};
-+		bimc: bimc at 400000 {
-+			compatible = "qcom,msm8916-bimc";
-+			#interconnect-cells = <1>;
-+			reg = <0x400000 0x62000>;
-+			clock-names = "bus_clk", "bus_a_clk";
-+			clocks = <&rpmcc RPM_SMD_BIMC_CLK>, <&rpmcc RPM_SMD_BIMC_A_CLK>;
-+		};
-+		pnoc: pnoc at 500000 {
-+			compatible = "qcom,msm8916-pnoc";
-+			#interconnect-cells = <1>;
-+			reg = <0x500000 0x11000>;
-+			clock-names = "bus_clk", "bus_a_clk";
-+			clocks = <&rpmcc RPM_SMD_PCNOC_CLK>, <&rpmcc RPM_SMD_PCNOC_A_CLK>;
-+		};
-+
-diff --git a/include/dt-bindings/interconnect/qcom.h b/include/dt-bindings/interconnect/qcom.h
-new file mode 100644
-index 000000000000..2177a216e17e
---- /dev/null
-+++ b/include/dt-bindings/interconnect/qcom.h
-@@ -0,0 +1,187 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Qualcomm interconnect IDs
-+ *
-+ * Copyright (c) 2018, Linaro Ltd.
-+ * Author: Georgi Djakov <georgi.djakov@linaro.org>
-+ */
-+
-+#ifndef __QCOM_INTERCONNECT_IDS_H
-+#define __QCOM_INTERCONNECT_IDS_H
-+
-+#define MASTER_AMPSS_M0 1
-+#define MASTER_AMPSS_M1 2
-+#define MASTER_LPASS_PROC 11
-+#define MASTER_MSS_PROCI 12
-+#define MASTER_MSS_PROCD 13
-+#define MASTER_MSS_MDM_PORT0 14
-+#define MASTER_LPASS 15
-+#define MASTER_MDP_PORT0 22
-+#define MASTER_MDP_PORT1 23
-+#define MASTER_ROTATOR 25
-+#define MASTER_GRAPHICS_3D 26
-+#define MASTER_VFE 29
-+#define MASTER_SPDM 36
-+#define MASTER_PCIE 45
-+#define MASTER_CRYPTO 47
-+#define MASTER_QDSS_BAM 53
-+#define MASTER_SNOC_CFG 54
-+#define MASTER_CRYPTO_CORE0 55
-+#define MASTER_OCMEM_DMA 58
-+#define MASTER_QDSS_ETR 60
-+#define MASTER_USB3 61
-+#define MASTER_JPEG 62
-+#define MASTER_VIDEO_P0 63
-+#define MASTER_VIDEO_P1 64
-+#define MASTER_JPEG_OCMEM 66
-+#define MASTER_VIDEO_P0_OCMEM 68
-+#define MASTER_DEHR 75
-+#define MASTER_QDSS_DAP 76
-+#define MASTER_TIC 77
-+#define MASTER_SDCC_1 78
-+#define MASTER_SDCC_2 81
-+#define MASTER_TSIF 82
-+#define MASTER_BLSP_2 84
-+#define MASTER_BLSP_1 86
-+#define MASTER_USB_HS 87
-+#define MASTER_IPA 90
-+#define MASTER_UFS 95
-+#define MASTER_PCIE_1 100
-+#define MASTER_USB3_1 101
-+#define MASTER_CNOC_MNOC_MMSS_CFG 102
-+#define MASTER_CNOC_MNOC_CFG 103
-+#define MASTER_TCU_0 104
-+#define MASTER_TCU_1 105
-+#define MASTER_CPP 106
-+
-+#define SNOC_MM_INT_0 10000
-+#define SNOC_MM_INT_1 10001
-+#define SNOC_MM_INT_2 10002
-+#define SNOC_MM_INT_BIMC 10003
-+#define SNOC_INT_0 10004
-+#define SNOC_INT_1 10005
-+#define SNOC_INT_BIMC 10006
-+#define SNOC_BIMC_0_MAS 10007
-+#define SNOC_BIMC_1_MAS 10008
-+#define SNOC_QDSS_INT 10009
-+#define PNOC_SNOC_MAS 10010
-+#define PNOC_SNOC_SLV 10011
-+#define PNOC_INT_0 10012
-+#define PNOC_INT_1 10013
-+#define PNOC_M_0 10014
-+#define PNOC_M_1 10015
-+#define BIMC_SNOC_MAS 10016
-+#define BIMC_SNOC_SLV 10017
-+#define PNOC_SLV_0 10018
-+#define PNOC_SLV_1 10019
-+#define PNOC_SLV_2 10020
-+#define PNOC_SLV_3 10021
-+#define PNOC_SLV_4 10022
-+#define PNOC_SLV_8 10023
-+#define PNOC_SLV_9 10024
-+#define SNOC_BIMC_0_SLV 10025
-+#define SNOC_BIMC_1_SLV 10026
-+#define BIMC_MNOC_MAS 10029
-+#define BIMC_MNOC_SLV 10030
-+#define SNOC_BIMC_MAS 10031
-+#define SNOC_BIMC_SLV 10032
-+#define CNOC_SNOC_MAS 10033
-+#define CNOC_SNOC_SLV 10034
-+#define SNOC_CNOC_MAS 10035
-+#define SNOC_CNOC_SLV 10036
-+#define SNOC_PNOC_MAS 10041
-+#define SNOC_PNOC_SLV 10042
-+#define BIMC_INT_APPS_EBI 10043
-+#define BIMC_INT_APPS_SNOC 10044
-+#define SNOC_BIMC_2_MAS 10045
-+#define SNOC_BIMC_2_SLV 10046
-+#define PNOC_SLV_5 10047
-+#define PNOC_SLV_7 10048
-+#define PNOC_INT_2 10049
-+#define PNOC_INT_3 10050
-+#define PNOC_INT_4 10051
-+#define PNOC_INT_5 10052
-+#define PNOC_INT_6 10053
-+#define PNOC_INT_7 10054
-+
-+#define SLAVE_EBI_CH0 512
-+#define SLAVE_AMPSS_L2 514
-+#define SYSTEM_SLAVE_FAB_APPS 517
-+#define SLAVE_SYSTEM_IMEM 519
-+#define SLAVE_MSS 521
-+#define SLAVE_LPASS 522
-+#define SLAVE_SPDM 533
-+#define SLAVE_RPM_MSG_RAM 535
-+#define SLAVE_MPM 536
-+#define SLAVE_TSIF 575
-+#define SLAVE_MSM_PDM 577
-+#define SLAVE_MSM_TCSR 579
-+#define SLAVE_USB3 583
-+#define SLAVE_OCIMEM 585
-+#define SLAVE_SERVICE_SNOC 587
-+#define SLAVE_QDSS_STM 588
-+#define SLAVE_CAMERA_CFG 589
-+#define SLAVE_DISPLAY_CFG 590
-+#define SLAVE_CPR_CFG 592
-+#define SLAVE_MISC_CFG 594
-+#define SLAVE_VENUS_CFG 596
-+#define SLAVE_GRAPHICS_3D_CFG 598
-+#define SLAVE_MMSS_CLK_CFG 599
-+#define SLAVE_MNOC_MPU_CFG 601
-+#define SLAVE_SERVICE_MNOC 603
-+#define SLAVE_OCMEM 604
-+#define SLAVE_SDCC_1 606
-+#define SLAVE_SDCC_2 608
-+#define SLAVE_SDCC_4 609
-+#define SLAVE_BLSP_2 611
-+#define SLAVE_BLSP_1 613
-+#define SLAVE_USB_HS 614
-+#define SLAVE_PDM 615
-+#define SLAVE_PRNG 618
-+#define SLAVE_CLK_CTL 620
-+#define SLAVE_SECURITY 622
-+#define SLAVE_TCSR 623
-+#define SLAVE_TLMM 624
-+#define SLAVE_CRYPTO_0_CFG 625
-+#define SLAVE_CRYPTO_1_CFG 626
-+#define SLAVE_IMEM_CFG 627
-+#define SLAVE_MESSAGE_RAM 628
-+#define SLAVE_BIMC_CFG 629
-+#define SLAVE_BOOT_ROM 630
-+#define SLAVE_CNOC_MNOC_MMSS_CFG 631
-+#define SLAVE_PMIC_ARB 632
-+#define SLAVE_SPDM_WRAPPER 633
-+#define SLAVE_DEHR_CFG 634
-+#define SLAVE_QDSS_CFG 635
-+#define SLAVE_RBCPR_CFG 636
-+#define SLAVE_RBCPR_QDSS_APU_CFG 637
-+#define SLAVE_SNOC_MPU_CFG 638
-+#define SLAVE_CNOC_ONOC_CFG 639
-+#define SLAVE_CNOC_MNOC_CFG 640
-+#define SLAVE_PNOC_CFG 641
-+#define SLAVE_SNOC_CFG 642
-+#define SLAVE_EBI1_DLL_CFG 643
-+#define SLAVE_PHY_APU_CFG 644
-+#define SLAVE_EBI1_PHY_CFG 645
-+#define SLAVE_SERVICE_CNOC 646
-+#define SLAVE_IPS_CFG 647
-+#define SLAVE_QPIC 648
-+#define SLAVE_DSI_CFG 649
-+#define SLAVE_UFS_CFG 650
-+#define SLAVE_RBCPR_CX_CFG 651
-+#define SLAVE_RBCPR_MX_CFG 652
-+#define SLAVE_PCIE_CFG 653
-+#define SLAVE_USB_PHYS_CFG 654
-+#define SLAVE_VIDEO_CAP_CFG 655
-+#define SLAVE_VPU_CFG 658
-+#define SLAVE_OCMEM_GFX 662
-+#define SLAVE_CATS_128 663
-+#define SLAVE_OCMEM_64 664
-+#define SLAVE_PCIE_0 665
-+#define SLAVE_PCIE_1 666
-+#define SLAVE_PCIE_0_CFG 667
-+#define SLAVE_PCIE_1_CFG 668
-+#define SLAVE_TCU 672
-+#define SLAVE_APPSS 673
-+
-+#endif
+ create mode 100644 include/linux/interconnect-provider.h
+ create mode 100644 include/linux/interconnect.h
