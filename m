@@ -1,55 +1,59 @@
-From: vkoul@kernel.org (Vinod)
-Date: Tue, 31 Jul 2018 09:59:03 +0530
-Subject: [RFC] dmaengine: Add metadat_ops for dma_async_tx_descriptor
-In-Reply-To: <e5112c28-a010-827b-c1fd-ecf00036412a@ti.com>
-References: <32208a9c-2b15-d345-1432-f1e387531f9b@ti.com>
- <20180601102429.16429-1-peter.ujfalusi@ti.com>
- <20180710055230.GB3219@vkoul-mobl>
- <052ebdd9-7e68-5b78-52c3-304376f48777@ti.com>
- <20180719092224.GK3219@vkoul-mobl>
- <eb5acd10-e255-774b-e8bc-f88eb2af172a@ti.com>
- <20180724111425.GK3219@vkoul-mobl>
- <e5112c28-a010-827b-c1fd-ecf00036412a@ti.com>
-Message-ID: <20180731042903.GC16775@vkoul-mobl>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 30 Jul 2018 21:34:03 -0700
+Subject: [PATCH v7 0/4] ARM: davinci: complete the conversion to using
+ the reset framework
+In-Reply-To: <e4bd9f57-617a-a59e-5d05-be1a6b3e6b3d@ti.com>
+References: <20180621073706.22812-1-brgl@bgdev.pl>
+ <9ec10627-49a5-07ad-8c9d-5ac873096cc0@ti.com>
+ <CAMRc=Me1JTuw40tMWaai2oKMxmc_ktN2OKBhF8tmGt0cQ6magg@mail.gmail.com>
+ <e4bd9f57-617a-a59e-5d05-be1a6b3e6b3d@ti.com>
+Message-ID: <20180731043403.GF5090@builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30-07-18, 12:46, Peter Ujfalusi wrote:
-> Vinod,
+On Mon 02 Jul 05:08 PDT 2018, Sekhar Nori wrote:
+
+> Hi Bjorn,
 > 
-> On 2018-07-24 14:14, Vinod wrote:
-> >>>> Clients must not mix the two way of handling the metadata.
-> >>>> The set_len() is intended to tell the DMA driver the client provided
-> >>>> metadata size (in MEM_TO_DEV case mostly).
-> >>>>
-> >>>> MEM_TO_DEV flow on client side:
-> >>>> get_ptr()
-> >>>> fill in the metadata to the pointer (not exceeding max_len)
-> >>>> set_len() to tell the DMA driver the amount of valid bytes written
-> >>>>
-> >>>> DEV_TO_MEM flow on client side:
-> >>>> In the completion callback, get_ptr()
-> >>>> the metadata is payload_len bytes and can be accessed in the return pointer.
-> >>>
-> >>> I would think to unify this..
+> On Thursday 21 June 2018 05:11 PM, Bartosz Golaszewski wrote:
+> > 2018-06-21 12:52 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
+> >> Hi Bartosz,
 > >>
-> >> I have tried it, but the attach mode and the pointer mode is hard to
-> >> handle with a generic API.
-> >> I will try to find a way to unify things in a sane way.
+> >> On Thursday 21 June 2018 01:07 PM, Bartosz Golaszewski wrote:
+> >>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> >>>
+> >>> These are the remaining patches that still need to be merged in order
+> >>> to complete the conversion of the davinci dsp driver to using the reset
+> >>> framework.
+> >>>
+> >>> They apply on top of v4.18-rc1 with David Lechner's remaining patches
+> >>> merged.
+> >>
+> >> Series looks good to me.
+> >>
+> >> To preserve bisect, shouldn't the order of applying be patch #3, #4, #1
+> >> and #2 ?
+> >>
+> >> Given the dependencies and to preserve bisect its easiest if I take the
+> >> series with acks from remoteproc and clock maintainers.
+> >>
+> >> Open to other suggestions as well.
+> >>
+> >> Thanks,
+> >> Sekhar
 > > 
-> > Hmmm, looking from the description they will be for different methods,
-> > so lets make them orthogonal and not allow driver to register both.
+> > Oops you're right about the order. Do you want me to resend?
 > 
-> I would allow DMA drivers to register both, but somehow enforce that
-> clients are not mixing the two distinct way of dealing with the metadata.
+> With your ack, I can queue 1/4 for v4.19 and provide an immutable commit
+> to you (on top of v4.18-rc1) for you to merge any further changes you
+> want to queue from your tree.
 > 
-> The reason for that is for example the attach mode is the simplest (I
-> implemented it first and I have a client using it), but if the pointer
-> mode is found to be more efficient and feasible for the DMA then the DMA
-> driver can implement that mode and the client can move as well w/o
-> breaking anything.
 
-Sounds reasonable...
+I'm not sure why I didn't see your request earlier, sorry about that.
 
--- 
-~Vinod
+I seem to have one other davinci patch from Suman, which should be
+possible to merge without any conflicts. So there's no need for an
+immutable branch at this time.
+
+Regards,
+Bjorn
