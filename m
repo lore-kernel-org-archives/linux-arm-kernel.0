@@ -1,75 +1,62 @@
-From: seanvk.dev@oregontracks.org (Sean V Kelley)
-Date: Tue, 31 Jul 2018 09:49:54 -0700
-Subject: ARM PMU ACPI Driver and Mapping Hardware Cache Events for Perf
-Message-ID: <1533055794.3985722.1458925912.4DA110B9@webmail.messagingengine.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 31 Jul 2018 18:00:32 +0100
+Subject: next/master boot: 171 boots: 6 failed, 162 passed with 3 offline
+ (next-20180724)
+In-Reply-To: <20180731155246.GG5719@sirena.org.uk>
+References: <5b5757ee.1c69fb81.411a5.52e2@mx.google.com>
+ <20180725161151.GA340@sirena.org.uk> <20180731155246.GG5719@sirena.org.uk>
+Message-ID: <bb89388b-db7e-a59f-6fd1-4e88b602054c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 31/07/18 16:52, Mark Brown wrote:
+> On Wed, Jul 25, 2018 at 05:11:51PM +0100, Mark Brown wrote:
+>> On Tue, Jul 24, 2018 at 09:46:38AM -0700, kernelci.org bot wrote:
+> 
+>> For a little while now the RPi B has been failing to boot using the
+>> bcm2835 defconfig in -next:
+> 
+> ...
+> 
+>> It's working fine on arm64, whatever's going on appears to be specific
+>> to this config (it's not getting booted with any other 32 bit configs).
+>> Full info and boot logs for one of the boards here:
+> 
+>>     https://kernelci.org/boot/id/5b58416759b514139596baae/
+> 
+>> it looks like it hangs somewhere shortly after or during initializing
+>> MMC so never makes it to the console, the tail of the failing logs looks
+>> like:
+> 
+> This went away for a day or two but it looks like it's back again I'm
+> afraid:
 
-I was trying to better understand why in Perf, ARM defined cache events are not getting mapped for an ARMv8  system when my PMU driver is the ARM ACPI one.  In particular I was looking at the following defined cache events listed via perf:
+FWIW, it looks like that blip was due to me completely breaking DMA API 
+functionality for DT devices in next-20180727. Funny that that actually 
+"helped" in this case (unlike all the others...), but it definitely 
+reinforces Stefan's observation.
 
-  L1-dcache-load-misses                              [Hardware cache event]
-  L1-dcache-loads                                    [Hardware cache event]
-  L1-dcache-store-misses                             [Hardware cache event]
-  L1-dcache-stores                                   [Hardware cache event]
-  L1-icache-load-misses                              [Hardware cache event]
-  L1-icache-loads                                    [Hardware cache event]
-  branch-load-misses                                 [Hardware cache event]
-  branch-loads                                       [Hardware cache event]
-  dTLB-load-misses                                   [Hardware cache event]
-  dTLB-loads                                         [Hardware cache event]
-  iTLB-load-misses                                   [Hardware cache event]
-  iTLB-loads                                         [Hardware cache event]
+Robin.
 
-Seeing those as implementation defined, and following the model from cavium under pmu-events, I then used the following JSON file to attempt to map those with matching addresses (only picking ones with EventCodes matching my own) :
-
-[
-    {
-        "ArchStdEvent": "L1D_CACHE_RD",
-    },
-    {
-        "ArchStdEvent": "L1D_CACHE_WR",
-    },
-    {
-        "ArchStdEvent": "L1D_CACHE_REFILL_RD",
-    },
-    {
-        "ArchStdEvent": "L1D_CACHE_REFILL_WR",
-    },
-    {
-        "ArchStdEvent": "L1D_TLB_REFILL_RD",
-    },
-    {
-        "ArchStdEvent": "L1D_TLB_REFILL_WR",
-    },
-    {
-        "ArchStdEvent": "L1D_TLB_RD",
-    },
-    {
-        "ArchStdEvent": "L1D_TLB_WR",
-    },
-    {
-        "ArchStdEvent": "BUS_ACCESS_RD",
-   },
-   {
-        "ArchStdEvent": "BUS_ACCESS_WR",
-   }
-]
-
-I also added the MIDR to the mapfile csv file.
-
-However, even though, for example, L1D_CACHE_RD has an address ?EventCode? of 0x40, using the string L1-dcache-loads for perf stats doesn?t use 0x40.   Instead it outputs the value of cache-references.  So it appears that L1-dcache-loads is actually getting mapped to something other than the address supplied in the ARM recommended json file ? which I was trying to manually map above.
-
-I understand that for ACPI boot, the ARM PMU CPU framework only supports the standard events for ARM, there is no support for  the custom events of other chips.  However, in the above example, I?m not using custom events.  I?m simply trying to map the ARM standard events and only the standard events whose addresses match myown.  More importantly I?m following the same example used by hisilicon and cavium in the their patches to respective json files for their SoC.
-
-Or am I limited to this JSON feature for only ARM based Device Tree PMU implementations rather an ARM ACPI PMU framework?
-
-Any feedback much appreciated!
-
-Thanks,
-
-Sean
--- 
-  Sean V Kelley
-  seanvk.dev at oregontracks.org
+> 
+>      https://kernelci.org/boot/id/5b604cd259b514364696baaa/
+> 
+>>
+>> | 09:18:36.332120  [    1.459801] mmc1: queuing unknown CIS tuple 0x80 (7 bytes)
+>> | 09:18:36.345711  [    1.467585] mmcblk0: mmc0:59b4 USD   7.51 GiB
+>> | 09:18:36.346169  [    1.474834]  mmcblk0: p1
+>> | 09:18:36.410184  [    1.539600] random: fast init done
+>> | 09:18:36.458065  [    1.578056] mmc1: new high speed SDIO card at address 0001
+>> | 09:20:39.745370  ShellCommand command timed out.: Sending # in case of corruption. Connection timeout 00:04:10, retry in 00:02:05
+>> | 09:20:39.846848  #
+>>
+>> but like I say the same -next boots with arm64 defconfig.
+> 
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
