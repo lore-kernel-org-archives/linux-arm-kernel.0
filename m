@@ -1,47 +1,151 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Tue, 31 Jul 2018 09:53:57 +0200
-Subject: [PATCH v2 0/7] tda998x: allow use with bridge based devices
-In-Reply-To: <20180731074114.GF17271@n2100.armlinux.org.uk>
-References: <20180730164137.GD17271@n2100.armlinux.org.uk>
- <73adc630-21cd-5b14-cb47-f1a58ee3bc83@axentia.se>
- <20180731074114.GF17271@n2100.armlinux.org.uk>
-Message-ID: <9d48e374-be2f-fbc0-ca92-1b7e1b68e358@axentia.se>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Tue, 31 Jul 2018 09:55:24 +0200
+Subject: [PATCH v7 1/4] remoteproc/davinci: use the reset framework
+In-Reply-To: <20180731042539.GE5090@builder>
+References: <20180621073706.22812-1-brgl@bgdev.pl>
+ <20180621073706.22812-2-brgl@bgdev.pl>
+ <20180731042539.GE5090@builder>
+Message-ID: <CAMRc=MdwCruRZ_EQ3Pzq-=HdhiA6pfSZczRKMa5i9Rju0JgHig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-31 09:41, Russell King - ARM Linux wrote:
-> On Tue, Jul 31, 2018 at 07:44:24AM +0200, Peter Rosin wrote:
->> On 2018-07-30 18:41, Russell King - ARM Linux wrote:
->>> Hi,
->>>
->>> This is a re-posting of the series I responded to Peter Rosin's May
->>> posting, with a few bugs fixed, and the bridge registered outside of
->>> the component helper.  This should allow Peter to use the driver
->>> while maintaining armada drm and tilcdc support.
->>>
->>> No comments (other than 0-day test results) were received on the
->>> previous posting.
+2018-07-31 6:25 GMT+02:00 Bjorn Andersson <bjorn.andersson@linaro.org>:
+> On Thu 21 Jun 00:37 PDT 2018, Bartosz Golaszewski wrote:
+>
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 >>
->> I of course meant to comment on this! I didn't because there was a rush
->> before vacation, then vacation, then a heap of important stuff that had
->> piled up. This one simply had too low priority to make a significant bleep
->> on the radar. Sorry for the silence...
+>> Switch to using the reset framework instead of handcoded reset routines
+>> we used so far.
 >>
->> However, now that I do try to test, I get conflicts as I try to apply the
->> patches. I'm wondering what this was based on? I've tried next-20180730
->> drm-misc/drm-misc-next from some minutes ago.
-> 
-> They're based on 4.17.
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+>> Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+>
+> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+>
 
-Right, meanwhile I massaged the patches into a combo of some local patches,
-next-20180730 and drm-misc-next, and tested that. The conflict was trivial
-once I had a closer look...
+Sekhar,
 
-And it seems to work (with atmel-hlcdc), so you can add
+can you take this through your tree or is it already too late?
 
-Tested-by: Peter Rosin <peda@axentia.se>
+Bart
 
-Thank you for very much for picking this up!
-
-Cheers,
-Peter
+> Regards,
+> Bjorn
+>
+>> ---
+>>  drivers/remoteproc/da8xx_remoteproc.c | 34 +++++++++++++++++++++++----
+>>  1 file changed, 29 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
+>> index b668e32996e2..76c06b70a1c6 100644
+>> --- a/drivers/remoteproc/da8xx_remoteproc.c
+>> +++ b/drivers/remoteproc/da8xx_remoteproc.c
+>> @@ -10,6 +10,7 @@
+>>
+>>  #include <linux/bitops.h>
+>>  #include <linux/clk.h>
+>> +#include <linux/reset.h>
+>>  #include <linux/err.h>
+>>  #include <linux/interrupt.h>
+>>  #include <linux/io.h>
+>> @@ -20,8 +21,6 @@
+>>  #include <linux/platform_device.h>
+>>  #include <linux/remoteproc.h>
+>>
+>> -#include <mach/clock.h>   /* for davinci_clk_reset_assert/deassert() */
+>> -
+>>  #include "remoteproc_internal.h"
+>>
+>>  static char *da8xx_fw_name;
+>> @@ -72,6 +71,7 @@ struct da8xx_rproc {
+>>       struct da8xx_rproc_mem *mem;
+>>       int num_mems;
+>>       struct clk *dsp_clk;
+>> +     struct reset_control *dsp_reset;
+>>       void (*ack_fxn)(struct irq_data *data);
+>>       struct irq_data *irq_data;
+>>       void __iomem *chipsig;
+>> @@ -138,6 +138,7 @@ static int da8xx_rproc_start(struct rproc *rproc)
+>>       struct device *dev = rproc->dev.parent;
+>>       struct da8xx_rproc *drproc = (struct da8xx_rproc *)rproc->priv;
+>>       struct clk *dsp_clk = drproc->dsp_clk;
+>> +     struct reset_control *dsp_reset = drproc->dsp_reset;
+>>       int ret;
+>>
+>>       /* hw requires the start (boot) address be on 1KB boundary */
+>> @@ -155,7 +156,12 @@ static int da8xx_rproc_start(struct rproc *rproc)
+>>               return ret;
+>>       }
+>>
+>> -     davinci_clk_reset_deassert(dsp_clk);
+>> +     ret = reset_control_deassert(dsp_reset);
+>> +     if (ret) {
+>> +             dev_err(dev, "reset_control_deassert() failed: %d\n", ret);
+>> +             clk_disable_unprepare(dsp_clk);
+>> +             return ret;
+>> +     }
+>>
+>>       return 0;
+>>  }
+>> @@ -163,8 +169,15 @@ static int da8xx_rproc_start(struct rproc *rproc)
+>>  static int da8xx_rproc_stop(struct rproc *rproc)
+>>  {
+>>       struct da8xx_rproc *drproc = rproc->priv;
+>> +     struct device *dev = rproc->dev.parent;
+>> +     int ret;
+>> +
+>> +     ret = reset_control_assert(drproc->dsp_reset);
+>> +     if (ret) {
+>> +             dev_err(dev, "reset_control_assert() failed: %d\n", ret);
+>> +             return ret;
+>> +     }
+>>
+>> -     davinci_clk_reset_assert(drproc->dsp_clk);
+>>       clk_disable_unprepare(drproc->dsp_clk);
+>>
+>>       return 0;
+>> @@ -232,6 +245,7 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+>>       struct resource *bootreg_res;
+>>       struct resource *chipsig_res;
+>>       struct clk *dsp_clk;
+>> +     struct reset_control *dsp_reset;
+>>       void __iomem *chipsig;
+>>       void __iomem *bootreg;
+>>       int irq;
+>> @@ -268,6 +282,15 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+>>               return PTR_ERR(dsp_clk);
+>>       }
+>>
+>> +     dsp_reset = devm_reset_control_get_exclusive(dev, NULL);
+>> +     if (IS_ERR(dsp_reset)) {
+>> +             if (PTR_ERR(dsp_reset) != -EPROBE_DEFER)
+>> +                     dev_err(dev, "unable to get reset control: %ld\n",
+>> +                             PTR_ERR(dsp_reset));
+>> +
+>> +             return PTR_ERR(dsp_reset);
+>> +     }
+>> +
+>>       if (dev->of_node) {
+>>               ret = of_reserved_mem_device_init(dev);
+>>               if (ret) {
+>> @@ -287,6 +310,7 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+>>       drproc = rproc->priv;
+>>       drproc->rproc = rproc;
+>>       drproc->dsp_clk = dsp_clk;
+>> +     drproc->dsp_reset = dsp_reset;
+>>       rproc->has_iommu = false;
+>>
+>>       ret = da8xx_rproc_get_internal_memories(pdev, drproc);
+>> @@ -309,7 +333,7 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+>>        * *not* in reset, but da8xx_rproc_start() needs the DSP to be
+>>        * held in reset at the time it is called.
+>>        */
+>> -     ret = davinci_clk_reset_assert(drproc->dsp_clk);
+>> +     ret = reset_control_assert(dsp_reset);
+>>       if (ret)
+>>               goto free_rproc;
+>>
+>> --
+>> 2.17.1
+>>
