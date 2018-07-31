@@ -1,124 +1,94 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jul 2018 10:42:47 +0100
-Subject: [PATCH 4/4] drm/i2c: tda998x: add support for pixel repeated modes
-In-Reply-To: <E1fkQvf-0003nV-CW@rmk-PC.armlinux.org.uk>
-References: <20180731092343.GH17271@n2100.armlinux.org.uk>
- <E1fkQvf-0003nV-CW@rmk-PC.armlinux.org.uk>
-Message-ID: <20180731094247.GI17271@n2100.armlinux.org.uk>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Tue, 31 Jul 2018 17:51:14 +0800
+Subject: [PATCH v1 1/2] arm64: dts: mt7622: add some misc device nodes
+In-Reply-To: <1533026633.10540.20.camel@mtkswgap22>
+References: <2ff39c40ef6bc3054667e63c785a1d28527b5ddf.1531753039.git.ryder.lee@mediatek.com>
+ <864955d5-26c4-a5f3-ec1a-420acba50880@gmail.com>
+ <2839886f07dc47afb9a05d06fb1acc84@mtkmbs08n1.mediatek.inc>
+ <1533026633.10540.20.camel@mtkswgap22>
+Message-ID: <1533030674.13386.7.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 10:26:55AM +0100, Russell King wrote:
-> TDA998x has no support for pixel repeated modes, and the code notes this
-> as a "TODO" item.  The implementation appears to be relatively simple,
-> so lets add it.
+On Tue, 2018-07-31 at 16:43 +0800, Ryder Lee wrote:
+> Hi Matthias,
 > 
-> We need to calculate the serializer clock divisor based on the TMDS
-> clock rate, set the repeat control, and set the serializer pixel
-> repeat count.  Since the audio code needs the actual TMDS clock,
-> record that.
-
-Note that this is an experimental patch - I haven't yet been able to
-test it beyond "does it still work with non-doubled modes".  They
-tend to be low resolution modes, because the doubling is needed to
-maintain a minimum clock rate over HDMI.
-
-The doubled modes are (eg):
-
-VIC 	Name
-6	720(1440)x480i at 60Hz
-7	720(1440)x480i at 60Hz
-8	720(1440)x240 at 60Hz
-21	720(1440)x576i at 50Hz
-22	720(1440)x576i at 50Hz
-23	720(1440)x288 at 50Hz
-24	720(1440)x288 at 50Hz
-
-They are probably only found with TVs rather than monitors.
-
+> Sorry for the late reply.
 > 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  drivers/gpu/drm/i2c/tda998x_drv.c | 26 ++++++++++++++++----------
->  1 file changed, 16 insertions(+), 10 deletions(-)
+> On Tue, 2018-07-31 at 16:17 +0800, Ryder Lee (???) wrote:
+> > Hi Ryder,
+> > 
+> > On 16/07/18 16:59, Ryder Lee wrote:
+> > > Add some misc nodes support - timer and ARM CCI-400.
+> > > 
+> > > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> > > ---
+> > >  arch/arm64/boot/dts/mediatek/mt7622.dtsi | 36 
+> > > ++++++++++++++++++++++++++++++++
+> > >  1 file changed, 36 insertions(+)
+> > > 
+> > > diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi 
+> > > b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> > > index 9213c96..8cdec52 100644
+> > > --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> > > +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> > > @@ -217,6 +217,16 @@
+> > >  		#reset-cells = <1>;
+> > >  	};
+> > >  
+> > > +	timer: timer at 10004000 {
+> > > +		compatible = "mediatek,mt7622-timer",
+> > > +			     "mediatek,mt6577-timer";
+> > > +		reg = <0 0x10004000 0 0x80>;
+> > > +		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
+> > > +		clocks = <&infracfg CLK_INFRA_APXGPT_PD>,
+> > > +			 <&topckgen CLK_TOP_RTC>;
+> > > +		clock-names = "system-clk", "rtc-clk";
+> > > +	};
+> > > +
+> > >  	scpsys: scpsys at 10006000 {
+> > >  		compatible = "mediatek,mt7622-scpsys",
+> > >  			     "syscon";
+> > > @@ -317,6 +327,32 @@
+> > >  		      <0 0x10360000 0 0x2000>;
+> > >  	};
+> > >  
+> > > +	cci: cci at 10390000 {
+> > > +		compatible = "arm,cci-400";
+> > > +		#address-cells = <1>;
+> > > +		#size-cells = <1>;
+> > > +		reg = <0 0x10390000 0 0x1000>;
+> > > +		ranges = <0 0 0x10390000 0x10000>;
+> > 
+> > From my understanding of the binding description ranges should hold child address, parent address and size of the region in the child address space. I can see in arch/arm64 two different variants using 4 ranges values (like here) and using three values.
+> > 
+> > @Rob + Will what is the preferred way to describe this?
 > 
-> diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-> index a31809ce30e2..08ce28cbdec4 100644
-> --- a/drivers/gpu/drm/i2c/tda998x_drv.c
-> +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-> @@ -241,6 +241,7 @@ struct tda998x_priv {
->  # define HVF_CNTRL_1_PAD(x)       (((x) & 3) << 4)
->  # define HVF_CNTRL_1_SEMI_PLANAR  (1 << 6)
->  #define REG_RPT_CNTRL             REG(0x00, 0xf0)     /* write */
-> +# define RPT_CNTRL_REPEAT(x)      ((x) & 15)
->  #define REG_I2S_FORMAT            REG(0x00, 0xfc)     /* read/write */
->  # define I2S_FORMAT(x)            (((x) & 3) << 0)
->  #define REG_AIP_CLKSEL            REG(0x00, 0xfd)     /* write */
-> @@ -1342,7 +1343,7 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
->  	u16 vwin1_line_s, vwin1_line_e;
->  	u16 vwin2_line_s, vwin2_line_e;
->  	u16 de_pix_s, de_pix_e;
-> -	u8 reg, div, rep;
-> +	u8 reg, div, rep, sel_clk;
->  
->  	/*
->  	 * Internally TDA998x is using ITU-R BT.656 style sync but
-> @@ -1405,7 +1406,16 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
->  			       (mode->vsync_end - mode->vsync_start)/2;
->  	}
->  
-> -	tmds_clock = mode->clock;
-> +	/*
-> +	 * Select pixel repeat depending on the double-clock flag
-> +	 * (which means we have to repeat each pixel once.)
-> +	 */
-> +	rep = mode->flags & DRM_MODE_FLAG_DBLCLK ? 1 : 0;
-> +	sel_clk = SEL_CLK_ENA_SC_CLK | SEL_CLK_SEL_CLK1 |
-> +		  SEL_CLK_SEL_VRF_CLK(rep ? 2 : 0);
-> +
-> +	/* the TMDS clock is scaled up by the pixel repeat */
-> +	tmds_clock = mode->clock * (1 + rep);
->  
->  	/*
->  	 * The divisor is power-of-2. The TDA9983B datasheet gives
-> @@ -1421,6 +1431,8 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
->  
->  	mutex_lock(&priv->audio_mutex);
->  
-> +	priv->tmds_clock = tmds_clock;
-> +
->  	/* mute the audio FIFO: */
->  	reg_set(priv, REG_AIP_CNTRL_0, AIP_CNTRL_0_RST_FIFO);
->  
-> @@ -1443,12 +1455,8 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
->  	reg_write(priv, REG_SERIALIZER, 0);
->  	reg_write(priv, REG_HVF_CNTRL_1, HVF_CNTRL_1_VQR(0));
->  
-> -	/* TODO enable pixel repeat for pixel rates less than 25Msamp/s */
-> -	rep = 0;
-> -	reg_write(priv, REG_RPT_CNTRL, 0);
-> -	reg_write(priv, REG_SEL_CLK, SEL_CLK_SEL_VRF_CLK(0) |
-> -			SEL_CLK_SEL_CLK1 | SEL_CLK_ENA_SC_CLK);
-> -
-> +	reg_write(priv, REG_RPT_CNTRL, RPT_CNTRL_REPEAT(rep));
-> +	reg_write(priv, REG_SEL_CLK, sel_clk);
->  	reg_write(priv, REG_PLL_SERIAL_2, PLL_SERIAL_2_SRL_NOSC(div) |
->  			PLL_SERIAL_2_SRL_PR(rep));
->  
-> @@ -1516,8 +1524,6 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
->  	/* must be last register set: */
->  	reg_write(priv, REG_TBG_CNTRL_0, 0);
->  
-> -	priv->tmds_clock = adjusted_mode->clock;
-> -
->  	/* CEA-861B section 6 says that:
->  	 * CEA version 1 (CEA-861) has no support for infoframes.
->  	 * CEA version 2 (CEA-861A) supports version 1 AVI infoframes,
-> -- 
-> 2.7.4
-> 
+> Hmmm... it's just a copy-paste (I take zynqmp.dtsi as an example).
+> > > +
+> > > +		cci_control0: slave-if at 1000 {
+> > > +			compatible = "arm,cci-400-ctrl-if";
+> > > +			interface-type = "ace-lite";
+> > > +			reg = <0x1000 0x1000>;
+> > > +		};
+> > 
+> > Don't we need to add phandles to the cci-control-port property in the cpu nodes?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+I forgot to answer this question in previous mail.
+
+Yes, we need it. I will add the cci-control-port property in the cpu
+nodes and add the child node PMU in cci-400 - somehow I forgot to add
+them.
+
+Thanks for your reminder.
+
+> > Regards,
+> > Matthias
+> 
+> MT7622 use cci-400 to improve performance (DMA IO coherence) for
+> high-speed IPs. (i.e., ETH/WIFI/SATA/...)
+> 
+> I added it early but actually the related features have not supported in
+> mainline yet.
+> 
+> Ryder
