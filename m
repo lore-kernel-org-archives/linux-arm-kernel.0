@@ -1,50 +1,67 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 31 Jul 2018 15:34:33 +0530
-Subject: [PATCH v7 1/4] remoteproc/davinci: use the reset framework
-In-Reply-To: <CAMRc=MdwCruRZ_EQ3Pzq-=HdhiA6pfSZczRKMa5i9Rju0JgHig@mail.gmail.com>
-References: <20180621073706.22812-1-brgl@bgdev.pl>
- <20180621073706.22812-2-brgl@bgdev.pl> <20180731042539.GE5090@builder>
- <CAMRc=MdwCruRZ_EQ3Pzq-=HdhiA6pfSZczRKMa5i9Rju0JgHig@mail.gmail.com>
-Message-ID: <c3484965-1efe-2425-86e0-ecb78ea189dd@ti.com>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Tue, 31 Jul 2018 15:45:33 +0530
+Subject: [PATCH v2] arm64, kaslr: export offset in VMCOREINFO ELF notes
+In-Reply-To: <20180731092629.GD4680@arm.com>
+References: <1532931883-16132-1-git-send-email-bhsharma@redhat.com>
+ <303e32f7-ff47-ea9b-d5a0-45a22e44d0a9@arm.com> <20180731092629.GD4680@arm.com>
+Message-ID: <CACi5LpMkuq78Vn6uncZ=StR8dSHzptiZnT9mmQR+OcaLv-ck_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bjorn,
+Hi Will, James,
 
-On Tuesday 31 July 2018 01:25 PM, Bartosz Golaszewski wrote:
-> 2018-07-31 6:25 GMT+02:00 Bjorn Andersson <bjorn.andersson@linaro.org>:
->> On Thu 21 Jun 00:37 PDT 2018, Bartosz Golaszewski wrote:
+On Tue, Jul 31, 2018 at 2:56 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Jul 31, 2018 at 10:19:35AM +0100, James Morse wrote:
+>> Hi Bhupesh,
 >>
->>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>
->>> Switch to using the reset framework instead of handcoded reset routines
->>> we used so far.
->>>
->>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>> Reviewed-by: Sekhar Nori <nsekhar@ti.com>
->>> Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+>> On 30/07/18 07:24, Bhupesh Sharma wrote:
+>> > Include KASLR offset in arm64 VMCOREINFO ELF notes to assist in
+>> > debugging. vmcore parsing in user-space already expects this value in
+>> > the notes and we are providing it for portability of those existing
+>> > tools with x86.
+>> >
+>> > Ideally we would like core code to do this (so that way this
+>> > information won't be missed when an architecture adds KASLR support),
+>> > but mips has CONFIG_RANDOMIZE_BASE, and doesn't provide kaslr_offset(),
+>> > so I am not sure if this is needed for mips (and other such similar arch
+>> > cases in future). So, lets keep this architecture specific for now.
 >>
->> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+>> (heh, I assumed you would rewrite my train-of-thought, but I guess this works!)
 >>
-> 
-> Sekhar,
-> 
-> can you take this through your tree or is it already too late?
+>>
+>> > As an example of a user-space use-case, consider the
+>> > makedumpfile user-space utility which will need fixup to use this
+>> > KASLR offset to work with cases where we need to find a way to
+>> > translate symbol address from vmlinux to kernel run time address
+>> > in case of KASLR boot on arm64.
+>>
+>> Acked-by: James Morse <james.morse@arm.com>
 
-The last -rc is already tagged and I am not sure ARM-SoC will be open to
-new stuff now (there is also a bit of lag after I send my pull request).
+Thanks James.
 
-Is this something you can take in your tree along with Suman's patch?
+>> If we want to send this to stable, it looks like it should have been part of the
+>> KASLR series, f80fb3a3d5084 ("arm64: add support for kernel ASLR") was merged
+>> for v4.6.
+>> CC: <stable@vger.kernel.org> # 4.6.x
+>
+> Hmm, does this warrant a stable backport? This hasn't ever worked, right?
 
-There are no build dependencies with my tree, so it will be safe to
-queue from your tree. It will be great if this can be merged late in the
-cycle though to avoid breaking remoteproc even for short while during
-the merge window.
+Yes, it is a new feature being enabled/tested in user-space utilities
+now for arm64 (although it's being used for x86_64 since some time).
 
-Or if you okay with it, it will be safest to send it soon after
-v4.19-rc1 is tagged.
+I would like the user-space utilities to do away with the arch
+specific code (as much as possible) for KASLR features, but we are
+still kind of stabilizing the same on various archs, so the user-space
+cleanup is one of items on my to-do list.
 
-Let me know.
+However, since kernel and user-space features are frequently
+backported to older versions (e.g. RHEL and OpenSuse), so it would
+help to send this patch to stable as well, so that stable kernels >=
+4.6.x can work well with such backported user-space utilities and
+utilize KASLR features on arm64 well.
+
+As such, I see no side-effect of adding this information to the
+vmcoreinfo in the stable kernels as well.
 
 Thanks,
-Sekhar
+Bhupesh
