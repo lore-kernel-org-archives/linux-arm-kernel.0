@@ -1,71 +1,91 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 31 Jul 2018 10:32:31 +0200
-Subject: [RFC] PCI: imx: Add multi-pd support
-In-Reply-To: <8018069bc772376caef29e76280e4d0facffdb68.1532455922.git.leonard.crestez@nxp.com>
-References: <8018069bc772376caef29e76280e4d0facffdb68.1532455922.git.leonard.crestez@nxp.com>
-Message-ID: <CAPDyKFpN99iDYf1mcG-G1=AAkiw8OjoynvK+5cBV8GvCs6WtKg@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 31 Jul 2018 17:39:42 +0900
+Subject: [GIT PULL 3/3] ARM: uniphier: UniPhier SoC updates for v4.19
+In-Reply-To: <CAK7LNAQHL16vxv7twzy9PPkLLrbvzuAMa9QtOjSN3Z1KHWKG_Q@mail.gmail.com>
+References: <CAK7LNAShLhWqCRR8RfuJ0xBJAFoj-S6WLcSdh9QShg8dGfq9RA@mail.gmail.com>
+ <20180721212430.odjwcusbbihffo6l@localhost>
+ <CAK7LNAQHL16vxv7twzy9PPkLLrbvzuAMa9QtOjSN3Z1KHWKG_Q@mail.gmail.com>
+Message-ID: <CAK7LNARSx1hSLQNCzAQyD74dvnHzVqkTFoWj6GL7_5+vZau7Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 July 2018 at 20:17, Leonard Crestez <leonard.crestez@nxp.com> wrote:
-> On some chips the PCIE and PCIE_PHY blocks are in separate power domains
-> which can be power-gated independently. The driver needs to handle this
-> by keeping both domain active.
+Hi Olof,
+
+
+2018-07-22 8:24 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Hi Olof,
 >
-> This is intended for imx6sx where PCIE is in DISPMIX and PCIE_PHY in
-> it's own domain. Defining the DISPMIX domain requires a way for pcie to
-> keep it active or it will break when displays are off.
+> 2018-07-22 6:24 GMT+09:00 Olof Johansson <olof@lixom.net>:
+>> On Thu, Jul 19, 2018 at 08:05:03AM +0900, Masahiro Yamada wrote:
+>>> Hi Arnd, Olof,
+>>>
+>>> Please pull UniPhier SoC changes for the v4.19 MW.
+>>>
+>>> Thanks!
+>>>
+>>>
+>>> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+>>>
+>>>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+>>> tags/uniphier-soc-v4.19
+>>>
+>>> for you to fetch changes up to ae93e694440a454609fa40725e16619c5a781768:
+>>>
+>>>   ARM: uniphier: remove empty Makefile (2018-07-19 06:53:16 +0900)
+>>>
+>>> ----------------------------------------------------------------
+>>> UniPhier ARM SoC updates for v4.19
+>>>
+>>> - enable ethernet and thermal drivers from multi_v7_defconfig
+>>>
+>>> - select RESET_CONTROLLER
+>>>
+>>> - remove empty arch/arm/mach-uniphier/Makefile
+>>>
+>>> ----------------------------------------------------------------
+>>> Kunihiko Hayashi (1):
+>>>       ARM: multi_v7_defconfig: add CONFIG_UNIPHIER_THERMAL and CONFIG_SNI_AVE
+>>
+>> I renormalied multi_v7_defconfig for 4.18-rc3, so please base your branch
+>> on that to avoid conflicts.
+>>
+>> Also, we separate out defconfig updates to branches on their own. I can
+>> cherry-pick the branch apart but wanted to check with you before I do
+>> so in case it messes up your workflow. If it does, send a fresh pull
+>> request for SoC, and either one for the defconfig or just the patch and
+>> we can apply it directly.
+>>
 >
-> The power-domains on imx6sx are meant to look like this:
->         power-domains = <&pd_disp>, <&pd_pci>;
->         power-domain-names = "pcie", "pcie_phy";
+> Can you do cherry-pick please?
 >
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Ping?
 
-See some comments below...
+You offered to cherry-pick the patches directly to your tree,
+and I asked you to do so.
 
-> ---
->
-> Right now if a device has a single power domain it will be activated
-> before probe but if it has multiple domains they need to be explicitly
-> "attached" to and controlled. Supporting both is a bit awkward, this
-> patch makes the distinction based on (dev->pm_domain != NULL).
->
-> Maybe the PM core should make this distinction based on a flag in struct
-> device_driver instead of number of power-domains? So by default when a
-> device has multiple power domains they would would be activated
-> together and this patch would be unnecessary.
 
-Activation is deliberately left to be manged by each user, as the PM
-core/genpd can't know when powering on the PM domains make sense.
 
-The main reason to why genpd powers on the PM domain for the single PM
-domain case, is because of legacy behaviors in drivers. Some drivers
-don't call pm_runtime_get_sync() during ->probe(), but instead use
-pm_runtime_set_active(), to synchronize the state with the HW. This
-means the ->runtime_resume() callback doesn't get invoked for genpd,
-hence genpd must power on the PM domain already at attache to cover
-this case.
+We do not have much time until the MW opens.
+Please cherry-pick the following four:
 
->
-> This is marked as "RFC" mostly because I believe it should be handled
-> inside PM core, without driver code. Does this make sense to anyone else?
->
-> This is independent of recent patches adding suspend/resume support to
-> imx pci, but supporting suspend with multi-pd requires adding device
-> links, not just activating pds at probe time.
->
-> The device_link is marked as "STATELESS" because otherwise a warning is
-> triggered in device_links_driver_bound. This seems to happen because the
-> pd devices are always marked as "DL_DEV_NO_DRIVER". Maybe they should be
-> instead always be marked as DL_DEV_DRIVER_BOUND?
 
-Using STATELESS is correct, because the supplier devices, which are
-managed by genpd don't have any driver attached to them.
+Kunihiko Hayashi (1):
+      ARM: multi_v7_defconfig: add CONFIG_UNIPHIER_THERMAL and CONFIG_SNI_AVE
 
-[...]
+Masahiro Yamada (3):
+      ARM: uniphier: select RESET_CONTROLLER
+      arm64: uniphier: select RESET_CONTROLLER
+      ARM: uniphier: remove empty Makefile
 
-Kind regards
-Uffe
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
