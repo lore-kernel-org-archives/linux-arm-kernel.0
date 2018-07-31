@@ -1,59 +1,124 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Tue, 31 Jul 2018 11:32:53 +0200
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.19 (#2)
-In-Reply-To: <20180721213352.eborr5dctfk3t7j3@localhost> (Olof Johansson's
- message of "Sat, 21 Jul 2018 14:33:52 -0700")
-References: <87sh4e8eym.fsf@bootlin.com>
- <20180721213352.eborr5dctfk3t7j3@localhost>
-Message-ID: <87h8kfda2i.fsf@bootlin.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 Jul 2018 10:42:47 +0100
+Subject: [PATCH 4/4] drm/i2c: tda998x: add support for pixel repeated modes
+In-Reply-To: <E1fkQvf-0003nV-CW@rmk-PC.armlinux.org.uk>
+References: <20180731092343.GH17271@n2100.armlinux.org.uk>
+ <E1fkQvf-0003nV-CW@rmk-PC.armlinux.org.uk>
+Message-ID: <20180731094247.GI17271@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
- 
- On sam., juil. 21 2018, Olof Johansson <olof@lixom.net> wrote:
+On Tue, Jul 31, 2018 at 10:26:55AM +0100, Russell King wrote:
+> TDA998x has no support for pixel repeated modes, and the code notes this
+> as a "TODO" item.  The implementation appears to be relatively simple,
+> so lets add it.
+> 
+> We need to calculate the serializer clock divisor based on the TMDS
+> clock rate, set the repeat control, and set the serializer pixel
+> repeat count.  Since the audio code needs the actual TMDS clock,
+> record that.
 
-> On Fri, Jul 20, 2018 at 10:54:25AM +0200, Gregory CLEMENT wrote:
->> Hi,
->> 
->> Here is the second pull request for dt64 for mvebu for v4.19.
->> 
->> Gregory
->> 
->> The following changes since commit 4436a3711e3249840e0679e92d3c951bcaf25515:
->> 
->>   arm64: dts: marvell: armada-37xx: reserve memory for ATF (2018-06-29 16:39:03 +0200)
->> 
->> are available in the Git repository at:
->> 
->>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.19-2
->> 
->> for you to fetch changes up to c462f6c77e72804b72e008a91c4b6fa8d9b4b265:
->> 
->>   arm64: dts: marvell: armada-37xx: update the crypto engine compatible (2018-07-13 13:42:03 +0200)
->> 
->> ----------------------------------------------------------------
->> mvebu dt64 for 4.19 (part 2)
->> 
->> Use more specific compatible for the Inside Secure SafeXcel on the
->> Armada 37xx and the Armada 7K/8K SoCs.
->
-> I'll reply to the patches -- usually compatible should go from specific to
-> generic and you're replacing here instead of adding a more specific first. You
-> probably want to do the former instead.
->
-> Not merged, let's settle discussion on the patch first.
+Note that this is an experimental patch - I haven't yet been able to
+test it beyond "does it still work with non-doubled modes".  They
+tend to be low resolution modes, because the doubling is needed to
+maintain a minimum clock rate over HDMI.
 
-Now that Antoine explained the reason for replacing the compatible, will
-you pull the branch?
+The doubled modes are (eg):
 
-Gregory
+VIC 	Name
+6	720(1440)x480i at 60Hz
+7	720(1440)x480i at 60Hz
+8	720(1440)x240 at 60Hz
+21	720(1440)x576i at 50Hz
+22	720(1440)x576i at 50Hz
+23	720(1440)x288 at 50Hz
+24	720(1440)x288 at 50Hz
 
->
->
-> -Olof
+They are probably only found with TVs rather than monitors.
+
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  drivers/gpu/drm/i2c/tda998x_drv.c | 26 ++++++++++++++++----------
+>  1 file changed, 16 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+> index a31809ce30e2..08ce28cbdec4 100644
+> --- a/drivers/gpu/drm/i2c/tda998x_drv.c
+> +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+> @@ -241,6 +241,7 @@ struct tda998x_priv {
+>  # define HVF_CNTRL_1_PAD(x)       (((x) & 3) << 4)
+>  # define HVF_CNTRL_1_SEMI_PLANAR  (1 << 6)
+>  #define REG_RPT_CNTRL             REG(0x00, 0xf0)     /* write */
+> +# define RPT_CNTRL_REPEAT(x)      ((x) & 15)
+>  #define REG_I2S_FORMAT            REG(0x00, 0xfc)     /* read/write */
+>  # define I2S_FORMAT(x)            (((x) & 3) << 0)
+>  #define REG_AIP_CLKSEL            REG(0x00, 0xfd)     /* write */
+> @@ -1342,7 +1343,7 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
+>  	u16 vwin1_line_s, vwin1_line_e;
+>  	u16 vwin2_line_s, vwin2_line_e;
+>  	u16 de_pix_s, de_pix_e;
+> -	u8 reg, div, rep;
+> +	u8 reg, div, rep, sel_clk;
+>  
+>  	/*
+>  	 * Internally TDA998x is using ITU-R BT.656 style sync but
+> @@ -1405,7 +1406,16 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
+>  			       (mode->vsync_end - mode->vsync_start)/2;
+>  	}
+>  
+> -	tmds_clock = mode->clock;
+> +	/*
+> +	 * Select pixel repeat depending on the double-clock flag
+> +	 * (which means we have to repeat each pixel once.)
+> +	 */
+> +	rep = mode->flags & DRM_MODE_FLAG_DBLCLK ? 1 : 0;
+> +	sel_clk = SEL_CLK_ENA_SC_CLK | SEL_CLK_SEL_CLK1 |
+> +		  SEL_CLK_SEL_VRF_CLK(rep ? 2 : 0);
+> +
+> +	/* the TMDS clock is scaled up by the pixel repeat */
+> +	tmds_clock = mode->clock * (1 + rep);
+>  
+>  	/*
+>  	 * The divisor is power-of-2. The TDA9983B datasheet gives
+> @@ -1421,6 +1431,8 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
+>  
+>  	mutex_lock(&priv->audio_mutex);
+>  
+> +	priv->tmds_clock = tmds_clock;
+> +
+>  	/* mute the audio FIFO: */
+>  	reg_set(priv, REG_AIP_CNTRL_0, AIP_CNTRL_0_RST_FIFO);
+>  
+> @@ -1443,12 +1455,8 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
+>  	reg_write(priv, REG_SERIALIZER, 0);
+>  	reg_write(priv, REG_HVF_CNTRL_1, HVF_CNTRL_1_VQR(0));
+>  
+> -	/* TODO enable pixel repeat for pixel rates less than 25Msamp/s */
+> -	rep = 0;
+> -	reg_write(priv, REG_RPT_CNTRL, 0);
+> -	reg_write(priv, REG_SEL_CLK, SEL_CLK_SEL_VRF_CLK(0) |
+> -			SEL_CLK_SEL_CLK1 | SEL_CLK_ENA_SC_CLK);
+> -
+> +	reg_write(priv, REG_RPT_CNTRL, RPT_CNTRL_REPEAT(rep));
+> +	reg_write(priv, REG_SEL_CLK, sel_clk);
+>  	reg_write(priv, REG_PLL_SERIAL_2, PLL_SERIAL_2_SRL_NOSC(div) |
+>  			PLL_SERIAL_2_SRL_PR(rep));
+>  
+> @@ -1516,8 +1524,6 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
+>  	/* must be last register set: */
+>  	reg_write(priv, REG_TBG_CNTRL_0, 0);
+>  
+> -	priv->tmds_clock = adjusted_mode->clock;
+> -
+>  	/* CEA-861B section 6 says that:
+>  	 * CEA version 1 (CEA-861) has no support for infoframes.
+>  	 * CEA version 2 (CEA-861A) supports version 1 AVI infoframes,
+> -- 
+> 2.7.4
+> 
 
 -- 
-Gregory Clement, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-http://bootlin.com
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
