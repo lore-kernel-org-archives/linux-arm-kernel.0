@@ -1,46 +1,40 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 31 Jul 2018 15:48:49 +0530
-Subject: [PATCH v7 4/6] dt-bindings: mailbox: imx-mu: add i.MX6SX and
- i.MX7S SoCs.
-In-Reply-To: <20180730222207.GA28554@rob-hp-laptop>
-References: <20180726065331.6186-1-o.rempel@pengutronix.de>
- <20180726065331.6186-5-o.rempel@pengutronix.de>
- <CABb+yY32vBy5qVYsQ6u45=rV6gEggqKy3Jqn1B4oWHaGfTyQ8Q@mail.gmail.com>
- <20180730222207.GA28554@rob-hp-laptop>
-Message-ID: <CABb+yY3Xhmp=tum-kW6x2OxrzVgoDZhddPOZo02VVYLbWDPxvQ@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 31 Jul 2018 12:20:07 +0200
+Subject: [PATCH 1/3] clk: imx6q: reset exclusive gates on init
+Message-ID: <20180731102009.6710-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 3:52 AM, Rob Herring <robh@kernel.org> wrote:
-> On Thu, Jul 26, 2018 at 03:25:15PM +0530, Jassi Brar wrote:
->> On Thu, Jul 26, 2018 at 12:23 PM, Oleksij Rempel
->> <o.rempel@pengutronix.de> wrote:
->> > This are currently tested SoCs with imx-mailbox driver.
->> >
->> > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
->> > ---
->> >  Documentation/devicetree/bindings/mailbox/fsl,mu.txt | 2 +-
->> >  1 file changed, 1 insertion(+), 1 deletion(-)
->> >
->> > diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
->> > index 113d6ab931ef..5616d2afca45 100644
->> > --- a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
->> > +++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
->> > @@ -18,7 +18,7 @@ Messaging Unit Device Node:
->> >  Required properties:
->> >  -------------------
->> >  - compatible : should be "fsl,<chip>-mu", the supported chips include
->> > -               imx8qxp, imx8qm.
->> > +               imx6sx, imx7s, imx8qxp, imx8qm.
->> >
->> This is not scalable. Do we add every new SoC that contains the same controller?
->> I think the controller name, if it has one or create a new one like
->> 'imx-mu',  should be used here.
->> So,
->>     compatible : should be "fsl,imx-mu"
->
-> No, for all the reasons already correctly explained in this thread.
->
-OK. I am curious to see what soc specific fixes we need in future.
+The exclusive gates may be set up in the wrong way by software running
+before the clock driver comes up. In that case the exclusive setup is
+locked in its initial state, as the complementary function can't be
+activated without disabling the initial setup first.
 
-Thanks.
+To avoid this lock situation, reset the exclusive gates to the off
+state and allow the kernel to provide the proper setup.
+
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ drivers/clk/imx/clk-imx6q.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
+index b9ea7037e193..9059a369ae95 100644
+--- a/drivers/clk/imx/clk-imx6q.c
++++ b/drivers/clk/imx/clk-imx6q.c
+@@ -515,8 +515,12 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	 * lvds1_gate and lvds2_gate are pseudo-gates.  Both can be
+ 	 * independently configured as clock inputs or outputs.  We treat
+ 	 * the "output_enable" bit as a gate, even though it's really just
+-	 * enabling clock output.
++	 * enabling clock output. Initially the gate bits are cleared, as
++	 * otherwise the exclusive configuration gets locked in the setup done
++	 * by software running before the clock driver, with no way to change
++	 * it.
+ 	 */
++	writel(readl(base + 0x160) & ~0x3c00, base + 0x160);
+ 	clk[IMX6QDL_CLK_LVDS1_GATE] = imx_clk_gate_exclusive("lvds1_gate", "lvds1_sel", base + 0x160, 10, BIT(12));
+ 	clk[IMX6QDL_CLK_LVDS2_GATE] = imx_clk_gate_exclusive("lvds2_gate", "lvds2_sel", base + 0x160, 11, BIT(13));
+ 
+-- 
+2.18.0
