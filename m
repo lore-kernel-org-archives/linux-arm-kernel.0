@@ -1,180 +1,122 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Tue, 31 Jul 2018 09:21:26 -0700
-Subject: [PATCH v5 1/3] thermal: qcom-spmi: Use PMIC thermal stage 2 for
- critical trip points
-In-Reply-To: <20180727224505.GD4450@localhost.localdomain>
-References: <20180724234636.57137-1-mka@chromium.org>
- <CAD=FV=VODGOE=qvJVeLGBs8xXQvbHZu7S9rqSpMY4AetUjd3fQ@mail.gmail.com>
- <20180726011228.GV129942@google.com>
- <20180727224050.GC4450@localhost.localdomain>
- <20180727224505.GD4450@localhost.localdomain>
-Message-ID: <20180731162126.GF68975@google.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 31 Jul 2018 21:51:37 +0530
+Subject: [PATCH v8 4/4] mailbox: Add support for i.MX7D messaging unit
+In-Reply-To: <20180731141146.10788-5-o.rempel@pengutronix.de>
+References: <20180731141146.10788-1-o.rempel@pengutronix.de>
+ <20180731141146.10788-5-o.rempel@pengutronix.de>
+Message-ID: <CABb+yY2PN=LN3bgTTzL9SpA43atughAbS1OjNsg0XZg42JxD3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 27, 2018 at 03:45:06PM -0700, Eduardo Valentin wrote:
-> On Fri, Jul 27, 2018 at 03:40:52PM -0700, Eduardo Valentin wrote:
-> > On Wed, Jul 25, 2018 at 06:12:28PM -0700, Matthias Kaehlcke wrote:
-> > > Hi Doug,
-> > > 
-> > > On Wed, Jul 25, 2018 at 04:19:56PM -0700, Doug Anderson wrote:
-> > > 
-> > > > On Tue, Jul 24, 2018 at 4:46 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
-> > > > > +static int qpnp_tm_update_critical_trip_temp(struct qpnp_tm_chip *chip,
-> > > > > +                                            int temp)
-> > > > > +{
-> > > > > +       u8 reg;
-> > > > > +       bool disable_s2_shutdown = false;
-> > > > > +       int ret;
-> > > > > +
-> > > > > +       WARN_ON(!mutex_is_locked(&chip->lock));
-> > > > > +
-> > > > > +       /*
-> > > > > +        * Default: S2 and S3 shutdown enabled, thresholds at
-> > > > > +        * 105C/125C/145C, monitoring at 25Hz
-> > > > > +        */
-> > > > > +       reg = SHUTDOWN_CTRL1_RATE_25HZ;
-> > > > > +
-> > > > > +       if ((temp == THERMAL_TEMP_INVALID) ||
-> > > > > +           (temp < STAGE2_THRESHOLD_MIN)) {
-> > > > > +               chip->thresh = THRESH_MIN;
-> > > > > +               goto skip;
-> > > > > +       }
-> > > > > +
-> > > > > +       if (temp <= STAGE2_THRESHOLD_MAX) {
-> > > > > +               chip->thresh = THRESH_MAX -
-> > > > > +                       ((STAGE2_THRESHOLD_MAX - temp) /
-> > > > > +                        TEMP_THRESH_STEP);
-> > > > > +               disable_s2_shutdown = true;
-> > > > > +       } else {
-> > > > > +               chip->thresh = THRESH_MAX;
-> > > > > +
-> > > > > +               if (!IS_ERR(chip->adc))
-> > > > > +                       disable_s2_shutdown = true;
-> > > > > +               else
-> > > > > +                       dev_warn(chip->dev,
-> > > > > +                                "No ADC is configured and critical temperature is above the maximum stage 2 threshold of 140?C! Configuring stage 2 shutdown at 140?C.\n");
-> > > > 
-> > > > Putting a non-ASCII character (the degree symbol) in your commit
-> > > > message is one thing, but are you sure it's wise to put it in the
-> > > > kernel logs?
-> > > 
-> > > A few other drivers also do this
-> > > (drivers/gpu/drm/nouveau/nvkm/subdev/clk/base.c,
-> > > drivers/macintosh/windfarm_pm121.c), however that doesn't mean it's a
-> > > good idea. Will change to degC or C.
-> > > 
-> > > > > +       }
-> > > > > +
-> > > > > +skip:
-> > > > > +       reg |= chip->thresh;
-> > > > > +       if (disable_s2_shutdown)
-> > > > > +               reg |= SHUTDOWN_CTRL1_OVERRIDE_S2;
-> > > > > +
-> > > > > +       ret = qpnp_tm_write(chip, QPNP_TM_REG_SHUTDOWN_CTRL1, reg);
-> > > > > +       if (ret < 0)
-> > > > > +               return ret;
-> > > > > +
-> > > > > +       return ret;
-> > > > 
-> > > > Simplify the above lines to:
-> > > > 
-> > > > return qpnp_tm_write(chip, QPNP_TM_REG_SHUTDOWN_CTRL1, reg);
-> > > 
-> > > Ouch, my code is indeed dumb ...
-> > > 
-> > > > > @@ -313,12 +441,7 @@ static int qpnp_tm_probe(struct platform_device *pdev)
-> > > > >         if (ret < 0)
-> > > > >                 return ret;
-> > > > >
-> > > > > -       chip->tz_dev = devm_thermal_zone_of_sensor_register(&pdev->dev, 0, chip,
-> > > > > -                                                       &qpnp_tm_sensor_ops);
-> > > > > -       if (IS_ERR(chip->tz_dev)) {
-> > > > > -               dev_err(&pdev->dev, "failed to register sensor\n");
-> > > > > -               return PTR_ERR(chip->tz_dev);
-> > > > > -       }
-> > > > > +       chip->initialized = true;
-> > > > 
-> > > > Should we add "thermal_zone_device_update(chip->tz_dev,
-> > > > THERMAL_EVENT_UNSPECIFIED);" here
-> > > 
-> > > Seems reasonable, will do.
-> > > 
-> > > > ...also: do we care about any type of locking for chip->initialized?
-> > > > Technically we can be running on weakly ordered memory so if
-> > > > qpnp_tm_update_temp_no_adc() is running on a different processor then
-> > > > possibly it could still keep returning the default temperature for a
-> > > > little while.  We could try to analyze whether there's some sort of
-> > > > implicit barrier or we could add manual memory barriers, but generally
-> > > > I try to avoid that and just do the simple locking...  What about just
-> > > > setting chip-Initialized = true at the end of qpnp_tm_init() while the
-> > > > mutex is still held?
-> > > 
-> > > Thanks for pointing that out. I agree that we should keep things
-> > > simple, chip->initialized to true at the end of qpnp_tm_init() sounds
-> > > good to me.
-> > > 
-> > > > I'd also love to hear from someone with more thermal framework
-> > > > experience to make sure it's legit to return a default value if
-> > > > someone calls us while we're initting.  It seems sane to me but nice
-> > > > to confirm it's OK.
-> > > 
-> > > An alternative could be to return THERMAL_TEMP_INVALID, however I
-> > > don't see this handled outside of thermal_core.c, not sure if it could
-> > > throw some other code off.
-> > > 
-> > > Comments from thermal folks on either approach (or alternatives) are
-> > > definitely welcome :)
-> > > 
-> > > > Overall I like the idea of this patch so hopefully others do too.
-> > > > Thanks for sending it out!
-> > > 
-> > 
-> > minor ask for next version
-> > 
-> > 
-> > WARNING: line over 80 characters
-> > #159: FILE: drivers/thermal/qcom-spmi-temp-alarm.c:65:
-> > +#define STAGE2_THRESHOLD_MIN		125000	/* Stage 2 Threshold
-> > Min: 125 C */
-> > 
-> > WARNING: line over 80 characters
-> > #160: FILE: drivers/thermal/qcom-spmi-temp-alarm.c:66:
-> > +#define STAGE2_THRESHOLD_MAX		140000	/* Stage 2 Threshold
-> > Max: 140 C */
-> > 
-> > ERROR: trailing statements should be on next line
-> > #201: FILE: drivers/thermal/qcom-spmi-temp-alarm.c:186:
-> > +	if (!chip->adc)) {
-> > 
-> > CHECK: Unnecessary parentheses around 'temp == THERMAL_TEMP_INVALID'
-> > #227: FILE: drivers/thermal/qcom-spmi-temp-alarm.c:220:
-> > +	if ((temp == THERMAL_TEMP_INVALID) ||
-> > +	    (temp < STAGE2_THRESHOLD_MIN)) {
-> > 
-> > CHECK: Unnecessary parentheses around 'temp < STAGE2_THRESHOLD_MIN'
-> > #227: FILE: drivers/thermal/qcom-spmi-temp-alarm.c:220:
-> > +	if ((temp == THERMAL_TEMP_INVALID) ||
-> > +	    (temp < STAGE2_THRESHOLD_MIN)) {
-> > 
-> > CHECK: Unnecessary parentheses around 'trips[i].type ==
-> > THERMAL_TRIP_CRITICAL'
-> > #305: FILE: drivers/thermal/qcom-spmi-temp-alarm.c:302:
-> > +		if (of_thermal_is_trip_valid(chip->tz_dev, i) &&
-> > +		    (trips[i].type == THERMAL_TRIP_CRITICAL))
-> > 
-> > CHECK: Alignment should match open parenthesis
-> > #386: FILE: drivers/thermal/qcom-spmi-temp-alarm.c:427:
-> > +	chip->tz_dev = devm_thermal_zone_of_sensor_register(&pdev->dev,
-> > 0, chip,
-> > +
-> > &qpnp_tm_sensor_ops);
-> 
-> 
-> And it would be great if you could combine these two in your a single
-> series, say when you fix this patch and send a new version of this
-> series, please include these too:
-> https://patchwork.kernel.org/patch/10543335/
-> https://patchwork.kernel.org/patch/10543333/
+Hi Oleksij,
 
-Ok, will do
+ A fast and fine turnaround! Mostly nits and a suggestion follows ...
+
+On Tue, Jul 31, 2018 at 7:41 PM, Oleksij Rempel <o.rempel@pengutronix.de> wrote:
+> The Mailbox controller is able to send messages (up to 4 32 bit words)
+> between the endpoints.
+>
+> This driver was tested using the mailbox-test driver sending messages
+> between the Cortex-A7 and the Cortex-M4.
+>
+Do we need something MU specific here?
+I mean MU doesn't really care if the endpoints are CA, CR or CM. So,
+maybe just the two-line ritual intro to MU?
+
+
+> +enum imx_mu_chan_type {
+> +       IMX_MU_TYPE_TX,         /* Tx with FIFO */
+> +       IMX_MU_TYPE_RX,         /* Rx with FIFO */
+>
+nit: its a register, not fifo
+
+
+> +
+> +static void imx_mu_txdb_work(struct work_struct *work)
+> +{
+> +       struct imx_mu_con_priv *cp =
+> +                       container_of(work, struct imx_mu_con_priv, work);
+> +       mbox_chan_txdone(cp->chan, 0);
+> +}
+>
+The api assumes a controller have same type of channels. So we are
+having to do this here.
+I am not sure, but would declaring two mailbox controllers (one with
+doorbells and the other data channels) work?
+If not, at least we could use a tasklet instead of a work queue?
+
+
+> +static bool imx_mu_last_tx_done(struct mbox_chan *chan)
+> +{
+> +       struct imx_mu_priv *priv = to_imx_mu_priv(chan->mbox);
+> +       struct imx_mu_con_priv *cp = chan->con_priv;
+> +
+> +       /* test if transmit register is empty */
+> +       return imx_mu_read(priv, IMX_MU_xSR) & IMX_MU_xSR_TEn(cp->idx);
+> +}
+> +
+> +static int imx_mu_send_data(struct mbox_chan *chan, void *data)
+> +{
+> +       struct imx_mu_priv *priv = to_imx_mu_priv(chan->mbox);
+> +       struct imx_mu_con_priv *cp = chan->con_priv;
+> +       u32 *arg = data;
+> +
+> +       switch (cp->type) {
+> +       case IMX_MU_TYPE_TX:
+> +               if (!imx_mu_last_tx_done(chan))
+> +                       return -EBUSY;
+>
+This test should be moved to imx_mu_startup().
+The api won't ever call if last tx was not done, and so it doesn't
+know how to recover from send_data() failure.
+
+
+> +
+> +static int imx_mu_startup(struct mbox_chan *chan)
+> +{
+> +       struct imx_mu_priv *priv = to_imx_mu_priv(chan->mbox);
+> +       struct imx_mu_con_priv *cp = chan->con_priv;
+> +       int ret;
+> +
+> +       if (cp->type == IMX_MU_TYPE_TXDB) {
+> +               /* Tx doorbell don't have ACK support */
+> +               INIT_WORK(&cp->work, imx_mu_txdb_work);
+> +               return 0;
+> +       }
+> +
+> +       cp->irq_desc = kasprintf(GFP_KERNEL, "imx_mu_chan[%i-%i]", cp->type,
+> +                                cp->idx);
+> +       if (!cp->irq_desc)
+> +               return -ENOMEM;
+>
+Probably you won't do but still .... name of irq is but one channel
+property. So you could set it in probe() and avoid creating another
+situation when startup could fail.
+
+
+> +       ret = request_irq(priv->irq, imx_mu_isr, IRQF_SHARED, cp->irq_desc,
+> +                         chan);
+> +       if (ret) {
+> +               dev_err(priv->dev,
+> +                       "Unable to acquire IRQ %d\n", priv->irq);
+> +               return ret;
+> +       }
+> +
+> +       switch (cp->type) {
+> +               break;
+>
+Is this intentional?
+
+
+> +
+> +static void imx_mu_shutdown(struct mbox_chan *chan)
+> +{
+> +       struct imx_mu_priv *priv = to_imx_mu_priv(chan->mbox);
+> +       struct imx_mu_con_priv *cp = chan->con_priv;
+> +
+> +       if (IMX_MU_TYPE_TXDB == cp->type)
+>
+nit: usually we do (cp->type == IMX_MU_TYPE_TXDB)
+
+
+Thanks
