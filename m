@@ -1,53 +1,85 @@
-From: alex.bou9@gmail.com (Alex Bounine)
-Date: Tue, 31 Jul 2018 09:15:58 -0400
-Subject: [PATCH 5/6] arm: enable RapidIO menu in Kconfig
-In-Reply-To: <20180731124815.GK17271@n2100.armlinux.org.uk>
-References: <20180730225035.28365-1-acolin@isi.edu>
- <20180730225035.28365-6-acolin@isi.edu> <20180731120428.GA5696@infradead.org>
- <3784698f-bd9d-6d02-6fa4-2f6057e4c93f@gmail.com>
- <20180731124815.GK17271@n2100.armlinux.org.uk>
-Message-ID: <bfc9daa3-6dd6-55ed-6a2b-f12f07fc6021@gmail.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Tue, 31 Jul 2018 15:22:13 +0200
+Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
+ sanitizer
+In-Reply-To: <CAAeHK+wTcH+2hgm_BTkLLdn1GkjBtkhQ=vPWZCncJ6KenqgKpg@mail.gmail.com>
+References: <cover.1530018818.git.andreyknvl@google.com>
+ <20180628105057.GA26019@e103592.cambridge.arm.com>
+ <CAAeHK+w0T43+h3xqU4a-qutxd-qiEhsvk0eaZpmAn-T0hpaLZQ@mail.gmail.com>
+ <20180629110709.GA17859@arm.com>
+ <CAAeHK+wHd8B2nhat-Z2Y2=s4NVobPG7vjr2CynjFhqPTwQRepQ@mail.gmail.com>
+ <20180703173608.GF27243@arm.com>
+ <CAAeHK+wTcH+2hgm_BTkLLdn1GkjBtkhQ=vPWZCncJ6KenqgKpg@mail.gmail.com>
+Message-ID: <CAAeHK+xc1E64tXEEHoXqOuUNZ7E_kVyho3_mNZTCc+LTGHYFdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-31 08:48 AM, Russell King - ARM Linux wrote:
-> On Tue, Jul 31, 2018 at 08:43:02AM -0400, Alex Bounine wrote:
->> On 2018-07-31 08:04 AM, Christoph Hellwig wrote:
->>> On Mon, Jul 30, 2018 at 06:50:33PM -0400, Alexei Colin wrote:
->>>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->>>> index afe350e5e3d9..602a61324890 100644
->>>> --- a/arch/arm/Kconfig
->>>> +++ b/arch/arm/Kconfig
->>>> @@ -1278,6 +1278,8 @@ config PCI_HOST_ITE8152
->>>>   source "drivers/pci/Kconfig"
->>>> +source "drivers/rapidio/Kconfig"
->>>
->>> Please include this from drivers/Kconfig instead of enabling it
->>> for a completely random set of architectures.
->>>
->> This is not a random set of architectures but only ones that implement
->> support for RapidIO as system bus.
->>
->> On some platforms RapidIO can be the only system bus available replacing
->> PCI/PCIe.
->>
->> As it is done now, RapidIO is configured in "Bus Options" (x86/PPC) or "Bus
->> Support" (ARMs) sub-menu and from system configuration option it should be
->> kept this way.
->>
->> Current location of RAPIDIO configuration option is familiar to users of
->> PowerPC and x86 platforms, and is similarly available in some ARM
->> manufacturers kernel code trees.
-> 
-> ... which is why you have a HAS_RAPIDIO thing and select it from
-> arch/*/Kconfig as I suggested in my original review of your patch
-> set.
+On Wed, Jul 18, 2018 at 7:16 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+> On Tue, Jul 3, 2018 at 7:36 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> Hmm, but elsewhere in this thread, Evgenii is motivating the need for this
+>> patch set precisely because the lower overhead means it's suitable for
+>> "near-production" use. So I don't think writing this off as a debugging
+>> feature is the right approach, and we instead need to put effort into
+>> analysing the impact of address tags on the kernel as a whole. Playing
+>> whack-a-mole with subtle tag issues sounds like the worst possible outcome
+>> for the long-term.
+>
+> I don't see a way to find cases where pointer tags would matter
+> statically, so I've implemented the dynamic approach that I mentioned
+> above. I've instrumented all pointer comparisons/subtractions in an
+> LLVM compiler pass and used a kernel module that would print a bug
+> report whenever two pointers with different tags are being
+> compared/subtracted (ignoring comparisons with NULL pointers and with
+> pointers obtained by casting an error code to a pointer type). Then I
+> tried booting the kernel in QEMU and on an Odroid C2 board and I ran
+> syzkaller overnight.
+>
+> This yielded the following results.
+>
+> ======
+>
+> The two places that look interesting are:
+>
+> is_vmalloc_addr in include/linux/mm.h (already mentioned by Catalin)
+> is_kernel_rodata in mm/util.c
+>
+> Here we compare a pointer with some fixed untagged values to make sure
+> that the pointer lies in a particular part of the kernel address
+> space. Since KWHASAN doesn't add tags to pointers that belong to
+> rodata or vmalloc regions, this should work as is. To make sure I've
+> added debug checks to those two functions that check that the result
+> doesn't change whether we operate on pointers with or without
+> untagging.
+>
+> ======
+>
+> A few other cases that don't look that interesting:
+>
+> Comparing pointers to achieve unique sorting order of pointee objects
+> (e.g. sorting locks addresses before performing a double lock):
+>
+> tty_ldisc_lock_pair_timeout in drivers/tty/tty_ldisc.c
+> pipe_double_lock in fs/pipe.c
+> unix_state_double_lock in net/unix/af_unix.c
+> lock_two_nondirectories in fs/inode.c
+> mutex_lock_double in kernel/events/core.c
+>
+> ep_cmp_ffd in fs/eventpoll.c
+> fsnotify_compare_groups fs/notify/mark.c
+>
+> Nothing needs to be done here, since the tags embedded into pointers
+> don't change, so the sorting order would still be unique.
+>
+> Check that a pointer belongs to some particular allocation:
+>
+> is_sibling_entry lib/radix-tree.c
+> object_is_on_stack in include/linux/sched/task_stack.h
+>
+> Nothing needs to be here either, since two pointers can only belong to
+> the same allocation if they have the same tag.
+>
+> ======
+>
+> Will, Catalin, WDYT?
 
-Correct, this option will be selected as soon as board that supports it 
-is added.
-
-> 
-> As I've also said, I'm unable to review what you've sent this time
-> around because I don't have all your patches.
-> 
-I think Alexei will resend full set soon.
+ping
