@@ -1,47 +1,48 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 31 Jul 2018 23:35:09 +0200 (CEST)
-Subject: next/master boot: 171 boots: 6 failed, 162 passed with 3
- offline (next-20180724)
-In-Reply-To: <bb89388b-db7e-a59f-6fd1-4e88b602054c@arm.com>
-References: <5b5757ee.1c69fb81.411a5.52e2@mx.google.com>
- <20180725161151.GA340@sirena.org.uk> <20180731155246.GG5719@sirena.org.uk>
- <bb89388b-db7e-a59f-6fd1-4e88b602054c@arm.com>
-Message-ID: <1380807549.9923.1533072909710@email.1und1.de>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 31 Jul 2018 15:49:20 -0600
+Subject: [PATCH 1/4] treewide: convert ISO_8859-1 text comments to utf-8
+In-Reply-To: <20180724111600.4158975-1-arnd@arndb.de>
+References: <20180724111600.4158975-1-arnd@arndb.de>
+Message-ID: <20180731214920.GA20796@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jul 24, 2018 at 01:13:25PM +0200, Arnd Bergmann wrote:
+> Almost all files in the kernel are either plain text or UTF-8
+> encoded. A couple however are ISO_8859-1, usually just a few
+> characters in a C comments, for historic reasons.
+> 
+> This converts them all to UTF-8 for consistency.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  .../devicetree/bindings/net/nfc/pn544.txt     |   2 +-
+>  arch/arm/boot/dts/sun4i-a10-inet97fv2.dts     |   2 +-
+>  arch/arm/crypto/sha256_glue.c                 |   2 +-
+>  arch/arm/crypto/sha256_neon_glue.c            |   4 +-
+>  drivers/crypto/vmx/ghashp8-ppc.pl             |  12 +-
+>  drivers/iio/dac/ltc2632.c                     |   2 +-
+>  drivers/power/reset/ltc2952-poweroff.c        |   4 +-
+>  kernel/events/callchain.c                     |   2 +-
+>  net/netfilter/ipvs/Kconfig                    |   8 +-
+>  net/netfilter/ipvs/ip_vs_mh.c                 |   4 +-
+>  tools/power/cpupower/po/de.po                 |  44 +++----
+>  tools/power/cpupower/po/fr.po                 | 120 +++++++++---------
+>  12 files changed, 103 insertions(+), 103 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/nfc/pn544.txt b/Documentation/devicetree/bindings/net/nfc/pn544.txt
+> index 538a86f7b2b0..72593f056b75 100644
+> --- a/Documentation/devicetree/bindings/net/nfc/pn544.txt
+> +++ b/Documentation/devicetree/bindings/net/nfc/pn544.txt
+> @@ -2,7 +2,7 @@
+>  
+>  Required properties:
+>  - compatible: Should be "nxp,pn544-i2c".
+> -- clock-frequency: I?C work frequency.
+> +- clock-frequency: I??C work frequency.
 
-> Robin Murphy <robin.murphy@arm.com> hat am 31. Juli 2018 um 19:00 geschrieben:
-> 
-> 
-> On 31/07/18 16:52, Mark Brown wrote:
-> > On Wed, Jul 25, 2018 at 05:11:51PM +0100, Mark Brown wrote:
-> >> On Tue, Jul 24, 2018 at 09:46:38AM -0700, kernelci.org bot wrote:
-> > 
-> >> For a little while now the RPi B has been failing to boot using the
-> >> bcm2835 defconfig in -next:
-> > 
-> > ...
-> > 
-> >> It's working fine on arm64, whatever's going on appears to be specific
-> >> to this config (it's not getting booted with any other 32 bit configs).
-> >> Full info and boot logs for one of the boards here:
-> > 
-> >>     https://kernelci.org/boot/id/5b58416759b514139596baae/
-> > 
-> >> it looks like it hangs somewhere shortly after or during initializing
-> >> MMC so never makes it to the console, the tail of the failing logs looks
-> >> like:
-> > 
-> > This went away for a day or two but it looks like it's back again I'm
-> > afraid:
-> 
-> FWIW, it looks like that blip was due to me completely breaking DMA API 
-> functionality for DT devices in next-20180727. Funny that that actually 
-> "helped" in this case (unlike all the others...), but it definitely 
-> reinforces Stefan's observation.
-> 
-> Robin.
-> 
+I'd prefer just plain ASCII 'I2C' here, but either way:
 
-Sorry, still not much time this week. All i can say that next-20180731 is broken, but dma-mapping/for-next is not.
+Acked-by: Rob Herring <robh@kernel.org>
+
+Rob
