@@ -1,75 +1,97 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 31 Jul 2018 10:26:44 +0100
-Subject: [PATCH 2/4] drm/i2c: tda998x: get rid of private fill_modes function
+Date: Tue, 31 Jul 2018 10:26:55 +0100
+Subject: [PATCH 4/4] drm/i2c: tda998x: add support for pixel repeated modes
 In-Reply-To: <20180731092343.GH17271@n2100.armlinux.org.uk>
 References: <20180731092343.GH17271@n2100.armlinux.org.uk>
-Message-ID: <E1fkQvU-0003nG-OK@rmk-PC.armlinux.org.uk>
+Message-ID: <E1fkQvf-0003nV-CW@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can achieve the same effect via the get_modes() method, rather than
-wrapping the fill_modes helper.
+TDA998x has no support for pixel repeated modes, and the code notes this
+as a "TODO" item.  The implementation appears to be relatively simple,
+so lets add it.
+
+We need to calculate the serializer clock divisor based on the TMDS
+clock rate, set the repeat control, and set the serializer pixel
+repeat count.  Since the audio code needs the actual TMDS clock,
+record that.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 30 ++++++------------------------
- 1 file changed, 6 insertions(+), 24 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 26 ++++++++++++++++----------
+ 1 file changed, 16 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 58831b6a4722..98ec91a55a6a 100644
+index a31809ce30e2..08ce28cbdec4 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -1097,29 +1097,6 @@ static int tda998x_audio_codec_init(struct tda998x_priv *priv,
+@@ -241,6 +241,7 @@ struct tda998x_priv {
+ # define HVF_CNTRL_1_PAD(x)       (((x) & 3) << 4)
+ # define HVF_CNTRL_1_SEMI_PLANAR  (1 << 6)
+ #define REG_RPT_CNTRL             REG(0x00, 0xf0)     /* write */
++# define RPT_CNTRL_REPEAT(x)      ((x) & 15)
+ #define REG_I2S_FORMAT            REG(0x00, 0xfc)     /* read/write */
+ # define I2S_FORMAT(x)            (((x) & 3) << 0)
+ #define REG_AIP_CLKSEL            REG(0x00, 0xfd)     /* write */
+@@ -1342,7 +1343,7 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
+ 	u16 vwin1_line_s, vwin1_line_e;
+ 	u16 vwin2_line_s, vwin2_line_e;
+ 	u16 de_pix_s, de_pix_e;
+-	u8 reg, div, rep;
++	u8 reg, div, rep, sel_clk;
  
- /* DRM connector functions */
- 
--static int tda998x_connector_fill_modes(struct drm_connector *connector,
--					uint32_t maxX, uint32_t maxY)
--{
--	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
--	int ret;
--
--	mutex_lock(&priv->audio_mutex);
--	ret = drm_helper_probe_single_connector_modes(connector, maxX, maxY);
--
--	if (connector->edid_blob_ptr) {
--		struct edid *edid = (void *)connector->edid_blob_ptr->data;
--
--		cec_notifier_set_phys_addr_from_edid(priv->cec_notify, edid);
--
--		priv->sink_has_audio = drm_detect_monitor_audio(edid);
--	} else {
--		priv->sink_has_audio = false;
--	}
--	mutex_unlock(&priv->audio_mutex);
--
--	return ret;
--}
--
- static enum drm_connector_status
- tda998x_connector_detect(struct drm_connector *connector, bool force)
- {
-@@ -1138,7 +1115,7 @@ static void tda998x_connector_destroy(struct drm_connector *connector)
- static const struct drm_connector_funcs tda998x_connector_funcs = {
- 	.dpms = drm_helper_connector_dpms,
- 	.reset = drm_atomic_helper_connector_reset,
--	.fill_modes = tda998x_connector_fill_modes,
-+	.fill_modes = drm_helper_probe_single_connector_modes,
- 	.detect = tda998x_connector_detect,
- 	.destroy = tda998x_connector_destroy,
- 	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
-@@ -1237,7 +1214,12 @@ static int tda998x_connector_get_modes(struct drm_connector *connector)
+ 	/*
+ 	 * Internally TDA998x is using ITU-R BT.656 style sync but
+@@ -1405,7 +1406,16 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
+ 			       (mode->vsync_end - mode->vsync_start)/2;
  	}
  
- 	drm_connector_update_edid_property(connector, edid);
-+	cec_notifier_set_phys_addr_from_edid(priv->cec_notify, edid);
+-	tmds_clock = mode->clock;
++	/*
++	 * Select pixel repeat depending on the double-clock flag
++	 * (which means we have to repeat each pixel once.)
++	 */
++	rep = mode->flags & DRM_MODE_FLAG_DBLCLK ? 1 : 0;
++	sel_clk = SEL_CLK_ENA_SC_CLK | SEL_CLK_SEL_CLK1 |
++		  SEL_CLK_SEL_VRF_CLK(rep ? 2 : 0);
 +
-+	mutex_lock(&priv->audio_mutex);
- 	n = drm_add_edid_modes(connector, edid);
-+	priv->sink_has_audio = drm_detect_monitor_audio(edid);
-+	mutex_unlock(&priv->audio_mutex);
++	/* the TMDS clock is scaled up by the pixel repeat */
++	tmds_clock = mode->clock * (1 + rep);
  
- 	kfree(edid);
+ 	/*
+ 	 * The divisor is power-of-2. The TDA9983B datasheet gives
+@@ -1421,6 +1431,8 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
  
+ 	mutex_lock(&priv->audio_mutex);
+ 
++	priv->tmds_clock = tmds_clock;
++
+ 	/* mute the audio FIFO: */
+ 	reg_set(priv, REG_AIP_CNTRL_0, AIP_CNTRL_0_RST_FIFO);
+ 
+@@ -1443,12 +1455,8 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
+ 	reg_write(priv, REG_SERIALIZER, 0);
+ 	reg_write(priv, REG_HVF_CNTRL_1, HVF_CNTRL_1_VQR(0));
+ 
+-	/* TODO enable pixel repeat for pixel rates less than 25Msamp/s */
+-	rep = 0;
+-	reg_write(priv, REG_RPT_CNTRL, 0);
+-	reg_write(priv, REG_SEL_CLK, SEL_CLK_SEL_VRF_CLK(0) |
+-			SEL_CLK_SEL_CLK1 | SEL_CLK_ENA_SC_CLK);
+-
++	reg_write(priv, REG_RPT_CNTRL, RPT_CNTRL_REPEAT(rep));
++	reg_write(priv, REG_SEL_CLK, sel_clk);
+ 	reg_write(priv, REG_PLL_SERIAL_2, PLL_SERIAL_2_SRL_NOSC(div) |
+ 			PLL_SERIAL_2_SRL_PR(rep));
+ 
+@@ -1516,8 +1524,6 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
+ 	/* must be last register set: */
+ 	reg_write(priv, REG_TBG_CNTRL_0, 0);
+ 
+-	priv->tmds_clock = adjusted_mode->clock;
+-
+ 	/* CEA-861B section 6 says that:
+ 	 * CEA version 1 (CEA-861) has no support for infoframes.
+ 	 * CEA version 2 (CEA-861A) supports version 1 AVI infoframes,
 -- 
 2.7.4
