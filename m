@@ -1,55 +1,132 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 31 Jul 2018 10:10:59 +0100
-Subject: [PATCH] arm64: drop unused kernel_neon_begin_partial() macro
-In-Reply-To: <20180731073545.32607-1-ard.biesheuvel@linaro.org>
-References: <20180731073545.32607-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180731091057.GB4240@e103592.cambridge.arm.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Tue, 31 Jul 2018 17:15:52 +0800
+Subject: [PATCH v6 3/4] Bluetooth: mediatek: Add protocol support for
+ MediaTek serial devices
+In-Reply-To: <F83B6E35-B0D7-4050-A112-251BDFB9C998@holtmann.org>
+References: <cover.1532060309.git.sean.wang@mediatek.com>
+ <f3a064f86c1da4664a231a40c6cf038cccc758da.1532060309.git.sean.wang@mediatek.com>
+ <60024004-779E-4E1A-8E1B-799339595A27@holtmann.org>
+ <1532966985.3472.54.camel@mtkswgap22>
+ <F83B6E35-B0D7-4050-A112-251BDFB9C998@holtmann.org>
+Message-ID: <1533028552.3472.95.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 09:35:45AM +0200, Ard Biesheuvel wrote:
-> When kernel mode NEON was first introduced to the arm64 kernel,
-> every call to kernel_neon_begin()/_end() stacked resp. unstacked
-> the entire NEON register file, making it worthwile to reduce the
-> number of used NEON registers to a bare minimum, and only stack
-> those. kernel_neon_begin_partial() was introduced for this purpose,
-> but after the refactoring for SVE and other changes, it no longer
-> exists and was simply #define'd to kernel_neon_begin() directly.
+On Mon, 2018-07-30 at 20:06 +0200, Marcel Holtmann wrote:
+> Hi Sean,
 > 
-> In the mean time, all users have been updated, so let's remove
-> the fallback macro.
+> > All suggestions seem reasonable for me in order to make code style aligned with the other drivers and code better to read,
+> > and it looks like no any big problem, so I'll start to work on the next version immediately.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> no rush, but if you can get this back to me quickly, we might be still able to get this driver included.
+> 
+> > And I also add a few explanations inline about questions about the diagnostic packet and how hci->shutdown is being made.
+> > 
+> > On Mon, 2018-07-30 at 15:40 +0200, Marcel Holtmann wrote:
 
-Makes sense, and nobody seems to use it any more.
 
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+[ ... ]
 
-> ---
->  arch/arm64/include/asm/neon.h | 7 -------
->  1 file changed, 7 deletions(-)
+> >> Do we want these as HCI vendor events. Or actually as vendor / diagnostic packets. There is a hci_recv_diag.
+> >> 
+> > 
+> > These are actually Hci vendor events. not for diagnostic purpose. They hdr->evt == 0xe4 are all the part of chip initialization.
 > 
-> diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
-> index f922eaf780f9..fb9d137256a6 100644
-> --- a/arch/arm64/include/asm/neon.h
-> +++ b/arch/arm64/include/asm/neon.h
-> @@ -19,11 +19,4 @@
->  void kernel_neon_begin(void);
->  void kernel_neon_end(void);
->  
-> -/*
-> - * Temporary macro to allow the crypto code to compile. Note that the
-> - * semantics of kernel_neon_begin_partial() are now different from the
-> - * original as it does not allow being called in an interrupt context.
-> - */
-> -#define kernel_neon_begin_partial(num_regs)	kernel_neon_begin()
-> -
->  #endif /* ! __ASM_NEON_H */
-> -- 
-> 2.18.0
+> Ok, then leave it as is.
 > 
+> > 
+> >> So let me ask this a different way, do you have support for LMP / LL tracing in your chips? If yes, then how is that enabled and how does it work? Or any general debug data that can be switched on. That is what we have a diagnostic channel for that is also fed into btmon.
+> >> 
+> > 
+> > I'm not really sure about them because I didn't see any diagnostic packets handling in vendor driver.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> You can see examples for this in btusb.c, hci_bcm.c and bpa10x.c where the hardware has a side channel. In case of Broadcom, they are LL or LMP trace packets, but it could be also debug messages or something else. Other vendors use HCI vendor events for that which is also fine. Just wanted to know what it is.
+> 
+> And if your hardware supports LL or LMP traces to be enabled, then implement hdev->set_diag() callback. You can then enable it via /sys/kernel/debug/bluetooth/hci0/vendor_diag
+> 
+
+Thanks for sharing the information to me.
+
+If I get the permission and details about adding support for these debug trace packets, I am willing to add them.
+
+> > 
+> >>> +
+> >>> +	/* Each HCI event would go through the core. */
+> >>> +	return hci_recv_frame(hdev, skb);
+> >>> +}
+> >>> +
+
+[ ... ]
+
+> >>> +
+> >>> +static int mtk_btuart_shutdown(struct hci_dev *hdev)
+> >>> +{
+> >>> +	struct mtk_btuart_dev *bdev = hci_get_drvdata(hdev);
+> >>> +	struct device *dev = &bdev->serdev->dev;
+> >>> +	u8 param = 0x0;
+> >>> +
+> >>> +	/* Disable the device. */
+> >>> +	mtk_hci_wmt_sync(hdev, MTK_WMT_FUNC_CTRL, 0x0, sizeof(param), &param);
+> >>> +
+> >>> +	/* Shutdown the clock and power domain the device requires. */
+> >>> +	clk_disable_unprepare(bdev->clk);
+> >>> +	pm_runtime_put_sync(dev);
+> >>> +	pm_runtime_disable(dev);
+> >> 
+> >> Don?t these belong into ->close method? And the enable ones into ->open? I really think that ->setup and ->shutdown should just do HCI commands and leave the others to ->open and ->close. Since ->open and ->close are suppose to set up and terminate the transport.
+> >> 
+> > 
+> > Yes, ->open and ->close are already done just for setup and terminate the transport. I've noted the part during earlier version discussion. 
+> > 
+> > Because mt7622 is a SoC integrating Bluetooth hardware inside, these operations for clk* and pm clk_* and pm_*  you saw here are all for controlling clocks and powers Bluetooth circuits requires on the SoC, not for the transports.
+> > 
+> > As for clocks for the transport, they're already being taken care of by the serial driver.
+> 
+> With transport, I meant the Bluetooth transport. So I really thing they belong into ->open and ->close. Within ->setup and ->shutdown, I would just expect HCI commands.
+> 
+
+At the moment, it's not easy that clk_* and pm_*  are moved to ->open and ->close
+
+because firmware download would depend on the full cycle of hardware power down and then up.
+
+And another advantage is that when users call hdev down and the up, the device can do the real hardware reset, not just the software reset via hci command.
+
+> > 
+> >>> +
+> >>> +	return 0;
+> >>> +}
+> >>> +
+> >>> +static int mtk_btuart_send(struct hci_dev *hdev, struct sk_buff *skb)
+> >>> +{
+> >> 
+> >> This should be called btmtkuart_send_frame.
+> >> 
+> > 
+> > okay, will have a rename.
+> > 
+> >>> +	struct mtk_btuart_dev *bdev = hci_get_drvdata(hdev);
+> >>> +	int err;
+> >>> +
+
+[ ... ]
+
+> >>> +static inline void
+> >>> +mtk_make_wmt_hdr(struct mtk_wmt_hdr *hdr, u8 op, u16 plen, u8 flag)
+> >>> +{
+> >>> +	hdr->dir = 1;
+> >>> +	hdr->op = op;
+> >>> +	hdr->dlen = cpu_to_le16(plen + 1);
+> >>> +	hdr->flag = flag;
+> >>> +}
+> >> 
+> >> Move all the *.h parts into the *.c file. It is all so simple that there is no need for having this in a header.
+> >> 
+> >> Minor cosmetic changes, but the rest look good to me.
+> >> 
+> > 
+> > okay, will move whole thing in *.h to *.c and finally I really appreciate your effort on reviewing on these code.
+> 
+> Regards
+> 
+> Marcel
+> 
