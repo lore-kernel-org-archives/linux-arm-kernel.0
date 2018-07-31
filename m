@@ -1,65 +1,59 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 31 Jul 2018 13:44:57 -0500
-Subject: [PATCH V5 0/3] PCI: separate hotplug handling from fatal error
- handling
-In-Reply-To: <1530571967-19099-1-git-send-email-okaya@codeaurora.org>
-References: <1530571967-19099-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20180731184457.GN45322@bhelgaas-glaptop.roam.corp.google.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Tue, 31 Jul 2018 11:45:53 -0700
+Subject: [PATCH v6 2/5] dt-bindings: thermal: qcom-spmi-temp-alarm: Improve
+ thermal zone in example
+In-Reply-To: <20180731184556.169290-1-mka@chromium.org>
+References: <20180731184556.169290-1-mka@chromium.org>
+Message-ID: <20180731184556.169290-2-mka@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 02, 2018 at 06:52:44PM -0400, Sinan Kaya wrote:
-> This is what happens when you insert a fatal error to a hotplug slot. See
-> multiple link up/down messages.
-> 
-> /_#_[__333.699731]_pcieport_0001:00:00.0:_AER:_Uncorrected_(Fatal)_error_received:_id=0000
-> [  333.748116] pcieport 0001:00:00.0: PCIe Bus Error: severity=Uncorrected (Fatal), type=Transaction Layer, id
-> [  333.816044] pcieport 0001:00:00.0:   device [17cb:0404] error status/mask=00040000/00400000
-> [  333.871581] pcieport 0001:00:00.0:    [18] Malformed TLP (First)
-> [  333.914675] pcieport 0001:00:00.0:   TLP Header: 40000001 000000ff 00000000 00000000
-> [  333.968397] pciehp 0001:00:00.0:pcie004: Slot(2): Link Down
-> [  334.043234] iommu: Removing device 0001:01:00.4 from group 0
-> [  334.095952] iommu: Removing device 0001:01:00.3 from group 0
-> [  334.144644] iommu: Removing device 0001:01:00.2 from group 0
-> [  334.194653] iommu: Removing device 0001:01:00.1 from group 0
-> [  334.243564] pciehp 0001:00:00.0:pcie004: Slot(2): Link Up
-> [  334.282556] iommu: Removing device 0001:01:00.0 from group 0
-> [  334.330994] pciehp 0001:00:00.0:pcie004: Slot(2): Link Up event queued;
-> currently getting powered off
-> [  334.890587] pciehp 0001:00:00.0:pcie004: Timeout on hotplug command
-> 0x13f1 (issued 282900 msec ago)
-> [  335.070190] pciehp 0001:00:00.0:pcie004: Slot(2): Link Down
-> [  335.106960] pciehp 0001:00:00.0:pcie004: Slot(2): Link Down event queued; currently getting powered on
-> [  335.191119] pcieport 0001:00:00.0: AER: Device recovery failed
-> [  346.590153] pciehp 0001:00:00.0:pcie004: Timeout on hotplug command 0x17f1 (issued 10250 msec ago)
-> 
-> 
-> Since DPC/AER patch to refactor fatal error handling, both hotplug
-> driver and AER/DPC driver will try removing devices and perform enumeration on
-> link events/AER events.
-> 
-> Perfect environment for race condition without a change.
-> 
-> Try to mask hotplug interrupts during AER/DPC fatal error handling.
-> 
-> Changes from v4:
-> * add mask_irq() and unmask_irq() callbacks to struct pcie_driver
-> * refactor reset_slot() to use pciehp_mask_irq() an pciehp_unmask_irq()
-> 
-> Sinan Kaya (3):
->   PCI: pciehp: implement mask and unmask interrupt functions
->   PCI: pciehp: reuse pciehp_mask/unmask_irq() in reset_slot()
->   PCI: Mask and unmask hotplug interrupts during reset
-> 
->  drivers/pci/hotplug/pciehp.h      |  2 ++
->  drivers/pci/hotplug/pciehp_core.c | 19 +++++++++++++++++++
->  drivers/pci/hotplug/pciehp_hpc.c  | 36 ++++++++++++++++++++++++++++--------
->  drivers/pci/pcie/err.c            | 11 +++++++++++
->  drivers/pci/pcie/portdrv.h        |  2 ++
->  5 files changed, 62 insertions(+), 8 deletions(-)
+The current example for a thermal zone isn't very useful as reference
+since it would result in a hardware shutdown at 145?C, instead of
+allowing the system to try to shutdown gracefully. Without an ADC
+channel a maximum of two trip points is useful in practice for this
+sensor, with temperatures corresponding to the stage 1 and stage 2
+'hardware trip points'. A critical trip point at stage 2 may allow the
+system to shutdown before a hardware shutdown at stage 3 kicks in. It
+should be noted though that by default the chip performs a 'partial
+shutdown' when the temperature reaches stage 2, which may prevent an
+orderly shutdown. The 'partial shutdown' can be disabled by software.
 
-There's been a ton of discussion about this, and I didn't see a clear
-consensus emerge, so I'm going to drop it for now.  If it's still
-needed, please repost it and I'll watch for reviewers.
+Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
+---
+Changes in v6:
+- patch added to the series
+---
+ .../bindings/thermal/qcom-spmi-temp-alarm.txt         | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
-Bjorn
+diff --git a/Documentation/devicetree/bindings/thermal/qcom-spmi-temp-alarm.txt b/Documentation/devicetree/bindings/thermal/qcom-spmi-temp-alarm.txt
+index 86fb41fe772f..0273a92a2a84 100644
+--- a/Documentation/devicetree/bindings/thermal/qcom-spmi-temp-alarm.txt
++++ b/Documentation/devicetree/bindings/thermal/qcom-spmi-temp-alarm.txt
+@@ -35,19 +35,14 @@ Example:
+ 			thermal-sensors = <&pm8941_temp>;
+ 
+ 			trips {
+-				passive {
+-					temperature = <1050000>;
++				stage1 {
++					temperature = <105000>;
+ 					hysteresis = <2000>;
+ 					type = "passive";
+ 				};
+-				alert {
++				stage2 {
+ 					temperature = <125000>;
+ 					hysteresis = <2000>;
+-					type = "hot";
+-				};
+-				crit {
+-					temperature = <145000>;
+-					hysteresis = <2000>;
+ 					type = "critical";
+ 				};
+ 			};
+-- 
+2.18.0.345.g5c9ce644c3-goog
