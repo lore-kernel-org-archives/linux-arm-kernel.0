@@ -1,48 +1,76 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 31 Jul 2018 09:06:57 -0600
-Subject: [PATCH v3 0/9] coresight: Update device tree bindings
-In-Reply-To: <20180730200232.GA31755@xps15>
-References: <1532686537-12380-1-git-send-email-suzuki.poulose@arm.com>
- <20180730200232.GA31755@xps15>
-Message-ID: <CANLsYkzBfCydwDO-KyDub4X=GTy_dtv-478RyMReBEH6VybSAg@mail.gmail.com>
+From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
+Date: Tue, 31 Jul 2018 17:09:10 +0200
+Subject: [RESEND PATCH 1/6] rapidio: define top Kconfig menu in driver
+ subtree
+In-Reply-To: <20180731142954.30345-2-acolin@isi.edu>
+References: <20180731142954.30345-1-acolin@isi.edu>
+ <20180731142954.30345-2-acolin@isi.edu>
+Message-ID: <053432eb-1f24-a763-0bfe-e67373e7ea82@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Hi!
 
-> >
-> > Suzuki K Poulose (9):
-> >   coresight: Document error handling in coresight_register
-> >   coresight: platform: Refactor graph endpoint parsing
-> >   coresight: platform: Fix refcounting for graph nodes
-> >   coresight: platform: Fix leaking device reference
-> >   coresight: Fix remote endpoint parsing
-> >   coresight: Add helper to check if the endpoint is input
-> >   coresight: platform: Cleanup coresight connection handling
-> >   coresight: Cleanup coresight DT bindings
-> >   dts: juno: Update coresight bindings
-> >
-> >  .../devicetree/bindings/arm/coresight.txt          |  95 +++++---
-> >  arch/arm64/boot/dts/arm/juno-base.dtsi             | 161 ++++++------
-> >  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi          |  52 ++--
-> >  arch/arm64/boot/dts/arm/juno.dts                   |  13 +-
-> >  drivers/hwtracing/coresight/coresight.c            |  35 +--
-> >  drivers/hwtracing/coresight/of_coresight.c         | 269 ++++++++++++++-------
-> >  include/linux/coresight.h                          |   9 +-
-> >  7 files changed, 359 insertions(+), 275 deletions(-)
-> >
->
-> Good day,
->
-> I have applied patches 1 to 7.  I will wait for Rob's ACK before doing the same
-> with 8 and 9.
+On 31/07/18 16:29, Alexei Colin wrote:
+> The top-level Kconfig entry for RapidIO subsystem is currently
+> duplicated in several architecture-specific Kconfigs. This
+> commit re-defines it in the driver subtree, and subsequent
+> commits, one per architecture, will remove the duplicated
+> definitions from respective per-architecture Kconfigs.
+> 
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: John Paul Walters <jwalters@isi.edu>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Cc: Paul Burton <paul.burton@mips.com>
+> Cc: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Peter Anvin <hpa@zytor.com>
+> Cc: x86 at kernel.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-mips at linux-mips.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Alexei Colin <acolin@isi.edu>
 
-I just applied patch 8 and 9.
+Reviewed-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
 
->
-> Thanks,
-> Mathieu
->
-> > --
-> > 2.7.4
-> >
+> ---
+>  drivers/rapidio/Kconfig | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/drivers/rapidio/Kconfig b/drivers/rapidio/Kconfig
+> index d6d2f20c4597..98e301847584 100644
+> --- a/drivers/rapidio/Kconfig
+> +++ b/drivers/rapidio/Kconfig
+> @@ -1,6 +1,21 @@
+>  #
+>  # RapidIO configuration
+>  #
+> +
+> +config HAS_RAPIDIO
+> +	bool
+> +	default n
+> +
+> +config RAPIDIO
+> +	tristate "RapidIO support"
+> +	depends on HAS_RAPIDIO || PCI
+> +	help
+> +	  This feature enables support for RapidIO high-performance
+> +	  packet-switched interconnect.
+> +
+> +	  If you say Y here, the kernel will include drivers and
+> +	  infrastructure code to support RapidIO interconnect devices.
+> +
+>  source "drivers/rapidio/devices/Kconfig"
+>  
+>  config RAPIDIO_DISC_TIMEOUT
+
+-- 
+Best regards,
+Alexander Sverdlin.
