@@ -1,37 +1,39 @@
-From: andreas@kemnade.info (Andreas Kemnade)
-Date: Tue, 31 Jul 2018 07:28:21 +0200
-Subject: [PATCH v3] pwm: pwm-omap-dmtimer: return -EPROBE_DEFER if no
- dmtimer platform data
-In-Reply-To: <20180730223030.10628-1-drivshin@awxrd.com>
-References: <20180730223030.10628-1-drivshin@awxrd.com>
-Message-ID: <20180731072803.61d364db@kemnade.info>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Tue, 31 Jul 2018 13:37:58 +0800
+Subject: [PATCH v4 01/10] dt-bindings: arm: Add bindings for Mediatek MT8183
+ SoC Platform
+In-Reply-To: <1533015487-60189-1-git-send-email-erin.lo@mediatek.com>
+References: <1533015487-60189-1-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1533015487-60189-2-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This adds dt-binding documentation of cpu for Mediatek MT8183.
 
-On Mon, 30 Jul 2018 18:30:30 -0400
-David Rivshin <drivshin@awxrd.com> wrote:
+Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/mediatek.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> From: David Rivshin <DRivshin@allworx.com>
-> 
-> If a pwm-omap-dmtimer is probed before the dmtimer it uses, the platform
-> data won't be set yet.
-> 
-you can of course have my Tested-by:
-The version without message runs without trouble in daily use
-here on top of 4.17.10. Did also some testing on 4.18-rc7 and I also tested this version. 
-
-I personally have no strange feeling about what dev_XXX() you have.
-I hope not too many other developers spend time to fix this just to find out
-that something like this is already in review queue.
-
-Regards,
-Andreas
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180731/33e3b4e5/attachment.sig>
+diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
+index 7d21ab3..2754535 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek.txt
+@@ -19,6 +19,7 @@ compatible: Must contain one of
+    "mediatek,mt8127"
+    "mediatek,mt8135"
+    "mediatek,mt8173"
++   "mediatek,mt8183"
+ 
+ 
+ Supported boards:
+@@ -73,3 +74,6 @@ Supported boards:
+ - MTK mt8173 tablet EVB:
+     Required root node properties:
+       - compatible = "mediatek,mt8173-evb", "mediatek,mt8173";
++- Evaluation board for MT8183:
++    Required root node properties:
++      - compatible = "mediatek,mt8183-evb", "mediatek,mt8183";
+-- 
+1.9.1
