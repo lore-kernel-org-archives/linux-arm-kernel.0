@@ -1,135 +1,111 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 31 Jul 2018 12:20:09 +0200
-Subject: [PATCH 3/3] clk: imx6q: handle ENET PLL bypass
-In-Reply-To: <20180731102009.6710-1-l.stach@pengutronix.de>
-References: <20180731102009.6710-1-l.stach@pengutronix.de>
-Message-ID: <20180731102009.6710-3-l.stach@pengutronix.de>
+Date: Tue, 31 Jul 2018 12:21:49 +0200
+Subject: [PATCH] PCI: imx6: support MPLL reconfiguration for 100MHz and 200MHz
+ refclock
+Message-ID: <20180731102149.8537-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ENET PLL is different from the other i.MX6 PLLs, as it has
-multiple outputs with different post-dividers, which are all
-bypassed if the single bypass bit is activated. The hardware setup
-looks something like this:
-                                _
-refclk-o---PLL---o----DIV1-----| \
-       |         |             |M |----OUT1
-       o-----------------------|_/
-       |         |              _
-       |         o----DIV2-----| \
-       |         |             |M |----OUT2
-       o-----------------------|_/
-       |         |              _
-       |         `----DIV3-----| \
-       |                       |M |----OUT3
-       `-----------------------|_/
+The power up defaults of the MPLL are designed for the standard 125MHz
+refclock derived from the ENET PLL. As this clock has a jitter that
+violates the PCIe Gen2 timing requirements, some board designs use
+an external reference clock generator. Those clock generators may
+output a clock at a different rate than what the MPLL expects
+(usually a 100MHz clock, to re-use the PCIe bus clock).
 
-The bypass bit not only bypasses the PLL, but also the attached
-post-dividers. This would be reasonbly straight forward to model
-with a single output, or with different bypass bits for each output,
-but sadly the HW guys decided that it would be good to actuate all
-3 muxes with a single bit.
+In that case the MPLL must be reconfigured via overrides to use
+different refclock dividers and loop multipliers. The i.MX6
+reference manual lists both 100MHz and 200MHz as supported refclock
+rates and the associated mult and div values.
 
-So the need to have the PLL bypassed for one of the outputs always
-affects 2 other (in our model) independent branches of the clock
-tree.
-
-This means the decision to bypass this PLL is a system wide design
-choice and should not be changed on-the-fly, so we can treat any
-bapass configuration as static. As such we can just register the
-post-dividiers with a ratio that reflects the bypass status, which
-allows us to bypass the PLL without breaking our abstraction model
-and with it DT stability.
+Only the 100MHz setup has been tested on a real board, but since the
+200MHz setup only differs in the used pre-divider it seems safe to
+add it now.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- drivers/clk/imx/clk-imx6q.c | 63 +++++++++++++++++++++++++++++++++----
- 1 file changed, 57 insertions(+), 6 deletions(-)
+ drivers/pci/controller/dwc/pci-imx6.c | 55 +++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
-index f64f0fe76658..c52294694273 100644
---- a/drivers/clk/imx/clk-imx6q.c
-+++ b/drivers/clk/imx/clk-imx6q.c
-@@ -231,6 +231,41 @@ static void of_assigned_ldb_sels(struct device_node *node,
- 	}
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index 80f604602783..c481c61a41b8 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -97,6 +97,16 @@ struct imx6_pcie {
+ #define PORT_LOGIC_SPEED_CHANGE		(0x1 << 17)
+ 
+ /* PHY registers (not memory-mapped) */
++#define PCIE_PHY_ATEOVRD			0x10
++#define  PCIE_PHY_ATEOVRD_EN			(0x1 << 2)
++#define  PCIE_PHY_ATEOVRD_REF_CLKDIV_SHIFT	0
++#define  PCIE_PHY_ATEOVRD_REF_CLKDIV_MASK	0x1
++
++#define PCIE_PHY_MPLL_OVRD_IN_LO		0x11
++#define  PCIE_PHY_MPLL_MULTIPLIER_SHIFT		2
++#define  PCIE_PHY_MPLL_MULTIPLIER_MASK		0x7f
++#define  PCIE_PHY_MPLL_MULTIPLIER_OVRD		(0x1 << 9)
++
+ #define PCIE_PHY_RX_ASIC_OUT 0x100D
+ #define PCIE_PHY_RX_ASIC_OUT_VALID	(1 << 0)
+ 
+@@ -508,6 +518,50 @@ static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
+ 			IMX6Q_GPR12_DEVICE_TYPE, PCI_EXP_TYPE_ROOT_PORT << 12);
  }
  
-+static bool pll6_bypassed(struct device_node *node)
++static int imx6_setup_phy_mpll(struct imx6_pcie *imx6_pcie)
 +{
-+	int index, ret, num_clocks;
-+	struct of_phandle_args clkspec;
++	unsigned long phy_rate = clk_get_rate(imx6_pcie->pcie_phy);
++	int mult, div;
++	u32 val;
 +
-+	num_clocks = of_count_phandle_with_args(node, "assigned-clocks",
-+						"#clock-cells");
-+	if (num_clocks < 0)
-+		return false;
-+
-+	for (index = 0; index < num_clocks; index++) {
-+		ret = of_parse_phandle_with_args(node, "assigned-clocks",
-+						 "#clock-cells", index,
-+						 &clkspec);
-+		if (ret < 0)
-+			return false;
-+
-+		if (clkspec.np == node &&
-+		    clkspec.args[0] == IMX6QDL_PLL6_BYPASS)
-+			break;
++	switch (phy_rate) {
++	case 125000000:
++		/*
++		 * The default settings of the MPLL are for a 125MHz input
++		 * clock, so no need to reconfigure anything in that case.
++		 */
++		return 0;
++	case 100000000:
++		mult = 25;
++		div = 0;
++		break;
++	case 200000000:
++		mult = 25;
++		div = 1;
++		break;
++	default:
++		dev_err(imx6_pcie->pci->dev,
++			"Unsupported PHY reference clock rate %lu\n", phy_rate);
++		return -EINVAL;
 +	}
 +
-+	/* PLL6 bypass is not part of the assigned clock list */
-+	if (index == num_clocks)
-+		return false;
++	pcie_phy_read(imx6_pcie, PCIE_PHY_MPLL_OVRD_IN_LO, &val);
++	val &= ~(PCIE_PHY_MPLL_MULTIPLIER_MASK <<
++		 PCIE_PHY_MPLL_MULTIPLIER_SHIFT);
++	val |= mult << PCIE_PHY_MPLL_MULTIPLIER_SHIFT;
++	val |= PCIE_PHY_MPLL_MULTIPLIER_OVRD;
++	pcie_phy_write(imx6_pcie, PCIE_PHY_MPLL_OVRD_IN_LO, val);
 +
-+	ret = of_parse_phandle_with_args(node, "assigned-clock-parents",
-+					 "#clock-cells", index, &clkspec);
++	pcie_phy_read(imx6_pcie, PCIE_PHY_ATEOVRD, &val);
++	val &= ~(PCIE_PHY_ATEOVRD_REF_CLKDIV_MASK <<
++		 PCIE_PHY_ATEOVRD_REF_CLKDIV_SHIFT);
++	val |= div << PCIE_PHY_ATEOVRD_REF_CLKDIV_SHIFT;
++	val |= PCIE_PHY_ATEOVRD_EN;
++	pcie_phy_write(imx6_pcie, PCIE_PHY_ATEOVRD, val);
 +
-+	if (clkspec.args[0] != IMX6QDL_CLK_PLL6)
-+		return true;
-+
-+	return false;
++	return 0;
 +}
 +
- #define CCM_CCDR		0x04
- #define CCM_CCSR		0x0c
- #define CCM_CS2CDR		0x2c
-@@ -510,16 +545,32 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_USBPHY1_GATE] = imx_clk_gate("usbphy1_gate", "dummy", base + 0x10, 6);
- 	clk[IMX6QDL_CLK_USBPHY2_GATE] = imx_clk_gate("usbphy2_gate", "dummy", base + 0x20, 6);
- 
--	clk[IMX6QDL_CLK_SATA_REF] = imx_clk_fixed_factor("sata_ref", "pll6_enet", 1, 5);
--	clk[IMX6QDL_CLK_PCIE_REF] = imx_clk_fixed_factor("pcie_ref", "pll6_enet", 1, 4);
-+	/*
-+	 * The ENET PLL is special in that is has multiple outputs with
-+	 * different post-dividers that are all affected by the single bypass
-+	 * bit, so a single mux bit affects 3 independent branches of the clock
-+	 * tree. There is no good way to model this in the clock framework and
-+	 * dynamically changing the bypass bit, will yield unexpected results.
-+	 * So we treat any configuration that bypasses the ENET PLL as
-+	 * essentially static with the divider ratios refelcting the bypass
-+	 * status.
-+	 *
-+	 */
-+	if (!pll6_bypassed(ccm_node)) {
-+		clk[IMX6QDL_CLK_SATA_REF] = imx_clk_fixed_factor("sata_ref", "pll6_enet", 1, 5);
-+		clk[IMX6QDL_CLK_PCIE_REF] = imx_clk_fixed_factor("pcie_ref", "pll6_enet", 1, 4);
-+		clk[IMX6QDL_CLK_ENET_REF] = clk_register_divider_table(NULL, "enet_ref", "pll6_enet", 0,
-+						base + 0xe0, 0, 2, 0, clk_enet_ref_table,
-+						&imx_ccm_lock);
-+	} else {
-+		clk[IMX6QDL_CLK_SATA_REF] = imx_clk_fixed_factor("sata_ref", "pll6_enet", 1, 1);
-+		clk[IMX6QDL_CLK_PCIE_REF] = imx_clk_fixed_factor("pcie_ref", "pll6_enet", 1, 1);
-+		clk[IMX6QDL_CLK_ENET_REF] = imx_clk_fixed_factor("enet_ref", "pll6_enet", 1, 1);
-+	}
- 
- 	clk[IMX6QDL_CLK_SATA_REF_100M] = imx_clk_gate("sata_ref_100m", "sata_ref", base + 0xe0, 20);
- 	clk[IMX6QDL_CLK_PCIE_REF_125M] = imx_clk_gate("pcie_ref_125m", "pcie_ref", base + 0xe0, 19);
- 
--	clk[IMX6QDL_CLK_ENET_REF] = clk_register_divider_table(NULL, "enet_ref", "pll6_enet", 0,
--			base + 0xe0, 0, 2, 0, clk_enet_ref_table,
--			&imx_ccm_lock);
--
- 	clk[IMX6QDL_CLK_LVDS1_SEL] = imx_clk_mux("lvds1_sel", base + 0x160, 0, 5, lvds_sels, ARRAY_SIZE(lvds_sels));
- 	clk[IMX6QDL_CLK_LVDS2_SEL] = imx_clk_mux("lvds2_sel", base + 0x160, 5, 5, lvds_sels, ARRAY_SIZE(lvds_sels));
+ static int imx6_pcie_wait_for_link(struct imx6_pcie *imx6_pcie)
+ {
+ 	struct dw_pcie *pci = imx6_pcie->pci;
+@@ -632,6 +686,7 @@ static int imx6_pcie_host_init(struct pcie_port *pp)
+ 	imx6_pcie_assert_core_reset(imx6_pcie);
+ 	imx6_pcie_init_phy(imx6_pcie);
+ 	imx6_pcie_deassert_core_reset(imx6_pcie);
++	imx6_setup_phy_mpll(imx6_pcie);
+ 	dw_pcie_setup_rc(pp);
+ 	imx6_pcie_establish_link(imx6_pcie);
  
 -- 
 2.18.0
