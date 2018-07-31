@@ -1,49 +1,48 @@
 From: pawel.mikolaj.chmiel@gmail.com (=?UTF-8?q?Pawe=C5=82=20Chmiel?=)
-Date: Tue, 31 Jul 2018 17:18:10 +0200
-Subject: [PATCH v3 2/3] Input: atmel_mxt_ts: Wait for device be ready for
- communication
+Date: Tue, 31 Jul 2018 17:18:11 +0200
+Subject: [PATCH v3 3/3] Input: atmel_mxt_ts: Document optional voltage
+ regulators
 In-Reply-To: <1533050291-11502-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 References: <1533050291-11502-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
-Message-ID: <1533050291-11502-3-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Message-ID: <1533050291-11502-4-git-send-email-pawel.mikolaj.chmiel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to documentation, device isn't ready for communication,
-until firmware asserts the CHG line. Add missing wait for this.
+Document new optional voltage regulators, which can be used
+to power down/up touchscreen.
 
 Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/input/touchscreen/atmel_mxt_ts.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Changes from v1:
+  - Added reviewed-by
+---
+ Documentation/devicetree/bindings/input/atmel,maxtouch.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/input/touchscreen/atmel_mxt_ts.c b/drivers/input/touchscreen/atmel_mxt_ts.c
-index 2cd7f6db6ba9..79e08916359f 100644
---- a/drivers/input/touchscreen/atmel_mxt_ts.c
-+++ b/drivers/input/touchscreen/atmel_mxt_ts.c
-@@ -202,6 +202,7 @@ enum t100_type {
- #define MXT_CRC_TIMEOUT		1000	/* msec */
- #define MXT_FW_RESET_TIME	3000	/* msec */
- #define MXT_FW_CHG_TIMEOUT	300	/* msec */
-+#define MXT_POWERON_DELAY	150	/* msec */
+diff --git a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
+index c88919480d37..17930ecadad3 100644
+--- a/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
++++ b/Documentation/devicetree/bindings/input/atmel,maxtouch.txt
+@@ -31,6 +31,12 @@ Optional properties for main touchpad device:
  
- /* Command to unlock bootloader */
- #define MXT_UNLOCK_CMD_MSB	0xaa
-@@ -3046,6 +3047,16 @@ static int mxt_regulator_enable(struct mxt_data *data)
- 		msleep(MXT_REGULATOR_DELAY);
- 		gpiod_set_value(data->reset_gpio, 1);
- 		msleep(MXT_RESET_INVALID_CHG);
-+
-+retry_wait:
-+		reinit_completion(&data->bl_completion);
-+		data->in_bootloader = true;
-+		error = mxt_wait_for_completion(data, &data->bl_completion,
-+										MXT_POWERON_DELAY);
-+		if (error == -EINTR)
-+			goto retry_wait;
-+
-+		data->in_bootloader = false;
- 	}
+ - reset-gpios: GPIO specifier for the touchscreen's reset pin (active low)
  
- 	return 0;
++- avdd-supply: Analog power supply. It powers up the analog channel block
++    of the controller to detect the touches.
++
++- vdd-supply: Digital power supply. It powers up the digital block
++    of the controller to enable i2c communication.
++
+ Example:
+ 
+ 	touch at 4b {
+@@ -38,4 +44,6 @@ Example:
+ 		reg = <0x4b>;
+ 		interrupt-parent = <&gpio>;
+ 		interrupts = <TEGRA_GPIO(W, 3) IRQ_TYPE_LEVEL_LOW>;
++		avdd-supply = <&atsp_reg>;
++		vdd-supply = <&tsp_reg>;
+ 	};
 -- 
 2.7.4
