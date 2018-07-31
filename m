@@ -1,89 +1,48 @@
 From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Tue, 31 Jul 2018 09:21:42 +0530
-Subject: [PATCH v7 5/6] trace_uprobe/sdt: Prevent multiple reference counter
- for same uprobe
+Date: Tue, 31 Jul 2018 09:21:41 +0530
+Subject: [PATCH v7 4/6] Uprobes/sdt: Prevent multiple reference counter for
+ same uprobe
 In-Reply-To: <20180731035143.11942-1-ravi.bangoria@linux.ibm.com>
 References: <20180731035143.11942-1-ravi.bangoria@linux.ibm.com>
-Message-ID: <20180731035143.11942-6-ravi.bangoria@linux.ibm.com>
+Message-ID: <20180731035143.11942-5-ravi.bangoria@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 We assume to have only one reference counter for one uprobe.
-Don't allow user to add multiple trace_uprobe entries having
-same inode+offset but different reference counter.
-
-Ex,
-  # echo "p:sdt_tick/loop2 /home/ravi/tick:0x6e4(0x10036)" > uprobe_events
-  # echo "p:sdt_tick/loop2_1 /home/ravi/tick:0x6e4(0xfffff)" >> uprobe_events
-  bash: echo: write error: Invalid argument
-
-  # dmesg
-  trace_kprobe: Reference counter offset mismatch.
-
-There is one exception though:
-When user is trying to replace the old entry with the new
-one, we allow this if the new entry does not conflict with
-any other existing entries.
+Don't allow user to register multiple uprobes having same
+inode+offset but different reference counter.
 
 Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
 ---
- kernel/trace/trace_uprobe.c | 37 +++++++++++++++++++++++++++++++++++--
- 1 file changed, 35 insertions(+), 2 deletions(-)
+ kernel/events/uprobes.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/kernel/trace/trace_uprobe.c b/kernel/trace/trace_uprobe.c
-index bf2be098eb08..be64d943d7ea 100644
---- a/kernel/trace/trace_uprobe.c
-+++ b/kernel/trace/trace_uprobe.c
-@@ -324,6 +324,35 @@ static int unregister_trace_uprobe(struct trace_uprobe *tu)
- 	return 0;
- }
- 
-+/*
-+ * Uprobe with multiple reference counter is not allowed. i.e.
-+ * If inode and offset matches, reference counter offset *must*
-+ * match as well. Though, there is one exception: If user is
-+ * replacing old trace_uprobe with new one(same group/event),
-+ * then we allow same uprobe with new reference counter as far
-+ * as the new one does not conflict with any other existing
-+ * ones.
-+ */
-+static struct trace_uprobe *find_old_trace_uprobe(struct trace_uprobe *new)
-+{
-+	struct trace_uprobe *tmp, *old = NULL;
-+	struct inode *new_inode = d_real_inode(new->path.dentry);
-+
-+	old = find_probe_event(trace_event_name(&new->tp.call),
-+				new->tp.call.class->system);
-+
-+	list_for_each_entry(tmp, &uprobe_list, list) {
-+		if ((old ? old != tmp : true) &&
-+		    new_inode == d_real_inode(tmp->path.dentry) &&
-+		    new->offset == tmp->offset &&
-+		    new->ref_ctr_offset != tmp->ref_ctr_offset) {
-+			pr_warn("Reference counter offset mismatch.");
+diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
+index ad92fed11526..c27546929ae7 100644
+--- a/kernel/events/uprobes.c
++++ b/kernel/events/uprobes.c
+@@ -679,6 +679,12 @@ static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset,
+ 	cur_uprobe = insert_uprobe(uprobe);
+ 	/* a uprobe exists for this inode:offset combination */
+ 	if (cur_uprobe) {
++		if (cur_uprobe->ref_ctr_offset != uprobe->ref_ctr_offset) {
++			pr_warn("Reference counter offset mismatch.\n");
++			put_uprobe(cur_uprobe);
++			kfree(uprobe);
 +			return ERR_PTR(-EINVAL);
 +		}
-+	}
-+	return old;
-+}
+ 		kfree(uprobe);
+ 		uprobe = cur_uprobe;
+ 	}
+@@ -1093,6 +1099,9 @@ static int __uprobe_register(struct inode *inode, loff_t offset,
+ 	uprobe = alloc_uprobe(inode, offset, ref_ctr_offset);
+ 	if (!uprobe)
+ 		return -ENOMEM;
++	if (IS_ERR(uprobe))
++		return PTR_ERR(uprobe);
 +
- /* Register a trace_uprobe and probe_event */
- static int register_trace_uprobe(struct trace_uprobe *tu)
- {
-@@ -333,8 +362,12 @@ static int register_trace_uprobe(struct trace_uprobe *tu)
- 	mutex_lock(&uprobe_lock);
- 
- 	/* register as an event */
--	old_tu = find_probe_event(trace_event_name(&tu->tp.call),
--			tu->tp.call.class->system);
-+	old_tu = find_old_trace_uprobe(tu);
-+	if (IS_ERR(old_tu)) {
-+		ret = PTR_ERR(old_tu);
-+		goto end;
-+	}
-+
- 	if (old_tu) {
- 		/* delete old event */
- 		ret = unregister_trace_uprobe(old_tu);
+ 	/*
+ 	 * We can race with uprobe_unregister()->delete_uprobe().
+ 	 * Check uprobe_is_active() and retry if it is false.
 -- 
 2.14.4
