@@ -1,29 +1,41 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 31 Jul 2018 12:54:14 +0530
-Subject: [PATCH] arm64: dts: hisilicon: Add missing clocks property for
- CPUs
-In-Reply-To: <6de0dde994326b3fdc2b746e22fdf1afe18067d2.1532315177.git.viresh.kumar@linaro.org>
-References: <6de0dde994326b3fdc2b746e22fdf1afe18067d2.1532315177.git.viresh.kumar@linaro.org>
-Message-ID: <20180731072414.vymng6k5uamgmyhi@vireshk-i7>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 31 Jul 2018 09:35:45 +0200
+Subject: [PATCH] arm64: drop unused kernel_neon_begin_partial() macro
+Message-ID: <20180731073545.32607-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23-07-18, 08:36, Viresh Kumar wrote:
-> The clocks property should either be present for all the CPUs of a
-> cluster or none. If these are present only for a subset of CPUs of a
-> cluster then things will start falling apart as soon as the CPUs are
-> brought online in a different order. For example, this will happen
-> because the operating system looks for such properties in the CPU node
-> it is trying to bring up, so that it can register a cooling device.
-> 
-> Add missing clocks property.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
+When kernel mode NEON was first introduced to the arm64 kernel,
+every call to kernel_neon_begin()/_end() stacked resp. unstacked
+the entire NEON register file, making it worthwile to reduce the
+number of used NEON registers to a bare minimum, and only stack
+those. kernel_neon_begin_partial() was introduced for this purpose,
+but after the refactoring for SVE and other changes, it no longer
+exists and was simply #define'd to kernel_neon_begin() directly.
 
-@Wei: Can you please apply this one as well ?
+In the mean time, all users have been updated, so let's remove
+the fallback macro.
 
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/neon.h | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
+index f922eaf780f9..fb9d137256a6 100644
+--- a/arch/arm64/include/asm/neon.h
++++ b/arch/arm64/include/asm/neon.h
+@@ -19,11 +19,4 @@
+ void kernel_neon_begin(void);
+ void kernel_neon_end(void);
+ 
+-/*
+- * Temporary macro to allow the crypto code to compile. Note that the
+- * semantics of kernel_neon_begin_partial() are now different from the
+- * original as it does not allow being called in an interrupt context.
+- */
+-#define kernel_neon_begin_partial(num_regs)	kernel_neon_begin()
+-
+ #endif /* ! __ASM_NEON_H */
 -- 
-viresh
+2.18.0
