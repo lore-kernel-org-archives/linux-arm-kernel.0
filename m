@@ -1,79 +1,39 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 31 Jul 2018 22:09:32 +0200
-Subject: [PATCH v7 5/6] i2c: Add Actions Semiconductor Owl family S900
- I2C driver
-In-Reply-To: <20180726154603.5089-6-manivannan.sadhasivam@linaro.org>
-References: <20180726154603.5089-1-manivannan.sadhasivam@linaro.org>
- <20180726154603.5089-6-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180731200932.n7djds2rmqhclit5@ninjato>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 31 Jul 2018 15:16:38 -0500
+Subject: [PATCH V5 0/3] PCI: separate hotplug handling from fatal error
+ handling
+In-Reply-To: <4dd903ec-3e4c-d2fb-8216-95d60bba4e55@kernel.org>
+References: <1530571967-19099-1-git-send-email-okaya@codeaurora.org>
+ <20180731184457.GN45322@bhelgaas-glaptop.roam.corp.google.com>
+ <4dd903ec-3e4c-d2fb-8216-95d60bba4e55@kernel.org>
+Message-ID: <20180731201637.GA235890@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manivannan,
-
-On Thu, Jul 26, 2018 at 09:16:02PM +0530, Manivannan Sadhasivam wrote:
-> Add Actions Semiconductor Owl family S900 I2C driver.
+On Tue, Jul 31, 2018 at 11:54:58AM -0700, Sinan Kaya wrote:
+> Hi Bjorn,
 > 
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> Acked-by: Peter Rosin <peda@axentia.se>
+> On 7/31/2018 11:44 AM, Bjorn Helgaas wrote:
+> > There's been a ton of discussion about this, and I didn't see a clear
+> > consensus emerge, so I'm going to drop it for now.  If it's still
+> > needed, please repost it and I'll watch for reviewers.
+> 
+> I apologize, let me summarize the conversation for you.
+> I proposed this [1]. Oza seems to be onboard [2].
+> 
+> Later, I posted v6 with this change last weekend.
 
-Looks mostly good already. Thanks Peter for the initial review!
+Oops, I missed that this had been obsoleted, sorry for the noise.
 
-> +static irqreturn_t owl_i2c_interrupt(int irq, void *_dev)
-> +{
-> +	struct owl_i2c_dev *i2c_dev = _dev;
-> +	struct i2c_msg *msg = i2c_dev->msg;
-> +	unsigned long flags;
-> +	unsigned int stat, fifostat;
-> +
-> +	spin_lock_irqsave(&i2c_dev->lock, flags);
-> +
-> +	fifostat = readl(i2c_dev->base + OWL_I2C_REG_FIFOSTAT);
-> +	if (fifostat & OWL_I2C_FIFOSTAT_RNB) {
-> +		dev_dbg(&i2c_dev->adap.dev, "received NACK from device\n");
-> +		goto stop;
-> +	}
-> +
-> +	stat = readl(i2c_dev->base + OWL_I2C_REG_STAT);
-> +	if (stat & OWL_I2C_STAT_BEB) {
-> +		dev_dbg(&i2c_dev->adap.dev, "bus error\n");
-> +		goto stop;
-> +	}
+> [patch v6 1/1] pci: pciehp: ignore link events when there is a fatal error
+> pending
+> 
+> Lukas and I discussed the patch last weekend under this v6 thread.
+> AFAIK, we agreed on the direction.
+> 
+> I'll post V7 with Lukas' comments and capture the detail from email
+> into the commit message.
+> 
+> Let us know what you think about it.
 
-I wonder if you can't pass back the different errors to the upper
-layers? Like -ENXIO for NACK and -EIO for bus error? We have a
-convention for that and it seems your HW can support it. The different
-error codes would then maybe also make the debug outputs obsolete.
-
-
-> +	/*
-> +	 * Here, -ENXIO will be returned if interrupt occurred but no
-> +	 * read or write happened. Else if msg_ptr equals to message length,
-> +	 * message count will be returned.
-> +	 */
-> +	ret = i2c_dev->msg_ptr == msg->len ? num : -ENXIO;
-
-I'd think this kinda unusual construct could go then as well by just
-returning the error code derived from the interrupt handler above.
-
-> +static const struct i2c_adapter_quirks owl_i2c_quirks = {
-> +	.flags		= I2C_AQ_COMB | I2C_AQ_COMB_WRITE_FIRST,
-> +	.max_read_len   = 240,
-> +	.max_write_len  = 240,
-> +	.max_comb_1st_msg_len = 6,
-> +	.max_comb_2nd_msg_len = 240,
-> +};
-
-Yay! Good use of the i2c_adapter_quirks struct :)
-
-Regards,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180731/591d947b/attachment.sig>
+Sounds good, I'll look for that.
