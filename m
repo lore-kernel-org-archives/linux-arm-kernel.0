@@ -1,155 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 31 Jul 2018 08:01:17 +0100
-Subject: [PATCH v7 08/12] mfd: intel-peci-client: Add PECI client MFD
- driver
-In-Reply-To: <7ab43253-1154-6e2f-b216-69b0d44b470a@linux.intel.com>
-References: <20180723214751.1733-1-jae.hyun.yoo@linux.intel.com>
- <20180723214751.1733-9-jae.hyun.yoo@linux.intel.com>
- <20180727082611.GE4628@dell>
- <acffdfef-cb20-4208-5297-d94bac5ecb1b@linux.intel.com>
- <CAL_JsqL7WkDOaegwmBDqLkRh0JfCo7O2krONVstjWMUsLiJMrg@mail.gmail.com>
- <7ab43253-1154-6e2f-b216-69b0d44b470a@linux.intel.com>
-Message-ID: <20180731070117.GE4662@dell>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Tue, 31 Jul 2018 07:21:56 +0000
+Subject: [PATCH v7 3/6] dt-bindings: mailbox: imx-mu: add generic MU
+ channel support
+In-Reply-To: <CABb+yY04dm_N1Ud2Mhi-g-eFdNVkxJKE8ONOqntZjN_QKwgLcg@mail.gmail.com>
+References: <AM0PR04MB42116C756EC78AD12EB254D6802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <CABb+yY0yn9os6nqH8eUfAr3Q3ev4=TfpTp=5ZDBR7FN67eb-wg@mail.gmail.com>
+ <VI1PR04MB4222672B8F7B6AF2B11A4442802A0@VI1PR04MB4222.eurprd04.prod.outlook.com>
+ <CABb+yY1EkHk85H72xYoYA3JbQL03+-o3UcRVdA_Zub-Q+D=OHw@mail.gmail.com>
+ <VI1PR04MB422216469EE5F3ED8E53A4F1802A0@VI1PR04MB4222.eurprd04.prod.outlook.com>
+ <CABb+yY0SfdFr8TMOMosTVb5+LFWqB8nQkKj3ze8usi-s7Cko4g@mail.gmail.com>
+ <VI1PR04MB4222B4877B341C0FA07A6A8D802A0@VI1PR04MB4222.eurprd04.prod.outlook.com>
+ <CABb+yY1MSSQKZ6BOQXC-x=qy4VZ5HqDBjmh_BJTXSkAm3+P8mA@mail.gmail.com>
+ <bf7aca98-7ec8-bcf3-b1a8-d86a7cf28d31@pengutronix.de>
+ <CABb+yY3PLcjduxm7uJ9xZpPP2zkcQ5Qngs4PjnhGAXp43QVzFA@mail.gmail.com>
+ <20180730144435.srxgohwgdhrmw2rz@pengutronix.de>
+ <CABb+yY0sUxGatozwdQVM55z7ACtpK8HCepnfvQNunQ=r5y_kVw@mail.gmail.com>
+ <CABb+yY04dm_N1Ud2Mhi-g-eFdNVkxJKE8ONOqntZjN_QKwgLcg@mail.gmail.com>
+Message-ID: <AM0PR04MB42118617A7F29C1D7BE59242802E0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Jul 2018, Jae Hyun Yoo wrote:
+Hi Jassi,
 
-> Hi Rob,
-> 
-> On 7/30/2018 3:10 PM, Rob Herring wrote:
-> > On Fri, Jul 27, 2018 at 11:36 AM Jae Hyun Yoo
-> > <jae.hyun.yoo@linux.intel.com> wrote:
-> > > 
-> > > Hi Lee,
-> > > 
-> > > On 7/27/2018 1:26 AM, Lee Jones wrote:
-> > > > On Mon, 23 Jul 2018, Jae Hyun Yoo wrote:
-> > > > 
-> > > > > This commit adds PECI client MFD driver.
-> > > > > 
-> > > > > Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
-> > > > > Cc: Lee Jones <lee.jones@linaro.org>
-> > > > > Cc: Rob Herring <robh+dt@kernel.org>
-> > > > > Cc: Andrew Jeffery <andrew@aj.id.au>
-> > > > > Cc: James Feist <james.feist@linux.intel.com>
-> > > > > Cc: Jason M Biils <jason.m.bills@linux.intel.com>
-> > > > > Cc: Joel Stanley <joel@jms.id.au>
-> > > > > Cc: Vernon Mauery <vernon.mauery@linux.intel.com>
-> > > > > ---
-> > > > >    drivers/mfd/Kconfig                   |  14 ++
-> > > > >    drivers/mfd/Makefile                  |   1 +
-> > > > >    drivers/mfd/intel-peci-client.c       | 182 ++++++++++++++++++++++++++
-> > > > >    include/linux/mfd/intel-peci-client.h |  81 ++++++++++++
-> > > > >    4 files changed, 278 insertions(+)
-> > > > >    create mode 100644 drivers/mfd/intel-peci-client.c
-> > > > >    create mode 100644 include/linux/mfd/intel-peci-client.h
-> > > > > 
-> > > > > diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> > > > > index f3fa516011ec..e38b591479d4 100644
-> > > > > --- a/drivers/mfd/Kconfig
-> > > > > +++ b/drivers/mfd/Kconfig
-> > > > > @@ -595,6 +595,20 @@ config MFD_INTEL_MSIC
-> > > > >         Passage) chip. This chip embeds audio, battery, GPIO, etc.
-> > > > >         devices used in Intel Medfield platforms.
-> > > > > 
-> > > > > +config MFD_INTEL_PECI_CLIENT
-> > > > > +    bool "Intel PECI client"
-> > > > > +    depends on (PECI || COMPILE_TEST)
-> > > > > +    select MFD_CORE
-> > > > > +    help
-> > > > > +      If you say yes to this option, support will be included for the
-> > > > > +      multi-funtional Intel PECI (Platform Environment Control Interface)
-> > > > > +      client. PECI is a one-wire bus interface that provides a communication
-> > > > > +      channel from PECI clients in Intel processors and chipset components
-> > > > > +      to external monitoring or control devices.
-> > > > > +
-> > > > > +      Additional drivers must be enabled in order to use the functionality
-> > > > > +      of the device.
-> > > > > +
-> > > > >    config MFD_IPAQ_MICRO
-> > > > >       bool "Atmel Micro ASIC (iPAQ h3100/h3600/h3700) Support"
-> > > > >       depends on SA1100_H3100 || SA1100_H3600
-> > > > > diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> > > > > index 2852a6042ecf..29e2cacc58bd 100644
-> > > > > --- a/drivers/mfd/Makefile
-> > > > > +++ b/drivers/mfd/Makefile
-> > > > > @@ -203,6 +203,7 @@ obj-$(CONFIG_MFD_INTEL_LPSS)     += intel-lpss.o
-> > > > >    obj-$(CONFIG_MFD_INTEL_LPSS_PCI)   += intel-lpss-pci.o
-> > > > >    obj-$(CONFIG_MFD_INTEL_LPSS_ACPI)  += intel-lpss-acpi.o
-> > > > >    obj-$(CONFIG_MFD_INTEL_MSIC)       += intel_msic.o
-> > > > > +obj-$(CONFIG_MFD_INTEL_PECI_CLIENT) += intel-peci-client.o
-> > > > >    obj-$(CONFIG_MFD_PALMAS)   += palmas.o
-> > > > >    obj-$(CONFIG_MFD_VIPERBOARD)    += viperboard.o
-> > > > >    obj-$(CONFIG_MFD_RC5T583)  += rc5t583.o rc5t583-irq.o
-> > > > > diff --git a/drivers/mfd/intel-peci-client.c b/drivers/mfd/intel-peci-client.c
-> > > > > new file mode 100644
-> > > > > index 000000000000..d7702cf1ea50
-> > > > > --- /dev/null
-> > > > > +++ b/drivers/mfd/intel-peci-client.c
-> > > > > @@ -0,0 +1,182 @@
-> > > > > +// SPDX-License-Identifier: GPL-2.0
-> > > > > +// Copyright (c) 2018 Intel Corporation
-> > > > > +
-> > > > > +#include <linux/bitfield.h>
-> > > > > +#include <linux/mfd/core.h>
-> > > > > +#include <linux/mfd/intel-peci-client.h>
-> > > > > +#include <linux/module.h>
-> > > > > +#include <linux/peci.h>
-> > > > > +#include <linux/of_device.h>
-> > > > > +
-> > > > > +enum cpu_gens {
-> > > > > +    CPU_GEN_HSX = 0, /* Haswell Xeon */
-> > > > > +    CPU_GEN_BRX,     /* Broadwell Xeon */
-> > > > > +    CPU_GEN_SKX,     /* Skylake Xeon */
-> > > > > +};
-> > > > > +
-> > > > > +static struct mfd_cell peci_functions[] = {
-> > > > > +    {
-> > > > > +            .name = "peci-cputemp",
-> > > > > +            .of_compatible = "intel,peci-cputemp",
-> > > > > +    },
-> > > > > +    {
-> > > > > +            .name = "peci-dimmtemp",
-> > > > > +            .of_compatible = "intel,peci-dimmtemp",
-> > > > > +    },
-> > > > > +};
-> > > > 
-> > > > The more I look at this driver, the less I think it fits into MFD.
-> > > > 
-> > > > What's stopping you from registering these devices directly from DT?
-> > > > 
-> > > 
-> > > Because DT doesn't allow 2 nodes at the same address so Rob suggested
-> > > MFD for this case.
-> > 
-> > Only after I first suggested you create cpu and dimm sensors from a
-> > single hwmon driver. Perhaps you should figure out how to fix the
-> > problem with delayed registration. Perhaps you can register the
-> > sensor, but just delay returning actual data until it is ready.
-> > 
-> 
-> The actual reason why I divided the single hwmon driver into two is for
-> using recommended hwmon API set which doesn't allow incremental
-> creation of sysfs attributes at run time - using of
-> 'devm_hwmon_device_register_with_info' is suggested by Guenter instead
-> of using other deprecated APIs.
-> 
-> The reason why the delayed registration is needed is, BMC kernel cannot
-> know how many DIMM are installed in remote machine before the machine
-> completing memory training and testing in POST. So dimm temp driver
-> cannot create hwmon attributes in advance.
-> 
-> My thought is, this way is the best to address these requirements.
+> > However, if SCU (in its current form) must be supported. We may need
+> > to add the third cell (irq enable or not) or some better way, right
+> > now.
+> >
+> Looking at imx_mu_scu_send_data(), which simply polls on the tx, I think we
+> don't even need third cell for scu client. A simple 2-cell, 8 uni-dir channel
+> setup should work.
 
-As I've previously explained, I do not think this is a good fit for
-MFD.  Since this whole PECI piece is a bit, let's say 'niche', perhaps
-it's better to contain the client within the PECI subsystem too.  You
-can then use the platform_device_add() API to register devices as and
-when required.
+How would you suggest to use for SCU in 2 -cells?
 
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> If I see the scu client driver, I could confirm how it would work.
+> 
+
+I've already given a general overview from here:
+https://www.spinics.net/lists/arm-kernel/msg669202.html
+
+Do you need me to send the full scu client driver patch for the reference?
+If yes, please feel free to let me know.
+
+Regards
+Dong Aisheng
+
+> So, lets please do the 8 uni-directional, 2 cells implementation.
+> 
+> Regards.
