@@ -1,104 +1,45 @@
-From: djw@t-chip.com.cn (djw at t-chip.com.cn)
-Date: Tue, 31 Jul 2018 13:59:22 +0800
-Subject: [PATCH v4 4/4] arm64: dts: rockchip: add sdmmc UHS support for
- roc-rk3328-cc
-In-Reply-To: <1533016762-5268-1-git-send-email-djw@t-chip.com.cn>
-References: <1533016762-5268-1-git-send-email-djw@t-chip.com.cn>
-Message-ID: <1533016762-5268-5-git-send-email-djw@t-chip.com.cn>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Tue, 31 Jul 2018 14:00:58 +0800
+Subject: [PATCH 0/2] dt: thermal: Fix broken cooling-maps
+In-Reply-To: <20180731045151.gqsgsm6l3gwr5m4z@vireshk-i7>
+References: <cover.1530766981.git.viresh.kumar@linaro.org>
+ <20180731045151.gqsgsm6l3gwr5m4z@vireshk-i7>
+Message-ID: <1533016858.2550.21.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Levin Du <djw@t-chip.com.cn>
+On ?, 2018-07-31 at 10:21 +0530, Viresh Kumar wrote:
+> On 05-07-18, 10:39, Viresh Kumar wrote:
+> > 
+> > Hi,
+> > 
+> > This is an attempt to fix the broken or partially defined DT
+> > bindings
+> > for cooling-maps. We should list every device that participates in
+> > cooling down at a certain trip point, instead of just the first in
+> > the
+> > list as that depends on certain ordering of events to work
+> > properly.
+> > 
+> > The first patch extends the binding to allow a list of phandles in
+> > "cooling-device" property and the second patch fixes one of the
+> > platform's DT.
+> > 
+> > This will be followed up by fixing all platform DT bindings that
+> > have
+> > these issues after this set is accepted.
+> > 
+> > The kernel also requires some changes to handle the phandle list,
+> > but
+> > wouldn't break with these changes as it reads the first phandle in
+> > the
+> > list for now. We can update that separately.
+> @Zhang: Are you going to apply this for 4.19-rc1 ? There are lot of
+> patches that
+> I am holding up until this gets merged,
+> 
+I suppose this patch should go via Eduardo' tree.
+Eduardo, can you please take a look at this patch set?
 
-In roc-rk3328-cc board, the signal voltage of sdmmc is supplied by the
-vcc_sdio regulator, which is a mux between 1.8V and 3.3V, controlled by
-a special output only gpio pin labeled "gpiomut_pmuio_iout",
-corresponding bit 1 of the syscon GRF_SOC_CON10.
-
-This special pin can now be reference as <&grf_gpio 0>, thanks to the
-gpio-syscon driver, which makes writing regulator-gpio possible.
-
-If the signal voltage changes, the io domain needs to change
-correspondingly.
-
-To use this feature, the following options are required in kernel config:
- - CONFIG_GPIO_SYSCON=y
- - CONFIG_POWER_AVS=y
- - CONFIG_ROCKCHIP_IODOMAIN=y
-
-Signed-off-by: Levin Du <djw@t-chip.com.cn>
-
----
-
-Changes in v4:
-- Use <&grf_gpio 0> to refer to the GPIO_MUTE pin.
-
-Changes in v3:
-- Use <&gpio_mute 0> instead of <&gpio_mute 1> to refer to the GPIO_MUTE pin.
-
-Changes in v2:
-- Rename gpio_syscon10 to gpio_mute in rk3328-roc-cc.dts
-
-Changes in v1:
-- Split into small patches
-- Sort dts properties in sdmmc node
-
- arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
-index b983abd..1edb39a 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts
-@@ -41,6 +41,19 @@
- 		vin-supply = <&vcc_io>;
- 	};
- 
-+	vcc_sdio: sdmmcio-regulator {
-+		compatible = "regulator-gpio";
-+		gpios = <&grf_gpio 0 GPIO_ACTIVE_HIGH>;
-+		states = <1800000 0x1
-+			  3300000 0x0>;
-+		regulator-name = "vcc_sdio";
-+		regulator-type = "voltage";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		vin-supply = <&vcc_sys>;
-+	};
-+
- 	vcc_host1_5v: vcc_otg_5v: vcc-host1-5v-regulator {
- 		compatible = "regulator-fixed";
- 		enable-active-high;
-@@ -213,7 +226,7 @@
- 
- 	vccio1-supply = <&vcc_io>;
- 	vccio2-supply = <&vcc18_emmc>;
--	vccio3-supply = <&vcc_io>;
-+	vccio3-supply = <&vcc_sdio>;
- 	vccio4-supply = <&vcc_18>;
- 	vccio5-supply = <&vcc_io>;
- 	vccio6-supply = <&vcc_io>;
-@@ -242,7 +255,12 @@
- 	max-frequency = <150000000>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sdmmc0_clk &sdmmc0_cmd &sdmmc0_dectn &sdmmc0_bus4>;
-+	sd-uhs-sdr12;
-+	sd-uhs-sdr25;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr104;
- 	vmmc-supply = <&vcc_sd>;
-+	vqmmc-supply = <&vcc_sdio>;
- 	status = "okay";
- };
- 
-@@ -277,3 +295,7 @@
- &usb_host0_ohci {
- 	status = "okay";
- };
-+
-+&grf_gpio {
-+	status = "okay";
-+};
--- 
-2.7.4
+thanks,
+rui
