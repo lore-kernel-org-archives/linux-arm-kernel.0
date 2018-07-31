@@ -1,83 +1,75 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 31 Jul 2018 10:26:39 +0100
-Subject: [PATCH 1/4] drm/i2c: tda998x: move mode_valid() to bridge
+Date: Tue, 31 Jul 2018 10:26:44 +0100
+Subject: [PATCH 2/4] drm/i2c: tda998x: get rid of private fill_modes function
 In-Reply-To: <20180731092343.GH17271@n2100.armlinux.org.uk>
 References: <20180731092343.GH17271@n2100.armlinux.org.uk>
-Message-ID: <E1fkQvP-0003n8-L9@rmk-PC.armlinux.org.uk>
+Message-ID: <E1fkQvU-0003nG-OK@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the mode_valid() implementation to the bridge instead of the
-connector, as we're checking the bridge's capabilities.
+We can achieve the same effect via the get_modes() method, rather than
+wrapping the fill_modes helper.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 32 ++++++++++++++++----------------
- 1 file changed, 16 insertions(+), 16 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 30 ++++++------------------------
+ 1 file changed, 6 insertions(+), 24 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 8ca5c9786bdf..58831b6a4722 100644
+index 58831b6a4722..98ec91a55a6a 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -1244,21 +1244,6 @@ static int tda998x_connector_get_modes(struct drm_connector *connector)
- 	return n;
- }
+@@ -1097,29 +1097,6 @@ static int tda998x_audio_codec_init(struct tda998x_priv *priv,
  
--static int tda998x_connector_mode_valid(struct drm_connector *connector,
--					struct drm_display_mode *mode)
+ /* DRM connector functions */
+ 
+-static int tda998x_connector_fill_modes(struct drm_connector *connector,
+-					uint32_t maxX, uint32_t maxY)
 -{
--	/* TDA19988 dotclock can go up to 165MHz */
 -	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
+-	int ret;
 -
--	if (mode->clock > ((priv->rev == TDA19988) ? 165000 : 150000))
--		return MODE_CLOCK_HIGH;
--	if (mode->htotal >= BIT(13))
--		return MODE_BAD_HVALUE;
--	if (mode->vtotal >= BIT(11))
--		return MODE_BAD_VVALUE;
--	return MODE_OK;
+-	mutex_lock(&priv->audio_mutex);
+-	ret = drm_helper_probe_single_connector_modes(connector, maxX, maxY);
+-
+-	if (connector->edid_blob_ptr) {
+-		struct edid *edid = (void *)connector->edid_blob_ptr->data;
+-
+-		cec_notifier_set_phys_addr_from_edid(priv->cec_notify, edid);
+-
+-		priv->sink_has_audio = drm_detect_monitor_audio(edid);
+-	} else {
+-		priv->sink_has_audio = false;
+-	}
+-	mutex_unlock(&priv->audio_mutex);
+-
+-	return ret;
 -}
 -
- static struct drm_encoder *
- tda998x_connector_best_encoder(struct drm_connector *connector)
+ static enum drm_connector_status
+ tda998x_connector_detect(struct drm_connector *connector, bool force)
  {
-@@ -1270,7 +1255,6 @@ tda998x_connector_best_encoder(struct drm_connector *connector)
- static
- const struct drm_connector_helper_funcs tda998x_connector_helper_funcs = {
- 	.get_modes = tda998x_connector_get_modes,
--	.mode_valid = tda998x_connector_mode_valid,
- 	.best_encoder = tda998x_connector_best_encoder,
- };
+@@ -1138,7 +1115,7 @@ static void tda998x_connector_destroy(struct drm_connector *connector)
+ static const struct drm_connector_funcs tda998x_connector_funcs = {
+ 	.dpms = drm_helper_connector_dpms,
+ 	.reset = drm_atomic_helper_connector_reset,
+-	.fill_modes = tda998x_connector_fill_modes,
++	.fill_modes = drm_helper_probe_single_connector_modes,
+ 	.detect = tda998x_connector_detect,
+ 	.destroy = tda998x_connector_destroy,
+ 	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+@@ -1237,7 +1214,12 @@ static int tda998x_connector_get_modes(struct drm_connector *connector)
+ 	}
  
-@@ -1316,6 +1300,21 @@ static void tda998x_bridge_detach(struct drm_bridge *bridge)
- 	drm_connector_cleanup(&priv->connector);
- }
+ 	drm_connector_update_edid_property(connector, edid);
++	cec_notifier_set_phys_addr_from_edid(priv->cec_notify, edid);
++
++	mutex_lock(&priv->audio_mutex);
+ 	n = drm_add_edid_modes(connector, edid);
++	priv->sink_has_audio = drm_detect_monitor_audio(edid);
++	mutex_unlock(&priv->audio_mutex);
  
-+static int tda998x_bridge_mode_valid(struct drm_bridge *bridge,
-+				     const struct drm_display_mode *mode)
-+{
-+	/* TDA19988 dotclock can go up to 165MHz */
-+	struct tda998x_priv *priv = bridge_to_tda998x_priv(bridge);
-+
-+	if (mode->clock > ((priv->rev == TDA19988) ? 165000 : 150000))
-+		return MODE_CLOCK_HIGH;
-+	if (mode->htotal >= BIT(13))
-+		return MODE_BAD_HVALUE;
-+	if (mode->vtotal >= BIT(11))
-+		return MODE_BAD_VVALUE;
-+	return MODE_OK;
-+}
-+
- static void tda998x_bridge_enable(struct drm_bridge *bridge)
- {
- 	struct tda998x_priv *priv = bridge_to_tda998x_priv(bridge);
-@@ -1562,6 +1561,7 @@ static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
- static const struct drm_bridge_funcs tda998x_bridge_funcs = {
- 	.attach = tda998x_bridge_attach,
- 	.detach = tda998x_bridge_detach,
-+	.mode_valid = tda998x_bridge_mode_valid,
- 	.disable = tda998x_bridge_disable,
- 	.mode_set = tda998x_bridge_mode_set,
- 	.enable = tda998x_bridge_enable,
+ 	kfree(edid);
+ 
 -- 
 2.7.4
