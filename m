@@ -1,79 +1,136 @@
-From: alex.bou9@gmail.com (Alex Bounine)
-Date: Tue, 31 Jul 2018 10:26:15 -0400
-Subject: [PATCH 0/6] rapidio: move Kconfig menu definition to subsystem
-In-Reply-To: <20180730225035.28365-1-acolin@isi.edu>
-References: <20180730225035.28365-1-acolin@isi.edu>
-Message-ID: <37edb8c5-a16f-ea39-5da8-312d138ce442@gmail.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Tue, 31 Jul 2018 11:28:35 -0300
+Subject: [PATCH] perf vendor events arm64: Update ThunderX2
+ implementation defined pmu core events
+In-Reply-To: <20180731100251.23575-1-ganapatrao.kulkarni@cavium.com>
+References: <20180731100251.23575-1-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20180731142835.GC4909@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Alexandre Bounine <alex.bou9@gmail.com>
+Em Tue, Jul 31, 2018 at 03:32:51PM +0530, Ganapatrao Kulkarni escreveu:
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 
-On 2018-07-30 06:50 PM, Alexei Colin wrote:
-> The top-level Kconfig entry for RapidIO subsystem is currently
-> duplicated in several architecture-specific Kconfig files. This set of
-> patches does two things:
+Can you please consider to provide an example of such counters being
+used, i.e. with a simple C synthetic test that causes these events to
+take place, then run it via 'perf stat' to show that indeed, they are
+being programmed and read correctly?
+
+Ideally for all of them, but if that becomes too burdensome, for a few
+of them?
+
+Thanks,
+
+- Arnaldo
+
+> ---
+>  .../arch/arm64/cavium/thunderx2/core-imp-def.json  | 87 +++++++++++++++++++++-
+>  1 file changed, 84 insertions(+), 3 deletions(-)
 > 
-> 1. Move the Kconfig menu definition into the RapidIO subsystem and
-> remove the duplicate definitions from arch Kconfig files.
-> 
-> 2. Enable RapidIO Kconfig menu entry for arm and arm64 architectures,
-> where it was not enabled before. I tested that subsystem and drivers
-> build successfully for both architectures, and tested that the modules
-> load on a custom arm64 Qemu model.
-> 
-> For all architectures, RapidIO menu should be offered when either:
-> (1) The platform has a PCI bus (which host a RapidIO module on the bus).
-> (2) The platform has a RapidIO IP block (connected to a system bus, e.g.
-> AXI on ARM). In this case, 'select HAS_RAPIDIO' should be added to the
-> 'config ARCH_*' menu entry for the SoCs that offer the IP block.
-> 
-> Prior to this patchset, different architectures used different criteria:
-> * powerpc: (1) and (2)
-> * mips: (1) and (2) after recent commit into next that added (2):
->    https://www.linux-mips.org/archives/linux-mips/2018-07/msg00596.html
->    fc5d988878942e9b42a4de5204bdd452f3f1ce47
->    491ec1553e0075f345fbe476a93775eabcbc40b6
-> * x86: (1)
-> * arm,arm64: none (RapidIO menus never offered)
-> 
-> Responses to feedback from prior submission (thanks for the reviews!):
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-July/593347.html
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-July/593349.html
-> 
-> Changelog:
->    * Moved Kconfig entry into RapidIO subsystem instead of duplicating
-> 
-> In the current patchset, I took the approach of adding '|| PCI' to the
-> depends in the subsystem. I did try the alterantive approach mentioned
-> in the reviews for v1 of this patch, where the subsystem Kconfig does
-> not add a '|| PCI' and each per-architecture Kconfig has to add a
-> 'select HAS_RAPIDIO if PCI' and SoCs with IP blocks have to also add
-> 'select HAS_RAPIDIO'. This works too but requires each architecture's
-> Kconfig to add the line for RapidIO (whereas current approach does not
-> require that involvement) and also may create a false impression that
-> the dependency on PCI is strict.
-> 
-> We appreciate the suggestion for also selecting the RapdiIO subsystem for
-> compilation with COMPILE_TEST, but hope to address it in a separate
-> patchset, localized to the subsystem, since it will need to change
-> depends on all drivers, not just on the top level, and since this
-> patch now spans multiple architectures.
-> 
-> 
-> Alexei Colin (6):
->    rapidio: define top Kconfig menu in driver subtree
->    x86: factor out RapidIO Kconfig menu
->    powerpc: factor out RapidIO Kconfig menu entry
->    mips: factor out RapidIO Kconfig entry
->    arm: enable RapidIO menu in Kconfig
->    arm64: enable RapidIO menu in Kconfig
-> 
->   arch/arm/Kconfig        |  2 ++
->   arch/arm64/Kconfig      |  2 ++
->   arch/mips/Kconfig       | 11 -----------
->   arch/powerpc/Kconfig    | 13 +------------
->   arch/x86/Kconfig        |  8 --------
->   drivers/rapidio/Kconfig | 15 +++++++++++++++
->   6 files changed, 20 insertions(+), 31 deletions(-)
-> 
+> diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+> index bc03c06..752e47e 100644
+> --- a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+> +++ b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+> @@ -12,6 +12,21 @@
+>          "ArchStdEvent": "L1D_CACHE_REFILL_WR",
+>      },
+>      {
+> +        "ArchStdEvent": "L1D_CACHE_REFILL_INNER",
+> +    },
+> +    {
+> +        "ArchStdEvent": "L1D_CACHE_REFILL_OUTER",
+> +    },
+> +    {
+> +        "ArchStdEvent": "L1D_CACHE_WB_VICTIM",
+> +    },
+> +    {
+> +        "ArchStdEvent": "L1D_CACHE_WB_CLEAN",
+> +    },
+> +    {
+> +        "ArchStdEvent": "L1D_CACHE_INVAL",
+> +    },
+> +    {
+>          "ArchStdEvent": "L1D_TLB_REFILL_RD",
+>      },
+>      {
+> @@ -24,9 +39,75 @@
+>          "ArchStdEvent": "L1D_TLB_WR",
+>      },
+>      {
+> +        "ArchStdEvent": "L2D_TLB_REFILL_RD",
+> +    },
+> +    {
+> +        "ArchStdEvent": "L2D_TLB_REFILL_WR",
+> +    },
+> +    {
+> +        "ArchStdEvent": "L2D_TLB_RD",
+> +    },
+> +    {
+> +        "ArchStdEvent": "L2D_TLB_WR",
+> +    },
+> +    {
+>          "ArchStdEvent": "BUS_ACCESS_RD",
+> -   },
+> -   {
+> +    },
+> +    {
+>          "ArchStdEvent": "BUS_ACCESS_WR",
+> -   }
+> +    },
+> +    {
+> +        "ArchStdEvent": "MEM_ACCESS_RD",
+> +    },
+> +    {
+> +        "ArchStdEvent": "MEM_ACCESS_WR",
+> +    },
+> +    {
+> +        "ArchStdEvent": "UNALIGNED_LD_SPEC",
+> +    },
+> +    {
+> +        "ArchStdEvent": "UNALIGNED_ST_SPEC",
+> +    },
+> +    {
+> +        "ArchStdEvent": "UNALIGNED_LDST_SPEC",
+> +    },
+> +    {
+> +        "ArchStdEvent": "EXC_UNDEF",
+> +    },
+> +    {
+> +        "ArchStdEvent": "EXC_SVC",
+> +    },
+> +    {
+> +        "ArchStdEvent": "EXC_PABORT",
+> +    },
+> +    {
+> +        "ArchStdEvent": "EXC_DABORT",
+> +    },
+> +    {
+> +        "ArchStdEvent": "EXC_IRQ",
+> +    },
+> +    {
+> +        "ArchStdEvent": "EXC_FIQ",
+> +    },
+> +    {
+> +        "ArchStdEvent": "EXC_SMC",
+> +    },
+> +    {
+> +        "ArchStdEvent": "EXC_HVC",
+> +    },
+> +    {
+> +        "ArchStdEvent": "EXC_TRAP_PABORT",
+> +    },
+> +    {
+> +        "ArchStdEvent": "EXC_TRAP_DABORT",
+> +    },
+> +    {
+> +        "ArchStdEvent": "EXC_TRAP_OTHER",
+> +    },
+> +    {
+> +        "ArchStdEvent": "EXC_TRAP_IRQ",
+> +    },
+> +    {
+> +        "ArchStdEvent": "EXC_TRAP_FIQ",
+> +    }
+>  ]
+> -- 
+> 2.9.4
