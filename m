@@ -1,84 +1,134 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 31 Jul 2018 08:21:38 +0530
-Subject: [PATCH v7 3/6] dt-bindings: mailbox: imx-mu: add generic MU
- channel support
-In-Reply-To: <20180730164928.sb3sgnfxueeiqfsq@pengutronix.de>
-References: <CABb+yY1EkHk85H72xYoYA3JbQL03+-o3UcRVdA_Zub-Q+D=OHw@mail.gmail.com>
- <VI1PR04MB422216469EE5F3ED8E53A4F1802A0@VI1PR04MB4222.eurprd04.prod.outlook.com>
- <CABb+yY0SfdFr8TMOMosTVb5+LFWqB8nQkKj3ze8usi-s7Cko4g@mail.gmail.com>
- <VI1PR04MB4222B4877B341C0FA07A6A8D802A0@VI1PR04MB4222.eurprd04.prod.outlook.com>
- <CABb+yY1MSSQKZ6BOQXC-x=qy4VZ5HqDBjmh_BJTXSkAm3+P8mA@mail.gmail.com>
- <bf7aca98-7ec8-bcf3-b1a8-d86a7cf28d31@pengutronix.de>
- <CABb+yY3PLcjduxm7uJ9xZpPP2zkcQ5Qngs4PjnhGAXp43QVzFA@mail.gmail.com>
- <20180730144435.srxgohwgdhrmw2rz@pengutronix.de>
- <CABb+yY0sUxGatozwdQVM55z7ACtpK8HCepnfvQNunQ=r5y_kVw@mail.gmail.com>
- <CABb+yY04dm_N1Ud2Mhi-g-eFdNVkxJKE8ONOqntZjN_QKwgLcg@mail.gmail.com>
- <20180730164928.sb3sgnfxueeiqfsq@pengutronix.de>
-Message-ID: <CABb+yY39tcH7DyQijE3Edgho3Aaq-ap8LErXTSs4VmeTszBcYA@mail.gmail.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Tue, 31 Jul 2018 11:29:24 +0800
+Subject: [PATCH mmc-next v2 3/3] mmc: sdhci-of-dwcmshc: solve 128MB DMA
+ boundary limitation
+In-Reply-To: <edaa7605-e0e0-b17a-8403-c3d7d60d7989@arm.com>
+References: <20180726151017.4da1e336@xhacker.debian>
+ <20180726151424.4bcecf41@xhacker.debian>
+ <edaa7605-e0e0-b17a-8403-c3d7d60d7989@arm.com>
+Message-ID: <20180731112924.6a1e8388@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2018 at 10:19 PM, Oleksij Rempel
-<o.rempel@pengutronix.de> wrote:
-> On Mon, Jul 30, 2018 at 09:48:35PM +0530, Jassi Brar wrote:
->> On Mon, Jul 30, 2018 at 8:32 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> > On Mon, Jul 30, 2018 at 8:14 PM, Oleksij Rempel <o.rempel@pengutronix.de> wrote:
->> >> On Mon, Jul 30, 2018 at 06:34:56PM +0530, Jassi Brar wrote:
->> >>> On Mon, Jul 30, 2018 at 1:05 PM, Oleksij Rempel <o.rempel@pengutronix.de> wrote:
->> >>> > Hi Aishen, Jassie,
->> >>> >
->> >>> > i'm lost in this discussion. Please, as soon as I need to add some
->> >>> > changes to my patches, notify me. Preferably on top for email.
->> >>> >
->> >>> I am ok with however you choose to implement, 8 unidirectional or 4
->> >>> bidirectional channels or whatever.
->> >>>
->> >>> We just can't have protocol specific s/w modes in the controller drivers.
->> >>>
->> >>> The best solution is to fix the SCU firmware. If that is _really_
->> >>> impossible, I provided a solution (3 cells work around). If you have a
->> >>> better idea please feel free to propose and implement that.
->> >>>
->> >>> It will also help if you could share the user code of "scu-mode". If
->> >>> there is no such code (and we know the driver doesn't respect the
->> >>> "scu-mode" property) why do we even have that binding? Maybe drop it.
->> >>
->> >> Tomorrow I have a time slot to address your generic iMX MU suggestions.
->> >> So, what is better, uni- or bi-directional channels?
->> >>
->> > The datasheet indicates there are 4 tx and 4 rx channels. So 8
->> > uni-directional channels (which allow more fine-grained/efficient
->> > resource allocation btw).
->> >
->> >> Should I implement
->> >> *all* (4TX+FIFO, 4RX+FIFO, 4TX-simple, 4RX-simple) channels in this run?
->> >>
->> > From datasheet, each of 8 channels should be defined as signal+data
->> > i.e, IRQ + TX/RX_Reg.
->> > The rest 4 GP channels are doorbells (irq only).
->> >
->> > So we can have 2-cells.
->> >     First cell is 0->Tx, 1->RX, 2->Doorbell
->> >     Second cell is index of the channel {0,3}
->> >
->> > Now you may implement only RX+TX, and leave 'doorbell' out for future.
->> > Thats ok, because we wouldn't have to change bindings then.
->> >
->> > However, if SCU (in its current form) must be supported. We may need
->> > to add the third cell (irq enable or not) or some better way, right
->> > now.
->> >
->> Looking at imx_mu_scu_send_data(), which simply polls on the tx, I
->> think we don't even need third cell for scu client. A simple 2-cell, 8
->> uni-dir channel setup should work.
->> If I see the scu client driver, I could confirm how it would work.
->>
->> So, lets please do the 8 uni-directional, 2 cells implementation.
->
-> Just in case.. to avoid confusion (or add more...). There are 4 GIP (General Interrupt Request n
-> Pending bits) or RX-doorbell and 4 GIR (General Interrupt Request bits)
-> or TX-doorbell.
->
-Ok. But the approach remains the same.
+Hi Robin,
 
-thanks.
+On Mon, 30 Jul 2018 12:06:08 +0100 Robin Murphy wrote:
+
+> Hi Jisheng,
+> 
+> On 26/07/18 08:14, Jisheng Zhang wrote:
+> > When using DMA, if the DMA addr spans 128MB boundary, we have to split
+> > the DMA transfer into two so that each one doesn't exceed the boundary.  
+> 
+> Out of interest, is the driver already setting its segment boundary mask 
+> appropriately? This sounds like the exact kind of hardware restriction 
+> that dma_parms is intended to describe, which scatterlist-generating 
+> code is *supposed* to already respect.
+
+Thanks for the nice input. It may provide an elegant solution for this
+limitation. 
+
+To simplify the situation, let's assume no iommu, only swiotlb. And
+the DDR is less than 4GB so swiotlb on arm64 doesn't init.
+
+There's no dma range limitation with the HW, the only limitation
+is boundary, while dma_capable() doesn't check the boundary mask, so if
+we taking this solution, we need to teach dma_capable() about the boundary
+mask, I'm not sure whether this is acceptable.
+
+Another problem is swiotlb initialization. When to init swiotlb, we dunno
+there's such boundary limitation HW. Is there any elegant solution for
+this problem?
+
+Thanks
+
+> 
+> Robin.
+> 
+> > Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> > ---
+> >   drivers/mmc/host/sdhci-of-dwcmshc.c | 42 +++++++++++++++++++++++++++++
+> >   1 file changed, 42 insertions(+)
+> > 
+> > diff --git a/drivers/mmc/host/sdhci-of-dwcmshc.c b/drivers/mmc/host/sdhci-of-dwcmshc.c
+> > index 1b7cd144fb01..7e189514bc83 100644
+> > --- a/drivers/mmc/host/sdhci-of-dwcmshc.c
+> > +++ b/drivers/mmc/host/sdhci-of-dwcmshc.c
+> > @@ -8,21 +8,51 @@
+> >    */
+> >   
+> >   #include <linux/clk.h>
+> > +#include <linux/mm.h>
+> >   #include <linux/module.h>
+> >   #include <linux/of.h>
+> >   
+> >   #include "sdhci-pltfm.h"
+> >   
+> > +#define BOUNDARY_OK(addr, len) \
+> > +	((addr | (SZ_128M - 1)) == ((addr + len - 1) | (SZ_128M - 1)))
+> > +
+> >   struct dwcmshc_priv {
+> >   	struct clk	*bus_clk;
+> >   };
+> >   
+> > +/*
+> > + * if DMA addr spans 128MB boundary, we split the DMA transfer into two
+> > + * so that the DMA transfer doesn't exceed the boundary.
+> > + */
+> > +static unsigned int dwcmshc_adma_write_desc(struct sdhci_host *host,
+> > +					    void *desc, dma_addr_t addr,
+> > +					    int len, unsigned int cmd)
+> > +{
+> > +	int tmplen, offset;
+> > +
+> > +	if (BOUNDARY_OK(addr, len) || !len)
+> > +		return _sdhci_adma_write_desc(host, desc, addr, len, cmd);
+> > +
+> > +	offset = addr & (SZ_128M - 1);
+> > +	tmplen = SZ_128M - offset;
+> > +	_sdhci_adma_write_desc(host, desc, addr, tmplen, cmd);
+> > +
+> > +	addr += tmplen;
+> > +	len -= tmplen;
+> > +	desc += host->desc_sz;
+> > +	_sdhci_adma_write_desc(host, desc, addr, len, cmd);
+> > +
+> > +	return host->desc_sz * 2;
+> > +}
+> > +
+> >   static const struct sdhci_ops sdhci_dwcmshc_ops = {
+> >   	.set_clock		= sdhci_set_clock,
+> >   	.set_bus_width		= sdhci_set_bus_width,
+> >   	.set_uhs_signaling	= sdhci_set_uhs_signaling,
+> >   	.get_max_clock		= sdhci_pltfm_clk_get_max_clock,
+> >   	.reset			= sdhci_reset,
+> > +	.adma_write_desc	= dwcmshc_adma_write_desc,
+> >   };
+> >   
+> >   static const struct sdhci_pltfm_data sdhci_dwcmshc_pdata = {
+> > @@ -36,12 +66,24 @@ static int dwcmshc_probe(struct platform_device *pdev)
+> >   	struct sdhci_host *host;
+> >   	struct dwcmshc_priv *priv;
+> >   	int err;
+> > +	u32 extra;
+> >   
+> >   	host = sdhci_pltfm_init(pdev, &sdhci_dwcmshc_pdata,
+> >   				sizeof(struct dwcmshc_priv));
+> >   	if (IS_ERR(host))
+> >   		return PTR_ERR(host);
+> >   
+> > +	/*
+> > +	 * The DMA descriptor table number is calculated as the maximum
+> > +	 * number of segments times 2, to allow for an alignment
+> > +	 * descriptor for each segment, plus 1 for a nop end descriptor,
+> > +	 * plus extra number for cross 128M boundary handling.
+> > +	 */
+> > +	extra = DIV_ROUND_UP(totalram_pages, SZ_128M / PAGE_SIZE);
+> > +	if (extra > SDHCI_MAX_SEGS)
+> > +		extra = SDHCI_MAX_SEGS;
+> > +	host->adma_table_num = SDHCI_MAX_SEGS * 2 + 1 + extra;
+> > +
+> >   	pltfm_host = sdhci_priv(host);
+> >   	priv = sdhci_pltfm_priv(pltfm_host);
+> >   
+> >   
