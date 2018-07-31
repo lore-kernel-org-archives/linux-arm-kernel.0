@@ -1,43 +1,111 @@
 From: tony.xie@rock-chips.com (Tony Xie)
-Date: Tue, 31 Jul 2018 15:57:25 +0800
-Subject: [PATCH v2 0/5] support a new type of PMIC，including two chips(rk817 and rk809)
-Message-ID: <1533023850-29004-1-git-send-email-tony.xie@rock-chips.com>
+Date: Tue, 31 Jul 2018 15:57:28 +0800
+Subject: [PATCH v2 3/5] dt-bindings: mfd: rk808: Add binding informations for
+ RK809 and RK817.
+In-Reply-To: <1533023850-29004-1-git-send-email-tony.xie@rock-chips.com>
+References: <1533023850-29004-1-git-send-email-tony.xie@rock-chips.com>
+Message-ID: <1533023850-29004-4-git-send-email-tony.xie@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of functions and registers of the rk817 and rk808 are the same,
-so they can share allmost all codes.
+Add device tree bindings documentation for Rockchip's RK809 & RK817 PMIC.
 
-Their specifications are as follows?
-  1) The RK809 and RK809 consist of 5 DCDCs, 9 LDOs and have the same registers
-     for these components except dcdc5.
-  2) The dcdc5 is a boost dcdc for RK817 and is a buck for RK809.
-  3) The RK817 has one switch but The Rk809 has two.
+Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
+---
+ Documentation/devicetree/bindings/mfd/rk808.txt | 55 +++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
-Changes in V2:
-1. initialize the pm_pwroff_fn to NULL. 
-2. use EXPORT_SYMBOL_GPL to export pm_power_off_prepare.
-3. change patch 2/3/4/5 subjects. 
-
-Tony Xie (5):
-  mfd: rk808: Add RK817 and RK809 support
-  regulator: rk808: add RK809 and RK817 support.
-  dt-bindings: mfd: rk808: Add binding informations for RK809 and RK817.
-  RTC: RK808: add RK809 and RK817 support.
-  clk: RK808: add RK809 and RK817 support.
-
- Documentation/devicetree/bindings/mfd/rk808.txt |  55 ++
- drivers/clk/Kconfig                             |   6 +-
- drivers/clk/clk-rk808.c                         |  62 ++-
- drivers/mfd/Kconfig                             |   6 +-
- drivers/mfd/rk808.c                             | 218 +++++++-
- drivers/regulator/Kconfig                       |   4 +-
- drivers/regulator/rk808-regulator.c             | 633 +++++++++++++++++++++++-
- drivers/rtc/Kconfig                             |   4 +-
- drivers/rtc/rtc-rk808.c                         |  68 ++-
- include/linux/mfd/rk808.h                       | 175 +++++++
- kernel/reboot.c                                 |   1 +
- 11 files changed, 1203 insertions(+), 29 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/mfd/rk808.txt b/Documentation/devicetree/bindings/mfd/rk808.txt
+index 91b6522..31c9f3d 100644
+--- a/Documentation/devicetree/bindings/mfd/rk808.txt
++++ b/Documentation/devicetree/bindings/mfd/rk808.txt
+@@ -3,11 +3,15 @@ RK8XX Power Management Integrated Circuit
+ The rk8xx family current members:
+ rk805
+ rk808
++rk809
++rk817
+ rk818
+ 
+ Required properties:
+ - compatible: "rockchip,rk805"
+ - compatible: "rockchip,rk808"
++- compatible: "rockchip,rk809"
++- compatible: "rockchip,rk817"
+ - compatible: "rockchip,rk818"
+ - reg: I2C slave address
+ - interrupt-parent: The parent interrupt controller.
+@@ -46,6 +50,28 @@ Optional RK808 properties:
+   the gpio controller. If DVS GPIOs aren't present, voltage changes will happen
+   very quickly with no slow ramp time.
+ 
++Optional RK809 properties:
++- vcc1-supply:  The input supply for DCDC_REG1
++- vcc2-supply:  The input supply for DCDC_REG2
++- vcc3-supply:  The input supply for DCDC_REG3
++- vcc4-supply:  The input supply for DCDC_REG4
++- vcc5-supply:  The input supply for LDO_REG1, LDO_REG2, LDO_REG3
++- vcc6-supply:  The input supply for LDO_REG4, LDO_REG5, LDO_REG6
++- vcc7-supply:  The input supply for LDO_REG7, LDO_REG8, LDO_REG9
++- vcc8-supply:  The input supply for SWITCH_REG1
++- vcc9-supply:  The input supply for DCDC_REG5, SWITCH_REG2
++
++Optional RK817 properties:
++- vcc1-supply:  The input supply for DCDC_REG1
++- vcc2-supply:  The input supply for DCDC_REG2
++- vcc3-supply:  The input supply for DCDC_REG3
++- vcc4-supply:  The input supply for DCDC_REG4
++- vcc5-supply:  The input supply for LDO_REG1, LDO_REG2, LDO_REG3
++- vcc6-supply:  The input supply for LDO_REG4, LDO_REG5, LDO_REG6
++- vcc7-supply:  The input supply for LDO_REG7, LDO_REG8, LDO_REG9
++- vcc8-supply:  The input supply for BOOST
++- vcc9-supply:  The input supply for OTG_SWITCH
++
+ Optional RK818 properties:
+ - vcc1-supply:  The input supply for DCDC_REG1
+ - vcc2-supply:  The input supply for DCDC_REG2
+@@ -87,6 +113,28 @@ number as described in RK808 datasheet.
+ 	- SWITCH_REGn
+ 		- valid values for n are 1 to 2
+ 
++Following regulators of the RK809 PMIC block are supported. Note that
++the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
++number as described in RK808 datasheet.
++
++	- DCDC_REGn
++		- valid values for n are 1 to 5.
++	- LDO_REGn
++		- valid values for n are 1 to 9.
++	- SWITCH_REGn
++		- valid values for n are 1 to 2.
++
++Following regulators of the RK817 PMIC block are supported. Note that
++the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
++number as described in RK818 datasheet.
++
++	- DCDC_REGn
++		- valid values for n are 1 to 4.
++	- LDO_REGn
++		- valid values for n are 1 to 9.
++	- BOOST
++	- OTG_SWITCH
++
+ Following regulators of the RK818 PMIC block are supported. Note that
+ the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
+ number as described in RK818 datasheet.
+@@ -99,6 +147,13 @@ number as described in RK818 datasheet.
+ 	- HDMI_SWITCH
+ 	- OTG_SWITCH
+ 
++There are three pins needed to config, named "gpio_ts" "gpio_gt" "gpio_slp".
++	The gpio_gt and gpio_ts pins support the gpio function.
++	The gpio_slp pin is for controlling the pmic states, as below:
++		- reset
++		- power down
++		- sleep
++
+ Standard regulator bindings are used inside regulator subnodes. Check
+   Documentation/devicetree/bindings/regulator/regulator.txt
+ for more details
 -- 
 1.9.1
