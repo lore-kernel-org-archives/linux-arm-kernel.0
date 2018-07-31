@@ -1,64 +1,48 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Tue, 31 Jul 2018 17:03:48 +0200
-Subject: [PATCH v4 13/17] khwasan: add hooks implementation
-In-Reply-To: <8240d4f9-c8df-cfe9-119d-6e933f8b13df@virtuozzo.com>
-References: <cover.1530018818.git.andreyknvl@google.com>
- <a2a93370d43ec85b02abaf8d007a15b464212221.1530018818.git.andreyknvl@google.com>
- <09cb5553-d84a-0e62-5174-315c14b88833@arm.com>
- <CAAeHK+yC3XRPoTByhH1QPrX45pG3QY_2Q4gz=dfDgxfzu1Fyfw@mail.gmail.com>
- <8240d4f9-c8df-cfe9-119d-6e933f8b13df@virtuozzo.com>
-Message-ID: <CACT4Y+Y=61VwwETQP3FwAN16ompSNJOCyDCG6Ew1Bm5f_Fe1Lw@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 31 Jul 2018 09:06:57 -0600
+Subject: [PATCH v3 0/9] coresight: Update device tree bindings
+In-Reply-To: <20180730200232.GA31755@xps15>
+References: <1532686537-12380-1-git-send-email-suzuki.poulose@arm.com>
+ <20180730200232.GA31755@xps15>
+Message-ID: <CANLsYkzBfCydwDO-KyDub4X=GTy_dtv-478RyMReBEH6VybSAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 4:50 PM, Andrey Ryabinin
-<aryabinin@virtuozzo.com> wrote:
->
->
-> On 07/31/2018 04:05 PM, Andrey Konovalov wrote:
->> On Wed, Jul 25, 2018 at 3:44 PM, Vincenzo Frascino at Foss
->> <vincenzo.frascino@arm.com> wrote:
->>> On 06/26/2018 02:15 PM, Andrey Konovalov wrote:
->>>
->>>> @@ -325,18 +341,41 @@ void kasan_init_slab_obj(struct kmem_cache *cache,
->>>> const void *object)
->>>>     void *kasan_slab_alloc(struct kmem_cache *cache, void *object, gfp_t
->>>> flags)
->>>>   {
->>>> -       return kasan_kmalloc(cache, object, cache->object_size, flags);
->>>> +       object = kasan_kmalloc(cache, object, cache->object_size, flags);
->>>> +       if (IS_ENABLED(CONFIG_KASAN_HW) && unlikely(cache->ctor)) {
->>>> +               /*
->>>> +                * Cache constructor might use object's pointer value to
->>>> +                * initialize some of its fields.
->>>> +                */
->>>> +               cache->ctor(object);
->>>>
->>> This seams breaking the kmem_cache_create() contract: "The @ctor is run when
->>> new pages are allocated by the cache."
->>> (https://elixir.bootlin.com/linux/v3.7/source/mm/slab_common.c#L83)
->>>
->>> Since there might be preexisting code relying on it, this could lead to
->>> global side effects. Did you verify that this is not the case?
->>>
->>> Another concern is performance related if we consider this solution suitable
->>> for "near-production", since with the current implementation you call the
->>> ctor (where present) on an object multiple times and this ends up memsetting
->>> and repopulating the memory every time (i.e. inode.c: inode_init_once). Do
->>> you know what is the performance impact?
->>
->> We can assign tags to objects with constructors when a slab is
->> allocated and call constructors once as usual. The downside is that
->> such object would always have the same tag when it is reallocated, so
->> we won't catch use-after-frees.
->
-> Actually you should do this for SLAB_TYPESAFE_BY_RCU slabs. Usually they are with ->ctors but there
-> are few without constructors.
-> We can't reinitialize or even retag them. The latter will definitely cause false-positive use-after-free reports.
+[...]
 
-Somewhat offtopic, but I can't understand how SLAB_TYPESAFE_BY_RCU
-slabs can be useful without ctors or at least memset(0). Objects in
-such slabs need to be type-stable, but I can't understand how it's
-possible to establish type stability without a ctor... Are these bugs?
-Or I am missing something subtle? What would be a canonical usage of
-SLAB_TYPESAFE_BY_RCU slab without a ctor?
+> >
+> > Suzuki K Poulose (9):
+> >   coresight: Document error handling in coresight_register
+> >   coresight: platform: Refactor graph endpoint parsing
+> >   coresight: platform: Fix refcounting for graph nodes
+> >   coresight: platform: Fix leaking device reference
+> >   coresight: Fix remote endpoint parsing
+> >   coresight: Add helper to check if the endpoint is input
+> >   coresight: platform: Cleanup coresight connection handling
+> >   coresight: Cleanup coresight DT bindings
+> >   dts: juno: Update coresight bindings
+> >
+> >  .../devicetree/bindings/arm/coresight.txt          |  95 +++++---
+> >  arch/arm64/boot/dts/arm/juno-base.dtsi             | 161 ++++++------
+> >  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi          |  52 ++--
+> >  arch/arm64/boot/dts/arm/juno.dts                   |  13 +-
+> >  drivers/hwtracing/coresight/coresight.c            |  35 +--
+> >  drivers/hwtracing/coresight/of_coresight.c         | 269 ++++++++++++++-------
+> >  include/linux/coresight.h                          |   9 +-
+> >  7 files changed, 359 insertions(+), 275 deletions(-)
+> >
+>
+> Good day,
+>
+> I have applied patches 1 to 7.  I will wait for Rob's ACK before doing the same
+> with 8 and 9.
+
+I just applied patch 8 and 9.
+
+>
+> Thanks,
+> Mathieu
+>
+> > --
+> > 2.7.4
+> >
