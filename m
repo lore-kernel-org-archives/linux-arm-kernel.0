@@ -1,60 +1,44 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jul 2018 10:23:43 +0100
-Subject: [PATCH v2 0/7] tda998x: allow use with bridge based devices
-In-Reply-To: <9d48e374-be2f-fbc0-ca92-1b7e1b68e358@axentia.se>
-References: <20180730164137.GD17271@n2100.armlinux.org.uk>
- <73adc630-21cd-5b14-cb47-f1a58ee3bc83@axentia.se>
- <20180731074114.GF17271@n2100.armlinux.org.uk>
- <9d48e374-be2f-fbc0-ca92-1b7e1b68e358@axentia.se>
-Message-ID: <20180731092343.GH17271@n2100.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 31 Jul 2018 10:26:29 +0100
+Subject: [PATCH v2] arm64, kaslr: export offset in VMCOREINFO ELF notes
+In-Reply-To: <303e32f7-ff47-ea9b-d5a0-45a22e44d0a9@arm.com>
+References: <1532931883-16132-1-git-send-email-bhsharma@redhat.com>
+ <303e32f7-ff47-ea9b-d5a0-45a22e44d0a9@arm.com>
+Message-ID: <20180731092629.GD4680@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 09:53:57AM +0200, Peter Rosin wrote:
-> On 2018-07-31 09:41, Russell King - ARM Linux wrote:
-> > On Tue, Jul 31, 2018 at 07:44:24AM +0200, Peter Rosin wrote:
-> >> On 2018-07-30 18:41, Russell King - ARM Linux wrote:
-> >>> Hi,
-> >>>
-> >>> This is a re-posting of the series I responded to Peter Rosin's May
-> >>> posting, with a few bugs fixed, and the bridge registered outside of
-> >>> the component helper.  This should allow Peter to use the driver
-> >>> while maintaining armada drm and tilcdc support.
-> >>>
-> >>> No comments (other than 0-day test results) were received on the
-> >>> previous posting.
-> >>
-> >> I of course meant to comment on this! I didn't because there was a rush
-> >> before vacation, then vacation, then a heap of important stuff that had
-> >> piled up. This one simply had too low priority to make a significant bleep
-> >> on the radar. Sorry for the silence...
-> >>
-> >> However, now that I do try to test, I get conflicts as I try to apply the
-> >> patches. I'm wondering what this was based on? I've tried next-20180730
-> >> drm-misc/drm-misc-next from some minutes ago.
+On Tue, Jul 31, 2018 at 10:19:35AM +0100, James Morse wrote:
+> Hi Bhupesh,
+> 
+> On 30/07/18 07:24, Bhupesh Sharma wrote:
+> > Include KASLR offset in arm64 VMCOREINFO ELF notes to assist in
+> > debugging. vmcore parsing in user-space already expects this value in
+> > the notes and we are providing it for portability of those existing
+> > tools with x86.
 > > 
-> > They're based on 4.17.
+> > Ideally we would like core code to do this (so that way this
+> > information won't be missed when an architecture adds KASLR support),
+> > but mips has CONFIG_RANDOMIZE_BASE, and doesn't provide kaslr_offset(),
+> > so I am not sure if this is needed for mips (and other such similar arch
+> > cases in future). So, lets keep this architecture specific for now.
 > 
-> Right, meanwhile I massaged the patches into a combo of some local patches,
-> next-20180730 and drm-misc-next, and tested that. The conflict was trivial
-> once I had a closer look...
+> (heh, I assumed you would rewrite my train-of-thought, but I guess this works!)
 > 
-> And it seems to work (with atmel-hlcdc), so you can add
 > 
-> Tested-by: Peter Rosin <peda@axentia.se>
+> > As an example of a user-space use-case, consider the
+> > makedumpfile user-space utility which will need fixup to use this
+> > KASLR offset to work with cases where we need to find a way to
+> > translate symbol address from vmlinux to kernel run time address
+> > in case of KASLR boot on arm64.
+> 
+> Acked-by: James Morse <james.morse@arm.com>
+> 
+> If we want to send this to stable, it looks like it should have been part of the
+> KASLR series, f80fb3a3d5084 ("arm64: add support for kernel ASLR") was merged
+> for v4.6.
+> CC: <stable@vger.kernel.org> # 4.6.x
 
-Thanks, I've added your attributation, and fixed patch 2 as you pointed
-out.
+Hmm, does this warrant a stable backport? This hasn't ever worked, right?
 
-I have a four more tda998x patches if you're willing to test.  These
-follow on from this set - I've tweaked patch 2 in this follow on set to
-cater for the removal of "_mode_" in
-drm_mode_connector_update_edid_property.
-
- drivers/gpu/drm/i2c/tda998x_drv.c | 106 ++++++++++++++++++--------------------
- 1 file changed, 51 insertions(+), 55 deletions(-)
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+Will
