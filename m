@@ -1,13 +1,20 @@
 From: acolin@isi.edu (Alexei Colin)
-Date: Tue, 31 Jul 2018 10:29:50 -0400
-Subject: [RESEND PATCH 2/6] x86: factor out RapidIO Kconfig menu
+Date: Tue, 31 Jul 2018 10:29:51 -0400
+Subject: [RESEND PATCH 3/6] powerpc: factor out RapidIO Kconfig menu entry
 In-Reply-To: <20180731142954.30345-1-acolin@isi.edu>
 References: <20180731142954.30345-1-acolin@isi.edu>
-Message-ID: <20180731142954.30345-3-acolin@isi.edu>
+Message-ID: <20180731142954.30345-4-acolin@isi.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The menu entry is now defined in the rapidio subtree.
+The menu entry is now defined in the rapidio subtree.  Also, re-order
+the bus menu so tha the platform-specific RapidIO controller appears
+after the entry for the RapidIO subsystem.
+
+Platforms with a PCI bus will be offered the RapidIO menu since they may
+be want support for a RapidIO PCI device. Platforms without a PCI bus
+that might include a RapidIO IP block will need to "select HAS_RAPIDIO"
+in the platform-/machine-specific "config ARCH_*" Kconfig entry.
 
 Cc: Andrew Morton <akpm@linux-foundation.org>
 Cc: Russell King <linux@armlinux.org.uk>
@@ -19,27 +26,39 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Alexei Colin <acolin@isi.edu>
 ---
- arch/x86/Kconfig | 8 --------
- 1 file changed, 8 deletions(-)
+ arch/powerpc/Kconfig | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 27fce7e84357..6f057000e486 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -2828,14 +2828,6 @@ config AMD_NB
+diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+index 25d005af0a5b..17ea8a5f90a0 100644
+--- a/arch/powerpc/Kconfig
++++ b/arch/powerpc/Kconfig
+@@ -993,16 +993,7 @@ source "drivers/pci/Kconfig"
  
  source "drivers/pcmcia/Kconfig"
  
+-config HAS_RAPIDIO
+-	bool
+-	default n
+-
 -config RAPIDIO
 -	tristate "RapidIO support"
--	depends on PCI
--	default n
+-	depends on HAS_RAPIDIO || PCI
 -	help
--	  If enabled this option will include drivers and the core
+-	  If you say Y here, the kernel will include drivers and
 -	  infrastructure code to support RapidIO interconnect devices.
--
- source "drivers/rapidio/Kconfig"
++source "drivers/rapidio/Kconfig"
  
- config X86_SYSFB
+ config FSL_RIO
+ 	bool "Freescale Embedded SRIO Controller support"
+@@ -1012,8 +1003,6 @@ config FSL_RIO
+ 	  Include support for RapidIO controller on Freescale embedded
+ 	  processors (MPC8548, MPC8641, etc).
+ 
+-source "drivers/rapidio/Kconfig"
+-
+ endmenu
+ 
+ config NONSTATIC_KERNEL
 -- 
 2.18.0
