@@ -1,9 +1,10 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed,  1 Aug 2018 18:48:41 +0200
-Subject: [PATCH 4.17 186/336] EDAC, altera: Fix ARM64 build warning
+Date: Wed,  1 Aug 2018 18:50:04 +0200
+Subject: [PATCH 4.17 269/336] soc: imx: gpcv2: Do not pass static memory as
+ platform data
 In-Reply-To: <20180801165028.930831994@linuxfoundation.org>
 References: <20180801165028.930831994@linuxfoundation.org>
-Message-ID: <20180801165036.217950148@linuxfoundation.org>
+Message-ID: <20180801165039.336372110@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,43 +12,76 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 ------------------
 
-From: Thor Thayer <thor.thayer@linux.intel.com>
+From: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-[ Upstream commit 9ef20753e044f7468c4113e5aecd785419b0b3cc ]
+[ Upstream commit 050f810e238f268670f14a8f8b793ba2dbf2e92f ]
 
-The kbuild test robot reported the following warning:
+Platform device core assumes the ownership of dev.platform_data as
+well as that it is dynamically allocated and it will try to kfree it
+as a part of platform_device_release(). Change the code to use
+platform_device_add_data() n instead of a pointer to a static memory
+to avoid causing a BUG() when calling platform_device_put().
 
-  drivers/edac/altera_edac.c: In function 'ocram_free_mem':
-  drivers/edac/altera_edac.c:1410:42: warning: cast from pointer to integer
-	of different size [-Wpointer-to-int-cast]
-    gen_pool_free((struct gen_pool *)other, (u32)p, size);
-                                             ^
+The problem can be reproduced by artificially enabling the error path
+of platform_device_add() call (around line 357).
 
-After adding support for ARM64 architectures, the unsigned long
-parameter is 64 bits and causes a build warning on 64-bit configs. Fix
-by casting to the correct size (unsigned long) instead of u32.
+Note that this change also allows us to constify imx7_pgc_domains,
+since we no longer need to be able to modify it.
 
-Reported-by: kbuild test robot <lkp@intel.com>
-Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+Cc: Stefan Agner <stefan@agner.ch>
+Cc: Lucas Stach <l.stach@pengutronix.de>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-edac <linux-edac@vger.kernel.org>
-Fixes: c3eea1942a16 ("EDAC, altera: Add Altera L2 cache and OCRAM support")
-Link: http://lkml.kernel.org/r/1526317441-4996-1-git-send-email-thor.thayer at linux.intel.com
-Signed-off-by: Borislav Petkov <bp@suse.de>
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+Signed-off-by: Shawn Guo <shawnguo@kernel.org>
 Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- drivers/edac/altera_edac.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/soc/imx/gpcv2.c |   22 +++++++++++++++-------
+ 1 file changed, 15 insertions(+), 7 deletions(-)
 
---- a/drivers/edac/altera_edac.c
-+++ b/drivers/edac/altera_edac.c
-@@ -1106,7 +1106,7 @@ static void *ocram_alloc_mem(size_t size
- 
- static void ocram_free_mem(void *p, size_t size, void *other)
- {
--	gen_pool_free((struct gen_pool *)other, (u32)p, size);
-+	gen_pool_free((struct gen_pool *)other, (unsigned long)p, size);
+--- a/drivers/soc/imx/gpcv2.c
++++ b/drivers/soc/imx/gpcv2.c
+@@ -155,7 +155,7 @@ static int imx7_gpc_pu_pgc_sw_pdn_req(st
+ 	return imx7_gpc_pu_pgc_sw_pxx_req(genpd, false);
  }
  
- static const struct edac_device_prv_data ocramecc_data = {
+-static struct imx7_pgc_domain imx7_pgc_domains[] = {
++static const struct imx7_pgc_domain imx7_pgc_domains[] = {
+ 	[IMX7_POWER_DOMAIN_MIPI_PHY] = {
+ 		.genpd = {
+ 			.name      = "mipi-phy",
+@@ -321,11 +321,6 @@ static int imx_gpcv2_probe(struct platfo
+ 			continue;
+ 		}
+ 
+-		domain = &imx7_pgc_domains[domain_index];
+-		domain->regmap = regmap;
+-		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
+-		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
+-
+ 		pd_pdev = platform_device_alloc("imx7-pgc-domain",
+ 						domain_index);
+ 		if (!pd_pdev) {
+@@ -334,7 +329,20 @@ static int imx_gpcv2_probe(struct platfo
+ 			return -ENOMEM;
+ 		}
+ 
+-		pd_pdev->dev.platform_data = domain;
++		ret = platform_device_add_data(pd_pdev,
++					       &imx7_pgc_domains[domain_index],
++					       sizeof(imx7_pgc_domains[domain_index]));
++		if (ret) {
++			platform_device_put(pd_pdev);
++			of_node_put(np);
++			return ret;
++		}
++
++		domain = pd_pdev->dev.platform_data;
++		domain->regmap = regmap;
++		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
++		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
++
+ 		pd_pdev->dev.parent = dev;
+ 		pd_pdev->dev.of_node = np;
+ 
