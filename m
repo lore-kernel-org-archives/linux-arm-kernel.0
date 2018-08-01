@@ -1,44 +1,33 @@
-From: tudor.ambarus@microchip.com (Tudor Ambarus)
-Date: Wed, 1 Aug 2018 16:35:12 +0300
-Subject: [PATCH 2/2] i2c: at91: Save the bus clock frequency in adapter
-In-Reply-To: <20180801133512.12276-1-tudor.ambarus@microchip.com>
-References: <20180801133512.12276-1-tudor.ambarus@microchip.com>
-Message-ID: <20180801133512.12276-3-tudor.ambarus@microchip.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed,  1 Aug 2018 15:40:30 +0200
+Subject: [PATCH v2 0/3] arm64: dts: meson-axg: add audio support
+Message-ID: <20180801134033.21739-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock-frequency property is not mandatory for the i2c buses. If it's
-not present in the device tree, the buses __usually__ assume it's 100kHZ
-(see altera, at91, axxia, etc.). Broadcom uses a 375kHZ default
-clock-frequency, so the default clock frequency varies from bus to bus.
+The main purpose of this patchset is to add the audio devices on amlogic's
+AXG SoCs.
 
-There are i2c clients that need to know the bus clock frequency in order to
-compute their wake token (see atecc508a i2c client).
+In term of dependency, apart from the clock bindings you have already
+pulled for your second PR to arm-soc, this patchset requires the ARB
+reset bindings [0] for patch 1.
 
-The clock-frequency value has to be propagated to the i2c clients, otherwise,
-if they will not find the i2c bus clock frequency in the device tree, they
-will have to make their own assumption of the clock frequency.
+Changes since v1 [1]:
+ - Dropped applied changes
+ - Update card bindings following Rob's comments on the card DT binding
+   documentation.
 
-Spare the i2c clients of making wrong assumptions of the i2c bus clock
-frequency and provide the bus clock frequency in adapter.
+[0]: 3bfd2fe0ab49 ("reset: meson: add dt-bindings for meson-axg audio arb")
+[1]: https://lkml.kernel.org/r/20180724125238.14567-1-jbrunet at baylibre.com
 
-Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
----
- drivers/i2c/busses/i2c-at91.c | 1 +
- 1 file changed, 1 insertion(+)
+Jerome Brunet (3):
+  arm64: dts: meson-axg: add audio fifos
+  arm64: dts: meson-axg: s400: enable audio devices
+  arm64: dts: meson-axg: s400: add sound card
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index 3f3e8b3..9aa0937 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -1124,6 +1124,7 @@ static int at91_twi_probe(struct platform_device *pdev)
- 	dev->adapter.quirks = &at91_twi_quirks;
- 	dev->adapter.dev.parent = dev->dev;
- 	dev->adapter.nr = pdev->id;
-+	dev->adapter.bus_freq_hz = bus_clk_rate;
- 	dev->adapter.timeout = AT91_I2C_TIMEOUT;
- 	dev->adapter.dev.of_node = pdev->dev.of_node;
- 
+ .../arm64/boot/dts/amlogic/meson-axg-s400.dts | 180 ++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi    |  67 +++++++
+ 2 files changed, 247 insertions(+)
+
 -- 
-2.9.4
+2.17.1
