@@ -1,48 +1,44 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 1 Aug 2018 21:57:33 +0200
-Subject: [RFC PATCH v2 5/6] spi: Add QuadSPI driver for Atmel SAMA5D2
-In-Reply-To: <20180801172747.GJ5509@sirena.org.uk>
-References: <20180627131609.13681-1-bugalski.piotr@gmail.com>
- <20180627131609.13681-6-bugalski.piotr@gmail.com>
- <20180801172747.GJ5509@sirena.org.uk>
-Message-ID: <20180801215733.4dfa3a95@bbrezillon>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed,  1 Aug 2018 15:04:17 -0500
+Subject: [RFC 1/2] slub: Avoid trying to allocate memory on offline nodes
+In-Reply-To: <20180801200418.1325826-1-jeremy.linton@arm.com>
+References: <20180801200418.1325826-1-jeremy.linton@arm.com>
+Message-ID: <20180801200418.1325826-2-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+If a user calls the *alloc_node() functions with an invalid node
+its possible to crash in alloc_pages_nodemask because NODE_DATA()
+returns a bad node, which propogates into the node zonelist in
+prepare_alloc_pages. This avoids that by not trying to allocate
+new slabs against offline nodes.
 
-On Wed, 1 Aug 2018 18:27:47 +0100
-Mark Brown <broonie@kernel.org> wrote:
+(example backtrace)
 
-> On Wed, Jun 27, 2018 at 03:16:08PM +0200, Piotr Bugalski wrote:
-> > Kernel contains QSPI driver strongly tied to MTD and nor-flash memory.
-> > New spi-mem interface allows usage also other memory types, especially
-> > much larger NAND with SPI interface. This driver works as SPI controller
-> > and is not related to MTD, however can work with NAND-flash or other
-> > peripherals using spi-mem interface.  
-> 
-> This is fine from a SPI point of view
+  __alloc_pages_nodemask+0x128/0xf48
+  allocate_slab+0x94/0x528
+  new_slab+0x68/0xc8
+  ___slab_alloc+0x44c/0x520
+  __slab_alloc+0x50/0x68
+  kmem_cache_alloc_node_trace+0xe0/0x230
 
-Cool. There are still 2 things I think should be addressed before
-merging the driver:
-1/ Fixing the SoB tag to match the author (problem reported by
-   Alexandre)
-2/ Getting this patch [1] merged and implementing the ->get_name() hook
-   in this driver so that SPI NOR devs declared to the MTD layer keep
-   the same name after the transition to spi-mem and mtdparts= passed on
-   the cmdline keep working. Without this in place we're likely to
-   break a few setups :-/.
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ mm/slub.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> but I'd like to apply it directly
-> to the SPI tree rather than ack it for merge via the MTD tree - can we
-> work something out with a shared branch or something?
-
-Sure, I can provide an immutable tag for you to pull and I'll add my
-acks on those patches once the 2 things I mentioned above are
-addressed.
-
-Regards,
-
-Boris
-
-[1]https://patchwork.kernel.org/patch/10508693/ 
+diff --git a/mm/slub.c b/mm/slub.c
+index 51258eff4178..e03719bac1e2 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -2519,6 +2519,8 @@ static void *___slab_alloc(struct kmem_cache *s, gfp_t gfpflags, int node,
+ 		if (unlikely(!node_match(page, searchnode))) {
+ 			stat(s, ALLOC_NODE_MISMATCH);
+ 			deactivate_slab(s, page, c->freelist, c);
++			if (!node_online(searchnode))
++				node = NUMA_NO_NODE;
+ 			goto new_slab;
+ 		}
+ 	}
+-- 
+2.14.3
