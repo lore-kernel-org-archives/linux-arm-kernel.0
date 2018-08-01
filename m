@@ -1,87 +1,86 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed,  1 Aug 2018 18:50:04 +0200
-Subject: [PATCH 4.17 269/336] soc: imx: gpcv2: Do not pass static memory as
- platform data
-In-Reply-To: <20180801165028.930831994@linuxfoundation.org>
-References: <20180801165028.930831994@linuxfoundation.org>
-Message-ID: <20180801165039.336372110@linuxfoundation.org>
+Date: Wed,  1 Aug 2018 18:49:12 +0200
+Subject: [PATCH 4.14 042/246] bpf,
+ arm32: fix inconsistent naming about emit_a32_lsr_{r64, i64}
+In-Reply-To: <20180801165011.700991984@linuxfoundation.org>
+References: <20180801165011.700991984@linuxfoundation.org>
+Message-ID: <20180801165013.734586676@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.17-stable review patch.  If anyone has any objections, please let me know.
+4.14-stable review patch.  If anyone has any objections, please let me know.
 
 ------------------
 
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
+From: Wang YanQing <udknight@gmail.com>
 
-[ Upstream commit 050f810e238f268670f14a8f8b793ba2dbf2e92f ]
+[ Upstream commit 68565a1af9f7012e6f2fe2bdd612f67d2d830c28 ]
 
-Platform device core assumes the ownership of dev.platform_data as
-well as that it is dynamically allocated and it will try to kfree it
-as a part of platform_device_release(). Change the code to use
-platform_device_add_data() n instead of a pointer to a static memory
-to avoid causing a BUG() when calling platform_device_put().
+The names for BPF_ALU64 | BPF_ARSH are emit_a32_arsh_*,
+the names for BPF_ALU64 | BPF_LSH are emit_a32_lsh_*, but
+the names for BPF_ALU64 | BPF_RSH are emit_a32_lsr_*.
 
-The problem can be reproduced by artificially enabling the error path
-of platform_device_add() call (around line 357).
+For consistence reason, let's rename emit_a32_lsr_* to
+emit_a32_rsh_*.
 
-Note that this change also allows us to constify imx7_pgc_domains,
-since we no longer need to be able to modify it.
+This patch also corrects a wrong comment.
 
-Cc: Stefan Agner <stefan@agner.ch>
-Cc: Lucas Stach <l.stach@pengutronix.de>
+Fixes: 39c13c204bb1 ("arm: eBPF JIT compiler")
+Signed-off-by: Wang YanQing <udknight@gmail.com>
+Cc: Shubham Bansal <illusionist.neo@gmail.com>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+Cc: linux at armlinux.org.uk
+Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
 Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- drivers/soc/imx/gpcv2.c |   22 +++++++++++++++-------
- 1 file changed, 15 insertions(+), 7 deletions(-)
+ arch/arm/net/bpf_jit_32.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
---- a/drivers/soc/imx/gpcv2.c
-+++ b/drivers/soc/imx/gpcv2.c
-@@ -155,7 +155,7 @@ static int imx7_gpc_pu_pgc_sw_pdn_req(st
- 	return imx7_gpc_pu_pgc_sw_pxx_req(genpd, false);
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -718,7 +718,7 @@ static inline void emit_a32_arsh_r64(con
  }
  
--static struct imx7_pgc_domain imx7_pgc_domains[] = {
-+static const struct imx7_pgc_domain imx7_pgc_domains[] = {
- 	[IMX7_POWER_DOMAIN_MIPI_PHY] = {
- 		.genpd = {
- 			.name      = "mipi-phy",
-@@ -321,11 +321,6 @@ static int imx_gpcv2_probe(struct platfo
- 			continue;
- 		}
+ /* dst = dst >> src */
+-static inline void emit_a32_lsr_r64(const u8 dst[], const u8 src[], bool dstk,
++static inline void emit_a32_rsh_r64(const u8 dst[], const u8 src[], bool dstk,
+ 				     bool sstk, struct jit_ctx *ctx) {
+ 	const u8 *tmp = bpf2a32[TMP_REG_1];
+ 	const u8 *tmp2 = bpf2a32[TMP_REG_2];
+@@ -734,7 +734,7 @@ static inline void emit_a32_lsr_r64(cons
+ 		emit(ARM_LDR_I(rm, ARM_SP, STACK_VAR(dst_hi)), ctx);
+ 	}
  
--		domain = &imx7_pgc_domains[domain_index];
--		domain->regmap = regmap;
--		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
--		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
--
- 		pd_pdev = platform_device_alloc("imx7-pgc-domain",
- 						domain_index);
- 		if (!pd_pdev) {
-@@ -334,7 +329,20 @@ static int imx_gpcv2_probe(struct platfo
- 			return -ENOMEM;
- 		}
+-	/* Do LSH operation */
++	/* Do RSH operation */
+ 	emit(ARM_RSB_I(ARM_IP, rt, 32), ctx);
+ 	emit(ARM_SUBS_I(tmp2[0], rt, 32), ctx);
+ 	emit(ARM_MOV_SR(ARM_LR, rd, SRTYPE_LSR, rt), ctx);
+@@ -784,7 +784,7 @@ static inline void emit_a32_lsh_i64(cons
+ }
  
--		pd_pdev->dev.platform_data = domain;
-+		ret = platform_device_add_data(pd_pdev,
-+					       &imx7_pgc_domains[domain_index],
-+					       sizeof(imx7_pgc_domains[domain_index]));
-+		if (ret) {
-+			platform_device_put(pd_pdev);
-+			of_node_put(np);
-+			return ret;
-+		}
-+
-+		domain = pd_pdev->dev.platform_data;
-+		domain->regmap = regmap;
-+		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
-+		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
-+
- 		pd_pdev->dev.parent = dev;
- 		pd_pdev->dev.of_node = np;
- 
+ /* dst = dst >> val */
+-static inline void emit_a32_lsr_i64(const u8 dst[], bool dstk,
++static inline void emit_a32_rsh_i64(const u8 dst[], bool dstk,
+ 				    const u32 val, struct jit_ctx *ctx) {
+ 	const u8 *tmp = bpf2a32[TMP_REG_1];
+ 	const u8 *tmp2 = bpf2a32[TMP_REG_2];
+@@ -1340,7 +1340,7 @@ static int build_insn(const struct bpf_i
+ 	case BPF_ALU64 | BPF_RSH | BPF_K:
+ 		if (unlikely(imm > 63))
+ 			return -EINVAL;
+-		emit_a32_lsr_i64(dst, dstk, imm, ctx);
++		emit_a32_rsh_i64(dst, dstk, imm, ctx);
+ 		break;
+ 	/* dst = dst << src */
+ 	case BPF_ALU64 | BPF_LSH | BPF_X:
+@@ -1348,7 +1348,7 @@ static int build_insn(const struct bpf_i
+ 		break;
+ 	/* dst = dst >> src */
+ 	case BPF_ALU64 | BPF_RSH | BPF_X:
+-		emit_a32_lsr_r64(dst, src, dstk, sstk, ctx);
++		emit_a32_rsh_r64(dst, src, dstk, sstk, ctx);
+ 		break;
+ 	/* dst = dst >> src (signed) */
+ 	case BPF_ALU64 | BPF_ARSH | BPF_X:
