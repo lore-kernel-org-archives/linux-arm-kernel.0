@@ -1,64 +1,43 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 01 Aug 2018 15:32:50 +0200
-Subject: [PATCH] drm/rockchip: Convert drm_atomic_helper_suspend/resume()
-In-Reply-To: <CAFqt6zbd5pJJEV+9_sqs3bML18gpWROBjGA13VeK3AWFgJ_u+A@mail.gmail.com>
-References: <20180731203430.GA30136@jordon-HP-15-Notebook-PC>
- <1843623.lUM99VBV1x@phil>
- <CAFqt6zbd5pJJEV+9_sqs3bML18gpWROBjGA13VeK3AWFgJ_u+A@mail.gmail.com>
-Message-ID: <4854810.RcpRblXvbi@phil>
+From: tudor.ambarus@microchip.com (Tudor Ambarus)
+Date: Wed, 1 Aug 2018 16:35:11 +0300
+Subject: [PATCH 1/2] i2c: enable buses to save their clock frequency in adapter
+In-Reply-To: <20180801133512.12276-1-tudor.ambarus@microchip.com>
+References: <20180801133512.12276-1-tudor.ambarus@microchip.com>
+Message-ID: <20180801133512.12276-2-tudor.ambarus@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 1. August 2018, 15:14:24 CEST schrieb Souptick Joarder:
-> On Wed, Aug 1, 2018 at 6:40 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> > Am Mittwoch, 1. August 2018, 14:43:47 CEST schrieb Souptick Joarder:
-> >> On Wed, Aug 1, 2018 at 6:03 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> >> > Hi Souptick,
-> >> >
-> >> > Am Dienstag, 31. Juli 2018, 22:34:30 CEST schrieb Souptick Joarder:
-> >> >> convert drm_atomic_helper_suspend/resume() to use
-> >> >> drm_mode_config_helper_suspend/resume().
-> >> >>
-> >> >> With this conversion, rockchip_drm_fb_resume() and
-> >> >> rockchip_drm_fb_suspend() will not be used anymore.
-> >> >> Both of these functions can be removed.
-> >> >>
-> >> >> Also, in struct rockchip_drm_private state will not be
-> >> >> used anymore. So this can be removed forever.
-> >> >>
-> >> >> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-> >> >> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
-> >> >
-> >> > the patch itself looks great, just a simple bookkeeping question.
-> >> >
-> >> > What role did Ajit play in creating the patch? If I remember correctly
-> >> > it is meant to be
-> >> > - 1st Signed-off: Patch-Author
-> >> > - 2nd Signed-off: E-Mail sender + patch possibly patch changes
-> >> > (optional of course if the same)
-> >> >
-> >> > So was this meant to be a Reviewed-by from Ajit?
-> >>
-> >> We both are working together for these patches to
-> >> convert drm_atomic_helper_suspend/resume().
-> >> That's the reason to add his name in 2nd Signed-off
-> >> in all similar patches.
-> >>
-> >> Is it a incorrect way to put 2nd Signed-off here ?
-> >
-> > Thanks for the clarification and the interesting question :-)
-> >
-> > I've just read through Documentation/process/submitting-patches.rst
-> > and it seems there is an "official" way to show that relationship, via a
-> > tag named "Co-Developed-by:" described under number 12.
-> >
-> > So I guess we could just adapt the patch accordingly, if that is ok with
-> > both of you (i.e. I can change this when applying, so no need to resend).
-> 
-> We are ok with it :-)
+The clock-frequency property is not mandatory for the i2c buses. If it's
+not present in the device tree, the buses __usually__ assume it's 100kHZ
+(see altera, at91, axxia, etc.). Broadcom uses a 375kHZ default
+clock-frequency, so the default clock frequency varies from bus to bus.
 
-applied to drm-misc-next with the second signed-off changed to
-co-developed-by.
+There are i2c clients that need to know the bus clock frequency in order to
+compute their wake token (see atecc508a i2c client).
 
-Thanks for that nice cleanup.
-Heiko
+The clock-frequency value has to be propagated to the i2c clients, otherwise,
+if they will not find the i2c bus clock frequency in the device tree, they
+will have to make their own assumption of the clock frequency.
+
+Spare the i2c clients of making wrong assumptions of the i2c bus clock
+frequency and enable the buses to save their clock frequency in adapter.
+
+Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+---
+ include/linux/i2c.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+index bc8d42f..fe65768 100644
+--- a/include/linux/i2c.h
++++ b/include/linux/i2c.h
+@@ -677,6 +677,7 @@ struct i2c_adapter {
+ 	struct rt_mutex bus_lock;
+ 	struct rt_mutex mux_lock;
+ 
++	u32 bus_freq_hz;
+ 	int timeout;			/* in jiffies */
+ 	int retries;
+ 	struct device dev;		/* the adapter device */
+-- 
+2.9.4
