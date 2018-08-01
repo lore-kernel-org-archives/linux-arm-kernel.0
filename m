@@ -1,27 +1,53 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 1 Aug 2018 18:27:47 +0100
-Subject: [RFC PATCH v2 5/6] spi: Add QuadSPI driver for Atmel SAMA5D2
-In-Reply-To: <20180627131609.13681-6-bugalski.piotr@gmail.com>
-References: <20180627131609.13681-1-bugalski.piotr@gmail.com>
- <20180627131609.13681-6-bugalski.piotr@gmail.com>
-Message-ID: <20180801172747.GJ5509@sirena.org.uk>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed,  1 Aug 2018 18:51:54 +0200
+Subject: [PATCH 4.9 087/144] EDAC, altera: Fix ARM64 build warning
+In-Reply-To: <20180801164949.023217860@linuxfoundation.org>
+References: <20180801164949.023217860@linuxfoundation.org>
+Message-ID: <20180801164955.918159963@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 27, 2018 at 03:16:08PM +0200, Piotr Bugalski wrote:
-> Kernel contains QSPI driver strongly tied to MTD and nor-flash memory.
-> New spi-mem interface allows usage also other memory types, especially
-> much larger NAND with SPI interface. This driver works as SPI controller
-> and is not related to MTD, however can work with NAND-flash or other
-> peripherals using spi-mem interface.
+4.9-stable review patch.  If anyone has any objections, please let me know.
 
-This is fine from a SPI point of view but I'd like to apply it directly
-to the SPI tree rather than ack it for merge via the MTD tree - can we
-work something out with a shared branch or something?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180801/c4c773c3/attachment.sig>
+------------------
+
+From: Thor Thayer <thor.thayer@linux.intel.com>
+
+[ Upstream commit 9ef20753e044f7468c4113e5aecd785419b0b3cc ]
+
+The kbuild test robot reported the following warning:
+
+  drivers/edac/altera_edac.c: In function 'ocram_free_mem':
+  drivers/edac/altera_edac.c:1410:42: warning: cast from pointer to integer
+	of different size [-Wpointer-to-int-cast]
+    gen_pool_free((struct gen_pool *)other, (u32)p, size);
+                                             ^
+
+After adding support for ARM64 architectures, the unsigned long
+parameter is 64 bits and causes a build warning on 64-bit configs. Fix
+by casting to the correct size (unsigned long) instead of u32.
+
+Reported-by: kbuild test robot <lkp@intel.com>
+Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-edac <linux-edac@vger.kernel.org>
+Fixes: c3eea1942a16 ("EDAC, altera: Add Altera L2 cache and OCRAM support")
+Link: http://lkml.kernel.org/r/1526317441-4996-1-git-send-email-thor.thayer at linux.intel.com
+Signed-off-by: Borislav Petkov <bp@suse.de>
+Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+ drivers/edac/altera_edac.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/drivers/edac/altera_edac.c
++++ b/drivers/edac/altera_edac.c
+@@ -1111,7 +1111,7 @@ static void *ocram_alloc_mem(size_t size
+ 
+ static void ocram_free_mem(void *p, size_t size, void *other)
+ {
+-	gen_pool_free((struct gen_pool *)other, (u32)p, size);
++	gen_pool_free((struct gen_pool *)other, (unsigned long)p, size);
+ }
+ 
+ static const struct edac_device_prv_data ocramecc_data = {
