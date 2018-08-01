@@ -1,29 +1,56 @@
-From: tpiepho@impinj.com (Trent Piepho)
-Date: Wed, 1 Aug 2018 17:33:32 +0000
-Subject: [PATCH 1/2] ARM: dts: imx7d: Add node for PCIe PHY
-In-Reply-To: <1533119951.20186.5.camel@pengutronix.de>
-References: <20180718194424.8844-1-tpiepho@impinj.com>
- <20180718194424.8844-2-tpiepho@impinj.com>
- <1533119951.20186.5.camel@pengutronix.de>
-Message-ID: <1533144812.2283.227.camel@impinj.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 1 Aug 2018 18:42:56 +0100
+Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
+In-Reply-To: <CAAeHK+yWF05XoU+0iuJoXAL3cWgdtxbeLoBz169yP12W4LkcQw@mail.gmail.com>
+References: <cover.1529507994.git.andreyknvl@google.com>
+ <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
+ <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
+ <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
+ <CAAeHK+wJbbCZd+-X=9oeJgsqQJiq8h+Aagz3SQMPaAzCD+pvFw@mail.gmail.com>
+ <CAAeHK+yWF05XoU+0iuJoXAL3cWgdtxbeLoBz169yP12W4LkcQw@mail.gmail.com>
+Message-ID: <20180801174256.5mbyf33eszml4nmu@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-08-01 at 12:39 +0200, Lucas Stach wrote:
+On Mon, Jul 16, 2018 at 01:25:59PM +0200, Andrey Konovalov wrote:
+> On Thu, Jun 28, 2018 at 9:30 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+> > On Wed, Jun 27, 2018 at 5:05 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+> >> On Tue, Jun 26, 2018 at 7:29 PM, Catalin Marinas
+> >> <catalin.marinas@arm.com> wrote:
+> >>> While I support this work, as a maintainer I'd like to understand
+> >>> whether we'd be in a continuous chase of ABI breaks with every kernel
+> >>> release or we have a better way to identify potential issues. Is there
+> >>> any way to statically analyse conversions from __user ptr to long for
+> >>> example? Or, could we get the compiler to do this for us?
+> >>
+> >> OK, got it, I'll try to figure out a way to find these conversions.
+> >
+> > I've prototyped a checker on top of clang static analyzer (initially
+> > looked at sparse, but couldn't find any documentation or examples).
+> > The results are here [1], search for "warning: user pointer cast".
+> > Sharing in case anybody wants to take a look, will look at them myself
+> > tomorrow.
+> >
+> > [1] https://gist.github.com/xairy/433edd5c86456a64026247cb2fef2115
 > 
-> > +This is the PHY associated with the IMX7d PCIe controller.  It's
-> > used by the
-> > +PCI-e controller via the fsl,pcie-phy phandle.
-> > +
-> > +Required properties:
-> > +- compatible:
-> > +	- "fsl,imx-pcie-phy"
-> 
-> This is too generic. Please change it to "fsl,imx7-pcie-phy".
+> So the checker reports ~100 different places where a __user pointer
+> being casted. I've looked through them and found 3 places where we
+> need to add untagging. Source code lines below come from 4.18-rc2+
+> (6f0d349d).
+[...]
+> I'll add the 3 patches with fixes to v5 of this patchset.
 
-Can anyone from NXP tell us if an external PCIe PHY block is present in
-other IMX designs?  I suspect that this is generic, but no design other
-than imx7d has had any reason to use this PHY register space yet.
+Thanks for investigating. You can fix those three places in your code
+but I was rather looking for a way to check such casting in the future
+for newly added code. While for the khwasan we can assume it's a debug
+option, the tagged user pointers are ABI and we need to keep it stable.
 
-If this is specific to this SoC, then maybe it shoudl be fsl,imx7d-
-pcie-phy, since the iMX7s has no pcie.
+We could we actually add some macros for explicit conversion between
+__user ptr and long and silence the warning there (I guess this would
+work better for sparse). We can then detect new ptr to long casts as
+they appear. I just hope that's not too intrusive.
+
+(I haven't tried the sparse patch yet, hopefully sometime this week)
+
+-- 
+Catalin
