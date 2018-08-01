@@ -1,77 +1,54 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Wed, 1 Aug 2018 10:19:38 +0200
-Subject: next/master boot: 179 boots: 11 failed, 167 passed with 1 offline
- (next-20180731)
-In-Reply-To: <20180731160623.GH5719@sirena.org.uk>
-References: <5b607cc4.1c69fb81.6c1d6.6534@mx.google.com>
- <20180731160623.GH5719@sirena.org.uk>
-Message-ID: <c50e3311-9dca-c64b-ca58-6a44e3559e98@st.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Wed,  1 Aug 2018 10:19:50 +0200
+Subject: [PATCH 2/2] dt-bindings: clock: Add bindings for the Clocking Wizard
+ IP
+In-Reply-To: <20180801081950.10497-1-boris.brezillon@bootlin.com>
+References: <20180801081950.10497-1-boris.brezillon@bootlin.com>
+Message-ID: <20180801081950.10497-2-boris.brezillon@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Mark, Ulf
+Document Xilinx Clocking Wizard bindings.
 
-When I see log, I think the patch in attachment could fix this issue
-, but like I've not qcom board I can't test if it's fixed :-(.
+Signed-off-by: Boris Brezillon <boris.brezillon@bootlin.com>
+---
+ .../devicetree/bindings/clock/xlnx,clk-wizard.txt  | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt
 
-Ulf: for patch delivery, you prefer a patch delivery on mailing list ?
-
-BR
-Ludo
-
-On 07/31/2018 06:06 PM, Mark Brown wrote:
-> On Tue, Jul 31, 2018 at 08:14:12AM -0700, kernelci.org bot wrote:
-> 
-> Today's -next fails to boot on a variety of Qualcomm 32 bit platforms:
-> 
->>      multi_v7_defconfig:
->>          qcom-apq8064-cm-qs600:
->>              lab-baylibre-seattle: new failure (last pass: next-20180730)
->>          qcom-apq8064-ifc6410:
->>              lab-baylibre-seattle: new failure (last pass: next-20180730)
->>
->>      qcom_defconfig:
->>          qcom-apq8064-cm-qs600:
->>              lab-baylibre-seattle: new failure (last pass: next-20180730)
-> 
-> The logs are all somewhat similar, for example:
-> 
->     https://storage.kernelci.org/next/master/next-20180731/arm/multi_v7_defconfig/lab-baylibre-seattle/boot-qcom-apq8064-cm-qs600.html
-> 
-> detects a DMA problem during MMCI initialization:
-> 
-> [    2.237566] mmci-pl18x 121c0000.sdcc: mmc2: PL180 manf 51 rev0 at 0x121c0000 irq 32,0 (pio)
-> [    2.244790] mmci-pl18x 121c0000.sdcc: DMA channels RX dma2chan1, TX dma2chan2
-> [    2.271722] mmci-pl18x 12400000.sdcc: error during DMA transfer!
-> [    2.271757] mmci-pl18x 12400000.sdcc: buggy DMA detected. Taking evasive action.
-> [    2.276798] ------------[ cut here ]------------
-> [    2.284185] WARNING: CPU: 0 PID: 0 at ../include/linux/dma-mapping.h:551 bam_free_chan+0x2d8/0x2e0
-> [    2.288772] Modules linked in:
-> [    2.297534] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.18.0-rc7-next-20180731 #1
-> 
-> then panics:
-> 
-> [    2.513796] ------------[ cut here ]------------
-> [    2.518367] kernel BUG at ../mm/vmalloc.c:1608!
-> [    2.522968] Internal error: Oops - BUG: 0 [#1] SMP ARM
-> 
-> trying to release the DMA channel.  I've not done any bisection or
-> anything but I do note 8bb2299d2d0b5cc (mmc: mmci: Add and implement a
-> ->dma_setup() callback for qcom dml) and some related commits in the MMC
-> tree.
-> 
-> More details for each of the failed boots at:
-> 
->    https://kernelci.org/boot/id/5b6054f559b5144b9396baa9/
->    https://kernelci.org/boot/id/5b60551259b5144abb96bab6/
->    https://kernelci.org/boot/id/5b6054e259b5144b1e96bab2/
-> 
-> including full logs, details of the build and so on.
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-mmc-mmci-fix-qcom-dma-issue-during-mmci-init-with-ne.patch
-Type: text/x-patch
-Size: 1267 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180801/c20093b4/attachment.bin>
+diff --git a/Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt b/Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt
+new file mode 100644
+index 000000000000..1bf7a764f4a9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt
+@@ -0,0 +1,28 @@
++Device Tree Clock bindings for the "Clocking Wizard" IP provided by Xilinx
++
++This block can be used to generate up to 4 clock signals out of a single input
++clock. It embeds a PLL to generate an intermediate clock which then feeds 4
++clock dividers whose divider value can be adjusted based on the user needs.
++
++Required properties:
++ - #clock-cells: must be 1. The cell is encoding the id of the output clk
++		 (from 0 to xlnx,clk-wizard-num-outputs - 1)
++ - compatible: must be "xlnx,clk-wizard-5.1"
++ - clocks: 2 clocks are required
++ - clock-names: should contain 2 clock names: "aclk" and "clkin".
++		"aclk" is driving the register interface and "clk_in" is the
++		input clock signal that is used by the PLL block
++ - xlnx,clk-wizard-num-outputs: this describe the number of output clocks
++				(chosen at synthesization time)
++ - reg: registers used to configure the Clocking wizard block
++
++Example:
++
++	clkwizard: clkwizard at 43c20000 {
++		compatible = "xlnx,clk-wizard-5.1";
++		reg = <0x43c20000 0x10000>;
++		clocks = <&clkc 18>, <&clkc 18>;
++		clock-names = "aclk", "clk_in1";
++		#clock-cells = <1>;
++		xlnx,clk-wizard-num-outputs = <2>;
++	};
+-- 
+2.14.1
