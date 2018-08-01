@@ -1,33 +1,106 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 01 Aug 2018 08:18:55 -0700
-Subject: [PATCH v2 5/5] clk: RK808: add RK809 and RK817 support.
-In-Reply-To: <1533024029-30273-1-git-send-email-tony.xie@rock-chips.com>
-References: <1533023850-29004-1-git-send-email-tony.xie@rock-chips.com>
- <1533024029-30273-1-git-send-email-tony.xie@rock-chips.com>
-Message-ID: <153313673531.17365.8764698693425766723@swboyd.mtv.corp.google.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Aug 2018 17:35:39 +0100
+Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
+ sanitizer
+In-Reply-To: <CAAeHK+xc1E64tXEEHoXqOuUNZ7E_kVyho3_mNZTCc+LTGHYFdA@mail.gmail.com>
+References: <cover.1530018818.git.andreyknvl@google.com>
+ <20180628105057.GA26019@e103592.cambridge.arm.com>
+ <CAAeHK+w0T43+h3xqU4a-qutxd-qiEhsvk0eaZpmAn-T0hpaLZQ@mail.gmail.com>
+ <20180629110709.GA17859@arm.com>
+ <CAAeHK+wHd8B2nhat-Z2Y2=s4NVobPG7vjr2CynjFhqPTwQRepQ@mail.gmail.com>
+ <20180703173608.GF27243@arm.com>
+ <CAAeHK+wTcH+2hgm_BTkLLdn1GkjBtkhQ=vPWZCncJ6KenqgKpg@mail.gmail.com>
+ <CAAeHK+xc1E64tXEEHoXqOuUNZ7E_kVyho3_mNZTCc+LTGHYFdA@mail.gmail.com>
+Message-ID: <20180801163538.GA10800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tony Xie (2018-07-31 01:00:29)
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index 721572a..fc1427c 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -46,11 +46,11 @@ config COMMON_CLK_MAX77686
->           clock.
->  
->  config COMMON_CLK_RK808
-> -       tristate "Clock driver for RK805/RK808/RK818"
-> +       tristate "Clock driver for RK805/RK808/RK809/RK817/RK818"
->         depends on MFD_RK808
->         ---help---
-> -         This driver supports RK805, RK808 and RK818 crystal oscillator clock. These
-> -         multi-function devices have two fixed-rate oscillators,
-> +         This driver supports RK805, RK809 and RK817, RK808 and RK818 crystal oscillator clock.
-> +          These multi-function devices have two fixed-rate oscillators,
+Hi Andrey,
 
-Something got messed up with the indentation here. Please fix.
+On Tue, Jul 31, 2018 at 03:22:13PM +0200, Andrey Konovalov wrote:
+> On Wed, Jul 18, 2018 at 7:16 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+> > On Tue, Jul 3, 2018 at 7:36 PM, Will Deacon <will.deacon@arm.com> wrote:
+> >> Hmm, but elsewhere in this thread, Evgenii is motivating the need for this
+> >> patch set precisely because the lower overhead means it's suitable for
+> >> "near-production" use. So I don't think writing this off as a debugging
+> >> feature is the right approach, and we instead need to put effort into
+> >> analysing the impact of address tags on the kernel as a whole. Playing
+> >> whack-a-mole with subtle tag issues sounds like the worst possible outcome
+> >> for the long-term.
+> >
+> > I don't see a way to find cases where pointer tags would matter
+> > statically, so I've implemented the dynamic approach that I mentioned
+> > above. I've instrumented all pointer comparisons/subtractions in an
+> > LLVM compiler pass and used a kernel module that would print a bug
+> > report whenever two pointers with different tags are being
+> > compared/subtracted (ignoring comparisons with NULL pointers and with
+> > pointers obtained by casting an error code to a pointer type). Then I
+> > tried booting the kernel in QEMU and on an Odroid C2 board and I ran
+> > syzkaller overnight.
+> >
+> > This yielded the following results.
+> >
+> > ======
+> >
+> > The two places that look interesting are:
+> >
+> > is_vmalloc_addr in include/linux/mm.h (already mentioned by Catalin)
+> > is_kernel_rodata in mm/util.c
+> >
+> > Here we compare a pointer with some fixed untagged values to make sure
+> > that the pointer lies in a particular part of the kernel address
+> > space. Since KWHASAN doesn't add tags to pointers that belong to
+> > rodata or vmalloc regions, this should work as is. To make sure I've
+> > added debug checks to those two functions that check that the result
+> > doesn't change whether we operate on pointers with or without
+> > untagging.
+> >
+> > ======
+> >
+> > A few other cases that don't look that interesting:
+> >
+> > Comparing pointers to achieve unique sorting order of pointee objects
+> > (e.g. sorting locks addresses before performing a double lock):
+> >
+> > tty_ldisc_lock_pair_timeout in drivers/tty/tty_ldisc.c
+> > pipe_double_lock in fs/pipe.c
+> > unix_state_double_lock in net/unix/af_unix.c
+> > lock_two_nondirectories in fs/inode.c
+> > mutex_lock_double in kernel/events/core.c
+> >
+> > ep_cmp_ffd in fs/eventpoll.c
+> > fsnotify_compare_groups fs/notify/mark.c
+> >
+> > Nothing needs to be done here, since the tags embedded into pointers
+> > don't change, so the sorting order would still be unique.
+> >
+> > Check that a pointer belongs to some particular allocation:
+> >
+> > is_sibling_entry lib/radix-tree.c
+> > object_is_on_stack in include/linux/sched/task_stack.h
+> >
+> > Nothing needs to be here either, since two pointers can only belong to
+> > the same allocation if they have the same tag.
+> >
+> > ======
+> >
+> > Will, Catalin, WDYT?
+> 
+> ping
 
->           clocked at 32KHz each. Clkout1 is always on, Clkout2 can off
->           by control register.
->  
+Thanks for tracking these cases down and going through each of them. The
+obvious follow-up question is: how do we ensure that we keep on top of
+this in mainline? Are you going to repeat your experiment at every kernel
+release or every -rc or something else? I really can't see how we can
+maintain this in the long run, especially given that the coverage we have
+is only dynamic -- do you have an idea of how much coverage you're actually
+getting for, say, a defconfig+modules build?
+
+I'd really like to enable pointer tagging in the kernel, I'm just still
+failing to see how we can do it in a controlled manner where we can reason
+about the semantic changes using something other than a best-effort,
+case-by-case basis which is likely to be fragile and error-prone.
+Unfortunately, if that's all we have, then this gets relegated to a
+debug feature, which sort of defeats the point in my opinion.
+
+Will
