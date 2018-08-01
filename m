@@ -1,60 +1,38 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 1 Aug 2018 14:32:39 +0200
-Subject: [PATCH] ARM: shmobile: silk: Add DA9063 PMIC node
-In-Reply-To: <20180730111817.5636-1-marek.vasut+renesas@gmail.com>
-References: <20180730111817.5636-1-marek.vasut+renesas@gmail.com>
-Message-ID: <CAMuHMdXib8fz3c41RX-70eA5w4ThM6e02ybmX=N=xXR6=F80KA@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 01 Aug 2018 14:33:36 +0200
+Subject: [PATCH] drm/rockchip: Convert drm_atomic_helper_suspend/resume()
+In-Reply-To: <20180731203430.GA30136@jordon-HP-15-Notebook-PC>
+References: <20180731203430.GA30136@jordon-HP-15-Notebook-PC>
+Message-ID: <16141309.kTfAWOe8rM@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi Souptick,
 
-On Mon, Jul 30, 2018 at 1:18 PM Marek Vasut <marek.vasut@gmail.com> wrote:
-> Add DA9063 PMIC node to the I2C bus.
->
-> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Am Dienstag, 31. Juli 2018, 22:34:30 CEST schrieb Souptick Joarder:
+> convert drm_atomic_helper_suspend/resume() to use
+> drm_mode_config_helper_suspend/resume().
+> 
+> With this conversion, rockchip_drm_fb_resume() and
+> rockchip_drm_fb_suspend() will not be used anymore.
+> Both of these functions can be removed.
+> 
+> Also, in struct rockchip_drm_private state will not be
+> used anymore. So this can be removed forever.
+> 
+> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
 
-Thanks for your patch!
+the patch itself looks great, just a simple bookkeeping question.
 
-Oneline-summary prefix should be "ARM: dts: silk:".
+What role did Ajit play in creating the patch? If I remember correctly
+it is meant to be
+- 1st Signed-off: Patch-Author
+- 2nd Signed-off: E-Mail sender + patch possibly patch changes
+(optional of course if the same)
 
-> --- a/arch/arm/boot/dts/r8a7794-silk.dts
-> +++ b/arch/arm/boot/dts/r8a7794-silk.dts
-> @@ -403,6 +403,18 @@
->         pinctrl-names = "i2c-hdmi";
->
->         clock-frequency = <400000>;
-> +
-> +       pmic at 5a {
+So was this meant to be a Reviewed-by from Ajit?
 
-Hmm, the da9063 is actually connected to two i2c buses: i2c1 (3.3v)
-and i2c7 (1.8v).
-On Koelsch, we describe the 1.8v connection, as that i2c bus
-("i2c_dvfs") is meant
-for power control.
 
-> +               compatible = "dlg,da9063";
-> +               reg = <0x5a>;
-> +               interrupt-parent = <&irqc0>;
-> +               interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-
-According to my schematics, the interrupt is connected to GP3_31?
-
-> +               interrupt-controller;
-> +
-> +               wdt {
-> +                       compatible = "dlg,da9063-watchdog";
-> +               };
-> +       };
->  };
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks
+Heiko
