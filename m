@@ -1,75 +1,54 @@
-From: atull@kernel.org (Alan Tull)
-Date: Wed, 1 Aug 2018 09:49:46 -0500
-Subject: [RFC PATCH 2/2] fpga manager: Adding FPGA Manager support for
- Xilinx zynqmp
-In-Reply-To: <MWHPR0201MB3481D2A338A004B2FB17CA61C22D0@MWHPR0201MB3481.namprd02.prod.outlook.com>
-References: <20180801100457.25614-1-nava.manne@xilinx.com>
- <20180801100457.25614-2-nava.manne@xilinx.com>
- <MWHPR0201MB34811402926886136673CE68C22E0@MWHPR0201MB3481.namprd02.prod.outlook.com>
- <CANk1AXQ-qrEKAm9zEs8sVaFNGGFkjCr+npTKUNDXz_bnpL=DQw@mail.gmail.com>
- <MWHPR0201MB3481D2A338A004B2FB17CA61C22D0@MWHPR0201MB3481.namprd02.prod.outlook.com>
-Message-ID: <CANk1AXQci08TOVq7TeXXGfMWi8C8o4AGYDJK2Dr-mVgZPqU8bQ@mail.gmail.com>
+From: pierre-louis.bossart@linux.intel.com (Pierre-Louis Bossart)
+Date: Wed, 1 Aug 2018 07:55:02 -0700
+Subject: [alsa-devel] [PATCH 9/9] ALSA: intel_hdmi: remove redundant
+ variable cfg_val
+In-Reply-To: <s5hin4unyh0.wl-tiwai@suse.de>
+References: <20180801104742.4328-1-colin.king@canonical.com>
+ <20180801104742.4328-10-colin.king@canonical.com>
+ <s5hin4unyh0.wl-tiwai@suse.de>
+Message-ID: <105efe0e-237e-dba0-3bfe-0f88b9ccd152@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 1, 2018 at 12:49 AM, Nava kishore Manne <navam@xilinx.com> wrote:
-> Hi Alan Tull,
->
-> Thanks for the quick response.
-> Please find my Comments inline...
->
->> -----Original Message-----
->> From: Alan Tull [mailto:atull at kernel.org]
->> Sent: Tuesday, July 31, 2018 8:52 PM
->> To: Nava kishore Manne <navam@xilinx.com>
->> Cc: robh+dt at kernel.org; mark.rutland at arm.com; Michal Simek
->> <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>;
->> atull at opensource.altera.com; moritz.fischer at ettus.com;
->> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
->> kernel at vger.kernel.org; Appana Durga Kedareswara Rao
->> <appanad@xilinx.com>; chinnikishore369 at gmail.com; linux-
->> fpga at vger.kernel.org
->> Subject: Re: [RFC PATCH 2/2] fpga manager: Adding FPGA Manager support for
->> Xilinx zynqmp
+On 8/1/18 4:00 AM, Takashi Iwai wrote:
+> On Wed, 01 Aug 2018 12:47:42 +0200,
+> Colin King wrote:
 >>
->> On Tue, Jul 31, 2018 at 8:08 AM, Nava kishore Manne <navam@xilinx.com>
->> wrote:
->> >
->> > +Alan Tull,
+>> From: Colin Ian King <colin.king@canonical.com>
 >>
->> + linux-fpga mailing list
+>> Variable cfg_val is being assigned but is never used hence it is
+>> redundant and can be removed.
 >>
->> Hi Nava,
+>> Cleans up clang warning:
+>> warning: variable 'cfg_val' set but not used [-Wunused-but-set-variable]
 >>
->> Thanks for submitting.
+>> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+>> ---
+>>   sound/x86/intel_hdmi_audio.c | 2 --
+>>   1 file changed, 2 deletions(-)
 >>
->> This should be on the linux-fpga mailing list.  The
->> linux/scripts/get_maintainer.pl script would tell you that.
->>
-> I have Created this Patch On Master Branch there get_maintainer.pl Doesn't have linux-fpga mailing list.
+>> diff --git a/sound/x86/intel_hdmi_audio.c b/sound/x86/intel_hdmi_audio.c
+>> index edc9f5a34eff..fa7dca5a68c8 100644
+>> --- a/sound/x86/intel_hdmi_audio.c
+>> +++ b/sound/x86/intel_hdmi_audio.c
+>> @@ -290,7 +290,6 @@ static void had_reset_audio(struct snd_intelhad *intelhaddata)
+>>   static int had_prog_status_reg(struct snd_pcm_substream *substream,
+>>   			struct snd_intelhad *intelhaddata)
+>>   {
+>> -	union aud_cfg cfg_val = {.regval = 0};
+>>   	union aud_ch_status_0 ch_stat0 = {.regval = 0};
+>>   	union aud_ch_status_1 ch_stat1 = {.regval = 0};
+>>   
+>> @@ -298,7 +297,6 @@ static int had_prog_status_reg(struct snd_pcm_substream *substream,
+>>   					  IEC958_AES0_NONAUDIO) >> 1;
+>>   	ch_stat0.regx.clk_acc = (intelhaddata->aes_bits &
+>>   					  IEC958_AES3_CON_CLOCK) >> 4;
+>> -	cfg_val.regx.val_bit = ch_stat0.regx.lpcm_id;
+> 
+> Actually this made me wonder what is the definition of val_bit.
+> It seems always 1 in the current code after the commit 964ca8083c02.
+> Pierre?
 
-The linux-fpga mailing list has been in MAINTAINERS since v4.9.
-
-> https://git.kernel.org/pub/scm/linux/kernel/git/atull/linux-fpga.git/
-> Please suggest a branch So will create a patch on top of it.
-
-I understand now.  linux-fpga/master is v4.9ish.  I haven't updated
-the master branch it since I cloned the repo, it doesn't have any
-special FPGA development patches, it's just what Linus's master branch
-was when I cloned.  I don't think you can count on any kernel.org's
-master branch to be up to date with Linus other than Linus.  Probably
-because it would be a waste of traffic on kernel.org and you can have
-multiple remotes on your local git repo with Linus being the one that
-contains the one true master branch.
-
-Right now, Linus's master branch has the latest FPGA API, so it would
-be a good one to develop on.
-
-Generally speaking, sometimes there will be some API changes for FPGA
-that are only on linux-next/master.  I spend most of my time
-developing on linux-next/master.  Occasionally that's broken but most
-of the time that works for me.  Or you could use a Linus release tag
-from linus' repo.  Or Linus' master branch.  When submitting, if your
-patches apply cleanly on linux-next/master, that is helpful and good.
-
-Alan
+I'll look into it, give me a couple of days. I vaguely remember this is 
+the AES validity bit but I am not sure why it's set with a pcm id, looks 
+like a mixup.
