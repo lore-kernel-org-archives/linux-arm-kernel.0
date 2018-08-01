@@ -1,273 +1,73 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Wed,  1 Aug 2018 14:44:53 -0700
-Subject: [PATCH i2c-next v3] i2c: aspeed: Handle master/slave combined irq
- events properly
-Message-ID: <20180801214453.30905-1-jae.hyun.yoo@linux.intel.com>
+From: arun.parameswaran@broadcom.com (Arun Parameswaran)
+Date: Wed, 1 Aug 2018 14:45:22 -0700
+Subject: [PATCH v3 7/8] net: phy: Add support to configure clock in
+ Broadcom iProc mdio mux
+In-Reply-To: <20180801203846.GE19257@lunn.ch>
+References: <1533146186-8374-1-git-send-email-arun.parameswaran@broadcom.com>
+ <1533146186-8374-8-git-send-email-arun.parameswaran@broadcom.com>
+ <0cc6db4f-7008-0ad3-58d7-9e93060f152f@gmail.com>
+ <20180801184659.GG30658@n2100.armlinux.org.uk>
+ <9af7e7a3-54d4-8802-f64a-fc4f9c49c8b9@broadcom.com>
+ <20180801200712.GD19257@lunn.ch>
+ <20180801202313.GH30658@n2100.armlinux.org.uk>
+ <20180801203846.GE19257@lunn.ch>
+Message-ID: <8133c1f0-addc-5c48-7a6a-44b0d106c425@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In most of cases, interrupt bits are set one by one but there are
-also a lot of other cases that Aspeed I2C IP sends multiple
-interrupt bits with combining master and slave events using a
-single interrupt call. It happens much more in multi-master
-environment than single-master. For an example, when master is
-waiting for a NORMAL_STOP interrupt in its MASTER_STOP state,
-SLAVE_MATCH and RX_DONE interrupts could come along with the
-NORMAL_STOP in case of an another master immediately sends data
-just after acquiring the bus. In this case, the NORMAL_STOP
-interrupt should be handled by master_irq and the SLAVE_MATCH and
-RX_DONE interrupts should be handled by slave_irq. This commit
-modifies irq hadling logic to handle the master/slave combined
-events properly.
+Hi Andrew, Russell,
 
-Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
----
-Changes since v2:
-- Changed the name of ASPEED_I2CD_INTR_ERRORS to ASPEED_I2CD_INTR_MASTER_ERRORS
-- Removed a member irq_status from the struct aspeed_i2c_bus and changed
-  master_irq and slave_irq handlers to make them return status_ack.
-- Added a comment to explain why it needs to try both irq handlers.
+On 18-08-01 01:38 PM, Andrew Lunn wrote:
+> On Wed, Aug 01, 2018 at 09:23:14PM +0100, Russell King - ARM Linux wrote:
+>> On Wed, Aug 01, 2018 at 10:07:12PM +0200, Andrew Lunn wrote:
+>>> You might want to consider adding clk_optional_get() and
+>>> devm_clk_optional_get().
+>>
+>> I think there's attempts to add such APIs but I don't think it's
+>> trivial - it seems to require a _lot_ of discussion.
+>>
+>> I think part of that is because of the quirky use of error codes.
+>> If you look at clk_get(), it calls __of_clk_get_by_name() which
+>> returns:
+>>
+>>  -ENOENT if DT is disabled
+>>  -ENOENT if the device has no DT node
+>>  -EPROBE_DEFER if the lookup in DT succeeds but there's no registered
+>>    clock
+>>  -EINVAL if the device has a DT node but the lookup of the name
+>>    failed (in otherwords, the optional clock was omitted)
+>>  -ENOENT if the clocks = property has not enough clocks for the
+>>     clock-names property
+>>  -ENOMEM if we fail to allocate the clk
+>>  -ENOENT if __clk_get() fails
+> 
+> That makes it hard. I added phy_optional_get() early on, when the
+> error cases were simple. Hopefully they remain simple...
+> 
+>       Andrew
+> 
+I traced the devm_clk_get() and ran into various error codes, so I
+figured I should return error on all the other errors (like ENOMEM, EINVAL
+& EPROBE_DEFER) but 'ENOENT'.
 
-Changes since v1:
-- Fixed a grammar issue in commit message.
-- Added a missing line feed character into a message printing.
+But, looking at the errors from Russell's email, it looks like I
+should look for both 'ENOENT' and 'EINVAL' and consider both these
+errors as 'clock not specified' ?
 
- drivers/i2c/busses/i2c-aspeed.c | 110 +++++++++++++++++++-------------
- 1 file changed, 65 insertions(+), 45 deletions(-)
+Can I do something like this in the code for this patchset:
 
-diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
-index efb89422d496..37cee46f1e36 100644
---- a/drivers/i2c/busses/i2c-aspeed.c
-+++ b/drivers/i2c/busses/i2c-aspeed.c
-@@ -82,6 +82,11 @@
- #define ASPEED_I2CD_INTR_RX_DONE			BIT(2)
- #define ASPEED_I2CD_INTR_TX_NAK				BIT(1)
- #define ASPEED_I2CD_INTR_TX_ACK				BIT(0)
-+#define ASPEED_I2CD_INTR_MASTER_ERRORS					       \
-+		(ASPEED_I2CD_INTR_SDA_DL_TIMEOUT |			       \
-+		 ASPEED_I2CD_INTR_SCL_TIMEOUT |				       \
-+		 ASPEED_I2CD_INTR_ABNORMAL |				       \
-+		 ASPEED_I2CD_INTR_ARBIT_LOSS)
- #define ASPEED_I2CD_INTR_ALL						       \
- 		(ASPEED_I2CD_INTR_SDA_DL_TIMEOUT |			       \
- 		 ASPEED_I2CD_INTR_BUS_RECOVER_DONE |			       \
-@@ -227,20 +232,16 @@ static int aspeed_i2c_recover_bus(struct aspeed_i2c_bus *bus)
- }
- 
- #if IS_ENABLED(CONFIG_I2C_SLAVE)
--static bool aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus)
-+static u32 aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus, u32 irq_status)
- {
--	u32 command, irq_status, status_ack = 0;
-+	u32 command, status_ack = 0;
- 	struct i2c_client *slave = bus->slave;
--	bool irq_handled = true;
- 	u8 value;
- 
--	if (!slave) {
--		irq_handled = false;
--		goto out;
--	}
-+	if (!slave)
-+		return 0;
- 
- 	command = readl(bus->base + ASPEED_I2C_CMD_REG);
--	irq_status = readl(bus->base + ASPEED_I2C_INTR_STS_REG);
- 
- 	/* Slave was requested, restart state machine. */
- 	if (irq_status & ASPEED_I2CD_INTR_SLAVE_MATCH) {
-@@ -249,10 +250,8 @@ static bool aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus)
- 	}
- 
- 	/* Slave is not currently active, irq was for someone else. */
--	if (bus->slave_state == ASPEED_I2C_SLAVE_STOP) {
--		irq_handled = false;
--		goto out;
--	}
-+	if (bus->slave_state == ASPEED_I2C_SLAVE_STOP)
-+		return status_ack;
- 
- 	dev_dbg(bus->dev, "slave irq status 0x%08x, cmd 0x%08x\n",
- 		irq_status, command);
-@@ -281,19 +280,19 @@ static bool aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus)
- 		status_ack |= ASPEED_I2CD_INTR_TX_NAK;
- 		bus->slave_state = ASPEED_I2C_SLAVE_STOP;
- 	}
-+	if (irq_status & ASPEED_I2CD_INTR_TX_ACK)
-+		status_ack |= ASPEED_I2CD_INTR_TX_ACK;
- 
- 	switch (bus->slave_state) {
- 	case ASPEED_I2C_SLAVE_READ_REQUESTED:
- 		if (irq_status & ASPEED_I2CD_INTR_TX_ACK)
- 			dev_err(bus->dev, "Unexpected ACK on read request.\n");
- 		bus->slave_state = ASPEED_I2C_SLAVE_READ_PROCESSED;
--
- 		i2c_slave_event(slave, I2C_SLAVE_READ_REQUESTED, &value);
- 		writel(value, bus->base + ASPEED_I2C_BYTE_BUF_REG);
- 		writel(ASPEED_I2CD_S_TX_CMD, bus->base + ASPEED_I2C_CMD_REG);
- 		break;
- 	case ASPEED_I2C_SLAVE_READ_PROCESSED:
--		status_ack |= ASPEED_I2CD_INTR_TX_ACK;
- 		if (!(irq_status & ASPEED_I2CD_INTR_TX_ACK))
- 			dev_err(bus->dev,
- 				"Expected ACK after processed read.\n");
-@@ -317,14 +316,7 @@ static bool aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus)
- 		break;
- 	}
- 
--	if (status_ack != irq_status)
--		dev_err(bus->dev,
--			"irq handled != irq. expected %x, but was %x\n",
--			irq_status, status_ack);
--	writel(status_ack, bus->base + ASPEED_I2C_INTR_STS_REG);
--
--out:
--	return irq_handled;
-+	return status_ack;
- }
- #endif /* CONFIG_I2C_SLAVE */
- 
-@@ -380,21 +372,21 @@ static int aspeed_i2c_is_irq_error(u32 irq_status)
- 	return 0;
- }
- 
--static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
-+static u32 aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus, u32 irq_status)
- {
--	u32 irq_status, status_ack = 0, command = 0;
-+	u32 status_ack = 0, command = 0;
- 	struct i2c_msg *msg;
- 	u8 recv_byte;
- 	int ret;
- 
--	irq_status = readl(bus->base + ASPEED_I2C_INTR_STS_REG);
--	/* Ack all interrupt bits. */
--	writel(irq_status, bus->base + ASPEED_I2C_INTR_STS_REG);
--
- 	if (irq_status & ASPEED_I2CD_INTR_BUS_RECOVER_DONE) {
- 		bus->master_state = ASPEED_I2C_MASTER_INACTIVE;
- 		status_ack |= ASPEED_I2CD_INTR_BUS_RECOVER_DONE;
- 		goto out_complete;
-+	} else {
-+		/* Master is not currently active, irq was for someone else. */
-+		if (bus->master_state == ASPEED_I2C_MASTER_INACTIVE)
-+			goto out_no_complete;
- 	}
- 
- 	/*
-@@ -403,19 +395,22 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
- 	 * INACTIVE state.
- 	 */
- 	ret = aspeed_i2c_is_irq_error(irq_status);
--	if (ret < 0) {
-+	if (ret) {
- 		dev_dbg(bus->dev, "received error interrupt: 0x%08x\n",
- 			irq_status);
- 		bus->cmd_err = ret;
- 		bus->master_state = ASPEED_I2C_MASTER_INACTIVE;
-+		status_ack |= (irq_status & ASPEED_I2CD_INTR_MASTER_ERRORS);
- 		goto out_complete;
- 	}
- 
- 	/* We are in an invalid state; reset bus to a known state. */
- 	if (!bus->msgs) {
--		dev_err(bus->dev, "bus in unknown state\n");
-+		dev_err(bus->dev, "bus in unknown state irq_status: 0x%x\n",
-+			irq_status);
- 		bus->cmd_err = -EIO;
--		if (bus->master_state != ASPEED_I2C_MASTER_STOP)
-+		if (bus->master_state != ASPEED_I2C_MASTER_STOP &&
-+		    bus->master_state != ASPEED_I2C_MASTER_INACTIVE)
- 			aspeed_i2c_do_stop(bus);
- 		goto out_no_complete;
- 	}
-@@ -428,6 +423,11 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
- 	 */
- 	if (bus->master_state == ASPEED_I2C_MASTER_START) {
- 		if (unlikely(!(irq_status & ASPEED_I2CD_INTR_TX_ACK))) {
-+			if (unlikely(!(irq_status & ASPEED_I2CD_INTR_TX_NAK))) {
-+				bus->cmd_err = -ENXIO;
-+				bus->master_state = ASPEED_I2C_MASTER_INACTIVE;
-+				goto out_complete;
-+			}
- 			pr_devel("no slave present at %02x\n", msg->addr);
- 			status_ack |= ASPEED_I2CD_INTR_TX_NAK;
- 			bus->cmd_err = -ENXIO;
-@@ -506,7 +506,9 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
- 		goto out_no_complete;
- 	case ASPEED_I2C_MASTER_STOP:
- 		if (unlikely(!(irq_status & ASPEED_I2CD_INTR_NORMAL_STOP))) {
--			dev_err(bus->dev, "master failed to STOP\n");
-+			dev_err(bus->dev,
-+				"master failed to STOP irq_status:0x%x\n",
-+				irq_status);
- 			bus->cmd_err = -EIO;
- 			/* Do not STOP as we have already tried. */
- 		} else {
-@@ -540,33 +542,51 @@ static bool aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus)
- 		bus->master_xfer_result = bus->msgs_index + 1;
- 	complete(&bus->cmd_complete);
- out_no_complete:
--	if (irq_status != status_ack)
--		dev_err(bus->dev,
--			"irq handled != irq. expected 0x%08x, but was 0x%08x\n",
--			irq_status, status_ack);
--	return !!irq_status;
-+	return status_ack;
- }
- 
- static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
- {
- 	struct aspeed_i2c_bus *bus = dev_id;
--	bool ret;
-+	u32 irq_received, irq_status, irq_acked;
- 
- 	spin_lock(&bus->lock);
-+	irq_received = readl(bus->base + ASPEED_I2C_INTR_STS_REG);
-+	irq_status = irq_received;
- 
- #if IS_ENABLED(CONFIG_I2C_SLAVE)
--	if (aspeed_i2c_slave_irq(bus)) {
--		dev_dbg(bus->dev, "irq handled by slave.\n");
--		ret = true;
--		goto out;
-+	/*
-+	 * In most cases, interrupt bits will be set one by one, although
-+	 * multiple interrupt bits could be set at the same time. It also
-+	 * possible that master interrupt bits could be set along with slave
-+	 * interrupt bits. Each case needs to be handled using corresponding
-+	 * handlers depending on the current state.
-+	 */
-+	if (bus->master_state != ASPEED_I2C_MASTER_INACTIVE) {
-+		irq_acked = aspeed_i2c_master_irq(bus, irq_status);
-+		irq_status &= ~irq_acked;
-+		if (irq_status)
-+			irq_acked = aspeed_i2c_slave_irq(bus, irq_status);
-+	} else {
-+		irq_acked = aspeed_i2c_slave_irq(bus, irq_status);
-+		irq_status &= ~irq_acked;
-+		if (irq_status)
-+			irq_acked = aspeed_i2c_master_irq(bus, irq_status);
- 	}
-+#else
-+	irq_acked = aspeed_i2c_master_irq(bus, irq_status);
- #endif /* CONFIG_I2C_SLAVE */
- 
--	ret = aspeed_i2c_master_irq(bus);
-+	irq_status &= ~irq_acked;
-+	if (irq_status)
-+		dev_err(bus->dev,
-+			"irq handled != irq. expected 0x%08x, but was 0x%08x\n",
-+			irq_received, irq_received ^ irq_status);
- 
--out:
-+	/* Ack all interrupt bits. */
-+	writel(irq_received, bus->base + ASPEED_I2C_INTR_STS_REG);
- 	spin_unlock(&bus->lock);
--	return ret ? IRQ_HANDLED : IRQ_NONE;
-+	return irq_status ? IRQ_NONE : IRQ_HANDLED;
- }
- 
- static int aspeed_i2c_master_xfer(struct i2c_adapter *adap,
--- 
-2.18.0
+md->core_clk = devm_clk_get(&pdev->dev, NULL);
+if (md->core_clk == ERR_PTR(-ENOENT) || md->core_clk == ERR_PTR(-EINVAL)) {
+	/* clock is optional, without it the default
+	 * rate divider register values will be used
+	 */
+	md->core_clk = NULL;
+} else if (IS_ERR(md->core_clk)) {
+	return PTR_ERR(md->core_clk);
+} else {
+	rc = clk_prepare_enable(md->core_clk);
+	...
+}
+
+Thanks
+Arun
