@@ -1,50 +1,47 @@
 From: colin.king@canonical.com (Colin King)
-Date: Wed,  1 Aug 2018 11:47:35 +0100
-Subject: [PATCH 2/9] ALSA: cs5535audio: remove redundant pointer 'dma'
+Date: Wed,  1 Aug 2018 11:47:34 +0100
+Subject: [PATCH 1/9] ALSA: asihpi: remove redundant variable max_streams
 In-Reply-To: <20180801104742.4328-1-colin.king@canonical.com>
 References: <20180801104742.4328-1-colin.king@canonical.com>
-Message-ID: <20180801104742.4328-3-colin.king@canonical.com>
+Message-ID: <20180801104742.4328-2-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Colin Ian King <colin.king@canonical.com>
 
-Pointer 'dma' is being assigned but is never used hence it is
+Variable max_streams is being assigned but is never used hence it is
 redundant and can be removed.
 
-Cleans up two clang warnings:
-warning: variable 'dma' set but not used [-Wunused-but-set-variable]
+Cleans up clang warning:
+warning: variable 'max_streams' set but not used [-Wunused-but-set-variable]
 
 Signed-off-by: Colin Ian King <colin.king@canonical.com>
 ---
- sound/pci/cs5535audio/cs5535audio.c | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ sound/pci/asihpi/hpi6205.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/sound/pci/cs5535audio/cs5535audio.c b/sound/pci/cs5535audio/cs5535audio.c
-index de409cda50aa..4590086d9cd8 100644
---- a/sound/pci/cs5535audio/cs5535audio.c
-+++ b/sound/pci/cs5535audio/cs5535audio.c
-@@ -192,8 +192,6 @@ static void process_bm0_irq(struct cs5535audio *cs5535au)
- 	bm_stat = cs_readb(cs5535au, ACC_BM0_STATUS);
- 	spin_unlock(&cs5535au->reg_lock);
- 	if (bm_stat & EOP) {
--		struct cs5535audio_dma *dma;
--		dma = cs5535au->playback_substream->runtime->private_data;
- 		snd_pcm_period_elapsed(cs5535au->playback_substream);
- 	} else {
- 		dev_err(cs5535au->card->dev,
-@@ -208,11 +206,8 @@ static void process_bm1_irq(struct cs5535audio *cs5535au)
- 	spin_lock(&cs5535au->reg_lock);
- 	bm_stat = cs_readb(cs5535au, ACC_BM1_STATUS);
- 	spin_unlock(&cs5535au->reg_lock);
--	if (bm_stat & EOP) {
--		struct cs5535audio_dma *dma;
--		dma = cs5535au->capture_substream->runtime->private_data;
-+	if (bm_stat & EOP)
- 		snd_pcm_period_elapsed(cs5535au->capture_substream);
--	}
- }
+diff --git a/sound/pci/asihpi/hpi6205.c b/sound/pci/asihpi/hpi6205.c
+index 8d5abfa4e24b..2864698436a5 100644
+--- a/sound/pci/asihpi/hpi6205.c
++++ b/sound/pci/asihpi/hpi6205.c
+@@ -635,7 +635,6 @@ static u16 create_adapter_obj(struct hpi_adapter_obj *pao,
+ 	{
+ 		struct hpi_message hm;
+ 		struct hpi_response hr;
+-		u32 max_streams;
  
- static irqreturn_t snd_cs5535audio_interrupt(int irq, void *dev_id)
+ 		HPI_DEBUG_LOG(VERBOSE, "init ADAPTER_GET_INFO\n");
+ 		memset(&hm, 0, sizeof(hm));
+@@ -660,10 +659,6 @@ static u16 create_adapter_obj(struct hpi_adapter_obj *pao,
+ 		pao->type = hr.u.ax.info.adapter_type;
+ 		pao->index = hr.u.ax.info.adapter_index;
+ 
+-		max_streams =
+-			hr.u.ax.info.num_outstreams +
+-			hr.u.ax.info.num_instreams;
+-
+ 		HPI_DEBUG_LOG(VERBOSE,
+ 			"got adapter info type %x index %d serial %d\n",
+ 			hr.u.ax.info.adapter_type, hr.u.ax.info.adapter_index,
 -- 
 2.17.1
