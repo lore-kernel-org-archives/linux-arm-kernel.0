@@ -1,45 +1,36 @@
 From: colin.king@canonical.com (Colin King)
-Date: Wed,  1 Aug 2018 11:47:36 +0100
-Subject: [PATCH 3/9] ALSA: emu10k1: remove redundant variable attn
-In-Reply-To: <20180801104742.4328-1-colin.king@canonical.com>
-References: <20180801104742.4328-1-colin.king@canonical.com>
-Message-ID: <20180801104742.4328-4-colin.king@canonical.com>
+Date: Wed,  1 Aug 2018 11:47:33 +0100
+Subject: [PATCH 0/9] ALSA: remove redundant variables
+Message-ID: <20180801104742.4328-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Colin Ian King <colin.king@canonical.com>
 
-Variable attn is being assigned but is never used hence it is
-redundant and can be removed.
+Clean up code by removing redundant variables that were
+detected by clang
 
-Cleans up clang warning:
-warning: variable 'attn' set but not used [-Wunused-but-set-variable]
+Colin Ian King (9):
+  ALSA: asihpi: remove redundant variable max_streams
+  ALSA: cs5535audio: remove redundant pointer 'dma'
+  ALSA: emu10k1: remove redundant variable attn
+  ALSA: ens137x: remove redundant array pcm_devs
+  ALSA: sonicvibes: remove redundant pointer 'dir'
+  ASoC: nau8540: remove redundant variable osrate
+  ASoC: stm32: remove redundant pointers 'priv' and 'rtd'
+  ALSA: usb-audio: remove redundant pointer 'urb'
+  ALSA: intel_hdmi: remove redundant variable cfg_val
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- sound/pci/emu10k1/emupcm.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ sound/pci/asihpi/hpi6205.c          | 5 -----
+ sound/pci/cs5535audio/cs5535audio.c | 7 +------
+ sound/pci/emu10k1/emupcm.c          | 3 +--
+ sound/pci/ens1370.c                 | 3 +--
+ sound/pci/sonicvibes.c              | 2 --
+ sound/soc/codecs/nau8540.c          | 3 ---
+ sound/soc/stm/stm32_adfsdm.c        | 8 +-------
+ sound/usb/endpoint.c                | 2 --
+ sound/x86/intel_hdmi_audio.c        | 2 --
+ 9 files changed, 4 insertions(+), 31 deletions(-)
 
-diff --git a/sound/pci/emu10k1/emupcm.c b/sound/pci/emu10k1/emupcm.c
-index 69f9b100bd24..26f6eda3e766 100644
---- a/sound/pci/emu10k1/emupcm.c
-+++ b/sound/pci/emu10k1/emupcm.c
-@@ -290,7 +290,7 @@ static void snd_emu10k1_pcm_init_voice(struct snd_emu10k1 *emu,
- 	struct snd_pcm_runtime *runtime = substream->runtime;
- 	unsigned int silent_page, tmp;
- 	int voice, stereo, w_16;
--	unsigned char attn, send_amount[8];
-+	unsigned char send_amount[8];
- 	unsigned char send_routing[8];
- 	unsigned long flags;
- 	unsigned int pitch_target;
-@@ -313,7 +313,6 @@ static void snd_emu10k1_pcm_init_voice(struct snd_emu10k1 *emu,
- 
- 	/* volume parameters */
- 	if (extra) {
--		attn = 0;
- 		memset(send_routing, 0, sizeof(send_routing));
- 		send_routing[0] = 0;
- 		send_routing[1] = 1;
 -- 
 2.17.1
