@@ -1,58 +1,91 @@
-From: yangbo.lu@nxp.com (Y.b. Lu)
-Date: Wed, 1 Aug 2018 04:38:41 +0000
-Subject: [PATCH 3/3] ptp_qoriq: convert to use module parameters for
- initialization
-In-Reply-To: <20180730.092545.225621578249887012.davem@davemloft.net>
-References: <20180730100154.27906-1-yangbo.lu@nxp.com>
- <20180730100154.27906-3-yangbo.lu@nxp.com>
- <20180730.092545.225621578249887012.davem@davemloft.net>
-Message-ID: <DB6PR0401MB2536D7611DEB88210C5AEFEFF82D0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Wed, 1 Aug 2018 10:26:39 +0530
+Subject: [PATCH v7 5/6] i2c: Add Actions Semiconductor Owl family S900
+ I2C driver
+In-Reply-To: <20180731200932.n7djds2rmqhclit5@ninjato>
+References: <20180726154603.5089-1-manivannan.sadhasivam@linaro.org>
+ <20180726154603.5089-6-manivannan.sadhasivam@linaro.org>
+ <20180731200932.n7djds2rmqhclit5@ninjato>
+Message-ID: <20180801045639.GB15529@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi Wolfram,
 
-> -----Original Message-----
-> From: David Miller [mailto:davem at davemloft.net]
-> Sent: Tuesday, July 31, 2018 12:26 AM
-> To: Y.b. Lu <yangbo.lu@nxp.com>
-> Cc: netdev at vger.kernel.org; Madalin-cristian Bucur
-> <madalin.bucur@nxp.com>; richardcochran at gmail.com; robh+dt at kernel.org;
-> shawnguo at kernel.org; devicetree at vger.kernel.org;
-> linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH 3/3] ptp_qoriq: convert to use module parameters for
-> initialization
+On Tue, Jul 31, 2018 at 10:09:32PM +0200, Wolfram Sang wrote:
+> Hi Manivannan,
 > 
-> From: Yangbo Lu <yangbo.lu@nxp.com>
-> Date: Mon, 30 Jul 2018 18:01:54 +0800
+> On Thu, Jul 26, 2018 at 09:16:02PM +0530, Manivannan Sadhasivam wrote:
+> > Add Actions Semiconductor Owl family S900 I2C driver.
+> > 
+> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> > Acked-by: Peter Rosin <peda@axentia.se>
 > 
-> > +static unsigned int cksel = DEFAULT_CKSEL; module_param(cksel, uint,
-> > +0644); MODULE_PARM_DESC(cksel, "Select reference clock");
+> Looks mostly good already. Thanks Peter for the initial review!
+> 
+
+Thanks to Andy also :)
+
+> > +static irqreturn_t owl_i2c_interrupt(int irq, void *_dev)
+> > +{
+> > +	struct owl_i2c_dev *i2c_dev = _dev;
+> > +	struct i2c_msg *msg = i2c_dev->msg;
+> > +	unsigned long flags;
+> > +	unsigned int stat, fifostat;
 > > +
-> > +static unsigned int clk_src;
-> > +module_param(clk_src, uint, 0644);
-> > +MODULE_PARM_DESC(clk_src, "Reference clock frequency (if clocks
-> > +property not provided in dts)");
+> > +	spin_lock_irqsave(&i2c_dev->lock, flags);
 > > +
-> > +static unsigned int tmr_prsc = 2;
-> > +module_param(tmr_prsc, uint, 0644);
-> > +MODULE_PARM_DESC(tmr_prsc, "Output clock division/prescale factor");
+> > +	fifostat = readl(i2c_dev->base + OWL_I2C_REG_FIFOSTAT);
+> > +	if (fifostat & OWL_I2C_FIFOSTAT_RNB) {
+> > +		dev_dbg(&i2c_dev->adap.dev, "received NACK from device\n");
+> > +		goto stop;
+> > +	}
 > > +
-> > +static unsigned int tmr_fiper1 = 1000000000; module_param(tmr_fiper1,
-> > +uint, 0644); MODULE_PARM_DESC(tmr_fiper1, "Desired fixed interval
-> > +pulse period (ns)");
-> > +
-> > +static unsigned int tmr_fiper2 = 100000; module_param(tmr_fiper2,
-> > +uint, 0644); MODULE_PARM_DESC(tmr_fiper2, "Desired fixed interval
-> > +pulse period (ns)");
+> > +	stat = readl(i2c_dev->base + OWL_I2C_REG_STAT);
+> > +	if (stat & OWL_I2C_STAT_BEB) {
+> > +		dev_dbg(&i2c_dev->adap.dev, "bus error\n");
+> > +		goto stop;
+> > +	}
 > 
-> Sorry, there is no way I am every applying something like this.  Module
-> parameters are to be avoided at all costs.
+> I wonder if you can't pass back the different errors to the upper
+> layers? Like -ENXIO for NACK and -EIO for bus error? We have a
+> convention for that and it seems your HW can support it. The different
+> error codes would then maybe also make the debug outputs obsolete.
 > 
-> And you don't need it here, you have DTS, please use it.
 > 
-> You are required to support the existing DTS cases, in order to avoid breaking
-> things, anyways.
-[Y.b. Lu] I get your point. Will drop module_param method.
-Thanks a lot for your suggestion.
+
+Sure, will catch the errors using an i2c_dev member and pass it to upper
+layers in owl_i2c_master_xfer.
+
+> > +	/*
+> > +	 * Here, -ENXIO will be returned if interrupt occurred but no
+> > +	 * read or write happened. Else if msg_ptr equals to message length,
+> > +	 * message count will be returned.
+> > +	 */
+> > +	ret = i2c_dev->msg_ptr == msg->len ? num : -ENXIO;
+> 
+> I'd think this kinda unusual construct could go then as well by just
+> returning the error code derived from the interrupt handler above.
+> 
+
+Makes sense! It will become:
+
+ret = i2c_dev->err < 0 ? i2c_dev->err : num;
+
+Thanks,
+Mani
+
+> > +static const struct i2c_adapter_quirks owl_i2c_quirks = {
+> > +	.flags		= I2C_AQ_COMB | I2C_AQ_COMB_WRITE_FIRST,
+> > +	.max_read_len   = 240,
+> > +	.max_write_len  = 240,
+> > +	.max_comb_1st_msg_len = 6,
+> > +	.max_comb_2nd_msg_len = 240,
+> > +};
+> 
+> Yay! Good use of the i2c_adapter_quirks struct :)
+> 
+> Regards,
+> 
+>    Wolfram
+> 
