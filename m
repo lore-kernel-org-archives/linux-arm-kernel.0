@@ -1,56 +1,41 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed,  1 Aug 2018 15:04:18 -0500
-Subject: [RFC 2/2] mm: harden alloc_pages code paths against bogus nodes
-In-Reply-To: <20180801200418.1325826-1-jeremy.linton@arm.com>
-References: <20180801200418.1325826-1-jeremy.linton@arm.com>
-Message-ID: <20180801200418.1325826-3-jeremy.linton@arm.com>
+Date: Wed,  1 Aug 2018 15:04:16 -0500
+Subject: [RFC 0/2] harden alloc_pages against bogus nid
+Message-ID: <20180801200418.1325826-1-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Its possible to crash __alloc_pages_nodemask by passing it
-bogus node ids. This is caused by NODE_DATA() returning null
-(hopefully) when the requested node is offline. We can
-harded against the basic case of a mostly valid node, that
-isn't online by checking for null and failing prepare_alloc_pages.
+The thread "avoid alloc memory on offline node"
 
-But this then suggests we should also harden NODE_DATA() like this
+https://lkml.org/lkml/2018/6/7/251
 
-#define NODE_DATA(nid)         ( (nid) < MAX_NUMNODES ? node_data[(nid)] : NULL)
+Asked at one point why the kzalloc_node was crashing rather than
+returning memory from a valid node. The thread ended up fixing
+the immediate causes of the crash but left open the case of bad
+proximity values being in DSDT tables without corrisponding
+SRAT/SLIT entries as is happening on another machine.
 
-eventually this starts to add a bunch of generally uneeded checks
-in some code paths that are called quite frequently.
+Its also easy to fix that, but we should also harden the allocator
+sufficiently that it doesn't crash when passed an invalid node id.
+There are a couple possible ways to do this, and i've attached two
+separate patches which individually fix that problem.
 
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
+The first detects the offline node before calling
+the new_slab code path when it becomes apparent that the allocation isn't
+going to succeed. The second actually hardens node_zonelist() and
+prepare_alloc_pages() in the face of NODE_DATA(nid) returning a NULL
+zonelist. This latter case happens if the node has never been initialized
+or is possibly out of range. There are other places (NODE_DATA &
+online_node) which should be checking if the node id's are > MAX_NUMNODES.
+
+Jeremy Linton (2):
+  slub: Avoid trying to allocate memory on offline nodes
+  mm: harden alloc_pages code paths against bogus nodes
+
  include/linux/gfp.h | 2 ++
  mm/page_alloc.c     | 2 ++
- 2 files changed, 4 insertions(+)
+ mm/slub.c           | 2 ++
+ 3 files changed, 6 insertions(+)
 
-diff --git a/include/linux/gfp.h b/include/linux/gfp.h
-index a6afcec53795..17d70271c42e 100644
---- a/include/linux/gfp.h
-+++ b/include/linux/gfp.h
-@@ -436,6 +436,8 @@ static inline int gfp_zonelist(gfp_t flags)
-  */
- static inline struct zonelist *node_zonelist(int nid, gfp_t flags)
- {
-+	if (unlikely(!NODE_DATA(nid))) //VM_WARN_ON?
-+		return NULL;
- 	return NODE_DATA(nid)->node_zonelists + gfp_zonelist(flags);
- }
- 
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index a790ef4be74e..3a3d9ac2662a 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -4306,6 +4306,8 @@ static inline bool prepare_alloc_pages(gfp_t gfp_mask, unsigned int order,
- {
- 	ac->high_zoneidx = gfp_zone(gfp_mask);
- 	ac->zonelist = node_zonelist(preferred_nid, gfp_mask);
-+	if (!ac->zonelist)
-+		return false;
- 	ac->nodemask = nodemask;
- 	ac->migratetype = gfpflags_to_migratetype(gfp_mask);
- 
 -- 
 2.14.3
