@@ -1,55 +1,63 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 31 Jul 2018 19:07:01 -0700
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.19 (#2)
-In-Reply-To: <87h8kfda2i.fsf@bootlin.com>
-References: <87sh4e8eym.fsf@bootlin.com>
- <20180721213352.eborr5dctfk3t7j3@localhost>
- <87h8kfda2i.fsf@bootlin.com>
-Message-ID: <CAOesGMgr0SH6VMkNHg9+C15QhYgus5+TpfgiTCHrLJbN2x8MhQ@mail.gmail.com>
+Date: Tue, 31 Jul 2018 19:12:59 -0700
+Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.19 round 3/late
+In-Reply-To: <7htvofyvwd.fsf@baylibre.com>
+References: <7htvofyvwd.fsf@baylibre.com>
+Message-ID: <CAOesGMgaAZ7Mk2+wj44maqY1h0G_rypuqjU0x389PwJXicwXqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 2:32 AM, Gregory CLEMENT
-<gregory.clement@bootlin.com> wrote:
-> Hi Olof,
->
->  On sam., juil. 21 2018, Olof Johansson <olof@lixom.net> wrote:
->
->> On Fri, Jul 20, 2018 at 10:54:25AM +0200, Gregory CLEMENT wrote:
->>> Hi,
->>>
->>> Here is the second pull request for dt64 for mvebu for v4.19.
->>>
->>> Gregory
->>>
->>> The following changes since commit 4436a3711e3249840e0679e92d3c951bcaf25515:
->>>
->>>   arm64: dts: marvell: armada-37xx: reserve memory for ATF (2018-06-29 16:39:03 +0200)
->>>
->>> are available in the Git repository at:
->>>
->>>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.19-2
->>>
->>> for you to fetch changes up to c462f6c77e72804b72e008a91c4b6fa8d9b4b265:
->>>
->>>   arm64: dts: marvell: armada-37xx: update the crypto engine compatible (2018-07-13 13:42:03 +0200)
->>>
->>> ----------------------------------------------------------------
->>> mvebu dt64 for 4.19 (part 2)
->>>
->>> Use more specific compatible for the Inside Secure SafeXcel on the
->>> Armada 37xx and the Armada 7K/8K SoCs.
->>
->> I'll reply to the patches -- usually compatible should go from specific to
->> generic and you're replacing here instead of adding a more specific first. You
->> probably want to do the former instead.
->>
->> Not merged, let's settle discussion on the patch first.
->
-> Now that Antoine explained the reason for replacing the compatible, will
-> you pull the branch?
+Hi,
 
-Yeah, seems reasonable. Merged!
+
+On Tue, Jul 31, 2018 at 1:48 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+> Olof, Arnd,
+>
+> Here's a final, late pull for Amlogic DT64, based on top of my round 2
+> redo.
+>
+> The audio drivers ended up being merged for v4.19, so wanted to get
+> these in if at all possible also.
+>
+> If it's too late for the normal DT pulls, feel free to include in a late
+> cycle, otherwise I'll (re)send after -rc1.
+
+Linus declared that we'll have an -rc8, so we've got a bit of time.
+
+> The following changes since commit aaa080fa7e0f01f7cd8eb22a7385a4d8106c7478:
+>
+>   ARM64: dts: meson-gxl: add support for the Oranth Tanix TX3 Mini (2018-07-20 09:02:22 -0700)
+>
+> are available in the git repository at:
+>
+>   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-3
+>
+> for you to fetch changes up to f2ac479f0da046097258c68ef834af01b568436a:
+>
+>   arm64: dts: meson-axg: add spdif-dit codec (2018-07-25 04:38:22 -0700)
+>
+> ----------------------------------------------------------------
+> Amlogic 64-bit DT updates for v4.19, round 3
+> - add DT support for AXG Audio
+>
+> ----------------------------------------------------------------
+> Jerome Brunet (11):
+>       arm64: dts: meson-axg: improve power supplies description
+>       arm64: dts: meson-axg: add vcc 5v regulator on the s400
+>       arm64: dts: meson-axg: add usb power regulator
+>       arm64: dts: meson-axg: add audio arb reset controller
+>       arm64: dts: meson-axg: add spdifout
+>       arm64: dts: meson-axg: add tdmin formatters
+>       arm64: dts: meson-axg: add tdmout formatters
+>       arm64: dts: meson-axg: add tdm interfaces
+>       arm64: dts: meson-axg: add linein codec
+>       arm64: dts: meson-axg: add lineout codec
+>       arm64: dts: meson-axg: add spdif-dit codec
+
+Hmm, not entirely sure you need a commit per entry here, since it's
+unlikely that you'll need to bisect across the series.
+
+Anyway, merged!
 
 
 -Olof
