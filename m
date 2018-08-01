@@ -1,61 +1,86 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed,  1 Aug 2018 16:58:11 +0900
-Subject: [PATCH v13 07/16] arm64: add image head flag definitions
+Date: Wed,  1 Aug 2018 16:58:12 +0900
+Subject: [PATCH v13 08/16] arm64: cpufeature: add MMFR0 helper functions
 In-Reply-To: <20180801075820.3753-1-takahiro.akashi@linaro.org>
 References: <20180801075820.3753-1-takahiro.akashi@linaro.org>
-Message-ID: <20180801075820.3753-8-takahiro.akashi@linaro.org>
+Message-ID: <20180801075820.3753-9-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Those image head's flags will be used later by kexec_file loader.
+Those helper functions for MMFR0 register will be used later by kexec_file
+loader.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Acked-by: James Morse <james.morse@arm.com>
+Reviewed-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/boot.h | 15 +++++++++++++++
- arch/arm64/kernel/head.S      |  2 +-
- 2 files changed, 16 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/cpufeature.h | 48 +++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
-index 355e552a9175..0bab7eed3012 100644
---- a/arch/arm64/include/asm/boot.h
-+++ b/arch/arm64/include/asm/boot.h
-@@ -5,6 +5,21 @@
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 1717ba1db35d..cd90b5252d6d 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -486,11 +486,59 @@ static inline bool system_supports_32bit_el0(void)
+ 	return cpus_have_const_cap(ARM64_HAS_32BIT_EL0);
+ }
  
- #include <asm/sizes.h>
++static inline bool system_supports_4kb_granule(void)
++{
++	u64 mmfr0;
++	u32 val;
++
++	mmfr0 =	read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1);
++	val = cpuid_feature_extract_unsigned_field(mmfr0,
++						ID_AA64MMFR0_TGRAN4_SHIFT);
++
++	return val == ID_AA64MMFR0_TGRAN4_SUPPORTED;
++}
++
++static inline bool system_supports_64kb_granule(void)
++{
++	u64 mmfr0;
++	u32 val;
++
++	mmfr0 =	read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1);
++	val = cpuid_feature_extract_unsigned_field(mmfr0,
++						ID_AA64MMFR0_TGRAN64_SHIFT);
++
++	return val == ID_AA64MMFR0_TGRAN64_SUPPORTED;
++}
++
++static inline bool system_supports_16kb_granule(void)
++{
++	u64 mmfr0;
++	u32 val;
++
++	mmfr0 =	read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1);
++	val = cpuid_feature_extract_unsigned_field(mmfr0,
++						ID_AA64MMFR0_TGRAN16_SHIFT);
++
++	return val == ID_AA64MMFR0_TGRAN16_SUPPORTED;
++}
++
+ static inline bool system_supports_mixed_endian_el0(void)
+ {
+ 	return id_aa64mmfr0_mixed_endian_el0(read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1));
+ }
  
-+#define ARM64_MAGIC		"ARM\x64"
++static inline bool system_supports_mixed_endian(void)
++{
++	u64 mmfr0;
++	u32 val;
 +
-+#define HEAD_FLAG_BE_SHIFT		0
-+#define HEAD_FLAG_PAGE_SIZE_SHIFT	1
-+#define HEAD_FLAG_BE_MASK		0x1
-+#define HEAD_FLAG_PAGE_SIZE_MASK	0x3
++	mmfr0 =	read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1);
++	val = cpuid_feature_extract_unsigned_field(mmfr0,
++						ID_AA64MMFR0_BIGENDEL_SHIFT);
 +
-+#define HEAD_FLAG_BE			1
-+#define HEAD_FLAG_PAGE_SIZE_4K		1
-+#define HEAD_FLAG_PAGE_SIZE_16K		2
-+#define HEAD_FLAG_PAGE_SIZE_64K		3
++	return val == 0x1;
++}
 +
-+#define head_flag_field(flags, field) \
-+		(((flags) >> field##_SHIFT) & field##_MASK)
-+
- /*
-  * arm64 requires the DTB to be 8 byte aligned and
-  * not exceed 2MB in size.
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index b0853069702f..8cbac6232ed1 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -91,7 +91,7 @@ _head:
- 	.quad	0				// reserved
- 	.quad	0				// reserved
- 	.quad	0				// reserved
--	.ascii	"ARM\x64"			// Magic number
-+	.ascii	ARM64_MAGIC			// Magic number
- #ifdef CONFIG_EFI
- 	.long	pe_header - _head		// Offset to the PE header.
- 
+ static inline bool system_supports_fpsimd(void)
+ {
+ 	return !cpus_have_const_cap(ARM64_HAS_NO_FPSIMD);
 -- 
 2.18.0
