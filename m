@@ -1,117 +1,86 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Wed, 1 Aug 2018 18:52:09 +0200
-Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <20180801163538.GA10800@arm.com>
-References: <cover.1530018818.git.andreyknvl@google.com>
- <20180628105057.GA26019@e103592.cambridge.arm.com>
- <CAAeHK+w0T43+h3xqU4a-qutxd-qiEhsvk0eaZpmAn-T0hpaLZQ@mail.gmail.com>
- <20180629110709.GA17859@arm.com>
- <CAAeHK+wHd8B2nhat-Z2Y2=s4NVobPG7vjr2CynjFhqPTwQRepQ@mail.gmail.com>
- <20180703173608.GF27243@arm.com>
- <CAAeHK+wTcH+2hgm_BTkLLdn1GkjBtkhQ=vPWZCncJ6KenqgKpg@mail.gmail.com>
- <CAAeHK+xc1E64tXEEHoXqOuUNZ7E_kVyho3_mNZTCc+LTGHYFdA@mail.gmail.com>
- <20180801163538.GA10800@arm.com>
-Message-ID: <CACT4Y+aZtph5qDsLzTDEgpQRz4_Vtg1DD-cB18qooi6D0bexDg@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed,  1 Aug 2018 18:46:21 +0200
+Subject: [PATCH 4.17 046/336] bpf,
+ arm32: fix inconsistent naming about emit_a32_lsr_{r64, i64}
+In-Reply-To: <20180801165028.930831994@linuxfoundation.org>
+References: <20180801165028.930831994@linuxfoundation.org>
+Message-ID: <20180801165030.839357457@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 1, 2018 at 6:35 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Andrey,
->
-> On Tue, Jul 31, 2018 at 03:22:13PM +0200, Andrey Konovalov wrote:
->> On Wed, Jul 18, 2018 at 7:16 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
->> > On Tue, Jul 3, 2018 at 7:36 PM, Will Deacon <will.deacon@arm.com> wrote:
->> >> Hmm, but elsewhere in this thread, Evgenii is motivating the need for this
->> >> patch set precisely because the lower overhead means it's suitable for
->> >> "near-production" use. So I don't think writing this off as a debugging
->> >> feature is the right approach, and we instead need to put effort into
->> >> analysing the impact of address tags on the kernel as a whole. Playing
->> >> whack-a-mole with subtle tag issues sounds like the worst possible outcome
->> >> for the long-term.
->> >
->> > I don't see a way to find cases where pointer tags would matter
->> > statically, so I've implemented the dynamic approach that I mentioned
->> > above. I've instrumented all pointer comparisons/subtractions in an
->> > LLVM compiler pass and used a kernel module that would print a bug
->> > report whenever two pointers with different tags are being
->> > compared/subtracted (ignoring comparisons with NULL pointers and with
->> > pointers obtained by casting an error code to a pointer type). Then I
->> > tried booting the kernel in QEMU and on an Odroid C2 board and I ran
->> > syzkaller overnight.
->> >
->> > This yielded the following results.
->> >
->> > ======
->> >
->> > The two places that look interesting are:
->> >
->> > is_vmalloc_addr in include/linux/mm.h (already mentioned by Catalin)
->> > is_kernel_rodata in mm/util.c
->> >
->> > Here we compare a pointer with some fixed untagged values to make sure
->> > that the pointer lies in a particular part of the kernel address
->> > space. Since KWHASAN doesn't add tags to pointers that belong to
->> > rodata or vmalloc regions, this should work as is. To make sure I've
->> > added debug checks to those two functions that check that the result
->> > doesn't change whether we operate on pointers with or without
->> > untagging.
->> >
->> > ======
->> >
->> > A few other cases that don't look that interesting:
->> >
->> > Comparing pointers to achieve unique sorting order of pointee objects
->> > (e.g. sorting locks addresses before performing a double lock):
->> >
->> > tty_ldisc_lock_pair_timeout in drivers/tty/tty_ldisc.c
->> > pipe_double_lock in fs/pipe.c
->> > unix_state_double_lock in net/unix/af_unix.c
->> > lock_two_nondirectories in fs/inode.c
->> > mutex_lock_double in kernel/events/core.c
->> >
->> > ep_cmp_ffd in fs/eventpoll.c
->> > fsnotify_compare_groups fs/notify/mark.c
->> >
->> > Nothing needs to be done here, since the tags embedded into pointers
->> > don't change, so the sorting order would still be unique.
->> >
->> > Check that a pointer belongs to some particular allocation:
->> >
->> > is_sibling_entry lib/radix-tree.c
->> > object_is_on_stack in include/linux/sched/task_stack.h
->> >
->> > Nothing needs to be here either, since two pointers can only belong to
->> > the same allocation if they have the same tag.
->> >
->> > ======
->> >
->> > Will, Catalin, WDYT?
->>
->> ping
->
-> Thanks for tracking these cases down and going through each of them. The
-> obvious follow-up question is: how do we ensure that we keep on top of
-> this in mainline? Are you going to repeat your experiment at every kernel
-> release or every -rc or something else? I really can't see how we can
-> maintain this in the long run, especially given that the coverage we have
-> is only dynamic -- do you have an idea of how much coverage you're actually
-> getting for, say, a defconfig+modules build?
->
-> I'd really like to enable pointer tagging in the kernel, I'm just still
-> failing to see how we can do it in a controlled manner where we can reason
-> about the semantic changes using something other than a best-effort,
-> case-by-case basis which is likely to be fragile and error-prone.
-> Unfortunately, if that's all we have, then this gets relegated to a
-> debug feature, which sort of defeats the point in my opinion.
+4.17-stable review patch.  If anyone has any objections, please let me know.
 
-Well, in some cases there is no other way as resorting to dynamic testing.
-How do we ensure that kernel does not dereference NULL pointers, does
-not access objects after free or out of bounds? Nohow. And, yes, it's
-constant maintenance burden resolved via dynamic testing.
-In some sense HWASAN is better in this regard because it's like, say,
-LOCKDEP in this regard. It's enabled only when one does dynamic
-testing and collect, analyze and fix everything that pops up. Any
-false positives will fail loudly (as opposed to, say, silent memory
-corruptions due to use-after-frees), so any false positives will be
-just first things to fix during the tool application.
+------------------
+
+From: Wang YanQing <udknight@gmail.com>
+
+[ Upstream commit 68565a1af9f7012e6f2fe2bdd612f67d2d830c28 ]
+
+The names for BPF_ALU64 | BPF_ARSH are emit_a32_arsh_*,
+the names for BPF_ALU64 | BPF_LSH are emit_a32_lsh_*, but
+the names for BPF_ALU64 | BPF_RSH are emit_a32_lsr_*.
+
+For consistence reason, let's rename emit_a32_lsr_* to
+emit_a32_rsh_*.
+
+This patch also corrects a wrong comment.
+
+Fixes: 39c13c204bb1 ("arm: eBPF JIT compiler")
+Signed-off-by: Wang YanQing <udknight@gmail.com>
+Cc: Shubham Bansal <illusionist.neo@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux at armlinux.org.uk
+Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
+Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+ arch/arm/net/bpf_jit_32.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -708,7 +708,7 @@ static inline void emit_a32_arsh_r64(con
+ }
+ 
+ /* dst = dst >> src */
+-static inline void emit_a32_lsr_r64(const u8 dst[], const u8 src[], bool dstk,
++static inline void emit_a32_rsh_r64(const u8 dst[], const u8 src[], bool dstk,
+ 				     bool sstk, struct jit_ctx *ctx) {
+ 	const u8 *tmp = bpf2a32[TMP_REG_1];
+ 	const u8 *tmp2 = bpf2a32[TMP_REG_2];
+@@ -724,7 +724,7 @@ static inline void emit_a32_lsr_r64(cons
+ 		emit(ARM_LDR_I(rm, ARM_SP, STACK_VAR(dst_hi)), ctx);
+ 	}
+ 
+-	/* Do LSH operation */
++	/* Do RSH operation */
+ 	emit(ARM_RSB_I(ARM_IP, rt, 32), ctx);
+ 	emit(ARM_SUBS_I(tmp2[0], rt, 32), ctx);
+ 	emit(ARM_MOV_SR(ARM_LR, rd, SRTYPE_LSR, rt), ctx);
+@@ -774,7 +774,7 @@ static inline void emit_a32_lsh_i64(cons
+ }
+ 
+ /* dst = dst >> val */
+-static inline void emit_a32_lsr_i64(const u8 dst[], bool dstk,
++static inline void emit_a32_rsh_i64(const u8 dst[], bool dstk,
+ 				    const u32 val, struct jit_ctx *ctx) {
+ 	const u8 *tmp = bpf2a32[TMP_REG_1];
+ 	const u8 *tmp2 = bpf2a32[TMP_REG_2];
+@@ -1330,7 +1330,7 @@ static int build_insn(const struct bpf_i
+ 	case BPF_ALU64 | BPF_RSH | BPF_K:
+ 		if (unlikely(imm > 63))
+ 			return -EINVAL;
+-		emit_a32_lsr_i64(dst, dstk, imm, ctx);
++		emit_a32_rsh_i64(dst, dstk, imm, ctx);
+ 		break;
+ 	/* dst = dst << src */
+ 	case BPF_ALU64 | BPF_LSH | BPF_X:
+@@ -1338,7 +1338,7 @@ static int build_insn(const struct bpf_i
+ 		break;
+ 	/* dst = dst >> src */
+ 	case BPF_ALU64 | BPF_RSH | BPF_X:
+-		emit_a32_lsr_r64(dst, src, dstk, sstk, ctx);
++		emit_a32_rsh_r64(dst, src, dstk, sstk, ctx);
+ 		break;
+ 	/* dst = dst >> src (signed) */
+ 	case BPF_ALU64 | BPF_ARSH | BPF_X:
