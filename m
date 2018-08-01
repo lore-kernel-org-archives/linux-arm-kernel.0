@@ -1,78 +1,27 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Aug 2018 10:21:19 +0100
-Subject: [PATCH 1/3] PCI: Introduce PCI software bridge common logic
-In-Reply-To: <20180801104957.1b01b847@windsurf>
-References: <20180629092231.32207-1-thomas.petazzoni@bootlin.com>
- <20180629092231.32207-2-thomas.petazzoni@bootlin.com>
- <20180712195802.GC28466@bhelgaas-glaptop.roam.corp.google.com>
- <20180801104957.1b01b847@windsurf>
-Message-ID: <20180801092119.GB30658@n2100.armlinux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 1 Aug 2018 10:25:12 +0100
+Subject: [PATCH v2 2/5] regulator: rk808: add RK809 and RK817 support.
+In-Reply-To: <1533023850-29004-3-git-send-email-tony.xie@rock-chips.com>
+References: <1533023850-29004-1-git-send-email-tony.xie@rock-chips.com>
+ <1533023850-29004-3-git-send-email-tony.xie@rock-chips.com>
+Message-ID: <20180801092512.GA5509@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 01, 2018 at 10:49:57AM +0200, Thomas Petazzoni wrote:
-> Indeed, yes. Will fix that.
-> 
-> So, to sum up, there are really three key questions:
-> 
->  (1) Which name do you want for this ?
-> 
->  (2) Agreeing on whether a RAM-like behavior is acceptable, and if not,
->      which solution do you propose instead.
+On Tue, Jul 31, 2018 at 03:57:27PM +0800, Tony Xie wrote:
 
-Please take the time to read the PCI(e) specifications and implement
-what it recommends, rather than doing something else.  That's what I
-did when I originally reworked the mvebu PCIe driver for Armada 388,
-and it's the only sensible approach to have something that works with
-the rest of the Linux PCI(e) layer.
+> +	default:
+> +		pr_warn("%s ramp_delay: %d not supported, setting 10000\n",
+> +			rdev->desc->name, ramp_delay);
+> +	}
 
-Going off and implementing a non-standard behaviour is a recipe for
-things breaking as the PCIe kernel support evolves.
-
-The spec requires reserved registers to read back as zero and ignore
-writes, whereas implemented registers have a mixture of behaviours:
-
-- read/write
-- read, write to clear
-- read-only
-
-Here's the extract(s):
-
-   All PCI devices must treat Configuration Space write operations
-   to reserved registers as no-ops; that is, the access must be
-   completed normally on the bus and the data discarded. Read
-   accesses to reserved or unimplemented registers must be completed
-   normally and a data value of 0 returned.
-
-(eg) PCI status:
-   Reserved bits should be read-only and return zero when read.
-   A one bit is reset (if it is not read-only) whenever the register
-   is written, and the write data in the corresponding bit location
-   is a 1.
-
-[which is why doing the read-modify-write action that some host
- bridges that only support 32-bit accesses is dangerous - it leads
- to various status bits being inadvertently reset.]
-
-Getting this right in a software emulation of the register space for
-each bit in every register makes for a happy Linux PCIe layer.
-
-Now, configuration read/writes use naturally aligned addresses.  The
-PCI specification defines the PC IO 0xcf8/0xcfc configuration access
-mechanism.  The first register defines the address with a 6 bit
-"double-word" address to cover the 256 bytes of standard config space.
-Accesses to 0xcfc are forwarded to the PCI bus as a single
-configuration request - and that means there is nothing to deal with
-an attempt to access a mis-aligned word.
-
-Indeed, if 0xcfe was to be accessed as a double word, this would
-result in the processor reading the two bytes from IO address 0xcfe,
-0xcff, as well as 0xd00 and 0xd01 which are not part of the
-configuration data register - resulting in undefined data being read.
-
-So, basically, misaligned configuration accesses are not supported.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+This looks mostly good but I notice that most of the prints in the
+driver are pr_ rather than dev_ ones - using dev_ is better as it allows
+people to see which device was affected.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180801/de3716a8/attachment-0001.sig>
