@@ -1,65 +1,73 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 1 Aug 2018 15:15:08 +0530
-Subject: [PATCH v8 4/4] mailbox: Add support for i.MX7D messaging unit
-In-Reply-To: <AM0PR04MB42118C26A7C5F80FD46FBB9B802D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <20180731141146.10788-1-o.rempel@pengutronix.de>
- <20180731141146.10788-5-o.rempel@pengutronix.de>
- <CABb+yY2PN=LN3bgTTzL9SpA43atughAbS1OjNsg0XZg42JxD3w@mail.gmail.com>
- <AM0PR04MB42118C26A7C5F80FD46FBB9B802D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <CABb+yY1pWAUDa33AvHy9LiPjp+r__F3v8w_z0uPJ-4eJ4nzuFA@mail.gmail.com>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Wed,  1 Aug 2018 11:47:57 +0200
+Subject: [PATCH v7 0/4] IR support for A83T
+Message-ID: <20180801094801.26627-1-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 1, 2018 at 1:14 PM, A.s. Dong <aisheng.dong@nxp.com> wrote:
->> -----Original Message-----
->> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
->
-> [...]
->
->> > +
->> > +static void imx_mu_txdb_work(struct work_struct *work) {
->> > +       struct imx_mu_con_priv *cp =
->> > +                       container_of(work, struct imx_mu_con_priv, work);
->> > +       mbox_chan_txdone(cp->chan, 0); }
->> >
->> The api assumes a controller have same type of channels. So we are having
->> to do this here.
->> I am not sure, but would declaring two mailbox controllers (one with
->> doorbells and the other data channels) work?
->> If not, at least we could use a tasklet instead of a work queue?
->>
->
-> I'm also a bit curious what the meaning of calling mbox_chan_txdone
-> for a doorbell mailbox?
->
-> Is there any recommended way to use it?
->
-The framework submits a message (a signal with or without data) for
-controller to transmit. Obviously, it has to know when the transfer
-completes (so that it can submit the next message).
+This patch series adds support for the sunxi A83T ir module and enhances 
+the sunxi-ir driver. Right now the base clock frequency for the ir driver
+is a hard coded define and is set to 8 MHz.
+This works for the most common ir receivers. On the Sinovoip Bananapi M3 
+the ir receiver needs, a 3 MHz base clock frequency to work without
+problems with this driver.
 
-Depending on the controller h/w design, there can be three ways.
+This patch series adds support for an optinal property that makes it able
+to override the default base clock frequency and enables the ir interface 
+on the a83t and the Bananapi M3.
 
-a) Controller has some irq that fires when the signal is consumed by
-the other end. Like MU does. So upon TX-IRQ, the controller driver
-calls mbox_chan_txdone() to tell the framework that the last submitted
-transfer has completed. This is indicated by setting only  txdone_irq
-= true
+changes since v6:
+* update Acked-by
+* add missing a83t compatile on patch 2
 
-b) Controller does not have any tx-irq, but it can read some register
-to know the status. That is it has to be polled. The framework calls
-last_tx_done() periodically to check the status. This is indicated by
-setting only  txdone_poll = true.
+changes since v5:
+* removed already merged patches
+* adapt patch 2 to be applyable to current rc-1
 
-c) Controller has neither irq, nor any status register. This is
-indicated by setting only  txdone_irq = false and  txdone_poll =
-false.   In this case, the protocol/client has to tell the framework
-(using some protocol level indicator like some ack packet reception)
-when the last submitted message was transferred, by calling
-mbox_client_txdone()
+changes since v4:
+* rename cir pin from cir_pins to r_cir_pin
+* drop unit-address from r_cir_pin
+* add a83t compatible to the cir node
+* move muxing options to dtsi
+* rename cir label and reorder it in the bananpim3.dts file
 
-A 'doorbell' is  (c) type channel -- just an irq raised at other end
-without any ack irq or status bit to check. So, the client would
-simply do
-                mbox_send_message(chan, msg);
-                mbox_client_txdone(chan, 0);
+changes since v3:
+* collecting all acks & reviewd by
+* fixed typos
+
+changes since v2:
+* reorder cir pin (alphabetical)
+* fix typo in documentation
+
+changes since v1:
+* fix typos, reword Documentation
+* initialize 'b_clk_freq' to 'SUNXI_IR_BASE_CLK' & remove if statement
+* change dev_info() to dev_dbg()
+* change naming to cir* in dts/dtsi
+* Added acked Ackedi-by to related patch
+* use whole memory block instead of registers needed + fix for h3/h5
+
+changes since rfc:
+* The property is now optinal. If the property is not available in 
+  the dtb the driver uses the default base clock frequency.
+* the driver prints out the the selected base clock frequency.
+* changed devicetree property from base-clk-frequency to clock-frequency
+
+Regards,
+Philipp
+
+
+Philipp Rossak (4):
+  ARM: dts: sun8i: a83t: Add the cir pin for the A83T
+  ARM: dts: sun8i: a83t: Add support for the cir interface
+  ARM: dts: sun8i: a83t: bananapi-m3: Enable IR controller
+  ARM: dts: sun8i: h3-h5: ir register size should be the whole memory
+    block
+
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts |  5 +++++
+ arch/arm/boot/dts/sun8i-a83t.dtsi            | 18 ++++++++++++++++++
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi           |  2 +-
+ 3 files changed, 24 insertions(+), 1 deletion(-)
+
+-- 
+2.11.0
