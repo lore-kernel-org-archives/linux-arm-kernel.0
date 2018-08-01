@@ -1,196 +1,70 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 01 Aug 2018 18:08:20 +0900
-Subject: [PATCH 3/8] devfreq: rk3399_dmc: Pass ODT and auto power down
- parameters to TF-A.
-In-Reply-To: <20180730081124.30698-4-enric.balletbo@collabora.com>
-References: <20180730081124.30698-1-enric.balletbo@collabora.com>
- <CGME20180730081238epcas5p1ee07f1c70f33018509b34f60736f4832@epcas5p1.samsung.com>
- <20180730081124.30698-4-enric.balletbo@collabora.com>
-Message-ID: <5B617884.5070600@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Aug 2018 10:10:27 +0100
+Subject: [PATCH 6/6] arm64: enable RapidIO menu in Kconfig
+In-Reply-To: <f2723578-f39d-27ac-b376-0f06905caa67@gmail.com>
+References: <20180730225035.28365-1-acolin@isi.edu>
+ <20180730225035.28365-7-acolin@isi.edu>
+ <20180731084143.GA4680@arm.com>
+ <d09cb4f5-768b-acd8-f9b1-d1d320a93564@gmail.com>
+ <f2723578-f39d-27ac-b376-0f06905caa67@gmail.com>
+Message-ID: <20180801091027.GC14438@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Enric,
-
-On 2018? 07? 30? 17:11, Enric Balletbo i Serra wrote:
-> Trusted Firmware-A (TF-A) for rk3399 implements a SiP call to get the
-> on-die termination (ODT) and auto power down parameters from kernel,
-> this patch adds the functionality to do this. Also, if DDR clock
-> frequency is lower than the on-die termination (ODT) disable frequency
-> this driver should disable the DDR ODT.
+On Tue, Jul 31, 2018 at 04:29:56PM -0400, Alex Bounine wrote:
+> On 2018-07-31 08:54 AM, Alex Bounine wrote:
+> >On 2018-07-31 04:41 AM, Will Deacon wrote:
+> >>On Mon, Jul 30, 2018 at 06:50:34PM -0400, Alexei Colin wrote:
+> >>>Platforms with a PCI bus will be offered the RapidIO menu since they may
+> >>>be want support for a RapidIO PCI device. Platforms without a PCI bus
+> >>>that might include a RapidIO IP block will need to "select HAS_RAPIDIO"
+> >>>in the platform-/machine-specific "config ARCH_*" Kconfig entry.
+> >>>
+> >>>Tested that kernel builds for arm64 with RapidIO subsystem and
+> >>>switch drivers enabled, also that the modules load successfully
+> >>>on a custom Aarch64 Qemu model.
+> >>>
+> >>>Cc: Andrew Morton <akpm@linux-foundation.org>
+> >>>Cc: Russell King <linux@armlinux.org.uk>
+> >>>Cc: John Paul Walters <jwalters@isi.edu>
+> >>>Cc: linux-arm-kernel at lists.infradead.org
+> >>>Cc: linux-kernel at vger.kernel.org,
+> >>>Signed-off-by: Alexei Colin <acolin@isi.edu>
+> >>>---
+> >>>? arch/arm64/Kconfig | 2 ++
+> >>>? 1 file changed, 2 insertions(+)
+> >>
+> >>Thanks, this looks much cleaner than before:
+> >>
+> >>Acked-by: Will Deacon <will.deacon@arm.com>
+> >>
+> >>The only thing I'm not sure about is why we don't just select HAS_RAPIDIO
+> >>unconditionally in the arm64 Kconfig. Does selecting only that option
+> >>actually pull in new code to the build?
+> >>
+> >HAS_RAPIDIO option is intended for SOCs that have built in SRIO
+> >controllers, like TI KeyStoneII or FPGAs. Because RapidIO subsystem core
+> >is required during RapidIO port driver initialization, having separate
+> >option allows us to control available build options for RapidIO core and
+> >port driver (bool vs. tristate) and disable module option if port driver
+> >is configured as built-in.
 > 
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> I am thinking about where HAS_RAPIDIO option can be set for arm64 branch.
+> Having it set globally is too broad. For example we have Xilinx Zinq US
+> board with SRIO IP on it. Having it globally in arm64 branch - bad. Probably
+> having it set in drivers/soc/... is the best place.
 
-Looks good to me.
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+Why is selecting HAS_RAPIDIO globally a bad thing to do? The way these
+normally work is, if some subsystem requires arch support, then there's
+an ARCH_HAS_xxxx option which the architecture selects when it implements
+that support. Once you've enabled that, then that allows other sub-options
+to be selected, such as specific drivers or what-not. Look at the Kconfig
+files under drivers/soc/ -- you don't see anybody selecting ARCH_HAS_*
+options.
 
-> ---
-> 
-> Changes in v1:
-> - [RFC 3/10] Add an explanation for platform SIP calls.
-> - [RFC 3/10] Change if statement for a switch.
-> - [RFC 3/10] Rename ddr_flag to odt_enable to be more clear.
-> 
->  drivers/devfreq/rk3399_dmc.c        | 74 ++++++++++++++++++++++++++++-
->  include/soc/rockchip/rockchip_sip.h |  1 +
->  2 files changed, 74 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
-> index e795ad2b3f6b..c619dc4ac620 100644
-> --- a/drivers/devfreq/rk3399_dmc.c
-> +++ b/drivers/devfreq/rk3399_dmc.c
-> @@ -18,14 +18,17 @@
->  #include <linux/devfreq.h>
->  #include <linux/devfreq-event.h>
->  #include <linux/interrupt.h>
-> +#include <linux/mfd/syscon.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/platform_device.h>
->  #include <linux/pm_opp.h>
-> +#include <linux/regmap.h>
->  #include <linux/regulator/consumer.h>
->  #include <linux/rwsem.h>
->  #include <linux/suspend.h>
->  
-> +#include <soc/rockchip/rk3399_grf.h>
->  #include <soc/rockchip/rockchip_sip.h>
->  
->  struct dram_timing {
-> @@ -69,8 +72,11 @@ struct rk3399_dmcfreq {
->  	struct mutex lock;
->  	struct dram_timing timing;
->  	struct regulator *vdd_center;
-> +	struct regmap *regmap_pmu;
->  	unsigned long rate, target_rate;
->  	unsigned long volt, target_volt;
-> +	unsigned int odt_dis_freq;
-> +	int odt_pd_arg0, odt_pd_arg1;
->  };
->  
->  static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
-> @@ -80,6 +86,8 @@ static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
->  	struct dev_pm_opp *opp;
->  	unsigned long old_clk_rate = dmcfreq->rate;
->  	unsigned long target_volt, target_rate;
-> +	struct arm_smccc_res res;
-> +	bool odt_enable = false;
->  	int err;
->  
->  	opp = devfreq_recommended_opp(dev, freq, flags);
-> @@ -95,6 +103,19 @@ static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
->  
->  	mutex_lock(&dmcfreq->lock);
->  
-> +	if (target_rate >= dmcfreq->odt_dis_freq)
-> +		odt_enable = true;
-> +
-> +	/*
-> +	 * This makes a SMC call to the TF-A to set the DDR PD (power-down)
-> +	 * timings and to enable or disable the ODT (on-die termination)
-> +	 * resistors.
-> +	 */
-> +	arm_smccc_smc(ROCKCHIP_SIP_DRAM_FREQ, dmcfreq->odt_pd_arg0,
-> +		      dmcfreq->odt_pd_arg1,
-> +		      ROCKCHIP_SIP_CONFIG_DRAM_SET_ODT_PD,
-> +		      odt_enable, 0, 0, 0, &res);
-> +
->  	/*
->  	 * If frequency scaling from low to high, adjust voltage first.
->  	 * If frequency scaling from high to low, adjust frequency first.
-> @@ -294,11 +315,13 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
->  {
->  	struct arm_smccc_res res;
->  	struct device *dev = &pdev->dev;
-> -	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *np = pdev->dev.of_node, *node;
->  	struct rk3399_dmcfreq *data;
->  	int ret, index, size;
->  	uint32_t *timing;
->  	struct dev_pm_opp *opp;
-> +	u32 ddr_type;
-> +	u32 val;
->  
->  	data = devm_kzalloc(dev, sizeof(struct rk3399_dmcfreq), GFP_KERNEL);
->  	if (!data)
-> @@ -334,6 +357,34 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> +	/* Try to find the optional reference to the pmu syscon */
-> +	node = of_parse_phandle(np, "rockchip,pmu", 0);
-> +	if (node) {
-> +		data->regmap_pmu = syscon_node_to_regmap(node);
-> +		if (IS_ERR(data->regmap_pmu))
-> +			return PTR_ERR(data->regmap_pmu);
-> +	}
-> +
-> +	/* Get DDR type */
-> +	regmap_read(data->regmap_pmu, RK3399_PMUGRF_OS_REG2, &val);
-> +	ddr_type = (val >> RK3399_PMUGRF_DDRTYPE_SHIFT) &
-> +		    RK3399_PMUGRF_DDRTYPE_MASK;
-> +
-> +	/* Get the odt_dis_freq parameter in function of the DDR type */
-> +	switch (ddr_type) {
-> +	case RK3399_PMUGRF_DDRTYPE_DDR3:
-> +		data->odt_dis_freq = data->timing.ddr3_odt_dis_freq;
-> +		break;
-> +	case RK3399_PMUGRF_DDRTYPE_LPDDR3:
-> +		data->odt_dis_freq = data->timing.lpddr3_odt_dis_freq;
-> +		break;
-> +	case RK3399_PMUGRF_DDRTYPE_LPDDR4:
-> +		data->odt_dis_freq = data->timing.lpddr4_odt_dis_freq;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	};
-> +
->  	/*
->  	 * Get dram timing and pass it to arm trust firmware,
->  	 * the dram drvier in arm trust firmware will get these
-> @@ -358,6 +409,27 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
->  		      ROCKCHIP_SIP_CONFIG_DRAM_INIT,
->  		      0, 0, 0, 0, &res);
->  
-> +	/*
-> +	 * In TF-A there is a platform SIP call to set the PD (power-down)
-> +	 * timings and to enable or disable the ODT (on-die termination).
-> +	 * This call needs three arguments as follows:
-> +	 *
-> +	 * arg0:
-> +	 *     bit[0-7]   : sr_idle
-> +	 *     bit[8-15]  : sr_mc_gate_idle
-> +	 *     bit[16-31] : standby idle
-> +	 * arg1:
-> +	 *     bit[0-11]  : pd_idle
-> +	 *     bit[16-27] : srpd_lite_idle
-> +	 * arg2:
-> +	 *     bit[0]     : odt enable
-> +	 */
-> +	data->odt_pd_arg0 = (data->timing.sr_idle & 0xff) |
-> +			    ((data->timing.sr_mc_gate_idle & 0xff) << 8) |
-> +			    ((data->timing.standby_idle & 0xffff) << 16);
-> +	data->odt_pd_arg1 = (data->timing.pd_idle & 0xfff) |
-> +			    ((data->timing.srpd_lite_idle & 0xfff) << 16);
-> +
->  	/*
->  	 * We add a devfreq driver to our parent since it has a device tree node
->  	 * with operating points.
-> diff --git a/include/soc/rockchip/rockchip_sip.h b/include/soc/rockchip/rockchip_sip.h
-> index 7e28092c4d3d..ad9482c56797 100644
-> --- a/include/soc/rockchip/rockchip_sip.h
-> +++ b/include/soc/rockchip/rockchip_sip.h
-> @@ -23,5 +23,6 @@
->  #define ROCKCHIP_SIP_CONFIG_DRAM_GET_RATE	0x05
->  #define ROCKCHIP_SIP_CONFIG_DRAM_CLR_IRQ	0x06
->  #define ROCKCHIP_SIP_CONFIG_DRAM_SET_PARAM	0x07
-> +#define ROCKCHIP_SIP_CONFIG_DRAM_SET_ODT_PD	0x08
->  
->  #endif
-> 
+Now, if HAS_RAPIDIO alone is pulling in a whole load of code to the build,
+then it sounds like a misnomer.
 
+Confused.
 
--- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+Will
