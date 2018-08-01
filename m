@@ -1,46 +1,62 @@
-From: maxi.jourdan@wanadoo.fr (Maxime Jourdan)
-Date: Wed,  1 Aug 2018 20:51:27 +0200
-Subject: [PATCH 3/4] ARM64: dts: meson-gx: add dmcbus and canvas nodes.
-In-Reply-To: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
-References: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
-Message-ID: <20180801185128.23440-4-maxi.jourdan@wanadoo.fr>
+From: arun.parameswaran@broadcom.com (Arun Parameswaran)
+Date: Wed, 1 Aug 2018 12:55:56 -0700
+Subject: [PATCH v3 7/8] net: phy: Add support to configure clock in
+ Broadcom iProc mdio mux
+In-Reply-To: <20180801184659.GG30658@n2100.armlinux.org.uk>
+References: <1533146186-8374-1-git-send-email-arun.parameswaran@broadcom.com>
+ <1533146186-8374-8-git-send-email-arun.parameswaran@broadcom.com>
+ <0cc6db4f-7008-0ad3-58d7-9e93060f152f@gmail.com>
+ <20180801184659.GG30658@n2100.armlinux.org.uk>
+Message-ID: <9af7e7a3-54d4-8802-f64a-fc4f9c49c8b9@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wrap the canvas node in a syscon node.
+Hi Russell, Florian,
 
-Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
----
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+On 18-08-01 11:46 AM, Russell King - ARM Linux wrote:
+> On Wed, Aug 01, 2018 at 11:40:33AM -0700, Florian Fainelli wrote:
+>> On 08/01/2018 10:56 AM, Arun Parameswaran wrote:
+>>>  static int iproc_mdio_wait_for_idle(void __iomem *base, bool result)
+>>> @@ -204,6 +225,20 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
+>>>  		return -ENOMEM;
+>>>  	}
+>>>  
+>>> +	md->core_clk = devm_clk_get(&pdev->dev, NULL);
+>>> +	if (IS_ERR(md->core_clk)) {
+>>> +		if (PTR_ERR(md->core_clk) == -EPROBE_DEFER)
+>>> +			return -EPROBE_DEFER;
+>>> +
+>>> +		md->core_clk = NULL;
+>>
+>> I would simplify this a bit:
+>>
+>> 	if (IS_ERR(md->core_clk) && PTR_ERR(md->core_clk) == -EPROBE_DEFER)
+> 
+> Even better is:
+> 
+> 	if (md->core_clk == ERR_PTR(-EPROBE_DEFER))
+> 
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index b8dc4dbb391b..d104b9e111fb 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -423,6 +423,23 @@
- 			};
- 		};
- 
-+		dmcbus: bus at c8838000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0xc8838000 0x0 0x1000>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges = <0x0 0x0 0x0 0xc8838000 0x0 0x1000>;
-+
-+			sysctrl_DMC: system-controller at 0 {
-+				compatible = "amlogic,meson-gx-dmc-sysctrl", "syscon", "simple-mfd";
-+				reg = <0x0 0x0 0x0 0x1000>;
-+
-+				canvas: canvas-provider at 0 {
-+					compatible = "amlogic,meson-canvas";
-+				};
-+			};
-+		};
-+
- 		hiubus: bus at c883c000 {
- 			compatible = "simple-bus";
- 			reg = <0x0 0xc883c000 0x0 0x2000>;
--- 
-2.17.1
+The clock is an optional parameter. But I realize, that I did not handle all
+the error cases.
+
+My intention was to proceed with probe if the clock is not found in the DT.
+If the clock is specified in the DT, make use of it.
+
+So, should I modify to something like:
+
+md->core_clk = devm_clk_get(&pdev->dev, NULL);
+if (md->core_clk == ERR_PTR(-ENOENT)) {
+	/* clock is optional, without it the default
+	 * rate divider register values will be used
+	 */
+	md->core_clk = NULL;
+} else if (IS_ERR(md->core_clk)) {
+	return PTR_ERR(md->core_clk);
+} else {
+	rc = clk_prepare_enable(md->core_clk);
+	...
+}
+
+Thanks
+Arun
