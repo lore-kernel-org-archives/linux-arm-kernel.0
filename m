@@ -1,95 +1,85 @@
-From: prudo@linux.ibm.com (Philipp Rudo)
-Date: Wed, 1 Aug 2018 10:29:51 +0200
-Subject: [PATCH v13 03/16] s390, kexec_file: drop arch_kexec_mem_walk()
-In-Reply-To: <20180801075820.3753-4-takahiro.akashi@linaro.org>
-References: <20180801075820.3753-1-takahiro.akashi@linaro.org>
- <20180801075820.3753-4-takahiro.akashi@linaro.org>
-Message-ID: <20180801102951.527cfc57@ThinkPad>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Wed, 1 Aug 2018 10:34:04 +0200
+Subject: [PATCH 2/2] dt-bindings: clock: Add bindings for the Clocking
+ Wizard IP
+In-Reply-To: <a8620c93-cf99-719d-d2bb-7d0f0b567130@xilinx.com>
+References: <20180801081950.10497-1-boris.brezillon@bootlin.com>
+ <20180801081950.10497-2-boris.brezillon@bootlin.com>
+ <a8620c93-cf99-719d-d2bb-7d0f0b567130@xilinx.com>
+Message-ID: <20180801103404.4b9135dc@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Akashi,
+Hi Michal,
 
-I kept thinking about this patch and remembered why I didn't made the change
-you are suggesting now.
+On Wed, 1 Aug 2018 10:26:11 +0200
+Michal Simek <michal.simek@xilinx.com> wrote:
 
-The problem is when you only check for kbuf->mem you are excluding address 0,
-which might be a valid address to load the kernel to. On s390 this is actually
-done when the kernel is not loaded via a boot loader. For kexec_file however,
-we cut off the first few kB of the image and jump directly to 'startup'. So
-checking for !0 does not cause a problem here.
-
-Anyway, the long term safer solution would be something like
-
-#define KEXEC_BUF_MEM_UNKNOWN (-1UL)
-
-for architectures to tell common code to search a fitting mem hole.
-
-Back then I didn't do the change because I had the other workaround, which
-didn't require a common code change. But when you are touching the code now it
-is worth thinking about it.
-
-Just wanted to let you know
-Philipp
-
-
-On Wed,  1 Aug 2018 16:58:07 +0900
-AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-
-> Since s390 already knows where to locate buffers, calling
-> arch_kexec_mem_walk() has no sense. So we can just drop it as kbuf->mem
-> indicates this while all other architectures sets it to 0 initially.
+> Hi Boris,
 > 
-> This change is a preparatory work for the next patch, where all the
-> variant memory walks, either on system resource or memblock, will be
-> put in one common place so that it will satisfy all the architectures'
-> need.
+> On 1.8.2018 10:19, Boris Brezillon wrote:
+> > Document Xilinx Clocking Wizard bindings.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@bootlin.com>
+> > ---
+> >  .../devicetree/bindings/clock/xlnx,clk-wizard.txt  | 28 ++++++++++++++++++++++
+> >  1 file changed, 28 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt b/Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt
+> > new file mode 100644
+> > index 000000000000..1bf7a764f4a9
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt
+> > @@ -0,0 +1,28 @@
+> > +Device Tree Clock bindings for the "Clocking Wizard" IP provided by Xilinx
+> > +
+> > +This block can be used to generate up to 4 clock signals out of a single input
+> > +clock. It embeds a PLL to generate an intermediate clock which then feeds 4
+> > +clock dividers whose divider value can be adjusted based on the user needs.
+> > +
+> > +Required properties:
+> > + - #clock-cells: must be 1. The cell is encoding the id of the output clk
+> > +		 (from 0 to xlnx,clk-wizard-num-outputs - 1)
+> > + - compatible: must be "xlnx,clk-wizard-5.1"
+> > + - clocks: 2 clocks are required
+> > + - clock-names: should contain 2 clock names: "aclk" and "clkin".
+> > +		"aclk" is driving the register interface and "clk_in" is the
+> > +		input clock signal that is used by the PLL block
+> > + - xlnx,clk-wizard-num-outputs: this describe the number of output clocks
+> > +				(chosen at synthesization time)
+> > + - reg: registers used to configure the Clocking wizard block
+> > +
+> > +Example:
+> > +
+> > +	clkwizard: clkwizard at 43c20000 {
+> > +		compatible = "xlnx,clk-wizard-5.1";
+> > +		reg = <0x43c20000 0x10000>;
+> > +		clocks = <&clkc 18>, <&clkc 18>;
+> > +		clock-names = "aclk", "clk_in1";
+> > +		#clock-cells = <1>;
+> > +		xlnx,clk-wizard-num-outputs = <2>;
+> > +	};
+> >   
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Reviewed-by: Philipp Rudo <prudo@linux.ibm.com>
-> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-> Cc: Dave Young <dyoung@redhat.com>
-> Cc: Vivek Goyal <vgoyal@redhat.com>
-> Cc: Baoquan He <bhe@redhat.com>
-> ---
->  arch/s390/kernel/machine_kexec_file.c | 10 ----------
->  kernel/kexec_file.c                   |  4 ++++
->  2 files changed, 4 insertions(+), 10 deletions(-)
+> First of all this should be 1/2.
+
+Hm, okay. Didn't know the order was important.
+
 > 
-> diff --git a/arch/s390/kernel/machine_kexec_file.c b/arch/s390/kernel/machine_kexec_file.c
-> index f413f57f8d20..32023b4f9dc0 100644
-> --- a/arch/s390/kernel/machine_kexec_file.c
-> +++ b/arch/s390/kernel/machine_kexec_file.c
-> @@ -134,16 +134,6 @@ int kexec_file_add_initrd(struct kimage *image, struct s390_load_data *data,
->  	return ret;
->  }
->  
-> -/*
-> - * The kernel is loaded to a fixed location. Turn off kexec_locate_mem_hole
-> - * and provide kbuf->mem by hand.
-> - */
-> -int arch_kexec_walk_mem(struct kexec_buf *kbuf,
-> -			int (*func)(struct resource *, void *))
-> -{
-> -	return 1;
-> -}
-> -
->  int arch_kexec_apply_relocations_add(struct purgatory_info *pi,
->  				     Elf_Shdr *section,
->  				     const Elf_Shdr *relsec,
-> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> index 63c7ce1c0c3e..bf39df5e5bb9 100644
-> --- a/kernel/kexec_file.c
-> +++ b/kernel/kexec_file.c
-> @@ -534,6 +534,10 @@ int kexec_locate_mem_hole(struct kexec_buf *kbuf)
->  {
->  	int ret;
->  
-> +	/* Arch knows where to place */
-> +	if (kbuf->mem)
-> +		return 0;
-> +
->  	ret = arch_kexec_walk_mem(kbuf, locate_mem_hole_callback);
->  
->  	return ret == 1 ? 0 : -EADDRNOTAVAIL;
+> The second is that this driver is already in staging area
+> (drivers/staging/clocking-wizard) for a while. That's why please use
+> this driver or send patches on the top of this.
+
+Crap! I didn't look in staging. BTW, any reason this driver is in
+staging?
+
+> 
+> I know we have been doing some changes in this driver recently but not
+> sure if they reach our tree or mainline.
+
+Okay. Can you point me to the patches touching this driver?
+
+Thanks,
+
+Boris
