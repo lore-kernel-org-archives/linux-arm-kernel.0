@@ -1,57 +1,83 @@
-From: acolin@isi.edu (Alexei Colin)
-Date: Wed, 1 Aug 2018 09:54:41 -0400
+From: alex.bou9@gmail.com (Alex Bounine)
+Date: Wed, 1 Aug 2018 09:57:08 -0400
 Subject: [PATCH 6/6] arm64: enable RapidIO menu in Kconfig
-In-Reply-To: <20180801103855.GD30658@n2100.armlinux.org.uk>
+In-Reply-To: <20180731204656.GC38497@guest228.east.isi.edu>
 References: <20180730225035.28365-1-acolin@isi.edu>
- <20180730225035.28365-7-acolin@isi.edu>
- <20180731084143.GA4680@arm.com>
+ <20180730225035.28365-7-acolin@isi.edu> <20180731084143.GA4680@arm.com>
  <d09cb4f5-768b-acd8-f9b1-d1d320a93564@gmail.com>
- <20180731155228.GN17271@n2100.armlinux.org.uk>
- <044af717-3883-a7a6-c346-18fa8cebce76@gmail.com>
- <20180731181834.GA30658@n2100.armlinux.org.uk>
- <570ad147-3c58-8911-0111-29e21087ca7a@gmail.com>
- <20180801103855.GD30658@n2100.armlinux.org.uk>
-Message-ID: <20180801135441.GD38497@guest228.east.isi.edu>
+ <f2723578-f39d-27ac-b376-0f06905caa67@gmail.com>
+ <20180731204656.GC38497@guest228.east.isi.edu>
+Message-ID: <89caf5a7-f7cc-ea9b-71ab-038602244a5f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Why we cannot use "select HAS_RAPIDIO" HW-specific Kconfig file
-> > (mach-*/Kconfig)? And have on-chip port selection in the same board-specific
-> > place.
+On 2018-07-31 04:46 PM, Alexei Colin wrote:
+> On Tue, Jul 31, 2018 at 04:29:56PM -0400, Alex Bounine wrote:
+... skip
+>>>>> Cc: Andrew Morton <akpm@linux-foundation.org>
+>>>>> Cc: Russell King <linux@armlinux.org.uk>
+>>>>> Cc: John Paul Walters <jwalters@isi.edu>
+>>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>>> Cc: linux-kernel at vger.kernel.org,
+>>>>> Signed-off-by: Alexei Colin <acolin@isi.edu>
+>>>>> ---
+>>>>>  ? arch/arm64/Kconfig | 2 ++
+>>>>>  ? 1 file changed, 2 insertions(+)
+>>>>
+>>>> Thanks, this looks much cleaner than before:
+>>>>
+>>>> Acked-by: Will Deacon <will.deacon@arm.com>
+>>>>
+>>>> The only thing I'm not sure about is why we don't just select HAS_RAPIDIO
+>>>> unconditionally in the arm64 Kconfig. Does selecting only that option
+>>>> actually pull in new code to the build?
+>>>>
+>>> HAS_RAPIDIO option is intended for SOCs that have built in SRIO
+>>> controllers, like TI KeyStoneII or FPGAs. Because RapidIO subsystem core
+>>> is required during RapidIO port driver initialization, having separate
+>>> option allows us to control available build options for RapidIO core and
+>>> port driver (bool vs. tristate) and disable module option if port driver
+>>> is configured as built-in.
+>>
+>> I am thinking about where HAS_RAPIDIO option can be set for arm64 branch.
+>> Having it set globally is too broad. For example we have Xilinx Zinq US
+>> board with SRIO IP on it. Having it globally in arm64 branch - bad. Probably
+>> having it set in drivers/soc/... is the best place.
+>>
+>> Will, Alexei what do you think?
 > 
-> As I've already explained, HAS_RAPIDIO has the expectation that it
-> controls the availability of the RAPIDIO option, not of drivers.
-> It is HAS_*RAPIDIO*, the clue is in the name.  Using it as you are
-> (basically, to mean that on-SoC rapidio hardware is present) and
-> allowing such configurations as HAS_RAPIDIO=n RAPIDIO=y PCI=y is
-> completely counter-intuitive.
+> Since the HAS_RAPIODIO flag adds meta info about SoC, maybe the line
+> that 'select's it can go where the rest of the meta info is, which
+> differs across architectures:
+> * For ARM64, in arch/arm64/Kconfig.platforms under each config ARCH_*
+> for each SoC that includes RapidIO.
+> * For ARM, in arch/arm/mach-*/Kconfig
+> 
+> But, if we want the flag to be automatically selected for some larger
+> set of ARM64 SoCs without explicitly adding it to each one, then the
+> above is not going to do that.
+>
 
-The intention in the patch was for HAS_RAPIDIO to mean exactly "on-SoC
-RapidIO hardware is present". Since the name does not reflect that well,
-I'll change it in the next version: would HAS_RAPIDIO_ONCHIP reflect the
-meaning well? 
+Thank you for clarification. I am leaning towards fine control of 
+available configuration options, on per-board basis.
+As Russell mentioned in some of his comments, RapidIO is relatively rare 
+thing to ordinary user. Because of that I would prefer not to pollute 
+config menu with selection options unrelated to most of boards supported 
+in given arch.
 
-HAS_RAPIDIO=n RAPIDIO=y PCI=y should be an intuitive configuration,
-for example for MIPS until last week it effectively was the only option
-https://www.linux-mips.org/archives/linux-mips/2018-07/msg00584.html
-If we have to rename to make this configuration intuitive again, then
-I'll rename and resubmit.
+Also it looks like proposed patches introduce minimal changes to the 
+generic part of code.
 
-There was never the intention to assign any other meaning to
-HAS_RAPIDIO, specifically that it controls the availability of the
-RAPIDIO menu option. I think interpreting it this way is is behind a lot
-of the issues raised. The intention is that availability of the menu
-options is controlled by (1) whether the architecture sources the
-rapidio/Kconfig and (2) whether dependencies of RapidIO are satisfied
-(either having a PCI bus and enabling it, or having the on-SoC RapidIO
-hardware.
-
-The patch does not indend to change the current meaning and usage of the
-config options and behavior for X86, PPC, MIPS -- the patch only
-refactors there (because it was requested). For ARM and ARM64, we are
-adding the same behavior in same way as for those three architectures. I
-assume there is nothing that sets ARM and ARM64 apart from the others in
-this narrow context. This is the indended scope of this patch. Are we
-now discussing a change in the current meaning/usage/behavior?  If so,
-could we do one piece at a time -- first, add ARM and ARM64 in the way
-consistent with the way other architectures currently do it?
+>>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>>>> index a8f0c74e6f7f..5e8cf90505ec 100644
+>>>>> --- a/arch/arm64/Kconfig
+>>>>> +++ b/arch/arm64/Kconfig
+>>>>> @@ -308,6 +308,8 @@ config PCI_SYSCALL
+>>>>>  ? source "drivers/pci/Kconfig"
+>>>>> +source "drivers/rapidio/Kconfig"
+>>>>> +
+>>>>>  ? endmenu
+>>>>>  ? menu "Kernel Features"
+>>>>> -- 
+>>>>> 2.18.0
+>>>>>
