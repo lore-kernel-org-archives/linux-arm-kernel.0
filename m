@@ -1,314 +1,91 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Wed, 1 Aug 2018 10:49:57 +0200
-Subject: [PATCH 1/3] PCI: Introduce PCI software bridge common logic
-In-Reply-To: <20180712195802.GC28466@bhelgaas-glaptop.roam.corp.google.com>
-References: <20180629092231.32207-1-thomas.petazzoni@bootlin.com>
- <20180629092231.32207-2-thomas.petazzoni@bootlin.com>
- <20180712195802.GC28466@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20180801104957.1b01b847@windsurf>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Wed, 1 Aug 2018 08:52:36 +0000
+Subject: [PATCH v2 0/4] arm64 SMMUv3 PMU driver with IORT support
+In-Reply-To: <20180724114515.21764-1-shameerali.kolothum.thodi@huawei.com>
+References: <20180724114515.21764-1-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA838755908@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Bjorn,
+Hi Lorenzo/Robin,
 
-Thanks for your review!
+Just a  gentle ping on this series. This is a v2 for smmu pmcg support
+based on Neil Leeder's v1[1]. 
 
-On Thu, 12 Jul 2018 14:58:02 -0500, Bjorn Helgaas wrote:
+Main changes include,
+-an helper function to IORT to retrieve the associated SMMU info.
+-MSI support to the PMU driver.
 
-> > The idea of this logic is to emulate a root port PCI bridge by
-> > providing configuration space read/write operations, and faking behind
-> > the scenes the configuration space of a PCI bridge. A PCI host
-> > controller driver simply has to call pci_sw_bridge_read() and
-> > pci_sw_bridge_write() to read/write the configuration space of the
-> > bridge.  
+Please take a look and let me know your thoughts.
+
+Thanks,
+Shameer
+
+[1]https://www.spinics.net/lists/arm-kernel/msg598591.html
+
+> -----Original Message-----
+> From: Linuxarm [mailto:linuxarm-bounces at huawei.com] On Behalf Of
+> Shameer Kolothum
+> Sent: 24 July 2018 12:45
+> To: lorenzo.pieralisi at arm.com; robin.murphy at arm.com
+> Cc: mark.rutland at arm.com; vkilari at codeaurora.org;
+> neil.m.leeder at gmail.com; pabba at codeaurora.org; will.deacon at arm.com;
+> rruigrok at codeaurora.org; Linuxarm <linuxarm@huawei.com>; linux-
+> kernel at vger.kernel.org; linux-acpi at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: [PATCH v2 0/4] arm64 SMMUv3 PMU driver with IORT support
 > 
-> These systems must actually have a Root Port (there's obviously a Port
-> that originates the link), but it's not visible in a spec-compliant
-> way.  So this is basically a wrapper that translates accesses to
-> standard config space into the vendor-specific registers.
-
-Correct.
-
-> Since there really *is* a hardware bridge but it just doesn't have the
-> interface we expect, "sw_bridge" doesn't feel like quite the right
-> name for it.  Maybe something related to adapter/emulation/interface/...?
-
-sw_adapter ? sw_adap ?
-
-> There are several drivers that do this, and it would be really cool to
-> have them all do it in a similar way.  I found at least these:
+> This adds a driver for the SMMUv3 PMU into the perf framework.
+> It includes an IORT update to support PM Counter Groups.
 > 
->   hv_pcifront_read_config()
-
-This one indeed looks potentially a bit similar.
-
->   mvebu_pcie_rd_conf()
-
-This one is converted by my patch series.
-
->   thunder_ecam_config_read()
-
-This one I'm not sure what is happening,
-
->   thunder_pem_config_read()
-
-For this one, it seems like the HW exposes a config space, just that it
-is bogus. It is a bit of a different situation. It could be handled by
-the same sw_bridge/sw_adapt stuff, but it's a slightly different use
-case than "the HW doesn't expose any spec-compliant root port config
-space".
-
->   xgene_pcie_config_read32()
-
-I don't see why this one would need sw_bridge/sw_adap.
-
->   iproc_pcie_config_read32()
-
-Not sure about this one either.
-
->   rcar_pcie_read_conf()
-
-Perhaps it needs sw_bridge/sw_adap.
-
-Really for all those ones, it would require some involvement from the
-corresponding driver maintainers, who understand better their HW and
-see if they would benefit from sw_bridge/sw_adap.
-
-> I *really* like the fact that your accessors use the normal register
-> names, e.g., PCI_EXP_DEVCAP instead of PCISWCAP_EXP_DEVCAP.  That's
-> huge for greppability.
-
-Thanks. There's however one down-side: I had to add separate accessors
-for reading/writing the main PCI config space and the PCIe capability
-config space. Any additional capability config space would require
-adding another pair of accessors. But I really wanted to re-use the
-existing PCI_EXP_* definitions. Another approach is perhaps to pass an
-"ID" of the config space being accessed, i.e 0x0 for the main config
-space, and PCI_CAP_ID_EXP for PCI express.
-
-So instead of 4 accessors in pci_sw_bridge_ops, we would have only two:
-
-pci_sw_bridge_read_status_t (*read)(struct pci_sw_bridge *bridge,
-				    int id, int reg, u32 *value);
-void (*write)(struct pci_sw_bridge *bridge, int id, int reg,
-              u32 old, u32 new, u32 mask);
-
-where "id" would allow the accessor to know if we're accessing the main
-config space, or the PCI express capability config space.
-
-How does that sound ?
-
-> > By default, the PCI bridge configuration space is simply emulated by a
-> > chunk of memory, but the PCI host controller can override the behavior
-> > of the read and write operations on a per-register basis to do
-> > additional actions if needed.
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-> > ---
-> >  drivers/pci/Kconfig           |   3 +
-> >  drivers/pci/Makefile          |   1 +
-> >  drivers/pci/pci-sw-bridge.c   | 149 ++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/pci-sw-bridge.h | 125 +++++++++++++++++++++++++++++++++++  
+> This is based on the initial work done by Neil Leeder[1]
 > 
-> Could this go in drivers/pci instead of include/linux?  I'd prefer to
-> hide it inside the PCI core if that's possible.
-
-Sure, I'll fix that.
-
-> > + * Should be called by the PCI controller driver when reading the PCI
-> > + * configuration space of the fake bridge. It will call back the
-> > + * ->ops->read_base or ->ops->read_pcie operations.
-> > + */
-> > +int pci_sw_bridge_read(struct pci_sw_bridge *bridge, int where,
-> > +		       int size, u32 *value)  
+> SMMUv3 PMCG devices are named as arm_smmu_v3_x_pmcg_y where x
+> denotes the associated smmuv3 dev id(if any) and y denotes the
+> pmu dev id.
 > 
-> We don't really have a strong convention about the names of config
-> accessors: *_rd_conf(), *_read_config(), *config_read() are all used.
-> Maybe we could at least include "conf" to connect this with config
-> space as opposed to MMIO space.
-
-No problem, I'll fix that, makes perfect sense.
-
-> > +	if (bridge->has_pcie && reg >= PCI_CAP_PCIE_START) {
-> > +		reg -= PCI_CAP_PCIE_START;
-> > +
-> > +		if (bridge->ops->read_pcie)
-> > +			ret = bridge->ops->read_pcie(bridge, reg, value);
-> > +		else
-> > +			ret = PCI_SW_BRIDGE_NOT_HANDLED;
-> > +
-> > +		if (ret == PCI_SW_BRIDGE_NOT_HANDLED)
-> > +			*value = *((u32*) &bridge->pcie_conf + reg / 4);
-> > +	} else {
-> > +		if (bridge->ops->read_base)
-> > +			ret = bridge->ops->read_base(bridge, reg, value);
-> > +		else
-> > +			ret = PCI_SW_BRIDGE_NOT_HANDLED;
-> > +
-> > +		if (ret == PCI_SW_BRIDGE_NOT_HANDLED)
-> > +			*value = *((u32*) &bridge->conf + reg / 4);  
+> Usage example:
+> For common arch supported events:
+> perf stat -e arm_smmu_v3_0_pmcg_6/transaction,filter_enable=1,
+>  filter_span=1,filter_stream_id=0x42/ -a pwd
 > 
-> I'm not sure about this part, where the config space that's not
-> handled by the bridge's ops ends up just being RAM that's readable and
-> writable with no effect on the hardware.  That seems a little
-> counter-intuitive.  I think dropping writes and reading zeroes would
-> simplify my mental model.
-
-The fact that it is handled just like RAM is actually needed for a
-number of registers. For example, in the current pci-mvebu driver, when
-reading we have:
-
-        case PCI_VENDOR_ID:
-                *value = bridge->device << 16 | bridge->vendor;
-                break;
-
-        case PCI_COMMAND:
-                *value = bridge->command | bridge->status << 16;
-                break;
-
-        case PCI_CLASS_REVISION:
-                *value = bridge->class << 16 | bridge->interface << 8 |
-                         bridge->revision;
-                break;
-
-        case PCI_CACHE_LINE_SIZE:
-                *value = bridge->bist << 24 | bridge->header_type << 16 |
-                         bridge->latency_timer << 8 | bridge->cache_line_size;
-                break;
-
-        case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
-                *value = bridge->bar[((where & ~3) - PCI_BASE_ADDRESS_0) / 4];
-                break;
-
-        case PCI_PRIMARY_BUS:
-                *value = (bridge->secondary_latency_timer << 24 |
-                          bridge->subordinate_bus         << 16 |
-                          bridge->secondary_bus           <<  8 |
-                          bridge->primary_bus);
-                break;
-
-        case PCI_IO_BASE:
-                if (!mvebu_has_ioport(port))
-                        *value = bridge->secondary_status << 16;
-                else
-                        *value = (bridge->secondary_status << 16 |
-                                  bridge->iolimit          <<  8 |
-                                  bridge->iobase);
-                break;
-
-We definitely cannot return zeroes for all these values.
-
-And for writes, we have code like this:
-
-        case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
-                bridge->bar[((where & ~3) - PCI_BASE_ADDRESS_0) / 4] = value;
-                break;
-
-        case PCI_IO_BASE:
-                /*
-                 * We also keep bit 1 set, it is a read-only bit that
-                 * indicates we support 32 bits addressing for the
-                 * I/O
-                 */
-                bridge->iobase = (value & 0xff) | PCI_IO_RANGE_TYPE_32;
-                bridge->iolimit = ((value >> 8) & 0xff) | PCI_IO_RANGE_TYPE_32;
-                mvebu_pcie_handle_iobase_change(port);
-                break;
-
-        case PCI_MEMORY_BASE:
-                bridge->membase = value & 0xffff;
-                bridge->memlimit = value >> 16;
-                mvebu_pcie_handle_membase_change(port);
-                break;
-
-        case PCI_IO_BASE_UPPER16:
-                bridge->iobaseupper = value & 0xffff;
-                bridge->iolimitupper = value >> 16;
-                mvebu_pcie_handle_iobase_change(port);
-                break;
-
-        case PCI_PRIMARY_BUS:
-                bridge->primary_bus             = value & 0xff;
-                bridge->secondary_bus           = (value >> 8) & 0xff;
-                bridge->subordinate_bus         = (value >> 16) & 0xff;
-                bridge->secondary_latency_timer = (value >> 24) & 0xff;
-                mvebu_pcie_set_local_bus_nr(port, bridge->secondary_bus);
-                break;
-
-The writes being made to those parts of the config space are being
-reflected back when reading the config space later.
-
-> > +	if (size == 1)
-> > +		*value = (*value >> (8 * (where & 3))) & 0xff;
-> > +	else if (size == 2)
-> > +		*value = (*value >> (8 * (where & 3))) & 0xffff;
-> > +	else if (size != 4)
-> > +		return PCIBIOS_BAD_REGISTER_NUMBER;  
+> For IMP DEF events:
+> perf stat -e arm_smmu_v3.0_pmcg.6/event=id/ -a pwd
 > 
-> This isn't directly related to your patches, but this is a common
-> pattern with some variations between drivers, which makes me wonder
-> whether there are bugs lurking.  These use "where & 3" for size 2:
+> Sanity tested on HiSilicon platform. Further testing on supported
+> platforms are very much welcome.
 > 
->   advk_pcie_rd_conf()
->   mtk_pcie_hw_rd_cfg()
->   pci_generic_config_read32()
+> v1 --> v2
 > 
-> But these use "where & 2":
+> - Addressed comments from Robin.
+> - Added an helper to retrieve the associated smmu dev and named PMUs
+>   to make the association visible to user.
+> - Added MSI support  for overflow irq
 > 
->   _altera_pcie_cfg_read()
->   rcar_pcie_read_conf()
+> [1]https://www.spinics.net/lists/arm-kernel/msg598591.html
 > 
-> I *think* this means that unaligned 2-byte config reads on Altera and
-> R-Car will return incorrect data.  In both cases, the actual read seen
-> by the hardware is a 32-bit read, but I think we extract the wrong 16
-> bits from that result.
-
-Indeed, if unaligned 2-byte config reads are made, they will return
-bogus results. But are such reads allowed ?
-
-> I wonder if there's a way to use a common helper function to do this.
-
-Yes, this small bit of logic is duplicated all over the place. I'll see
-if I can come up with some reasonable helpers for that.
-
-> > +	return PCIBIOS_SUCCESSFUL;
-> > +}  
+> Neil Leeder (2):
+>   acpi: arm64: add iort support for PMCG
+>   perf: add arm64 smmuv3 pmu driver
 > 
-> > +	/*
-> > +	 * Called when writing to the regular PCI bridge configuration
-> > +	 * space. old is the current value, new is the new value being
-> > +	 * written, and mask indicates which parts of the value are
-> > +	 * being changed.
-> > +	 */
-> > +	void (*write_base)(struct pci_sw_bridge *bridge, int reg,
-> > +			   u32 old, u32 new, u32 mask);
-> > +
-> > +	/*
-> > +	 * Same as ->read_base(), except it is for reading from the
-> > +	 * PCIe capability configuration space.  
+> Shameer Kolothum (2):
+>   acpi: arm64: iort helper to find the associated smmu of pmcg node
+>   perf/smmuv3: Add MSI irq support
 > 
-> I think you mean "->write_base(), except it is for writing to"
-
-Indeed, yes. Will fix that.
-
-So, to sum up, there are really three key questions:
-
- (1) Which name do you want for this ?
-
- (2) Agreeing on whether a RAM-like behavior is acceptable, and if not,
-     which solution do you propose instead.
-
- (3) How much do you want me to convert other drivers vs. the
-     maintainers for those drivers being responsible for doing this.
-
-Since "There are only two hard things in Computer Science: cache
-invalidation and naming things.", I expect question (1) to be the most
-difficult one :-)
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+>  drivers/acpi/arm64/iort.c     | 179 +++++++--
+>  drivers/perf/Kconfig          |   9 +
+>  drivers/perf/Makefile         |   1 +
+>  drivers/perf/arm_smmuv3_pmu.c | 901
+> ++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/acpi_iort.h     |   4 +
+>  5 files changed, 1063 insertions(+), 31 deletions(-)
+>  create mode 100644 drivers/perf/arm_smmuv3_pmu.c
+> 
+> --
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> Linuxarm mailing list
+> Linuxarm at huawei.com
+> http://hulk.huawei.com/mailman/listinfo/linuxarm
