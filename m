@@ -1,50 +1,72 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 2 Aug 2018 00:18:09 +0200
-Subject: [PATCH v3 7/8] net: phy: Add support to configure clock in
- Broadcom iProc mdio mux
-In-Reply-To: <af188f23-bbef-ed90-b42d-a680c07f3fd2@broadcom.com>
-References: <1533146186-8374-8-git-send-email-arun.parameswaran@broadcom.com>
- <0cc6db4f-7008-0ad3-58d7-9e93060f152f@gmail.com>
- <20180801184659.GG30658@n2100.armlinux.org.uk>
- <9af7e7a3-54d4-8802-f64a-fc4f9c49c8b9@broadcom.com>
- <20180801200712.GD19257@lunn.ch>
- <20180801202313.GH30658@n2100.armlinux.org.uk>
- <20180801203846.GE19257@lunn.ch>
- <8133c1f0-addc-5c48-7a6a-44b0d106c425@broadcom.com>
- <20180801215511.GG19257@lunn.ch>
- <af188f23-bbef-ed90-b42d-a680c07f3fd2@broadcom.com>
-Message-ID: <20180801221809.GH19257@lunn.ch>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 1 Aug 2018 17:56:46 -0500
+Subject: [RFC 0/2] harden alloc_pages against bogus nid
+In-Reply-To: <20180801145020.8c76a490c1bf9bef5f87078a@linux-foundation.org>
+References: <20180801200418.1325826-1-jeremy.linton@arm.com>
+ <20180801145020.8c76a490c1bf9bef5f87078a@linux-foundation.org>
+Message-ID: <d9f8e9d1-2fb8-6016-5081-7e3213b23ed4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > As Florian pointed out, the clk_ API is happy to take a NULL pointer
-> > for a clock. So you don't need this last else.
-> > 
-> >     Andrew
-> > 
-> I do return with an error from the probe if the clk_prepare_enable() fails,
-> so I was calling the prepare with a valid clock.
+Hi,
 
-How many times do we need to say it?
+On 08/01/2018 04:50 PM, Andrew Morton wrote:
+> On Wed,  1 Aug 2018 15:04:16 -0500 Jeremy Linton <jeremy.linton@arm.com> wrote:
+> 
+>> The thread "avoid alloc memory on offline node"
+>>
+>> https://lkml.org/lkml/2018/6/7/251
+>>
+>> Asked at one point why the kzalloc_node was crashing rather than
+>> returning memory from a valid node. The thread ended up fixing
+>> the immediate causes of the crash but left open the case of bad
+>> proximity values being in DSDT tables without corrisponding
+>> SRAT/SLIT entries as is happening on another machine.
+>>
+>> Its also easy to fix that, but we should also harden the allocator
+>> sufficiently that it doesn't crash when passed an invalid node id.
+>> There are a couple possible ways to do this, and i've attached two
+>> separate patches which individually fix that problem.
+>>
+>> The first detects the offline node before calling
+>> the new_slab code path when it becomes apparent that the allocation isn't
+>> going to succeed. The second actually hardens node_zonelist() and
+>> prepare_alloc_pages() in the face of NODE_DATA(nid) returning a NULL
+>> zonelist. This latter case happens if the node has never been initialized
+>> or is possibly out of range. There are other places (NODE_DATA &
+>> online_node) which should be checking if the node id's are > MAX_NUMNODES.
+>>
+> 
+> What is it that leads to a caller requesting memory from an invalid
+> node?  A race against offlining?  If so then that's a lack of
+> appropriate locking, isn't it?
 
-NULL is a valid clock. 
+There were a couple unrelated cases, both having to do with the PXN 
+associated with a PCI port. The first case AFAIK, the domain wasn't 
+really invalid if the entire SRAT was parsed and nodes created even when 
+there weren't associated CPUs. The second case (a different machine) is 
+simply a PXN value that is completely invalid (no associated 
+SLIT/SRAT/etc entries) due to firmware making a mistake when a socket 
+isn't populated.
 
-int clk_prepare(struct clk *clk)
-{
-	if (!clk)
-	   return 0;
+There have been a few other suggested or merged patches for the 
+individual problems above, this set is just an attempt at avoiding a 
+full crash if/when another similar problem happens.
 
-	   return clk_core_prepare_lock(clk->core);
-}
 
-int clk_enable(struct clk *clk)
-{
-	if (!clk)
-	   return 0;
+> 
+> I don't see a problem with emitting a warning and then selecting a
+> different node so we can keep running.  But we do want that warning, so
+> we can understand the root cause and fix it?
 
-	   return clk_core_enable_lock(clk->core);
-}
+Yes, we do want to know when an invalid id is passed, i will add the 
+VM_WARN in the first one.
 
-clk_prepare_enable(NULL) returns 0, which is not an error.
+The second one I wasn't sure about as failing prepare_alloc_pages() 
+generates a couple of error messages, but the system then continues 
+operation.
 
-	 Andrew
+I guess my question though is which method (or both/something else?) is 
+the preferred way to harden this up?
+
+Thanks for looking at this.
