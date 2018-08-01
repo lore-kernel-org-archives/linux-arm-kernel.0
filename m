@@ -1,75 +1,60 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Wed,  1 Aug 2018 18:05:53 +0800
-Subject: [v2, 2/3] powerpc/mpc85xx: add clocks property for fman ptp timer node
-In-Reply-To: <20180801100554.36634-1-yangbo.lu@nxp.com>
-References: <20180801100554.36634-1-yangbo.lu@nxp.com>
-Message-ID: <20180801100554.36634-2-yangbo.lu@nxp.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 1 Aug 2018 12:08:38 +0200
+Subject: [PATCH 01/14] mmc: mmci: fix qcom dma issue during mmci init with
+ new dma_setup callback
+In-Reply-To: <1533116221-380-2-git-send-email-ludovic.Barre@st.com>
+References: <1533116221-380-1-git-send-email-ludovic.Barre@st.com>
+ <1533116221-380-2-git-send-email-ludovic.Barre@st.com>
+Message-ID: <CAPDyKFq4Qx5e8Hk40F5DpTJn3g1bnm6sbQERS0Lt-OGmzEdLyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to add clocks property for fman ptp timer node.
+On 1 August 2018 at 11:36, Ludovic Barre <ludovic.Barre@st.com> wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
+>
+> This patch fixes qcom dma issue during mmci init.
+> Like init callback of qcom variant is not set, the qcom dma
+> is not correctly initialized and fail while dma transfer
+> ("buggy DMA detected. Taking evasive action").
+>
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> ---
+>  drivers/mmc/host/mmci.c | 1 +
+>  drivers/mmc/host/mmci.h | 1 +
+>  2 files changed, 2 insertions(+)
+>
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index 71e9336..1841d250 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -208,6 +208,7 @@ static struct variant_data variant_qcom = {
+>         .mmcimask1              = true,
+>         .start_err              = MCI_STARTBITERR,
+>         .opendrain              = MCI_ROD,
+> +       .init                   = qcom_variant_init,
+>  };
+>
+>  /* Busy detection for the ST Micro variant */
+> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+> index 517591d..696a066 100644
+> --- a/drivers/mmc/host/mmci.h
+> +++ b/drivers/mmc/host/mmci.h
+> @@ -338,3 +338,4 @@ struct mmci_host {
+>  #endif
+>  };
+>
+> +void qcom_variant_init(struct mmci_host *host);
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
----
-Changes for v2:
-	- None.
----
- arch/powerpc/boot/dts/fsl/qoriq-fman-0.dtsi   |    1 +
- arch/powerpc/boot/dts/fsl/qoriq-fman-1.dtsi   |    1 +
- arch/powerpc/boot/dts/fsl/qoriq-fman3-0.dtsi  |    1 +
- arch/powerpc/boot/dts/fsl/qoriq-fman3-1.dtsi  |    1 +
- arch/powerpc/boot/dts/fsl/qoriq-fman3l-0.dtsi |    1 +
- 5 files changed, 5 insertions(+), 0 deletions(-)
+This isn't needed.
 
-diff --git a/arch/powerpc/boot/dts/fsl/qoriq-fman-0.dtsi b/arch/powerpc/boot/dts/fsl/qoriq-fman-0.dtsi
-index 6b124f7..9b6cf91 100644
---- a/arch/powerpc/boot/dts/fsl/qoriq-fman-0.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/qoriq-fman-0.dtsi
-@@ -100,4 +100,5 @@ ptp_timer0: ptp-timer at 4fe000 {
- 	compatible = "fsl,fman-ptp-timer";
- 	reg = <0x4fe000 0x1000>;
- 	interrupts = <96 2 0 0>;
-+	clocks = <&clockgen 3 0>;
- };
-diff --git a/arch/powerpc/boot/dts/fsl/qoriq-fman-1.dtsi b/arch/powerpc/boot/dts/fsl/qoriq-fman-1.dtsi
-index b80aaf5..e95c11f 100644
---- a/arch/powerpc/boot/dts/fsl/qoriq-fman-1.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/qoriq-fman-1.dtsi
-@@ -100,4 +100,5 @@ ptp_timer1: ptp-timer at 5fe000 {
- 	compatible = "fsl,fman-ptp-timer";
- 	reg = <0x5fe000 0x1000>;
- 	interrupts = <97 2 0 0>;
-+	clocks = <&clockgen 3 1>;
- };
-diff --git a/arch/powerpc/boot/dts/fsl/qoriq-fman3-0.dtsi b/arch/powerpc/boot/dts/fsl/qoriq-fman3-0.dtsi
-index d3720fd..d62b36c 100644
---- a/arch/powerpc/boot/dts/fsl/qoriq-fman3-0.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/qoriq-fman3-0.dtsi
-@@ -105,4 +105,5 @@ ptp_timer0: ptp-timer at 4fe000 {
- 	compatible = "fsl,fman-ptp-timer";
- 	reg = <0x4fe000 0x1000>;
- 	interrupts = <96 2 0 0>;
-+	clocks = <&clockgen 3 0>;
- };
-diff --git a/arch/powerpc/boot/dts/fsl/qoriq-fman3-1.dtsi b/arch/powerpc/boot/dts/fsl/qoriq-fman3-1.dtsi
-index ae34c20..3102324 100644
---- a/arch/powerpc/boot/dts/fsl/qoriq-fman3-1.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/qoriq-fman3-1.dtsi
-@@ -105,4 +105,5 @@ ptp_timer1: ptp-timer at 5fe000 {
- 	compatible = "fsl,fman-ptp-timer";
- 	reg = <0x5fe000 0x1000>;
- 	interrupts = <97 2 0 0>;
-+	clocks = <&clockgen 3 1>;
- };
-diff --git a/arch/powerpc/boot/dts/fsl/qoriq-fman3l-0.dtsi b/arch/powerpc/boot/dts/fsl/qoriq-fman3l-0.dtsi
-index 02f2755..c90702b 100644
---- a/arch/powerpc/boot/dts/fsl/qoriq-fman3l-0.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/qoriq-fman3l-0.dtsi
-@@ -93,4 +93,5 @@ ptp_timer0: ptp-timer at 4fe000 {
- 	compatible = "fsl,fman-ptp-timer";
- 	reg = <0x4fe000 0x1000>;
- 	interrupts = <96 2 0 0>;
-+	clocks = <&clockgen 3 0>;
- };
--- 
-1.7.1
+> --
+> 2.7.4
+>
+
+Anyway, we can just drop this patch from your series as I amended the
+patch causing the problem.
+
+I will continue to review the rest.
+
+Kind regards
+Uffe
