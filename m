@@ -1,46 +1,43 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Wed, 1 Aug 2018 11:36:48 +0200
-Subject: [PATCH 01/14] mmc: mmci: fix qcom dma issue during mmci init with new
- dma_setup callback
-In-Reply-To: <1533116221-380-1-git-send-email-ludovic.Barre@st.com>
-References: <1533116221-380-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1533116221-380-2-git-send-email-ludovic.Barre@st.com>
+Date: Wed, 1 Aug 2018 11:36:47 +0200
+Subject: [PATCH 00/14] mmc: mmci: prepare dma callbacks with mmci_host_ops
+Message-ID: <1533116221-380-1-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch fixes qcom dma issue during mmci init.
-Like init callback of qcom variant is not set, the qcom dma
-is not correctly initialized and fail while dma transfer
-("buggy DMA detected. Taking evasive action").
+This patch series prepares and adds callbacks for dma transfert at
+mmci_host_ops. This series is composed of 3 parts:
+-Internalize specific needs of legacy dmaengine.
+-Create and setup dma_priv pointer
+-Create generic callbacks  which share some features
+(like cookie...) and call specific needs
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- drivers/mmc/host/mmci.c | 1 +
- drivers/mmc/host/mmci.h | 1 +
- 2 files changed, 2 insertions(+)
+This patch series must be applied on top of 
+"mmc: mmci: Add and implement a ->dma_setup() callback for qcom dml"
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 71e9336..1841d250 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -208,6 +208,7 @@ static struct variant_data variant_qcom = {
- 	.mmcimask1		= true,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_ROD,
-+	.init			= qcom_variant_init,
- };
- 
- /* Busy detection for the ST Micro variant */
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 517591d..696a066 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -338,3 +338,4 @@ struct mmci_host {
- #endif
- };
- 
-+void qcom_variant_init(struct mmci_host *host);
+Ludovic Barre (14):
+  mmc: mmci: fix qcom dma issue during mmci init with new dma_setup
+    callback
+  mmc: mmci: internalize dma map/unmap into mmci dma functions
+  mmc: mmci: internalize dma_inprogress into mmci dma functions
+  mmc: mmci: introduce dma_priv pointer to mmci_host
+  mmc: mmci: move mmci next cookie to mci host
+  mmc: mmci: merge prepare data functions
+  mmc: mmci: add prepare/unprepare_data callbacks
+  mmc: mmci: add get_next_data callback
+  mmc: mmci: modify dma_setup callback
+  mmc: mmci: add dma_release callback
+  mmc: mmci: add dma_start callback
+  mmc: mmci: add dma_finalize callback
+  mmc: mmci: add dma_error callback
+  mmc: mmci: add validate_data callback
+
+ drivers/mmc/host/mmci.c          | 458 ++++++++++++++++++++++++---------------
+ drivers/mmc/host/mmci.h          |  45 ++--
+ drivers/mmc/host/mmci_qcom_dml.c |  15 +-
+ 3 files changed, 322 insertions(+), 196 deletions(-)
+
 -- 
 2.7.4
