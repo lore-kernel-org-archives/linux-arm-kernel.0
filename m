@@ -1,68 +1,43 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 1 Aug 2018 22:28:21 +0200
-Subject: [PATCH] fix vibrations on Droid 4
-In-Reply-To: <20180716075926.GU99251@atomide.com>
-References: <20180709081534.GA6799@amd>
- <20180709214910.tes6u4ivxomd3aja@earth.universe>
- <20180709220211.GA7760@amd>
- <20180710101147.lyu65ro4czvrs2da@earth.universe>
- <20180710133040.GA4391@amd>
- <20180710161123.azym6sbboriuj4yc@earth.universe>
- <20180711080218.GA21225@amd> <20180711132739.GL99251@atomide.com>
- <20180715201729.GB19675@amd> <20180716075926.GU99251@atomide.com>
-Message-ID: <20180801202821.GB4033@amd>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 1 Aug 2018 22:38:46 +0200
+Subject: [PATCH v3 7/8] net: phy: Add support to configure clock in
+ Broadcom iProc mdio mux
+In-Reply-To: <20180801202313.GH30658@n2100.armlinux.org.uk>
+References: <1533146186-8374-1-git-send-email-arun.parameswaran@broadcom.com>
+ <1533146186-8374-8-git-send-email-arun.parameswaran@broadcom.com>
+ <0cc6db4f-7008-0ad3-58d7-9e93060f152f@gmail.com>
+ <20180801184659.GG30658@n2100.armlinux.org.uk>
+ <9af7e7a3-54d4-8802-f64a-fc4f9c49c8b9@broadcom.com>
+ <20180801200712.GD19257@lunn.ch>
+ <20180801202313.GH30658@n2100.armlinux.org.uk>
+Message-ID: <20180801203846.GE19257@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vibration GPIOs don't have anything to do with wakeup. Move it to
-normal section; this fixes vibrations on Droid 4.
-    
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+On Wed, Aug 01, 2018 at 09:23:14PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Aug 01, 2018 at 10:07:12PM +0200, Andrew Lunn wrote:
+> > You might want to consider adding clk_optional_get() and
+> > devm_clk_optional_get().
+> 
+> I think there's attempts to add such APIs but I don't think it's
+> trivial - it seems to require a _lot_ of discussion.
+> 
+> I think part of that is because of the quirky use of error codes.
+> If you look at clk_get(), it calls __of_clk_get_by_name() which
+> returns:
+> 
+>  -ENOENT if DT is disabled
+>  -ENOENT if the device has no DT node
+>  -EPROBE_DEFER if the lookup in DT succeeds but there's no registered
+>    clock
+>  -EINVAL if the device has a DT node but the lookup of the name
+>    failed (in otherwords, the optional clock was omitted)
+>  -ENOENT if the clocks = property has not enough clocks for the
+>     clock-names property
+>  -ENOMEM if we fail to allocate the clk
+>  -ENOENT if __clk_get() fails
 
-diff --git a/arch/arm/boot/dts/omap4-droid4-xt894.dts b/arch/arm/boot/dts/omap4-droid4-xt894.dts
-index c27fc87..7b82179 100644
---- a/arch/arm/boot/dts/omap4-droid4-xt894.dts
-+++ b/arch/arm/boot/dts/omap4-droid4-xt894.dts
-@@ -646,15 +646,6 @@
- 		OMAP4_IOPAD(0x10c, PIN_INPUT | MUX_MODE1)	/* abe_mcbsp3_fsx */
- 		>;
- 	};
--};
--
--&omap4_pmx_wkup {
--	usb_gpio_mux_sel2: pinmux_usb_gpio_mux_sel2_pins {
--		/* gpio_wk0 */
--		pinctrl-single,pins = <
--		OMAP4_IOPAD(0x040, PIN_OUTPUT_PULLDOWN | MUX_MODE3)
--		>;
--	};
- 
- 	vibrator_direction_pin: pinmux_vibrator_direction_pin {
- 		pinctrl-single,pins = <
-@@ -669,6 +660,15 @@
- 	};
- };
- 
-+&omap4_pmx_wkup {
-+	usb_gpio_mux_sel2: pinmux_usb_gpio_mux_sel2_pins {
-+		/* gpio_wk0 */
-+		pinctrl-single,pins = <
-+		OMAP4_IOPAD(0x040, PIN_OUTPUT_PULLDOWN | MUX_MODE3)
-+		>;
-+	};
-+};
-+
- /*
-  * As uart1 is wired to mdm6600 with rts and cts, we can use the cts pin for
-  * uart1 wakeirq.
+That makes it hard. I added phy_optional_get() early on, when the
+error cases were simple. Hopefully they remain simple...
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180801/00f6b171/attachment-0001.sig>
+      Andrew
