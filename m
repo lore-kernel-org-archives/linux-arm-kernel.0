@@ -1,139 +1,70 @@
 From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Wed,  1 Aug 2018 18:36:43 -0300
-Subject: [PATCH 16/21] perf vendor events arm64: Update ThunderX2
- implementation defined pmu core events
+Date: Wed,  1 Aug 2018 18:36:42 -0300
+Subject: [PATCH 15/21] perf cs-etm: Generate branch sample for CS_ETM_TRACE_ON
+ packet
 In-Reply-To: <20180801213648.4814-1-acme@kernel.org>
 References: <20180801213648.4814-1-acme@kernel.org>
-Message-ID: <20180801213648.4814-17-acme@kernel.org>
+Message-ID: <20180801213648.4814-16-acme@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+From: Leo Yan <leo.yan@linaro.org>
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+CS_ETM_TRACE_ON packet itself can give the info that there have a
+discontinuity in the trace, this patch is to add branch sample for
+CS_ETM_TRACE_ON packet if it is inserted in the middle of CS_ETM_RANGE
+packets; as result we can have hint for the trace discontinuity.
+
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Ganapatrao Kulkarni <gklkml16@gmail.com>
-Cc: Jan Glauber <jan.glauber@cavium.com>
-Cc: Jayachandran C <jnair@caviumnetworks.com>
 Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Kim Phillips <kim.phillips@arm.com>
+Cc: Mike Leach <mike.leach@linaro.org>
 Cc: Namhyung Kim <namhyung@kernel.org>
 Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Robert Richter <robert.richter@cavium.com>
-Cc: Vadim Lomovtsev <vadim.lomovtsev@cavium.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Link: http://lkml.kernel.org/r/20180731100251.23575-1-ganapatrao.kulkarni at cavium.com
+Cc: Robert Walker <robert.walker@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/1531295145-596-7-git-send-email-leo.yan at linaro.org
 Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
 ---
- .../arch/arm64/cavium/thunderx2/core-imp-def.json  | 87 +++++++++++++++++++++-
- 1 file changed, 84 insertions(+), 3 deletions(-)
+ tools/perf/util/cs-etm.c | 24 +++++++++++++++++-------
+ 1 file changed, 17 insertions(+), 7 deletions(-)
 
-diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
-index bc03c06c3918..752e47eb6977 100644
---- a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
-+++ b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
-@@ -11,6 +11,21 @@
-     {
-         "ArchStdEvent": "L1D_CACHE_REFILL_WR",
-     },
-+    {
-+        "ArchStdEvent": "L1D_CACHE_REFILL_INNER",
-+    },
-+    {
-+        "ArchStdEvent": "L1D_CACHE_REFILL_OUTER",
-+    },
-+    {
-+        "ArchStdEvent": "L1D_CACHE_WB_VICTIM",
-+    },
-+    {
-+        "ArchStdEvent": "L1D_CACHE_WB_CLEAN",
-+    },
-+    {
-+        "ArchStdEvent": "L1D_CACHE_INVAL",
-+    },
-     {
-         "ArchStdEvent": "L1D_TLB_REFILL_RD",
-     },
-@@ -23,10 +38,76 @@
-     {
-         "ArchStdEvent": "L1D_TLB_WR",
-     },
-+    {
-+        "ArchStdEvent": "L2D_TLB_REFILL_RD",
-+    },
-+    {
-+        "ArchStdEvent": "L2D_TLB_REFILL_WR",
-+    },
-+    {
-+        "ArchStdEvent": "L2D_TLB_RD",
-+    },
-+    {
-+        "ArchStdEvent": "L2D_TLB_WR",
-+    },
-     {
-         "ArchStdEvent": "BUS_ACCESS_RD",
--   },
--   {
-+    },
-+    {
-         "ArchStdEvent": "BUS_ACCESS_WR",
--   }
-+    },
-+    {
-+        "ArchStdEvent": "MEM_ACCESS_RD",
-+    },
-+    {
-+        "ArchStdEvent": "MEM_ACCESS_WR",
-+    },
-+    {
-+        "ArchStdEvent": "UNALIGNED_LD_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "UNALIGNED_ST_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "UNALIGNED_LDST_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_UNDEF",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_SVC",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_PABORT",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_DABORT",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_IRQ",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_FIQ",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_SMC",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_HVC",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_TRAP_PABORT",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_TRAP_DABORT",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_TRAP_OTHER",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_TRAP_IRQ",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_TRAP_FIQ",
-+    }
- ]
+diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+index d3b794286bca..2ae640257fdb 100644
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -910,13 +910,23 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+ 		etmq->period_instructions = instrs_over;
+ 	}
+ 
+-	if (etm->sample_branches &&
+-	    etmq->prev_packet &&
+-	    etmq->prev_packet->sample_type == CS_ETM_RANGE &&
+-	    etmq->prev_packet->last_instr_taken_branch) {
+-		ret = cs_etm__synth_branch_sample(etmq);
+-		if (ret)
+-			return ret;
++	if (etm->sample_branches && etmq->prev_packet) {
++		bool generate_sample = false;
++
++		/* Generate sample for tracing on packet */
++		if (etmq->prev_packet->sample_type == CS_ETM_TRACE_ON)
++			generate_sample = true;
++
++		/* Generate sample for branch taken packet */
++		if (etmq->prev_packet->sample_type == CS_ETM_RANGE &&
++		    etmq->prev_packet->last_instr_taken_branch)
++			generate_sample = true;
++
++		if (generate_sample) {
++			ret = cs_etm__synth_branch_sample(etmq);
++			if (ret)
++				return ret;
++		}
+ 	}
+ 
+ 	if (etm->sample_branches || etm->synth_opts.last_branch) {
 -- 
 2.14.4
