@@ -1,62 +1,48 @@
-From: arun.parameswaran@broadcom.com (Arun Parameswaran)
-Date: Wed, 1 Aug 2018 12:55:56 -0700
-Subject: [PATCH v3 7/8] net: phy: Add support to configure clock in
- Broadcom iProc mdio mux
-In-Reply-To: <20180801184659.GG30658@n2100.armlinux.org.uk>
-References: <1533146186-8374-1-git-send-email-arun.parameswaran@broadcom.com>
- <1533146186-8374-8-git-send-email-arun.parameswaran@broadcom.com>
- <0cc6db4f-7008-0ad3-58d7-9e93060f152f@gmail.com>
- <20180801184659.GG30658@n2100.armlinux.org.uk>
-Message-ID: <9af7e7a3-54d4-8802-f64a-fc4f9c49c8b9@broadcom.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Wed, 1 Aug 2018 21:57:33 +0200
+Subject: [RFC PATCH v2 5/6] spi: Add QuadSPI driver for Atmel SAMA5D2
+In-Reply-To: <20180801172747.GJ5509@sirena.org.uk>
+References: <20180627131609.13681-1-bugalski.piotr@gmail.com>
+ <20180627131609.13681-6-bugalski.piotr@gmail.com>
+ <20180801172747.GJ5509@sirena.org.uk>
+Message-ID: <20180801215733.4dfa3a95@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell, Florian,
+Hi Mark,
 
-On 18-08-01 11:46 AM, Russell King - ARM Linux wrote:
-> On Wed, Aug 01, 2018 at 11:40:33AM -0700, Florian Fainelli wrote:
->> On 08/01/2018 10:56 AM, Arun Parameswaran wrote:
->>>  static int iproc_mdio_wait_for_idle(void __iomem *base, bool result)
->>> @@ -204,6 +225,20 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
->>>  		return -ENOMEM;
->>>  	}
->>>  
->>> +	md->core_clk = devm_clk_get(&pdev->dev, NULL);
->>> +	if (IS_ERR(md->core_clk)) {
->>> +		if (PTR_ERR(md->core_clk) == -EPROBE_DEFER)
->>> +			return -EPROBE_DEFER;
->>> +
->>> +		md->core_clk = NULL;
->>
->> I would simplify this a bit:
->>
->> 	if (IS_ERR(md->core_clk) && PTR_ERR(md->core_clk) == -EPROBE_DEFER)
+On Wed, 1 Aug 2018 18:27:47 +0100
+Mark Brown <broonie@kernel.org> wrote:
+
+> On Wed, Jun 27, 2018 at 03:16:08PM +0200, Piotr Bugalski wrote:
+> > Kernel contains QSPI driver strongly tied to MTD and nor-flash memory.
+> > New spi-mem interface allows usage also other memory types, especially
+> > much larger NAND with SPI interface. This driver works as SPI controller
+> > and is not related to MTD, however can work with NAND-flash or other
+> > peripherals using spi-mem interface.  
 > 
-> Even better is:
-> 
-> 	if (md->core_clk == ERR_PTR(-EPROBE_DEFER))
-> 
+> This is fine from a SPI point of view
 
-The clock is an optional parameter. But I realize, that I did not handle all
-the error cases.
+Cool. There are still 2 things I think should be addressed before
+merging the driver:
+1/ Fixing the SoB tag to match the author (problem reported by
+   Alexandre)
+2/ Getting this patch [1] merged and implementing the ->get_name() hook
+   in this driver so that SPI NOR devs declared to the MTD layer keep
+   the same name after the transition to spi-mem and mtdparts= passed on
+   the cmdline keep working. Without this in place we're likely to
+   break a few setups :-/.
 
-My intention was to proceed with probe if the clock is not found in the DT.
-If the clock is specified in the DT, make use of it.
+> but I'd like to apply it directly
+> to the SPI tree rather than ack it for merge via the MTD tree - can we
+> work something out with a shared branch or something?
 
-So, should I modify to something like:
+Sure, I can provide an immutable tag for you to pull and I'll add my
+acks on those patches once the 2 things I mentioned above are
+addressed.
 
-md->core_clk = devm_clk_get(&pdev->dev, NULL);
-if (md->core_clk == ERR_PTR(-ENOENT)) {
-	/* clock is optional, without it the default
-	 * rate divider register values will be used
-	 */
-	md->core_clk = NULL;
-} else if (IS_ERR(md->core_clk)) {
-	return PTR_ERR(md->core_clk);
-} else {
-	rc = clk_prepare_enable(md->core_clk);
-	...
-}
+Regards,
 
-Thanks
-Arun
+Boris
+
+[1]https://patchwork.kernel.org/patch/10508693/ 
