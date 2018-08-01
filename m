@@ -1,133 +1,215 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed,  1 Aug 2018 16:58:10 +0900
-Subject: [PATCH v13 06/16] of/fdt: add helper functions for handling properties
+Date: Wed,  1 Aug 2018 16:58:08 +0900
+Subject: [PATCH v13 04/16] powerpc,
+ kexec_file: factor out memblock-based arch_kexec_walk_mem()
 In-Reply-To: <20180801075820.3753-1-takahiro.akashi@linaro.org>
 References: <20180801075820.3753-1-takahiro.akashi@linaro.org>
-Message-ID: <20180801075820.3753-7-takahiro.akashi@linaro.org>
+Message-ID: <20180801075820.3753-5-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These functions will be used later to handle kexec-specific properties
-in arm64's kexec_file implementation.
+Memblock list is another source for usable system memory layout.
+So move powerpc's arch_kexec_walk_mem() to common code so that other
+memblock-based architectures, particularly arm64, can also utilise it.
+A moved function is now renamed to kexec_walk_memblock() and integrated
+into kexec_locate_mem_hole(), which will now be usable for all
+architectures with no need for overriding arch_kexec_walk_mem().
+
+With this change, arch_kexec_walk_mem() need no longer be a weak function,
+and was now renamed to kexec_walk_resources().
+
+Since powerpc doesn't support kdump in its kexec_file_load(), the current
+kexec_walk_memblock() won't work for kdump either in this form, this will
+be fixed in the next patch.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Frank Rowand <frowand.list@gmail.com>
+Cc: "Eric W. Biederman" <ebiederm@xmission.com>
+Acked-by: Dave Young <dyoung@redhat.com>
+Cc: Vivek Goyal <vgoyal@redhat.com>
+Cc: Baoquan He <bhe@redhat.com>
+Acked-by: James Morse <james.morse@arm.com>
 ---
- drivers/of/fdt.c       | 62 ++++++++++++++++++++++++++++++++++++++++--
- include/linux/of_fdt.h | 10 +++++--
- 2 files changed, 68 insertions(+), 4 deletions(-)
+ arch/powerpc/kernel/machine_kexec_file_64.c | 54 -------------------
+ include/linux/kexec.h                       |  2 -
+ kernel/kexec_file.c                         | 60 +++++++++++++++++++--
+ 3 files changed, 57 insertions(+), 59 deletions(-)
 
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 6da20b9688f7..f7c9d69ce86c 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -25,6 +25,7 @@
- #include <linux/debugfs.h>
- #include <linux/serial_core.h>
- #include <linux/sysfs.h>
-+#include <linux/types.h>
+diff --git a/arch/powerpc/kernel/machine_kexec_file_64.c b/arch/powerpc/kernel/machine_kexec_file_64.c
+index 0bd23dc789a4..5357b09902c5 100644
+--- a/arch/powerpc/kernel/machine_kexec_file_64.c
++++ b/arch/powerpc/kernel/machine_kexec_file_64.c
+@@ -24,7 +24,6 @@
  
- #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
- #include <asm/page.h>
-@@ -537,8 +538,8 @@ void *of_fdt_unflatten_tree(const unsigned long *blob,
- EXPORT_SYMBOL_GPL(of_fdt_unflatten_tree);
+ #include <linux/slab.h>
+ #include <linux/kexec.h>
+-#include <linux/memblock.h>
+ #include <linux/of_fdt.h>
+ #include <linux/libfdt.h>
+ #include <asm/ima.h>
+@@ -46,59 +45,6 @@ int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
+ 	return kexec_image_probe_default(image, buf, buf_len);
+ }
  
- /* Everything below here references initial_boot_params directly. */
--int __initdata dt_root_addr_cells;
--int __initdata dt_root_size_cells;
-+int dt_root_addr_cells;
-+int dt_root_size_cells;
+-/**
+- * arch_kexec_walk_mem - call func(data) for each unreserved memory block
+- * @kbuf:	Context info for the search. Also passed to @func.
+- * @func:	Function to call for each memory block.
+- *
+- * This function is used by kexec_add_buffer and kexec_locate_mem_hole
+- * to find unreserved memory to load kexec segments into.
+- *
+- * Return: The memory walk will stop when func returns a non-zero value
+- * and that value will be returned. If all free regions are visited without
+- * func returning non-zero, then zero will be returned.
+- */
+-int arch_kexec_walk_mem(struct kexec_buf *kbuf,
+-			int (*func)(struct resource *, void *))
+-{
+-	int ret = 0;
+-	u64 i;
+-	phys_addr_t mstart, mend;
+-	struct resource res = { };
+-
+-	if (kbuf->top_down) {
+-		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
+-						&mstart, &mend, NULL) {
+-			/*
+-			 * In memblock, end points to the first byte after the
+-			 * range while in kexec, end points to the last byte
+-			 * in the range.
+-			 */
+-			res.start = mstart;
+-			res.end = mend - 1;
+-			ret = func(&res, kbuf);
+-			if (ret)
+-				break;
+-		}
+-	} else {
+-		for_each_free_mem_range(i, NUMA_NO_NODE, 0, &mstart, &mend,
+-					NULL) {
+-			/*
+-			 * In memblock, end points to the first byte after the
+-			 * range while in kexec, end points to the last byte
+-			 * in the range.
+-			 */
+-			res.start = mstart;
+-			res.end = mend - 1;
+-			ret = func(&res, kbuf);
+-			if (ret)
+-				break;
+-		}
+-	}
+-
+-	return ret;
+-}
+-
+ /**
+  * setup_purgatory - initialize the purgatory's global variables
+  * @image:		kexec image.
+diff --git a/include/linux/kexec.h b/include/linux/kexec.h
+index 49ab758f4d91..c196bfd11bee 100644
+--- a/include/linux/kexec.h
++++ b/include/linux/kexec.h
+@@ -184,8 +184,6 @@ int __weak arch_kexec_apply_relocations(struct purgatory_info *pi,
+ 					const Elf_Shdr *relsec,
+ 					const Elf_Shdr *symtab);
  
- void *initial_boot_params;
+-int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
+-			       int (*func)(struct resource *, void *));
+ extern int kexec_add_buffer(struct kexec_buf *kbuf);
+ int kexec_locate_mem_hole(struct kexec_buf *kbuf);
  
-@@ -1330,3 +1331,60 @@ late_initcall(of_fdt_raw_init);
- #endif
+diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+index bf39df5e5bb9..1073ef56a95d 100644
+--- a/kernel/kexec_file.c
++++ b/kernel/kexec_file.c
+@@ -16,6 +16,7 @@
+ #include <linux/file.h>
+ #include <linux/slab.h>
+ #include <linux/kexec.h>
++#include <linux/memblock.h>
+ #include <linux/mutex.h>
+ #include <linux/list.h>
+ #include <linux/fs.h>
+@@ -501,6 +502,55 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
+ 	return locate_mem_hole_bottom_up(start, end, kbuf);
+ }
  
- #endif /* CONFIG_OF_EARLY_FLATTREE */
-+
-+bool of_fdt_cells_size_fitted(u64 base, u64 size)
++#if defined(CONFIG_HAVE_MEMBLOCK) && !defined(CONFIG_ARCH_DISCARD_MEMBLOCK)
++static int kexec_walk_memblock(struct kexec_buf *kbuf,
++			       int (*func)(struct resource *, void *))
 +{
-+	/* if *_cells >= 2, cells can hold 64-bit values anyway */
-+	if ((dt_root_addr_cells == 1) && (base > U32_MAX))
-+		return false;
++	int ret = 0;
++	u64 i;
++	phys_addr_t mstart, mend;
++	struct resource res = { };
 +
-+	if ((dt_root_size_cells == 1) && (size > U32_MAX))
-+		return false;
-+
-+	return true;
-+}
-+
-+size_t of_fdt_reg_cells_size(void)
-+{
-+	return (dt_root_addr_cells + dt_root_size_cells) * sizeof(u32);
-+}
-+
-+#define FDT_ALIGN(x, a)	(((x) + (a) - 1) & ~((a) - 1))
-+#define FDT_TAGALIGN(x)	(FDT_ALIGN((x), FDT_TAGSIZE))
-+
-+int fdt_prop_len(const char *prop_name, int len)
-+{
-+	return (strlen(prop_name) + 1) +
-+		sizeof(struct fdt_property) +
-+		FDT_TAGALIGN(len);
-+}
-+
-+static void fill_property(void *buf, u64 val64, int cells)
-+{
-+	__be32 val32;
-+
-+	while (cells) {
-+		val32 = cpu_to_fdt32((val64 >> (32 * (--cells))) & U32_MAX);
-+		memcpy(buf, &val32, sizeof(val32));
-+		buf += sizeof(val32);
++	if (kbuf->top_down) {
++		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
++						&mstart, &mend, NULL) {
++			/*
++			 * In memblock, end points to the first byte after the
++			 * range while in kexec, end points to the last byte
++			 * in the range.
++			 */
++			res.start = mstart;
++			res.end = mend - 1;
++			ret = func(&res, kbuf);
++			if (ret)
++				break;
++		}
++	} else {
++		for_each_free_mem_range(i, NUMA_NO_NODE, 0, &mstart, &mend,
++					NULL) {
++			/*
++			 * In memblock, end points to the first byte after the
++			 * range while in kexec, end points to the last byte
++			 * in the range.
++			 */
++			res.start = mstart;
++			res.end = mend - 1;
++			ret = func(&res, kbuf);
++			if (ret)
++				break;
++		}
 +	}
-+}
 +
-+int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
-+						u64 addr, u64 size)
++	return ret;
++}
++#else
++static int kexec_walk_memblock(struct kexec_buf *kbuf,
++			       int (*func)(struct resource *, void *))
 +{
-+	char buf[sizeof(__be32) * 2 * 2];
-+		/* assume dt_root_[addr|size]_cells <= 2 */
-+	void *prop;
-+	size_t buf_size;
-+
-+	buf_size = of_fdt_reg_cells_size();
-+	prop = buf;
-+
-+	fill_property(prop, addr, dt_root_addr_cells);
-+	prop += dt_root_addr_cells * sizeof(u32);
-+
-+	fill_property(prop, size, dt_root_size_cells);
-+
-+	return fdt_setprop(fdt, nodeoffset, name, buf, buf_size);
++	return 0;
 +}
-diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-index b9cd9ebdf9b9..9615d6142578 100644
---- a/include/linux/of_fdt.h
-+++ b/include/linux/of_fdt.h
-@@ -37,8 +37,8 @@ extern void *of_fdt_unflatten_tree(const unsigned long *blob,
- 				   struct device_node **mynodes);
- 
- /* TBD: Temporary export of fdt globals - remove when code fully merged */
--extern int __initdata dt_root_addr_cells;
--extern int __initdata dt_root_size_cells;
-+extern int dt_root_addr_cells;
-+extern int dt_root_size_cells;
- extern void *initial_boot_params;
- 
- extern char __dtb_start[];
-@@ -108,5 +108,11 @@ static inline void unflatten_device_tree(void) {}
- static inline void unflatten_and_copy_device_tree(void) {}
- #endif /* CONFIG_OF_EARLY_FLATTREE */
- 
-+bool of_fdt_cells_size_fitted(u64 base, u64 size);
-+size_t of_fdt_reg_cells_size(void);
-+int fdt_prop_len(const char *prop_name, int len);
-+int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
-+						u64 addr, u64 size);
++#endif
 +
- #endif /* __ASSEMBLY__ */
- #endif /* _LINUX_OF_FDT_H */
+ /**
+  * arch_kexec_walk_mem - call func(data) on free memory regions
+  * @kbuf:	Context info for the search. Also passed to @func.
+@@ -510,8 +560,8 @@ static int locate_mem_hole_callback(struct resource *res, void *arg)
+  * and that value will be returned. If all free regions are visited without
+  * func returning non-zero, then zero will be returned.
+  */
+-int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
+-			       int (*func)(struct resource *, void *))
++static int kexec_walk_resources(struct kexec_buf *kbuf,
++				int (*func)(struct resource *, void *))
+ {
+ 	if (kbuf->image->type == KEXEC_TYPE_CRASH)
+ 		return walk_iomem_res_desc(crashk_res.desc,
+@@ -538,7 +588,11 @@ int kexec_locate_mem_hole(struct kexec_buf *kbuf)
+ 	if (kbuf->mem)
+ 		return 0;
+ 
+-	ret = arch_kexec_walk_mem(kbuf, locate_mem_hole_callback);
++	if (IS_ENABLED(CONFIG_HAVE_MEMBLOCK) &&
++			!IS_ENABLED(CONFIG_ARCH_DISCARD_MEMBLOCK))
++		ret = kexec_walk_memblock(kbuf, locate_mem_hole_callback);
++	else
++		ret = kexec_walk_resources(kbuf, locate_mem_hole_callback);
+ 
+ 	return ret == 1 ? 0 : -EADDRNOTAVAIL;
+ }
 -- 
 2.18.0
