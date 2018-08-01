@@ -1,70 +1,67 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed,  1 Aug 2018 09:09:05 +0530
-Subject: [PATCH v2 00/10] Add Reset Controller support for Actions Semi Owl
- SoCs
-Message-ID: <20180801033915.15880-1-manivannan.sadhasivam@linaro.org>
+Date: Wed,  1 Aug 2018 09:09:06 +0530
+Subject: [PATCH v2 01/10] dt-bindings: clock: Add syscon support to Actions
+ Semi Owl SoCs
+In-Reply-To: <20180801033915.15880-1-manivannan.sadhasivam@linaro.org>
+References: <20180801033915.15880-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180801033915.15880-2-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds Reset Controller (RMU) support for Actions Semi
-Owl SoCs, S900 and S700. For the Owl SoCs, RMU's registers has been
-integrated into the CMU memory map in hardware. Hence, in this patchset
-the CMU driver has been converted to syscon so that the same memory map
-can be resued by both CMU and RMU drivers. Finally, the support for RMU
-in S700 and S900 SoCs are added.
+Since the clock and reset management units are sharing the same memory
+map, document the clock bindings to support System Controller.
 
-This patch series depends on the recently posted S700 clk series:
-"[PATCH v7 0/5] Add clock driver for Actions S700 SoC". For the S700 clk
-series, driver and bindings patches are applied through the clk tree.
-But the DTS patches are not yet picked up by the platform maintainer,
-Andreas.
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ .../bindings/clock/actions,owl-cmu.txt        | 21 +++++++++++++------
+ 1 file changed, 15 insertions(+), 6 deletions(-)
 
-Hence, Andreas is expected to pick the DTS patches in this series once
-reviewed by the maintainers along with S700 clk DTS patches.
-
-Note: I have only tested the S900 part, S700 is only compile tested. But
-there is no reason for it to fail.
-
-Thanks,
-Mani
-
-Changes in v2:
-
-* Converted the CMU and RMU drivers to syscon for a more cleaner
-  approach
-* Declared the owl_reset_map structs to const
-* Used regmap_update_bits instead of a combined regmap_read and write
-* Removed unused headers in RMU drivers
-* Added MAINTAINERS entry for the RMU driver and bindings
-
-Manivannan Sadhasivam (10):
-  dt-bindings: clock: Add syscon support to Actions Semi Owl SoCs
-  arm64: dts: actions: Convert Owl SoCs clock-controller nodes to syscon
-  clk: actions: Add syscon support for Actions Semi Owl SoCs
-  dt-bindings: reset: Add Actions Semi S900 SoC RMU support
-  dt-bindings: reset: Add Actions Semi S700 SoC RMU support
-  arm64: dts: actions: Add RMU node for Actions Semi S900 SoC
-  arm64: dts: actions: Add RMU node for Actions Semi S700 SoC
-  reset: Add Actions Semi S900 SoC Reset Management Unit support
-  reset: Add Actions Semi S700 SoC Reset Management Unit support
-  MAINTAINERS: Add entry for Actions Semi Owl SoCs Reset Management Unit
-
- .../bindings/clock/actions,owl-cmu.txt        |  21 +-
- .../bindings/reset/actions,owl-reset.txt      |  35 +++
- MAINTAINERS                                   |   4 +
- arch/arm64/boot/dts/actions/s700.dtsi         |  18 +-
- arch/arm64/boot/dts/actions/s900.dtsi         |  18 +-
- drivers/clk/actions/owl-common.c              |  20 +-
- drivers/reset/Kconfig                         |   6 +
- drivers/reset/Makefile                        |   1 +
- drivers/reset/reset-owl.c                     | 225 ++++++++++++++++++
- include/dt-bindings/reset/actions,s700-rmu.h  |  34 +++
- include/dt-bindings/reset/actions,s900-rmu.h  |  65 +++++
- 11 files changed, 416 insertions(+), 31 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/reset/actions,owl-reset.txt
- create mode 100644 drivers/reset/reset-owl.c
- create mode 100644 include/dt-bindings/reset/actions,s700-rmu.h
- create mode 100644 include/dt-bindings/reset/actions,s900-rmu.h
-
+diff --git a/Documentation/devicetree/bindings/clock/actions,owl-cmu.txt b/Documentation/devicetree/bindings/clock/actions,owl-cmu.txt
+index d1e60d297387..649c95fc4582 100644
+--- a/Documentation/devicetree/bindings/clock/actions,owl-cmu.txt
++++ b/Documentation/devicetree/bindings/clock/actions,owl-cmu.txt
+@@ -9,8 +9,6 @@ Required Properties:
+ - compatible: should be one of the following,
+ 	"actions,s900-cmu"
+ 	"actions,s700-cmu"
+-- reg: physical base address of the controller and length of memory mapped
+-  region.
+ - clocks: Reference to the parent clocks ("hosc", "losc")
+ - #clock-cells: should be 1.
+ 
+@@ -21,6 +19,13 @@ All available clocks are defined as preprocessor macros in corresponding
+ dt-bindings/clock/actions,s900-cmu.h or actions,s700-cmu.h header and can be
+ used in device tree sources.
+ 
++The CMU registers are part of the system-controller block on Owl SoCs.
++
++Parent node should have the following properties :
++- compatible: "syscon", "simple-mfd"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++
+ External clocks:
+ 
+ The hosc clock used as input for the plls is generated outside the SoC. It is
+@@ -31,11 +36,15 @@ Actions Semi S900 CMU also requires one more clock:
+ 
+ Example: Clock Management Unit node:
+ 
+-        cmu: clock-controller at e0160000 {
+-                compatible = "actions,s900-cmu";
++        sysctrl: system-controller at e0160000 {
++                compatible = "syscon", "simple-mfd";
+                 reg = <0x0 0xe0160000 0x0 0x1000>;
+-                clocks = <&hosc>, <&losc>;
+-                #clock-cells = <1>;
++
++                cmu: clock-controller {
++                        compatible = "actions,s900-cmu";
++                        clocks = <&hosc>, <&losc>;
++                        #clock-cells = <1>;
++                };
+         };
+ 
+ Example: UART controller node that consumes clock generated by the clock
 -- 
 2.17.1
