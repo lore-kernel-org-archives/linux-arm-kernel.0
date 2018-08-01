@@ -1,44 +1,48 @@
-From: colin.king@canonical.com (Colin King)
-Date: Wed,  1 Aug 2018 11:47:41 +0100
-Subject: [PATCH 8/9] ALSA: usb-audio: remove redundant pointer 'urb'
-In-Reply-To: <20180801104742.4328-1-colin.king@canonical.com>
-References: <20180801104742.4328-1-colin.king@canonical.com>
-Message-ID: <20180801104742.4328-9-colin.king@canonical.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 01 Aug 2018 12:47:54 +0200
+Subject: [PATCH 0/2] Workaround for IMX7d PCI-e PLL lock failure
+In-Reply-To: <20180718194424.8844-1-tpiepho@impinj.com>
+References: <20180718194424.8844-1-tpiepho@impinj.com>
+Message-ID: <1533120474.20186.9.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+Hi Trent,
 
-Pointer 'urb' is being assigned but is never used hence it is
-redundant and can be removed.
+Am Mittwoch, den 18.07.2018, 12:44 -0700 schrieb Trent Piepho:
+> This is the workaround for the IMX7d Erratum e10728, failure of
+> initialize PCIe PLL VCO oscillation resulting in PLL lock failure and
+> failure of the PCI-e link to come up.
+> 
+> The registers used in the workaround are based on the latest patch in
+> the NXP kernel, but many things around that have been changed.
+> 
+> This uses a new node of type fsl,imx-pcie-phy to get the PHY's
+> registers.??The node is found via a phandle added to the PCI-e
+> controller's node, rather than the incorrect way done in the NXP kernel.
+> 
+> There is no error if the phandle is not preset (since it's needed except
+> for the imx7d workaround and no existing dtses have it), but if preset
+> it is an error if something relating to it does not work.
+> 
+> ** Should the node be fsl,imx7d-pcie-phy???snps,dw-pcie-phy???
+> 
+> There is little to no documenation from NXP and Synopsis about this, so I'm
+> unsure of the PHY's lineage.
+> 
+> The imx6 PCI-e driver does not use the generic phy layer to interact
+> with the PHY.??It appears PHY related hardware, like clocks, regulators,
+> and resets, are part of the fsl,imx6q-pcie node.??But again, the
+> topology of this hardware is not documented very well.
+> 
+> Another approach would be to add the PHY registers as another bank in
+> the PCI-e node.??This would match how the PHY reset, clock, etc.??are
+> done.??However, the PHY is attached to a different AXI master than the
+> PCI-e controller, so the register range really does not belong there.
 
-Cleans up clang warning:
-warning: variable 'urb' set but not used [-Wunused-but-set-variable]
+I took some time pondering about the way this is done. There are some
+small issues in the implementation (see my replies to the individual
+patches), but the overall approach taken looks fine to me.
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- sound/usb/endpoint.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/sound/usb/endpoint.c b/sound/usb/endpoint.c
-index c90607ebe155..d86be8bfe412 100644
---- a/sound/usb/endpoint.c
-+++ b/sound/usb/endpoint.c
-@@ -325,7 +325,6 @@ static void queue_pending_output_urbs(struct snd_usb_endpoint *ep)
- 		unsigned long flags;
- 		struct snd_usb_packet_info *uninitialized_var(packet);
- 		struct snd_urb_ctx *ctx = NULL;
--		struct urb *urb;
- 		int err, i;
- 
- 		spin_lock_irqsave(&ep->lock, flags);
-@@ -345,7 +344,6 @@ static void queue_pending_output_urbs(struct snd_usb_endpoint *ep)
- 			return;
- 
- 		list_del_init(&ctx->ready_list);
--		urb = ctx->urb;
- 
- 		/* copy over the length information */
- 		for (i = 0; i < packet->packets; i++)
--- 
-2.17.1
+Regards,
+Lucas
