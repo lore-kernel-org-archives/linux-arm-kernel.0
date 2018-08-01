@@ -1,57 +1,42 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 01 Aug 2018 15:10:29 +0200
-Subject: [PATCH] drm/rockchip: Convert drm_atomic_helper_suspend/resume()
-In-Reply-To: <CAFqt6zZfLXuMUT75a3dWKeiCCmKZOfi=FdTeFRjcdFDZdfcRVQ@mail.gmail.com>
-References: <20180731203430.GA30136@jordon-HP-15-Notebook-PC>
- <16141309.kTfAWOe8rM@phil>
- <CAFqt6zZfLXuMUT75a3dWKeiCCmKZOfi=FdTeFRjcdFDZdfcRVQ@mail.gmail.com>
-Message-ID: <1843623.lUM99VBV1x@phil>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 01 Aug 2018 21:11:05 +0800
+Subject: [PATCH v3 02/14] ARM: dts: sunxi: h3/h5: Fix i2c2 register address
+In-Reply-To: <20170926072234.27481-3-clabbe.montjoie@gmail.com>
+References: <20170926072234.27481-1-clabbe.montjoie@gmail.com>
+ <20170926072234.27481-3-clabbe.montjoie@gmail.com>
+Message-ID: <1c12672d56b1e97aa594d2938ea9a36b5c0a98e0.camel@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 1. August 2018, 14:43:47 CEST schrieb Souptick Joarder:
-> On Wed, Aug 1, 2018 at 6:03 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> > Hi Souptick,
-> >
-> > Am Dienstag, 31. Juli 2018, 22:34:30 CEST schrieb Souptick Joarder:
-> >> convert drm_atomic_helper_suspend/resume() to use
-> >> drm_mode_config_helper_suspend/resume().
-> >>
-> >> With this conversion, rockchip_drm_fb_resume() and
-> >> rockchip_drm_fb_suspend() will not be used anymore.
-> >> Both of these functions can be removed.
-> >>
-> >> Also, in struct rockchip_drm_private state will not be
-> >> used anymore. So this can be removed forever.
-> >>
-> >> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-> >> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
-> >
-> > the patch itself looks great, just a simple bookkeeping question.
-> >
-> > What role did Ajit play in creating the patch? If I remember correctly
-> > it is meant to be
-> > - 1st Signed-off: Patch-Author
-> > - 2nd Signed-off: E-Mail sender + patch possibly patch changes
-> > (optional of course if the same)
-> >
-> > So was this meant to be a Reviewed-by from Ajit?
+? 2017-09-26?? 09:22 +0200?Corentin Labbe???
+> The unit address and register address does not match.
+> This patch fix the register address with the good one.
 > 
-> We both are working together for these patches to
-> convert drm_atomic_helper_suspend/resume().
-> That's the reason to add his name in 2nd Signed-off
-> in all similar patches.
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+
+This patch should be backported.
+
+Older LTS also needs patches, but the patch needs to be refactored to
+suite the versions.
+
+Cc: stable at vger.kernel.org # 4.14
+
+> ---
+>  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Is it a incorrect way to put 2nd Signed-off here ?
-
-Thanks for the clarification and the interesting question :-)
-
-I've just read through Documentation/process/submitting-patches.rst
-and it seems there is an "official" way to show that relationship, via a
-tag named "Co-Developed-by:" described under number 12.
-
-So I guess we could just adapt the patch accordingly, if that is ok with
-both of you (i.e. I can change this when applying, so no need to resend).
-
-
-Heiko
+> diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> index b37ed3461229..289f2cd06dfe 100644
+> --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> @@ -632,7 +632,7 @@
+>  
+>  		i2c2: i2c at 1c2b400 {
+>  			compatible = "allwinner,sun6i-a31-i2c";
+> -			reg = <0x01c2b000 0x400>;
+> +			reg = <0x01c2b400 0x400>;
+>  			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+>  			clocks = <&ccu CLK_BUS_I2C2>;
+>  			resets = <&ccu RST_BUS_I2C2>;
