@@ -1,126 +1,94 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Wed, 1 Aug 2018 11:36:49 +0200
-Subject: [PATCH 02/14] mmc: mmci: internalize dma map/unmap into mmci dma
- functions
+Date: Wed, 1 Aug 2018 11:36:59 +0200
+Subject: [PATCH 12/14] mmc: mmci: add dma_finalize callback
 In-Reply-To: <1533116221-380-1-git-send-email-ludovic.Barre@st.com>
 References: <1533116221-380-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1533116221-380-3-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1533116221-380-13-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch internalizes the management of dma map/unmap into
-mmci dma interfaces. This allows to simplify and prepare the next dma
-callbacks for mmci host ops.
-mmci_dma_unmap was called in mmci_data_irq & mmci_cmd_irq functions
-and can be integrated in mmci_dma_data_error.
+This patch adds dma_finalize callback at mmci_host_ops
+to allow to call specific variant.
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- drivers/mmc/host/mmci.c | 44 +++++++++++++++++++-------------------------
- 1 file changed, 19 insertions(+), 25 deletions(-)
+ drivers/mmc/host/mmci.c          | 14 ++++++++------
+ drivers/mmc/host/mmci.h          |  2 ++
+ drivers/mmc/host/mmci_qcom_dml.c |  1 +
+ 3 files changed, 11 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 1841d250..d8fa178 100644
+index 642ef19..b124a73 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -482,17 +482,7 @@ static inline void mmci_dma_release(struct mmci_host *host)
- 	host->dma_rx_channel = host->dma_tx_channel = NULL;
+@@ -447,6 +447,12 @@ int mmci_dma_start(struct mmci_host *host, unsigned int datactrl)
+ 	return 0;
  }
  
--static void mmci_dma_data_error(struct mmci_host *host)
--{
--	dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
--	dmaengine_terminate_all(host->dma_current);
--	host->dma_in_progress = false;
--	host->dma_current = NULL;
--	host->dma_desc_current = NULL;
--	host->data->host_cookie = 0;
--}
--
--static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
-+static void __mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
- {
- 	struct dma_chan *chan;
- 
-@@ -505,6 +495,18 @@ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
- 		     mmc_get_dma_dir(data));
- }
- 
-+static void mmci_dma_data_error(struct mmci_host *host)
++void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
 +{
-+	dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
-+	dmaengine_terminate_all(host->dma_current);
-+	host->dma_in_progress = false;
-+	host->dma_current = NULL;
-+	host->dma_desc_current = NULL;
-+	host->data->host_cookie = 0;
-+
-+	__mmci_dma_unmap(host, host->data);
++	if (host->ops && host->ops->dma_finalize)
++		host->ops->dma_finalize(host, data);
 +}
 +
- static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
+ static void
+ mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
  {
- 	u32 status;
-@@ -528,11 +530,10 @@ static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
- 		mmci_dma_data_error(host);
- 		if (!data->error)
- 			data->error = -EIO;
-+	} else if (!data->host_cookie) {
-+		__mmci_dma_unmap(host, data);
- 	}
- 
--	if (!data->host_cookie)
--		mmci_dma_unmap(host, data);
--
- 	/*
- 	 * Use of DMA with scatter-gather is impossible.
- 	 * Give up with DMA and switch back to PIO mode.
-@@ -704,7 +705,7 @@ static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
- 	if (!data || !data->host_cookie)
- 		return;
- 
--	mmci_dma_unmap(host, data);
-+	__mmci_dma_unmap(host, data);
- 
- 	if (err) {
- 		struct mmci_host_next *next = &host->next_data;
-@@ -742,10 +743,6 @@ static inline void mmci_dma_release(struct mmci_host *host)
- {
+@@ -626,7 +632,7 @@ static void mmci_dma_data_error(struct mmci_host *host)
+ 	__mmci_dmae_unmap(host, host->data);
  }
  
--static inline void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
+-static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
++void mmci_dmae_finalize(struct mmci_host *host, struct mmc_data *data)
+ {
+ 	struct dmaengine_priv *dmae = host->dma_priv;
+ 	u32 status;
+@@ -820,14 +826,10 @@ static struct mmci_host_ops mmci_variant_ops = {
+ 	.dma_setup = mmci_dmae_setup,
+ 	.dma_release = mmci_dmae_release,
+ 	.dma_start = mmci_dmae_start,
++	.dma_finalize = mmci_dmae_finalize,
+ };
+ #else
+ /* Blank functions if the DMA engine is not available */
+-static inline void mmci_dma_finalize(struct mmci_host *host,
+-				     struct mmc_data *data)
 -{
 -}
 -
- static inline void mmci_dma_finalize(struct mmci_host *host,
- 				     struct mmc_data *data)
+ static inline void mmci_dma_data_error(struct mmci_host *host)
  {
-@@ -906,10 +903,8 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 		u32 remain, success;
+ }
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index 3a200a9..3f482d5 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -281,6 +281,7 @@ struct mmci_host_ops {
+ 	int (*dma_setup)(struct mmci_host *host);
+ 	void (*dma_release)(struct mmci_host *host);
+ 	int (*dma_start)(struct mmci_host *host, unsigned int *datactrl);
++	void (*dma_finalize)(struct mmci_host *host, struct mmc_data *data);
+ };
  
- 		/* Terminate the DMA transfer */
--		if (dma_inprogress(host)) {
-+		if (dma_inprogress(host))
- 			mmci_dma_data_error(host);
--			mmci_dma_unmap(host, data);
--		}
+ struct mmci_host {
+@@ -340,3 +341,4 @@ void mmci_dmae_get_next_data(struct mmci_host *host, struct mmc_data *data);
+ int mmci_dmae_setup(struct mmci_host *host);
+ void mmci_dmae_release(struct mmci_host *host);
+ int mmci_dmae_start(struct mmci_host *host, unsigned int *datactrl);
++void mmci_dmae_finalize(struct mmci_host *host, struct mmc_data *data);
+diff --git a/drivers/mmc/host/mmci_qcom_dml.c b/drivers/mmc/host/mmci_qcom_dml.c
+index e6267ad..ba7e311 100644
+--- a/drivers/mmc/host/mmci_qcom_dml.c
++++ b/drivers/mmc/host/mmci_qcom_dml.c
+@@ -188,6 +188,7 @@ static struct mmci_host_ops qcom_variant_ops = {
+ 	.dma_setup = qcom_dma_setup,
+ 	.dma_release = mmci_dmae_release,
+ 	.dma_start = mmci_dmae_start,
++	.dma_finalize = mmci_dmae_finalize,
+ };
  
- 		/*
- 		 * Calculate how far we are into the transfer.  Note that
-@@ -1055,10 +1050,9 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
- 	if ((!sbc && !cmd->data) || cmd->error) {
- 		if (host->data) {
- 			/* Terminate the DMA transfer */
--			if (dma_inprogress(host)) {
-+			if (dma_inprogress(host))
- 				mmci_dma_data_error(host);
--				mmci_dma_unmap(host, host->data);
--			}
-+
- 			mmci_stop_data(host);
- 		}
- 		mmci_request_end(host, host->mrq);
+ void qcom_variant_init(struct mmci_host *host)
 -- 
 2.7.4
