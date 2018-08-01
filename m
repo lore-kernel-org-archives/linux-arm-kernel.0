@@ -1,230 +1,86 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Aug 2018 11:38:55 +0100
-Subject: [PATCH 6/6] arm64: enable RapidIO menu in Kconfig
-In-Reply-To: <570ad147-3c58-8911-0111-29e21087ca7a@gmail.com>
-References: <20180730225035.28365-1-acolin@isi.edu>
- <20180730225035.28365-7-acolin@isi.edu>
- <20180731084143.GA4680@arm.com>
- <d09cb4f5-768b-acd8-f9b1-d1d320a93564@gmail.com>
- <20180731155228.GN17271@n2100.armlinux.org.uk>
- <044af717-3883-a7a6-c346-18fa8cebce76@gmail.com>
- <20180731181834.GA30658@n2100.armlinux.org.uk>
- <570ad147-3c58-8911-0111-29e21087ca7a@gmail.com>
-Message-ID: <20180801103855.GD30658@n2100.armlinux.org.uk>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 01 Aug 2018 12:39:11 +0200
+Subject: [PATCH 1/2] ARM: dts: imx7d: Add node for PCIe PHY
+In-Reply-To: <20180718194424.8844-2-tpiepho@impinj.com>
+References: <20180718194424.8844-1-tpiepho@impinj.com>
+ <20180718194424.8844-2-tpiepho@impinj.com>
+Message-ID: <1533119951.20186.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 04:01:27PM -0400, Alex Bounine wrote:
-> On 2018-07-31 02:18 PM, Russell King - ARM Linux wrote:
-> >On Tue, Jul 31, 2018 at 01:59:27PM -0400, Alex Bounine wrote:
-> >>On 2018-07-31 11:52 AM, Russell King - ARM Linux wrote:
-> >>>On Tue, Jul 31, 2018 at 08:54:14AM -0400, Alex Bounine wrote:
-> >>>>On 2018-07-31 04:41 AM, Will Deacon wrote:
-> >>>>>On Mon, Jul 30, 2018 at 06:50:34PM -0400, Alexei Colin wrote:
-> >>>>>>Platforms with a PCI bus will be offered the RapidIO menu since they may
-> >>>>>>be want support for a RapidIO PCI device. Platforms without a PCI bus
-> >>>>>>that might include a RapidIO IP block will need to "select HAS_RAPIDIO"
-> >>>>>>in the platform-/machine-specific "config ARCH_*" Kconfig entry.
-> >>>>>>
-> >>>>>>Tested that kernel builds for arm64 with RapidIO subsystem and
-> >>>>>>switch drivers enabled, also that the modules load successfully
-> >>>>>>on a custom Aarch64 Qemu model.
-> >>>>>>
-> >>>>>>Cc: Andrew Morton <akpm@linux-foundation.org>
-> >>>>>>Cc: Russell King <linux@armlinux.org.uk>
-> >>>>>>Cc: John Paul Walters <jwalters@isi.edu>
-> >>>>>>Cc: linux-arm-kernel at lists.infradead.org
-> >>>>>>Cc: linux-kernel at vger.kernel.org,
-> >>>>>>Signed-off-by: Alexei Colin <acolin@isi.edu>
-> >>>>>>---
-> >>>>>>  arch/arm64/Kconfig | 2 ++
-> >>>>>>  1 file changed, 2 insertions(+)
-> >>>>>
-> >>>>>Thanks, this looks much cleaner than before:
-> >>>>>
-> >>>>>Acked-by: Will Deacon <will.deacon@arm.com>
-> >>>>>
-> >>>>>The only thing I'm not sure about is why we don't just select HAS_RAPIDIO
-> >>>>>unconditionally in the arm64 Kconfig. Does selecting only that option
-> >>>>>actually pull in new code to the build?
-> >>>>>
-> >>>>HAS_RAPIDIO option is intended for SOCs that have built in SRIO controllers,
-> >>>>like TI KeyStoneII or FPGAs. Because RapidIO subsystem core is required
-> >>>>during RapidIO port driver initialization, having separate option allows us
-> >>>>to control available build options for RapidIO core and port driver (bool
-> >>>>vs. tristate) and disable module option if port driver is configured as
-> >>>>built-in.
-> >>>
-> >>>Your explanation doesn't make much sense to me.
-> >>>
-> >>>RAPIDIO is the bus-level support, right?  So drivers that depend on
-> >>>the bus-level support should depend on RAPIDIO, and so, if RAPIDIO
-> >>>is configured as a module, they will also be allowed to be disabled
-> >>>or a module, but not built-in if tristate.  If it is boolean, and
-> >>>causes the driver to be built-in to the kernel, then you need to use
-> >>>"RAPIDIO=y" so that it's dependency is only satisfied when the core
-> >>>is built-in.
-> >>>
-> >>
-> >>RapidIO host controllers (on local bus like SoC internal or PCIe) are
-> >>serviced by MPORT device drivers that are subsystem specific and communicate
-> >>with RapidIO core using set of callbacks. Depending on HW architecture these
-> >>drivers may be defined as built-in or module.
-> >
-> >Why does hardware architecture define whether something has to be built
-> >in or can be modular?
-> >
-> >It is the case today that (eg) on-SoC hardware _can_ be built as a module
-> >if desired - just because it's on the SoC does not mean it has to be
-> >built in to the kernel.  Why is RapidIO any different?
-> >
+Am Mittwoch, den 18.07.2018, 12:44 -0700 schrieb Trent Piepho:
+> There isn't yet any code in the kernel that uses this device's register,
+> but there will be some for a PCIe PLL erratum wortkaround.
 > 
-> Not HW architecture - legacy can be blamed as well. Freescale's FSL_RIO
-> driver still exist as built-in so far. Intent of this patch set is to allow
-> RapidIO support in more architectures without reworking old stuff.
-> I do not think that anyone will be updating FSL_RIO driver soon.
-
-Sorry, but I'm even more confused.  If it's not hardware architecture,
-then why did you say previously "Depending on HW architecture these
-drivers may be defined as built-in or module." ?
-
-If it's that the driver isn't written to be a module, then that is not
-"HW architecture".  Are you just trying to muddy the water?
-
-> Also we cannot dictate to developers of future drivers which method to use -
-> they may have built-in option only for the first release.
-
-How is that any different from all the other drivers that we have?
-
-If a driver can only be built-in, then we do this in the Kconfig:
-
-config DRIVERFOO
-	bool "Support driverfoo"
-	depends on SUBSYSTEM=y
-
-which ensures that the driver can only be built when it's dependent
-subsystem is also built-in.
-
-There is another alternative way, which is:
-
-config SUBSYSTEM
-	tristate
-
-config DRIVERFOO
-	bool "Support driverfoo"
-	select SUBSYSTEM
-
-config DRIVERBAR
-	tristate "Support driverbar"
-	select SUBSYSTEM
-
-and "SUBSYSTEM" will automatically adopt either 'm' or 'y' correctly
-depending on whether any drivers are built-in or not.
-
-> Unfortunately we have on hands dependency between mport driver build mode
-> and  RapidIO core which we need to respect.
-
-How is that any different from (eg) hundreds of network drivers and the
-networking core code that we already have?  That doesn't have such a
-convoluted configuration system, and what you have is much simpler.
-
-> >For example, can you point out why my idea I present below would not
-> >work?
+> This adds the PHY as a new node.??The PCI-e controller node gains a
+> phandle property that points to it.??There is no driver for the PHY at
+> this point and all the existing code that relates to the PHY is part of
+> the PCI-e controller driver (and does not need register access, yet).
 > 
-> See below.
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > Cc: Richard Zhu <hongxing.zhu@nxp.com>
+> > Cc: Lucas Stach <l.stach@pengutronix.de>
+> > Signed-off-by: Trent Piepho <tpiepho@impinj.com>
+> ---
+> ?Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt | 11 +++++++++++
+> ?arch/arm/boot/dts/imx7d.dtsi?????????????????????????????|??9 +++++++++
+> ?2 files changed, 20 insertions(+)
 > 
-> >
-> >>For peripheral devices attached to the RapidIO fabric such dependency on
-> >>local mport implementation does not exist and therefore they all can be
-> >>treated as tristate.
-> >>
-> >>>HAS_RAPIDIO gives the impression that it defines whether or not
-> >>>the rapidio core code is allowable or not - it doesn't suggest that
-> >>>it has anything to do with drivers. However, reading the PowerPC
-> >>>Kconfig files, it seems to be used that way.  That's confusing, and
-> >>>ought to be fixed.  From what I can tell, it's only used for FSL_RIO,
-> >>>so I suggest that gets converted to:
-> >>>
-> >>>config HAS_RAPIDIO
-> >>>	bool PCI
-> 
-> PCI and RAPIDIO can be mutually exclusive.
+> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> index cb33421184a0..c7aeda6878ff 100644
+> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> @@ -50,6 +50,7 @@ Additional required properties for imx7d-pcie:
+> ?- reset-names: Must contain the following entires:
+> > ?	???????- "pciephy"
+> > ?	???????- "apps"
+> +- fsl,pcie-phy: A phandle to an fsl,imx-pcie-phy node.
+> ?
+> ?Example:
+> ?
+> @@ -76,3 +77,13 @@ Example:
+> > ?		clocks = <&clks 144>, <&clks 206>, <&clks 189>;
+> > ?		clock-names = "pcie", "pcie_bus", "pcie_phy";
+> > ?	};
+> +
+> +* Freescale i.MX7d PCIe PHY
+> +
+> +This is the PHY associated with the IMX7d PCIe controller.??It's used by the
+> +PCI-e controller via the fsl,pcie-phy phandle.
+> +
+> +Required properties:
+> +- compatible:
+> +	- "fsl,imx-pcie-phy"
 
-Please explain this in light of your patches which contain:
+This is too generic. Please change it to "fsl,imx7-pcie-phy".
 
-config RAPIDIO
-	tristate "RapidIO support"
-	depends on HAS_RAPIDIO || PCI
-
-This allows RAPIDIO can be selected when PCI is enabled.  Therefore,
-PCI and RAPIDIO *are not* mutually exclusive as your comment above
-states, therefore, I have to assume that your comment is wrong.
-
-> >>>
-> >>>config RAPIDIO
-> >>>	tristate "RapidIO support"
-> >>>	depends on HAS_RAPIDIO
-> >>>
-> >>>config HAS_FSL_RIO
-> >>>	bool
-> >>>	select HAS_RAPIDIO
-> 
-> Introducing new variable HAS_FSL_RIO here. Do you suggest having one for
-> each ARM-based board that has on-chip RIO?
-
-No, I'm suggesting a solution for what I see in the kernel tree today,
-which is frankly a mess for the reasons I've already outlined.
-
-HAS_FSL_RIO is based on the _only_ SoC driver apparently in the tree
-based on what I could find in the arch/*/Kconfig files.  If you don't
-think having individual HAS_* options in this way is appropriate,
-then maybe instead having per-SoC hidden HAS_* config options are
-more appropriate.
-
-> >>>
-> >>>config FSL_RIO
-> >>>	bool "Freescale Embedded SRIO Controller support"
-> >>>	depends on RAPIDIO = y && HAS_FSL_RIO
-> >>>
-> >>>This frees up HAS_RAPIDIO to operate as one would expect - to define
-> >>>whether or not RAPIDIO should be offered.  This also allows:
-> >>>
-> >>>config ARM
-> >>>	select HAS_RAPIDIO if PCI
-> 
-> Some SOCs can be configured without PCI. We have confusing action here - we
-> have to enable PCI on platform that does not have it.
-
-Again, you said above "PCI and RAPIDIO can be mutually exclusive."  This
-comment self-conflicts with your previous comment.
-
-What you now seem to be saying goes against the patches and the current
-Kconfig.  You seem to be saying that RAPIDIO _requires_ PCI.
-
-So, we now have three completely different statements from you:
-- "we have to enable PCI on platform that does not have it."
-- "PCI and RAPIDIO can be mutually exclusive."
-- RAPIDIO does not require PCI (since HAS_RAPIDIO=y RAPIDIO=y PCI=n is
-  a permissible configuration as things stand with PowerPC.)
-
-Which is it?
-
-It seems to be that your replies are just muddying the water - I can
-only assume that this is to make us give up.  Please don't do that,
-it's not in your interest.
-
-> Why we cannot use "select HAS_RAPIDIO" HW-specific Kconfig file
-> (mach-*/Kconfig)? And have on-chip port selection in the same board-specific
-> place.
-
-As I've already explained, HAS_RAPIDIO has the expectation that it
-controls the availability of the RAPIDIO option, not of drivers.
-It is HAS_*RAPIDIO*, the clue is in the name.  Using it as you are
-(basically, to mean that on-SoC rapidio hardware is present) and
-allowing such configurations as HAS_RAPIDIO=n RAPIDIO=y PCI=y is
-completely counter-intuitive.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+> +- reg: base address and length of the PCIe PHY controller
+> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+> index 200714e3feea..31f5c8576251 100644
+> --- a/arch/arm/boot/dts/imx7d.dtsi
+> +++ b/arch/arm/boot/dts/imx7d.dtsi
+> @@ -94,6 +94,14 @@
+> > ?	};
+> ?};
+> ?
+> +&aips2 {
+> > > +	pcie_phy: pcie-phy at 306d0000 {
+> > +		??compatible = "fsl,imx-pcie-phy";
+> > +		??reg = <0x306d0000 0x10000>;
+> > +		??status = "disabled";
+> > +	};
+> +};
+> +
+> ?&aips3 {
+> > > ?	usbotg2: usb at 30b20000 {
+> > ?		compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
+> @@ -167,6 +175,7 @@
+> > ?			?<&src IMX7_RESET_PCIE_CTRL_APPS_EN>;
+> > ?		reset-names = "pciephy", "apps";
+> > ?		status = "disabled";
+> > +		fsl,pcie-phy = <&pcie_phy>;
+> > ?	};
+> ?};
+> ?
