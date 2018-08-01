@@ -1,46 +1,41 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Aug 2018 21:23:14 +0100
-Subject: [PATCH v3 7/8] net: phy: Add support to configure clock in
- Broadcom iProc mdio mux
-In-Reply-To: <20180801200712.GD19257@lunn.ch>
-References: <1533146186-8374-1-git-send-email-arun.parameswaran@broadcom.com>
- <1533146186-8374-8-git-send-email-arun.parameswaran@broadcom.com>
- <0cc6db4f-7008-0ad3-58d7-9e93060f152f@gmail.com>
- <20180801184659.GG30658@n2100.armlinux.org.uk>
- <9af7e7a3-54d4-8802-f64a-fc4f9c49c8b9@broadcom.com>
- <20180801200712.GD19257@lunn.ch>
-Message-ID: <20180801202313.GH30658@n2100.armlinux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 1 Aug 2018 22:26:39 +0200
+Subject: Vibrations on Droid 4?
+In-Reply-To: <20180716075926.GU99251@atomide.com>
+References: <20180709081534.GA6799@amd>
+ <20180709214910.tes6u4ivxomd3aja@earth.universe>
+ <20180709220211.GA7760@amd>
+ <20180710101147.lyu65ro4czvrs2da@earth.universe>
+ <20180710133040.GA4391@amd>
+ <20180710161123.azym6sbboriuj4yc@earth.universe>
+ <20180711080218.GA21225@amd> <20180711132739.GL99251@atomide.com>
+ <20180715201729.GB19675@amd> <20180716075926.GU99251@atomide.com>
+Message-ID: <20180801202639.GA4033@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 01, 2018 at 10:07:12PM +0200, Andrew Lunn wrote:
-> You might want to consider adding clk_optional_get() and
-> devm_clk_optional_get().
+On Mon 2018-07-16 00:59:26, Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [180715 20:20]:
+> > Yep, so I have two patches that make the device appear, but vibrations
+> > still do not work for me.
+> > 
+> > a) any ideas how to debug that / get them to work?
+> 
+> Hmm no new ideas except I wonder if there is also some other
+> regression with the timer pdata not being passed properly now.
 
-I think there's attempts to add such APIs but I don't think it's
-trivial - it seems to require a _lot_ of discussion.
+Got it, pinmux part of dts was at wrong place, too. Patch will follow.
 
-I think part of that is because of the quirky use of error codes.
-If you look at clk_get(), it calls __of_clk_get_by_name() which
-returns:
-
- -ENOENT if DT is disabled
- -ENOENT if the device has no DT node
- -EPROBE_DEFER if the lookup in DT succeeds but there's no registered
-   clock
- -EINVAL if the device has a DT node but the lookup of the name
-   failed (in otherwords, the optional clock was omitted)
- -ENOENT if the clocks = property has not enough clocks for the
-    clock-names property
- -ENOMEM if we fail to allocate the clk
- -ENOENT if __clk_get() fails
-
-or any other error code returned via of_clk_provider's ->get() method.
-
-The use of -EINVAL, one of the most common error codes, makes it
-difficult to be sure that the clock is not specified in DT.
+Best regards,
+									Pavel
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180801/4b9bc8f6/attachment.sig>
