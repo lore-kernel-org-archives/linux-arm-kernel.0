@@ -1,63 +1,47 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 31 Jul 2018 19:12:59 -0700
-Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.19 round 3/late
-In-Reply-To: <7htvofyvwd.fsf@baylibre.com>
-References: <7htvofyvwd.fsf@baylibre.com>
-Message-ID: <CAOesGMgaAZ7Mk2+wj44maqY1h0G_rypuqjU0x389PwJXicwXqg@mail.gmail.com>
+Date: Tue, 31 Jul 2018 19:13:50 -0700
+Subject: [GIT PULL 1/2] Rockchip dts64 updates for 4.19 round 2
+In-Reply-To: <1809430.FkQi5Ue9ae@phil>
+References: <2000491.bLgWuj0xar@phil> <1809430.FkQi5Ue9ae@phil>
+Message-ID: <CAOesGMh7hEK_JRk1qKOyLJcr3tB4KVOMMBMUsvXHs0nE1_LGHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-
-On Tue, Jul 31, 2018 at 1:48 PM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Olof, Arnd,
+On Mon, Jul 30, 2018 at 3:35 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Hi Arnd, Kevin, Olof,
 >
-> Here's a final, late pull for Amlogic DT64, based on top of my round 2
-> redo.
+> please find below some more Rockchip devicetree updates
+> targeted at 4.19. With mainly a new board to go on top of the
+> first round of patches.
 >
-> The audio drivers ended up being merged for v4.19, so wanted to get
-> these in if at all possible also.
+> And in a second pull-request just some defconfig64 additions
+> enabling yet more stuff for kevin.
 >
-> If it's too late for the normal DT pulls, feel free to include in a late
-> cycle, otherwise I'll (re)send after -rc1.
-
-Linus declared that we'll have an -rc8, so we've got a bit of time.
-
-> The following changes since commit aaa080fa7e0f01f7cd8eb22a7385a4d8106c7478:
+> If we're not to late for 4.19, please pull!
+> Otherwise I'll migrate these over to 4.19+1
 >
->   ARM64: dts: meson-gxl: add support for the Oranth Tanix TX3 Mini (2018-07-20 09:02:22 -0700)
 >
-> are available in the git repository at:
+> Thanks
+> Heiko
 >
->   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64-3
+> The following changes since commit d0414fdd58eb51ffd6528280fd66705123663964:
 >
-> for you to fetch changes up to f2ac479f0da046097258c68ef834af01b568436a:
+>   arm64: dts: rockchip: corrected uart1 clock-names for rk3328 (2018-07-07 13:02:27 +0200)
 >
->   arm64: dts: meson-axg: add spdif-dit codec (2018-07-25 04:38:22 -0700)
+> are available in the Git repository at:
 >
-> ----------------------------------------------------------------
-> Amlogic 64-bit DT updates for v4.19, round 3
-> - add DT support for AXG Audio
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.19-rockchip-dts64-2
+>
+> for you to fetch changes up to 0fbfe10fa96b8df44cfb140a6672f9418e16a2a6:
+>
+>   arm64: dts: rockchip: add led support for Firefly-RK3399 (2018-07-25 12:19:41 +0200)
 >
 > ----------------------------------------------------------------
-> Jerome Brunet (11):
->       arm64: dts: meson-axg: improve power supplies description
->       arm64: dts: meson-axg: add vcc 5v regulator on the s400
->       arm64: dts: meson-axg: add usb power regulator
->       arm64: dts: meson-axg: add audio arb reset controller
->       arm64: dts: meson-axg: add spdifout
->       arm64: dts: meson-axg: add tdmin formatters
->       arm64: dts: meson-axg: add tdmout formatters
->       arm64: dts: meson-axg: add tdm interfaces
->       arm64: dts: meson-axg: add linein codec
->       arm64: dts: meson-axg: add lineout codec
->       arm64: dts: meson-axg: add spdif-dit codec
+> A new board, the Vamrs Ficus using the rk3399 and followin the 96boards
+> standard. LEDs and power button for the rk3399 firefly and removal of
+> some deprecated type-c properties from the rk3399 devicetree.
 
-Hmm, not entirely sure you need a commit per entry here, since it's
-unlikely that you'll need to bisect across the series.
-
-Anyway, merged!
+Merged, thanks!
 
 
 -Olof
