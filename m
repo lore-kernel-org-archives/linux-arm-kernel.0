@@ -1,48 +1,52 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 01 Aug 2018 12:47:54 +0200
-Subject: [PATCH 0/2] Workaround for IMX7d PCI-e PLL lock failure
-In-Reply-To: <20180718194424.8844-1-tpiepho@impinj.com>
-References: <20180718194424.8844-1-tpiepho@impinj.com>
-Message-ID: <1533120474.20186.9.camel@pengutronix.de>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Wed, 01 Aug 2018 13:00:11 +0200
+Subject: [PATCH 9/9] ALSA: intel_hdmi: remove redundant variable cfg_val
+In-Reply-To: <20180801104742.4328-10-colin.king@canonical.com>
+References: <20180801104742.4328-1-colin.king@canonical.com>
+ <20180801104742.4328-10-colin.king@canonical.com>
+Message-ID: <s5hin4unyh0.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Trent,
+On Wed, 01 Aug 2018 12:47:42 +0200,
+Colin King wrote:
+> 
+> From: Colin Ian King <colin.king@canonical.com>
+> 
+> Variable cfg_val is being assigned but is never used hence it is
+> redundant and can be removed.
+> 
+> Cleans up clang warning:
+> warning: variable 'cfg_val' set but not used [-Wunused-but-set-variable]
+> 
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
+>  sound/x86/intel_hdmi_audio.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/sound/x86/intel_hdmi_audio.c b/sound/x86/intel_hdmi_audio.c
+> index edc9f5a34eff..fa7dca5a68c8 100644
+> --- a/sound/x86/intel_hdmi_audio.c
+> +++ b/sound/x86/intel_hdmi_audio.c
+> @@ -290,7 +290,6 @@ static void had_reset_audio(struct snd_intelhad *intelhaddata)
+>  static int had_prog_status_reg(struct snd_pcm_substream *substream,
+>  			struct snd_intelhad *intelhaddata)
+>  {
+> -	union aud_cfg cfg_val = {.regval = 0};
+>  	union aud_ch_status_0 ch_stat0 = {.regval = 0};
+>  	union aud_ch_status_1 ch_stat1 = {.regval = 0};
+>  
+> @@ -298,7 +297,6 @@ static int had_prog_status_reg(struct snd_pcm_substream *substream,
+>  					  IEC958_AES0_NONAUDIO) >> 1;
+>  	ch_stat0.regx.clk_acc = (intelhaddata->aes_bits &
+>  					  IEC958_AES3_CON_CLOCK) >> 4;
+> -	cfg_val.regx.val_bit = ch_stat0.regx.lpcm_id;
 
-Am Mittwoch, den 18.07.2018, 12:44 -0700 schrieb Trent Piepho:
-> This is the workaround for the IMX7d Erratum e10728, failure of
-> initialize PCIe PLL VCO oscillation resulting in PLL lock failure and
-> failure of the PCI-e link to come up.
-> 
-> The registers used in the workaround are based on the latest patch in
-> the NXP kernel, but many things around that have been changed.
-> 
-> This uses a new node of type fsl,imx-pcie-phy to get the PHY's
-> registers.??The node is found via a phandle added to the PCI-e
-> controller's node, rather than the incorrect way done in the NXP kernel.
-> 
-> There is no error if the phandle is not preset (since it's needed except
-> for the imx7d workaround and no existing dtses have it), but if preset
-> it is an error if something relating to it does not work.
-> 
-> ** Should the node be fsl,imx7d-pcie-phy???snps,dw-pcie-phy???
-> 
-> There is little to no documenation from NXP and Synopsis about this, so I'm
-> unsure of the PHY's lineage.
-> 
-> The imx6 PCI-e driver does not use the generic phy layer to interact
-> with the PHY.??It appears PHY related hardware, like clocks, regulators,
-> and resets, are part of the fsl,imx6q-pcie node.??But again, the
-> topology of this hardware is not documented very well.
-> 
-> Another approach would be to add the PHY registers as another bank in
-> the PCI-e node.??This would match how the PHY reset, clock, etc.??are
-> done.??However, the PHY is attached to a different AXI master than the
-> PCI-e controller, so the register range really does not belong there.
+Actually this made me wonder what is the definition of val_bit.
+It seems always 1 in the current code after the commit 964ca8083c02.
+Pierre?
 
-I took some time pondering about the way this is done. There are some
-small issues in the implementation (see my replies to the individual
-patches), but the overall approach taken looks fine to me.
 
-Regards,
-Lucas
+thanks,
+
+Takashi
