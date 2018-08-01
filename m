@@ -1,56 +1,57 @@
-From: drivshin@awxrd.com (David Rivshin)
-Date: Wed,  1 Aug 2018 10:17:29 -0400
-Subject: [PATCH v4] pwm: pwm-omap-dmtimer: return -EPROBE_DEFER if no dmtimer
- platform data
-Message-ID: <20180801141729.2840-1-drivshin@awxrd.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Wed,  1 Aug 2018 09:31:34 -0500
+Subject: [PATCHv2 2/2] ARM: dts: socfpga: update NAND clocking for c5/a5
+In-Reply-To: <1533133894-31932-1-git-send-email-dinguyen@kernel.org>
+References: <1533133894-31932-1-git-send-email-dinguyen@kernel.org>
+Message-ID: <1533133894-31932-2-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Rivshin <DRivshin@allworx.com>
+The NAND IP needs 3 clocks(nand_x_clk, nand_clk, and nand_ecc_clk). The
+nand_x_clk and nand_ecc_clk are derived from the nand_clk. The nand_x_clk
+has a fixed divider of 4.
 
-If a pwm-omap-dmtimer is probed before the dmtimer it uses, the platform
-data won't be set yet.
+Also, update the NAND dts property with the correct clocks property.
 
-Fixes: ac30751df953 ("ARM: OMAP: pdata-quirks: Remove unused timer pdata")
-Cc: <stable@vger.kernel.org> # 4.17+
-Signed-off-by: David Rivshin <drivshin@allworx.com>
-Acked-by: Pavel Machek <pavel@ucw.cz>
-Tested-by: Pavel Machek <pavel@ucw.cz>
-Acked-by: Ladislav Michl <ladis@linux-mips.org>
-Tested-by: Andreas Kemnade <andreas@kemnade.info>
+Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
 ---
-Changes in v4:
-* Added Ladislav's Acked-by [2]
-* Added Andreas's Tested-by [3]
-Changes in v3:
-* Changed dev_info to dev_dbg
-Changes in v2:
-* Added Pavel's Acked-by/Tested-by [1]
+v2: add nand_ecc_clk and update commit message
+---
+ arch/arm/boot/dts/socfpga.dtsi | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-[1] https://lkml.org/lkml/2018/7/16/346
-[2] https://www.spinics.net/lists/arm-kernel/msg668768.html
-[3] https://www.spinics.net/lists/arm-kernel/msg669302.html
-
-drivers/pwm/pwm-omap-dmtimer.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
-index 665da3c8fbceb..f45798679e3c0 100644
---- a/drivers/pwm/pwm-omap-dmtimer.c
-+++ b/drivers/pwm/pwm-omap-dmtimer.c
-@@ -264,8 +264,9 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index b38f8c2..daf249e 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -483,10 +483,17 @@
+ 						clk-gate = <0xa0 9>;
+ 					};
  
- 	timer_pdata = dev_get_platdata(&timer_pdev->dev);
- 	if (!timer_pdata) {
--		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
--		ret = -EINVAL;
-+		dev_dbg(&pdev->dev,
-+			 "dmtimer pdata structure NULL, deferring probe\n");
-+		ret = -EPROBE_DEFER;
- 		goto put;
- 	}
++					nand_ecc_clk: nand_ecc_clk {
++						#clock-cells = <0>;
++						compatible = "altr,socfpga-gate-clk";
++						clocks = <&nand_x_clk>;
++						clk-gate = <0xa0 9>;
++					};
++
+ 					nand_clk: nand_clk {
+ 						#clock-cells = <0>;
+ 						compatible = "altr,socfpga-gate-clk";
+-						clocks = <&f2s_periph_ref_clk>, <&main_nand_sdmmc_clk>, <&per_nand_mmc_clk>;
++						clocks = <&nand_x_clk>;
+ 						clk-gate = <0xa0 10>;
+ 						fixed-divider = <4>;
+ 					};
+@@ -754,7 +761,8 @@
+ 			reg-names = "nand_data", "denali_reg";
+ 			interrupts = <0x0 0x90 0x4>;
+ 			dma-mask = <0xffffffff>;
+-			clocks = <&nand_x_clk>;
++			clocks = <&nand_clk>, <&nand_x_clk>, <&nand_ecc_clk>;
++			clock-names = "nand", "nand_x", "ecc";
+ 			status = "disabled";
+ 		};
  
-
-base-commit: acb1872577b346bd15ab3a3f8dff780d6cca4b70
 -- 
-2.17.1
+2.7.4
