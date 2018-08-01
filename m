@@ -1,149 +1,57 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed,  1 Aug 2018 15:40:33 +0200
-Subject: [PATCH v2 3/3] arm64: dts: meson-axg: s400: add sound card
-In-Reply-To: <20180801134033.21739-1-jbrunet@baylibre.com>
-References: <20180801134033.21739-1-jbrunet@baylibre.com>
-Message-ID: <20180801134033.21739-4-jbrunet@baylibre.com>
+From: acolin@isi.edu (Alexei Colin)
+Date: Wed, 1 Aug 2018 09:54:41 -0400
+Subject: [PATCH 6/6] arm64: enable RapidIO menu in Kconfig
+In-Reply-To: <20180801103855.GD30658@n2100.armlinux.org.uk>
+References: <20180730225035.28365-1-acolin@isi.edu>
+ <20180730225035.28365-7-acolin@isi.edu>
+ <20180731084143.GA4680@arm.com>
+ <d09cb4f5-768b-acd8-f9b1-d1d320a93564@gmail.com>
+ <20180731155228.GN17271@n2100.armlinux.org.uk>
+ <044af717-3883-a7a6-c346-18fa8cebce76@gmail.com>
+ <20180731181834.GA30658@n2100.armlinux.org.uk>
+ <570ad147-3c58-8911-0111-29e21087ca7a@gmail.com>
+ <20180801103855.GD30658@n2100.armlinux.org.uk>
+Message-ID: <20180801135441.GD38497@guest228.east.isi.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the sound card of the s400. With it the following interface
-should be working:
- * Lineout
- * Daugther card speaker 1 (same output as lineout)
- * Linein
- * SPDIF output
+> > Why we cannot use "select HAS_RAPIDIO" HW-specific Kconfig file
+> > (mach-*/Kconfig)? And have on-chip port selection in the same board-specific
+> > place.
+> 
+> As I've already explained, HAS_RAPIDIO has the expectation that it
+> controls the availability of the RAPIDIO option, not of drivers.
+> It is HAS_*RAPIDIO*, the clue is in the name.  Using it as you are
+> (basically, to mean that on-SoC rapidio hardware is present) and
+> allowing such configurations as HAS_RAPIDIO=n RAPIDIO=y PCI=y is
+> completely counter-intuitive.
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- .../arm64/boot/dts/amlogic/meson-axg-s400.dts | 108 ++++++++++++++++++
- 1 file changed, 108 insertions(+)
+The intention in the patch was for HAS_RAPIDIO to mean exactly "on-SoC
+RapidIO hardware is present". Since the name does not reflect that well,
+I'll change it in the next version: would HAS_RAPIDIO_ONCHIP reflect the
+meaning well? 
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-index 9f5d81c3ee29..d399078d1f0c 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-@@ -204,6 +204,113 @@
- 		status = "okay";
- 		sound-name-prefix = "DIT";
- 	};
-+
-+	sound {
-+		compatible = "amlogic,axg-sound-card";
-+		model = "AXG-S400";
-+		audio-aux-devs = <&tdmin_a>, <&tdmin_b>,  <&tdmin_c>,
-+				 <&tdmin_lb>, <&tdmout_c>;
-+		audio-widgets = "Line", "Lineout",
-+				"Line", "Linein",
-+				"Speaker", "Speaker1 Left",
-+				"Speaker", "Speaker1 Right";
-+		audio-routing = "TDMOUT_C IN 0", "FRDDR_A OUT 2",
-+				"SPDIFOUT IN 0", "FRDDR_A OUT 3",
-+				"TDMOUT_C IN 1", "FRDDR_B OUT 2",
-+				"SPDIFOUT IN 1", "FRDDR_B OUT 3",
-+				"TDMOUT_C IN 2", "FRDDR_C OUT 2",
-+				"SPDIFOUT IN 2", "FRDDR_C OUT 3",
-+				"TDM_C Playback", "TDMOUT_C OUT",
-+				"TDMIN_A IN 2", "TDM_C Capture",
-+				"TDMIN_A IN 5", "TDM_C Loopback",
-+				"TDMIN_B IN 2", "TDM_C Capture",
-+				"TDMIN_B IN 5", "TDM_C Loopback",
-+				"TDMIN_C IN 2", "TDM_C Capture",
-+				"TDMIN_C IN 5", "TDM_C Loopback",
-+				"TDMIN_LB IN 2", "TDM_C Loopback",
-+				"TDMIN_LB IN 5", "TDM_C Capture",
-+				"TODDR_A IN 0", "TDMIN_A OUT",
-+				"TODDR_B IN 0", "TDMIN_A OUT",
-+				"TODDR_C IN 0", "TDMIN_A OUT",
-+				"TODDR_A IN 1", "TDMIN_B OUT",
-+				"TODDR_B IN 1", "TDMIN_B OUT",
-+				"TODDR_C IN 1", "TDMIN_B OUT",
-+				"TODDR_A IN 2", "TDMIN_C OUT",
-+				"TODDR_B IN 2", "TDMIN_C OUT",
-+				"TODDR_C IN 2", "TDMIN_C OUT",
-+				"TODDR_A IN 6", "TDMIN_LB OUT",
-+				"TODDR_B IN 6", "TDMIN_LB OUT",
-+				"TODDR_C IN 6", "TDMIN_LB OUT",
-+				"Lineout", "Lineout AOUTL",
-+				"Lineout", "Lineout AOUTR",
-+				"Speaker1 Left", "SPK1 OUT_A",
-+				"Speaker1 Left", "SPK1 OUT_B",
-+				"Speaker1 Right", "SPK1 OUT_C",
-+				"Speaker1 Right", "SPK1 OUT_D",
-+				"Linein AINL", "Linein",
-+				"Linein AINR", "Linein";
-+		assigned-clocks = <&clkc CLKID_HIFI_PLL>,
-+				  <&clkc CLKID_MPLL0>,
-+				  <&clkc CLKID_MPLL1>;
-+		assigned-clock-parents = <0>, <0>, <0>;
-+		assigned-clock-rates = <589824000>,
-+				       <270950400>,
-+				       <393216000>;
-+		status = "okay";
-+
-+		dai-link at 0 {
-+			sound-dai = <&frddr_a>;
-+		};
-+
-+		dai-link at 1 {
-+			sound-dai = <&frddr_b>;
-+		};
-+
-+		dai-link at 2 {
-+			sound-dai = <&frddr_c>;
-+		};
-+
-+		dai-link at 3 {
-+			sound-dai = <&toddr_a>;
-+		};
-+
-+		dai-link at 4 {
-+			sound-dai = <&toddr_b>;
-+		};
-+
-+		dai-link at 5 {
-+			sound-dai = <&toddr_c>;
-+		};
-+
-+		dai-link at 6 {
-+			sound-dai = <&tdmif_c>;
-+			dai-format = "i2s";
-+			dai-tdm-slot-tx-mask-2 = <1 1>;
-+			dai-tdm-slot-rx-mask-1 = <1 1>;
-+			mclk-fs = <256>;
-+
-+			codec at 0 {
-+				sound-dai = <&lineout>;
-+			};
-+
-+			codec at 1 {
-+				sound-dai = <&speaker_amp1>;
-+			};
-+
-+			codec at 2 {
-+				sound-dai = <&linein>;
-+			};
-+
-+		};
-+
-+		dai-link at 7 {
-+			sound-dai = <&spdifout>;
-+
-+			codec {
-+				sound-dai = <&spdif_dit>;
-+			};
-+		};
-+	};
- };
- 
- &ethmac {
-@@ -272,6 +379,7 @@
- 		PVDD_B-supply = <&main_12v>;
- 		PVDD_C-supply = <&main_12v>;
- 		PVDD_D-supply = <&main_12v>;
-+		sound-name-prefix = "SPK1";
- 	};
- };
- 
--- 
-2.17.1
+HAS_RAPIDIO=n RAPIDIO=y PCI=y should be an intuitive configuration,
+for example for MIPS until last week it effectively was the only option
+https://www.linux-mips.org/archives/linux-mips/2018-07/msg00584.html
+If we have to rename to make this configuration intuitive again, then
+I'll rename and resubmit.
+
+There was never the intention to assign any other meaning to
+HAS_RAPIDIO, specifically that it controls the availability of the
+RAPIDIO menu option. I think interpreting it this way is is behind a lot
+of the issues raised. The intention is that availability of the menu
+options is controlled by (1) whether the architecture sources the
+rapidio/Kconfig and (2) whether dependencies of RapidIO are satisfied
+(either having a PCI bus and enabling it, or having the on-SoC RapidIO
+hardware.
+
+The patch does not indend to change the current meaning and usage of the
+config options and behavior for X86, PPC, MIPS -- the patch only
+refactors there (because it was requested). For ARM and ARM64, we are
+adding the same behavior in same way as for those three architectures. I
+assume there is nothing that sets ARM and ARM64 apart from the others in
+this narrow context. This is the indended scope of this patch. Are we
+now discussing a change in the current meaning/usage/behavior?  If so,
+could we do one piece at a time -- first, add ARM and ARM64 in the way
+consistent with the way other architectures currently do it?
