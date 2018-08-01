@@ -1,45 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 31 Jul 2018 19:13:50 -0700
-Subject: [GIT PULL 1/2] Rockchip dts64 updates for 4.19 round 2
-In-Reply-To: <1809430.FkQi5Ue9ae@phil>
+Date: Tue, 31 Jul 2018 19:15:08 -0700
+Subject: [GIT PULL 2/2] Rockchip defconfig64 updates for 4.19
+In-Reply-To: <6710740.gS0PWvgRmW@phil>
 References: <2000491.bLgWuj0xar@phil> <1809430.FkQi5Ue9ae@phil>
-Message-ID: <CAOesGMh7hEK_JRk1qKOyLJcr3tB4KVOMMBMUsvXHs0nE1_LGHw@mail.gmail.com>
+ <6710740.gS0PWvgRmW@phil>
+Message-ID: <CAOesGMhV5R_=_x8T--sQ7pOSteTtZ0R199gXSzBWu4JmbXX0HQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2018 at 3:35 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Hi Arnd, Kevin, Olof,
->
-> please find below some more Rockchip devicetree updates
-> targeted at 4.19. With mainly a new board to go on top of the
-> first round of patches.
->
-> And in a second pull-request just some defconfig64 additions
-> enabling yet more stuff for kevin.
->
-> If we're not to late for 4.19, please pull!
-> Otherwise I'll migrate these over to 4.19+1
+On Mon, Jul 30, 2018 at 3:37 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> This time with less granularity, as requested by Olof during the last pull.
 >
 >
-> Thanks
-> Heiko
+> The following changes since commit 021c91791a5e7e85c567452f1be3e4c2c6cb6063:
 >
-> The following changes since commit d0414fdd58eb51ffd6528280fd66705123663964:
->
->   arm64: dts: rockchip: corrected uart1 clock-names for rk3328 (2018-07-07 13:02:27 +0200)
+>   Linux 4.18-rc3 (2018-07-01 16:04:53 -0700)
 >
 > are available in the Git repository at:
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.19-rockchip-dts64-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.19-rockchip-defconfig64-1
 >
-> for you to fetch changes up to 0fbfe10fa96b8df44cfb140a6672f9418e16a2a6:
+> for you to fetch changes up to 365e660fc88d6b8bbff13e61114cfb7b57e8a23d:
 >
->   arm64: dts: rockchip: add led support for Firefly-RK3399 (2018-07-25 12:19:41 +0200)
+>   arm64: defconfig: Enable more peripherals for Samsung Chromebook Plus. (2018-07-23 12:36:03 +0200)
 >
 > ----------------------------------------------------------------
-> A new board, the Vamrs Ficus using the rk3399 and followin the 96boards
-> standard. LEDs and power button for the rk3399 firefly and removal of
-> some deprecated type-c properties from the rk3399 devicetree.
+> Enablement of some more features relevant to rk3399-kevin
+> (Chromebook Plus)
+>
+> ----------------------------------------------------------------
+> Enric Balletbo i Serra (1):
+>       arm64: defconfig: Enable more peripherals for Samsung Chromebook Plus.
 
 Merged, thanks!
 
