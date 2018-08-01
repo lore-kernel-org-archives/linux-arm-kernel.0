@@ -1,40 +1,32 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Wed,  1 Aug 2018 11:48:00 +0200
-Subject: [PATCH v7 3/4] ARM: dts: sun8i: a83t: bananapi-m3: Enable IR
- controller
-In-Reply-To: <20180801094801.26627-1-embed3d@gmail.com>
-References: <20180801094801.26627-1-embed3d@gmail.com>
-Message-ID: <20180801094801.26627-4-embed3d@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  1 Aug 2018 11:48:33 +0200
+Subject: [PATCH] tee: optee: take DT status property into account
+Message-ID: <20180801094833.8361-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Bananapi M3 has an onboard IR receiver.
-This enables the onboard IR receiver subnode.
-Unlike the other IR receivers this one needs a base clock frequency
-of 3000000 Hz (3 MHz), to be able to work.
+DT nodes may have a 'status' property which, if set to anything other
+than 'ok' or 'okay', indicates to the OS that the DT node should be
+treated as if it was not present. So add that missing logic to the
+OP-TEE driver.
 
-Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/tee/optee/core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-index 3b579d7567c8..ea23ff821166 100644
---- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-@@ -183,6 +183,11 @@
- 	status = "okay";
- };
+diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
+index e5fd5ed217da..69ea1efbb051 100644
+--- a/drivers/tee/optee/core.c
++++ b/drivers/tee/optee/core.c
+@@ -696,7 +696,7 @@ static int __init optee_driver_init(void)
+ 		return -ENODEV;
  
-+&r_cir {
-+	clock-frequency = <3000000>;
-+	status = "okay";
-+};
-+
- &r_rsb {
- 	status = "okay";
+ 	np = of_find_matching_node(fw_np, optee_match);
+-	if (!np)
++	if (!np || !of_device_is_available(np))
+ 		return -ENODEV;
  
+ 	optee = optee_probe(np);
 -- 
-2.11.0
+2.18.0
