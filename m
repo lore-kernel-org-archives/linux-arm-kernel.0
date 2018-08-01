@@ -1,44 +1,64 @@
-From: alex.bou9@gmail.com (Alex Bounine)
-Date: Wed, 1 Aug 2018 09:15:57 -0400
-Subject: [RESEND PATCH 6/6] arm64: enable RapidIO menu in Kconfig
-In-Reply-To: <20180801095404.GA17585@infradead.org>
-References: <20180731142954.30345-1-acolin@isi.edu>
- <20180731142954.30345-7-acolin@isi.edu>
- <20180801095404.GA17585@infradead.org>
-Message-ID: <fad8661c-cd8c-3a9c-ca03-5d2f63893a24@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 01 Aug 2018 15:32:50 +0200
+Subject: [PATCH] drm/rockchip: Convert drm_atomic_helper_suspend/resume()
+In-Reply-To: <CAFqt6zbd5pJJEV+9_sqs3bML18gpWROBjGA13VeK3AWFgJ_u+A@mail.gmail.com>
+References: <20180731203430.GA30136@jordon-HP-15-Notebook-PC>
+ <1843623.lUM99VBV1x@phil>
+ <CAFqt6zbd5pJJEV+9_sqs3bML18gpWROBjGA13VeK3AWFgJ_u+A@mail.gmail.com>
+Message-ID: <4854810.RcpRblXvbi@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-08-01 05:54 AM, Christoph Hellwig wrote:
-> On Tue, Jul 31, 2018 at 10:29:54AM -0400, Alexei Colin wrote:
->> Platforms with a PCI bus will be offered the RapidIO menu since they may
->> be want support for a RapidIO PCI device. Platforms without a PCI bus
->> that might include a RapidIO IP block will need to "select HAS_RAPIDIO"
->> in the platform-/machine-specific "config ARCH_*" Kconfig entry.
->>
->> Tested that kernel builds for arm64 with RapidIO subsystem and
->> switch drivers enabled, also that the modules load successfully
->> on a custom Aarch64 Qemu model.
+Am Mittwoch, 1. August 2018, 15:14:24 CEST schrieb Souptick Joarder:
+> On Wed, Aug 1, 2018 at 6:40 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> > Am Mittwoch, 1. August 2018, 14:43:47 CEST schrieb Souptick Joarder:
+> >> On Wed, Aug 1, 2018 at 6:03 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> >> > Hi Souptick,
+> >> >
+> >> > Am Dienstag, 31. Juli 2018, 22:34:30 CEST schrieb Souptick Joarder:
+> >> >> convert drm_atomic_helper_suspend/resume() to use
+> >> >> drm_mode_config_helper_suspend/resume().
+> >> >>
+> >> >> With this conversion, rockchip_drm_fb_resume() and
+> >> >> rockchip_drm_fb_suspend() will not be used anymore.
+> >> >> Both of these functions can be removed.
+> >> >>
+> >> >> Also, in struct rockchip_drm_private state will not be
+> >> >> used anymore. So this can be removed forever.
+> >> >>
+> >> >> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> >> >> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
+> >> >
+> >> > the patch itself looks great, just a simple bookkeeping question.
+> >> >
+> >> > What role did Ajit play in creating the patch? If I remember correctly
+> >> > it is meant to be
+> >> > - 1st Signed-off: Patch-Author
+> >> > - 2nd Signed-off: E-Mail sender + patch possibly patch changes
+> >> > (optional of course if the same)
+> >> >
+> >> > So was this meant to be a Reviewed-by from Ajit?
+> >>
+> >> We both are working together for these patches to
+> >> convert drm_atomic_helper_suspend/resume().
+> >> That's the reason to add his name in 2nd Signed-off
+> >> in all similar patches.
+> >>
+> >> Is it a incorrect way to put 2nd Signed-off here ?
+> >
+> > Thanks for the clarification and the interesting question :-)
+> >
+> > I've just read through Documentation/process/submitting-patches.rst
+> > and it seems there is an "official" way to show that relationship, via a
+> > tag named "Co-Developed-by:" described under number 12.
+> >
+> > So I guess we could just adapt the patch accordingly, if that is ok with
+> > both of you (i.e. I can change this when applying, so no need to resend).
 > 
-> As said before, please include it from drivers/Kconfig so that _all_
-> architectures supporting PCI (or other Rapidio attachements) get it
-> and not some arbitrary selection of architectures.
-> 
-As it was replied earlier this is not a random selection of 
-architectures but only ones that implement support for RapidIO as system 
-bus. If other architectures choose to adopt RapidIO we will include them 
-as well.
+> We are ok with it :-)
 
-On some platforms RapidIO can be the only system bus available replacing 
-PCI/PCIe or RapidIO can coexist with PCIe.
+applied to drm-misc-next with the second signed-off changed to
+co-developed-by.
 
-As it is done now, RapidIO is configured in "Bus Options" (x86/PPC) or 
-"Bus Support" (ARMs) sub-menu and from system configuration option it 
-should be kept this way.
-
-Current location of RAPIDIO configuration option is familiar to users of 
-PowerPC and x86 platforms, and is similarly available in some ARM 
-manufacturers kernel code trees.
-
-drivers/Kconfig will be used for configuring drivers for peripheral 
-RapidIO devices if/when such device drivers will be published.
+Thanks for that nice cleanup.
+Heiko
