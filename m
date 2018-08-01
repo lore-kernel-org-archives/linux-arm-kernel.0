@@ -1,45 +1,46 @@
 From: colin.king@canonical.com (Colin King)
-Date: Wed,  1 Aug 2018 11:47:37 +0100
-Subject: [PATCH 4/9] ALSA: ens137x: remove redundant array pcm_devs
+Date: Wed,  1 Aug 2018 11:47:40 +0100
+Subject: [PATCH 7/9] ASoC: stm32: remove redundant pointers 'priv' and 'rtd'
 In-Reply-To: <20180801104742.4328-1-colin.king@canonical.com>
 References: <20180801104742.4328-1-colin.king@canonical.com>
-Message-ID: <20180801104742.4328-5-colin.king@canonical.com>
+Message-ID: <20180801104742.4328-8-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Colin Ian King <colin.king@canonical.com>
 
-The array pcm_devs is being assigned but is never used hence it is
-redundant and can be removed.
+Pointer 'priv' is assigned and not used, removing this allows
+the removal of pointer 'rtd'.
 
 Cleans up clang warning:
-warning: variable 'pcm_devs' set but not used [-Wunused-but-set-variable]
+warning: variable 'priv' set but not used [-Wunused-but-set-variable]
 
 Signed-off-by: Colin Ian King <colin.king@canonical.com>
 ---
- sound/pci/ens1370.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ sound/soc/stm/stm32_adfsdm.c | 8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
 
-diff --git a/sound/pci/ens1370.c b/sound/pci/ens1370.c
-index 39f79a6b5283..727eb3da1fda 100644
---- a/sound/pci/ens1370.c
-+++ b/sound/pci/ens1370.c
-@@ -2392,7 +2392,7 @@ static int snd_audiopci_probe(struct pci_dev *pci,
- 	static int dev;
- 	struct snd_card *card;
- 	struct ensoniq *ensoniq;
--	int err, pcm_devs[2];
-+	int err;
+diff --git a/sound/soc/stm/stm32_adfsdm.c b/sound/soc/stm/stm32_adfsdm.c
+index 0e9373064032..706ff005234f 100644
+--- a/sound/soc/stm/stm32_adfsdm.c
++++ b/sound/soc/stm/stm32_adfsdm.c
+@@ -269,16 +269,10 @@ static int stm32_adfsdm_pcm_new(struct snd_soc_pcm_runtime *rtd)
+ static void stm32_adfsdm_pcm_free(struct snd_pcm *pcm)
+ {
+ 	struct snd_pcm_substream *substream;
+-	struct snd_soc_pcm_runtime *rtd;
+-	struct stm32_adfsdm_priv *priv;
  
- 	if (dev >= SNDRV_CARDS)
- 		return -ENODEV;
-@@ -2412,7 +2412,6 @@ static int snd_audiopci_probe(struct pci_dev *pci,
- 	}
- 	card->private_data = ensoniq;
+ 	substream = pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream;
+-	if (substream) {
+-		rtd = substream->private_data;
+-		priv = snd_soc_dai_get_drvdata(rtd->cpu_dai);
+-
++	if (substream)
+ 		snd_pcm_lib_preallocate_free_for_all(pcm);
+-	}
+ }
  
--	pcm_devs[0] = 0; pcm_devs[1] = 1;
- #ifdef CHIP1370
- 	if ((err = snd_ensoniq_1370_mixer(ensoniq)) < 0) {
- 		snd_card_free(card);
+ static struct snd_soc_component_driver stm32_adfsdm_soc_platform = {
 -- 
 2.17.1
