@@ -1,44 +1,257 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 1 Aug 2018 08:45:35 +0800
-Subject: [PATCH v4 5/5] arm64: dts: actions: Add pinctrl node for Actions
- Semi S700
-In-Reply-To: <20180731194743.13678-6-sravanhome@gmail.com>
-References: <20180731194743.13678-6-sravanhome@gmail.com>
-Message-ID: <201808010805.DWcXxX04%fengguang.wu@intel.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Wed, 1 Aug 2018 09:04:16 +0530
+Subject: [PATCH 7/9] clk: actions: Add Actions Semi Owl SoCs Reset
+ Management Unit support
+In-Reply-To: <1532946112.3471.2.camel@pengutronix.de>
+References: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
+ <20180727184527.13287-8-manivannan.sadhasivam@linaro.org>
+ <1532946112.3471.2.camel@pengutronix.de>
+Message-ID: <20180801033416.GA15529@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Saravanan,
+Hi Philipp,
 
-Thank you for the patch! Yet something to improve:
+On Mon, Jul 30, 2018 at 12:21:52PM +0200, Philipp Zabel wrote:
+> Hi Manivannan,
+> 
+> Thank you for the patch, a few small comments below:
+> 
+> On Sat, 2018-07-28 at 00:15 +0530, Manivannan Sadhasivam wrote:
+> > Add Reset Management Unit (RMU) support for Actions Semi Owl SoCs.
+> > 
+> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> > ---
+> >  drivers/clk/actions/Kconfig      |  1 +
+> >  drivers/clk/actions/Makefile     |  1 +
+> >  drivers/clk/actions/owl-common.h |  2 +
+> >  drivers/clk/actions/owl-reset.c  | 72 ++++++++++++++++++++++++++++++++
+> >  drivers/clk/actions/owl-reset.h  | 32 ++++++++++++++
+> >  5 files changed, 108 insertions(+)
+> >  create mode 100644 drivers/clk/actions/owl-reset.c
+> >  create mode 100644 drivers/clk/actions/owl-reset.h
+> > 
+> > diff --git a/drivers/clk/actions/Kconfig b/drivers/clk/actions/Kconfig
+> > index dc38c85a4833..04f0a6355726 100644
+> > --- a/drivers/clk/actions/Kconfig
+> > +++ b/drivers/clk/actions/Kconfig
+> > @@ -2,6 +2,7 @@ config CLK_ACTIONS
+> >  	bool "Clock driver for Actions Semi SoCs"
+> >  	depends on ARCH_ACTIONS || COMPILE_TEST
+> >  	select REGMAP_MMIO
+> > +	select RESET_CONTROLLER
+> >  	default ARCH_ACTIONS
+> >  
+> >  if CLK_ACTIONS
+> > diff --git a/drivers/clk/actions/Makefile b/drivers/clk/actions/Makefile
+> > index 78c17d56f991..ccfdf9781cef 100644
+> > --- a/drivers/clk/actions/Makefile
+> > +++ b/drivers/clk/actions/Makefile
+> > @@ -7,6 +7,7 @@ clk-owl-y			+= owl-divider.o
+> >  clk-owl-y			+= owl-factor.o
+> >  clk-owl-y			+= owl-composite.o
+> >  clk-owl-y			+= owl-pll.o
+> > +clk-owl-y			+= owl-reset.o
+> >  
+> >  # SoC support
+> >  obj-$(CONFIG_CLK_OWL_S700)	+= owl-s700.o
+> > diff --git a/drivers/clk/actions/owl-common.h b/drivers/clk/actions/owl-common.h
+> > index 56f01f7774aa..4dc7f286831f 100644
+> > --- a/drivers/clk/actions/owl-common.h
+> > +++ b/drivers/clk/actions/owl-common.h
+> > @@ -26,6 +26,8 @@ struct owl_clk_desc {
+> >  	struct owl_clk_common		**clks;
+> >  	unsigned long			num_clks;
+> >  	struct clk_hw_onecell_data	*hw_clks;
+> > +	struct owl_reset_map		*resets;
+> 
+> Could this be:
+> 	const struct owl_reset_map	*resets;
+> ?
+> 
 
-[auto build test ERROR on pinctrl/devel]
-[also build test ERROR on next-20180731]
-[cannot apply to v4.18-rc7]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Ack.
 
-url:    https://github.com/0day-ci/linux/commits/Saravanan-Sekar/pinctrl-actions-define-constructor-generic-to-Actions-Semi-SoC-s/20180801-042834
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git devel
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
+> > +	unsigned long			num_resets;
+> >  	struct regmap			*regmap;
+> >  };
+> >  
+> > diff --git a/drivers/clk/actions/owl-reset.c b/drivers/clk/actions/owl-reset.c
+> > new file mode 100644
+> > index 000000000000..91b161cc68de
+> > --- /dev/null
+> > +++ b/drivers/clk/actions/owl-reset.c
+> > @@ -0,0 +1,72 @@
+> > +// SPDX-License-Identifier: GPL-2.0-or-later
+> > +//
+> > +// Actions Semi Owl SoCs Reset Management Unit driver
+> > +//
+> > +// Copyright (c) 2018 Linaro Ltd.
+> > +// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> > +
+> > +#include <linux/delay.h>
+> > +#include <linux/io.h>
+> 
+> This seems unnecessary, since register access is done via regmap.
+> 
 
-All errors (new ones prefixed by >>):
+Will remove this header.
 
->> Error: arch/arm64/boot/dts/actions/s700.dtsi:172.19-20 syntax error
->> FATAL ERROR: Unable to parse input tree
+> > +#include <linux/regmap.h>
+> > +#include <linux/reset-controller.h>
+> > +
+> > +#include "owl-reset.h"
+> > +
+> > +static int owl_reset_assert(struct reset_controller_dev *rcdev,
+> > +			    unsigned long id)
+> > +{
+> > +	struct owl_reset *reset = to_owl_reset(rcdev);
+> > +	const struct owl_reset_map *map = &reset->reset_map[id];
+> > +	u32 reg;
+> > +
+> > +	regmap_read(reset->regmap, map->reg, &reg);
+> > +	regmap_write(reset->regmap, map->reg, reg & ~map->bit);
+> 
+> This read-modify-write sequence needs locking against concurrent
+> register access. Better use regmap_update_bits():
+> 
+> 	return regmap_update_bits(reset->regmap, map->reg, map->bit, 0);
+> 
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 38876 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180801/90058689/attachment-0001.gz>
+Ack.
+
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int owl_reset_deassert(struct reset_controller_dev *rcdev,
+> > +			      unsigned long id)
+> > +{
+> > +	struct owl_reset *reset = to_owl_reset(rcdev);
+> > +	const struct owl_reset_map *map = &reset->reset_map[id];
+> > +	u32 reg;
+> > +
+> > +	regmap_read(reset->regmap, map->reg, &reg);
+> > +	regmap_write(reset->regmap, map->reg, reg | map->bit);
+> 
+> Better:
+> 
+> 	return regmap_update_bits(reset->regmap, map->reg, map->bit, map->bit);
+> 
+
+Ack.
+
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int owl_reset_reset(struct reset_controller_dev *rcdev,
+> > +			   unsigned long id)
+> > +{
+> > +	owl_reset_assert(rcdev, id);
+> > +	udelay(1);
+> 
+> Is the delay valid for all IP cores on all SoCs variants?
+> 
+
+It is valid for S900 and S700 for now but I'm not sure about S500. Will
+make sure while adding S500 support.
+
+> > +	owl_reset_deassert(rcdev, id);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int owl_reset_status(struct reset_controller_dev *rcdev,
+> > +			    unsigned long id)
+> > +{
+> > +	struct owl_reset *reset = to_owl_reset(rcdev);
+> > +	const struct owl_reset_map *map = &reset->reset_map[id];
+> > +	u32 reg;
+> > +
+> > +	regmap_read(reset->regmap, map->reg, &reg);
+> 
+> If this could return an error, better report it.
+> 
+
+Ack.
+
+> > +
+> > +	/*
+> > +	 * The reset control API expects 0 if reset is not asserted,
+> > +	 * which is the opposite of what our hardware uses.
+> > +	 */
+> > +	return !(map->bit & reg);
+> > +}
+> > +
+> > +const struct reset_control_ops owl_reset_ops = {
+> > +	.assert		= owl_reset_assert,
+> > +	.deassert	= owl_reset_deassert,
+> > +	.reset		= owl_reset_reset,
+> > +	.status		= owl_reset_status,
+> > +};
+> > diff --git a/drivers/clk/actions/owl-reset.h b/drivers/clk/actions/owl-reset.h
+> > new file mode 100644
+> > index 000000000000..1a5e987ba99b
+> > --- /dev/null
+> > +++ b/drivers/clk/actions/owl-reset.h
+> > @@ -0,0 +1,32 @@
+> > +// SPDX-License-Identifier: GPL-2.0-or-later
+> > +//
+> > +// Actions Semi Owl SoCs Reset Management Unit driver
+> > +//
+> > +// Copyright (c) 2018 Linaro Ltd.
+> > +// Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> > +
+> > +#ifndef _OWL_RESET_H_
+> > +#define _OWL_RESET_H_
+> > +
+> > +#include <linux/reset-controller.h>
+> > +#include <linux/spinlock.h>
+> 
+> spinlock?
+> 
+
+Oops. Not needed, will remove that.
+
+> > +
+> > +struct owl_reset_map {
+> > +	u16	reg;
+> 
+> Note that this will be aligned to 32-bits. If the intention was to save
+> space, consider storing an u8 bit index instead of the mask.
+> 
+
+Better to change it to u32, no need of memory saving here :)
+
+> > +	u32	bit;
+> > +};
+> > +
+> > +struct owl_reset {
+> > +	struct reset_controller_dev	rcdev;
+> > +	struct owl_reset_map		*reset_map;
+> 
+> Could this be
+> 	const struct owl_reset_map	*reset_map;
+> ?
+> 
+
+Ack.
+
+Thanks,
+Mani
+
+> > +	struct regmap			*regmap;
+> > +};
+> > +
+> > +static inline struct owl_reset *to_owl_reset(struct reset_controller_dev *rcdev)
+> > +{
+> > +	return container_of(rcdev, struct owl_reset, rcdev);
+> > +}
+> > +
+> > +extern const struct reset_control_ops owl_reset_ops;
+> > +
+> > +#endif /* _OWL_RESET_H_ */
+> 
+> regards
+> Philipp
