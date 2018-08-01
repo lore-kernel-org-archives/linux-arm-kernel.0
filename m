@@ -1,70 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 1 Aug 2018 10:10:27 +0100
-Subject: [PATCH 6/6] arm64: enable RapidIO menu in Kconfig
-In-Reply-To: <f2723578-f39d-27ac-b376-0f06905caa67@gmail.com>
-References: <20180730225035.28365-1-acolin@isi.edu>
- <20180730225035.28365-7-acolin@isi.edu>
- <20180731084143.GA4680@arm.com>
- <d09cb4f5-768b-acd8-f9b1-d1d320a93564@gmail.com>
- <f2723578-f39d-27ac-b376-0f06905caa67@gmail.com>
-Message-ID: <20180801091027.GC14438@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Aug 2018 10:21:19 +0100
+Subject: [PATCH 1/3] PCI: Introduce PCI software bridge common logic
+In-Reply-To: <20180801104957.1b01b847@windsurf>
+References: <20180629092231.32207-1-thomas.petazzoni@bootlin.com>
+ <20180629092231.32207-2-thomas.petazzoni@bootlin.com>
+ <20180712195802.GC28466@bhelgaas-glaptop.roam.corp.google.com>
+ <20180801104957.1b01b847@windsurf>
+Message-ID: <20180801092119.GB30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 04:29:56PM -0400, Alex Bounine wrote:
-> On 2018-07-31 08:54 AM, Alex Bounine wrote:
-> >On 2018-07-31 04:41 AM, Will Deacon wrote:
-> >>On Mon, Jul 30, 2018 at 06:50:34PM -0400, Alexei Colin wrote:
-> >>>Platforms with a PCI bus will be offered the RapidIO menu since they may
-> >>>be want support for a RapidIO PCI device. Platforms without a PCI bus
-> >>>that might include a RapidIO IP block will need to "select HAS_RAPIDIO"
-> >>>in the platform-/machine-specific "config ARCH_*" Kconfig entry.
-> >>>
-> >>>Tested that kernel builds for arm64 with RapidIO subsystem and
-> >>>switch drivers enabled, also that the modules load successfully
-> >>>on a custom Aarch64 Qemu model.
-> >>>
-> >>>Cc: Andrew Morton <akpm@linux-foundation.org>
-> >>>Cc: Russell King <linux@armlinux.org.uk>
-> >>>Cc: John Paul Walters <jwalters@isi.edu>
-> >>>Cc: linux-arm-kernel at lists.infradead.org
-> >>>Cc: linux-kernel at vger.kernel.org,
-> >>>Signed-off-by: Alexei Colin <acolin@isi.edu>
-> >>>---
-> >>>? arch/arm64/Kconfig | 2 ++
-> >>>? 1 file changed, 2 insertions(+)
-> >>
-> >>Thanks, this looks much cleaner than before:
-> >>
-> >>Acked-by: Will Deacon <will.deacon@arm.com>
-> >>
-> >>The only thing I'm not sure about is why we don't just select HAS_RAPIDIO
-> >>unconditionally in the arm64 Kconfig. Does selecting only that option
-> >>actually pull in new code to the build?
-> >>
-> >HAS_RAPIDIO option is intended for SOCs that have built in SRIO
-> >controllers, like TI KeyStoneII or FPGAs. Because RapidIO subsystem core
-> >is required during RapidIO port driver initialization, having separate
-> >option allows us to control available build options for RapidIO core and
-> >port driver (bool vs. tristate) and disable module option if port driver
-> >is configured as built-in.
+On Wed, Aug 01, 2018 at 10:49:57AM +0200, Thomas Petazzoni wrote:
+> Indeed, yes. Will fix that.
 > 
-> I am thinking about where HAS_RAPIDIO option can be set for arm64 branch.
-> Having it set globally is too broad. For example we have Xilinx Zinq US
-> board with SRIO IP on it. Having it globally in arm64 branch - bad. Probably
-> having it set in drivers/soc/... is the best place.
+> So, to sum up, there are really three key questions:
+> 
+>  (1) Which name do you want for this ?
+> 
+>  (2) Agreeing on whether a RAM-like behavior is acceptable, and if not,
+>      which solution do you propose instead.
 
-Why is selecting HAS_RAPIDIO globally a bad thing to do? The way these
-normally work is, if some subsystem requires arch support, then there's
-an ARCH_HAS_xxxx option which the architecture selects when it implements
-that support. Once you've enabled that, then that allows other sub-options
-to be selected, such as specific drivers or what-not. Look at the Kconfig
-files under drivers/soc/ -- you don't see anybody selecting ARCH_HAS_*
-options.
+Please take the time to read the PCI(e) specifications and implement
+what it recommends, rather than doing something else.  That's what I
+did when I originally reworked the mvebu PCIe driver for Armada 388,
+and it's the only sensible approach to have something that works with
+the rest of the Linux PCI(e) layer.
 
-Now, if HAS_RAPIDIO alone is pulling in a whole load of code to the build,
-then it sounds like a misnomer.
+Going off and implementing a non-standard behaviour is a recipe for
+things breaking as the PCIe kernel support evolves.
 
-Confused.
+The spec requires reserved registers to read back as zero and ignore
+writes, whereas implemented registers have a mixture of behaviours:
 
-Will
+- read/write
+- read, write to clear
+- read-only
+
+Here's the extract(s):
+
+   All PCI devices must treat Configuration Space write operations
+   to reserved registers as no-ops; that is, the access must be
+   completed normally on the bus and the data discarded. Read
+   accesses to reserved or unimplemented registers must be completed
+   normally and a data value of 0 returned.
+
+(eg) PCI status:
+   Reserved bits should be read-only and return zero when read.
+   A one bit is reset (if it is not read-only) whenever the register
+   is written, and the write data in the corresponding bit location
+   is a 1.
+
+[which is why doing the read-modify-write action that some host
+ bridges that only support 32-bit accesses is dangerous - it leads
+ to various status bits being inadvertently reset.]
+
+Getting this right in a software emulation of the register space for
+each bit in every register makes for a happy Linux PCIe layer.
+
+Now, configuration read/writes use naturally aligned addresses.  The
+PCI specification defines the PC IO 0xcf8/0xcfc configuration access
+mechanism.  The first register defines the address with a 6 bit
+"double-word" address to cover the 256 bytes of standard config space.
+Accesses to 0xcfc are forwarded to the PCI bus as a single
+configuration request - and that means there is nothing to deal with
+an attempt to access a mis-aligned word.
+
+Indeed, if 0xcfe was to be accessed as a double word, this would
+result in the processor reading the two bytes from IO address 0xcfe,
+0xcff, as well as 0xd00 and 0xd01 which are not part of the
+configuration data register - resulting in undefined data being read.
+
+So, basically, misaligned configuration accesses are not supported.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
