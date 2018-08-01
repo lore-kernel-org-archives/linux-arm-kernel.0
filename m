@@ -1,87 +1,27 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed,  1 Aug 2018 18:51:47 +0200
-Subject: [PATCH 4.14 197/246] soc: imx: gpcv2: Do not pass static memory as
- platform data
-In-Reply-To: <20180801165011.700991984@linuxfoundation.org>
-References: <20180801165011.700991984@linuxfoundation.org>
-Message-ID: <20180801165021.152438216@linuxfoundation.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 1 Aug 2018 18:27:47 +0100
+Subject: [RFC PATCH v2 5/6] spi: Add QuadSPI driver for Atmel SAMA5D2
+In-Reply-To: <20180627131609.13681-6-bugalski.piotr@gmail.com>
+References: <20180627131609.13681-1-bugalski.piotr@gmail.com>
+ <20180627131609.13681-6-bugalski.piotr@gmail.com>
+Message-ID: <20180801172747.GJ5509@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.14-stable review patch.  If anyone has any objections, please let me know.
+On Wed, Jun 27, 2018 at 03:16:08PM +0200, Piotr Bugalski wrote:
+> Kernel contains QSPI driver strongly tied to MTD and nor-flash memory.
+> New spi-mem interface allows usage also other memory types, especially
+> much larger NAND with SPI interface. This driver works as SPI controller
+> and is not related to MTD, however can work with NAND-flash or other
+> peripherals using spi-mem interface.
 
-------------------
-
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
-
-[ Upstream commit 050f810e238f268670f14a8f8b793ba2dbf2e92f ]
-
-Platform device core assumes the ownership of dev.platform_data as
-well as that it is dynamically allocated and it will try to kfree it
-as a part of platform_device_release(). Change the code to use
-platform_device_add_data() n instead of a pointer to a static memory
-to avoid causing a BUG() when calling platform_device_put().
-
-The problem can be reproduced by artificially enabling the error path
-of platform_device_add() call (around line 357).
-
-Note that this change also allows us to constify imx7_pgc_domains,
-since we no longer need to be able to modify it.
-
-Cc: Stefan Agner <stefan@agner.ch>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
----
- drivers/soc/imx/gpcv2.c |   22 +++++++++++++++-------
- 1 file changed, 15 insertions(+), 7 deletions(-)
-
---- a/drivers/soc/imx/gpcv2.c
-+++ b/drivers/soc/imx/gpcv2.c
-@@ -155,7 +155,7 @@ static int imx7_gpc_pu_pgc_sw_pdn_req(st
- 	return imx7_gpc_pu_pgc_sw_pxx_req(genpd, false);
- }
- 
--static struct imx7_pgc_domain imx7_pgc_domains[] = {
-+static const struct imx7_pgc_domain imx7_pgc_domains[] = {
- 	[IMX7_POWER_DOMAIN_MIPI_PHY] = {
- 		.genpd = {
- 			.name      = "mipi-phy",
-@@ -321,11 +321,6 @@ static int imx_gpcv2_probe(struct platfo
- 			continue;
- 		}
- 
--		domain = &imx7_pgc_domains[domain_index];
--		domain->regmap = regmap;
--		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
--		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
--
- 		pd_pdev = platform_device_alloc("imx7-pgc-domain",
- 						domain_index);
- 		if (!pd_pdev) {
-@@ -334,7 +329,20 @@ static int imx_gpcv2_probe(struct platfo
- 			return -ENOMEM;
- 		}
- 
--		pd_pdev->dev.platform_data = domain;
-+		ret = platform_device_add_data(pd_pdev,
-+					       &imx7_pgc_domains[domain_index],
-+					       sizeof(imx7_pgc_domains[domain_index]));
-+		if (ret) {
-+			platform_device_put(pd_pdev);
-+			of_node_put(np);
-+			return ret;
-+		}
-+
-+		domain = pd_pdev->dev.platform_data;
-+		domain->regmap = regmap;
-+		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
-+		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
-+
- 		pd_pdev->dev.parent = dev;
- 		pd_pdev->dev.of_node = np;
- 
+This is fine from a SPI point of view but I'd like to apply it directly
+to the SPI tree rather than ack it for merge via the MTD tree - can we
+work something out with a shared branch or something?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180801/c4c773c3/attachment.sig>
