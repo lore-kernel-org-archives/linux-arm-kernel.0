@@ -1,56 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Aug 2018 18:42:56 +0100
-Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
-In-Reply-To: <CAAeHK+yWF05XoU+0iuJoXAL3cWgdtxbeLoBz169yP12W4LkcQw@mail.gmail.com>
-References: <cover.1529507994.git.andreyknvl@google.com>
- <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
- <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
- <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
- <CAAeHK+wJbbCZd+-X=9oeJgsqQJiq8h+Aagz3SQMPaAzCD+pvFw@mail.gmail.com>
- <CAAeHK+yWF05XoU+0iuJoXAL3cWgdtxbeLoBz169yP12W4LkcQw@mail.gmail.com>
-Message-ID: <20180801174256.5mbyf33eszml4nmu@armageddon.cambridge.arm.com>
+From: arun.parameswaran@broadcom.com (Arun Parameswaran)
+Date: Wed,  1 Aug 2018 10:56:21 -0700
+Subject: [PATCH v3 3/8] arm64: dts: Fix the base address of the Broadcom iProc
+ mdio mux
+In-Reply-To: <1533146186-8374-1-git-send-email-arun.parameswaran@broadcom.com>
+References: <1533146186-8374-1-git-send-email-arun.parameswaran@broadcom.com>
+Message-ID: <1533146186-8374-4-git-send-email-arun.parameswaran@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2018 at 01:25:59PM +0200, Andrey Konovalov wrote:
-> On Thu, Jun 28, 2018 at 9:30 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> > On Wed, Jun 27, 2018 at 5:05 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> >> On Tue, Jun 26, 2018 at 7:29 PM, Catalin Marinas
-> >> <catalin.marinas@arm.com> wrote:
-> >>> While I support this work, as a maintainer I'd like to understand
-> >>> whether we'd be in a continuous chase of ABI breaks with every kernel
-> >>> release or we have a better way to identify potential issues. Is there
-> >>> any way to statically analyse conversions from __user ptr to long for
-> >>> example? Or, could we get the compiler to do this for us?
-> >>
-> >> OK, got it, I'll try to figure out a way to find these conversions.
-> >
-> > I've prototyped a checker on top of clang static analyzer (initially
-> > looked at sparse, but couldn't find any documentation or examples).
-> > The results are here [1], search for "warning: user pointer cast".
-> > Sharing in case anybody wants to take a look, will look at them myself
-> > tomorrow.
-> >
-> > [1] https://gist.github.com/xairy/433edd5c86456a64026247cb2fef2115
-> 
-> So the checker reports ~100 different places where a __user pointer
-> being casted. I've looked through them and found 3 places where we
-> need to add untagging. Source code lines below come from 4.18-rc2+
-> (6f0d349d).
-[...]
-> I'll add the 3 patches with fixes to v5 of this patchset.
+Modify the base address of the mdio mux driver to point to the
+start of the mdio mux block's register address space.
 
-Thanks for investigating. You can fix those three places in your code
-but I was rather looking for a way to check such casting in the future
-for newly added code. While for the khwasan we can assume it's a debug
-option, the tagged user pointers are ABI and we need to keep it stable.
+Signed-off-by: Arun Parameswaran <arun.parameswaran@broadcom.com>
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi    | 4 ++--
+ arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-We could we actually add some macros for explicit conversion between
-__user ptr and long and silence the warning there (I guess this would
-work better for sparse). We can then detect new ptr to long casts as
-they appear. I just hope that's not too intrusive.
-
-(I haven't tried the sparse patch yet, hopefully sometime this week)
-
+diff --git a/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi b/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi
+index 4057197..1a406a7 100644
+--- a/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi
++++ b/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi
+@@ -482,9 +482,9 @@
+ 			status = "disabled";
+ 		};
+ 
+-		mdio_mux_iproc: mdio-mux at 6602023c {
++		mdio_mux_iproc: mdio-mux at 66020000 {
+ 			compatible = "brcm,mdio-mux-iproc";
+-			reg = <0x6602023c 0x14>;
++			reg = <0x66020000 0x250>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+index b203152..a70e8dd 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+@@ -278,9 +278,9 @@
+ 
+ 		#include "stingray-pinctrl.dtsi"
+ 
+-		mdio_mux_iproc: mdio-mux at 2023c {
++		mdio_mux_iproc: mdio-mux at 20000 {
+ 			compatible = "brcm,mdio-mux-iproc";
+-			reg = <0x0002023c 0x14>;
++			reg = <0x00020000 0x250>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
 -- 
-Catalin
+1.9.1
