@@ -1,35 +1,33 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 01 Aug 2018 13:46:49 +0200
-Subject: [PATCH v4 1/4] gpio: syscon: rockchip: add GRF GPIO support for
- rk3328
-In-Reply-To: <1533016762-5268-2-git-send-email-djw@t-chip.com.cn>
-References: <1533016762-5268-1-git-send-email-djw@t-chip.com.cn>
- <1533016762-5268-2-git-send-email-djw@t-chip.com.cn>
-Message-ID: <4408660.D6TumT1hZf@phil>
+From: alex@ghiti.fr (Alexandre Ghiti)
+Date: Wed, 1 Aug 2018 13:50:49 +0200
+Subject: [PATCH v5 00/11] hugetlb: Factorize hugetlb architecture
+ primitives
+In-Reply-To: <20180731160640.11306628@doriath>
+References: <20180731060155.16915-1-alex@ghiti.fr>
+ <20180731160640.11306628@doriath>
+Message-ID: <1cee9f98-4cff-3e42-6cc8-088310e406d9@ghiti.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 31. Juli 2018, 07:59:19 CEST schrieb djw at t-chip.com.cn:
-> From: Levin Du <djw@t-chip.com.cn>
-> 
-> In Rockchip RK3328, the output only GPIO_MUTE pin, originally for codec
-> mute control, can also be used for general purpose. It is manipulated by
-> the GRF_SOC_CON10 register in GRF. Aside from the GPIO_MUTE pin, the HDMI
-> pins can also be set in the same way.
-> 
-> Currently this GRF GPIO controller only supports the mute pin. If needed
-> in the future, the HDMI pins support can also be added.
-> 
-> Signed-off-by: Levin Du <djw@t-chip.com.cn>
+On 07/31/2018 10:06 PM, Luiz Capitulino wrote:
+> On Tue, 31 Jul 2018 06:01:44 +0000
+> Alexandre Ghiti <alex@ghiti.fr> wrote:
+>
+>> [CC linux-mm for inclusion in -mm tree]
+>>
+>> In order to reduce copy/paste of functions across architectures and then
+>> make riscv hugetlb port (and future ports) simpler and smaller, this
+>> patchset intends to factorize the numerous hugetlb primitives that are
+>> defined across all the architectures.
+> [...]
+>
+>>   15 files changed, 139 insertions(+), 382 deletions(-)
+> I imagine you're mostly interested in non-x86 review at this point, but
+> as this series is looking amazing:
+>
+> Reviewed-by: Luiz Capitulino <lcapitulino@redhat.com>
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+It's always good to have another feedback :)
+Thanks for your review Luiz,
 
-It looks like Linus (Torvalds) is doing an -rc8 this time [0] so we might
-still be in time for 4.19 , depending on when this patch is going to be
-applied ;-) .
-
-
-Heiko
-
-
-[0] https://lore.kernel.org/lkml/CA+55aFzHRaNMHxLCEa5Zke-1FgbQ4rtHf8-HOu0zBzo4Liz88A at mail.gmail.com/
+Alex
