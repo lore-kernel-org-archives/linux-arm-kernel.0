@@ -1,85 +1,124 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 1 Aug 2018 10:34:04 +0200
-Subject: [PATCH 2/2] dt-bindings: clock: Add bindings for the Clocking
- Wizard IP
-In-Reply-To: <a8620c93-cf99-719d-d2bb-7d0f0b567130@xilinx.com>
-References: <20180801081950.10497-1-boris.brezillon@bootlin.com>
- <20180801081950.10497-2-boris.brezillon@bootlin.com>
- <a8620c93-cf99-719d-d2bb-7d0f0b567130@xilinx.com>
-Message-ID: <20180801103404.4b9135dc@bbrezillon>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 01 Aug 2018 17:36:04 +0900
+Subject: [PATCH 1/8] devfreq: rockchip-dfi: Move GRF definitions to a
+ common place.
+In-Reply-To: <20180730081124.30698-2-enric.balletbo@collabora.com>
+References: <20180730081124.30698-1-enric.balletbo@collabora.com>
+ <CGME20180730081245epcas3p2794d7d7c21f4059ab89ec59a0ef9fa22@epcas3p2.samsung.com>
+ <20180730081124.30698-2-enric.balletbo@collabora.com>
+Message-ID: <5B6170F4.4070102@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Hi Enric,
 
-On Wed, 1 Aug 2018 10:26:11 +0200
-Michal Simek <michal.simek@xilinx.com> wrote:
-
-> Hi Boris,
+On 2018? 07? 30? 17:11, Enric Balletbo i Serra wrote:
+> Some rk3399 GRF (Generic Register Files) definitions can be used for
+> different drivers. Move these definitions to a common include so we
+> don't need to duplicate these definitions.
 > 
-> On 1.8.2018 10:19, Boris Brezillon wrote:
-> > Document Xilinx Clocking Wizard bindings.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@bootlin.com>
-> > ---
-> >  .../devicetree/bindings/clock/xlnx,clk-wizard.txt  | 28 ++++++++++++++++++++++
-> >  1 file changed, 28 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt b/Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt
-> > new file mode 100644
-> > index 000000000000..1bf7a764f4a9
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt
-> > @@ -0,0 +1,28 @@
-> > +Device Tree Clock bindings for the "Clocking Wizard" IP provided by Xilinx
-> > +
-> > +This block can be used to generate up to 4 clock signals out of a single input
-> > +clock. It embeds a PLL to generate an intermediate clock which then feeds 4
-> > +clock dividers whose divider value can be adjusted based on the user needs.
-> > +
-> > +Required properties:
-> > + - #clock-cells: must be 1. The cell is encoding the id of the output clk
-> > +		 (from 0 to xlnx,clk-wizard-num-outputs - 1)
-> > + - compatible: must be "xlnx,clk-wizard-5.1"
-> > + - clocks: 2 clocks are required
-> > + - clock-names: should contain 2 clock names: "aclk" and "clkin".
-> > +		"aclk" is driving the register interface and "clk_in" is the
-> > +		input clock signal that is used by the PLL block
-> > + - xlnx,clk-wizard-num-outputs: this describe the number of output clocks
-> > +				(chosen at synthesization time)
-> > + - reg: registers used to configure the Clocking wizard block
-> > +
-> > +Example:
-> > +
-> > +	clkwizard: clkwizard at 43c20000 {
-> > +		compatible = "xlnx,clk-wizard-5.1";
-> > +		reg = <0x43c20000 0x10000>;
-> > +		clocks = <&clkc 18>, <&clkc 18>;
-> > +		clock-names = "aclk", "clk_in1";
-> > +		#clock-cells = <1>;
-> > +		xlnx,clk-wizard-num-outputs = <2>;
-> > +	};
-> >   
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> ---
 > 
-> First of all this should be 1/2.
+> Changes in v1:
+> - [RFC 1/10] Add Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-Hm, okay. Didn't know the order was important.
+Even if you add the changes log, you are missing my Acked-by tag.
 
+> - [RFC 1/10] s/Generic/General/ (Robin Murphy)
+> - [RFC 4/10] Removed from the series. I did not found a use case where not holding the mutex causes the issue.
+> - [RFC 7/10] Removed from the series. I did not found a use case where this matters.
 > 
-> The second is that this driver is already in staging area
-> (drivers/staging/clocking-wizard) for a while. That's why please use
-> this driver or send patches on the top of this.
-
-Crap! I didn't look in staging. BTW, any reason this driver is in
-staging?
-
+>  drivers/devfreq/event/rockchip-dfi.c | 23 +++++++----------------
+>  include/soc/rockchip/rk3399_grf.h    | 21 +++++++++++++++++++++
+>  2 files changed, 28 insertions(+), 16 deletions(-)
+>  create mode 100644 include/soc/rockchip/rk3399_grf.h
 > 
-> I know we have been doing some changes in this driver recently but not
-> sure if they reach our tree or mainline.
+> diff --git a/drivers/devfreq/event/rockchip-dfi.c b/drivers/devfreq/event/rockchip-dfi.c
+> index 22b113363ffc..2fbbcbeb644f 100644
+> --- a/drivers/devfreq/event/rockchip-dfi.c
+> +++ b/drivers/devfreq/event/rockchip-dfi.c
+> @@ -26,6 +26,8 @@
+>  #include <linux/list.h>
+>  #include <linux/of.h>
+>  
+> +#include <soc/rockchip/rk3399_grf.h>
+> +
+>  #define RK3399_DMC_NUM_CH	2
+>  
+>  /* DDRMON_CTRL */
+> @@ -43,18 +45,6 @@
+>  #define DDRMON_CH1_COUNT_NUM		0x3c
+>  #define DDRMON_CH1_DFI_ACCESS_NUM	0x40
+>  
+> -/* pmu grf */
+> -#define PMUGRF_OS_REG2	0x308
+> -#define DDRTYPE_SHIFT	13
+> -#define DDRTYPE_MASK	7
+> -
+> -enum {
+> -	DDR3 = 3,
+> -	LPDDR3 = 6,
+> -	LPDDR4 = 7,
+> -	UNUSED = 0xFF
+> -};
+> -
+>  struct dmc_usage {
+>  	u32 access;
+>  	u32 total;
+> @@ -83,16 +73,17 @@ static void rockchip_dfi_start_hardware_counter(struct devfreq_event_dev *edev)
+>  	u32 ddr_type;
+>  
+>  	/* get ddr type */
+> -	regmap_read(info->regmap_pmu, PMUGRF_OS_REG2, &val);
+> -	ddr_type = (val >> DDRTYPE_SHIFT) & DDRTYPE_MASK;
+> +	regmap_read(info->regmap_pmu, RK3399_PMUGRF_OS_REG2, &val);
+> +	ddr_type = (val >> RK3399_PMUGRF_DDRTYPE_SHIFT) &
+> +		    RK3399_PMUGRF_DDRTYPE_MASK;
+>  
+>  	/* clear DDRMON_CTRL setting */
+>  	writel_relaxed(CLR_DDRMON_CTRL, dfi_regs + DDRMON_CTRL);
+>  
+>  	/* set ddr type to dfi */
+> -	if (ddr_type == LPDDR3)
+> +	if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR3)
+>  		writel_relaxed(LPDDR3_EN, dfi_regs + DDRMON_CTRL);
+> -	else if (ddr_type == LPDDR4)
+> +	else if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR4)
+>  		writel_relaxed(LPDDR4_EN, dfi_regs + DDRMON_CTRL);
+>  
+>  	/* enable count, use software mode */
+> diff --git a/include/soc/rockchip/rk3399_grf.h b/include/soc/rockchip/rk3399_grf.h
+> new file mode 100644
+> index 000000000000..3eebabcb2812
+> --- /dev/null
+> +++ b/include/soc/rockchip/rk3399_grf.h
+> @@ -0,0 +1,21 @@
+> +/* SPDX-License-Identifier: GPL-2.0+ */
+> +/*
+> + * Rockchip General Register Files definitions
+> + *
+> + * Copyright (c) 2018, Collabora Ltd.
+> + * Author: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> + */
+> +
+> +#ifndef __SOC_RK3399_GRF_H
+> +#define __SOC_RK3399_GRF_H
+> +
+> +/* PMU GRF Registers */
+> +#define RK3399_PMUGRF_OS_REG2		0x308
+> +#define RK3399_PMUGRF_DDRTYPE_SHIFT	13
+> +#define RK3399_PMUGRF_DDRTYPE_MASK	7
+> +#define RK3399_PMUGRF_DDRTYPE_DDR3	3
+> +#define RK3399_PMUGRF_DDRTYPE_LPDDR2	5
+> +#define RK3399_PMUGRF_DDRTYPE_LPDDR3	6
+> +#define RK3399_PMUGRF_DDRTYPE_LPDDR4	7
+> +
+> +#endif
+> 
 
-Okay. Can you point me to the patches touching this driver?
 
-Thanks,
-
-Boris
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
