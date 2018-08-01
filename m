@@ -1,263 +1,52 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed,  1 Aug 2018 16:58:14 +0900
-Subject: [PATCH v13 10/16] arm64: kexec_file: load initrd and device-tree
-In-Reply-To: <20180801075820.3753-1-takahiro.akashi@linaro.org>
-References: <20180801075820.3753-1-takahiro.akashi@linaro.org>
-Message-ID: <20180801075820.3753-11-takahiro.akashi@linaro.org>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Wed, 1 Aug 2018 10:00:43 +0200
+Subject: [PATCH v8 4/4] mailbox: Add support for i.MX7D messaging unit
+In-Reply-To: <AM0PR04MB42113FA3268A1DA75006702B802D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <20180731141146.10788-1-o.rempel@pengutronix.de>
+ <20180731141146.10788-5-o.rempel@pengutronix.de>
+ <AM0PR04MB42113FA3268A1DA75006702B802D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20180801080043.xzoyz4xijjcxlaid@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-load_other_segments() is expected to allocate and place all the necessary
-memory segments other than kernel, including initrd and device-tree
-blob (and elf core header for crash).
-While most of the code was borrowed from kexec-tools' counterpart,
-users may not be allowed to specify dtb explicitly, instead, the dtb
-presented by the original boot loader is reused.
+On Wed, Aug 01, 2018 at 07:52:43AM +0000, A.s. Dong wrote:
+> > -----Original Message-----
+> > From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
+> > Sent: Tuesday, July 31, 2018 10:12 PM
+> > To: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
+> > <fabio.estevam@nxp.com>; Rob Herring <robh+dt@kernel.org>; Mark
+> > Rutland <mark.rutland@arm.com>; A.s. Dong <aisheng.dong@nxp.com>;
+> > Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>; Jassi Brar
+> > <jassisinghbrar@gmail.com>
+> > Cc: Oleksij Rempel <o.rempel@pengutronix.de>; kernel at pengutronix.de;
+> > linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org; dl-linux-
+> > imx <linux-imx@nxp.com>
+> > Subject: [PATCH v8 4/4] mailbox: Add support for i.MX7D messaging unit
+> > 
+> > The Mailbox controller is able to send messages (up to 4 32 bit words)
+> > between the endpoints.
+> > 
+> 
+> I'm not sure but is this still valid after change to multi channels mode?
+> We actually lost the HW capability to send messages up to 4 words
+> in the multi channels mode.
+> And such commit message probably will confuse people.
+> Worth a improve?
+> 
+> Otherwise this patch mostly is okay to me except a few bits already
+> pointed out by Jassi.
 
-arch_kimage_kernel_post_load_cleanup() is responsible for freeing arm64-
-specific data allocated in load_other_segments().
+Ok, I schedule this task for Thursday or Friday.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Reviewed-by: James Morse <james.morse@arm.com>
----
- arch/arm64/include/asm/kexec.h         |  17 +++
- arch/arm64/kernel/machine_kexec_file.c | 188 +++++++++++++++++++++++++
- 2 files changed, 205 insertions(+)
-
-diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-index e17f0529a882..157b2897d911 100644
---- a/arch/arm64/include/asm/kexec.h
-+++ b/arch/arm64/include/asm/kexec.h
-@@ -93,6 +93,23 @@ static inline void crash_prepare_suspend(void) {}
- static inline void crash_post_resume(void) {}
- #endif
- 
-+#ifdef CONFIG_KEXEC_FILE
-+#define ARCH_HAS_KIMAGE_ARCH
-+
-+struct kimage_arch {
-+	void *dtb;
-+	unsigned long dtb_mem;
-+};
-+
-+struct kimage;
-+
-+extern int arch_kimage_file_post_load_cleanup(struct kimage *image);
-+extern int load_other_segments(struct kimage *image,
-+		unsigned long kernel_load_addr, unsigned long kernel_size,
-+		char *initrd, unsigned long initrd_len,
-+		char *cmdline, unsigned long cmdline_len);
-+#endif
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif
-diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
-index c38a8048ed00..f53f14bd1700 100644
---- a/arch/arm64/kernel/machine_kexec_file.c
-+++ b/arch/arm64/kernel/machine_kexec_file.c
-@@ -5,12 +5,200 @@
-  * Copyright (C) 2018 Linaro Limited
-  * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-  *
-+ * Most code is derived from arm64 port of kexec-tools
-  */
- 
- #define pr_fmt(fmt) "kexec_file: " fmt
- 
-+#include <linux/ioport.h>
-+#include <linux/kernel.h>
- #include <linux/kexec.h>
-+#include <linux/libfdt.h>
-+#include <linux/memblock.h>
-+#include <linux/of_fdt.h>
-+#include <linux/types.h>
-+#include <asm/byteorder.h>
-+
-+/* relevant device tree properties */
-+#define FDT_PSTR_INITRD_STA	"linux,initrd-start"
-+#define FDT_PSTR_INITRD_END	"linux,initrd-end"
-+#define FDT_PSTR_BOOTARGS	"bootargs"
- 
- const struct kexec_file_ops * const kexec_file_loaders[] = {
- 	NULL
- };
-+
-+int arch_kimage_file_post_load_cleanup(struct kimage *image)
-+{
-+	vfree(image->arch.dtb);
-+	image->arch.dtb = NULL;
-+
-+	return kexec_image_post_load_cleanup_default(image);
-+}
-+
-+static int setup_dtb(struct kimage *image,
-+		unsigned long initrd_load_addr, unsigned long initrd_len,
-+		char *cmdline, unsigned long cmdline_len,
-+		void **dtb_buf, unsigned long *dtb_buf_len)
-+{
-+	void *buf = NULL;
-+	size_t buf_size;
-+	int nodeoffset;
-+	int ret;
-+
-+	/* duplicate dt blob */
-+	buf_size = fdt_totalsize(initial_boot_params);
-+
-+	if (initrd_load_addr) {
-+		/* can be redundant, but trimmed at the end */
-+		buf_size += fdt_prop_len(FDT_PSTR_INITRD_STA, sizeof(u64));
-+		buf_size += fdt_prop_len(FDT_PSTR_INITRD_END, sizeof(u64));
-+	}
-+
-+	if (cmdline)
-+		/* can be redundant, but trimmed at the end */
-+		buf_size += fdt_prop_len(FDT_PSTR_BOOTARGS, cmdline_len);
-+
-+	buf = vmalloc(buf_size);
-+	if (!buf) {
-+		ret = -ENOMEM;
-+		goto out_err;
-+	}
-+
-+	ret = fdt_open_into(initial_boot_params, buf, buf_size);
-+	if (ret) {
-+		ret = -EINVAL;
-+		goto out_err;
-+	}
-+
-+	nodeoffset = fdt_path_offset(buf, "/chosen");
-+	if (nodeoffset < 0) {
-+		ret = -EINVAL;
-+		goto out_err;
-+	}
-+
-+	/* add bootargs */
-+	if (cmdline) {
-+		ret = fdt_setprop_string(buf, nodeoffset, FDT_PSTR_BOOTARGS,
-+							cmdline);
-+		if (ret) {
-+			ret = -EINVAL;
-+			goto out_err;
-+		}
-+	} else {
-+		ret = fdt_delprop(buf, nodeoffset, FDT_PSTR_BOOTARGS);
-+		if (ret && (ret != -FDT_ERR_NOTFOUND)) {
-+			ret = -EINVAL;
-+			goto out_err;
-+		}
-+	}
-+
-+	/* add initrd-* */
-+	if (initrd_load_addr) {
-+		ret = fdt_setprop_u64(buf, nodeoffset, FDT_PSTR_INITRD_STA,
-+							initrd_load_addr);
-+		if (ret) {
-+			ret = -EINVAL;
-+			goto out_err;
-+		}
-+
-+		ret = fdt_setprop_u64(buf, nodeoffset, FDT_PSTR_INITRD_END,
-+						initrd_load_addr + initrd_len);
-+		if (ret) {
-+			ret = -EINVAL;
-+			goto out_err;
-+		}
-+	} else {
-+		ret = fdt_delprop(buf, nodeoffset, FDT_PSTR_INITRD_STA);
-+		if (ret && (ret != -FDT_ERR_NOTFOUND)) {
-+			ret = -EINVAL;
-+			goto out_err;
-+		}
-+
-+		ret = fdt_delprop(buf, nodeoffset, FDT_PSTR_INITRD_END);
-+		if (ret && (ret != -FDT_ERR_NOTFOUND)) {
-+			ret = -EINVAL;
-+			goto out_err;
-+		}
-+	}
-+
-+	/* trim a buffer */
-+	fdt_pack(buf);
-+	*dtb_buf = buf;
-+	*dtb_buf_len = fdt_totalsize(buf);
-+
-+	return 0;
-+
-+out_err:
-+	vfree(buf);
-+	return ret;
-+}
-+
-+int load_other_segments(struct kimage *image,
-+			unsigned long kernel_load_addr,
-+			unsigned long kernel_size,
-+			char *initrd, unsigned long initrd_len,
-+			char *cmdline, unsigned long cmdline_len)
-+{
-+	struct kexec_buf kbuf;
-+	void *dtb = NULL;
-+	unsigned long initrd_load_addr = 0, dtb_len;
-+	int ret = 0;
-+
-+	kbuf.image = image;
-+	/* not allocate anything below the kernel */
-+	kbuf.buf_min = kernel_load_addr + kernel_size;
-+
-+	/* load initrd */
-+	if (initrd) {
-+		kbuf.buffer = initrd;
-+		kbuf.bufsz = initrd_len;
-+		kbuf.mem = 0;
-+		kbuf.memsz = initrd_len;
-+		kbuf.buf_align = 0;
-+		/* within 1GB-aligned window of up to 32GB in size */
-+		kbuf.buf_max = round_down(kernel_load_addr, SZ_1G)
-+						+ (unsigned long)SZ_1G * 32;
-+		kbuf.top_down = false;
-+
-+		ret = kexec_add_buffer(&kbuf);
-+		if (ret)
-+			goto out_err;
-+		initrd_load_addr = kbuf.mem;
-+
-+		pr_debug("Loaded initrd@0x%lx bufsz=0x%lx memsz=0x%lx\n",
-+				initrd_load_addr, initrd_len, initrd_len);
-+	}
-+
-+	/* load dtb blob */
-+	ret = setup_dtb(image, initrd_load_addr, initrd_len,
-+				cmdline, cmdline_len, &dtb, &dtb_len);
-+	if (ret) {
-+		pr_err("Preparing for new dtb failed\n");
-+		goto out_err;
-+	}
-+
-+	kbuf.buffer = dtb;
-+	kbuf.bufsz = dtb_len;
-+	kbuf.mem = 0;
-+	kbuf.memsz = dtb_len;
-+	/* not across 2MB boundary */
-+	kbuf.buf_align = SZ_2M;
-+	kbuf.buf_max = ULONG_MAX;
-+	kbuf.top_down = true;
-+
-+	ret = kexec_add_buffer(&kbuf);
-+	if (ret)
-+		goto out_err;
-+	image->arch.dtb = dtb;
-+	image->arch.dtb_mem = kbuf.mem;
-+
-+	pr_debug("Loaded dtb at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
-+			kbuf.mem, dtb_len, dtb_len);
-+
-+	return 0;
-+
-+out_err:
-+	vfree(dtb);
-+	return ret;
-+}
 -- 
-2.18.0
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180801/b9a2ebf3/attachment.sig>
