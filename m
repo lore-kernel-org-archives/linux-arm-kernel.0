@@ -1,135 +1,324 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 1 Aug 2018 16:57:21 +0900
-Subject: [PATCH v12 16/16] arm64: kexec_file: add kaslr support
-In-Reply-To: <405b6708-4518-d81e-3938-39032c2b487e@arm.com>
-References: <20180724065759.19186-1-takahiro.akashi@linaro.org>
- <20180724065759.19186-17-takahiro.akashi@linaro.org>
- <50b31f17-fc85-aa72-06f5-d3b62060a91f@arm.com>
- <20180727083104.GI11258@linaro.org>
- <405b6708-4518-d81e-3938-39032c2b487e@arm.com>
-Message-ID: <20180801075720.GM11258@linaro.org>
+Date: Wed,  1 Aug 2018 16:58:04 +0900
+Subject: [PATCH v13 00/16] subject: arm64: kexec: add kexec_file_load() support
+Message-ID: <20180801075820.3753-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James,
+This is the thirteenth round of implementing kexec_file_load() support
+on arm64.[1] (See "Changes" below)
+Most of the code is based on kexec-tools.
 
-All the changes mentioned below were applied to my coming v13.
 
-On Fri, Jul 27, 2018 at 10:22:31AM +0100, James Morse wrote:
-> Hi Akashi,
-> 
-> 
-> On 07/27/2018 09:31 AM, AKASHI Takahiro wrote:
-> >On Thu, Jul 26, 2018 at 02:40:49PM +0100, James Morse wrote:
-> >>On 24/07/18 07:57, AKASHI Takahiro wrote:
-> >>>Adding "kaslr-seed" to dtb enables triggering kaslr, or kernel virtual
-> >>>address randomization, at secondary kernel boot.
-> >>Hmm, there are three things that get moved by CONFIG_RANDOMIZE_BASE. The kernel
-> >>physical placement when booted via the EFIstub, the kernel-text VAs and the
-> >>location of memory in the linear-map region. Adding the kaslr-seed only does the
-> >>last two.
-> >Yes, but I think that I and Mark has agreed that "kaslr" meant
-> >"virtual" randomisation, not including "physical" randomisation.
-> Okay, I'll update my terminology!
-> 
-> 
-> >>This means the physical placement of the new kernel is predictable from
-> >>/proc/iomem ... but this also tells you the physical placement of the current
-> >>kernel, so I don't think this is a problem.
-> >>
-> >>
-> >>>We always do this as it will have no harm on kaslr-incapable kernel.
-> >>>We don't have any "switch" to turn off this feature directly, but still
-> >>>can suppress it by passing "nokaslr" as a kernel boot argument.
-> >>
-> >>>diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
-> >>>index 7356da5a53d5..47a4fbd0dc34 100644
-> >>>--- a/arch/arm64/kernel/machine_kexec_file.c
-> >>>+++ b/arch/arm64/kernel/machine_kexec_file.c
-> >>>@@ -158,6 +160,12 @@ static int setup_dtb(struct kimage *image,
-> >>Don't you need to reserve some space in the area you vmalloc()d for the DT?
-> >No, I don't think so.
-> >All the data to be loaded are temporarily saved in kexec buffers,
-> >which will eventually be copied to target locations in machine_kexec
-> >(arm64_relocate_new_kernel, which, unlike its name, will handle
-> >not only kernel but also other data as well).
-> 
-> I think we're speaking at cross purposes. Don't you need:
-> 
-> | buf_size += fdt_prop_len("kaslr?seed", sizeof(u64));
-> 
-> 
-> You can't assume the existing DTB had a kaslr-seed property, and the
-> difference may take us over a PAGE_SIZE boundary.
+This patch series enables us to
+  * load the kernel by specifying its file descriptor, instead of user-
+    filled buffer, at kexec_file_load() system call, and
+  * optionally verify its signature at load time for trusted boot.
+Kernel virtual address randomization is also supported since v9.
 
-I see, I will add that.
+Contrary to kexec_load() system call, as we discussed a long time ago,
+users may not be allowed to provide a device tree to the 2nd kernel
+explicitly, hence enforcing a dt blob of the first kernel to be re-used
+internally.
 
-> 
-> >
-> >>
-> >>>+	/* add kaslr-seed */
-> >>>+	get_random_bytes(&value, sizeof(value));
-> >>What happens if the crng isn't ready?
-> >>
-> >>It looks like this will print a warning that these random-bytes aren't really up
-> >>to standard, but the new kernel doesn't know this happened.
-> >>
-> >>crng_ready() isn't exposed, all we could do now is
-> >>wait_for_random_bytes(), but that may wait forever because we do this
-> >>unconditionally.
-> >>
-> >>I'd prefer to leave this feature until we can check crng_ready(), and skip
-> >>adding a dodgy-seed if its not-ready. This avoids polluting the next-kernel's
-> >>entropy pool.
-> >OK. I would try to follow the same way as Bhupesh's userspace patch
-> >does for kaslr-seed:
-> >http://lists.infradead.org/pipermail/kexec/2018-April/020564.html
-> 
-> (I really don't understand this 'copying code from user-space' that happens
-> with kexec_file_load)
-> 
-> 
-> >   if (not found kaslr-seed in 1st kernel's dtb)
-> >      don't care; go ahead
-> 
-> Don' t bother. As you say in the commit-message its harmless if the new
-> kernel doesn't support it.
-> Always having this would let you use kexec_file_load as a bootloader that
-> can get the crng to
-> provide decent entropy even if the platform bootloader can't.
+To use kexec_file_load() system call, instead of kexec_load(), at kexec
+command, '-s' option must be specified. See [2] for a necessary patch for
+kexec-tools.
 
-OK, but anyway previous "kaslr-seed" will be dropped first.
+To analyze a generated crash dump file, use the latest master branch of
+crash utility[3]. I always try to submit patches to fix any inconsistencies
+introduced in the latest kernel.
 
-> 
-> >   else
-> >      if (current kaslr-seed != 0)
-> >         error
-> 
-> Don't bother. If this happens its a bug in another part of the kernel that
-> doesn't affect this one. We aren't second-guessing the file-system when we
-> read the kernel-fd, lets keep this simple.
+Regarding a kernel image verification, a signature must be presented
+along with the binary itself. A signature is basically a hash value
+calculated against the whole binary data and encrypted by a key which
+will be authenticated by one of the system's trusted certificates.
+Any attempt to read and load a to-be-kexec-ed kernel image through
+a system call will be checked and blocked if the binary's hash value
+doesn't match its associated signature.
 
-OK
+There are two methods available now:
+1. implementing arch-specific verification hook of kexec_file_load()
+2. utilizing IMA(Integrity Measurement Architecture)[4] appraisal framework
 
-> >      if (crng_ready()) ; FIXME, it's a local macro
-> >         get_random_bytes(non-blocking)
-> >         set new kaslr-seed
-> >      else
-> >         error
-> error? Something like pr_warn_once().
+Before my v7, I believed that my patch only supports (1) but am now
+confident that (2) comes free if IMA is enabled and properly configured.
 
-It was changed to pr_notice() since there is nothing wrong.
 
-Thanks,
--Takahiro AKASHI
+(1) Arch-specific verification hook
+If CONFIG_KEXEC_VERIFY_SIG is enabled, kexec_file_load() invokes an arch-
+defined (and hence file-format-specific) hook function to check for the
+validity of kernel binary.
 
-> I thought the kaslr-seed was added to the entropy pool, but now I look again
-> I see its a separate EFI table. So the new kernel will add the same entropy
-> ... that doesn't sound clever. (I can't see where its zero'd or
-> re-initialised)
-> 
-> 
-> 
-> Thanks,
-> 
-> James
+On x86, a signature is embedded into a PE file (Microsoft's format) header
+of binary. Since arm64's "Image" can also be seen as a PE file as far as
+CONFIG_EFI is enabled, we adopt this format for kernel signing.  
+
+As in the case of UEFI applications, we can create a signed kernel image:
+    $ sbsign --key ${KEY} --cert ${CERT} Image
+
+You may want to use certs/signing_key.pem, which is intended to be used
+for module signing (CONFIG_MODULE_SIG), as ${KEY} and ${CERT} for test
+purpose.
+
+
+(2) IMA appraisal-based
+IMA was first introduced in linux in order to meet TCG (Trusted Computing
+Group) requirement that all the sensitive files be *measured* before
+reading/executing them to detect any untrusted changes/modification.
+Then appraisal feature, which allows us to ensure the integrity of
+files and even prevent them from reading/executing, was added later.
+
+Meanwhile, kexec_file_load() has been merged since v3.17 and evolved to
+enable IMA-appraisal type verification by the commit b804defe4297 ("kexec:
+replace call to copy_file_from_fd() with kernel version").
+
+In this scheme, a signature will be stored in a extended file attribute,
+"security.ima" while a decryption key is hold in a dedicated keyring,
+".ima" or "_ima".  All the necessary process of verification is confined
+in a secure API, kernel_read_file_from_fd(), called by kexec_file_load().
+
+    Please note that powerpc is one of the two architectures now
+    supporting KEXEC_FILE, and that it wishes to extend IMA,
+    where a signature may be appended to "vmlinux" file[5], like module
+    signing, instead of using an extended file attribute.
+
+While IMA meant to be used with TPM (Trusted Platform Module) on secure
+platform, IMA is still usable without TPM. Here is an example procedure
+about how we can give it a try to run the feature using a self-signed
+root ca for demo/test purposes:
+
+ 1) Generate needed keys and certificates, following "Generate trusted
+    keys" section in README of ima-evm-utils[6].
+
+ 2) Build the kernel with the following kernel configurations, specifying
+    "ima-local-ca.pem" for CONFIG_SYSTEM_TRUSTED_KEYS:
+	CONFIG_EXT4_FS_SECURITY
+	CONFIG_INTEGRITY_SIGNATURE
+	CONFIG_INTEGRITY_ASYMMETRIC_KEYS
+	CONFIG_INTEGRITY_TRUSTED_KEYRING
+	CONFIG_IMA
+	CONFIG_IMA_WRITE_POLICY
+	CONFIG_IMA_READ_POLICY
+	CONFIG_IMA_APPRAISE
+	CONFIG_IMA_APPRAISE_BOOTPARAM
+	CONFIG_SYSTEM_TRUSTED_KEYS
+    Please note that CONFIG_KEXEC_VERIFY_SIG is not, actually should
+    not be, enabled.
+
+ 3) Sign(label) a kernel image binary to be kexec-ed on target filesystem:
+    $ evmctl ima_sign --key /path/to/private_key.pem /your/Image
+
+ 4) Add a command line parameter and boot the kernel:
+    ima_appraise=enforce
+
+ On live system,
+ 5) Set a security policy:
+    $ mount -t securityfs none /sys/kernel/security
+    $ echo "appraise func=KEXEC_KERNEL_CHECK appraise_type=imasig" \
+      > /sys/kernel/security/ima/policy
+
+ 6) Add a key for ima:
+    $ keyctl padd asymmetric my_ima_key %:.ima < /path/to/x509_ima.der
+    (or evmctl import /path/to/x509_ima.der <ima_keyring_id>)
+
+ 7) Then try kexec as normal.
+
+
+Concerns(or future works):
+* Support for physical address randomization
+* Signature verification of big endian kernel with CONFIG_KEXEC_VERIFY_SIG
+  While big-endian kernel can support kernel signing, I'm not sure that
+  Image can be recognized as in PE format because x86 standard only
+  defines little-endian-based format.
+* Support for vminux loading
+
+  [1] http://git.linaro.org/people/takahiro.akashi/linux-aarch64.git
+	branch:arm64/kexec_file
+  [2] http://git.linaro.org/people/takahiro.akashi/kexec-tools.git
+	branch:arm64/kexec_file
+  [3] http://github.com/crash-utility/crash.git
+  [4] https://sourceforge.net/p/linux-ima/wiki/Home/
+  [5] http://lkml.iu.edu//hypermail/linux/kernel/1707.0/03669.html
+  [6] https://sourceforge.net/p/linux-ima/ima-evm-utils/ci/master/tree/
+
+
+Changes in v13 (Aug 1, 2018)
+* rebased to arm64/for-next/core
+* system call number changed to 294
+  (kexec-tools must be updated as well.)
+* rename arch_kexec_walk_mem() to kexec_walk_resources()
+* define string macros for dtb properties' names in setup_dtb()
+* use MEMBLOCK_NONE rather than 0 at for_each_mem_range[_reverse]()
+* rename dtb_buf to dtb in struct kexec_arch at right place
+* provide "kaslr-seed" only if random number generator is available
+
+Changes in v12 (July 24, 2018)
+ (mostly addressing James' comments)
+* unify all the variants of arch_kexec_walk_mem(), including s390's, into
+  common code, leaving arch_kexec_walk_mem() static (i.e. no longer
+  replaceable)
+* always initialize kbuf.mem to zero to align with a change above
+* set kbuf.buf_min/buf_max consistently between kexec and kdump
+* try to consistently use "unsigned long" for physical (kexec-time)
+  address, and "void *" for virtual (runtime) address in
+  load_other_segments() with a couple of variables renamed for readability
+* fix a 'sparse' warning against arch_kimage_file_post_load_cleanup()
+* fix a calculation of string length of "ARM64_MAGIC"
+* set kernel image alignment to MIN_KIMG_ALIGN rather than SZ_2M
+* set elf header alignment to SZ_64K rather than SZ_4K
+
+
+Changes in v11 (July 11, 2018)
+* split v10's patch#3, a refactoring stuff, into two parts, "just move"
+  and modify
+* remove selecting BUILD_BIN2C from KEXEC_FILE config
+* modify setup_dtb()
+   * to correct a return value on failure of fdt_xyz() call,
+   * to always remove existing bootargs and initrd-start/end properties,
+     if any, when copying current system's dtb into new dtb
+   * to use fdt_setprop_string() for bootargs (I'm now sure that
+     kimage->cmdline_buf is a null-terminated string.)
+* revise a warning comment in case of KEXEC_VERIFY_SIG but
+  !(EFI && SIGNED_PE_FILE_VERIFICATION)
+
+Changes in v10 (June 23, 2018)
+* rebased to v4.18-rc
+* change syscall numer of kexec_file_load from 292 to 293
+* factor out memblock-based arch_kexec_walk_mem() from powerpc and
+  merge it into generic one
+* move generic fdt helper functions from arm64 dir to drivers/of
+  (dt_root_[addr|size]_cells are no longer __initdata.)
+* modify fill_property() to use 'while' loop
+* modify fdt_setprop_reg() to allocate a buffer on stack
+* modify setup_dtb() to use fdt_setprop_u64()
+* pass kernel_load_addr/size directly as arguments, instead of via
+  kimage_arch.kern_segment, at load_other_segments()
+* refuse loading an image which cannot be supported in image loader,
+  adding cpu-feature(MMFR0) helper functions
+* modify prepare_elf_headers() to use kmalloc() instead of vmalloc()
+* always pass arch.dtb_mem as the fourth argument to cpu_soft_restart()
+  in machine_kexec() while dtb_mem will be zero in kexec case
+
+Changes in v9 (April 25, 2018)
+* rebased to v4.17-rc
+* remove preparatory patches on generic/x86/ppc code
+  They have now been merged in v4.17-rc1.
+* allocate memory based on memblock list instead of system resources
+  This will prevent reserved regions, particularly UEFI/ACPI data,
+  from being corrupted.
+* correct dt property names, linux,initrd-*, in newly-created dtb
+  "linux," was missing.
+* remove alignment requirement for initrd loading
+* add kaslr (kernel virtual address randomization) support
+* misc code clean-up
+* revise commit messages
+
+Changes in v8 (Feb 22, 2018)
+* introduce ARCH_HAS_KEXEC_PURGATORY so that arm64 will be able to skip
+  purgatory
+* remove "ifdef CONFIG_X86_64" stuffs from a re-factored function,
+  prepare_elf64_headers(), making its interface more generic
+  (The original patch was split into two for easier reviews.)
+* modify cpu_soft_restart() so as to let the 2nd kernel jump into its entry
+  code directly without requiring purgatory in case of kexec_file_load
+* remove CONFIG_KEXEC_FILE_IMAGE_FMT and introduce
+  CONFIG_KEXEC_IMAGE_VERIFY_SIG, much similar to x86 but quite redundant
+  for now.
+* In addition, update/modify dependencies of KEXEC_IMAGE_VERIFY_SIG
+
+Changes in v7 (Dec 4, 2017)
+* rebased to v4.15-rc2
+* re-organize the patch set to separate KEXEC_FILE_VERIFY_SIG-related
+  code from the others
+* revamp factored-out code in kernel/kexec_file.c due to the changes
+  in original x86 code
+* redefine walk_sys_ram_res_rev() prototype due to change of callback
+  type in the counterpart, walk_sys_ram_res()
+* make KEXEC_FILE_IMAGE_FMT default on if KEXEC_FILE selected
+
+Changes in v6 (Oct 24, 2017)
+* fix a for-loop bug in _kexec_kernel_image_probe() per Julien
+
+Changes in v5 (Oct 10, 2017)
+* fix kbuild errors around patch #3
+per Julien's comments,
+* fix a bug in walk_system_ram_res_rev() with some cleanup
+* modify fdt_setprop_range() to use vmalloc()
+* modify fill_property() to use memset()
+
+Changes in v4 (Oct 2, 2017)
+* reinstate x86's arch_kexec_kernel_image_load()
+* rename weak arch_kexec_kernel_xxx() to _kexec_kernel_xxx() for
+  better re-use
+* constify kexec_file_loaders[]
+
+Changes in v3 (Sep 15, 2017)
+* fix kbuild test error
+* factor out arch_kexec_kernel_*() & arch_kimage_file_post_load_cleanup()
+* remove CONFIG_CRASH_CORE guard from kexec_file.c
+* add vmapped kernel region to vmcore for gdb backtracing
+  (see prepare_elf64_headers())
+* merge asm/kexec_file.h into asm/kexec.h
+* and some cleanups
+
+Changes in v2 (Sep 8, 2017)
+* move core-header-related functions from crash_core.c to kexec_file.c
+* drop hash-check code from purgatory
+* modify purgatory asm to remove arch_kexec_apply_relocations_add()
+* drop older kernel support
+* drop vmlinux support (at least, for this series)
+
+
+Patch #1 to #10 are essential part for KEXEC_FILE support
+(additionally allowing for IMA-based verification):
+  Patch #1 to #6 are all preparatory patches on generic side.
+  Patch #7 to #11 are to enable kexec_file_load on arm64.
+
+Patch #12 to #13 are for KEXEC_VERIFY_SIG (arch-specific verification)
+support
+
+AKASHI Takahiro (16):
+  asm-generic: add kexec_file_load system call to unistd.h
+  kexec_file: make kexec_image_post_load_cleanup_default() global
+  s390, kexec_file: drop arch_kexec_mem_walk()
+  powerpc, kexec_file: factor out memblock-based arch_kexec_walk_mem()
+  kexec_file: kexec_walk_memblock() only walks a dedicated region at
+    kdump
+  of/fdt: add helper functions for handling properties
+  arm64: add image head flag definitions
+  arm64: cpufeature: add MMFR0 helper functions
+  arm64: enable KEXEC_FILE config
+  arm64: kexec_file: load initrd and device-tree
+  arm64: kexec_file: allow for loading Image-format kernel
+  arm64: kexec_file: add crash dump support
+  arm64: kexec_file: invoke the kernel without purgatory
+  include: pe.h: remove message[] from mz header definition
+  arm64: kexec_file: add kernel signature verification support
+  arm64: kexec_file: add kaslr support
+
+ arch/arm64/Kconfig                          |  33 ++
+ arch/arm64/include/asm/boot.h               |  15 +
+ arch/arm64/include/asm/cpufeature.h         |  48 +++
+ arch/arm64/include/asm/kexec.h              |  49 +++
+ arch/arm64/kernel/Makefile                  |   3 +-
+ arch/arm64/kernel/cpu-reset.S               |   8 +-
+ arch/arm64/kernel/head.S                    |   2 +-
+ arch/arm64/kernel/kexec_image.c             | 123 +++++++
+ arch/arm64/kernel/machine_kexec.c           |  12 +-
+ arch/arm64/kernel/machine_kexec_file.c      | 357 ++++++++++++++++++++
+ arch/arm64/kernel/relocate_kernel.S         |   3 +-
+ arch/powerpc/kernel/machine_kexec_file_64.c |  54 ---
+ arch/s390/kernel/machine_kexec_file.c       |  10 -
+ drivers/of/fdt.c                            |  62 +++-
+ include/linux/kexec.h                       |   3 +-
+ include/linux/of_fdt.h                      |  10 +-
+ include/linux/pe.h                          |   2 +-
+ include/uapi/asm-generic/unistd.h           |   4 +-
+ kernel/kexec_file.c                         |  69 +++-
+ 19 files changed, 782 insertions(+), 85 deletions(-)
+ create mode 100644 arch/arm64/kernel/kexec_image.c
+ create mode 100644 arch/arm64/kernel/machine_kexec_file.c
+
+-- 
+2.18.0
