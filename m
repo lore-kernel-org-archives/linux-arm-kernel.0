@@ -1,128 +1,69 @@
-From: hongxing.zhu@nxp.com (Richard Zhu)
-Date: Wed, 1 Aug 2018 08:20:38 +0000
-Subject: [PATCH] PCI: imx6: support MPLL reconfiguration for 100MHz and
- 200MHz refclock
-In-Reply-To: <20180731102149.8537-1-l.stach@pengutronix.de>
-References: <20180731102149.8537-1-l.stach@pengutronix.de>
-Message-ID: <AM5PR0402MB2850AC0AED7396CE64D5BAC78C2D0@AM5PR0402MB2850.eurprd04.prod.outlook.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 1 Aug 2018 10:26:11 +0200
+Subject: [PATCH 2/2] dt-bindings: clock: Add bindings for the Clocking
+ Wizard IP
+In-Reply-To: <20180801081950.10497-2-boris.brezillon@bootlin.com>
+References: <20180801081950.10497-1-boris.brezillon@bootlin.com>
+ <20180801081950.10497-2-boris.brezillon@bootlin.com>
+Message-ID: <a8620c93-cf99-719d-d2bb-7d0f0b567130@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Boris,
 
-> -----Original Message-----
-> From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> Sent: Tuesday, July 31, 2018 6:22 PM
-> To: Richard Zhu <hongxing.zhu@nxp.com>; Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com>
-> Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> kernel at pengutronix.de; patchwork-lst at pengutronix.de
-> Subject: [PATCH] PCI: imx6: support MPLL reconfiguration for 100MHz and
-> 200MHz refclock
+On 1.8.2018 10:19, Boris Brezillon wrote:
+> Document Xilinx Clocking Wizard bindings.
 > 
-> The power up defaults of the MPLL are designed for the standard 125MHz
-> refclock derived from the ENET PLL. As this clock has a jitter that violates the
-> PCIe Gen2 timing requirements, some board designs use an external reference
-> clock generator. Those clock generators may output a clock at a different rate
-> than what the MPLL expects (usually a 100MHz clock, to re-use the PCIe bus
-> clock).
-> 
-> In that case the MPLL must be reconfigured via overrides to use different
-> refclock dividers and loop multipliers. The i.MX6 reference manual lists both
-> 100MHz and 200MHz as supported refclock rates and the associated mult and
-> div values.
-> 
-> Only the 100MHz setup has been tested on a real board, but since the 200MHz
-> setup only differs in the used pre-divider it seems safe to add it now.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-
-Reviewed-by: Richard Zhu <hongxing.zhu@nxp.com>
-Richard Zhu
-Best Regards!
-
+> Signed-off-by: Boris Brezillon <boris.brezillon@bootlin.com>
 > ---
->  drivers/pci/controller/dwc/pci-imx6.c | 55 +++++++++++++++++++++++++++
->  1 file changed, 55 insertions(+)
+>  .../devicetree/bindings/clock/xlnx,clk-wizard.txt  | 28 ++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt
 > 
-> diff --git a/drivers/pci/controller/dwc/pci-imx6.c
-> b/drivers/pci/controller/dwc/pci-imx6.c
-> index 80f604602783..c481c61a41b8 100644
-> --- a/drivers/pci/controller/dwc/pci-imx6.c
-> +++ b/drivers/pci/controller/dwc/pci-imx6.c
-> @@ -97,6 +97,16 @@ struct imx6_pcie {
->  #define PORT_LOGIC_SPEED_CHANGE		(0x1 << 17)
+> diff --git a/Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt b/Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt
+> new file mode 100644
+> index 000000000000..1bf7a764f4a9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt
+> @@ -0,0 +1,28 @@
+> +Device Tree Clock bindings for the "Clocking Wizard" IP provided by Xilinx
+> +
+> +This block can be used to generate up to 4 clock signals out of a single input
+> +clock. It embeds a PLL to generate an intermediate clock which then feeds 4
+> +clock dividers whose divider value can be adjusted based on the user needs.
+> +
+> +Required properties:
+> + - #clock-cells: must be 1. The cell is encoding the id of the output clk
+> +		 (from 0 to xlnx,clk-wizard-num-outputs - 1)
+> + - compatible: must be "xlnx,clk-wizard-5.1"
+> + - clocks: 2 clocks are required
+> + - clock-names: should contain 2 clock names: "aclk" and "clkin".
+> +		"aclk" is driving the register interface and "clk_in" is the
+> +		input clock signal that is used by the PLL block
+> + - xlnx,clk-wizard-num-outputs: this describe the number of output clocks
+> +				(chosen at synthesization time)
+> + - reg: registers used to configure the Clocking wizard block
+> +
+> +Example:
+> +
+> +	clkwizard: clkwizard at 43c20000 {
+> +		compatible = "xlnx,clk-wizard-5.1";
+> +		reg = <0x43c20000 0x10000>;
+> +		clocks = <&clkc 18>, <&clkc 18>;
+> +		clock-names = "aclk", "clk_in1";
+> +		#clock-cells = <1>;
+> +		xlnx,clk-wizard-num-outputs = <2>;
+> +	};
 > 
->  /* PHY registers (not memory-mapped) */
-> +#define PCIE_PHY_ATEOVRD			0x10
-> +#define  PCIE_PHY_ATEOVRD_EN			(0x1 << 2)
-> +#define  PCIE_PHY_ATEOVRD_REF_CLKDIV_SHIFT	0
-> +#define  PCIE_PHY_ATEOVRD_REF_CLKDIV_MASK	0x1
-> +
-> +#define PCIE_PHY_MPLL_OVRD_IN_LO		0x11
-> +#define  PCIE_PHY_MPLL_MULTIPLIER_SHIFT		2
-> +#define  PCIE_PHY_MPLL_MULTIPLIER_MASK		0x7f
-> +#define  PCIE_PHY_MPLL_MULTIPLIER_OVRD		(0x1 << 9)
-> +
->  #define PCIE_PHY_RX_ASIC_OUT 0x100D
->  #define PCIE_PHY_RX_ASIC_OUT_VALID	(1 << 0)
-> 
-> @@ -508,6 +518,50 @@ static void imx6_pcie_init_phy(struct imx6_pcie
-> *imx6_pcie)
->  			IMX6Q_GPR12_DEVICE_TYPE, PCI_EXP_TYPE_ROOT_PORT <<
-> 12);  }
-> 
-> +static int imx6_setup_phy_mpll(struct imx6_pcie *imx6_pcie) {
-> +	unsigned long phy_rate = clk_get_rate(imx6_pcie->pcie_phy);
-> +	int mult, div;
-> +	u32 val;
-> +
-> +	switch (phy_rate) {
-> +	case 125000000:
-> +		/*
-> +		 * The default settings of the MPLL are for a 125MHz input
-> +		 * clock, so no need to reconfigure anything in that case.
-> +		 */
-> +		return 0;
-> +	case 100000000:
-> +		mult = 25;
-> +		div = 0;
-> +		break;
-> +	case 200000000:
-> +		mult = 25;
-> +		div = 1;
-> +		break;
-> +	default:
-> +		dev_err(imx6_pcie->pci->dev,
-> +			"Unsupported PHY reference clock rate %lu\n", phy_rate);
-> +		return -EINVAL;
-> +	}
-> +
-> +	pcie_phy_read(imx6_pcie, PCIE_PHY_MPLL_OVRD_IN_LO, &val);
-> +	val &= ~(PCIE_PHY_MPLL_MULTIPLIER_MASK <<
-> +		 PCIE_PHY_MPLL_MULTIPLIER_SHIFT);
-> +	val |= mult << PCIE_PHY_MPLL_MULTIPLIER_SHIFT;
-> +	val |= PCIE_PHY_MPLL_MULTIPLIER_OVRD;
-> +	pcie_phy_write(imx6_pcie, PCIE_PHY_MPLL_OVRD_IN_LO, val);
-> +
-> +	pcie_phy_read(imx6_pcie, PCIE_PHY_ATEOVRD, &val);
-> +	val &= ~(PCIE_PHY_ATEOVRD_REF_CLKDIV_MASK <<
-> +		 PCIE_PHY_ATEOVRD_REF_CLKDIV_SHIFT);
-> +	val |= div << PCIE_PHY_ATEOVRD_REF_CLKDIV_SHIFT;
-> +	val |= PCIE_PHY_ATEOVRD_EN;
-> +	pcie_phy_write(imx6_pcie, PCIE_PHY_ATEOVRD, val);
-> +
-> +	return 0;
-> +}
-> +
->  static int imx6_pcie_wait_for_link(struct imx6_pcie *imx6_pcie)  {
->  	struct dw_pcie *pci = imx6_pcie->pci;
-> @@ -632,6 +686,7 @@ static int imx6_pcie_host_init(struct pcie_port *pp)
->  	imx6_pcie_assert_core_reset(imx6_pcie);
->  	imx6_pcie_init_phy(imx6_pcie);
->  	imx6_pcie_deassert_core_reset(imx6_pcie);
-> +	imx6_setup_phy_mpll(imx6_pcie);
->  	dw_pcie_setup_rc(pp);
->  	imx6_pcie_establish_link(imx6_pcie);
-> 
-> --
-> 2.18.0
+
+First of all this should be 1/2.
+
+The second is that this driver is already in staging area
+(drivers/staging/clocking-wizard) for a while. That's why please use
+this driver or send patches on the top of this.
+
+I know we have been doing some changes in this driver recently but not
+sure if they reach our tree or mainline.
+
+Thanks,
+Michal
