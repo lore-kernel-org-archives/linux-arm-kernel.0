@@ -1,526 +1,314 @@
-From: cl@rock-chips.com (cl at rock-chips.com)
-Date: Wed,  1 Aug 2018 16:45:16 +0800
-Subject: [PATCH v3 4/4] arm64: dts: rockchip: add PX30 eavluation board
- devicetree
-In-Reply-To: <1533113116-8820-1-git-send-email-cl@rock-chips.com>
-References: <1533113116-8820-1-git-send-email-cl@rock-chips.com>
-Message-ID: <1533113116-8820-5-git-send-email-cl@rock-chips.com>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Wed, 1 Aug 2018 10:49:57 +0200
+Subject: [PATCH 1/3] PCI: Introduce PCI software bridge common logic
+In-Reply-To: <20180712195802.GC28466@bhelgaas-glaptop.roam.corp.google.com>
+References: <20180629092231.32207-1-thomas.petazzoni@bootlin.com>
+ <20180629092231.32207-2-thomas.petazzoni@bootlin.com>
+ <20180712195802.GC28466@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20180801104957.1b01b847@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Liang Chen <cl@rock-chips.com>
+Hello Bjorn,
 
-This patch add px30-evb.dts for PX30 evaluation board.
-Tested on PX30 evb.
+Thanks for your review!
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Liang Chen <cl@rock-chips.com>
----
- Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
- arch/arm64/boot/dts/rockchip/Makefile              |   1 +
- arch/arm64/boot/dts/rockchip/px30-evb.dts          | 470 +++++++++++++++++++++
- 3 files changed, 475 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/px30-evb.dts
+On Thu, 12 Jul 2018 14:58:02 -0500, Bjorn Helgaas wrote:
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index 1c1d62d..e33b23a 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -158,6 +158,10 @@ Rockchip platforms device tree bindings
-     Required root node properties:
-       - compatible = "rockchip,rv1108-evb", "rockchip,rv1108";
- 
-+- Rockchip PX30 evb:
-+    Required root node properties:
-+      - compatible = "rockchip,px30-evb", "rockchip,px30";
-+
- - Rockchip RK3368 evb:
-     Required root node properties:
-       - compatible = "rockchip,rk3368-evb-act8846", "rockchip,rk3368";
-diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-index 48a83f8..19aa9c6 100644
---- a/arch/arm64/boot/dts/rockchip/Makefile
-+++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -14,3 +14,4 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-gru-kevin.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-puma-haikou.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-sapphire.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-sapphire-excavator.dtb
-+dtb-$(CONFIG_ARCH_ROCKCHIP) += px30-evb.dtb
-diff --git a/arch/arm64/boot/dts/rockchip/px30-evb.dts b/arch/arm64/boot/dts/rockchip/px30-evb.dts
-new file mode 100644
-index 0000000..f7bd2e3
---- /dev/null
-+++ b/arch/arm64/boot/dts/rockchip/px30-evb.dts
-@@ -0,0 +1,470 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (c) 2018 Fuzhou Rockchip Electronics Co., Ltd
-+ */
-+
-+/dts-v1/;
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/pinctrl/rockchip.h>
-+#include "px30.dtsi"
-+
-+/ {
-+	model = "Rockchip PX30 EVB";
-+	compatible = "rockchip,px30-evb", "rockchip,px30";
-+
-+	adc-keys {
-+		compatible = "adc-keys";
-+		io-channels = <&saradc 2>;
-+		io-channel-names = "buttons";
-+		poll-interval = <100>;
-+		keyup-threshold-microvolt = <1800000>;
-+
-+		esc-key {
-+			linux,code = <KEY_ESC>;
-+			label = "esc";
-+			press-threshold-microvolt = <1310000>;
-+		};
-+
-+		home-key {
-+			linux,code = <KEY_HOME>;
-+			label = "home";
-+			press-threshold-microvolt = <624000>;
-+		};
-+
-+		menu-key {
-+			linux,code = <KEY_MENU>;
-+			label = "menu";
-+			press-threshold-microvolt = <987000>;
-+		};
-+
-+		vol-down-key {
-+			linux,code = <KEY_VOLUMEDOWN>;
-+			label = "volume down";
-+			press-threshold-microvolt = <300000>;
-+		};
-+
-+		vol-up-key {
-+			linux,code = <KEY_VOLUMEUP>;
-+			label = "volume up";
-+			press-threshold-microvolt = <17000>;
-+		};
-+	};
-+
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm1 0 25000 0>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS2,1500000n8";
-+	};
-+
-+	sdio_pwrseq: sdio-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wifi_enable_h>;
-+
-+		/*
-+		 * On the module itself this is one of these (depending
-+		 * on the actual card populated):
-+		 * - SDIO_RESET_L_WL_REG_ON
-+		 * - PDN (power down when low)
-+		 */
-+		reset-gpios = <&gpio0 RK_PA2 GPIO_ACTIVE_LOW>; /* GPIO3_A4 */
-+	};
-+
-+	vcc_phy: vcc-phy-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_phy";
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
-+	vcc5v0_sys: vccsys {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc5v0_sys";
-+		regulator-always-on;
-+		regulator-boot-on;
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+	};
-+};
-+
-+&cpu0 {
-+	cpu-supply = <&vdd_arm>;
-+};
-+
-+&display_subsystem {
-+	status = "okay";
-+};
-+
-+&emmc {
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+	mmc-hs200-1_8v;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&gmac {
-+	phy-supply = <&vcc_phy>;
-+	clock_in_out = "output";
-+	snps,reset-gpio = <&gpio2 13 GPIO_ACTIVE_LOW>;
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 50000 50000>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	rk809: pmic at 20 {
-+		compatible = "rockchip,rk809";
-+		reg = <0x20>;
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <7 IRQ_TYPE_LEVEL_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_int>;
-+		rockchip,system-power-controller;
-+		wakeup-source;
-+		#clock-cells = <1>;
-+		clock-output-names = "rk808-clkout1", "rk808-clkout2";
-+
-+		vcc1-supply = <&vcc5v0_sys>;
-+		vcc2-supply = <&vcc5v0_sys>;
-+		vcc3-supply = <&vcc5v0_sys>;
-+		vcc4-supply = <&vcc5v0_sys>;
-+		vcc5-supply = <&vcc3v3_sys>;
-+		vcc6-supply = <&vcc3v3_sys>;
-+		vcc7-supply = <&vcc3v3_sys>;
-+		vcc8-supply = <&vcc3v3_sys>;
-+		vcc9-supply = <&vcc5v0_sys>;
-+
-+		pwrkey {
-+			status = "okay";
-+		};
-+
-+		regulators {
-+			vdd_logic: DCDC_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <950000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-ramp-delay = <6001>;
-+				regulator-initial-mode = <0x2>;
-+				regulator-name = "vdd_logic";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <950000>;
-+				};
-+			};
-+
-+			vdd_arm: DCDC_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <950000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-ramp-delay = <6001>;
-+				regulator-initial-mode = <0x2>;
-+				regulator-name = "vdd_arm";
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+					regulator-suspend-microvolt = <950000>;
-+				};
-+			};
-+
-+			vcc_ddr: DCDC_REG3 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc_ddr";
-+				regulator-initial-mode = <0x2>;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			vcc_3v0: DCDC_REG4 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-initial-mode = <0x2>;
-+				regulator-name = "vcc_3v0";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3000000>;
-+				};
-+			};
-+
-+			vcc_1v0: LDO_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-name = "vcc_1v0";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
-+			};
-+
-+			vcc1v8_soc: LDO_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+
-+				regulator-name = "vcc1v8_soc";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vdd1v0_soc: LDO_REG3 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+
-+				regulator-name = "vcc1v0_soc";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
-+			};
-+
-+			vcc3v0_pmu: LDO_REG4 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+
-+				regulator-name = "vcc3v0_pmu";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3000000>;
-+
-+				};
-+			};
-+
-+			vccio_sd: LDO_REG5 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+
-+				regulator-name = "vccio_sd";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
-+			};
-+
-+			vcc_sd: LDO_REG6 {
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+
-+				regulator-name = "vcc_sd";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+
-+				};
-+			};
-+
-+			vcc2v8_dvp: LDO_REG7 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+
-+				regulator-name = "vcc2v8_dvp";
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+					regulator-suspend-microvolt = <2800000>;
-+				};
-+			};
-+
-+			vcc1v8_dvp: LDO_REG8 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+
-+				regulator-name = "vcc1v8_dvp";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vdd1v5_dvp: LDO_REG9 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1500000>;
-+				regulator-max-microvolt = <1500000>;
-+
-+				regulator-name = "vdd1v5_dvp";
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+					regulator-suspend-microvolt = <1500000>;
-+				};
-+			};
-+
-+			vcc3v3_sys: DCDC_REG5 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc3v3_sys";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
-+			};
-+
-+			vcc3v3_lcd: SWITCH_REG1 {
-+				regulator-boot-on;
-+				regulator-name = "vcc3v3_lcd";
-+			};
-+
-+			vcc5v0_host: SWITCH_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc5v0_host";
-+			};
-+		};
-+	};
-+};
-+
-+&i2s1_2ch {
-+	status = "okay";
-+	#sound-dai-cells = <0>;
-+};
-+
-+&io_domains {
-+	status = "okay";
-+
-+	vccio1-supply = <&vcc1v8_soc>;
-+	vccio2-supply = <&vccio_sd>;
-+	vccio3-supply = <&vcc_3v0>;
-+	vccio4-supply = <&vcc3v0_pmu>;
-+	vccio5-supply = <&vcc_3v0>;
-+};
-+
-+&pinctrl {
-+	headphone {
-+		hp_det: hp-det {
-+			rockchip,pins = <2 RK_PB0 RK_FUNC_GPIO &pcfg_pull_down>;
-+		};
-+	};
-+
-+	pmic {
-+		pmic_int: pmic_int {
-+			rockchip,pins =
-+				<0 RK_PA7 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+
-+		soc_slppin_gpio: soc_slppin_gpio {
-+			rockchip,pins =
-+				<0 RK_PA4 RK_FUNC_GPIO &pcfg_output_low>;
-+		};
-+
-+		soc_slppin_slp: soc_slppin_slp {
-+			rockchip,pins =
-+				<0 RK_PA4 RK_FUNC_1 &pcfg_pull_none>;
-+		};
-+
-+		soc_slppin_rst: soc_slppin_rst {
-+			rockchip,pins =
-+				<0 RK_PA4 RK_FUNC_2 &pcfg_pull_none>;
-+		};
-+	};
-+
-+	sdio-pwrseq {
-+		wifi_enable_h: wifi-enable-h {
-+			rockchip,pins = <0 RK_PA2 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+};
-+
-+&pmu_io_domains {
-+	status = "okay";
-+
-+	pmuio1-supply = <&vcc3v0_pmu>;
-+	pmuio2-supply = <&vcc3v0_pmu>;
-+};
-+
-+&pwm1 {
-+	status = "okay";
-+};
-+
-+&saradc {
-+	status = "okay";
-+	vref-supply = <&vcc1v8_soc>;
-+};
-+
-+&sdmmc {
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	card-detect-delay = <800>;
-+	/*cd-gpios = <&gpio2 4 GPIO_ACTIVE_HIGH>; [> CD GPIO <]*/
-+	sd-uhs-sdr12;
-+	sd-uhs-sdr25;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr104;
-+	vqmmc-supply = <&vccio_sd>;
-+	vmmc-supply = <&vcc_sd>;
-+	status = "okay";
-+};
-+
-+&sdio {
-+	bus-width = <4>;
-+	cap-sd-highspeed;
-+	keep-power-in-suspend;
-+	non-removable;
-+	mmc-pwrseq = <&sdio_pwrseq>;
-+	sd-uhs-sdr104;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_xfer &uart1_cts>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&usb20_otg {
-+	status = "okay";
-+};
-+
-+&usb_host0_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host0_ohci {
-+	status = "okay";
-+};
-+
-+&vopb {
-+	status = "okay";
-+};
-+
-+&vopb_mmu {
-+	status = "okay";
-+};
-+
-+&vopl {
-+	status = "okay";
-+};
-+
-+&vopl_mmu {
-+	status = "okay";
-+};
+> > The idea of this logic is to emulate a root port PCI bridge by
+> > providing configuration space read/write operations, and faking behind
+> > the scenes the configuration space of a PCI bridge. A PCI host
+> > controller driver simply has to call pci_sw_bridge_read() and
+> > pci_sw_bridge_write() to read/write the configuration space of the
+> > bridge.  
+> 
+> These systems must actually have a Root Port (there's obviously a Port
+> that originates the link), but it's not visible in a spec-compliant
+> way.  So this is basically a wrapper that translates accesses to
+> standard config space into the vendor-specific registers.
+
+Correct.
+
+> Since there really *is* a hardware bridge but it just doesn't have the
+> interface we expect, "sw_bridge" doesn't feel like quite the right
+> name for it.  Maybe something related to adapter/emulation/interface/...?
+
+sw_adapter ? sw_adap ?
+
+> There are several drivers that do this, and it would be really cool to
+> have them all do it in a similar way.  I found at least these:
+> 
+>   hv_pcifront_read_config()
+
+This one indeed looks potentially a bit similar.
+
+>   mvebu_pcie_rd_conf()
+
+This one is converted by my patch series.
+
+>   thunder_ecam_config_read()
+
+This one I'm not sure what is happening,
+
+>   thunder_pem_config_read()
+
+For this one, it seems like the HW exposes a config space, just that it
+is bogus. It is a bit of a different situation. It could be handled by
+the same sw_bridge/sw_adapt stuff, but it's a slightly different use
+case than "the HW doesn't expose any spec-compliant root port config
+space".
+
+>   xgene_pcie_config_read32()
+
+I don't see why this one would need sw_bridge/sw_adap.
+
+>   iproc_pcie_config_read32()
+
+Not sure about this one either.
+
+>   rcar_pcie_read_conf()
+
+Perhaps it needs sw_bridge/sw_adap.
+
+Really for all those ones, it would require some involvement from the
+corresponding driver maintainers, who understand better their HW and
+see if they would benefit from sw_bridge/sw_adap.
+
+> I *really* like the fact that your accessors use the normal register
+> names, e.g., PCI_EXP_DEVCAP instead of PCISWCAP_EXP_DEVCAP.  That's
+> huge for greppability.
+
+Thanks. There's however one down-side: I had to add separate accessors
+for reading/writing the main PCI config space and the PCIe capability
+config space. Any additional capability config space would require
+adding another pair of accessors. But I really wanted to re-use the
+existing PCI_EXP_* definitions. Another approach is perhaps to pass an
+"ID" of the config space being accessed, i.e 0x0 for the main config
+space, and PCI_CAP_ID_EXP for PCI express.
+
+So instead of 4 accessors in pci_sw_bridge_ops, we would have only two:
+
+pci_sw_bridge_read_status_t (*read)(struct pci_sw_bridge *bridge,
+				    int id, int reg, u32 *value);
+void (*write)(struct pci_sw_bridge *bridge, int id, int reg,
+              u32 old, u32 new, u32 mask);
+
+where "id" would allow the accessor to know if we're accessing the main
+config space, or the PCI express capability config space.
+
+How does that sound ?
+
+> > By default, the PCI bridge configuration space is simply emulated by a
+> > chunk of memory, but the PCI host controller can override the behavior
+> > of the read and write operations on a per-register basis to do
+> > additional actions if needed.
+> > 
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+> > ---
+> >  drivers/pci/Kconfig           |   3 +
+> >  drivers/pci/Makefile          |   1 +
+> >  drivers/pci/pci-sw-bridge.c   | 149 ++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/pci-sw-bridge.h | 125 +++++++++++++++++++++++++++++++++++  
+> 
+> Could this go in drivers/pci instead of include/linux?  I'd prefer to
+> hide it inside the PCI core if that's possible.
+
+Sure, I'll fix that.
+
+> > + * Should be called by the PCI controller driver when reading the PCI
+> > + * configuration space of the fake bridge. It will call back the
+> > + * ->ops->read_base or ->ops->read_pcie operations.
+> > + */
+> > +int pci_sw_bridge_read(struct pci_sw_bridge *bridge, int where,
+> > +		       int size, u32 *value)  
+> 
+> We don't really have a strong convention about the names of config
+> accessors: *_rd_conf(), *_read_config(), *config_read() are all used.
+> Maybe we could at least include "conf" to connect this with config
+> space as opposed to MMIO space.
+
+No problem, I'll fix that, makes perfect sense.
+
+> > +	if (bridge->has_pcie && reg >= PCI_CAP_PCIE_START) {
+> > +		reg -= PCI_CAP_PCIE_START;
+> > +
+> > +		if (bridge->ops->read_pcie)
+> > +			ret = bridge->ops->read_pcie(bridge, reg, value);
+> > +		else
+> > +			ret = PCI_SW_BRIDGE_NOT_HANDLED;
+> > +
+> > +		if (ret == PCI_SW_BRIDGE_NOT_HANDLED)
+> > +			*value = *((u32*) &bridge->pcie_conf + reg / 4);
+> > +	} else {
+> > +		if (bridge->ops->read_base)
+> > +			ret = bridge->ops->read_base(bridge, reg, value);
+> > +		else
+> > +			ret = PCI_SW_BRIDGE_NOT_HANDLED;
+> > +
+> > +		if (ret == PCI_SW_BRIDGE_NOT_HANDLED)
+> > +			*value = *((u32*) &bridge->conf + reg / 4);  
+> 
+> I'm not sure about this part, where the config space that's not
+> handled by the bridge's ops ends up just being RAM that's readable and
+> writable with no effect on the hardware.  That seems a little
+> counter-intuitive.  I think dropping writes and reading zeroes would
+> simplify my mental model.
+
+The fact that it is handled just like RAM is actually needed for a
+number of registers. For example, in the current pci-mvebu driver, when
+reading we have:
+
+        case PCI_VENDOR_ID:
+                *value = bridge->device << 16 | bridge->vendor;
+                break;
+
+        case PCI_COMMAND:
+                *value = bridge->command | bridge->status << 16;
+                break;
+
+        case PCI_CLASS_REVISION:
+                *value = bridge->class << 16 | bridge->interface << 8 |
+                         bridge->revision;
+                break;
+
+        case PCI_CACHE_LINE_SIZE:
+                *value = bridge->bist << 24 | bridge->header_type << 16 |
+                         bridge->latency_timer << 8 | bridge->cache_line_size;
+                break;
+
+        case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
+                *value = bridge->bar[((where & ~3) - PCI_BASE_ADDRESS_0) / 4];
+                break;
+
+        case PCI_PRIMARY_BUS:
+                *value = (bridge->secondary_latency_timer << 24 |
+                          bridge->subordinate_bus         << 16 |
+                          bridge->secondary_bus           <<  8 |
+                          bridge->primary_bus);
+                break;
+
+        case PCI_IO_BASE:
+                if (!mvebu_has_ioport(port))
+                        *value = bridge->secondary_status << 16;
+                else
+                        *value = (bridge->secondary_status << 16 |
+                                  bridge->iolimit          <<  8 |
+                                  bridge->iobase);
+                break;
+
+We definitely cannot return zeroes for all these values.
+
+And for writes, we have code like this:
+
+        case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
+                bridge->bar[((where & ~3) - PCI_BASE_ADDRESS_0) / 4] = value;
+                break;
+
+        case PCI_IO_BASE:
+                /*
+                 * We also keep bit 1 set, it is a read-only bit that
+                 * indicates we support 32 bits addressing for the
+                 * I/O
+                 */
+                bridge->iobase = (value & 0xff) | PCI_IO_RANGE_TYPE_32;
+                bridge->iolimit = ((value >> 8) & 0xff) | PCI_IO_RANGE_TYPE_32;
+                mvebu_pcie_handle_iobase_change(port);
+                break;
+
+        case PCI_MEMORY_BASE:
+                bridge->membase = value & 0xffff;
+                bridge->memlimit = value >> 16;
+                mvebu_pcie_handle_membase_change(port);
+                break;
+
+        case PCI_IO_BASE_UPPER16:
+                bridge->iobaseupper = value & 0xffff;
+                bridge->iolimitupper = value >> 16;
+                mvebu_pcie_handle_iobase_change(port);
+                break;
+
+        case PCI_PRIMARY_BUS:
+                bridge->primary_bus             = value & 0xff;
+                bridge->secondary_bus           = (value >> 8) & 0xff;
+                bridge->subordinate_bus         = (value >> 16) & 0xff;
+                bridge->secondary_latency_timer = (value >> 24) & 0xff;
+                mvebu_pcie_set_local_bus_nr(port, bridge->secondary_bus);
+                break;
+
+The writes being made to those parts of the config space are being
+reflected back when reading the config space later.
+
+> > +	if (size == 1)
+> > +		*value = (*value >> (8 * (where & 3))) & 0xff;
+> > +	else if (size == 2)
+> > +		*value = (*value >> (8 * (where & 3))) & 0xffff;
+> > +	else if (size != 4)
+> > +		return PCIBIOS_BAD_REGISTER_NUMBER;  
+> 
+> This isn't directly related to your patches, but this is a common
+> pattern with some variations between drivers, which makes me wonder
+> whether there are bugs lurking.  These use "where & 3" for size 2:
+> 
+>   advk_pcie_rd_conf()
+>   mtk_pcie_hw_rd_cfg()
+>   pci_generic_config_read32()
+> 
+> But these use "where & 2":
+> 
+>   _altera_pcie_cfg_read()
+>   rcar_pcie_read_conf()
+> 
+> I *think* this means that unaligned 2-byte config reads on Altera and
+> R-Car will return incorrect data.  In both cases, the actual read seen
+> by the hardware is a 32-bit read, but I think we extract the wrong 16
+> bits from that result.
+
+Indeed, if unaligned 2-byte config reads are made, they will return
+bogus results. But are such reads allowed ?
+
+> I wonder if there's a way to use a common helper function to do this.
+
+Yes, this small bit of logic is duplicated all over the place. I'll see
+if I can come up with some reasonable helpers for that.
+
+> > +	return PCIBIOS_SUCCESSFUL;
+> > +}  
+> 
+> > +	/*
+> > +	 * Called when writing to the regular PCI bridge configuration
+> > +	 * space. old is the current value, new is the new value being
+> > +	 * written, and mask indicates which parts of the value are
+> > +	 * being changed.
+> > +	 */
+> > +	void (*write_base)(struct pci_sw_bridge *bridge, int reg,
+> > +			   u32 old, u32 new, u32 mask);
+> > +
+> > +	/*
+> > +	 * Same as ->read_base(), except it is for reading from the
+> > +	 * PCIe capability configuration space.  
+> 
+> I think you mean "->write_base(), except it is for writing to"
+
+Indeed, yes. Will fix that.
+
+So, to sum up, there are really three key questions:
+
+ (1) Which name do you want for this ?
+
+ (2) Agreeing on whether a RAM-like behavior is acceptable, and if not,
+     which solution do you propose instead.
+
+ (3) How much do you want me to convert other drivers vs. the
+     maintainers for those drivers being responsible for doing this.
+
+Since "There are only two hard things in Computer Science: cache
+invalidation and naming things.", I expect question (1) to be the most
+difficult one :-)
+
+Best regards,
+
+Thomas
 -- 
-1.9.1
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
