@@ -1,59 +1,83 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Wed, 1 Aug 2018 11:14:35 -0700
-Subject: [PATCH i2c-next v2] i2c: aspeed: Add an explicit type casting for
- *get_clk_reg_val
-In-Reply-To: <CAFd5g44L+-6wtV4+Kn5-j8zRXA1aNamR2pV0EaFpcoshgQ4bTQ@mail.gmail.com>
-References: <20180724203615.5770-1-jae.hyun.yoo@linux.intel.com>
- <CAFd5g44L+-6wtV4+Kn5-j8zRXA1aNamR2pV0EaFpcoshgQ4bTQ@mail.gmail.com>
-Message-ID: <fe205b04-3c27-9a27-fdeb-0b6c5a971df2@linux.intel.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 1 Aug 2018 11:37:56 -0700
+Subject: [PATCH v3 5/8] net: phy: Use devm api for mdio bus allocation in
+ bcm iproc mdio mux
+In-Reply-To: <1533146186-8374-6-git-send-email-arun.parameswaran@broadcom.com>
+References: <1533146186-8374-1-git-send-email-arun.parameswaran@broadcom.com>
+ <1533146186-8374-6-git-send-email-arun.parameswaran@broadcom.com>
+Message-ID: <e1adee03-3ee0-300c-af3e-32e52ef2965d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/31/2018 11:56 PM, Brendan Higgins wrote:
-> On Tue, Jul 24, 2018 at 1:39 PM Jae Hyun Yoo
-> <jae.hyun.yoo@linux.intel.com> wrote:
->>
->> This commit fixes this sparse warning:
->> drivers/i2c/busses/i2c-aspeed.c:875:38: warning: incorrect type in assignment (different modifiers)
->> drivers/i2c/busses/i2c-aspeed.c:875:38:    expected unsigned int ( *get_clk_reg_val )( ... )
->> drivers/i2c/busses/i2c-aspeed.c:875:38:    got void const *const data
->>
->> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
->> ---
->> Changes since v1:
->> - Fixed title and added Reported-by tag.
->>
->>   drivers/i2c/busses/i2c-aspeed.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
->> index efb89422d496..a4f956c6d567 100644
->> --- a/drivers/i2c/busses/i2c-aspeed.c
->> +++ b/drivers/i2c/busses/i2c-aspeed.c
->> @@ -872,7 +872,7 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
->>          if (!match)
->>                  bus->get_clk_reg_val = aspeed_i2c_24xx_get_clk_reg_val;
->>          else
->> -               bus->get_clk_reg_val = match->data;
->> +               bus->get_clk_reg_val = (u32 (*)(u32))match->data;
->>
->>          /* Initialize the I2C adapter */
->>          spin_lock_init(&bus->lock);
->> --
->> 2.18.0
->>
+On 08/01/2018 10:56 AM, Arun Parameswaran wrote:
+> Use devm_mdiobus_alloc() instead of mdiobus_alloc() in the Broadcom
+> iProc mdio mux driver.
 > 
-> Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
+> Also, clear the driver data on error from probe or when remove() is
+> called.
+> 
+> Signed-off-by: Arun Parameswaran <arun.parameswaran@broadcom.com>
+> ---
+>  drivers/net/phy/mdio-mux-bcm-iproc.c | 9 ++++-----
+>  1 file changed, 4 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
+> index c36ce4b..5640d78 100644
+> --- a/drivers/net/phy/mdio-mux-bcm-iproc.c
+> +++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
+> @@ -198,7 +198,7 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
+>  		return PTR_ERR(md->base);
+>  	}
+>  
+> -	md->mii_bus = mdiobus_alloc();
+> +	md->mii_bus = devm_mdiobus_alloc(&pdev->dev);
+>  	if (!md->mii_bus) {
+>  		dev_err(&pdev->dev, "mdiomux bus alloc failed\n");
+>  		return -ENOMEM;
+> @@ -217,7 +217,7 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
+>  	rc = mdiobus_register(bus);
+>  	if (rc) {
+>  		dev_err(&pdev->dev, "mdiomux registration failed\n");
+> -		goto out;
+> +		return rc;
+>  	}
+>  
+>  	platform_set_drvdata(pdev, md);
+> @@ -226,6 +226,7 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
+>  			   &md->mux_handle, md, md->mii_bus);
+>  	if (rc) {
+>  		dev_info(md->dev, "mdiomux initialization failed\n");
+> +		platform_set_drvdata(pdev, NULL);
+
+This is minor, but I don't think this is necessary, the core device
+driver layer does that already.
+
+>  		goto out_register;
+>  	}
+>  
+> @@ -236,8 +237,6 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
+>  
+>  out_register:
+>  	mdiobus_unregister(bus);
+> -out:
+> -	mdiobus_free(bus);
+>  	return rc;
+>  }
+>  
+> @@ -247,7 +246,7 @@ static int mdio_mux_iproc_remove(struct platform_device *pdev)
+>  
+>  	mdio_mux_uninit(md->mux_handle);
+>  	mdiobus_unregister(md->mii_bus);
+> -	mdiobus_free(md->mii_bus);
+> +	platform_set_drvdata(pdev, NULL);
+
+Likewise.
+
+>  
+>  	return 0;
+>  }
 > 
 
-Thanks a lot Brendan for your review!
 
-Hi Wolfram,
-
-I forgot adding 'Reported-by: Wolfram Sang <wsa@the-dreams.de>'. Please
-add this tag when you apply this patch, or let me know if I need to
-submit v3 for adding the tag.
-
-Thanks,
-
-Jae
+-- 
+Florian
