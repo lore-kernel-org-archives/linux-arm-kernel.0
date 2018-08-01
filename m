@@ -1,27 +1,32 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Wed, 01 Aug 2018 14:01:48 +0200
-Subject: [PATCH 8/9] ALSA: usb-audio: remove redundant pointer 'urb'
-In-Reply-To: <20180801104742.4328-9-colin.king@canonical.com>
-References: <20180801104742.4328-1-colin.king@canonical.com>
- <20180801104742.4328-9-colin.king@canonical.com>
-Message-ID: <s5ha7q6nvmb.wl-tiwai@suse.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 1 Aug 2018 14:16:14 +0200
+Subject: [PATCH] ARM: shmobile: gose: Add DA9210 node for CPU DVFS
+In-Reply-To: <20180730111726.5526-1-marek.vasut+renesas@gmail.com>
+References: <20180730111726.5526-1-marek.vasut+renesas@gmail.com>
+Message-ID: <CAMuHMdUop4fUTbgh0iCQRWTNz_X49070qPKZc0iJ9xFvhi9RHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 01 Aug 2018 12:47:41 +0200,
-Colin King wrote:
-> 
-> From: Colin Ian King <colin.king@canonical.com>
-> 
-> Pointer 'urb' is being assigned but is never used hence it is
-> redundant and can be removed.
-> 
-> Cleans up clang warning:
-> warning: variable 'urb' set but not used [-Wunused-but-set-variable]
-> 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Hi Marek,
 
-Applied, thanks.
+On Mon, Jul 30, 2018 at 1:17 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+> Add DA9210 DVFS node to the I2C bus and link it to CPU0 for DVFS.
+>
+> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
 
+Thanks for your patch!
 
-Takashi
+Oneline-summary prefix should be "ARM: dts: gose:".
+
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
