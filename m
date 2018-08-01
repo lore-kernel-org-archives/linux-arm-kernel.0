@@ -1,42 +1,42 @@
-From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu,  2 Aug 2018 09:45:26 +1200
-Subject: [PATCH] arm_pmu: fix compiler warning in arm_pmu_device_probe
-Message-ID: <20180801214526.24599-1-chris.packham@alliedtelesis.co.nz>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 1 Aug 2018 14:50:20 -0700
+Subject: [RFC 0/2] harden alloc_pages against bogus nid
+In-Reply-To: <20180801200418.1325826-1-jeremy.linton@arm.com>
+References: <20180801200418.1325826-1-jeremy.linton@arm.com>
+Message-ID: <20180801145020.8c76a490c1bf9bef5f87078a@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GCC warns
+On Wed,  1 Aug 2018 15:04:16 -0500 Jeremy Linton <jeremy.linton@arm.com> wrote:
 
-  arm_pmu_platform.c:234:5: error: 'err' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> The thread "avoid alloc memory on offline node"
+> 
+> https://lkml.org/lkml/2018/6/7/251
+> 
+> Asked at one point why the kzalloc_node was crashing rather than
+> returning memory from a valid node. The thread ended up fixing
+> the immediate causes of the crash but left open the case of bad
+> proximity values being in DSDT tables without corrisponding
+> SRAT/SLIT entries as is happening on another machine.
+> 
+> Its also easy to fix that, but we should also harden the allocator
+> sufficiently that it doesn't crash when passed an invalid node id.
+> There are a couple possible ways to do this, and i've attached two
+> separate patches which individually fix that problem.
+> 
+> The first detects the offline node before calling
+> the new_slab code path when it becomes apparent that the allocation isn't
+> going to succeed. The second actually hardens node_zonelist() and
+> prepare_alloc_pages() in the face of NODE_DATA(nid) returning a NULL
+> zonelist. This latter case happens if the node has never been initialized
+> or is possibly out of range. There are other places (NODE_DATA &
+> online_node) which should be checking if the node id's are > MAX_NUMNODES.
+> 
 
-This is because we rely on the for_each_cpu loop in armpmu_request_irqs
-to initialise err. The warning is a little bogus because we know if
-there were 0 CPUs this code would not be running.
+What is it that leads to a caller requesting memory from an invalid
+node?  A race against offlining?  If so then that's a lack of
+appropriate locking, isn't it?
 
-Initialise err to 0 to avoid the warning.
-
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
----
-This has been reported before in https://lkml.org/lkml/2018/3/5/508 I'm not
-sure if it was dismmissed as "meh, gcc is wrong" or if it was just wainting for
-someone with some round tuits.
-
-
- drivers/perf/arm_pmu_platform.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
-index 971ff336494a..96075cecb0ae 100644
---- a/drivers/perf/arm_pmu_platform.c
-+++ b/drivers/perf/arm_pmu_platform.c
-@@ -160,7 +160,7 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
- static int armpmu_request_irqs(struct arm_pmu *armpmu)
- {
- 	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
--	int cpu, err;
-+	int cpu, err = 0;
- 
- 	for_each_cpu(cpu, &armpmu->supported_cpus) {
- 		int irq = per_cpu(hw_events->irq, cpu);
--- 
-2.18.0
+I don't see a problem with emitting a warning and then selecting a
+different node so we can keep running.  But we do want that warning, so
+we can understand the root cause and fix it?
