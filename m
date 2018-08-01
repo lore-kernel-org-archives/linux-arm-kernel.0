@@ -1,63 +1,35 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Wed,  1 Aug 2018 18:36:41 -0300
-Subject: [PATCH 14/21] perf cs-etm: Generate branch sample when receiving a
- CS_ETM_TRACE_ON packet
-In-Reply-To: <20180801213648.4814-1-acme@kernel.org>
-References: <20180801213648.4814-1-acme@kernel.org>
-Message-ID: <20180801213648.4814-15-acme@kernel.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 1 Aug 2018 23:55:11 +0200
+Subject: [PATCH v3 7/8] net: phy: Add support to configure clock in
+ Broadcom iProc mdio mux
+In-Reply-To: <8133c1f0-addc-5c48-7a6a-44b0d106c425@broadcom.com>
+References: <1533146186-8374-1-git-send-email-arun.parameswaran@broadcom.com>
+ <1533146186-8374-8-git-send-email-arun.parameswaran@broadcom.com>
+ <0cc6db4f-7008-0ad3-58d7-9e93060f152f@gmail.com>
+ <20180801184659.GG30658@n2100.armlinux.org.uk>
+ <9af7e7a3-54d4-8802-f64a-fc4f9c49c8b9@broadcom.com>
+ <20180801200712.GD19257@lunn.ch>
+ <20180801202313.GH30658@n2100.armlinux.org.uk>
+ <20180801203846.GE19257@lunn.ch>
+ <8133c1f0-addc-5c48-7a6a-44b0d106c425@broadcom.com>
+Message-ID: <20180801215511.GG19257@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leo Yan <leo.yan@linaro.org>
+> md->core_clk = devm_clk_get(&pdev->dev, NULL);
+> if (md->core_clk == ERR_PTR(-ENOENT) || md->core_clk == ERR_PTR(-EINVAL)) {
+> 	/* clock is optional, without it the default
+> 	 * rate divider register values will be used
+> 	 */
+> 	md->core_clk = NULL;
+> } else if (IS_ERR(md->core_clk)) {
+> 	return PTR_ERR(md->core_clk);
+> } else {
+> 	rc = clk_prepare_enable(md->core_clk);
+> 	...
+> }
 
-If one CS_ETM_TRACE_ON packet is inserted, we miss to generate branch
-sample for the previous CS_ETM_RANGE packet.
+As Florian pointed out, the clk_ API is happy to take a NULL pointer
+for a clock. So you don't need this last else.
 
-This patch is to generate branch sample when receiving a CS_ETM_TRACE_ON
-packet, so this can save complete info for the previous CS_ETM_RANGE
-packet just before CS_ETM_TRACE_ON packet.
-
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Kim Phillips <kim.phillips@arm.com>
-Cc: Mike Leach <mike.leach@linaro.org>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Robert Walker <robert.walker@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1531295145-596-6-git-send-email-leo.yan at linaro.org
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
----
- tools/perf/util/cs-etm.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 976db8483478..d3b794286bca 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -935,6 +935,7 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
- static int cs_etm__flush(struct cs_etm_queue *etmq)
- {
- 	int err = 0;
-+	struct cs_etm_auxtrace *etm = etmq->etm;
- 	struct cs_etm_packet *tmp;
- 
- 	if (!etmq->prev_packet)
-@@ -965,6 +966,13 @@ static int cs_etm__flush(struct cs_etm_queue *etmq)
- 
- 	}
- 
-+	if (etm->sample_branches &&
-+	    etmq->prev_packet->sample_type == CS_ETM_RANGE) {
-+		err = cs_etm__synth_branch_sample(etmq);
-+		if (err)
-+			return err;
-+	}
-+
- swap_packet:
- 	if (etmq->etm->synth_opts.last_branch) {
- 		/*
--- 
-2.14.4
+    Andrew
