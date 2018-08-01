@@ -1,73 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 31 Jul 2018 16:13:32 -0600
-Subject: [PATCH 1/3] dt-bindings: interrupt-controller: Actions external
- interrupt controller
-In-Reply-To: <20180724150219.1807724-2-pn@denx.de>
-References: <20180724150219.1807724-1-pn@denx.de>
- <20180724150219.1807724-2-pn@denx.de>
-Message-ID: <20180731221332.GA29883@rob-hp-laptop>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 31 Jul 2018 19:03:14 -0700
+Subject: [GIT PULL v2] ARM: aspeed: dts changes for 4.19
+In-Reply-To: <CACPK8XdBARcXsndyvc-roTi1SvYC4U+wHG0v0QPfWr_91wGkBg@mail.gmail.com>
+References: <CACPK8XdBARcXsndyvc-roTi1SvYC4U+wHG0v0QPfWr_91wGkBg@mail.gmail.com>
+Message-ID: <CAOesGMg3Vs0HqbbWA-LdkWnUPWgvgkWbj6p78HQB0jcii4XSYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 24, 2018 at 05:02:17PM +0200, Parthiban Nallathambi wrote:
-> Actions Semi OWL family SoC's provides support for external interrupt
-> controller to be connected and controlled using SIRQ pins. S500, S700
-> and S900 provides 3 SIRQ lines and works independently for 3 external
-> interrupt controllers.
-> 
-> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
-> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
-> ---
->  .../interrupt-controller/actions,owl-sirq.txt      | 34 ++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
-> new file mode 100644
-> index 000000000000..c5f8a29573c8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
-> @@ -0,0 +1,34 @@
-> +Actions Semi Owl SoCs SIRQ interrupt controller
-> +
-> +S500, S700 and S900 SoC's from Actions provides interface, in which external
-> +interrupt controller can be connected. It has the following properties:
-> +
-> +- inputs three interrupt signal from external interrupt controller
-> +
-> +Required properties:
-> +
-> +- compatible: should be one of the following
-> +	"actions,s700-sirq"
-> +	"actions,s900-sirq"
-> +- reg: physical base address of the controller and length of memory mapped.
-> +- interrupt-controller: identifies the node as an interrupt controller
-> +- #interrupt-cells: specifies the number of cells needed to encode an interrupt
-> +  source, should be 2.
-> +- interrupts: specifies the interrupt line in the interrupt controller and
-> +  interrupt type (level or edge triggered)
+On Thu, Jul 26, 2018 at 6:20 PM, Joel Stanley <joel@jms.id.au> wrote:
+> Hi Olof,
+>
+> Here's the ASPEED device tree bits, minus the FSI related changes.
+> I've placed the tag earlier on in the series.
+>
+> We can merge the FSI work separately once Ben has reworked them,
+> either this time around or for 4.20.
+>
+> Hopefully I've got my line breaks sorted this time around too.
+>
+> The following changes since commit 7daf201d7fe8334e2d2364d4e8ed3394ec9af819:
+>
+>   Linux 4.18-rc2 (2018-06-24 20:54:29 +0800)
+>
+> are available in the Git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git \
+>       tags/aspeed-4.19-devicetree-no-fsi
 
-Need to state there are 3 interrupts.
+Merged, thanks!
 
-> +- sampling-rate-24m: this means the external controller's interrupts can be
 
-Needs a vendor prefix.
-
-> +  sampled at 24MHz. Sampling can be specified for each SIRQ lines, as an array
-> +  element. By default, all lines are sampled at 32KHz.
-> +
-> +Example:
-> +
-> +sirq: interrupt-controller at e01b0000 {
-> +	compatible = "actions,s700-sirq";
-> +	reg = <0 0xe01b0000 0 0x1000>;
-> +	interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-> +		<GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
-> +		<GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-> +	interrupt-controller;
-> +	#interrupt-cells = <2>;
-> +	sampling-rate-24m = <0 0 1>;
-> +};
-> -- 
-> 2.14.4
-> 
+-Olof
