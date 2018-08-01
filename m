@@ -1,158 +1,313 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Wed, 1 Aug 2018 07:31:25 +0200
-Subject: [PATCH v8 4/4] mailbox: Add support for i.MX7D messaging unit
-In-Reply-To: <CABb+yY2PN=LN3bgTTzL9SpA43atughAbS1OjNsg0XZg42JxD3w@mail.gmail.com>
-References: <20180731141146.10788-1-o.rempel@pengutronix.de>
- <20180731141146.10788-5-o.rempel@pengutronix.de>
- <CABb+yY2PN=LN3bgTTzL9SpA43atughAbS1OjNsg0XZg42JxD3w@mail.gmail.com>
-Message-ID: <20180801053125.gmdgojgejyremaul@pengutronix.de>
+From: navam@xilinx.com (Nava kishore Manne)
+Date: Wed, 1 Aug 2018 05:49:16 +0000
+Subject: [RFC PATCH 2/2] fpga manager: Adding FPGA Manager support for
+ Xilinx zynqmp
+In-Reply-To: <CANk1AXQ-qrEKAm9zEs8sVaFNGGFkjCr+npTKUNDXz_bnpL=DQw@mail.gmail.com>
+References: <20180801100457.25614-1-nava.manne@xilinx.com>
+ <20180801100457.25614-2-nava.manne@xilinx.com>
+ <MWHPR0201MB34811402926886136673CE68C22E0@MWHPR0201MB3481.namprd02.prod.outlook.com>
+ <CANk1AXQ-qrEKAm9zEs8sVaFNGGFkjCr+npTKUNDXz_bnpL=DQw@mail.gmail.com>
+Message-ID: <MWHPR0201MB3481D2A338A004B2FB17CA61C22D0@MWHPR0201MB3481.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 09:51:37PM +0530, Jassi Brar wrote:
-> Hi Oleksij,
+Hi Alan Tull,
+
+Thanks for the quick response.
+Please find my Comments inline...
+
+> -----Original Message-----
+> From: Alan Tull [mailto:atull at kernel.org]
+> Sent: Tuesday, July 31, 2018 8:52 PM
+> To: Nava kishore Manne <navam@xilinx.com>
+> Cc: robh+dt at kernel.org; mark.rutland at arm.com; Michal Simek
+> <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>;
+> atull at opensource.altera.com; moritz.fischer at ettus.com;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; Appana Durga Kedareswara Rao
+> <appanad@xilinx.com>; chinnikishore369 at gmail.com; linux-
+> fpga at vger.kernel.org
+> Subject: Re: [RFC PATCH 2/2] fpga manager: Adding FPGA Manager support for
+> Xilinx zynqmp
 > 
->  A fast and fine turnaround! Mostly nits and a suggestion follows ...
+> On Tue, Jul 31, 2018 at 8:08 AM, Nava kishore Manne <navam@xilinx.com>
+> wrote:
+> >
+> > +Alan Tull,
 > 
-> On Tue, Jul 31, 2018 at 7:41 PM, Oleksij Rempel <o.rempel@pengutronix.de> wrote:
-> > The Mailbox controller is able to send messages (up to 4 32 bit words)
-> > between the endpoints.
-> >
-> > This driver was tested using the mailbox-test driver sending messages
-> > between the Cortex-A7 and the Cortex-M4.
-> >
-> Do we need something MU specific here?
-> I mean MU doesn't really care if the endpoints are CA, CR or CM. So,
-> maybe just the two-line ritual intro to MU?
+> + linux-fpga mailing list
+> 
+> Hi Nava,
+> 
+> Thanks for submitting.
+> 
+> This should be on the linux-fpga mailing list.  The
+> linux/scripts/get_maintainer.pl script would tell you that.
+> 
+I have Created this Patch On Master Branch there get_maintainer.pl Doesn't have linux-fpga mailing list.
+https://git.kernel.org/pub/scm/linux/kernel/git/atull/linux-fpga.git/ 
+Please suggest a branch So will create a patch on top of it.
 
-Till now, every additional word about MU added more disagreement in this
-topic. I prefer the reduced variant.
+> Also, did you run checkpatch.pl on these? :)  I encourage using the --strict
+> parameter.
+> 
+Will Fix in the next version.
+> >
+> >> -----Original Message-----
+> >> From: Nava kishore Manne [mailto:nava.manne at xilinx.com]
+> >> Sent: Wednesday, August 1, 2018 3:35 PM
+> >> To: robh+dt at kernel.org; mark.rutland at arm.com; Michal Simek
+> >> <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>;
+> >> atull at opensource.altera.com; moritz.fischer at ettus.com; Nava kishore
+> >> Manne <navam@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
+> >> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Appana
+> >> Durga Kedareswara Rao <appanad@xilinx.com>;
+> >> chinnikishore369 at gmail.com
+> >> Subject: [RFC PATCH 2/2] fpga manager: Adding FPGA Manager support
+> >> for Xilinx zynqmp
+> >>
+> >> This patch adds FPGA Manager support for the Xilinx ZynqMp chip.
+> >>
+> >> Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
+> >> ---
+> >>  drivers/fpga/Kconfig       |   6 ++
+> >>  drivers/fpga/Makefile      |   1 +
+> >>  drivers/fpga/zynqmp-fpga.c | 164
+> >> +++++++++++++++++++++++++++++++++++++
+> >>  3 files changed, 171 insertions(+)
+> >>  create mode 100644 drivers/fpga/zynqmp-fpga.c
+> >>
+> >> diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig index
+> >> cd84934774cc..b84e3555b3e3 100644
+> >> --- a/drivers/fpga/Kconfig
+> >> +++ b/drivers/fpga/Kconfig
+> >> @@ -26,6 +26,12 @@ config FPGA_MGR_ZYNQ_FPGA
+> >>       help
+> >>         FPGA manager driver support for Xilinx Zynq FPGAs.
+> >>
+> >> +config FPGA_MGR_ZYNQMP_FPGA
+> >> +     tristate "Xilinx Zynqmp FPGA"
+> >> +     depends on ARCH_ZYNQMP || COMPILE_TEST
+> >> +     help
+> >> +       FPGA manager driver support for Xilinx ZynqMp FPGAs.
+> >> +
+> >>  endif # FPGA
+> >>
+> >>  endmenu
+> >> diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile index
+> >> 8d83fc6b1613..ef444512cb01 100644
+> >> --- a/drivers/fpga/Makefile
+> >> +++ b/drivers/fpga/Makefile
+> >> @@ -8,3 +8,4 @@ obj-$(CONFIG_FPGA)                    += fpga-mgr.o
+> >>  # FPGA Manager Drivers
+> >>  obj-$(CONFIG_FPGA_MGR_SOCFPGA)               += socfpga.o
+> >>  obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)     += zynq-fpga.o
+> >> +obj-$(CONFIG_FPGA_MGR_ZYNQMP_FPGA)   += zynqmp-fpga.o
+> >> diff --git a/drivers/fpga/zynqmp-fpga.c b/drivers/fpga/zynqmp-fpga.c
+> >> new file mode 100644 index 000000000000..e4172c3a6868
+> >> --- /dev/null
+> >> +++ b/drivers/fpga/zynqmp-fpga.c
+> >> @@ -0,0 +1,164 @@
+> >> +// SPDX-License-Identifier: GPL-2.0+
+> >> +/*
+> >> + * Copyright (C) 2018 Xilinx, Inc.
+> >> + *
+> 
+> Please delete the unnecessary blank '*' line here.
+> 
+Will Fix in the next version.
+
+> >> + */
+> >> +
+> >> +#include <linux/dma-mapping.h>
+> >> +#include <linux/fpga/fpga-mgr.h>
+> >> +#include <linux/io.h>
+> >> +#include <linux/kernel.h>
+> >> +#include <linux/module.h>
+> >> +#include <linux/of_address.h>
+> >> +#include <linux/string.h>
+> >> +#include <linux/firmware/xilinx/zynqmp/firmware.h>
+> 
+> I don't see this firmware/xilinx folder.  Is this dependent on other commits that
+> were submitted?  If so, please note that in the header.
+> 
+This  Driver have a dependency On firmware.h currently Jolly Shah is working On it.
+Once its got accepted will add the Required API's in the firmware.h
+https://lkml.org/lkml/2018/7/17/1038 
+will fix this in the next version.
+
+> >> +
+> >> +/* Constant Definitions */
+> >> +#define IXR_FPGA_DONE_MASK   0X00000008U
+> >> +#define IXR_FPGA_ENCRYPTION_EN       0x00000008U
+> >> +
+> >> +/**
+> >> + * struct zynqmp_fpga_priv - Private data structure
+> >> + * @dev:     Device data structure
+> >> + * @flags:   flags which is used to identify the bitfile type
+> >> + */
+> >> +struct zynqmp_fpga_priv {
+> >> +     struct device *dev;
+> >> +     u32 flags;
+> >> +};
+> >> +
+> >> +static int zynqmp_fpga_ops_write_init(struct fpga_manager *mgr,
+> >> +                                   struct fpga_image_info *info,
+> >> +                                   const char *buf, size_t size) {
+> 
+> checkpatch.pl would have complained about this:
+> ERROR: open brace '{' following function definitions go on the next line
+> 
+Will Fix in the next version.
+
+> >> +     struct zynqmp_fpga_priv *priv;
+> >> +
+> >> +     priv = mgr->priv;
+> >> +     priv->flags = info->flags;
+> >> +
+> >> +     return 0;
+> >> +}
+> >> +
+> >> +static int zynqmp_fpga_ops_write(struct fpga_manager *mgr,
+> >> +                              const char *buf, size_t size) {
+> >> +     struct zynqmp_fpga_priv *priv;
+> >> +     char *kbuf;
+> >> +     size_t dma_size;
+> >> +     dma_addr_t dma_addr;
+> >> +     int ret;
+> >> +     const struct zynqmp_eemi_ops *eemi_ops =
+> >> zynqmp_pm_get_eemi_ops();
+> 
+> Appears to have a dependency that I can't see here.  I'm looking at the current
+> linux-next/master branch and not seeing this zynqmp_pm_get_eemi_ops
+> function anywhere.
+> 
+This API exists in firmware.c file. Currently it is in under review...
+ https://lkml.org/lkml/2018/7/17/1038 
+
+> >> +
+> >> +     if (!eemi_ops || !eemi_ops->fpga_load)
+> >> +             return -ENXIO;
+> >> +
+> >> +     priv = mgr->priv;
+> >> +
+> >> +     if (mgr->flags & IXR_FPGA_ENCRYPTION_EN)
+> >> +             dma_size = size + ENCRYPTED_KEY_LEN;
+> >> +     else
+> >> +             dma_size = size;
+> >> +
+> >> +     kbuf = dma_alloc_coherent(priv->dev, dma_size, &dma_addr,
+> >> GFP_KERNEL);
+> >> +     if (!kbuf)
+> >> +             return -ENOMEM;
+> >> +
+> >> +     memcpy(kbuf, buf, size);
+> >> +
+> >> +     if (mgr->flags & IXR_FPGA_ENCRYPTION_EN)
+> >> +             memcpy(kbuf + size, mgr->key, ENCRYPTED_KEY_LEN);
+> >> +
+> >> +     wmb(); /* ensure all writes are done before initiate FW call */
+> >> +
+> >> +     if (mgr->flags & IXR_FPGA_ENCRYPTION_EN)
+> >> +             ret = eemi_ops->fpga_load(dma_addr, dma_addr + size,
+> >> +                                       mgr->flags);
+> >> +     else
+> >> +             ret = eemi_ops->fpga_load(dma_addr, size, mgr->flags);
+> >> +
+> >> +     dma_free_coherent(priv->dev, dma_size, kbuf, dma_addr);
+> >> +
+> >> +     return ret;
+> >> +}
+> >> +
+> >> +static int zynqmp_fpga_ops_write_complete(struct fpga_manager *mgr,
+> >> +                                       struct fpga_image_info *info)
+> >> +{
+> >> +     return 0;
+> >> +}
+> >> +
+> >> +static enum fpga_mgr_states zynqmp_fpga_ops_state(struct
+> >> +fpga_manager
+> >> +*mgr) {
+> >> +     u32 status;
+> >> +     const struct zynqmp_eemi_ops *eemi_ops =
+> >> zynqmp_pm_get_eemi_ops();
+> >> +
+> >> +     if (!eemi_ops || !eemi_ops->fpga_get_status)
+> >> +             return FPGA_MGR_STATE_UNKNOWN;
+> >> +
+> >> +     eemi_ops->fpga_get_status(&status);
+> >> +     if (status & IXR_FPGA_DONE_MASK)
+> >> +             return FPGA_MGR_STATE_OPERATING;
+> >> +
+> >> +     return FPGA_MGR_STATE_UNKNOWN;
+> >> +}
+> >> +
+> >> +static const struct fpga_manager_ops zynqmp_fpga_ops = {
+> >> +     .state = zynqmp_fpga_ops_state,
+> >> +     .write_init = zynqmp_fpga_ops_write_init,
+> >> +     .write = zynqmp_fpga_ops_write,
+> >> +     .write_complete = zynqmp_fpga_ops_write_complete, };
+> >> +
+> >> +static int zynqmp_fpga_probe(struct platform_device *pdev) {
+> >> +     struct device *dev = &pdev->dev;
+> >> +     struct zynqmp_fpga_priv *priv;
+> >> +     int err, ret;
+> >> +
+> >> +     priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> >> +     if (!priv)
+> >> +             return -ENOMEM;
+> >> +
+> >> +     priv->dev = dev;
+> >> +     ret = dma_set_mask_and_coherent(&pdev->dev,
+> >> DMA_BIT_MASK(44));
+> >> +     if (ret < 0)
+> >> +             dev_err(dev, "no usable DMA configuration");
+> >> +
+> >> +     err = fpga_mgr_register(dev, "Xilinx ZynqMP FPGA Manager",
+> >> +                             &zynqmp_fpga_ops, priv);
+> 
+> The API has changed in 4.17 to be
+> fpga_mgr_create/free/register/unregister.  Please look at linux-next/master for
+> the latest.
+
+Will Fix in the next version.
 
 > 
-> > +enum imx_mu_chan_type {
-> > +       IMX_MU_TYPE_TX,         /* Tx with FIFO */
-> > +       IMX_MU_TYPE_RX,         /* Rx with FIFO */
+> >> +     if (err) {
+> >> +             dev_err(dev, "unable to register FPGA manager");
+> >> +             return err;
+> >> +     }
+> >> +
+> >> +     return 0;
+> >> +}
+> >> +
+> >> +static int zynqmp_fpga_remove(struct platform_device *pdev) {
+> >> +     fpga_mgr_unregister(&pdev->dev);
+> >> +
+> >> +     return 0;
+> >> +}
+> >> +
+> >> +static const struct of_device_id zynqmp_fpga_of_match[] = {
+> >> +     { .compatible = "xlnx,zynqmp-pcap-fpga", },
+> >> +     {},
+> >> +};
+> >> +
+> >> +MODULE_DEVICE_TABLE(of, zynqmp_fpga_of_match);
+> >> +
+> >> +static struct platform_driver zynqmp_fpga_driver = {
+> >> +     .probe = zynqmp_fpga_probe,
+> >> +     .remove = zynqmp_fpga_remove,
+> >> +     .driver = {
+> >> +             .name = "zynqmp_fpga_manager",
+> >> +             .of_match_table = of_match_ptr(zynqmp_fpga_of_match),
+> >> +     },
+> >> +};
+> >> +
+> >> +module_platform_driver(zynqmp_fpga_driver);
+> >> +
+> >> +MODULE_AUTHOR("Nava kishore Manne <navam@xilinx.com>");
+> >> +MODULE_DESCRIPTION("Xilinx ZynqMp FPGA Manager");
+> >> +MODULE_LICENSE("GPL");
+> >> --
+> >> 2.18.0
 > >
-> nit: its a register, not fifo
-
-ok
-
-> 
-> > +
-> > +static void imx_mu_txdb_work(struct work_struct *work)
-> > +{
-> > +       struct imx_mu_con_priv *cp =
-> > +                       container_of(work, struct imx_mu_con_priv, work);
-> > +       mbox_chan_txdone(cp->chan, 0);
-> > +}
-> >
-> The api assumes a controller have same type of channels. So we are
-> having to do this here.
-> I am not sure, but would declaring two mailbox controllers (one with
-> doorbells and the other data channels) work?
-
-I was thinking about it and decided that this pain was not worth it.
-
-> If not, at least we could use a tasklet instead of a work queue?
-
-ok. probably it is better to fix the mailbox framework.... may be not right
-now.
-
-> 
-> > +static bool imx_mu_last_tx_done(struct mbox_chan *chan)
-> > +{
-> > +       struct imx_mu_priv *priv = to_imx_mu_priv(chan->mbox);
-> > +       struct imx_mu_con_priv *cp = chan->con_priv;
-> > +
-> > +       /* test if transmit register is empty */
-> > +       return imx_mu_read(priv, IMX_MU_xSR) & IMX_MU_xSR_TEn(cp->idx);
-> > +}
-> > +
-> > +static int imx_mu_send_data(struct mbox_chan *chan, void *data)
-> > +{
-> > +       struct imx_mu_priv *priv = to_imx_mu_priv(chan->mbox);
-> > +       struct imx_mu_con_priv *cp = chan->con_priv;
-> > +       u32 *arg = data;
-> > +
-> > +       switch (cp->type) {
-> > +       case IMX_MU_TYPE_TX:
-> > +               if (!imx_mu_last_tx_done(chan))
-> > +                       return -EBUSY;
-> >
-> This test should be moved to imx_mu_startup().
-> The api won't ever call if last tx was not done, and so it doesn't
-> know how to recover from send_data() failure.
-
-ok.
-
-> 
-> > +
-> > +static int imx_mu_startup(struct mbox_chan *chan)
-> > +{
-> > +       struct imx_mu_priv *priv = to_imx_mu_priv(chan->mbox);
-> > +       struct imx_mu_con_priv *cp = chan->con_priv;
-> > +       int ret;
-> > +
-> > +       if (cp->type == IMX_MU_TYPE_TXDB) {
-> > +               /* Tx doorbell don't have ACK support */
-> > +               INIT_WORK(&cp->work, imx_mu_txdb_work);
-> > +               return 0;
-> > +       }
-> > +
-> > +       cp->irq_desc = kasprintf(GFP_KERNEL, "imx_mu_chan[%i-%i]", cp->type,
-> > +                                cp->idx);
-> > +       if (!cp->irq_desc)
-> > +               return -ENOMEM;
-> >
-> Probably you won't do but still .... name of irq is but one channel
-> property. So you could set it in probe() and avoid creating another
-> situation when startup could fail.
-
-You mean, fail on probe with no mem is better then fail on startup? Why?
-
-> 
-> > +       ret = request_irq(priv->irq, imx_mu_isr, IRQF_SHARED, cp->irq_desc,
-> > +                         chan);
-> > +       if (ret) {
-> > +               dev_err(priv->dev,
-> > +                       "Unable to acquire IRQ %d\n", priv->irq);
-> > +               return ret;
-> > +       }
-> > +
-> > +       switch (cp->type) {
-> > +               break;
-> >
-> Is this intentional?
-
-no. thx.
-
-> 
-> > +
-> > +static void imx_mu_shutdown(struct mbox_chan *chan)
-> > +{
-> > +       struct imx_mu_priv *priv = to_imx_mu_priv(chan->mbox);
-> > +       struct imx_mu_con_priv *cp = chan->con_priv;
-> > +
-> > +       if (IMX_MU_TYPE_TXDB == cp->type)
-> >
-> nit: usually we do (cp->type == IMX_MU_TYPE_TXDB)
-
-why? I do it with simple reason:
-this error will be detected by compiler
-if (IMX_MU_TYPE_TXDB = cp->type)
-
-this error will silently fail
-if (cp->type = IMX_MU_TYPE_TXDB)
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180801/3154343e/attachment.sig>
