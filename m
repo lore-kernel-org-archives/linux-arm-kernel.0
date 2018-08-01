@@ -1,54 +1,467 @@
 From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed,  1 Aug 2018 10:19:50 +0200
-Subject: [PATCH 2/2] dt-bindings: clock: Add bindings for the Clocking Wizard
- IP
-In-Reply-To: <20180801081950.10497-1-boris.brezillon@bootlin.com>
-References: <20180801081950.10497-1-boris.brezillon@bootlin.com>
-Message-ID: <20180801081950.10497-2-boris.brezillon@bootlin.com>
+Date: Wed,  1 Aug 2018 10:19:49 +0200
+Subject: [PATCH 1/2] clk: Add a driver for the Xilinx Clocking Wizard block
+Message-ID: <20180801081950.10497-1-boris.brezillon@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document Xilinx Clocking Wizard bindings.
+Add a clk driver for Xilinx Clocking Wizard IP.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@bootlin.com>
 ---
- .../devicetree/bindings/clock/xlnx,clk-wizard.txt  | 28 ++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt
+ drivers/clk/Kconfig           |   1 +
+ drivers/clk/zynq/Kconfig      |   5 +
+ drivers/clk/zynq/Makefile     |   2 +
+ drivers/clk/zynq/clk-wizard.c | 408 ++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 416 insertions(+)
+ create mode 100644 drivers/clk/zynq/Kconfig
+ create mode 100644 drivers/clk/zynq/clk-wizard.c
 
-diff --git a/Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt b/Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 721572a8c429..6c14f48b4f19 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -293,5 +293,6 @@ source "drivers/clk/sunxi-ng/Kconfig"
+ source "drivers/clk/tegra/Kconfig"
+ source "drivers/clk/ti/Kconfig"
+ source "drivers/clk/uniphier/Kconfig"
++source "drivers/clk/zynq/Kconfig"
+ 
+ endmenu
+diff --git a/drivers/clk/zynq/Kconfig b/drivers/clk/zynq/Kconfig
 new file mode 100644
-index 000000000000..1bf7a764f4a9
+index 000000000000..654d72ef0349
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/xlnx,clk-wizard.txt
-@@ -0,0 +1,28 @@
-+Device Tree Clock bindings for the "Clocking Wizard" IP provided by Xilinx
++++ b/drivers/clk/zynq/Kconfig
+@@ -0,0 +1,5 @@
++config CLK_ZYNQ_CLK_WIZARD
++	tristate "Xilinx clocking wizard driver"
++	depends on ARCH_ZYNQ || COMPILE_TEST
++	help
++	  Enable the driver for Xilinx clocking wizard IP.
+diff --git a/drivers/clk/zynq/Makefile b/drivers/clk/zynq/Makefile
+index 0afc2e7cc5c1..ac2a5e09fad9 100644
+--- a/drivers/clk/zynq/Makefile
++++ b/drivers/clk/zynq/Makefile
+@@ -1,3 +1,5 @@
+ # Zynq clock specific Makefile
+ 
+ obj-y	+= clkc.o pll.o
 +
-+This block can be used to generate up to 4 clock signals out of a single input
-+clock. It embeds a PLL to generate an intermediate clock which then feeds 4
-+clock dividers whose divider value can be adjusted based on the user needs.
++obj-$(CONFIG_CLK_ZYNQ_CLK_WIZARD)	+= clk-wizard.o
+diff --git a/drivers/clk/zynq/clk-wizard.c b/drivers/clk/zynq/clk-wizard.c
+new file mode 100644
+index 000000000000..07a60ab78133
+--- /dev/null
++++ b/drivers/clk/zynq/clk-wizard.c
+@@ -0,0 +1,408 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Zynq Clocking Wizard driver
++ *
++ *  Copyright (C) 2018 Macronix
++ */
 +
-+Required properties:
-+ - #clock-cells: must be 1. The cell is encoding the id of the output clk
-+		 (from 0 to xlnx,clk-wizard-num-outputs - 1)
-+ - compatible: must be "xlnx,clk-wizard-5.1"
-+ - clocks: 2 clocks are required
-+ - clock-names: should contain 2 clock names: "aclk" and "clkin".
-+		"aclk" is driving the register interface and "clk_in" is the
-+		input clock signal that is used by the PLL block
-+ - xlnx,clk-wizard-num-outputs: this describe the number of output clocks
-+				(chosen at synthesization time)
-+ - reg: registers used to configure the Clocking wizard block
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/iopoll.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/string.h>
 +
-+Example:
++#define SRR			0x0
 +
-+	clkwizard: clkwizard at 43c20000 {
-+		compatible = "xlnx,clk-wizard-5.1";
-+		reg = <0x43c20000 0x10000>;
-+		clocks = <&clkc 18>, <&clkc 18>;
-+		clock-names = "aclk", "clk_in1";
-+		#clock-cells = <1>;
-+		xlnx,clk-wizard-num-outputs = <2>;
-+	};
++#define SR			0x4
++#define SR_LOCKED		BIT(0)
++
++#define CCR(x)			(0x200 + ((x) * 4))
++
++#define FBOUT_CFG		CCR(0)
++#define FBOUT_DIV(x)		(x)
++#define FBOUT_GET_DIV(x)	((x) & GENMASK(7, 0))
++#define FBOUT_MUL(x)		((x) << 8)
++#define FBOUT_GET_MUL(x)	(((x) & GENMASK(15, 8)) >> 8)
++#define FBOUT_FRAC(x)		((x) << 16)
++#define FBOUT_GET_FRAC(x)	(((x) & GENMASK(25, 16)) >> 16)
++#define FBOUT_FRAC_EN		BIT(26)
++
++#define FBOUT_PHASE		CCR(1)
++
++#define OUT_CFG(x)		CCR(2 + ((x) * 3))
++#define OUT_DIV(x)		(x)
++#define OUT_GET_DIV(x)		((x) & GENMASK(7, 0))
++#define OUT_FRAC(x)		((x) << 8)
++#define OUT_GET_FRAC(x)		(((x) & GENMASK(17, 8)) >> 8)
++#define OUT_FRAC_EN		BIT(18)
++
++#define OUT_PHASE(x)		CCR(3 + ((x) * 3))
++#define OUT_DUTY(x)		CCR(4 + ((x) * 3))
++
++#define CTRL			CCR(23)
++#define CTRL_SEN		BIT(2)
++#define CTRL_SADDR		BIT(1)
++#define CTRL_LOAD		BIT(0)
++
++struct clkwzd;
++
++struct clkwzd_fbout {
++	struct clk_hw base;
++	struct clkwzd *wzd;
++};
++
++static inline struct clkwzd_fbout *to_clkwzd_fbout(struct clk_hw *hw)
++{
++	return container_of(hw, struct clkwzd_fbout, base);
++}
++
++struct clkwzd_out {
++	struct clk_hw base;
++	struct clkwzd *wzd;
++	unsigned int id;
++};
++
++static inline struct clkwzd_out *to_clkwzd_out(struct clk_hw *hw)
++{
++	return container_of(hw, struct clkwzd_out, base);
++}
++
++#define CLKWZD_MAX_OUTPUT	7
++
++struct clkwzd {
++	struct mutex lock;
++	struct clk *aclk;
++	struct clk *clk_in1;
++	void __iomem *regs;
++	struct clkwzd_out out[CLKWZD_MAX_OUTPUT];
++	struct clkwzd_fbout fbout;
++	struct clk_hw_onecell_data *onecell;
++};
++
++static int clkwzd_is_locked(struct clkwzd *wzd)
++{
++	bool prepared;
++
++	mutex_lock(&wzd->lock);
++	prepared = readl(wzd->regs + SR) & SR_LOCKED;
++	mutex_unlock(&wzd->lock);
++
++	return prepared;
++}
++
++static int clkwzd_apply_conf(struct clkwzd *wzd)
++{
++	int ret;
++	u32 val;
++
++	mutex_lock(&wzd->lock);
++	ret = readl_poll_timeout(wzd->regs + SR, val, val & SR_LOCKED, 1, 100);
++	if (!ret) {
++		writel(CTRL_SEN | CTRL_SADDR | CTRL_LOAD, wzd->regs + CTRL);
++		writel(CTRL_SADDR, wzd->regs + CTRL);
++		ret = readl_poll_timeout(wzd->regs + SR, val, val & SR_LOCKED,
++					 1, 100);
++	}
++	mutex_unlock(&wzd->lock);
++
++	return 0;
++}
++
++static int clkwzd_fbout_is_prepared(struct clk_hw *hw)
++{
++	struct clkwzd_fbout *fbout = to_clkwzd_fbout(hw);
++
++	return clkwzd_is_locked(fbout->wzd);
++}
++
++static int clkwzd_fbout_prepare(struct clk_hw *hw)
++{
++	struct clkwzd_fbout *fbout = to_clkwzd_fbout(hw);
++
++	return clkwzd_apply_conf(fbout->wzd);
++}
++
++static unsigned long clkwzd_fbout_recalc_rate(struct clk_hw *hw,
++					      unsigned long parent_rate)
++{
++	struct clkwzd_fbout *fbout = to_clkwzd_fbout(hw);
++	unsigned long rate;
++	u32 cfg;
++
++	cfg = readl(fbout->wzd->regs + FBOUT_CFG);
++	if (cfg & FBOUT_FRAC_EN)
++		rate = DIV_ROUND_DOWN_ULL((u64)parent_rate *
++					  ((FBOUT_GET_MUL(cfg) * 1000) +
++					   FBOUT_GET_FRAC(cfg)),
++					  1000);
++	else
++		rate = parent_rate * FBOUT_GET_MUL(cfg);
++
++	rate /= FBOUT_GET_DIV(cfg);
++
++	return rate;
++}
++
++static int clkwzd_fbout_set_phase(struct clk_hw *hw, int degrees)
++{
++	struct clkwzd_fbout *fbout = to_clkwzd_fbout(hw);
++
++	writel(degrees * 1000, fbout->wzd->regs + FBOUT_PHASE);
++
++	return 0;
++}
++
++static int clkwzd_fbout_get_phase(struct clk_hw *hw)
++{
++	struct clkwzd_fbout *fbout = to_clkwzd_fbout(hw);
++
++	return readl(fbout->wzd->regs + FBOUT_PHASE) / 1000;
++}
++
++const struct clk_ops fbout_ops = {
++	.is_prepared = clkwzd_fbout_is_prepared,
++	.prepare = clkwzd_fbout_prepare,
++	.recalc_rate = clkwzd_fbout_recalc_rate,
++	.set_phase = clkwzd_fbout_set_phase,
++	.get_phase = clkwzd_fbout_get_phase,
++};
++
++static int clkwzd_out_is_prepared(struct clk_hw *hw)
++{
++	struct clkwzd_out *out = to_clkwzd_out(hw);
++
++	return clkwzd_is_locked(out->wzd);
++}
++
++static int clkwzd_out_prepare(struct clk_hw *hw)
++{
++	struct clkwzd_out *out = to_clkwzd_out(hw);
++
++	return clkwzd_apply_conf(out->wzd);
++}
++
++static unsigned long clkwzd_out_recalc_rate(struct clk_hw *hw,
++					    unsigned long parent_rate)
++{
++	struct clkwzd_out *out = to_clkwzd_out(hw);
++	unsigned long rate;
++	u32 cfg;
++
++	cfg = readl(out->wzd->regs + OUT_CFG(out->id));
++	if (cfg & OUT_FRAC_EN)
++		rate = DIV_ROUND_DOWN_ULL((u64)parent_rate * 1000,
++					  ((OUT_GET_DIV(cfg) * 1000) +
++					   OUT_GET_FRAC(cfg)));
++	else
++		rate = parent_rate / OUT_GET_DIV(cfg);
++
++	return rate;
++}
++
++static int clkwzd_out_set_rate(struct clk_hw *hw,
++			       unsigned long rate,
++			       unsigned long parent_rate)
++{
++	struct clkwzd_out *out = to_clkwzd_out(hw);
++	u64 div;
++	u32 cfg;
++
++	div = DIV_ROUND_DOWN_ULL((u64)parent_rate * 1000, rate);
++	if (div < 1000 || div > 255999)
++		return -EINVAL;
++
++	cfg = OUT_DIV((u32)div / 1000);
++
++	if ((u32)div % 1000)
++		cfg |= OUT_FRAC_EN | OUT_FRAC((u32)div % 1000);
++
++	writel(cfg, out->wzd->regs + OUT_CFG(out->id));
++
++	/* Set duty cycle to 50%. */
++	writel(50000, out->wzd->regs + OUT_DUTY(out->id));
++
++	return 0;
++}
++
++static long clkwzd_out_round_rate(struct clk_hw *hw,
++				  unsigned long rate,
++				  unsigned long *parent_rate)
++{
++	u64 div;
++
++	div = DIV_ROUND_CLOSEST_ULL((u64)(*parent_rate) * 1000, rate);
++	if (div < 1000)
++		return *parent_rate;
++
++	if (div > 255999)
++		div = 255999;
++
++	return DIV_ROUND_DOWN_ULL((u64)(*parent_rate) * 1000, (u32)div);
++}
++
++static int clkwzd_out_set_phase(struct clk_hw *hw, int degrees)
++{
++	struct clkwzd_out *out = to_clkwzd_out(hw);
++
++	writel(degrees * 1000, out->wzd->regs + OUT_PHASE(out->id));
++
++	return 0;
++}
++
++static int clkwzd_out_get_phase(struct clk_hw *hw)
++{
++	struct clkwzd_out *out = to_clkwzd_out(hw);
++
++	return readl(out->wzd->regs + OUT_PHASE(out->id)) / 1000;
++}
++
++static const struct clk_ops out_ops = {
++	.is_prepared = clkwzd_out_is_prepared,
++	.prepare = clkwzd_out_prepare,
++	.recalc_rate = clkwzd_out_recalc_rate,
++	.round_rate = clkwzd_out_round_rate,
++	.set_rate = clkwzd_out_set_rate,
++	.set_phase = clkwzd_out_set_phase,
++	.get_phase = clkwzd_out_get_phase,
++};
++
++static int zynq_clkwzd_probe(struct platform_device *pdev)
++{
++	struct clk_init_data fboutinit = { };
++	const char *clk_in_name;
++	struct resource *res;
++	struct clkwzd *wzd;
++	u32 i, noutputs = 0;
++	int ret;
++
++	wzd = devm_kzalloc(&pdev->dev, sizeof(*wzd), GFP_KERNEL);
++	if (!wzd)
++		return -ENOMEM;
++
++	wzd->aclk = devm_clk_get(&pdev->dev, "aclk");
++	if (IS_ERR(wzd->aclk))
++		return PTR_ERR(wzd->aclk);
++
++	wzd->clk_in1 = devm_clk_get(&pdev->dev, "clk_in1");
++	if (IS_ERR(wzd->clk_in1))
++		return PTR_ERR(wzd->clk_in1);
++
++	of_property_read_u32(pdev->dev.of_node, "xlnx,clk-wizard-num-outputs",
++			     &noutputs);
++	if (!noutputs || noutputs >= CLKWZD_MAX_OUTPUT)
++		return -EINVAL;
++
++	wzd->onecell = devm_kzalloc(&pdev->dev,
++				    sizeof(*wzd->onecell) +
++				    (sizeof(*wzd->onecell->hws) * noutputs),
++				    GFP_KERNEL);
++	if (!wzd->onecell)
++		return -ENOMEM;
++
++	clk_in_name = __clk_get_name(wzd->clk_in1);
++	if (!clk_in_name)
++		return -EINVAL;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	wzd->regs = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(wzd->regs))
++		return PTR_ERR(wzd->regs);
++
++	mutex_init(&wzd->lock);
++
++	wzd->fbout.wzd = wzd;
++	fboutinit.ops = &fbout_ops;
++	fboutinit.flags = CLK_SET_RATE_GATE;
++	fboutinit.num_parents = 1;
++	fboutinit.parent_names = &clk_in_name;
++	fboutinit.flags = CLK_SET_RATE_GATE;
++
++	fboutinit.name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "%s-fbout",
++					dev_name(&pdev->dev));
++	if (!fboutinit.name)
++		return -ENOMEM;
++
++	ret = clk_prepare_enable(wzd->aclk);
++	if (ret)
++		return ret;
++
++	wzd->fbout.base.init = &fboutinit;
++	ret = devm_clk_hw_register(&pdev->dev, &wzd->fbout.base);
++	if (ret)
++		goto err_disable_aclk;
++
++	for (i = 0; i < noutputs; i++) {
++		struct clk_init_data outinit = { };
++
++		wzd->out[i].id = i;
++		wzd->out[i].wzd = wzd;
++		outinit.ops = &out_ops;
++		outinit.num_parents = 1;
++		outinit.parent_names = &fboutinit.name;
++		outinit.flags = CLK_SET_RATE_GATE;
++		wzd->out[i].base.init = &outinit;
++		outinit.name = devm_kasprintf(&pdev->dev, GFP_KERNEL,
++					      "%s-out%d",
++					      dev_name(&pdev->dev), i);
++		if (!outinit.name) {
++			ret = -ENOMEM;
++			goto err_disable_aclk;
++		}
++
++		ret = devm_clk_hw_register(&pdev->dev, &wzd->out[i].base);
++		if (ret)
++			goto err_disable_aclk;
++
++		wzd->onecell->hws[i] = &wzd->out[i].base;
++	}
++
++	wzd->onecell->num = noutputs;
++	ret = devm_of_clk_add_hw_provider(&pdev->dev,
++					  of_clk_hw_onecell_get,
++					  wzd->onecell);
++	if (ret)
++		goto err_disable_aclk;
++
++	platform_set_drvdata(pdev, wzd);
++
++	return 0;
++
++err_disable_aclk:
++	clk_disable_unprepare(wzd->aclk);
++
++	return ret;
++}
++
++static int zynq_clkwzd_remove(struct platform_device *pdev)
++{
++	struct clkwzd *wzd = platform_get_drvdata(pdev);
++
++	clk_disable_unprepare(wzd->aclk);
++
++	return 0;
++}
++
++static const struct of_device_id zynq_clkwzd_of_ids[] = {
++	{ .compatible = "xlnx,clk-wizard-5.1" },
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, zynq_clkwzd_of_ids);
++
++static struct platform_driver zynq_clkwzd_driver = {
++	.probe = zynq_clkwzd_probe,
++	.remove = zynq_clkwzd_remove,
++	.driver = {
++		.name = "zynq-clk-wizard",
++		.of_match_table = zynq_clkwzd_of_ids,
++	},
++};
++module_platform_driver(zynq_clkwzd_driver);
++
++MODULE_AUTHOR("Boris Brezillon <boris.brezillon@bootlin.com>");
++MODULE_DESCRIPTION("Xilinx Clocking Wizard driver");
++MODULE_LICENSE("GPL");
 -- 
 2.14.1
