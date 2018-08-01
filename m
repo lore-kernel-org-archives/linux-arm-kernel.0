@@ -1,60 +1,24 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 1 Aug 2018 12:08:38 +0200
+From: ludovic.barre@st.com (Ludovic BARRE)
+Date: Wed, 1 Aug 2018 12:09:57 +0200
 Subject: [PATCH 01/14] mmc: mmci: fix qcom dma issue during mmci init with
  new dma_setup callback
-In-Reply-To: <1533116221-380-2-git-send-email-ludovic.Barre@st.com>
+In-Reply-To: <CAPDyKFq4Qx5e8Hk40F5DpTJn3g1bnm6sbQERS0Lt-OGmzEdLyQ@mail.gmail.com>
 References: <1533116221-380-1-git-send-email-ludovic.Barre@st.com>
  <1533116221-380-2-git-send-email-ludovic.Barre@st.com>
-Message-ID: <CAPDyKFq4Qx5e8Hk40F5DpTJn3g1bnm6sbQERS0Lt-OGmzEdLyQ@mail.gmail.com>
+ <CAPDyKFq4Qx5e8Hk40F5DpTJn3g1bnm6sbQERS0Lt-OGmzEdLyQ@mail.gmail.com>
+Message-ID: <70d12552-f7d5-c1e5-fbf1-53caf8ee7b4a@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 August 2018 at 11:36, Ludovic Barre <ludovic.Barre@st.com> wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
->
-> This patch fixes qcom dma issue during mmci init.
-> Like init callback of qcom variant is not set, the qcom dma
-> is not correctly initialized and fail while dma transfer
-> ("buggy DMA detected. Taking evasive action").
->
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> ---
->  drivers/mmc/host/mmci.c | 1 +
->  drivers/mmc/host/mmci.h | 1 +
->  2 files changed, 2 insertions(+)
->
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index 71e9336..1841d250 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -208,6 +208,7 @@ static struct variant_data variant_qcom = {
->         .mmcimask1              = true,
->         .start_err              = MCI_STARTBITERR,
->         .opendrain              = MCI_ROD,
-> +       .init                   = qcom_variant_init,
->  };
->
->  /* Busy detection for the ST Micro variant */
-> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-> index 517591d..696a066 100644
-> --- a/drivers/mmc/host/mmci.h
-> +++ b/drivers/mmc/host/mmci.h
-> @@ -338,3 +338,4 @@ struct mmci_host {
->  #endif
->  };
->
-> +void qcom_variant_init(struct mmci_host *host);
 
-This isn't needed.
 
-> --
-> 2.7.4
->
+On 08/01/2018 12:08 PM, Ulf Hansson wrote:
+> Anyway, we can just drop this patch from your series as I amended the
+> patch causing the problem.
+> 
+> I will continue to review the rest.
 
-Anyway, we can just drop this patch from your series as I amended the
-patch causing the problem.
+yes, I sent to early. (sorry)
 
-I will continue to review the rest.
-
-Kind regards
-Uffe
+BR
+Ludo
