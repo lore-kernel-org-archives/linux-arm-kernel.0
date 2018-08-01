@@ -1,38 +1,27 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 01 Aug 2018 13:57:12 +0200
-Subject: [PATCH v2] arm64: dts: rockchip: add support for ROC-RK3399-PC
- board
-In-Reply-To: <1532916721-24117-1-git-send-email-djw@t-chip.com.cn>
-References: <1532916721-24117-1-git-send-email-djw@t-chip.com.cn>
-Message-ID: <3845549.84TLR0FYli@phil>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Wed, 01 Aug 2018 14:00:52 +0200
+Subject: [PATCH 1/9] ALSA: asihpi: remove redundant variable max_streams
+In-Reply-To: <20180801104742.4328-2-colin.king@canonical.com>
+References: <20180801104742.4328-1-colin.king@canonical.com>
+ <20180801104742.4328-2-colin.king@canonical.com>
+Message-ID: <s5hh8kenvnv.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 30. Juli 2018, 04:12:01 CEST schrieb djw at t-chip.com.cn:
-> From: Levin Du <djw@t-chip.com.cn>
+On Wed, 01 Aug 2018 12:47:34 +0200,
+Colin King wrote:
 > 
-> ROC-RK3399-PC is a power efficient 4GB LPDDR4 single board
-> computer with USB 3.0 and Gigabit Ethernet in a form factor
-> compatible with the Raspberry Pi. It is based on the Rockchip
-> RK3399 SoC, powered by the Type-C port.
+> From: Colin Ian King <colin.king@canonical.com>
 > 
-> The devicetree currently supports peripherals of:
+> Variable max_streams is being assigned but is never used hence it is
+> redundant and can be removed.
 > 
-> - Ethernet
-> - HDMI
-> - SD Card
-> - UART2 debug
-> - Type-C
-> - eMMC
+> Cleans up clang warning:
+> warning: variable 'max_streams' set but not used [-Wunused-but-set-variable]
 > 
-> USB3 in Type-C port currently only works with normal orientation,
-> not flip one.
-> 
-> Signed-off-by: Levin Du <djw@t-chip.com.cn>
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
 
-applied with Rob's review-tag.
-
-Might still make it into 4.19 but also may have to wait for 4.20
+Applied, thanks.
 
 
-Heiko
+Takashi
