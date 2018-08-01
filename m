@@ -1,120 +1,99 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Wed, 1 Aug 2018 11:37:00 +0200
-Subject: [PATCH 13/14] mmc: mmci: add dma_error callback
-In-Reply-To: <1533116221-380-1-git-send-email-ludovic.Barre@st.com>
-References: <1533116221-380-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1533116221-380-14-git-send-email-ludovic.Barre@st.com>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Wed, 1 Aug 2018 11:37:41 +0200
+Subject: [PATCH 1/3] PCI: Introduce PCI software bridge common logic
+In-Reply-To: <20180801092119.GB30658@n2100.armlinux.org.uk>
+References: <20180629092231.32207-1-thomas.petazzoni@bootlin.com>
+ <20180629092231.32207-2-thomas.petazzoni@bootlin.com>
+ <20180712195802.GC28466@bhelgaas-glaptop.roam.corp.google.com>
+ <20180801104957.1b01b847@windsurf>
+ <20180801092119.GB30658@n2100.armlinux.org.uk>
+Message-ID: <20180801113741.06fceba9@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+Hello Russell,
 
-This patch adds dma_error callback at mmci_host_ops
-to allow to call specific variant.
+Thanks for your feedback.
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- drivers/mmc/host/mmci.c          | 20 +++++++++++---------
- drivers/mmc/host/mmci.h          |  2 ++
- drivers/mmc/host/mmci_qcom_dml.c |  1 +
- 3 files changed, 14 insertions(+), 9 deletions(-)
+On Wed, 1 Aug 2018 10:21:19 +0100, Russell King - ARM Linux wrote:
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index b124a73..d5ca93e 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -453,6 +453,12 @@ void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
- 		host->ops->dma_finalize(host, data);
- }
- 
-+void mmci_dma_error(struct mmci_host *host)
-+{
-+	if (host->ops && host->ops->dma_error)
-+		host->ops->dma_error(host);
-+}
-+
- static void
- mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
- {
-@@ -615,7 +621,7 @@ static void __mmci_dmae_unmap(struct mmci_host *host, struct mmc_data *data)
- 		     mmc_get_dma_dir(data));
- }
- 
--static void mmci_dma_data_error(struct mmci_host *host)
-+void mmci_dmae_error(struct mmci_host *host)
- {
- 	struct dmaengine_priv *dmae = host->dma_priv;
- 
-@@ -656,7 +662,7 @@ void mmci_dmae_finalize(struct mmci_host *host, struct mmc_data *data)
- 	 * contiguous buffers.  On TX, we'll get a FIFO underrun error.
- 	 */
- 	if (status & MCI_RXDATAAVLBLMASK) {
--		mmci_dma_data_error(host);
-+		mmci_dma_error(host);
- 		if (!data->error)
- 			data->error = -EIO;
- 	} else if (!data->host_cookie) {
-@@ -827,13 +833,9 @@ static struct mmci_host_ops mmci_variant_ops = {
- 	.dma_release = mmci_dmae_release,
- 	.dma_start = mmci_dmae_start,
- 	.dma_finalize = mmci_dmae_finalize,
-+	.dma_error = mmci_dmae_error,
- };
- #else
--/* Blank functions if the DMA engine is not available */
--static inline void mmci_dma_data_error(struct mmci_host *host)
--{
--}
--
- static struct mmci_host_ops mmci_variant_ops = {};
- #endif
- 
-@@ -1011,7 +1013,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 		u32 remain, success;
- 
- 		/* Terminate the DMA transfer */
--		mmci_dma_data_error(host);
-+		mmci_dma_error(host);
- 
- 		/*
- 		 * Calculate how far we are into the transfer.  Note that
-@@ -1157,7 +1159,7 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
- 	if ((!sbc && !cmd->data) || cmd->error) {
- 		if (host->data) {
- 			/* Terminate the DMA transfer */
--			mmci_dma_data_error(host);
-+			mmci_dma_error(host);
- 
- 			mmci_stop_data(host);
- 		}
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 3f482d5..0a4811d 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -282,6 +282,7 @@ struct mmci_host_ops {
- 	void (*dma_release)(struct mmci_host *host);
- 	int (*dma_start)(struct mmci_host *host, unsigned int *datactrl);
- 	void (*dma_finalize)(struct mmci_host *host, struct mmc_data *data);
-+	void (*dma_error)(struct mmci_host *host);
- };
- 
- struct mmci_host {
-@@ -342,3 +343,4 @@ int mmci_dmae_setup(struct mmci_host *host);
- void mmci_dmae_release(struct mmci_host *host);
- int mmci_dmae_start(struct mmci_host *host, unsigned int *datactrl);
- void mmci_dmae_finalize(struct mmci_host *host, struct mmc_data *data);
-+void mmci_dmae_error(struct mmci_host *host);
-diff --git a/drivers/mmc/host/mmci_qcom_dml.c b/drivers/mmc/host/mmci_qcom_dml.c
-index ba7e311..80701b4 100644
---- a/drivers/mmc/host/mmci_qcom_dml.c
-+++ b/drivers/mmc/host/mmci_qcom_dml.c
-@@ -189,6 +189,7 @@ static struct mmci_host_ops qcom_variant_ops = {
- 	.dma_release = mmci_dmae_release,
- 	.dma_start = mmci_dmae_start,
- 	.dma_finalize = mmci_dmae_finalize,
-+	.dma_error = mmci_dmae_error,
- };
- 
- void qcom_variant_init(struct mmci_host *host)
+> >  (2) Agreeing on whether a RAM-like behavior is acceptable, and if not,
+> >      which solution do you propose instead.  
+> 
+> Please take the time to read the PCI(e) specifications and implement
+> what it recommends, rather than doing something else.  That's what I
+> did when I originally reworked the mvebu PCIe driver for Armada 388,
+> and it's the only sensible approach to have something that works with
+> the rest of the Linux PCI(e) layer.
+
+Actually, all what I'm doing is generalizing what the mvebu PCIe driver
+is doing (which you significantly contributed) to, and try to make it
+usable by other drivers that have the same need.
+
+So, I'm precisely trying to make sure we implement this stuff once,
+correctly, rather than duplicate it in several drivers. I'm not
+pretending that my first iteration is entirely correct, and your review
+of it to make it better is much appreciated.
+
+> Going off and implementing a non-standard behaviour is a recipe for
+> things breaking as the PCIe kernel support evolves.
+
+Sure.
+
+> The spec requires reserved registers to read back as zero and ignore
+> writes, whereas implemented registers have a mixture of behaviours:
+> 
+> - read/write
+> - read, write to clear
+> - read-only
+> 
+> Here's the extract(s):
+> 
+>    All PCI devices must treat Configuration Space write operations
+>    to reserved registers as no-ops; that is, the access must be
+>    completed normally on the bus and the data discarded. Read
+>    accesses to reserved or unimplemented registers must be completed
+>    normally and a data value of 0 returned.
+> 
+> (eg) PCI status:
+>    Reserved bits should be read-only and return zero when read.
+>    A one bit is reset (if it is not read-only) whenever the register
+>    is written, and the write data in the corresponding bit location
+>    is a 1.
+
+Right. This pci-sw-bridge layer should implement this behavior.
+
+> [which is why doing the read-modify-write action that some host
+>  bridges that only support 32-bit accesses is dangerous - it leads
+>  to various status bits being inadvertently reset.]
+> 
+> Getting this right in a software emulation of the register space for
+> each bit in every register makes for a happy Linux PCIe layer.
+
+Absolutely.
+
+> Now, configuration read/writes use naturally aligned addresses.  The
+> PCI specification defines the PC IO 0xcf8/0xcfc configuration access
+> mechanism.  The first register defines the address with a 6 bit
+> "double-word" address to cover the 256 bytes of standard config space.
+> Accesses to 0xcfc are forwarded to the PCI bus as a single
+> configuration request - and that means there is nothing to deal with
+> an attempt to access a mis-aligned word.
+> 
+> Indeed, if 0xcfe was to be accessed as a double word, this would
+> result in the processor reading the two bytes from IO address 0xcfe,
+> 0xcff, as well as 0xd00 and 0xd01 which are not part of the
+> configuration data register - resulting in undefined data being read.
+> 
+> So, basically, misaligned configuration accesses are not supported.
+
+OK. So the where & 2 that the RCAR driver is doing for 2 bytes accesses
+is OK, because bit 0 of where will always be 0 for a 2 bytes access.
+
+Thanks,
+
+Thomas Petazzoni
 -- 
-2.7.4
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
