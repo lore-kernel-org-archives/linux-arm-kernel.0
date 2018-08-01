@@ -1,42 +1,54 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 1 Aug 2018 20:58:29 +0200
-Subject: v4.18-rc2 on droid4: screen turns red
-In-Reply-To: <20180717062608.GY99251@atomide.com>
-References: <20180630131812.GA549@amd> <20180711102655.GA6864@amd>
- <20180717062608.GY99251@atomide.com>
-Message-ID: <20180801185829.GD26087@amd>
+Date: Wed, 1 Aug 2018 20:58:24 +0200
+Subject: Vibrations on Droid 4?
+In-Reply-To: <20180716075926.GU99251@atomide.com>
+References: <20180709081534.GA6799@amd>
+ <20180709214910.tes6u4ivxomd3aja@earth.universe>
+ <20180709220211.GA7760@amd>
+ <20180710101147.lyu65ro4czvrs2da@earth.universe>
+ <20180710133040.GA4391@amd>
+ <20180710161123.azym6sbboriuj4yc@earth.universe>
+ <20180711080218.GA21225@amd> <20180711132739.GL99251@atomide.com>
+ <20180715201729.GB19675@amd> <20180716075926.GU99251@atomide.com>
+Message-ID: <20180801185823.GC26087@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi!
 
-> > > After longer inactivity, attempt to wake up the screen results in
-> > > screen being completely red. Not too useful. I can still connect over
-> > > ssh.
+> > Yep, so I have two patches that make the device appear, but vibrations
+> > still do not work for me.
 > > 
-> > Still there in -rc4 :-(. But happens only once in a few days for me...
-> > 
-> > When X is shut down, text console works ok.
+> > a) any ideas how to debug that / get them to work?
 > 
-> FYI, I've been chasing an occasional hang with lapdock and it might
-> be related to the usb phy switching between usb and uart mode
-> spontaneously. And then the usb traffic can cause a sysrq trigger
-> potentially when the glitch happens. Not sure yet why it happens, it
-> might be related to lost cpcap interrupts still.
-> 
-> Anyways, so far looks like doing the following may have prevented
-> it. Well at least for about four days of uptime now:
-> 
-> # echo 0 > /proc/sys/kernel/sysrq
-> 
-> And no red screens here yet either. Care to check if this might
-> somehow also prevent your red screen issue?
+> Hmm no new ideas except I wonder if there is also some other
+> regression with the timer pdata not being passed properly now.
 
-Looks like red screens are pretty seldom :-(. I did not see it since
-that report. (But I stopped using Droid 4 as my primary phone after it
-lost some SMS.)
+I checked vibrations work in original Motorola Android; my hardware is
+not broken.
+
+I see:
+
+commit b7290cf6ff7869ec12070aa146c370728cab62c2
+Author: Keerthy <j-keerthy@ti.com>
+Date:   Thu Feb 15 11:31:50 2018 +0530
+
+    pwm: pwm-omap-dmtimer: Adapt driver to utilize dmtimer pdata ops
+
+    Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
+
+ Signed-off-by: Keerthy <j-keerthy@ti.com>
+ Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+ Reviewed-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+ Signed-off-by: Tony Lindgren <tony@atomide.com>
+		
+should I try to revert that one? (Are pdata still there in the board
+files somewhere).
+
+Do vibrations work for you?
 
 Best regards,
+
 									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
@@ -47,4 +59,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 181 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180801/a71a3ef4/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180801/6f4562f7/attachment.sig>
