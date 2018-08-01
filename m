@@ -1,50 +1,35 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Wed, 1 Aug 2018 11:54:30 +0200
-Subject: [PATCH 1/3] PCI: Introduce PCI software bridge common logic
-In-Reply-To: <20180801092119.GB30658@n2100.armlinux.org.uk>
-References: <20180629092231.32207-1-thomas.petazzoni@bootlin.com>
- <20180629092231.32207-2-thomas.petazzoni@bootlin.com>
- <20180712195802.GC28466@bhelgaas-glaptop.roam.corp.google.com>
- <20180801104957.1b01b847@windsurf>
- <20180801092119.GB30658@n2100.armlinux.org.uk>
-Message-ID: <20180801115430.388c62ae@windsurf>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 1 Aug 2018 15:28:02 +0530
+Subject: [PATCH v8 2/4] dt-bindings: mailbox: imx-mu: add generic MU
+ channel support
+In-Reply-To: <AM0PR04MB4211B20B99E087177D0C06D8802D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <20180731141146.10788-1-o.rempel@pengutronix.de>
+ <20180731141146.10788-3-o.rempel@pengutronix.de>
+ <CABb+yY1ZusgN4UVxmUgXZS9ObGdLwFAL4XkW7F1yVb6Gq=9XPA@mail.gmail.com>
+ <AM0PR04MB4211B20B99E087177D0C06D8802D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <CABb+yY304PeP_G9NiRW+pkXod+bUnYdKaYxOgH7XjsGEqQ5TVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
-
-On Wed, 1 Aug 2018 10:21:19 +0100, Russell King - ARM Linux wrote:
-
-
->    All PCI devices must treat Configuration Space write operations
->    to reserved registers as no-ops; that is, the access must be
->    completed normally on the bus and the data discarded. Read
->    accesses to reserved or unimplemented registers must be completed
->    normally and a data value of 0 returned.
-> 
-> (eg) PCI status:
->    Reserved bits should be read-only and return zero when read.
->    A one bit is reset (if it is not read-only) whenever the register
->    is written, and the write data in the corresponding bit location
->    is a 1.
-> 
-> [which is why doing the read-modify-write action that some host
->  bridges that only support 32-bit accesses is dangerous - it leads
->  to various status bits being inadvertently reset.]
-
-Speaking of this, the generic pci_generic_config_write32() function
-indeed does this incorrectly, and prints a warning.
-
-However, I just looked at the pci-thunder-pem code, and it seems to
-correctly account for those W1C bits, by having an explicit list of
-registers and their W1C bits (see thunder_pem_bridge_w1c_bits). This
-isn't specific to the Thunder PCIe controller at all, and would benefit
-from being made generic, no ?
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
+On Wed, Aug 1, 2018 at 2:28 PM, A.s. Dong <aisheng.dong@nxp.com> wrote:
+> Hi Jassi,
+>
+>> > +               The doorbell channels should be used with shared memory and
+>> protocol
+>> > +               level acknowledgment if needed.
+>> > +
+>> I would avoid this. People might get notions that they have to use shmem
+>> with doorbell -- a trivial protocol might mean doing some fixed action (like
+>> reset) whenever the doorbell rings.
+>>
+>
+> That's right.
+> i.MX8 using the general purpose interrupt for peripherals. No shmem needed.
+> e.g. RTC, Watchdog and ON/OFF interrupt.
+>
+> BTW, this means the peripheral will use mailbox doorbell channels to handle
+> Interrupts. Is there such user case in kernel we can refer to?
+>
+I don't find any publicly in kernel.
+It should be simple though. Acquire the RX channel, and populate the
+rx_callback() with the "interrupt" handler.
