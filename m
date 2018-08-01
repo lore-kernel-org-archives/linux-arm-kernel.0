@@ -1,84 +1,55 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 31 Jul 2018 19:06:30 -0700
-Subject: [GIT PULL 3/3] ARM: uniphier: UniPhier SoC updates for v4.19
-In-Reply-To: <CAK7LNARSx1hSLQNCzAQyD74dvnHzVqkTFoWj6GL7_5+vZau7Uw@mail.gmail.com>
-References: <CAK7LNAShLhWqCRR8RfuJ0xBJAFoj-S6WLcSdh9QShg8dGfq9RA@mail.gmail.com>
- <20180721212430.odjwcusbbihffo6l@localhost>
- <CAK7LNAQHL16vxv7twzy9PPkLLrbvzuAMa9QtOjSN3Z1KHWKG_Q@mail.gmail.com>
- <CAK7LNARSx1hSLQNCzAQyD74dvnHzVqkTFoWj6GL7_5+vZau7Uw@mail.gmail.com>
-Message-ID: <CAOesGMjBotm_SGL2U3aq+YNey5NODcMZwgt_Xj3os+BL1-GSFQ@mail.gmail.com>
+Date: Tue, 31 Jul 2018 19:07:01 -0700
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.19 (#2)
+In-Reply-To: <87h8kfda2i.fsf@bootlin.com>
+References: <87sh4e8eym.fsf@bootlin.com>
+ <20180721213352.eborr5dctfk3t7j3@localhost>
+ <87h8kfda2i.fsf@bootlin.com>
+Message-ID: <CAOesGMgr0SH6VMkNHg9+C15QhYgus5+TpfgiTCHrLJbN2x8MhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jul 31, 2018 at 1:39 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+On Tue, Jul 31, 2018 at 2:32 AM, Gregory CLEMENT
+<gregory.clement@bootlin.com> wrote:
 > Hi Olof,
 >
+>  On sam., juil. 21 2018, Olof Johansson <olof@lixom.net> wrote:
 >
-> 2018-07-22 8:24 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
->> Hi Olof,
->>
->> 2018-07-22 6:24 GMT+09:00 Olof Johansson <olof@lixom.net>:
->>> On Thu, Jul 19, 2018 at 08:05:03AM +0900, Masahiro Yamada wrote:
->>>> Hi Arnd, Olof,
->>>>
->>>> Please pull UniPhier SoC changes for the v4.19 MW.
->>>>
->>>> Thanks!
->>>>
->>>>
->>>> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
->>>>
->>>>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
->>>> tags/uniphier-soc-v4.19
->>>>
->>>> for you to fetch changes up to ae93e694440a454609fa40725e16619c5a781768:
->>>>
->>>>   ARM: uniphier: remove empty Makefile (2018-07-19 06:53:16 +0900)
->>>>
->>>> ----------------------------------------------------------------
->>>> UniPhier ARM SoC updates for v4.19
->>>>
->>>> - enable ethernet and thermal drivers from multi_v7_defconfig
->>>>
->>>> - select RESET_CONTROLLER
->>>>
->>>> - remove empty arch/arm/mach-uniphier/Makefile
->>>>
->>>> ----------------------------------------------------------------
->>>> Kunihiko Hayashi (1):
->>>>       ARM: multi_v7_defconfig: add CONFIG_UNIPHIER_THERMAL and CONFIG_SNI_AVE
+>> On Fri, Jul 20, 2018 at 10:54:25AM +0200, Gregory CLEMENT wrote:
+>>> Hi,
 >>>
->>> I renormalied multi_v7_defconfig for 4.18-rc3, so please base your branch
->>> on that to avoid conflicts.
+>>> Here is the second pull request for dt64 for mvebu for v4.19.
 >>>
->>> Also, we separate out defconfig updates to branches on their own. I can
->>> cherry-pick the branch apart but wanted to check with you before I do
->>> so in case it messes up your workflow. If it does, send a fresh pull
->>> request for SoC, and either one for the defconfig or just the patch and
->>> we can apply it directly.
+>>> Gregory
 >>>
+>>> The following changes since commit 4436a3711e3249840e0679e92d3c951bcaf25515:
+>>>
+>>>   arm64: dts: marvell: armada-37xx: reserve memory for ATF (2018-06-29 16:39:03 +0200)
+>>>
+>>> are available in the Git repository at:
+>>>
+>>>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.19-2
+>>>
+>>> for you to fetch changes up to c462f6c77e72804b72e008a91c4b6fa8d9b4b265:
+>>>
+>>>   arm64: dts: marvell: armada-37xx: update the crypto engine compatible (2018-07-13 13:42:03 +0200)
+>>>
+>>> ----------------------------------------------------------------
+>>> mvebu dt64 for 4.19 (part 2)
+>>>
+>>> Use more specific compatible for the Inside Secure SafeXcel on the
+>>> Armada 37xx and the Armada 7K/8K SoCs.
 >>
->> Can you do cherry-pick please?
+>> I'll reply to the patches -- usually compatible should go from specific to
+>> generic and you're replacing here instead of adding a more specific first. You
+>> probably want to do the former instead.
 >>
+>> Not merged, let's settle discussion on the patch first.
 >
-> Ping?
->
-> You offered to cherry-pick the patches directly to your tree,
-> and I asked you to do so.
->
->
->
-> We do not have much time until the MW opens.
-> Please cherry-pick the following four:
+> Now that Antoine explained the reason for replacing the compatible, will
+> you pull the branch?
 
-Done now, thanks!
+Yeah, seems reasonable. Merged!
 
 
 -Olof
