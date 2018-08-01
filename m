@@ -1,286 +1,405 @@
 From: maxi.jourdan@wanadoo.fr (Maxime Jourdan)
-Date: Wed,  1 Aug 2018 20:51:25 +0200
-Subject: [PATCH 1/4] soc: amlogic: add meson-canvas driver
+Date: Wed,  1 Aug 2018 20:51:28 +0200
+Subject: [PATCH 4/4] drm/meson: convert to the new canvas module
 In-Reply-To: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
 References: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
-Message-ID: <20180801185128.23440-2-maxi.jourdan@wanadoo.fr>
+Message-ID: <20180801185128.23440-5-maxi.jourdan@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amlogic SoCs have a repository of 256 canvas which they use to
-describe pixel buffers.
+This removes the meson_canvas files within the meson/drm layer
+and makes use of the new canvas module that is referenced in the dts.
 
-They contain metadata like width, height, block mode, endianness [..]
-
-Many IPs within those SoCs like vdec/vpu rely on those canvas to read/write
-pixels.
+Canvases can be used by different IPs and modules, and it is as such
+preferable to rely on a module that can safely dispatch canvases on
+demand.
 
 Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
 ---
- drivers/soc/amlogic/Kconfig              |   7 +
- drivers/soc/amlogic/Makefile             |   1 +
- drivers/soc/amlogic/meson-canvas.c       | 182 +++++++++++++++++++++++
- include/linux/soc/amlogic/meson-canvas.h |  37 +++++
- 4 files changed, 227 insertions(+)
- create mode 100644 drivers/soc/amlogic/meson-canvas.c
- create mode 100644 include/linux/soc/amlogic/meson-canvas.h
+ .../bindings/display/amlogic,meson-vpu.txt    |  9 +--
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi     |  7 +-
+ drivers/gpu/drm/meson/Kconfig                 |  1 +
+ drivers/gpu/drm/meson/Makefile                |  2 +-
+ drivers/gpu/drm/meson/meson_canvas.c          | 70 -------------------
+ drivers/gpu/drm/meson/meson_canvas.h          | 42 -----------
+ drivers/gpu/drm/meson/meson_crtc.c            |  5 +-
+ drivers/gpu/drm/meson/meson_drv.c             | 35 ++++++----
+ drivers/gpu/drm/meson/meson_drv.h             |  5 +-
+ drivers/gpu/drm/meson/meson_plane.c           |  3 +-
+ drivers/gpu/drm/meson/meson_viu.c             |  1 -
+ 11 files changed, 39 insertions(+), 141 deletions(-)
+ delete mode 100644 drivers/gpu/drm/meson/meson_canvas.c
+ delete mode 100644 drivers/gpu/drm/meson/meson_canvas.h
 
-diff --git a/drivers/soc/amlogic/Kconfig b/drivers/soc/amlogic/Kconfig
-index b04f6e4aedbc..5bd049899d88 100644
---- a/drivers/soc/amlogic/Kconfig
-+++ b/drivers/soc/amlogic/Kconfig
-@@ -1,5 +1,12 @@
- menu "Amlogic SoC drivers"
+diff --git a/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt b/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
+index 057b81335775..60b6e1398636 100644
+--- a/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
++++ b/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
+@@ -60,9 +60,9 @@ Required properties:
+ - reg: base address and size of he following memory-mapped regions :
+ 	- vpu
+ 	- hhi
+-	- dmc
+ - reg-names: should contain the names of the previous memory regions
+ - interrupts: should contain the VENC Vsync interrupt number
++- amlogic,canvas: should point to a meson canvas provider node
  
-+config MESON_CANVAS
-+	bool "Amlogic Meson Canvas driver"
-+	depends on ARCH_MESON || COMPILE_TEST
-+	default ARCH_MESON
-+	help
-+	  Say yes to support the canvas IP within Amlogic Meson Soc family.
+ Optional properties:
+ - power-domains: Optional phandle to associated power domain as described in
+@@ -98,13 +98,14 @@ tv-connector {
+ vpu: vpu at d0100000 {
+ 	compatible = "amlogic,meson-gxbb-vpu";
+ 	reg = <0x0 0xd0100000 0x0 0x100000>,
+-	      <0x0 0xc883c000 0x0 0x1000>,
+-	      <0x0 0xc8838000 0x0 0x1000>;
+-	reg-names = "vpu", "hhi", "dmc";
++	      <0x0 0xc883c000 0x0 0x1000>;
++	reg-names = "vpu", "hhi";
+ 	interrupts = <GIC_SPI 3 IRQ_TYPE_EDGE_RISING>;
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
+ 
++	amlogic,canvas = <&canvas>;
 +
- config MESON_GX_SOCINFO
- 	bool "Amlogic Meson GX SoC Information driver"
- 	depends on ARCH_MESON || COMPILE_TEST
-diff --git a/drivers/soc/amlogic/Makefile b/drivers/soc/amlogic/Makefile
-index 8fa321893928..0ab16d35ac36 100644
---- a/drivers/soc/amlogic/Makefile
-+++ b/drivers/soc/amlogic/Makefile
-@@ -1,3 +1,4 @@
-+obj-$(CONFIG_MESON_CANVAS) += meson-canvas.o
- obj-$(CONFIG_MESON_GX_SOCINFO) += meson-gx-socinfo.o
- obj-$(CONFIG_MESON_GX_PM_DOMAINS) += meson-gx-pwrc-vpu.o
- obj-$(CONFIG_MESON_MX_SOCINFO) += meson-mx-socinfo.o
-diff --git a/drivers/soc/amlogic/meson-canvas.c b/drivers/soc/amlogic/meson-canvas.c
-new file mode 100644
-index 000000000000..671eb89c8904
---- /dev/null
-+++ b/drivers/soc/amlogic/meson-canvas.c
-@@ -0,0 +1,182 @@
-+/*
-+ * Copyright (C) 2018 Maxime Jourdan
-+ * Copyright (C) 2016 BayLibre, SAS
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
-+ * Copyright (C) 2014 Endless Mobile
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of the
-+ * License, or (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, see <http://www.gnu.org/licenses/>.
-+ */
+ 	/* CVBS VDAC output port */
+ 	port at 0 {
+ 		reg = <0>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+index d104b9e111fb..7c4d971ecd80 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+@@ -503,13 +503,14 @@
+ 		vpu: vpu at d0100000 {
+ 			compatible = "amlogic,meson-gx-vpu";
+ 			reg = <0x0 0xd0100000 0x0 0x100000>,
+-			      <0x0 0xc883c000 0x0 0x1000>,
+-			      <0x0 0xc8838000 0x0 0x1000>;
+-			reg-names = "vpu", "hhi", "dmc";
++			      <0x0 0xc883c000 0x0 0x1000>;
++			reg-names = "vpu", "hhi";
+ 			interrupts = <GIC_SPI 3 IRQ_TYPE_EDGE_RISING>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
++			amlogic,canvas = <&canvas>;
 +
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
+ 			/* CVBS VDAC output port */
+ 			cvbs_vdac_port: port at 0 {
+ 				reg = <0>;
+diff --git a/drivers/gpu/drm/meson/Kconfig b/drivers/gpu/drm/meson/Kconfig
+index 3ce51d8dfe1c..c28b69f48555 100644
+--- a/drivers/gpu/drm/meson/Kconfig
++++ b/drivers/gpu/drm/meson/Kconfig
+@@ -7,6 +7,7 @@ config DRM_MESON
+ 	select DRM_GEM_CMA_HELPER
+ 	select VIDEOMODE_HELPERS
+ 	select REGMAP_MMIO
++	select MESON_CANVAS
+ 
+ config DRM_MESON_DW_HDMI
+ 	tristate "HDMI Synopsys Controller support for Amlogic Meson Display"
+diff --git a/drivers/gpu/drm/meson/Makefile b/drivers/gpu/drm/meson/Makefile
+index c5c4cc362f02..bd67429185ff 100644
+--- a/drivers/gpu/drm/meson/Makefile
++++ b/drivers/gpu/drm/meson/Makefile
+@@ -1,5 +1,5 @@
+ meson-drm-y := meson_drv.o meson_plane.o meson_crtc.o meson_venc_cvbs.o
+-meson-drm-y += meson_viu.o meson_vpp.o meson_venc.o meson_vclk.o meson_canvas.o
++meson-drm-y += meson_viu.o meson_vpp.o meson_venc.o meson_vclk.o
+ 
+ obj-$(CONFIG_DRM_MESON) += meson-drm.o
+ obj-$(CONFIG_DRM_MESON_DW_HDMI) += meson_dw_hdmi.o
+diff --git a/drivers/gpu/drm/meson/meson_canvas.c b/drivers/gpu/drm/meson/meson_canvas.c
+deleted file mode 100644
+index 08f6073d967e..000000000000
+--- a/drivers/gpu/drm/meson/meson_canvas.c
++++ /dev/null
+@@ -1,70 +0,0 @@
+-/*
+- * Copyright (C) 2016 BayLibre, SAS
+- * Author: Neil Armstrong <narmstrong@baylibre.com>
+- * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
+- * Copyright (C) 2014 Endless Mobile
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License as
+- * published by the Free Software Foundation; either version 2 of the
+- * License, or (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/module.h>
+-#include "meson_drv.h"
+-#include "meson_canvas.h"
+-#include "meson_registers.h"
+-
+-/**
+- * DOC: Canvas
+- *
+- * CANVAS is a memory zone where physical memory frames information
+- * are stored for the VIU to scanout.
+- */
+-
+-/* DMC Registers */
+-#define DMC_CAV_LUT_DATAL	0x48 /* 0x12 offset in data sheet */
+-#define CANVAS_WIDTH_LBIT	29
+-#define CANVAS_WIDTH_LWID       3
+-#define DMC_CAV_LUT_DATAH	0x4c /* 0x13 offset in data sheet */
+-#define CANVAS_WIDTH_HBIT       0
+-#define CANVAS_HEIGHT_BIT       9
+-#define CANVAS_BLKMODE_BIT      24
+-#define DMC_CAV_LUT_ADDR	0x50 /* 0x14 offset in data sheet */
+-#define CANVAS_LUT_WR_EN        (0x2 << 8)
+-#define CANVAS_LUT_RD_EN        (0x1 << 8)
+-
+-void meson_canvas_setup(struct meson_drm *priv,
+-			uint32_t canvas_index, uint32_t addr,
+-			uint32_t stride, uint32_t height,
+-			unsigned int wrap,
+-			unsigned int blkmode)
+-{
+-	unsigned int val;
+-
+-	regmap_write(priv->dmc, DMC_CAV_LUT_DATAL,
+-		(((addr + 7) >> 3)) |
+-		(((stride + 7) >> 3) << CANVAS_WIDTH_LBIT));
+-
+-	regmap_write(priv->dmc, DMC_CAV_LUT_DATAH,
+-		((((stride + 7) >> 3) >> CANVAS_WIDTH_LWID) <<
+-						CANVAS_WIDTH_HBIT) |
+-		(height << CANVAS_HEIGHT_BIT) |
+-		(wrap << 22) |
+-		(blkmode << CANVAS_BLKMODE_BIT));
+-
+-	regmap_write(priv->dmc, DMC_CAV_LUT_ADDR,
+-			CANVAS_LUT_WR_EN | canvas_index);
+-
+-	/* Force a read-back to make sure everything is flushed. */
+-	regmap_read(priv->dmc, DMC_CAV_LUT_DATAH, &val);
+-}
+diff --git a/drivers/gpu/drm/meson/meson_canvas.h b/drivers/gpu/drm/meson/meson_canvas.h
+deleted file mode 100644
+index af1759da4b27..000000000000
+--- a/drivers/gpu/drm/meson/meson_canvas.h
++++ /dev/null
+@@ -1,42 +0,0 @@
+-/*
+- * Copyright (C) 2016 BayLibre, SAS
+- * Author: Neil Armstrong <narmstrong@baylibre.com>
+- * Copyright (C) 2014 Endless Mobile
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License as
+- * published by the Free Software Foundation; either version 2 of the
+- * License, or (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+- */
+-
+-/* Canvas LUT Memory */
+-
+-#ifndef __MESON_CANVAS_H
+-#define __MESON_CANVAS_H
+-
+-#define MESON_CANVAS_ID_OSD1	0x4e
+-
+-/* Canvas configuration. */
+-#define MESON_CANVAS_WRAP_NONE	0x00
+-#define	MESON_CANVAS_WRAP_X	0x01
+-#define	MESON_CANVAS_WRAP_Y	0x02
+-
+-#define	MESON_CANVAS_BLKMODE_LINEAR	0x00
+-#define	MESON_CANVAS_BLKMODE_32x32	0x01
+-#define	MESON_CANVAS_BLKMODE_64x64	0x02
+-
+-void meson_canvas_setup(struct meson_drm *priv,
+-			uint32_t canvas_index, uint32_t addr,
+-			uint32_t stride, uint32_t height,
+-			unsigned int wrap,
+-			unsigned int blkmode);
+-
+-#endif /* __MESON_CANVAS_H */
+diff --git a/drivers/gpu/drm/meson/meson_crtc.c b/drivers/gpu/drm/meson/meson_crtc.c
+index 05520202c967..506b3619c983 100644
+--- a/drivers/gpu/drm/meson/meson_crtc.c
++++ b/drivers/gpu/drm/meson/meson_crtc.c
+@@ -36,7 +36,6 @@
+ #include "meson_venc.h"
+ #include "meson_vpp.h"
+ #include "meson_viu.h"
+-#include "meson_canvas.h"
+ #include "meson_registers.h"
+ 
+ /* CRTC definition */
+@@ -193,10 +192,10 @@ void meson_crtc_irq(struct meson_drm *priv)
+ 		} else
+ 			meson_vpp_disable_interlace_vscaler_osd1(priv);
+ 
+-		meson_canvas_setup(priv, MESON_CANVAS_ID_OSD1,
++		priv->canvas_ops->setup(priv->canvas_id_osd1,
+ 			   priv->viu.osd1_addr, priv->viu.osd1_stride,
+ 			   priv->viu.osd1_height, MESON_CANVAS_WRAP_NONE,
+-			   MESON_CANVAS_BLKMODE_LINEAR);
++			   MESON_CANVAS_BLKMODE_LINEAR, 0);
+ 
+ 		/* Enable OSD1 */
+ 		writel_bits_relaxed(VPP_OSD1_POSTBLEND, VPP_OSD1_POSTBLEND,
+diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+index d3443125e661..de468339d75a 100644
+--- a/drivers/gpu/drm/meson/meson_drv.c
++++ b/drivers/gpu/drm/meson/meson_drv.c
+@@ -26,6 +26,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/component.h>
+ #include <linux/of_graph.h>
++#include <linux/of_platform.h>
+ 
+ #include <drm/drmP.h>
+ #include <drm/drm_atomic.h>
+@@ -47,7 +48,6 @@
+ #include "meson_vpp.h"
+ #include "meson_viu.h"
+ #include "meson_venc.h"
+-#include "meson_canvas.h"
+ #include "meson_registers.h"
+ 
+ #define DRIVER_NAME "meson"
+@@ -165,6 +165,8 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
+ 	struct meson_drm *priv;
+ 	struct drm_device *drm;
+ 	struct resource *res;
++	struct device_node *canvas;
++	struct platform_device *canvas_pdev;
+ 	void __iomem *regs;
+ 	int ret;
+ 
+@@ -211,31 +213,35 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
+ 	priv->hhi = devm_regmap_init_mmio(dev, regs,
+ 					  &meson_regmap_config);
+ 	if (IS_ERR(priv->hhi)) {
+-		dev_err(&pdev->dev, "Couldn't create the HHI regmap\n");
++		dev_err(dev, "Couldn't create the HHI regmap\n");
+ 		ret = PTR_ERR(priv->hhi);
+ 		goto free_drm;
+ 	}
+ 
+-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "dmc");
+-	if (!res) {
+-		ret = -EINVAL;
++	canvas = of_parse_phandle(dev->of_node, "amlogic,canvas", 0);
++	if (!canvas) {
++		ret = -ENODEV;
+ 		goto free_drm;
+ 	}
+-	/* Simply ioremap since it may be a shared register zone */
+-	regs = devm_ioremap(dev, res->start, resource_size(res));
+-	if (!regs) {
+-		ret = -EADDRNOTAVAIL;
++
++	canvas_pdev = of_find_device_by_node(canvas);
++	if (!canvas_pdev) {
++		dev_err(dev, "Unable to find canvas pdev\n");
++		ret = -ENODEV;
+ 		goto free_drm;
+ 	}
+ 
+-	priv->dmc = devm_regmap_init_mmio(dev, regs,
+-					  &meson_regmap_config);
+-	if (IS_ERR(priv->dmc)) {
+-		dev_err(&pdev->dev, "Couldn't create the DMC regmap\n");
+-		ret = PTR_ERR(priv->dmc);
++	priv->canvas_ops = dev_get_platdata(&canvas_pdev->dev);
++	if (!priv->canvas_ops) {
++		dev_err(dev, "canvas pdata structure NULL\n");
++		ret = -EINVAL;
+ 		goto free_drm;
+ 	}
+ 
++	ret = priv->canvas_ops->alloc(&priv->canvas_id_osd1);
++	if (ret)
++		goto free_drm;
++
+ 	priv->vsync_irq = platform_get_irq(pdev, 0);
+ 
+ 	ret = drm_vblank_init(drm, 1);
+@@ -315,6 +321,7 @@ static void meson_drv_unbind(struct device *dev)
+ 	struct drm_device *drm = dev_get_drvdata(dev);
+ 	struct meson_drm *priv = drm->dev_private;
+ 
++	priv->canvas_ops->free(priv->canvas_id_osd1);
+ 	drm_dev_unregister(drm);
+ 	drm_kms_helper_poll_fini(drm);
+ 	drm_fbdev_cma_fini(priv->fbdev);
+diff --git a/drivers/gpu/drm/meson/meson_drv.h b/drivers/gpu/drm/meson/meson_drv.h
+index 8450d6ac8c9b..dfea959baaa3 100644
+--- a/drivers/gpu/drm/meson/meson_drv.h
++++ b/drivers/gpu/drm/meson/meson_drv.h
+@@ -22,15 +22,18 @@
+ #include <linux/platform_device.h>
+ #include <linux/regmap.h>
+ #include <linux/of.h>
 +#include <linux/soc/amlogic/meson-canvas.h>
-+#include <asm/io.h>
+ #include <drm/drmP.h>
+ 
+ struct meson_drm {
+ 	struct device *dev;
+ 	void __iomem *io_base;
+ 	struct regmap *hhi;
+-	struct regmap *dmc;
+ 	int vsync_irq;
+ 
++	struct meson_canvas_platform_data *canvas_ops;
++	uint8_t canvas_id_osd1;
 +
-+#define NUM_CANVAS 256
-+
-+/* DMC Registers */
-+#define DMC_CAV_LUT_DATAL	0x48 /* 0x12 offset in data sheet */
-+	#define CANVAS_WIDTH_LBIT	29
-+	#define CANVAS_WIDTH_LWID       3
-+#define DMC_CAV_LUT_DATAH	0x4c /* 0x13 offset in data sheet */
-+	#define CANVAS_WIDTH_HBIT       0
-+	#define CANVAS_HEIGHT_BIT       9
-+	#define CANVAS_BLKMODE_BIT      24
-+#define DMC_CAV_LUT_ADDR	0x50 /* 0x14 offset in data sheet */
-+	#define CANVAS_LUT_WR_EN        (0x2 << 8)
-+	#define CANVAS_LUT_RD_EN        (0x1 << 8)
-+
-+struct meson_canvas {
-+	struct device *dev;
-+	struct regmap *regmap_dmc;
-+	struct mutex lock;
-+	u8 used[NUM_CANVAS];
-+};
-+
-+static struct meson_canvas canvas = { 0 };
-+
-+static int meson_canvas_setup(uint8_t canvas_index, uint32_t addr,
-+			uint32_t stride, uint32_t height,
-+			unsigned int wrap,
-+			unsigned int blkmode,
-+			unsigned int endian)
-+{
-+	struct regmap *regmap = canvas.regmap_dmc;
-+	u32 val;
-+
-+	mutex_lock(&canvas.lock);
-+
-+	if (!canvas.used[canvas_index]) {
-+		dev_err(canvas.dev,
-+			"Trying to setup non allocated canvas %u\n",
-+			canvas_index);
-+		mutex_unlock(&canvas.lock);
-+		return -EINVAL;
-+	}
-+
-+	regmap_write(regmap, DMC_CAV_LUT_DATAL,
-+		((addr + 7) >> 3) |
-+		(((stride + 7) >> 3) << CANVAS_WIDTH_LBIT));
-+
-+	regmap_write(regmap, DMC_CAV_LUT_DATAH,
-+		((((stride + 7) >> 3) >> CANVAS_WIDTH_LWID) <<
-+						CANVAS_WIDTH_HBIT) |
-+		(height << CANVAS_HEIGHT_BIT) |
-+		(wrap << 22) |
-+		(blkmode << CANVAS_BLKMODE_BIT) |
-+		(endian << 26));
-+
-+	regmap_write(regmap, DMC_CAV_LUT_ADDR,
-+		CANVAS_LUT_WR_EN | canvas_index);
-+
-+	/* Force a read-back to make sure everything is flushed. */
-+	regmap_read(regmap, DMC_CAV_LUT_DATAH, &val);
-+	mutex_unlock(&canvas.lock);
-+
-+	return 0;
-+}
-+
-+static int meson_canvas_alloc(uint8_t *canvas_index)
-+{
-+	int i;
-+
-+	mutex_lock(&canvas.lock);
-+	for (i = 0; i < NUM_CANVAS; ++i) {
-+		if (!canvas.used[i]) {
-+			canvas.used[i] = 1;
-+			mutex_unlock(&canvas.lock);
-+			*canvas_index = i;
-+			return 0;
-+		}
-+	}
-+	mutex_unlock(&canvas.lock);
-+	dev_err(canvas.dev, "No more canvas available\n");
-+
-+	return -ENODEV;
-+}
-+
-+static int meson_canvas_free(uint8_t canvas_index)
-+{
-+	mutex_lock(&canvas.lock);
-+	if (!canvas.used[canvas_index]) {
-+		dev_err(canvas.dev,
-+			"Trying to free unused canvas %u\n", canvas_index);
-+		mutex_unlock(&canvas.lock);
-+		return -EINVAL;
-+	}
-+	canvas.used[canvas_index] = 0;
-+	mutex_unlock(&canvas.lock);
-+
-+	return 0;
-+}
-+
-+static struct meson_canvas_platform_data canvas_platform_data = {
-+	.alloc = meson_canvas_alloc,
-+	.free = meson_canvas_free,
-+	.setup = meson_canvas_setup,
-+};
-+
-+static int meson_canvas_probe(struct platform_device *pdev)
-+{
-+	struct regmap *regmap_dmc;
-+	struct device *dev;
-+
-+	dev = &pdev->dev;
-+
-+	regmap_dmc = syscon_node_to_regmap(of_get_parent(dev->of_node));
-+	if (IS_ERR(regmap_dmc)) {
-+		dev_err(&pdev->dev, "failed to get DMC regmap\n");
-+		return PTR_ERR(regmap_dmc);
-+	}
-+
-+	canvas.dev = dev;
-+	canvas.regmap_dmc = regmap_dmc;
-+	mutex_init(&canvas.lock);
-+
-+	dev->platform_data = &canvas_platform_data;
-+
-+	return 0;
-+}
-+
-+static int meson_canvas_remove(struct platform_device *pdev)
-+{
-+	mutex_destroy(&canvas.lock);
-+	return 0;
-+}
-+
-+static const struct of_device_id canvas_dt_match[] = {
-+	{ .compatible = "amlogic,meson-canvas" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, canvas_dt_match);
-+
-+static struct platform_driver meson_canvas_driver = {
-+	.probe = meson_canvas_probe,
-+	.remove = meson_canvas_remove,
-+	.driver = {
-+		.name = "meson-canvas",
-+		.of_match_table = canvas_dt_match,
-+	},
-+};
-+module_platform_driver(meson_canvas_driver);
-+
-+MODULE_ALIAS("platform:meson-canvas");
-+MODULE_DESCRIPTION("AMLogic Meson Canvas driver");
-+MODULE_AUTHOR("Maxime Jourdan <maxi.jourdan@wanadoo.fr>");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/soc/amlogic/meson-canvas.h b/include/linux/soc/amlogic/meson-canvas.h
-new file mode 100644
-index 000000000000..af9e2415056a
---- /dev/null
-+++ b/include/linux/soc/amlogic/meson-canvas.h
-@@ -0,0 +1,37 @@
-+/*
-+ * Copyright (c) 2018 Maxime Jourdan
-+ * Author: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#ifndef MESON_CANVAS_H
-+#define MESON_CANVAS_H
-+
-+#include <linux/kernel.h>
-+
-+#define MESON_CANVAS_WRAP_NONE	0x00
-+#define MESON_CANVAS_WRAP_X	0x01
-+#define MESON_CANVAS_WRAP_Y	0x02
-+
-+#define MESON_CANVAS_BLKMODE_LINEAR	0x00
-+#define MESON_CANVAS_BLKMODE_32x32	0x01
-+#define MESON_CANVAS_BLKMODE_64x64	0x02
-+
-+struct meson_canvas_platform_data {
-+	int (*alloc)(uint8_t *canvas_index);
-+	int (*free) (uint8_t canvas_index);
-+	int (*setup)(uint8_t canvas_index, uint32_t addr,
-+			uint32_t stride, uint32_t height,
-+			unsigned int wrap,
-+			unsigned int blkmode,
-+			unsigned int endian);
-+};
-+
-+#endif
+ 	struct drm_device *drm;
+ 	struct drm_crtc *crtc;
+ 	struct drm_fbdev_cma *fbdev;
+diff --git a/drivers/gpu/drm/meson/meson_plane.c b/drivers/gpu/drm/meson/meson_plane.c
+index 12c80dfcff59..8745f9209625 100644
+--- a/drivers/gpu/drm/meson/meson_plane.c
++++ b/drivers/gpu/drm/meson/meson_plane.c
+@@ -36,7 +36,6 @@
+ #include "meson_plane.h"
+ #include "meson_vpp.h"
+ #include "meson_viu.h"
+-#include "meson_canvas.h"
+ #include "meson_registers.h"
+ 
+ struct meson_plane {
+@@ -105,7 +104,7 @@ static void meson_plane_atomic_update(struct drm_plane *plane,
+ 				   OSD_BLK0_ENABLE;
+ 
+ 	/* Set up BLK0 to point to the right canvas */
+-	priv->viu.osd1_blk0_cfg[0] = ((MESON_CANVAS_ID_OSD1 << OSD_CANVAS_SEL) |
++	priv->viu.osd1_blk0_cfg[0] = ((priv->canvas_id_osd1 << OSD_CANVAS_SEL) |
+ 				      OSD_ENDIANNESS_LE);
+ 
+ 	/* On GXBB, Use the old non-HDR RGB2YUV converter */
+diff --git a/drivers/gpu/drm/meson/meson_viu.c b/drivers/gpu/drm/meson/meson_viu.c
+index 6bcfa527c180..5b48c4c0985b 100644
+--- a/drivers/gpu/drm/meson/meson_viu.c
++++ b/drivers/gpu/drm/meson/meson_viu.c
+@@ -25,7 +25,6 @@
+ #include "meson_viu.h"
+ #include "meson_vpp.h"
+ #include "meson_venc.h"
+-#include "meson_canvas.h"
+ #include "meson_registers.h"
+ 
+ /**
 -- 
 2.17.1
