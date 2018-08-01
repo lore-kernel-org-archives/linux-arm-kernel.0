@@ -1,91 +1,116 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Wed, 1 Aug 2018 08:52:36 +0000
-Subject: [PATCH v2 0/4] arm64 SMMUv3 PMU driver with IORT support
-In-Reply-To: <20180724114515.21764-1-shameerali.kolothum.thodi@huawei.com>
-References: <20180724114515.21764-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA838755908@FRAEML521-MBX.china.huawei.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed,  1 Aug 2018 16:58:20 +0900
+Subject: [PATCH v13 16/16] arm64: kexec_file: add kaslr support
+In-Reply-To: <20180801075820.3753-1-takahiro.akashi@linaro.org>
+References: <20180801075820.3753-1-takahiro.akashi@linaro.org>
+Message-ID: <20180801075820.3753-17-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo/Robin,
+Adding "kaslr-seed" to dtb enables triggering kaslr, or kernel virtual
+address randomization, at secondary kernel boot. We always do this as
+it will have no harm on kaslr-incapable kernel.
 
-Just a  gentle ping on this series. This is a v2 for smmu pmcg support
-based on Neil Leeder's v1[1]. 
+We don't have any "switch" to turn off this feature directly, but still
+can suppress it by passing "nokaslr" as a kernel boot argument.
 
-Main changes include,
--an helper function to IORT to retrieve the associated SMMU info.
--MSI support to the PMU driver.
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/machine_kexec_file.c | 45 ++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-Please take a look and let me know your thoughts.
-
-Thanks,
-Shameer
-
-[1]https://www.spinics.net/lists/arm-kernel/msg598591.html
-
-> -----Original Message-----
-> From: Linuxarm [mailto:linuxarm-bounces at huawei.com] On Behalf Of
-> Shameer Kolothum
-> Sent: 24 July 2018 12:45
-> To: lorenzo.pieralisi at arm.com; robin.murphy at arm.com
-> Cc: mark.rutland at arm.com; vkilari at codeaurora.org;
-> neil.m.leeder at gmail.com; pabba at codeaurora.org; will.deacon at arm.com;
-> rruigrok at codeaurora.org; Linuxarm <linuxarm@huawei.com>; linux-
-> kernel at vger.kernel.org; linux-acpi at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: [PATCH v2 0/4] arm64 SMMUv3 PMU driver with IORT support
-> 
-> This adds a driver for the SMMUv3 PMU into the perf framework.
-> It includes an IORT update to support PM Counter Groups.
-> 
-> This is based on the initial work done by Neil Leeder[1]
-> 
-> SMMUv3 PMCG devices are named as arm_smmu_v3_x_pmcg_y where x
-> denotes the associated smmuv3 dev id(if any) and y denotes the
-> pmu dev id.
-> 
-> Usage example:
-> For common arch supported events:
-> perf stat -e arm_smmu_v3_0_pmcg_6/transaction,filter_enable=1,
->  filter_span=1,filter_stream_id=0x42/ -a pwd
-> 
-> For IMP DEF events:
-> perf stat -e arm_smmu_v3.0_pmcg.6/event=id/ -a pwd
-> 
-> Sanity tested on HiSilicon platform. Further testing on supported
-> platforms are very much welcome.
-> 
-> v1 --> v2
-> 
-> - Addressed comments from Robin.
-> - Added an helper to retrieve the associated smmu dev and named PMUs
->   to make the association visible to user.
-> - Added MSI support  for overflow irq
-> 
-> [1]https://www.spinics.net/lists/arm-kernel/msg598591.html
-> 
-> Neil Leeder (2):
->   acpi: arm64: add iort support for PMCG
->   perf: add arm64 smmuv3 pmu driver
-> 
-> Shameer Kolothum (2):
->   acpi: arm64: iort helper to find the associated smmu of pmcg node
->   perf/smmuv3: Add MSI irq support
-> 
->  drivers/acpi/arm64/iort.c     | 179 +++++++--
->  drivers/perf/Kconfig          |   9 +
->  drivers/perf/Makefile         |   1 +
->  drivers/perf/arm_smmuv3_pmu.c | 901
-> ++++++++++++++++++++++++++++++++++++++++++
->  include/linux/acpi_iort.h     |   4 +
->  5 files changed, 1063 insertions(+), 31 deletions(-)
->  create mode 100644 drivers/perf/arm_smmuv3_pmu.c
-> 
-> --
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> Linuxarm mailing list
-> Linuxarm at huawei.com
-> http://hulk.huawei.com/mailman/listinfo/linuxarm
+diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+index ecaecb122cad..967db9824e3f 100644
+--- a/arch/arm64/kernel/machine_kexec_file.c
++++ b/arch/arm64/kernel/machine_kexec_file.c
+@@ -16,6 +16,7 @@
+ #include <linux/libfdt.h>
+ #include <linux/memblock.h>
+ #include <linux/of_fdt.h>
++#include <linux/random.h>
+ #include <linux/slab.h>
+ #include <linux/types.h>
+ #include <linux/vmalloc.h>
+@@ -27,6 +28,7 @@
+ #define FDT_PSTR_INITRD_STA	"linux,initrd-start"
+ #define FDT_PSTR_INITRD_END	"linux,initrd-end"
+ #define FDT_PSTR_BOOTARGS	"bootargs"
++#define FDT_PSTR_KASLR_SEED	"kaslr-seed"
+ 
+ const struct kexec_file_ops * const kexec_file_loaders[] = {
+ 	&kexec_image_ops,
+@@ -45,6 +47,32 @@ int arch_kimage_file_post_load_cleanup(struct kimage *image)
+ 	return kexec_image_post_load_cleanup_default(image);
+ }
+ 
++/* crng needs to have been initialized for providing kaslr-seed */
++static int random_ready;
++
++static void random_ready_notified(struct random_ready_callback *unused)
++{
++	random_ready = 1;
++}
++
++static struct random_ready_callback random_ready_cb = {
++	.func = random_ready_notified,
++};
++
++static __init int init_random_ready_cb(void)
++{
++	int ret;
++
++	ret = add_random_ready_callback(&random_ready_cb);
++	if (ret == -EALREADY)
++		random_ready = 1;
++	else if (ret)
++		pr_warn("failed to add a callback for random_ready\n");
++
++	return 0;
++}
++late_initcall(init_random_ready_cb)
++
+ static int setup_dtb(struct kimage *image,
+ 		unsigned long initrd_load_addr, unsigned long initrd_len,
+ 		char *cmdline, unsigned long cmdline_len,
+@@ -53,6 +81,7 @@ static int setup_dtb(struct kimage *image,
+ 	void *buf = NULL;
+ 	size_t buf_size, range_size;
+ 	int nodeoffset;
++	u64 value;
+ 	int ret;
+ 
+ 	/* check ranges against root's #address-cells and #size-cells */
+@@ -85,6 +114,8 @@ static int setup_dtb(struct kimage *image,
+ 		/* can be redundant, but trimmed at the end */
+ 		buf_size += fdt_prop_len(FDT_PSTR_BOOTARGS, cmdline_len);
+ 
++	buf_size += fdt_prop_len(FDT_PSTR_KASLR_SEED, sizeof(u64));
++
+ 	buf = vmalloc(buf_size);
+ 	if (!buf) {
+ 		ret = -ENOMEM;
+@@ -164,6 +195,20 @@ static int setup_dtb(struct kimage *image,
+ 		}
+ 	}
+ 
++	/* add kaslr-seed */
++	fdt_delprop(buf, nodeoffset, FDT_PSTR_KASLR_SEED);
++	if (random_ready) {
++		get_random_bytes(&value, sizeof(value));
++		ret = fdt_setprop_u64(buf, nodeoffset, FDT_PSTR_KASLR_SEED,
++							value);
++		if (ret) {
++			ret = -EINVAL;
++			goto out_err;
++		}
++	} else {
++		pr_notice("kaslr-seed won't be fed\n");
++	}
++
+ 	/* trim a buffer */
+ 	fdt_pack(buf);
+ 	*dtb_buf = buf;
+-- 
+2.18.0
