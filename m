@@ -1,86 +1,46 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 1 Aug 2018 14:38:51 -0500
-Subject: [PATCH] arm64: PCI: Remove node-local allocations when
- initialising host controller
-In-Reply-To: <20180801173132.19739-1-punit.agrawal@arm.com>
-References: <20180801173132.19739-1-punit.agrawal@arm.com>
-Message-ID: <38ad03ba-2658-98c8-1888-0aa3bfb59bd4@arm.com>
+From: maxi.jourdan@wanadoo.fr (Maxime Jourdan)
+Date: Wed,  1 Aug 2018 20:51:27 +0200
+Subject: [PATCH 3/4] ARM64: dts: meson-gx: add dmcbus and canvas nodes.
+In-Reply-To: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
+References: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
+Message-ID: <20180801185128.23440-4-maxi.jourdan@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Wrap the canvas node in a syscon node.
 
-+CC Jiang Lui
+Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
+---
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-On 08/01/2018 12:31 PM, Punit Agrawal wrote:
-> Memory for host controller data structures is allocated local to the
-> node to which the controller is associated with. This has been the
-> behaviour since support for ACPI was added in
-> commit 0cb0786bac15 ("ARM64: PCI: Support ACPI-based PCI host controller").
-
-Which was apparently influenced by:
-
-965cd0e4a5e5 x86, PCI, ACPI: Use kmalloc_node() to optimize for performance
-
-Was there an actual use-case behind that change?
-
-I think this fixes the immediate boot problem, but if there is any perf 
-advantage it seems wise to keep it... Particularly since x86 seems to be 
-doing the node sanitation in pci_acpi_root_get_node().
-
-
-
-> 
-> Drop the node local allocation as there is no benefit from doing so -
-> the usage of these structures is independent from where the controller
-> is located. It also causes problem during probe if the associated numa
-> node hasn't been initialised due to booting with restricted cpus via
-> kernel command line or where the node doesn't have cpus or memory
-> associated with it.
-> 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
-> Hi,
-> 
-> This came up in the context of investigating the boot issues reported
-> due to restricted cpus or buggy firmware. Part of the problem is fixed
-> by Lorenzo's rework of NUMA initialisation[0].
-> 
-> But there also doesn't seem to be any justification for using
-> node-local allocation to begin with.
-> 
-> Thanks,
-> Punit
-> 
-> [0] https://patchwork.kernel.org/patch/10486001/
-> 
->   arch/arm64/kernel/pci.c | 5 ++---
->   1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index 0e2ea1c78542..bb85e2f4603f 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -165,16 +165,15 @@ static void pci_acpi_generic_release_info(struct acpi_pci_root_info *ci)
->   /* Interface called from ACPI code to setup PCI host controller */
->   struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->   {
-> -	int node = acpi_get_node(root->device->handle);
->   	struct acpi_pci_generic_root_info *ri;
->   	struct pci_bus *bus, *child;
->   	struct acpi_pci_root_ops *root_ops;
->   
-> -	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
-> +	ri = kzalloc(sizeof(*ri), GFP_KERNEL);
->   	if (!ri)
->   		return NULL;
->   
-> -	root_ops = kzalloc_node(sizeof(*root_ops), GFP_KERNEL, node);
-> +	root_ops = kzalloc(sizeof(*root_ops), GFP_KERNEL);
->   	if (!root_ops) {
->   		kfree(ri);
->   		return NULL;
-> 
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+index b8dc4dbb391b..d104b9e111fb 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+@@ -423,6 +423,23 @@
+ 			};
+ 		};
+ 
++		dmcbus: bus at c8838000 {
++			compatible = "simple-bus";
++			reg = <0x0 0xc8838000 0x0 0x1000>;
++			#address-cells = <2>;
++			#size-cells = <2>;
++			ranges = <0x0 0x0 0x0 0xc8838000 0x0 0x1000>;
++
++			sysctrl_DMC: system-controller at 0 {
++				compatible = "amlogic,meson-gx-dmc-sysctrl", "syscon", "simple-mfd";
++				reg = <0x0 0x0 0x0 0x1000>;
++
++				canvas: canvas-provider at 0 {
++					compatible = "amlogic,meson-canvas";
++				};
++			};
++		};
++
+ 		hiubus: bus at c883c000 {
+ 			compatible = "simple-bus";
+ 			reg = <0x0 0xc883c000 0x0 0x2000>;
+-- 
+2.17.1
