@@ -1,84 +1,44 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 1 Aug 2018 00:08:12 +0100
-Subject: [PATCH v3 05/13] coresight: perf: Allow tracing on hotplugged CPUs
-In-Reply-To: <20180731174643.GB11692@xps15>
-References: <1532609691-16863-1-git-send-email-suzuki.poulose@arm.com>
- <1532609691-16863-6-git-send-email-suzuki.poulose@arm.com>
- <20180731174643.GB11692@xps15>
-Message-ID: <182ebcb4-dece-d6d0-965e-aa0d560bc6b7@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 1 Aug 2018 08:45:35 +0800
+Subject: [PATCH v4 5/5] arm64: dts: actions: Add pinctrl node for Actions
+ Semi S700
+In-Reply-To: <20180731194743.13678-6-sravanhome@gmail.com>
+References: <20180731194743.13678-6-sravanhome@gmail.com>
+Message-ID: <201808010805.DWcXxX04%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2018 06:46 PM, Mathieu Poirier wrote:
-> On Thu, Jul 26, 2018 at 01:54:43PM +0100, Suzuki K Poulose wrote:
->> At the moment, if there is no CPU specified for a given
->> event, we use cpu_online_mask and try to build path for
->> each of the CPUs in the mask. This could prevent any CPU
->> that is turned online later to be used for the tracing.
->>
->> This patch changes to use the cpu_present_mask and tries
->> to build path for as much CPUs as possible ignoring the
->> failures in building path for some of the CPUs. If ever
->> we try to trace on those CPUs, we fail the operation.
->>
->> Based on a patch from Mathieu Poirier.
->>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   drivers/hwtracing/coresight/coresight-etm-perf.c | 46 +++++++++++++++---------
->>   1 file changed, 30 insertions(+), 16 deletions(-)
->>
->> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
->> index 6beb662..afe7e7f 100644
->> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
->> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
->> @@ -127,11 +127,9 @@ static void free_event_data(struct work_struct *work)
->>   
->>   	event_data = container_of(work, struct etm_event_data, work);
->>   	mask = &event_data->mask;
->> -	/*
->> -	 * First deal with the sink configuration.  See comment in
->> -	 * etm_setup_aux() about why we take the first available path.
->> -	 */
->> -	if (event_data->snk_config) {
->> +
->> +	/* Free the sink buffers, if there are any */
->> +	if (event_data->snk_config && !WARN_ON(cpumask_empty(mask))) {
-> 
-> I'm not sure the WARN_ON() is required.
-> 
-> Here @mask can't be empty since you've added a check in setup_aux().  So if
-> @mask does end up being empty something has trampled the memory and we have
-> far bigger problems.
+Hi Saravanan,
 
-And thats exactly why I have a WARN_ON(). The issue is, we can't free 
-the sink_config unless we are able to find the sink device. So, if we
-ever end up with a sink_config with an empty mask, there is something
-seriously wrong and hence the WARN_ON().
+Thank you for the patch! Yet something to improve:
 
+[auto build test ERROR on pinctrl/devel]
+[also build test ERROR on next-20180731]
+[cannot apply to v4.18-rc7]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> 
-> 
->>   		cpu = cpumask_first(mask);
->>   		sink = coresight_get_sink(etm_event_cpu_path(event_data, cpu));
->>   		if (sink_ops(sink)->free_buffer)
->> @@ -166,7 +164,7 @@ static void *alloc_event_data(int cpu)
+url:    https://github.com/0day-ci/linux/commits/Saravanan-Sekar/pinctrl-actions-define-constructor-generic-to-Actions-Semi-SoC-s/20180801-042834
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git devel
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
 
-...
+All errors (new ones prefixed by >>):
 
->> -	if (!sink_ops(sink)->alloc_buffer)
->> -		goto err;
->> -
->> +	/* If we don't have any CPUs ready for tracing, abort */
->>   	cpu = cpumask_first(mask);
->> -	/* Get the AUX specific data from the sink buffer */
->> +	if (cpu >= nr_cpu_ids)
->> +		goto err;
->> +
->> +	/* Allocate the sink buffer for this session */
->>   	event_data->snk_config =
->>   			sink_ops(sink)->alloc_buffer(sink, cpu, pages,
->>   						     nr_pages, overwrite);
+>> Error: arch/arm64/boot/dts/actions/s700.dtsi:172.19-20 syntax error
+>> FATAL ERROR: Unable to parse input tree
 
-Suzuki
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 38876 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180801/90058689/attachment-0001.gz>
