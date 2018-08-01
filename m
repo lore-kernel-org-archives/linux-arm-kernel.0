@@ -1,273 +1,96 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 1 Aug 2018 10:29:32 +0530
-Subject: [PATCH] perf vendor events arm64: Update ThunderX2 implementation
- defined pmu core events
-In-Reply-To: <20180731172919.GE4909@kernel.org>
-References: <20180731100251.23575-1-ganapatrao.kulkarni@cavium.com>
- <20180731142835.GC4909@kernel.org>
- <CAKTKpr7ZLru2wvtarq01p6PqJKQLEhCFtoo=tw45Svh-V_vFag@mail.gmail.com>
- <20180731172919.GE4909@kernel.org>
-Message-ID: <CAKTKpr5wBZ0QogsZsKZb9Fk4D4K-u9XNza9S4GDg5Kt7WTRV4w@mail.gmail.com>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Wed, 1 Aug 2018 07:05:30 +0200
+Subject: [PATCH v8 2/4] dt-bindings: mailbox: imx-mu: add generic MU
+ channel support
+In-Reply-To: <CABb+yY1ZusgN4UVxmUgXZS9ObGdLwFAL4XkW7F1yVb6Gq=9XPA@mail.gmail.com>
+References: <20180731141146.10788-1-o.rempel@pengutronix.de>
+ <20180731141146.10788-3-o.rempel@pengutronix.de>
+ <CABb+yY1ZusgN4UVxmUgXZS9ObGdLwFAL4XkW7F1yVb6Gq=9XPA@mail.gmail.com>
+Message-ID: <20180801050530.nzmomvvyo5pfwclz@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaldo,
+On Tue, Jul 31, 2018 at 09:28:09PM +0530, Jassi Brar wrote:
+> On Tue, Jul 31, 2018 at 7:41 PM, Oleksij Rempel <o.rempel@pengutronix.de> wrote:
+> > Each MU has four pairs of rx/tx data register with four rx/tx interrupts
+> > which can also be used as a separate channel.
+> >
+> > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> > ---
+> >  .../devicetree/bindings/mailbox/fsl,mu.txt    | 28 +++++++++++++++++--
+> >  1 file changed, 25 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> > index 90e4905dfc69..9efd3a9ade44 100644
+> > --- a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> > +++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> > @@ -18,11 +18,33 @@ Messaging Unit Device Node:
+> >  Required properties:
+> >  -------------------
+> >  - compatible : should be "fsl,<chip>-mu", the supported chips include
+> > -               imx8qxp, imx8qm.
+> > +               imx6sx, imx7s, imx8qxp, imx8qm.
+> > +               The "fsl,imx6sx-mu" compatible is seen as generic and should
+> > +               be included together with SoC specific compatible.
+> >  - reg :                Should contain the registers location and length
+> >  - interrupts : Interrupt number. The interrupt specifier format depends
+> >                 on the interrupt controller parent.
+> > -- #mbox-cells:  Must be 0. Number of cells in a mailbox
+> > +- #mbox-cells:  Must be 2.
+> >
+> This seems like modifying the bindings. But since nothing exists yet,
+> maybe we should merge patch 1 and 2 ?
 
+For some weeks I already asked to squash this patches.. it was not
+ACKed. We can try again... @Rob, @Aisheng, should I merge this two
+patches?
 
-On Tue, Jul 31, 2018 at 10:59 PM, Arnaldo Carvalho de Melo
-<arnaldo.melo@gmail.com> wrote:
-> Em Tue, Jul 31, 2018 at 08:40:51PM +0530, Ganapatrao Kulkarni escreveu:
->> Hi Arnaldo,
->>
->> On Tue, Jul 31, 2018 at 7:58 PM, Arnaldo Carvalho de Melo
->> <arnaldo.melo@gmail.com> wrote:
->> > Em Tue, Jul 31, 2018 at 03:32:51PM +0530, Ganapatrao Kulkarni escreveu:
->> >> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> >
->> > Can you please consider to provide an example of such counters being
->> > used, i.e. with a simple C synthetic test that causes these events to
->> > take place, then run it via 'perf stat' to show that indeed, they are
->> > being programmed and read correctly?
->> >
->> > Ideally for all of them, but if that becomes too burdensome, for a few
->> > of them?
->>
->> It may be tedious for all, certainly I will provide the test
->> results/log for some of them(as many as possible).
->
-> Right, we do try to test some of the events via 'perf test', for
-> instance:
->
-> [root at jouet perf]# perf test openat
->  2: Detect openat syscall event                           : Ok
->  3: Detect openat syscall event on all cpus               : Ok
-> 15: syscalls:sys_enter_openat event fields                : Ok
-> [root at jouet perf]#
+> 
+> > +                         <&phandle type channel>
+> > +                           phandle   : Label name of controller
+> > +                           type      : Channel type
+> > +                           channel   : Channel number
+> > +
+> > +               This MU support 4 type of unidirectional channels, each type
+> > +               has 4 channels. A total of 16 channels. Following types are
+> > +               supported:
+> > +               0 - TX channel with 32bit transmit register and IRQ transmit
+> > +               acknowledgment support.
+> > +               1 - RX channel with 32bit receive register and IRQ support
+> > +               2 - TX doorbell channel. Without own register and no ACK support.
+> > +               3 - RX doorbell channel.
+> >
+> Thanks. This is great.
+> 
+> > +               The doorbell channels should be used with shared memory and protocol
+> > +               level acknowledgment if needed.
+> > +
+> I would avoid this. People might get notions that they have to use
+> shmem with doorbell -- a trivial protocol might mean doing some fixed
+> action (like reset) whenever the doorbell rings.
 
-we have not tried perf test, will look in to this test suite to keep
-it complaint on our hardware too!
+Ok.
 
->
-> Things like setting up evsels for some events, then forking + calling a
-> syscall, then checking if that event appeared on the ring buffer, check
-> if the payload for the event, as read using the tracefs format fields
-> matches the parameters we passed in the syscall, etc.
->
-> See tools/perf/tests/openat-syscall-tp-fields.c for that
-> "syscalls:sys_enter_openat event fields" specific source code.
->
-> So doing some of these synthetic tests when updating the event files may
-> help us in the direction of having tests that run on those specific
-> hardwares (ThunderX2 in this case) everytime we run 'perf test', so that
-> we can detect failures sooner.
->
-> I.e. first write a simple test for one of those events, use it as
-> documentation, at some point, as time permits, turn those into a 'perf
-> test' entry.
+> 
+> > +Optional properties:
+> > +-------------------
+> > +- clocks :     phandle to the input clock.
+> > +- fsl,mu-side-b : Should be set for side B MU.
+> >
+> Nit: can we call this 'fsl,no-init' ?
 
-All these events are implemented as per "ARMv8, The Performance
-Monitors Extension specification" [1].
-Brief explanation of each of these events is already captured at
-tools/perf/pmu-events/arch/arm64/armv8-recommended.json
+No. It is HW description and not functionality which is present in
+current Linux driver.
 
-[1] https://static.docs.arm.com/ddi0487/a/DDI0487A_j_armv8_arm.pdf?_ga=2.104377475.2065785066.1533095452-1490247355.1441251141
-
-i have used ltp testcases as workload to test some of the events and
-log is below,
-
-root at SBR-26>ganapat>> perf stat -e
-unaligned_ld_spec,unaligned_st_spec,unaligned_ldst_spec,mem_access_rd,mem_access_wr,armv8_pmuv3_0/mem_access/
-ltp/testcases/kernel/mem/mtest001 -p80
-mtest01     0  TINFO  :  Total memory already used on system = 11849792 kbytes
-mtest01     0  TINFO  :  Total memory used needed to reach maximum =
-214325040 kbytes
-mtest01     0  TINFO  :  Filling up 80% of ram which is 202475248 kbytes
-mtest01     1  TPASS  :  202475248 kbytes allocated only.
-
- Performance counter stats for 'ltp/testcases/kernel/mem/mtest01/mtest01 -p80':
-
-             2,573      unaligned_ld_spec
-             3,976      unaligned_st_spec
-             6,549      unaligned_ldst_spec
-         1,525,489      mem_access_rd
-         1,549,531      mem_access_wr
-         3,075,020      armv8_pmuv3_0/mem_access/
-
-       0.006368837 seconds time elapsed
-
-       0.000000000 seconds user
-       0.006390000 seconds sys
-
-
-root at SBR-26>ganapat>> perf stat -e
-l1d_cache_refill_rd,l1d_cache_refill_wr,armv8_pmuv3_0/l1d_cache_refill/
-./ltp/testcases/kernel/mem/mtest01/mtest01 -p80
-mtest01     0  TINFO  :  Total memory already used on system = 11851520 kbytes
-mtest01     0  TINFO  :  Total memory used needed to reach maximum =
-214325040 kbytes
-mtest01     0  TINFO  :  Filling up 80% of ram which is 202473520 kbytes
-mtest01     1  TPASS  :  202473520 kbytes allocated only.
-
- Performance counter stats for
-'./ltp/testcases/kernel/mem/mtest01/mtest01 -p80':
-
-           257,128      l1d_cache_refill_rd
-           162,151      l1d_cache_refill_wr
-           419,279      armv8_pmuv3_0/l1d_cache_refill/
-
-       0.006118645 seconds time elapsed
-
-       0.000000000 seconds user
-       0.006141000 seconds sys
-
-
-root at SBR-26>ganapat>> perf stat -e exc_svc
-./ltp/testcases/kernel/syscalls/brk/brk01
-tst_test.c:1015: INFO: Timeout per run is 0h 05m 00s
-brk01.c:67: PASS: brk() works fine
-
-Summary:
-passed   1
-failed   0
-skipped  0
-warnings 0
-
- Performance counter stats for './ltp/testcases/kernel/syscalls/brk/brk01':
-
-               100      exc_svc
-
-       0.000887222 seconds time elapsed
-
-       0.000950000 seconds user
-       0.000000000 seconds sys
-
-
-root at SBR-26>ganapat>>
-
->
-> Thanks,
->
-> - Arnaldo
->
->> >
->> > Thanks,
->> >
->> > - Arnaldo
->> >
->> >> ---
->> >>  .../arch/arm64/cavium/thunderx2/core-imp-def.json  | 87 +++++++++++++++++++++-
->> >>  1 file changed, 84 insertions(+), 3 deletions(-)
->> >>
->> >> diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
->> >> index bc03c06..752e47e 100644
->> >> --- a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
->> >> +++ b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
->> >> @@ -12,6 +12,21 @@
->> >>          "ArchStdEvent": "L1D_CACHE_REFILL_WR",
->> >>      },
->> >>      {
->> >> +        "ArchStdEvent": "L1D_CACHE_REFILL_INNER",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "L1D_CACHE_REFILL_OUTER",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "L1D_CACHE_WB_VICTIM",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "L1D_CACHE_WB_CLEAN",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "L1D_CACHE_INVAL",
->> >> +    },
->> >> +    {
->> >>          "ArchStdEvent": "L1D_TLB_REFILL_RD",
->> >>      },
->> >>      {
->> >> @@ -24,9 +39,75 @@
->> >>          "ArchStdEvent": "L1D_TLB_WR",
->> >>      },
->> >>      {
->> >> +        "ArchStdEvent": "L2D_TLB_REFILL_RD",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "L2D_TLB_REFILL_WR",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "L2D_TLB_RD",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "L2D_TLB_WR",
->> >> +    },
->> >> +    {
->> >>          "ArchStdEvent": "BUS_ACCESS_RD",
->> >> -   },
->> >> -   {
->> >> +    },
->> >> +    {
->> >>          "ArchStdEvent": "BUS_ACCESS_WR",
->> >> -   }
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "MEM_ACCESS_RD",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "MEM_ACCESS_WR",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "UNALIGNED_LD_SPEC",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "UNALIGNED_ST_SPEC",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "UNALIGNED_LDST_SPEC",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "EXC_UNDEF",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "EXC_SVC",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "EXC_PABORT",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "EXC_DABORT",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "EXC_IRQ",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "EXC_FIQ",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "EXC_SMC",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "EXC_HVC",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "EXC_TRAP_PABORT",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "EXC_TRAP_DABORT",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "EXC_TRAP_OTHER",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "EXC_TRAP_IRQ",
->> >> +    },
->> >> +    {
->> >> +        "ArchStdEvent": "EXC_TRAP_FIQ",
->> >> +    }
->> >>  ]
->> >> --
->> >> 2.9.4
->>
->> thanks
->> Ganapat
-
-thanks
-Ganapat
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180801/07207792/attachment.sig>
