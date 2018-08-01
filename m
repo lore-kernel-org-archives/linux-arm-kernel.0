@@ -1,35 +1,31 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 1 Aug 2018 15:28:02 +0530
-Subject: [PATCH v8 2/4] dt-bindings: mailbox: imx-mu: add generic MU
- channel support
-In-Reply-To: <AM0PR04MB4211B20B99E087177D0C06D8802D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <20180731141146.10788-1-o.rempel@pengutronix.de>
- <20180731141146.10788-3-o.rempel@pengutronix.de>
- <CABb+yY1ZusgN4UVxmUgXZS9ObGdLwFAL4XkW7F1yVb6Gq=9XPA@mail.gmail.com>
- <AM0PR04MB4211B20B99E087177D0C06D8802D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <CABb+yY304PeP_G9NiRW+pkXod+bUnYdKaYxOgH7XjsGEqQ5TVg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 1 Aug 2018 11:58:58 +0200
+Subject: next/master boot: 179 boots: 11 failed,
+ 167 passed with 1 offline (next-20180731)
+In-Reply-To: <c50e3311-9dca-c64b-ca58-6a44e3559e98@st.com>
+References: <5b607cc4.1c69fb81.6c1d6.6534@mx.google.com>
+ <20180731160623.GH5719@sirena.org.uk>
+ <c50e3311-9dca-c64b-ca58-6a44e3559e98@st.com>
+Message-ID: <CAPDyKFoJ173XKL-xSRJtvk5_3E2cx1Pb-rs=7g9d9+Gt8QAOqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 1, 2018 at 2:28 PM, A.s. Dong <aisheng.dong@nxp.com> wrote:
-> Hi Jassi,
+On 1 August 2018 at 10:19, Ludovic BARRE <ludovic.barre@st.com> wrote:
+> hi Mark, Ulf
 >
->> > +               The doorbell channels should be used with shared memory and
->> protocol
->> > +               level acknowledgment if needed.
->> > +
->> I would avoid this. People might get notions that they have to use shmem
->> with doorbell -- a trivial protocol might mean doing some fixed action (like
->> reset) whenever the doorbell rings.
->>
+> When I see log, I think the patch in attachment could fix this issue
+> , but like I've not qcom board I can't test if it's fixed :-(.
 >
-> That's right.
-> i.MX8 using the general purpose interrupt for peripherals. No shmem needed.
-> e.g. RTC, Watchdog and ON/OFF interrupt.
->
-> BTW, this means the peripheral will use mailbox doorbell channels to handle
-> Interrupts. Is there such user case in kernel we can refer to?
->
-I don't find any publicly in kernel.
-It should be simple though. Acquire the RX channel, and populate the
-rx_callback() with the "interrupt" handler.
+> Ulf: for patch delivery, you prefer a patch delivery on mailing list ?
+
+Thanks for looking into this.
+
+However, no need to post a fix this time (your patch fixed the issue,
+but should declare the qcom_variant_init() in mmci.h.
+
+I have already amended the patch, so no further actions is needed.
+
+[...]
+
+Kind regards
+Uffe
