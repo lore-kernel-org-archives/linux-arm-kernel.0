@@ -1,74 +1,86 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 1 Aug 2018 13:23:04 -0600
-Subject: [PATCH v3 02/13] coresight: etb10: Fix handling of perf mode
-In-Reply-To: <7b311596-025a-f4f4-1859-6f3531258b75@arm.com>
-References: <1532609691-16863-1-git-send-email-suzuki.poulose@arm.com>
- <1532609691-16863-3-git-send-email-suzuki.poulose@arm.com>
- <20180731170731.GA11692@xps15> <7b311596-025a-f4f4-1859-6f3531258b75@arm.com>
-Message-ID: <CANLsYkzyb0Lmb3DNomVuK-Bon2gfS7jGYRnX4F7LQghR-aMZCw@mail.gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 1 Aug 2018 14:38:51 -0500
+Subject: [PATCH] arm64: PCI: Remove node-local allocations when
+ initialising host controller
+In-Reply-To: <20180801173132.19739-1-punit.agrawal@arm.com>
+References: <20180801173132.19739-1-punit.agrawal@arm.com>
+Message-ID: <38ad03ba-2658-98c8-1888-0aa3bfb59bd4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 Jul 2018 at 15:32, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->
-> On 07/31/2018 06:07 PM, Mathieu Poirier wrote:
-> > Hello,
-> >
-> > On Thu, Jul 26, 2018 at 01:54:40PM +0100, Suzuki K Poulose wrote:
-> >> If the ETB is already enabled in sysfs mode, the ETB reports
-> >> success even if a perf mode is requested. Fix this by checking
-> >> the requested mode.
-> >>
-> >> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> >> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >> ---
-> >>   drivers/hwtracing/coresight/coresight-etb10.c | 8 ++++++--
-> >>   1 file changed, 6 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-> >> index 306119e..e5808fd 100644
-> >> --- a/drivers/hwtracing/coresight/coresight-etb10.c
-> >> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
-> >> @@ -148,8 +148,12 @@ static int etb_enable(struct coresight_device *csdev, u32 mode)
-> >>              return -EBUSY;
-> >>
-> >>      /* Nothing to do, the tracer is already enabled. */
-> >> -    if (val == CS_MODE_SYSFS)
-> >> -            goto out;
-> >> +    if (val == CS_MODE_SYSFS) {
-> >> +            if (mode == CS_MODE_SYSFS)
-> >> +                    goto out;
-> >> +            else
-> >> +                    return -EBUSY;
-> >> +    }
-> >
-> > How about:
-> >
-> >          if (val == CS_MODE_PERF)
-> >                  return -EBUSY;
-> >
-> > +       /* Don't let perf disturb sysFS sessions */
-> > +       if (val == CS_MODE_SYSFS && mode = CS_MODE_PERF)
-> > +               return -EBUSY;
-> > +
-> >          /* Nothing to do, the tracer is already enabled. */
-> >          if (val == CS_MODE_SYSFS)
-> >                  goto out;
-> >
-> >
-> > I just find it more readable that way.
->
-> Sure, thats fine by me.
+Hi,
 
-Ok good.  Doing another round just to address this is cumbersome so I
-just fixed it in my tree.  Also, I still think the WARN_ON() in patch
-5/13 is superfluous but once again not important enough to make a big
-deal out of it.  I have applied this set.
++CC Jiang Lui
 
-Thanks,
-Mathieu
+On 08/01/2018 12:31 PM, Punit Agrawal wrote:
+> Memory for host controller data structures is allocated local to the
+> node to which the controller is associated with. This has been the
+> behaviour since support for ACPI was added in
+> commit 0cb0786bac15 ("ARM64: PCI: Support ACPI-based PCI host controller").
 
->
-> Cheers
-> Suzuki
->
+Which was apparently influenced by:
+
+965cd0e4a5e5 x86, PCI, ACPI: Use kmalloc_node() to optimize for performance
+
+Was there an actual use-case behind that change?
+
+I think this fixes the immediate boot problem, but if there is any perf 
+advantage it seems wise to keep it... Particularly since x86 seems to be 
+doing the node sanitation in pci_acpi_root_get_node().
+
+
+
+> 
+> Drop the node local allocation as there is no benefit from doing so -
+> the usage of these structures is independent from where the controller
+> is located. It also causes problem during probe if the associated numa
+> node hasn't been initialised due to booting with restricted cpus via
+> kernel command line or where the node doesn't have cpus or memory
+> associated with it.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+> Hi,
+> 
+> This came up in the context of investigating the boot issues reported
+> due to restricted cpus or buggy firmware. Part of the problem is fixed
+> by Lorenzo's rework of NUMA initialisation[0].
+> 
+> But there also doesn't seem to be any justification for using
+> node-local allocation to begin with.
+> 
+> Thanks,
+> Punit
+> 
+> [0] https://patchwork.kernel.org/patch/10486001/
+> 
+>   arch/arm64/kernel/pci.c | 5 ++---
+>   1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index 0e2ea1c78542..bb85e2f4603f 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -165,16 +165,15 @@ static void pci_acpi_generic_release_info(struct acpi_pci_root_info *ci)
+>   /* Interface called from ACPI code to setup PCI host controller */
+>   struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>   {
+> -	int node = acpi_get_node(root->device->handle);
+>   	struct acpi_pci_generic_root_info *ri;
+>   	struct pci_bus *bus, *child;
+>   	struct acpi_pci_root_ops *root_ops;
+>   
+> -	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
+> +	ri = kzalloc(sizeof(*ri), GFP_KERNEL);
+>   	if (!ri)
+>   		return NULL;
+>   
+> -	root_ops = kzalloc_node(sizeof(*root_ops), GFP_KERNEL, node);
+> +	root_ops = kzalloc(sizeof(*root_ops), GFP_KERNEL);
+>   	if (!root_ops) {
+>   		kfree(ri);
+>   		return NULL;
+> 
