@@ -1,23 +1,50 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Wed, 1 Aug 2018 02:54:04 -0700
-Subject: [RESEND PATCH 6/6] arm64: enable RapidIO menu in Kconfig
-In-Reply-To: <20180731142954.30345-7-acolin@isi.edu>
-References: <20180731142954.30345-1-acolin@isi.edu>
- <20180731142954.30345-7-acolin@isi.edu>
-Message-ID: <20180801095404.GA17585@infradead.org>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Wed, 1 Aug 2018 11:54:30 +0200
+Subject: [PATCH 1/3] PCI: Introduce PCI software bridge common logic
+In-Reply-To: <20180801092119.GB30658@n2100.armlinux.org.uk>
+References: <20180629092231.32207-1-thomas.petazzoni@bootlin.com>
+ <20180629092231.32207-2-thomas.petazzoni@bootlin.com>
+ <20180712195802.GC28466@bhelgaas-glaptop.roam.corp.google.com>
+ <20180801104957.1b01b847@windsurf>
+ <20180801092119.GB30658@n2100.armlinux.org.uk>
+Message-ID: <20180801115430.388c62ae@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 10:29:54AM -0400, Alexei Colin wrote:
-> Platforms with a PCI bus will be offered the RapidIO menu since they may
-> be want support for a RapidIO PCI device. Platforms without a PCI bus
-> that might include a RapidIO IP block will need to "select HAS_RAPIDIO"
-> in the platform-/machine-specific "config ARCH_*" Kconfig entry.
-> 
-> Tested that kernel builds for arm64 with RapidIO subsystem and
-> switch drivers enabled, also that the modules load successfully
-> on a custom Aarch64 Qemu model.
+Hello Russell,
 
-As said before, please include it from drivers/Kconfig so that _all_
-architectures supporting PCI (or other Rapidio attachements) get it
-and not some arbitrary selection of architectures.
+On Wed, 1 Aug 2018 10:21:19 +0100, Russell King - ARM Linux wrote:
+
+
+>    All PCI devices must treat Configuration Space write operations
+>    to reserved registers as no-ops; that is, the access must be
+>    completed normally on the bus and the data discarded. Read
+>    accesses to reserved or unimplemented registers must be completed
+>    normally and a data value of 0 returned.
+> 
+> (eg) PCI status:
+>    Reserved bits should be read-only and return zero when read.
+>    A one bit is reset (if it is not read-only) whenever the register
+>    is written, and the write data in the corresponding bit location
+>    is a 1.
+> 
+> [which is why doing the read-modify-write action that some host
+>  bridges that only support 32-bit accesses is dangerous - it leads
+>  to various status bits being inadvertently reset.]
+
+Speaking of this, the generic pci_generic_config_write32() function
+indeed does this incorrectly, and prints a warning.
+
+However, I just looked at the pci-thunder-pem code, and it seems to
+correctly account for those W1C bits, by having an explicit list of
+registers and their W1C bits (see thunder_pem_bridge_w1c_bits). This
+isn't specific to the Thunder PCIe controller at all, and would benefit
+from being made generic, no ?
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
