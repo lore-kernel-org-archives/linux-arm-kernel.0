@@ -1,621 +1,230 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 1 Aug 2018 13:20:45 +0300
-Subject: [PATCH v3 2/2] spi: add SPI controller driver for UniPhier SoC
-In-Reply-To: <1533108552-19878-3-git-send-email-hayashibara.keiji@socionext.com>
-References: <1533108552-19878-1-git-send-email-hayashibara.keiji@socionext.com>
- <1533108552-19878-3-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <CAHp75VeiGuTpPHYcq+aoZUWiX7HFmOg63Zs6dfk0OJiN4Ux=5g@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Aug 2018 11:38:55 +0100
+Subject: [PATCH 6/6] arm64: enable RapidIO menu in Kconfig
+In-Reply-To: <570ad147-3c58-8911-0111-29e21087ca7a@gmail.com>
+References: <20180730225035.28365-1-acolin@isi.edu>
+ <20180730225035.28365-7-acolin@isi.edu>
+ <20180731084143.GA4680@arm.com>
+ <d09cb4f5-768b-acd8-f9b1-d1d320a93564@gmail.com>
+ <20180731155228.GN17271@n2100.armlinux.org.uk>
+ <044af717-3883-a7a6-c346-18fa8cebce76@gmail.com>
+ <20180731181834.GA30658@n2100.armlinux.org.uk>
+ <570ad147-3c58-8911-0111-29e21087ca7a@gmail.com>
+Message-ID: <20180801103855.GD30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 1, 2018 at 10:29 AM, Keiji Hayashibara
-<hayashibara.keiji@socionext.com> wrote:
-> Add SPI controller driver implemented in Socionext UniPhier SoCs.
->
-> UniPhier SoCs have two types SPI controllers; SCSSI supports a
-> single channel, and MCSSI supports multiple channels.
-> This driver supports SCSSI only.
->
-> This controller has 32bit TX/RX FIFO with depth of eight entry,
-> and supports the SPI master mode only.
->
-> This commit is implemented in PIO transfer mode, not DMA transfer.
->
+On Tue, Jul 31, 2018 at 04:01:27PM -0400, Alex Bounine wrote:
+> On 2018-07-31 02:18 PM, Russell King - ARM Linux wrote:
+> >On Tue, Jul 31, 2018 at 01:59:27PM -0400, Alex Bounine wrote:
+> >>On 2018-07-31 11:52 AM, Russell King - ARM Linux wrote:
+> >>>On Tue, Jul 31, 2018 at 08:54:14AM -0400, Alex Bounine wrote:
+> >>>>On 2018-07-31 04:41 AM, Will Deacon wrote:
+> >>>>>On Mon, Jul 30, 2018 at 06:50:34PM -0400, Alexei Colin wrote:
+> >>>>>>Platforms with a PCI bus will be offered the RapidIO menu since they may
+> >>>>>>be want support for a RapidIO PCI device. Platforms without a PCI bus
+> >>>>>>that might include a RapidIO IP block will need to "select HAS_RAPIDIO"
+> >>>>>>in the platform-/machine-specific "config ARCH_*" Kconfig entry.
+> >>>>>>
+> >>>>>>Tested that kernel builds for arm64 with RapidIO subsystem and
+> >>>>>>switch drivers enabled, also that the modules load successfully
+> >>>>>>on a custom Aarch64 Qemu model.
+> >>>>>>
+> >>>>>>Cc: Andrew Morton <akpm@linux-foundation.org>
+> >>>>>>Cc: Russell King <linux@armlinux.org.uk>
+> >>>>>>Cc: John Paul Walters <jwalters@isi.edu>
+> >>>>>>Cc: linux-arm-kernel at lists.infradead.org
+> >>>>>>Cc: linux-kernel at vger.kernel.org,
+> >>>>>>Signed-off-by: Alexei Colin <acolin@isi.edu>
+> >>>>>>---
+> >>>>>>  arch/arm64/Kconfig | 2 ++
+> >>>>>>  1 file changed, 2 insertions(+)
+> >>>>>
+> >>>>>Thanks, this looks much cleaner than before:
+> >>>>>
+> >>>>>Acked-by: Will Deacon <will.deacon@arm.com>
+> >>>>>
+> >>>>>The only thing I'm not sure about is why we don't just select HAS_RAPIDIO
+> >>>>>unconditionally in the arm64 Kconfig. Does selecting only that option
+> >>>>>actually pull in new code to the build?
+> >>>>>
+> >>>>HAS_RAPIDIO option is intended for SOCs that have built in SRIO controllers,
+> >>>>like TI KeyStoneII or FPGAs. Because RapidIO subsystem core is required
+> >>>>during RapidIO port driver initialization, having separate option allows us
+> >>>>to control available build options for RapidIO core and port driver (bool
+> >>>>vs. tristate) and disable module option if port driver is configured as
+> >>>>built-in.
+> >>>
+> >>>Your explanation doesn't make much sense to me.
+> >>>
+> >>>RAPIDIO is the bus-level support, right?  So drivers that depend on
+> >>>the bus-level support should depend on RAPIDIO, and so, if RAPIDIO
+> >>>is configured as a module, they will also be allowed to be disabled
+> >>>or a module, but not built-in if tristate.  If it is boolean, and
+> >>>causes the driver to be built-in to the kernel, then you need to use
+> >>>"RAPIDIO=y" so that it's dependency is only satisfied when the core
+> >>>is built-in.
+> >>>
+> >>
+> >>RapidIO host controllers (on local bus like SoC internal or PCIe) are
+> >>serviced by MPORT device drivers that are subsystem specific and communicate
+> >>with RapidIO core using set of callbacks. Depending on HW architecture these
+> >>drivers may be defined as built-in or module.
+> >
+> >Why does hardware architecture define whether something has to be built
+> >in or can be modular?
+> >
+> >It is the case today that (eg) on-SoC hardware _can_ be built as a module
+> >if desired - just because it's on the SoC does not mean it has to be
+> >built in to the kernel.  Why is RapidIO any different?
+> >
+> 
+> Not HW architecture - legacy can be blamed as well. Freescale's FSL_RIO
+> driver still exist as built-in so far. Intent of this patch set is to allow
+> RapidIO support in more architectures without reworking old stuff.
+> I do not think that anyone will be updating FSL_RIO driver soon.
 
-One comment below, otherwise FWIW,
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+Sorry, but I'm even more confused.  If it's not hardware architecture,
+then why did you say previously "Depending on HW architecture these
+drivers may be defined as built-in or module." ?
 
+If it's that the driver isn't written to be a module, then that is not
+"HW architecture".  Are you just trying to muddy the water?
 
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
-> ---
->  drivers/spi/Kconfig        |  13 ++
->  drivers/spi/Makefile       |   1 +
->  drivers/spi/spi-uniphier.c | 525 +++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 539 insertions(+)
->  create mode 100644 drivers/spi/spi-uniphier.c
->
-> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-> index ad5d68e..671d078 100644
-> --- a/drivers/spi/Kconfig
-> +++ b/drivers/spi/Kconfig
-> @@ -688,6 +688,19 @@ config SPI_TXX9
->         help
->           SPI driver for Toshiba TXx9 MIPS SoCs
->
-> +config SPI_UNIPHIER
-> +       tristate "Socionext UniPhier SPI Controller"
-> +       depends on (ARCH_UNIPHIER || COMPILE_TEST) && OF
-> +       help
-> +         This enables a driver for the Socionext UniPhier SoC SCSSI SPI controller.
-> +
-> +         UniPhier SoCs have SCSSI and MCSSI SPI controllers.
-> +         Every UniPhier SoC has SCSSI which supports single channel.
-> +         Older UniPhier Pro4/Pro5 also has MCSSI which support multiple channels.
-> +         This driver supports SCSSI only.
-> +
-> +         If your SoC supports SCSSI, say Y here.
-> +
->  config SPI_XCOMM
->         tristate "Analog Devices AD-FMCOMMS1-EBZ SPI-I2C-bridge driver"
->         depends on I2C
-> diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
-> index cb1f437..a90d559 100644
-> --- a/drivers/spi/Makefile
-> +++ b/drivers/spi/Makefile
-> @@ -101,6 +101,7 @@ spi-thunderx-objs                   := spi-cavium.o spi-cavium-thunderx.o
->  obj-$(CONFIG_SPI_THUNDERX)             += spi-thunderx.o
->  obj-$(CONFIG_SPI_TOPCLIFF_PCH)         += spi-topcliff-pch.o
->  obj-$(CONFIG_SPI_TXX9)                 += spi-txx9.o
-> +obj-$(CONFIG_SPI_UNIPHIER)             += spi-uniphier.o
->  obj-$(CONFIG_SPI_XCOMM)                += spi-xcomm.o
->  obj-$(CONFIG_SPI_XILINX)               += spi-xilinx.o
->  obj-$(CONFIG_SPI_XLP)                  += spi-xlp.o
-> diff --git a/drivers/spi/spi-uniphier.c b/drivers/spi/spi-uniphier.c
-> new file mode 100644
-> index 0000000..0899854
-> --- /dev/null
-> +++ b/drivers/spi/spi-uniphier.c
-> @@ -0,0 +1,525 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +// spi-uniphier.c - Socionext UniPhier SPI controller driver
-> +// Copyright 2012      Panasonic Corporation
-> +// Copyright 2016-2018 Socionext Inc.
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/bitfield.h>
-> +#include <linux/bitops.h>
-> +#include <linux/clk.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
+> Also we cannot dictate to developers of future drivers which method to use -
+> they may have built-in option only for the first release.
 
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
+How is that any different from all the other drivers that we have?
 
-I fail to find where those two are used, just remove them.
+If a driver can only be built-in, then we do this in the Kconfig:
 
-> +#include <linux/platform_device.h>
-> +#include <linux/spi/spi.h>
-> +
-> +#include <asm/unaligned.h>
-> +
-> +#define SSI_TIMEOUT_MS         2000
-> +#define SSI_MAX_CLK_DIVIDER    254
-> +#define SSI_MIN_CLK_DIVIDER    4
-> +
-> +struct uniphier_spi_priv {
-> +       void __iomem *base;
-> +       struct clk *clk;
-> +       struct spi_master *master;
-> +       struct completion xfer_done;
-> +
-> +       int error;
-> +       unsigned int tx_bytes;
-> +       unsigned int rx_bytes;
-> +       const u8 *tx_buf;
-> +       u8 *rx_buf;
-> +
-> +       bool is_save_param;
-> +       u8 bits_per_word;
-> +       u16 mode;
-> +       u32 speed_hz;
-> +};
-> +
-> +#define SSI_CTL                        0x00
-> +#define   SSI_CTL_EN           BIT(0)
-> +
-> +#define SSI_CKS                        0x04
-> +#define   SSI_CKS_CKRAT_MASK   GENMASK(7, 0)
-> +#define   SSI_CKS_CKPHS                BIT(14)
-> +#define   SSI_CKS_CKINIT       BIT(13)
-> +#define   SSI_CKS_CKDLY                BIT(12)
-> +
-> +#define SSI_TXWDS              0x08
-> +#define   SSI_TXWDS_WDLEN_MASK GENMASK(13, 8)
-> +#define   SSI_TXWDS_TDTF_MASK  GENMASK(7, 6)
-> +#define   SSI_TXWDS_DTLEN_MASK GENMASK(5, 0)
-> +
-> +#define SSI_RXWDS              0x0c
-> +#define   SSI_RXWDS_DTLEN_MASK GENMASK(5, 0)
-> +
-> +#define SSI_FPS                        0x10
-> +#define   SSI_FPS_FSPOL                BIT(15)
-> +#define   SSI_FPS_FSTRT                BIT(14)
-> +
-> +#define SSI_SR                 0x14
-> +#define   SSI_SR_RNE           BIT(0)
-> +
-> +#define SSI_IE                 0x18
-> +#define   SSI_IE_RCIE          BIT(3)
-> +#define   SSI_IE_RORIE         BIT(0)
-> +
-> +#define SSI_IS                 0x1c
-> +#define   SSI_IS_RXRS          BIT(9)
-> +#define   SSI_IS_RCID          BIT(3)
-> +#define   SSI_IS_RORID         BIT(0)
-> +
-> +#define SSI_IC                 0x1c
-> +#define   SSI_IC_TCIC          BIT(4)
-> +#define   SSI_IC_RCIC          BIT(3)
-> +#define   SSI_IC_RORIC         BIT(0)
-> +
-> +#define SSI_FC                 0x20
-> +#define   SSI_FC_TXFFL         BIT(12)
-> +#define   SSI_FC_TXFTH_MASK    GENMASK(11, 8)
-> +#define   SSI_FC_RXFFL         BIT(4)
-> +#define   SSI_FC_RXFTH_MASK    GENMASK(3, 0)
-> +
-> +#define SSI_TXDR               0x24
-> +#define SSI_RXDR               0x24
-> +
-> +#define SSI_FIFO_DEPTH         8U
-> +
-> +static inline unsigned int bytes_per_word(unsigned int bits)
-> +{
-> +       return bits <= 8 ? 1 : (bits <= 16 ? 2 : 4);
-> +}
-> +
-> +static inline void uniphier_spi_irq_enable(struct spi_device *spi, u32 mask)
-> +{
-> +       struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
-> +       u32 val;
-> +
-> +       val = readl(priv->base + SSI_IE);
-> +       val |= mask;
-> +       writel(val, priv->base + SSI_IE);
-> +}
-> +
-> +static inline void uniphier_spi_irq_disable(struct spi_device *spi, u32 mask)
-> +{
-> +       struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
-> +       u32 val;
-> +
-> +       val = readl(priv->base + SSI_IE);
-> +       val &= ~mask;
-> +       writel(val, priv->base + SSI_IE);
-> +}
-> +
-> +static void uniphier_spi_set_mode(struct spi_device *spi)
-> +{
-> +       struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
-> +       u32 val1, val2;
-> +
-> +       /*
-> +        * clock setting
-> +        * CKPHS    capture timing. 0:rising edge, 1:falling edge
-> +        * CKINIT   clock initial level. 0:low, 1:high
-> +        * CKDLY    clock delay. 0:no delay, 1:delay depending on FSTRT
-> +        *          (FSTRT=0: 1 clock, FSTRT=1: 0.5 clock)
-> +        *
-> +        * frame setting
-> +        * FSPOL    frame signal porarity. 0: low, 1: high
-> +        * FSTRT    start frame timing
-> +        *          0: rising edge of clock, 1: falling edge of clock
-> +        */
-> +       switch (spi->mode & (SPI_CPOL | SPI_CPHA)) {
-> +       case SPI_MODE_0:
-> +               /* CKPHS=1, CKINIT=0, CKDLY=1, FSTRT=0 */
-> +               val1 = SSI_CKS_CKPHS | SSI_CKS_CKDLY;
-> +               val2 = 0;
-> +               break;
-> +       case SPI_MODE_1:
-> +               /* CKPHS=0, CKINIT=0, CKDLY=0, FSTRT=1 */
-> +               val1 = 0;
-> +               val2 = SSI_FPS_FSTRT;
-> +               break;
-> +       case SPI_MODE_2:
-> +               /* CKPHS=0, CKINIT=1, CKDLY=1, FSTRT=1 */
-> +               val1 = SSI_CKS_CKINIT | SSI_CKS_CKDLY;
-> +               val2 = SSI_FPS_FSTRT;
-> +               break;
-> +       case SPI_MODE_3:
-> +               /* CKPHS=1, CKINIT=1, CKDLY=0, FSTRT=0 */
-> +               val1 = SSI_CKS_CKPHS | SSI_CKS_CKINIT;
-> +               val2 = 0;
-> +               break;
-> +       }
-> +
-> +       if (!(spi->mode & SPI_CS_HIGH))
-> +               val2 |= SSI_FPS_FSPOL;
-> +
-> +       writel(val1, priv->base + SSI_CKS);
-> +       writel(val2, priv->base + SSI_FPS);
-> +
-> +       val1 = 0;
-> +       if (spi->mode & SPI_LSB_FIRST)
-> +               val1 |= FIELD_PREP(SSI_TXWDS_TDTF_MASK, 1);
-> +       writel(val1, priv->base + SSI_TXWDS);
-> +       writel(val1, priv->base + SSI_RXWDS);
-> +}
-> +
-> +static void uniphier_spi_set_transfer_size(struct spi_device *spi, int size)
-> +{
-> +       struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
-> +       u32 val;
-> +
-> +       val = readl(priv->base + SSI_TXWDS);
-> +       val &= ~(SSI_TXWDS_WDLEN_MASK | SSI_TXWDS_DTLEN_MASK);
-> +       val |= FIELD_PREP(SSI_TXWDS_WDLEN_MASK, size);
-> +       val |= FIELD_PREP(SSI_TXWDS_DTLEN_MASK, size);
-> +       writel(val, priv->base + SSI_TXWDS);
-> +
-> +       val = readl(priv->base + SSI_RXWDS);
-> +       val &= ~SSI_RXWDS_DTLEN_MASK;
-> +       val |= FIELD_PREP(SSI_RXWDS_DTLEN_MASK, size);
-> +       writel(val, priv->base + SSI_RXWDS);
-> +}
-> +
-> +static void uniphier_spi_set_baudrate(struct spi_device *spi,
-> +                                     unsigned int speed)
-> +{
-> +       struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
-> +       u32 val, ckdiv;
-> +
-> +       /*
-> +        * the supported rates are even numbers from 4 to 254. (4,6,8...254)
-> +        * round up as we look for equal or less speed
-> +        */
-> +       ckdiv = DIV_ROUND_UP(clk_get_rate(priv->clk), speed);
-> +       ckdiv = round_up(ckdiv, 2);
-> +
-> +       val = readl(priv->base + SSI_CKS);
-> +       val &= ~SSI_CKS_CKRAT_MASK;
-> +       val |= ckdiv & SSI_CKS_CKRAT_MASK;
-> +       writel(val, priv->base + SSI_CKS);
-> +}
-> +
-> +static void uniphier_spi_setup_transfer(struct spi_device *spi,
-> +                                      struct spi_transfer *t)
-> +{
-> +       struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
-> +       u32 val;
-> +
-> +       priv->error = 0;
-> +       priv->tx_buf = t->tx_buf;
-> +       priv->rx_buf = t->rx_buf;
-> +       priv->tx_bytes = priv->rx_bytes = t->len;
-> +
-> +       if (!priv->is_save_param || priv->mode != spi->mode) {
-> +               uniphier_spi_set_mode(spi);
-> +               priv->mode = spi->mode;
-> +       }
-> +
-> +       if (!priv->is_save_param || priv->bits_per_word != t->bits_per_word) {
-> +               uniphier_spi_set_transfer_size(spi, t->bits_per_word);
-> +               priv->bits_per_word = t->bits_per_word;
-> +       }
-> +
-> +       if (!priv->is_save_param || priv->speed_hz != t->speed_hz) {
-> +               uniphier_spi_set_baudrate(spi, t->speed_hz);
-> +               priv->speed_hz = t->speed_hz;
-> +       }
-> +
-> +       if (!priv->is_save_param)
-> +               priv->is_save_param = true;
-> +
-> +       /* reset FIFOs */
-> +       val = SSI_FC_TXFFL | SSI_FC_RXFFL;
-> +       writel(val, priv->base + SSI_FC);
-> +}
-> +
-> +static void uniphier_spi_send(struct uniphier_spi_priv *priv)
-> +{
-> +       int wsize;
-> +       u32 val = 0;
-> +
-> +       wsize = min(bytes_per_word(priv->bits_per_word), priv->tx_bytes);
-> +       priv->tx_bytes -= wsize;
-> +
-> +       if (priv->tx_buf) {
-> +               switch (wsize) {
-> +               case 1:
-> +                       val = *priv->tx_buf;
-> +                       break;
-> +               case 2:
-> +                       val = get_unaligned_le16(priv->tx_buf);
-> +                       break;
-> +               case 4:
-> +                       val = get_unaligned_le32(priv->tx_buf);
-> +                       break;
-> +               }
-> +
-> +               priv->tx_buf += wsize;
-> +       }
-> +
-> +       writel(val, priv->base + SSI_TXDR);
-> +}
-> +
-> +static void uniphier_spi_recv(struct uniphier_spi_priv *priv)
-> +{
-> +       int rsize;
-> +       u32 val;
-> +
-> +       rsize = min(bytes_per_word(priv->bits_per_word), priv->rx_bytes);
-> +       priv->rx_bytes -= rsize;
-> +
-> +       val = readl(priv->base + SSI_RXDR);
-> +
-> +       if (priv->rx_buf) {
-> +               switch (rsize) {
-> +               case 1:
-> +                       *priv->rx_buf = val;
-> +                       break;
-> +               case 2:
-> +                       put_unaligned_le16(val, priv->rx_buf);
-> +                       break;
-> +               case 4:
-> +                       put_unaligned_le32(val, priv->rx_buf);
-> +                       break;
-> +               }
-> +
-> +               priv->rx_buf += rsize;
-> +       }
-> +}
-> +
-> +static void uniphier_spi_fill_tx_fifo(struct uniphier_spi_priv *priv)
-> +{
-> +       unsigned int tx_count;
-> +       u32 val;
-> +
-> +       tx_count = DIV_ROUND_UP(priv->tx_bytes,
-> +                               bytes_per_word(priv->bits_per_word));
-> +       tx_count = min(tx_count, SSI_FIFO_DEPTH);
-> +
-> +       /* set fifo threshold */
-> +       val = readl(priv->base + SSI_FC);
-> +       val &= ~(SSI_FC_TXFTH_MASK | SSI_FC_RXFTH_MASK);
-> +       val |= FIELD_PREP(SSI_FC_TXFTH_MASK, tx_count);
-> +       val |= FIELD_PREP(SSI_FC_RXFTH_MASK, tx_count);
-> +       writel(val, priv->base + SSI_FC);
-> +
-> +       while (tx_count--)
-> +               uniphier_spi_send(priv);
-> +}
-> +
-> +static void uniphier_spi_set_cs(struct spi_device *spi, bool enable)
-> +{
-> +       struct uniphier_spi_priv *priv = spi_master_get_devdata(spi->master);
-> +       u32 val;
-> +
-> +       val = readl(priv->base + SSI_FPS);
-> +
-> +       if (enable)
-> +               val |= SSI_FPS_FSPOL;
-> +       else
-> +               val &= ~SSI_FPS_FSPOL;
-> +
-> +       writel(val, priv->base + SSI_FPS);
-> +}
-> +
-> +static int uniphier_spi_transfer_one(struct spi_master *master,
-> +                                    struct spi_device *spi,
-> +                                    struct spi_transfer *t)
-> +{
-> +       struct uniphier_spi_priv *priv = spi_master_get_devdata(master);
-> +       int status;
-> +
-> +       uniphier_spi_setup_transfer(spi, t);
-> +
-> +       reinit_completion(&priv->xfer_done);
-> +
-> +       uniphier_spi_fill_tx_fifo(priv);
-> +
-> +       uniphier_spi_irq_enable(spi, SSI_IE_RCIE | SSI_IE_RORIE);
-> +
-> +       status = wait_for_completion_timeout(&priv->xfer_done,
-> +                                            msecs_to_jiffies(SSI_TIMEOUT_MS));
-> +
-> +       uniphier_spi_irq_disable(spi, SSI_IE_RCIE | SSI_IE_RORIE);
-> +
-> +       if (status < 0)
-> +               return status;
-> +
-> +       return priv->error;
-> +}
-> +
-> +static int uniphier_spi_prepare_transfer_hardware(struct spi_master *master)
-> +{
-> +       struct uniphier_spi_priv *priv = spi_master_get_devdata(master);
-> +
-> +       writel(SSI_CTL_EN, priv->base + SSI_CTL);
-> +
-> +       return 0;
-> +}
-> +
-> +static int uniphier_spi_unprepare_transfer_hardware(struct spi_master *master)
-> +{
-> +       struct uniphier_spi_priv *priv = spi_master_get_devdata(master);
-> +
-> +       writel(0, priv->base + SSI_CTL);
-> +
-> +       return 0;
-> +}
-> +
-> +static irqreturn_t uniphier_spi_handler(int irq, void *dev_id)
-> +{
-> +       struct uniphier_spi_priv *priv = dev_id;
-> +       u32 val, stat;
-> +
-> +       stat = readl(priv->base + SSI_IS);
-> +       val = SSI_IC_TCIC | SSI_IC_RCIC | SSI_IC_RORIC;
-> +       writel(val, priv->base + SSI_IC);
-> +
-> +       /* rx fifo overrun */
-> +       if (stat & SSI_IS_RORID) {
-> +               priv->error = -EIO;
-> +               goto done;
-> +       }
-> +
-> +       /* rx complete */
-> +       if ((stat & SSI_IS_RCID) && (stat & SSI_IS_RXRS)) {
-> +               while ((readl(priv->base + SSI_SR) & SSI_SR_RNE) &&
-> +                               (priv->rx_bytes - priv->tx_bytes) > 0)
-> +                       uniphier_spi_recv(priv);
-> +
-> +               if ((readl(priv->base + SSI_SR) & SSI_SR_RNE) ||
-> +                               (priv->rx_bytes != priv->tx_bytes)) {
-> +                       priv->error = -EIO;
-> +                       goto done;
-> +               } else if (priv->rx_bytes == 0)
-> +                       goto done;
-> +
-> +               /* next tx transfer */
-> +               uniphier_spi_fill_tx_fifo(priv);
-> +
-> +               return IRQ_HANDLED;
-> +       }
-> +
-> +       return IRQ_NONE;
-> +
-> +done:
-> +       complete(&priv->xfer_done);
-> +       return IRQ_HANDLED;
-> +}
-> +
-> +static int uniphier_spi_probe(struct platform_device *pdev)
-> +{
-> +       struct uniphier_spi_priv *priv;
-> +       struct spi_master *master;
-> +       struct resource *res;
-> +       unsigned long clk_rate;
-> +       int irq;
-> +       int ret;
-> +
-> +       master = spi_alloc_master(&pdev->dev, sizeof(*priv));
-> +       if (!master)
-> +               return -ENOMEM;
-> +
-> +       platform_set_drvdata(pdev, master);
-> +
-> +       priv = spi_master_get_devdata(master);
-> +       priv->master = master;
-> +       priv->is_save_param = false;
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       priv->base = devm_ioremap_resource(&pdev->dev, res);
-> +       if (IS_ERR(priv->base)) {
-> +               ret = PTR_ERR(priv->base);
-> +               goto out_master_put;
-> +       }
-> +
-> +       priv->clk = devm_clk_get(&pdev->dev, NULL);
-> +       if (IS_ERR(priv->clk)) {
-> +               dev_err(&pdev->dev, "failed to get clock\n");
-> +               ret = PTR_ERR(priv->clk);
-> +               goto out_master_put;
-> +       }
-> +
-> +       ret = clk_prepare_enable(priv->clk);
-> +       if (ret)
-> +               goto out_master_put;
-> +
-> +       irq = platform_get_irq(pdev, 0);
-> +       if (irq < 0) {
-> +               dev_err(&pdev->dev, "failed to get IRQ\n");
-> +               ret = irq;
-> +               goto out_disable_clk;
-> +       }
-> +
-> +       ret = devm_request_irq(&pdev->dev, irq, uniphier_spi_handler,
-> +                              0, "uniphier-spi", priv);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "failed to request IRQ\n");
-> +               goto out_disable_clk;
-> +       }
-> +
-> +       init_completion(&priv->xfer_done);
-> +
-> +       clk_rate = clk_get_rate(priv->clk);
-> +
-> +       master->max_speed_hz = DIV_ROUND_UP(clk_rate, SSI_MIN_CLK_DIVIDER);
-> +       master->min_speed_hz = DIV_ROUND_UP(clk_rate, SSI_MAX_CLK_DIVIDER);
-> +       master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH | SPI_LSB_FIRST;
-> +       master->dev.of_node = pdev->dev.of_node;
-> +       master->bus_num = pdev->id;
-> +       master->bits_per_word_mask = SPI_BPW_RANGE_MASK(1, 32);
-> +
-> +       master->set_cs = uniphier_spi_set_cs;
-> +       master->transfer_one = uniphier_spi_transfer_one;
-> +       master->prepare_transfer_hardware
-> +                               = uniphier_spi_prepare_transfer_hardware;
-> +       master->unprepare_transfer_hardware
-> +                               = uniphier_spi_unprepare_transfer_hardware;
-> +       master->num_chipselect = 1;
-> +
-> +       ret = devm_spi_register_master(&pdev->dev, master);
-> +       if (ret)
-> +               goto out_disable_clk;
-> +
-> +       return 0;
-> +
-> +out_disable_clk:
-> +       clk_disable_unprepare(priv->clk);
-> +
-> +out_master_put:
-> +       spi_master_put(master);
-> +       return ret;
-> +}
-> +
-> +static int uniphier_spi_remove(struct platform_device *pdev)
-> +{
-> +       struct uniphier_spi_priv *priv = platform_get_drvdata(pdev);
-> +
-> +       clk_disable_unprepare(priv->clk);
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id uniphier_spi_match[] = {
-> +       { .compatible = "socionext,uniphier-scssi" },
-> +       { /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, uniphier_spi_match);
-> +
-> +static struct platform_driver uniphier_spi_driver = {
-> +       .probe = uniphier_spi_probe,
-> +       .remove = uniphier_spi_remove,
-> +       .driver = {
-> +               .name = "uniphier-spi",
-> +               .of_match_table = uniphier_spi_match,
-> +       },
-> +};
-> +module_platform_driver(uniphier_spi_driver);
-> +
-> +MODULE_AUTHOR("Kunihiko Hayashi <hayashi.kunihiko@socionext.com>");
-> +MODULE_AUTHOR("Keiji Hayashibara <hayashibara.keiji@socionext.com>");
-> +MODULE_DESCRIPTION("Socionext UniPhier SPI controller driver");
-> +MODULE_LICENSE("GPL v2");
-> --
-> 2.7.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-spi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+config DRIVERFOO
+	bool "Support driverfoo"
+	depends on SUBSYSTEM=y
 
+which ensures that the driver can only be built when it's dependent
+subsystem is also built-in.
 
+There is another alternative way, which is:
+
+config SUBSYSTEM
+	tristate
+
+config DRIVERFOO
+	bool "Support driverfoo"
+	select SUBSYSTEM
+
+config DRIVERBAR
+	tristate "Support driverbar"
+	select SUBSYSTEM
+
+and "SUBSYSTEM" will automatically adopt either 'm' or 'y' correctly
+depending on whether any drivers are built-in or not.
+
+> Unfortunately we have on hands dependency between mport driver build mode
+> and  RapidIO core which we need to respect.
+
+How is that any different from (eg) hundreds of network drivers and the
+networking core code that we already have?  That doesn't have such a
+convoluted configuration system, and what you have is much simpler.
+
+> >For example, can you point out why my idea I present below would not
+> >work?
+> 
+> See below.
+> 
+> >
+> >>For peripheral devices attached to the RapidIO fabric such dependency on
+> >>local mport implementation does not exist and therefore they all can be
+> >>treated as tristate.
+> >>
+> >>>HAS_RAPIDIO gives the impression that it defines whether or not
+> >>>the rapidio core code is allowable or not - it doesn't suggest that
+> >>>it has anything to do with drivers. However, reading the PowerPC
+> >>>Kconfig files, it seems to be used that way.  That's confusing, and
+> >>>ought to be fixed.  From what I can tell, it's only used for FSL_RIO,
+> >>>so I suggest that gets converted to:
+> >>>
+> >>>config HAS_RAPIDIO
+> >>>	bool PCI
+> 
+> PCI and RAPIDIO can be mutually exclusive.
+
+Please explain this in light of your patches which contain:
+
+config RAPIDIO
+	tristate "RapidIO support"
+	depends on HAS_RAPIDIO || PCI
+
+This allows RAPIDIO can be selected when PCI is enabled.  Therefore,
+PCI and RAPIDIO *are not* mutually exclusive as your comment above
+states, therefore, I have to assume that your comment is wrong.
+
+> >>>
+> >>>config RAPIDIO
+> >>>	tristate "RapidIO support"
+> >>>	depends on HAS_RAPIDIO
+> >>>
+> >>>config HAS_FSL_RIO
+> >>>	bool
+> >>>	select HAS_RAPIDIO
+> 
+> Introducing new variable HAS_FSL_RIO here. Do you suggest having one for
+> each ARM-based board that has on-chip RIO?
+
+No, I'm suggesting a solution for what I see in the kernel tree today,
+which is frankly a mess for the reasons I've already outlined.
+
+HAS_FSL_RIO is based on the _only_ SoC driver apparently in the tree
+based on what I could find in the arch/*/Kconfig files.  If you don't
+think having individual HAS_* options in this way is appropriate,
+then maybe instead having per-SoC hidden HAS_* config options are
+more appropriate.
+
+> >>>
+> >>>config FSL_RIO
+> >>>	bool "Freescale Embedded SRIO Controller support"
+> >>>	depends on RAPIDIO = y && HAS_FSL_RIO
+> >>>
+> >>>This frees up HAS_RAPIDIO to operate as one would expect - to define
+> >>>whether or not RAPIDIO should be offered.  This also allows:
+> >>>
+> >>>config ARM
+> >>>	select HAS_RAPIDIO if PCI
+> 
+> Some SOCs can be configured without PCI. We have confusing action here - we
+> have to enable PCI on platform that does not have it.
+
+Again, you said above "PCI and RAPIDIO can be mutually exclusive."  This
+comment self-conflicts with your previous comment.
+
+What you now seem to be saying goes against the patches and the current
+Kconfig.  You seem to be saying that RAPIDIO _requires_ PCI.
+
+So, we now have three completely different statements from you:
+- "we have to enable PCI on platform that does not have it."
+- "PCI and RAPIDIO can be mutually exclusive."
+- RAPIDIO does not require PCI (since HAS_RAPIDIO=y RAPIDIO=y PCI=n is
+  a permissible configuration as things stand with PowerPC.)
+
+Which is it?
+
+It seems to be that your replies are just muddying the water - I can
+only assume that this is to make us give up.  Please don't do that,
+it's not in your interest.
+
+> Why we cannot use "select HAS_RAPIDIO" HW-specific Kconfig file
+> (mach-*/Kconfig)? And have on-chip port selection in the same board-specific
+> place.
+
+As I've already explained, HAS_RAPIDIO has the expectation that it
+controls the availability of the RAPIDIO option, not of drivers.
+It is HAS_*RAPIDIO*, the clue is in the name.  Using it as you are
+(basically, to mean that on-SoC rapidio hardware is present) and
+allowing such configurations as HAS_RAPIDIO=n RAPIDIO=y PCI=y is
+completely counter-intuitive.
 
 -- 
-With Best Regards,
-Andy Shevchenko
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
