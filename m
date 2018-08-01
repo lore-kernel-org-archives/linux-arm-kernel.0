@@ -1,39 +1,81 @@
 From: arun.parameswaran@broadcom.com (Arun Parameswaran)
-Date: Wed,  1 Aug 2018 10:56:19 -0700
-Subject: [PATCH v3 1/8] dt-bindings: net: Fix Broadcom iProc mdio mux driver
- base address
+Date: Wed,  1 Aug 2018 10:56:20 -0700
+Subject: [PATCH v3 2/8] net: phy: Fix the register offsets in Broadcom iProc
+ mdio mux driver
 In-Reply-To: <1533146186-8374-1-git-send-email-arun.parameswaran@broadcom.com>
 References: <1533146186-8374-1-git-send-email-arun.parameswaran@broadcom.com>
-Message-ID: <1533146186-8374-2-git-send-email-arun.parameswaran@broadcom.com>
+Message-ID: <1533146186-8374-3-git-send-email-arun.parameswaran@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modify the base address of the Broadcom iProc MDIO mux driver to
-point to the start of the block's register address space.
+Modify the register offsets in the Broadcom iProc mdio mux to start
+from the top of the register address space.
+
+Earlier, the base address pointed to the end of the block's register
+space. The base address will now point to the start of the mdio's
+address space. The offsets have been fixed to match this.
 
 Signed-off-by: Arun Parameswaran <arun.parameswaran@broadcom.com>
 Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/phy/mdio-mux-bcm-iproc.c | 20 +++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-index dfe287a..dc8aa68 100644
---- a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-+++ b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-@@ -18,9 +18,9 @@ at- Documentation/devicetree/bindings/net/mdio-mux.txt
+diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
+index 0831b71..48bb74a 100644
+--- a/drivers/net/phy/mdio-mux-bcm-iproc.c
++++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
+@@ -22,7 +22,7 @@
+ #include <linux/mdio-mux.h>
+ #include <linux/delay.h>
  
+-#define MDIO_PARAM_OFFSET		0x00
++#define MDIO_PARAM_OFFSET		0x23c
+ #define MDIO_PARAM_MIIM_CYCLE		29
+ #define MDIO_PARAM_INTERNAL_SEL		25
+ #define MDIO_PARAM_BUS_ID		22
+@@ -30,20 +30,22 @@
+ #define MDIO_PARAM_PHY_ID		16
+ #define MDIO_PARAM_PHY_DATA		0
  
- for example:
--		mdio_mux_iproc: mdio-mux at 6602023c {
-+		mdio_mux_iproc: mdio-mux at 66020000 {
- 			compatible = "brcm,mdio-mux-iproc";
--			reg = <0x6602023c 0x14>;
-+			reg = <0x66020000 0x250>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+-#define MDIO_READ_OFFSET		0x04
++#define MDIO_READ_OFFSET		0x240
+ #define MDIO_READ_DATA_MASK		0xffff
+-#define MDIO_ADDR_OFFSET		0x08
++#define MDIO_ADDR_OFFSET		0x244
  
+-#define MDIO_CTRL_OFFSET		0x0C
++#define MDIO_CTRL_OFFSET		0x248
+ #define MDIO_CTRL_WRITE_OP		0x1
+ #define MDIO_CTRL_READ_OP		0x2
+ 
+-#define MDIO_STAT_OFFSET		0x10
++#define MDIO_STAT_OFFSET		0x24c
+ #define MDIO_STAT_DONE			1
+ 
+ #define BUS_MAX_ADDR			32
+ #define EXT_BUS_START_ADDR		16
+ 
++#define MDIO_REG_ADDR_SPACE_SIZE	0x250
++
+ struct iproc_mdiomux_desc {
+ 	void *mux_handle;
+ 	void __iomem *base;
+@@ -169,6 +171,14 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
+ 	md->dev = &pdev->dev;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (res->start & 0xfff) {
++		/* For backward compatibility in case the
++		 * base address is specified with an offset.
++		 */
++		dev_info(&pdev->dev, "fix base address in dt-blob\n");
++		res->start &= ~0xfff;
++		res->end = res->start + MDIO_REG_ADDR_SPACE_SIZE - 1;
++	}
+ 	md->base = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(md->base)) {
+ 		dev_err(&pdev->dev, "failed to ioremap register\n");
 -- 
 1.9.1
