@@ -1,99 +1,139 @@
 From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Wed,  1 Aug 2018 18:36:39 -0300
-Subject: [PATCH 12/21] perf cs-etm: Fix start tracing packet handling
+Date: Wed,  1 Aug 2018 18:36:43 -0300
+Subject: [PATCH 16/21] perf vendor events arm64: Update ThunderX2
+ implementation defined pmu core events
 In-Reply-To: <20180801213648.4814-1-acme@kernel.org>
 References: <20180801213648.4814-1-acme@kernel.org>
-Message-ID: <20180801213648.4814-13-acme@kernel.org>
+Message-ID: <20180801213648.4814-17-acme@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leo Yan <leo.yan@linaro.org>
+From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 
-Usually the start tracing packet is a CS_ETM_TRACE_ON packet, this
-packet is passed to cs_etm__flush();  cs_etm__flush() will check the
-condition 'prev_packet->sample_type == CS_ETM_RANGE' but 'prev_packet'
-is allocated by zalloc() so 'prev_packet->sample_type' is zero in
-initialization and this condition is false.  So cs_etm__flush() will
-directly bail out without handling the start tracing packet.
-
-This patch is to introduce a new sample type CS_ETM_EMPTY, which is used
-to indicate the packet is an empty packet.  cs_etm__flush() will swap
-packets when it finds the previous packet is empty, so this can record
-the start tracing packet into 'etmq->prev_packet'.
-
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Cc: Ganapatrao Kulkarni <gklkml16@gmail.com>
+Cc: Jan Glauber <jan.glauber@cavium.com>
+Cc: Jayachandran C <jnair@caviumnetworks.com>
 Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Kim Phillips <kim.phillips@arm.com>
-Cc: Mike Leach <mike.leach@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Namhyung Kim <namhyung@kernel.org>
 Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Robert Walker <robert.walker@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1531295145-596-4-git-send-email-leo.yan at linaro.org
+Cc: Robert Richter <robert.richter@cavium.com>
+Cc: Vadim Lomovtsev <vadim.lomovtsev@cavium.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Link: http://lkml.kernel.org/r/20180731100251.23575-1-ganapatrao.kulkarni at cavium.com
 Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
 ---
- tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  1 +
- tools/perf/util/cs-etm.c                        | 19 ++++++++++++++++++-
- 2 files changed, 19 insertions(+), 1 deletion(-)
+ .../arch/arm64/cavium/thunderx2/core-imp-def.json  | 87 +++++++++++++++++++++-
+ 1 file changed, 84 insertions(+), 3 deletions(-)
 
-diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
-index 743f5f444304..612b5755f742 100644
---- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
-+++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
-@@ -23,6 +23,7 @@ struct cs_etm_buffer {
- };
- 
- enum cs_etm_sample_type {
-+	CS_ETM_EMPTY = 0,
- 	CS_ETM_RANGE = 1 << 0,
- 	CS_ETM_TRACE_ON = 1 << 1,
- };
-diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 8b2c099e750a..ae7c9c880cb2 100644
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -924,8 +924,14 @@ static int cs_etm__flush(struct cs_etm_queue *etmq)
- 	int err = 0;
- 	struct cs_etm_packet *tmp;
- 
-+	if (!etmq->prev_packet)
-+		return 0;
-+
-+	/* Handle start tracing packet */
-+	if (etmq->prev_packet->sample_type == CS_ETM_EMPTY)
-+		goto swap_packet;
-+
- 	if (etmq->etm->synth_opts.last_branch &&
--	    etmq->prev_packet &&
- 	    etmq->prev_packet->sample_type == CS_ETM_RANGE) {
- 		/*
- 		 * Generate a last branch event for the branches left in the
-@@ -944,6 +950,10 @@ static int cs_etm__flush(struct cs_etm_queue *etmq)
- 
- 		etmq->period_instructions = 0;
- 
-+	}
-+
-+swap_packet:
-+	if (etmq->etm->synth_opts.last_branch) {
- 		/*
- 		 * Swap PACKET with PREV_PACKET: PACKET becomes PREV_PACKET for
- 		 * the next incoming packet.
-@@ -1023,6 +1033,13 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
- 					 */
- 					cs_etm__flush(etmq);
- 					break;
-+				case CS_ETM_EMPTY:
-+					/*
-+					 * Should not receive empty packet,
-+					 * report error.
-+					 */
-+					pr_err("CS ETM Trace: empty packet\n");
-+					return -EINVAL;
- 				default:
- 					break;
- 				}
+diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+index bc03c06c3918..752e47eb6977 100644
+--- a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
++++ b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+@@ -11,6 +11,21 @@
+     {
+         "ArchStdEvent": "L1D_CACHE_REFILL_WR",
+     },
++    {
++        "ArchStdEvent": "L1D_CACHE_REFILL_INNER",
++    },
++    {
++        "ArchStdEvent": "L1D_CACHE_REFILL_OUTER",
++    },
++    {
++        "ArchStdEvent": "L1D_CACHE_WB_VICTIM",
++    },
++    {
++        "ArchStdEvent": "L1D_CACHE_WB_CLEAN",
++    },
++    {
++        "ArchStdEvent": "L1D_CACHE_INVAL",
++    },
+     {
+         "ArchStdEvent": "L1D_TLB_REFILL_RD",
+     },
+@@ -23,10 +38,76 @@
+     {
+         "ArchStdEvent": "L1D_TLB_WR",
+     },
++    {
++        "ArchStdEvent": "L2D_TLB_REFILL_RD",
++    },
++    {
++        "ArchStdEvent": "L2D_TLB_REFILL_WR",
++    },
++    {
++        "ArchStdEvent": "L2D_TLB_RD",
++    },
++    {
++        "ArchStdEvent": "L2D_TLB_WR",
++    },
+     {
+         "ArchStdEvent": "BUS_ACCESS_RD",
+-   },
+-   {
++    },
++    {
+         "ArchStdEvent": "BUS_ACCESS_WR",
+-   }
++    },
++    {
++        "ArchStdEvent": "MEM_ACCESS_RD",
++    },
++    {
++        "ArchStdEvent": "MEM_ACCESS_WR",
++    },
++    {
++        "ArchStdEvent": "UNALIGNED_LD_SPEC",
++    },
++    {
++        "ArchStdEvent": "UNALIGNED_ST_SPEC",
++    },
++    {
++        "ArchStdEvent": "UNALIGNED_LDST_SPEC",
++    },
++    {
++        "ArchStdEvent": "EXC_UNDEF",
++    },
++    {
++        "ArchStdEvent": "EXC_SVC",
++    },
++    {
++        "ArchStdEvent": "EXC_PABORT",
++    },
++    {
++        "ArchStdEvent": "EXC_DABORT",
++    },
++    {
++        "ArchStdEvent": "EXC_IRQ",
++    },
++    {
++        "ArchStdEvent": "EXC_FIQ",
++    },
++    {
++        "ArchStdEvent": "EXC_SMC",
++    },
++    {
++        "ArchStdEvent": "EXC_HVC",
++    },
++    {
++        "ArchStdEvent": "EXC_TRAP_PABORT",
++    },
++    {
++        "ArchStdEvent": "EXC_TRAP_DABORT",
++    },
++    {
++        "ArchStdEvent": "EXC_TRAP_OTHER",
++    },
++    {
++        "ArchStdEvent": "EXC_TRAP_IRQ",
++    },
++    {
++        "ArchStdEvent": "EXC_TRAP_FIQ",
++    }
+ ]
 -- 
 2.14.4
