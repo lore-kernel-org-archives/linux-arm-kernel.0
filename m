@@ -1,54 +1,42 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed,  1 Aug 2018 16:58:09 +0900
-Subject: [PATCH v13 05/16] kexec_file: kexec_walk_memblock() only walks a
- dedicated region at kdump
-In-Reply-To: <20180801075820.3753-1-takahiro.akashi@linaro.org>
-References: <20180801075820.3753-1-takahiro.akashi@linaro.org>
-Message-ID: <20180801075820.3753-6-takahiro.akashi@linaro.org>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 1 Aug 2018 08:58:06 +0000
+Subject: [PATCH v8 2/4] dt-bindings: mailbox: imx-mu: add generic MU
+ channel support
+In-Reply-To: <CABb+yY1ZusgN4UVxmUgXZS9ObGdLwFAL4XkW7F1yVb6Gq=9XPA@mail.gmail.com>
+References: <20180731141146.10788-1-o.rempel@pengutronix.de>
+ <20180731141146.10788-3-o.rempel@pengutronix.de>
+ <CABb+yY1ZusgN4UVxmUgXZS9ObGdLwFAL4XkW7F1yVb6Gq=9XPA@mail.gmail.com>
+Message-ID: <AM0PR04MB4211B20B99E087177D0C06D8802D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In kdump case, there exists only one dedicated memblock region as usable
-memory (crashk_res). With this patch, kexec_walk_memblock() runs a given
-callback function on this region.
+Hi Jassi,
 
-Cosmetic change: 0 to MEMBLOCK_NONE at for_each_free_mem_range*()
+> > +               The doorbell channels should be used with shared memory and
+> protocol
+> > +               level acknowledgment if needed.
+> > +
+> I would avoid this. People might get notions that they have to use shmem
+> with doorbell -- a trivial protocol might mean doing some fixed action (like
+> reset) whenever the doorbell rings.
+>
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Dave Young <dyoung@redhat.com>
-Cc: Vivek Goyal <vgoyal@redhat.com>
-Cc: Baoquan He <bhe@redhat.com>
----
- kernel/kexec_file.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+That's right.
+i.MX8 using the general purpose interrupt for peripherals. No shmem needed.
+e.g. RTC, Watchdog and ON/OFF interrupt.
 
-diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-index 1073ef56a95d..370d7d8ff27f 100644
---- a/kernel/kexec_file.c
-+++ b/kernel/kexec_file.c
-@@ -511,8 +511,11 @@ static int kexec_walk_memblock(struct kexec_buf *kbuf,
- 	phys_addr_t mstart, mend;
- 	struct resource res = { };
- 
-+	if (kbuf->image->type == KEXEC_TYPE_CRASH)
-+		return func(&crashk_res, kbuf);
-+
- 	if (kbuf->top_down) {
--		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
-+		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, MEMBLOCK_NONE,
- 						&mstart, &mend, NULL) {
- 			/*
- 			 * In memblock, end points to the first byte after the
-@@ -526,8 +529,8 @@ static int kexec_walk_memblock(struct kexec_buf *kbuf,
- 				break;
- 		}
- 	} else {
--		for_each_free_mem_range(i, NUMA_NO_NODE, 0, &mstart, &mend,
--					NULL) {
-+		for_each_free_mem_range(i, NUMA_NO_NODE, MEMBLOCK_NONE,
-+					&mstart, &mend, NULL) {
- 			/*
- 			 * In memblock, end points to the first byte after the
- 			 * range while in kexec, end points to the last byte
--- 
-2.18.0
+BTW, this means the peripheral will use mailbox doorbell channels to handle
+Interrupts. Is there such user case in kernel we can refer to?
+
+> 
+> > +Optional properties:
+> > +-------------------
+> > +- clocks :     phandle to the input clock.
+> > +- fsl,mu-side-b : Should be set for side B MU.
+> >
+> Nit: can we call this 'fsl,no-init' ?
+
+Fsl,mu-side-b is more describing HW.
+
+Regards
+Dong Aisheng
