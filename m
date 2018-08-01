@@ -1,70 +1,69 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed,  1 Aug 2018 09:09:07 +0530
-Subject: [PATCH v2 02/10] arm64: dts: actions: Convert Owl SoCs
- clock-controller nodes to syscon
+Date: Wed,  1 Aug 2018 09:09:08 +0530
+Subject: [PATCH v2 03/10] clk: actions: Add syscon support for Actions Semi
+ Owl SoCs
 In-Reply-To: <20180801033915.15880-1-manivannan.sadhasivam@linaro.org>
 References: <20180801033915.15880-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180801033915.15880-3-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180801033915.15880-4-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since clock and reset management units are sharing the same memory map,
-Owl SoCs clock-controller nodes needs to be converted to syscon so that
-the corresponding reset drivers can also reuse the same memory region.
+Since the clock and reset management units are sharing the same memory
+map, convert the Owl common clock driver to support System Controller so
+that the reset driver can reuse the same memory region.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- arch/arm64/boot/dts/actions/s700.dtsi | 12 ++++++++----
- arch/arm64/boot/dts/actions/s900.dtsi | 12 ++++++++----
- 2 files changed, 16 insertions(+), 8 deletions(-)
+ drivers/clk/actions/owl-common.c | 20 +++-----------------
+ 1 file changed, 3 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
-index 59d29e4ca404..a57f54587164 100644
---- a/arch/arm64/boot/dts/actions/s700.dtsi
-+++ b/arch/arm64/boot/dts/actions/s700.dtsi
-@@ -160,11 +160,15 @@
- 			status = "disabled";
- 		};
+diff --git a/drivers/clk/actions/owl-common.c b/drivers/clk/actions/owl-common.c
+index 61c1071b5180..080f980b2ec4 100644
+--- a/drivers/clk/actions/owl-common.c
++++ b/drivers/clk/actions/owl-common.c
+@@ -8,6 +8,7 @@
+ // Copyright (c) 2018 Linaro Ltd.
+ // Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
  
--		cmu: clock-controller at e0168000 {
--			compatible = "actions,s700-cmu";
-+		sysctrl: system-controller at e0168000 {
-+			compatible = "syscon", "simple-mfd";
- 			reg = <0x0 0xe0168000 0x0 0x1000>;
--			clocks = <&hosc>, <&losc>;
--			#clock-cells = <1>;
-+
-+			cmu: clock-controller {
-+				compatible = "actions,s700-cmu";
-+				clocks = <&hosc>, <&losc>;
-+				#clock-cells = <1>;
-+			};
- 		};
++#include <linux/mfd/syscon.h>
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+@@ -15,14 +16,6 @@
  
- 		sps: power-controller at e01b0100 {
-diff --git a/arch/arm64/boot/dts/actions/s900.dtsi b/arch/arm64/boot/dts/actions/s900.dtsi
-index aa3a49b0d646..d239033f9599 100644
---- a/arch/arm64/boot/dts/actions/s900.dtsi
-+++ b/arch/arm64/boot/dts/actions/s900.dtsi
-@@ -167,11 +167,15 @@
- 			status = "disabled";
- 		};
+ #include "owl-common.h"
  
--		cmu: clock-controller at e0160000 {
--			compatible = "actions,s900-cmu";
-+		sysctrl: system-controller at e0160000 {
-+			compatible = "syscon", "simple-mfd";
- 			reg = <0x0 0xe0160000 0x0 0x1000>;
--			clocks = <&hosc>, <&losc>;
--			#clock-cells = <1>;
-+
-+			cmu: clock-controller {
-+				compatible = "actions,s900-cmu";
-+				clocks = <&hosc>, <&losc>;
-+				#clock-cells = <1>;
-+			};
- 		};
+-static const struct regmap_config owl_regmap_config = {
+-	.reg_bits	= 32,
+-	.reg_stride	= 4,
+-	.val_bits	= 32,
+-	.max_register	= 0x00cc,
+-	.fast_io	= true,
+-};
+-
+ static void owl_clk_set_regmap(const struct owl_clk_desc *desc,
+ 			 struct regmap *regmap)
+ {
+@@ -41,18 +34,11 @@ static void owl_clk_set_regmap(const struct owl_clk_desc *desc,
+ int owl_clk_regmap_init(struct platform_device *pdev,
+ 			 const struct owl_clk_desc *desc)
+ {
+-	void __iomem *base;
+ 	struct regmap *regmap;
+-	struct resource *res;
+-
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	base = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(base))
+-		return PTR_ERR(base);
  
- 		pinctrl: pinctrl at e01b0000 {
+-	regmap = devm_regmap_init_mmio(&pdev->dev, base, &owl_regmap_config);
++	regmap = syscon_node_to_regmap(of_get_parent(pdev->dev.of_node));
+ 	if (IS_ERR(regmap)) {
+-		pr_err("failed to init regmap\n");
++		dev_err(&pdev->dev, "failed to get regmap\n");
+ 		return PTR_ERR(regmap);
+ 	}
+ 
 -- 
 2.17.1
