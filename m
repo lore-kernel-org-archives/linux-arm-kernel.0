@@ -1,47 +1,137 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 2 Aug 2018 08:06:10 +0200
-Subject: [PATCH v2 0/7] tda998x: allow use with bridge based devices
-In-Reply-To: <20180801093528.GC30658@n2100.armlinux.org.uk>
-References: <20180730164137.GD17271@n2100.armlinux.org.uk>
- <73adc630-21cd-5b14-cb47-f1a58ee3bc83@axentia.se>
- <20180731074114.GF17271@n2100.armlinux.org.uk>
- <9d48e374-be2f-fbc0-ca92-1b7e1b68e358@axentia.se>
- <20180731092343.GH17271@n2100.armlinux.org.uk>
- <9bf5e0e9-c1e8-5af2-7fea-40f9618d4d52@axentia.se>
- <20180731111537.GJ17271@n2100.armlinux.org.uk>
- <59eeb1c4-163c-4fda-d51e-27f2f404fe3e@axentia.se>
- <20180801093528.GC30658@n2100.armlinux.org.uk>
-Message-ID: <1ad8d087-40a8-7a00-31cf-c4d34a9a12fb@axentia.se>
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Thu, 2 Aug 2018 11:55:56 +0530
+Subject: [PATCH v2] gpu/drm/exynos: Convert
+ drm_atomic_helper_suspend/resume()
+In-Reply-To: <20180726155459.GA30138@jordon-HP-15-Notebook-PC>
+References: <20180726155459.GA30138@jordon-HP-15-Notebook-PC>
+Message-ID: <CAFqt6zY6vcqrmztcEf9QYMXoHr08oTirSTNA7X6+5YvvoHRR4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-08-01 11:35, Russell King - ARM Linux wrote:
-> On Wed, Aug 01, 2018 at 11:01:12AM +0200, Peter Rosin wrote:
->> I don't think it's a problem with the atmel I2C driver. IIRC, the
->> tda998x driver issues the command a initiate the EDID read, but that
->> times out. So it appears to be the TDA19988 that fails to read the
->> EDID over the DDC bus? Which brings me to the double problem with the
->> scopes mentioned above...
-> 
-> It sounds like it.
-> 
-> It may be helpful to know that there are HDMI pass-through boards
-> available that give access to all the HDMI signals:
-> 
-> https://elabbay.myshopify.com/collections/camera
-> https://elabbay.myshopify.com/collections/camera/products/hdmi-af-af-v1a-hdmi-type-a-female-to-hdmi-type-a-male-pass-through-adapter-breakout-board
-> 
-> I've never bought from them, so please don't take this as a
-> recommendation - the fact that there seems to be no company details
-> on their site doesn't seem good, and as the whois for elabbay.com is
-> obscured also doesn't give me any confidence to buy from them.
+On Thu, Jul 26, 2018 at 9:24 PM, Souptick Joarder <jrdr.linux@gmail.com> wrote:
+> convert drm_atomic_helper_suspend/resume() to use
+> drm_mode_config_helper_suspend/resume().
+>
+> exynos_drm_fbdev_suspend/resume can be removed
+> as drm_mode_config_helper_suspend/resume has
+> implement the same in generic way.
+>
+> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
+> ---
+> v2: Address Inki Dae's comment. Remove
+>     ret variable from both suspend/resume
+>     function.
+>
 
-I still will not be able to inspect the DDC bus between the TDA19988
-and the buffer circuit (IP4786), but the gadget seems useful enough and
-it's not a shitload of money. We'll see how long it takes for it to get
-here...
+Any further comment on this patch ?
 
-Thanks for the pointer! Maybe :-)
-
-Cheers,
-Peter
+>  drivers/gpu/drm/exynos/exynos_drm_drv.c   | 26 ++++----------------------
+>  drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 17 -----------------
+>  drivers/gpu/drm/exynos/exynos_drm_fbdev.h | 10 ----------
+>  3 files changed, 4 insertions(+), 49 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+> index a81b4a5..46d28cd 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+> @@ -151,39 +151,21 @@ static void exynos_drm_postclose(struct drm_device *dev, struct drm_file *file)
+>  static int exynos_drm_suspend(struct device *dev)
+>  {
+>         struct drm_device *drm_dev = dev_get_drvdata(dev);
+> -       struct exynos_drm_private *private;
+>
+> -       if (pm_runtime_suspended(dev) || !drm_dev)
+> +       if (pm_runtime_suspended(dev))
+>                 return 0;
+>
+> -       private = drm_dev->dev_private;
+> -
+> -       drm_kms_helper_poll_disable(drm_dev);
+> -       exynos_drm_fbdev_suspend(drm_dev);
+> -       private->suspend_state = drm_atomic_helper_suspend(drm_dev);
+> -       if (IS_ERR(private->suspend_state)) {
+> -               exynos_drm_fbdev_resume(drm_dev);
+> -               drm_kms_helper_poll_enable(drm_dev);
+> -               return PTR_ERR(private->suspend_state);
+> -       }
+> -
+> -       return 0;
+> +       return drm_mode_config_helper_suspend(drm_dev);
+>  }
+>
+>  static int exynos_drm_resume(struct device *dev)
+>  {
+>         struct drm_device *drm_dev = dev_get_drvdata(dev);
+> -       struct exynos_drm_private *private;
+>
+> -       if (pm_runtime_suspended(dev) || !drm_dev)
+> +       if (pm_runtime_suspended(dev))
+>                 return 0;
+>
+> -       private = drm_dev->dev_private;
+> -       drm_atomic_helper_resume(drm_dev, private->suspend_state);
+> -       exynos_drm_fbdev_resume(drm_dev);
+> -       drm_kms_helper_poll_enable(drm_dev);
+> -
+> -       return 0;
+> +       return drm_mode_config_helper_resume(drm_dev);
+>  }
+>  #endif
+>
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> index 132dd52..918dd2c 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> @@ -270,20 +270,3 @@ void exynos_drm_fbdev_fini(struct drm_device *dev)
+>         private->fb_helper = NULL;
+>  }
+>
+> -void exynos_drm_fbdev_suspend(struct drm_device *dev)
+> -{
+> -       struct exynos_drm_private *private = dev->dev_private;
+> -
+> -       console_lock();
+> -       drm_fb_helper_set_suspend(private->fb_helper, 1);
+> -       console_unlock();
+> -}
+> -
+> -void exynos_drm_fbdev_resume(struct drm_device *dev)
+> -{
+> -       struct exynos_drm_private *private = dev->dev_private;
+> -
+> -       console_lock();
+> -       drm_fb_helper_set_suspend(private->fb_helper, 0);
+> -       console_unlock();
+> -}
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+> index b338472..6840b6a 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+> @@ -19,8 +19,6 @@
+>
+>  int exynos_drm_fbdev_init(struct drm_device *dev);
+>  void exynos_drm_fbdev_fini(struct drm_device *dev);
+> -void exynos_drm_fbdev_suspend(struct drm_device *drm);
+> -void exynos_drm_fbdev_resume(struct drm_device *drm);
+>
+>  #else
+>
+> @@ -39,14 +37,6 @@ static inline void exynos_drm_fbdev_restore_mode(struct drm_device *dev)
+>
+>  #define exynos_drm_output_poll_changed (NULL)
+>
+> -static inline void exynos_drm_fbdev_suspend(struct drm_device *drm)
+> -{
+> -}
+> -
+> -static inline void exynos_drm_fbdev_resume(struct drm_device *drm)
+> -{
+> -}
+> -
+>  #endif
+>
+>  #endif
+> --
+> 1.9.1
+>
