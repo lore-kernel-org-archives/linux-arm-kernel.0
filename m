@@ -1,36 +1,57 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu,  2 Aug 2018 15:01:31 +0200
-Subject: [PATCH 1/3] dt-bindings: usb: dwc2: add description for px30
-In-Reply-To: <20180802130133.4898-1-heiko@sntech.de>
-References: <20180802130133.4898-1-heiko@sntech.de>
-Message-ID: <20180802130133.4898-2-heiko@sntech.de>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu, 02 Aug 2018 15:01:41 +0200
+Subject: [PATCH 4/4] drm/meson: convert to the new canvas module
+In-Reply-To: <CAHStOZ6B-R7=5utGqb49OsFBsUsMVsn=WMrzNK8Wk-zcgbnPuA@mail.gmail.com>
+References: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
+ <20180801185128.23440-5-maxi.jourdan@wanadoo.fr>
+ <744700e43aed3880807f86abde0caf3df1127e60.camel@baylibre.com>
+ <CAHStOZ6B-R7=5utGqb49OsFBsUsMVsn=WMrzNK8Wk-zcgbnPuA@mail.gmail.com>
+Message-ID: <843e41de9fa7d5f87309ff4e0db2ed84a1153a4c.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Liang Chen <cl@rock-chips.com>
+On Thu, 2018-08-02 at 14:34 +0200, Maxime Jourdan wrote:
+> Hi Jerome,
+> 
+> 2018-08-02 10:39 GMT+02:00 Jerome Brunet <jbrunet@baylibre.com>:
+> > I looks like the consumer of your 'canvas' devices must know how the canvas
+> > device is organized internally. Maybe something better can be done ?
+> > 
+> > Your canvas driver could provide a consumer API, for example:
+> > meson_canvas_get(): to translate for struct device_node to whatever abstract
+> > pointer you would need.
+> > meson_canvas_alloc(), setup(), etc ...
+> > 
+> > ... This is just adding a bit of indirection but it would help hide the plumbing
+> > of your canvas driver from the consumers (and repeat this code in each). This
+> > might be usefull if you ever to make this canvas driver evolve.
+> 
+> Overall the inner workings are hidden as there is an ops struct
+> instead of public functions.
 
-This patch adds the compatible of dwc2 for PX30 SoCs.
+What I don't like is precisely that you need to expose this 'struct ops' to the
+consumer. I would prefer an API for this (it can be a 1:1 mapping). The canvas
+should remain some abstract object you get from DT.
 
-Signed-off-by: Liang Chen <cl@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-unchanged from it being part of the general px30 series
+IMO, this is the same as a reset, a syscon or whatever other phandle you get
+from DT. The consumer should not have to 'care' how it works (how data are
+organized), it should just use it.
 
- Documentation/devicetree/bindings/usb/dwc2.txt | 1 +
- 1 file changed, 1 insertion(+)
+Whatever you need to do to deal with your canvas phandle should (IMO) reside in
+your soc/amlogic/meson-canvas.c, and not be spread in the consumers.
 
-diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
-index 46da5f184460..6dc3c4a34483 100644
---- a/Documentation/devicetree/bindings/usb/dwc2.txt
-+++ b/Documentation/devicetree/bindings/usb/dwc2.txt
-@@ -6,6 +6,7 @@ Required properties:
-   - brcm,bcm2835-usb: The DWC2 USB controller instance in the BCM2835 SoC.
-   - hisilicon,hi6220-usb: The DWC2 USB controller instance in the hi6220 SoC.
-   - rockchip,rk3066-usb: The DWC2 USB controller instance in the rk3066 Soc;
-+  - "rockchip,px30-usb", "rockchip,rk3066-usb", "snps,dwc2": for px30 Soc;
-   - "rockchip,rk3188-usb", "rockchip,rk3066-usb", "snps,dwc2": for rk3188 Soc;
-   - "rockchip,rk3288-usb", "rockchip,rk3066-usb", "snps,dwc2": for rk3288 Soc;
-   - "lantiq,arx100-usb": The DWC2 USB controller instance in Lantiq ARX SoCs;
--- 
-2.17.0
+> 
+> I agree that the "fetch the node" boilerplate code could be put behind
+> a helper, but at the same time this code helps remind the developer
+> that there needs to be a canvas node in the dts, and that it has to be
+> linked in your own device node.
+
+This is why we have a DT documentation.
+
+And, as far as I understand amlogic's display and decoder stuff, you won't get
+very far w/o a canvas, so 'the developer' will be reminded fairly quickly ;)
+
+> 
+> I would like to keep it that way if that is okay with you.
+
+It's just my opinion, I'm not the one merging it ... :P
