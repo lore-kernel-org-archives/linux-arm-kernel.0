@@ -1,53 +1,65 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 02 Aug 2018 13:16:18 +0200
-Subject: [PATCH v2 3/5] dt-bindings: mfd: rk808: Add binding informations
- for RK809 and RK817.
-In-Reply-To: <1533023850-29004-4-git-send-email-tony.xie@rock-chips.com>
-References: <1533023850-29004-1-git-send-email-tony.xie@rock-chips.com>
- <1533023850-29004-4-git-send-email-tony.xie@rock-chips.com>
-Message-ID: <2820701.ErqR8ge6r7@phil>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu, 02 Aug 2018 13:21:23 +0200
+Subject: [PATCH 2/5] pinctrl: meson: Add support to set direction with a
+ secure monitor call
+In-Reply-To: <d319d871-ba93-ab1d-dae4-b44916161e85@baylibre.com>
+References: <1533117623-27856-1-git-send-email-narmstrong@baylibre.com>
+ <1533117623-27856-3-git-send-email-narmstrong@baylibre.com>
+ <CAFBinCBcUijFGdLoQwkzioX7MF0H_gH1rbcvxG+UWc1rA2pRiQ@mail.gmail.com>
+ <d319d871-ba93-ab1d-dae4-b44916161e85@baylibre.com>
+Message-ID: <acab5d8ab9eb871c616171c00814d1fec93af1e7.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Thu, 2018-08-02 at 09:52 +0200, Neil Armstrong wrote:
+> On 01/08/2018 22:23, Martin Blumenstingl wrote:
+> > Hi Neil,
+> > 
+> > On Wed, Aug 1, 2018 at 12:05 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
+> > > 
+> > > The Amlogic Meson GX and AXG SoCs needs to do a Secure Monitor call to
+> > > set the TEST_N pin direction.
+> > > This patch adds a "smc" boolean to the bank structure to differentiate
+> > > the TEST_N bank and call the Secure Monitor in the _input/_output functions.
+> > > 
+> > > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> > > ---
+> > >  drivers/pinctrl/meson/Kconfig         |  1 +
+> > >  drivers/pinctrl/meson/pinctrl-meson.c | 31 ++++++++++++++++++++++++++-----
+> > >  drivers/pinctrl/meson/pinctrl-meson.h | 10 +++++++++-
+> > >  3 files changed, 36 insertions(+), 6 deletions(-)
+> > > 
+> > > diff --git a/drivers/pinctrl/meson/Kconfig b/drivers/pinctrl/meson/Kconfig
+> > > index c80951d..1b90470 100644
+> > > --- a/drivers/pinctrl/meson/Kconfig
+> > > +++ b/drivers/pinctrl/meson/Kconfig
+> > > @@ -8,6 +8,7 @@ menuconfig PINCTRL_MESON
+> > >         select GPIOLIB
+> > >         select OF_GPIO
+> > >         select REGMAP_MMIO
+> > > +       select MESON_SM
+> > 
+> > I wonder why PINCTRL_MESON has to select MESON_SM - shouldn't
+> > PINCTRL_MESON_GXBB, PINCTRL_MESON_GXL and PINCTRL_MESON_AXG select it
+> > instead?
+> > selecting MESON_SM is probably no-op on Meson8 and Meson8b (which
+> > don't have the GX secure monitor), but I haven't tested it yet
 
-Am Dienstag, 31. Juli 2018, 09:57:28 CEST schrieb Tony Xie:
-> Add device tree bindings documentation for Rockchip's RK809 & RK817 PMIC.
+I'm not so sure about that. meson_sm_call() symbol is used in the common pinctrl
+code, so it should be selected when compiled even if meson8b is not going to use
+it in the end.
+
 > 
-> Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
-
-I don't see the devicetree binding maintainers listed in the recipient
-list, so adding them in the next iteration might increase your chances
-to get an Ack on the binding.
-
-scripts/get_maintainer.pl -f Documentation/devicetree/bindings lists
-
-Rob Herring <robh+dt@kernel.org>
-Mark Rutland <mark.rutland@arm.com>
-
-as the main dt maintainers.
-
-[...]
-
-> @@ -99,6 +147,13 @@ number as described in RK818 datasheet.
->  	- HDMI_SWITCH
->  	- OTG_SWITCH
->  
-> +There are three pins needed to config, named "gpio_ts" "gpio_gt" "gpio_slp".
-> +	The gpio_gt and gpio_ts pins support the gpio function.
-> +	The gpio_slp pin is for controlling the pmic states, as below:
-> +		- reset
-> +		- power down
-> +		- sleep
-> +
-
-Is this common for all rk8xx pmics or just the two new ones?
-As the paragraph above makes it sound like these are present on all
-and I didn't find mention of them in the datasheets for previous pmics
-I have.
-
-Also to me it is not clear in what way these should be used and I didn't
-find any mention of them at all in the rest of your series.
-
-
-Heiko
+> Hi Martin, you are right !
+> 
+> I will fix it on v2..
+> 
+> Neil
+> 
+> > 
+> > 
+> > Regards
+> > Martin
+> > 
+> 
+> 
