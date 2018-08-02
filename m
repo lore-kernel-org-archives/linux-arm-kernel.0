@@ -1,5 +1,5 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 2 Aug 2018 12:46:58 +0100
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Thu, 2 Aug 2018 13:48:04 +0200
 Subject: [RFC PATCH v2 5/6] spi: Add QuadSPI driver for Atmel SAMA5D2
 In-Reply-To: <6f9ca4f1-6809-2d7d-4d64-6869a4e413cb@exceet.de>
 References: <20180627131609.13681-1-bugalski.piotr@gmail.com>
@@ -8,30 +8,42 @@ References: <20180627131609.13681-1-bugalski.piotr@gmail.com>
  <20180801215733.4dfa3a95@bbrezillon>
  <20180802101742.GF9117@sirena.org.uk>
  <6f9ca4f1-6809-2d7d-4d64-6869a4e413cb@exceet.de>
-Message-ID: <20180802114658.GL9117@sirena.org.uk>
+Message-ID: <20180802134804.2352ee89@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 02, 2018 at 12:46:36PM +0200, Frieder Schrempf wrote:
+On Thu, 2 Aug 2018 12:46:36 +0200
+Frieder Schrempf <frieder.schrempf@exceet.de> wrote:
+
+> Hi Mark,
+> 
 > On 02.08.2018 12:17, Mark Brown wrote:
-
+> > On Wed, Aug 01, 2018 at 09:57:33PM +0200, Boris Brezillon wrote:  
+> >> Mark Brown <broonie@kernel.org> wrote:  
+> >   
+> >> 2/ Getting this patch [1] merged and implementing the ->get_name() hook
+> >>     in this driver so that SPI NOR devs declared to the MTD layer keep
+> >>     the same name after the transition to spi-mem and mtdparts= passed on
+> >>     the cmdline keep working. Without this in place we're likely to
+> >>     break a few setups :-/.  
+> >   
+> >> [1]https://patchwork.kernel.org/patch/10508693/  
+> > 
 > > I don't seem to have a copy of this patch...  not sure it was sent to
-> > me?
-
-> When I sent the patch I put you in cc. So if nothing went wrong you should
-> have it.
+> > me?  
+> 
+> When I sent the patch I put you in cc. So if nothing went wrong you 
+> should have it.
 > It is part of the SPI MEM conversion series for the FSL QSPI driver [1].
+> 
+> Boris made some remarks on documentation in v2, that I have fixed, but 
+> not sent out yet, as we have some blocking issues with the driver itself.
 
-Well, I can't find any references to it anywhere so yeah.
+I don't remember where we were stuck. Are you still waiting answers
+from Yogesh? Probably a good time to ping him if that's the case ;-).
 
-> So if you want I could send the patch separately so it can be applied with
-> the Atmel driver.
+> 
+> So if you want I could send the patch separately so it can be applied 
+> with the Atmel driver.
 
-I'm going to need a copy to review it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180802/534421f9/attachment.sig>
+Yes please, send a v3 for patch 1 and 2.
