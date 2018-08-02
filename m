@@ -1,138 +1,125 @@
-From: skannan@codeaurora.org (skannan at codeaurora.org)
-Date: Wed, 01 Aug 2018 15:57:52 -0700
-Subject: [PATCH v7 8/8] interconnect: Allow endpoints translation via DT
-In-Reply-To: <20180731161340.13000-9-georgi.djakov@linaro.org>
-References: <20180731161340.13000-1-georgi.djakov@linaro.org>
- <20180731161340.13000-9-georgi.djakov@linaro.org>
-Message-ID: <804925d5927ccb6927b16f7e9a4aa05c@codeaurora.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 2 Aug 2018 09:01:52 +0900
+Subject: [PATCH v13 03/16] s390, kexec_file: drop arch_kexec_mem_walk()
+In-Reply-To: <20180801102951.527cfc57@ThinkPad>
+References: <20180801075820.3753-1-takahiro.akashi@linaro.org>
+ <20180801075820.3753-4-takahiro.akashi@linaro.org>
+ <20180801102951.527cfc57@ThinkPad>
+Message-ID: <20180802000150.GN11258@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-07-31 09:13, Georgi Djakov wrote:
-> Currently we support only platform data for specifying the interconnect
-> endpoints. As now the endpoints are hard-coded into the consumer driver
-> this may lead to complications when a single driver is used by multiple
-> SoCs, which may have different interconnect topology.
-> To avoid cluttering the consumer drivers, introduce a translation 
-> function
-> to help us get the board specific interconnect data from device-tree.
-> 
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-> ---
->  drivers/interconnect/core.c  | 62 ++++++++++++++++++++++++++++++++++++
->  include/linux/interconnect.h |  7 ++++
->  2 files changed, 69 insertions(+)
-> 
-> diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
-> index 9fef180cf77e..d1b6adff0a3d 100644
-> --- a/drivers/interconnect/core.c
-> +++ b/drivers/interconnect/core.c
-> @@ -16,6 +16,7 @@
->  #include <linux/module.h>
->  #include <linux/mutex.h>
->  #include <linux/slab.h>
-> +#include <linux/of.h>
->  #include <linux/overflow.h>
->  #include <linux/uaccess.h>
-> 
-> @@ -251,6 +252,67 @@ static int apply_constraints(struct icc_path 
-> *path)
->  	return ret;
->  }
-> 
-> +struct icc_path *of_icc_get(struct device *dev, const char *name)
-> +{
-> +	struct device_node *np = NULL;
-> +	struct of_phandle_args src_args, dst_args;
-> +	u32 src_id, dst_id;
-> +	int idx = 0;
-> +	int ret;
-> +
-> +	if (!dev || !dev->of_node)
-> +		return ERR_PTR(-ENODEV);
-> +
-> +	np = dev->of_node;
-> +
-> +	/*
-> +	 * When the consumer DT node do not have "interconnects" property
-> +	 * return a NULL path to skip setting constraints.
-> +	 */
-> +	if (!of_find_property(np, "interconnects", NULL))
-> +		return NULL;
-> +
-> +	/*
-> +	 * We use a combination of phandle and specifier for endpoint. For 
-> now
-> +	 * lets support only global ids and extend this is the future if 
-> needed
-> +	 * without breaking DT compatibility.
-> +	 */
-> +	if (name) {
-> +		idx = of_property_match_string(np, "interconnect-names", name);
-> +		if (idx < 0)
-> +			return ERR_PTR(idx);
-> +	}
-> +
-> +	ret = of_parse_phandle_with_args(np, "interconnects",
-> +					 "#interconnect-cells", idx * 2,
-> +					 &src_args);
-> +	if (ret)
-> +		return ERR_PTR(ret);
-> +
-> +	of_node_put(src_args.np);
-> +
-> +	if (!src_args.args_count || src_args.args_count > 1)
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	src_id = src_args.args[0];
-> +
-> +	ret = of_parse_phandle_with_args(np, "interconnects",
-> +					 "#interconnect-cells", idx * 2 + 1,
-> +					 &dst_args);
-> +	if (ret)
-> +		return ERR_PTR(ret);
-> +
-> +	of_node_put(dst_args.np);
-> +
-> +	if (!dst_args.args_count || dst_args.args_count > 1)
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	dst_id = dst_args.args[0];
-> +
-> +	return icc_get(dev, src_id, dst_id);
-> +}
-> +EXPORT_SYMBOL_GPL(of_icc_get);
-> +
->  /**
->   * icc_set() - set constraints on an interconnect path between two 
-> endpoints
->   * @path: reference to the path returned by icc_get()
-> diff --git a/include/linux/interconnect.h 
-> b/include/linux/interconnect.h
-> index 593215371fd6..ae6744da9bc2 100644
-> --- a/include/linux/interconnect.h
-> +++ b/include/linux/interconnect.h
-> @@ -17,6 +17,7 @@ struct device;
-> 
->  struct icc_path *icc_get(struct device *dev, const int src_id,
->  			 const int dst_id);
-> +struct icc_path *of_icc_get(struct device *dev, const char *name);
->  void icc_put(struct icc_path *path);
->  int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
-> 
-> @@ -28,6 +29,12 @@ static inline struct icc_path *icc_get(struct
-> device *dev, const int src_id,
->  	return NULL;
->  }
-> 
-> +static inline struct icc_path *of_icc_get(struct device *dev,
-> +					  const char *name)
-> +{
-> +	return NULL;
-> +}
-> +
+Hi,
 
-Might want to return PTR(-ENODEV) or some error code so that client 
-doesn't have to do NULL check AND an error check?
+On Wed, Aug 01, 2018 at 10:29:51AM +0200, Philipp Rudo wrote:
+> Hey Akashi,
+> 
+> I kept thinking about this patch and remembered why I didn't made the change
+> you are suggesting now.
 
--Saravana
+Hmm.
+
+> The problem is when you only check for kbuf->mem you are excluding address 0,
+> which might be a valid address to load the kernel to. On s390 this is actually
+> done when the kernel is not loaded via a boot loader. For kexec_file however,
+> we cut off the first few kB of the image and jump directly to 'startup'. So
+> checking for !0 does not cause a problem here.
+
+Yeah, as Dave(RedHat) described, all the current kexec-capable architectures,
+except arm64, implicitly initialize kbuf.mem to zero with "kbuf = { ... }"
+initializer. So surely my change would not break anything on the existing code.
+On the other hand, I also see your concern here.
+
+> Anyway, the long term safer solution would be something like
+> 
+> #define KEXEC_BUF_MEM_UNKNOWN (-1UL)
+> 
+> for architectures to tell common code to search a fitting mem hole.
+
+This would require the existing code on every arch to be modified, which
+I think should be avoided if possible. Instead,
+we'd better define in linux/kexec.h:
+  #ifndef KEXEC_BUF_MEM_UNKNOWN
+  #define KEXEC_BUF_MEM_UNKNOWN 0
+  #endif
+and then check for kbuf in kexec_locate_mem_hole():
+  if (kbuf->mem != KEXEC_BUF_MEM_UNKNOWN)
+        return 0;
+  ...
+
+This way if some arch wants to treat *zero* as a valid address, it can
+redefine this macro in arch/asm/kexec.h.
+
+Thanks,
+-Takahiro AKASHI
+
+> 
+> Back then I didn't do the change because I had the other workaround, which
+> didn't require a common code change. But when you are touching the code now it
+> is worth thinking about it.
+> 
+> Just wanted to let you know
+> Philipp
+> 
+> 
+> On Wed,  1 Aug 2018 16:58:07 +0900
+> AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> 
+> > Since s390 already knows where to locate buffers, calling
+> > arch_kexec_mem_walk() has no sense. So we can just drop it as kbuf->mem
+> > indicates this while all other architectures sets it to 0 initially.
+> > 
+> > This change is a preparatory work for the next patch, where all the
+> > variant memory walks, either on system resource or memblock, will be
+> > put in one common place so that it will satisfy all the architectures'
+> > need.
+> > 
+> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > Reviewed-by: Philipp Rudo <prudo@linux.ibm.com>
+> > Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
+> > Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+> > Cc: Dave Young <dyoung@redhat.com>
+> > Cc: Vivek Goyal <vgoyal@redhat.com>
+> > Cc: Baoquan He <bhe@redhat.com>
+> > ---
+> >  arch/s390/kernel/machine_kexec_file.c | 10 ----------
+> >  kernel/kexec_file.c                   |  4 ++++
+> >  2 files changed, 4 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/arch/s390/kernel/machine_kexec_file.c b/arch/s390/kernel/machine_kexec_file.c
+> > index f413f57f8d20..32023b4f9dc0 100644
+> > --- a/arch/s390/kernel/machine_kexec_file.c
+> > +++ b/arch/s390/kernel/machine_kexec_file.c
+> > @@ -134,16 +134,6 @@ int kexec_file_add_initrd(struct kimage *image, struct s390_load_data *data,
+> >  	return ret;
+> >  }
+> >  
+> > -/*
+> > - * The kernel is loaded to a fixed location. Turn off kexec_locate_mem_hole
+> > - * and provide kbuf->mem by hand.
+> > - */
+> > -int arch_kexec_walk_mem(struct kexec_buf *kbuf,
+> > -			int (*func)(struct resource *, void *))
+> > -{
+> > -	return 1;
+> > -}
+> > -
+> >  int arch_kexec_apply_relocations_add(struct purgatory_info *pi,
+> >  				     Elf_Shdr *section,
+> >  				     const Elf_Shdr *relsec,
+> > diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
+> > index 63c7ce1c0c3e..bf39df5e5bb9 100644
+> > --- a/kernel/kexec_file.c
+> > +++ b/kernel/kexec_file.c
+> > @@ -534,6 +534,10 @@ int kexec_locate_mem_hole(struct kexec_buf *kbuf)
+> >  {
+> >  	int ret;
+> >  
+> > +	/* Arch knows where to place */
+> > +	if (kbuf->mem)
+> > +		return 0;
+> > +
+> >  	ret = arch_kexec_walk_mem(kbuf, locate_mem_hole_callback);
+> >  
+> >  	return ret == 1 ? 0 : -EADDRNOTAVAIL;
+> 
