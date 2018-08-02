@@ -1,64 +1,60 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 3 Aug 2018 04:25:30 +0800
-Subject: [PATCH v8 1/3] dt-bindings: net: bluetooth: Add mediatek-bluetooth
-In-Reply-To: <cover.1533241009.git.sean.wang@mediatek.com>
-References: <cover.1533241009.git.sean.wang@mediatek.com>
-Message-ID: <82d9bef756cd6b9d4687ffb8e4f501ab5a7d12f7.1533241009.git.sean.wang@mediatek.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Thu, 2 Aug 2018 22:42:53 +0200
+Subject: [PATCH 2/5] pinctrl: meson: Add support to set direction with a
+ secure monitor call
+In-Reply-To: <acab5d8ab9eb871c616171c00814d1fec93af1e7.camel@baylibre.com>
+References: <1533117623-27856-1-git-send-email-narmstrong@baylibre.com>
+ <1533117623-27856-3-git-send-email-narmstrong@baylibre.com>
+ <CAFBinCBcUijFGdLoQwkzioX7MF0H_gH1rbcvxG+UWc1rA2pRiQ@mail.gmail.com>
+ <d319d871-ba93-ab1d-dae4-b44916161e85@baylibre.com>
+ <acab5d8ab9eb871c616171c00814d1fec93af1e7.camel@baylibre.com>
+Message-ID: <CAFBinCAAcqiJAwBMr2_7V90beFwq9xkPBnBdKB8oPsMKXU_-HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On Thu, Aug 2, 2018 at 1:21 PM Jerome Brunet <jbrunet@baylibre.com> wrote:
+>
+> On Thu, 2018-08-02 at 09:52 +0200, Neil Armstrong wrote:
+> > On 01/08/2018 22:23, Martin Blumenstingl wrote:
+> > > Hi Neil,
+> > >
+> > > On Wed, Aug 1, 2018 at 12:05 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
+> > > >
+> > > > The Amlogic Meson GX and AXG SoCs needs to do a Secure Monitor call to
+> > > > set the TEST_N pin direction.
+> > > > This patch adds a "smc" boolean to the bank structure to differentiate
+> > > > the TEST_N bank and call the Secure Monitor in the _input/_output functions.
+> > > >
+> > > > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> > > > ---
+> > > >  drivers/pinctrl/meson/Kconfig         |  1 +
+> > > >  drivers/pinctrl/meson/pinctrl-meson.c | 31 ++++++++++++++++++++++++++-----
+> > > >  drivers/pinctrl/meson/pinctrl-meson.h | 10 +++++++++-
+> > > >  3 files changed, 36 insertions(+), 6 deletions(-)
+> > > >
+> > > > diff --git a/drivers/pinctrl/meson/Kconfig b/drivers/pinctrl/meson/Kconfig
+> > > > index c80951d..1b90470 100644
+> > > > --- a/drivers/pinctrl/meson/Kconfig
+> > > > +++ b/drivers/pinctrl/meson/Kconfig
+> > > > @@ -8,6 +8,7 @@ menuconfig PINCTRL_MESON
+> > > >         select GPIOLIB
+> > > >         select OF_GPIO
+> > > >         select REGMAP_MMIO
+> > > > +       select MESON_SM
+> > >
+> > > I wonder why PINCTRL_MESON has to select MESON_SM - shouldn't
+> > > PINCTRL_MESON_GXBB, PINCTRL_MESON_GXL and PINCTRL_MESON_AXG select it
+> > > instead?
+> > > selecting MESON_SM is probably no-op on Meson8 and Meson8b (which
+> > > don't have the GX secure monitor), but I haven't tested it yet
+>
+> I'm not so sure about that. meson_sm_call() symbol is used in the common pinctrl
+> code, so it should be selected when compiled even if meson8b is not going to use
+> it in the end.
+unfortunately MESON_SM depends on ARM64_4K_PAGES so it can't be
+enabled for the 32-bit SoCs
+any ideas how to solve this?
 
-Add binding document for a SoC built-in device using MediaTek protocol.
-Which could be found on MT7622 SoC or other similar MediaTek SoCs.
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/net/mediatek-bluetooth.txt | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
-
-diff --git a/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
-new file mode 100644
-index 0000000..14ceb2a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
-@@ -0,0 +1,35 @@
-+MediaTek SoC built-in Bluetooth Devices
-+==================================
-+
-+This device is a serial attached device to BTIF device and thus it must be a
-+child node of the serial node with BTIF. The dt-bindings details for BTIF
-+device can be known via Documentation/devicetree/bindings/serial/8250.txt.
-+
-+Required properties:
-+
-+- compatible:	Must be
-+		  "mediatek,mt7622-bluetooth": for MT7622 SoC
-+- clocks:	Should be the clock specifiers corresponding to the entry in
-+		clock-names property.
-+- clock-names:	Should contain "ref" entries.
-+- power-domains: Phandle to the power domain that the device is part of
-+
-+Example:
-+
-+	btif: serial at 1100c000 {
-+		compatible = "mediatek,mt7622-btif",
-+			     "mediatek,mtk-btif";
-+		reg = <0 0x1100c000 0 0x1000>;
-+		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_BTIF_PD>;
-+		clock-names = "main";
-+		reg-shift = <2>;
-+		reg-io-width = <4>;
-+
-+		bluetooth {
-+			compatible = "mediatek,mt7622-bluetooth";
-+			power-domains = <&scpsys MT7622_POWER_DOMAIN_WB>;
-+			clocks = <&clk25m>;
-+			clock-names = "ref";
-+		};
-+	};
--- 
-2.7.4
+Regards
+Martin
