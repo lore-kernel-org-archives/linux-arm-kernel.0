@@ -1,110 +1,137 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Thu, 2 Aug 2018 11:45:04 +0200
-Subject: [PATCH v7 2/3] Bluetooth: mediatek: Add protocol support for
- MediaTek serial devices
-In-Reply-To: <1533199720.3472.136.camel@mtkswgap22>
-References: <cover.1533056925.git.sean.wang@mediatek.com>
- <c92ed10cf16f36d9a3b390e864af92e2dfe7b771.1533056925.git.sean.wang@mediatek.com>
- <1707FFA1-A294-4A95-A3BF-0910CE455232@holtmann.org>
- <1533192799.3472.122.camel@mtkswgap22>
- <FF45A90A-F9F1-47CB-AB1F-1E92BF587FBE@holtmann.org>
- <1533199720.3472.136.camel@mtkswgap22>
-Message-ID: <9526E5D9-50BA-4D57-80F5-083DB7D28AFE@holtmann.org>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Thu, 2 Aug 2018 11:47:03 +0200
+Subject: [PATCH v9 4/4] mailbox: Add support for i.MX messaging unit
+In-Reply-To: <4d6931be-8caa-5168-d980-40dbe949386c@mentor.com>
+References: <20180802072325.22991-1-o.rempel@pengutronix.de>
+ <20180802072325.22991-5-o.rempel@pengutronix.de>
+ <4d6931be-8caa-5168-d980-40dbe949386c@mentor.com>
+Message-ID: <df93c03d-a982-2aa4-f3eb-11caa4817dab@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+Hi Vladimir,
 
->>>>> +
->>>>> +static int mtk_hci_wmt_sync(struct hci_dev *hdev, u8 op, u8 flag, u16 plen,
->>>>> +			    const void *param)
->>>>> +{
->>>>> +	struct mtk_hci_wmt_cmd wc;
->>>>> +	struct mtk_wmt_hdr *hdr;
->>>>> +	struct sk_buff *skb;
->>>>> +	u32 hlen;
->>>>> +
->>>>> +	hlen = sizeof(*hdr) + plen;
->>>>> +	if (hlen > 255)
->>>>> +		return -EINVAL;
->>>>> +
->>>>> +	hdr = (struct mtk_wmt_hdr *)&wc;
->>>>> +	hdr->dir = 1;
->>>>> +	hdr->op = op;
->>>>> +	hdr->dlen = cpu_to_le16(plen + 1);
->>>>> +	hdr->flag = flag;
->>>>> +	memcpy(wc.data, param, plen);
->>>>> +
->>>>> +	atomic_inc(&hdev->cmd_cnt);
->>>> 
->>>> Why are you doing this one. It will need a comment here if really needed. However I doubt that this is needed. You are only using it from hdev->setup and hdev->shutdown callbacks.
->>>> 
->>> 
->>> An increment on cmd_cnt is really needed because hci_cmd_work would check whether cmd_cnt is positive and then has a decrement on cmd_cnt before a packet is being sent out.
->>> 
->>> okay will add a comment.
->> 
->> but you are in ->setup callback this time. So if you need this, then all the other ->setup routines would actually fail as well. Either this is leftover from when you did things in ->probe or ->open or this is some thing we might better fix properly in the core instead of papering over it. Can you recheck if this is really needed.
->> 
-> 
-> I added a counter print and the counter increments as below
-> 
-> 	/* atomic_inc(&hdev->cmd_cnt); */
->        pr_info("cmd_cnt = %d\n" , atomic_read(&hdev->cmd_cnt));
-> 
->        skb = __hci_cmd_sync_ev(hdev, 0xfc6f, hlen, &wc, HCI_VENDOR_PKT,
->                                HCI_INIT_TIMEOUT);
-> 
-> and the log show up that 
-> 
-> 
-> [  334.049156] Bluetooth: hci0: command 0xfc6f tx timeout
-> [  334.054840] cmd_cnt = 0
-> [  336.065076] Bluetooth: hci0: command 0xfc6f tx timeout
-> [  336.070795] cmd_cnt = 0
-> [  338.080997] Bluetooth: hci0: command 0xfc6f tx timeout
-> [  338.086683] cmd_cnt = 0
-> [  340.096907] Bluetooth: hci0: command 0xfc6f tx timeout
-> [  340.102609] cmd_cnt = 0
-> [  342.112824] Bluetooth: hci0: command 0xfc6f tx timeout
-> [  342.118520] cmd_cnt = 0
-> [  344.128747] Bluetooth: hci0: command 0xfc6f tx timeout
-> [  344.134454] cmd_cnt = 0
-> [  346.144667] Bluetooth: hci0: command 0xfc6f tx timeout
-> [  346.150372] cmd_cnt = 0
-> 
-> 
-> The packet is dropped by hci_cmd_work at [1], so I also wondered why the
-> other vendor driver works, it seems the counter needs to be incremented
-> before every skb is being queued to cmd_q.
-> 
-> 4257 static void hci_cmd_work(struct work_struct *work)
-> 4258 {
-> 4259         struct hci_dev *hdev = container_of(work, struct hci_dev, cmd_work);
-> 4260         struct sk_buff *skb;
-> 4261
-> 4262         BT_DBG("%s cmd_cnt %d cmd queued %d", hdev->name,
-> 4263                atomic_read(&hdev->cmd_cnt), skb_queue_len(&hdev->cmd_q));
-> 4264
-> 4265         /* Send queued commands */
-> 
-> [1]
-> 4266         if (atomic_read(&hdev->cmd_cnt)) { /* dropped when cmd_cnt is zero */
-> 4267                 skb = skb_dequeue(&hdev->cmd_q);
-> 4268                 if (!skb)
-> 4269                         return;
-> 4270
-> 4271                 kfree_skb(hdev->sent_cmd);
-> 4272
-> 4273                 hdev->sent_cmd = skb_clone(skb, GFP_KERNEL);
-> 4274                 if (hdev->sent_cmd) {
-> 4275                         atomic_dec(&hdev->cmd_cnt);  /* cmd_cnt-- */
-> 4276                         hci_send_frame(hdev, skb);
+thank you for review.
 
-actually the command also needs to better go via the raw_q anyway since it doesn?t come back with the cmd status or cmd complete. You have it waiting for a vendor event. Maybe with is something we need to consider with __hci_cmd_sync_ev anyway.
+Jassi, Dong, any other comments? If no, i'll send tomorrow updated version.
 
-Johan would know best since he wrote that code. Anyway, we should fix that in the core and not have you hack around it.
+On 02.08.2018 09:54, Vladimir Zapolskiy wrote:
+> Hi Oleksij,
+> 
+> two more nitpickings fro my side.
+> 
+> On 08/02/2018 10:23 AM, Oleksij Rempel wrote:
+>> The i.MX Messaging Unit is a two side block which allows applications
+>> implement communication over this sides.
+>>
+>> The MU includes the following features:
+>> - Messaging control by interrupts or by polling
+>> - Four general-purpose interrupt requests reflected to the other side
+>> - Three general-purpose flags reflected to the other side
+>> - Four receive registers with maskable interrupt
+>> - Four transmit registers with maskable interrupt
+>>
+>> Reviewed-by: Vladimir Zapolskiy <vz@mleia.com>
+>> Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
+>> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> 
+> [snip]
+> 
+>> +static irqreturn_t imx_mu_isr(int irq, void *p)
+>> +{
+>> +	struct mbox_chan *chan = p;
+>> +	struct imx_mu_priv *priv = to_imx_mu_priv(chan->mbox);
+>> +	struct imx_mu_con_priv *cp = chan->con_priv;
+>> +	u32 val, ctrl, dat;
+>> +
+>> +	ctrl = imx_mu_read(priv, IMX_MU_xCR);
+>> +	val = imx_mu_read(priv, IMX_MU_xSR);
+>> +
+>> +	switch (cp->type) {
+>> +	case IMX_MU_TYPE_TX:
+>> +		val &= IMX_MU_xSR_TEn(cp->idx) &
+>> +			(ctrl & IMX_MU_xCR_TIEn(cp->idx));
+>> +		break;
+>> +	case IMX_MU_TYPE_RX:
+>> +		val &= IMX_MU_xSR_RFn(cp->idx) &
+>> +			(ctrl & IMX_MU_xCR_RIEn(cp->idx));
+>> +		break;
+>> +	case IMX_MU_TYPE_RXDB:
+>> +		val &= IMX_MU_xSR_GIPn(cp->idx) &
+>> +			(ctrl & IMX_MU_xCR_GIEn(cp->idx));
+>> +		break;
+>> +	default:
+>> +		break;
+>> +	}
+>> +
+>> +	if (!val) {
+>> +		return IRQ_NONE;
+>> +	} else if (val == IMX_MU_xSR_TEn(cp->idx)) {
+> 
+> Please drop the 'else' branch above.
+> 
+> Here you can either just start from a new 'if', or all together drop 'if (!val)'
+> and return IRQ_NONE at the end of the if-else construction.
+> 
+>> +		imx_mu_xcr_rmw(priv, 0, IMX_MU_xCR_TIEn(cp->idx));
+>> +		mbox_chan_txdone(chan, 0);
+>> +	} else if (val == IMX_MU_xSR_RFn(cp->idx)) {
+>> +		dat = imx_mu_read(priv, IMX_MU_xRRn(cp->idx));
+>> +		mbox_chan_received_data(chan, (void *)&dat);
+>> +	} else if (val == IMX_MU_xSR_GIPn(cp->idx)) {
+>> +		imx_mu_write(priv, IMX_MU_xSR_GIPn(cp->idx), IMX_MU_xSR);
+>> +		mbox_chan_received_data(chan, NULL);
+>> +	} else {
+>> +		dev_warn_ratelimited(priv->dev, "Not handled interrupt\n");
+>> +		return IRQ_NONE;
+>> +	}
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+> 
+> [snip]
+> 
+>> +	for (i = 0; i < IMX_MU_CHANS; i++) {
+>> +		struct imx_mu_con_priv *cp = &priv->con_priv[i];
+>> +
+>> +		cp->idx = i % 4;
+>> +		cp->type = (i - cp->idx) >> 2;
+> 
+> cp->type = i >> 2;
+> 
+>> +		cp->chan = &priv->mbox_chans[i];
+>> +		priv->mbox_chans[i].con_priv = cp;
+>> +		snprintf(cp->irq_desc, sizeof(cp->irq_desc),
+>> +			 "imx_mu_chan[%i-%i]", cp->type, cp->idx);
+>> +	}
+>> +
+>> +	priv->side_b = of_property_read_bool(np, "fsl,mu-side-b");
+>> +
+>> +	spin_lock_init(&priv->xcr_lock);
+>> +
+>> +	priv->mbox.dev = dev;
+>> +	priv->mbox.ops = &imx_mu_ops;
+>> +	priv->mbox.chans = priv->mbox_chans;
+>> +	priv->mbox.num_chans = IMX_MU_CHANS;
+>> +	priv->mbox.of_xlate = imx_mu_xlate;
+>> +	priv->mbox.txdone_irq = true;
+>> +
+>> +	platform_set_drvdata(pdev, priv);
+>> +
+>> +	imx_mu_init_generic(priv);
+>> +
+>> +	return mbox_controller_register(&priv->mbox);
+>> +}
+> 
+> --
+> Best wishes,
+> Vladimir
+> 
 
-Regards
-
-Marcel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180802/60e6ef56/attachment.sig>
