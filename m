@@ -1,34 +1,33 @@
-From: alex.bou9@gmail.com (Alex Bounine)
-Date: Thu, 2 Aug 2018 10:16:48 -0400
-Subject: [RESEND PATCH 6/6] arm64: enable RapidIO menu in Kconfig
-In-Reply-To: <20180802140033.GH38497@guest228.east.isi.edu>
-References: <20180731142954.30345-1-acolin@isi.edu>
- <20180731142954.30345-7-acolin@isi.edu>
- <20180801095404.GA17585@infradead.org>
- <fad8661c-cd8c-3a9c-ca03-5d2f63893a24@gmail.com>
- <CAMuHMdVDra1MKcuuD0SqEYXSggr0iVFcbcjL33z7JuiE1_y8yw@mail.gmail.com>
- <20180802134544.GG38497@guest228.east.isi.edu>
- <20180802135421.GA13512@infradead.org>
- <20180802140033.GH38497@guest228.east.isi.edu>
-Message-ID: <D6EE6CE1-FB11-41EB-B787-A093D26CE3E3@gmail.com>
+From: cl@linux.com (Christopher Lameter)
+Date: Thu, 2 Aug 2018 14:23:34 +0000
+Subject: [RFC 1/2] slub: Avoid trying to allocate memory on offline nodes
+In-Reply-To: <20180801200418.1325826-2-jeremy.linton@arm.com>
+References: <20180801200418.1325826-1-jeremy.linton@arm.com>
+ <20180801200418.1325826-2-jeremy.linton@arm.com>
+Message-ID: <01000164fb05bba7-1804e794-a08d-4ee0-b842-c44c89647716-000000@email.amazonses.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I will experiment with this idea.
-Please keep me in CC as well.
+On Wed, 1 Aug 2018, Jeremy Linton wrote:
 
-Sent from my iPad
+> diff --git a/mm/slub.c b/mm/slub.c
+> index 51258eff4178..e03719bac1e2 100644
+> --- a/mm/slub.c
+> +++ b/mm/slub.c
+> @@ -2519,6 +2519,8 @@ static void *___slab_alloc(struct kmem_cache *s, gfp_t gfpflags, int node,
+>  		if (unlikely(!node_match(page, searchnode))) {
+>  			stat(s, ALLOC_NODE_MISMATCH);
+>  			deactivate_slab(s, page, c->freelist, c);
+> +			if (!node_online(searchnode))
+> +				node = NUMA_NO_NODE;
+>  			goto new_slab;
+>  		}
+>  	}
+>
 
-> On Aug 2, 2018, at 10:00 AM, Alexei Colin <acolin@isi.edu> wrote:
-> 
->> On Thu, Aug 02, 2018 at 06:54:21AM -0700, Christoph Hellwig wrote:
->>> On Thu, Aug 02, 2018 at 09:45:44AM -0400, Alexei Colin wrote:
->>> If I move RapidIO option to drivers/Kconfig, then it won't appear under
->>> the Bus Options/System Support menu, along with other choices for the
->>> system bus (PCI, PCMCIA, ISA, TC, ...).
->> 
->> It's not like anyone cares.  And FYI, moving all those to
->> drivers/Kconfig is osmething I will submit for the next merge window.
-> 
-> Ok, I would appreciate a CC on that patch. After it lands, if
-> there is time, I'll resubmit a rebased version of this patch.
+Would it not be better to implement this check in the page allocator?
+There is also the issue of how to fallback to the nearest node.
+
+NUMA_NO_NODE should fallback to the current memory allocation policy but
+it seems by inserting it here you would end up just with the default node
+for the processor.
