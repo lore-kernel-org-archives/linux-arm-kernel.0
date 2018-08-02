@@ -1,197 +1,216 @@
-From: starnight@g.ncu.edu.tw (Jian-Hong Pan)
-Date: Thu, 2 Aug 2018 15:52:21 +0800
-Subject: [RFC net-next 00/15] net: A socket API for LoRa
-In-Reply-To: <BY1PR02MB11143134B9ABAC9C9929A9C4E7530@BY1PR02MB1114.namprd02.prod.outlook.com>
-References: <20180701110804.32415-1-afaerber@suse.de>
- <BY1PR02MB11147C7443AB9623D6B65798E75A0@BY1PR02MB1114.namprd02.prod.outlook.com>
- <e08cdcfb-207f-bd73-2afd-f775810b72b7@suse.de>
- <BY1PR02MB11143134B9ABAC9C9929A9C4E7530@BY1PR02MB1114.namprd02.prod.outlook.com>
-Message-ID: <CAC=mGzg0uP6ddm-kjev6JAH=GrKX9bT6s2canFOjKsC4rCcVAQ@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 2 Aug 2018 10:03:06 +0200
+Subject: [GIT PULL 00/21] perf/core improvements and fixes
+In-Reply-To: <20180801213648.4814-1-acme@kernel.org>
+References: <20180801213648.4814-1-acme@kernel.org>
+Message-ID: <20180802080306.GA30142@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-07-18 19:28 GMT+08:00 Ben Whitten <Ben.Whitten@lairdtech.com>:
->> Subject: Re: [RFC net-next 00/15] net: A socket API for LoRa
->>
->> + linux-wireless + Stefan + Seth
->>
->> Am 11.07.2018 um 17:21 schrieb Ben Whitten:
->> >> This patchset is clearly not ready for merging, but is being
->> >> submitted for
->> >> discussion, as requested by Jiri, in particular of the design
->> >> choices:
->> >>
->> >> 1) PF_LORA/AF_LORA and associated identifiers are
->> >> proposed to represent
->> >>    this technology. While for an SX1276 - case a) above - it
->> >> might work to
->> >>    layer LoRaWAN as a protocol option for PF_LORA and
->> add
->> >> LoRaWAN address
->> >>    fields to the union in my sockaddr_lora, how would that
->> >> work for devices
->> >>    that only support LoRaWAN but not pure LoRa? Do we
->> >> need both AF_LORA and
->> >>    AF_LORAWAN, or just a separate ETH_P_LORAWAN or
->> >> ARPHRD_LORAWAN?
->> >>
->> >> 2) PF_LORA is used with SOCK_DGRAM here. The
->> >> assumption is that RAW mode
->> >>    would be DGRAM plus preamble plus optional
->> checksum.
->> >>
->> >> 3) Only the transmit path is partially implemented
->> already.
->> >> The assumption
->> >>    is that the devices should go into receive mode by
->> default
->> >> and only
->> >>    interrupt that when asked to transmit.
->> >>
->> >> 4) Some hardware settings need to be supplied
->> externally,
->> >> such as the radio
->> >>    frequency for some modules, but many others can be
->> >> runtime-configured,
->> >>    such as Spreading Factor, Bandwidth, Sync Word, or
->> which
->> >> antenna to use.
->> >>    What settings should be implemented as socket option
->> vs.
->> >> netlink layer
->> >>    vs. ioctl vs. sysfs? What are the criteria to apply?
->> >>
->> >> 5) Many of the modules support multiple modes, such as
->> >> LoRa, LoRaWAN and FSK.
->> >>    Lacking a LoRaWAN implementation, I am currently
->> >> switching them into LoRa
->> >>    mode at probe time wherever possible. How do we
->> deal
->> >> with that properly?
->> >>
->> >>   a) Is there any precedence from the Wifi world for
->> >> dynamically selecting
->> >>      between our own trusted Open Source
->> implementation
->> >> vs. hardware/firmware
->> >>      accelerated and/or certified implementations?
->> >>
->> >>   b) Would a proof of concept for FSK (non-LoRa) modes
->> be
->> >> required for
->> >>      merging any LoRa driver for chipsets that support
->> both?
->> >> Or is there any
->> >>      facility or design guidelines that would allow us to
->> focus
->> >> on LoRa and
->> >>      LoRaWAN and leave non-LoRa radio modes to later
->> >> contributors?
->> >
->> > Down the line I think we should also plan for a CRDA style
->> regdb somewhere in the path for raw LoRa transceivers
->> operating as softMAC, much like with WiFi.
->>
->> Yes, I had raised the topic of wireless-regdb for Stefan's
->> conference -
->> currently it seems to only cover 2.4 GHz, 5 GHz and 60 GHz.
->> Not sure if
->> we can easily extend that to cover 433 MHz, 868 MHz, 915
->> MHz and 923 MHz
->> bands or whether we'd just need something similar... Is
->> 802.15.4 able to
->> share this database with Wifi?
->
-> Well the README in the wireless-regdb doesn't bind itself to 80211, there are references to the other ETSI EN specs so this would be the place rather than duplicating.
-> There would need a bit of additional information to capture duty-cycle requirements, however the SRD spec states the maximum bandwidths can be 'The whole band', so with a flag set we could hijack this band information for duty-cycle.
-> I am unsure if 802.15.4 uses this database, most of the naming seems geared towards 80211, nl80211, cfg80211 so perhaps we need our own versions of these with a common component, I hope the maintainers can give some guidance here.
->
->> An argument to share with Wifi might be that Semtech's
->> SX1280 and SX1281
->> 2.4 GHz transceivers claim to support LoRa modulation, too.
->> Having two
->> different regulatory DBs interact with LoRa drivers seems a
->> bad idea,
->> and duplicating 2.4 GHz into a new DB doesn't sound
->> appealing either.
->
-> Well I'm not sure if the modulation affects regulatory information, just bands, power, and techniques like DFS.
-> As these chips are 2.4GHz only I expect they are bound by the existing regulatory information we would just need a path to access it.
->
->> https://www.semtech.com/products/wireless-rf/24-ghz-
->> transceivers
->>
->> Meanwhile my attempt to play with netlink during SUSE
->> Hackweek has been
->> going slow and I could use some guidance or a volunteer to
->> contribute: I
->> have a bare skeleton of registration, commands, attributes
->> and multicast
->> groups, but no plan yet how to connect that to the actual
->> drivers to
->> query or apply the settings...
->
-> Happy to help, I will be starting from zero on netlink but I can contribute my existing work incorporating Marks comments for sx1301 etal.
->
->> https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/li
->> nux-lora.git/tree/net/lora/netlink.c?h=lora-next
 
-Is this the repository used for the LoRa subsystem now?!!!
-If it is, than great!
+* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
 
-As the previous mails, I am trying to implement the LoRaWAN
-specification as the soft MAC as the MAC layer over LoRa PHY.
-This is the the talk about LoRaWAN class module I gave in Netdev Conf
-https://www.slideshare.net/chienhungpan/lorawan-class-module-and-subsystem
+> Hi Ingo,
+> 
+> 	Please consider pulling, contains a recently merged
+> tip/perf/urgent,
+> 
+> - Arnaldo
+> 
+> Test results at the end of this message, as usual.
+> 
+> The following changes since commit c2586cfbb905939b79b49a9121fb0a59a5668fd6:
+> 
+>   Merge remote-tracking branch 'tip/perf/urgent' into perf/core (2018-07-31 09:55:45 -0300)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-core-for-mingo-4.19-20180801
+> 
+> for you to fetch changes up to b912885ab75c7c8aa841c615108afd755d0b97f8:
+> 
+>   perf trace: Do not require --no-syscalls to suppress strace like output (2018-08-01 16:20:28 -0300)
+> 
+> ----------------------------------------------------------------
+> perf/core improvements and fixes:
+> 
+> perf trace: (Arnaldo Carvalho de Melo)
+> 
+> - Do not require --no-syscalls to suppress strace like output, i.e.
+> 
+>      # perf trace -e sched:*switch
+> 
+>   will show just sched:sched_switch events, not strace-like formatted
+>   syscall events, use --syscalls to get the previous behaviour.
+> 
+>   If instead:
+> 
+>      # perf trace
+> 
+>   is used, i.e. no events specified, then --syscalls is implied and
+>   system wide strace like formatting will be applied to all syscalls.
+> 
+>   The behaviour when just a syscall subset is used with '-e' is unchanged:
+> 
+>      # perf trace -e *sleep,sched:*switch
+> 
+>   will work as before: just the 'nanosleep' syscall will be strace-like
+>   formatted plus the sched:sched_switch tracepoint event, system wide.
+> 
+> - Allow string table generators to use a default header dir, allowing
+>   use of them without parameters to see the table it generates on
+>   stdout, e.g.:
+> 
+>     $ tools/perf/trace/beauty/kvm_ioctl.sh
+>     static const char *kvm_ioctl_cmds[] = {
+>         [0x00] = "GET_API_VERSION",
+>         [0x01] = "CREATE_VM",
+>         [0x02] = "GET_MSR_INDEX_LIST",
+>         [0x03] = "CHECK_EXTENSION",
+> <BIG SNIP>
+>         [0xe0] = "CREATE_DEVICE",
+>         [0xe1] = "SET_DEVICE_ATTR",
+>         [0xe2] = "GET_DEVICE_ATTR",
+>         [0xe3] = "HAS_DEVICE_ATTR",
+>     };
+>     $
+> 
+>   See 'ls tools/perf/trace/beauty/*.sh' to see the available string
+>   table generators.
+> 
+> - Add a generator for IPPROTO_ socket's protocol constants.
+> 
+> perf record: (Kan Liang)
+> 
+> - Fix error out while applying initial delay and using LBR, due to
+>   the use of a PERF_TYPE_SOFTWARE/PERF_COUNT_SW_DUMMY event to track
+>   PERF_RECORD_MMAP events while waiting for the initial delay. Such
+>   events fail when configured asking PERF_SAMPLE_BRANCH_STACK in
+>   perf_event_attr.sample_type.
+> 
+> perf c2c: (Jiri Olsa)
+> 
+> - Fix report crash for empty browser, when processing a perf.data file
+>   without events of interest, either because not asked for in
+>   'perf record' or because the workload didn't triggered such events.
+> 
+> perf list: (Michael Petlan)
+> 
+> - Align metric group description format with PMU event description.
+> 
+> perf tests: (Sandipan Das)
+> 
+> - Fix indexing when invoking subtests, which caused BPF tests to
+>   get results for the next test in the list, with the last one
+>   reporting a failure.
+> 
+> eBPF:
+> 
+> - Fix installation directory for header files included from eBPF proggies,
+>   avoiding clashing with relative paths used to build other software projects
+>   such as glibc. (Thomas Richter)
+> 
+> - Show better message when failing to load an object. (Arnaldo Carvalho de Melo)
+> 
+> General: (Christophe Leroy)
+> 
+> - Allow overriding MAX_NR_CPUS at compile time, to make the tooling
+>   usable in systems with less memory, in time this has to be changed
+>   to properly allocate based on _NPROCESSORS_ONLN.
+> 
+> Architecture specific:
+> 
+> - Update arm64's ThunderX2 implementation defined pmu core events (Ganapatrao Kulkarni)
+> 
+> - Fix complex event name parsing in 'perf test' for PowerPC, where the 'umask' event
+>   modifier isn't present. (Sandipan Das)
+> 
+> CoreSight ARM hardware tracing: (Leo Yan)
+> 
+> - Fix start tracing packet handling.
+> 
+> - Support dummy address value for CS_ETM_TRACE_ON packet.
+> 
+> - Generate branch sample when receiving a CS_ETM_TRACE_ON packet.
+> 
+> - Generate branch sample for CS_ETM_TRACE_ON packet.
+> 
+> Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+> 
+> ----------------------------------------------------------------
+> Arnaldo Carvalho de Melo (9):
+>       perf trace beauty: Default header_dir to cwd to work without parms
+>       tools include uapi: Grab a copy of linux/in.h
+>       perf beauty: Add a generator for IPPROTO_ socket's protocol constants
+>       perf trace beauty: Do not print NULL strarray entries
+>       perf trace beauty: Add beautifiers for 'socket''s 'protocol' arg
+>       perf trace: Beautify the AF_INET & AF_INET6 'socket' syscall 'protocol' args
+>       perf bpf: Show better message when failing to load an object
+>       perf bpf: Include uapi/linux/bpf.h from the 'perf trace' script's bpf.h
+>       perf trace: Do not require --no-syscalls to suppress strace like output
+> 
+> Christophe Leroy (1):
+>       perf tools: Allow overriding MAX_NR_CPUS at compile time
+> 
+> Ganapatrao Kulkarni (1):
+>       perf vendor events arm64: Update ThunderX2 implementation defined pmu core events
+> 
+> Jiri Olsa (1):
+>       perf c2c report: Fix crash for empty browser
+> 
+> Kan Liang (1):
+>       perf evlist: Fix error out while applying initial delay and LBR
+> 
+> Leo Yan (4):
+>       perf cs-etm: Fix start tracing packet handling
+>       perf cs-etm: Support dummy address value for CS_ETM_TRACE_ON packet
+>       perf cs-etm: Generate branch sample when receiving a CS_ETM_TRACE_ON packet
+>       perf cs-etm: Generate branch sample for CS_ETM_TRACE_ON packet
+> 
+> Michael Petlan (1):
+>       perf list: Unify metric group description format with PMU event description
+> 
+> Sandipan Das (2):
+>       perf tests: Fix complex event name parsing
+>       perf tests: Fix indexing when invoking subtests
+> 
+> Thomas Richter (1):
+>       perf build: Fix installation directory for eBPF
+> 
+>  tools/include/uapi/linux/in.h                      | 301 +++++++++++++++++++++
+>  tools/perf/Makefile.config                         |   4 +-
+>  tools/perf/Makefile.perf                           |  10 +
+>  tools/perf/builtin-c2c.c                           |   3 +
+>  tools/perf/builtin-trace.c                         |  19 +-
+>  tools/perf/check-headers.sh                        |   1 +
+>  tools/perf/include/bpf/bpf.h                       |   3 +
+>  tools/perf/perf.h                                  |   2 +
+>  .../arch/arm64/cavium/thunderx2/core-imp-def.json  |  87 +++++-
+>  tools/perf/tests/builtin-test.c                    |   4 +-
+>  tools/perf/tests/parse-events.c                    |   2 +-
+>  tools/perf/trace/beauty/Build                      |   1 +
+>  tools/perf/trace/beauty/beauty.h                   |   3 +
+>  tools/perf/trace/beauty/drm_ioctl.sh               |   9 +-
+>  tools/perf/trace/beauty/kcmp_type.sh               |   2 +-
+>  tools/perf/trace/beauty/kvm_ioctl.sh               |   4 +-
+>  tools/perf/trace/beauty/madvise_behavior.sh        |   2 +-
+>  tools/perf/trace/beauty/perf_ioctl.sh              |   2 +-
+>  .../perf/trace/beauty/pkey_alloc_access_rights.sh  |   2 +-
+>  tools/perf/trace/beauty/sndrv_ctl_ioctl.sh         |   4 +-
+>  tools/perf/trace/beauty/sndrv_pcm_ioctl.sh         |   4 +-
+>  tools/perf/trace/beauty/socket.c                   |  28 ++
+>  tools/perf/trace/beauty/socket_ipproto.sh          |  11 +
+>  tools/perf/trace/beauty/vhost_virtio_ioctl.sh      |   6 +-
+>  tools/perf/util/bpf-loader.c                       |   4 +-
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.h    |   1 +
+>  tools/perf/util/cs-etm.c                           |  68 ++++-
+>  tools/perf/util/evsel.c                            |  14 +
+>  tools/perf/util/metricgroup.c                      |   4 +-
+>  29 files changed, 556 insertions(+), 49 deletions(-)
+>  create mode 100644 tools/include/uapi/linux/in.h
+>  create mode 100644 tools/perf/trace/beauty/socket.c
+>  create mode 100755 tools/perf/trace/beauty/socket_ipproto.sh
 
-The expectation is:
+Pulled, thanks a lot Arnaldo!
 
-socket APIs:
-send and receive the data
-------------------------------------------------------------
-LoRaWAN class module implements MAC:
-append the header/footer, encryption/decryption, timing slot and MAC commands
-------------------------------------------------------------
-LoRa device drivers:
-send and receive the messages for MAC layer
-------------------------------------------------------------
-LoRa devices
-
-Is it possible that combine the LoRaWAN class module I implemented?
-I start from the simplest class A end device's behavior, especially
-the timing slot.
-Also the encryption/decryption for uplink/downlink data messages.
-I can send it as patches.
-
-However, I have 2 problems right now.
-1. Which Address and Protocol Family should we use?  PF_LORA or PF_LORAWAN?
-2. To test the LoRaWAN class module, adding more procedures in LoRa
-device drivers to register as a LoRaWAN device is needed.
-
-Regards,
-Jian-Hong Pan
-
->> > LoRa radios used in Gateway devices are typically relatively
->> high power (capable of 27dBm) and operate in bands with
->> certain restrictions, eg the EU has keep out areas within
->> 868MHz for alarms and SRD devices must abide by certain
->> duty cycle restrictions, there are also maximum powers to
->> consider for sub-bands. (ETSI EN 300 220-2 V3.2.1, Bands K,
->> L, M, N, P, Q)
->>
->> > The certified AT style modules will (should) already have
->> this regulatory data baked in so it only applied to situations
->> where we drive the transceivers directly, but it wouldn't
->> hurt to check that the frequency being asked to transmit on
->> doesn't spill into a restricted band.
->>
->> Some do have configuration options that will need to be set
->> or checked.
->>
->> Regards,
->> Andreas
->>
->> --
->> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
->> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
->> HRB 21284 (AG N?rnberg)
+	Ingo
