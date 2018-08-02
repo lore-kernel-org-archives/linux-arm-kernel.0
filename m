@@ -1,173 +1,244 @@
-From: jrdr.linux@gmail.com (Souptick Joarder)
-Date: Thu, 2 Aug 2018 21:21:02 +0530
-Subject: [PATCH v3] gpu/drm/exynos: Convert
- drm_atomic_helper_suspend/resume()
-In-Reply-To: <20180802133852eucas1p1de66cfd2db5ed0c87665567455ea4747~HFNvAtE4-1249412494eucas1p1c@eucas1p1.samsung.com>
-References: <CGME20180802131924epcas4p105dc354b2ee651e70a5e777850222bc5@epcas4p1.samsung.com>
- <20180802132152.GA2833@jordon-HP-15-Notebook-PC>
- <20180802133852eucas1p1de66cfd2db5ed0c87665567455ea4747~HFNvAtE4-1249412494eucas1p1c@eucas1p1.samsung.com>
-Message-ID: <CAFqt6zYUT72e7CnUF9a3kg5ZjFcPjZViMNm687-FC_9PF5Oc7A@mail.gmail.com>
+From: luis_martins_5@hotmail.com (Luis Martins)
+Date: Thu, 2 Aug 2018 16:03:11 +0000
+Subject: Help module drivers - PMU
+Message-ID: <HE1PR0902MB20442C530B1CC03B141E6581872C0@HE1PR0902MB2044.eurprd09.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 2, 2018 at 7:08 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hi,
->
-> On 2018-08-02 15:21, Souptick Joarder wrote:
->> convert drm_atomic_helper_suspend/resume() to use
->> drm_mode_config_helper_suspend/resume().
->>
->> exynos_drm_fbdev_suspend/resume can be removed
->> as drm_mode_config_helper_suspend/resume has
->> implement the same in generic way.
->>
->> Remove suspend_state from exynos_drm_private
->> struct as it is no more useful.
->>
->> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
->> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
->> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->> v2: Address Inki Dae's comment. Remove ret variable
->>      from both suspend/resume function.
->>
->> v3: Tested by Marek. Updated the change log.
->>
->>   drivers/gpu/drm/exynos/exynos_drm_drv.c   | 26 ++------------------------
->>   drivers/gpu/drm/exynos/exynos_drm_drv.h   |  1 -
->>   drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 17 -----------------
->>   drivers/gpu/drm/exynos/exynos_drm_fbdev.h | 10 ----------
->>   4 files changed, 2 insertions(+), 52 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
->> index b599f74..d86dd81 100644
->> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
->> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
->> @@ -149,37 +149,15 @@ static void exynos_drm_postclose(struct drm_device *dev, struct drm_file *file)
->>   static int exynos_drm_suspend(struct device *dev)
->>   {
->>       struct drm_device *drm_dev = dev_get_drvdata(dev);
->> -     struct exynos_drm_private *private;
->> -
->> -     if (!drm_dev)
->> -             return 0;
->> -
->> -     private = drm_dev->dev_private;
->> -
->> -     drm_kms_helper_poll_disable(drm_dev);
->> -     exynos_drm_fbdev_suspend(drm_dev);
->> -     private->suspend_state = drm_atomic_helper_suspend(drm_dev);
->> -     if (IS_ERR(private->suspend_state)) {
->> -             exynos_drm_fbdev_resume(drm_dev);
->> -             drm_kms_helper_poll_enable(drm_dev);
->> -             return PTR_ERR(private->suspend_state);
->> -     }
->>
->> -     return 0;
->> +     return  drm_mode_config_helper_suspend(drm_dev);
->>   }
->>
->>   static void exynos_drm_resume(struct device *dev)
->>   {
->>       struct drm_device *drm_dev = dev_get_drvdata(dev);
->> -     struct exynos_drm_private *private;
->> -
->> -     if (!drm_dev)
->> -             return;
->>
->> -     private = drm_dev->dev_private;
->> -     drm_atomic_helper_resume(drm_dev, private->suspend_state);
->> -     exynos_drm_fbdev_resume(drm_dev);
->> -     drm_kms_helper_poll_enable(drm_dev);
->> +     return drm_mode_config_helper_resume(drm_dev);
->
-> exynos_drm_resume() now returns 'void', so to be strict with
-> c standard, the return statement should not be used here.
+Hi,?
 
-But in struct dev_pm_ops, it is still defined as
+I'm following these instructions:
+https://developer.arm.com/products/system-design/cycle-models/knowledge-articles/system-performance-analysis-and-the-arm-performance-monitor-unit
 
-                int (*resume)(struct device *dev);
+My goal is to enable userspace access for the PMUs. To enable it, I need to configure PMCR_EL0 and PMUSERENR_EL0  using a set of rules defined by ARM.
 
-I think, we need to correct the return type of
-exynos_drm_resume() to int.
-
-Although I posted v4.
+These are some of the instructions of the module I'm using:
+static void enable_cpu_counters(void* data)? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+{? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+? ? asm volatile("msr pmuserenr_el0, %0" :: "r"(0xf));
+? ? armv8pmu_pmcr_write (ARMV8_PMCR_LC|ARMV8_PMCR_E);? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ??
+? ? asm volatile("msr PMCNTENSET_EL0, %0" :: "r" ((u32)(1<<31)));
+? ? armv8pmu_pmcr_write(armv8pmu_pmcr_read() | ARMV8_PMCR_E|ARMV8_PMCR_LC);? ?
+? ? printk("\nCPU:%d \n", smp_processor_id());
+}? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
 
 
+static void disable_cpu_counters (void* data)? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ??
+{? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+? ? printk(KERN_INFO "\ndisabling user-mode PMU access on CPU #%d \n",? ? ? ? ? ? ? ? ? ? ? ?
+? ? smp_processor_id());
+? ? /* Program PMU and disable all counters */? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ??
+? ? armv8pmu_pmcr_write(armv8pmu_pmcr_read() |~ARMV8_PMCR_E);? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ??
+? ? asm volatile("msr pmuserenr_el0, %0" ::"r"((u64)0));? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+}? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
 
->
->>   }
->>
->>   static const struct dev_pm_ops exynos_drm_pm_ops = {
->> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.h b/drivers/gpu/drm/exynos/exynos_drm_drv.h
->> index c737c4b..7349e7c 100644
->> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.h
->> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.h
->> @@ -195,7 +195,6 @@ struct drm_exynos_file_private {
->>    */
->>   struct exynos_drm_private {
->>       struct drm_fb_helper *fb_helper;
->> -     struct drm_atomic_state *suspend_state;
->>
->>       struct device *g2d_dev;
->>       struct device *dma_dev;
->> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
->> index 132dd52..918dd2c 100644
->> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
->> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
->> @@ -270,20 +270,3 @@ void exynos_drm_fbdev_fini(struct drm_device *dev)
->>       private->fb_helper = NULL;
->>   }
->>
->> -void exynos_drm_fbdev_suspend(struct drm_device *dev)
->> -{
->> -     struct exynos_drm_private *private = dev->dev_private;
->> -
->> -     console_lock();
->> -     drm_fb_helper_set_suspend(private->fb_helper, 1);
->> -     console_unlock();
->> -}
->> -
->> -void exynos_drm_fbdev_resume(struct drm_device *dev)
->> -{
->> -     struct exynos_drm_private *private = dev->dev_private;
->> -
->> -     console_lock();
->> -     drm_fb_helper_set_suspend(private->fb_helper, 0);
->> -     console_unlock();
->> -}
->> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
->> index b338472..6840b6a 100644
->> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
->> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
->> @@ -19,8 +19,6 @@
->>
->>   int exynos_drm_fbdev_init(struct drm_device *dev);
->>   void exynos_drm_fbdev_fini(struct drm_device *dev);
->> -void exynos_drm_fbdev_suspend(struct drm_device *drm);
->> -void exynos_drm_fbdev_resume(struct drm_device *drm);
->>
->>   #else
->>
->> @@ -39,14 +37,6 @@ static inline void exynos_drm_fbdev_restore_mode(struct drm_device *dev)
->>
->>   #define exynos_drm_output_poll_changed (NULL)
->>
->> -static inline void exynos_drm_fbdev_suspend(struct drm_device *drm)
->> -{
->> -}
->> -
->> -static inline void exynos_drm_fbdev_resume(struct drm_device *drm)
->> -{
->> -}
->> -
->>   #endif
->>
->>   #endif
->
-> Best regards
-> --
-> Marek Szyprowski, PhD
-> Samsung R&D Institute Poland
->
+
+static int __init init(void)? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ??
+{
+? ? unsigned int reguser=0;? ? ?
+
+
+? ? isb();
+
+
+? ? asm volatile("mrs %0, pmcr_el0" : "=r" (reguser));
+? ? printk(KERN_INFO "\nPMCR_EL0 register before : %x\n", reguser);
+? ? asm volatile("mrs %0, pmuserenr_el0" : "=r" (reguser));
+? ? printk(KERN_INFO "\nPMUSERENR register before : %x\n", reguser);
+
+
+on_each_cpu (enable_cpu_counters, NULL, 1);? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+? ? printk(KERN_INFO "\nEnable Access PMU Initialized\n");
+
+
+? ? /* Enable counters */
+? ? asm volatile("mrs %0, pmcr_el0" : "=r" (reguser));
+? ? printk(KERN_INFO "\nPMCR_EL0 register after : %x\n", reguser);
+? ? asm volatile("mrs %0, pmuserenr_el0" : "=r" (reguser));
+? ? printk(KERN_INFO "\nPMUSERENR register after : %x\n", reguser);
+
+
+? ? return 0;? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ??
+}? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+
+
+static void __exit fini(void)? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ??
+{? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+? ? on_each_cpu(disable_cpu_counters, NULL, 1);? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ??
+? ? printk(KERN_INFO "\nAccess PMU Disabled\n");? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ??
+}? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+
+
+module_init (init);? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ??
+module_exit (fini);
+
+
+Output (dmesg):
+[79371.445026] \x0aPMCR_EL0 register before : 41023040
+[79371.450997] \x0aPMUSERENR register before : 0
+[79371.456511] \x0aCPU:3
+[79371.456546] \x0aCPU:2
+[79371.456614] \x0aCPU:0
+[79371.456631] \x0aCPU:4
+[79371.456652] \x0aCPU:5
+[79371.473784] \x0aCPU:1
+[79371.477254] \x0aEnable Access PMU Initialized
+[79371.482693] \x0aPMCR_EL0 register after : 41023001
+[79371.488560] \x0aPMUSERENR register after : f
+
+
+So I can change the value of the registers.
+
+Followed with a second module, this time I'm only interested in reading the values from the registers.
+
+
+Module (testing if it keeps the values on the registers):
+static int __init init(void)? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ??
+{? ? ? ??
+? ? unsigned int reguser=0;? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+? ? isb();
+
+
+? ? /* Enable counters */
+? ? asm volatile("mrs %0, pmcr_el0" : "=r" (reguser));
+? ? printk(KERN_INFO "\nPMCR_EL0 register : %x\n", reguser);
+? ? asm volatile("mrs %0, pmuserenr_el0" : "=r" (reguser));
+? ? printk(KERN_INFO "\nPMUSERENR register : %x\n", reguser);
+
+
+? ? return 0;? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ??
+}? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+
+
+static void __exit fini(void)? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ??
+{? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+? ? printk(KERN_INFO "\nDisabling read_arm_pmu.ko\n");? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ??
+}? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?
+
+
+module_init (init);? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ??
+module_exit (fini);
+
+
+Output (dmesg):
+[79385.429198] \x0aPMCR_EL0 register : 41023040
+[79385.434584] \x0aPMUSERENR register : 0
+
+
+I was expecting that instead of PMCR_EL0 register : 41023040 I would get PMCR_EL0 register : 41023001 and that instead of PMUSERENR register : 0 I would get PMUSERENR register : f.
+
+___________________________
+
+Running:
+juno:/ # cat /proc/modules?
+read_arm_pmu 16384 0 - Live 0x0000000000000000 (PO)
+enable_arm_pmu 16384 0 - Live 0x0000000000000000 (PO)
+
+
+juno:/ # cat /proc/devices?
+Character devices:
+1 mem
+5 /dev/tty
+5 /dev/console
+5 /dev/ptmx
+10 misc
+13 input
+14 sound
+29 fb
+90 mtd
+108 ppp
+116 alsa
+128 ptm
+136 pts
+180 usb
+189 usb_device
+204 ttyAMA
+226 drm
+249 roccat
+250 hidraw
+251 bsg
+252 tee
+253 rtc
+254 gpiochip
+
+
+Block devices:
+1 ramdisk
+259 blkext
+7 loop
+8 sd
+31 mtdblock
+65 sd
+66 sd
+67 sd
+68 sd
+69 sd
+70 sd
+71 sd
+128 sd
+129 sd
+130 sd
+131 sd
+132 sd
+133 sd
+134 sd
+135 sd
+179 mmc
+253 device-mapper
+254 virtblk
+___________________________
+
+cat /proc/sys/kernel/tainted
+4097
+___________________________
+
+juno:/ # cat /proc/interrupts?
+CPU0 CPU1 CPU2 CPU3 CPU4 CPU5
+2: 1844410 1197983 1353732 16779 3199 5419 GIC v2 92 Level arch_mem_timer
+3: 0 0 0 0 0 0 GIC v2 29 Level arch_timer
+4: 894927 272142 288023 18616 39333 15390 GIC v2 30 Level arch_timer
+7: 0 0 0 0 0 0 GIC v2 198 Level timer
+14: 419017 0 0 0 0 0 GIC v2 68 Level mhu_link
+15: 0 0 0 0 0 0 GIC v2 67 Level mhu_link
+16: 0 0 0 0 0 0 GIC v2 120 Level 7ff00000.dma
+17: 0 0 0 0 0 0 GIC v2 121 Level 7ff00000.dma
+18: 0 0 0 0 0 0 GIC v2 122 Level 7ff00000.dma
+19: 0 0 0 0 0 0 GIC v2 123 Level 7ff00000.dma
+20: 0 0 0 0 0 0 GIC v2 124 Level 7ff00000.dma
+21: 0 0 0 0 0 0 GIC v2 140 Level 7ff00000.dma
+22: 0 0 0 0 0 0 GIC v2 141 Level 7ff00000.dma
+23: 0 0 0 0 0 0 GIC v2 142 Level 7ff00000.dma
+24: 0 0 0 0 0 0 GIC v2 143 Level 7ff00000.dma
+25: 0 0 0 0 0 0 GIC v2 125 Level hdlcd
+26: 0 0 0 0 0 0 GIC v2 117 Level hdlcd
+27: 6336 0 0 0 0 0 GIC v2 115 Level uart-pl011
+28: 53666 0 0 0 0 0 GIC v2 136 Level 7ffa0000.i2c
+30: 47345 0 0 0 0 0 GIC v2 149 Level ehci_hcd:usb1
+33: 14370 0 0 0 0 0 GIC v2 65 Level 2d000000.gpu
+34: 0 0 0 0 0 0 GIC v2 66 Level 2d000000.gpu
+35: 39222 0 0 0 0 0 GIC v2 64 Level 2d000000.gpu
+37: 52 0 0 0 0 0 GIC v2 194 Level mmci-pl18x (cmd)
+40: 0 0 0 0 0 0 GIC v2 100 Level rtc-pl031
+43: 0 0 0 0 0 0 GIC v2 169 Level sata_sil24[0000:03:00.0]
+45: 0 0 0 0 0 0 M SI 0 Edge PCIe PME, aerdrv
+52: 1049234 0 0 0 0 0 M SI 4194304 Edge eth0
+IPI0: 62569 1835646 1888285 43688 29194 29798 R escheduling interrupts
+IPI1: 315 1276 725 386 307 207 F unction call interrupts
+IPI2: 0 0 0 0 0 0 C PU stop interrupts
+IPI3: 829962 24938 62500 1274 498 1029 T imer broadcast interrupts
+IPI4: 800250 925302 1266671 10821 9264 7192 I RQ work interrupts
+IPI5: 0 0 0 0 0 0 C PU wake-up interrupts
+Err: 0
+___________________________
+
+Testing the functionality on userspace with a simple program gives:
+
+juno:/data/data/papi/workplace # ./monitoring 2 2 2 3
+[1359092.706711] monitoring[11095]: undefined instruction: pc=000000000040065c
+[1359092.713652] Code: 00000000 00000000 00000000 d10043ff (d53b9c00)
+Illegal instruction
+
+TLDR - Shouldn't the second module keep the same data as the first module values, since the reading portion of the code is exactly the same?
+
+Thanks,
+Luis
