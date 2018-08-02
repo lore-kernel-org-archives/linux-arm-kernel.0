@@ -1,7 +1,7 @@
 From: manish.narani@xilinx.com (Manish Narani)
-Date: Thu, 2 Aug 2018 18:04:44 +0530
-Subject: [PATCH v2 0/4] EDAC: Enhancements to Synopsys EDAC driver
-Message-ID: <1533213288-8771-1-git-send-email-manish.narani@xilinx.com>
+Date: Thu, 2 Aug 2018 18:21:18 +0530
+Subject: [PATCH v3 0/4] EDAC: Enhancements to Synopsys EDAC driver
+Message-ID: <1533214282-9977-1-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,6 +15,10 @@ Changes in v2:
 	  a feature of ZynqMP DDRC
 	- The Binding Documentation in (2/4) is modified as per the review
 	  comments
+
+Changes in v3:
+	- The commit message in (2/4) is modified (Synopsys EDAC Driver -->
+	  ZynqMP DDRC)
 
 Manish Narani (4):
   edac: synps: Add platform specific structures for ddrc controller
