@@ -1,69 +1,142 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Thu, 2 Aug 2018 15:07:10 +0300
-Subject: [PATCH v7 8/8] interconnect: Allow endpoints translation via DT
-In-Reply-To: <804925d5927ccb6927b16f7e9a4aa05c@codeaurora.org>
-References: <20180731161340.13000-1-georgi.djakov@linaro.org>
- <20180731161340.13000-9-georgi.djakov@linaro.org>
- <804925d5927ccb6927b16f7e9a4aa05c@codeaurora.org>
-Message-ID: <3a7bb27a-0609-133b-08e9-8864f1ccc4bc@linaro.org>
+From: hch@lst.de (Christoph Hellwig)
+Date: Thu,  2 Aug 2018 14:13:18 +0200
+Subject: [PATCH] arm64: remove dummy_dma_ops
+Message-ID: <20180802121318.5785-1-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Saravana,
+Returning NULL from get_arch_dma_ops makes all DMA mapping routines
+retourn sensible errors, so remove the dummy ops.
 
-On 08/02/2018 01:57 AM, skannan at codeaurora.org wrote:
-> On 2018-07-31 09:13, Georgi Djakov wrote:
->> Currently we support only platform data for specifying the interconnect
->> endpoints. As now the endpoints are hard-coded into the consumer driver
->> this may lead to complications when a single driver is used by multiple
->> SoCs, which may have different interconnect topology.
->> To avoid cluttering the consumer drivers, introduce a translation
->> function
->> to help us get the board specific interconnect data from device-tree.
->>
->> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->> ---
->> ?drivers/interconnect/core.c? | 62 ++++++++++++++++++++++++++++++++++++
->> ?include/linux/interconnect.h |? 7 ++++
->> ?2 files changed, 69 insertions(+)
->>
->> diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
->> index 9fef180cf77e..d1b6adff0a3d 100644
->> --- a/drivers/interconnect/core.c
->> +++ b/drivers/interconnect/core.c
-[..]
->> --- a/include/linux/interconnect.h
->> +++ b/include/linux/interconnect.h
->> @@ -17,6 +17,7 @@ struct device;
->>
->> ?struct icc_path *icc_get(struct device *dev, const int src_id,
->> ????????????? const int dst_id);
->> +struct icc_path *of_icc_get(struct device *dev, const char *name);
->> ?void icc_put(struct icc_path *path);
->> ?int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
->>
->> @@ -28,6 +29,12 @@ static inline struct icc_path *icc_get(struct
->> device *dev, const int src_id,
->> ???? return NULL;
->> ?}
->>
->> +static inline struct icc_path *of_icc_get(struct device *dev,
->> +????????????????????? const char *name)
->> +{
->> +??? return NULL;
->> +}
->> +
-> 
-> Might want to return PTR(-ENODEV) or some error code so that client
-> doesn't have to do NULL check AND an error check?
-> 
-> -Saravana
+Signed-off-by: Christoph Hellwig <hch@lst.de>
+---
+ arch/arm64/include/asm/dma-mapping.h |  4 +-
+ arch/arm64/mm/dma-mapping.c          | 92 ----------------------------
+ 2 files changed, 1 insertion(+), 95 deletions(-)
 
-NULL is returned when CONFIG_INTERCONNECT=n. Configuration of
-interconnects by consumer drivers could be optional and that's why null
-is returned instead of an error. The consumer drivers decide how to
-proceed in this case and if there is a hard requirement for interconnect
-support, then i would suggest to express it as a dependency in Kconfig.
-
-Thanks,
-Georgi
+diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+index b7847eb8a7bb7..3dd7c10efc745 100644
+--- a/arch/arm64/include/asm/dma-mapping.h
++++ b/arch/arm64/include/asm/dma-mapping.h
+@@ -24,15 +24,13 @@
+ #include <xen/xen.h>
+ #include <asm/xen/hypervisor.h>
+ 
+-extern const struct dma_map_ops dummy_dma_ops;
+-
+ static inline const struct dma_map_ops *get_arch_dma_ops(struct bus_type *bus)
+ {
+ 	/*
+ 	 * We expect no ISA devices, and all other DMA masters are expected to
+ 	 * have someone call arch_setup_dma_ops at device creation time.
+ 	 */
+-	return &dummy_dma_ops;
++	return NULL;
+ }
+ 
+ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 072c51fb07d73..4fdce2db6f12d 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -406,98 +406,6 @@ static int __init atomic_pool_init(void)
+ 	return -ENOMEM;
+ }
+ 
+-/********************************************
+- * The following APIs are for dummy DMA ops *
+- ********************************************/
+-
+-static void *__dummy_alloc(struct device *dev, size_t size,
+-			   dma_addr_t *dma_handle, gfp_t flags,
+-			   unsigned long attrs)
+-{
+-	return NULL;
+-}
+-
+-static void __dummy_free(struct device *dev, size_t size,
+-			 void *vaddr, dma_addr_t dma_handle,
+-			 unsigned long attrs)
+-{
+-}
+-
+-static int __dummy_mmap(struct device *dev,
+-			struct vm_area_struct *vma,
+-			void *cpu_addr, dma_addr_t dma_addr, size_t size,
+-			unsigned long attrs)
+-{
+-	return -ENXIO;
+-}
+-
+-static dma_addr_t __dummy_map_page(struct device *dev, struct page *page,
+-				   unsigned long offset, size_t size,
+-				   enum dma_data_direction dir,
+-				   unsigned long attrs)
+-{
+-	return 0;
+-}
+-
+-static void __dummy_unmap_page(struct device *dev, dma_addr_t dev_addr,
+-			       size_t size, enum dma_data_direction dir,
+-			       unsigned long attrs)
+-{
+-}
+-
+-static int __dummy_map_sg(struct device *dev, struct scatterlist *sgl,
+-			  int nelems, enum dma_data_direction dir,
+-			  unsigned long attrs)
+-{
+-	return 0;
+-}
+-
+-static void __dummy_unmap_sg(struct device *dev,
+-			     struct scatterlist *sgl, int nelems,
+-			     enum dma_data_direction dir,
+-			     unsigned long attrs)
+-{
+-}
+-
+-static void __dummy_sync_single(struct device *dev,
+-				dma_addr_t dev_addr, size_t size,
+-				enum dma_data_direction dir)
+-{
+-}
+-
+-static void __dummy_sync_sg(struct device *dev,
+-			    struct scatterlist *sgl, int nelems,
+-			    enum dma_data_direction dir)
+-{
+-}
+-
+-static int __dummy_mapping_error(struct device *hwdev, dma_addr_t dma_addr)
+-{
+-	return 1;
+-}
+-
+-static int __dummy_dma_supported(struct device *hwdev, u64 mask)
+-{
+-	return 0;
+-}
+-
+-const struct dma_map_ops dummy_dma_ops = {
+-	.alloc                  = __dummy_alloc,
+-	.free                   = __dummy_free,
+-	.mmap                   = __dummy_mmap,
+-	.map_page               = __dummy_map_page,
+-	.unmap_page             = __dummy_unmap_page,
+-	.map_sg                 = __dummy_map_sg,
+-	.unmap_sg               = __dummy_unmap_sg,
+-	.sync_single_for_cpu    = __dummy_sync_single,
+-	.sync_single_for_device = __dummy_sync_single,
+-	.sync_sg_for_cpu        = __dummy_sync_sg,
+-	.sync_sg_for_device     = __dummy_sync_sg,
+-	.mapping_error          = __dummy_mapping_error,
+-	.dma_supported          = __dummy_dma_supported,
+-};
+-EXPORT_SYMBOL(dummy_dma_ops);
+-
+ static int __init arm64_dma_init(void)
+ {
+ 	if (swiotlb_force == SWIOTLB_FORCE ||
+-- 
+2.18.0
