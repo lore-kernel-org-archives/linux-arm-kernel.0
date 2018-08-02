@@ -1,77 +1,54 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 1 Aug 2018 17:14:14 -0700
-Subject: [RFC 0/2] harden alloc_pages against bogus nid
-In-Reply-To: <d9f8e9d1-2fb8-6016-5081-7e3213b23ed4@arm.com>
-References: <20180801200418.1325826-1-jeremy.linton@arm.com>
- <20180801145020.8c76a490c1bf9bef5f87078a@linux-foundation.org>
- <d9f8e9d1-2fb8-6016-5081-7e3213b23ed4@arm.com>
-Message-ID: <20180801171414.30e54a106733ccaaa566388d@linux-foundation.org>
+From: hongxing.zhu@nxp.com (Richard Zhu)
+Date: Thu, 2 Aug 2018 00:43:27 +0000
+Subject: [PATCH 1/2] ARM: dts: imx7d: Add node for PCIe PHY
+In-Reply-To: <1533144812.2283.227.camel@impinj.com>
+References: <20180718194424.8844-1-tpiepho@impinj.com>
+ <20180718194424.8844-2-tpiepho@impinj.com>
+ <1533119951.20186.5.camel@pengutronix.de>
+ <1533144812.2283.227.camel@impinj.com>
+Message-ID: <AM5PR0402MB28501824F60DB56D923758A38C2C0@AM5PR0402MB2850.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 1 Aug 2018 17:56:46 -0500 Jeremy Linton <jeremy.linton@arm.com> wrote:
 
-> Hi,
+> -----Original Message-----
+> From: Trent Piepho [mailto:tpiepho at impinj.com]
+> Sent: Thursday, August 2, 2018 1:34 AM
+> To: l.stach at pengutronix.de; linux-arm-kernel at lists.infradead.org;
+> linux-pci at vger.kernel.org
+> Cc: Richard Zhu <hongxing.zhu@nxp.com>; shawnguo at kernel.org;
+> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>
+> Subject: Re: [PATCH 1/2] ARM: dts: imx7d: Add node for PCIe PHY
 > 
-> On 08/01/2018 04:50 PM, Andrew Morton wrote:
-> > On Wed,  1 Aug 2018 15:04:16 -0500 Jeremy Linton <jeremy.linton@arm.com> wrote:
-> > 
-> >> The thread "avoid alloc memory on offline node"
-> >>
-> >> https://lkml.org/lkml/2018/6/7/251
-> >>
-> >> Asked at one point why the kzalloc_node was crashing rather than
-> >> returning memory from a valid node. The thread ended up fixing
-> >> the immediate causes of the crash but left open the case of bad
-> >> proximity values being in DSDT tables without corrisponding
-> >> SRAT/SLIT entries as is happening on another machine.
-> >>
-> >> Its also easy to fix that, but we should also harden the allocator
-> >> sufficiently that it doesn't crash when passed an invalid node id.
-> >> There are a couple possible ways to do this, and i've attached two
-> >> separate patches which individually fix that problem.
-> >>
-> >> The first detects the offline node before calling
-> >> the new_slab code path when it becomes apparent that the allocation isn't
-> >> going to succeed. The second actually hardens node_zonelist() and
-> >> prepare_alloc_pages() in the face of NODE_DATA(nid) returning a NULL
-> >> zonelist. This latter case happens if the node has never been initialized
-> >> or is possibly out of range. There are other places (NODE_DATA &
-> >> online_node) which should be checking if the node id's are > MAX_NUMNODES.
-> >>
-> > 
-> > What is it that leads to a caller requesting memory from an invalid
-> > node?  A race against offlining?  If so then that's a lack of
-> > appropriate locking, isn't it?
+> On Wed, 2018-08-01 at 12:39 +0200, Lucas Stach wrote:
+> >
+> > > +This is the PHY associated with the IMX7d PCIe controller.  It's
+> > > used by the
+> > > +PCI-e controller via the fsl,pcie-phy phandle.
+> > > +
+> > > +Required properties:
+> > > +- compatible:
+> > > +	- "fsl,imx-pcie-phy"
+> >
+> > This is too generic. Please change it to "fsl,imx7-pcie-phy".
 > 
-> There were a couple unrelated cases, both having to do with the PXN 
-> associated with a PCI port. The first case AFAIK, the domain wasn't 
-> really invalid if the entire SRAT was parsed and nodes created even when 
-> there weren't associated CPUs. The second case (a different machine) is 
-> simply a PXN value that is completely invalid (no associated 
-> SLIT/SRAT/etc entries) due to firmware making a mistake when a socket 
-> isn't populated.
-> 
-> There have been a few other suggested or merged patches for the 
-> individual problems above, this set is just an attempt at avoiding a 
-> full crash if/when another similar problem happens.
+> Can anyone from NXP tell us if an external PCIe PHY block is present in other
+> IMX designs?  I suspect that this is generic, but no design other than imx7d
+> has had any reason to use this PHY register space yet.
+>
+Hi Trent:
+There is a different PCIe PHY block in imx7d PCIe refer to the imx6.
+So, the standalone memory region is used to map the imx7d PCIe PHY registers.
+Instead of the standalone PHY node, how about to include the PHY registers memory region into PCIe node?
+For example:
+               pcie: pcie at 0x33800000 {
+                        compatible = "fsl,imx7d-pcie", "snps,dw-pcie";
+                        reg = <0x33800000 0x4000>, <0x306d0000 0x10000>, <0x4ff00000 0x80000>;
+                        reg-names = "dbi", "phy", "config";
 
-Please add the above info to the changelog.
+Richard Zhu
+Best Regards!
 
-> 
-> > 
-> > I don't see a problem with emitting a warning and then selecting a
-> > different node so we can keep running.  But we do want that warning, so
-> > we can understand the root cause and fix it?
-> 
-> Yes, we do want to know when an invalid id is passed, i will add the 
-> VM_WARN in the first one.
-> 
-> The second one I wasn't sure about as failing prepare_alloc_pages() 
-> generates a couple of error messages, but the system then continues 
-> operation.
-> 
-> I guess my question though is which method (or both/something else?) is 
-> the preferred way to harden this up?
-
-The first patch looked neater.  Can we get a WARN_ON in there as well?
+ 
+> If this is specific to this SoC, then maybe it shoudl be fsl,imx7d- pcie-phy, since
+> the iMX7s has no pcie.
