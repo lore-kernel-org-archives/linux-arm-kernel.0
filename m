@@ -1,39 +1,45 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 02 Aug 2018 13:58:51 +0200
-Subject: [PATCH v3 3/4] arm64: dts: rockchip: add core dtsi file for PX30
- SoCs
-In-Reply-To: <1533113116-8820-4-git-send-email-cl@rock-chips.com>
-References: <1533113116-8820-1-git-send-email-cl@rock-chips.com>
- <1533113116-8820-4-git-send-email-cl@rock-chips.com>
-Message-ID: <5420010.G1GNdo6K2G@phil>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 2 Aug 2018 13:01:17 +0100
+Subject: [GIT PULL] arm64 regression fix for 4.18
+Message-ID: <20180802120117.GB14419@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Linus,
 
-Am Mittwoch, 1. August 2018, 10:45:15 CEST schrieb cl at rock-chips.com:
-> From: Liang Chen <cl@rock-chips.com>
-> 
-> This patch adds core dtsi file for Rockchip PX30 SoCs.
-> 
-> Signed-off-by: Liang Chen <cl@rock-chips.com>
+Ard found a nasty arm64 regression in 4.18 where the AES ghash/gcm code
+doesn't notify the kernel about its use of the vector registers, therefore
+potentially corrupting live user state. The fix is straightforward and
+Herbert agreed for it to go via arm64.
 
-applied with the following changes:
-- some reordering
-- cpu properties should be present in all cpu nodes (clocks etc)
-- added dma-names to uarts
-- dropped #dma-cells from uarts+spi (only for dma-controllers)
-- dropped phy-names from usb nodes without actual phys
-  (please readd once you have phy support)
-- dropped the gamma_lut + reg-names and spanned the
-  registers till below the iommu, similar to all other socs we have
-- dropped the high_speed pinctrl state from the spi nodes
-  (not part of mainline dt-binding)
-- dropped peripherals-req-type-burst from the dmac
-  (not part of mainline dt-binding)
-- split out dwc2 into separate patch to be applied once the binding lands
-- set #sound-dai-cells in px30.dtsi ... property of the i2s controller
-  and doesn't change per board
+Please pull.
 
+Thanks,
 
-Heiko
+Will
+
+--->8
+
+The following changes since commit acb1872577b346bd15ab3a3f8dff780d6cca4b70:
+
+  Linux 4.18-rc7 (2018-07-29 14:44:52 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to c7513c2a2714204d3588ecaa170ae628fd0d217e:
+
+  crypto/arm64: aes-ce-gcm - add missing kernel_neon_begin/end pair (2018-07-31 13:20:30 +0100)
+
+----------------------------------------------------------------
+arm64 regression fix
+
+- Fix potential clobbering of user vector register state by AES ghash code
+
+----------------------------------------------------------------
+Ard Biesheuvel (1):
+      crypto/arm64: aes-ce-gcm - add missing kernel_neon_begin/end pair
+
+ arch/arm64/crypto/ghash-ce-glue.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
