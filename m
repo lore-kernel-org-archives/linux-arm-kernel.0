@@ -1,33 +1,37 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 2 Aug 2018 13:46:57 +0200
-Subject: [PATCH] ARM: shmobile: gose: Add DA9210 node for CPU DVFS
-In-Reply-To: <20180802112345.nnb6zcnq5t3cxvnu@verge.net.au>
-References: <20180730111726.5526-1-marek.vasut+renesas@gmail.com>
- <CAMuHMdUop4fUTbgh0iCQRWTNz_X49070qPKZc0iJ9xFvhi9RHA@mail.gmail.com>
- <20180802112345.nnb6zcnq5t3cxvnu@verge.net.au>
-Message-ID: <08920867-e6c9-e89c-7fc9-aa047a6fd44a@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 2 Aug 2018 12:46:58 +0100
+Subject: [RFC PATCH v2 5/6] spi: Add QuadSPI driver for Atmel SAMA5D2
+In-Reply-To: <6f9ca4f1-6809-2d7d-4d64-6869a4e413cb@exceet.de>
+References: <20180627131609.13681-1-bugalski.piotr@gmail.com>
+ <20180627131609.13681-6-bugalski.piotr@gmail.com>
+ <20180801172747.GJ5509@sirena.org.uk>
+ <20180801215733.4dfa3a95@bbrezillon>
+ <20180802101742.GF9117@sirena.org.uk>
+ <6f9ca4f1-6809-2d7d-4d64-6869a4e413cb@exceet.de>
+Message-ID: <20180802114658.GL9117@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/2018 01:23 PM, Simon Horman wrote:
-> On Wed, Aug 01, 2018 at 02:16:14PM +0200, Geert Uytterhoeven wrote:
->> Hi Marek,
->>
->> On Mon, Jul 30, 2018 at 1:17 PM Marek Vasut <marek.vasut@gmail.com> wrote:
->>> Add DA9210 DVFS node to the I2C bus and link it to CPU0 for DVFS.
->>>
->>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
->>
->> Thanks for your patch!
->>
->> Oneline-summary prefix should be "ARM: dts: gose:".
->>
->> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> Thanks, applied with that fixed.
+On Thu, Aug 02, 2018 at 12:46:36PM +0200, Frieder Schrempf wrote:
+> On 02.08.2018 12:17, Mark Brown wrote:
 
-Oh, was about to send V2. Thanks, this saves me a minute.
+> > I don't seem to have a copy of this patch...  not sure it was sent to
+> > me?
 
--- 
-Best regards,
-Marek Vasut
+> When I sent the patch I put you in cc. So if nothing went wrong you should
+> have it.
+> It is part of the SPI MEM conversion series for the FSL QSPI driver [1].
+
+Well, I can't find any references to it anywhere so yeah.
+
+> So if you want I could send the patch separately so it can be applied with
+> the Atmel driver.
+
+I'm going to need a copy to review it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180802/534421f9/attachment.sig>
