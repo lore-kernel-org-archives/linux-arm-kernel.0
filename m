@@ -1,65 +1,40 @@
 From: arun.parameswaran@broadcom.com (Arun Parameswaran)
-Date: Wed,  1 Aug 2018 17:53:49 -0700
-Subject: [PATCH v4 4/8] net: phy: Disable external master access in bcm mdio
- mux driver
+Date: Wed,  1 Aug 2018 17:53:51 -0700
+Subject: [PATCH v4 6/8] dt-bindings: net: Add clock handle to Broadcom iProc
+ mdio mux
 In-Reply-To: <1533171233-14557-1-git-send-email-arun.parameswaran@broadcom.com>
 References: <1533171233-14557-1-git-send-email-arun.parameswaran@broadcom.com>
-Message-ID: <1533171233-14557-5-git-send-email-arun.parameswaran@broadcom.com>
+Message-ID: <1533171233-14557-7-git-send-email-arun.parameswaran@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure the scan control register in the Broadcom iProc
-mdio mux driver to disable access to external master.
+Add clock phandle, of the core clock driving the mdio block, as an
+optional property to the Broadcom iProc mdio mux.
 
-In some SoC's, the scan control register defaults to an incorrect
-value.
+The clock, when specified, will be used to setup the rate adjust registers
+in the mdio to derrive the mdio's operating frequency.
 
 Signed-off-by: Arun Parameswaran <arun.parameswaran@broadcom.com>
 Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/net/phy/mdio-mux-bcm-iproc.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
-index 48bb74a..c36ce4b 100644
---- a/drivers/net/phy/mdio-mux-bcm-iproc.c
-+++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
-@@ -22,6 +22,9 @@
- #include <linux/mdio-mux.h>
- #include <linux/delay.h>
+diff --git a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
+index dc8aa68..b58843f 100644
+--- a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
++++ b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
+@@ -13,6 +13,9 @@ MDIO multiplexer node:
+ Every non-ethernet PHY requires a compatible so that it could be probed based
+ on this compatible string.
  
-+#define MDIO_SCAN_CTRL_OFFSET		0x008
-+#define MDIO_SCAN_CTRL_OVRIDE_EXT_MSTR	28
++Optional properties:
++- clocks: phandle of the core clock which drives the mdio block.
 +
- #define MDIO_PARAM_OFFSET		0x23c
- #define MDIO_PARAM_MIIM_CYCLE		29
- #define MDIO_PARAM_INTERNAL_SEL		25
-@@ -53,6 +56,16 @@ struct iproc_mdiomux_desc {
- 	struct mii_bus *mii_bus;
- };
- 
-+static void mdio_mux_iproc_config(struct iproc_mdiomux_desc *md)
-+{
-+	u32 val;
-+
-+	/* Disable external mdio master access */
-+	val = readl(md->base + MDIO_SCAN_CTRL_OFFSET);
-+	val |= BIT(MDIO_SCAN_CTRL_OVRIDE_EXT_MSTR);
-+	writel(val, md->base + MDIO_SCAN_CTRL_OFFSET);
-+}
-+
- static int iproc_mdio_wait_for_idle(void __iomem *base, bool result)
- {
- 	unsigned int timeout = 1000; /* loop for 1s */
-@@ -216,6 +229,8 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
- 		goto out_register;
- 	}
- 
-+	mdio_mux_iproc_config(md);
-+
- 	dev_info(md->dev, "iProc mdiomux registered\n");
- 	return 0;
+ Additional information regarding generic multiplexer properties can be found
+ at- Documentation/devicetree/bindings/net/mdio-mux.txt
  
 -- 
 1.9.1
