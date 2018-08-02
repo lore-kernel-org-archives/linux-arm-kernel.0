@@ -1,161 +1,299 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Thu, 2 Aug 2018 16:48:40 +0800
-Subject: [PATCH v7 2/3] Bluetooth: mediatek: Add protocol support for
- MediaTek serial devices
-In-Reply-To: <FF45A90A-F9F1-47CB-AB1F-1E92BF587FBE@holtmann.org>
-References: <cover.1533056925.git.sean.wang@mediatek.com>
- <c92ed10cf16f36d9a3b390e864af92e2dfe7b771.1533056925.git.sean.wang@mediatek.com>
- <1707FFA1-A294-4A95-A3BF-0910CE455232@holtmann.org>
- <1533192799.3472.122.camel@mtkswgap22>
- <FF45A90A-F9F1-47CB-AB1F-1E92BF587FBE@holtmann.org>
-Message-ID: <1533199720.3472.136.camel@mtkswgap22>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 2 Aug 2018 10:52:59 +0200
+Subject: [PATCH 1/4] soc: amlogic: add meson-canvas driver
+In-Reply-To: <20180801185128.23440-2-maxi.jourdan@wanadoo.fr>
+References: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
+ <20180801185128.23440-2-maxi.jourdan@wanadoo.fr>
+Message-ID: <36fcadd3-074d-7c11-6ca5-b44aecaa3639@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-08-02 at 09:38 +0200, Marcel Holtmann wrote:
-> Hi Sean,
+Hi Maxime,
+
+On 01/08/2018 20:51, Maxime Jourdan wrote:
+> Amlogic SoCs have a repository of 256 canvas which they use to
+> describe pixel buffers.
 > 
-
-[ ... ]
-
-> >>> +
-> >>> +static int mtk_hci_wmt_sync(struct hci_dev *hdev, u8 op, u8 flag, u16 plen,
-> >>> +			    const void *param)
-> >>> +{
-> >>> +	struct mtk_hci_wmt_cmd wc;
-> >>> +	struct mtk_wmt_hdr *hdr;
-> >>> +	struct sk_buff *skb;
-> >>> +	u32 hlen;
-> >>> +
-> >>> +	hlen = sizeof(*hdr) + plen;
-> >>> +	if (hlen > 255)
-> >>> +		return -EINVAL;
-> >>> +
-> >>> +	hdr = (struct mtk_wmt_hdr *)&wc;
-> >>> +	hdr->dir = 1;
-> >>> +	hdr->op = op;
-> >>> +	hdr->dlen = cpu_to_le16(plen + 1);
-> >>> +	hdr->flag = flag;
-> >>> +	memcpy(wc.data, param, plen);
-> >>> +
-> >>> +	atomic_inc(&hdev->cmd_cnt);
-> >> 
-> >> Why are you doing this one. It will need a comment here if really needed. However I doubt that this is needed. You are only using it from hdev->setup and hdev->shutdown callbacks.
-> >> 
-> > 
-> > An increment on cmd_cnt is really needed because hci_cmd_work would check whether cmd_cnt is positive and then has a decrement on cmd_cnt before a packet is being sent out.
-> > 
-> > okay will add a comment.
+> They contain metadata like width, height, block mode, endianness [..]
 > 
-> but you are in ->setup callback this time. So if you need this, then all the other ->setup routines would actually fail as well. Either this is leftover from when you did things in ->probe or ->open or this is some thing we might better fix properly in the core instead of papering over it. Can you recheck if this is really needed.
+> Many IPs within those SoCs like vdec/vpu rely on those canvas to read/write
+> pixels.
+
+I rebased my DRM Overlay patch on top of this and :
+Tested-by: Neil Armstrong <narmstrong@baylibre.com>
+
+You can keep this tag on future versions.
+
+The tree is available at : https://github.com/superna9999/linux/commits/amlogic/v4.19/drm-overlay-canvas
+
+Neil
+
 > 
-
-I added a counter print and the counter increments as below
-
-	/* atomic_inc(&hdev->cmd_cnt); */
-        pr_info("cmd_cnt = %d\n" , atomic_read(&hdev->cmd_cnt));
-
-        skb = __hci_cmd_sync_ev(hdev, 0xfc6f, hlen, &wc, HCI_VENDOR_PKT,
-                                HCI_INIT_TIMEOUT);
-
-and the log show up that 
-
-
-[  334.049156] Bluetooth: hci0: command 0xfc6f tx timeout
-[  334.054840] cmd_cnt = 0
-[  336.065076] Bluetooth: hci0: command 0xfc6f tx timeout
-[  336.070795] cmd_cnt = 0
-[  338.080997] Bluetooth: hci0: command 0xfc6f tx timeout
-[  338.086683] cmd_cnt = 0
-[  340.096907] Bluetooth: hci0: command 0xfc6f tx timeout
-[  340.102609] cmd_cnt = 0
-[  342.112824] Bluetooth: hci0: command 0xfc6f tx timeout
-[  342.118520] cmd_cnt = 0
-[  344.128747] Bluetooth: hci0: command 0xfc6f tx timeout
-[  344.134454] cmd_cnt = 0
-[  346.144667] Bluetooth: hci0: command 0xfc6f tx timeout
-[  346.150372] cmd_cnt = 0
-
-
-The packet is dropped by hci_cmd_work at [1], so I also wondered why the
-other vendor driver works, it seems the counter needs to be incremented
-before every skb is being queued to cmd_q.
-
-4257 static void hci_cmd_work(struct work_struct *work)
-4258 {
-4259         struct hci_dev *hdev = container_of(work, struct hci_dev, cmd_work);
-4260         struct sk_buff *skb;
-4261
-4262         BT_DBG("%s cmd_cnt %d cmd queued %d", hdev->name,
-4263                atomic_read(&hdev->cmd_cnt), skb_queue_len(&hdev->cmd_q));
-4264
-4265         /* Send queued commands */
-
-[1]
-4266         if (atomic_read(&hdev->cmd_cnt)) { /* dropped when cmd_cnt is zero */
-4267                 skb = skb_dequeue(&hdev->cmd_q);
-4268                 if (!skb)
-4269                         return;
-4270
-4271                 kfree_skb(hdev->sent_cmd);
-4272
-4273                 hdev->sent_cmd = skb_clone(skb, GFP_KERNEL);
-4274                 if (hdev->sent_cmd) {
-4275                         atomic_dec(&hdev->cmd_cnt);  /* cmd_cnt-- */
-4276                         hci_send_frame(hdev, skb);
-
-
-> >>> +
-> >>> +	skb = __hci_cmd_sync_ev(hdev, 0xfc6f, hlen, &wc, HCI_VENDOR_PKT,
-> >>> +				HCI_INIT_TIMEOUT);
-> >>> +
-> >>> +	if (IS_ERR(skb)) {
-> >>> +		int err = PTR_ERR(skb);
-> >>> +
-> >>> +		bt_dev_err(hdev, "Failed to send wmt cmd (%d)", err);
-> >>> +		return err;
-> >>> +	}
-> >>> +
-> >>> +	kfree_skb(skb);
-> >>> +
-> >>> +	return 0;
-> >>> +}
-> >>> +
-
-[ ... ]
-
-> >>> +	shdr->dlen2 = dlen & 0xff;
-> >>> +	shdr->cs = p[0] + p[1] + p[2];
-> >> 
-> > 
-> > as above discussion about shr->cs , it can be filled with zero to have less computing 
+> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
+> ---
+>  drivers/soc/amlogic/Kconfig              |   7 +
+>  drivers/soc/amlogic/Makefile             |   1 +
+>  drivers/soc/amlogic/meson-canvas.c       | 182 +++++++++++++++++++++++
+>  include/linux/soc/amlogic/meson-canvas.h |  37 +++++
+>  4 files changed, 227 insertions(+)
+>  create mode 100644 drivers/soc/amlogic/meson-canvas.c
+>  create mode 100644 include/linux/soc/amlogic/meson-canvas.h
 > 
-> If it has no value, then zero it out and add a comment for it.
-> 
-
-okay
-
-> > 
-> >> I would add another comment here that this added the STP trailer. And change the above to mention it adds the STP header.
-> >> 
-> > 
-> > sure
-> > 
-> >> And you might want to check if there is space for the trailer as well. Otherwise skb_put tends to call BUG() if I remember correctly. I know this is super unlikely since our bt_skb_alloc is pretty large.
-> >> 
-> > 
-> > sure, I will add the handling for that. it should be better to make sure all rooms are enough for header and trailer before adding content to them
-> > 
-> > 
-
-[ ... ]
-
-> >> You want to add a MODULE_FIRMWARE here as well.
-> >> 
-> > 
-> > okay
-> 
-> Regards
-> 
-> Marcel
+> diff --git a/drivers/soc/amlogic/Kconfig b/drivers/soc/amlogic/Kconfig
+> index b04f6e4aedbc..5bd049899d88 100644
+> --- a/drivers/soc/amlogic/Kconfig
+> +++ b/drivers/soc/amlogic/Kconfig
+> @@ -1,5 +1,12 @@
+>  menu "Amlogic SoC drivers"
+>  
+> +config MESON_CANVAS
+> +	bool "Amlogic Meson Canvas driver"
+> +	depends on ARCH_MESON || COMPILE_TEST
+> +	default ARCH_MESON
+> +	help
+> +	  Say yes to support the canvas IP within Amlogic Meson Soc family.
+> +
+>  config MESON_GX_SOCINFO
+>  	bool "Amlogic Meson GX SoC Information driver"
+>  	depends on ARCH_MESON || COMPILE_TEST
+> diff --git a/drivers/soc/amlogic/Makefile b/drivers/soc/amlogic/Makefile
+> index 8fa321893928..0ab16d35ac36 100644
+> --- a/drivers/soc/amlogic/Makefile
+> +++ b/drivers/soc/amlogic/Makefile
+> @@ -1,3 +1,4 @@
+> +obj-$(CONFIG_MESON_CANVAS) += meson-canvas.o
+>  obj-$(CONFIG_MESON_GX_SOCINFO) += meson-gx-socinfo.o
+>  obj-$(CONFIG_MESON_GX_PM_DOMAINS) += meson-gx-pwrc-vpu.o
+>  obj-$(CONFIG_MESON_MX_SOCINFO) += meson-mx-socinfo.o
+> diff --git a/drivers/soc/amlogic/meson-canvas.c b/drivers/soc/amlogic/meson-canvas.c
+> new file mode 100644
+> index 000000000000..671eb89c8904
+> --- /dev/null
+> +++ b/drivers/soc/amlogic/meson-canvas.c
+> @@ -0,0 +1,182 @@
+> +/*
+> + * Copyright (C) 2018 Maxime Jourdan
+> + * Copyright (C) 2016 BayLibre, SAS
+> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+> + * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
+> + * Copyright (C) 2014 Endless Mobile
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of the
+> + * License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful, but
+> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/soc/amlogic/meson-canvas.h>
+> +#include <asm/io.h>
+> +
+> +#define NUM_CANVAS 256
+> +
+> +/* DMC Registers */
+> +#define DMC_CAV_LUT_DATAL	0x48 /* 0x12 offset in data sheet */
+> +	#define CANVAS_WIDTH_LBIT	29
+> +	#define CANVAS_WIDTH_LWID       3
+> +#define DMC_CAV_LUT_DATAH	0x4c /* 0x13 offset in data sheet */
+> +	#define CANVAS_WIDTH_HBIT       0
+> +	#define CANVAS_HEIGHT_BIT       9
+> +	#define CANVAS_BLKMODE_BIT      24
+> +#define DMC_CAV_LUT_ADDR	0x50 /* 0x14 offset in data sheet */
+> +	#define CANVAS_LUT_WR_EN        (0x2 << 8)
+> +	#define CANVAS_LUT_RD_EN        (0x1 << 8)
+> +
+> +struct meson_canvas {
+> +	struct device *dev;
+> +	struct regmap *regmap_dmc;
+> +	struct mutex lock;
+> +	u8 used[NUM_CANVAS];
+> +};
+> +
+> +static struct meson_canvas canvas = { 0 };
+> +
+> +static int meson_canvas_setup(uint8_t canvas_index, uint32_t addr,
+> +			uint32_t stride, uint32_t height,
+> +			unsigned int wrap,
+> +			unsigned int blkmode,
+> +			unsigned int endian)
+> +{
+> +	struct regmap *regmap = canvas.regmap_dmc;
+> +	u32 val;
+> +
+> +	mutex_lock(&canvas.lock);
+> +
+> +	if (!canvas.used[canvas_index]) {
+> +		dev_err(canvas.dev,
+> +			"Trying to setup non allocated canvas %u\n",
+> +			canvas_index);
+> +		mutex_unlock(&canvas.lock);
+> +		return -EINVAL;
+> +	}
+> +
+> +	regmap_write(regmap, DMC_CAV_LUT_DATAL,
+> +		((addr + 7) >> 3) |
+> +		(((stride + 7) >> 3) << CANVAS_WIDTH_LBIT));
+> +
+> +	regmap_write(regmap, DMC_CAV_LUT_DATAH,
+> +		((((stride + 7) >> 3) >> CANVAS_WIDTH_LWID) <<
+> +						CANVAS_WIDTH_HBIT) |
+> +		(height << CANVAS_HEIGHT_BIT) |
+> +		(wrap << 22) |
+> +		(blkmode << CANVAS_BLKMODE_BIT) |
+> +		(endian << 26));
+> +
+> +	regmap_write(regmap, DMC_CAV_LUT_ADDR,
+> +		CANVAS_LUT_WR_EN | canvas_index);
+> +
+> +	/* Force a read-back to make sure everything is flushed. */
+> +	regmap_read(regmap, DMC_CAV_LUT_DATAH, &val);
+> +	mutex_unlock(&canvas.lock);
+> +
+> +	return 0;
+> +}
+> +
+> +static int meson_canvas_alloc(uint8_t *canvas_index)
+> +{
+> +	int i;
+> +
+> +	mutex_lock(&canvas.lock);
+> +	for (i = 0; i < NUM_CANVAS; ++i) {
+> +		if (!canvas.used[i]) {
+> +			canvas.used[i] = 1;
+> +			mutex_unlock(&canvas.lock);
+> +			*canvas_index = i;
+> +			return 0;
+> +		}
+> +	}
+> +	mutex_unlock(&canvas.lock);
+> +	dev_err(canvas.dev, "No more canvas available\n");
+> +
+> +	return -ENODEV;
+> +}
+> +
+> +static int meson_canvas_free(uint8_t canvas_index)
+> +{
+> +	mutex_lock(&canvas.lock);
+> +	if (!canvas.used[canvas_index]) {
+> +		dev_err(canvas.dev,
+> +			"Trying to free unused canvas %u\n", canvas_index);
+> +		mutex_unlock(&canvas.lock);
+> +		return -EINVAL;
+> +	}
+> +	canvas.used[canvas_index] = 0;
+> +	mutex_unlock(&canvas.lock);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct meson_canvas_platform_data canvas_platform_data = {
+> +	.alloc = meson_canvas_alloc,
+> +	.free = meson_canvas_free,
+> +	.setup = meson_canvas_setup,
+> +};
+> +
+> +static int meson_canvas_probe(struct platform_device *pdev)
+> +{
+> +	struct regmap *regmap_dmc;
+> +	struct device *dev;
+> +
+> +	dev = &pdev->dev;
+> +
+> +	regmap_dmc = syscon_node_to_regmap(of_get_parent(dev->of_node));
+> +	if (IS_ERR(regmap_dmc)) {
+> +		dev_err(&pdev->dev, "failed to get DMC regmap\n");
+> +		return PTR_ERR(regmap_dmc);
+> +	}
+> +
+> +	canvas.dev = dev;
+> +	canvas.regmap_dmc = regmap_dmc;
+> +	mutex_init(&canvas.lock);
+> +
+> +	dev->platform_data = &canvas_platform_data;
+> +
+> +	return 0;
+> +}
+> +
+> +static int meson_canvas_remove(struct platform_device *pdev)
+> +{
+> +	mutex_destroy(&canvas.lock);
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id canvas_dt_match[] = {
+> +	{ .compatible = "amlogic,meson-canvas" },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, canvas_dt_match);
+> +
+> +static struct platform_driver meson_canvas_driver = {
+> +	.probe = meson_canvas_probe,
+> +	.remove = meson_canvas_remove,
+> +	.driver = {
+> +		.name = "meson-canvas",
+> +		.of_match_table = canvas_dt_match,
+> +	},
+> +};
+> +module_platform_driver(meson_canvas_driver);
+> +
+> +MODULE_ALIAS("platform:meson-canvas");
+> +MODULE_DESCRIPTION("AMLogic Meson Canvas driver");
+> +MODULE_AUTHOR("Maxime Jourdan <maxi.jourdan@wanadoo.fr>");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/include/linux/soc/amlogic/meson-canvas.h b/include/linux/soc/amlogic/meson-canvas.h
+> new file mode 100644
+> index 000000000000..af9e2415056a
+> --- /dev/null
+> +++ b/include/linux/soc/amlogic/meson-canvas.h
+> @@ -0,0 +1,37 @@
+> +/*
+> + * Copyright (c) 2018 Maxime Jourdan
+> + * Author: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +#ifndef MESON_CANVAS_H
+> +#define MESON_CANVAS_H
+> +
+> +#include <linux/kernel.h>
+> +
+> +#define MESON_CANVAS_WRAP_NONE	0x00
+> +#define MESON_CANVAS_WRAP_X	0x01
+> +#define MESON_CANVAS_WRAP_Y	0x02
+> +
+> +#define MESON_CANVAS_BLKMODE_LINEAR	0x00
+> +#define MESON_CANVAS_BLKMODE_32x32	0x01
+> +#define MESON_CANVAS_BLKMODE_64x64	0x02
+> +
+> +struct meson_canvas_platform_data {
+> +	int (*alloc)(uint8_t *canvas_index);
+> +	int (*free) (uint8_t canvas_index);
+> +	int (*setup)(uint8_t canvas_index, uint32_t addr,
+> +			uint32_t stride, uint32_t height,
+> +			unsigned int wrap,
+> +			unsigned int blkmode,
+> +			unsigned int endian);
+> +};
+> +
+> +#endif
 > 
