@@ -1,58 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 2 Aug 2018 16:07:22 +0200
-Subject: [PATCH] ARM: shmobile: silk: Add DA9063 PMIC node
-In-Reply-To: <42d09bc8-a883-c3af-b0d6-0087b6e2558e@gmail.com>
-References: <20180730111817.5636-1-marek.vasut+renesas@gmail.com>
- <CAMuHMdXib8fz3c41RX-70eA5w4ThM6e02ybmX=N=xXR6=F80KA@mail.gmail.com>
- <42d09bc8-a883-c3af-b0d6-0087b6e2558e@gmail.com>
-Message-ID: <CAMuHMdXSjLSsmU32tKo5tkS6+MipAXuVAUqkLYrXxmR07+eCEg@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 2 Aug 2018 08:09:26 -0600
+Subject: [PATCH v8 2/4] dt-bindings: mailbox: imx-mu: add generic MU
+ channel support
+In-Reply-To: <20180801050530.nzmomvvyo5pfwclz@pengutronix.de>
+References: <20180731141146.10788-1-o.rempel@pengutronix.de>
+ <20180731141146.10788-3-o.rempel@pengutronix.de>
+ <CABb+yY1ZusgN4UVxmUgXZS9ObGdLwFAL4XkW7F1yVb6Gq=9XPA@mail.gmail.com>
+ <20180801050530.nzmomvvyo5pfwclz@pengutronix.de>
+Message-ID: <CAL_Jsq+S0c9TNSfaHahQGZ05OcRMZnpbbwBRps_dOEm+WofyLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-On Thu, Aug 2, 2018 at 3:56 PM Marek Vasut <marek.vasut@gmail.com> wrote:
-> On 08/01/2018 02:32 PM, Geert Uytterhoeven wrote:
-> > On Mon, Jul 30, 2018 at 1:18 PM Marek Vasut <marek.vasut@gmail.com> wrote:
-> >> Add DA9063 PMIC node to the I2C bus.
-> >>
-> >> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> >
-> > Thanks for your patch!
-> >
-> > Oneline-summary prefix should be "ARM: dts: silk:".
+On Tue, Jul 31, 2018 at 11:05 PM Oleksij Rempel <o.rempel@pengutronix.de> wrote:
 >
-> Right, fixed
+> On Tue, Jul 31, 2018 at 09:28:09PM +0530, Jassi Brar wrote:
+> > On Tue, Jul 31, 2018 at 7:41 PM, Oleksij Rempel <o.rempel@pengutronix.de> wrote:
+> > > Each MU has four pairs of rx/tx data register with four rx/tx interrupts
+> > > which can also be used as a separate channel.
+> > >
+> > > Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> > > ---
+> > >  .../devicetree/bindings/mailbox/fsl,mu.txt    | 28 +++++++++++++++++--
+> > >  1 file changed, 25 insertions(+), 3 deletions(-)
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> > > index 90e4905dfc69..9efd3a9ade44 100644
+> > > --- a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> > > +++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> > > @@ -18,11 +18,33 @@ Messaging Unit Device Node:
+> > >  Required properties:
+> > >  -------------------
+> > >  - compatible : should be "fsl,<chip>-mu", the supported chips include
+> > > -               imx8qxp, imx8qm.
+> > > +               imx6sx, imx7s, imx8qxp, imx8qm.
+> > > +               The "fsl,imx6sx-mu" compatible is seen as generic and should
+> > > +               be included together with SoC specific compatible.
+> > >  - reg :                Should contain the registers location and length
+> > >  - interrupts : Interrupt number. The interrupt specifier format depends
+> > >                 on the interrupt controller parent.
+> > > -- #mbox-cells:  Must be 0. Number of cells in a mailbox
+> > > +- #mbox-cells:  Must be 2.
+> > >
+> > This seems like modifying the bindings. But since nothing exists yet,
+> > maybe we should merge patch 1 and 2 ?
 >
-> >> --- a/arch/arm/boot/dts/r8a7794-silk.dts
-> >> +++ b/arch/arm/boot/dts/r8a7794-silk.dts
-> >> @@ -403,6 +403,18 @@
-> >>         pinctrl-names = "i2c-hdmi";
-> >>
-> >>         clock-frequency = <400000>;
-> >> +
-> >> +       pmic at 5a {
-> >
-> > Hmm, the da9063 is actually connected to two i2c buses: i2c1 (3.3v)
-> > and i2c7 (1.8v).
-> > On Koelsch, we describe the 1.8v connection, as that i2c bus
-> > ("i2c_dvfs") is meant
-> > for power control.
->
-> On Koelsch, the pmic is sitting on i2c6 only. What am I missing ?
+> For some weeks I already asked to squash this patches.. it was not
+> ACKed. We can try again... @Rob, @Aisheng, should I merge this two
+> patches?
 
-On Koelsch, i2c6 is wired to the da9063' 2-wire bus, and i2c1 is wired to
-the da9063's HS (high-speed) 2-wire bus.
+Whatever you like. I don't really care.
 
-Wolfram: do you like i2c slaves connected to multiple buses?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Rob
