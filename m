@@ -1,43 +1,20 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 2 Aug 2018 21:21:49 +0000
-Subject: [PATCH] arm_pmu: fix compiler warning in arm_pmu_device_probe
-References: <20180801214526.24599-1-chris.packham@alliedtelesis.co.nz>
- <20180802105705.GB14312@arm.com>
-Message-ID: <31509165164e4e32af172a1857a2ab90@svr-chch-ex1.atlnz.lc>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 02 Aug 2018 14:39:26 -0700 (PDT)
+Subject: [PATCH v4 0/8] Add clock config and pm support to bcm iProc
+ mdio mux
+In-Reply-To: <1533171233-14557-1-git-send-email-arun.parameswaran@broadcom.com>
+References: <1533171233-14557-1-git-send-email-arun.parameswaran@broadcom.com>
+Message-ID: <20180802.143926.1196419242536904239.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/18 23:05, Will Deacon wrote:
-> On Thu, Aug 02, 2018 at 09:45:26AM +1200, Chris Packham wrote:
->> GCC warns
->>
->>    arm_pmu_platform.c:234:5: error: 'err' may be used uninitialized in this function [-Werror=maybe-uninitialized]
->>
->> This is because we rely on the for_each_cpu loop in armpmu_request_irqs
->> to initialise err. The warning is a little bogus because we know if
->> there were 0 CPUs this code would not be running.
->>
->> Initialise err to 0 to avoid the warning.
->>
->> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->> ---
->> This has been reported before in https://lkml.org/lkml/2018/3/5/508 I'm not
->> sure if it was dismmissed as "meh, gcc is wrong" or if it was just wainting for
->> someone with some round tuits.
-> 
-> Which version of GCC are you using? I don't see this warning locally.
-> 
+From: Arun Parameswaran <arun.parameswaran@broadcom.com>
+Date: Wed,  1 Aug 2018 17:53:45 -0700
 
-My local cross-compiler is
+> The patchset extends the Broadcom iProc mdio mux to add support for
+> suspend/resume and the ability to configure the internal clock
+> divider. The patchset also sets the scan control register to
+> disable external master access.
+ ...
 
-$ arm-softfloat-linux-gnueabi-gcc --version
-arm-softfloat-linux-gnueabi-gcc (crosstool-NG crosstool-ng-1.22.0) 4.9.3
-
-Old-ish but as far as I was aware still supported for building the kernel.
-
-I've just tried 7.3.0 and 8.1.0 neither of which complain.
-
-A quick look at the report linked to above seems they probably were 
-using 4.6.3 and it still appears in current build reports
-
-http://kisskb.ellerman.id.au/kisskb/buildresult/13455291/
+Series applied to net-next, thank you.
