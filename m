@@ -1,49 +1,76 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 02 Aug 2018 13:59:43 -0700
-Subject: [PATCH v10 00/10] drivers: Introduce firmware dnd clock river for
- ZynqMP core
-In-Reply-To: <e5448935-770a-5c14-438c-23a652b17822@xilinx.com>
-References: <1531857547-16652-1-git-send-email-jollys@xilinx.com>
- <2c3aad45-37ce-2446-4b90-bddb477286ed@xilinx.com>
- <CY1PR02MB2138E21A3FFBD5FEEAA7D6D4B8550@CY1PR02MB2138.namprd02.prod.outlook.com>
- <19376df2-fdd4-12e3-da4c-37106fffed19@xilinx.com>
- <153262301567.48062.15432354725863055071@swboyd.mtv.corp.google.com>
- <e5448935-770a-5c14-438c-23a652b17822@xilinx.com>
-Message-ID: <153324358299.10763.8724416723915219268@swboyd.mtv.corp.google.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 2 Aug 2018 15:02:16 -0600
+Subject: [PATCH v7 2/8] dt-bindings: Introduce interconnect provider
+ bindings
+In-Reply-To: <20180731161340.13000-3-georgi.djakov@linaro.org>
+References: <20180731161340.13000-1-georgi.djakov@linaro.org>
+ <20180731161340.13000-3-georgi.djakov@linaro.org>
+Message-ID: <CABGGisxq+hf91R18pnZ=VZ9f99GssWWPhpPCjNAROJmKg5-udA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Michal Simek (2018-07-30 05:50:42)
-> On 26.7.2018 18:36, Stephen Boyd wrote:
-> > Quoting Michal Simek (2018-07-25 02:51:14)
-> >> On 24.7.2018 20:14, Jolly Shah wrote:
-> >>>>>  create mode 100644 drivers/firmware/xilinx/zynqmp-debug.h
-> >>>>>  create mode 100644 drivers/firmware/xilinx/zynqmp.c  create mode
-> >>>>> 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
-> >>>>>  create mode 100644 include/linux/firmware/xlnx-zynqmp.h
-> >>>>>
-> >>>>
-> >>>> It looks pretty calm over the last several series that's why when I get an answer
-> >>>> from Stephen or Mike I will take this series via my tree and arm-soc tree.
-> >>>>
-> >>>> I have applied 01-08 here
-> >>>>  https://github.com/Xilinx/linux-xlnx/commits/zynqmp/soc
-> >>>>
-> >>>> Thanks,
-> >>>> Michal
-> >>>
-> >>>
-> >>> Thanks for merging the patches. 
-> >>> By mistake I added ?Reviewed-by: Stephen Boyd sboyd at kernel.org? for firmware bindings (Patch01).  Stephen had reviewed clock bindings only.  Please suggest if I should send a new version with that fix.
-> >>
-> >> I have fixed that in my branch and I have asked Shephen to look at clk
-> >> over chat.
-> >>
-> > 
-> > I have some unresolved review comments on v9. I'll give reviewed-by when
-> > that discussion is resolved.
-> 
-> ok. Do you want to take them via clk tree or via arm-soc tree?
-> 
+On Tue, Jul 31, 2018 at 10:13 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+>
+> This binding is intended to represent the interconnect hardware present
+> in some of the modern SoCs. Currently it consists only of a binding for
+> the interconnect hardware devices (provider).
 
-I'm fine for the clk patch to go via arm-soc if that makes it easier.
+If you want the bindings reviewed, then you need to send them to the
+DT list. CC'ing me is pointless, I get CC'ed too many things to read.
+
+The consumer and producer binding should be a single patch. One is not
+useful without the other.
+
+There is also a patch series from Maxime Ripard that's addressing the
+same general area. See "dt-bindings: Add a dma-parent property". We
+don't need multiple ways to address describing the device to memory
+paths, so you all had better work out a common solution.
+
+Rob
+
+>
+> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+> ---
+>  .../bindings/interconnect/interconnect.txt    | 33 +++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
+>
+> diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
+> new file mode 100644
+> index 000000000000..6e2b2971b094
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
+> @@ -0,0 +1,33 @@
+> +Interconnect Provider Device Tree Bindings
+> +=========================================
+> +
+> +The purpose of this document is to define a common set of generic interconnect
+> +providers/consumers properties.
+> +
+> +
+> += interconnect providers =
+> +
+> +The interconnect provider binding is intended to represent the interconnect
+> +controllers in the system. Each provider registers a set of interconnect
+> +nodes, which expose the interconnect related capabilities of the interconnect
+> +to consumer drivers. These capabilities can be throughput, latency, priority
+> +etc. The consumer drivers set constraints on interconnect path (or endpoints)
+> +depending on the use case. Interconnect providers can also be interconnect
+> +consumers, such as in the case where two network-on-chip fabrics interface
+> +directly
+> +
+> +Required properties:
+> +- compatible : contains the interconnect provider compatible string
+> +- #interconnect-cells : number of cells in a interconnect specifier needed to
+> +                       encode the interconnect node id
+> +
+> +Example:
+> +
+> +               snoc: snoc at 580000 {
+> +                       compatible = "qcom,msm8916-snoc";
+> +                       #interconnect-cells = <1>;
+> +                       reg = <0x580000 0x14000>;
+> +                       clock-names = "bus_clk", "bus_a_clk";
+> +                       clocks = <&rpmcc RPM_SMD_SNOC_CLK>,
+> +                                <&rpmcc RPM_SMD_SNOC_A_CLK>;
+> +               };
