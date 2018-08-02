@@ -1,40 +1,59 @@
 From: arun.parameswaran@broadcom.com (Arun Parameswaran)
-Date: Wed,  1 Aug 2018 17:53:51 -0700
-Subject: [PATCH v4 6/8] dt-bindings: net: Add clock handle to Broadcom iProc
- mdio mux
+Date: Wed,  1 Aug 2018 17:53:50 -0700
+Subject: [PATCH v4 5/8] net: phy: Use devm api for mdio bus allocation in bcm
+ iproc mdio mux
 In-Reply-To: <1533171233-14557-1-git-send-email-arun.parameswaran@broadcom.com>
 References: <1533171233-14557-1-git-send-email-arun.parameswaran@broadcom.com>
-Message-ID: <1533171233-14557-7-git-send-email-arun.parameswaran@broadcom.com>
+Message-ID: <1533171233-14557-6-git-send-email-arun.parameswaran@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock phandle, of the core clock driving the mdio block, as an
-optional property to the Broadcom iProc mdio mux.
-
-The clock, when specified, will be used to setup the rate adjust registers
-in the mdio to derrive the mdio's operating frequency.
+Use devm_mdiobus_alloc() instead of mdiobus_alloc() in the Broadcom
+iProc mdio mux driver.
 
 Signed-off-by: Arun Parameswaran <arun.parameswaran@broadcom.com>
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/net/phy/mdio-mux-bcm-iproc.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-index dc8aa68..b58843f 100644
---- a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-+++ b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-@@ -13,6 +13,9 @@ MDIO multiplexer node:
- Every non-ethernet PHY requires a compatible so that it could be probed based
- on this compatible string.
+diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
+index c36ce4b..3ba9616 100644
+--- a/drivers/net/phy/mdio-mux-bcm-iproc.c
++++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
+@@ -198,7 +198,7 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
+ 		return PTR_ERR(md->base);
+ 	}
  
-+Optional properties:
-+- clocks: phandle of the core clock which drives the mdio block.
-+
- Additional information regarding generic multiplexer properties can be found
- at- Documentation/devicetree/bindings/net/mdio-mux.txt
+-	md->mii_bus = mdiobus_alloc();
++	md->mii_bus = devm_mdiobus_alloc(&pdev->dev);
+ 	if (!md->mii_bus) {
+ 		dev_err(&pdev->dev, "mdiomux bus alloc failed\n");
+ 		return -ENOMEM;
+@@ -217,7 +217,7 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
+ 	rc = mdiobus_register(bus);
+ 	if (rc) {
+ 		dev_err(&pdev->dev, "mdiomux registration failed\n");
+-		goto out;
++		return rc;
+ 	}
  
+ 	platform_set_drvdata(pdev, md);
+@@ -236,8 +236,6 @@ static int mdio_mux_iproc_probe(struct platform_device *pdev)
+ 
+ out_register:
+ 	mdiobus_unregister(bus);
+-out:
+-	mdiobus_free(bus);
+ 	return rc;
+ }
+ 
+@@ -247,7 +245,6 @@ static int mdio_mux_iproc_remove(struct platform_device *pdev)
+ 
+ 	mdio_mux_uninit(md->mux_handle);
+ 	mdiobus_unregister(md->mii_bus);
+-	mdiobus_free(md->mii_bus);
+ 
+ 	return 0;
+ }
 -- 
 1.9.1
