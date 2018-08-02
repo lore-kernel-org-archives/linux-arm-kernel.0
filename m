@@ -1,82 +1,32 @@
-From: skannan@codeaurora.org (skannan at codeaurora.org)
-Date: Thu, 02 Aug 2018 12:12:15 -0700
-Subject: [PATCH v7 8/8] interconnect: Allow endpoints translation via DT
-In-Reply-To: <3a7bb27a-0609-133b-08e9-8864f1ccc4bc@linaro.org>
-References: <20180731161340.13000-1-georgi.djakov@linaro.org>
- <20180731161340.13000-9-georgi.djakov@linaro.org>
- <804925d5927ccb6927b16f7e9a4aa05c@codeaurora.org>
- <3a7bb27a-0609-133b-08e9-8864f1ccc4bc@linaro.org>
-Message-ID: <37ac189618cda02567977f65570d15d3@codeaurora.org>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Thu, 2 Aug 2018 15:31:15 -0400 (EDT)
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+Message-ID: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-08-02 05:07, Georgi Djakov wrote:
-> Hi Saravana,
-> 
-> On 08/02/2018 01:57 AM, skannan at codeaurora.org wrote:
->> On 2018-07-31 09:13, Georgi Djakov wrote:
->>> Currently we support only platform data for specifying the 
->>> interconnect
->>> endpoints. As now the endpoints are hard-coded into the consumer 
->>> driver
->>> this may lead to complications when a single driver is used by 
->>> multiple
->>> SoCs, which may have different interconnect topology.
->>> To avoid cluttering the consumer drivers, introduce a translation
->>> function
->>> to help us get the board specific interconnect data from device-tree.
->>> 
->>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->>> ---
->>> ?drivers/interconnect/core.c? | 62 
->>> ++++++++++++++++++++++++++++++++++++
->>> ?include/linux/interconnect.h |? 7 ++++
->>> ?2 files changed, 69 insertions(+)
->>> 
->>> diff --git a/drivers/interconnect/core.c 
->>> b/drivers/interconnect/core.c
->>> index 9fef180cf77e..d1b6adff0a3d 100644
->>> --- a/drivers/interconnect/core.c
->>> +++ b/drivers/interconnect/core.c
-> [..]
->>> --- a/include/linux/interconnect.h
->>> +++ b/include/linux/interconnect.h
->>> @@ -17,6 +17,7 @@ struct device;
->>> 
->>> ?struct icc_path *icc_get(struct device *dev, const int src_id,
->>> ????????????? const int dst_id);
->>> +struct icc_path *of_icc_get(struct device *dev, const char *name);
->>> ?void icc_put(struct icc_path *path);
->>> ?int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
->>> 
->>> @@ -28,6 +29,12 @@ static inline struct icc_path *icc_get(struct
->>> device *dev, const int src_id,
->>> ???? return NULL;
->>> ?}
->>> 
->>> +static inline struct icc_path *of_icc_get(struct device *dev,
->>> +????????????????????? const char *name)
->>> +{
->>> +??? return NULL;
->>> +}
->>> +
->> 
->> Might want to return PTR(-ENODEV) or some error code so that client
->> doesn't have to do NULL check AND an error check?
->> 
->> -Saravana
-> 
-> NULL is returned when CONFIG_INTERCONNECT=n. Configuration of
-> interconnects by consumer drivers could be optional and that's why null
-> is returned instead of an error. The consumer drivers decide how to
-> proceed in this case and if there is a hard requirement for 
-> interconnect
-> support, then i would suggest to express it as a dependency in Kconfig.
+Hi
 
-Ehh... you could make the same argument with an error. If it's not 
-mandatory for functioning, they can ignore a specific error and 
-continue? At a minimum, these stub functions returning NULL doesn't 
-match with the documentation that says these APIs will only ever return 
-ERR_PTR().
+I tried to use a PCIe graphics card on the MacchiatoBIN board and I hit a 
+strange problem.
 
--Saravana
+When I use the links browser in graphics mode on the framebuffer, I get 
+occasional pixel corruption. Links does memcpy, memset and 4-byte writes 
+on the framebuffer - nothing else.
+
+I found out that the pixel corruption is caused by overlapping unaligned 
+stp instructions inside memcpy. In order to avoid branching, the arm64 
+memcpy implementation may write the same destination twice with different 
+alignment. If I put "dmb sy" between the overlapping stp instructions, the 
+pixel corruption goes away.
+
+This seems like a hardware bug. Is it a known errata? Do you have any 
+workarounds for it?
+
+I tried AMD card (HD 6350) and NVidia (NVS 285) and both exhibit the same 
+corruption. OpenGL doesn't work (it results in artifacts on the AMD card 
+and lock-up on the NVidia card), but it's quite expected if even simple 
+writing to the framebuffer doesn't work.
+
+Mikulas
