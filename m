@@ -1,50 +1,66 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Thu,  2 Aug 2018 09:23:24 +0200
-Subject: [PATCH v9 3/4] ARM: dts: imx7s: add i.MX7 messaging unit support
+Date: Thu,  2 Aug 2018 09:23:23 +0200
+Subject: [PATCH v9 2/4] dt-bindings: mailbox: imx-mu: add generic MU channel
+ support
 In-Reply-To: <20180802072325.22991-1-o.rempel@pengutronix.de>
 References: <20180802072325.22991-1-o.rempel@pengutronix.de>
-Message-ID: <20180802072325.22991-4-o.rempel@pengutronix.de>
+Message-ID: <20180802072325.22991-3-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Messaging Unit (MU) for i.MX7 in the processor's dtsi.
-The respective driver is added in the next commit.
+Each MU has four pairs of rx/tx data register with four rx/tx interrupts
+which can also be used as a separate channel.
 
-Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 ---
- arch/arm/boot/dts/imx7s.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ .../devicetree/bindings/mailbox/fsl,mu.txt    | 26 ++++++++++++++++---
+ 1 file changed, 23 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index ce85b3ca1a55..3581fc2cc01d 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -1001,6 +1001,25 @@
- 				status = "disabled";
- 			};
+diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+index 90e4905dfc69..f3cf77eb5ab4 100644
+--- a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
++++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+@@ -18,11 +18,31 @@ Messaging Unit Device Node:
+ Required properties:
+ -------------------
+ - compatible :	should be "fsl,<chip>-mu", the supported chips include
+-		imx8qxp, imx8qm.
++		imx6sx, imx7s, imx8qxp, imx8qm.
++		The "fsl,imx6sx-mu" compatible is seen as generic and should
++		be included together with SoC specific compatible.
+ - reg :		Should contain the registers location and length
+ - interrupts :	Interrupt number. The interrupt specifier format depends
+ 		on the interrupt controller parent.
+-- #mbox-cells:  Must be 0. Number of cells in a mailbox
++- #mbox-cells:  Must be 2.
++			  <&phandle type channel>
++			    phandle   : Label name of controller
++			    type      : Channel type
++			    channel   : Channel number
++
++		This MU support 4 type of unidirectional channels, each type
++		has 4 channels. A total of 16 channels. Following types are
++		supported:
++		0 - TX channel with 32bit transmit register and IRQ transmit
++		acknowledgment support.
++		1 - RX channel with 32bit receive register and IRQ support
++		2 - TX doorbell channel. Without own register and no ACK support.
++		3 - RX doorbell channel.
++
++Optional properties:
++-------------------
++- clocks :	phandle to the input clock.
++- fsl,mu-side-b : Should be set for side B MU.
  
-+			mu0a: mailbox at 30aa0000 {
-+				compatible = "fsl,imx7s-mu", "fsl,imx6sx-mu";
-+				reg = <0x30aa0000 0x10000>;
-+				interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_MU_ROOT_CLK>;
-+				#mbox-cells = <2>;
-+				status = "disabled";
-+			};
-+
-+			mu0b: mailbox at 30ab0000 {
-+				compatible = "fsl,imx7s-mu", "fsl,imx6sx-mu";
-+				reg = <0x30ab0000 0x10000>;
-+				interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_MU_ROOT_CLK>;
-+				#mbox-cells = <2>;
-+				fsl,mu-side-b;
-+				status = "disabled";
-+			};
-+
- 			usbotg1: usb at 30b10000 {
- 				compatible = "fsl,imx7d-usb", "fsl,imx27-usb";
- 				reg = <0x30b10000 0x200>;
+ Examples:
+ --------
+@@ -30,5 +50,5 @@ lsio_mu0: mailbox at 5d1b0000 {
+ 	compatible = "fsl,imx8qxp-mu";
+ 	reg = <0x0 0x5d1b0000 0x0 0x10000>;
+ 	interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
+-	#mbox-cells = <0>;
++	#mbox-cells = <2>;
+ };
 -- 
 2.18.0
