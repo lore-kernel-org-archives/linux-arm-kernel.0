@@ -1,32 +1,84 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 2 Aug 2018 12:35:52 +0100
-Subject: [PATCH v9 3/6] kernel/reboot.c: export pm_power_off_prepare
-In-Reply-To: <94d48ecb-7302-c7ed-e815-730be0426a04@pengutronix.de>
-References: <20180802103425.3053-1-o.rempel@pengutronix.de>
- <20180802103425.3053-4-o.rempel@pengutronix.de>
- <20180802104443.GH9117@sirena.org.uk>
- <94d48ecb-7302-c7ed-e815-730be0426a04@pengutronix.de>
-Message-ID: <20180802113552.GJ9117@sirena.org.uk>
+From: stu.hsieh@mediatek.com (Stu Hsieh)
+Date: Thu, 2 Aug 2018 19:36:26 +0800
+Subject: [PATCH v1 06/15] drm/mediatek: add memory mode for RDMA
+In-Reply-To: <1532486454.9280.12.camel@mtksdaap41>
+References: <1532420235-22268-1-git-send-email-stu.hsieh@mediatek.com>
+ <1532420235-22268-7-git-send-email-stu.hsieh@mediatek.com>
+ <1532486454.9280.12.camel@mtksdaap41>
+Message-ID: <1533209786.11190.60.camel@mtksdccf07>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 02, 2018 at 12:47:27PM +0200, Oleksij Rempel wrote:
-> On 02.08.2018 12:44, Mark Brown wrote:
+Hi, CK:
 
-> > I thought we'd got an ack for this from Raphael on a previous version or
-> > am I mistaken?
+On Wed, 2018-07-25 at 10:40 +0800, CK Hu wrote:
+> Hi, Stu:
+> 
+> On Tue, 2018-07-24 at 16:17 +0800, Stu Hsieh wrote:
+> > This patch add memory mode for RDMA
+> > 
+> > If use RDMA to read data from memory, it should set memory mode to RDMA
+> > 
+> > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> > ---
+> >  drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 16 +++++++++++++++-
+> >  1 file changed, 15 insertions(+), 1 deletion(-)
+> > 
+> 
+> [...]
+> 
+> >  static inline struct mtk_disp_rdma *comp_to_rdma(struct mtk_ddp_comp *comp)
+> > @@ -111,7 +116,8 @@ static void mtk_rdma_start(struct mtk_ddp_comp *comp)
+> >  
+> >  static void mtk_rdma_stop(struct mtk_ddp_comp *comp)
+> >  {
+> > -	rdma_update_bits(comp, DISP_REG_RDMA_GLOBAL_CON, RDMA_ENGINE_EN, 0);
+> > +	writel(RDMA_SOFT_RESET, comp->regs + DISP_REG_RDMA_GLOBAL_CON);
+> > +	writel(0, comp->regs + DISP_REG_RDMA_GLOBAL_CON);
+> 
+> Without reset, what happen to dram mode? Why direct link mode need not
+> this reset?
+> 
 
-> No, we got an:
-> "Anyway, I have no particular problems with exporting
-> pm_power_off_prepare via EXPORT_SYMBOL_GPL()."
+There is nothing to happen, I would remove it.
 
-> Should i see it as ACK?
+> >  }
+> >  
+> >  static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
+> > @@ -121,10 +127,18 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
+> >  	unsigned int threshold;
+> >  	unsigned int reg;
+> >  	struct mtk_disp_rdma *rdma = comp_to_rdma(comp);
+> > +	bool *rdma_memory_mode = comp->comp_mode;
+> >  
+> >  	rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0, 0xfff, width);
+> >  	rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_1, 0xfffff, height);
+> >  
+> > +	if (*rdma_memory_mode == true) {
+> > +		rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0, 0xff0000,
+> > +				 MATRIX_INT_MTX_SEL_DEFAULT);
+> > +		rdma_update_bits(comp, DISP_REG_RDMA_GLOBAL_CON,
+> > +				 RDMA_MODE_MEMORY, RDMA_MODE_MEMORY);
+> > +	}
+> > +
+> 
+> I would like this to be a kind of 'layer' config. In some SoC, one layer
+> of OVL could switch to direct link input or dram input. So I think it's
+> better to move this setting into some layer interface.
+> 
+> Regards,
+> CK
+> 
 
-It's probably good enough.  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180802/4192567a/attachment.sig>
+If move it to layer_config, RDMA would not trigger interrupt.
+In the future, when cmdq patch upstream and accepted, this part can move
+to layer_config. 
+
+Regard,
+Stu
+
+> >  	/*
+> >  	 * Enable FIFO underflow since DSI and DPI can't be blocked.
+> >  	 * Keep the FIFO pseudo size reset default of 8 KiB. Set the
+> 
+> 
