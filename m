@@ -1,122 +1,157 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  2 Aug 2018 15:21:32 +0200
-Subject: [RFC/PoC PATCH 3/3] arm64: enable ROP protection by clearing SP bit
- #55 across function returns
-In-Reply-To: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
-References: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180802132133.23999-4-ard.biesheuvel@linaro.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 2 Aug 2018 15:38:51 +0200
+Subject: [PATCH v3] gpu/drm/exynos: Convert
+ drm_atomic_helper_suspend/resume()
+In-Reply-To: <20180802132152.GA2833@jordon-HP-15-Notebook-PC>
+References: <CGME20180802131924epcas4p105dc354b2ee651e70a5e777850222bc5@epcas4p1.samsung.com>
+ <20180802132152.GA2833@jordon-HP-15-Notebook-PC>
+Message-ID: <20180802133852eucas1p1de66cfd2db5ed0c87665567455ea4747~HFNvAtE4-1249412494eucas1p1c@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ROP attacks rely on a large supply of so-called 'gadgets', which are
-(in this context) short sequences of instructions ending in a stack
-pop and a return instruction. By exploiting a stack overflow to create
-a specially crafted stack frame, each gadget jumps to the next by
-popping off the next gadget's address as a fake return address,
-allowing non-trivial 'programs' to be executed by piecing together
-a large number of such gadgets.
+Hi,
 
-This attack vector relies heavily on the ability to jump to arbitrary
-places in the code. If we could limit where a function could return to,
-it is much more difficult to obtain critical mass in terms of a gadget
-collection that allows arbitrary attacks to be mounted.
+On 2018-08-02 15:21, Souptick Joarder wrote:
+> convert drm_atomic_helper_suspend/resume() to use
+> drm_mode_config_helper_suspend/resume().
+>
+> exynos_drm_fbdev_suspend/resume can be removed
+> as drm_mode_config_helper_suspend/resume has
+> implement the same in generic way.
+>
+> Remove suspend_state from exynos_drm_private
+> struct as it is no more useful.
+>
+> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
+> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+> v2: Address Inki Dae's comment. Remove ret variable
+>      from both suspend/resume function.
+>
+> v3: Tested by Marek. Updated the change log.
+>
+>   drivers/gpu/drm/exynos/exynos_drm_drv.c   | 26 ++------------------------
+>   drivers/gpu/drm/exynos/exynos_drm_drv.h   |  1 -
+>   drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 17 -----------------
+>   drivers/gpu/drm/exynos/exynos_drm_fbdev.h | 10 ----------
+>   4 files changed, 2 insertions(+), 52 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+> index b599f74..d86dd81 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+> @@ -149,37 +149,15 @@ static void exynos_drm_postclose(struct drm_device *dev, struct drm_file *file)
+>   static int exynos_drm_suspend(struct device *dev)
+>   {
+>   	struct drm_device *drm_dev = dev_get_drvdata(dev);
+> -	struct exynos_drm_private *private;
+> -
+> -	if (!drm_dev)
+> -		return 0;
+> -
+> -	private = drm_dev->dev_private;
+> -
+> -	drm_kms_helper_poll_disable(drm_dev);
+> -	exynos_drm_fbdev_suspend(drm_dev);
+> -	private->suspend_state = drm_atomic_helper_suspend(drm_dev);
+> -	if (IS_ERR(private->suspend_state)) {
+> -		exynos_drm_fbdev_resume(drm_dev);
+> -		drm_kms_helper_poll_enable(drm_dev);
+> -		return PTR_ERR(private->suspend_state);
+> -	}
+>   
+> -	return 0;
+> +	return  drm_mode_config_helper_suspend(drm_dev);
+>   }
+>   
+>   static void exynos_drm_resume(struct device *dev)
+>   {
+>   	struct drm_device *drm_dev = dev_get_drvdata(dev);
+> -	struct exynos_drm_private *private;
+> -
+> -	if (!drm_dev)
+> -		return;
+>   
+> -	private = drm_dev->dev_private;
+> -	drm_atomic_helper_resume(drm_dev, private->suspend_state);
+> -	exynos_drm_fbdev_resume(drm_dev);
+> -	drm_kms_helper_poll_enable(drm_dev);
+> +	return drm_mode_config_helper_resume(drm_dev);
 
-So let's try and do so by clearing bit #55 in the stack pointer register
-before returning from a function, and setting it again right after a
-'bl' or 'blr' instruction. That way, jumping to arbitrary places in the
-code and popping the next gadget's address becomes a lot more complicated,
-since the stack pointer will not be valid after a function return until
-the 'reset' sequence is executed (or after an exception is taken).
+exynos_drm_resume() now returns 'void', so to be strict with
+c standard, the return statement should not be used here.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/Kconfig                 | 10 ++++++++++
- arch/arm64/include/asm/assembler.h |  9 +++++++++
- arch/arm64/kernel/entry.S          | 18 ++++++++++++++++++
- 3 files changed, 37 insertions(+)
+>   }
+>   
+>   static const struct dev_pm_ops exynos_drm_pm_ops = {
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.h b/drivers/gpu/drm/exynos/exynos_drm_drv.h
+> index c737c4b..7349e7c 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.h
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.h
+> @@ -195,7 +195,6 @@ struct drm_exynos_file_private {
+>    */
+>   struct exynos_drm_private {
+>   	struct drm_fb_helper *fb_helper;
+> -	struct drm_atomic_state *suspend_state;
+>   
+>   	struct device *g2d_dev;
+>   	struct device *dma_dev;
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> index 132dd52..918dd2c 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+> @@ -270,20 +270,3 @@ void exynos_drm_fbdev_fini(struct drm_device *dev)
+>   	private->fb_helper = NULL;
+>   }
+>   
+> -void exynos_drm_fbdev_suspend(struct drm_device *dev)
+> -{
+> -	struct exynos_drm_private *private = dev->dev_private;
+> -
+> -	console_lock();
+> -	drm_fb_helper_set_suspend(private->fb_helper, 1);
+> -	console_unlock();
+> -}
+> -
+> -void exynos_drm_fbdev_resume(struct drm_device *dev)
+> -{
+> -	struct exynos_drm_private *private = dev->dev_private;
+> -
+> -	console_lock();
+> -	drm_fb_helper_set_suspend(private->fb_helper, 0);
+> -	console_unlock();
+> -}
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+> index b338472..6840b6a 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+> @@ -19,8 +19,6 @@
+>   
+>   int exynos_drm_fbdev_init(struct drm_device *dev);
+>   void exynos_drm_fbdev_fini(struct drm_device *dev);
+> -void exynos_drm_fbdev_suspend(struct drm_device *drm);
+> -void exynos_drm_fbdev_resume(struct drm_device *drm);
+>   
+>   #else
+>   
+> @@ -39,14 +37,6 @@ static inline void exynos_drm_fbdev_restore_mode(struct drm_device *dev)
+>   
+>   #define exynos_drm_output_poll_changed (NULL)
+>   
+> -static inline void exynos_drm_fbdev_suspend(struct drm_device *drm)
+> -{
+> -}
+> -
+> -static inline void exynos_drm_fbdev_resume(struct drm_device *drm)
+> -{
+> -}
+> -
+>   #endif
+>   
+>   #endif
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 42c090cf0292..4562af0250b9 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1011,6 +1011,16 @@ config ARM64_SW_TTBR0_PAN
- 	  zeroed area and reserved ASID. The user access routines
- 	  restore the valid TTBR0_EL1 temporarily.
- 
-+config ARM64_ROP_SHIELD
-+	bool "Enable basic ROP protection through the stack pointer sign bit"
-+	depends on GCC_PLUGINS && VMAP_STACK
-+	select GCC_PLUGIN_ARM64_ROP_SHIELD
-+	help
-+	  Enable protection against ROP attacks by clearing bit #55 in the
-+	  stack pointer register across a function return.
-+
-+	  If paranoid, say Y here. If unsure, say N.
-+
- menu "ARMv8.1 architectural features"
- 
- config ARM64_HW_AFDBM
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 346ada4de48a..95d3ec98eb58 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -701,12 +701,21 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
- .Lyield_out_\@ :
- 	.endm
- 
-+	.macro		unclobber_sp, tmp
-+#ifdef CONFIG_ARM64_ROP_SHIELD
-+	mov		\tmp, sp
-+	orr		sp, \tmp, #(1 << 55)
-+#endif
-+	.endm
-+
- 	.macro		bl_c, target
- 	bl		\target
-+	unclobber_sp	x30
- 	.endm
- 
- 	.macro		blr_c, reg
- 	blr		\reg
-+	unclobber_sp	x30
- 	.endm
- 
- #endif	/* __ASM_ASSEMBLER_H */
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index eba5b6b528ea..2adebca74f11 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -95,6 +95,9 @@ alternative_else_nop_endif
- 	 */
- 	add	sp, sp, x0			// sp' = sp + x0
- 	sub	x0, sp, x0			// x0' = sp' - x0 = (sp + x0) - x0 = sp
-+#ifdef CONFIG_ARM64_ROP_SHIELD
-+	tbz	x0, #55, 1f
-+#endif
- 	tbnz	x0, #THREAD_SHIFT, 0f
- 	sub	x0, sp, x0			// x0'' = sp' - x0' = (sp + x0) - sp = x0
- 	sub	sp, sp, x0			// sp'' = sp' - x0 = (sp + x0) - x0 = sp
-@@ -129,6 +132,21 @@ alternative_else_nop_endif
- 	/* We were already on the overflow stack. Restore sp/x0 and carry on. */
- 	sub	sp, sp, x0
- 	mrs	x0, tpidrro_el0
-+	b	el\()\el\()_\label
-+
-+#ifdef CONFIG_ARM64_ROP_SHIELD
-+1:	/*
-+	 * We have to do a little dance here to set bit 55 in the stack
-+	 * pointer register without clobbering anything else.
-+	 */
-+	orr	x0, x0, #(1 << 55)
-+	str	x1, [x0]
-+	mov	x1, sp
-+	mov	sp, x0
-+	and	x0, x0, #~(1 << 55)
-+	sub	x0, x1, x0
-+	ldr	x1, [sp]
-+#endif
- #endif
- 	b	el\()\el\()_\label
- 	.endm
+Best regards
 -- 
-2.18.0
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
