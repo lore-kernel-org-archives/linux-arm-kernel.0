@@ -1,85 +1,28 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 2 Aug 2018 14:52:02 +0100
-Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <CACT4Y+b0gkSQHUG67MbYZUTA_aZWs7EmJ2eUzOEPWdt9==ysdg@mail.gmail.com>
-References: <CAAeHK+w0T43+h3xqU4a-qutxd-qiEhsvk0eaZpmAn-T0hpaLZQ@mail.gmail.com>
- <20180629110709.GA17859@arm.com>
- <CAAeHK+wHd8B2nhat-Z2Y2=s4NVobPG7vjr2CynjFhqPTwQRepQ@mail.gmail.com>
- <20180703173608.GF27243@arm.com>
- <CAAeHK+wTcH+2hgm_BTkLLdn1GkjBtkhQ=vPWZCncJ6KenqgKpg@mail.gmail.com>
- <CAAeHK+xc1E64tXEEHoXqOuUNZ7E_kVyho3_mNZTCc+LTGHYFdA@mail.gmail.com>
- <20180801163538.GA10800@arm.com>
- <CACT4Y+aZtph5qDsLzTDEgpQRz4_Vtg1DD-cB18qooi6D0bexDg@mail.gmail.com>
- <20180802111031.yx3x6y5d5q6drq52@armageddon.cambridge.arm.com>
- <CACT4Y+b0gkSQHUG67MbYZUTA_aZWs7EmJ2eUzOEPWdt9==ysdg@mail.gmail.com>
-Message-ID: <20180802135201.qjweapbskllthvhu@armageddon.cambridge.arm.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Thu, 2 Aug 2018 06:54:21 -0700
+Subject: [RESEND PATCH 6/6] arm64: enable RapidIO menu in Kconfig
+In-Reply-To: <20180802134544.GG38497@guest228.east.isi.edu>
+References: <20180731142954.30345-1-acolin@isi.edu>
+ <20180731142954.30345-7-acolin@isi.edu>
+ <20180801095404.GA17585@infradead.org>
+ <fad8661c-cd8c-3a9c-ca03-5d2f63893a24@gmail.com>
+ <CAMuHMdVDra1MKcuuD0SqEYXSggr0iVFcbcjL33z7JuiE1_y8yw@mail.gmail.com>
+ <20180802134544.GG38497@guest228.east.isi.edu>
+Message-ID: <20180802135421.GA13512@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(trimming the quoted text a bit)
+On Thu, Aug 02, 2018 at 09:45:44AM -0400, Alexei Colin wrote:
+> If I move RapidIO option to drivers/Kconfig, then it won't appear under
+> the Bus Options/System Support menu, along with other choices for the
+> system bus (PCI, PCMCIA, ISA, TC, ...).
 
-On Thu, Aug 02, 2018 at 01:36:25PM +0200, Dmitry Vyukov wrote:
-> On Thu, Aug 2, 2018 at 1:10 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Wed, Aug 01, 2018 at 06:52:09PM +0200, Dmitry Vyukov wrote:
-> >> On Wed, Aug 1, 2018 at 6:35 PM, Will Deacon <will.deacon@arm.com> wrote:
-> >> > I'd really like to enable pointer tagging in the kernel, I'm just still
-> >> > failing to see how we can do it in a controlled manner where we can reason
-> >> > about the semantic changes using something other than a best-effort,
-> >> > case-by-case basis which is likely to be fragile and error-prone.
-> >> > Unfortunately, if that's all we have, then this gets relegated to a
-> >> > debug feature, which sort of defeats the point in my opinion.
-> >>
-> >> Well, in some cases there is no other way as resorting to dynamic testing.
-> >> How do we ensure that kernel does not dereference NULL pointers, does
-> >> not access objects after free or out of bounds?
-> >
-> > We should not confuse software bugs (like NULL pointer dereference) with
-> > unexpected software behaviour introduced by khwasan where pointers no
-> > longer represent only an address range (e.g. calling find_vmap_area())
-> > but rather an address and a tag.
-[...]
-> > However, not untagging a pointer when converting to long may have
-> > side-effects in some cases and I consider these bugs introduced by the
-> > khwasan support rather than bugs in the original kernel code. Ideally
-> > we'd need some tooling on top of khwasan to detect such shortcomings but
-> > I'm not sure we can do this statically, as Andrey already mentioned. For
-> > __user pointers, things are slightly better as we can detect the
-> > conversion either with sparse (modified) or some LLVM changes.
-[...]
-> For example, LOCKDEP has the same problem. Previously correct code can
-> become incorrect and require finer-grained lock class annotations.
-> KMEMLEAK has the same problem: previously correct code that hides a
-> pointer may now need changes to unhide the pointer.
+It's not like anyone cares.  And FYI, moving all those to
+drivers/Kconfig is osmething I will submit for the next merge window.
 
-It's not actually the same. Take the kmemleak example as I'm familiar
-with, previously correct code _continues_ to run correctly in the
-presence of kmemleak. The annotation or unhiding is only necessary to
-reduce the kmemleak false positives. With khwasan, OTOH, an explicit
-untagging is necessary so that the code functions correctly again.
+> Alex explains above that RapidIO
+> may be selected as a system bus on some architectures, and users expect
+> it to be in the menu in which it has been for some time now.  What
+> problem is the current organization causing?
 
-IOW, kmemleak only monitors the behaviour of the original code while
-khwasan changes such behaviour by tagging the pointers.
-
-> If somebody has a practical idea how to detect these statically, let's
-> do it. Otherwise let's go with the traditional solution to this --
-> dynamic testing. The patch series show that the problem is not a
-> disaster and we won't need to change just every line of kernel code.
-
-It's indeed not a disaster but we had to do this exercise to find out
-whether there are better ways of detecting where untagging is necessary.
-
-If you want to enable khwasan in "production" and since enabling it
-could potentially change the behaviour of existing code paths, the
-run-time validation space doubles as we'd need to get the same code
-coverage with and without the feature being enabled. I wouldn't say it's
-a blocker for khwasan, more like something to be aware of.
-
-The awareness is a bit of a problem as the normal programmer would have
-to pay more attention to conversions between pointer and long. Given
-that this is an arm64-only feature, we have a risk of khwasan-triggered
-bugs being introduced in generic code in the future (hence the
-suggestion of some static checker, if possible).
-
--- 
-Catalin
+A "system bus" seems like a rather outdated concept to start with.
