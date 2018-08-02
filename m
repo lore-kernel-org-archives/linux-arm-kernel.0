@@ -1,45 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 2 Aug 2018 13:01:17 +0100
-Subject: [GIT PULL] arm64 regression fix for 4.18
-Message-ID: <20180802120117.GB14419@arm.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Thu, 2 Aug 2018 15:07:10 +0300
+Subject: [PATCH v7 8/8] interconnect: Allow endpoints translation via DT
+In-Reply-To: <804925d5927ccb6927b16f7e9a4aa05c@codeaurora.org>
+References: <20180731161340.13000-1-georgi.djakov@linaro.org>
+ <20180731161340.13000-9-georgi.djakov@linaro.org>
+ <804925d5927ccb6927b16f7e9a4aa05c@codeaurora.org>
+Message-ID: <3a7bb27a-0609-133b-08e9-8864f1ccc4bc@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Saravana,
 
-Ard found a nasty arm64 regression in 4.18 where the AES ghash/gcm code
-doesn't notify the kernel about its use of the vector registers, therefore
-potentially corrupting live user state. The fix is straightforward and
-Herbert agreed for it to go via arm64.
+On 08/02/2018 01:57 AM, skannan at codeaurora.org wrote:
+> On 2018-07-31 09:13, Georgi Djakov wrote:
+>> Currently we support only platform data for specifying the interconnect
+>> endpoints. As now the endpoints are hard-coded into the consumer driver
+>> this may lead to complications when a single driver is used by multiple
+>> SoCs, which may have different interconnect topology.
+>> To avoid cluttering the consumer drivers, introduce a translation
+>> function
+>> to help us get the board specific interconnect data from device-tree.
+>>
+>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>> ---
+>> ?drivers/interconnect/core.c? | 62 ++++++++++++++++++++++++++++++++++++
+>> ?include/linux/interconnect.h |? 7 ++++
+>> ?2 files changed, 69 insertions(+)
+>>
+>> diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
+>> index 9fef180cf77e..d1b6adff0a3d 100644
+>> --- a/drivers/interconnect/core.c
+>> +++ b/drivers/interconnect/core.c
+[..]
+>> --- a/include/linux/interconnect.h
+>> +++ b/include/linux/interconnect.h
+>> @@ -17,6 +17,7 @@ struct device;
+>>
+>> ?struct icc_path *icc_get(struct device *dev, const int src_id,
+>> ????????????? const int dst_id);
+>> +struct icc_path *of_icc_get(struct device *dev, const char *name);
+>> ?void icc_put(struct icc_path *path);
+>> ?int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
+>>
+>> @@ -28,6 +29,12 @@ static inline struct icc_path *icc_get(struct
+>> device *dev, const int src_id,
+>> ???? return NULL;
+>> ?}
+>>
+>> +static inline struct icc_path *of_icc_get(struct device *dev,
+>> +????????????????????? const char *name)
+>> +{
+>> +??? return NULL;
+>> +}
+>> +
+> 
+> Might want to return PTR(-ENODEV) or some error code so that client
+> doesn't have to do NULL check AND an error check?
+> 
+> -Saravana
 
-Please pull.
+NULL is returned when CONFIG_INTERCONNECT=n. Configuration of
+interconnects by consumer drivers could be optional and that's why null
+is returned instead of an error. The consumer drivers decide how to
+proceed in this case and if there is a hard requirement for interconnect
+support, then i would suggest to express it as a dependency in Kconfig.
 
 Thanks,
-
-Will
-
---->8
-
-The following changes since commit acb1872577b346bd15ab3a3f8dff780d6cca4b70:
-
-  Linux 4.18-rc7 (2018-07-29 14:44:52 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to c7513c2a2714204d3588ecaa170ae628fd0d217e:
-
-  crypto/arm64: aes-ce-gcm - add missing kernel_neon_begin/end pair (2018-07-31 13:20:30 +0100)
-
-----------------------------------------------------------------
-arm64 regression fix
-
-- Fix potential clobbering of user vector register state by AES ghash code
-
-----------------------------------------------------------------
-Ard Biesheuvel (1):
-      crypto/arm64: aes-ce-gcm - add missing kernel_neon_begin/end pair
-
- arch/arm64/crypto/ghash-ce-glue.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+Georgi
