@@ -1,44 +1,52 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 2 Aug 2018 11:52:17 +0100
-Subject: [PATCH 2/6] ARM: vfp: use __copy_from_user() when restoring VFP
- state
-In-Reply-To: <E1fctOq-0005us-Ar@rmk-PC.armlinux.org.uk>
-References: <20180710141322.GL17271@n2100.armlinux.org.uk>
- <E1fctOq-0005us-Ar@rmk-PC.armlinux.org.uk>
-Message-ID: <a2e8fb09-28c9-51cb-ce2a-081eb1a80820@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 2 Aug 2018 11:55:29 +0100
+Subject: [PATCH] arm_pmu: fix compiler warning in arm_pmu_device_probe
+In-Reply-To: <20180801214526.24599-1-chris.packham@alliedtelesis.co.nz>
+References: <20180801214526.24599-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <449c26bb-9d31-984e-da74-73ef1bd9a674@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Chris,
 
-On 10/07/18 15:13, Russell King wrote:
-> Use __copy_from_user() rather than __get_user_err() for individual
-> members when restoring VFP state.
+On 01/08/18 22:45, Chris Packham wrote:
+> GCC warns
 > 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+>    arm_pmu_platform.c:234:5: error: 'err' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> 
+> This is because we rely on the for_each_cpu loop in armpmu_request_irqs
+> to initialise err. The warning is a little bogus because we know if
+> there were 0 CPUs this code would not be running.
+> 
+> Initialise err to 0 to avoid the warning.
+
+Maybe initialising to something like -EINVAL would be more appropriate, 
+just in case we did ever manage to get here with armpmu->supported_cpus 
+unset?
+
+Robin.
+
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 > ---
->   arch/arm/include/asm/thread_info.h |  2 +-
->   arch/arm/kernel/signal.c           | 20 ++++++++------------
->   arch/arm/vfp/vfpmodule.c           | 16 +++++++---------
->   3 files changed, 16 insertions(+), 22 deletions(-)
+> This has been reported before in https://lkml.org/lkml/2018/3/5/508 I'm not
+> sure if it was dismmissed as "meh, gcc is wrong" or if it was just wainting for
+> someone with some round tuits.
 > 
-> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-> index e71cc35de163..341f6eb9b8be 100644
-> --- a/arch/arm/include/asm/thread_info.h
-> +++ b/arch/arm/include/asm/thread_info.h
-> @@ -123,7 +123,7 @@ struct user_vfp_exc;
+> 
+>   drivers/perf/arm_pmu_platform.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
+> index 971ff336494a..96075cecb0ae 100644
+> --- a/drivers/perf/arm_pmu_platform.c
+> +++ b/drivers/perf/arm_pmu_platform.c
+> @@ -160,7 +160,7 @@ static int pmu_parse_irqs(struct arm_pmu *pmu)
+>   static int armpmu_request_irqs(struct arm_pmu *armpmu)
+>   {
+>   	struct pmu_hw_events __percpu *hw_events = armpmu->hw_events;
+> -	int cpu, err;
+> +	int cpu, err = 0;
 >   
->   extern int vfp_preserve_user_clear_hwstate(struct user_vfp __user *,
->   					   struct user_vfp_exc __user *);
-> -extern int vfp_restore_user_hwstate(struct user_vfp __user *,
-> +extern int vfp_restore_user_hwstate(struct user_vfp *,
->   				    struct user_vfp_exc __user *);
-
-
-Just a small nit. With this patch, shouldn't the struct user_vfp_exc 
-argument lose the __user tag for this function?
-
-Cheers,
-
--- 
-Julien Thierry
+>   	for_each_cpu(cpu, &armpmu->supported_cpus) {
+>   		int irq = per_cpu(hw_events->irq, cpu);
+> 
