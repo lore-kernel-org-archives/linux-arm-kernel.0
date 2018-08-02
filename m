@@ -1,34 +1,44 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Thu, 2 Aug 2018 12:47:27 +0200
-Subject: [PATCH v9 3/6] kernel/reboot.c: export pm_power_off_prepare
-In-Reply-To: <20180802104443.GH9117@sirena.org.uk>
-References: <20180802103425.3053-1-o.rempel@pengutronix.de>
- <20180802103425.3053-4-o.rempel@pengutronix.de>
- <20180802104443.GH9117@sirena.org.uk>
-Message-ID: <94d48ecb-7302-c7ed-e815-730be0426a04@pengutronix.de>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 2 Aug 2018 11:52:17 +0100
+Subject: [PATCH 2/6] ARM: vfp: use __copy_from_user() when restoring VFP
+ state
+In-Reply-To: <E1fctOq-0005us-Ar@rmk-PC.armlinux.org.uk>
+References: <20180710141322.GL17271@n2100.armlinux.org.uk>
+ <E1fctOq-0005us-Ar@rmk-PC.armlinux.org.uk>
+Message-ID: <a2e8fb09-28c9-51cb-ce2a-081eb1a80820@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.08.2018 12:44, Mark Brown wrote:
-> On Thu, Aug 02, 2018 at 12:34:22PM +0200, Oleksij Rempel wrote:
->> Export pm_power_off_prepare. It is needed to implement power off on
->> Freescale/NXP iMX6 based boards with external power management
->> integrated circuit (PMIC).
+Hi Russell,
+
+On 10/07/18 15:13, Russell King wrote:
+> Use __copy_from_user() rather than __get_user_err() for individual
+> members when restoring VFP state.
 > 
-> I thought we'd got an ack for this from Raphael on a previous version or
-> am I mistaken?
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>   arch/arm/include/asm/thread_info.h |  2 +-
+>   arch/arm/kernel/signal.c           | 20 ++++++++------------
+>   arch/arm/vfp/vfpmodule.c           | 16 +++++++---------
+>   3 files changed, 16 insertions(+), 22 deletions(-)
 > 
+> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+> index e71cc35de163..341f6eb9b8be 100644
+> --- a/arch/arm/include/asm/thread_info.h
+> +++ b/arch/arm/include/asm/thread_info.h
+> @@ -123,7 +123,7 @@ struct user_vfp_exc;
+>   
+>   extern int vfp_preserve_user_clear_hwstate(struct user_vfp __user *,
+>   					   struct user_vfp_exc __user *);
+> -extern int vfp_restore_user_hwstate(struct user_vfp __user *,
+> +extern int vfp_restore_user_hwstate(struct user_vfp *,
+>   				    struct user_vfp_exc __user *);
 
-No, we got an:
-"Anyway, I have no particular problems with exporting
-pm_power_off_prepare via EXPORT_SYMBOL_GPL()."
 
-Should i see it as ACK?
+Just a small nit. With this patch, shouldn't the struct user_vfp_exc 
+argument lose the __user tag for this function?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180802/3f8ff04c/attachment.sig>
+Cheers,
+
+-- 
+Julien Thierry
