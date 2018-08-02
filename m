@@ -1,26 +1,32 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 02 Aug 2018 14:43:00 +0200
-Subject: [PATCH v3 2/4] dt-bindings: rockchip: grf: add grf and pmugrf
- description for px30
-In-Reply-To: <1533113116-8820-3-git-send-email-cl@rock-chips.com>
-References: <1533113116-8820-1-git-send-email-cl@rock-chips.com>
- <1533113116-8820-3-git-send-email-cl@rock-chips.com>
-Message-ID: <4382913.ZrggMOPMn4@phil>
+From: manish.narani@xilinx.com (Manish Narani)
+Date: Thu, 2 Aug 2018 18:04:44 +0530
+Subject: [PATCH v2 0/4] EDAC: Enhancements to Synopsys EDAC driver
+Message-ID: <1533213288-8771-1-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch series enhances the current EDAC driver to support different
+platforms.This series adds support for ZynqMP DDRC controller in synopsys
+EDAC driver. This series also adds Device tree properties and relevant
+binding documentation.
 
-Am Mittwoch, 1. August 2018, 10:45:14 CEST schrieb cl at rock-chips.com:
-> From: Liang Chen <cl@rock-chips.com>
-> 
-> This patch adds the compatible of GRF and PMUGRF for PX30 SoCs.
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Liang Chen <cl@rock-chips.com>
+Changes in v2:
+	- Moved checking of DDR_ECC_INTR_SUPPORT from (1/4) to (3/4) as it is
+	  a feature of ZynqMP DDRC
+	- The Binding Documentation in (2/4) is modified as per the review
+	  comments
 
-applied together with the px30 dts patches
+Manish Narani (4):
+  edac: synps: Add platform specific structures for ddrc controller
+  dt: bindings: Document ZynqMP DDRC in Synopsys documentation
+  edac: synopsys: Add EDAC ECC support for ZynqMP DDRC
+  arm64: zynqmp: Add DDRC node
 
+ .../bindings/memory-controllers/synopsys.txt       |  27 +-
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |   7 +
+ drivers/edac/Kconfig                               |   2 +-
+ drivers/edac/synopsys_edac.c                       | 919 ++++++++++++++++++++-
+ 4 files changed, 922 insertions(+), 33 deletions(-)
 
-Thanks
-Heiko
+-- 
+2.1.1
