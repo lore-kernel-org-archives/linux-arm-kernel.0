@@ -1,32 +1,39 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Thu, 2 Aug 2018 15:31:15 -0400 (EDT)
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-Message-ID: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Fri, 3 Aug 2018 04:25:32 +0800
+Subject: [PATCH v8 3/3] MAINTAINERS: add an entry for MediaTek Bluetooth driver
+In-Reply-To: <cover.1533241009.git.sean.wang@mediatek.com>
+References: <cover.1533241009.git.sean.wang@mediatek.com>
+Message-ID: <fb32ae5aafdde907eaecedf53915a531e5e6651b.1533241009.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+From: Sean Wang <sean.wang@mediatek.com>
 
-I tried to use a PCIe graphics card on the MacchiatoBIN board and I hit a 
-strange problem.
+Add an entry for the MediaTek Bluetooth driver.
 
-When I use the links browser in graphics mode on the framebuffer, I get 
-occasional pixel corruption. Links does memcpy, memset and 4-byte writes 
-on the framebuffer - nothing else.
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-I found out that the pixel corruption is caused by overlapping unaligned 
-stp instructions inside memcpy. In order to avoid branching, the arm64 
-memcpy implementation may write the same destination twice with different 
-alignment. If I put "dmb sy" between the overlapping stp instructions, the 
-pixel corruption goes away.
-
-This seems like a hardware bug. Is it a known errata? Do you have any 
-workarounds for it?
-
-I tried AMD card (HD 6350) and NVidia (NVS 285) and both exhibit the same 
-corruption. OpenGL doesn't work (it results in artifacts on the AMD card 
-and lock-up on the NVidia card), but it's quite expected if even simple 
-writing to the framebuffer doesn't work.
-
-Mikulas
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 0f2cce4..e983d9e 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -9144,6 +9144,14 @@ F:	include/uapi/linux/meye.h
+ F:	include/uapi/linux/ivtv*
+ F:	include/uapi/linux/uvcvideo.h
+ 
++MEDIATEK BLUETOOTH DRIVER
++M:	Sean Wang <sean.wang@mediatek.com>
++L:	linux-bluetooth at vger.kernel.org
++L:	linux-mediatek at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
++F:	drivers/bluetooth/btmtkuart.c
++
+ MEDIATEK CIR DRIVER
+ M:	Sean Wang <sean.wang@mediatek.com>
+ S:	Maintained
+-- 
+2.7.4
