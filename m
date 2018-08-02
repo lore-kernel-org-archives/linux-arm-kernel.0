@@ -1,76 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 2 Aug 2018 15:02:16 -0600
-Subject: [PATCH v7 2/8] dt-bindings: Introduce interconnect provider
- bindings
-In-Reply-To: <20180731161340.13000-3-georgi.djakov@linaro.org>
-References: <20180731161340.13000-1-georgi.djakov@linaro.org>
- <20180731161340.13000-3-georgi.djakov@linaro.org>
-Message-ID: <CABGGisxq+hf91R18pnZ=VZ9f99GssWWPhpPCjNAROJmKg5-udA@mail.gmail.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Thu, 2 Aug 2018 21:21:49 +0000
+Subject: [PATCH] arm_pmu: fix compiler warning in arm_pmu_device_probe
+References: <20180801214526.24599-1-chris.packham@alliedtelesis.co.nz>
+ <20180802105705.GB14312@arm.com>
+Message-ID: <31509165164e4e32af172a1857a2ab90@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 10:13 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
->
-> This binding is intended to represent the interconnect hardware present
-> in some of the modern SoCs. Currently it consists only of a binding for
-> the interconnect hardware devices (provider).
+On 02/08/18 23:05, Will Deacon wrote:
+> On Thu, Aug 02, 2018 at 09:45:26AM +1200, Chris Packham wrote:
+>> GCC warns
+>>
+>>    arm_pmu_platform.c:234:5: error: 'err' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+>>
+>> This is because we rely on the for_each_cpu loop in armpmu_request_irqs
+>> to initialise err. The warning is a little bogus because we know if
+>> there were 0 CPUs this code would not be running.
+>>
+>> Initialise err to 0 to avoid the warning.
+>>
+>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>> ---
+>> This has been reported before in https://lkml.org/lkml/2018/3/5/508 I'm not
+>> sure if it was dismmissed as "meh, gcc is wrong" or if it was just wainting for
+>> someone with some round tuits.
+> 
+> Which version of GCC are you using? I don't see this warning locally.
+> 
 
-If you want the bindings reviewed, then you need to send them to the
-DT list. CC'ing me is pointless, I get CC'ed too many things to read.
+My local cross-compiler is
 
-The consumer and producer binding should be a single patch. One is not
-useful without the other.
+$ arm-softfloat-linux-gnueabi-gcc --version
+arm-softfloat-linux-gnueabi-gcc (crosstool-NG crosstool-ng-1.22.0) 4.9.3
 
-There is also a patch series from Maxime Ripard that's addressing the
-same general area. See "dt-bindings: Add a dma-parent property". We
-don't need multiple ways to address describing the device to memory
-paths, so you all had better work out a common solution.
+Old-ish but as far as I was aware still supported for building the kernel.
 
-Rob
+I've just tried 7.3.0 and 8.1.0 neither of which complain.
 
->
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-> ---
->  .../bindings/interconnect/interconnect.txt    | 33 +++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
->
-> diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
-> new file mode 100644
-> index 000000000000..6e2b2971b094
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
-> @@ -0,0 +1,33 @@
-> +Interconnect Provider Device Tree Bindings
-> +=========================================
-> +
-> +The purpose of this document is to define a common set of generic interconnect
-> +providers/consumers properties.
-> +
-> +
-> += interconnect providers =
-> +
-> +The interconnect provider binding is intended to represent the interconnect
-> +controllers in the system. Each provider registers a set of interconnect
-> +nodes, which expose the interconnect related capabilities of the interconnect
-> +to consumer drivers. These capabilities can be throughput, latency, priority
-> +etc. The consumer drivers set constraints on interconnect path (or endpoints)
-> +depending on the use case. Interconnect providers can also be interconnect
-> +consumers, such as in the case where two network-on-chip fabrics interface
-> +directly
-> +
-> +Required properties:
-> +- compatible : contains the interconnect provider compatible string
-> +- #interconnect-cells : number of cells in a interconnect specifier needed to
-> +                       encode the interconnect node id
-> +
-> +Example:
-> +
-> +               snoc: snoc at 580000 {
-> +                       compatible = "qcom,msm8916-snoc";
-> +                       #interconnect-cells = <1>;
-> +                       reg = <0x580000 0x14000>;
-> +                       clock-names = "bus_clk", "bus_a_clk";
-> +                       clocks = <&rpmcc RPM_SMD_SNOC_CLK>,
-> +                                <&rpmcc RPM_SMD_SNOC_A_CLK>;
-> +               };
+A quick look at the report linked to above seems they probably were 
+using 4.6.3 and it still appears in current build reports
+
+http://kisskb.ellerman.id.au/kisskb/buildresult/13455291/
