@@ -1,143 +1,50 @@
-From: jrdr.linux@gmail.com (Souptick Joarder)
-Date: Thu, 2 Aug 2018 18:51:53 +0530
-Subject: [PATCH v3] gpu/drm/exynos: Convert drm_atomic_helper_suspend/resume()
-Message-ID: <20180802132152.GA2833@jordon-HP-15-Notebook-PC>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  2 Aug 2018 15:21:29 +0200
+Subject: [RFC/PoC PATCH 0/3] arm64: basic ROP mitigation
+Message-ID: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-convert drm_atomic_helper_suspend/resume() to use
-drm_mode_config_helper_suspend/resume().
+This is a proof of concept I cooked up, primarily to trigger a discussion
+about whether there is a point to doing anything like this, and if there
+is, what the pitfalls are. Also, while I am not aware of any similar
+implementations, the idea is so simple that I would be surprised if nobody
+else thought of the same thing way before I did.
 
-exynos_drm_fbdev_suspend/resume can be removed
-as drm_mode_config_helper_suspend/resume has
-implement the same in generic way.
+The idea is that we can significantly limit the kernel's attack surface
+for ROP based attacks by clearing the stack pointer's sign bit before
+returning from a function, and setting it again right after proceeding
+from the [expected] return address. This should make it much more difficult
+to return to arbitrary gadgets, given that they rely on being chained to
+the next via a return address popped off the stack, and this is difficult
+when the stack pointer is invalid.
 
-Remove suspend_state from exynos_drm_private
-struct as it is no more useful.
+Of course, 4 additional instructions per function return is not exactly
+for free, but they are just movs and adds, and leaf functions are
+disregarded unless they allocate a stack frame (this comes for free
+because simple_return insns are disregarded by the plugin)
 
-Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
-Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
-v2: Address Inki Dae's comment. Remove ret variable
-    from both suspend/resume function.
+Please shoot, preferably with better ideas ...
 
-v3: Tested by Marek. Updated the change log.
+Ard Biesheuvel (3):
+  arm64: use wrapper macro for bl/blx instructions from asm code
+  gcc: plugins: add ROP shield plugin for arm64
+  arm64: enable ROP protection by clearing SP bit #55 across function
+    returns
 
- drivers/gpu/drm/exynos/exynos_drm_drv.c   | 26 ++------------------------
- drivers/gpu/drm/exynos/exynos_drm_drv.h   |  1 -
- drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 17 -----------------
- drivers/gpu/drm/exynos/exynos_drm_fbdev.h | 10 ----------
- 4 files changed, 2 insertions(+), 52 deletions(-)
+ arch/Kconfig                                  |   4 +
+ arch/arm64/Kconfig                            |  10 ++
+ arch/arm64/include/asm/assembler.h            |  21 +++-
+ arch/arm64/kernel/entry-ftrace.S              |   6 +-
+ arch/arm64/kernel/entry.S                     | 104 +++++++++-------
+ arch/arm64/kernel/head.S                      |   4 +-
+ arch/arm64/kernel/probes/kprobes_trampoline.S |   2 +-
+ arch/arm64/kernel/sleep.S                     |   6 +-
+ drivers/firmware/efi/libstub/Makefile         |   3 +-
+ scripts/Makefile.gcc-plugins                  |   7 ++
+ scripts/gcc-plugins/arm64_rop_shield_plugin.c | 116 ++++++++++++++++++
+ 11 files changed, 228 insertions(+), 55 deletions(-)
+ create mode 100644 scripts/gcc-plugins/arm64_rop_shield_plugin.c
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
-index b599f74..d86dd81 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
-@@ -149,37 +149,15 @@ static void exynos_drm_postclose(struct drm_device *dev, struct drm_file *file)
- static int exynos_drm_suspend(struct device *dev)
- {
- 	struct drm_device *drm_dev = dev_get_drvdata(dev);
--	struct exynos_drm_private *private;
--
--	if (!drm_dev)
--		return 0;
--
--	private = drm_dev->dev_private;
--
--	drm_kms_helper_poll_disable(drm_dev);
--	exynos_drm_fbdev_suspend(drm_dev);
--	private->suspend_state = drm_atomic_helper_suspend(drm_dev);
--	if (IS_ERR(private->suspend_state)) {
--		exynos_drm_fbdev_resume(drm_dev);
--		drm_kms_helper_poll_enable(drm_dev);
--		return PTR_ERR(private->suspend_state);
--	}
- 
--	return 0;
-+	return  drm_mode_config_helper_suspend(drm_dev);
- }
- 
- static void exynos_drm_resume(struct device *dev)
- {
- 	struct drm_device *drm_dev = dev_get_drvdata(dev);
--	struct exynos_drm_private *private;
--
--	if (!drm_dev)
--		return;
- 
--	private = drm_dev->dev_private;
--	drm_atomic_helper_resume(drm_dev, private->suspend_state);
--	exynos_drm_fbdev_resume(drm_dev);
--	drm_kms_helper_poll_enable(drm_dev);
-+	return drm_mode_config_helper_resume(drm_dev);
- }
- 
- static const struct dev_pm_ops exynos_drm_pm_ops = {
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.h b/drivers/gpu/drm/exynos/exynos_drm_drv.h
-index c737c4b..7349e7c 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_drv.h
-+++ b/drivers/gpu/drm/exynos/exynos_drm_drv.h
-@@ -195,7 +195,6 @@ struct drm_exynos_file_private {
-  */
- struct exynos_drm_private {
- 	struct drm_fb_helper *fb_helper;
--	struct drm_atomic_state *suspend_state;
- 
- 	struct device *g2d_dev;
- 	struct device *dma_dev;
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-index 132dd52..918dd2c 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
-@@ -270,20 +270,3 @@ void exynos_drm_fbdev_fini(struct drm_device *dev)
- 	private->fb_helper = NULL;
- }
- 
--void exynos_drm_fbdev_suspend(struct drm_device *dev)
--{
--	struct exynos_drm_private *private = dev->dev_private;
--
--	console_lock();
--	drm_fb_helper_set_suspend(private->fb_helper, 1);
--	console_unlock();
--}
--
--void exynos_drm_fbdev_resume(struct drm_device *dev)
--{
--	struct exynos_drm_private *private = dev->dev_private;
--
--	console_lock();
--	drm_fb_helper_set_suspend(private->fb_helper, 0);
--	console_unlock();
--}
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
-index b338472..6840b6a 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
-@@ -19,8 +19,6 @@
- 
- int exynos_drm_fbdev_init(struct drm_device *dev);
- void exynos_drm_fbdev_fini(struct drm_device *dev);
--void exynos_drm_fbdev_suspend(struct drm_device *drm);
--void exynos_drm_fbdev_resume(struct drm_device *drm);
- 
- #else
- 
-@@ -39,14 +37,6 @@ static inline void exynos_drm_fbdev_restore_mode(struct drm_device *dev)
- 
- #define exynos_drm_output_poll_changed (NULL)
- 
--static inline void exynos_drm_fbdev_suspend(struct drm_device *drm)
--{
--}
--
--static inline void exynos_drm_fbdev_resume(struct drm_device *drm)
--{
--}
--
- #endif
- 
- #endif
 -- 
-1.9.1
+2.18.0
