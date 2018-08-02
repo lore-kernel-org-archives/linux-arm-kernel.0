@@ -1,137 +1,97 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Thu, 2 Aug 2018 11:47:03 +0200
-Subject: [PATCH v9 4/4] mailbox: Add support for i.MX messaging unit
-In-Reply-To: <4d6931be-8caa-5168-d980-40dbe949386c@mentor.com>
-References: <20180802072325.22991-1-o.rempel@pengutronix.de>
- <20180802072325.22991-5-o.rempel@pengutronix.de>
- <4d6931be-8caa-5168-d980-40dbe949386c@mentor.com>
-Message-ID: <df93c03d-a982-2aa4-f3eb-11caa4817dab@pengutronix.de>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Thu, 2 Aug 2018 10:07:51 +0000
+Subject: [PATCH v8 2/4] dt-bindings: mailbox: imx-mu: add generic MU
+ channel support
+In-Reply-To: <20180801050530.nzmomvvyo5pfwclz@pengutronix.de>
+References: <20180731141146.10788-1-o.rempel@pengutronix.de>
+ <20180731141146.10788-3-o.rempel@pengutronix.de>
+ <CABb+yY1ZusgN4UVxmUgXZS9ObGdLwFAL4XkW7F1yVb6Gq=9XPA@mail.gmail.com>
+ <20180801050530.nzmomvvyo5pfwclz@pengutronix.de>
+Message-ID: <AM0PR04MB42117DA905926F3B3DAC014E802C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+> -----Original Message-----
+> From: Oleksij Rempel [mailto:o.rempel at pengutronix.de]
 
-thank you for review.
+[...]
 
-Jassi, Dong, any other comments? If no, i'll send tomorrow updated version.
+> > > diff --git a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> > > b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> > > index 90e4905dfc69..9efd3a9ade44 100644
+> > > --- a/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> > > +++ b/Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+> > > @@ -18,11 +18,33 @@ Messaging Unit Device Node:
+> > >  Required properties:
+> > >  -------------------
+> > >  - compatible : should be "fsl,<chip>-mu", the supported chips include
+> > > -               imx8qxp, imx8qm.
+> > > +               imx6sx, imx7s, imx8qxp, imx8qm.
+> > > +               The "fsl,imx6sx-mu" compatible is seen as generic and should
+> > > +               be included together with SoC specific compatible.
+> > >  - reg :                Should contain the registers location and length
+> > >  - interrupts : Interrupt number. The interrupt specifier format depends
+> > >                 on the interrupt controller parent.
+> > > -- #mbox-cells:  Must be 0. Number of cells in a mailbox
+> > > +- #mbox-cells:  Must be 2.
+> > >
+> > This seems like modifying the bindings. But since nothing exists yet,
+> > maybe we should merge patch 1 and 2 ?
+> 
+> For some weeks I already asked to squash this patches.. it was not ACKed.
+> We can try again... @Rob, @Aisheng, should I merge this two patches?
+> 
 
-On 02.08.2018 09:54, Vladimir Zapolskiy wrote:
-> Hi Oleksij,
+I guess It may depend on whether we use single channel mode for SCU.
+
+I'm not sure we've already got the conclusion that multi channel mode
+is suitable for SCU. I'm trying to implement it but meet some problems.
+I've just explained in another reply. Hope Jassie can shine some light.
+
+Regards
+Dong Aisheng
+
+> >
+> > > +                         <&phandle type channel>
+> > > +                           phandle   : Label name of controller
+> > > +                           type      : Channel type
+> > > +                           channel   : Channel number
+> > > +
+> > > +               This MU support 4 type of unidirectional channels, each type
+> > > +               has 4 channels. A total of 16 channels. Following types are
+> > > +               supported:
+> > > +               0 - TX channel with 32bit transmit register and IRQ transmit
+> > > +               acknowledgment support.
+> > > +               1 - RX channel with 32bit receive register and IRQ support
+> > > +               2 - TX doorbell channel. Without own register and no ACK
+> support.
+> > > +               3 - RX doorbell channel.
+> > >
+> > Thanks. This is great.
+> >
+> > > +               The doorbell channels should be used with shared memory and
+> protocol
+> > > +               level acknowledgment if needed.
+> > > +
+> > I would avoid this. People might get notions that they have to use
+> > shmem with doorbell -- a trivial protocol might mean doing some fixed
+> > action (like reset) whenever the doorbell rings.
 > 
-> two more nitpickings fro my side.
+> Ok.
 > 
-> On 08/02/2018 10:23 AM, Oleksij Rempel wrote:
->> The i.MX Messaging Unit is a two side block which allows applications
->> implement communication over this sides.
->>
->> The MU includes the following features:
->> - Messaging control by interrupts or by polling
->> - Four general-purpose interrupt requests reflected to the other side
->> - Three general-purpose flags reflected to the other side
->> - Four receive registers with maskable interrupt
->> - Four transmit registers with maskable interrupt
->>
->> Reviewed-by: Vladimir Zapolskiy <vz@mleia.com>
->> Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
->> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> >
+> > > +Optional properties:
+> > > +-------------------
+> > > +- clocks :     phandle to the input clock.
+> > > +- fsl,mu-side-b : Should be set for side B MU.
+> > >
+> > Nit: can we call this 'fsl,no-init' ?
 > 
-> [snip]
-> 
->> +static irqreturn_t imx_mu_isr(int irq, void *p)
->> +{
->> +	struct mbox_chan *chan = p;
->> +	struct imx_mu_priv *priv = to_imx_mu_priv(chan->mbox);
->> +	struct imx_mu_con_priv *cp = chan->con_priv;
->> +	u32 val, ctrl, dat;
->> +
->> +	ctrl = imx_mu_read(priv, IMX_MU_xCR);
->> +	val = imx_mu_read(priv, IMX_MU_xSR);
->> +
->> +	switch (cp->type) {
->> +	case IMX_MU_TYPE_TX:
->> +		val &= IMX_MU_xSR_TEn(cp->idx) &
->> +			(ctrl & IMX_MU_xCR_TIEn(cp->idx));
->> +		break;
->> +	case IMX_MU_TYPE_RX:
->> +		val &= IMX_MU_xSR_RFn(cp->idx) &
->> +			(ctrl & IMX_MU_xCR_RIEn(cp->idx));
->> +		break;
->> +	case IMX_MU_TYPE_RXDB:
->> +		val &= IMX_MU_xSR_GIPn(cp->idx) &
->> +			(ctrl & IMX_MU_xCR_GIEn(cp->idx));
->> +		break;
->> +	default:
->> +		break;
->> +	}
->> +
->> +	if (!val) {
->> +		return IRQ_NONE;
->> +	} else if (val == IMX_MU_xSR_TEn(cp->idx)) {
-> 
-> Please drop the 'else' branch above.
-> 
-> Here you can either just start from a new 'if', or all together drop 'if (!val)'
-> and return IRQ_NONE at the end of the if-else construction.
-> 
->> +		imx_mu_xcr_rmw(priv, 0, IMX_MU_xCR_TIEn(cp->idx));
->> +		mbox_chan_txdone(chan, 0);
->> +	} else if (val == IMX_MU_xSR_RFn(cp->idx)) {
->> +		dat = imx_mu_read(priv, IMX_MU_xRRn(cp->idx));
->> +		mbox_chan_received_data(chan, (void *)&dat);
->> +	} else if (val == IMX_MU_xSR_GIPn(cp->idx)) {
->> +		imx_mu_write(priv, IMX_MU_xSR_GIPn(cp->idx), IMX_MU_xSR);
->> +		mbox_chan_received_data(chan, NULL);
->> +	} else {
->> +		dev_warn_ratelimited(priv->dev, "Not handled interrupt\n");
->> +		return IRQ_NONE;
->> +	}
->> +
->> +	return IRQ_HANDLED;
->> +}
-> 
-> [snip]
-> 
->> +	for (i = 0; i < IMX_MU_CHANS; i++) {
->> +		struct imx_mu_con_priv *cp = &priv->con_priv[i];
->> +
->> +		cp->idx = i % 4;
->> +		cp->type = (i - cp->idx) >> 2;
-> 
-> cp->type = i >> 2;
-> 
->> +		cp->chan = &priv->mbox_chans[i];
->> +		priv->mbox_chans[i].con_priv = cp;
->> +		snprintf(cp->irq_desc, sizeof(cp->irq_desc),
->> +			 "imx_mu_chan[%i-%i]", cp->type, cp->idx);
->> +	}
->> +
->> +	priv->side_b = of_property_read_bool(np, "fsl,mu-side-b");
->> +
->> +	spin_lock_init(&priv->xcr_lock);
->> +
->> +	priv->mbox.dev = dev;
->> +	priv->mbox.ops = &imx_mu_ops;
->> +	priv->mbox.chans = priv->mbox_chans;
->> +	priv->mbox.num_chans = IMX_MU_CHANS;
->> +	priv->mbox.of_xlate = imx_mu_xlate;
->> +	priv->mbox.txdone_irq = true;
->> +
->> +	platform_set_drvdata(pdev, priv);
->> +
->> +	imx_mu_init_generic(priv);
->> +
->> +	return mbox_controller_register(&priv->mbox);
->> +}
+> No. It is HW description and not functionality which is present in current Linux
+> driver.
 > 
 > --
-> Best wishes,
-> Vladimir
-> 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180802/60e6ef56/attachment.sig>
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
