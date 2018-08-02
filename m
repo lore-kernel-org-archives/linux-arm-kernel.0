@@ -1,55 +1,120 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 2 Aug 2018 09:52:53 +0200
-Subject: [PATCH 2/5] pinctrl: meson: Add support to set direction with a
- secure monitor call
-In-Reply-To: <CAFBinCBcUijFGdLoQwkzioX7MF0H_gH1rbcvxG+UWc1rA2pRiQ@mail.gmail.com>
-References: <1533117623-27856-1-git-send-email-narmstrong@baylibre.com>
- <1533117623-27856-3-git-send-email-narmstrong@baylibre.com>
- <CAFBinCBcUijFGdLoQwkzioX7MF0H_gH1rbcvxG+UWc1rA2pRiQ@mail.gmail.com>
-Message-ID: <d319d871-ba93-ab1d-dae4-b44916161e85@baylibre.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Thu, 2 Aug 2018 10:54:42 +0300
+Subject: [PATCH v9 4/4] mailbox: Add support for i.MX messaging unit
+In-Reply-To: <20180802072325.22991-5-o.rempel@pengutronix.de>
+References: <20180802072325.22991-1-o.rempel@pengutronix.de>
+ <20180802072325.22991-5-o.rempel@pengutronix.de>
+Message-ID: <4d6931be-8caa-5168-d980-40dbe949386c@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2018 22:23, Martin Blumenstingl wrote:
-> Hi Neil,
-> 
-> On Wed, Aug 1, 2018 at 12:05 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
->>
->> The Amlogic Meson GX and AXG SoCs needs to do a Secure Monitor call to
->> set the TEST_N pin direction.
->> This patch adds a "smc" boolean to the bank structure to differentiate
->> the TEST_N bank and call the Secure Monitor in the _input/_output functions.
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->>  drivers/pinctrl/meson/Kconfig         |  1 +
->>  drivers/pinctrl/meson/pinctrl-meson.c | 31 ++++++++++++++++++++++++++-----
->>  drivers/pinctrl/meson/pinctrl-meson.h | 10 +++++++++-
->>  3 files changed, 36 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/pinctrl/meson/Kconfig b/drivers/pinctrl/meson/Kconfig
->> index c80951d..1b90470 100644
->> --- a/drivers/pinctrl/meson/Kconfig
->> +++ b/drivers/pinctrl/meson/Kconfig
->> @@ -8,6 +8,7 @@ menuconfig PINCTRL_MESON
->>         select GPIOLIB
->>         select OF_GPIO
->>         select REGMAP_MMIO
->> +       select MESON_SM
-> I wonder why PINCTRL_MESON has to select MESON_SM - shouldn't
-> PINCTRL_MESON_GXBB, PINCTRL_MESON_GXL and PINCTRL_MESON_AXG select it
-> instead?
-> selecting MESON_SM is probably no-op on Meson8 and Meson8b (which
-> don't have the GX secure monitor), but I haven't tested it yet
+Hi Oleksij,
 
-Hi Martin, you are right !
+two more nitpickings fro my side.
 
-I will fix it on v2..
+On 08/02/2018 10:23 AM, Oleksij Rempel wrote:
+> The i.MX Messaging Unit is a two side block which allows applications
+> implement communication over this sides.
+> 
+> The MU includes the following features:
+> - Messaging control by interrupts or by polling
+> - Four general-purpose interrupt requests reflected to the other side
+> - Three general-purpose flags reflected to the other side
+> - Four receive registers with maskable interrupt
+> - Four transmit registers with maskable interrupt
+> 
+> Reviewed-by: Vladimir Zapolskiy <vz@mleia.com>
+> Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 
-Neil
+[snip]
 
-> 
-> 
-> Regards
-> Martin
-> 
+> +static irqreturn_t imx_mu_isr(int irq, void *p)
+> +{
+> +	struct mbox_chan *chan = p;
+> +	struct imx_mu_priv *priv = to_imx_mu_priv(chan->mbox);
+> +	struct imx_mu_con_priv *cp = chan->con_priv;
+> +	u32 val, ctrl, dat;
+> +
+> +	ctrl = imx_mu_read(priv, IMX_MU_xCR);
+> +	val = imx_mu_read(priv, IMX_MU_xSR);
+> +
+> +	switch (cp->type) {
+> +	case IMX_MU_TYPE_TX:
+> +		val &= IMX_MU_xSR_TEn(cp->idx) &
+> +			(ctrl & IMX_MU_xCR_TIEn(cp->idx));
+> +		break;
+> +	case IMX_MU_TYPE_RX:
+> +		val &= IMX_MU_xSR_RFn(cp->idx) &
+> +			(ctrl & IMX_MU_xCR_RIEn(cp->idx));
+> +		break;
+> +	case IMX_MU_TYPE_RXDB:
+> +		val &= IMX_MU_xSR_GIPn(cp->idx) &
+> +			(ctrl & IMX_MU_xCR_GIEn(cp->idx));
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +
+> +	if (!val) {
+> +		return IRQ_NONE;
+> +	} else if (val == IMX_MU_xSR_TEn(cp->idx)) {
+
+Please drop the 'else' branch above.
+
+Here you can either just start from a new 'if', or all together drop 'if (!val)'
+and return IRQ_NONE at the end of the if-else construction.
+
+> +		imx_mu_xcr_rmw(priv, 0, IMX_MU_xCR_TIEn(cp->idx));
+> +		mbox_chan_txdone(chan, 0);
+> +	} else if (val == IMX_MU_xSR_RFn(cp->idx)) {
+> +		dat = imx_mu_read(priv, IMX_MU_xRRn(cp->idx));
+> +		mbox_chan_received_data(chan, (void *)&dat);
+> +	} else if (val == IMX_MU_xSR_GIPn(cp->idx)) {
+> +		imx_mu_write(priv, IMX_MU_xSR_GIPn(cp->idx), IMX_MU_xSR);
+> +		mbox_chan_received_data(chan, NULL);
+> +	} else {
+> +		dev_warn_ratelimited(priv->dev, "Not handled interrupt\n");
+> +		return IRQ_NONE;
+> +	}
+> +
+> +	return IRQ_HANDLED;
+> +}
+
+[snip]
+
+> +	for (i = 0; i < IMX_MU_CHANS; i++) {
+> +		struct imx_mu_con_priv *cp = &priv->con_priv[i];
+> +
+> +		cp->idx = i % 4;
+> +		cp->type = (i - cp->idx) >> 2;
+
+cp->type = i >> 2;
+
+> +		cp->chan = &priv->mbox_chans[i];
+> +		priv->mbox_chans[i].con_priv = cp;
+> +		snprintf(cp->irq_desc, sizeof(cp->irq_desc),
+> +			 "imx_mu_chan[%i-%i]", cp->type, cp->idx);
+> +	}
+> +
+> +	priv->side_b = of_property_read_bool(np, "fsl,mu-side-b");
+> +
+> +	spin_lock_init(&priv->xcr_lock);
+> +
+> +	priv->mbox.dev = dev;
+> +	priv->mbox.ops = &imx_mu_ops;
+> +	priv->mbox.chans = priv->mbox_chans;
+> +	priv->mbox.num_chans = IMX_MU_CHANS;
+> +	priv->mbox.of_xlate = imx_mu_xlate;
+> +	priv->mbox.txdone_irq = true;
+> +
+> +	platform_set_drvdata(pdev, priv);
+> +
+> +	imx_mu_init_generic(priv);
+> +
+> +	return mbox_controller_register(&priv->mbox);
+> +}
+
+--
+Best wishes,
+Vladimir
