@@ -1,98 +1,43 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 2 Aug 2018 15:33:19 +0100
-Subject: [PATCH] arm64: PCI: Remove node-local allocations when
- initialising host controller
-In-Reply-To: <38ad03ba-2658-98c8-1888-0aa3bfb59bd4@arm.com>
-References: <20180801173132.19739-1-punit.agrawal@arm.com>
- <38ad03ba-2658-98c8-1888-0aa3bfb59bd4@arm.com>
-Message-ID: <20180802143319.GA13512@red-moon>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Thu, 2 Aug 2018 17:00:25 +0200
+Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
+In-Reply-To: <20180801174256.5mbyf33eszml4nmu@armageddon.cambridge.arm.com>
+References: <cover.1529507994.git.andreyknvl@google.com>
+ <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
+ <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
+ <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
+ <CAAeHK+wJbbCZd+-X=9oeJgsqQJiq8h+Aagz3SQMPaAzCD+pvFw@mail.gmail.com>
+ <CAAeHK+yWF05XoU+0iuJoXAL3cWgdtxbeLoBz169yP12W4LkcQw@mail.gmail.com>
+ <20180801174256.5mbyf33eszml4nmu@armageddon.cambridge.arm.com>
+Message-ID: <CAAeHK+zb7vcehuX9=oxLUJVJr1ZcgmRTODQz7wsPy+rJb=3kbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 01, 2018 at 02:38:51PM -0500, Jeremy Linton wrote:
-> Hi,
-> 
-> +CC Jiang Lui
+On Wed, Aug 1, 2018 at 7:42 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, Jul 16, 2018 at 01:25:59PM +0200, Andrey Konovalov wrote:
+>> On Thu, Jun 28, 2018 at 9:30 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+>> So the checker reports ~100 different places where a __user pointer
+>> being casted. I've looked through them and found 3 places where we
+>> need to add untagging. Source code lines below come from 4.18-rc2+
+>> (6f0d349d).
+> [...]
+>> I'll add the 3 patches with fixes to v5 of this patchset.
+>
+> Thanks for investigating. You can fix those three places in your code
 
-Jiang Liu does not work on the kernel anymore so we won't know
-anytime soon the reasoning behind commit 965cd0e4a5e5
+OK, will do.
 
-> On 08/01/2018 12:31 PM, Punit Agrawal wrote:
-> >Memory for host controller data structures is allocated local to the
-> >node to which the controller is associated with. This has been the
-> >behaviour since support for ACPI was added in
-> >commit 0cb0786bac15 ("ARM64: PCI: Support ACPI-based PCI host controller").
-> 
-> Which was apparently influenced by:
-> 
-> 965cd0e4a5e5 x86, PCI, ACPI: Use kmalloc_node() to optimize for performance
-> 
-> Was there an actual use-case behind that change?
-> 
-> I think this fixes the immediate boot problem, but if there is any
-> perf advantage it seems wise to keep it... Particularly since x86
-> seems to be doing the node sanitation in pci_acpi_root_get_node().
+> but I was rather looking for a way to check such casting in the future
+> for newly added code. While for the khwasan we can assume it's a debug
+> option, the tagged user pointers are ABI and we need to keep it stable.
+>
+> We could we actually add some macros for explicit conversion between
+> __user ptr and long and silence the warning there (I guess this would
+> work better for sparse). We can then detect new ptr to long casts as
+> they appear. I just hope that's not too intrusive.
+>
+> (I haven't tried the sparse patch yet, hopefully sometime this week)
 
-I am struggling to see the perf advantage of allocating a struct
-that the PCI controller will never read/write from a NUMA node that
-is local to the PCI controller, happy to be corrected if there is
-a sound rationale behind that.
-
-Lorenzo
-
-> 
-> 
-> 
-> >
-> >Drop the node local allocation as there is no benefit from doing so -
-> >the usage of these structures is independent from where the controller
-> >is located. It also causes problem during probe if the associated numa
-> >node hasn't been initialised due to booting with restricted cpus via
-> >kernel command line or where the node doesn't have cpus or memory
-> >associated with it.
-> >
-> >Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> >Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >Cc: Will Deacon <will.deacon@arm.com>
-> >Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >---
-> >Hi,
-> >
-> >This came up in the context of investigating the boot issues reported
-> >due to restricted cpus or buggy firmware. Part of the problem is fixed
-> >by Lorenzo's rework of NUMA initialisation[0].
-> >
-> >But there also doesn't seem to be any justification for using
-> >node-local allocation to begin with.
-> >
-> >Thanks,
-> >Punit
-> >
-> >[0] https://patchwork.kernel.org/patch/10486001/
-> >
-> >  arch/arm64/kernel/pci.c | 5 ++---
-> >  1 file changed, 2 insertions(+), 3 deletions(-)
-> >
-> >diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> >index 0e2ea1c78542..bb85e2f4603f 100644
-> >--- a/arch/arm64/kernel/pci.c
-> >+++ b/arch/arm64/kernel/pci.c
-> >@@ -165,16 +165,15 @@ static void pci_acpi_generic_release_info(struct acpi_pci_root_info *ci)
-> >  /* Interface called from ACPI code to setup PCI host controller */
-> >  struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-> >  {
-> >-	int node = acpi_get_node(root->device->handle);
-> >  	struct acpi_pci_generic_root_info *ri;
-> >  	struct pci_bus *bus, *child;
-> >  	struct acpi_pci_root_ops *root_ops;
-> >-	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
-> >+	ri = kzalloc(sizeof(*ri), GFP_KERNEL);
-> >  	if (!ri)
-> >  		return NULL;
-> >-	root_ops = kzalloc_node(sizeof(*root_ops), GFP_KERNEL, node);
-> >+	root_ops = kzalloc(sizeof(*root_ops), GFP_KERNEL);
-> >  	if (!root_ops) {
-> >  		kfree(ri);
-> >  		return NULL;
-> >
-> 
+Haven't look at that sparse patch yet myself, but sounds doable.
+Should these macros go into this patchset or should they go
+separately?
