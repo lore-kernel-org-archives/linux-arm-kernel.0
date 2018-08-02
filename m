@@ -1,174 +1,77 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Wed, 1 Aug 2018 17:05:44 -0700
-Subject: [PATCH v7 1/8] interconnect: Add generic on-chip interconnect API
-In-Reply-To: <20180731161340.13000-2-georgi.djakov@linaro.org>
-References: <20180731161340.13000-1-georgi.djakov@linaro.org>
- <20180731161340.13000-2-georgi.djakov@linaro.org>
-Message-ID: <fc7fd938-0e87-b88e-b2f2-ca8fd4134746@infradead.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 1 Aug 2018 17:14:14 -0700
+Subject: [RFC 0/2] harden alloc_pages against bogus nid
+In-Reply-To: <d9f8e9d1-2fb8-6016-5081-7e3213b23ed4@arm.com>
+References: <20180801200418.1325826-1-jeremy.linton@arm.com>
+ <20180801145020.8c76a490c1bf9bef5f87078a@linux-foundation.org>
+ <d9f8e9d1-2fb8-6016-5081-7e3213b23ed4@arm.com>
+Message-ID: <20180801171414.30e54a106733ccaaa566388d@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2018 09:13 AM, Georgi Djakov wrote:
-> This patch introduces a new API to get requirements and configure the
-> interconnect buses across the entire chipset to fit with the current
-> demand.
+On Wed, 1 Aug 2018 17:56:46 -0500 Jeremy Linton <jeremy.linton@arm.com> wrote:
+
+> Hi,
 > 
-> The API is using a consumer/provider-based model, where the providers are
-> the interconnect buses and the consumers could be various drivers.
-> The consumers request interconnect resources (path) between endpoints and
-> set the desired constraints on this data flow path. The providers receive
-> requests from consumers and aggregate these requests for all master-slave
-> pairs on that path. Then the providers configure each participating in the
-> topology node according to the requested data flow path, physical links and
-> constraints. The topology could be complicated and multi-tiered and is SoC
-> specific.
+> On 08/01/2018 04:50 PM, Andrew Morton wrote:
+> > On Wed,  1 Aug 2018 15:04:16 -0500 Jeremy Linton <jeremy.linton@arm.com> wrote:
+> > 
+> >> The thread "avoid alloc memory on offline node"
+> >>
+> >> https://lkml.org/lkml/2018/6/7/251
+> >>
+> >> Asked at one point why the kzalloc_node was crashing rather than
+> >> returning memory from a valid node. The thread ended up fixing
+> >> the immediate causes of the crash but left open the case of bad
+> >> proximity values being in DSDT tables without corrisponding
+> >> SRAT/SLIT entries as is happening on another machine.
+> >>
+> >> Its also easy to fix that, but we should also harden the allocator
+> >> sufficiently that it doesn't crash when passed an invalid node id.
+> >> There are a couple possible ways to do this, and i've attached two
+> >> separate patches which individually fix that problem.
+> >>
+> >> The first detects the offline node before calling
+> >> the new_slab code path when it becomes apparent that the allocation isn't
+> >> going to succeed. The second actually hardens node_zonelist() and
+> >> prepare_alloc_pages() in the face of NODE_DATA(nid) returning a NULL
+> >> zonelist. This latter case happens if the node has never been initialized
+> >> or is possibly out of range. There are other places (NODE_DATA &
+> >> online_node) which should be checking if the node id's are > MAX_NUMNODES.
+> >>
+> > 
+> > What is it that leads to a caller requesting memory from an invalid
+> > node?  A race against offlining?  If so then that's a lack of
+> > appropriate locking, isn't it?
 > 
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-> ---
->  Documentation/interconnect/interconnect.rst |  96 ++++
->  drivers/Kconfig                             |   2 +
->  drivers/Makefile                            |   1 +
->  drivers/interconnect/Kconfig                |  10 +
->  drivers/interconnect/Makefile               |   2 +
->  drivers/interconnect/core.c                 | 569 ++++++++++++++++++++
->  include/linux/interconnect-provider.h       | 125 +++++
->  include/linux/interconnect.h                |  42 ++
->  8 files changed, 847 insertions(+)
->  create mode 100644 Documentation/interconnect/interconnect.rst
->  create mode 100644 drivers/interconnect/Kconfig
->  create mode 100644 drivers/interconnect/Makefile
->  create mode 100644 drivers/interconnect/core.c
->  create mode 100644 include/linux/interconnect-provider.h
->  create mode 100644 include/linux/interconnect.h
+> There were a couple unrelated cases, both having to do with the PXN 
+> associated with a PCI port. The first case AFAIK, the domain wasn't 
+> really invalid if the entire SRAT was parsed and nodes created even when 
+> there weren't associated CPUs. The second case (a different machine) is 
+> simply a PXN value that is completely invalid (no associated 
+> SLIT/SRAT/etc entries) due to firmware making a mistake when a socket 
+> isn't populated.
 > 
-> diff --git a/Documentation/interconnect/interconnect.rst b/Documentation/interconnect/interconnect.rst
-> new file mode 100644
-> index 000000000000..e628881ee218
-> --- /dev/null
-> +++ b/Documentation/interconnect/interconnect.rst
-> @@ -0,0 +1,96 @@
-> +.. SPDX-License-Identifier: GPL-2.0
-> +
-> +=====================================
-> +GENERIC SYSTEM INTERCONNECT SUBSYSTEM
-> +=====================================
-> +
-> +Introduction
-> +------------
-> +
-> +This framework is designed to provide a standard kernel interface to control
-> +the settings of the interconnects on a SoC. These settings can be throughput,
+> There have been a few other suggested or merged patches for the 
+> individual problems above, this set is just an attempt at avoiding a 
+> full crash if/when another similar problem happens.
 
-I would say:                         on an SoC.
+Please add the above info to the changelog.
 
-Do you pronounce that as "sock" or the letters S.O.C.?
+> 
+> > 
+> > I don't see a problem with emitting a warning and then selecting a
+> > different node so we can keep running.  But we do want that warning, so
+> > we can understand the root cause and fix it?
+> 
+> Yes, we do want to know when an invalid id is passed, i will add the 
+> VM_WARN in the first one.
+> 
+> The second one I wasn't sure about as failing prepare_alloc_pages() 
+> generates a couple of error messages, but the system then continues 
+> operation.
+> 
+> I guess my question though is which method (or both/something else?) is 
+> the preferred way to harden this up?
 
-
-> +latency and priority between multiple interconnected devices or functional
-> +blocks. This can be controlled dynamically in order to save power or provide
-> +maximum performance.
-> +
-> +The interconnect bus is a hardware with configurable parameters, which can be
-
-                    bus is hardware
-
-> +set on a data path according to the requests received from various drivers.
-> +An example of interconnect buses are the interconnects between various
-> +components or functional blocks in chipsets. There can be multiple interconnects
-> +on a SoC that can be multi-tiered.
-
-      an SoC
-
-> +
-> +Below is a simplified diagram of a real-world SoC interconnect bus topology.
-> +
-> +::
-> +
-> + +----------------+    +----------------+
-> + | HW Accelerator |--->|      M NoC     |<---------------+
-> + +----------------+    +----------------+                |
-> +                         |      |                    +------------+
-> +  +-----+  +-------------+      V       +------+     |            |
-> +  | DDR |  |                +--------+  | PCIe |     |            |
-> +  +-----+  |                | Slaves |  +------+     |            |
-> +    ^ ^    |                +--------+     |         |   C NoC    |
-> +    | |    V                               V         |            |
-> + +------------------+   +------------------------+   |            |   +-----+
-> + |                  |-->|                        |-->|            |-->| CPU |
-> + |                  |-->|                        |<--|            |   +-----+
-> + |     Mem NoC      |   |         S NoC          |   +------------+
-> + |                  |<--|                        |---------+    |
-> + |                  |<--|                        |<------+ |    |   +--------+
-> + +------------------+   +------------------------+       | |    +-->| Slaves |
-> +   ^  ^    ^    ^          ^                             | |        +--------+
-> +   |  |    |    |          |                             | V
-> + +------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
-> + | CPUs |  |  | GPU |   | DSP |  | Masters |-->|       P NoC    |-->| Slaves |
-> + +------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
-> +           |
-> +       +-------+
-> +       | Modem |
-> +       +-------+
-> +
-> +Terminology
-> +-----------
-> +
-> +Interconnect provider is the software definition of the interconnect hardware.
-> +The interconnect providers on the above diagram are M NoC, S NoC, C NoC, P NoC
-> +and Mem NoC.
-> +
-> +Interconnect node is the software definition of the interconnect hardware
-> +port. Each interconnect provider consists of multiple interconnect nodes,
-> +which are connected to other SoC components including other interconnect
-> +providers. The point on the diagram where the CPUs connect to the memory is
-> +called an interconnect node, which belongs to the Mem NoC interconnect provider.
-> +
-> +Interconnect endpoints are the first or the last element of the path. Every
-> +endpoint is a node, but not every node is an endpoint.
-> +
-> +Interconnect path is everything between two endpoints including all the nodes
-> +that have to be traversed to reach from a source to destination node. It may
-> +include multiple master-slave pairs across several interconnect providers.
-> +
-> +Interconnect consumers are the entities which make use of the data paths exposed
-> +by the providers. The consumers send requests to providers requesting various
-> +throughput, latency and priority. Usually the consumers are device drivers, that
-> +send request based on their needs. An example for a consumer is a video decoder
-> +that supports various formats and image sizes.
-> +
-> +Interconnect providers
-> +----------------------
-> +
-> +Interconnect provider is an entity that implements methods to initialize and
-> +configure a interconnect bus hardware. The interconnect provider drivers should
-
-   configure interconnect bus hardware.
-(i.e., drop the "a")
-
-> +be registered with the interconnect provider core.
-> +
-> +The interconnect framework provider API functions are documented in
-> +.. kernel-doc:: include/linux/interconnect-provider.h
-
-What do you want that to do?  and does that happen?
-
-The .. kernel-doc:: line won't be printed.  It will just be expanded to the
-contents of that header file, so the preceding sentence fragment will look/sound
-odd.
-
-> +
-> +Interconnect consumers
-> +----------------------
-> +
-> +Interconnect consumers are the clients which use the interconnect APIs to
-> +get paths between endpoints and set their bandwidth/latency/QoS requirements
-> +for these interconnect paths.
-> +
-> +The interconnect framework consumer API functions are documented in
-> +.. kernel-doc:: include/linux/interconnect.h
-
-same as above.
-
-
--- 
-~Randy
+The first patch looked neater.  Can we get a WARN_ON in there as well?
