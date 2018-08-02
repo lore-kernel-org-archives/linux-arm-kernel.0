@@ -1,74 +1,82 @@
-From: palmer@sifive.com (Palmer Dabbelt)
-Date: Thu, 02 Aug 2018 11:30:55 -0700 (PDT)
-Subject: [PATCH 04/24] 32-bit userspace ABI: introduce ARCH_32BIT_OFF_T
- config option
-In-Reply-To: <20180625061950.GB23998@yury-thinkpad>
-Message-ID: <mhng-96b7425f-3358-4b26-bd80-2a8957100f9a@palmer-si-x1c4>
+From: skannan@codeaurora.org (skannan at codeaurora.org)
+Date: Thu, 02 Aug 2018 12:12:15 -0700
+Subject: [PATCH v7 8/8] interconnect: Allow endpoints translation via DT
+In-Reply-To: <3a7bb27a-0609-133b-08e9-8864f1ccc4bc@linaro.org>
+References: <20180731161340.13000-1-georgi.djakov@linaro.org>
+ <20180731161340.13000-9-georgi.djakov@linaro.org>
+ <804925d5927ccb6927b16f7e9a4aa05c@codeaurora.org>
+ <3a7bb27a-0609-133b-08e9-8864f1ccc4bc@linaro.org>
+Message-ID: <37ac189618cda02567977f65570d15d3@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 24 Jun 2018 23:19:50 PDT (-0700), ynorov at caviumnetworks.com wrote:
-> On Mon, Jun 11, 2018 at 02:27:36PM +0300, Yury Norov wrote:
->> On Mon, Jun 11, 2018 at 09:48:02AM +0200, Arnd Bergmann wrote:
->> > On Sat, Jun 9, 2018 at 9:42 AM, Yury Norov <ynorov@caviumnetworks.com> wrote:
->> > > On Fri, Jun 08, 2018 at 06:32:07PM +0100, Catalin Marinas wrote:
->> > >> On Wed, May 16, 2018 at 11:18:49AM +0300, Yury Norov wrote:
->> > >> > diff --git a/arch/Kconfig b/arch/Kconfig
->> > >> > index 76c0b54443b1..ee079244dc3c 100644
->> > >> > --- a/arch/Kconfig
->> > >> > +++ b/arch/Kconfig
->> > >> > @@ -264,6 +264,21 @@ config ARCH_THREAD_STACK_ALLOCATOR
->> > >> >  config ARCH_WANTS_DYNAMIC_TASK_STRUCT
->> > >> >     bool
->> > >> >
->> > >> > +config ARCH_32BIT_OFF_T
->> > >> > +   bool
->> > >> > +   depends on !64BIT
->> > >> > +   help
->> > >> > +     All new 32-bit architectures should have 64-bit off_t type on
->> > >> > +     userspace side which corresponds to the loff_t kernel type. This
->> > >> > +     is the requirement for modern ABIs. Some existing architectures
->> > >> > +     already have 32-bit off_t. This option is enabled for all such
->> > >> > +     architectures explicitly. Namely: arc, arm, blackfin, cris, frv,
->> > >> > +     h8300, hexagon, m32r, m68k, metag, microblaze, mips32, mn10300,
->> > >> > +     nios2, openrisc, parisc32, powerpc32, score, sh, sparc, tile32,
->> > >> > +     unicore32, x86_32 and xtensa. This is the complete list. Any
->> > >> > +     new 32-bit architecture should declare 64-bit off_t type on user
->> > >> > +     side and so should not enable this option.
->> > >>
->> > >> Do you know if this is the case for riscv and nds32, merged in the
->> > >> meantime? If not, I suggest you drop this patch altogether and just
->> > >> define force_o_largefile() for arm64/ilp32 as we don't seem to stick to
->> > >> "all new 32-bit architectures should have 64-bit off_t".
->> > >
->> > > I wrote this patch at request of Arnd Bergmann. This is actually his
->> > > words that all new 32-bit architectures should have 64-bit off_t. So
->> > > I was surprized when riscv was merged with 32-bit off_t (and I didn't
->> > > follow nds32).
->> > >
->> > > If this rule is still in force, we'd better add new exceptions to this
->> > > patch. Otherwise, we can drop it.
->> > >
->> > > Arnd, could you please comment it?
->> >
->> > I completely forgot about it and had assumed that it was merged long
->> > ago, sorry about that.
->>
->> Hi Arnd,
->>
->> There are 3 patches like this in ILP32 series that change ABI for new
->> targets. I've submitted them in separated series:
->> https://lkml.org/lkml/2017/9/25/574
->>
->> They all seems to be acked by you. If you ready to upstream the
->> series, I can rebase it and add riscv32 and nds32 exceptions.
->>
->> If Palmer and riscv people will decide to follow new rules, we can
->> easily drop the exception.
->
-> Ping?
+On 2018-08-02 05:07, Georgi Djakov wrote:
+> Hi Saravana,
+> 
+> On 08/02/2018 01:57 AM, skannan at codeaurora.org wrote:
+>> On 2018-07-31 09:13, Georgi Djakov wrote:
+>>> Currently we support only platform data for specifying the 
+>>> interconnect
+>>> endpoints. As now the endpoints are hard-coded into the consumer 
+>>> driver
+>>> this may lead to complications when a single driver is used by 
+>>> multiple
+>>> SoCs, which may have different interconnect topology.
+>>> To avoid cluttering the consumer drivers, introduce a translation
+>>> function
+>>> to help us get the board specific interconnect data from device-tree.
+>>> 
+>>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>>> ---
+>>> ?drivers/interconnect/core.c? | 62 
+>>> ++++++++++++++++++++++++++++++++++++
+>>> ?include/linux/interconnect.h |? 7 ++++
+>>> ?2 files changed, 69 insertions(+)
+>>> 
+>>> diff --git a/drivers/interconnect/core.c 
+>>> b/drivers/interconnect/core.c
+>>> index 9fef180cf77e..d1b6adff0a3d 100644
+>>> --- a/drivers/interconnect/core.c
+>>> +++ b/drivers/interconnect/core.c
+> [..]
+>>> --- a/include/linux/interconnect.h
+>>> +++ b/include/linux/interconnect.h
+>>> @@ -17,6 +17,7 @@ struct device;
+>>> 
+>>> ?struct icc_path *icc_get(struct device *dev, const int src_id,
+>>> ????????????? const int dst_id);
+>>> +struct icc_path *of_icc_get(struct device *dev, const char *name);
+>>> ?void icc_put(struct icc_path *path);
+>>> ?int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
+>>> 
+>>> @@ -28,6 +29,12 @@ static inline struct icc_path *icc_get(struct
+>>> device *dev, const int src_id,
+>>> ???? return NULL;
+>>> ?}
+>>> 
+>>> +static inline struct icc_path *of_icc_get(struct device *dev,
+>>> +????????????????????? const char *name)
+>>> +{
+>>> +??? return NULL;
+>>> +}
+>>> +
+>> 
+>> Might want to return PTR(-ENODEV) or some error code so that client
+>> doesn't have to do NULL check AND an error check?
+>> 
+>> -Saravana
+> 
+> NULL is returned when CONFIG_INTERCONNECT=n. Configuration of
+> interconnects by consumer drivers could be optional and that's why null
+> is returned instead of an error. The consumer drivers decide how to
+> proceed in this case and if there is a hard requirement for 
+> interconnect
+> support, then i would suggest to express it as a dependency in Kconfig.
 
-Sorry to be a bit slow, but we just decided to skip this current glibc release 
-for rv32i and instead focus on getting the 32-bit ABI nice and clean for the 
-next release.  Thus we in RISC-V land are OK with taking these changes to the 
-32-bit kernel ABI.
+Ehh... you could make the same argument with an error. If it's not 
+mandatory for functioning, they can ignore a specific error and 
+continue? At a minimum, these stub functions returning NULL doesn't 
+match with the documentation that says these APIs will only ever return 
+ERR_PTR().
+
+-Saravana
