@@ -1,49 +1,186 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu, 2 Aug 2018 13:48:04 +0200
-Subject: [RFC PATCH v2 5/6] spi: Add QuadSPI driver for Atmel SAMA5D2
-In-Reply-To: <6f9ca4f1-6809-2d7d-4d64-6869a4e413cb@exceet.de>
-References: <20180627131609.13681-1-bugalski.piotr@gmail.com>
- <20180627131609.13681-6-bugalski.piotr@gmail.com>
- <20180801172747.GJ5509@sirena.org.uk>
- <20180801215733.4dfa3a95@bbrezillon>
- <20180802101742.GF9117@sirena.org.uk>
- <6f9ca4f1-6809-2d7d-4d64-6869a4e413cb@exceet.de>
-Message-ID: <20180802134804.2352ee89@bbrezillon>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Thu, 2 Aug 2018 14:58:55 +0300
+Subject: [PATCH v7 1/8] interconnect: Add generic on-chip interconnect API
+In-Reply-To: <fc7fd938-0e87-b88e-b2f2-ca8fd4134746@infradead.org>
+References: <20180731161340.13000-1-georgi.djakov@linaro.org>
+ <20180731161340.13000-2-georgi.djakov@linaro.org>
+ <fc7fd938-0e87-b88e-b2f2-ca8fd4134746@infradead.org>
+Message-ID: <56986119-5365-e53a-6106-31f7d87d63dc@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2 Aug 2018 12:46:36 +0200
-Frieder Schrempf <frieder.schrempf@exceet.de> wrote:
+Hi Randy,
 
-> Hi Mark,
+On 08/02/2018 03:05 AM, Randy Dunlap wrote:
+> On 07/31/2018 09:13 AM, Georgi Djakov wrote:
+>> This patch introduces a new API to get requirements and configure the
+>> interconnect buses across the entire chipset to fit with the current
+>> demand.
+>>
+>> The API is using a consumer/provider-based model, where the providers are
+>> the interconnect buses and the consumers could be various drivers.
+>> The consumers request interconnect resources (path) between endpoints and
+>> set the desired constraints on this data flow path. The providers receive
+>> requests from consumers and aggregate these requests for all master-slave
+>> pairs on that path. Then the providers configure each participating in the
+>> topology node according to the requested data flow path, physical links and
+>> constraints. The topology could be complicated and multi-tiered and is SoC
+>> specific.
+>>
+>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>> ---
+>>  Documentation/interconnect/interconnect.rst |  96 ++++
+>>  drivers/Kconfig                             |   2 +
+>>  drivers/Makefile                            |   1 +
+>>  drivers/interconnect/Kconfig                |  10 +
+>>  drivers/interconnect/Makefile               |   2 +
+>>  drivers/interconnect/core.c                 | 569 ++++++++++++++++++++
+>>  include/linux/interconnect-provider.h       | 125 +++++
+>>  include/linux/interconnect.h                |  42 ++
+>>  8 files changed, 847 insertions(+)
+>>  create mode 100644 Documentation/interconnect/interconnect.rst
+>>  create mode 100644 drivers/interconnect/Kconfig
+>>  create mode 100644 drivers/interconnect/Makefile
+>>  create mode 100644 drivers/interconnect/core.c
+>>  create mode 100644 include/linux/interconnect-provider.h
+>>  create mode 100644 include/linux/interconnect.h
+>>
+>> diff --git a/Documentation/interconnect/interconnect.rst b/Documentation/interconnect/interconnect.rst
+>> new file mode 100644
+>> index 000000000000..e628881ee218
+>> --- /dev/null
+>> +++ b/Documentation/interconnect/interconnect.rst
+>> @@ -0,0 +1,96 @@
+>> +.. SPDX-License-Identifier: GPL-2.0
+>> +
+>> +=====================================
+>> +GENERIC SYSTEM INTERCONNECT SUBSYSTEM
+>> +=====================================
+>> +
+>> +Introduction
+>> +------------
+>> +
+>> +This framework is designed to provide a standard kernel interface to control
+>> +the settings of the interconnects on a SoC. These settings can be throughput,
 > 
-> On 02.08.2018 12:17, Mark Brown wrote:
-> > On Wed, Aug 01, 2018 at 09:57:33PM +0200, Boris Brezillon wrote:  
-> >> Mark Brown <broonie@kernel.org> wrote:  
-> >   
-> >> 2/ Getting this patch [1] merged and implementing the ->get_name() hook
-> >>     in this driver so that SPI NOR devs declared to the MTD layer keep
-> >>     the same name after the transition to spi-mem and mtdparts= passed on
-> >>     the cmdline keep working. Without this in place we're likely to
-> >>     break a few setups :-/.  
-> >   
-> >> [1]https://patchwork.kernel.org/patch/10508693/  
-> > 
-> > I don't seem to have a copy of this patch...  not sure it was sent to
-> > me?  
+> I would say:                         on an SoC.
 > 
-> When I sent the patch I put you in cc. So if nothing went wrong you 
-> should have it.
-> It is part of the SPI MEM conversion series for the FSL QSPI driver [1].
-> 
-> Boris made some remarks on documentation in v2, that I have fixed, but 
-> not sent out yet, as we have some blocking issues with the driver itself.
+> Do you pronounce that as "sock" or the letters S.O.C.?
 
-I don't remember where we were stuck. Are you still waiting answers
-from Yogesh? Probably a good time to ping him if that's the case ;-).
+Ah right indeed, this should be based on the phonetics and not the writing.
 
+>> +latency and priority between multiple interconnected devices or functional
+>> +blocks. This can be controlled dynamically in order to save power or provide
+>> +maximum performance.
+>> +
+>> +The interconnect bus is a hardware with configurable parameters, which can be
 > 
-> So if you want I could send the patch separately so it can be applied 
-> with the Atmel driver.
+>                     bus is hardware
 
-Yes please, send a v3 for patch 1 and 2.
+Ok.
+
+>> +set on a data path according to the requests received from various drivers.
+>> +An example of interconnect buses are the interconnects between various
+>> +components or functional blocks in chipsets. There can be multiple interconnects
+>> +on a SoC that can be multi-tiered.
+> 
+>       an SoC
+> 
+>> +
+>> +Below is a simplified diagram of a real-world SoC interconnect bus topology.
+>> +
+>> +::
+>> +
+>> + +----------------+    +----------------+
+>> + | HW Accelerator |--->|      M NoC     |<---------------+
+>> + +----------------+    +----------------+                |
+>> +                         |      |                    +------------+
+>> +  +-----+  +-------------+      V       +------+     |            |
+>> +  | DDR |  |                +--------+  | PCIe |     |            |
+>> +  +-----+  |                | Slaves |  +------+     |            |
+>> +    ^ ^    |                +--------+     |         |   C NoC    |
+>> +    | |    V                               V         |            |
+>> + +------------------+   +------------------------+   |            |   +-----+
+>> + |                  |-->|                        |-->|            |-->| CPU |
+>> + |                  |-->|                        |<--|            |   +-----+
+>> + |     Mem NoC      |   |         S NoC          |   +------------+
+>> + |                  |<--|                        |---------+    |
+>> + |                  |<--|                        |<------+ |    |   +--------+
+>> + +------------------+   +------------------------+       | |    +-->| Slaves |
+>> +   ^  ^    ^    ^          ^                             | |        +--------+
+>> +   |  |    |    |          |                             | V
+>> + +------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
+>> + | CPUs |  |  | GPU |   | DSP |  | Masters |-->|       P NoC    |-->| Slaves |
+>> + +------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
+>> +           |
+>> +       +-------+
+>> +       | Modem |
+>> +       +-------+
+>> +
+>> +Terminology
+>> +-----------
+>> +
+>> +Interconnect provider is the software definition of the interconnect hardware.
+>> +The interconnect providers on the above diagram are M NoC, S NoC, C NoC, P NoC
+>> +and Mem NoC.
+>> +
+>> +Interconnect node is the software definition of the interconnect hardware
+>> +port. Each interconnect provider consists of multiple interconnect nodes,
+>> +which are connected to other SoC components including other interconnect
+>> +providers. The point on the diagram where the CPUs connect to the memory is
+>> +called an interconnect node, which belongs to the Mem NoC interconnect provider.
+>> +
+>> +Interconnect endpoints are the first or the last element of the path. Every
+>> +endpoint is a node, but not every node is an endpoint.
+>> +
+>> +Interconnect path is everything between two endpoints including all the nodes
+>> +that have to be traversed to reach from a source to destination node. It may
+>> +include multiple master-slave pairs across several interconnect providers.
+>> +
+>> +Interconnect consumers are the entities which make use of the data paths exposed
+>> +by the providers. The consumers send requests to providers requesting various
+>> +throughput, latency and priority. Usually the consumers are device drivers, that
+>> +send request based on their needs. An example for a consumer is a video decoder
+>> +that supports various formats and image sizes.
+>> +
+>> +Interconnect providers
+>> +----------------------
+>> +
+>> +Interconnect provider is an entity that implements methods to initialize and
+>> +configure a interconnect bus hardware. The interconnect provider drivers should
+> 
+>    configure interconnect bus hardware.
+> (i.e., drop the "a")
+
+Ok.
+
+>> +be registered with the interconnect provider core.
+>> +
+>> +The interconnect framework provider API functions are documented in
+>> +.. kernel-doc:: include/linux/interconnect-provider.h
+> 
+> What do you want that to do?  and does that happen?
+> 
+> The .. kernel-doc:: line won't be printed.  It will just be expanded to the
+> contents of that header file, so the preceding sentence fragment will look/sound
+> odd.
+
+Thanks for catching this, I understood it incorrectly. Will improve it.
+
+BR,
+Georgi
+
+>> +
+>> +Interconnect consumers
+>> +----------------------
+>> +
+>> +Interconnect consumers are the clients which use the interconnect APIs to
+>> +get paths between endpoints and set their bandwidth/latency/QoS requirements
+>> +for these interconnect paths.
+>> +
+>> +The interconnect framework consumer API functions are documented in
+>> +.. kernel-doc:: include/linux/interconnect.h
+> 
+> same as above.
+> 
+> 
