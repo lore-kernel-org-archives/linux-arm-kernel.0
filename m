@@ -1,43 +1,143 @@
-From: maxi.jourdan@wanadoo.fr (Maxime Jourdan)
-Date: Thu, 2 Aug 2018 15:14:30 +0200
-Subject: [PATCH 1/4] soc: amlogic: add meson-canvas driver
-In-Reply-To: <36fcadd3-074d-7c11-6ca5-b44aecaa3639@baylibre.com>
-References: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
- <20180801185128.23440-2-maxi.jourdan@wanadoo.fr>
- <36fcadd3-074d-7c11-6ca5-b44aecaa3639@baylibre.com>
-Message-ID: <CAHStOZ4DV8FbAgzMKhnbLOOPj7Gm8+5=KxMSGL6J1D00Ejk42g@mail.gmail.com>
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Thu, 2 Aug 2018 18:51:53 +0530
+Subject: [PATCH v3] gpu/drm/exynos: Convert drm_atomic_helper_suspend/resume()
+Message-ID: <20180802132152.GA2833@jordon-HP-15-Notebook-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+convert drm_atomic_helper_suspend/resume() to use
+drm_mode_config_helper_suspend/resume().
 
-2018-08-02 10:38 GMT+02:00 Neil Armstrong <narmstrong@baylibre.com>:
-> Please switch to the spdx header format here and in the .h.
+exynos_drm_fbdev_suspend/resume can be removed
+as drm_mode_config_helper_suspend/resume has
+implement the same in generic way.
 
-> In the DRM driver these are updated in IRQ context, we should make sure we don't sleep
-> in interrupt context if IRQ occurs when the VDEC updates it's canvases.
->
-> Could you switch to spin_lock_irqsave() instead ?
+Remove suspend_state from exynos_drm_private
+struct as it is no more useful.
 
-Will do.
+Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
+Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+v2: Address Inki Dae's comment. Remove ret variable
+    from both suspend/resume function.
 
-> Can you add the endian defines ?
->
-> #define MESON_CANVAS_ENDIAN_SWAP16      0x1
-> #define MESON_CANVAS_ENDIAN_SWAP32      0x3
-> #define MESON_CANVAS_ENDIAN_SWAP64      0x7
-> #define MESON_CANVAS_ENDIAN_SWAP128     0xf
->
-> the SWAP64 is the one used in the VDEC and DRM Overlays.
+v3: Tested by Marek. Updated the change log.
 
-Sure. Maybe I should push the flags (0x1, 0x2, 0x4, 0x8) rather than
-the combinations?
-Or both, since the combinations are more likely to be used in practice
-more than the single flags.
+ drivers/gpu/drm/exynos/exynos_drm_drv.c   | 26 ++------------------------
+ drivers/gpu/drm/exynos/exynos_drm_drv.h   |  1 -
+ drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 17 -----------------
+ drivers/gpu/drm/exynos/exynos_drm_fbdev.h | 10 ----------
+ 4 files changed, 2 insertions(+), 52 deletions(-)
 
-> I rebased my DRM Overlay patch on top of this and :
-> Tested-by: Neil Armstrong <narmstrong@baylibre.com>
->
-> You can keep this tag on future versions.
-
-Thanks!
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+index b599f74..d86dd81 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+@@ -149,37 +149,15 @@ static void exynos_drm_postclose(struct drm_device *dev, struct drm_file *file)
+ static int exynos_drm_suspend(struct device *dev)
+ {
+ 	struct drm_device *drm_dev = dev_get_drvdata(dev);
+-	struct exynos_drm_private *private;
+-
+-	if (!drm_dev)
+-		return 0;
+-
+-	private = drm_dev->dev_private;
+-
+-	drm_kms_helper_poll_disable(drm_dev);
+-	exynos_drm_fbdev_suspend(drm_dev);
+-	private->suspend_state = drm_atomic_helper_suspend(drm_dev);
+-	if (IS_ERR(private->suspend_state)) {
+-		exynos_drm_fbdev_resume(drm_dev);
+-		drm_kms_helper_poll_enable(drm_dev);
+-		return PTR_ERR(private->suspend_state);
+-	}
+ 
+-	return 0;
++	return  drm_mode_config_helper_suspend(drm_dev);
+ }
+ 
+ static void exynos_drm_resume(struct device *dev)
+ {
+ 	struct drm_device *drm_dev = dev_get_drvdata(dev);
+-	struct exynos_drm_private *private;
+-
+-	if (!drm_dev)
+-		return;
+ 
+-	private = drm_dev->dev_private;
+-	drm_atomic_helper_resume(drm_dev, private->suspend_state);
+-	exynos_drm_fbdev_resume(drm_dev);
+-	drm_kms_helper_poll_enable(drm_dev);
++	return drm_mode_config_helper_resume(drm_dev);
+ }
+ 
+ static const struct dev_pm_ops exynos_drm_pm_ops = {
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.h b/drivers/gpu/drm/exynos/exynos_drm_drv.h
+index c737c4b..7349e7c 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_drv.h
++++ b/drivers/gpu/drm/exynos/exynos_drm_drv.h
+@@ -195,7 +195,6 @@ struct drm_exynos_file_private {
+  */
+ struct exynos_drm_private {
+ 	struct drm_fb_helper *fb_helper;
+-	struct drm_atomic_state *suspend_state;
+ 
+ 	struct device *g2d_dev;
+ 	struct device *dma_dev;
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+index 132dd52..918dd2c 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+@@ -270,20 +270,3 @@ void exynos_drm_fbdev_fini(struct drm_device *dev)
+ 	private->fb_helper = NULL;
+ }
+ 
+-void exynos_drm_fbdev_suspend(struct drm_device *dev)
+-{
+-	struct exynos_drm_private *private = dev->dev_private;
+-
+-	console_lock();
+-	drm_fb_helper_set_suspend(private->fb_helper, 1);
+-	console_unlock();
+-}
+-
+-void exynos_drm_fbdev_resume(struct drm_device *dev)
+-{
+-	struct exynos_drm_private *private = dev->dev_private;
+-
+-	console_lock();
+-	drm_fb_helper_set_suspend(private->fb_helper, 0);
+-	console_unlock();
+-}
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+index b338472..6840b6a 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
++++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+@@ -19,8 +19,6 @@
+ 
+ int exynos_drm_fbdev_init(struct drm_device *dev);
+ void exynos_drm_fbdev_fini(struct drm_device *dev);
+-void exynos_drm_fbdev_suspend(struct drm_device *drm);
+-void exynos_drm_fbdev_resume(struct drm_device *drm);
+ 
+ #else
+ 
+@@ -39,14 +37,6 @@ static inline void exynos_drm_fbdev_restore_mode(struct drm_device *dev)
+ 
+ #define exynos_drm_output_poll_changed (NULL)
+ 
+-static inline void exynos_drm_fbdev_suspend(struct drm_device *drm)
+-{
+-}
+-
+-static inline void exynos_drm_fbdev_resume(struct drm_device *drm)
+-{
+-}
+-
+ #endif
+ 
+ #endif
+-- 
+1.9.1
