@@ -1,120 +1,166 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Thu, 2 Aug 2018 18:24:55 +0800
-Subject: [PATCH v7 2/3] Bluetooth: mediatek: Add protocol support for
- MediaTek serial devices
-In-Reply-To: <9526E5D9-50BA-4D57-80F5-083DB7D28AFE@holtmann.org>
-References: <cover.1533056925.git.sean.wang@mediatek.com>
- <c92ed10cf16f36d9a3b390e864af92e2dfe7b771.1533056925.git.sean.wang@mediatek.com>
- <1707FFA1-A294-4A95-A3BF-0910CE455232@holtmann.org>
- <1533192799.3472.122.camel@mtkswgap22>
- <FF45A90A-F9F1-47CB-AB1F-1E92BF587FBE@holtmann.org>
- <1533199720.3472.136.camel@mtkswgap22>
- <9526E5D9-50BA-4D57-80F5-083DB7D28AFE@holtmann.org>
-Message-ID: <1533205495.3472.144.camel@mtkswgap22>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Thu,  2 Aug 2018 12:34:24 +0200
+Subject: [PATCH v9 5/6] regulator: pfuze100-regulator: provide
+ pm_power_off_prepare handler
+In-Reply-To: <20180802103425.3053-1-o.rempel@pengutronix.de>
+References: <20180802103425.3053-1-o.rempel@pengutronix.de>
+Message-ID: <20180802103425.3053-6-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-08-02 at 11:45 +0200, Marcel Holtmann wrote:
-> Hi Sean,
-> 
-> >>>>> +
-> >>>>> +static int mtk_hci_wmt_sync(struct hci_dev *hdev, u8 op, u8 flag, u16 plen,
-> >>>>> +			    const void *param)
-> >>>>> +{
-> >>>>> +	struct mtk_hci_wmt_cmd wc;
-> >>>>> +	struct mtk_wmt_hdr *hdr;
-> >>>>> +	struct sk_buff *skb;
-> >>>>> +	u32 hlen;
-> >>>>> +
-> >>>>> +	hlen = sizeof(*hdr) + plen;
-> >>>>> +	if (hlen > 255)
-> >>>>> +		return -EINVAL;
-> >>>>> +
-> >>>>> +	hdr = (struct mtk_wmt_hdr *)&wc;
-> >>>>> +	hdr->dir = 1;
-> >>>>> +	hdr->op = op;
-> >>>>> +	hdr->dlen = cpu_to_le16(plen + 1);
-> >>>>> +	hdr->flag = flag;
-> >>>>> +	memcpy(wc.data, param, plen);
-> >>>>> +
-> >>>>> +	atomic_inc(&hdev->cmd_cnt);
-> >>>> 
-> >>>> Why are you doing this one. It will need a comment here if really needed. However I doubt that this is needed. You are only using it from hdev->setup and hdev->shutdown callbacks.
-> >>>> 
-> >>> 
-> >>> An increment on cmd_cnt is really needed because hci_cmd_work would check whether cmd_cnt is positive and then has a decrement on cmd_cnt before a packet is being sent out.
-> >>> 
-> >>> okay will add a comment.
-> >> 
-> >> but you are in ->setup callback this time. So if you need this, then all the other ->setup routines would actually fail as well. Either this is leftover from when you did things in ->probe or ->open or this is some thing we might better fix properly in the core instead of papering over it. Can you recheck if this is really needed.
-> >> 
-> > 
-> > I added a counter print and the counter increments as below
-> > 
-> > 	/* atomic_inc(&hdev->cmd_cnt); */
-> >        pr_info("cmd_cnt = %d\n" , atomic_read(&hdev->cmd_cnt));
-> > 
-> >        skb = __hci_cmd_sync_ev(hdev, 0xfc6f, hlen, &wc, HCI_VENDOR_PKT,
-> >                                HCI_INIT_TIMEOUT);
-> > 
-> > and the log show up that 
-> > 
-> > 
-> > [  334.049156] Bluetooth: hci0: command 0xfc6f tx timeout
-> > [  334.054840] cmd_cnt = 0
-> > [  336.065076] Bluetooth: hci0: command 0xfc6f tx timeout
-> > [  336.070795] cmd_cnt = 0
-> > [  338.080997] Bluetooth: hci0: command 0xfc6f tx timeout
-> > [  338.086683] cmd_cnt = 0
-> > [  340.096907] Bluetooth: hci0: command 0xfc6f tx timeout
-> > [  340.102609] cmd_cnt = 0
-> > [  342.112824] Bluetooth: hci0: command 0xfc6f tx timeout
-> > [  342.118520] cmd_cnt = 0
-> > [  344.128747] Bluetooth: hci0: command 0xfc6f tx timeout
-> > [  344.134454] cmd_cnt = 0
-> > [  346.144667] Bluetooth: hci0: command 0xfc6f tx timeout
-> > [  346.150372] cmd_cnt = 0
-> > 
-> > 
-> > The packet is dropped by hci_cmd_work at [1], so I also wondered why the
-> > other vendor driver works, it seems the counter needs to be incremented
-> > before every skb is being queued to cmd_q.
-> > 
-> > 4257 static void hci_cmd_work(struct work_struct *work)
-> > 4258 {
-> > 4259         struct hci_dev *hdev = container_of(work, struct hci_dev, cmd_work);
-> > 4260         struct sk_buff *skb;
-> > 4261
-> > 4262         BT_DBG("%s cmd_cnt %d cmd queued %d", hdev->name,
-> > 4263                atomic_read(&hdev->cmd_cnt), skb_queue_len(&hdev->cmd_q));
-> > 4264
-> > 4265         /* Send queued commands */
-> > 
-> > [1]
-> > 4266         if (atomic_read(&hdev->cmd_cnt)) { /* dropped when cmd_cnt is zero */
-> > 4267                 skb = skb_dequeue(&hdev->cmd_q);
-> > 4268                 if (!skb)
-> > 4269                         return;
-> > 4270
-> > 4271                 kfree_skb(hdev->sent_cmd);
-> > 4272
-> > 4273                 hdev->sent_cmd = skb_clone(skb, GFP_KERNEL);
-> > 4274                 if (hdev->sent_cmd) {
-> > 4275                         atomic_dec(&hdev->cmd_cnt);  /* cmd_cnt-- */
-> > 4276                         hci_send_frame(hdev, skb);
-> 
-> actually the command also needs to better go via the raw_q anyway since it doesn?t come back with the cmd status or cmd complete. You have it waiting for a vendor event. Maybe with is something we need to consider with __hci_cmd_sync_ev anyway.
-> 
-> Johan would know best since he wrote that code. Anyway, we should fix that in the core and not have you hack around it.
-> 
+On some boards the SoC can use one pin "PMIC_STBY_REQ" to notify th PMIC
+about state changes. In this case internal state of PMIC must be
+preconfigured for upcomming state change.
+It works fine with the current regulator framework, except with the
+power-off case.
 
-yes, my case is that received event is neither cmd status nor cmd complete. It is completely a vendor event.
+This patch is providing an optional pm_power_off_prepare handler
+which will configure standby state of the PMIC to disable all power lines.
 
-if it wants to be solved by the core layer, do you permit that I remove the hack and then send it in the next version?
+In my power consumption test on RIoTBoard, I got the following results:
+power off without this patch:	320 mA
+power off with this patch:	2   mA
+suspend to ram:			40  mA
 
-	Sean
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+---
+ drivers/regulator/pfuze100-regulator.c | 91 ++++++++++++++++++++++++++
+ 1 file changed, 91 insertions(+)
 
-> Regards
-> 
-> Marcel
-> 
+diff --git a/drivers/regulator/pfuze100-regulator.c b/drivers/regulator/pfuze100-regulator.c
+index 31c3a236120a..1e43a9de3bd5 100644
+--- a/drivers/regulator/pfuze100-regulator.c
++++ b/drivers/regulator/pfuze100-regulator.c
+@@ -31,11 +31,17 @@
+ 
+ #define PFUZE100_COINVOL	0x1a
+ #define PFUZE100_SW1ABVOL	0x20
++#define PFUZE100_SW1ABMODE	0x23
+ #define PFUZE100_SW1CVOL	0x2e
++#define PFUZE100_SW1CMODE	0x31
+ #define PFUZE100_SW2VOL		0x35
++#define PFUZE100_SW2MODE	0x38
+ #define PFUZE100_SW3AVOL	0x3c
++#define PFUZE100_SW3AMODE	0x3f
+ #define PFUZE100_SW3BVOL	0x43
++#define PFUZE100_SW3BMODE	0x46
+ #define PFUZE100_SW4VOL		0x4a
++#define PFUZE100_SW4MODE	0x4d
+ #define PFUZE100_SWBSTCON1	0x66
+ #define PFUZE100_VREFDDRCON	0x6a
+ #define PFUZE100_VSNVSVOL	0x6b
+@@ -46,6 +52,13 @@
+ #define PFUZE100_VGEN5VOL	0x70
+ #define PFUZE100_VGEN6VOL	0x71
+ 
++#define PFUZE100_SWxMODE_MASK	0xf
++#define PFUZE100_SWxMODE_APS_APS	0x8
++#define PFUZE100_SWxMODE_APS_OFF	0x4
++
++#define PFUZE100_VGENxLPWR	BIT(6)
++#define PFUZE100_VGENxSTBY	BIT(5)
++
+ enum chips { PFUZE100, PFUZE200, PFUZE3000 = 3, PFUZE3001 = 0x31, };
+ 
+ struct pfuze_regulator {
+@@ -559,6 +572,69 @@ static inline struct device_node *match_of_node(int index)
+ }
+ #endif
+ 
++static struct pfuze_chip *syspm_pfuze_chip;
++
++static void pfuze_power_off_prepare(void)
++{
++	dev_info(syspm_pfuze_chip->dev, "Configure standy mode for power off");
++
++	/* Switch from default mode: APS/APS to APS/Off */
++	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW1ABMODE,
++			   PFUZE100_SWxMODE_MASK, PFUZE100_SWxMODE_APS_OFF);
++	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW1CMODE,
++			   PFUZE100_SWxMODE_MASK, PFUZE100_SWxMODE_APS_OFF);
++	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW2MODE,
++			   PFUZE100_SWxMODE_MASK, PFUZE100_SWxMODE_APS_OFF);
++	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW3AMODE,
++			   PFUZE100_SWxMODE_MASK, PFUZE100_SWxMODE_APS_OFF);
++	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW3BMODE,
++			   PFUZE100_SWxMODE_MASK, PFUZE100_SWxMODE_APS_OFF);
++	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_SW4MODE,
++			   PFUZE100_SWxMODE_MASK, PFUZE100_SWxMODE_APS_OFF);
++
++	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN1VOL,
++			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
++			   PFUZE100_VGENxSTBY);
++	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN2VOL,
++			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
++			   PFUZE100_VGENxSTBY);
++	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN3VOL,
++			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
++			   PFUZE100_VGENxSTBY);
++	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN4VOL,
++			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
++			   PFUZE100_VGENxSTBY);
++	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN5VOL,
++			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
++			   PFUZE100_VGENxSTBY);
++	regmap_update_bits(syspm_pfuze_chip->regmap, PFUZE100_VGEN6VOL,
++			   PFUZE100_VGENxLPWR | PFUZE100_VGENxSTBY,
++			   PFUZE100_VGENxSTBY);
++}
++
++static int pfuze_power_off_prepare_init(struct pfuze_chip *pfuze_chip)
++{
++	if (pfuze_chip->chip_id != PFUZE100) {
++		dev_warn(pfuze_chip->dev, "Requested pm_power_off_prepare handler for not supported chip\n");
++		return -ENODEV;
++	}
++
++	if (pm_power_off_prepare) {
++		dev_warn(pfuze_chip->dev, "pm_power_off_prepare is already registered.\n");
++		return -EBUSY;
++	}
++
++	if (syspm_pfuze_chip) {
++		dev_warn(pfuze_chip->dev, "syspm_pfuze_chip is already set.\n");
++		return -EBUSY;
++	}
++
++	syspm_pfuze_chip = pfuze_chip;
++	pm_power_off_prepare = pfuze_power_off_prepare;
++
++	return 0;
++}
++
+ static int pfuze_identify(struct pfuze_chip *pfuze_chip)
+ {
+ 	unsigned int value;
+@@ -753,6 +829,20 @@ static int pfuze100_regulator_probe(struct i2c_client *client,
+ 		}
+ 	}
+ 
++	if (of_property_read_bool(client->dev.of_node,
++				  "fsl,pmic-stby-poweroff"))
++		return pfuze_power_off_prepare_init(pfuze_chip);
++
++	return 0;
++}
++
++static int pfuze100_regulator_remove(struct i2c_client *client)
++{
++	if (syspm_pfuze_chip) {
++		syspm_pfuze_chip = NULL;
++		pm_power_off_prepare = NULL;
++	}
++
+ 	return 0;
+ }
+ 
+@@ -763,6 +853,7 @@ static struct i2c_driver pfuze_driver = {
+ 		.of_match_table = pfuze_dt_ids,
+ 	},
+ 	.probe = pfuze100_regulator_probe,
++	.remove = pfuze100_regulator_remove,
+ };
+ module_i2c_driver(pfuze_driver);
+ 
+-- 
+2.18.0
