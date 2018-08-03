@@ -1,121 +1,225 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Fri, 3 Aug 2018 14:51:03 +0200
-Subject: [PATCH v7 2/3] Bluetooth: mediatek: Add protocol support for
- MediaTek serial devices
-In-Reply-To: <1533205495.3472.144.camel@mtkswgap22>
-References: <cover.1533056925.git.sean.wang@mediatek.com>
- <c92ed10cf16f36d9a3b390e864af92e2dfe7b771.1533056925.git.sean.wang@mediatek.com>
- <1707FFA1-A294-4A95-A3BF-0910CE455232@holtmann.org>
- <1533192799.3472.122.camel@mtkswgap22>
- <FF45A90A-F9F1-47CB-AB1F-1E92BF587FBE@holtmann.org>
- <1533199720.3472.136.camel@mtkswgap22>
- <9526E5D9-50BA-4D57-80F5-083DB7D28AFE@holtmann.org>
- <1533205495.3472.144.camel@mtkswgap22>
-Message-ID: <A6D48D49-52CE-405D-8C5D-C4D54CE67221@holtmann.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 3 Aug 2018 14:52:39 +0200
+Subject: [PATCH v4 03/10] arm64: dts: Add Mediatek SoC MT8183 and
+ evaluation board dts and Makefile
+In-Reply-To: <1533015487-60189-4-git-send-email-erin.lo@mediatek.com>
+References: <1533015487-60189-1-git-send-email-erin.lo@mediatek.com>
+ <1533015487-60189-4-git-send-email-erin.lo@mediatek.com>
+Message-ID: <6a73e655-66bd-5f4e-9c37-06d310c80b8c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
 
->>>>>>> +
->>>>>>> +static int mtk_hci_wmt_sync(struct hci_dev *hdev, u8 op, u8 flag, u16 plen,
->>>>>>> +			    const void *param)
->>>>>>> +{
->>>>>>> +	struct mtk_hci_wmt_cmd wc;
->>>>>>> +	struct mtk_wmt_hdr *hdr;
->>>>>>> +	struct sk_buff *skb;
->>>>>>> +	u32 hlen;
->>>>>>> +
->>>>>>> +	hlen = sizeof(*hdr) + plen;
->>>>>>> +	if (hlen > 255)
->>>>>>> +		return -EINVAL;
->>>>>>> +
->>>>>>> +	hdr = (struct mtk_wmt_hdr *)&wc;
->>>>>>> +	hdr->dir = 1;
->>>>>>> +	hdr->op = op;
->>>>>>> +	hdr->dlen = cpu_to_le16(plen + 1);
->>>>>>> +	hdr->flag = flag;
->>>>>>> +	memcpy(wc.data, param, plen);
->>>>>>> +
->>>>>>> +	atomic_inc(&hdev->cmd_cnt);
->>>>>> 
->>>>>> Why are you doing this one. It will need a comment here if really needed. However I doubt that this is needed. You are only using it from hdev->setup and hdev->shutdown callbacks.
->>>>>> 
->>>>> 
->>>>> An increment on cmd_cnt is really needed because hci_cmd_work would check whether cmd_cnt is positive and then has a decrement on cmd_cnt before a packet is being sent out.
->>>>> 
->>>>> okay will add a comment.
->>>> 
->>>> but you are in ->setup callback this time. So if you need this, then all the other ->setup routines would actually fail as well. Either this is leftover from when you did things in ->probe or ->open or this is some thing we might better fix properly in the core instead of papering over it. Can you recheck if this is really needed.
->>>> 
->>> 
->>> I added a counter print and the counter increments as below
->>> 
->>> 	/* atomic_inc(&hdev->cmd_cnt); */
->>>       pr_info("cmd_cnt = %d\n" , atomic_read(&hdev->cmd_cnt));
->>> 
->>>       skb = __hci_cmd_sync_ev(hdev, 0xfc6f, hlen, &wc, HCI_VENDOR_PKT,
->>>                               HCI_INIT_TIMEOUT);
->>> 
->>> and the log show up that 
->>> 
->>> 
->>> [  334.049156] Bluetooth: hci0: command 0xfc6f tx timeout
->>> [  334.054840] cmd_cnt = 0
->>> [  336.065076] Bluetooth: hci0: command 0xfc6f tx timeout
->>> [  336.070795] cmd_cnt = 0
->>> [  338.080997] Bluetooth: hci0: command 0xfc6f tx timeout
->>> [  338.086683] cmd_cnt = 0
->>> [  340.096907] Bluetooth: hci0: command 0xfc6f tx timeout
->>> [  340.102609] cmd_cnt = 0
->>> [  342.112824] Bluetooth: hci0: command 0xfc6f tx timeout
->>> [  342.118520] cmd_cnt = 0
->>> [  344.128747] Bluetooth: hci0: command 0xfc6f tx timeout
->>> [  344.134454] cmd_cnt = 0
->>> [  346.144667] Bluetooth: hci0: command 0xfc6f tx timeout
->>> [  346.150372] cmd_cnt = 0
->>> 
->>> 
->>> The packet is dropped by hci_cmd_work at [1], so I also wondered why the
->>> other vendor driver works, it seems the counter needs to be incremented
->>> before every skb is being queued to cmd_q.
->>> 
->>> 4257 static void hci_cmd_work(struct work_struct *work)
->>> 4258 {
->>> 4259         struct hci_dev *hdev = container_of(work, struct hci_dev, cmd_work);
->>> 4260         struct sk_buff *skb;
->>> 4261
->>> 4262         BT_DBG("%s cmd_cnt %d cmd queued %d", hdev->name,
->>> 4263                atomic_read(&hdev->cmd_cnt), skb_queue_len(&hdev->cmd_q));
->>> 4264
->>> 4265         /* Send queued commands */
->>> 
->>> [1]
->>> 4266         if (atomic_read(&hdev->cmd_cnt)) { /* dropped when cmd_cnt is zero */
->>> 4267                 skb = skb_dequeue(&hdev->cmd_q);
->>> 4268                 if (!skb)
->>> 4269                         return;
->>> 4270
->>> 4271                 kfree_skb(hdev->sent_cmd);
->>> 4272
->>> 4273                 hdev->sent_cmd = skb_clone(skb, GFP_KERNEL);
->>> 4274                 if (hdev->sent_cmd) {
->>> 4275                         atomic_dec(&hdev->cmd_cnt);  /* cmd_cnt-- */
->>> 4276                         hci_send_frame(hdev, skb);
->> 
->> actually the command also needs to better go via the raw_q anyway since it doesn?t come back with the cmd status or cmd complete. You have it waiting for a vendor event. Maybe with is something we need to consider with __hci_cmd_sync_ev anyway.
->> 
->> Johan would know best since he wrote that code. Anyway, we should fix that in the core and not have you hack around it.
->> 
+
+On 31/07/18 07:38, Erin Lo wrote:
+> From: Ben Ho <Ben.Ho@mediatek.com>
 > 
-> yes, my case is that received event is neither cmd status nor cmd complete. It is completely a vendor event.
+> Add basic chip support for Mediatek 8183
 > 
-> if it wants to be solved by the core layer, do you permit that I remove the hack and then send it in the next version?
+> Signed-off-by: Ben Ho <Ben.Ho@mediatek.com>
+> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> ---
+>  arch/arm64/boot/dts/mediatek/Makefile       |   1 +
+>  arch/arm64/boot/dts/mediatek/mt8183-evb.dts |  23 +++++
+>  arch/arm64/boot/dts/mediatek/mt8183.dtsi    | 146 ++++++++++++++++++++++++++++
+>  3 files changed, 170 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183-evb.dts
+>  create mode 100644 arch/arm64/boot/dts/mediatek/mt8183.dtsi
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
+> index 7506b0d..a91d462 100644
+> --- a/arch/arm64/boot/dts/mediatek/Makefile
+> +++ b/arch/arm64/boot/dts/mediatek/Makefile
+> @@ -6,3 +6,4 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
+>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
+>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt7622-rfb1.dtb
+>  dtb-$(CONFIG_ARCH_MEDIATEK) += mt8173-evb.dtb
+> +dtb-$(CONFIG_ARCH_MEDIATEK) += mt8183-evb.dtb
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8183-evb.dts b/arch/arm64/boot/dts/mediatek/mt8183-evb.dts
+> new file mode 100644
+> index 0000000..2a3dd5a
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/mediatek/mt8183-evb.dts
+> @@ -0,0 +1,23 @@
+> +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+> +/*
+> + * Copyright (c) 2018 MediaTek Inc.
+> + * Author: Ben Ho <ben.ho@mediatek.com>
+> + *	   Erin Lo <erin.lo@mediatek.com>
+> + */
+> +
+> +/dts-v1/;
+> +#include "mt8183.dtsi"
+> +
+> +/ {
+> +	model = "MediaTek MT8183 evaluation board";
+> +	compatible = "mediatek,mt8183-evb", "mediatek,mt8183";
+> +
+> +	memory at 40000000 {
+> +		device_type = "memory";
+> +		reg = <0 0x40000000 0 0x80000000>;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:921600n8";
 
-we need to have a __hci_raw_sync_ev that uses the hdev->raw_q and waits for the specified event to come back. I never realized that you are missing the cmd status or cmd complete. So this is similar to the original CSR vendor commands which had the same behavior.
+This should go into 10/10.
 
-I have the feeling that you hdev->cmd_cnt increment is just hiding the problem here. If you really think that it is not chains any side effects we can merge the driver with a big warning and fix this up. However the clean way would be for you to create a patch that introduces __hci_raw_sync_ev as describe above.
+Regards,
+Matthias
 
-Regards
-
-Marcel
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8183.dtsi b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
+> new file mode 100644
+> index 0000000..1553265
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
+> @@ -0,0 +1,146 @@
+> +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+> +/*
+> + * Copyright (c) 2018 MediaTek Inc.
+> + * Author: Ben Ho <ben.ho@mediatek.com>
+> + *	   Erin Lo <erin.lo@mediatek.com>
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +/ {
+> +	compatible = "mediatek,mt8183";
+> +	interrupt-parent = <&sysirq>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu-map {
+> +			cluster0 {
+> +				core0 {
+> +					cpu = <&cpu0>;
+> +				};
+> +				core1 {
+> +					cpu = <&cpu1>;
+> +				};
+> +				core2 {
+> +					cpu = <&cpu2>;
+> +				};
+> +				core3 {
+> +					cpu = <&cpu3>;
+> +				};
+> +			};
+> +
+> +			cluster1 {
+> +				core0 {
+> +					cpu = <&cpu4>;
+> +				};
+> +				core1 {
+> +					cpu = <&cpu5>;
+> +				};
+> +				core2 {
+> +					cpu = <&cpu6>;
+> +				};
+> +				core3 {
+> +					cpu = <&cpu7>;
+> +				};
+> +			};
+> +		};
+> +
+> +		cpu0: cpu at 000 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			reg = <0x000>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu1: cpu at 001 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			reg = <0x001>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu2: cpu at 002 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			reg = <0x002>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu3: cpu at 003 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53";
+> +			reg = <0x003>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu4: cpu at 100 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a73";
+> +			reg = <0x100>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu5: cpu at 101 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a73";
+> +			reg = <0x101>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu6: cpu at 102 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a73";
+> +			reg = <0x102>;
+> +			enable-method = "psci";
+> +		};
+> +
+> +		cpu7: cpu at 103 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a73";
+> +			reg = <0x103>;
+> +			enable-method = "psci";
+> +		};
+> +	};
+> +
+> +	psci {
+> +		compatible      = "arm,psci-1.0";
+> +		method          = "smc";
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
+> +	};
+> +
+> +	gic: interrupt-controller at 0c000000 {
+> +		compatible = "arm,gic-v3";
+> +		#interrupt-cells = <3>;
+> +		interrupt-parent = <&gic>;
+> +		interrupt-controller;
+> +		reg = <0 0x0c000000 0 0x40000>,  /* GICD */
+> +		      <0 0x0c100000 0 0x200000>, /* GICR */
+> +		      <0 0x0c400000 0 0x2000>,   /* GICC */
+> +		      <0 0x0c410000 0 0x1000>,   /* GICH */
+> +		      <0 0x0c420000 0 0x2000>;   /* GICV */
+> +
+> +		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> +	};
+> +
+> +	sysirq: intpol-controller at 0c530a80 {
+> +		compatible = "mediatek,mt8183-sysirq",
+> +			     "mediatek,mt6577-sysirq";
+> +		interrupt-controller;
+> +		#interrupt-cells = <3>;
+> +		interrupt-parent = <&gic>;
+> +		reg = <0 0x0c530a80 0 0x50>;
+> +	};
+> +};
+> 
