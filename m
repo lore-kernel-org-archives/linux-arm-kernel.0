@@ -1,38 +1,21 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Fri, 3 Aug 2018 18:54:57 +0200
-Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
-In-Reply-To: <20180803164337.GB4718@bombadil.infradead.org>
-References: <cover.1529507994.git.andreyknvl@google.com>
- <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
- <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
- <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
- <CAAeHK+wJbbCZd+-X=9oeJgsqQJiq8h+Aagz3SQMPaAzCD+pvFw@mail.gmail.com>
- <CAAeHK+yWF05XoU+0iuJoXAL3cWgdtxbeLoBz169yP12W4LkcQw@mail.gmail.com>
- <20180801174256.5mbyf33eszml4nmu@armageddon.cambridge.arm.com>
- <CAAeHK+zb7vcehuX9=oxLUJVJr1ZcgmRTODQz7wsPy+rJb=3kbQ@mail.gmail.com>
- <CAAeHK+xTxPhfbVTNxcbsx7VdwQ21Bt-vo2ZU1tEM1_JX7uKnng@mail.gmail.com>
- <20180803150945.GC9297@kroah.com>
- <20180803164337.GB4718@bombadil.infradead.org>
-Message-ID: <CAAeHK+zqVTOSFD5yZ0E5Z3HZPVn8KYQJMGjBvin8rEfugBdfag@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 3 Aug 2018 19:06:30 +0200
+Subject: [PATCH 1/5] meson_sm: add TEST_N pin direction call
+In-Reply-To: <1533117848-28194-1-git-send-email-narmstrong@baylibre.com>
+References: <1533117623-27856-1-git-send-email-narmstrong@baylibre.com>
+ <1533117848-28194-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CACRpkdbpe4RjCa6MnC=hvEEHJq8SAq5UAzuVKRU_rTxx_hRyDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 3, 2018 at 6:43 PM, Matthew Wilcox <willy@infradead.org> wrote:
-> On Fri, Aug 03, 2018 at 05:09:45PM +0200, Greg Kroah-Hartman wrote:
->> On Fri, Aug 03, 2018 at 04:59:18PM +0200, Andrey Konovalov wrote:
->> > Started looking at this. When I run sparse with default checks enabled
->> > (make C=1) I get countless warnings. Does anybody actually use it?
->>
->> Try using a more up-to-date version of sparse.  Odds are you are using
->> an old one, there is a newer version in a different branch on kernel.org
->> somewhere...
+On Wed, Aug 1, 2018 at 12:04 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
+
+> The Amlogic Meson GX and AXG has a Secure Monitor call to change the
+> TEST_N pin gpio direction, add it in the supported call list.
 >
-> That's not true.  Building the current version of sparse from
-> git://git.kernel.org/pub/scm/devel/sparse/sparse.git leaves me with a
-> thousand errors just building the mm/ directory.  A sample:
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-I'm running the one from https://github.com/lucvoo/sparse-dev which
-seems to be even more up to date. Defconfig on x86 gives me ~3000
-warnings:
+Looks fine to me, could we have Carlo's review on this patch?
 
-https://gist.github.com/xairy/8adace989f64462e18ffb5cb7d096b73
+Yours,
+Linus Walleij
