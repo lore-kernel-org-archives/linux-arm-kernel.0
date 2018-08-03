@@ -1,59 +1,129 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Fri, 3 Aug 2018 11:10:53 +0800
-Subject: [PATCH v2 00/15] Add RDMA memory mode support for mediatek SOC MT2712
-Message-ID: <1533265868-28110-1-git-send-email-stu.hsieh@mediatek.com>
+Date: Fri, 3 Aug 2018 11:11:06 +0800
+Subject: [PATCH v2 13/15] drm/mediatek: use layer_nr function to get layer
+ number to init plane
+In-Reply-To: <1533265868-28110-1-git-send-email-stu.hsieh@mediatek.com>
+References: <1533265868-28110-1-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1533265868-28110-14-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series add RDMA memory mode support for mediatek SOC MT2712.
-MT2712 has three display data path, including three HW engine,
-two OVL and one RDMA.
+This patch use layer_nr function to get layer number to init plane
 
-The RDMA used in third ddp and it need to be set memory mode,
-then RDMA could read data from memory and output to panel.
+When plane init in crtc create,
+it use the number of OVL layer to init plane.
+That's OVL can read 4 memory address.
 
-Change in v2:
-- Remove some modification about dummy buffer in patch
-  "drm/mediatek: add memory mode for RDMA":
-  Register setting about reset and MATRIX_INT_MTX_SEL_DEFAULT.
-- Remove some patches about dummy buffer as folowing:
-  "drm/mediatek: add drm_device in RDMA for mamory mode to reaquest buffer"
-  "drm/mediatek: add dummy buffer for RDMA memory mode"
-- Rename and modify the v1 patch
-  "drm/mediatek: add layer number condition for RDMA to control plane"
-  as following patches to get the layer number by module.
-  "drm/mediatek: add function to get layer number for component"
-  "drm/mediatek: add callback function to return OVL layer number"
-  "drm/mediatek: add callback function to return RDMA layer number"
-  "drm/mediatek: use layer_nr function to get layer number to init plane"
-- Remove v1 patch
-  "drm/mediatek: fixed the error value for add DSI1 in mutex"
-  This patch would be send in the future.
+For mt2712 third ddp, it use RDMA to read memory.
+RDMA can read 1 memory address, so it just init one plane.
 
-Stu Hsieh (15):
-  drm/mediatek: add connection from RDMA0 to DPI1
-  drm/mediatek: add connection from RDMA0 to DSI1
-  drm/mediatek: add connection from RDMA1 to DSI0
-  drm/mediatek: add connection from RDMA2 to DSI0
-  drm/mediatek: add RDMA memory mode for crtc created
-  drm/mediatek: add memory mode for RDMA
-  drm/mediatek: add layer config to set RDMA for plane setting
-  drm/mediatek: add RGB color format support for RDMA
-  drm/mediatek: add YUYV/UYVY color format support for RDMA
-  drm/mediatek: add function to get layer number for component
-  drm/mediatek: add callback function to return OVL layer number
-  drm/mediatek: add callback function to return RDMA layer number
-  drm/mediatek: use layer_nr function to get layer number to init plane
-  drm/mediatek: update some variable name from ovl to comp
-  drm/mediatek: fix connection from RDMA2 to DSI1
+For compatibility, this patch use mtk_ddp_comp_layer_nr function
+to get layer number from their HW component in ddp for plane init.
 
- drivers/gpu/drm/mediatek/mtk_disp_ovl.c     | 10 +++
- drivers/gpu/drm/mediatek/mtk_disp_rdma.c    | 99 ++++++++++++++++++++++++++++-
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c     | 60 +++++++++++------
- drivers/gpu/drm/mediatek/mtk_drm_crtc.h     |  4 +-
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 18 +++++-
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |  8 +++
- 6 files changed, 174 insertions(+), 25 deletions(-)
+Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c | 26 ++++++++++++++++++--------
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.h |  2 +-
+ 2 files changed, 19 insertions(+), 9 deletions(-)
 
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+index 4bf636e466f2..b4d3dfca4003 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+@@ -45,7 +45,8 @@ struct mtk_drm_crtc {
+ 	bool				pending_needs_vblank;
+ 	struct drm_pending_vblank_event	*event;
+ 
+-	struct drm_plane		planes[OVL_LAYER_NR];
++	struct drm_plane		planes[MAX_LAYER_NR];
++	unsigned int			layer_nr;
+ 	bool				pending_planes;
+ 
+ 	void __iomem			*config_regs;
+@@ -286,7 +287,7 @@ static int mtk_crtc_ddp_hw_init(struct mtk_drm_crtc *mtk_crtc)
+ 	}
+ 
+ 	/* Initially configure all planes */
+-	for (i = 0; i < OVL_LAYER_NR; i++) {
++	for (i = 0; i < mtk_crtc->layer_nr; i++) {
+ 		struct drm_plane *plane = &mtk_crtc->planes[i];
+ 		struct mtk_plane_state *plane_state;
+ 
+@@ -351,7 +352,7 @@ static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
+ 	}
+ 
+ 	if (mtk_crtc->pending_planes) {
+-		for (i = 0; i < OVL_LAYER_NR; i++) {
++		for (i = 0; i < mtk_crtc->layer_nr; i++) {
+ 			struct drm_plane *plane = &mtk_crtc->planes[i];
+ 			struct mtk_plane_state *plane_state;
+ 
+@@ -403,7 +404,7 @@ static void mtk_drm_crtc_atomic_disable(struct drm_crtc *crtc,
+ 		return;
+ 
+ 	/* Set all pending plane state to disabled */
+-	for (i = 0; i < OVL_LAYER_NR; i++) {
++	for (i = 0; i < mtk_crtc->layer_nr; i++) {
+ 		struct drm_plane *plane = &mtk_crtc->planes[i];
+ 		struct mtk_plane_state *plane_state;
+ 
+@@ -450,7 +451,7 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+ 
+ 	if (mtk_crtc->event)
+ 		mtk_crtc->pending_needs_vblank = true;
+-	for (i = 0; i < OVL_LAYER_NR; i++) {
++	for (i = 0; i < mtk_crtc->layer_nr; i++) {
+ 		struct drm_plane *plane = &mtk_crtc->planes[i];
+ 		struct mtk_plane_state *plane_state;
+ 
+@@ -596,6 +597,9 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+ 			goto unprepare;
+ 		}
+ 
++		if (i == 0)
++			mtk_crtc->layer_nr = mtk_ddp_comp_layer_nr(comp);
++
+ 		if (i == 0 && (comp_id == DDP_COMPONENT_RDMA0 ||
+ 			       comp_id == DDP_COMPONENT_RDMA1 ||
+ 			       comp_id == DDP_COMPONENT_RDMA2)) {
+@@ -606,7 +610,7 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+ 		mtk_crtc->ddp_comp[i] = comp;
+ 	}
+ 
+-	for (zpos = 0; zpos < OVL_LAYER_NR; zpos++) {
++	for (zpos = 0; zpos < mtk_crtc->layer_nr; zpos++) {
+ 		type = (zpos == 0) ? DRM_PLANE_TYPE_PRIMARY :
+ 				(zpos == 1) ? DRM_PLANE_TYPE_CURSOR :
+ 						DRM_PLANE_TYPE_OVERLAY;
+@@ -616,8 +620,14 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+ 			goto unprepare;
+ 	}
+ 
+-	ret = mtk_drm_crtc_init(drm_dev, mtk_crtc, &mtk_crtc->planes[0],
+-				&mtk_crtc->planes[1], pipe);
++	if (mtk_crtc->layer_nr == 1) {
++		ret = mtk_drm_crtc_init(drm_dev, mtk_crtc, &mtk_crtc->planes[0],
++					NULL, pipe);
++	} else {
++		ret = mtk_drm_crtc_init(drm_dev, mtk_crtc, &mtk_crtc->planes[0],
++					&mtk_crtc->planes[1], pipe);
++	}
++
+ 	if (ret < 0)
+ 		goto unprepare;
+ 	drm_mode_crtc_set_gamma_size(&mtk_crtc->base, MTK_LUT_SIZE);
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.h b/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
+index 9d9410c67ae9..0399321b1414 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
+@@ -18,7 +18,7 @@
+ #include "mtk_drm_ddp_comp.h"
+ #include "mtk_drm_plane.h"
+ 
+-#define OVL_LAYER_NR	4
++#define MAX_LAYER_NR	4
+ #define MTK_LUT_SIZE	512
+ #define MTK_MAX_BPC	10
+ #define MTK_MIN_BPC	3
 -- 
 2.12.5.2.gbdf23ab
