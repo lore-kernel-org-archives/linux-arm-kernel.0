@@ -1,47 +1,52 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Fri, 3 Aug 2018 13:04:22 +0000
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Fri, 3 Aug 2018 09:20:40 -0400 (EDT)
 Subject: framebuffer corruption due to overlapping stp instructions on
  arm64
-In-Reply-To: <alpine.LRH.2.02.1808030759480.12341@file01.intranet.prod.int.rdu2.redhat.com>
+In-Reply-To: <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
 References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
  <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
  <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
- <CAJA7tRZbmnZq7RfvQeYEy_a1ZObWqpFpVdvgsXgsioQ3RyPMuA@mail.gmail.com>
- <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
- <f696ebe8605840e3bb04bb78b60a6cfa@AcuMS.aculab.com>
- <alpine.LRH.2.02.1808030759480.12341@file01.intranet.prod.int.rdu2.redhat.com>
-Message-ID: <a1564e8d091648bcad9b5ec58ab6cc95@AcuMS.aculab.com>
+Message-ID: <alpine.LRH.2.02.1808030916160.27060@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mikulas Patocka
-> Sent: 03 August 2018 13:05
-...
-> > Even on x86 using memcpy() on PCIe memory (maybe mmap()ed into userspace)
-> > isn't a good idea.
-> > In the kernel memcpy_to/fromio() ought to be a better choice but that
-> > is just an alternate name for memcpy().
-> >
-> > The problem on x86 is that memcpy() is likely to be implemented as
-> > 'rep movsb' on modern cpu - relying on the cpu hardware to perform
-> > cache-line sized transfers (etc).
-> > Unfortunately on uncached locations it has to revert to byte copies.
-> > So PCIe transfers (especially reads) are very slow.
-> >
-> > The transfers need to use the largest size register available.
-> >
-> > 	David
+
+
+On Fri, 3 Aug 2018, Florian Weimer wrote:
+
+> On 08/03/2018 09:11 AM, Andrew Pinski wrote:
+> > Yes fix Links not to use memcpy on the framebuffer.
+> > It is undefined behavior to use device memory with memcpy.
 > 
-> On x86, the framebuffer is mapped as write-combining memory type, so "rep
-> movsb" could merge the byte writes to larger chunks. I don't have a cpu
-> with the ERMS feature - could anyone try it if rep movsb works worse or
-> better than explicit writes to the framebuffer?
+> Some (de facto) ABIs require that it is supported, though.  For example, 
+> the POWER string functions avoid unaligned loads and stores for this 
+> reason because the platform has the same issue with device memory.  And 
+> yes, GCC will expand memcpy on POWER to something that is incompatible 
+> with device memory. 8-(
+> 
+> If we don't want people to use memcpy, we probably need to provide a 
+> credible alternative.
+> 
+> Thanks,
+> Florian
 
-I don't think 'write combining' can help reads, and memcpy_to/fromio()
-are likely to be used for normal memory mapped io areas.
+And what does POWER do with code like this?
 
-	David
+void write_merge(int *x)
+{
+        x[0] = x[1] = 0;
+}
 
--
-Registered Address Lakeside, Bramley Road, Mount Farm, Milton Keynes, MK1 1PT, UK
-Registration No: 1397386 (Wales)
+With -O2, gcc-8 translates it into:
+
+        li 9,0
+        std 9,0(3)
+        blr
+
+And that std instruction may end up being unaligned (the C ABI mandates 
+that x is aligned to 4 bytes, not 8).
+
+If this piece of code is inside some graphics driver and writes to 
+framebuffer memory, what do you do with it?
+
+Mikulas
