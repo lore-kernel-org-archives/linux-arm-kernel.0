@@ -1,51 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 3 Aug 2018 19:27:53 +0200
-Subject: [PATCH] arm64: build CONFIG_ARM64_LSE_ATOMICS without -ffixed-
- flags
-In-Reply-To: <CAKwvOd=vYBoZazvvN=MHVZnYtekgr-fCktuOFePsV-eSvbFQyQ@mail.gmail.com>
-References: <20180802231753.86336-1-trong@android.com>
- <CAKv+Gu_QzzDSV74pzLQcPBsWHZK5hvMwa8PojSJmzTOMnY780Q@mail.gmail.com>
- <CAKwvOd=vYBoZazvvN=MHVZnYtekgr-fCktuOFePsV-eSvbFQyQ@mail.gmail.com>
-Message-ID: <CAKv+Gu8KeXFqqWu6yV4_rRpL-6NN5KQyLWKCuC_XnbotGtMu7w@mail.gmail.com>
+From: okaya@kernel.org (Sinan Kaya)
+Date: Fri, 3 Aug 2018 13:32:10 -0400
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
+ <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
+ <20180803094129.GB17798@arm.com>
+ <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
+Message-ID: <f0ab7c55-c104-241e-99d1-8247b2c567d1@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 August 2018 at 19:17, Nick Desaulniers <ndesaulniers@google.com> wrote:
-> On Fri, Aug 3, 2018 at 1:43 AM Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+On 8/3/2018 1:09 PM, Mikulas Patocka wrote:
+>>> Most accelerated graphics drivers rely heavily on the ability to map
+>>> the VRAM normal-non-cacheable (ioremap_wc, basically), and treat it as
+>>> ordinary memory.
+>> Yeah, I'd expect framebuffers to be mapped as normal NC. That should be
+>> fine for prefetchable BARs, no?
 >>
->> On 3 August 2018 at 01:17, Tri Vo <trong@android.com> wrote:
->> > Remove -ffixed- compile flags as they are not required for correct
->> > behavior of out-of-line ll/sc implementations of atomic functions.
->> > Registers (except x0 which contains return value) only need to be
->> > callee-saved, not necessarily fixed.
->> >
->> > For readability purposes, represent "callee-saves-all-registers" calling
->> > convention with a combination of -fcall-used- and -fcall-saved- flags only.
->> >
->> > Signed-off-by: Tri Vo <trong@android.com>
->>
->> Wouldn't this permit the compiler to stack/unstack these registers in
->> the implementations of the out of line LL/SC fallbacks.
->
-> I'm curious to understand more about how this LSE patching works, and
-> what the constraints exactly are.  Are there some docs I should read
-> that you can point me to?  I see
-> arch/arm64/include/asm/atomic_ll_sc.h, but are those are the in line
-> implementations?  Does that make arch/arm64/include/asm/atomic.h the
-> out of line definitions?  What are the restrictions around preventing
-> the compiler to push/pop those registers?
->
+>> Will
+> So - why does it corrupt data then? I've created this program that
+> reproduces the data corruption quicky. If I run it on /dev/fb0, I get an
+> instant failure. Sometimes a few bytes are not written, sometimes a few
+> bytes are written with a value that should be 16 bytes apart.
+> 
+> I tried to run it on system RAM mapped with the NC attribute and I didn't
+> get any corruption - that suggests the the bug may be in the PCIE
+> subsystem.
 
-The idea is that LSE atomics can each be patched into a bl instruction
-that calls the appropriate LL/SC fallback, but without the overhead of
-an ordinary function call. (actually the bl is there by default, but
-patched into LSE ops on h/w that supports it)
+Note that normal-NC gives you write combining whereas device
+nGnRE doesn't have any write-combining support.
+normal-NC is typically mapped to prefetchable BAR space where
+write-combining is welcome.
 
-So that is why the 'bl' is in an asm() block, and why x30 is used as a
-temporary/clobber in the LSE sequences: the function call is
-completely hidden from the compiler. Obviously, for performance, you
-want to prevent these fallbacks from touching the stack.
-
-Note that x16 and x17 are allowed as temporaries: this is due to the
-fact that function calls may be taken through a PLT entry, which may
-clobber x16 and x17 (as per the AAPCS).
+It could be an issue on the SOC itself too. I suggest you contact your
+board vendor.
