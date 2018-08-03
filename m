@@ -1,116 +1,92 @@
 From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Fri, 3 Aug 2018 10:53:28 -0700
-Subject: [PATCH v11 11/11] firmware: xilinx: Replace init call with probe
- method
+Date: Fri, 3 Aug 2018 10:53:21 -0700
+Subject: [PATCH v11 04/11] firmware: xilinx: Add query data API
 In-Reply-To: <1533318808-10781-1-git-send-email-jollys@xilinx.com>
 References: <1533318808-10781-1-git-send-email-jollys@xilinx.com>
-Message-ID: <1533318808-10781-12-git-send-email-jollys@xilinx.com>
+Message-ID: <1533318808-10781-5-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajan Vaja <rajan.vaja@xilinx.com>
+From: Rajan Vaja <rajanv@xilinx.com>
 
-As of all of child of ZynqMP firmware are platform
-driver, there is no need of init call in firmware
-driver. Earlier clock driver was init method so
-firmware driver had to use init call to make sure
-firmware init is done in early stage.
+Add ZynqMP firmware query data API to query platform
+specific information(clocks, pins) from firmware.
 
-Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
+Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
 Signed-off-by: Jolly Shah <jollys@xilinx.com>
 ---
- drivers/firmware/xilinx/zynqmp.c | 63 ++++++++++++----------------------------
- 1 file changed, 18 insertions(+), 45 deletions(-)
+ drivers/firmware/xilinx/zynqmp.c     | 14 ++++++++++++++
+ include/linux/firmware/xlnx-zynqmp.h | 20 ++++++++++++++++++++
+ 2 files changed, 34 insertions(+)
 
 diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
-index 7ccedf0..ce6c746 100644
+index 24cfd9e..8ec5682 100644
 --- a/drivers/firmware/xilinx/zynqmp.c
 +++ b/drivers/firmware/xilinx/zynqmp.c
-@@ -476,50 +476,17 @@ EXPORT_SYMBOL_GPL(zynqmp_pm_get_eemi_ops);
- static int zynqmp_firmware_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
--
--	return of_platform_populate(dev->of_node, NULL, NULL, dev);
--}
--
--static const struct of_device_id zynqmp_firmware_of_match[] = {
--	{.compatible = "xlnx,zynqmp-firmware"},
--	{},
--};
--MODULE_DEVICE_TABLE(of, zynqmp_firmware_of_match);
--
--static struct platform_driver zynqmp_firmware_driver = {
--	.driver = {
--		.name = "zynqmp_firmware",
--		.of_match_table = zynqmp_firmware_of_match,
--	},
--	.probe = zynqmp_firmware_probe,
--};
--module_platform_driver(zynqmp_firmware_driver);
--
--static int __init zynqmp_plat_init(void)
--{
--	int ret;
- 	struct device_node *np;
-+	int ret;
- 
- 	np = of_find_compatible_node(NULL, NULL, "xlnx,zynqmp");
- 	if (!np)
- 		return 0;
- 	of_node_put(np);
- 
--	/*
--	 * We're running on a ZynqMP machine,
--	 * the zynqmp-firmware node is mandatory.
--	 */
--	np = of_find_compatible_node(NULL, NULL, "xlnx,zynqmp-firmware");
--	if (!np) {
--		pr_warn("%s: zynqmp-firmware node not found\n", __func__);
--		return -ENXIO;
--	}
--
--	ret = get_set_conduit_method(np);
--	if (ret) {
--		of_node_put(np);
-+	ret = get_set_conduit_method(dev->of_node);
-+	if (ret)
- 		return ret;
--	}
- 
- 	/* Check PM API version number */
- 	zynqmp_pm_get_api_version(&pm_api_version);
-@@ -547,16 +514,22 @@ static int __init zynqmp_plat_init(void)
- 	pr_info("%s Trustzone version v%d.%d\n", __func__,
- 		pm_tz_version >> 16, pm_tz_version & 0xFFFF);
- 
--	of_node_put(np);
-+	zynqmp_pm_api_debugfs_init();
- 
--	return ret;
-+	return of_platform_populate(dev->of_node, NULL, NULL, dev);
+@@ -260,9 +260,23 @@ static int zynqmp_pm_ioctl(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2,
+ 				   arg1, arg2, out);
  }
--early_initcall(zynqmp_plat_init);
  
--static int zynqmp_firmware_init(void)
--{
--	zynqmp_pm_api_debugfs_init();
-+static const struct of_device_id zynqmp_firmware_of_match[] = {
-+	{.compatible = "xlnx,zynqmp-firmware"},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, zynqmp_firmware_of_match);
++/**
++ * zynqmp_pm_query_data() - Get query data from firmware
++ * @qdata:	Variable to the zynqmp_pm_query_data structure
++ * @out:	Returned output value
++ *
++ * Return: Returns status, either success or error+reason
++ */
++static int zynqmp_pm_query_data(struct zynqmp_pm_query_data qdata, u32 *out)
++{
++	return zynqmp_pm_invoke_fn(PM_QUERY_DATA, qdata.qid, qdata.arg1,
++				   qdata.arg2, qdata.arg3, out);
++}
++
+ static const struct zynqmp_eemi_ops eemi_ops = {
+ 	.get_api_version = zynqmp_pm_get_api_version,
+ 	.ioctl = zynqmp_pm_ioctl,
++	.query_data = zynqmp_pm_query_data,
+ };
  
--	return 0;
--}
--device_initcall(zynqmp_firmware_init);
-+static struct platform_driver zynqmp_firmware_driver = {
-+	.driver = {
-+		.name = "zynqmp_firmware",
-+		.of_match_table = zynqmp_firmware_of_match,
-+	},
-+	.probe = zynqmp_firmware_probe,
+ /**
+diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
+index 2eec6e7..55ed2ba 100644
+--- a/include/linux/firmware/xlnx-zynqmp.h
++++ b/include/linux/firmware/xlnx-zynqmp.h
+@@ -35,6 +35,7 @@
+ enum pm_api_id {
+ 	PM_GET_API_VERSION = 1,
+ 	PM_IOCTL = 34,
++	PM_QUERY_DATA,
+ };
+ 
+ /* PMU-FW return status codes */
+@@ -48,9 +49,28 @@ enum pm_ret_status {
+ 	XST_PM_ABORT_SUSPEND,
+ };
+ 
++enum pm_query_id {
++	PM_QID_INVALID,
 +};
-+module_platform_driver(zynqmp_firmware_driver);
++
++/**
++ * struct zynqmp_pm_query_data - PM query data
++ * @qid:	query ID
++ * @arg1:	Argument 1 of query data
++ * @arg2:	Argument 2 of query data
++ * @arg3:	Argument 3 of query data
++ */
++struct zynqmp_pm_query_data {
++	u32 qid;
++	u32 arg1;
++	u32 arg2;
++	u32 arg3;
++};
++
+ struct zynqmp_eemi_ops {
+ 	int (*get_api_version)(u32 *version);
+ 	int (*ioctl)(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2, u32 *out);
++	int (*query_data)(struct zynqmp_pm_query_data qdata, u32 *out);
+ };
+ 
+ #if IS_REACHABLE(CONFIG_ARCH_ZYNQMP)
 -- 
 2.7.4
