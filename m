@@ -1,30 +1,52 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 3 Aug 2018 13:40:59 +0200
-Subject: [PATCH] ARM: shmobile: silk: Add DA9063 PMIC node
-In-Reply-To: <20180803104811.2kfa456t7ytcft6s@katana>
-References: <20180730111817.5636-1-marek.vasut+renesas@gmail.com>
- <CAMuHMdXib8fz3c41RX-70eA5w4ThM6e02ybmX=N=xXR6=F80KA@mail.gmail.com>
- <42d09bc8-a883-c3af-b0d6-0087b6e2558e@gmail.com>
- <CAMuHMdXSjLSsmU32tKo5tkS6+MipAXuVAUqkLYrXxmR07+eCEg@mail.gmail.com>
- <75d2797a-48db-4979-c059-d7359eb39cff@gmail.com>
- <20180803104811.2kfa456t7ytcft6s@katana>
-Message-ID: <a2948be8-ee81-8357-6bae-0ba7bdbee62b@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 3 Aug 2018 13:42:06 +0200
+Subject: [PATCH v8 09/26] kernel/cpu_pm: Manage runtime PM in the idle
+ path for CPUs
+In-Reply-To: <1726374.375PCQfjLZ@aspire.rjw.lan>
+References: <20180620172226.15012-1-ulf.hansson@linaro.org>
+ <2056372.NMt4aPaF4h@aspire.rjw.lan> <2205807.cU2puvubpP@aspire.rjw.lan>
+ <1726374.375PCQfjLZ@aspire.rjw.lan>
+Message-ID: <CAPDyKFrmP15+_hyRp44Jw-wsTmsNFKORdCeGJEgW8o0OoKiHhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/2018 12:48 PM, Wolfram Sang wrote:
-> 
->>> Wolfram: do you like i2c slaves connected to multiple buses?
-> 
-> 'Like' would be an exaggeration, but if they are connected to multiple
-> busses, this might be a reason to describe that. People could then in
-> userspace bind/unbind to the bus they want? Not pretty, but there might
-> be reasons for that?
+[...]
 
-Would that be useful for a PMIC ? I suspect it'd create quite a few
-problems if the user could move PMIC between I2C busses at will and I
-don't see any benefits.
+>>
+>> Assuming that I have got that right, there are concerns, mostly regarding
+>> patch [07/26], but I will reply to that directly.
+>
+> Well, I haven't got that right, so never mind.
+>
+> There are a few minor things to address, but apart from that the general
+> genpd patches look ready.
 
--- 
-Best regards,
-Marek Vasut
+Alright, thanks!
+
+I will re-spin the series and post a new version once 4.19 rc1 is out.
+Hopefully we can queue it up early in next cycle to get it tested in
+next for a while.
+
+>
+>> The $subject patch is fine by me by itself, but it obviously depends on the
+>> previous ones.  Patches [01-02/26] are fine too, but they don't seem to be
+>> particularly useful without the rest of the series.
+>>
+>> As far as patches [10-26/26] go, I'd like to see some review comments and/or
+>> tags from the people with vested interest in there, in particular from Daniel
+>> on patch [12/26] and from Sudeep on the PSCI ones.
+>
+> But this still holds.
+
+Actually, patch 10 and patch11 is ready to go as well. I ping Daniel
+on patch 12.
+
+In regards to the rest of the series, some of the PSCI/ARM changes
+have been reviewed by Mark Rutland, however several changes have not
+been acked.
+
+On the other hand, one can also interpret the long silence in regards
+to PSCI/ARM changes as they are good to go. :-)
+
+Kind regards
+Uffe
