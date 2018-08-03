@@ -1,29 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 Aug 2018 19:10:22 +0200
-Subject: [PATCH 0/5] pinctrl: meson: Add support for TEST_N gpio
-In-Reply-To: <1533117623-27856-1-git-send-email-narmstrong@baylibre.com>
-References: <1533117623-27856-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CACRpkdbSE0ThGpEo2YnVQ7wW85QbAeOwmFpLczHwL3Q2W3ZF6Q@mail.gmail.com>
+Date: Fri, 3 Aug 2018 19:13:21 +0200
+Subject: [PATCH v4 1/4] gpio: syscon: rockchip: add GRF GPIO support for
+ rk3328
+In-Reply-To: <1533016762-5268-2-git-send-email-djw@t-chip.com.cn>
+References: <1533016762-5268-1-git-send-email-djw@t-chip.com.cn>
+ <1533016762-5268-2-git-send-email-djw@t-chip.com.cn>
+Message-ID: <CACRpkdZapWq6t772Hy0COSZ0n4+qR5sd26E9QuQ6_exNeupEXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 1, 2018 at 12:00 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
+On Tue, Jul 31, 2018 at 8:00 AM <djw@t-chip.com.cn> wrote:
 
-> The Amlogic Meson GX and AXG SoCs needs to do a Secure Monitor call to
-> set the TEST_N pin direction.
-> This patchset :
-> - adds the Secure Monitor call
-> - adds support int the pinctrl-meson common code
-> - adds support for GXBB, GXL and AGX SoCs
+> From: Levin Du <djw@t-chip.com.cn>
+>
+> In Rockchip RK3328, the output only GPIO_MUTE pin, originally for codec
+> mute control, can also be used for general purpose. It is manipulated by
+> the GRF_SOC_CON10 register in GRF. Aside from the GPIO_MUTE pin, the HDMI
+> pins can also be set in the same way.
+>
+> Currently this GRF GPIO controller only supports the mute pin. If needed
+> in the future, the HDMI pins support can also be added.
+>
+> Signed-off-by: Levin Du <djw@t-chip.com.cn>
 
-A lot of trouble to access a single GPIO pin (I guess _N means "active low"?)
-
-Is this line used for something especially important? Would be nice to
-include in some commit message like patch 1/5 why we invest so much
-energy to accessing this pin.
-
-Just curious. If you're just aiming for feature completion, that is a good
-reason as well :D
+Patch applied with Rob's and Heiko's ACKs.
 
 Yours,
 Linus Walleij
