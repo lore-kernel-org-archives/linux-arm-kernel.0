@@ -1,72 +1,107 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 3 Aug 2018 10:10:09 +0200
-Subject: [PATCH 2/5] pinctrl: meson: Add support to set direction with a
- secure monitor call
-In-Reply-To: <CAFBinCAAcqiJAwBMr2_7V90beFwq9xkPBnBdKB8oPsMKXU_-HA@mail.gmail.com>
-References: <1533117623-27856-1-git-send-email-narmstrong@baylibre.com>
- <1533117623-27856-3-git-send-email-narmstrong@baylibre.com>
- <CAFBinCBcUijFGdLoQwkzioX7MF0H_gH1rbcvxG+UWc1rA2pRiQ@mail.gmail.com>
- <d319d871-ba93-ab1d-dae4-b44916161e85@baylibre.com>
- <acab5d8ab9eb871c616171c00814d1fec93af1e7.camel@baylibre.com>
- <CAFBinCAAcqiJAwBMr2_7V90beFwq9xkPBnBdKB8oPsMKXU_-HA@mail.gmail.com>
-Message-ID: <ff6d516d-5d3b-c80f-941b-fed41a3a9ead@baylibre.com>
+From: jacopo@jmondi.org (jacopo mondi)
+Date: Fri, 3 Aug 2018 10:11:28 +0200
+Subject: [RESEND PATCH v5 2/3] dt-bindings: display: atmel: optional
+ video-interface of endpoints
+In-Reply-To: <20180803072308.14962-3-peda@axentia.se>
+References: <20180803072308.14962-1-peda@axentia.se>
+ <20180803072308.14962-3-peda@axentia.se>
+Message-ID: <20180803081128.GA4528@w540>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/2018 22:42, Martin Blumenstingl wrote:
-> On Thu, Aug 2, 2018 at 1:21 PM Jerome Brunet <jbrunet@baylibre.com> wrote:
->>
->> On Thu, 2018-08-02 at 09:52 +0200, Neil Armstrong wrote:
->>> On 01/08/2018 22:23, Martin Blumenstingl wrote:
->>>> Hi Neil,
->>>>
->>>> On Wed, Aug 1, 2018 at 12:05 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
->>>>>
->>>>> The Amlogic Meson GX and AXG SoCs needs to do a Secure Monitor call to
->>>>> set the TEST_N pin direction.
->>>>> This patch adds a "smc" boolean to the bank structure to differentiate
->>>>> the TEST_N bank and call the Secure Monitor in the _input/_output functions.
->>>>>
->>>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>>>> ---
->>>>>  drivers/pinctrl/meson/Kconfig         |  1 +
->>>>>  drivers/pinctrl/meson/pinctrl-meson.c | 31 ++++++++++++++++++++++++++-----
->>>>>  drivers/pinctrl/meson/pinctrl-meson.h | 10 +++++++++-
->>>>>  3 files changed, 36 insertions(+), 6 deletions(-)
->>>>>
->>>>> diff --git a/drivers/pinctrl/meson/Kconfig b/drivers/pinctrl/meson/Kconfig
->>>>> index c80951d..1b90470 100644
->>>>> --- a/drivers/pinctrl/meson/Kconfig
->>>>> +++ b/drivers/pinctrl/meson/Kconfig
->>>>> @@ -8,6 +8,7 @@ menuconfig PINCTRL_MESON
->>>>>         select GPIOLIB
->>>>>         select OF_GPIO
->>>>>         select REGMAP_MMIO
->>>>> +       select MESON_SM
->>>>
->>>> I wonder why PINCTRL_MESON has to select MESON_SM - shouldn't
->>>> PINCTRL_MESON_GXBB, PINCTRL_MESON_GXL and PINCTRL_MESON_AXG select it
->>>> instead?
->>>> selecting MESON_SM is probably no-op on Meson8 and Meson8b (which
->>>> don't have the GX secure monitor), but I haven't tested it yet
->>
->> I'm not so sure about that. meson_sm_call() symbol is used in the common pinctrl
->> code, so it should be selected when compiled even if meson8b is not going to use
->> it in the end.
-> unfortunately MESON_SM depends on ARM64_4K_PAGES so it can't be
-> enabled for the 32-bit SoCs
-> any ideas how to solve this?
+Hi Peter!
 
-I think I'll need to wrap the meson_sm calls around a
-#if IS_ENABLED(MESON_SM)
+On Fri, Aug 03, 2018 at 09:23:07AM +0200, Peter Rosin wrote:
+> With bus-type/bus-width properties in the endpoint nodes, the video-
+> interface of the connection can be specified for cases where the
+> heuristic fails to select the correct output mode. This can happen
+> e.g. if not all RGB pins are routed on the PCB; the driver has no
+> way of knowing this, and needs to be told explicitly.
+>
+> This is critical for the devices that have the "conflicting output
+> formats" issue (SAM9N12, SAM9X5, SAMA5D3), since the most significant
+> RGB bits move around depending on the selected output mode. For
+> devices that do not have the "conflicting output formats" issue
+> (SAMA5D2, SAMA5D4), this is completely irrelevant.
+>
+> Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Peter Rosin <peda@axentia.se>
+> ---
+>  .../devicetree/bindings/display/atmel/hlcdc-dc.txt | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
+> index 82f2acb3d374..9de434a8f523 100644
+> --- a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
+> +++ b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
+> @@ -15,6 +15,14 @@ Required children nodes:
+>   to external devices using the OF graph reprensentation (see ../graph.txt).
+>   At least one port node is required.
+>
+> +Optional properties in grandchild nodes:
+> + Any endpoint grandchild node may specify a desired video interface
+> + according to ../../media/video-interfaces.txt, specifically
+> + - bus-type: must be <0>.
 
-and
-select MESON_SM if ARM64
+Is there any value in specifying this, if it has a fixed value to
+"autodetect"? I understand it's optional, so if nobody else objects,
+feels free to keep it there.
 
-in Kconfig
 
-> 
-> 
-> Regards
-> Martin
-> 
+> + - bus-width: recognized values are <12>, <16>, <18> and <24>, and
+> +   override any output mode selection heuristic, forcing "rgb444",
+> +   "rgb565", "rgb666" and "rgb888" respectively.
+> +
+>  Example:
+>
+>  	hlcdc: hlcdc at f0030000 {
+> @@ -50,3 +58,21 @@ Example:
+>  			#pwm-cells = <3>;
+>  		};
+>  	};
+> +
+
+Two blank lines here.
+
+> +
+> +Example 2: With a video interface override to force rgb565; as above
+> +but with these changes/additions:
+> +
+> +	&hlcdc {
+> +		hlcdc-display-controller {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb565>;
+> +
+> +			port at 0 {
+
+The node has a unit address specified, you're missing a reg = <0>
+property (no big deal, it's an example, but the other one has it)
+
+> +				hlcdc_panel_output: endpoint at 0 {
+
+Missing reg here too.
+
+Minors apart:
+
+Reviewed-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+
+Thanks
+   j
+
+> +					bus-type = <0>;
+> +					bus-width = <16>;
+> +				};
+> +			};
+> +		};
+> +	};
+> --
+> 2.11.0
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180803/1c45460f/attachment.sig>
