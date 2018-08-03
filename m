@@ -1,80 +1,66 @@
-From: Richard.Earnshaw@arm.com (Richard Earnshaw (lists))
-Date: Fri, 3 Aug 2018 10:42:40 +0100
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
- <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
- <CAJA7tRZbmnZq7RfvQeYEy_a1ZObWqpFpVdvgsXgsioQ3RyPMuA@mail.gmail.com>
- <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
-Message-ID: <11f9185a-7f71-83df-3a57-0a0ae9c1f934@arm.com>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Fri, 3 Aug 2018 11:42:32 +0200
+Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
+ sanitizer
+In-Reply-To: <20180803092312.GA17798@arm.com>
+References: <cover.1530018818.git.andreyknvl@google.com>
+ <20180628105057.GA26019@e103592.cambridge.arm.com>
+ <CAAeHK+w0T43+h3xqU4a-qutxd-qiEhsvk0eaZpmAn-T0hpaLZQ@mail.gmail.com>
+ <20180629110709.GA17859@arm.com>
+ <CAAeHK+wHd8B2nhat-Z2Y2=s4NVobPG7vjr2CynjFhqPTwQRepQ@mail.gmail.com>
+ <20180703173608.GF27243@arm.com>
+ <CAAeHK+wTcH+2hgm_BTkLLdn1GkjBtkhQ=vPWZCncJ6KenqgKpg@mail.gmail.com>
+ <CAAeHK+xc1E64tXEEHoXqOuUNZ7E_kVyho3_mNZTCc+LTGHYFdA@mail.gmail.com>
+ <20180801163538.GA10800@arm.com>
+ <CACT4Y+aZtph5qDsLzTDEgpQRz4_Vtg1DD-cB18qooi6D0bexDg@mail.gmail.com>
+ <20180803092312.GA17798@arm.com>
+Message-ID: <CACT4Y+bCen+ccU8awYyx_Tw14JNZhaP4D-jNq-WZy7itW+vpYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/18 10:29, Ard Biesheuvel wrote:
-> On 3 August 2018 at 11:15, Ramana Radhakrishnan
-> <ramana.gcc@googlemail.com> wrote:
->> On Fri, Aug 3, 2018 at 8:53 AM, Florian Weimer <fweimer@redhat.com> wrote:
->>> On 08/03/2018 09:11 AM, Andrew Pinski wrote:
->>>>
->>>> Yes fix Links not to use memcpy on the framebuffer.
->>>> It is undefined behavior to use device memory with memcpy.
->>>
->>>
->>> Some (de facto) ABIs require that it is supported, though.  For example, the
->>> POWER string functions avoid unaligned loads and stores for this reason
->>> because the platform has the same issue with device memory.  And yes, GCC
->>> will expand memcpy on POWER to something that is incompatible with device
->>> memory. 8-(
+On Fri, Aug 3, 2018 at 11:23 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Aug 01, 2018 at 06:52:09PM +0200, Dmitry Vyukov wrote:
+>> On Wed, Aug 1, 2018 at 6:35 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > Thanks for tracking these cases down and going through each of them. The
+>> > obvious follow-up question is: how do we ensure that we keep on top of
+>> > this in mainline? Are you going to repeat your experiment at every kernel
+>> > release or every -rc or something else? I really can't see how we can
+>> > maintain this in the long run, especially given that the coverage we have
+>> > is only dynamic -- do you have an idea of how much coverage you're actually
+>> > getting for, say, a defconfig+modules build?
+>> >
+>> > I'd really like to enable pointer tagging in the kernel, I'm just still
+>> > failing to see how we can do it in a controlled manner where we can reason
+>> > about the semantic changes using something other than a best-effort,
+>> > case-by-case basis which is likely to be fragile and error-prone.
+>> > Unfortunately, if that's all we have, then this gets relegated to a
+>> > debug feature, which sort of defeats the point in my opinion.
 >>
->> GCC for AArch64 - use -mstrict-align
->> GCC for AArch32 - use -mno-unaligned-access.
->>
->> If you see unaligned accesses coming out of the compiler for well
->> defined programs then that's a bug. Frequently we see undefined
->> programs that get the compiler to produce traps - atleast one or 2
->> bugs a year  in  GCC .
->>
->>
->>>
->>> If we don't want people to use memcpy, we probably need to provide a
->>> credible alternative.
->>
->> I believe a number of packages have rolled their own to take these
->> constraints into account
->> for AArch32, perhaps it needs to be expanded for AArch64 as well.
->>
-> 
-> I guess the semantics of a framebuffer are not strictly defined, but
-> the current reality is that it is expected to have memory semantics
-> (by Linux/glibc)
-> 
-> Matt is saying fundamental properties of the underlying interconnects
-> (AMBA) make that impossible on ARM, but I'd like to understand better
-> if that is universally the case, and whether such a system is still
-> PCIe compliant.
-> 
-> The discussion about whether memcpy() should rely on unaligned
-> accesses, and whether you should use it on device memory is orthogonal
-> to that, and not the heart of the matter IMO
-> 
+>> Well, in some cases there is no other way as resorting to dynamic testing.
+>> How do we ensure that kernel does not dereference NULL pointers, does
+>> not access objects after free or out of bounds? Nohow. And, yes, it's
+>> constant maintenance burden resolved via dynamic testing.
+>
+> ... and the advantage of NULL pointer issues is that you're likely to see
+> them as a synchronous exception at runtime, regardless of architecture and
+> regardless of Kconfig options. With pointer tagging, that's certainly not
+> the case, and so I don't think we can just treat issues there like we do for
+> NULL pointers.
 
-Whoa, hold on.
+Well, let's take use-after-frees, out-of-bounds, info leaks, data
+races is a good example, deadlocks and just logical bugs...
 
-Memcpy should never be used on device memory.  Period.  Memcpy doesn't
-know anything about what size of access is needed for accessing a device.
+> If you want to enable khwasan in "production" and since enabling it
+> could potentially change the behaviour of existing code paths, the
+> run-time validation space doubles as we'd need to get the same code
+> coverage with and without the feature being enabled.
 
-But why is the buffer in device memory rather than some other form of
-uncached memory?
+This is true for just any change in configs, sysctls or just a
+different workload. Any of this can enable new code, exiting code
+working differently, or just working with data in new states. And we
+have tens of thousands of bugs, so blindly deploying anything new to
+production without proper testing is a bad idea. It's not specific to
+HWASAN in any way. And when you enable HWASAN you actually do mean to
+retest everything as hard as possible.
 
-If you change memcpy to deal with an aspect of the system hardware,
-you'll end up hosing performance EVERYWHERE.  DON'T DO IT!
-
-If you must, create a new API with tighter semantics, but don't change
-memcpy to accommodate this.
-
-Anyway, back to the original report.  What memory mapping is being used?
- In detail?
-
-R.
+And in the end we do not seem to have any action points here, right?
