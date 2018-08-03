@@ -1,51 +1,56 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 3 Aug 2018 12:20:48 -0400 (EDT)
-Subject: [PATCH] ARM: mm: fix pci_ioremap_io() offset check
-In-Reply-To: <20180803144044.21725-1-thomas.petazzoni@bootlin.com>
-References: <20180803144044.21725-1-thomas.petazzoni@bootlin.com>
-Message-ID: <nycvar.YSQ.7.76.1808031220080.13885@knanqh.ubzr>
+From: willy@infradead.org (Matthew Wilcox)
+Date: Fri, 3 Aug 2018 09:43:37 -0700
+Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
+In-Reply-To: <20180803150945.GC9297@kroah.com>
+References: <cover.1529507994.git.andreyknvl@google.com>
+ <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
+ <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
+ <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
+ <CAAeHK+wJbbCZd+-X=9oeJgsqQJiq8h+Aagz3SQMPaAzCD+pvFw@mail.gmail.com>
+ <CAAeHK+yWF05XoU+0iuJoXAL3cWgdtxbeLoBz169yP12W4LkcQw@mail.gmail.com>
+ <20180801174256.5mbyf33eszml4nmu@armageddon.cambridge.arm.com>
+ <CAAeHK+zb7vcehuX9=oxLUJVJr1ZcgmRTODQz7wsPy+rJb=3kbQ@mail.gmail.com>
+ <CAAeHK+xTxPhfbVTNxcbsx7VdwQ21Bt-vo2ZU1tEM1_JX7uKnng@mail.gmail.com>
+ <20180803150945.GC9297@kroah.com>
+Message-ID: <20180803164337.GB4718@bombadil.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 3 Aug 2018, Thomas Petazzoni wrote:
+On Fri, Aug 03, 2018 at 05:09:45PM +0200, Greg Kroah-Hartman wrote:
+> On Fri, Aug 03, 2018 at 04:59:18PM +0200, Andrey Konovalov wrote:
+> > Started looking at this. When I run sparse with default checks enabled
+> > (make C=1) I get countless warnings. Does anybody actually use it?
+> 
+> Try using a more up-to-date version of sparse.  Odds are you are using
+> an old one, there is a newer version in a different branch on kernel.org
+> somewhere...
 
-> IO_SPACE_LIMIT is the ending address of the PCI IO space, i.e
-> something like 0xfffff (and not 0x100000).
-> 
-> Therefore, when offset = 0xf0000 is passed as argument, this function
-> fails even though the offset + SZ_64K fits below the
-> IO_SPACE_LIMIT. This makes the last chunk of 64 KB of the I/O space
-> not usable as it cannot be mapped.
-> 
-> This patch fixes that by substracing 1 to offset + SZ_64K, so that we
-> compare the addrss of the last byte of the I/O space against
-> IO_SPACE_LIMIT instead of the address of the first byte of what is
-> after the I/O space.
-> 
-> Fixes: c2794437091a4 ("ARM: Add fixed PCI i/o mapping")
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+That's not true.  Building the current version of sparse from
+git://git.kernel.org/pub/scm/devel/sparse/sparse.git leaves me with a
+thousand errors just building the mm/ directory.  A sample:
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+../mm/filemap.c:2353:21: warning: expression using sizeof(void)
+../mm/filemap.c:2618:35: warning: symbol 'generic_file_vm_ops' was not declared. Should it be static?
+../include/linux/slab.h:666:13: error: undefined identifier '__builtin_mul_overflow'
+../include/linux/slab.h:666:13: warning: call with no type!
+../include/linux/rcupdate.h:683:9: warning: context imbalance in 'find_lock_task_mm' - wrong count at exit
+../include/linux/sched/mm.h:141:37: warning: dereference of noderef expression
+../mm/page_alloc.c:886:1: error: directive in argument list
+../include/trace/events/vmscan.h:79:1: warning: cast from restricted gfp_t
+../include/trace/events/vmscan.h:196:1: warning: too many warnings (ahem!)
+../mm/mmap.c:137:9: warning: cast to non-scalar
+../mm/mmap.c:137:9: warning: cast from non-scalar
+../mm/page_vma_mapped.c:134:29: warning: Using plain integer as NULL pointer
+../include/linux/slab.h:631:13: warning: call with no type!
 
+Basically, nobody is fixing their shit.  The only way that sparse output
+is useful is to log the warnings before your changes, log them afterwards
+and run diff.  The worst offender (as in: fixing it would remove most of
+the warnings) is the new min()/max() macro:
 
-> ---
->  arch/arm/mm/ioremap.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-> index fc91205ff46c..5bf9443cfbaa 100644
-> --- a/arch/arm/mm/ioremap.c
-> +++ b/arch/arm/mm/ioremap.c
-> @@ -473,7 +473,7 @@ void pci_ioremap_set_mem_type(int mem_type)
->  
->  int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
->  {
-> -	BUG_ON(offset + SZ_64K > IO_SPACE_LIMIT);
-> +	BUG_ON(offset + SZ_64K - 1 > IO_SPACE_LIMIT);
->  
->  	return ioremap_page_range(PCI_IO_VIRT_BASE + offset,
->  				  PCI_IO_VIRT_BASE + offset + SZ_64K,
-> -- 
-> 2.14.4
-> 
-> 
+        ra->start = max_t(long, 0, offset - ra->ra_pages / 2);
+
+produces that first warning at line 2353 of filemap.c.  I have no idea if
+this is a sparse mistake or something it's genuinely warning us about,
+but the sparse warnings are pretty ineffectual because nobody's paying
+attention to them.
