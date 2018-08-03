@@ -1,63 +1,186 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Fri, 3 Aug 2018 02:35:46 -0400 (EDT)
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
-Message-ID: <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 3 Aug 2018 09:00:08 +0200
+Subject: [PATCH v3] gpu/drm/exynos: Convert
+ drm_atomic_helper_suspend/resume()
+In-Reply-To: <CAFqt6zYUT72e7CnUF9a3kg5ZjFcPjZViMNm687-FC_9PF5Oc7A@mail.gmail.com>
+References: <CGME20180802131924epcas4p105dc354b2ee651e70a5e777850222bc5@epcas4p1.samsung.com>
+ <20180802132152.GA2833@jordon-HP-15-Notebook-PC>
+ <20180802133852eucas1p1de66cfd2db5ed0c87665567455ea4747~HFNvAtE4-1249412494eucas1p1c@eucas1p1.samsung.com>
+ <CAFqt6zYUT72e7CnUF9a3kg5ZjFcPjZViMNm687-FC_9PF5Oc7A@mail.gmail.com>
+Message-ID: <20180803070009eucas1p1583f6df0ce5caf37662e7546f782513b~HTa5xqhex1670416704eucas1p1H@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On 2018-08-02 17:51, Souptick Joarder wrote:
+> On Thu, Aug 2, 2018 at 7:08 PM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+>> On 2018-08-02 15:21, Souptick Joarder wrote:
+>>> convert drm_atomic_helper_suspend/resume() to use
+>>> drm_mode_config_helper_suspend/resume().
+>>>
+>>> exynos_drm_fbdev_suspend/resume can be removed
+>>> as drm_mode_config_helper_suspend/resume has
+>>> implement the same in generic way.
+>>>
+>>> Remove suspend_state from exynos_drm_private
+>>> struct as it is no more useful.
+>>>
+>>> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
+>>> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+>>> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>> ---
+>>> v2: Address Inki Dae's comment. Remove ret variable
+>>>       from both suspend/resume function.
+>>>
+>>> v3: Tested by Marek. Updated the change log.
+>>>
+>>>    drivers/gpu/drm/exynos/exynos_drm_drv.c   | 26 ++------------------------
+>>>    drivers/gpu/drm/exynos/exynos_drm_drv.h   |  1 -
+>>>    drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 17 -----------------
+>>>    drivers/gpu/drm/exynos/exynos_drm_fbdev.h | 10 ----------
+>>>    4 files changed, 2 insertions(+), 52 deletions(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+>>> index b599f74..d86dd81 100644
+>>> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
+>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+>>> @@ -149,37 +149,15 @@ static void exynos_drm_postclose(struct drm_device *dev, struct drm_file *file)
+>>>    static int exynos_drm_suspend(struct device *dev)
+>>>    {
+>>>        struct drm_device *drm_dev = dev_get_drvdata(dev);
+>>> -     struct exynos_drm_private *private;
+>>> -
+>>> -     if (!drm_dev)
+>>> -             return 0;
+>>> -
+>>> -     private = drm_dev->dev_private;
+>>> -
+>>> -     drm_kms_helper_poll_disable(drm_dev);
+>>> -     exynos_drm_fbdev_suspend(drm_dev);
+>>> -     private->suspend_state = drm_atomic_helper_suspend(drm_dev);
+>>> -     if (IS_ERR(private->suspend_state)) {
+>>> -             exynos_drm_fbdev_resume(drm_dev);
+>>> -             drm_kms_helper_poll_enable(drm_dev);
+>>> -             return PTR_ERR(private->suspend_state);
+>>> -     }
+>>>
+>>> -     return 0;
+>>> +     return  drm_mode_config_helper_suspend(drm_dev);
+>>>    }
+>>>
+>>>    static void exynos_drm_resume(struct device *dev)
+>>>    {
+>>>        struct drm_device *drm_dev = dev_get_drvdata(dev);
+>>> -     struct exynos_drm_private *private;
+>>> -
+>>> -     if (!drm_dev)
+>>> -             return;
+>>>
+>>> -     private = drm_dev->dev_private;
+>>> -     drm_atomic_helper_resume(drm_dev, private->suspend_state);
+>>> -     exynos_drm_fbdev_resume(drm_dev);
+>>> -     drm_kms_helper_poll_enable(drm_dev);
+>>> +     return drm_mode_config_helper_resume(drm_dev);
+>> exynos_drm_resume() now returns 'void', so to be strict with
+>> c standard, the return statement should not be used here.
+> But in struct dev_pm_ops, it is still defined as
+>
+>                  int (*resume)(struct device *dev);
+>
+> I think, we need to correct the return type of
+> exynos_drm_resume() to int.
 
-On Thu, 2 Aug 2018, Matt Sealey wrote:
+Nope. After commit dc684af6fc8d ("drm/exynos: Suspend/resume display
+pipeline as early/late as possible") exynos_drm_resume() is assigned
+to .complete callback, which use 'void' return type, so for now no
+more changes are needed.
 
-> The easiest explanation for this would be that the memory isn?t mapped 
-> correctly. You can?t use PCIe memory spaces with anything other than 
-> Device-nGnRE or stricter mappings. That?s just differences between the 
-> AMBA and PCIe (posted/unposted) memory models.
+> Although I posted v4.
+>
+>
+>>>    }
+>>>
+>>>    static const struct dev_pm_ops exynos_drm_pm_ops = {
+>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.h b/drivers/gpu/drm/exynos/exynos_drm_drv.h
+>>> index c737c4b..7349e7c 100644
+>>> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.h
+>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.h
+>>> @@ -195,7 +195,6 @@ struct drm_exynos_file_private {
+>>>     */
+>>>    struct exynos_drm_private {
+>>>        struct drm_fb_helper *fb_helper;
+>>> -     struct drm_atomic_state *suspend_state;
+>>>
+>>>        struct device *g2d_dev;
+>>>        struct device *dma_dev;
+>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+>>> index 132dd52..918dd2c 100644
+>>> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+>>> @@ -270,20 +270,3 @@ void exynos_drm_fbdev_fini(struct drm_device *dev)
+>>>        private->fb_helper = NULL;
+>>>    }
+>>>
+>>> -void exynos_drm_fbdev_suspend(struct drm_device *dev)
+>>> -{
+>>> -     struct exynos_drm_private *private = dev->dev_private;
+>>> -
+>>> -     console_lock();
+>>> -     drm_fb_helper_set_suspend(private->fb_helper, 1);
+>>> -     console_unlock();
+>>> -}
+>>> -
+>>> -void exynos_drm_fbdev_resume(struct drm_device *dev)
+>>> -{
+>>> -     struct exynos_drm_private *private = dev->dev_private;
+>>> -
+>>> -     console_lock();
+>>> -     drm_fb_helper_set_suspend(private->fb_helper, 0);
+>>> -     console_unlock();
+>>> -}
+>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+>>> index b338472..6840b6a 100644
+>>> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+>>> @@ -19,8 +19,6 @@
+>>>
+>>>    int exynos_drm_fbdev_init(struct drm_device *dev);
+>>>    void exynos_drm_fbdev_fini(struct drm_device *dev);
+>>> -void exynos_drm_fbdev_suspend(struct drm_device *drm);
+>>> -void exynos_drm_fbdev_resume(struct drm_device *drm);
+>>>
+>>>    #else
+>>>
+>>> @@ -39,14 +37,6 @@ static inline void exynos_drm_fbdev_restore_mode(struct drm_device *dev)
+>>>
+>>>    #define exynos_drm_output_poll_changed (NULL)
+>>>
+>>> -static inline void exynos_drm_fbdev_suspend(struct drm_device *drm)
+>>> -{
+>>> -}
+>>> -
+>>> -static inline void exynos_drm_fbdev_resume(struct drm_device *drm)
+>>> -{
+>>> -}
+>>> -
+>>>    #endif
+>>>
+>>>    #endif
+>> Best regards
+>> --
+>> Marek Szyprowski, PhD
+>> Samsung R&D Institute Poland
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
 
-I've tried to use Device-nGnRE mapping and I've got unaligned access 
-traps. Gcc have store-merging pass so that it generates unaligned accesses 
-even in code that has none explicit unaligned accesses. Perhaps it would 
-be possible to recompile the kernel without the store-merging pass, but 
-recompiling all the userspace code is impossible.
-
-Should we catch the unaligned access traps in the kernel and emulate them? 
-There are a lot of instructions that access memory in the ARMv8 ISA, so 
-the emulator would be quite complicated.
-
-> Normal memory (cacheable or uncacheable, which Linux tends to call 
-> ?memory? and ?writecombine? respectively) is not a good idea.
-> 
-> There are two options; make sure Links maps it?s framebuffer as Device 
-> memory, or the driver, or both - and make sure that only aligned 
-> accesses happen (otherwise you?ll just get a synchronous exception) and 
-> there isn?t a Normal memory alias.
-> 
-> Alternatively, tell the PCIe driver that the framebuffer is in system 
-> memory
-
-But how would the graphics card display from it? You'd have to 
-periodically copy the framebuffer from the system memory to the real 
-videoram. I'm not an expert in graphics drivers, I don't know if the 
-graphics drivers have this possibility.
-
-> - you can map it however you like but there?ll be a performance 
-> hit if you start to use GPU acceleration, but a significant performance 
-> boost from the PoV of the CPU. Only memory accessed from the PCIe master 
-> interface (i.e. reads and writes generated by the card itself - telling 
-> the GPU to pull from system memory or other DMA) can be in Normal memory 
-> and this allows PCIe to be cache coherent with the right interconnect. 
-> The slave port on a PCIe root complex (i.e. CPU writes) can?t be used 
-> with Normal, or reorderable, and therefore your 2GB of graphics memory 
-> is going to be slow from the point of view of the CPU.
-> 
-> To find the correct mapping you?ll need to know just how cache coherent 
-> the PCIe RC is...
-> 
-> Ta,
-> Matt
-
-Mikulas
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
