@@ -1,37 +1,49 @@
 From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Fri,  3 Aug 2018 16:38:44 +0200
-Subject: [PATCH v2 2/6] PCI: mvebu: fix I/O space end address calculation
-In-Reply-To: <20180803143848.21551-1-thomas.petazzoni@bootlin.com>
-References: <20180803143848.21551-1-thomas.petazzoni@bootlin.com>
-Message-ID: <20180803143848.21551-3-thomas.petazzoni@bootlin.com>
+Date: Fri,  3 Aug 2018 16:38:42 +0200
+Subject: [PATCH v2 0/6] PCI: mvebu: cleanup and improvements
+Message-ID: <20180803143848.21551-1-thomas.petazzoni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pcie->realio.end should be the address of last byte of the area,
-therefore using resource_size() of another resource is not correct, we
-must substract 1 to get the address of the last byte.
+Hello,
 
-Fixes: 11be65472a427 ("PCI: mvebu: Adapt to the new device tree layout")
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
----
-This bug never had any visible impact, so there is no need to push to
-stable.
----
- drivers/pci/controller/pci-mvebu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This is the v2 of the pci-mvebu cleanup and improvements, mainly
+aiming at using pci_host_bridge.
 
-diff --git a/drivers/pci/controller/pci-mvebu.c b/drivers/pci/controller/pci-mvebu.c
-index 38fa2d08527d..a195592723c2 100644
---- a/drivers/pci/controller/pci-mvebu.c
-+++ b/drivers/pci/controller/pci-mvebu.c
-@@ -1219,7 +1219,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
- 		pcie->realio.start = PCIBIOS_MIN_IO;
- 		pcie->realio.end = min_t(resource_size_t,
- 					 IO_SPACE_LIMIT,
--					 resource_size(&pcie->io));
-+					 resource_size(&pcie->io) - 1);
- 	} else
- 		pcie->realio = pcie->io;
- 
+Since v1, the changes are:
+
+ - Rebase on v4.18-rc1 to make sure the patches apply
+
+ - Add a patch fixing the I/O space end calculation (using
+   resource_size() as the .end address of a resource is not correct)
+
+ - Only remap the I/O space if there is a PCI I/O aperture described
+   in the DT.
+
+ - Use resource_size() in the loop mapping the I/O space, as suggested
+   by Lorenzo.
+
+ - Use pci_add_resource() instead of pci_add_resource_offset(), as
+   suggested by Lorenzo.
+
+ - Revert to using pci_ioremap_io(), since we need to map with a
+   special memory type on Armada platforms, and pci_remap_iospace()
+   doesn't allow to do that. Noticed by Lorenzo.
+
+Thanks!
+
+Thomas
+
+Thomas Petazzoni (6):
+  PCI: mvebu: Remove redundant platform_set_drvdata() call
+  PCI: mvebu: fix I/O space end address calculation
+  PCI: mvebu: only remap I/O space if configured
+  PCI: mvebu: use resource_size() to remap I/O space
+  PCI: mvebu: Convert to use pci_host_bridge directly
+  PCI: mvebu: Drop bogus comment above mvebu_pcie_map_registers()
+
+ drivers/pci/controller/pci-mvebu.c | 153 +++++++++++++++++--------------------
+ 1 file changed, 68 insertions(+), 85 deletions(-)
+
 -- 
 2.14.4
