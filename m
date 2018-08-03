@@ -1,37 +1,36 @@
-From: ramana.gcc@googlemail.com (Ramana Radhakrishnan)
-Date: Fri, 3 Aug 2018 10:37:29 +0100
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 3 Aug 2018 10:41:30 +0100
 Subject: framebuffer corruption due to overlapping stp instructions on
  arm64
-In-Reply-To: <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
+In-Reply-To: <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
 References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
- <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
- <CAJA7tRZbmnZq7RfvQeYEy_a1ZObWqpFpVdvgsXgsioQ3RyPMuA@mail.gmail.com>
- <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
-Message-ID: <CAJA7tRahXGuPK=ktS5h86MZuV_o5cA3x1JbbyuwVspAHLKdP9g@mail.gmail.com>
+ <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
+ <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
+Message-ID: <20180803094129.GB17798@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-< snip>
+On Fri, Aug 03, 2018 at 09:16:39AM +0200, Ard Biesheuvel wrote:
+> On 3 August 2018 at 08:35, Mikulas Patocka <mpatocka@redhat.com> wrote:
+> >
+> >
+> > On Thu, 2 Aug 2018, Matt Sealey wrote:
+> >
+> >> The easiest explanation for this would be that the memory isn?t mapped
+> >> correctly. You can?t use PCIe memory spaces with anything other than
+> >> Device-nGnRE or stricter mappings. That?s just differences between the
+> >> AMBA and PCIe (posted/unposted) memory models.
+> 
+> Whoa hold on there.
+> 
+> Are you saying we cannot have PCIe BAR windows with memory semantics on ARM?
+> 
+> Most accelerated graphics drivers rely heavily on the ability to map
+> the VRAM normal-non-cacheable (ioremap_wc, basically), and treat it as
+> ordinary memory.
 
-> I guess the semantics of a framebuffer are not strictly defined, but
-> the current reality is that it is expected to have memory semantics
-> (by Linux/glibc)
->
-> Matt is saying fundamental properties of the underlying interconnects
-> (AMBA) make that impossible on ARM, but I'd like to understand better
-> if that is universally the case, and whether such a system is still
-> PCIe compliant.
+Yeah, I'd expect framebuffers to be mapped as normal NC. That should be
+fine for prefetchable BARs, no?
 
-I don't know that side of the architecture enough to make any
-definitive statements.
-
->
-> The discussion about whether memcpy() should rely on unaligned
-> accesses, and whether you should use it on device memory is orthogonal
-> to that, and not the heart of the matter IMO
-
-Then maybe take libc-alpha off if it isn't relevant.
-
-regards
-Ramana
+Will
