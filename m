@@ -1,56 +1,90 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 3 Aug 2018 17:09:45 +0200
-Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
-In-Reply-To: <CAAeHK+xTxPhfbVTNxcbsx7VdwQ21Bt-vo2ZU1tEM1_JX7uKnng@mail.gmail.com>
-References: <cover.1529507994.git.andreyknvl@google.com>
- <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
- <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
- <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
- <CAAeHK+wJbbCZd+-X=9oeJgsqQJiq8h+Aagz3SQMPaAzCD+pvFw@mail.gmail.com>
- <CAAeHK+yWF05XoU+0iuJoXAL3cWgdtxbeLoBz169yP12W4LkcQw@mail.gmail.com>
- <20180801174256.5mbyf33eszml4nmu@armageddon.cambridge.arm.com>
- <CAAeHK+zb7vcehuX9=oxLUJVJr1ZcgmRTODQz7wsPy+rJb=3kbQ@mail.gmail.com>
- <CAAeHK+xTxPhfbVTNxcbsx7VdwQ21Bt-vo2ZU1tEM1_JX7uKnng@mail.gmail.com>
-Message-ID: <20180803150945.GC9297@kroah.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Fri, 3 Aug 2018 17:11:09 +0200
+Subject: [RFC PATCH 14/16] KVM: arm64/sve: Add SVE support to register
+ access ioctl interface
+In-Reply-To: <20180803145757.GC4240@e103592.cambridge.arm.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-15-git-send-email-Dave.Martin@arm.com>
+ <20180719130433.mfqqnxxlmvhduqri@kamzik.brq.redhat.com>
+ <20180803145757.GC4240@e103592.cambridge.arm.com>
+Message-ID: <20180803151109.j5fztbai2nuqhzbv@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2018 at 04:59:18PM +0200, Andrey Konovalov wrote:
-> On Thu, Aug 2, 2018 at 5:00 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> > On Wed, Aug 1, 2018 at 7:42 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> On Mon, Jul 16, 2018 at 01:25:59PM +0200, Andrey Konovalov wrote:
-> >>> On Thu, Jun 28, 2018 at 9:30 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> >>> So the checker reports ~100 different places where a __user pointer
-> >>> being casted. I've looked through them and found 3 places where we
-> >>> need to add untagging. Source code lines below come from 4.18-rc2+
-> >>> (6f0d349d).
-> >> [...]
-> >>> I'll add the 3 patches with fixes to v5 of this patchset.
-> >>
-> >> Thanks for investigating. You can fix those three places in your code
-> >
-> > OK, will do.
-> >
-> >> but I was rather looking for a way to check such casting in the future
-> >> for newly added code. While for the khwasan we can assume it's a debug
-> >> option, the tagged user pointers are ABI and we need to keep it stable.
-> >>
-> >> We could we actually add some macros for explicit conversion between
-> >> __user ptr and long and silence the warning there (I guess this would
-> >> work better for sparse). We can then detect new ptr to long casts as
-> >> they appear. I just hope that's not too intrusive.
-> >>
-> >> (I haven't tried the sparse patch yet, hopefully sometime this week)
-> >
-> > Haven't look at that sparse patch yet myself, but sounds doable.
-> > Should these macros go into this patchset or should they go
-> > separately?
+On Fri, Aug 03, 2018 at 03:57:59PM +0100, Dave Martin wrote:
+> On Thu, Jul 19, 2018 at 03:04:33PM +0200, Andrew Jones wrote:
+> > On Thu, Jun 21, 2018 at 03:57:38PM +0100, Dave Martin wrote:
+> > > This patch adds the following registers for access via the
+> > > KVM_{GET,SET}_ONE_REG interface:
+> > > 
+> > >  * KVM_REG_ARM64_SVE_ZREG(n, i) (n = 0..31) (in 2048-bit slices)
+> > >  * KVM_REG_ARM64_SVE_PREG(n, i) (n = 0..15) (in 256-bit slices)
+> > >  * KVM_REG_ARM64_SVE_FFR(i) (in 256-bit slices)
+> > > 
+> > > In order to adapt gracefully to future architectural extensions,
+> > > the registers are divided up into slices as noted above:  the i
+> > > parameter denotes the slice index.
+> > > 
+> > > For simplicity, bits or slices that exceed the maximum vector
+> > > length supported for the vcpu are ignored for KVM_SET_ONE_REG, and
+> > > read as zero for KVM_GET_ONE_REG.
+> > > 
+> > > For the current architecture, only slice i = 0 is significant.  The
+> > > interface design allows i to increase to up to 31 in the future if
+> > > required by future architectural amendments.
+> > > 
+> > > The registers are only visible for vcpus that have SVE enabled.
+> > > They are not enumerated by KVM_GET_REG_LIST on vcpus that do not
+> > > have SVE.  In all cases, surplus slices are not enumerated by
+> > > KVM_GET_REG_LIST.
+> > > 
+> > > Accesses to the FPSIMD registers via KVM_REG_ARM_CORE are
+> > > redirected to access the underlying vcpu SVE register storage as
+> > > appropriate.  In order to make this more straightforward, register
+> > > accesses that straddle register boundaries are no longer guaranteed
+> > > to succeed.  (Support for such use was never deliberate, and
+> > > userspace does not currently seem to be relying on it.)
+> > > 
+> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > 
-> Started looking at this. When I run sparse with default checks enabled
-> (make C=1) I get countless warnings. Does anybody actually use it?
+> [...]
+> 
+> > > diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> 
+> [...]
+> 
+> > > +static int sve_reg_bounds(struct reg_bounds_struct *b,
+> > > +			  const struct kvm_vcpu *vcpu,
+> > > +			  const struct kvm_one_reg *reg)
+> > > +{
+> 
+> [...]
+> 
+> > > +	b->kptr += start;
+> > > +
+> > > +	if (copy_limit < start)
+> > > +		copy_limit = start;
+> > > +	else if (copy_limit > limit)
+> > > +		copy_limit = limit;
+> > 
+> >  copy_limit = clamp(copy_limit, start, limit)
+> 
+> Hmmm, having looked in detail in the definition of clamp(), I'm not sure
+> I like it that much -- it can introduce type issues that are not readily
+> apparent to the reader.
+> 
+> gcc can warn about signed/unsigned comparisons, which is the only issue
+> where clamp() genuinely helps AFAICT, but this requires -Wsign-compare
+> (which is not enabled by default, nor with -Wall).  Great.
+> 
+> I can use clamp() if you feel strongly about it, but otherwise I tend
+> prefer my subtleties to be in plain sight rather than buried inside a
+> macro, unless there is a serious verbosity impact from not using the
+> macro (here, I would say there isn't, since it's just a single
+> instance).
+>
 
-Try using a more up-to-date version of sparse.  Odds are you are using
-an old one, there is a newer version in a different branch on kernel.org
-somewhere...
+Would clamp_t, with an appropriate type, satisfy your concerns?
 
-greg k-h
+Thanks,
+drew
