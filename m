@@ -1,21 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 Aug 2018 18:47:27 +0200
-Subject: [RFC PATCH 6/8] gpio: omap: Add get/set_multiple() callbacks
-In-Reply-To: <20180718235710.18242-7-jmkrzyszt@gmail.com>
-References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
- <20180718235710.18242-7-jmkrzyszt@gmail.com>
-Message-ID: <CACRpkda8AC9Z635SWmit_RiaYbHA2TrwG-DsSg43vJ8E9Dq4GA@mail.gmail.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Fri, 3 Aug 2018 18:54:57 +0200
+Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
+In-Reply-To: <20180803164337.GB4718@bombadil.infradead.org>
+References: <cover.1529507994.git.andreyknvl@google.com>
+ <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
+ <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
+ <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
+ <CAAeHK+wJbbCZd+-X=9oeJgsqQJiq8h+Aagz3SQMPaAzCD+pvFw@mail.gmail.com>
+ <CAAeHK+yWF05XoU+0iuJoXAL3cWgdtxbeLoBz169yP12W4LkcQw@mail.gmail.com>
+ <20180801174256.5mbyf33eszml4nmu@armageddon.cambridge.arm.com>
+ <CAAeHK+zb7vcehuX9=oxLUJVJr1ZcgmRTODQz7wsPy+rJb=3kbQ@mail.gmail.com>
+ <CAAeHK+xTxPhfbVTNxcbsx7VdwQ21Bt-vo2ZU1tEM1_JX7uKnng@mail.gmail.com>
+ <20180803150945.GC9297@kroah.com>
+ <20180803164337.GB4718@bombadil.infradead.org>
+Message-ID: <CAAeHK+zqVTOSFD5yZ0E5Z3HZPVn8KYQJMGjBvin8rEfugBdfag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 19, 2018 at 1:56 AM Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
-
-> This should make applications utilizing whole banks work faster.
+On Fri, Aug 3, 2018 at 6:43 PM, Matthew Wilcox <willy@infradead.org> wrote:
+> On Fri, Aug 03, 2018 at 05:09:45PM +0200, Greg Kroah-Hartman wrote:
+>> On Fri, Aug 03, 2018 at 04:59:18PM +0200, Andrey Konovalov wrote:
+>> > Started looking at this. When I run sparse with default checks enabled
+>> > (make C=1) I get countless warnings. Does anybody actually use it?
+>>
+>> Try using a more up-to-date version of sparse.  Odds are you are using
+>> an old one, there is a newer version in a different branch on kernel.org
+>> somewhere...
 >
-> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+> That's not true.  Building the current version of sparse from
+> git://git.kernel.org/pub/scm/devel/sparse/sparse.git leaves me with a
+> thousand errors just building the mm/ directory.  A sample:
 
-Patch applied with Grygorii's ACK.
-No reason to delay it, if there are any problems we will just revert it.
+I'm running the one from https://github.com/lucvoo/sparse-dev which
+seems to be even more up to date. Defconfig on x86 gives me ~3000
+warnings:
 
-Yours,
-Linus Walleij
+https://gist.github.com/xairy/8adace989f64462e18ffb5cb7d096b73
