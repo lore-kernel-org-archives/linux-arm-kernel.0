@@ -1,78 +1,45 @@
-From: seanvk.dev@oregontracks.org (Sean V Kelley)
-Date: Thu,  2 Aug 2018 21:18:11 -0700
-Subject: [PATCH] perf vendor events arm64: Enable JSON events for eMAG
-Message-ID: <20180803041811.17065-1-seanvk.dev@oregontracks.org>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Fri, 3 Aug 2018 12:57:52 +0800
+Subject: [PATCH v2 01/15] drm/mediatek: add connection from RDMA0 to DPI1
+In-Reply-To: <1533265868-28110-2-git-send-email-stu.hsieh@mediatek.com>
+References: <1533265868-28110-1-git-send-email-stu.hsieh@mediatek.com>
+ <1533265868-28110-2-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1533272272.31144.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the Ampere Computing eMAG file.  This platform
-follows the ARMv8 recommended IMPLEMENTATION DEFINED events, where
-applicable.
+Hi, Stu:
 
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: John Garry <john.garry@huawei.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-Cc: William Cohen <wcohen@redhat.com>
+On Fri, 2018-08-03 at 11:10 +0800, Stu Hsieh wrote:
+> This patch add connection from RDMA0 to DPI1
+> 
+> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 
-Signed-off-by: Sean V Kelley <seanvk.dev@oregontracks.org>
----
- .../arch/arm64/ampere/emag/core-imp-def.json  | 32 +++++++++++++++++++
- tools/perf/pmu-events/arch/arm64/mapfile.csv  |  1 +
- 2 files changed, 33 insertions(+)
- create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
 
-diff --git a/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
-new file mode 100644
-index 000000000000..bc03c06c3918
---- /dev/null
-+++ b/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
-@@ -0,0 +1,32 @@
-+[
-+    {
-+        "ArchStdEvent": "L1D_CACHE_RD",
-+    },
-+    {
-+        "ArchStdEvent": "L1D_CACHE_WR",
-+    },
-+    {
-+        "ArchStdEvent": "L1D_CACHE_REFILL_RD",
-+    },
-+    {
-+        "ArchStdEvent": "L1D_CACHE_REFILL_WR",
-+    },
-+    {
-+        "ArchStdEvent": "L1D_TLB_REFILL_RD",
-+    },
-+    {
-+        "ArchStdEvent": "L1D_TLB_REFILL_WR",
-+    },
-+    {
-+        "ArchStdEvent": "L1D_TLB_RD",
-+    },
-+    {
-+        "ArchStdEvent": "L1D_TLB_WR",
-+    },
-+    {
-+        "ArchStdEvent": "BUS_ACCESS_RD",
-+   },
-+   {
-+        "ArchStdEvent": "BUS_ACCESS_WR",
-+   }
-+]
-diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-index f03e26ecb658..59cd8604b0bd 100644
---- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
-+++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-@@ -16,3 +16,4 @@
- 0x00000000420f5160,v1,cavium/thunderx2,core
- 0x00000000430f0af0,v1,cavium/thunderx2,core
- 0x00000000480fd010,v1,hisilicon/hip08,core
-+0x00000000500f0000,v1,ampere/emag,core
--- 
-2.17.1
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> index 87e4191c250e..03e3628b5b0d 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> @@ -106,6 +106,7 @@
+>  #define OVL1_MOUT_EN_COLOR1		0x1
+>  #define GAMMA_MOUT_EN_RDMA1		0x1
+>  #define RDMA0_SOUT_DPI0			0x2
+> +#define RDMA0_SOUT_DPI1			0x3
+>  #define RDMA0_SOUT_DSI2			0x4
+>  #define RDMA0_SOUT_DSI3			0x5
+>  #define RDMA1_SOUT_DPI0			0x2
+> @@ -224,6 +225,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+>  	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DPI0) {
+>  		*addr = DISP_REG_CONFIG_DISP_RDMA0_SOUT_EN;
+>  		value = RDMA0_SOUT_DPI0;
+> +	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DPI1) {
+> +		*addr = DISP_REG_CONFIG_DISP_RDMA0_SOUT_EN;
+> +		value = RDMA0_SOUT_DPI1;
+>  	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DSI2) {
+>  		*addr = DISP_REG_CONFIG_DISP_RDMA0_SOUT_EN;
+>  		value = RDMA0_SOUT_DSI2;
