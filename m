@@ -1,66 +1,52 @@
-From: yixun.lan@gmail.com (Yixun Lan)
-Date: Fri, 3 Aug 2018 21:50:25 +0800
-Subject: [PATCH 3/4] ARM64: dts: meson-gx: add dmcbus and canvas nodes.
-In-Reply-To: <20180801185128.23440-4-maxi.jourdan@wanadoo.fr>
-References: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
- <20180801185128.23440-4-maxi.jourdan@wanadoo.fr>
-Message-ID: <CALecT5hgk+Wuh4-UWY29NNoEz-47Fx3pSjve8raCd3hRMzXE5w@mail.gmail.com>
+From: hejianet@gmail.com (Jia He)
+Date: Fri,  3 Aug 2018 21:57:03 +0800
+Subject: [PATCH 1/2] KVM: arm/arm64: vgic: move DEBUG_SPINLOCK_BUG_ON to vgic.h
+Message-ID: <1533304624-43250-1-git-send-email-jia.he@hxt-semitech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime
+This is to let DEBUG_SPINLOCK_BUG_ON be commonly used in vgic-v2 and
+vgic-v3.
 
-great job! thanks for contributing the patches..
+Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+---
+ virt/kvm/arm/vgic/vgic.c | 6 ------
+ virt/kvm/arm/vgic/vgic.h | 6 ++++++
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-On Thu, Aug 2, 2018 at 2:51 AM, Maxime Jourdan <maxi.jourdan@wanadoo.fr> wrote:
-> Wrap the canvas node in a syscon node.
->
-> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
-> ---
->  arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-> index b8dc4dbb391b..d104b9e111fb 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-> @@ -423,6 +423,23 @@
->                         };
->                 };
->
-> +               dmcbus: bus at c8838000 {
-> +                       compatible = "simple-bus";
-> +                       reg = <0x0 0xc8838000 0x0 0x1000>;
-> +                       #address-cells = <2>;
-> +                       #size-cells = <2>;
-> +                       ranges = <0x0 0x0 0x0 0xc8838000 0x0 0x1000>;
-> +
-> +                       sysctrl_DMC: system-controller at 0 {
-> +                               compatible = "amlogic,meson-gx-dmc-sysctrl", "syscon", "simple-mfd";
-
-we'd like to drop 'meson-' prefix, so better using "amlogic,gx-dmc-sysctrl",
-please take a look at the discussion here [1]
-
-[1] https://lkml.kernel.org/r/7hk1prmg4w.fsf at baylibre.com
-
-> +                               reg = <0x0 0x0 0x0 0x1000>;
-> +
-> +                               canvas: canvas-provider at 0 {
-> +                                       compatible = "amlogic,meson-canvas";
-ditto
-
-> +                               };
-> +                       };
-> +               };
-> +
->                 hiubus: bus at c883c000 {
->                         compatible = "simple-bus";
->                         reg = <0x0 0xc883c000 0x0 0x2000>;
-> --
-> 2.17.1
->
->
-> _______________________________________________
-> linux-amlogic mailing list
-> linux-amlogic at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 33c8325..c22cea6 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -28,12 +28,6 @@
+ #define CREATE_TRACE_POINTS
+ #include "trace.h"
+ 
+-#ifdef CONFIG_DEBUG_SPINLOCK
+-#define DEBUG_SPINLOCK_BUG_ON(p) BUG_ON(p)
+-#else
+-#define DEBUG_SPINLOCK_BUG_ON(p)
+-#endif
+-
+ struct vgic_global kvm_vgic_global_state __ro_after_init = {
+ 	.gicv3_cpuif = STATIC_KEY_FALSE_INIT,
+ };
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index ead00b2..ea51fcc 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -103,6 +103,12 @@
+ #define KVM_VGIC_V3_RDIST_COUNT_MASK	GENMASK_ULL(63, 52)
+ #define KVM_VGIC_V3_RDIST_COUNT_SHIFT	52
+ 
++#ifdef CONFIG_DEBUG_SPINLOCK
++#define DEBUG_SPINLOCK_BUG_ON(p) BUG_ON(p)
++#else
++#define DEBUG_SPINLOCK_BUG_ON(p)
++#endif
++
+ /* Requires the irq_lock to be held by the caller. */
+ static inline bool irq_is_pending(struct vgic_irq *irq)
+ {
+-- 
+1.8.3.1
