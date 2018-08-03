@@ -1,49 +1,51 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 3 Aug 2018 18:05:34 +0200 (CEST)
-Subject: [PATCH] staging/vc04_services: Use __user annotation for
- user-space pointers
-In-Reply-To: <CAGR7KeqKzxqEM=jmKG-KK=xtDXHS2umUsRrUqVawjuUUrxSgxg@mail.gmail.com>
-References: <20180724083217.20921-1-cmaiolino28@gmail.com>
- <20180730085811.GA30820@kroah.com>
- <CAGR7KeoDrp8FBX_H1a8h9hVFF_w9mLXGkvCT6jJAacG7-morRg@mail.gmail.com>
- <f6a7405a-4251-c6b8-470f-d50137fb9b00@i2se.com>
- <CAGR7Keo6zD_M+KHMkK8dDm=oujkwxM7Dv7weT11+oKtJNOZpFA@mail.gmail.com>
- <46f35184-fbb5-985c-a5b1-d6ab27ced8bc@i2se.com>
- <CAGR7Keqb6B7bYHM7AFm68K7gyBkMXvM2Z=3uvp4HJ7pW-LURSg@mail.gmail.com>
- <cdcd7246-9cf6-22a9-a828-3b7925480d90@i2se.com>
- <CAGR7KeqKzxqEM=jmKG-KK=xtDXHS2umUsRrUqVawjuUUrxSgxg@mail.gmail.com>
-Message-ID: <1349608474.81150.1533312334425@email.1und1.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 3 Aug 2018 12:20:48 -0400 (EDT)
+Subject: [PATCH] ARM: mm: fix pci_ioremap_io() offset check
+In-Reply-To: <20180803144044.21725-1-thomas.petazzoni@bootlin.com>
+References: <20180803144044.21725-1-thomas.petazzoni@bootlin.com>
+Message-ID: <nycvar.YSQ.7.76.1808031220080.13885@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Carlos,
+On Fri, 3 Aug 2018, Thomas Petazzoni wrote:
 
-> Carlos Maiolino <cmaiolino28@gmail.com> hat am 30. Juli 2018 um 11:57 geschrieben:
+> IO_SPACE_LIMIT is the ending address of the PCI IO space, i.e
+> something like 0xfffff (and not 0x100000).
 > 
+> Therefore, when offset = 0xf0000 is passed as argument, this function
+> fails even though the offset + SZ_64K fits below the
+> IO_SPACE_LIMIT. This makes the last chunk of 64 KB of the I/O space
+> not usable as it cannot be mapped.
 > 
-> On Mon, Jul 30, 2018 at 11:49 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> > Am 30.07.2018 um 11:43 schrieb Carlos Maiolino:
-> >> On Mon, Jul 30, 2018 at 11:34 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> >>> i think easiest the way would be to get a recent Raspbian Lite (
-> >>> https://www.raspberrypi.org/downloads/raspbian/ ),
-> >>> build the kernel with bcm2835_defconfig, modify config.txt to use the
-> >>> upstream DTB, add the upstream kernel and DTB to boot partition.
-> >>>
-> >>> The following command must be successful:
-> >>>
-> >>> vchiq_test -f 1
-> >> K, I'll take a look and find a way to test it, I don't have a rPI at
-> >> the moment to test
-> >> it, I'll take a look if I can borrow one. in mean time, can it be
-> >> tested somehow in x86 environment?
-> >
-> > I don't see a chance because this driver talks to the VC4 firmware.
-> >
+> This patch fixes that by substracing 1 to offset + SZ_64K, so that we
+> compare the addrss of the last byte of the I/O space against
+> IO_SPACE_LIMIT instead of the address of the first byte of what is
+> after the I/O space.
 > 
-> kk
-> 
-> thx
+> Fixes: c2794437091a4 ("ARM: Add fixed PCI i/o mapping")
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 
-i only want to point out that there was a regression (deadlock) in linux-next, which has been reverted [1] / fixed.
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
-[1] - https://lkml.org/lkml/2018/8/2/578
+
+> ---
+>  arch/arm/mm/ioremap.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+> index fc91205ff46c..5bf9443cfbaa 100644
+> --- a/arch/arm/mm/ioremap.c
+> +++ b/arch/arm/mm/ioremap.c
+> @@ -473,7 +473,7 @@ void pci_ioremap_set_mem_type(int mem_type)
+>  
+>  int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
+>  {
+> -	BUG_ON(offset + SZ_64K > IO_SPACE_LIMIT);
+> +	BUG_ON(offset + SZ_64K - 1 > IO_SPACE_LIMIT);
+>  
+>  	return ioremap_page_range(PCI_IO_VIRT_BASE + offset,
+>  				  PCI_IO_VIRT_BASE + offset + SZ_64K,
+> -- 
+> 2.14.4
+> 
+> 
