@@ -1,40 +1,43 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 3 Aug 2018 12:09:32 +0200 (CEST)
-Subject: Finish the GENERIC_IRQ_MULTI_HANDLER conversion
-In-Reply-To: <mhng-ef3db5ea-d5f5-4d51-b32c-1b9ca38abccf@palmer-si-x1c4>
-References: <mhng-ef3db5ea-d5f5-4d51-b32c-1b9ca38abccf@palmer-si-x1c4>
-Message-ID: <alpine.DEB.2.21.1808031209070.1745@nanos.tec.linutronix.de>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri,  3 Aug 2018 12:11:21 +0200
+Subject: [PATCH v6 0/3] drm/atmel-hlcdc: bus-width override support
+Message-ID: <20180803101124.4622-1-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2 Aug 2018, Palmer Dabbelt wrote:
+Hi!
 
-> On Sun, 24 Jun 2018 06:15:25 PDT (-0700), tglx at linutronix.de wrote:
-> > On Thu, 21 Jun 2018, Palmer Dabbelt wrote:
-> > > A while ago I sent a patch set that adds a GENERIC_IRQ_MULTI_HANDLER,
-> > > which is an exact copy of the existing IRQ_MULTI_HANDLER support in the
-> > > arm port, which is being used unconditionally by arm64 and openrisc.
-> > > GENERIC_IRQ_MULTI_HANDLER is currently being used by the RISC-V port.  I
-> > > managed to make a few mistakes in my original patch set and as a result
-> > > my conversion of the other architectures of GENERIC_IRQ_MULTI_HANDLER
-> > > was dropped.
-> > > 
-> > > This patch set finishes up my original patch set by converting arm,
-> > > arm64, and openrisc over to the new GENERIC_IRQ_MULTI_HANDLER support
-> > > and then removing MULTI_IRQ_HANDLER as it's obselete.
-> > > 
-> > > At the time I wrote this I gave it fairly extensive build testing, but
-> > > went I recently rebased it I just tested the full patch set on arm,
-> > > arm64, and openrisc defconfigs.
-> > > 
-> > > Various flavors of this patch set have bounced around a few times
-> > > before, but I'm calling this a whole new patch set as it builds on top
-> > > of what was merged.
-> > 
-> > I'll take the whole pile through tip irq/core which probably makes the most
-> > sense unless there are any objections from architecture maintainers.
-> 
-> Thanks!  Unless I've managed to screw something up I don't see these in your
-> tree, but I also don't see any feedback from anyone else.
+The background for these patches is that our PCB interface between
+the SAMA5D3 and the ds90c185 lvds encoder is only using 16 bits, and
+this has to be described somewhere, or the atmel-hlcdc driver have no
+chance of selecting the correct output mode. Since we have similar
+problems with a tda19988 HDMI encoder I added patches to override
+the atmel-hlcdc output format via DT properties compatible with the
+media video-interface binding and things start to play together.
 
-Yeah, I somehow managed to lose track of them. Picking them up now.
+There is still an open question regardning the binding in patch 2/3,
+where Laurent wondered about plans Sakari might have for explicit
+bus types for parallel buses. See https://lkml.org/lkml/2018/8/3/278
+
+Cheers,
+Peter
+
+Changes since (the shortened) v5  https://lkml.org/lkml/2018/8/3/182
+- add reg properties (and #*-cells) to the example in patch 2/3
+- prohibit bus-width 0 in the device-tree in patch 3/3
+- added reviewed-by from Jacopo to patch 2/3 and 3/3
+
+Peter Rosin (3):
+  dt-bindings: display: bridge: lvds-transmitter: add ti,ds90c185
+  dt-bindings: display: atmel: optional video-interface of endpoints
+  drm/atmel-hlcdc: support bus-width (12/16/18/24) in endpoint nodes
+
+ .../devicetree/bindings/display/atmel/hlcdc-dc.txt | 30 ++++++++++
+ .../bindings/display/bridge/lvds-transmitter.txt   |  8 ++-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     | 70 +++++++++++++++-------
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h       |  1 +
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c   | 70 +++++++++++++++++++---
+ 5 files changed, 151 insertions(+), 28 deletions(-)
+
+-- 
+2.11.0
