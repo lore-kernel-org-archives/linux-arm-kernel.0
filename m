@@ -1,123 +1,110 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 3 Aug 2018 16:28:09 +0200
-Subject: [PATCH v8 07/26] PM / Domains: Add genpd governor for CPUs
-In-Reply-To: <10360149.m4MlxDWZY5@aspire.rjw.lan>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <20180620172226.15012-8-ulf.hansson@linaro.org>
- <3574880.GjmnMm1lMq@aspire.rjw.lan>
- <10360149.m4MlxDWZY5@aspire.rjw.lan>
-Message-ID: <CAPDyKFonHYSq32WxvB1x5PXissXZvraqazgU_ZyLR=tsyD9vAA@mail.gmail.com>
+From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
+Date: Fri,  3 Aug 2018 19:58:41 +0530
+Subject: [RFC PATCH 0/3] Register read/write tracing with dynamic debug and
+ pstore
+Message-ID: <cover.1533211508.git.saiprakash.ranjan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 July 2018 at 11:14, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Thursday, July 19, 2018 12:32:52 PM CEST Rafael J. Wysocki wrote:
->> On Wednesday, June 20, 2018 7:22:07 PM CEST Ulf Hansson wrote:
->> > As it's now perfectly possible that a PM domain managed by genpd contains
->> > devices belonging to CPUs, we should start to take into account the
->> > residency values for the idle states during the state selection process.
->> > The residency value specifies the minimum duration of time, the CPU or a
->> > group of CPUs, needs to spend in an idle state to not waste energy entering
->> > it.
->> >
->> > To deal with this, let's add a new genpd governor, pm_domain_cpu_gov, that
->> > may be used for a PM domain that have CPU devices attached or if the CPUs
->> > are attached through subdomains.
->> >
->> > The new governor computes the minimum expected idle duration time for the
->> > online CPUs being attached to the PM domain and its subdomains. Then in the
->> > state selection process, trying the deepest state first, it verifies that
->> > the idle duration time satisfies the state's residency value.
->> >
->> > It should be noted that, when computing the minimum expected idle duration
->> > time, we use the information from tick_nohz_get_next_wakeup(), to find the
->> > next wakeup for the related CPUs. Future wise, this may deserve to be
->> > improved, as there are more reasons to why a CPU may be woken up from idle.
->> >
->> > Cc: Thomas Gleixner <tglx@linutronix.de>
->> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> > Cc: Lina Iyer <ilina@codeaurora.org>
->> > Cc: Frederic Weisbecker <fweisbec@gmail.com>
->> > Cc: Ingo Molnar <mingo@kernel.org>
->> > Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
->> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> > ---
->> >  drivers/base/power/domain_governor.c | 58 ++++++++++++++++++++++++++++
->> >  include/linux/pm_domain.h            |  2 +
->> >  2 files changed, 60 insertions(+)
->> >
->> > diff --git a/drivers/base/power/domain_governor.c b/drivers/base/power/domain_governor.c
->> > index 99896fbf18e4..1aad55719537 100644
->> > --- a/drivers/base/power/domain_governor.c
->> > +++ b/drivers/base/power/domain_governor.c
->> > @@ -10,6 +10,9 @@
->> >  #include <linux/pm_domain.h>
->> >  #include <linux/pm_qos.h>
->> >  #include <linux/hrtimer.h>
->> > +#include <linux/cpumask.h>
->> > +#include <linux/ktime.h>
->> > +#include <linux/tick.h>
->> >
->> >  static int dev_update_qos_constraint(struct device *dev, void *data)
->> >  {
->> > @@ -245,6 +248,56 @@ static bool always_on_power_down_ok(struct dev_pm_domain *domain)
->> >     return false;
->> >  }
->> >
->> > +static bool cpu_power_down_ok(struct dev_pm_domain *pd)
->> > +{
->> > +   struct generic_pm_domain *genpd = pd_to_genpd(pd);
->> > +   ktime_t domain_wakeup, cpu_wakeup;
->> > +   s64 idle_duration_ns;
->> > +   int cpu, i;
->> > +
->> > +   if (!(genpd->flags & GENPD_FLAG_CPU_DOMAIN))
->> > +           return true;
->> > +
->> > +   /*
->> > +    * Find the next wakeup for any of the online CPUs within the PM domain
->> > +    * and its subdomains. Note, we only need the genpd->cpus, as it already
->> > +    * contains a mask of all CPUs from subdomains.
->> > +    */
->> > +   domain_wakeup = ktime_set(KTIME_SEC_MAX, 0);
->> > +   for_each_cpu_and(cpu, genpd->cpus, cpu_online_mask) {
->> > +           cpu_wakeup = tick_nohz_get_next_wakeup(cpu);
->> > +           if (ktime_before(cpu_wakeup, domain_wakeup))
->> > +                   domain_wakeup = cpu_wakeup;
->> > +   }
->
-> Here's a concern I have missed before. :-/
->
-> Say, one of the CPUs you're walking here is woken up in the meantime.
+Hi,
 
-Yes, that can happen - when we miss-predicted "next wakeup".
+This patch series adds a new tracing facility for register reads and writes called
+Register Trace Buffer(RTB).
 
->
-> I don't think it is valid to evaluate tick_nohz_get_next_wakeup() for it then
-> to update domain_wakeup.  We really should just avoid the domain power off in
-> that case at all IMO.
+We also add pstore support through which we can save all register read/write logs into a
+persistent ram buffer that can be dumped after reboot.
 
-Correct.
+It can be used to determine from where register was read/written before unclocked
+access or some kind of bus hang or an unexpected reset caused by some buggy driver
+which happens a lot during initial development stages.
 
-However, we also want to avoid locking contentions in the idle path,
-which is what this boils done to.
+In addition to this, we provide dynamic debug support to filter out unwanted logs
+and limit trace to only specific files or directories since there can be aweful
+lot of register events and we will be interested only in specific drivers or subsystems
+which we will be working on. Last few RTB entries will give us the hint for debugging.
+With dynamic debug, we are also reducing the overhead of tracing considerably.
 
->
-> Sure enough, if the domain power off is already started and one of the CPUs
-> in the domain is woken up then, too bad, it will suffer the latency (but in
-> that case the hardware should be able to help somewhat), but otherwise CPU
-> wakeup should prevent domain power off from being carried out.
+Also as a bonus, this tracing can be extended to include IRQ, printk, context switch
+and lot other things with proper hooks. It can be very helpful for real case debug scenarios.
 
-The CPU is not prevented from waking up, as we rely on the FW to deal with that.
+Below is a simple example of identifying cause for bus hang in qcom mdp tested on db410c.
+This hang was intentionally introduced just to show the usecase of RTB.
+The module used can be found here: https://github.com/saiprakash-ranjan/Bus-Hang which does
+an unclocked access and will reset db410c and later logs can be viewed through pstore.
 
-Even if the above computation turns out to wrongly suggest that the
-cluster can be powered off, the FW shall together with the genpd
-backend driver prevent it.
+Note: I just copied bus_hang.c to drivers/soc/qcom and built it.
 
-To cover this case for PSCI, we also use a per cpu variable for the
-CPU's power off state, as can be seen later in the series.
+1) Set bootargs with dyndbg parameter as below:
 
-Hope this clarifies your concern, else tell and will to elaborate a bit more.
+   # dyndbg="file drivers/soc/qcom/* +p"
 
-Kind regards
-Uffe
+2) Bus hang by reading below debugfs entry with bus_hang module.
+
+   # cat /sys/kernel/debug/hang/bus_hang
+
+3) After restart, we can find the cause in last entry i.e. (bus_hang_mdp+0x98/0xb0)
+
+   # cat /sys/fs/pstore/rtb-ramoops-0
+   [LOGK_WRITEL ] ts:1373101930  data:ffff00000cd065a4  <ffff00000867cb44>  qcom_smsm_probe+0x51c/0x668
+   [LOGK_WRITEL ] ts:1373311878  data:ffff00000cd06608  <ffff00000867cb44>  qcom_smsm_probe+0x51c/0x668
+   [LOGK_READL  ] ts:18177142294  data:ffff00000ab85040 <ffff00000867cdc8>  bus_hang_mdp+0x98/0xb0
+
+4) Offending register access found as below:
+
+   # (gdb)
+   # (gdb) list *(bus_hang_mdp+0x98)
+   # 0xffff00000867cdc8 is in bus_hang_mdp (drivers/soc/qcom/bus_hang.c:10).
+   # 5       static int bus_hang_mdp(void *data, u64 *val)
+   # 6       {
+   # 7               void *p = ioremap(0x01a01000, SZ_4K);
+   # 8               unsigned int a;
+   # 9
+   # 10              a = __raw_readl((void *)((unsigned long)p + 0x40));  <----
+   # 11
+   # 12              *val = a;
+   # 13
+   # 14              return 0;
+   # (gdb)
+
+There will be a lot more real usecases where RTB can be used. Maybe we can test on other boards as well.
+
+Patchwise one line description is given below:
+
+This trace module is based on RTB driver in CAF.
+Link: https://source.codeaurora.org/quic/la/kernel/msm-4.9/tree/kernel/trace/msm_rtb.c
+
+Patch 1 provides the api called uncached_logk which can be used to log register accesses.
+
+Patch 2 adds the pstore support for viewing the logs.
+
+Patch 3 adds dynamic debug support to filter the register readl/writel access.
+
+Sai Prakash Ranjan (3):
+  tracing: Add support for logging data to uncached buffer
+  pstore: Add register readl/writel tracing support
+  dynamic_debug: Add support for dynamic register trace
+
+ .../bindings/reserved-memory/ramoops.txt      |   7 +-
+ arch/arm64/include/asm/io.h                   |  93 ++++++++++
+ fs/pstore/Kconfig                             |  12 ++
+ fs/pstore/Makefile                            |   1 +
+ fs/pstore/inode.c                             |  71 +++++++-
+ fs/pstore/internal.h                          |   8 +
+ fs/pstore/platform.c                          |   4 +
+ fs/pstore/ram.c                               |  42 ++++-
+ fs/pstore/rtb.c                               |  45 +++++
+ include/linux/dynamic_debug.h                 |  10 ++
+ include/linux/pstore.h                        |   2 +
+ include/linux/pstore_ram.h                    |   1 +
+ include/linux/rtb.h                           |  31 ++++
+ kernel/trace/Kconfig                          |   8 +
+ kernel/trace/Makefile                         |   2 +
+ kernel/trace/trace_rtb.c                      | 163 ++++++++++++++++++
+ 16 files changed, 495 insertions(+), 5 deletions(-)
+ create mode 100644 fs/pstore/rtb.c
+ create mode 100644 include/linux/rtb.h
+ create mode 100644 kernel/trace/trace_rtb.c
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
