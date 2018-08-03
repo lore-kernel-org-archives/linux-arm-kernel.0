@@ -1,66 +1,75 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Fri, 3 Aug 2018 11:42:32 +0200
-Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <20180803092312.GA17798@arm.com>
-References: <cover.1530018818.git.andreyknvl@google.com>
- <20180628105057.GA26019@e103592.cambridge.arm.com>
- <CAAeHK+w0T43+h3xqU4a-qutxd-qiEhsvk0eaZpmAn-T0hpaLZQ@mail.gmail.com>
- <20180629110709.GA17859@arm.com>
- <CAAeHK+wHd8B2nhat-Z2Y2=s4NVobPG7vjr2CynjFhqPTwQRepQ@mail.gmail.com>
- <20180703173608.GF27243@arm.com>
- <CAAeHK+wTcH+2hgm_BTkLLdn1GkjBtkhQ=vPWZCncJ6KenqgKpg@mail.gmail.com>
- <CAAeHK+xc1E64tXEEHoXqOuUNZ7E_kVyho3_mNZTCc+LTGHYFdA@mail.gmail.com>
- <20180801163538.GA10800@arm.com>
- <CACT4Y+aZtph5qDsLzTDEgpQRz4_Vtg1DD-cB18qooi6D0bexDg@mail.gmail.com>
- <20180803092312.GA17798@arm.com>
-Message-ID: <CACT4Y+bCen+ccU8awYyx_Tw14JNZhaP4D-jNq-WZy7itW+vpYg@mail.gmail.com>
+From: alex@ghiti.fr (Alexandre Ghiti)
+Date: Fri, 3 Aug 2018 11:47:10 +0200
+Subject: [PATCH v5 09/11] hugetlb: Introduce generic version of
+ huge_ptep_set_wrprotect
+In-Reply-To: <87muu3hlzc.fsf@concordia.ellerman.id.au>
+References: <20180731060155.16915-1-alex@ghiti.fr>
+ <20180731060155.16915-10-alex@ghiti.fr>
+ <87h8kfhg7o.fsf@concordia.ellerman.id.au>
+ <6acb1389-6998-bafb-cf69-174fd522c04c@ghiti.fr>
+ <90bf556f-144d-24b8-d2f6-70fee4a30559@ghiti.fr>
+ <87muu3hlzc.fsf@concordia.ellerman.id.au>
+Message-ID: <ef7fbd80-84a9-0b39-f948-413dea6f6469@ghiti.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 3, 2018 at 11:23 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Aug 01, 2018 at 06:52:09PM +0200, Dmitry Vyukov wrote:
->> On Wed, Aug 1, 2018 at 6:35 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > Thanks for tracking these cases down and going through each of them. The
->> > obvious follow-up question is: how do we ensure that we keep on top of
->> > this in mainline? Are you going to repeat your experiment at every kernel
->> > release or every -rc or something else? I really can't see how we can
->> > maintain this in the long run, especially given that the coverage we have
->> > is only dynamic -- do you have an idea of how much coverage you're actually
->> > getting for, say, a defconfig+modules build?
->> >
->> > I'd really like to enable pointer tagging in the kernel, I'm just still
->> > failing to see how we can do it in a controlled manner where we can reason
->> > about the semantic changes using something other than a best-effort,
->> > case-by-case basis which is likely to be fragile and error-prone.
->> > Unfortunately, if that's all we have, then this gets relegated to a
->> > debug feature, which sort of defeats the point in my opinion.
->>
->> Well, in some cases there is no other way as resorting to dynamic testing.
->> How do we ensure that kernel does not dereference NULL pointers, does
->> not access objects after free or out of bounds? Nohow. And, yes, it's
->> constant maintenance burden resolved via dynamic testing.
+Hi Michael,
+
+Thanks, I will then remove those two specific implementations and we'll 
+use the generic ones.
+
+I send a v6 asap.
+
+Thanks again,
+
+Alex
+
+
+On 08/03/2018 10:51 AM, Michael Ellerman wrote:
+> Hi Alex,
 >
-> ... and the advantage of NULL pointer issues is that you're likely to see
-> them as a synchronous exception at runtime, regardless of architecture and
-> regardless of Kconfig options. With pointer tagging, that's certainly not
-> the case, and so I don't think we can just treat issues there like we do for
-> NULL pointers.
-
-Well, let's take use-after-frees, out-of-bounds, info leaks, data
-races is a good example, deadlocks and just logical bugs...
-
-> If you want to enable khwasan in "production" and since enabling it
-> could potentially change the behaviour of existing code paths, the
-> run-time validation space doubles as we'd need to get the same code
-> coverage with and without the feature being enabled.
-
-This is true for just any change in configs, sysctls or just a
-different workload. Any of this can enable new code, exiting code
-working differently, or just working with data in new states. And we
-have tens of thousands of bugs, so blindly deploying anything new to
-production without proper testing is a bad idea. It's not specific to
-HWASAN in any way. And when you enable HWASAN you actually do mean to
-retest everything as hard as possible.
-
-And in the end we do not seem to have any action points here, right?
+> Sorry missed your previous mail.
+>
+> Alex Ghiti <alex@ghiti.fr> writes:
+>> Ok, I tried every defconfig available:
+>>
+>> - for the nohash/32, I found that I could use mpc885_ads_defconfig and I
+>> activated HUGETLBFS.
+>> I removed the definition of huge_ptep_set_wrprotect from
+>> nohash/32/pgtable.h, add an #error in
+>> include/asm-generic/hugetlb.h right before the generic definition of
+>> huge_ptep_set_wrprotect,
+>> and fell onto it at compile-time:
+>> => I'm pretty confident then that removing the definition of
+>> huge_ptep_set_wrprotect does not
+>> break anythingin this case.
+> Thanks, that sounds good.
+>
+>> - regardind book3s/32, I did not find any defconfig with
+>> CONFIG_PPC_BOOK3S_32, CONFIG_PPC32
+>> allowing to enable huge page support (ie CONFIG_SYS_SUPPORTS_HUGETLBFS)
+>> => Do you have a defconfig that would allow me to try the same as above ?
+> I think you're right, it's dead code AFAICS.
+>
+> We have:
+>
+> config PPC_BOOK3S_64
+>          ...
+> 	select SYS_SUPPORTS_HUGETLBFS
+>
+> config PPC_FSL_BOOK3E
+>          ...
+> 	select SYS_SUPPORTS_HUGETLBFS if PHYS_64BIT || PPC64
+>
+> config PPC_8xx
+> 	...
+> 	select SYS_SUPPORTS_HUGETLBFS
+>
+>
+> So we can't ever enable HUGETLBFS for Book3S 32.
+>
+> Presumably the code got copied when we split the headers apart.
+>
+> So I think you can just ignore that one, and we'll delete it.
+>
+> cheers
