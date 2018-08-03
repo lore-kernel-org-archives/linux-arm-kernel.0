@@ -1,474 +1,528 @@
 From: angelo@sysam.it (Angelo Dureghello)
-Date: Fri,  3 Aug 2018 21:32:44 +0200
-Subject: [PATCH v8 3/3] dmaengine: fsl-edma: add ColdFire mcf5441x edma support
+Date: Fri,  3 Aug 2018 21:32:43 +0200
+Subject: [PATCH v8 2/3] dmaengine: fsl-edma: add edma version and configurable
+ registers
 In-Reply-To: <20180803193244.12084-1-angelo@sysam.it>
 References: <20180803193244.12084-1-angelo@sysam.it>
-Message-ID: <20180803193244.12084-3-angelo@sysam.it>
+Message-ID: <20180803193244.12084-2-angelo@sysam.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for ColdFire mcf5441x-family edma
-module.
+This patch adds configurable registers (using __iomem addresses)
+to allow the use of fsl-edma-common code with slightly different
+edma module versions, as Vybrid (v1) and ColdFire (v2) are.
 
-The ColdFire edma module is slightly different from fsl-edma,
-so a new driver is added. But most of the code is common
-between fsl-edma and mcf-edma so it has been collected into a
-separate common module fsl-edma-common (patch 1/3).
+Removal of old membase-referenced registers, amd some fixes on
+macroes are included.
 
 Signed-off-by: Angelo Dureghello <angelo@sysam.it>
 ---
-Changes for v7:
-- patch rewritten from scratch, this patch (3/3) has just been added.
+Changes from v7:
+- patch rewritten from scratch, this patch (2/3) has just been added.
 ---
- drivers/dma/Kconfig                        |  11 +
- drivers/dma/Makefile                       |   1 +
- drivers/dma/fsl-edma-common.c              |  24 +-
- drivers/dma/mcf-edma.c                     | 315 +++++++++++++++++++++
- include/linux/platform_data/dma-mcf-edma.h |  38 +++
- 5 files changed, 385 insertions(+), 4 deletions(-)
- create mode 100644 drivers/dma/mcf-edma.c
- create mode 100644 include/linux/platform_data/dma-mcf-edma.h
+ drivers/dma/fsl-edma-common.c | 138 ++++++++++++++++++++++++++--------
+ drivers/dma/fsl-edma-common.h | 115 ++++++++++++++--------------
+ drivers/dma/fsl-edma.c        |  32 ++++----
+ 3 files changed, 182 insertions(+), 103 deletions(-)
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index ca1680afa20a..b45008e9c7e9 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -320,6 +320,17 @@ config LPC18XX_DMAMUX
- 	  Enable support for DMA on NXP LPC18xx/43xx platforms
- 	  with PL080 and multiplexed DMA request lines.
- 
-+config MCF_EDMA
-+	tristate "Freescale eDMA engine support, ColdFire mcf5441x SoCs"
-+	depends on M5441x
-+	select DMA_ENGINE
-+	select DMA_VIRTUAL_CHANNELS
-+	help
-+	  Support the Freescale ColdFire eDMA engine, 64-channel
-+	  implementation that performs complex data transfers with
-+	  minimal intervention from a host processor.
-+	  This module can be found on Freescale ColdFire mcf5441x SoCs.
-+
- config MMP_PDMA
- 	bool "MMP PDMA support"
- 	depends on ARCH_MMP || ARCH_PXA || COMPILE_TEST
-diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
-index 66022f59fca4..d97f317f4b34 100644
---- a/drivers/dma/Makefile
-+++ b/drivers/dma/Makefile
-@@ -32,6 +32,7 @@ obj-$(CONFIG_DW_DMAC_CORE) += dw/
- obj-$(CONFIG_EP93XX_DMA) += ep93xx_dma.o
- obj-$(CONFIG_FSL_DMA) += fsldma.o
- obj-$(CONFIG_FSL_EDMA) += fsl-edma.o fsl-edma-common.o
-+obj-$(CONFIG_MCF_EDMA) += mcf-edma.o fsl-edma-common.o
- obj-$(CONFIG_FSL_RAID) += fsl_raid.o
- obj-$(CONFIG_HSU_DMA) += hsu/
- obj-$(CONFIG_IMG_MDC_DMA) += img-mdc-dma.o
 diff --git a/drivers/dma/fsl-edma-common.c b/drivers/dma/fsl-edma-common.c
-index 948a3ee51bbb..5a830a238a0c 100644
+index 0ae7094f477a..948a3ee51bbb 100644
 --- a/drivers/dma/fsl-edma-common.c
 +++ b/drivers/dma/fsl-edma-common.c
-@@ -102,8 +102,16 @@ static void fsl_edma_enable_request(struct fsl_edma_chan *fsl_chan)
- 	struct edma_regs *regs = &fsl_chan->edma->regs;
+@@ -9,6 +9,38 @@
+ 
+ #include "fsl-edma-common.h"
+ 
++#define EDMA_CR			0x00
++#define EDMA_ES			0x04
++#define EDMA_ERQ		0x0C
++#define EDMA_EEI		0x14
++#define EDMA_SERQ		0x1B
++#define EDMA_CERQ		0x1A
++#define EDMA_SEEI		0x19
++#define EDMA_CEEI		0x18
++#define EDMA_CINT		0x1F
++#define EDMA_CERR		0x1E
++#define EDMA_SSRT		0x1D
++#define EDMA_CDNE		0x1C
++#define EDMA_INTR		0x24
++#define EDMA_ERR		0x2C
++
++#define EDMA64_ERQH		0x08
++#define EDMA64_EEIH		0x10
++#define EDMA64_SERQ		0x18
++#define EDMA64_CERQ		0x19
++#define EDMA64_SEEI		0x1a
++#define EDMA64_CEEI		0x1b
++#define EDMA64_CINT		0x1c
++#define EDMA64_CERR		0x1d
++#define EDMA64_SSRT		0x1e
++#define EDMA64_CDNE		0x1f
++#define EDMA64_INTH		0x20
++#define EDMA64_INTL		0x24
++#define EDMA64_ERRH		0x28
++#define EDMA64_ERRL		0x2c
++
++#define EDMA_TCD		0x1000
++
+ /*
+  * R/W functions for big- or little-endian registers:
+  * The eDMA controller's endian is independent of the CPU core's endian.
+@@ -67,20 +99,20 @@ EXPORT_SYMBOL_GPL(to_fsl_edma_desc);
+ 
+ static void fsl_edma_enable_request(struct fsl_edma_chan *fsl_chan)
+ {
+-	void __iomem *addr = fsl_chan->edma->membase;
++	struct edma_regs *regs = &fsl_chan->edma->regs;
  	u32 ch = fsl_chan->vchan.chan.chan_id;
  
--	edma_writeb(fsl_chan->edma, EDMA_SEEI_SEEI(ch), regs->seei);
--	edma_writeb(fsl_chan->edma, ch, regs->serq);
-+	if (fsl_chan->edma->version == v1) {
-+		edma_writeb(fsl_chan->edma, EDMA_SEEI_SEEI(ch), regs->seei);
-+		edma_writeb(fsl_chan->edma, ch, regs->serq);
-+	} else {
-+		/* ColdFire is big endian, and accesses natively
-+		 * big endian I/O peripherals
-+		 */
-+		iowrite8(EDMA_SEEI_SEEI(ch), regs->seei);
-+		iowrite8(ch, regs->serq);
-+	}
+-	edma_writeb(fsl_chan->edma, EDMA_SEEI_SEEI(ch), addr + EDMA_SEEI);
+-	edma_writeb(fsl_chan->edma, ch, addr + EDMA_SERQ);
++	edma_writeb(fsl_chan->edma, EDMA_SEEI_SEEI(ch), regs->seei);
++	edma_writeb(fsl_chan->edma, ch, regs->serq);
  }
  
  void fsl_edma_disable_request(struct fsl_edma_chan *fsl_chan)
-@@ -111,8 +119,16 @@ void fsl_edma_disable_request(struct fsl_edma_chan *fsl_chan)
- 	struct edma_regs *regs = &fsl_chan->edma->regs;
+ {
+-	void __iomem *addr = fsl_chan->edma->membase;
++	struct edma_regs *regs = &fsl_chan->edma->regs;
  	u32 ch = fsl_chan->vchan.chan.chan_id;
  
--	edma_writeb(fsl_chan->edma, ch, regs->cerq);
--	edma_writeb(fsl_chan->edma, EDMA_CEEI_CEEI(ch), regs->ceei);
-+	if (fsl_chan->edma->version == v1) {
-+		edma_writeb(fsl_chan->edma, ch, regs->cerq);
-+		edma_writeb(fsl_chan->edma, EDMA_CEEI_CEEI(ch), regs->ceei);
-+	} else {
-+		/* ColdFire is big endian, and accesses natively
-+		 * big endian I/O peripherals
-+		 */
-+		iowrite8(ch, regs->cerq);
-+		iowrite8(EDMA_CEEI_CEEI(ch), regs->ceei);
-+	}
+-	edma_writeb(fsl_chan->edma, ch, addr + EDMA_CERQ);
+-	edma_writeb(fsl_chan->edma, EDMA_CEEI_CEEI(ch), addr + EDMA_CEEI);
++	edma_writeb(fsl_chan->edma, ch, regs->cerq);
++	edma_writeb(fsl_chan->edma, EDMA_CEEI_CEEI(ch), regs->ceei);
  }
  EXPORT_SYMBOL_GPL(fsl_edma_disable_request);
  
-diff --git a/drivers/dma/mcf-edma.c b/drivers/dma/mcf-edma.c
-new file mode 100644
-index 000000000000..31e5317a8f90
---- /dev/null
-+++ b/drivers/dma/mcf-edma.c
-@@ -0,0 +1,315 @@
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// Copyright (c) 2013-2014 Freescale Semiconductor, Inc
-+// Copyright (c) 2017 Sysam, Angelo Dureghello  <angelo@sysam.it>
-+
-+#include <linux/module.h>
-+#include <linux/interrupt.h>
-+#include <linux/dmaengine.h>
-+#include <linux/platform_device.h>
-+#include <linux/platform_data/dma-mcf-edma.h>
-+
-+#include "fsl-edma-common.h"
-+
-+#define EDMA_CHANNELS		64
-+#define EDMA_MASK_CH(x)		((x) & GENMASK(5, 0))
-+
-+static irqreturn_t mcf_edma_tx_handler(int irq, void *dev_id)
-+{
-+	struct fsl_edma_engine *mcf_edma = dev_id;
-+	struct edma_regs *regs = &mcf_edma->regs;
-+	unsigned int ch;
-+	struct fsl_edma_chan *mcf_chan;
-+	u64 intmap;
-+
-+	intmap = ioread32(regs->inth);
-+	intmap <<= 32;
-+	intmap |= ioread32(regs->intl);
-+	if (!intmap)
-+		return IRQ_NONE;
-+
-+	for (ch = 0; ch < mcf_edma->n_chans; ch++) {
-+		if (intmap & BIT(ch)) {
-+			iowrite8(EDMA_MASK_CH(ch), regs->cint);
-+
-+			mcf_chan = &mcf_edma->chans[ch];
-+
-+			spin_lock(&mcf_chan->vchan.lock);
-+			if (!mcf_chan->edesc->iscyclic) {
-+				list_del(&mcf_chan->edesc->vdesc.node);
-+				vchan_cookie_complete(&mcf_chan->edesc->vdesc);
-+				mcf_chan->edesc = NULL;
-+				mcf_chan->status = DMA_COMPLETE;
-+				mcf_chan->idle = true;
-+			} else {
-+				vchan_cyclic_callback(&mcf_chan->edesc->vdesc);
-+			}
-+
-+			if (!mcf_chan->edesc)
-+				fsl_edma_xfer_desc(mcf_chan);
-+
-+			spin_unlock(&mcf_chan->vchan.lock);
-+		}
-+	}
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static irqreturn_t mcf_edma_err_handler(int irq, void *dev_id)
-+{
-+	struct fsl_edma_engine *mcf_edma = dev_id;
-+	struct edma_regs *regs = &mcf_edma->regs;
-+	unsigned int err, ch;
-+
-+	err = ioread32(regs->errl);
-+	if (!err)
-+		return IRQ_NONE;
-+
-+	for (ch = 0; ch < (EDMA_CHANNELS / 2); ch++) {
-+		if (err & BIT(ch)) {
-+			fsl_edma_disable_request(&mcf_edma->chans[ch]);
-+			iowrite8(EDMA_CERR_CERR(ch), regs->cerr);
-+			mcf_edma->chans[ch].status = DMA_ERROR;
-+			mcf_edma->chans[ch].idle = true;
-+		}
-+	}
-+
-+	err = ioread32(regs->errh);
-+	if (!err)
-+		return IRQ_NONE;
-+
-+	for (ch = (EDMA_CHANNELS / 2); ch < EDMA_CHANNELS; ch++) {
-+		if (err & (BIT(ch - (EDMA_CHANNELS / 2)))) {
-+			fsl_edma_disable_request(&mcf_edma->chans[ch]);
-+			iowrite8(EDMA_CERR_CERR(ch), regs->cerr);
-+			mcf_edma->chans[ch].status = DMA_ERROR;
-+			mcf_edma->chans[ch].idle = true;
-+		}
-+	}
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int mcf_edma_irq_init(struct platform_device *pdev,
-+				struct fsl_edma_engine *mcf_edma)
-+{
-+	int ret = 0, i;
-+	struct resource *res;
-+
-+	res = platform_get_resource_byname(pdev,
-+				IORESOURCE_IRQ, "edma-tx-00-15");
-+	if (!res)
-+		return -1;
-+
-+	for (ret = 0, i = res->start; i <= res->end; ++i)
-+		ret |= request_irq(i, mcf_edma_tx_handler, 0, "eDMA", mcf_edma);
-+	if (ret)
-+		return ret;
-+
-+	res = platform_get_resource_byname(pdev,
-+			IORESOURCE_IRQ, "edma-tx-16-55");
-+	if (!res)
-+		return -1;
-+
-+	for (ret = 0, i = res->start; i <= res->end; ++i)
-+		ret |= request_irq(i, mcf_edma_tx_handler, 0, "eDMA", mcf_edma);
-+	if (ret)
-+		return ret;
-+
-+	ret = platform_get_irq_byname(pdev, "edma-tx-56-63");
-+	if (ret != -ENXIO) {
-+		ret = request_irq(ret, mcf_edma_tx_handler,
-+				  0, "eDMA", mcf_edma);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	ret = platform_get_irq_byname(pdev, "edma-err");
-+	if (ret != -ENXIO) {
-+		ret = request_irq(ret, mcf_edma_err_handler,
-+				  0, "eDMA", mcf_edma);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static void mcf_edma_irq_free(struct platform_device *pdev,
-+				struct fsl_edma_engine *mcf_edma)
-+{
-+	int irq;
-+	struct resource *res;
-+
-+	res = platform_get_resource_byname(pdev,
-+			IORESOURCE_IRQ, "edma-tx-00-15");
-+	if (res) {
-+		for (irq = res->start; irq <= res->end; irq++)
-+			free_irq(irq, mcf_edma);
-+	}
-+
-+	res = platform_get_resource_byname(pdev,
-+			IORESOURCE_IRQ, "edma-tx-16-55");
-+	if (res) {
-+		for (irq = res->start; irq <= res->end; irq++)
-+			free_irq(irq, mcf_edma);
-+	}
-+
-+	irq = platform_get_irq_byname(pdev, "edma-tx-56-63");
-+	if (irq != -ENXIO)
-+		free_irq(irq, mcf_edma);
-+
-+	irq = platform_get_irq_byname(pdev, "edma-err");
-+	if (irq != -ENXIO)
-+		free_irq(irq, mcf_edma);
-+}
-+
-+static int mcf_edma_probe(struct platform_device *pdev)
-+{
-+	struct mcf_edma_platform_data *pdata;
-+	struct fsl_edma_engine *mcf_edma;
-+	struct fsl_edma_chan *mcf_chan;
-+	struct edma_regs *regs;
-+	struct resource *res;
-+	int ret, i, len, chans;
-+
-+	pdata = dev_get_platdata(&pdev->dev);
-+	if (!pdata)
-+		return PTR_ERR(pdata);
-+
-+	chans = pdata->dma_channels;
-+	len = sizeof(*mcf_edma) + sizeof(*mcf_chan) * chans;
-+	mcf_edma = devm_kzalloc(&pdev->dev, len, GFP_KERNEL);
-+	if (!mcf_edma)
-+		return -ENOMEM;
-+
-+	mcf_edma->n_chans = chans;
-+
-+	/* Set up version for ColdFire edma */
-+	mcf_edma->version = v2;
-+	mcf_edma->big_endian = 1;
-+
-+	if (!mcf_edma->n_chans) {
-+		dev_info(&pdev->dev, "setting default channel number to 64");
-+		mcf_edma->n_chans = 64;
-+	}
-+
-+	mutex_init(&mcf_edma->fsl_edma_mutex);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+
-+	mcf_edma->membase = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(mcf_edma->membase))
-+		return PTR_ERR(mcf_edma->membase);
-+
-+	fsl_edma_setup_regs(mcf_edma);
-+	regs = &mcf_edma->regs;
-+
-+	INIT_LIST_HEAD(&mcf_edma->dma_dev.channels);
-+	for (i = 0; i < mcf_edma->n_chans; i++) {
-+		struct fsl_edma_chan *mcf_chan = &mcf_edma->chans[i];
-+
-+		mcf_chan->edma = mcf_edma;
-+		mcf_chan->slave_id = i;
-+		mcf_chan->idle = true;
-+		mcf_chan->vchan.desc_free = fsl_edma_free_desc;
-+		vchan_init(&mcf_chan->vchan, &mcf_edma->dma_dev);
-+		iowrite32(0x0, &regs->tcd[i].csr);
-+	}
-+
-+	iowrite32(~0, regs->inth);
-+	iowrite32(~0, regs->intl);
-+
-+	ret = mcf_edma_irq_init(pdev, mcf_edma);
-+	if (ret)
-+		return ret;
-+
-+	dma_cap_set(DMA_PRIVATE, mcf_edma->dma_dev.cap_mask);
-+	dma_cap_set(DMA_SLAVE, mcf_edma->dma_dev.cap_mask);
-+	dma_cap_set(DMA_CYCLIC, mcf_edma->dma_dev.cap_mask);
-+
-+	mcf_edma->dma_dev.dev = &pdev->dev;
-+	mcf_edma->dma_dev.device_alloc_chan_resources =
-+			fsl_edma_alloc_chan_resources;
-+	mcf_edma->dma_dev.device_free_chan_resources =
-+			fsl_edma_free_chan_resources;
-+	mcf_edma->dma_dev.device_config = fsl_edma_slave_config;
-+	mcf_edma->dma_dev.device_prep_dma_cyclic =
-+			fsl_edma_prep_dma_cyclic;
-+	mcf_edma->dma_dev.device_prep_slave_sg = fsl_edma_prep_slave_sg;
-+	mcf_edma->dma_dev.device_tx_status = fsl_edma_tx_status;
-+	mcf_edma->dma_dev.device_pause = fsl_edma_pause;
-+	mcf_edma->dma_dev.device_resume = fsl_edma_resume;
-+	mcf_edma->dma_dev.device_terminate_all = fsl_edma_terminate_all;
-+	mcf_edma->dma_dev.device_issue_pending = fsl_edma_issue_pending;
-+
-+	mcf_edma->dma_dev.src_addr_widths = FSL_EDMA_BUSWIDTHS;
-+	mcf_edma->dma_dev.dst_addr_widths = FSL_EDMA_BUSWIDTHS;
-+	mcf_edma->dma_dev.directions =
-+			BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-+
-+	mcf_edma->dma_dev.filter.fn = mcf_edma_filter_fn;
-+	mcf_edma->dma_dev.filter.map = pdata->slave_map;
-+	mcf_edma->dma_dev.filter.mapcnt = pdata->slavecnt;
-+
-+	platform_set_drvdata(pdev, mcf_edma);
-+
-+	ret = dma_async_device_register(&mcf_edma->dma_dev);
-+	if (ret) {
-+		dev_err(&pdev->dev,
-+			"Can't register Freescale eDMA engine. (%d)\n", ret);
-+		return ret;
-+	}
-+
-+	/* Enable round robin arbitration */
-+	iowrite32(EDMA_CR_ERGA | EDMA_CR_ERCA, regs->cr);
-+
-+	return 0;
-+}
-+
-+static int mcf_edma_remove(struct platform_device *pdev)
-+{
-+	struct fsl_edma_engine *mcf_edma = platform_get_drvdata(pdev);
-+
-+	mcf_edma_irq_free(pdev, mcf_edma);
-+	fsl_edma_cleanup_vchan(&mcf_edma->dma_dev);
-+	dma_async_device_unregister(&mcf_edma->dma_dev);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver mcf_edma_driver = {
-+	.driver		= {
-+		.name	= "mcf-edma",
-+	},
-+	.probe		= mcf_edma_probe,
-+	.remove		= mcf_edma_remove,
-+};
-+
-+bool mcf_edma_filter_fn(struct dma_chan *chan, void *param)
-+{
-+	if (chan->device->dev->driver == &mcf_edma_driver.driver) {
-+		struct fsl_edma_chan *mcf_chan = to_fsl_edma_chan(chan);
-+
-+		return (mcf_chan->slave_id == (int)param);
-+	}
-+
-+	return false;
-+}
-+EXPORT_SYMBOL(mcf_edma_filter_fn);
-+
-+static int __init mcf_edma_init(void)
-+{
-+	return platform_driver_register(&mcf_edma_driver);
-+}
-+subsys_initcall(mcf_edma_init);
-+
-+static void __exit mcf_edma_exit(void)
-+{
-+	platform_driver_unregister(&mcf_edma_driver);
-+}
-+module_exit(mcf_edma_exit);
-+
-+MODULE_ALIAS("platform:mcf-edma");
-+MODULE_DESCRIPTION("Freescale eDMA engine driver, ColdFire family");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/platform_data/dma-mcf-edma.h b/include/linux/platform_data/dma-mcf-edma.h
-new file mode 100644
-index 000000000000..9a1819acb28f
---- /dev/null
-+++ b/include/linux/platform_data/dma-mcf-edma.h
-@@ -0,0 +1,38 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
+@@ -208,7 +240,7 @@ static size_t fsl_edma_desc_residue(struct fsl_edma_chan *fsl_chan,
+ 		struct virt_dma_desc *vdesc, bool in_progress)
+ {
+ 	struct fsl_edma_desc *edesc = fsl_chan->edesc;
+-	void __iomem *addr = fsl_chan->edma->membase;
++	struct edma_regs *regs = &fsl_chan->edma->regs;
+ 	u32 ch = fsl_chan->vchan.chan.chan_id;
+ 	enum dma_transfer_direction dir = fsl_chan->fsc.dir;
+ 	dma_addr_t cur_addr, dma_addr;
+@@ -224,11 +256,9 @@ static size_t fsl_edma_desc_residue(struct fsl_edma_chan *fsl_chan,
+ 		return len;
+ 
+ 	if (dir == DMA_MEM_TO_DEV)
+-		cur_addr = edma_readl(
+-			fsl_chan->edma, addr + EDMA_TCD_SADDR(ch));
++		cur_addr = edma_readl(fsl_chan->edma, &regs->tcd[ch].saddr);
+ 	else
+-		cur_addr = edma_readl(
+-			fsl_chan->edma, addr + EDMA_TCD_DADDR(ch));
++		cur_addr = edma_readl(fsl_chan->edma, &regs->tcd[ch].daddr);
+ 
+ 	/* figure out the finished and calculate the residue */
+ 	for (i = 0; i < fsl_chan->edesc->n_tcds; i++) {
+@@ -285,7 +315,7 @@ static void fsl_edma_set_tcd_regs(struct fsl_edma_chan *fsl_chan,
+ 				  struct fsl_edma_hw_tcd *tcd)
+ {
+ 	struct fsl_edma_engine *edma = fsl_chan->edma;
+-	void __iomem *addr = fsl_chan->edma->membase;
++	struct edma_regs *regs = &fsl_chan->edma->regs;
+ 	u32 ch = fsl_chan->vchan.chan.chan_id;
+ 
+ 	/*
+@@ -293,24 +323,24 @@ static void fsl_edma_set_tcd_regs(struct fsl_edma_chan *fsl_chan,
+ 	 * endian format. However, we need to load the TCD registers in
+ 	 * big- or little-endian obeying the eDMA engine model endian.
+ 	 */
+-	edma_writew(edma, 0, addr + EDMA_TCD_CSR(ch));
+-	edma_writel(edma, le32_to_cpu(tcd->saddr), addr + EDMA_TCD_SADDR(ch));
+-	edma_writel(edma, le32_to_cpu(tcd->daddr), addr + EDMA_TCD_DADDR(ch));
++	edma_writew(edma, 0,  &regs->tcd[ch].csr);
++	edma_writel(edma, le32_to_cpu(tcd->saddr), &regs->tcd[ch].saddr);
++	edma_writel(edma, le32_to_cpu(tcd->daddr), &regs->tcd[ch].daddr);
+ 
+-	edma_writew(edma, le16_to_cpu(tcd->attr), addr + EDMA_TCD_ATTR(ch));
+-	edma_writew(edma, le16_to_cpu(tcd->soff), addr + EDMA_TCD_SOFF(ch));
++	edma_writew(edma, le16_to_cpu(tcd->attr), &regs->tcd[ch].attr);
++	edma_writew(edma, le16_to_cpu(tcd->soff), &regs->tcd[ch].soff);
+ 
+-	edma_writel(edma, le32_to_cpu(tcd->nbytes), addr + EDMA_TCD_NBYTES(ch));
+-	edma_writel(edma, le32_to_cpu(tcd->slast), addr + EDMA_TCD_SLAST(ch));
++	edma_writel(edma, le32_to_cpu(tcd->nbytes), &regs->tcd[ch].nbytes);
++	edma_writel(edma, le32_to_cpu(tcd->slast), &regs->tcd[ch].slast);
+ 
+-	edma_writew(edma, le16_to_cpu(tcd->citer), addr + EDMA_TCD_CITER(ch));
+-	edma_writew(edma, le16_to_cpu(tcd->biter), addr + EDMA_TCD_BITER(ch));
+-	edma_writew(edma, le16_to_cpu(tcd->doff), addr + EDMA_TCD_DOFF(ch));
++	edma_writew(edma, le16_to_cpu(tcd->citer), &regs->tcd[ch].citer);
++	edma_writew(edma, le16_to_cpu(tcd->biter), &regs->tcd[ch].biter);
++	edma_writew(edma, le16_to_cpu(tcd->doff), &regs->tcd[ch].doff);
+ 
+-	edma_writel(edma,
+-		    le32_to_cpu(tcd->dlast_sga), addr + EDMA_TCD_DLAST_SGA(ch));
++	edma_writel(edma, le32_to_cpu(tcd->dlast_sga),
++			&regs->tcd[ch].dlast_sga);
+ 
+-	edma_writew(edma, le16_to_cpu(tcd->csr), addr + EDMA_TCD_CSR(ch));
++	edma_writew(edma, le16_to_cpu(tcd->csr), &regs->tcd[ch].csr);
+ }
+ 
+ static inline
+@@ -332,15 +362,15 @@ void fsl_edma_fill_tcd(struct fsl_edma_hw_tcd *tcd, u32 src, u32 dst,
+ 
+ 	tcd->attr = cpu_to_le16(attr);
+ 
+-	tcd->soff = cpu_to_le16(EDMA_TCD_SOFF_SOFF(soff));
++	tcd->soff = cpu_to_le16(soff);
+ 
+-	tcd->nbytes = cpu_to_le32(EDMA_TCD_NBYTES_NBYTES(nbytes));
+-	tcd->slast = cpu_to_le32(EDMA_TCD_SLAST_SLAST(slast));
++	tcd->nbytes = cpu_to_le32(nbytes);
++	tcd->slast = cpu_to_le32(slast);
+ 
+ 	tcd->citer = cpu_to_le16(EDMA_TCD_CITER_CITER(citer));
+-	tcd->doff = cpu_to_le16(EDMA_TCD_DOFF_DOFF(doff));
++	tcd->doff = cpu_to_le16(doff);
+ 
+-	tcd->dlast_sga = cpu_to_le32(EDMA_TCD_DLAST_SGA_DLAST_SGA(dlast_sga));
++	tcd->dlast_sga = cpu_to_le32(dlast_sga);
+ 
+ 	tcd->biter = cpu_to_le16(EDMA_TCD_BITER_BITER(biter));
+ 	if (major_int)
+@@ -573,4 +603,52 @@ void fsl_edma_cleanup_vchan(struct dma_device *dmadev)
+ }
+ EXPORT_SYMBOL_GPL(fsl_edma_cleanup_vchan);
+ 
 +/*
-+ * Freescale eDMA platform data, ColdFire SoC's family.
++ * On the 32 channels Vybrid/mpc577x edma version (here called "v1"),
++ * register offsets are different compared to ColdFire mcf5441x 64 channels
++ * edma (here called "v2").
 + *
-+ * Copyright (c) 2017 Angelo Dureghello <angelo@sysam.it>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * This function sets up register offsets as per proper declared version
++ * so must be called in xxx_edma_probe() just after setting the
++ * edma "version" and "membase" appropriately.
 + */
++void fsl_edma_setup_regs(struct fsl_edma_engine *edma)
++{
++	edma->regs.cr = edma->membase + EDMA_CR;
++	edma->regs.es = edma->membase + EDMA_ES;
++	edma->regs.erql = edma->membase + EDMA_ERQ;
++	edma->regs.eeil = edma->membase + EDMA_EEI;
 +
-+#ifndef __MACH_MCF_EDMA_H__
-+#define __MACH_MCF_EDMA_H__
++	edma->regs.serq = edma->membase + ((edma->version == v1) ?
++			EDMA_SERQ : EDMA64_SERQ);
++	edma->regs.cerq = edma->membase + ((edma->version == v1) ?
++			EDMA_CERQ : EDMA64_CERQ);
++	edma->regs.seei = edma->membase + ((edma->version == v1) ?
++			EDMA_SEEI : EDMA64_SEEI);
++	edma->regs.ceei = edma->membase + ((edma->version == v1) ?
++			EDMA_CEEI : EDMA64_CEEI);
++	edma->regs.cint = edma->membase + ((edma->version == v1) ?
++			EDMA_CINT : EDMA64_CINT);
++	edma->regs.cerr = edma->membase + ((edma->version == v1) ?
++			EDMA_CERR : EDMA64_CERR);
++	edma->regs.ssrt = edma->membase + ((edma->version == v1) ?
++			EDMA_SSRT : EDMA64_SSRT);
++	edma->regs.cdne = edma->membase + ((edma->version == v1) ?
++			EDMA_CDNE : EDMA64_CDNE);
++	edma->regs.intl = edma->membase + ((edma->version == v1) ?
++			EDMA_INTR : EDMA64_INTL);
++	edma->regs.errl = edma->membase + ((edma->version == v1) ?
++			EDMA_ERR : EDMA64_ERRL);
 +
-+struct dma_slave_map;
++	if (edma->version == v2) {
++		edma->regs.erqh = edma->membase + EDMA64_ERQH;
++		edma->regs.eeih = edma->membase + EDMA64_EEIH;
++		edma->regs.errh = edma->membase + EDMA64_ERRH;
++		edma->regs.inth = edma->membase + EDMA64_INTH;
++	}
 +
-+bool mcf_edma_filter_fn(struct dma_chan *chan, void *param);
++	edma->regs.tcd = edma->membase + EDMA_TCD;
++}
++EXPORT_SYMBOL_GPL(fsl_edma_setup_regs);
 +
-+#define MCF_EDMA_FILTER_PARAM(ch)	((void *)ch)
+ MODULE_LICENSE("GPL v2");
+diff --git a/drivers/dma/fsl-edma-common.h b/drivers/dma/fsl-edma-common.h
+index f3ea68e15b23..7a9231e7639f 100644
+--- a/drivers/dma/fsl-edma-common.h
++++ b/drivers/dma/fsl-edma-common.h
+@@ -8,35 +8,6 @@
+ 
+ #include "virt-dma.h"
+ 
+-#define EDMA_CR			0x00
+-#define EDMA_ES			0x04
+-#define EDMA_ERQ		0x0C
+-#define EDMA_EEI		0x14
+-#define EDMA_SERQ		0x1B
+-#define EDMA_CERQ		0x1A
+-#define EDMA_SEEI		0x19
+-#define EDMA_CEEI		0x18
+-#define EDMA_CINT		0x1F
+-#define EDMA_CERR		0x1E
+-#define EDMA_SSRT		0x1D
+-#define EDMA_CDNE		0x1C
+-#define EDMA_INTR		0x24
+-#define EDMA_ERR		0x2C
+-
+-#define EDMA_TCD_SADDR(x)	(0x1000 + 32 * (x))
+-#define EDMA_TCD_SOFF(x)	(0x1004 + 32 * (x))
+-#define EDMA_TCD_ATTR(x)	(0x1006 + 32 * (x))
+-#define EDMA_TCD_NBYTES(x)	(0x1008 + 32 * (x))
+-#define EDMA_TCD_SLAST(x)	(0x100C + 32 * (x))
+-#define EDMA_TCD_DADDR(x)	(0x1010 + 32 * (x))
+-#define EDMA_TCD_DOFF(x)	(0x1014 + 32 * (x))
+-#define EDMA_TCD_CITER_ELINK(x)	(0x1016 + 32 * (x))
+-#define EDMA_TCD_CITER(x)	(0x1016 + 32 * (x))
+-#define EDMA_TCD_DLAST_SGA(x)	(0x1018 + 32 * (x))
+-#define EDMA_TCD_CSR(x)		(0x101C + 32 * (x))
+-#define EDMA_TCD_BITER_ELINK(x)	(0x101E + 32 * (x))
+-#define EDMA_TCD_BITER(x)	(0x101E + 32 * (x))
+-
+ #define EDMA_CR_EDBG		BIT(1)
+ #define EDMA_CR_ERCA		BIT(2)
+ #define EDMA_CR_ERGA		BIT(3)
+@@ -47,34 +18,29 @@
+ #define EDMA_CR_ECX		BIT(16)
+ #define EDMA_CR_CX		BIT(17)
+ 
+-#define EDMA_SEEI_SEEI(x)	((x) & 0x1F)
+-#define EDMA_CEEI_CEEI(x)	((x) & 0x1F)
+-#define EDMA_CINT_CINT(x)	((x) & 0x1F)
+-#define EDMA_CERR_CERR(x)	((x) & 0x1F)
+-
+-#define EDMA_TCD_ATTR_DSIZE(x)		(((x) & 0x0007))
+-#define EDMA_TCD_ATTR_DMOD(x)		(((x) & 0x001F) << 3)
+-#define EDMA_TCD_ATTR_SSIZE(x)		(((x) & 0x0007) << 8)
+-#define EDMA_TCD_ATTR_SMOD(x)		(((x) & 0x001F) << 11)
+-#define EDMA_TCD_ATTR_SSIZE_8BIT	(0x0000)
+-#define EDMA_TCD_ATTR_SSIZE_16BIT	(0x0100)
+-#define EDMA_TCD_ATTR_SSIZE_32BIT	(0x0200)
+-#define EDMA_TCD_ATTR_SSIZE_64BIT	(0x0300)
+-#define EDMA_TCD_ATTR_SSIZE_32BYTE	(0x0500)
+-#define EDMA_TCD_ATTR_DSIZE_8BIT	(0x0000)
+-#define EDMA_TCD_ATTR_DSIZE_16BIT	(0x0001)
+-#define EDMA_TCD_ATTR_DSIZE_32BIT	(0x0002)
+-#define EDMA_TCD_ATTR_DSIZE_64BIT	(0x0003)
+-#define EDMA_TCD_ATTR_DSIZE_32BYTE	(0x0005)
+-
+-#define EDMA_TCD_SOFF_SOFF(x)		(x)
+-#define EDMA_TCD_NBYTES_NBYTES(x)	(x)
+-#define EDMA_TCD_SLAST_SLAST(x)		(x)
+-#define EDMA_TCD_DADDR_DADDR(x)		(x)
+-#define EDMA_TCD_CITER_CITER(x)		((x) & 0x7FFF)
+-#define EDMA_TCD_DOFF_DOFF(x)		(x)
+-#define EDMA_TCD_DLAST_SGA_DLAST_SGA(x)	(x)
+-#define EDMA_TCD_BITER_BITER(x)		((x) & 0x7FFF)
++#define EDMA_SEEI_SEEI(x)	((x) & GENMASK(4, 0))
++#define EDMA_CEEI_CEEI(x)	((x) & GENMASK(4, 0))
++#define EDMA_CINT_CINT(x)	((x) & GENMASK(4, 0))
++#define EDMA_CERR_CERR(x)	((x) & GENMASK(4, 0))
 +
-+/**
-+ * struct mcf_edma_platform_data - platform specific data for eDMA engine
-+ *
-+ * @ver			The eDMA module version.
-+ * @dma_channels	The number of eDMA channels.
++#define EDMA_TCD_ATTR_DSIZE(x)		(((x) & GENMASK(2, 0)))
++#define EDMA_TCD_ATTR_DMOD(x)		(((x) & GENMASK(4, 0)) << 3)
++#define EDMA_TCD_ATTR_SSIZE(x)		(((x) & GENMASK(2, 0)) << 8)
++#define EDMA_TCD_ATTR_SMOD(x)		(((x) & GENMASK(4, 0)) << 11)
++
++#define EDMA_TCD_ATTR_DSIZE_8BIT	0
++#define EDMA_TCD_ATTR_DSIZE_16BIT	BIT(0)
++#define EDMA_TCD_ATTR_DSIZE_32BIT	BIT(1)
++#define EDMA_TCD_ATTR_DSIZE_64BIT	(BIT(0) | BIT(1))
++#define EDMA_TCD_ATTR_DSIZE_32BYTE	(BIT(3) | BIT(0))
++#define EDMA_TCD_ATTR_SSIZE_8BIT	0
++#define EDMA_TCD_ATTR_SSIZE_16BIT	(EDMA_TCD_ATTR_DSIZE_16BIT << 8)
++#define EDMA_TCD_ATTR_SSIZE_32BIT	(EDMA_TCD_ATTR_DSIZE_32BIT << 8)
++#define EDMA_TCD_ATTR_SSIZE_64BIT	(EDMA_TCD_ATTR_DSIZE_64BIT << 8)
++#define EDMA_TCD_ATTR_SSIZE_32BYTE	(EDMA_TCD_ATTR_DSIZE_32BYTE << 8)
++
++#define EDMA_TCD_CITER_CITER(x)		((x) & GENMASK(14, 0))
++#define EDMA_TCD_BITER_BITER(x)		((x) & GENMASK(14, 0))
+ 
+ #define EDMA_TCD_CSR_START		BIT(0)
+ #define EDMA_TCD_CSR_INT_MAJOR		BIT(1)
+@@ -87,7 +53,7 @@
+ 
+ #define EDMAMUX_CHCFG_DIS		0x0
+ #define EDMAMUX_CHCFG_ENBL		0x80
+-#define EDMAMUX_CHCFG_SOURCE(n)		((n) & 0x3F)
++#define EDMAMUX_CHCFG_SOURCE(n)		((n) & GENMASK(6, 0))
+ 
+ #define DMAMUX_NR	2
+ 
+@@ -114,6 +80,31 @@ struct fsl_edma_hw_tcd {
+ 	__le16	biter;
+ };
+ 
++/*
++ * This are iomem pointers, for both v32 and v64.
 + */
-+struct mcf_edma_platform_data {
-+	int dma_channels;
-+	const struct dma_slave_map *slave_map;
-+	int slavecnt;
++struct edma_regs {
++	void __iomem *cr;
++	void __iomem *es;
++	void __iomem *erqh;
++	void __iomem *erql;	/* aka erq on v32 */
++	void __iomem *eeih;
++	void __iomem *eeil;	/* aka eei on v32 */
++	void __iomem *seei;
++	void __iomem *ceei;
++	void __iomem *serq;
++	void __iomem *cerq;
++	void __iomem *cint;
++	void __iomem *cerr;
++	void __iomem *ssrt;
++	void __iomem *cdne;
++	void __iomem *inth;
++	void __iomem *intl;
++	void __iomem *errh;
++	void __iomem *errl;
++	struct fsl_edma_hw_tcd __iomem *tcd;
 +};
 +
-+#endif /* __MACH_MCF_EDMA_H__ */
+ struct fsl_edma_sw_tcd {
+ 	dma_addr_t			ptcd;
+ 	struct fsl_edma_hw_tcd		*vtcd;
+@@ -147,6 +138,11 @@ struct fsl_edma_desc {
+ 	struct fsl_edma_sw_tcd		tcd[];
+ };
+ 
++enum edma_version {
++	v1, /* 32ch, Vybdir, mpc57x, etc */
++	v2, /* 64ch Coldfire */
++};
++
+ struct fsl_edma_engine {
+ 	struct dma_device	dma_dev;
+ 	void __iomem		*membase;
+@@ -157,6 +153,8 @@ struct fsl_edma_engine {
+ 	int			txirq;
+ 	int			errirq;
+ 	bool			big_endian;
++	enum edma_version	version;
++	struct edma_regs	regs;
+ 	struct fsl_edma_chan	chans[];
+ };
+ 
+@@ -192,5 +190,6 @@ void fsl_edma_issue_pending(struct dma_chan *chan);
+ int fsl_edma_alloc_chan_resources(struct dma_chan *chan);
+ void fsl_edma_free_chan_resources(struct dma_chan *chan);
+ void fsl_edma_cleanup_vchan(struct dma_device *dmadev);
++void fsl_edma_setup_regs(struct fsl_edma_engine *edma);
+ 
+ #endif /* _FSL_EDMA_COMMON_H_ */
+diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+index 337ad0c0ea78..34d70112fcc9 100644
+--- a/drivers/dma/fsl-edma.c
++++ b/drivers/dma/fsl-edma.c
+@@ -28,19 +28,16 @@ static irqreturn_t fsl_edma_tx_handler(int irq, void *dev_id)
+ {
+ 	struct fsl_edma_engine *fsl_edma = dev_id;
+ 	unsigned int intr, ch;
+-	void __iomem *base_addr;
++	struct edma_regs *regs = &fsl_edma->regs;
+ 	struct fsl_edma_chan *fsl_chan;
+ 
+-	base_addr = fsl_edma->membase;
+-
+-	intr = edma_readl(fsl_edma, base_addr + EDMA_INTR);
++	intr = edma_readl(fsl_edma, regs->intl);
+ 	if (!intr)
+ 		return IRQ_NONE;
+ 
+ 	for (ch = 0; ch < fsl_edma->n_chans; ch++) {
+ 		if (intr & (0x1 << ch)) {
+-			edma_writeb(fsl_edma, EDMA_CINT_CINT(ch),
+-				base_addr + EDMA_CINT);
++			edma_writeb(fsl_edma, EDMA_CINT_CINT(ch), regs->cint);
+ 
+ 			fsl_chan = &fsl_edma->chans[ch];
+ 
+@@ -68,16 +65,16 @@ static irqreturn_t fsl_edma_err_handler(int irq, void *dev_id)
+ {
+ 	struct fsl_edma_engine *fsl_edma = dev_id;
+ 	unsigned int err, ch;
++	struct edma_regs *regs = &fsl_edma->regs;
+ 
+-	err = edma_readl(fsl_edma, fsl_edma->membase + EDMA_ERR);
++	err = edma_readl(fsl_edma, regs->errl);
+ 	if (!err)
+ 		return IRQ_NONE;
+ 
+ 	for (ch = 0; ch < fsl_edma->n_chans; ch++) {
+ 		if (err & (0x1 << ch)) {
+ 			fsl_edma_disable_request(&fsl_edma->chans[ch]);
+-			edma_writeb(fsl_edma, EDMA_CERR_CERR(ch),
+-				fsl_edma->membase + EDMA_CERR);
++			edma_writeb(fsl_edma, EDMA_CERR_CERR(ch), regs->cerr);
+ 			fsl_edma->chans[ch].status = DMA_ERROR;
+ 			fsl_edma->chans[ch].idle = true;
+ 		}
+@@ -192,6 +189,7 @@ static int fsl_edma_probe(struct platform_device *pdev)
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct fsl_edma_engine *fsl_edma;
+ 	struct fsl_edma_chan *fsl_chan;
++	struct edma_regs *regs;
+ 	struct resource *res;
+ 	int len, chans;
+ 	int ret, i;
+@@ -207,6 +205,7 @@ static int fsl_edma_probe(struct platform_device *pdev)
+ 	if (!fsl_edma)
+ 		return -ENOMEM;
+ 
++	fsl_edma->version = v1;
+ 	fsl_edma->n_chans = chans;
+ 	mutex_init(&fsl_edma->fsl_edma_mutex);
+ 
+@@ -215,6 +214,9 @@ static int fsl_edma_probe(struct platform_device *pdev)
+ 	if (IS_ERR(fsl_edma->membase))
+ 		return PTR_ERR(fsl_edma->membase);
+ 
++	fsl_edma_setup_regs(fsl_edma);
++	regs = &fsl_edma->regs;
++
+ 	for (i = 0; i < DMAMUX_NR; i++) {
+ 		char clkname[32];
+ 
+@@ -255,11 +257,11 @@ static int fsl_edma_probe(struct platform_device *pdev)
+ 		fsl_chan->vchan.desc_free = fsl_edma_free_desc;
+ 		vchan_init(&fsl_chan->vchan, &fsl_edma->dma_dev);
+ 
+-		edma_writew(fsl_edma, 0x0, fsl_edma->membase + EDMA_TCD_CSR(i));
++		edma_writew(fsl_edma, 0x0, &regs->tcd[i].csr);
+ 		fsl_edma_chan_mux(fsl_chan, 0, false);
+ 	}
+ 
+-	edma_writel(fsl_edma, ~0, fsl_edma->membase + EDMA_INTR);
++	edma_writel(fsl_edma, ~0, regs->intl);
+ 	ret = fsl_edma_irq_init(pdev, fsl_edma);
+ 	if (ret)
+ 		return ret;
+@@ -306,7 +308,7 @@ static int fsl_edma_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* enable round robin arbitration */
+-	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA, fsl_edma->membase + EDMA_CR);
++	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA, regs->cr);
+ 
+ 	return 0;
+ }
+@@ -353,18 +355,18 @@ static int fsl_edma_resume_early(struct device *dev)
+ {
+ 	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
+ 	struct fsl_edma_chan *fsl_chan;
++	struct edma_regs *regs = &fsl_edma->regs;
+ 	int i;
+ 
+ 	for (i = 0; i < fsl_edma->n_chans; i++) {
+ 		fsl_chan = &fsl_edma->chans[i];
+ 		fsl_chan->pm_state = RUNNING;
+-		edma_writew(fsl_edma, 0x0, fsl_edma->membase + EDMA_TCD_CSR(i));
++		edma_writew(fsl_edma, 0x0, &regs->tcd[i].csr);
+ 		if (fsl_chan->slave_id != 0)
+ 			fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id, true);
+ 	}
+ 
+-	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA,
+-			fsl_edma->membase + EDMA_CR);
++	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA, regs->cr);
+ 
+ 	return 0;
+ }
 -- 
 2.18.0
