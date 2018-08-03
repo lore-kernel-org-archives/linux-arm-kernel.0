@@ -1,28 +1,39 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 3 Aug 2018 12:48:11 +0200
-Subject: [PATCH] ARM: shmobile: silk: Add DA9063 PMIC node
-In-Reply-To: <75d2797a-48db-4979-c059-d7359eb39cff@gmail.com>
-References: <20180730111817.5636-1-marek.vasut+renesas@gmail.com>
- <CAMuHMdXib8fz3c41RX-70eA5w4ThM6e02ybmX=N=xXR6=F80KA@mail.gmail.com>
- <42d09bc8-a883-c3af-b0d6-0087b6e2558e@gmail.com>
- <CAMuHMdXSjLSsmU32tKo5tkS6+MipAXuVAUqkLYrXxmR07+eCEg@mail.gmail.com>
- <75d2797a-48db-4979-c059-d7359eb39cff@gmail.com>
-Message-ID: <20180803104811.2kfa456t7ytcft6s@katana>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Fri, 3 Aug 2018 11:24:28 +0000
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
+ <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
+ <CAJA7tRZbmnZq7RfvQeYEy_a1ZObWqpFpVdvgsXgsioQ3RyPMuA@mail.gmail.com>
+ <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
+Message-ID: <f696ebe8605840e3bb04bb78b60a6cfa@AcuMS.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Ard Biesheuvel
+> Sent: 03 August 2018 10:30
+...
+> The discussion about whether memcpy() should rely on unaligned
+> accesses, and whether you should use it on device memory is orthogonal
+> to that, and not the heart of the matter IMO
 
-> > Wolfram: do you like i2c slaves connected to multiple buses?
+Even on x86 using memcpy() on PCIe memory (maybe mmap()ed into userspace)
+isn't a good idea.
+In the kernel memcpy_to/fromio() ought to be a better choice but that
+is just an alternate name for memcpy().
 
-'Like' would be an exaggeration, but if they are connected to multiple
-busses, this might be a reason to describe that. People could then in
-userspace bind/unbind to the bus they want? Not pretty, but there might
-be reasons for that?
+The problem on x86 is that memcpy() is likely to be implemented as
+'rep movsb' on modern cpu - relying on the cpu hardware to perform
+cache-line sized transfers (etc).
+Unfortunately on uncached locations it has to revert to byte copies.
+So PCIe transfers (especially reads) are very slow.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180803/bc0b119e/attachment.sig>
+The transfers need to use the largest size register available.
+
+	David
+
+-
+Registered Address Lakeside, Bramley Road, Mount Farm, Milton Keynes, MK1 1PT, UK
+Registration No: 1397386 (Wales)
