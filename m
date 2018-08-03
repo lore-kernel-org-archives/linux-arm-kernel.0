@@ -1,219 +1,283 @@
 From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Fri, 3 Aug 2018 10:53:26 -0700
-Subject: [PATCH v11 09/11] dt-bindings: clock: Add bindings for ZynqMP clock
- driver
+Date: Fri, 3 Aug 2018 10:53:22 -0700
+Subject: [PATCH v11 05/11] firmware: xilinx: Add clock APIs
 In-Reply-To: <1533318808-10781-1-git-send-email-jollys@xilinx.com>
 References: <1533318808-10781-1-git-send-email-jollys@xilinx.com>
-Message-ID: <1533318808-10781-10-git-send-email-jollys@xilinx.com>
+Message-ID: <1533318808-10781-6-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rajan Vaja <rajanv@xilinx.com>
 
-Add documentation to describe Xilinx ZynqMP clock driver
-bindings.
+Add clock APIs to control clocks through firmware
+interface.
 
 Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
 Signed-off-by: Jolly Shah <jollys@xilinx.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Stephen Boyd <sboyd@kernel.org>
 ---
- .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |  53 ++++++++++
- include/dt-bindings/clock/xlnx,zynqmp-clk.h        | 116 +++++++++++++++++++++
- 2 files changed, 169 insertions(+)
- create mode 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
+ drivers/firmware/xilinx/zynqmp.c     | 186 ++++++++++++++++++++++++++++++++++-
+ include/linux/firmware/xlnx-zynqmp.h |  30 ++++++
+ 2 files changed, 214 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-index 1b431d9..d215d15 100644
---- a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-+++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-@@ -17,6 +17,53 @@ Required properties:
- 		  - "smc" : SMC #0, following the SMCCC
- 		  - "hvc" : HVC #0, following the SMCCC
- 
-+--------------------------------------------------------------------------
-+Device Tree Clock bindings for the Zynq Ultrascale+ MPSoC controlled using
-+Zynq MPSoC firmware interface
-+--------------------------------------------------------------------------
-+The clock controller is a h/w block of Zynq Ultrascale+ MPSoC clock
-+tree. It reads required input clock frequencies from the devicetree and acts
-+as clock provider for all clock consumers of PS clocks.
+diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
+index 8ec5682..41ed800 100644
+--- a/drivers/firmware/xilinx/zynqmp.c
++++ b/drivers/firmware/xilinx/zynqmp.c
+@@ -269,14 +269,196 @@ static int zynqmp_pm_ioctl(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2,
+  */
+ static int zynqmp_pm_query_data(struct zynqmp_pm_query_data qdata, u32 *out)
+ {
+-	return zynqmp_pm_invoke_fn(PM_QUERY_DATA, qdata.qid, qdata.arg1,
+-				   qdata.arg2, qdata.arg3, out);
++	int ret;
 +
-+See clock_bindings.txt for more information on the generic clock bindings.
++	ret = zynqmp_pm_invoke_fn(PM_QUERY_DATA, qdata.qid, qdata.arg1,
++				  qdata.arg2, qdata.arg3, out);
 +
-+Required properties:
-+ - #clock-cells:	Must be 1
-+ - compatible:		Must contain:	"xlnx,zynqmp-clk"
-+ - clocks:		List of clock specifiers which are external input
-+			clocks to the given clock controller. Please refer
-+			the next section to find the input clocks for a
-+			given controller.
-+ - clock-names:		List of clock names which are exteral input clocks
-+			to the given clock controller. Please refer to the
-+			clock bindings for more details.
++	/*
++	 * For clock name query, all bytes in SMC response are clock name
++	 * characters and return code is always success. For invalid clocks,
++	 * clock name bytes would be zeros.
++	 */
++	return qdata.qid == PM_QID_CLOCK_GET_NAME ? 0 : ret;
++}
 +
-+Input clocks for zynqmp Ultrascale+ clock controller:
-+
-+The Zynq UltraScale+ MPSoC has one primary and four alternative reference clock
-+inputs. These required clock inputs are:
-+ - pss_ref_clk (PS reference clock)
-+ - video_clk (reference clock for video system )
-+ - pss_alt_ref_clk (alternative PS reference clock)
-+ - aux_ref_clk
-+ - gt_crx_ref_clk (transceiver reference clock)
-+
-+The following strings are optional parameters to the 'clock-names' property in
-+order to provide an optional (E)MIO clock source:
-+ - swdt0_ext_clk
-+ - swdt1_ext_clk
-+ - gem0_emio_clk
-+ - gem1_emio_clk
-+ - gem2_emio_clk
-+ - gem3_emio_clk
-+ - mio_clk_XX		# with XX = 00..77
-+ - mio_clk_50_or_51	#for the mux clock to gem tsu from 50 or 51
-+
-+
-+Output clocks are registered based on clock information received
-+from firmware. Output clocks indexes are mentioned in
-+include/dt-bindings/clock/xlnx,zynqmp-clk.h.
-+
- -------
- Example
- -------
-@@ -25,5 +72,11 @@ firmware {
- 	zynqmp_firmware: zynqmp-firmware {
- 		compatible = "xlnx,zynqmp-firmware";
- 		method = "smc";
-+		zynqmp_clk : clock-controller {
-+			#clock-cells = <1>;
-+			compatible = "xlnx,zynqmp-clk";
-+			clocks = <&pss_ref_clk>, <&video_clk>, <&pss_alt_ref_clk>, <&aux_ref_clk>, <&gt_crx_ref_clk>;
-+			clock-names = "pss_ref_clk", "video_clk", "pss_alt_ref_clk","aux_ref_clk", "gt_crx_ref_clk";
-+		};
- 	};
- };
-diff --git a/include/dt-bindings/clock/xlnx,zynqmp-clk.h b/include/dt-bindings/clock/xlnx,zynqmp-clk.h
-new file mode 100644
-index 0000000..4aebe6e
---- /dev/null
-+++ b/include/dt-bindings/clock/xlnx,zynqmp-clk.h
-@@ -0,0 +1,116 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Xilinx Zynq MPSoC Firmware layer
++/**
++ * zynqmp_pm_clock_enable() - Enable the clock for given id
++ * @clock_id:	ID of the clock to be enabled
 + *
-+ *  Copyright (C) 2014-2018 Xilinx, Inc.
++ * This function is used by master to enable the clock
++ * including peripherals and PLL clocks.
 + *
++ * Return: Returns status, either success or error+reason
 + */
++static int zynqmp_pm_clock_enable(u32 clock_id)
++{
++	return zynqmp_pm_invoke_fn(PM_CLOCK_ENABLE, clock_id, 0, 0, 0, NULL);
++}
 +
-+#ifndef _DT_BINDINGS_CLK_ZYNQMP_H
-+#define _DT_BINDINGS_CLK_ZYNQMP_H
++/**
++ * zynqmp_pm_clock_disable() - Disable the clock for given id
++ * @clock_id:	ID of the clock to be disable
++ *
++ * This function is used by master to disable the clock
++ * including peripherals and PLL clocks.
++ *
++ * Return: Returns status, either success or error+reason
++ */
++static int zynqmp_pm_clock_disable(u32 clock_id)
++{
++	return zynqmp_pm_invoke_fn(PM_CLOCK_DISABLE, clock_id, 0, 0, 0, NULL);
++}
 +
-+#define IOPLL			0
-+#define RPLL			1
-+#define APLL			2
-+#define DPLL			3
-+#define VPLL			4
-+#define IOPLL_TO_FPD		5
-+#define RPLL_TO_FPD		6
-+#define APLL_TO_LPD		7
-+#define DPLL_TO_LPD		8
-+#define VPLL_TO_LPD		9
-+#define ACPU			10
-+#define ACPU_HALF		11
-+#define DBF_FPD			12
-+#define DBF_LPD			13
-+#define DBG_TRACE		14
-+#define DBG_TSTMP		15
-+#define DP_VIDEO_REF		16
-+#define DP_AUDIO_REF		17
-+#define DP_STC_REF		18
-+#define GDMA_REF		19
-+#define DPDMA_REF		20
-+#define DDR_REF			21
-+#define SATA_REF		22
-+#define PCIE_REF		23
-+#define GPU_REF			24
-+#define GPU_PP0_REF		25
-+#define GPU_PP1_REF		26
-+#define TOPSW_MAIN		27
-+#define TOPSW_LSBUS		28
-+#define GTGREF0_REF		29
-+#define LPD_SWITCH		30
-+#define LPD_LSBUS		31
-+#define USB0_BUS_REF		32
-+#define USB1_BUS_REF		33
-+#define USB3_DUAL_REF		34
-+#define USB0			35
-+#define USB1			36
-+#define CPU_R5			37
-+#define CPU_R5_CORE		38
-+#define CSU_SPB			39
-+#define CSU_PLL			40
-+#define PCAP			41
-+#define IOU_SWITCH		42
-+#define GEM_TSU_REF		43
-+#define GEM_TSU			44
-+#define GEM0_REF		45
-+#define GEM1_REF		46
-+#define GEM2_REF		47
-+#define GEM3_REF		48
-+#define GEM0_TX			49
-+#define GEM1_TX			50
-+#define GEM2_TX			51
-+#define GEM3_TX			52
-+#define QSPI_REF		53
-+#define SDIO0_REF		54
-+#define SDIO1_REF		55
-+#define UART0_REF		56
-+#define UART1_REF		57
-+#define SPI0_REF		58
-+#define SPI1_REF		59
-+#define NAND_REF		60
-+#define I2C0_REF		61
-+#define I2C1_REF		62
-+#define CAN0_REF		63
-+#define CAN1_REF		64
-+#define CAN0			65
-+#define CAN1			66
-+#define DLL_REF			67
-+#define ADMA_REF		68
-+#define TIMESTAMP_REF		69
-+#define AMS_REF			70
-+#define PL0_REF			71
-+#define PL1_REF			72
-+#define PL2_REF			73
-+#define PL3_REF			74
-+#define WDT			75
-+#define IOPLL_INT		76
-+#define IOPLL_PRE_SRC		77
-+#define IOPLL_HALF		78
-+#define IOPLL_INT_MUX		79
-+#define IOPLL_POST_SRC		80
-+#define RPLL_INT		81
-+#define RPLL_PRE_SRC		82
-+#define RPLL_HALF		83
-+#define RPLL_INT_MUX		84
-+#define RPLL_POST_SRC		85
-+#define APLL_INT		86
-+#define APLL_PRE_SRC		87
-+#define APLL_HALF		88
-+#define APLL_INT_MUX		89
-+#define APLL_POST_SRC		90
-+#define DPLL_INT		91
-+#define DPLL_PRE_SRC		92
-+#define DPLL_HALF		93
-+#define DPLL_INT_MUX		94
-+#define DPLL_POST_SRC		95
-+#define VPLL_INT		96
-+#define VPLL_PRE_SRC		97
-+#define VPLL_HALF		98
-+#define VPLL_INT_MUX		99
-+#define VPLL_POST_SRC		100
-+#define CAN0_MIO		101
-+#define CAN1_MIO		102
++/**
++ * zynqmp_pm_clock_getstate() - Get the clock state for given id
++ * @clock_id:	ID of the clock to be queried
++ * @state:	1/0 (Enabled/Disabled)
++ *
++ * This function is used by master to get the state of clock
++ * including peripherals and PLL clocks.
++ *
++ * Return: Returns status, either success or error+reason
++ */
++static int zynqmp_pm_clock_getstate(u32 clock_id, u32 *state)
++{
++	u32 ret_payload[PAYLOAD_ARG_CNT];
++	int ret;
 +
-+#endif
++	ret = zynqmp_pm_invoke_fn(PM_CLOCK_GETSTATE, clock_id, 0,
++				  0, 0, ret_payload);
++	*state = ret_payload[1];
++
++	return ret;
++}
++
++/**
++ * zynqmp_pm_clock_setdivider() - Set the clock divider for given id
++ * @clock_id:	ID of the clock
++ * @divider:	divider value
++ *
++ * This function is used by master to set divider for any clock
++ * to achieve desired rate.
++ *
++ * Return: Returns status, either success or error+reason
++ */
++static int zynqmp_pm_clock_setdivider(u32 clock_id, u32 divider)
++{
++	return zynqmp_pm_invoke_fn(PM_CLOCK_SETDIVIDER, clock_id, divider,
++				   0, 0, NULL);
++}
++
++/**
++ * zynqmp_pm_clock_getdivider() - Get the clock divider for given id
++ * @clock_id:	ID of the clock
++ * @divider:	divider value
++ *
++ * This function is used by master to get divider values
++ * for any clock.
++ *
++ * Return: Returns status, either success or error+reason
++ */
++static int zynqmp_pm_clock_getdivider(u32 clock_id, u32 *divider)
++{
++	u32 ret_payload[PAYLOAD_ARG_CNT];
++	int ret;
++
++	ret = zynqmp_pm_invoke_fn(PM_CLOCK_GETDIVIDER, clock_id, 0,
++				  0, 0, ret_payload);
++	*divider = ret_payload[1];
++
++	return ret;
++}
++
++/**
++ * zynqmp_pm_clock_setrate() - Set the clock rate for given id
++ * @clock_id:	ID of the clock
++ * @rate:	rate value in hz
++ *
++ * This function is used by master to set rate for any clock.
++ *
++ * Return: Returns status, either success or error+reason
++ */
++static int zynqmp_pm_clock_setrate(u32 clock_id, u64 rate)
++{
++	return zynqmp_pm_invoke_fn(PM_CLOCK_SETRATE, clock_id,
++				   lower_32_bits(rate),
++				   upper_32_bits(rate),
++				   0, NULL);
++}
++
++/**
++ * zynqmp_pm_clock_getrate() - Get the clock rate for given id
++ * @clock_id:	ID of the clock
++ * @rate:	rate value in hz
++ *
++ * This function is used by master to get rate
++ * for any clock.
++ *
++ * Return: Returns status, either success or error+reason
++ */
++static int zynqmp_pm_clock_getrate(u32 clock_id, u64 *rate)
++{
++	u32 ret_payload[PAYLOAD_ARG_CNT];
++	int ret;
++
++	ret = zynqmp_pm_invoke_fn(PM_CLOCK_GETRATE, clock_id, 0,
++				  0, 0, ret_payload);
++	*rate = ((u64)ret_payload[2] << 32) | ret_payload[1];
++
++	return ret;
++}
++
++/**
++ * zynqmp_pm_clock_setparent() - Set the clock parent for given id
++ * @clock_id:	ID of the clock
++ * @parent_id:	parent id
++ *
++ * This function is used by master to set parent for any clock.
++ *
++ * Return: Returns status, either success or error+reason
++ */
++static int zynqmp_pm_clock_setparent(u32 clock_id, u32 parent_id)
++{
++	return zynqmp_pm_invoke_fn(PM_CLOCK_SETPARENT, clock_id,
++				   parent_id, 0, 0, NULL);
++}
++
++/**
++ * zynqmp_pm_clock_getparent() - Get the clock parent for given id
++ * @clock_id:	ID of the clock
++ * @parent_id:	parent id
++ *
++ * This function is used by master to get parent index
++ * for any clock.
++ *
++ * Return: Returns status, either success or error+reason
++ */
++static int zynqmp_pm_clock_getparent(u32 clock_id, u32 *parent_id)
++{
++	u32 ret_payload[PAYLOAD_ARG_CNT];
++	int ret;
++
++	ret = zynqmp_pm_invoke_fn(PM_CLOCK_GETPARENT, clock_id, 0,
++				  0, 0, ret_payload);
++	*parent_id = ret_payload[1];
++
++	return ret;
+ }
+ 
+ static const struct zynqmp_eemi_ops eemi_ops = {
+ 	.get_api_version = zynqmp_pm_get_api_version,
+ 	.ioctl = zynqmp_pm_ioctl,
+ 	.query_data = zynqmp_pm_query_data,
++	.clock_enable = zynqmp_pm_clock_enable,
++	.clock_disable = zynqmp_pm_clock_disable,
++	.clock_getstate = zynqmp_pm_clock_getstate,
++	.clock_setdivider = zynqmp_pm_clock_setdivider,
++	.clock_getdivider = zynqmp_pm_clock_getdivider,
++	.clock_setrate = zynqmp_pm_clock_setrate,
++	.clock_getrate = zynqmp_pm_clock_getrate,
++	.clock_setparent = zynqmp_pm_clock_setparent,
++	.clock_getparent = zynqmp_pm_clock_getparent,
+ };
+ 
+ /**
+diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
+index 55ed2ba..58a7478 100644
+--- a/include/linux/firmware/xlnx-zynqmp.h
++++ b/include/linux/firmware/xlnx-zynqmp.h
+@@ -36,6 +36,15 @@ enum pm_api_id {
+ 	PM_GET_API_VERSION = 1,
+ 	PM_IOCTL = 34,
+ 	PM_QUERY_DATA,
++	PM_CLOCK_ENABLE,
++	PM_CLOCK_DISABLE,
++	PM_CLOCK_GETSTATE,
++	PM_CLOCK_SETDIVIDER,
++	PM_CLOCK_GETDIVIDER,
++	PM_CLOCK_SETRATE,
++	PM_CLOCK_GETRATE,
++	PM_CLOCK_SETPARENT,
++	PM_CLOCK_GETPARENT,
+ };
+ 
+ /* PMU-FW return status codes */
+@@ -49,8 +58,20 @@ enum pm_ret_status {
+ 	XST_PM_ABORT_SUSPEND,
+ };
+ 
++enum pm_ioctl_id {
++	IOCTL_SET_PLL_FRAC_MODE = 8,
++	IOCTL_GET_PLL_FRAC_MODE,
++	IOCTL_SET_PLL_FRAC_DATA,
++	IOCTL_GET_PLL_FRAC_DATA,
++};
++
+ enum pm_query_id {
+ 	PM_QID_INVALID,
++	PM_QID_CLOCK_GET_NAME,
++	PM_QID_CLOCK_GET_TOPOLOGY,
++	PM_QID_CLOCK_GET_FIXEDFACTOR_PARAMS,
++	PM_QID_CLOCK_GET_PARENTS,
++	PM_QID_CLOCK_GET_ATTRIBUTES,
+ };
+ 
+ /**
+@@ -71,6 +92,15 @@ struct zynqmp_eemi_ops {
+ 	int (*get_api_version)(u32 *version);
+ 	int (*ioctl)(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2, u32 *out);
+ 	int (*query_data)(struct zynqmp_pm_query_data qdata, u32 *out);
++	int (*clock_enable)(u32 clock_id);
++	int (*clock_disable)(u32 clock_id);
++	int (*clock_getstate)(u32 clock_id, u32 *state);
++	int (*clock_setdivider)(u32 clock_id, u32 divider);
++	int (*clock_getdivider)(u32 clock_id, u32 *divider);
++	int (*clock_setrate)(u32 clock_id, u64 rate);
++	int (*clock_getrate)(u32 clock_id, u64 *rate);
++	int (*clock_setparent)(u32 clock_id, u32 parent_id);
++	int (*clock_getparent)(u32 clock_id, u32 *parent_id);
+ };
+ 
+ #if IS_REACHABLE(CONFIG_ARCH_ZYNQMP)
 -- 
 2.7.4
