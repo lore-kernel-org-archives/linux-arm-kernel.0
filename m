@@ -1,114 +1,76 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Fri, 3 Aug 2018 13:24:55 +0200
-Subject: [PATCH v7 3/6] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180731035143.11942-4-ravi.bangoria@linux.ibm.com>
-References: <20180731035143.11942-1-ravi.bangoria@linux.ibm.com>
- <20180731035143.11942-4-ravi.bangoria@linux.ibm.com>
-Message-ID: <20180803112455.GA13794@redhat.com>
+From: aeden@csail.mit.edu (Anthony Eden)
+Date: Fri, 3 Aug 2018 07:26:04 -0400
+Subject: [GIT PULL 5/5] arm64: tegra: Device tree changes for v4.19-rc1
+In-Reply-To: <20180803104318.GA28546@ulmo>
+References: <20180712154128.22705-1-thierry.reding@gmail.com>
+ <20180712154128.22705-6-thierry.reding@gmail.com>
+ <20180714212210.at4b2gcpopsznyxx@localhost>
+ <20180803104318.GA28546@ulmo>
+Message-ID: <CAHMsQjU=nmpTnPK6Ryhui67YVANHExd=yRB4hp+upd7O-Tjn+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ravi,
+Mesa support aside- if I start a computationally intensive job on the
+Jetson TX2 like building the Linux kernel on all cores, it will lock
+up. My only work around has been to disable the Denver CPU's. I don't
+think the tegra186 has upstream support to control the fan on the
+Jetson TX2, could this be a thermal problem?
 
-I was going to give up and ack this series, but it seems I noticed
-a bug...
-
-On 07/31, Ravi Bangoria wrote:
+On Fri, Aug 3, 2018, 6:43 AM Thierry Reding <thierry.reding@gmail.com> wrote:
 >
-> +static int delayed_uprobe_add(struct uprobe *uprobe, struct mm_struct *mm)
-> +{
-> +	struct delayed_uprobe *du;
-> +
-> +	if (delayed_uprobe_check(uprobe, mm))
-> +		return 0;
-> +
-> +	du  = kzalloc(sizeof(*du), GFP_KERNEL);
-> +	if (!du)
-> +		return -ENOMEM;
-> +
-> +	du->uprobe = uprobe;
-> +	du->mm = mm;
-
-I am surprised I didn't notice this before...
-
-So
-	du->mm = mm;
-
-is fine, mm can't go away, uprobe_clear_state() does delayed_uprobe_remove(NULL,mm).
-
-But
-	du->uprobe = uprobe;
-
-doesn't look right, uprobe can go away and it can be freed, its memory can be reused.
-We can't rely on remove_breakpoint(), the application can unmap the probed page/vma.
-Yes we do not care about the application in this case, say, the next uprobe_mmap() can
-wrongly increment the counter, we do not care although this can lead to hard-to-debug
-problems. But, if nothing else, the kernel can crash if the freed memory is unmapped.
-So I think put_uprobe() should do delayed_uprobe_remove(uprobe, NULL) before kfree()
-and delayed_uprobe_remove() should be updated to handle the mm==NULL case.
-
-Also. delayed_uprobe_add() should check the list and avoid duplicates. Otherwise the
-trivial
-
-	for (;;)
-		munmap(mmap(uprobed_file));
-
-will eat the memory until uprobe is unregistered.
-
-
-> +static bool valid_ref_ctr_vma(struct uprobe *uprobe,
-> +			      struct vm_area_struct *vma)
-> +{
-> +	unsigned long vaddr = offset_to_vaddr(vma, uprobe->ref_ctr_offset);
-> +
-> +	return uprobe->ref_ctr_offset &&
-> +		vma->vm_file &&
-> +		file_inode(vma->vm_file) == uprobe->inode &&
-> +		vma->vm_flags & VM_WRITE &&
-> +		!(vma->vm_flags & VM_SHARED) &&
-
-		vma->vm_flags & (VM_WRITE|VM_SHARED) == VM_WRITE &&
-
-looks a bit better to me, but I won't insist.
-
-> +static int delayed_uprobe_install(struct vm_area_struct *vma)
-> +{
-> +	struct list_head *pos, *q;
-> +	struct delayed_uprobe *du;
-> +	unsigned long vaddr;
-> +	int ret = 0, err = 0;
-> +
-> +	mutex_lock(&delayed_uprobe_lock);
-> +	list_for_each_safe(pos, q, &delayed_uprobe_list) {
-> +		du = list_entry(pos, struct delayed_uprobe, list);
-> +
-> +		if (!valid_ref_ctr_vma(du->uprobe, vma))
-> +			continue;
-> +
-> +		vaddr = offset_to_vaddr(vma, du->uprobe->ref_ctr_offset);
-> +		ret = __update_ref_ctr(vma->vm_mm, vaddr, 1);
-> +		/* Record an error and continue. */
-> +		err = ret & !err ? ret : err;
-
-I try to avoid the cosmetic nits, but I simply can't look at this line ;)
-
-		if (ret && !err)
-			err = ret;
-
-> @@ -1072,7 +1281,14 @@ int uprobe_mmap(struct vm_area_struct *vma)
->  	struct uprobe *uprobe, *u;
->  	struct inode *inode;
+> On Sat, Jul 14, 2018 at 02:22:10PM -0700, Olof Johansson wrote:
+> > On Thu, Jul 12, 2018 at 05:41:28PM +0200, Thierry Reding wrote:
+> > > Hi ARM SoC maintainers,
+> > >
+> > > The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> > >
+> > >   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> > >
+> > > are available in the Git repository at:
+> > >
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.19-arm64-dt
+> > >
+> > > for you to fetch changes up to 7780a03495e13cd2bef704bcbf8c727de9f65232:
+> > >
+> > >   arm64: tegra: Add CPU nodes to Tegra194 device tree (2018-07-02 15:57:39 +0200)
+> > >
+> > > Thanks,
+> > > Thierry
+> > >
+> > > ----------------------------------------------------------------
+> > > arm64: tegra: Device tree changes for v4.19-rc1
+> > >
+> > > These changes enable the GPIO controllers on Tegra194 SoCs, which in
+> > > turn allows the SD card detection and ethernet controllers to be enabled
+> > > as well. The Tegra194 device tree is also extended with the list of CPUs
+> > > and a PSCI node to inform the kernel about the presence of PSCI capable
+> > > firmware.
+> >
+> > Merged, thanks. Are you planning on supporting 194 better than 186? That never
+> > really made it to a useful level upstream I think? :(
 >
-> -	if (no_uprobe_events() || !valid_vma(vma, true))
-> +	if (no_uprobe_events())
-> +		return 0;
-> +
-> +	if (vma->vm_flags & VM_WRITE &&
-> +	    test_bit(MMF_HAS_UPROBES, &vma->vm_mm->flags))
-> +		delayed_uprobe_install(vma);
-
-OK, so you also added the VM_WRITE check and I agree. But then I think we
-should also check VM_SHARED, just like valid_ref_ctr_vma() does?
-
-Oleg.
+> I think we have pretty decent upstream support for Tegra186 at this
+> point. It took a little time because Tegra186 was a little work than
+> many previous chips because the changes were less incremental than
+> before.
+>
+> Generally our goal is to provide at least feature parity with prior
+> chips for each new chip. Usually we manage to incrementally add new
+> features, too.
+>
+> Perhaps the reason why it seems that Tegra186 is not well supported
+> upstream is because a lot of things have moved into BPMP firmware,
+> which deals with a lot of the nitty gritty details that prior chips
+> needed a driver for.
+>
+> That said, I may be missing something. Do you have any specific features
+> in mind that aren't working upstream on Tegra186?
+>
+> Tegra194 uses the same firmware as Tegra186 (well, a binary compatible
+> interface to the firmware, I should say), so we've been able to
+> bootstrap it much quicker than prior chips. That said, there are a slew
+> of new features in Tegra194, not all of which are easy to upstream. But
+> we're still aiming for at least feature parity with prior chips and get
+> as much of the new hardware supported as we can.
+>
+> Thierry
