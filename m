@@ -1,308 +1,40 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Fri,  3 Aug 2018 18:54:05 +0900
-Subject: [PATCH v2 4/4] phy: socionext: add USB2 PHY driver for UniPhier SoC
-In-Reply-To: <1533290045-18969-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1533290045-18969-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1533290045-18969-5-git-send-email-hayashi.kunihiko@socionext.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 3 Aug 2018 12:09:32 +0200 (CEST)
+Subject: Finish the GENERIC_IRQ_MULTI_HANDLER conversion
+In-Reply-To: <mhng-ef3db5ea-d5f5-4d51-b32c-1b9ca38abccf@palmer-si-x1c4>
+References: <mhng-ef3db5ea-d5f5-4d51-b32c-1b9ca38abccf@palmer-si-x1c4>
+Message-ID: <alpine.DEB.2.21.1808031209070.1745@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a driver for PHY interface built into USB2 controller implemented on
-UniPhier SoCs. This driver supports HS-PHY for Pro4 and LD11.
+On Thu, 2 Aug 2018, Palmer Dabbelt wrote:
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
----
- drivers/phy/socionext/Kconfig             |  13 ++
- drivers/phy/socionext/Makefile            |   1 +
- drivers/phy/socionext/phy-uniphier-usb2.c | 246 ++++++++++++++++++++++++++++++
- 3 files changed, 260 insertions(+)
- create mode 100644 drivers/phy/socionext/phy-uniphier-usb2.c
+> On Sun, 24 Jun 2018 06:15:25 PDT (-0700), tglx at linutronix.de wrote:
+> > On Thu, 21 Jun 2018, Palmer Dabbelt wrote:
+> > > A while ago I sent a patch set that adds a GENERIC_IRQ_MULTI_HANDLER,
+> > > which is an exact copy of the existing IRQ_MULTI_HANDLER support in the
+> > > arm port, which is being used unconditionally by arm64 and openrisc.
+> > > GENERIC_IRQ_MULTI_HANDLER is currently being used by the RISC-V port.  I
+> > > managed to make a few mistakes in my original patch set and as a result
+> > > my conversion of the other architectures of GENERIC_IRQ_MULTI_HANDLER
+> > > was dropped.
+> > > 
+> > > This patch set finishes up my original patch set by converting arm,
+> > > arm64, and openrisc over to the new GENERIC_IRQ_MULTI_HANDLER support
+> > > and then removing MULTI_IRQ_HANDLER as it's obselete.
+> > > 
+> > > At the time I wrote this I gave it fairly extensive build testing, but
+> > > went I recently rebased it I just tested the full patch set on arm,
+> > > arm64, and openrisc defconfigs.
+> > > 
+> > > Various flavors of this patch set have bounced around a few times
+> > > before, but I'm calling this a whole new patch set as it builds on top
+> > > of what was merged.
+> > 
+> > I'll take the whole pile through tip irq/core which probably makes the most
+> > sense unless there are any objections from architecture maintainers.
+> 
+> Thanks!  Unless I've managed to screw something up I don't see these in your
+> tree, but I also don't see any feedback from anyone else.
 
-diff --git a/drivers/phy/socionext/Kconfig b/drivers/phy/socionext/Kconfig
-index 4a172fc..497ca38 100644
---- a/drivers/phy/socionext/Kconfig
-+++ b/drivers/phy/socionext/Kconfig
-@@ -2,6 +2,19 @@
- # PHY drivers for Socionext platforms.
- #
- 
-+config PHY_UNIPHIER_USB2
-+	tristate "UniPhier USB2 PHY driver"
-+	depends on ARCH_UNIPHIER || COMPILE_TEST
-+	depends on OF && HAS_IOMEM
-+	select GENERIC_PHY
-+	select MFD_SYSCON
-+	help
-+	  Enable this to support USB PHY implemented on USB2 controller
-+	  on UniPhier SoCs. This driver provides interface to interact
-+	  with USB 2.0 PHY that is part of the UniPhier SoC.
-+	  In case of Pro4, it is necessary to specify this USB2 PHY instead
-+	  of USB3 HS-PHY.
-+
- config PHY_UNIPHIER_USB3
- 	tristate "UniPhier USB3 PHY driver"
- 	depends on ARCH_UNIPHIER || COMPILE_TEST
-diff --git a/drivers/phy/socionext/Makefile b/drivers/phy/socionext/Makefile
-index e230fa31..91e4825 100644
---- a/drivers/phy/socionext/Makefile
-+++ b/drivers/phy/socionext/Makefile
-@@ -3,4 +3,5 @@
- # Makefile for the phy drivers.
- #
- 
-+obj-$(CONFIG_PHY_UNIPHIER_USB2)	+= phy-uniphier-usb2.o
- obj-$(CONFIG_PHY_UNIPHIER_USB3)	+= phy-uniphier-usb3hs.o phy-uniphier-usb3ss.o
-diff --git a/drivers/phy/socionext/phy-uniphier-usb2.c b/drivers/phy/socionext/phy-uniphier-usb2.c
-new file mode 100644
-index 0000000..22eece2
---- /dev/null
-+++ b/drivers/phy/socionext/phy-uniphier-usb2.c
-@@ -0,0 +1,246 @@
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// phy-uniphier-usb2.c - PHY driver for UniPhier USB2 controller
-+// Copyright 2015-2018 Socionext Inc.
-+// Author:
-+//      Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-+
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/phy/phy.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/regulator/consumer.h>
-+
-+#define SG_USBPHY1CTRL		0x500
-+#define SG_USBPHY1CTRL2		0x504
-+#define SG_USBPHY2CTRL		0x508
-+#define SG_USBPHY2CTRL2		0x50c	/* LD11 */
-+#define SG_USBPHY12PLL		0x50c	/* Pro4 */
-+#define SG_USBPHY3CTRL		0x510
-+#define SG_USBPHY3CTRL2		0x514
-+#define SG_USBPHY4CTRL		0x518	/* Pro4 */
-+#define SG_USBPHY4CTRL2		0x51c	/* Pro4 */
-+#define SG_USBPHY34PLL		0x51c	/* Pro4 */
-+
-+struct uniphier_u2phy_param {
-+	u32 offset;
-+	u32 value;
-+};
-+
-+struct uniphier_u2phy_soc_data {
-+	struct uniphier_u2phy_param config0;
-+	struct uniphier_u2phy_param config1;
-+};
-+
-+struct uniphier_u2phy_priv {
-+	struct regmap *regmap;
-+	struct phy *phy;
-+	struct regulator *vbus;
-+	const struct uniphier_u2phy_soc_data *data;
-+	struct uniphier_u2phy_priv *next;
-+};
-+
-+static int uniphier_u2phy_power_on(struct phy *phy)
-+{
-+	struct uniphier_u2phy_priv *priv = phy_get_drvdata(phy);
-+	int ret = 0;
-+
-+	if (priv->vbus)
-+		ret = regulator_enable(priv->vbus);
-+
-+	return ret;
-+}
-+
-+static int uniphier_u2phy_power_off(struct phy *phy)
-+{
-+	struct uniphier_u2phy_priv *priv = phy_get_drvdata(phy);
-+
-+	if (priv->vbus)
-+		regulator_disable(priv->vbus);
-+
-+	return 0;
-+}
-+
-+static int uniphier_u2phy_init(struct phy *phy)
-+{
-+	struct uniphier_u2phy_priv *priv = phy_get_drvdata(phy);
-+
-+	if (!priv->data)
-+		return 0;
-+
-+	regmap_write(priv->regmap, priv->data->config0.offset,
-+		     priv->data->config0.value);
-+	regmap_write(priv->regmap, priv->data->config1.offset,
-+		     priv->data->config1.value);
-+
-+	return 0;
-+}
-+
-+static struct phy *uniphier_u2phy_xlate(struct device *dev,
-+					struct of_phandle_args *args)
-+{
-+	struct uniphier_u2phy_priv *priv = dev_get_drvdata(dev);
-+
-+	while (priv && args->np != priv->phy->dev.of_node)
-+		priv = priv->next;
-+
-+	if (!priv) {
-+		dev_err(dev, "Failed to find appropriate phy\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	return priv->phy;
-+}
-+
-+static const struct phy_ops uniphier_u2phy_ops = {
-+	.init      = uniphier_u2phy_init,
-+	.power_on  = uniphier_u2phy_power_on,
-+	.power_off = uniphier_u2phy_power_off,
-+	.owner = THIS_MODULE,
-+};
-+
-+static int uniphier_u2phy_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *parent, *child;
-+	struct uniphier_u2phy_priv *priv = NULL, *next = NULL;
-+	struct phy_provider *phy_provider;
-+	struct regmap *regmap;
-+	const struct uniphier_u2phy_soc_data *data;
-+	int ret, data_idx, ndatas;
-+
-+	data = of_device_get_match_data(dev);
-+	if (WARN_ON(!data))
-+		return -EINVAL;
-+
-+	/* get number of data */
-+	for (ndatas = 0; data[ndatas].config0.offset; ndatas++)
-+		;
-+
-+	parent = of_get_parent(dev->of_node);
-+	regmap = syscon_node_to_regmap(parent);
-+	of_node_put(parent);
-+	if (IS_ERR(regmap)) {
-+		dev_err(dev, "Failed to get regmap\n");
-+		return PTR_ERR(regmap);
-+	}
-+
-+	for_each_child_of_node(dev->of_node, child) {
-+		priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+		if (!priv) {
-+			ret = -ENOMEM;
-+			goto out_put_child;
-+		}
-+		priv->regmap = regmap;
-+
-+		priv->vbus = devm_regulator_get_optional(dev, "vbus");
-+		if (IS_ERR(priv->vbus)) {
-+			if (PTR_ERR(priv->vbus) == -EPROBE_DEFER) {
-+				ret = PTR_ERR(priv->vbus);
-+				goto out_put_child;
-+			}
-+			priv->vbus = NULL;
-+		}
-+
-+		priv->phy = devm_phy_create(dev, child, &uniphier_u2phy_ops);
-+		if (IS_ERR(priv->phy)) {
-+			dev_err(dev, "Failed to create phy\n");
-+			ret = PTR_ERR(priv->phy);
-+			goto out_put_child;
-+		}
-+
-+		ret = of_property_read_u32(child, "reg", &data_idx);
-+		if (ret) {
-+			dev_err(dev, "Failed to get reg property\n");
-+			goto out_put_child;
-+		}
-+
-+		if (data_idx < ndatas)
-+			priv->data = &data[data_idx];
-+		else
-+			dev_warn(dev, "No phy configuration: %s\n",
-+				 child->full_name);
-+
-+		phy_set_drvdata(priv->phy, priv);
-+		priv->next = next;
-+		next = priv;
-+	}
-+
-+	dev_set_drvdata(dev, priv);
-+	phy_provider = devm_of_phy_provider_register(dev,
-+						     uniphier_u2phy_xlate);
-+	if (IS_ERR(phy_provider))
-+		return PTR_ERR(phy_provider);
-+
-+	return 0;
-+
-+out_put_child:
-+	of_node_put(child);
-+
-+	return ret;
-+}
-+
-+static const struct uniphier_u2phy_soc_data uniphier_pro4_data[] = {
-+	{
-+		.config0 = { SG_USBPHY1CTRL, 0x05142400 },
-+		.config1 = { SG_USBPHY12PLL, 0x00010010 },
-+	},
-+	{
-+		.config0 = { SG_USBPHY2CTRL, 0x05142400 },
-+		.config1 = { SG_USBPHY12PLL, 0x00010010 },
-+	},
-+	{
-+		.config0 = { SG_USBPHY3CTRL, 0x05142400 },
-+		.config1 = { SG_USBPHY34PLL, 0x00010010 },
-+	},
-+	{
-+		.config0 = { SG_USBPHY4CTRL, 0x05142400 },
-+		.config1 = { SG_USBPHY34PLL, 0x00010010 },
-+	},
-+	{ /* sentinel */ }
-+};
-+
-+static const struct uniphier_u2phy_soc_data uniphier_ld11_data[] = {
-+	{
-+		.config0 = { SG_USBPHY1CTRL,  0x82280000 },
-+		.config1 = { SG_USBPHY1CTRL2, 0x00000106 },
-+	},
-+	{
-+		.config0 = { SG_USBPHY2CTRL,  0x82280000 },
-+		.config1 = { SG_USBPHY2CTRL2, 0x00000106 },
-+	},
-+	{
-+		.config0 = { SG_USBPHY3CTRL,  0x82280000 },
-+		.config1 = { SG_USBPHY3CTRL2, 0x00000106 },
-+	},
-+	{ /* sentinel */ }
-+};
-+
-+static const struct of_device_id uniphier_u2phy_match[] = {
-+	{
-+		.compatible = "socionext,uniphier-pro4-usb2-phy",
-+		.data = &uniphier_pro4_data,
-+	},
-+	{
-+		.compatible = "socionext,uniphier-ld11-usb2-phy",
-+		.data = &uniphier_ld11_data,
-+	},
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, uniphier_u2phy_match);
-+
-+static struct platform_driver uniphier_u2phy_driver = {
-+	.probe = uniphier_u2phy_probe,
-+	.driver = {
-+		.name = "uniphier-usb2-phy",
-+		.of_match_table = uniphier_u2phy_match,
-+	},
-+};
-+module_platform_driver(uniphier_u2phy_driver);
-+
-+MODULE_AUTHOR("Kunihiko Hayashi <hayashi.kunihiko@socionext.com>");
-+MODULE_DESCRIPTION("UniPhier PHY driver for USB2 controller");
-+MODULE_LICENSE("GPL v2");
--- 
-2.7.4
+Yeah, I somehow managed to lose track of them. Picking them up now.
