@@ -1,67 +1,62 @@
 From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Fri, 3 Aug 2018 10:53:25 -0700
-Subject: [PATCH v11 08/11] firmware: xilinx: Add debugfs for query data API
+Date: Fri, 3 Aug 2018 10:53:18 -0700
+Subject: [PATCH v11 01/11] dt-bindings: firmware: Add bindings for ZynqMP
+ firmware
 In-Reply-To: <1533318808-10781-1-git-send-email-jollys@xilinx.com>
 References: <1533318808-10781-1-git-send-email-jollys@xilinx.com>
-Message-ID: <1533318808-10781-9-git-send-email-jollys@xilinx.com>
+Message-ID: <1533318808-10781-2-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rajan Vaja <rajanv@xilinx.com>
 
-Add debugfs file to query platform specific data from firmware
-using debugfs interface.
+Add documentation to describe Xilinx ZynqMP firmware driver
+bindings. Firmware driver provides an interface to firmware
+APIs. Interface APIs can be used by any driver to communicate
+to PMUFW (Platform Management Unit).
 
 Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
 Signed-off-by: Jolly Shah <jollys@xilinx.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/firmware/xilinx/zynqmp-debug.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ .../firmware/xilinx/xlnx,zynqmp-firmware.txt       | 29 ++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
 
-diff --git a/drivers/firmware/xilinx/zynqmp-debug.c b/drivers/firmware/xilinx/zynqmp-debug.c
-index fc11db9..4532bd0 100644
---- a/drivers/firmware/xilinx/zynqmp-debug.c
-+++ b/drivers/firmware/xilinx/zynqmp-debug.c
-@@ -33,6 +33,7 @@ static char debugfs_buf[PAGE_SIZE];
- static struct pm_api_info pm_api_list[] = {
- 	PM_API(PM_GET_API_VERSION),
- 	PM_API(PM_IOCTL),
-+	PM_API(PM_QUERY_DATA),
- };
- 
- /**
-@@ -105,6 +106,32 @@ static int process_api_request(u32 pm_id, u64 *pm_api_arg, u32 *pm_api_ret)
- 			sprintf(debugfs_buf, "IOCTL return value: %u\n",
- 				pm_api_ret[1]);
- 		break;
-+	case PM_QUERY_DATA:
-+	{
-+		struct zynqmp_pm_query_data qdata = {0};
+diff --git a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+new file mode 100644
+index 0000000..1b431d9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+@@ -0,0 +1,29 @@
++-----------------------------------------------------------------
++Device Tree Bindings for the Xilinx Zynq MPSoC Firmware Interface
++-----------------------------------------------------------------
 +
-+		qdata.qid = pm_api_arg[0];
-+		qdata.arg1 = pm_api_arg[1];
-+		qdata.arg2 = pm_api_arg[2];
-+		qdata.arg3 = pm_api_arg[3];
++The zynqmp-firmware node describes the interface to platform firmware.
++ZynqMP has an interface to communicate with secure firmware. Firmware
++driver provides an interface to firmware APIs. Interface APIs can be
++used by any driver to communicate to PMUFW(Platform Management Unit).
++These requests include clock management, pin control, device control,
++power management service, FPGA service and other platform management
++services.
 +
-+		ret = eemi_ops->query_data(qdata, pm_api_ret);
-+		if (ret)
-+			break;
++Required properties:
++ - compatible:	Must contain:	"xlnx,zynqmp-firmware"
++ - method:	The method of calling the PM-API firmware layer.
++		Permitted values are:
++		  - "smc" : SMC #0, following the SMCCC
++		  - "hvc" : HVC #0, following the SMCCC
 +
-+		if (qdata.qid == PM_QID_CLOCK_GET_NAME)
-+			sprintf(debugfs_buf, "Clock name = %s\n",
-+				(char *)pm_api_ret);
-+		else if (qdata.qid == PM_QID_CLOCK_GET_FIXEDFACTOR_PARAMS)
-+			sprintf(debugfs_buf, "Multiplier = %d, Divider = %d\n",
-+				pm_api_ret[1], pm_api_ret[2]);
-+		else
-+			sprintf(debugfs_buf,
-+				"data[0] = 0x%08x\ndata[1] = 0x%08x\n data[2] = 0x%08x\ndata[3] = 0x%08x\n",
-+				pm_api_ret[0], pm_api_ret[1],
-+				pm_api_ret[2], pm_api_ret[3]);
-+		break;
-+	}
- 	default:
- 		sprintf(debugfs_buf, "Unsupported PM-API request\n");
- 		ret = -EINVAL;
++-------
++Example
++-------
++
++firmware {
++	zynqmp_firmware: zynqmp-firmware {
++		compatible = "xlnx,zynqmp-firmware";
++		method = "smc";
++	};
++};
 -- 
 2.7.4
