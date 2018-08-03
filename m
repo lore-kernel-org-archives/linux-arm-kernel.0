@@ -1,49 +1,45 @@
 From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Fri,  3 Aug 2018 16:38:42 +0200
-Subject: [PATCH v2 0/6] PCI: mvebu: cleanup and improvements
-Message-ID: <20180803143848.21551-1-thomas.petazzoni@bootlin.com>
+Date: Fri,  3 Aug 2018 16:38:46 +0200
+Subject: [PATCH v2 4/6] PCI: mvebu: use resource_size() to remap I/O space
+In-Reply-To: <20180803143848.21551-1-thomas.petazzoni@bootlin.com>
+References: <20180803143848.21551-1-thomas.petazzoni@bootlin.com>
+Message-ID: <20180803143848.21551-5-thomas.petazzoni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Instead of hardcoding the remapping of IO_SPACE_LIMIT - SZ_64K, use
+resource_size(), as suggested by Lorenzo Pieralisi.
 
-This is the v2 of the pci-mvebu cleanup and improvements, mainly
-aiming at using pci_host_bridge.
+However, we cannot use just IO_SPACE_LIMIT, because pci_ioremap_io()
+has a bug (which will be fixed separately) and doesn't allow remapping
+the last 64 KB before IO_SPACE_LIMIT, so we ensure that we do not
+exceed this limit. A separate patch will be sent to fix the
+pci_ioremap_io() issue, and once it is merged, we will be able to drop
+this work-around. Note that this workaround already existed, since we
+were mapping only up to IO_SPACE_LIMIT - SZ_64K.
 
-Since v1, the changes are:
+Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+---
+ drivers/pci/controller/pci-mvebu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
- - Rebase on v4.18-rc1 to make sure the patches apply
-
- - Add a patch fixing the I/O space end calculation (using
-   resource_size() as the .end address of a resource is not correct)
-
- - Only remap the I/O space if there is a PCI I/O aperture described
-   in the DT.
-
- - Use resource_size() in the loop mapping the I/O space, as suggested
-   by Lorenzo.
-
- - Use pci_add_resource() instead of pci_add_resource_offset(), as
-   suggested by Lorenzo.
-
- - Revert to using pci_ioremap_io(), since we need to map with a
-   special memory type on Armada platforms, and pci_remap_iospace()
-   doesn't allow to do that. Noticed by Lorenzo.
-
-Thanks!
-
-Thomas
-
-Thomas Petazzoni (6):
-  PCI: mvebu: Remove redundant platform_set_drvdata() call
-  PCI: mvebu: fix I/O space end address calculation
-  PCI: mvebu: only remap I/O space if configured
-  PCI: mvebu: use resource_size() to remap I/O space
-  PCI: mvebu: Convert to use pci_host_bridge directly
-  PCI: mvebu: Drop bogus comment above mvebu_pcie_map_registers()
-
- drivers/pci/controller/pci-mvebu.c | 153 +++++++++++++++++--------------------
- 1 file changed, 68 insertions(+), 85 deletions(-)
-
+diff --git a/drivers/pci/controller/pci-mvebu.c b/drivers/pci/controller/pci-mvebu.c
+index 9aa224f2f009..05f863435e5e 100644
+--- a/drivers/pci/controller/pci-mvebu.c
++++ b/drivers/pci/controller/pci-mvebu.c
+@@ -1218,10 +1218,10 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+ 		pcie->realio.flags = pcie->io.flags;
+ 		pcie->realio.start = PCIBIOS_MIN_IO;
+ 		pcie->realio.end = min_t(resource_size_t,
+-					 IO_SPACE_LIMIT,
++					 IO_SPACE_LIMIT - SZ_64K,
+ 					 resource_size(&pcie->io) - 1);
+ 
+-		for (i = 0; i < (IO_SPACE_LIMIT - SZ_64K); i += SZ_64K)
++		for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
+ 			pci_ioremap_io(i, pcie->io.start + i);
+ 	} else
+ 		pcie->realio = pcie->io;
 -- 
 2.14.4
