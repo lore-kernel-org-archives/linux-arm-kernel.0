@@ -1,42 +1,78 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 2 Aug 2018 22:21:53 -0500
-Subject: [RFC 1/2] slub: Avoid trying to allocate memory on offline nodes
-In-Reply-To: <20180802091554.GE10808@dhcp22.suse.cz>
-References: <20180801200418.1325826-1-jeremy.linton@arm.com>
- <20180801200418.1325826-2-jeremy.linton@arm.com>
- <20180802091554.GE10808@dhcp22.suse.cz>
-Message-ID: <c6caddbf-e275-219e-12b6-538a53ced17d@arm.com>
+From: seanvk.dev@oregontracks.org (Sean V Kelley)
+Date: Thu,  2 Aug 2018 21:18:11 -0700
+Subject: [PATCH] perf vendor events arm64: Enable JSON events for eMAG
+Message-ID: <20180803041811.17065-1-seanvk.dev@oregontracks.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds the Ampere Computing eMAG file.  This platform
+follows the ARMv8 recommended IMPLEMENTATION DEFINED events, where
+applicable.
 
-On 08/02/2018 04:15 AM, Michal Hocko wrote:
-> On Wed 01-08-18 15:04:17, Jeremy Linton wrote:
-> [...]
->> @@ -2519,6 +2519,8 @@ static void *___slab_alloc(struct kmem_cache *s, gfp_t gfpflags, int node,
->>   		if (unlikely(!node_match(page, searchnode))) {
->>   			stat(s, ALLOC_NODE_MISMATCH);
->>   			deactivate_slab(s, page, c->freelist, c);
->> +			if (!node_online(searchnode))
->> +				node = NUMA_NO_NODE;
->>   			goto new_slab;
-> 
-> This is inherently racy. Numa node can get offline at any point after
-> you check it here. Making it race free would involve some sort of
-> locking and I am not really convinced this is a good idea.
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: John Garry <john.garry@huawei.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+Cc: William Cohen <wcohen@redhat.com>
 
-I spent some time looking/thinking about this, and i'm pretty sure its 
-not creating any new problems. But OTOH, I think the node_online() check 
-is probably a bit misleading as what we really want to assure is that 
-node<MAX_NUMNODES and that there is going to be a valid entry in 
-NODE_DATA() so we don't deference null.
+Signed-off-by: Sean V Kelley <seanvk.dev@oregontracks.org>
+---
+ .../arch/arm64/ampere/emag/core-imp-def.json  | 32 +++++++++++++++++++
+ tools/perf/pmu-events/arch/arm64/mapfile.csv  |  1 +
+ 2 files changed, 33 insertions(+)
+ create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
 
-
-> 
->>   		}
->>   	}
->> -- 
->> 2.14.3
->>
-> 
+diff --git a/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
+new file mode 100644
+index 000000000000..bc03c06c3918
+--- /dev/null
++++ b/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
+@@ -0,0 +1,32 @@
++[
++    {
++        "ArchStdEvent": "L1D_CACHE_RD",
++    },
++    {
++        "ArchStdEvent": "L1D_CACHE_WR",
++    },
++    {
++        "ArchStdEvent": "L1D_CACHE_REFILL_RD",
++    },
++    {
++        "ArchStdEvent": "L1D_CACHE_REFILL_WR",
++    },
++    {
++        "ArchStdEvent": "L1D_TLB_REFILL_RD",
++    },
++    {
++        "ArchStdEvent": "L1D_TLB_REFILL_WR",
++    },
++    {
++        "ArchStdEvent": "L1D_TLB_RD",
++    },
++    {
++        "ArchStdEvent": "L1D_TLB_WR",
++    },
++    {
++        "ArchStdEvent": "BUS_ACCESS_RD",
++   },
++   {
++        "ArchStdEvent": "BUS_ACCESS_WR",
++   }
++]
+diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+index f03e26ecb658..59cd8604b0bd 100644
+--- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
++++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+@@ -16,3 +16,4 @@
+ 0x00000000420f5160,v1,cavium/thunderx2,core
+ 0x00000000430f0af0,v1,cavium/thunderx2,core
+ 0x00000000480fd010,v1,hisilicon/hip08,core
++0x00000000500f0000,v1,ampere/emag,core
+-- 
+2.17.1
