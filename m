@@ -1,74 +1,149 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Fri, 3 Aug 2018 18:07:09 +0000
-Subject: [RFC] PCI: imx: Add multi-pd support
-In-Reply-To: <CAPDyKFpN99iDYf1mcG-G1=AAkiw8OjoynvK+5cBV8GvCs6WtKg@mail.gmail.com>
-References: <8018069bc772376caef29e76280e4d0facffdb68.1532455922.git.leonard.crestez@nxp.com>
- <CAPDyKFpN99iDYf1mcG-G1=AAkiw8OjoynvK+5cBV8GvCs6WtKg@mail.gmail.com>
-Message-ID: <53f9f939dbce11e1c96986ff41f29dd6e41b9220.camel@nxp.com>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Fri, 3 Aug 2018 14:25:38 -0400 (EDT)
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
+ <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
+ <20180803094129.GB17798@arm.com>
+ <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
+Message-ID: <alpine.LRH.2.02.1808031424140.14030@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-07-31 at 10:32 +0200, Ulf Hansson wrote:
-> On 24 July 2018 at 20:17, Leonard Crestez <leonard.crestez@nxp.com> wrote:
-> > On some chips the PCIE and PCIE_PHY blocks are in separate power domains
-> > which can be power-gated independently. The driver needs to handle this
-> > by keeping both domain active.
-> > 
-> > This is intended for imx6sx where PCIE is in DISPMIX and PCIE_PHY in
-> > it's own domain. Defining the DISPMIX domain requires a way for pcie to
-> > keep it active or it will break when displays are off.
-> > 
-> > The power-domains on imx6sx are meant to look like this:
-> >         power-domains = <&pd_disp>, <&pd_pci>;
-> >         power-domain-names = "pcie", "pcie_phy";
-> > 
-> > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Thanks for taking the time to look at this, I will likely repost this
-as PATCH in a series later.
 
-> > Right now if a device has a single power domain it will be activated
-> > before probe but if it has multiple domains they need to be explicitly
-> > "attached" to and controlled. Supporting both is a bit awkward, this
-> > patch makes the distinction based on (dev->pm_domain != NULL).
-> > 
-> > Maybe the PM core should make this distinction based on a flag in struct
-> > device_driver instead of number of power-domains? So by default when a
-> > device has multiple power domains they would would be activated
-> > together and this patch would be unnecessary.
+On Fri, 3 Aug 2018, Ard Biesheuvel wrote:
+
+> (- libc-alpha)
 > 
-> Activation is deliberately left to be manged by each user, as the PM
-> core/genpd can't know when powering on the PM domains make sense.
-
-By default the PM core could treat a list of pm domains just like it
-treats a domain now. My patch doesn't do anything pci-specific, it just
-attaches all domains and creates device links. Couldn't the core do
-this?
-
-> The main reason to why genpd powers on the PM domain for the single PM
-> domain case, is because of legacy behaviors in drivers.
-
-Wouldn't it be nicer to out-out of such legacy behaviors with a flag in
-struct driver instead of single-versus-multiple domains?
-
-> > The device_link is marked as "STATELESS" because otherwise a warning is
-> > triggered in device_links_driver_bound. This seems to happen because the
-> > pd devices are always marked as "DL_DEV_NO_DRIVER". Maybe they should be
-> > instead always be marked as DL_DEV_DRIVER_BOUND?
+> On 3 August 2018 at 19:09, Mikulas Patocka <mpatocka@redhat.com> wrote:
+> >
+> >
+> > On Fri, 3 Aug 2018, Will Deacon wrote:
+> >
+> >> On Fri, Aug 03, 2018 at 09:16:39AM +0200, Ard Biesheuvel wrote:
+> >> > On 3 August 2018 at 08:35, Mikulas Patocka <mpatocka@redhat.com> wrote:
+> >> > >
+> >> > >
+> >> > > On Thu, 2 Aug 2018, Matt Sealey wrote:
+> >> > >
+> >> > >> The easiest explanation for this would be that the memory isn?t mapped
+> >> > >> correctly. You can?t use PCIe memory spaces with anything other than
+> >> > >> Device-nGnRE or stricter mappings. That?s just differences between the
+> >> > >> AMBA and PCIe (posted/unposted) memory models.
+> >> >
+> >> > Whoa hold on there.
+> >> >
+> >> > Are you saying we cannot have PCIe BAR windows with memory semantics on ARM?
+> >> >
+> >> > Most accelerated graphics drivers rely heavily on the ability to map
+> >> > the VRAM normal-non-cacheable (ioremap_wc, basically), and treat it as
+> >> > ordinary memory.
+> >>
+> >> Yeah, I'd expect framebuffers to be mapped as normal NC. That should be
+> >> fine for prefetchable BARs, no?
+> >>
+> >> Will
+> >
+> > So - why does it corrupt data then? I've created this program that
+> > reproduces the data corruption quicky. If I run it on /dev/fb0, I get an
+> > instant failure. Sometimes a few bytes are not written, sometimes a few
+> > bytes are written with a value that should be 16 bytes apart.
+> >
 > 
-> Using STATELESS is correct, because the supplier devices, which are
-> managed by genpd don't have any driver attached to them.
+> Are we still talking about overlapping unaligned accesses here? Or do
+> you see other failures as well?
 
-As far as I can tell these genpd_dev devices need to be manually
-unregistered in the consumer's remove function, right? If they were
-marked with DL_DEV_DRIVER_BOUND then you could use
-DL_FLAG_AUTOREMOVE_SUPPLIER on them.
+Yes - it is caused by overlapping unaligned accesses inside memcpy. When I 
+put "dmb sy" between the overlapping accesses in 
+glibc/sysdeps/aarch64/memcpy.S, this program doesn't detect any memory 
+corruption.
 
-As far as I can tell the DL_DEV_* states are used to deal with probing
-order but since no driver will ever bind to these suppliers we could
-treat them as effectively always bounds.
-
-
-Perhaps this can be revisited later, imx-pci is not a very good usecase
-for this because it doesn't even support remove.
+> > I tried to run it on system RAM mapped with the NC attribute and I didn't
+> > get any corruption - that suggests the the bug may be in the PCIE
+> > subsystem.
+> >
+> > Jingoo Han and Joao Pinto are maintainers for the designware PCIE
+> > controllers. Could you suggest why does the controller corrupt data when
+> > writing to videoram? Are there any tricks that could be tried to work
+> > around the corruption?
+> >
+> > Mikulas
+> >
+> >
+> >
+> > #include <stdio.h>
+> > #include <stdlib.h>
+> > #include <string.h>
+> > #include <fcntl.h>
+> > #include <unistd.h>
+> > #include <sys/mman.h>
+> >
+> > #define LEN             256
+> > #define PRINT_STRIDE    0x20
+> >
+> > static unsigned char data[LEN];
+> > static unsigned char val = 0;
+> >
+> > static unsigned char prev_data[LEN];
+> >
+> > static unsigned char map_copy[LEN];
+> >
+> > int main(int argc, char *argv[])
+> > {
+> >         unsigned long n = 0;
+> >         int h;
+> >         unsigned char *map;
+> >         unsigned start, end, i;
+> >
+> >         if (argc < 2) fprintf(stderr, "argc\n"), exit(1);
+> >         if (argc >= 4) srandom(atoll(argv[3]));
+> >         h = open(argv[1], O_RDWR | O_DSYNC);
+> >         if (h == -1) perror("open"), exit(1);
+> >         map = mmap(NULL, LEN, PROT_READ | PROT_WRITE, MAP_SHARED, h, argc >= 3 ? strtoull(argv[2], NULL, 16) : 0);
+> >         if (map == MAP_FAILED) perror("mmap"), exit(1);
+> >
+> >         memset(data, 0, LEN);
+> >         memset(prev_data, 0, LEN);
+> >         memset(map, 0, LEN);
+> >
+> >         sleep(1);
+> >
+> >         while (1) {
+> >                 start = (unsigned)random() % (LEN + 1);
+> >                 end = (unsigned)random() % (LEN + 1);
+> >                 if (start > end)
+> >                         continue;
+> >                 for (i = start; i < end; i++)
+> >                         data[i] = val++;
+> >                 memcpy(map + start, data + start, end - start);
+> >                 if (memcmp(map, data, LEN)) {
+> >                         unsigned j;
+> >                         memcpy(map_copy, map, LEN);
+> >                         fprintf(stderr, "mismatch after %lu loops!\n", n);
+> >                         fprintf(stderr, "last copied range: 0x%x - 0x%x (0x%x)\n", start, end, (unsigned)(end - start));
+> >                         for (j = 0; j < LEN; j += PRINT_STRIDE) {
+> >                                 fprintf(stderr, "p[%03x]", j);
+> >                                 for (i = j; i < j + PRINT_STRIDE && i < LEN; i++)
+> >                                         fprintf(stderr, " %s%s%02x\e[0m", !(i % 4) ? " " : "", data[i] != map_copy[i] ? "\e[31m" : "", prev_data[i]);
+> >                                 fprintf(stderr, "\n");
+> >                                 fprintf(stderr, "d[%03x]", j);
+> >                                 for (i = j; i < j + PRINT_STRIDE && i < LEN; i++)
+> >                                         fprintf(stderr, " %s%s%02x\e[0m", !(i % 4) ? " " : "", data[i] != map_copy[i] ? "\e[31m" : "", data[i]);
+> >                                 fprintf(stderr, "\n");
+> >                                 fprintf(stderr, "m[%03x]", j);
+> >                                 for (i = j; i < j + PRINT_STRIDE && i < LEN; i++)
+> >                                         fprintf(stderr, " %s%s%02x\e[0m", !(i % 4) ? " " : "", data[i] != map_copy[i] ? "\e[31m" : "", map_copy[i]);
+> >                                 fprintf(stderr, "\n\n");
+> >                         }
+> >                         exit(1);
+> >                 }
+> >                 memcpy(prev_data, data, LEN);
+> >                 n++;
+> >         }
+> > }
+> 
