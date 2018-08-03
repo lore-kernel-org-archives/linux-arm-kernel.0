@@ -1,149 +1,73 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Fri, 3 Aug 2018 14:25:38 -0400 (EDT)
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
- <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
- <20180803094129.GB17798@arm.com>
- <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
-Message-ID: <alpine.LRH.2.02.1808031424140.14030@file01.intranet.prod.int.rdu2.redhat.com>
+From: trong@android.com (Tri Vo)
+Date: Fri, 3 Aug 2018 12:08:52 -0700
+Subject: [PATCH] arm64: build CONFIG_ARM64_LSE_ATOMICS without -ffixed-
+ flags
+In-Reply-To: <CAKv+Gu8KeXFqqWu6yV4_rRpL-6NN5KQyLWKCuC_XnbotGtMu7w@mail.gmail.com>
+References: <20180802231753.86336-1-trong@android.com>
+ <CAKv+Gu_QzzDSV74pzLQcPBsWHZK5hvMwa8PojSJmzTOMnY780Q@mail.gmail.com>
+ <CAKwvOd=vYBoZazvvN=MHVZnYtekgr-fCktuOFePsV-eSvbFQyQ@mail.gmail.com>
+ <CAKv+Gu8KeXFqqWu6yV4_rRpL-6NN5KQyLWKCuC_XnbotGtMu7w@mail.gmail.com>
+Message-ID: <CANA+-vD0U3_1r4xJuv0fq6J1qAwRDLuu1sH+GHhL4vMh8JJ3Gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Aug 3, 2018 at 10:27 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 3 August 2018 at 19:17, Nick Desaulniers <ndesaulniers@google.com> wrote:
+>> On Fri, Aug 3, 2018 at 1:43 AM Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>
+>>> On 3 August 2018 at 01:17, Tri Vo <trong@android.com> wrote:
+>>> > Remove -ffixed- compile flags as they are not required for correct
+>>> > behavior of out-of-line ll/sc implementations of atomic functions.
+>>> > Registers (except x0 which contains return value) only need to be
+>>> > callee-saved, not necessarily fixed.
+>>> >
+>>> > For readability purposes, represent "callee-saves-all-registers" calling
+>>> > convention with a combination of -fcall-used- and -fcall-saved- flags only.
+>>> >
+>>> > Signed-off-by: Tri Vo <trong@android.com>
+>>>
+>>> Wouldn't this permit the compiler to stack/unstack these registers in
+>>> the implementations of the out of line LL/SC fallbacks.
 
+Yes. However, the number of registers that get stacked/unstacked
+should remain the same since compiler should only preserve registers
+that are used by callee (assuming callee saves all).
+>>
+>> I'm curious to understand more about how this LSE patching works, and
+>> what the constraints exactly are.  Are there some docs I should read
+>> that you can point me to?  I see
+>> arch/arm64/include/asm/atomic_ll_sc.h, but are those are the in line
+>> implementations?  Does that make arch/arm64/include/asm/atomic.h the
+>> out of line definitions?  What are the restrictions around preventing
+>> the compiler to push/pop those registers?
+>>
+>
+> The idea is that LSE atomics can each be patched into a bl instruction
+> that calls the appropriate LL/SC fallback, but without the overhead of
+> an ordinary function call. (actually the bl is there by default, but
+> patched into LSE ops on h/w that supports it)
+>
+> So that is why the 'bl' is in an asm() block, and why x30 is used as a
+> temporary/clobber in the LSE sequences: the function call is
+> completely hidden from the compiler. Obviously, for performance, you
+> want to prevent these fallbacks from touching the stack.
 
-On Fri, 3 Aug 2018, Ard Biesheuvel wrote:
+The function call is hidden from the compiler on the caller side
+using 'bl' in the asm block. I suspect that is done to make
+alternative instructions the same byte length (constraints of dynamic
+patching). However, on the callee side, LL/SC fallbacks
+(in atomic_ll_sc.h) are implemented as C functions. So the compiler
+still handles the function call details and register allocation
+within those functions.
 
-> (- libc-alpha)
-> 
-> On 3 August 2018 at 19:09, Mikulas Patocka <mpatocka@redhat.com> wrote:
-> >
-> >
-> > On Fri, 3 Aug 2018, Will Deacon wrote:
-> >
-> >> On Fri, Aug 03, 2018 at 09:16:39AM +0200, Ard Biesheuvel wrote:
-> >> > On 3 August 2018 at 08:35, Mikulas Patocka <mpatocka@redhat.com> wrote:
-> >> > >
-> >> > >
-> >> > > On Thu, 2 Aug 2018, Matt Sealey wrote:
-> >> > >
-> >> > >> The easiest explanation for this would be that the memory isn?t mapped
-> >> > >> correctly. You can?t use PCIe memory spaces with anything other than
-> >> > >> Device-nGnRE or stricter mappings. That?s just differences between the
-> >> > >> AMBA and PCIe (posted/unposted) memory models.
-> >> >
-> >> > Whoa hold on there.
-> >> >
-> >> > Are you saying we cannot have PCIe BAR windows with memory semantics on ARM?
-> >> >
-> >> > Most accelerated graphics drivers rely heavily on the ability to map
-> >> > the VRAM normal-non-cacheable (ioremap_wc, basically), and treat it as
-> >> > ordinary memory.
-> >>
-> >> Yeah, I'd expect framebuffers to be mapped as normal NC. That should be
-> >> fine for prefetchable BARs, no?
-> >>
-> >> Will
-> >
-> > So - why does it corrupt data then? I've created this program that
-> > reproduces the data corruption quicky. If I run it on /dev/fb0, I get an
-> > instant failure. Sometimes a few bytes are not written, sometimes a few
-> > bytes are written with a value that should be 16 bytes apart.
-> >
-> 
-> Are we still talking about overlapping unaligned accesses here? Or do
-> you see other failures as well?
+Since the caller doesn't save any registers, callee stacks/unstacks
+all the registers it uses. So, for example, LL/SC fallback
+implementation of atomic_add preserves 2 registers with or without
+this change.
 
-Yes - it is caused by overlapping unaligned accesses inside memcpy. When I 
-put "dmb sy" between the overlapping accesses in 
-glibc/sysdeps/aarch64/memcpy.S, this program doesn't detect any memory 
-corruption.
-
-> > I tried to run it on system RAM mapped with the NC attribute and I didn't
-> > get any corruption - that suggests the the bug may be in the PCIE
-> > subsystem.
-> >
-> > Jingoo Han and Joao Pinto are maintainers for the designware PCIE
-> > controllers. Could you suggest why does the controller corrupt data when
-> > writing to videoram? Are there any tricks that could be tried to work
-> > around the corruption?
-> >
-> > Mikulas
-> >
-> >
-> >
-> > #include <stdio.h>
-> > #include <stdlib.h>
-> > #include <string.h>
-> > #include <fcntl.h>
-> > #include <unistd.h>
-> > #include <sys/mman.h>
-> >
-> > #define LEN             256
-> > #define PRINT_STRIDE    0x20
-> >
-> > static unsigned char data[LEN];
-> > static unsigned char val = 0;
-> >
-> > static unsigned char prev_data[LEN];
-> >
-> > static unsigned char map_copy[LEN];
-> >
-> > int main(int argc, char *argv[])
-> > {
-> >         unsigned long n = 0;
-> >         int h;
-> >         unsigned char *map;
-> >         unsigned start, end, i;
-> >
-> >         if (argc < 2) fprintf(stderr, "argc\n"), exit(1);
-> >         if (argc >= 4) srandom(atoll(argv[3]));
-> >         h = open(argv[1], O_RDWR | O_DSYNC);
-> >         if (h == -1) perror("open"), exit(1);
-> >         map = mmap(NULL, LEN, PROT_READ | PROT_WRITE, MAP_SHARED, h, argc >= 3 ? strtoull(argv[2], NULL, 16) : 0);
-> >         if (map == MAP_FAILED) perror("mmap"), exit(1);
-> >
-> >         memset(data, 0, LEN);
-> >         memset(prev_data, 0, LEN);
-> >         memset(map, 0, LEN);
-> >
-> >         sleep(1);
-> >
-> >         while (1) {
-> >                 start = (unsigned)random() % (LEN + 1);
-> >                 end = (unsigned)random() % (LEN + 1);
-> >                 if (start > end)
-> >                         continue;
-> >                 for (i = start; i < end; i++)
-> >                         data[i] = val++;
-> >                 memcpy(map + start, data + start, end - start);
-> >                 if (memcmp(map, data, LEN)) {
-> >                         unsigned j;
-> >                         memcpy(map_copy, map, LEN);
-> >                         fprintf(stderr, "mismatch after %lu loops!\n", n);
-> >                         fprintf(stderr, "last copied range: 0x%x - 0x%x (0x%x)\n", start, end, (unsigned)(end - start));
-> >                         for (j = 0; j < LEN; j += PRINT_STRIDE) {
-> >                                 fprintf(stderr, "p[%03x]", j);
-> >                                 for (i = j; i < j + PRINT_STRIDE && i < LEN; i++)
-> >                                         fprintf(stderr, " %s%s%02x\e[0m", !(i % 4) ? " " : "", data[i] != map_copy[i] ? "\e[31m" : "", prev_data[i]);
-> >                                 fprintf(stderr, "\n");
-> >                                 fprintf(stderr, "d[%03x]", j);
-> >                                 for (i = j; i < j + PRINT_STRIDE && i < LEN; i++)
-> >                                         fprintf(stderr, " %s%s%02x\e[0m", !(i % 4) ? " " : "", data[i] != map_copy[i] ? "\e[31m" : "", data[i]);
-> >                                 fprintf(stderr, "\n");
-> >                                 fprintf(stderr, "m[%03x]", j);
-> >                                 for (i = j; i < j + PRINT_STRIDE && i < LEN; i++)
-> >                                         fprintf(stderr, " %s%s%02x\e[0m", !(i % 4) ? " " : "", data[i] != map_copy[i] ? "\e[31m" : "", map_copy[i]);
-> >                                 fprintf(stderr, "\n\n");
-> >                         }
-> >                         exit(1);
-> >                 }
-> >                 memcpy(prev_data, data, LEN);
-> >                 n++;
-> >         }
-> > }
-> 
+I might be wrong in my understaing though.
+>
+> Note that x16 and x17 are allowed as temporaries: this is due to the
+> fact that function calls may be taken through a PLT entry, which may
+> clobber x16 and x17 (as per the AAPCS).
