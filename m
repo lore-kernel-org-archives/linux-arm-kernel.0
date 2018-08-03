@@ -1,48 +1,48 @@
-From: ramana.gcc@googlemail.com (Ramana Radhakrishnan)
-Date: Fri, 3 Aug 2018 10:15:52 +0100
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
- <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
-Message-ID: <CAJA7tRZbmnZq7RfvQeYEy_a1ZObWqpFpVdvgsXgsioQ3RyPMuA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 3 Aug 2018 10:23:13 +0100
+Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
+ sanitizer
+In-Reply-To: <CACT4Y+aZtph5qDsLzTDEgpQRz4_Vtg1DD-cB18qooi6D0bexDg@mail.gmail.com>
+References: <cover.1530018818.git.andreyknvl@google.com>
+ <20180628105057.GA26019@e103592.cambridge.arm.com>
+ <CAAeHK+w0T43+h3xqU4a-qutxd-qiEhsvk0eaZpmAn-T0hpaLZQ@mail.gmail.com>
+ <20180629110709.GA17859@arm.com>
+ <CAAeHK+wHd8B2nhat-Z2Y2=s4NVobPG7vjr2CynjFhqPTwQRepQ@mail.gmail.com>
+ <20180703173608.GF27243@arm.com>
+ <CAAeHK+wTcH+2hgm_BTkLLdn1GkjBtkhQ=vPWZCncJ6KenqgKpg@mail.gmail.com>
+ <CAAeHK+xc1E64tXEEHoXqOuUNZ7E_kVyho3_mNZTCc+LTGHYFdA@mail.gmail.com>
+ <20180801163538.GA10800@arm.com>
+ <CACT4Y+aZtph5qDsLzTDEgpQRz4_Vtg1DD-cB18qooi6D0bexDg@mail.gmail.com>
+Message-ID: <20180803092312.GA17798@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 3, 2018 at 8:53 AM, Florian Weimer <fweimer@redhat.com> wrote:
-> On 08/03/2018 09:11 AM, Andrew Pinski wrote:
->>
->> Yes fix Links not to use memcpy on the framebuffer.
->> It is undefined behavior to use device memory with memcpy.
->
->
-> Some (de facto) ABIs require that it is supported, though.  For example, the
-> POWER string functions avoid unaligned loads and stores for this reason
-> because the platform has the same issue with device memory.  And yes, GCC
-> will expand memcpy on POWER to something that is incompatible with device
-> memory. 8-(
+On Wed, Aug 01, 2018 at 06:52:09PM +0200, Dmitry Vyukov wrote:
+> On Wed, Aug 1, 2018 at 6:35 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > Thanks for tracking these cases down and going through each of them. The
+> > obvious follow-up question is: how do we ensure that we keep on top of
+> > this in mainline? Are you going to repeat your experiment at every kernel
+> > release or every -rc or something else? I really can't see how we can
+> > maintain this in the long run, especially given that the coverage we have
+> > is only dynamic -- do you have an idea of how much coverage you're actually
+> > getting for, say, a defconfig+modules build?
+> >
+> > I'd really like to enable pointer tagging in the kernel, I'm just still
+> > failing to see how we can do it in a controlled manner where we can reason
+> > about the semantic changes using something other than a best-effort,
+> > case-by-case basis which is likely to be fragile and error-prone.
+> > Unfortunately, if that's all we have, then this gets relegated to a
+> > debug feature, which sort of defeats the point in my opinion.
+> 
+> Well, in some cases there is no other way as resorting to dynamic testing.
+> How do we ensure that kernel does not dereference NULL pointers, does
+> not access objects after free or out of bounds? Nohow. And, yes, it's
+> constant maintenance burden resolved via dynamic testing.
 
-GCC for AArch64 - use -mstrict-align
-GCC for AArch32 - use -mno-unaligned-access.
+... and the advantage of NULL pointer issues is that you're likely to see
+them as a synchronous exception at runtime, regardless of architecture and
+regardless of Kconfig options. With pointer tagging, that's certainly not
+the case, and so I don't think we can just treat issues there like we do for
+NULL pointers.
 
-If you see unaligned accesses coming out of the compiler for well
-defined programs then that's a bug. Frequently we see undefined
-programs that get the compiler to produce traps - atleast one or 2
-bugs a year  in  GCC .
-
-
->
-> If we don't want people to use memcpy, we probably need to provide a
-> credible alternative.
-
-I believe a number of packages have rolled their own to take these
-constraints into account
-for AArch32, perhaps it needs to be expanded for AArch64 as well.
-
-regards
-Ramana
-
->
-> Thanks,
-> Florian
+Will
