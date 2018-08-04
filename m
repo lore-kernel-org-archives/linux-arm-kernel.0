@@ -1,423 +1,193 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Sat, 4 Aug 2018 15:30:18 +0200
-Subject: [PATCH v6 1/8] media: v4l: Add definitions for MPEG2 slice format
- and metadata
-In-Reply-To: <20180725100256.22833-2-paul.kocialkowski@bootlin.com>
-References: <20180725100256.22833-1-paul.kocialkowski@bootlin.com>
- <20180725100256.22833-2-paul.kocialkowski@bootlin.com>
-Message-ID: <57d8c895-ad9f-5105-e923-9666fdf909d9@xs4all.nl>
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Sat, 4 Aug 2018 20:02:30 +0530
+Subject: [PATCH v3] gpu/drm/exynos: Convert
+ drm_atomic_helper_suspend/resume()
+In-Reply-To: <20180803070009eucas1p1583f6df0ce5caf37662e7546f782513b~HTa5xqhex1670416704eucas1p1H@eucas1p1.samsung.com>
+References: <CGME20180802131924epcas4p105dc354b2ee651e70a5e777850222bc5@epcas4p1.samsung.com>
+ <20180802132152.GA2833@jordon-HP-15-Notebook-PC>
+ <20180802133852eucas1p1de66cfd2db5ed0c87665567455ea4747~HFNvAtE4-1249412494eucas1p1c@eucas1p1.samsung.com>
+ <CAFqt6zYUT72e7CnUF9a3kg5ZjFcPjZViMNm687-FC_9PF5Oc7A@mail.gmail.com>
+ <20180803070009eucas1p1583f6df0ce5caf37662e7546f782513b~HTa5xqhex1670416704eucas1p1H@eucas1p1.samsung.com>
+Message-ID: <CAFqt6zYxV6K4oZUXVaYLifx3xqPxPs9v5-BmAOfm6hG04g6hvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2018 12:02 PM, Paul Kocialkowski wrote:
-> Stateless video decoding engines require both the MPEG slices and
-> associated metadata from the video stream in order to decode frames.
-> 
-> This introduces definitions for a new pixel format, describing buffers
-> with MPEG2 slice data, as well as a control structure for passing the
-> frame metadata to drivers.
-> 
-> This is based on work from both Florent Revest and Hugues Fruchet.
-> 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> ---
->  .../media/uapi/v4l/extended-controls.rst      | 122 ++++++++++++++++++
->  .../media/uapi/v4l/pixfmt-compressed.rst      |   5 +
->  drivers/media/v4l2-core/v4l2-ctrls.c          |  54 ++++++++
->  drivers/media/v4l2-core/v4l2-ioctl.c          |   1 +
->  include/media/v4l2-ctrls.h                    |  18 ++-
->  include/uapi/linux/v4l2-controls.h            |  43 ++++++
->  include/uapi/linux/videodev2.h                |   5 +
->  7 files changed, 241 insertions(+), 7 deletions(-)
-> 
-> diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
-> index 9f7312bf3365..4a29d89fd9ac 100644
-> --- a/Documentation/media/uapi/v4l/extended-controls.rst
-> +++ b/Documentation/media/uapi/v4l/extended-controls.rst
-> @@ -1497,6 +1497,128 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type -
->  
->  
->  
-> +.. _v4l2-mpeg-mpeg2:
-> +
-> +``V4L2_CID_MPEG_VIDEO_MPEG2_SLICE_PARAMS (struct)``
-> +    Specifies the slice parameters (also known as slice header) for the
-> +    associated MPEG-2 slice data. This includes all the necessary
-> +    parameters for configuring a hardware decoder pipeline for MPEG-2.
-> +
-> +.. tabularcolumns:: |p{2.0cm}|p{4.0cm}|p{11.0cm}|
-> +
-> +.. c:type:: v4l2_ctrl_mpeg2_slice_params
-> +
-> +.. cssclass:: longtable
-> +
-> +.. flat-table:: struct v4l2_ctrl_mpeg2_slice_params
-> +    :header-rows:  0
-> +    :stub-columns: 0
-> +    :widths:       1 1 2
-> +
-> +    * - __u32
-> +      - ``slice_len``
-> +      - Length (in bits) of the current slice data.
-> +    * - __u32
-> +      - ``slice_pos``
-> +      - Position (in bits) of the current slice data, relative to the
-> +        frame start.
-> +    * - __u16
-> +      - ``width``
-> +      - Width of the corresponding output frame for the current slice.
-> +    * - __u16
-> +      - ``height``
-> +      - Height of the corresponding output frame for the current slice.
-> +    * - __u8
-> +      - ``slice_type``
-> +      - Picture coding type for the frame covered by the current slice
-> +        (V4L2_MPEG2_SLICE_TYPE_I, V4L2_MPEG2_SLICE_TYPE_P or
-> +        V4L2_MPEG2_SLICE_PCT_B).
-> +    * - __u8
-> +      - ``f_code[2][2]``
-> +      - Motion vector codes.
-> +    * - __u8
-> +      - ``intra_dc_precision``
-> +      - Precision of Discrete Cosine transform (0: 8 bits precision,
-> +        1: 9 bits precision, 2: 10 bits precision, 11: 11 bits precision).
-> +    * - __u8
-> +      - ``picture_structure``
-> +      - Picture structure (1: interlaced top field,
-> +        2: interlaced bottom field, 3: progressive frame).
-> +    * - __u8
-> +      - ``top_field_first``
-> +      - If set to 1 and interlaced stream, top field is output first.
-> +    * - __u8
-> +      - ``frame_pred_frame_dct``
-> +      - If set to 1, only frame-DCT and frame prediction are used.
-> +    * - __u8
-> +      - ``concealment_motion_vectors``
-> +      -  If set to 1, motion vectors are coded for intra macroblocks.
-> +    * - __u8
-> +      - ``q_scale_type``
-> +      - This flag affects the inverse quantisation process.
-> +    * - __u8
-> +      - ``intra_vlc_format``
-> +      - This flag affects the decoding of transform coefficient data.
-> +    * - __u8
-> +      - ``alternate_scan``
-> +      - This flag affects the decoding of transform coefficient data.
-> +    * - __u8
-> +      - ``backward_ref_index``
-> +      - Index for the V4L2 buffer to use as backward reference, used with
-> +        B-coded and P-coded frames.
-> +    * - __u8
-> +      - ``forward_ref_index``
-> +      - Index for the V4L2 buffer to use as forward reference, used with
-> +        P-coded frames.
-> +    * - :cspan:`2`
-> +
-> +``V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION (struct)``
-> +    Specifies quantization matrices for the associated MPEG-2 slice data.
-> +
-> +.. tabularcolumns:: |p{2.0cm}|p{4.0cm}|p{11.0cm}|
-> +
-> +.. c:type:: v4l2_ctrl_mpeg2_quantization
-> +
-> +.. cssclass:: longtable
-> +
-> +.. flat-table:: struct v4l2_ctrl_mpeg2_quantization
-> +    :header-rows:  0
-> +    :stub-columns: 0
-> +    :widths:       1 1 2
-> +
-> +    * - __u8
-> +      - ``load_intra_quantiser_matrix``
-> +      - One bit to indicate whether to load the intra quantiser matrix.
-> +    * - __u32
-> +      - ``load_non_intra_quantiser_matrix``
-> +      - One bit to indicate whether to load the non-intra quantiser matrix.
-> +    * - __u32
-> +      - ``load_chroma_intra_quantiser_matrix``
-> +      - One bit to indicate whether to load the chroma intra quantiser matrix,
-> +        only relevant for non-4:2:0 YUV formats.
-> +    * - __u32
-> +      - ``load_chroma_non_intra_quantiser_matrix``
-> +      - One bit to indicate whether to load the non-chroma intra quantiser
-> +        matrix, only relevant for non-4:2:0 YUV formats.
-> +    * - __u32
-> +      - ``intra_quantiser_matrix[64]``
-> +      - The intra quantiser matrix coefficients, in zigzag scanning order.
-> +        It is relevant for both luma and chroma components, although it can be
-> +        superseded by the chroma-specific matrix for non-4:2:0 YUV formats.
-> +    * - __u32
-> +      - ``non_intra_quantiser_matrix[64]``
-> +      - The non-intra quantiser matrix coefficients, in zigzag scanning order.
-> +        It is relevant for both luma and chroma components, although it can be
-> +        superseded by the chroma-specific matrix for non-4:2:0 YUV formats.
-> +    * - __u32
-> +      - ``chroma_intra_quantiser_matrix[64]``
-> +      - The intra quantiser matrix coefficients for the chroma YUV component,
-> +        in zigzag scanning order. Only relevant for non-4:2:0 YUV formats.
-> +    * - __u32
-> +      - ``chroma_non_intra_quantiser_matrix[64]``
-> +      - The non-intra quantiser matrix coefficients for the chroma YUV component,
-> +        in zigzag scanning order. Only relevant for non-4:2:0 YUV formats.
-> +    * - :cspan:`2`
->  
->  MFC 5.1 MPEG Controls
->  ---------------------
-> diff --git a/Documentation/media/uapi/v4l/pixfmt-compressed.rst b/Documentation/media/uapi/v4l/pixfmt-compressed.rst
-> index abec03937bb3..4e73f62b5163 100644
-> --- a/Documentation/media/uapi/v4l/pixfmt-compressed.rst
-> +++ b/Documentation/media/uapi/v4l/pixfmt-compressed.rst
-> @@ -60,6 +60,11 @@ Compressed Formats
->        - ``V4L2_PIX_FMT_MPEG2``
->        - 'MPG2'
->        - MPEG2 video elementary stream.
-> +    * .. _V4L2-PIX-FMT-MPEG2-SLICE:
-> +
-> +      - ``V4L2_PIX_FMT_MPEG2_SLICE``
-> +      - 'MG2S'
-> +      - MPEG2 parsed slice data, as extracted from the MPEG2 bitstream.
+On Fri, Aug 3, 2018 at 12:30 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hi,
+>
+> On 2018-08-02 17:51, Souptick Joarder wrote:
+>> On Thu, Aug 2, 2018 at 7:08 PM, Marek Szyprowski
+>> <m.szyprowski@samsung.com> wrote:
+>>> On 2018-08-02 15:21, Souptick Joarder wrote:
+>>>> convert drm_atomic_helper_suspend/resume() to use
+>>>> drm_mode_config_helper_suspend/resume().
+>>>>
+>>>> exynos_drm_fbdev_suspend/resume can be removed
+>>>> as drm_mode_config_helper_suspend/resume has
+>>>> implement the same in generic way.
+>>>>
+>>>> Remove suspend_state from exynos_drm_private
+>>>> struct as it is no more useful.
+>>>>
+>>>> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
+>>>> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+>>>> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>>> ---
+>>>> v2: Address Inki Dae's comment. Remove ret variable
+>>>>       from both suspend/resume function.
+>>>>
+>>>> v3: Tested by Marek. Updated the change log.
+>>>>
+>>>>    drivers/gpu/drm/exynos/exynos_drm_drv.c   | 26 ++------------------------
+>>>>    drivers/gpu/drm/exynos/exynos_drm_drv.h   |  1 -
+>>>>    drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 17 -----------------
+>>>>    drivers/gpu/drm/exynos/exynos_drm_fbdev.h | 10 ----------
+>>>>    4 files changed, 2 insertions(+), 52 deletions(-)
+>>>>
+>>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+>>>> index b599f74..d86dd81 100644
+>>>> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
+>>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+>>>> @@ -149,37 +149,15 @@ static void exynos_drm_postclose(struct drm_device *dev, struct drm_file *file)
+>>>>    static int exynos_drm_suspend(struct device *dev)
+>>>>    {
+>>>>        struct drm_device *drm_dev = dev_get_drvdata(dev);
+>>>> -     struct exynos_drm_private *private;
+>>>> -
+>>>> -     if (!drm_dev)
+>>>> -             return 0;
+>>>> -
+>>>> -     private = drm_dev->dev_private;
+>>>> -
+>>>> -     drm_kms_helper_poll_disable(drm_dev);
+>>>> -     exynos_drm_fbdev_suspend(drm_dev);
+>>>> -     private->suspend_state = drm_atomic_helper_suspend(drm_dev);
+>>>> -     if (IS_ERR(private->suspend_state)) {
+>>>> -             exynos_drm_fbdev_resume(drm_dev);
+>>>> -             drm_kms_helper_poll_enable(drm_dev);
+>>>> -             return PTR_ERR(private->suspend_state);
+>>>> -     }
+>>>>
+>>>> -     return 0;
+>>>> +     return  drm_mode_config_helper_suspend(drm_dev);
+>>>>    }
+>>>>
+>>>>    static void exynos_drm_resume(struct device *dev)
+>>>>    {
+>>>>        struct drm_device *drm_dev = dev_get_drvdata(dev);
+>>>> -     struct exynos_drm_private *private;
+>>>> -
+>>>> -     if (!drm_dev)
+>>>> -             return;
+>>>>
+>>>> -     private = drm_dev->dev_private;
+>>>> -     drm_atomic_helper_resume(drm_dev, private->suspend_state);
+>>>> -     exynos_drm_fbdev_resume(drm_dev);
+>>>> -     drm_kms_helper_poll_enable(drm_dev);
+>>>> +     return drm_mode_config_helper_resume(drm_dev);
+>>> exynos_drm_resume() now returns 'void', so to be strict with
+>>> c standard, the return statement should not be used here.
+>> But in struct dev_pm_ops, it is still defined as
+>>
+>>                  int (*resume)(struct device *dev);
+>>
+>> I think, we need to correct the return type of
+>> exynos_drm_resume() to int.
+>
+> Nope. After commit dc684af6fc8d ("drm/exynos: Suspend/resume display
+> pipeline as early/late as possible") exynos_drm_resume() is assigned
+> to .complete callback, which use 'void' return type, so for now no
+> more changes are needed.
 
-This does not mention that this requires the use of the Request API and which controls
-are compulsory in the request.
+Ok, then v4 is the right candidate to go.
 
->      * .. _V4L2-PIX-FMT-MPEG4:
->  
->        - ``V4L2_PIX_FMT_MPEG4``
-> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
-> index 3610dce3a4f8..22483d894259 100644
-> --- a/drivers/media/v4l2-core/v4l2-ctrls.c
-> +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
-> @@ -844,6 +844,8 @@ const char *v4l2_ctrl_get_name(u32 id)
->  	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:		return "Vertical MV Search Range";
->  	case V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER:		return "Repeat Sequence Header";
->  	case V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME:		return "Force Key Frame";
-> +	case V4L2_CID_MPEG_VIDEO_MPEG2_SLICE_PARAMS:		return "MPEG2 Slice Header";
-> +	case V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION:		return "MPEG2 Quantization Matrices";
-
-Use MPEG-2 instead of MPEG2 in these two descriptions.
-
-Regards,
-
-	Hans
-
->  
->  	/* VPX controls */
->  	case V4L2_CID_MPEG_VIDEO_VPX_NUM_PARTITIONS:		return "VPX Number of Partitions";
-> @@ -1292,6 +1294,12 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
->  	case V4L2_CID_RDS_TX_ALT_FREQS:
->  		*type = V4L2_CTRL_TYPE_U32;
->  		break;
-> +	case V4L2_CID_MPEG_VIDEO_MPEG2_SLICE_PARAMS:
-> +		*type = V4L2_CTRL_TYPE_MPEG2_SLICE_PARAMS;
-> +		break;
-> +	case V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION:
-> +		*type = V4L2_CTRL_TYPE_MPEG2_QUANTIZATION;
-> +		break;
->  	default:
->  		*type = V4L2_CTRL_TYPE_INTEGER;
->  		break;
-> @@ -1550,6 +1558,7 @@ static void std_log(const struct v4l2_ctrl *ctrl)
->  static int std_validate(const struct v4l2_ctrl *ctrl, u32 idx,
->  			union v4l2_ctrl_ptr ptr)
->  {
-> +	struct v4l2_ctrl_mpeg2_slice_params *p_mpeg2_slice_params;
->  	size_t len;
->  	u64 offset;
->  	s64 val;
-> @@ -1612,6 +1621,45 @@ static int std_validate(const struct v4l2_ctrl *ctrl, u32 idx,
->  			return -ERANGE;
->  		return 0;
->  
-> +	case V4L2_CTRL_TYPE_MPEG2_SLICE_PARAMS:
-> +		p_mpeg2_slice_params = ptr.p;
-> +
-> +		switch (p_mpeg2_slice_params->intra_dc_precision) {
-> +		case 0: /* 8 bits */
-> +		case 1: /* 9 bits */
-> +		case 11: /* 11 bits */
-> +			break;
-> +		default:
-> +			return -EINVAL;
-> +		}
-> +
-> +		switch (p_mpeg2_slice_params->picture_structure) {
-> +		case 1: /* interlaced top field */
-> +		case 2: /* interlaced bottom field */
-> +		case 3: /* progressive */
-> +			break;
-> +		default:
-> +			return -EINVAL;
-> +		}
-> +
-> +		switch (p_mpeg2_slice_params->slice_type) {
-> +		case V4L2_MPEG2_SLICE_TYPE_I:
-> +		case V4L2_MPEG2_SLICE_TYPE_P:
-> +		case V4L2_MPEG2_SLICE_TYPE_B:
-> +			break;
-> +		default:
-> +			return -EINVAL;
-> +		}
-> +
-> +		if (p_mpeg2_slice_params->backward_ref_index > VIDEO_MAX_FRAME ||
-> +		    p_mpeg2_slice_params->forward_ref_index > VIDEO_MAX_FRAME)
-> +			return -EINVAL;
-> +
-> +		return 0;
-> +
-> +	case V4L2_CTRL_TYPE_MPEG2_QUANTIZATION:
-> +		return 0;
-> +
->  	default:
->  		return -EINVAL;
->  	}
-> @@ -2186,6 +2234,12 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct v4l2_ctrl_handler *hdl,
->  	case V4L2_CTRL_TYPE_U32:
->  		elem_size = sizeof(u32);
->  		break;
-> +	case V4L2_CTRL_TYPE_MPEG2_SLICE_PARAMS:
-> +		elem_size = sizeof(struct v4l2_ctrl_mpeg2_slice_params);
-> +		break;
-> +	case V4L2_CTRL_TYPE_MPEG2_QUANTIZATION:
-> +		elem_size = sizeof(struct v4l2_ctrl_mpeg2_quantization);
-> +		break;
->  	default:
->  		if (type < V4L2_CTRL_COMPOUND_TYPES)
->  			elem_size = sizeof(s32);
-> diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
-> index 44fc0102221f..68e914b83a03 100644
-> --- a/drivers/media/v4l2-core/v4l2-ioctl.c
-> +++ b/drivers/media/v4l2-core/v4l2-ioctl.c
-> @@ -1304,6 +1304,7 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
->  		case V4L2_PIX_FMT_H263:		descr = "H.263"; break;
->  		case V4L2_PIX_FMT_MPEG1:	descr = "MPEG-1 ES"; break;
->  		case V4L2_PIX_FMT_MPEG2:	descr = "MPEG-2 ES"; break;
-> +		case V4L2_PIX_FMT_MPEG2_SLICE:	descr = "MPEG-2 parsed slice data"; break;
->  		case V4L2_PIX_FMT_MPEG4:	descr = "MPEG-4 part 2 ES"; break;
->  		case V4L2_PIX_FMT_XVID:		descr = "Xvid"; break;
->  		case V4L2_PIX_FMT_VC1_ANNEX_G:	descr = "VC-1 (SMPTE 412M Annex G)"; break;
-> diff --git a/include/media/v4l2-ctrls.h b/include/media/v4l2-ctrls.h
-> index 34ee3167d7dd..83eff6f91ed2 100644
-> --- a/include/media/v4l2-ctrls.h
-> +++ b/include/media/v4l2-ctrls.h
-> @@ -35,13 +35,15 @@ struct poll_table_struct;
->  
->  /**
->   * union v4l2_ctrl_ptr - A pointer to a control value.
-> - * @p_s32:	Pointer to a 32-bit signed value.
-> - * @p_s64:	Pointer to a 64-bit signed value.
-> - * @p_u8:	Pointer to a 8-bit unsigned value.
-> - * @p_u16:	Pointer to a 16-bit unsigned value.
-> - * @p_u32:	Pointer to a 32-bit unsigned value.
-> - * @p_char:	Pointer to a string.
-> - * @p:		Pointer to a compound value.
-> + * @p_s32:			Pointer to a 32-bit signed value.
-> + * @p_s64:			Pointer to a 64-bit signed value.
-> + * @p_u8:			Pointer to a 8-bit unsigned value.
-> + * @p_u16:			Pointer to a 16-bit unsigned value.
-> + * @p_u32:			Pointer to a 32-bit unsigned value.
-> + * @p_char:			Pointer to a string.
-> + * @p_mpeg2_slice_params:	Pointer to a MPEG2 slice parameters structure.
-> + * @p_mpeg2_quantization:	Pointer to a MPEG2 quantization data structure.
-> + * @p:				Pointer to a compound value.
->   */
->  union v4l2_ctrl_ptr {
->  	s32 *p_s32;
-> @@ -50,6 +52,8 @@ union v4l2_ctrl_ptr {
->  	u16 *p_u16;
->  	u32 *p_u32;
->  	char *p_char;
-> +	struct v4l2_ctrl_mpeg2_slice_params *p_mpeg2_slice_params;
-> +	struct v4l2_ctrl_mpeg2_quantization *p_mpeg2_quantization;
->  	void *p;
->  };
->  
-> diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
-> index e4ee10ee917d..ce6de781037a 100644
-> --- a/include/uapi/linux/v4l2-controls.h
-> +++ b/include/uapi/linux/v4l2-controls.h
-> @@ -557,6 +557,9 @@ enum v4l2_mpeg_video_mpeg4_profile {
->  };
->  #define V4L2_CID_MPEG_VIDEO_MPEG4_QPEL		(V4L2_CID_MPEG_BASE+407)
->  
-> +#define V4L2_CID_MPEG_VIDEO_MPEG2_SLICE_PARAMS	(V4L2_CID_MPEG_BASE+450)
-> +#define V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION	(V4L2_CID_MPEG_BASE+451)
-> +
->  /*  Control IDs for VP8 streams
->   *  Although VP8 is not part of MPEG we add these controls to the MPEG class
->   *  as that class is already handling other video compression standards
-> @@ -1092,4 +1095,44 @@ enum v4l2_detect_md_mode {
->  #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_CLASS_BASE + 3)
->  #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DETECT_CLASS_BASE + 4)
->  
-> +#define V4L2_MPEG2_SLICE_TYPE_I			1
-> +#define V4L2_MPEG2_SLICE_TYPE_P			2
-> +#define V4L2_MPEG2_SLICE_TYPE_B			3
-> +#define V4L2_MPEG2_SLICE_TYPE_D			4
-> +
-> +struct v4l2_ctrl_mpeg2_slice_params {
-> +	__u32	slice_len;
-> +	__u32	slice_pos;
-> +
-> +	__u16	width;
-> +	__u16	height;
-> +
-> +	__u8	slice_type;
-> +	__u8	f_code[2][2];
-> +
-> +	__u8	intra_dc_precision;
-> +	__u8	picture_structure;
-> +	__u8	top_field_first;
-> +	__u8	frame_pred_frame_dct;
-> +	__u8	concealment_motion_vectors;
-> +	__u8	q_scale_type;
-> +	__u8	intra_vlc_format;
-> +	__u8	alternate_scan;
-> +
-> +	__u8	backward_ref_index;
-> +	__u8	forward_ref_index;
-> +};
-> +
-> +struct v4l2_ctrl_mpeg2_quantization {
-> +	__u8	load_intra_quantiser_matrix : 1;
-> +	__u8	load_non_intra_quantiser_matrix : 1;
-> +	__u8	load_chroma_intra_quantiser_matrix : 1;
-> +	__u8	load_chroma_non_intra_quantiser_matrix : 1;
-> +
-> +	__u8	intra_quantiser_matrix[64];
-> +	__u8	non_intra_quantiser_matrix[64];
-> +	__u8	chroma_intra_quantiser_matrix[64];
-> +	__u8	chroma_non_intra_quantiser_matrix[64];
-> +};
-> +
->  #endif
-> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-> index 1f6c4b52baae..d171361ed9b3 100644
-> --- a/include/uapi/linux/videodev2.h
-> +++ b/include/uapi/linux/videodev2.h
-> @@ -629,6 +629,7 @@ struct v4l2_pix_format {
->  #define V4L2_PIX_FMT_H263     v4l2_fourcc('H', '2', '6', '3') /* H263          */
->  #define V4L2_PIX_FMT_MPEG1    v4l2_fourcc('M', 'P', 'G', '1') /* MPEG-1 ES     */
->  #define V4L2_PIX_FMT_MPEG2    v4l2_fourcc('M', 'P', 'G', '2') /* MPEG-2 ES     */
-> +#define V4L2_PIX_FMT_MPEG2_SLICE v4l2_fourcc('M', 'G', '2', 'S') /* MPEG-2 parsed slice data */
->  #define V4L2_PIX_FMT_MPEG4    v4l2_fourcc('M', 'P', 'G', '4') /* MPEG-4 part 2 ES */
->  #define V4L2_PIX_FMT_XVID     v4l2_fourcc('X', 'V', 'I', 'D') /* Xvid           */
->  #define V4L2_PIX_FMT_VC1_ANNEX_G v4l2_fourcc('V', 'C', '1', 'G') /* SMPTE 421M Annex G compliant stream */
-> @@ -1587,6 +1588,8 @@ struct v4l2_ext_control {
->  		__u8 __user *p_u8;
->  		__u16 __user *p_u16;
->  		__u32 __user *p_u32;
-> +		struct v4l2_ctrl_mpeg2_slice_params __user *p_mpeg2_slice_params;
-> +		struct v4l2_ctrl_mpeg2_quantization __user *p_mpeg2_quantization;
->  		void __user *ptr;
->  	};
->  } __attribute__ ((packed));
-> @@ -1632,6 +1635,8 @@ enum v4l2_ctrl_type {
->  	V4L2_CTRL_TYPE_U8	     = 0x0100,
->  	V4L2_CTRL_TYPE_U16	     = 0x0101,
->  	V4L2_CTRL_TYPE_U32	     = 0x0102,
-> +	V4L2_CTRL_TYPE_MPEG2_SLICE_PARAMS = 0x0103,
-> +	V4L2_CTRL_TYPE_MPEG2_QUANTIZATION = 0x0104,
->  };
->  
->  /*  Used in the VIDIOC_QUERYCTRL ioctl for querying controls */
-> 
+>
+>> Although I posted v4.
+>>
+>>
+>>>>    }
+>>>>
+>>>>    static const struct dev_pm_ops exynos_drm_pm_ops = {
+>>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.h b/drivers/gpu/drm/exynos/exynos_drm_drv.h
+>>>> index c737c4b..7349e7c 100644
+>>>> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.h
+>>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.h
+>>>> @@ -195,7 +195,6 @@ struct drm_exynos_file_private {
+>>>>     */
+>>>>    struct exynos_drm_private {
+>>>>        struct drm_fb_helper *fb_helper;
+>>>> -     struct drm_atomic_state *suspend_state;
+>>>>
+>>>>        struct device *g2d_dev;
+>>>>        struct device *dma_dev;
+>>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+>>>> index 132dd52..918dd2c 100644
+>>>> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+>>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+>>>> @@ -270,20 +270,3 @@ void exynos_drm_fbdev_fini(struct drm_device *dev)
+>>>>        private->fb_helper = NULL;
+>>>>    }
+>>>>
+>>>> -void exynos_drm_fbdev_suspend(struct drm_device *dev)
+>>>> -{
+>>>> -     struct exynos_drm_private *private = dev->dev_private;
+>>>> -
+>>>> -     console_lock();
+>>>> -     drm_fb_helper_set_suspend(private->fb_helper, 1);
+>>>> -     console_unlock();
+>>>> -}
+>>>> -
+>>>> -void exynos_drm_fbdev_resume(struct drm_device *dev)
+>>>> -{
+>>>> -     struct exynos_drm_private *private = dev->dev_private;
+>>>> -
+>>>> -     console_lock();
+>>>> -     drm_fb_helper_set_suspend(private->fb_helper, 0);
+>>>> -     console_unlock();
+>>>> -}
+>>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+>>>> index b338472..6840b6a 100644
+>>>> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+>>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+>>>> @@ -19,8 +19,6 @@
+>>>>
+>>>>    int exynos_drm_fbdev_init(struct drm_device *dev);
+>>>>    void exynos_drm_fbdev_fini(struct drm_device *dev);
+>>>> -void exynos_drm_fbdev_suspend(struct drm_device *drm);
+>>>> -void exynos_drm_fbdev_resume(struct drm_device *drm);
+>>>>
+>>>>    #else
+>>>>
+>>>> @@ -39,14 +37,6 @@ static inline void exynos_drm_fbdev_restore_mode(struct drm_device *dev)
+>>>>
+>>>>    #define exynos_drm_output_poll_changed (NULL)
+>>>>
+>>>> -static inline void exynos_drm_fbdev_suspend(struct drm_device *drm)
+>>>> -{
+>>>> -}
+>>>> -
+>>>> -static inline void exynos_drm_fbdev_resume(struct drm_device *drm)
+>>>> -{
+>>>> -}
+>>>> -
+>>>>    #endif
+>>>>
+>>>>    #endif
+>>> Best regards
+>>> --
+>>> Marek Szyprowski, PhD
+>>> Samsung R&D Institute Poland
+>>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>>
+>
+> Best regards
+> --
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
+>
