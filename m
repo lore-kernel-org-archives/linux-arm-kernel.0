@@ -1,193 +1,77 @@
-From: jrdr.linux@gmail.com (Souptick Joarder)
-Date: Sat, 4 Aug 2018 20:02:30 +0530
-Subject: [PATCH v3] gpu/drm/exynos: Convert
- drm_atomic_helper_suspend/resume()
-In-Reply-To: <20180803070009eucas1p1583f6df0ce5caf37662e7546f782513b~HTa5xqhex1670416704eucas1p1H@eucas1p1.samsung.com>
-References: <CGME20180802131924epcas4p105dc354b2ee651e70a5e777850222bc5@epcas4p1.samsung.com>
- <20180802132152.GA2833@jordon-HP-15-Notebook-PC>
- <20180802133852eucas1p1de66cfd2db5ed0c87665567455ea4747~HFNvAtE4-1249412494eucas1p1c@eucas1p1.samsung.com>
- <CAFqt6zYUT72e7CnUF9a3kg5ZjFcPjZViMNm687-FC_9PF5Oc7A@mail.gmail.com>
- <20180803070009eucas1p1583f6df0ce5caf37662e7546f782513b~HTa5xqhex1670416704eucas1p1H@eucas1p1.samsung.com>
-Message-ID: <CAFqt6zYxV6K4oZUXVaYLifx3xqPxPs9v5-BmAOfm6hG04g6hvA@mail.gmail.com>
+From: alexandru-cosmin.gheorghe@arm.com (Alexandru Gheorghe)
+Date: Sat,  4 Aug 2018 17:15:20 +0100
+Subject: [PATCH v3 00/10] Add helper for plane reset
+Message-ID: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 3, 2018 at 12:30 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hi,
->
-> On 2018-08-02 17:51, Souptick Joarder wrote:
->> On Thu, Aug 2, 2018 at 7:08 PM, Marek Szyprowski
->> <m.szyprowski@samsung.com> wrote:
->>> On 2018-08-02 15:21, Souptick Joarder wrote:
->>>> convert drm_atomic_helper_suspend/resume() to use
->>>> drm_mode_config_helper_suspend/resume().
->>>>
->>>> exynos_drm_fbdev_suspend/resume can be removed
->>>> as drm_mode_config_helper_suspend/resume has
->>>> implement the same in generic way.
->>>>
->>>> Remove suspend_state from exynos_drm_private
->>>> struct as it is no more useful.
->>>>
->>>> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
->>>> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
->>>> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>>> ---
->>>> v2: Address Inki Dae's comment. Remove ret variable
->>>>       from both suspend/resume function.
->>>>
->>>> v3: Tested by Marek. Updated the change log.
->>>>
->>>>    drivers/gpu/drm/exynos/exynos_drm_drv.c   | 26 ++------------------------
->>>>    drivers/gpu/drm/exynos/exynos_drm_drv.h   |  1 -
->>>>    drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 17 -----------------
->>>>    drivers/gpu/drm/exynos/exynos_drm_fbdev.h | 10 ----------
->>>>    4 files changed, 2 insertions(+), 52 deletions(-)
->>>>
->>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
->>>> index b599f74..d86dd81 100644
->>>> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
->>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
->>>> @@ -149,37 +149,15 @@ static void exynos_drm_postclose(struct drm_device *dev, struct drm_file *file)
->>>>    static int exynos_drm_suspend(struct device *dev)
->>>>    {
->>>>        struct drm_device *drm_dev = dev_get_drvdata(dev);
->>>> -     struct exynos_drm_private *private;
->>>> -
->>>> -     if (!drm_dev)
->>>> -             return 0;
->>>> -
->>>> -     private = drm_dev->dev_private;
->>>> -
->>>> -     drm_kms_helper_poll_disable(drm_dev);
->>>> -     exynos_drm_fbdev_suspend(drm_dev);
->>>> -     private->suspend_state = drm_atomic_helper_suspend(drm_dev);
->>>> -     if (IS_ERR(private->suspend_state)) {
->>>> -             exynos_drm_fbdev_resume(drm_dev);
->>>> -             drm_kms_helper_poll_enable(drm_dev);
->>>> -             return PTR_ERR(private->suspend_state);
->>>> -     }
->>>>
->>>> -     return 0;
->>>> +     return  drm_mode_config_helper_suspend(drm_dev);
->>>>    }
->>>>
->>>>    static void exynos_drm_resume(struct device *dev)
->>>>    {
->>>>        struct drm_device *drm_dev = dev_get_drvdata(dev);
->>>> -     struct exynos_drm_private *private;
->>>> -
->>>> -     if (!drm_dev)
->>>> -             return;
->>>>
->>>> -     private = drm_dev->dev_private;
->>>> -     drm_atomic_helper_resume(drm_dev, private->suspend_state);
->>>> -     exynos_drm_fbdev_resume(drm_dev);
->>>> -     drm_kms_helper_poll_enable(drm_dev);
->>>> +     return drm_mode_config_helper_resume(drm_dev);
->>> exynos_drm_resume() now returns 'void', so to be strict with
->>> c standard, the return statement should not be used here.
->> But in struct dev_pm_ops, it is still defined as
->>
->>                  int (*resume)(struct device *dev);
->>
->> I think, we need to correct the return type of
->> exynos_drm_resume() to int.
->
-> Nope. After commit dc684af6fc8d ("drm/exynos: Suspend/resume display
-> pipeline as early/late as possible") exynos_drm_resume() is assigned
-> to .complete callback, which use 'void' return type, so for now no
-> more changes are needed.
+No significant change since v2, fixed a spelling mistake and
+added/removed some newlines in 01 and 07 patches.
 
-Ok, then v4 is the right candidate to go.
+I plan to apply the first patch of the series and the patches for
+the drivers maintained through drm-misc(that go Reviewed/Ack) in
+drm-misc-next on Monday.
 
->
->> Although I posted v4.
->>
->>
->>>>    }
->>>>
->>>>    static const struct dev_pm_ops exynos_drm_pm_ops = {
->>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.h b/drivers/gpu/drm/exynos/exynos_drm_drv.h
->>>> index c737c4b..7349e7c 100644
->>>> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.h
->>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.h
->>>> @@ -195,7 +195,6 @@ struct drm_exynos_file_private {
->>>>     */
->>>>    struct exynos_drm_private {
->>>>        struct drm_fb_helper *fb_helper;
->>>> -     struct drm_atomic_state *suspend_state;
->>>>
->>>>        struct device *g2d_dev;
->>>>        struct device *dma_dev;
->>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
->>>> index 132dd52..918dd2c 100644
->>>> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
->>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
->>>> @@ -270,20 +270,3 @@ void exynos_drm_fbdev_fini(struct drm_device *dev)
->>>>        private->fb_helper = NULL;
->>>>    }
->>>>
->>>> -void exynos_drm_fbdev_suspend(struct drm_device *dev)
->>>> -{
->>>> -     struct exynos_drm_private *private = dev->dev_private;
->>>> -
->>>> -     console_lock();
->>>> -     drm_fb_helper_set_suspend(private->fb_helper, 1);
->>>> -     console_unlock();
->>>> -}
->>>> -
->>>> -void exynos_drm_fbdev_resume(struct drm_device *dev)
->>>> -{
->>>> -     struct exynos_drm_private *private = dev->dev_private;
->>>> -
->>>> -     console_lock();
->>>> -     drm_fb_helper_set_suspend(private->fb_helper, 0);
->>>> -     console_unlock();
->>>> -}
->>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
->>>> index b338472..6840b6a 100644
->>>> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
->>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
->>>> @@ -19,8 +19,6 @@
->>>>
->>>>    int exynos_drm_fbdev_init(struct drm_device *dev);
->>>>    void exynos_drm_fbdev_fini(struct drm_device *dev);
->>>> -void exynos_drm_fbdev_suspend(struct drm_device *drm);
->>>> -void exynos_drm_fbdev_resume(struct drm_device *drm);
->>>>
->>>>    #else
->>>>
->>>> @@ -39,14 +37,6 @@ static inline void exynos_drm_fbdev_restore_mode(struct drm_device *dev)
->>>>
->>>>    #define exynos_drm_output_poll_changed (NULL)
->>>>
->>>> -static inline void exynos_drm_fbdev_suspend(struct drm_device *drm)
->>>> -{
->>>> -}
->>>> -
->>>> -static inline void exynos_drm_fbdev_resume(struct drm_device *drm)
->>>> -{
->>>> -}
->>>> -
->>>>    #endif
->>>>
->>>>    #endif
->>> Best regards
->>> --
->>> Marek Szyprowski, PhD
->>> Samsung R&D Institute Poland
->>>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->>
->
-> Best regards
-> --
-> Marek Szyprowski, PhD
-> Samsung R&D Institute Poland
->
+For the other drivers please let me know if you want me to push them
+in drm-misc-next as well.
+
+Changes since v1: 
+ - Make __drm_atomic_helper_plane_reset consistent with the other
+   helpers and require that both plane and state not be NULL,
+   suggested by Boris Brezillon and Philipp Zabel. Drivers already
+   check for that.
+ - Add a proper commit message for driver changes.
+
+Drivers that subclass drm_plane need to copy the logic for linking the
+drm_plane with its state and to initialize core properties to their
+default values. E.g (alpha and rotation)
+
+Having a helper to reset the plane_state makes sense because of multiple
+reasons:
+1. Eliminate code duplication.
+2. Add a single place for initializing core properties to their
+default values, no need for driver to do it if what the helper sets
+makes sense for them.
+3. No need to debug the driver when you enable a core property and
+observe it doesn't have a proper default value.
+
+Tested with mali-dp the other drivers are just built-tested.
+
+
+Alexandru Gheorghe (10):
+  drm/atomic: Add  __drm_atomic_helper_plane_reset
+  drm/amd/display: Use __drm_atomic_helper_plane_reset instead of
+    copying the logic
+  drm: mali-dp: Use __drm_atomic_helper_plane_reset instead of copying
+    the logic
+  drm: atmel-hlcdc: Use __drm_atomic_helper_plane_reset instead of
+    copying the logic
+  drm/exynos: Use __drm_atomic_helper_plane_reset instead of copying the
+    logic
+  drm/imx: Use __drm_atomic_helper_plane_reset instead of copying the
+    logic
+  drm: rcar-du: Use __drm_atomic_helper_plane_reset instead of copying
+    the logic
+  drm/sun4i: Use __drm_atomic_helper_plane_reset instead of copying the
+    logic
+  drm/vc4: Use __drm_atomic_helper_plane_reset instead of copying the
+    logic
+  drm/vmwgfx: Use __drm_atomic_helper_plane_reset instead of copying the
+    logic
+
+ .../gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c |  7 ++--
+ drivers/gpu/drm/arm/malidp_planes.c           |  7 ++--
+ .../gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c   |  5 +--
+ drivers/gpu/drm/drm_atomic_helper.c           | 33 ++++++++++++++-----
+ drivers/gpu/drm/exynos/exynos_drm_plane.c     |  3 +-
+ drivers/gpu/drm/imx/ipuv3-plane.c             |  8 ++---
+ drivers/gpu/drm/rcar-du/rcar_du_plane.c       |  6 ++--
+ drivers/gpu/drm/rcar-du/rcar_du_vsp.c         |  5 +--
+ drivers/gpu/drm/sun4i/sun4i_layer.c           |  4 +--
+ drivers/gpu/drm/vc4/vc4_plane.c               |  4 +--
+ drivers/gpu/drm/vmwgfx/vmwgfx_kms.c           |  4 +--
+ include/drm/drm_atomic_helper.h               |  2 ++
+ 12 files changed, 41 insertions(+), 47 deletions(-)
+
+-- 
+2.18.0
