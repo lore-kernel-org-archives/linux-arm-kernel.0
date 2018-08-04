@@ -1,52 +1,98 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 04 Aug 2018 15:18:32 +0200
-Subject: [PATCH v4 4/4] arm64: dts: rockchip: add sdmmc UHS support for
- roc-rk3328-cc
-In-Reply-To: <1533016762-5268-5-git-send-email-djw@t-chip.com.cn>
-References: <1533016762-5268-1-git-send-email-djw@t-chip.com.cn>
- <1533016762-5268-5-git-send-email-djw@t-chip.com.cn>
-Message-ID: <3379811.jaOMd9KUxU@phil>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Sat, 4 Aug 2018 09:29:10 -0400 (EDT)
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <CAHCPf3s-+Qf=WBZz1KpisDMG3520jCUh8PLAO3PHa4jdt8kCTw@mail.gmail.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
+ <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
+ <20180803094129.GB17798@arm.com>
+ <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
+ <alpine.LRH.2.02.1808031424140.14030@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAHCPf3s-+Qf=WBZz1KpisDMG3520jCUh8PLAO3PHa4jdt8kCTw@mail.gmail.com>
+Message-ID: <alpine.LRH.2.02.1808040840410.16932@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Levin,
-
-Am Dienstag, 31. Juli 2018, 07:59:22 CEST schrieb djw at t-chip.com.cn:
-> From: Levin Du <djw@t-chip.com.cn>
-> 
-> In roc-rk3328-cc board, the signal voltage of sdmmc is supplied by the
-> vcc_sdio regulator, which is a mux between 1.8V and 3.3V, controlled by
-> a special output only gpio pin labeled "gpiomut_pmuio_iout",
-> corresponding bit 1 of the syscon GRF_SOC_CON10.
-> 
-> This special pin can now be reference as <&grf_gpio 0>, thanks to the
-> gpio-syscon driver, which makes writing regulator-gpio possible.
-> 
-> If the signal voltage changes, the io domain needs to change
-> correspondingly.
-> 
-> To use this feature, the following options are required in kernel config:
->  - CONFIG_GPIO_SYSCON=y
->  - CONFIG_POWER_AVS=y
->  - CONFIG_ROCKCHIP_IODOMAIN=y
-> 
-> Signed-off-by: Levin Du <djw@t-chip.com.cn>
-
-[...]
-
-> @@ -277,3 +295,7 @@
->  &usb_host0_ohci {
->  	status = "okay";
->  };
-> +
-> +&grf_gpio {
-> +	status = "okay";
-> +};
-> 
-
-applied to my dts64 branch after dropping the grf_gpio enablement,
-see comment in patch2 regarding the always present pin.
 
 
-Thanks
-Heiko
+On Fri, 3 Aug 2018, Matt Sealey wrote:
+
+> On 3 August 2018 at 13:25, Mikulas Patocka <mpatocka@redhat.com> wrote:
+> >
+> >
+> > On Fri, 3 Aug 2018, Ard Biesheuvel wrote:
+> >
+> >> Are we still talking about overlapping unaligned accesses here? Or do
+> >> you see other failures as well?
+> >
+> > Yes - it is caused by overlapping unaligned accesses inside memcpy. When I
+> > put "dmb sy" between the overlapping accesses in
+> > glibc/sysdeps/aarch64/memcpy.S, this program doesn't detect any memory
+> > corruption.
+> 
+> It is a symptom of generating reorderable accesses inside memcpy. It's nothing
+> to do with alignment, per se (see below). A dmb sy just hides the symptoms.
+> 
+> What we're talking about here - yes, Ard, within certain amounts of 
+> reason - is that you cannot use PCI BAR memory as 'Normal' - certainly 
+> never cacheable memory, but Normal NC isn't good either.
+
+So, are you going to map the PCI BAR as Device-nGnRE and then emulate all 
+the unaligned accesses in the trap handler?
+
+Or are you going to give up on supporting PCIe graphics on ARM at all?
+
+Videocards have linear framebuffer for 25 years. It was introduced as a 
+feature that simplified graphics programming a lot - programmers can use C 
+pointer arithmetics for drawing and they don't have to fiddle with 
+hardware registers. If you argue that graphics programmers can't use it 
+(after they have been using it for 25 years) - they will just ignore you 
+and ARM.
+
+
+> Links is broken.
+
+What else should it use? Are you going to introduce new functions 
+memcpy_to_framebuffer() and memset_framebuffer()?
+
+> Even on Intel.
+
+No, it's not. Intel will detect overlapping accesses.
+
+You can write this - it is legal C code:
+
+void g(void);
+void overlapping(unsigned char *p)
+{
+        p[0] = p[1] = p[2] = p[3] = 1;
+        g();
+        p[3] = p[4] = p[5] = p[6] = 2;
+}
+
+and the compiler compiles it to this:
+
+overlapping:
+.LFB0:
+        pushl   %ebx
+        subl    $8, %esp
+        movl    16(%esp), %ebx
+        movl    $16843009, (%ebx)
+        call    g
+        movl    $33686018, 3(%ebx)
+        addl    $8, %esp
+        popl    %ebx
+        ret
+
+Now - if the CPU is incapable of detecing the hazaard between writes to 
+(%ebx) and 3(%ebx) and reorders these writes, it is just broken because it 
+violates the C standard.
+
+If you argue that ARM is incapable of detecting this hazaard and reorders 
+these two overlapping memory writes - it means that you can't use C 
+pointers to access videoram on ARM - which means that you can't have PCIe 
+graphics at all.
+
+Mikulas
