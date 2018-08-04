@@ -1,50 +1,113 @@
 From: manu@freebsd.org (Emmanuel Vadot)
-Date: Sat,  4 Aug 2018 09:03:52 +0200
-Subject: [PATCH 4/7] arm64: dts: allwinner: a64: Add thermal sensor controller
- node
+Date: Sat,  4 Aug 2018 09:03:55 +0200
+Subject: [PATCH 7/7] arm64: dts: allwinner: H5: Enable the THS on H5 boards
 In-Reply-To: <20180804070355.14857-1-manu@freebsd.org>
 References: <20180804070355.14857-1-manu@freebsd.org>
-Message-ID: <20180804070355.14857-4-manu@freebsd.org>
+Message-ID: <20180804070355.14857-7-manu@freebsd.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add the ths controller for the A64 and the nvmem cell for the
-calibration data on the sid node.
+Enable the Thermal Sensor Controller on all H5 boards.
 
 Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts  | 4 ++++
+ arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts       | 4 ++++
+ arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts      | 4 ++++
+ arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts    | 4 ++++
+ .../arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts | 4 ++++
+ .../boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts      | 4 ++++
+ 6 files changed, 24 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 925bf38fb536..ad72a6fcdd7c 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -273,6 +273,25 @@
- 		sid: eeprom at 1c14000 {
- 			compatible = "allwinner,sun50i-a64-sid";
- 			reg = <0x1c14000 0x400>;
-+
-+			ths_calib: calib at 234 {
-+				reg = <0x234 0x6>;
-+			};
-+		};
-+
-+		ths: thermal_sensor at 1c25000 {
-+			compatible = "allwinner,sun50i-a64-ths";
-+			reg = <0x01c25000 0x100>;
-+			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
-+			clock-names = "apb", "ths";
-+			resets = <&ccu RST_BUS_THS>;
-+			reset-names = "apb";
-+			#thermal-sensor-cells = <2>;
-+			status = "disabled";
-+
-+			nvmem-cells = <&ths_calib>;
-+			nvmem-cell-names = "ths-calib";
- 		};
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
+index 506e25ba028a..767826684d2a 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
+@@ -189,6 +189,10 @@
+ 	status = "okay";
+ };
  
- 		usb_otg: usb at 1c19000 {
++&ths {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
+index cc268a69786c..dc49cc942fa9 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
+@@ -140,6 +140,10 @@
+ 	status = "okay";
+ };
+ 
++&ths {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+index 3e0d5a9c096d..6ffd048c0d93 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+@@ -219,6 +219,10 @@
+ 	};
+ };
+ 
++&ths {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
+index b75ca4d7d001..07819747a731 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
+@@ -222,6 +222,10 @@
+ 	status = "okay";
+ };
+ 
++&ths {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
+index 1238de25a969..405440fedd1e 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
+@@ -125,6 +125,10 @@
+ 	status = "okay";
+ };
+ 
++&ths {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+index 53c8c11620e0..09d2bbefcefa 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+@@ -132,6 +132,10 @@
+ 	status = "okay";
+ };
+ 
++&ths {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 2.18.0
