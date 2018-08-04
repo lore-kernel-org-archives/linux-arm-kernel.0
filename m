@@ -1,25 +1,26 @@
-From: maxi.jourdan@wanadoo.fr (Maxime Jourdan)
-Date: Sat, 4 Aug 2018 22:02:46 +0200
-Subject: [PATCH 3/4] ARM64: dts: meson-gx: add dmcbus and canvas nodes.
-In-Reply-To: <CALecT5hgk+Wuh4-UWY29NNoEz-47Fx3pSjve8raCd3hRMzXE5w@mail.gmail.com>
-References: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
- <20180801185128.23440-4-maxi.jourdan@wanadoo.fr>
- <CALecT5hgk+Wuh4-UWY29NNoEz-47Fx3pSjve8raCd3hRMzXE5w@mail.gmail.com>
-Message-ID: <CAHStOZ5VaOiOQhi7vG0Q9R7gF+LHvZim1qsEUJanZkFoXqgwDA@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 4 Aug 2018 23:00:24 +0200
+Subject: [PATCH v8 5/6] i2c: Add Actions Semiconductor Owl family S900
+ I2C driver
+In-Reply-To: <20180801180232.23680-6-manivannan.sadhasivam@linaro.org>
+References: <20180801180232.23680-1-manivannan.sadhasivam@linaro.org>
+ <20180801180232.23680-6-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180804210024.epnf3smqviqsm2jj@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +                       sysctrl_DMC: system-controller at 0 {
->> +                               compatible = "amlogic,meson-gx-dmc-sysctrl", "syscon", "simple-mfd";
->
-> we'd like to drop 'meson-' prefix, so better using "amlogic,gx-dmc-sysctrl",
-> please take a look at the discussion here [1]
->
-> [1] https://lkml.kernel.org/r/7hk1prmg4w.fsf at baylibre.com
->
+On Wed, Aug 01, 2018 at 11:32:31PM +0530, Manivannan Sadhasivam wrote:
+> Add Actions Semiconductor Owl family S900 I2C driver.
+> 
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> Acked-by: Peter Rosin <peda@axentia.se>
 
-On that subject, should I remove the meson keyword from dts only, or
-from everything ?
+Applied to for-next, thanks!
 
-e.g use amlogic_canvas_* symbols instead of meson_canvas_*, name the
-source file "amlogic-canvas.c", etc. ?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180804/8a92fdff/attachment.sig>
