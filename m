@@ -1,255 +1,467 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Sat,  4 Aug 2018 13:14:39 +0200
-Subject: [PATCH v7 3/3] drm/atmel-hlcdc: support bus-width (12/16/18/24) in
- endpoint nodes
-In-Reply-To: <20180804111439.7455-1-peda@axentia.se>
-References: <20180804111439.7455-1-peda@axentia.se>
-Message-ID: <20180804111439.7455-4-peda@axentia.se>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Sat, 4 Aug 2018 13:35:01 +0200
+Subject: [PATCH v6 1/8] media: v4l: Add definitions for MPEG2 slice format
+ and metadata
+In-Reply-To: <20180725100256.22833-2-paul.kocialkowski@bootlin.com>
+References: <20180725100256.22833-1-paul.kocialkowski@bootlin.com>
+ <20180725100256.22833-2-paul.kocialkowski@bootlin.com>
+Message-ID: <cf07a5d1-9179-44af-de11-61f02bbcf904@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This beats the heuristic that the connector is involved in what format
-should be output for cases where this fails.
+Hi Paul,
 
-E.g. if there is a bridge that changes format between the encoder and the
-connector, or if some of the RGB pins between the lcd controller and the
-encoder are not routed on the PCB.
+Some comments below. It looks pretty good, it's mostly small things that I
+commented upon.
 
-This is critical for the devices that have the "conflicting output
-formats" issue (SAM9N12, SAM9X5, SAMA5D3), since the most significant
-RGB bits move around depending on the selected output mode. For
-devices that do not have the "conflicting output formats" issue
-(SAMA5D2, SAMA5D4), this is completely irrelevant.
+On 07/25/2018 12:02 PM, Paul Kocialkowski wrote:
+> Stateless video decoding engines require both the MPEG slices and
+> associated metadata from the video stream in order to decode frames.
+> 
+> This introduces definitions for a new pixel format, describing buffers
+> with MPEG2 slice data, as well as a control structure for passing the
+> frame metadata to drivers.
+> 
+> This is based on work from both Florent Revest and Hugues Fruchet.
+> 
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> ---
+>  .../media/uapi/v4l/extended-controls.rst      | 122 ++++++++++++++++++
+>  .../media/uapi/v4l/pixfmt-compressed.rst      |   5 +
+>  drivers/media/v4l2-core/v4l2-ctrls.c          |  54 ++++++++
+>  drivers/media/v4l2-core/v4l2-ioctl.c          |   1 +
+>  include/media/v4l2-ctrls.h                    |  18 ++-
+>  include/uapi/linux/v4l2-controls.h            |  43 ++++++
+>  include/uapi/linux/videodev2.h                |   5 +
+>  7 files changed, 241 insertions(+), 7 deletions(-)
+> 
+> diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
+> index 9f7312bf3365..4a29d89fd9ac 100644
+> --- a/Documentation/media/uapi/v4l/extended-controls.rst
+> +++ b/Documentation/media/uapi/v4l/extended-controls.rst
+> @@ -1497,6 +1497,128 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type -
+>  
+>  
+>  
+> +.. _v4l2-mpeg-mpeg2:
+> +
+> +``V4L2_CID_MPEG_VIDEO_MPEG2_SLICE_PARAMS (struct)``
+> +    Specifies the slice parameters (also known as slice header) for the
+> +    associated MPEG-2 slice data. This includes all the necessary
+> +    parameters for configuring a hardware decoder pipeline for MPEG-2.
 
-Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
-Reviewed-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c   | 70 +++++++++++++++++-------
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h     |  1 +
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 70 +++++++++++++++++++++---
- 3 files changed, 114 insertions(+), 27 deletions(-)
+This seems to be mostly a representation of the MPEG-2 "Picture coding
+extension" (6.2.3.1 in ISO/IEC 13818-2: 1995).
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-index d73281095fac..c38a479ada98 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-@@ -226,6 +226,55 @@ static void atmel_hlcdc_crtc_atomic_enable(struct drm_crtc *c,
- #define ATMEL_HLCDC_RGB888_OUTPUT	BIT(3)
- #define ATMEL_HLCDC_OUTPUT_MODE_MASK	GENMASK(3, 0)
- 
-+static int atmel_hlcdc_connector_output_mode(struct drm_connector_state *state)
-+{
-+	struct drm_connector *connector = state->connector;
-+	struct drm_display_info *info = &connector->display_info;
-+	struct drm_encoder *encoder;
-+	unsigned int supported_fmts = 0;
-+	int j;
-+
-+	encoder = state->best_encoder;
-+	if (!encoder)
-+		encoder = connector->encoder;
-+
-+	switch (atmel_hlcdc_encoder_get_bus_fmt(encoder)) {
-+	case 0:
-+		break;
-+	case MEDIA_BUS_FMT_RGB444_1X12:
-+		return ATMEL_HLCDC_RGB444_OUTPUT;
-+	case MEDIA_BUS_FMT_RGB565_1X16:
-+		return ATMEL_HLCDC_RGB565_OUTPUT;
-+	case MEDIA_BUS_FMT_RGB666_1X18:
-+		return ATMEL_HLCDC_RGB666_OUTPUT;
-+	case MEDIA_BUS_FMT_RGB888_1X24:
-+		return ATMEL_HLCDC_RGB888_OUTPUT;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	for (j = 0; j < info->num_bus_formats; j++) {
-+		switch (info->bus_formats[j]) {
-+		case MEDIA_BUS_FMT_RGB444_1X12:
-+			supported_fmts |= ATMEL_HLCDC_RGB444_OUTPUT;
-+			break;
-+		case MEDIA_BUS_FMT_RGB565_1X16:
-+			supported_fmts |= ATMEL_HLCDC_RGB565_OUTPUT;
-+			break;
-+		case MEDIA_BUS_FMT_RGB666_1X18:
-+			supported_fmts |= ATMEL_HLCDC_RGB666_OUTPUT;
-+			break;
-+		case MEDIA_BUS_FMT_RGB888_1X24:
-+			supported_fmts |= ATMEL_HLCDC_RGB888_OUTPUT;
-+			break;
-+		default:
-+			break;
-+		}
-+	}
-+
-+	return supported_fmts;
-+}
-+
- static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
- {
- 	unsigned int output_fmts = ATMEL_HLCDC_OUTPUT_MODE_MASK;
-@@ -238,31 +287,12 @@ static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
- 	crtc = drm_crtc_to_atmel_hlcdc_crtc(state->crtc);
- 
- 	for_each_new_connector_in_state(state->state, connector, cstate, i) {
--		struct drm_display_info *info = &connector->display_info;
- 		unsigned int supported_fmts = 0;
--		int j;
- 
- 		if (!cstate->crtc)
- 			continue;
- 
--		for (j = 0; j < info->num_bus_formats; j++) {
--			switch (info->bus_formats[j]) {
--			case MEDIA_BUS_FMT_RGB444_1X12:
--				supported_fmts |= ATMEL_HLCDC_RGB444_OUTPUT;
--				break;
--			case MEDIA_BUS_FMT_RGB565_1X16:
--				supported_fmts |= ATMEL_HLCDC_RGB565_OUTPUT;
--				break;
--			case MEDIA_BUS_FMT_RGB666_1X18:
--				supported_fmts |= ATMEL_HLCDC_RGB666_OUTPUT;
--				break;
--			case MEDIA_BUS_FMT_RGB888_1X24:
--				supported_fmts |= ATMEL_HLCDC_RGB888_OUTPUT;
--				break;
--			default:
--				break;
--			}
--		}
-+		supported_fmts = atmel_hlcdc_connector_output_mode(cstate);
- 
- 		if (crtc->dc->desc->conflicting_output_formats)
- 			output_fmts &= supported_fmts;
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-index 60c937f42114..4cc1e03f0aee 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-@@ -441,5 +441,6 @@ void atmel_hlcdc_crtc_irq(struct drm_crtc *c);
- int atmel_hlcdc_crtc_create(struct drm_device *dev);
- 
- int atmel_hlcdc_create_outputs(struct drm_device *dev);
-+int atmel_hlcdc_encoder_get_bus_fmt(struct drm_encoder *encoder);
- 
- #endif /* DRM_ATMEL_HLCDC_H */
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-index 8db51fb131db..f587ae596791 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-@@ -27,33 +27,89 @@
- 
- #include "atmel_hlcdc_dc.h"
- 
-+struct atmel_hlcdc_rgb_output {
-+	struct drm_encoder encoder;
-+	int bus_fmt;
-+};
-+
- static const struct drm_encoder_funcs atmel_hlcdc_panel_encoder_funcs = {
- 	.destroy = drm_encoder_cleanup,
- };
- 
-+static struct atmel_hlcdc_rgb_output *
-+atmel_hlcdc_encoder_to_rgb_output(struct drm_encoder *encoder)
-+{
-+	return container_of(encoder, struct atmel_hlcdc_rgb_output, encoder);
-+}
-+
-+int atmel_hlcdc_encoder_get_bus_fmt(struct drm_encoder *encoder)
-+{
-+	struct atmel_hlcdc_rgb_output *output;
-+
-+	output = atmel_hlcdc_encoder_to_rgb_output(encoder);
-+
-+	return output->bus_fmt;
-+}
-+
-+static int atmel_hlcdc_of_bus_fmt(struct device_node *ep)
-+{
-+	u32 bus_width;
-+	int ret;
-+
-+	ret = of_property_read_u32(ep, "bus-width", &bus_width);
-+	if (ret == -EINVAL)
-+		return 0;
-+	if (ret)
-+		return ret;
-+
-+	switch (bus_width) {
-+	case 12:
-+		return MEDIA_BUS_FMT_RGB444_1X12;
-+	case 16:
-+		return MEDIA_BUS_FMT_RGB565_1X16;
-+	case 18:
-+		return MEDIA_BUS_FMT_RGB666_1X18;
-+	case 24:
-+		return MEDIA_BUS_FMT_RGB888_1X24;
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
- static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
- {
--	struct drm_encoder *encoder;
-+	struct atmel_hlcdc_rgb_output *output;
-+	struct device_node *ep;
- 	struct drm_panel *panel;
- 	struct drm_bridge *bridge;
- 	int ret;
- 
-+	ep = of_graph_get_endpoint_by_regs(dev->dev->of_node, 0, endpoint);
-+	if (!ep)
-+		return -ENODEV;
-+
- 	ret = drm_of_find_panel_or_bridge(dev->dev->of_node, 0, endpoint,
- 					  &panel, &bridge);
- 	if (ret)
- 		return ret;
- 
--	encoder = devm_kzalloc(dev->dev, sizeof(*encoder), GFP_KERNEL);
--	if (!encoder)
-+	output = devm_kzalloc(dev->dev, sizeof(*output), GFP_KERNEL);
-+	if (!output)
- 		return -EINVAL;
- 
--	ret = drm_encoder_init(dev, encoder,
-+	output->bus_fmt = atmel_hlcdc_of_bus_fmt(ep);
-+	if (output->bus_fmt < 0) {
-+		dev_err(dev->dev, "invalid bus width\n");
-+		return -EINVAL;
-+	}
-+
-+	ret = drm_encoder_init(dev, &output->encoder,
- 			       &atmel_hlcdc_panel_encoder_funcs,
- 			       DRM_MODE_ENCODER_NONE, NULL);
- 	if (ret)
- 		return ret;
- 
--	encoder->possible_crtcs = 0x1;
-+	output->encoder.possible_crtcs = 0x1;
- 
- 	if (panel) {
- 		bridge = drm_panel_bridge_add(panel, DRM_MODE_CONNECTOR_Unknown);
-@@ -62,7 +118,7 @@ static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
- 	}
- 
- 	if (bridge) {
--		ret = drm_bridge_attach(encoder, bridge, NULL);
-+		ret = drm_bridge_attach(&output->encoder, bridge, NULL);
- 		if (!ret)
- 			return 0;
- 
-@@ -70,7 +126,7 @@ static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
- 			drm_panel_bridge_remove(bridge);
- 	}
- 
--	drm_encoder_cleanup(encoder);
-+	drm_encoder_cleanup(&output->encoder);
- 
- 	return ret;
- }
--- 
-2.11.0
+Is that correct? I think some references to the standard should be added
+were appropriate.
+
+> +
+> +.. tabularcolumns:: |p{2.0cm}|p{4.0cm}|p{11.0cm}|
+> +
+> +.. c:type:: v4l2_ctrl_mpeg2_slice_params
+> +
+> +.. cssclass:: longtable
+> +
+> +.. flat-table:: struct v4l2_ctrl_mpeg2_slice_params
+> +    :header-rows:  0
+> +    :stub-columns: 0
+> +    :widths:       1 1 2
+> +
+> +    * - __u32
+> +      - ``slice_len``
+> +      - Length (in bits) of the current slice data.
+> +    * - __u32
+> +      - ``slice_pos``
+> +      - Position (in bits) of the current slice data, relative to the
+> +        frame start.
+> +    * - __u16
+> +      - ``width``
+> +      - Width of the corresponding output frame for the current slice.
+> +    * - __u16
+> +      - ``height``
+> +      - Height of the corresponding output frame for the current slice.
+> +    * - __u8
+> +      - ``slice_type``
+> +      - Picture coding type for the frame covered by the current slice
+> +        (V4L2_MPEG2_SLICE_TYPE_I, V4L2_MPEG2_SLICE_TYPE_P or
+> +        V4L2_MPEG2_SLICE_PCT_B).
+> +    * - __u8
+> +      - ``f_code[2][2]``
+> +      - Motion vector codes.
+> +    * - __u8
+> +      - ``intra_dc_precision``
+> +      - Precision of Discrete Cosine transform (0: 8 bits precision,
+> +        1: 9 bits precision, 2: 10 bits precision, 11: 11 bits precision).
+> +    * - __u8
+> +      - ``picture_structure``
+> +      - Picture structure (1: interlaced top field,
+> +        2: interlaced bottom field, 3: progressive frame).
+> +    * - __u8
+> +      - ``top_field_first``
+> +      - If set to 1 and interlaced stream, top field is output first.
+> +    * - __u8
+> +      - ``frame_pred_frame_dct``
+> +      - If set to 1, only frame-DCT and frame prediction are used.
+> +    * - __u8
+> +      - ``concealment_motion_vectors``
+> +      -  If set to 1, motion vectors are coded for intra macroblocks.
+> +    * - __u8
+> +      - ``q_scale_type``
+> +      - This flag affects the inverse quantisation process.
+
+quantization
+
+The american spelling appears to be the standard in our documentation, so
+let's stick to that.
+
+> +    * - __u8
+> +      - ``intra_vlc_format``
+> +      - This flag affects the decoding of transform coefficient data.
+> +    * - __u8
+> +      - ``alternate_scan``
+> +      - This flag affects the decoding of transform coefficient data.
+> +    * - __u8
+> +      - ``backward_ref_index``
+> +      - Index for the V4L2 buffer to use as backward reference, used with
+> +        B-coded and P-coded frames.
+> +    * - __u8
+> +      - ``forward_ref_index``
+> +      - Index for the V4L2 buffer to use as forward reference, used with
+> +        P-coded frames.
+> +    * - :cspan:`2`
+> +
+> +``V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION (struct)``
+> +    Specifies quantization matrices for the associated MPEG-2 slice data.
+> +
+> +.. tabularcolumns:: |p{2.0cm}|p{4.0cm}|p{11.0cm}|
+> +
+> +.. c:type:: v4l2_ctrl_mpeg2_quantization
+> +
+> +.. cssclass:: longtable
+> +
+> +.. flat-table:: struct v4l2_ctrl_mpeg2_quantization
+> +    :header-rows:  0
+> +    :stub-columns: 0
+> +    :widths:       1 1 2
+> +
+> +    * - __u8
+> +      - ``load_intra_quantiser_matrix``
+> +      - One bit to indicate whether to load the intra quantiser matrix.
+
+So the MPEG-2 spec appears to follow the British spelling, so for consistency
+with that spec we should stick to that for the field name.
+
+I'm not sure what is better in the description: stick to quantiser or change
+it to the US quantizer. I think we should keep quantiser since it looks weird
+otherwise.
+
+> +    * - __u32
+> +      - ``load_non_intra_quantiser_matrix``
+> +      - One bit to indicate whether to load the non-intra quantiser matrix.
+> +    * - __u32
+> +      - ``load_chroma_intra_quantiser_matrix``
+> +      - One bit to indicate whether to load the chroma intra quantiser matrix,
+> +        only relevant for non-4:2:0 YUV formats.
+> +    * - __u32
+> +      - ``load_chroma_non_intra_quantiser_matrix``
+> +      - One bit to indicate whether to load the non-chroma intra quantiser
+> +        matrix, only relevant for non-4:2:0 YUV formats.
+> +    * - __u32
+> +      - ``intra_quantiser_matrix[64]``
+> +      - The intra quantiser matrix coefficients, in zigzag scanning order.
+> +        It is relevant for both luma and chroma components, although it can be
+> +        superseded by the chroma-specific matrix for non-4:2:0 YUV formats.
+> +    * - __u32
+> +      - ``non_intra_quantiser_matrix[64]``
+> +      - The non-intra quantiser matrix coefficients, in zigzag scanning order.
+> +        It is relevant for both luma and chroma components, although it can be
+> +        superseded by the chroma-specific matrix for non-4:2:0 YUV formats.
+> +    * - __u32
+> +      - ``chroma_intra_quantiser_matrix[64]``
+> +      - The intra quantiser matrix coefficients for the chroma YUV component,
+> +        in zigzag scanning order. Only relevant for non-4:2:0 YUV formats.
+> +    * - __u32
+> +      - ``chroma_non_intra_quantiser_matrix[64]``
+> +      - The non-intra quantiser matrix coefficients for the chroma YUV component,
+> +        in zigzag scanning order. Only relevant for non-4:2:0 YUV formats.
+
+According to the MPEG-2 spec (6.3.11) these are all unsigned 8 bit values, so why
+use __u32?
+
+> +    * - :cspan:`2`
+>  
+>  MFC 5.1 MPEG Controls
+>  ---------------------
+> diff --git a/Documentation/media/uapi/v4l/pixfmt-compressed.rst b/Documentation/media/uapi/v4l/pixfmt-compressed.rst
+> index abec03937bb3..4e73f62b5163 100644
+> --- a/Documentation/media/uapi/v4l/pixfmt-compressed.rst
+> +++ b/Documentation/media/uapi/v4l/pixfmt-compressed.rst
+> @@ -60,6 +60,11 @@ Compressed Formats
+>        - ``V4L2_PIX_FMT_MPEG2``
+>        - 'MPG2'
+>        - MPEG2 video elementary stream.
+> +    * .. _V4L2-PIX-FMT-MPEG2-SLICE:
+> +
+> +      - ``V4L2_PIX_FMT_MPEG2_SLICE``
+> +      - 'MG2S'
+> +      - MPEG2 parsed slice data, as extracted from the MPEG2 bitstream.
+>      * .. _V4L2-PIX-FMT-MPEG4:
+>  
+>        - ``V4L2_PIX_FMT_MPEG4``
+> diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+> index 3610dce3a4f8..22483d894259 100644
+> --- a/drivers/media/v4l2-core/v4l2-ctrls.c
+> +++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+> @@ -844,6 +844,8 @@ const char *v4l2_ctrl_get_name(u32 id)
+>  	case V4L2_CID_MPEG_VIDEO_MV_V_SEARCH_RANGE:		return "Vertical MV Search Range";
+>  	case V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER:		return "Repeat Sequence Header";
+>  	case V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME:		return "Force Key Frame";
+> +	case V4L2_CID_MPEG_VIDEO_MPEG2_SLICE_PARAMS:		return "MPEG2 Slice Header";
+> +	case V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION:		return "MPEG2 Quantization Matrices";
+>  
+>  	/* VPX controls */
+>  	case V4L2_CID_MPEG_VIDEO_VPX_NUM_PARTITIONS:		return "VPX Number of Partitions";
+> @@ -1292,6 +1294,12 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
+>  	case V4L2_CID_RDS_TX_ALT_FREQS:
+>  		*type = V4L2_CTRL_TYPE_U32;
+>  		break;
+> +	case V4L2_CID_MPEG_VIDEO_MPEG2_SLICE_PARAMS:
+> +		*type = V4L2_CTRL_TYPE_MPEG2_SLICE_PARAMS;
+> +		break;
+> +	case V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION:
+> +		*type = V4L2_CTRL_TYPE_MPEG2_QUANTIZATION;
+> +		break;
+>  	default:
+>  		*type = V4L2_CTRL_TYPE_INTEGER;
+>  		break;
+> @@ -1550,6 +1558,7 @@ static void std_log(const struct v4l2_ctrl *ctrl)
+>  static int std_validate(const struct v4l2_ctrl *ctrl, u32 idx,
+>  			union v4l2_ctrl_ptr ptr)
+>  {
+> +	struct v4l2_ctrl_mpeg2_slice_params *p_mpeg2_slice_params;
+>  	size_t len;
+>  	u64 offset;
+>  	s64 val;
+> @@ -1612,6 +1621,45 @@ static int std_validate(const struct v4l2_ctrl *ctrl, u32 idx,
+>  			return -ERANGE;
+>  		return 0;
+>  
+> +	case V4L2_CTRL_TYPE_MPEG2_SLICE_PARAMS:
+> +		p_mpeg2_slice_params = ptr.p;
+> +
+> +		switch (p_mpeg2_slice_params->intra_dc_precision) {
+> +		case 0: /* 8 bits */
+> +		case 1: /* 9 bits */
+> +		case 11: /* 11 bits */
+> +			break;
+> +		default:
+> +			return -EINVAL;
+> +		}
+> +
+> +		switch (p_mpeg2_slice_params->picture_structure) {
+> +		case 1: /* interlaced top field */
+> +		case 2: /* interlaced bottom field */
+> +		case 3: /* progressive */
+> +			break;
+> +		default:
+> +			return -EINVAL;
+> +		}
+> +
+> +		switch (p_mpeg2_slice_params->slice_type) {
+> +		case V4L2_MPEG2_SLICE_TYPE_I:
+> +		case V4L2_MPEG2_SLICE_TYPE_P:
+> +		case V4L2_MPEG2_SLICE_TYPE_B:
+> +			break;
+> +		default:
+> +			return -EINVAL;
+> +		}
+> +
+> +		if (p_mpeg2_slice_params->backward_ref_index > VIDEO_MAX_FRAME ||
+> +		    p_mpeg2_slice_params->forward_ref_index > VIDEO_MAX_FRAME)
+
+Should be >=
+
+> +			return -EINVAL;
+> +
+> +		return 0;
+> +
+> +	case V4L2_CTRL_TYPE_MPEG2_QUANTIZATION:
+> +		return 0;
+> +
+>  	default:
+>  		return -EINVAL;
+>  	}
+> @@ -2186,6 +2234,12 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct v4l2_ctrl_handler *hdl,
+>  	case V4L2_CTRL_TYPE_U32:
+>  		elem_size = sizeof(u32);
+>  		break;
+> +	case V4L2_CTRL_TYPE_MPEG2_SLICE_PARAMS:
+> +		elem_size = sizeof(struct v4l2_ctrl_mpeg2_slice_params);
+> +		break;
+> +	case V4L2_CTRL_TYPE_MPEG2_QUANTIZATION:
+> +		elem_size = sizeof(struct v4l2_ctrl_mpeg2_quantization);
+> +		break;
+>  	default:
+>  		if (type < V4L2_CTRL_COMPOUND_TYPES)
+>  			elem_size = sizeof(s32);
+> diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
+> index 44fc0102221f..68e914b83a03 100644
+> --- a/drivers/media/v4l2-core/v4l2-ioctl.c
+> +++ b/drivers/media/v4l2-core/v4l2-ioctl.c
+> @@ -1304,6 +1304,7 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
+>  		case V4L2_PIX_FMT_H263:		descr = "H.263"; break;
+>  		case V4L2_PIX_FMT_MPEG1:	descr = "MPEG-1 ES"; break;
+>  		case V4L2_PIX_FMT_MPEG2:	descr = "MPEG-2 ES"; break;
+> +		case V4L2_PIX_FMT_MPEG2_SLICE:	descr = "MPEG-2 parsed slice data"; break;
+
+"MPEG-2 Parsed Slice Data"
+
+>  		case V4L2_PIX_FMT_MPEG4:	descr = "MPEG-4 part 2 ES"; break;
+>  		case V4L2_PIX_FMT_XVID:		descr = "Xvid"; break;
+>  		case V4L2_PIX_FMT_VC1_ANNEX_G:	descr = "VC-1 (SMPTE 412M Annex G)"; break;
+> diff --git a/include/media/v4l2-ctrls.h b/include/media/v4l2-ctrls.h
+> index 34ee3167d7dd..83eff6f91ed2 100644
+> --- a/include/media/v4l2-ctrls.h
+> +++ b/include/media/v4l2-ctrls.h
+> @@ -35,13 +35,15 @@ struct poll_table_struct;
+>  
+>  /**
+>   * union v4l2_ctrl_ptr - A pointer to a control value.
+> - * @p_s32:	Pointer to a 32-bit signed value.
+> - * @p_s64:	Pointer to a 64-bit signed value.
+> - * @p_u8:	Pointer to a 8-bit unsigned value.
+> - * @p_u16:	Pointer to a 16-bit unsigned value.
+> - * @p_u32:	Pointer to a 32-bit unsigned value.
+> - * @p_char:	Pointer to a string.
+> - * @p:		Pointer to a compound value.
+> + * @p_s32:			Pointer to a 32-bit signed value.
+> + * @p_s64:			Pointer to a 64-bit signed value.
+> + * @p_u8:			Pointer to a 8-bit unsigned value.
+> + * @p_u16:			Pointer to a 16-bit unsigned value.
+> + * @p_u32:			Pointer to a 32-bit unsigned value.
+> + * @p_char:			Pointer to a string.
+> + * @p_mpeg2_slice_params:	Pointer to a MPEG2 slice parameters structure.
+> + * @p_mpeg2_quantization:	Pointer to a MPEG2 quantization data structure.
+> + * @p:				Pointer to a compound value.
+>   */
+>  union v4l2_ctrl_ptr {
+>  	s32 *p_s32;
+> @@ -50,6 +52,8 @@ union v4l2_ctrl_ptr {
+>  	u16 *p_u16;
+>  	u32 *p_u32;
+>  	char *p_char;
+> +	struct v4l2_ctrl_mpeg2_slice_params *p_mpeg2_slice_params;
+> +	struct v4l2_ctrl_mpeg2_quantization *p_mpeg2_quantization;
+>  	void *p;
+>  };
+>  
+> diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+> index e4ee10ee917d..ce6de781037a 100644
+> --- a/include/uapi/linux/v4l2-controls.h
+> +++ b/include/uapi/linux/v4l2-controls.h
+> @@ -557,6 +557,9 @@ enum v4l2_mpeg_video_mpeg4_profile {
+>  };
+>  #define V4L2_CID_MPEG_VIDEO_MPEG4_QPEL		(V4L2_CID_MPEG_BASE+407)
+>  
+> +#define V4L2_CID_MPEG_VIDEO_MPEG2_SLICE_PARAMS	(V4L2_CID_MPEG_BASE+450)
+
+I would insert this at V4L2_CID_MPEG_BASE+250
+
+That is close to the existing MPEG2 controls, which makes sense.
+
+> +#define V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION	(V4L2_CID_MPEG_BASE+451)
+
+and this becomes +251 of course.
+
+> +
+>  /*  Control IDs for VP8 streams
+>   *  Although VP8 is not part of MPEG we add these controls to the MPEG class
+>   *  as that class is already handling other video compression standards
+> @@ -1092,4 +1095,44 @@ enum v4l2_detect_md_mode {
+>  #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_CLASS_BASE + 3)
+>  #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DETECT_CLASS_BASE + 4)
+>  
+> +#define V4L2_MPEG2_SLICE_TYPE_I			1
+> +#define V4L2_MPEG2_SLICE_TYPE_P			2
+> +#define V4L2_MPEG2_SLICE_TYPE_B			3
+> +#define V4L2_MPEG2_SLICE_TYPE_D			4
+> +
+> +struct v4l2_ctrl_mpeg2_slice_params {
+> +	__u32	slice_len;
+> +	__u32	slice_pos;
+> +
+> +	__u16	width;
+> +	__u16	height;
+> +
+> +	__u8	slice_type;
+> +	__u8	f_code[2][2];
+> +
+> +	__u8	intra_dc_precision;
+> +	__u8	picture_structure;
+> +	__u8	top_field_first;
+> +	__u8	frame_pred_frame_dct;
+> +	__u8	concealment_motion_vectors;
+> +	__u8	q_scale_type;
+> +	__u8	intra_vlc_format;
+> +	__u8	alternate_scan;
+> +
+> +	__u8	backward_ref_index;
+> +	__u8	forward_ref_index;
+
+How certain are you that this is all that's needed? Should we add
+a reserved field?
+
+> +};
+> +
+> +struct v4l2_ctrl_mpeg2_quantization {
+> +	__u8	load_intra_quantiser_matrix : 1;
+> +	__u8	load_non_intra_quantiser_matrix : 1;
+> +	__u8	load_chroma_intra_quantiser_matrix : 1;
+> +	__u8	load_chroma_non_intra_quantiser_matrix : 1;
+
+I wouldn't use bitfields here. It doesn't add anything.
+
+> +
+> +	__u8	intra_quantiser_matrix[64];
+> +	__u8	non_intra_quantiser_matrix[64];
+> +	__u8	chroma_intra_quantiser_matrix[64];
+> +	__u8	chroma_non_intra_quantiser_matrix[64];
+> +};
+> +
+>  #endif
+> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> index 1f6c4b52baae..d171361ed9b3 100644
+> --- a/include/uapi/linux/videodev2.h
+> +++ b/include/uapi/linux/videodev2.h
+> @@ -629,6 +629,7 @@ struct v4l2_pix_format {
+>  #define V4L2_PIX_FMT_H263     v4l2_fourcc('H', '2', '6', '3') /* H263          */
+>  #define V4L2_PIX_FMT_MPEG1    v4l2_fourcc('M', 'P', 'G', '1') /* MPEG-1 ES     */
+>  #define V4L2_PIX_FMT_MPEG2    v4l2_fourcc('M', 'P', 'G', '2') /* MPEG-2 ES     */
+> +#define V4L2_PIX_FMT_MPEG2_SLICE v4l2_fourcc('M', 'G', '2', 'S') /* MPEG-2 parsed slice data */
+>  #define V4L2_PIX_FMT_MPEG4    v4l2_fourcc('M', 'P', 'G', '4') /* MPEG-4 part 2 ES */
+>  #define V4L2_PIX_FMT_XVID     v4l2_fourcc('X', 'V', 'I', 'D') /* Xvid           */
+>  #define V4L2_PIX_FMT_VC1_ANNEX_G v4l2_fourcc('V', 'C', '1', 'G') /* SMPTE 421M Annex G compliant stream */
+> @@ -1587,6 +1588,8 @@ struct v4l2_ext_control {
+>  		__u8 __user *p_u8;
+>  		__u16 __user *p_u16;
+>  		__u32 __user *p_u32;
+> +		struct v4l2_ctrl_mpeg2_slice_params __user *p_mpeg2_slice_params;
+> +		struct v4l2_ctrl_mpeg2_quantization __user *p_mpeg2_quantization;
+>  		void __user *ptr;
+>  	};
+>  } __attribute__ ((packed));
+> @@ -1632,6 +1635,8 @@ enum v4l2_ctrl_type {
+>  	V4L2_CTRL_TYPE_U8	     = 0x0100,
+>  	V4L2_CTRL_TYPE_U16	     = 0x0101,
+>  	V4L2_CTRL_TYPE_U32	     = 0x0102,
+> +	V4L2_CTRL_TYPE_MPEG2_SLICE_PARAMS = 0x0103,
+> +	V4L2_CTRL_TYPE_MPEG2_QUANTIZATION = 0x0104,
+>  };
+>  
+>  /*  Used in the VIDIOC_QUERYCTRL ioctl for querying controls */
+> 
+
+Regards,
+
+	Hans
