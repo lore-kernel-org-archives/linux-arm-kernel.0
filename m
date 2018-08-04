@@ -1,10 +1,10 @@
 From: alexandru-cosmin.gheorghe@arm.com (Alexandru Gheorghe)
-Date: Sat,  4 Aug 2018 17:15:26 +0100
-Subject: [PATCH v3 06/10] drm/imx: Use __drm_atomic_helper_plane_reset instead
- of copying the logic
+Date: Sat,  4 Aug 2018 17:15:27 +0100
+Subject: [PATCH v3 07/10] drm: rcar-du: Use __drm_atomic_helper_plane_reset
+ instead of copying the logic
 In-Reply-To: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
 References: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
-Message-ID: <20180804161530.12275-7-alexandru-cosmin.gheorghe@arm.com>
+Message-ID: <20180804161530.12275-8-alexandru-cosmin.gheorghe@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,34 +13,54 @@ for linking a plane with its state and resetting the core
 properties(alpha, rotation, etc.) to their default values.
 Use that instead of duplicating the logic.
 
+__drm_atomic_helper_plane_reset initializes the alpha property to its
+max value, which is defined by the drm core as DRM_BLEND_ALPHA_OPAQUE,
+so nothing changes regarding the alpha value.
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
 ---
- drivers/gpu/drm/imx/ipuv3-plane.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/rcar-du/rcar_du_plane.c | 6 ++----
+ drivers/gpu/drm/rcar-du/rcar_du_vsp.c   | 5 +----
+ 2 files changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/gpu/drm/imx/ipuv3-plane.c b/drivers/gpu/drm/imx/ipuv3-plane.c
-index 203f247d4854..1bd4de03ce9e 100644
---- a/drivers/gpu/drm/imx/ipuv3-plane.c
-+++ b/drivers/gpu/drm/imx/ipuv3-plane.c
-@@ -281,16 +281,14 @@ static void ipu_plane_state_reset(struct drm_plane *plane)
- 		ipu_state = to_ipu_plane_state(plane->state);
- 		__drm_atomic_helper_plane_destroy_state(plane->state);
- 		kfree(ipu_state);
-+		plane->state = NULL;
- 	}
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_plane.c b/drivers/gpu/drm/rcar-du/rcar_du_plane.c
+index c20f7ed48c8d..8861e715c248 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_plane.c
++++ b/drivers/gpu/drm/rcar-du/rcar_du_plane.c
+@@ -690,14 +690,12 @@ static void rcar_du_plane_reset(struct drm_plane *plane)
+ 	if (state == NULL)
+ 		return;
  
- 	ipu_state = kzalloc(sizeof(*ipu_state), GFP_KERNEL);
- 
--	if (ipu_state) {
--		ipu_state->base.plane = plane;
--		ipu_state->base.rotation = DRM_MODE_ROTATE_0;
--	}
-+	if (ipu_state)
-+		__drm_atomic_helper_plane_reset(plane, &ipu_state->base);
- 
--	plane->state = &ipu_state->base;
++	__drm_atomic_helper_plane_reset(plane, &state->state);
++
+ 	state->hwindex = -1;
+ 	state->source = RCAR_DU_PLANE_MEMORY;
+ 	state->colorkey = RCAR_DU_COLORKEY_NONE;
+ 	state->state.zpos = plane->type == DRM_PLANE_TYPE_PRIMARY ? 0 : 1;
+-
+-	plane->state = &state->state;
+-	plane->state->alpha = DRM_BLEND_ALPHA_OPAQUE;
+-	plane->state->plane = plane;
  }
  
- static struct drm_plane_state *
+ static int rcar_du_plane_atomic_set_property(struct drm_plane *plane,
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_vsp.c b/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
+index 72eebeda518e..45eb777a16a4 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
++++ b/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
+@@ -346,11 +346,8 @@ static void rcar_du_vsp_plane_reset(struct drm_plane *plane)
+ 	if (state == NULL)
+ 		return;
+ 
+-	state->state.alpha = DRM_BLEND_ALPHA_OPAQUE;
++	__drm_atomic_helper_plane_reset(plane, &state->state);
+ 	state->state.zpos = plane->type == DRM_PLANE_TYPE_PRIMARY ? 0 : 1;
+-
+-	plane->state = &state->state;
+-	plane->state->plane = plane;
+ }
+ 
+ static const struct drm_plane_funcs rcar_du_vsp_plane_funcs = {
 -- 
 2.18.0
