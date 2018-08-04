@@ -1,10 +1,10 @@
 From: alexandru-cosmin.gheorghe@arm.com (Alexandru Gheorghe)
-Date: Sat,  4 Aug 2018 17:15:27 +0100
-Subject: [PATCH v3 07/10] drm: rcar-du: Use __drm_atomic_helper_plane_reset
+Date: Sat,  4 Aug 2018 17:15:28 +0100
+Subject: [PATCH v3 08/10] drm/sun4i: Use __drm_atomic_helper_plane_reset
  instead of copying the logic
 In-Reply-To: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
 References: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
-Message-ID: <20180804161530.12275-8-alexandru-cosmin.gheorghe@arm.com>
+Message-ID: <20180804161530.12275-9-alexandru-cosmin.gheorghe@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,50 +17,26 @@ __drm_atomic_helper_plane_reset initializes the alpha property to its
 max value, which is defined by the drm core as DRM_BLEND_ALPHA_OPAQUE,
 so nothing changes regarding the alpha value.
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
 ---
- drivers/gpu/drm/rcar-du/rcar_du_plane.c | 6 ++----
- drivers/gpu/drm/rcar-du/rcar_du_vsp.c   | 5 +----
- 2 files changed, 3 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_layer.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/rcar-du/rcar_du_plane.c b/drivers/gpu/drm/rcar-du/rcar_du_plane.c
-index c20f7ed48c8d..8861e715c248 100644
---- a/drivers/gpu/drm/rcar-du/rcar_du_plane.c
-+++ b/drivers/gpu/drm/rcar-du/rcar_du_plane.c
-@@ -690,14 +690,12 @@ static void rcar_du_plane_reset(struct drm_plane *plane)
- 	if (state == NULL)
- 		return;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index 750ad24de1d7..78f77af8805a 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -35,9 +35,7 @@ static void sun4i_backend_layer_reset(struct drm_plane *plane)
  
-+	__drm_atomic_helper_plane_reset(plane, &state->state);
-+
- 	state->hwindex = -1;
- 	state->source = RCAR_DU_PLANE_MEMORY;
- 	state->colorkey = RCAR_DU_COLORKEY_NONE;
- 	state->state.zpos = plane->type == DRM_PLANE_TYPE_PRIMARY ? 0 : 1;
--
--	plane->state = &state->state;
--	plane->state->alpha = DRM_BLEND_ALPHA_OPAQUE;
--	plane->state->plane = plane;
+ 	state = kzalloc(sizeof(*state), GFP_KERNEL);
+ 	if (state) {
+-		plane->state = &state->state;
+-		plane->state->plane = plane;
+-		plane->state->alpha = DRM_BLEND_ALPHA_OPAQUE;
++		__drm_atomic_helper_plane_reset(plane, &state->state);
+ 		plane->state->zpos = layer->id;
+ 	}
  }
- 
- static int rcar_du_plane_atomic_set_property(struct drm_plane *plane,
-diff --git a/drivers/gpu/drm/rcar-du/rcar_du_vsp.c b/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
-index 72eebeda518e..45eb777a16a4 100644
---- a/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
-+++ b/drivers/gpu/drm/rcar-du/rcar_du_vsp.c
-@@ -346,11 +346,8 @@ static void rcar_du_vsp_plane_reset(struct drm_plane *plane)
- 	if (state == NULL)
- 		return;
- 
--	state->state.alpha = DRM_BLEND_ALPHA_OPAQUE;
-+	__drm_atomic_helper_plane_reset(plane, &state->state);
- 	state->state.zpos = plane->type == DRM_PLANE_TYPE_PRIMARY ? 0 : 1;
--
--	plane->state = &state->state;
--	plane->state->plane = plane;
- }
- 
- static const struct drm_plane_funcs rcar_du_vsp_plane_funcs = {
 -- 
 2.18.0
