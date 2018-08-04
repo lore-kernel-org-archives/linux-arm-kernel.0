@@ -1,41 +1,30 @@
-From: alexandru-cosmin.gheorghe@arm.com (Alexandru Gheorghe)
-Date: Sat,  4 Aug 2018 17:15:29 +0100
-Subject: [PATCH v3 09/10] drm/vc4: Use __drm_atomic_helper_plane_reset instead
- of copying the logic
-In-Reply-To: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
-References: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
-Message-ID: <20180804161530.12275-10-alexandru-cosmin.gheorghe@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat,  4 Aug 2018 20:46:23 +0200
+Subject: [PATCH 0/2] crypto: arm64/ghash-ce - performance improvements
+Message-ID: <20180804184625.28523-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new helper function(__drm_atomic_helper_plane_reset) has been added
-for linking a plane with its state and resetting the core
-properties(alpha, rotation, etc.) to their default values.
-Use that instead of duplicating the logic.
+Another bit of performance work on the GHASH driver: this time it is not
+the combined AES/GCM algorithm but the bare GHASH driver that gets updated.
 
-__drm_atomic_helper_plane_reset initializes the alpha property to its
-max value, which is defined by the drm core as DRM_BLEND_ALPHA_OPAQUE,
-so nothing changes regarding the alpha value.
+Even though ARM cores that implement the polynomical multiplication
+instructions that these routines depend on are guaranteed to also support
+the AES instructions, and can thus use the AES/GCM driver, there could
+be reasons to use the accelerated GHASH in isolation, e.g., with another
+symmetric blockcipher, with a faster h/w accelerator, or potentially with
+an accelerator that does not expose the AES key to the OS.
 
-Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
----
- drivers/gpu/drm/vc4/vc4_plane.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+The resulting code runs at 1.1 cycles per byte on Cortex-A53 (down from
+2.4 cycles per byte)
 
-diff --git a/drivers/gpu/drm/vc4/vc4_plane.c b/drivers/gpu/drm/vc4/vc4_plane.c
-index 9d7a36f148cf..688ad9bb0f08 100644
---- a/drivers/gpu/drm/vc4/vc4_plane.c
-+++ b/drivers/gpu/drm/vc4/vc4_plane.c
-@@ -200,9 +200,7 @@ static void vc4_plane_reset(struct drm_plane *plane)
- 	if (!vc4_state)
- 		return;
- 
--	plane->state = &vc4_state->base;
--	plane->state->alpha = DRM_BLEND_ALPHA_OPAQUE;
--	vc4_state->base.plane = plane;
-+	__drm_atomic_helper_plane_reset(plane, &vc4_state->base);
- }
- 
- static void vc4_dlist_write(struct vc4_plane_state *vc4_state, u32 val)
+Ard Biesheuvel (2):
+  crypto: arm64/ghash-ce - replace NEON yield check with block limit
+  crypto: arm64/ghash-ce - implement 4-way aggregation
+
+ arch/arm64/crypto/ghash-ce-core.S | 153 ++++++++++++++------
+ arch/arm64/crypto/ghash-ce-glue.c |  87 ++++++-----
+ 2 files changed, 161 insertions(+), 79 deletions(-)
+
 -- 
 2.18.0
