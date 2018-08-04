@@ -1,29 +1,37 @@
 From: manu@freebsd.org (Emmanuel Vadot)
-Date: Sat,  4 Aug 2018 09:03:55 +0200
-Subject: [PATCH 7/7] arm64: dts: allwinner: H5: Enable the THS on H5 boards
+Date: Sat,  4 Aug 2018 09:03:53 +0200
+Subject: [PATCH 5/7] ARM: dts: sun8i: h3: Enable the THS on H3 boards
 In-Reply-To: <20180804070355.14857-1-manu@freebsd.org>
 References: <20180804070355.14857-1-manu@freebsd.org>
-Message-ID: <20180804070355.14857-7-manu@freebsd.org>
+Message-ID: <20180804070355.14857-5-manu@freebsd.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the Thermal Sensor Controller on all H5 boards.
+Enable the Thermal Sensor Controller on all H3 boards.
 
 Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts  | 4 ++++
- arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts       | 4 ++++
- arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts      | 4 ++++
- arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts    | 4 ++++
- .../arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts | 4 ++++
- .../boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts      | 4 ++++
- 6 files changed, 24 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 4 ++++
+ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts       | 4 ++++
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts   | 4 ++++
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts        | 4 ++++
+ arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts   | 4 ++++
+ arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts       | 4 ++++
+ arch/arm/boot/dts/sun8i-h3-nanopi.dtsi          | 4 ++++
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts       | 4 ++++
+ arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts    | 4 ++++
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts     | 4 ++++
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts | 4 ++++
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts      | 4 ++++
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts    | 4 ++++
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts  | 4 ++++
+ 14 files changed, 56 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
-index 506e25ba028a..767826684d2a 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
-@@ -189,6 +189,10 @@
+diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+index 30540dc8e0c5..e6cf879f7324 100644
+--- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
+@@ -211,6 +211,10 @@
  	status = "okay";
  };
  
@@ -34,11 +42,11 @@ index 506e25ba028a..767826684d2a 100644
  &uart0 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
-index cc268a69786c..dc49cc942fa9 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo2.dts
-@@ -140,6 +140,10 @@
+diff --git a/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts b/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
+index 5d23667dc2d2..d95269df8dca 100644
+--- a/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
++++ b/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
+@@ -197,6 +197,10 @@
  	status = "okay";
  };
  
@@ -49,11 +57,38 @@ index cc268a69786c..dc49cc942fa9 100644
  &uart0 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-index 3e0d5a9c096d..6ffd048c0d93 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-@@ -219,6 +219,10 @@
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+index 65cba1050802..9858ca42a826 100644
+--- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+@@ -135,6 +135,10 @@
+ 	status = "okay";
+ };
+ 
++&ths {
++	status = "okay";
++};
++
+ &uart3 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart3_pins>, <&uart3_rts_cts_pins>;
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
+index 9412668bb888..ad9df48f86fa 100644
+--- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
+@@ -104,3 +104,7 @@
+ &ohci2 {
+ 	status = "okay";
+ };
++
++&ths {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
+index 6246d3eff39d..2a21dfedfc31 100644
+--- a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
+@@ -103,6 +103,10 @@
  	};
  };
  
@@ -64,11 +99,41 @@ index 3e0d5a9c096d..6ffd048c0d93 100644
  &uart0 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
-index b75ca4d7d001..07819747a731 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-prime.dts
-@@ -222,6 +222,10 @@
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
+index 9f33f6fae595..1122ac363f55 100644
+--- a/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
+@@ -62,6 +62,10 @@
+ 	status = "okay";
+ };
+ 
++&ths {
++	status = "okay";
++};
++
+ &usb_otg {
+ 	status = "okay";
+ 	dr_mode = "peripheral";
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi.dtsi b/arch/arm/boot/dts/sun8i-h3-nanopi.dtsi
+index f110ee382239..7166f6af530b 100644
+--- a/arch/arm/boot/dts/sun8i-h3-nanopi.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi.dtsi
+@@ -123,6 +123,10 @@
+ 	};
+ };
+ 
++&ths {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+index f1fc6bdca8be..0aa15832e9a1 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+@@ -208,6 +208,10 @@
  	status = "okay";
  };
  
@@ -79,11 +144,26 @@ index b75ca4d7d001..07819747a731 100644
  &uart0 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
-index 1238de25a969..405440fedd1e 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus.dts
-@@ -125,6 +125,10 @@
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts
+index 476ae8e387ca..f78aaec27a8f 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts
+@@ -179,6 +179,10 @@
+ 	};
+ };
+ 
++&ths {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+index 245fd658defb..221d130b4153 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+@@ -190,6 +190,10 @@
  	status = "okay";
  };
  
@@ -94,11 +174,23 @@ index 1238de25a969..405440fedd1e 100644
  &uart0 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-index 53c8c11620e0..09d2bbefcefa 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-@@ -132,6 +132,10 @@
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
+index 71fb73208939..d07f3d3db344 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts
+@@ -89,3 +89,7 @@
+ 	/* eMMC is missing pull-ups */
+ 	bias-pull-up;
+ };
++
++&ths {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index 46240334128f..53bc681ca0ca 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -227,6 +227,10 @@
  	status = "okay";
  };
  
@@ -109,5 +201,32 @@ index 53c8c11620e0..09d2bbefcefa 100644
  &uart0 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&uart0_pins_a>;
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+index b403e5d787cb..8213481e262a 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+@@ -119,6 +119,10 @@
+ 	};
+ };
+ 
++&ths {
++	status = "okay";
++};
++
+ &usbphy {
+ 	usb3_vbus-supply = <&reg_usb3_vbus>;
+ };
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts
+index 6dbf7b2e0c13..b744bc26b8a6 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus2e.dts
+@@ -77,3 +77,7 @@
+ 		reg = <1>;
+ 	};
+ };
++
++&ths {
++	status = "okay";
++};
 -- 
 2.18.0
