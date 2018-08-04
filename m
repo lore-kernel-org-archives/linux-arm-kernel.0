@@ -1,32 +1,52 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 04 Aug 2018 15:16:01 +0200
-Subject: [PATCH v4 2/4] arm64: dts: rockchip: add GRF GPIO controller to
- rk3328
-In-Reply-To: <1533016762-5268-3-git-send-email-djw@t-chip.com.cn>
+Date: Sat, 04 Aug 2018 15:18:32 +0200
+Subject: [PATCH v4 4/4] arm64: dts: rockchip: add sdmmc UHS support for
+ roc-rk3328-cc
+In-Reply-To: <1533016762-5268-5-git-send-email-djw@t-chip.com.cn>
 References: <1533016762-5268-1-git-send-email-djw@t-chip.com.cn>
- <1533016762-5268-3-git-send-email-djw@t-chip.com.cn>
-Message-ID: <4016409.aba6YNvtTb@phil>
+ <1533016762-5268-5-git-send-email-djw@t-chip.com.cn>
+Message-ID: <3379811.jaOMd9KUxU@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Levin,
 
-Am Dienstag, 31. Juli 2018, 07:59:20 CEST schrieb djw at t-chip.com.cn:
+Am Dienstag, 31. Juli 2018, 07:59:22 CEST schrieb djw at t-chip.com.cn:
 > From: Levin Du <djw@t-chip.com.cn>
 > 
-> Adding a GRF GPIO controller labled "grf_gpio" to rk3328, currently
-> providing access to the GPIO_MUTE pin, which is manupulated by the
-> GRF_SOC_CON10 register.
+> In roc-rk3328-cc board, the signal voltage of sdmmc is supplied by the
+> vcc_sdio regulator, which is a mux between 1.8V and 3.3V, controlled by
+> a special output only gpio pin labeled "gpiomut_pmuio_iout",
+> corresponding bit 1 of the syscon GRF_SOC_CON10.
 > 
-> The GPIO_MUTE pin is referred to as <&grf_gpio 0>.
+> This special pin can now be reference as <&grf_gpio 0>, thanks to the
+> gpio-syscon driver, which makes writing regulator-gpio possible.
+> 
+> If the signal voltage changes, the io domain needs to change
+> correspondingly.
+> 
+> To use this feature, the following options are required in kernel config:
+>  - CONFIG_GPIO_SYSCON=y
+>  - CONFIG_POWER_AVS=y
+>  - CONFIG_ROCKCHIP_IODOMAIN=y
 > 
 > Signed-off-by: Levin Du <djw@t-chip.com.cn>
 
-applied to my dts64 branch, with 2 changes:
-- reordered, please sort nodes without address alphabetically
-- removed default disabled status
-  The controlled pin is always present on the soc, so doesn't need
-  to be enabled on a per-board level
+[...]
+
+> @@ -277,3 +295,7 @@
+>  &usb_host0_ohci {
+>  	status = "okay";
+>  };
+> +
+> +&grf_gpio {
+> +	status = "okay";
+> +};
+> 
+
+applied to my dts64 branch after dropping the grf_gpio enablement,
+see comment in patch2 regarding the always present pin.
 
 
+Thanks
 Heiko
