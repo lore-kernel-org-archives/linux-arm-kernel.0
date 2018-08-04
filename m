@@ -1,41 +1,62 @@
 From: manish.narani@xilinx.com (Manish Narani)
-Date: Sat, 4 Aug 2018 14:55:31 +0530
-Subject: [PATCH v4 0/4] EDAC: Enhancements to Synopsys EDAC driver
-Message-ID: <1533374735-16662-1-git-send-email-manish.narani@xilinx.com>
+Date: Sat, 4 Aug 2018 14:55:33 +0530
+Subject: [PATCH v4 2/4] dt: bindings: Document ZynqMP DDRC in Synopsys
+ documentation
+In-Reply-To: <1533374735-16662-1-git-send-email-manish.narani@xilinx.com>
+References: <1533374735-16662-1-git-send-email-manish.narani@xilinx.com>
+Message-ID: <1533374735-16662-3-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enhances the current EDAC driver to support different
-platforms.This series adds support for ZynqMP DDRC controller in synopsys
-EDAC driver. This series also adds Device tree properties and relevant
-binding documentation.
+This patch adds information of ZynqMP DDRC which reports the single bit
+errors that are corrected and the double bit errors that are detected.
 
-Changes in v2:
-	- Moved checking of DDR_ECC_INTR_SUPPORT from (1/4) to (3/4) as it is
-	  a feature of ZynqMP DDRC
-	- The Binding Documentation in (2/4) is modified as per the review
-	  comments
+Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+---
+ .../bindings/memory-controllers/synopsys.txt       | 27 ++++++++++++++++++----
+ 1 file changed, 22 insertions(+), 5 deletions(-)
 
-Changes in v3:
-	- The commit message in (2/4) is modified (Synopsys EDAC Driver -->
-	  ZynqMP DDRC)
-
-Changes in v4:
-	- Updated the commit message in (1/4)
-	- Renamed function pointer names removing 'synps_' in (1/4)
-	- Shortened unnecessary long lines as per the review comment on (1/4)
-
-Manish Narani (4):
-  edac: synps: Add platform specific structures for ddrc controller
-  dt: bindings: Document ZynqMP DDRC in Synopsys documentation
-  edac: synopsys: Add EDAC ECC support for ZynqMP DDRC
-  arm64: zynqmp: Add DDRC node
-
- .../bindings/memory-controllers/synopsys.txt       |  27 +-
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |   7 +
- drivers/edac/Kconfig                               |   2 +-
- drivers/edac/synopsys_edac.c                       | 945 ++++++++++++++++++++-
- 4 files changed, 941 insertions(+), 40 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/memory-controllers/synopsys.txt b/Documentation/devicetree/bindings/memory-controllers/synopsys.txt
+index a43d26d..9d32762 100644
+--- a/Documentation/devicetree/bindings/memory-controllers/synopsys.txt
++++ b/Documentation/devicetree/bindings/memory-controllers/synopsys.txt
+@@ -1,15 +1,32 @@
+ Binding for Synopsys IntelliDDR Multi Protocol Memory Controller
+ 
+-This controller has an optional ECC support in half-bus width (16-bit)
+-configuration. The ECC controller corrects one bit error and detects
+-two bit errors.
++The ZynqMP DDR ECC controller has an optional ECC support in 64-bit and 32-bit
++bus width configurations.
++
++The Zynq DDR ECC controller has an optional ECC support in half-bus width
++(16-bit) configuration.
++
++These both ECC controllers correct single bit ECC errors and detect double bit
++ECC errors.
+ 
+ Required properties:
+- - compatible: Should be 'xlnx,zynq-ddrc-a05'
+- - reg: Base address and size of the controllers memory area
++ - compatible: One of:
++	- 'xlnx,zynq-ddrc-a05' : Zynq DDR ECC controller
++	- 'xlnx,zynqmp-ddrc-2.40a' : ZynqMP DDR ECC controller
++ - reg: Should contain DDR controller registers location and length.
++
++Required properties for "xlnx,zynqmp-ddrc-2.40a":
++ - interrupts: Property with a value describing the interrupt number.
+ 
+ Example:
+ 	memory-controller at f8006000 {
+ 		compatible = "xlnx,zynq-ddrc-a05";
+ 		reg = <0xf8006000 0x1000>;
+ 	};
++
++	mc: memory-controller at fd070000 {
++		compatible = "xlnx,zynqmp-ddrc-2.40a";
++		reg = <0x0 0xfd070000 0x0 0x30000>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 112 4>;
++	};
 -- 
 2.1.1
