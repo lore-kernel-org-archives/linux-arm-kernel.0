@@ -1,54 +1,41 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat,  4 Aug 2018 18:38:18 +0200
-Subject: [PATCH V2] ARM: dts: silk: Add DA9063 PMIC node
-Message-ID: <20180804163818.23360-1-marek.vasut+renesas@gmail.com>
+From: alexandru-cosmin.gheorghe@arm.com (Alexandru Gheorghe)
+Date: Sat,  4 Aug 2018 17:15:29 +0100
+Subject: [PATCH v3 09/10] drm/vc4: Use __drm_atomic_helper_plane_reset instead
+ of copying the logic
+In-Reply-To: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
+References: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
+Message-ID: <20180804161530.12275-10-alexandru-cosmin.gheorghe@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DA9063 PMIC node to the I2C bus.
+A new helper function(__drm_atomic_helper_plane_reset) has been added
+for linking a plane with its state and resetting the core
+properties(alpha, rotation, etc.) to their default values.
+Use that instead of duplicating the logic.
 
-Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Cc: Simon Horman <horms+renesas@verge.net.au>
-Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Cc: linux-renesas-soc at vger.kernel.org
----
-V2: - Replace shmobile with dts since it's a DT patch in subject
-    - Connect the 9063_IRQ# line to GP3_31
-    - Since the DA9063 is connected to both i2c1 and i2c7, connect
-      it to i2c7, which is the dedicated dvfs i2c.
----
- arch/arm/boot/dts/r8a7794-silk.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+__drm_atomic_helper_plane_reset initializes the alpha property to its
+max value, which is defined by the drm core as DRM_BLEND_ALPHA_OPAQUE,
+so nothing changes regarding the alpha value.
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index daec965889d3..6ea60e1faf75 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -405,6 +405,23 @@
- 	clock-frequency = <400000>;
- };
+Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
+---
+ drivers/gpu/drm/vc4/vc4_plane.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/vc4/vc4_plane.c b/drivers/gpu/drm/vc4/vc4_plane.c
+index 9d7a36f148cf..688ad9bb0f08 100644
+--- a/drivers/gpu/drm/vc4/vc4_plane.c
++++ b/drivers/gpu/drm/vc4/vc4_plane.c
+@@ -200,9 +200,7 @@ static void vc4_plane_reset(struct drm_plane *plane)
+ 	if (!vc4_state)
+ 		return;
  
-+&i2c7 {
-+	status = "okay";
-+	clock-frequency = <100000>;
-+
-+	pmic at 58 {
-+		compatible = "dlg,da9063";
-+		reg = <0x58>;
-+		interrupt-parent = <&gpio3>;
-+		interrupts = <31 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-controller;
-+
-+		wdt {
-+			compatible = "dlg,da9063-watchdog";
-+		};
-+	};
-+};
-+
- &mmcif0 {
- 	pinctrl-0 = <&mmcif0_pins>;
- 	pinctrl-names = "default";
+-	plane->state = &vc4_state->base;
+-	plane->state->alpha = DRM_BLEND_ALPHA_OPAQUE;
+-	vc4_state->base.plane = plane;
++	__drm_atomic_helper_plane_reset(plane, &vc4_state->base);
+ }
+ 
+ static void vc4_dlist_write(struct vc4_plane_state *vc4_state, u32 val)
 -- 
-2.16.2
+2.18.0
