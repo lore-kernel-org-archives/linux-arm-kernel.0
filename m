@@ -1,29 +1,54 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Sat, 4 Aug 2018 18:32:30 +0200
-Subject: [PATCH v4 0/4] EDAC: Enhancements to Synopsys EDAC driver
-In-Reply-To: <1533374735-16662-1-git-send-email-manish.narani@xilinx.com>
-References: <1533374735-16662-1-git-send-email-manish.narani@xilinx.com>
-Message-ID: <20180804163230.GA8157@nazgul.tnic>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat,  4 Aug 2018 18:38:18 +0200
+Subject: [PATCH V2] ARM: dts: silk: Add DA9063 PMIC node
+Message-ID: <20180804163818.23360-1-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 04, 2018 at 02:55:31PM +0530, Manish Narani wrote:
-> This patch series enhances the current EDAC driver to support different
+Add DA9063 PMIC node to the I2C bus.
 
-This one, your 2/4 and 4/4 still says "this patch". Hurried too much?
-How about slowing down and looking at them with a critical eye?
+Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Cc: Simon Horman <horms+renesas@verge.net.au>
+Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Cc: linux-renesas-soc at vger.kernel.org
+---
+V2: - Replace shmobile with dts since it's a DT patch in subject
+    - Connect the 9063_IRQ# line to GP3_31
+    - Since the DA9063 is connected to both i2c1 and i2c7, connect
+      it to i2c7, which is the dedicated dvfs i2c.
+---
+ arch/arm/boot/dts/r8a7794-silk.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-Also, how about waiting for a week before resending your patches so that
-you give people chance to review them too?
-
-While you wait, please read Documentation/process/submitting-patches.rst
-- it'll help you with the submission modalities.
-
-Thanks.
-
+diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
+index daec965889d3..6ea60e1faf75 100644
+--- a/arch/arm/boot/dts/r8a7794-silk.dts
++++ b/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -405,6 +405,23 @@
+ 	clock-frequency = <400000>;
+ };
+ 
++&i2c7 {
++	status = "okay";
++	clock-frequency = <100000>;
++
++	pmic at 58 {
++		compatible = "dlg,da9063";
++		reg = <0x58>;
++		interrupt-parent = <&gpio3>;
++		interrupts = <31 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-controller;
++
++		wdt {
++			compatible = "dlg,da9063-watchdog";
++		};
++	};
++};
++
+ &mmcif0 {
+ 	pinctrl-0 = <&mmcif0_pins>;
+ 	pinctrl-names = "default";
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+2.16.2
