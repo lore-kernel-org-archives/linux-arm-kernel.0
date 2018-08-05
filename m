@@ -1,50 +1,50 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun,  5 Aug 2018 13:46:16 +0100
-Subject: [PATCH] iommu/rockchip: Handle errors returned from PM framework
-Message-ID: <20180805124616.18020-1-marc.zyngier@arm.com>
+Date: Sun,  5 Aug 2018 13:48:07 +0100
+Subject: [PATCH] drm/rockchip: Allow driver to be shutdown on reboot/kexec
+Message-ID: <20180805124807.18169-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pm_runtime_get_if_in_use can fail: either PM has been disabled
-altogether (-EINVAL), or the device hasn't been enabled yet (0).
-Sadly, we ignore the first case at the moment, and end up treating
-it as if we had received a valid interrupt.
+Leaving the DRM driver enabled on reboot or kexec has the annoying
+effect of leaving the display generating transactions whilst the
+IOMMU has been shut down.
 
-The first case could happen because the interrupt line is shared
-(with the VOP for example), and although that device hasn't been
-programmed yet, an interrupt may be pending (think kexec/kdump).
+In turn, the IOMMU driver (which shares its interrupt line with
+the VOP) starts warning either on shutdown or when entering the
+secondary kernel in the kexec case (nothing is expected on that
+front).
 
-The second case means that we've enabled the IOMMU, but it is
-not powered-on just yet. This could be another instance of the
-above, but as it deserves investigation, let's output a single
-warning (instead of flodding the console).
+A cheap way of ensuring that things are nicely shut down is to
+register a shutdown callback in the platform driver.
 
-In both cases, bail with an IRQ_NONE.
-
-Fixes: 0f181d3cf7d98 ("iommu/rockchip: Add runtime PM support")
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/iommu/rockchip-iommu.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index 054cd2c8e9c8..9d21495a8433 100644
---- a/drivers/iommu/rockchip-iommu.c
-+++ b/drivers/iommu/rockchip-iommu.c
-@@ -521,10 +521,11 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
- 	u32 int_status;
- 	dma_addr_t iova;
- 	irqreturn_t ret = IRQ_NONE;
--	int i;
-+	int i, err;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index f814d37b1db2..05368fa4f956 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -442,6 +442,11 @@ static int rockchip_drm_platform_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
--	if (WARN_ON(!pm_runtime_get_if_in_use(iommu->dev)))
--		return 0;
-+	err = pm_runtime_get_if_in_use(iommu->dev);
-+	if ((err < 0) || WARN_ON_ONCE(!err))
-+		return ret;
- 
- 	if (WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks)))
- 		goto out;
++static void rockchip_drm_platform_shutdown(struct platform_device *pdev)
++{
++	rockchip_drm_platform_remove(pdev);
++}
++
+ static const struct of_device_id rockchip_drm_dt_ids[] = {
+ 	{ .compatible = "rockchip,display-subsystem", },
+ 	{ /* sentinel */ },
+@@ -451,6 +456,7 @@ MODULE_DEVICE_TABLE(of, rockchip_drm_dt_ids);
+ static struct platform_driver rockchip_drm_platform_driver = {
+ 	.probe = rockchip_drm_platform_probe,
+ 	.remove = rockchip_drm_platform_remove,
++	.shutdown = rockchip_drm_platform_shutdown,
+ 	.driver = {
+ 		.name = "rockchip-drm",
+ 		.of_match_table = rockchip_drm_dt_ids,
 -- 
 2.14.2
