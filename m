@@ -1,76 +1,31 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Sun, 5 Aug 2018 10:36:01 -0400 (EDT)
+From: fweimer@redhat.com (Florian Weimer)
+Date: Sun, 5 Aug 2018 20:33:06 +0200
 Subject: framebuffer corruption due to overlapping stp instructions on
  arm64
-In-Reply-To: <a1564e8d091648bcad9b5ec58ab6cc95@AcuMS.aculab.com>
+In-Reply-To: <alpine.LRH.2.02.1808040611070.23762@file01.intranet.prod.int.rdu2.redhat.com>
 References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
  <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
  <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
  <CAJA7tRZbmnZq7RfvQeYEy_a1ZObWqpFpVdvgsXgsioQ3RyPMuA@mail.gmail.com>
  <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
- <f696ebe8605840e3bb04bb78b60a6cfa@AcuMS.aculab.com>
- <alpine.LRH.2.02.1808030759480.12341@file01.intranet.prod.int.rdu2.redhat.com>
- <a1564e8d091648bcad9b5ec58ab6cc95@AcuMS.aculab.com>
-Message-ID: <alpine.LRH.2.02.1808051018360.23136@file01.intranet.prod.int.rdu2.redhat.com>
+ <11f9185a-7f71-83df-3a57-0a0ae9c1f934@arm.com>
+ <alpine.LRH.2.02.1808032046540.24748@file01.intranet.prod.int.rdu2.redhat.com>
+ <CA+=Sn1=6F-fGLmXE0VqQHTqTCUKUT=Fz29mMT7349SPFisbZ9A@mail.gmail.com>
+ <alpine.LRH.2.02.1808040611070.23762@file01.intranet.prod.int.rdu2.redhat.com>
+Message-ID: <fd2cae87-b2df-d8ef-8836-e6cbf8c5f851@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/04/2018 01:04 PM, Mikulas Patocka wrote:
+> There's plenty of memcpy's in the graphics stack. No one will be rewriting
+> all the graphics drivers because of tiny market share that ARM has in
+> desktop computers. So if you refuse to fix things and blame everyone else,
+> you can as well announce that you don't want to have PCIe graphics on ARM
+> at all.
 
+The POWER toolchain maintainers said pretty much the same thing not too 
+long ago.  I wonder how many architectures need to fail until the 
+graphics stack is finally fixed.
 
-On Fri, 3 Aug 2018, David Laight wrote:
-
-> From: Mikulas Patocka
-> > Sent: 03 August 2018 13:05
-> ...
-> > > Even on x86 using memcpy() on PCIe memory (maybe mmap()ed into userspace)
-> > > isn't a good idea.
-> > > In the kernel memcpy_to/fromio() ought to be a better choice but that
-> > > is just an alternate name for memcpy().
-> > >
-> > > The problem on x86 is that memcpy() is likely to be implemented as
-> > > 'rep movsb' on modern cpu - relying on the cpu hardware to perform
-> > > cache-line sized transfers (etc).
-> > > Unfortunately on uncached locations it has to revert to byte copies.
-> > > So PCIe transfers (especially reads) are very slow.
-> > >
-> > > The transfers need to use the largest size register available.
-> > >
-> > > 	David
-> > 
-> > On x86, the framebuffer is mapped as write-combining memory type, so "rep
-> > movsb" could merge the byte writes to larger chunks. I don't have a cpu
-> > with the ERMS feature - could anyone try it if rep movsb works worse or
-> > better than explicit writes to the framebuffer?
-> 
-> I don't think 'write combining' can help reads, and memcpy_to/fromio()
-
-There's an instruction movntdqa (and vmovntdqa) that can actually do 
-prefetch on write-combining memory type. It's the only instruction that 
-can do it.
-
-It this instruction is used on non-write-combining memory type, it behaves 
-like movdqa.
-
-> are likely to be used for normal memory mapped io areas.
-> 
-> 	David
-
-I benchmarked it on a processor with ERMS - for writes to the framebuffer, 
-there's no difference between memcpy, 8-byte writes, rep stosb, rep stosq, 
-mmx, sse, avx - all this method achieve 16-17 GB/s
-
-For reading from the framebuffer:
- 323 MB/s - memcpy (using avx2)
-  91 MB/s - explicit 8-byte reads
- 249 MB/s - rep movsq
- 307 MB/s - rep movsb
-  90 MB/s - mmx
- 176 MB/s - sse
-4750 MB/s - sse movntdqa
- 330 MB/s - avx
-5369 MB/s - avx vmovntdqa
-
-So - it may make sense to introduce a function memcpy_from_framebuffer() 
-that uses movntdqa or vmovntdqa on CPUs that support it.
-
-Mikulas
+Thanks,
+Florian
