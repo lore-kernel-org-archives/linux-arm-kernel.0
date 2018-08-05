@@ -1,31 +1,48 @@
-From: fweimer@redhat.com (Florian Weimer)
-Date: Sun, 5 Aug 2018 20:33:06 +0200
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 5 Aug 2018 23:36:15 +0200
 Subject: framebuffer corruption due to overlapping stp instructions on
  arm64
-In-Reply-To: <alpine.LRH.2.02.1808040611070.23762@file01.intranet.prod.int.rdu2.redhat.com>
+In-Reply-To: <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
 References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
  <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
- <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
- <CAJA7tRZbmnZq7RfvQeYEy_a1ZObWqpFpVdvgsXgsioQ3RyPMuA@mail.gmail.com>
- <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
- <11f9185a-7f71-83df-3a57-0a0ae9c1f934@arm.com>
- <alpine.LRH.2.02.1808032046540.24748@file01.intranet.prod.int.rdu2.redhat.com>
- <CA+=Sn1=6F-fGLmXE0VqQHTqTCUKUT=Fz29mMT7349SPFisbZ9A@mail.gmail.com>
- <alpine.LRH.2.02.1808040611070.23762@file01.intranet.prod.int.rdu2.redhat.com>
-Message-ID: <fd2cae87-b2df-d8ef-8836-e6cbf8c5f851@redhat.com>
+Message-ID: <20180805213615.GA1862@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/2018 01:04 PM, Mikulas Patocka wrote:
-> There's plenty of memcpy's in the graphics stack. No one will be rewriting
-> all the graphics drivers because of tiny market share that ARM has in
-> desktop computers. So if you refuse to fix things and blame everyone else,
-> you can as well announce that you don't want to have PCIe graphics on ARM
-> at all.
+Hi!
 
-The POWER toolchain maintainers said pretty much the same thing not too 
-long ago.  I wonder how many architectures need to fail until the 
-graphics stack is finally fixed.
+> > I tried to use a PCIe graphics card on the MacchiatoBIN board and I hit a
+> > strange problem.
+> >
+> > When I use the links browser in graphics mode on the framebuffer, I get
+> > occasional pixel corruption. Links does memcpy, memset and 4-byte writes
+> > on the framebuffer - nothing else.
+> >
+> > I found out that the pixel corruption is caused by overlapping unaligned
+> > stp instructions inside memcpy. In order to avoid branching, the arm64
+> > memcpy implementation may write the same destination twice with different
+> > alignment. If I put "dmb sy" between the overlapping stp instructions, the
+> > pixel corruption goes away.
+> >
+> > This seems like a hardware bug. Is it a known errata? Do you have any
+> > workarounds for it?
+> 
+> Yes fix Links not to use memcpy on the framebuffer.
+> It is undefined behavior to use device memory with memcpy.
 
-Thanks,
-Florian
+No, I don't think so. Why do you think so?
+
+I'm pretty sure that gcc is allowed to do memcpy-like tricks even when
+memcpy is not mentioned explicitely.
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180805/30c3bcbe/attachment.sig>
