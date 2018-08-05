@@ -1,72 +1,28 @@
-From: gengdj.1984@gmail.com (gengdongjiu)
-Date: Sun, 5 Aug 2018 10:35:03 +0800
-Subject: [PATCH] arm64: clean the additional checks before calling
- ghes_notify_sea()
-In-Reply-To: <20180727100617.GB25592@arm.com>
-References: <1532638907-46129-1-git-send-email-gengdongjiu@huawei.com>
- <20180727100617.GB25592@arm.com>
-Message-ID: <CAMj-D2Ab9Txk27GDQbOy3X=Qup7BuA3sWSovsOpffpxe6UcBFQ@mail.gmail.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Sun, 5 Aug 2018 09:11:40 +0530
+Subject: [PATCH v8 2/6] arm64: dts: actions: Add pinctrl definition for
+ S900 I2C controller
+In-Reply-To: <20180804210440.6fw4zrvk6lzawypc@ninjato>
+References: <20180801180232.23680-1-manivannan.sadhasivam@linaro.org>
+ <20180801180232.23680-3-manivannan.sadhasivam@linaro.org>
+ <20180804210440.6fw4zrvk6lzawypc@ninjato>
+Message-ID: <20180805034140.GA6907@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-07-27 18:06 GMT+08:00 Will Deacon <will.deacon@arm.com>:
-> On Thu, Jul 26, 2018 at 05:01:47PM -0400, Dongjiu Geng wrote:
->> In order to remove the additional check before calling the
->> ghes_notify_sea(), make stub definition when !CONFIG_ACPI_APEI_SEA.
->>
->> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
->> ---
+On Sat, Aug 04, 2018 at 11:04:40PM +0200, Wolfram Sang wrote:
+> On Wed, Aug 01, 2018 at 11:32:28PM +0530, Manivannan Sadhasivam wrote:
+> > Add pinctrl definition for Actions Semiconductor S900 I2C controller.
+> > Pinctrl definitions are only available for I2C0, I2C1, and I2C2.
+> > 
+> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> 
+> Note that I don't take DTS patches, so skipping patches 2-4.
 >
-> Acked-by: Will Deacon <will.deacon@arm.com>
 
-Will,
-     This patch will be applied, right? thanks
+Hi Andreas,
 
->
-> Will
->
->> This cleanup is ever mentioned by Mark Rutland in [1]
->>
->> [1]:
->> https://lkml.org/lkml/2018/5/31/289
->> ---
->>  arch/arm64/mm/fault.c | 7 +------
->>  include/acpi/ghes.h   | 4 ++++
->>  2 files changed, 5 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->> index b8eecc7..9ffe01d 100644
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -727,12 +727,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>
->>  int handle_guest_sea(phys_addr_t addr, unsigned int esr)
->>  {
->> -     int ret = -ENOENT;
->> -
->> -     if (IS_ENABLED(CONFIG_ACPI_APEI_SEA))
->> -             ret = ghes_notify_sea();
->> -
->> -     return ret;
->> +     return ghes_notify_sea();
->>  }
->>
->>  asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
->> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
->> index 1624e2b..82cb4eb 100644
->> --- a/include/acpi/ghes.h
->> +++ b/include/acpi/ghes.h
->> @@ -118,6 +118,10 @@ static inline void *acpi_hest_get_next(struct acpi_hest_generic_data *gdata)
->>            (void *)section - (void *)(estatus + 1) < estatus->data_length; \
->>            section = acpi_hest_get_next(section))
->>
->> +#ifdef CONFIG_ACPI_APEI_SEA
->>  int ghes_notify_sea(void);
->> +#else
->> +static inline int ghes_notify_sea(void) { return -ENOENT; }
->> +#endif
->>
->>  #endif /* GHES_H */
->> --
->> 1.9.1
->>
+Can you please take the DTS patches through Actions tree?
+
+Thanks,
+Mani
