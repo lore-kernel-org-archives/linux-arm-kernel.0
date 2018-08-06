@@ -1,30 +1,27 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 06 Aug 2018 08:29:16 +0200
-Subject: [PATCH v3 01/10] drm/atomic: Add __drm_atomic_helper_plane_reset
-In-Reply-To: <20180804161530.12275-2-alexandru-cosmin.gheorghe@arm.com>
-References: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
- <20180804161530.12275-2-alexandru-cosmin.gheorghe@arm.com>
-Message-ID: <1533536956.4204.4.camel@pengutronix.de>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Mon, 06 Aug 2018 14:29:38 +0800
+Subject: [PATCH 0/2] dt: thermal: Fix broken cooling-maps
+In-Reply-To: <20180803084000.73ofs6cttnqc6uiq@vireshk-i7>
+References: <cover.1530766981.git.viresh.kumar@linaro.org>
+ <20180731045151.gqsgsm6l3gwr5m4z@vireshk-i7>
+ <1533016858.2550.21.camel@intel.com>
+ <20180803084000.73ofs6cttnqc6uiq@vireshk-i7>
+Message-ID: <1533536978.2158.86.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2018-08-04 at 17:15 +0100, Alexandru Gheorghe wrote:
-> There are a lot of drivers that subclass drm_plane_state, all of them
-> duplicate the code that links together the plane with plane_state.
+On ?, 2018-08-03 at 14:10 +0530, Viresh Kumar wrote:
+> On 31-07-18, 14:00, Zhang Rui wrote:
+> > 
+> > I suppose this patch should go via Eduardo' tree.
+> > Eduardo, can you please take a look at this patch set?
+> Zhang,
 > 
-> On top of that, drivers that enable core properties also have to
-> duplicate the code for initializing the properties to their default
-> values, which in all cases are the same as the defaults from core.
+> Since Eduardo isn't replying, will it be possible for you to pick it
+> up as I
+> don't want to miss 4.19-rc1.
 > 
-> Change since v1:
-> - Make it consistent with the other helpers and require that both
->   plane and state not be NULL, suggested by Boris Brezillon and
->   Philipp Zabel.
-> 
-> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
+Okay, I will keep queue it in my tree first.
 
-Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
-
-regards
-Philipp
+thanks,
+rui
