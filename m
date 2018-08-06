@@ -1,32 +1,46 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Mon, 6 Aug 2018 19:58:20 +0800
-Subject: [PATCH v3 13/13] drm/mediatek: fix connection from RDMA2 to DSI1
+Date: Mon, 6 Aug 2018 19:58:15 +0800
+Subject: [PATCH v3 08/13] drm/mediatek: add function to get layer number for
+ component
 In-Reply-To: <1533556700-26525-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1533556700-26525-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1533556700-26525-14-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1533556700-26525-9-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fix connection from RDMA2 to DSI1
+This patch add function to get layer number for component
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 3239f22785fd..546b3e3b300b 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -314,7 +314,7 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
- 		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
- 		value = DSI0_SEL_IN_RDMA2;
- 	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI1) {
--		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
-+		*addr = DISP_REG_CONFIG_DSIO_SEL_IN;
- 		value = DSI1_SEL_IN_RDMA2;
- 	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI2) {
- 		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+index 7413ffeb3c9d..8399229e6ad2 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+@@ -78,6 +78,7 @@ struct mtk_ddp_comp_funcs {
+ 	void (*stop)(struct mtk_ddp_comp *comp);
+ 	void (*enable_vblank)(struct mtk_ddp_comp *comp, struct drm_crtc *crtc);
+ 	void (*disable_vblank)(struct mtk_ddp_comp *comp);
++	unsigned int (*layer_nr)(struct mtk_ddp_comp *comp);
+ 	void (*layer_on)(struct mtk_ddp_comp *comp, unsigned int idx);
+ 	void (*layer_off)(struct mtk_ddp_comp *comp, unsigned int idx);
+ 	void (*layer_config)(struct mtk_ddp_comp *comp, unsigned int idx,
+@@ -128,6 +129,14 @@ static inline void mtk_ddp_comp_disable_vblank(struct mtk_ddp_comp *comp)
+ 		comp->funcs->disable_vblank(comp);
+ }
+ 
++static inline unsigned int mtk_ddp_comp_layer_nr(struct mtk_ddp_comp *comp)
++{
++	if (comp->funcs && comp->funcs->layer_nr)
++		return comp->funcs->layer_nr(comp);
++
++	return 0;
++}
++
+ static inline void mtk_ddp_comp_layer_on(struct mtk_ddp_comp *comp,
+ 					 unsigned int idx)
+ {
 -- 
 2.12.5.2.gbdf23ab
