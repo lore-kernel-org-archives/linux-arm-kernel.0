@@ -1,8 +1,8 @@
-From: tuliom@linux.ibm.com (Tulio Magno Quites Machado Filho)
-Date: Mon, 06 Aug 2018 11:26:22 -0300
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Mon, 6 Aug 2018 10:30:15 -0400 (EDT)
 Subject: framebuffer corruption due to overlapping stp instructions on
  arm64
-In-Reply-To: <fd2cae87-b2df-d8ef-8836-e6cbf8c5f851@redhat.com>
+In-Reply-To: <20180805215150.GB1862@amd>
 References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
  <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
  <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
@@ -12,30 +12,49 @@ References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.r
  <alpine.LRH.2.02.1808032046540.24748@file01.intranet.prod.int.rdu2.redhat.com>
  <CA+=Sn1=6F-fGLmXE0VqQHTqTCUKUT=Fz29mMT7349SPFisbZ9A@mail.gmail.com>
  <alpine.LRH.2.02.1808040611070.23762@file01.intranet.prod.int.rdu2.redhat.com>
- <fd2cae87-b2df-d8ef-8836-e6cbf8c5f851@redhat.com>
-Message-ID: <87h8k7h8q9.fsf@linux.ibm.com>
+ <20180805215150.GB1862@amd>
+Message-ID: <alpine.LRH.2.02.1808061003320.9697@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Florian Weimer <fweimer@redhat.com> writes:
 
-> On 08/04/2018 01:04 PM, Mikulas Patocka wrote:
->> There's plenty of memcpy's in the graphics stack. No one will be rewriting
->> all the graphics drivers because of tiny market share that ARM has in
->> desktop computers. So if you refuse to fix things and blame everyone else,
->> you can as well announce that you don't want to have PCIe graphics on ARM
->> at all.
->
-> The POWER toolchain maintainers said pretty much the same thing not too 
-> long ago.  I wonder how many architectures need to fail until the 
-> graphics stack is finally fixed.
 
-Unfortunately, it is not just the graphics stack.
-This is being used in other userspace programs that benefit from GPUs and
-accelerators.
+On Sun, 5 Aug 2018, Pavel Machek wrote:
 
-But can we say they're are nonportable programs?
-I'm not convinced yet.
+> Hi!
+> 
+> > > Can you run the test program on x86 using the similar framebuffer
+> > > setup?  Does doing two writes (one aligned and one unaligned but
+> > > overlapping with previous one) cause the same issue?  I suspect it
+> > > does, then using memcpy for frame buffers is wrong.
+> 
+> I'm pretty sure it will work ok on x86.
+> 
+> > Overlapping unaligned writes work on x86 - they have to, because of 
+> > backward compatibility.
+> 
+> It is not that easy. 8086s (and similar) did not have MTRRs and PATs
+> either. Overlapping unaligned writes _on main memory_, _with normal
+> MTRR settings_ certainly work ok on x86.
 
--- 
-Tulio Magno
+It works even with write-combining. Write-combining specifies, that the 
+writes may hit the framebuffer in unspecified order. But if the writes are 
+overlapping, the CPU can't just reorder them and write the wrong result to 
+the framebuffer.
+
+> Chances is memory type can be configured to work similar way on your
+> ARM/PCIe case?
+
+ARM has memory types GRE, nGRE, nGnRE, nGnRnE - that allow or not allow 
+gathering, reordering, early write acknowledgement. Unfortunatelly, all 
+these memory types will trigger a fault on unaligned accesses.
+
+It has also Non-Cached memory type (some people on this thread believe 
+that it can't be used for GPUs, some believe that it can) - this memory 
+type supports unaligned accesses, so it is actually used for framebuffers 
+on ARM.
+
+If we had a memory type that didn't do early write acknowledgement and 
+supported unaligned accesses, it would solve this problem.
+
+Mikulas
