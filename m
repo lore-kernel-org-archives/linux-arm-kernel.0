@@ -1,44 +1,79 @@
-From: syeh@vmware.com (Sinclair Yeh)
-Date: Mon, 6 Aug 2018 09:57:53 -0700
-Subject: [PATCH v3 10/10] drm/vmwgfx: Use __drm_atomic_helper_plane_reset
- instead of copying the logic
-In-Reply-To: <20180804161530.12275-11-alexandru-cosmin.gheorghe@arm.com>
-References: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
- <20180804161530.12275-11-alexandru-cosmin.gheorghe@arm.com>
-Message-ID: <20180806165752.GD17089@vmware.com>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Mon, 6 Aug 2018 13:09:18 -0400 (EDT)
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <CAKv+Gu_C2g=C=gMpk4a5jpDORnxZY6t1v=HDoy59m5vwNBxBBg@mail.gmail.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
+ <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
+ <20180803094129.GB17798@arm.com>
+ <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
+ <alpine.LRH.2.02.1808031424140.14030@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAHCPf3s-+Qf=WBZz1KpisDMG3520jCUh8PLAO3PHa4jdt8kCTw@mail.gmail.com>
+ <CAKv+Gu9_h-WFi1j4+DWUN_dMj75SKKHxWoDH8WQ9P7S7MNpZQg@mail.gmail.com>
+ <alpine.LRH.2.02.1808060553130.30832@file01.intranet.prod.int.rdu2.redhat.com>
+ <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
+ <CAKv+Gu_C2g=C=gMpk4a5jpDORnxZY6t1v=HDoy59m5vwNBxBBg@mail.gmail.com>
+Message-ID: <alpine.LRH.2.02.1808061306490.12989@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Sinclair Yeh <syeh@vmware.com>
 
-On Sat, Aug 04, 2018 at 05:15:30PM +0100, Alexandru Gheorghe wrote:
-> A new helper function(__drm_atomic_helper_plane_reset) has been added
-> for linking a plane with its state and resetting the core
-> properties(alpha, rotation, etc.) to their default values.
-> Use that instead of duplicating the logic.
+
+On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
+
+> On 6 August 2018 at 14:42, Robin Murphy <robin.murphy@arm.com> wrote:
+> > On 06/08/18 11:25, Mikulas Patocka wrote:
+> > [...]
+> >>>
+> >>> None of this explains why some transactions fail to make it across
+> >>> entirely. The overlapping writes in question write the same data to
+> >>> the memory locations that are covered by both, and so the ordering in
+> >>> which the transactions are received should not affect the outcome.
+> >>
+> >>
+> >> You're right that the corruption couldn't be explained just by reordering
+> >> writes. My hypothesis is that the PCIe controller tries to disambiguate
+> >> the overlapping writes, but the disambiguation logic was not tested and it
+> >> is buggy. If there's a barrier between the overlapping writes, the PCIe
+> >> controller won't see any overlapping writes, so it won't trigger the
+> >> faulty disambiguation logic and it works.
+> >>
+> >> Could the ARM engineers look if there's some chicken bit in Cortex-A72
+> >> that could insert barriers between non-cached writes automatically?
+> >
+> >
+> > I don't think there is, and even if there was I imagine it would have a
+> > pretty hideous effect on non-coherent DMA buffers and the various other
+> > places in which we have Normal-NC mappings of actual system RAM.
+> >
 > 
-> Reviewed-by: Sinclair Yeh <syeh@vmware.com>
-> Reviewed-by: Deepak Rawat <drawat@vmware.com>
-> Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
-> ---
->  drivers/gpu/drm/vmwgfx/vmwgfx_kms.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
+> Looking at the A72 manual, there is one chicken bit that looks like it
+> may be related:
 > 
-> diff --git a/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c b/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
-> index 4a0f0f41afa1..61824e360619 100644
-> --- a/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
-> +++ b/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
-> @@ -720,9 +720,7 @@ void vmw_du_plane_reset(struct drm_plane *plane)
->  		return;
->  	}
->  
-> -	plane->state = &vps->base;
-> -	plane->state->plane = plane;
-> -	plane->state->rotation = DRM_MODE_ROTATE_0;
-> +	__drm_atomic_helper_plane_reset(plane, &vps->base);
->  }
->  
->  
-> -- 
-> 2.18.0
+> CPUACTLR_EL1 bit #50:
 > 
+> 0 Enables store streaming on NC/GRE memory type. This is the reset value.
+> 1 Disables store streaming on NC/GRE memory type.
+> 
+> so putting something like
+> 
+> mrs x0, S3_1_C15_C2_0
+> orr x0, x0, #(1 << 50)
+> msr S3_1_C15_C2_0, x0
+> 
+> in __cpu_setup() would be worth a try.
+
+It won't boot.
+
+But if i write the same value that was read, it also won't boot.
+
+I created a simple kernel module that reads this register and it has bit 
+32 set, all other bits clear. But when I write the same value into it, the 
+core that does the write is stuck in infinite loop.
+
+So, it seems that we are writing this register from a wrong place.
+
+Mikulas
