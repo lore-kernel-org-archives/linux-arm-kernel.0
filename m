@@ -1,76 +1,30 @@
-From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Mon, 6 Aug 2018 19:58:12 +0800
-Subject: [PATCH v3 05/13] drm/mediatek: add memory mode and layer_config for
- RDMA
-In-Reply-To: <1533556700-26525-1-git-send-email-stu.hsieh@mediatek.com>
-References: <1533556700-26525-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1533556700-26525-6-git-send-email-stu.hsieh@mediatek.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Mon, 6 Aug 2018 14:13:34 +0200
+Subject: [PATCH v2 0/7] Stop losing firmware-set DMA masks
+In-Reply-To: <CAK8P3a3ZcOeHMR_qFnsBdXED+2X8_AEMKoS5MeAQhbapbGmm9w@mail.gmail.com>
+References: <cover.1532382222.git.robin.murphy@arm.com>
+ <CAK8P3a3HDJ6svNN_cwvegxu20yNv8+tvc0D1A6Ooeq8agawbFg@mail.gmail.com>
+ <1ccccc4b-7d4c-a3ee-23a2-f108916705e9@arm.com>
+ <CAK8P3a3ZcOeHMR_qFnsBdXED+2X8_AEMKoS5MeAQhbapbGmm9w@mail.gmail.com>
+Message-ID: <20180806121334.GA5340@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add memory mode for RDMA and layer_config for RDMA
+On Mon, Aug 06, 2018 at 12:01:34PM +0200, Arnd Bergmann wrote:
+> There are a few subtle corner cases here, in particular in which cases
+> the new dma_set_mask() behavior on arm64 reports success or
+> failure when truncating the mask to the bus_dma_mask.
 
-If use RDMA to read data from memory, it should set memory mode to RDMA
+Going forward my plan was to make dma_set_mask() never fail.  The idea
+is that it sets the mask that the device is capable of, and the core
+dma code is responsible for also looking at bus_dma_mask and otherwise
+make things just work.
 
-Layer config set the data address and pitch to RDMA from plane setting.
-
-Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
-
-diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-index 585943c81e1f..08866550740f 100644
---- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-+++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-@@ -31,14 +31,20 @@
- #define RDMA_REG_UPDATE_INT				BIT(0)
- #define DISP_REG_RDMA_GLOBAL_CON		0x0010
- #define RDMA_ENGINE_EN					BIT(0)
-+#define RDMA_MODE_MEMORY				BIT(1)
- #define DISP_REG_RDMA_SIZE_CON_0		0x0014
- #define DISP_REG_RDMA_SIZE_CON_1		0x0018
- #define DISP_REG_RDMA_TARGET_LINE		0x001c
-+#define DISP_RDMA_MEM_SRC_PITCH			0x002c
-+#define DISP_RDMA_MEM_GMC_SETTING_0		0x0030
- #define DISP_REG_RDMA_FIFO_CON			0x0040
- #define RDMA_FIFO_UNDERFLOW_EN				BIT(31)
- #define RDMA_FIFO_PSEUDO_SIZE(bytes)			(((bytes) / 16) << 16)
- #define RDMA_OUTPUT_VALID_FIFO_THRESHOLD(bytes)		((bytes) / 16)
- #define RDMA_FIFO_SIZE(rdma)			((rdma)->data->fifo_size)
-+#define DISP_RDMA_MEM_START_ADDR		0x0f00
-+
-+#define RDMA_MEM_GMC				0x40402020
- 
- struct mtk_disp_rdma_data {
- 	unsigned int fifo_size;
-@@ -138,12 +144,27 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
- 	writel(reg, comp->regs + DISP_REG_RDMA_FIFO_CON);
- }
- 
-+static void mtk_rdma_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
-+				  struct mtk_plane_state *state)
-+{
-+	struct mtk_plane_pending_state *pending = &state->pending;
-+	unsigned int addr = pending->addr;
-+	unsigned int pitch = pending->pitch & 0xffff;
-+
-+	writel_relaxed(addr, comp->regs + DISP_RDMA_MEM_START_ADDR);
-+	writel_relaxed(pitch, comp->regs + DISP_RDMA_MEM_SRC_PITCH);
-+	writel(RDMA_MEM_GMC, comp->regs + DISP_RDMA_MEM_GMC_SETTING_0);
-+	rdma_update_bits(comp, DISP_REG_RDMA_GLOBAL_CON,
-+			 RDMA_MODE_MEMORY, RDMA_MODE_MEMORY);
-+}
-+
- static const struct mtk_ddp_comp_funcs mtk_disp_rdma_funcs = {
- 	.config = mtk_rdma_config,
- 	.start = mtk_rdma_start,
- 	.stop = mtk_rdma_stop,
- 	.enable_vblank = mtk_rdma_enable_vblank,
- 	.disable_vblank = mtk_rdma_disable_vblank,
-+	.layer_config = mtk_rdma_layer_config,
- };
- 
- static int mtk_disp_rdma_bind(struct device *dev, struct device *master,
--- 
-2.12.5.2.gbdf23ab
+Robin brought up the case where a platform can't handle a given limitation
+ever, e.g. a PCI(e) device with a 24-bit dma mask on a device with a dma
+offset that means we'll never have any physical memory reachable in that
+range.  So we'll either still need to allow it to fail for such corner
+cases or delay such error until later, e.g. when dma_alloc_* (or in the
+corner case of the corner case dma_map_*) is called.  I'm still undecided
+which way to go, but not allowing error returns from dma_set_mask and
+its variants sounds very tempting.
