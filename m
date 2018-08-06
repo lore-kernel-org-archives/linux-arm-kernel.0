@@ -1,71 +1,47 @@
-From: Alexandru-Cosmin.Gheorghe@arm.com (Alexandru-Cosmin Gheorghe)
-Date: Mon, 6 Aug 2018 09:53:22 +0100
-Subject: [PATCH v3 06/10] drm/imx: Use __drm_atomic_helper_plane_reset
- instead of copying the logic
-In-Reply-To: <1533536953.4204.3.camel@pengutronix.de>
-References: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
- <20180804161530.12275-7-alexandru-cosmin.gheorghe@arm.com>
- <1533536953.4204.3.camel@pengutronix.de>
-Message-ID: <20180806085322.GA16672@e114479-lin.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 6 Aug 2018 10:56:19 +0200
+Subject: [PATCH RESEND 1/5] spi: imx: Remove duplicate variable assignments
+In-Reply-To: <20180717143154.28241-2-maxime.chevallier@bootlin.com>
+References: <20180717143154.28241-1-maxime.chevallier@bootlin.com>
+ <20180717143154.28241-2-maxime.chevallier@bootlin.com>
+Message-ID: <20180806085619.zfhrow3pnkcjbjdu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2018 at 08:29:13AM +0200, Philipp Zabel wrote:
-
-Hi,
-
-> Hi Alexandru,
+On Tue, Jul 17, 2018 at 04:31:50PM +0200, Maxime Chevallier wrote:
+> Some fields in struct spi_imx_data are assigned a different value twice
+> in a row, in spi_imx_setupxfer.
 > 
-> On Sat, 2018-08-04 at 17:15 +0100, Alexandru Gheorghe wrote:
-> > A new helper function(__drm_atomic_helper_plane_reset) has been added
-> > for linking a plane with its state and resetting the core
-> > properties(alpha, rotation, etc.) to their default values.
-> > Use that instead of duplicating the logic.
-> > 
-> > Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
-> > ---
-> >  drivers/gpu/drm/imx/ipuv3-plane.c | 8 +++-----
-> >  1 file changed, 3 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/imx/ipuv3-plane.c b/drivers/gpu/drm/imx/ipuv3-plane.c
-> > index 203f247d4854..1bd4de03ce9e 100644
-> > --- a/drivers/gpu/drm/imx/ipuv3-plane.c
-> > +++ b/drivers/gpu/drm/imx/ipuv3-plane.c
-> > @@ -281,16 +281,14 @@ static void ipu_plane_state_reset(struct drm_plane *plane)
-> >  		ipu_state = to_ipu_plane_state(plane->state);
-> >  		__drm_atomic_helper_plane_destroy_state(plane->state);
-> >  		kfree(ipu_state);
-> > +		plane->state = NULL;
-> >  	}
-> >  
-> >  	ipu_state = kzalloc(sizeof(*ipu_state), GFP_KERNEL);
-> >  
-> > -	if (ipu_state) {
-> > -		ipu_state->base.plane = plane;
-> > -		ipu_state->base.rotation = DRM_MODE_ROTATE_0;
-> > -	}
-> > +	if (ipu_state)
-> > +		__drm_atomic_helper_plane_reset(plane, &ipu_state->base);
-> >  
-> 
-> Could you remove this white line as well?
+> Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+> ---
+>  drivers/spi/spi-imx.c | 2 --
+>  1 file changed, 2 deletions(-)
 
-Yes, will do before applying.
+Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
 
+Sascha
 
 > 
-> > -	plane->state = &ipu_state->base;
-> >  }
-> >  
-> >  static struct drm_plane_state *
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index d3b21faf6b1f..d75153c995af 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -1106,8 +1106,6 @@ static int spi_imx_setupxfer(struct spi_device *spi,
+>  	if (spi_imx->devtype_data->dynamic_burst && !spi_imx->slave_mode) {
+>  		u32 mask;
+>  
+> -		spi_imx->dynamic_burst = 0;
+> -		spi_imx->remainder = 0;
+>  		spi_imx->read_u32  = 1;
+>  
+>  		mask = (1 << spi_imx->bits_per_word) - 1;
+> -- 
+> 2.11.0
 > 
-> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 > 
-> to be merged through drm-misc together with the other changes.
-> 
-> regards
-> Philipp
 
 -- 
-Cheers,
-Alex G
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
