@@ -1,12 +1,9 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Mon, 6 Aug 2018 13:09:18 -0400 (EDT)
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 6 Aug 2018 18:13:57 +0100
 Subject: framebuffer corruption due to overlapping stp instructions on
  arm64
 In-Reply-To: <CAKv+Gu_C2g=C=gMpk4a5jpDORnxZY6t1v=HDoy59m5vwNBxBBg@mail.gmail.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
- <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
+References: <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
  <20180803094129.GB17798@arm.com>
  <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
  <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
@@ -16,14 +13,11 @@ References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.r
  <alpine.LRH.2.02.1808060553130.30832@file01.intranet.prod.int.rdu2.redhat.com>
  <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
  <CAKv+Gu_C2g=C=gMpk4a5jpDORnxZY6t1v=HDoy59m5vwNBxBBg@mail.gmail.com>
-Message-ID: <alpine.LRH.2.02.1808061306490.12989@file01.intranet.prod.int.rdu2.redhat.com>
+Message-ID: <20180806171356.kk45vd7n5bdi6ka3@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
-
+On Mon, Aug 06, 2018 at 05:47:36PM +0200, Ard Biesheuvel wrote:
 > On 6 August 2018 at 14:42, Robin Murphy <robin.murphy@arm.com> wrote:
 > > On 06/08/18 11:25, Mikulas Patocka wrote:
 > > [...]
@@ -32,7 +26,6 @@ On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
 > >>> entirely. The overlapping writes in question write the same data to
 > >>> the memory locations that are covered by both, and so the ordering in
 > >>> which the transactions are received should not affect the outcome.
-> >>
 > >>
 > >> You're right that the corruption couldn't be explained just by reordering
 > >> writes. My hypothesis is that the PCIe controller tries to disambiguate
@@ -44,11 +37,9 @@ On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
 > >> Could the ARM engineers look if there's some chicken bit in Cortex-A72
 > >> that could insert barriers between non-cached writes automatically?
 > >
-> >
 > > I don't think there is, and even if there was I imagine it would have a
 > > pretty hideous effect on non-coherent DMA buffers and the various other
 > > places in which we have Normal-NC mappings of actual system RAM.
-> >
 > 
 > Looking at the A72 manual, there is one chicken bit that looks like it
 > may be related:
@@ -66,14 +57,11 @@ On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
 > 
 > in __cpu_setup() would be worth a try.
 
-It won't boot.
+Note that access to this register may be disabled at EL3 by firmware
+(ACTLR_EL3.CPUACTLR).
 
-But if i write the same value that was read, it also won't boot.
+FWIW, Mikulas' test seems to run fine on a ThunderX1 with AMD
+FirePro W2100 (on /dev/fb1)
 
-I created a simple kernel module that reads this register and it has bit 
-32 set, all other bits clear. But when I write the same value into it, the 
-core that does the write is stuck in infinite loop.
-
-So, it seems that we are writing this register from a wrong place.
-
-Mikulas
+-- 
+Catalin
