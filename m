@@ -1,383 +1,121 @@
-From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Tue,  7 Aug 2018 00:29:16 +0200
-Subject: [RFC PATCH v2 10/12] gpiolib: Introduce bitmap get/set array API
- extension
-In-Reply-To: <20180806222918.12644-1-jmkrzyszt@gmail.com>
-References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
- <20180806222918.12644-1-jmkrzyszt@gmail.com>
-Message-ID: <20180806222918.12644-11-jmkrzyszt@gmail.com>
+From: ebiggers@kernel.org (Eric Biggers)
+Date: Mon,  6 Aug 2018 15:32:52 -0700
+Subject: [RFC PATCH 1/9] crypto: chacha20-generic - add HChaCha20 library
+ function
+In-Reply-To: <20180806223300.113891-1-ebiggers@kernel.org>
+References: <20180806223300.113891-1-ebiggers@kernel.org>
+Message-ID: <20180806223300.113891-2-ebiggers@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain GPIO array lookups may return arrays marked as applicable for
-fast get/set array operations.  In order to make use of that
-information, a new API extension which allows passing it to get/set
-functions is needed.
+From: Eric Biggers <ebiggers@google.com>
 
-Create a set of frontends to get/set array functions which accept
-strict descriptor array structures returned by gpiod_get_array()
-instead of arbitrary descriptor arrays.
+Refactor the unkeyed permutation part of chacha20_block() into its own
+function, then add hchacha20_block() which is the ChaCha equivalent of
+HSalsa20 and is an intermediate step towards XChaCha20 (see
+https://cr.yp.to/snuffle/xsalsa-20081128.pdf).  HChaCha20 skips the
+final addition of the initial state, and outputs only certain words of
+the state.  It should not be used for streaming directly.
 
-Since the intended purpose of the new API extension is to speed up
-get/set array operations, also replace array of integer values argument
-with their bitmap representation, ready for being passed directly to
-chip callback functions, without iterating them.
-
-Applicability of the new API is limited to arrays not exceeding bit
-length of type unsigned long (32 pins).
-
-Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+Signed-off-by: Eric Biggers <ebiggers@google.com>
 ---
- Documentation/driver-api/gpio/consumer.rst |  26 ++++
- drivers/gpio/gpiolib.c                     | 209 +++++++++++++++++++++++++++++
- include/linux/gpio/consumer.h              |  14 ++
- 3 files changed, 249 insertions(+)
+ include/crypto/chacha20.h |  2 ++
+ lib/chacha20.c            | 52 +++++++++++++++++++++++++++++++++------
+ 2 files changed, 47 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/driver-api/gpio/consumer.rst b/Documentation/driver-api/gpio/consumer.rst
-index 38a990b5f3b6..bec4eab3b87c 100644
---- a/Documentation/driver-api/gpio/consumer.rst
-+++ b/Documentation/driver-api/gpio/consumer.rst
-@@ -383,6 +383,32 @@ or negative on error. Note the difference to gpiod_get_value(), which returns
- 0 or 1 on success to convey the GPIO value. With the array functions, the GPIO
- values are stored in value_array rather than passed back as return value.
+diff --git a/include/crypto/chacha20.h b/include/crypto/chacha20.h
+index b83d66073db0..f00052137942 100644
+--- a/include/crypto/chacha20.h
++++ b/include/crypto/chacha20.h
+@@ -20,6 +20,8 @@ struct chacha20_ctx {
+ };
  
-+Additionally, the following variants of the above functions exist which operate
-+on bitmaps of values instead of arrays of values::
+ void chacha20_block(u32 *state, u32 *stream);
++void hchacha20_block(const u32 *in, u32 *out);
 +
-+	int gpiod_get_array_bitmap(struct gpio_descs *desc_array,
-+				   unsigned long *bits);
-+	int gpiod_get_raw_array_bitmap(struct gpio_descs *desc_array,
-+				       unsigned long *bits);
-+	int gpiod_get_array_bitmap_cansleep(struct gpio_desc *desc_array,
-+					    unsigned long *bits);
-+	int gpiod_get_raw_array_bitmap_cansleep(struct gpio_desc **desc_array,
-+						unsigned long *bits)
-+
-+	void gpiod_set_array_bitmap(struct gpio_descs *desc_array,
-+				    unsigned long *bits)
-+	void gpiod_set_raw_array_bitmap(struct gpio_descs *desc_array,
-+				        unsigned long *bitmap)
-+	void gpiod_set_array_bitmap_cansleep(struct gpio_descs *desc_array,
-+					     unsigned long *bits)
-+	void gpiod_set_raw_array_bitmap_cansleep(struct gpio_descs *desc_array,
-+						 unsigned long *bits)
-+
-+Unlike their counterparts, these functions don't accept arbitrary GPIO
-+descriptor arrays, only those of type struct gpio_descs returned by
-+gpiod_get_array() and its variants.  Supported array size is limited to the size
-+of the bitmap, i.e., sizeof(unsigned long).
-+
- 
- GPIOs mapped to IRQs
- --------------------
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index c50bcec6e2d7..5b541364dee0 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -2836,6 +2836,27 @@ int gpiod_get_array_value_complex(bool raw, bool can_sleep,
- 	return 0;
- }
- 
-+int gpiod_get_array_bitmap_complex(bool raw, bool can_sleep,
-+				   struct gpio_descs *array,
-+				   unsigned long *bits)
-+{
-+	int value_array[sizeof(*bits)];
-+	int i;
-+
-+	if (array->ndescs > sizeof(*bits))
-+		return -EINVAL;
-+
-+	i = gpiod_get_array_value_complex(raw, can_sleep, array->ndescs,
-+					  array->desc, value_array);
-+	if (i)
-+		return i;
-+
-+	for (i = 0; i < array->ndescs; i++)
-+		__assign_bit(i, bits, value_array[i]);
-+
-+	return 0;
-+}
-+
- /**
-  * gpiod_get_raw_value() - return a gpio's raw value
-  * @desc: gpio whose value will be returned
-@@ -2929,6 +2950,50 @@ int gpiod_get_array_value(unsigned int array_size,
- }
- EXPORT_SYMBOL_GPL(gpiod_get_array_value);
- 
-+/**
-+ * gpiod_get_raw_array_bitmap() - read raw values from an array of GPIOs
-+ * @desc_array: array of GPIO descriptors whose values will be read, obtained
-+ *		with gpiod_get_array(),
-+ * @bits: bitmap to store the read values
-+ *
-+ * Read the raw values of the GPIOs, i.e. the values of the physical lines
-+ * without regard for their ACTIVE_LOW status.  Return 0 in case of success,
-+ * else an error code.
-+ *
-+ * This function should be called from contexts where we cannot sleep,
-+ * and it will complain if the GPIO chip functions potentially sleep.
-+ */
-+int gpiod_get_raw_array_bitmap(struct gpio_descs *desc_array,
-+			       unsigned long *bits)
-+{
-+	if (!desc_array)
-+		return -EINVAL;
-+	return gpiod_get_array_bitmap_complex(true, false, desc_array, bits);
-+}
-+EXPORT_SYMBOL_GPL(gpiod_get_raw_array_bitmap);
-+
-+/**
-+ * gpiod_get_array_bitmap() - read values from an array of GPIOs
-+ * @desc_array: array of GPIO descriptors whose values will be read, obtained
-+ *		with gpiod_get_array(),
-+ * @bits: bitmap to store the read values
-+ *
-+ * Read the logical values of the GPIOs, i.e. taking their ACTIVE_LOW status
-+ * into account.  Return 0 in case of success, else an error code.
-+ *
-+ * This function should be called from contexts where we cannot sleep,
-+ * and it will complain if the GPIO chip functions potentially sleep.
-+ */
-+
-+int gpiod_get_array_bitmap(struct gpio_descs *desc_array,
-+			   unsigned long *bits)
-+{
-+	if (!desc_array)
-+		return -EINVAL;
-+	return gpiod_get_array_bitmap_complex(false, false, desc_array, bits);
-+}
-+EXPORT_SYMBOL_GPL(gpiod_get_raw_array_bitmap);
-+
+ void crypto_chacha20_init(u32 *state, struct chacha20_ctx *ctx, u8 *iv);
+ int crypto_chacha20_setkey(struct crypto_skcipher *tfm, const u8 *key,
+ 			   unsigned int keysize);
+diff --git a/lib/chacha20.c b/lib/chacha20.c
+index c1cc50fb68c9..13a0bdcb1604 100644
+--- a/lib/chacha20.c
++++ b/lib/chacha20.c
+@@ -1,5 +1,5 @@
  /*
-  *  gpio_set_open_drain_value_commit() - Set the open drain gpio's value.
-  * @desc: gpio descriptor whose state need to be set.
-@@ -3081,6 +3146,23 @@ int gpiod_set_array_value_complex(bool raw, bool can_sleep,
- 	return 0;
- }
+- * ChaCha20 256-bit cipher algorithm, RFC7539
++ * The "hash function" used as the core of the ChaCha20 stream cipher (RFC7539)
+  *
+  * Copyright (C) 2015 Martin Willi
+  *
+@@ -16,14 +16,10 @@
+ #include <asm/unaligned.h>
+ #include <crypto/chacha20.h>
  
-+int gpiod_set_array_bitmap_complex(bool raw, bool can_sleep,
-+				   struct gpio_descs *array,
-+				   unsigned long *bits)
+-void chacha20_block(u32 *state, u32 *stream)
++static void chacha20_permute(u32 *x)
+ {
+-	u32 x[16], *out = stream;
+ 	int i;
+ 
+-	for (i = 0; i < ARRAY_SIZE(x); i++)
+-		x[i] = state[i];
+-
+ 	for (i = 0; i < 20; i += 2) {
+ 		x[0]  += x[4];    x[12] = rol32(x[12] ^ x[0],  16);
+ 		x[1]  += x[5];    x[13] = rol32(x[13] ^ x[1],  16);
+@@ -65,10 +61,52 @@ void chacha20_block(u32 *state, u32 *stream)
+ 		x[8]  += x[13];   x[7]  = rol32(x[7]  ^ x[8],   7);
+ 		x[9]  += x[14];   x[4]  = rol32(x[4]  ^ x[9],   7);
+ 	}
++}
++
++/**
++ * chacha20_block - generate one keystream block and increment block counter
++ * @state: input state matrix (16 32-bit words)
++ * @stream: output keystream block (64 bytes)
++ *
++ * This is the ChaCha20 core, a function from 64-byte strings to 64-byte
++ * strings.  The caller has already converted the endianness of the input.  This
++ * function also handles incrementing the block counter in the input matrix.
++ */
++void chacha20_block(u32 *state, u32 *stream)
 +{
-+	int value_array[sizeof(*bits)];
++	u32 x[16];
 +	int i;
 +
-+	if (array->ndescs > sizeof(*bits))
-+		return -EINVAL;
++	memcpy(x, state, 64);
 +
-+	for (i = 0; i < array->ndescs; i++)
-+		value_array[i] = test_bit(i, bits);
-+
-+	return gpiod_set_array_value_complex(raw, can_sleep, array->ndescs,
-+					     array->desc, value_array);
-+}
-+
- /**
-  * gpiod_set_raw_value() - assign a gpio's raw value
-  * @desc: gpio whose value will be assigned
-@@ -3185,6 +3267,48 @@ void gpiod_set_array_value(unsigned int array_size,
++	chacha20_permute(x);
+ 
+ 	for (i = 0; i < ARRAY_SIZE(x); i++)
+-		out[i] = cpu_to_le32(x[i] + state[i]);
++		stream[i] = cpu_to_le32(x[i] + state[i]);
+ 
+ 	state[12]++;
  }
- EXPORT_SYMBOL_GPL(gpiod_set_array_value);
- 
-+/**
-+ * gpiod_set_raw_array_bitmap() - assign values to an array of GPIOs
-+ * @desc_array: array of GPIO descriptors whose values will be assigned,
-+ *		obtained with gpiod_get_array(),
-+ * @bits: bitmap of values to assign
-+ *
-+ * Set the raw values of the GPIOs, i.e. the values of the physical lines
-+ * without regard for their ACTIVE_LOW status.
-+ *
-+ * This function should be called from contexts where we cannot sleep, and will
-+ * complain if the GPIO chip functions potentially sleep.
-+ */
-+int gpiod_set_raw_array_bitmap(struct gpio_descs *desc_array,
-+			       unsigned long *bits)
-+{
-+	if (!desc_array)
-+		return -EINVAL;
-+	return gpiod_set_array_bitmap_complex(true, false, desc_array, bits);
-+}
-+EXPORT_SYMBOL_GPL(gpiod_set_raw_array_bitmap);
+ EXPORT_SYMBOL(chacha20_block);
 +
 +/**
-+ * gpiod_set_array_bitmap() - assign values to an array of GPIOs
-+ * @array_size: number of elements in the descriptor / value arrays
-+ * @desc_array: array of GPIO descriptors whose values will be assigned
-+ * @bits: bitmap of values to assign
++ * hchacha20_block - abbreviated ChaCha20 core, for XChaCha20
++ * @in: input state matrix (16 32-bit words)
++ * @out: output (8 32-bit words)
 + *
-+ * Set the logical values of the GPIOs, i.e. taking their ACTIVE_LOW status
-+ * into account.
-+ *
-+ * This function should be called from contexts where we cannot sleep, and will
-+ * complain if the GPIO chip functions potentially sleep.
++ * HChaCha20 is the ChaCha equivalent of HSalsa20 and is an intermediate step
++ * towards XChaCha20 (see https://cr.yp.to/snuffle/xsalsa-20081128.pdf).
++ * HChaCha20 skips the final addition of the initial state, and outputs only
++ * certain words of the state.  It should not be used for streaming directly.
 + */
-+void gpiod_set_array_bitmap(struct gpio_descs *desc_array,
-+			    unsigned long *bits)
++void hchacha20_block(const u32 *in, u32 *out)
 +{
-+	if (!desc_array)
-+		return;
-+	gpiod_set_array_bitmap_complex(false, false, desc_array, bits);
-+}
-+EXPORT_SYMBOL_GPL(gpiod_set_array_bitmap);
++	u32 x[16];
 +
- /**
-  * gpiod_cansleep() - report whether gpio value access may sleep
-  * @desc: gpio to check
-@@ -3446,6 +3570,49 @@ int gpiod_get_array_value_cansleep(unsigned int array_size,
- }
- EXPORT_SYMBOL_GPL(gpiod_get_array_value_cansleep);
- 
-+/**
-+ * gpiod_get_raw_array_bitmap_cansleep() - read raw values from array of GPIOs
-+ * @desc_array: array of GPIO descriptors whose values will be read, obtained
-+ *		with gpiod_get_array(),
-+ * @bits: bitmap to store the read values
-+ *
-+ * Read the raw values of the GPIOs, i.e. the values of the physical lines
-+ * without regard for their ACTIVE_LOW status.  Return 0 in case of success,
-+ * else an error code.
-+ *
-+ * This function is to be called from contexts that can sleep.
-+ */
-+int gpiod_get_raw_array_bitmap_cansleep(struct gpio_descs *desc_array,
-+					unsigned long *bits)
-+{
-+	might_sleep_if(extra_checks);
-+	if (!desc_array)
-+		return -EINVAL;
-+	return gpiod_get_array_bitmap_complex(true, true, desc_array, bits);
-+}
-+EXPORT_SYMBOL_GPL(gpiod_get_raw_array_bitmap_cansleep);
++	memcpy(x, in, 64);
 +
-+/**
-+ * gpiod_get_array_bitmap_cansleep() - read values from an array of GPIOs
-+ * @desc_array: array of GPIO descriptors whose values will be read, obtained
-+ *		with gpiod_get_array(),
-+ * @bits: bitmap to store the read values
-+ *
-+ * Read the logical values of the GPIOs, i.e. taking their ACTIVE_LOW status
-+ * into account.  Return 0 in case of success, else an error code.
-+ *
-+ * This function is to be called from contexts that can sleep.
-+ */
-+int gpiod_get_array_bitmap_cansleep(struct gpio_descs *desc_array,
-+				    unsigned long *bits)
-+{
-+	might_sleep_if(extra_checks);
-+	if (!desc_array)
-+		return -EINVAL;
-+	return gpiod_get_array_bitmap_complex(false, true, desc_array, bits);
-+}
-+EXPORT_SYMBOL_GPL(gpiod_get_array_bitmap_cansleep);
++	chacha20_permute(x);
 +
- /**
-  * gpiod_set_raw_value_cansleep() - assign a gpio's raw value
-  * @desc: gpio whose value will be assigned
-@@ -3545,6 +3712,48 @@ void gpiod_set_array_value_cansleep(unsigned int array_size,
- }
- EXPORT_SYMBOL_GPL(gpiod_set_array_value_cansleep);
- 
-+/**
-+ * gpiod_set_raw_array_bitmap_cansleep() - assign values to an array of GPIOs
-+ * @desc_array: array of GPIO descriptors whose values will be assigned,
-+ *		obtained with gpiod_get_array(),
-+ * @bits: bitmap of values to assign
-+ *
-+ * Set the raw values of the GPIOs, i.e. the values of the physical lines
-+ * without regard for their ACTIVE_LOW status.
-+ *
-+ * This function is to be called from contexts that can sleep.
-+ */
-+int gpiod_set_raw_array_bitmap_cansleep(struct gpio_descs *desc_array,
-+					unsigned long *bits)
-+{
-+	might_sleep_if(extra_checks);
-+	if (!desc_array)
-+		return -EINVAL;
-+	return gpiod_set_array_bitmap_complex(true, true, desc_array, bits);
++	memcpy(&out[0], &x[0], 16);
++	memcpy(&out[4], &x[12], 16);
 +}
-+EXPORT_SYMBOL_GPL(gpiod_set_raw_array_bitmap_cansleep);
-+
-+/**
-+ * gpiod_set_array_bitmap_cansleep() - assign values to an array of GPIOs
-+ * @desc_array: array of GPIO descriptors whose values will be assigned,
-+ *		obtained with gpiod_get_array(),
-+ * @bits: bitmap of values to assign
-+ *
-+ * Set the logical values of the GPIOs, i.e. taking their ACTIVE_LOW status
-+ * into account.
-+ *
-+ * This function is to be called from contexts that can sleep.
-+ */
-+void gpiod_set_array_bitmap_cansleep(struct gpio_descs *desc_array,
-+				     unsigned long *bits)
-+{
-+	might_sleep_if(extra_checks);
-+	if (!desc_array)
-+		return;
-+	gpiod_set_array_bitmap_complex(false, true, desc_array, bits);
-+}
-+EXPORT_SYMBOL_GPL(gpiod_set_array_bitmap_cansleep);
-+
- /**
-  * gpiod_add_lookup_table() - register GPIO device consumers
-  * @table: table of consumers to register
-diff --git a/include/linux/gpio/consumer.h b/include/linux/gpio/consumer.h
-index 862ee027a02f..1eabce4fc6c5 100644
---- a/include/linux/gpio/consumer.h
-+++ b/include/linux/gpio/consumer.h
-@@ -106,35 +106,49 @@ int gpiod_direction_output_raw(struct gpio_desc *desc, int value);
- int gpiod_get_value(const struct gpio_desc *desc);
- int gpiod_get_array_value(unsigned int array_size,
- 			  struct gpio_desc **desc_array, int *value_array);
-+int gpiod_get_array_bitmap(struct gpio_descs *desc_array, unsigned long *bits);
- void gpiod_set_value(struct gpio_desc *desc, int value);
- void gpiod_set_array_value(unsigned int array_size,
- 			   struct gpio_desc **desc_array, int *value_array);
-+void gpiod_set_array_bitmap(struct gpio_descs *desc_array, unsigned long *bits);
- int gpiod_get_raw_value(const struct gpio_desc *desc);
- int gpiod_get_raw_array_value(unsigned int array_size,
- 			      struct gpio_desc **desc_array,
- 			      int *value_array);
-+int gpiod_get_raw_array_bitmap(struct gpio_descs *desc_array,
-+			       unsigned long *bits);
- void gpiod_set_raw_value(struct gpio_desc *desc, int value);
- int gpiod_set_raw_array_value(unsigned int array_size,
- 			       struct gpio_desc **desc_array,
- 			       int *value_array);
-+int gpiod_set_raw_array_bitmap(struct gpio_descs *desc_array,
-+			       unsigned long *bits);
- 
- /* Value get/set from sleeping context */
- int gpiod_get_value_cansleep(const struct gpio_desc *desc);
- int gpiod_get_array_value_cansleep(unsigned int array_size,
- 				   struct gpio_desc **desc_array,
- 				   int *value_array);
-+int gpiod_get_array_bitmap_cansleep(struct gpio_descs *desc_array,
-+				    unsigned long *bits);
- void gpiod_set_value_cansleep(struct gpio_desc *desc, int value);
- void gpiod_set_array_value_cansleep(unsigned int array_size,
- 				    struct gpio_desc **desc_array,
- 				    int *value_array);
-+void gpiod_set_array_bitmap_cansleep(struct gpio_descs *desc_array,
-+				     unsigned long *bits);
- int gpiod_get_raw_value_cansleep(const struct gpio_desc *desc);
- int gpiod_get_raw_array_value_cansleep(unsigned int array_size,
- 				       struct gpio_desc **desc_array,
- 				       int *value_array);
-+int gpiod_get_raw_array_bitmap_cansleep(struct gpio_descs *desc_array,
-+					unsigned long *bits);
- void gpiod_set_raw_value_cansleep(struct gpio_desc *desc, int value);
- int gpiod_set_raw_array_value_cansleep(unsigned int array_size,
- 					struct gpio_desc **desc_array,
- 					int *value_array);
-+int gpiod_set_raw_array_bitmap_cansleep(struct gpio_descs *desc_array,
-+					unsigned long *bits);
- 
- int gpiod_set_debounce(struct gpio_desc *desc, unsigned debounce);
- int gpiod_set_transitory(struct gpio_desc *desc, bool transitory);
++EXPORT_SYMBOL(hchacha20_block);
 -- 
-2.16.4
+2.18.0.597.ga71716f1ad-goog
