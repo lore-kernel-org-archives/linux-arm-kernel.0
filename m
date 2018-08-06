@@ -1,58 +1,45 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Mon,  6 Aug 2018 18:40:43 +0200
-Subject: [PATCH v5 08/10] usb, arm64: untag user addresses in devio
+Date: Mon,  6 Aug 2018 18:40:39 +0200
+Subject: [PATCH v5 04/10] mm, arm64: untag user addresses in mm/gup.c
 In-Reply-To: <cover.1533573460.git.andreyknvl@google.com>
 References: <cover.1533573460.git.andreyknvl@google.com>
-Message-ID: <39bbae2c9d880bd3c27ac3ee03d4be72e161491c.1533573460.git.andreyknvl@google.com>
+Message-ID: <64762ca688f8611c38cf6a8c8bf50a75d9f2fa3a.1533573460.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devio allows to mmap memory regions and keeps them in a list. It also
-accepts a user address through an ioctl call and searches the memory
-region list for the region that contains this address. Since the addresses
-provided to mmap must not be tagged, and the addresses provided to ioctl
-might be tagged, we might compare tagged and untagged addresses during the
-search.
+mm/gup.c provides a kernel interface that accepts user addresses and
+manipulates user pages directly (for example get_user_pages, that is used
+by the futex syscall). Since a user can provided tagged addresses, we need
+to handle such case.
 
-Untag the provided addresses before searching.
+Add untagging to gup.c functions that use user addresses for vma lookup.
 
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- drivers/usb/core/devio.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ mm/gup.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/usb/core/devio.c b/drivers/usb/core/devio.c
-index 476dcc5f2da3..357c2e7b87b8 100644
---- a/drivers/usb/core/devio.c
-+++ b/drivers/usb/core/devio.c
-@@ -1404,7 +1404,7 @@ find_memory_area(struct usb_dev_state *ps, const struct usbdevfs_urb *uurb)
- {
- 	struct usb_memory *usbm = NULL, *iter;
- 	unsigned long flags;
--	unsigned long uurb_start = (unsigned long)uurb->buffer;
-+	unsigned long uurb_start = (unsigned long)untagged_addr(uurb->buffer);
+diff --git a/mm/gup.c b/mm/gup.c
+index fc5f98069f4e..ebb87fb56709 100644
+--- a/mm/gup.c
++++ b/mm/gup.c
+@@ -666,6 +666,8 @@ static long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
+ 	if (!nr_pages)
+ 		return 0;
  
- 	spin_lock_irqsave(&ps->lock, flags);
- 	list_for_each_entry(iter, &ps->memory_list, memlist) {
-@@ -1633,7 +1633,8 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
- 		}
- 	} else if (uurb->buffer_length > 0) {
- 		if (as->usbm) {
--			unsigned long uurb_start = (unsigned long)uurb->buffer;
-+			unsigned long uurb_start =
-+				(unsigned long)untagged_addr(uurb->buffer);
++	start = untagged_addr(start);
++
+ 	VM_BUG_ON(!!pages != !!(gup_flags & FOLL_GET));
  
- 			as->urb->transfer_buffer = as->usbm->mem +
- 					(uurb_start - as->usbm->vm_start);
-@@ -1712,7 +1713,8 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
- 	as->ps = ps;
- 	as->userurb = arg;
- 	if (as->usbm) {
--		unsigned long uurb_start = (unsigned long)uurb->buffer;
-+		unsigned long uurb_start =
-+			(unsigned long)untagged_addr(uurb->buffer);
+ 	/*
+@@ -820,6 +822,8 @@ int fixup_user_fault(struct task_struct *tsk, struct mm_struct *mm,
+ 	struct vm_area_struct *vma;
+ 	int ret, major = 0;
  
- 		as->urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
- 		as->urb->transfer_dma = as->usbm->dma_handle +
++	address = untagged_addr(address);
++
+ 	if (unlocked)
+ 		fault_flags |= FAULT_FLAG_ALLOW_RETRY;
+ 
 -- 
 2.18.0.597.ga71716f1ad-goog
