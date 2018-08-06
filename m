@@ -1,58 +1,30 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 06 Aug 2018 08:29:13 +0200
-Subject: [PATCH v3 06/10] drm/imx: Use __drm_atomic_helper_plane_reset
- instead of copying the logic
-In-Reply-To: <20180804161530.12275-7-alexandru-cosmin.gheorghe@arm.com>
+Date: Mon, 06 Aug 2018 08:29:16 +0200
+Subject: [PATCH v3 01/10] drm/atomic: Add __drm_atomic_helper_plane_reset
+In-Reply-To: <20180804161530.12275-2-alexandru-cosmin.gheorghe@arm.com>
 References: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
- <20180804161530.12275-7-alexandru-cosmin.gheorghe@arm.com>
-Message-ID: <1533536953.4204.3.camel@pengutronix.de>
+ <20180804161530.12275-2-alexandru-cosmin.gheorghe@arm.com>
+Message-ID: <1533536956.4204.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandru,
-
 On Sat, 2018-08-04 at 17:15 +0100, Alexandru Gheorghe wrote:
-> A new helper function(__drm_atomic_helper_plane_reset) has been added
-> for linking a plane with its state and resetting the core
-> properties(alpha, rotation, etc.) to their default values.
-> Use that instead of duplicating the logic.
+> There are a lot of drivers that subclass drm_plane_state, all of them
+> duplicate the code that links together the plane with plane_state.
 > 
+> On top of that, drivers that enable core properties also have to
+> duplicate the code for initializing the properties to their default
+> values, which in all cases are the same as the defaults from core.
+> 
+> Change since v1:
+> - Make it consistent with the other helpers and require that both
+>   plane and state not be NULL, suggested by Boris Brezillon and
+>   Philipp Zabel.
+> 
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 > Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
-> ---
->  drivers/gpu/drm/imx/ipuv3-plane.c | 8 +++-----
->  1 file changed, 3 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/imx/ipuv3-plane.c b/drivers/gpu/drm/imx/ipuv3-plane.c
-> index 203f247d4854..1bd4de03ce9e 100644
-> --- a/drivers/gpu/drm/imx/ipuv3-plane.c
-> +++ b/drivers/gpu/drm/imx/ipuv3-plane.c
-> @@ -281,16 +281,14 @@ static void ipu_plane_state_reset(struct drm_plane *plane)
->  		ipu_state = to_ipu_plane_state(plane->state);
->  		__drm_atomic_helper_plane_destroy_state(plane->state);
->  		kfree(ipu_state);
-> +		plane->state = NULL;
->  	}
->  
->  	ipu_state = kzalloc(sizeof(*ipu_state), GFP_KERNEL);
->  
-> -	if (ipu_state) {
-> -		ipu_state->base.plane = plane;
-> -		ipu_state->base.rotation = DRM_MODE_ROTATE_0;
-> -	}
-> +	if (ipu_state)
-> +		__drm_atomic_helper_plane_reset(plane, &ipu_state->base);
->  
 
-Could you remove this white line as well?
-
-> -	plane->state = &ipu_state->base;
->  }
->  
->  static struct drm_plane_state *
-
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-
-to be merged through drm-misc together with the other changes.
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
 
 regards
 Philipp
