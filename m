@@ -1,48 +1,44 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Mon, 6 Aug 2018 23:10:40 +0900
-Subject: [PATCH v6 4/8] media: platform: Add Cedrus VPU decoder driver
-In-Reply-To: <dba0f9496b393c76f355398018b14ae06b2b18c9.camel@bootlin.com>
-References: <20180725100256.22833-1-paul.kocialkowski@bootlin.com>
- <20180725100256.22833-5-paul.kocialkowski@bootlin.com>
- <b45a8a89-1313-7a08-206d-b93017724754@xs4all.nl>
- <dba0f9496b393c76f355398018b14ae06b2b18c9.camel@bootlin.com>
-Message-ID: <CAAFQd5DgFDFupACthsz1iLpAeYRtUtEfzQC1E5XZQ6gPZAYi1Q@mail.gmail.com>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Mon, 6 Aug 2018 10:13:19 -0400 (EDT)
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <CAPv3WKeVkWChEE7WjKuu__bg+zvh9dTNy=U_2jiSyWxFWiatbA@mail.gmail.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
+ <20180803094129.GB17798@arm.com>
+ <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
+ <alpine.LRH.2.02.1808031424140.14030@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAHCPf3s-+Qf=WBZz1KpisDMG3520jCUh8PLAO3PHa4jdt8kCTw@mail.gmail.com>
+ <CAKv+Gu9_h-WFi1j4+DWUN_dMj75SKKHxWoDH8WQ9P7S7MNpZQg@mail.gmail.com>
+ <alpine.LRH.2.02.1808060553130.30832@file01.intranet.prod.int.rdu2.redhat.com>
+ <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
+ <CAPv3WKdxwoW5MAOvy6uEBEuMpsigMo98hyO+TpKMsFrKR9oBzg@mail.gmail.com>
+ <CAKv+Gu8XN-vP64G_NLHFcRUJ2fptSrmxfd6CHWDgHkJj073Hbg@mail.gmail.com>
+ <CAPv3WKeVkWChEE7WjKuu__bg+zvh9dTNy=U_2jiSyWxFWiatbA@mail.gmail.com>
+Message-ID: <alpine.LRH.2.02.1808061008520.9697@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
 
-On Mon, Aug 6, 2018 at 10:50 PM Paul Kocialkowski
-<paul.kocialkowski@bootlin.com> wrote:
->
-> Hi Hans and thanks for the review!
->
-> On Sat, 2018-08-04 at 14:18 +0200, Hans Verkuil wrote:
-> > Hi Paul,
+
+On Mon, 6 Aug 2018, Marcin Wojtas wrote:
+
+> > Hi Marcin,
 > >
-> > See below for my review comments. Mostly small fry, the main issue I found is
-> > that there is no support for VIDIOC_DECODER_CMD. That's the proper way of
-> > stopping a decoder. Don't rely on the deprecated allow_zero_bytesused field.
->
-> Mhh, it looks like this was kept around by negligence, but we do expect
-> that streamoff stops the decoder, not a zero bytesused field.
->
-> Is it still required to implement the V4L2_DEC_CMD_STOP
-> VIDIOC_DECODER_CMD in that case? I read in the doc that this ioctl
-> should be optional.
+> > Could you please try running his reproducer?
+> 
+> This is exactly what I plan to do, as soon as I can plug my GFX card
+> back to the board (tomorrow). Just to remain aligned - is it ok, if I
+> boot my debian with GT630 plugged, compile the program with -O2 and
+> simlply run it on /dev/fb0?
+> 
+> Best regards,
+> Marcin
 
-If I understand correctly that this decoder is stateless, there should
-be no need for any special flush sequence, since a 1:1 relation
-between OUTPUT and CAPTURE buffers is expected, which means that
-userspace can just stop queuing new OUTPUT buffers and keep dequeuing
-CAPTURE buffers until it matches all OUTPUT buffers queued before.
+Yes - when you run it, don't switch consoles (it will obviously trigger 
+false warning), don't move the mouse to the upper left corner, and if you 
+want to run it in the long term, turn off console blanking.
 
-By the way, I guess we will also need some documentation for the
-stateless codec interface. Do you or Maxime (who sent the H264 part)
-have any plans to work on it? We have some internal documents, which
-should be convertible to rst using pandoc, but we might need some help
-with updating to latest request API and further editing. Alexandre
-(moved from Cc to To) is going to be looking into this.
-
-Best regards,
-Tomasz
+Mikulas
