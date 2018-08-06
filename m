@@ -1,162 +1,147 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  6 Aug 2018 14:41:43 +0100
-Subject: [PATCH 01/13] coresight: tmc-etr: Refactor for handling errors
+Date: Mon,  6 Aug 2018 14:41:49 +0100
+Subject: [PATCH 07/13] coresight: dynamic-replicator: Handle multiple
+ connections
 In-Reply-To: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
 References: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1533562915-21558-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1533562915-21558-8-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Refactor the tmc-etr enable operation to make it easier to
-handle errors in enabling the hardware. We need to make
-sure that the buffer is compatible with the ETR. This
-patch re-arranges to make the error handling easier, by
-deferring the hardware enablement until all the errors
-are checked. This also avoids turning the CATU on/off
-during a sysfs read session.
+When a replicator port is enabled, we block the traffic
+on the other port and route all traffic to the new enabled
+port. If there are two active trace sessions each targeting
+the two different paths from the replicator, the second session
+will disable the first session and route all the data to the
+second path.
+                    ETR
+                 /
+e.g, replicator
+                 \
+                    ETB
+
+If CPU0 is operated in sysfs mode to ETR and CPU1 is operated
+in perf mode to ETB, depending on the order in which the
+replicator is enabled one device is blocked.
+
+Ideally we need trace-id for the session to make the
+right choice. That implies we need a trace-id allocation
+logic for the coresight subsystem and use that to route
+the traffic. The short term solution is to only manage
+the "target port" and leave the other port untouched.
+That leaves both the paths unaffected, except that some
+unwanted traffic may be pushed to the paths (if the Trace-IDs
+are not far enough), which is still fine and can be filtered
+out while processing rather than silently blocking the data.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 67 ++++++++++++++++---------
- 1 file changed, 43 insertions(+), 24 deletions(-)
+ .../coresight/coresight-dynamic-replicator.c       | 66 ++++++++++++++++------
+ 1 file changed, 48 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 56fea4f..c426935 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -918,21 +918,10 @@ static void tmc_sync_etr_buf(struct tmc_drvdata *drvdata)
- 		tmc_etr_buf_insert_barrier_packet(etr_buf, etr_buf->offset);
- }
+diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+index ebb8043..97f4673 100644
+--- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
++++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+@@ -34,26 +34,42 @@ struct replicator_state {
+ 	struct coresight_device	*csdev;
+ };
  
--static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
--			      struct etr_buf *etr_buf)
-+static void __tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
++/*
++ * replicator_reset : Reset the replicator configuration to sane values.
++ */
++static void replicator_reset(struct replicator_state *drvdata)
++{
++	CS_UNLOCK(drvdata->base);
++
++	writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER0);
++	writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER1);
++
++	CS_LOCK(drvdata->base);
++}
++
+ static int replicator_enable(struct coresight_device *csdev, int inport,
+ 			      int outport)
  {
- 	u32 axictl, sts;
--
--	/* Callers should provide an appropriate buffer for use */
--	if (WARN_ON(!etr_buf || drvdata->etr_buf))
--		return;
--	drvdata->etr_buf = etr_buf;
++	u32 reg;
+ 	struct replicator_state *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 
+-	CS_UNLOCK(drvdata->base);
 -
 -	/*
--	 * If this ETR is connected to a CATU, enable it before we turn
--	 * this on
+-	 * Ensure that the other port is disabled
+-	 * 0x00 - passing through the replicator unimpeded
+-	 * 0xff - disable (or impede) the flow of ATB data
 -	 */
--	tmc_etr_enable_catu(drvdata);
-+	struct etr_buf *etr_buf = drvdata->etr_buf;
- 
- 	CS_UNLOCK(drvdata->base);
- 
-@@ -952,11 +941,8 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
- 		axictl |= TMC_AXICTL_ARCACHE_OS;
+-	if (outport == 0) {
+-		writel_relaxed(0x00, drvdata->base + REPLICATOR_IDFILTER0);
+-		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER1);
+-	} else {
+-		writel_relaxed(0x00, drvdata->base + REPLICATOR_IDFILTER1);
+-		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER0);
++	switch (outport) {
++	case 0:
++		reg = REPLICATOR_IDFILTER0;
++		break;
++	case 1:
++		reg = REPLICATOR_IDFILTER1;
++		break;
++	default:
++		WARN_ON(1);
++		return -EINVAL;
  	}
  
--	if (etr_buf->mode == ETR_MODE_ETR_SG) {
--		if (WARN_ON(!tmc_etr_has_cap(drvdata, TMC_ETR_SG)))
--			return;
-+	if (etr_buf->mode == ETR_MODE_ETR_SG)
- 		axictl |= TMC_AXICTL_SCT_GAT_MODE;
--	}
- 
- 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
- 	tmc_write_dba(drvdata, etr_buf->hwaddr);
-@@ -982,6 +968,32 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
++	CS_UNLOCK(drvdata->base);
++
++
++	/* Ensure that the outport is enabled. */
++	writel_relaxed(0x00, drvdata->base + reg);
  	CS_LOCK(drvdata->base);
- }
  
-+static int tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
-+			     struct etr_buf *etr_buf)
-+{
-+	/* Callers should provide an appropriate buffer for use */
-+	if (WARN_ON(!etr_buf))
-+		return -EINVAL;
-+
-+	if ((etr_buf->mode == ETR_MODE_ETR_SG) &&
-+	    WARN_ON(!tmc_etr_has_cap(drvdata, TMC_ETR_SG)))
-+		return -EINVAL;
-+
-+	if (WARN_ON(drvdata->etr_buf))
-+		return -EBUSY;
-+
-+	/* Set the buffer for the session */
-+	drvdata->etr_buf = etr_buf;
-+	/*
-+	 * If this ETR is connected to a CATU, enable it before we turn
-+	 * this on.
-+	 */
-+	tmc_etr_enable_catu(drvdata);
-+
-+	__tmc_etr_enable_hw(drvdata);
-+	return 0;
-+}
-+
- /*
-  * Return the available trace data in the buffer (starts at etr_buf->offset,
-  * limited by etr_buf->len) from @pos, with a maximum limit of @len,
-@@ -1037,7 +1049,7 @@ static void tmc_etr_sync_sysfs_buf(struct tmc_drvdata *drvdata)
- 	}
- }
- 
--static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
-+static void __tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
+ 	dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
+@@ -63,15 +79,25 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
+ static void replicator_disable(struct coresight_device *csdev, int inport,
+ 				int outport)
  {
++	u32 reg;
+ 	struct replicator_state *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 
++	switch (outport) {
++	case 0:
++		reg = REPLICATOR_IDFILTER0;
++		break;
++	case 1:
++		reg = REPLICATOR_IDFILTER1;
++		break;
++	default:
++		WARN_ON(1);
++		return;
++	}
++
  	CS_UNLOCK(drvdata->base);
  
-@@ -1053,6 +1065,11 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
+ 	/* disable the flow of ATB data through port */
+-	if (outport == 0)
+-		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER0);
+-	else
+-		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER1);
++	writel_relaxed(0xff, drvdata->base + reg);
  
  	CS_LOCK(drvdata->base);
  
-+}
-+
-+static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
-+{
-+	__tmc_etr_disable_hw(drvdata);
- 	/* Disable CATU device if this ETR is connected to one */
- 	tmc_etr_disable_catu(drvdata);
- 	/* Reset the ETR buf used by hardware */
-@@ -1111,8 +1128,9 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
- 		drvdata->sysfs_buf = new_buf;
- 	}
+@@ -156,7 +182,11 @@ static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
+ 	desc.groups = replicator_groups;
+ 	drvdata->csdev = coresight_register(&desc);
  
--	drvdata->mode = CS_MODE_SYSFS;
--	tmc_etr_enable_hw(drvdata, drvdata->sysfs_buf);
-+	ret = tmc_etr_enable_hw(drvdata, drvdata->sysfs_buf);
-+	if (!ret)
-+		drvdata->mode = CS_MODE_SYSFS;
- out:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+-	return PTR_ERR_OR_ZERO(drvdata->csdev);
++	if (!IS_ERR(drvdata->csdev)) {
++		replicator_reset(drvdata);
++		return 0;
++	}
++	return PTR_ERR(drvdata->csdev);
+ }
  
-@@ -1342,8 +1360,9 @@ static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, void *data)
- 
- 	etr_perf->head = PERF_IDX2OFF(handle->head, etr_perf);
- 	drvdata->perf_data = etr_perf;
--	drvdata->mode = CS_MODE_PERF;
--	tmc_etr_enable_hw(drvdata, etr_perf->etr_buf);
-+	rc = tmc_etr_enable_hw(drvdata, etr_perf->etr_buf);
-+	if (!rc)
-+		drvdata->mode = CS_MODE_PERF;
- 
- unlock_out:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-@@ -1425,7 +1444,7 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
- 
- 	/* Disable the TMC if we are trying to read from a running session. */
- 	if (drvdata->mode == CS_MODE_SYSFS)
--		tmc_etr_disable_hw(drvdata);
-+		__tmc_etr_disable_hw(drvdata);
- 
- 	drvdata->reading = true;
- out:
-@@ -1452,7 +1471,7 @@ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
- 		 * buffer. Since the tracer is still enabled drvdata::buf can't
- 		 * be NULL.
- 		 */
--		tmc_etr_enable_hw(drvdata, drvdata->sysfs_buf);
-+		__tmc_etr_enable_hw(drvdata);
- 	} else {
- 		/*
- 		 * The ETR is not tracing and the buffer was just read.
+ #ifdef CONFIG_PM
 -- 
 2.7.4
