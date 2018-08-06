@@ -1,70 +1,74 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 6 Aug 2018 11:21:21 +0200
-Subject: [PATCH RESEND 3/5] spi: imx: Use correct number of bytes per words
-In-Reply-To: <20180717143154.28241-4-maxime.chevallier@bootlin.com>
-References: <20180717143154.28241-1-maxime.chevallier@bootlin.com>
- <20180717143154.28241-4-maxime.chevallier@bootlin.com>
-Message-ID: <20180806092121.s7kuwf3yamrerw24@pengutronix.de>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Mon, 06 Aug 2018 11:22:43 +0200
+Subject: [PATCH v6 0/8] Cedrus driver for the Allwinner Video Engine,
+ using media requests
+In-Reply-To: <4e8a0286-7e49-5622-1895-ac3268224152@xs4all.nl>
+References: <20180725100256.22833-1-paul.kocialkowski@bootlin.com>
+ <4e8a0286-7e49-5622-1895-ac3268224152@xs4all.nl>
+Message-ID: <145b34861e7cd487dc4d9383020f186c9f273f13.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 04:31:52PM +0200, Maxime Chevallier wrote:
-> The SPI core enforces that we always use the next power-of-two number of
-> bytes to store words. As a result, a 24 bits word will be stored in 4
-> bytes.
-> 
-> This commit fixes the spi_imx_bytes_per_word function to return the
-> correct number of bytes.
-> 
-> This also allows to get rid of unnecessary checks in the can_dma
-> function, since the SPI core validates that we always have a transfer
-> length that is a multiple of the number of bytes per word.
-> 
-> Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+Hi,
 
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+On Sat, 2018-08-04 at 14:43 +0200, Hans Verkuil wrote:
+> On 07/25/2018 12:02 PM, Paul Kocialkowski wrote:
+> > This is the sixth iteration of the updated Cedrus driver,
+> > that supports the Video Engine found in most Allwinner SoCs, starting
+> > with the A10. It was tested on the A13, A20, A33 and H3.
+> > 
+> > The initial version of this driver[0] was originally written and
+> > submitted by Florent Revest using a previous version of the request API
+> > that is necessary to provide coherency between controls and the buffers
+> > they apply to.
+> > 
+> > The driver was adapted to use the latest version of the media request
+> > API[1], as submitted by Hand Verkuil. Media request API support is a
+> > hard requirement for the Cedrus driver.
+> > 
+> > The driver itself currently only supports MPEG2 and more codecs will be
+> > added to the driver eventually. The output frames provided by the
+> > Video Engine are in a multi-planar 32x32-tiled YUV format, with a plane
+> > for luminance (Y) and a plane for chrominance (UV). A specific format is
+> > introduced in the V4L2 API to describe it.
+> > 
+> > This implementation is based on the significant work that was conducted
+> > by various members of the linux-sunxi community for understanding and
+> > documenting the Video Engine's innards.
+> > 
+> > In addition to the media requests API, the following series are required
+> > for Cedrus:
+> > * vicodec: the Virtual Codec driver
+> 
+> This will appear in for 4.19.
+>
+> > * allwinner: a64: add SRAM controller / system control
+> > * SRAM patches from the Cedrus VPU driver series version 5
+> 
+> What about these? Are they queued up for 4.19 as well?
 
-Sascha
+Yes, they are queued for 4.19 through Maxime's tree[0].
 
-> ---
->  drivers/spi/spi-imx.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index ecafbda5ec94..3ae706dac660 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -202,7 +202,12 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
->  
->  static int spi_imx_bytes_per_word(const int bits_per_word)
->  {
-> -	return DIV_ROUND_UP(bits_per_word, BITS_PER_BYTE);
-> +	if (bits_per_word <= 8)
-> +		return 1;
-> +	else if (bits_per_word <= 16)
-> +		return 2;
-> +	else
-> +		return 4;
->  }
->  
->  static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
-> @@ -219,9 +224,6 @@ static bool spi_imx_can_dma(struct spi_master *master, struct spi_device *spi,
->  
->  	bytes_per_word = spi_imx_bytes_per_word(transfer->bits_per_word);
->  
-> -	if (bytes_per_word != 1 && bytes_per_word != 2 && bytes_per_word != 4)
-> -		return false;
-> -
->  	for (i = spi_imx->devtype_data->fifo_size / 2; i > 0; i--) {
->  		if (!(transfer->len % (i * bytes_per_word)))
->  			break;
-> -- 
-> 2.11.0
-> 
-> 
+> I'll post a rebased reqv17 later today that includes the
+> "add v4l2_ctrl_request_hdl_find/put/ctrl_find functions" patch.
+
+Great, I'll rebase and send a new version (taking in account your latest
+review) as soon as time allows!
+
+Cheers,
+
+Paul
+
+[0]: https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git/log/?h=sunxi/for-next
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180806/3f5b6bf8/attachment.sig>
