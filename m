@@ -1,55 +1,33 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 06 Aug 2018 18:49:32 +0200
-Subject: [PATCH v8 1/6] ARM: imx6q: provide documentation for new
- fsl,pmic-stby-poweroff property
-In-Reply-To: <DB6PR04MB3223362445234D81383F0D1689200@DB6PR04MB3223.eurprd04.prod.outlook.com>
-References: <20180726092220.17250-1-o.rempel@pengutronix.de>
- <20180726092220.17250-2-o.rempel@pengutronix.de>
- <DB6PR04MB3223605CB1F5E06D4A278B3C892B0@DB6PR04MB3223.eurprd04.prod.outlook.com>
- <84c1921c-922e-4b5d-b688-db89047fa1db@pengutronix.de>
- <DB6PR04MB32236EA307DCD070771B1D4D892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
- <1532680211.32306.36.camel@pengutronix.de>
- <DB6PR04MB32239840E3DF12328A3E7E47892A0@DB6PR04MB3223.eurprd04.prod.outlook.com>
- <02f4b642-14a8-f2db-ea23-c42a4f6f1652@pengutronix.de>
- <DB6PR04MB3223362445234D81383F0D1689200@DB6PR04MB3223.eurprd04.prod.outlook.com>
-Message-ID: <1533574172.2809.11.camel@pengutronix.de>
+From: colin.king@canonical.com (Colin King)
+Date: Mon,  6 Aug 2018 17:50:45 +0100
+Subject: [PATCH] net: thunderx: check for failed allocation lmac->dmacs
+Message-ID: <20180806165045.15707-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 06.08.2018, 02:34 +0000 schrieb Robin Gong:
-> > > > Not all boards follow the reference design, that's a fact of
-> > > > life.
-> > > > 
-> > > > Please look at the i.MX6Q reference manual. The sequence
-> > > > implemented
-> > > > in this patchset can be found as a valid way to power off the
-> > > > system
-> > > > in
-> > > > "60.4.3 Power mode transitions" "Normal ON to OFF with external
-> > > > PMIC", so there is hardly any way to argue that this is a board
-> > > > specific quirk. This is one of the Freescale/NXP recommended
-> > > > sequences to
-> > 
-> > turn off the system.
-> > 
-> > > Okay, but could you add one more comment for this solution? RTC
-> > > alarm
-> > > and ONOFF Button wakeup feature can't be support in this case.
-> > 
-> > Enough to add it in to changelog? or should it go to the binding
-> > documentation?
-> 
-> The binding doc is better.
+From: Colin Ian King <colin.king@canonical.com>
 
-Sorry, I disagree.
+The allocation of lmac->dmacs is not being checked for allocation
+failure. Add the check.
 
-A binding is a way to describe a specific hardware layout, it isn't the
-right place to advice a hardware designer on the implications of a
-specific hardware implementation. The NXP hardware design guide is a
-more suitable place for this information.
+Fixes: 3a34ecfd9d3f ("net: thunderx: add MAC address filter tracking for LMAC")
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-We also don't mention in random bindings that the system won't be able
-to brew a fresh cup of coffee.
-
-Regards,
-Lucas
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index 5d08d2aeb172..e337da6ba2a4 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -1083,6 +1083,8 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
+ 	lmac->dmacs_count = (RX_DMAC_COUNT / bgx->lmac_count);
+ 	lmac->dmacs = kcalloc(lmac->dmacs_count, sizeof(*lmac->dmacs),
+ 			      GFP_KERNEL);
++	if (!lmac->dmacs)
++		return -ENOMEM;
+ 
+ 	/* Enable lmac */
+ 	bgx_reg_modify(bgx, lmacid, BGX_CMRX_CFG, CMR_EN);
+-- 
+2.17.1
