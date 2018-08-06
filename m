@@ -1,60 +1,53 @@
-From: paulcrowley@google.com (Paul Crowley)
-Date: Mon, 6 Aug 2018 16:48:41 -0700
-Subject: [RFC PATCH 3/9] crypto: chacha20-generic - refactor to allow
- varying number of rounds
-In-Reply-To: <CAHmME9rbe6eT6dkUqKnp-GxcqGrp-tvMfTMr8kZtsn=S3cmP8A@mail.gmail.com>
-References: <20180806223300.113891-1-ebiggers@kernel.org>
- <20180806223300.113891-4-ebiggers@kernel.org>
- <CAHmME9rbe6eT6dkUqKnp-GxcqGrp-tvMfTMr8kZtsn=S3cmP8A@mail.gmail.com>
-Message-ID: <CA+_SqcD+KpQ_X6iXUCpQh0N6pWzBorstBJDx7eBqcybY4Dvy8Q@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 7 Aug 2018 00:55:06 +0100
+Subject: [PATCH v9 1/2] regulator: dt-bindings: add QCOM RPMh regulator
+ bindings
+In-Reply-To: <CAD=FV=VJN4vj9eU7wzPV8=WC_+MgRPYx1smF+FUmfDiP3uuTqw@mail.gmail.com>
+References: <cover.1531531808.git.collinsd@codeaurora.org>
+ <56b9d5c38cfe46da1228c54f001a49773c3e31dc.1531531808.git.collinsd@codeaurora.org>
+ <CAD=FV=VmfqWRGRMEn+0dzZ8x4R5vVaHbkthXAN91Lm-XmP9Gqg@mail.gmail.com>
+ <20180724145755.GF13268@sirena.org.uk>
+ <CAD=FV=Uo8sT72a0gRitOVoK0SfC-_QixsovW94_LnL6H7QdKvA@mail.gmail.com>
+ <20180724152514.GJ13268@sirena.org.uk>
+ <CAD=FV=WHJcAoR7Y_uhi7_GbVzy6K8FnovVFVRz8js0REONox=w@mail.gmail.com>
+ <20180724165942.GP13268@sirena.org.uk>
+ <20180726183922.GA4402@hector.mosconeconnections.com>
+ <CAD=FV=VJN4vj9eU7wzPV8=WC_+MgRPYx1smF+FUmfDiP3uuTqw@mail.gmail.com>
+Message-ID: <20180806235506.GU2414@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salsa20 was one of the earlier ARX proposals, and set a very
-conservative number of rounds as befits our state of knowledge at the
-time. Since then we've learned a lot more about cryptanalysis of such
-offerings, and I think we can be comfortable with fewer rounds. The
-best attack on ChaCha breaks 7 rounds, and that attack requires 2^248
-operations. Every round of ChaCha makes attacks vastly harder.
+On Mon, Aug 06, 2018 at 03:55:53PM -0700, Doug Anderson wrote:
+> On Thu, Jul 26, 2018 at 11:39 AM, Andy Gross <andy.gross@linaro.org> wrote:
 
-Performance is absolutely crucial when it comes to disk encryption;
-users and vendors will push back hard against encryption that degrades
-the user experience. So we're always going to choose the fastest
-option that gives us a solid margin of security, and here that's
-ChaCha12.
+> > The arm-soc guys merged the Qualcomm pull requests.  So you can just use my
+> > qcom-drivers-for-4.19 tag.  That won't change at this point.
 
-I'd like to turn the question around. Why 20? DJB's 20 round proposal
-predates his 12 round proposal, but I don't think that's a reason to
-choose it when all cryptanalysis has considered reduced-round
-variants. The 20 round variant is more widely used, but again I think
-that's informative more about the historical order of things than the
-security. If 20 is better than 12, is 24 better than 20? What is it
-that draws you to 20 rounds specifically?
+> > git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git
+> > qcom-drivers-for-4.19
 
-(apologies for reposting, I forgot to set Plain Text Mode.)
+> Did Andy's idea of using the above tag work for you?  It appears that
+> there are a few patches you don't need there, but it shouldn't hurt to
+> pick them up too I think?  Here's what I see:
 
-On Mon, 6 Aug 2018 at 16:16, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
->
-> Hey Eric,
->
-> On Tue, Aug 7, 2018 at 12:35 AM Eric Biggers <ebiggers@kernel.org> wrote:
-> > In preparation for adding XChaCha12 support, rename/refactor
-> > chacha20-generic to support different numbers of rounds.
->
-> I'm interested in learning the motivation behind going with ChaCha12.
-> So far, the vast majority of users of ChaCha have been getting along
-> quite fine with ChaCha20 and enjoying the very large security margin
-> this provides. In some ways, introducing ChaCha12 into the ecosystem
-> feels like a bit of a step backwards, even if it probably still
-> provides adequate security (though ChaCha8 probably shouldn't be used
-> or included at all). I realize the simple answer is just, "because
-> it's faster." But I'm wondering specifically about the speed
-> requirements and on what hardware and in what circumstances you found
-> ChaCha20 was too slow, and if this is the kind of circumstance you
-> expect to persist into the future.
->
-> Jason
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-fscrypt" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+It does make my pull request look larger which is hard to get enthused
+about.
+
+> a3134fb09e0b drivers: soc: Add LLCC driver
+
+Stuff like this jumped out for example.
+
+> It seems like it's too late to land RPMh-regulator for 4.19, so I
+> guess we'll have to aim for 4.20.  I'm not sure if that means you're
+> going to want to wait until 4.20-rc1 comes out to use as a base before
+> thinking about landing RPMh-regulator?  If so then I guess we've got
+
+If I apply it after the merge window it's going to be based on -rc1.  If
+I get to it this week I guess I'll have to pull in the drivers tag.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180807/529ed762/attachment.sig>
