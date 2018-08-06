@@ -1,62 +1,88 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 6 Aug 2018 17:48:39 +0200
-Subject: [PATCH v3 00/10] Add helper for plane reset
-In-Reply-To: <7271371.hQdeefBnlA@avalon>
-References: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
- <15977863.ZBGtPEODRU@avalon>
- <20180806122038.GA6755@e114479-lin.cambridge.arm.com>
- <7271371.hQdeefBnlA@avalon>
-Message-ID: <20180806154839.GR3008@phenom.ffwll.local>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 6 Aug 2018 17:50:16 +0200
+Subject: [RFC/PoC PATCH 0/3] arm64: basic ROP mitigation
+In-Reply-To: <b0c974a2-4e81-7855-7d4e-22834c5d8997@arm.com>
+References: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
+ <7529eedf-af56-2e94-261e-bc5c86abadaa@arm.com>
+ <CAKv+Gu9X1CDpy+XvrmbSdjBjMb45eBW7JVsvsK_JQdUt2Dbvgw@mail.gmail.com>
+ <b0c974a2-4e81-7855-7d4e-22834c5d8997@arm.com>
+Message-ID: <CAKv+Gu_ZzDbWwHVwOuoheXeN-ta_FjOT4Aj15=r56QZVTUK0FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2018 at 03:28:06PM +0300, Laurent Pinchart wrote:
-> Hi Alex,
-> 
-> On Monday, 6 August 2018 15:20:38 EEST Alexandru-Cosmin Gheorghe wrote:
-> > On Mon, Aug 06, 2018 at 02:45:42PM +0300, Laurent Pinchart wrote:
-> > > On Monday, 6 August 2018 14:07:27 EEST Alexandru-Cosmin Gheorghe wrote:
-> > >> On Sat, Aug 04, 2018 at 05:15:20PM +0100, Alexandru Gheorghe wrote:
-> > >>> No significant change since v2, fixed a spelling mistake and
-> > >>> added/removed some newlines in 01 and 07 patches.
-> > >>> 
-> > >>> I plan to apply the first patch of the series and the patches for
-> > >>> the drivers maintained through drm-misc(that go Reviewed/Ack) in
-> > >>> drm-misc-next on Monday.
-> > >>> 
-> > >>> For the other drivers please let me know if you want me to push them
-> > >>> in drm-misc-next as well.
-> > >> 
-> > >> Pushed the following patch to drm-misc-next:
-> > >> 
-> > >> drm/atomic: Add __drm_atomic_helper_plane_reset
-> > >> drm: mali-dp: Use __drm_atomic_helper_plane_reset instead of copying the
-> > >> logic
-> > >> drm: atmel-hlcdc: Use __drm_atomic_helper_plane_reset instead of copying
-> > >> the logic
-> > >> drm/imx: Use __drm_atomic_helper_plane_reset instead of copying the
-> > >> logic
-> > >> drm/sun4i: Use __drm_atomic_helper_plane_reset instead of copying the
-> > >> logic
-> > > 
-> > > I've acked the rcar-du part, could it be merged with the rest of the code
-> > > ?
-> > 
-> > Done, it's in drm-misc-next now. I didn't know how to handle this for
-> > drivers that have their own tree, so I just pushed the patches where I was
-> > explicitly asked.
-> 
-> No worries. It's actually better to ask than pushing changes directly, as 
-> maintainers could have conflicting patches queued up. I should have made this 
-> clear in my review, thank you for handling it.
+On 6 August 2018 at 17:38, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 06/08/18 15:04, Ard Biesheuvel wrote:
+>>
+>> On 6 August 2018 at 15:55, Robin Murphy <robin.murphy@arm.com> wrote:
+>>>
+>>> On 02/08/18 14:21, Ard Biesheuvel wrote:
+>>>>
+>>>>
+>>>> This is a proof of concept I cooked up, primarily to trigger a
+>>>> discussion
+>>>> about whether there is a point to doing anything like this, and if there
+>>>> is, what the pitfalls are. Also, while I am not aware of any similar
+>>>> implementations, the idea is so simple that I would be surprised if
+>>>> nobody
+>>>> else thought of the same thing way before I did.
+>>>
+>>>
+>>>
+>>> So, "TTBR0 PAN: Pointer Auth edition"? :P
+>>>
+>>>> The idea is that we can significantly limit the kernel's attack surface
+>>>> for ROP based attacks by clearing the stack pointer's sign bit before
+>>>> returning from a function, and setting it again right after proceeding
+>>>> from the [expected] return address. This should make it much more
+>>>> difficult
+>>>> to return to arbitrary gadgets, given that they rely on being chained to
+>>>> the next via a return address popped off the stack, and this is
+>>>> difficult
+>>>> when the stack pointer is invalid.
+>>>>
+>>>> Of course, 4 additional instructions per function return is not exactly
+>>>> for free, but they are just movs and adds, and leaf functions are
+>>>> disregarded unless they allocate a stack frame (this comes for free
+>>>> because simple_return insns are disregarded by the plugin)
+>>>>
+>>>> Please shoot, preferably with better ideas ...
+>>>
+>>>
+>>>
+>>> Actually, on the subject of PAN, shouldn't this at least have a very hard
+>>> dependency on that? AFAICS without PAN clearing bit 55 of SP is
+>>> effectively
+>>> giving userspace direct control of the kernel stack (thanks to TBI).
+>>> Ouch.
+>>>
+>>
+>> How's that? Bits 52 .. 54 will still be set, so SP will never contain
+>> a valid userland address in any case. Or am I missing something?
+>
+>
+> Ah, yes, I'd managed to forget about the address hole, but I think that only
+> makes it a bit trickier, rather than totally safe - it feels like you just
+> need to chain one or two returns through "valid" targets until you can hit
+> an epilogue with a "mov sp, x29" (at first glance there are a fair few of
+> those in my vmlinux), after which we're back to the bit 55 scheme alone
+> giving no protection against retargeting the stack to a valid TTBR0 address.
+>
 
-Poke them a few times, if no response then just get someone to review the
-remaining ones and push them all into drm-misc-next. This is needed all
-the time because many drivers aren't group maintained and the single
-maintainer swamped/absent. Worst case there's a conflict or a
-double-merge, which isn't really all that bad.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Wouldn't such an epilogue clear the SP bit before returning again?
+
+>>> I wonder if there's a little  more mileage in using "{add,sub} sp, sp,
+>>> #1"
+>>> sequences to rely on stack alignment exceptions instead, with the added
+>>> bonus that that's about as low as the instruction-level overhead can get.
+>>>
+>>
+>> Good point. I did consider that, but couldn't convince myself that it
+>> isn't easier to defeat: loads via x29 occur reasonably often, and you
+>> can simply offset your doctored stack frame by a single byte.
+>
+>
+> True; in theory there are 3072 possible unaligned offsets to choose from,
+> but compile-time randomisation doesn't seem much use, and hotpatching just
+> about every function call in the kernel isn't a nice thought either.
+>
+> Robin.
