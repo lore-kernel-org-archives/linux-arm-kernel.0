@@ -1,41 +1,45 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Mon, 6 Aug 2018 19:58:08 +0800
-Subject: [PATCH v3 01/13] drm/mediatek: add connection from RDMA0 to DPI1
+Date: Mon, 6 Aug 2018 19:58:16 +0800
+Subject: [PATCH v3 09/13] drm/mediatek: add callback function to return OVL
+ layer number
 In-Reply-To: <1533556700-26525-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1533556700-26525-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1533556700-26525-2-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1533556700-26525-10-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add connection from RDMA0 to DPI1
+This patch add callback function to return OVL layer number
+
+For now, MT8173, MT2712, MT2701 OVL all has 4 layer.
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_disp_ovl.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 87e4191c250e..03e3628b5b0d 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -106,6 +106,7 @@
- #define OVL1_MOUT_EN_COLOR1		0x1
- #define GAMMA_MOUT_EN_RDMA1		0x1
- #define RDMA0_SOUT_DPI0			0x2
-+#define RDMA0_SOUT_DPI1			0x3
- #define RDMA0_SOUT_DSI2			0x4
- #define RDMA0_SOUT_DSI3			0x5
- #define RDMA1_SOUT_DPI0			0x2
-@@ -224,6 +225,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
- 	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DPI0) {
- 		*addr = DISP_REG_CONFIG_DISP_RDMA0_SOUT_EN;
- 		value = RDMA0_SOUT_DPI0;
-+	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DPI1) {
-+		*addr = DISP_REG_CONFIG_DISP_RDMA0_SOUT_EN;
-+		value = RDMA0_SOUT_DPI1;
- 	} else if (cur == DDP_COMPONENT_RDMA0 && next == DDP_COMPONENT_DSI2) {
- 		*addr = DISP_REG_CONFIG_DISP_RDMA0_SOUT_EN;
- 		value = RDMA0_SOUT_DSI2;
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+index 978782a77629..66060e79afbc 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+@@ -132,6 +132,11 @@ static void mtk_ovl_config(struct mtk_ddp_comp *comp, unsigned int w,
+ 	writel(0x0, comp->regs + DISP_REG_OVL_RST);
+ }
+ 
++static unsigned int mtk_ovl_layer_nr(struct mtk_ddp_comp *comp)
++{
++	return 4;
++}
++
+ static void mtk_ovl_layer_on(struct mtk_ddp_comp *comp, unsigned int idx)
+ {
+ 	unsigned int reg;
+@@ -221,6 +226,7 @@ static const struct mtk_ddp_comp_funcs mtk_disp_ovl_funcs = {
+ 	.stop = mtk_ovl_stop,
+ 	.enable_vblank = mtk_ovl_enable_vblank,
+ 	.disable_vblank = mtk_ovl_disable_vblank,
++	.layer_nr = mtk_ovl_layer_nr,
+ 	.layer_on = mtk_ovl_layer_on,
+ 	.layer_off = mtk_ovl_layer_off,
+ 	.layer_config = mtk_ovl_layer_config,
 -- 
 2.12.5.2.gbdf23ab
