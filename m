@@ -1,60 +1,75 @@
 From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Tue,  7 Aug 2018 00:29:09 +0200
-Subject: [RFC PATCH v2 03/12] ARM: OMAP1: ams-delta: Provide GPIO lookup table
- for NAND data port
+Date: Tue,  7 Aug 2018 00:29:18 +0200
+Subject: [RFC PATCH v2 12/12] gpiolib: Add fast processing path to bitmap API
+ functions
 In-Reply-To: <20180806222918.12644-1-jmkrzyszt@gmail.com>
 References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
  <20180806222918.12644-1-jmkrzyszt@gmail.com>
-Message-ID: <20180806222918.12644-4-jmkrzyszt@gmail.com>
+Message-ID: <20180806222918.12644-13-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Data port used by Amstrad Delta NAND driver is actually an OMAP MPUIO
-device, already under control of gpio-omap driver.  The NAND driver
-gets access to the port by ioremapping it and performs read/write
-operations.  That is done without any proteciton from other users
-legally manipulating the port pins over GPIO API.
+Certain GPIO descriptor arrays returned by gpio_get_array() may contain
+information on a single GPIO chip driving array member pins in hardware
+order.  In such cases, bitmaps of values can be passed directly to the
+chip callback functions without wasting time on iterations.
 
-The plan is to convert the driver to access the port over GPIO consumer
-API.  Before that is implemented, the driver can already obtain
-exclusive access to the port by requesting an array of its GPIO
-descriptors.
-
-Add respective entries to the NAND GPIO lookup table.
+Add respective code to gpiod_get/set_array_bitmap_complex() functions.
 
 Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 ---
- arch/arm/mach-omap1/board-ams-delta.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ Documentation/driver-api/gpio/consumer.rst |  6 ++++++
+ drivers/gpio/gpiolib.c                     | 14 ++++++++++++++
+ 2 files changed, 20 insertions(+)
 
-diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
-index eedacdfe9725..16f7bbe47607 100644
---- a/arch/arm/mach-omap1/board-ams-delta.c
-+++ b/arch/arm/mach-omap1/board-ams-delta.c
-@@ -337,7 +337,8 @@ static struct platform_device ams_delta_nand_device = {
- 	.resource	= ams_delta_nand_resources,
- };
+diff --git a/Documentation/driver-api/gpio/consumer.rst b/Documentation/driver-api/gpio/consumer.rst
+index bec4eab3b87c..b82f134dc352 100644
+--- a/Documentation/driver-api/gpio/consumer.rst
++++ b/Documentation/driver-api/gpio/consumer.rst
+@@ -409,6 +409,12 @@ descriptor arrays, only those of type struct gpio_descs returned by
+ gpiod_get_array() and its variants.  Supported array size is limited to the size
+ of the bitmap, i.e., sizeof(unsigned long).
  
--#define OMAP_GPIO_LABEL	"gpio-0-15"
-+#define OMAP_GPIO_LABEL		"gpio-0-15"
-+#define OMAP_MPUIO_LABEL	"mpuio"
++If the .chip member of the array structure, filled in by gpiod_get_array() in
++certain circumstances, contains a valid GPIO chip descriptor, the raw variants
++of the functions can take fast processing paths, passing bitmap arguments
++directly to the chip callback functions.  That allows for utilization of GPIO
++banks as data I/O ports without much loss of performance.
++
  
- static struct gpiod_lookup_table ams_delta_nand_gpio_table = {
- 	.table = {
-@@ -349,6 +350,14 @@ static struct gpiod_lookup_table ams_delta_nand_gpio_table = {
- 		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_NWE, "nwe", 0),
- 		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_ALE, "ale", 0),
- 		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_CLE, "cle", 0),
-+		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 0, "data", 0, 0),
-+		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 1, "data", 1, 0),
-+		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 2, "data", 2, 0),
-+		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 3, "data", 3, 0),
-+		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 4, "data", 4, 0),
-+		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 5, "data", 5, 0),
-+		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 6, "data", 6, 0),
-+		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 7, "data", 7, 0),
- 		{ },
- 	},
- };
+ GPIOs mapped to IRQs
+ --------------------
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 5b541364dee0..bf95f2964bc5 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -2846,6 +2846,12 @@ int gpiod_get_array_bitmap_complex(bool raw, bool can_sleep,
+ 	if (array->ndescs > sizeof(*bits))
+ 		return -EINVAL;
+ 
++	if (raw && !IS_ERR_OR_NULL(array->chip)) {
++		unsigned long mask = (1ULL << array->ndescs) - 1;
++
++		return gpio_chip_get_multiple(array->chip, &mask, bits);
++	}
++
+ 	i = gpiod_get_array_value_complex(raw, can_sleep, array->ndescs,
+ 					  array->desc, value_array);
+ 	if (i)
+@@ -3156,6 +3162,14 @@ int gpiod_set_array_bitmap_complex(bool raw, bool can_sleep,
+ 	if (array->ndescs > sizeof(*bits))
+ 		return -EINVAL;
+ 
++	if (raw && !IS_ERR_OR_NULL(array->chip)) {
++		unsigned long mask = (1ULL << array->ndescs) - 1;
++
++		gpio_chip_set_multiple(array->chip, &mask, bits);
++
++		return 0;
++	}
++
+ 	for (i = 0; i < array->ndescs; i++)
+ 		value_array[i] = test_bit(i, bits);
+ 
 -- 
 2.16.4
