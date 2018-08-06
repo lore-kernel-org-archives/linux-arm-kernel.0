@@ -1,60 +1,63 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Mon, 6 Aug 2018 10:30:15 -0400 (EDT)
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <20180805215150.GB1862@amd>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
- <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
- <CAJA7tRZbmnZq7RfvQeYEy_a1ZObWqpFpVdvgsXgsioQ3RyPMuA@mail.gmail.com>
- <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
- <11f9185a-7f71-83df-3a57-0a0ae9c1f934@arm.com>
- <alpine.LRH.2.02.1808032046540.24748@file01.intranet.prod.int.rdu2.redhat.com>
- <CA+=Sn1=6F-fGLmXE0VqQHTqTCUKUT=Fz29mMT7349SPFisbZ9A@mail.gmail.com>
- <alpine.LRH.2.02.1808040611070.23762@file01.intranet.prod.int.rdu2.redhat.com>
- <20180805215150.GB1862@amd>
-Message-ID: <alpine.LRH.2.02.1808061003320.9697@file01.intranet.prod.int.rdu2.redhat.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 6 Aug 2018 17:20:08 +0200
+Subject: [RFC/PoC PATCH 0/3] arm64: basic ROP mitigation
+In-Reply-To: <CAKv+Gu9X1CDpy+XvrmbSdjBjMb45eBW7JVsvsK_JQdUt2Dbvgw@mail.gmail.com>
+References: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
+ <7529eedf-af56-2e94-261e-bc5c86abadaa@arm.com>
+ <CAKv+Gu9X1CDpy+XvrmbSdjBjMb45eBW7JVsvsK_JQdUt2Dbvgw@mail.gmail.com>
+Message-ID: <CAKv+Gu8qT+2-m=2jGO-ppC7Ru4vX_FXnn+AL4WmBqyvFGv5ZTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 6 August 2018 at 16:04, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 6 August 2018 at 15:55, Robin Murphy <robin.murphy@arm.com> wrote:
+>> On 02/08/18 14:21, Ard Biesheuvel wrote:
+>>>
+>>> This is a proof of concept I cooked up, primarily to trigger a discussion
+>>> about whether there is a point to doing anything like this, and if there
+>>> is, what the pitfalls are. Also, while I am not aware of any similar
+>>> implementations, the idea is so simple that I would be surprised if nobody
+>>> else thought of the same thing way before I did.
+>>
+>>
+>> So, "TTBR0 PAN: Pointer Auth edition"? :P
+>>
+>>> The idea is that we can significantly limit the kernel's attack surface
+>>> for ROP based attacks by clearing the stack pointer's sign bit before
+>>> returning from a function, and setting it again right after proceeding
+>>> from the [expected] return address. This should make it much more
+>>> difficult
+>>> to return to arbitrary gadgets, given that they rely on being chained to
+>>> the next via a return address popped off the stack, and this is difficult
+>>> when the stack pointer is invalid.
+>>>
+>>> Of course, 4 additional instructions per function return is not exactly
+>>> for free, but they are just movs and adds, and leaf functions are
+>>> disregarded unless they allocate a stack frame (this comes for free
+>>> because simple_return insns are disregarded by the plugin)
+>>>
+>>> Please shoot, preferably with better ideas ...
+>>
+>>
+>> Actually, on the subject of PAN, shouldn't this at least have a very hard
+>> dependency on that? AFAICS without PAN clearing bit 55 of SP is effectively
+>> giving userspace direct control of the kernel stack (thanks to TBI). Ouch.
+>>
+>
+> How's that? Bits 52 .. 54 will still be set, so SP will never contain
+> a valid userland address in any case. Or am I missing something?
+>
+>> I wonder if there's a little  more mileage in using "{add,sub} sp, sp, #1"
+>> sequences to rely on stack alignment exceptions instead, with the added
+>> bonus that that's about as low as the instruction-level overhead can get.
+>>
+>
+> Good point. I did consider that, but couldn't convince myself that it
+> isn't easier to defeat: loads via x29 occur reasonably often, and you
+> can simply offset your doctored stack frame by a single byte.
+>
 
-
-On Sun, 5 Aug 2018, Pavel Machek wrote:
-
-> Hi!
-> 
-> > > Can you run the test program on x86 using the similar framebuffer
-> > > setup?  Does doing two writes (one aligned and one unaligned but
-> > > overlapping with previous one) cause the same issue?  I suspect it
-> > > does, then using memcpy for frame buffers is wrong.
-> 
-> I'm pretty sure it will work ok on x86.
-> 
-> > Overlapping unaligned writes work on x86 - they have to, because of 
-> > backward compatibility.
-> 
-> It is not that easy. 8086s (and similar) did not have MTRRs and PATs
-> either. Overlapping unaligned writes _on main memory_, _with normal
-> MTRR settings_ certainly work ok on x86.
-
-It works even with write-combining. Write-combining specifies, that the 
-writes may hit the framebuffer in unspecified order. But if the writes are 
-overlapping, the CPU can't just reorder them and write the wrong result to 
-the framebuffer.
-
-> Chances is memory type can be configured to work similar way on your
-> ARM/PCIe case?
-
-ARM has memory types GRE, nGRE, nGnRE, nGnRnE - that allow or not allow 
-gathering, reordering, early write acknowledgement. Unfortunatelly, all 
-these memory types will trigger a fault on unaligned accesses.
-
-It has also Non-Cached memory type (some people on this thread believe 
-that it can't be used for GPUs, some believe that it can) - this memory 
-type supports unaligned accesses, so it is actually used for framebuffers 
-on ARM.
-
-If we had a memory type that didn't do early write acknowledgement and 
-supported unaligned accesses, it would solve this problem.
-
-Mikulas
+Also, the restore has to be idempotent: only functions that modify sp
+set the bit, so it cannot be reset unconditionally. Also, when taking
+an exception in the middle, we'll return with the bit set even if it
+was clear when the exception was taken.
