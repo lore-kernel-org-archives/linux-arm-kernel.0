@@ -1,43 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 6 Aug 2018 14:13:45 +0200
-Subject: [PATCH v2 0/7] Stop losing firmware-set DMA masks
-In-Reply-To: <20180806121334.GA5340@lst.de>
-References: <cover.1532382222.git.robin.murphy@arm.com>
- <CAK8P3a3HDJ6svNN_cwvegxu20yNv8+tvc0D1A6Ooeq8agawbFg@mail.gmail.com>
- <1ccccc4b-7d4c-a3ee-23a2-f108916705e9@arm.com>
- <CAK8P3a3ZcOeHMR_qFnsBdXED+2X8_AEMKoS5MeAQhbapbGmm9w@mail.gmail.com>
- <20180806121334.GA5340@lst.de>
-Message-ID: <CAK8P3a0z8K9GHfg_RtPo9fmyJtVuhUpfSVqoxkoTO6ohG=i4UA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 6 Aug 2018 14:19:31 +0200
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <alpine.LRH.2.02.1808060700070.10220@file01.intranet.prod.int.rdu2.redhat.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
+ <11f9185a-7f71-83df-3a57-0a0ae9c1f934@arm.com>
+ <alpine.LRH.2.02.1808032046540.24748@file01.intranet.prod.int.rdu2.redhat.com>
+ <CA+=Sn1=6F-fGLmXE0VqQHTqTCUKUT=Fz29mMT7349SPFisbZ9A@mail.gmail.com>
+ <alpine.LRH.2.02.1808040611070.23762@file01.intranet.prod.int.rdu2.redhat.com>
+ <fd2cae87-b2df-d8ef-8836-e6cbf8c5f851@redhat.com>
+ <alpine.LRH.2.02.1808060325110.3756@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu_y6La77sWOSROrwfRy65jrFVYVvRZt+ewNheYhdhHCkQ@mail.gmail.com>
+ <alpine.LRH.2.02.1808060626060.2986@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu87YqLM=FFZ6V8rHhuhskDdsBUuXFpqNKVbXWqdnuNEyA@mail.gmail.com>
+ <alpine.LRH.2.02.1808060639200.2986@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu8HyHX8qjg1qHV2M9Re+RGQJigjdAFVC_yR4niGkk2ikA@mail.gmail.com>
+ <alpine.LRH.2.02.1808060700070.10220@file01.intranet.prod.int.rdu2.redhat.com>
+Message-ID: <CAKv+Gu8384LZwL898wJ8BKjmJNzvd+-cSFUp4X4OpfmRDCP4Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 6, 2018 at 2:08 PM Christoph Hellwig <hch@lst.de> wrote:
+On 6 August 2018 at 14:09, Mikulas Patocka <mpatocka@redhat.com> wrote:
 >
-> On Mon, Aug 06, 2018 at 12:01:34PM +0200, Arnd Bergmann wrote:
-> > There are a few subtle corner cases here, in particular in which cases
-> > the new dma_set_mask() behavior on arm64 reports success or
-> > failure when truncating the mask to the bus_dma_mask.
 >
-> Going forward my plan was to make dma_set_mask() never fail.  The idea
-> is that it sets the mask that the device is capable of, and the core
-> dma code is responsible for also looking at bus_dma_mask and otherwise
-> make things just work.
+> On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
 >
-> Robin brought up the case where a platform can't handle a given limitation
-> ever, e.g. a PCI(e) device with a 24-bit dma mask on a device with a dma
-> offset that means we'll never have any physical memory reachable in that
-> range.  So we'll either still need to allow it to fail for such corner
-> cases or delay such error until later, e.g. when dma_alloc_* (or in the
-> corner case of the corner case dma_map_*) is called.  I'm still undecided
-> which way to go, but not allowing error returns from dma_set_mask and
-> its variants sounds very tempting.
+>> >> Are we talking about a quirk for the Armada 8040 or about PCIe on ARM
+>> >> in general?
+>> >
+>> > I don't know - there are not any other easily available PCIe ARM boards
+>> > except for Armada 8040.
+>>
+>> ... indeed, and sadly, the ones that are available all have this
+>> horrible Synopsys DesignWare PCIe IP that does not implement a true
+>> root complex at all, but is simply repurposed endpoint IP with some
+>> tweaks so it vaguely resembles a root complex.
+>>
+>> But this is exactly why I am asking: I use a AMD Seattle Overdrive as
+>> my main Linux development system, and it runs the gnome-shell stack
+>> flawlessly (using the nouveau driver), as well as a UEFI framebuffer
+>> using efifb. So my suspicion is that this is either a Synopsys IP
+>> issue or an interconnect issue, and has nothing to do with the
+>> impedance mismatch between AMBA and PCIe.
+>
+> If you run the program for testing memcpy on framebuffer that I posted in
+> this thread - does it detect some corruption for you?
+>
 
-Another case that I think can happen in practice are devices that need a
-DMA mask smaller than 32-bit wide (either asked for by the driver
-or according to bus limitations) on a platform that has no ZONE_DMA.
+I won't be able to check that for a while - I'm currently travelling.
 
-However, IIRC there was no reason to ever fail a dma_set_mask()
-to something wider than 32 bit even if the resulting mask still stays
-at the default 32-bit mask or something inbetween.
+>
+> BTW. does the Radeon GPU driver work for you?
+>
+> My observation is that OpenGL with Nouveau works, but it's slow and the
+> whole system locks up when playing video in chromium.
+>
 
-      Arnd
+No that works fine for me. VDPAU acceleration works as well, but it
+depends on your chromium build whether it can actually use it, I
+think? In any case, mplayer can use vdpau to play 1080p h264 without
+breaking a sweat on this system.
+
+Note that the VDPAU driver also relies on memory semantics, i.e., it
+may use DC ZVA (zero cacheline) instructions which are not permitted
+on device mappings. This is probably just glibc's memset() being
+invoked, but I remember hitting this on another PCIe-impaired arm64
+system with Synopsys PCIe IP
+
+> Radeon HD 6350 (pre-GCN), doesn't lock up, but OpenGL (and Glamour) has
+> many artifacts and corrupted textures. When I switch it to EXA
+> acceleration and don't use OpenGL, it works.
+>
+> The artifacts are not fixed by preloading a glibc with fixed memcpy, so
+> there's supposedly some other bug somewhere.
+>
+
+Yes, I have the same experience, and I have been meaning to report it
+to the maintainers/developers. Good to have another data point.
