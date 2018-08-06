@@ -1,80 +1,119 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 6 Aug 2018 14:19:31 +0200
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <alpine.LRH.2.02.1808060700070.10220@file01.intranet.prod.int.rdu2.redhat.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
- <11f9185a-7f71-83df-3a57-0a0ae9c1f934@arm.com>
- <alpine.LRH.2.02.1808032046540.24748@file01.intranet.prod.int.rdu2.redhat.com>
- <CA+=Sn1=6F-fGLmXE0VqQHTqTCUKUT=Fz29mMT7349SPFisbZ9A@mail.gmail.com>
- <alpine.LRH.2.02.1808040611070.23762@file01.intranet.prod.int.rdu2.redhat.com>
- <fd2cae87-b2df-d8ef-8836-e6cbf8c5f851@redhat.com>
- <alpine.LRH.2.02.1808060325110.3756@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu_y6La77sWOSROrwfRy65jrFVYVvRZt+ewNheYhdhHCkQ@mail.gmail.com>
- <alpine.LRH.2.02.1808060626060.2986@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu87YqLM=FFZ6V8rHhuhskDdsBUuXFpqNKVbXWqdnuNEyA@mail.gmail.com>
- <alpine.LRH.2.02.1808060639200.2986@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8HyHX8qjg1qHV2M9Re+RGQJigjdAFVC_yR4niGkk2ikA@mail.gmail.com>
- <alpine.LRH.2.02.1808060700070.10220@file01.intranet.prod.int.rdu2.redhat.com>
-Message-ID: <CAKv+Gu8384LZwL898wJ8BKjmJNzvd+-cSFUp4X4OpfmRDCP4Ng@mail.gmail.com>
+From: Alexandru-Cosmin.Gheorghe@arm.com (Alexandru-Cosmin Gheorghe)
+Date: Mon, 6 Aug 2018 13:20:38 +0100
+Subject: [PATCH v3 00/10] Add helper for plane reset
+In-Reply-To: <15977863.ZBGtPEODRU@avalon>
+References: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
+ <20180806110727.GA3314@e114479-lin.cambridge.arm.com>
+ <15977863.ZBGtPEODRU@avalon>
+Message-ID: <20180806122038.GA6755@e114479-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2018 at 14:09, Mikulas Patocka <mpatocka@redhat.com> wrote:
->
->
-> On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
->
->> >> Are we talking about a quirk for the Armada 8040 or about PCIe on ARM
->> >> in general?
->> >
->> > I don't know - there are not any other easily available PCIe ARM boards
->> > except for Armada 8040.
->>
->> ... indeed, and sadly, the ones that are available all have this
->> horrible Synopsys DesignWare PCIe IP that does not implement a true
->> root complex at all, but is simply repurposed endpoint IP with some
->> tweaks so it vaguely resembles a root complex.
->>
->> But this is exactly why I am asking: I use a AMD Seattle Overdrive as
->> my main Linux development system, and it runs the gnome-shell stack
->> flawlessly (using the nouveau driver), as well as a UEFI framebuffer
->> using efifb. So my suspicion is that this is either a Synopsys IP
->> issue or an interconnect issue, and has nothing to do with the
->> impedance mismatch between AMBA and PCIe.
->
-> If you run the program for testing memcpy on framebuffer that I posted in
-> this thread - does it detect some corruption for you?
->
+On Mon, Aug 06, 2018 at 02:45:42PM +0300, Laurent Pinchart wrote:
 
-I won't be able to check that for a while - I'm currently travelling.
+Hi Laurent,
 
->
-> BTW. does the Radeon GPU driver work for you?
->
-> My observation is that OpenGL with Nouveau works, but it's slow and the
-> whole system locks up when playing video in chromium.
->
+> Hi Alex,
+> 
+> On Monday, 6 August 2018 14:07:27 EEST Alexandru-Cosmin Gheorghe wrote:
+> > Hi,
+> > 
+> > On Sat, Aug 04, 2018 at 05:15:20PM +0100, Alexandru Gheorghe wrote:
+> > > No significant change since v2, fixed a spelling mistake and
+> > > added/removed some newlines in 01 and 07 patches.
+> > > 
+> > > I plan to apply the first patch of the series and the patches for
+> > > the drivers maintained through drm-misc(that go Reviewed/Ack) in
+> > > drm-misc-next on Monday.
+> > > 
+> > > For the other drivers please let me know if you want me to push them
+> > > in drm-misc-next as well.
+> > 
+> > Pushed the following patch to drm-misc-next:
+> > 
+> > drm/atomic: Add __drm_atomic_helper_plane_reset
+> > drm: mali-dp: Use __drm_atomic_helper_plane_reset instead of copying the
+> > logic
+> > drm: atmel-hlcdc: Use __drm_atomic_helper_plane_reset instead of copying the
+> > logic
+> > drm/imx: Use __drm_atomic_helper_plane_reset instead of copying the logic
+> > drm/sun4i: Use __drm_atomic_helper_plane_reset instead of copying the logic
+> 
+> I've acked the rcar-du part, could it be merged with the rest of the code ?
+> 
 
-No that works fine for me. VDPAU acceleration works as well, but it
-depends on your chromium build whether it can actually use it, I
-think? In any case, mplayer can use vdpau to play 1080p h264 without
-breaking a sweat on this system.
+Done, it's in drm-misc-next now. I didn't know how to handle this for
+drivers that have their own tree, so I just pushed the patches where I
+was explicitly asked.
 
-Note that the VDPAU driver also relies on memory semantics, i.e., it
-may use DC ZVA (zero cacheline) instructions which are not permitted
-on device mappings. This is probably just glibc's memset() being
-invoked, but I remember hitting this on another PCIe-impaired arm64
-system with Synopsys PCIe IP
+Thank you,
+Alex Gheorghe
 
-> Radeon HD 6350 (pre-GCN), doesn't lock up, but OpenGL (and Glamour) has
-> many artifacts and corrupted textures. When I switch it to EXA
-> acceleration and don't use OpenGL, it works.
->
-> The artifacts are not fixed by preloading a glibc with fixed memcpy, so
-> there's supposedly some other bug somewhere.
->
+> > > Changes since v1:
+> > >  - Make __drm_atomic_helper_plane_reset consistent with the other
+> > >    helpers and require that both plane and state not be NULL,
+> > >    suggested by Boris Brezillon and Philipp Zabel. Drivers already
+> > >    check for that.
+> > >  
+> > >  - Add a proper commit message for driver changes.
+> > > 
+> > > Drivers that subclass drm_plane need to copy the logic for linking the
+> > > drm_plane with its state and to initialize core properties to their
+> > > default values. E.g (alpha and rotation)
+> > > 
+> > > Having a helper to reset the plane_state makes sense because of multiple
+> > > reasons:
+> > > 1. Eliminate code duplication.
+> > > 2. Add a single place for initializing core properties to their
+> > > default values, no need for driver to do it if what the helper sets
+> > > makes sense for them.
+> > > 3. No need to debug the driver when you enable a core property and
+> > > observe it doesn't have a proper default value.
+> > > 
+> > > Tested with mali-dp the other drivers are just built-tested.
+> > > 
+> > > Alexandru Gheorghe (10):
+> > >   drm/atomic: Add  __drm_atomic_helper_plane_reset
+> > >   drm/amd/display: Use __drm_atomic_helper_plane_reset instead of
+> > >     copying the logic
+> > >   drm: mali-dp: Use __drm_atomic_helper_plane_reset instead of copying
+> > >     the logic
+> > >   drm: atmel-hlcdc: Use __drm_atomic_helper_plane_reset instead of
+> > >     copying the logic
+> > >   drm/exynos: Use __drm_atomic_helper_plane_reset instead of copying the
+> > >     logic
+> > >   drm/imx: Use __drm_atomic_helper_plane_reset instead of copying the
+> > >     logic
+> > >   drm: rcar-du: Use __drm_atomic_helper_plane_reset instead of copying
+> > >     the logic
+> > >   drm/sun4i: Use __drm_atomic_helper_plane_reset instead of copying the
+> > >     logic
+> > >   drm/vc4: Use __drm_atomic_helper_plane_reset instead of copying the
+> > >     logic
+> > >   drm/vmwgfx: Use __drm_atomic_helper_plane_reset instead of copying the
+> > >     logic
+> > >  
+> > >  .../gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c |  7 ++--
+> > >  drivers/gpu/drm/arm/malidp_planes.c           |  7 ++--
+> > >  .../gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c   |  5 +--
+> > >  drivers/gpu/drm/drm_atomic_helper.c           | 33 ++++++++++++++-----
+> > >  drivers/gpu/drm/exynos/exynos_drm_plane.c     |  3 +-
+> > >  drivers/gpu/drm/imx/ipuv3-plane.c             |  8 ++---
+> > >  drivers/gpu/drm/rcar-du/rcar_du_plane.c       |  6 ++--
+> > >  drivers/gpu/drm/rcar-du/rcar_du_vsp.c         |  5 +--
+> > >  drivers/gpu/drm/sun4i/sun4i_layer.c           |  4 +--
+> > >  drivers/gpu/drm/vc4/vc4_plane.c               |  4 +--
+> > >  drivers/gpu/drm/vmwgfx/vmwgfx_kms.c           |  4 +--
+> > >  include/drm/drm_atomic_helper.h               |  2 ++
+> > >  12 files changed, 41 insertions(+), 47 deletions(-)
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
+> 
 
-Yes, I have the same experience, and I have been meaning to report it
-to the maintainers/developers. Good to have another data point.
+-- 
+Cheers,
+Alex G
