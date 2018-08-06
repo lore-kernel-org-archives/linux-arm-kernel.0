@@ -1,33 +1,44 @@
-From: colin.king@canonical.com (Colin King)
-Date: Mon,  6 Aug 2018 17:50:45 +0100
-Subject: [PATCH] net: thunderx: check for failed allocation lmac->dmacs
-Message-ID: <20180806165045.15707-1-colin.king@canonical.com>
+From: syeh@vmware.com (Sinclair Yeh)
+Date: Mon, 6 Aug 2018 09:57:53 -0700
+Subject: [PATCH v3 10/10] drm/vmwgfx: Use __drm_atomic_helper_plane_reset
+ instead of copying the logic
+In-Reply-To: <20180804161530.12275-11-alexandru-cosmin.gheorghe@arm.com>
+References: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
+ <20180804161530.12275-11-alexandru-cosmin.gheorghe@arm.com>
+Message-ID: <20180806165752.GD17089@vmware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+Acked-by: Sinclair Yeh <syeh@vmware.com>
 
-The allocation of lmac->dmacs is not being checked for allocation
-failure. Add the check.
-
-Fixes: 3a34ecfd9d3f ("net: thunderx: add MAC address filter tracking for LMAC")
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index 5d08d2aeb172..e337da6ba2a4 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -1083,6 +1083,8 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
- 	lmac->dmacs_count = (RX_DMAC_COUNT / bgx->lmac_count);
- 	lmac->dmacs = kcalloc(lmac->dmacs_count, sizeof(*lmac->dmacs),
- 			      GFP_KERNEL);
-+	if (!lmac->dmacs)
-+		return -ENOMEM;
- 
- 	/* Enable lmac */
- 	bgx_reg_modify(bgx, lmacid, BGX_CMRX_CFG, CMR_EN);
--- 
-2.17.1
+On Sat, Aug 04, 2018 at 05:15:30PM +0100, Alexandru Gheorghe wrote:
+> A new helper function(__drm_atomic_helper_plane_reset) has been added
+> for linking a plane with its state and resetting the core
+> properties(alpha, rotation, etc.) to their default values.
+> Use that instead of duplicating the logic.
+> 
+> Reviewed-by: Sinclair Yeh <syeh@vmware.com>
+> Reviewed-by: Deepak Rawat <drawat@vmware.com>
+> Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
+> ---
+>  drivers/gpu/drm/vmwgfx/vmwgfx_kms.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c b/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
+> index 4a0f0f41afa1..61824e360619 100644
+> --- a/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
+> +++ b/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
+> @@ -720,9 +720,7 @@ void vmw_du_plane_reset(struct drm_plane *plane)
+>  		return;
+>  	}
+>  
+> -	plane->state = &vps->base;
+> -	plane->state->plane = plane;
+> -	plane->state->rotation = DRM_MODE_ROTATE_0;
+> +	__drm_atomic_helper_plane_reset(plane, &vps->base);
+>  }
+>  
+>  
+> -- 
+> 2.18.0
+> 
