@@ -1,100 +1,80 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 06 Aug 2018 14:45:42 +0300
-Subject: [PATCH v3 00/10] Add helper for plane reset
-In-Reply-To: <20180806110727.GA3314@e114479-lin.cambridge.arm.com>
-References: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
- <20180806110727.GA3314@e114479-lin.cambridge.arm.com>
-Message-ID: <15977863.ZBGtPEODRU@avalon>
+From: stu.hsieh@mediatek.com (Stu Hsieh)
+Date: Mon, 6 Aug 2018 19:53:54 +0800
+Subject: [PATCH v2 12/15] drm/mediatek: add callback function to return
+ RDMA layer number
+In-Reply-To: <1533273202.31144.8.camel@mtksdaap41>
+References: <1533265868-28110-1-git-send-email-stu.hsieh@mediatek.com>
+ <1533265868-28110-13-git-send-email-stu.hsieh@mediatek.com>
+ <1533273202.31144.8.camel@mtksdaap41>
+Message-ID: <1533556434.11190.70.camel@mtksdccf07>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+Hi, CK:
 
-On Monday, 6 August 2018 14:07:27 EEST Alexandru-Cosmin Gheorghe wrote:
-> Hi,
+On Fri, 2018-08-03 at 13:13 +0800, CK Hu wrote:
+> Hi, Stu:
 > 
-> On Sat, Aug 04, 2018 at 05:15:20PM +0100, Alexandru Gheorghe wrote:
-> > No significant change since v2, fixed a spelling mistake and
-> > added/removed some newlines in 01 and 07 patches.
+> On Fri, 2018-08-03 at 11:11 +0800, Stu Hsieh wrote:
+> > This patch add callback function to return RDMA layer number
 > > 
-> > I plan to apply the first patch of the series and the patches for
-> > the drivers maintained through drm-misc(that go Reviewed/Ack) in
-> > drm-misc-next on Monday.
+> > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> > ---
+> >  drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
 > > 
-> > For the other drivers please let me know if you want me to push them
-> > in drm-misc-next as well.
-> 
-> Pushed the following patch to drm-misc-next:
-> 
-> drm/atomic: Add __drm_atomic_helper_plane_reset
-> drm: mali-dp: Use __drm_atomic_helper_plane_reset instead of copying the
-> logic
-> drm: atmel-hlcdc: Use __drm_atomic_helper_plane_reset instead of copying the
-> logic
-> drm/imx: Use __drm_atomic_helper_plane_reset instead of copying the logic
-> drm/sun4i: Use __drm_atomic_helper_plane_reset instead of copying the logic
-
-I've acked the rcar-du part, could it be merged with the rest of the code ?
-
-> > Changes since v1:
-> >  - Make __drm_atomic_helper_plane_reset consistent with the other
-> >    helpers and require that both plane and state not be NULL,
-> >    suggested by Boris Brezillon and Philipp Zabel. Drivers already
-> >    check for that.
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> > index b728f0f42611..8c145a87c9e5 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> > @@ -60,6 +60,7 @@
 > >  
-> >  - Add a proper commit message for driver changes.
-> > 
-> > Drivers that subclass drm_plane need to copy the logic for linking the
-> > drm_plane with its state and to initialize core properties to their
-> > default values. E.g (alpha and rotation)
-> > 
-> > Having a helper to reset the plane_state makes sense because of multiple
-> > reasons:
-> > 1. Eliminate code duplication.
-> > 2. Add a single place for initializing core properties to their
-> > default values, no need for driver to do it if what the helper sets
-> > makes sense for them.
-> > 3. No need to debug the driver when you enable a core property and
-> > observe it doesn't have a proper default value.
-> > 
-> > Tested with mali-dp the other drivers are just built-tested.
-> > 
-> > Alexandru Gheorghe (10):
-> >   drm/atomic: Add  __drm_atomic_helper_plane_reset
-> >   drm/amd/display: Use __drm_atomic_helper_plane_reset instead of
-> >     copying the logic
-> >   drm: mali-dp: Use __drm_atomic_helper_plane_reset instead of copying
-> >     the logic
-> >   drm: atmel-hlcdc: Use __drm_atomic_helper_plane_reset instead of
-> >     copying the logic
-> >   drm/exynos: Use __drm_atomic_helper_plane_reset instead of copying the
-> >     logic
-> >   drm/imx: Use __drm_atomic_helper_plane_reset instead of copying the
-> >     logic
-> >   drm: rcar-du: Use __drm_atomic_helper_plane_reset instead of copying
-> >     the logic
-> >   drm/sun4i: Use __drm_atomic_helper_plane_reset instead of copying the
-> >     logic
-> >   drm/vc4: Use __drm_atomic_helper_plane_reset instead of copying the
-> >     logic
-> >   drm/vmwgfx: Use __drm_atomic_helper_plane_reset instead of copying the
-> >     logic
+> >  struct mtk_disp_rdma_data {
+> >  	unsigned int fifo_size;
+> > +	unsigned int layer_nr;
+> >  };
 > >  
-> >  .../gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c |  7 ++--
-> >  drivers/gpu/drm/arm/malidp_planes.c           |  7 ++--
-> >  .../gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c   |  5 +--
-> >  drivers/gpu/drm/drm_atomic_helper.c           | 33 ++++++++++++++-----
-> >  drivers/gpu/drm/exynos/exynos_drm_plane.c     |  3 +-
-> >  drivers/gpu/drm/imx/ipuv3-plane.c             |  8 ++---
-> >  drivers/gpu/drm/rcar-du/rcar_du_plane.c       |  6 ++--
-> >  drivers/gpu/drm/rcar-du/rcar_du_vsp.c         |  5 +--
-> >  drivers/gpu/drm/sun4i/sun4i_layer.c           |  4 +--
-> >  drivers/gpu/drm/vc4/vc4_plane.c               |  4 +--
-> >  drivers/gpu/drm/vmwgfx/vmwgfx_kms.c           |  4 +--
-> >  include/drm/drm_atomic_helper.h               |  2 ++
-> >  12 files changed, 41 insertions(+), 47 deletions(-)
+> >  /**
+> > @@ -194,6 +195,13 @@ static unsigned int rdma_fmt_convert(struct mtk_disp_rdma *rdma,
+> >  	}
+> >  }
+> >  
+> > +static unsigned int mtk_rdma_layer_nr(struct mtk_ddp_comp *comp)
+> > +{
+> > +	struct mtk_disp_rdma *rdma = comp_to_rdma(comp);
+> > +
+> > +	return rdma->data->layer_nr;
+> 
+> Maybe RDMA always has one layer, so you could just return 1 here.
+> 
+> Regards,
+> CK
+> 
+OK
 
--- 
 Regards,
+Stu
 
-Laurent Pinchart
+> > +}
+> > +
+> >  static void mtk_rdma_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
+> >  				  struct mtk_plane_state *state)
+> >  {
+> > @@ -227,6 +235,7 @@ static const struct mtk_ddp_comp_funcs mtk_disp_rdma_funcs = {
+> >  	.stop = mtk_rdma_stop,
+> >  	.enable_vblank = mtk_rdma_enable_vblank,
+> >  	.disable_vblank = mtk_rdma_disable_vblank,
+> > +	.layer_nr = mtk_rdma_layer_nr,
+> >  	.layer_config = mtk_rdma_layer_config,
+> >  };
+> >  
+> > @@ -329,6 +338,7 @@ static const struct mtk_disp_rdma_data mt2701_rdma_driver_data = {
+> >  
+> >  static const struct mtk_disp_rdma_data mt8173_rdma_driver_data = {
+> >  	.fifo_size = SZ_8K,
+> > +	.layer_nr = 1,
+> >  };
+> >  
+> >  static const struct of_device_id mtk_disp_rdma_driver_dt_match[] = {
+> 
+> 
