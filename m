@@ -1,19 +1,17 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 6 Aug 2018 12:34:02 +0200
-Subject: [PATCH v2 5/9] dmaengine: ste_dma40: use
- dmaenginem_async_device_register to simplify the code
-In-Reply-To: <20180806085231.4597-6-sjhuang@iluvatar.ai>
+Date: Mon, 6 Aug 2018 12:35:00 +0200
+Subject: [PATCH v2 9/9] dmaengine: add COMPILE_TEST for the drivers
+In-Reply-To: <20180806085231.4597-10-sjhuang@iluvatar.ai>
 References: <20180806085231.4597-1-sjhuang@iluvatar.ai>
- <20180806085231.4597-6-sjhuang@iluvatar.ai>
-Message-ID: <CACRpkdYhZ6WPwPPyZ13KFhcjbRArXsqxk4W-+e5CvpJ7gX7+uA@mail.gmail.com>
+ <20180806085231.4597-10-sjhuang@iluvatar.ai>
+Message-ID: <CACRpkdYwpKR_+FYHYRy2me+gWSM=oGkpHwyHbvdjAUn-A1uuvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Aug 6, 2018 at 10:53 AM Huang Shijie <sjhuang@iluvatar.ai> wrote:
 
-> Use dmaenginem_async_device_register to simplify the code:
->         remove dma_async_device_unregister.
->         remove label unregister_slave, unregister_memcpy
+> We can do the compiling test with COMPILE_TEST.
+> This patch adds the COMPILE_TEST for the drivers.
 >
 > Signed-off-by: Huang Shijie <sjhuang@iluvatar.ai>
 
