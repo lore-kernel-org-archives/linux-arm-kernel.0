@@ -1,44 +1,147 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Mon, 6 Aug 2018 10:13:19 -0400 (EDT)
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <CAPv3WKeVkWChEE7WjKuu__bg+zvh9dTNy=U_2jiSyWxFWiatbA@mail.gmail.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
- <20180803094129.GB17798@arm.com>
- <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
- <alpine.LRH.2.02.1808031424140.14030@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3s-+Qf=WBZz1KpisDMG3520jCUh8PLAO3PHa4jdt8kCTw@mail.gmail.com>
- <CAKv+Gu9_h-WFi1j4+DWUN_dMj75SKKHxWoDH8WQ9P7S7MNpZQg@mail.gmail.com>
- <alpine.LRH.2.02.1808060553130.30832@file01.intranet.prod.int.rdu2.redhat.com>
- <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
- <CAPv3WKdxwoW5MAOvy6uEBEuMpsigMo98hyO+TpKMsFrKR9oBzg@mail.gmail.com>
- <CAKv+Gu8XN-vP64G_NLHFcRUJ2fptSrmxfd6CHWDgHkJj073Hbg@mail.gmail.com>
- <CAPv3WKeVkWChEE7WjKuu__bg+zvh9dTNy=U_2jiSyWxFWiatbA@mail.gmail.com>
-Message-ID: <alpine.LRH.2.02.1808061008520.9697@file01.intranet.prod.int.rdu2.redhat.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Mon, 6 Aug 2018 16:13:55 +0200
+Subject: [PATCH 2/2] KVM: arm/arm64: vgic: no need to call
+ spin_lock_irqsave/restore when irq is disabled
+In-Reply-To: <1533304624-43250-2-git-send-email-jia.he@hxt-semitech.com>
+References: <1533304624-43250-1-git-send-email-jia.he@hxt-semitech.com>
+ <1533304624-43250-2-git-send-email-jia.he@hxt-semitech.com>
+Message-ID: <20180806141355.GF5985@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Mon, 6 Aug 2018, Marcin Wojtas wrote:
-
-> > Hi Marcin,
-> >
-> > Could you please try running his reproducer?
+On Fri, Aug 03, 2018 at 09:57:04PM +0800, Jia He wrote:
+> Because kvm_vgic_sync_hwstate currently is definitly in the context
+> which irq is disabled (local_irq_disable/enable). There is no need to
+> call spin_lock_irqsave/restore in vgic_fold_lr_state and vgic_prune_ap_list
 > 
-> This is exactly what I plan to do, as soon as I can plug my GFX card
-> back to the board (tomorrow). Just to remain aligned - is it ok, if I
-> boot my debian with GT630 plugged, compile the program with -O2 and
-> simlply run it on /dev/fb0?
+> This patch replace them with the spin_lock/unlock no irq version
 > 
-> Best regards,
-> Marcin
-
-Yes - when you run it, don't switch consoles (it will obviously trigger 
-false warning), don't move the mouse to the upper left corner, and if you 
-want to run it in the long term, turn off console blanking.
-
-Mikulas
+> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-v2.c |  7 ++++---
+>  virt/kvm/arm/vgic/vgic-v3.c |  7 ++++---
+>  virt/kvm/arm/vgic/vgic.c    | 13 +++++++------
+>  3 files changed, 15 insertions(+), 12 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+> index a5f2e44..487f5f2 100644
+> --- a/virt/kvm/arm/vgic/vgic-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-v2.c
+> @@ -62,7 +62,8 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+>  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>  	struct vgic_v2_cpu_if *cpuif = &vgic_cpu->vgic_v2;
+>  	int lr;
+> -	unsigned long flags;
+> +
+> +	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
+>  
+>  	cpuif->vgic_hcr &= ~GICH_HCR_UIE;
+>  
+> @@ -83,7 +84,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+>  
+>  		irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
+>  
+> -		spin_lock_irqsave(&irq->irq_lock, flags);
+> +		spin_lock(&irq->irq_lock);
+>  
+>  		/* Always preserve the active bit */
+>  		irq->active = !!(val & GICH_LR_ACTIVE_BIT);
+> @@ -126,7 +127,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+>  				vgic_irq_set_phys_active(irq, false);
+>  		}
+>  
+> -		spin_unlock_irqrestore(&irq->irq_lock, flags);
+> +		spin_unlock(&irq->irq_lock);
+>  		vgic_put_irq(vcpu->kvm, irq);
+>  	}
+>  
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index cdce653..b66b513 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -46,7 +46,8 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+>  	struct vgic_v3_cpu_if *cpuif = &vgic_cpu->vgic_v3;
+>  	u32 model = vcpu->kvm->arch.vgic.vgic_model;
+>  	int lr;
+> -	unsigned long flags;
+> +
+> +	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
+>  
+>  	cpuif->vgic_hcr &= ~ICH_HCR_UIE;
+>  
+> @@ -75,7 +76,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+>  		if (!irq)	/* An LPI could have been unmapped. */
+>  			continue;
+>  
+> -		spin_lock_irqsave(&irq->irq_lock, flags);
+> +		spin_lock(&irq->irq_lock);
+>  
+>  		/* Always preserve the active bit */
+>  		irq->active = !!(val & ICH_LR_ACTIVE_BIT);
+> @@ -118,7 +119,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+>  				vgic_irq_set_phys_active(irq, false);
+>  		}
+>  
+> -		spin_unlock_irqrestore(&irq->irq_lock, flags);
+> +		spin_unlock(&irq->irq_lock);
+>  		vgic_put_irq(vcpu->kvm, irq);
+>  	}
+>  
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index c22cea6..7cfdfbc 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -593,10 +593,11 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+>  {
+>  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>  	struct vgic_irq *irq, *tmp;
+> -	unsigned long flags;
+> +
+> +	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
+>  
+>  retry:
+> -	spin_lock_irqsave(&vgic_cpu->ap_list_lock, flags);
+> +	spin_lock(&vgic_cpu->ap_list_lock);
+>  
+>  	list_for_each_entry_safe(irq, tmp, &vgic_cpu->ap_list_head, ap_list) {
+>  		struct kvm_vcpu *target_vcpu, *vcpuA, *vcpuB;
+> @@ -637,7 +638,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+>  		/* This interrupt looks like it has to be migrated. */
+>  
+>  		spin_unlock(&irq->irq_lock);
+> -		spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
+> +		spin_unlock(&vgic_cpu->ap_list_lock);
+>  
+>  		/*
+>  		 * Ensure locking order by always locking the smallest
+> @@ -651,7 +652,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+>  			vcpuB = vcpu;
+>  		}
+>  
+> -		spin_lock_irqsave(&vcpuA->arch.vgic_cpu.ap_list_lock, flags);
+> +		spin_lock(&vcpuA->arch.vgic_cpu.ap_list_lock);
+>  		spin_lock_nested(&vcpuB->arch.vgic_cpu.ap_list_lock,
+>  				 SINGLE_DEPTH_NESTING);
+>  		spin_lock(&irq->irq_lock);
+> @@ -676,7 +677,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+>  
+>  		spin_unlock(&irq->irq_lock);
+>  		spin_unlock(&vcpuB->arch.vgic_cpu.ap_list_lock);
+> -		spin_unlock_irqrestore(&vcpuA->arch.vgic_cpu.ap_list_lock, flags);
+> +		spin_unlock(&vcpuA->arch.vgic_cpu.ap_list_lock);
+>  
+>  		if (target_vcpu_needs_kick) {
+>  			kvm_make_request(KVM_REQ_IRQ_PENDING, target_vcpu);
+> @@ -686,7 +687,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+>  		goto retry;
+>  	}
+>  
+> -	spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
+> +	spin_unlock(&vgic_cpu->ap_list_lock);
+>  }
+>  
+>  static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
+> -- 
+> 1.8.3.1
+> 
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
