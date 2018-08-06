@@ -1,74 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 6 Aug 2018 21:35:53 +0200
-Subject: [RFC/PoC PATCH 0/3] arm64: basic ROP mitigation
-In-Reply-To: <CAGXu5jLj=KP038d-c+xzCx=Oogn1prH__oryQjNZZwNaAHaAAw@mail.gmail.com>
-References: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
- <7529eedf-af56-2e94-261e-bc5c86abadaa@arm.com>
- <CAKv+Gu9X1CDpy+XvrmbSdjBjMb45eBW7JVsvsK_JQdUt2Dbvgw@mail.gmail.com>
- <b0c974a2-4e81-7855-7d4e-22834c5d8997@arm.com>
- <CAKv+Gu_ZzDbWwHVwOuoheXeN-ta_FjOT4Aj15=r56QZVTUK0FA@mail.gmail.com>
- <CAKv+Gu_wGk2Gdzd6WuOMZqz1tKHAWHL7pWm2Szyt0DZwPTCmOw@mail.gmail.com>
- <31443e6a-56b4-c4fb-82b1-b8eb5d7eebe1@arm.com>
- <CAGXu5jLj=KP038d-c+xzCx=Oogn1prH__oryQjNZZwNaAHaAAw@mail.gmail.com>
-Message-ID: <CAKv+Gu-9M0yO-rSXiREs11feEro0mJFcNN3Wkp_LSOGrKKd5dg@mail.gmail.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Mon, 06 Aug 2018 21:37:52 +0200
+Subject: [alsa-devel] [PATCH 9/9] ALSA: intel_hdmi: remove redundant
+ variable cfg_val
+In-Reply-To: <a5a408bc-cc58-946e-5b36-496548a6316f@linux.intel.com>
+References: <20180801104742.4328-1-colin.king@canonical.com>
+ <20180801104742.4328-10-colin.king@canonical.com>
+ <s5hin4unyh0.wl-tiwai@suse.de>
+ <a5a408bc-cc58-946e-5b36-496548a6316f@linux.intel.com>
+Message-ID: <s5hwot3gub3.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2018 at 20:49, Kees Cook <keescook@chromium.org> wrote:
-> On Mon, Aug 6, 2018 at 10:45 AM, Robin Murphy <robin.murphy@arm.com> wrote:
->> I guess what I'm getting at is that if the protection mechanism is "always
->> return with SP outside TTBR1", there seems little point in going through the
->> motions if SP in TTBR0 could still be valid and allow an attack to succeed
->> anyway; this is basically just me working through a justification for saying
->> the proposed scheme needs "depends on ARM64_PAN || ARM64_SW_TTBR0_PAN",
->> making it that much uglier for v8.0 CPUs...
->
-> I think anyone with v8.0 CPUs interested in this mitigation would also
-> very much want PAN emulation. If a "depends on" isn't desired, what
-> about "imply" in the Kconfig?
->
+On Mon, 06 Aug 2018 20:37:53 +0200,
+Pierre-Louis Bossart wrote:
+> 
+> On 8/1/18 6:00 AM, Takashi Iwai wrote:
+> > On Wed, 01 Aug 2018 12:47:42 +0200,
+> > Colin King wrote:
+> >>
+> >> From: Colin Ian King <colin.king@canonical.com>
+> >>
+> >> Variable cfg_val is being assigned but is never used hence it is
+> >> redundant and can be removed.
+> >>
+> >> Cleans up clang warning:
+> >> warning: variable 'cfg_val' set but not used [-Wunused-but-set-variable]
+> >>
+> >> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> >> ---
+> >>   sound/x86/intel_hdmi_audio.c | 2 --
+> >>   1 file changed, 2 deletions(-)
+> >>
+> >> diff --git a/sound/x86/intel_hdmi_audio.c b/sound/x86/intel_hdmi_audio.c
+> >> index edc9f5a34eff..fa7dca5a68c8 100644
+> >> --- a/sound/x86/intel_hdmi_audio.c
+> >> +++ b/sound/x86/intel_hdmi_audio.c
+> >> @@ -290,7 +290,6 @@ static void had_reset_audio(struct snd_intelhad *intelhaddata)
+> >>   static int had_prog_status_reg(struct snd_pcm_substream *substream,
+> >>   			struct snd_intelhad *intelhaddata)
+> >>   {
+> >> -	union aud_cfg cfg_val = {.regval = 0};
+> >>   	union aud_ch_status_0 ch_stat0 = {.regval = 0};
+> >>   	union aud_ch_status_1 ch_stat1 = {.regval = 0};
+> >>   @@ -298,7 +297,6 @@ static int had_prog_status_reg(struct
+> >> snd_pcm_substream *substream,
+> >>   					  IEC958_AES0_NONAUDIO) >> 1;
+> >>   	ch_stat0.regx.clk_acc = (intelhaddata->aes_bits &
+> >>   					  IEC958_AES3_CON_CLOCK) >> 4;
+> >> -	cfg_val.regx.val_bit = ch_stat0.regx.lpcm_id;
+> >
+> > Actually this made me wonder what is the definition of val_bit.
+> > It seems always 1 in the current code after the commit 964ca8083c02.
+> > Pierre?
+> 
+> This val_bit is only there for debug/test, it should be set to one by
+> default and has nothing to do with the lpcm_id. This variable was set
+> even in patches before upstream submission and was never needed, I
+> guess it must be a 9-yr old issue. Good catch!
+> 
+> Acked-by: Pierre-Louis Bossart <pierre-louis.bossart@linux.intel.com>
 
-Yes, but actually, using bit #0 is maybe a better alternative in any
-case. You can never dereference SP with bit #0 set, regardless of
-whether the address points to user or kernel space, and my concern
-about reloading sp from x29 doesn't really make sense, given that x29
-is always assigned from sp right after pushing x29 and x30 in the
-function prologue, and sp only gets restored from x29 in the epilogue
-when there is a stack frame to begin with, in which case we add #1 to
-sp again before returning from the function.
+Good to hear, applied the patch now.
 
-The other code gets a lot cleaner as well.
+> BTW looking at the structures in intel_hdmi_lpe_audio.h, the field
+> format:3 in audio_ch_status_0 is misleading at best, it should be the
+> emphasis if I look at the SPDIF/AES docs. It's not used but I'll have
+> to relook at all this when I find some time... We should really set
+> the registers to mirror what the aes_bits are, not just the non_audio
+> and clock accuracy fields.
 
-So for the return we'll have
+A fix patch is always welcome ;)
 
-  ldp     x29, x30, [sp], #nn
->>add     sp, sp, #0x1
-  ret
 
-and for the function call
-
-  bl      <foo>
->>mov      x30, sp
->>bic     sp, x30, #1
-
-The restore sequence in entry.s:96 (which has no spare registers) gets
-much simpler as well:
-
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -95,6 +95,15 @@ alternative_else_nop_endif
-         */
-        add     sp, sp, x0      // sp' = sp + x0
-        sub     x0, sp, x0      // x0' = sp' - x0 = (sp + x0) - x0 = sp
-+#ifdef CONFIG_ARM64_ROP_SHIELD
-+       tbnz    x0, #0, 1f
-+       .subsection     1
-+1:     sub     x0, x0, #1
-+       sub     sp, sp, #1
-+       b       2f
-+       .previous
-+2:
-+#endif
-        tbnz    x0, #THREAD_SHIFT, 0f
-        sub     x0, sp, x0      // x0'' = sp' - x0' = (sp + x0) - sp = x0
-        sub     sp, sp, x0      // sp'' = sp' - x0 = (sp + x0) - x0 = sp
+Takashi
