@@ -1,147 +1,89 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Mon, 6 Aug 2018 16:13:55 +0200
-Subject: [PATCH 2/2] KVM: arm/arm64: vgic: no need to call
- spin_lock_irqsave/restore when irq is disabled
-In-Reply-To: <1533304624-43250-2-git-send-email-jia.he@hxt-semitech.com>
-References: <1533304624-43250-1-git-send-email-jia.he@hxt-semitech.com>
- <1533304624-43250-2-git-send-email-jia.he@hxt-semitech.com>
-Message-ID: <20180806141355.GF5985@e113682-lin.lund.arm.com>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Mon, 06 Aug 2018 16:21:01 +0200
+Subject: [PATCH v6 4/8] media: platform: Add Cedrus VPU decoder driver
+In-Reply-To: <faa0436aad809ca562b5c152420b1e4d4b6f507b.camel@collabora.com>
+References: <20180725100256.22833-1-paul.kocialkowski@bootlin.com>
+ <20180725100256.22833-5-paul.kocialkowski@bootlin.com>
+ <faa0436aad809ca562b5c152420b1e4d4b6f507b.camel@collabora.com>
+Message-ID: <130e4f08534d0dfbd26f97f9b95d533ce86ceada.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2018 at 09:57:04PM +0800, Jia He wrote:
-> Because kvm_vgic_sync_hwstate currently is definitly in the context
-> which irq is disabled (local_irq_disable/enable). There is no need to
-> call spin_lock_irqsave/restore in vgic_fold_lr_state and vgic_prune_ap_list
+Hi,
+
+On Fri, 2018-08-03 at 17:49 -0300, Ezequiel Garcia wrote:
+> On Wed, 2018-07-25 at 12:02 +0200, Paul Kocialkowski wrote:
+> > This introduces the Cedrus VPU driver that supports the VPU found in
+> > Allwinner SoCs, also known as Video Engine. It is implemented through
+> > a v4l2 m2m decoder device and a media device (used for media requests).
+> > So far, it only supports MPEG2 decoding.
+> > 
+> > Since this VPU is stateless, synchronization with media requests is
+> > required in order to ensure consistency between frame headers that
+> > contain metadata about the frame to process and the raw slice data that
+> > is used to generate the frame.
+> > 
+> > This driver was made possible thanks to the long-standing effort
+> > carried out by the linux-sunxi community in the interest of reverse
+> > engineering, documenting and implementing support for Allwinner VPU.
+> > 
+> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 > 
-> This patch replace them with the spin_lock/unlock no irq version
+> [..]
+> > +static int cedrus_probe(struct platform_device *pdev)
+> > +{
+> > +	struct cedrus_dev *dev;
+> > +	struct video_device *vfd;
+> > +	int ret;
+> > +
+> > +	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
+> > +	if (!dev)
+> > +		return -ENOMEM;
+> > +
+> > +	dev->dev = &pdev->dev;
+> > +	dev->pdev = pdev;
+> > +
+> > +	ret = cedrus_hw_probe(dev);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev, "Failed to probe hardware\n");
+> > +		return ret;
+> > +	}
+> > +
+> > +	dev->dec_ops[CEDRUS_CODEC_MPEG2] = &cedrus_dec_ops_mpeg2;
+> > +
+> > +	mutex_init(&dev->dev_mutex);
+> > +	spin_lock_init(&dev->irq_lock);
+> > +
 > 
-> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
-> ---
->  virt/kvm/arm/vgic/vgic-v2.c |  7 ++++---
->  virt/kvm/arm/vgic/vgic-v3.c |  7 ++++---
->  virt/kvm/arm/vgic/vgic.c    | 13 +++++++------
->  3 files changed, 15 insertions(+), 12 deletions(-)
+> A minor thing.
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-> index a5f2e44..487f5f2 100644
-> --- a/virt/kvm/arm/vgic/vgic-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> @@ -62,7 +62,8 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
->  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->  	struct vgic_v2_cpu_if *cpuif = &vgic_cpu->vgic_v2;
->  	int lr;
-> -	unsigned long flags;
-> +
-> +	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
->  
->  	cpuif->vgic_hcr &= ~GICH_HCR_UIE;
->  
-> @@ -83,7 +84,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
->  
->  		irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
->  
-> -		spin_lock_irqsave(&irq->irq_lock, flags);
-> +		spin_lock(&irq->irq_lock);
->  
->  		/* Always preserve the active bit */
->  		irq->active = !!(val & GICH_LR_ACTIVE_BIT);
-> @@ -126,7 +127,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
->  				vgic_irq_set_phys_active(irq, false);
->  		}
->  
-> -		spin_unlock_irqrestore(&irq->irq_lock, flags);
-> +		spin_unlock(&irq->irq_lock);
->  		vgic_put_irq(vcpu->kvm, irq);
->  	}
->  
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index cdce653..b66b513 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -46,7 +46,8 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
->  	struct vgic_v3_cpu_if *cpuif = &vgic_cpu->vgic_v3;
->  	u32 model = vcpu->kvm->arch.vgic.vgic_model;
->  	int lr;
-> -	unsigned long flags;
-> +
-> +	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
->  
->  	cpuif->vgic_hcr &= ~ICH_HCR_UIE;
->  
-> @@ -75,7 +76,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
->  		if (!irq)	/* An LPI could have been unmapped. */
->  			continue;
->  
-> -		spin_lock_irqsave(&irq->irq_lock, flags);
-> +		spin_lock(&irq->irq_lock);
->  
->  		/* Always preserve the active bit */
->  		irq->active = !!(val & ICH_LR_ACTIVE_BIT);
-> @@ -118,7 +119,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
->  				vgic_irq_set_phys_active(irq, false);
->  		}
->  
-> -		spin_unlock_irqrestore(&irq->irq_lock, flags);
-> +		spin_unlock(&irq->irq_lock);
->  		vgic_put_irq(vcpu->kvm, irq);
->  	}
->  
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index c22cea6..7cfdfbc 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -593,10 +593,11 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
->  {
->  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->  	struct vgic_irq *irq, *tmp;
-> -	unsigned long flags;
-> +
-> +	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
->  
->  retry:
-> -	spin_lock_irqsave(&vgic_cpu->ap_list_lock, flags);
-> +	spin_lock(&vgic_cpu->ap_list_lock);
->  
->  	list_for_each_entry_safe(irq, tmp, &vgic_cpu->ap_list_head, ap_list) {
->  		struct kvm_vcpu *target_vcpu, *vcpuA, *vcpuB;
-> @@ -637,7 +638,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
->  		/* This interrupt looks like it has to be migrated. */
->  
->  		spin_unlock(&irq->irq_lock);
-> -		spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
-> +		spin_unlock(&vgic_cpu->ap_list_lock);
->  
->  		/*
->  		 * Ensure locking order by always locking the smallest
-> @@ -651,7 +652,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
->  			vcpuB = vcpu;
->  		}
->  
-> -		spin_lock_irqsave(&vcpuA->arch.vgic_cpu.ap_list_lock, flags);
-> +		spin_lock(&vcpuA->arch.vgic_cpu.ap_list_lock);
->  		spin_lock_nested(&vcpuB->arch.vgic_cpu.ap_list_lock,
->  				 SINGLE_DEPTH_NESTING);
->  		spin_lock(&irq->irq_lock);
-> @@ -676,7 +677,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
->  
->  		spin_unlock(&irq->irq_lock);
->  		spin_unlock(&vcpuB->arch.vgic_cpu.ap_list_lock);
-> -		spin_unlock_irqrestore(&vcpuA->arch.vgic_cpu.ap_list_lock, flags);
-> +		spin_unlock(&vcpuA->arch.vgic_cpu.ap_list_lock);
->  
->  		if (target_vcpu_needs_kick) {
->  			kvm_make_request(KVM_REQ_IRQ_PENDING, target_vcpu);
-> @@ -686,7 +687,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
->  		goto retry;
->  	}
->  
-> -	spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
-> +	spin_unlock(&vgic_cpu->ap_list_lock);
->  }
->  
->  static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
-> -- 
-> 1.8.3.1
-> 
-Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+> I believe this spinlock is not needed. All the data structures
+> it's accessing are already protected, and some operations
+> (stop_streaming) are guaranteed to not run at the same
+> time as a job.
+
+I think we were afraid of this kind of scenario happening, but
+everything seems to indicate that these data structures are already
+properly protected by the core, as you're suggesting.
+
+Removing the lock does not cause any noticeable issue at first try, but
+I'd like to test decoding for a few hours in a row to reduce the
+probability of missing a corner case that our lock was preventing.
+
+If that goes well, I guess we can remove it from our driver.
+
+Cheers,
+
+Paul
+
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180806/3b55ea45/attachment.sig>
