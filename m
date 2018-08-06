@@ -1,94 +1,70 @@
 From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Tue,  7 Aug 2018 00:29:15 +0200
-Subject: [RFC PATCH v2 09/12] gpiolib: Identify GPIO descriptor arrays with
- direct mapping
+Date: Tue,  7 Aug 2018 00:29:17 +0200
+Subject: [RFC PATCH v2 11/12] mtd: rawnand: ams-delta: Use GPIO API bitmap
+ extension
 In-Reply-To: <20180806222918.12644-1-jmkrzyszt@gmail.com>
 References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
  <20180806222918.12644-1-jmkrzyszt@gmail.com>
-Message-ID: <20180806222918.12644-10-jmkrzyszt@gmail.com>
+Message-ID: <20180806222918.12644-12-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain GPIO array lookup results may map directly to GPIO pins of a
-single GPIO chip in hardware order.  If that condition is recognized
-and handled efficiently, significant performance gain of get/set array
-functions may be possible.
+Try to address the driver performance issues by replacing traditional
+get/set array function calls with their bitmap based equivalents.
 
-While processing a request for an array of GPIO descriptors, verify if
-the descriptors just collected represent consecutive pins of a single
-GPIO chip.  Pass that information with the array to the caller so it
-can benefit from enhanced performance as soon as bitmap based get/set
-array functions which can make efficient use of that are available.
+As long as fast bitmap processing path is not implemented in the new
+API extension, performance of the driver remains unchanged.
 
 Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 ---
- Documentation/driver-api/gpio/consumer.rst |  4 +++-
- drivers/gpio/gpiolib.c                     | 14 ++++++++++++++
- include/linux/gpio/consumer.h              |  1 +
- 3 files changed, 18 insertions(+), 1 deletion(-)
+ drivers/mtd/nand/raw/ams-delta.c | 19 +++----------------
+ 1 file changed, 3 insertions(+), 16 deletions(-)
 
-diff --git a/Documentation/driver-api/gpio/consumer.rst b/Documentation/driver-api/gpio/consumer.rst
-index aa03f389d41d..38a990b5f3b6 100644
---- a/Documentation/driver-api/gpio/consumer.rst
-+++ b/Documentation/driver-api/gpio/consumer.rst
-@@ -109,11 +109,13 @@ For a function using multiple GPIOs all of those can be obtained with one call::
- 					   enum gpiod_flags flags)
+diff --git a/drivers/mtd/nand/raw/ams-delta.c b/drivers/mtd/nand/raw/ams-delta.c
+index 30c461138195..7b08b2c441d3 100644
+--- a/drivers/mtd/nand/raw/ams-delta.c
++++ b/drivers/mtd/nand/raw/ams-delta.c
+@@ -78,15 +78,9 @@ static void ams_delta_write_commit(struct ams_delta_nand *priv)
  
- This function returns a struct gpio_descs which contains an array of
--descriptors::
-+descriptors.  It may also contain a valid descriptor of a single GPIO chip in
-+case the array strictly matches pin hardware layout of the chip::
- 
- 	struct gpio_descs {
- 		unsigned int ndescs;
- 		struct gpio_desc *desc[];
-+		struct gpio_chip *chip;
- 	}
- 
- The following function returns NULL instead of -ENOENT if no GPIOs have been
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index bdbfc95793e7..c50bcec6e2d7 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -4161,6 +4161,7 @@ struct gpio_descs *__must_check gpiod_get_array(struct device *dev,
+ static void ams_delta_write_next_byte(struct ams_delta_nand *priv, u_char byte)
  {
- 	struct gpio_desc *desc;
- 	struct gpio_descs *descs;
-+	struct gpio_chip *chip;
- 	int count;
+-	struct gpio_descs *data_gpiods = priv->data_gpiods;
+ 	unsigned long bits = byte;
+-	int i, value_array[data_gpiods->ndescs];
+-
+-	for (i = 0; i < data_gpiods->ndescs; i++)
+-		value_array[i] = test_bit(i, &bits);
  
- 	count = gpiod_count(dev, con_id);
-@@ -4177,6 +4178,19 @@ struct gpio_descs *__must_check gpiod_get_array(struct device *dev,
- 			gpiod_put_array(descs);
- 			return ERR_CAST(desc);
- 		}
-+
-+		/*
-+		 * Verify if the array qualifies for fast bitmap operations
-+		 * (single chip, pins in hardware order starting from 0)
-+		 * and mark the array with the chip descriptor if true.
-+		 */
-+		chip = gpiod_to_chip(desc);
-+		if (descs->chip == NULL)
-+			descs->chip = chip;
-+		if (!IS_ERR(descs->chip) && (chip != descs->chip ||
-+		    gpio_chip_hwgpio(desc) != descs->ndescs))
-+			descs->chip = ERR_PTR(-EINVAL);
-+
- 		descs->desc[descs->ndescs] = desc;
- 		descs->ndescs++;
- 	}
-diff --git a/include/linux/gpio/consumer.h b/include/linux/gpio/consumer.h
-index 21ddbe440030..862ee027a02f 100644
---- a/include/linux/gpio/consumer.h
-+++ b/include/linux/gpio/consumer.h
-@@ -22,6 +22,7 @@ struct gpio_desc;
-  * gpiod_get_array().
-  */
- struct gpio_descs {
-+	struct gpio_chip *chip;
- 	unsigned int ndescs;
- 	struct gpio_desc *desc[];
- };
+-	gpiod_set_raw_array_value(data_gpiods->ndescs, data_gpiods->desc,
+-				  value_array);
++	gpiod_set_raw_array_bitmap(priv->data_gpiods, &bits);
+ 
+ 	ams_delta_write_commit(priv);
+ }
+@@ -106,22 +100,15 @@ static void ams_delta_write_first_byte(struct ams_delta_nand *priv, u_char byte)
+ 
+ static u_char ams_delta_read_next_byte(struct ams_delta_nand *priv)
+ {
+-	struct gpio_descs *data_gpiods = priv->data_gpiods;
+-	unsigned long bits = 0;
+-	int i, value_array[data_gpiods->ndescs];
++	unsigned long bits;
+ 
+ 	gpiod_set_value(priv->gpiod_nre, 0);
+ 	ndelay(40);
+ 
+-	gpiod_get_raw_array_value(data_gpiods->ndescs, data_gpiods->desc,
+-				  value_array);
++	gpiod_get_raw_array_bitmap(priv->data_gpiods, &bits);
+ 
+ 	gpiod_set_value(priv->gpiod_nre, 1);
+ 
+-	for (i = 0; i < data_gpiods->ndescs; i++)
+-		if (value_array[i])
+-			__set_bit(i, &bits);
+-
+ 	return bits;
+ }
+ 
 -- 
 2.16.4
