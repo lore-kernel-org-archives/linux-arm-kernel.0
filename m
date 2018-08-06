@@ -1,163 +1,64 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  6 Aug 2018 14:41:45 +0100
-Subject: [PATCH 03/13] coresight: tmc-etb/etf: Prepare to handle errors
- enabling
-In-Reply-To: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
-References: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1533562915-21558-4-git-send-email-suzuki.poulose@arm.com>
+Date: Mon,  6 Aug 2018 14:41:42 +0100
+Subject: [PATCH 00/13] coresight: Implement device claim protocol
+Message-ID: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare to handle errors in enabling the hardware and
-report it back to the core driver.
+Coresight architecture defines CLAIM tags for a device to negotiate
+control of the components (external agent vs self-hosted). Each device
+has a pair of registers (CLAIMSET & CLAIMCLR) for managing the CLAIM
+tags. However, the protocol for the CLAIM tags is IMPLEMENTATION DEFINED.
+PSCI has recommendations for the use of the CLAIM tags to negotiate
+controls for external agent vs self-hosted use, as defined in
+ARM DEN 0022D, Section "6.8.1 Debug and Trace save and restore".
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 71 +++++++++++++++----------
- 1 file changed, 44 insertions(+), 27 deletions(-)
+This series implements the recommended protocol by PSCI.
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index 4156c95..ceb4b30 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -15,7 +15,7 @@
- static int tmc_set_etf_buffer(struct coresight_device *csdev,
- 			      struct perf_output_handle *handle);
- 
--static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
-+static void __tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
- {
- 	CS_UNLOCK(drvdata->base);
- 
-@@ -34,6 +34,12 @@ static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
- 	CS_LOCK(drvdata->base);
- }
- 
-+static int tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
-+{
-+	__tmc_etb_enable_hw(drvdata);
-+	return 0;
-+}
-+
- static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
- {
- 	char *bufp;
-@@ -76,7 +82,7 @@ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
- 	CS_LOCK(drvdata->base);
- }
- 
--static void tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
-+static void __tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
- {
- 	CS_UNLOCK(drvdata->base);
- 
-@@ -92,6 +98,12 @@ static void tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
- 	CS_LOCK(drvdata->base);
- }
- 
-+static int tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
-+{
-+	__tmc_etf_enable_hw(drvdata);
-+	return 0;
-+}
-+
- static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
- {
- 	CS_UNLOCK(drvdata->base);
-@@ -174,8 +186,12 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev)
- 		drvdata->buf = buf;
- 	}
- 
--	drvdata->mode = CS_MODE_SYSFS;
--	tmc_etb_enable_hw(drvdata);
-+	ret = tmc_etb_enable_hw(drvdata);
-+	if (!ret)
-+		drvdata->mode = CS_MODE_SYSFS;
-+	else
-+		/* Free up the buffer if we failed to enable */
-+		used = false;
- out:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
-@@ -194,27 +210,25 @@ static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, void *data)
- 	struct perf_output_handle *handle = data;
- 
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
--	if (drvdata->reading) {
-+	do {
- 		ret = -EINVAL;
--		goto out;
--	}
-+		if (drvdata->reading)
-+			break;
-+		/*
-+		 * In Perf mode there can be only one writer per sink.  There
-+		 * is also no need to continue if the ETB/ETF is already
-+		 * operated from sysFS.
-+		 */
-+		if (drvdata->mode != CS_MODE_DISABLED)
-+			break;
- 
--	/*
--	 * In Perf mode there can be only one writer per sink.  There
--	 * is also no need to continue if the ETB/ETR is already operated
--	 * from sysFS.
--	 */
--	if (drvdata->mode != CS_MODE_DISABLED) {
--		ret = -EINVAL;
--		goto out;
--	}
--
--	ret = tmc_set_etf_buffer(csdev, handle);
--	if (!ret) {
--		drvdata->mode = CS_MODE_PERF;
--		tmc_etb_enable_hw(drvdata);
--	}
--out:
-+		ret = tmc_set_etf_buffer(csdev, handle);
-+		if (ret)
-+			break;
-+		ret  = tmc_etb_enable_hw(drvdata);
-+		if (!ret)
-+			drvdata->mode = CS_MODE_PERF;
-+	} while (0);
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
- 	return ret;
-@@ -271,6 +285,7 @@ static void tmc_disable_etf_sink(struct coresight_device *csdev)
- static int tmc_enable_etf_link(struct coresight_device *csdev,
- 			       int inport, int outport)
- {
-+	int ret;
- 	unsigned long flags;
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -280,11 +295,13 @@ static int tmc_enable_etf_link(struct coresight_device *csdev,
- 		return -EBUSY;
- 	}
- 
--	tmc_etf_enable_hw(drvdata);
--	drvdata->mode = CS_MODE_SYSFS;
-+	ret = tmc_etf_enable_hw(drvdata);
-+	if (!ret)
-+		drvdata->mode = CS_MODE_SYSFS;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_dbg(drvdata->dev, "TMC-ETF enabled\n");
-+	if (!ret)
-+		dev_dbg(drvdata->dev, "TMC-ETF enabled\n");
- 	return 0;
- }
- 
-@@ -579,7 +596,7 @@ int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata)
- 		 * can't be NULL.
- 		 */
- 		memset(drvdata->buf, 0, drvdata->size);
--		tmc_etb_enable_hw(drvdata);
-+		__tmc_etb_enable_hw(drvdata);
- 	} else {
- 		/*
- 		 * The ETB/ETF is not tracing and the buffer was just read.
+There were two options for the implementation.
+ 1) Have the claim/disclaim operations performed from the coresight
+    generic driver - This doesn't work unfortunately for ETM devices
+    as the need cross-CPU calls to access the CLAIM registers. Also,
+    makes it complex for error recovery and reference counting.
+
+ 2) Have the claim/disclaim operations performed from the device
+    specific drivers. The disadvantage is that the calls are sprinkled
+    in each driver, but this makes the operation much simpler.
+
+This series implements the method (2). The first part of the series
+prepares different drivers to handle errors from the lower layer
+and clean up the state.
+
+Applies on coresight/next:
+
+
+Suzuki K Poulose (13):
+  coresight: tmc-etr: Refactor for handling errors
+  coresight: tmc-etr: Handle errors enabling CATU
+  coresight: tmc-etb/etf: Prepare to handle errors enabling
+  coresight: etm4x: Add support for handling errors
+  coresight: etm3: Add support for handling errors
+  coresight: etb10: Handle errors enabling the device
+  coresight: dynamic-replicator: Handle multiple connections
+  coresight: Add support for CLAIM tag protocol
+  coresight: etmx: Claim devices before use
+  coresight: funnel: Claim devices before use
+  coresight: catu: Claim device before use
+  coresight: dynamic-replicator: Claim device for use
+  coreisght: tmc: Claim device before use
+
+ drivers/hwtracing/coresight/coresight-catu.c       |  6 ++
+ .../coresight/coresight-dynamic-replicator.c       | 79 +++++++++++++-----
+ drivers/hwtracing/coresight/coresight-etb10.c      | 18 +++--
+ drivers/hwtracing/coresight/coresight-etm3x.c      | 58 ++++++++++----
+ drivers/hwtracing/coresight/coresight-etm4x.c      | 52 ++++++++----
+ drivers/hwtracing/coresight/coresight-funnel.c     | 26 ++++--
+ drivers/hwtracing/coresight/coresight-priv.h       |  7 ++
+ drivers/hwtracing/coresight/coresight-tmc-etf.c    | 93 +++++++++++++++-------
+ drivers/hwtracing/coresight/coresight-tmc-etr.c    | 80 +++++++++++++------
+ drivers/hwtracing/coresight/coresight.c            | 85 ++++++++++++++++++++
+ include/linux/coresight.h                          | 20 +++++
+ 11 files changed, 409 insertions(+), 115 deletions(-)
+
 -- 
 2.7.4
