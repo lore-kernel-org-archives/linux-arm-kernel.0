@@ -1,90 +1,134 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  6 Aug 2018 14:41:52 +0100
-Subject: [PATCH 10/13] coresight: funnel: Claim devices before use
+Date: Mon,  6 Aug 2018 14:41:51 +0100
+Subject: [PATCH 09/13] coresight: etmx: Claim devices before use
 In-Reply-To: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
 References: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1533562915-21558-11-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1533562915-21558-10-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the CLAIM protocol to grab the ownership of the component.
+Use the CLAIM tags to grab the device for self-hosted usage.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-funnel.c | 26 +++++++++++++++++++++-----
- 1 file changed, 21 insertions(+), 5 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm3x.c | 18 +++++++++++++++---
+ drivers/hwtracing/coresight/coresight-etm4x.c | 15 ++++++++++++---
+ 2 files changed, 27 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index ee7a30b..9279251 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -25,6 +25,7 @@
- #define FUNNEL_HOLDTIME_MASK	0xf00
- #define FUNNEL_HOLDTIME_SHFT	0x8
- #define FUNNEL_HOLDTIME		(0x7 << FUNNEL_HOLDTIME_SHFT)
-+#define FUNNEL_ENSx_MASK	0xff
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index 771691c..b810bbc 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -357,7 +357,7 @@ static int etm_parse_event_config(struct etm_drvdata *drvdata,
  
- /**
-  * struct funnel_drvdata - specifics associated to a funnel component
-@@ -42,31 +43,42 @@ struct funnel_drvdata {
- 	unsigned long		priority;
- };
- 
--static void funnel_enable_hw(struct funnel_drvdata *drvdata, int port)
-+static int funnel_enable_hw(struct funnel_drvdata *drvdata, int port)
+ static int etm_enable_hw(struct etm_drvdata *drvdata)
  {
- 	u32 functl;
-+	int rc = 0;
+-	int i;
++	int i, rc;
+ 	u32 etmcr;
+ 	struct etm_config *config = &drvdata->config;
+ 
+@@ -369,6 +369,9 @@ static int etm_enable_hw(struct etm_drvdata *drvdata)
+ 	etm_set_pwrup(drvdata);
+ 	/* Make sure all registers are accessible */
+ 	etm_os_unlock(drvdata);
++	rc = coresight_claim_device_unlocked(drvdata->base);
++	if (rc)
++		goto done;
+ 
+ 	etm_set_prog(drvdata);
+ 
+@@ -417,10 +420,15 @@ static int etm_enable_hw(struct etm_drvdata *drvdata)
+ 	etm_writel(drvdata, 0x0, ETMVMIDCVR);
+ 
+ 	etm_clr_prog(drvdata);
++
++done:
++	if (rc)
++		etm_set_pwrdwn(drvdata);
+ 	CS_LOCK(drvdata->base);
+ 
+-	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
+-	return 0;
++	dev_dbg(drvdata->dev, "cpu: %d enable smp call done: %d\n",
++		drvdata->cpu, rc);
++	return rc;
+ }
+ 
+ struct etm_enable_arg {
+@@ -561,6 +569,8 @@ static void etm_disable_hw(void *info)
+ 	struct etm_config *config = &drvdata->config;
+ 
+ 	CS_UNLOCK(drvdata->base);
++
++
+ 	etm_set_prog(drvdata);
+ 
+ 	/* Read back sequencer and counters for post trace analysis */
+@@ -569,6 +579,8 @@ static void etm_disable_hw(void *info)
+ 	for (i = 0; i < drvdata->nr_cntr; i++)
+ 		config->cntr_val[i] = etm_readl(drvdata, ETMCNTVRn(i));
+ 
++	coresight_disclaim_device_unlocked(drvdata->base);
++
+ 	etm_set_pwrdwn(drvdata);
+ 	CS_LOCK(drvdata->base);
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 4f9e6bb..20d1015 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -84,13 +84,17 @@ struct etm4_enable_arg {
+ 
+ static int etm4_enable_hw(struct etmv4_drvdata *drvdata)
+ {
+-	int i;
++	int i, rc;
+ 	struct etmv4_config *config = &drvdata->config;
  
  	CS_UNLOCK(drvdata->base);
  
- 	functl = readl_relaxed(drvdata->base + FUNNEL_FUNCTL);
-+	/* Claim the device only when we enable the first slave */
-+	if (!(functl & FUNNEL_ENSx_MASK)) {
-+		rc = coresight_claim_device_unlocked(drvdata->base);
-+		if (rc)
-+			goto done;
-+	}
+ 	etm4_os_unlock(drvdata);
+ 
++	rc = coresight_claim_device_unlocked(drvdata->base);
++	if (rc)
++		goto done;
 +
- 	functl &= ~FUNNEL_HOLDTIME_MASK;
- 	functl |= FUNNEL_HOLDTIME;
- 	functl |= (1 << port);
- 	writel_relaxed(functl, drvdata->base + FUNNEL_FUNCTL);
- 	writel_relaxed(drvdata->priority, drvdata->base + FUNNEL_PRICTL);
--
+ 	/* Disable the trace unit before programming trace registers */
+ 	writel_relaxed(0, drvdata->base + TRCPRGCTLR);
+ 
+@@ -178,10 +182,12 @@ static int etm4_enable_hw(struct etmv4_drvdata *drvdata)
+ 		dev_err(drvdata->dev,
+ 			"timeout while waiting for Idle Trace Status\n");
+ 
 +done:
  	CS_LOCK(drvdata->base);
-+	return rc;
- }
  
- static int funnel_enable(struct coresight_device *csdev, int inport,
- 			 int outport)
- {
-+	int rc;
- 	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
--	funnel_enable_hw(drvdata, inport);
-+	rc = funnel_enable_hw(drvdata, inport);
- 
--	dev_dbg(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
+-	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
 -	return 0;
-+	if (!rc)
-+		dev_dbg(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
++	dev_dbg(drvdata->dev, "cpu: %d enable smp call done: %d\n",
++		drvdata->cpu, rc);
 +	return rc;
  }
  
- static void funnel_disable_hw(struct funnel_drvdata *drvdata, int inport)
-@@ -79,6 +91,10 @@ static void funnel_disable_hw(struct funnel_drvdata *drvdata, int inport)
- 	functl &= ~(1 << inport);
- 	writel_relaxed(functl, drvdata->base + FUNNEL_FUNCTL);
+ static void etm4_enable_hw_smp_call(void *info)
+@@ -326,6 +332,7 @@ static void etm4_disable_hw(void *info)
  
-+	/* Disclaim the device if none of the slaves are now active */
-+	if (!(functl & FUNNEL_ENSx_MASK))
-+		coresight_disclaim_device_unlocked(drvdata->base);
+ 	CS_UNLOCK(drvdata->base);
+ 
++
+ 	/* power can be removed from the trace unit now */
+ 	control = readl_relaxed(drvdata->base + TRCPDCR);
+ 	control &= ~TRCPDCR_PU;
+@@ -341,6 +348,8 @@ static void etm4_disable_hw(void *info)
+ 	isb();
+ 	writel_relaxed(control, drvdata->base + TRCPRGCTLR);
+ 
++	coresight_disclaim_device_unlocked(drvdata->base);
 +
  	CS_LOCK(drvdata->base);
- }
  
+ 	dev_dbg(drvdata->dev, "cpu: %d disable smp call done\n", drvdata->cpu);
 -- 
 2.7.4
