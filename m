@@ -1,8 +1,8 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Mon, 6 Aug 2018 06:42:01 -0400 (EDT)
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 6 Aug 2018 12:48:49 +0200
 Subject: framebuffer corruption due to overlapping stp instructions on
  arm64
-In-Reply-To: <CAKv+Gu87YqLM=FFZ6V8rHhuhskDdsBUuXFpqNKVbXWqdnuNEyA@mail.gmail.com>
+In-Reply-To: <alpine.LRH.2.02.1808060639200.2986@file01.intranet.prod.int.rdu2.redhat.com>
 References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
  <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
  <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
@@ -17,102 +17,111 @@ References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.r
  <CAKv+Gu_y6La77sWOSROrwfRy65jrFVYVvRZt+ewNheYhdhHCkQ@mail.gmail.com>
  <alpine.LRH.2.02.1808060626060.2986@file01.intranet.prod.int.rdu2.redhat.com>
  <CAKv+Gu87YqLM=FFZ6V8rHhuhskDdsBUuXFpqNKVbXWqdnuNEyA@mail.gmail.com>
-Message-ID: <alpine.LRH.2.02.1808060639200.2986@file01.intranet.prod.int.rdu2.redhat.com>
+ <alpine.LRH.2.02.1808060639200.2986@file01.intranet.prod.int.rdu2.redhat.com>
+Message-ID: <CAKv+Gu8HyHX8qjg1qHV2M9Re+RGQJigjdAFVC_yR4niGkk2ikA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 6 August 2018 at 12:42, Mikulas Patocka <mpatocka@redhat.com> wrote:
+>
+>
+> On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
+>
+>> On 6 August 2018 at 12:31, Mikulas Patocka <mpatocka@redhat.com> wrote:
+>> >
+>> >
+>> > On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
+>> >
+>> >> On 6 August 2018 at 10:02, Mikulas Patocka <mpatocka@redhat.com> wrote:
+>> >> >
+>> >> >
+>> >> > On Sun, 5 Aug 2018, Florian Weimer wrote:
+>> >> >
+>> >> >> On 08/04/2018 01:04 PM, Mikulas Patocka wrote:
+>> >> >> > There's plenty of memcpy's in the graphics stack. No one will be rewriting
+>> >> >> > all the graphics drivers because of tiny market share that ARM has in
+>> >> >> > desktop computers. So if you refuse to fix things and blame everyone else,
+>> >> >> > you can as well announce that you don't want to have PCIe graphics on ARM
+>> >> >> > at all.
+>> >> >>
+>> >> >> The POWER toolchain maintainers said pretty much the same thing not too
+>> >> >> long ago. I wonder how many architectures need to fail until the
+>> >> >> graphics stack is finally fixed.
+>> >> >>
+>> >> >> Thanks,
+>> >> >> Florian
+>> >> >
+>> >> > If you say that your architecture doesn't support unaligned accesses at
+>> >> > all, there's no problem - the compiler won't generate them and the libc
+>> >> > won't contain them.
+>> >> >
+>> >> > But if you say that your architecture supports unaligned accesses except
+>> >> > for the framebuffer, then you have a problem - the compiler can't know
+>> >> > which pointers point to the framebuffer and libc can't know either - you
+>> >> > caused this problem by your architectural decision.
+>> >> >
+>> >> > You can use 'volatile' to suppress memory optimizations, but it's
+>> >> > impossible to go through the whole Linux graphics stack and add volatile
+>> >> > to every pointer that may point to videoram. Even if you succeesed, new
+>> >> > videoram accesses without volatile will appear after a year of
+>> >> > development.
+>> >> >
+>> >> > See for example the macros READ_ONCE and WRITE_ONCE in Linux kernel - they
+>> >> > should be used when there's concurrent access to the particular variable,
+>> >> > but mainstream architectures don't require them, so many kernel developers
+>> >> > are omitting them in their code.
+>> >> >
+>> >> > If you are building a supercomputer with a particular GPU, you can force
+>> >> > the GPU vendor to provide POWER-compliant drivers. If you are building a
+>> >> > workstation where the user can plug any GPU, forcing developers will go
+>> >> > nowhere. You have to emulate the unaligned accesses and make sure that the
+>> >> > next versions of your architecture support them in hardware.
+>> >> >
+>> >>
+>> >> I have the feeling this discussion is going off the rails again.
+>> >>
+>> >> The original report is about corruption when doing overlapping writes.
+>> >> Matt Sealey said you cannot have PCI outbound windows with memory
+>> >> semantics on ARM, and so you should be using device mappings (which do
+>> >> not tolerate unaligned accesses)
+>> >>
+>> >> In this context, 'device mapping' does not mean 'any non-DRAM region',
+>> >> but it refers to a particular type of MMU mapping attribute defined by
+>> >> the ARM architecture.
+>> >>
+>> >> I think we can all agree that memcpy() should be usable on any region
+>> >> of memory that has true memory semantics, even if it is backed by VRAM
+>> >> on a graphics card.
+>> >>
+>> >> The question is if PCIe can provide such regions on ARM.
+>> >
+>> > I think there are three possible solutions:
+>> >
+>> > 1. provide an alternative memcpy implementation that doesn't do unaligned
+>> > accesses and recompile the graphics software with -mstrict-align
+>> >
+>> > 2. map the PCI BAR as device memory and emulate the unaligned instructions
+>> >
+>> > 3. find some hardware workaround that could insert delays between the PCIe
+>> > accesses (but the hardware engineers need to cooperate on this instead of
+>> > asserting that they refuse tu support it)
+>> >
+>>
+>> Are we talking about a quirk for the Armada 8040 or about PCIe on ARM
+>> in general?
+>
+> I don't know - there are not any other easily available PCIe ARM boards
+> except for Armada 8040.
+>
 
+... indeed, and sadly, the ones that are available all have this
+horrible Synopsys DesignWare PCIe IP that does not implement a true
+root complex at all, but is simply repurposed endpoint IP with some
+tweaks so it vaguely resembles a root complex.
 
-On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
-
-> On 6 August 2018 at 12:31, Mikulas Patocka <mpatocka@redhat.com> wrote:
-> >
-> >
-> > On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
-> >
-> >> On 6 August 2018 at 10:02, Mikulas Patocka <mpatocka@redhat.com> wrote:
-> >> >
-> >> >
-> >> > On Sun, 5 Aug 2018, Florian Weimer wrote:
-> >> >
-> >> >> On 08/04/2018 01:04 PM, Mikulas Patocka wrote:
-> >> >> > There's plenty of memcpy's in the graphics stack. No one will be rewriting
-> >> >> > all the graphics drivers because of tiny market share that ARM has in
-> >> >> > desktop computers. So if you refuse to fix things and blame everyone else,
-> >> >> > you can as well announce that you don't want to have PCIe graphics on ARM
-> >> >> > at all.
-> >> >>
-> >> >> The POWER toolchain maintainers said pretty much the same thing not too
-> >> >> long ago. I wonder how many architectures need to fail until the
-> >> >> graphics stack is finally fixed.
-> >> >>
-> >> >> Thanks,
-> >> >> Florian
-> >> >
-> >> > If you say that your architecture doesn't support unaligned accesses at
-> >> > all, there's no problem - the compiler won't generate them and the libc
-> >> > won't contain them.
-> >> >
-> >> > But if you say that your architecture supports unaligned accesses except
-> >> > for the framebuffer, then you have a problem - the compiler can't know
-> >> > which pointers point to the framebuffer and libc can't know either - you
-> >> > caused this problem by your architectural decision.
-> >> >
-> >> > You can use 'volatile' to suppress memory optimizations, but it's
-> >> > impossible to go through the whole Linux graphics stack and add volatile
-> >> > to every pointer that may point to videoram. Even if you succeesed, new
-> >> > videoram accesses without volatile will appear after a year of
-> >> > development.
-> >> >
-> >> > See for example the macros READ_ONCE and WRITE_ONCE in Linux kernel - they
-> >> > should be used when there's concurrent access to the particular variable,
-> >> > but mainstream architectures don't require them, so many kernel developers
-> >> > are omitting them in their code.
-> >> >
-> >> > If you are building a supercomputer with a particular GPU, you can force
-> >> > the GPU vendor to provide POWER-compliant drivers. If you are building a
-> >> > workstation where the user can plug any GPU, forcing developers will go
-> >> > nowhere. You have to emulate the unaligned accesses and make sure that the
-> >> > next versions of your architecture support them in hardware.
-> >> >
-> >>
-> >> I have the feeling this discussion is going off the rails again.
-> >>
-> >> The original report is about corruption when doing overlapping writes.
-> >> Matt Sealey said you cannot have PCI outbound windows with memory
-> >> semantics on ARM, and so you should be using device mappings (which do
-> >> not tolerate unaligned accesses)
-> >>
-> >> In this context, 'device mapping' does not mean 'any non-DRAM region',
-> >> but it refers to a particular type of MMU mapping attribute defined by
-> >> the ARM architecture.
-> >>
-> >> I think we can all agree that memcpy() should be usable on any region
-> >> of memory that has true memory semantics, even if it is backed by VRAM
-> >> on a graphics card.
-> >>
-> >> The question is if PCIe can provide such regions on ARM.
-> >
-> > I think there are three possible solutions:
-> >
-> > 1. provide an alternative memcpy implementation that doesn't do unaligned
-> > accesses and recompile the graphics software with -mstrict-align
-> >
-> > 2. map the PCI BAR as device memory and emulate the unaligned instructions
-> >
-> > 3. find some hardware workaround that could insert delays between the PCIe
-> > accesses (but the hardware engineers need to cooperate on this instead of
-> > asserting that they refuse tu support it)
-> >
-> 
-> Are we talking about a quirk for the Armada 8040 or about PCIe on ARM
-> in general?
-
-I don't know - there are not any other easily available PCIe ARM boards 
-except for Armada 8040.
-
-> If the latter, I still haven't seen an explanation why the particulars
-> of AMBA justify overlapped writes being dropped at will by the
-> interconnect.
-
-Mikulas
+But this is exactly why I am asking: I use a AMD Seattle Overdrive as
+my main Linux development system, and it runs the gnome-shell stack
+flawlessly (using the nouveau driver), as well as a UEFI framebuffer
+using efifb. So my suspicion is that this is either a Synopsys IP
+issue or an interconnect issue, and has nothing to do with the
+impedance mismatch between AMBA and PCIe.
