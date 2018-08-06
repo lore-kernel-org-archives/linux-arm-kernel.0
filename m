@@ -1,383 +1,147 @@
-From: angelo@sysam.it (Angelo Dureghello)
-Date: Mon, 6 Aug 2018 22:31:17 +0200
-Subject: [PATCH v8 2/3] dmaengine: fsl-edma: add edma version and
- configurable registers
-In-Reply-To: <CAJKOXPeBN16iGR980ZEC_ZJU86KzBPz=rT7Mb5QEKNFpafpMXg@mail.gmail.com>
-References: <20180803193244.12084-1-angelo@sysam.it>
- <20180803193244.12084-2-angelo@sysam.it>
- <CAJKOXPeBN16iGR980ZEC_ZJU86KzBPz=rT7Mb5QEKNFpafpMXg@mail.gmail.com>
-Message-ID: <20180806203117.GB6092@jerusalem>
+From: trong@android.com (Tri Vo)
+Date: Mon, 6 Aug 2018 14:54:32 -0700
+Subject: [PATCH] arm64: build CONFIG_ARM64_LSE_ATOMICS without -ffixed-
+ flags
+In-Reply-To: <CAKv+Gu-oWw9qa-U=XB8YPhUtSGcGwtEddafpsOY7XW9L6aPNdQ@mail.gmail.com>
+References: <20180802231753.86336-1-trong@android.com>
+ <CAKv+Gu_QzzDSV74pzLQcPBsWHZK5hvMwa8PojSJmzTOMnY780Q@mail.gmail.com>
+ <CAKwvOd=vYBoZazvvN=MHVZnYtekgr-fCktuOFePsV-eSvbFQyQ@mail.gmail.com>
+ <CAKv+Gu8KeXFqqWu6yV4_rRpL-6NN5KQyLWKCuC_XnbotGtMu7w@mail.gmail.com>
+ <CANA+-vD0U3_1r4xJuv0fq6J1qAwRDLuu1sH+GHhL4vMh8JJ3Gw@mail.gmail.com>
+ <CAKv+Gu8MaDPHuDmqg14-98CwAznuP8R0oo7BNPsAKMU_vPmKMQ@mail.gmail.com>
+ <CAKv+Gu-SgWCzbBH1iZnWKYbTj28TiL6Xd_x9OTm0CXSiBQCitw@mail.gmail.com>
+ <CANA+-vDMckt3WN+7E59vd_EKnUS4r_iuPNgyp2cs6-uWiAg3qA@mail.gmail.com>
+ <CAKv+Gu-oWw9qa-U=XB8YPhUtSGcGwtEddafpsOY7XW9L6aPNdQ@mail.gmail.com>
+Message-ID: <CANA+-vB5v5JPnthjJ-1wqgEnNdcz6eiJ28NyeO37ggSvVtWEeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
-
-many thanks for testing.
-
-On Mon, Aug 06, 2018 at 09:59:35AM +0200, Krzysztof Kozlowski wrote:
-> On 3 August 2018 at 21:32, Angelo Dureghello <angelo@sysam.it> wrote:
-> > This patch adds configurable registers (using __iomem addresses)
-> > to allow the use of fsl-edma-common code with slightly different
-> > edma module versions, as Vybrid (v1) and ColdFire (v2) are.
-> >
-> > Removal of old membase-referenced registers, amd some fixes on
-> > macroes are included.
-> >
-> > Signed-off-by: Angelo Dureghello <angelo@sysam.it>
-> > ---
-> > Changes from v7:
-> > - patch rewritten from scratch, this patch (2/3) has just been added.
-> > ---
-> >  drivers/dma/fsl-edma-common.c | 138 ++++++++++++++++++++++++++--------
-> >  drivers/dma/fsl-edma-common.h | 115 ++++++++++++++--------------
-> >  drivers/dma/fsl-edma.c        |  32 ++++----
-> >  3 files changed, 182 insertions(+), 103 deletions(-)
-> >
-> > diff --git a/drivers/dma/fsl-edma-common.c b/drivers/dma/fsl-edma-common.c
-> > index 0ae7094f477a..948a3ee51bbb 100644
-> > --- a/drivers/dma/fsl-edma-common.c
-> > +++ b/drivers/dma/fsl-edma-common.c
-> > @@ -9,6 +9,38 @@
-> >
-> >  #include "fsl-edma-common.h"
-> >
-> > +#define EDMA_CR                        0x00
-> > +#define EDMA_ES                        0x04
-> > +#define EDMA_ERQ               0x0C
-> > +#define EDMA_EEI               0x14
-> > +#define EDMA_SERQ              0x1B
-> > +#define EDMA_CERQ              0x1A
-> > +#define EDMA_SEEI              0x19
-> > +#define EDMA_CEEI              0x18
-> > +#define EDMA_CINT              0x1F
-> > +#define EDMA_CERR              0x1E
-> > +#define EDMA_SSRT              0x1D
-> > +#define EDMA_CDNE              0x1C
-> > +#define EDMA_INTR              0x24
-> > +#define EDMA_ERR               0x2C
-> > +
-> > +#define EDMA64_ERQH            0x08
-> > +#define EDMA64_EEIH            0x10
-> > +#define EDMA64_SERQ            0x18
-> > +#define EDMA64_CERQ            0x19
-> > +#define EDMA64_SEEI            0x1a
-> > +#define EDMA64_CEEI            0x1b
-> > +#define EDMA64_CINT            0x1c
-> > +#define EDMA64_CERR            0x1d
-> > +#define EDMA64_SSRT            0x1e
-> > +#define EDMA64_CDNE            0x1f
-> > +#define EDMA64_INTH            0x20
-> > +#define EDMA64_INTL            0x24
-> > +#define EDMA64_ERRH            0x28
-> > +#define EDMA64_ERRL            0x2c
-> > +
-> > +#define EDMA_TCD               0x1000
-> > +
-> >  /*
-> >   * R/W functions for big- or little-endian registers:
-> >   * The eDMA controller's endian is independent of the CPU core's endian.
-> > @@ -67,20 +99,20 @@ EXPORT_SYMBOL_GPL(to_fsl_edma_desc);
-> >
-> >  static void fsl_edma_enable_request(struct fsl_edma_chan *fsl_chan)
-> >  {
-> > -       void __iomem *addr = fsl_chan->edma->membase;
-> > +       struct edma_regs *regs = &fsl_chan->edma->regs;
-> >         u32 ch = fsl_chan->vchan.chan.chan_id;
-> >
-> > -       edma_writeb(fsl_chan->edma, EDMA_SEEI_SEEI(ch), addr + EDMA_SEEI);
-> > -       edma_writeb(fsl_chan->edma, ch, addr + EDMA_SERQ);
-> > +       edma_writeb(fsl_chan->edma, EDMA_SEEI_SEEI(ch), regs->seei);
-> > +       edma_writeb(fsl_chan->edma, ch, regs->serq);
-> >  }
-> >
-> >  void fsl_edma_disable_request(struct fsl_edma_chan *fsl_chan)
-> >  {
-> > -       void __iomem *addr = fsl_chan->edma->membase;
-> > +       struct edma_regs *regs = &fsl_chan->edma->regs;
-> >         u32 ch = fsl_chan->vchan.chan.chan_id;
-> >
-> > -       edma_writeb(fsl_chan->edma, ch, addr + EDMA_CERQ);
-> > -       edma_writeb(fsl_chan->edma, EDMA_CEEI_CEEI(ch), addr + EDMA_CEEI);
-> > +       edma_writeb(fsl_chan->edma, ch, regs->cerq);
-> > +       edma_writeb(fsl_chan->edma, EDMA_CEEI_CEEI(ch), regs->ceei);
-> >  }
-> >  EXPORT_SYMBOL_GPL(fsl_edma_disable_request);
-> >
-> > @@ -208,7 +240,7 @@ static size_t fsl_edma_desc_residue(struct fsl_edma_chan *fsl_chan,
-> >                 struct virt_dma_desc *vdesc, bool in_progress)
-> >  {
-> >         struct fsl_edma_desc *edesc = fsl_chan->edesc;
-> > -       void __iomem *addr = fsl_chan->edma->membase;
-> > +       struct edma_regs *regs = &fsl_chan->edma->regs;
-> >         u32 ch = fsl_chan->vchan.chan.chan_id;
-> >         enum dma_transfer_direction dir = fsl_chan->fsc.dir;
-> >         dma_addr_t cur_addr, dma_addr;
-> > @@ -224,11 +256,9 @@ static size_t fsl_edma_desc_residue(struct fsl_edma_chan *fsl_chan,
-> >                 return len;
-> >
-> >         if (dir == DMA_MEM_TO_DEV)
-> > -               cur_addr = edma_readl(
-> > -                       fsl_chan->edma, addr + EDMA_TCD_SADDR(ch));
-> > +               cur_addr = edma_readl(fsl_chan->edma, &regs->tcd[ch].saddr);
-> >         else
-> > -               cur_addr = edma_readl(
-> > -                       fsl_chan->edma, addr + EDMA_TCD_DADDR(ch));
-> > +               cur_addr = edma_readl(fsl_chan->edma, &regs->tcd[ch].daddr);
-> >
-> >         /* figure out the finished and calculate the residue */
-> >         for (i = 0; i < fsl_chan->edesc->n_tcds; i++) {
-> > @@ -285,7 +315,7 @@ static void fsl_edma_set_tcd_regs(struct fsl_edma_chan *fsl_chan,
-> >                                   struct fsl_edma_hw_tcd *tcd)
-> >  {
-> >         struct fsl_edma_engine *edma = fsl_chan->edma;
-> > -       void __iomem *addr = fsl_chan->edma->membase;
-> > +       struct edma_regs *regs = &fsl_chan->edma->regs;
-> >         u32 ch = fsl_chan->vchan.chan.chan_id;
-> >
-> >         /*
-> > @@ -293,24 +323,24 @@ static void fsl_edma_set_tcd_regs(struct fsl_edma_chan *fsl_chan,
-> >          * endian format. However, we need to load the TCD registers in
-> >          * big- or little-endian obeying the eDMA engine model endian.
-> >          */
-> > -       edma_writew(edma, 0, addr + EDMA_TCD_CSR(ch));
-> > -       edma_writel(edma, le32_to_cpu(tcd->saddr), addr + EDMA_TCD_SADDR(ch));
-> > -       edma_writel(edma, le32_to_cpu(tcd->daddr), addr + EDMA_TCD_DADDR(ch));
-> > +       edma_writew(edma, 0,  &regs->tcd[ch].csr);
-> > +       edma_writel(edma, le32_to_cpu(tcd->saddr), &regs->tcd[ch].saddr);
-> > +       edma_writel(edma, le32_to_cpu(tcd->daddr), &regs->tcd[ch].daddr);
-> >
-> > -       edma_writew(edma, le16_to_cpu(tcd->attr), addr + EDMA_TCD_ATTR(ch));
-> > -       edma_writew(edma, le16_to_cpu(tcd->soff), addr + EDMA_TCD_SOFF(ch));
-> > +       edma_writew(edma, le16_to_cpu(tcd->attr), &regs->tcd[ch].attr);
-> > +       edma_writew(edma, le16_to_cpu(tcd->soff), &regs->tcd[ch].soff);
-> >
-> > -       edma_writel(edma, le32_to_cpu(tcd->nbytes), addr + EDMA_TCD_NBYTES(ch));
-> > -       edma_writel(edma, le32_to_cpu(tcd->slast), addr + EDMA_TCD_SLAST(ch));
-> > +       edma_writel(edma, le32_to_cpu(tcd->nbytes), &regs->tcd[ch].nbytes);
-> > +       edma_writel(edma, le32_to_cpu(tcd->slast), &regs->tcd[ch].slast);
-> >
-> > -       edma_writew(edma, le16_to_cpu(tcd->citer), addr + EDMA_TCD_CITER(ch));
-> > -       edma_writew(edma, le16_to_cpu(tcd->biter), addr + EDMA_TCD_BITER(ch));
-> > -       edma_writew(edma, le16_to_cpu(tcd->doff), addr + EDMA_TCD_DOFF(ch));
-> > +       edma_writew(edma, le16_to_cpu(tcd->citer), &regs->tcd[ch].citer);
-> > +       edma_writew(edma, le16_to_cpu(tcd->biter), &regs->tcd[ch].biter);
-> > +       edma_writew(edma, le16_to_cpu(tcd->doff), &regs->tcd[ch].doff);
-> >
-> > -       edma_writel(edma,
-> > -                   le32_to_cpu(tcd->dlast_sga), addr + EDMA_TCD_DLAST_SGA(ch));
-> > +       edma_writel(edma, le32_to_cpu(tcd->dlast_sga),
-> > +                       &regs->tcd[ch].dlast_sga);
-> >
-> > -       edma_writew(edma, le16_to_cpu(tcd->csr), addr + EDMA_TCD_CSR(ch));
-> > +       edma_writew(edma, le16_to_cpu(tcd->csr), &regs->tcd[ch].csr);
-> >  }
-> >
-> >  static inline
-> > @@ -332,15 +362,15 @@ void fsl_edma_fill_tcd(struct fsl_edma_hw_tcd *tcd, u32 src, u32 dst,
-> >
-> >         tcd->attr = cpu_to_le16(attr);
-> >
-> > -       tcd->soff = cpu_to_le16(EDMA_TCD_SOFF_SOFF(soff));
-> > +       tcd->soff = cpu_to_le16(soff);
-> >
-> > -       tcd->nbytes = cpu_to_le32(EDMA_TCD_NBYTES_NBYTES(nbytes));
-> > -       tcd->slast = cpu_to_le32(EDMA_TCD_SLAST_SLAST(slast));
-> > +       tcd->nbytes = cpu_to_le32(nbytes);
-> > +       tcd->slast = cpu_to_le32(slast);
-> >
-> >         tcd->citer = cpu_to_le16(EDMA_TCD_CITER_CITER(citer));
-> > -       tcd->doff = cpu_to_le16(EDMA_TCD_DOFF_DOFF(doff));
-> > +       tcd->doff = cpu_to_le16(doff);
-> >
-> > -       tcd->dlast_sga = cpu_to_le32(EDMA_TCD_DLAST_SGA_DLAST_SGA(dlast_sga));
-> > +       tcd->dlast_sga = cpu_to_le32(dlast_sga);
-> >
-> >         tcd->biter = cpu_to_le16(EDMA_TCD_BITER_BITER(biter));
-> >         if (major_int)
-> > @@ -573,4 +603,52 @@ void fsl_edma_cleanup_vchan(struct dma_device *dmadev)
-> >  }
-> >  EXPORT_SYMBOL_GPL(fsl_edma_cleanup_vchan);
-> >
-> > +/*
-> > + * On the 32 channels Vybrid/mpc577x edma version (here called "v1"),
-> > + * register offsets are different compared to ColdFire mcf5441x 64 channels
-> > + * edma (here called "v2").
-> > + *
-> > + * This function sets up register offsets as per proper declared version
-> > + * so must be called in xxx_edma_probe() just after setting the
-> > + * edma "version" and "membase" appropriately.
-> > + */
-> > +void fsl_edma_setup_regs(struct fsl_edma_engine *edma)
-> > +{
-> > +       edma->regs.cr = edma->membase + EDMA_CR;
-> > +       edma->regs.es = edma->membase + EDMA_ES;
-> > +       edma->regs.erql = edma->membase + EDMA_ERQ;
-> > +       edma->regs.eeil = edma->membase + EDMA_EEI;
-> > +
-> > +       edma->regs.serq = edma->membase + ((edma->version == v1) ?
-> > +                       EDMA_SERQ : EDMA64_SERQ);
-> > +       edma->regs.cerq = edma->membase + ((edma->version == v1) ?
-> > +                       EDMA_CERQ : EDMA64_CERQ);
-> > +       edma->regs.seei = edma->membase + ((edma->version == v1) ?
-> > +                       EDMA_SEEI : EDMA64_SEEI);
-> > +       edma->regs.ceei = edma->membase + ((edma->version == v1) ?
-> > +                       EDMA_CEEI : EDMA64_CEEI);
-> > +       edma->regs.cint = edma->membase + ((edma->version == v1) ?
-> > +                       EDMA_CINT : EDMA64_CINT);
-> > +       edma->regs.cerr = edma->membase + ((edma->version == v1) ?
-> > +                       EDMA_CERR : EDMA64_CERR);
-> > +       edma->regs.ssrt = edma->membase + ((edma->version == v1) ?
-> > +                       EDMA_SSRT : EDMA64_SSRT);
-> > +       edma->regs.cdne = edma->membase + ((edma->version == v1) ?
-> > +                       EDMA_CDNE : EDMA64_CDNE);
-> > +       edma->regs.intl = edma->membase + ((edma->version == v1) ?
-> > +                       EDMA_INTR : EDMA64_INTL);
-> > +       edma->regs.errl = edma->membase + ((edma->version == v1) ?
-> > +                       EDMA_ERR : EDMA64_ERRL);
-> > +
-> > +       if (edma->version == v2) {
-> > +               edma->regs.erqh = edma->membase + EDMA64_ERQH;
-> > +               edma->regs.eeih = edma->membase + EDMA64_EEIH;
-> > +               edma->regs.errh = edma->membase + EDMA64_ERRH;
-> > +               edma->regs.inth = edma->membase + EDMA64_INTH;
-> > +       }
-> > +
-> > +       edma->regs.tcd = edma->membase + EDMA_TCD;
-> > +}
-> > +EXPORT_SYMBOL_GPL(fsl_edma_setup_regs);
-> > +
-> >  MODULE_LICENSE("GPL v2");
-> > diff --git a/drivers/dma/fsl-edma-common.h b/drivers/dma/fsl-edma-common.h
-> > index f3ea68e15b23..7a9231e7639f 100644
-> > --- a/drivers/dma/fsl-edma-common.h
-> > +++ b/drivers/dma/fsl-edma-common.h
-> > @@ -8,35 +8,6 @@
-> >
-> >  #include "virt-dma.h"
-> >
-> > -#define EDMA_CR                        0x00
-> > -#define EDMA_ES                        0x04
-> > -#define EDMA_ERQ               0x0C
-> > -#define EDMA_EEI               0x14
-> > -#define EDMA_SERQ              0x1B
-> > -#define EDMA_CERQ              0x1A
-> > -#define EDMA_SEEI              0x19
-> > -#define EDMA_CEEI              0x18
-> > -#define EDMA_CINT              0x1F
-> > -#define EDMA_CERR              0x1E
-> > -#define EDMA_SSRT              0x1D
-> > -#define EDMA_CDNE              0x1C
-> > -#define EDMA_INTR              0x24
-> > -#define EDMA_ERR               0x2C
-> > -
-> > -#define EDMA_TCD_SADDR(x)      (0x1000 + 32 * (x))
-> > -#define EDMA_TCD_SOFF(x)       (0x1004 + 32 * (x))
-> > -#define EDMA_TCD_ATTR(x)       (0x1006 + 32 * (x))
-> > -#define EDMA_TCD_NBYTES(x)     (0x1008 + 32 * (x))
-> > -#define EDMA_TCD_SLAST(x)      (0x100C + 32 * (x))
-> > -#define EDMA_TCD_DADDR(x)      (0x1010 + 32 * (x))
-> > -#define EDMA_TCD_DOFF(x)       (0x1014 + 32 * (x))
-> > -#define EDMA_TCD_CITER_ELINK(x)        (0x1016 + 32 * (x))
-> > -#define EDMA_TCD_CITER(x)      (0x1016 + 32 * (x))
-> > -#define EDMA_TCD_DLAST_SGA(x)  (0x1018 + 32 * (x))
-> > -#define EDMA_TCD_CSR(x)                (0x101C + 32 * (x))
-> > -#define EDMA_TCD_BITER_ELINK(x)        (0x101E + 32 * (x))
-> > -#define EDMA_TCD_BITER(x)      (0x101E + 32 * (x))
-> > -
-> >  #define EDMA_CR_EDBG           BIT(1)
-> >  #define EDMA_CR_ERCA           BIT(2)
-> >  #define EDMA_CR_ERGA           BIT(3)
-> > @@ -47,34 +18,29 @@
-> >  #define EDMA_CR_ECX            BIT(16)
-> >  #define EDMA_CR_CX             BIT(17)
-> >
-> > -#define EDMA_SEEI_SEEI(x)      ((x) & 0x1F)
-> > -#define EDMA_CEEI_CEEI(x)      ((x) & 0x1F)
-> > -#define EDMA_CINT_CINT(x)      ((x) & 0x1F)
-> > -#define EDMA_CERR_CERR(x)      ((x) & 0x1F)
-> > -
-> > -#define EDMA_TCD_ATTR_DSIZE(x)         (((x) & 0x0007))
-> > -#define EDMA_TCD_ATTR_DMOD(x)          (((x) & 0x001F) << 3)
-> > -#define EDMA_TCD_ATTR_SSIZE(x)         (((x) & 0x0007) << 8)
-> > -#define EDMA_TCD_ATTR_SMOD(x)          (((x) & 0x001F) << 11)
-> > -#define EDMA_TCD_ATTR_SSIZE_8BIT       (0x0000)
-> > -#define EDMA_TCD_ATTR_SSIZE_16BIT      (0x0100)
-> > -#define EDMA_TCD_ATTR_SSIZE_32BIT      (0x0200)
-> > -#define EDMA_TCD_ATTR_SSIZE_64BIT      (0x0300)
-> > -#define EDMA_TCD_ATTR_SSIZE_32BYTE     (0x0500)
-> > -#define EDMA_TCD_ATTR_DSIZE_8BIT       (0x0000)
-> > -#define EDMA_TCD_ATTR_DSIZE_16BIT      (0x0001)
-> > -#define EDMA_TCD_ATTR_DSIZE_32BIT      (0x0002)
-> > -#define EDMA_TCD_ATTR_DSIZE_64BIT      (0x0003)
-> > -#define EDMA_TCD_ATTR_DSIZE_32BYTE     (0x0005)
-> > -
-> > -#define EDMA_TCD_SOFF_SOFF(x)          (x)
-> > -#define EDMA_TCD_NBYTES_NBYTES(x)      (x)
-> > -#define EDMA_TCD_SLAST_SLAST(x)                (x)
-> > -#define EDMA_TCD_DADDR_DADDR(x)                (x)
-> > -#define EDMA_TCD_CITER_CITER(x)                ((x) & 0x7FFF)
-> > -#define EDMA_TCD_DOFF_DOFF(x)          (x)
-> > -#define EDMA_TCD_DLAST_SGA_DLAST_SGA(x)        (x)
-> > -#define EDMA_TCD_BITER_BITER(x)                ((x) & 0x7FFF)
-> > +#define EDMA_SEEI_SEEI(x)      ((x) & GENMASK(4, 0))
-> > +#define EDMA_CEEI_CEEI(x)      ((x) & GENMASK(4, 0))
-> > +#define EDMA_CINT_CINT(x)      ((x) & GENMASK(4, 0))
-> > +#define EDMA_CERR_CERR(x)      ((x) & GENMASK(4, 0))
-> > +
-> > +#define EDMA_TCD_ATTR_DSIZE(x)         (((x) & GENMASK(2, 0)))
-> > +#define EDMA_TCD_ATTR_DMOD(x)          (((x) & GENMASK(4, 0)) << 3)
-> > +#define EDMA_TCD_ATTR_SSIZE(x)         (((x) & GENMASK(2, 0)) << 8)
-> > +#define EDMA_TCD_ATTR_SMOD(x)          (((x) & GENMASK(4, 0)) << 11)
-> 
-> This looks like a change for its own commit.
-> 
-Yes, was previously required the usage of BIT() and GENMASK().
-
-> > +
-> > +#define EDMA_TCD_ATTR_DSIZE_8BIT       0
-> > +#define EDMA_TCD_ATTR_DSIZE_16BIT      BIT(0)
-> > +#define EDMA_TCD_ATTR_DSIZE_32BIT      BIT(1)
-> > +#define EDMA_TCD_ATTR_DSIZE_64BIT      (BIT(0) | BIT(1))
-> > +#define EDMA_TCD_ATTR_DSIZE_32BYTE     (BIT(3) | BIT(0))
-> > +#define EDMA_TCD_ATTR_SSIZE_8BIT       0
-> > +#define EDMA_TCD_ATTR_SSIZE_16BIT      (EDMA_TCD_ATTR_DSIZE_16BIT << 8)
-> > +#define EDMA_TCD_ATTR_SSIZE_32BIT      (EDMA_TCD_ATTR_DSIZE_32BIT << 8)
-> > +#define EDMA_TCD_ATTR_SSIZE_64BIT      (EDMA_TCD_ATTR_DSIZE_64BIT << 8)
-> > +#define EDMA_TCD_ATTR_SSIZE_32BYTE     (EDMA_TCD_ATTR_DSIZE_32BYTE << 8)
-> > +
-> > +#define EDMA_TCD_CITER_CITER(x)                ((x) & GENMASK(14, 0))
-> > +#define EDMA_TCD_BITER_BITER(x)                ((x) & GENMASK(14, 0))
-> >
-> >  #define EDMA_TCD_CSR_START             BIT(0)
-> >  #define EDMA_TCD_CSR_INT_MAJOR         BIT(1)
-> > @@ -87,7 +53,7 @@
-> >
-> >  #define EDMAMUX_CHCFG_DIS              0x0
-> >  #define EDMAMUX_CHCFG_ENBL             0x80
-> > -#define EDMAMUX_CHCFG_SOURCE(n)                ((n) & 0x3F)
-> > +#define EDMAMUX_CHCFG_SOURCE(n)                ((n) & GENMASK(6, 0))
-> >
-> >  #define DMAMUX_NR      2
-> >
-> > @@ -114,6 +80,31 @@ struct fsl_edma_hw_tcd {
-> >         __le16  biter;
-> >  };
-> >
-> > +/*
-> > + * This are iomem pointers, for both v32 and v64.
-> 
-> s/This/These/
+On Sat, Aug 4, 2018 at 12:21 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 4 August 2018 at 03:05, Tri Vo <trong@android.com> wrote:
+>> On Fri, Aug 3, 2018 at 12:34 PM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> On 3 August 2018 at 21:13, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>> On 3 August 2018 at 21:08, Tri Vo <trong@android.com> wrote:
+>>>>> On Fri, Aug 3, 2018 at 10:27 AM, Ard Biesheuvel
+>>>>> <ard.biesheuvel@linaro.org> wrote:
+>>>>>> On 3 August 2018 at 19:17, Nick Desaulniers <ndesaulniers@google.com> wrote:
+>>>>>>> On Fri, Aug 3, 2018 at 1:43 AM Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>>>>>>>>
+>>>>>>>> On 3 August 2018 at 01:17, Tri Vo <trong@android.com> wrote:
+>>>>>>>> > Remove -ffixed- compile flags as they are not required for correct
+>>>>>>>> > behavior of out-of-line ll/sc implementations of atomic functions.
+>>>>>>>> > Registers (except x0 which contains return value) only need to be
+>>>>>>>> > callee-saved, not necessarily fixed.
+>>>>>>>> >
+>>>>>>>> > For readability purposes, represent "callee-saves-all-registers" calling
+>>>>>>>> > convention with a combination of -fcall-used- and -fcall-saved- flags only.
+>>>>>>>> >
+>>>>>>>> > Signed-off-by: Tri Vo <trong@android.com>
+>>>>>>>>
+>>>>>>>> Wouldn't this permit the compiler to stack/unstack these registers in
+>>>>>>>> the implementations of the out of line LL/SC fallbacks.
+>>>>>
+>>>>> Yes. However, the number of registers that get stacked/unstacked
+>>>>> should remain the same since compiler should only preserve registers
+>>>>> that are used by callee (assuming callee saves all).
+>>>>>>>
+>>>>>>> I'm curious to understand more about how this LSE patching works, and
+>>>>>>> what the constraints exactly are.  Are there some docs I should read
+>>>>>>> that you can point me to?  I see
+>>>>>>> arch/arm64/include/asm/atomic_ll_sc.h, but are those are the in line
+>>>>>>> implementations?  Does that make arch/arm64/include/asm/atomic.h the
+>>>>>>> out of line definitions?  What are the restrictions around preventing
+>>>>>>> the compiler to push/pop those registers?
+>>>>>>>
+>>>>>>
+>>>>>> The idea is that LSE atomics can each be patched into a bl instruction
+>>>>>> that calls the appropriate LL/SC fallback, but without the overhead of
+>>>>>> an ordinary function call. (actually the bl is there by default, but
+>>>>>> patched into LSE ops on h/w that supports it)
+>>>>>>
+>>>>>> So that is why the 'bl' is in an asm() block, and why x30 is used as a
+>>>>>> temporary/clobber in the LSE sequences: the function call is
+>>>>>> completely hidden from the compiler. Obviously, for performance, you
+>>>>>> want to prevent these fallbacks from touching the stack.
+>>>>>
+>>>>> The function call is hidden from the compiler on the caller side
+>>>>> using 'bl' in the asm block. I suspect that is done to make
+>>>>> alternative instructions the same byte length (constraints of dynamic
+>>>>> patching). However, on the callee side, LL/SC fallbacks
+>>>>> (in atomic_ll_sc.h) are implemented as C functions. So the compiler
+>>>>> still handles the function call details and register allocation
+>>>>> within those functions.
+>>>>>
+>>>>> Since the caller doesn't save any registers, callee stacks/unstacks
+>>>>> all the registers it uses. So, for example, LL/SC fallback
+>>>>> implementation of atomic_add preserves 2 registers with or without
+>>>>> this change.
+>>>>>
+>>>>
+>>>> Did you look at the disassembly?
+>>
+>> Yes, I did.
 >
-Ack. Will eventually fix all in a v9. Collecting feedbacks.
- 
-> Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
-> 
-> Best regards,
-> Krzysztof
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-m68k" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 0000000000000000 <__ll_sc_atomic_add>:
+>    0: f9800031 prfm pstl1strm, [x1]
+>    4: 885f7c31 ldxr w17, [x1]
+>    8: 0b000231 add w17, w17, w0
+>    c: 88107c31 stxr w16, w17, [x1]
+>   10: 35ffffb0 cbnz w16, 4 <__ll_sc_atomic_add+0x4>
+>   14: d65f03c0 ret
+>
+> Now where does it preserve 2 registers?
 
-Best Regards,
-Angelo
+I tested the change on a Hikey 4.9 kernel. The disassembly there
+looks like this:
+0000000000000000 <__ll_sc_atomic_add>:
+       0: a9be7bfd stp x29, x30, [sp, #-32]!
+       4: 910003fd mov x29, sp
+       8: a90127e8 stp x8, x9, [sp, #16]
+       c: 2a0003e9 mov w9, w0
+      10: aa0103e8 mov x8, x1
+      14: aa1e03e0 mov x0, x30
+      18: 94000000 bl 0 <_mcount>
+      1c: f9800111 prfm pstl1strm, [x8]
+      20: 885f7d00 ldxr w0, [x8]
+      24: 0b090000 add w0, w0, w9
+      28: 88107d00 stxr w16, w0, [x8]
+      2c: 35ffffb0 cbnz w16, 20 <__ll_sc_atomic_add+0x20>
+      30: a94127e8 ldp x8, x9, [sp, #16]
+      34: a8c27bfd ldp x29, x30, [sp], #32
+      38: d65f03c0 ret
+      3c: d503201f nop
+
+Excluding FP, SP, there are 2 registers x8, x9 preserved.
+>
+>>>
+>>> Actually, I only just spotted that you only modify x1 .. x7 and that
+>>> the other registers already use -fcall-saved-xNN
+>>>
+>>> Will should comment on why the distinction exists in the first place.
+>>> Note that a strict reading of the GCC man page suggests that using
+>>> -fcall-saved-x8 is a bad idea, given that it is the indirect return
+>>> register. However, given the limited scope of the option here, that
+>>> probably does not matter in practice.
+>>>
+>>> So I guess you need this patch for Clang? Would be better to mention
+>>> that in the commit log if this is the case.
+>>
+>> Yes, I am planning to fold whatever compiler support is needed for LSE
+>> atomics into "callee-saves-all-registers" calling convention (without
+>> ffixed flags). I'll then implement that calling convention in Clang.
+>> I'll mention that in the commit message.
+>
+> Not *all* registers. x16 and x17 are excluded in this case, and I am
+> not sure whether you would to encode that in an option.
+>
+> What is wrong with using -ffixed or -fcall-saved?
+
+Looking at your disassembly snippet, usage of -ffixed flags makes
+sense to me now. They prevent argument registers from being
+unnecessarily stacked/unstacked if compiler uses x16, x17 (which
+don't need to be saved) for allocation.
+
+This patch will indeed cause a performance regression, although not
+on all build environments. Sorry for the confusion.
