@@ -1,144 +1,415 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Mon, 6 Aug 2018 15:54:33 -0400 (EDT)
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <CAKv+Gu_8Rq6X24ZOYvG7+kQQGSGYAZuu_co4k1nJS8K7rkrWMA@mail.gmail.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
- <20180803094129.GB17798@arm.com>
- <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
- <alpine.LRH.2.02.1808031424140.14030@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3s-+Qf=WBZz1KpisDMG3520jCUh8PLAO3PHa4jdt8kCTw@mail.gmail.com>
- <CAKv+Gu9_h-WFi1j4+DWUN_dMj75SKKHxWoDH8WQ9P7S7MNpZQg@mail.gmail.com>
- <alpine.LRH.2.02.1808060553130.30832@file01.intranet.prod.int.rdu2.redhat.com>
- <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
- <CAKv+Gu_C2g=C=gMpk4a5jpDORnxZY6t1v=HDoy59m5vwNBxBBg@mail.gmail.com>
- <alpine.LRH.2.02.1808061306490.12989@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu_8Rq6X24ZOYvG7+kQQGSGYAZuu_co4k1nJS8K7rkrWMA@mail.gmail.com>
-Message-ID: <alpine.LRH.2.02.1808061552090.11930@file01.intranet.prod.int.rdu2.redhat.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 6 Aug 2018 22:55:00 +0300
+Subject: [PATCH] arm64: dts: renesas: r8a77980: add CSI2/VIN support
+In-Reply-To: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
+References: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
+Message-ID: <758a8c87-272c-e861-4aab-01309cff2f84@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Describe the CSI2 and VIN (and their interconnections) in the R8A77980
+device tree.
 
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
+---
+This patch is against the 'renesas-devel-20180802v2-v4.18-rc7' branch of
+Simon Horman's 'renesas.git' repo.
 
-> On 6 August 2018 at 19:09, Mikulas Patocka <mpatocka@redhat.com> wrote:
-> >
-> >
-> > On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
-> >
-> >> On 6 August 2018 at 14:42, Robin Murphy <robin.murphy@arm.com> wrote:
-> >> > On 06/08/18 11:25, Mikulas Patocka wrote:
-> >> > [...]
-> >> >>>
-> >> >>> None of this explains why some transactions fail to make it across
-> >> >>> entirely. The overlapping writes in question write the same data to
-> >> >>> the memory locations that are covered by both, and so the ordering in
-> >> >>> which the transactions are received should not affect the outcome.
-> >> >>
-> >> >>
-> >> >> You're right that the corruption couldn't be explained just by reordering
-> >> >> writes. My hypothesis is that the PCIe controller tries to disambiguate
-> >> >> the overlapping writes, but the disambiguation logic was not tested and it
-> >> >> is buggy. If there's a barrier between the overlapping writes, the PCIe
-> >> >> controller won't see any overlapping writes, so it won't trigger the
-> >> >> faulty disambiguation logic and it works.
-> >> >>
-> >> >> Could the ARM engineers look if there's some chicken bit in Cortex-A72
-> >> >> that could insert barriers between non-cached writes automatically?
-> >> >
-> >> >
-> >> > I don't think there is, and even if there was I imagine it would have a
-> >> > pretty hideous effect on non-coherent DMA buffers and the various other
-> >> > places in which we have Normal-NC mappings of actual system RAM.
-> >> >
-> >>
-> >> Looking at the A72 manual, there is one chicken bit that looks like it
-> >> may be related:
-> >>
-> >> CPUACTLR_EL1 bit #50:
-> >>
-> >> 0 Enables store streaming on NC/GRE memory type. This is the reset value.
-> >> 1 Disables store streaming on NC/GRE memory type.
-> >>
-> >> so putting something like
-> >>
-> >> mrs x0, S3_1_C15_C2_0
-> >> orr x0, x0, #(1 << 50)
-> >> msr S3_1_C15_C2_0, x0
-> >>
-> >> in __cpu_setup() would be worth a try.
-> >
-> > It won't boot.
-> >
-> > But if i write the same value that was read, it also won't boot.
-> >
-> > I created a simple kernel module that reads this register and it has bit
-> > 32 set, all other bits clear. But when I write the same value into it, the
-> > core that does the write is stuck in infinite loop.
-> >
-> > So, it seems that we are writing this register from a wrong place.
-> >
-> 
-> Ah, my bad. I didn't look closely enough at the description:
-> 
-> """
-> The accessibility to the CPUACTLR_EL1 by Exception level is:
-> 
-> EL0              -
-> EL1(NS)          RW (a)
-> EL1(S)           RW (a)
-> EL2              RW (b)
-> EL3(SCR.NS = 1)  RW
-> EL3(SCR.NS = 0)  RW
-> 
-> (a) Write access if ACTLR_EL3.CPUACTLR is 1 and ACTLR_EL2.CPUACTLR is
-> 1, or ACTLR_EL3.CPUACTLR is 1 and SCR.NS is 0.
-> """
-> 
-> so you'll have to do this from ARM Trusted Firmware. If you're
-> comfortable rebuilding that:
-> 
-> diff --git a/include/lib/cpus/aarch64/cortex_a72.h
-> b/include/lib/cpus/aarch64/cortex_a72.h
-> index bfd64918625b..a7b8cf4be0c6 100644
-> --- a/include/lib/cpus/aarch64/cortex_a72.h
-> +++ b/include/lib/cpus/aarch64/cortex_a72.h
-> @@ -31,6 +31,7 @@
->  #define CORTEX_A72_ACTLR_EL1                   S3_1_C15_C2_0
-> 
->  #define CORTEX_A72_ACTLR_DISABLE_L1_DCACHE_HW_PFTCH    (1 << 56)
-> +#define CORTEX_A72_ACTLR_DIS_NC_GRE_STORE_STREAMING    (1 << 50)
->  #define CORTEX_A72_ACTLR_NO_ALLOC_WBWA         (1 << 49)
->  #define CORTEX_A72_ACTLR_DCC_AS_DCCI           (1 << 44)
->  #define CORTEX_A72_ACTLR_EL1_DIS_INSTR_PREFETCH                (1 << 32)
-> diff --git a/lib/cpus/aarch64/cortex_a72.S b/lib/cpus/aarch64/cortex_a72.S
-> index 55e508678284..5914d6ee3ba6 100644
-> --- a/lib/cpus/aarch64/cortex_a72.S
-> +++ b/lib/cpus/aarch64/cortex_a72.S
-> @@ -133,6 +133,15 @@ func cortex_a72_reset_func
->         orr     x0, x0, #CORTEX_A72_ECTLR_SMP_BIT
->         msr     CORTEX_A72_ECTLR_EL1, x0
->         isb
-> +
-> +       /* ---------------------------------------------
-> +        * Disables store streaming on NC/GRE memory type.
-> +        * ---------------------------------------------
-> +        */
-> +       mrs     x0, CORTEX_A72_ACTLR_EL1
-> +       orr     x0, x0, #CORTEX_A72_ACTLR_DIS_NC_GRE_STORE_STREAMING
-> +       msr     CORTEX_A72_ACTLR_EL1, x0
-> +       isb
->         ret x19
->  endfunc cortex_a72_reset_func
+The R8A77980 CSI2/VIN DT binding updates have been posted earlier today...
 
-Unfortunatelly, it doesn't work. I verified that the bit is set after 
-booting Linux, but the memcpy corruption was still present.
+ arch/arm64/boot/dts/renesas/r8a77980.dtsi |  374 ++++++++++++++++++++++++++++++
+ 1 file changed, 374 insertions(+)
 
-I also tried the other chicken bits, it slowed down the system noticeably, 
-but had no effect on the memcpy corruption.
-
-Mikulas
+Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+===================================================================
+--- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
++++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+@@ -579,6 +579,302 @@
+ 			status = "disabled";
+ 		};
+ 
++		vin0: video at e6ef0000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6ef0000 0 0x1000>;
++			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 811>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 811>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin0csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint= <&csi40vin0>;
++					};
++				};
++			};
++		};
++
++		vin1: video at e6ef1000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6ef1000 0 0x1000>;
++			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 810>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			status = "disabled";
++			resets = <&cpg 810>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin1csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint= <&csi40vin1>;
++					};
++				};
++			};
++		};
++
++		vin2: video at e6ef2000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6ef2000 0 0x1000>;
++			interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 809>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 809>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin2csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint= <&csi40vin2>;
++					};
++				};
++			};
++		};
++
++		vin3: video at e6ef3000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6ef3000 0 0x1000>;
++			interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 808>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 808>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin3csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint= <&csi40vin3>;
++					};
++				};
++			};
++		};
++
++		vin4: video at e6ef4000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6ef4000 0 0x1000>;
++			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 807>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 807>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin4csi41: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint= <&csi41vin4>;
++					};
++				};
++			};
++		};
++
++		vin5: video at e6ef5000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6ef5000 0 0x1000>;
++			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 806>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 806>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin5csi41: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint= <&csi41vin5>;
++					};
++				};
++			};
++		};
++
++		vin6: video at e6ef6000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6ef6000 0 0x1000>;
++			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 805>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 805>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin6csi41: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint= <&csi41vin6>;
++					};
++				};
++			};
++		};
++
++		vin7: video at e6ef7000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6ef7000 0 0x1000>;
++			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 804>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 804>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin7csi41: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint= <&csi41vin7>;
++					};
++				};
++			};
++		};
++
++		vin8: video at e6ef8000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6ef8000 0 0x1000>;
++			interrupts = <GIC_SPI 268 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 628>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 628>;
++			status = "disabled";
++		};
++
++		vin9: video at e6ef9000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6ef9000 0 0x1000>;
++			interrupts = <GIC_SPI 269 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 627>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 627>;
++			status = "disabled";
++		};
++
++		vin10: video at e6efa000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6efa000 0 0x1000>;
++			interrupts = <GIC_SPI 289 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 625>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 625>;
++			status = "disabled";
++		};
++
++		vin11: video at e6efb000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6efb000 0 0x1000>;
++			interrupts = <GIC_SPI 296 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 618>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 618>;
++			status = "disabled";
++		};
++
++		vin12: video at e6efc000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6efc000 0 0x1000>;
++			interrupts = <GIC_SPI 298 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 612>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 612>;
++			status = "disabled";
++		};
++
++		vin13: video at e6efd000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6efd000 0 0x1000>;
++			interrupts = <GIC_SPI 299 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 608>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 608>;
++			status = "disabled";
++		};
++
++		vin14: video at e6efe000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6efe000 0 0x1000>;
++			interrupts = <GIC_SPI 301 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 605>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 605>;
++			status = "disabled";
++		};
++
++		vin15: video at e6eff000 {
++			compatible = "renesas,vin-r8a77980";
++			reg = <0 0xe6eff000 0 0x1000>;
++			interrupts = <GIC_SPI 302 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 604>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 604>;
++			status = "disabled";
++		};
++
+ 		dmac1: dma-controller at e7300000 {
+ 			compatible = "renesas,dmac-r8a77980",
+ 				     "renesas,rcar-dmac";
+@@ -769,6 +1065,84 @@
+ 			resets = <&cpg 603>;
+ 		};
+ 
++		csi40: csi2 at feaa0000 {
++			compatible = "renesas,r8a77980-csi2";
++			reg = <0 0xfeaa0000 0 0x10000>;
++			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 716>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 716>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					csi40vin0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&vin0csi40>;
++					};
++					csi40vin1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&vin1csi40>;
++					};
++					csi40vin2: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint = <&vin2csi40>;
++					};
++					csi40vin3: endpoint at 3 {
++						reg = <3>;
++						remote-endpoint = <&vin3csi40>;
++					};
++				};
++			};
++		};
++
++		csi41: csi2 at feab0000 {
++			compatible = "renesas,r8a77980-csi2";
++			reg = <0 0xfeab0000 0 0x10000>;
++			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 716>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 716>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					csi41vin4: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&vin4csi41>;
++					};
++					csi41vin5: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&vin5csi41>;
++					};
++					csi41vin6: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint = <&vin6csi41>;
++					};
++					csi41vin7: endpoint at 3 {
++						reg = <3>;
++						remote-endpoint = <&vin7csi41>;
++					};
++				};
++			};
++		};
++
+ 		du: display at feb00000 {
+ 			compatible = "renesas,du-r8a77980",
+ 				     "renesas,du-r8a77970";
