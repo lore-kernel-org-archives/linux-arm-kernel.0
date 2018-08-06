@@ -1,127 +1,60 @@
 From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Tue,  7 Aug 2018 00:29:14 +0200
-Subject: [RFC PATCH v2 08/12] mtd: rawnand: ams-delta: Simplify pointer
- resolution on read/write
+Date: Tue,  7 Aug 2018 00:29:09 +0200
+Subject: [RFC PATCH v2 03/12] ARM: OMAP1: ams-delta: Provide GPIO lookup table
+ for NAND data port
 In-Reply-To: <20180806222918.12644-1-jmkrzyszt@gmail.com>
 References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
  <20180806222918.12644-1-jmkrzyszt@gmail.com>
-Message-ID: <20180806222918.12644-9-jmkrzyszt@gmail.com>
+Message-ID: <20180806222918.12644-4-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify data read/write sub-functions by changing their APIs so they
-accept driver private structure pointer instead of mtd_info.
+Data port used by Amstrad Delta NAND driver is actually an OMAP MPUIO
+device, already under control of gpio-omap driver.  The NAND driver
+gets access to the port by ioremapping it and performs read/write
+operations.  That is done without any proteciton from other users
+legally manipulating the port pins over GPIO API.
+
+The plan is to convert the driver to access the port over GPIO consumer
+API.  Before that is implemented, the driver can already obtain
+exclusive access to the port by requesting an array of its GPIO
+descriptors.
+
+Add respective entries to the NAND GPIO lookup table.
 
 Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 ---
- drivers/mtd/nand/raw/ams-delta.c | 40 ++++++++++++++++++++++------------------
- 1 file changed, 22 insertions(+), 18 deletions(-)
+ arch/arm/mach-omap1/board-ams-delta.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/nand/raw/ams-delta.c b/drivers/mtd/nand/raw/ams-delta.c
-index d02c48c013e8..30c461138195 100644
---- a/drivers/mtd/nand/raw/ams-delta.c
-+++ b/drivers/mtd/nand/raw/ams-delta.c
-@@ -76,10 +76,8 @@ static void ams_delta_write_commit(struct ams_delta_nand *priv)
- 	gpiod_set_value(priv->gpiod_nwe, 1);
- }
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index eedacdfe9725..16f7bbe47607 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -337,7 +337,8 @@ static struct platform_device ams_delta_nand_device = {
+ 	.resource	= ams_delta_nand_resources,
+ };
  
--static void ams_delta_write_next_byte(struct mtd_info *mtd, u_char byte)
-+static void ams_delta_write_next_byte(struct ams_delta_nand *priv, u_char byte)
- {
--	struct nand_chip *this = mtd_to_nand(mtd);
--	struct ams_delta_nand *priv = nand_get_controller_data(this);
- 	struct gpio_descs *data_gpiods = priv->data_gpiods;
- 	unsigned long bits = byte;
- 	int i, value_array[data_gpiods->ndescs];
-@@ -93,10 +91,8 @@ static void ams_delta_write_next_byte(struct mtd_info *mtd, u_char byte)
- 	ams_delta_write_commit(priv);
- }
+-#define OMAP_GPIO_LABEL	"gpio-0-15"
++#define OMAP_GPIO_LABEL		"gpio-0-15"
++#define OMAP_MPUIO_LABEL	"mpuio"
  
--static void ams_delta_write_byte(struct mtd_info *mtd, u_char byte)
-+static void ams_delta_write_first_byte(struct ams_delta_nand *priv, u_char byte)
- {
--	struct nand_chip *this = mtd_to_nand(mtd);
--	struct ams_delta_nand *priv = nand_get_controller_data(this);
- 	struct gpio_descs *data_gpiods = priv->data_gpiods;
- 	unsigned long bits = byte;
- 	int i;
-@@ -108,10 +104,8 @@ static void ams_delta_write_byte(struct mtd_info *mtd, u_char byte)
- 	ams_delta_write_commit(priv);
- }
- 
--static u_char ams_delta_read_next_byte(struct mtd_info *mtd)
-+static u_char ams_delta_read_next_byte(struct ams_delta_nand *priv)
- {
--	struct nand_chip *this = mtd_to_nand(mtd);
--	struct ams_delta_nand *priv = nand_get_controller_data(this);
- 	struct gpio_descs *data_gpiods = priv->data_gpiods;
- 	unsigned long bits = 0;
- 	int i, value_array[data_gpiods->ndescs];
-@@ -131,38 +125,48 @@ static u_char ams_delta_read_next_byte(struct mtd_info *mtd)
- 	return bits;
- }
- 
--static u_char ams_delta_read_byte(struct mtd_info *mtd)
-+static u_char ams_delta_read_first_byte(struct ams_delta_nand *priv)
- {
--	struct nand_chip *this = mtd_to_nand(mtd);
--	struct ams_delta_nand *priv = nand_get_controller_data(this);
- 	struct gpio_descs *data_gpiods = priv->data_gpiods;
- 	int i;
- 
- 	for (i = 0; i < data_gpiods->ndescs; i++)
- 		gpiod_direction_input(data_gpiods->desc[i]);
- 
--	return ams_delta_read_next_byte(mtd);
-+	return ams_delta_read_next_byte(priv);
-+}
-+
-+static u_char ams_delta_read_byte(struct mtd_info *mtd)
-+{
-+	struct nand_chip *this = mtd_to_nand(mtd);
-+	struct ams_delta_nand *priv = nand_get_controller_data(this);
-+
-+	return ams_delta_read_first_byte(priv);
- }
- 
- static void ams_delta_write_buf(struct mtd_info *mtd, const u_char *buf,
- 				int len)
- {
-+	struct nand_chip *this = mtd_to_nand(mtd);
-+	struct ams_delta_nand *priv = nand_get_controller_data(this);
- 	int i;
- 
- 	if (len > 0)
--		ams_delta_write_byte(mtd, buf[0]);
-+		ams_delta_write_first_byte(priv, buf[0]);
- 	for (i = 1; i < len; i++)
--		ams_delta_write_next_byte(mtd, buf[i]);
-+		ams_delta_write_next_byte(priv, buf[i]);
- }
- 
- static void ams_delta_read_buf(struct mtd_info *mtd, u_char *buf, int len)
- {
-+	struct nand_chip *this = mtd_to_nand(mtd);
-+	struct ams_delta_nand *priv = nand_get_controller_data(this);
- 	int i;
- 
- 	if (len > 0)
--		buf[0] = ams_delta_read_byte(mtd);
-+		buf[0] = ams_delta_read_first_byte(priv);
- 	for (i = 1; i < len; i++)
--		buf[i] = ams_delta_read_next_byte(mtd);
-+		buf[i] = ams_delta_read_next_byte(priv);
- }
- 
- /*
-@@ -186,7 +190,7 @@ static void ams_delta_hwcontrol(struct mtd_info *mtd, int cmd,
- 	}
- 
- 	if (cmd != NAND_CMD_NONE)
--		ams_delta_write_byte(mtd, cmd);
-+		ams_delta_write_first_byte(priv, cmd);
- }
- 
- static int ams_delta_nand_ready(struct mtd_info *mtd)
+ static struct gpiod_lookup_table ams_delta_nand_gpio_table = {
+ 	.table = {
+@@ -349,6 +350,14 @@ static struct gpiod_lookup_table ams_delta_nand_gpio_table = {
+ 		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_NWE, "nwe", 0),
+ 		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_ALE, "ale", 0),
+ 		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_CLE, "cle", 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 0, "data", 0, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 1, "data", 1, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 2, "data", 2, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 3, "data", 3, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 4, "data", 4, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 5, "data", 5, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 6, "data", 6, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 7, "data", 7, 0),
+ 		{ },
+ 	},
+ };
 -- 
 2.16.4
