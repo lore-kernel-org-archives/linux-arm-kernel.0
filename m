@@ -1,157 +1,60 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon,  6 Aug 2018 18:09:31 +0200
-Subject: [PATCH 2/4] ARM: dts: exynos: Add unused PMIC regulators on
- Exynos5422 Odroid boards
-In-Reply-To: <20180806160933.6578-1-krzk@kernel.org>
-References: <20180806160933.6578-1-krzk@kernel.org>
-Message-ID: <20180806160933.6578-2-krzk@kernel.org>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 6 Aug 2018 11:32:24 -0500
+Subject: New remoteproc driver for TI PRU
+In-Reply-To: <536d28bd-bcdd-1665-e1c8-828572051cfb@ti.com>
+References: <20180623210810.21232-1-david@lechnology.com>
+ <e0a883af-8228-5b06-3186-f57d8f898aaa@ti.com>
+ <8fc18d40-72f5-9215-26f0-1492e3a6c0e7@lechnology.com>
+ <536d28bd-bcdd-1665-e1c8-828572051cfb@ti.com>
+Message-ID: <5bd5e388-959c-cff7-df38-d267e06d4d96@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define LDO14, LDO20-22, LDO25 and LOD29-38 unused regulators to
-describe the hardware.
+On 06/29/2018 07:17 PM, Suman Anna wrote:
+> Hi David,
+> 
+> On 06/29/2018 12:44 PM, David Lechner wrote:
+>> On 06/29/2018 04:58 AM, Roger Quadros wrote:
+>>> +Suman & Tero
+>>>
+>>> Hi David,
+>>>
+>>> On 24/06/18 00:08, David Lechner wrote:
+>>>>
+>>>> Date: Sat, 23 Jun 2018 15:43:59 -0500
+>>>> Subject: [PATCH 0/8] New remoteproc driver for TI PRU
+>>>>
+>>>> This series adds a new remoteproc driver for the TI Programmable
+>>>> Runtime Unit
+>>>> (PRU) that is present in some TI Sitara processors. This code has
+>>>> been tested
+>>>> working on AM1808 (LEGO MINDSTORMS EV3) and AM3358 (BeagleBone Green).
+>>>
+>>> This is great. We have been working on something similar and I think
+>>> it would
+>>> be great if we can collaborate to get all our needs addressed.
+>>
+>> Yes, I have used the PRU with the TI kernel on BeagleBone so I've seen
+>> the TI
+>> implementation. My primary interest is in the AM1808, which has a far
+>> simpler
+>> PRU than other SoCs. So, I was hoping I could get away with just
+>> implementing
+>> the basic stuff that I need and let TI add the more complex stuff later.
+> 
+> Thanks for the series. PRUSS is present on many SoCs now, and each with
+> their own integration quirks, both in terms of SoC connections as well
+> as internal sub-modules within the subsystem. We currently support
+> AM335x, AM437x, AM57xx, Keystone 2 based 66AK2G and a newer generation
+> AM65x as well. It should be relatively straight-forward to scale this
+> for AM1808/OMAP-L138 as well. The move to the standard Common Clock and
+> Reset frameworks for clocks with the Davinci chips should make it
+> relatively straight-forward for the architecture pieces.
+> 
+> I will take a look at your series in detail sometime next week, and
+> mostly post our series to the upstream lists as well within the next
+> couple of weeks so that it is easier for discussion on the upstream lists.
+> 
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- arch/arm/boot/dts/exynos5422-odroid-core.dtsi | 105 ++++++++++++++++++++++++++
- 1 file changed, 105 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-index d0218a82c93a..744fd86a38ad 100644
---- a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-@@ -235,6 +235,13 @@
- 				regulator-max-microvolt = <2800000>;
- 			};
- 
-+			ldo14_reg: LDO14 {
-+				/* Unused */
-+				regulator-name = "vdd_ldo14";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+			};
-+
- 			ldo15_reg: LDO15 {
- 				regulator-name = "vdd_ldo15";
- 				regulator-min-microvolt = <3300000>;
-@@ -268,6 +275,27 @@
- 				regulator-max-microvolt = <2800000>;
- 			};
- 
-+			ldo20_reg: LDO20 {
-+				/* Unused */
-+				regulator-name = "vdd_ldo20";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+			};
-+
-+			ldo21_reg: LDO21 {
-+				/* Unused */
-+				regulator-name = "vdd_ldo21";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+			};
-+
-+			ldo22_reg: LDO22 {
-+				/* Unused */
-+				regulator-name = "vdd_ldo22";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <2375000>;
-+			};
-+
- 			ldo23_reg: LDO23 {
- 				regulator-name = "vdd_mifs";
- 				regulator-min-microvolt = <1100000>;
-@@ -282,6 +310,13 @@
- 				regulator-always-on;
- 			};
- 
-+			ldo25_reg: LDO25 {
-+				/* Unused */
-+				regulator-name = "vdd_ldo25";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+			};
-+
- 			ldo26_reg: LDO26 {
- 				regulator-name = "vdd_ldo26";
- 				regulator-min-microvolt = <3000000>;
-@@ -296,6 +331,76 @@
- 				regulator-always-on;
- 			};
- 
-+			ldo29_reg: LDO29 {
-+				/* Unused */
-+				regulator-name = "vdd_ldo29";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+			};
-+
-+			ldo30_reg: LDO30 {
-+				/* Unused */
-+				regulator-name = "vdd_ldo30";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+			};
-+
-+			ldo31_reg: LDO31 {
-+				/* Unused */
-+				regulator-name = "vdd_ldo31";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+			};
-+
-+			ldo32_reg: LDO32 {
-+				/* Unused */
-+				regulator-name = "vdd_ldo32";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+			};
-+
-+			ldo33_reg: LDO33 {
-+				/* Unused */
-+				regulator-name = "vdd_ldo33";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+			};
-+
-+			ldo34_reg: LDO34 {
-+				/* Unused */
-+				regulator-name = "vdd_ldo34";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+			};
-+
-+			ldo35_reg: LDO35 {
-+				/* Unused */
-+				regulator-name = "vdd_ldo35";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <2375000>;
-+			};
-+
-+			ldo36_reg: LDO36 {
-+				/* Unused */
-+				regulator-name = "vdd_ldo36";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+			};
-+
-+			ldo37_reg: LDO37 {
-+				/* Unused */
-+				regulator-name = "vdd_ldo37";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+			};
-+
-+			ldo38_reg: LDO38 {
-+				/* Unused */
-+				regulator-name = "vdd_ldo38";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+			};
-+
- 			buck1_reg: BUCK1 {
- 				regulator-name = "vdd_mif";
- 				regulator-min-microvolt = <800000>;
--- 
-2.14.1
+Have you had time to look at this yet? If you are too busy, I can submit
+a v2 with the interrupt controller broken out into a separate driver.
