@@ -1,30 +1,74 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Mon, 6 Aug 2018 14:13:34 +0200
-Subject: [PATCH v2 0/7] Stop losing firmware-set DMA masks
-In-Reply-To: <CAK8P3a3ZcOeHMR_qFnsBdXED+2X8_AEMKoS5MeAQhbapbGmm9w@mail.gmail.com>
-References: <cover.1532382222.git.robin.murphy@arm.com>
- <CAK8P3a3HDJ6svNN_cwvegxu20yNv8+tvc0D1A6Ooeq8agawbFg@mail.gmail.com>
- <1ccccc4b-7d4c-a3ee-23a2-f108916705e9@arm.com>
- <CAK8P3a3ZcOeHMR_qFnsBdXED+2X8_AEMKoS5MeAQhbapbGmm9w@mail.gmail.com>
-Message-ID: <20180806121334.GA5340@lst.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 06 Aug 2018 14:09:38 +0200
+Subject: [PATCH] iommu/rockchip: Handle errors returned from PM framework
+In-Reply-To: <20180805124616.18020-1-marc.zyngier@arm.com>
+References: <20180805124616.18020-1-marc.zyngier@arm.com>
+Message-ID: <2071881.EAoDzUiQGL@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2018 at 12:01:34PM +0200, Arnd Bergmann wrote:
-> There are a few subtle corner cases here, in particular in which cases
-> the new dma_set_mask() behavior on arm64 reports success or
-> failure when truncating the mask to the bus_dma_mask.
+Hi Marc,
 
-Going forward my plan was to make dma_set_mask() never fail.  The idea
-is that it sets the mask that the device is capable of, and the core
-dma code is responsible for also looking at bus_dma_mask and otherwise
-make things just work.
+Am Sonntag, 5. August 2018, 14:46:16 CEST schrieb Marc Zyngier:
+> pm_runtime_get_if_in_use can fail: either PM has been disabled
+> altogether (-EINVAL), or the device hasn't been enabled yet (0).
+> Sadly, we ignore the first case at the moment, and end up treating
+> it as if we had received a valid interrupt.
+> 
+> The first case could happen because the interrupt line is shared
+> (with the VOP for example), and although that device hasn't been
+> programmed yet, an interrupt may be pending (think kexec/kdump).
+> 
+> The second case means that we've enabled the IOMMU, but it is
+> not powered-on just yet. This could be another instance of the
+> above, but as it deserves investigation, let's output a single
+> warning (instead of flodding the console).
+> 
+> In both cases, bail with an IRQ_NONE.
+> 
+> Fixes: 0f181d3cf7d98 ("iommu/rockchip: Add runtime PM support")
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Robin brought up the case where a platform can't handle a given limitation
-ever, e.g. a PCI(e) device with a 24-bit dma mask on a device with a dma
-offset that means we'll never have any physical memory reachable in that
-range.  So we'll either still need to allow it to fail for such corner
-cases or delay such error until later, e.g. when dma_alloc_* (or in the
-corner case of the corner case dma_map_*) is called.  I'm still undecided
-which way to go, but not allowing error returns from dma_set_mask and
-its variants sounds very tempting.
+Hmm, maybe my thinking is flawed, but to me it looks a bit different.
+
+I.e. the iommu, as well as the vop have the capability to check if the irq
+is for them via their status registers (INT_STATUS and MMU_STATUS).
+
+For this to happen the power-domain must be active and the device clocked.
+Clock handling is done on both the vop and iommu and in the !CONFIG_PM
+case all power-domains are left on.
+
+Right now a !CONFIG_PM just passes through the driver unnoticed but with
+this change, we would actually make it depend on PM?
+
+What am I missing?
+
+Also there are quite a bit more instances of pm_runtime_get_if_in_use
+present in the iommu driver.
+
+
+Heiko
+
+>  drivers/iommu/rockchip-iommu.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index 054cd2c8e9c8..9d21495a8433 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -521,10 +521,11 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
+>  	u32 int_status;
+>  	dma_addr_t iova;
+>  	irqreturn_t ret = IRQ_NONE;
+> -	int i;
+> +	int i, err;
+>  
+> -	if (WARN_ON(!pm_runtime_get_if_in_use(iommu->dev)))
+> -		return 0;
+> +	err = pm_runtime_get_if_in_use(iommu->dev);
+> +	if ((err < 0) || WARN_ON_ONCE(!err))
+> +		return ret;
+>  
+>  	if (WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks)))
+>  		goto out;
+> 
