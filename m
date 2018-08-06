@@ -1,89 +1,44 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Mon, 6 Aug 2018 20:26:59 +0800
-Subject: [PATCH v4 0/5] add non-strict mode support for arm-smmu-v3
-Message-ID: <1533558424-16748-1-git-send-email-thunder.leizhen@huawei.com>
+Date: Mon, 6 Aug 2018 20:27:03 +0800
+Subject: [PATCH v4 4/5] iommu/arm-smmu-v3: add support for non-strict mode
+In-Reply-To: <1533558424-16748-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1533558424-16748-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1533558424-16748-5-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v3 -> v4:
-1. Add a new member "non_strict" in struct iommu_domain to mark whether
-   that domain use non-strict mode or not. This can help us to remove the
-   capability which was added in prior version.
-2. Add a new quirk IO_PGTABLE_QUIRK_NON_STRICT, so that we can get "strict
-   mode" in io-pgtable-arm.c according to data->iop.cfg.quirks.
-3. rename the new boot option to "arm_iommu".
+Dynamically choose strict or non-strict mode for page table config based
+on the iommu domain type.
 
-Thanks for Robin's review comments.
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-v2 -> v3:
-Add a bootup option "iommu_strict_mode" to make the manager can choose which
-mode to be used. The first 5 patches have not changed.
-+	iommu_strict_mode=	[arm-smmu-v3]
-+		0 - strict mode (default)
-+		1 - non-strict mode
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 2f1304b..904bc1e 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1622,6 +1622,11 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
+ 	if (smmu->features & ARM_SMMU_FEAT_COHERENCY)
+ 		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
 
-v1 -> v2:
-Use the lowest bit of the io_pgtable_ops.unmap's iova parameter to pass the strict mode:
-0, IOMMU_STRICT;
-1, IOMMU_NON_STRICT;
-Treat 0 as IOMMU_STRICT, so that the unmap operation can compatible with
-other IOMMUs which still use strict mode. In other words, this patch series
-will not impact other IOMMU drivers. I tried add a new quirk IO_PGTABLE_QUIRK_NON_STRICT
-in io_pgtable_cfg.quirks, but it can not pass the strict mode of the domain from SMMUv3
-driver to io-pgtable module. 
++	if (domain->type == IOMMU_DOMAIN_DMA) {
++		domain->non_strict = 1;
++		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
++	}
++
+ 	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
+ 	if (!pgtbl_ops)
+ 		return -ENOMEM;
+@@ -1782,7 +1787,7 @@ static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
+ {
+ 	struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
 
-Add a new member domain_non_strict in struct iommu_dma_cookie, this member will only be
-initialized when the related domain and IOMMU driver support non-strict mode.
+-	if (smmu)
++	if (smmu && !domain->non_strict)
+ 		__arm_smmu_tlb_sync(smmu);
+ }
 
-v1:
-In common, a IOMMU unmap operation follow the below steps:
-1. remove the mapping in page table of the specified iova range
-2. execute tlbi command to invalid the mapping which is cached in TLB
-3. wait for the above tlbi operation to be finished
-4. free the IOVA resource
-5. free the physical memory resource
-
-This maybe a problem when unmap is very frequently, the combination of tlbi
-and wait operation will consume a lot of time. A feasible method is put off
-tlbi and iova-free operation, when accumulating to a certain number or
-reaching a specified time, execute only one tlbi_all command to clean up
-TLB, then free the backup IOVAs. Mark as non-strict mode.
-
-But it must be noted that, although the mapping has already been removed in
-the page table, it maybe still exist in TLB. And the freed physical memory
-may also be reused for others. So a attacker can persistent access to memory
-based on the just freed IOVA, to obtain sensible data or corrupt memory. So
-the VFIO should always choose the strict mode.
-
-Some may consider put off physical memory free also, that will still follow
-strict mode. But for the map_sg cases, the memory allocation is not controlled
-by IOMMU APIs, so it is not enforceable.
-
-Fortunately, Intel and AMD have already applied the non-strict mode, and put
-queue_iova() operation into the common file dma-iommu.c., and my work is based
-on it. The difference is that arm-smmu-v3 driver will call IOMMU common APIs to
-unmap, but Intel and AMD IOMMU drivers are not.
-
-Below is the performance data of strict vs non-strict for NVMe device:
-Randomly Read  IOPS: 146K(strict) vs 573K(non-strict)
-Randomly Write IOPS: 143K(strict) vs 513K(non-strict)
-
-
-Zhen Lei (5):
-  iommu/arm-smmu-v3: fix the implementation of flush_iotlb_all hook
-  iommu/dma: add support for non-strict mode
-  iommu/io-pgtable-arm: add support for non-strict mode
-  iommu/arm-smmu-v3: add support for non-strict mode
-  iommu/arm-smmu-v3: add bootup option "arm_iommu"
-
- Documentation/admin-guide/kernel-parameters.txt |  9 +++++++
- drivers/iommu/arm-smmu-v3.c                     | 32 +++++++++++++++++++++++--
- drivers/iommu/dma-iommu.c                       | 23 ++++++++++++++++++
- drivers/iommu/io-pgtable-arm.c                  | 27 ++++++++++++++-------
- drivers/iommu/io-pgtable.h                      |  3 +++
- drivers/iommu/iommu.c                           |  1 +
- include/linux/iommu.h                           |  1 +
- 7 files changed, 85 insertions(+), 11 deletions(-)
-
--- 
+--
 1.8.3
