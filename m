@@ -1,15 +1,15 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 6 Aug 2018 17:20:08 +0200
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 6 Aug 2018 16:38:41 +0100
 Subject: [RFC/PoC PATCH 0/3] arm64: basic ROP mitigation
 In-Reply-To: <CAKv+Gu9X1CDpy+XvrmbSdjBjMb45eBW7JVsvsK_JQdUt2Dbvgw@mail.gmail.com>
 References: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
  <7529eedf-af56-2e94-261e-bc5c86abadaa@arm.com>
  <CAKv+Gu9X1CDpy+XvrmbSdjBjMb45eBW7JVsvsK_JQdUt2Dbvgw@mail.gmail.com>
-Message-ID: <CAKv+Gu8qT+2-m=2jGO-ppC7Ru4vX_FXnn+AL4WmBqyvFGv5ZTw@mail.gmail.com>
+Message-ID: <b0c974a2-4e81-7855-7d4e-22834c5d8997@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2018 at 16:04, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+On 06/08/18 15:04, Ard Biesheuvel wrote:
 > On 6 August 2018 at 15:55, Robin Murphy <robin.murphy@arm.com> wrote:
 >> On 02/08/18 14:21, Ard Biesheuvel wrote:
 >>>
@@ -43,21 +43,30 @@ On 6 August 2018 at 16:04, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 >> dependency on that? AFAICS without PAN clearing bit 55 of SP is effectively
 >> giving userspace direct control of the kernel stack (thanks to TBI). Ouch.
 >>
->
+> 
 > How's that? Bits 52 .. 54 will still be set, so SP will never contain
 > a valid userland address in any case. Or am I missing something?
->
+
+Ah, yes, I'd managed to forget about the address hole, but I think that 
+only makes it a bit trickier, rather than totally safe - it feels like 
+you just need to chain one or two returns through "valid" targets until 
+you can hit an epilogue with a "mov sp, x29" (at first glance there are 
+a fair few of those in my vmlinux), after which we're back to the bit 55 
+scheme alone giving no protection against retargeting the stack to a 
+valid TTBR0 address.
+
 >> I wonder if there's a little  more mileage in using "{add,sub} sp, sp, #1"
 >> sequences to rely on stack alignment exceptions instead, with the added
 >> bonus that that's about as low as the instruction-level overhead can get.
 >>
->
+> 
 > Good point. I did consider that, but couldn't convince myself that it
 > isn't easier to defeat: loads via x29 occur reasonably often, and you
 > can simply offset your doctored stack frame by a single byte.
->
 
-Also, the restore has to be idempotent: only functions that modify sp
-set the bit, so it cannot be reset unconditionally. Also, when taking
-an exception in the middle, we'll return with the bit set even if it
-was clear when the exception was taken.
+True; in theory there are 3072 possible unaligned offsets to choose 
+from, but compile-time randomisation doesn't seem much use, and 
+hotpatching just about every function call in the kernel isn't a nice 
+thought either.
+
+Robin.
