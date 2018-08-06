@@ -1,41 +1,108 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 06 Aug 2018 12:37:20 +0200
-Subject: Reset controller changes for v4.19, part 2
-Message-ID: <1533551840.4204.11.camel@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 6 Aug 2018 12:37:26 +0200
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <alpine.LRH.2.02.1808060626060.2986@file01.intranet.prod.int.rdu2.redhat.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
+ <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
+ <CAJA7tRZbmnZq7RfvQeYEy_a1ZObWqpFpVdvgsXgsioQ3RyPMuA@mail.gmail.com>
+ <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
+ <11f9185a-7f71-83df-3a57-0a0ae9c1f934@arm.com>
+ <alpine.LRH.2.02.1808032046540.24748@file01.intranet.prod.int.rdu2.redhat.com>
+ <CA+=Sn1=6F-fGLmXE0VqQHTqTCUKUT=Fz29mMT7349SPFisbZ9A@mail.gmail.com>
+ <alpine.LRH.2.02.1808040611070.23762@file01.intranet.prod.int.rdu2.redhat.com>
+ <fd2cae87-b2df-d8ef-8836-e6cbf8c5f851@redhat.com>
+ <alpine.LRH.2.02.1808060325110.3756@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu_y6La77sWOSROrwfRy65jrFVYVvRZt+ewNheYhdhHCkQ@mail.gmail.com>
+ <alpine.LRH.2.02.1808060626060.2986@file01.intranet.prod.int.rdu2.redhat.com>
+Message-ID: <CAKv+Gu87YqLM=FFZ6V8rHhuhskDdsBUuXFpqNKVbXWqdnuNEyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear arm-soc maintainers,
+On 6 August 2018 at 12:31, Mikulas Patocka <mpatocka@redhat.com> wrote:
+>
+>
+> On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
+>
+>> On 6 August 2018 at 10:02, Mikulas Patocka <mpatocka@redhat.com> wrote:
+>> >
+>> >
+>> > On Sun, 5 Aug 2018, Florian Weimer wrote:
+>> >
+>> >> On 08/04/2018 01:04 PM, Mikulas Patocka wrote:
+>> >> > There's plenty of memcpy's in the graphics stack. No one will be rewriting
+>> >> > all the graphics drivers because of tiny market share that ARM has in
+>> >> > desktop computers. So if you refuse to fix things and blame everyone else,
+>> >> > you can as well announce that you don't want to have PCIe graphics on ARM
+>> >> > at all.
+>> >>
+>> >> The POWER toolchain maintainers said pretty much the same thing not too
+>> >> long ago. I wonder how many architectures need to fail until the
+>> >> graphics stack is finally fixed.
+>> >>
+>> >> Thanks,
+>> >> Florian
+>> >
+>> > If you say that your architecture doesn't support unaligned accesses at
+>> > all, there's no problem - the compiler won't generate them and the libc
+>> > won't contain them.
+>> >
+>> > But if you say that your architecture supports unaligned accesses except
+>> > for the framebuffer, then you have a problem - the compiler can't know
+>> > which pointers point to the framebuffer and libc can't know either - you
+>> > caused this problem by your architectural decision.
+>> >
+>> > You can use 'volatile' to suppress memory optimizations, but it's
+>> > impossible to go through the whole Linux graphics stack and add volatile
+>> > to every pointer that may point to videoram. Even if you succeesed, new
+>> > videoram accesses without volatile will appear after a year of
+>> > development.
+>> >
+>> > See for example the macros READ_ONCE and WRITE_ONCE in Linux kernel - they
+>> > should be used when there's concurrent access to the particular variable,
+>> > but mainstream architectures don't require them, so many kernel developers
+>> > are omitting them in their code.
+>> >
+>> > If you are building a supercomputer with a particular GPU, you can force
+>> > the GPU vendor to provide POWER-compliant drivers. If you are building a
+>> > workstation where the user can plug any GPU, forcing developers will go
+>> > nowhere. You have to emulate the unaligned accesses and make sure that the
+>> > next versions of your architecture support them in hardware.
+>> >
+>>
+>> I have the feeling this discussion is going off the rails again.
+>>
+>> The original report is about corruption when doing overlapping writes.
+>> Matt Sealey said you cannot have PCI outbound windows with memory
+>> semantics on ARM, and so you should be using device mappings (which do
+>> not tolerate unaligned accesses)
+>>
+>> In this context, 'device mapping' does not mean 'any non-DRAM region',
+>> but it refers to a particular type of MMU mapping attribute defined by
+>> the ARM architecture.
+>>
+>> I think we can all agree that memcpy() should be usable on any region
+>> of memory that has true memory semantics, even if it is backed by VRAM
+>> on a graphics card.
+>>
+>> The question is if PCIe can provide such regions on ARM.
+>
+> I think there are three possible solutions:
+>
+> 1. provide an alternative memcpy implementation that doesn't do unaligned
+> accesses and recompile the graphics software with -mstrict-align
+>
+> 2. map the PCI BAR as device memory and emulate the unaligned instructions
+>
+> 3. find some hardware workaround that could insert delays between the PCIe
+> accesses (but the hardware engineers need to cooperate on this instead of
+> asserting that they refuse tu support it)
+>
 
-The following changes since commit 6b39fd590aebca1a6a4c827f29f14d2b6df3939d:
+Are we talking about a quirk for the Armada 8040 or about PCIe on ARM
+in general?
 
-  reset: uniphier: add reset control support for SPI (2018-07-19 11:19:47 +0200)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.19-2
-
-for you to fetch changes up to d903779b58be442f3afd2c51c46c7cf19c97684e:
-
-  reset: meson: add meson audio arb driver (2018-07-20 18:17:31 +0200)
-
-----------------------------------------------------------------
-Reset controller changes for v4.19, part 2
-
-This adds a single new driver for the Amlogic Meson Audio Memory Arbiter
-resets.
-
-----------------------------------------------------------------
-Jerome Brunet (2):
-      reset: meson: add dt-bindings for meson-axg audio arb
-      reset: meson: add meson audio arb driver
-
- .../bindings/reset/amlogic,meson-axg-audio-arb.txt |  21 +++
- drivers/reset/Kconfig                              |   7 +
- drivers/reset/Makefile                             |   1 +
- drivers/reset/reset-meson-audio-arb.c              | 168 +++++++++++++++++++++
- .../reset/amlogic,meson-axg-audio-arb.h            |  17 +++
- 5 files changed, 214 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/amlogic,meson-axg-audio-arb.txt
- create mode 100644 drivers/reset/reset-meson-audio-arb.c
- create mode 100644 include/dt-bindings/reset/amlogic,meson-axg-audio-arb.h
+If the latter, I still haven't seen an explanation why the particulars
+of AMBA justify overlapped writes being dropped at will by the
+interconnect.
