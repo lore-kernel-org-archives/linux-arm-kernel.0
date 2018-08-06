@@ -1,78 +1,180 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  6 Aug 2018 14:41:54 +0100
-Subject: [PATCH 12/13] coresight: dynamic-replicator: Claim device for use
+Date: Mon,  6 Aug 2018 14:41:50 +0100
+Subject: [PATCH 08/13] coresight: Add support for CLAIM tag protocol
 In-Reply-To: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
 References: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1533562915-21558-13-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1533562915-21558-9-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use CLAIM protocol to make sure the device is available for use.
+Add support for the CLAIM tag protocol for negotiating the
+device ownership with other agents trying to use the coresight
+component (internal vs. external). The Coresight architecture
+specifies CLAIM tags (managed via CLAIMSET CLAIMCLR registers)
+to negotiate the ownership of the device. PSCI recommends the
+reservation of the bits in CLAIM tags for self-hosted and external
+debug use. This patch implements the protocol for claiming
+the devices before they are actually used.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- .../coresight/coresight-dynamic-replicator.c       | 23 +++++++++++++++++-----
- 1 file changed, 18 insertions(+), 5 deletions(-)
+ drivers/hwtracing/coresight/coresight-priv.h |  7 +++
+ drivers/hwtracing/coresight/coresight.c      | 85 ++++++++++++++++++++++++++++
+ include/linux/coresight.h                    | 20 +++++++
+ 3 files changed, 112 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-index 97f4673..299667b 100644
---- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-@@ -41,8 +41,11 @@ static void replicator_reset(struct replicator_state *drvdata)
- {
- 	CS_UNLOCK(drvdata->base);
+diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+index c11da55..579f349 100644
+--- a/drivers/hwtracing/coresight/coresight-priv.h
++++ b/drivers/hwtracing/coresight/coresight-priv.h
+@@ -25,6 +25,13 @@
+ #define CORESIGHT_DEVID		0xfc8
+ #define CORESIGHT_DEVTYPE	0xfcc
  
--	writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER0);
--	writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER1);
-+	if (!coresight_claim_device_unlocked(drvdata->base)) {
-+		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER0);
-+		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER1);
-+		coresight_disclaim_device_unlocked(drvdata->base);
-+	}
- 
- 	CS_LOCK(drvdata->base);
- }
-@@ -50,6 +53,7 @@ static void replicator_reset(struct replicator_state *drvdata)
- static int replicator_enable(struct coresight_device *csdev, int inport,
- 			      int outport)
- {
-+	int rc = 0;
- 	u32 reg;
- 	struct replicator_state *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -67,13 +71,19 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
- 
- 	CS_UNLOCK(drvdata->base);
- 
-+	if ((readl_relaxed(drvdata->base + REPLICATOR_IDFILTER0) == 0xff) &&
-+	    (readl_relaxed(drvdata->base + REPLICATOR_IDFILTER1) == 0xff))
-+		rc = coresight_claim_device_unlocked(drvdata->base);
- 
- 	/* Ensure that the outport is enabled. */
--	writel_relaxed(0x00, drvdata->base + reg);
-+	if (!rc) {
-+		writel_relaxed(0x00, drvdata->base + reg);
-+		dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
-+	}
 +
- 	CS_LOCK(drvdata->base);
++/*
++ * Coresight device CLAIM protocol.
++ * See PSCI - ARM DEN 0022D, Section: 6.8.1 Debug and Trace save and restore.
++ */
++#define CORESIGHT_CLAIM_SELF_HOSTED	BIT(1)
++
+ #define TIMEOUT_US		100
+ #define BMVAL(val, lsb, msb)	((val & GENMASK(msb, lsb)) >> lsb)
  
--	dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
--	return 0;
-+	return rc;
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index e73ca6a..8f06866 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -128,6 +128,91 @@ static int coresight_find_link_outport(struct coresight_device *csdev,
+ 	return -ENODEV;
  }
  
- static void replicator_disable(struct coresight_device *csdev, int inport,
-@@ -99,6 +109,9 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
- 	/* disable the flow of ATB data through port */
- 	writel_relaxed(0xff, drvdata->base + reg);
++static inline u32 coresight_read_claim_tags(void __iomem *base)
++{
++	return readl_relaxed(base + CORESIGHT_CLAIMCLR);
++}
++
++static inline bool coresight_is_claimed_self_hosted(void __iomem *base)
++{
++	return coresight_read_claim_tags(base) == CORESIGHT_CLAIM_SELF_HOSTED;
++}
++
++static inline bool coresight_is_claimed_any(void __iomem *base)
++{
++	return coresight_read_claim_tags(base) != 0;
++}
++
++static inline void coresight_set_claim_tags(void __iomem *base)
++{
++	writel_relaxed(CORESIGHT_CLAIM_SELF_HOSTED, base + CORESIGHT_CLAIMSET);
++	isb();
++}
++
++static inline void coresight_clear_claim_tags(void __iomem *base)
++{
++	writel_relaxed(CORESIGHT_CLAIM_SELF_HOSTED, base + CORESIGHT_CLAIMCLR);
++	isb();
++}
++
++/*
++ * coresight_claim_device_unlocked : Claim the device for self-hosted usage
++ * to prevent an external tool from touching this device. As per PSCI
++ * standards, section "Preserving the execution context" => "Debug and Trace
++ * save and Restore", DBGCLAIM[1] is reserved for Self-hosted debug/trace and
++ * DBGCLAIM[0] is reserved for external tools.
++ *
++ * Called with CS_UNLOCKed for the component.
++ * Returns : 0 on success
++ */
++int coresight_claim_device_unlocked(void __iomem *base)
++{
++	if (coresight_is_claimed_any(base))
++		return -EBUSY;
++
++	coresight_set_claim_tags(base);
++	if (coresight_is_claimed_self_hosted(base))
++		return 0;
++	/* There was a race setting the tags, clean up and fail */
++	coresight_clear_claim_tags(base);
++	return -EBUSY;
++}
++
++int coresight_claim_device(void __iomem *base)
++{
++	int rc;
++
++	CS_UNLOCK(base);
++	rc = coresight_claim_device_unlocked(base);
++	CS_LOCK(base);
++
++	return rc;
++}
++
++/*
++ * coresight_disclaim_device_unlocked : Clear the claim tags for the device.
++ * Called with CS_UNLOCKed for the component.
++ */
++void coresight_disclaim_device_unlocked(void __iomem *base)
++{
++
++	if (coresight_is_claimed_self_hosted(base))
++		coresight_clear_claim_tags(base);
++	else
++		/*
++		 * Either we or the external agent doesn't follow
++		 * the protocol.
++		 */
++		WARN_ON_ONCE(1);
++}
++
++void coresight_disclaim_device(void __iomem *base)
++{
++	CS_UNLOCK(base);
++	coresight_disclaim_device_unlocked(base);
++	CS_LOCK(base);
++}
++
+ static int coresight_enable_sink(struct coresight_device *csdev,
+ 				 u32 mode, void *data)
+ {
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index 5353582..16151a2 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -257,6 +257,13 @@ extern int coresight_enable(struct coresight_device *csdev);
+ extern void coresight_disable(struct coresight_device *csdev);
+ extern int coresight_timeout(void __iomem *addr, u32 offset,
+ 			     int position, int value);
++
++extern int coresight_claim_device(void __iomem *base);
++extern int coresight_claim_device_unlocked(void __iomem *base);
++
++extern void coresight_disclaim_device(void __iomem *base);
++extern void coresight_disclaim_device_unlocked(void __iomem *base);
++
+ #else
+ static inline struct coresight_device *
+ coresight_register(struct coresight_desc *desc) { return NULL; }
+@@ -266,6 +273,19 @@ coresight_enable(struct coresight_device *csdev) { return -ENOSYS; }
+ static inline void coresight_disable(struct coresight_device *csdev) {}
+ static inline int coresight_timeout(void __iomem *addr, u32 offset,
+ 				     int position, int value) { return 1; }
++static inline int coresight_claim_device_unlocked(void __iomem *base)
++{
++	return 0;
++}
++
++static inline int coresight_claim_device(void __iomem *base)
++{
++	return 0;
++}
++
++static inline void coresight_disclaim_device(void __iomem *base) {}
++static inline void coresight_disclaim_device_unlocked(void __iomem *base) {}
++
+ #endif
  
-+	if ((readl_relaxed(drvdata->base + REPLICATOR_IDFILTER0) == 0xff) &&
-+	    (readl_relaxed(drvdata->base + REPLICATOR_IDFILTER1) == 0xff))
-+		coresight_disclaim_device_unlocked(drvdata->base);
- 	CS_LOCK(drvdata->base);
- 
- 	dev_dbg(drvdata->dev, "REPLICATOR disabled\n");
+ #ifdef CONFIG_OF
 -- 
 2.7.4
