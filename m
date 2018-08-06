@@ -1,52 +1,132 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Mon, 6 Aug 2018 19:54:32 +0800
-Subject: [PATCH v2 11/15] drm/mediatek: add callback function to return
- OVL layer number
-In-Reply-To: <1533273092.31144.7.camel@mtksdaap41>
+Date: Mon, 6 Aug 2018 19:55:45 +0800
+Subject: [PATCH v2 13/15] drm/mediatek: use layer_nr function to get
+ layer number to init plane
+In-Reply-To: <1533274405.31144.16.camel@mtksdaap41>
 References: <1533265868-28110-1-git-send-email-stu.hsieh@mediatek.com>
- <1533265868-28110-12-git-send-email-stu.hsieh@mediatek.com>
- <1533273092.31144.7.camel@mtksdaap41>
-Message-ID: <1533556472.11190.71.camel@mtksdccf07>
+ <1533265868-28110-14-git-send-email-stu.hsieh@mediatek.com>
+ <1533274405.31144.16.camel@mtksdaap41>
+Message-ID: <1533556545.11190.72.camel@mtksdccf07>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi, CK:
-On Fri, 2018-08-03 at 13:11 +0800, CK Hu wrote:
+On Fri, 2018-08-03 at 13:33 +0800, CK Hu wrote:
 > Hi, Stu:
 > 
 > On Fri, 2018-08-03 at 11:11 +0800, Stu Hsieh wrote:
-> > This patch add callback function to return OVL layer number
+> > This patch use layer_nr function to get layer number to init plane
+> > 
+> > When plane init in crtc create,
+> > it use the number of OVL layer to init plane.
+> > That's OVL can read 4 memory address.
+> > 
+> > For mt2712 third ddp, it use RDMA to read memory.
+> > RDMA can read 1 memory address, so it just init one plane.
+> > 
+> > For compatibility, this patch use mtk_ddp_comp_layer_nr function
+> > to get layer number from their HW component in ddp for plane init.
 > > 
 > > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 > > ---
-> >  drivers/gpu/drm/mediatek/mtk_disp_ovl.c | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
+> >  drivers/gpu/drm/mediatek/mtk_drm_crtc.c | 26 ++++++++++++++++++--------
+> >  drivers/gpu/drm/mediatek/mtk_drm_crtc.h |  2 +-
+> >  2 files changed, 19 insertions(+), 9 deletions(-)
 > > 
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> > index 978782a77629..a42cfa057f42 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> > @@ -58,6 +58,7 @@
-> >  struct mtk_disp_ovl_data {
-> >  	unsigned int addr;
-> >  	bool fmt_rgb565_is_0;
-> > +	unsigned int layer_nr;
-> >  };
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> > index 4bf636e466f2..b4d3dfca4003 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> > @@ -45,7 +45,8 @@ struct mtk_drm_crtc {
+> >  	bool				pending_needs_vblank;
+> >  	struct drm_pending_vblank_event	*event;
 > >  
-> >  /**
-> > @@ -132,6 +133,13 @@ static void mtk_ovl_config(struct mtk_ddp_comp *comp, unsigned int w,
-> >  	writel(0x0, comp->regs + DISP_REG_OVL_RST);
-> >  }
-> >  
-> > +static unsigned int mtk_ovl_layer_nr(struct mtk_ddp_comp *comp)
-> > +{
-> > +	struct mtk_disp_ovl *ovl = comp_to_ovl(comp);
-> > +
-> > +	return ovl->data->layer_nr;
+> > -	struct drm_plane		planes[OVL_LAYER_NR];
+> > +	struct drm_plane		planes[MAX_LAYER_NR];
 > 
-> For now, MT8173, MT2712, MT2701 OVL all has 4 layer, so you could return
-> 4 here. Once a SoC OVL has another layer number, then modified the code
-> to this statement.
+> For the RDMA crtc, there is only one plane but here allocate 4 planes. I
+> would like the array size is depend on layer_nr to prevent wasting
+> memory.
+> 
+OK
+
+> > +	unsigned int			layer_nr;
+> >  	bool				pending_planes;
+> >  
+> >  	void __iomem			*config_regs;
+> > @@ -286,7 +287,7 @@ static int mtk_crtc_ddp_hw_init(struct mtk_drm_crtc *mtk_crtc)
+> >  	}
+> >  
+> >  	/* Initially configure all planes */
+> > -	for (i = 0; i < OVL_LAYER_NR; i++) {
+> > +	for (i = 0; i < mtk_crtc->layer_nr; i++) {
+> >  		struct drm_plane *plane = &mtk_crtc->planes[i];
+> >  		struct mtk_plane_state *plane_state;
+> >  
+> > @@ -351,7 +352,7 @@ static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
+> >  	}
+> >  
+> >  	if (mtk_crtc->pending_planes) {
+> > -		for (i = 0; i < OVL_LAYER_NR; i++) {
+> > +		for (i = 0; i < mtk_crtc->layer_nr; i++) {
+> >  			struct drm_plane *plane = &mtk_crtc->planes[i];
+> >  			struct mtk_plane_state *plane_state;
+> >  
+> > @@ -403,7 +404,7 @@ static void mtk_drm_crtc_atomic_disable(struct drm_crtc *crtc,
+> >  		return;
+> >  
+> >  	/* Set all pending plane state to disabled */
+> > -	for (i = 0; i < OVL_LAYER_NR; i++) {
+> > +	for (i = 0; i < mtk_crtc->layer_nr; i++) {
+> >  		struct drm_plane *plane = &mtk_crtc->planes[i];
+> >  		struct mtk_plane_state *plane_state;
+> >  
+> > @@ -450,7 +451,7 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+> >  
+> >  	if (mtk_crtc->event)
+> >  		mtk_crtc->pending_needs_vblank = true;
+> > -	for (i = 0; i < OVL_LAYER_NR; i++) {
+> > +	for (i = 0; i < mtk_crtc->layer_nr; i++) {
+> >  		struct drm_plane *plane = &mtk_crtc->planes[i];
+> >  		struct mtk_plane_state *plane_state;
+> >  
+> > @@ -596,6 +597,9 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+> >  			goto unprepare;
+> >  		}
+> >  
+> > +		if (i == 0)
+> > +			mtk_crtc->layer_nr = mtk_ddp_comp_layer_nr(comp);
+> > +
+> >  		if (i == 0 && (comp_id == DDP_COMPONENT_RDMA0 ||
+> >  			       comp_id == DDP_COMPONENT_RDMA1 ||
+> >  			       comp_id == DDP_COMPONENT_RDMA2)) {
+> > @@ -606,7 +610,7 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+> >  		mtk_crtc->ddp_comp[i] = comp;
+> >  	}
+> >  
+> > -	for (zpos = 0; zpos < OVL_LAYER_NR; zpos++) {
+> > +	for (zpos = 0; zpos < mtk_crtc->layer_nr; zpos++) {
+> >  		type = (zpos == 0) ? DRM_PLANE_TYPE_PRIMARY :
+> >  				(zpos == 1) ? DRM_PLANE_TYPE_CURSOR :
+> >  						DRM_PLANE_TYPE_OVERLAY;
+> > @@ -616,8 +620,14 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+> >  			goto unprepare;
+> >  	}
+> >  
+> > -	ret = mtk_drm_crtc_init(drm_dev, mtk_crtc, &mtk_crtc->planes[0],
+> > -				&mtk_crtc->planes[1], pipe);
+> > +	if (mtk_crtc->layer_nr == 1) {
+> > +		ret = mtk_drm_crtc_init(drm_dev, mtk_crtc, &mtk_crtc->planes[0],
+> > +					NULL, pipe);
+> > +	} else {
+> > +		ret = mtk_drm_crtc_init(drm_dev, mtk_crtc, &mtk_crtc->planes[0],
+> > +					&mtk_crtc->planes[1], pipe);
+> > +	}
+> 
+> You could write as
+> 
+> ret = mtk_drm_crtc_init(drm_dev, mtk_crtc, &mtk_crtc->planes[0],
+> 			mtk_crtc->layer_nr > 1 ? &mtk_crtc->planes[1] : NULL, pipe);
 > 
 > Regards,
 > CK
@@ -55,27 +135,22 @@ OK
 
 Regards,
 Stu
-
-> > +}
 > > +
-> >  static void mtk_ovl_layer_on(struct mtk_ddp_comp *comp, unsigned int idx)
-> >  {
-> >  	unsigned int reg;
-> > @@ -221,6 +229,7 @@ static const struct mtk_ddp_comp_funcs mtk_disp_ovl_funcs = {
-> >  	.stop = mtk_ovl_stop,
-> >  	.enable_vblank = mtk_ovl_enable_vblank,
-> >  	.disable_vblank = mtk_ovl_disable_vblank,
-> > +	.layer_nr = mtk_ovl_layer_nr,
-> >  	.layer_on = mtk_ovl_layer_on,
-> >  	.layer_off = mtk_ovl_layer_off,
-> >  	.layer_config = mtk_ovl_layer_config,
-> > @@ -319,6 +328,7 @@ static const struct mtk_disp_ovl_data mt2701_ovl_driver_data = {
-> >  static const struct mtk_disp_ovl_data mt8173_ovl_driver_data = {
-> >  	.addr = DISP_REG_OVL_ADDR_MT8173,
-> >  	.fmt_rgb565_is_0 = true,
-> > +	.layer_nr = 4,
-> >  };
+> >  	if (ret < 0)
+> >  		goto unprepare;
+> >  	drm_mode_crtc_set_gamma_size(&mtk_crtc->base, MTK_LUT_SIZE);
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.h b/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
+> > index 9d9410c67ae9..0399321b1414 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
+> > @@ -18,7 +18,7 @@
+> >  #include "mtk_drm_ddp_comp.h"
+> >  #include "mtk_drm_plane.h"
 > >  
-> >  static const struct of_device_id mtk_disp_ovl_driver_dt_match[] = {
+> > -#define OVL_LAYER_NR	4
+> > +#define MAX_LAYER_NR	4
+> >  #define MTK_LUT_SIZE	512
+> >  #define MTK_MAX_BPC	10
+> >  #define MTK_MIN_BPC	3
 > 
 > 
