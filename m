@@ -1,79 +1,248 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 6 Aug 2018 14:53:07 +0200
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
- <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
- <20180803094129.GB17798@arm.com>
- <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
- <alpine.LRH.2.02.1808031424140.14030@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3s-+Qf=WBZz1KpisDMG3520jCUh8PLAO3PHa4jdt8kCTw@mail.gmail.com>
- <CAKv+Gu9_h-WFi1j4+DWUN_dMj75SKKHxWoDH8WQ9P7S7MNpZQg@mail.gmail.com>
- <alpine.LRH.2.02.1808060553130.30832@file01.intranet.prod.int.rdu2.redhat.com>
- <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
-Message-ID: <CAKv+Gu_UZmq=6juE98ceXgJ1KCgvzncYbzYiC2Uz+6mhf6yMpw@mail.gmail.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Mon, 6 Aug 2018 15:03:24 +0200
+Subject: [RFC PATCH 09/16] KVM: arm64: Allow ID registers to by
+ dynamically read-as-zero
+In-Reply-To: <1529593060-542-10-git-send-email-Dave.Martin@arm.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-10-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180806130324.GA5985@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2018 at 14:42, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 06/08/18 11:25, Mikulas Patocka wrote:
-> [...]
->>>
->>> None of this explains why some transactions fail to make it across
->>> entirely. The overlapping writes in question write the same data to
->>> the memory locations that are covered by both, and so the ordering in
->>> which the transactions are received should not affect the outcome.
->>
->>
->> You're right that the corruption couldn't be explained just by reordering
->> writes. My hypothesis is that the PCIe controller tries to disambiguate
->> the overlapping writes, but the disambiguation logic was not tested and it
->> is buggy. If there's a barrier between the overlapping writes, the PCIe
->> controller won't see any overlapping writes, so it won't trigger the
->> faulty disambiguation logic and it works.
->>
->> Could the ARM engineers look if there's some chicken bit in Cortex-A72
->> that could insert barriers between non-cached writes automatically?
->
->
-> I don't think there is, and even if there was I imagine it would have a
-> pretty hideous effect on non-coherent DMA buffers and the various other
-> places in which we have Normal-NC mappings of actual system RAM.
->
->> I observe these kinds of corruptions:
->> - failing to write a few bytes
->
->
-> That could potentially be explained by the reordering/atomicity issues Matt
-> mentioned, i.e. the load is observing part of the store, before the store
-> has fully completed.
->
+Hi Dave,
 
-OK, so that means the unaligned transaction gets split, and the
-subtransactions are reordered with the aligned transaction so that the
-sub-writes contain stale values from the sub-reads?
+I think there's a typo in the subject "to be" rather than "to by".
 
->> - writing a few bytes that were written 16 bytes before
->> - writing a few bytes that were written 16 bytes after
->
->
-> Those sound more like the interconnect or root complex ignoring the byte
-> strobes on an unaligned burst, of which I think the simplistic view would be
-> "it's broken".
->
-> FWIW I stuck my old Nvidia 7600GT card in my Arm Juno r2 board (2x
-> Cortex-A72), built your test program natively with GCC 8.1.1 at -O2, and
-> it's still happily flickering pixels in the corner of the console after
-> nearly an hour (in parallel with some iperf3 just to ensure plenty of PCIe
-> traffic). I would strongly suspect this issue is particular to Armada 8k, so
-> its' probably one for the Marvell folks to take a closer look at - I believe
-> some previous interconnect issues on those SoCs were actually fixable in
-> firmware.
->
+On Thu, Jun 21, 2018 at 03:57:33PM +0100, Dave Martin wrote:
+> When a feature-dependent ID register is hidden from the guest, it
+> needs to exhibit read-as-zero behaviour as defined by the Arm
+> architecture, rather than appearing to be entirely absent.
+> 
+> This patch updates the ID register emulation logic to make use of
+> the new check_present() method to determine whether the register
+> should read as zero instead of yielding the host's sanitised
+> value.  Because currently a false result from this method truncates
+> the trap call chain before the sysreg's emulate method() is called,
+> a flag is added to distinguish this special case, and helpers are
+> refactored appropriately.
 
-IIRC that was DVM dropping a few VA bits at the top, and a single MMIO
-control bit to put it back into 'non-broken' mode.
+I don't understand this last sentence.
+
+And I'm not really sure I understand the code either.
+
+I can't seem to see any registers which are defined as !present && !raz,
+which is what I thought this feature was all about.
+
+In other words, what is the benefit of this more generic method as
+opposed to having a wrapper around read_id_reg() for read_sve_id_reg()
+which sets RAZ if there is no support for SVE in this context?
+
+Thanks,
+-Christoffer
+
+> 
+> This invloves some trivial updates to pass the vcpu pointer down
+> into the ID register emulation/access functions.
+> 
+> A new ID_SANITISED_IF() macro is defined for declaring
+> conditionally visible ID registers.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 51 ++++++++++++++++++++++++++++++-----------------
+>  arch/arm64/kvm/sys_regs.h | 11 ++++++++++
+>  2 files changed, 44 insertions(+), 18 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 31a351a..87d2468 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -987,11 +987,17 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
+>  }
+>  
+>  /* Read a sanitised cpufeature ID register by sys_reg_desc */
+> -static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
+> +static u64 read_id_reg(const struct kvm_vcpu *vcpu,
+> +		       struct sys_reg_desc const *r, bool raz)
+>  {
+>  	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
+>  			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
+> -	u64 val = raz ? 0 : read_sanitised_ftr_reg(id);
+> +	u64 val;
+> +
+> +	if (raz || !sys_reg_present(vcpu, r))
+> +		val = 0;
+> +	else
+> +		val = read_sanitised_ftr_reg(id);
+>  
+>  	if (id == SYS_ID_AA64PFR0_EL1) {
+>  		if (val & (0xfUL << ID_AA64PFR0_SVE_SHIFT))
+> @@ -1018,7 +1024,7 @@ static bool __access_id_reg(struct kvm_vcpu *vcpu,
+>  	if (p->is_write)
+>  		return write_to_read_only(vcpu, p, r);
+>  
+> -	p->regval = read_id_reg(r, raz);
+> +	p->regval = read_id_reg(vcpu, r, raz);
+>  	return true;
+>  }
+>  
+> @@ -1047,16 +1053,18 @@ static u64 sys_reg_to_index(const struct sys_reg_desc *reg);
+>   * are stored, and for set_id_reg() we don't allow the effective value
+>   * to be changed.
+>   */
+> -static int __get_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
+> +static int __get_id_reg(const struct kvm_vcpu *vcpu,
+> +			const struct sys_reg_desc *rd, void __user *uaddr,
+>  			bool raz)
+>  {
+>  	const u64 id = sys_reg_to_index(rd);
+> -	const u64 val = read_id_reg(rd, raz);
+> +	const u64 val = read_id_reg(vcpu, rd, raz);
+>  
+>  	return reg_to_user(uaddr, &val, id);
+>  }
+>  
+> -static int __set_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
+> +static int __set_id_reg(const struct kvm_vcpu *vcpu,
+> +			const struct sys_reg_desc *rd, void __user *uaddr,
+>  			bool raz)
+>  {
+>  	const u64 id = sys_reg_to_index(rd);
+> @@ -1068,7 +1076,7 @@ static int __set_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
+>  		return err;
+>  
+>  	/* This is what we mean by invariant: you can't change it. */
+> -	if (val != read_id_reg(rd, raz))
+> +	if (val != read_id_reg(vcpu, rd, raz))
+>  		return -EINVAL;
+>  
+>  	return 0;
+> @@ -1077,33 +1085,40 @@ static int __set_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
+>  static int get_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>  		      const struct kvm_one_reg *reg, void __user *uaddr)
+>  {
+> -	return __get_id_reg(rd, uaddr, false);
+> +	return __get_id_reg(vcpu, rd, uaddr, false);
+>  }
+>  
+>  static int set_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>  		      const struct kvm_one_reg *reg, void __user *uaddr)
+>  {
+> -	return __set_id_reg(rd, uaddr, false);
+> +	return __set_id_reg(vcpu, rd, uaddr, false);
+>  }
+>  
+>  static int get_raz_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>  			  const struct kvm_one_reg *reg, void __user *uaddr)
+>  {
+> -	return __get_id_reg(rd, uaddr, true);
+> +	return __get_id_reg(vcpu, rd, uaddr, true);
+>  }
+>  
+>  static int set_raz_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>  			  const struct kvm_one_reg *reg, void __user *uaddr)
+>  {
+> -	return __set_id_reg(rd, uaddr, true);
+> +	return __set_id_reg(vcpu, rd, uaddr, true);
+>  }
+>  
+>  /* sys_reg_desc initialiser for known cpufeature ID registers */
+> -#define ID_SANITISED(name) {			\
+> +#define __ID_SANITISED(name)			\
+>  	SYS_DESC(SYS_##name),			\
+>  	.access	= access_id_reg,		\
+>  	.get_user = get_id_reg,			\
+> -	.set_user = set_id_reg,			\
+> +	.set_user = set_id_reg
+> +
+> +#define ID_SANITISED(name) { __ID_SANITISED(name) }
+> +
+> +#define ID_SANITISED_IF(name, check) {		\
+> +	__ID_SANITISED(name),			\
+> +	.check_present = check,			\
+> +	.flags = SR_RAZ_IF_ABSENT,		\
+>  }
+>  
+>  /*
+> @@ -1840,7 +1855,7 @@ static int emulate_cp(struct kvm_vcpu *vcpu,
+>  
+>  	r = find_reg(params, table, num);
+>  
+> -	if (likely(r) && sys_reg_present(vcpu, r)) {
+> +	if (likely(r) && sys_reg_present_or_raz(vcpu, r)) {
+>  		perform_access(vcpu, params, r);
+>  		return 0;
+>  	}
+> @@ -2016,7 +2031,7 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
+>  	if (!r)
+>  		r = find_reg(params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
+>  
+> -	if (likely(r) && sys_reg_present(vcpu, r)) {
+> +	if (likely(r) && sys_reg_present_or_raz(vcpu, r)) {
+>  		perform_access(vcpu, params, r);
+>  	} else {
+>  		kvm_err("Unsupported guest sys_reg access at: %lx\n",
+> @@ -2313,7 +2328,7 @@ int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
+>  	if (!r)
+>  		return get_invariant_sys_reg(reg->id, uaddr);
+>  
+> -	if (!sys_reg_present(vcpu, r))
+> +	if (!sys_reg_present_or_raz(vcpu, r))
+>  		return -ENOENT;
+>  
+>  	if (r->get_user)
+> @@ -2337,7 +2352,7 @@ int kvm_arm_sys_reg_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
+>  	if (!r)
+>  		return set_invariant_sys_reg(reg->id, uaddr);
+>  
+> -	if (!sys_reg_present(vcpu, r))
+> +	if (!sys_reg_present_or_raz(vcpu, r))
+>  		return -ENOENT;
+>  
+>  	if (r->set_user)
+> @@ -2408,7 +2423,7 @@ static int walk_one_sys_reg(struct kvm_vcpu *vcpu,
+>  	if (!(rd->reg || rd->get_user))
+>  		return 0;
+>  
+> -	if (!sys_reg_present(vcpu, rd))
+> +	if (!sys_reg_present_or_raz(vcpu, rd))
+>  		return 0;
+>  
+>  	if (!copy_reg_to_user(rd, uind))
+> diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+> index dfbb342..304928f 100644
+> --- a/arch/arm64/kvm/sys_regs.h
+> +++ b/arch/arm64/kvm/sys_regs.h
+> @@ -66,14 +66,25 @@ struct sys_reg_desc {
+>  			const struct kvm_one_reg *reg, void __user *uaddr);
+>  	bool (*check_present)(const struct kvm_vcpu *vpcu,
+>  			      const struct sys_reg_desc *rd);
+> +
+> +	/* OR of SR_* flags */
+> +	unsigned int flags;
+>  };
+>  
+> +#define SR_RAZ_IF_ABSENT	(1 << 0)
+> +
+>  static inline bool sys_reg_present(const struct kvm_vcpu *vcpu,
+>  				   const struct sys_reg_desc *rd)
+>  {
+>  	return likely(!rd->check_present) || rd->check_present(vcpu, rd);
+>  }
+>  
+> +static inline bool sys_reg_present_or_raz(const struct kvm_vcpu *vcpu,
+> +					  const struct sys_reg_desc *rd)
+> +{
+> +	return sys_reg_present(vcpu, rd) || (rd->flags & SR_RAZ_IF_ABSENT);
+> +}
+> +
+>  static inline void print_sys_reg_instr(const struct sys_reg_params *p)
+>  {
+>  	/* Look, we even formatted it for you to paste into the table! */
+> -- 
+> 2.1.4
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
