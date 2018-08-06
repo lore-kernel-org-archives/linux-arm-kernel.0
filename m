@@ -1,66 +1,36 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 6 Aug 2018 14:55:31 +0100
-Subject: [RFC/PoC PATCH 0/3] arm64: basic ROP mitigation
-In-Reply-To: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
-References: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
-Message-ID: <7529eedf-af56-2e94-261e-bc5c86abadaa@arm.com>
+From: MNARANI@xilinx.com (Manish Narani)
+Date: Mon, 6 Aug 2018 13:58:27 +0000
+Subject: [PATCH v4 0/4] EDAC: Enhancements to Synopsys EDAC driver
+In-Reply-To: <20180804163230.GA8157@nazgul.tnic>
+References: <1533374735-16662-1-git-send-email-manish.narani@xilinx.com>
+ <20180804163230.GA8157@nazgul.tnic>
+Message-ID: <SN6PR02MB4959577EB1CE589F980E6A43C1200@SN6PR02MB4959.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/18 14:21, Ard Biesheuvel wrote:
-> This is a proof of concept I cooked up, primarily to trigger a discussion
-> about whether there is a point to doing anything like this, and if there
-> is, what the pitfalls are. Also, while I am not aware of any similar
-> implementations, the idea is so simple that I would be surprised if nobody
-> else thought of the same thing way before I did.
+Hi Boris,
 
-So, "TTBR0 PAN: Pointer Auth edition"? :P
 
-> The idea is that we can significantly limit the kernel's attack surface
-> for ROP based attacks by clearing the stack pointer's sign bit before
-> returning from a function, and setting it again right after proceeding
-> from the [expected] return address. This should make it much more difficult
-> to return to arbitrary gadgets, given that they rely on being chained to
-> the next via a return address popped off the stack, and this is difficult
-> when the stack pointer is invalid.
+> -----Original Message-----
+> From: Borislav Petkov [mailto:bp at alien8.de]
+> Sent: Saturday, August 4, 2018 10:03 PM
+> Subject: Re: [PATCH v4 0/4] EDAC: Enhancements to Synopsys EDAC driver
 > 
-> Of course, 4 additional instructions per function return is not exactly
-> for free, but they are just movs and adds, and leaf functions are
-> disregarded unless they allocate a stack frame (this comes for free
-> because simple_return insns are disregarded by the plugin)
+> On Sat, Aug 04, 2018 at 02:55:31PM +0530, Manish Narani wrote:
+> > This patch series enhances the current EDAC driver to support
+> > different
 > 
-> Please shoot, preferably with better ideas ...
-
-Actually, on the subject of PAN, shouldn't this at least have a very 
-hard dependency on that? AFAICS without PAN clearing bit 55 of SP is 
-effectively giving userspace direct control of the kernel stack (thanks 
-to TBI). Ouch.
-
-I wonder if there's a little  more mileage in using "{add,sub} sp, sp, 
-#1" sequences to rely on stack alignment exceptions instead, with the 
-added bonus that that's about as low as the instruction-level overhead 
-can get.
-
-Robin.
-
+> This one, your 2/4 and 4/4 still says "this patch". Hurried too much?
+> How about slowing down and looking at them with a critical eye?
 > 
-> Ard Biesheuvel (3):
->    arm64: use wrapper macro for bl/blx instructions from asm code
->    gcc: plugins: add ROP shield plugin for arm64
->    arm64: enable ROP protection by clearing SP bit #55 across function
->      returns
+> Also, how about waiting for a week before resending your patches so that you
+> give people chance to review them too?
 > 
->   arch/Kconfig                                  |   4 +
->   arch/arm64/Kconfig                            |  10 ++
->   arch/arm64/include/asm/assembler.h            |  21 +++-
->   arch/arm64/kernel/entry-ftrace.S              |   6 +-
->   arch/arm64/kernel/entry.S                     | 104 +++++++++-------
->   arch/arm64/kernel/head.S                      |   4 +-
->   arch/arm64/kernel/probes/kprobes_trampoline.S |   2 +-
->   arch/arm64/kernel/sleep.S                     |   6 +-
->   drivers/firmware/efi/libstub/Makefile         |   3 +-
->   scripts/Makefile.gcc-plugins                  |   7 ++
->   scripts/gcc-plugins/arm64_rop_shield_plugin.c | 116 ++++++++++++++++++
->   11 files changed, 228 insertions(+), 55 deletions(-)
->   create mode 100644 scripts/gcc-plugins/arm64_rop_shield_plugin.c
-> 
+> While you wait, please read Documentation/process/submitting-patches.rst
+> - it'll help you with the submission modalities.
+
+Yes, I missed it. Sorry for that. I will surely wait for around a week for others to review.
+Thanks for the guidance.
+
+Thanks,
+Manish Narani
