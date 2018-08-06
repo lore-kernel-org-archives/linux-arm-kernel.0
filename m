@@ -1,72 +1,164 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 6 Aug 2018 16:38:41 +0100
-Subject: [RFC/PoC PATCH 0/3] arm64: basic ROP mitigation
-In-Reply-To: <CAKv+Gu9X1CDpy+XvrmbSdjBjMb45eBW7JVsvsK_JQdUt2Dbvgw@mail.gmail.com>
-References: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
- <7529eedf-af56-2e94-261e-bc5c86abadaa@arm.com>
- <CAKv+Gu9X1CDpy+XvrmbSdjBjMb45eBW7JVsvsK_JQdUt2Dbvgw@mail.gmail.com>
-Message-ID: <b0c974a2-4e81-7855-7d4e-22834c5d8997@arm.com>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Mon, 6 Aug 2018 17:39:28 +0200
+Subject: [PATCH v7 2/3] Bluetooth: mediatek: Add protocol support for
+ MediaTek serial devices
+In-Reply-To: <1533319214.3472.187.camel@mtkswgap22>
+References: <cover.1533056925.git.sean.wang@mediatek.com>
+ <c92ed10cf16f36d9a3b390e864af92e2dfe7b771.1533056925.git.sean.wang@mediatek.com>
+ <1707FFA1-A294-4A95-A3BF-0910CE455232@holtmann.org>
+ <1533192799.3472.122.camel@mtkswgap22>
+ <FF45A90A-F9F1-47CB-AB1F-1E92BF587FBE@holtmann.org>
+ <1533199720.3472.136.camel@mtkswgap22>
+ <9526E5D9-50BA-4D57-80F5-083DB7D28AFE@holtmann.org>
+ <1533205495.3472.144.camel@mtkswgap22>
+ <A6D48D49-52CE-405D-8C5D-C4D54CE67221@holtmann.org>
+ <1533303749.3472.160.camel@mtkswgap22>
+ <D2336CD2-B69B-4B5B-8125-F0CAD29E3243@holtmann.org>
+ <1533319214.3472.187.camel@mtkswgap22>
+Message-ID: <7A3537C5-5940-45AD-AB80-77418CCFE130@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/18 15:04, Ard Biesheuvel wrote:
-> On 6 August 2018 at 15:55, Robin Murphy <robin.murphy@arm.com> wrote:
->> On 02/08/18 14:21, Ard Biesheuvel wrote:
->>>
->>> This is a proof of concept I cooked up, primarily to trigger a discussion
->>> about whether there is a point to doing anything like this, and if there
->>> is, what the pitfalls are. Also, while I am not aware of any similar
->>> implementations, the idea is so simple that I would be surprised if nobody
->>> else thought of the same thing way before I did.
->>
->>
->> So, "TTBR0 PAN: Pointer Auth edition"? :P
->>
->>> The idea is that we can significantly limit the kernel's attack surface
->>> for ROP based attacks by clearing the stack pointer's sign bit before
->>> returning from a function, and setting it again right after proceeding
->>> from the [expected] return address. This should make it much more
->>> difficult
->>> to return to arbitrary gadgets, given that they rely on being chained to
->>> the next via a return address popped off the stack, and this is difficult
->>> when the stack pointer is invalid.
->>>
->>> Of course, 4 additional instructions per function return is not exactly
->>> for free, but they are just movs and adds, and leaf functions are
->>> disregarded unless they allocate a stack frame (this comes for free
->>> because simple_return insns are disregarded by the plugin)
->>>
->>> Please shoot, preferably with better ideas ...
->>
->>
->> Actually, on the subject of PAN, shouldn't this at least have a very hard
->> dependency on that? AFAICS without PAN clearing bit 55 of SP is effectively
->> giving userspace direct control of the kernel stack (thanks to TBI). Ouch.
->>
+Hi Sean,
+
+>>>>>>>>>>> +
+>>>>>>>>>>> +static int mtk_hci_wmt_sync(struct hci_dev *hdev, u8 op, u8 flag, u16 plen,
+>>>>>>>>>>> +			    const void *param)
+>>>>>>>>>>> +{
+>>>>>>>>>>> +	struct mtk_hci_wmt_cmd wc;
+>>>>>>>>>>> +	struct mtk_wmt_hdr *hdr;
+>>>>>>>>>>> +	struct sk_buff *skb;
+>>>>>>>>>>> +	u32 hlen;
+>>>>>>>>>>> +
+>>>>>>>>>>> +	hlen = sizeof(*hdr) + plen;
+>>>>>>>>>>> +	if (hlen > 255)
+>>>>>>>>>>> +		return -EINVAL;
+>>>>>>>>>>> +
+>>>>>>>>>>> +	hdr = (struct mtk_wmt_hdr *)&wc;
+>>>>>>>>>>> +	hdr->dir = 1;
+>>>>>>>>>>> +	hdr->op = op;
+>>>>>>>>>>> +	hdr->dlen = cpu_to_le16(plen + 1);
+>>>>>>>>>>> +	hdr->flag = flag;
+>>>>>>>>>>> +	memcpy(wc.data, param, plen);
+>>>>>>>>>>> +
+>>>>>>>>>>> +	atomic_inc(&hdev->cmd_cnt);
+>>>>>>>>>> 
+>>>>>>>>>> Why are you doing this one. It will need a comment here if really needed. However I doubt that this is needed. You are only using it from hdev->setup and hdev->shutdown callbacks.
+>>>>>>>>>> 
+>>>>>>>>> 
+>>>>>>>>> An increment on cmd_cnt is really needed because hci_cmd_work would check whether cmd_cnt is positive and then has a decrement on cmd_cnt before a packet is being sent out.
+>>>>>>>>> 
+>>>>>>>>> okay will add a comment.
+>>>>>>>> 
+>>>>>>>> but you are in ->setup callback this time. So if you need this, then all the other ->setup routines would actually fail as well. Either this is leftover from when you did things in ->probe or ->open or this is some thing we might better fix properly in the core instead of papering over it. Can you recheck if this is really needed.
+>>>>>>>> 
+>>>>>>> 
+>>>>>>> I added a counter print and the counter increments as below
+>>>>>>> 
+>>>>>>> 	/* atomic_inc(&hdev->cmd_cnt); */
+>>>>>>>     pr_info("cmd_cnt = %d\n" , atomic_read(&hdev->cmd_cnt));
+>>>>>>> 
+>>>>>>>     skb = __hci_cmd_sync_ev(hdev, 0xfc6f, hlen, &wc, HCI_VENDOR_PKT,
+>>>>>>>                             HCI_INIT_TIMEOUT);
+>>>>>>> 
+>>>>>>> and the log show up that 
+>>>>>>> 
+>>>>>>> 
+>>>>>>> [  334.049156] Bluetooth: hci0: command 0xfc6f tx timeout
+>>>>>>> [  334.054840] cmd_cnt = 0
+>>>>>>> [  336.065076] Bluetooth: hci0: command 0xfc6f tx timeout
+>>>>>>> [  336.070795] cmd_cnt = 0
+>>>>>>> [  338.080997] Bluetooth: hci0: command 0xfc6f tx timeout
+>>>>>>> [  338.086683] cmd_cnt = 0
+>>>>>>> [  340.096907] Bluetooth: hci0: command 0xfc6f tx timeout
+>>>>>>> [  340.102609] cmd_cnt = 0
+>>>>>>> [  342.112824] Bluetooth: hci0: command 0xfc6f tx timeout
+>>>>>>> [  342.118520] cmd_cnt = 0
+>>>>>>> [  344.128747] Bluetooth: hci0: command 0xfc6f tx timeout
+>>>>>>> [  344.134454] cmd_cnt = 0
+>>>>>>> [  346.144667] Bluetooth: hci0: command 0xfc6f tx timeout
+>>>>>>> [  346.150372] cmd_cnt = 0
+>>>>>>> 
+>>>>>>> 
+>>>>>>> The packet is dropped by hci_cmd_work at [1], so I also wondered why the
+>>>>>>> other vendor driver works, it seems the counter needs to be incremented
+>>>>>>> before every skb is being queued to cmd_q.
+>>>>>>> 
+>>>>>>> 4257 static void hci_cmd_work(struct work_struct *work)
+>>>>>>> 4258 {
+>>>>>>> 4259         struct hci_dev *hdev = container_of(work, struct hci_dev, cmd_work);
+>>>>>>> 4260         struct sk_buff *skb;
+>>>>>>> 4261
+>>>>>>> 4262         BT_DBG("%s cmd_cnt %d cmd queued %d", hdev->name,
+>>>>>>> 4263                atomic_read(&hdev->cmd_cnt), skb_queue_len(&hdev->cmd_q));
+>>>>>>> 4264
+>>>>>>> 4265         /* Send queued commands */
+>>>>>>> 
+>>>>>>> [1]
+>>>>>>> 4266         if (atomic_read(&hdev->cmd_cnt)) { /* dropped when cmd_cnt is zero */
+>>>>>>> 4267                 skb = skb_dequeue(&hdev->cmd_q);
+>>>>>>> 4268                 if (!skb)
+>>>>>>> 4269                         return;
+>>>>>>> 4270
+>>>>>>> 4271                 kfree_skb(hdev->sent_cmd);
+>>>>>>> 4272
+>>>>>>> 4273                 hdev->sent_cmd = skb_clone(skb, GFP_KERNEL);
+>>>>>>> 4274                 if (hdev->sent_cmd) {
+>>>>>>> 4275                         atomic_dec(&hdev->cmd_cnt);  /* cmd_cnt-- */
+>>>>>>> 4276                         hci_send_frame(hdev, skb);
+>>>>>> 
+>>>>>> actually the command also needs to better go via the raw_q anyway since it doesn?t come back with the cmd status or cmd complete. You have it waiting for a vendor event. Maybe with is something we need to consider with __hci_cmd_sync_ev anyway.
+>>>>>> 
+>>>>>> Johan would know best since he wrote that code. Anyway, we should fix that in the core and not have you hack around it.
+>>>>>> 
+>>>>> 
+>>>>> yes, my case is that received event is neither cmd status nor cmd complete. It is completely a vendor event.
+>>>>> 
+>>>>> if it wants to be solved by the core layer, do you permit that I remove the hack and then send it in the next version?
+>>>> 
+>>>> we need to have a __hci_raw_sync_ev that uses the hdev->raw_q and waits for the specified event to come back. I never realized that you are missing the cmd status or cmd complete. So this is similar to the original CSR vendor commands which had the same behavior.
+>>>> 
+>>>> I have the feeling that you hdev->cmd_cnt increment is just hiding the problem here. If you really think that it is not chains any side effects we can merge the driver with a big warning and fix this up. However the clean way would be for you to create a patch that introduces __hci_raw_sync_ev as describe above.
+>>> 
+>>> What do you think of this? If I add extra atomic_set 1 on cmd_cnt after driver really got a vendor event back instead of blinding to increment for every packet sent.
+>>> 
+>>> the behavior is the same to receive a cmd status or complete. it should not have side effects.
+>>> 
+>>> 96         skb = __hci_cmd_sync_ev(hdev, 0xfc6f, hlen, &wc, HCI_VENDOR_PKT,
+>>> 97                                 HCI_INIT_TIMEOUT);
+>>> 98
+>>> 99         if (IS_ERR(skb)) {
+>>> 100                 int err = PTR_ERR(skb);
+>>> 101
+>>> 102                 bt_dev_err(hdev, "Failed to send wmt cmd (%d)", err);
+>>> 103                 return err;
+>>> 104         }
+>>> 105
+>>> 106         if (!test_bit(HCI_RESET, &hdev->flags)) <<<<<<
+>>> 107                 atomic_set(&hdev->cmd_cnt, 1);  <<<<<<
+>>> 108
+>>> 109         kfree_skb(skb);
+>> 
+>> this is even more hackish since the __hci_cmd_sync_ev command is really meant to get a cmd status first before waiting for that event.
+>> 
 > 
-> How's that? Bits 52 .. 54 will still be set, so SP will never contain
-> a valid userland address in any case. Or am I missing something?
-
-Ah, yes, I'd managed to forget about the address hole, but I think that 
-only makes it a bit trickier, rather than totally safe - it feels like 
-you just need to chain one or two returns through "valid" targets until 
-you can hit an epilogue with a "mov sp, x29" (at first glance there are 
-a fair few of those in my vmlinux), after which we're back to the bit 55 
-scheme alone giving no protection against retargeting the stack to a 
-valid TTBR0 address.
-
->> I wonder if there's a little  more mileage in using "{add,sub} sp, sp, #1"
->> sequences to rely on stack alignment exceptions instead, with the added
->> bonus that that's about as low as the instruction-level overhead can get.
->>
+> Understood.
 > 
-> Good point. I did consider that, but couldn't convince myself that it
-> isn't easier to defeat: loads via x29 occur reasonably often, and you
-> can simply offset your doctored stack frame by a single byte.
+> I've stopped the hack in v8. could we merge v8 first ? and then I will a fix up with __hci_raw_sync_ev that uses the hdev->raw_q instead of __hci_cmd_sync_ev in TODO.
 
-True; in theory there are 3072 possible unaligned offsets to choose 
-from, but compile-time randomisation doesn't seem much use, and 
-hotpatching just about every function call in the kernel isn't a nice 
-thought either.
+so I looked into this a bit more. We actually added __hci_cmd_send for a Qualcomm firmware loader that was doing something similar. So instead of trying to add a yet another command to the core, I actually used that and implemented the wait for vendor event in the driver.
 
-Robin.
+You will see my v9 on the mailing list. I also did a bunch of cosmetic minor cleanup and spelling correction. Please test this version. I also make __le16 dlen instead of dlen1 + dlen2 since I think that is what your hardware does.
+
+If this version of the driver works for you then I am happy to merge it. You can then add support for hdev->set_bdaddr and hdev->set_diag in later patches. I also like to clean up the STP receive handler since it can be done a lot simpler and smaller, but that has to wait.
+
+>> Are all Mediatek vendor commands this way? Or just the ones for loading the firmware? So only the WMT ones?
+>> 
+> 
+> Only the WMT ones, WMT commands/events are usually used in system controlling, for example, global function on/off, firmware download, reset and so on. most only appear on device initialization
+
+Since you never checked the result of the vendor event, I opted for just signaling that it arrived. If they can report success or failure, we need to add some extra code for that.
+
+Regards
+
+Marcel
