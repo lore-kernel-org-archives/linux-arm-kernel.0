@@ -1,82 +1,36 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 6 Aug 2018 10:10:22 +0200
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <alpine.LRH.2.02.1808060325110.3756@file01.intranet.prod.int.rdu2.redhat.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
- <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
- <CAJA7tRZbmnZq7RfvQeYEy_a1ZObWqpFpVdvgsXgsioQ3RyPMuA@mail.gmail.com>
- <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
- <11f9185a-7f71-83df-3a57-0a0ae9c1f934@arm.com>
- <alpine.LRH.2.02.1808032046540.24748@file01.intranet.prod.int.rdu2.redhat.com>
- <CA+=Sn1=6F-fGLmXE0VqQHTqTCUKUT=Fz29mMT7349SPFisbZ9A@mail.gmail.com>
- <alpine.LRH.2.02.1808040611070.23762@file01.intranet.prod.int.rdu2.redhat.com>
- <fd2cae87-b2df-d8ef-8836-e6cbf8c5f851@redhat.com>
- <alpine.LRH.2.02.1808060325110.3756@file01.intranet.prod.int.rdu2.redhat.com>
-Message-ID: <CAKv+Gu_y6La77sWOSROrwfRy65jrFVYVvRZt+ewNheYhdhHCkQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 06 Aug 2018 10:10:15 +0200
+Subject: [PATCH v0] clk: rockchip: Add pclk_rkpwm_pmu to PMU critical
+ clocks in rk3399
+In-Reply-To: <1533367862-7212-1-git-send-email-djw@t-chip.com.cn>
+References: <1533367862-7212-1-git-send-email-djw@t-chip.com.cn>
+Message-ID: <2499930.7n9Q7JauMx@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2018 at 10:02, Mikulas Patocka <mpatocka@redhat.com> wrote:
->
->
-> On Sun, 5 Aug 2018, Florian Weimer wrote:
->
->> On 08/04/2018 01:04 PM, Mikulas Patocka wrote:
->> > There's plenty of memcpy's in the graphics stack. No one will be rewriting
->> > all the graphics drivers because of tiny market share that ARM has in
->> > desktop computers. So if you refuse to fix things and blame everyone else,
->> > you can as well announce that you don't want to have PCIe graphics on ARM
->> > at all.
->>
->> The POWER toolchain maintainers said pretty much the same thing not too
->> long ago. I wonder how many architectures need to fail until the
->> graphics stack is finally fixed.
->>
->> Thanks,
->> Florian
->
-> If you say that your architecture doesn't support unaligned accesses at
-> all, there's no problem - the compiler won't generate them and the libc
-> won't contain them.
->
-> But if you say that your architecture supports unaligned accesses except
-> for the framebuffer, then you have a problem - the compiler can't know
-> which pointers point to the framebuffer and libc can't know either - you
-> caused this problem by your architectural decision.
->
-> You can use 'volatile' to suppress memory optimizations, but it's
-> impossible to go through the whole Linux graphics stack and add volatile
-> to every pointer that may point to videoram. Even if you succeesed, new
-> videoram accesses without volatile will appear after a year of
-> development.
->
-> See for example the macros READ_ONCE and WRITE_ONCE in Linux kernel - they
-> should be used when there's concurrent access to the particular variable,
-> but mainstream architectures don't require them, so many kernel developers
-> are omitting them in their code.
->
-> If you are building a supercomputer with a particular GPU, you can force
-> the GPU vendor to provide POWER-compliant drivers. If you are building a
-> workstation where the user can plug any GPU, forcing developers will go
-> nowhere. You have to emulate the unaligned accesses and make sure that the
-> next versions of your architecture support them in hardware.
->
+Hi Levin,
 
-I have the feeling this discussion is going off the rails again.
+Am Samstag, 4. August 2018, 09:31:02 CEST schrieb djw at t-chip.com.cn:
+> From: Levin Du <djw@t-chip.com.cn>
+> 
+> PWM2 is commonly used to control voltage of PWM regulator of VDD_LOG in
+> RK3399. On the Firefly-RK3399 board, PWM2 outputs 40 KHz square wave
+> from power on and the VDD_LOG is about 0.9V. When the kernel boots
+> normally into the system, the PWM2 keeps outputing PWM signal.
+> 
+> But the kernel hangs randomly after "Starting kernel ..." line on that
+> board. When it happens, PWM2 outputs high level which causes VDD_LOG
+> drops to 0.4V below the normal operating voltage.
+> 
+> By adding "pclk_rkpwm_pmu" to the rk3399_pmucru_critical_clocks array,
+> PWM clock is ensured to be prepared at startup and the PWM2 output is
+> normal. After repeated tests, the early boot hang is gone.
+> 
+> This patch works on both Firefly-RK3399 and ROC-RK3399-PC boards.
+> 
+> Signed-off-by: Levin Du <djw@t-chip.com.cn>
 
-The original report is about corruption when doing overlapping writes.
-Matt Sealey said you cannot have PCI outbound windows with memory
-semantics on ARM, and so you should be using device mappings (which do
-not tolerate unaligned accesses)
+applied to my clk-branch
 
-In this context, 'device mapping' does not mean 'any non-DRAM region',
-but it refers to a particular type of MMU mapping attribute defined by
-the ARM architecture.
-
-I think we can all agree that memcpy() should be usable on any region
-of memory that has true memory semantics, even if it is backed by VRAM
-on a graphics card.
-
-The question is if PCIe can provide such regions on ARM.
+Thanks for tracking that down
+Heiko
