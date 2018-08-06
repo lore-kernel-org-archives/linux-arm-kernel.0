@@ -1,91 +1,144 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 6 Aug 2018 21:54:32 +0200
-Subject: [RFC/PoC PATCH 0/3] arm64: basic ROP mitigation
-In-Reply-To: <CAGXu5j+Tddmp_VgyvwTd+StEGtx=oGofeY+KpLD4OuPw+2=S2Q@mail.gmail.com>
-References: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
- <7529eedf-af56-2e94-261e-bc5c86abadaa@arm.com>
- <CAKv+Gu9X1CDpy+XvrmbSdjBjMb45eBW7JVsvsK_JQdUt2Dbvgw@mail.gmail.com>
- <b0c974a2-4e81-7855-7d4e-22834c5d8997@arm.com>
- <CAKv+Gu_ZzDbWwHVwOuoheXeN-ta_FjOT4Aj15=r56QZVTUK0FA@mail.gmail.com>
- <CAKv+Gu_wGk2Gdzd6WuOMZqz1tKHAWHL7pWm2Szyt0DZwPTCmOw@mail.gmail.com>
- <31443e6a-56b4-c4fb-82b1-b8eb5d7eebe1@arm.com>
- <CAGXu5jLj=KP038d-c+xzCx=Oogn1prH__oryQjNZZwNaAHaAAw@mail.gmail.com>
- <CAKv+Gu-9M0yO-rSXiREs11feEro0mJFcNN3Wkp_LSOGrKKd5dg@mail.gmail.com>
- <CAGXu5j+Tddmp_VgyvwTd+StEGtx=oGofeY+KpLD4OuPw+2=S2Q@mail.gmail.com>
-Message-ID: <CAKv+Gu-5ERHvqgXHR626QzKCZJPc0Cp5Ktv+gwucep5ZGvu9Vw@mail.gmail.com>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Mon, 6 Aug 2018 15:54:33 -0400 (EDT)
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <CAKv+Gu_8Rq6X24ZOYvG7+kQQGSGYAZuu_co4k1nJS8K7rkrWMA@mail.gmail.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
+ <20180803094129.GB17798@arm.com>
+ <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
+ <alpine.LRH.2.02.1808031424140.14030@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAHCPf3s-+Qf=WBZz1KpisDMG3520jCUh8PLAO3PHa4jdt8kCTw@mail.gmail.com>
+ <CAKv+Gu9_h-WFi1j4+DWUN_dMj75SKKHxWoDH8WQ9P7S7MNpZQg@mail.gmail.com>
+ <alpine.LRH.2.02.1808060553130.30832@file01.intranet.prod.int.rdu2.redhat.com>
+ <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
+ <CAKv+Gu_C2g=C=gMpk4a5jpDORnxZY6t1v=HDoy59m5vwNBxBBg@mail.gmail.com>
+ <alpine.LRH.2.02.1808061306490.12989@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu_8Rq6X24ZOYvG7+kQQGSGYAZuu_co4k1nJS8K7rkrWMA@mail.gmail.com>
+Message-ID: <alpine.LRH.2.02.1808061552090.11930@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2018 at 21:50, Kees Cook <keescook@chromium.org> wrote:
-> On Mon, Aug 6, 2018 at 12:35 PM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 6 August 2018 at 20:49, Kees Cook <keescook@chromium.org> wrote:
->>> On Mon, Aug 6, 2018 at 10:45 AM, Robin Murphy <robin.murphy@arm.com> wrote:
->>>> I guess what I'm getting at is that if the protection mechanism is "always
->>>> return with SP outside TTBR1", there seems little point in going through the
->>>> motions if SP in TTBR0 could still be valid and allow an attack to succeed
->>>> anyway; this is basically just me working through a justification for saying
->>>> the proposed scheme needs "depends on ARM64_PAN || ARM64_SW_TTBR0_PAN",
->>>> making it that much uglier for v8.0 CPUs...
->>>
->>> I think anyone with v8.0 CPUs interested in this mitigation would also
->>> very much want PAN emulation. If a "depends on" isn't desired, what
->>> about "imply" in the Kconfig?
->>>
->>
->> Yes, but actually, using bit #0 is maybe a better alternative in any
->> case. You can never dereference SP with bit #0 set, regardless of
->> whether the address points to user or kernel space, and my concern
->> about reloading sp from x29 doesn't really make sense, given that x29
->> is always assigned from sp right after pushing x29 and x30 in the
->> function prologue, and sp only gets restored from x29 in the epilogue
->> when there is a stack frame to begin with, in which case we add #1 to
->> sp again before returning from the function.
->
-> Fair enough! :)
->
->> The other code gets a lot cleaner as well.
->>
->> So for the return we'll have
->>
->>   ldp     x29, x30, [sp], #nn
->>>>add     sp, sp, #0x1
->>   ret
->>
->> and for the function call
->>
->>   bl      <foo>
->>>>mov      x30, sp
->>>>bic     sp, x30, #1
->>
->> The restore sequence in entry.s:96 (which has no spare registers) gets
->> much simpler as well:
->>
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -95,6 +95,15 @@ alternative_else_nop_endif
->>          */
->>         add     sp, sp, x0      // sp' = sp + x0
->>         sub     x0, sp, x0      // x0' = sp' - x0 = (sp + x0) - x0 = sp
->> +#ifdef CONFIG_ARM64_ROP_SHIELD
->> +       tbnz    x0, #0, 1f
->> +       .subsection     1
->> +1:     sub     x0, x0, #1
->> +       sub     sp, sp, #1
->> +       b       2f
->> +       .previous
->> +2:
->> +#endif
->>         tbnz    x0, #THREAD_SHIFT, 0f
->>         sub     x0, sp, x0      // x0'' = sp' - x0' = (sp + x0) - sp = x0
->>         sub     sp, sp, x0      // sp'' = sp' - x0 = (sp + x0) - x0 = sp
->
-> I get slightly concerned about "add" vs "clear bit", but I don't see a
-> real way to chain a lot of "add"s to get to avoid the unaligned
-> access. Is "or" less efficient than "add"?
->
 
-Yes. The stack pointer is special on arm64, and can only be used with
-a limited set of ALU instructions. So orring #1 would involve 'mov
-<reg>, sp ; orr sp, <reg>, #1' like in the 'bic' case above, which
-requires a scratch register as well.
+
+On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
+
+> On 6 August 2018 at 19:09, Mikulas Patocka <mpatocka@redhat.com> wrote:
+> >
+> >
+> > On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
+> >
+> >> On 6 August 2018 at 14:42, Robin Murphy <robin.murphy@arm.com> wrote:
+> >> > On 06/08/18 11:25, Mikulas Patocka wrote:
+> >> > [...]
+> >> >>>
+> >> >>> None of this explains why some transactions fail to make it across
+> >> >>> entirely. The overlapping writes in question write the same data to
+> >> >>> the memory locations that are covered by both, and so the ordering in
+> >> >>> which the transactions are received should not affect the outcome.
+> >> >>
+> >> >>
+> >> >> You're right that the corruption couldn't be explained just by reordering
+> >> >> writes. My hypothesis is that the PCIe controller tries to disambiguate
+> >> >> the overlapping writes, but the disambiguation logic was not tested and it
+> >> >> is buggy. If there's a barrier between the overlapping writes, the PCIe
+> >> >> controller won't see any overlapping writes, so it won't trigger the
+> >> >> faulty disambiguation logic and it works.
+> >> >>
+> >> >> Could the ARM engineers look if there's some chicken bit in Cortex-A72
+> >> >> that could insert barriers between non-cached writes automatically?
+> >> >
+> >> >
+> >> > I don't think there is, and even if there was I imagine it would have a
+> >> > pretty hideous effect on non-coherent DMA buffers and the various other
+> >> > places in which we have Normal-NC mappings of actual system RAM.
+> >> >
+> >>
+> >> Looking at the A72 manual, there is one chicken bit that looks like it
+> >> may be related:
+> >>
+> >> CPUACTLR_EL1 bit #50:
+> >>
+> >> 0 Enables store streaming on NC/GRE memory type. This is the reset value.
+> >> 1 Disables store streaming on NC/GRE memory type.
+> >>
+> >> so putting something like
+> >>
+> >> mrs x0, S3_1_C15_C2_0
+> >> orr x0, x0, #(1 << 50)
+> >> msr S3_1_C15_C2_0, x0
+> >>
+> >> in __cpu_setup() would be worth a try.
+> >
+> > It won't boot.
+> >
+> > But if i write the same value that was read, it also won't boot.
+> >
+> > I created a simple kernel module that reads this register and it has bit
+> > 32 set, all other bits clear. But when I write the same value into it, the
+> > core that does the write is stuck in infinite loop.
+> >
+> > So, it seems that we are writing this register from a wrong place.
+> >
+> 
+> Ah, my bad. I didn't look closely enough at the description:
+> 
+> """
+> The accessibility to the CPUACTLR_EL1 by Exception level is:
+> 
+> EL0              -
+> EL1(NS)          RW (a)
+> EL1(S)           RW (a)
+> EL2              RW (b)
+> EL3(SCR.NS = 1)  RW
+> EL3(SCR.NS = 0)  RW
+> 
+> (a) Write access if ACTLR_EL3.CPUACTLR is 1 and ACTLR_EL2.CPUACTLR is
+> 1, or ACTLR_EL3.CPUACTLR is 1 and SCR.NS is 0.
+> """
+> 
+> so you'll have to do this from ARM Trusted Firmware. If you're
+> comfortable rebuilding that:
+> 
+> diff --git a/include/lib/cpus/aarch64/cortex_a72.h
+> b/include/lib/cpus/aarch64/cortex_a72.h
+> index bfd64918625b..a7b8cf4be0c6 100644
+> --- a/include/lib/cpus/aarch64/cortex_a72.h
+> +++ b/include/lib/cpus/aarch64/cortex_a72.h
+> @@ -31,6 +31,7 @@
+>  #define CORTEX_A72_ACTLR_EL1                   S3_1_C15_C2_0
+> 
+>  #define CORTEX_A72_ACTLR_DISABLE_L1_DCACHE_HW_PFTCH    (1 << 56)
+> +#define CORTEX_A72_ACTLR_DIS_NC_GRE_STORE_STREAMING    (1 << 50)
+>  #define CORTEX_A72_ACTLR_NO_ALLOC_WBWA         (1 << 49)
+>  #define CORTEX_A72_ACTLR_DCC_AS_DCCI           (1 << 44)
+>  #define CORTEX_A72_ACTLR_EL1_DIS_INSTR_PREFETCH                (1 << 32)
+> diff --git a/lib/cpus/aarch64/cortex_a72.S b/lib/cpus/aarch64/cortex_a72.S
+> index 55e508678284..5914d6ee3ba6 100644
+> --- a/lib/cpus/aarch64/cortex_a72.S
+> +++ b/lib/cpus/aarch64/cortex_a72.S
+> @@ -133,6 +133,15 @@ func cortex_a72_reset_func
+>         orr     x0, x0, #CORTEX_A72_ECTLR_SMP_BIT
+>         msr     CORTEX_A72_ECTLR_EL1, x0
+>         isb
+> +
+> +       /* ---------------------------------------------
+> +        * Disables store streaming on NC/GRE memory type.
+> +        * ---------------------------------------------
+> +        */
+> +       mrs     x0, CORTEX_A72_ACTLR_EL1
+> +       orr     x0, x0, #CORTEX_A72_ACTLR_DIS_NC_GRE_STORE_STREAMING
+> +       msr     CORTEX_A72_ACTLR_EL1, x0
+> +       isb
+>         ret x19
+>  endfunc cortex_a72_reset_func
+
+Unfortunatelly, it doesn't work. I verified that the bit is set after 
+booting Linux, but the memcpy corruption was still present.
+
+I also tried the other chicken bits, it slowed down the system noticeably, 
+but had no effect on the memcpy corruption.
+
+Mikulas
