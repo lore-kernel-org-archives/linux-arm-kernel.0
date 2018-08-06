@@ -1,132 +1,105 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 6 Aug 2018 19:21:37 +0200
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <alpine.LRH.2.02.1808061306490.12989@file01.intranet.prod.int.rdu2.redhat.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
- <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
- <20180803094129.GB17798@arm.com>
- <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
- <alpine.LRH.2.02.1808031424140.14030@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3s-+Qf=WBZz1KpisDMG3520jCUh8PLAO3PHa4jdt8kCTw@mail.gmail.com>
- <CAKv+Gu9_h-WFi1j4+DWUN_dMj75SKKHxWoDH8WQ9P7S7MNpZQg@mail.gmail.com>
- <alpine.LRH.2.02.1808060553130.30832@file01.intranet.prod.int.rdu2.redhat.com>
- <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
- <CAKv+Gu_C2g=C=gMpk4a5jpDORnxZY6t1v=HDoy59m5vwNBxBBg@mail.gmail.com>
- <alpine.LRH.2.02.1808061306490.12989@file01.intranet.prod.int.rdu2.redhat.com>
-Message-ID: <CAKv+Gu_8Rq6X24ZOYvG7+kQQGSGYAZuu_co4k1nJS8K7rkrWMA@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 6 Aug 2018 18:45:01 +0100
+Subject: [RFC/PoC PATCH 0/3] arm64: basic ROP mitigation
+In-Reply-To: <CAKv+Gu_wGk2Gdzd6WuOMZqz1tKHAWHL7pWm2Szyt0DZwPTCmOw@mail.gmail.com>
+References: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
+ <7529eedf-af56-2e94-261e-bc5c86abadaa@arm.com>
+ <CAKv+Gu9X1CDpy+XvrmbSdjBjMb45eBW7JVsvsK_JQdUt2Dbvgw@mail.gmail.com>
+ <b0c974a2-4e81-7855-7d4e-22834c5d8997@arm.com>
+ <CAKv+Gu_ZzDbWwHVwOuoheXeN-ta_FjOT4Aj15=r56QZVTUK0FA@mail.gmail.com>
+ <CAKv+Gu_wGk2Gdzd6WuOMZqz1tKHAWHL7pWm2Szyt0DZwPTCmOw@mail.gmail.com>
+Message-ID: <31443e6a-56b4-c4fb-82b1-b8eb5d7eebe1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2018 at 19:09, Mikulas Patocka <mpatocka@redhat.com> wrote:
->
->
-> On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
->
->> On 6 August 2018 at 14:42, Robin Murphy <robin.murphy@arm.com> wrote:
->> > On 06/08/18 11:25, Mikulas Patocka wrote:
->> > [...]
->> >>>
->> >>> None of this explains why some transactions fail to make it across
->> >>> entirely. The overlapping writes in question write the same data to
->> >>> the memory locations that are covered by both, and so the ordering in
->> >>> which the transactions are received should not affect the outcome.
->> >>
->> >>
->> >> You're right that the corruption couldn't be explained just by reordering
->> >> writes. My hypothesis is that the PCIe controller tries to disambiguate
->> >> the overlapping writes, but the disambiguation logic was not tested and it
->> >> is buggy. If there's a barrier between the overlapping writes, the PCIe
->> >> controller won't see any overlapping writes, so it won't trigger the
->> >> faulty disambiguation logic and it works.
->> >>
->> >> Could the ARM engineers look if there's some chicken bit in Cortex-A72
->> >> that could insert barriers between non-cached writes automatically?
->> >
->> >
->> > I don't think there is, and even if there was I imagine it would have a
->> > pretty hideous effect on non-coherent DMA buffers and the various other
->> > places in which we have Normal-NC mappings of actual system RAM.
->> >
+
+
+On 06/08/18 17:04, Ard Biesheuvel wrote:
+> On 6 August 2018 at 17:50, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> On 6 August 2018 at 17:38, Robin Murphy <robin.murphy@arm.com> wrote:
+>>> On 06/08/18 15:04, Ard Biesheuvel wrote:
+>>>>
+>>>> On 6 August 2018 at 15:55, Robin Murphy <robin.murphy@arm.com> wrote:
+>>>>>
+>>>>> On 02/08/18 14:21, Ard Biesheuvel wrote:
+>>>>>>
+>>>>>>
+>>>>>> This is a proof of concept I cooked up, primarily to trigger a
+>>>>>> discussion
+>>>>>> about whether there is a point to doing anything like this, and if there
+>>>>>> is, what the pitfalls are. Also, while I am not aware of any similar
+>>>>>> implementations, the idea is so simple that I would be surprised if
+>>>>>> nobody
+>>>>>> else thought of the same thing way before I did.
+>>>>>
+>>>>>
+>>>>>
+>>>>> So, "TTBR0 PAN: Pointer Auth edition"? :P
+>>>>>
+>>>>>> The idea is that we can significantly limit the kernel's attack surface
+>>>>>> for ROP based attacks by clearing the stack pointer's sign bit before
+>>>>>> returning from a function, and setting it again right after proceeding
+>>>>>> from the [expected] return address. This should make it much more
+>>>>>> difficult
+>>>>>> to return to arbitrary gadgets, given that they rely on being chained to
+>>>>>> the next via a return address popped off the stack, and this is
+>>>>>> difficult
+>>>>>> when the stack pointer is invalid.
+>>>>>>
+>>>>>> Of course, 4 additional instructions per function return is not exactly
+>>>>>> for free, but they are just movs and adds, and leaf functions are
+>>>>>> disregarded unless they allocate a stack frame (this comes for free
+>>>>>> because simple_return insns are disregarded by the plugin)
+>>>>>>
+>>>>>> Please shoot, preferably with better ideas ...
+>>>>>
+>>>>>
+>>>>>
+>>>>> Actually, on the subject of PAN, shouldn't this at least have a very hard
+>>>>> dependency on that? AFAICS without PAN clearing bit 55 of SP is
+>>>>> effectively
+>>>>> giving userspace direct control of the kernel stack (thanks to TBI).
+>>>>> Ouch.
+>>>>>
+>>>>
+>>>> How's that? Bits 52 .. 54 will still be set, so SP will never contain
+>>>> a valid userland address in any case. Or am I missing something?
+>>>
+>>>
+>>> Ah, yes, I'd managed to forget about the address hole, but I think that only
+>>> makes it a bit trickier, rather than totally safe - it feels like you just
+>>> need to chain one or two returns through "valid" targets until you can hit
+>>> an epilogue with a "mov sp, x29" (at first glance there are a fair few of
+>>> those in my vmlinux), after which we're back to the bit 55 scheme alone
+>>> giving no protection against retargeting the stack to a valid TTBR0 address.
+>>>
 >>
->> Looking at the A72 manual, there is one chicken bit that looks like it
->> may be related:
+>> Wouldn't such an epilogue clear the SP bit before returning again?
 >>
->> CPUACTLR_EL1 bit #50:
->>
->> 0 Enables store streaming on NC/GRE memory type. This is the reset value.
->> 1 Disables store streaming on NC/GRE memory type.
->>
->> so putting something like
->>
->> mrs x0, S3_1_C15_C2_0
->> orr x0, x0, #(1 << 50)
->> msr S3_1_C15_C2_0, x0
->>
->> in __cpu_setup() would be worth a try.
->
-> It won't boot.
->
-> But if i write the same value that was read, it also won't boot.
->
-> I created a simple kernel module that reads this register and it has bit
-> 32 set, all other bits clear. But when I write the same value into it, the
-> core that does the write is stuck in infinite loop.
->
-> So, it seems that we are writing this register from a wrong place.
->
+> 
+> ... or are you saying you can play tricks and clear bits 52 .. 54 ? If
+> so, you can already do that, right? And apply it to bit 55 as well?
 
-Ah, my bad. I didn't look closely enough at the description:
+Indeed, in this scenario clearing bit 55 immediately before the final 
+ret does nothing because the "valid" return beforehand loaded x29 with 
+an arbitrary userspace address from a doctored stack frame, so the rest 
+of that epilogue beyond that first mov already ran off the fake stack.
 
-"""
-The accessibility to the CPUACTLR_EL1 by Exception level is:
+Admittedly you might have to retain control of the "real" kernel stack 
+and go through much the same dance if the gadget chain ever needs to 
+pass through a real return target (to mitigate bit 55 being 
+unconditionally set again to make an invalid TTBR1 address). Working 
+around the mitigations certainly makes the exploit more difficult, but 
+still seemingly far from impossible. And yes, AFAICS an attacker could 
+indeed use the same SP-hijacking trick today (in the same absence of 
+PAN), it's just that without any mitigations to prevent using the kernel 
+stack alone I can't imagine it would be worth the extra complication.
 
-EL0              -
-EL1(NS)          RW (a)
-EL1(S)           RW (a)
-EL2              RW (b)
-EL3(SCR.NS = 1)  RW
-EL3(SCR.NS = 0)  RW
+I guess what I'm getting at is that if the protection mechanism is 
+"always return with SP outside TTBR1", there seems little point in going 
+through the motions if SP in TTBR0 could still be valid and allow an 
+attack to succeed anyway; this is basically just me working through a 
+justification for saying the proposed scheme needs "depends on ARM64_PAN 
+|| ARM64_SW_TTBR0_PAN", making it that much uglier for v8.0 CPUs...
 
-(a) Write access if ACTLR_EL3.CPUACTLR is 1 and ACTLR_EL2.CPUACTLR is
-1, or ACTLR_EL3.CPUACTLR is 1 and SCR.NS is 0.
-"""
-
-so you'll have to do this from ARM Trusted Firmware. If you're
-comfortable rebuilding that:
-
-diff --git a/include/lib/cpus/aarch64/cortex_a72.h
-b/include/lib/cpus/aarch64/cortex_a72.h
-index bfd64918625b..a7b8cf4be0c6 100644
---- a/include/lib/cpus/aarch64/cortex_a72.h
-+++ b/include/lib/cpus/aarch64/cortex_a72.h
-@@ -31,6 +31,7 @@
- #define CORTEX_A72_ACTLR_EL1                   S3_1_C15_C2_0
-
- #define CORTEX_A72_ACTLR_DISABLE_L1_DCACHE_HW_PFTCH    (1 << 56)
-+#define CORTEX_A72_ACTLR_DIS_NC_GRE_STORE_STREAMING    (1 << 50)
- #define CORTEX_A72_ACTLR_NO_ALLOC_WBWA         (1 << 49)
- #define CORTEX_A72_ACTLR_DCC_AS_DCCI           (1 << 44)
- #define CORTEX_A72_ACTLR_EL1_DIS_INSTR_PREFETCH                (1 << 32)
-diff --git a/lib/cpus/aarch64/cortex_a72.S b/lib/cpus/aarch64/cortex_a72.S
-index 55e508678284..5914d6ee3ba6 100644
---- a/lib/cpus/aarch64/cortex_a72.S
-+++ b/lib/cpus/aarch64/cortex_a72.S
-@@ -133,6 +133,15 @@ func cortex_a72_reset_func
-        orr     x0, x0, #CORTEX_A72_ECTLR_SMP_BIT
-        msr     CORTEX_A72_ECTLR_EL1, x0
-        isb
-+
-+       /* ---------------------------------------------
-+        * Disables store streaming on NC/GRE memory type.
-+        * ---------------------------------------------
-+        */
-+       mrs     x0, CORTEX_A72_ACTLR_EL1
-+       orr     x0, x0, #CORTEX_A72_ACTLR_DIS_NC_GRE_STORE_STREAMING
-+       msr     CORTEX_A72_ACTLR_EL1, x0
-+       isb
-        ret x19
- endfunc cortex_a72_reset_func
+Robin.
