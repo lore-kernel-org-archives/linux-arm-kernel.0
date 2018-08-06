@@ -1,76 +1,74 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Mon, 6 Aug 2018 21:12:53 +0200
-Subject: [PATCH v4 0/7] arm64: untag user pointers passed to the kernel
-In-Reply-To: <20180803150945.GC9297@kroah.com>
-References: <cover.1529507994.git.andreyknvl@google.com>
- <CAAeHK+zqtyGzd_CZ7qKZKU-uZjZ1Pkmod5h8zzbN0xCV26nSfg@mail.gmail.com>
- <20180626172900.ufclp2pfrhwkxjco@armageddon.cambridge.arm.com>
- <CAAeHK+yqWKTdTG+ymZ2-5XKiDANV+fmUjnQkRy-5tpgphuLJRA@mail.gmail.com>
- <CAAeHK+wJbbCZd+-X=9oeJgsqQJiq8h+Aagz3SQMPaAzCD+pvFw@mail.gmail.com>
- <CAAeHK+yWF05XoU+0iuJoXAL3cWgdtxbeLoBz169yP12W4LkcQw@mail.gmail.com>
- <20180801174256.5mbyf33eszml4nmu@armageddon.cambridge.arm.com>
- <CAAeHK+zb7vcehuX9=oxLUJVJr1ZcgmRTODQz7wsPy+rJb=3kbQ@mail.gmail.com>
- <CAAeHK+xTxPhfbVTNxcbsx7VdwQ21Bt-vo2ZU1tEM1_JX7uKnng@mail.gmail.com>
- <20180803150945.GC9297@kroah.com>
-Message-ID: <CAExDi1T=s1ASPz6wMbV-G+Wiq8u9zu9cFztaCQ1kDy_TDQkXvg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 6 Aug 2018 21:35:53 +0200
+Subject: [RFC/PoC PATCH 0/3] arm64: basic ROP mitigation
+In-Reply-To: <CAGXu5jLj=KP038d-c+xzCx=Oogn1prH__oryQjNZZwNaAHaAAw@mail.gmail.com>
+References: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
+ <7529eedf-af56-2e94-261e-bc5c86abadaa@arm.com>
+ <CAKv+Gu9X1CDpy+XvrmbSdjBjMb45eBW7JVsvsK_JQdUt2Dbvgw@mail.gmail.com>
+ <b0c974a2-4e81-7855-7d4e-22834c5d8997@arm.com>
+ <CAKv+Gu_ZzDbWwHVwOuoheXeN-ta_FjOT4Aj15=r56QZVTUK0FA@mail.gmail.com>
+ <CAKv+Gu_wGk2Gdzd6WuOMZqz1tKHAWHL7pWm2Szyt0DZwPTCmOw@mail.gmail.com>
+ <31443e6a-56b4-c4fb-82b1-b8eb5d7eebe1@arm.com>
+ <CAGXu5jLj=KP038d-c+xzCx=Oogn1prH__oryQjNZZwNaAHaAAw@mail.gmail.com>
+Message-ID: <CAKv+Gu-9M0yO-rSXiREs11feEro0mJFcNN3Wkp_LSOGrKKd5dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 3, 2018 at 5:09 PM, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Fri, Aug 03, 2018 at 04:59:18PM +0200, Andrey Konovalov wrote:
->> On Thu, Aug 2, 2018 at 5:00 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
->> > On Wed, Aug 1, 2018 at 7:42 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> >> On Mon, Jul 16, 2018 at 01:25:59PM +0200, Andrey Konovalov wrote:
->> >>> On Thu, Jun 28, 2018 at 9:30 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
->> >>> So the checker reports ~100 different places where a __user pointer
->> >>> being casted. I've looked through them and found 3 places where we
->> >>> need to add untagging. Source code lines below come from 4.18-rc2+
->> >>> (6f0d349d).
->> >> [...]
->> >>> I'll add the 3 patches with fixes to v5 of this patchset.
->> >>
->> >> Thanks for investigating. You can fix those three places in your code
->> >
->> > OK, will do.
->> >
->> >> but I was rather looking for a way to check such casting in the future
->> >> for newly added code. While for the khwasan we can assume it's a debug
->> >> option, the tagged user pointers are ABI and we need to keep it stable.
->> >>
->> >> We could we actually add some macros for explicit conversion between
->> >> __user ptr and long and silence the warning there (I guess this would
->> >> work better for sparse). We can then detect new ptr to long casts as
->> >> they appear. I just hope that's not too intrusive.
->> >>
->> >> (I haven't tried the sparse patch yet, hopefully sometime this week)
->> >
->> > Haven't look at that sparse patch yet myself, but sounds doable.
->> > Should these macros go into this patchset or should they go
->> > separately?
->>
->> Started looking at this. When I run sparse with default checks enabled
->> (make C=1) I get countless warnings. Does anybody actually use it?
+On 6 August 2018 at 20:49, Kees Cook <keescook@chromium.org> wrote:
+> On Mon, Aug 6, 2018 at 10:45 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+>> I guess what I'm getting at is that if the protection mechanism is "always
+>> return with SP outside TTBR1", there seems little point in going through the
+>> motions if SP in TTBR0 could still be valid and allow an attack to succeed
+>> anyway; this is basically just me working through a justification for saying
+>> the proposed scheme needs "depends on ARM64_PAN || ARM64_SW_TTBR0_PAN",
+>> making it that much uglier for v8.0 CPUs...
 >
-> Try using a more up-to-date version of sparse.  Odds are you are using
-> an old one, there is a newer version in a different branch on kernel.org
-> somewhere...
->
-> greg k-h
+> I think anyone with v8.0 CPUs interested in this mitigation would also
+> very much want PAN emulation. If a "depends on" isn't desired, what
+> about "imply" in the Kconfig?
 >
 
-Quoting Linus in [1]:
+Yes, but actually, using bit #0 is maybe a better alternative in any
+case. You can never dereference SP with bit #0 set, regardless of
+whether the address points to user or kernel space, and my concern
+about reloading sp from x29 doesn't really make sense, given that x29
+is always assigned from sp right after pushing x29 and x30 in the
+function prologue, and sp only gets restored from x29 in the epilogue
+when there is a stack frame to begin with, in which case we add #1 to
+sp again before returning from the function.
 
-Honestly, I'd like to just encourage people to get the sparse update
-from Luc Van Oostenryck instead.
+The other code gets a lot cleaner as well.
 
-For a while there it looked like Chris Li would just pull from Luc,
-and we'd have timely releases, but that really doesn't seem to have
-ended up happening after all. So right now it's probably just best to
-get Luc's tree instead from
+So for the return we'll have
 
-    https://github.com/lucvoo/sparse-dev
+  ldp     x29, x30, [sp], #nn
+>>add     sp, sp, #0x1
+  ret
 
-which also ends up fixing a lot of other issues.
+and for the function call
 
-[1] https://lore.kernel.org/lkml/CA+55aFzYEnZR2GZLR-DwpONjMNYGYoDy+6AWLCVNayWiaZuqoA at mail.gmail.com/T/#u
+  bl      <foo>
+>>mov      x30, sp
+>>bic     sp, x30, #1
+
+The restore sequence in entry.s:96 (which has no spare registers) gets
+much simpler as well:
+
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -95,6 +95,15 @@ alternative_else_nop_endif
+         */
+        add     sp, sp, x0      // sp' = sp + x0
+        sub     x0, sp, x0      // x0' = sp' - x0 = (sp + x0) - x0 = sp
++#ifdef CONFIG_ARM64_ROP_SHIELD
++       tbnz    x0, #0, 1f
++       .subsection     1
++1:     sub     x0, x0, #1
++       sub     sp, sp, #1
++       b       2f
++       .previous
++2:
++#endif
+        tbnz    x0, #THREAD_SHIFT, 0f
+        sub     x0, sp, x0      // x0'' = sp' - x0' = (sp + x0) - sp = x0
+        sub     sp, sp, x0      // sp'' = sp' - x0 = (sp + x0) - x0 = sp
