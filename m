@@ -1,74 +1,64 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 06 Aug 2018 14:09:38 +0200
-Subject: [PATCH] iommu/rockchip: Handle errors returned from PM framework
-In-Reply-To: <20180805124616.18020-1-marc.zyngier@arm.com>
-References: <20180805124616.18020-1-marc.zyngier@arm.com>
-Message-ID: <2071881.EAoDzUiQGL@phil>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Mon, 6 Aug 2018 08:09:50 -0400 (EDT)
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <CAKv+Gu8HyHX8qjg1qHV2M9Re+RGQJigjdAFVC_yR4niGkk2ikA@mail.gmail.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
+ <11f9185a-7f71-83df-3a57-0a0ae9c1f934@arm.com>
+ <alpine.LRH.2.02.1808032046540.24748@file01.intranet.prod.int.rdu2.redhat.com>
+ <CA+=Sn1=6F-fGLmXE0VqQHTqTCUKUT=Fz29mMT7349SPFisbZ9A@mail.gmail.com>
+ <alpine.LRH.2.02.1808040611070.23762@file01.intranet.prod.int.rdu2.redhat.com>
+ <fd2cae87-b2df-d8ef-8836-e6cbf8c5f851@redhat.com>
+ <alpine.LRH.2.02.1808060325110.3756@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu_y6La77sWOSROrwfRy65jrFVYVvRZt+ewNheYhdhHCkQ@mail.gmail.com>
+ <alpine.LRH.2.02.1808060626060.2986@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu87YqLM=FFZ6V8rHhuhskDdsBUuXFpqNKVbXWqdnuNEyA@mail.gmail.com>
+ <alpine.LRH.2.02.1808060639200.2986@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu8HyHX8qjg1qHV2M9Re+RGQJigjdAFVC_yR4niGkk2ikA@mail.gmail.com>
+Message-ID: <alpine.LRH.2.02.1808060700070.10220@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
 
-Am Sonntag, 5. August 2018, 14:46:16 CEST schrieb Marc Zyngier:
-> pm_runtime_get_if_in_use can fail: either PM has been disabled
-> altogether (-EINVAL), or the device hasn't been enabled yet (0).
-> Sadly, we ignore the first case at the moment, and end up treating
-> it as if we had received a valid interrupt.
+
+On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
+
+> >> Are we talking about a quirk for the Armada 8040 or about PCIe on ARM
+> >> in general?
+> >
+> > I don't know - there are not any other easily available PCIe ARM boards
+> > except for Armada 8040.
 > 
-> The first case could happen because the interrupt line is shared
-> (with the VOP for example), and although that device hasn't been
-> programmed yet, an interrupt may be pending (think kexec/kdump).
+> ... indeed, and sadly, the ones that are available all have this
+> horrible Synopsys DesignWare PCIe IP that does not implement a true
+> root complex at all, but is simply repurposed endpoint IP with some
+> tweaks so it vaguely resembles a root complex.
 > 
-> The second case means that we've enabled the IOMMU, but it is
-> not powered-on just yet. This could be another instance of the
-> above, but as it deserves investigation, let's output a single
-> warning (instead of flodding the console).
-> 
-> In both cases, bail with an IRQ_NONE.
-> 
-> Fixes: 0f181d3cf7d98 ("iommu/rockchip: Add runtime PM support")
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> But this is exactly why I am asking: I use a AMD Seattle Overdrive as
+> my main Linux development system, and it runs the gnome-shell stack
+> flawlessly (using the nouveau driver), as well as a UEFI framebuffer
+> using efifb. So my suspicion is that this is either a Synopsys IP
+> issue or an interconnect issue, and has nothing to do with the
+> impedance mismatch between AMBA and PCIe.
 
-Hmm, maybe my thinking is flawed, but to me it looks a bit different.
-
-I.e. the iommu, as well as the vop have the capability to check if the irq
-is for them via their status registers (INT_STATUS and MMU_STATUS).
-
-For this to happen the power-domain must be active and the device clocked.
-Clock handling is done on both the vop and iommu and in the !CONFIG_PM
-case all power-domains are left on.
-
-Right now a !CONFIG_PM just passes through the driver unnoticed but with
-this change, we would actually make it depend on PM?
-
-What am I missing?
-
-Also there are quite a bit more instances of pm_runtime_get_if_in_use
-present in the iommu driver.
+If you run the program for testing memcpy on framebuffer that I posted in 
+this thread - does it detect some corruption for you?
 
 
-Heiko
+BTW. does the Radeon GPU driver work for you?
 
->  drivers/iommu/rockchip-iommu.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-> index 054cd2c8e9c8..9d21495a8433 100644
-> --- a/drivers/iommu/rockchip-iommu.c
-> +++ b/drivers/iommu/rockchip-iommu.c
-> @@ -521,10 +521,11 @@ static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
->  	u32 int_status;
->  	dma_addr_t iova;
->  	irqreturn_t ret = IRQ_NONE;
-> -	int i;
-> +	int i, err;
->  
-> -	if (WARN_ON(!pm_runtime_get_if_in_use(iommu->dev)))
-> -		return 0;
-> +	err = pm_runtime_get_if_in_use(iommu->dev);
-> +	if ((err < 0) || WARN_ON_ONCE(!err))
-> +		return ret;
->  
->  	if (WARN_ON(clk_bulk_enable(iommu->num_clocks, iommu->clocks)))
->  		goto out;
-> 
+My observation is that OpenGL with Nouveau works, but it's slow and the 
+whole system locks up when playing video in chromium.
+
+Radeon HD 6350 (pre-GCN), doesn't lock up, but OpenGL (and Glamour) has 
+many artifacts and corrupted textures. When I switch it to EXA 
+acceleration and don't use OpenGL, it works.
+
+The artifacts are not fixed by preloading a glibc with fixed memcpy, so 
+there's supposedly some other bug somewhere.
+
+
+Unfortunatelly, there's no low-power GCN card.
+
+Mikulas
