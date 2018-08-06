@@ -1,56 +1,100 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 6 Aug 2018 13:29:00 +0200
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <df77857e-1674-38ea-2337-366182afb41e@gotplt.org>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
- <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
- <CAJA7tRZbmnZq7RfvQeYEy_a1ZObWqpFpVdvgsXgsioQ3RyPMuA@mail.gmail.com>
- <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
- <11f9185a-7f71-83df-3a57-0a0ae9c1f934@arm.com>
- <alpine.LRH.2.02.1808032046540.24748@file01.intranet.prod.int.rdu2.redhat.com>
- <CA+=Sn1=6F-fGLmXE0VqQHTqTCUKUT=Fz29mMT7349SPFisbZ9A@mail.gmail.com>
- <alpine.LRH.2.02.1808040611070.23762@file01.intranet.prod.int.rdu2.redhat.com>
- <fd2cae87-b2df-d8ef-8836-e6cbf8c5f851@redhat.com>
- <alpine.LRH.2.02.1808060325110.3756@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu_y6La77sWOSROrwfRy65jrFVYVvRZt+ewNheYhdhHCkQ@mail.gmail.com>
- <alpine.LRH.2.02.1808060626060.2986@file01.intranet.prod.int.rdu2.redhat.com>
- <df77857e-1674-38ea-2337-366182afb41e@gotplt.org>
-Message-ID: <CAKv+Gu_Qo+VJMBg0WxzR49oqTv+8nw-1Z+uOOeFV0cduCO8a_A@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 06 Aug 2018 14:45:42 +0300
+Subject: [PATCH v3 00/10] Add helper for plane reset
+In-Reply-To: <20180806110727.GA3314@e114479-lin.cambridge.arm.com>
+References: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
+ <20180806110727.GA3314@e114479-lin.cambridge.arm.com>
+Message-ID: <15977863.ZBGtPEODRU@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2018 at 13:19, Siddhesh Poyarekar <siddhesh@gotplt.org> wrote:
-> On 08/06/2018 04:01 PM, Mikulas Patocka wrote:
->>
->> I think there are three possible solutions:
->>
->> 1. provide an alternative memcpy implementation that doesn't do unaligned
->> accesses and recompile the graphics software with -mstrict-align
->
->
-> Given that there's already a tunable glibc.cpu.cached_memopt for powerpc
-> that (as Tulio clarified elsewhere) essentially does the same thing for
-> cache-inhibited memory, it wouldn't be too much of an overhead to put in
-> another ifunc implementation that gets chosen only when one sets this
-> tunable.  In fact, we could reuse the C string routines for this to avoid
-> adding yet another assembly implementation to have to support. That way we
-> can minimally fix the issue at hand without regressing existing uses.
->
-> You can then set the glibc.cpu.cached_memopt tunable in the default
-> environment for your board[1] or for applications that need it (e.g.
-> whenever DISPLAY is exported or something like that).
->
-> The only difference from Power would be that cpu.noncached==0 for Power by
-> default whereas for aarch64 it will be the other way around.  It shouldn't
-> be too hard to enhance the framework to set platform-specific defaults.
->
+Hi Alex,
 
-Thanks Siddhesh,
+On Monday, 6 August 2018 14:07:27 EEST Alexandru-Cosmin Gheorghe wrote:
+> Hi,
+> 
+> On Sat, Aug 04, 2018 at 05:15:20PM +0100, Alexandru Gheorghe wrote:
+> > No significant change since v2, fixed a spelling mistake and
+> > added/removed some newlines in 01 and 07 patches.
+> > 
+> > I plan to apply the first patch of the series and the patches for
+> > the drivers maintained through drm-misc(that go Reviewed/Ack) in
+> > drm-misc-next on Monday.
+> > 
+> > For the other drivers please let me know if you want me to push them
+> > in drm-misc-next as well.
+> 
+> Pushed the following patch to drm-misc-next:
+> 
+> drm/atomic: Add __drm_atomic_helper_plane_reset
+> drm: mali-dp: Use __drm_atomic_helper_plane_reset instead of copying the
+> logic
+> drm: atmel-hlcdc: Use __drm_atomic_helper_plane_reset instead of copying the
+> logic
+> drm/imx: Use __drm_atomic_helper_plane_reset instead of copying the logic
+> drm/sun4i: Use __drm_atomic_helper_plane_reset instead of copying the logic
 
-But we don't need another memcpy(). We need outbound PCIe windows that
-tolerate being mapped as normal non-cacheable memory.
+I've acked the rcar-du part, could it be merged with the rest of the code ?
 
-And if this is fundamentally impossible, can someone please try
-explaining it again? (apologies for being thick)
+> > Changes since v1:
+> >  - Make __drm_atomic_helper_plane_reset consistent with the other
+> >    helpers and require that both plane and state not be NULL,
+> >    suggested by Boris Brezillon and Philipp Zabel. Drivers already
+> >    check for that.
+> >  
+> >  - Add a proper commit message for driver changes.
+> > 
+> > Drivers that subclass drm_plane need to copy the logic for linking the
+> > drm_plane with its state and to initialize core properties to their
+> > default values. E.g (alpha and rotation)
+> > 
+> > Having a helper to reset the plane_state makes sense because of multiple
+> > reasons:
+> > 1. Eliminate code duplication.
+> > 2. Add a single place for initializing core properties to their
+> > default values, no need for driver to do it if what the helper sets
+> > makes sense for them.
+> > 3. No need to debug the driver when you enable a core property and
+> > observe it doesn't have a proper default value.
+> > 
+> > Tested with mali-dp the other drivers are just built-tested.
+> > 
+> > Alexandru Gheorghe (10):
+> >   drm/atomic: Add  __drm_atomic_helper_plane_reset
+> >   drm/amd/display: Use __drm_atomic_helper_plane_reset instead of
+> >     copying the logic
+> >   drm: mali-dp: Use __drm_atomic_helper_plane_reset instead of copying
+> >     the logic
+> >   drm: atmel-hlcdc: Use __drm_atomic_helper_plane_reset instead of
+> >     copying the logic
+> >   drm/exynos: Use __drm_atomic_helper_plane_reset instead of copying the
+> >     logic
+> >   drm/imx: Use __drm_atomic_helper_plane_reset instead of copying the
+> >     logic
+> >   drm: rcar-du: Use __drm_atomic_helper_plane_reset instead of copying
+> >     the logic
+> >   drm/sun4i: Use __drm_atomic_helper_plane_reset instead of copying the
+> >     logic
+> >   drm/vc4: Use __drm_atomic_helper_plane_reset instead of copying the
+> >     logic
+> >   drm/vmwgfx: Use __drm_atomic_helper_plane_reset instead of copying the
+> >     logic
+> >  
+> >  .../gpu/drm/amd/display/amdgpu_dm/amdgpu_dm.c |  7 ++--
+> >  drivers/gpu/drm/arm/malidp_planes.c           |  7 ++--
+> >  .../gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c   |  5 +--
+> >  drivers/gpu/drm/drm_atomic_helper.c           | 33 ++++++++++++++-----
+> >  drivers/gpu/drm/exynos/exynos_drm_plane.c     |  3 +-
+> >  drivers/gpu/drm/imx/ipuv3-plane.c             |  8 ++---
+> >  drivers/gpu/drm/rcar-du/rcar_du_plane.c       |  6 ++--
+> >  drivers/gpu/drm/rcar-du/rcar_du_vsp.c         |  5 +--
+> >  drivers/gpu/drm/sun4i/sun4i_layer.c           |  4 +--
+> >  drivers/gpu/drm/vc4/vc4_plane.c               |  4 +--
+> >  drivers/gpu/drm/vmwgfx/vmwgfx_kms.c           |  4 +--
+> >  include/drm/drm_atomic_helper.h               |  2 ++
+> >  12 files changed, 41 insertions(+), 47 deletions(-)
+
+-- 
+Regards,
+
+Laurent Pinchart
