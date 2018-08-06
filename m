@@ -1,110 +1,78 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  6 Aug 2018 14:41:55 +0100
-Subject: [PATCH 13/13] coreisght: tmc: Claim device before use
+Date: Mon,  6 Aug 2018 14:41:54 +0100
+Subject: [PATCH 12/13] coresight: dynamic-replicator: Claim device for use
 In-Reply-To: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
 References: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1533562915-21558-14-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1533562915-21558-13-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use CLAIM tags to make sure the device is available for use.
+Use CLAIM protocol to make sure the device is available for use.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 22 +++++++++++++++++++---
- drivers/hwtracing/coresight/coresight-tmc-etr.c |  4 ++++
- 2 files changed, 23 insertions(+), 3 deletions(-)
+ .../coresight/coresight-dynamic-replicator.c       | 23 +++++++++++++++++-----
+ 1 file changed, 18 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index ceb4b30..59d862d6e 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -36,6 +36,11 @@ static void __tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
- 
- static int tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
- {
-+	int rc = coresight_claim_device(drvdata->base);
-+
-+	if (rc)
-+		return rc;
-+
- 	__tmc_etb_enable_hw(drvdata);
- 	return 0;
- }
-@@ -66,7 +71,7 @@ static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
- 	return;
- }
- 
--static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
-+static void __tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+index 97f4673..299667b 100644
+--- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
++++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+@@ -41,8 +41,11 @@ static void replicator_reset(struct replicator_state *drvdata)
  {
  	CS_UNLOCK(drvdata->base);
  
-@@ -82,6 +87,12 @@ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+-	writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER0);
+-	writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER1);
++	if (!coresight_claim_device_unlocked(drvdata->base)) {
++		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER0);
++		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER1);
++		coresight_disclaim_device_unlocked(drvdata->base);
++	}
+ 
  	CS_LOCK(drvdata->base);
  }
- 
-+static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
-+{
-+	coresight_disclaim_device(drvdata);
-+	__tmc_etb_disable_hw(drvdata);
-+}
-+
- static void __tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
+@@ -50,6 +53,7 @@ static void replicator_reset(struct replicator_state *drvdata)
+ static int replicator_enable(struct coresight_device *csdev, int inport,
+ 			      int outport)
  {
++	int rc = 0;
+ 	u32 reg;
+ 	struct replicator_state *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 
+@@ -67,13 +71,19 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
+ 
  	CS_UNLOCK(drvdata->base);
-@@ -100,6 +111,11 @@ static void __tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
  
- static int tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
- {
-+	int rc = coresight_claim_device(drvdata->base);
-+
-+	if (rc)
-+		return rc;
-+
- 	__tmc_etf_enable_hw(drvdata);
- 	return 0;
- }
-@@ -110,7 +126,7 @@ static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
++	if ((readl_relaxed(drvdata->base + REPLICATOR_IDFILTER0) == 0xff) &&
++	    (readl_relaxed(drvdata->base + REPLICATOR_IDFILTER1) == 0xff))
++		rc = coresight_claim_device_unlocked(drvdata->base);
  
- 	tmc_flush_and_stop(drvdata);
- 	tmc_disable_hw(drvdata);
--
-+	coresight_disclaim_device_unlocked(drvdata->base);
+ 	/* Ensure that the outport is enabled. */
+-	writel_relaxed(0x00, drvdata->base + reg);
++	if (!rc) {
++		writel_relaxed(0x00, drvdata->base + reg);
++		dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
++	}
++
  	CS_LOCK(drvdata->base);
+ 
+-	dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
+-	return 0;
++	return rc;
  }
  
-@@ -556,7 +572,7 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+ static void replicator_disable(struct coresight_device *csdev, int inport,
+@@ -99,6 +109,9 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
+ 	/* disable the flow of ATB data through port */
+ 	writel_relaxed(0xff, drvdata->base + reg);
  
- 	/* Disable the TMC if need be */
- 	if (drvdata->mode == CS_MODE_SYSFS)
--		tmc_etb_disable_hw(drvdata);
-+		__tmc_etb_disable_hw(drvdata);
++	if ((readl_relaxed(drvdata->base + REPLICATOR_IDFILTER0) == 0xff) &&
++	    (readl_relaxed(drvdata->base + REPLICATOR_IDFILTER1) == 0xff))
++		coresight_disclaim_device_unlocked(drvdata->base);
+ 	CS_LOCK(drvdata->base);
  
- 	drvdata->reading = true;
- out:
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index daad521..f684283 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -991,6 +991,9 @@ static int tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
- 	 * this on.
- 	 */
- 	rc = tmc_etr_enable_catu(drvdata, etr_buf);
-+	if (rc)
-+		return rc;
-+	rc = coresight_claim_device(drvdata->base);
- 	if (!rc) {
- 		drvdata->etr_buf = etr_buf;
- 		__tmc_etr_enable_hw(drvdata);
-@@ -1077,6 +1080,7 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
- 	__tmc_etr_disable_hw(drvdata);
- 	/* Disable CATU device if this ETR is connected to one */
- 	tmc_etr_disable_catu(drvdata);
-+	coresight_disclaim_device(drvdata->base);
- 	/* Reset the ETR buf used by hardware */
- 	drvdata->etr_buf = NULL;
- }
+ 	dev_dbg(drvdata->dev, "REPLICATOR disabled\n");
 -- 
 2.7.4
