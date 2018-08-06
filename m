@@ -1,88 +1,112 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 6 Aug 2018 17:50:16 +0200
-Subject: [RFC/PoC PATCH 0/3] arm64: basic ROP mitigation
-In-Reply-To: <b0c974a2-4e81-7855-7d4e-22834c5d8997@arm.com>
-References: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
- <7529eedf-af56-2e94-261e-bc5c86abadaa@arm.com>
- <CAKv+Gu9X1CDpy+XvrmbSdjBjMb45eBW7JVsvsK_JQdUt2Dbvgw@mail.gmail.com>
- <b0c974a2-4e81-7855-7d4e-22834c5d8997@arm.com>
-Message-ID: <CAKv+Gu_ZzDbWwHVwOuoheXeN-ta_FjOT4Aj15=r56QZVTUK0FA@mail.gmail.com>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Mon,  6 Aug 2018 17:53:39 +0200
+Subject: [PATCH] drm/rockchip: update cursors asynchronously through atomic.
+Message-ID: <20180806155339.9473-1-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2018 at 17:38, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 06/08/18 15:04, Ard Biesheuvel wrote:
->>
->> On 6 August 2018 at 15:55, Robin Murphy <robin.murphy@arm.com> wrote:
->>>
->>> On 02/08/18 14:21, Ard Biesheuvel wrote:
->>>>
->>>>
->>>> This is a proof of concept I cooked up, primarily to trigger a
->>>> discussion
->>>> about whether there is a point to doing anything like this, and if there
->>>> is, what the pitfalls are. Also, while I am not aware of any similar
->>>> implementations, the idea is so simple that I would be surprised if
->>>> nobody
->>>> else thought of the same thing way before I did.
->>>
->>>
->>>
->>> So, "TTBR0 PAN: Pointer Auth edition"? :P
->>>
->>>> The idea is that we can significantly limit the kernel's attack surface
->>>> for ROP based attacks by clearing the stack pointer's sign bit before
->>>> returning from a function, and setting it again right after proceeding
->>>> from the [expected] return address. This should make it much more
->>>> difficult
->>>> to return to arbitrary gadgets, given that they rely on being chained to
->>>> the next via a return address popped off the stack, and this is
->>>> difficult
->>>> when the stack pointer is invalid.
->>>>
->>>> Of course, 4 additional instructions per function return is not exactly
->>>> for free, but they are just movs and adds, and leaf functions are
->>>> disregarded unless they allocate a stack frame (this comes for free
->>>> because simple_return insns are disregarded by the plugin)
->>>>
->>>> Please shoot, preferably with better ideas ...
->>>
->>>
->>>
->>> Actually, on the subject of PAN, shouldn't this at least have a very hard
->>> dependency on that? AFAICS without PAN clearing bit 55 of SP is
->>> effectively
->>> giving userspace direct control of the kernel stack (thanks to TBI).
->>> Ouch.
->>>
->>
->> How's that? Bits 52 .. 54 will still be set, so SP will never contain
->> a valid userland address in any case. Or am I missing something?
->
->
-> Ah, yes, I'd managed to forget about the address hole, but I think that only
-> makes it a bit trickier, rather than totally safe - it feels like you just
-> need to chain one or two returns through "valid" targets until you can hit
-> an epilogue with a "mov sp, x29" (at first glance there are a fair few of
-> those in my vmlinux), after which we're back to the bit 55 scheme alone
-> giving no protection against retargeting the stack to a valid TTBR0 address.
->
+Add support to async updates of cursors by using the new atomic
+interface for that.
 
-Wouldn't such an epilogue clear the SP bit before returning again?
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
+Hi,
 
->>> I wonder if there's a little  more mileage in using "{add,sub} sp, sp,
->>> #1"
->>> sequences to rely on stack alignment exceptions instead, with the added
->>> bonus that that's about as low as the instruction-level overhead can get.
->>>
->>
->> Good point. I did consider that, but couldn't convince myself that it
->> isn't easier to defeat: loads via x29 occur reasonably often, and you
->> can simply offset your doctored stack frame by a single byte.
->
->
-> True; in theory there are 3072 possible unaligned offsets to choose from,
-> but compile-time randomisation doesn't seem much use, and hotpatching just
-> about every function call in the kernel isn't a nice thought either.
->
-> Robin.
+This first version is slightly different from the RFC, note that I did
+not maintain the Sean reviewed tag for that reason. With this version I
+don't touch the atomic_update function and all is implemented in the
+async_check/update functions. See the changelog for a list of changes.
+
+The patch was tested on a Samsung Chromebook Plus in two ways.
+
+ 1. Running all igt kms_cursor_legacy and kms_atomic at plane_cursor_legacy
+    tests and see that there is no regression after the patch.
+
+ 2. Running weston using the atomic API.
+
+Best regards,
+  Enric
+
+Changes in v1:
+- Rebased on top of drm-misc
+- In async_check call drm_atomic_helper_check_plane_state to check that
+  the desired plane is valid and update various bits of derived state
+  (clipped coordinates etc.)
+- In async_check allow to configure new scaling in the fast path.
+- In async_update force to flush all registered PSR encoders.
+- In async_update call atomic_update directly.
+- In async_update call vop_cfg_done needed to set the vop registers and take effect.
+
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 53 +++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index e9f91278137d..dab70056ee73 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -811,10 +811,63 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+ 	spin_unlock(&vop->reg_lock);
+ }
+ 
++static int vop_plane_atomic_async_check(struct drm_plane *plane,
++					struct drm_plane_state *state)
++{
++	struct vop_win *vop_win = to_vop_win(plane);
++	const struct vop_win_data *win = vop_win->data;
++	int min_scale = win->phy->scl ? FRAC_16_16(1, 8) :
++					DRM_PLANE_HELPER_NO_SCALING;
++	int max_scale = win->phy->scl ? FRAC_16_16(8, 1) :
++					DRM_PLANE_HELPER_NO_SCALING;
++	int ret;
++
++	if (plane != state->crtc->cursor)
++		return -EINVAL;
++
++	if (!plane->state)
++		return -EINVAL;
++
++	if (!plane->state->fb ||
++	    plane->state->fb != state->fb)
++		return -EINVAL;
++
++	ret = drm_atomic_helper_check_plane_state(plane->state,
++						  plane->crtc->state,
++						  min_scale, max_scale,
++						  true, true);
++	return ret;
++}
++
++static void vop_plane_atomic_async_update(struct drm_plane *plane,
++					  struct drm_plane_state *new_state)
++{
++	struct vop *vop = to_vop(plane->state->crtc);
++
++	plane->state->crtc_x = new_state->crtc_x;
++	plane->state->crtc_y = new_state->crtc_y;
++	plane->state->crtc_h = new_state->crtc_h;
++	plane->state->crtc_w = new_state->crtc_w;
++	plane->state->src_x = new_state->src_x;
++	plane->state->src_y = new_state->src_y;
++	plane->state->src_h = new_state->src_h;
++	plane->state->src_w = new_state->src_w;
++
++	if (vop->is_enabled) {
++		rockchip_drm_psr_flush_all(plane->dev);
++		vop_plane_atomic_update(plane, plane->state);
++		spin_lock(&vop->reg_lock);
++		vop_cfg_done(vop);
++		spin_unlock(&vop->reg_lock);
++	}
++}
++
+ static const struct drm_plane_helper_funcs plane_helper_funcs = {
+ 	.atomic_check = vop_plane_atomic_check,
+ 	.atomic_update = vop_plane_atomic_update,
+ 	.atomic_disable = vop_plane_atomic_disable,
++	.atomic_async_check = vop_plane_atomic_async_check,
++	.atomic_async_update = vop_plane_atomic_async_update,
+ };
+ 
+ static const struct drm_plane_funcs vop_plane_funcs = {
+-- 
+2.18.0
