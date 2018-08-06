@@ -1,51 +1,52 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Mon, 6 Aug 2018 19:53:54 +0800
-Subject: [PATCH v2 12/15] drm/mediatek: add callback function to return
- RDMA layer number
-In-Reply-To: <1533273202.31144.8.camel@mtksdaap41>
+Date: Mon, 6 Aug 2018 19:54:32 +0800
+Subject: [PATCH v2 11/15] drm/mediatek: add callback function to return
+ OVL layer number
+In-Reply-To: <1533273092.31144.7.camel@mtksdaap41>
 References: <1533265868-28110-1-git-send-email-stu.hsieh@mediatek.com>
- <1533265868-28110-13-git-send-email-stu.hsieh@mediatek.com>
- <1533273202.31144.8.camel@mtksdaap41>
-Message-ID: <1533556434.11190.70.camel@mtksdccf07>
+ <1533265868-28110-12-git-send-email-stu.hsieh@mediatek.com>
+ <1533273092.31144.7.camel@mtksdaap41>
+Message-ID: <1533556472.11190.71.camel@mtksdccf07>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi, CK:
-
-On Fri, 2018-08-03 at 13:13 +0800, CK Hu wrote:
+On Fri, 2018-08-03 at 13:11 +0800, CK Hu wrote:
 > Hi, Stu:
 > 
 > On Fri, 2018-08-03 at 11:11 +0800, Stu Hsieh wrote:
-> > This patch add callback function to return RDMA layer number
+> > This patch add callback function to return OVL layer number
 > > 
 > > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 > > ---
-> >  drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 10 ++++++++++
+> >  drivers/gpu/drm/mediatek/mtk_disp_ovl.c | 10 ++++++++++
 > >  1 file changed, 10 insertions(+)
 > > 
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> > index b728f0f42611..8c145a87c9e5 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> > @@ -60,6 +60,7 @@
-> >  
-> >  struct mtk_disp_rdma_data {
-> >  	unsigned int fifo_size;
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> > index 978782a77629..a42cfa057f42 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> > @@ -58,6 +58,7 @@
+> >  struct mtk_disp_ovl_data {
+> >  	unsigned int addr;
+> >  	bool fmt_rgb565_is_0;
 > > +	unsigned int layer_nr;
 > >  };
 > >  
 > >  /**
-> > @@ -194,6 +195,13 @@ static unsigned int rdma_fmt_convert(struct mtk_disp_rdma *rdma,
-> >  	}
+> > @@ -132,6 +133,13 @@ static void mtk_ovl_config(struct mtk_ddp_comp *comp, unsigned int w,
+> >  	writel(0x0, comp->regs + DISP_REG_OVL_RST);
 > >  }
 > >  
-> > +static unsigned int mtk_rdma_layer_nr(struct mtk_ddp_comp *comp)
+> > +static unsigned int mtk_ovl_layer_nr(struct mtk_ddp_comp *comp)
 > > +{
-> > +	struct mtk_disp_rdma *rdma = comp_to_rdma(comp);
+> > +	struct mtk_disp_ovl *ovl = comp_to_ovl(comp);
 > > +
-> > +	return rdma->data->layer_nr;
+> > +	return ovl->data->layer_nr;
 > 
-> Maybe RDMA always has one layer, so you could just return 1 here.
+> For now, MT8173, MT2712, MT2701 OVL all has 4 layer, so you could return
+> 4 here. Once a SoC OVL has another layer number, then modified the code
+> to this statement.
 > 
 > Regards,
 > CK
@@ -57,24 +58,24 @@ Stu
 
 > > +}
 > > +
-> >  static void mtk_rdma_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
-> >  				  struct mtk_plane_state *state)
+> >  static void mtk_ovl_layer_on(struct mtk_ddp_comp *comp, unsigned int idx)
 > >  {
-> > @@ -227,6 +235,7 @@ static const struct mtk_ddp_comp_funcs mtk_disp_rdma_funcs = {
-> >  	.stop = mtk_rdma_stop,
-> >  	.enable_vblank = mtk_rdma_enable_vblank,
-> >  	.disable_vblank = mtk_rdma_disable_vblank,
-> > +	.layer_nr = mtk_rdma_layer_nr,
-> >  	.layer_config = mtk_rdma_layer_config,
+> >  	unsigned int reg;
+> > @@ -221,6 +229,7 @@ static const struct mtk_ddp_comp_funcs mtk_disp_ovl_funcs = {
+> >  	.stop = mtk_ovl_stop,
+> >  	.enable_vblank = mtk_ovl_enable_vblank,
+> >  	.disable_vblank = mtk_ovl_disable_vblank,
+> > +	.layer_nr = mtk_ovl_layer_nr,
+> >  	.layer_on = mtk_ovl_layer_on,
+> >  	.layer_off = mtk_ovl_layer_off,
+> >  	.layer_config = mtk_ovl_layer_config,
+> > @@ -319,6 +328,7 @@ static const struct mtk_disp_ovl_data mt2701_ovl_driver_data = {
+> >  static const struct mtk_disp_ovl_data mt8173_ovl_driver_data = {
+> >  	.addr = DISP_REG_OVL_ADDR_MT8173,
+> >  	.fmt_rgb565_is_0 = true,
+> > +	.layer_nr = 4,
 > >  };
 > >  
-> > @@ -329,6 +338,7 @@ static const struct mtk_disp_rdma_data mt2701_rdma_driver_data = {
-> >  
-> >  static const struct mtk_disp_rdma_data mt8173_rdma_driver_data = {
-> >  	.fifo_size = SZ_8K,
-> > +	.layer_nr = 1,
-> >  };
-> >  
-> >  static const struct of_device_id mtk_disp_rdma_driver_dt_match[] = {
+> >  static const struct of_device_id mtk_disp_ovl_driver_dt_match[] = {
 > 
 > 
