@@ -1,43 +1,41 @@
 From: sjhuang@iluvatar.ai (Huang Shijie)
-Date: Mon,  6 Aug 2018 16:52:24 +0800
-Subject: [PATCH v2 2/9] dmaengine: stm32-mdma: use
+Date: Mon,  6 Aug 2018 16:52:29 +0800
+Subject: [PATCH v2 7/9] dmaengine: pxa_dma: use
  dmaenginem_async_device_register to simplify the code
 In-Reply-To: <20180806085231.4597-1-sjhuang@iluvatar.ai>
 References: <20180806085231.4597-1-sjhuang@iluvatar.ai>
-Message-ID: <20180806085231.4597-3-sjhuang@iluvatar.ai>
+Message-ID: <20180806085231.4597-8-sjhuang@iluvatar.ai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use dmaenginem_async_device_register to simplify the code:
 	remove dma_async_device_unregister.
 
-Acked-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 Signed-off-by: Huang Shijie <sjhuang@iluvatar.ai>
 ---
- drivers/dma/stm32-mdma.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/dma/pxa_dma.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
-index 06dd1725375e..390e4cae0e1a 100644
---- a/drivers/dma/stm32-mdma.c
-+++ b/drivers/dma/stm32-mdma.c
-@@ -1656,7 +1656,7 @@ static int stm32_mdma_probe(struct platform_device *pdev)
- 		return ret;
- 	}
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index b31c28b67ad3..21001ea078fb 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -1285,7 +1285,6 @@ static int pxad_remove(struct platform_device *op)
  
--	ret = dma_async_device_register(dd);
-+	ret = dmaenginem_async_device_register(dd);
- 	if (ret)
- 		return ret;
- 
-@@ -1674,8 +1674,6 @@ static int stm32_mdma_probe(struct platform_device *pdev)
+ 	pxad_cleanup_debugfs(pdev);
+ 	pxad_free_channels(&pdev->slave);
+-	dma_async_device_unregister(&pdev->slave);
  	return 0;
- 
- err_unregister:
--	dma_async_device_unregister(dd);
--
- 	return ret;
  }
  
+@@ -1396,7 +1395,7 @@ static int pxad_init_dmadev(struct platform_device *op,
+ 		init_waitqueue_head(&c->wq_state);
+ 	}
+ 
+-	return dma_async_device_register(&pdev->slave);
++	return dmaenginem_async_device_register(&pdev->slave);
+ }
+ 
+ static int pxad_probe(struct platform_device *op)
 -- 
 2.17.1
