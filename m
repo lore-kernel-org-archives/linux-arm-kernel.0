@@ -1,146 +1,215 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Mon, 6 Aug 2018 20:27:02 +0800
-Subject: [PATCH v4 3/5] iommu/io-pgtable-arm: add support for non-strict mode
-In-Reply-To: <1533558424-16748-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1533558424-16748-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1533558424-16748-4-git-send-email-thunder.leizhen@huawei.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 06 Aug 2018 14:29:50 +0200
+Subject: [PATCH v3 3/3] dmaengine: imx-sdma: allocate max 20 bds for one
+ transfer
+In-Reply-To: <DB6PR04MB3223BB3159EB8D376BE64B3E89200@DB6PR04MB3223.eurprd04.prod.outlook.com>
+References: <1532367972-29707-1-git-send-email-yibin.gong@nxp.com>
+ <1532367972-29707-4-git-send-email-yibin.gong@nxp.com>
+ <1532343252.3163.99.camel@pengutronix.de>
+ <DB6PR04MB322323354B2184421502FC5889560@DB6PR04MB3223.eurprd04.prod.outlook.com>
+ <1532424136.32306.3.camel@pengutronix.de>
+ <DB6PR04MB32233768DB36BB208206EBCE89540@DB6PR04MB3223.eurprd04.prod.outlook.com>
+ <DB6PR04MB3223BB3159EB8D376BE64B3E89200@DB6PR04MB3223.eurprd04.prod.outlook.com>
+Message-ID: <1533558590.2809.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support the non-strict mode, now we only tlbi and sync for the strict
-mode. But for the non-leaf case, always follow strict mode.
+Hi Robin,
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/iommu/io-pgtable-arm.c | 27 ++++++++++++++++++---------
- drivers/iommu/io-pgtable.h     |  3 +++
- 2 files changed, 21 insertions(+), 9 deletions(-)
+Am Montag, den 06.08.2018, 08:04 +0000 schrieb Robin Gong:
+> Hello Lucas,
+> 	Any comment for my reply?
 
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 010a254..bb61bef 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -292,7 +292,7 @@ static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
+So I've looked at this again and sadly I need to NACK this patch. It is
+a total API abuse of the dma_pool API and even the patch introducing
+the dma_pool usage in this driver is wrong and should be reverted.
 
- static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
- 			       unsigned long iova, size_t size, int lvl,
--			       arm_lpae_iopte *ptep);
-+			       arm_lpae_iopte *ptep, bool strict);
+The SDMA need contiguous buffer descriptors for each channel, something
+the dma_pool abstraction isn't able to provide. So either the dma_pool
+implementation needs to be extended to support this use-case, or you
+can't use this at all in the sdma driver. Adding hacks, which are
+abusing the API, to cram a dma_pool into the sdma driver is not a valid
+way to implement things for upstream.
 
- static void __arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
- 				phys_addr_t paddr, arm_lpae_iopte prot,
-@@ -319,6 +319,7 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
- 			     arm_lpae_iopte prot, int lvl,
- 			     arm_lpae_iopte *ptep)
- {
-+	size_t unmapped;
- 	arm_lpae_iopte pte = *ptep;
+Regards,
+Lucas
 
- 	if (iopte_leaf(pte, lvl)) {
-@@ -334,7 +335,8 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
- 		size_t sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
-
- 		tblp = ptep - ARM_LPAE_LVL_IDX(iova, lvl, data);
--		if (WARN_ON(__arm_lpae_unmap(data, iova, sz, lvl, tblp) != sz))
-+		unmapped = __arm_lpae_unmap(data, iova, sz, lvl, tblp, true);
-+		if (WARN_ON(unmapped != sz))
- 			return -EINVAL;
- 	}
-
-@@ -576,15 +578,17 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
- 	}
-
- 	if (unmap_idx < 0)
--		return __arm_lpae_unmap(data, iova, size, lvl, tablep);
-+		return __arm_lpae_unmap(data, iova, size, lvl, tablep, true);
-
- 	io_pgtable_tlb_add_flush(&data->iop, iova, size, size, true);
-+	io_pgtable_tlb_sync(&data->iop);
-+
- 	return size;
- }
-
- static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
- 			       unsigned long iova, size_t size, int lvl,
--			       arm_lpae_iopte *ptep)
-+			       arm_lpae_iopte *ptep, bool strict)
- {
- 	arm_lpae_iopte pte;
- 	struct io_pgtable *iop = &data->iop;
-@@ -609,7 +613,7 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
- 			io_pgtable_tlb_sync(iop);
- 			ptep = iopte_deref(pte, data);
- 			__arm_lpae_free_pgtable(data, lvl + 1, ptep);
--		} else {
-+		} else if (strict) {
- 			io_pgtable_tlb_add_flush(iop, iova, size, size, true);
- 		}
-
-@@ -625,12 +629,13 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
-
- 	/* Keep on walkin' */
- 	ptep = iopte_deref(pte, data);
--	return __arm_lpae_unmap(data, iova, size, lvl + 1, ptep);
-+	return __arm_lpae_unmap(data, iova, size, lvl + 1, ptep, strict);
- }
-
- static size_t arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
- 			     size_t size)
- {
-+	bool strict;
- 	struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
- 	arm_lpae_iopte *ptep = data->pgd;
- 	int lvl = ARM_LPAE_START_LVL(data);
-@@ -638,7 +643,9 @@ static size_t arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
- 	if (WARN_ON(iova >= (1ULL << data->iop.cfg.ias)))
- 		return 0;
-
--	return __arm_lpae_unmap(data, iova, size, lvl, ptep);
-+	strict = !(data->iop.cfg.quirks & IO_PGTABLE_QUIRK_NON_STRICT);
-+
-+	return __arm_lpae_unmap(data, iova, size, lvl, ptep, strict);
- }
-
- static phys_addr_t arm_lpae_iova_to_phys(struct io_pgtable_ops *ops,
-@@ -771,7 +778,8 @@ static void arm_lpae_restrict_pgsizes(struct io_pgtable_cfg *cfg)
- 	u64 reg;
- 	struct arm_lpae_io_pgtable *data;
-
--	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA))
-+	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA |
-+			IO_PGTABLE_QUIRK_NON_STRICT))
- 		return NULL;
-
- 	data = arm_lpae_alloc_pgtable(cfg);
-@@ -863,7 +871,8 @@ static void arm_lpae_restrict_pgsizes(struct io_pgtable_cfg *cfg)
- 	struct arm_lpae_io_pgtable *data;
-
- 	/* The NS quirk doesn't apply at stage 2 */
--	if (cfg->quirks & ~IO_PGTABLE_QUIRK_NO_DMA)
-+	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_NO_DMA |
-+		IO_PGTABLE_QUIRK_NON_STRICT))
- 		return NULL;
-
- 	data = arm_lpae_alloc_pgtable(cfg);
-diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-index 2df7909..beb14a3 100644
---- a/drivers/iommu/io-pgtable.h
-+++ b/drivers/iommu/io-pgtable.h
-@@ -71,12 +71,15 @@ struct io_pgtable_cfg {
- 	 *	be accessed by a fully cache-coherent IOMMU or CPU (e.g. for a
- 	 *	software-emulated IOMMU), such that pagetable updates need not
- 	 *	be treated as explicit DMA data.
-+	 * IO_PGTABLE_QUIRK_NON_STRICT: Put off TLBs invalidation and release
-+	 *	memory first.
- 	 */
- 	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
- 	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
- 	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2)
- 	#define IO_PGTABLE_QUIRK_ARM_MTK_4GB	BIT(3)
- 	#define IO_PGTABLE_QUIRK_NO_DMA		BIT(4)
-+	#define IO_PGTABLE_QUIRK_NON_STRICT	BIT(5)
- 	unsigned long			quirks;
- 	unsigned long			pgsize_bitmap;
- 	unsigned int			ias;
---
-1.8.3
+> > -----Original Message-----
+> > From: Robin Gong
+> > Sent: 2018?7?25? 9:25
+> > To: 'Lucas Stach' <l.stach@pengutronix.de>; vkoul at kernel.org;
+> > dan.j.williams at intel.com; s.hauer at pengutronix.de; linux at armlinux.or
+> > g.uk
+> > Cc: dmaengine at vger.kernel.org; dl-linux-imx <linux-imx@nxp.com>;
+> > kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
+> > linux-kernel at vger.kernel.org
+> > Subject: RE: [PATCH v3 3/3] dmaengine: imx-sdma: allocate max 20
+> > bds for one
+> > transfer
+> > 
+> > > -----Original Message-----
+> > > From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> > > Sent: 2018?7?24? 17:22
+> > > To: Robin Gong <yibin.gong@nxp.com>; vkoul at kernel.org;
+> > > dan.j.williams at intel.com; s.hauer at pengutronix.de;
+> > > linux at armlinux.org.uk
+> > > Cc: dmaengine at vger.kernel.org; dl-linux-imx <linux-imx@nxp.com>;
+> > > kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
+> > > linux-kernel at vger.kernel.org
+> > > Subject: Re: [PATCH v3 3/3] dmaengine: imx-sdma: allocate max 20
+> > > bds
+> > > for one transfer
+> > > 
+> > > Am Montag, den 23.07.2018, 13:55 +0000 schrieb Robin Gong:
+> > > > > -----Original Message-----
+> > > > > From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> > > > > Sent: 2018?7?23? 18:54
+> > > > > To: Robin Gong <yibin.gong@nxp.com>; vkoul at kernel.org;
+> > > > > dan.j.williams at intel.com; s.hauer at pengutronix.de;
+> > > > > linux at armlinux.or g.uk
+> > > > > Cc: dmaengine at vger.kernel.org; dl-linux-imx <linux-imx@nxp.co
+> > > > > m>;
+> > > > > kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
+> > > > > linux-kernel at vger.kernel.org
+> > > > > Subject: Re: [PATCH v3 3/3] dmaengine: imx-sdma: allocate max
+> > > > > 20
+> > > > > bds for one transfer
+> > > > > 
+> > > > > Am Dienstag, den 24.07.2018, 01:46 +0800 schrieb Robin Gong:
+> > > > > > If multi-bds used in one transfer, all bds should be
+> > > > > > consisten
+> > > > > > memory.To easily follow it, enlarge the dma pool size into
+> > > > > > 20
+> > > > > > bds, and it will report error if the number of bds is over
+> > > > > > than
+> > > > > > 20. For dmatest, the max count for single transfer is
+> > > > > > NUM_BD *
+> > > > > 
+> > > > > SDMA_BD_MAX_CNT
+> > > > > > = 20 * 65535 = ~1.28MB.
+> > > > > 
+> > > > > Both the commit message and the comment need a lot more care
+> > > > > to
+> > > > > actually tell what this commit is trying to achieve.
+> > > > > Currently I
+> > > > > don't follow at all. What does "consisten" mean? Do you mean
+> > > > > BDs
+> > > > > should be contiguous in memory?
+> > > > 
+> > > > Yes, BDs should be contiguous??one by one in memory.
+> > > 
+> > > Okay, but this isn't what the code change does. By increasing the
+> > > size
+> > > parameter of the dma pool you just allocate 20 times as much
+> > > memory as
+> > > needed for each BD. So actually the BDs end up being very non-
+> > > contiguous in memory as there are now holes of 19 BD sizes
+> > > between the
+> > 
+> > start of each BD.
+> > Please notice only allocate bds memory from dma pool one time even
+> > in multi
+> > bds.
+> > That's different with the common use case that allocate memory from
+> > dma
+> > pool everytime for every bd. Why do this is to make sure all bd
+> > memory is
+> > contiguous for single transfer whatever single bd or multi-bds,
+> > since two call
+> > dma_pool_alloc() can't promise the address is contiguous especially
+> > for multi
+> > thread case such as dmatest 'threads_per_chan = 5'. You can change
+> > to '
+> > norandom=true ' and ' test_buf_size = 163840' in dmatest.c to look
+> > what issue
+> > coming without this patch.
+> > > 
+> > > So something isn't right with this change.
+> > 
+> > I think this patch is the easy way to resolve the bd contiguous
+> > issue, but the
+> > cost is to allocate more dma pool memory which may not used.
+> > > 
+> > > Regards,
+> > > Lucas
+> > > 
+> > > > > 
+> > > > > What do you gain by over-allocating each BD by a factor of
+> > > > > 20?
+> > > > 
+> > > > I guess dma_pool_alloc will return error in such case, and then
+> > > > cause dma setup transfer failure.
+> > > > > 
+> > > > > Regards,
+> > > > > Lucas
+> > > > > 
+> > > > > > Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+> > > > > > ---
+> > > > > > ?drivers/dma/imx-sdma.c | 17 ++++++++++++++++-
+> > > > > > ?1 file changed, 16 insertions(+), 1 deletion(-)
+> > > > > > 
+> > > > > > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-
+> > > > > > sdma.c
+> > > > > > index
+> > > > > > b4ec2d2..5973489 100644
+> > > > > > --- a/drivers/dma/imx-sdma.c
+> > > > > > +++ b/drivers/dma/imx-sdma.c
+> > > > > > @@ -298,6 +298,15 @@ struct sdma_context_data {
+> > > > > > > ?	u32??scratch7;
+> > > > > > 
+> > > > > > ?} __attribute__ ((packed));
+> > > > > > 
+> > > > > > +/*
+> > > > > > + * All bds in one transfer should be consitent on SDMA. To
+> > > > > > easily
+> > > > > > +follow it,just
+> > > > > > + * set the dma pool size as the enough bds. For example,
+> > > > > > in
+> > > > > > dmatest
+> > > > > > +case, the
+> > > > > > + * max 20 bds means the max for single transfer is NUM_BD
+> > > > > > *
+> > > > > > +SDMA_BD_MAX_CNT = 20
+> > > > > > + * * 65535 = ~1.28MB. 20 bds supposed to be enough
+> > > > > > basically.If
+> > > > > > it's
+> > > > > > +still not
+> > > > > > + * enough in some specific cases, enlarge it here.Warning
+> > > > > > message
+> > > > > > +would also
+> > > > > > + * appear if the bd numbers is over than 20.
+> > > > > > + */
+> > > > > > +#define NUM_BD 20
+> > > > > > 
+> > > > > > ?struct sdma_engine;
+> > > > > > 
+> > > > > > @@ -1273,7 +1282,7 @@ static int
+> > > > > > sdma_alloc_chan_resources(struct dma_chan *chan)
+> > > > > > > ?		goto disable_clk_ahb;
+> > > > > > > ?	sdmac->bd_pool = dma_pool_create("bd_pool",
+> > > > > > > chan-
+> > > > > > > > device->dev,
+> > > > > > > 
+> > > > > > > -				sizeof(struct
+> > > > > > > sdma_buffer_descriptor),
+> > > > > > > +				NUM_BD * sizeof(struct
+> > > > > > > sdma_buffer_descriptor),
+> > > > > > > ?				32, 0);
+> > > > > > > ?	return 0;
+> > > > > > 
+> > > > > > @@ -1314,6 +1323,12 @@ static struct sdma_desc
+> > > > > > *sdma_transfer_init(struct sdma_channel *sdmac,
+> > > > > > ?{
+> > > > > > > ?	struct sdma_desc *desc;
+> > > > > > > +	if (bds > NUM_BD) {
+> > > > > > > +		dev_err(sdmac->sdma->dev, "%d bds exceed
+> > > > > > > the
+> > > > > > > max %d\n",
+> > > > > > > +			bds, NUM_BD);
+> > > > > > > +		goto err_out;
+> > > > > > > +	}
+> > > > > > 
+> > > > > > +
+> > > > > > > ?	desc = kzalloc((sizeof(*desc)), GFP_NOWAIT);
+> > > > > > > ?	if (!desc)
+> > > > > > > ?		goto err_out;
