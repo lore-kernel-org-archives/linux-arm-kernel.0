@@ -1,30 +1,48 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Tue, 7 Aug 2018 01:16:18 +0200
-Subject: [RFC PATCH 3/9] crypto: chacha20-generic - refactor to allow
- varying number of rounds
-In-Reply-To: <20180806223300.113891-4-ebiggers@kernel.org>
-References: <20180806223300.113891-1-ebiggers@kernel.org>
- <20180806223300.113891-4-ebiggers@kernel.org>
-Message-ID: <CAHmME9rbe6eT6dkUqKnp-GxcqGrp-tvMfTMr8kZtsn=S3cmP8A@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 7 Aug 2018 01:29:43 +0200
+Subject: [RFC PATCH v2 09/12] gpiolib: Identify GPIO descriptor arrays
+ with direct mapping
+In-Reply-To: <20180806222918.12644-10-jmkrzyszt@gmail.com>
+References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
+ <20180806222918.12644-1-jmkrzyszt@gmail.com>
+ <20180806222918.12644-10-jmkrzyszt@gmail.com>
+Message-ID: <CACRpkdZtuU6zXBz6UqprE7-31vW9-1ZabFjyzHBgWaTgmqkbbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Eric,
+Hi Janusz!
 
-On Tue, Aug 7, 2018 at 12:35 AM Eric Biggers <ebiggers@kernel.org> wrote:
-> In preparation for adding XChaCha12 support, rename/refactor
-> chacha20-generic to support different numbers of rounds.
+On Tue, Aug 7, 2018 at 12:29 AM Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
 
-I'm interested in learning the motivation behind going with ChaCha12.
-So far, the vast majority of users of ChaCha have been getting along
-quite fine with ChaCha20 and enjoying the very large security margin
-this provides. In some ways, introducing ChaCha12 into the ecosystem
-feels like a bit of a step backwards, even if it probably still
-provides adequate security (though ChaCha8 probably shouldn't be used
-or included at all). I realize the simple answer is just, "because
-it's faster." But I'm wondering specifically about the speed
-requirements and on what hardware and in what circumstances you found
-ChaCha20 was too slow, and if this is the kind of circumstance you
-expect to persist into the future.
+> Certain GPIO array lookup results may map directly to GPIO pins of a
+> single GPIO chip in hardware order.  If that condition is recognized
+> and handled efficiently, significant performance gain of get/set array
+> functions may be possible.
+>
+> While processing a request for an array of GPIO descriptors, verify if
+> the descriptors just collected represent consecutive pins of a single
+> GPIO chip.  Pass that information with the array to the caller so it
+> can benefit from enhanced performance as soon as bitmap based get/set
+> array functions which can make efficient use of that are available.
+>
+> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+(...)
+>  This function returns a struct gpio_descs which contains an array of
+> -descriptors::
+> +descriptors.  It may also contain a valid descriptor of a single GPIO chip in
+> +case the array strictly matches pin hardware layout of the chip::
+>
+>         struct gpio_descs {
+>                 unsigned int ndescs;
+>                 struct gpio_desc *desc[];
+> +               struct gpio_chip *chip;
 
-Jason
+This must be motivated: if the only purpose is to indicate to the consumer that
+all GPIOs are on the same chip, why not just have a
+
+bool all_on_same_chip;
+
+That you set to true if these are all on the same chip?
+
+Yours,
+Linus Walleij
