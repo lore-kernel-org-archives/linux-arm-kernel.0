@@ -1,54 +1,110 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Mon, 6 Aug 2018 11:37:55 +0200
-Subject: [PATCH v8 09/26] kernel/cpu_pm: Manage runtime PM in the idle
- path for CPUs
-In-Reply-To: <CAPDyKFrmP15+_hyRp44Jw-wsTmsNFKORdCeGJEgW8o0OoKiHhA@mail.gmail.com>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <2056372.NMt4aPaF4h@aspire.rjw.lan> <2205807.cU2puvubpP@aspire.rjw.lan>
- <1726374.375PCQfjLZ@aspire.rjw.lan>
- <CAPDyKFrmP15+_hyRp44Jw-wsTmsNFKORdCeGJEgW8o0OoKiHhA@mail.gmail.com>
-Message-ID: <CAJZ5v0hk1wfm10fyycmddKF6wR4D51r30fD_-J5UDMbtB3+V-Q@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 6 Aug 2018 11:41:11 +0200
+Subject: [PATCH RESEND 2/5] spi: imx: Use dynamic bursts only when
+ bits_per_word is 8, 16 or 32
+In-Reply-To: <20180717143154.28241-3-maxime.chevallier@bootlin.com>
+References: <20180717143154.28241-1-maxime.chevallier@bootlin.com>
+ <20180717143154.28241-3-maxime.chevallier@bootlin.com>
+Message-ID: <20180806094111.uutolczqccm2e2ot@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 3, 2018 at 1:42 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> [...]
->
->>>
->>> Assuming that I have got that right, there are concerns, mostly regarding
->>> patch [07/26], but I will reply to that directly.
->>
->> Well, I haven't got that right, so never mind.
->>
->> There are a few minor things to address, but apart from that the general
->> genpd patches look ready.
->
-> Alright, thanks!
->
-> I will re-spin the series and post a new version once 4.19 rc1 is out.
-> Hopefully we can queue it up early in next cycle to get it tested in
-> next for a while.
->
->>
->>> The $subject patch is fine by me by itself, but it obviously depends on the
->>> previous ones.  Patches [01-02/26] are fine too, but they don't seem to be
->>> particularly useful without the rest of the series.
->>>
->>> As far as patches [10-26/26] go, I'd like to see some review comments and/or
->>> tags from the people with vested interest in there, in particular from Daniel
->>> on patch [12/26] and from Sudeep on the PSCI ones.
->>
->> But this still holds.
->
-> Actually, patch 10 and patch11 is ready to go as well. I ping Daniel
-> on patch 12.
->
-> In regards to the rest of the series, some of the PSCI/ARM changes
-> have been reviewed by Mark Rutland, however several changes have not
-> been acked.
->
-> On the other hand, one can also interpret the long silence in regards
-> to PSCI/ARM changes as they are good to go. :-)
+On Tue, Jul 17, 2018 at 04:31:51PM +0200, Maxime Chevallier wrote:
+> The dynamic bursts mode allows to group together multiple words into a
+> single burst. To do so, it's necessary that words can be packed into the
+> 32-bits FIFO entries, so we can't allow using this mode with bit_per_words
+> different to 8, 16 or 32.
+> 
+> This prevents shitfing out extra clock ticks for transfers with
 
-Well, in that case giving an ACK to them should not be an issue for
-the people with a vested interest I suppose.
+s/shitfing/shifting/
+
+> bit_per_word values not aligned on 8 bits.
+> 
+> With that , we are sure that only the correct number of bits is
+> shifted out at each transfer, so we don't need to mask out the remaining
+> parts of the words.
+> 
+> Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+
+Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Sascha
+
+> ---
+>  drivers/spi/spi-imx.c | 23 +++++++++--------------
+>  1 file changed, 9 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index d75153c995af..ecafbda5ec94 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -95,7 +95,6 @@ struct spi_imx_data {
+>  	const void *tx_buf;
+>  	unsigned int txfifo; /* number of words pushed in tx FIFO */
+>  	unsigned int dynamic_burst, read_u32;
+> -	unsigned int word_mask;
+>  
+>  	/* Slave mode */
+>  	bool slave_mode;
+> @@ -291,7 +290,6 @@ static void spi_imx_buf_rx_swap_u32(struct spi_imx_data *spi_imx)
+>  		else if (bytes_per_word == 2)
+>  			val = (val << 16) | (val >> 16);
+>  #endif
+> -		val &= spi_imx->word_mask;
+>  		*(u32 *)spi_imx->rx_buf = val;
+>  		spi_imx->rx_buf += sizeof(u32);
+>  	}
+> @@ -322,7 +320,6 @@ static void spi_imx_buf_tx_swap_u32(struct spi_imx_data *spi_imx)
+>  
+>  	if (spi_imx->tx_buf) {
+>  		val = *(u32 *)spi_imx->tx_buf;
+> -		val &= spi_imx->word_mask;
+>  		spi_imx->tx_buf += sizeof(u32);
+>  	}
+>  
+> @@ -1102,25 +1099,23 @@ static int spi_imx_setupxfer(struct spi_device *spi,
+>  	spi_imx->bits_per_word = t->bits_per_word;
+>  	spi_imx->speed_hz  = t->speed_hz;
+>  
+> -	/* Initialize the functions for transfer */
+> -	if (spi_imx->devtype_data->dynamic_burst && !spi_imx->slave_mode) {
+> -		u32 mask;
+> +	/*
+> +	 * Initialize the functions for transfer. To transfer non byte-aligned
+> +	 * words, we have to use multiple word-size bursts, we can't use
+> +	 * dynamic_burst in that case.
+> +	 */
+> +	if (spi_imx->devtype_data->dynamic_burst && !spi_imx->slave_mode &&
+> +	    (spi_imx->bits_per_word == 8 ||
+> +	    spi_imx->bits_per_word == 16 ||
+> +	    spi_imx->bits_per_word == 32)) {
+>  
+>  		spi_imx->read_u32  = 1;
+>  
+> -		mask = (1 << spi_imx->bits_per_word) - 1;
+>  		spi_imx->rx = spi_imx_buf_rx_swap;
+>  		spi_imx->tx = spi_imx_buf_tx_swap;
+>  		spi_imx->dynamic_burst = 1;
+>  		spi_imx->remainder = t->len;
+>  
+> -		if (spi_imx->bits_per_word <= 8)
+> -			spi_imx->word_mask = mask << 24 | mask << 16
+> -					     | mask << 8 | mask;
+> -		else if (spi_imx->bits_per_word <= 16)
+> -			spi_imx->word_mask = mask << 16 | mask;
+> -		else
+> -			spi_imx->word_mask = mask;
+>  	} else {
+>  		if (spi_imx->bits_per_word <= 8) {
+>  			spi_imx->rx = spi_imx_buf_rx_u8;
+> -- 
+> 2.11.0
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
