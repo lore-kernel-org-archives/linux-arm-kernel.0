@@ -1,110 +1,61 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 6 Aug 2018 11:41:11 +0200
-Subject: [PATCH RESEND 2/5] spi: imx: Use dynamic bursts only when
- bits_per_word is 8, 16 or 32
-In-Reply-To: <20180717143154.28241-3-maxime.chevallier@bootlin.com>
-References: <20180717143154.28241-1-maxime.chevallier@bootlin.com>
- <20180717143154.28241-3-maxime.chevallier@bootlin.com>
-Message-ID: <20180806094111.uutolczqccm2e2ot@pengutronix.de>
+From: sjhuang@iluvatar.ai (Huang Shijie)
+Date: Mon,  6 Aug 2018 17:43:28 +0800
+Subject: [PATCH V2 fix] dmaengine: st_fdma: use
+ dmaenginem_async_device_register to simplify the code
+In-Reply-To: <20180806085231.4597-4-sjhuang@iluvatar.ai>
+References: <20180806085231.4597-4-sjhuang@iluvatar.ai>
+Message-ID: <20180806094328.15483-1-sjhuang@iluvatar.ai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 17, 2018 at 04:31:51PM +0200, Maxime Chevallier wrote:
-> The dynamic bursts mode allows to group together multiple words into a
-> single burst. To do so, it's necessary that words can be packed into the
-> 32-bits FIFO entries, so we can't allow using this mode with bit_per_words
-> different to 8, 16 or 32.
-> 
-> This prevents shitfing out extra clock ticks for transfers with
+Use dmaenginem_async_device_register to simplify the code:
+	remove dma_async_device_unregister.
+	remove label err_dma_dev
 
-s/shitfing/shifting/
+Signed-off-by: Huang Shijie <sjhuang@iluvatar.ai>
+---
+Remove the label err_dma_dev
+---
+ drivers/dma/st_fdma.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-> bit_per_word values not aligned on 8 bits.
-> 
-> With that , we are sure that only the correct number of bits is
-> shifted out at each transfer, so we don't need to mask out the remaining
-> parts of the words.
-> 
-> Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
-
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-Sascha
-
-> ---
->  drivers/spi/spi-imx.c | 23 +++++++++--------------
->  1 file changed, 9 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index d75153c995af..ecafbda5ec94 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -95,7 +95,6 @@ struct spi_imx_data {
->  	const void *tx_buf;
->  	unsigned int txfifo; /* number of words pushed in tx FIFO */
->  	unsigned int dynamic_burst, read_u32;
-> -	unsigned int word_mask;
->  
->  	/* Slave mode */
->  	bool slave_mode;
-> @@ -291,7 +290,6 @@ static void spi_imx_buf_rx_swap_u32(struct spi_imx_data *spi_imx)
->  		else if (bytes_per_word == 2)
->  			val = (val << 16) | (val >> 16);
->  #endif
-> -		val &= spi_imx->word_mask;
->  		*(u32 *)spi_imx->rx_buf = val;
->  		spi_imx->rx_buf += sizeof(u32);
->  	}
-> @@ -322,7 +320,6 @@ static void spi_imx_buf_tx_swap_u32(struct spi_imx_data *spi_imx)
->  
->  	if (spi_imx->tx_buf) {
->  		val = *(u32 *)spi_imx->tx_buf;
-> -		val &= spi_imx->word_mask;
->  		spi_imx->tx_buf += sizeof(u32);
->  	}
->  
-> @@ -1102,25 +1099,23 @@ static int spi_imx_setupxfer(struct spi_device *spi,
->  	spi_imx->bits_per_word = t->bits_per_word;
->  	spi_imx->speed_hz  = t->speed_hz;
->  
-> -	/* Initialize the functions for transfer */
-> -	if (spi_imx->devtype_data->dynamic_burst && !spi_imx->slave_mode) {
-> -		u32 mask;
-> +	/*
-> +	 * Initialize the functions for transfer. To transfer non byte-aligned
-> +	 * words, we have to use multiple word-size bursts, we can't use
-> +	 * dynamic_burst in that case.
-> +	 */
-> +	if (spi_imx->devtype_data->dynamic_burst && !spi_imx->slave_mode &&
-> +	    (spi_imx->bits_per_word == 8 ||
-> +	    spi_imx->bits_per_word == 16 ||
-> +	    spi_imx->bits_per_word == 32)) {
->  
->  		spi_imx->read_u32  = 1;
->  
-> -		mask = (1 << spi_imx->bits_per_word) - 1;
->  		spi_imx->rx = spi_imx_buf_rx_swap;
->  		spi_imx->tx = spi_imx_buf_tx_swap;
->  		spi_imx->dynamic_burst = 1;
->  		spi_imx->remainder = t->len;
->  
-> -		if (spi_imx->bits_per_word <= 8)
-> -			spi_imx->word_mask = mask << 24 | mask << 16
-> -					     | mask << 8 | mask;
-> -		else if (spi_imx->bits_per_word <= 16)
-> -			spi_imx->word_mask = mask << 16 | mask;
-> -		else
-> -			spi_imx->word_mask = mask;
->  	} else {
->  		if (spi_imx->bits_per_word <= 8) {
->  			spi_imx->rx = spi_imx_buf_rx_u8;
-> -- 
-> 2.11.0
-> 
-> 
-
+diff --git a/drivers/dma/st_fdma.c b/drivers/dma/st_fdma.c
+index bfb79bd0c6de..07c20aa2e955 100644
+--- a/drivers/dma/st_fdma.c
++++ b/drivers/dma/st_fdma.c
+@@ -833,7 +833,7 @@ static int st_fdma_probe(struct platform_device *pdev)
+ 	fdev->dma_device.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 	fdev->dma_device.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
+ 
+-	ret = dma_async_device_register(&fdev->dma_device);
++	ret = dmaenginem_async_device_register(&fdev->dma_device);
+ 	if (ret) {
+ 		dev_err(&pdev->dev,
+ 			"Failed to register DMA device (%d)\n", ret);
+@@ -844,15 +844,13 @@ static int st_fdma_probe(struct platform_device *pdev)
+ 	if (ret) {
+ 		dev_err(&pdev->dev,
+ 			"Failed to register controller (%d)\n", ret);
+-		goto err_dma_dev;
++		goto err_rproc;
+ 	}
+ 
+ 	dev_info(&pdev->dev, "ST FDMA engine driver, irq:%d\n", fdev->irq);
+ 
+ 	return 0;
+ 
+-err_dma_dev:
+-	dma_async_device_unregister(&fdev->dma_device);
+ err_rproc:
+ 	st_fdma_free(fdev);
+ 	st_slim_rproc_put(fdev->slim_rproc);
+@@ -867,7 +865,6 @@ static int st_fdma_remove(struct platform_device *pdev)
+ 	devm_free_irq(&pdev->dev, fdev->irq, fdev);
+ 	st_slim_rproc_put(fdev->slim_rproc);
+ 	of_dma_controller_free(pdev->dev.of_node);
+-	dma_async_device_unregister(&fdev->dma_device);
+ 
+ 	return 0;
+ }
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.17.1
