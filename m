@@ -1,55 +1,75 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 6 Aug 2018 10:44:51 +0200
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <CAJA7tRZ69kbyA-Y0n4QBtz1JGFQdTXzNykewsySX0aj-CF5zqQ@mail.gmail.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
- <20180805213615.GA1862@amd>
- <CAJA7tRZ69kbyA-Y0n4QBtz1JGFQdTXzNykewsySX0aj-CF5zqQ@mail.gmail.com>
-Message-ID: <20180806084451.GB19523@amd>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 06 Aug 2018 10:46:03 +0200
+Subject: [GIT PULL] Rockchip dts64 updates for 4.19 round 3
+In-Reply-To: <2000491.bLgWuj0xar@phil>
+References: <2000491.bLgWuj0xar@phil>
+Message-ID: <2105931.jBd9xt4tCK@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2018-08-06 09:04:33, Ramana Radhakrishnan wrote:
-> On Sun, Aug 5, 2018 at 10:36 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> > Hi!
-> >
-> >> > I tried to use a PCIe graphics card on the MacchiatoBIN board and I hit a
-> >> > strange problem.
-> >> >
-> >> > When I use the links browser in graphics mode on the framebuffer, I get
-> >> > occasional pixel corruption. Links does memcpy, memset and 4-byte writes
-> >> > on the framebuffer - nothing else.
-> >> >
-> >> > I found out that the pixel corruption is caused by overlapping unaligned
-> >> > stp instructions inside memcpy. In order to avoid branching, the arm64
-> >> > memcpy implementation may write the same destination twice with different
-> >> > alignment. If I put "dmb sy" between the overlapping stp instructions, the
-> >> > pixel corruption goes away.
-> >> >
-> >> > This seems like a hardware bug. Is it a known errata? Do you have any
-> >> > workarounds for it?
-> >>
-> >> Yes fix Links not to use memcpy on the framebuffer.
-> >> It is undefined behavior to use device memory with memcpy.
-> >
-> > No, I don't think so. Why do you think so?
-> 
-> It is undefined behaviour in the architecture.
+Hi Arnd, Kevin, Olof,
 
-Why do you think so? Pointer to documentation would be helpful.
+with Linus doing an -rc8 this time, I thought I send off some more
+things that became ready since the round2 pull from last week.
 
-Normal access is used for mmapped areas, and I don't think we want to
- change that.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180806/53c42960/attachment.sig>
+As the tag describes a new soc, 2 new boards and 1 UHS support.
+
+No worries, if you haven't got the time to look at it. Then I'll just move
+things over to 4.20
+
+Thanks
+Heiko
+
+The following changes since commit 0fbfe10fa96b8df44cfb140a6672f9418e16a2a6:
+
+  arm64: dts: rockchip: add led support for Firefly-RK3399 (2018-07-25 12:19:41 +0200)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.19-rockchip-dts64-3
+
+for you to fetch changes up to 504705e0c2113776d5836035667977a6d2fc0789:
+
+  arm64: dts: rockchip: add sdmmc UHS support for roc-rk3328-cc (2018-08-04 15:16:53 +0200)
+
+----------------------------------------------------------------
+Some more things that became ripe since the last pull:
+One new SoC, the PX30 targetting IoT things it seems which uses
+quad-core Cortex-A35 cores and a Mali-G31.
+Two new boards, the evaluation board for the PX30 as well as
+the roc-rk3399-pc from Libre Computer and Firefly.
+And the addition of UHS support for roc-rk3328-cc which uses
+the newly added syscon-gpio support for voltage switching.
+
+----------------------------------------------------------------
+Elaine Zhang (1):
+      clk: rockchip: add dt-binding header for px30
+
+Heiko Stuebner (1):
+      Merge branch 'v4.19-shared/clkids' into v4.19-armsoc/dts64
+
+Levin Du (4):
+      arm64: dts: rockchip: add support for ROC-RK3399-PC board
+      arm64: dts: rockchip: add io-domain to roc-rk3328-cc
+      arm64: dts: rockchip: add GRF GPIO controller to rk3328
+      arm64: dts: rockchip: add sdmmc UHS support for roc-rk3328-cc
+
+Liang Chen (3):
+      dt-bindings: rockchip: grf: add grf and pmugrf description for px30
+      arm64: dts: rockchip: add core dtsi file for PX30 SoCs
+      arm64: dts: rockchip: add PX30 evaluation board devicetree
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |    8 +
+ .../devicetree/bindings/soc/rockchip/grf.txt       |    2 +
+ arch/arm64/boot/dts/rockchip/Makefile              |    2 +
+ arch/arm64/boot/dts/rockchip/px30-evb.dts          |  231 +++
+ arch/arm64/boot/dts/rockchip/px30.dtsi             | 2016 ++++++++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts     |   30 +
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi           |    7 +-
+ arch/arm64/boot/dts/rockchip/rk3399-roc-pc.dts     |  680 +++++++
+ include/dt-bindings/clock/px30-cru.h               |  389 ++++
+ 9 files changed, 3364 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/rockchip/px30-evb.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/px30.dtsi
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-roc-pc.dts
+ create mode 100644 include/dt-bindings/clock/px30-cru.h
