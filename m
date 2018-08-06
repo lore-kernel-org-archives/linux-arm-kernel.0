@@ -1,80 +1,105 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 6 Aug 2018 15:41:34 +0200
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
- <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
- <20180803094129.GB17798@arm.com>
- <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
- <alpine.LRH.2.02.1808031424140.14030@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3s-+Qf=WBZz1KpisDMG3520jCUh8PLAO3PHa4jdt8kCTw@mail.gmail.com>
- <CAKv+Gu9_h-WFi1j4+DWUN_dMj75SKKHxWoDH8WQ9P7S7MNpZQg@mail.gmail.com>
- <alpine.LRH.2.02.1808060553130.30832@file01.intranet.prod.int.rdu2.redhat.com>
- <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
-Message-ID: <CAPv3WKdxwoW5MAOvy6uEBEuMpsigMo98hyO+TpKMsFrKR9oBzg@mail.gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon,  6 Aug 2018 14:41:46 +0100
+Subject: [PATCH 04/13] coresight: etm4x: Add support for handling errors
+In-Reply-To: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
+References: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1533562915-21558-5-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mikulas,
+Add support for handling errors in enabling the component.
+The ETM is enabled via cross call to owner CPU. Make
+necessary changes to report the error back from the cross
+call.
 
-pon., 6 sie 2018 o 14:42 Robin Murphy <robin.murphy@arm.com> napisa?(a):
->
-> On 06/08/18 11:25, Mikulas Patocka wrote:
-> [...]
-> >> None of this explains why some transactions fail to make it across
-> >> entirely. The overlapping writes in question write the same data to
-> >> the memory locations that are covered by both, and so the ordering in
-> >> which the transactions are received should not affect the outcome.
-> >
-> > You're right that the corruption couldn't be explained just by reordering
-> > writes. My hypothesis is that the PCIe controller tries to disambiguate
-> > the overlapping writes, but the disambiguation logic was not tested and it
-> > is buggy. If there's a barrier between the overlapping writes, the PCIe
-> > controller won't see any overlapping writes, so it won't trigger the
-> > faulty disambiguation logic and it works.
-> >
-> > Could the ARM engineers look if there's some chicken bit in Cortex-A72
-> > that could insert barriers between non-cached writes automatically?
->
-> I don't think there is, and even if there was I imagine it would have a
-> pretty hideous effect on non-coherent DMA buffers and the various other
-> places in which we have Normal-NC mappings of actual system RAM.
->
-> > I observe these kinds of corruptions:
-> > - failing to write a few bytes
->
-> That could potentially be explained by the reordering/atomicity issues
-> Matt mentioned, i.e. the load is observing part of the store, before the
-> store has fully completed.
->
-> > - writing a few bytes that were written 16 bytes before
-> > - writing a few bytes that were written 16 bytes after
->
-> Those sound more like the interconnect or root complex ignoring the byte
-> strobes on an unaligned burst, of which I think the simplistic view
-> would be "it's broken".
->
-> FWIW I stuck my old Nvidia 7600GT card in my Arm Juno r2 board (2x
-> Cortex-A72), built your test program natively with GCC 8.1.1 at -O2, and
-> it's still happily flickering pixels in the corner of the console after
-> nearly an hour (in parallel with some iperf3 just to ensure plenty of
-> PCIe traffic). I would strongly suspect this issue is particular to
-> Armada 8k, so its' probably one for the Marvell folks to take a closer
-> look at - I believe some previous interconnect issues on those SoCs were
-> actually fixable in firmware.
->
->
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-etm4x.c | 39 ++++++++++++++++++---------
+ 1 file changed, 26 insertions(+), 13 deletions(-)
 
-On my Macchiato I use GT630 card (nuveau driver) + debian + xfce
-desktop and in dual monitor mode, I could run a couple of 1080p
-streams. All smooth and I've never noticed any image corruption
-whatsoever (I spent a lot of time in front of such setup). Just to be
-on a safe side, can you send me a bootlog and your board revision? I'd
-like to see your firware version and type.
-
-Thanks,
-Marcin
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index c1dcc7c..4f9e6bb 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -77,10 +77,14 @@ static int etm4_trace_id(struct coresight_device *csdev)
+ 	return drvdata->trcid;
+ }
+ 
+-static void etm4_enable_hw(void *info)
++struct etm4_enable_arg {
++	struct etmv4_drvdata *drvdata;
++	int rc;
++};
++
++static int etm4_enable_hw(struct etmv4_drvdata *drvdata)
+ {
+ 	int i;
+-	struct etmv4_drvdata *drvdata = info;
+ 	struct etmv4_config *config = &drvdata->config;
+ 
+ 	CS_UNLOCK(drvdata->base);
+@@ -177,6 +181,16 @@ static void etm4_enable_hw(void *info)
+ 	CS_LOCK(drvdata->base);
+ 
+ 	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
++	return 0;
++}
++
++static void etm4_enable_hw_smp_call(void *info)
++{
++	struct etm4_enable_arg *arg = info;
++
++	if (WARN_ON(!arg))
++		return;
++	arg->rc = etm4_enable_hw(arg->drvdata);
+ }
+ 
+ static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
+@@ -242,7 +256,7 @@ static int etm4_enable_perf(struct coresight_device *csdev,
+ 	if (ret)
+ 		goto out;
+ 	/* And enable it */
+-	etm4_enable_hw(drvdata);
++	ret = etm4_enable_hw(drvdata);
+ 
+ out:
+ 	return ret;
+@@ -251,6 +265,7 @@ static int etm4_enable_perf(struct coresight_device *csdev,
+ static int etm4_enable_sysfs(struct coresight_device *csdev)
+ {
+ 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	struct etm4_enable_arg arg = { 0 };
+ 	int ret;
+ 
+ 	spin_lock(&drvdata->spinlock);
+@@ -259,19 +274,17 @@ static int etm4_enable_sysfs(struct coresight_device *csdev)
+ 	 * Executing etm4_enable_hw on the cpu whose ETM is being enabled
+ 	 * ensures that register writes occur when cpu is powered.
+ 	 */
++	arg.drvdata = drvdata;
+ 	ret = smp_call_function_single(drvdata->cpu,
+-				       etm4_enable_hw, drvdata, 1);
+-	if (ret)
+-		goto err;
+-
+-	drvdata->sticky_enable = true;
++				       etm4_enable_hw_smp_call, &arg, 1);
++	if (!ret)
++		ret = arg.rc;
++	if (!ret)
++		drvdata->sticky_enable = true;
+ 	spin_unlock(&drvdata->spinlock);
+ 
+-	dev_dbg(drvdata->dev, "ETM tracing enabled\n");
+-	return 0;
+-
+-err:
+-	spin_unlock(&drvdata->spinlock);
++	if (!ret)
++		dev_dbg(drvdata->dev, "ETM tracing enabled\n");
+ 	return ret;
+ }
+ 
+-- 
+2.7.4
