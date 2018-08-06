@@ -1,34 +1,55 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon,  6 Aug 2018 10:43:10 +0200
-Subject: [PATCH] mmc: sdhci-of-arasan: Do now show error message in case of
- deffered probe
-Message-ID: <c9688c600633ce9f4d7b6319366116e6e7c4b97d.1533544988.git.michal.simek@xilinx.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 6 Aug 2018 10:44:51 +0200
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <CAJA7tRZ69kbyA-Y0n4QBtz1JGFQdTXzNykewsySX0aj-CF5zqQ@mail.gmail.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
+ <20180805213615.GA1862@amd>
+ <CAJA7tRZ69kbyA-Y0n4QBtz1JGFQdTXzNykewsySX0aj-CF5zqQ@mail.gmail.com>
+Message-ID: <20180806084451.GB19523@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When mmc-pwrseq property is passed mmc_pwrseq_alloc() can return
--EPROBE_DEFER because driver for power sequence provider is not probed
-yet. Do not show error message when this situation happens.
+On Mon 2018-08-06 09:04:33, Ramana Radhakrishnan wrote:
+> On Sun, Aug 5, 2018 at 10:36 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> > Hi!
+> >
+> >> > I tried to use a PCIe graphics card on the MacchiatoBIN board and I hit a
+> >> > strange problem.
+> >> >
+> >> > When I use the links browser in graphics mode on the framebuffer, I get
+> >> > occasional pixel corruption. Links does memcpy, memset and 4-byte writes
+> >> > on the framebuffer - nothing else.
+> >> >
+> >> > I found out that the pixel corruption is caused by overlapping unaligned
+> >> > stp instructions inside memcpy. In order to avoid branching, the arm64
+> >> > memcpy implementation may write the same destination twice with different
+> >> > alignment. If I put "dmb sy" between the overlapping stp instructions, the
+> >> > pixel corruption goes away.
+> >> >
+> >> > This seems like a hardware bug. Is it a known errata? Do you have any
+> >> > workarounds for it?
+> >>
+> >> Yes fix Links not to use memcpy on the framebuffer.
+> >> It is undefined behavior to use device memory with memcpy.
+> >
+> > No, I don't think so. Why do you think so?
+> 
+> It is undefined behaviour in the architecture.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Why do you think so? Pointer to documentation would be helpful.
 
- drivers/mmc/host/sdhci-of-arasan.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-index e3332a522a5d..e65f3bce3643 100644
---- a/drivers/mmc/host/sdhci-of-arasan.c
-+++ b/drivers/mmc/host/sdhci-of-arasan.c
-@@ -772,7 +772,8 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
- 
- 	ret = mmc_of_parse(host->mmc);
- 	if (ret) {
--		dev_err(&pdev->dev, "parsing dt failed (%d)\n", ret);
-+		if (ret != -EPROBE_DEFER)
-+			dev_err(&pdev->dev, "parsing dt failed (%d)\n", ret);
- 		goto unreg_clk;
- 	}
- 
+Normal access is used for mmapped areas, and I don't think we want to
+ change that.
+									Pavel
 -- 
-1.9.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180806/53c42960/attachment.sig>
