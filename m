@@ -1,215 +1,76 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 06 Aug 2018 14:29:50 +0200
-Subject: [PATCH v3 3/3] dmaengine: imx-sdma: allocate max 20 bds for one
- transfer
-In-Reply-To: <DB6PR04MB3223BB3159EB8D376BE64B3E89200@DB6PR04MB3223.eurprd04.prod.outlook.com>
-References: <1532367972-29707-1-git-send-email-yibin.gong@nxp.com>
- <1532367972-29707-4-git-send-email-yibin.gong@nxp.com>
- <1532343252.3163.99.camel@pengutronix.de>
- <DB6PR04MB322323354B2184421502FC5889560@DB6PR04MB3223.eurprd04.prod.outlook.com>
- <1532424136.32306.3.camel@pengutronix.de>
- <DB6PR04MB32233768DB36BB208206EBCE89540@DB6PR04MB3223.eurprd04.prod.outlook.com>
- <DB6PR04MB3223BB3159EB8D376BE64B3E89200@DB6PR04MB3223.eurprd04.prod.outlook.com>
-Message-ID: <1533558590.2809.1.camel@pengutronix.de>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Mon, 6 Aug 2018 20:31:29 +0800
+Subject: [PATCH 1/1] iommu/arm-smmu-v3: fix unexpected CMD_SYNC timeout
+Message-ID: <1533558689-3000-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+The condition "(int)(VAL - sync_idx) >= 0" to break loop in function
+__arm_smmu_sync_poll_msi requires that sync_idx must be increased
+monotonously according to the sequence of the CMDs in the cmdq.
 
-Am Montag, den 06.08.2018, 08:04 +0000 schrieb Robin Gong:
-> Hello Lucas,
-> 	Any comment for my reply?
+But ".msidata = atomic_inc_return_relaxed(&smmu->sync_nr)" is not protected
+by spinlock, so the following scenarios may appear:
+cpu0			cpu1
+msidata=0
+			msidata=1
+			insert cmd1
+insert cmd0
+			smmu execute cmd1
+smmu execute cmd0
+			poll timeout, because msidata=1 is overridden by
+			cmd0, that means VAL=0, sync_idx=1.
 
-So I've looked at this again and sadly I need to NACK this patch. It is
-a total API abuse of the dma_pool API and even the patch introducing
-the dma_pool usage in this driver is wrong and should be reverted.
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-The SDMA need contiguous buffer descriptors for each channel, something
-the dma_pool abstraction isn't able to provide. So either the dma_pool
-implementation needs to be extended to support this use-case, or you
-can't use this at all in the sdma driver. Adding hacks, which are
-abusing the API, to cram a dma_pool into the sdma driver is not a valid
-way to implement things for upstream.
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 1d64710..4810f61 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -566,7 +566,7 @@ struct arm_smmu_device {
 
-Regards,
-Lucas
+ 	int				gerr_irq;
+ 	int				combined_irq;
+-	atomic_t			sync_nr;
++	u32				sync_nr;
 
-> > -----Original Message-----
-> > From: Robin Gong
-> > Sent: 2018?7?25? 9:25
-> > To: 'Lucas Stach' <l.stach@pengutronix.de>; vkoul at kernel.org;
-> > dan.j.williams at intel.com; s.hauer at pengutronix.de; linux at armlinux.or
-> > g.uk
-> > Cc: dmaengine at vger.kernel.org; dl-linux-imx <linux-imx@nxp.com>;
-> > kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
-> > linux-kernel at vger.kernel.org
-> > Subject: RE: [PATCH v3 3/3] dmaengine: imx-sdma: allocate max 20
-> > bds for one
-> > transfer
-> > 
-> > > -----Original Message-----
-> > > From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> > > Sent: 2018?7?24? 17:22
-> > > To: Robin Gong <yibin.gong@nxp.com>; vkoul at kernel.org;
-> > > dan.j.williams at intel.com; s.hauer at pengutronix.de;
-> > > linux at armlinux.org.uk
-> > > Cc: dmaengine at vger.kernel.org; dl-linux-imx <linux-imx@nxp.com>;
-> > > kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
-> > > linux-kernel at vger.kernel.org
-> > > Subject: Re: [PATCH v3 3/3] dmaengine: imx-sdma: allocate max 20
-> > > bds
-> > > for one transfer
-> > > 
-> > > Am Montag, den 23.07.2018, 13:55 +0000 schrieb Robin Gong:
-> > > > > -----Original Message-----
-> > > > > From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> > > > > Sent: 2018?7?23? 18:54
-> > > > > To: Robin Gong <yibin.gong@nxp.com>; vkoul at kernel.org;
-> > > > > dan.j.williams at intel.com; s.hauer at pengutronix.de;
-> > > > > linux at armlinux.or g.uk
-> > > > > Cc: dmaengine at vger.kernel.org; dl-linux-imx <linux-imx@nxp.co
-> > > > > m>;
-> > > > > kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
-> > > > > linux-kernel at vger.kernel.org
-> > > > > Subject: Re: [PATCH v3 3/3] dmaengine: imx-sdma: allocate max
-> > > > > 20
-> > > > > bds for one transfer
-> > > > > 
-> > > > > Am Dienstag, den 24.07.2018, 01:46 +0800 schrieb Robin Gong:
-> > > > > > If multi-bds used in one transfer, all bds should be
-> > > > > > consisten
-> > > > > > memory.To easily follow it, enlarge the dma pool size into
-> > > > > > 20
-> > > > > > bds, and it will report error if the number of bds is over
-> > > > > > than
-> > > > > > 20. For dmatest, the max count for single transfer is
-> > > > > > NUM_BD *
-> > > > > 
-> > > > > SDMA_BD_MAX_CNT
-> > > > > > = 20 * 65535 = ~1.28MB.
-> > > > > 
-> > > > > Both the commit message and the comment need a lot more care
-> > > > > to
-> > > > > actually tell what this commit is trying to achieve.
-> > > > > Currently I
-> > > > > don't follow at all. What does "consisten" mean? Do you mean
-> > > > > BDs
-> > > > > should be contiguous in memory?
-> > > > 
-> > > > Yes, BDs should be contiguous??one by one in memory.
-> > > 
-> > > Okay, but this isn't what the code change does. By increasing the
-> > > size
-> > > parameter of the dma pool you just allocate 20 times as much
-> > > memory as
-> > > needed for each BD. So actually the BDs end up being very non-
-> > > contiguous in memory as there are now holes of 19 BD sizes
-> > > between the
-> > 
-> > start of each BD.
-> > Please notice only allocate bds memory from dma pool one time even
-> > in multi
-> > bds.
-> > That's different with the common use case that allocate memory from
-> > dma
-> > pool everytime for every bd. Why do this is to make sure all bd
-> > memory is
-> > contiguous for single transfer whatever single bd or multi-bds,
-> > since two call
-> > dma_pool_alloc() can't promise the address is contiguous especially
-> > for multi
-> > thread case such as dmatest 'threads_per_chan = 5'. You can change
-> > to '
-> > norandom=true ' and ' test_buf_size = 163840' in dmatest.c to look
-> > what issue
-> > coming without this patch.
-> > > 
-> > > So something isn't right with this change.
-> > 
-> > I think this patch is the easy way to resolve the bd contiguous
-> > issue, but the
-> > cost is to allocate more dma pool memory which may not used.
-> > > 
-> > > Regards,
-> > > Lucas
-> > > 
-> > > > > 
-> > > > > What do you gain by over-allocating each BD by a factor of
-> > > > > 20?
-> > > > 
-> > > > I guess dma_pool_alloc will return error in such case, and then
-> > > > cause dma setup transfer failure.
-> > > > > 
-> > > > > Regards,
-> > > > > Lucas
-> > > > > 
-> > > > > > Signed-off-by: Robin Gong <yibin.gong@nxp.com>
-> > > > > > ---
-> > > > > > ?drivers/dma/imx-sdma.c | 17 ++++++++++++++++-
-> > > > > > ?1 file changed, 16 insertions(+), 1 deletion(-)
-> > > > > > 
-> > > > > > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-
-> > > > > > sdma.c
-> > > > > > index
-> > > > > > b4ec2d2..5973489 100644
-> > > > > > --- a/drivers/dma/imx-sdma.c
-> > > > > > +++ b/drivers/dma/imx-sdma.c
-> > > > > > @@ -298,6 +298,15 @@ struct sdma_context_data {
-> > > > > > > ?	u32??scratch7;
-> > > > > > 
-> > > > > > ?} __attribute__ ((packed));
-> > > > > > 
-> > > > > > +/*
-> > > > > > + * All bds in one transfer should be consitent on SDMA. To
-> > > > > > easily
-> > > > > > +follow it,just
-> > > > > > + * set the dma pool size as the enough bds. For example,
-> > > > > > in
-> > > > > > dmatest
-> > > > > > +case, the
-> > > > > > + * max 20 bds means the max for single transfer is NUM_BD
-> > > > > > *
-> > > > > > +SDMA_BD_MAX_CNT = 20
-> > > > > > + * * 65535 = ~1.28MB. 20 bds supposed to be enough
-> > > > > > basically.If
-> > > > > > it's
-> > > > > > +still not
-> > > > > > + * enough in some specific cases, enlarge it here.Warning
-> > > > > > message
-> > > > > > +would also
-> > > > > > + * appear if the bd numbers is over than 20.
-> > > > > > + */
-> > > > > > +#define NUM_BD 20
-> > > > > > 
-> > > > > > ?struct sdma_engine;
-> > > > > > 
-> > > > > > @@ -1273,7 +1282,7 @@ static int
-> > > > > > sdma_alloc_chan_resources(struct dma_chan *chan)
-> > > > > > > ?		goto disable_clk_ahb;
-> > > > > > > ?	sdmac->bd_pool = dma_pool_create("bd_pool",
-> > > > > > > chan-
-> > > > > > > > device->dev,
-> > > > > > > 
-> > > > > > > -				sizeof(struct
-> > > > > > > sdma_buffer_descriptor),
-> > > > > > > +				NUM_BD * sizeof(struct
-> > > > > > > sdma_buffer_descriptor),
-> > > > > > > ?				32, 0);
-> > > > > > > ?	return 0;
-> > > > > > 
-> > > > > > @@ -1314,6 +1323,12 @@ static struct sdma_desc
-> > > > > > *sdma_transfer_init(struct sdma_channel *sdmac,
-> > > > > > ?{
-> > > > > > > ?	struct sdma_desc *desc;
-> > > > > > > +	if (bds > NUM_BD) {
-> > > > > > > +		dev_err(sdmac->sdma->dev, "%d bds exceed
-> > > > > > > the
-> > > > > > > max %d\n",
-> > > > > > > +			bds, NUM_BD);
-> > > > > > > +		goto err_out;
-> > > > > > > +	}
-> > > > > > 
-> > > > > > +
-> > > > > > > ?	desc = kzalloc((sizeof(*desc)), GFP_NOWAIT);
-> > > > > > > ?	if (!desc)
-> > > > > > > ?		goto err_out;
+ 	unsigned long			ias; /* IPA */
+ 	unsigned long			oas; /* PA */
+@@ -836,7 +836,6 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
+ 			cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_SEV);
+ 		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSH, ARM_SMMU_SH_ISH);
+ 		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIATTR, ARM_SMMU_MEMATTR_OIWB);
+-		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIDATA, ent->sync.msidata);
+ 		cmd[1] |= ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
+ 		break;
+ 	default:
+@@ -947,7 +946,6 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
+ 	struct arm_smmu_cmdq_ent ent = {
+ 		.opcode = CMDQ_OP_CMD_SYNC,
+ 		.sync	= {
+-			.msidata = atomic_inc_return_relaxed(&smmu->sync_nr),
+ 			.msiaddr = virt_to_phys(&smmu->sync_count),
+ 		},
+ 	};
+@@ -955,6 +953,8 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
+ 	arm_smmu_cmdq_build_cmd(cmd, &ent);
+
+ 	spin_lock_irqsave(&smmu->cmdq.lock, flags);
++	ent.sync.msidata = ++smmu->sync_nr;
++	cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIDATA, ent.sync.msidata);
+ 	arm_smmu_cmdq_insert_cmd(smmu, cmd);
+ 	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+
+@@ -2179,7 +2179,6 @@ static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
+ {
+ 	int ret;
+
+-	atomic_set(&smmu->sync_nr, 0);
+ 	ret = arm_smmu_init_queues(smmu);
+ 	if (ret)
+ 		return ret;
+--
+1.8.3
