@@ -1,140 +1,80 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Mon, 6 Aug 2018 15:41:33 +0200
-Subject: [RFC PATCH 16/16] KVM: arm64/sve: Report and enable SVE API
- extensions for userspace
-In-Reply-To: <20180726131802.GX4240@e103592.cambridge.arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-17-git-send-email-Dave.Martin@arm.com>
- <20180719145921.oasa3a57at5nnwya@kamzik.brq.redhat.com>
- <20180725152749.GQ4240@e103592.cambridge.arm.com>
- <20180725165256.k2kcrazgyt7y4i4o@kamzik.brq.redhat.com>
- <20180726131802.GX4240@e103592.cambridge.arm.com>
-Message-ID: <20180806134133.GE5985@e113682-lin.lund.arm.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Mon, 6 Aug 2018 15:41:34 +0200
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
+ <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
+ <20180803094129.GB17798@arm.com>
+ <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
+ <alpine.LRH.2.02.1808031424140.14030@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAHCPf3s-+Qf=WBZz1KpisDMG3520jCUh8PLAO3PHa4jdt8kCTw@mail.gmail.com>
+ <CAKv+Gu9_h-WFi1j4+DWUN_dMj75SKKHxWoDH8WQ9P7S7MNpZQg@mail.gmail.com>
+ <alpine.LRH.2.02.1808060553130.30832@file01.intranet.prod.int.rdu2.redhat.com>
+ <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
+Message-ID: <CAPv3WKdxwoW5MAOvy6uEBEuMpsigMo98hyO+TpKMsFrKR9oBzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 02:18:02PM +0100, Dave Martin wrote:
-> On Wed, Jul 25, 2018 at 06:52:56PM +0200, Andrew Jones wrote:
-> > On Wed, Jul 25, 2018 at 04:27:49PM +0100, Dave Martin wrote:
-> > > On Thu, Jul 19, 2018 at 04:59:21PM +0200, Andrew Jones wrote:
-> > > > On Thu, Jun 21, 2018 at 03:57:40PM +0100, Dave Martin wrote:
-> > > > > -	/*
-> > > > > -	 * For now, we don't return any features.
-> > > > > -	 * In future, we might use features to return target
-> > > > > -	 * specific features available for the preferred
-> > > > > -	 * target type.
-> > > > > -	 */
-> > > > > +	/* KVM_ARM_VCPU_SVE understood by KVM_VCPU_INIT */
-> > > > > +	init->features[0] = 1 << KVM_ARM_VCPU_SVE;
-> > > > > +
-> > > > 
-> > > > We shouldn't need to do this. The "preferred" target type isn't defined
-> > > > well (that I know of), but IMO it should probably be the target that
-> > > > best matches the host, minus optional features. The best base target. We
-> > > > may use these features to convey that the preferred target should enable
-> > > > some optional feature if that feature is necessary to workaround a bug,
-> > > > i.e. using the "feature" bit as an erratum bit someday, but that'd be
-> > > > quite a debatable use, so maybe not even that. Most likely we'll never
-> > > > need to add features here.
-> > > 
-> > > init->features[] has no semantics yet so we can define it how we like,
-> > > but I agree that the way I use it here is not necessarily the most
-> > > natural.
-> > > 
-> > > OTOH, we cannot use features[] for "mandatory" features like erratum
-> > > workarounds, because current userspace just ignores these bits.
-> > 
-> > It would have to learn to look here if that's how we started using it,
-> > but it'd be better to invent something else that wouldn't appear as
-> > abusive if we're going to teach userspace new stuff anyway.
-> > 
-> > > 
-> > > Rather, these bits would be for features that are considered beneficial
-> > > but must be off by default (due to incompatibility risks across nodes,
-> > > or due to ABI impacts).  Just blindly using the preferred target
-> > > already risks configuring a vcpu that won't work across all nodes in
-> > > your cluster.
-> > 
-> > KVM usually advertises optional features through capabilities. A device
-> > (vcpu device, in this case) ioctl can also be used to check for feature
-> > availability.
-> > 
-> > > 
-> > > So I'm not convinced that there is any useful interpretation of
-> > > features[] unless we interpret it as suggested in this patch.
-> > > 
-> > > Can you elaborate why you think it should be used with a more
-> > > concrete example?
-> > 
-> > I'm advocating that it *not* be used here. I think it should be used
-> > like the PMU feature uses it - and the PMU feature doesn't set a bit
-> > here.
-> > 
-> > > 
-> > > > That said, I think defining the feature bit makes sense. ATM, I'm feeling
-> > > > like we'll want to model the user interface for SVE like PMU (using VCPU
-> > > > device ioctls).
-> > > 
-> > > Some people expressed concerns about the ioctls becoming order-sensitive.
-> > > 
-> > > In the SVE case we don't want people enabling/disabling/reconfiguring
-> > > "silicon" features like SVE after the vcpu starts executing.
-> > > 
-> > > We will need an extra ioctl() for configuring the allowed SVE vector
-> > > lengths though.  I don't see a way around that.  So maybe we have to
-> > > solve the ordering problem anyway.
-> > 
-> > Yes, that's why I'm thinking that the vcpu device ioctls is probably the
-> > right way to go. The SVE group can have its own "finalize" request that
-> > allows all other SVE ioctls to be in any order prior to it.
-> > 
-> > > 
-> > > 
-> > > By current approach (not in this series) was to have VCPU_INIT return
-> > > -EINPROGRESS or similar if SVE is enabled in features[]: this indicates
-> > > that certain setup ioctls are required before the vcpu can run.
-> > > 
-> > > This may be overkill / not the best approach though.  I can look at
-> > > vcpu device ioctls as an alternative.
-> > 
-> > With a "finalize" attribute if SVE isn't finalized by VCPU_INIT or
-> > KVM_RUN time, then SVE just won't be enabled for that VCPU.
-> 
-> So I suppose we could do something like this:
-> 
->  * Advertise SVE availability through a vcpu device capability (I need
->    to check how that works).
-> 
->  * SVE-aware userspace that understands SVE can do the relevant
->    vcpu device ioctls to configure SVE and turn it on: these are only
->    permitted before the vcpu runs.  We might require an explicit
->    "finish SVE setup" ioctl to be issued before the vcpu can run.
-> 
->  * Finally, the vcpu is set running by userspace as normal.
-> 
-> Marc or Christoffer was objecting to me previously that this may be an
-> abuse of vcpu device ioctls, because SVE is a CPU feature rather than a
-> device.  I guess it depends on how you define "device" -- I'm not sure
-> where to draw the line.
+Hi Mikulas,
 
-I initially advocated for a VCPU device ioctl as well, because it's a
-less crowded number space that gives you more flexibility.  Marc did
-have a strong point that vcpu *devices* implies something else than
-features though.
+pon., 6 sie 2018 o 14:42 Robin Murphy <robin.murphy@arm.com> napisa?(a):
+>
+> On 06/08/18 11:25, Mikulas Patocka wrote:
+> [...]
+> >> None of this explains why some transactions fail to make it across
+> >> entirely. The overlapping writes in question write the same data to
+> >> the memory locations that are covered by both, and so the ordering in
+> >> which the transactions are received should not affect the outcome.
+> >
+> > You're right that the corruption couldn't be explained just by reordering
+> > writes. My hypothesis is that the PCIe controller tries to disambiguate
+> > the overlapping writes, but the disambiguation logic was not tested and it
+> > is buggy. If there's a barrier between the overlapping writes, the PCIe
+> > controller won't see any overlapping writes, so it won't trigger the
+> > faulty disambiguation logic and it works.
+> >
+> > Could the ARM engineers look if there's some chicken bit in Cortex-A72
+> > that could insert barriers between non-cached writes automatically?
+>
+> I don't think there is, and even if there was I imagine it would have a
+> pretty hideous effect on non-coherent DMA buffers and the various other
+> places in which we have Normal-NC mappings of actual system RAM.
+>
+> > I observe these kinds of corruptions:
+> > - failing to write a few bytes
+>
+> That could potentially be explained by the reordering/atomicity issues
+> Matt mentioned, i.e. the load is observing part of the store, before the
+> store has fully completed.
+>
+> > - writing a few bytes that were written 16 bytes before
+> > - writing a few bytes that were written 16 bytes after
+>
+> Those sound more like the interconnect or root complex ignoring the byte
+> strobes on an unaligned burst, of which I think the simplistic view
+> would be "it's broken".
+>
+> FWIW I stuck my old Nvidia 7600GT card in my Arm Juno r2 board (2x
+> Cortex-A72), built your test program natively with GCC 8.1.1 at -O2, and
+> it's still happily flickering pixels in the corner of the console after
+> nearly an hour (in parallel with some iperf3 just to ensure plenty of
+> PCIe traffic). I would strongly suspect this issue is particular to
+> Armada 8k, so its' probably one for the Marvell folks to take a closer
+> look at - I believe some previous interconnect issues on those SoCs were
+> actually fixable in firmware.
+>
+>
 
-I think you (a) definitely want to announce SVE support via a
-capability, and (b) only set the preferred target flag if enabling SVE
-*generally* gives you a VM more like the real hardware with similar
-performance on some system.
-
-I'm personally fine with both feature flags and vcpu device ioctls.  If
-using vcpu device ioctls gives you an obvious way to set attributes
-relating to SVE, e.g. the vector length, then I think that's a strong
-argument for that approach.
-
-Whatever you do, please document this in
-Documentation/virtual/kvm/api.txt and related files, such as
-Documentation/virtual/kvm/devices/vcpu.txt.
+On my Macchiato I use GT630 card (nuveau driver) + debian + xfce
+desktop and in dual monitor mode, I could run a couple of 1080p
+streams. All smooth and I've never noticed any image corruption
+whatsoever (I spent a lot of time in front of such setup). Just to be
+on a safe side, can you send me a bootlog and your board revision? I'd
+like to see your firware version and type.
 
 Thanks,
--Christoffer
+Marcin
