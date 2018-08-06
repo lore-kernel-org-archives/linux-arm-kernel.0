@@ -1,59 +1,82 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 6 Aug 2018 11:35:16 -0500
-Subject: [PATCH v3 00/13] ARM: davinci: remove duplicate aemif support
-In-Reply-To: <92e41afc-cf3a-e713-11d5-247b8d6e3a64@ti.com>
-References: <20180628095748.4462-1-brgl@bgdev.pl>
- <52a274f1-283a-a14a-54f3-4b95b6605c4f@ti.com>
- <59fdc532-bb72-ffae-cfb6-a7f156c14771@lechnology.com>
- <e1222b3c-dfa4-4cb0-eebf-8e2550e9d674@ti.com>
- <125d73f7-7311-866f-1e9d-d3c1f9473899@lechnology.com>
- <92e41afc-cf3a-e713-11d5-247b8d6e3a64@ti.com>
-Message-ID: <4154b955-4f89-035a-8a02-a3e8bd8d9ede@lechnology.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Mon,  6 Aug 2018 18:40:35 +0200
+Subject: [PATCH v5 00/10] arm64: untag user pointers passed to the kernel
+Message-ID: <cover.1533573460.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2018 05:19 AM, Sekhar Nori wrote:
-> On Friday 06 July 2018 11:09 PM, David Lechner wrote:
->> On 07/04/2018 01:35 AM, Sekhar Nori wrote:
->>> Hi David,
->>>
->>> On Monday 02 July 2018 09:02 PM, David Lechner wrote:
->>>> On 07/02/2018 07:28 AM, Sekhar Nori wrote:
->>>>> Hi David, Stephen,
->>>>>
->>>>> On Thursday 28 June 2018 03:27 PM, Bartosz Golaszewski wrote:
->>>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>>>>
->>>>>> This series moves all aemif/nand users to using the ti-aemif platform
->>>>>> driver located in drivers/memory instead of the older API located in
->>>>>> mach-davinci.
->>>>>>
->>>>>> First five patches add necessary changes to the clock driver. Next
->>>>>> seven convert the board files to using the ti-aemif driver. Last patch
->>>>>> removes now dead code.
->>>>>
->>>>> How do you want to handle this series? I can apply the series and
->>>>> provide you an immutable branch on v4.18-rc1 with the clock patches
->>>>> applied if that can work.
->>>>
->>>> Sounds good to me. But I'm new to this maintainer thing, so maybe
->>>> there is something to consider that I haven't thought of?
->>>
->>> I don't think there is more to it. Ultimately there should not be two
->>> commits for the same patch. Either you can apply and share the commit to
->>> use or I can do that as well. I am equally fine either way.
->>>
->>> Regards,
->>> Sekhar
->>>
->>
->> I've created a branch for-sekhar at https://github.com/dlech/linux.git
->> with the clk commits.
-> 
-> Thanks. I merged commit f917ff75ac55b6d829c9d1142e83913064565d5b (top of
-> that branch) to my v4.19/soc branch. Please do let Stephen and Mike know
-> about this then when you send your stuff for v4.19.
-> 
+arm64 has a feature called Top Byte Ignore, which allows to embed pointer
+tags into the top byte of each pointer. Userspace programs (such as
+HWASan, a memory debugging tool [1]) might use this feature and pass
+tagged user pointers to the kernel through syscalls or other interfaces.
 
-Since there have been no more clk-davinci patches for v4.19, I assume that
-it is OK to just let this go through the ARM tree via Sekhar?
+This patch makes a few of the kernel interfaces accept tagged user
+pointers. The kernel is already able to handle user faults with tagged
+pointers and has the untagged_addr macro, which this patchset reuses.
+
+Thanks!
+
+[1] http://clang.llvm.org/docs/HardwareAssistedAddressSanitizerDesign.html
+
+Changes in v5:
+- Added 3 new patches that add untagging to places found with static
+  analysis.
+- Rebased onto 44c929e1 (4.18-rc8).
+
+Changes in v4:
+- Added a selftest for checking that passing tagged pointers to the
+  kernel succeeds.
+- Rebased onto 81e97f013 (4.18-rc1+).
+
+Changes in v3:
+- Rebased onto e5c51f30 (4.17-rc6+).
+- Added linux-arch@ to the list of recipients.
+
+Changes in v2:
+- Rebased onto 2d618bdf (4.17-rc3+).
+- Removed excessive untagging in gup.c.
+- Removed untagging pointers returned from __uaccess_mask_ptr.
+
+Changes in v1:
+- Rebased onto 4.17-rc1.
+
+Changes in RFC v2:
+- Added "#ifndef untagged_addr..." fallback in linux/uaccess.h instead of
+  defining it for each arch individually.
+- Updated Documentation/arm64/tagged-pointers.txt.
+- Dropped "mm, arm64: untag user addresses in memory syscalls".
+- Rebased onto 3eb2ce82 (4.16-rc7).
+
+Andrey Konovalov (10):
+  arm64: add type casts to untagged_addr macro
+  uaccess: add untagged_addr definition for other arches
+  arm64: untag user addresses in access_ok and __uaccess_mask_ptr
+  mm, arm64: untag user addresses in mm/gup.c
+  lib, arm64: untag addrs passed to strncpy_from_user and strnlen_user
+  arm64: untag user address in __do_user_fault
+  fs, arm64: untag user address in copy_mount_options
+  usb, arm64: untag user addresses in devio
+  arm64: update Documentation/arm64/tagged-pointers.txt
+  selftests, arm64: add a selftest for passing tagged pointers to kernel
+
+ Documentation/arm64/tagged-pointers.txt       |  5 +++--
+ arch/arm64/include/asm/uaccess.h              | 14 +++++++++-----
+ arch/arm64/mm/fault.c                         |  2 +-
+ drivers/usb/core/devio.c                      |  8 +++++---
+ fs/namespace.c                                |  2 +-
+ include/linux/uaccess.h                       |  4 ++++
+ lib/strncpy_from_user.c                       |  2 ++
+ lib/strnlen_user.c                            |  2 ++
+ mm/gup.c                                      |  4 ++++
+ tools/testing/selftests/arm64/.gitignore      |  1 +
+ tools/testing/selftests/arm64/Makefile        | 11 +++++++++++
+ .../testing/selftests/arm64/run_tags_test.sh  | 12 ++++++++++++
+ tools/testing/selftests/arm64/tags_test.c     | 19 +++++++++++++++++++
+ 13 files changed, 74 insertions(+), 12 deletions(-)
+ create mode 100644 tools/testing/selftests/arm64/.gitignore
+ create mode 100644 tools/testing/selftests/arm64/Makefile
+ create mode 100755 tools/testing/selftests/arm64/run_tags_test.sh
+ create mode 100644 tools/testing/selftests/arm64/tags_test.c
+
+-- 
+2.18.0.597.ga71716f1ad-goog
