@@ -1,75 +1,57 @@
 From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Tue,  7 Aug 2018 00:29:18 +0200
-Subject: [RFC PATCH v2 12/12] gpiolib: Add fast processing path to bitmap API
- functions
+Date: Tue,  7 Aug 2018 00:29:10 +0200
+Subject: [RFC PATCH v2 04/12] mtd: rawnand: ams-delta: request data port GPIO
+ resource
 In-Reply-To: <20180806222918.12644-1-jmkrzyszt@gmail.com>
 References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
  <20180806222918.12644-1-jmkrzyszt@gmail.com>
-Message-ID: <20180806222918.12644-13-jmkrzyszt@gmail.com>
+Message-ID: <20180806222918.12644-5-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain GPIO descriptor arrays returned by gpio_get_array() may contain
-information on a single GPIO chip driving array member pins in hardware
-order.  In such cases, bitmaps of values can be passed directly to the
-chip callback functions without wasting time on iterations.
+Data port used by the driver is actually an OMAP MPUIO device, already
+under control of gpio-omap driver.  For that reason we used to not
+request the memory region of the port as that would fail because the
+region is already busy.  Despite that, we are still accessing the port
+by just ioremapping it and performing read/write operations.  Moreover,
+we are doing that without any proteciton from other users legally
+manipulating the port pins over GPIO API.
 
-Add respective code to gpiod_get/set_array_bitmap_complex() functions.
+The plan is to convert the driver to access the port over functions
+exposed by the gpio-omap driver.  Before that happens, already prevent
+from other users accessing the port pins by requesting an array of its
+GPIO descriptors.
 
 Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 ---
- Documentation/driver-api/gpio/consumer.rst |  6 ++++++
- drivers/gpio/gpiolib.c                     | 14 ++++++++++++++
- 2 files changed, 20 insertions(+)
+ drivers/mtd/nand/raw/ams-delta.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/driver-api/gpio/consumer.rst b/Documentation/driver-api/gpio/consumer.rst
-index bec4eab3b87c..b82f134dc352 100644
---- a/Documentation/driver-api/gpio/consumer.rst
-+++ b/Documentation/driver-api/gpio/consumer.rst
-@@ -409,6 +409,12 @@ descriptor arrays, only those of type struct gpio_descs returned by
- gpiod_get_array() and its variants.  Supported array size is limited to the size
- of the bitmap, i.e., sizeof(unsigned long).
+diff --git a/drivers/mtd/nand/raw/ams-delta.c b/drivers/mtd/nand/raw/ams-delta.c
+index 48233d638d2a..09d6901fc94d 100644
+--- a/drivers/mtd/nand/raw/ams-delta.c
++++ b/drivers/mtd/nand/raw/ams-delta.c
+@@ -161,6 +161,7 @@ static int ams_delta_init(struct platform_device *pdev)
+ 	struct mtd_info *mtd;
+ 	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	void __iomem *io_base;
++	struct gpio_descs *data_gpiods;
+ 	int err = 0;
  
-+If the .chip member of the array structure, filled in by gpiod_get_array() in
-+certain circumstances, contains a valid GPIO chip descriptor, the raw variants
-+of the functions can take fast processing paths, passing bitmap arguments
-+directly to the chip callback functions.  That allows for utilization of GPIO
-+banks as data I/O ports without much loss of performance.
-+
- 
- GPIOs mapped to IRQs
- --------------------
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index 5b541364dee0..bf95f2964bc5 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -2846,6 +2846,12 @@ int gpiod_get_array_bitmap_complex(bool raw, bool can_sleep,
- 	if (array->ndescs > sizeof(*bits))
- 		return -EINVAL;
- 
-+	if (raw && !IS_ERR_OR_NULL(array->chip)) {
-+		unsigned long mask = (1ULL << array->ndescs) - 1;
-+
-+		return gpio_chip_get_multiple(array->chip, &mask, bits);
+ 	if (!res)
+@@ -261,6 +262,13 @@ static int ams_delta_init(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "CLE GPIO request failed (%d)\n", err);
+ 		goto out_mtd;
+ 	}
++	/* Request array of data pins, initialize them as input */
++	data_gpiods = devm_gpiod_get_array(&pdev->dev, "data", GPIOD_IN);
++	if (IS_ERR(data_gpiods)) {
++		err = PTR_ERR(data_gpiods);
++		dev_err(&pdev->dev, "data GPIO request failed: %d\n", err);
++		goto out_mtd;
 +	}
-+
- 	i = gpiod_get_array_value_complex(raw, can_sleep, array->ndescs,
- 					  array->desc, value_array);
- 	if (i)
-@@ -3156,6 +3162,14 @@ int gpiod_set_array_bitmap_complex(bool raw, bool can_sleep,
- 	if (array->ndescs > sizeof(*bits))
- 		return -EINVAL;
  
-+	if (raw && !IS_ERR_OR_NULL(array->chip)) {
-+		unsigned long mask = (1ULL << array->ndescs) - 1;
-+
-+		gpio_chip_set_multiple(array->chip, &mask, bits);
-+
-+		return 0;
-+	}
-+
- 	for (i = 0; i < array->ndescs; i++)
- 		value_array[i] = test_bit(i, bits);
- 
+ 	/* Scan to find existence of the device */
+ 	err = nand_scan(mtd, 1);
 -- 
 2.16.4
