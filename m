@@ -1,30 +1,101 @@
-From: sjhuang@iluvatar.ai (Huang Shijie)
-Date: Mon, 6 Aug 2018 17:22:59 +0800
-Subject: [PATCH v2 3/9] dmaengine: st_fdma: use
- dmaenginem_async_device_register to simplify the code
-In-Reply-To: <a2d2f8d5-95a7-f511-24e6-6d43228de2a6@zonque.org>
-References: <20180806085231.4597-1-sjhuang@iluvatar.ai>
- <20180806085231.4597-4-sjhuang@iluvatar.ai>
- <a2d2f8d5-95a7-f511-24e6-6d43228de2a6@zonque.org>
-Message-ID: <20180806092252.GA5301@hsj-Precision-5520>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 6 Aug 2018 11:36:02 +0200
+Subject: [PATCH v8 04/26] PM / Domains: Add support for CPU devices to
+ genpd
+In-Reply-To: <CAPDyKFq=m7ad66SwiOr+4ab=e7PNiXrXJ6c8G0ZTPOdO1RQ_6g@mail.gmail.com>
+References: <20180620172226.15012-1-ulf.hansson@linaro.org>
+ <20180620172226.15012-5-ulf.hansson@linaro.org>
+ <1678369.6pMUSOvdlV@aspire.rjw.lan>
+ <CAPDyKFq=m7ad66SwiOr+4ab=e7PNiXrXJ6c8G0ZTPOdO1RQ_6g@mail.gmail.com>
+Message-ID: <CAJZ5v0jah=aiYoV_b_p=-x+puO0sxeGRBCtJnQAD8xb8p1QGfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2018 at 11:03:51AM +0200, Daniel Mack wrote:
-> > -	ret = dma_async_device_register(&fdev->dma_device);
-> > +	ret = dmaenginem_async_device_register(&fdev->dma_device);
-> >   	if (ret) {
-> >   		dev_err(&pdev->dev,
-> >   			"Failed to register DMA device (%d)\n", ret);
-> > @@ -852,7 +852,6 @@ static int st_fdma_probe(struct platform_device *pdev)
-> >   	return 0;
-> >   err_dma_dev:
-> > -	dma_async_device_unregister(&fdev->dma_device);
-> 
-> I guess the jump label can go away too?
-Yes. 
+On Fri, Aug 3, 2018 at 1:43 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 19 July 2018 at 12:25, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> On Wednesday, June 20, 2018 7:22:04 PM CEST Ulf Hansson wrote:
+>>> To enable a device belonging to a CPU to be attached to a PM domain managed
+>>> by genpd, let's do a few changes to genpd as to make it convenient to
+>>> manage the specifics around CPUs.
+>>>
+>>> First, as to be able to quickly find out what CPUs that are attached to a
+>>> genpd, which typically becomes useful from a genpd governor as following
+>>> changes is about to show, let's add a cpumask 'cpus' to the struct
+>>> generic_pm_domain.
+>>>
+>>> At the point when a device that belongs to a CPU, is attached/detached to
+>>> its corresponding PM domain via genpd_add_device(), let's update the
+>>> cpumask in genpd->cpus. Moreover, propagate the update of the cpumask to
+>>> the master domains, which makes the genpd->cpus to contain a cpumask that
+>>> hierarchically reflect all CPUs for a genpd, including CPUs attached to
+>>> subdomains.
+>>>
+>>> Second, to unconditionally manage CPUs and the cpumask in genpd->cpus, is
+>>> unnecessary for cases when only non-CPU devices are parts of a genpd.
+>>> Let's avoid this by adding a new configuration bit, GENPD_FLAG_CPU_DOMAIN.
+>>> Clients must set the bit before they call pm_genpd_init(), as to instruct
+>>> genpd that it shall deal with CPUs and thus manage the cpumask in
+>>> genpd->cpus.
+>>>
+>>> Cc: Lina Iyer <ilina@codeaurora.org>
+>>> Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>> ---
+>>>  drivers/base/power/domain.c | 69 ++++++++++++++++++++++++++++++++++++-
+>>>  include/linux/pm_domain.h   |  3 ++
+>>>  2 files changed, 71 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>>> index 21d298e1820b..6149ce0bfa7b 100644
+>>> --- a/drivers/base/power/domain.c
+>>> +++ b/drivers/base/power/domain.c
+>>> @@ -20,6 +20,7 @@
+>>>  #include <linux/sched.h>
+>>>  #include <linux/suspend.h>
+>>>  #include <linux/export.h>
+>>> +#include <linux/cpu.h>
+>>>
+>>>  #include "power.h"
+>>>
+>>> @@ -126,6 +127,7 @@ static const struct genpd_lock_ops genpd_spin_ops = {
+>>>  #define genpd_is_irq_safe(genpd)     (genpd->flags & GENPD_FLAG_IRQ_SAFE)
+>>>  #define genpd_is_always_on(genpd)    (genpd->flags & GENPD_FLAG_ALWAYS_ON)
+>>>  #define genpd_is_active_wakeup(genpd)        (genpd->flags & GENPD_FLAG_ACTIVE_WAKEUP)
+>>> +#define genpd_is_cpu_domain(genpd)   (genpd->flags & GENPD_FLAG_CPU_DOMAIN)
+>>>
+>>>  static inline bool irq_safe_dev_in_no_sleep_domain(struct device *dev,
+>>>               const struct generic_pm_domain *genpd)
+>>> @@ -1377,6 +1379,62 @@ static void genpd_free_dev_data(struct device *dev,
+>>>       dev_pm_put_subsys_data(dev);
+>>>  }
+>>>
+>>> +static void __genpd_update_cpumask(struct generic_pm_domain *genpd,
+>>> +                                int cpu, bool set, unsigned int depth)
+>>> +{
+>>> +     struct gpd_link *link;
+>>> +
+>>> +     if (!genpd_is_cpu_domain(genpd))
+>>> +             return;
+>>> +
+>>> +     list_for_each_entry(link, &genpd->slave_links, slave_node) {
+>>> +             struct generic_pm_domain *master = link->master;
+>>> +
+>>> +             genpd_lock_nested(master, depth + 1);
+>>> +             __genpd_update_cpumask(master, cpu, set, depth + 1);
+>>> +             genpd_unlock(master);
+>>> +     }
+>>> +
+>>> +     if (set)
+>>> +             cpumask_set_cpu(cpu, genpd->cpus);
+>>> +     else
+>>> +             cpumask_clear_cpu(cpu, genpd->cpus);
+>>> +}
+>>
+>> As noted elsewhere, there is a concern about the possible weight of this
+>> cpumask and I think that it would be good to explicitly put a limit on it.
+>
+> I have been digesting your comments on the series, but wonder if this
+> is still a relevant concern?
 
-We can remove the err_dma_dev too.
-
-Thanks
-Huang Shijie
+Well, there are systems with very large cpumasks and it is sort of
+good to have that in mind when designing any code using them.
