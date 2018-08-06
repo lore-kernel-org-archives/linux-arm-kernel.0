@@ -1,41 +1,102 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Mon, 6 Aug 2018 16:31:18 -0400 (EDT)
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <CAKv+Gu_iCgAeGmrajZ_euMcFLntWG1a51HF_HQ1TO=fV_v__AQ@mail.gmail.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <20180803094129.GB17798@arm.com>
- <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
- <alpine.LRH.2.02.1808031424140.14030@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3s-+Qf=WBZz1KpisDMG3520jCUh8PLAO3PHa4jdt8kCTw@mail.gmail.com>
- <CAKv+Gu9_h-WFi1j4+DWUN_dMj75SKKHxWoDH8WQ9P7S7MNpZQg@mail.gmail.com>
- <alpine.LRH.2.02.1808060553130.30832@file01.intranet.prod.int.rdu2.redhat.com>
- <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
- <CAKv+Gu_C2g=C=gMpk4a5jpDORnxZY6t1v=HDoy59m5vwNBxBBg@mail.gmail.com>
- <alpine.LRH.2.02.1808061306490.12989@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu_8Rq6X24ZOYvG7+kQQGSGYAZuu_co4k1nJS8K7rkrWMA@mail.gmail.com>
- <alpine.LRH.2.02.1808061552090.11930@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu_iCgAeGmrajZ_euMcFLntWG1a51HF_HQ1TO=fV_v__AQ@mail.gmail.com>
-Message-ID: <alpine.LRH.2.02.1808061630380.18304@file01.intranet.prod.int.rdu2.redhat.com>
+From: angelo@sysam.it (Angelo Dureghello)
+Date: Mon, 6 Aug 2018 22:40:21 +0200
+Subject: [PATCH v8 1/3] dmaengine: fsl-edma: extract common fsl-edma code
+ (no changes in behavior intended)
+In-Reply-To: <CAJKOXPejwmfp2g9hXFjxP_vt=j0UDubLDnsqca=KKmEYosNg4Q@mail.gmail.com>
+References: <20180803193244.12084-1-angelo@sysam.it>
+ <CAJKOXPejwmfp2g9hXFjxP_vt=j0UDubLDnsqca=KKmEYosNg4Q@mail.gmail.com>
+Message-ID: <20180806204021.GC6092@jerusalem>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Krzysztof,
 
-
-On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
-
-> > Unfortunatelly, it doesn't work. I verified that the bit is set after
-> > booting Linux, but the memcpy corruption was still present.
+On Mon, Aug 06, 2018 at 09:43:42AM +0200, Krzysztof Kozlowski wrote:
+> On 3 August 2018 at 21:32, Angelo Dureghello <angelo@sysam.it> wrote:
+> > This patch adds a new fsl-edma-common module to allow new
+> > mcf-edma module code to use most of the fsl-edma code.
 > >
-> > I also tried the other chicken bits, it slowed down the system noticeably,
-> > but had no effect on the memcpy corruption.
+> > Signed-off-by: Angelo Dureghello <angelo@sysam.it>
+> > ---
+> > Changes for v2:
+> > - patch splitted into 4
+> > - add mcf-edma as minimal different parts from fsl-edma
 > >
+> > Changes for v3:
+> > none
+> >
+> > Changes for v4:
+> > - patch simplified from 4/4 into 2/2
+> > - collecting all the mcf-edma-related changes
+> >
+> > Changes for v5:
+> > none
+> >
+> > Changes for v6:
+> > - adjusted comment header
+> > - fixed bit shift with BIT()
+> > - we need to free the interrupts at remove(), so removed all devm_
+> >   interrupt related calls
+> >
+> > Changes for v7:
+> > none
+> >
+> > Changes for v8:
+> > - patch rewritten from scratch, splitted into 3, common code isolated,
+> >   minimal changes from the original Freescale code have been done.
+> >   The patch has been tested with both Iris + Colibri Vybrid VF50 and
+> >   stmark2/mcf54415 Coldfire boards.
+> > ---
+> >  drivers/dma/Makefile          |   2 +-
+> >  drivers/dma/fsl-edma-common.c | 576 ++++++++++++++++++++++++++++
+> >  drivers/dma/fsl-edma-common.h | 196 ++++++++++
+> >  drivers/dma/fsl-edma.c        | 697 +---------------------------------
+> >  4 files changed, 774 insertions(+), 697 deletions(-)
+> >  create mode 100644 drivers/dma/fsl-edma-common.c
+> >  create mode 100644 drivers/dma/fsl-edma-common.h
+> >
+> > diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
+> > index 203a99d68315..66022f59fca4 100644
+> > --- a/drivers/dma/Makefile
+> > +++ b/drivers/dma/Makefile
+> > @@ -31,7 +31,7 @@ obj-$(CONFIG_DW_AXI_DMAC) += dw-axi-dmac/
+> >  obj-$(CONFIG_DW_DMAC_CORE) += dw/
+> >  obj-$(CONFIG_EP93XX_DMA) += ep93xx_dma.o
+> >  obj-$(CONFIG_FSL_DMA) += fsldma.o
+> > -obj-$(CONFIG_FSL_EDMA) += fsl-edma.o
+> > +obj-$(CONFIG_FSL_EDMA) += fsl-edma.o fsl-edma-common.o
+> >  obj-$(CONFIG_FSL_RAID) += fsl_raid.o
+> >  obj-$(CONFIG_HSU_DMA) += hsu/
+> >  obj-$(CONFIG_IMG_MDC_DMA) += img-mdc-dma.o
+> > diff --git a/drivers/dma/fsl-edma-common.c b/drivers/dma/fsl-edma-common.c
+> > new file mode 100644
+> > index 000000000000..0ae7094f477a
+> > --- /dev/null
+> > +++ b/drivers/dma/fsl-edma-common.c
+> > @@ -0,0 +1,576 @@
+> > +// SPDX-License-Identifier: GPL-2.0
 > 
-> OK, it was worth a shot
+> You moved code from fsl-edma.c which is licensed on GPL-2.0+. I think
+> that's not allowed as you effectively relicense the work on new
+> license.
 > 
-> Let's wait and see if Marcin has any results.
+Ok, so if i undestrand, i should change that comment to
+// SPDX-License-Identifier: GPL-2.0+
+Right ?
 
-BTW. is there documentation for that DesignWare PCIe controller somewhere?
+> Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
+> 
+> Best regards,
+> Krzysztof
+>
 
-Mikulas
+Best regards,
+Angelo
+ 
+> > +//
+> > +// Copyright (c) 2013-2014 Freescale Semiconductor, Inc
+> > +// Copyright (c) 2017 Sysam, Angelo Dureghello  <angelo@sysam.it>
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
