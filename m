@@ -1,66 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 6 Aug 2018 14:22:00 +0200
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <CAKv+Gu8384LZwL898wJ8BKjmJNzvd+-cSFUp4X4OpfmRDCP4Ng@mail.gmail.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
- <11f9185a-7f71-83df-3a57-0a0ae9c1f934@arm.com>
- <alpine.LRH.2.02.1808032046540.24748@file01.intranet.prod.int.rdu2.redhat.com>
- <CA+=Sn1=6F-fGLmXE0VqQHTqTCUKUT=Fz29mMT7349SPFisbZ9A@mail.gmail.com>
- <alpine.LRH.2.02.1808040611070.23762@file01.intranet.prod.int.rdu2.redhat.com>
- <fd2cae87-b2df-d8ef-8836-e6cbf8c5f851@redhat.com>
- <alpine.LRH.2.02.1808060325110.3756@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu_y6La77sWOSROrwfRy65jrFVYVvRZt+ewNheYhdhHCkQ@mail.gmail.com>
- <alpine.LRH.2.02.1808060626060.2986@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu87YqLM=FFZ6V8rHhuhskDdsBUuXFpqNKVbXWqdnuNEyA@mail.gmail.com>
- <alpine.LRH.2.02.1808060639200.2986@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8HyHX8qjg1qHV2M9Re+RGQJigjdAFVC_yR4niGkk2ikA@mail.gmail.com>
- <alpine.LRH.2.02.1808060700070.10220@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8384LZwL898wJ8BKjmJNzvd+-cSFUp4X4OpfmRDCP4Ng@mail.gmail.com>
-Message-ID: <CAKv+Gu9Sa0pPeKVYBcCF8w-4QYYtp0YhHArzL3F2bnfVqyBYYA@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 06 Aug 2018 15:28:06 +0300
+Subject: [PATCH v3 00/10] Add helper for plane reset
+In-Reply-To: <20180806122038.GA6755@e114479-lin.cambridge.arm.com>
+References: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
+ <15977863.ZBGtPEODRU@avalon>
+ <20180806122038.GA6755@e114479-lin.cambridge.arm.com>
+Message-ID: <7271371.hQdeefBnlA@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2018 at 14:19, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 6 August 2018 at 14:09, Mikulas Patocka <mpatocka@redhat.com> wrote:
->>
->>
->> On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
->>
->>> >> Are we talking about a quirk for the Armada 8040 or about PCIe on ARM
->>> >> in general?
->>> >
->>> > I don't know - there are not any other easily available PCIe ARM boards
->>> > except for Armada 8040.
->>>
->>> ... indeed, and sadly, the ones that are available all have this
->>> horrible Synopsys DesignWare PCIe IP that does not implement a true
->>> root complex at all, but is simply repurposed endpoint IP with some
->>> tweaks so it vaguely resembles a root complex.
->>>
->>> But this is exactly why I am asking: I use a AMD Seattle Overdrive as
->>> my main Linux development system, and it runs the gnome-shell stack
->>> flawlessly (using the nouveau driver), as well as a UEFI framebuffer
->>> using efifb. So my suspicion is that this is either a Synopsys IP
->>> issue or an interconnect issue, and has nothing to do with the
->>> impedance mismatch between AMBA and PCIe.
->>
->> If you run the program for testing memcpy on framebuffer that I posted in
->> this thread - does it detect some corruption for you?
->>
->
-> I won't be able to check that for a while - I'm currently travelling.
->
->>
->> BTW. does the Radeon GPU driver work for you?
->>
->> My observation is that OpenGL with Nouveau works, but it's slow and the
->> whole system locks up when playing video in chromium.
->>
+Hi Alex,
 
-Are you setting the pstate to auto? That helps a lot in my experience.
+On Monday, 6 August 2018 15:20:38 EEST Alexandru-Cosmin Gheorghe wrote:
+> On Mon, Aug 06, 2018 at 02:45:42PM +0300, Laurent Pinchart wrote:
+> > On Monday, 6 August 2018 14:07:27 EEST Alexandru-Cosmin Gheorghe wrote:
+> >> On Sat, Aug 04, 2018 at 05:15:20PM +0100, Alexandru Gheorghe wrote:
+> >>> No significant change since v2, fixed a spelling mistake and
+> >>> added/removed some newlines in 01 and 07 patches.
+> >>> 
+> >>> I plan to apply the first patch of the series and the patches for
+> >>> the drivers maintained through drm-misc(that go Reviewed/Ack) in
+> >>> drm-misc-next on Monday.
+> >>> 
+> >>> For the other drivers please let me know if you want me to push them
+> >>> in drm-misc-next as well.
+> >> 
+> >> Pushed the following patch to drm-misc-next:
+> >> 
+> >> drm/atomic: Add __drm_atomic_helper_plane_reset
+> >> drm: mali-dp: Use __drm_atomic_helper_plane_reset instead of copying the
+> >> logic
+> >> drm: atmel-hlcdc: Use __drm_atomic_helper_plane_reset instead of copying
+> >> the logic
+> >> drm/imx: Use __drm_atomic_helper_plane_reset instead of copying the
+> >> logic
+> >> drm/sun4i: Use __drm_atomic_helper_plane_reset instead of copying the
+> >> logic
+> > 
+> > I've acked the rcar-du part, could it be merged with the rest of the code
+> > ?
+> 
+> Done, it's in drm-misc-next now. I didn't know how to handle this for
+> drivers that have their own tree, so I just pushed the patches where I was
+> explicitly asked.
 
-I.e.,
+No worries. It's actually better to ask than pushing changes directly, as 
+maintainers could have conflicting patches queued up. I should have made this 
+clear in my review, thank you for handling it.
 
-echo auto > /sys/kernel/debug/dri/0/pstate
+-- 
+Regards,
+
+Laurent Pinchart
