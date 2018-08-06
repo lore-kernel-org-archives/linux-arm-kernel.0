@@ -1,53 +1,41 @@
 From: sjhuang@iluvatar.ai (Huang Shijie)
-Date: Mon,  6 Aug 2018 16:52:26 +0800
-Subject: [PATCH v2 4/9] dmaengine: mmp_tdma: use
- dmaenginem_async_device_register to simplify the code
+Date: Mon,  6 Aug 2018 16:52:31 +0800
+Subject: [PATCH v2 9/9] dmaengine: add COMPILE_TEST for the drivers
 In-Reply-To: <20180806085231.4597-1-sjhuang@iluvatar.ai>
 References: <20180806085231.4597-1-sjhuang@iluvatar.ai>
-Message-ID: <20180806085231.4597-5-sjhuang@iluvatar.ai>
+Message-ID: <20180806085231.4597-10-sjhuang@iluvatar.ai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use dmaenginem_async_device_register to simplify the code:
-	remove dma_async_device_unregister.
-	return error if it fails.
+We can do the compiling test with COMPILE_TEST.
+This patch adds the COMPILE_TEST for the drivers.
 
 Signed-off-by: Huang Shijie <sjhuang@iluvatar.ai>
 ---
- drivers/dma/mmp_tdma.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ drivers/dma/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/mmp_tdma.c b/drivers/dma/mmp_tdma.c
-index 13c68b6434ce..9f5869e1a017 100644
---- a/drivers/dma/mmp_tdma.c
-+++ b/drivers/dma/mmp_tdma.c
-@@ -530,9 +530,6 @@ static void mmp_tdma_issue_pending(struct dma_chan *chan)
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index d4a4230a7942..1f0dceb055d8 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -439,7 +439,7 @@ config PL330_DMA
  
- static int mmp_tdma_remove(struct platform_device *pdev)
- {
--	struct mmp_tdma_device *tdev = platform_get_drvdata(pdev);
--
--	dma_async_device_unregister(&tdev->device);
- 	return 0;
- }
+ config PXA_DMA
+ 	bool "PXA DMA support"
+-	depends on (ARCH_MMP || ARCH_PXA)
++	depends on (ARCH_MMP || ARCH_PXA || COMPILE_TEST)
+ 	select DMA_ENGINE
+ 	select DMA_VIRTUAL_CHANNELS
+ 	help
+@@ -457,7 +457,7 @@ config SIRF_DMA
  
-@@ -696,7 +693,7 @@ static int mmp_tdma_probe(struct platform_device *pdev)
- 	dma_set_mask(&pdev->dev, DMA_BIT_MASK(64));
- 	platform_set_drvdata(pdev, tdev);
- 
--	ret = dma_async_device_register(&tdev->device);
-+	ret = dmaenginem_async_device_register(&tdev->device);
- 	if (ret) {
- 		dev_err(tdev->device.dev, "unable to register\n");
- 		return ret;
-@@ -708,7 +705,7 @@ static int mmp_tdma_probe(struct platform_device *pdev)
- 		if (ret) {
- 			dev_err(tdev->device.dev,
- 				"failed to register controller\n");
--			dma_async_device_unregister(&tdev->device);
-+			return ret;
- 		}
- 	}
- 
+ config STE_DMA40
+ 	bool "ST-Ericsson DMA40 support"
+-	depends on ARCH_U8500
++	depends on ARCH_U8500 || COMPILE_TEST
+ 	select DMA_ENGINE
+ 	help
+ 	  Support for ST-Ericsson DMA40 controller
 -- 
 2.17.1
