@@ -1,24 +1,46 @@
-From: mwjian@foxmail.com (=?utf-8?B?6ams5paH5YGl?=)
-Date: Tue, 7 Aug 2018 09:59:13 +0800
-Subject: [PATCH] ARM: spinlock: avoid exclusive accesses on unlock()
- path
-In-Reply-To: <tencent_6BF9DD7B77B1CAA95FBAEE73@qq.com>
-References: <tencent_76D135D5D379BDAB2A2436393315C6E4E807@qq.com>
- <tencent_6BF9DD7B77B1CAA95FBAEE73@qq.com>
-Message-ID: <tencent_7ECB5CA838202151603A2FF6@qq.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Tue, 7 Aug 2018 10:06:32 +0800
+Subject: [PATCH v3 0/2] pinctrl: meson-g12a: add pinctrl driver support
+Message-ID: <20180807020634.18182-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-while one cpu is doing arch_spin_unlock,another cpu doing arch_spin_lock
-the first cpu's
-lock->tickets.owner++;
-may be over writed by the second's 
-strex	%2, %1, [%3]\n
-so the owner filed doesn't get increased. 
+  This patch series try to add pinctrl driver support for
+the Meson-G12A SoC.
 
-But i'm not sure about this, may be there are something i have missed. 
+  The pinctrl driver for Meson-G12A SoC share the similar IP as
+the previous Meson-AXG SoC, both use same pinmux ops (register layout).
+But, a new driver is needed here due to the differences in the pins.
 
-Thanks.
+Changes since v2 at [2]
+ - use ${FUNCTION}_${DOMAIN}_${PORT}_${PINFUNC}_${BANK}${PINNUM}
+   to rename some pins
+ - fix tdm groups
+ - explain the similarity of pinmux between AXG and G12A - thanks Martin 
+ - collect Rob's Reviewed-by
 
------------------- Original ------------------
+Changes since v1 at [1]
+ - add Martin's Ack, Xingyu's Signed-off
+ - squash patch 1,2 (documentation & header file)
+ - explain pinctrl IP
+ - notice GPIOE located in AO bank
+
+[1] https://lkml.kernel.org/r/20180704224511.29350-1-yixun.lan at amlogic.com
+[2] https://lkml.kernel.org/r/20180714232754.5402-1-yixun.lan at amlogic.com
+
+Yixun Lan (2):
+  documentation: pinctrl: Add compatibles for Amlogic Meson G12A pin
+    controllers
+  pinctrl: meson-g12a: add pinctrl driver support
+
+ .../bindings/pinctrl/meson,pinctrl.txt        |    2 +
+ drivers/pinctrl/meson/Kconfig                 |    6 +
+ drivers/pinctrl/meson/Makefile                |    1 +
+ drivers/pinctrl/meson/pinctrl-meson-g12a.c    | 1404 +++++++++++++++++
+ include/dt-bindings/gpio/meson-g12a-gpio.h    |  114 ++
+ 5 files changed, 1527 insertions(+)
+ create mode 100644 drivers/pinctrl/meson/pinctrl-meson-g12a.c
+ create mode 100644 include/dt-bindings/gpio/meson-g12a-gpio.h
+
+-- 
+2.18.0
