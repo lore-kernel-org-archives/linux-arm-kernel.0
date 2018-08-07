@@ -1,69 +1,34 @@
-From: ebiggers@kernel.org (Eric Biggers)
-Date: Tue, 7 Aug 2018 16:19:41 -0700
-Subject: [RFC PATCH 8/9] crypto: arm/poly1305 - add NEON accelerated
- Poly1305 implementation
-In-Reply-To: <CAKv+Gu_T+f=isb_dBF7icfTHApG+E8Y5njSQ=NmtyTHEN2VMgg@mail.gmail.com>
-References: <20180806223300.113891-1-ebiggers@kernel.org>
- <20180806223300.113891-9-ebiggers@kernel.org>
- <CAKv+Gu_T+f=isb_dBF7icfTHApG+E8Y5njSQ=NmtyTHEN2VMgg@mail.gmail.com>
-Message-ID: <20180807231941.GC25300@gmail.com>
+From: tuomas@tuxera.com (Tuomas Tynkkynen)
+Date: Wed, 8 Aug 2018 02:25:54 +0300
+Subject: [PATCH 2/2] arm64: dts: sunxi: Don't use cd-inverted in
+ sun50i-a64-pinebook
+In-Reply-To: <20180807232554.16825-1-tuomas@tuxera.com>
+References: <20180807232554.16825-1-tuomas@tuxera.com>
+Message-ID: <20180807232554.16825-2-tuomas@tuxera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Another user of cd-inverted seems to have crept in. Switch it away from
+cd-inverted to be consistent with other sunxi boards.
 
-On Tue, Aug 07, 2018 at 02:09:05PM +0200, Ard Biesheuvel wrote:
-> On 7 August 2018 at 00:32, Eric Biggers <ebiggers@kernel.org> wrote:
-> > From: Eric Biggers <ebiggers@google.com>
-> >
-> > Add the Poly1305 code from OpenSSL, which was written by Andy Polyakov.
-> > I took the .S file from WireGuard, whose author has made the needed
-> > tweaks for Linux kernel integration and verified that Andy had given
-> > permission for GPLv2 distribution.  I didn't make any additional changes
-> > to the .S file.
-> >
-> > Note, for HPolyC I'd eventually like a Poly1305 implementation that
-> > allows precomputing powers of the key.  But for now this implementation
-> > just provides the existing semantics where the key and nonce are treated
-> > as a "one-time key" that must be provided for every message.
-> >
-> > Signed-off-by: Eric Biggers <ebiggers@google.com>
-> 
-> Hi Eric,
-> 
-> In the past, I worked with Andy on several occasions to get my kernel
-> changes incorporated into the upstream OpenSSL version of the
-> 'perlasm' .pl file.
-> 
-> This achieves a number of things:
-> - we get a readable version of the code in the kernel tree,
-> - our changes are reviewed upstream
-> - upgrading involves grabbing the latest .pl file rather than merging
-> generated code (which requires careful review)
-> - GPLv2 permission is made explicit, rather than something someone
-> claims to have reached agreement on,
-> - no legal ambiguity whether the output of the perl script is covered
-> by the license (which is what we incorporate here)
-> 
-> Note that the 'available under GPL depending on where you obtained the
-> code' in the CRYPTOGAMS license likely conflicts with the GPL itself,
-> but I am not a lawyer so I'd much prefer having the upstream copy
-> mention this explicitly.
+Signed-off-by: Tuomas Tynkkynen <tuomas@tuxera.com>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-First, note that Jason is proposing adding this exact same .S file as part of
-his new "zinc" cryptography library, along with 7 other OpenSSL .S files.  So it
-may really be him you need to convince.
-
-But yes, I don't really like the approach of just including the .S output of the
-.pl script either, as it loses semantic information that was in the .pl script.
-Ideally the source should either be the .pl script, or else a real hand written
-.S file with the proper comments and macros to make it readable -- not something
-in-between.
-
-Getting the license clarification and possibly other changes upstream is a good
-idea too.  I noticed, though, that the actual wording used in some files
-upstream ("Permission to use under GPLv2 terms is granted") apparently still
-isn't considered sufficient by some, so a separate clarification from Andy was
-apparently still needed: see kernel commit c2e415fe75bbc83c1...
-
-- Eric
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+index 897e60cbe38d..4b8fe453bacd 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+@@ -80,8 +80,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+ 	vmmc-supply = <&reg_dcdc1>;
+-	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
+ 	disable-wp;
+ 	bus-width = <4>;
+ 	status = "okay";
+-- 
+2.16.3
