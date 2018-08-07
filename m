@@ -1,53 +1,40 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 7 Aug 2018 11:30:54 +0100
-Subject: [PATCH] arm64: Trap WFI executed in userspace
-In-Reply-To: <9af8bb9a-7c6c-2560-5965-118dfadf8141@arm.com>
-References: <20180807093326.5090-1-marc.zyngier@arm.com>
- <20180807100437.GA9097@e103592.cambridge.arm.com>
- <9af8bb9a-7c6c-2560-5965-118dfadf8141@arm.com>
-Message-ID: <20180807103054.GB9097@e103592.cambridge.arm.com>
+From: tali.perry1@gmail.com (Tali Perry)
+Date: Tue,  7 Aug 2018 13:38:12 +0300
+Subject: [PATCH v2 0/2] i2c: npcm7xx: new driver for I2C controller
+Message-ID: <20180807103814.29586-1-tali.perry1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2018 at 11:24:34AM +0100, Marc Zyngier wrote:
-> On 07/08/18 11:05, Dave Martin wrote:
-> > On Tue, Aug 07, 2018 at 10:33:26AM +0100, Marc Zyngier wrote:
-> >> It recently came to light that userspace can execute WFI, and that
-> >> the arm64 kernel doesn trap this event. This sounds rather benign,
-> >> but the kernel should decide when it wants to wait for an interrupt,
-> >> and not userspace.
-> >>
-> >> Let's trap WFI and treat it as a way to yield the CPU to another
-> >> process.
-> > 
-> > This doesn't amount to a justification.
-> > 
-> > If the power controller is unexpectedly left in a bad state so that
-> > WFI will do something nasty to a cpu that may enter userspace, then we
-> > probably have bigger problems.
-> > 
-> > So, maybe it really is pretty harmless to let userspace execute this.
-> 
-> Or not. It is also a very good way for userspace to find out when an
-> interrupt gets delivered and start doing all kind of probing on the
-> kernel. The least the userspace knows about that, the better I feel.
+Nuvoton NPCM7XX I2C Controller
+NPCM7xx includes 16 I2C contollers. THis driver operates the controller.
+This module also includes a slave mode, which will be submitted later on.
 
-Possibly.  I suspect there are other ways to guess pretty accurately
-when an interrupt occurs, but WFI allows greater precision.
+Any feedback would be appreciated.  
 
-> > I can't think of a legitimate reason for userspace to execute WFI
-> > however.  Userspace doesn't have interrupts under Linux, so it makes
-> > no sense to wait for one.
-> > 
-> > Have we seen anybody using WFI in userspace?  It may be cleaner to
-> > map this to SIGILL rather than be permissive and regret it later.
-> 
-> I couldn't find any user, and I'm happy to just send userspace to hell
-> in that case. But it could also been said that since it was never
-> prevented, it is a de-facto ABI.
+v2 -> v1:
+	- run check patch in strict mode.
+	- use linux crc.
+	- define regs in constant offset without base.
+	- remove debug prints.
+	- no declerations for local functions.
+	
+v1: initial version
 
-Agreed.  I wonder whether it's sufficient to have this mapping to SIGILL
-in -next for a while and see whether anybody complains.
+Signed-off-by: Tali Perry <tali.perry1@gmail.com>
 
-Cheers
----Dave
+---
+Tali Perry (2):
+  dt-binding: i2c: npcm7xx: add binding for i2c controller
+  i2c: npcm7xx: add i2c controller master mode only
+
+ .../devicetree/bindings/i2c/i2c-npcm7xx.txt        |   27 +
+ MAINTAINERS                                        |    8 +
+ drivers/i2c/busses/Kconfig                         |   11 +
+ drivers/i2c/busses/Makefile                        |    1 +
+ drivers/i2c/busses/i2c-npcm7xx.c                   | 2017 ++++++++++++++++++++
+ 5 files changed, 2064 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-npcm7xx.txt
+ create mode 100644 drivers/i2c/busses/i2c-npcm7xx.c
+
+-- 
+2.14.1
