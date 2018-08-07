@@ -1,50 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 7 Aug 2018 13:31:49 +0100
-Subject: [PATCH 1/2] iommu/rockchip: Handle errors returned from PM
- framework
-In-Reply-To: <2940317.dDZy1L4CDY@phil>
-References: <20180807085406.3863-1-marc.zyngier@arm.com>
- <20180807085406.3863-2-marc.zyngier@arm.com> <2940317.dDZy1L4CDY@phil>
-Message-ID: <94b6aab1-e8d3-6929-a2e6-2f06c564bc70@arm.com>
+From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
+Date: Tue, 7 Aug 2018 18:03:20 +0530
+Subject: [PATCH v7 3/6] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <20180807113622.GC19831@redhat.com>
+References: <20180731035143.11942-1-ravi.bangoria@linux.ibm.com>
+ <20180731035143.11942-4-ravi.bangoria@linux.ibm.com>
+ <20180803112455.GA13794@redhat.com>
+ <bfb47985-8f58-e5e4-f8b4-695dfea7937f@linux.ibm.com>
+ <20180807113622.GC19831@redhat.com>
+Message-ID: <4d1e2a17-14ba-f277-8e57-4a4573630ab2@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/18 13:09, Heiko Stuebner wrote:
-> Hi Marc,
-> 
-> Am Dienstag, 7. August 2018, 10:54:05 CEST schrieb Marc Zyngier:
->> pm_runtime_get_if_in_use can fail: either PM has been disabled
->> altogether (-EINVAL), or the device hasn't been enabled yet (0).
->> Sadly, the Rockchip IOMMU driver tends to conflate the two things
->> by considering a non-zero return value as successful.
->>
->> This has the consequence of hiding other bugs, so let's handle this
->> case throughout the driver, with a WARN_ON_ONCE so that we can try
->> and work out what happened.
->>
->> Fixes: 0f181d3cf7d98 ("iommu/rockchip: Add runtime PM support")
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> I'm still not sure about the !CONFIG_PM case, as it was probably silently
-> working in that case before
+Hi Oleg,
 
-Do we agree that this is an orthogonal problem though?
-
+>> I'm sorry. I didn't get this. How can uprobe go away without calling
+>>     uprobe_unregister()
+>>     -> rergister_for_each_vma()
+>>        -> remove_breakpoint()
+>> And remove_breakpoint() will get called
 > 
-> But on the other hand we're also already running over it in other places
-> like in the iommu-shutdown and I guess if someone _really_ disabled
-> CONFIG_PM, a lot of additional stuff would fail anyway.
-> 
-> So should we wrap that in some #ifdef magic, just ignore it or simply
-> select PM similar to what Tegra, Renesas and Vexpress seem to do?
-> 
-> I guess I like the 3rd option best ;-)
+> assuming that _unregister() will find the same vma with the probed insn. But
+> as I said, the application can munmap the probed page/vma.
 
-It probably doesn't hurt. At what level do you want it? As a dependency
-to the IOMMU? or to the platform?
+Got it now :)
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks.
