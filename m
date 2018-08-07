@@ -1,32 +1,47 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 7 Aug 2018 14:51:22 +0200
-Subject: [PATCH] crypto: remove speck
-In-Reply-To: <20180807031526.GD5048@thunk.org>
-References: <20180806223300.113891-1-ebiggers@kernel.org>
- <20180806230437.21431-1-Jason@zx2c4.com>
- <20180807011937.GA133621@gmail.com>
- <CAHmME9oTApV-zHD60QPryaoQf45ODpG25Da5FgB8c+LO162gWQ@mail.gmail.com>
- <20180807031237.GA779@sol.localdomain> <20180807031526.GD5048@thunk.org>
-Message-ID: <CAKv+Gu_Dr1KvEOMdkhxZtq093MDgvcP_G-5=JMmqsx+zYV-=mw@mail.gmail.com>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Tue, 7 Aug 2018 14:54:57 +0200
+Subject: [PATCH v2 0/3] ARM: dts: stm32: Fix DT dtc warnings for STM32 MCU's
+Message-ID: <1533646500-4028-1-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 August 2018 at 05:15, Theodore Y. Ts'o <tytso@mit.edu> wrote:
-> On Mon, Aug 06, 2018 at 08:12:38PM -0700, Eric Biggers wrote:
->> I mention this because people are naturally going to be curious about that, e.g.
->> speculating that Google found a "backdoor" -- remember that we do have some good
->> cryptographers!  I'm just stating what we know, out of honesty and openness; I
->> don't really intend to be arguing for Speck with this statement, and in any case
->> we already made the decision to not use Speck.
->
-> Let's be clear --- the arguments about whether or not to use Speck,
-> and whether or not to remove Speck from the kernel, are purely
-> political --- not techinical.
->
+From: Patrice Chotard <patrice.chotard@st.com>
 
-Whether or not to use it may be a political rather than a technical
-motivation. But the reason I acked this patch is not because removing
-it aligns with my political conviction regarding Speck, but simply
-because its contributor, primary intended user and therefore de facto
-maintainer stated publicly that it no longer had any intention to use
-it going forward.
+Change since v1:
+	- update nodes name as following: <node_name>@0 to <node_name>-0
+
+
+This series fixes DT dtc warnings for following STM32 MCU's boards:
+	- stm32f429i evaluation
+	- stm32f429 discovery
+	- stm32f469 discovery
+	- stm32746g evaluation
+	- stm32f746 discovery
+	- stm32h743i discovery
+	- stm32h743i evaluation
+
+Patrice Chotard (3):
+  ARM: dts: stm32: Fix DT dtc warnings for stm32h7
+  ARM: dts: stm32: Fix DT dtc warnings for stm32f7
+  ARM: dts: stm32: Fix DT dtc warnings for stm32f4
+
+ arch/arm/boot/dts/stm32429i-eval.dts     | 11 +++--
+ arch/arm/boot/dts/stm32746g-eval.dts     |  9 ++--
+ arch/arm/boot/dts/stm32f4-pinctrl.dtsi   | 30 ++++++-------
+ arch/arm/boot/dts/stm32f429-disco.dts    |  7 ++-
+ arch/arm/boot/dts/stm32f429-pinctrl.dtsi | 74 +++++++++++++++----------------
+ arch/arm/boot/dts/stm32f429.dtsi         |  8 ++--
+ arch/arm/boot/dts/stm32f469-disco.dts    | 11 +++--
+ arch/arm/boot/dts/stm32f469-pinctrl.dtsi | 76 +++++++++++++++-----------------
+ arch/arm/boot/dts/stm32f7-pinctrl.dtsi   | 24 +++++-----
+ arch/arm/boot/dts/stm32f746-disco.dts    |  6 +--
+ arch/arm/boot/dts/stm32f746.dtsi         |  8 ++--
+ arch/arm/boot/dts/stm32f769-disco.dts    | 11 +++--
+ arch/arm/boot/dts/stm32h743-pinctrl.dtsi | 10 ++---
+ arch/arm/boot/dts/stm32h743.dtsi         |  8 ++--
+ arch/arm/boot/dts/stm32h743i-disco.dts   |  2 +-
+ arch/arm/boot/dts/stm32h743i-eval.dts    |  2 +-
+ 16 files changed, 140 insertions(+), 157 deletions(-)
+
+-- 
+1.9.1
