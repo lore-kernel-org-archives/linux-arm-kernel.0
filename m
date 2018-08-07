@@ -1,50 +1,76 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Tue, 7 Aug 2018 14:33:58 +0000
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <alpine.LRH.2.02.1808070939320.6020@file01.intranet.prod.int.rdu2.redhat.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
- <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
- <CAJA7tRZbmnZq7RfvQeYEy_a1ZObWqpFpVdvgsXgsioQ3RyPMuA@mail.gmail.com>
- <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
- <f696ebe8605840e3bb04bb78b60a6cfa@AcuMS.aculab.com>
- <alpine.LRH.2.02.1808030759480.12341@file01.intranet.prod.int.rdu2.redhat.com>
- <a1564e8d091648bcad9b5ec58ab6cc95@AcuMS.aculab.com>
- <alpine.LRH.2.02.1808051018360.23136@file01.intranet.prod.int.rdu2.redhat.com>
- <51a6c4e102ad4193b3f42498f0ff11a4@AcuMS.aculab.com>
- <alpine.LRH.2.02.1808070939320.6020@file01.intranet.prod.int.rdu2.redhat.com>
-Message-ID: <5f5ab5ba0bc84b31be52bd7708c6a356@AcuMS.aculab.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Tue, 7 Aug 2018 22:34:05 +0800
+Subject: [PATCH v7 2/3] Bluetooth: mediatek: Add protocol support for
+ MediaTek serial devices
+In-Reply-To: <7A3537C5-5940-45AD-AB80-77418CCFE130@holtmann.org>
+References: <cover.1533056925.git.sean.wang@mediatek.com>
+ <c92ed10cf16f36d9a3b390e864af92e2dfe7b771.1533056925.git.sean.wang@mediatek.com>
+ <1707FFA1-A294-4A95-A3BF-0910CE455232@holtmann.org>
+ <1533192799.3472.122.camel@mtkswgap22>
+ <FF45A90A-F9F1-47CB-AB1F-1E92BF587FBE@holtmann.org>
+ <1533199720.3472.136.camel@mtkswgap22>
+ <9526E5D9-50BA-4D57-80F5-083DB7D28AFE@holtmann.org>
+ <1533205495.3472.144.camel@mtkswgap22>
+ <A6D48D49-52CE-405D-8C5D-C4D54CE67221@holtmann.org>
+ <1533303749.3472.160.camel@mtkswgap22>
+ <D2336CD2-B69B-4B5B-8125-F0CAD29E3243@holtmann.org>
+ <1533319214.3472.187.camel@mtkswgap22>
+ <7A3537C5-5940-45AD-AB80-77418CCFE130@holtmann.org>
+Message-ID: <1533652445.3472.230.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mikulas Patocka
-> Sent: 07 August 2018 15:07
-...
-> Unaccelerated scrolling is still painfully slow
-> even on modern computers because of slow framebuffer read.
+On Mon, 2018-08-06 at 17:39 +0200, Marcel Holtmann wrote:
+> Hi Sean,
+> 
+> >>>>>>>>>>> +
 
-I solved that many years ago on a strongarm system by mapping
-the screen memory at two separate virtual addresses.
-One uncached used for writes, the second cached using the
-'minicache' for reads.
-(and immediately fell foul of a memcpy() function that compared
-the two virtual addresses and decided to copy backwards)
+[ ... ]
 
-I suspect some modern cpus don't like you doing that and the
-graphics 'drivers' won't use different mappings.
+> >> this is even more hackish since the __hci_cmd_sync_ev command is really meant to get a cmd status first before waiting for that event.
+> >> 
+> > 
+> > Understood.
+> > 
+> > I've stopped the hack in v8. could we merge v8 first ? and then I will a fix up with __hci_raw_sync_ev that uses the hdev->raw_q instead of __hci_cmd_sync_ev in TODO.
+> 
+> so I looked into this a bit more. We actually added __hci_cmd_send for a Qualcomm firmware loader that was doing something similar. So instead of trying to add a yet another command to the core, I actually used that and implemented the wait for vendor event in the driver.
+> 
+> You will see my v9 on the mailing list. I also did a bunch of cosmetic minor cleanup and spelling correction. Please test this version. I also make __le16 dlen instead of dlen1 + dlen2 since I think that is what your hardware does.
 
-Even in glibc you want a more general copy_to/from_io_memory()
-rather than just 'copy_from_framebuffer()'.
-Best to define both - even if they end up identical.
-Other drivers allow PCIe space be mmap()ed into user space.
+Only one thing needs to be corrected in v9. that is __be16 is required instead of dlen1 + dlen2. I will fix it up in v10 and the other changes all look good to me.
 
-While your tests show vmovntdqa being slightly slower than an
-avx read for uncached mappings it is still much better than
-all the other options.
+> If this version of the driver works for you then I am happy to merge it. You can then add support for hdev->set_bdaddr and hdev->set_diag in later patches. I also like to clean up the STP receive handler since it can be done a lot simpler and smaller, but that has to wait.
+> 
 
-	David
+hopefully v10 also can be merged :)
 
--
-Registered Address Lakeside, Bramley Road, Mount Farm, Milton Keynes, MK1 1PT, UK
-Registration No: 1397386 (Wales)
+I will investigate more about how to add ->set_bdaddr, ->set_diag and STP receive enhancement in later patches.
+
+but so far I have not much idea about how to make STP multiplexer be a independent driver.
+
+my thought is that it would be really better and cleaner a chain of serdev is be used as the base of mtkbtuart. something like
+  
+8250 serial bus <----> STP multiplexer serdev <----> mtkbtuart serdev
+
+however, STP multiplexer serdev is not a real device, that doesn't no request any resource. I think it should not be allowed to be added in a device tree and even in dt-binding document.
+
+> >> Are all Mediatek vendor commands this way? Or just the ones for loading the firmware? So only the WMT ones?
+> >> 
+> > 
+> > Only the WMT ones, WMT commands/events are usually used in system controlling, for example, global function on/off, firmware download, reset and so on. most only appear on device initialization
+> 
+> Since you never checked the result of the vendor event, I opted for just signaling that it arrived. If they can report success or failure, we need to add some extra code for that.
+> 
+
+I will consider more WMT event status when I add more Bluetooth devices such as MT7668U usb based Bluetooth which I plan to add the support in later patches in the next weeks 
+
+> Regards
+> 
+> Marcel
+> 
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
