@@ -1,71 +1,42 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 7 Aug 2018 11:32:13 +0530
-Subject: [PATCH v3 00/13] ARM: davinci: remove duplicate aemif support
-In-Reply-To: <4154b955-4f89-035a-8a02-a3e8bd8d9ede@lechnology.com>
-References: <20180628095748.4462-1-brgl@bgdev.pl>
- <52a274f1-283a-a14a-54f3-4b95b6605c4f@ti.com>
- <59fdc532-bb72-ffae-cfb6-a7f156c14771@lechnology.com>
- <e1222b3c-dfa4-4cb0-eebf-8e2550e9d674@ti.com>
- <125d73f7-7311-866f-1e9d-d3c1f9473899@lechnology.com>
- <92e41afc-cf3a-e713-11d5-247b8d6e3a64@ti.com>
- <4154b955-4f89-035a-8a02-a3e8bd8d9ede@lechnology.com>
-Message-ID: <c09e90e1-2e55-aced-1215-4c845349c1b1@ti.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue,  7 Aug 2018 15:17:15 +0900
+Subject: [v0.1 PATCH 0/7] mmc: tmio: refactor TMIO core a bit and add UniPhier
+ SD/eMMC controller support
+Message-ID: <1533622642-13989-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
 
-On Monday 06 August 2018 10:05 PM, David Lechner wrote:
-> On 07/10/2018 05:19 AM, Sekhar Nori wrote:
->> On Friday 06 July 2018 11:09 PM, David Lechner wrote:
->>> On 07/04/2018 01:35 AM, Sekhar Nori wrote:
->>>> Hi David,
->>>>
->>>> On Monday 02 July 2018 09:02 PM, David Lechner wrote:
->>>>> On 07/02/2018 07:28 AM, Sekhar Nori wrote:
->>>>>> Hi David, Stephen,
->>>>>>
->>>>>> On Thursday 28 June 2018 03:27 PM, Bartosz Golaszewski wrote:
->>>>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>>>>>
->>>>>>> This series moves all aemif/nand users to using the ti-aemif
->>>>>>> platform
->>>>>>> driver located in drivers/memory instead of the older API located in
->>>>>>> mach-davinci.
->>>>>>>
->>>>>>> First five patches add necessary changes to the clock driver. Next
->>>>>>> seven convert the board files to using the ti-aemif driver. Last
->>>>>>> patch
->>>>>>> removes now dead code.
->>>>>>
->>>>>> How do you want to handle this series? I can apply the series and
->>>>>> provide you an immutable branch on v4.18-rc1 with the clock patches
->>>>>> applied if that can work.
->>>>>
->>>>> Sounds good to me. But I'm new to this maintainer thing, so maybe
->>>>> there is something to consider that I haven't thought of?
->>>>
->>>> I don't think there is more to it. Ultimately there should not be two
->>>> commits for the same patch. Either you can apply and share the
->>>> commit to
->>>> use or I can do that as well. I am equally fine either way.
->>>>
->>>> Regards,
->>>> Sekhar
->>>>
->>>
->>> I've created a branch for-sekhar at https://github.com/dlech/linux.git
->>> with the clk commits.
->>
->> Thanks. I merged commit f917ff75ac55b6d829c9d1142e83913064565d5b (top of
->> that branch) to my v4.19/soc branch. Please do let Stephen and Mike know
->> about this then when you send your stuff for v4.19.
->>
-> 
-> Since there have been no more clk-davinci patches for v4.19, I assume that
-> it is OK to just let this go through the ARM tree via Sekhar?
+Add UniPhier SD/eMMC controller support.
 
-Yes, that should be fine.
+As a preparation, I changed tmio_mmc_set_clock() to a platform hook.
+The clock rate setting is platform-specific, and UniPhier variants
+will add another way.  I thought it would be better to split this
+to a hook to avoid a mess.
 
-Thanks,
-Sekhar
+
+
+Masahiro Yamada (7):
+  mmc: tmio: replace tmio_mmc_clk_stop() calls with tmio_mmc_set_clock()
+  mmc: tmio: move tmio_mmc_set_clock() to platform hook
+  dt-bindings: mmc: add DT binding for UniPhier SD/eMMC controller
+  mmc: uniphier-sd: add UniPhier SD/eMMC controller driver
+  mmc: renesas_sdhi: merge clk_{start,stop} functions to set_clock
+  mmc: renesas_sdhi: refactor CLK_CTL bit calculation
+  mmc: tmio: refactor CLK_CTL bit calculation
+
+ .../devicetree/bindings/mmc/uniphier-sd.txt        |  60 ++
+ MAINTAINERS                                        |   1 +
+ drivers/mmc/host/Kconfig                           |  10 +
+ drivers/mmc/host/Makefile                          |   1 +
+ drivers/mmc/host/renesas_sdhi_core.c               |  40 +-
+ drivers/mmc/host/tmio_mmc.c                        |  56 ++
+ drivers/mmc/host/tmio_mmc.h                        |   4 +-
+ drivers/mmc/host/tmio_mmc_core.c                   |  79 +--
+ drivers/mmc/host/uniphier-sd.c                     | 694 +++++++++++++++++++++
+ 9 files changed, 869 insertions(+), 76 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/uniphier-sd.txt
+ create mode 100644 drivers/mmc/host/uniphier-sd.c
+
+-- 
+2.7.4
