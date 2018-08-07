@@ -1,43 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 7 Aug 2018 12:47:10 -0600
-Subject: [PATCH 0/9] Add Reset Controller support for Actions Semi Owl SoCs
-In-Reply-To: <20180730151131.GA28633@mani>
+Date: Tue, 7 Aug 2018 12:48:53 -0600
+Subject: [PATCH 2/9] dt-bindings: clock: Add reset controller bindings
+ for Actions Semi Owl SoCs
+In-Reply-To: <20180727184527.13287-3-manivannan.sadhasivam@linaro.org>
 References: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
- <c3ae668a-6bcc-a0eb-1e00-14ef9d607316@suse.de>
- <20180730151131.GA28633@mani>
-Message-ID: <20180807184710.GA26423@rob-hp-laptop>
+ <20180727184527.13287-3-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180807184853.GA6303@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2018 at 08:41:31PM +0530, Manivannan Sadhasivam wrote:
-> Hi Andreas,
+On Sat, Jul 28, 2018 at 12:15:20AM +0530, Manivannan Sadhasivam wrote:
+> Add Reset Controller bindings to clock bindings for Actions Semi Owl
+> SoCs, S700 and S900.
 > 
-> On Mon, Jul 30, 2018 at 12:26:07PM +0200, Andreas F?rber wrote:
-> > Hi Mani,
-> > 
-> > Am 27.07.2018 um 20:45 schrieb Manivannan Sadhasivam:
-> > > This patchset adds Reset Controller (RMU) support for Actions Semi
-> > > Owl SoCs, S900 and S700. For the Owl SoCs, RMU has been integrated into
-> > > the clock subsystem in hardware. Hence, in software we integrate RMU
-> > > support into common clock driver inorder to maintain compatibility.
-> > 
-> > Can this not be placed into drivers/reset/ by using mfd-simple with a
-> > sub-node in DT?
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/clock/actions,owl-cmu.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 
-That is exactly what I tell folks not to do. Design the DT based on h/w 
-blocks, not current desired driver split for some OS.
+This one is:
 
-> Actually I was not sure where to place this reset controller driver. When I
-> looked into other similar ones such as sunxi, they just integrated into the
-> clk subsystem. So I just chose that path. But yeah, this is hacky!
-> 
-> But this RMU is not MFD by any means. Since the CMU (Clock) and RMU (Reset)
-> are two separate IPs inside SoC, we shouldn't describe it as a MFD driver. Since
-> RMU has only 2 registers, the HW designers decided to use up the CMU memory
-> map. So, maybe syscon would be best option I think. What is your opinion?
+Reviewed-by: Rob Herring <robh@kernel.org>
 
-If there's nothing shared then it is not a syscon. If you can create 
-separate address ranges, then 2 nodes is probably okay. If the registers 
-are all mixed up, then 1 node.
-
-Rob
+v2 is not.
