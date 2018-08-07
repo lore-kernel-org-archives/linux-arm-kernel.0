@@ -1,65 +1,48 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 8 Aug 2018 01:52:47 +0800
-Subject: [PATCH v10 1/3] dt-bindings: net: bluetooth: Add mediatek-bluetooth
-In-Reply-To: <cover.1533663928.git.sean.wang@mediatek.com>
-References: <cover.1533663928.git.sean.wang@mediatek.com>
-Message-ID: <c3cc9622c64a2682c45ded9f7a3588738e5b5f7e.1533663928.git.sean.wang@mediatek.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 7 Aug 2018 11:59:02 -0600
+Subject: [PATCH 1/1] ARM: dts: imx6ull: keep IMX6UL_ prefix for signals
+ on both i.MX6UL and i.MX6ULL
+In-Reply-To: <20180720102321.23291-1-sebastien.szymanski@armadeus.com>
+References: <20180720102321.23291-1-sebastien.szymanski@armadeus.com>
+Message-ID: <20180807175902.GA2389@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On Fri, Jul 20, 2018 at 12:23:21PM +0200, S?bastien Szymanski wrote:
+> Signals available on both i.MX6UL and i.MX6ULL should have the same name
+> because it is the case of all others common signals, it avoids to make
+> mistakes (use the wrong ones) and it makes writing device tree files
+> less complicated. For example:
+> 
+> imx6ul-imx6ull-board.dtsi:
+>  ...
+>  pinctrl_uart5: uart5grp {
+> 	fsl,pins = <
+> 		MX6UL_PAD_UART5_TX_DATA__UART5_DCE_TX   0x1b0b1
+> 	 	MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX   0x1b0b1
+>  	 >;
+>  };
+> 
+> imx6ul-board.dts:
+>  #include <imx6ul.dtsi>
+>  #include <imx6ul-imx6ull-board.dtsi>
+>  ...
+> 
+> imx6ull-board.dts:
+>  #include <imx6ull.dtsi>
+>  #include <imx6ul-imx6ull-board.dtsi>
+>  ...
+> 
+> Without this patch, the imx6ull-board.dtb will use
+> MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX instead of
+> MX6ULL_PAD_UART5_RX_DATA__UART5_DCE_RX and the uart5 will be
+> misconfigured.
+> 
+> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+> ---
+>  arch/arm/boot/dts/imx6ull-pinfunc.h | 27 +++++++++++++++++++--------
+>  1 file changed, 19 insertions(+), 8 deletions(-)
 
-Add binding document for a SoC built-in device using MediaTek protocol.
-Which could be found on MT7622 SoC or other similar MediaTek SoCs.
+This may be less error prone, but it is ugly still.
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Marcel Holtmann <marcel@holtmann.org>
----
- .../devicetree/bindings/net/mediatek-bluetooth.txt | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
-
-diff --git a/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
-new file mode 100644
-index 0000000..14ceb2a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
-@@ -0,0 +1,35 @@
-+MediaTek SoC built-in Bluetooth Devices
-+==================================
-+
-+This device is a serial attached device to BTIF device and thus it must be a
-+child node of the serial node with BTIF. The dt-bindings details for BTIF
-+device can be known via Documentation/devicetree/bindings/serial/8250.txt.
-+
-+Required properties:
-+
-+- compatible:	Must be
-+		  "mediatek,mt7622-bluetooth": for MT7622 SoC
-+- clocks:	Should be the clock specifiers corresponding to the entry in
-+		clock-names property.
-+- clock-names:	Should contain "ref" entries.
-+- power-domains: Phandle to the power domain that the device is part of
-+
-+Example:
-+
-+	btif: serial at 1100c000 {
-+		compatible = "mediatek,mt7622-btif",
-+			     "mediatek,mtk-btif";
-+		reg = <0 0x1100c000 0 0x1000>;
-+		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_BTIF_PD>;
-+		clock-names = "main";
-+		reg-shift = <2>;
-+		reg-io-width = <4>;
-+
-+		bluetooth {
-+			compatible = "mediatek,mt7622-bluetooth";
-+			power-domains = <&scpsys MT7622_POWER_DOMAIN_WB>;
-+			clocks = <&clk25m>;
-+			clock-names = "ref";
-+		};
-+	};
--- 
-2.7.4
+Acked-by: Rob Herring <robh@kernel.org>
