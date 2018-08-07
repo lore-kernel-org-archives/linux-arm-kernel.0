@@ -1,48 +1,31 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 7 Aug 2018 11:59:02 -0600
-Subject: [PATCH 1/1] ARM: dts: imx6ull: keep IMX6UL_ prefix for signals
- on both i.MX6UL and i.MX6ULL
-In-Reply-To: <20180720102321.23291-1-sebastien.szymanski@armadeus.com>
-References: <20180720102321.23291-1-sebastien.szymanski@armadeus.com>
-Message-ID: <20180807175902.GA2389@rob-hp-laptop>
+Date: Tue, 7 Aug 2018 12:00:59 -0600
+Subject: [PATCH 1/2] arm64: dts: stratix10: Add Stratix10 SMMU support
+In-Reply-To: <1532543077-8933-2-git-send-email-thor.thayer@linux.intel.com>
+References: <1532543077-8933-1-git-send-email-thor.thayer@linux.intel.com>
+ <1532543077-8933-2-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <20180807180059.GA4415@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 12:23:21PM +0200, S?bastien Szymanski wrote:
-> Signals available on both i.MX6UL and i.MX6ULL should have the same name
-> because it is the case of all others common signals, it avoids to make
-> mistakes (use the wrong ones) and it makes writing device tree files
-> less complicated. For example:
+On Wed, Jul 25, 2018 at 01:24:36PM -0500, thor.thayer at linux.intel.com wrote:
+> From: Thor Thayer <thor.thayer@linux.intel.com>
 > 
-> imx6ul-imx6ull-board.dtsi:
->  ...
->  pinctrl_uart5: uart5grp {
-> 	fsl,pins = <
-> 		MX6UL_PAD_UART5_TX_DATA__UART5_DCE_TX   0x1b0b1
-> 	 	MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX   0x1b0b1
->  	 >;
->  };
+> Add SMMU support to the Stratix10 Device Tree which
+> includes adding the SMMU node and adding IOMMU stream
+> ids to the SMMU peripherals. Update bindings.
 > 
-> imx6ul-board.dts:
->  #include <imx6ul.dtsi>
->  #include <imx6ul-imx6ull-board.dtsi>
->  ...
-> 
-> imx6ull-board.dts:
->  #include <imx6ull.dtsi>
->  #include <imx6ul-imx6ull-board.dtsi>
->  ...
-> 
-> Without this patch, the imx6ull-board.dtb will use
-> MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX instead of
-> MX6ULL_PAD_UART5_RX_DATA__UART5_DCE_RX and the uart5 will be
-> misconfigured.
-> 
-> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
 > ---
->  arch/arm/boot/dts/imx6ull-pinfunc.h | 27 +++++++++++++++++++--------
->  1 file changed, 19 insertions(+), 8 deletions(-)
+> This patch is dependent on the patch series
+> "iommu/arm-smmu: Add runtime pm/sleep support"
+> (https://patchwork.ozlabs.org/cover/946160/)
 
-This may be less error prone, but it is ugly still.
+I don't think so.
 
-Acked-by: Rob Herring <robh@kernel.org>
+> ---
+>  .../devicetree/bindings/iommu/arm,smmu.txt         | 25 ++++++++++++++++++
+>  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 30 ++++++++++++++++++++++
+>  2 files changed, 55 insertions(+)
+
+Reviewed-by: Rob Herring <robh@kernel.org>
