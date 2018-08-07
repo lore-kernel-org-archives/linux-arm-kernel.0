@@ -1,89 +1,104 @@
-From: ebiggers@kernel.org (Eric Biggers)
-Date: Tue, 7 Aug 2018 13:18:19 -0700
-Subject: [PATCH] crypto: remove speck
-In-Reply-To: <CAH8yC8kKet=fx0rYF8QEWK+TzyBgwHrLabWE72znBY=QLZVWkA@mail.gmail.com>
-References: <20180806223300.113891-1-ebiggers@kernel.org>
- <20180806230437.21431-1-Jason@zx2c4.com>
- <CAH8yC8kKet=fx0rYF8QEWK+TzyBgwHrLabWE72znBY=QLZVWkA@mail.gmail.com>
-Message-ID: <20180807201819.GA25300@gmail.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Tue, 07 Aug 2018 22:31:30 +0200
+Subject: [PATCH] drm/sun4i: Avoid failing to init fbdev without any
+ connector
+In-Reply-To: <20180807201801.GF3008@phenom.ffwll.local>
+References: <20180807193919.4800-1-contact@paulk.fr>
+ <20180807201801.GF3008@phenom.ffwll.local>
+Message-ID: <230112e8b2ad4b4e53b54fe1446e7f71aa09e514.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffrey,
+Hi,
 
-On Mon, Aug 06, 2018 at 09:03:27PM -0400, Jeffrey Walton wrote:
-> On Mon, Aug 6, 2018 at 7:04 PM, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
-> > These are unused, undesired, and have never actually been used by
-> > anybody. The original authors of this code have changed their mind about
-> > its inclusion. Therefore, this patch removes it.
+Le mardi 07 ao?t 2018 ? 22:18 +0200, Daniel Vetter a ?crit :
+> On Tue, Aug 07, 2018 at 09:39:19PM +0200, Paul Kocialkowski wrote:
+> > Initializing and registering fbdev requires at least one DRM connector
+> > and will fail otherwise. In order to support headless setups (for
+> > instance for GPU rendering with the GBM backend, where a DRI card node
+> > is required to provide GEM memory reservation), add a check on the
+> > number of registered connectors before initializing fbdev.
 > 
-> I think it may be unwise to completely discard Speck for several
-> reasons. The two biggest pain points for me are:
-> 
->   - political concerns addressed by other ciphers
->   - high quality lightweight block cipher implementation
->   - some regulated industries will need it for their problem domains
-> 
-> It seems to me the political concerns were addressed by not using
-> Speck for Android. I don't believe HPolyC and Speck are orthogonal.
-> Instead they provide the user with a choice which is usually a good
-> thing.
-> 
-> I also think allowing politics a heavy hand endangers other ciphers
-> like SM3 and SM4. I would advise against removing them just because
-> they are Chinese ciphers. I suppose the same could be argued for North
-> Korea and Jipsam and Pilsung (if North Korea ever offers their
-> ciphers).
-> 
-> I think Eric, Ard and other contributions lead to a high quality
-> implementation of Speck. High quality implementations that "just
-> works" everywhere on multiple platforms are rather hard to come by.
-> The kernel's unified implementation ensures lots of folks don't go
-> making lots of mistakes when rolling their own.
-> 
-> There are verticals that will need a choice or alternative like Speck.
-> US Aerospace, US Automotive and US Hoteliers come to mind. US
-> Financial my use them too (they having some trading platforms with
-> absurd requirements that make Simon and Speck appear bloated and
-> overweight).  Some of the verticals are going to need an alternative
-> that meets technical and security goals and pass the audits.
-> 
-> Choice is a good thing. Users need choices for technical, regulatory
-> and legal reasons.
-> 
+> sun4i is a pure kms driver, why exactly do you need it for gbm backed
+> rendering? What exactly is rendering here, and why does it insist on a
+> display card node, even if that display card node is 100% defunct?
 
-This is about the Linux kernel, though.  The purpose of the Linux kernel's
-crypto API is to allow kernel code to do crypto, and also sometimes to allow
-access to crypto accelerator hardware.  It's *not* to provide a comprehensive
-collection of algorithms for userspace programs to use, or to provide reference
-implementations for crypto algorithms.  Before our change in plans, we needed
-Speck-XTS in the kernel so that it could be used in dm-crypt and fscrypt, which
-are kernel features and therefore require in-kernel implementations.  And of
-course, our proposed new solution, HPolyC, will need to be supported in the
-kernel too for the same reason.  It's just the way transparent disk and file
-encryption works; the crypto needs to be done in the kernel.  But do your other
-mentioned use cases actually need Speck to be in the Linux kernel?
+The non-free Mali blobs provide GPU support with a GBM interface that
+takes a DRM fd in order to reserve the memory it needs for its rendering
+targets. This uses the GEM interface available through the DRI card node
+(and there is no render node with the non-free Mali driver). Allwinner
+has a minimalistic out-of-tree driver pretty much only for this purpose.
 
-I doubt it, in general.  Userspace applications of Speck seem likely to use
-their own implementation.  Remember, Speck is extraordinarily simple, and the
-original paper has example C code.  So if someone really wanted to use Speck in
-a userspace application, they're likely to just add an implementation directly
-to their application, rather than coding up a Linux-specific thing using AF_ALG.
-Or they'd use a Speck implementation from a library like Crypto++.
+I crafted this patch when someone on IRC tried to get the out-of-tree
+Mali GPU driver going with the mainline kernel in order to do rendering
+in a GBM buffer, since it's apparently the only option for headless
+rendering with the blob.
 
-And while I think it's clear that the reasons why a significant number of people
-don't want to *use* Speck (even in legitimate use cases) are heavily political,
-that doesn't necessarily mean that the reason for removing Speck from Linux
-needs to be as political.  If there's code in the kernel with no known users
-anymore, whether it's a crypto algorithm or something like an obsolete CPU
-architecture, then it's eligible to be removed so that it doesn't need to be
-maintained -- potentially even if it breaks the userspace ABI (since it's not
-really broken if no one cares)...  Note that Skein is another example of a
-crypto algorithm that was recently removed from the kernel because no one was
-using it, though to be fair it was in the staging directory too.  It's still a
-bit of a double standard as there are likely other ciphers in the kernel that
-actually no one is using either, but it's a valid argument...
+In my opinion, supporting the pipeline of an out-of-tree GPU driver that
+only works with a non-free userspace blob is not a valid reason to do
+anything. Still, it felt like adding support for the headless use-case
+wouldn't hurt, whatever the underlying use case for it may be. I found
+that other drivers also implement the same mechanism (perhaps for
+different reasons).
 
-Thanks,
+Cheers,
 
-- Eric
+Paul
+
+> -Daniel
+> 
+> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> > ---
+> >  drivers/gpu/drm/sun4i/sun4i_framebuffer.c | 10 +++++++++-
+> >  1 file changed, 9 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+> > index 5f29850ef8ac..19a265e4a93a 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+> > @@ -49,6 +49,8 @@ static struct drm_mode_config_helper_funcs sun4i_de_mode_config_helpers = {
+> >  
+> >  int sun4i_framebuffer_init(struct drm_device *drm)
+> >  {
+> > +	int ret;
+> > +
+> >  	drm_mode_config_reset(drm);
+> >  
+> >  	drm->mode_config.max_width = 8192;
+> > @@ -57,7 +59,13 @@ int sun4i_framebuffer_init(struct drm_device *drm)
+> >  	drm->mode_config.funcs = &sun4i_de_mode_config_funcs;
+> >  	drm->mode_config.helper_private = &sun4i_de_mode_config_helpers;
+> >  
+> > -	return drm_fb_cma_fbdev_init(drm, 32, 0);
+> > +	if (drm->mode_config.num_connector > 0) {
+> > +		ret = drm_fb_cma_fbdev_init(drm, 32, 0);
+> > +		if (ret)
+> > +			return ret;
+> > +	}
+> > +
+> > +	return 0;
+> >  }
+> >  
+> >  void sun4i_framebuffer_free(struct drm_device *drm)
+> > -- 
+> > 2.18.0
+> > 
+> > _______________________________________________
+> > dri-devel mailing list
+> > dri-devel at lists.freedesktop.org
+> > https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> 
+> 
+-- 
+Developer of free digital technology and hardware support.
+
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180807/53703d32/attachment.sig>
