@@ -1,24 +1,24 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 7 Aug 2018 14:25:44 +0800
-Subject: [PATCH v7 0/4] IR support for A83T
-In-Reply-To: <20180801094801.26627-1-embed3d@gmail.com>
-References: <20180801094801.26627-1-embed3d@gmail.com>
-Message-ID: <CAGb2v66oe71CEtqkB2S-AYRzGnTQiJjVPUoRPkefd=9aqK+XbA@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 7 Aug 2018 15:26:16 +0900
+Subject: [v0.1 PATCH 0/7] mmc: tmio: refactor TMIO core a bit and add
+ UniPhier SD/eMMC controller support
+In-Reply-To: <1533622642-13989-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1533622642-13989-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNAQ7fwWofFb-xVU7E4=hJh2x=NPOce9LBF3ncWqYtqt-hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 1, 2018 at 5:47 PM, Philipp Rossak <embed3d@gmail.com> wrote:
-> This patch series adds support for the sunxi A83T ir module and enhances
-> the sunxi-ir driver. Right now the base clock frequency for the ir driver
-> is a hard coded define and is set to 8 MHz.
-> This works for the most common ir receivers. On the Sinovoip Bananapi M3
-> the ir receiver needs, a 3 MHz base clock frequency to work without
-> problems with this driver.
->
-> This patch series adds support for an optinal property that makes it able
-> to override the default base clock frequency and enables the ir interface
-> on the a83t and the Bananapi M3.
+2018-08-07 15:17 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
 
-Queued up for 4.20.
 
-Thanks!
+> [v0.1 PATCH 0/7] mmc: tmio: refactor TMIO core a bit and add UniPhier SD/eMMC controller support
+
+
+This series is v1.
+
+v0.1 was the internal numbering, which I forgot to change.
+
+
+-- 
+Best Regards
+Masahiro Yamada
