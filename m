@@ -1,31 +1,48 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 07 Aug 2018 13:45:26 +0200
-Subject: [PATCH 2/2] iommu/rockchip: Move irq request past
- pm_runtime_enable
-In-Reply-To: <20180807085406.3863-3-marc.zyngier@arm.com>
-References: <20180807085406.3863-1-marc.zyngier@arm.com>
- <20180807085406.3863-3-marc.zyngier@arm.com>
-Message-ID: <2114757.JfhfUCyzvi@phil>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 7 Aug 2018 12:50:57 +0100
+Subject: [PATCH 1/1] arm64: dts: Stingray: Adjust SMMU non-secure context
+ interrupt
+In-Reply-To: <1533632824-17436-1-git-send-email-jitendra.bhivare@broadcom.com>
+References: <1533632824-17436-1-git-send-email-jitendra.bhivare@broadcom.com>
+Message-ID: <1780aecd-f81d-02fe-086c-a32506c013b7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 7. August 2018, 10:54:06 CEST schrieb Marc Zyngier:
-> Enabling the interrupt early, before power has been applied to the
-> device, can result in an interrupt being delivered too early if:
+On 07/08/18 10:07, Jitendra Bhivare wrote:
+> From: Pramod Kumar <pramod.kumar@broadcom.com>
 > 
-> - the IOMMU shares an interrupt with a VOP
-> - the VOP has a pending interrupt (after a kexec, for example)
-> 
-> In these conditions, we end-up taking the interrupt without
-> the IOMMU being ready to handle the interrupt (not powered on).
-> 
-> Moving the interrupt request past the pm_runtime_enable() call
-> makes sure we can at least access the IOMMU registers. Note that
-> this is only a partial fix, and that the VOP interrupt will still
-> be screaming until the VOP driver kicks in, which advocates for
-> a more synchronized interrupt enabling/disabling approach.
-> 
-> Fixes: 0f181d3cf7d98 ("iommu/rockchip: Add runtime PM support")
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> One context bank has been reserved for secure master, CRMU.
+> hence need to remove context interrupt accordingly. Doing
+> the same in this patch.
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+FWIW, if the motivation here is that the SMMU driver inadvertently 
+treats the extra context interrupt as an error, then do note that we 
+have a patch queued to fix that already (see commit d1e20222d537 in 
+linux-next). However if this context is always going to be reserved and 
+you don't expect secure software or firmware to ever consume this DT, 
+then removing the interrupt specifier doesn't do any harm.
+
+Robin.
+
+> Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
+> ---
+>   arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi | 3 +--
+>   1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+> index b203152..7fcaf38 100644
+> --- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+> +++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+> @@ -244,8 +244,7 @@
+>   				     <GIC_SPI 770 IRQ_TYPE_LEVEL_HIGH>,
+>   				     <GIC_SPI 771 IRQ_TYPE_LEVEL_HIGH>,
+>   				     <GIC_SPI 772 IRQ_TYPE_LEVEL_HIGH>,
+> -				     <GIC_SPI 773 IRQ_TYPE_LEVEL_HIGH>,
+> -				     <GIC_SPI 774 IRQ_TYPE_LEVEL_HIGH>;
+> +				     <GIC_SPI 773 IRQ_TYPE_LEVEL_HIGH>;
+>   			#iommu-cells = <2>;
+>   		};
+>   	};
+> 
