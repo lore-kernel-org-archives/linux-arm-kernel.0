@@ -1,127 +1,78 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Tue, 7 Aug 2018 12:50:46 +0200
-Subject: [PATCH 1/8] devfreq: rockchip-dfi: Move GRF definitions to a
- common place.
-In-Reply-To: <5B6170F4.4070102@samsung.com>
-References: <20180730081124.30698-1-enric.balletbo@collabora.com>
- <CGME20180730081245epcas3p2794d7d7c21f4059ab89ec59a0ef9fa22@epcas3p2.samsung.com>
- <20180730081124.30698-2-enric.balletbo@collabora.com>
- <5B6170F4.4070102@samsung.com>
-Message-ID: <94d01f35-7baa-aa6a-710e-c046fcf52286@collabora.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 7 Aug 2018 12:59:48 +0200
+Subject: [RFT 4/4] ARM: dts: exynos: Add LDO28 regulator on Exynos5422
+ Odroid boards
+In-Reply-To: <20180806160933.6578-4-krzk@kernel.org>
+References: <20180806160933.6578-1-krzk@kernel.org>
+ <CGME20180806160955epcas4p14c924297f156db1dcb30ce543bc2d79a@epcas4p1.samsung.com>
+ <20180806160933.6578-4-krzk@kernel.org>
+Message-ID: <20180807105950eucas1p1e48a3d064afb4d601fa33eeb67f0ba02~IlRTyxXuT0840608406eucas1p1t@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Krzysztof,
 
-On 01/08/18 10:36, Chanwoo Choi wrote:
-> Hi Enric,
-> 
-> On 2018? 07? 30? 17:11, Enric Balletbo i Serra wrote:
->> Some rk3399 GRF (Generic Register Files) definitions can be used for
->> different drivers. Move these definitions to a common include so we
->> don't need to duplicate these definitions.
->>
->> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
->> ---
->>
->> Changes in v1:
->> - [RFC 1/10] Add Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
-> 
-> Even if you add the changes log, you are missing my Acked-by tag.
-> 
+On 2018-08-06 18:09, Krzysztof Kozlowski wrote:
+> The LDO28 is used only on Odroid XU3 for Display Port.  Define it so DTS
+> will describe entire hardware.
+>
+> Depending on bootloader behavior this might affect the Display Port
+> because none of drivers are enabling it. By default it is off in S2MPS11
+> PMIC reset values.  However it could be enabled by bootloader so in such
+> case kernel will later disable it as unused regulator.
+>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Ops, right, sorry about that. I'll fix in next version.
+Odroid XU3 boots fine with this patch. Display Port is not yet enabled in
+mainline for OdroidXU3, so there is not much else to test for now.
 
->> - [RFC 1/10] s/Generic/General/ (Robin Murphy)
->> - [RFC 4/10] Removed from the series. I did not found a use case where not holding the mutex causes the issue.
->> - [RFC 7/10] Removed from the series. I did not found a use case where this matters.
->>
->>  drivers/devfreq/event/rockchip-dfi.c | 23 +++++++----------------
->>  include/soc/rockchip/rk3399_grf.h    | 21 +++++++++++++++++++++
->>  2 files changed, 28 insertions(+), 16 deletions(-)
->>  create mode 100644 include/soc/rockchip/rk3399_grf.h
->>
->> diff --git a/drivers/devfreq/event/rockchip-dfi.c b/drivers/devfreq/event/rockchip-dfi.c
->> index 22b113363ffc..2fbbcbeb644f 100644
->> --- a/drivers/devfreq/event/rockchip-dfi.c
->> +++ b/drivers/devfreq/event/rockchip-dfi.c
->> @@ -26,6 +26,8 @@
->>  #include <linux/list.h>
->>  #include <linux/of.h>
->>  
->> +#include <soc/rockchip/rk3399_grf.h>
->> +
->>  #define RK3399_DMC_NUM_CH	2
->>  
->>  /* DDRMON_CTRL */
->> @@ -43,18 +45,6 @@
->>  #define DDRMON_CH1_COUNT_NUM		0x3c
->>  #define DDRMON_CH1_DFI_ACCESS_NUM	0x40
->>  
->> -/* pmu grf */
->> -#define PMUGRF_OS_REG2	0x308
->> -#define DDRTYPE_SHIFT	13
->> -#define DDRTYPE_MASK	7
->> -
->> -enum {
->> -	DDR3 = 3,
->> -	LPDDR3 = 6,
->> -	LPDDR4 = 7,
->> -	UNUSED = 0xFF
->> -};
->> -
->>  struct dmc_usage {
->>  	u32 access;
->>  	u32 total;
->> @@ -83,16 +73,17 @@ static void rockchip_dfi_start_hardware_counter(struct devfreq_event_dev *edev)
->>  	u32 ddr_type;
->>  
->>  	/* get ddr type */
->> -	regmap_read(info->regmap_pmu, PMUGRF_OS_REG2, &val);
->> -	ddr_type = (val >> DDRTYPE_SHIFT) & DDRTYPE_MASK;
->> +	regmap_read(info->regmap_pmu, RK3399_PMUGRF_OS_REG2, &val);
->> +	ddr_type = (val >> RK3399_PMUGRF_DDRTYPE_SHIFT) &
->> +		    RK3399_PMUGRF_DDRTYPE_MASK;
->>  
->>  	/* clear DDRMON_CTRL setting */
->>  	writel_relaxed(CLR_DDRMON_CTRL, dfi_regs + DDRMON_CTRL);
->>  
->>  	/* set ddr type to dfi */
->> -	if (ddr_type == LPDDR3)
->> +	if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR3)
->>  		writel_relaxed(LPDDR3_EN, dfi_regs + DDRMON_CTRL);
->> -	else if (ddr_type == LPDDR4)
->> +	else if (ddr_type == RK3399_PMUGRF_DDRTYPE_LPDDR4)
->>  		writel_relaxed(LPDDR4_EN, dfi_regs + DDRMON_CTRL);
->>  
->>  	/* enable count, use software mode */
->> diff --git a/include/soc/rockchip/rk3399_grf.h b/include/soc/rockchip/rk3399_grf.h
->> new file mode 100644
->> index 000000000000..3eebabcb2812
->> --- /dev/null
->> +++ b/include/soc/rockchip/rk3399_grf.h
->> @@ -0,0 +1,21 @@
->> +/* SPDX-License-Identifier: GPL-2.0+ */
->> +/*
->> + * Rockchip General Register Files definitions
->> + *
->> + * Copyright (c) 2018, Collabora Ltd.
->> + * Author: Enric Balletbo i Serra <enric.balletbo@collabora.com>
->> + */
->> +
->> +#ifndef __SOC_RK3399_GRF_H
->> +#define __SOC_RK3399_GRF_H
->> +
->> +/* PMU GRF Registers */
->> +#define RK3399_PMUGRF_OS_REG2		0x308
->> +#define RK3399_PMUGRF_DDRTYPE_SHIFT	13
->> +#define RK3399_PMUGRF_DDRTYPE_MASK	7
->> +#define RK3399_PMUGRF_DDRTYPE_DDR3	3
->> +#define RK3399_PMUGRF_DDRTYPE_LPDDR2	5
->> +#define RK3399_PMUGRF_DDRTYPE_LPDDR3	6
->> +#define RK3399_PMUGRF_DDRTYPE_LPDDR4	7
->> +
->> +#endif
->>
-> 
-> 
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+> ---
+>
+> Not tested on Odroid XU3 with Display Port.
+> ---
+>   arch/arm/boot/dts/exynos5422-odroid-core.dtsi | 7 +++++++
+>   arch/arm/boot/dts/exynos5422-odroidxu3.dts    | 6 ++++++
+>   2 files changed, 13 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
+> index b0dc9cc81b94..178e1064cfc7 100644
+> --- a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
+> +++ b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
+> @@ -331,6 +331,13 @@
+>   				regulator-always-on;
+>   			};
+>   
+> +			ldo28_reg: LDO28 {
+> +				/* Used on XU3 */
+> +				regulator-name = "vdd_ldo26";
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <3950000>;
+> +			};
+> +
+>   			ldo29_reg: LDO29 {
+>   				/* Unused */
+>   				regulator-name = "vdd_ldo29";
+> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> index 0322f281912c..db0bc17a667b 100644
+> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+> @@ -49,6 +49,12 @@
+>   	};
+>   };
+>   
+> +&ldo28_reg {
+> +	regulator-name = "dp_p3v3";
+> +	regulator-min-microvolt = <3300000>;
+> +	regulator-max-microvolt = <3300000>;
+> +};
+> +
+>   &pwm {
+>   	/*
+>   	 * PWM 0 -- fan
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
