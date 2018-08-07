@@ -1,195 +1,139 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Tue, 7 Aug 2018 21:35:12 +0200
-Subject: [RFC PATCH 09/16] KVM: arm64: Allow ID registers to by
- dynamically read-as-zero
-In-Reply-To: <20180807110958.GC9097@e103592.cambridge.arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-10-git-send-email-Dave.Martin@arm.com>
- <20180806130324.GA5985@e113682-lin.lund.arm.com>
- <20180807110958.GC9097@e103592.cambridge.arm.com>
-Message-ID: <20180807193512.GH5985@e113682-lin.lund.arm.com>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Tue, 7 Aug 2018 21:36:32 +0200
+Subject: [PATCH v10 0/3] add support for Bluetooth on MT7622 SoC
+In-Reply-To: <cover.1533663928.git.sean.wang@mediatek.com>
+References: <cover.1533663928.git.sean.wang@mediatek.com>
+Message-ID: <69A04F99-C0B8-4571-8A0C-2DAFDAB51D86@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2018 at 12:09:58PM +0100, Dave Martin wrote:
-> On Mon, Aug 06, 2018 at 03:03:24PM +0200, Christoffer Dall wrote:
-> > Hi Dave,
-> > 
-> > I think there's a typo in the subject "to be" rather than "to by".
-> > 
-> > On Thu, Jun 21, 2018 at 03:57:33PM +0100, Dave Martin wrote:
-> > > When a feature-dependent ID register is hidden from the guest, it
-> > > needs to exhibit read-as-zero behaviour as defined by the Arm
-> > > architecture, rather than appearing to be entirely absent.
-> > > 
-> > > This patch updates the ID register emulation logic to make use of
-> > > the new check_present() method to determine whether the register
-> > > should read as zero instead of yielding the host's sanitised
-> > > value.  Because currently a false result from this method truncates
-> > > the trap call chain before the sysreg's emulate method() is called,
-> > > a flag is added to distinguish this special case, and helpers are
-> > > refactored appropriately.
-> > 
-> > I don't understand this last sentence.
-> > 
-> > And I'm not really sure I understand the code either.
-> > 
-> > I can't seem to see any registers which are defined as !present && !raz,
-> > which is what I thought this feature was all about.
-> 
-> !present and !raz is the default behaviour for everything that is not
-> ID-register-like.  This patch is adding the !present && raz case (though
-> that may not be a helpful way to descibe it ... see below).
+Hi Sean,
 
-Fair enough, but I don't really see why you need to classify a register
-as !present && raz, because raz implies present AFAICT.
+> v10 and changes since v9: 
+> - Add a fixup that is __be16 is required instead of dlen1 + dlen2 in STP header.
+> - Align a few one-line comments style as they're made in v9
+> - Fix two warnings catched by checkpatch.pl
+> 	WARNING:TYPO_SPELLING: 'specifc' may be misspelled - perhaps 'specific'?
+> 	at 248: FILE: drivers/bluetooth/btmtkuart.c:186:
+> 
+> 	WARNING:MEMORY_BARRIER: memory barrier without comment
+> 	at 260: FILE: drivers/bluetooth/btmtkuart.c:198:
+> 
+> v9 and changes since v8:
+> - Marcel Holtmann helps to add v9, which includes did a bunch of cosmetic minor cleanup,
+>   spelling correction and added __hci_cmd_send and its event synchronization scheme.
+>   For details, they can be found in [1].
+> 
+> [1] http://lists.infradead.org/pipermail/linux-mediatek/2018-August/014587.html
+> 
+> v8 and changes since v7:
+> - add updates per these suggestions mentioned in [1][2]
+> - remove the hack atomic_inc(&hdev->cmd_cnt) mentioned in [2] because it should
+>   be better to be considered in the core
+> 
+> [1] http://lists.infradead.org/pipermail/linux-mediatek/2018-August/014516.html
+> [2] http://lists.infradead.org/pipermail/linux-mediatek/2018-August/014518.html
+> 
+> v7 and changes since v6:
+> - drop already applied patches
+> - move clk_* and pm_* operation to ->open and ->close 
+> - label this driver as BT_MTKUART
+> - make code style aligned with the other drivers and code better to read
+>   as these suggestions and fixes are mentioned in [1]
+> 
+> [1] http://lists.infradead.org/pipermail/linux-mediatek/2018-July/014458.html
+> 
+> v6 and changes since v5:
+> - make btmtkuart become a separate driver.
+> - drop already applied patches and the patch for btuart driver
+> - refine comments in driver allowing people know that mtk extra header
+>   + length doesn't indicate a full H:4 frame, things can fragment.
+> - enhance dt-binding document with removing mistaken added " and improve
+>   English sentence.
+> - remove unnecessary '\n' with bt_dev_err.
+> - refine code style.
+> - set hdev->manufacturer as mtk id.
+> 
+> v5 and changes since v4:
+> - add Reviewed-by Tag from Ulf Hansson for patch 2
+> - remove default y in Kconfig for btmtkuart selection to avoid overkill for
+>   users which would like to have less an amount on stuff in kernel.
+> - list header declarations in alphabetical order and add a proper blank line
+>   within.
+> - remove unused macro.
+> - use sizeof to calculate structure size instead of an aextra macro to hardcode.
+> - use struct hci_dev * as input paraments for mtk_hci_wmt_sync and mtk_setup_fw
+>   for that can be reused in mtk bluetooth with other interfaces.
+> - remove unused local variabled in mtk_btuart_recv.
+> - remove superfluous :8 for dlen2 in struct mtk_stp_hdr definition.
+> - give a reasonable naming for these labels and add a pm_runtime_put_noidle()
+>   in the path undoing failing pm_runtime_get_sync().
+> - Turn __u8 into u8 in struct mtk_stp_hdr.
+> 
+> Really thanks for these reviews by Johan Hovold and Andy Shevchenko
+> 
+> v4 and changes since v3:
+> - refine patch 2 based on commit 919b7308fcc4 to allow that
+>   dev_pm_domain_attach() will return better error codes. 
+> 
+> v3 and changes since v2
+> * all changes happen on patch 6
+> - fix up SPDX license style for btmtkuart.h.
+> - change firmware download from in ACL data to in HCI commands
+>   and then remove unused mtk_acl_wmt_sync and related code.
+> - add a workaround replacing bad vendor event id 0xe4 with 0xff every
+>   vendor should use.
+> - add a sanity check for mtk_hci_wmt_sync to verifying if
+>   input parameters are valid.
+> - add an atomic_inc(&bdev->hdev->cmd_cnt) for __hci_cmd_sync_ev.
+> - be changed to use firmware with a header called mt7622pr2h.bin.
+> 
+> v2 and changes since v1
+> - Dropped patches already being applied
+> - Rewirte the whole driver using btuart [1], and add slight extension
+>   of btuart to fit into btmtkuart driver. Beware that [1] is also pulled
+>   into one part of the series for avoiding any breakage when the patchset
+>   is being compiled.
+> 
+> [1] btuart 
+> 	https://www.spinics.net/lists/linux-bluetooth/msg74918.html
+> 
+> v1:
+> 
+> Hi,
+> 
+> This patchset introduces built-in Bluetooth support on MT7622 SoC.
+> And, it should be simple to make an extension to support other
+> MediaTek SoCs with adjusting a few of changes on the initialization
+> sequence of the device.
+> 
+> Before the main driver is being introduced, a few of things about
+> power-domain management should be re-worked for serdev core and MediaTek
+> SCPSYS to allow the Bluetooth to properly power up.
+> 
+> Patch 2: add a generic way attaching power domain to serdev
+> Patch 3 and 4: add cleanups with reuse APIs from Linux core
+> Patch 5: fix a limitation about power enablement Bluetooth depends on
+> Patch 1, 6 and 7: the major part of adding Bluetooth support to MT7622
+> 	
+> 	Sean
+> 
+> Sean Wang (3):
+>  dt-bindings: net: bluetooth: Add mediatek-bluetooth
+>  Bluetooth: mediatek: Add protocol support for MediaTek serial devices
+>  MAINTAINERS: add an entry for MediaTek Bluetooth driver
+> 
+> .../devicetree/bindings/net/mediatek-bluetooth.txt |  35 ++
+> MAINTAINERS                                        |   8 +
+> drivers/bluetooth/Kconfig                          |  11 +
+> drivers/bluetooth/Makefile                         |   1 +
+> drivers/bluetooth/btmtkuart.c                      | 629 +++++++++++++++++++++
+> 5 files changed, 684 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/net/mediatek-bluetooth.txt
+> create mode 100644 drivers/bluetooth/btmtkuart.c
 
-> 
-> > In other words, what is the benefit of this more generic method as
-> > opposed to having a wrapper around read_id_reg() for read_sve_id_reg()
-> > which sets RAZ if there is no support for SVE in this context?
-> 
-> There may be other ways to factor this.  I can't now remember whay I
-> went with this particular approach, except that I vaguely recall
-> hitting some obstacles when doing things another way.
+all 3 patches have been applied to bluetooth-next tree.
 
-What I don't much care for is that we now seem to be mixing the concept
-of whether something is present and the value it returns if it is
-present in the overall system register handling logic.  And I don't
-understand why this is a requirement.
+Regards
 
-> 
-> Can you take a look at my attempted explanation below and then we
-> can reconsider this?
-
-Sure, see my comments below.
-
-> 
-> [...]
-> 
-> > 
-> > > 
-> > > This invloves some trivial updates to pass the vcpu pointer down
-> > > into the ID register emulation/access functions.
-> > > 
-> > > A new ID_SANITISED_IF() macro is defined for declaring
-> > > conditionally visible ID registers.
-> > > 
-> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > > ---
-> > >  arch/arm64/kvm/sys_regs.c | 51 ++++++++++++++++++++++++++++++-----------------
-> > >  arch/arm64/kvm/sys_regs.h | 11 ++++++++++
-> > >  2 files changed, 44 insertions(+), 18 deletions(-)
-> > > 
-> 
-> [...]
-> 
-> > > @@ -1840,7 +1855,7 @@ static int emulate_cp(struct kvm_vcpu *vcpu,
-> > >  
-> > >  	r = find_reg(params, table, num);
-> > >  
-> > > -	if (likely(r) && sys_reg_present(vcpu, r)) {
-> > > +	if (likely(r) && sys_reg_present_or_raz(vcpu, r)) {
-> > >  		perform_access(vcpu, params, r);
-> > >  		return 0;
-> > >  	}
-> > > @@ -2016,7 +2031,7 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
-> > >  	if (!r)
-> > >  		r = find_reg(params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
-> > >  
-> > > -	if (likely(r) && sys_reg_present(vcpu, r)) {
-> > > +	if (likely(r) && sys_reg_present_or_raz(vcpu, r)) {
-> > >  		perform_access(vcpu, params, r);
-> > >  	} else {
-> > >  		kvm_err("Unsupported guest sys_reg access at: %lx\n",
-> > > @@ -2313,7 +2328,7 @@ int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
-> > >  	if (!r)
-> > >  		return get_invariant_sys_reg(reg->id, uaddr);
-> > >  
-> > > -	if (!sys_reg_present(vcpu, r))
-> > > +	if (!sys_reg_present_or_raz(vcpu, r))
-> > >  		return -ENOENT;
-> > >  
-> > >  	if (r->get_user)
-> > > @@ -2337,7 +2352,7 @@ int kvm_arm_sys_reg_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
-> > >  	if (!r)
-> > >  		return set_invariant_sys_reg(reg->id, uaddr);
-> > >  
-> > > -	if (!sys_reg_present(vcpu, r))
-> > > +	if (!sys_reg_present_or_raz(vcpu, r))
-> > >  		return -ENOENT;
-> 
-> On Wed, Jul 25, 2018 at 04:46:55PM +0100, Alex Benn?e wrote:
-> > It's all very well being raz, but shouldn't you catch this further down
-> > and not attempt to write the register that doesn't exist?
-> 
-> To be clear, is this a question about factoring, or do you think there's
-> a bug here?
-> 
-> 
-> In response to both sets of comments, I think the way the code is
-> factored is causing some confusion.
-> 
-> The idea in my head was something like this:
-> 
-> System register encodings fall into two classes:
-> 
->  a) encodings that we emulate in some way
-
-this is present, then
-
->  b) encodings that we unconditionally reflect back to the guest as an
->     Undef.
-
-this is !present, then
-
-The previous change made this a configurable thing as opposed to a
-static compile time thing, right?
-> 
-> Architecturally defined system registers fall into two classes:
-> 
->  i) registers whose removal turns all accesses into an Undef
->  ii) registers whose removal exhibits some other behaviour.
-
-I'm not sure what you mean by 'removal' here, and which architectural
-concept that relates to, which makes it hard for me to parse the rest
-here...
-
-> 
-> These two classifications overlap somwehat.
-> 
-> 
-> From an emulation perspective, (b), and (i) in the "register not
-> present" case, look the same: we trap the register and reflect an Undef
-> directly back to the guest with no further action required.
-> 
-> From an emulation perspective, (a) and (ii) are also somewhat the
-> same: we need to emulate something, although precisely what we need
-> to do depends on which register it is and on whether the register is
-> deemed present or not.
-> 
-> sys_reg_check_present_or_raz() thus means "falls under (a) or (ii)",
-> i.e., some emulation is required and we need to call sysreg-specific
-> methods to figure out precisely what we need to do.
-
-yes, but we've always had that without the "or_raz" stuff at the lookup
-level.  What has changed?
-
-> 
-> Conversely !sys_reg_check_present_or_raz() means that we can just
-> Undef the guest with no further logic required.
-
-Yes, but that's the same as !present, because raz then implies present,
-see above.
-
-> 
-> Does this rationale make things clearer?  The naming is perhaps
-> unfortunate.
-> 
-
-Unfortunately not so much.  I have a strong feeling you want to move
-anything relating to something being emulated as RAZ/RAO/something else
-into sysreg specific functions.
-
-Thanks,
--Christoffer
+Marcel
