@@ -1,45 +1,71 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Tue, 7 Aug 2018 10:20:07 -0700
-Subject: [PATCH 1/1] arm64: dts: Stingray: Adjust SMMU non-secure context
- interrupt
-In-Reply-To: <1533632824-17436-1-git-send-email-jitendra.bhivare@broadcom.com>
-References: <1533632824-17436-1-git-send-email-jitendra.bhivare@broadcom.com>
-Message-ID: <77afc740-7fbb-7d6d-6a9a-594c5b09d30a@broadcom.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Tue, 07 Aug 2018 19:29:53 +0200
+Subject: [RFC PATCH v2 12/12] gpiolib: Add fast processing path to bitmap
+ API functions
+In-Reply-To: <CACRpkdYHqFOFSv-erCzx8_u-mVUgGPdDH0ts-+DNAvjP3Qxb9w@mail.gmail.com>
+References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
+ <20180806222918.12644-13-jmkrzyszt@gmail.com>
+ <CACRpkdYHqFOFSv-erCzx8_u-mVUgGPdDH0ts-+DNAvjP3Qxb9w@mail.gmail.com>
+Message-ID: <11711552.OvaP4pOjBH@z50>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 8/7/2018 2:07 AM, Jitendra Bhivare wrote:
-> From: Pramod Kumar <pramod.kumar@broadcom.com>
+On Tuesday, August 7, 2018 1:43:56 AM CEST Linus Walleij wrote:
+> On Tue, Aug 7, 2018 at 12:29 AM Janusz Krzysztofik <jmkrzyszt@gmail.com> 
+wrote:
 > 
-> One context bank has been reserved for secure master, CRMU.
-> hence need to remove context interrupt accordingly. Doing
-> the same in this patch.
+> Hi Janusz!
+> 
+> > Certain GPIO descriptor arrays returned by gpio_get_array() may contain
+> > information on a single GPIO chip driving array member pins in hardware
+> > order.  In such cases, bitmaps of values can be passed directly to the
+> > chip callback functions without wasting time on iterations.
+> >
+> > Add respective code to gpiod_get/set_array_bitmap_complex() functions.
+> >
+> > Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+> 
+> I think it would be disappointing to leave all the users of the old
+> array API without the performance improvement. I think we need to
+> deal with this in a way such that everyone can benefit from it.
 
-I thought you need proper "Fixes" tag so this can be back ported to 
-older kernels.
+There are a few issues to be resolved:
 
+1) array size limited by bitmap size:
+    - are we ready to limit array size to a single bitmap for all users?
+    - if not, how can we pass a bitmap of an arbitrary size?
+    - if as an array of bitmaps, is that still clear enough and easy to use?
+    - other ideas?
+
+2) arbitrary array support:
+     - are we ready to drop that?
+     - if not, do we agree to require all users to pack their arbitrary arrays 
+        inside the gpio_descs structure?
+
+Maybe more.
+
+> Also it is kludgy if users (consumers) would need to handle the case
+> where all lines are on the same chip separately, through the bitmap
+> API.
+
+Not true as long as array size fits (arbitrary arrays can be packed by users), 
+but I see your point.
+
+> What we need is an API that:
 > 
-> Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
-> ---
->   arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi | 3 +--
->   1 file changed, 1 insertion(+), 2 deletions(-)
+> - All drivers handling arrays can use (including current users).
 > 
-> diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-> index b203152..7fcaf38 100644
-> --- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-> +++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-> @@ -244,8 +244,7 @@
->   				     <GIC_SPI 770 IRQ_TYPE_LEVEL_HIGH>,
->   				     <GIC_SPI 771 IRQ_TYPE_LEVEL_HIGH>,
->   				     <GIC_SPI 772 IRQ_TYPE_LEVEL_HIGH>,
-> -				     <GIC_SPI 773 IRQ_TYPE_LEVEL_HIGH>,
-> -				     <GIC_SPI 774 IRQ_TYPE_LEVEL_HIGH>;
-> +				     <GIC_SPI 773 IRQ_TYPE_LEVEL_HIGH>;
->   			#iommu-cells = <2>;
->   		};
->   	};
+> - Enables speed-up if the lines are all on the same chip/register.
 > 
+> - Doesn't require consumers to know if they are all on the same
+>   chip or not.
+> 
+> This means a deep API with a small surface.
+> 
+> How do we achieve this the best way?
+
+I think widely accepted solutions to those two issues I've mentioned above can 
+give the answer.
+
+Thanks,
+Janusz
