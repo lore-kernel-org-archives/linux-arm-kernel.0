@@ -1,63 +1,63 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 07 Aug 2018 15:15:39 +0200
-Subject: [PATCH 1/2] iommu/rockchip: Handle errors returned from PM
- framework
-In-Reply-To: <94b6aab1-e8d3-6929-a2e6-2f06c564bc70@arm.com>
-References: <20180807085406.3863-1-marc.zyngier@arm.com>
- <2940317.dDZy1L4CDY@phil> <94b6aab1-e8d3-6929-a2e6-2f06c564bc70@arm.com>
-Message-ID: <3265383.PcPThIO4HC@phil>
+From: syeh@vmware.com (Sinclair Yeh)
+Date: Tue, 7 Aug 2018 06:25:58 -0700
+Subject: [PATCH v3 10/10] drm/vmwgfx: Use __drm_atomic_helper_plane_reset
+ instead of copying the logic
+In-Reply-To: <20180807080327.GA32008@e114479-lin.cambridge.arm.com>
+References: <20180804161530.12275-1-alexandru-cosmin.gheorghe@arm.com>
+ <20180804161530.12275-11-alexandru-cosmin.gheorghe@arm.com>
+ <20180806165752.GD17089@vmware.com>
+ <20180807080327.GA32008@e114479-lin.cambridge.arm.com>
+Message-ID: <20180807132557.GA1160@vmware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 7. August 2018, 14:31:49 CEST schrieb Marc Zyngier:
-> On 07/08/18 13:09, Heiko Stuebner wrote:
-> > Hi Marc,
-> > 
-> > Am Dienstag, 7. August 2018, 10:54:05 CEST schrieb Marc Zyngier:
-> >> pm_runtime_get_if_in_use can fail: either PM has been disabled
-> >> altogether (-EINVAL), or the device hasn't been enabled yet (0).
-> >> Sadly, the Rockchip IOMMU driver tends to conflate the two things
-> >> by considering a non-zero return value as successful.
-> >>
-> >> This has the consequence of hiding other bugs, so let's handle this
-> >> case throughout the driver, with a WARN_ON_ONCE so that we can try
-> >> and work out what happened.
-> >>
-> >> Fixes: 0f181d3cf7d98 ("iommu/rockchip: Add runtime PM support")
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > 
-> > I'm still not sure about the !CONFIG_PM case, as it was probably silently
-> > working in that case before
+On Tue, Aug 07, 2018 at 09:03:27AM +0100, Alexandru-Cosmin Gheorghe wrote:
+> Hi Sinclair,
 > 
-> Do we agree that this is an orthogonal problem though?
+> Is it ok if I merge this patch through drm-misc-next ?
 
-Nope ;-) .... I.e. right now the code ignores the -EINVAL from disabled PM
-and continues, possibly even handling the irq correctly.
+Sure. Thanks for handling this.
 
-If it actually worked is a different matter, as I guess nobody really tried
-with !PM in the past.
+Sinclair
 
-Now with error-handling we always return IRQ_NONE for !PM.
-
-
-> > But on the other hand we're also already running over it in other places
-> > like in the iommu-shutdown and I guess if someone _really_ disabled
-> > CONFIG_PM, a lot of additional stuff would fail anyway.
-> > 
-> > So should we wrap that in some #ifdef magic, just ignore it or simply
-> > select PM similar to what Tegra, Renesas and Vexpress seem to do?
-> > 
-> > I guess I like the 3rd option best ;-)
+> Thank you,
+> Alex Gheorghe
 > 
-> It probably doesn't hurt. At what level do you want it? As a dependency
-> to the IOMMU? or to the platform?
-
-I guess it might be best to go the Tegra, etc way. Whoever in their right
-mind would want to drive a mobile platform without any form for power
-management ;-) .
-
-I can do these patches for arm32+arm64 myself ... I just wanted to put
-that thought out there - in case that was just a stupid idea of mine :-D .
-
-
-Heiko
+> On Mon, Aug 06, 2018 at 09:57:53AM -0700, Sinclair Yeh wrote:
+> > Acked-by: Sinclair Yeh <syeh@vmware.com>
+> > 
+> > On Sat, Aug 04, 2018 at 05:15:30PM +0100, Alexandru Gheorghe wrote:
+> > > A new helper function(__drm_atomic_helper_plane_reset) has been added
+> > > for linking a plane with its state and resetting the core
+> > > properties(alpha, rotation, etc.) to their default values.
+> > > Use that instead of duplicating the logic.
+> > > 
+> > > Reviewed-by: Sinclair Yeh <syeh@vmware.com>
+> > > Reviewed-by: Deepak Rawat <drawat@vmware.com>
+> > > Signed-off-by: Alexandru Gheorghe <alexandru-cosmin.gheorghe@arm.com>
+> > > ---
+> > >  drivers/gpu/drm/vmwgfx/vmwgfx_kms.c | 4 +---
+> > >  1 file changed, 1 insertion(+), 3 deletions(-)
+> > > 
+> > > diff --git a/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c b/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
+> > > index 4a0f0f41afa1..61824e360619 100644
+> > > --- a/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
+> > > +++ b/drivers/gpu/drm/vmwgfx/vmwgfx_kms.c
+> > > @@ -720,9 +720,7 @@ void vmw_du_plane_reset(struct drm_plane *plane)
+> > >  		return;
+> > >  	}
+> > >  
+> > > -	plane->state = &vps->base;
+> > > -	plane->state->plane = plane;
+> > > -	plane->state->rotation = DRM_MODE_ROTATE_0;
+> > > +	__drm_atomic_helper_plane_reset(plane, &vps->base);
+> > >  }
+> > >  
+> > >  
+> > > -- 
+> > > 2.18.0
+> > > 
+> 
+> -- 
+> Cheers,
+> Alex G
