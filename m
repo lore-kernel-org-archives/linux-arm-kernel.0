@@ -1,229 +1,45 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Tue, 7 Aug 2018 14:47:17 +0000
-Subject: [PATCH v2 3/3] ARM: dts: stm32: Fix DT dtc warnings for stm32f4
-In-Reply-To: <CABGGisxNQgduwhpX_jt1d=gKasDFTGovvQeRLh0-dsjSU277bQ@mail.gmail.com>
-References: <1533646500-4028-1-git-send-email-patrice.chotard@st.com>
- <1533646500-4028-4-git-send-email-patrice.chotard@st.com>
- <CABGGisxNQgduwhpX_jt1d=gKasDFTGovvQeRLh0-dsjSU277bQ@mail.gmail.com>
-Message-ID: <b91caf84-81d6-1bc4-2e23-9fd14c9af38f@st.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Tue, 7 Aug 2018 17:54:38 +0300
+Subject: [PATCH v7 2/8] dt-bindings: Introduce interconnect provider
+ bindings
+In-Reply-To: <CABGGisxq+hf91R18pnZ=VZ9f99GssWWPhpPCjNAROJmKg5-udA@mail.gmail.com>
+References: <20180731161340.13000-1-georgi.djakov@linaro.org>
+ <20180731161340.13000-3-georgi.djakov@linaro.org>
+ <CABGGisxq+hf91R18pnZ=VZ9f99GssWWPhpPCjNAROJmKg5-udA@mail.gmail.com>
+Message-ID: <e114ed83-fd54-4952-f375-e1d94826ac6e@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob
+Hi Rob,
 
-On 08/07/2018 04:08 PM, Rob Herring wrote:
-> On Tue, Aug 7, 2018 at 6:55 AM <patrice.chotard@st.com> wrote:
+On 08/03/2018 12:02 AM, Rob Herring wrote:
+> On Tue, Jul 31, 2018 at 10:13 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
 >>
->> From: Patrice Chotard <patrice.chotard@st.com>
->>
->> Fix the following DT dtc warnings for stm32f429 and
->> stm32f469 boards:
->>
->> Warning (node_name_chars_strict): /soc/pin-controller/usbotg_fs at 0: Character '_' not recommended in node name
->> Warning (node_name_chars_strict): /soc/pin-controller/usbotg_fs at 1: Character '_' not recommended in node name
->> Warning (node_name_chars_strict): /soc/pin-controller/usbotg_hs at 0: Character '_' not recommended in node name
->> Warning (node_name_chars_strict): /soc/pin-controller/sdio_pins at 0: Character '_' not recommended in node name
->> Warning (node_name_chars_strict): /soc/pin-controller/sdio_pins_od at 0: Character '_' not recommended in node name
->> Warning (node_name_chars_strict): /gpio_keys: Character '_' not recommended in node name
->> Warning (unit_address_vs_reg): /memory: node has a reg or ranges property, but no unit name
->> Warning (unit_address_vs_reg): /soc/pin-controller: node has a reg or ranges property, but no unit name
->> Warning (unit_address_vs_reg): /soc/pin-controller/usart1 at 0: node has a unit name, but no reg property
->> Warning (unit_address_vs_reg): /soc/pin-controller/usart3 at 0: node has a unit name, but no reg property
->> Warning (unit_address_vs_reg): /soc/pin-controller/usbotg_fs at 0: node has a unit name, but no reg property
->> Warning (unit_address_vs_reg): /soc/pin-controller/usbotg_fs at 1: node has a unit name, but no reg property
->> Warning (unit_address_vs_reg): /soc/pin-controller/usbotg_hs at 0: node has a unit name, but no reg property
->> Warning (unit_address_vs_reg): /soc/pin-controller/mii at 0: node has a unit name, but no reg property
->> Warning (unit_address_vs_reg): /soc/pin-controller/adc at 200: node has a unit name, but no reg property
->> Warning (unit_address_vs_reg): /soc/pin-controller/pwm at 1: node has a unit name, but no reg property
->> Warning (unit_address_vs_reg): /soc/pin-controller/pwm at 3: node has a unit name, but no reg property
->> Warning (unit_address_vs_reg): /soc/pin-controller/i2c1 at 0: node has a unit name, but no reg property
->> Warning (unit_address_vs_reg): /soc/pin-controller/ltdc at 0: node has a unit name, but no reg property
->> Warning (unit_address_vs_reg): /soc/pin-controller/dcmi at 0: node has a unit name, but no reg property
->> Warning (unit_address_vs_reg): /soc/pin-controller/sdio_pins at 0: node has a unit name, but no reg property
->> Warning (unit_address_vs_reg): /soc/pin-controller/sdio_pins_od at 0: node has a unit name, but no reg property
->> Warning (unit_address_vs_reg): /gpio_keys/button at 0: node has a unit name, but no reg property
->> Warning (avoid_unnecessary_addr_size): /gpio_keys: unnecessary #address-cells/#size-cells without "ranges" or child "reg" property
->>
->> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
->> ---
->> Change since v1:
->>          - update nodes name as following: <node_name>@0 to <node_name>-0
->>
->>
->>   arch/arm/boot/dts/stm32429i-eval.dts     | 11 +++--
->>   arch/arm/boot/dts/stm32f4-pinctrl.dtsi   | 30 ++++++-------
->>   arch/arm/boot/dts/stm32f429-disco.dts    |  7 ++-
->>   arch/arm/boot/dts/stm32f429-pinctrl.dtsi | 74 +++++++++++++++----------------
->>   arch/arm/boot/dts/stm32f429.dtsi         |  8 ++--
->>   arch/arm/boot/dts/stm32f469-disco.dts    | 11 +++--
->>   arch/arm/boot/dts/stm32f469-pinctrl.dtsi | 76 +++++++++++++++-----------------
->>   7 files changed, 102 insertions(+), 115 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
->> index 7eb786a2d624..116232b589e4 100644
->> --- a/arch/arm/boot/dts/stm32429i-eval.dts
->> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
->> @@ -60,7 +60,7 @@
->>                  stdout-path = "serial0:115200n8";
->>          };
->>
->> -       memory {
->> +       memory at 0 {
->>                  reg = <0x00000000 0x2000000>;
->>          };
->>
->> @@ -111,17 +111,16 @@
->>                  };
->>          };
->>
->> -       gpio_keys {
->> +       gpio-keys {
->>                  compatible = "gpio-keys";
->> -               #address-cells = <1>;
->>                  #size-cells = <0>;
+>> This binding is intended to represent the interconnect hardware present
+>> in some of the modern SoCs. Currently it consists only of a binding for
+>> the interconnect hardware devices (provider).
 > 
-> Think you forgot this line.
+> If you want the bindings reviewed, then you need to send them to the
+> DT list. CC'ing me is pointless, I get CC'ed too many things to read.
 
-You are right, i will remove it
+Ops, ok!
 
-> 
->>                  autorepeat;
->> -               button at 0 {
->> +               button-0 {
->>                          label = "Wake up";
->>                          linux,code = <KEY_WAKEUP>;
->>                          gpios = <&gpioa 0 0>;
->>                  };
->> -               button at 1 {
->> +               button-1 {
->>                          label = "Tamper";
->>                          linux,code = <KEY_RESTART>;
->>                          gpios = <&gpioc 13 0>;
->> @@ -145,7 +144,7 @@
->>                  };
->>          };
->>
->> -       mmc_vcard: mmc_vcard {
->> +       mmc_vcard: mmc-vcard {
->>                  compatible = "regulator-fixed";
->>                  regulator-name = "mmc_vcard";
->>                  regulator-min-microvolt = <3300000>;
->> diff --git a/arch/arm/boot/dts/stm32f4-pinctrl.dtsi b/arch/arm/boot/dts/stm32f4-pinctrl.dtsi
->> index 35202896c093..244c7ab8c76d 100644
->> --- a/arch/arm/boot/dts/stm32f4-pinctrl.dtsi
->> +++ b/arch/arm/boot/dts/stm32f4-pinctrl.dtsi
->> @@ -45,7 +45,7 @@
->>
->>   / {
->>          soc {
->> -               pinctrl: pin-controller {
->> +               pinctrl: pin-controller at 40020000 {
-> 
-> pinctrl is the documented node name, not pin-controller.
+> The consumer and producer binding should be a single patch. One is not
+> useful without the other.
 
-Okay
+The reason for splitting them is that they can be reviewed separately.
+Also we can rely on platform data instead of using DT and the consumer
+binding. However will do as you suggest.
 
-> 
->>                          #address-cells = <1>;
->>                          #size-cells = <1>;
->>                          ranges = <0 0x40020000 0x3000>;
->> @@ -163,7 +163,7 @@
->>                                  st,bank-name = "GPIOK";
->>                          };
->>
->> -                       usart1_pins_a: usart1 at 0 {
->> +                       usart1_pins_a: usart1-0 {
-> 
-> What's wrong with just "usart1"?
-> 
-> I think I would like to see "-pins" appended to the node names.
+> There is also a patch series from Maxime Ripard that's addressing the
+> same general area. See "dt-bindings: Add a dma-parent property". We
+> don't need multiple ways to address describing the device to memory
+> paths, so you all had better work out a common solution.
 
-Our way of naming our node is <IP_name><instance>-<differentiator>
+Looks like this fits exactly into the interconnect API concept. I see
+MBUS as interconnect provider and display/camera as consumers, that
+report their bandwidth needs. I am also planning to add support for
+priority.
 
-differentiator starts at 0, and is incremented if needed.
-For example, if we want to add a sleep config, the node's name would be:
-
-usart1_pins_sleep_a: usart1-1 { blablabla ...}
-
-
-
-> 
->>                                  pins1 {
->>                                          pinmux = <STM32_PINMUX('A', 9, AF7)>; /* USART1_TX */
->>                                          bias-disable;
->> @@ -176,7 +176,7 @@
->>                                  };
->>                          };
->>
->> -                       usart3_pins_a: usart3 at 0 {
->> +                       usart3_pins_a: usart3-0 {
->>                                  pins1 {
->>                                          pinmux = <STM32_PINMUX('B', 10, AF7)>; /* USART3_TX */
->>                                          bias-disable;
->> @@ -189,7 +189,7 @@
->>                                  };
->>                          };
->>
->> -                       usbotg_fs_pins_a: usbotg_fs at 0 {
->> +                       usbotg_fs_pins_a: usbotg-fs-0 {
->>                                  pins {
->>                                          pinmux = <STM32_PINMUX('A', 10, AF10)>, /* OTG_FS_ID */
->>                                                   <STM32_PINMUX('A', 11, AF10)>, /* OTG_FS_DM */
->> @@ -200,7 +200,7 @@
->>                                  };
->>                          };
->>
->> -                       usbotg_fs_pins_b: usbotg_fs at 1 {
->> +                       usbotg_fs_pins_b: usbotg-fs-1 {
->>                                  pins {
->>                                          pinmux = <STM32_PINMUX('B', 12, AF12)>, /* OTG_HS_ID */
->>                                                   <STM32_PINMUX('B', 14, AF12)>, /* OTG_HS_DM */
->> @@ -211,7 +211,7 @@
->>                                  };
->>                          };
->>
->> -                       usbotg_hs_pins_a: usbotg_hs at 0 {
->> +                       usbotg_hs_pins_a: usbotg-hs-0 {
->>                                  pins {
->>                                          pinmux = <STM32_PINMUX('H', 4, AF10)>, /* OTG_HS_ULPI_NXT*/
->>                                                   <STM32_PINMUX('I', 11, AF10)>, /* OTG_HS_ULPI_DIR */
->> @@ -231,7 +231,7 @@
->>                                  };
->>                          };
->>
->> -                       ethernet_mii: mii at 0 {
->> +                       ethernet_mii: mii-0 {
->>                                  pins {
->>                                          pinmux = <STM32_PINMUX('G', 13, AF11)>, /* ETH_MII_TXD0_ETH_RMII_TXD0 */
->>                                                   <STM32_PINMUX('G', 14, AF11)>, /* ETH_MII_TXD1_ETH_RMII_TXD1 */
->> @@ -251,13 +251,13 @@
->>                                  };
->>                          };
->>
->> -                       adc3_in8_pin: adc at 200 {
->> +                       adc3_in8_pin: adc-0 {
->>                                  pins {
->>                                          pinmux = <STM32_PINMUX('F', 10, ANALOG)>;
->>                                  };
->>                          };
->>
->> -                       pwm1_pins: pwm at 1 {
->> +                       pwm1_pins: pwm-1 {
-> 
-> You have a mixture of the number suffix being a pin mode # and block
-> instance #. pwm1 or pwm1-pins?
-
-Right, if we follow our rules, the node's name must be :
-
-pwm1_pins: pwm1-0 { ....
-
-
-Thanks
-
-Patrice
-
-> 
-> Similar comments on the rest.
-> 
-> Rob
-> 
+Thanks,
+Georgi
