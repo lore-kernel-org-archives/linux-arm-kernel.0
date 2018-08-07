@@ -1,71 +1,43 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Tue, 7 Aug 2018 14:17:34 -0400 (EDT)
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <CAKv+Gu_HasYTYLy3d_1vhBHA=M5i40DmU3EuVHhzT4pRiahcmA@mail.gmail.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3s-+Qf=WBZz1KpisDMG3520jCUh8PLAO3PHa4jdt8kCTw@mail.gmail.com>
- <CAKv+Gu9_h-WFi1j4+DWUN_dMj75SKKHxWoDH8WQ9P7S7MNpZQg@mail.gmail.com>
- <alpine.LRH.2.02.1808060553130.30832@file01.intranet.prod.int.rdu2.redhat.com>
- <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
- <CAKv+Gu_C2g=C=gMpk4a5jpDORnxZY6t1v=HDoy59m5vwNBxBBg@mail.gmail.com>
- <alpine.LRH.2.02.1808061306490.12989@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu_8Rq6X24ZOYvG7+kQQGSGYAZuu_co4k1nJS8K7rkrWMA@mail.gmail.com>
- <alpine.LRH.2.02.1808061552090.11930@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu_iCgAeGmrajZ_euMcFLntWG1a51HF_HQ1TO=fV_v__AQ@mail.gmail.com>
- <CAPv3WKdCMpy6KarducQEtSYP35zdELhparkmPPMKGMUhsdk1Qw@mail.gmail.com>
- <alpine.LRH.2.02.1808071331260.16565@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu_HasYTYLy3d_1vhBHA=M5i40DmU3EuVHhzT4pRiahcmA@mail.gmail.com>
-Message-ID: <alpine.LRH.2.02.1808071414340.25017@file01.intranet.prod.int.rdu2.redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 7 Aug 2018 12:47:10 -0600
+Subject: [PATCH 0/9] Add Reset Controller support for Actions Semi Owl SoCs
+In-Reply-To: <20180730151131.GA28633@mani>
+References: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
+ <c3ae668a-6bcc-a0eb-1e00-14ef9d607316@suse.de>
+ <20180730151131.GA28633@mani>
+Message-ID: <20180807184710.GA26423@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Tue, 7 Aug 2018, Ard Biesheuvel wrote:
-
-> On 7 August 2018 at 19:39, Mikulas Patocka <mpatocka@redhat.com> wrote:
-> >
-> >
-> > On Tue, 7 Aug 2018, Marcin Wojtas wrote:
-> >
-> >> Ard, Mikulas,
-> >>
-> >> After some self-caused setup issues I was able to run the test on my
-> >> MacchiatoBin with the kernel v4.18-rc8. It's been running for 1h+ now,
-> >> loading the CPU to 100% and no single error event...
-> >>
-> >> I built the binary file with:
-> >> gcc-linaro-7.2.1-2017.11-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc -O2
-> >>
-> >> Maybe it's the older firmware issue?
-> >
-> > I have downloaded and built the firmware recently (it has timestamp Jul 30
-> > 2018).
-> >
-> > Do you still have your firmware file "flash-image.bin" that you used, so
-> > that I could try it?
-> >
-> >> Please send the full bootlog with
-> >> the very first line after reset. My board rev is v1.3 and I use
-> >> mainline UEFI (newest edk2 + edk2-platforms) + newest publicly
-> >> available ARM-TF and earliest firmware for this board.
-> >>
-> >> Best regards,
-> >> Marcin
-> >
+On Mon, Jul 30, 2018 at 08:41:31PM +0530, Manivannan Sadhasivam wrote:
+> Hi Andreas,
 > 
-> Mikulas,
+> On Mon, Jul 30, 2018 at 12:26:07PM +0200, Andreas F?rber wrote:
+> > Hi Mani,
+> > 
+> > Am 27.07.2018 um 20:45 schrieb Manivannan Sadhasivam:
+> > > This patchset adds Reset Controller (RMU) support for Actions Semi
+> > > Owl SoCs, S900 and S700. For the Owl SoCs, RMU has been integrated into
+> > > the clock subsystem in hardware. Hence, in software we integrate RMU
+> > > support into common clock driver inorder to maintain compatibility.
+> > 
+> > Can this not be placed into drivers/reset/ by using mfd-simple with a
+> > sub-node in DT?
+
+That is exactly what I tell folks not to do. Design the DT based on h/w 
+blocks, not current desired driver split for some OS.
+
+> Actually I was not sure where to place this reset controller driver. When I
+> looked into other similar ones such as sunxi, they just integrated into the
+> clk subsystem. So I just chose that path. But yeah, this is hacky!
 > 
-> Is the issue reproducible with an nvidia card + nouveau driver as well ?
-> 
-> Given the screen corruption i see with radeon even on other arm
-> systems, i'd like to ensure that this is a platform bug not a driver
-> bug.
+> But this RMU is not MFD by any means. Since the CMU (Clock) and RMU (Reset)
+> are two separate IPs inside SoC, we shouldn't describe it as a MFD driver. Since
+> RMU has only 2 registers, the HW designers decided to use up the CMU memory
+> map. So, maybe syscon would be best option I think. What is your opinion?
 
-I see the same memcpy-to-framebuffer corruption on Radeon HD 6450 and 
-nVidia Quadro NVS 285.
+If there's nothing shared then it is not a syscon. If you can create 
+separate address ranges, then 2 nodes is probably okay. If the registers 
+are all mixed up, then 1 node.
 
-3D acceleration on nVidia is slow, but it doesn't have visible glitches.
-
-Mikulas
+Rob
