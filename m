@@ -1,31 +1,24 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Tue, 7 Aug 2018 14:37:36 +0800
-Subject: [PATCH] arm64: clean the additional checks before calling
- ghes_notify_sea()
-In-Reply-To: <20180806142623.GA15275@arm.com>
-References: <1532638907-46129-1-git-send-email-gengdongjiu@huawei.com>
- <20180727100617.GB25592@arm.com>
- <CAMj-D2Ab9Txk27GDQbOy3X=Qup7BuA3sWSovsOpffpxe6UcBFQ@mail.gmail.com>
- <20180806142623.GA15275@arm.com>
-Message-ID: <2c3baa9e-c647-01a9-cef6-eb61ba6c529c@huawei.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 7 Aug 2018 08:57:17 +0200
+Subject: [PATCH v2] crypto: remove Speck
+In-Reply-To: <20180807062225.6331-1-Jason@zx2c4.com>
+References: <20180807011937.GA133621@gmail.com>
+ <20180807062225.6331-1-Jason@zx2c4.com>
+Message-ID: <CAKv+Gu893jhyC9m++r719845-7axqj5qCPhk7hp-iStykj+HsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 7 August 2018 at 08:22, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
+> These are unused, undesired, and have never actually been used by
+> anybody. The original authors of this code have changed their mind about
+> its inclusion. While originally proposed for disk encryption on low-end
+> devices, the idea was discarded [1] in favor of something else before
+> that could really get going. Therefore, this patch removes Speck.
+>
+> [1] https://marc.info/?l=linux-crypto-vger&m=153359499015659
+>
+> Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
+> Acked-by: Eric Biggers <ebiggers@google.com>
+> Cc: stable at vger.kernel.org
 
-
-On 2018/8/6 22:26, Will Deacon wrote:
->> Will,
->>      This patch will be applied, right? thanks
-> I haven't queued it in the arm64 tree, since it touches include/acpi/ghes.h
-> and you don't have an ack from the acpi folks. I acked it so that you could
-> route it via the acpi tree without me holding you up.
-
-Thanks the explanation.
-yes, this patch touches the "include/acpi/ghes.h", I will repost this patch to let acpi
-folks review it.
-
-
-> 
-> Will
-> 
->>>> This cleanup is ever mentioned by Mark Rutland in [1]
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
