@@ -1,76 +1,53 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Tue, 7 Aug 2018 22:34:05 +0800
-Subject: [PATCH v7 2/3] Bluetooth: mediatek: Add protocol support for
- MediaTek serial devices
-In-Reply-To: <7A3537C5-5940-45AD-AB80-77418CCFE130@holtmann.org>
-References: <cover.1533056925.git.sean.wang@mediatek.com>
- <c92ed10cf16f36d9a3b390e864af92e2dfe7b771.1533056925.git.sean.wang@mediatek.com>
- <1707FFA1-A294-4A95-A3BF-0910CE455232@holtmann.org>
- <1533192799.3472.122.camel@mtkswgap22>
- <FF45A90A-F9F1-47CB-AB1F-1E92BF587FBE@holtmann.org>
- <1533199720.3472.136.camel@mtkswgap22>
- <9526E5D9-50BA-4D57-80F5-083DB7D28AFE@holtmann.org>
- <1533205495.3472.144.camel@mtkswgap22>
- <A6D48D49-52CE-405D-8C5D-C4D54CE67221@holtmann.org>
- <1533303749.3472.160.camel@mtkswgap22>
- <D2336CD2-B69B-4B5B-8125-F0CAD29E3243@holtmann.org>
- <1533319214.3472.187.camel@mtkswgap22>
- <7A3537C5-5940-45AD-AB80-77418CCFE130@holtmann.org>
-Message-ID: <1533652445.3472.230.camel@mtkswgap22>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 7 Aug 2018 16:40:39 +0200
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <alpine.LRH.2.02.1808071010240.11209@file01.intranet.prod.int.rdu2.redhat.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <alpine.LRH.2.02.1808032046540.24748@file01.intranet.prod.int.rdu2.redhat.com>
+ <CA+=Sn1=6F-fGLmXE0VqQHTqTCUKUT=Fz29mMT7349SPFisbZ9A@mail.gmail.com>
+ <alpine.LRH.2.02.1808040611070.23762@file01.intranet.prod.int.rdu2.redhat.com>
+ <fd2cae87-b2df-d8ef-8836-e6cbf8c5f851@redhat.com>
+ <alpine.LRH.2.02.1808060325110.3756@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu_y6La77sWOSROrwfRy65jrFVYVvRZt+ewNheYhdhHCkQ@mail.gmail.com>
+ <alpine.LRH.2.02.1808060626060.2986@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu87YqLM=FFZ6V8rHhuhskDdsBUuXFpqNKVbXWqdnuNEyA@mail.gmail.com>
+ <alpine.LRH.2.02.1808060639200.2986@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu8HyHX8qjg1qHV2M9Re+RGQJigjdAFVC_yR4niGkk2ikA@mail.gmail.com>
+ <alpine.LRH.2.02.1808060700070.10220@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu8384LZwL898wJ8BKjmJNzvd+-cSFUp4X4OpfmRDCP4Ng@mail.gmail.com>
+ <alpine.LRH.2.02.1808071010240.11209@file01.intranet.prod.int.rdu2.redhat.com>
+Message-ID: <CAKv+Gu_h6DDW4tvECrj3rGUaii4-2audYpYYiJQXfbEMch2pDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-08-06 at 17:39 +0200, Marcel Holtmann wrote:
-> Hi Sean,
-> 
-> >>>>>>>>>>> +
+On 7 August 2018 at 16:14, Mikulas Patocka <mpatocka@redhat.com> wrote:
+>
+>
+> On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
+>
+>> No that works fine for me. VDPAU acceleration works as well, but it
+>> depends on your chromium build whether it can actually use it, I
+>> think? In any case, mplayer can use vdpau to play 1080p h264 without
+>> breaking a sweat on this system.
+>>
+>> Note that the VDPAU driver also relies on memory semantics, i.e., it
+>> may use DC ZVA (zero cacheline) instructions which are not permitted
+>> on device mappings. This is probably just glibc's memset() being
+>> invoked, but I remember hitting this on another PCIe-impaired arm64
+>> system with Synopsys PCIe IP
+>
+> DC ZVA can be disabled with the SCTRL_EL1.DZE bit, so that neither kernel
+> nor userspace will use it.
 
-[ ... ]
+Of course, but only the OS can do that, and only system wide unless
+we're eager to create infrastructure for managing this per process.
 
-> >> this is even more hackish since the __hci_cmd_sync_ev command is really meant to get a cmd status first before waiting for that event.
-> >> 
-> > 
-> > Understood.
-> > 
-> > I've stopped the hack in v8. could we merge v8 first ? and then I will a fix up with __hci_raw_sync_ev that uses the hdev->raw_q instead of __hci_cmd_sync_ev in TODO.
-> 
-> so I looked into this a bit more. We actually added __hci_cmd_send for a Qualcomm firmware loader that was doing something similar. So instead of trying to add a yet another command to the core, I actually used that and implemented the wait for vendor event in the driver.
-> 
-> You will see my v9 on the mailing list. I also did a bunch of cosmetic minor cleanup and spelling correction. Please test this version. I also make __le16 dlen instead of dlen1 + dlen2 since I think that is what your hardware does.
+But it is also beside the point: I mentioned it to illustrate that
+even use cases like libvdpau that don't operate on the 'framebuffer'
+abstraction make assumptions about VRAM having true memory semantics.
 
-Only one thing needs to be corrected in v9. that is __be16 is required instead of dlen1 + dlen2. I will fix it up in v10 and the other changes all look good to me.
-
-> If this version of the driver works for you then I am happy to merge it. You can then add support for hdev->set_bdaddr and hdev->set_diag in later patches. I also like to clean up the STP receive handler since it can be done a lot simpler and smaller, but that has to wait.
-> 
-
-hopefully v10 also can be merged :)
-
-I will investigate more about how to add ->set_bdaddr, ->set_diag and STP receive enhancement in later patches.
-
-but so far I have not much idea about how to make STP multiplexer be a independent driver.
-
-my thought is that it would be really better and cleaner a chain of serdev is be used as the base of mtkbtuart. something like
-  
-8250 serial bus <----> STP multiplexer serdev <----> mtkbtuart serdev
-
-however, STP multiplexer serdev is not a real device, that doesn't no request any resource. I think it should not be allowed to be added in a device tree and even in dt-binding document.
-
-> >> Are all Mediatek vendor commands this way? Or just the ones for loading the firmware? So only the WMT ones?
-> >> 
-> > 
-> > Only the WMT ones, WMT commands/events are usually used in system controlling, for example, global function on/off, firmware download, reset and so on. most only appear on device initialization
-> 
-> Since you never checked the result of the vendor event, I opted for just signaling that it arrived. If they can report success or failure, we need to add some extra code for that.
-> 
-
-I will consider more WMT event status when I add more Bluetooth devices such as MT7668U usb based Bluetooth which I plan to add the support in later patches in the next weeks 
-
-> Regards
-> 
-> Marcel
-> 
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+> If the mapping didn't support unaligned writes,
+> it would be worse.
+>
+> Mikulas
