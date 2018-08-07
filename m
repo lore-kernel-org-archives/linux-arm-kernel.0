@@ -1,45 +1,21 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Tue, 7 Aug 2018 17:54:38 +0300
-Subject: [PATCH v7 2/8] dt-bindings: Introduce interconnect provider
- bindings
-In-Reply-To: <CABGGisxq+hf91R18pnZ=VZ9f99GssWWPhpPCjNAROJmKg5-udA@mail.gmail.com>
-References: <20180731161340.13000-1-georgi.djakov@linaro.org>
- <20180731161340.13000-3-georgi.djakov@linaro.org>
- <CABGGisxq+hf91R18pnZ=VZ9f99GssWWPhpPCjNAROJmKg5-udA@mail.gmail.com>
-Message-ID: <e114ed83-fd54-4952-f375-e1d94826ac6e@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 7 Aug 2018 08:56:53 -0600
+Subject: [PATCH v4 2/4] dt: bindings: Document ZynqMP DDRC in Synopsys
+ documentation
+In-Reply-To: <1533374735-16662-3-git-send-email-manish.narani@xilinx.com>
+References: <1533374735-16662-1-git-send-email-manish.narani@xilinx.com>
+ <1533374735-16662-3-git-send-email-manish.narani@xilinx.com>
+Message-ID: <20180807145652.GA4106@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On 08/03/2018 12:02 AM, Rob Herring wrote:
-> On Tue, Jul 31, 2018 at 10:13 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
->>
->> This binding is intended to represent the interconnect hardware present
->> in some of the modern SoCs. Currently it consists only of a binding for
->> the interconnect hardware devices (provider).
+On Sat, Aug 04, 2018 at 02:55:33PM +0530, Manish Narani wrote:
+> This patch adds information of ZynqMP DDRC which reports the single bit
+> errors that are corrected and the double bit errors that are detected.
 > 
-> If you want the bindings reviewed, then you need to send them to the
-> DT list. CC'ing me is pointless, I get CC'ed too many things to read.
+> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> ---
+>  .../bindings/memory-controllers/synopsys.txt       | 27 ++++++++++++++++++----
+>  1 file changed, 22 insertions(+), 5 deletions(-)
 
-Ops, ok!
-
-> The consumer and producer binding should be a single patch. One is not
-> useful without the other.
-
-The reason for splitting them is that they can be reviewed separately.
-Also we can rely on platform data instead of using DT and the consumer
-binding. However will do as you suggest.
-
-> There is also a patch series from Maxime Ripard that's addressing the
-> same general area. See "dt-bindings: Add a dma-parent property". We
-> don't need multiple ways to address describing the device to memory
-> paths, so you all had better work out a common solution.
-
-Looks like this fits exactly into the interconnect API concept. I see
-MBUS as interconnect provider and display/camera as consumers, that
-report their bandwidth needs. I am also planning to add support for
-priority.
-
-Thanks,
-Georgi
+Reviewed-by: Rob Herring <robh@kernel.org>
