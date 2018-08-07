@@ -1,641 +1,172 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue,  7 Aug 2018 12:38:36 +0530
-Subject: [PATCH 1/3] ARM: dts: imx: Switch Engicam boards to use SPDX
- identifier
-Message-ID: <20180807070838.24685-1-jagan@amarulasolutions.com>
+Date: Tue,  7 Aug 2018 12:38:37 +0530
+Subject: [PATCH 2/3] ARM: dts: imx6ul-isiot: Move node definitions into dtsi
+In-Reply-To: <20180807070838.24685-1-jagan@amarulasolutions.com>
+References: <20180807070838.24685-1-jagan@amarulasolutions.com>
+Message-ID: <20180807070838.24685-2-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adopt the SPDX license identifier headers to ease license compliance
-management.
-
-Also added Engicam Copyright on missing files.
+Move usdhc2 and gpmi along with pinctrl nodes on
+imx6ul-isiot.dtsi from dts files and mark it as 'disabled'
+and the relevant dts will enable the status as 'okay'
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- arch/arm/boot/dts/imx6dl-icore-mipi.dts   |  2 +-
- arch/arm/boot/dts/imx6dl-icore-rqs.dts    | 38 +---------------------
- arch/arm/boot/dts/imx6dl-icore.dts        | 38 +---------------------
- arch/arm/boot/dts/imx6q-icore-mipi.dts    |  2 +-
- arch/arm/boot/dts/imx6q-icore-ofcap10.dts | 38 +---------------------
- arch/arm/boot/dts/imx6q-icore-ofcap12.dts | 38 +---------------------
- arch/arm/boot/dts/imx6q-icore-rqs.dts     | 39 ++---------------------
- arch/arm/boot/dts/imx6q-icore.dts         | 38 +---------------------
- arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi  | 39 ++---------------------
- arch/arm/boot/dts/imx6qdl-icore.dtsi      | 38 +---------------------
- arch/arm/boot/dts/imx6ul-geam.dts         | 38 +---------------------
- arch/arm/boot/dts/imx6ul-isiot-emmc.dts   | 38 +---------------------
- arch/arm/boot/dts/imx6ul-isiot-nand.dts   | 38 +---------------------
- arch/arm/boot/dts/imx6ul-isiot.dtsi       | 38 +---------------------
- 14 files changed, 16 insertions(+), 446 deletions(-)
+ arch/arm/boot/dts/imx6ul-isiot-emmc.dts | 23 -----------
+ arch/arm/boot/dts/imx6ul-isiot-nand.dts | 25 ------------
+ arch/arm/boot/dts/imx6ul-isiot.dtsi     | 52 +++++++++++++++++++++++++
+ 3 files changed, 52 insertions(+), 48 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl-icore-mipi.dts b/arch/arm/boot/dts/imx6dl-icore-mipi.dts
-index bf53f0552aa1..e43bccb78ab2 100644
---- a/arch/arm/boot/dts/imx6dl-icore-mipi.dts
-+++ b/arch/arm/boot/dts/imx6dl-icore-mipi.dts
-@@ -1,4 +1,4 @@
--// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+// SPDX-License-Identifier: GPL-2.0 OR X11
- /*
-  * Copyright (C) 2018 Engicam S.r.l.
-  * Copyright (C) 2018 Amarula Solutions B.V.
-diff --git a/arch/arm/boot/dts/imx6dl-icore-rqs.dts b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-index 1281bc39b7ab..73d710d34b9d 100644
---- a/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-+++ b/arch/arm/boot/dts/imx6dl-icore-rqs.dts
-@@ -1,43 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0 OR X11
- /*
-  * Copyright (C) 2016 Amarula Solutions B.V.
-  * Copyright (C) 2016 Engicam S.r.l.
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License
-- *     version 2 as published by the Free Software Foundation.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/imx6dl-icore.dts b/arch/arm/boot/dts/imx6dl-icore.dts
-index 971f9fc39c66..80fa60607ab1 100644
---- a/arch/arm/boot/dts/imx6dl-icore.dts
-+++ b/arch/arm/boot/dts/imx6dl-icore.dts
-@@ -1,43 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0 OR X11
- /*
-  * Copyright (C) 2016 Amarula Solutions B.V.
-  * Copyright (C) 2016 Engicam S.r.l.
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License
-- *     version 2 as published by the Free Software Foundation.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/imx6q-icore-mipi.dts b/arch/arm/boot/dts/imx6q-icore-mipi.dts
-index 95b2efda17b4..84f4f7acc328 100644
---- a/arch/arm/boot/dts/imx6q-icore-mipi.dts
-+++ b/arch/arm/boot/dts/imx6q-icore-mipi.dts
-@@ -1,4 +1,4 @@
--// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+// SPDX-License-Identifier: GPL-2.0 OR X11
- /*
-  * Copyright (C) 2017 Engicam S.r.l.
-  * Copyright (C) 2017 Amarula Solutions B.V.
-diff --git a/arch/arm/boot/dts/imx6q-icore-ofcap10.dts b/arch/arm/boot/dts/imx6q-icore-ofcap10.dts
-index 49b60ca20e6d..81cc346dd149 100644
---- a/arch/arm/boot/dts/imx6q-icore-ofcap10.dts
-+++ b/arch/arm/boot/dts/imx6q-icore-ofcap10.dts
-@@ -1,43 +1,7 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
- /*
-  * Copyright (C) 2016 Amarula Solutions B.V.
-  * Copyright (C) 2016 Engicam S.r.l.
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License
-- *     version 2 as published by the Free Software Foundation.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/imx6q-icore-ofcap12.dts b/arch/arm/boot/dts/imx6q-icore-ofcap12.dts
-index 6e27c8143f82..241811c52b62 100644
---- a/arch/arm/boot/dts/imx6q-icore-ofcap12.dts
-+++ b/arch/arm/boot/dts/imx6q-icore-ofcap12.dts
-@@ -1,43 +1,7 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
- /*
-  * Copyright (C) 2016 Amarula Solutions B.V.
-  * Copyright (C) 2016 Engicam S.r.l.
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License
-- *     version 2 as published by the Free Software Foundation.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/imx6q-icore-rqs.dts b/arch/arm/boot/dts/imx6q-icore-rqs.dts
-index b81f48c6a8c6..cf6ba724f497 100644
---- a/arch/arm/boot/dts/imx6q-icore-rqs.dts
-+++ b/arch/arm/boot/dts/imx6q-icore-rqs.dts
-@@ -1,42 +1,7 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
- /*
-  * Copyright (C) 2015 Amarula Solutions B.V.
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License
-- *     version 2 as published by the Free Software Foundation.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-+ * Copyright (C) 2015 Engicam S.r.l.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/imx6q-icore.dts b/arch/arm/boot/dts/imx6q-icore.dts
-index 5613dd9dc469..fe28c3cf54c0 100644
---- a/arch/arm/boot/dts/imx6q-icore.dts
-+++ b/arch/arm/boot/dts/imx6q-icore.dts
-@@ -1,43 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0 OR X11
- /*
-  * Copyright (C) 2016 Amarula Solutions B.V.
-  * Copyright (C) 2016 Engicam S.r.l.
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License
-- *     version 2 as published by the Free Software Foundation.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-index acc3b11fba2a..6feae392830e 100644
---- a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-@@ -1,42 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0 OR X11
- /*
-  * Copyright (C) 2015 Amarula Solutions B.V.
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License
-- *     version 2 as published by the Free Software Foundation.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-+ * Copyright (C) 2015 Engicam S.r.l.
-  */
- 
- #include <dt-bindings/gpio/gpio.h>
-diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-index 9ce993776160..d39966e80415 100644
---- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-@@ -1,43 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0 OR X11
- /*
-  * Copyright (C) 2016 Amarula Solutions B.V.
-  * Copyright (C) 2016 Engicam S.r.l.
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License
-- *     version 2 as published by the Free Software Foundation.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- #include <dt-bindings/gpio/gpio.h>
-diff --git a/arch/arm/boot/dts/imx6ul-geam.dts b/arch/arm/boot/dts/imx6ul-geam.dts
-index d81d20f8fc8d..bf86a5e33fc5 100644
---- a/arch/arm/boot/dts/imx6ul-geam.dts
-+++ b/arch/arm/boot/dts/imx6ul-geam.dts
-@@ -1,43 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0 OR X11
- /*
-  * Copyright (C) 2016 Amarula Solutions B.V.
-  * Copyright (C) 2016 Engicam S.r.l.
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License
-- *     version 2 as published by the Free Software Foundation.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
- /dts-v1/;
 diff --git a/arch/arm/boot/dts/imx6ul-isiot-emmc.dts b/arch/arm/boot/dts/imx6ul-isiot-emmc.dts
-index f5b422898e61..464bd21930fd 100644
+index 464bd21930fd..1df3e376ae2c 100644
 --- a/arch/arm/boot/dts/imx6ul-isiot-emmc.dts
 +++ b/arch/arm/boot/dts/imx6ul-isiot-emmc.dts
-@@ -1,43 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0 OR X11
- /*
-  * Copyright (C) 2016 Amarula Solutions B.V.
-  * Copyright (C) 2016 Engicam S.r.l.
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License
-- *     version 2 as published by the Free Software Foundation.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-  */
+@@ -14,28 +14,5 @@
+ };
  
- /dts-v1/;
+ &usdhc2 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usdhc2>;
+-	cd-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>;
+-	bus-width = <8>;
+-	no-1-8-v;
+ 	status = "okay";
+ };
+-
+-&iomuxc {
+-	pinctrl_usdhc2: usdhc2grp {
+-		fsl,pins = <
+-			MX6UL_PAD_NAND_RE_B__USDHC2_CLK      0x17070
+-			MX6UL_PAD_NAND_WE_B__USDHC2_CMD      0x10070
+-			MX6UL_PAD_NAND_DATA00__USDHC2_DATA0  0x17070
+-			MX6UL_PAD_NAND_DATA01__USDHC2_DATA1  0x17070
+-			MX6UL_PAD_NAND_DATA02__USDHC2_DATA2  0x17070
+-			MX6UL_PAD_NAND_DATA03__USDHC2_DATA3  0x17070
+-			MX6UL_PAD_NAND_DATA04__USDHC2_DATA4  0x17070
+-			MX6UL_PAD_NAND_DATA05__USDHC2_DATA5  0x17070
+-			MX6UL_PAD_NAND_DATA06__USDHC2_DATA6  0x17070
+-			MX6UL_PAD_NAND_DATA07__USDHC2_DATA7  0x17070
+-			MX6UL_PAD_NAND_ALE__USDHC2_RESET_B   0x17070
+-		>;
+-	};
+-};
 diff --git a/arch/arm/boot/dts/imx6ul-isiot-nand.dts b/arch/arm/boot/dts/imx6ul-isiot-nand.dts
-index de15e1c75dd1..84420ed47106 100644
+index 84420ed47106..8c26d4d1a7bf 100644
 --- a/arch/arm/boot/dts/imx6ul-isiot-nand.dts
 +++ b/arch/arm/boot/dts/imx6ul-isiot-nand.dts
-@@ -1,43 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0 OR X11
- /*
-  * Copyright (C) 2016 Amarula Solutions B.V.
-  * Copyright (C) 2016 Engicam S.r.l.
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License
-- *     version 2 as published by the Free Software Foundation.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-  */
+@@ -14,30 +14,5 @@
+ };
  
- /dts-v1/;
+ &gpmi {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_gpmi_nand>;
+-	nand-on-flash-bbt;
+ 	status = "okay";
+ };
+-
+-&iomuxc {
+-	pinctrl_gpmi_nand: gpmi-nand {
+-		fsl,pins = <
+-			MX6UL_PAD_NAND_CLE__RAWNAND_CLE         0xb0b1
+-			MX6UL_PAD_NAND_ALE__RAWNAND_ALE         0xb0b1
+-			MX6UL_PAD_NAND_WP_B__RAWNAND_WP_B       0xb0b1
+-			MX6UL_PAD_NAND_READY_B__RAWNAND_READY_B 0xb000
+-			MX6UL_PAD_NAND_CE0_B__RAWNAND_CE0_B     0xb0b1
+-			MX6UL_PAD_NAND_RE_B__RAWNAND_RE_B       0xb0b1
+-			MX6UL_PAD_NAND_WE_B__RAWNAND_WE_B       0xb0b1
+-			MX6UL_PAD_NAND_DATA00__RAWNAND_DATA00   0xb0b1
+-			MX6UL_PAD_NAND_DATA01__RAWNAND_DATA01   0xb0b1
+-			MX6UL_PAD_NAND_DATA02__RAWNAND_DATA02   0xb0b1
+-			MX6UL_PAD_NAND_DATA03__RAWNAND_DATA03   0xb0b1
+-			MX6UL_PAD_NAND_DATA04__RAWNAND_DATA04   0xb0b1
+-			MX6UL_PAD_NAND_DATA05__RAWNAND_DATA05   0xb0b1
+-			MX6UL_PAD_NAND_DATA06__RAWNAND_DATA06   0xb0b1
+-			MX6UL_PAD_NAND_DATA07__RAWNAND_DATA07   0xb0b1
+-		>;
+-	};
+-};
 diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-index cd9928551154..ba66225fe86e 100644
+index ba66225fe86e..fe435484e69d 100644
 --- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
 +++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-@@ -1,43 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0 OR X11
- /*
-  * Copyright (C) 2016 Amarula Solutions B.V.
-  * Copyright (C) 2016 Engicam S.r.l.
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License
-- *     version 2 as published by the Free Software Foundation.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-  */
+@@ -97,6 +97,13 @@
+ 	};
+ };
  
- #include <dt-bindings/gpio/gpio.h>
++&gpmi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_gpmi_nand>;
++	nand-on-flash-bbt;
++	status = "disabled";
++};
++
+ &i2c1 {
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
+@@ -207,6 +214,15 @@
+ 	status = "okay";
+ };
+ 
++&usdhc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	cd-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>;
++	bus-width = <8>;
++	no-1-8-v;
++	status = "disabled";
++};
++
+ &iomuxc {
+ 	pinctrl_enet1: enet1grp {
+ 		fsl,pins = <
+@@ -223,6 +239,26 @@
+ 		>;
+ 	};
+ 
++	pinctrl_gpmi_nand: gpmi-nand {
++		fsl,pins = <
++			MX6UL_PAD_NAND_CLE__RAWNAND_CLE         0xb0b1
++			MX6UL_PAD_NAND_ALE__RAWNAND_ALE         0xb0b1
++			MX6UL_PAD_NAND_WP_B__RAWNAND_WP_B       0xb0b1
++			MX6UL_PAD_NAND_READY_B__RAWNAND_READY_B 0xb000
++			MX6UL_PAD_NAND_CE0_B__RAWNAND_CE0_B     0xb0b1
++			MX6UL_PAD_NAND_RE_B__RAWNAND_RE_B       0xb0b1
++			MX6UL_PAD_NAND_WE_B__RAWNAND_WE_B       0xb0b1
++			MX6UL_PAD_NAND_DATA00__RAWNAND_DATA00   0xb0b1
++			MX6UL_PAD_NAND_DATA01__RAWNAND_DATA01   0xb0b1
++			MX6UL_PAD_NAND_DATA02__RAWNAND_DATA02   0xb0b1
++			MX6UL_PAD_NAND_DATA03__RAWNAND_DATA03   0xb0b1
++			MX6UL_PAD_NAND_DATA04__RAWNAND_DATA04   0xb0b1
++			MX6UL_PAD_NAND_DATA05__RAWNAND_DATA05   0xb0b1
++			MX6UL_PAD_NAND_DATA06__RAWNAND_DATA06   0xb0b1
++			MX6UL_PAD_NAND_DATA07__RAWNAND_DATA07   0xb0b1
++		>;
++	};
++
+ 	pinctrl_i2c1: i2c1grp {
+ 		fsl,pins = <
+ 			MX6UL_PAD_UART4_TX_DATA__I2C1_SCL 0x4001b8b0
+@@ -330,4 +366,20 @@
+ 			MX6UL_PAD_SD1_DATA3__USDHC1_DATA3 0x170f9
+ 		>;
+ 	};
++
++	pinctrl_usdhc2: usdhc2grp {
++		fsl,pins = <
++			MX6UL_PAD_NAND_RE_B__USDHC2_CLK      0x17070
++			MX6UL_PAD_NAND_WE_B__USDHC2_CMD      0x10070
++			MX6UL_PAD_NAND_DATA00__USDHC2_DATA0  0x17070
++			MX6UL_PAD_NAND_DATA01__USDHC2_DATA1  0x17070
++			MX6UL_PAD_NAND_DATA02__USDHC2_DATA2  0x17070
++			MX6UL_PAD_NAND_DATA03__USDHC2_DATA3  0x17070
++			MX6UL_PAD_NAND_DATA04__USDHC2_DATA4  0x17070
++			MX6UL_PAD_NAND_DATA05__USDHC2_DATA5  0x17070
++			MX6UL_PAD_NAND_DATA06__USDHC2_DATA6  0x17070
++			MX6UL_PAD_NAND_DATA07__USDHC2_DATA7  0x17070
++			MX6UL_PAD_NAND_ALE__USDHC2_RESET_B   0x17070
++		>;
++	};
+ };
 -- 
 2.18.0.321.gffc6fa0e3
