@@ -1,50 +1,41 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Mon, 6 Aug 2018 22:38:23 -0400
-Subject: [PATCH] crypto: remove speck
-In-Reply-To: <20180807011937.GA133621@gmail.com>
-References: <20180806223300.113891-1-ebiggers@kernel.org>
- <20180806230437.21431-1-Jason@zx2c4.com>
- <20180807011937.GA133621@gmail.com>
-Message-ID: <CAHmME9oTApV-zHD60QPryaoQf45ODpG25Da5FgB8c+LO162gWQ@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue,  7 Aug 2018 11:49:39 +0900
+Subject: [PATCH] pinctrl: uniphier: drop meaningless pin from SD1 pin-mux of
+ Pro4
+Message-ID: <1533610179-13885-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/6/18, Eric Biggers <ebiggers@kernel.org> wrote:
->
-> For context, in your commit message can you include a link to my email
-> mentioning Android's Speck decision
-> (https://marc.info/?l=linux-crypto-vger&m=153359499015659)?
+The pin 327 was supposed to be used as a voltage control line for the
+SD card regulator, but the SD card port1 does not support UHS-I.  It
+only supports 3.3V signaling, hence this pin is pointless.
 
-Sure.
+Just a note about the background.  At first, hardware engineers tried
+to implement the UHS for this port.  Then, they needed to shrink the
+silicon die size, and gave up the UHS, but forgot to remove the pin
+assignment.
 
->
-> Also: "speck" => "Speck".
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Ack.
+ drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
->
-> Also I think the fscrypt code points should be reserved so they don't
-> get reused for something else:
->
-> #define FS_ENCRYPTION_MODE_SPECK128_256_XTS    7	/* removed */
-> #define FS_ENCRYPTION_MODE_SPECK128_256_CTS    8	/* removed */
-
-I thought about this too, but it occurred to me it's highly improbable
-these were ever used, and I thought it shinier not to leave scars. But
-if you feel strongly about it, no problem, I'll fix that up and send
-in a v2 shortly.
-
->
-> For the record, I think the statements Paul and I have made evaluating
-> Speck from a technical perspective remain substantially accurate.
-
-It wasn't my intention to relitigate this, hence the rather short
-commit message. You said your thing, Tomer said his, and now I'm just
-trying to clear out the leftover soda cans.
-
-> We've also designed and proposed
-> an alternative solution for the ARMv7 disk encryption use case, HPolyC.
-
-This sounds like a nice and interesting outcome of the whole thing.
-I'll certainly be looking forward to reading analyses of HPolyC as
-they come out.
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
+index 24788a7..b2c1ffe 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
+@@ -1047,9 +1047,8 @@ static const unsigned nand_cs1_pins[] = {131, 132};
+ static const int nand_cs1_muxvals[] = {1, 1};
+ static const unsigned sd_pins[] = {150, 151, 152, 153, 154, 155, 156, 157, 158};
+ static const int sd_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+-static const unsigned sd1_pins[] = {319, 320, 321, 322, 323, 324, 325, 326,
+-				    327};
+-static const int sd1_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
++static const unsigned int sd1_pins[] = {319, 320, 321, 322, 323, 324, 325, 326};
++static const int sd1_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0};
+ static const unsigned system_bus_pins[] = {25, 26, 27, 28, 29, 30, 31, 32, 33,
+ 					   34, 35, 36, 37, 38};
+ static const int system_bus_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-- 
+2.7.4
