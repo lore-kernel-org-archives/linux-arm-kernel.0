@@ -1,108 +1,98 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  7 Aug 2018 10:33:26 +0100
-Subject: [PATCH] arm64: Trap WFI executed in userspace
-Message-ID: <20180807093326.5090-1-marc.zyngier@arm.com>
+From: stu.hsieh@mediatek.com (Stu Hsieh)
+Date: Tue, 7 Aug 2018 17:49:02 +0800
+Subject: [PATCH v3 07/13] drm/mediatek: add YUYV/UYVY color format
+ support for RDMA
+In-Reply-To: <1533612817.22668.5.camel@mtksdaap41>
+References: <1533556700-26525-1-git-send-email-stu.hsieh@mediatek.com>
+ <1533556700-26525-8-git-send-email-stu.hsieh@mediatek.com>
+ <1533612817.22668.5.camel@mtksdaap41>
+Message-ID: <1533635342.11190.73.camel@mtksdccf07>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It recently came to light that userspace can execute WFI, and that
-the arm64 kernel doesn trap this event. This sounds rather benign,
-but the kernel should decide when it wants to wait for an interrupt,
-and not userspace.
+Hi, CK:
 
-Let's trap WFI and treat it as a way to yield the CPU to another
-process.
+On Tue, 2018-08-07 at 11:33 +0800, CK Hu wrote:
+> Hi, Stu:
+> 
+> On Mon, 2018-08-06 at 19:58 +0800, Stu Hsieh wrote:
+> > This patch add YUYV/UYVY color format support for RDMA
+> > and transform matrix for YUYV/UYVY.
+> > 
+> > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> > ---
+> >  drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 15 +++++++++++++++
+> >  1 file changed, 15 insertions(+)
+> > 
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> > index ba72d392dc27..91a8b6e27d39 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> > @@ -33,6 +33,8 @@
+> >  #define RDMA_ENGINE_EN					BIT(0)
+> >  #define RDMA_MODE_MEMORY				BIT(1)
+> >  #define DISP_REG_RDMA_SIZE_CON_0		0x0014
+> > +#define RDMA_MATRIX_ENABLE				BIT(17)
+> > +#define RDMA_MATRIX_INT_MTX_SEL				(7UL << 20)
+> >  #define DISP_REG_RDMA_SIZE_CON_1		0x0018
+> >  #define DISP_REG_RDMA_TARGET_LINE		0x001c
+> >  #define DISP_RDMA_MEM_CON			0x0024
+> > @@ -46,12 +48,15 @@
+> >  #define RDMA_FIFO_SIZE(rdma)			((rdma)->data->fifo_size)
+> >  #define DISP_RDMA_MEM_START_ADDR		0x0f00
+> >  
+> > +#define MATRIX_INT_MTX_SEL_DEFAULT		0xb00000
+> >  #define RDMA_MEM_GMC				0x40402020
+> >  
+> >  #define MEM_MODE_INPUT_FORMAT_RGB565		0x0
+> >  #define MEM_MODE_INPUT_FORMAT_RGB888		(0x001 << 4)
+> >  #define MEM_MODE_INPUT_FORMAT_RGBA8888		(0x002 << 4)
+> >  #define MEM_MODE_INPUT_FORMAT_ARGB8888		(0x003 << 4)
+> > +#define MEM_MODE_INPUT_FORMAT_UYVY		(0x004 << 4)
+> > +#define MEM_MODE_INPUT_FORMAT_YUYV		(0x005 << 4)
+> >  
+> >  struct mtk_disp_rdma_data {
+> >  	unsigned int fifo_size;
+> > @@ -176,6 +181,10 @@ static unsigned int rdma_fmt_convert(struct mtk_disp_rdma *rdma,
+> >  	case DRM_FORMAT_XBGR8888:
+> >  	case DRM_FORMAT_ABGR8888:
+> >  		return MEM_MODE_INPUT_FORMAT_RGBA8888 | MEM_MODE_INPUT_SWAP;
+> > +	case DRM_FORMAT_UYVY:
+> > +		return MEM_MODE_INPUT_FORMAT_UYVY;
+> > +	case DRM_FORMAT_YUYV:
+> > +		return MEM_MODE_INPUT_FORMAT_YUYV;
+> >  	}
+> >  }
+> >  
+> > @@ -191,6 +200,12 @@ static void mtk_rdma_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
+> >  
+> >  	con = rdma_fmt_convert(rdma, fmt);
+> >  	writel_relaxed(con, comp->regs + DISP_RDMA_MEM_CON);
+> > +	if (fmt == DRM_FORMAT_UYVY || fmt == DRM_FORMAT_YUYV)
+> > +		rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0, 0xff0000,
+> 
+> Symbolize 0xff0000. Maybe you should define as
+> 
+> #define RDMA_MATRIX_INT_MTX_SEL GENMASK(23, 20)
+> #define RDMA_MATRIX_INT_MTX_YUV_TO_RGB   0x7
+> #define RDMA_MATRIX_INT_MTX_RGB_TO_RGB   0xb
+> 
+> Correct the naming to align data sheet.
+> 
+> Regards,
+> CK
+> 
+OK
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/esr.h    |  4 ++++
- arch/arm64/include/asm/sysreg.h |  4 ++--
- arch/arm64/kernel/entry.S       |  1 +
- arch/arm64/kernel/traps.c       | 12 ++++++++++++
- 4 files changed, 19 insertions(+), 2 deletions(-)
+Regards,
+Stu
 
-diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-index ce70c3ffb993..9a2b6cee4e2b 100644
---- a/arch/arm64/include/asm/esr.h
-+++ b/arch/arm64/include/asm/esr.h
-@@ -137,6 +137,7 @@
- #define ESR_ELx_CV		(UL(1) << 24)
- #define ESR_ELx_COND_SHIFT	(20)
- #define ESR_ELx_COND_MASK	(UL(0xF) << ESR_ELx_COND_SHIFT)
-+#define ESR_ELx_WFx_ISS_WFI	(UL(0) << 0)
- #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
- #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
- 
-@@ -148,6 +149,9 @@
- #define DISR_EL1_ESR_MASK	(ESR_ELx_AET | ESR_ELx_EA | ESR_ELx_FSC)
- 
- /* ESR value templates for specific events */
-+#define ESR_ELx_WFx_MASK	(ESR_ELx_EC_MASK | 1)
-+#define ESR_ELx_WFx_WFI_VAL	((ESR_ELx_EC_WFx << ESR_ELx_EC_SHIFT) |	\
-+				 ESR_ELx_WFx_ISS_WFI)
- 
- /* BRK instruction trap from AArch64 state */
- #define ESR_ELx_VAL_BRK64(imm)					\
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 98af0b37fb31..56bcf0408dbb 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -485,12 +485,12 @@
- 
- #define SCTLR_EL1_SET	(SCTLR_ELx_M    | SCTLR_ELx_C    | SCTLR_ELx_SA   |\
- 			 SCTLR_EL1_SA0  | SCTLR_EL1_SED  | SCTLR_ELx_I    |\
--			 SCTLR_EL1_DZE  | SCTLR_EL1_UCT  | SCTLR_EL1_NTWI |\
-+			 SCTLR_EL1_DZE  | SCTLR_EL1_UCT  |		   \
- 			 SCTLR_EL1_NTWE | SCTLR_ELx_IESB | SCTLR_EL1_SPAN |\
- 			 ENDIAN_SET_EL1 | SCTLR_EL1_UCI  | SCTLR_EL1_RES1)
- #define SCTLR_EL1_CLEAR	(SCTLR_ELx_A   | SCTLR_EL1_CP15BEN | SCTLR_EL1_ITD    |\
- 			 SCTLR_EL1_UMA | SCTLR_ELx_WXN     | ENDIAN_CLEAR_EL1 |\
--			 SCTLR_EL1_RES0)
-+			 SCTLR_EL1_NTWI | SCTLR_EL1_RES0)
- 
- /* Check all the bits are accounted for */
- #define SCTLR_EL1_BUILD_BUG_ON_MISSING_BITS	BUILD_BUG_ON((SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != ~0)
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 28ad8799406f..4c01c0ba81aa 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -675,6 +675,7 @@ el0_sync:
- 	cmp	x24, #ESR_ELx_EC_FP_EXC64	// FP/ASIMD exception
- 	b.eq	el0_fpsimd_exc
- 	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
-+	ccmp	x24, #ESR_ELx_EC_WFx, #4, ne
- 	b.eq	el0_sys
- 	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
- 	b.eq	el0_sp_pc
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index d399d459397b..2e4b389a6c8f 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -496,6 +496,12 @@ static void cntfrq_read_handler(unsigned int esr, struct pt_regs *regs)
- 	arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
- }
- 
-+static void wfi_handler(unsigned int esr, struct pt_regs *regs)
-+{
-+	arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
-+	schedule();
-+}
-+
- struct sys64_hook {
- 	unsigned int esr_mask;
- 	unsigned int esr_val;
-@@ -526,6 +532,12 @@ static struct sys64_hook sys64_hooks[] = {
- 		.esr_val = ESR_ELx_SYS64_ISS_SYS_CNTFRQ,
- 		.handler = cntfrq_read_handler,
- 	},
-+	{
-+		/* Trap WFI instructions executed in userspace */
-+		.esr_mask = ESR_ELx_WFx_MASK,
-+		.esr_val = ESR_ELx_WFx_WFI_VAL,
-+		.handler = wfi_handler,
-+	},
- 	{},
- };
- 
--- 
-2.18.0
+> > +				 RDMA_MATRIX_ENABLE | RDMA_MATRIX_INT_MTX_SEL);
+> > +	else
+> > +		rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0, 0xff0000,
+> > +				 MATRIX_INT_MTX_SEL_DEFAULT);
+> >  
+> >  	writel_relaxed(addr, comp->regs + DISP_RDMA_MEM_START_ADDR);
+> >  	writel_relaxed(pitch, comp->regs + DISP_RDMA_MEM_SRC_PITCH);
+> 
+> 
