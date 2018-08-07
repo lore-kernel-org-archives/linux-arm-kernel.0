@@ -1,134 +1,167 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Tue, 7 Aug 2018 20:57:52 +0200
-Subject: [RFC PATCH v2 07/12] mtd: rawnand: ams-delta: Set port
- direction once per transfer
-In-Reply-To: <20180806222918.12644-8-jmkrzyszt@gmail.com>
-References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
- <20180806222918.12644-1-jmkrzyszt@gmail.com>
- <20180806222918.12644-8-jmkrzyszt@gmail.com>
-Message-ID: <20180807205752.32cd3e53@bbrezillon>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Tue, 7 Aug 2018 21:20:10 +0200
+Subject: [RFC PATCH 08/16] KVM: arm64: Support dynamically hideable
+ system registers
+In-Reply-To: <1529593060-542-9-git-send-email-Dave.Martin@arm.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-9-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180807192010.GG5985@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  7 Aug 2018 00:29:13 +0200
-Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
-
-> In its current shape, the driver sets data port direction before each
-> byte read/write operation, even during multi-byte transfers.  Since
-> performance of the driver is completely not acceptable on Amstrad Delta
-> after it has been converted to GPIO bitbang, try to improve things a
-> bit by setting the port direction only on first byte of each transfer.
+On Thu, Jun 21, 2018 at 03:57:32PM +0100, Dave Martin wrote:
+> Some system registers may or may not logically exist for a vcpu
+> depending on whether certain architectural features are enabled for
+> the vcpu.
 > 
-> Resulting performance on Amstrad Delta is still far from acceptable.
+> In order to avoid spuriously emulating access to these registers
+> when they should not exist, or allowing the registers to be
+> spuriously enumerated or saved/restored through the ioctl
+> interface, a means is needed to allow registers to be hidden
+> depending on the vcpu configuration.
 > 
-> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+> In order to support this in a flexible way, this patch adds a
+> check_present() method to struct sys_reg_desc, and updates the
+> generic system register access and enumeration code to be aware of
+> it:  if check_present() returns false, the code behaves as if the
+> register did not exist.
+> 
+> For convenience, the complete check is wrapped up in a new helper
+> sys_reg_present().
+> 
+> An attempt has been made to hook the new check into the generic
+> accessors for trapped system registers.  This should reduce the
+> potential for future surprises, although the redundant check will
+> add a small cost.  No system register depends on this functionality
+> yet, and some paths needing the check may also need attention.
+> 
+> Naturally, this facility makes sense only for registers that are
+> trapped.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > ---
->  drivers/mtd/nand/raw/ams-delta.c | 58 ++++++++++++++++++++++++++++++++--------
->  1 file changed, 47 insertions(+), 11 deletions(-)
+>  arch/arm64/kvm/sys_regs.c | 20 +++++++++++++++-----
+>  arch/arm64/kvm/sys_regs.h | 11 +++++++++++
+>  2 files changed, 26 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/mtd/nand/raw/ams-delta.c b/drivers/mtd/nand/raw/ams-delta.c
-> index 78996ddf82e0..d02c48c013e8 100644
-> --- a/drivers/mtd/nand/raw/ams-delta.c
-> +++ b/drivers/mtd/nand/raw/ams-delta.c
-> @@ -69,6 +69,30 @@ static const struct mtd_partition partition_info[] = {
->  	  .size		=  3 * SZ_256K },
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index a436373..31a351a 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -1840,7 +1840,7 @@ static int emulate_cp(struct kvm_vcpu *vcpu,
+>  
+>  	r = find_reg(params, table, num);
+>  
+> -	if (r) {
+> +	if (likely(r) && sys_reg_present(vcpu, r)) {
+>  		perform_access(vcpu, params, r);
+>  		return 0;
+>  	}
+> @@ -2016,7 +2016,7 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
+>  	if (!r)
+>  		r = find_reg(params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
+>  
+> -	if (likely(r)) {
+> +	if (likely(r) && sys_reg_present(vcpu, r)) {
+>  		perform_access(vcpu, params, r);
+>  	} else {
+>  		kvm_err("Unsupported guest sys_reg access at: %lx\n",
+
+This looks a bit fishy, because it seems that now a guest can be
+configured in such a way that it can access non-present emulated system
+registers and get the host to tell the operator that the KVM instance
+running on the system doesn't really support the hardware...
+
+Thanks,
+-Christoffer
+
+> @@ -2313,6 +2313,9 @@ int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
+>  	if (!r)
+>  		return get_invariant_sys_reg(reg->id, uaddr);
+>  
+> +	if (!sys_reg_present(vcpu, r))
+> +		return -ENOENT;
+> +
+>  	if (r->get_user)
+>  		return (r->get_user)(vcpu, r, reg, uaddr);
+>  
+> @@ -2334,6 +2337,9 @@ int kvm_arm_sys_reg_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
+>  	if (!r)
+>  		return set_invariant_sys_reg(reg->id, uaddr);
+>  
+> +	if (!sys_reg_present(vcpu, r))
+> +		return -ENOENT;
+> +
+>  	if (r->set_user)
+>  		return (r->set_user)(vcpu, r, reg, uaddr);
+>  
+> @@ -2390,7 +2396,8 @@ static bool copy_reg_to_user(const struct sys_reg_desc *reg, u64 __user **uind)
+>  	return true;
+>  }
+>  
+> -static int walk_one_sys_reg(const struct sys_reg_desc *rd,
+> +static int walk_one_sys_reg(struct kvm_vcpu *vcpu,
+> +			    const struct sys_reg_desc *rd,
+>  			    u64 __user **uind,
+>  			    unsigned int *total)
+>  {
+> @@ -2401,6 +2408,9 @@ static int walk_one_sys_reg(const struct sys_reg_desc *rd,
+>  	if (!(rd->reg || rd->get_user))
+>  		return 0;
+>  
+> +	if (!sys_reg_present(vcpu, rd))
+> +		return 0;
+> +
+>  	if (!copy_reg_to_user(rd, uind))
+>  		return -EFAULT;
+>  
+> @@ -2429,9 +2439,9 @@ static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
+>  		int cmp = cmp_sys_reg(i1, i2);
+>  		/* target-specific overrides generic entry. */
+>  		if (cmp <= 0)
+> -			err = walk_one_sys_reg(i1, &uind, &total);
+> +			err = walk_one_sys_reg(vcpu, i1, &uind, &total);
+>  		else
+> -			err = walk_one_sys_reg(i2, &uind, &total);
+> +			err = walk_one_sys_reg(vcpu, i2, &uind, &total);
+>  
+>  		if (err)
+>  			return err;
+> diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+> index cd710f8..dfbb342 100644
+> --- a/arch/arm64/kvm/sys_regs.h
+> +++ b/arch/arm64/kvm/sys_regs.h
+> @@ -22,6 +22,9 @@
+>  #ifndef __ARM64_KVM_SYS_REGS_LOCAL_H__
+>  #define __ARM64_KVM_SYS_REGS_LOCAL_H__
+>  
+> +#include <linux/compiler.h>
+> +#include <linux/types.h>
+> +
+>  struct sys_reg_params {
+>  	u8	Op0;
+>  	u8	Op1;
+> @@ -61,8 +64,16 @@ struct sys_reg_desc {
+>  			const struct kvm_one_reg *reg, void __user *uaddr);
+>  	int (*set_user)(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+>  			const struct kvm_one_reg *reg, void __user *uaddr);
+> +	bool (*check_present)(const struct kvm_vcpu *vpcu,
+> +			      const struct sys_reg_desc *rd);
 >  };
 >  
-> +static void ams_delta_write_commit(struct ams_delta_nand *priv)
+> +static inline bool sys_reg_present(const struct kvm_vcpu *vcpu,
+> +				   const struct sys_reg_desc *rd)
 > +{
-> +	gpiod_set_value(priv->gpiod_nwe, 0);
-> +	ndelay(40);
-> +	gpiod_set_value(priv->gpiod_nwe, 1);
+> +	return likely(!rd->check_present) || rd->check_present(vcpu, rd);
 > +}
 > +
-> +static void ams_delta_write_next_byte(struct mtd_info *mtd, u_char byte)
-> +{
-> +	struct nand_chip *this = mtd_to_nand(mtd);
-> +	struct ams_delta_nand *priv = nand_get_controller_data(this);
-> +	struct gpio_descs *data_gpiods = priv->data_gpiods;
-> +	unsigned long bits = byte;
-> +	int i, value_array[data_gpiods->ndescs];
-> +
-> +	for (i = 0; i < data_gpiods->ndescs; i++)
-> +		value_array[i] = test_bit(i, &bits);
-> +
-> +	gpiod_set_raw_array_value(data_gpiods->ndescs, data_gpiods->desc,
-> +				  value_array);
-> +
-> +	ams_delta_write_commit(priv);
-> +}
-> +
->  static void ams_delta_write_byte(struct mtd_info *mtd, u_char byte)
+>  static inline void print_sys_reg_instr(const struct sys_reg_params *p)
 >  {
->  	struct nand_chip *this = mtd_to_nand(mtd);
-> @@ -81,12 +105,10 @@ static void ams_delta_write_byte(struct mtd_info *mtd, u_char byte)
->  		gpiod_direction_output_raw(data_gpiods->desc[i],
->  					   test_bit(i, &bits));
->  
-> -	gpiod_set_value(priv->gpiod_nwe, 0);
-> -	ndelay(40);
-> -	gpiod_set_value(priv->gpiod_nwe, 1);
-> +	ams_delta_write_commit(priv);
->  }
->  
-> -static u_char ams_delta_read_byte(struct mtd_info *mtd)
-> +static u_char ams_delta_read_next_byte(struct mtd_info *mtd)
->  {
->  	struct nand_chip *this = mtd_to_nand(mtd);
->  	struct ams_delta_nand *priv = nand_get_controller_data(this);
-> @@ -94,9 +116,6 @@ static u_char ams_delta_read_byte(struct mtd_info *mtd)
->  	unsigned long bits = 0;
->  	int i, value_array[data_gpiods->ndescs];
->  
-> -	for (i = 0; i < data_gpiods->ndescs; i++)
-> -		gpiod_direction_input(data_gpiods->desc[i]);
-> -
->  	gpiod_set_value(priv->gpiod_nre, 0);
->  	ndelay(40);
->  
-> @@ -112,21 +131,38 @@ static u_char ams_delta_read_byte(struct mtd_info *mtd)
->  	return bits;
->  }
->  
-> +static u_char ams_delta_read_byte(struct mtd_info *mtd)
-> +{
-> +	struct nand_chip *this = mtd_to_nand(mtd);
-> +	struct ams_delta_nand *priv = nand_get_controller_data(this);
-> +	struct gpio_descs *data_gpiods = priv->data_gpiods;
-> +	int i;
-> +
-> +	for (i = 0; i < data_gpiods->ndescs; i++)
-> +		gpiod_direction_input(data_gpiods->desc[i]);
-> +
-> +	return ams_delta_read_next_byte(mtd);
-> +}
-> +
->  static void ams_delta_write_buf(struct mtd_info *mtd, const u_char *buf,
->  				int len)
->  {
->  	int i;
->  
-> -	for (i=0; i<len; i++)
-> -		ams_delta_write_byte(mtd, buf[i]);
-> +	if (len > 0)
-> +		ams_delta_write_byte(mtd, buf[0]);
-> +	for (i = 1; i < len; i++)
-> +		ams_delta_write_next_byte(mtd, buf[i]);
->  }
->  
->  static void ams_delta_read_buf(struct mtd_info *mtd, u_char *buf, int len)
->  {
->  	int i;
->  
-> -	for (i=0; i<len; i++)
-> -		buf[i] = ams_delta_read_byte(mtd);
-> +	if (len > 0)
-> +		buf[0] = ams_delta_read_byte(mtd);
-> +	for (i = 1; i < len; i++)
-> +		buf[i] = ams_delta_read_next_byte(mtd);
->  }
-
-I'd suggest a slightly different approach where the data pins
-direction state is stored in the the priv struct and only changed when
-required. This way you just have to add a test in
-ams_delta_read/write_byte().
+>  	/* Look, we even formatted it for you to paste into the table! */
+> -- 
+> 2.1.4
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
