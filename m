@@ -1,41 +1,78 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue,  7 Aug 2018 11:49:39 +0900
-Subject: [PATCH] pinctrl: uniphier: drop meaningless pin from SD1 pin-mux of
- Pro4
-Message-ID: <1533610179-13885-1-git-send-email-yamada.masahiro@socionext.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 7 Aug 2018 10:52:20 +0800
+Subject: [PATCH] arm64: dts: allwinner: a64: add csi regulator to sopine
+ dts
+In-Reply-To: <1533109399-21174-1-git-send-email-Akash_Gajjar@mentor.com>
+References: <Akash_Gajjar@mentor.com>
+ <1533109399-21174-1-git-send-email-Akash_Gajjar@mentor.com>
+Message-ID: <CAGb2v66GoZJ4nXs7S0F3JXJ3Jm0ZBRXy0r2e4STqVPV5S0UVUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pin 327 was supposed to be used as a voltage control line for the
-SD card regulator, but the SD card port1 does not support UHS-I.  It
-only supports 3.3V signaling, hence this pin is pointless.
+On Wed, Aug 1, 2018 at 3:43 PM, Akash Gajjar <Akash_Gajjar@mentor.com> wrote:
+> sopine board has a csi. enable supply dvdd-1v8-csi, dovdd-2v8-csi and
+> avdd-2v8-csi on board to access external camera connected to it.
 
-Just a note about the background.  At first, hardware engineers tried
-to implement the UHS for this port.  Then, they needed to shrink the
-silicon die size, and gave up the UHS, but forgot to remove the pin
-assignment.
+Unless there are other uses beyond supplying the camera module, this is not
+going to be accepted. Enabling power to the camera should be in the same
+patch as enabling the camera itself. And since it is a module, it should
+be an overlay file.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
 
- drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ChenYu
 
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-index 24788a7..b2c1ffe 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-@@ -1047,9 +1047,8 @@ static const unsigned nand_cs1_pins[] = {131, 132};
- static const int nand_cs1_muxvals[] = {1, 1};
- static const unsigned sd_pins[] = {150, 151, 152, 153, 154, 155, 156, 157, 158};
- static const int sd_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
--static const unsigned sd1_pins[] = {319, 320, 321, 322, 323, 324, 325, 326,
--				    327};
--static const int sd1_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-+static const unsigned int sd1_pins[] = {319, 320, 321, 322, 323, 324, 325, 326};
-+static const int sd1_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0};
- static const unsigned system_bus_pins[] = {25, 26, 27, 28, 29, 30, 31, 32, 33,
- 					   34, 35, 36, 37, 38};
- static const int system_bus_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--- 
-2.7.4
+
+> Signed-off-by: Akash Gajjar <Akash_Gajjar@mentor.com>
+> ---
+>  .../arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
+> index 43418bd..256229b 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
+> @@ -68,6 +68,13 @@
+>
+>  #include "axp803.dtsi"
+>
+> +&reg_aldo1 {
+> +       regulator-always-on;
+> +       regulator-min-microvolt = <2800000>;
+> +       regulator-max-microvolt = <2800000>;
+> +       regulator-name = "dovdd-csi";
+> +};
+> +
+>  &reg_aldo2 {
+>         regulator-always-on;
+>         regulator-min-microvolt = <1800000>;
+> @@ -112,6 +119,13 @@
+>         regulator-name = "vdd-sys";
+>  };
+>
+> +&reg_dldo3 {
+> +       regulator-always-on;
+> +       regulator-min-microvolt = <2800000>;
+> +       regulator-max-microvolt = <2800000>;
+> +       regulator-name = "avdd-csi";
+> +};
+> +
+>  &reg_eldo1 {
+>         regulator-always-on;
+>         regulator-min-microvolt = <1800000>;
+> @@ -119,6 +133,13 @@
+>         regulator-name = "vdd-1v8-lpddr";
+>  };
+>
+> +&reg_eldo3 {
+> +       regulator-always-on;
+> +       regulator-min-microvolt = <1800000>;
+> +       regulator-max-microvolt = <1800000>;
+> +       regulator-name = "vdd-csi";
+> +};
+> +
+>  &reg_fldo1 {
+>         regulator-min-microvolt = <1200000>;
+>         regulator-max-microvolt = <1200000>;
+> --
+> 2.7.4
+>
