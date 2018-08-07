@@ -1,75 +1,38 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 7 Aug 2018 13:53:04 +0800
-Subject: [PATCH v3 18/19] arm64: dts: allwinner: a64: NanoPi-A64: Add Wifi
- chip
-In-Reply-To: <20180730123137.923-19-andre.przywara@arm.com>
+Date: Tue, 7 Aug 2018 13:55:26 +0800
+Subject: [PATCH v3 00/19] arm64: dts: allwinner: A64 boards DT updates
+In-Reply-To: <20180731123041.33gl4zcaxlvli3to@flea>
 References: <20180730123137.923-1-andre.przywara@arm.com>
- <20180730123137.923-19-andre.przywara@arm.com>
-Message-ID: <CAGb2v65ee0EOGMP=xrBL1K0yHzGOE__oXmOJkr6jVbuBjNKhmQ@mail.gmail.com>
+ <20180731123041.33gl4zcaxlvli3to@flea>
+Message-ID: <CAGb2v66hiA_sf28RX9UCEWQ1CiaizmWLUnsivSzLJ_NGnyVk8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 30, 2018 at 8:31 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> The NanoPi-A64 has an on-board WiFi chip, connected to the usual MMC1 SDIO
-> interface. The AXP power line is the always-on VDD_SYS_3.3V, but it uses
-> pin L2 to enable the regulator.
-> As the actual WiFi driver is not in mainline Linux, it doesn't have a
-> compatible string, so we omit this from the node.
+On Tue, Jul 31, 2018 at 8:30 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> On Mon, Jul 30, 2018 at 01:31:18PM +0100, Andre Przywara wrote:
+>> Hi,
+>>
+>> only smaller changes compared to v2, addressing the comments on the
+>> ML. This fixes Ethernet for the Nano Pi A64 and removes the DT nodes
+>> for the non-existent BT part of this board. Also some fixes for the
+>> OrangePi as requested by Maxime.
+>>
+>> Please note:
+>> I am leaving for a three weeks holiday in a few hours, so won't be
+>> able to respond or work on this.
+>> Maxime, if you feel like you want to merge some parts, feel free to pick
+>> some patches and/or make adjustments. Otherwise I will be picking this
+>> up once I am back end of August.
 >
-> Add the respective nodes to the DT to make it usable.
->
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   | 23 ++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-> index 1eba1324e5b9..5e3dc2666d0f 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
-> @@ -58,6 +58,11 @@
->         chosen {
->                 stdout-path = "serial0:115200n8";
->         };
-> +
-> +       wifi_pwrseq: wifi_pwrseq {
-> +               compatible = "mmc-pwrseq-simple";
+> Apart from the serdev patch,
+> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-The schmatics also show the LPO pin hooked up to the RTC's 32k clock output.
-I added this part when applying.
+I queued up all patches except the serdev patch for 4.20.
+
+I did a few fix ups, notably to the "Orange Pi Win USB OTG" and "NanoPi-A64
+WiFi" patches. Please check the result here:
+
+    https://git.kernel.org/pub/scm/linux/kernel/git/wens/linux.git/log/?h=sunxi/dt64-for-4.20
 
 ChenYu
-
-> +               reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
-> +       };
->  };
->
->  &ehci0 {
-> @@ -105,6 +110,24 @@
->         status = "okay";
->  };
->
-> +&mmc1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&mmc1_pins>;
-> +       vmmc-supply = <&reg_dcdc1>;
-> +       vqmmc-supply = <&reg_dldo4>;
-> +       mmc-pwrseq = <&wifi_pwrseq>;
-> +       bus-width = <4>;
-> +       non-removable;
-> +       status = "okay";
-> +
-> +       rtl8189etv: wifi at 1 {
-> +               reg = <1>;
-> +               interrupt-parent = <&r_pio>;
-> +               interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
-> +               interrupt-names = "host-wake";
-> +       };
-> +};
-> +
->  &ohci0 {
->         status = "okay";
->  };
-> --
-> 2.14.4
->
