@@ -1,87 +1,32 @@
 From: gustavo@embeddedor.com (Gustavo A. R. Silva)
-Date: Tue, 7 Aug 2018 18:09:00 -0500
-Subject: [PATCH 00/33] net: ethernet: Mark expected switch fall-throughs
-Message-ID: <cover.1533675546.git.gustavo@embeddedor.com>
+Date: Tue, 7 Aug 2018 18:15:32 -0500
+Subject: [PATCH 09/33] net: thunderx: mark expected switch fall-through
+In-Reply-To: <cover.1533675546.git.gustavo@embeddedor.com>
+References: <cover.1533675546.git.gustavo@embeddedor.com>
+Message-ID: <c6613aa9afb1e3849036d73827ae07f3fbf56549.1533675546.git.gustavo@embeddedor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+In preparation to enabling -Wimplicit-fallthrough, mark switch cases
+where we are expecting to fall through.
 
-In preparation to enabling -Wimplicit-fallthrough, this patchset aims
-to add some annotations in order to mark switch cases where we are
-expecting to fall through.
+Addresses-Coverity-ID: 114781 ("Missing break in switch")
+Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+---
+ drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks
-
-Gustavo A. R. Silva (33):
-  8390: axnet_cs: Mark expected switch fall-through
-  alteon: acenic: mark expected switch fall-through
-  bnx2x: Mark expected switch fall-thoughs
-  net: macb: Mark expected switch fall-through
-  liquidio: mark expected switch fall-through
-  cxgb4/l2t: Mark expected switch fall-through
-  cxgb4/t4_hw: mark expected switch fall-throughs
-  cxgb3/l2t: Mark expected switch fall-through
-  net: thunderx: mark expected switch fall-through
-  net: tulip_core: mark expected switch fall-through
-  net: tulip: de4x5: mark expected switch fall-throughs
-  be2net: Mark expected switch fall-through
-  net: hns: Mark expected switch fall-through
-  net: hns3: Mark expected switch fall-through
-  i40e_main: mark expected switch fall-through
-  i40e_txrx: mark expected switch fall-through
-  net/mlx4/mcg: Mark expected switch fall-throughs
-  net/mlx4/en_rx: Mark expected switch fall-throughs
-  igb_main: Mark expected switch fall-throughs
-  igb: e1000_82575: Mark expected switch fall-through
-  igb: e1000_phy: Mark expected switch fall-through
-  igbvf: netdev: Mark expected switch fall-through
-  vxge: Mark expected switch fall-throughs
-  net/mlx5e: Mark expected switch fall-throughs
-  qed: qed_dev: Mark expected switch fall-throughs
-  netxen_nic: Mark expected switch fall-throughs
-  qede: qede_fp: Mark expected switch fall-through
-  qlcnic: Mark expected switch fall-througs
-  qlge: mark expected switch fall-through
-  net: ethernet: sxgbe: mark expected switch fall-throughs
-  net: sfc: falcon: mark expected switch fall-through
-  net: tlan: Mark expected switch fall-through
-  net: ethernet: ti: cpts: mark expected switch fall-through
-
- drivers/net/ethernet/8390/axnet_cs.c                    | 1 +
- drivers/net/ethernet/alteon/acenic.c                    | 1 +
- drivers/net/ethernet/broadcom/bnxt/bnxt.c               | 2 +-
- drivers/net/ethernet/cadence/macb_ptp.c                 | 1 +
- drivers/net/ethernet/cavium/liquidio/lio_main.c         | 1 +
- drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c     | 1 +
- drivers/net/ethernet/chelsio/cxgb3/l2t.c                | 1 +
- drivers/net/ethernet/chelsio/cxgb4/l2t.c                | 1 +
- drivers/net/ethernet/chelsio/cxgb4/t4_hw.c              | 3 +++
- drivers/net/ethernet/dec/tulip/de4x5.c                  | 6 ++++++
- drivers/net/ethernet/dec/tulip/tulip_core.c             | 1 +
- drivers/net/ethernet/emulex/benet/be_ethtool.c          | 1 +
- drivers/net/ethernet/hisilicon/hns/hns_ethtool.c        | 1 +
- drivers/net/ethernet/hisilicon/hns3/hns3_enet.c         | 1 +
- drivers/net/ethernet/intel/i40e/i40e_main.c             | 1 +
- drivers/net/ethernet/intel/i40e/i40e_txrx.c             | 3 ++-
- drivers/net/ethernet/intel/igb/e1000_82575.c            | 1 +
- drivers/net/ethernet/intel/igb/e1000_phy.c              | 1 +
- drivers/net/ethernet/intel/igb/igb_main.c               | 2 ++
- drivers/net/ethernet/intel/igbvf/netdev.c               | 1 +
- drivers/net/ethernet/mellanox/mlx4/en_rx.c              | 2 ++
- drivers/net/ethernet/mellanox/mlx4/mcg.c                | 2 ++
- drivers/net/ethernet/mellanox/mlx5/core/en/xdp.c        | 2 ++
- drivers/net/ethernet/neterion/vxge/vxge-config.c        | 3 +++
- drivers/net/ethernet/qlogic/netxen/netxen_nic_ethtool.c | 3 ++-
- drivers/net/ethernet/qlogic/qed/qed_dev.c               | 4 ++--
- drivers/net/ethernet/qlogic/qede/qede_fp.c              | 2 ++
- drivers/net/ethernet/qlogic/qlcnic/qlcnic_ethtool.c     | 3 ++-
- drivers/net/ethernet/qlogic/qlge/qlge_mpi.c             | 1 +
- drivers/net/ethernet/samsung/sxgbe/sxgbe_ethtool.c      | 2 ++
- drivers/net/ethernet/sfc/falcon/ethtool.c               | 1 +
- drivers/net/ethernet/ti/cpts.c                          | 1 +
- drivers/net/ethernet/ti/tlan.c                          | 1 +
- 33 files changed, 52 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
+index 5603f5a..92ba958 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_ethtool.c
+@@ -527,6 +527,7 @@ static int nicvf_get_rss_hash_opts(struct nicvf *nic,
+ 	case SCTP_V4_FLOW:
+ 	case SCTP_V6_FLOW:
+ 		info->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
++		/* Fall through */
+ 	case IPV4_FLOW:
+ 	case IPV6_FLOW:
+ 		info->data |= RXH_IP_SRC | RXH_IP_DST;
 -- 
 2.7.4
