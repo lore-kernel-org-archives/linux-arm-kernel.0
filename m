@@ -1,72 +1,127 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Tue, 7 Aug 2018 17:54:53 +0200
-Subject: [PATCH v7 2/3] Bluetooth: mediatek: Add protocol support for
- MediaTek serial devices
-In-Reply-To: <1533652445.3472.230.camel@mtkswgap22>
-References: <cover.1533056925.git.sean.wang@mediatek.com>
- <c92ed10cf16f36d9a3b390e864af92e2dfe7b771.1533056925.git.sean.wang@mediatek.com>
- <1707FFA1-A294-4A95-A3BF-0910CE455232@holtmann.org>
- <1533192799.3472.122.camel@mtkswgap22>
- <FF45A90A-F9F1-47CB-AB1F-1E92BF587FBE@holtmann.org>
- <1533199720.3472.136.camel@mtkswgap22>
- <9526E5D9-50BA-4D57-80F5-083DB7D28AFE@holtmann.org>
- <1533205495.3472.144.camel@mtkswgap22>
- <A6D48D49-52CE-405D-8C5D-C4D54CE67221@holtmann.org>
- <1533303749.3472.160.camel@mtkswgap22>
- <D2336CD2-B69B-4B5B-8125-F0CAD29E3243@holtmann.org>
- <1533319214.3472.187.camel@mtkswgap22>
- <7A3537C5-5940-45AD-AB80-77418CCFE130@holtmann.org>
- <1533652445.3472.230.camel@mtkswgap22>
-Message-ID: <8AF72CFC-4978-42AD-8ECC-752EB137DD2A@holtmann.org>
+From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
+Date: Tue, 07 Aug 2018 18:40:15 +0200
+Subject: [PATCH v6 2/8] media: v4l: Add definition for Allwinner's
+ MB32-tiled NV12 format
+In-Reply-To: <4628cfe1-e42f-67ad-20b3-078c6a96d6ed@xs4all.nl>
+References: <20180725100256.22833-1-paul.kocialkowski@bootlin.com>
+ <20180725100256.22833-3-paul.kocialkowski@bootlin.com>
+ <4628cfe1-e42f-67ad-20b3-078c6a96d6ed@xs4all.nl>
+Message-ID: <2f2f5721ab5b07e36ec920b9d9c7fa0839b99a95.camel@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+Hi,
 
->>>> this is even more hackish since the __hci_cmd_sync_ev command is really meant to get a cmd status first before waiting for that event.
->>>> 
->>> 
->>> Understood.
->>> 
->>> I've stopped the hack in v8. could we merge v8 first ? and then I will a fix up with __hci_raw_sync_ev that uses the hdev->raw_q instead of __hci_cmd_sync_ev in TODO.
->> 
->> so I looked into this a bit more. We actually added __hci_cmd_send for a Qualcomm firmware loader that was doing something similar. So instead of trying to add a yet another command to the core, I actually used that and implemented the wait for vendor event in the driver.
->> 
->> You will see my v9 on the mailing list. I also did a bunch of cosmetic minor cleanup and spelling correction. Please test this version. I also make __le16 dlen instead of dlen1 + dlen2 since I think that is what your hardware does.
+On Sat, 2018-08-04 at 13:42 +0200, Hans Verkuil wrote:
+> On 07/25/2018 12:02 PM, Paul Kocialkowski wrote:
+> > This introduces support for Allwinner's MB32-tiled NV12 format, where
+> > each plane is divided into macroblocks of 32x32 pixels. Hence, the size
+> > of each plane has to be aligned to 32 bytes. The pixels inside each
+> > macroblock are coded as they would be if the macroblock was a single
+> > plane, line after line.
+> > 
+> > The MB32-tiled NV12 format is used by the video engine on Allwinner
+> > platforms: it is the default format for decoded frames (and the only one
+> > available in the oldest supported platforms).
+> > 
+> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > ---
+> >  Documentation/media/uapi/v4l/pixfmt-reserved.rst | 15 ++++++++++++++-
+> >  drivers/media/v4l2-core/v4l2-ioctl.c             |  1 +
+> >  include/uapi/linux/videodev2.h                   |  1 +
+> >  3 files changed, 16 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/media/uapi/v4l/pixfmt-reserved.rst b/Documentation/media/uapi/v4l/pixfmt-reserved.rst
+> > index 38af1472a4b4..9a68b6a787bf 100644
+> > --- a/Documentation/media/uapi/v4l/pixfmt-reserved.rst
+> > +++ b/Documentation/media/uapi/v4l/pixfmt-reserved.rst
+> > @@ -243,7 +243,20 @@ please make a proposal on the linux-media mailing list.
+> >  	It is an opaque intermediate format and the MDP hardware must be
+> >  	used to convert ``V4L2_PIX_FMT_MT21C`` to ``V4L2_PIX_FMT_NV12M``,
+> >  	``V4L2_PIX_FMT_YUV420M`` or ``V4L2_PIX_FMT_YVU420``.
+> > -
+> > +    * .. _V4L2-PIX-FMT-MB32-NV12:
+> > +
+> > +      - ``V4L2_PIX_FMT_MB32_NV12``
+> > +      - 'MN12'
+> > +      - Two-planar NV12-based format used by the Allwinner video engine
+> > +        hardware, with 32x32 tiles for the luminance plane and 32x64 tiles
+> > +        for the chrominance plane. Each tile is a linear pixel data
+> > +        representation within its own bounds. Each tile follows the previous
+> > +        one linearly (as in, from left to right, top to bottom).
 > 
-> Only one thing needs to be corrected in v9. that is __be16 is required instead of dlen1 + dlen2. I will fix it up in v10 and the other changes all look good to me.
-> 
->> If this version of the driver works for you then I am happy to merge it. You can then add support for hdev->set_bdaddr and hdev->set_diag in later patches. I also like to clean up the STP receive handler since it can be done a lot simpler and smaller, but that has to wait.
->> 
-> 
-> hopefully v10 also can be merged :)
+> as in, -> as in:
 
-send me a v10 and I can merge it.
+Thanks!
 
-> I will investigate more about how to add ->set_bdaddr, ->set_diag and STP receive enhancement in later patches.
+> > +
+> > +        The frame dimensions are aligned to match an integer number of
+> > +        tiles, resulting in 32-aligned resolutions for the luminance plane
+> > +        and 16-aligned resolutions for the chrominance plane (with 2x2
+> > +        subsampling).
+> >  
+> >  .. tabularcolumns:: |p{6.6cm}|p{2.2cm}|p{8.7cm}|
+> >  
+> > diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
+> > index 68e914b83a03..7e1c200de10d 100644
+> > --- a/drivers/media/v4l2-core/v4l2-ioctl.c
+> > +++ b/drivers/media/v4l2-core/v4l2-ioctl.c
+> > @@ -1331,6 +1331,7 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
+> >  		case V4L2_PIX_FMT_SE401:	descr = "GSPCA SE401"; break;
+> >  		case V4L2_PIX_FMT_S5C_UYVY_JPG:	descr = "S5C73MX interleaved UYVY/JPEG"; break;
+> >  		case V4L2_PIX_FMT_MT21C:	descr = "Mediatek Compressed Format"; break;
+> > +		case V4L2_PIX_FMT_MB32_NV12:	descr = "Allwinner tiled NV12 format"; break;
 > 
-> but so far I have not much idea about how to make STP multiplexer be a independent driver.
+> "Allwinner Tiled NV12 Format"
 > 
-> my thought is that it would be really better and cleaner a chain of serdev is be used as the base of mtkbtuart. something like
+> If it is Allwinner specific, then that should be in the PIX_FMT name as well:
+> something like V4L2_PIX_FMT_ALLWINNER_MB32_NV12 or perhaps SUNXI_MB32_NV12.
 > 
-> 8250 serial bus <----> STP multiplexer serdev <----> mtkbtuart serdev
+> On the other hand, you could also see this as a variant of e.g. V4L2_PIX_FMT_NV12MT
+> or V4L2_PIX_FMT_NV12MT_16X16. In that case it is not necessarily Allwinner specific
+> since other devices might choose this format. You can go either way, as long
+> as it is consistent.
+
+I think it is fair to say that the format is Allwinner-specific and
+unlikely to be found elsewhere. It is not actually very well described
+by "MB32" since the chroma tiles have a different pixel size than the
+luma tiles (16x64).
+
+It would probably be clearer to just call the format:
+V4L2_PIX_FMT_SUNXI_TILED_NV12
+
+Cheers,
+
+Paul
+
+> >  		default:
+> >  			WARN(1, "Unknown pixelformat 0x%08x\n", fmt->pixelformat);
+> >  			if (fmt->description[0])
+> > diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> > index d171361ed9b3..453d27142e31 100644
+> > --- a/include/uapi/linux/videodev2.h
+> > +++ b/include/uapi/linux/videodev2.h
+> > @@ -670,6 +670,7 @@ struct v4l2_pix_format {
+> >  #define V4L2_PIX_FMT_Z16      v4l2_fourcc('Z', '1', '6', ' ') /* Depth data 16-bit */
+> >  #define V4L2_PIX_FMT_MT21C    v4l2_fourcc('M', 'T', '2', '1') /* Mediatek compressed block mode  */
+> >  #define V4L2_PIX_FMT_INZI     v4l2_fourcc('I', 'N', 'Z', 'I') /* Intel Planar Greyscale 10-bit and Depth 16-bit */
+> > +#define V4L2_PIX_FMT_MB32_NV12 v4l2_fourcc('M', 'N', '1', '2') /* Allwinner tiled NV12 format */
+> >  
+> >  /* 10bit raw bayer packed, 32 bytes for every 25 pixels, last LSB 6 bits unused */
+> >  #define V4L2_PIX_FMT_IPU3_SBGGR10	v4l2_fourcc('i', 'p', '3', 'b') /* IPU3 packed 10-bit BGGR bayer */
+> > 
 > 
-> however, STP multiplexer serdev is not a real device, that doesn't no request any resource. I think it should not be allowed to be added in a device tree and even in dt-binding document.
-
-Before we do that, lets get a cleaner parser for it. I just don?t have enough time to wrap my head around this one yet.
-
->>>> Are all Mediatek vendor commands this way? Or just the ones for loading the firmware? So only the WMT ones?
->>>> 
->>> 
->>> Only the WMT ones, WMT commands/events are usually used in system controlling, for example, global function on/off, firmware download, reset and so on. most only appear on device initialization
->> 
->> Since you never checked the result of the vendor event, I opted for just signaling that it arrived. If they can report success or failure, we need to add some extra code for that.
->> 
+> Regards,
 > 
-> I will consider more WMT event status when I add more Bluetooth devices such as MT7668U usb based Bluetooth which I plan to add the support in later patches in the next weeks 
-
-Are the USB ones also using STP or are they H:2 based like all the others. What are prominent MT7668U based ones that I could buy?
-
-Regards
-
-Marcel
+> 	Hans
+-- 
+Paul Kocialkowski, Bootlin (formerly Free Electrons)
+Embedded Linux and kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180807/04eae2c7/attachment.sig>
