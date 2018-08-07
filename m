@@ -1,172 +1,87 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue,  7 Aug 2018 12:38:37 +0530
-Subject: [PATCH 2/3] ARM: dts: imx6ul-isiot: Move node definitions into dtsi
+Date: Tue,  7 Aug 2018 12:38:38 +0530
+Subject: [PATCH 3/3] ARM: dts: i.MX6: Use consistent node names for Engicam
+ files
 In-Reply-To: <20180807070838.24685-1-jagan@amarulasolutions.com>
 References: <20180807070838.24685-1-jagan@amarulasolutions.com>
-Message-ID: <20180807070838.24685-2-jagan@amarulasolutions.com>
+Message-ID: <20180807070838.24685-3-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move usdhc2 and gpmi along with pinctrl nodes on
-imx6ul-isiot.dtsi from dts files and mark it as 'disabled'
-and the relevant dts will enable the status as 'okay'
+Use consistent pinctrl node names for Engicam dt files,
+sufix 'grp' look consistent than actual node name
+
+- pinctrl_gpmi_nand: gpmi-nand {
++ pinctrl_gpmi_nand: gpminandgrp {
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- arch/arm/boot/dts/imx6ul-isiot-emmc.dts | 23 -----------
- arch/arm/boot/dts/imx6ul-isiot-nand.dts | 25 ------------
- arch/arm/boot/dts/imx6ul-isiot.dtsi     | 52 +++++++++++++++++++++++++
- 3 files changed, 52 insertions(+), 48 deletions(-)
+ arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 2 +-
+ arch/arm/boot/dts/imx6qdl-icore.dtsi     | 4 ++--
+ arch/arm/boot/dts/imx6ul-geam.dts        | 2 +-
+ arch/arm/boot/dts/imx6ul-isiot.dtsi      | 2 +-
+ 4 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6ul-isiot-emmc.dts b/arch/arm/boot/dts/imx6ul-isiot-emmc.dts
-index 464bd21930fd..1df3e376ae2c 100644
---- a/arch/arm/boot/dts/imx6ul-isiot-emmc.dts
-+++ b/arch/arm/boot/dts/imx6ul-isiot-emmc.dts
-@@ -14,28 +14,5 @@
+diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+index 6feae392830e..ba93026ecee8 100644
+--- a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+@@ -281,7 +281,7 @@
  };
  
- &usdhc2 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_usdhc2>;
--	cd-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>;
--	bus-width = <8>;
--	no-1-8-v;
- 	status = "okay";
- };
--
--&iomuxc {
--	pinctrl_usdhc2: usdhc2grp {
--		fsl,pins = <
--			MX6UL_PAD_NAND_RE_B__USDHC2_CLK      0x17070
--			MX6UL_PAD_NAND_WE_B__USDHC2_CMD      0x10070
--			MX6UL_PAD_NAND_DATA00__USDHC2_DATA0  0x17070
--			MX6UL_PAD_NAND_DATA01__USDHC2_DATA1  0x17070
--			MX6UL_PAD_NAND_DATA02__USDHC2_DATA2  0x17070
--			MX6UL_PAD_NAND_DATA03__USDHC2_DATA3  0x17070
--			MX6UL_PAD_NAND_DATA04__USDHC2_DATA4  0x17070
--			MX6UL_PAD_NAND_DATA05__USDHC2_DATA5  0x17070
--			MX6UL_PAD_NAND_DATA06__USDHC2_DATA6  0x17070
--			MX6UL_PAD_NAND_DATA07__USDHC2_DATA7  0x17070
--			MX6UL_PAD_NAND_ALE__USDHC2_RESET_B   0x17070
--		>;
--	};
--};
-diff --git a/arch/arm/boot/dts/imx6ul-isiot-nand.dts b/arch/arm/boot/dts/imx6ul-isiot-nand.dts
-index 84420ed47106..8c26d4d1a7bf 100644
---- a/arch/arm/boot/dts/imx6ul-isiot-nand.dts
-+++ b/arch/arm/boot/dts/imx6ul-isiot-nand.dts
-@@ -14,30 +14,5 @@
+ &iomuxc {
+-	pinctrl_audmux: audmux {
++	pinctrl_audmux: audmuxgrp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_DISP0_DAT20__AUD4_TXC  0x130b0
+ 			MX6QDL_PAD_DISP0_DAT21__AUD4_TXD  0x110b0
+diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+index d39966e80415..84d03c65f4c8 100644
+--- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+@@ -274,7 +274,7 @@
  };
  
- &gpmi {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_gpmi_nand>;
--	nand-on-flash-bbt;
- 	status = "okay";
- };
--
--&iomuxc {
+ &iomuxc {
+-	pinctrl_audmux: audmux {
++	pinctrl_audmux: audmuxgrp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_DISP0_DAT20__AUD4_TXC  0x130b0
+ 			MX6QDL_PAD_DISP0_DAT21__AUD4_TXD  0x110b0
+@@ -313,7 +313,7 @@
+ 		>;
+ 	};
+ 
 -	pinctrl_gpmi_nand: gpmi-nand {
--		fsl,pins = <
--			MX6UL_PAD_NAND_CLE__RAWNAND_CLE         0xb0b1
--			MX6UL_PAD_NAND_ALE__RAWNAND_ALE         0xb0b1
--			MX6UL_PAD_NAND_WP_B__RAWNAND_WP_B       0xb0b1
--			MX6UL_PAD_NAND_READY_B__RAWNAND_READY_B 0xb000
--			MX6UL_PAD_NAND_CE0_B__RAWNAND_CE0_B     0xb0b1
--			MX6UL_PAD_NAND_RE_B__RAWNAND_RE_B       0xb0b1
--			MX6UL_PAD_NAND_WE_B__RAWNAND_WE_B       0xb0b1
--			MX6UL_PAD_NAND_DATA00__RAWNAND_DATA00   0xb0b1
--			MX6UL_PAD_NAND_DATA01__RAWNAND_DATA01   0xb0b1
--			MX6UL_PAD_NAND_DATA02__RAWNAND_DATA02   0xb0b1
--			MX6UL_PAD_NAND_DATA03__RAWNAND_DATA03   0xb0b1
--			MX6UL_PAD_NAND_DATA04__RAWNAND_DATA04   0xb0b1
--			MX6UL_PAD_NAND_DATA05__RAWNAND_DATA05   0xb0b1
--			MX6UL_PAD_NAND_DATA06__RAWNAND_DATA06   0xb0b1
--			MX6UL_PAD_NAND_DATA07__RAWNAND_DATA07   0xb0b1
--		>;
--	};
--};
++	pinctrl_gpmi_nand: gpminandgrp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_NANDF_CLE__NAND_CLE     0xb0b1
+ 			MX6QDL_PAD_NANDF_ALE__NAND_ALE     0xb0b1
+diff --git a/arch/arm/boot/dts/imx6ul-geam.dts b/arch/arm/boot/dts/imx6ul-geam.dts
+index bf86a5e33fc5..e22ec5be2b78 100644
+--- a/arch/arm/boot/dts/imx6ul-geam.dts
++++ b/arch/arm/boot/dts/imx6ul-geam.dts
+@@ -292,7 +292,7 @@
+ 		>;
+ 	};
+ 
+-	pinctrl_gpmi_nand: gpmi-nand {
++	pinctrl_gpmi_nand: gpminandgrp {
+ 		fsl,pins = <
+ 			MX6UL_PAD_NAND_CLE__RAWNAND_CLE         0xb0b1
+ 			MX6UL_PAD_NAND_ALE__RAWNAND_ALE         0xb0b1
 diff --git a/arch/arm/boot/dts/imx6ul-isiot.dtsi b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-index ba66225fe86e..fe435484e69d 100644
+index fe435484e69d..b1fa3f0a684d 100644
 --- a/arch/arm/boot/dts/imx6ul-isiot.dtsi
 +++ b/arch/arm/boot/dts/imx6ul-isiot.dtsi
-@@ -97,6 +97,13 @@
- 	};
- };
- 
-+&gpmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpmi_nand>;
-+	nand-on-flash-bbt;
-+	status = "disabled";
-+};
-+
- &i2c1 {
- 	clock-frequency = <100000>;
- 	pinctrl-names = "default";
-@@ -207,6 +214,15 @@
- 	status = "okay";
- };
- 
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2>;
-+	cd-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>;
-+	bus-width = <8>;
-+	no-1-8-v;
-+	status = "disabled";
-+};
-+
- &iomuxc {
- 	pinctrl_enet1: enet1grp {
- 		fsl,pins = <
-@@ -223,6 +239,26 @@
+@@ -239,7 +239,7 @@
  		>;
  	};
  
-+	pinctrl_gpmi_nand: gpmi-nand {
-+		fsl,pins = <
-+			MX6UL_PAD_NAND_CLE__RAWNAND_CLE         0xb0b1
-+			MX6UL_PAD_NAND_ALE__RAWNAND_ALE         0xb0b1
-+			MX6UL_PAD_NAND_WP_B__RAWNAND_WP_B       0xb0b1
-+			MX6UL_PAD_NAND_READY_B__RAWNAND_READY_B 0xb000
-+			MX6UL_PAD_NAND_CE0_B__RAWNAND_CE0_B     0xb0b1
-+			MX6UL_PAD_NAND_RE_B__RAWNAND_RE_B       0xb0b1
-+			MX6UL_PAD_NAND_WE_B__RAWNAND_WE_B       0xb0b1
-+			MX6UL_PAD_NAND_DATA00__RAWNAND_DATA00   0xb0b1
-+			MX6UL_PAD_NAND_DATA01__RAWNAND_DATA01   0xb0b1
-+			MX6UL_PAD_NAND_DATA02__RAWNAND_DATA02   0xb0b1
-+			MX6UL_PAD_NAND_DATA03__RAWNAND_DATA03   0xb0b1
-+			MX6UL_PAD_NAND_DATA04__RAWNAND_DATA04   0xb0b1
-+			MX6UL_PAD_NAND_DATA05__RAWNAND_DATA05   0xb0b1
-+			MX6UL_PAD_NAND_DATA06__RAWNAND_DATA06   0xb0b1
-+			MX6UL_PAD_NAND_DATA07__RAWNAND_DATA07   0xb0b1
-+		>;
-+	};
-+
- 	pinctrl_i2c1: i2c1grp {
+-	pinctrl_gpmi_nand: gpmi-nand {
++	pinctrl_gpmi_nand: gpminandgrp {
  		fsl,pins = <
- 			MX6UL_PAD_UART4_TX_DATA__I2C1_SCL 0x4001b8b0
-@@ -330,4 +366,20 @@
- 			MX6UL_PAD_SD1_DATA3__USDHC1_DATA3 0x170f9
- 		>;
- 	};
-+
-+	pinctrl_usdhc2: usdhc2grp {
-+		fsl,pins = <
-+			MX6UL_PAD_NAND_RE_B__USDHC2_CLK      0x17070
-+			MX6UL_PAD_NAND_WE_B__USDHC2_CMD      0x10070
-+			MX6UL_PAD_NAND_DATA00__USDHC2_DATA0  0x17070
-+			MX6UL_PAD_NAND_DATA01__USDHC2_DATA1  0x17070
-+			MX6UL_PAD_NAND_DATA02__USDHC2_DATA2  0x17070
-+			MX6UL_PAD_NAND_DATA03__USDHC2_DATA3  0x17070
-+			MX6UL_PAD_NAND_DATA04__USDHC2_DATA4  0x17070
-+			MX6UL_PAD_NAND_DATA05__USDHC2_DATA5  0x17070
-+			MX6UL_PAD_NAND_DATA06__USDHC2_DATA6  0x17070
-+			MX6UL_PAD_NAND_DATA07__USDHC2_DATA7  0x17070
-+			MX6UL_PAD_NAND_ALE__USDHC2_RESET_B   0x17070
-+		>;
-+	};
- };
+ 			MX6UL_PAD_NAND_CLE__RAWNAND_CLE         0xb0b1
+ 			MX6UL_PAD_NAND_ALE__RAWNAND_ALE         0xb0b1
 -- 
 2.18.0.321.gffc6fa0e3
