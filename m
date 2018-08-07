@@ -1,37 +1,76 @@
-From: yixun.lan@gmail.com (Yixun Lan)
-Date: Tue, 7 Aug 2018 09:29:59 +0800
-Subject: [PATCH 3/4] ARM64: dts: meson-gx: add dmcbus and canvas nodes.
-In-Reply-To: <CAHStOZ5VaOiOQhi7vG0Q9R7gF+LHvZim1qsEUJanZkFoXqgwDA@mail.gmail.com>
-References: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
- <20180801185128.23440-4-maxi.jourdan@wanadoo.fr>
- <CALecT5hgk+Wuh4-UWY29NNoEz-47Fx3pSjve8raCd3hRMzXE5w@mail.gmail.com>
- <CAHStOZ5VaOiOQhi7vG0Q9R7gF+LHvZim1qsEUJanZkFoXqgwDA@mail.gmail.com>
-Message-ID: <CALecT5jp2Z9A8=ZciXQW5AD29TQY_6A-GW92swRiYx-sCV-LhA@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 6 Aug 2018 20:39:44 -0500
+Subject: New remoteproc driver for TI PRU
+In-Reply-To: <5bd5e388-959c-cff7-df38-d267e06d4d96@lechnology.com>
+References: <20180623210810.21232-1-david@lechnology.com>
+ <e0a883af-8228-5b06-3186-f57d8f898aaa@ti.com>
+ <8fc18d40-72f5-9215-26f0-1492e3a6c0e7@lechnology.com>
+ <536d28bd-bcdd-1665-e1c8-828572051cfb@ti.com>
+ <5bd5e388-959c-cff7-df38-d267e06d4d96@lechnology.com>
+Message-ID: <a377163f-e7a5-1f35-02ad-f223fc2c6e9d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Maxime:
+Hi David,
 
-On Sun, Aug 5, 2018 at 4:02 AM, Maxime Jourdan <maxi.jourdan@wanadoo.fr> wrote:
->>> +                       sysctrl_DMC: system-controller at 0 {
->>> +                               compatible = "amlogic,meson-gx-dmc-sysctrl", "syscon", "simple-mfd";
+On 08/06/2018 11:32 AM, David Lechner wrote:
+> On 06/29/2018 07:17 PM, Suman Anna wrote:
+>> Hi David,
 >>
->> we'd like to drop 'meson-' prefix, so better using "amlogic,gx-dmc-sysctrl",
->> please take a look at the discussion here [1]
+>> On 06/29/2018 12:44 PM, David Lechner wrote:
+>>> On 06/29/2018 04:58 AM, Roger Quadros wrote:
+>>>> +Suman & Tero
+>>>>
+>>>> Hi David,
+>>>>
+>>>> On 24/06/18 00:08, David Lechner wrote:
+>>>>>
+>>>>> Date: Sat, 23 Jun 2018 15:43:59 -0500
+>>>>> Subject: [PATCH 0/8] New remoteproc driver for TI PRU
+>>>>>
+>>>>> This series adds a new remoteproc driver for the TI Programmable
+>>>>> Runtime Unit
+>>>>> (PRU) that is present in some TI Sitara processors. This code has
+>>>>> been tested
+>>>>> working on AM1808 (LEGO MINDSTORMS EV3) and AM3358 (BeagleBone Green).
+>>>>
+>>>> This is great. We have been working on something similar and I think
+>>>> it would
+>>>> be great if we can collaborate to get all our needs addressed.
+>>>
+>>> Yes, I have used the PRU with the TI kernel on BeagleBone so I've seen
+>>> the TI
+>>> implementation. My primary interest is in the AM1808, which has a far
+>>> simpler
+>>> PRU than other SoCs. So, I was hoping I could get away with just
+>>> implementing
+>>> the basic stuff that I need and let TI add the more complex stuff later.
 >>
->> [1] https://lkml.kernel.org/r/7hk1prmg4w.fsf at baylibre.com
+>> Thanks for the series. PRUSS is present on many SoCs now, and each with
+>> their own integration quirks, both in terms of SoC connections as well
+>> as internal sub-modules within the subsystem. We currently support
+>> AM335x, AM437x, AM57xx, Keystone 2 based 66AK2G and a newer generation
+>> AM65x as well. It should be relatively straight-forward to scale this
+>> for AM1808/OMAP-L138 as well. The move to the standard Common Clock and
+>> Reset frameworks for clocks with the Davinci chips should make it
+>> relatively straight-forward for the architecture pieces.
 >>
->
-> On that subject, should I remove the meson keyword from dts only, or
-> from everything ?
->
-remove the 'meson-' from dts is enough..
+>> I will take a look at your series in detail sometime next week, and
+>> mostly post our series to the upstream lists as well within the next
+>> couple of weeks so that it is easier for discussion on the upstream
+>> lists.
+>>
+> 
+> Have you had time to look at this yet? If you are too busy, I can submit
+> a v2 with the interrupt controller broken out into a separate driver.
 
-> e.g use amlogic_canvas_* symbols instead of meson_canvas_*, name the
-> source file "amlogic-canvas.c", etc. ?
->
-Actually, I'd suggest to keep using meson_canvas_* in the code for the
-consistency,
-unless Kevin or Jerome/Neil has something to say?
+Yeah, I worked on it a bit around -rc4 time, but didn't get a chance to
+complete the cleanup & testing before I had to shift to some other
+tasks. If you are interested, I can share my branch. I will mostly get
+back to this towards the latter half of next week. Anyway, I am
+expecting 4.19-rc1 to be in a better shape w.r.t Davinci platform as the
+genpd and CCF stuff comes in, and the pm_runtime usage for clocking in
+my PRUSS drivers will fit well with those available.
 
-Yixun
+regards
+Suman
