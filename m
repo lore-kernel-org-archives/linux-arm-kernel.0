@@ -1,259 +1,40 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 7 Aug 2018 01:57:14 +0200
-Subject: [RFC PATCH v2 05/12] mtd: rawnand: ams-delta: use GPIO API for
- data read/write
-In-Reply-To: <20180806222918.12644-6-jmkrzyszt@gmail.com>
-References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
- <20180806222918.12644-1-jmkrzyszt@gmail.com>
- <20180806222918.12644-6-jmkrzyszt@gmail.com>
-Message-ID: <f4ebe9bf-8ca8-9ad2-3e48-697266b6962b@gmail.com>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Mon, 6 Aug 2018 20:15:43 -0400
+Subject: [RFC PATCH 3/9] crypto: chacha20-generic - refactor to allow
+ varying number of rounds
+In-Reply-To: <CA+_SqcD+KpQ_X6iXUCpQh0N6pWzBorstBJDx7eBqcybY4Dvy8Q@mail.gmail.com>
+References: <20180806223300.113891-1-ebiggers@kernel.org>
+ <20180806223300.113891-4-ebiggers@kernel.org>
+ <CAHmME9rbe6eT6dkUqKnp-GxcqGrp-tvMfTMr8kZtsn=S3cmP8A@mail.gmail.com>
+ <CA+_SqcD+KpQ_X6iXUCpQh0N6pWzBorstBJDx7eBqcybY4Dvy8Q@mail.gmail.com>
+Message-ID: <CAHmME9o6XQ+16d4b8+BiQViSiOOApi-J_ML2UOOBpTN8hV3iVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/2018 12:29 AM, Janusz Krzysztofik wrote:
-> Don't readw()/writew() data directly from/to GPIO port which is under
-> control of gpio-omap driver, use GPIO API instead.
-> 
-> Degrade of performance on Amstrad Delta is completely not acceptable.
+Hi Paul,
 
-I'd expect that changing from direct PIO to access through GPIO API
-would degrade the performance. Maybe I misunderstood something ?
+On 8/6/18, Paul Crowley <paulcrowley@google.com> wrote:
+> Salsa20 was one of the earlier ARX proposals, and set a very
+> conservative number of rounds as befits our state of knowledge at the
+> time. Since then we've learned a lot more about cryptanalysis of such
+> offerings, and I think we can be comfortable with fewer rounds. The
+> best attack on ChaCha breaks 7 rounds, and that attack requires 2^248
+> operations. Every round of ChaCha makes attacks vastly harder.
 
-> The driver should work with any 8+-bit bidirectional GPIO port, not
-> only OMAP.
-> 
-> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
-> ---
->  drivers/mtd/nand/raw/ams-delta.c | 97 ++++++++++++++++------------------------
->  1 file changed, 38 insertions(+), 59 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/raw/ams-delta.c b/drivers/mtd/nand/raw/ams-delta.c
-> index 09d6901fc94d..78996ddf82e0 100644
-> --- a/drivers/mtd/nand/raw/ams-delta.c
-> +++ b/drivers/mtd/nand/raw/ams-delta.c
-> @@ -24,13 +24,10 @@
->  #include <linux/mtd/mtd.h>
->  #include <linux/mtd/rawnand.h>
->  #include <linux/mtd/partitions.h>
-> -#include <linux/platform_data/gpio-omap.h>
-> +#include <linux/platform_device.h>
->  
-> -#include <asm/io.h>
->  #include <asm/sizes.h>
->  
-> -#include <mach/hardware.h>
-> -
->  /*
->   * MTD structure for E3 (Delta)
->   */
-> @@ -44,7 +41,7 @@ struct ams_delta_nand {
->  	struct gpio_desc	*gpiod_nwe;
->  	struct gpio_desc	*gpiod_ale;
->  	struct gpio_desc	*gpiod_cle;
-> -	void __iomem		*io_base;
-> +	struct gpio_descs	*data_gpiods;
->  };
->  
->  /*
-> @@ -76,10 +73,14 @@ static void ams_delta_write_byte(struct mtd_info *mtd, u_char byte)
->  {
->  	struct nand_chip *this = mtd_to_nand(mtd);
->  	struct ams_delta_nand *priv = nand_get_controller_data(this);
-> -	void __iomem *io_base = priv->io_base;
-> +	struct gpio_descs *data_gpiods = priv->data_gpiods;
-> +	unsigned long bits = byte;
-> +	int i;
-> +
-> +	for (i = 0; i < data_gpiods->ndescs; i++)
-> +		gpiod_direction_output_raw(data_gpiods->desc[i],
-> +					   test_bit(i, &bits));
->  
-> -	writew(0, io_base + OMAP_MPUIO_IO_CNTL);
-> -	writew(byte, this->IO_ADDR_W);
->  	gpiod_set_value(priv->gpiod_nwe, 0);
->  	ndelay(40);
->  	gpiod_set_value(priv->gpiod_nwe, 1);
-> @@ -87,18 +88,28 @@ static void ams_delta_write_byte(struct mtd_info *mtd, u_char byte)
->  
->  static u_char ams_delta_read_byte(struct mtd_info *mtd)
->  {
-> -	u_char res;
->  	struct nand_chip *this = mtd_to_nand(mtd);
->  	struct ams_delta_nand *priv = nand_get_controller_data(this);
-> -	void __iomem *io_base = priv->io_base;
-> +	struct gpio_descs *data_gpiods = priv->data_gpiods;
-> +	unsigned long bits = 0;
-> +	int i, value_array[data_gpiods->ndescs];
-> +
-> +	for (i = 0; i < data_gpiods->ndescs; i++)
-> +		gpiod_direction_input(data_gpiods->desc[i]);
->  
->  	gpiod_set_value(priv->gpiod_nre, 0);
->  	ndelay(40);
-> -	writew(~0, io_base + OMAP_MPUIO_IO_CNTL);
-> -	res = readw(this->IO_ADDR_R);
-> +
-> +	gpiod_get_raw_array_value(data_gpiods->ndescs, data_gpiods->desc,
-> +				  value_array);
-> +
->  	gpiod_set_value(priv->gpiod_nre, 1);
->  
-> -	return res;
-> +	for (i = 0; i < data_gpiods->ndescs; i++)
-> +		if (value_array[i])
-> +			__set_bit(i, &bits);
-> +
-> +	return bits;
->  }
->  
->  static void ams_delta_write_buf(struct mtd_info *mtd, const u_char *buf,
-> @@ -159,14 +170,8 @@ static int ams_delta_init(struct platform_device *pdev)
->  	struct ams_delta_nand *priv;
->  	struct nand_chip *this;
->  	struct mtd_info *mtd;
-> -	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	void __iomem *io_base;
-> -	struct gpio_descs *data_gpiods;
->  	int err = 0;
->  
-> -	if (!res)
-> -		return -ENXIO;
-> -
->  	/* Allocate memory for MTD device structure and private data */
->  	priv = devm_kzalloc(&pdev->dev, sizeof(struct ams_delta_nand),
->  			    GFP_KERNEL);
-> @@ -179,25 +184,8 @@ static int ams_delta_init(struct platform_device *pdev)
->  	mtd = nand_to_mtd(this);
->  	mtd->dev.parent = &pdev->dev;
->  
-> -	/*
-> -	 * Don't try to request the memory region from here,
-> -	 * it should have been already requested from the
-> -	 * gpio-omap driver and requesting it again would fail.
-> -	 */
-> -
-> -	io_base = ioremap(res->start, resource_size(res));
-> -	if (io_base == NULL) {
-> -		dev_err(&pdev->dev, "ioremap failed\n");
-> -		err = -EIO;
-> -		goto out_free;
-> -	}
-> -
-> -	priv->io_base = io_base;
->  	nand_set_controller_data(this, priv);
->  
-> -	/* Set address of NAND IO lines */
-> -	this->IO_ADDR_R = io_base + OMAP_MPUIO_INPUT_LATCH;
-> -	this->IO_ADDR_W = io_base + OMAP_MPUIO_OUTPUT;
->  	this->read_byte = ams_delta_read_byte;
->  	this->write_buf = ams_delta_write_buf;
->  	this->read_buf = ams_delta_read_buf;
-> @@ -207,7 +195,7 @@ static int ams_delta_init(struct platform_device *pdev)
->  	if (IS_ERR(priv->gpiod_rdy)) {
->  		err = PTR_ERR(priv->gpiod_rdy);
->  		dev_warn(&pdev->dev, "RDY GPIO request failed (%d)\n", err);
-> -		goto out_mtd;
-> +		return err;
->  	}
->  
->  	if (priv->gpiod_rdy)
-> @@ -225,66 +213,60 @@ static int ams_delta_init(struct platform_device *pdev)
->  	if (IS_ERR(priv->gpiod_nwp)) {
->  		err = PTR_ERR(priv->gpiod_nwp);
->  		dev_err(&pdev->dev, "NWP GPIO request failed (%d)\n", err);
-> -		goto out_mtd;
-> +		return err;
->  	}
->  
->  	priv->gpiod_nce = devm_gpiod_get(&pdev->dev, "nce", GPIOD_OUT_HIGH);
->  	if (IS_ERR(priv->gpiod_nce)) {
->  		err = PTR_ERR(priv->gpiod_nce);
->  		dev_err(&pdev->dev, "NCE GPIO request failed (%d)\n", err);
-> -		goto out_mtd;
-> +		return err;
->  	}
->  
->  	priv->gpiod_nre = devm_gpiod_get(&pdev->dev, "nre", GPIOD_OUT_HIGH);
->  	if (IS_ERR(priv->gpiod_nre)) {
->  		err = PTR_ERR(priv->gpiod_nre);
->  		dev_err(&pdev->dev, "NRE GPIO request failed (%d)\n", err);
-> -		goto out_mtd;
-> +		return err;
->  	}
->  
->  	priv->gpiod_nwe = devm_gpiod_get(&pdev->dev, "nwe", GPIOD_OUT_HIGH);
->  	if (IS_ERR(priv->gpiod_nwe)) {
->  		err = PTR_ERR(priv->gpiod_nwe);
->  		dev_err(&pdev->dev, "NWE GPIO request failed (%d)\n", err);
-> -		goto out_mtd;
-> +		return err;
->  	}
->  
->  	priv->gpiod_ale = devm_gpiod_get(&pdev->dev, "ale", GPIOD_OUT_LOW);
->  	if (IS_ERR(priv->gpiod_ale)) {
->  		err = PTR_ERR(priv->gpiod_ale);
->  		dev_err(&pdev->dev, "ALE GPIO request failed (%d)\n", err);
-> -		goto out_mtd;
-> +		return err;
->  	}
->  
->  	priv->gpiod_cle = devm_gpiod_get(&pdev->dev, "cle", GPIOD_OUT_LOW);
->  	if (IS_ERR(priv->gpiod_cle)) {
->  		err = PTR_ERR(priv->gpiod_cle);
->  		dev_err(&pdev->dev, "CLE GPIO request failed (%d)\n", err);
-> -		goto out_mtd;
-> +		return err;
->  	}
->  	/* Request array of data pins, initialize them as input */
-> -	data_gpiods = devm_gpiod_get_array(&pdev->dev, "data", GPIOD_IN);
-> -	if (IS_ERR(data_gpiods)) {
-> -		err = PTR_ERR(data_gpiods);
-> +	priv->data_gpiods = devm_gpiod_get_array(&pdev->dev, "data", GPIOD_IN);
-> +	if (IS_ERR(priv->data_gpiods)) {
-> +		err = PTR_ERR(priv->data_gpiods);
->  		dev_err(&pdev->dev, "data GPIO request failed: %d\n", err);
-> -		goto out_mtd;
-> +		return err;
->  	}
->  
->  	/* Scan to find existence of the device */
->  	err = nand_scan(mtd, 1);
->  	if (err)
-> -		goto out_mtd;
-> +		return err;
->  
->  	/* Register the partitions */
->  	mtd_device_register(mtd, partition_info, ARRAY_SIZE(partition_info));
->  
-> -	goto out;
-> -
-> - out_mtd:
-> -	iounmap(io_base);
-> -out_free:
-> - out:
-> -	return err;
-> +	return 0;
->  }
->  
->  /*
-> @@ -294,13 +276,10 @@ static int ams_delta_cleanup(struct platform_device *pdev)
->  {
->  	struct ams_delta_nand *priv = platform_get_drvdata(pdev);
->  	struct mtd_info *mtd = nand_to_mtd(&priv->nand_chip);
-> -	void __iomem *io_base = priv->io_base;
->  
-> -	/* Release resources, unregister device */
-> +	/* Unregister device */
->  	nand_release(mtd);
->  
-> -	iounmap(io_base);
-> -
->  	return 0;
->  }
->  
-> 
+I'm well aware of that, which is why I mentioned that ChaCha12
+_probably_ has an adequate security. My primary concerns are a bit
+different actually from where you're going - that it breaks from
+what's becoming a pretty widely accepted "norm" and, more importantly,
+that it increases implementation complexity. These aren't really
+drastic concerns, but I am in earnest wondering the type of hardware
+analysis you did to determine that you really do need the 12-speedup.
+What's the practical landscape out there look like? What disk speeds
+were too low for which specific kind of Android usage on which
+particular hardware? Did you hit the bottlenecks when paging for code
+or when filling up caches when writing asynchronously? And for how
+much longer do you foresee underpowered hardware like that being a not
+insignificant part of the market? I'm especially curious to know
+because ostensibly at Google you have all sorts metrics regarding that
+kind of thing.
 
-
--- 
-Best regards,
-Marek Vasut
+Jason
