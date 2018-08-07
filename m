@@ -1,31 +1,46 @@
-From: samuel.c.p.neves@gmail.com (Samuel Neves)
-Date: Tue, 7 Aug 2018 11:21:04 +0100
-Subject: [RFC PATCH 3/9] crypto: chacha20-generic - refactor to allow
- varying number of rounds
-In-Reply-To: <CA+_SqcD+KpQ_X6iXUCpQh0N6pWzBorstBJDx7eBqcybY4Dvy8Q@mail.gmail.com>
-References: <20180806223300.113891-1-ebiggers@kernel.org>
- <20180806223300.113891-4-ebiggers@kernel.org>
- <CAHmME9rbe6eT6dkUqKnp-GxcqGrp-tvMfTMr8kZtsn=S3cmP8A@mail.gmail.com>
- <CA+_SqcD+KpQ_X6iXUCpQh0N6pWzBorstBJDx7eBqcybY4Dvy8Q@mail.gmail.com>
-Message-ID: <CAEX_ruFp0KddnZyetZt997OvRzKDuN7U95MF_N9AgTh+mTcD7Q@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 7 Aug 2018 11:24:34 +0100
+Subject: [PATCH] arm64: Trap WFI executed in userspace
+In-Reply-To: <20180807100437.GA9097@e103592.cambridge.arm.com>
+References: <20180807093326.5090-1-marc.zyngier@arm.com>
+ <20180807100437.GA9097@e103592.cambridge.arm.com>
+Message-ID: <9af8bb9a-7c6c-2560-5965-118dfadf8141@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The best attack on ChaCha breaks 7 rounds, and that attack requires 2^248 operations.
+On 07/08/18 11:05, Dave Martin wrote:
+> On Tue, Aug 07, 2018 at 10:33:26AM +0100, Marc Zyngier wrote:
+>> It recently came to light that userspace can execute WFI, and that
+>> the arm64 kernel doesn trap this event. This sounds rather benign,
+>> but the kernel should decide when it wants to wait for an interrupt,
+>> and not userspace.
+>>
+>> Let's trap WFI and treat it as a way to yield the CPU to another
+>> process.
+> 
+> This doesn't amount to a justification.
+> 
+> If the power controller is unexpectedly left in a bad state so that
+> WFI will do something nasty to a cpu that may enter userspace, then we
+> probably have bigger problems.
+> 
+> So, maybe it really is pretty harmless to let userspace execute this.
 
-This number, as far as I can tell, comes from the "New features of
-Latin dances" paper. There have been some minor improvements in the
-intervening 10 years, e.g., [1, 2, 3, 4], which pull back the
-complexity of breaking ChaCha7 down to 2^235. In any case, every
-attack so far appears to hit a wall at 8 rounds, with 12 rounds---the
-recommended eSTREAM round number for Salsa20---seeming to offer a
-reasonable security margin, still somewhat better than that of the
-AES.
+Or not. It is also a very good way for userspace to find out when an
+interrupt gets delivered and start doing all kind of probing on the
+kernel. The least the userspace knows about that, the better I feel.
 
-Best regards,
-Samuel Neves
+> I can't think of a legitimate reason for userspace to execute WFI
+> however.  Userspace doesn't have interrupts under Linux, so it makes
+> no sense to wait for one.
+> 
+> Have we seen anybody using WFI in userspace?  It may be cleaner to
+> map this to SIGILL rather than be permissive and regret it later.
 
-[1] https://eprint.iacr.org/2015/698
-[2] https://eprint.iacr.org/2015/217
-[3] https://eprint.iacr.org/2016/1034
-[4] https://doi.org/10.1016/j.dam.2017.04.034
+I couldn't find any user, and I'm happy to just send userspace to hell
+in that case. But it could also been said that since it was never
+prevented, it is a de-facto ABI.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
