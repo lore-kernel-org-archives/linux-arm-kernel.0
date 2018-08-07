@@ -1,28 +1,31 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Tue, 7 Aug 2018 19:06:27 +0200
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Tue, 07 Aug 2018 19:11:22 +0200
 Subject: [RFC PATCH v2 05/12] mtd: rawnand: ams-delta: use GPIO API for
  data read/write
-In-Reply-To: <20180806222918.12644-6-jmkrzyszt@gmail.com>
+In-Reply-To: <20180807190627.4340aade@bbrezillon>
 References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
- <20180806222918.12644-1-jmkrzyszt@gmail.com>
  <20180806222918.12644-6-jmkrzyszt@gmail.com>
-Message-ID: <20180807190627.4340aade@bbrezillon>
+ <20180807190627.4340aade@bbrezillon>
+Message-ID: <1593487.Cmi0mten1c@z50>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  7 Aug 2018 00:29:11 +0200
-Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
+Hi Boris,
 
-> Don't readw()/writew() data directly from/to GPIO port which is under
-> control of gpio-omap driver, use GPIO API instead.
+On Tuesday, August 7, 2018 7:06:27 PM CEST Boris Brezillon wrote:
+> On Tue,  7 Aug 2018 00:29:11 +0200
+> Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
 > 
-> Degrade of performance on Amstrad Delta is completely not acceptable.
-
-Can we have numbers along with information about where the overhead is
-when using gpiod_{get,set}_raw_array_value()?
-
+> > Don't readw()/writew() data directly from/to GPIO port which is under
+> > control of gpio-omap driver, use GPIO API instead.
+> > 
+> > Degrade of performance on Amstrad Delta is completely not acceptable.
 > 
-> The driver should work with any 8+-bit bidirectional GPIO port, not
-> only OMAP.
+> Can we have numbers along with information about where the overhead is
+> when using gpiod_{get,set}_raw_array_value()?
 
-That's cool!
+Yes, as soon as I get physical access to the device, probably this or next 
+weekend.
+
+Thanks,
+Janusz
