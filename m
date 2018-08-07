@@ -1,45 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 7 Aug 2018 17:56:34 +0100
-Subject: [RFC PATCH] arm64: lse: provide additional GPR to 'fetch' LL/SC
- fallback variants
-In-Reply-To: <20180804095553.16358-1-ard.biesheuvel@linaro.org>
-References: <20180804095553.16358-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180807165634.GA21809@arm.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Tue, 7 Aug 2018 18:57:38 +0200
+Subject: [RFC PATCH v2 01/12] mtd: rawnand: ams-delta: Assign
+ mtd->dev.parent, not mtd->owner
+In-Reply-To: <20180806222918.12644-2-jmkrzyszt@gmail.com>
+References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
+ <20180806222918.12644-1-jmkrzyszt@gmail.com>
+ <20180806222918.12644-2-jmkrzyszt@gmail.com>
+Message-ID: <20180807185738.695960dc@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Tue,  7 Aug 2018 00:29:07 +0200
+Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
 
-On Sat, Aug 04, 2018 at 11:55:53AM +0200, Ard Biesheuvel wrote:
-> When support for ARMv8.2 LSE atomics is compiled in, the original
-> LL/SC implementations are demoted to fallbacks that are invoked
-> via function calls on systems that do not implement the new instructions.
+> Fix missing mtd->dev.parent assignment and drop useless mtd->owner.
 > 
-> Due to the fact that these function calls may occur from modules that
-> are located further than 128 MB away from their targets in the core
-> kernel, such calls may be indirected via PLT entries, which are permitted
-> to clobber registers x16 and x17. Since we must assume that those
-> registers do not retain their value across a function call to such a
-> LL/SC fallback, and given that those function calls are hidden from the
-> compiler entirely, we must assume that calling any of the LSE atomics
-> routines clobbers x16 and x17 (and x30, for that matter).
-> 
-> Fortunately, there is an upside: having two scratch register available
-> permits the compiler to emit many of the LL/SC fallbacks without having
-> to preserve/restore registers on the stack, which would penalise the
-> users of the LL/SC fallbacks even more, given that they are already
-> putting up with the function call overhead.
-> 
-> However, the 'fetch' variants need an additional scratch register in
-> order to execute without the need to preserve registers on the stack.
-> 
-> So let's give those routines an additional scratch register 'x15' when
-> emitted as a LL/SC fallback, and ensure that the register is marked as
-> clobbered at the associated LSE call sites (but not anywhere else)
+> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 
-Hmm, doesn't this mean that we'll needlessly spill/reload in the case that
-we have LSE atomics in the CPU? I'd rather keep the LSE code as fast as
-possible if ARM64_LSE_ATOMICS=y, and allow people to disable the config
-option if they want to get the best performance for the LL/SC variants.
+Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
 
-Will
+> ---
+>  drivers/mtd/nand/raw/ams-delta.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/nand/raw/ams-delta.c b/drivers/mtd/nand/raw/ams-delta.c
+> index 2a8872ebd14a..af313c620264 100644
+> --- a/drivers/mtd/nand/raw/ams-delta.c
+> +++ b/drivers/mtd/nand/raw/ams-delta.c
+> @@ -162,7 +162,7 @@ static int ams_delta_init(struct platform_device *pdev)
+>  	}
+>  
+>  	ams_delta_mtd = nand_to_mtd(this);
+> -	ams_delta_mtd->owner = THIS_MODULE;
+> +	ams_delta_mtd->dev.parent = &pdev->dev;
+>  
+>  	/*
+>  	 * Don't try to request the memory region from here,
