@@ -1,32 +1,31 @@
 From: ykaukab@suse.de (Mian Yousaf Kaukab)
-Date: Tue,  7 Aug 2018 20:14:13 +0200
-Subject: [PATCH 0/6] arm64: add support for generic cpu vulnerabilities
-Message-ID: <20180807181419.15690-1-ykaukab@suse.de>
+Date: Tue,  7 Aug 2018 20:14:19 +0200
+Subject: [PATCH 6/6] arm64: enable generic CPU vulnerabilites support
+In-Reply-To: <20180807181419.15690-1-ykaukab@suse.de>
+References: <20180807181419.15690-1-ykaukab@suse.de>
+Message-ID: <20180807181419.15690-7-ykaukab@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GENERIC_CPU_VULNERABILITIES provide a common way to figure out if a
-system is affected by vulnerabilities like meltdown and other variants
-of spectre. This small series adds support for it in arm64.
+Enable CPU vulnerabilty show functions for spectre_v1, spectre_v2,
+meltdown and store-bypass.
 
-Thank you,
+Signed-off-by: Mian Yousaf Kaukab <ykaukab@suse.de>
+---
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Best regards,
-Yousaf
-
-Mian Yousaf Kaukab (6):
-  arm64: kpti: move check for non-vulnerable CPUs to a function
-  arm64: add sysfs vulnerability show for meltdown
-  arm64: add sysfs vulnerability show for spectre v1
-  arm64: add sysfs vulnerability show for spectre v2
-  arm64: add sysfs vulnerability show for speculative store bypass
-  arm64: enable generic CPU vulnerabilites support
-
- arch/arm64/Kconfig                  |  1 +
- arch/arm64/include/asm/cpufeature.h | 16 +++++++
- arch/arm64/kernel/cpu_errata.c      | 84 ++++++++++++++++++++++++++++++++++++-
- arch/arm64/kernel/cpufeature.c      |  9 +---
- 4 files changed, 101 insertions(+), 9 deletions(-)
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 0dec01a0c81c..ffd97bc0f5d5 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -84,6 +84,7 @@ config ARM64
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_CLOCKEVENTS_BROADCAST
+ 	select GENERIC_CPU_AUTOPROBE
++	select GENERIC_CPU_VULNERABILITIES
+ 	select GENERIC_EARLY_IOREMAP
+ 	select GENERIC_IDLE_POLL_SETUP
+ 	select GENERIC_IRQ_MULTI_HANDLER
 -- 
 2.11.0
