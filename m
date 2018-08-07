@@ -1,42 +1,78 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Tue, 7 Aug 2018 10:14:13 -0400 (EDT)
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <CAKv+Gu8384LZwL898wJ8BKjmJNzvd+-cSFUp4X4OpfmRDCP4Ng@mail.gmail.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <alpine.LRH.2.02.1808032046540.24748@file01.intranet.prod.int.rdu2.redhat.com>
- <CA+=Sn1=6F-fGLmXE0VqQHTqTCUKUT=Fz29mMT7349SPFisbZ9A@mail.gmail.com>
- <alpine.LRH.2.02.1808040611070.23762@file01.intranet.prod.int.rdu2.redhat.com>
- <fd2cae87-b2df-d8ef-8836-e6cbf8c5f851@redhat.com>
- <alpine.LRH.2.02.1808060325110.3756@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu_y6La77sWOSROrwfRy65jrFVYVvRZt+ewNheYhdhHCkQ@mail.gmail.com>
- <alpine.LRH.2.02.1808060626060.2986@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu87YqLM=FFZ6V8rHhuhskDdsBUuXFpqNKVbXWqdnuNEyA@mail.gmail.com>
- <alpine.LRH.2.02.1808060639200.2986@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8HyHX8qjg1qHV2M9Re+RGQJigjdAFVC_yR4niGkk2ikA@mail.gmail.com>
- <alpine.LRH.2.02.1808060700070.10220@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8384LZwL898wJ8BKjmJNzvd+-cSFUp4X4OpfmRDCP4Ng@mail.gmail.com>
-Message-ID: <alpine.LRH.2.02.1808071010240.11209@file01.intranet.prod.int.rdu2.redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 7 Aug 2018 15:25:53 +0100
+Subject: [PATCH 1/2] iommu/rockchip: Handle errors returned from PM
+ framework
+In-Reply-To: <3265383.PcPThIO4HC@phil>
+References: <20180807085406.3863-1-marc.zyngier@arm.com>
+ <2940317.dDZy1L4CDY@phil> <94b6aab1-e8d3-6929-a2e6-2f06c564bc70@arm.com>
+ <3265383.PcPThIO4HC@phil>
+Message-ID: <5aa8d184-0c58-3471-a661-8a66a93271c7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Mon, 6 Aug 2018, Ard Biesheuvel wrote:
-
-> No that works fine for me. VDPAU acceleration works as well, but it
-> depends on your chromium build whether it can actually use it, I
-> think? In any case, mplayer can use vdpau to play 1080p h264 without
-> breaking a sweat on this system.
+On 07/08/18 14:15, Heiko Stuebner wrote:
+> Am Dienstag, 7. August 2018, 14:31:49 CEST schrieb Marc Zyngier:
+>> On 07/08/18 13:09, Heiko Stuebner wrote:
+>>> Hi Marc,
+>>>
+>>> Am Dienstag, 7. August 2018, 10:54:05 CEST schrieb Marc Zyngier:
+>>>> pm_runtime_get_if_in_use can fail: either PM has been disabled
+>>>> altogether (-EINVAL), or the device hasn't been enabled yet (0).
+>>>> Sadly, the Rockchip IOMMU driver tends to conflate the two things
+>>>> by considering a non-zero return value as successful.
+>>>>
+>>>> This has the consequence of hiding other bugs, so let's handle this
+>>>> case throughout the driver, with a WARN_ON_ONCE so that we can try
+>>>> and work out what happened.
+>>>>
+>>>> Fixes: 0f181d3cf7d98 ("iommu/rockchip: Add runtime PM support")
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>
+>>> I'm still not sure about the !CONFIG_PM case, as it was probably silently
+>>> working in that case before
+>>
+>> Do we agree that this is an orthogonal problem though?
 > 
-> Note that the VDPAU driver also relies on memory semantics, i.e., it
-> may use DC ZVA (zero cacheline) instructions which are not permitted
-> on device mappings. This is probably just glibc's memset() being
-> invoked, but I remember hitting this on another PCIe-impaired arm64
-> system with Synopsys PCIe IP
+> Nope ;-) .... I.e. right now the code ignores the -EINVAL from disabled PM
+> and continues, possibly even handling the irq correctly.
 
-DC ZVA can be disabled with the SCTRL_EL1.DZE bit, so that neither kernel 
-nor userspace will use it. If the mapping didn't support unaligned writes, 
-it would be worse.
+Ah, I now see what you mean. Yeah, this is a bit rubbish. It would have
+been better if the API returned something more sensible in that case,
+but that's a bit late...
 
-Mikulas
+> If it actually worked is a different matter, as I guess nobody really tried
+> with !PM in the past.
+
+I don't think anyone noticed. !CONFIG_PM on something like rk3399
+probably isn't very popular, and certainly comes for free on a
+multiplatform kernel.
+
+> Now with error-handling we always return IRQ_NONE for !PM.
+
+Yup.
+
+>>> But on the other hand we're also already running over it in other places
+>>> like in the iommu-shutdown and I guess if someone _really_ disabled
+>>> CONFIG_PM, a lot of additional stuff would fail anyway.
+>>>
+>>> So should we wrap that in some #ifdef magic, just ignore it or simply
+>>> select PM similar to what Tegra, Renesas and Vexpress seem to do?
+>>>
+>>> I guess I like the 3rd option best ;-)
+>>
+>> It probably doesn't hurt. At what level do you want it? As a dependency
+>> to the IOMMU? or to the platform?
+> 
+> I guess it might be best to go the Tegra, etc way. Whoever in their right
+> mind would want to drive a mobile platform without any form for power
+> management ;-) .
+> 
+> I can do these patches for arm32+arm64 myself ... I just wanted to put
+> that thought out there - in case that was just a stupid idea of mine :-D .
+
+Not stupid at all. Regarding this very patch: where do you want me to
+take it?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
