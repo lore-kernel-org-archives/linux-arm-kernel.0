@@ -1,74 +1,68 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 7 Aug 2018 10:16:16 +0200
-Subject: [PATCH V2] ARM: dts: silk: Add DA9063 PMIC node
-In-Reply-To: <20180804163818.23360-1-marek.vasut+renesas@gmail.com>
-References: <20180804163818.23360-1-marek.vasut+renesas@gmail.com>
-Message-ID: <CAMuHMdU8=pb1V9gPxTe6JX5waXr0aRg5PW6t_bDY2fij0PVr5A@mail.gmail.com>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Tue, 7 Aug 2018 12:26:15 -0400
+Subject: [PATCH RESEND v2] arm64: clean the additional checks before calling
+ ghes_notify_sea()
+Message-ID: <1533659175-47076-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+In order to remove the additional check before calling the
+ghes_notify_sea(), make stub definition when !CONFIG_ACPI_APEI_SEA.
 
-On Sat, Aug 4, 2018 at 6:38 PM Marek Vasut <marek.vasut@gmail.com> wrote:
-> Add DA9063 PMIC node to the I2C bus.
->
-> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Cc: Simon Horman <horms+renesas@verge.net.au>
-> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> Cc: linux-renesas-soc at vger.kernel.org
-> ---
-> V2: - Replace shmobile with dts since it's a DT patch in subject
->     - Connect the 9063_IRQ# line to GP3_31
->     - Since the DA9063 is connected to both i2c1 and i2c7, connect
->       it to i2c7, which is the dedicated dvfs i2c.
+After this cleanup, we can simply call the ghes_notify_sea() to let
+APEI driver handle the SEA notification.
 
-Thanks for the update!
+CC: Tyler Baicar <tbaicar@codeaurora.org>
+CC: James Morse <james.morse@arm.com>
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
+This cleanup is ever mentioned by Mark Rutland in [1]
 
-> --- a/arch/arm/boot/dts/r8a7794-silk.dts
-> +++ b/arch/arm/boot/dts/r8a7794-silk.dts
-> @@ -405,6 +405,23 @@
->         clock-frequency = <400000>;
->  };
->
-> +&i2c7 {
-> +       status = "okay";
-> +       clock-frequency = <100000>;
-> +
-> +       pmic at 58 {
-> +               compatible = "dlg,da9063";
-> +               reg = <0x58>;
-> +               interrupt-parent = <&gpio3>;
-> +               interrupts = <31 IRQ_TYPE_LEVEL_LOW>;
-> +               interrupt-controller;
-> +
-> +               wdt {
-> +                       compatible = "dlg,da9063-watchdog";
-> +               };
+[1]:
+https://lkml.org/lkml/2018/5/31/289
 
-Given Silk has the full da9063 (unlike the "L" version on Porter), shouldn't
-you add an rtc subnode?
+Change since v1:
+1. Update the commit messages
+2. CC Tyler and James
+3. Add Acked-by of Will
+---
+ arch/arm64/mm/fault.c | 7 +------
+ include/acpi/ghes.h   | 4 ++++
+ 2 files changed, 5 insertions(+), 6 deletions(-)
 
-Oh, Silk also has the onkey pin wired, so perhaps you want to add an onkey
-subnode, too? Does that feature work?
-
-BTW, Stout also has the onkey wired, but lacks the onkey subnode.
-
-> +       };
-> +};
-> +
-
-Nevertheless:
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index b8eecc7..9ffe01d 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -727,12 +727,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+ 
+ int handle_guest_sea(phys_addr_t addr, unsigned int esr)
+ {
+-	int ret = -ENOENT;
+-
+-	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA))
+-		ret = ghes_notify_sea();
+-
+-	return ret;
++	return ghes_notify_sea();
+ }
+ 
+ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+index 1624e2b..82cb4eb 100644
+--- a/include/acpi/ghes.h
++++ b/include/acpi/ghes.h
+@@ -118,6 +118,10 @@ static inline void *acpi_hest_get_next(struct acpi_hest_generic_data *gdata)
+ 	     (void *)section - (void *)(estatus + 1) < estatus->data_length; \
+ 	     section = acpi_hest_get_next(section))
+ 
++#ifdef CONFIG_ACPI_APEI_SEA
+ int ghes_notify_sea(void);
++#else
++static inline int ghes_notify_sea(void) { return -ENOENT; }
++#endif
+ 
+ #endif /* GHES_H */
+-- 
+1.9.1
