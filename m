@@ -1,167 +1,195 @@
 From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Tue, 7 Aug 2018 21:20:10 +0200
-Subject: [RFC PATCH 08/16] KVM: arm64: Support dynamically hideable
- system registers
-In-Reply-To: <1529593060-542-9-git-send-email-Dave.Martin@arm.com>
+Date: Tue, 7 Aug 2018 21:35:12 +0200
+Subject: [RFC PATCH 09/16] KVM: arm64: Allow ID registers to by
+ dynamically read-as-zero
+In-Reply-To: <20180807110958.GC9097@e103592.cambridge.arm.com>
 References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-9-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180807192010.GG5985@e113682-lin.lund.arm.com>
+ <1529593060-542-10-git-send-email-Dave.Martin@arm.com>
+ <20180806130324.GA5985@e113682-lin.lund.arm.com>
+ <20180807110958.GC9097@e103592.cambridge.arm.com>
+Message-ID: <20180807193512.GH5985@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 21, 2018 at 03:57:32PM +0100, Dave Martin wrote:
-> Some system registers may or may not logically exist for a vcpu
-> depending on whether certain architectural features are enabled for
-> the vcpu.
+On Tue, Aug 07, 2018 at 12:09:58PM +0100, Dave Martin wrote:
+> On Mon, Aug 06, 2018 at 03:03:24PM +0200, Christoffer Dall wrote:
+> > Hi Dave,
+> > 
+> > I think there's a typo in the subject "to be" rather than "to by".
+> > 
+> > On Thu, Jun 21, 2018 at 03:57:33PM +0100, Dave Martin wrote:
+> > > When a feature-dependent ID register is hidden from the guest, it
+> > > needs to exhibit read-as-zero behaviour as defined by the Arm
+> > > architecture, rather than appearing to be entirely absent.
+> > > 
+> > > This patch updates the ID register emulation logic to make use of
+> > > the new check_present() method to determine whether the register
+> > > should read as zero instead of yielding the host's sanitised
+> > > value.  Because currently a false result from this method truncates
+> > > the trap call chain before the sysreg's emulate method() is called,
+> > > a flag is added to distinguish this special case, and helpers are
+> > > refactored appropriately.
+> > 
+> > I don't understand this last sentence.
+> > 
+> > And I'm not really sure I understand the code either.
+> > 
+> > I can't seem to see any registers which are defined as !present && !raz,
+> > which is what I thought this feature was all about.
 > 
-> In order to avoid spuriously emulating access to these registers
-> when they should not exist, or allowing the registers to be
-> spuriously enumerated or saved/restored through the ioctl
-> interface, a means is needed to allow registers to be hidden
-> depending on the vcpu configuration.
-> 
-> In order to support this in a flexible way, this patch adds a
-> check_present() method to struct sys_reg_desc, and updates the
-> generic system register access and enumeration code to be aware of
-> it:  if check_present() returns false, the code behaves as if the
-> register did not exist.
-> 
-> For convenience, the complete check is wrapped up in a new helper
-> sys_reg_present().
-> 
-> An attempt has been made to hook the new check into the generic
-> accessors for trapped system registers.  This should reduce the
-> potential for future surprises, although the redundant check will
-> add a small cost.  No system register depends on this functionality
-> yet, and some paths needing the check may also need attention.
-> 
-> Naturally, this facility makes sense only for registers that are
-> trapped.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/kvm/sys_regs.c | 20 +++++++++++++++-----
->  arch/arm64/kvm/sys_regs.h | 11 +++++++++++
->  2 files changed, 26 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index a436373..31a351a 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -1840,7 +1840,7 @@ static int emulate_cp(struct kvm_vcpu *vcpu,
->  
->  	r = find_reg(params, table, num);
->  
-> -	if (r) {
-> +	if (likely(r) && sys_reg_present(vcpu, r)) {
->  		perform_access(vcpu, params, r);
->  		return 0;
->  	}
-> @@ -2016,7 +2016,7 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
->  	if (!r)
->  		r = find_reg(params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
->  
-> -	if (likely(r)) {
-> +	if (likely(r) && sys_reg_present(vcpu, r)) {
->  		perform_access(vcpu, params, r);
->  	} else {
->  		kvm_err("Unsupported guest sys_reg access at: %lx\n",
+> !present and !raz is the default behaviour for everything that is not
+> ID-register-like.  This patch is adding the !present && raz case (though
+> that may not be a helpful way to descibe it ... see below).
 
-This looks a bit fishy, because it seems that now a guest can be
-configured in such a way that it can access non-present emulated system
-registers and get the host to tell the operator that the KVM instance
-running on the system doesn't really support the hardware...
+Fair enough, but I don't really see why you need to classify a register
+as !present && raz, because raz implies present AFAICT.
+
+> 
+> > In other words, what is the benefit of this more generic method as
+> > opposed to having a wrapper around read_id_reg() for read_sve_id_reg()
+> > which sets RAZ if there is no support for SVE in this context?
+> 
+> There may be other ways to factor this.  I can't now remember whay I
+> went with this particular approach, except that I vaguely recall
+> hitting some obstacles when doing things another way.
+
+What I don't much care for is that we now seem to be mixing the concept
+of whether something is present and the value it returns if it is
+present in the overall system register handling logic.  And I don't
+understand why this is a requirement.
+
+> 
+> Can you take a look at my attempted explanation below and then we
+> can reconsider this?
+
+Sure, see my comments below.
+
+> 
+> [...]
+> 
+> > 
+> > > 
+> > > This invloves some trivial updates to pass the vcpu pointer down
+> > > into the ID register emulation/access functions.
+> > > 
+> > > A new ID_SANITISED_IF() macro is defined for declaring
+> > > conditionally visible ID registers.
+> > > 
+> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > > ---
+> > >  arch/arm64/kvm/sys_regs.c | 51 ++++++++++++++++++++++++++++++-----------------
+> > >  arch/arm64/kvm/sys_regs.h | 11 ++++++++++
+> > >  2 files changed, 44 insertions(+), 18 deletions(-)
+> > > 
+> 
+> [...]
+> 
+> > > @@ -1840,7 +1855,7 @@ static int emulate_cp(struct kvm_vcpu *vcpu,
+> > >  
+> > >  	r = find_reg(params, table, num);
+> > >  
+> > > -	if (likely(r) && sys_reg_present(vcpu, r)) {
+> > > +	if (likely(r) && sys_reg_present_or_raz(vcpu, r)) {
+> > >  		perform_access(vcpu, params, r);
+> > >  		return 0;
+> > >  	}
+> > > @@ -2016,7 +2031,7 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
+> > >  	if (!r)
+> > >  		r = find_reg(params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
+> > >  
+> > > -	if (likely(r) && sys_reg_present(vcpu, r)) {
+> > > +	if (likely(r) && sys_reg_present_or_raz(vcpu, r)) {
+> > >  		perform_access(vcpu, params, r);
+> > >  	} else {
+> > >  		kvm_err("Unsupported guest sys_reg access at: %lx\n",
+> > > @@ -2313,7 +2328,7 @@ int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
+> > >  	if (!r)
+> > >  		return get_invariant_sys_reg(reg->id, uaddr);
+> > >  
+> > > -	if (!sys_reg_present(vcpu, r))
+> > > +	if (!sys_reg_present_or_raz(vcpu, r))
+> > >  		return -ENOENT;
+> > >  
+> > >  	if (r->get_user)
+> > > @@ -2337,7 +2352,7 @@ int kvm_arm_sys_reg_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
+> > >  	if (!r)
+> > >  		return set_invariant_sys_reg(reg->id, uaddr);
+> > >  
+> > > -	if (!sys_reg_present(vcpu, r))
+> > > +	if (!sys_reg_present_or_raz(vcpu, r))
+> > >  		return -ENOENT;
+> 
+> On Wed, Jul 25, 2018 at 04:46:55PM +0100, Alex Benn?e wrote:
+> > It's all very well being raz, but shouldn't you catch this further down
+> > and not attempt to write the register that doesn't exist?
+> 
+> To be clear, is this a question about factoring, or do you think there's
+> a bug here?
+> 
+> 
+> In response to both sets of comments, I think the way the code is
+> factored is causing some confusion.
+> 
+> The idea in my head was something like this:
+> 
+> System register encodings fall into two classes:
+> 
+>  a) encodings that we emulate in some way
+
+this is present, then
+
+>  b) encodings that we unconditionally reflect back to the guest as an
+>     Undef.
+
+this is !present, then
+
+The previous change made this a configurable thing as opposed to a
+static compile time thing, right?
+> 
+> Architecturally defined system registers fall into two classes:
+> 
+>  i) registers whose removal turns all accesses into an Undef
+>  ii) registers whose removal exhibits some other behaviour.
+
+I'm not sure what you mean by 'removal' here, and which architectural
+concept that relates to, which makes it hard for me to parse the rest
+here...
+
+> 
+> These two classifications overlap somwehat.
+> 
+> 
+> From an emulation perspective, (b), and (i) in the "register not
+> present" case, look the same: we trap the register and reflect an Undef
+> directly back to the guest with no further action required.
+> 
+> From an emulation perspective, (a) and (ii) are also somewhat the
+> same: we need to emulate something, although precisely what we need
+> to do depends on which register it is and on whether the register is
+> deemed present or not.
+> 
+> sys_reg_check_present_or_raz() thus means "falls under (a) or (ii)",
+> i.e., some emulation is required and we need to call sysreg-specific
+> methods to figure out precisely what we need to do.
+
+yes, but we've always had that without the "or_raz" stuff at the lookup
+level.  What has changed?
+
+> 
+> Conversely !sys_reg_check_present_or_raz() means that we can just
+> Undef the guest with no further logic required.
+
+Yes, but that's the same as !present, because raz then implies present,
+see above.
+
+> 
+> Does this rationale make things clearer?  The naming is perhaps
+> unfortunate.
+> 
+
+Unfortunately not so much.  I have a strong feeling you want to move
+anything relating to something being emulated as RAZ/RAO/something else
+into sysreg specific functions.
 
 Thanks,
 -Christoffer
-
-> @@ -2313,6 +2313,9 @@ int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
->  	if (!r)
->  		return get_invariant_sys_reg(reg->id, uaddr);
->  
-> +	if (!sys_reg_present(vcpu, r))
-> +		return -ENOENT;
-> +
->  	if (r->get_user)
->  		return (r->get_user)(vcpu, r, reg, uaddr);
->  
-> @@ -2334,6 +2337,9 @@ int kvm_arm_sys_reg_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
->  	if (!r)
->  		return set_invariant_sys_reg(reg->id, uaddr);
->  
-> +	if (!sys_reg_present(vcpu, r))
-> +		return -ENOENT;
-> +
->  	if (r->set_user)
->  		return (r->set_user)(vcpu, r, reg, uaddr);
->  
-> @@ -2390,7 +2396,8 @@ static bool copy_reg_to_user(const struct sys_reg_desc *reg, u64 __user **uind)
->  	return true;
->  }
->  
-> -static int walk_one_sys_reg(const struct sys_reg_desc *rd,
-> +static int walk_one_sys_reg(struct kvm_vcpu *vcpu,
-> +			    const struct sys_reg_desc *rd,
->  			    u64 __user **uind,
->  			    unsigned int *total)
->  {
-> @@ -2401,6 +2408,9 @@ static int walk_one_sys_reg(const struct sys_reg_desc *rd,
->  	if (!(rd->reg || rd->get_user))
->  		return 0;
->  
-> +	if (!sys_reg_present(vcpu, rd))
-> +		return 0;
-> +
->  	if (!copy_reg_to_user(rd, uind))
->  		return -EFAULT;
->  
-> @@ -2429,9 +2439,9 @@ static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
->  		int cmp = cmp_sys_reg(i1, i2);
->  		/* target-specific overrides generic entry. */
->  		if (cmp <= 0)
-> -			err = walk_one_sys_reg(i1, &uind, &total);
-> +			err = walk_one_sys_reg(vcpu, i1, &uind, &total);
->  		else
-> -			err = walk_one_sys_reg(i2, &uind, &total);
-> +			err = walk_one_sys_reg(vcpu, i2, &uind, &total);
->  
->  		if (err)
->  			return err;
-> diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
-> index cd710f8..dfbb342 100644
-> --- a/arch/arm64/kvm/sys_regs.h
-> +++ b/arch/arm64/kvm/sys_regs.h
-> @@ -22,6 +22,9 @@
->  #ifndef __ARM64_KVM_SYS_REGS_LOCAL_H__
->  #define __ARM64_KVM_SYS_REGS_LOCAL_H__
->  
-> +#include <linux/compiler.h>
-> +#include <linux/types.h>
-> +
->  struct sys_reg_params {
->  	u8	Op0;
->  	u8	Op1;
-> @@ -61,8 +64,16 @@ struct sys_reg_desc {
->  			const struct kvm_one_reg *reg, void __user *uaddr);
->  	int (*set_user)(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
->  			const struct kvm_one_reg *reg, void __user *uaddr);
-> +	bool (*check_present)(const struct kvm_vcpu *vpcu,
-> +			      const struct sys_reg_desc *rd);
->  };
->  
-> +static inline bool sys_reg_present(const struct kvm_vcpu *vcpu,
-> +				   const struct sys_reg_desc *rd)
-> +{
-> +	return likely(!rd->check_present) || rd->check_present(vcpu, rd);
-> +}
-> +
->  static inline void print_sys_reg_instr(const struct sys_reg_params *p)
->  {
->  	/* Look, we even formatted it for you to paste into the table! */
-> -- 
-> 2.1.4
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
