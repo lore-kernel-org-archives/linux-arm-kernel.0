@@ -1,36 +1,43 @@
-From: hari.vyas@broadcom.com (Hari Vyas)
-Date: Tue,  7 Aug 2018 16:33:48 +0530
-Subject: [PATCH] arm64: fix for bad_mode() handler to always result in panic
-Message-ID: <1533639828-19039-1-git-send-email-hari.vyas@broadcom.com>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Tue, 7 Aug 2018 13:06:32 +0200
+Subject: [PATCH 0/3] ARM: dts: stm32: Fix DT dtc warnings for STM32 MCU's
+Message-ID: <1533639995-27047-1-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bad_mode() handler is called for invalid or undefined
-instruction in el1 level or when irq,fiq,sync or error
-situation happen in el1 or el0 level.
+From: Patrice Chotard <patrice.chotard@st.com>
 
-As per latest code, above abnormal situation may not result in
-panic always due to die() call if user mode is determined at
-that moment. That will just result in kill of current process
-and panic will be avoided which it must not.
+This series fixes DT dtc warnings for following STM32 MCU's boards:
+	- stm32f429i evaluation
+	- stm32f429 discovery
+	- stm32f469 discovery
+	- stm32746g evaluation
+	- stm32f746 discovery
+	- stm32h743i discovery
+	- stm32h743i evaluation
 
-Link: https://bugzilla.kernel.org/show_bug.cgi?id=200637
-Signed-off-by: Hari Vyas <hari.vyas@broadcom.com>
----
- arch/arm64/kernel/traps.c | 1 -
- 1 file changed, 1 deletion(-)
+Patrice Chotard (3):
+  ARM: dts: stm32: Fix DT dtc warnings for stm32h7
+  ARM: dts: stm32: Fix DT dtc warnings for stm32f7
+  ARM: dts: stm32: Fix DT dtc warnings for stm32f4
 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index d399d45..716ee73 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -621,7 +621,6 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
- 		handler[reason], smp_processor_id(), esr,
- 		esr_get_class_string(esr));
- 
--	die("Oops - bad mode", regs, 0);
- 	local_daif_mask();
- 	panic("bad mode");
- }
+ arch/arm/boot/dts/stm32429i-eval.dts     | 11 +++--
+ arch/arm/boot/dts/stm32746g-eval.dts     |  9 ++--
+ arch/arm/boot/dts/stm32f4-pinctrl.dtsi   | 30 ++++++-------
+ arch/arm/boot/dts/stm32f429-disco.dts    |  7 ++-
+ arch/arm/boot/dts/stm32f429-pinctrl.dtsi | 74 +++++++++++++++----------------
+ arch/arm/boot/dts/stm32f429.dtsi         |  8 ++--
+ arch/arm/boot/dts/stm32f469-disco.dts    | 11 +++--
+ arch/arm/boot/dts/stm32f469-pinctrl.dtsi | 76 +++++++++++++++-----------------
+ arch/arm/boot/dts/stm32f7-pinctrl.dtsi   | 24 +++++-----
+ arch/arm/boot/dts/stm32f746-disco.dts    |  6 +--
+ arch/arm/boot/dts/stm32f746.dtsi         |  8 ++--
+ arch/arm/boot/dts/stm32f769-disco.dts    | 11 +++--
+ arch/arm/boot/dts/stm32h743-pinctrl.dtsi | 10 ++---
+ arch/arm/boot/dts/stm32h743.dtsi         |  8 ++--
+ arch/arm/boot/dts/stm32h743i-disco.dts   |  2 +-
+ arch/arm/boot/dts/stm32h743i-eval.dts    |  2 +-
+ 16 files changed, 140 insertions(+), 157 deletions(-)
+
 -- 
 1.9.1
