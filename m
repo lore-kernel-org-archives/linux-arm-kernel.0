@@ -1,36 +1,89 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 7 Aug 2018 17:53:41 +0800
-Subject: [PATCH 0/2] crypto: arm64/ghash-ce - performance improvements
-In-Reply-To: <20180804184625.28523-1-ard.biesheuvel@linaro.org>
-References: <20180804184625.28523-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180807095341.osf4ugfhl5kzhenc@gondor.apana.org.au>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 7 Aug 2018 11:54:02 +0200
+Subject: [PATCH v6 00/11] hugetlb: Factorize hugetlb architecture
+ primitives
+In-Reply-To: <20180806175711.24438-1-alex@ghiti.fr>
+References: <20180806175711.24438-1-alex@ghiti.fr>
+Message-ID: <20180807095402.GA12200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 04, 2018 at 08:46:23PM +0200, Ard Biesheuvel wrote:
-> Another bit of performance work on the GHASH driver: this time it is not
-> the combined AES/GCM algorithm but the bare GHASH driver that gets updated.
-> 
-> Even though ARM cores that implement the polynomical multiplication
-> instructions that these routines depend on are guaranteed to also support
-> the AES instructions, and can thus use the AES/GCM driver, there could
-> be reasons to use the accelerated GHASH in isolation, e.g., with another
-> symmetric blockcipher, with a faster h/w accelerator, or potentially with
-> an accelerator that does not expose the AES key to the OS.
-> 
-> The resulting code runs at 1.1 cycles per byte on Cortex-A53 (down from
-> 2.4 cycles per byte)
-> 
-> Ard Biesheuvel (2):
->   crypto: arm64/ghash-ce - replace NEON yield check with block limit
->   crypto: arm64/ghash-ce - implement 4-way aggregation
-> 
->  arch/arm64/crypto/ghash-ce-core.S | 153 ++++++++++++++------
->  arch/arm64/crypto/ghash-ce-glue.c |  87 ++++++-----
->  2 files changed, 161 insertions(+), 79 deletions(-)
 
-All applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+* Alexandre Ghiti <alex@ghiti.fr> wrote:
+
+> [CC linux-mm for inclusion in -mm tree]                                          
+>                                                                                  
+> In order to reduce copy/paste of functions across architectures and then         
+> make riscv hugetlb port (and future ports) simpler and smaller, this             
+> patchset intends to factorize the numerous hugetlb primitives that are           
+> defined across all the architectures.                                            
+>                                                                                  
+> Except for prepare_hugepage_range, this patchset moves the versions that         
+> are just pass-through to standard pte primitives into                            
+> asm-generic/hugetlb.h by using the same #ifdef semantic that can be              
+> found in asm-generic/pgtable.h, i.e. __HAVE_ARCH_***.                            
+>                                                                                  
+> s390 architecture has not been tackled in this serie since it does not           
+> use asm-generic/hugetlb.h at all.                                                
+>                                                                                  
+> This patchset has been compiled on all addressed architectures with              
+> success (except for parisc, but the problem does not come from this              
+> series).                                                                         
+>                                                                                  
+> v6:                                                                              
+>   - Remove nohash/32 and book3s/32 powerpc specific implementations in
+>     order to use the generic ones.                                                        
+>   - Add all the Reviewed-by, Acked-by and Tested-by in the commits,              
+>     thanks to everyone.                                                          
+>                                                                                  
+> v5:                                                                              
+>   As suggested by Mike Kravetz, no need to move the #include                     
+>   <asm-generic/hugetlb.h> for arm and x86 architectures, let it live at          
+>   the top of the file.                                                           
+>                                                                                  
+> v4:                                                                              
+>   Fix powerpc build error due to misplacing of #include                          
+>   <asm-generic/hugetlb.h> outside of #ifdef CONFIG_HUGETLB_PAGE, as              
+>   pointed by Christophe Leroy.                                                   
+>                                                                                  
+> v1, v2, v3:                                                                      
+>   Same version, just problems with email provider and misuse of                  
+>   --batch-size option of git send-email
+> 
+> Alexandre Ghiti (11):
+>   hugetlb: Harmonize hugetlb.h arch specific defines with pgtable.h
+>   hugetlb: Introduce generic version of hugetlb_free_pgd_range
+>   hugetlb: Introduce generic version of set_huge_pte_at
+>   hugetlb: Introduce generic version of huge_ptep_get_and_clear
+>   hugetlb: Introduce generic version of huge_ptep_clear_flush
+>   hugetlb: Introduce generic version of huge_pte_none
+>   hugetlb: Introduce generic version of huge_pte_wrprotect
+>   hugetlb: Introduce generic version of prepare_hugepage_range
+>   hugetlb: Introduce generic version of huge_ptep_set_wrprotect
+>   hugetlb: Introduce generic version of huge_ptep_set_access_flags
+>   hugetlb: Introduce generic version of huge_ptep_get
+> 
+>  arch/arm/include/asm/hugetlb-3level.h        | 32 +---------
+>  arch/arm/include/asm/hugetlb.h               | 30 ----------
+>  arch/arm64/include/asm/hugetlb.h             | 39 +++---------
+>  arch/ia64/include/asm/hugetlb.h              | 47 ++-------------
+>  arch/mips/include/asm/hugetlb.h              | 40 +++----------
+>  arch/parisc/include/asm/hugetlb.h            | 33 +++--------
+>  arch/powerpc/include/asm/book3s/32/pgtable.h |  6 --
+>  arch/powerpc/include/asm/book3s/64/pgtable.h |  1 +
+>  arch/powerpc/include/asm/hugetlb.h           | 43 ++------------
+>  arch/powerpc/include/asm/nohash/32/pgtable.h |  6 --
+>  arch/powerpc/include/asm/nohash/64/pgtable.h |  1 +
+>  arch/sh/include/asm/hugetlb.h                | 54 ++---------------
+>  arch/sparc/include/asm/hugetlb.h             | 40 +++----------
+>  arch/x86/include/asm/hugetlb.h               | 69 ----------------------
+>  include/asm-generic/hugetlb.h                | 88 +++++++++++++++++++++++++++-
+>  15 files changed, 135 insertions(+), 394 deletions(-)
+
+The x86 bits look good to me (assuming it's all tested on all relevant architectures, etc.)
+
+Acked-by: Ingo Molnar <mingo@kernel.org>
+
+Thanks,
+
+	Ingo
