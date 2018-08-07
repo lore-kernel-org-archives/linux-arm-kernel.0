@@ -1,38 +1,92 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 7 Aug 2018 13:55:26 +0800
-Subject: [PATCH v3 00/19] arm64: dts: allwinner: A64 boards DT updates
-In-Reply-To: <20180731123041.33gl4zcaxlvli3to@flea>
-References: <20180730123137.923-1-andre.przywara@arm.com>
- <20180731123041.33gl4zcaxlvli3to@flea>
-Message-ID: <CAGb2v66hiA_sf28RX9UCEWQ1CiaizmWLUnsivSzLJ_NGnyVk8A@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 7 Aug 2018 08:02:15 +0200
+Subject: [PATCH v8 1/3] dmaengine: fsl-edma: extract common fsl-edma code
+ (no changes in behavior intended)
+In-Reply-To: <20180806204021.GC6092@jerusalem>
+References: <20180803193244.12084-1-angelo@sysam.it>
+ <CAJKOXPejwmfp2g9hXFjxP_vt=j0UDubLDnsqca=KKmEYosNg4Q@mail.gmail.com>
+ <20180806204021.GC6092@jerusalem>
+Message-ID: <CAJKOXPc0n3GkaMp+ghgEFpawZY78o53AyptYa9G67d8+nOj0og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 8:30 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Mon, Jul 30, 2018 at 01:31:18PM +0100, Andre Przywara wrote:
->> Hi,
->>
->> only smaller changes compared to v2, addressing the comments on the
->> ML. This fixes Ethernet for the Nano Pi A64 and removes the DT nodes
->> for the non-existent BT part of this board. Also some fixes for the
->> OrangePi as requested by Maxime.
->>
->> Please note:
->> I am leaving for a three weeks holiday in a few hours, so won't be
->> able to respond or work on this.
->> Maxime, if you feel like you want to merge some parts, feel free to pick
->> some patches and/or make adjustments. Otherwise I will be picking this
->> up once I am back end of August.
+On 6 August 2018 at 22:40, Angelo Dureghello <angelo@sysam.it> wrote:
+> Hi Krzysztof,
 >
-> Apart from the serdev patch,
-> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> On Mon, Aug 06, 2018 at 09:43:42AM +0200, Krzysztof Kozlowski wrote:
+>> On 3 August 2018 at 21:32, Angelo Dureghello <angelo@sysam.it> wrote:
+>> > This patch adds a new fsl-edma-common module to allow new
+>> > mcf-edma module code to use most of the fsl-edma code.
+>> >
+>> > Signed-off-by: Angelo Dureghello <angelo@sysam.it>
+>> > ---
+>> > Changes for v2:
+>> > - patch splitted into 4
+>> > - add mcf-edma as minimal different parts from fsl-edma
+>> >
+>> > Changes for v3:
+>> > none
+>> >
+>> > Changes for v4:
+>> > - patch simplified from 4/4 into 2/2
+>> > - collecting all the mcf-edma-related changes
+>> >
+>> > Changes for v5:
+>> > none
+>> >
+>> > Changes for v6:
+>> > - adjusted comment header
+>> > - fixed bit shift with BIT()
+>> > - we need to free the interrupts at remove(), so removed all devm_
+>> >   interrupt related calls
+>> >
+>> > Changes for v7:
+>> > none
+>> >
+>> > Changes for v8:
+>> > - patch rewritten from scratch, splitted into 3, common code isolated,
+>> >   minimal changes from the original Freescale code have been done.
+>> >   The patch has been tested with both Iris + Colibri Vybrid VF50 and
+>> >   stmark2/mcf54415 Coldfire boards.
+>> > ---
+>> >  drivers/dma/Makefile          |   2 +-
+>> >  drivers/dma/fsl-edma-common.c | 576 ++++++++++++++++++++++++++++
+>> >  drivers/dma/fsl-edma-common.h | 196 ++++++++++
+>> >  drivers/dma/fsl-edma.c        | 697 +---------------------------------
+>> >  4 files changed, 774 insertions(+), 697 deletions(-)
+>> >  create mode 100644 drivers/dma/fsl-edma-common.c
+>> >  create mode 100644 drivers/dma/fsl-edma-common.h
+>> >
+>> > diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
+>> > index 203a99d68315..66022f59fca4 100644
+>> > --- a/drivers/dma/Makefile
+>> > +++ b/drivers/dma/Makefile
+>> > @@ -31,7 +31,7 @@ obj-$(CONFIG_DW_AXI_DMAC) += dw-axi-dmac/
+>> >  obj-$(CONFIG_DW_DMAC_CORE) += dw/
+>> >  obj-$(CONFIG_EP93XX_DMA) += ep93xx_dma.o
+>> >  obj-$(CONFIG_FSL_DMA) += fsldma.o
+>> > -obj-$(CONFIG_FSL_EDMA) += fsl-edma.o
+>> > +obj-$(CONFIG_FSL_EDMA) += fsl-edma.o fsl-edma-common.o
+>> >  obj-$(CONFIG_FSL_RAID) += fsl_raid.o
+>> >  obj-$(CONFIG_HSU_DMA) += hsu/
+>> >  obj-$(CONFIG_IMG_MDC_DMA) += img-mdc-dma.o
+>> > diff --git a/drivers/dma/fsl-edma-common.c b/drivers/dma/fsl-edma-common.c
+>> > new file mode 100644
+>> > index 000000000000..0ae7094f477a
+>> > --- /dev/null
+>> > +++ b/drivers/dma/fsl-edma-common.c
+>> > @@ -0,0 +1,576 @@
+>> > +// SPDX-License-Identifier: GPL-2.0
+>>
+>> You moved code from fsl-edma.c which is licensed on GPL-2.0+. I think
+>> that's not allowed as you effectively relicense the work on new
+>> license.
+>>
+> Ok, so if i undestrand, i should change that comment to
+> // SPDX-License-Identifier: GPL-2.0+
+> Right ?
 
-I queued up all patches except the serdev patch for 4.20.
+Yes, GPL-2.0+.
 
-I did a few fix ups, notably to the "Orange Pi Win USB OTG" and "NanoPi-A64
-WiFi" patches. Please check the result here:
-
-    https://git.kernel.org/pub/scm/linux/kernel/git/wens/linux.git/log/?h=sunxi/dt64-for-4.20
-
-ChenYu
+Best regards,
+Krzysztof
