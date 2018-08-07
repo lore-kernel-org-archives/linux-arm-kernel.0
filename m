@@ -1,141 +1,108 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 7 Aug 2018 11:21:58 +0200
-Subject: [RFC/PoC PATCH 0/3] arm64: basic ROP mitigation
-In-Reply-To: <CAN+XpFQCO1nr5tQ4oyPPaSfvnQSvwx-=JCtba2xJXrEN+6=LZg@mail.gmail.com>
-References: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
- <7529eedf-af56-2e94-261e-bc5c86abadaa@arm.com>
- <CAKv+Gu9X1CDpy+XvrmbSdjBjMb45eBW7JVsvsK_JQdUt2Dbvgw@mail.gmail.com>
- <b0c974a2-4e81-7855-7d4e-22834c5d8997@arm.com>
- <CAKv+Gu_ZzDbWwHVwOuoheXeN-ta_FjOT4Aj15=r56QZVTUK0FA@mail.gmail.com>
- <CAKv+Gu_wGk2Gdzd6WuOMZqz1tKHAWHL7pWm2Szyt0DZwPTCmOw@mail.gmail.com>
- <31443e6a-56b4-c4fb-82b1-b8eb5d7eebe1@arm.com>
- <CAGXu5jLj=KP038d-c+xzCx=Oogn1prH__oryQjNZZwNaAHaAAw@mail.gmail.com>
- <CAKv+Gu-9M0yO-rSXiREs11feEro0mJFcNN3Wkp_LSOGrKKd5dg@mail.gmail.com>
- <CAGXu5j+Tddmp_VgyvwTd+StEGtx=oGofeY+KpLD4OuPw+2=S2Q@mail.gmail.com>
- <CAKv+Gu-5ERHvqgXHR626QzKCZJPc0Cp5Ktv+gwucep5ZGvu9Vw@mail.gmail.com>
- <CAN+XpFQCO1nr5tQ4oyPPaSfvnQSvwx-=JCtba2xJXrEN+6=LZg@mail.gmail.com>
-Message-ID: <CAKv+Gu_jNh7vLfGEdi2BpA42rPJrNr8qV-Xss_toV2fJzUV5jQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  7 Aug 2018 10:33:26 +0100
+Subject: [PATCH] arm64: Trap WFI executed in userspace
+Message-ID: <20180807093326.5090-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 August 2018 at 05:05, Mark Brand <markbrand@google.com> wrote:
-> I think the phrasing of "limit kernel attack surface against ROP attacks" is
-> confusing and misleading. ROP does not describe a class of bugs,
-> vulnerabilities or attacks against the kernel - it's just one of many
-> code-reuse techniques that can be used by an attacker while exploiting a
-> vulnerability. But that's kind of off-topic!
->
-> I think what this thread is talking about is implementing extremely
-> coarse-grained reverse-edge control-flow-integrity, in that a return can
-> only return to the address following a legitimate call, but it can return to
-> any of those.
->
+It recently came to light that userspace can execute WFI, and that
+the arm64 kernel doesn trap this event. This sounds rather benign,
+but the kernel should decide when it wants to wait for an interrupt,
+and not userspace.
 
-Indeed. Apologies for not mastering the lingo, but it is indeed about
-no longer being able to subvert function returns into jumping to
-arbitrary places in the code.
+Let's trap WFI and treat it as a way to yield the CPU to another
+process.
 
-> I suspect there's not much benefit to this, since (as far as I can see) the
-> assumption is that an attacker has the means to direct flow of execution as
-> far as taking complete control of the (el1) stack before executing any ROP
-> payload.
->
-> At that point, I think it's highly unlikely an attacker needs to chain
-> gadgets through return instructions at all - I suspect there are a few
-> places in the kernel where it is necessary to load the entire register
-> context from a register that is not the stack pointer, and it would likely
-> not be more than a minor inconvenience to an attacker to use these (and
-> chaining through branch register) instructions instead of chaining through
-> return instructions.
->
-> I'd have to take a closer look at an arm64 kernel image to be sure though -
-> I'll do that when I get a chance and update...
->
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/esr.h    |  4 ++++
+ arch/arm64/include/asm/sysreg.h |  4 ++--
+ arch/arm64/kernel/entry.S       |  1 +
+ arch/arm64/kernel/traps.c       | 12 ++++++++++++
+ 4 files changed, 19 insertions(+), 2 deletions(-)
 
-Thanks. Reloading all registers from an arbitrary offset register
-should occur rarely, no? Could we work around that?
-
-> On Mon, 6 Aug 2018 at 19:28, Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> wrote:
->>
->> On 6 August 2018 at 21:50, Kees Cook <keescook@chromium.org> wrote:
->> > On Mon, Aug 6, 2018 at 12:35 PM, Ard Biesheuvel
->> > <ard.biesheuvel@linaro.org> wrote:
->> >> On 6 August 2018 at 20:49, Kees Cook <keescook@chromium.org> wrote:
->> >>> On Mon, Aug 6, 2018 at 10:45 AM, Robin Murphy <robin.murphy@arm.com>
->> >>> wrote:
->> >>>> I guess what I'm getting at is that if the protection mechanism is
->> >>>> "always
->> >>>> return with SP outside TTBR1", there seems little point in going
->> >>>> through the
->> >>>> motions if SP in TTBR0 could still be valid and allow an attack to
->> >>>> succeed
->> >>>> anyway; this is basically just me working through a justification for
->> >>>> saying
->> >>>> the proposed scheme needs "depends on ARM64_PAN ||
->> >>>> ARM64_SW_TTBR0_PAN",
->> >>>> making it that much uglier for v8.0 CPUs...
->> >>>
->> >>> I think anyone with v8.0 CPUs interested in this mitigation would also
->> >>> very much want PAN emulation. If a "depends on" isn't desired, what
->> >>> about "imply" in the Kconfig?
->> >>>
->> >>
->> >> Yes, but actually, using bit #0 is maybe a better alternative in any
->> >> case. You can never dereference SP with bit #0 set, regardless of
->> >> whether the address points to user or kernel space, and my concern
->> >> about reloading sp from x29 doesn't really make sense, given that x29
->> >> is always assigned from sp right after pushing x29 and x30 in the
->> >> function prologue, and sp only gets restored from x29 in the epilogue
->> >> when there is a stack frame to begin with, in which case we add #1 to
->> >> sp again before returning from the function.
->> >
->> > Fair enough! :)
->> >
->> >> The other code gets a lot cleaner as well.
->> >>
->> >> So for the return we'll have
->> >>
->> >>   ldp     x29, x30, [sp], #nn
->> >>>>add     sp, sp, #0x1
->> >>   ret
->> >>
->> >> and for the function call
->> >>
->> >>   bl      <foo>
->> >>>>mov      x30, sp
->> >>>>bic     sp, x30, #1
->> >>
->> >> The restore sequence in entry.s:96 (which has no spare registers) gets
->> >> much simpler as well:
->> >>
->> >> --- a/arch/arm64/kernel/entry.S
->> >> +++ b/arch/arm64/kernel/entry.S
->> >> @@ -95,6 +95,15 @@ alternative_else_nop_endif
->> >>          */
->> >>         add     sp, sp, x0      // sp' = sp + x0
->> >>         sub     x0, sp, x0      // x0' = sp' - x0 = (sp + x0) - x0 = sp
->> >> +#ifdef CONFIG_ARM64_ROP_SHIELD
->> >> +       tbnz    x0, #0, 1f
->> >> +       .subsection     1
->> >> +1:     sub     x0, x0, #1
->> >> +       sub     sp, sp, #1
->> >> +       b       2f
->> >> +       .previous
->> >> +2:
->> >> +#endif
->> >>         tbnz    x0, #THREAD_SHIFT, 0f
->> >>         sub     x0, sp, x0      // x0'' = sp' - x0' = (sp + x0) - sp =
->> >> x0
->> >>         sub     sp, sp, x0      // sp'' = sp' - x0 = (sp + x0) - x0 =
->> >> sp
->> >
->> > I get slightly concerned about "add" vs "clear bit", but I don't see a
->> > real way to chain a lot of "add"s to get to avoid the unaligned
->> > access. Is "or" less efficient than "add"?
->> >
->>
->> Yes. The stack pointer is special on arm64, and can only be used with
->> a limited set of ALU instructions. So orring #1 would involve 'mov
->> <reg>, sp ; orr sp, <reg>, #1' like in the 'bic' case above, which
->> requires a scratch register as well.
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index ce70c3ffb993..9a2b6cee4e2b 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -137,6 +137,7 @@
+ #define ESR_ELx_CV		(UL(1) << 24)
+ #define ESR_ELx_COND_SHIFT	(20)
+ #define ESR_ELx_COND_MASK	(UL(0xF) << ESR_ELx_COND_SHIFT)
++#define ESR_ELx_WFx_ISS_WFI	(UL(0) << 0)
+ #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
+ #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
+ 
+@@ -148,6 +149,9 @@
+ #define DISR_EL1_ESR_MASK	(ESR_ELx_AET | ESR_ELx_EA | ESR_ELx_FSC)
+ 
+ /* ESR value templates for specific events */
++#define ESR_ELx_WFx_MASK	(ESR_ELx_EC_MASK | 1)
++#define ESR_ELx_WFx_WFI_VAL	((ESR_ELx_EC_WFx << ESR_ELx_EC_SHIFT) |	\
++				 ESR_ELx_WFx_ISS_WFI)
+ 
+ /* BRK instruction trap from AArch64 state */
+ #define ESR_ELx_VAL_BRK64(imm)					\
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 98af0b37fb31..56bcf0408dbb 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -485,12 +485,12 @@
+ 
+ #define SCTLR_EL1_SET	(SCTLR_ELx_M    | SCTLR_ELx_C    | SCTLR_ELx_SA   |\
+ 			 SCTLR_EL1_SA0  | SCTLR_EL1_SED  | SCTLR_ELx_I    |\
+-			 SCTLR_EL1_DZE  | SCTLR_EL1_UCT  | SCTLR_EL1_NTWI |\
++			 SCTLR_EL1_DZE  | SCTLR_EL1_UCT  |		   \
+ 			 SCTLR_EL1_NTWE | SCTLR_ELx_IESB | SCTLR_EL1_SPAN |\
+ 			 ENDIAN_SET_EL1 | SCTLR_EL1_UCI  | SCTLR_EL1_RES1)
+ #define SCTLR_EL1_CLEAR	(SCTLR_ELx_A   | SCTLR_EL1_CP15BEN | SCTLR_EL1_ITD    |\
+ 			 SCTLR_EL1_UMA | SCTLR_ELx_WXN     | ENDIAN_CLEAR_EL1 |\
+-			 SCTLR_EL1_RES0)
++			 SCTLR_EL1_NTWI | SCTLR_EL1_RES0)
+ 
+ /* Check all the bits are accounted for */
+ #define SCTLR_EL1_BUILD_BUG_ON_MISSING_BITS	BUILD_BUG_ON((SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != ~0)
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 28ad8799406f..4c01c0ba81aa 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -675,6 +675,7 @@ el0_sync:
+ 	cmp	x24, #ESR_ELx_EC_FP_EXC64	// FP/ASIMD exception
+ 	b.eq	el0_fpsimd_exc
+ 	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
++	ccmp	x24, #ESR_ELx_EC_WFx, #4, ne
+ 	b.eq	el0_sys
+ 	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
+ 	b.eq	el0_sp_pc
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index d399d459397b..2e4b389a6c8f 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -496,6 +496,12 @@ static void cntfrq_read_handler(unsigned int esr, struct pt_regs *regs)
+ 	arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
+ }
+ 
++static void wfi_handler(unsigned int esr, struct pt_regs *regs)
++{
++	arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
++	schedule();
++}
++
+ struct sys64_hook {
+ 	unsigned int esr_mask;
+ 	unsigned int esr_val;
+@@ -526,6 +532,12 @@ static struct sys64_hook sys64_hooks[] = {
+ 		.esr_val = ESR_ELx_SYS64_ISS_SYS_CNTFRQ,
+ 		.handler = cntfrq_read_handler,
+ 	},
++	{
++		/* Trap WFI instructions executed in userspace */
++		.esr_mask = ESR_ELx_WFx_MASK,
++		.esr_val = ESR_ELx_WFx_WFI_VAL,
++		.handler = wfi_handler,
++	},
+ 	{},
+ };
+ 
+-- 
+2.18.0
