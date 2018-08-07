@@ -1,92 +1,71 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 7 Aug 2018 08:02:15 +0200
-Subject: [PATCH v8 1/3] dmaengine: fsl-edma: extract common fsl-edma code
- (no changes in behavior intended)
-In-Reply-To: <20180806204021.GC6092@jerusalem>
-References: <20180803193244.12084-1-angelo@sysam.it>
- <CAJKOXPejwmfp2g9hXFjxP_vt=j0UDubLDnsqca=KKmEYosNg4Q@mail.gmail.com>
- <20180806204021.GC6092@jerusalem>
-Message-ID: <CAJKOXPc0n3GkaMp+ghgEFpawZY78o53AyptYa9G67d8+nOj0og@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 7 Aug 2018 11:32:13 +0530
+Subject: [PATCH v3 00/13] ARM: davinci: remove duplicate aemif support
+In-Reply-To: <4154b955-4f89-035a-8a02-a3e8bd8d9ede@lechnology.com>
+References: <20180628095748.4462-1-brgl@bgdev.pl>
+ <52a274f1-283a-a14a-54f3-4b95b6605c4f@ti.com>
+ <59fdc532-bb72-ffae-cfb6-a7f156c14771@lechnology.com>
+ <e1222b3c-dfa4-4cb0-eebf-8e2550e9d674@ti.com>
+ <125d73f7-7311-866f-1e9d-d3c1f9473899@lechnology.com>
+ <92e41afc-cf3a-e713-11d5-247b8d6e3a64@ti.com>
+ <4154b955-4f89-035a-8a02-a3e8bd8d9ede@lechnology.com>
+Message-ID: <c09e90e1-2e55-aced-1215-4c845349c1b1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2018 at 22:40, Angelo Dureghello <angelo@sysam.it> wrote:
-> Hi Krzysztof,
->
-> On Mon, Aug 06, 2018 at 09:43:42AM +0200, Krzysztof Kozlowski wrote:
->> On 3 August 2018 at 21:32, Angelo Dureghello <angelo@sysam.it> wrote:
->> > This patch adds a new fsl-edma-common module to allow new
->> > mcf-edma module code to use most of the fsl-edma code.
->> >
->> > Signed-off-by: Angelo Dureghello <angelo@sysam.it>
->> > ---
->> > Changes for v2:
->> > - patch splitted into 4
->> > - add mcf-edma as minimal different parts from fsl-edma
->> >
->> > Changes for v3:
->> > none
->> >
->> > Changes for v4:
->> > - patch simplified from 4/4 into 2/2
->> > - collecting all the mcf-edma-related changes
->> >
->> > Changes for v5:
->> > none
->> >
->> > Changes for v6:
->> > - adjusted comment header
->> > - fixed bit shift with BIT()
->> > - we need to free the interrupts at remove(), so removed all devm_
->> >   interrupt related calls
->> >
->> > Changes for v7:
->> > none
->> >
->> > Changes for v8:
->> > - patch rewritten from scratch, splitted into 3, common code isolated,
->> >   minimal changes from the original Freescale code have been done.
->> >   The patch has been tested with both Iris + Colibri Vybrid VF50 and
->> >   stmark2/mcf54415 Coldfire boards.
->> > ---
->> >  drivers/dma/Makefile          |   2 +-
->> >  drivers/dma/fsl-edma-common.c | 576 ++++++++++++++++++++++++++++
->> >  drivers/dma/fsl-edma-common.h | 196 ++++++++++
->> >  drivers/dma/fsl-edma.c        | 697 +---------------------------------
->> >  4 files changed, 774 insertions(+), 697 deletions(-)
->> >  create mode 100644 drivers/dma/fsl-edma-common.c
->> >  create mode 100644 drivers/dma/fsl-edma-common.h
->> >
->> > diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
->> > index 203a99d68315..66022f59fca4 100644
->> > --- a/drivers/dma/Makefile
->> > +++ b/drivers/dma/Makefile
->> > @@ -31,7 +31,7 @@ obj-$(CONFIG_DW_AXI_DMAC) += dw-axi-dmac/
->> >  obj-$(CONFIG_DW_DMAC_CORE) += dw/
->> >  obj-$(CONFIG_EP93XX_DMA) += ep93xx_dma.o
->> >  obj-$(CONFIG_FSL_DMA) += fsldma.o
->> > -obj-$(CONFIG_FSL_EDMA) += fsl-edma.o
->> > +obj-$(CONFIG_FSL_EDMA) += fsl-edma.o fsl-edma-common.o
->> >  obj-$(CONFIG_FSL_RAID) += fsl_raid.o
->> >  obj-$(CONFIG_HSU_DMA) += hsu/
->> >  obj-$(CONFIG_IMG_MDC_DMA) += img-mdc-dma.o
->> > diff --git a/drivers/dma/fsl-edma-common.c b/drivers/dma/fsl-edma-common.c
->> > new file mode 100644
->> > index 000000000000..0ae7094f477a
->> > --- /dev/null
->> > +++ b/drivers/dma/fsl-edma-common.c
->> > @@ -0,0 +1,576 @@
->> > +// SPDX-License-Identifier: GPL-2.0
->>
->> You moved code from fsl-edma.c which is licensed on GPL-2.0+. I think
->> that's not allowed as you effectively relicense the work on new
->> license.
->>
-> Ok, so if i undestrand, i should change that comment to
-> // SPDX-License-Identifier: GPL-2.0+
-> Right ?
+Hi David,
 
-Yes, GPL-2.0+.
+On Monday 06 August 2018 10:05 PM, David Lechner wrote:
+> On 07/10/2018 05:19 AM, Sekhar Nori wrote:
+>> On Friday 06 July 2018 11:09 PM, David Lechner wrote:
+>>> On 07/04/2018 01:35 AM, Sekhar Nori wrote:
+>>>> Hi David,
+>>>>
+>>>> On Monday 02 July 2018 09:02 PM, David Lechner wrote:
+>>>>> On 07/02/2018 07:28 AM, Sekhar Nori wrote:
+>>>>>> Hi David, Stephen,
+>>>>>>
+>>>>>> On Thursday 28 June 2018 03:27 PM, Bartosz Golaszewski wrote:
+>>>>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>>>>
+>>>>>>> This series moves all aemif/nand users to using the ti-aemif
+>>>>>>> platform
+>>>>>>> driver located in drivers/memory instead of the older API located in
+>>>>>>> mach-davinci.
+>>>>>>>
+>>>>>>> First five patches add necessary changes to the clock driver. Next
+>>>>>>> seven convert the board files to using the ti-aemif driver. Last
+>>>>>>> patch
+>>>>>>> removes now dead code.
+>>>>>>
+>>>>>> How do you want to handle this series? I can apply the series and
+>>>>>> provide you an immutable branch on v4.18-rc1 with the clock patches
+>>>>>> applied if that can work.
+>>>>>
+>>>>> Sounds good to me. But I'm new to this maintainer thing, so maybe
+>>>>> there is something to consider that I haven't thought of?
+>>>>
+>>>> I don't think there is more to it. Ultimately there should not be two
+>>>> commits for the same patch. Either you can apply and share the
+>>>> commit to
+>>>> use or I can do that as well. I am equally fine either way.
+>>>>
+>>>> Regards,
+>>>> Sekhar
+>>>>
+>>>
+>>> I've created a branch for-sekhar at https://github.com/dlech/linux.git
+>>> with the clk commits.
+>>
+>> Thanks. I merged commit f917ff75ac55b6d829c9d1142e83913064565d5b (top of
+>> that branch) to my v4.19/soc branch. Please do let Stephen and Mike know
+>> about this then when you send your stuff for v4.19.
+>>
+> 
+> Since there have been no more clk-davinci patches for v4.19, I assume that
+> it is OK to just let this go through the ARM tree via Sekhar?
 
-Best regards,
-Krzysztof
+Yes, that should be fine.
+
+Thanks,
+Sekhar
