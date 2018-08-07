@@ -1,28 +1,32 @@
-From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Tue, 7 Aug 2018 18:03:20 +0530
-Subject: [PATCH v7 3/6] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180807113622.GC19831@redhat.com>
-References: <20180731035143.11942-1-ravi.bangoria@linux.ibm.com>
- <20180731035143.11942-4-ravi.bangoria@linux.ibm.com>
- <20180803112455.GA13794@redhat.com>
- <bfb47985-8f58-e5e4-f8b4-695dfea7937f@linux.ibm.com>
- <20180807113622.GC19831@redhat.com>
-Message-ID: <4d1e2a17-14ba-f277-8e57-4a4573630ab2@linux.ibm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 7 Aug 2018 14:51:22 +0200
+Subject: [PATCH] crypto: remove speck
+In-Reply-To: <20180807031526.GD5048@thunk.org>
+References: <20180806223300.113891-1-ebiggers@kernel.org>
+ <20180806230437.21431-1-Jason@zx2c4.com>
+ <20180807011937.GA133621@gmail.com>
+ <CAHmME9oTApV-zHD60QPryaoQf45ODpG25Da5FgB8c+LO162gWQ@mail.gmail.com>
+ <20180807031237.GA779@sol.localdomain> <20180807031526.GD5048@thunk.org>
+Message-ID: <CAKv+Gu_Dr1KvEOMdkhxZtq093MDgvcP_G-5=JMmqsx+zYV-=mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oleg,
+On 7 August 2018 at 05:15, Theodore Y. Ts'o <tytso@mit.edu> wrote:
+> On Mon, Aug 06, 2018 at 08:12:38PM -0700, Eric Biggers wrote:
+>> I mention this because people are naturally going to be curious about that, e.g.
+>> speculating that Google found a "backdoor" -- remember that we do have some good
+>> cryptographers!  I'm just stating what we know, out of honesty and openness; I
+>> don't really intend to be arguing for Speck with this statement, and in any case
+>> we already made the decision to not use Speck.
+>
+> Let's be clear --- the arguments about whether or not to use Speck,
+> and whether or not to remove Speck from the kernel, are purely
+> political --- not techinical.
+>
 
->> I'm sorry. I didn't get this. How can uprobe go away without calling
->>     uprobe_unregister()
->>     -> rergister_for_each_vma()
->>        -> remove_breakpoint()
->> And remove_breakpoint() will get called
-> 
-> assuming that _unregister() will find the same vma with the probed insn. But
-> as I said, the application can munmap the probed page/vma.
-
-Got it now :)
-
-Thanks.
+Whether or not to use it may be a political rather than a technical
+motivation. But the reason I acked this patch is not because removing
+it aligns with my political conviction regarding Speck, but simply
+because its contributor, primary intended user and therefore de facto
+maintainer stated publicly that it no longer had any intention to use
+it going forward.
