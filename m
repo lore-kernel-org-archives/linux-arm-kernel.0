@@ -1,60 +1,28 @@
-From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Tue, 07 Aug 2018 18:50:22 +0200
-Subject: [RFC PATCH v2 09/12] gpiolib: Identify GPIO descriptor arrays
- with direct mapping
-In-Reply-To: <CACRpkdZtuU6zXBz6UqprE7-31vW9-1ZabFjyzHBgWaTgmqkbbQ@mail.gmail.com>
-References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
- <20180806222918.12644-10-jmkrzyszt@gmail.com>
- <CACRpkdZtuU6zXBz6UqprE7-31vW9-1ZabFjyzHBgWaTgmqkbbQ@mail.gmail.com>
-Message-ID: <1793769.2WP40jSPqy@z50>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 7 Aug 2018 17:56:39 +0100
+Subject: [PATCH] ARM: spinlock: avoid exclusive accesses on unlock()
+ path
+In-Reply-To: <tencent_7ECB5CA838202151603A2FF6@qq.com>
+References: <tencent_76D135D5D379BDAB2A2436393315C6E4E807@qq.com>
+ <tencent_6BF9DD7B77B1CAA95FBAEE73@qq.com>
+ <tencent_7ECB5CA838202151603A2FF6@qq.com>
+Message-ID: <20180807165638.GB21809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, Aug 07, 2018 at 09:59:13AM +0800, ??? wrote:
+> while one cpu is doing arch_spin_unlock,another cpu doing arch_spin_lock
+> the first cpu's
+> lock->tickets.owner++;
+> may be over writed by the second's 
+> strex	%2, %1, [%3]\n
+> so the owner filed doesn't get increased. 
 
-On Tuesday, August 7, 2018 1:29:43 AM CEST Linus Walleij wrote:
-> Hi Janusz!
-> 
-> On Tue, Aug 7, 2018 at 12:29 AM Janusz Krzysztofik <jmkrzyszt@gmail.com> 
-wrote:
-> 
-> > Certain GPIO array lookup results may map directly to GPIO pins of a
-> > single GPIO chip in hardware order.  If that condition is recognized
-> > and handled efficiently, significant performance gain of get/set array
-> > functions may be possible.
-> >
-> > While processing a request for an array of GPIO descriptors, verify if
-> > the descriptors just collected represent consecutive pins of a single
-> > GPIO chip.  Pass that information with the array to the caller so it
-> > can benefit from enhanced performance as soon as bitmap based get/set
-> > array functions which can make efficient use of that are available.
-> >
-> > Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
-> (...)
-> >  This function returns a struct gpio_descs which contains an array of
-> > -descriptors::
-> > +descriptors.  It may also contain a valid descriptor of a single GPIO 
-chip in
-> > +case the array strictly matches pin hardware layout of the chip::
-> >
-> >         struct gpio_descs {
-> >                 unsigned int ndescs;
-> >                 struct gpio_desc *desc[];
-> > +               struct gpio_chip *chip;
-> 
-> This must be motivated: if the only purpose is to indicate to the consumer 
-that
-> all GPIOs are on the same chip, why not just have a
-> 
-> bool all_on_same_chip;
-> 
-> That you set to true if these are all on the same chip?
+I don't see how this can happen. If the unlocker writes to the owner field
+in-between the locker's LDXR/STXR pair (which is the only way the harmful
+overwrite could occur as far as I can tell), then the STXR will fail and not
+update memory.
 
-My approach would probably save one or two instructions per get/set call, but 
-I'm not stuck to it and will be happy to find a better solution.
+Are you actually seeing a problem here?
 
-How about folding the chip descriptor inside an additional structure, private 
-to drivers, with internals not revealed to consumers?
-
-Thanks,
-Janusz
+Will
