@@ -1,89 +1,37 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 7 Aug 2018 11:54:02 +0200
-Subject: [PATCH v6 00/11] hugetlb: Factorize hugetlb architecture
- primitives
-In-Reply-To: <20180806175711.24438-1-alex@ghiti.fr>
-References: <20180806175711.24438-1-alex@ghiti.fr>
-Message-ID: <20180807095402.GA12200@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 7 Aug 2018 11:05:02 +0100
+Subject: [PATCH] arm64: Trap WFI executed in userspace
+In-Reply-To: <20180807093326.5090-1-marc.zyngier@arm.com>
+References: <20180807093326.5090-1-marc.zyngier@arm.com>
+Message-ID: <20180807100437.GA9097@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-* Alexandre Ghiti <alex@ghiti.fr> wrote:
-
-> [CC linux-mm for inclusion in -mm tree]                                          
->                                                                                  
-> In order to reduce copy/paste of functions across architectures and then         
-> make riscv hugetlb port (and future ports) simpler and smaller, this             
-> patchset intends to factorize the numerous hugetlb primitives that are           
-> defined across all the architectures.                                            
->                                                                                  
-> Except for prepare_hugepage_range, this patchset moves the versions that         
-> are just pass-through to standard pte primitives into                            
-> asm-generic/hugetlb.h by using the same #ifdef semantic that can be              
-> found in asm-generic/pgtable.h, i.e. __HAVE_ARCH_***.                            
->                                                                                  
-> s390 architecture has not been tackled in this serie since it does not           
-> use asm-generic/hugetlb.h at all.                                                
->                                                                                  
-> This patchset has been compiled on all addressed architectures with              
-> success (except for parisc, but the problem does not come from this              
-> series).                                                                         
->                                                                                  
-> v6:                                                                              
->   - Remove nohash/32 and book3s/32 powerpc specific implementations in
->     order to use the generic ones.                                                        
->   - Add all the Reviewed-by, Acked-by and Tested-by in the commits,              
->     thanks to everyone.                                                          
->                                                                                  
-> v5:                                                                              
->   As suggested by Mike Kravetz, no need to move the #include                     
->   <asm-generic/hugetlb.h> for arm and x86 architectures, let it live at          
->   the top of the file.                                                           
->                                                                                  
-> v4:                                                                              
->   Fix powerpc build error due to misplacing of #include                          
->   <asm-generic/hugetlb.h> outside of #ifdef CONFIG_HUGETLB_PAGE, as              
->   pointed by Christophe Leroy.                                                   
->                                                                                  
-> v1, v2, v3:                                                                      
->   Same version, just problems with email provider and misuse of                  
->   --batch-size option of git send-email
+On Tue, Aug 07, 2018 at 10:33:26AM +0100, Marc Zyngier wrote:
+> It recently came to light that userspace can execute WFI, and that
+> the arm64 kernel doesn trap this event. This sounds rather benign,
+> but the kernel should decide when it wants to wait for an interrupt,
+> and not userspace.
 > 
-> Alexandre Ghiti (11):
->   hugetlb: Harmonize hugetlb.h arch specific defines with pgtable.h
->   hugetlb: Introduce generic version of hugetlb_free_pgd_range
->   hugetlb: Introduce generic version of set_huge_pte_at
->   hugetlb: Introduce generic version of huge_ptep_get_and_clear
->   hugetlb: Introduce generic version of huge_ptep_clear_flush
->   hugetlb: Introduce generic version of huge_pte_none
->   hugetlb: Introduce generic version of huge_pte_wrprotect
->   hugetlb: Introduce generic version of prepare_hugepage_range
->   hugetlb: Introduce generic version of huge_ptep_set_wrprotect
->   hugetlb: Introduce generic version of huge_ptep_set_access_flags
->   hugetlb: Introduce generic version of huge_ptep_get
-> 
->  arch/arm/include/asm/hugetlb-3level.h        | 32 +---------
->  arch/arm/include/asm/hugetlb.h               | 30 ----------
->  arch/arm64/include/asm/hugetlb.h             | 39 +++---------
->  arch/ia64/include/asm/hugetlb.h              | 47 ++-------------
->  arch/mips/include/asm/hugetlb.h              | 40 +++----------
->  arch/parisc/include/asm/hugetlb.h            | 33 +++--------
->  arch/powerpc/include/asm/book3s/32/pgtable.h |  6 --
->  arch/powerpc/include/asm/book3s/64/pgtable.h |  1 +
->  arch/powerpc/include/asm/hugetlb.h           | 43 ++------------
->  arch/powerpc/include/asm/nohash/32/pgtable.h |  6 --
->  arch/powerpc/include/asm/nohash/64/pgtable.h |  1 +
->  arch/sh/include/asm/hugetlb.h                | 54 ++---------------
->  arch/sparc/include/asm/hugetlb.h             | 40 +++----------
->  arch/x86/include/asm/hugetlb.h               | 69 ----------------------
->  include/asm-generic/hugetlb.h                | 88 +++++++++++++++++++++++++++-
->  15 files changed, 135 insertions(+), 394 deletions(-)
+> Let's trap WFI and treat it as a way to yield the CPU to another
+> process.
 
-The x86 bits look good to me (assuming it's all tested on all relevant architectures, etc.)
+This doesn't amount to a justification.
 
-Acked-by: Ingo Molnar <mingo@kernel.org>
+If the power controller is unexpectedly left in a bad state so that
+WFI will do something nasty to a cpu that may enter userspace, then we
+probably have bigger problems.
 
-Thanks,
+So, maybe it really is pretty harmless to let userspace execute this.
 
-	Ingo
+I can't think of a legitimate reason for userspace to execute WFI
+however.  Userspace doesn't have interrupts under Linux, so it makes
+no sense to wait for one.
+
+Have we seen anybody using WFI in userspace?  It may be cleaner to
+map this to SIGILL rather than be permissive and regret it later.
+
+[...]
+
+Cheers
+---Dave
