@@ -1,24 +1,24 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 7 Aug 2018 15:26:16 +0900
-Subject: [v0.1 PATCH 0/7] mmc: tmio: refactor TMIO core a bit and add
- UniPhier SD/eMMC controller support
-In-Reply-To: <1533622642-13989-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1533622642-13989-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNAQ7fwWofFb-xVU7E4=hJh2x=NPOce9LBF3ncWqYtqt-hg@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 07 Aug 2018 08:32:49 +0200
+Subject: [PATCH v2 9/9] dmaengine: add COMPILE_TEST for the drivers
+In-Reply-To: <20180806085231.4597-10-sjhuang@iluvatar.ai> (Huang Shijie's
+ message of "Mon, 6 Aug 2018 16:52:31 +0800")
+References: <20180806085231.4597-1-sjhuang@iluvatar.ai>
+ <20180806085231.4597-10-sjhuang@iluvatar.ai>
+Message-ID: <87a7py1yb2.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-08-07 15:17 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+Huang Shijie <sjhuang@iluvatar.ai> writes:
 
+> We can do the compiling test with COMPILE_TEST.
+> This patch adds the COMPILE_TEST for the drivers.
+>
+> Signed-off-by: Huang Shijie <sjhuang@iluvatar.ai>
+For pxa :
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-> [v0.1 PATCH 0/7] mmc: tmio: refactor TMIO core a bit and add UniPhier SD/eMMC controller support
+Cheers.
 
-
-This series is v1.
-
-v0.1 was the internal numbering, which I forgot to change.
-
-
--- 
-Best Regards
-Masahiro Yamada
+--
+Robert
