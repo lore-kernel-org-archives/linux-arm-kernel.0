@@ -1,37 +1,24 @@
-From: ebiggers@kernel.org (Eric Biggers)
-Date: Tue, 7 Aug 2018 14:51:21 -0700
-Subject: [RFC PATCH 3/9] crypto: chacha20-generic - refactor to allow
- varying number of rounds
-In-Reply-To: <CAEX_ruFp0KddnZyetZt997OvRzKDuN7U95MF_N9AgTh+mTcD7Q@mail.gmail.com>
-References: <20180806223300.113891-1-ebiggers@kernel.org>
- <20180806223300.113891-4-ebiggers@kernel.org>
- <CAHmME9rbe6eT6dkUqKnp-GxcqGrp-tvMfTMr8kZtsn=S3cmP8A@mail.gmail.com>
- <CA+_SqcD+KpQ_X6iXUCpQh0N6pWzBorstBJDx7eBqcybY4Dvy8Q@mail.gmail.com>
- <CAEX_ruFp0KddnZyetZt997OvRzKDuN7U95MF_N9AgTh+mTcD7Q@mail.gmail.com>
-Message-ID: <20180807215121.GB25300@gmail.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Tue, 07 Aug 2018 23:55:14 +0200
+Subject: [RFC PATCH v2 01/12] mtd: rawnand: ams-delta: Assign
+ mtd->dev.parent, not mtd->owner
+In-Reply-To: <604ff0fb-07d5-9068-2f69-41198f3d9854@gmail.com>
+References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
+ <20180806222918.12644-2-jmkrzyszt@gmail.com>
+ <604ff0fb-07d5-9068-2f69-41198f3d9854@gmail.com>
+Message-ID: <5203112.3RHHgWL3HE@z50>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2018 at 11:21:04AM +0100, Samuel Neves wrote:
-> > The best attack on ChaCha breaks 7 rounds, and that attack requires 2^248 operations.
-> 
-> This number, as far as I can tell, comes from the "New features of
-> Latin dances" paper. There have been some minor improvements in the
-> intervening 10 years, e.g., [1, 2, 3, 4], which pull back the
-> complexity of breaking ChaCha7 down to 2^235. In any case, every
-> attack so far appears to hit a wall at 8 rounds, with 12 rounds---the
-> recommended eSTREAM round number for Salsa20---seeming to offer a
-> reasonable security margin, still somewhat better than that of the
-> AES.
-> 
-> Best regards,
-> Samuel Neves
-> 
-> [1] https://eprint.iacr.org/2015/698
-> [2] https://eprint.iacr.org/2015/217
-> [3] https://eprint.iacr.org/2016/1034
-> [4] https://doi.org/10.1016/j.dam.2017.04.034
+Hi Marek,
 
-Thanks Samuel, I'll fix that number in the next iteration of the patchset.
+On Tuesday, August 7, 2018 1:54:10 AM CEST Marek Vasut wrote:
+> On 08/07/2018 12:29 AM, Janusz Krzysztofik wrote:
+> > Fix missing mtd->dev.parent assignment and drop useless mtd->owner.
+> 
+> You fail to explain why this fix is required.
 
-- Eric
+OK, I'll have a look at similar patches from the past and add an explanation.
+
+Thanks,
+Janusz
