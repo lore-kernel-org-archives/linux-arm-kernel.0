@@ -1,65 +1,124 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 7 Aug 2018 13:12:03 +0100
-Subject: [PATCH] arm64: Trap WFI executed in userspace
-In-Reply-To: <20180807103054.GB9097@e103592.cambridge.arm.com>
-References: <20180807093326.5090-1-marc.zyngier@arm.com>
- <20180807100437.GA9097@e103592.cambridge.arm.com>
- <9af8bb9a-7c6c-2560-5965-118dfadf8141@arm.com>
- <20180807103054.GB9097@e103592.cambridge.arm.com>
-Message-ID: <da5d1650-fcd8-83ec-bd4c-02f236163776@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 7 Aug 2018 14:14:28 +0200
+Subject: [PATCH v8 1/3] dmaengine: fsl-edma: extract common fsl-edma code
+ (no changes in behavior intended)
+In-Reply-To: <326d1fd7010c34488af6a874011d5280@agner.ch>
+References: <20180803193244.12084-1-angelo@sysam.it>
+ <326d1fd7010c34488af6a874011d5280@agner.ch>
+Message-ID: <CAJKOXPchX3H9JVf1VyA+m9waLz74DnWRb2xLBg4yp=YbrEGu0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/18 11:30, Dave Martin wrote:
-> On Tue, Aug 07, 2018 at 11:24:34AM +0100, Marc Zyngier wrote:
->> On 07/08/18 11:05, Dave Martin wrote:
->>> On Tue, Aug 07, 2018 at 10:33:26AM +0100, Marc Zyngier wrote:
->>>> It recently came to light that userspace can execute WFI, and that
->>>> the arm64 kernel doesn trap this event. This sounds rather benign,
->>>> but the kernel should decide when it wants to wait for an interrupt,
->>>> and not userspace.
->>>>
->>>> Let's trap WFI and treat it as a way to yield the CPU to another
->>>> process.
->>>
->>> This doesn't amount to a justification.
->>>
->>> If the power controller is unexpectedly left in a bad state so that
->>> WFI will do something nasty to a cpu that may enter userspace, then we
->>> probably have bigger problems.
->>>
->>> So, maybe it really is pretty harmless to let userspace execute this.
+On 7 August 2018 at 10:08, Stefan Agner <stefan@agner.ch> wrote:
+> On 03.08.2018 21:32, Angelo Dureghello wrote:
+>> This patch adds a new fsl-edma-common module to allow new
+>> mcf-edma module code to use most of the fsl-edma code.
 >>
->> Or not. It is also a very good way for userspace to find out when an
->> interrupt gets delivered and start doing all kind of probing on the
->> kernel. The least the userspace knows about that, the better I feel.
-> 
-> Possibly.  I suspect there are other ways to guess pretty accurately
-> when an interrupt occurs, but WFI allows greater precision.
-
-...unless you're running in a VM and it traps to KVM anyway ;)
-
->>> I can't think of a legitimate reason for userspace to execute WFI
->>> however.  Userspace doesn't have interrupts under Linux, so it makes
->>> no sense to wait for one.
->>>
->>> Have we seen anybody using WFI in userspace?  It may be cleaner to
->>> map this to SIGILL rather than be permissive and regret it later.
+>> Signed-off-by: Angelo Dureghello <angelo@sysam.it>
+>> ---
+>> Changes for v2:
+>> - patch splitted into 4
+>> - add mcf-edma as minimal different parts from fsl-edma
 >>
->> I couldn't find any user, and I'm happy to just send userspace to hell
->> in that case. But it could also been said that since it was never
->> prevented, it is a de-facto ABI.
-> 
-> Agreed.  I wonder whether it's sufficient to have this mapping to SIGILL
-> in -next for a while and see whether anybody complains.
+>> Changes for v3:
+>> none
+>>
+>> Changes for v4:
+>> - patch simplified from 4/4 into 2/2
+>> - collecting all the mcf-edma-related changes
+>>
+>> Changes for v5:
+>> none
+>>
+>> Changes for v6:
+>> - adjusted comment header
+>> - fixed bit shift with BIT()
+>> - we need to free the interrupts at remove(), so removed all devm_
+>>   interrupt related calls
+>>
+>> Changes for v7:
+>> none
+>>
+>> Changes for v8:
+>> - patch rewritten from scratch, splitted into 3, common code isolated,
+>>   minimal changes from the original Freescale code have been done.
+>>   The patch has been tested with both Iris + Colibri Vybrid VF50 and
+>>   stmark2/mcf54415 Coldfire boards.
+>> ---
+>>  drivers/dma/Makefile          |   2 +-
+>>  drivers/dma/fsl-edma-common.c | 576 ++++++++++++++++++++++++++++
+>>  drivers/dma/fsl-edma-common.h | 196 ++++++++++
+>>  drivers/dma/fsl-edma.c        | 697 +---------------------------------
+>>  4 files changed, 774 insertions(+), 697 deletions(-)
+>>  create mode 100644 drivers/dma/fsl-edma-common.c
+>>  create mode 100644 drivers/dma/fsl-edma-common.h
+>>
+>> diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
+>> index 203a99d68315..66022f59fca4 100644
+>> --- a/drivers/dma/Makefile
+>> +++ b/drivers/dma/Makefile
+>> @@ -31,7 +31,7 @@ obj-$(CONFIG_DW_AXI_DMAC) += dw-axi-dmac/
+>>  obj-$(CONFIG_DW_DMAC_CORE) += dw/
+>>  obj-$(CONFIG_EP93XX_DMA) += ep93xx_dma.o
+>>  obj-$(CONFIG_FSL_DMA) += fsldma.o
+>> -obj-$(CONFIG_FSL_EDMA) += fsl-edma.o
+>> +obj-$(CONFIG_FSL_EDMA) += fsl-edma.o fsl-edma-common.o
+>>  obj-$(CONFIG_FSL_RAID) += fsl_raid.o
+>>  obj-$(CONFIG_HSU_DMA) += hsu/
+>>  obj-$(CONFIG_IMG_MDC_DMA) += img-mdc-dma.o
+>> diff --git a/drivers/dma/fsl-edma-common.c b/drivers/dma/fsl-edma-common.c
+>> new file mode 100644
+>> index 000000000000..0ae7094f477a
+>> --- /dev/null
+>> +++ b/drivers/dma/fsl-edma-common.c
+>> @@ -0,0 +1,576 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +//
+>> +// Copyright (c) 2013-2014 Freescale Semiconductor, Inc
+>> +// Copyright (c) 2017 Sysam, Angelo Dureghello  <angelo@sysam.it>
+>> +
+>> +#include <linux/dmapool.h>
+>> +#include <linux/module.h>
+>> +#include <linux/slab.h>
+>> +
+>> +#include "fsl-edma-common.h"
+>> +
+>> +/*
+>> + * R/W functions for big- or little-endian registers:
+>> + * The eDMA controller's endian is independent of the CPU core's endian.
+>> + * For the big-endian IP module, the offset for 8-bit or 16-bit registers
+>> + * should also be swapped opposite to that in little-endian IP.
+>> + */
+>> +u32 edma_readl(struct fsl_edma_engine *edma, void __iomem *addr)
+>> +{
+>> +     if (edma->big_endian)
+>> +             return ioread32be(addr);
+>> +     else
+>> +             return ioread32(addr);
+>> +}
+>> +EXPORT_SYMBOL_GPL(edma_readl);
+>
+> In 3/3 you link the common object into the two modules individually:
+>
+> obj-$(CONFIG_FSL_EDMA) += fsl-edma.o fsl-edma-common.o
+> obj-$(CONFIG_MCF_EDMA) += mcf-edma.o fsl-edma-common.o
+>
+> Therefor you do not access those functions from another module (they are
+> within the module). No exporting should be necessary. Drop all those
+> exports.
 
-I think we'd have to avoid that for compat, though, since v7 code would 
-have the expectation that WFI can't be trapped by the kernel at all. 
-Personally I'm in favour of this patch as-is, since the architectural 
-intent of the instruction is essentially "I've got nothing better to do 
-right now than wait for something to happen", so treating it as a poor 
-man's sched_vield() stays close to that while mitigating the potential 
-nefarious and/or minor DoS implications of letting it architecturally 
-execute.
+The fsl-edma-common will be its own module so the exports are
+necessary for proper linking/modpost.
 
-Robin.
+Best regards,
+Krzysztof
+
+> If possible I would prefer if you start with cleanup/conversions, then
+> split-up and finally add functionality.
+>
+> So ideally:
+> 1. Use macros for preprocessor defines (where you move to BIT/GENMASK)
+> 2. Split
+> 3. Add EDMA macros etc.
+> 4. Add ColdFire mcf5441x edma support
+>
