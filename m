@@ -1,34 +1,37 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  7 Aug 2018 23:18:36 +0200
-Subject: [PATCH] crypto: arm64/sm4-ce - check for the right CPU feature bit
-Message-ID: <20180807211836.9899-1-ard.biesheuvel@linaro.org>
+From: ebiggers@kernel.org (Eric Biggers)
+Date: Tue, 7 Aug 2018 14:51:21 -0700
+Subject: [RFC PATCH 3/9] crypto: chacha20-generic - refactor to allow
+ varying number of rounds
+In-Reply-To: <CAEX_ruFp0KddnZyetZt997OvRzKDuN7U95MF_N9AgTh+mTcD7Q@mail.gmail.com>
+References: <20180806223300.113891-1-ebiggers@kernel.org>
+ <20180806223300.113891-4-ebiggers@kernel.org>
+ <CAHmME9rbe6eT6dkUqKnp-GxcqGrp-tvMfTMr8kZtsn=S3cmP8A@mail.gmail.com>
+ <CA+_SqcD+KpQ_X6iXUCpQh0N6pWzBorstBJDx7eBqcybY4Dvy8Q@mail.gmail.com>
+ <CAEX_ruFp0KddnZyetZt997OvRzKDuN7U95MF_N9AgTh+mTcD7Q@mail.gmail.com>
+Message-ID: <20180807215121.GB25300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv8.2 specifies special instructions for the SM3 cryptographic hash
-and the SM4 symmetric cipher. While it is unlikely that a core would
-implement one and not the other, we should only use SM4 instructions
-if the SM4 CPU feature bit is set, and we currently check the SM3
-feature bit instead. So fix that.
+On Tue, Aug 07, 2018 at 11:21:04AM +0100, Samuel Neves wrote:
+> > The best attack on ChaCha breaks 7 rounds, and that attack requires 2^248 operations.
+> 
+> This number, as far as I can tell, comes from the "New features of
+> Latin dances" paper. There have been some minor improvements in the
+> intervening 10 years, e.g., [1, 2, 3, 4], which pull back the
+> complexity of breaking ChaCha7 down to 2^235. In any case, every
+> attack so far appears to hit a wall at 8 rounds, with 12 rounds---the
+> recommended eSTREAM round number for Salsa20---seeming to offer a
+> reasonable security margin, still somewhat better than that of the
+> AES.
+> 
+> Best regards,
+> Samuel Neves
+> 
+> [1] https://eprint.iacr.org/2015/698
+> [2] https://eprint.iacr.org/2015/217
+> [3] https://eprint.iacr.org/2016/1034
+> [4] https://doi.org/10.1016/j.dam.2017.04.034
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-It would be good to get this backported to -stable but there is no
-need to merge this as a fix at -rc8
+Thanks Samuel, I'll fix that number in the next iteration of the patchset.
 
- arch/arm64/crypto/sm4-ce-glue.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/crypto/sm4-ce-glue.c b/arch/arm64/crypto/sm4-ce-glue.c
-index b7fb5274b250..0c4fc223f225 100644
---- a/arch/arm64/crypto/sm4-ce-glue.c
-+++ b/arch/arm64/crypto/sm4-ce-glue.c
-@@ -69,5 +69,5 @@ static void __exit sm4_ce_mod_fini(void)
- 	crypto_unregister_alg(&sm4_ce_alg);
- }
- 
--module_cpu_feature_match(SM3, sm4_ce_mod_init);
-+module_cpu_feature_match(SM4, sm4_ce_mod_init);
- module_exit(sm4_ce_mod_fini);
--- 
-2.18.0
+- Eric
