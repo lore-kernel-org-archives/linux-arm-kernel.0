@@ -1,66 +1,65 @@
 From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Tue, 7 Aug 2018 19:10:42 +0200
-Subject: [RFC PATCH v2 09/12] gpiolib: Identify GPIO descriptor arrays
- with direct mapping
-In-Reply-To: <1793769.2WP40jSPqy@z50>
+Date: Tue, 7 Aug 2018 18:59:58 +0200
+Subject: [RFC PATCH v2 03/12] ARM: OMAP1: ams-delta: Provide GPIO lookup
+ table for NAND data port
+In-Reply-To: <20180806222918.12644-4-jmkrzyszt@gmail.com>
 References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
- <20180806222918.12644-10-jmkrzyszt@gmail.com>
- <CACRpkdZtuU6zXBz6UqprE7-31vW9-1ZabFjyzHBgWaTgmqkbbQ@mail.gmail.com>
- <1793769.2WP40jSPqy@z50>
-Message-ID: <20180807191042.0204909a@bbrezillon>
+ <20180806222918.12644-1-jmkrzyszt@gmail.com>
+ <20180806222918.12644-4-jmkrzyszt@gmail.com>
+Message-ID: <20180807185958.2fc6e22b@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 07 Aug 2018 18:50:22 +0200
+On Tue,  7 Aug 2018 00:29:09 +0200
 Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
 
-> Hi Linus,
+> Data port used by Amstrad Delta NAND driver is actually an OMAP MPUIO
+> device, already under control of gpio-omap driver.  The NAND driver
+> gets access to the port by ioremapping it and performs read/write
+> operations.  That is done without any proteciton from other users
+> legally manipulating the port pins over GPIO API.
 > 
-> On Tuesday, August 7, 2018 1:29:43 AM CEST Linus Walleij wrote:
-> > Hi Janusz!
-> > 
-> > On Tue, Aug 7, 2018 at 12:29 AM Janusz Krzysztofik <jmkrzyszt@gmail.com>   
-> wrote:
-> >   
-> > > Certain GPIO array lookup results may map directly to GPIO pins of a
-> > > single GPIO chip in hardware order.  If that condition is recognized
-> > > and handled efficiently, significant performance gain of get/set array
-> > > functions may be possible.
-> > >
-> > > While processing a request for an array of GPIO descriptors, verify if
-> > > the descriptors just collected represent consecutive pins of a single
-> > > GPIO chip.  Pass that information with the array to the caller so it
-> > > can benefit from enhanced performance as soon as bitmap based get/set
-> > > array functions which can make efficient use of that are available.
-> > >
-> > > Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>  
-> > (...)  
-> > >  This function returns a struct gpio_descs which contains an array of
-> > > -descriptors::
-> > > +descriptors.  It may also contain a valid descriptor of a single GPIO   
-> chip in
-> > > +case the array strictly matches pin hardware layout of the chip::
-> > >
-> > >         struct gpio_descs {
-> > >                 unsigned int ndescs;
-> > >                 struct gpio_desc *desc[];
-> > > +               struct gpio_chip *chip;  
-> > 
-> > This must be motivated: if the only purpose is to indicate to the consumer   
-> that
-> > all GPIOs are on the same chip, why not just have a
-> > 
-> > bool all_on_same_chip;
-> > 
-> > That you set to true if these are all on the same chip?  
+> The plan is to convert the driver to access the port over GPIO consumer
+> API.  Before that is implemented, the driver can already obtain
+> exclusive access to the port by requesting an array of its GPIO
+> descriptors.
 > 
-> My approach would probably save one or two instructions per get/set call, but 
-> I'm not stuck to it and will be happy to find a better solution.
+> Add respective entries to the NAND GPIO lookup table.
 > 
-> How about folding the chip descriptor inside an additional structure, private 
-> to drivers, with internals not revealed to consumers?
+> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 
-Or just get the chip from gpio_descs->desc[0]->gdev->chip when
-->all_on_same_chip is true...
+Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
 
-That adds 2 dereferencing though.
+> ---
+>  arch/arm/mach-omap1/board-ams-delta.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+> index eedacdfe9725..16f7bbe47607 100644
+> --- a/arch/arm/mach-omap1/board-ams-delta.c
+> +++ b/arch/arm/mach-omap1/board-ams-delta.c
+> @@ -337,7 +337,8 @@ static struct platform_device ams_delta_nand_device = {
+>  	.resource	= ams_delta_nand_resources,
+>  };
+>  
+> -#define OMAP_GPIO_LABEL	"gpio-0-15"
+> +#define OMAP_GPIO_LABEL		"gpio-0-15"
+> +#define OMAP_MPUIO_LABEL	"mpuio"
+>  
+>  static struct gpiod_lookup_table ams_delta_nand_gpio_table = {
+>  	.table = {
+> @@ -349,6 +350,14 @@ static struct gpiod_lookup_table ams_delta_nand_gpio_table = {
+>  		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_NWE, "nwe", 0),
+>  		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_ALE, "ale", 0),
+>  		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_CLE, "cle", 0),
+> +		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 0, "data", 0, 0),
+> +		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 1, "data", 1, 0),
+> +		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 2, "data", 2, 0),
+> +		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 3, "data", 3, 0),
+> +		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 4, "data", 4, 0),
+> +		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 5, "data", 5, 0),
+> +		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 6, "data", 6, 0),
+> +		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 7, "data", 7, 0),
+>  		{ },
+>  	},
+>  };
