@@ -1,110 +1,23 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Tue, 7 Aug 2018 19:47:22 +0200
-Subject: [RFC PATCH v2 12/12] gpiolib: Add fast processing path to
- bitmap API functions
-In-Reply-To: <11711552.OvaP4pOjBH@z50>
-References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
- <20180806222918.12644-13-jmkrzyszt@gmail.com>
- <CACRpkdYHqFOFSv-erCzx8_u-mVUgGPdDH0ts-+DNAvjP3Qxb9w@mail.gmail.com>
- <11711552.OvaP4pOjBH@z50>
-Message-ID: <20180807194722.5aabb6da@bbrezillon>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 7 Aug 2018 11:48:35 -0600
+Subject: [PATCH v2 01/10] dt-bindings: clock: Add syscon support to
+ Actions Semi Owl SoCs
+In-Reply-To: <20180801033915.15880-2-manivannan.sadhasivam@linaro.org>
+References: <20180801033915.15880-1-manivannan.sadhasivam@linaro.org>
+ <20180801033915.15880-2-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180807174835.GA13777@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Janusz,
+On Wed, Aug 01, 2018 at 09:09:06AM +0530, Manivannan Sadhasivam wrote:
+> Since the clock and reset management units are sharing the same memory
+> map, document the clock bindings to support System Controller.
 
-On Tue, 07 Aug 2018 19:29:53 +0200
-Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
-
-> On Tuesday, August 7, 2018 1:43:56 AM CEST Linus Walleij wrote:
-> > On Tue, Aug 7, 2018 at 12:29 AM Janusz Krzysztofik <jmkrzyszt@gmail.com>   
-> wrote:
-> > 
-> > Hi Janusz!
-> >   
-> > > Certain GPIO descriptor arrays returned by gpio_get_array() may contain
-> > > information on a single GPIO chip driving array member pins in hardware
-> > > order.  In such cases, bitmaps of values can be passed directly to the
-> > > chip callback functions without wasting time on iterations.
-> > >
-> > > Add respective code to gpiod_get/set_array_bitmap_complex() functions.
-> > >
-> > > Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>  
-> > 
-> > I think it would be disappointing to leave all the users of the old
-> > array API without the performance improvement. I think we need to
-> > deal with this in a way such that everyone can benefit from it.  
-
-I agree with Linus on that one. When I initially proposed the gpio
-bitbanging API I had something more advanced in mind where the GPIO
-framework would be responsible for toggling the GPIOs on its own when
-it's given an array of bytes to transmit (this way you avoid going
-back and forth between the GPIO user and the GPIO framework). But this
-approach would clearly be more invasive than what you propose
-here (turning the int array into a bitmap and optimizing). So, if we go
-for the "int array -> bitmap" approach I think all users should be
-converted so that we end up with a single API.
+This is no reason to add child nodes. The existing node can be both a 
+clock and reset provider.
 
 > 
-> There are a few issues to be resolved:
-> 
-> 1) array size limited by bitmap size:
->     - are we ready to limit array size to a single bitmap for all users?
->     - if not, how can we pass a bitmap of an arbitrary size?
->     - if as an array of bitmaps, is that still clear enough and easy to use?
->     - other ideas?
-
-What we call a bitmap is an array of unsigned longs each entry
-containing NBITS_PER_LONG bits, so yes, it's an arbitrary size (see the
-bitmap API here [1]).
-
-> 
-> 2) arbitrary array support:
->      - are we ready to drop that?
->      - if not, do we agree to require all users to pack their arbitrary arrays 
->         inside the gpio_descs structure?
-
-I could only find one user, and it's the core itself (for the ioctl),
-so that shouldn't be too hard to convert all users. Did you find more.
-
-> 
-> Maybe more.
-> 
-> > Also it is kludgy if users (consumers) would need to handle the case
-> > where all lines are on the same chip separately, through the bitmap
-> > API.  
-> 
-> Not true as long as array size fits (arbitrary arrays can be packed by users), 
-> but I see your point.
-
-I think the API should be the same and the framework should decide to
-take the fast path if all gpios belong to the same chip (which AFAICT
-is already the case, except it's putting the result in an int array
-instead of a bitmap)
-
-> 
-> > What we need is an API that:
-> > 
-> > - All drivers handling arrays can use (including current users).
-> > 
-> > - Enables speed-up if the lines are all on the same chip/register.
-> > 
-> > - Doesn't require consumers to know if they are all on the same
-> >   chip or not.
-> > 
-> > This means a deep API with a small surface.
-> > 
-> > How do we achieve this the best way?  
-> 
-> I think widely accepted solutions to those two issues I've mentioned above can 
-> give the answer.
-
-I'd still like to see how far we are from the initial perfs (the one
-poking the GPIO regs directly) with this approach, and what's the
-improvement compared to the int array solution we already have in place.
-
-Regards,
-
-Boris
-
-[1]https://elixir.bootlin.com/linux/v4.18-rc8/source/include/linux/bitmap.h
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> ---
+>  .../bindings/clock/actions,owl-cmu.txt        | 21 +++++++++++++------
+>  1 file changed, 15 insertions(+), 6 deletions(-)
