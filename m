@@ -1,46 +1,45 @@
-From: gustavo@embeddedor.com (Gustavo A. R. Silva)
-Date: Tue, 7 Aug 2018 19:07:35 -0500
-Subject: [PATCH] dma/direct: Use true and false for boolean values
-Message-ID: <20180808000735.GA7314@embeddedor.com>
+From: ebiggers@kernel.org (Eric Biggers)
+Date: Tue, 7 Aug 2018 17:15:24 -0700
+Subject: [RFC PATCH 3/9] crypto: chacha20-generic - refactor to allow
+ varying number of rounds
+In-Reply-To: <20180807215121.GB25300@gmail.com>
+References: <20180806223300.113891-1-ebiggers@kernel.org>
+ <20180806223300.113891-4-ebiggers@kernel.org>
+ <CAHmME9rbe6eT6dkUqKnp-GxcqGrp-tvMfTMr8kZtsn=S3cmP8A@mail.gmail.com>
+ <CA+_SqcD+KpQ_X6iXUCpQh0N6pWzBorstBJDx7eBqcybY4Dvy8Q@mail.gmail.com>
+ <CAEX_ruFp0KddnZyetZt997OvRzKDuN7U95MF_N9AgTh+mTcD7Q@mail.gmail.com>
+ <20180807215121.GB25300@gmail.com>
+Message-ID: <20180808001524.GD25300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Return statements in functions returning bool should use true or false
-instead of an integer value.
+On Tue, Aug 07, 2018 at 02:51:21PM -0700, Eric Biggers wrote:
+> On Tue, Aug 07, 2018 at 11:21:04AM +0100, Samuel Neves wrote:
+> > > The best attack on ChaCha breaks 7 rounds, and that attack requires 2^248 operations.
+> > 
+> > This number, as far as I can tell, comes from the "New features of
+> > Latin dances" paper. There have been some minor improvements in the
+> > intervening 10 years, e.g., [1, 2, 3, 4], which pull back the
+> > complexity of breaking ChaCha7 down to 2^235. In any case, every
+> > attack so far appears to hit a wall at 8 rounds, with 12 rounds---the
+> > recommended eSTREAM round number for Salsa20---seeming to offer a
+> > reasonable security margin, still somewhat better than that of the
+> > AES.
+> > 
+> > Best regards,
+> > Samuel Neves
+> > 
+> > [1] https://eprint.iacr.org/2015/698
+> > [2] https://eprint.iacr.org/2015/217
+> > [3] https://eprint.iacr.org/2016/1034
+> > [4] https://doi.org/10.1016/j.dam.2017.04.034
+> 
+> Thanks Samuel, I'll fix that number in the next iteration of the patchset.
+> 
 
-This code was detected with the help of Coccinelle.
+Oops, sorry, for some reason I thought you had quoted one of my commit messages,
+but it was actually Paul's email.  I did mention in "crypto: chacha - add
+XChaCha12 support" that "the best known attack on ChaCha makes it through only 7
+rounds", but I didn't specify the complexity.
 
-Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
----
- arch/arm/include/asm/dma-direct.h | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/include/asm/dma-direct.h b/arch/arm/include/asm/dma-direct.h
-index b67e5fc..906fdcf 100644
---- a/arch/arm/include/asm/dma-direct.h
-+++ b/arch/arm/include/asm/dma-direct.h
-@@ -19,18 +19,18 @@ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
- 	u64 limit, mask;
- 
- 	if (!dev->dma_mask)
--		return 0;
-+		return false;
- 
- 	mask = *dev->dma_mask;
- 
- 	limit = (mask + 1) & ~mask;
- 	if (limit && size > limit)
--		return 0;
-+		return false;
- 
- 	if ((addr | (addr + size - 1)) & ~mask)
--		return 0;
-+		return false;
- 
--	return 1;
-+	return true;
- }
- 
- #endif /* ASM_ARM_DMA_DIRECT_H */
--- 
-2.7.4
+- Eric
