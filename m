@@ -1,40 +1,53 @@
 From: marek.behun@nic.cz (=?UTF-8?q?Marek=20Beh=C3=BAn?=)
-Date: Wed,  8 Aug 2018 17:27:04 +0200
-Subject: [PATCH v1 5/7] arm64: dts: marvell: armada-37xx: add nodes to support
- watchdog
+Date: Wed,  8 Aug 2018 17:27:05 +0200
+Subject: [PATCH v1 6/7] net: mvneta: Don't use GRO on Armada 3720
 In-Reply-To: <20180808152706.21727-1-marek.behun@nic.cz>
 References: <20180808152706.21727-1-marek.behun@nic.cz>
-Message-ID: <20180808152706.21727-6-marek.behun@nic.cz>
+Message-ID: <20180808152706.21727-7-marek.behun@nic.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the system controller node for CPU Miscellaneous Registers
-(which is needed for the watchdog node) and the watchdog node.
+For some reason on Armada 3720 boards (EspressoBin and Turris Mox) the
+networking driver behaves weirdly when using napi_gro_receive.
+
+For example downloading a big file from a local network (low ping) is
+fast, but when downloading from a remote server (higher ping), the
+download speed is at first high but drops rapidly to almost nothing or
+absolutely nothing.
+
+This is fixed when using netif_receive_skb instead of napi_gro_receive.
 
 Signed-off-by: Marek Behun <marek.behun@nic.cz>
+Cc: Russell King - ARM Linux <linux@armlinux.org.uk>
+Cc: netdev at vger.kernel.org
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index 3353252d78a0..b2f041a17d9d 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -65,6 +65,18 @@
- 			/* 32M internal register @ 0xd000_0000 */
- 			ranges = <0x0 0x0 0xd0000000 0x2000000>;
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 0ad2f3f7da85..27f3017d94c5 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -1959,7 +1959,10 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
  
-+			wdt: watchdog-timer at 8300 {
-+				compatible = "marvell,armada-3700-wdt";
-+				reg = <0x8300 0x40>;
-+				marvell,system-controller = <&cpu_misc>;
-+				clocks = <&xtalclk>;
-+			};
-+
-+			cpu_misc: system-controller at d000 {
-+				compatible = "syscon", "simple-mfd";
-+				reg = <0xd000 0x1000>;
-+			};
-+
- 			spi0: spi at 10600 {
- 				compatible = "marvell,armada-3700-spi";
- 				#address-cells = <1>;
+ 			skb->protocol = eth_type_trans(skb, dev);
+ 			mvneta_rx_csum(pp, rx_status, skb);
+-			napi_gro_receive(&port->napi, skb);
++			if (pp->neta_armada3700)
++				netif_receive_skb(skb);
++			else
++				napi_gro_receive(&port->napi, skb);
+ 
+ 			rcvd_pkts++;
+ 			rcvd_bytes += rx_bytes;
+@@ -2001,7 +2004,10 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
+ 
+ 		mvneta_rx_csum(pp, rx_status, skb);
+ 
+-		napi_gro_receive(&port->napi, skb);
++		if (pp->neta_armada3700)
++			netif_receive_skb(skb);
++		else
++			napi_gro_receive(&port->napi, skb);
+ 	}
+ 
+ 	if (rcvd_pkts) {
 -- 
 2.16.4
