@@ -1,262 +1,118 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Wed, 8 Aug 2018 11:58:35 +0200
-Subject: [RFC PATCH 09/16] KVM: arm64: Allow ID registers to by
- dynamically read-as-zero
-In-Reply-To: <20180808091111.GL9097@e103592.cambridge.arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-10-git-send-email-Dave.Martin@arm.com>
- <20180806130324.GA5985@e113682-lin.lund.arm.com>
- <20180807110958.GC9097@e103592.cambridge.arm.com>
- <20180807193512.GH5985@e113682-lin.lund.arm.com>
- <20180808091111.GL9097@e103592.cambridge.arm.com>
-Message-ID: <20180808095835.GK5985@e113682-lin.lund.arm.com>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Wed, 8 Aug 2018 12:01:19 +0200
+Subject: [PATCH V4 0/9] clk: add imx7ulp clk support
+In-Reply-To: <AM0PR04MB421169829CFE1A6A32DCC209802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1531921023-18497-1-git-send-email-aisheng.dong@nxp.com>
+ <AM0PR04MB421169829CFE1A6A32DCC209802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <5a5950a4-e164-a604-ccb4-ae6d5bbe1708@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2018 at 10:11:11AM +0100, Dave Martin wrote:
-> On Tue, Aug 07, 2018 at 09:35:12PM +0200, Christoffer Dall wrote:
-> > On Tue, Aug 07, 2018 at 12:09:58PM +0100, Dave Martin wrote:
-> > > On Mon, Aug 06, 2018 at 03:03:24PM +0200, Christoffer Dall wrote:
-> > > > Hi Dave,
-> > > > 
-> > > > I think there's a typo in the subject "to be" rather than "to by".
-> > > > 
-> > > > On Thu, Jun 21, 2018 at 03:57:33PM +0100, Dave Martin wrote:
-> > > > > When a feature-dependent ID register is hidden from the guest, it
-> > > > > needs to exhibit read-as-zero behaviour as defined by the Arm
-> > > > > architecture, rather than appearing to be entirely absent.
-> > > > > 
-> > > > > This patch updates the ID register emulation logic to make use of
-> > > > > the new check_present() method to determine whether the register
-> > > > > should read as zero instead of yielding the host's sanitised
-> > > > > value.  Because currently a false result from this method truncates
-> > > > > the trap call chain before the sysreg's emulate method() is called,
-> > > > > a flag is added to distinguish this special case, and helpers are
-> > > > > refactored appropriately.
-> > > > 
-> > > > I don't understand this last sentence.
-> > > > 
-> > > > And I'm not really sure I understand the code either.
-> > > > 
-> > > > I can't seem to see any registers which are defined as !present && !raz,
-> > > > which is what I thought this feature was all about.
-> > > 
-> > > !present and !raz is the default behaviour for everything that is not
-> > > ID-register-like.  This patch is adding the !present && raz case (though
-> > > that may not be a helpful way to descibe it ... see below).
-> > 
-> > Fair enough, but I don't really see why you need to classify a register
-> > as !present && raz, because raz implies present AFAICT.
-> > 
-> > > 
-> > > > In other words, what is the benefit of this more generic method as
-> > > > opposed to having a wrapper around read_id_reg() for read_sve_id_reg()
-> > > > which sets RAZ if there is no support for SVE in this context?
-> > > 
-> > > There may be other ways to factor this.  I can't now remember whay I
-> > > went with this particular approach, except that I vaguely recall
-> > > hitting some obstacles when doing things another way.
-> > 
-> > What I don't much care for is that we now seem to be mixing the concept
-> > of whether something is present and the value it returns if it is
-> > present in the overall system register handling logic.  And I don't
-> > understand why this is a requirement.
-> > 
-> > > 
-> > > Can you take a look at my attempted explanation below and then we
-> > > can reconsider this?
-> > 
-> > Sure, see my comments below.
-> > 
-> > > 
-> > > [...]
-> > > 
-> > > > 
-> > > > > 
-> > > > > This invloves some trivial updates to pass the vcpu pointer down
-> > > > > into the ID register emulation/access functions.
-> > > > > 
-> > > > > A new ID_SANITISED_IF() macro is defined for declaring
-> > > > > conditionally visible ID registers.
-> > > > > 
-> > > > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > > > > ---
-> > > > >  arch/arm64/kvm/sys_regs.c | 51 ++++++++++++++++++++++++++++++-----------------
-> > > > >  arch/arm64/kvm/sys_regs.h | 11 ++++++++++
-> > > > >  2 files changed, 44 insertions(+), 18 deletions(-)
-> > > > > 
-> > > 
-> > > [...]
-> > > 
-> > > > > @@ -1840,7 +1855,7 @@ static int emulate_cp(struct kvm_vcpu *vcpu,
-> > > > >  
-> > > > >  	r = find_reg(params, table, num);
-> > > > >  
-> > > > > -	if (likely(r) && sys_reg_present(vcpu, r)) {
-> > > > > +	if (likely(r) && sys_reg_present_or_raz(vcpu, r)) {
-> > > > >  		perform_access(vcpu, params, r);
-> > > > >  		return 0;
-> > > > >  	}
-> > > > > @@ -2016,7 +2031,7 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
-> > > > >  	if (!r)
-> > > > >  		r = find_reg(params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
-> > > > >  
-> > > > > -	if (likely(r) && sys_reg_present(vcpu, r)) {
-> > > > > +	if (likely(r) && sys_reg_present_or_raz(vcpu, r)) {
-> > > > >  		perform_access(vcpu, params, r);
-> > > > >  	} else {
-> > > > >  		kvm_err("Unsupported guest sys_reg access at: %lx\n",
-> > > > > @@ -2313,7 +2328,7 @@ int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
-> > > > >  	if (!r)
-> > > > >  		return get_invariant_sys_reg(reg->id, uaddr);
-> > > > >  
-> > > > > -	if (!sys_reg_present(vcpu, r))
-> > > > > +	if (!sys_reg_present_or_raz(vcpu, r))
-> > > > >  		return -ENOENT;
-> > > > >  
-> > > > >  	if (r->get_user)
-> > > > > @@ -2337,7 +2352,7 @@ int kvm_arm_sys_reg_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
-> > > > >  	if (!r)
-> > > > >  		return set_invariant_sys_reg(reg->id, uaddr);
-> > > > >  
-> > > > > -	if (!sys_reg_present(vcpu, r))
-> > > > > +	if (!sys_reg_present_or_raz(vcpu, r))
-> > > > >  		return -ENOENT;
-> > > 
-> > > On Wed, Jul 25, 2018 at 04:46:55PM +0100, Alex Benn?e wrote:
-> > > > It's all very well being raz, but shouldn't you catch this further down
-> > > > and not attempt to write the register that doesn't exist?
-> > > 
-> > > To be clear, is this a question about factoring, or do you think there's
-> > > a bug here?
-> > > 
-> > > 
-> > > In response to both sets of comments, I think the way the code is
-> > > factored is causing some confusion.
-> > > 
-> > > The idea in my head was something like this:
-> > > 
-> > > System register encodings fall into two classes:
-> > > 
-> > >  a) encodings that we emulate in some way
-> > 
-> > this is present, then
-> > 
-> > >  b) encodings that we unconditionally reflect back to the guest as an
-> > >     Undef.
-> > 
-> > this is !present, then
-> > 
-> > The previous change made this a configurable thing as opposed to a
-> > static compile time thing, right?
-> > > 
-> > > Architecturally defined system registers fall into two classes:
-> > > 
-> > >  i) registers whose removal turns all accesses into an Undef
-> > >  ii) registers whose removal exhibits some other behaviour.
-> > 
-> > I'm not sure what you mean by 'removal' here, and which architectural
-> > concept that relates to, which makes it hard for me to parse the rest
-> > here...
-> > 
-> > > 
-> > > These two classifications overlap somwehat.
-> > > 
-> > > 
-> > > From an emulation perspective, (b), and (i) in the "register not
-> > > present" case, look the same: we trap the register and reflect an Undef
-> > > directly back to the guest with no further action required.
-> > > 
-> > > From an emulation perspective, (a) and (ii) are also somewhat the
-> > > same: we need to emulate something, although precisely what we need
-> > > to do depends on which register it is and on whether the register is
-> > > deemed present or not.
-> > > 
-> > > sys_reg_check_present_or_raz() thus means "falls under (a) or (ii)",
-> > > i.e., some emulation is required and we need to call sysreg-specific
-> > > methods to figure out precisely what we need to do.
-> > 
-> > yes, but we've always had that without the "or_raz" stuff at the lookup
-> > level.  What has changed?
-> > 
-> > > 
-> > > Conversely !sys_reg_check_present_or_raz() means that we can just
-> > > Undef the guest with no further logic required.
-> > 
-> > Yes, but that's the same as !present, because raz then implies present,
-> > see above.
-> > 
-> > > 
-> > > Does this rationale make things clearer?  The naming is perhaps
-> > > unfortunate.
-> > > 
-> > 
-> > Unfortunately not so much.  I have a strong feeling you want to move
-> > anything relating to something being emulated as RAZ/RAO/something else
-> > into sysreg specific functions.
-> 
-> 
-> The way I integrated this seemed natural at the time, but your
-> reaction suggests that it may not be the right approach...
-> 
-> 
-> At its heart, I'm trying to abstract out the special behaviour of
-> all unallocated ID registers, so that we can decide at runtime which
-> ones to hide fro the guest: within the ID register block, each
-> unallocated register becomes RAZ, not UNDEFINED as would be the case
-> for other system registers, so we need to capture both behaviours.
-> 
-> 
-> If we want a generic handler for all the ID registers in sys_regs.c,
-> then we need a flag to tell us whether to pass the ID register through
-> from cpufeatures or to make it appear as zero.
-> 
-> For ZCR_EL1 on the other hand, we really want attempts to access that
-> to reflect an Undef to the guest if we are pretending that SVE is not
-> implemented.  Again if we want to filter out some sysregs in a runtime-
-> controlled way, we need a flag to tell us whether to filter out a
-> particular register.
-> 
-> So, we have two specific ways of rolling a feature that is really
-> implemented in the hardware back to the ARMv8-A behaviour (RAZ for ID
-> registers and Undef for anything else).
-> 
-> I tried to group these under a single concept of presence/absence,
-> which is what check_present() is intended to check.  However, we
-> don't really want ID registers to Undef when !check_present(): this
-> is bodged around with the additional SR_RAZ_IF_ABSENT flag so that
-> the decision about whether to make the register Undef or not can
-> be made generic.
-> 
-> 
-> It seems that this attempt at generalisation is creating more confusion
-> than it solves, so I may abandon it and just handle ID_AA64PFR0_EL1 and
-> ID_AA64ZFR0_EL1 specially.
-> 
-> When/if we've done that a few times for different features, it may
-> become clearer what any generic framework for doing it should look
-> like...
-> 
+Hi Dong Aisheng,
 
-I think there's just a reasonable amount of complexity in sys_regs.c
-already, and the naming and concepts aren't clear from the reading the
-code as it stands now.
+On 07/26/2018 03:50 AM, A.s. Dong wrote:
+> Hi Stephen,
+> 
+> Do you have a chance to look at it?
+> This patch series has been pending for quite a long time without much comments.
+I'm not a kernel maintainer but I would not review a series that has
+checkpatch errors.
+Please run checkpatch, fix the errors and the warnings, and then
+resubmit a series.
 
-I think it would probably help to flag things as ID registers as opposed
-to 'RAZ' behavior, beccause it's clear we're then trying to support an
-architectural concept.
-
-However, I think of the generic infrastructre in sys_regs.c to be
-worried about KVM-specifics, and the implementation of the
-emulate/access functions to be concerned with architectural concepts.
-That's just how I've always thought abuot this code.
-
-Therefore, I would suggest wrapping all ID register accesses through
-common ID register access functions (read/write) which handles the RAZ
-case.
-
-At least, I'd like to see if that becomes too horrible before taking
-this route.
-
-Thanks,
--Christoffer
+Best Regards,
+Alexandre
+> 
+> Regards
+> Dong Aisheng
+> 
+>> -----Original Message-----
+>> From: A.s. Dong
+>> Sent: Wednesday, July 18, 2018 9:37 PM
+>> To: linux-clk at vger.kernel.org
+>> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>> sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org;
+>> Anson Huang <anson.huang@nxp.com>; Jacky Bai <ping.bai@nxp.com>; dl-
+>> linux-imx <linux-imx@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
+>> Subject: [PATCH V4 0/9] clk: add imx7ulp clk support
+>>
+>> This is a rebased version of below patch series against latest clk tree.
+>> [PATCH RESEND V3 0/9] clk: add imx7ulp clk support
+>> https://lkml.org/lkml/2018/3/16/310
+>>
+>> This patch series intends to add imx7ulp clk support.
+>>
+>> i.MX7ULP Clock functions are under joint control of the System Clock
+>> Generation (SCG) modules, Peripheral Clock Control (PCC) modules, and
+>> Core Mode Controller (CMC)1 blocks
+>>
+>> The clocking scheme provides clear separation between M4 domain and A7
+>> domain. Except for a few clock sources shared between two domains, such
+>> as the System Oscillator clock, the Slow IRC (SIRC), and and the Fast IRC clock
+>> (FIRCLK), clock sources and clock management are separated and contained
+>> within each domain.
+>>
+>> M4 clock management consists of SCG0, PCC0, PCC1, and CMC0 modules.
+>> A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
+>>
+>> Note: this series only adds A7 clock domain support as M4 clock domain will
+>> be handled by M4 seperately.
+>>
+>> Change Log:
+>> v3->v4:
+>>  * rebased to latest kernel
+>>  * make scg and pcc separate nodes according to Rob's suggestion
+>>
+>> v2->v3:
+>>  * Patch 1 changed on: 1) split normal and gate ops 2) fix the possible racy
+>>    Others no changes.
+>>
+>> v1->v2:
+>>  * add enable/disable for the type of CLK_DIVIDER_ZERO_GATE dividers
+>>  * use clk_hw apis to register clocks
+>>  * use of_clk_add_hw_provider
+>>  * split the clocks register process into two parts: early part for possible
+>>    timers clocks registered by CLK_OF_DECLARE_DRIVER and the later part for
+>>    the left normal peripheral clocks registered by a platform driver.
+>>
+>> Dong Aisheng (9):
+>>   clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk support
+>>   clk: fractional-divider: add CLK_FRAC_DIVIDER_ZERO_BASED flag support
+>>   clk: imx: add pllv4 support
+>>   clk: imx: add pfdv2 support
+>>   clk: imx: add composite clk support
+>>   dt-bindings: clock: add imx7ulp clock binding doc
+>>   clk: imx: make mux parent strings const
+>>   clk: imx: implement new clk_hw based APIs
+>>   clk: imx: add imx7ulp clk driver
+>>
+>>  .../devicetree/bindings/clock/imx7ulp-clock.txt    |  87 +++++++++
+>>  drivers/clk/clk-divider.c                          | 152 +++++++++++++++
+>>  drivers/clk/clk-fractional-divider.c               |  10 +
+>>  drivers/clk/imx/Makefile                           |   6 +-
+>>  drivers/clk/imx/clk-busy.c                         |   2 +-
+>>  drivers/clk/imx/clk-composite.c                    |  85 +++++++++
+>>  drivers/clk/imx/clk-fixup-mux.c                    |   2 +-
+>>  drivers/clk/imx/clk-imx7ulp.c                      | 209 +++++++++++++++++++++
+>>  drivers/clk/imx/clk-pfdv2.c                        | 201 ++++++++++++++++++++
+>>  drivers/clk/imx/clk-pllv4.c                        | 182 ++++++++++++++++++
+>>  drivers/clk/imx/clk.c                              |  22 +++
+>>  drivers/clk/imx/clk.h                              |  92 ++++++++-
+>>  include/dt-bindings/clock/imx7ulp-clock.h          | 109 +++++++++++
+>>  include/linux/clk-provider.h                       |  17 ++
+>>  14 files changed, 1166 insertions(+), 10 deletions(-)  create mode 100644
+>> Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
+>>  create mode 100644 drivers/clk/imx/clk-composite.c  create mode 100644
+>> drivers/clk/imx/clk-imx7ulp.c  create mode 100644 drivers/clk/imx/clk-
+>> pfdv2.c  create mode 100644 drivers/clk/imx/clk-pllv4.c  create mode 100644
+>> include/dt-bindings/clock/imx7ulp-clock.h
+>>
+>> --
+>> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
