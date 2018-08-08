@@ -1,59 +1,177 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 8 Aug 2018 22:59:46 +0530
-Subject: [PATCH 0/9] Add Reset Controller support for Actions Semi Owl SoCs
-In-Reply-To: <20180807184710.GA26423@rob-hp-laptop>
-References: <20180727184527.13287-1-manivannan.sadhasivam@linaro.org>
- <c3ae668a-6bcc-a0eb-1e00-14ef9d607316@suse.de>
- <20180730151131.GA28633@mani>
- <20180807184710.GA26423@rob-hp-laptop>
-Message-ID: <20180808172946.GA4188@Mani-XPS-13-9360>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 8 Aug 2018 18:38:05 +0100
+Subject: [PATCH 1/2] arm64: dts: stratix10: Add Stratix10 SMMU support
+In-Reply-To: <1532543077-8933-2-git-send-email-thor.thayer@linux.intel.com>
+References: <1532543077-8933-1-git-send-email-thor.thayer@linux.intel.com>
+ <1532543077-8933-2-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <db4d8290-c015-aa8b-6058-11fd3d25464b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Tue, Aug 07, 2018 at 12:47:10PM -0600, Rob Herring wrote:
-> On Mon, Jul 30, 2018 at 08:41:31PM +0530, Manivannan Sadhasivam wrote:
-> > Hi Andreas,
-> > 
-> > On Mon, Jul 30, 2018 at 12:26:07PM +0200, Andreas F?rber wrote:
-> > > Hi Mani,
-> > > 
-> > > Am 27.07.2018 um 20:45 schrieb Manivannan Sadhasivam:
-> > > > This patchset adds Reset Controller (RMU) support for Actions Semi
-> > > > Owl SoCs, S900 and S700. For the Owl SoCs, RMU has been integrated into
-> > > > the clock subsystem in hardware. Hence, in software we integrate RMU
-> > > > support into common clock driver inorder to maintain compatibility.
-> > > 
-> > > Can this not be placed into drivers/reset/ by using mfd-simple with a
-> > > sub-node in DT?
+On 25/07/18 19:24, thor.thayer at linux.intel.com wrote:
+> From: Thor Thayer <thor.thayer@linux.intel.com>
 > 
-> That is exactly what I tell folks not to do. Design the DT based on h/w 
-> blocks, not current desired driver split for some OS.
+> Add SMMU support to the Stratix10 Device Tree which
+> includes adding the SMMU node and adding IOMMU stream
+> ids to the SMMU peripherals. Update bindings.
 > 
-> > Actually I was not sure where to place this reset controller driver. When I
-> > looked into other similar ones such as sunxi, they just integrated into the
-> > clk subsystem. So I just chose that path. But yeah, this is hacky!
-> > 
-> > But this RMU is not MFD by any means. Since the CMU (Clock) and RMU (Reset)
-> > are two separate IPs inside SoC, we shouldn't describe it as a MFD driver. Since
-> > RMU has only 2 registers, the HW designers decided to use up the CMU memory
-> > map. So, maybe syscon would be best option I think. What is your opinion?
+> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+> ---
+> This patch is dependent on the patch series
+> "iommu/arm-smmu: Add runtime pm/sleep support"
+> (https://patchwork.ozlabs.org/cover/946160/)
+> ---
+>   .../devicetree/bindings/iommu/arm,smmu.txt         | 25 ++++++++++++++++++
+>   arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  | 30 ++++++++++++++++++++++
+>   2 files changed, 55 insertions(+)
 > 
-> If there's nothing shared then it is not a syscon. If you can create 
-> separate address ranges, then 2 nodes is probably okay. If the registers 
-> are all mixed up, then 1 node.
+> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> index 7c71a6ed465a..8e3fe0594e3e 100644
+> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> @@ -18,6 +18,7 @@ conditions.
+>                           "arm,mmu-500"
+>                           "cavium,smmu-v2"
+>                           "qcom,<soc>-smmu-v2", "qcom,smmu-v2"
+> +                        "altr,smmu-v2"
+
+Can we guarantee that no Altera SoC will ever exist with a different 
+SMMU implementation, configuration, or clock tree? If we must have 
+compatibles for SoC-specific integrations, I'd be a lot happier if they 
+were actually SoC-specific, i.e. at least "altr,stratix10-smmu", or even 
+something like "altr,gx5500-smmu" if there's a chance of new 
+incompatible designs being added to the Stratix 10 family in future.
+
+I'm still dubious that we actually need this for MMU-500, though, since 
+we will always need the TCU clock enabled to do anything, and given the 
+difficulty in associating particular TBU clocks with whichever domains 
+might cause allocations into which TBU's TLBs, it seems highly unlikely 
+that it'll ever be feasible to work at a granularity finer than "all of 
+the clocks". And at that point the names don't really matter, and we 
+merely need something like the proposed of_clk_bulk_get()[1], which 
+works fine regardless of how many TBUs and distinct clocks exist for a 
+particular MMU-500 configuration and integration.
+
+>   
+>                     depending on the particular implementation and/or the
+>                     version of the architecture implemented.
+> @@ -179,3 +180,27 @@ conditions.
+>   			 <&mmcc SMMU_MDP_AHB_CLK>;
+>   		clock-names = "bus", "iface";
+>   	};
+> +
+> +	/* Stratix10 arm,smmu-v2 implementation */
+> +	smmu5: iommu at fa000000 {
+> +		compatible = "altr,smmu-v2", "arm,mmu-500",
+> +			     "arm,smmu-v2";
+> +		reg = <0xfa000000 0x40000>;
+> +		#global-interrupts = <2>;
+> +		#iommu-cells = <1>;
+> +		clocks = <&clkmgr STRATIX10_L4_MAIN_CLK>;
+> +		clock-names = "masters";
+
+This isn't documented as an actual property, and if it also clocks the 
+TCU then I'm not sure it's really the most accurate name.
+
+Robin.
+
+[1] https://patchwork.kernel.org/patch/10427095/
+
+> +		interrupt-parent = <&intc>;
+> +		interrupts = <0 128 4>,	/* Global Secure Fault */
+> +			<0 129 4>, /* Global Non-secure Fault */
+> +			/* Non-secure Context Interrupts (32) */
+> +			<0 138 4>, <0 139 4>, <0 140 4>, <0 141 4>,
+> +			<0 142 4>, <0 143 4>, <0 144 4>, <0 145 4>,
+> +			<0 146 4>, <0 147 4>, <0 148 4>, <0 149 4>,
+> +			<0 150 4>, <0 151 4>, <0 152 4>, <0 153 4>,
+> +			<0 154 4>, <0 155 4>, <0 156 4>, <0 157 4>,
+> +			<0 158 4>, <0 159 4>, <0 160 4>, <0 161 4>,
+> +			<0 162 4>, <0 163 4>, <0 164 4>, <0 165 4>,
+> +			<0 166 4>, <0 167 4>, <0 168 4>, <0 169 4>;
+> +		stream-match-mask = <0x7ff0>;
+> +	};
+> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> index d033da401c26..e38ca86d48f6 100644
+> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> @@ -137,6 +137,7 @@
+>   			reset-names = "stmmaceth", "stmmaceth-ocp";
+>   			clocks = <&clkmgr STRATIX10_EMAC0_CLK>;
+>   			clock-names = "stmmaceth";
+> +			iommus = <&smmu 1>;
+>   			status = "disabled";
+>   		};
+>   
+> @@ -150,6 +151,7 @@
+>   			reset-names = "stmmaceth", "stmmaceth-ocp";
+>   			clocks = <&clkmgr STRATIX10_EMAC1_CLK>;
+>   			clock-names = "stmmaceth";
+> +			iommus = <&smmu 2>;
+>   			status = "disabled";
+>   		};
+>   
+> @@ -163,6 +165,7 @@
+>   			reset-names = "stmmaceth", "stmmaceth-ocp";
+>   			clocks = <&clkmgr STRATIX10_EMAC2_CLK>;
+>   			clock-names = "stmmaceth";
+> +			iommus = <&smmu 3>;
+>   			status = "disabled";
+>   		};
+>   
+> @@ -273,6 +276,7 @@
+>   			clocks = <&clkmgr STRATIX10_L4_MP_CLK>,
+>   				 <&clkmgr STRATIX10_SDMMC_CLK>;
+>   			clock-names = "biu", "ciu";
+> +			iommus = <&smmu 5>;
+>   			status = "disabled";
+>   		};
+>   
+> @@ -307,6 +311,30 @@
+>   			altr,modrst-offset = <0x20>;
+>   		};
+>   
+> +		smmu: iommu at fa000000 {
+> +			compatible = "altr,smmu-v2", "arm,mmu-500",
+> +				     "arm,smmu-v2";
+> +			reg = <0xfa000000 0x40000>;
+> +			#global-interrupts = <2>;
+> +			#iommu-cells = <1>;
+> +			clocks = <&clkmgr STRATIX10_L4_MAIN_CLK>;
+> +			clock-names = "masters";
+> +			interrupt-parent = <&intc>;
+> +			interrupts = <0 128 4>,	/* Global Secure Fault */
+> +				<0 129 4>, /* Global Non-secure Fault */
+> +				/* Non-secure Context Interrupts (32) */
+> +				<0 138 4>, <0 139 4>, <0 140 4>, <0 141 4>,
+> +				<0 142 4>, <0 143 4>, <0 144 4>, <0 145 4>,
+> +				<0 146 4>, <0 147 4>, <0 148 4>, <0 149 4>,
+> +				<0 150 4>, <0 151 4>, <0 152 4>, <0 153 4>,
+> +				<0 154 4>, <0 155 4>, <0 156 4>, <0 157 4>,
+> +				<0 158 4>, <0 159 4>, <0 160 4>, <0 161 4>,
+> +				<0 162 4>, <0 163 4>, <0 164 4>, <0 165 4>,
+> +				<0 166 4>, <0 167 4>, <0 168 4>, <0 169 4>;
+> +			stream-match-mask = <0x7ff0>;
+> +			status = "disabled";
+> +		};
+> +
+>   		spi0: spi at ffda4000 {
+>   			compatible = "snps,dw-apb-ssi";
+>   			#address-cells = <1>;
+> @@ -416,6 +444,7 @@
+>   			resets = <&rst USB0_RESET>, <&rst USB0_OCP_RESET>;
+>   			reset-names = "dwc2", "dwc2-ecc";
+>   			clocks = <&clkmgr STRATIX10_USB_CLK>;
+> +			iommus = <&smmu 6>;
+>   			status = "disabled";
+>   		};
+>   
+> @@ -428,6 +457,7 @@
+>   			resets = <&rst USB1_RESET>, <&rst USB1_OCP_RESET>;
+>   			reset-names = "dwc2", "dwc2-ecc";
+>   			clocks = <&clkmgr STRATIX10_USB_CLK>;
+> +			iommus = <&smmu 7>;
+>   			status = "disabled";
+>   		};
+>   
 > 
-
-I don't quite understand the reason for not being syscon. The definition
-of syscon says that, "System controller node represents a register region
-containing a set of miscellaneous registers. The registers are not cohesive
-enough to represent as any specific type of device." which exactly fits
-this case. Only the registers of CMU & RMU are shared and not the HW block!
-
-Can you please clarify?
-
-Thanks,
-Mani
-
-> Rob
