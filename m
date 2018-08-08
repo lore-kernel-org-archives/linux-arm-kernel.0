@@ -1,93 +1,164 @@
-From: alex@ghiti.fr (Alex Ghiti)
-Date: Wed, 8 Aug 2018 05:36:07 +0000
-Subject: [PATCH v6 00/11] hugetlb: Factorize hugetlb architecture
- primitives
-In-Reply-To: <20180807095402.GA12200@gmail.com>
-References: <20180806175711.24438-1-alex@ghiti.fr>
- <20180807095402.GA12200@gmail.com>
-Message-ID: <e144d038-330a-8b23-c058-94764430ff31@ghiti.fr>
+From: daniel@zonque.org (Daniel Mack)
+Date: Wed, 8 Aug 2018 07:38:16 +0200
+Subject: ASoC: pxa: possible regressions
+In-Reply-To: <5be00a36-d54b-e8ab-2d5f-4c1870f14aac@gmail.com>
+References: <5be00a36-d54b-e8ab-2d5f-4c1870f14aac@gmail.com>
+Message-ID: <58f65d89-c342-026f-6e24-a67fcd625a26@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your time,
+Hi Petr,
 
-Alex
+On Wednesday, August 08, 2018 04:24 AM, Petr Cvek wrote:
+> I was trying to update my system (PXA Magician) to 4.18-next and i've
+> ran into few problems with sound.
 
-Le 07/08/2018 ? 09:54, Ingo Molnar a ?crit?:
-> * Alexandre Ghiti <alex@ghiti.fr> wrote:
->
->> [CC linux-mm for inclusion in -mm tree]
->>                                                                                   
->> In order to reduce copy/paste of functions across architectures and then
->> make riscv hugetlb port (and future ports) simpler and smaller, this
->> patchset intends to factorize the numerous hugetlb primitives that are
->> defined across all the architectures.
->>                                                                                   
->> Except for prepare_hugepage_range, this patchset moves the versions that
->> are just pass-through to standard pte primitives into
->> asm-generic/hugetlb.h by using the same #ifdef semantic that can be
->> found in asm-generic/pgtable.h, i.e. __HAVE_ARCH_***.
->>                                                                                   
->> s390 architecture has not been tackled in this serie since it does not
->> use asm-generic/hugetlb.h at all.
->>                                                                                   
->> This patchset has been compiled on all addressed architectures with
->> success (except for parisc, but the problem does not come from this
->> series).
->>                                                                                   
->> v6:
->>    - Remove nohash/32 and book3s/32 powerpc specific implementations in
->>      order to use the generic ones.
->>    - Add all the Reviewed-by, Acked-by and Tested-by in the commits,
->>      thanks to everyone.
->>                                                                                   
->> v5:
->>    As suggested by Mike Kravetz, no need to move the #include
->>    <asm-generic/hugetlb.h> for arm and x86 architectures, let it live at
->>    the top of the file.
->>                                                                                   
->> v4:
->>    Fix powerpc build error due to misplacing of #include
->>    <asm-generic/hugetlb.h> outside of #ifdef CONFIG_HUGETLB_PAGE, as
->>    pointed by Christophe Leroy.
->>                                                                                   
->> v1, v2, v3:
->>    Same version, just problems with email provider and misuse of
->>    --batch-size option of git send-email
->>
->> Alexandre Ghiti (11):
->>    hugetlb: Harmonize hugetlb.h arch specific defines with pgtable.h
->>    hugetlb: Introduce generic version of hugetlb_free_pgd_range
->>    hugetlb: Introduce generic version of set_huge_pte_at
->>    hugetlb: Introduce generic version of huge_ptep_get_and_clear
->>    hugetlb: Introduce generic version of huge_ptep_clear_flush
->>    hugetlb: Introduce generic version of huge_pte_none
->>    hugetlb: Introduce generic version of huge_pte_wrprotect
->>    hugetlb: Introduce generic version of prepare_hugepage_range
->>    hugetlb: Introduce generic version of huge_ptep_set_wrprotect
->>    hugetlb: Introduce generic version of huge_ptep_set_access_flags
->>    hugetlb: Introduce generic version of huge_ptep_get
->>
->>   arch/arm/include/asm/hugetlb-3level.h        | 32 +---------
->>   arch/arm/include/asm/hugetlb.h               | 30 ----------
->>   arch/arm64/include/asm/hugetlb.h             | 39 +++---------
->>   arch/ia64/include/asm/hugetlb.h              | 47 ++-------------
->>   arch/mips/include/asm/hugetlb.h              | 40 +++----------
->>   arch/parisc/include/asm/hugetlb.h            | 33 +++--------
->>   arch/powerpc/include/asm/book3s/32/pgtable.h |  6 --
->>   arch/powerpc/include/asm/book3s/64/pgtable.h |  1 +
->>   arch/powerpc/include/asm/hugetlb.h           | 43 ++------------
->>   arch/powerpc/include/asm/nohash/32/pgtable.h |  6 --
->>   arch/powerpc/include/asm/nohash/64/pgtable.h |  1 +
->>   arch/sh/include/asm/hugetlb.h                | 54 ++---------------
->>   arch/sparc/include/asm/hugetlb.h             | 40 +++----------
->>   arch/x86/include/asm/hugetlb.h               | 69 ----------------------
->>   include/asm-generic/hugetlb.h                | 88 +++++++++++++++++++++++++++-
->>   15 files changed, 135 insertions(+), 394 deletions(-)
-> The x86 bits look good to me (assuming it's all tested on all relevant architectures, etc.)
->
-> Acked-by: Ingo Molnar <mingo@kernel.org>
->
-> Thanks,
->
-> 	Ingo
+Ah, so you have a Magician platform, that's very good!
+
+> My setup has only a few changes from
+> vanilla (change to using devm_snd_soc_register_card+devm_gpio_request).
+
+Care to share these changes, or ideally rebase them on top of 4.18-next 
+for mainline inclusion? Also, I'm curious what mainline version you used 
+to be based on that worked for you.
+
+> I've started digging around:
+
+Thanks for that. Are you also willing to send patches to fix things once 
+they work for you?
+
+> 1) unimportant goto
+> 
+> Commit 7afd1b0b2ef9a812095 ("ASoC: pxa: move some functions to
+> pxa2xx-lib") is this construct necessary?
+> 
+> 	if (pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream) {
+> 		ret = pxa2xx_pcm_preallocate_dma_buffer(pcm,
+> 			SNDRV_PCM_STREAM_CAPTURE);
+> 		if (ret)
+> 			goto out;
+> 	}
+>    out:
+> 	return ret;
+> 
+> After calling pxa2xx_pcm_preallocate_dma_buffer() the code will jump to
+> out anyway.
+
+True. That's a cosmetic cleanup which can go in for 4.19. Would you want 
+to send a patch after the merge window?
+
+> 2) wrong units (sample rate vs osc rate)
+> 
+> Commit 05739375f1c0a1048 ("ASoC: pxa-ssp: remove .set_pll() and
+> .set_clkdiv() callbacks"). The function pxa_ssp_hw_params() get's called
+> with sample rate so:
+> 
+> 	/* The values in the table are for 16 bits */
+> 	if (width == 32)
+> 		acds--;
+> 
+> 	ret = pxa_ssp_set_pll(priv, bclk);
+> 	if (ret < 0)
+> 		return ret;
+> 
+> 	ssacd = pxa_ssp_read_reg(ssp, SSACD);
+> 	ssacd &= ~(SSACD_ACDS(7) | SSACD_SCDB_1X);
+> 
+> pxa_ssp_set_pll() will try to set something like 8000, 44100, ... and
+> not the speed of an oscilator. The line should be probably:
+> 
+> 	ret = pxa_ssp_set_pll(priv, m->pll);
+> 
+> and there is a previous call to pxa_ssp_set_pll():
+
+Ah, yes. Does changing that fix it for you?
+
+The changes in that machine driver where done blindly because I don't 
+have Magician hardware, and I really don't like doing things that way.
+
+> 3) setup fails
+> 
+> Recent changes in ASoC PXA DMA are causing a fail of a condition in
+> pxa_ssp_hw_params():
+> 
+> 	if ((sscr0 & SSCR0_MOD) && !ttsa) {
+
+What are the values of sscr0 and ttsa in your case? Can you cross-check 
+that with a kernel that doesn't have my recent changes?
+
+> 		dev_err(&ssp->pdev->dev, "No TDM timeslot configured\n");
+> 		return -EINVAL;
+> 	}
+> 
+> It seems the SSCR0_MOD flag is set in the fall through switch statement
+> in pxa_ssp_configure_dai_fmt():
+> 
+> 	case SND_SOC_DAIFMT_DSP_A:
+> 		sspsp |= SSPSP_FSRT;
+> 		/* fall through */
+> 	case SND_SOC_DAIFMT_DSP_B:
+> 		sscr0 |= SSCR0_MOD | SSCR0_PSP;
+> 		sscr1 |= SSCR1_TRAIL | SSCR1_RWOT;
+> 		break;
+> 
+> the switch statement is an old code and it worked in the past versions.
+
+Yes, it was merely moved to some location that is called earlier. This 
+was fixing a regression caused by a8bd0ee558714 ("ASoC: raumfeld: Use 
+static DAI format setup"), so supposedly, all PXA sound was broken since 
+v4.0.
+
+> 4) names are not unique
+> 
+> The initialization of magician_dai structure wants to have (at least in
+> the past versions) for the .name item:
+> 
+> 	static struct snd_soc_dai_link magician_dai[] = {
+> 	{
+> 		.name = "uda1380",
+> 		.stream_name = "UDA1380 Playback",
+> 		.cpu_dai_name = "pxa-ssp-dai.0",
+> 		...
+> 	{
+> 		.name = "uda1380",
+> 		.stream_name = "UDA1380 Capture",
+> 		.cpu_dai_name = "pxa2xx-i2s",
+> 
+> my personal branch has them named as "uda1380_playback" and
+> "uda1380_capture".
+
+Care to send a patch for that as well, please?
+
+> 5) Unbalanced references
+> 
+> When trying to play a sound (with quick-and-dirty workarounds for
+> problems above):
+> 
+>     # cat /dev/urandom | aplay -
+> 
+> the system will crash when terminating aplay (stopping playback). The
+> backtrace:
+
+So you did hear a sound?
+
+[...]
+
+> I've only managed to discover there are two calls of
+> pxa2xx_soc_pcm_new() (where DMA buffer is allocated) for both dai links:
+> 
+> 	magician-audio magician-audio: uda1380-hifi-playback <-> pxa-ssp-dai.0
+> mapping ok
+> 	...
+> 	magician-audio magician-audio: uda1380-hifi-capture <-> pxa2xx-i2s
+> mapping ok
+> 
+> but I don't know if this information is relevant.
+
+That seems fine. The question is why there are are unbalanced calls to 
+snd_dmaengine_pcm_close_release_chan(). Could you dig a bit further 
+maybe and add some printk()?
+
+Thanks for helping fix these regressions!
+
+
+Daniel
