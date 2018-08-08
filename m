@@ -1,115 +1,36 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Wed, 8 Aug 2018 18:53:54 +0200
-Subject: [PATCH v4 00/17] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <20180808162752.GA26592@arm.com>
-References: <CAAeHK+w0T43+h3xqU4a-qutxd-qiEhsvk0eaZpmAn-T0hpaLZQ@mail.gmail.com>
- <20180629110709.GA17859@arm.com>
- <CAAeHK+wHd8B2nhat-Z2Y2=s4NVobPG7vjr2CynjFhqPTwQRepQ@mail.gmail.com>
- <20180703173608.GF27243@arm.com>
- <CAAeHK+wTcH+2hgm_BTkLLdn1GkjBtkhQ=vPWZCncJ6KenqgKpg@mail.gmail.com>
- <CAAeHK+xc1E64tXEEHoXqOuUNZ7E_kVyho3_mNZTCc+LTGHYFdA@mail.gmail.com>
- <20180801163538.GA10800@arm.com>
- <CACT4Y+aZtph5qDsLzTDEgpQRz4_Vtg1DD-cB18qooi6D0bexDg@mail.gmail.com>
- <20180803092312.GA17798@arm.com>
- <CACT4Y+bCen+ccU8awYyx_Tw14JNZhaP4D-jNq-WZy7itW+vpYg@mail.gmail.com>
- <20180808162752.GA26592@arm.com>
-Message-ID: <CACT4Y+bQxwz2fcuGqtQYkCCV75chtLvOAfM9W-HBSjkTS1q=-w@mail.gmail.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Wed, 08 Aug 2018 18:55:35 +0200
+Subject: [RFC PATCH v2 07/12] mtd: rawnand: ams-delta: Set port direction
+ once per transfer
+In-Reply-To: <20180807205752.32cd3e53@bbrezillon>
+References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
+ <20180806222918.12644-8-jmkrzyszt@gmail.com>
+ <20180807205752.32cd3e53@bbrezillon>
+Message-ID: <3260564.acbQT1CZaz@z50>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2018 at 6:27 PM, Will Deacon <will.deacon@arm.com> wrote:
->> >> > Thanks for tracking these cases down and going through each of them. The
->> >> > obvious follow-up question is: how do we ensure that we keep on top of
->> >> > this in mainline? Are you going to repeat your experiment at every kernel
->> >> > release or every -rc or something else? I really can't see how we can
->> >> > maintain this in the long run, especially given that the coverage we have
->> >> > is only dynamic -- do you have an idea of how much coverage you're actually
->> >> > getting for, say, a defconfig+modules build?
->> >> >
->> >> > I'd really like to enable pointer tagging in the kernel, I'm just still
->> >> > failing to see how we can do it in a controlled manner where we can reason
->> >> > about the semantic changes using something other than a best-effort,
->> >> > case-by-case basis which is likely to be fragile and error-prone.
->> >> > Unfortunately, if that's all we have, then this gets relegated to a
->> >> > debug feature, which sort of defeats the point in my opinion.
->> >>
->> >> Well, in some cases there is no other way as resorting to dynamic testing.
->> >> How do we ensure that kernel does not dereference NULL pointers, does
->> >> not access objects after free or out of bounds? Nohow. And, yes, it's
->> >> constant maintenance burden resolved via dynamic testing.
->> >
->> > ... and the advantage of NULL pointer issues is that you're likely to see
->> > them as a synchronous exception at runtime, regardless of architecture and
->> > regardless of Kconfig options. With pointer tagging, that's certainly not
->> > the case, and so I don't think we can just treat issues there like we do for
->> > NULL pointers.
->>
->> Well, let's take use-after-frees, out-of-bounds, info leaks, data
->> races is a good example, deadlocks and just logical bugs...
->
-> Ok, but it was you that brought up NULL pointers, so there's some goalpost
-> moving here.
+Hi Boris,
 
-I moved it only because our views on bugs seems to be somewhat
-different. I would put it all including NULL derefs into the same
-bucket of bugs. But the point I wanted to make holds if we take NULL
-derefs out of equation too, so I took them out so that we don't
-concentrate on "synchronous exceptions" only.
+On Tuesday, August 7, 2018 8:57:52 PM CEST Boris Brezillon wrote:
+> On Tue,  7 Aug 2018 00:29:13 +0200
+> Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
+> 
+> > In its current shape, the driver sets data port direction before each
+> > byte read/write operation, even during multi-byte transfers.  Since
+> > performance of the driver is completely not acceptable on Amstrad Delta
+> > after it has been converted to GPIO bitbang, try to improve things a
+> > bit by setting the port direction only on first byte of each transfer.
+> ...
+> I'd suggest a slightly different approach where the data pins
+> direction state is stored in the the priv struct and only changed when
+> required. This way you just have to add a test in
+> ams_delta_read/write_byte().
 
-> And as with NULL pointers, all of the issues you mention above
-> apply to other architectures and the majority of their configurations, so my
-> concerns about this feature remain.
->
->> > If you want to enable khwasan in "production" and since enabling it
->> > could potentially change the behaviour of existing code paths, the
->> > run-time validation space doubles as we'd need to get the same code
->> > coverage with and without the feature being enabled.
->>
->> This is true for just any change in configs, sysctls or just a
->> different workload. Any of this can enable new code, exiting code
->> working differently, or just working with data in new states. And we
->> have tens of thousands of bugs, so blindly deploying anything new to
->> production without proper testing is a bad idea. It's not specific to
->> HWASAN in any way. And when you enable HWASAN you actually do mean to
->> retest everything as hard as possible.
->
-> I suppose I'm trying to understand whether we have to resort to testing, or
-> whether we can do better. I'm really uncomfortable with testing as our only
-> means of getting this right because this is a non-standard, arm64-specific
-> option and I don't think it will get very much testing in mainline at all.
-> Rather, we'll get spurious bug reports from forks of -stable many releases
-> later and we'll actually be worse-off for it.
->
->> And in the end we do not seem to have any action points here, right?
->
-> Right now, it feels like this series trades one set of bugs for another,
-> so I'd like to get to a position where this new set of bugs is genuinely
-> more manageable (i.e. detectable, fixable, preventable) than the old set.
-> Unfortunately, the only suggestion seems to be "testing", which I really
-> don't find convincing :(
->
-> Could we do things like:
->
->   - Set up a dedicated arm64 test farm, running mainline and with a public
->     frontend, aimed at getting maximum coverage of the kernel with KHWASAN
->     enabled?
+Good idea, I'm going to use it, thanks.
 
-FWIW we could try to setup a syzbot instance with qemu/arm64
-emulation. We run such combination few times, but I am not sure how
-stable it will be wrt flaky timeouts/stalls/etc. If works, it will
-give instant coverage of about 1MLOC.
+Once done, may I also move that one earlier in the series so that it can be 
+applied while our discussion on GPIO bitmap changes still continues?
 
->   - Have an implementation of KHWASAN for other architectures? (Is this even
->     possible?)
->
->   - Have a compiler plugin to clear out the tag for pointer arithmetic?
->     Could we WARN if two pointers are compared with different tags?
->     Could we manipulate the tag on cast-to-pointer so that a mismatch would
->     be qualifier to say that pointer was created via a cast?
->
->   - ...
->
-> ?
->
-> Will
+Thanks,
+Janusz
