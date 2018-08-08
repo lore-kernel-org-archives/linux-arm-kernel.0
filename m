@@ -1,460 +1,260 @@
 From: marek.behun@nic.cz (=?UTF-8?q?Marek=20Beh=C3=BAn?=)
-Date: Wed,  8 Aug 2018 17:27:03 +0200
-Subject: [PATCH v1 4/7] watchdog: Add support for Armada 37xx CPU watchdog
+Date: Wed,  8 Aug 2018 17:27:02 +0200
+Subject: [PATCH v1 3/7] drivers: gpio: Add support for Turris Mox SFP GPIOs
 In-Reply-To: <20180808152706.21727-1-marek.behun@nic.cz>
 References: <20180808152706.21727-1-marek.behun@nic.cz>
-Message-ID: <20180808152706.21727-5-marek.behun@nic.cz>
+Message-ID: <20180808152706.21727-4-marek.behun@nic.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the CPU watchdog found on Marvell Armada 37xx
-SoCs.
+The SFP cage GPIOs on the SFP cage module of Turris Mox can be
+configured via the moxtet bus.
 
-There are 4 counters which can be set as CPU watchdog counters.
-This driver uses the second counter (ID 1, counting from 0)
-(Marvell's Linux also uses second counter by default).
-In the future it could be adapted to use other counters, with
-definition in the device tree.
+This driver supports those GPIOs so that they can be used by phylink.
 
 Signed-off-by: Marek Behun <marek.behun@nic.cz>
-Tested-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 
- create mode 100644 Documentation/devicetree/bindings/watchdog/armada-37xx-wdt.txt
- create mode 100644 drivers/watchdog/armada_37xx_wdt.c
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-moxtet-sfp.txt
+ create mode 100644 drivers/gpio/gpio-moxtet-sfp.c
 
-diff --git a/Documentation/devicetree/bindings/watchdog/armada-37xx-wdt.txt b/Documentation/devicetree/bindings/watchdog/armada-37xx-wdt.txt
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-moxtet-sfp.txt b/Documentation/devicetree/bindings/gpio/gpio-moxtet-sfp.txt
 new file mode 100644
-index 000000000000..4ba9e40ad386
+index 000000000000..a8267aef7d2c
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/armada-37xx-wdt.txt
-@@ -0,0 +1,23 @@
-+* Armada 37xx CPU Watchdog Timer Controller
++++ b/Documentation/devicetree/bindings/gpio/gpio-moxtet-sfp.txt
+@@ -0,0 +1,16 @@
++GPIO configuration of the SFP cage found on Turris Mox (over Moxtet bus)
 +
 +Required properties:
-+- compatible : must be "marvell,armada-3700-wdt"
-+- reg : base physical address of the controller and length of memory mapped
-+	region.
-+- clocks : the clock feeding the watchdog timer. See clock-bindings.txt
-+- marvell,system-controller : reference to syscon node for the CPU Miscellaneous
-+	Registers
++ - compatible		: Should be "cznic,moxtet-sfp".
++ - gpio-controller	: Marks the device node as a GPIO controller.
++ - #gpio-cells		: Should be two. For consumer use see gpio.txt.
 +
 +Example:
 +
-+	cpu_misc: system-controller at d000 {
-+		compatible = "syscon", "simple-mfd";
-+		reg = <0xd000 0x1000>;
-+	};
-+
-+	wdt: watchdog-timer at 8300 {
-+		compatible = "marvell,armada-3700-wdt";
-+		reg = <0x8300 0x40>;
-+		marvell,system-controller = <&cpu_misc>;
-+		clocks = <&xtalclk>;
-+	};
++	moxtet_sfp: moxtet-sfp at 0 {
++		compatible = "cznic,moxtet-sfp";
++		gpio-controller;
++		#gpio-cells;
++		reg = <0>;
++		moxtet,id = <1>;
++	}
 diff --git a/MAINTAINERS b/MAINTAINERS
-index cfac1b21596c..e2d2955a8331 100644
+index 27ca12e8309a..cfac1b21596c 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -1385,6 +1385,7 @@ S:	Maintained
+@@ -1383,6 +1383,7 @@ M:	Marek Behun <marek.behun@nic.cz>
+ W:	http://mox.turris.cz
+ S:	Maintained
  F:	include/mfd/moxtet.h
- F:	drivers/gpio/gpio-moxtet-sfp.c
++F:	drivers/gpio/gpio-moxtet-sfp.c
  F:	drivers/mfd/moxtet.c
-+F:	drivers/watchdog/armada_37xx_wdt.c
  
  ARM/EBSA110 MACHINE SUPPORT
- M:	Russell King <linux@armlinux.org.uk>
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 9af07fd92763..c3d82e3fe1e1 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -263,6 +263,17 @@ config ARM_SBSA_WATCHDOG
- 	  To compile this driver as module, choose M here: The module
- 	  will be called sbsa_gwdt.
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 71c0ab46f216..bd6e52de99c5 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -1048,6 +1048,15 @@ config GPIO_MAX77620
+ 	  driver also provides interrupt support for each of the gpios.
+ 	  Say yes here to enable the max77620 to be used as gpio controller.
  
-+config ARMADA_37XX_WATCHDOG
-+	tristate "Armada 37xx watchdog"
-+	depends on ARCH_MVEBU || COMPILE_TEST
-+	select MFD_SYSCON
-+	select WATCHDOG_CORE
++config GPIO_MOXTET_SFP
++	tristate "Turris Mox SFP GPIO expander"
++	depends on MFD_MOXTET
 +	help
-+	  Say Y here to include support for the watchdog timer found on
-+	  Marvell Armada 37xx SoCs.
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called armada_37xx_wdt.
++	  Say yes here if you are building for the Turris Mox router.
++	  This is the driver needed for configuring the GPIOs found on the
++	  module with SFP cage of the Turris Mox router.
++	  This driver uses the Moxtet bus.
 +
- config ASM9260_WATCHDOG
- 	tristate "Alphascale ASM9260 watchdog"
- 	depends on MACH_ASM9260 || COMPILE_TEST
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index 1d3c6b094fe5..476d9069ed7c 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -38,6 +38,7 @@ obj-$(CONFIG_USBPCWATCHDOG) += pcwd_usb.o
- # ARM Architecture
- obj-$(CONFIG_ARM_SP805_WATCHDOG) += sp805_wdt.o
- obj-$(CONFIG_ARM_SBSA_WATCHDOG) += sbsa_gwdt.o
-+obj-$(CONFIG_ARMADA_37XX_WATCHDOG) += armada_37xx_wdt.o
- obj-$(CONFIG_ASM9260_WATCHDOG) += asm9260_wdt.o
- obj-$(CONFIG_AT91RM9200_WATCHDOG) += at91rm9200_wdt.o
- obj-$(CONFIG_AT91SAM9X_WATCHDOG) += at91sam9_wdt.o
-diff --git a/drivers/watchdog/armada_37xx_wdt.c b/drivers/watchdog/armada_37xx_wdt.c
+ config GPIO_MSIC
+ 	bool "Intel MSIC mixed signal gpio support"
+ 	depends on (X86 || COMPILE_TEST) && MFD_INTEL_MSIC
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 1324c8f966a7..ba464186c468 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -84,7 +84,8 @@ obj-$(CONFIG_GPIO_MC33880)	+= gpio-mc33880.o
+ obj-$(CONFIG_GPIO_MC9S08DZ60)	+= gpio-mc9s08dz60.o
+ obj-$(CONFIG_GPIO_ML_IOH)	+= gpio-ml-ioh.o
+ obj-$(CONFIG_GPIO_MM_LANTIQ)	+= gpio-mm-lantiq.o
+-obj-$(CONFIG_GPIO_MOCKUP)      += gpio-mockup.o
++obj-$(CONFIG_GPIO_MOCKUP)	+= gpio-mockup.o
++obj-$(CONFIG_GPIO_MOXTET_SFP)	+= gpio-moxtet-sfp.o
+ obj-$(CONFIG_GPIO_MPC5200)	+= gpio-mpc5200.o
+ obj-$(CONFIG_GPIO_MPC8XXX)	+= gpio-mpc8xxx.o
+ obj-$(CONFIG_GPIO_MSIC)		+= gpio-msic.o
+@@ -100,7 +101,7 @@ obj-$(CONFIG_GPIO_PCI_IDIO_16)	+= gpio-pci-idio-16.o
+ obj-$(CONFIG_GPIO_PCIE_IDIO_24)	+= gpio-pcie-idio-24.o
+ obj-$(CONFIG_GPIO_PISOSR)	+= gpio-pisosr.o
+ obj-$(CONFIG_GPIO_PL061)	+= gpio-pl061.o
+-obj-$(CONFIG_GPIO_PMIC_EIC_SPRD)	+= gpio-pmic-eic-sprd.o
++obj-$(CONFIG_GPIO_PMIC_EIC_SPRD)+= gpio-pmic-eic-sprd.o
+ obj-$(CONFIG_GPIO_PXA)		+= gpio-pxa.o
+ obj-$(CONFIG_GPIO_RC5T583)	+= gpio-rc5t583.o
+ obj-$(CONFIG_GPIO_RDC321X)	+= gpio-rdc321x.o
+diff --git a/drivers/gpio/gpio-moxtet-sfp.c b/drivers/gpio/gpio-moxtet-sfp.c
 new file mode 100644
-index 000000000000..83ba4ce40d2f
+index 000000000000..87ba73bf55c5
 --- /dev/null
-+++ b/drivers/watchdog/armada_37xx_wdt.c
-@@ -0,0 +1,353 @@
-+// SPDX-License-Identifier: GPL-2.0+
++++ b/drivers/gpio/gpio-moxtet-sfp.c
+@@ -0,0 +1,156 @@
++// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * Watchdog driver for Marvell Armada 37xx SoCs
++ *  Turris Mox SFP - GPIOs on the SFP cage found on Turris Mox SFP module
 + *
-+ * Author: Marek Behun <marek.behun@nic.cz>
++ *  Copyright (C) 2018 Marek Behun <marek.behun@nic.cz>
 + */
 +
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/syscon.h>
++#include <linux/gpio/consumer.h>
++#include <linux/gpio.h>
++#include <linux/mfd/moxtet.h>
 +#include <linux/module.h>
-+#include <linux/moduleparam.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/types.h>
-+#include <linux/watchdog.h>
++#include <linux/of_gpio.h>
 +
-+/*
-+ * There are four counters that can be used for watchdog on Armada 37xx.
-+ * The addresses for counter control registers are register base plus ID*0x10,
-+ * where ID is 0, 1, 2 or 3.
-+ * In this driver we use ID 1. Marvell's Linux also uses this ID by default,
-+ * and the U-Boot driver written simultaneosly by the same author as this
-+ * driver also uses ID 1.
-+ * Maybe in the future we could change this driver to support other counters,
-+ * depending on the device tree, but I don't think this is necessary.
-+ *
-+ * Note that CNTR_ID cannot be 3, because the third counter is an increment
-+ * counter, and this driver is written to support decrementing counters only.
-+ */
++#define MOXTET_SFP_IN_GPIOS	3
 +
-+/* relative to cpu_misc */
-+#define WDT_TIMER_SELECT		0x64
-+#define WDT_TIMER_SELECT_MASK		0xf
-+#define WDT_TIMER_SELECT_VAL		BIT(CNTR_ID)
-+
-+/* relative to reg */
-+#define CNTR_ID				1
-+
-+#define CNTR_CTRL			(CNTR_ID * 0x10)
-+#define CNTR_CTRL_ENABLE		0x0001
-+#define CNTR_CTRL_ACTIVE		0x0002
-+#define CNTR_CTRL_MODE_MASK		0x000c
-+#define CNTR_CTRL_MODE_ONESHOT		0x0000
-+#define CNTR_CTRL_PRESCALE_MASK		0xff00
-+#define CNTR_CTRL_PRESCALE_MIN		2
-+#define CNTR_CTRL_PRESCALE_SHIFT	8
-+
-+#define CNTR_COUNT_LOW			(CNTR_CTRL + 0x4)
-+#define CNTR_COUNT_HIGH			(CNTR_CTRL + 0x8)
-+
-+#define WATCHDOG_TIMEOUT		120
-+
-+static unsigned int timeout = WATCHDOG_TIMEOUT;
-+module_param(timeout, int, 0);
-+MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default="
-+			  __MODULE_STRING(WATCHDOG_TIMEOUT) ")");
-+
-+static bool nowayout = WATCHDOG_NOWAYOUT;
-+module_param(nowayout, bool, 0);
-+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
-+			   __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
-+
-+struct armada_37xx_watchdog {
-+	struct watchdog_device wdt;
-+	struct regmap *cpu_misc;
-+	void __iomem *reg;
-+	u64 timeout; /* in clock ticks */
-+	unsigned long clk_rate;
-+	struct clk *clk;
++struct moxtet_sfp_chip {
++	struct device		*dev;
++	struct gpio_chip	gpio_chip;
++	struct gpio_desc	*gpiod_oe;
++	u8			state;
 +};
 +
-+static u64 get_counter_value(struct armada_37xx_watchdog *dev)
++static int moxtet_sfp_get_value(struct gpio_chip *gc, unsigned int offset)
 +{
-+	u64 val;
-+
-+	val = readl(dev->reg + CNTR_COUNT_HIGH);
-+	val = (val << 32) | readl(dev->reg + CNTR_COUNT_LOW);
-+
-+	return val;
-+}
-+
-+static void set_counter_value(struct armada_37xx_watchdog *dev)
-+{
-+	writel(dev->timeout & 0xffffffff, dev->reg + CNTR_COUNT_LOW);
-+	writel(dev->timeout >> 32, dev->reg + CNTR_COUNT_HIGH);
-+}
-+
-+static void armada_37xx_wdt_counter_enable(struct armada_37xx_watchdog *dev)
-+{
-+	u32 reg;
-+
-+	reg = readl(dev->reg + CNTR_CTRL);
-+	reg |= CNTR_CTRL_ENABLE;
-+	writel(reg, dev->reg + CNTR_CTRL);
-+}
-+
-+static void armada_37xx_wdt_counter_disable(struct armada_37xx_watchdog *dev)
-+{
-+	u32 reg;
-+
-+	reg = readl(dev->reg + CNTR_CTRL);
-+	reg &= ~CNTR_CTRL_ENABLE;
-+	writel(reg, dev->reg + CNTR_CTRL);
-+}
-+
-+static int armada_37xx_wdt_ping(struct watchdog_device *wdt)
-+{
-+	struct armada_37xx_watchdog *dev = watchdog_get_drvdata(wdt);
-+
-+	armada_37xx_wdt_counter_disable(dev);
-+	set_counter_value(dev);
-+	armada_37xx_wdt_counter_enable(dev);
-+
-+	return 0;
-+}
-+
-+static unsigned int armada_37xx_wdt_get_timeleft(struct watchdog_device *wdt)
-+{
-+	struct armada_37xx_watchdog *dev = watchdog_get_drvdata(wdt);
-+	unsigned int res;
-+
-+	res = get_counter_value(dev) * CNTR_CTRL_PRESCALE_MIN / dev->clk_rate;
-+
-+	return res;
-+}
-+
-+static int armada_37xx_wdt_set_timeout(struct watchdog_device *wdt,
-+				       unsigned int timeout)
-+{
-+	struct armada_37xx_watchdog *dev = watchdog_get_drvdata(wdt);
-+
-+	wdt->timeout = timeout;
-+
-+	/*
-+	 * Compute the timeout in clock rate. We use smallest possible
-+	 * prescaler, which divides the clock rate by 2
-+	 * (CNTR_CTRL_PRESCALE_MIN).
-+	 */
-+	dev->timeout = (u64)dev->clk_rate * timeout / CNTR_CTRL_PRESCALE_MIN;
-+
-+	return 0;
-+}
-+
-+static bool armada_37xx_wdt_is_running(struct armada_37xx_watchdog *dev)
-+{
-+	u32 reg;
-+
-+	regmap_read(dev->cpu_misc, WDT_TIMER_SELECT, &reg);
-+	if ((reg & WDT_TIMER_SELECT_MASK) != WDT_TIMER_SELECT_VAL)
-+		return false;
-+
-+	reg = readl(dev->reg + CNTR_CTRL);
-+	return !!(reg & CNTR_CTRL_ACTIVE);
-+}
-+
-+static int armada_37xx_wdt_start(struct watchdog_device *wdt)
-+{
-+	struct armada_37xx_watchdog *dev = watchdog_get_drvdata(wdt);
-+	u32 reg;
-+
-+	reg = readl(dev->reg + CNTR_CTRL);
-+
-+	if (reg & CNTR_CTRL_ACTIVE)
-+		return -EBUSY;
-+
-+	/* set mode */
-+	reg = (reg & ~CNTR_CTRL_MODE_MASK) | CNTR_CTRL_MODE_ONESHOT;
-+
-+	/* set prescaler to the min value of 2 */
-+	reg &= ~CNTR_CTRL_PRESCALE_MASK;
-+	reg |= CNTR_CTRL_PRESCALE_MIN << CNTR_CTRL_PRESCALE_SHIFT;
-+
-+	writel(reg, dev->reg + CNTR_CTRL);
-+
-+	set_counter_value(dev);
-+
-+	regmap_write(dev->cpu_misc, WDT_TIMER_SELECT, WDT_TIMER_SELECT_VAL);
-+	armada_37xx_wdt_counter_enable(dev);
-+
-+	return 0;
-+}
-+
-+static int armada_37xx_wdt_stop(struct watchdog_device *wdt)
-+{
-+	struct armada_37xx_watchdog *dev = watchdog_get_drvdata(wdt);
-+
-+	armada_37xx_wdt_counter_disable(dev);
-+	regmap_write(dev->cpu_misc, WDT_TIMER_SELECT, 0);
-+
-+	return 0;
-+}
-+
-+static const struct watchdog_info armada_37xx_wdt_info = {
-+	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
-+	.identity = "Armada 37xx Watchdog",
-+};
-+
-+static const struct watchdog_ops armada_37xx_wdt_ops = {
-+	.owner = THIS_MODULE,
-+	.start = armada_37xx_wdt_start,
-+	.stop = armada_37xx_wdt_stop,
-+	.ping = armada_37xx_wdt_ping,
-+	.set_timeout = armada_37xx_wdt_set_timeout,
-+	.get_timeleft = armada_37xx_wdt_get_timeleft,
-+};
-+
-+static int armada_37xx_wdt_probe(struct platform_device *pdev)
-+{
-+	struct armada_37xx_watchdog *dev;
-+	struct resource *res;
-+	struct regmap *regmap;
++	struct moxtet_sfp_chip *chip = gpiochip_get_data(gc);
 +	int ret;
 +
-+	dev = devm_kzalloc(&pdev->dev, sizeof(struct armada_37xx_watchdog),
-+			   GFP_KERNEL);
-+	if (!dev)
-+		return -ENOMEM;
++	if (offset < MOXTET_SFP_IN_GPIOS) {
++		ret = moxtet_device_read(chip->dev);
++	} else {
++		offset -= MOXTET_SFP_IN_GPIOS;
++		ret = moxtet_device_written(chip->dev);
++	}
 +
-+	dev->wdt.info = &armada_37xx_wdt_info;
-+	dev->wdt.ops = &armada_37xx_wdt_ops;
-+	dev->wdt.min_timeout = 1;
-+
-+	regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-+						 "marvell,system-controller");
-+	if (IS_ERR(regmap))
-+		return PTR_ERR(regmap);
-+	dev->cpu_misc = regmap;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res)
-+		return -ENODEV;
-+	dev->reg = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-+
-+	/* init clock */
-+	dev->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(dev->clk))
-+		return PTR_ERR(dev->clk);
-+
-+	ret = clk_prepare_enable(dev->clk);
-+	if (ret)
++	if (ret < 0)
 +		return ret;
 +
-+	dev->clk_rate = clk_get_rate(dev->clk);
++	return (ret >> offset) & 1;
++}
 +
-+	/*
-+	 * Since the timeout in seconds is given as 32 bit unsigned int, and
-+	 * the counters hold 64 bit values, even after multiplication by clock
-+	 * rate the counter can hold timeout of UINT_MAX seconds.
-+	 */
-+	dev->wdt.min_timeout = 0;
-+	dev->wdt.max_timeout = UINT_MAX;
-+	dev->wdt.parent = &pdev->dev;
++static void moxtet_sfp_set_value(struct gpio_chip *gc, unsigned int offset,
++				 int val)
++{
++	struct moxtet_sfp_chip *chip = gpiochip_get_data(gc);
++	int ret;
 +
-+	/* default value, possibly override by module parameter or dtb */
-+	dev->wdt.timeout = WATCHDOG_TIMEOUT;
-+	watchdog_init_timeout(&dev->wdt, timeout, &pdev->dev);
++	if (offset < MOXTET_SFP_IN_GPIOS)
++		return;
 +
-+	platform_set_drvdata(pdev, &dev->wdt);
-+	watchdog_set_drvdata(&dev->wdt, dev);
++	offset -= MOXTET_SFP_IN_GPIOS;
 +
-+	armada_37xx_wdt_set_timeout(&dev->wdt, dev->wdt.timeout);
++	ret = moxtet_device_written(chip->dev);
++	if (ret < 0)
++		return;
 +
-+	if (armada_37xx_wdt_is_running(dev))
-+		set_bit(WDOG_HW_RUNNING, &dev->wdt.status);
++	if (val)
++		ret |= (1 << offset);
 +	else
-+		armada_37xx_wdt_stop(&dev->wdt);
++		ret &= ~(1 << offset);
 +
-+	watchdog_set_nowayout(&dev->wdt, nowayout);
-+	ret = watchdog_register_device(&dev->wdt);
-+	if (ret)
-+		goto disable_clk;
-+
-+	dev_info(&pdev->dev, "Initial timeout %d sec%s\n",
-+		 dev->wdt.timeout, nowayout ? ", nowayout" : "");
-+
-+	return 0;
-+
-+disable_clk:
-+	clk_disable_unprepare(dev->clk);
-+	return ret;
++	moxtet_device_write(chip->dev, ret);
 +}
 +
-+static int armada_37xx_wdt_remove(struct platform_device *pdev)
++static int moxtet_sfp_get_direction(struct gpio_chip *gc, unsigned int offset)
 +{
-+	struct watchdog_device *wdt = platform_get_drvdata(pdev);
-+	struct armada_37xx_watchdog *dev = watchdog_get_drvdata(wdt);
++	return offset < MOXTET_SFP_IN_GPIOS;
++}
 +
-+	watchdog_unregister_device(wdt);
-+	clk_disable_unprepare(dev->clk);
++static int moxtet_sfp_direction_input(struct gpio_chip *gc, unsigned int offset)
++{
++	if (offset >= MOXTET_SFP_IN_GPIOS)
++		return -EINVAL;
 +	return 0;
 +}
 +
-+static void armada_37xx_wdt_shutdown(struct platform_device *pdev)
++static int moxtet_sfp_direction_output(struct gpio_chip *gc,
++				       unsigned int offset, int val)
 +{
-+	struct watchdog_device *wdt = platform_get_drvdata(pdev);
++	if (offset < MOXTET_SFP_IN_GPIOS)
++		return -EINVAL;
 +
-+	armada_37xx_wdt_stop(wdt);
++	moxtet_sfp_set_value(gc, offset, val);
++	return 0;
 +}
 +
-+static int __maybe_unused armada_37xx_wdt_suspend(struct device *dev)
++static int moxtet_sfp_probe(struct device *dev)
 +{
-+	struct watchdog_device *wdt = dev_get_drvdata(dev);
++	struct moxtet_sfp_chip *chip;
 +
-+	return armada_37xx_wdt_stop(wdt);
++	chip = devm_kzalloc(dev, sizeof(*chip), GFP_KERNEL);
++	if (!chip)
++		return -ENOMEM;
++
++	chip->dev = dev;
++	chip->gpio_chip.parent = dev;
++
++	dev_set_drvdata(dev, chip);
++
++	chip->gpiod_oe = devm_gpiod_get_optional(dev, "enable",
++						 GPIOD_OUT_LOW);
++	if (IS_ERR(chip->gpiod_oe))
++		return PTR_ERR(chip->gpiod_oe);
++
++	gpiod_set_value_cansleep(chip->gpiod_oe, 1);
++
++	chip->gpio_chip.label = dev_name(dev);
++	chip->gpio_chip.get_direction = moxtet_sfp_get_direction;
++	chip->gpio_chip.direction_input = moxtet_sfp_direction_input;
++	chip->gpio_chip.direction_output = moxtet_sfp_direction_output;
++	chip->gpio_chip.get = moxtet_sfp_get_value;
++	chip->gpio_chip.set = moxtet_sfp_set_value;
++	chip->gpio_chip.base = -1;
++
++	chip->gpio_chip.ngpio = 5;
++
++	chip->gpio_chip.can_sleep = true;
++	chip->gpio_chip.owner = THIS_MODULE;
++
++	return gpiochip_add_data(&chip->gpio_chip, chip);
 +}
 +
-+static int __maybe_unused armada_37xx_wdt_resume(struct device *dev)
++static int moxtet_sfp_remove(struct device *dev)
 +{
-+	struct watchdog_device *wdt = dev_get_drvdata(dev);
++	struct moxtet_sfp_chip *chip = dev_get_drvdata(dev);
 +
-+	if (watchdog_active(wdt))
-+		return armada_37xx_wdt_start(wdt);
++	gpiod_set_value_cansleep(chip->gpiod_oe, 0);
++	gpiochip_remove(&chip->gpio_chip);
 +
 +	return 0;
 +}
 +
-+static const struct dev_pm_ops armada_37xx_wdt_dev_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(armada_37xx_wdt_suspend,
-+				armada_37xx_wdt_resume)
-+};
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id armada_37xx_wdt_match[] = {
-+	{ .compatible = "marvell,armada-3700-wdt", },
++static const struct of_device_id moxtet_sfp_dt_ids[] = {
++	{ .compatible = "cznic,moxtet-sfp" },
 +	{},
 +};
-+MODULE_DEVICE_TABLE(of, armada_37xx_wdt_match);
-+#endif
++MODULE_DEVICE_TABLE(of, moxtet_sfp_dt_ids);
 +
-+static struct platform_driver armada_37xx_wdt_driver = {
-+	.probe		= armada_37xx_wdt_probe,
-+	.remove		= armada_37xx_wdt_remove,
-+	.shutdown	= armada_37xx_wdt_shutdown,
-+	.driver		= {
-+		.name	= "armada_37xx_wdt",
-+		.of_match_table = of_match_ptr(armada_37xx_wdt_match),
-+		.pm = &armada_37xx_wdt_dev_pm_ops,
-+	},
++static const enum turris_mox_module_id moxtet_sfp_id_table[] = {
++	TURRIS_MOX_MODULE_SFP,
++	0
 +};
 +
-+module_platform_driver(armada_37xx_wdt_driver);
++static struct moxtet_driver moxtet_sfp_driver = {
++	.driver = {
++		.name		= "moxtet-sfp",
++		.of_match_table	= moxtet_sfp_dt_ids,
++		.probe		= moxtet_sfp_probe,
++		.remove		= moxtet_sfp_remove,
++	},
++	.id_table	= moxtet_sfp_id_table,
++};
++module_moxtet_driver(moxtet_sfp_driver);
 +
 +MODULE_AUTHOR("Marek Behun <marek.behun@nic.cz>");
-+MODULE_DESCRIPTION("Armada 37xx CPU Watchdog");
-+
++MODULE_DESCRIPTION("GPIO configuration of the SFP cage found on Turris Mox");
 +MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:armada_37xx_wdt");
 -- 
 2.16.4
