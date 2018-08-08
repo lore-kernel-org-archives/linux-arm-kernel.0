@@ -1,61 +1,62 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 8 Aug 2018 16:40:58 +0100
-Subject: [PATCH v2 0/6] PCI: mvebu: cleanup and improvements
-In-Reply-To: <20180803143848.21551-1-thomas.petazzoni@bootlin.com>
-References: <20180803143848.21551-1-thomas.petazzoni@bootlin.com>
-Message-ID: <20180808154058.GA19383@red-moon>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Wed,  8 Aug 2018 17:31:46 +0200
+Subject: [PATCH 24/28] ARM: davinci: sffsdr: use device properties for at24
+ eeprom
+In-Reply-To: <20180808153150.23444-1-brgl@bgdev.pl>
+References: <20180808153150.23444-1-brgl@bgdev.pl>
+Message-ID: <20180808153150.23444-25-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2018 at 04:38:42PM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> This is the v2 of the pci-mvebu cleanup and improvements, mainly
-> aiming at using pci_host_bridge.
-> 
-> Since v1, the changes are:
-> 
->  - Rebase on v4.18-rc1 to make sure the patches apply
-> 
->  - Add a patch fixing the I/O space end calculation (using
->    resource_size() as the .end address of a resource is not correct)
-> 
->  - Only remap the I/O space if there is a PCI I/O aperture described
->    in the DT.
-> 
->  - Use resource_size() in the loop mapping the I/O space, as suggested
->    by Lorenzo.
-> 
->  - Use pci_add_resource() instead of pci_add_resource_offset(), as
->    suggested by Lorenzo.
-> 
->  - Revert to using pci_ioremap_io(), since we need to map with a
->    special memory type on Armada platforms, and pci_remap_iospace()
->    doesn't allow to do that. Noticed by Lorenzo.
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Pulled into pci/mvebu (I reworded some commit logs in the process
-please have a look) for (tentatively) v4.19 but it is a bit late
-in the cycle so let's see how things go.
+We want to work towards phasing out the at24_platform_data structure.
+There are few users and its contents can be represented using generic
+device properties. Using device properties only will allow us to
+significantly simplify the at24 configuration code.
 
-Thanks,
-Lorenzo
+Remove the at24_platform_data structure and replace it with an array
+of property entries. Drop the byte_len/size property, as the model name
+already implies the EEPROM's size.
 
-> 
-> Thanks!
-> 
-> Thomas
-> 
-> Thomas Petazzoni (6):
->   PCI: mvebu: Remove redundant platform_set_drvdata() call
->   PCI: mvebu: fix I/O space end address calculation
->   PCI: mvebu: only remap I/O space if configured
->   PCI: mvebu: use resource_size() to remap I/O space
->   PCI: mvebu: Convert to use pci_host_bridge directly
->   PCI: mvebu: Drop bogus comment above mvebu_pcie_map_registers()
-> 
->  drivers/pci/controller/pci-mvebu.c | 153 +++++++++++++++++--------------------
->  1 file changed, 68 insertions(+), 85 deletions(-)
-> 
-> -- 
-> 2.14.4
-> 
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ arch/arm/mach-davinci/board-sffsdr.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
+index f6a4d094cbc3..680e5d7628a8 100644
+--- a/arch/arm/mach-davinci/board-sffsdr.c
++++ b/arch/arm/mach-davinci/board-sffsdr.c
+@@ -26,7 +26,7 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/i2c.h>
+-#include <linux/platform_data/at24.h>
++#include <linux/property.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/rawnand.h>
+ #include <linux/mtd/partitions.h>
+@@ -92,16 +92,15 @@ static struct platform_device davinci_sffsdr_nandflash_device = {
+ 	.resource	= davinci_sffsdr_nandflash_resource,
+ };
+ 
+-static struct at24_platform_data eeprom_info = {
+-	.byte_len	= (64*1024) / 8,
+-	.page_size	= 32,
+-	.flags		= AT24_FLAG_ADDR16,
++static const struct property_entry eeprom_properties[] = {
++	PROPERTY_ENTRY_U32("pagesize", 32),
++	{ },
+ };
+ 
+ static struct i2c_board_info __initdata i2c_info[] =  {
+ 	{
+ 		I2C_BOARD_INFO("24c64", 0x50),
+-		.platform_data	= &eeprom_info,
++		.properties = eeprom_properties,
+ 	},
+ 	/* Other I2C devices:
+ 	 * MSP430,  addr 0x23 (not used)
+-- 
+2.18.0
