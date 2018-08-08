@@ -1,59 +1,82 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  8 Aug 2018 17:31:29 +0200
-Subject: [PATCH 07/28] ARM: davinci: dm365-evm: use nvmem lookup for mac
- address
-In-Reply-To: <20180808153150.23444-1-brgl@bgdev.pl>
-References: <20180808153150.23444-1-brgl@bgdev.pl>
-Message-ID: <20180808153150.23444-8-brgl@bgdev.pl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 Aug 2018 18:01:31 +0200
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <20180808151444.GF24736@iMac.local>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
+ <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
+ <20180803094129.GB17798@arm.com>
+ <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
+ <20180808113927.GA24736@iMac.local>
+ <alpine.LRH.2.02.1808081011110.9997@file01.intranet.prod.int.rdu2.redhat.com>
+ <b1a0dac5-3cf2-1a7f-ac7f-649126eb7873@arm.com>
+ <20180808151444.GF24736@iMac.local>
+Message-ID: <CAK8P3a2=rVvvW8bBcrPm3nXNNP56Ygxchu4ThD2ZgZ_cVcd8wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Wed, Aug 8, 2018 at 5:15 PM Catalin Marinas <catalin.marinas@arm.com> wrote:
+>
+> On Wed, Aug 08, 2018 at 04:01:12PM +0100, Richard Earnshaw wrote:
+> > On 08/08/18 15:12, Mikulas Patocka wrote:
+> > > On Wed, 8 Aug 2018, Catalin Marinas wrote:
+> > >> On Fri, Aug 03, 2018 at 01:09:02PM -0400, Mikulas Patocka wrote:
+> - failing to write a few bytes
+> - writing a few bytes that were written 16 bytes before
+> - writing a few bytes that were written 16 bytes after
+>
+> > The overlapping writes in memcpy never write different values to the
+> > same location, so I still feel this must be some sort of HW issue, not a
+> > SW one.
+>
+> So do I (my interpretation is that it combines or rather skips some of
+> the writes to the same 16-byte address as it ignores the data strobes).
 
-We now support nvmem lookups for machine code. Add a lookup for
-mac-address.
+Maybe it just always writes to the wrong location, 16 bytes apart for one of
+the stp instructions. Since we are usually dealing with a pair of overlapping
+'stp', both unaligned, that could explain both the missing bytes (we write
+data to the wrong place, but overwrite it with the correct data right away)
+and the extra copy (we write it to the wrong place, but then write the correct
+data to the correct place as well).
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/board-dm365-evm.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+This sounds a bit like what the original ARM CPUs did on unaligned
+memory access, where a single aligned 4-byte location was accessed,
+but the bytes swapped around.
 
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index 435f7ec7d9af..cb0ac92a278e 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -28,6 +28,7 @@
- #include <linux/spi/spi.h>
- #include <linux/spi/eeprom.h>
- #include <linux/v4l2-dv-timings.h>
-+#include <linux/nvmem-provider.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -169,6 +170,15 @@ static struct platform_device davinci_nand_device = {
- 	},
- };
- 
-+static struct nvmem_cell_lookup dm365evm_mac_address_cell = {
-+	.info = {
-+		.name = "mac-address",
-+		.offset = 0x7f00,
-+		.bytes = ETH_ALEN,
-+	},
-+	.nvmem_name = "1-00500",
-+};
-+
- static struct at24_platform_data eeprom_info = {
- 	.byte_len       = (256*1024) / 8,
- 	.page_size      = 64,
-@@ -769,6 +779,8 @@ static __init void dm365_evm_init(void)
- 
- 	dm365_init_spi0(BIT(0), dm365_evm_spi_info,
- 			ARRAY_SIZE(dm365_evm_spi_info));
-+
-+	nvmem_add_lookup_table(&dm365evm_mac_address_cell, 1);
- }
- 
- MACHINE_START(DAVINCI_DM365_EVM, "DaVinci DM365 EVM")
--- 
-2.18.0
+There may be a few more things worth trying out or analysing from
+the recorded past failures to understand more about how it goes
+wrong:
+
+- For which data lengths does it fail? Having two overlapping
+  unaligned stp is something that only happens for 16..96 byte
+  memcpy.
+
+- What if we use a pair of str instructions instead of an stp in
+  a modified memcpy? Does it now write to still write to the
+  wrong place 16 bytes away, just 8 bytes away, or correctly?
+
+- Does it change in any way if we do the overlapping writes
+  in the reverse order? E.g. for the 16..64 byte case:
+
+diff --git a/sysdeps/aarch64/memcpy.S b/sysdeps/aarch64/memcpy.S
+index 7e1163e6a0..09d0160bdf 100644
+--- a/sysdeps/aarch64/memcpy.S
++++ b/sysdeps/aarch64/memcpy.S
+@@ -102,11 +102,11 @@ ENTRY (MEMCPY)
+        tbz     tmp1, 5, 1f
+        ldp     B_l, B_h, [src, 16]
+        ldp     C_l, C_h, [srcend, -32]
+-       stp     B_l, B_h, [dstin, 16]
+        stp     C_l, C_h, [dstend, -32]
++       stp     B_l, B_h, [dstin, 16]
+ 1:
+-       stp     A_l, A_h, [dstin]
+        stp     D_l, D_h, [dstend, -16]
++       stp     A_l, A_h, [dstin]
+        ret
+
+        .p2align 4
+
+        Arnd
