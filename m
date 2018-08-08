@@ -1,48 +1,35 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 8 Aug 2018 18:44:02 +0200
-Subject: [PATCH 00/28] at24: remove at24_platform_data
-In-Reply-To: <CAMpxmJXVNiyqF4qaYtNhPUG3mSZVdvBSGUqDYK-nh59BKeh=Gw@mail.gmail.com>
-References: <20180808153150.23444-1-brgl@bgdev.pl>
- <20180808155548.s7p4xqsjywz3psrj@ninjato>
- <CAMpxmJXVNiyqF4qaYtNhPUG3mSZVdvBSGUqDYK-nh59BKeh=Gw@mail.gmail.com>
-Message-ID: <20180808164402.GH7275@lunn.ch>
+Date: Wed, 8 Aug 2018 18:49:51 +0200
+Subject: [PATCH v1 1/7] From: Ken Ma <make@marvell.com>
+In-Reply-To: <20180808152706.21727-2-marek.behun@nic.cz>
+References: <20180808152706.21727-1-marek.behun@nic.cz>
+ <20180808152706.21727-2-marek.behun@nic.cz>
+Message-ID: <20180808164951.GI7275@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2018 at 06:27:25PM +0200, Bartosz Golaszewski wrote:
-> 2018-08-08 17:55 GMT+02:00 Wolfram Sang <wsa@the-dreams.de>:
-> > On Wed, Aug 08, 2018 at 05:31:22PM +0200, Bartosz Golaszewski wrote:
-> >> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> >>
-> >> This is a follow-up to the previously rejected series[1] which partially
-> >> removed the at24_platform_data structure. After further development and
-> >> taking reviews into account, this series finally removes that struct
-> >> completely but not without touching many different parts of the code
-> >> base.
-> >>
-> >> Since I took over maintainership of the at24 driver I've been working
-> >> towards removing at24_platform_data in favor for device properties.
-> >
-> > Wooha, nice work. I can't really comment on it but wondered how you want
-> > to upstream it (after reviews)? Pull request of an immutable branch for
-> > nvmem-tree sounds best to me. Then I could also pull it in if i2c needs
-> > it. Probably same situation for arm-soc...
-> >
+On Wed, Aug 08, 2018 at 05:27:00PM +0200, Marek Beh?n wrote:
+> pinctrl: armada-37xx: Correct mpp definitions
+
+Hi Marek
+
+The subject line is messed up.
+
 > 
-> I initially wanted to merge small parts of it starting with v4.18, but
-> there were some voices against merging APIs without users. I'm not
-> sure how it should go in. There'll be a need for multiple immutable
-> branches most probably...
+> This patch corrects below mpp definitions:
+>  - The sdio_sb group is composed of 6 pins and not 5;
+>  - The rgmii group contains pins mpp2[17:6] and not mpp2[19:6];
+>  - Pin of group "pmic0" is mpp1[6] but not mpp1[16];
+>  - Pin of group "pmic1" is mpp1[7] but not mpp1[17];
+>  - A new group "smi" is added in A0 with 2 pins - mpp2[19:18], its
+>    bitmask is bit4;
+>  - Group "pcie1" has 3 pins in A0 - mpp2[5:3], its bit mask is
+>    bit5 | bit9 | bit10 but not bit4;
+>  - Group "ptp" has 3 pins in A0 as Z1, but its bitmask is changed to
+>    bit11 | bit12 | bit13.
+> 
+> Signed-off-by: Marek Behun <marek.behun@nic.cz>
 
-Hi Bartosz
-
-What this series does is show all the different parts are now
-available, and can be reviewed as a whole. Once that review is
-completed, merging in parts then becomes possible.
-
-It looks like you could probably merge the nvmem, mtd and net parts
-independently via there maintainers for 4.20, since i don't think
-there are any dependencies. The arm-soc changes in 4.21, and the
-removal of the platform data in 4.22?
+This probably should should have the original Marvell SOB as well.
 
      Andrew
