@@ -1,34 +1,35 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 8 Aug 2018 18:20:42 +0200
-Subject: [PATCH 06/28] mtd: Add support for reading MTD devices via the
- nvmem API
-In-Reply-To: <20180808153150.23444-7-brgl@bgdev.pl>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Wed, 8 Aug 2018 18:27:25 +0200
+Subject: [PATCH 00/28] at24: remove at24_platform_data
+In-Reply-To: <20180808155548.s7p4xqsjywz3psrj@ninjato>
 References: <20180808153150.23444-1-brgl@bgdev.pl>
- <20180808153150.23444-7-brgl@bgdev.pl>
-Message-ID: <20180808162042.GG7275@lunn.ch>
+ <20180808155548.s7p4xqsjywz3psrj@ninjato>
+Message-ID: <CAMpxmJXVNiyqF4qaYtNhPUG3mSZVdvBSGUqDYK-nh59BKeh=Gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2018 at 05:31:28PM +0200, Bartosz Golaszewski wrote:
-> From: Alban Bedel <albeu@free.fr>
-> 
-> Allow drivers that use the nvmem API to read data stored on MTD devices.
-> For this the mtd devices are registered as read-only NVMEM providers.
-> On OF systems only devices that have the 'nvmem-provider' property
-> are registered, on non-OF system all MTD devices are registered.
-> @@ -570,6 +613,11 @@ int add_mtd_device(struct mtd_info *mtd)
->  	if (error)
->  		goto fail_added;
->  
-> +	/* Add the nvmem provider */
-> +	error = mtd_nvmem_add(mtd);
-> +	if (error)
-> +		goto fail_nvmem_add;
-> +
+2018-08-08 17:55 GMT+02:00 Wolfram Sang <wsa@the-dreams.de>:
+> On Wed, Aug 08, 2018 at 05:31:22PM +0200, Bartosz Golaszewski wrote:
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> This is a follow-up to the previously rejected series[1] which partially
+>> removed the at24_platform_data structure. After further development and
+>> taking reviews into account, this series finally removes that struct
+>> completely but not without touching many different parts of the code
+>> base.
+>>
+>> Since I took over maintainership of the at24 driver I've been working
+>> towards removing at24_platform_data in favor for device properties.
+>
+> Wooha, nice work. I can't really comment on it but wondered how you want
+> to upstream it (after reviews)? Pull request of an immutable branch for
+> nvmem-tree sounds best to me. Then I could also pull it in if i2c needs
+> it. Probably same situation for arm-soc...
+>
 
-Hi Bartosz
+I initially wanted to merge small parts of it starting with v4.18, but
+there were some voices against merging APIs without users. I'm not
+sure how it should go in. There'll be a need for multiple immutable
+branches most probably...
 
-Maybe it is hiding somewhere, but i don't see any code looking into
-device tree looking for the 'nvmem-provider' property.
-
-       Andrew
+Bart
