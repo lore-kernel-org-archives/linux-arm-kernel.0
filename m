@@ -1,10 +1,10 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  8 Aug 2018 17:31:44 +0200
-Subject: [PATCH 22/28] ARM: davinci: dm646x-evm: use device properties for
+Date: Wed,  8 Aug 2018 17:31:49 +0200
+Subject: [PATCH 27/28] ARM: davinci: mityomapl138: use device properties for
  at24 eeprom
 In-Reply-To: <20180808153150.23444-1-brgl@bgdev.pl>
 References: <20180808153150.23444-1-brgl@bgdev.pl>
-Message-ID: <20180808153150.23444-23-brgl@bgdev.pl>
+Message-ID: <20180808153150.23444-28-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,46 +21,48 @@ already implies the EEPROM's size.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-dm646x-evm.c | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
+ arch/arm/mach-davinci/board-mityomapl138.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-index 5a9de47bc8a2..5049f0c6cd1a 100644
---- a/arch/arm/mach-davinci/board-dm646x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-@@ -22,7 +22,7 @@
- #include <linux/gpio.h>
+diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+index 17b67e26bc0e..be0fb7d17e25 100644
+--- a/arch/arm/mach-davinci/board-mityomapl138.c
++++ b/arch/arm/mach-davinci/board-mityomapl138.c
+@@ -14,11 +14,11 @@
+ #include <linux/init.h>
+ #include <linux/console.h>
  #include <linux/platform_device.h>
++#include <linux/property.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/notifier.h>
+ #include <linux/regulator/machine.h>
  #include <linux/i2c.h>
 -#include <linux/platform_data/at24.h>
-+#include <linux/property.h>
- #include <linux/platform_data/pcf857x.h>
- 
- #include <media/i2c/tvp514x.h>
-@@ -320,12 +320,9 @@ static struct nvmem_cell_lookup dm646x_evm_mac_address_cell = {
- 	.nvmem_name = "1-00500",
+ #include <linux/etherdevice.h>
+ #include <linux/spi/spi.h>
+ #include <linux/spi/flash.h>
+@@ -185,10 +185,9 @@ static struct nvmem_cell_lookup mityomapl138_nvmem_cells[] = {
+ 	}
  };
  
--static struct at24_platform_data eeprom_info = {
--	.byte_len       = (256*1024) / 8,
--	.page_size      = 64,
--	.flags          = AT24_FLAG_ADDR16,
--	.setup          = davinci_get_mac_addr,
--	.context	= (void *)0x7f00,
-+static const struct property_entry eeprom_properties[] = {
-+	PROPERTY_ENTRY_U32("pagesize", 64),
-+	{ }
+-static struct at24_platform_data mityomapl138_fd_chip = {
+-	.byte_len	= 256,
+-	.page_size	= 8,
+-	.flags		= AT24_FLAG_READONLY | AT24_FLAG_IRUGO,
++static const struct property_entry mityomapl138_fd_chip_properties[] = {
++	PROPERTY_ENTRY_U32("pagesize", 8),
++	PROPERTY_ENTRY_BOOL("read-only"),
  };
- #endif
  
-@@ -396,7 +393,7 @@ static void evm_init_cpld(void)
- static struct i2c_board_info __initdata i2c_info[] =  {
- 	{
- 		I2C_BOARD_INFO("24c256", 0x50),
--		.platform_data  = &eeprom_info,
-+		.properties  = eeprom_properties,
+ static struct davinci_i2c_platform_data mityomap_i2c_0_pdata = {
+@@ -317,7 +316,7 @@ static struct i2c_board_info __initdata mityomap_tps65023_info[] = {
  	},
  	{
- 		I2C_BOARD_INFO("pcf8574a", 0x38),
+ 		I2C_BOARD_INFO("24c02", 0x50),
+-		.platform_data = &mityomapl138_fd_chip,
++		.properties = mityomapl138_fd_chip_properties,
+ 	},
+ };
+ 
 -- 
 2.18.0
