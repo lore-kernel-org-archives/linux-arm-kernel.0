@@ -1,54 +1,74 @@
-From: dave.taht@gmail.com (Dave Taht)
-Date: Wed, 8 Aug 2018 10:57:45 -0700
-Subject: [PATCH v1 6/7] net: mvneta: Don't use GRO on Armada 3720
-In-Reply-To: <20180808165846.GK7275@lunn.ch>
-References: <20180808152706.21727-1-marek.behun@nic.cz>
- <20180808152706.21727-7-marek.behun@nic.cz>
- <20180808165846.GK7275@lunn.ch>
-Message-ID: <CAA93jw7dna_9M_Mt22iCvSPeC3piLdrHRg+3NR3R44+VVmgREA@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 8 Aug 2018 20:57:02 +0300
+Subject: [PATCH 24/28] ARM: davinci: sffsdr: use device properties for
+ at24 eeprom
+In-Reply-To: <20180808153150.23444-25-brgl@bgdev.pl>
+References: <20180808153150.23444-1-brgl@bgdev.pl>
+ <20180808153150.23444-25-brgl@bgdev.pl>
+Message-ID: <CAHp75VfU6Dsge0XX5h18zjY9kJ73kFPevLT9j7vZBO__tNronw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2018 at 10:00 AM Andrew Lunn <andrew@lunn.ch> wrote:
+On Wed, Aug 8, 2018 at 6:31 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 >
-> On Wed, Aug 08, 2018 at 05:27:05PM +0200, Marek Beh?n wrote:
-> > For some reason on Armada 3720 boards (EspressoBin and Turris Mox) the
-> > networking driver behaves weirdly when using napi_gro_receive.
-> >
-> > For example downloading a big file from a local network (low ping) is
-> > fast, but when downloading from a remote server (higher ping), the
-> > download speed is at first high but drops rapidly to almost nothing or
-> > absolutely nothing.
-> >
-> > This is fixed when using netif_receive_skb instead of napi_gro_receive.
+> We want to work towards phasing out the at24_platform_data structure.
+> There are few users and its contents can be represented using generic
+> device properties. Using device properties only will allow us to
+> significantly simplify the at24 configuration code.
 >
-> Before doing this, we should really understand what is going on. It is
-> probably just a driver bug which needs fixing. And GRO should be good
-> for performance, so we do want to use it, if possible.
-
-I'd just disable it and worry about it later. The software gro in the
-mvneta would batch up 64k and is one of the reasons why sch_cake does
-gso splitting by default. (64k unsplit, downshifted to 1mbit = ~540ms
-of latency). If this mvneta facility is in addition buggy, that
-explains some puzzling things I've seen in various benchmarks. thx for
-the steer as to what to look for!
-
-IMHO: in general gro looks good on dumb single stream benchmarks, not
-as useful on mixed routed traffic with more entropy, and batching
-clutters up the mvneta receive path that otherwise could be draining
-the rx ring and spitting packets into the rest of the system faster.
-The mvneta is mostly (?) used on routing devices.
-
-
-
+> Remove the at24_platform_data structure and replace it with an array
+> of property entries. Drop the byte_len/size property, as the model name
+> already implies the EEPROM's size.
 >
->     Andrew
+
+Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/mach-davinci/board-sffsdr.c | 11 +++++------
+>  1 file changed, 5 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
+> index f6a4d094cbc3..680e5d7628a8 100644
+> --- a/arch/arm/mach-davinci/board-sffsdr.c
+> +++ b/arch/arm/mach-davinci/board-sffsdr.c
+> @@ -26,7 +26,7 @@
+>  #include <linux/init.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/i2c.h>
+> -#include <linux/platform_data/at24.h>
+> +#include <linux/property.h>
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/mtd/rawnand.h>
+>  #include <linux/mtd/partitions.h>
+> @@ -92,16 +92,15 @@ static struct platform_device davinci_sffsdr_nandflash_device = {
+>         .resource       = davinci_sffsdr_nandflash_resource,
+>  };
+>
+> -static struct at24_platform_data eeprom_info = {
+> -       .byte_len       = (64*1024) / 8,
+> -       .page_size      = 32,
+> -       .flags          = AT24_FLAG_ADDR16,
+> +static const struct property_entry eeprom_properties[] = {
+> +       PROPERTY_ENTRY_U32("pagesize", 32),
+> +       { },
+>  };
+>
+>  static struct i2c_board_info __initdata i2c_info[] =  {
+>         {
+>                 I2C_BOARD_INFO("24c64", 0x50),
+> -               .platform_data  = &eeprom_info,
+> +               .properties = eeprom_properties,
+>         },
+>         /* Other I2C devices:
+>          * MSP430,  addr 0x23 (not used)
+> --
+> 2.18.0
+>
 
 
 
 -- 
-
-Dave T?ht
-CEO, TekLibre, LLC
-http://www.teklibre.com
-Tel: 1-669-226-2619
+With Best Regards,
+Andy Shevchenko
