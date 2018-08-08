@@ -1,33 +1,61 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 8 Aug 2018 17:55:49 +0200
-Subject: [PATCH 00/28] at24: remove at24_platform_data
-In-Reply-To: <20180808153150.23444-1-brgl@bgdev.pl>
-References: <20180808153150.23444-1-brgl@bgdev.pl>
-Message-ID: <20180808155548.s7p4xqsjywz3psrj@ninjato>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 8 Aug 2018 16:40:58 +0100
+Subject: [PATCH v2 0/6] PCI: mvebu: cleanup and improvements
+In-Reply-To: <20180803143848.21551-1-thomas.petazzoni@bootlin.com>
+References: <20180803143848.21551-1-thomas.petazzoni@bootlin.com>
+Message-ID: <20180808154058.GA19383@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2018 at 05:31:22PM +0200, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Fri, Aug 03, 2018 at 04:38:42PM +0200, Thomas Petazzoni wrote:
+> Hello,
 > 
-> This is a follow-up to the previously rejected series[1] which partially
-> removed the at24_platform_data structure. After further development and
-> taking reviews into account, this series finally removes that struct
-> completely but not without touching many different parts of the code
-> base.
+> This is the v2 of the pci-mvebu cleanup and improvements, mainly
+> aiming at using pci_host_bridge.
 > 
-> Since I took over maintainership of the at24 driver I've been working
-> towards removing at24_platform_data in favor for device properties.
+> Since v1, the changes are:
+> 
+>  - Rebase on v4.18-rc1 to make sure the patches apply
+> 
+>  - Add a patch fixing the I/O space end calculation (using
+>    resource_size() as the .end address of a resource is not correct)
+> 
+>  - Only remap the I/O space if there is a PCI I/O aperture described
+>    in the DT.
+> 
+>  - Use resource_size() in the loop mapping the I/O space, as suggested
+>    by Lorenzo.
+> 
+>  - Use pci_add_resource() instead of pci_add_resource_offset(), as
+>    suggested by Lorenzo.
+> 
+>  - Revert to using pci_ioremap_io(), since we need to map with a
+>    special memory type on Armada platforms, and pci_remap_iospace()
+>    doesn't allow to do that. Noticed by Lorenzo.
 
-Wooha, nice work. I can't really comment on it but wondered how you want
-to upstream it (after reviews)? Pull request of an immutable branch for
-nvmem-tree sounds best to me. Then I could also pull it in if i2c needs
-it. Probably same situation for arm-soc...
+Pulled into pci/mvebu (I reworded some commit logs in the process
+please have a look) for (tentatively) v4.19 but it is a bit late
+in the cycle so let's see how things go.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180808/845034ad/attachment.sig>
+Thanks,
+Lorenzo
+
+> 
+> Thanks!
+> 
+> Thomas
+> 
+> Thomas Petazzoni (6):
+>   PCI: mvebu: Remove redundant platform_set_drvdata() call
+>   PCI: mvebu: fix I/O space end address calculation
+>   PCI: mvebu: only remap I/O space if configured
+>   PCI: mvebu: use resource_size() to remap I/O space
+>   PCI: mvebu: Convert to use pci_host_bridge directly
+>   PCI: mvebu: Drop bogus comment above mvebu_pcie_map_registers()
+> 
+>  drivers/pci/controller/pci-mvebu.c | 153 +++++++++++++++++--------------------
+>  1 file changed, 68 insertions(+), 85 deletions(-)
+> 
+> -- 
+> 2.14.4
+> 
