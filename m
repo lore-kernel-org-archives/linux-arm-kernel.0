@@ -1,75 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed,  8 Aug 2018 01:07:05 -0700
-Subject: [PATCH 3/4] bus: ti-sysc: Fix module register ioremap for larger
- offsets
-In-Reply-To: <20180808080706.100389-1-tony@atomide.com>
-References: <20180808080706.100389-1-tony@atomide.com>
-Message-ID: <20180808080706.100389-4-tony@atomide.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 8 Aug 2018 09:23:35 +0100
+Subject: [RFC PATCH 12/16] KVM: arm64/sve: Context switch the SVE registers
+In-Reply-To: <20180807194338.GI5985@e113682-lin.lund.arm.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-13-git-send-email-Dave.Martin@arm.com>
+ <20180806131910.GC5985@e113682-lin.lund.arm.com>
+ <20180807111526.GD9097@e103592.cambridge.arm.com>
+ <20180807194338.GI5985@e113682-lin.lund.arm.com>
+Message-ID: <20180808082333.GI9097@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can have the interconnect target module control registers pretty
-much anywhere within the module range. The current code attempts an
-incomplete optimization of the ioremap size but does it wrong and
-it only works for registers at the beginning of the module.
+On Tue, Aug 07, 2018 at 09:43:38PM +0200, Christoffer Dall wrote:
+> On Tue, Aug 07, 2018 at 12:15:26PM +0100, Dave Martin wrote:
+> > On Mon, Aug 06, 2018 at 03:19:10PM +0200, Christoffer Dall wrote:
 
-Let's just use the largest control register to calculate the ioremap
-size. The ioremapped range is for most part cached anyways so there
-is no need for size optimization. Let's also update the comments
-accordingly.
+[...]
 
-Fixes: 0eecc636e5a2 ("bus: ti-sysc: Add minimal TI sysc interconnect
-target driver")
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- drivers/bus/ti-sysc.c | 29 ++++++++++++++---------------
- 1 file changed, 14 insertions(+), 15 deletions(-)
+> > > nit: this may also be folded nicely into a static bool
+> > > __trap_fpsimd_sve_access() check.
+> > 
+> > It wouldn't hurt to make this look less fiddly, certainly.
+> > 
+> > Can you elaborate on precisely what you had in mind?
+> 
+> sure:
+> 
+> static bool __hyp_text __trap_is_fpsimd_sve_access(struct kvm_vcpu *vcpu)
+> {
+> 	/*
+> 	 * Can we support SVE without FPSIMD? If not, this can be
+> 	 * simplified by reversing the condition.
+> 	 */
+> 	if (system_supports_fpsimd() &&
+> 	    kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_FP_ASIMD)
+> 		return true;
+> 
+> 	if (guest_has_sve && kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_SVE)
+> 		return true;
+> 
+> 	return false;
+> }
+> 
+> 
+> static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+> {
+> 	[...]
+> 	if (__trap_is_fpsimd_sve_access(vcpu))
+> 		return __hyp_switch_fpsimd(vcpu, guest_has_sve);
+> 	[...]
+> }
+> 
+> Of course not even compile-tested or anything like that.
 
-diff --git a/drivers/bus/ti-sysc.c b/drivers/bus/ti-sysc.c
---- a/drivers/bus/ti-sysc.c
-+++ b/drivers/bus/ti-sysc.c
-@@ -498,28 +498,27 @@ static int sysc_check_registers(struct sysc *ddata)
- 
- /**
-  * syc_ioremap - ioremap register space for the interconnect target module
-- * @ddata: deviec driver data
-+ * @ddata: device driver data
-  *
-  * Note that the interconnect target module registers can be anywhere
-- * within the first child device address space. For example, SGX has
-- * them at offset 0x1fc00 in the 32MB module address space. We just
-- * what we need around the interconnect target module registers.
-+ * within the interconnect target module range. For example, SGX has
-+ * them at offset 0x1fc00 in the 32MB module address space. And cpsw
-+ * has them at offset 0x1200 in the CPSW_WR child. Usually the
-+ * the interconnect target module registers are at the beginning of
-+ * the module range though.
-  */
- static int sysc_ioremap(struct sysc *ddata)
- {
--	u32 size = 0;
--
--	if (ddata->offsets[SYSC_SYSSTATUS] >= 0)
--		size = ddata->offsets[SYSC_SYSSTATUS];
--	else if (ddata->offsets[SYSC_SYSCONFIG] >= 0)
--		size = ddata->offsets[SYSC_SYSCONFIG];
--	else if (ddata->offsets[SYSC_REVISION] >= 0)
--		size = ddata->offsets[SYSC_REVISION];
--	else
-+	u32 size;
-+
-+	size = max3(ddata->offsets[SYSC_REVISION],
-+		    ddata->offsets[SYSC_SYSCONFIG],
-+		    ddata->offsets[SYSC_SYSSTATUS]);
-+
-+	if (size < 0)
- 		return -EINVAL;
- 
--	size &= 0xfff00;
--	size += SZ_256;
-+	size += 4;
- 
- 	ddata->module_va = devm_ioremap(ddata->dev,
- 					ddata->module_pa,
--- 
-2.17.1
+Sure, I can do something along these line.  The conditions are indeed a
+bit unwieldy today.
+
+Cheers
+---Dave
