@@ -1,166 +1,83 @@
-From: petrcvekcz@gmail.com (Petr Cvek)
-Date: Wed, 8 Aug 2018 04:24:30 +0200
-Subject: ASoC: pxa: possible regressions
-Message-ID: <5be00a36-d54b-e8ab-2d5f-4c1870f14aac@gmail.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Wed, 8 Aug 2018 12:16:28 +0900
+Subject: [PATCH v6 4/8] media: platform: Add Cedrus VPU decoder driver
+In-Reply-To: <94e3eaf26ed7d6859d74abad0a0dbc94a3308a2e.camel@bootlin.com>
+References: <20180725100256.22833-1-paul.kocialkowski@bootlin.com>
+ <20180725100256.22833-5-paul.kocialkowski@bootlin.com>
+ <b45a8a89-1313-7a08-206d-b93017724754@xs4all.nl>
+ <dba0f9496b393c76f355398018b14ae06b2b18c9.camel@bootlin.com>
+ <CAAFQd5DgFDFupACthsz1iLpAeYRtUtEfzQC1E5XZQ6gPZAYi1Q@mail.gmail.com>
+ <94e3eaf26ed7d6859d74abad0a0dbc94a3308a2e.camel@bootlin.com>
+Message-ID: <CAAFQd5A-EbQixAq7Umk6mgHvEmjjSvrwNL8GTGF-pmgswtn2ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Aug 7, 2018 at 4:20 PM Paul Kocialkowski
+<paul.kocialkowski@bootlin.com> wrote:
+>
+> Hi,
+>
+> On Mon, 2018-08-06 at 23:10 +0900, Tomasz Figa wrote:
+> > Hi Paul,
+> >
+> > On Mon, Aug 6, 2018 at 10:50 PM Paul Kocialkowski
+> > <paul.kocialkowski@bootlin.com> wrote:
+> > >
+> > > Hi Hans and thanks for the review!
+> > >
+> > > On Sat, 2018-08-04 at 14:18 +0200, Hans Verkuil wrote:
+> > > > Hi Paul,
+> > > >
+> > > > See below for my review comments. Mostly small fry, the main issue I found is
+> > > > that there is no support for VIDIOC_DECODER_CMD. That's the proper way of
+> > > > stopping a decoder. Don't rely on the deprecated allow_zero_bytesused field.
+> > >
+> > > Mhh, it looks like this was kept around by negligence, but we do expect
+> > > that streamoff stops the decoder, not a zero bytesused field.
+> > >
+> > > Is it still required to implement the V4L2_DEC_CMD_STOP
+> > > VIDIOC_DECODER_CMD in that case? I read in the doc that this ioctl
+> > > should be optional.
+> >
+> > If I understand correctly that this decoder is stateless, there should
+> > be no need for any special flush sequence, since a 1:1 relation
+> > between OUTPUT and CAPTURE buffers is expected, which means that
+> > userspace can just stop queuing new OUTPUT buffers and keep dequeuing
+> > CAPTURE buffers until it matches all OUTPUT buffers queued before.
+>
+> This is indeed a stateless decoder and I don't have any particular need
+> for a particular stop command indeed, since flushing remaining buffers
+> when stopping is already implemented at streamoff time.
+>
 
-I was trying to update my system (PXA Magician) to 4.18-next and i've 
-ran into few problems with sound. My setup has only a few changes from 
-vanilla (change to using devm_snd_soc_register_card+devm_gpio_request). 
-I've started digging around:
+Do you mean implemented in user space or the driver? Obviously the
+latter is against the API specification, since VIDIOC_STREAMOFF is
+expected to instantly stop any pending hardware operations and
+gracefully discard any queued buffers or processing results.
 
-1) unimportant goto
+> > By the way, I guess we will also need some documentation for the
+> > stateless codec interface. Do you or Maxime (who sent the H264 part)
+> > have any plans to work on it? We have some internal documents, which
+> > should be convertible to rst using pandoc, but we might need some help
+> > with updating to latest request API and further editing. Alexandre
+> > (moved from Cc to To) is going to be looking into this.
+>
+> As far as I'm concerned, I am interested in contributing to this
+> documentation although our priorities for the Allwinner VPU effort are
+> currently focused on H265 support. This might mean that my contributions
+> to this documentation will be made on a best-effort basis (as opposed to
+> during the workday). Either way, if someone was to come up with an
+> initial draft, I'd be happy to review it!
 
-Commit 7afd1b0b2ef9a812095 ("ASoC: pxa: move some functions to 
-pxa2xx-lib") is this construct necessary?
+I've talked with Alex and he should be able to convert our internal
+document and post it as the initial draft RFC. Help with review will
+be definitely appreciated, thanks!
 
-	if (pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream) {
-		ret = pxa2xx_pcm_preallocate_dma_buffer(pcm,
-			SNDRV_PCM_STREAM_CAPTURE);
-		if (ret)
-			goto out;
-	}
-  out:
-	return ret;
+Note that we shouldn't repeat the same mistake as with stateful codecs
+and allow merging drivers without the API being specified. That led to
+drivers doing this their own ways and having to account for those
+quirks in the stateful codec API specification we're working on right
+now.
 
-After calling pxa2xx_pcm_preallocate_dma_buffer() the code will jump to 
-out anyway.
-
-2) wrong units (sample rate vs osc rate)
-
-Commit 05739375f1c0a1048 ("ASoC: pxa-ssp: remove .set_pll() and 
-.set_clkdiv() callbacks"). The function pxa_ssp_hw_params() get's called 
-with sample rate so:
-
-	/* The values in the table are for 16 bits */
-	if (width == 32)
-		acds--;
-
-	ret = pxa_ssp_set_pll(priv, bclk);
-	if (ret < 0)
-		return ret;
-
-	ssacd = pxa_ssp_read_reg(ssp, SSACD);
-	ssacd &= ~(SSACD_ACDS(7) | SSACD_SCDB_1X);
-
-pxa_ssp_set_pll() will try to set something like 8000, 44100, ... and 
-not the speed of an oscilator. The line should be probably:
-
-	ret = pxa_ssp_set_pll(priv, m->pll);
-
-and there is a previous call to pxa_ssp_set_pll():
-
-	if (sscr0 & SSCR0_ACS) {
-		ret = pxa_ssp_set_pll(priv, bclk);
-
-This one is OK I suppose?
-
-3) setup fails
-
-Recent changes in ASoC PXA DMA are causing a fail of a condition in 
-pxa_ssp_hw_params():
-
-	if ((sscr0 & SSCR0_MOD) && !ttsa) {
-		dev_err(&ssp->pdev->dev, "No TDM timeslot configured\n");
-		return -EINVAL;
-	}
-
-It seems the SSCR0_MOD flag is set in the fall through switch statement 
-in pxa_ssp_configure_dai_fmt():
-
-	case SND_SOC_DAIFMT_DSP_A:
-		sspsp |= SSPSP_FSRT;
-		/* fall through */
-	case SND_SOC_DAIFMT_DSP_B:
-		sscr0 |= SSCR0_MOD | SSCR0_PSP;
-		sscr1 |= SSCR1_TRAIL | SSCR1_RWOT;
-		break;
-
-the switch statement is an old code and it worked in the past versions.
-
-4) names are not unique
-
-The initialization of magician_dai structure wants to have (at least in 
-the past versions) for the .name item:
-
-	static struct snd_soc_dai_link magician_dai[] = {
-	{
-		.name = "uda1380",
-		.stream_name = "UDA1380 Playback",
-		.cpu_dai_name = "pxa-ssp-dai.0",
-		...
-	{
-		.name = "uda1380",
-		.stream_name = "UDA1380 Capture",
-		.cpu_dai_name = "pxa2xx-i2s",
-
-my personal branch has them named as "uda1380_playback" and 
-"uda1380_capture".
-
-5) Unbalanced references
-
-When trying to play a sound (with quick-and-dirty workarounds for 
-problems above):
-
-   # cat /dev/urandom | aplay -
-
-the system will crash when terminating aplay (stopping playback). The 
-backtrace:
-
-  ------------[ cut here ]------------
-  WARNING: CPU: 0 PID: 352 at drivers/dma/dmaengine.c:788 
-dma_release_channel+0x44/0xa0
-  chan reference count 0 != 1
-  Modules linked in: snd_soc_magician snd_soc_uda1380 snd_soc_pxa2xx_i2s 
-spi_pxa2xx_platform snd_soc_pxa_ssp snd_soc_pxa2xx snd_pxa2xx_lib 
-snd_pcm_dmaengine snd_soc_core snd_pcm videobuf2_common snd_timer snd 
-ssp soundcore ... [last unloaded: udc_core]
-  CPU: 0 PID: 352 Comm: aplay Tainted: G         C 
-4.18.0-rc6-next-20180726-magician+ #15
-  Hardware name: HTC Magician
-  [<c0107d90>] (unwind_backtrace) from [<c010594c>] (show_stack+0x10/0x14)
-  [<c010594c>] (show_stack) from [<c0111680>] (__warn+0xd4/0xec)
-  [<c0111680>] (__warn) from [<c01112d0>] (warn_slowpath_fmt+0x44/0x6c)
-  [<c01112d0>] (warn_slowpath_fmt) from [<c034908c>] 
-(dma_release_channel+0x44/0xa0)
-  [<c034908c>] (dma_release_channel) from [<bf3183d4>] 
-(snd_dmaengine_pcm_close_release_chan+0x2c/0x3c [snd_pcm_dmaengine])
-  [<bf3183d4>] (snd_dmaengine_pcm_close_release_chan 
-[snd_pcm_dmaengine]) from [<bf1e4fbc>] 
-(soc_pcm_components_close+0x64/0x70 [snd_soc_core])
-  [<bf1e4fbc>] (soc_pcm_components_close [snd_soc_core]) from 
-[<bf1e74a0>] (soc_pcm_close+0xac/0x1c0 [snd_soc_core])
-  [<bf1e74a0>] (soc_pcm_close [snd_soc_core]) from [<bf1407c8>] 
-(snd_pcm_release_substream+0x68/0xb8 [snd_pcm])
-  [<bf1407c8>] (snd_pcm_release_substream [snd_pcm]) from [<bf14085c>] 
-(snd_pcm_release+0x44/0x8c [snd_pcm])
-  [<bf14085c>] (snd_pcm_release [snd_pcm]) from [<c01c39e4>] 
-(__fput+0xdc/0x1e8)
-  [<c01c39e4>] (__fput) from [<c0129e7c>] (task_work_run+0xc4/0xd4)
-  [<c0129e7c>] (task_work_run) from [<c01053ac>] (do_work_pending+0xc0/0xc8)
-  [<c01053ac>] (do_work_pending) from [<c0101068>] 
-(slow_work_pending+0xc/0x20)
-  Exception stack(0xc2ffbfb0 to 0xc2ffbff8)
-  bfa0:                                     00000000 01f7a1a0 01f6fa3c 
-00000000
-  bfc0: 01f7a150 00000000 0009283c 00000006 000003f0 01f7a4c8 00000000 
-01f7a4c8
-  bfe0: b6ebbd70 be8ea960 b6e287b8 b6cd2018 60000010 00000004
-  ---[ end trace b671f6531db6f6b3 ]---
-
-I've only managed to discover there are two calls of 
-pxa2xx_soc_pcm_new() (where DMA buffer is allocated) for both dai links:
-
-	magician-audio magician-audio: uda1380-hifi-playback <-> pxa-ssp-dai.0 
-mapping ok
-	...
-	magician-audio magician-audio: uda1380-hifi-capture <-> pxa2xx-i2s 
-mapping ok
-
-but I don't know if this information is relevant.
-
-thanks for any help,
-Petr Cvek
+Best regards,
+Tomasz
