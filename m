@@ -1,164 +1,81 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Wed, 8 Aug 2018 07:38:16 +0200
-Subject: ASoC: pxa: possible regressions
-In-Reply-To: <5be00a36-d54b-e8ab-2d5f-4c1870f14aac@gmail.com>
-References: <5be00a36-d54b-e8ab-2d5f-4c1870f14aac@gmail.com>
-Message-ID: <58f65d89-c342-026f-6e24-a67fcd625a26@zonque.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 08 Aug 2018 08:30:17 +0200
+Subject: [PATCH 1/2] iommu/rockchip: Handle errors returned from PM
+ framework
+In-Reply-To: <5aa8d184-0c58-3471-a661-8a66a93271c7@arm.com>
+References: <20180807085406.3863-1-marc.zyngier@arm.com>
+ <3265383.PcPThIO4HC@phil> <5aa8d184-0c58-3471-a661-8a66a93271c7@arm.com>
+Message-ID: <8919220.oqSeQNaOOv@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Petr,
-
-On Wednesday, August 08, 2018 04:24 AM, Petr Cvek wrote:
-> I was trying to update my system (PXA Magician) to 4.18-next and i've
-> ran into few problems with sound.
-
-Ah, so you have a Magician platform, that's very good!
-
-> My setup has only a few changes from
-> vanilla (change to using devm_snd_soc_register_card+devm_gpio_request).
-
-Care to share these changes, or ideally rebase them on top of 4.18-next 
-for mainline inclusion? Also, I'm curious what mainline version you used 
-to be based on that worked for you.
-
-> I've started digging around:
-
-Thanks for that. Are you also willing to send patches to fix things once 
-they work for you?
-
-> 1) unimportant goto
+Am Dienstag, 7. August 2018, 16:25:53 CEST schrieb Marc Zyngier:
+> On 07/08/18 14:15, Heiko Stuebner wrote:
+> > Am Dienstag, 7. August 2018, 14:31:49 CEST schrieb Marc Zyngier:
+> >> On 07/08/18 13:09, Heiko Stuebner wrote:
+> >>> Hi Marc,
+> >>>
+> >>> Am Dienstag, 7. August 2018, 10:54:05 CEST schrieb Marc Zyngier:
+> >>>> pm_runtime_get_if_in_use can fail: either PM has been disabled
+> >>>> altogether (-EINVAL), or the device hasn't been enabled yet (0).
+> >>>> Sadly, the Rockchip IOMMU driver tends to conflate the two things
+> >>>> by considering a non-zero return value as successful.
+> >>>>
+> >>>> This has the consequence of hiding other bugs, so let's handle this
+> >>>> case throughout the driver, with a WARN_ON_ONCE so that we can try
+> >>>> and work out what happened.
+> >>>>
+> >>>> Fixes: 0f181d3cf7d98 ("iommu/rockchip: Add runtime PM support")
+> >>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >>>
+> >>> I'm still not sure about the !CONFIG_PM case, as it was probably silently
+> >>> working in that case before
+> >>
+> >> Do we agree that this is an orthogonal problem though?
+> > 
+> > Nope ;-) .... I.e. right now the code ignores the -EINVAL from disabled PM
+> > and continues, possibly even handling the irq correctly.
 > 
-> Commit 7afd1b0b2ef9a812095 ("ASoC: pxa: move some functions to
-> pxa2xx-lib") is this construct necessary?
+> Ah, I now see what you mean. Yeah, this is a bit rubbish. It would have
+> been better if the API returned something more sensible in that case,
+> but that's a bit late...
 > 
-> 	if (pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream) {
-> 		ret = pxa2xx_pcm_preallocate_dma_buffer(pcm,
-> 			SNDRV_PCM_STREAM_CAPTURE);
-> 		if (ret)
-> 			goto out;
-> 	}
->    out:
-> 	return ret;
+> > If it actually worked is a different matter, as I guess nobody really tried
+> > with !PM in the past.
 > 
-> After calling pxa2xx_pcm_preallocate_dma_buffer() the code will jump to
-> out anyway.
+> I don't think anyone noticed. !CONFIG_PM on something like rk3399
+> probably isn't very popular, and certainly comes for free on a
+> multiplatform kernel.
+> 
+> > Now with error-handling we always return IRQ_NONE for !PM.
+> 
+> Yup.
+> 
+> >>> But on the other hand we're also already running over it in other places
+> >>> like in the iommu-shutdown and I guess if someone _really_ disabled
+> >>> CONFIG_PM, a lot of additional stuff would fail anyway.
+> >>>
+> >>> So should we wrap that in some #ifdef magic, just ignore it or simply
+> >>> select PM similar to what Tegra, Renesas and Vexpress seem to do?
+> >>>
+> >>> I guess I like the 3rd option best ;-)
+> >>
+> >> It probably doesn't hurt. At what level do you want it? As a dependency
+> >> to the IOMMU? or to the platform?
+> > 
+> > I guess it might be best to go the Tegra, etc way. Whoever in their right
+> > mind would want to drive a mobile platform without any form for power
+> > management ;-) .
+> > 
+> > I can do these patches for arm32+arm64 myself ... I just wanted to put
+> > that thought out there - in case that was just a stupid idea of mine :-D .
+> 
+> Not stupid at all. Regarding this very patch: where do you want me to
+> take it?
 
-True. That's a cosmetic cleanup which can go in for 4.19. Would you want 
-to send a patch after the merge window?
-
-> 2) wrong units (sample rate vs osc rate)
-> 
-> Commit 05739375f1c0a1048 ("ASoC: pxa-ssp: remove .set_pll() and
-> .set_clkdiv() callbacks"). The function pxa_ssp_hw_params() get's called
-> with sample rate so:
-> 
-> 	/* The values in the table are for 16 bits */
-> 	if (width == 32)
-> 		acds--;
-> 
-> 	ret = pxa_ssp_set_pll(priv, bclk);
-> 	if (ret < 0)
-> 		return ret;
-> 
-> 	ssacd = pxa_ssp_read_reg(ssp, SSACD);
-> 	ssacd &= ~(SSACD_ACDS(7) | SSACD_SCDB_1X);
-> 
-> pxa_ssp_set_pll() will try to set something like 8000, 44100, ... and
-> not the speed of an oscilator. The line should be probably:
-> 
-> 	ret = pxa_ssp_set_pll(priv, m->pll);
-> 
-> and there is a previous call to pxa_ssp_set_pll():
-
-Ah, yes. Does changing that fix it for you?
-
-The changes in that machine driver where done blindly because I don't 
-have Magician hardware, and I really don't like doing things that way.
-
-> 3) setup fails
-> 
-> Recent changes in ASoC PXA DMA are causing a fail of a condition in
-> pxa_ssp_hw_params():
-> 
-> 	if ((sscr0 & SSCR0_MOD) && !ttsa) {
-
-What are the values of sscr0 and ttsa in your case? Can you cross-check 
-that with a kernel that doesn't have my recent changes?
-
-> 		dev_err(&ssp->pdev->dev, "No TDM timeslot configured\n");
-> 		return -EINVAL;
-> 	}
-> 
-> It seems the SSCR0_MOD flag is set in the fall through switch statement
-> in pxa_ssp_configure_dai_fmt():
-> 
-> 	case SND_SOC_DAIFMT_DSP_A:
-> 		sspsp |= SSPSP_FSRT;
-> 		/* fall through */
-> 	case SND_SOC_DAIFMT_DSP_B:
-> 		sscr0 |= SSCR0_MOD | SSCR0_PSP;
-> 		sscr1 |= SSCR1_TRAIL | SSCR1_RWOT;
-> 		break;
-> 
-> the switch statement is an old code and it worked in the past versions.
-
-Yes, it was merely moved to some location that is called earlier. This 
-was fixing a regression caused by a8bd0ee558714 ("ASoC: raumfeld: Use 
-static DAI format setup"), so supposedly, all PXA sound was broken since 
-v4.0.
-
-> 4) names are not unique
-> 
-> The initialization of magician_dai structure wants to have (at least in
-> the past versions) for the .name item:
-> 
-> 	static struct snd_soc_dai_link magician_dai[] = {
-> 	{
-> 		.name = "uda1380",
-> 		.stream_name = "UDA1380 Playback",
-> 		.cpu_dai_name = "pxa-ssp-dai.0",
-> 		...
-> 	{
-> 		.name = "uda1380",
-> 		.stream_name = "UDA1380 Capture",
-> 		.cpu_dai_name = "pxa2xx-i2s",
-> 
-> my personal branch has them named as "uda1380_playback" and
-> "uda1380_capture".
-
-Care to send a patch for that as well, please?
-
-> 5) Unbalanced references
-> 
-> When trying to play a sound (with quick-and-dirty workarounds for
-> problems above):
-> 
->     # cat /dev/urandom | aplay -
-> 
-> the system will crash when terminating aplay (stopping playback). The
-> backtrace:
-
-So you did hear a sound?
-
-[...]
-
-> I've only managed to discover there are two calls of
-> pxa2xx_soc_pcm_new() (where DMA buffer is allocated) for both dai links:
-> 
-> 	magician-audio magician-audio: uda1380-hifi-playback <-> pxa-ssp-dai.0
-> mapping ok
-> 	...
-> 	magician-audio magician-audio: uda1380-hifi-capture <-> pxa2xx-i2s
-> mapping ok
-> 
-> but I don't know if this information is relevant.
-
-That seems fine. The question is why there are are unbalanced calls to 
-snd_dmaengine_pcm_close_release_chan(). Could you dig a bit further 
-maybe and add some printk()?
-
-Thanks for helping fix these regressions!
+If you want to add select PM for Rockchip yourself (32+64 bit), just send
+them regularly and maybe include arm at kernel.org directly, so they can
+apply them directly, with just a reviewed-by tag from me.
 
 
-Daniel
+Heiko
