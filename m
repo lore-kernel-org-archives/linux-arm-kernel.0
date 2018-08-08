@@ -1,10 +1,10 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  8 Aug 2018 17:31:32 +0200
-Subject: [PATCH 10/28] ARM: davinci: da830-evm: use nvmem lookup for mac
+Date: Wed,  8 Aug 2018 17:31:29 +0200
+Subject: [PATCH 07/28] ARM: davinci: dm365-evm: use nvmem lookup for mac
  address
 In-Reply-To: <20180808153150.23444-1-brgl@bgdev.pl>
 References: <20180808153150.23444-1-brgl@bgdev.pl>
-Message-ID: <20180808153150.23444-11-brgl@bgdev.pl>
+Message-ID: <20180808153150.23444-8-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,26 +15,26 @@ mac-address.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-da830-evm.c | 12 ++++++++++++
+ arch/arm/mach-davinci/board-dm365-evm.c | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index 14a6fc061744..4a2fe8142a2f 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -29,6 +29,7 @@
- #include <linux/platform_data/spi-davinci.h>
- #include <linux/platform_data/usb-davinci.h>
- #include <linux/regulator/machine.h>
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index 435f7ec7d9af..cb0ac92a278e 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -28,6 +28,7 @@
+ #include <linux/spi/spi.h>
+ #include <linux/spi/eeprom.h>
+ #include <linux/v4l2-dv-timings.h>
 +#include <linux/nvmem-provider.h>
  
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
-@@ -409,6 +410,15 @@ static inline void da830_evm_init_lcdc(int mux_mode)
- static inline void da830_evm_init_lcdc(int mux_mode) { }
- #endif
+@@ -169,6 +170,15 @@ static struct platform_device davinci_nand_device = {
+ 	},
+ };
  
-+static struct nvmem_cell_lookup da830_evm_mac_address_cell = {
++static struct nvmem_cell_lookup dm365evm_mac_address_cell = {
 +	.info = {
 +		.name = "mac-address",
 +		.offset = 0x7f00,
@@ -43,17 +43,17 @@ index 14a6fc061744..4a2fe8142a2f 100644
 +	.nvmem_name = "1-00500",
 +};
 +
- static struct at24_platform_data da830_evm_i2c_eeprom_info = {
- 	.byte_len	= SZ_256K / 8,
- 	.page_size	= 64,
-@@ -618,6 +628,8 @@ static __init void da830_evm_init(void)
- 		pr_warn("%s: spi 0 registration failed: %d\n", __func__, ret);
+ static struct at24_platform_data eeprom_info = {
+ 	.byte_len       = (256*1024) / 8,
+ 	.page_size      = 64,
+@@ -769,6 +779,8 @@ static __init void dm365_evm_init(void)
  
- 	regulator_has_full_constraints();
+ 	dm365_init_spi0(BIT(0), dm365_evm_spi_info,
+ 			ARRAY_SIZE(dm365_evm_spi_info));
 +
-+	nvmem_add_lookup_table(&da830_evm_mac_address_cell, 1);
++	nvmem_add_lookup_table(&dm365evm_mac_address_cell, 1);
  }
  
- #ifdef CONFIG_SERIAL_8250_CONSOLE
+ MACHINE_START(DAVINCI_DM365_EVM, "DaVinci DM365 EVM")
 -- 
 2.18.0
