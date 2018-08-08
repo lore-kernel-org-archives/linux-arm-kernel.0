@@ -1,115 +1,32 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 8 Aug 2018 08:54:28 -0500
-Subject: [PATCH] arm64: PCI: Remove node-local allocations when
- initialising host controller
-In-Reply-To: <20180802143319.GA13512@red-moon>
-References: <20180801173132.19739-1-punit.agrawal@arm.com>
- <38ad03ba-2658-98c8-1888-0aa3bfb59bd4@arm.com>
- <20180802143319.GA13512@red-moon>
-Message-ID: <CAErSpo5i7AAXq4vmfsH2WjheXpzzM1iaehdeM24eQZjzYY39Rg@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Wed, 8 Aug 2018 15:03:31 +0100
+Subject: [RFC PATCH 09/16] KVM: arm64: Allow ID registers to by
+ dynamically read-as-zero
+In-Reply-To: <20180808091111.GL9097@e103592.cambridge.arm.com>
+References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
+ <1529593060-542-10-git-send-email-Dave.Martin@arm.com>
+ <20180806130324.GA5985@e113682-lin.lund.arm.com>
+ <20180807110958.GC9097@e103592.cambridge.arm.com>
+ <20180807193512.GH5985@e113682-lin.lund.arm.com>
+ <20180808091111.GL9097@e103592.cambridge.arm.com>
+Message-ID: <CAFEAcA_9JDzj3NSrJcR6fkVm=Cuy71B_te+PUDJgDvV1gkDLSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc linux-pci, linux-kernel]
+On 8 August 2018 at 10:11, Dave Martin <Dave.Martin@arm.com> wrote:
+> At its heart, I'm trying to abstract out the special behaviour of
+> all unallocated ID registers, so that we can decide at runtime which
+> ones to hide fro the guest: within the ID register block, each
+> unallocated register becomes RAZ, not UNDEFINED as would be the case
+> for other system registers, so we need to capture both behaviours.
 
-On Thu, Aug 2, 2018 at 9:33 AM Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
->
-> On Wed, Aug 01, 2018 at 02:38:51PM -0500, Jeremy Linton wrote:
-> > Hi,
-> >
-> > +CC Jiang Lui
->
-> Jiang Liu does not work on the kernel anymore so we won't know
-> anytime soon the reasoning behind commit 965cd0e4a5e5
->
-> > On 08/01/2018 12:31 PM, Punit Agrawal wrote:
-> > >Memory for host controller data structures is allocated local to the
-> > >node to which the controller is associated with. This has been the
-> > >behaviour since support for ACPI was added in
-> > >commit 0cb0786bac15 ("ARM64: PCI: Support ACPI-based PCI host controller").
-> >
-> > Which was apparently influenced by:
-> >
-> > 965cd0e4a5e5 x86, PCI, ACPI: Use kmalloc_node() to optimize for performance
-> >
-> > Was there an actual use-case behind that change?
-> >
-> > I think this fixes the immediate boot problem, but if there is any
-> > perf advantage it seems wise to keep it... Particularly since x86
-> > seems to be doing the node sanitation in pci_acpi_root_get_node().
->
-> I am struggling to see the perf advantage of allocating a struct
-> that the PCI controller will never read/write from a NUMA node that
-> is local to the PCI controller, happy to be corrected if there is
-> a sound rationale behind that.
+I think a better way to think of the ID register block is
+that all the registers in it *are* allocated. It's just that
+some of them are specified as RAZ/WI (because no bits in
+them have been given meaning yet). Then you retain the
+straightforward "unallocated == UNDEF". (In the Arm ARM
+the gaps in the ID register block are documented as
+"reserved, RAZ", not "unallocated".)
 
-If there is no reason to use kzalloc_node() here, we shouldn't use it.
-
-But we should use it (or not use it) consistently across arches.  I do
-not believe there is an arch-specific reason to be different.
-Currently, pci_acpi_scan_root() uses kzalloc_node() on x86 and arm64,
-but kzalloc() on ia64.  They all ought to be the same.
-
-> > >Drop the node local allocation as there is no benefit from doing so -
-> > >the usage of these structures is independent from where the controller
-> > >is located. It also causes problem during probe if the associated numa
-> > >node hasn't been initialised due to booting with restricted cpus via
-> > >kernel command line or where the node doesn't have cpus or memory
-> > >associated with it.
-
-I do not support the avoidance of kzalloc_node() as a means of working
-around the problem of a NUMA node not being initialized correctly.
-
-We got that node number from acpi_get_node().  I think we should be
-able to pass it to kzalloc_node() and expect something reasonable,
-i.e., either a successful allocation from the desired node (or from a
-node that is present) or an error return.  I don't think the caller is
-in a position to figure out whether it's safe to use kzalloc_node() or
-not.
-
-> > >Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> > >Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > >Cc: Will Deacon <will.deacon@arm.com>
-> > >Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > >---
-> > >Hi,
-> > >
-> > >This came up in the context of investigating the boot issues reported
-> > >due to restricted cpus or buggy firmware. Part of the problem is fixed
-> > >by Lorenzo's rework of NUMA initialisation[0].
-> > >
-> > >But there also doesn't seem to be any justification for using
-> > >node-local allocation to begin with.
-> > >
-> > >Thanks,
-> > >Punit
-> > >
-> > >[0] https://patchwork.kernel.org/patch/10486001/
-> > >
-> > >  arch/arm64/kernel/pci.c | 5 ++---
-> > >  1 file changed, 2 insertions(+), 3 deletions(-)
-> > >
-> > >diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> > >index 0e2ea1c78542..bb85e2f4603f 100644
-> > >--- a/arch/arm64/kernel/pci.c
-> > >+++ b/arch/arm64/kernel/pci.c
-> > >@@ -165,16 +165,15 @@ static void pci_acpi_generic_release_info(struct acpi_pci_root_info *ci)
-> > >  /* Interface called from ACPI code to setup PCI host controller */
-> > >  struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-> > >  {
-> > >-    int node = acpi_get_node(root->device->handle);
-> > >     struct acpi_pci_generic_root_info *ri;
-> > >     struct pci_bus *bus, *child;
-> > >     struct acpi_pci_root_ops *root_ops;
-> > >-    ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
-> > >+    ri = kzalloc(sizeof(*ri), GFP_KERNEL);
-> > >     if (!ri)
-> > >             return NULL;
-> > >-    root_ops = kzalloc_node(sizeof(*root_ops), GFP_KERNEL, node);
-> > >+    root_ops = kzalloc(sizeof(*root_ops), GFP_KERNEL);
-> > >     if (!root_ops) {
-> > >             kfree(ri);
-> > >             return NULL;
-> > >
-> >
+thanks
+-- PMM
