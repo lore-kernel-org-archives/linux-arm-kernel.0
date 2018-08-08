@@ -1,67 +1,108 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  8 Aug 2018 17:31:26 +0200
-Subject: [PATCH 04/28] nvmem: provide nvmem_device_name()
-In-Reply-To: <20180808153150.23444-1-brgl@bgdev.pl>
-References: <20180808153150.23444-1-brgl@bgdev.pl>
-Message-ID: <20180808153150.23444-5-brgl@bgdev.pl>
+Date: Wed,  8 Aug 2018 17:31:22 +0200
+Subject: [PATCH 00/28] at24: remove at24_platform_data
+Message-ID: <20180808153150.23444-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Kernel users don't have any means of checking the names of nvmem
-devices. Add a routine that returns the name of the nvmem provider.
+This is a follow-up to the previously rejected series[1] which partially
+removed the at24_platform_data structure. After further development and
+taking reviews into account, this series finally removes that struct
+completely but not without touching many different parts of the code
+base.
 
-This will be useful for nvmem notifier subscribers - otherwise they
-can't check what device is being added/removed.
+Since I took over maintainership of the at24 driver I've been working
+towards removing at24_platform_data in favor for device properties.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- drivers/nvmem/core.c           | 6 ++++++
- include/linux/nvmem-consumer.h | 7 +++++++
- 2 files changed, 13 insertions(+)
+DaVinci is the only platform that's still using it - all other users
+have already been converted.
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 128c8e51bff2..b040370292a7 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -1440,6 +1440,12 @@ int nvmem_device_write(struct nvmem_device *nvmem,
- }
- EXPORT_SYMBOL_GPL(nvmem_device_write);
- 
-+const char *nvmem_device_name(struct nvmem_device *nvmem)
-+{
-+	return dev_name(&nvmem->dev);
-+}
-+EXPORT_SYMBOL_GPL(nvmem_device_name);
-+
- static int __init nvmem_init(void)
- {
- 	return bus_register(&nvmem_bus_type);
-diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
-index ae4d30347602..c4000a218f67 100644
---- a/include/linux/nvmem-consumer.h
-+++ b/include/linux/nvmem-consumer.h
-@@ -69,6 +69,8 @@ int nvmem_device_cell_write(struct nvmem_device *nvmem,
- 
- int nvmem_register_notifier(struct notifier_block *nb);
- int nvmem_unregister_notifier(struct notifier_block *nb);
-+
-+const char *nvmem_device_name(struct nvmem_device *nvmem);
- #else
- 
- static inline struct nvmem_cell *nvmem_cell_get(struct device *dev,
-@@ -167,6 +169,11 @@ static inline int int nvmem_unregister_notifier(struct notifier_block *nb)
- {
- 	return -ENOSYS;
- }
-+
-+static inline const char *nvmem_device_name(struct nvmem_device *nvmem)
-+{
-+	return ERR_PTR(-ENOSYS);
-+}
- #endif /* CONFIG_NVMEM */
- 
- #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+One of the obstacles in case of DaVinci is removing the setup() callback
+from the pdata struct, the only user of which are some davinci boards.
+
+Most boards use the EEPROM to store the MAC address. This series adds
+support for cell lookups to the nvmem framework, registers relevant
+cells for all users, adds nvmem support to eth_platform_get_mac_address(),
+converts davinci_emac driver to using it and replaces at24_platform_data
+with device properties.
+
+There's also one board (da850-evm) which uses MTD for reading the MAC
+address. I used the patch from Alban Bedel's previous submission[2] to
+add support for nvmem to the MTD framework. Since this user doesn't
+need device tree, I dropped Alban's patches modifying the DT bindings.
+We can add that later once an agreement is reached. For the time being
+MTD devices are registered as nvmem devices and we're registering the
+mac-address cell using the cell lookup mechanism.
+
+This series adds a blocking notifier chain to the nvmem framework, so
+that we can keep the EEPROM reading code in the mityomapl138 board file
+with only slight modifications.
+
+I also included some minor fixes to the modified code.
+
+Tested on da850-evm & dm365-evm.
+
+[1] https://lkml.org/lkml/2018/6/29/153
+[2] https://lkml.org/lkml/2018/3/24/312
+
+Alban Bedel (1):
+  mtd: Add support for reading MTD devices via the nvmem API
+
+Bartosz Golaszewski (27):
+  nvmem: add support for cell lookups
+  Documentation: nvmem: document lookup entries
+  nvmem: add a notifier chain
+  nvmem: provide nvmem_device_name()
+  nvmem: remove the name field from struct nvmem_device
+  ARM: davinci: dm365-evm: use nvmem lookup for mac address
+  ARM: davinci: dm644-evm: use nvmem lookup for mac address
+  ARM: davinci: dm646x-evm: use nvmem lookup for mac address
+  ARM: davinci: da830-evm: use nvmem lookup for mac address
+  ARM: davinci: mityomapl138: add nvmem cells lookup entries
+  ARM: davinci: da850-evm: use nvmem lookup for mac address
+  ARM: davinci: da850-evm: remove unnecessary include
+  net: split eth_platform_get_mac_address() into subroutines
+  net: add support for nvmem to eth_platform_get_mac_address()
+  net: davinci_emac: use eth_platform_get_mac_address()
+  ARM: davinci: da850-evm: remove dead MTD code
+  ARM: davinci: mityomapl138: don't read the MAC address from machine
+    code
+  ARM: davinci: dm365-evm: use device properties for at24 eeprom
+  ARM: davinci: da830-evm: use device properties for at24 eeprom
+  ARM: davinci: dm644x-evm: use device properties for at24 eeprom
+  ARM: davinci: dm646x-evm: use device properties for at24 eeprom
+  ARM: davinci: sffsdr: fix the at24 eeprom device name
+  ARM: davinci: sffsdr: use device properties for at24 eeprom
+  ARM: davinci: remove dead code related to MAC address reading
+  ARM: davinci: mityomapl138: use nvmem notifiers
+  ARM: davinci: mityomapl138: use device properties for at24 eeprom
+  eeprom: at24: kill at24_platform_data
+
+ Documentation/nvmem/nvmem.txt              |  28 +++++
+ MAINTAINERS                                |   1 -
+ arch/arm/mach-davinci/board-da830-evm.c    |  25 ++--
+ arch/arm/mach-davinci/board-da850-evm.c    |  45 +++-----
+ arch/arm/mach-davinci/board-dm365-evm.c    |  25 ++--
+ arch/arm/mach-davinci/board-dm644x-evm.c   |  24 ++--
+ arch/arm/mach-davinci/board-dm646x-evm.c   |  25 ++--
+ arch/arm/mach-davinci/board-mityomapl138.c |  59 +++++++---
+ arch/arm/mach-davinci/board-sffsdr.c       |  13 +--
+ arch/arm/mach-davinci/common.c             |  15 ---
+ drivers/misc/eeprom/at24.c                 | 127 +++++++++------------
+ drivers/mtd/Kconfig                        |   1 +
+ drivers/mtd/mtdcore.c                      |  50 ++++++++
+ drivers/net/ethernet/ti/davinci_emac.c     |  12 +-
+ drivers/nvmem/core.c                       | 106 ++++++++++++++++-
+ include/linux/davinci_emac.h               |   2 -
+ include/linux/mtd/mtd.h                    |   2 +
+ include/linux/nvmem-consumer.h             |  31 +++++
+ include/linux/nvmem-provider.h             |  10 ++
+ include/linux/platform_data/at24.h         |  60 ----------
+ net/ethernet/eth.c                         |  86 ++++++++++++--
+ 21 files changed, 492 insertions(+), 255 deletions(-)
+ delete mode 100644 include/linux/platform_data/at24.h
+
 -- 
 2.18.0
