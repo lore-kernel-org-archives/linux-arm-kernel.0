@@ -1,45 +1,51 @@
-From: ebiggers@kernel.org (Eric Biggers)
-Date: Tue, 7 Aug 2018 17:15:24 -0700
-Subject: [RFC PATCH 3/9] crypto: chacha20-generic - refactor to allow
- varying number of rounds
-In-Reply-To: <20180807215121.GB25300@gmail.com>
-References: <20180806223300.113891-1-ebiggers@kernel.org>
- <20180806223300.113891-4-ebiggers@kernel.org>
- <CAHmME9rbe6eT6dkUqKnp-GxcqGrp-tvMfTMr8kZtsn=S3cmP8A@mail.gmail.com>
- <CA+_SqcD+KpQ_X6iXUCpQh0N6pWzBorstBJDx7eBqcybY4Dvy8Q@mail.gmail.com>
- <CAEX_ruFp0KddnZyetZt997OvRzKDuN7U95MF_N9AgTh+mTcD7Q@mail.gmail.com>
- <20180807215121.GB25300@gmail.com>
-Message-ID: <20180808001524.GD25300@gmail.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Wed, 08 Aug 2018 09:41:37 +0900
+Subject: [PATCH v2 2/4] phy: socionext: add USB3 PHY driver for UniPhier
+ SoC
+In-Reply-To: <1533290045-18969-3-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1533290045-18969-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1533290045-18969-3-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <20180808094136.5509.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2018 at 02:51:21PM -0700, Eric Biggers wrote:
-> On Tue, Aug 07, 2018 at 11:21:04AM +0100, Samuel Neves wrote:
-> > > The best attack on ChaCha breaks 7 rounds, and that attack requires 2^248 operations.
-> > 
-> > This number, as far as I can tell, comes from the "New features of
-> > Latin dances" paper. There have been some minor improvements in the
-> > intervening 10 years, e.g., [1, 2, 3, 4], which pull back the
-> > complexity of breaking ChaCha7 down to 2^235. In any case, every
-> > attack so far appears to hit a wall at 8 rounds, with 12 rounds---the
-> > recommended eSTREAM round number for Salsa20---seeming to offer a
-> > reasonable security margin, still somewhat better than that of the
-> > AES.
-> > 
-> > Best regards,
-> > Samuel Neves
-> > 
-> > [1] https://eprint.iacr.org/2015/698
-> > [2] https://eprint.iacr.org/2015/217
-> > [3] https://eprint.iacr.org/2016/1034
-> > [4] https://doi.org/10.1016/j.dam.2017.04.034
-> 
-> Thanks Samuel, I'll fix that number in the next iteration of the patchset.
-> 
+On Fri, 3 Aug 2018 18:54:03 +0900 <hayashi.kunihiko@socionext.com> wrote:
 
-Oops, sorry, for some reason I thought you had quoted one of my commit messages,
-but it was actually Paul's email.  I did mention in "crypto: chacha - add
-XChaCha12 support" that "the best known attack on ChaCha makes it through only 7
-rounds", but I didn't specify the complexity.
+> Add a driver for PHY interface built into USB3 controller
+> implemented in UniPhier SoCs.
+> This driver supports High-Speed PHY and Super-Speed PHY.
+> 
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Signed-off-by: Motoya Tanigawa <tanigawa.motoya@socionext.com>
+> Signed-off-by: Masami Hiramatsu <masami.hiramatsu@linaro.org>
+> ---
+>  drivers/phy/Kconfig                         |   1 +
+>  drivers/phy/Makefile                        |   1 +
+>  drivers/phy/socionext/Kconfig               |  12 +
+>  drivers/phy/socionext/Makefile              |   6 +
+>  drivers/phy/socionext/phy-uniphier-usb3hs.c | 423 ++++++++++++++++++++++++++++
+>  drivers/phy/socionext/phy-uniphier-usb3ss.c | 350 +++++++++++++++++++++++
+>  6 files changed, 793 insertions(+)
+>  create mode 100644 drivers/phy/socionext/Kconfig
+>  create mode 100644 drivers/phy/socionext/Makefile
+>  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3hs.c
+>  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3ss.c
 
-- Eric
+[snip]
+
+> +static void uniphier_u3ssphy_testio_write(struct uniphier_u3ssphy_priv *priv,
+> +					  u32 data)
+> +{
+> +	/* need to read TESTO twice after accessing TESTI */
+> +	writel(data, priv->base + SSPHY_TESTI);
+> +	readl(priv->base + SSPHY_TESTI);
+> +	readl(priv->base + SSPHY_TESTI);
+
+I made a mistake here. The comment and the code are inconsistent.
+I'll fix it next.
+
+Thanks,
+
+---
+Best Regards,
+Kunihiko Hayashi
