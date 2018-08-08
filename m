@@ -1,32 +1,109 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 8 Aug 2018 15:03:31 +0100
-Subject: [RFC PATCH 09/16] KVM: arm64: Allow ID registers to by
- dynamically read-as-zero
-In-Reply-To: <20180808091111.GL9097@e103592.cambridge.arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-10-git-send-email-Dave.Martin@arm.com>
- <20180806130324.GA5985@e113682-lin.lund.arm.com>
- <20180807110958.GC9097@e103592.cambridge.arm.com>
- <20180807193512.GH5985@e113682-lin.lund.arm.com>
- <20180808091111.GL9097@e103592.cambridge.arm.com>
-Message-ID: <CAFEAcA_9JDzj3NSrJcR6fkVm=Cuy71B_te+PUDJgDvV1gkDLSQ@mail.gmail.com>
+From: marcel@holtmann.org (Marcel Holtmann)
+Date: Wed, 8 Aug 2018 16:07:08 +0200
+Subject: [PATCH v7 2/3] Bluetooth: mediatek: Add protocol support for
+ MediaTek serial devices
+In-Reply-To: <1533715447.3472.251.camel@mtkswgap22>
+References: <cover.1533056925.git.sean.wang@mediatek.com>
+ <c92ed10cf16f36d9a3b390e864af92e2dfe7b771.1533056925.git.sean.wang@mediatek.com>
+ <1707FFA1-A294-4A95-A3BF-0910CE455232@holtmann.org>
+ <1533192799.3472.122.camel@mtkswgap22>
+ <FF45A90A-F9F1-47CB-AB1F-1E92BF587FBE@holtmann.org>
+ <1533199720.3472.136.camel@mtkswgap22>
+ <9526E5D9-50BA-4D57-80F5-083DB7D28AFE@holtmann.org>
+ <1533205495.3472.144.camel@mtkswgap22>
+ <A6D48D49-52CE-405D-8C5D-C4D54CE67221@holtmann.org>
+ <1533303749.3472.160.camel@mtkswgap22>
+ <D2336CD2-B69B-4B5B-8125-F0CAD29E3243@holtmann.org>
+ <1533319214.3472.187.camel@mtkswgap22>
+ <7A3537C5-5940-45AD-AB80-77418CCFE130@holtmann.org>
+ <1533652445.3472.230.camel@mtkswgap22>
+ <8AF72CFC-4978-42AD-8ECC-752EB137DD2A@holtmann.org>
+ <1533715447.3472.251.camel@mtkswgap22>
+Message-ID: <78F5F65C-F155-473A-BC94-809683FB9BDA@holtmann.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 August 2018 at 10:11, Dave Martin <Dave.Martin@arm.com> wrote:
-> At its heart, I'm trying to abstract out the special behaviour of
-> all unallocated ID registers, so that we can decide at runtime which
-> ones to hide fro the guest: within the ID register block, each
-> unallocated register becomes RAZ, not UNDEFINED as would be the case
-> for other system registers, so we need to capture both behaviours.
+Hi Sean,
 
-I think a better way to think of the ID register block is
-that all the registers in it *are* allocated. It's just that
-some of them are specified as RAZ/WI (because no bits in
-them have been given meaning yet). Then you retain the
-straightforward "unallocated == UNDEF". (In the Arm ARM
-the gaps in the ID register block are documented as
-"reserved, RAZ", not "unallocated".)
+>>>>>> this is even more hackish since the __hci_cmd_sync_ev command is really meant to get a cmd status first before waiting for that event.
+>>>>>> 
+>>>>> 
+>>>>> Understood.
+>>>>> 
+>>>>> I've stopped the hack in v8. could we merge v8 first ? and then I will a fix up with __hci_raw_sync_ev that uses the hdev->raw_q instead of __hci_cmd_sync_ev in TODO.
+>>>> 
+>>>> so I looked into this a bit more. We actually added __hci_cmd_send for a Qualcomm firmware loader that was doing something similar. So instead of trying to add a yet another command to the core, I actually used that and implemented the wait for vendor event in the driver.
+>>>> 
+>>>> You will see my v9 on the mailing list. I also did a bunch of cosmetic minor cleanup and spelling correction. Please test this version. I also make __le16 dlen instead of dlen1 + dlen2 since I think that is what your hardware does.
+>>> 
+>>> Only one thing needs to be corrected in v9. that is __be16 is required instead of dlen1 + dlen2. I will fix it up in v10 and the other changes all look good to me.
+>>> 
+>>>> If this version of the driver works for you then I am happy to merge it. You can then add support for hdev->set_bdaddr and hdev->set_diag in later patches. I also like to clean up the STP receive handler since it can be done a lot simpler and smaller, but that has to wait.
+>>>> 
+>>> 
+>>> hopefully v10 also can be merged :)
+>> 
+>> send me a v10 and I can merge it.
+>> 
+>>> I will investigate more about how to add ->set_bdaddr, ->set_diag and STP receive enhancement in later patches.
+>>> 
+>>> but so far I have not much idea about how to make STP multiplexer be a independent driver.
+>>> 
+>>> my thought is that it would be really better and cleaner a chain of serdev is be used as the base of mtkbtuart. something like
+>>> 
+>>> 8250 serial bus <----> STP multiplexer serdev <----> mtkbtuart serdev
+>>> 
+>>> however, STP multiplexer serdev is not a real device, that doesn't no request any resource. I think it should not be allowed to be added in a device tree and even in dt-binding document.
+>> 
+>> Before we do that, lets get a cleaner parser for it. I just don?t have enough time to wrap my head around this one yet.
+>> 
+>>>>>> Are all Mediatek vendor commands this way? Or just the ones for loading the firmware? So only the WMT ones?
+>>>>>> 
+>>>>> 
+>>>>> Only the WMT ones, WMT commands/events are usually used in system controlling, for example, global function on/off, firmware download, reset and so on. most only appear on device initialization
+>>>> 
+>>>> Since you never checked the result of the vendor event, I opted for just signaling that it arrived. If they can report success or failure, we need to add some extra code for that.
+>>>> 
+>>> 
+>>> I will consider more WMT event status when I add more Bluetooth devices such as MT7668U usb based Bluetooth which I plan to add the support in later patches in the next weeks 
+>> 
+>> Are the USB ones also using STP or are they H:2 based like all the others. What are prominent MT7668U based ones that I could buy?
+>> 
+> 1.
+> USB ones don't use any STP framing, which is totally dedicated to the
+> serial based device.
+> 
+> I don't exactly know what the term H:2 means you mentioned here. I only
+> know the btusb driver can be reused for M7668U and just only one weird
+> thing to solve in btusb driver. That is HCI WMT event coming through
+> control in pipe, not through interrupt pipe :(
+> 
+> And as for the others generic hci/acl/sco data, they all work well as
+> btusb usually work. I will show you the code to let you exactly know
+> what I'm meaning instead of just talking :)
 
-thanks
--- PMM
+Bluetooth USB transport was originally section H:2 in the specification (and UART was section H:4) that is where this naming comes wrong. The btusb.c driver is implementing H:2 transport.
+
+How does /sys/kernel/debug/usb/devices look for these devices? And I don?t recall that there is a control in pipe. That concept doesn?t really exist in USB.
+
+> 2.
+> Another thing is I think it's better if the core layer can support
+> __hci_raw_sync_ev-like APIs to allow each transport driver not to care
+> the details about cmd/event synchronization. If it can be done in this
+> way, that helps to help WMT cmd/event handling can be put into a
+> commonplace to allow btmtkuart and btusb for mtk port to have the same
+> codeshare.
+
+Such a core API will not help you. The btusb.c driver has already bunch of examples where it has to fix up things. Qualcomm/Atheros have done there fun way of firmware download and Intel also has done fun stuff with event over bulk endpoints.
+
+> 3. 
+> MT7668U should always be bundled with CE product, I am not really sure
+> whether it is easy to get from the retailer. Or you really like to want
+> a sample, maybe I can try to contact with internal people to make it
+> happen.
+
+If it is some NGFF mPCI card that I can plug into an adapter card and attach it to USB, or if you have some dev board, that would be interesting.
+
+Regards
+
+Marcel
