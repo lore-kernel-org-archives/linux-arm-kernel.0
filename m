@@ -1,65 +1,102 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 8 Aug 2018 11:23:33 -0700
-Subject: [PATCH] arm64: fix for bad_mode() handler to always result in
- panic
-In-Reply-To: <CAM5rFu-_x1EfXE72X-4_5XcO6zK86itiny16mgwoRrDBB2=oAA@mail.gmail.com>
-References: <1533639828-19039-1-git-send-email-hari.vyas@broadcom.com>
- <20180807122727.GA9359@kroah.com>
- <CAM5rFu-_x1EfXE72X-4_5XcO6zK86itiny16mgwoRrDBB2=oAA@mail.gmail.com>
-Message-ID: <1bfd65dc-3bf2-f40f-2337-d7f95f4c756e@gmail.com>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Wed, 8 Aug 2018 14:25:48 -0400 (EDT)
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <CAK8P3a2=rVvvW8bBcrPm3nXNNP56Ygxchu4ThD2ZgZ_cVcd8wQ@mail.gmail.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
+ <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
+ <20180803094129.GB17798@arm.com>
+ <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
+ <20180808113927.GA24736@iMac.local>
+ <alpine.LRH.2.02.1808081011110.9997@file01.intranet.prod.int.rdu2.redhat.com>
+ <b1a0dac5-3cf2-1a7f-ac7f-649126eb7873@arm.com>
+ <20180808151444.GF24736@iMac.local>
+ <CAK8P3a2=rVvvW8bBcrPm3nXNNP56Ygxchu4ThD2ZgZ_cVcd8wQ@mail.gmail.com>
+Message-ID: <alpine.LRH.2.02.1808081347180.18198@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2018 11:18 AM, Hari Vyas wrote:
-> On Tue, Aug 7, 2018 at 5:57 PM, Greg KH <greg@kroah.com> wrote:
->> On Tue, Aug 07, 2018 at 04:33:48PM +0530, Hari Vyas wrote:
->>> bad_mode() handler is called for invalid or undefined
->>> instruction in el1 level or when irq,fiq,sync or error
->>> situation happen in el1 or el0 level.
->>>
->>> As per latest code, above abnormal situation may not result in
->>> panic always due to die() call if user mode is determined at
->>> that moment. That will just result in kill of current process
->>> and panic will be avoided which it must not.
->>>
->>> Link: https://bugzilla.kernel.org/show_bug.cgi?id=200637
->>> Signed-off-by: Hari Vyas <hari.vyas@broadcom.com>
->>> ---
->>>  arch/arm64/kernel/traps.c | 1 -
->>>  1 file changed, 1 deletion(-)
->>>
->>> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
->>> index d399d45..716ee73 100644
->>> --- a/arch/arm64/kernel/traps.c
->>> +++ b/arch/arm64/kernel/traps.c
->>> @@ -621,7 +621,6 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
->>>               handler[reason], smp_processor_id(), esr,
->>>               esr_get_class_string(esr));
->>>
->>> -     die("Oops - bad mode", regs, 0);
->>>       local_daif_mask();
->>>       panic("bad mode");
->>>  }
->>> --
->>> 1.9.1
->>
->> <formletter>
->>
->> This is not the correct way to submit patches for inclusion in the
->> stable kernel tree.  Please read:
->>     https://www.kernel.org/doc/html/latest/process/stable-kernel-rules.html
->> for how to do this properly.
->>
->> </formletter>
-> 
-> Thanks. Probably my mistake to include stable kernel list for regular
-> minor patch.
-> In any case, will take care about it along with arm maintainers and
-> developers review comments which I am awaiting.
 
-Also, if this is a real fix, then providing an appropriate Fixes: tag
-would help understand when this broke, and how far back this needs to be
-backported to. This of course, assumes that your patch is the right
-course of action.
--- 
-Florian
+
+On Wed, 8 Aug 2018, Arnd Bergmann wrote:
+
+> On Wed, Aug 8, 2018 at 5:15 PM Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >
+> > On Wed, Aug 08, 2018 at 04:01:12PM +0100, Richard Earnshaw wrote:
+> > > On 08/08/18 15:12, Mikulas Patocka wrote:
+> > > > On Wed, 8 Aug 2018, Catalin Marinas wrote:
+> > > >> On Fri, Aug 03, 2018 at 01:09:02PM -0400, Mikulas Patocka wrote:
+> > - failing to write a few bytes
+> > - writing a few bytes that were written 16 bytes before
+> > - writing a few bytes that were written 16 bytes after
+> >
+> > > The overlapping writes in memcpy never write different values to the
+> > > same location, so I still feel this must be some sort of HW issue, not a
+> > > SW one.
+> >
+> > So do I (my interpretation is that it combines or rather skips some of
+> > the writes to the same 16-byte address as it ignores the data strobes).
+> 
+> Maybe it just always writes to the wrong location, 16 bytes apart for one of
+> the stp instructions. Since we are usually dealing with a pair of overlapping
+> 'stp', both unaligned, that could explain both the missing bytes (we write
+> data to the wrong place, but overwrite it with the correct data right away)
+> and the extra copy (we write it to the wrong place, but then write the correct
+> data to the correct place as well).
+> 
+> This sounds a bit like what the original ARM CPUs did on unaligned
+> memory access, where a single aligned 4-byte location was accessed,
+> but the bytes swapped around.
+> 
+> There may be a few more things worth trying out or analysing from
+> the recorded past failures to understand more about how it goes
+> wrong:
+> 
+> - For which data lengths does it fail? Having two overlapping
+>   unaligned stp is something that only happens for 16..96 byte
+>   memcpy.
+
+If you want to research the corruptions in detail, I uploaded a file 
+containing 7k corruptions here: 
+http://people.redhat.com/~mpatocka/testcases/arm-pcie-corruption/
+
+> - What if we use a pair of str instructions instead of an stp in
+>   a modified memcpy? Does it now write to still write to the
+>   wrong place 16 bytes away, just 8 bytes away, or correctly?
+
+I replaced all stp instructions with str and it didn't have effect on 
+corruptions. Either a few bytes is omitted, or a value that belongs 16 
+bytes before or after is written.
+
+> - Does it change in any way if we do the overlapping writes
+>   in the reverse order? E.g. for the 16..64 byte case:
+> 
+> diff --git a/sysdeps/aarch64/memcpy.S b/sysdeps/aarch64/memcpy.S
+> index 7e1163e6a0..09d0160bdf 100644
+> --- a/sysdeps/aarch64/memcpy.S
+> +++ b/sysdeps/aarch64/memcpy.S
+> @@ -102,11 +102,11 @@ ENTRY (MEMCPY)
+>         tbz     tmp1, 5, 1f
+>         ldp     B_l, B_h, [src, 16]
+>         ldp     C_l, C_h, [srcend, -32]
+> -       stp     B_l, B_h, [dstin, 16]
+>         stp     C_l, C_h, [dstend, -32]
+> +       stp     B_l, B_h, [dstin, 16]
+>  1:
+> -       stp     A_l, A_h, [dstin]
+>         stp     D_l, D_h, [dstend, -16]
+> +       stp     A_l, A_h, [dstin]
+>         ret
+> 
+>         .p2align 4
+> 
+>         Arnd
+
+After reordering them, I observe only omitted writes, there are no longer 
+misdirected writes:
+
+http://people.redhat.com/~mpatocka/testcases/arm-pcie-corruption/reorder-test/
+
+Mikulas
