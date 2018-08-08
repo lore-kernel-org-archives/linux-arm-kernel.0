@@ -1,53 +1,77 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 8 Aug 2018 09:33:00 +0100
-Subject: [RFC PATCH 08/16] KVM: arm64: Support dynamically hideable
- system registers
-In-Reply-To: <20180807192010.GG5985@e113682-lin.lund.arm.com>
-References: <1529593060-542-1-git-send-email-Dave.Martin@arm.com>
- <1529593060-542-9-git-send-email-Dave.Martin@arm.com>
- <20180807192010.GG5985@e113682-lin.lund.arm.com>
-Message-ID: <20180808083300.GK9097@e103592.cambridge.arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 08 Aug 2018 10:41:44 +0200
+Subject: [PATCH v2 3/4] ARM64: dts: meson-gx: add dmcbus and canvas nodes.
+In-Reply-To: <20180807220011.24436-4-maxi.jourdan@wanadoo.fr>
+References: <20180807220011.24436-1-maxi.jourdan@wanadoo.fr>
+ <20180807220011.24436-4-maxi.jourdan@wanadoo.fr>
+Message-ID: <3221c65f87f8fd3541e0188186cb0259327cb671.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2018 at 09:20:10PM +0200, Christoffer Dall wrote:
-
-[...]
-
-> > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> > index a436373..31a351a 100644
-> > --- a/arch/arm64/kvm/sys_regs.c
-> > +++ b/arch/arm64/kvm/sys_regs.c
-> > @@ -1840,7 +1840,7 @@ static int emulate_cp(struct kvm_vcpu *vcpu,
-> >  
-> >  	r = find_reg(params, table, num);
-> >  
-> > -	if (r) {
-> > +	if (likely(r) && sys_reg_present(vcpu, r)) {
-> >  		perform_access(vcpu, params, r);
-> >  		return 0;
-> >  	}
-> > @@ -2016,7 +2016,7 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
-> >  	if (!r)
-> >  		r = find_reg(params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
-> >  
-> > -	if (likely(r)) {
-> > +	if (likely(r) && sys_reg_present(vcpu, r)) {
-> >  		perform_access(vcpu, params, r);
-> >  	} else {
-> >  		kvm_err("Unsupported guest sys_reg access at: %lx\n",
+On Wed, 2018-08-08 at 00:00 +0200, Maxime Jourdan wrote:
+> Wrap the canvas node in a syscon node.
 > 
-> This looks a bit fishy, because it seems that now a guest can be
-> configured in such a way that it can access non-present emulated system
-> registers and get the host to tell the operator that the KVM instance
-> running on the system doesn't really support the hardware...
+> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+> index b8dc4dbb391b..c98198662ae2 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+> @@ -423,6 +423,23 @@
+>  			};
+>  		};
+>  
+> +		dmcbus: bus at c8838000 {
+> +			compatible = "simple-bus";
+> +			reg = <0x0 0xc8838000 0x0 0x1000>;
+> +			#address-cells = <2>;
+> +			#size-cells = <2>;
+> +			ranges = <0x0 0x0 0x0 0xc8838000 0x0 0x1000>;
+> +
+> +			sysctrl_DMC: system-controller at 0 {
+> +				compatible = "amlogic,gx-dmc-sysctrl", "syscon", "simple-mfd";
+> +				reg = <0x0 0x0 0x0 0x1000>;
+> +
+> +				canvas: canvas-provider at 0 {
+> +					compatible = "amlogic,canvas";
 
-Hmmm, looks like I just blindly adapted the if () condition without
-looking at the context here.
+If there is only one canvas provider under "sysctrl_DMC" and it has no reg
+property , you should not put a unit-address (@0) here. (same for the
+documentation patch)
 
-I'll take a look at it.
+You may have seen unit-address without a reg property used elsewhere (ASoC
+simple-card, my recent axg-sound-card), when there is multiple node with the
+same node-name (ex: dai-link).
+
+As Martin pointed out, the DT spec says we should not use unit-address unless
+there is a reg property. We did not get Rob's view on this and we might have to
+update this later on. In your case, unless I missed something, you should
+definitely not have it
+
+nitpick regarding the node-name (canvas-provider). If appropriate, we should try
+to stick to one of the generic names proposed in the spec. I wonder if the
+canvas provider could be viewed as a "memory" or "memory-controller"
+
+So, what about this ? Just a proposition, feel free to comment ;)
+
+	sysctrl_DMC: system-controller at 0 {							compatib
+le = "amlogic,gx-dmc-sysctrl", "syscon", "simple-mfd";> 		reg =
+<0x0 0x0 0x0 0x1000>;
+	
+		canvas: memory-controller {
+			compatible = "amlogic,canvas";
+		}
 
 [...]
 
-Cheers
----Dave
+
+> +				};
+> +			};
+> +		};
+> +
+>  		hiubus: bus at c883c000 {
+>  			compatible = "simple-bus";
+>  			reg = <0x0 0xc883c000 0x0 0x2000>;
