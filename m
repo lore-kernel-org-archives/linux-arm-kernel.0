@@ -1,78 +1,54 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 8 Aug 2018 20:56:11 +0300
-Subject: [PATCH 22/28] ARM: davinci: dm646x-evm: use device properties for
- at24 eeprom
-In-Reply-To: <20180808153150.23444-23-brgl@bgdev.pl>
-References: <20180808153150.23444-1-brgl@bgdev.pl>
- <20180808153150.23444-23-brgl@bgdev.pl>
-Message-ID: <CAHp75VeGFr9e-pNeoo7HdvnGLud49wwKvFhFotFyQnwCh0d0iA@mail.gmail.com>
+From: dave.taht@gmail.com (Dave Taht)
+Date: Wed, 8 Aug 2018 10:57:45 -0700
+Subject: [PATCH v1 6/7] net: mvneta: Don't use GRO on Armada 3720
+In-Reply-To: <20180808165846.GK7275@lunn.ch>
+References: <20180808152706.21727-1-marek.behun@nic.cz>
+ <20180808152706.21727-7-marek.behun@nic.cz>
+ <20180808165846.GK7275@lunn.ch>
+Message-ID: <CAA93jw7dna_9M_Mt22iCvSPeC3piLdrHRg+3NR3R44+VVmgREA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2018 at 6:31 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Wed, Aug 8, 2018 at 10:00 AM Andrew Lunn <andrew@lunn.ch> wrote:
 >
-> We want to work towards phasing out the at24_platform_data structure.
-> There are few users and its contents can be represented using generic
-> device properties. Using device properties only will allow us to
-> significantly simplify the at24 configuration code.
+> On Wed, Aug 08, 2018 at 05:27:05PM +0200, Marek Beh?n wrote:
+> > For some reason on Armada 3720 boards (EspressoBin and Turris Mox) the
+> > networking driver behaves weirdly when using napi_gro_receive.
+> >
+> > For example downloading a big file from a local network (low ping) is
+> > fast, but when downloading from a remote server (higher ping), the
+> > download speed is at first high but drops rapidly to almost nothing or
+> > absolutely nothing.
+> >
+> > This is fixed when using netif_receive_skb instead of napi_gro_receive.
 >
-> Remove the at24_platform_data structure and replace it with an array
-> of property entries. Drop the byte_len/size property, as the model name
-> already implies the EEPROM's size.
->
+> Before doing this, we should really understand what is going on. It is
+> probably just a driver bug which needs fixing. And GRO should be good
+> for performance, so we do want to use it, if possible.
 
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+I'd just disable it and worry about it later. The software gro in the
+mvneta would batch up 64k and is one of the reasons why sch_cake does
+gso splitting by default. (64k unsplit, downshifted to 1mbit = ~540ms
+of latency). If this mvneta facility is in addition buggy, that
+explains some puzzling things I've seen in various benchmarks. thx for
+the steer as to what to look for!
 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  arch/arm/mach-davinci/board-dm646x-evm.c | 13 +++++--------
->  1 file changed, 5 insertions(+), 8 deletions(-)
+IMHO: in general gro looks good on dumb single stream benchmarks, not
+as useful on mixed routed traffic with more entropy, and batching
+clutters up the mvneta receive path that otherwise could be draining
+the rx ring and spitting packets into the rest of the system faster.
+The mvneta is mostly (?) used on routing devices.
+
+
+
 >
-> diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-> index 5a9de47bc8a2..5049f0c6cd1a 100644
-> --- a/arch/arm/mach-davinci/board-dm646x-evm.c
-> +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-> @@ -22,7 +22,7 @@
->  #include <linux/gpio.h>
->  #include <linux/platform_device.h>
->  #include <linux/i2c.h>
-> -#include <linux/platform_data/at24.h>
-> +#include <linux/property.h>
->  #include <linux/platform_data/pcf857x.h>
->
->  #include <media/i2c/tvp514x.h>
-> @@ -320,12 +320,9 @@ static struct nvmem_cell_lookup dm646x_evm_mac_address_cell = {
->         .nvmem_name = "1-00500",
->  };
->
-> -static struct at24_platform_data eeprom_info = {
-> -       .byte_len       = (256*1024) / 8,
-> -       .page_size      = 64,
-> -       .flags          = AT24_FLAG_ADDR16,
-> -       .setup          = davinci_get_mac_addr,
-> -       .context        = (void *)0x7f00,
-> +static const struct property_entry eeprom_properties[] = {
-> +       PROPERTY_ENTRY_U32("pagesize", 64),
-> +       { }
->  };
->  #endif
->
-> @@ -396,7 +393,7 @@ static void evm_init_cpld(void)
->  static struct i2c_board_info __initdata i2c_info[] =  {
->         {
->                 I2C_BOARD_INFO("24c256", 0x50),
-> -               .platform_data  = &eeprom_info,
-> +               .properties  = eeprom_properties,
->         },
->         {
->                 I2C_BOARD_INFO("pcf8574a", 0x38),
-> --
-> 2.18.0
->
+>     Andrew
 
 
 
 -- 
-With Best Regards,
-Andy Shevchenko
+
+Dave T?ht
+CEO, TekLibre, LLC
+http://www.teklibre.com
+Tel: 1-669-226-2619
