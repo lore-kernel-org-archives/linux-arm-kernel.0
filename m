@@ -1,170 +1,107 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 9 Aug 2018 00:42:58 +0200
-Subject: [RFC net-next 00/15] net: A socket API for LoRa
-In-Reply-To: <20180808213640.10a1d76f@alans-desktop>
-References: <20180701110804.32415-1-afaerber@suse.de>
- <CAC=mGzgUCopz2xTOA0R-WD8a1DOaOOUn=YpfdMiJ33y3hnh6kg@mail.gmail.com>
- <92ee4016-1da9-826b-3674-b2d604a64848@suse.de>
- <20180808213640.10a1d76f@alans-desktop>
-Message-ID: <a70e9715-beac-d9a8-145e-de00175e56fa@suse.de>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Wed,  8 Aug 2018 16:47:00 -0600
+Subject: [PATCH 1/2] dt-bindings: Document qcom,adreno-gmu
+In-Reply-To: <20180808224701.7527-1-jcrouse@codeaurora.org>
+References: <20180808224701.7527-1-jcrouse@codeaurora.org>
+Message-ID: <20180808224701.7527-2-jcrouse@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 08.08.2018 um 22:36 schrieb Alan Cox:
-> On Sun, 5 Aug 2018 02:11:25 +0200
-> Andreas F?rber <afaerber@suse.de> wrote:
->> Am 03.07.2018 um 17:11 schrieb Jian-Hong Pan:
->>> 2018-07-01 19:07 GMT+08:00 Andreas F?rber <afaerber@suse.de>:  
->> LoRa radio channels being half-duplex, we'd need to stop receiving in
->> ndo_start_xmit and re-start receiving in the TX interrupt handler AFAIU.
->> Yes, it's ugly - one reason I haven't implemented RX in sx1276 yet.
-> 
-> Why - the signal is still floating around in the air, you can't unhear it
-> at the antenna.
+Document the device tree bindings for the Adreno GMU device
+available on Adreno a6xx targets.
 
-Why what? :)
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+---
+ .../devicetree/bindings/display/msm/gmu.txt   | 54 +++++++++++++++++++
+ .../devicetree/bindings/display/msm/gpu.txt   | 10 +++-
+ 2 files changed, 62 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/msm/gmu.txt
 
-> If a given piece of hardware needs to flip between RX
-> and TX mode then it should be handled by that driver.
-
-Yes, and we are talking about that concrete sx1276 driver here, whose
-chipset has a state machine that only allows either rx or tx and also
-has standby and sleep modes with differing levels of data retention.
-
-The sx1301 is a different beast (and driver) and may allow both.
-
-In any case, the ndo_start_xmit hook is in each device driver. But the
-recvmsg hook I mentioned is at protocol layer, which exactly is the
-layering problem I see.
-
-> (Some ancient ethernet cards do this btw.. they can't listen and transmit
-> at the same time)
-
-So when do they start receiving?
-
-The issue here was that my original description, which you appear to
-have cut, suggested a continuous listen mode, interrupted by transmit.
-Jian-Hong didn't like that, with reference to the LoRaWAN spec that
-supposedly asks for only being in receive mode when expecting a message,
-likely to save on battery. So the question is, could we cleanly
-implement receiving only when the user asks us to, or is that a no-go?
-
->>> - We can have a pre-defined table according to LoRaWAN Regional Parameters.
->>> - Device driver declares the hardware's capability, for example
->>> frequency, TX power.  And then registers as a LoRaWAN compatible
->>> device.  
->>
->> That sounds like a layering violation. We rather need to expose all
->> these tunable parameters individually at the LoRa layer, allowing the
->> LoRaWAN layer to configure them as it pleases. Not the other direction.
->> That still leaves my above question 4) open of how to implement each.
-> 
-> Wifi already has the general policy database for the various existing
-> protocols. Please take a look at the CRDA agent and how it hooks into
-> wireless.It might need to some tweaking but it would be odd to have
-> different configuration schemes for different wifi protocols.
-
-CRDA/wireless-regdb had been brought up and I've been pointed to nl80211
-and nl802154, which I've tried to make sense of for my initial nllora.
-Admittedly with limited success, as that code is slightly complex.
-
-We also seemed to have consensus here that we _should_ be reusing
-wireless-regdb but would need to extend it 1.) with sub-GHz frequency
-bands and 2.) duty-cycle limits for some of those bands. No maintainer
-commented on that so far. Thus I am working in tiny steps on providing
-netlink-layer commands in nllora that can dispatch the individual radio
-settings to drivers, which then upper layers can instrument as needed.
-
-And making my very first steps with netlink here, it appeared as if each
-technology has its own enums of commands and attributes, so I don't see
-how to reuse anything from Wifi here apart from some design inspiration.
-
->> The use case I have in mind is this: User A opens a LoRaWAN socket and
->> using maclorawan sends a packet P1. Here the LoRaWAN Regional Parameters
->> and LoRaWAN Sync Word need to be applied.
->> User B then opens a pure LoRa socket and transmits a packet P1' with
->> different Sync Word, SF, BW, CR, etc.
->> Afterwards user A wants to send another packet P2 via LoRaWAN - this
->> needs to use the same LoRaWAN settings as before, not those used for
->> LoRa in between. Therefore I was thinking about socket-level options, as
->> netlink operations would be device-wide, with undesired side-effects.
-> 
-> Agreed
-> 
->> Obviously in that scenario not both users can receive at the same time.
-> 
-> That's a hardware question. Imagine a software defined radio. If your
-> limitation wouldn't exist in a pure software defined radio then it's
-> almost certainly a device level detal.
-
-An SDR would not be using this sx1276 device driver, I imagine.
-
-In fact I would expect an SDR device not to be in drivers/net/lora/ at
-all but to live in drivers/net/sdr/ and to consume ETH_P_LORA etc. skbs
-and just do the right thing for them depending on their type...
-
->> interface but cleanly distinguished as ETH_P_GFSK or something.
->> For example, the Chistera Pi HAT has both an RFM95W and an RFM22 module.
-> 
-> Agreed if you can flip per packet.
-
-The SX127x can - it might involve delays of course.
-
-The SX130x doesn't even need to flip for sending AFAICT, it's just
-metadata after the payload in the FIFO.
-
->> The next question arising is how the user would create such an skb. Just
->> like I was hesitant about PF_LORAWAN originally, I'd like to avoid
->> polluting the PF_ number space for each of these. Maybe have one PF_FSK
->> as equivalent to PF_LORA and then have either a socket option or
->> sockaddr field to select the modulation variants? Not sure how exactly
->> those others differ from each other, that's why I tried to postpone the
->> FSK topic and to focus on LoRa first - b) below.
->>
->> At this point we could also argue whether we need a PF_LORA at all or
->> rather just some generic PF_RADIO with lots of options stored in its
->> sockaddr.
-> 
-> What matters most is mux/demux.
-> 
-> If you've got something listening to data but without the structure
-> needed to identify multiple listeners and split out the data meaningfully
-> to those listeners according to parts of the packet then you've got no
-> reason to make it a protocol just use SOCK_PACKET and if need be BPF.
-
-Sorry, that doesn't parse for me. SOCK_PACKET must be a protocol on some
-PF_ protocol family, no? Are you suggesting I use SOCK_PACKET instead of
-SOCK_DGRAM in what is now net/lora/dgram.c? Or are you saying there's
-some generic implementation that we can reuse and scratch mine?
-
-> The reason we have a socket layer not /dev/ethernet0 is that it's
-> meaningful to divide messages up into flows, and to partition those flows
-> securely amongst multiple consumers/generators.
-
-For me the distinction is that a /dev/whatever0 would seem more suited
-for a stream of data to read/write, whereas sockets give us a bounded
-skb for packets at device driver level.
-
-These PHYs all broadcast something over the antenna when sending, with
-any addressing of listeners or senders being optional and MAC-specific,
-apart from the LoRa/FSK SyncWord as well as the various frequency etc.
-settings that determine what the receiver listens for.
-
-None of these PHYs define any mechanism like EtherType through which to
-identify upper-layer protocols.
-
-So in a way, listening is always in a promiscuous mode, and I guess we
-would need to try to parse each incoming packet as e.g. a LoRaWAN packet
-and just give up if it's too short or checksums don't match. Only at the
-layer of LoRaWAN and competing proprietary or custom protocols can we
-split received packets out to individual listeners.
-
-Does that give us any further clues for the design discussion here?
-
-Regards,
-Andreas
-
+diff --git a/Documentation/devicetree/bindings/display/msm/gmu.txt b/Documentation/devicetree/bindings/display/msm/gmu.txt
+new file mode 100644
+index 000000000000..6ab3e2cf29e9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/msm/gmu.txt
+@@ -0,0 +1,54 @@
++Qualcomm adreno/snapdragon GMU (Graphics management unit)
++
++The GMU is a programmable power controller for the GPU. the CPU controls the
++GMU which in turn handles power controls for the GPU.
++
++Required properties:
++- compatible:
++  * "qcom,adreno-gmu"
++- reg: Physical base address and length of the GMU registers.
++- reg-names: Matching names for the register regions
++  * "gmu"
++  * "gmu_pdc"
++- interrupts: The interrupt signals from the GMU.
++- interrupt-names: Matching names for the interrupts
++  * "hfi"
++  * "gmu"
++- clocks: phandles to the device clocks
++- clock-names: Matching names for the clocks
++   * "gmu"
++   * "cxo"
++   * "axi"
++   * "mnoc"
++- power-domains: should be <&clock_gpucc GPU_CX_GDSC>
++- iommus: phandle to the adreno iommu
++- operating-points-v2: phandle to the OPP operating points
++
++Example:
++
++/ {
++	...
++
++	gmu: gmu at 506a000 {
++		compatible="qcom,adreno-gmu";
++
++		reg = <0x506a000 0x30000>,
++			<0xb200000 0x300000>;
++		reg-names = "gmu", "gmu_pdc";
++
++		interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
++			<GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "hfi", "gmu";
++
++		clocks = <&clock_gpucc GPU_CC_CX_GMU_CLK>,
++			<&clock_gpucc GPU_CC_CXO_CLK>,
++			<&clock_gcc GCC_DDRSS_GPU_AXI_CLK>,
++			<&clock_gcc GCC_GPU_MEMNOC_GFX_CLK>;
++		clock-names = "gmu", "cxo", "axi", "memnoc";
++
++		power-domains = <&clock_gpucc GPU_CX_GDSC>;
++		iommus = <&adreno_smmu 5>;
++
++		operating-points-v2 = <&gmu_opp_table>;
++	};
++};
+diff --git a/Documentation/devicetree/bindings/display/msm/gpu.txt b/Documentation/devicetree/bindings/display/msm/gpu.txt
+index 43fac0fe09bb..544a7510166b 100644
+--- a/Documentation/devicetree/bindings/display/msm/gpu.txt
++++ b/Documentation/devicetree/bindings/display/msm/gpu.txt
+@@ -8,12 +8,18 @@ Required properties:
+   with the chip-id.
+ - reg: Physical base address and length of the controller's registers.
+ - interrupts: The interrupt signal from the gpu.
+-- clocks: device clocks
++
++Optional properties.
++- clocks: device clocks. Required for a3xx, a4xx and a5xx targets. a6xx and
++  newer with a GMU attached do not have direct clock control from the CPU and
++  do not need to provide clock properties.
+   See ../clocks/clock-bindings.txt for details.
+-- clock-names: the following clocks are required:
++- clock-names: the following clocks can be provided:
+   * "core"
+   * "iface"
+   * "mem_iface"
++- qcom,gmu: For a6xx and newer targets a phandle to the GMU device that will
++  control the power for the GPU
+ 
+ Example:
+ 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.18.0
