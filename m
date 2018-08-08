@@ -1,140 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Aug 2018 23:51:53 +0200
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <alpine.LRH.2.02.1808081347180.18198@file01.intranet.prod.int.rdu2.redhat.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
- <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
- <20180803094129.GB17798@arm.com>
- <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
- <20180808113927.GA24736@iMac.local>
- <alpine.LRH.2.02.1808081011110.9997@file01.intranet.prod.int.rdu2.redhat.com>
- <b1a0dac5-3cf2-1a7f-ac7f-649126eb7873@arm.com>
- <20180808151444.GF24736@iMac.local>
- <CAK8P3a2=rVvvW8bBcrPm3nXNNP56Ygxchu4ThD2ZgZ_cVcd8wQ@mail.gmail.com>
- <alpine.LRH.2.02.1808081347180.18198@file01.intranet.prod.int.rdu2.redhat.com>
-Message-ID: <CAK8P3a1CdL5ZVvWPMriOknTCgkfbR4F-a6dRZ7ap9+NiD8H5cg@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 8 Aug 2018 15:02:26 -0700
+Subject: [RFC/PoC PATCH 0/3] arm64: basic ROP mitigation
+In-Reply-To: <CAN+XpFTbqMXiX=dYpK_ExvctkaJjZL9q=n06goujPht35Bieqg@mail.gmail.com>
+References: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
+ <7529eedf-af56-2e94-261e-bc5c86abadaa@arm.com>
+ <CAKv+Gu9X1CDpy+XvrmbSdjBjMb45eBW7JVsvsK_JQdUt2Dbvgw@mail.gmail.com>
+ <b0c974a2-4e81-7855-7d4e-22834c5d8997@arm.com>
+ <CAKv+Gu_ZzDbWwHVwOuoheXeN-ta_FjOT4Aj15=r56QZVTUK0FA@mail.gmail.com>
+ <CAKv+Gu_wGk2Gdzd6WuOMZqz1tKHAWHL7pWm2Szyt0DZwPTCmOw@mail.gmail.com>
+ <31443e6a-56b4-c4fb-82b1-b8eb5d7eebe1@arm.com>
+ <CAGXu5jLj=KP038d-c+xzCx=Oogn1prH__oryQjNZZwNaAHaAAw@mail.gmail.com>
+ <CAKv+Gu-9M0yO-rSXiREs11feEro0mJFcNN3Wkp_LSOGrKKd5dg@mail.gmail.com>
+ <CAGXu5j+Tddmp_VgyvwTd+StEGtx=oGofeY+KpLD4OuPw+2=S2Q@mail.gmail.com>
+ <CAKv+Gu-5ERHvqgXHR626QzKCZJPc0Cp5Ktv+gwucep5ZGvu9Vw@mail.gmail.com>
+ <CAN+XpFQCO1nr5tQ4oyPPaSfvnQSvwx-=JCtba2xJXrEN+6=LZg@mail.gmail.com>
+ <CAKv+Gu_jNh7vLfGEdi2BpA42rPJrNr8qV-Xss_toV2fJzUV5jQ@mail.gmail.com>
+ <CAN+XpFTbqMXiX=dYpK_ExvctkaJjZL9q=n06goujPht35Bieqg@mail.gmail.com>
+Message-ID: <CAGXu5jJrB89-egt6n5qC88Hj5Oi4UOQO=cBO6vD7MZwgdjwHyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2018 at 8:25 PM Mikulas Patocka <mpatocka@redhat.com> wrote:
-> On Wed, 8 Aug 2018, Arnd Bergmann wrote:
+On Wed, Aug 8, 2018 at 9:09 AM, Mark Brand <markbrand@google.com> wrote:
+> (1) chaining through the mempool_free function, I found this really
+> quickly when searching for useful gadgets based off x0
 >
-> > On Wed, Aug 8, 2018 at 5:15 PM Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > >
-> > > On Wed, Aug 08, 2018 at 04:01:12PM +0100, Richard Earnshaw wrote:
-> > > > On 08/08/18 15:12, Mikulas Patocka wrote:
-> > > > > On Wed, 8 Aug 2018, Catalin Marinas wrote:
-> > > > >> On Fri, Aug 03, 2018 at 01:09:02PM -0400, Mikulas Patocka wrote:
-> > > - failing to write a few bytes
-> > > - writing a few bytes that were written 16 bytes before
-> > > - writing a few bytes that were written 16 bytes after
-> > >
-> > > > The overlapping writes in memcpy never write different values to the
-> > > > same location, so I still feel this must be some sort of HW issue, not a
-> > > > SW one.
-> > >
-> > > So do I (my interpretation is that it combines or rather skips some of
-> > > the writes to the same 16-byte address as it ignores the data strobes).
-> >
-> > Maybe it just always writes to the wrong location, 16 bytes apart for one of
-> > the stp instructions. Since we are usually dealing with a pair of overlapping
-> > 'stp', both unaligned, that could explain both the missing bytes (we write
-> > data to the wrong place, but overwrite it with the correct data right away)
-> > and the extra copy (we write it to the wrong place, but then write the correct
-> > data to the correct place as well).
-> >
-> > This sounds a bit like what the original ARM CPUs did on unaligned
-> > memory access, where a single aligned 4-byte location was accessed,
-> > but the bytes swapped around.
-> >
-> > There may be a few more things worth trying out or analysing from
-> > the recorded past failures to understand more about how it goes
-> > wrong:
-> >
-> > - For which data lengths does it fail? Having two overlapping
-> >   unaligned stp is something that only happens for 16..96 byte
-> >   memcpy.
+> void mempool_free(void *element, mempool_t *pool)
+> {
+>   unsigned long flags;
 >
-> If you want to research the corruptions in detail, I uploaded a file
-> containing 7k corruptions here:
-> http://people.redhat.com/~mpatocka/testcases/arm-pcie-corruption/
+>   if (unlikely(element == NULL))
+>     return;
+>
+>   /* snip */
+>   smp_rmb();
+>
+>   /* snip */
+>   if (unlikely(pool->curr_nr < pool->min_nr)) {
+>     spin_lock_irqsave(&pool->lock, flags);
+>     if (likely(pool->curr_nr < pool->min_nr)) {
+>       add_element(pool, element);
+>       spin_unlock_irqrestore(&pool->lock, flags);
+>       wake_up(&pool->wait);
+>       return;
+>     }
+>     spin_unlock_irqrestore(&pool->lock, flags);
+>   }
+>
+>   pool->free(element, pool->pool_data);
+> }
+>
+> Since the callsites for this function usually load the arguments
+> through some registers, and the function to call gets pulled out of
+> one of those arguments, it's easy to get a couple of registers loaded
+> here and then the chain continue.
+>
+> (2) loading complete register state using kernel_exit macro.
+>
+> Since the kernel_exit macro actually loads spsr_el1 and elr_el1 from
+> registers, I think that you can let the eret return to anywhere in el1
+> without dropping to el0, since the same handler is used for "exiting
+> the kernel" when a hardware interrupt interrupts the kernel itself. I
+> didn't fill out the necessary register values in the chain below,
+> since I don't anyway have a device around to test this on right now.
+>
+> I'm not sure that you could really robustly protect this eret; I
+> suppose that you could try and somehow validate the saved register
+> state, but given that it would be happening on every exception return,
+> I suspect it would be expensive.
 
-Nice!
+This is a wonderful example, thanks! Yeah, Call-Oriented Programming?
+:P mempool_free() is quite a nice gadget.
 
-I already found a couple of things:
+-Kees
 
-- Failure to copy always happens at the *end* of a 16 byte aligned
-  physical address, it misses between 1 and 6 bytes, never 7 or more,
-  and it's more likely to be fewer bytes that are affected.
-   279 7
-   389 6
-   484 5
-   683 4
-   741 3
-   836 2
-   946 1
-
-- The first byte that fails to get copied is always 16 bytes after the
-  memcpy target. Since we only observe it at the end of the 16 byte
-  range, it means this happens specifically for addresses ending in
-  0x9 (7 bytes missed) to 0xf (1 byte missed).
-
-- Out of 7445 corruptions, 4358 were of the kind that misses a copy at the
-  end of a 16-byte area, they were for copies between 41 and 64 bytes,
-  more to the larger end of the scale  (note that with your test program,
-  smaller memcpys happen more frequenly than larger ones).
-     47 0x29
-     36 0x2a
-     47 0x2b
-     23 0x2c
-     29 0x2d
-     31 0x2e
-     36 0x2f
-     46 0x30
-     45 0x31
-     51 0x32
-     62 0x33
-     64 0x34
-     77 0x35
-     91 0x36
-     90 0x37
-    100 0x38
-    100 0x39
-    209 0x3a
-    279 0x3b
-    366 0x3c
-    498 0x3d
-    602 0x3e
-    682 0x3f
-    747 0x40
-
-- All corruption with data copied to the wrong place happened for copies
-  between 33 and 47 bytes, mostly to the smaller end of the scale:
-    391 0x21
-    360 0x22
-    319 0x23
-    273 0x24
-    273 0x25
-    241 0x26
-    224 0x27
-    221 0x28
-    231 0x29
-    208 0x2a
-    163 0x2b
-     86 0x2c
-     63 0x2d
-     33 0x2e
-      1 0x2f
-
-- One common (but not the only, still investigating) case for data getting
-  written to the wrong place is:
-   * corruption starts 16 bytes after the memcpy start
-   * corrupt bytes are the same as the bytes written to the start
-   * start address ends in 0x1 through 0x7
-   * length of corruption is at most memcpy length- 32, always
-     between 1 and 7.
-
-       Arnd
+-- 
+Kees Cook
+Pixel Security
