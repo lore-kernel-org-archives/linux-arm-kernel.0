@@ -1,57 +1,56 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 8 Aug 2018 19:40:11 +0530
-Subject: [PATCH v3 3/8] mailbox: Add transmit done by blocking option
-In-Reply-To: <afc8a305-79ea-2194-0af0-919bbb8f675e@kapsi.fi>
-References: <20180702114033.15654-1-mperttunen@nvidia.com>
- <20180702114033.15654-4-mperttunen@nvidia.com>
- <CABb+yY0_dKC_cYFwwb-aeRgrx=sjv=8VLP=C6DJEecFf=v+mkQ@mail.gmail.com>
- <907bac36-0c54-8f38-0f5e-f59196d414c6@kapsi.fi>
- <afc8a305-79ea-2194-0af0-919bbb8f675e@kapsi.fi>
-Message-ID: <CABb+yY2mpNV186=M2anmZANgMOra4JM7ybyUT4yCxhqAG6-AZg@mail.gmail.com>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Wed, 8 Aug 2018 10:10:48 -0400 (EDT)
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <CAPv3WKcKoEe=Qysp6Oac2C=G9bUhUQf1twSRCY+_qJ6XEC-iag@mail.gmail.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAHCPf3s-+Qf=WBZz1KpisDMG3520jCUh8PLAO3PHa4jdt8kCTw@mail.gmail.com>
+ <CAKv+Gu9_h-WFi1j4+DWUN_dMj75SKKHxWoDH8WQ9P7S7MNpZQg@mail.gmail.com>
+ <alpine.LRH.2.02.1808060553130.30832@file01.intranet.prod.int.rdu2.redhat.com>
+ <99fff4fe-afa9-f12f-a518-472a9dd1c530@arm.com>
+ <CAKv+Gu_C2g=C=gMpk4a5jpDORnxZY6t1v=HDoy59m5vwNBxBBg@mail.gmail.com>
+ <alpine.LRH.2.02.1808061306490.12989@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu_8Rq6X24ZOYvG7+kQQGSGYAZuu_co4k1nJS8K7rkrWMA@mail.gmail.com>
+ <alpine.LRH.2.02.1808061552090.11930@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAKv+Gu_iCgAeGmrajZ_euMcFLntWG1a51HF_HQ1TO=fV_v__AQ@mail.gmail.com>
+ <CAPv3WKdCMpy6KarducQEtSYP35zdELhparkmPPMKGMUhsdk1Qw@mail.gmail.com>
+ <alpine.LRH.2.02.1808071331260.16565@file01.intranet.prod.int.rdu2.redhat.com>
+ <CAPv3WKcKoEe=Qysp6Oac2C=G9bUhUQf1twSRCY+_qJ6XEC-iag@mail.gmail.com>
+Message-ID: <alpine.LRH.2.02.1808081010130.9997@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2018 at 5:08 PM, Mikko Perttunen <cyndis@kapsi.fi> wrote:
->
->
-> On 04.08.2018 13:45, Mikko Perttunen wrote:
->>
->> On 08/03/2018 03:54 PM, Jassi Brar wrote:
->>>
->>> On Mon, Jul 2, 2018 at 5:10 PM, Mikko Perttunen <mperttunen@nvidia.com>
->>> wrote:
->>>>
->>>> Add a new TXDONE option, TXDONE_BY_BLOCK. With this option, the
->>>> send_data function of the mailbox driver is expected to block until
->>>> the message has been sent. The new option is used with the Tegra
->>>> Combined UART driver to minimize unnecessary overhead when transmitting
->>>> data.
->>>>
->>> 1) TXDONE_BY_BLOCK flag :-
->>>          Have you tried setting the flag mbox_chan->mbox_client->tx_block
->>> ?
->>
->>
->> No - I suppose I should have done that. I'm a bit concerned about overhead
->> as send_data may be called thousands of times per second, so I tried to make
->> it as close as possible to the downstream driver that just pokes the mailbox
->> register directly.
->
->
-> I tried using polling in the mailbox framework. Some printing is done from
-> atomic context so it seems tx_block cannot be used -
-> wait_for_completion_timeout understandably does not work in atomic context.
-> I also tried without tx_block, in which case I got some horribly garbled
-> output, but "Try increasing MBOX_TX_QUEUE_LEN" was readable there.
->
-> Any opinions?
->
-The problems arise because your hardware (SM) supports TXDONE_BY_POLL,
-but your client drives it by TXDONE_BY_ACK because the older DB
-channels are so.
 
-Please populate SM channels as a separate controller than DB.
-The DB controller, as is, run by ACK method.
-The SM controller should be run by polling, i.e, set txdone_poll =
-true and the poll period small enough. The virtual tty client driver
-should be able to safely set tx_block from appropriate context.
+
+On Wed, 8 Aug 2018, Marcin Wojtas wrote:
+
+> Hi Mikulas,
+> 
+> wt., 7 sie 2018 o 19:39 Mikulas Patocka <mpatocka@redhat.com> napisa?(a):
+> >
+> >
+> >
+> > On Tue, 7 Aug 2018, Marcin Wojtas wrote:
+> >
+> > > Ard, Mikulas,
+> > >
+> > > After some self-caused setup issues I was able to run the test on my
+> > > MacchiatoBin with the kernel v4.18-rc8. It's been running for 1h+ now,
+> > > loading the CPU to 100% and no single error event...
+> > >
+> > > I built the binary file with:
+> > > gcc-linaro-7.2.1-2017.11-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc -O2
+> > >
+> > > Maybe it's the older firmware issue?
+> >
+> > I have downloaded and built the firmware recently (it has timestamp Jul 30
+> > 2018).
+> >
+> > Do you still have your firmware file "flash-image.bin" that you used, so
+> > that I could try it?
+> 
+> Attached. Please let know if you see any difference.
+
+I booted this image, but the same corruption happens.
+
+Mikulas
