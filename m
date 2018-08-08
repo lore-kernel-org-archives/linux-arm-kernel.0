@@ -1,96 +1,107 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 8 Aug 2018 21:00:31 +0300
-Subject: [PATCH 27/28] ARM: davinci: mityomapl138: use device properties
- for at24 eeprom
-In-Reply-To: <CAHp75VdBkSHtqXkzRJgOHwaL5UhgV+TgySjEs57bisbKTpO4SQ@mail.gmail.com>
-References: <20180808153150.23444-1-brgl@bgdev.pl>
- <20180808153150.23444-28-brgl@bgdev.pl>
- <CAHp75VdBkSHtqXkzRJgOHwaL5UhgV+TgySjEs57bisbKTpO4SQ@mail.gmail.com>
-Message-ID: <CAHp75VejMix_CVETOiMMZsrOyMh+o=OGx4-A24QpBAYf_ka=FA@mail.gmail.com>
+From: ilina@codeaurora.org (Lina Iyer)
+Date: Wed, 8 Aug 2018 12:02:48 -0600
+Subject: [PATCH v8 09/26] kernel/cpu_pm: Manage runtime PM in the idle
+ path for CPUs
+In-Reply-To: <20180808105619.GB25150@e107981-ln.cambridge.arm.com>
+References: <20180620172226.15012-1-ulf.hansson@linaro.org>
+ <2056372.NMt4aPaF4h@aspire.rjw.lan>
+ <2205807.cU2puvubpP@aspire.rjw.lan>
+ <1726374.375PCQfjLZ@aspire.rjw.lan>
+ <CAPDyKFrmP15+_hyRp44Jw-wsTmsNFKORdCeGJEgW8o0OoKiHhA@mail.gmail.com>
+ <CAJZ5v0hk1wfm10fyycmddKF6wR4D51r30fD_-J5UDMbtB3+V-Q@mail.gmail.com>
+ <20180808105619.GB25150@e107981-ln.cambridge.arm.com>
+Message-ID: <20180808180248.GC27850@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2018 at 8:58 PM, Andy Shevchenko
-<andy.shevchenko@gmail.com> wrote:
-> On Wed, Aug 8, 2018 at 6:31 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Wed, Aug 08 2018 at 04:56 -0600, Lorenzo Pieralisi wrote:
+>On Mon, Aug 06, 2018 at 11:37:55AM +0200, Rafael J. Wysocki wrote:
+>> On Fri, Aug 3, 2018 at 1:42 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> > [...]
+>> >
+>> >>>
+>> >>> Assuming that I have got that right, there are concerns, mostly regarding
+>> >>> patch [07/26], but I will reply to that directly.
+>> >>
+>> >> Well, I haven't got that right, so never mind.
+>> >>
+>> >> There are a few minor things to address, but apart from that the general
+>> >> genpd patches look ready.
+>> >
+>> > Alright, thanks!
+>> >
+>> > I will re-spin the series and post a new version once 4.19 rc1 is out.
+>> > Hopefully we can queue it up early in next cycle to get it tested in
+>> > next for a while.
+>> >
+>> >>
+>> >>> The $subject patch is fine by me by itself, but it obviously depends on the
+>> >>> previous ones.  Patches [01-02/26] are fine too, but they don't seem to be
+>> >>> particularly useful without the rest of the series.
+>> >>>
+>> >>> As far as patches [10-26/26] go, I'd like to see some review comments and/or
+>> >>> tags from the people with vested interest in there, in particular from Daniel
+>> >>> on patch [12/26] and from Sudeep on the PSCI ones.
+>> >>
+>> >> But this still holds.
+>> >
+>> > Actually, patch 10 and patch11 is ready to go as well. I ping Daniel
+>> > on patch 12.
+>> >
+>> > In regards to the rest of the series, some of the PSCI/ARM changes
+>> > have been reviewed by Mark Rutland, however several changes have not
+>> > been acked.
+>> >
+>> > On the other hand, one can also interpret the long silence in regards
+>> > to PSCI/ARM changes as they are good to go. :-)
 >>
->> We want to work towards phasing out the at24_platform_data structure.
->> There are few users and its contents can be represented using generic
->> device properties. Using device properties only will allow us to
->> significantly simplify the at24 configuration code.
->>
->> Remove the at24_platform_data structure and replace it with an array
->> of property entries. Drop the byte_len/size property, as the model name
->> already implies the EEPROM's size.
->>
+>> Well, in that case giving an ACK to them should not be an issue for
+>> the people with a vested interest I suppose.
 >
-> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+>Apologies to everyone for the delay in replying.
 >
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->>  arch/arm/mach-davinci/board-mityomapl138.c | 11 +++++------
->>  1 file changed, 5 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
->> index 17b67e26bc0e..be0fb7d17e25 100644
->> --- a/arch/arm/mach-davinci/board-mityomapl138.c
->> +++ b/arch/arm/mach-davinci/board-mityomapl138.c
->> @@ -14,11 +14,11 @@
->>  #include <linux/init.h>
->>  #include <linux/console.h>
->>  #include <linux/platform_device.h>
->> +#include <linux/property.h>
->>  #include <linux/mtd/partitions.h>
->>  #include <linux/notifier.h>
->>  #include <linux/regulator/machine.h>
->>  #include <linux/i2c.h>
->> -#include <linux/platform_data/at24.h>
->>  #include <linux/etherdevice.h>
->>  #include <linux/spi/spi.h>
->>  #include <linux/spi/flash.h>
->> @@ -185,10 +185,9 @@ static struct nvmem_cell_lookup mityomapl138_nvmem_cells[] = {
->>         }
->>  };
->>
->> -static struct at24_platform_data mityomapl138_fd_chip = {
->> -       .byte_len       = 256,
->> -       .page_size      = 8,
->> -       .flags          = AT24_FLAG_READONLY | AT24_FLAG_IRUGO,
->> +static const struct property_entry mityomapl138_fd_chip_properties[] = {
->> +       PROPERTY_ENTRY_U32("pagesize", 8),
->> +       PROPERTY_ENTRY_BOOL("read-only"),
-
-Missed terminator
-
->>  };
->>
->>  static struct davinci_i2c_platform_data mityomap_i2c_0_pdata = {
->> @@ -317,7 +316,7 @@ static struct i2c_board_info __initdata mityomap_tps65023_info[] = {
->>         },
->>         {
->>                 I2C_BOARD_INFO("24c02", 0x50),
->> -               .platform_data = &mityomapl138_fd_chip,
->> +               .properties = mityomapl138_fd_chip_properties,
->>         },
->>  };
->>
->> --
->> 2.18.0
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>Side note: cpu_pm_enter()/exit() are also called through syscore ops in
+>s2RAM/IDLE, you know that but I just wanted to mention it to compound
+>the discussion.
 >
+>As for PSCI patches I do not personally think PSCI OSI enablement is
+>beneficial (and my position has always been the same since PSCI OSI was
+>added to the specification, I am not even talking about this patchset)
+>and Arm Trusted Firmware does not currently support it for the same
+>reason.
 >
+>We (if Mark and Sudeep agree) will enable PSCI OSI if and when we have a
+>definitive and constructive answer to *why* we have to do that that is
+>not a dogmatic "the kernel knows better" but rather a comprehensive
+>power benchmark evaluation - I thought that was the agreement reached
+>at OSPM but apparently I was mistaken.
 >
-> --
-> With Best Regards,
-> Andy Shevchenko
+I will not speak to any comparison of benchmarks between OSI and PC.
+AFAIK, there are no platforms supporting both.
 
+But, the OSI feature is critical for QCOM mobile platforms. The
+last man activities during cpuidle save quite a lot of power. Powering
+off the clocks, busses, regulators and even the oscillator is very
+important to have a reasonable battery life when using the phone.
+Platform coordinated approach falls quite short of the needs of a
+powerful processor with a desired battery efficiency.
 
+-- Lina
 
--- 
-With Best Regards,
-Andy Shevchenko
+>As a reminder - PSCI firmware implementation has to have state machines
+>and locking to guarantee safe power down operations (and to flush caches
+>only if necessary - which requires cpu masks for power domains) and
+>that's true whether we enable PSCI OSI or not, the coordination logic
+>must be in firmware/hardware _already_ - the cpumasks, the power domain
+>topology, etc.
+>
+>I agree with the power-domains representation of idle-states (since
+>that's the correct HW description) and I thought and hoped that runtime
+>PM could help _remove_ the CPU PM notifiers (by making the notifiers
+>callbacks a runtime PM one) even though I have to say that's quite
+>complex, given that only few (ie one instance :)) CPU PM notifiers
+>callbacks are backed by a struct device (eg an ARM PMU is a device but
+>for instance the GIC is not a device so its save/restore code I am not
+>sure it can be implemented with runtime PM callbacks).
+>
+>Lorenzo
