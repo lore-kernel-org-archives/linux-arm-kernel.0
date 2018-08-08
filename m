@@ -1,117 +1,84 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Wed,  8 Aug 2018 12:39:27 +0800
-Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
-In-Reply-To: <1533703167-26583-1-git-send-email-Anson.Huang@nxp.com>
-References: <1533703167-26583-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1533703167-26583-2-git-send-email-Anson.Huang@nxp.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Wed,  8 Aug 2018 14:25:12 +0900
+Subject: [PATCH v2 0/7] add UniPhier DVB Frontend system support
+Message-ID: <20180808052519.14528-1-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clock framework will enable those clocks registered
-with CLK_IS_CRITICAL flag, so no need to have
-clks_init_on array during clock initialization now.
+This series adds support for DVB Frontend system named HSC support
+for UniPhier LD11/LD20 SoCs. This driver supports MPEG2-TS serial
+signal input from external demodulator and DMA MPEG2-TS stream data
+onto memory.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+UniPhier HSC driver provides many ports of TS input. Since the HSC
+has mixed register map for those ports. It hard to split each register
+areas.
+
 ---
- drivers/clk/imx/clk-imx7d.c | 27 ++++++++-------------------
- drivers/clk/imx/clk.h       |  7 +++++++
- 2 files changed, 15 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index c4518d7..076460b 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -379,13 +379,6 @@ static const char *pll_enet_bypass_sel[] = { "pll_enet_main", "pll_enet_main_src
- static const char *pll_audio_bypass_sel[] = { "pll_audio_main", "pll_audio_main_src", };
- static const char *pll_video_bypass_sel[] = { "pll_video_main", "pll_video_main_src", };
- 
--static int const clks_init_on[] __initconst = {
--	IMX7D_ARM_A7_ROOT_CLK, IMX7D_MAIN_AXI_ROOT_CLK,
--	IMX7D_PLL_SYS_MAIN_480M_CLK, IMX7D_IPG_ROOT_CLK,
--	IMX7D_DRAM_PHYM_ROOT_CLK, IMX7D_DRAM_ROOT_CLK,
--	IMX7D_DRAM_PHYM_ALT_ROOT_CLK, IMX7D_DRAM_ALT_ROOT_CLK,
--};
--
- static struct clk_onecell_data clk_data;
- 
- static struct clk ** const uart_clks[] __initconst = {
-@@ -403,7 +396,6 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- {
- 	struct device_node *np;
- 	void __iomem *base;
--	int i;
- 
- 	clks[IMX7D_CLK_DUMMY] = imx_clk_fixed("dummy", 0);
- 	clks[IMX7D_OSC_24M_CLK] = of_clk_get_by_name(ccm_node, "osc");
-@@ -466,7 +458,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	clks[IMX7D_PLL_SYS_MAIN_120M] = imx_clk_fixed_factor("pll_sys_main_120m", "pll_sys_main_clk", 1, 4);
- 	clks[IMX7D_PLL_DRAM_MAIN_533M] = imx_clk_fixed_factor("pll_dram_533m", "pll_dram_main_clk", 1, 2);
- 
--	clks[IMX7D_PLL_SYS_MAIN_480M_CLK] = imx_clk_gate_dis("pll_sys_main_480m_clk", "pll_sys_main_480m", base + 0xb0, 4);
-+	clks[IMX7D_PLL_SYS_MAIN_480M_CLK] = imx_clk_gate_dis_flags("pll_sys_main_480m_clk", "pll_sys_main_480m", base + 0xb0, 4, CLK_IS_CRITICAL);
- 	clks[IMX7D_PLL_SYS_MAIN_240M_CLK] = imx_clk_gate_dis("pll_sys_main_240m_clk", "pll_sys_main_240m", base + 0xb0, 5);
- 	clks[IMX7D_PLL_SYS_MAIN_120M_CLK] = imx_clk_gate_dis("pll_sys_main_120m_clk", "pll_sys_main_120m", base + 0xb0, 6);
- 	clks[IMX7D_PLL_DRAM_MAIN_533M_CLK] = imx_clk_gate("pll_dram_533m_clk", "pll_dram_533m", base + 0x70, 12);
-@@ -719,7 +711,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	clks[IMX7D_ENET_AXI_ROOT_DIV] = imx_clk_divider2("enet_axi_post_div", "enet_axi_pre_div", base + 0x8900, 0, 6);
- 	clks[IMX7D_NAND_USDHC_BUS_ROOT_CLK] = imx_clk_divider2("nand_usdhc_root_clk", "nand_usdhc_pre_div", base + 0x8980, 0, 6);
- 	clks[IMX7D_AHB_CHANNEL_ROOT_DIV] = imx_clk_divider2("ahb_root_clk", "ahb_pre_div", base + 0x9000, 0, 6);
--	clks[IMX7D_IPG_ROOT_CLK] = imx_clk_divider2("ipg_root_clk", "ahb_root_clk", base + 0x9080, 0, 2);
-+	clks[IMX7D_IPG_ROOT_CLK] = imx_clk_divider_flags("ipg_root_clk", "ahb_root_clk", base + 0x9080, 0, 2, CLK_IS_CRITICAL | CLK_OPS_PARENT_ENABLE | CLK_SET_RATE_PARENT);
- 	clks[IMX7D_DRAM_ROOT_DIV] = imx_clk_divider2("dram_post_div", "dram_cg", base + 0x9880, 0, 3);
- 	clks[IMX7D_DRAM_PHYM_ALT_ROOT_DIV] = imx_clk_divider2("dram_phym_alt_post_div", "dram_phym_alt_pre_div", base + 0xa000, 0, 3);
- 	clks[IMX7D_DRAM_ALT_ROOT_DIV] = imx_clk_divider2("dram_alt_post_div", "dram_alt_pre_div", base + 0xa080, 0, 3);
-@@ -783,17 +775,17 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	clks[IMX7D_CLKO1_ROOT_DIV] = imx_clk_divider2("clko1_post_div", "clko1_pre_div", base + 0xbd80, 0, 6);
- 	clks[IMX7D_CLKO2_ROOT_DIV] = imx_clk_divider2("clko2_post_div", "clko2_pre_div", base + 0xbe00, 0, 6);
- 
--	clks[IMX7D_ARM_A7_ROOT_CLK] = imx_clk_gate4("arm_a7_root_clk", "arm_a7_div", base + 0x4000, 0);
-+	clks[IMX7D_ARM_A7_ROOT_CLK] = imx_clk_gate2_flags("arm_a7_root_clk", "arm_a7_div", base + 0x4000, 0, CLK_IS_CRITICAL | CLK_OPS_PARENT_ENABLE);
- 	clks[IMX7D_ARM_M4_ROOT_CLK] = imx_clk_gate4("arm_m4_root_clk", "arm_m4_div", base + 0x4010, 0);
--	clks[IMX7D_MAIN_AXI_ROOT_CLK] = imx_clk_gate4("main_axi_root_clk", "axi_post_div", base + 0x4040, 0);
-+	clks[IMX7D_MAIN_AXI_ROOT_CLK] = imx_clk_gate2_flags("main_axi_root_clk", "axi_post_div", base + 0x4040, 0, CLK_IS_CRITICAL | CLK_OPS_PARENT_ENABLE);
- 	clks[IMX7D_DISP_AXI_ROOT_CLK] = imx_clk_gate4("disp_axi_root_clk", "disp_axi_post_div", base + 0x4050, 0);
- 	clks[IMX7D_ENET_AXI_ROOT_CLK] = imx_clk_gate4("enet_axi_root_clk", "enet_axi_post_div", base + 0x4060, 0);
- 	clks[IMX7D_OCRAM_CLK] = imx_clk_gate4("ocram_clk", "main_axi_root_clk", base + 0x4110, 0);
- 	clks[IMX7D_OCRAM_S_CLK] = imx_clk_gate4("ocram_s_clk", "ahb_root_clk", base + 0x4120, 0);
--	clks[IMX7D_DRAM_ROOT_CLK] = imx_clk_gate4("dram_root_clk", "dram_post_div", base + 0x4130, 0);
--	clks[IMX7D_DRAM_PHYM_ROOT_CLK] = imx_clk_gate4("dram_phym_root_clk", "dram_phym_cg", base + 0x4130, 0);
--	clks[IMX7D_DRAM_PHYM_ALT_ROOT_CLK] = imx_clk_gate4("dram_phym_alt_root_clk", "dram_phym_alt_post_div", base + 0x4130, 0);
--	clks[IMX7D_DRAM_ALT_ROOT_CLK] = imx_clk_gate4("dram_alt_root_clk", "dram_alt_post_div", base + 0x4130, 0);
-+	clks[IMX7D_DRAM_ROOT_CLK] = imx_clk_gate2_flags("dram_root_clk", "dram_post_div", base + 0x4130, 0, CLK_IS_CRITICAL | CLK_OPS_PARENT_ENABLE);
-+	clks[IMX7D_DRAM_PHYM_ROOT_CLK] = imx_clk_gate2_flags("dram_phym_root_clk", "dram_phym_cg", base + 0x4130, 0, CLK_IS_CRITICAL | CLK_OPS_PARENT_ENABLE);
-+	clks[IMX7D_DRAM_PHYM_ALT_ROOT_CLK] = imx_clk_gate2_flags("dram_phym_alt_root_clk", "dram_phym_alt_post_div", base + 0x4130, 0, CLK_IS_CRITICAL | CLK_OPS_PARENT_ENABLE);
-+	clks[IMX7D_DRAM_ALT_ROOT_CLK] = imx_clk_gate2_flags("dram_alt_root_clk", "dram_alt_post_div", base + 0x4130, 0, CLK_IS_CRITICAL | CLK_OPS_PARENT_ENABLE);
- 	clks[IMX7D_OCOTP_CLK] = imx_clk_gate4("ocotp_clk", "ipg_root_clk", base + 0x4230, 0);
- 	clks[IMX7D_SNVS_CLK] = imx_clk_gate4("snvs_clk", "ipg_root_clk", base + 0x4250, 0);
- 	clks[IMX7D_MU_ROOT_CLK] = imx_clk_gate4("mu_root_clk", "ipg_root_clk", base + 0x4270, 0);
-@@ -882,9 +874,6 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	clk_data.clk_num = ARRAY_SIZE(clks);
- 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
- 
--	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
--		clk_prepare_enable(clks[clks_init_on[i]]);
--
- 	clk_set_parent(clks[IMX7D_PLL_ARM_MAIN_BYPASS], clks[IMX7D_PLL_ARM_MAIN]);
- 	clk_set_parent(clks[IMX7D_PLL_DRAM_MAIN_BYPASS], clks[IMX7D_PLL_DRAM_MAIN]);
- 	clk_set_parent(clks[IMX7D_PLL_SYS_MAIN_BYPASS], clks[IMX7D_PLL_SYS_MAIN]);
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index 8076ec0..5895e223 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -137,6 +137,13 @@ static inline struct clk *imx_clk_gate_dis(const char *name, const char *parent,
- 			shift, CLK_GATE_SET_TO_DISABLE, &imx_ccm_lock);
- }
- 
-+static inline struct clk *imx_clk_gate_dis_flags(const char *name, const char *parent,
-+		void __iomem *reg, u8 shift, unsigned long flags)
-+{
-+	return clk_register_gate(NULL, name, parent, flags | CLK_SET_RATE_PARENT, reg,
-+			shift, CLK_GATE_SET_TO_DISABLE, &imx_ccm_lock);
-+}
-+
- static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
+Changes from v1:
+  DT bindings
+    - Fix mistakes of spelling
+    - Rename uniphier,hsc.txt -> socionext,uniphier-hsc.txt
+  Kconfig, Makefile
+    - Add COMPILE_TEST, REGMAP_MMIO
+    - Add $(srctree) to include path option
+  Headers
+    - Split large patch
+    - Remove more unused definitions
+    - Remove unneeded const
+    - Replace enum that has special value into #define
+    - Remove weird macro from register definitions
+    - Remove field_get/prop inline functions
+  Modules
+    - Split register definitions, function prototypes
+    - Fix include lines
+    - Fix depended config
+    - Remove redundant conditions
+    - Drop adapter patches, and need no patches to build
+    - Merge uniphier-adapter.o into each adapter drivers
+    - Split 3 modules (core, ld11, ld20) to build adapter drivers as
+      module
+    - Fix compile error if build as module
+    - Use hardware spec table to remove weird macro from register
+      definitions
+    - Use usleep_range instead of msleep
+    - Use shift and mask instead of field_get/prop inline functions
+
+Katsuhiro Suzuki (7):
+  media: uniphier: add DT bindings documentation for UniPhier HSC
+  media: uniphier: add DMA common file of HSC
+  media: uniphier: add CSS common file of HSC
+  media: uniphier: add TS common file of HSC
+  media: uniphier: add ucode load common file of HSC
+  media: uniphier: add platform driver module of HSC
+  media: uniphier: add LD11/LD20 HSC support
+
+ .../bindings/media/socionext,uniphier-hsc.txt |  38 ++
+ drivers/media/platform/Kconfig                |   1 +
+ drivers/media/platform/Makefile               |   2 +
+ drivers/media/platform/uniphier/Kconfig       |  19 +
+ drivers/media/platform/uniphier/Makefile      |   5 +
+ drivers/media/platform/uniphier/hsc-core.c    | 515 ++++++++++++++++++
+ drivers/media/platform/uniphier/hsc-css.c     | 250 +++++++++
+ drivers/media/platform/uniphier/hsc-dma.c     | 212 +++++++
+ drivers/media/platform/uniphier/hsc-ld11.c    | 273 ++++++++++
+ drivers/media/platform/uniphier/hsc-reg.h     | 272 +++++++++
+ drivers/media/platform/uniphier/hsc-ts.c      | 127 +++++
+ drivers/media/platform/uniphier/hsc-ucode.c   | 416 ++++++++++++++
+ drivers/media/platform/uniphier/hsc.h         | 389 +++++++++++++
+ 13 files changed, 2519 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/socionext,uniphier-hsc.txt
+ create mode 100644 drivers/media/platform/uniphier/Kconfig
+ create mode 100644 drivers/media/platform/uniphier/Makefile
+ create mode 100644 drivers/media/platform/uniphier/hsc-core.c
+ create mode 100644 drivers/media/platform/uniphier/hsc-css.c
+ create mode 100644 drivers/media/platform/uniphier/hsc-dma.c
+ create mode 100644 drivers/media/platform/uniphier/hsc-ld11.c
+ create mode 100644 drivers/media/platform/uniphier/hsc-reg.h
+ create mode 100644 drivers/media/platform/uniphier/hsc-ts.c
+ create mode 100644 drivers/media/platform/uniphier/hsc-ucode.c
+ create mode 100644 drivers/media/platform/uniphier/hsc.h
+
 -- 
-2.7.4
+2.18.0
