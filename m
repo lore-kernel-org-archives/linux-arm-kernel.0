@@ -1,28 +1,37 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 08 Aug 2018 08:33:54 +0200
-Subject: [PATCH 1/2] iommu/rockchip: Handle errors returned from PM
- framework
-In-Reply-To: <20180807085406.3863-2-marc.zyngier@arm.com>
-References: <20180807085406.3863-1-marc.zyngier@arm.com>
- <20180807085406.3863-2-marc.zyngier@arm.com>
-Message-ID: <1943708.zxIcSzHDJ6@phil>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Wed, 8 Aug 2018 15:35:42 +0800
+Subject: [PATCH] soc: mediatek: pwrap: use true and false for boolean
+ values
+In-Reply-To: <20180805010201.GA7320@embeddedor.com>
+References: <20180805010201.GA7320@embeddedor.com>
+Message-ID: <1533713742.3472.231.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 7. August 2018, 10:54:05 CEST schrieb Marc Zyngier:
-> pm_runtime_get_if_in_use can fail: either PM has been disabled
-> altogether (-EINVAL), or the device hasn't been enabled yet (0).
-> Sadly, the Rockchip IOMMU driver tends to conflate the two things
-> by considering a non-zero return value as successful.
+On Sat, 2018-08-04 at 20:02 -0500, Gustavo A. R. Silva wrote:
+> Return statements in functions returning bool should use true or false
+> instead of an integer value.
 > 
-> This has the consequence of hiding other bugs, so let's handle this
-> case throughout the driver, with a WARN_ON_ONCE so that we can try
-> and work out what happened.
+> This issue was detected with the help of Coccinelle.
 > 
-> Fixes: 0f181d3cf7d98 ("iommu/rockchip: Add runtime PM support")
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+> ---
+>  drivers/soc/mediatek/mtk-pmic-wrap.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> index 4e931fd..932470a 100644
+> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -1096,7 +1096,7 @@ static bool pwrap_is_pmic_cipher_ready(struct pmic_wrapper *wrp)
+>  	ret = pwrap_read(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_RDY],
+>  			 &rdata);
+>  	if (ret)
+> -		return 0;
+> +		return false;
+>  
 
-With Rockchip platforms always selecting PM
-[see other longer thread in reply to the patch]
+Acked-by: Sean Wang <sean.wang@mediatek.com>
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+>  	return rdata == 1;
+>  }
