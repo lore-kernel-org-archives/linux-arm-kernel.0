@@ -1,53 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 8 Aug 2018 15:28:53 +0100
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <alpine.LRH.2.02.1808081011110.9997@file01.intranet.prod.int.rdu2.redhat.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
- <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
- <20180803094129.GB17798@arm.com>
- <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
- <20180808113927.GA24736@iMac.local>
- <alpine.LRH.2.02.1808081011110.9997@file01.intranet.prod.int.rdu2.redhat.com>
-Message-ID: <20180808142852.GD24736@iMac.local>
+From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
+Date: Wed, 8 Aug 2018 19:59:30 +0530
+Subject: [RFC PATCH 3/3] dynamic_debug: Add support for dynamic register
+ trace
+In-Reply-To: <20180807165713.GJ21809@arm.com>
+References: <cover.1533211508.git.saiprakash.ranjan@codeaurora.org>
+ <37c723a7892b21eb67b8447160d8d602703f321f.1533211509.git.saiprakash.ranjan@codeaurora.org>
+ <20180807165713.GJ21809@arm.com>
+Message-ID: <eb55098d-6825-ab50-e1e9-0d95b1e1ea14@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2018 at 10:12:27AM -0400, Mikulas Patocka wrote:
-> On Wed, 8 Aug 2018, Catalin Marinas wrote:
-> > On Fri, Aug 03, 2018 at 01:09:02PM -0400, Mikulas Patocka wrote:
-> > > 	while (1) {
-> > > 		start = (unsigned)random() % (LEN + 1);
-> > > 		end = (unsigned)random() % (LEN + 1);
-> > > 		if (start > end)
-> > > 			continue;
-> > > 		for (i = start; i < end; i++)
-> > > 			data[i] = val++;
-> > > 		memcpy(map + start, data + start, end - start);
-> > > 		if (memcmp(map, data, LEN)) {
-> > 
-> > It may be worth trying to do a memcmp(map+start, data+start, end-start)
-> > here to see whether the hazard logic fails when the writes are unaligned
-> > but the reads are not.
-> > 
-> > This problem may as well appear if you do byte writes and read longs
-> > back (and I consider this a hardware problem on this specific board).
+On 8/7/2018 10:27 PM, Will Deacon wrote:
+> On Fri, Aug 03, 2018 at 07:58:44PM +0530, Sai Prakash Ranjan wrote:
+>> Introduce dynamic debug filtering mechanism to register
+>> tracing as dynamic_rtb() which will reduce a lot of
+>> overhead otherwise of tracing all the register reads/writes
+>> in all files.
+>>
+>> Now we can just specify the file name or any wildcard pattern
+>> as any other dynamic debug facility in bootargs and dynamic rtb
+>> will just trace them and the output can be seen in pstore.
+>>
+>> TODO: Now we use same 'p' flag but will add a separate flag for register trace
+>> later.
+>>
+>> Example for tracing all register reads/writes in drivers/soc/qcom/* below:
+>>
+>>    # dyndbg="file drivers/soc/qcom/* +p" in bootargs
+>>    # reboot -f
+>>    # mount -t pstore pstore /sys/fs/pstore
+>>    # cat /sys/fs/pstore/rtb-ramoops-0
+>>      [LOGK_WRITEL ] ts:1373030419  data:ffff00000d5065a4  <ffff00000867cb44>  qcom_smsm_probe+0x51c/0x668
+>>      [LOGK_WRITEL ] ts:1373360576  data:ffff00000d506608  <ffff00000867cb44>  qcom_smsm_probe+0x51c/0x668
+>>
+>> Also we add uncached_logk api to readl/writel definitions for arm64
+>> as of now. This can be extended to arm as well later for tracing.
+>>
+>> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+>> ---
+>>   arch/arm64/include/asm/io.h   | 93 +++++++++++++++++++++++++++++++++++
 > 
-> I triad to insert usleep(10000) between the memcpy and memcmp, but the 
-> same corruption occurs. So, it can't be read-after-write hazard. It is 
-> caused by the improper handling of hazard between the overlapping writes 
-> inside memcpy.
+> Putting all of this in the arch code, which basically duplicates everything,
+> feels very wrong to me. Perhaps take a look at the ongoing work for
+> instrumenting the atomics and take some inspiration from there?
+> 
+> Ideally, the architecture just needs to provide the low-level primivites
+> (which it already does) and the core can generate instruments versions if
+> required.
+> 
 
-It could get it wrong between subsequent writes to the same 64-bit range
-(e.g. the address & ~63 is the same but the data strobes for which bytes
-to write are different). If it somehow thinks that it's a
-write-after-write hazard even though the strobes are different, it could
-cancel one of the writes.
+Hi Will,
 
-It may be worth trying with a byte-only memcpy() function while keeping
-the default memcmp().
+Thanks for the review. Will look at instrumented atomics implementation 
+and get back. Let me know if anything else can be improved.
 
--- 
-Catalin
+  - Sai Prakash
