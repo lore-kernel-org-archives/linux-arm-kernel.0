@@ -1,53 +1,67 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 8 Aug 2018 15:19:38 +0100
-Subject: [PATCH v3 0/2] PCI: imx: Initial imx7d pm support
-In-Reply-To: <a5556be9a5f62ea0472a1a2336bce8d71df0dcaa.camel@nxp.com>
-References: <cover.1532448745.git.leonard.crestez@nxp.com>
- <bac2cb70b16d81f589915fc0900126b516414243.camel@nxp.com>
- <20180808111429.GC25150@e107981-ln.cambridge.arm.com>
- <a5556be9a5f62ea0472a1a2336bce8d71df0dcaa.camel@nxp.com>
-Message-ID: <20180808141938.GA30428@e107981-ln.cambridge.arm.com>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Wed, 8 Aug 2018 10:21:46 -0400 (EDT)
+Subject: framebuffer corruption due to overlapping stp instructions on
+ arm64
+In-Reply-To: <5f5ab5ba0bc84b31be52bd7708c6a356@AcuMS.aculab.com>
+References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
+ <CA+=Sn1mWkjuwVnjw6OWWUM=UcP76bdFa680FebCseewHfx3NpA@mail.gmail.com>
+ <9acdacdb-3bd5-b71a-3003-e48132ee1371@redhat.com>
+ <CAJA7tRZbmnZq7RfvQeYEy_a1ZObWqpFpVdvgsXgsioQ3RyPMuA@mail.gmail.com>
+ <CAKv+Gu97QvwoLLK_zueiA_gjg_4Q5cqU4YVUyHUVFFfffdyJaw@mail.gmail.com>
+ <f696ebe8605840e3bb04bb78b60a6cfa@AcuMS.aculab.com>
+ <alpine.LRH.2.02.1808030759480.12341@file01.intranet.prod.int.rdu2.redhat.com>
+ <a1564e8d091648bcad9b5ec58ab6cc95@AcuMS.aculab.com>
+ <alpine.LRH.2.02.1808051018360.23136@file01.intranet.prod.int.rdu2.redhat.com>
+ <51a6c4e102ad4193b3f42498f0ff11a4@AcuMS.aculab.com>
+ <alpine.LRH.2.02.1808070939320.6020@file01.intranet.prod.int.rdu2.redhat.com>
+ <5f5ab5ba0bc84b31be52bd7708c6a356@AcuMS.aculab.com>
+Message-ID: <alpine.LRH.2.02.1808081017210.9997@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2018 at 11:37:14AM +0000, Leonard Crestez wrote:
-> On Wed, 2018-08-08 at 12:14 +0100, Lorenzo Pieralisi wrote:
-> > On Wed, Aug 08, 2018 at 10:53:52AM +0000, Leonard Crestez wrote:
-> > > On Tue, 2018-07-24 at 19:14 +0300, Leonard Crestez wrote:
-> > > > Changes since v2:
-> > > >  * Print with dev_info if link fails on resume (Lucas)
-> > > >  * Add a comment on imx7d pci irq mappings (Andrey)
-> > > >  * Make imx6_pcie_ltssm_disable print an error on IMX6Q (Lucas)
-> > > > 
-> > > > The ltssm_disable does not return an error because it can't be usefully
-> > > > handled, reversing partial suspend is a nightmare and unlikely to work.
-> > > > 
-> > > >  * Drop "reset: imx7: Fix always writing bits as 0 (accepted by Philipp)
-> > > > 
-> > > > Series is against linux-next tag next-20180724 where the reset patch was
-> > > > already accepted. The imx7d.dtsi patch is also useful standalone.
-> > > > 
-> > > > Link to v2: https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Flkml.org%2Flkml%2F2018%2F7%2F20%2F472&amp;data=02%7C01%7Cleonard.crestez%40nxp.com%7Cc1e98512a50246c457a208d5fd2021dc%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C636693236811248777&amp;sdata=gxs1%2BfevIaBmQCVcJLUK41ml8CK2zLg%2FFKGGV%2F%2FHSLQ%3D&amp;reserved=0
-> > > 
-> > > This is a gentle reminder that this series was reviewed by Lucas two
-> > > weeks ago but not yet included.
-> > 
-> > Does this series have a functional dependency on the reset fix ? If yes
-> > we can have a bisection proplem depending on which tree gets merged
-> > first.
+
+
+On Tue, 7 Aug 2018, David Laight wrote:
+
+> From: Mikulas Patocka
+> > Sent: 07 August 2018 15:07
+> ...
+> > Unaccelerated scrolling is still painfully slow
+> > even on modern computers because of slow framebuffer read.
 > 
-> Yes, without the reset fix I expect hangs.
+> I solved that many years ago on a strongarm system by mapping
+> the screen memory at two separate virtual addresses.
+> One uncached used for writes, the second cached using the
+> 'minicache' for reads.
+> (and immediately fell foul of a memcpy() function that compared
+> the two virtual addresses and decided to copy backwards)
 > 
-> Maybe the reset fix should be pulled in the pci tree? I don't know how
-> these issues are sorted out.
+> I suspect some modern cpus don't like you doing that and the
+> graphics 'drivers' won't use different mappings.
 
-Well either I pull that fix into the PCI tree (but it is already -rc8
-and I can't guarantee v4.19 inclusion - I shall try) or I can ack these
-patches and Philippe will send them upstream on my behalf, atop the
-reset fix above.
+Intel says that you can't mix PAT memory attributes - but the non-temporal 
+store instructions use write-combining semantics on a memory that is 
+normally cacheable - and it is allowed to mix non-temporal stores with 
+other cacheable memory accesses - so I believe that the CPU will snoop the 
+cache for wc accesses and handle the conflict.
 
-When will the reset fix will be sent to Linus ? Please let me know
-how you want to proceed.
+> Even in glibc you want a more general copy_to/from_io_memory()
+> rather than just 'copy_from_framebuffer()'.
+> Best to define both - even if they end up identical.
+> Other drivers allow PCIe space be mmap()ed into user space.
+> 
+> While your tests show vmovntdqa being slightly slower than an
+> avx read for uncached mappings it is still much better than
+> all the other options.
 
-Thanks,
-Lorenzo
+Tihs was a measuring glitch - movntdqa is as fast as movdqa on non-cached
+mappings.
+
+Mikulas
+
+> 	David
+> 
+> -
+> Registered Address Lakeside, Bramley Road, Mount Farm, Milton Keynes, MK1 1PT, UK
+> Registration No: 1397386 (Wales)
+> 
