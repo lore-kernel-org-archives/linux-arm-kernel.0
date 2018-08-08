@@ -1,33 +1,28 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed,  8 Aug 2018 01:07:03 -0700
-Subject: [PATCH 1/4] ARM: OMAP2+: Fix null hwmod for ti-sysc debug
-In-Reply-To: <20180808080706.100389-1-tony@atomide.com>
-References: <20180808080706.100389-1-tony@atomide.com>
-Message-ID: <20180808080706.100389-2-tony@atomide.com>
+Date: Wed,  8 Aug 2018 01:07:02 -0700
+Subject: [PATCH 0/4] Few corner case fixes for ti-sysc
+Message-ID: <20180808080706.100389-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We may call omap_hwmod_parse_module_range() with no hwmod allocated yet
-and may have debug enabled. Let's fix this by checking for hwmod before
-trying to use it's name.
+Hi all,
 
-Fixes: 6c72b3550672 ("ARM: OMAP2+: Parse module IO range from dts for legacy
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/omap_hwmod.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Here are few corner case fixes for ti-sysc.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2220,7 +2220,7 @@ int omap_hwmod_parse_module_range(struct omap_hwmod *oh,
- 	size = be32_to_cpup(ranges);
- 
- 	pr_debug("omap_hwmod: %s %s at 0x%llx size 0x%llx\n",
--		 oh->name, np->name, base, size);
-+		 oh ? oh->name : "", np->name, base, size);
- 
- 	res->start = base;
- 	res->end = base + size - 1;
+Regards,
+
+Tony
+
+
+Tony Lindgren (4):
+  ARM: OMAP2+: Fix null hwmod for ti-sysc debug
+  ARM: OMAP2+: Fix module address for modules using mpu_rt_idx
+  bus: ti-sysc: Fix module register ioremap for larger offsets
+  bus: ti-sysc: Fix no_console_suspend handling
+
+ arch/arm/mach-omap2/omap_hwmod.c | 39 +++++++++++++++++++++++++++++++-
+ drivers/bus/ti-sysc.c            | 35 ++++++++++++++--------------
+ 2 files changed, 55 insertions(+), 19 deletions(-)
+
 -- 
 2.17.1
