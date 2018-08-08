@@ -1,66 +1,90 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  8 Aug 2018 17:31:42 +0200
-Subject: [PATCH 20/28] ARM: davinci: da830-evm: use device properties for at24
- eeprom
+Date: Wed,  8 Aug 2018 17:31:37 +0200
+Subject: [PATCH 15/28] net: add support for nvmem to
+ eth_platform_get_mac_address()
 In-Reply-To: <20180808153150.23444-1-brgl@bgdev.pl>
 References: <20180808153150.23444-1-brgl@bgdev.pl>
-Message-ID: <20180808153150.23444-21-brgl@bgdev.pl>
+Message-ID: <20180808153150.23444-16-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We want to work towards phasing out the at24_platform_data structure.
-There are few users and its contents can be represented using generic
-device properties. Using device properties only will allow us to
-significantly simplify the at24 configuration code.
+Many non-DT platforms read the MAC address from EEPROM. Usually it's
+either done with callbacks defined in board files or from SoC-specific
+ethernet drivers.
 
-Remove the at24_platform_data structure and replace it with an array
-of property entries. Drop the byte_len/size property, as the model name
-already implies the EEPROM's size.
+In order to generalize this, try to read the MAC from nvmem in
+eth_platform_get_mac_address() using a standard lookup name:
+"mac-address".
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-da830-evm.c | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
+ net/ethernet/eth.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index 4a2fe8142a2f..08a23e777eca 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -18,7 +18,7 @@
- #include <linux/platform_device.h>
- #include <linux/i2c.h>
- #include <linux/platform_data/pcf857x.h>
--#include <linux/platform_data/at24.h>
-+#include <linux/property.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- #include <linux/spi/spi.h>
-@@ -419,12 +419,9 @@ static struct nvmem_cell_lookup da830_evm_mac_address_cell = {
- 	.nvmem_name = "1-00500",
- };
+diff --git a/net/ethernet/eth.c b/net/ethernet/eth.c
+index cf54cdf042b7..98bc280b8a62 100644
+--- a/net/ethernet/eth.c
++++ b/net/ethernet/eth.c
+@@ -54,6 +54,7 @@
+ #include <linux/if_ether.h>
+ #include <linux/of_net.h>
+ #include <linux/pci.h>
++#include <linux/nvmem-consumer.h>
+ #include <net/dst.h>
+ #include <net/arp.h>
+ #include <net/sock.h>
+@@ -559,6 +560,39 @@ static int mac_address_from_arch(u8 *mac_addr)
+ 	return 0;
+ }
  
--static struct at24_platform_data da830_evm_i2c_eeprom_info = {
--	.byte_len	= SZ_256K / 8,
--	.page_size	= 64,
--	.flags		= AT24_FLAG_ADDR16,
--	.setup		= davinci_get_mac_addr,
--	.context	= (void *)0x7f00,
-+static const struct property_entry da830_evm_i2c_eeprom_properties[] = {
-+	PROPERTY_ENTRY_U32("pagesize", 64),
-+	{ }
- };
++static int mac_address_from_nvmem(struct device *dev, u8 *mac_addr)
++{
++	const unsigned char *addr;
++	struct nvmem_cell *cell;
++	size_t alen;
++	int rv = 0;
++
++	cell = nvmem_cell_get(dev, "mac-address");
++	if (IS_ERR(cell))
++		return PTR_ERR(cell);
++
++	addr = nvmem_cell_read(cell, &alen);
++	if (IS_ERR(addr)) {
++		rv = PTR_ERR(addr);
++		goto put_nvmem;
++	}
++
++	if (alen != ETH_ALEN || !is_valid_ether_addr(addr)) {
++		rv = -ENODEV;
++		goto free_addr;
++	}
++
++	ether_addr_copy(mac_addr, addr);
++
++free_addr:
++	kfree(addr);
++
++put_nvmem:
++	nvmem_cell_put(cell);
++
++	return rv;
++}
++
+ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
+ {
+ 	int rv;
+@@ -571,6 +605,10 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
+ 	if (!rv)
+ 		return 0;
  
- static int __init da830_evm_ui_expander_setup(struct i2c_client *client,
-@@ -458,7 +455,7 @@ static struct pcf857x_platform_data __initdata da830_evm_ui_expander_info = {
- static struct i2c_board_info __initdata da830_evm_i2c_devices[] = {
- 	{
- 		I2C_BOARD_INFO("24c256", 0x50),
--		.platform_data	= &da830_evm_i2c_eeprom_info,
-+		.properties = da830_evm_i2c_eeprom_properties,
- 	},
- 	{
- 		I2C_BOARD_INFO("tlv320aic3x", 0x18),
++	rv = mac_address_from_nvmem(dev, mac_addr);
++	if (!rv)
++		return 0;
++
+ 	return -ENODEV;
+ }
+ EXPORT_SYMBOL(eth_platform_get_mac_address);
 -- 
 2.18.0
