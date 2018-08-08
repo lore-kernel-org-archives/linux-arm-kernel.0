@@ -1,62 +1,58 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 8 Aug 2018 19:09:33 +0200
-Subject: Vibrations on Droid 4?
-In-Reply-To: <20180802110701.3b4voigegy67h4p5@earth.universe>
-References: <20180709220211.GA7760@amd>
- <20180710101147.lyu65ro4czvrs2da@earth.universe>
- <20180710133040.GA4391@amd>
- <20180710161123.azym6sbboriuj4yc@earth.universe>
- <20180711080218.GA21225@amd> <20180711132739.GL99251@atomide.com>
- <20180715201729.GB19675@amd> <20180716075926.GU99251@atomide.com>
- <20180801185823.GC26087@amd>
- <20180802110701.3b4voigegy67h4p5@earth.universe>
-Message-ID: <20180808170933.GC7306@amd>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Thu,  9 Aug 2018 01:19:52 +0800
+Subject: [PATCH] clk: sunxi-ng: fix H6 bus clocks divider position
+Message-ID: <20180808171952.17263-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The bus clocks (AHB/APB) on Allwinner H6 have their second divider start
+at bit 8, according to the user manual and the BSP code. However,
+currently the divider is wrongly set to 16, thus the divider is not
+correctly read and the clock frequency is not correctly calculated.
 
-> On Wed, Aug 01, 2018 at 08:58:24PM +0200, Pavel Machek wrote:
-> > > > Yep, so I have two patches that make the device appear, but vibrations
-> > > > still do not work for me.
-> > > > 
-> > > > a) any ideas how to debug that / get them to work?
-> > > 
-> > > Hmm no new ideas except I wonder if there is also some other
-> > > regression with the timer pdata not being passed properly now.
-> > 
-> > I checked vibrations work in original Motorola Android; my hardware is
-> > not broken.
-> 
-> You got it working, but this information might still be interesting
-> in case of future problems:
-> 
-> The Android "driver" is very different from the one I wrote from
-> scratch and upstreamed. The mainline driver is less lines of code
-> (iirc 25%), less complicated (Android vibration support is spread
-> over multiple drivers/arch code), more efficient (Android drivers
-> does GPIO bitbanging instead of PWM) and provides more features
-> (Android driver does not allow all strength settings). Also it uses
-> normal input device API instead of a custom one.
+Fix this bit offset on all affected bus clocks in ccu-sun50i-h6.
 
-Thanks for doing it right.
+Cc: stable at vger.kernel.org # v4.17.y
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ drivers/clk/sunxi-ng/ccu-sun50i-h6.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-> P.S.: Sorry, I don't have much time to work on D4 at the moment :(
-
-Thanks for doing the work, d4 seems to be the most usable phone at the
-moment. Yes, there's more work to do, but there's always more work to
-do.
-
-Best regards,
-
-									Pavel
+diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+index bdbfe78fe133..0f7a0ffd3f70 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
++++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+@@ -224,7 +224,7 @@ static SUNXI_CCU_MP_WITH_MUX(psi_ahb1_ahb2_clk, "psi-ahb1-ahb2",
+ 			     psi_ahb1_ahb2_parents,
+ 			     0x510,
+ 			     0, 5,	/* M */
+-			     16, 2,	/* P */
++			     8, 2,	/* P */
+ 			     24, 2,	/* mux */
+ 			     0);
+ 
+@@ -233,19 +233,19 @@ static const char * const ahb3_apb1_apb2_parents[] = { "osc24M", "osc32k",
+ 						       "pll-periph0" };
+ static SUNXI_CCU_MP_WITH_MUX(ahb3_clk, "ahb3", ahb3_apb1_apb2_parents, 0x51c,
+ 			     0, 5,	/* M */
+-			     16, 2,	/* P */
++			     8, 2,	/* P */
+ 			     24, 2,	/* mux */
+ 			     0);
+ 
+ static SUNXI_CCU_MP_WITH_MUX(apb1_clk, "apb1", ahb3_apb1_apb2_parents, 0x520,
+ 			     0, 5,	/* M */
+-			     16, 2,	/* P */
++			     8, 2,	/* P */
+ 			     24, 2,	/* mux */
+ 			     0);
+ 
+ static SUNXI_CCU_MP_WITH_MUX(apb2_clk, "apb2", ahb3_apb1_apb2_parents, 0x524,
+ 			     0, 5,	/* M */
+-			     16, 2,	/* P */
++			     8, 2,	/* P */
+ 			     24, 2,	/* mux */
+ 			     0);
+ 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180808/13330542/attachment.sig>
+2.18.0
