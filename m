@@ -1,51 +1,21 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Wed, 08 Aug 2018 09:41:37 +0900
-Subject: [PATCH v2 2/4] phy: socionext: add USB3 PHY driver for UniPhier
- SoC
-In-Reply-To: <1533290045-18969-3-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1533290045-18969-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1533290045-18969-3-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <20180808094136.5509.4A936039@socionext.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 07 Aug 2018 17:59:31 -0700 (PDT)
+Subject: [PATCH 00/33] net: ethernet: Mark expected switch fall-throughs
+In-Reply-To: <cover.1533675546.git.gustavo@embeddedor.com>
+References: <cover.1533675546.git.gustavo@embeddedor.com>
+Message-ID: <20180807.175931.200772329178253653.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 3 Aug 2018 18:54:03 +0900 <hayashi.kunihiko@socionext.com> wrote:
+From: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+Date: Tue, 7 Aug 2018 18:09:00 -0500
 
-> Add a driver for PHY interface built into USB3 controller
-> implemented in UniPhier SoCs.
-> This driver supports High-Speed PHY and Super-Speed PHY.
-> 
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> Signed-off-by: Motoya Tanigawa <tanigawa.motoya@socionext.com>
-> Signed-off-by: Masami Hiramatsu <masami.hiramatsu@linaro.org>
-> ---
->  drivers/phy/Kconfig                         |   1 +
->  drivers/phy/Makefile                        |   1 +
->  drivers/phy/socionext/Kconfig               |  12 +
->  drivers/phy/socionext/Makefile              |   6 +
->  drivers/phy/socionext/phy-uniphier-usb3hs.c | 423 ++++++++++++++++++++++++++++
->  drivers/phy/socionext/phy-uniphier-usb3ss.c | 350 +++++++++++++++++++++++
->  6 files changed, 793 insertions(+)
->  create mode 100644 drivers/phy/socionext/Kconfig
->  create mode 100644 drivers/phy/socionext/Makefile
->  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3hs.c
->  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3ss.c
+> In preparation to enabling -Wimplicit-fallthrough, this patchset aims
+> to add some annotations in order to mark switch cases where we are
+> expecting to fall through.
 
-[snip]
+Ok, I went through all of these and they look good.
 
-> +static void uniphier_u3ssphy_testio_write(struct uniphier_u3ssphy_priv *priv,
-> +					  u32 data)
-> +{
-> +	/* need to read TESTO twice after accessing TESTI */
-> +	writel(data, priv->base + SSPHY_TESTI);
-> +	readl(priv->base + SSPHY_TESTI);
-> +	readl(priv->base + SSPHY_TESTI);
+If any are not correct we can revert/fix.
 
-I made a mistake here. The comment and the code are inconsistent.
-I'll fix it next.
-
-Thanks,
-
----
-Best Regards,
-Kunihiko Hayashi
+Series applied, thanks.
