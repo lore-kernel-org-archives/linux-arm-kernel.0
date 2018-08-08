@@ -1,78 +1,41 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 8 Aug 2018 15:02:26 -0700
-Subject: [RFC/PoC PATCH 0/3] arm64: basic ROP mitigation
-In-Reply-To: <CAN+XpFTbqMXiX=dYpK_ExvctkaJjZL9q=n06goujPht35Bieqg@mail.gmail.com>
-References: <20180802132133.23999-1-ard.biesheuvel@linaro.org>
- <7529eedf-af56-2e94-261e-bc5c86abadaa@arm.com>
- <CAKv+Gu9X1CDpy+XvrmbSdjBjMb45eBW7JVsvsK_JQdUt2Dbvgw@mail.gmail.com>
- <b0c974a2-4e81-7855-7d4e-22834c5d8997@arm.com>
- <CAKv+Gu_ZzDbWwHVwOuoheXeN-ta_FjOT4Aj15=r56QZVTUK0FA@mail.gmail.com>
- <CAKv+Gu_wGk2Gdzd6WuOMZqz1tKHAWHL7pWm2Szyt0DZwPTCmOw@mail.gmail.com>
- <31443e6a-56b4-c4fb-82b1-b8eb5d7eebe1@arm.com>
- <CAGXu5jLj=KP038d-c+xzCx=Oogn1prH__oryQjNZZwNaAHaAAw@mail.gmail.com>
- <CAKv+Gu-9M0yO-rSXiREs11feEro0mJFcNN3Wkp_LSOGrKKd5dg@mail.gmail.com>
- <CAGXu5j+Tddmp_VgyvwTd+StEGtx=oGofeY+KpLD4OuPw+2=S2Q@mail.gmail.com>
- <CAKv+Gu-5ERHvqgXHR626QzKCZJPc0Cp5Ktv+gwucep5ZGvu9Vw@mail.gmail.com>
- <CAN+XpFQCO1nr5tQ4oyPPaSfvnQSvwx-=JCtba2xJXrEN+6=LZg@mail.gmail.com>
- <CAKv+Gu_jNh7vLfGEdi2BpA42rPJrNr8qV-Xss_toV2fJzUV5jQ@mail.gmail.com>
- <CAN+XpFTbqMXiX=dYpK_ExvctkaJjZL9q=n06goujPht35Bieqg@mail.gmail.com>
-Message-ID: <CAGXu5jJrB89-egt6n5qC88Hj5Oi4UOQO=cBO6vD7MZwgdjwHyA@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Aug 2018 23:15:47 +0100
+Subject: [PATCH v2 4/7] drm/i2c: tda998x: convert to bridge driver
+In-Reply-To: <20180808190930.GQ20303@art_vandelay>
+References: <20180730164137.GD17271@n2100.armlinux.org.uk>
+ <E1fkBFV-00048s-O2@rmk-PC.armlinux.org.uk>
+ <20180808190930.GQ20303@art_vandelay>
+Message-ID: <20180808221547.GN30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2018 at 9:09 AM, Mark Brand <markbrand@google.com> wrote:
-> (1) chaining through the mempool_free function, I found this really
-> quickly when searching for useful gadgets based off x0
->
-> void mempool_free(void *element, mempool_t *pool)
-> {
->   unsigned long flags;
->
->   if (unlikely(element == NULL))
->     return;
->
->   /* snip */
->   smp_rmb();
->
->   /* snip */
->   if (unlikely(pool->curr_nr < pool->min_nr)) {
->     spin_lock_irqsave(&pool->lock, flags);
->     if (likely(pool->curr_nr < pool->min_nr)) {
->       add_element(pool, element);
->       spin_unlock_irqrestore(&pool->lock, flags);
->       wake_up(&pool->wait);
->       return;
->     }
->     spin_unlock_irqrestore(&pool->lock, flags);
->   }
->
->   pool->free(element, pool->pool_data);
-> }
->
-> Since the callsites for this function usually load the arguments
-> through some registers, and the function to call gets pulled out of
-> one of those arguments, it's easy to get a couple of registers loaded
-> here and then the chain continue.
->
-> (2) loading complete register state using kernel_exit macro.
->
-> Since the kernel_exit macro actually loads spsr_el1 and elr_el1 from
-> registers, I think that you can let the eret return to anywhere in el1
-> without dropping to el0, since the same handler is used for "exiting
-> the kernel" when a hardware interrupt interrupts the kernel itself. I
-> didn't fill out the necessary register values in the chain below,
-> since I don't anyway have a device around to test this on right now.
->
-> I'm not sure that you could really robustly protect this eret; I
-> suppose that you could try and somehow validate the saved register
-> state, but given that it would be happening on every exception return,
-> I suspect it would be expensive.
+On Wed, Aug 08, 2018 at 03:09:30PM -0400, Sean Paul wrote:
+> > -static const struct drm_encoder_helper_funcs tda998x_encoder_helper_funcs = {
+> > -	.dpms = tda998x_encoder_dpms,
+> > -	.prepare = tda998x_encoder_prepare,
+> > -	.commit = tda998x_encoder_commit,
+> > -	.mode_set = tda998x_encoder_mode_set,
+> > -};
+> 
+> Now that encoder is a stub, it should really be removed from here. The encoder
+> should be instantiated elsewhere and attach the bridge to itself. There are a
+> bunch of examples of this in bridge/
 
-This is a wonderful example, thanks! Yeah, Call-Oriented Programming?
-:P mempool_free() is quite a nice gadget.
+That's not possible at present - this driver has to remain compatible
+with Armada and TI LCDC, both of which expect this driver to create
+the encoder.
 
--Kees
+In any case, bridges are buggy with unbinding/rebinding as I've pointed
+out several times in the past, but TDA998x used with Armada and TI LCDC
+as it currently stands are not.  So, to do this as a full conversion to
+bridge and pushing the encoders into the DRM drivers results in a
+regression for these two DRM drivers.  I'm not willing to accept such
+a regression, sorry.
+
+Thanks for the other cleanup suggestions, they can be done with a
+later patch (these changes have already been been merged.)
 
 -- 
-Kees Cook
-Pixel Security
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
