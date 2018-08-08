@@ -1,57 +1,68 @@
-From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
-Date: Wed, 8 Aug 2018 19:59:30 +0530
-Subject: [RFC PATCH 3/3] dynamic_debug: Add support for dynamic register
- trace
-In-Reply-To: <20180807165713.GJ21809@arm.com>
-References: <cover.1533211508.git.saiprakash.ranjan@codeaurora.org>
- <37c723a7892b21eb67b8447160d8d602703f321f.1533211509.git.saiprakash.ranjan@codeaurora.org>
- <20180807165713.GJ21809@arm.com>
-Message-ID: <eb55098d-6825-ab50-e1e9-0d95b1e1ea14@codeaurora.org>
+From: cyndis@kapsi.fi (Mikko Perttunen)
+Date: Wed, 8 Aug 2018 17:34:12 +0300
+Subject: [PATCH v3 3/8] mailbox: Add transmit done by blocking option
+In-Reply-To: <CABb+yY2mpNV186=M2anmZANgMOra4JM7ybyUT4yCxhqAG6-AZg@mail.gmail.com>
+References: <20180702114033.15654-1-mperttunen@nvidia.com>
+ <20180702114033.15654-4-mperttunen@nvidia.com>
+ <CABb+yY0_dKC_cYFwwb-aeRgrx=sjv=8VLP=C6DJEecFf=v+mkQ@mail.gmail.com>
+ <907bac36-0c54-8f38-0f5e-f59196d414c6@kapsi.fi>
+ <afc8a305-79ea-2194-0af0-919bbb8f675e@kapsi.fi>
+ <CABb+yY2mpNV186=M2anmZANgMOra4JM7ybyUT4yCxhqAG6-AZg@mail.gmail.com>
+Message-ID: <b5a91f9e-c3ff-371c-d355-4a5e8a147796@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/7/2018 10:27 PM, Will Deacon wrote:
-> On Fri, Aug 03, 2018 at 07:58:44PM +0530, Sai Prakash Ranjan wrote:
->> Introduce dynamic debug filtering mechanism to register
->> tracing as dynamic_rtb() which will reduce a lot of
->> overhead otherwise of tracing all the register reads/writes
->> in all files.
+
+
+On 08/08/2018 05:10 PM, Jassi Brar wrote:
+> On Wed, Aug 8, 2018 at 5:08 PM, Mikko Perttunen <cyndis@kapsi.fi> wrote:
 >>
->> Now we can just specify the file name or any wildcard pattern
->> as any other dynamic debug facility in bootargs and dynamic rtb
->> will just trace them and the output can be seen in pstore.
 >>
->> TODO: Now we use same 'p' flag but will add a separate flag for register trace
->> later.
+>> On 04.08.2018 13:45, Mikko Perttunen wrote:
+>>>
+>>> On 08/03/2018 03:54 PM, Jassi Brar wrote:
+>>>>
+>>>> On Mon, Jul 2, 2018 at 5:10 PM, Mikko Perttunen <mperttunen@nvidia.com>
+>>>> wrote:
+>>>>>
+>>>>> Add a new TXDONE option, TXDONE_BY_BLOCK. With this option, the
+>>>>> send_data function of the mailbox driver is expected to block until
+>>>>> the message has been sent. The new option is used with the Tegra
+>>>>> Combined UART driver to minimize unnecessary overhead when transmitting
+>>>>> data.
+>>>>>
+>>>> 1) TXDONE_BY_BLOCK flag :-
+>>>>           Have you tried setting the flag mbox_chan->mbox_client->tx_block
+>>>> ?
+>>>
+>>>
+>>> No - I suppose I should have done that. I'm a bit concerned about overhead
+>>> as send_data may be called thousands of times per second, so I tried to make
+>>> it as close as possible to the downstream driver that just pokes the mailbox
+>>> register directly.
 >>
->> Example for tracing all register reads/writes in drivers/soc/qcom/* below:
 >>
->>    # dyndbg="file drivers/soc/qcom/* +p" in bootargs
->>    # reboot -f
->>    # mount -t pstore pstore /sys/fs/pstore
->>    # cat /sys/fs/pstore/rtb-ramoops-0
->>      [LOGK_WRITEL ] ts:1373030419  data:ffff00000d5065a4  <ffff00000867cb44>  qcom_smsm_probe+0x51c/0x668
->>      [LOGK_WRITEL ] ts:1373360576  data:ffff00000d506608  <ffff00000867cb44>  qcom_smsm_probe+0x51c/0x668
+>> I tried using polling in the mailbox framework. Some printing is done from
+>> atomic context so it seems tx_block cannot be used -
+>> wait_for_completion_timeout understandably does not work in atomic context.
+>> I also tried without tx_block, in which case I got some horribly garbled
+>> output, but "Try increasing MBOX_TX_QUEUE_LEN" was readable there.
 >>
->> Also we add uncached_logk api to readl/writel definitions for arm64
->> as of now. This can be extended to arm as well later for tracing.
+>> Any opinions?
 >>
->> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
->> ---
->>   arch/arm64/include/asm/io.h   | 93 +++++++++++++++++++++++++++++++++++
+> The problems arise because your hardware (SM) supports TXDONE_BY_POLL,
+> but your client drives it by TXDONE_BY_ACK because the older DB
+> channels are so.
 > 
-> Putting all of this in the arch code, which basically duplicates everything,
-> feels very wrong to me. Perhaps take a look at the ongoing work for
-> instrumenting the atomics and take some inspiration from there?
-> 
-> Ideally, the architecture just needs to provide the low-level primivites
-> (which it already does) and the core can generate instruments versions if
-> required.
+> Please populate SM channels as a separate controller than DB.
+> The DB controller, as is, run by ACK method.
+> The SM controller should be run by polling, i.e, set txdone_poll =
+> true and the poll period small enough. The virtual tty client driver
+> should be able to safely set tx_block from appropriate context.
 > 
 
-Hi Will,
+Sorry, I should have clarified that I already split up the controllers. 
+The SM controller has txdone_poll = true. I didn't adjust txpoll_period 
+so I guess it's zero.
 
-Thanks for the review. Will look at instrumented atomics implementation 
-and get back. Let me know if anything else can be improved.
-
-  - Sai Prakash
+Mikko
