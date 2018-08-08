@@ -1,31 +1,37 @@
-From: atull@kernel.org (Alan Tull)
-Date: Wed,  8 Aug 2018 10:42:41 -0500
-Subject: [PATCH] arm64: dts: stratix10: i2c clock running out of spec
-Message-ID: <20180808154241.3760-1-atull@kernel.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 8 Aug 2018 16:44:48 +0100
+Subject: [PATCH] ARM: spinlock: avoid exclusive accesses on
+ unlock()path
+In-Reply-To: <tencent_5E0B19C04FA531B834205F9F@qq.com>
+References: <tencent_5E0B19C04FA531B834205F9F@qq.com>
+Message-ID: <20180808154448.GB31006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DesignWare I2C controller was observed running at 105.93kHz rather
-than the specified 100kHz.  Adjust device tree settings to bring it
-within spec (a slightly conservative 98 MHz).
+On Wed, Aug 08, 2018 at 08:30:28AM +0800, ??? wrote:
+> On 8 Aug 2018, will.deacon wrote:
+> 
+> >On Tue, Aug 07, 2018 at 09:59:13AM +0800, ??? wrote:
+> >> while one cpu is doing arch_spin_unlock,another cpu doing arch_spin_lock
+> > >the first cpu's
+> > >lock->tickets.owner++;
+> > >may be over writed by the second's
+> > >strex %2, %1, [%3]\n
+> > >so the owner filed doesn't get increased.
+> 
+> >I don't see how this can happen. If the unlocker writes to the owner field
+> >in-between the locker's LDXR/STXR pair (which is the only way the harmful
+> >overwrite could occur as far as I can tell), then the STXR will fail and not
+> >update memory.
+> 
+> >Are you actually seeing a problem here?
+> 
+> In DDI0406C_C_arm_architecture_reference_manual.pdf A3-117, It says after
+> normal Store operation,  the monitor maybe in Exclusive Access or Open Access
+> which is implementation defined.
 
-Signed-off-by: Alan Tull <atull@kernel.org>
----
- arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts | 2 ++
- 1 file changed, 2 insertions(+)
+You're looking at the section describing non-shareable memory. If you scroll
+down to A3-119, you can see that a store to the tagged address from a
+different CPU will transition the monitor to the open state.
 
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-index 6edc4fa..53cf195 100644
---- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-@@ -124,6 +124,8 @@
- &i2c1 {
- 	status = "okay";
- 	clock-frequency = <100000>;
-+	i2c-sda-falling-time-ns = <890>;  /* hcnt */
-+	i2c-sdl-falling-time-ns = <890>;  /* lcnt */
- 
- 	adc at 14 {
- 		compatible = "lltc,ltc2497";
--- 
-2.7.4
+Will
