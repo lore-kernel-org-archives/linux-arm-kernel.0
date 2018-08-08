@@ -1,84 +1,71 @@
 From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Wed,  8 Aug 2018 14:25:12 +0900
-Subject: [PATCH v2 0/7] add UniPhier DVB Frontend system support
-Message-ID: <20180808052519.14528-1-suzuki.katsuhiro@socionext.com>
+Date: Wed,  8 Aug 2018 14:25:13 +0900
+Subject: [PATCH v2 1/7] media: uniphier: add DT bindings documentation for
+ UniPhier HSC
+In-Reply-To: <20180808052519.14528-1-suzuki.katsuhiro@socionext.com>
+References: <20180808052519.14528-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <20180808052519.14528-2-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for DVB Frontend system named HSC support
-for UniPhier LD11/LD20 SoCs. This driver supports MPEG2-TS serial
-signal input from external demodulator and DMA MPEG2-TS stream data
-onto memory.
+This patch adds DT binding documentation for UniPhier HSC which is
+MPEG2-TS input/output and demux subsystem.
 
-UniPhier HSC driver provides many ports of TS input. Since the HSC
-has mixed register map for those ports. It hard to split each register
-areas.
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 
 ---
 
 Changes from v1:
-  DT bindings
-    - Fix mistakes of spelling
-    - Rename uniphier,hsc.txt -> socionext,uniphier-hsc.txt
-  Kconfig, Makefile
-    - Add COMPILE_TEST, REGMAP_MMIO
-    - Add $(srctree) to include path option
-  Headers
-    - Split large patch
-    - Remove more unused definitions
-    - Remove unneeded const
-    - Replace enum that has special value into #define
-    - Remove weird macro from register definitions
-    - Remove field_get/prop inline functions
-  Modules
-    - Split register definitions, function prototypes
-    - Fix include lines
-    - Fix depended config
-    - Remove redundant conditions
-    - Drop adapter patches, and need no patches to build
-    - Merge uniphier-adapter.o into each adapter drivers
-    - Split 3 modules (core, ld11, ld20) to build adapter drivers as
-      module
-    - Fix compile error if build as module
-    - Use hardware spec table to remove weird macro from register
-      definitions
-    - Use usleep_range instead of msleep
-    - Use shift and mask instead of field_get/prop inline functions
-
-Katsuhiro Suzuki (7):
-  media: uniphier: add DT bindings documentation for UniPhier HSC
-  media: uniphier: add DMA common file of HSC
-  media: uniphier: add CSS common file of HSC
-  media: uniphier: add TS common file of HSC
-  media: uniphier: add ucode load common file of HSC
-  media: uniphier: add platform driver module of HSC
-  media: uniphier: add LD11/LD20 HSC support
-
- .../bindings/media/socionext,uniphier-hsc.txt |  38 ++
- drivers/media/platform/Kconfig                |   1 +
- drivers/media/platform/Makefile               |   2 +
- drivers/media/platform/uniphier/Kconfig       |  19 +
- drivers/media/platform/uniphier/Makefile      |   5 +
- drivers/media/platform/uniphier/hsc-core.c    | 515 ++++++++++++++++++
- drivers/media/platform/uniphier/hsc-css.c     | 250 +++++++++
- drivers/media/platform/uniphier/hsc-dma.c     | 212 +++++++
- drivers/media/platform/uniphier/hsc-ld11.c    | 273 ++++++++++
- drivers/media/platform/uniphier/hsc-reg.h     | 272 +++++++++
- drivers/media/platform/uniphier/hsc-ts.c      | 127 +++++
- drivers/media/platform/uniphier/hsc-ucode.c   | 416 ++++++++++++++
- drivers/media/platform/uniphier/hsc.h         | 389 +++++++++++++
- 13 files changed, 2519 insertions(+)
+  - Fix mistakes of spelling
+  - Rename uniphier,hsc.txt -> socionext,uniphier-hsc.txt
+---
+ .../bindings/media/socionext,uniphier-hsc.txt | 38 +++++++++++++++++++
+ 1 file changed, 38 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/media/socionext,uniphier-hsc.txt
- create mode 100644 drivers/media/platform/uniphier/Kconfig
- create mode 100644 drivers/media/platform/uniphier/Makefile
- create mode 100644 drivers/media/platform/uniphier/hsc-core.c
- create mode 100644 drivers/media/platform/uniphier/hsc-css.c
- create mode 100644 drivers/media/platform/uniphier/hsc-dma.c
- create mode 100644 drivers/media/platform/uniphier/hsc-ld11.c
- create mode 100644 drivers/media/platform/uniphier/hsc-reg.h
- create mode 100644 drivers/media/platform/uniphier/hsc-ts.c
- create mode 100644 drivers/media/platform/uniphier/hsc-ucode.c
- create mode 100644 drivers/media/platform/uniphier/hsc.h
 
+diff --git a/Documentation/devicetree/bindings/media/socionext,uniphier-hsc.txt b/Documentation/devicetree/bindings/media/socionext,uniphier-hsc.txt
+new file mode 100644
+index 000000000000..7a91046091e2
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/socionext,uniphier-hsc.txt
+@@ -0,0 +1,38 @@
++Socionext UniPhier HSC (High-speed Stream Controller)
++
++The Socionext UniPhier HSC subsystem consists of MPEG2-TS input/output and
++demultiplexer cores in the same register space.
++
++This interface supports TS serial signals (clock, valid, sync, data) from
++external demodulators.
++
++Required properties:
++- compatible      : should be one of the following:
++		    "socionext,uniphier-ld11-hsc"
++		    "socionext,uniphier-ld20-hsc"
++- reg             : offset and length of the register set for the device.
++- interrupts      : should contain DMA and TSI error interrupt.
++- pinctrl-names   : should be "default".
++- pinctrl-0       : defined TS serial signal pins for external demodulators.
++- clock-names     : should include the following entries:
++                    "hsc", "stdmac"
++- clocks          : a list of phandle, should contain an entry for each
++                    entry in clock-names.
++- reset-names     : should include the following entries:
++                    "hsc", "stdmac"
++- resets          : a list of phandle, should contain an entry for each
++                    entry in reset-names.
++
++Example:
++	hsc {
++		compatible = "socionext,uniphier-ld20-hsc";
++		reg = <0x5c000000 0x100000>;
++		interrupts = <0 100 4>, <0 101 4>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_hscin2_s>,
++			    <&pinctrl_hscin3_s>;
++		clock-names = "stdmac", "hsc";
++		clocks = <&sys_clk 8>, <&sys_clk 9>;
++		reset-names = "stdmac", "hsc";
++		resets = <&sys_rst 8>, <&sys_rst 9>;
++	};
 -- 
 2.18.0
