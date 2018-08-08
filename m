@@ -1,58 +1,64 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu,  9 Aug 2018 01:19:52 +0800
-Subject: [PATCH] clk: sunxi-ng: fix H6 bus clocks divider position
-Message-ID: <20180808171952.17263-1-icenowy@aosc.io>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 8 Aug 2018 12:22:11 -0500
+Subject: [PATCH] arm64: PCI: Remove node-local allocations when
+ initialising host controller
+In-Reply-To: <87eff85364.fsf@e105922-lin.cambridge.arm.com>
+References: <20180801173132.19739-1-punit.agrawal@arm.com>
+ <38ad03ba-2658-98c8-1888-0aa3bfb59bd4@arm.com>
+ <20180802143319.GA13512@red-moon>
+ <CAErSpo5i7AAXq4vmfsH2WjheXpzzM1iaehdeM24eQZjzYY39Rg@mail.gmail.com>
+ <87eff85364.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20180808172211.GD49411@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bus clocks (AHB/APB) on Allwinner H6 have their second divider start
-at bit 8, according to the user manual and the BSP code. However,
-currently the divider is wrongly set to 16, thus the divider is not
-correctly read and the clock frequency is not correctly calculated.
+On Wed, Aug 08, 2018 at 03:44:03PM +0100, Punit Agrawal wrote:
+> Bjorn Helgaas <bhelgaas@google.com> writes:
+> > On Thu, Aug 2, 2018 at 9:33 AM Lorenzo Pieralisi
+> > <lorenzo.pieralisi@arm.com> wrote:
+> >> On Wed, Aug 01, 2018 at 02:38:51PM -0500, Jeremy Linton wrote:
+> >>
+> >> Jiang Liu does not work on the kernel anymore so we won't know
+> >> anytime soon the reasoning behind commit 965cd0e4a5e5
+> >>
+> >> > On 08/01/2018 12:31 PM, Punit Agrawal wrote:
+> >> > >Memory for host controller data structures is allocated local to the
+> >> > >node to which the controller is associated with. This has been the
+> >> > >behaviour since support for ACPI was added in
+> >> > >commit 0cb0786bac15 ("ARM64: PCI: Support ACPI-based PCI host controller").
+> >> >
+> >> > Which was apparently influenced by:
+> >> >
+> >> > 965cd0e4a5e5 x86, PCI, ACPI: Use kmalloc_node() to optimize for performance
+> >> >
+> >> > Was there an actual use-case behind that change?
+> >> >
+> >> > I think this fixes the immediate boot problem, but if there is any
+> >> > perf advantage it seems wise to keep it... Particularly since x86
+> >> > seems to be doing the node sanitation in pci_acpi_root_get_node().
+> >>
+> >> I am struggling to see the perf advantage of allocating a struct
+> >> that the PCI controller will never read/write from a NUMA node that
+> >> is local to the PCI controller, happy to be corrected if there is
+> >> a sound rationale behind that.
+> >
+> > If there is no reason to use kzalloc_node() here, we shouldn't use it.
+> >
+> > But we should use it (or not use it) consistently across arches.  I do
+> > not believe there is an arch-specific reason to be different.
+> > Currently, pci_acpi_scan_root() uses kzalloc_node() on x86 and arm64,
+> > but kzalloc() on ia64.  They all ought to be the same.
+> 
+> From my understanding, arm64 use of kzalloc_node() was derived from the
+> x86 version. Maybe somebody familiar with behaviour on x86 can provide
+> input here.
 
-Fix this bit offset on all affected bus clocks in ccu-sun50i-h6.
+If you want to remove use of kzalloc_node(), I'm fine with that as
+long as you do it for x86 at the same time (maybe separate patches,
+but at least in the same series).
 
-Cc: stable at vger.kernel.org # v4.17.y
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- drivers/clk/sunxi-ng/ccu-sun50i-h6.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+I don't see any evidence in 965cd0e4a5e5 ("x86, PCI, ACPI: Use
+kmalloc_node() to optimize for performance") that it actually improves
+performance, so I'd be inclined to just use kzalloc().
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-index bdbfe78fe133..0f7a0ffd3f70 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-@@ -224,7 +224,7 @@ static SUNXI_CCU_MP_WITH_MUX(psi_ahb1_ahb2_clk, "psi-ahb1-ahb2",
- 			     psi_ahb1_ahb2_parents,
- 			     0x510,
- 			     0, 5,	/* M */
--			     16, 2,	/* P */
-+			     8, 2,	/* P */
- 			     24, 2,	/* mux */
- 			     0);
- 
-@@ -233,19 +233,19 @@ static const char * const ahb3_apb1_apb2_parents[] = { "osc24M", "osc32k",
- 						       "pll-periph0" };
- static SUNXI_CCU_MP_WITH_MUX(ahb3_clk, "ahb3", ahb3_apb1_apb2_parents, 0x51c,
- 			     0, 5,	/* M */
--			     16, 2,	/* P */
-+			     8, 2,	/* P */
- 			     24, 2,	/* mux */
- 			     0);
- 
- static SUNXI_CCU_MP_WITH_MUX(apb1_clk, "apb1", ahb3_apb1_apb2_parents, 0x520,
- 			     0, 5,	/* M */
--			     16, 2,	/* P */
-+			     8, 2,	/* P */
- 			     24, 2,	/* mux */
- 			     0);
- 
- static SUNXI_CCU_MP_WITH_MUX(apb2_clk, "apb2", ahb3_apb1_apb2_parents, 0x524,
- 			     0, 5,	/* M */
--			     16, 2,	/* P */
-+			     8, 2,	/* P */
- 			     24, 2,	/* mux */
- 			     0);
- 
--- 
-2.18.0
+Bjorn
