@@ -1,35 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 8 Aug 2018 12:39:28 +0100
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
- <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
- <20180803094129.GB17798@arm.com>
- <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
-Message-ID: <20180808113927.GA24736@iMac.local>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 08 Aug 2018 13:47:21 +0200
+Subject: Reset controller fixes for v4.18
+In-Reply-To: <1533551833.4204.10.camel@pengutronix.de>
+References: <1533551833.4204.10.camel@pengutronix.de>
+Message-ID: <1533728841.19096.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2018 at 01:09:02PM -0400, Mikulas Patocka wrote:
-> 	while (1) {
-> 		start = (unsigned)random() % (LEN + 1);
-> 		end = (unsigned)random() % (LEN + 1);
-> 		if (start > end)
-> 			continue;
-> 		for (i = start; i < end; i++)
-> 			data[i] = val++;
-> 		memcpy(map + start, data + start, end - start);
-> 		if (memcmp(map, data, LEN)) {
+On Mon, 2018-08-06 at 12:37 +0200, Philipp Zabel wrote:
+> Dear arm-soc maintainers,
+> 
+> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
+> 
+>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/pza/linux.git tags/reset-fixes-for-4.18
+> 
+> for you to fetch changes up to 26fce0557fa639fb7bbc33e31a57cff7df25c3a0:
+> 
+>   reset: imx7: Fix always writing bits as 0 (2018-07-23 13:00:28 +0200)
+> 
+> ----------------------------------------------------------------
+> Reset controller fixes for v4.18
+> 
+> This tag fixes reset assertion on i.MX7 for all non-inverted reset
+> control bits. Currently only PCIE controller and PHY resets are used.
+> 
+> ----------------------------------------------------------------
+> Leonard Crestez (1):
+>       reset: imx7: Fix always writing bits as 0
+> 
+>  drivers/reset/reset-imx7.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-It may be worth trying to do a memcmp(map+start, data+start, end-start)
-here to see whether the hazard logic fails when the writes are unaligned
-but the reads are not.
+I've resent the pull requests with the missing [GIT PULL] tag added,
+sorry for the noise.
 
-This problem may as well appear if you do byte writes and read longs
-back (and I consider this a hardware problem on this specific board).
-
--- 
-Catalin
+regards
+Philipp
