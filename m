@@ -1,21 +1,26 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 8 Aug 2018 18:55:32 +0200
-Subject: [PATCH v1 3/7] drivers: gpio: Add support for Turris Mox SFP GPIOs
-In-Reply-To: <20180808152706.21727-4-marek.behun@nic.cz>
+Date: Wed, 8 Aug 2018 18:58:46 +0200
+Subject: [PATCH v1 6/7] net: mvneta: Don't use GRO on Armada 3720
+In-Reply-To: <20180808152706.21727-7-marek.behun@nic.cz>
 References: <20180808152706.21727-1-marek.behun@nic.cz>
- <20180808152706.21727-4-marek.behun@nic.cz>
-Message-ID: <20180808165532.GJ7275@lunn.ch>
+ <20180808152706.21727-7-marek.behun@nic.cz>
+Message-ID: <20180808165846.GK7275@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2018 at 05:27:02PM +0200, Marek Beh?n wrote:
-> The SFP cage GPIOs on the SFP cage module of Turris Mox can be
-> configured via the moxtet bus.
+On Wed, Aug 08, 2018 at 05:27:05PM +0200, Marek Beh?n wrote:
+> For some reason on Armada 3720 boards (EspressoBin and Turris Mox) the
+> networking driver behaves weirdly when using napi_gro_receive.
 > 
-> This driver supports those GPIOs so that they can be used by phylink.
+> For example downloading a big file from a local network (low ping) is
+> fast, but when downloading from a remote server (higher ping), the
+> download speed is at first high but drops rapidly to almost nothing or
+> absolutely nothing.
+> 
+> This is fixed when using netif_receive_skb instead of napi_gro_receive.
 
-I don't see anything in this driver which is specific to SFP. It is
-just a GPIO driver for 3 lines. So i would drop all references to SFP.
-You can then use it to blink LEDs on some other module, etc.
+Before doing this, we should really understand what is going on. It is
+probably just a driver bug which needs fixing. And GRO should be good
+for performance, so we do want to use it, if possible.
 
-     Andrew
+    Andrew
