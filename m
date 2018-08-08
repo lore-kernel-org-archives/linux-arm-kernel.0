@@ -1,42 +1,37 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Wed, 8 Aug 2018 13:02:54 +0000
-Subject: framebuffer corruption due to overlapping stp instructions on
- arm64
-In-Reply-To: <20180808121641.GB24736@iMac.local>
-References: <alpine.LRH.2.02.1808021242320.31834@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3tFGqkYEcWNN4LaWThw_rVqT316pzLv6T7RfxwO-eZ0EA@mail.gmail.com>
- <alpine.LRH.2.02.1808030212340.17672@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu8DeuksZhk1g3q_msSKV_hSY_2e1uzVten9-oGO3j9Sqg@mail.gmail.com>
- <20180803094129.GB17798@arm.com>
- <alpine.LRH.2.02.1808031235410.31584@file01.intranet.prod.int.rdu2.redhat.com>
- <CAKv+Gu-aNFh1fsr_05SEwDp99n3pLrguP7=tEcFQPNY53=K7Fw@mail.gmail.com>
- <alpine.LRH.2.02.1808031424140.14030@file01.intranet.prod.int.rdu2.redhat.com>
- <CAHCPf3s-+Qf=WBZz1KpisDMG3520jCUh8PLAO3PHa4jdt8kCTw@mail.gmail.com>
- <20180808121641.GB24736@iMac.local>
-Message-ID: <b1de49af14d941979977af07dc81e1c2@AcuMS.aculab.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  8 Aug 2018 14:14:57 +0100
+Subject: [PATCH 0/4] KVM: arm/arm64: vgic-v3: Group0 SGI support
+Message-ID: <20180808131501.584-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Catalin Marinas
-> Sent: 08 August 2018 13:17
-...
-> I think hazarding is what goes wrong here, especially since with
-> overlapping unaligned addresses. However, I disagree that it is
-> impossible to implement this properly on a platform with PCIe so that
-> Normal NC mappings can be used.
+Although we now have Group0 support, we still miss support for Group0
+SGIs (which amounts to handling ICC_SGI0R_EL1 and ICC_ASGI1R_EL1
+traps), and this small series adds such support.
 
-I've been trying to follow this discussion...
+I appreciate this is *very* late for 4.19, I'd like to take it in as
+they complement Christoffer's Group0 support, and It'd be annoying to
+have something incomplete in 4.19.
 
-Is the problem just that reads don't snoop/flush the write-combining buffer?
-Aligned writes that end on an appropriate boundary will leave the write
-combining buffer empty.
-But if the buffer isn't emptied the PCIe read gets ahead of the PCIe write.
+Please shout if you spot something that doesn't look quite right.
 
-ISTR even x86 requires a fence instruction in some sequence associated
-with write-combining writes.
+Thanks,
 
-	David
+	M.
 
--
-Registered Address Lakeside, Bramley Road, Mount Farm, Milton Keynes, MK1 1PT, UK
-Registration No: 1397386 (Wales)
+Marc Zyngier (4):
+  KVM: arm64: Remove non-existent AArch32 ICC_SGI1R encoding
+  KVM: arm/arm64: vgic-v3: Add core support for Group0 SGIs
+  KVM: arm64: vgic-v3: Add support for ICC_SGI0R_EL1 and ICC_ASGI1R_EL1
+    accesses
+  KVM: arm: vgic-v3: Add support for ICC_SGI0R and ICC_ASGI1R accesses
+
+ arch/arm/kvm/coproc.c            | 25 ++++++++++++++++++-
+ arch/arm64/include/asm/sysreg.h  |  2 ++
+ arch/arm64/kvm/sys_regs.c        | 43 +++++++++++++++++++++++++++++---
+ include/kvm/arm_vgic.h           |  2 +-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 16 +++++++++---
+ 5 files changed, 79 insertions(+), 9 deletions(-)
+
+-- 
+2.18.0
