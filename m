@@ -1,94 +1,52 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Thu,  9 Aug 2018 18:52:15 +0200
-Subject: [PATCH 3/5] clk: sunxi-ng: r40: Add max. rate constraint to video PLLs
+Date: Thu,  9 Aug 2018 18:52:16 +0200
+Subject: [PATCH 4/5] clk: sunxi-ng: nkmp: Add constraint for maximum rate
 In-Reply-To: <20180809165217.30680-1-jernej.skrabec@siol.net>
 References: <20180809165217.30680-1-jernej.skrabec@siol.net>
-Message-ID: <20180809165217.30680-4-jernej.skrabec@siol.net>
+Message-ID: <20180809165217.30680-5-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Video PLLs on R40 can be set to higher rate that it is actually
+Some, if not most, NKMP PLLs can be set to higher rate that is really
 supported by HW.
 
-Limit maximum rate to 1008 MHz. This is the maximum allowed rate by BSP
-clock driver. Interestengly, user manual specifies maximum frequency to
-be 600 MHz. Historically, this data was wrong in some user manuals for
-other SoCs, so more faith is put in BSP clock driver.
+Implement support for maximum frequency constrain for NKMP PLLs.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-r40.c | 52 ++++++++++++++--------------
- 1 file changed, 26 insertions(+), 26 deletions(-)
+ drivers/clk/sunxi-ng/ccu_nkmp.c | 7 +++++++
+ drivers/clk/sunxi-ng/ccu_nkmp.h | 1 +
+ 2 files changed, 8 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
-index 0f388f6944d5..582ebd41d20d 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-r40.c
-@@ -65,19 +65,19 @@ static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
- 				   BIT(28),	/* lock */
- 				   CLK_SET_RATE_UNGATE);
+diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
+index ebd9436d2c7c..9b49adb20d07 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkmp.c
++++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
+@@ -137,6 +137,13 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
+ 		rate *= nkmp->fixed_post_div;
  
--/* TODO: The result of N/M is required to be in [8, 25] range. */
--static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN(pll_video0_clk, "pll-video0",
--					    "osc24M", 0x0010,
--					    192000000,	/* Minimum rate */
--					    8, 7,	/* N */
--					    0, 4,	/* M */
--					    BIT(24),	/* frac enable */
--					    BIT(25),	/* frac select */
--					    270000000,	/* frac rate 0 */
--					    297000000,	/* frac rate 1 */
--					    BIT(31),	/* gate */
--					    BIT(28),	/* lock */
--					    CLK_SET_RATE_UNGATE);
-+static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN_MAX(pll_video0_clk, "pll-video0",
-+						"osc24M", 0x0010,
-+						192000000,  /* Minimum rate */
-+						1008000000, /* Maximum rate */
-+						8, 7,       /* N */
-+						0, 4,       /* M */
-+						BIT(24),    /* frac enable */
-+						BIT(25),    /* frac select */
-+						270000000,  /* frac rate 0 */
-+						297000000,  /* frac rate 1 */
-+						BIT(31),    /* gate */
-+						BIT(28),    /* lock */
-+						CLK_SET_RATE_UNGATE);
++	if (nkmp->max_rate && rate > nkmp->max_rate) {
++		rate = nkmp->max_rate;
++		if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
++			rate /= nkmp->fixed_post_div;
++		return rate;
++	}
++
+ 	_nkmp.min_n = nkmp->n.min ?: 1;
+ 	_nkmp.max_n = nkmp->n.max ?: 1 << nkmp->n.width;
+ 	_nkmp.min_k = nkmp->k.min ?: 1;
+diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.h b/drivers/clk/sunxi-ng/ccu_nkmp.h
+index 6940503e7fc4..a9f8c116a745 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkmp.h
++++ b/drivers/clk/sunxi-ng/ccu_nkmp.h
+@@ -35,6 +35,7 @@ struct ccu_nkmp {
+ 	struct ccu_div_internal		p;
  
- /* TODO: The result of N/M is required to be in [8, 25] range. */
- static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_ve_clk, "pll-ve",
-@@ -152,19 +152,19 @@ static struct ccu_nk pll_periph1_clk = {
- 	},
+ 	unsigned int		fixed_post_div;
++	unsigned int		max_rate;
+ 
+ 	struct ccu_common	common;
  };
- 
--/* TODO: The result of N/M is required to be in [8, 25] range. */
--static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN(pll_video1_clk, "pll-video1",
--					    "osc24M", 0x030,
--					    192000000,	/* Minimum rate */
--					    8, 7,	/* N */
--					    0, 4,	/* M */
--					    BIT(24),	/* frac enable */
--					    BIT(25),	/* frac select */
--					    270000000,	/* frac rate 0 */
--					    297000000,	/* frac rate 1 */
--					    BIT(31),	/* gate */
--					    BIT(28),	/* lock */
--					    CLK_SET_RATE_UNGATE);
-+static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN_MAX(pll_video1_clk, "pll-video1",
-+						"osc24M", 0x030,
-+						192000000,  /* Minimum rate */
-+						1008000000, /* Maximum rate */
-+						8, 7,       /* N */
-+						0, 4,       /* M */
-+						BIT(24),    /* frac enable */
-+						BIT(25),    /* frac select */
-+						270000000,  /* frac rate 0 */
-+						297000000,  /* frac rate 1 */
-+						BIT(31),    /* gate */
-+						BIT(28),    /* lock */
-+						CLK_SET_RATE_UNGATE);
- 
- static struct ccu_nkm pll_sata_clk = {
- 	.enable		= BIT(31),
 -- 
 2.18.0
