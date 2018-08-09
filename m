@@ -1,49 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 9 Aug 2018 01:22:29 -0700
-Subject: Droid 4: suspend to RAM?
-In-Reply-To: <20180808213204.GD15831@amd>
-References: <20180725200205.GA29594@amd>
- <CAOf5uwkyPoDT8TZe9V24p+nQMiee9XfD=943xwx0ThGi9_cPng@mail.gmail.com>
- <20180725212853.GA1965@amd> <20180727113214.GA32069@amd>
- <20180808090512.GQ99251@atomide.com> <20180808213204.GD15831@amd>
-Message-ID: <20180809082229.GU99251@atomide.com>
+From: jianxin.pan@amlogic.com (Jianxin Pan)
+Date: Thu, 9 Aug 2018 16:22:29 +0800
+Subject: [PATCH 0/2] arm64: dts: meson-g12a: Introduce new DT files for
+ Meson-G12A SoC
+Message-ID: <1533802951-49919-1-git-send-email-jianxin.pan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [180808 21:35]:
-> On Wed 2018-08-08 02:05:12, Tony Lindgren wrote:
-> > Then for deeper idle modes, you need to also idle UARTs, and unbind or
-> > unload USB related modules. You should get to something like 160mW
-> > power consumption with mdm6600 enabled and SoC suspended that way.
-> 
-> That's slightly interesting. echo mem > /sys/power/state should do all
-> the work, right? Disable UARTs etc. Plus, is 160mW still a bit high?
+From: Jianxin <jianxin.pan@amlogic.com>
 
-Yes suspend will do it, you still need to configure wake-up events
-though at least for the UARTs. I think I got enabled mdm6600 to low-power
-state after connecting over UART ts27010 and then suspending OHCI:
+This attempt will try to add new DT files to support Meson-G12A SoC.
 
-        ohci=$(find /sys/bus/platform/devices -name \*.ohci)
-        devices=$(find ${ohci}/ -type d -name control)
-        for device in ${devices}; do
-                echo -n "auto" > ${device}/level
-                echo -n "control" > ${device}/level
-        done
+1) first, Please notice that, in this patch series, the DT node about 16M reserved
+memory for hwrom is removed, since it's not needed by G12A SoC.
+2) second, the pclk for uart_AO need to be fixed once G12A clock_ao driver is
+merged. In this version, it rely on bootloader to enable the pclk gate which 
+belong to AO clock domain. Please add clk_ignore_unused to bootargs.
 
-        echo "usb-phy at 1" > /sys/bus/platform/drivers/phy-mapphone-mdm6600/unbind
 
-For power consumption, 160mW is high yeah. We currently cannot hit core
-retention on omap4 until some GPIO issues are fixed. I've been trying to
-think for a good fix for that, but need to debug it more when I get a chance.
+Jianxin Pan (2):
+  dt-bindings: arm: amlogic: Add Meson G12A binding
+  arm64: dts: meson-g12a: add initial g12a s905d2 SoC DT support
 
->From few months ago, I recall I got droid4 to run at around 65mW idle
-with WLAN connected and modem off with my test hacks. With modem on
-and USB suspended I think I got to around 100mW.
+ Documentation/devicetree/bindings/arm/amlogic.txt |   6 +
+ arch/arm64/boot/dts/amlogic/Makefile              |   1 +
+ arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts   |  22 +++
+ arch/arm64/boot/dts/amlogic/meson-g12a.dtsi       | 174 ++++++++++++++++++++++
+ 4 files changed, 203 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
 
-Then I recall measuring droid4 with stock android in flight mode
-measuring at around 15 - 30mW. But that requires off mode to work on
-omap4, maybe we'll get to that too at some point after core retention.
-
-Regards,
-
-Tony
+-- 
+1.9.1
