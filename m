@@ -1,60 +1,111 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 9 Aug 2018 11:25:01 +0100
-Subject: [PATCH v4 1/5] iommu/arm-smmu-v3: fix the implementation of
- flush_iotlb_all hook
-In-Reply-To: <1533558424-16748-2-git-send-email-thunder.leizhen@huawei.com>
-References: <1533558424-16748-1-git-send-email-thunder.leizhen@huawei.com>
- <1533558424-16748-2-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <8e00e0c2-c3d1-96ed-569a-b03170fb23a4@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 9 Aug 2018 11:25:04 +0100
+Subject: [PATCH v8 09/26] kernel/cpu_pm: Manage runtime PM in the idle
+ path for CPUs
+In-Reply-To: <20180808180248.GC27850@codeaurora.org>
+References: <20180620172226.15012-1-ulf.hansson@linaro.org>
+ <2056372.NMt4aPaF4h@aspire.rjw.lan>
+ <2205807.cU2puvubpP@aspire.rjw.lan>
+ <1726374.375PCQfjLZ@aspire.rjw.lan>
+ <CAPDyKFrmP15+_hyRp44Jw-wsTmsNFKORdCeGJEgW8o0OoKiHhA@mail.gmail.com>
+ <CAJZ5v0hk1wfm10fyycmddKF6wR4D51r30fD_-J5UDMbtB3+V-Q@mail.gmail.com>
+ <20180808105619.GB25150@e107981-ln.cambridge.arm.com>
+ <20180808180248.GC27850@codeaurora.org>
+Message-ID: <20180809102504.GB13428@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/18 13:27, Zhen Lei wrote:
-> .flush_iotlb_all can not just wait for previous tlbi operations to be
-> completed, but should also invalid all TLBs of the related domain.
+On Wed, Aug 08, 2018 at 12:02:48PM -0600, Lina Iyer wrote:
+> On Wed, Aug 08 2018 at 04:56 -0600, Lorenzo Pieralisi wrote:
+> >On Mon, Aug 06, 2018 at 11:37:55AM +0200, Rafael J. Wysocki wrote:
+> >>On Fri, Aug 3, 2018 at 1:42 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> >>> [...]
+> >>>
+> >>>>>
+> >>>>> Assuming that I have got that right, there are concerns, mostly regarding
+> >>>>> patch [07/26], but I will reply to that directly.
+> >>>>
+> >>>> Well, I haven't got that right, so never mind.
+> >>>>
+> >>>> There are a few minor things to address, but apart from that the general
+> >>>> genpd patches look ready.
+> >>>
+> >>> Alright, thanks!
+> >>>
+> >>> I will re-spin the series and post a new version once 4.19 rc1 is out.
+> >>> Hopefully we can queue it up early in next cycle to get it tested in
+> >>> next for a while.
+> >>>
+> >>>>
+> >>>>> The $subject patch is fine by me by itself, but it obviously depends on the
+> >>>>> previous ones.  Patches [01-02/26] are fine too, but they don't seem to be
+> >>>>> particularly useful without the rest of the series.
+> >>>>>
+> >>>>> As far as patches [10-26/26] go, I'd like to see some review comments and/or
+> >>>>> tags from the people with vested interest in there, in particular from Daniel
+> >>>>> on patch [12/26] and from Sudeep on the PSCI ones.
+> >>>>
+> >>>> But this still holds.
+> >>>
+> >>> Actually, patch 10 and patch11 is ready to go as well. I ping Daniel
+> >>> on patch 12.
+> >>>
+> >>> In regards to the rest of the series, some of the PSCI/ARM changes
+> >>> have been reviewed by Mark Rutland, however several changes have not
+> >>> been acked.
+> >>>
+> >>> On the other hand, one can also interpret the long silence in regards
+> >>> to PSCI/ARM changes as they are good to go. :-)
+> >>
+> >>Well, in that case giving an ACK to them should not be an issue for
+> >>the people with a vested interest I suppose.
+> >
+> >Apologies to everyone for the delay in replying.
+> >
+> >Side note: cpu_pm_enter()/exit() are also called through syscore ops in
+> >s2RAM/IDLE, you know that but I just wanted to mention it to compound
+> >the discussion.
+> >
+> >As for PSCI patches I do not personally think PSCI OSI enablement is
+> >beneficial (and my position has always been the same since PSCI OSI was
+> >added to the specification, I am not even talking about this patchset)
+> >and Arm Trusted Firmware does not currently support it for the same
+> >reason.
+> >
+> >We (if Mark and Sudeep agree) will enable PSCI OSI if and when we have a
+> >definitive and constructive answer to *why* we have to do that that is
+> >not a dogmatic "the kernel knows better" but rather a comprehensive
+> >power benchmark evaluation - I thought that was the agreement reached
+> >at OSPM but apparently I was mistaken.
+> >
+> I will not speak to any comparison of benchmarks between OSI and PC.
+> AFAIK, there are no platforms supporting both.
 
-I think it was like that because the only caller in practice was 
-iommu_group_create_direct_mappings(), and at that point any relevant 
-invalidations would have already been issued anyway. Once 
-flush_iotlb_all actually does what it's supposed to we'll get a bit of 
-unavoidable over-invalidation on that path, but it's no big deal.
+PSCI specifications, 5.20.1:
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+"The platform will boot in platform-coordinated mode."
 
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->   drivers/iommu/arm-smmu-v3.c | 10 +++++++++-
->   1 file changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 4810f61..2f1304b 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -1770,6 +1770,14 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
->   	return ops->unmap(ops, iova, size);
->   }
-> 
-> +static void arm_smmu_flush_iotlb_all(struct iommu_domain *domain)
-> +{
-> +	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-> +
-> +	if (smmu_domain->smmu)
-> +		arm_smmu_tlb_inv_context(smmu_domain);
-> +}
-> +
->   static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
->   {
->   	struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
-> @@ -1998,7 +2006,7 @@ static void arm_smmu_put_resv_regions(struct device *dev,
->   	.map			= arm_smmu_map,
->   	.unmap			= arm_smmu_unmap,
->   	.map_sg			= default_iommu_map_sg,
-> -	.flush_iotlb_all	= arm_smmu_iotlb_sync,
-> +	.flush_iotlb_all	= arm_smmu_flush_iotlb_all,
->   	.iotlb_sync		= arm_smmu_iotlb_sync,
->   	.iova_to_phys		= arm_smmu_iova_to_phys,
->   	.add_device		= arm_smmu_add_device,
-> --
-> 1.8.3
-> 
-> 
+So all platforms implementing OSI have to support both.
+
+> But, the OSI feature is critical for QCOM mobile platforms. The
+> last man activities during cpuidle save quite a lot of power.
+
+What I expressed above was that, in PSCI based systems (OSI or PC
+alike), it is up to firmware/hardware to detect "the last man" not
+the kernel.
+
+I need to understand what you mean by "last man activities" to
+provide feedback here.
+
+> Powering off the clocks, busses, regulators and even the oscillator is
+> very important to have a reasonable battery life when using the phone.
+> Platform coordinated approach falls quite short of the needs of a
+> powerful processor with a desired battery efficiency.
+
+I am sorry but if you want us to merge PSCI patches in this series you
+will have to back the claim above with a detailed technical explanation
+of *why* platform-coordination falls short of QCOM (or whoever else)
+needs wrt PSCI OSI.
+
+Thanks,
+Lorenzo
