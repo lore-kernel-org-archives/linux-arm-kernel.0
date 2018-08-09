@@ -1,32 +1,35 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Thu, 9 Aug 2018 10:15:49 +0800
-Subject: [PATCH v4 14/14] drm/mediatek: fix connection from RDMA2 to DSI1
+Date: Thu, 9 Aug 2018 10:15:42 +0800
+Subject: [PATCH v4 07/14] drm/mediatek: add the comment about color format
+ setting for OVL
 In-Reply-To: <1533780949-30141-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1533780949-30141-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1533780949-30141-15-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1533780949-30141-8-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fix connection from RDMA2 to DSI1
+This patch add the comment about color format setting for OVL
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/mediatek/mtk_disp_ovl.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 3239f22785fd..546b3e3b300b 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -314,7 +314,7 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
- 		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
- 		value = DSI0_SEL_IN_RDMA2;
- 	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI1) {
--		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
-+		*addr = DISP_REG_CONFIG_DSIO_SEL_IN;
- 		value = DSI1_SEL_IN_RDMA2;
- 	} else if (cur == DDP_COMPONENT_RDMA2 && next == DDP_COMPONENT_DSI2) {
- 		*addr = DISP_REG_CONFIG_DSIE_SEL_IN;
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+index 978782a77629..0facd823c552 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+@@ -157,6 +157,11 @@ static void mtk_ovl_layer_off(struct mtk_ddp_comp *comp, unsigned int idx)
+ 
+ static unsigned int ovl_fmt_convert(struct mtk_disp_ovl *ovl, unsigned int fmt)
+ {
++	/* The return value in switch "MEM_MODE_INPUT_FORMAT_XXX"
++	 * is defined in mediatek HW data sheet.
++	 * The alphabet order in XXX is no relation to data
++	 * arrangement in memory.
++	 */
+ 	switch (fmt) {
+ 	default:
+ 	case DRM_FORMAT_RGB565:
 -- 
 2.12.5.2.gbdf23ab
