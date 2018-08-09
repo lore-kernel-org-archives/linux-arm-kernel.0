@@ -1,40 +1,38 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 09 Aug 2018 16:41:22 -0600
-Subject: [PATCH 7/8] arm64: dts: rk3399: Add dfi and dmc nodes.
-In-Reply-To: <20180730081124.30698-8-enric.balletbo@collabora.com>
-References: <20180730081124.30698-1-enric.balletbo@collabora.com>
- <20180730081124.30698-8-enric.balletbo@collabora.com>
-Message-ID: <5b6cc314.1c69fb81.96ced.16f7@mx.google.com>
+Date: Thu, 09 Aug 2018 16:41:24 -0600
+Subject: [PATCH 2/3] clk: imx6q: optionally get CCM inputs via standard
+ clock handles
+In-Reply-To: <20180731102009.6710-2-l.stach@pengutronix.de>
+References: <20180731102009.6710-1-l.stach@pengutronix.de>
+ <20180731102009.6710-2-l.stach@pengutronix.de>
+Message-ID: <5b6cc315.1c69fb81.3b2b4.137c@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi, this is an automated email from Rob's (experimental) review bot. I
 found a couple of common problems with your patch. Please see below.
 
-On Mon, 30 Jul 2018 10:11:23 +0200, Enric Balletbo i Serra wrote:
-> From: Lin Huang <hl@rock-chips.com>
+On Tue, 31 Jul 2018 12:20:08 +0200, Lucas Stach wrote:
+> When specifying external clock inputs to the CCM the current code
+> requires the clocks to be in a "clocks" child node of the DT root.
+> This is not really conformant with DT best practices.
 > 
-> These are required to support DDR DVFS on rk3399 platform. The patch also
-> introduces two new files (rk3399-dram.h and rk3399-dram-default-timing)
-> with default DRAM settings.
+> To avoid the need to deviate from those best practices, allow the
+> clock inputs to be specifies via standard clock handles. This is
+> in line with how drivers of the later CCM driver revisions on
+> newer i.MX SoCs handle this.
 > 
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> As we can't retroactively change the DT binding, allow this as an
+> option with a fallback to the old way of how this has been handled.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
 The preferred subject prefix is "dt-bindings: <binding dir>: ...".
 
 > ---
-> 
-> Changes in v1:
-> - [RFC 8/10] Move rk3399-dram.h to dt-includes.
-> - [RFC 8/10] Put sdram default values under the dmc node.
-> - [RFC 8/10] Removed rk3399-dram-default-timing.dts
-> 
->  .../boot/dts/rockchip/rk3399-op1-opp.dtsi     | 29 ++++++++
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi      | 49 +++++++++++++
->  include/dt-bindings/power/rk3399-dram.h       | 73 +++++++++++++++++++
->  3 files changed, 151 insertions(+)
->  create mode 100644 include/dt-bindings/power/rk3399-dram.h
+>  .../devicetree/bindings/clock/imx6q-clock.txt |  5 +++++
+>  drivers/clk/imx/clk-imx6q.c                   | 22 ++++++++++++++-----
+>  2 files changed, 22 insertions(+), 5 deletions(-)
 > 
 
 DT bindings (including binding headers) should be a separate patch. See
