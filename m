@@ -1,85 +1,41 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 9 Aug 2018 12:08:36 +0100
-Subject: [PATCH v4 5/5] iommu/arm-smmu-v3: add bootup option "arm_iommu"
-In-Reply-To: <1533558424-16748-6-git-send-email-thunder.leizhen@huawei.com>
-References: <1533558424-16748-1-git-send-email-thunder.leizhen@huawei.com>
- <1533558424-16748-6-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <c46fa263-2dfa-b8fc-b2c1-0b1bf6029748@arm.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Thu, 9 Aug 2018 13:12:47 +0200
+Subject: [PATCH 14/28] net: split eth_platform_get_mac_address() into
+ subroutines
+In-Reply-To: <CAHp75VfxVOPzAtBgTe4RSax1Ki+323WDBTSmh=j7LV_c+vsXDA@mail.gmail.com>
+References: <20180808153150.23444-1-brgl@bgdev.pl>
+ <20180808153150.23444-15-brgl@bgdev.pl>
+ <CAHp75VfxVOPzAtBgTe4RSax1Ki+323WDBTSmh=j7LV_c+vsXDA@mail.gmail.com>
+Message-ID: <CAMRc=MfgoCt1BvRx1jJrYp_258_Z9NTNs7waEiOCvdTsK+KWFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/18 13:27, Zhen Lei wrote:
-> Add a bootup option to make the system manager can choose which mode to
-> be used. The default mode is strict.
-> 
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->   Documentation/admin-guide/kernel-parameters.txt |  9 +++++++++
->   drivers/iommu/arm-smmu-v3.c                     | 17 ++++++++++++++++-
->   2 files changed, 25 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-> index 533ff5c..426e989 100644
-> --- a/Documentation/admin-guide/kernel-parameters.txt
-> +++ b/Documentation/admin-guide/kernel-parameters.txt
-> @@ -1720,6 +1720,15 @@
->   		nobypass	[PPC/POWERNV]
->   			Disable IOMMU bypass, using IOMMU for PCI devices.
-> 
-> +	arm_iommu=	[ARM64]
-> +		non-strict	[Default Off]
-
-Again, I'd much rather have "iommu.non_strict= { "0" | "1" }" in line 
-with the passthrough option.
-
-Robin.
-
-> +			Put off TLBs invalidation and release memory first.
-> +			It's good for scatter-gather performance but lacks full
-> +			isolation, an untrusted device can access the reused
-> +			memory because the TLBs may still valid. Please take
-> +			full consideration before choosing this mode.
-> +			Note that, VFIO will always use strict mode.
-> +
->   	iommu.passthrough=
->   			[ARM64] Configure DMA to bypass the IOMMU by default.
->   			Format: { "0" | "1" }
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 904bc1e..9a30892 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -631,6 +631,21 @@ struct arm_smmu_option_prop {
->   	{ 0, NULL},
->   };
-> 
-> +static u32 smmu_non_strict __read_mostly;
-> +
-> +static int __init arm_smmu_setup(char *str)
-> +{
-> +	if (!strncmp(str, "non-strict", 10)) {
-> +		smmu_non_strict = 1;
-> +		pr_warn("WARNING: iommu non-strict mode is chosen.\n"
-> +			"It's good for scatter-gather performance but lacks full isolation\n");
-> +		add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
-> +	}
-> +
-> +	return 0;
-> +}
-> +early_param("arm_iommu", arm_smmu_setup);
-> +
->   static inline void __iomem *arm_smmu_page1_fixup(unsigned long offset,
->   						 struct arm_smmu_device *smmu)
->   {
-> @@ -1622,7 +1637,7 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
->   	if (smmu->features & ARM_SMMU_FEAT_COHERENCY)
->   		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
-> 
-> -	if (domain->type == IOMMU_DOMAIN_DMA) {
-> +	if ((domain->type == IOMMU_DOMAIN_DMA) && smmu_non_strict) {
->   		domain->non_strict = 1;
->   		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
->   	}
+2018-08-08 19:50 GMT+02:00 Andy Shevchenko <andy.shevchenko@gmail.com>:
+> On Wed, Aug 8, 2018 at 6:31 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> We want do add more sources from which to read the MAC address. In
+>> order to avoid bloating this function too much, start by splitting it
+>> into subroutines, each of which takes care of reading the MAC from
+>> one source.
+>
+>> +static int mac_address_from_of(struct device *dev, u8 *mac_addr)
+>>  {
+>>         const unsigned char *addr;
+>> +       struct device_node *np;
+>>
+>
+>> +       np = dev_is_pci(dev) ? pci_device_to_OF_node(to_pci_dev(dev))
+>> +                            : dev->of_node;
+>
+> I didn't get these manipulations.
+>
+> What the scenario when pci_dev->dev.of_node != dev->of_node?
+>
 > --
-> 1.8.3
-> 
-> 
+> With Best Regards,
+> Andy Shevchenko
+
+I'll add an additional patch that addresses it.
+
+Bart
