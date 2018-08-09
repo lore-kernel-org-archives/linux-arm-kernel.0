@@ -1,176 +1,76 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Thu, 9 Aug 2018 19:20:44 +0800
-Subject: [PATCH v4 3/5] iommu/io-pgtable-arm: add support for non-strict
- mode
-In-Reply-To: <788428ef-28b8-e5f2-b519-44b206179b89@arm.com>
-References: <1533558424-16748-1-git-send-email-thunder.leizhen@huawei.com>
- <1533558424-16748-4-git-send-email-thunder.leizhen@huawei.com>
- <788428ef-28b8-e5f2-b519-44b206179b89@arm.com>
-Message-ID: <5B6C238C.7070600@huawei.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Thu, 9 Aug 2018 19:27:55 +0800
+Subject: [PATCH v1 6/7] net: mvneta: Don't use GRO on Armada 3720
+In-Reply-To: <20180809124022.790f1784@xhacker.debian>
+References: <20180808152706.21727-1-marek.behun@nic.cz>
+ <20180808152706.21727-7-marek.behun@nic.cz>
+ <20180809124022.790f1784@xhacker.debian>
+Message-ID: <20180809192755.24e57782@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Thu, 9 Aug 2018 12:40:41 +0800 Jisheng Zhang wrote:
 
-On 2018/8/9 18:54, Robin Murphy wrote:
-> On 06/08/18 13:27, Zhen Lei wrote:
->> To support the non-strict mode, now we only tlbi and sync for the strict
->> mode. But for the non-leaf case, always follow strict mode.
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>   drivers/iommu/io-pgtable-arm.c | 27 ++++++++++++++++++---------
->>   drivers/iommu/io-pgtable.h     |  3 +++
->>   2 files changed, 21 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
->> index 010a254..bb61bef 100644
->> --- a/drivers/iommu/io-pgtable-arm.c
->> +++ b/drivers/iommu/io-pgtable-arm.c
->> @@ -292,7 +292,7 @@ static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
->>
->>   static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
->>                      unsigned long iova, size_t size, int lvl,
->> -                   arm_lpae_iopte *ptep);
->> +                   arm_lpae_iopte *ptep, bool strict);
->>
->>   static void __arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
->>                   phys_addr_t paddr, arm_lpae_iopte prot,
->> @@ -319,6 +319,7 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
->>                    arm_lpae_iopte prot, int lvl,
->>                    arm_lpae_iopte *ptep)
->>   {
->> +    size_t unmapped;
->>       arm_lpae_iopte pte = *ptep;
->>
->>       if (iopte_leaf(pte, lvl)) {
->> @@ -334,7 +335,8 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
->>           size_t sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
->>
->>           tblp = ptep - ARM_LPAE_LVL_IDX(iova, lvl, data);
->> -        if (WARN_ON(__arm_lpae_unmap(data, iova, sz, lvl, tblp) != sz))
->> +        unmapped = __arm_lpae_unmap(data, iova, sz, lvl, tblp, true);
->> +        if (WARN_ON(unmapped != sz))
+> + more people
 > 
-> What's the extra local variable for?
+> On Wed,  8 Aug 2018 17:27:05 +0200 Marek Beh?n wrote:
+> 
+> > For some reason on Armada 3720 boards (EspressoBin and Turris Mox) the
+> > networking driver behaves weirdly when using napi_gro_receive.
+> > 
+> > For example downloading a big file from a local network (low ping) is
+> > fast, but when downloading from a remote server (higher ping), the
+> > download speed is at first high but drops rapidly to almost nothing or
+> > absolutely nothing.  
+> 
+> We also met this issue on some berlin platforms. I tried to fix the bug,
+> but no clue so far.
+> 
+> > 
+> > This is fixed when using netif_receive_skb instead of napi_gro_receive.  
+> 
+> This is a workaround. The good news is this workaround also fixes the issue
+> we saw on berlin.
+> 
+> > 
+> > Signed-off-by: Marek Behun <marek.behun@nic.cz>
+> > Cc: Russell King - ARM Linux <linux@armlinux.org.uk>
+> > Cc: netdev at vger.kernel.org
+> > 
+> > diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> > index 0ad2f3f7da85..27f3017d94c5 100644
+> > --- a/drivers/net/ethernet/marvell/mvneta.c
+> > +++ b/drivers/net/ethernet/marvell/mvneta.c
+> > @@ -1959,7 +1959,10 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
+> >  
+> >  			skb->protocol = eth_type_trans(skb, dev);
+> >  			mvneta_rx_csum(pp, rx_status, skb);
+> > -			napi_gro_receive(&port->napi, skb);
+> > +			if (pp->neta_armada3700)
+> > +				netif_receive_skb(skb);
+> > +			else
+> > +				napi_gro_receive(&port->napi, skb);
 
-in order to remove the warning: more than 80 characters a line
+I think I found the root cause, if neta_armada3700 is true, the port got from
+this_cpu_ptr(pp->ports) is invalid, this is bug... I'll cook a patch for this
 
-> 
->>               return -EINVAL;
->>       }
->>
->> @@ -576,15 +578,17 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
->>       }
->>
->>       if (unmap_idx < 0)
->> -        return __arm_lpae_unmap(data, iova, size, lvl, tablep);
->> +        return __arm_lpae_unmap(data, iova, size, lvl, tablep, true);
->>
->>       io_pgtable_tlb_add_flush(&data->iop, iova, size, size, true);
->> +    io_pgtable_tlb_sync(&data->iop);
->> +
->>       return size;
->>   }
->>
->>   static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
->>                      unsigned long iova, size_t size, int lvl,
->> -                   arm_lpae_iopte *ptep)
->> +                   arm_lpae_iopte *ptep, bool strict)
->>   {
->>       arm_lpae_iopte pte;
->>       struct io_pgtable *iop = &data->iop;
->> @@ -609,7 +613,7 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
->>               io_pgtable_tlb_sync(iop);
->>               ptep = iopte_deref(pte, data);
->>               __arm_lpae_free_pgtable(data, lvl + 1, ptep);
->> -        } else {
->> +        } else if (strict) {
-> 
-> Since this is the only place we ever actually evaluate "strict", can't we just test iop->cfg.quirks directly at this point instead of playing pass-the-parcel with the extra argument?
+Thanks
 
-Wonderful, you're right!
-
+> >  
+> >  			rcvd_pkts++;
+> >  			rcvd_bytes += rx_bytes;
+> > @@ -2001,7 +2004,10 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
+> >  
+> >  		mvneta_rx_csum(pp, rx_status, skb);
+> >  
+> > -		napi_gro_receive(&port->napi, skb);
+> > +		if (pp->neta_armada3700)
+> > +			netif_receive_skb(skb);
+> > +		else
+> > +			napi_gro_receive(&port->napi, skb);
+> >  	}
+> >  
+> >  	if (rcvd_pkts) {  
 > 
-> Robin.
-> 
->>               io_pgtable_tlb_add_flush(iop, iova, size, size, true);
->>           }
->>
->> @@ -625,12 +629,13 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
->>
->>       /* Keep on walkin' */
->>       ptep = iopte_deref(pte, data);
->> -    return __arm_lpae_unmap(data, iova, size, lvl + 1, ptep);
->> +    return __arm_lpae_unmap(data, iova, size, lvl + 1, ptep, strict);
->>   }
->>
->>   static size_t arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
->>                    size_t size)
->>   {
->> +    bool strict;
->>       struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
->>       arm_lpae_iopte *ptep = data->pgd;
->>       int lvl = ARM_LPAE_START_LVL(data);
->> @@ -638,7 +643,9 @@ static size_t arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
->>       if (WARN_ON(iova >= (1ULL << data->iop.cfg.ias)))
->>           return 0;
->>
->> -    return __arm_lpae_unmap(data, iova, size, lvl, ptep);
->> +    strict = !(data->iop.cfg.quirks & IO_PGTABLE_QUIRK_NON_STRICT);
->> +
->> +    return __arm_lpae_unmap(data, iova, size, lvl, ptep, strict);
->>   }
->>
->>   static phys_addr_t arm_lpae_iova_to_phys(struct io_pgtable_ops *ops,
->> @@ -771,7 +778,8 @@ static void arm_lpae_restrict_pgsizes(struct io_pgtable_cfg *cfg)
->>       u64 reg;
->>       struct arm_lpae_io_pgtable *data;
->>
->> -    if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA))
->> +    if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA |
->> +            IO_PGTABLE_QUIRK_NON_STRICT))
->>           return NULL;
->>
->>       data = arm_lpae_alloc_pgtable(cfg);
->> @@ -863,7 +871,8 @@ static void arm_lpae_restrict_pgsizes(struct io_pgtable_cfg *cfg)
->>       struct arm_lpae_io_pgtable *data;
->>
->>       /* The NS quirk doesn't apply at stage 2 */
->> -    if (cfg->quirks & ~IO_PGTABLE_QUIRK_NO_DMA)
->> +    if (cfg->quirks & ~(IO_PGTABLE_QUIRK_NO_DMA |
->> +        IO_PGTABLE_QUIRK_NON_STRICT))
->>           return NULL;
->>
->>       data = arm_lpae_alloc_pgtable(cfg);
->> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
->> index 2df7909..beb14a3 100644
->> --- a/drivers/iommu/io-pgtable.h
->> +++ b/drivers/iommu/io-pgtable.h
->> @@ -71,12 +71,15 @@ struct io_pgtable_cfg {
->>        *    be accessed by a fully cache-coherent IOMMU or CPU (e.g. for a
->>        *    software-emulated IOMMU), such that pagetable updates need not
->>        *    be treated as explicit DMA data.
->> +     * IO_PGTABLE_QUIRK_NON_STRICT: Put off TLBs invalidation and release
->> +     *    memory first.
->>        */
->>       #define IO_PGTABLE_QUIRK_ARM_NS        BIT(0)
->>       #define IO_PGTABLE_QUIRK_NO_PERMS    BIT(1)
->>       #define IO_PGTABLE_QUIRK_TLBI_ON_MAP    BIT(2)
->>       #define IO_PGTABLE_QUIRK_ARM_MTK_4GB    BIT(3)
->>       #define IO_PGTABLE_QUIRK_NO_DMA        BIT(4)
->> +    #define IO_PGTABLE_QUIRK_NON_STRICT    BIT(5)
->>       unsigned long            quirks;
->>       unsigned long            pgsize_bitmap;
->>       unsigned int            ias;
->> -- 
->> 1.8.3
->>
->>
-> 
-> .
-> 
-
--- 
-Thanks!
-BestRegards
