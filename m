@@ -1,58 +1,100 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 9 Aug 2018 02:50:39 +0200
-Subject: [RFC net-next 00/15] net: A socket API for LoRa
-In-Reply-To: <92ee4016-1da9-826b-3674-b2d604a64848@suse.de>
-References: <20180701110804.32415-1-afaerber@suse.de>
- <CAC=mGzgUCopz2xTOA0R-WD8a1DOaOOUn=YpfdMiJ33y3hnh6kg@mail.gmail.com>
- <92ee4016-1da9-826b-3674-b2d604a64848@suse.de>
-Message-ID: <f1967750-0a42-0e76-2d7d-da293bc351af@suse.de>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Thu, 9 Aug 2018 09:30:51 +0800
+Subject: [PATCH 1/1] iommu/arm-smmu-v3: fix unexpected CMD_SYNC timeout
+In-Reply-To: <20180808101215.GB28557@arm.com>
+References: <1533558689-3000-1-git-send-email-thunder.leizhen@huawei.com>
+ <20180808101215.GB28557@arm.com>
+Message-ID: <5B6B994B.10208@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 05.08.2018 um 02:11 schrieb Andreas F?rber:
-> Am 03.07.2018 um 17:11 schrieb Jian-Hong Pan:
->> 2018-07-01 19:07 GMT+08:00 Andreas F?rber <afaerber@suse.de>:
->>> 5) Many of the modules support multiple modes, such as LoRa, LoRaWAN and FSK.
->>>    Lacking a LoRaWAN implementation, I am currently switching them into LoRa
->>>    mode at probe time wherever possible. How do we deal with that properly?
-[...]
-> Independently of what LoRaWAN does, the
-> user needs to be able to send on the physical layer from a selection of
-> LoRa, GFSK, FSK, OOK, GMSK and MSK.
-> Supposedly Wireless M-Bus and IEEE 802.15.4 can be implemented via those
-> according to the SX1276 datasheet.
-> 
-> This opens a can of worms...
-> 
-> SX127x has a single channel, so I don't think there should be six
-> network interfaces lora0, gfsk0, fsk0, ook0, gmsk0 and msk0 exposed to
-> the user.
-> Having a lora0 interface speak non-LoRa modulations may be confusing,
-> but since the chip is sold as LoRa transceiver it might be acceptable.
-> 
-> SX130x has 8+2 channels, with IF9 dedicated to GFSK/FSK. It appears to
-> use one FIFO for receiving (up to 16 packets) and can only transmit one
-> packet at a time. So I think this should be one lora0 interface, too.
-> 
-> With a view to supporting non-LoRa RF chipsets such as Si4xxx (GFSK,
-> FSK, OOK) or nRF905 and nRF24L01+ (both GFSK) at a later date, I don't
-> think those modulations should be some netlink option on a PF_LORA
-> interface but cleanly distinguished as ETH_P_GFSK or something.
-> For example, the Chistera Pi HAT has both an RFM95W and an RFM22 module.
 
-Answering myself here: MSK is a special case of FSK, and GMSK a special
-case of GFSK. SX1276 allows to switch between LoRa and FSK/OOK modes,
-and in FSK/OOK mode between FSK and OOK modulation types and for FSK
-modulation allows to set Gaussian filter values. I assume (G)MSK is
-selected indirectly through BitRate and Fdev settings or something.
 
-So we would just need ETH_P_FSK and ETH_P_OOK plus some skb fields for
-ETH_P_FSK.
+On 2018/8/8 18:12, Will Deacon wrote:
+> Hi Thunder,
+> 
+> On Mon, Aug 06, 2018 at 08:31:29PM +0800, Zhen Lei wrote:
+>> The condition "(int)(VAL - sync_idx) >= 0" to break loop in function
+>> __arm_smmu_sync_poll_msi requires that sync_idx must be increased
+>> monotonously according to the sequence of the CMDs in the cmdq.
+>>
+>> But ".msidata = atomic_inc_return_relaxed(&smmu->sync_nr)" is not protected
+>> by spinlock, so the following scenarios may appear:
+>> cpu0			cpu1
+>> msidata=0
+>> 			msidata=1
+>> 			insert cmd1
+>> insert cmd0
+>> 			smmu execute cmd1
+>> smmu execute cmd0
+>> 			poll timeout, because msidata=1 is overridden by
+>> 			cmd0, that means VAL=0, sync_idx=1.
+> 
+> Oh yuck, you're right! We probably want a CC stable on this. Did you see
+> this go wrong in practice?
+Just misreported and make the caller wait for a long time until TIMEOUT. It's
+rare to happen, because any other CMD_SYNC during the waiting period will break
+it.
 
-Regards,
-Andreas
+> 
+> One comment on your patch...
+> 
+>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> ---
+>>  drivers/iommu/arm-smmu-v3.c | 7 +++----
+>>  1 file changed, 3 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 1d64710..4810f61 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -566,7 +566,7 @@ struct arm_smmu_device {
+>>
+>>  	int				gerr_irq;
+>>  	int				combined_irq;
+>> -	atomic_t			sync_nr;
+>> +	u32				sync_nr;
+>>
+>>  	unsigned long			ias; /* IPA */
+>>  	unsigned long			oas; /* PA */
+>> @@ -836,7 +836,6 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
+>>  			cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_SEV);
+>>  		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSH, ARM_SMMU_SH_ISH);
+>>  		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIATTR, ARM_SMMU_MEMATTR_OIWB);
+>> -		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIDATA, ent->sync.msidata);
+>>  		cmd[1] |= ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
+>>  		break;
+>>  	default:
+>> @@ -947,7 +946,6 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
+>>  	struct arm_smmu_cmdq_ent ent = {
+>>  		.opcode = CMDQ_OP_CMD_SYNC,
+>>  		.sync	= {
+>> -			.msidata = atomic_inc_return_relaxed(&smmu->sync_nr),
+>>  			.msiaddr = virt_to_phys(&smmu->sync_count),
+>>  		},
+>>  	};
+>> @@ -955,6 +953,8 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
+>>  	arm_smmu_cmdq_build_cmd(cmd, &ent);
+>>
+>>  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+>> +	ent.sync.msidata = ++smmu->sync_nr;
+>> +	cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIDATA, ent.sync.msidata);
+> 
+> I really don't like splitting this out from building the rest of the
+> command. Can you just move the call to arm_smmu_cmdq_build_cmd into the
+> critical section, please?
+OK. I have considered that before, just worry it will increase the compition of spinlock.
+
+In addition, I will append a optimization patch: the adjacent CMD_SYNCs, we only need one.
+
+> 
+> Thanks,
+> 
+> Will
+> 
+> .
+> 
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Thanks!
+BestRegards
