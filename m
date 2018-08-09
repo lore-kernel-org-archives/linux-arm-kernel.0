@@ -1,39 +1,60 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 9 Aug 2018 12:21:04 +0200
-Subject: [GIT PULL 5/5] arm64: tegra: Device tree changes for v4.19-rc1
-In-Reply-To: <CAHMsQjU=nmpTnPK6Ryhui67YVANHExd=yRB4hp+upd7O-Tjn+Q@mail.gmail.com>
-References: <20180712154128.22705-1-thierry.reding@gmail.com>
- <20180712154128.22705-6-thierry.reding@gmail.com>
- <20180714212210.at4b2gcpopsznyxx@localhost>
- <20180803104318.GA28546@ulmo>
- <CAHMsQjU=nmpTnPK6Ryhui67YVANHExd=yRB4hp+upd7O-Tjn+Q@mail.gmail.com>
-Message-ID: <20180809102104.GB21639@ulmo>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 9 Aug 2018 11:25:01 +0100
+Subject: [PATCH v4 1/5] iommu/arm-smmu-v3: fix the implementation of
+ flush_iotlb_all hook
+In-Reply-To: <1533558424-16748-2-git-send-email-thunder.leizhen@huawei.com>
+References: <1533558424-16748-1-git-send-email-thunder.leizhen@huawei.com>
+ <1533558424-16748-2-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <8e00e0c2-c3d1-96ed-569a-b03170fb23a4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2018 at 07:26:04AM -0400, Anthony Eden wrote:
-> Mesa support aside- if I start a computationally intensive job on the
-> Jetson TX2 like building the Linux kernel on all cores, it will lock
-> up. My only work around has been to disable the Denver CPU's. I don't
-> think the tegra186 has upstream support to control the fan on the
-> Jetson TX2, could this be a thermal problem?
+On 06/08/18 13:27, Zhen Lei wrote:
+> .flush_iotlb_all can not just wait for previous tlbi operations to be
+> completed, but should also invalid all TLBs of the related domain.
 
-Yes, I suppose this could be a thermal problem. Or it could be something
-else entirely. We do support CPU frequency scaling on Tegra X2, so what
-you could do is keep the Denver CPUs enabled, but set the powersave CPU
-frequency governor. That way it should use all the CPUs but at a lower
-clock rate, which should also be able to avoid any thermal issues. This
-could help determine whether or not the problem is thermal or something
-else.
+I think it was like that because the only caller in practice was 
+iommu_group_create_direct_mappings(), and at that point any relevant 
+invalidations would have already been issued anyway. Once 
+flush_iotlb_all actually does what it's supposed to we'll get a bit of 
+unavoidable over-invalidation on that path, but it's no big deal.
 
-Also adding Mikko on Cc who wrote the Tegra186 driver, maybe he's aware
-of any issues.
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180809/abf0c033/attachment.sig>
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>   drivers/iommu/arm-smmu-v3.c | 10 +++++++++-
+>   1 file changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 4810f61..2f1304b 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -1770,6 +1770,14 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
+>   	return ops->unmap(ops, iova, size);
+>   }
+> 
+> +static void arm_smmu_flush_iotlb_all(struct iommu_domain *domain)
+> +{
+> +	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+> +
+> +	if (smmu_domain->smmu)
+> +		arm_smmu_tlb_inv_context(smmu_domain);
+> +}
+> +
+>   static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
+>   {
+>   	struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
+> @@ -1998,7 +2006,7 @@ static void arm_smmu_put_resv_regions(struct device *dev,
+>   	.map			= arm_smmu_map,
+>   	.unmap			= arm_smmu_unmap,
+>   	.map_sg			= default_iommu_map_sg,
+> -	.flush_iotlb_all	= arm_smmu_iotlb_sync,
+> +	.flush_iotlb_all	= arm_smmu_flush_iotlb_all,
+>   	.iotlb_sync		= arm_smmu_iotlb_sync,
+>   	.iova_to_phys		= arm_smmu_iova_to_phys,
+>   	.add_device		= arm_smmu_add_device,
+> --
+> 1.8.3
+> 
+> 
