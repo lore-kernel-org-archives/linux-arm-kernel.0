@@ -1,104 +1,113 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Thu, 9 Aug 2018 12:10:59 -0700
-Subject: [PATCH v1 01/10] arm/arm64: dts: msm8974/msm8916: thermal: Split
- address space into two
-In-Reply-To: <d01f560abed221b536b27bfaa42a530257642974.1533815718.git.amit.kucheria@linaro.org>
-References: <cover.1533815718.git.amit.kucheria@linaro.org>
- <d01f560abed221b536b27bfaa42a530257642974.1533815718.git.amit.kucheria@linaro.org>
-Message-ID: <20180809191059.GI160295@google.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Thu,  9 Aug 2018 21:20:57 +0200
+Subject: [PATCH v5 05/18] khwasan: initialize shadow to 0xff
+In-Reply-To: <cover.1533842385.git.andreyknvl@google.com>
+References: <cover.1533842385.git.andreyknvl@google.com>
+Message-ID: <f3656f4a52592aaad7bcc8a2ed859eef7f758c62.1533842385.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 09, 2018 at 06:02:33PM +0530, Amit Kucheria wrote:
-> We've earlier added support to split the register address space into TM
-> and SROT regions.
-> 
-> Split up the regmap address space into two for the remaining platforms that
-> have a similar register layout and make corresponding changes to the
-> get_temp_common() function used by these platforms.
-> 
-> Since tsens-common.c/init_common() currently only registers one address
-> space, the order is important (TM before SROT).  This is OK since the code
-> doesn't really use the SROT functionality yet.
-> 
-> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-> ---
->  arch/arm/boot/dts/qcom-msm8974.dtsi   | 6 ++++--
->  arch/arm64/boot/dts/qcom/msm8916.dtsi | 6 ++++--
->  drivers/thermal/qcom/tsens-common.c   | 5 +++--
->  3 files changed, 11 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> index d9019a49b292..3c4b81c29798 100644
-> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> @@ -427,11 +427,13 @@
->  			};
->  		};
->  
-> -		tsens: thermal-sensor at fc4a8000 {
-> +		tsens: thermal-sensor at fc4a9000 {
->  			compatible = "qcom,msm8974-tsens";
-> -			reg = <0xfc4a8000 0x2000>;
-> +			reg = <0xfc4a9000 0x1000>, /* TM */
-> +			      <0xfc4a8000 0x1000>; /* SROT */
->  			nvmem-cells = <&tsens_calib>, <&tsens_backup>;
->  			nvmem-cell-names = "calib", "calib_backup";
-> +			#qcom,sensors = <11>;
+A KHWASAN shadow memory cell contains a memory tag, that corresponds to
+the tag in the top byte of the pointer, that points to that memory. The
+native top byte value of kernel pointers is 0xff, so with KHWASAN we
+need to initialize shadow memory to 0xff. This commit does that.
 
-nit: adding the number of sensors isn't directly related and probably
-should be in a separate patch. Not important enough to re-spin just
-for this though ;-)
+Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+---
+ arch/arm64/mm/kasan_init.c | 16 ++++++++++++++--
+ include/linux/kasan.h      |  8 ++++++++
+ mm/kasan/common.c          |  3 ++-
+ 3 files changed, 24 insertions(+), 3 deletions(-)
 
->  			#thermal-sensor-cells = <1>;
->  		};
->  
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> index cc1040eacdf5..abf84df5a7bc 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> @@ -774,11 +774,13 @@
->  			};
->  		};
->  
-> -		tsens: thermal-sensor at 4a8000 {
-> +		tsens: thermal-sensor at 4a9000 {
->  			compatible = "qcom,msm8916-tsens";
-> -			reg = <0x4a8000 0x2000>;
-> +			reg = <0x4a9000 0x1000>, /* TM */
-> +			      <0x4a8000 0x1000>; /* SROT */
->  			nvmem-cells = <&tsens_caldata>, <&tsens_calsel>;
->  			nvmem-cell-names = "calib", "calib_sel";
-> +			#qcom,sensors = <5>;
-
-ditto
-
->  			#thermal-sensor-cells = <1>;
->  		};
->  
-> diff --git a/drivers/thermal/qcom/tsens-common.c b/drivers/thermal/qcom/tsens-common.c
-> index 6207d8d92351..478739543bbc 100644
-> --- a/drivers/thermal/qcom/tsens-common.c
-> +++ b/drivers/thermal/qcom/tsens-common.c
-> @@ -21,7 +21,7 @@
->  #include <linux/regmap.h>
->  #include "tsens.h"
->  
-> -#define S0_ST_ADDR		0x1030
-> +#define STATUS_OFFSET		0x30
->  #define SN_ADDR_OFFSET		0x4
->  #define SN_ST_TEMP_MASK		0x3ff
->  #define CAL_DEGC_PT1		30
-> @@ -107,8 +107,9 @@ int get_temp_common(struct tsens_device *tmdev, int id, int *temp)
->  	unsigned int status_reg;
->  	int last_temp = 0, ret;
->  
-> -	status_reg = S0_ST_ADDR + s->hw_id * SN_ADDR_OFFSET;
-> +	status_reg = tmdev->tm_offset + STATUS_OFFSET + s->hw_id * SN_ADDR_OFFSET;
->  	ret = regmap_read(tmdev->map, status_reg, &code);
-> +
->  	if (ret)
->  		return ret;
->  	last_temp = code & SN_ST_TEMP_MASK;
-
-Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+index 12145874c02b..7a31e8ccbad2 100644
+--- a/arch/arm64/mm/kasan_init.c
++++ b/arch/arm64/mm/kasan_init.c
+@@ -44,6 +44,15 @@ static phys_addr_t __init kasan_alloc_zeroed_page(int node)
+ 	return __pa(p);
+ }
+ 
++static phys_addr_t __init kasan_alloc_raw_page(int node)
++{
++	void *p = memblock_virt_alloc_try_nid_raw(PAGE_SIZE, PAGE_SIZE,
++						  __pa(MAX_DMA_ADDRESS),
++						  MEMBLOCK_ALLOC_ACCESSIBLE,
++						  node);
++	return __pa(p);
++}
++
+ static pte_t *__init kasan_pte_offset(pmd_t *pmdp, unsigned long addr, int node,
+ 				      bool early)
+ {
+@@ -89,7 +98,9 @@ static void __init kasan_pte_populate(pmd_t *pmdp, unsigned long addr,
+ 
+ 	do {
+ 		phys_addr_t page_phys = early ? __pa_symbol(kasan_zero_page)
+-					      : kasan_alloc_zeroed_page(node);
++					      : kasan_alloc_raw_page(node);
++		if (!early)
++			memset(__va(page_phys), KASAN_SHADOW_INIT, PAGE_SIZE);
+ 		next = addr + PAGE_SIZE;
+ 		set_pte(ptep, pfn_pte(__phys_to_pfn(page_phys), PAGE_KERNEL));
+ 	} while (ptep++, addr = next, addr != end && pte_none(READ_ONCE(*ptep)));
+@@ -139,6 +150,7 @@ asmlinkage void __init kasan_early_init(void)
+ 		KASAN_SHADOW_END - (1UL << (64 - KASAN_SHADOW_SCALE_SHIFT)));
+ 	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_START, PGDIR_SIZE));
+ 	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE));
++
+ 	kasan_pgd_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, NUMA_NO_NODE,
+ 			   true);
+ }
+@@ -235,7 +247,7 @@ void __init kasan_init(void)
+ 		set_pte(&kasan_zero_pte[i],
+ 			pfn_pte(sym_to_pfn(kasan_zero_page), PAGE_KERNEL_RO));
+ 
+-	memset(kasan_zero_page, 0, PAGE_SIZE);
++	memset(kasan_zero_page, KASAN_SHADOW_INIT, PAGE_SIZE);
+ 	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
+ 
+ 	/* At this point kasan is fully initialized. Enable error messages */
+diff --git a/include/linux/kasan.h b/include/linux/kasan.h
+index 6608aa9b35ac..336385baf926 100644
+--- a/include/linux/kasan.h
++++ b/include/linux/kasan.h
+@@ -139,6 +139,8 @@ static inline size_t kasan_metadata_size(struct kmem_cache *cache) { return 0; }
+ 
+ #ifdef CONFIG_KASAN_GENERIC
+ 
++#define KASAN_SHADOW_INIT 0
++
+ void kasan_cache_shrink(struct kmem_cache *cache);
+ void kasan_cache_shutdown(struct kmem_cache *cache);
+ 
+@@ -149,4 +151,10 @@ static inline void kasan_cache_shutdown(struct kmem_cache *cache) {}
+ 
+ #endif /* CONFIG_KASAN_GENERIC */
+ 
++#ifdef CONFIG_KASAN_HW
++
++#define KASAN_SHADOW_INIT 0xFF
++
++#endif /* CONFIG_KASAN_HW */
++
+ #endif /* LINUX_KASAN_H */
+diff --git a/mm/kasan/common.c b/mm/kasan/common.c
+index 154010ba6c1f..bed8e13c6e1d 100644
+--- a/mm/kasan/common.c
++++ b/mm/kasan/common.c
+@@ -474,11 +474,12 @@ int kasan_module_alloc(void *addr, size_t size)
+ 
+ 	ret = __vmalloc_node_range(shadow_size, 1, shadow_start,
+ 			shadow_start + shadow_size,
+-			GFP_KERNEL | __GFP_ZERO,
++			GFP_KERNEL,
+ 			PAGE_KERNEL, VM_NO_GUARD, NUMA_NO_NODE,
+ 			__builtin_return_address(0));
+ 
+ 	if (ret) {
++		__memset(ret, KASAN_SHADOW_INIT, shadow_size);
+ 		find_vm_area(addr)->flags |= VM_KASAN;
+ 		kmemleak_ignore(ret);
+ 		return 0;
+-- 
+2.18.0.597.ga71716f1ad-goog
