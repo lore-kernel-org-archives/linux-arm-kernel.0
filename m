@@ -1,28 +1,113 @@
 From: marek.behun@nic.cz (=?UTF-8?q?Marek=20Beh=C3=BAn?=)
-Date: Thu,  9 Aug 2018 04:20:30 +0200
-Subject: [PATCH v2 0/7] Add support for the Turris Mox router
-Message-ID: <20180809022037.12001-1-marek.behun@nic.cz>
+Date: Thu,  9 Aug 2018 04:20:31 +0200
+Subject: [PATCH v2 1/7] pinctrl: armada-37xx: Correct mpp definitions
+In-Reply-To: <20180809022037.12001-1-marek.behun@nic.cz>
+References: <20180809022037.12001-1-marek.behun@nic.cz>
+Message-ID: <20180809022037.12001-2-marek.behun@nic.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds preliminary support for the Turris Mox SOHO router developed by CZ.NIC
-to mainline kernel.
+From: Ken Ma <make@marvell.com>
 
-The differences from previous version of these patches:
+This patch icorrects below mpp definitions:
+ - The sdio_sb group is composed of 6 pins and not 5;
+ - The rgmii group contains pins mpp2[17:6] and not mpp2[19:6];
+ - Pin of group "pmic0" is mpp1[6] but not mpp1[16];
+ - Pin of group "pmic1" is mpp1[7] but not mpp1[17];
+ - A new group "smi" is added in A0 with 2 pins - mpp2[19:18], its
+   bitmask is bit4;
+ - Group "pcie1" has 3 pins in A0 - mpp2[5:3], its bit mask is
+   bit5 | bit9 | bit10 but not bit4;
+ - Group "ptp" has 3 pins in A0 as Z1, but its bitmask is changed to
+   bit11 | bit12 | bit13.
 
-The 1st patch should also change some devicetree bindings Documentation.
-Previously I only used the code change from the original patches from
-linux-marvell.
-I also corrected the name of the commit as Andrew pointed out I should.
+Reviewed-on: http://vgitil04.il.marvell.com:8080/41830
+Reviewed-on: http://vgitil04.il.marvell.com:8080/42774
+Reviewed-on: http://vgitil04.il.marvell.com:8080/41970
+Reviewed-on: http://vgitil04.il.marvell.com:8080/42775
+Reviewed-by: Wilson Ding <dingwei@marvell.com>
+Reviewed-by: Evan Wang <xswang@marvell.com>
+Reviewed-by: Victor Gu <xigu@marvell.com>
+Tested-by: Wilson Ding <dingwei@marvell.com>
+Tested-by: iSoC Platform CI <ykjenk@marvell.com>
+Tested-by: Victor Gu <xigu@marvell.com>
+Verified-Armada37x0: Wilson Ding <dingwei@marvell.com>
+Signed-off-by: Ken Ma <make@marvell.com>
+Signed-off-by: Marek Behun <marek.behun@nic.cz>
+---
+ .../bindings/pinctrl/marvell,armada-37xx-pinctrl.txt       | 14 +++++++++-----
+ drivers/pinctrl/mvebu/pinctrl-armada-37xx.c                |  9 +++++----
+ 2 files changed, 14 insertions(+), 9 deletions(-)
 
-In the 2nd patch, which adds support for the Moxtet bus, I added code
-to check if a driver for the subdevice has it's it_table NULL. If so,
-the driver can be specifier only via device tree.
-
-The 3rd patch, which adds support for GPIOs over Moxtet bus, I made the
-code more generic, so that it does not only support the current SFP cage
-module, but, in the future, maybe others.
-
-In the 7th patch only a typo in commit name was changed.
-
-Marek
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
+index c7c088d2dd50..9c1499b2f4c4 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-37xx-pinctrl.txt
+@@ -58,11 +58,11 @@ group pwm3
+  - functions pwm, gpio
+ 
+ group pmic1
+- - pin 17
++ - pin 7
+  - functions pmic, gpio
+ 
+ group pmic0
+- - pin 16
++ - pin 6
+  - functions pmic, gpio
+ 
+ group i2c2
+@@ -112,17 +112,21 @@ group usb2_drvvbus1
+  - functions drvbus, gpio
+ 
+ group sdio_sb
+- - pins 60-64
++ - pins 60-65
+  - functions sdio, gpio
+ 
+ group rgmii
+- - pins 42-55
++ - pins 42-53
+  - functions mii, gpio
+ 
+ group pcie1
+- - pins 39-40
++ - pins 39-41
+  - functions pcie, gpio
+ 
++group smi
++ - pins 54-55
++ - functions smi, gpio
++
+ group ptp
+  - pins 56-58
+  - functions ptp, gpio
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+index 53cf800688e9..95abadee8542 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+@@ -157,8 +157,8 @@ static struct armada_37xx_pin_group armada_37xx_nb_groups[] = {
+ 	PIN_GRP_GPIO("pwm1", 12, 1, BIT(4), "pwm"),
+ 	PIN_GRP_GPIO("pwm2", 13, 1, BIT(5), "pwm"),
+ 	PIN_GRP_GPIO("pwm3", 14, 1, BIT(6), "pwm"),
+-	PIN_GRP_GPIO("pmic1", 17, 1, BIT(7), "pmic"),
+-	PIN_GRP_GPIO("pmic0", 16, 1, BIT(8), "pmic"),
++	PIN_GRP_GPIO("pmic1", 7, 1, BIT(7), "pmic"),
++	PIN_GRP_GPIO("pmic0", 6, 1, BIT(8), "pmic"),
+ 	PIN_GRP_GPIO("i2c2", 2, 2, BIT(9), "i2c"),
+ 	PIN_GRP_GPIO("i2c1", 0, 2, BIT(10), "i2c"),
+ 	PIN_GRP_GPIO("spi_cs1", 17, 1, BIT(12), "spi"),
+@@ -182,8 +182,9 @@ static struct armada_37xx_pin_group armada_37xx_sb_groups[] = {
+ 	PIN_GRP_GPIO("usb2_drvvbus1", 1, 1, BIT(1), "drvbus"),
+ 	PIN_GRP_GPIO("sdio_sb", 24, 6, BIT(2), "sdio"),
+ 	PIN_GRP_GPIO("rgmii", 6, 12, BIT(3), "mii"),
+-	PIN_GRP_GPIO("pcie1", 3, 2, BIT(4), "pcie"),
+-	PIN_GRP_GPIO("ptp", 20, 3, BIT(5), "ptp"),
++	PIN_GRP_GPIO("smi", 18, 2, BIT(4), "smi"),
++	PIN_GRP_GPIO("pcie1", 3, 3, BIT(5) | BIT(9) | BIT(10), "pcie"),
++	PIN_GRP_GPIO("ptp", 20, 3, BIT(11) | BIT(12) | BIT(13), "ptp"),
+ 	PIN_GRP("ptp_clk", 21, 1, BIT(6), "ptp", "mii"),
+ 	PIN_GRP("ptp_trig", 22, 1, BIT(7), "ptp", "mii"),
+ 	PIN_GRP_GPIO_3("mii_col", 23, 1, BIT(8) | BIT(14), 0, BIT(8), BIT(14),
+-- 
+2.16.4
