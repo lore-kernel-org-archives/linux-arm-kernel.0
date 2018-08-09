@@ -1,47 +1,89 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 9 Aug 2018 13:51:48 +0200
-Subject: [PATCH 0/4] KVM: arm/arm64: vgic-v3: Group0 SGI support
-In-Reply-To: <20180808131501.584-1-marc.zyngier@arm.com>
-References: <20180808131501.584-1-marc.zyngier@arm.com>
-Message-ID: <39f39eb5-8a93-0538-e17d-eab5387cbeb2@redhat.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Thu, 9 Aug 2018 20:08:32 +0800
+Subject: [PATCH v1 6/7] net: mvneta: Don't use GRO on Armada 3720
+In-Reply-To: <20180809192755.24e57782@xhacker.debian>
+References: <20180808152706.21727-1-marek.behun@nic.cz>
+ <20180808152706.21727-7-marek.behun@nic.cz>
+ <20180809124022.790f1784@xhacker.debian>
+ <20180809192755.24e57782@xhacker.debian>
+Message-ID: <20180809200832.7de1fa9e@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Thu, 9 Aug 2018 19:27:55 +0800 Jisheng Zhang wrote:
 
-On 08/08/2018 03:14 PM, Marc Zyngier wrote:
-> Although we now have Group0 support, we still miss support for Group0
-> SGIs (which amounts to handling ICC_SGI0R_EL1 and ICC_ASGI1R_EL1
-> traps), and this small series adds such support.
+> Hi,
 > 
-> I appreciate this is *very* late for 4.19, I'd like to take it in as
-> they complement Christoffer's Group0 support, and It'd be annoying to
-> have something incomplete in 4.19.
+> On Thu, 9 Aug 2018 12:40:41 +0800 Jisheng Zhang wrote:
 > 
-> Please shout if you spot something that doesn't look quite right.
+> > + more people
+> > 
+> > On Wed,  8 Aug 2018 17:27:05 +0200 Marek Beh?n wrote:
+> >   
+> > > For some reason on Armada 3720 boards (EspressoBin and Turris Mox) the
+> > > networking driver behaves weirdly when using napi_gro_receive.
+> > > 
+> > > For example downloading a big file from a local network (low ping) is
+> > > fast, but when downloading from a remote server (higher ping), the
+> > > download speed is at first high but drops rapidly to almost nothing or
+> > > absolutely nothing.    
+> > 
+> > We also met this issue on some berlin platforms. I tried to fix the bug,
+> > but no clue so far.
+> >   
+> > > 
+> > > This is fixed when using netif_receive_skb instead of napi_gro_receive.    
+> > 
+> > This is a workaround. The good news is this workaround also fixes the issue
+> > we saw on berlin.
+> >   
+> > > 
+> > > Signed-off-by: Marek Behun <marek.behun@nic.cz>
+> > > Cc: Russell King - ARM Linux <linux@armlinux.org.uk>
+> > > Cc: netdev at vger.kernel.org
+> > > 
+> > > diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> > > index 0ad2f3f7da85..27f3017d94c5 100644
+> > > --- a/drivers/net/ethernet/marvell/mvneta.c
+> > > +++ b/drivers/net/ethernet/marvell/mvneta.c
+> > > @@ -1959,7 +1959,10 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
+> > >  
+> > >  			skb->protocol = eth_type_trans(skb, dev);
+> > >  			mvneta_rx_csum(pp, rx_status, skb);
+> > > -			napi_gro_receive(&port->napi, skb);
+> > > +			if (pp->neta_armada3700)
+> > > +				netif_receive_skb(skb);
+> > > +			else
+> > > +				napi_gro_receive(&port->napi, skb);  
+> 
+> I think I found the root cause, if neta_armada3700 is true, the port got from
+> this_cpu_ptr(pp->ports) is invalid, this is bug... I'll cook a patch for this
 
-Series
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+correct it as:
 
-Thanks
+the port's(port is got from this_cpu_ptr(pp->ports) napi is invalid.
 
-Eric
+Patch is sent out. Could you please try?
+
+Per my test, it solves the issue we saw on berlin.
+
 > 
-> Thanks,
+> Thanks
 > 
-> 	M.
-> 
-> Marc Zyngier (4):
->   KVM: arm64: Remove non-existent AArch32 ICC_SGI1R encoding
->   KVM: arm/arm64: vgic-v3: Add core support for Group0 SGIs
->   KVM: arm64: vgic-v3: Add support for ICC_SGI0R_EL1 and ICC_ASGI1R_EL1
->     accesses
->   KVM: arm: vgic-v3: Add support for ICC_SGI0R and ICC_ASGI1R accesses
-> 
->  arch/arm/kvm/coproc.c            | 25 ++++++++++++++++++-
->  arch/arm64/include/asm/sysreg.h  |  2 ++
->  arch/arm64/kvm/sys_regs.c        | 43 +++++++++++++++++++++++++++++---
->  include/kvm/arm_vgic.h           |  2 +-
->  virt/kvm/arm/vgic/vgic-mmio-v3.c | 16 +++++++++---
->  5 files changed, 79 insertions(+), 9 deletions(-)
+> > >  
+> > >  			rcvd_pkts++;
+> > >  			rcvd_bytes += rx_bytes;
+> > > @@ -2001,7 +2004,10 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
+> > >  
+> > >  		mvneta_rx_csum(pp, rx_status, skb);
+> > >  
+> > > -		napi_gro_receive(&port->napi, skb);
+> > > +		if (pp->neta_armada3700)
+> > > +			netif_receive_skb(skb);
+> > > +		else
+> > > +			napi_gro_receive(&port->napi, skb);
+> > >  	}
+> > >  
+> > >  	if (rcvd_pkts) {    
+> >   
 > 
