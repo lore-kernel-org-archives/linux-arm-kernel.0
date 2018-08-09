@@ -1,56 +1,53 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu,  9 Aug 2018 16:26:39 +0100
-Subject: [PATCH 4/8] ARM: spectre-v1.1: harden __copy_to_user
-In-Reply-To: <1533828403-21323-1-git-send-email-julien.thierry@arm.com>
-References: <1533828403-21323-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1533828403-21323-5-git-send-email-julien.thierry@arm.com>
+Date: Thu,  9 Aug 2018 16:26:35 +0100
+Subject: [PATCH 0/8] ARM: spectre-v1.1 mitigations
+Message-ID: <1533828403-21323-1-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sanitize user pointer given to __copy_to_user, both for standard version
-and memcopy version of the user accessor.
+Hi,
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
----
- arch/arm/lib/copy_to_user.S        | 6 +++++-
- arch/arm/lib/uaccess_with_memcpy.c | 3 ++-
- 2 files changed, 7 insertions(+), 2 deletions(-)
+This series applies on top of Russell's latest spectre variant 1
+mitigations [1],
 
-diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
-index caf5019..970abe5 100644
---- a/arch/arm/lib/copy_to_user.S
-+++ b/arch/arm/lib/copy_to_user.S
-@@ -94,6 +94,11 @@
+This is mostly mirroring what Russell did, but this time for writes to
+user provided addresses.
 
- ENTRY(__copy_to_user_std)
- WEAK(arm_copy_to_user)
-+#ifdef CONFIG_CPU_SPECTRE
-+	get_thread_info r3
-+	ldr	r3, [r3, #TI_ADDR_LIMIT]
-+	uaccess_mask_range_ptr r0, r2, r3, ip
-+#endif
+* Patches 1-4 ensure user addresses used by __put_user* and
+  __copy_to_user functions are sanitized before being used.
 
- #include "copy_template.S"
+* Patches 5-8 replace some __put_user_error calls with __copy_to_user, this
+  both reduces the number of time address sanitizing is performed and also
+  the number of time PAN needs to be toggled.
 
-@@ -108,4 +113,3 @@ ENDPROC(__copy_to_user_std)
- 	rsb	r0, r0, r2
- 	copy_abort_end
- 	.popsection
--
-diff --git a/arch/arm/lib/uaccess_with_memcpy.c b/arch/arm/lib/uaccess_with_memcpy.c
-index 9b4ed17..73dc736 100644
---- a/arch/arm/lib/uaccess_with_memcpy.c
-+++ b/arch/arm/lib/uaccess_with_memcpy.c
-@@ -152,7 +152,8 @@
- 		n = __copy_to_user_std(to, from, n);
- 		uaccess_restore(ua_flags);
- 	} else {
--		n = __copy_to_user_memcpy(to, from, n);
-+		n = __copy_to_user_memcpy(uaccess_mask_range_ptr(to, n),
-+					  from, n);
- 	}
- 	return n;
- }
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-July/589869.html
+
+Cheers,
+
+Julien
+
+-->
+
+Julien Thierry (8):
+  ARM: uaccess: Prevent speculative use of the current addr_limit
+  ARM: spectre-v1.1: force address sanitizing for __put_user*()
+  ARM: spectre-v1,v1.1: provide helpers for address sanitization
+  ARM: spectre-v1.1: harden __copy_to_user
+  ARM: signal: copy registers using __copy_to_user()
+  ARM: signal: always use __copy_to_user to save iwmmxt context
+  ARM: vfp: use __copy_to_user() when saving VFP state
+  ARM: oabi-compat: copy oabi events using __copy_to_user()
+
+ arch/arm/include/asm/assembler.h   | 10 ++++++
+ arch/arm/include/asm/thread_info.h |  4 +--
+ arch/arm/include/asm/uaccess.h     | 48 ++++++++++++++++++++++++++
+ arch/arm/kernel/signal.c           | 71 +++++++++++++++++++++-----------------
+ arch/arm/kernel/sys_oabi-compat.c  | 10 +++---
+ arch/arm/lib/copy_from_user.S      |  6 +---
+ arch/arm/lib/copy_to_user.S        |  6 +++-
+ arch/arm/lib/uaccess_with_memcpy.c |  3 +-
+ arch/arm/vfp/vfpmodule.c           | 20 +++++------
+ 9 files changed, 119 insertions(+), 59 deletions(-)
+
 --
 1.9.1
