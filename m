@@ -1,36 +1,34 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 9 Aug 2018 13:35:12 +0200
-Subject: [PATCH 28/28] eeprom: at24: kill at24_platform_data
-In-Reply-To: <CAMRc=MdTgr-CTia55cRS-Ob8eOVBQom-nXB670nxjf89U_ZEvg@mail.gmail.com>
-References: <20180808153150.23444-1-brgl@bgdev.pl>
- <20180808153150.23444-29-brgl@bgdev.pl>
- <CAHp75Veiop-0xAbs7MtdhOrX_vzDz7v=xAUSDnEhTYVfMovFQA@mail.gmail.com>
- <CAMRc=MdTgr-CTia55cRS-Ob8eOVBQom-nXB670nxjf89U_ZEvg@mail.gmail.com>
-Message-ID: <CAMpxmJU83V_2m+_iipJXGFvj1wgjRp3KHQtZooUc4Ctu1Hw4MA@mail.gmail.com>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Thu, 9 Aug 2018 19:48:51 +0800
+Subject: [PATCH v2 0/2] bugfix and optimization about CMD_SYNC
+Message-ID: <1533815333-17320-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-08-09 13:33 GMT+02:00 Bartosz Golaszewski <brgl@bgdev.pl>:
-> 2018-08-08 20:03 GMT+02:00 Andy Shevchenko <andy.shevchenko@gmail.com>:
->> On Wed, Aug 8, 2018 at 6:31 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>
->>> There are no more users of at24_platform_data. Remove the relevant
->>> header and modify the driver code to not use it anymore.
->>>
->>
->>
->> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
->>
->> If you want me to test this on Intel Galileo Gen 2 board, give me a
->> public tree from where I can pull.
->> Thanks.
->>
->
-> Yes, you can pull from git at github.com:brgl/linux.git
-> davinci-remove-at24-platform-data
->
+v1->v2:
+1. move the call to arm_smmu_cmdq_build_cmd into the critical section,
+   and keep itself unchange.
+2. Although patch2 can make sure no two CMD_SYNCs will be adjacent,
+but patch1 is still needed, see below:
 
-The branch is topic/davinci-remove-at24-platform-data
+cpu0			cpu1			cpu2
+msidata=0
+			msidata=1
+			insert cmd1
+						insert a TLBI command
+insert cmd0
+			smmu execute cmd1
+						smmu execute TLBI
+smmu execute cmd0
+			poll timeout, because msidata=1 is overridden by
+			cmd0, that means VAL=0, sync_idx=1.
 
-> Bart
+Zhen Lei (2):
+  iommu/arm-smmu-v3: fix unexpected CMD_SYNC timeout
+  iommu/arm-smmu-v3: avoid redundant CMD_SYNCs if possible
+
+ drivers/iommu/arm-smmu-v3.c | 26 ++++++++++++++++++++------
+ 1 file changed, 20 insertions(+), 6 deletions(-)
+
+-- 
+1.8.3
