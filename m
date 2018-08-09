@@ -1,81 +1,135 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 9 Aug 2018 19:48:53 +0800
-Subject: [PATCH v2 2/2] iommu/arm-smmu-v3: avoid redundant CMD_SYNCs if
- possible
-In-Reply-To: <1533815333-17320-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1533815333-17320-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1533815333-17320-3-git-send-email-thunder.leizhen@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 9 Aug 2018 12:59:09 +0100
+Subject: [PATCH 2/4] KVM: arm/arm64: vgic-v3: Add core support for Group0
+ SGIs
+In-Reply-To: <20180809074034.GC20606@e113682-lin.lund.arm.com>
+References: <20180808131501.584-1-marc.zyngier@arm.com>
+ <20180808131501.584-3-marc.zyngier@arm.com>
+ <20180809074034.GC20606@e113682-lin.lund.arm.com>
+Message-ID: <7a6b9fb5-7078-12fd-573c-b3f88e482b0b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-More than two CMD_SYNCs maybe adjacent in the command queue, and the first
-one has done what others want to do. Drop the redundant CMD_SYNCs can
-improve IO performance especially under the pressure scene.
+On 09/08/18 08:40, Christoffer Dall wrote:
+> On Wed, Aug 08, 2018 at 02:14:59PM +0100, Marc Zyngier wrote:
+>> Although vgic-v3 now supports Group0 interrupts, it still doesn't
+>> deal with Group0 SGIs. As usually with the GIC, nothing is simple:
+>>
+>> - ICC_SGI1R can signal SGIs of both groups, since GICD_CTLR.DS==1
+>>   with KVM (as per 8.1.10, Non-secure EL1 access)
+>>
+>> - ICC_SGI0R can only generate Group0 SGIs
+>>
+>> - ICC_ASGI1R sees its scope refocussed to generate only Group0
+>>   SGIs (as per the note at the bottom of Table 8-14)
+>>
+>> One way to look at this is that an SGI can be generated if the
+>> group implied by the CPU interface is lower or equal to the
+>> group specified by the interrupt.
+> 
+> This sentence hurts my brain. Another way to look at it is that with
+> DS=1, only SGI1R allows signaling group1 interrupts.  See below.
 
-I did the statistics in my test environment, the number of CMD_SYNCs can
-be reduced about 1/3. See below:
-CMD_SYNCs reduced:	19542181
-CMD_SYNCs total:	58098548	(include reduced)
-CMDs total:		116197099	(TLBI:SYNC about 1:1)
+Fair enough.
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/iommu/arm-smmu-v3.c | 22 +++++++++++++++++++---
- 1 file changed, 19 insertions(+), 3 deletions(-)
+>>
+>> We only support Group1 SGIs so far, so no material change.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/kvm/coproc.c            |  2 +-
+>>  arch/arm64/kvm/sys_regs.c        |  2 +-
+>>  include/kvm/arm_vgic.h           |  2 +-
+>>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 16 +++++++++++++---
+>>  4 files changed, 16 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+>> index 3a02e76699a6..ec517992c12d 100644
+>> --- a/arch/arm/kvm/coproc.c
+>> +++ b/arch/arm/kvm/coproc.c
+>> @@ -253,7 +253,7 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
+>>  	reg = (u64)*vcpu_reg(vcpu, p->Rt2) << 32;
+>>  	reg |= *vcpu_reg(vcpu, p->Rt1) ;
+>>  
+>> -	vgic_v3_dispatch_sgi(vcpu, reg);
+>> +	vgic_v3_dispatch_sgi(vcpu, reg, 1);
+>>  
+>>  	return true;
+>>  }
+>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>> index e04aacb2a24c..a09139b97e81 100644
+>> --- a/arch/arm64/kvm/sys_regs.c
+>> +++ b/arch/arm64/kvm/sys_regs.c
+>> @@ -255,7 +255,7 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
+>>  	if (!p->is_write)
+>>  		return read_from_write_only(vcpu, p, r);
+>>  
+>> -	vgic_v3_dispatch_sgi(vcpu, p->regval);
+>> +	vgic_v3_dispatch_sgi(vcpu, p->regval, 1);
+>>  
+>>  	return true;
+>>  }
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index c134790be32c..06a25b11efa7 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -373,7 +373,7 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+>>  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+>>  void kvm_vgic_reset_mapped_irq(struct kvm_vcpu *vcpu, u32 vintid);
+>>  
+>> -void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+>> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg, int group);
+>>  
+>>  /**
+>>   * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> index 88e78b582139..11d321f7ad71 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> @@ -901,6 +901,7 @@ static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
+>>   * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
+>>   * @vcpu: The VCPU requesting a SGI
+>>   * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
+>> + * @group: Interrupt group requested by the sender
+>>   *
+>>   * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
+>>   * This will trap in sys_regs.c and call this function.
+>> @@ -910,7 +911,7 @@ static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
+>>   * check for matching ones. If this bit is set, we signal all, but not the
+>>   * calling VCPU.
+>>   */
+>> -void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+>> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg, int group)
+>>  {
+>>  	struct kvm *kvm = vcpu->kvm;
+>>  	struct kvm_vcpu *c_vcpu;
+>> @@ -959,9 +960,18 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+>>  		irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
+>>  
+>>  		spin_lock_irqsave(&irq->irq_lock, flags);
+>> -		irq->pending_latch = true;
+>>  
+>> -		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
+>> +		/*
+>> +		 * A Group0 access can only generate a Group0 SGI,
+>> +		 * while a Group1 access can generate either group.
+>> +		 */
+> 
+> nit: "Is a Group 0 access" a well-defined term?
+> 
+> I think it may be clearer if the parameter was: bool allow_group1
+> 
+> and the condition was:
+> 
+> if (irq->group && allow_group1) {
+> 	...
+> 
+> At least that would match the comment.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index d17a9a7..b96d2d2 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -567,6 +567,7 @@ struct arm_smmu_device {
- 	int				gerr_irq;
- 	int				combined_irq;
- 	u32				sync_nr;
-+	u8				prev_cmd_opcode;
+Indeed, that's better. Let me respin that.
 
- 	unsigned long			ias; /* IPA */
- 	unsigned long			oas; /* PA */
-@@ -775,6 +776,11 @@ static int queue_remove_raw(struct arm_smmu_queue *q, u64 *ent)
- 	return 0;
- }
+Thanks,
 
-+static inline u8 arm_smmu_cmd_opcode_get(u64 *cmd)
-+{
-+	return cmd[0] & CMDQ_0_OP;
-+}
-+
- /* High-level queue accessors */
- static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
- {
-@@ -900,6 +906,8 @@ static void arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
- 	struct arm_smmu_queue *q = &smmu->cmdq.q;
- 	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
-
-+	smmu->prev_cmd_opcode = arm_smmu_cmd_opcode_get(cmd);
-+
- 	while (queue_insert_raw(q, cmd) == -ENOSPC) {
- 		if (queue_poll_cons(q, false, wfe))
- 			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
-@@ -952,9 +960,17 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
- 	};
-
- 	spin_lock_irqsave(&smmu->cmdq.lock, flags);
--	ent.sync.msidata = ++smmu->sync_nr;
--	arm_smmu_cmdq_build_cmd(cmd, &ent);
--	arm_smmu_cmdq_insert_cmd(smmu, cmd);
-+	if (smmu->prev_cmd_opcode == CMDQ_OP_CMD_SYNC) {
-+		/*
-+		 * Previous command is CMD_SYNC also, there is no need to add
-+		 * one more. Just poll it.
-+		 */
-+		ent.sync.msidata = smmu->sync_nr;
-+	} else {
-+		ent.sync.msidata = ++smmu->sync_nr;
-+		arm_smmu_cmdq_build_cmd(cmd, &ent);
-+		arm_smmu_cmdq_insert_cmd(smmu, cmd);
-+	}
- 	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
-
- 	return __arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
---
-1.8.3
+	M.
+-- 
+Jazz is not dead. It just smells funny...
