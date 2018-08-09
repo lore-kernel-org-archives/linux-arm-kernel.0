@@ -1,75 +1,57 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Thu, 9 Aug 2018 09:41:53 +0200
-Subject: [PATCH 4/4] KVM: arm: vgic-v3: Add support for ICC_SGI0R and
- ICC_ASGI1R accesses
-In-Reply-To: <20180808131501.584-5-marc.zyngier@arm.com>
-References: <20180808131501.584-1-marc.zyngier@arm.com>
- <20180808131501.584-5-marc.zyngier@arm.com>
-Message-ID: <20180809074153.GF20606@e113682-lin.lund.arm.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Thu, 9 Aug 2018 09:36:12 +0200
+Subject: qemu machine settings and root fs for armv8?
+In-Reply-To: <CAKwvOdnA5OTcBuRVbcBv8oYHR-mU3+Ee_iFjqbHx4UQxVnpxtQ@mail.gmail.com>
+References: <CAKwvOdkGatK1HbXG0hDr=a1DtnoCXUbVppLdR6uN5tAKzKdDDQ@mail.gmail.com>
+ <CAKwvOdnA5OTcBuRVbcBv8oYHR-mU3+Ee_iFjqbHx4UQxVnpxtQ@mail.gmail.com>
+Message-ID: <5d585df0-abbe-c95f-adff-c4c2e3962832@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2018 at 02:15:01PM +0100, Marc Zyngier wrote:
-> In order to generate Group0 SGIs, let's add some decoding logic to
-> access_gic_sgi(), and pass the generating group accordingly.
+On 08/09/2018 01:10 AM, Nick Desaulniers wrote:
+> On Wed, Aug 8, 2018 at 11:52 AM Nick Desaulniers
+> <ndesaulniers@google.com> wrote:
+>>
+>> I was wondering if folks had recommendations for testing armv8 kernels
+>> in qemu, such as what machine settings and if root fs images existed.
+>> I've been playing around with buildroot, but was curious if people had
+>> recipes they could share?
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/coproc.c | 25 ++++++++++++++++++++++++-
->  1 file changed, 24 insertions(+), 1 deletion(-)
+> Following up, I found:
+> https://github.com/google/syzkaller/blob/master/docs/linux/setup_linux-host_qemu-vm_arm64-kernel.md
+> helpful to build the rootfs using buildroot.
 > 
-> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> index ec517992c12d..0dc0ca061d78 100644
-> --- a/arch/arm/kvm/coproc.c
-> +++ b/arch/arm/kvm/coproc.c
-> @@ -246,6 +246,7 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
->  			   const struct coproc_reg *r)
->  {
->  	u64 reg;
-> +	int group;
->  
->  	if (!p->is_write)
->  		return read_from_write_only(vcpu, p);
-> @@ -253,7 +254,25 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
->  	reg = (u64)*vcpu_reg(vcpu, p->Rt2) << 32;
->  	reg |= *vcpu_reg(vcpu, p->Rt1) ;
->  
-> -	vgic_v3_dispatch_sgi(vcpu, reg, 1);
-> +	/*
-> +	 * In a system where GICD_CTLR.DS=1, a ICC_SGI0R access generates
-> +	 * Group0 SGIs only, while ICC_SGI1R can generate either group,
-> +	 * depending on the SGI configuration. ICC_ASGI1R is effectively
-> +	 * equivalent to ICC_SGI0R, as there is no "alternative" secure
-> +	 * group.
-> +	 */
-> +	switch (p->Op1) {
-> +	default:		/* Keep GCC quiet */
-> +	case 0:			/* ICC_SGI1R */
-> +		group = 1;
-> +		break;
-> +	case 1:			/* ICC_ASGI1R */
-> +	case 2:			/* ICC_SGI0R */
-> +		group = 0;
-> +		break;
-> +	}
-> +
-> +	vgic_v3_dispatch_sgi(vcpu, reg, group);
->  
->  	return true;
->  }
-> @@ -459,6 +478,10 @@ static const struct coproc_reg cp15_regs[] = {
->  
->  	/* ICC_SGI1R */
->  	{ CRm64(12), Op1( 0), is64, access_gic_sgi},
-> +	/* ICC_ASGI1R */
-> +	{ CRm64(12), Op1( 1), is64, access_gic_sgi},
-> +	/* ICC_SGI0R */
-> +	{ CRm64(12), Op1( 2), is64, access_gic_sgi},
->  
->  	/* VBAR: swapped by interrupt.S. */
->  	{ CRn(12), CRm( 0), Op1( 0), Op2( 0), is32,
-> -- 
-> 2.18.0
+> Then:
+> 
+> $ qemu-system-aarch64 -kernel arch/arm64/boot/Image -machine virt -cpu
+> cortex-a57 -hda rootfs.ext2 -append "console=ttyAMA0 root=/dev/vda"
+> -serial mon:stdio -m 512 -nographic
+> 
+> worked for me.
 > 
 
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+
+I usually use a buildroot environment and just boot as an initramfs:
+
+qemu-system-aarch64 \
+	-s \
+	-smp 8 \
+	-machine virt \
+	-cpu cortex-a57 \
+	-machine type=virt \
+	-nographic \
+	-m 1024 \
+	-kernel /path/to/kernel \
+	--append "nokaslr slub_debug=- console=ttyAMA0 debug_pagealloc=on 
+earlycon=pl011,0x9000000" \
+	-initrd /path/to/arm64_rootfs.cpio \
+	-fsdev local,security_model=passthrough,id=fsdev0,path=/tmp/share \
+	-device virtio-9p-pci,id=fs0,fsdev=fsdev0,mount_tag=hostshare
+
+I'll note that this setup makes using kernel modules a big pain but
+it's useful for certain types of testing.
+The virtio settings are from https://www.linux-kvm.org/page/9p_virtio
+for sharing files.
+
+Thanks,
+Laura
