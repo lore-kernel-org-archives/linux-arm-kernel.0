@@ -1,41 +1,41 @@
-From: gengdj.1984@gmail.com (gengdongjiu)
-Date: Fri, 10 Aug 2018 06:16:45 +0800
-Subject: [PATCH RESEND v2] arm64: clean the additional checks before
- calling ghes_notify_sea()
-In-Reply-To: <CABo9ajBKEWmgh6tBbUnrY8zM3vAH+TKWwBHn-Vz556Up+614Zw@mail.gmail.com>
-References: <1533659175-47076-1-git-send-email-gengdongjiu@huawei.com>
- <CAMj-D2Arv-ZxUMTB_zKKy58CghWsZJbTOcNdiD3KVzxJ-v973g@mail.gmail.com>
- <CABo9ajBKEWmgh6tBbUnrY8zM3vAH+TKWwBHn-Vz556Up+614Zw@mail.gmail.com>
-Message-ID: <CAMj-D2De_LzxMjNT_w-N2iiqBYq4wbdY6vEvjxr5yaAuhBg+jw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 09 Aug 2018 16:41:22 -0600
+Subject: [PATCH 7/8] arm64: dts: rk3399: Add dfi and dmc nodes.
+In-Reply-To: <20180730081124.30698-8-enric.balletbo@collabora.com>
+References: <20180730081124.30698-1-enric.balletbo@collabora.com>
+ <20180730081124.30698-8-enric.balletbo@collabora.com>
+Message-ID: <5b6cc314.1c69fb81.96ced.16f7@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-08-10 5:05 GMT+08:00 Tyler Baicar <baicar.tyler@gmail.com>:
-> On Thu, Aug 9, 2018 at 8:32 AM, gengdongjiu <gengdj.1984@gmail.com> wrote:
->>
->> 2018-08-08 0:26 GMT+08:00 Dongjiu Geng <gengdongjiu@huawei.com>:
->> > In order to remove the additional check before calling the
->> > ghes_notify_sea(), make stub definition when !CONFIG_ACPI_APEI_SEA.
->> >
->> > After this cleanup, we can simply call the ghes_notify_sea() to let
->> > APEI driver handle the SEA notification.
->> >
->> > CC: Tyler Baicar <tbaicar@codeaurora.org>
->> > CC: James Morse <james.morse@arm.com>
->> > Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
->> > Acked-by: Will Deacon <will.deacon@arm.com>
->> > ---
->> > This cleanup is ever mentioned by Mark Rutland in [1]
->> >
->> > [1]:
->> > https://lkml.org/lkml/2018/5/31/289
->> >
->
-> FWIW - Looks good to me!
+Hi, this is an automated email from Rob's (experimental) review bot. I
+found a couple of common problems with your patch. Please see below.
 
-Thanks very much for this comments and review,
-whether I can get your "Acked-by" or "Reviewed-by"? thanks
+On Mon, 30 Jul 2018 10:11:23 +0200, Enric Balletbo i Serra wrote:
+> From: Lin Huang <hl@rock-chips.com>
+> 
+> These are required to support DDR DVFS on rk3399 platform. The patch also
+> introduces two new files (rk3399-dram.h and rk3399-dram-default-timing)
+> with default DRAM settings.
+> 
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 
->
-> Thanks,
-> Tyler
+The preferred subject prefix is "dt-bindings: <binding dir>: ...".
+
+> ---
+> 
+> Changes in v1:
+> - [RFC 8/10] Move rk3399-dram.h to dt-includes.
+> - [RFC 8/10] Put sdram default values under the dmc node.
+> - [RFC 8/10] Removed rk3399-dram-default-timing.dts
+> 
+>  .../boot/dts/rockchip/rk3399-op1-opp.dtsi     | 29 ++++++++
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi      | 49 +++++++++++++
+>  include/dt-bindings/power/rk3399-dram.h       | 73 +++++++++++++++++++
+>  3 files changed, 151 insertions(+)
+>  create mode 100644 include/dt-bindings/power/rk3399-dram.h
+> 
+
+DT bindings (including binding headers) should be a separate patch. See
+Documentation/devicetree/bindings/submitting-patches.txt.
