@@ -1,190 +1,96 @@
-From: piliu@redhat.com (Pingfan Liu)
-Date: Thu, 9 Aug 2018 00:14:05 -0400 (EDT)
-Subject: [PATCH v13 03/16] s390, kexec_file: drop arch_kexec_mem_walk()
-In-Reply-To: <20180809033416.GA5069@dhcp-128-65.nay.redhat.com>
-References: <20180801075820.3753-1-takahiro.akashi@linaro.org>
- <20180801075820.3753-4-takahiro.akashi@linaro.org>
- <20180801102951.527cfc57@ThinkPad> <20180802000150.GN11258@linaro.org>
- <20180806055047.GC4246@dhcp-128-65.nay.redhat.com>
- <20180809033416.GA5069@dhcp-128-65.nay.redhat.com>
-Message-ID: <1235507889.17337085.1533788045597.JavaMail.zimbra@redhat.com>
+From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
+Date: Thu,  9 Aug 2018 09:48:52 +0530
+Subject: [PATCH v8 2/6] Uprobe: Additional argument arch_uprobe to
+ uprobe_write_opcode()
+In-Reply-To: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
+References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
+Message-ID: <20180809041856.1547-3-ravi.bangoria@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add addition argument 'arch_uprobe' to uprobe_write_opcode().
+We need this in later set of patches.
 
+Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
+---
+ arch/arm/probes/uprobes/core.c | 2 +-
+ arch/mips/kernel/uprobes.c     | 2 +-
+ include/linux/uprobes.h        | 2 +-
+ kernel/events/uprobes.c        | 9 +++++----
+ 4 files changed, 8 insertions(+), 7 deletions(-)
 
-
-
------ Original Message -----
-> From: "Dave Young" <dyoung@redhat.com>
-> To: "AKASHI Takahiro" <takahiro.akashi@linaro.org>, "Philipp Rudo" <prudo@linux.ibm.com>, "catalin marinas"
-> <catalin.marinas@arm.com>, "will deacon" <will.deacon@arm.com>, dhowells at redhat.com, vgoyal at redhat.com,
-> herbert at gondor.apana.org.au, davem at davemloft.net, bhe at redhat.com, arnd at arndb.de, schwidefsky at de.ibm.com, "heiko
-> carstens" <heiko.carstens@de.ibm.com>, "ard biesheuvel" <ard.biesheuvel@linaro.org>, "james morse"
-> <james.morse@arm.com>, bhsharma at redhat.com, kexec at lists.infradead.org, linux-arm-kernel at lists.infradead.org,
-> linux-kernel at vger.kernel.org, "piliu at redhat.com Thiago Jung Bauermann" <bauerman@linux.vnet.ibm.com>
-> Sent: Thursday, August 9, 2018 11:34:16 AM
-> Subject: Re: [PATCH v13 03/16] s390, kexec_file: drop arch_kexec_mem_walk()
-> 
-> Add more cc. Pingfan Liu confirmed ppc does not use 0 as valid address,
-> if so it should be safe.
-> 
-> Pingfan, can you add more words?
-> 
-
-ppc64 uses a few KB starting from 0 for exception handler.
-
-> On 08/06/18 at 01:50pm, Dave Young wrote:
-> > Add Thiago in cc so that he can review from powerpc point of view.
-> > 
-> > On 08/02/18 at 09:01am, AKASHI Takahiro wrote:
-> > > Hi,
-> > > 
-> > > On Wed, Aug 01, 2018 at 10:29:51AM +0200, Philipp Rudo wrote:
-> > > > Hey Akashi,
-> > > > 
-> > > > I kept thinking about this patch and remembered why I didn't made the
-> > > > change
-> > > > you are suggesting now.
-> > > 
-> > > Hmm.
-> > > 
-> > > > The problem is when you only check for kbuf->mem you are excluding
-> > > > address 0,
-> > > > which might be a valid address to load the kernel to. On s390 this is
-> > > > actually
-> > > > done when the kernel is not loaded via a boot loader. For kexec_file
-> > > > however,
-> > > > we cut off the first few kB of the image and jump directly to
-> > > > 'startup'. So
-> > > > checking for !0 does not cause a problem here.
-> > > 
-> > > Yeah, as Dave(RedHat) described, all the current kexec-capable
-> > > architectures,
-> > > except arm64, implicitly initialize kbuf.mem to zero with "kbuf = { ...
-> > > }"
-> > > initializer. So surely my change would not break anything on the existing
-> > > code.
-> > > On the other hand, I also see your concern here.
-> > > 
-> > > > Anyway, the long term safer solution would be something like
-> > > > 
-> > > > #define KEXEC_BUF_MEM_UNKNOWN (-1UL)
-> > > > 
-> > > > for architectures to tell common code to search a fitting mem hole.
-> > > 
-> > > This would require the existing code on every arch to be modified, which
-> > > I think should be avoided if possible. Instead,
-> > > we'd better define in linux/kexec.h:
-> > >   #ifndef KEXEC_BUF_MEM_UNKNOWN
-> > >   #define KEXEC_BUF_MEM_UNKNOWN 0
-> > >   #endif
-> > > and then check for kbuf in kexec_locate_mem_hole():
-> > >   if (kbuf->mem != KEXEC_BUF_MEM_UNKNOWN)
-> > >         return 0;
-> > >   ...
-> > > 
-> > > This way if some arch wants to treat *zero* as a valid address, it can
-> > > redefine this macro in arch/asm/kexec.h.
-> > 
-> > I think this way works if powerpc is safe for using zero as the unknown
-> > address in this case.  Thiago, can you provide some review?
-> > 
-> > Philipp, thanks for catching the problem!
-> > 
-> > > 
-> > > Thanks,
-> > > -Takahiro AKASHI
-> > > 
-> > > > 
-> > > > Back then I didn't do the change because I had the other workaround,
-> > > > which
-> > > > didn't require a common code change. But when you are touching the code
-> > > > now it
-> > > > is worth thinking about it.
-> > > > 
-> > > > Just wanted to let you know
-> > > > Philipp
-> > > > 
-> > > > 
-> > > > On Wed,  1 Aug 2018 16:58:07 +0900
-> > > > AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-> > > > 
-> > > > > Since s390 already knows where to locate buffers, calling
-> > > > > arch_kexec_mem_walk() has no sense. So we can just drop it as
-> > > > > kbuf->mem
-> > > > > indicates this while all other architectures sets it to 0 initially.
-> > > > > 
-> > > > > This change is a preparatory work for the next patch, where all the
-> > > > > variant memory walks, either on system resource or memblock, will be
-> > > > > put in one common place so that it will satisfy all the
-> > > > > architectures'
-> > > > > need.
-> > > > > 
-> > > > > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > > > > Reviewed-by: Philipp Rudo <prudo@linux.ibm.com>
-> > > > > Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-> > > > > Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-> > > > > Cc: Dave Young <dyoung@redhat.com>
-> > > > > Cc: Vivek Goyal <vgoyal@redhat.com>
-> > > > > Cc: Baoquan He <bhe@redhat.com>
-> > > > > ---
-> > > > >  arch/s390/kernel/machine_kexec_file.c | 10 ----------
-> > > > >  kernel/kexec_file.c                   |  4 ++++
-> > > > >  2 files changed, 4 insertions(+), 10 deletions(-)
-> > > > > 
-> > > > > diff --git a/arch/s390/kernel/machine_kexec_file.c
-> > > > > b/arch/s390/kernel/machine_kexec_file.c
-> > > > > index f413f57f8d20..32023b4f9dc0 100644
-> > > > > --- a/arch/s390/kernel/machine_kexec_file.c
-> > > > > +++ b/arch/s390/kernel/machine_kexec_file.c
-> > > > > @@ -134,16 +134,6 @@ int kexec_file_add_initrd(struct kimage *image,
-> > > > > struct s390_load_data *data,
-> > > > >  	return ret;
-> > > > >  }
-> > > > >  
-> > > > > -/*
-> > > > > - * The kernel is loaded to a fixed location. Turn off
-> > > > > kexec_locate_mem_hole
-> > > > > - * and provide kbuf->mem by hand.
-> > > > > - */
-> > > > > -int arch_kexec_walk_mem(struct kexec_buf *kbuf,
-> > > > > -			int (*func)(struct resource *, void *))
-> > > > > -{
-> > > > > -	return 1;
-> > > > > -}
-> > > > > -
-> > > > >  int arch_kexec_apply_relocations_add(struct purgatory_info *pi,
-> > > > >  				     Elf_Shdr *section,
-> > > > >  				     const Elf_Shdr *relsec,
-> > > > > diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> > > > > index 63c7ce1c0c3e..bf39df5e5bb9 100644
-> > > > > --- a/kernel/kexec_file.c
-> > > > > +++ b/kernel/kexec_file.c
-> > > > > @@ -534,6 +534,10 @@ int kexec_locate_mem_hole(struct kexec_buf
-> > > > > *kbuf)
-> > > > >  {
-> > > > >  	int ret;
-> > > > >  
-> > > > > +	/* Arch knows where to place */
-> > > > > +	if (kbuf->mem)
-> > > > > +		return 0;
-> > > > > +
-> > > > >  	ret = arch_kexec_walk_mem(kbuf, locate_mem_hole_callback);
-> > > > >  
-> > > > >  	return ret == 1 ? 0 : -EADDRNOTAVAIL;
-> > > > 
-> > > 
-> > > _______________________________________________
-> > > kexec mailing list
-> > > kexec at lists.infradead.org
-> > > http://lists.infradead.org/mailman/listinfo/kexec
-> > 
-> > Thanks
-> > Dave
-> 
-> _______________________________________________
-> kexec mailing list
-> kexec at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/kexec
-> 
+diff --git a/arch/arm/probes/uprobes/core.c b/arch/arm/probes/uprobes/core.c
+index d1329f1ba4e4..bf992264060e 100644
+--- a/arch/arm/probes/uprobes/core.c
++++ b/arch/arm/probes/uprobes/core.c
+@@ -32,7 +32,7 @@ bool is_swbp_insn(uprobe_opcode_t *insn)
+ int set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm,
+ 	     unsigned long vaddr)
+ {
+-	return uprobe_write_opcode(mm, vaddr,
++	return uprobe_write_opcode(auprobe, mm, vaddr,
+ 		   __opcode_to_mem_arm(auprobe->bpinsn));
+ }
+ 
+diff --git a/arch/mips/kernel/uprobes.c b/arch/mips/kernel/uprobes.c
+index f7a0645ccb82..4aaff3b3175c 100644
+--- a/arch/mips/kernel/uprobes.c
++++ b/arch/mips/kernel/uprobes.c
+@@ -224,7 +224,7 @@ unsigned long arch_uretprobe_hijack_return_addr(
+ int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm,
+ 	unsigned long vaddr)
+ {
+-	return uprobe_write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
++	return uprobe_write_opcode(auprobe, mm, vaddr, UPROBE_SWBP_INSN);
+ }
+ 
+ void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
+diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
+index 0a294e950df8..bb9d2084af03 100644
+--- a/include/linux/uprobes.h
++++ b/include/linux/uprobes.h
+@@ -121,7 +121,7 @@ extern bool is_swbp_insn(uprobe_opcode_t *insn);
+ extern bool is_trap_insn(uprobe_opcode_t *insn);
+ extern unsigned long uprobe_get_swbp_addr(struct pt_regs *regs);
+ extern unsigned long uprobe_get_trap_addr(struct pt_regs *regs);
+-extern int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr, uprobe_opcode_t);
++extern int uprobe_write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr, uprobe_opcode_t);
+ extern int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *uc);
+ extern int uprobe_apply(struct inode *inode, loff_t offset, struct uprobe_consumer *uc, bool);
+ extern void uprobe_unregister(struct inode *inode, loff_t offset, struct uprobe_consumer *uc);
+diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
+index 471eac896635..c0418ba52ba8 100644
+--- a/kernel/events/uprobes.c
++++ b/kernel/events/uprobes.c
+@@ -299,8 +299,8 @@ static int verify_opcode(struct page *page, unsigned long vaddr, uprobe_opcode_t
+  * Called with mm->mmap_sem held for write.
+  * Return 0 (success) or a negative errno.
+  */
+-int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr,
+-			uprobe_opcode_t opcode)
++int uprobe_write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm,
++			unsigned long vaddr, uprobe_opcode_t opcode)
+ {
+ 	struct page *old_page, *new_page;
+ 	struct vm_area_struct *vma;
+@@ -351,7 +351,7 @@ int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr,
+  */
+ int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr)
+ {
+-	return uprobe_write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
++	return uprobe_write_opcode(auprobe, mm, vaddr, UPROBE_SWBP_INSN);
+ }
+ 
+ /**
+@@ -366,7 +366,8 @@ int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned
+ int __weak
+ set_orig_insn(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr)
+ {
+-	return uprobe_write_opcode(mm, vaddr, *(uprobe_opcode_t *)&auprobe->insn);
++	return uprobe_write_opcode(auprobe, mm, vaddr,
++			*(uprobe_opcode_t *)&auprobe->insn);
+ }
+ 
+ static struct uprobe *get_uprobe(struct uprobe *uprobe)
+-- 
+2.14.4
