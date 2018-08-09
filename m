@@ -1,47 +1,96 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Thu, 9 Aug 2018 10:15:44 +0800
-Subject: [PATCH v4 09/14] drm/mediatek: add function to get layer number for
- component
+Date: Thu, 9 Aug 2018 10:15:41 +0800
+Subject: [PATCH v4 06/14] drm/mediatek: add RGB color format support for RDMA
 In-Reply-To: <1533780949-30141-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1533780949-30141-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1533780949-30141-10-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1533780949-30141-7-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add function to get layer number for component
+This patch add RGB color format support for RDMA,
+including RGB565, RGB888, RGBA8888 and ARGB8888.
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 46 ++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-index 7413ffeb3c9d..8399229e6ad2 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
-@@ -78,6 +78,7 @@ struct mtk_ddp_comp_funcs {
- 	void (*stop)(struct mtk_ddp_comp *comp);
- 	void (*enable_vblank)(struct mtk_ddp_comp *comp, struct drm_crtc *crtc);
- 	void (*disable_vblank)(struct mtk_ddp_comp *comp);
-+	unsigned int (*layer_nr)(struct mtk_ddp_comp *comp);
- 	void (*layer_on)(struct mtk_ddp_comp *comp, unsigned int idx);
- 	void (*layer_off)(struct mtk_ddp_comp *comp, unsigned int idx);
- 	void (*layer_config)(struct mtk_ddp_comp *comp, unsigned int idx,
-@@ -128,6 +129,14 @@ static inline void mtk_ddp_comp_disable_vblank(struct mtk_ddp_comp *comp)
- 		comp->funcs->disable_vblank(comp);
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+index 08866550740f..1f57f86c7910 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+@@ -35,6 +35,8 @@
+ #define DISP_REG_RDMA_SIZE_CON_0		0x0014
+ #define DISP_REG_RDMA_SIZE_CON_1		0x0018
+ #define DISP_REG_RDMA_TARGET_LINE		0x001c
++#define DISP_RDMA_MEM_CON			0x0024
++#define MEM_MODE_INPUT_SWAP				BIT(8)
+ #define DISP_RDMA_MEM_SRC_PITCH			0x002c
+ #define DISP_RDMA_MEM_GMC_SETTING_0		0x0030
+ #define DISP_REG_RDMA_FIFO_CON			0x0040
+@@ -46,6 +48,11 @@
+ 
+ #define RDMA_MEM_GMC				0x40402020
+ 
++#define MEM_MODE_INPUT_FORMAT_RGB565		0x0
++#define MEM_MODE_INPUT_FORMAT_RGB888		(0x001 << 4)
++#define MEM_MODE_INPUT_FORMAT_RGBA8888		(0x002 << 4)
++#define MEM_MODE_INPUT_FORMAT_ARGB8888		(0x003 << 4)
++
+ struct mtk_disp_rdma_data {
+ 	unsigned int fifo_size;
+ };
+@@ -144,12 +151,51 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
+ 	writel(reg, comp->regs + DISP_REG_RDMA_FIFO_CON);
  }
  
-+static inline unsigned int mtk_ddp_comp_layer_nr(struct mtk_ddp_comp *comp)
++static unsigned int rdma_fmt_convert(struct mtk_disp_rdma *rdma,
++				     unsigned int fmt)
 +{
-+	if (comp->funcs && comp->funcs->layer_nr)
-+		return comp->funcs->layer_nr(comp);
-+
-+	return 0;
++	/* The return value in switch "MEM_MODE_INPUT_FORMAT_XXX"
++	 * is defined in mediatek HW data sheet.
++	 * The alphabet order in XXX is no relation to data
++	 * arrangement in memory.
++	 */
++	switch (fmt) {
++	default:
++	case DRM_FORMAT_RGB565:
++		return MEM_MODE_INPUT_FORMAT_RGB565;
++	case DRM_FORMAT_BGR565:
++		return MEM_MODE_INPUT_FORMAT_RGB565 | MEM_MODE_INPUT_SWAP;
++	case DRM_FORMAT_RGB888:
++		return MEM_MODE_INPUT_FORMAT_RGB888;
++	case DRM_FORMAT_BGR888:
++		return MEM_MODE_INPUT_FORMAT_RGB888 | MEM_MODE_INPUT_SWAP;
++	case DRM_FORMAT_RGBX8888:
++	case DRM_FORMAT_RGBA8888:
++		return MEM_MODE_INPUT_FORMAT_ARGB8888;
++	case DRM_FORMAT_BGRX8888:
++	case DRM_FORMAT_BGRA8888:
++		return MEM_MODE_INPUT_FORMAT_ARGB8888 | MEM_MODE_INPUT_SWAP;
++	case DRM_FORMAT_XRGB8888:
++	case DRM_FORMAT_ARGB8888:
++		return MEM_MODE_INPUT_FORMAT_RGBA8888;
++	case DRM_FORMAT_XBGR8888:
++	case DRM_FORMAT_ABGR8888:
++		return MEM_MODE_INPUT_FORMAT_RGBA8888 | MEM_MODE_INPUT_SWAP;
++	}
 +}
 +
- static inline void mtk_ddp_comp_layer_on(struct mtk_ddp_comp *comp,
- 					 unsigned int idx)
+ static void mtk_rdma_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
+ 				  struct mtk_plane_state *state)
  {
++	struct mtk_disp_rdma *rdma = comp_to_rdma(comp);
+ 	struct mtk_plane_pending_state *pending = &state->pending;
+ 	unsigned int addr = pending->addr;
+ 	unsigned int pitch = pending->pitch & 0xffff;
++	unsigned int fmt = pending->format;
++	unsigned int con;
++
++	con = rdma_fmt_convert(rdma, fmt);
++	writel_relaxed(con, comp->regs + DISP_RDMA_MEM_CON);
+ 
+ 	writel_relaxed(addr, comp->regs + DISP_RDMA_MEM_START_ADDR);
+ 	writel_relaxed(pitch, comp->regs + DISP_RDMA_MEM_SRC_PITCH);
 -- 
 2.12.5.2.gbdf23ab
