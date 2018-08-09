@@ -1,57 +1,85 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Thu, 9 Aug 2018 09:36:12 +0200
-Subject: qemu machine settings and root fs for armv8?
-In-Reply-To: <CAKwvOdnA5OTcBuRVbcBv8oYHR-mU3+Ee_iFjqbHx4UQxVnpxtQ@mail.gmail.com>
-References: <CAKwvOdkGatK1HbXG0hDr=a1DtnoCXUbVppLdR6uN5tAKzKdDDQ@mail.gmail.com>
- <CAKwvOdnA5OTcBuRVbcBv8oYHR-mU3+Ee_iFjqbHx4UQxVnpxtQ@mail.gmail.com>
-Message-ID: <5d585df0-abbe-c95f-adff-c4c2e3962832@redhat.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 9 Aug 2018 09:53:21 +0200
+Subject: [PATCH v2 3/4] ARM64: dts: meson-gx: add dmcbus and canvas nodes.
+In-Reply-To: <3221c65f87f8fd3541e0188186cb0259327cb671.camel@baylibre.com>
+References: <20180807220011.24436-1-maxi.jourdan@wanadoo.fr>
+ <20180807220011.24436-4-maxi.jourdan@wanadoo.fr>
+ <3221c65f87f8fd3541e0188186cb0259327cb671.camel@baylibre.com>
+Message-ID: <fcbfff13-aec5-c571-3a5e-a3d571505342@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09/2018 01:10 AM, Nick Desaulniers wrote:
-> On Wed, Aug 8, 2018 at 11:52 AM Nick Desaulniers
-> <ndesaulniers@google.com> wrote:
+On 08/08/2018 10:41, Jerome Brunet wrote:
+> On Wed, 2018-08-08 at 00:00 +0200, Maxime Jourdan wrote:
+>> Wrap the canvas node in a syscon node.
 >>
->> I was wondering if folks had recommendations for testing armv8 kernels
->> in qemu, such as what machine settings and if root fs images existed.
->> I've been playing around with buildroot, but was curious if people had
->> recipes they could share?
+>> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
+>> ---
+>>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 17 +++++++++++++++++
+>>  1 file changed, 17 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+>> index b8dc4dbb391b..c98198662ae2 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+>> @@ -423,6 +423,23 @@
+>>  			};
+>>  		};
+>>  
+>> +		dmcbus: bus at c8838000 {
+>> +			compatible = "simple-bus";
+>> +			reg = <0x0 0xc8838000 0x0 0x1000>;
+>> +			#address-cells = <2>;
+>> +			#size-cells = <2>;
+>> +			ranges = <0x0 0x0 0x0 0xc8838000 0x0 0x1000>;
+>> +
+>> +			sysctrl_DMC: system-controller at 0 {
+>> +				compatible = "amlogic,gx-dmc-sysctrl", "syscon", "simple-mfd";
+>> +				reg = <0x0 0x0 0x0 0x1000>;
+>> +
+>> +				canvas: canvas-provider at 0 {
+>> +					compatible = "amlogic,canvas";
 > 
-> Following up, I found:
-> https://github.com/google/syzkaller/blob/master/docs/linux/setup_linux-host_qemu-vm_arm64-kernel.md
-> helpful to build the rootfs using buildroot.
+> If there is only one canvas provider under "sysctrl_DMC" and it has no reg
+> property , you should not put a unit-address (@0) here. (same for the
+> documentation patch)
 > 
-> Then:
+> You may have seen unit-address without a reg property used elsewhere (ASoC
+> simple-card, my recent axg-sound-card), when there is multiple node with the
+> same node-name (ex: dai-link).
 > 
-> $ qemu-system-aarch64 -kernel arch/arm64/boot/Image -machine virt -cpu
-> cortex-a57 -hda rootfs.ext2 -append "console=ttyAMA0 root=/dev/vda"
-> -serial mon:stdio -m 512 -nographic
+> As Martin pointed out, the DT spec says we should not use unit-address unless
+> there is a reg property. We did not get Rob's view on this and we might have to
+> update this later on. In your case, unless I missed something, you should
+> definitely not have it
 > 
-> worked for me.
+> nitpick regarding the node-name (canvas-provider). If appropriate, we should try
+> to stick to one of the generic names proposed in the spec. I wonder if the
+> canvas provider could be viewed as a "memory" or "memory-controller"
+
+It's not really a memory or memory-controller, it's a Lookup Table on top of the memory controller,
+nothing really matches here...
+
 > 
-
-
-I usually use a buildroot environment and just boot as an initramfs:
-
-qemu-system-aarch64 \
-	-s \
-	-smp 8 \
-	-machine virt \
-	-cpu cortex-a57 \
-	-machine type=virt \
-	-nographic \
-	-m 1024 \
-	-kernel /path/to/kernel \
-	--append "nokaslr slub_debug=- console=ttyAMA0 debug_pagealloc=on 
-earlycon=pl011,0x9000000" \
-	-initrd /path/to/arm64_rootfs.cpio \
-	-fsdev local,security_model=passthrough,id=fsdev0,path=/tmp/share \
-	-device virtio-9p-pci,id=fs0,fsdev=fsdev0,mount_tag=hostshare
-
-I'll note that this setup makes using kernel modules a big pain but
-it's useful for certain types of testing.
-The virtio settings are from https://www.linux-kvm.org/page/9p_virtio
-for sharing files.
-
-Thanks,
-Laura
+> So, what about this ? Just a proposition, feel free to comment ;)
+> 
+> 	sysctrl_DMC: system-controller at 0 {							compatib
+> le = "amlogic,gx-dmc-sysctrl", "syscon", "simple-mfd";> 		reg =
+> <0x0 0x0 0x0 0x1000>;
+> 	
+> 		canvas: memory-controller {
+> 			compatible = "amlogic,canvas";
+> 		}
+> 
+> [...]
+> 
+> 
+>> +				};
+>> +			};
+>> +		};
+>> +
+>>  		hiubus: bus at c883c000 {
+>>  			compatible = "simple-bus";
+>>  			reg = <0x0 0xc883c000 0x0 0x2000>;
+> 
+> 
