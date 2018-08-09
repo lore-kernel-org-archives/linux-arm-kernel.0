@@ -1,104 +1,81 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Thu, 9 Aug 2018 14:05:11 -0700
-Subject: [PATCH v1 09/10] arm64: dts: qcom: Add reg-names for all tsens
- nodes
-In-Reply-To: <188c07144d98bfbe2bbbb7d1f2941acdcf4e6682.1533815718.git.amit.kucheria@linaro.org>
-References: <cover.1533815718.git.amit.kucheria@linaro.org>
- <188c07144d98bfbe2bbbb7d1f2941acdcf4e6682.1533815718.git.amit.kucheria@linaro.org>
-Message-ID: <20180809210511.GQ160295@google.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 9 Aug 2018 14:28:12 -0700
+Subject: [PATCH v6 3/5] thermal: qcom-spmi: Use PMIC thermal stage 2 for
+ critical trip points
+In-Reply-To: <20180731185917.176074-3-mka@chromium.org>
+References: <20180731185917.176074-1-mka@chromium.org>
+ <20180731185917.176074-3-mka@chromium.org>
+Message-ID: <CAD=FV=Us-Cp6AEUfbNbAuRwri4y1opiGY6O+HHModserppYdxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 09, 2018 at 06:02:41PM +0530, Amit Kucheria wrote:
-> Instead of showing up as thermal-sensor@<addr>, the nodes will show up as
-> tsens0_tm, tsen1_tm, tsens1_srot, etc. in /proc/iomem making it easier to
-> read.
-> 
-> IOW,
-> 
-> 0c222000-0c2221fe : thermal-sensor at c263000
-> 0c223000-0c2231fe : thermal-sensor at c265000
-> 0c263000-0c2631fe : thermal-sensor at c263000
-> 0c265000-0c2651fe : thermal-sensor at c265000
-> 
-> becomes
-> 
-> 0c222000-0c2221fe : tsens0_srot
-> 0c223000-0c2231fe : tsens1_srot
-> 0c263000-0c2631fe : tsens0_tm
-> 0c265000-0c2651fe : tsens1_tm
-> 
-> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-> ---
->  arch/arm/boot/dts/qcom-msm8974.dtsi   | 1 +
->  arch/arm64/boot/dts/qcom/msm8916.dtsi | 1 +
->  arch/arm64/boot/dts/qcom/msm8996.dtsi | 2 ++
->  arch/arm64/boot/dts/qcom/sdm845.dtsi  | 2 ++
->  4 files changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> index 3c4b81c29798..64c9f81ddd90 100644
-> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> @@ -431,6 +431,7 @@
->  			compatible = "qcom,msm8974-tsens";
->  			reg = <0xfc4a9000 0x1000>, /* TM */
->  			      <0xfc4a8000 0x1000>; /* SROT */
-> +			reg-names = "tsens_tm", "tsens_srot";
->  			nvmem-cells = <&tsens_calib>, <&tsens_backup>;
->  			nvmem-cell-names = "calib", "calib_backup";
->  			#qcom,sensors = <11>;
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> index abf84df5a7bc..4e6a5e462a91 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> @@ -778,6 +778,7 @@
->  			compatible = "qcom,msm8916-tsens";
->  			reg = <0x4a9000 0x1000>, /* TM */
->  			      <0x4a8000 0x1000>; /* SROT */
-> +			reg-names = "tsens_tm", "tsens_srot";
->  			nvmem-cells = <&tsens_caldata>, <&tsens_calsel>;
->  			nvmem-cell-names = "calib", "calib_sel";
->  			#qcom,sensors = <5>;
-> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> index c2dca3a30091..7e5982daa2ed 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> @@ -969,6 +969,7 @@
->  			compatible = "qcom,msm8996-tsens";
->  			reg = <0x4a9000 0x1000>, /* TM */
->  			      <0x4a8000 0x1000>; /* SROT */
-> +			reg-names = "tsens0_tm", "tsens0_srot";
->  			#qcom,sensors = <13>;
->  			#thermal-sensor-cells = <1>;
->  		};
-> @@ -977,6 +978,7 @@
->  			compatible = "qcom,msm8996-tsens";
->  			reg = <0x4ad000 0x1000>, /* TM */
->  			      <0x4ac000 0x1000>; /* SROT */
-> +			reg-names = "tsens1_tm", "tsens1_srot";
->  			#qcom,sensors = <8>;
->  			#thermal-sensor-cells = <1>;
->  		};
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> index f722785df26b..efd5d7abd1cd 100644
-> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> @@ -1531,6 +1531,7 @@
->  			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
->  			reg = <0xc263000 0x1ff>, /* TM */
->  			      <0xc222000 0x1ff>; /* SROT */
-> +			reg-names = "tsens0_tm", "tsens0_srot";
->  			#qcom,sensors = <13>;
->  			#thermal-sensor-cells = <1>;
->  		};
-> @@ -1539,6 +1540,7 @@
->  			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
->  			reg = <0xc265000 0x1ff>, /* TM */
->  			      <0xc223000 0x1ff>; /* SROT */
-> +			reg-names = "tsens1_tm", "tsens1_srot";
->  			#qcom,sensors = <8>;
->  			#thermal-sensor-cells = <1>;
->  		};
+Hi,
 
-Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+On Tue, Jul 31, 2018 at 11:59 AM, Matthias Kaehlcke <mka@chromium.org> wrote:
+> There are three thermal stages defined in the PMIC:
+>
+> stage 1: warning
+> stage 2: system should shut down
+> stage 3: emergency shut down
+>
+> By default the PMIC assumes that the OS isn't doing anything and thus
+> at stage 2 it does a partial PMIC shutdown and at stage 3 it kills
+> all power. When switching between thermal stages the PMIC generates an
+> interrupt which is handled by the driver. The partial PMIC shutdown at
+> stage 2 can be disabled by software, which allows the OS to initiate a
+> shutdown at stage 2 with a thermal zone configured accordingly.
+>
+> If a critical trip point is configured in the thermal zone the driver
+> adjusts the stage 1-3 temperature thresholds to (closely) match the
+> critical temperature with a stage 2 threshold (125/130/135/140 ?C).
+> If a suitable match is found the partial shutdown at stage 2 is
+> disabled. If for some reason the system doesn't shutdown at stage 2
+> the emergency shutdown at stage 3 kicks in.
+>
+> The partial shutdown at stage 2 remains enabled in these cases:
+> - no critical trip point defined
+> - the temperature of the critical trip point is < 125?C
+> - the temperature of the critical trip point is > 140?C and no
+>   ADC channel is configured (thus the OS is not notified when the critical
+>   temperature is reached)
+>
+> Suggested-by: Douglas Anderson <dianders@chromium.org>
+> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+> ---
+> Changes in v6:
+> - fixed condition to check if ADC is configured in
+>   qpnp_tm_update_critical_trip_temp()
+> - changed ?C in logs to C
+> - removed needless evaluation of qpnp_tm_write() return value in
+>   qpnp_tm_update_critical_trip_temp()
+> - move assignment of chip->initialized to true to qpnp_tm_init(),
+>   where the lock is held
+> - call thermal_zone_device_update() after initialization is
+>   completed
+> - split some #define + comment in two lines to avoid exceeding
+>   chars per line limit
+> - removed extra closing parenthesis in qpnp_tm_get_temp()
+> - remove unnecessary parentheses around conditions in
+>   qpnp_tm_update_critical_trip_temp() and qpnp_tm_get_critical_trip_temp()
+> - fixed indentation of call devm_thermal_zone_of_sensor_register() call
+>   in qpnp_tm_probe()
+>
+> Changes in v5:
+> - patch added to the series
+> ---
+>  drivers/thermal/qcom-spmi-temp-alarm.c | 158 ++++++++++++++++++++++---
+>  1 file changed, 140 insertions(+), 18 deletions(-)
+
+I won't claim to have spent too much time in the thermal framework,
+but from what I can tell everything looks supergreat now.  FWIW:
+
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
+
+One minor comment I'd have is that I personally would have ordered
+this in the series before the patch ("dt-bindings: thermal:
+qcom-spmi-temp-alarm: Improve thermal zone in example") just because
+that patch only really makes sense after this one lands.  ...but I
+don't think it's terribly important.
+
+
+-Doug
