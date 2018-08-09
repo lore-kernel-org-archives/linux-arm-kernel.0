@@ -1,46 +1,54 @@
 From: stelford@cadence.com (Scott Telford)
-Date: Thu, 9 Aug 2018 11:30:28 +0100
-Subject: [PATCH v4 0/2] phy: Add driver for Cadence MHDP DisplayPort SD0801 PHY
-Message-ID: <1533810630-17673-1-git-send-email-stelford@cadence.com>
+Date: Thu, 9 Aug 2018 11:30:29 +0100
+Subject: [PATCH v4 1/2] dt-bindings: phy: Document Cadence MHDP DisplayPort
+ PHY bindings
+In-Reply-To: <1533810630-17673-1-git-send-email-stelford@cadence.com>
+References: <1533810630-17673-1-git-send-email-stelford@cadence.com>
+Message-ID: <1533810630-17673-2-git-send-email-stelford@cadence.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches add preliminary support for the Cadence "Torrent" SD0801
-PHY used with the Cadence MHDP DisplayPort Tx controller.
-
-Integration with the MHDP driver will be the subject of another commit.
-
-v4:
-* Comment formatting
-* Describe "num_lanes" and "max_bit_rate" properties as optional in
-  dt-bindings documentation
-
-v3:
-* Split devicetree bindings documentation into separate commit
-* Merged phy-cadence-dp.h into phy-cadence-dp.c
-* Moved probe function to end of file
-* Minor refactoring of cdns_dp_phy_pma_lane_cfg()
-* Fixed SPDX comment format
-
-v2:
-* Fixed Linux/um build 
-
-
-Scott Telford (2):
-  dt-bindings: phy: Document Cadence MHDP DisplayPort PHY bindings
-  phy: Add driver for Cadence MHDP DisplayPort SD0801 PHY
-
- .../devicetree/bindings/phy/phy-cadence-dp.txt     |  30 ++
- drivers/phy/Kconfig                                |   1 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/cadence/Kconfig                        |  10 +
- drivers/phy/cadence/Makefile                       |   1 +
- drivers/phy/cadence/phy-cadence-dp.c               | 541 +++++++++++++++++++++
- 6 files changed, 584 insertions(+)
+Signed-off-by: Scott Telford <stelford@cadence.com>
+---
+ .../devicetree/bindings/phy/phy-cadence-dp.txt     | 30 ++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/phy/phy-cadence-dp.txt
- create mode 100644 drivers/phy/cadence/Kconfig
- create mode 100644 drivers/phy/cadence/Makefile
- create mode 100644 drivers/phy/cadence/phy-cadence-dp.c
 
+diff --git a/Documentation/devicetree/bindings/phy/phy-cadence-dp.txt b/Documentation/devicetree/bindings/phy/phy-cadence-dp.txt
+new file mode 100644
+index 0000000..7f49fd54e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/phy-cadence-dp.txt
+@@ -0,0 +1,30 @@
++Cadence MHDP DisplayPort SD0801 PHY binding
++===========================================
++
++This binding describes the Cadence SD0801 PHY hardware included with
++the Cadence MHDP DisplayPort controller.
++
++-------------------------------------------------------------------------------
++Required properties (controller (parent) node):
++- compatible	: Should be "cdns,dp-phy"
++- reg		: Defines the following sets of registers in the parent
++		  mhdp device:
++			- Offset of the DPTX PHY configuration registers
++			- Offset of the SD0801 PHY configuration registers
++- #phy-cells	: from the generic PHY bindings, must be 0.
++
++Optional properties:
++- num_lanes	: Number of DisplayPort lanes to use (1, 2 or 4)
++- max_bit_rate	: Maximum DisplayPort link bit rate to use, in Mbps (2160,
++		  2430, 2700, 3240, 4320, 5400 or 8100)
++-------------------------------------------------------------------------------
++
++Example:
++	dp_phy: phy at f0fb030a00 {
++		compatible = "cdns,dp-phy";
++		reg = <0xf0 0xfb030a00 0x0 0x00000040>,
++		      <0xf0 0xfb500000 0x0 0x00100000>;
++		num_lanes = <4>;
++		max_bit_rate = <8100>;
++		#phy-cells = <0>;
++	};
 -- 
 2.2.2
