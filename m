@@ -1,96 +1,28 @@
-From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Thu, 9 Aug 2018 10:15:41 +0800
-Subject: [PATCH v4 06/14] drm/mediatek: add RGB color format support for RDMA
-In-Reply-To: <1533780949-30141-1-git-send-email-stu.hsieh@mediatek.com>
-References: <1533780949-30141-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1533780949-30141-7-git-send-email-stu.hsieh@mediatek.com>
+From: marek.behun@nic.cz (=?UTF-8?q?Marek=20Beh=C3=BAn?=)
+Date: Thu,  9 Aug 2018 04:20:30 +0200
+Subject: [PATCH v2 0/7] Add support for the Turris Mox router
+Message-ID: <20180809022037.12001-1-marek.behun@nic.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add RGB color format support for RDMA,
-including RGB565, RGB888, RGBA8888 and ARGB8888.
+This adds preliminary support for the Turris Mox SOHO router developed by CZ.NIC
+to mainline kernel.
 
-Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 46 ++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+The differences from previous version of these patches:
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-index 08866550740f..1f57f86c7910 100644
---- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-+++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-@@ -35,6 +35,8 @@
- #define DISP_REG_RDMA_SIZE_CON_0		0x0014
- #define DISP_REG_RDMA_SIZE_CON_1		0x0018
- #define DISP_REG_RDMA_TARGET_LINE		0x001c
-+#define DISP_RDMA_MEM_CON			0x0024
-+#define MEM_MODE_INPUT_SWAP				BIT(8)
- #define DISP_RDMA_MEM_SRC_PITCH			0x002c
- #define DISP_RDMA_MEM_GMC_SETTING_0		0x0030
- #define DISP_REG_RDMA_FIFO_CON			0x0040
-@@ -46,6 +48,11 @@
- 
- #define RDMA_MEM_GMC				0x40402020
- 
-+#define MEM_MODE_INPUT_FORMAT_RGB565		0x0
-+#define MEM_MODE_INPUT_FORMAT_RGB888		(0x001 << 4)
-+#define MEM_MODE_INPUT_FORMAT_RGBA8888		(0x002 << 4)
-+#define MEM_MODE_INPUT_FORMAT_ARGB8888		(0x003 << 4)
-+
- struct mtk_disp_rdma_data {
- 	unsigned int fifo_size;
- };
-@@ -144,12 +151,51 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
- 	writel(reg, comp->regs + DISP_REG_RDMA_FIFO_CON);
- }
- 
-+static unsigned int rdma_fmt_convert(struct mtk_disp_rdma *rdma,
-+				     unsigned int fmt)
-+{
-+	/* The return value in switch "MEM_MODE_INPUT_FORMAT_XXX"
-+	 * is defined in mediatek HW data sheet.
-+	 * The alphabet order in XXX is no relation to data
-+	 * arrangement in memory.
-+	 */
-+	switch (fmt) {
-+	default:
-+	case DRM_FORMAT_RGB565:
-+		return MEM_MODE_INPUT_FORMAT_RGB565;
-+	case DRM_FORMAT_BGR565:
-+		return MEM_MODE_INPUT_FORMAT_RGB565 | MEM_MODE_INPUT_SWAP;
-+	case DRM_FORMAT_RGB888:
-+		return MEM_MODE_INPUT_FORMAT_RGB888;
-+	case DRM_FORMAT_BGR888:
-+		return MEM_MODE_INPUT_FORMAT_RGB888 | MEM_MODE_INPUT_SWAP;
-+	case DRM_FORMAT_RGBX8888:
-+	case DRM_FORMAT_RGBA8888:
-+		return MEM_MODE_INPUT_FORMAT_ARGB8888;
-+	case DRM_FORMAT_BGRX8888:
-+	case DRM_FORMAT_BGRA8888:
-+		return MEM_MODE_INPUT_FORMAT_ARGB8888 | MEM_MODE_INPUT_SWAP;
-+	case DRM_FORMAT_XRGB8888:
-+	case DRM_FORMAT_ARGB8888:
-+		return MEM_MODE_INPUT_FORMAT_RGBA8888;
-+	case DRM_FORMAT_XBGR8888:
-+	case DRM_FORMAT_ABGR8888:
-+		return MEM_MODE_INPUT_FORMAT_RGBA8888 | MEM_MODE_INPUT_SWAP;
-+	}
-+}
-+
- static void mtk_rdma_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
- 				  struct mtk_plane_state *state)
- {
-+	struct mtk_disp_rdma *rdma = comp_to_rdma(comp);
- 	struct mtk_plane_pending_state *pending = &state->pending;
- 	unsigned int addr = pending->addr;
- 	unsigned int pitch = pending->pitch & 0xffff;
-+	unsigned int fmt = pending->format;
-+	unsigned int con;
-+
-+	con = rdma_fmt_convert(rdma, fmt);
-+	writel_relaxed(con, comp->regs + DISP_RDMA_MEM_CON);
- 
- 	writel_relaxed(addr, comp->regs + DISP_RDMA_MEM_START_ADDR);
- 	writel_relaxed(pitch, comp->regs + DISP_RDMA_MEM_SRC_PITCH);
--- 
-2.12.5.2.gbdf23ab
+The 1st patch should also change some devicetree bindings Documentation.
+Previously I only used the code change from the original patches from
+linux-marvell.
+I also corrected the name of the commit as Andrew pointed out I should.
+
+In the 2nd patch, which adds support for the Moxtet bus, I added code
+to check if a driver for the subdevice has it's it_table NULL. If so,
+the driver can be specifier only via device tree.
+
+The 3rd patch, which adds support for GPIOs over Moxtet bus, I made the
+code more generic, so that it does not only support the current SFP cage
+module, but, in the future, maybe others.
+
+In the 7th patch only a typo in commit name was changed.
+
+Marek
