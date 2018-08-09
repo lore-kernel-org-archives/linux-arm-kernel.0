@@ -1,71 +1,101 @@
-From: chuhu@redhat.com (Chunyu Hu)
-Date: Thu, 9 Aug 2018 08:47:38 -0400 (EDT)
-Subject: Bug report: Bad mode in FIQ handler detected on CPU0, code 0x56000000
-In-Reply-To: <1426298268.23978174.1533818483053.JavaMail.zimbra@redhat.com>
-Message-ID: <381494229.23979617.1533818858635.JavaMail.zimbra@redhat.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Thu,  9 Aug 2018 18:02:41 +0530
+Subject: [PATCH v1 09/10] arm64: dts: qcom: Add reg-names for all tsens nodes
+In-Reply-To: <cover.1533815718.git.amit.kucheria@linaro.org>
+References: <cover.1533815718.git.amit.kucheria@linaro.org>
+Message-ID: <188c07144d98bfbe2bbbb7d1f2941acdcf4e6682.1533815718.git.amit.kucheria@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Instead of showing up as thermal-sensor@<addr>, the nodes will show up as
+tsens0_tm, tsen1_tm, tsens1_srot, etc. in /proc/iomem making it easier to
+read.
 
-I hit an 100% panic when I executed:
+IOW,
 
-perf &
-perf top
+0c222000-0c2221fe : thermal-sensor at c263000
+0c223000-0c2231fe : thermal-sensor at c265000
+0c263000-0c2631fe : thermal-sensor at c263000
+0c265000-0c2651fe : thermal-sensor at c265000
 
-Logs are as below,
+becomes
 
-[  123.234492] Bad mode in FIQ handler detected on CPU0, code 0x56000000 -- SVC (AArch64)
-[  123.242379] Internal error: Oops - bad mode: 0 [#1] SMP
-[  123.247578] Modules linked in: rpcsec_gss_krb5 auth_rpcgss nfsv4 dns_resolver nfs lockd grace fscache sunrpc vfat fat xgene_hwmon sg gpio_xgene_sb gpio_dwapb xgene_edac mailbox_xgene_slimpro gpio_generic xgene_rng uio_pdrv_genirq uio xfs libcrc32c xgene_enet at803x i2c_xgene_slimpro realtek ahci_xgene libahci_platform mdio_xgene dm_mirror dm_region_hash dm_log dm_mod
-[  123.279949] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.18.0-rc8+ #1
-[  123.286270] Hardware name: AmpereComputing(R) Mustang/Mustang, BIOS 0ACDY027 06/22/2018
-[  123.294235] pstate: 00000085 (nzcv daIf -PAN -UAO)
-[  123.299005] pc : __perf_event_enable+0x188/0x1e0
-[  123.303599] lr : __perf_event_enable+0x188/0x1e0
-[  123.308191] sp : ffff00000800fe80
-[  123.311486] x29: ffff00000800fe80 x28: ffff0000092c5640 
-[  123.316772] x27: 0000000000000000 x26: 0000000000000000 
-[  123.322058] x25: 0000000000000001 x24: 0000000000000000 
-[  123.327343] x23: ffff8003c926b000 x22: ffff8003c926b000 
-[  123.332629] x21: ffff8003ffdf51a0 x20: ffff8003ffdf51a0 
-[  123.337914] x19: ffff8003c926b000 x18: ffff0000092f7104 
-[  123.343199] x17: 000000007fff2728 x16: 0000000000000000 
-[  123.348485] x15: ffff0000092f7100 x14: 0000000000000000 
-[  123.353771] x13: ffff8003a081d1e0 x12: ffff8003a081d208 
-[  123.359056] x11: ffff8003a081d2f9 x10: 0000000000000c50 
-[  123.364341] x9 : ffff00000928fe30 x8 : 0000000000000001 
-[  123.369626] x7 : ffff8003c926b000 x6 : 00000000869b5fc0 
-[  123.374912] x5 : 00ffffffffffffff x4 : ffff8003c2ef5500 
-[  123.380197] x3 : 0000000000000000 x2 : 0000000000000041 
-[  123.385482] x1 : 0000000000000080 x0 : 0000000000000070 
-[  123.390769] Process swapper/0 (pid: 0, stack limit = 0x00000000307099b4)
-[  123.397436] Call trace:
-[  123.399869]  __perf_event_enable+0x188/0x1e0
-[  123.404117]  event_function+0x84/0xd0
-[  123.407760]  remote_function+0x58/0x68
-[  123.411491]  flush_smp_call_function_queue+0x60/0x150
-[  123.416516]  generic_smp_call_function_single_interrupt+0x18/0x20
-[  123.422581]  handle_IPI+0x110/0x390
-[  123.426050]  gic_handle_irq+0xa4/0xa8
-[  123.429693]  el1_irq+0xb0/0x140
-[  123.432818]  arch_cpu_idle+0x34/0x140
-[  123.436462]  do_idle+0x210/0x278
-[  123.439673]  cpu_startup_entry+0x2c/0x30
-[  123.443576]  rest_init+0xb8/0xc4
-[  123.446788]  start_kernel+0x448/0x470
-[  123.450432] Code: f100007f 321d0043 1a820062 97ffff77 (17ffffbf) 
-[  123.456501] ---[ end trace 7c22327cfccb25ee ]---
-[  123.461094] Kernel panic - not syncing: Fatal exception in interrupt
-[  123.467417] SMP: stopping secondary CPUs
-[  123.471321] Kernel Offset: disabled
-[  123.474791] CPU features: 0x20802000
-[  123.478347] Memory Limit: none
-[  123.481386] ---[ end Kernel panic - not syncing: Fatal exception in interrupt ]---
-[  123.488918] Bad mode in FIQ handler detected on CPU0, code 0x56000000 -- SVC (AArch64)
+0c222000-0c2221fe : tsens0_srot
+0c223000-0c2231fe : tsens1_srot
+0c263000-0c2631fe : tsens0_tm
+0c265000-0c2651fe : tsens1_tm
 
-Is this a known issue?
+Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+---
+ arch/arm/boot/dts/qcom-msm8974.dtsi   | 1 +
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 1 +
+ arch/arm64/boot/dts/qcom/msm8996.dtsi | 2 ++
+ arch/arm64/boot/dts/qcom/sdm845.dtsi  | 2 ++
+ 4 files changed, 6 insertions(+)
 
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index 3c4b81c29798..64c9f81ddd90 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -431,6 +431,7 @@
+ 			compatible = "qcom,msm8974-tsens";
+ 			reg = <0xfc4a9000 0x1000>, /* TM */
+ 			      <0xfc4a8000 0x1000>; /* SROT */
++			reg-names = "tsens_tm", "tsens_srot";
+ 			nvmem-cells = <&tsens_calib>, <&tsens_backup>;
+ 			nvmem-cell-names = "calib", "calib_backup";
+ 			#qcom,sensors = <11>;
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index abf84df5a7bc..4e6a5e462a91 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -778,6 +778,7 @@
+ 			compatible = "qcom,msm8916-tsens";
+ 			reg = <0x4a9000 0x1000>, /* TM */
+ 			      <0x4a8000 0x1000>; /* SROT */
++			reg-names = "tsens_tm", "tsens_srot";
+ 			nvmem-cells = <&tsens_caldata>, <&tsens_calsel>;
+ 			nvmem-cell-names = "calib", "calib_sel";
+ 			#qcom,sensors = <5>;
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index c2dca3a30091..7e5982daa2ed 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -969,6 +969,7 @@
+ 			compatible = "qcom,msm8996-tsens";
+ 			reg = <0x4a9000 0x1000>, /* TM */
+ 			      <0x4a8000 0x1000>; /* SROT */
++			reg-names = "tsens0_tm", "tsens0_srot";
+ 			#qcom,sensors = <13>;
+ 			#thermal-sensor-cells = <1>;
+ 		};
+@@ -977,6 +978,7 @@
+ 			compatible = "qcom,msm8996-tsens";
+ 			reg = <0x4ad000 0x1000>, /* TM */
+ 			      <0x4ac000 0x1000>; /* SROT */
++			reg-names = "tsens1_tm", "tsens1_srot";
+ 			#qcom,sensors = <8>;
+ 			#thermal-sensor-cells = <1>;
+ 		};
+diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+index f722785df26b..efd5d7abd1cd 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
++++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+@@ -1531,6 +1531,7 @@
+ 			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
+ 			reg = <0xc263000 0x1ff>, /* TM */
+ 			      <0xc222000 0x1ff>; /* SROT */
++			reg-names = "tsens0_tm", "tsens0_srot";
+ 			#qcom,sensors = <13>;
+ 			#thermal-sensor-cells = <1>;
+ 		};
+@@ -1539,6 +1540,7 @@
+ 			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
+ 			reg = <0xc265000 0x1ff>, /* TM */
+ 			      <0xc223000 0x1ff>; /* SROT */
++			reg-names = "tsens1_tm", "tsens1_srot";
+ 			#qcom,sensors = <8>;
+ 			#thermal-sensor-cells = <1>;
+ 		};
 -- 
-Regards,
-Chunyu Hu
+2.17.1
