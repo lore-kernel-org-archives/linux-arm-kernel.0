@@ -1,90 +1,54 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Thu, 9 Aug 2018 17:17:37 +0300
-Subject: [PATCH v7 8/8] interconnect: Allow endpoints translation via DT
-In-Reply-To: <37ac189618cda02567977f65570d15d3@codeaurora.org>
-References: <20180731161340.13000-1-georgi.djakov@linaro.org>
- <20180731161340.13000-9-georgi.djakov@linaro.org>
- <804925d5927ccb6927b16f7e9a4aa05c@codeaurora.org>
- <3a7bb27a-0609-133b-08e9-8864f1ccc4bc@linaro.org>
- <37ac189618cda02567977f65570d15d3@codeaurora.org>
-Message-ID: <df517d56-a181-b72b-2fb4-cb58bb817a99@linaro.org>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Thu, 9 Aug 2018 16:38:28 +0200
+Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
+References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
+ <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
+Message-ID: <20180809143827.GC22636@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Saravana,
+I need to read this (hopefully final) version carefully. I'll try to do
+this before next Monday.
 
-On 08/02/2018 10:12 PM, skannan at codeaurora.org wrote:
-> On 2018-08-02 05:07, Georgi Djakov wrote:
->> Hi Saravana,
->>
->> On 08/02/2018 01:57 AM, skannan at codeaurora.org wrote:
->>> On 2018-07-31 09:13, Georgi Djakov wrote:
->>>> Currently we support only platform data for specifying the interconnect
->>>> endpoints. As now the endpoints are hard-coded into the consumer driver
->>>> this may lead to complications when a single driver is used by multiple
->>>> SoCs, which may have different interconnect topology.
->>>> To avoid cluttering the consumer drivers, introduce a translation
->>>> function
->>>> to help us get the board specific interconnect data from device-tree.
->>>>
->>>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
->>>> ---
->>>> ?drivers/interconnect/core.c? | 62 ++++++++++++++++++++++++++++++++++++
->>>> ?include/linux/interconnect.h |? 7 ++++
->>>> ?2 files changed, 69 insertions(+)
->>>>
->>>> diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
->>>> index 9fef180cf77e..d1b6adff0a3d 100644
->>>> --- a/drivers/interconnect/core.c
->>>> +++ b/drivers/interconnect/core.c
->> [..]
->>>> --- a/include/linux/interconnect.h
->>>> +++ b/include/linux/interconnect.h
->>>> @@ -17,6 +17,7 @@ struct device;
->>>>
->>>> ?struct icc_path *icc_get(struct device *dev, const int src_id,
->>>> ????????????? const int dst_id);
->>>> +struct icc_path *of_icc_get(struct device *dev, const char *name);
->>>> ?void icc_put(struct icc_path *path);
->>>> ?int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
->>>>
->>>> @@ -28,6 +29,12 @@ static inline struct icc_path *icc_get(struct
->>>> device *dev, const int src_id,
->>>> ???? return NULL;
->>>> ?}
->>>>
->>>> +static inline struct icc_path *of_icc_get(struct device *dev,
->>>> +????????????????????? const char *name)
->>>> +{
->>>> +??? return NULL;
->>>> +}
->>>> +
->>>
->>> Might want to return PTR(-ENODEV) or some error code so that client
->>> doesn't have to do NULL check AND an error check?
->>>
->>> -Saravana
->>
->> NULL is returned when CONFIG_INTERCONNECT=n. Configuration of
->> interconnects by consumer drivers could be optional and that's why null
->> is returned instead of an error. The consumer drivers decide how to
->> proceed in this case and if there is a hard requirement for interconnect
->> support, then i would suggest to express it as a dependency in Kconfig.
-> 
-> Ehh... you could make the same argument with an error. If it's not
-> mandatory for functioning, they can ignore a specific error and
-> continue? At a minimum, these stub functions returning NULL doesn't
-> match with the documentation that says these APIs will only ever return
-> ERR_PTR().
-> 
-> -Saravana
+just one note,
 
-Here i am trying to align with other frameworks, which provide some
-resources to consumers. The regulator/clock/reset frameworks return
-NULL, so i prefer to do the same here. Drivers are free to handle NULL
-specifically, but they don't have to. This NULL may also mean that
-interconnects have been already configured by bootloader or firmware.
-Of course i accept the comment to update the documentation to mention this.
+On 08/09, Ravi Bangoria wrote:
+>
+> +static void delayed_uprobe_remove(struct uprobe *uprobe, struct mm_struct *mm)
+> +{
+> +	struct list_head *pos, *q;
+> +	struct delayed_uprobe *du;
+> +
+> +	if (!uprobe && !mm)
+> +		return;
+> +
+> +	list_for_each_safe(pos, q, &delayed_uprobe_list) {
+> +		du = list_entry(pos, struct delayed_uprobe, list);
+> +
+> +		if (uprobe && mm && du->uprobe == uprobe && du->mm == mm)
+> +			delayed_uprobe_delete(du);
+> +		else if (!uprobe && du->mm == mm)
+> +			delayed_uprobe_delete(du);
+> +		else if (!mm && du->uprobe == uprobe)
+> +			delayed_uprobe_delete(du);
+> +	}
 
-Thanks,
-Georgi
+Sorry, I can't resist... this doesn't look very nice. How about
+
+	list_for_each_safe(pos, q, &delayed_uprobe_list) {
+		du = list_entry(pos, struct delayed_uprobe, list);
+
+		if (uprobe && du->uprobe != uprobe)
+			continue;
+		if (mm && du->mm != mm)
+			continue;
+
+		delayed_uprobe_delete();
+	}
+
+I won't insist, this is cosmetic after all, but please consider this change
+in case you will need to send v9.
+
+Oleg.
