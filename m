@@ -1,39 +1,121 @@
-From: cyndis@kapsi.fi (Mikko Perttunen)
-Date: Thu, 9 Aug 2018 13:34:37 +0300
-Subject: [GIT PULL 5/5] arm64: tegra: Device tree changes for v4.19-rc1
-In-Reply-To: <20180809102104.GB21639@ulmo>
-References: <20180712154128.22705-1-thierry.reding@gmail.com>
- <20180712154128.22705-6-thierry.reding@gmail.com>
- <20180714212210.at4b2gcpopsznyxx@localhost> <20180803104318.GA28546@ulmo>
- <CAHMsQjU=nmpTnPK6Ryhui67YVANHExd=yRB4hp+upd7O-Tjn+Q@mail.gmail.com>
- <20180809102104.GB21639@ulmo>
-Message-ID: <51a19ec3-8b34-56f5-d9c7-69397d3d11ff@kapsi.fi>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 9 Aug 2018 11:46:33 +0100
+Subject: [PATCH v4 2/5] iommu/dma: add support for non-strict mode
+In-Reply-To: <1533558424-16748-3-git-send-email-thunder.leizhen@huawei.com>
+References: <1533558424-16748-1-git-send-email-thunder.leizhen@huawei.com>
+ <1533558424-16748-3-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <e57298b0-66ec-b97c-1b36-b35bb3e1f20a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.08.2018 13:21, Thierry Reding wrote:
-> On Fri, Aug 03, 2018 at 07:26:04AM -0400, Anthony Eden wrote:
->> Mesa support aside- if I start a computationally intensive job on the
->> Jetson TX2 like building the Linux kernel on all cores, it will lock
->> up. My only work around has been to disable the Denver CPU's. I don't
->> think the tegra186 has upstream support to control the fan on the
->> Jetson TX2, could this be a thermal problem?
+On 06/08/18 13:27, Zhen Lei wrote:
+> 1. Save the related domain pointer in struct iommu_dma_cookie, make iovad
+>     capable call domain->ops->flush_iotlb_all to flush TLB.
+> 2. During the iommu domain initialization phase, base on domain->non_strict
+>     field to check whether non-strict mode is supported or not. If so, call
+>     init_iova_flush_queue to register iovad->flush_cb callback.
+> 3. All unmap(contains iova-free) APIs will finally invoke __iommu_dma_unmap
+>     -->iommu_dma_free_iova. If the domain is non-strict, call queue_iova to
+>     put off iova freeing.
 > 
-> Yes, I suppose this could be a thermal problem. Or it could be something
-> else entirely. We do support CPU frequency scaling on Tegra X2, so what
-> you could do is keep the Denver CPUs enabled, but set the powersave CPU
-> frequency governor. That way it should use all the CPUs but at a lower
-> clock rate, which should also be able to avoid any thermal issues. This
-> could help determine whether or not the problem is thermal or something
-> else.
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>   drivers/iommu/dma-iommu.c | 23 +++++++++++++++++++++++
+>   drivers/iommu/iommu.c     |  1 +
+>   include/linux/iommu.h     |  1 +
+>   3 files changed, 25 insertions(+)
 > 
-> Also adding Mikko on Cc who wrote the Tegra186 driver, maybe he's aware
-> of any issues.
+> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+> index ddcbbdb..213e62a 100644
+> --- a/drivers/iommu/dma-iommu.c
+> +++ b/drivers/iommu/dma-iommu.c
+> @@ -55,6 +55,7 @@ struct iommu_dma_cookie {
+>   	};
+>   	struct list_head		msi_page_list;
+>   	spinlock_t			msi_lock;
+> +	struct iommu_domain		*domain;
+>   };
+> 
+>   static inline size_t cookie_msi_granule(struct iommu_dma_cookie *cookie)
+> @@ -257,6 +258,17 @@ static int iova_reserve_iommu_regions(struct device *dev,
+>   	return ret;
+>   }
+> 
+> +static void iommu_dma_flush_iotlb_all(struct iova_domain *iovad)
+> +{
+> +	struct iommu_dma_cookie *cookie;
+> +	struct iommu_domain *domain;
+> +
+> +	cookie = container_of(iovad, struct iommu_dma_cookie, iovad);
+> +	domain = cookie->domain;
+> +
+> +	domain->ops->flush_iotlb_all(domain);
+> +}
+> +
+>   /**
+>    * iommu_dma_init_domain - Initialise a DMA mapping domain
+>    * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie()
+> @@ -308,6 +320,14 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
+>   	}
+> 
+>   	init_iova_domain(iovad, 1UL << order, base_pfn);
+> +
+> +	if (domain->non_strict) {
+> +		BUG_ON(!domain->ops->flush_iotlb_all);
+> +
+> +		cookie->domain = domain;
 
-I haven't seen any issues myself, though I haven't stressed the CPU too 
-heavily. We also have a thermal driver for Tegra186, so we could set up 
-thermal throttling with a device tree change.
+cookie->domain will only be non-NULL if domain->non_strict is true...
 
+> +		init_iova_flush_queue(iovad, iommu_dma_flush_iotlb_all, NULL);
+> +	}
+> +
+>   	if (!dev)
+>   		return 0;
 > 
-> Thierry
+> @@ -390,6 +410,9 @@ static void iommu_dma_free_iova(struct iommu_dma_cookie *cookie,
+>   	/* The MSI case is only ever cleaning up its most recent allocation */
+>   	if (cookie->type == IOMMU_DMA_MSI_COOKIE)
+>   		cookie->msi_iova -= size;
+> +	else if (cookie->domain && cookie->domain->non_strict)
+
+...so we don't need to re-check non_strict every time here.
+
+> +		queue_iova(iovad, iova_pfn(iovad, iova),
+> +				size >> iova_shift(iovad), 0);
+>   	else
+>   		free_iova_fast(iovad, iova_pfn(iovad, iova),
+>   				size >> iova_shift(iovad));
+> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> index 63b3756..7811fde 100644
+> --- a/drivers/iommu/iommu.c
+> +++ b/drivers/iommu/iommu.c
+> @@ -1263,6 +1263,7 @@ static struct iommu_domain *__iommu_domain_alloc(struct bus_type *bus,
+> 
+>   	domain->ops  = bus->iommu_ops;
+>   	domain->type = type;
+> +	domain->non_strict = 0;
+>   	/* Assume all sizes by default; the driver may override this later */
+>   	domain->pgsize_bitmap  = bus->iommu_ops->pgsize_bitmap;
+> 
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index 19938ee..0a0fb48 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -88,6 +88,7 @@ struct iommu_domain_geometry {
+> 
+>   struct iommu_domain {
+>   	unsigned type;
+> +	int non_strict;
+
+bool?
+
+Robin.
+
+>   	const struct iommu_ops *ops;
+>   	unsigned long pgsize_bitmap;	/* Bitmap of page sizes in use */
+>   	iommu_fault_handler_t handler;
+> --
+> 1.8.3
+> 
 > 
