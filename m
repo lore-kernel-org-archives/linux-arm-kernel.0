@@ -1,75 +1,55 @@
-From: gengdj.1984@gmail.com (gengdongjiu)
-Date: Thu, 9 Aug 2018 20:32:45 +0800
-Subject: [PATCH RESEND v2] arm64: clean the additional checks before
- calling ghes_notify_sea()
-In-Reply-To: <1533659175-47076-1-git-send-email-gengdongjiu@huawei.com>
-References: <1533659175-47076-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <CAMj-D2Arv-ZxUMTB_zKKy58CghWsZJbTOcNdiD3KVzxJ-v973g@mail.gmail.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Thu,  9 Aug 2018 18:02:32 +0530
+Subject: [PATCH v1 00/10] Another round of tsens cleanups
+Message-ID: <cover.1533815718.git.amit.kucheria@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC Borislav
+This is another series of tsens cleanups before we add interrupt support.
+This applies on top of the earlier two series[1][2] that have already been
+accepted for 4.19.
+
+In this series, we have the following:
+- splitup 8916 and 8974 register address spaces for SROT and TM
+- cleanups: move to spdx, dead code removal, removal of id field
+- Add support to map the SROT address space for DTs that list it separately
+- Check if TSENS IP is enabled in firmware by querying the SROT space
+- Add reg-names property to get more readable outputs in /proc/iomem
+- Add myself as maintainer of tsens
+
+Regards,
+Amit
+
+[1] https://lore.kernel.org/lkml/cover.1531895128.git.amit.kucheria at linaro.org/
+[2] https://lore.kernel.org/lkml/cover.1532600791.git.amit.kucheria at linaro.org/
 
 
-2018-08-08 0:26 GMT+08:00 Dongjiu Geng <gengdongjiu@huawei.com>:
-> In order to remove the additional check before calling the
-> ghes_notify_sea(), make stub definition when !CONFIG_ACPI_APEI_SEA.
->
-> After this cleanup, we can simply call the ghes_notify_sea() to let
-> APEI driver handle the SEA notification.
->
-> CC: Tyler Baicar <tbaicar@codeaurora.org>
-> CC: James Morse <james.morse@arm.com>
-> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> ---
-> This cleanup is ever mentioned by Mark Rutland in [1]
->
-> [1]:
-> https://lkml.org/lkml/2018/5/31/289
->
-> Change since v1:
-> 1. Update the commit messages
-> 2. CC Tyler and James
-> 3. Add Acked-by of Will
-> ---
->  arch/arm64/mm/fault.c | 7 +------
->  include/acpi/ghes.h   | 4 ++++
->  2 files changed, 5 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index b8eecc7..9ffe01d 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -727,12 +727,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->
->  int handle_guest_sea(phys_addr_t addr, unsigned int esr)
->  {
-> -       int ret = -ENOENT;
-> -
-> -       if (IS_ENABLED(CONFIG_ACPI_APEI_SEA))
-> -               ret = ghes_notify_sea();
-> -
-> -       return ret;
-> +       return ghes_notify_sea();
->  }
->
->  asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
-> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-> index 1624e2b..82cb4eb 100644
-> --- a/include/acpi/ghes.h
-> +++ b/include/acpi/ghes.h
-> @@ -118,6 +118,10 @@ static inline void *acpi_hest_get_next(struct acpi_hest_generic_data *gdata)
->              (void *)section - (void *)(estatus + 1) < estatus->data_length; \
->              section = acpi_hest_get_next(section))
->
-> +#ifdef CONFIG_ACPI_APEI_SEA
->  int ghes_notify_sea(void);
-> +#else
-> +static inline int ghes_notify_sea(void) { return -ENOENT; }
-> +#endif
->
->  #endif /* GHES_H */
-> --
-> 1.9.1
->
+Amit Kucheria (10):
+  arm/arm64: dts: msm8974/msm8916: thermal: Split address space into two
+  dt-bindings: thermal: Fix a typo in documentation
+  thermal: tsens: Add SPDX license identifiers
+  thermal: tsens: Get rid of dead code
+  thermal: tsens: Rename map field in order to add a second address map
+  thermal: tsens: Add the SROT address map
+  thermal: tsens: Check if the IP is correctly enabled by firmware
+  thermal: tsens: Get rid of 'id' field
+  arm64: dts: qcom: Add reg-names for all tsens nodes
+  MAINTAINERS: Add entry for Qualcomm TSENS thermal drivers
+
+ .../devicetree/bindings/thermal/thermal.txt   |  2 +-
+ MAINTAINERS                                   |  7 +++
+ arch/arm/boot/dts/qcom-msm8974.dtsi           |  7 ++-
+ arch/arm64/boot/dts/qcom/msm8916.dtsi         |  7 ++-
+ arch/arm64/boot/dts/qcom/msm8996.dtsi         |  2 +
+ arch/arm64/boot/dts/qcom/sdm845.dtsi          |  2 +
+ drivers/thermal/qcom/tsens-8916.c             | 11 +---
+ drivers/thermal/qcom/tsens-8960.c             | 41 +++++-------
+ drivers/thermal/qcom/tsens-8974.c             | 11 +---
+ drivers/thermal/qcom/tsens-common.c           | 62 ++++++++++++-------
+ drivers/thermal/qcom/tsens-v2.c               |  6 +-
+ drivers/thermal/qcom/tsens.c                  | 21 +------
+ drivers/thermal/qcom/tsens.h                  | 24 +++----
+ 13 files changed, 99 insertions(+), 104 deletions(-)
+
+-- 
+2.17.1
