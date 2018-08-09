@@ -1,84 +1,83 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Thu, 9 Aug 2018 10:39:27 +0800
-Subject: [PATCH v3 2/2] clk: meson: add sub MMC clock controller driver
-In-Reply-To: <e89f28253070abae5dc755800feee500cc3396ce.camel@baylibre.com>
-References: <20180712211244.11428-1-yixun.lan@amlogic.com>
- <20180712211244.11428-3-yixun.lan@amlogic.com>
- <153261840298.48062.2497103873681297587@swboyd.mtv.corp.google.com>
- <f52d2511-bab7-2c39-cea7-8702e27d2ef8@amlogic.com>
- <153270970080.48062.18399022907046343950@swboyd.mtv.corp.google.com>
- <153270995155.48062.4302847978258086624@swboyd.mtv.corp.google.com>
- <e89f28253070abae5dc755800feee500cc3396ce.camel@baylibre.com>
-Message-ID: <1e5f7ba3-59c1-27c8-89b7-cce87659462e@amlogic.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Thu, 9 Aug 2018 10:41:26 +0800
+Subject: [PATCH v4 08/14] drm/mediatek: add YUYV/UYVY color format
+ support for RDMA
+In-Reply-To: <1533780949-30141-9-git-send-email-stu.hsieh@mediatek.com>
+References: <1533780949-30141-1-git-send-email-stu.hsieh@mediatek.com>
+ <1533780949-30141-9-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1533782486.29986.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jerome
+Hi, Stu:
 
-On 07/30/18 16:57, Jerome Brunet wrote:
-> On Fri, 2018-07-27 at 09:45 -0700, Stephen Boyd wrote:
->> Quoting Stephen Boyd (2018-07-27 09:41:40)
->>> Quoting Yixun Lan (2018-07-27 07:52:23)
->>>> HI Stephen:
->>>>
->>>> On 07/26/2018 11:20 PM, Stephen Boyd wrote:
->>>>> Quoting Yixun Lan (2018-07-12 14:12:44)
->>>>>> diff --git a/drivers/clk/meson/mmc-clkc.c b/drivers/clk/meson/mmc-clkc.c
->>>>>> new file mode 100644
->>>>>> index 000000000000..36c4c7cd69a6
->>>>>> --- /dev/null
->>>>>> +++ b/drivers/clk/meson/mmc-clkc.c
->>>>>> @@ -0,0 +1,367 @@
->>>>>> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->>>>>> +/*
->>>>>> + * Amlogic Meson MMC Sub Clock Controller Driver
->>>>>> + *
->>>>>> + * Copyright (c) 2017 Baylibre SAS.
->>>>>> + * Author: Jerome Brunet <jbrunet@baylibre.com>
->>>>>> + *
->>>>>> + * Copyright (c) 2018 Amlogic, inc.
->>>>>> + * Author: Yixun Lan <yixun.lan@amlogic.com>
->>>>>> + */
->>>>>> +
->>>>>> +#include <linux/clk.h>
->>>>>
->>>>> Is this include used?
->>>>>
->>>>
->>>> this is needed by clk_get_rate()
->>>> see drivers/clk/meson/mmc-clkc.c:204
->>>
->>> Hmm ok. That's unfortunate.
->>
->> You should be able to read the hardware to figure out the clk frequency?
->> This may be a sign that the phase clk_ops are bad and should be passing
->> in the frequency of the parent clk to the op so that phase can be
->> calculated. Jerome?
->>
+On Thu, 2018-08-09 at 10:15 +0800, Stu Hsieh wrote:
+> This patch add YUYV/UYVY color format support for RDMA
+> and transform matrix for YUYV/UYVY.
 > 
-> It could be a away to do it but:
-> a) if we modify the API, we would need to update every clock driver using it.
->    There is not that many users of the phase API but still, it is annoying
-> b) This particular driver need the parent rate, other might need something else
-> I guess. (parent phase ??, duty cycle ??) 
-> 
-> I think the real problem here it that you are using the consumer API. You should
-> be using the provider API like clk_hw_get_rate. Look at the clk-divider.c which
-> use clk_hw_round_rate() on the parent clock. 
-I will replace it with clk_hw_get_rate()
+> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 
-> 
-> Clock drivers should deal with 'struct clk_hw', not 'struct clk'. I think it was
-> mentioned in the past that the 'clk' within 'struct clk_hw' might be removed
-> someday.
-> 
-> Yixun, please don't put your clock driver within the controller driver. Please
-> implement your 'phase-delay' clock in its own file and export the ops, like
-> every other clock in the amlogic directory. Also, please review your list of
-> '#define', some of them are unnecessary copy/paste from the MMC driver.
-> 
-will implement a clk-phase-delay.c
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
 
-I can move the extra CC list
-
-Yixun
+> ---
+>  drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> index 1f57f86c7910..8b015c2d4418 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> @@ -33,6 +33,8 @@
+>  #define RDMA_ENGINE_EN					BIT(0)
+>  #define RDMA_MODE_MEMORY				BIT(1)
+>  #define DISP_REG_RDMA_SIZE_CON_0		0x0014
+> +#define RDMA_MATRIX_ENABLE				BIT(17)
+> +#define RDMA_MATRIX_INT_MTX_BT601_to_RGB		(6 << 20)
+>  #define DISP_REG_RDMA_SIZE_CON_1		0x0018
+>  #define DISP_REG_RDMA_TARGET_LINE		0x001c
+>  #define DISP_RDMA_MEM_CON			0x0024
+> @@ -46,12 +48,15 @@
+>  #define RDMA_FIFO_SIZE(rdma)			((rdma)->data->fifo_size)
+>  #define DISP_RDMA_MEM_START_ADDR		0x0f00
+>  
+> +#define RDMA_MATRIX_INT_MTX_SEL			GENMASK(23, 20)
+>  #define RDMA_MEM_GMC				0x40402020
+>  
+>  #define MEM_MODE_INPUT_FORMAT_RGB565		0x0
+>  #define MEM_MODE_INPUT_FORMAT_RGB888		(0x001 << 4)
+>  #define MEM_MODE_INPUT_FORMAT_RGBA8888		(0x002 << 4)
+>  #define MEM_MODE_INPUT_FORMAT_ARGB8888		(0x003 << 4)
+> +#define MEM_MODE_INPUT_FORMAT_UYVY		(0x004 << 4)
+> +#define MEM_MODE_INPUT_FORMAT_YUYV		(0x005 << 4)
+>  
+>  struct mtk_disp_rdma_data {
+>  	unsigned int fifo_size;
+> @@ -181,6 +186,10 @@ static unsigned int rdma_fmt_convert(struct mtk_disp_rdma *rdma,
+>  	case DRM_FORMAT_XBGR8888:
+>  	case DRM_FORMAT_ABGR8888:
+>  		return MEM_MODE_INPUT_FORMAT_RGBA8888 | MEM_MODE_INPUT_SWAP;
+> +	case DRM_FORMAT_UYVY:
+> +		return MEM_MODE_INPUT_FORMAT_UYVY;
+> +	case DRM_FORMAT_YUYV:
+> +		return MEM_MODE_INPUT_FORMAT_YUYV;
+>  	}
+>  }
+>  
+> @@ -197,6 +206,17 @@ static void mtk_rdma_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
+>  	con = rdma_fmt_convert(rdma, fmt);
+>  	writel_relaxed(con, comp->regs + DISP_RDMA_MEM_CON);
+>  
+> +	if (fmt == DRM_FORMAT_UYVY || fmt == DRM_FORMAT_YUYV) {
+> +		rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0,
+> +				 RDMA_MATRIX_ENABLE, RDMA_MATRIX_ENABLE);
+> +		rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0,
+> +				 RDMA_MATRIX_INT_MTX_SEL,
+> +				 RDMA_MATRIX_INT_MTX_BT601_to_RGB);
+> +	} else {
+> +		rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0,
+> +				 RDMA_MATRIX_ENABLE, 0);
+> +	}
+> +
+>  	writel_relaxed(addr, comp->regs + DISP_RDMA_MEM_START_ADDR);
+>  	writel_relaxed(pitch, comp->regs + DISP_RDMA_MEM_SRC_PITCH);
+>  	writel(RDMA_MEM_GMC, comp->regs + DISP_RDMA_MEM_GMC_SETTING_0);
