@@ -1,45 +1,58 @@
-From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Thu,  9 Aug 2018 18:52:12 +0200
-Subject: [PATCH 0/5] Set max rate for video PLLs
-Message-ID: <20180809165217.30680-1-jernej.skrabec@siol.net>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Thu, 9 Aug 2018 10:15:14 -0700
+Subject: qemu machine settings and root fs for armv8?
+In-Reply-To: <5d585df0-abbe-c95f-adff-c4c2e3962832@redhat.com>
+References: <CAKwvOdkGatK1HbXG0hDr=a1DtnoCXUbVppLdR6uN5tAKzKdDDQ@mail.gmail.com>
+ <CAKwvOdnA5OTcBuRVbcBv8oYHR-mU3+Ee_iFjqbHx4UQxVnpxtQ@mail.gmail.com>
+ <5d585df0-abbe-c95f-adff-c4c2e3962832@redhat.com>
+Message-ID: <CAKwvOdnaknwFshVAk=G0x44RxZyrMPp+O2yFBauAe9-3C4DpTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series implement maximum rate constraint for video PLLs,
-because it is possible to set higher PLL rate that is actually
-supported in HW.
+On Thu, Aug 9, 2018 at 12:36 AM Laura Abbott <labbott@redhat.com> wrote:
+>
+> I usually use a buildroot environment and just boot as an initramfs:
 
-Issue became apparent when user reported non-working monitor connected
-to board with H5 SoC. Native monitor resolution in this case was
-2560x1080, with 185580 kHz pixel clock. Clock subsystem found out that
-best matching pixel clock can be generated if video PLL is set to 2040
-MHz, which is way out of specs for PLL. With this patch series applied,
-everything worked just fine, with slightly higher rate error, but within
-working limits for PLL and HDMI.
+I need to play around more with buildroot, but I'll bet that's an
+option to make a ramdisk instead of a full disk image?
 
-I'm not sure if "Fixes" tag should be added. It solves real world
-problem, but there was nothing wrongly implemented, just upper limit
-is missing.
+> qemu-system-aarch64 \
+>         -s \
+>         -smp 8 \
+>         -machine virt \
+>         -cpu cortex-a57 \
+>         -machine type=virt \
+>         -nographic \
+>         -m 1024 \
+>         -kernel /path/to/kernel \
+>         --append "nokaslr slub_debug=- console=ttyAMA0 debug_pagealloc=on
+> earlycon=pl011,0x9000000" \
 
-While user reported that these patches solve the issue on H5, I added
-similar fixes for other SoCs too. Since I don't have such monitor,
-I only tested if board boots up and if HDMI works (H3, R40 and A83T).
+Very cool, thank you for sharing!
 
-Jernej Skrabec (5):
-  clk: sunxi-ng: Add maximum rate constraint to NM PLLs
-  clk: sunxi-ng: h3/h5: Add max. rate constraint to pll-video
-  clk: sunxi-ng: r40: Add max. rate constraint to video PLLs
-  clk: sunxi-ng: nkmp: Add constraint for maximum rate
-  clk: sunxi-ng: a83t: Add max. rate constraint to video PLLs
+I'm guessing that kaslr makes it difficult to keep track of addresses
+in between reboots?  There's a parameter "panic=-1" that will reboot
+the kernel on panic that probably works well with this.
 
- drivers/clk/sunxi-ng/ccu-sun8i-a83t.c |  2 ++
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c   | 25 ++++++-------
- drivers/clk/sunxi-ng/ccu-sun8i-r40.c  | 52 +++++++++++++--------------
- drivers/clk/sunxi-ng/ccu_nkmp.c       |  7 ++++
- drivers/clk/sunxi-ng/ccu_nkmp.h       |  1 +
- drivers/clk/sunxi-ng/ccu_nm.c         |  7 ++++
- drivers/clk/sunxi-ng/ccu_nm.h         | 30 ++++++++++++++++
- 7 files changed, 86 insertions(+), 38 deletions(-)
+>         -initrd /path/to/arm64_rootfs.cpio \
+>         -fsdev local,security_model=passthrough,id=fsdev0,path=/tmp/share \
+>         -device virtio-9p-pci,id=fs0,fsdev=fsdev0,mount_tag=hostshare
+>
+> I'll note that this setup makes using kernel modules a big pain but
 
+How come?
+
+> it's useful for certain types of testing.
+> The virtio settings are from https://www.linux-kvm.org/page/9p_virtio
+> for sharing files.
+
+Wow, that's super cool!  That probably helps so that you don't need to
+keep rebuilding your ramdisk.  For binaries I'd guess that any
+dynamically linked dependencies would have to be in that dir, too,
+otherwise the VM wouldn't be able to load them.  But maybe nice for
+statically linked cross compiled binaries.
+
+Thanks again.
 -- 
-2.18.0
+Thanks,
+~Nick Desaulniers
