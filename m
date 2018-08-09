@@ -1,244 +1,74 @@
-From: jianxin.pan@amlogic.com (Jianxin Pan)
-Date: Thu, 9 Aug 2018 16:22:31 +0800
-Subject: [PATCH 2/2] arm64: dts: meson-g12a: add initial g12a s905d2 SoC DT
- support
-In-Reply-To: <1533802951-49919-1-git-send-email-jianxin.pan@amlogic.com>
-References: <1533802951-49919-1-git-send-email-jianxin.pan@amlogic.com>
-Message-ID: <1533802951-49919-3-git-send-email-jianxin.pan@amlogic.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Thu, 09 Aug 2018 09:31:41 +0100
+Subject: [PATCH] arm64: PCI: Remove node-local allocations when
+ initialising host controller
+In-Reply-To: <20180808172211.GD49411@bhelgaas-glaptop.roam.corp.google.com>
+ (Bjorn Helgaas's message of "Wed, 8 Aug 2018 12:22:11 -0500")
+References: <20180801173132.19739-1-punit.agrawal@arm.com>
+ <38ad03ba-2658-98c8-1888-0aa3bfb59bd4@arm.com>
+ <20180802143319.GA13512@red-moon>
+ <CAErSpo5i7AAXq4vmfsH2WjheXpzzM1iaehdeM24eQZjzYY39Rg@mail.gmail.com>
+ <87eff85364.fsf@e105922-lin.cambridge.arm.com>
+ <20180808172211.GD49411@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <871sb83pqq.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Try to add basic DT support for the Amlogic's Meson-G12A S905D2 SoC,
-which describe components as follows: Reserve Memory, CPU, GIC, IRQ,
-Timer, UART. It's capable of booting up into the serial console.
+Bjorn Helgaas <helgaas@kernel.org> writes:
 
-Signed-off-by: Jianxin <jianxin.pan@amlogic.com>
----
- arch/arm64/boot/dts/amlogic/Makefile            |   1 +
- arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts |  22 +++
- arch/arm64/boot/dts/amlogic/meson-g12a.dtsi     | 174 ++++++++++++++++++++++++
- 3 files changed, 197 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
+> On Wed, Aug 08, 2018 at 03:44:03PM +0100, Punit Agrawal wrote:
+>> Bjorn Helgaas <bhelgaas@google.com> writes:
+>> > On Thu, Aug 2, 2018 at 9:33 AM Lorenzo Pieralisi
+>> > <lorenzo.pieralisi@arm.com> wrote:
+>> >> On Wed, Aug 01, 2018 at 02:38:51PM -0500, Jeremy Linton wrote:
+>> >>
+>> >> Jiang Liu does not work on the kernel anymore so we won't know
+>> >> anytime soon the reasoning behind commit 965cd0e4a5e5
+>> >>
+>> >> > On 08/01/2018 12:31 PM, Punit Agrawal wrote:
+>> >> > >Memory for host controller data structures is allocated local to the
+>> >> > >node to which the controller is associated with. This has been the
+>> >> > >behaviour since support for ACPI was added in
+>> >> > >commit 0cb0786bac15 ("ARM64: PCI: Support ACPI-based PCI host controller").
+>> >> >
+>> >> > Which was apparently influenced by:
+>> >> >
+>> >> > 965cd0e4a5e5 x86, PCI, ACPI: Use kmalloc_node() to optimize for performance
+>> >> >
+>> >> > Was there an actual use-case behind that change?
+>> >> >
+>> >> > I think this fixes the immediate boot problem, but if there is any
+>> >> > perf advantage it seems wise to keep it... Particularly since x86
+>> >> > seems to be doing the node sanitation in pci_acpi_root_get_node().
+>> >>
+>> >> I am struggling to see the perf advantage of allocating a struct
+>> >> that the PCI controller will never read/write from a NUMA node that
+>> >> is local to the PCI controller, happy to be corrected if there is
+>> >> a sound rationale behind that.
+>> >
+>> > If there is no reason to use kzalloc_node() here, we shouldn't use it.
+>> >
+>> > But we should use it (or not use it) consistently across arches.  I do
+>> > not believe there is an arch-specific reason to be different.
+>> > Currently, pci_acpi_scan_root() uses kzalloc_node() on x86 and arm64,
+>> > but kzalloc() on ia64.  They all ought to be the same.
+>> 
+>> From my understanding, arm64 use of kzalloc_node() was derived from the
+>> x86 version. Maybe somebody familiar with behaviour on x86 can provide
+>> input here.
+>
+> If you want to remove use of kzalloc_node(), I'm fine with that as
+> long as you do it for x86 at the same time (maybe separate patches,
+> but at least in the same series).
+>
+> I don't see any evidence in 965cd0e4a5e5 ("x86, PCI, ACPI: Use
+> kmalloc_node() to optimize for performance") that it actually improves
+> performance, so I'd be inclined to just use kzalloc().
 
-diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-index a97c0e2..c31f29d6 100644
---- a/arch/arm64/boot/dts/amlogic/Makefile
-+++ b/arch/arm64/boot/dts/amlogic/Makefile
-@@ -1,5 +1,6 @@
- # SPDX-License-Identifier: GPL-2.0
- dtb-$(CONFIG_ARCH_MESON) += meson-axg-s400.dtb
-+dtb-$(CONFIG_ARCH_MESON) += meson-g12a-u200.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nanopi-k2.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nexbox-a95x.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-odroidc2.dtb
-diff --git a/arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts b/arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
-new file mode 100644
-index 0000000..d267a37
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
-@@ -0,0 +1,22 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
-+ */
-+
-+/dts-v1/;
-+
-+#include "meson-g12a.dtsi"
-+
-+/ {
-+	compatible = "amlogic,u200", "amlogic,g12a";
-+	model = "Amlogic Meson G12A U200 Development Board";
-+
-+	aliases {
-+		serial0 = &uart_AO;
-+	};
-+};
-+
-+&uart_AO {
-+	status = "okay";
-+};
-+
-diff --git a/arch/arm64/boot/dts/amlogic/meson-g12a.dtsi b/arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
-new file mode 100644
-index 0000000..64a0f2e
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
-@@ -0,0 +1,174 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
-+ */
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "amlogic,g12a";
-+
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		/* Alternate 3 MiB reserved for ARM Trusted Firmware (BL31) */
-+		secmon_reserved: secmon at 5000000 {
-+			reg = <0x0 0x05000000 0x0 0x300000>;
-+			no-map;
-+		};
-+	};
-+
-+	cpus {
-+		#address-cells = <0x2>;
-+		#size-cells = <0x0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+		};
-+
-+		cpu2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+		};
-+
-+		cpu3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+		};
-+
-+		l2: l2-cache0 {
-+			compatible = "cache";
-+		};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-1.0";
-+		method = "smc";
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13
-+			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14
-+			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11
-+			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10
-+			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	xtal: xtal-clk {
-+		compatible = "fixed-clock";
-+		clock-frequency = <24000000>;
-+		clock-output-names = "xtal";
-+		#clock-cells = <0>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		apb: apb at ffe00000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0xffe00000 0x0 0x200000>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges = <0x0 0x0 0x0 0xffe00000 0x0 0x200000>;
-+		};
-+
-+		cbus: bus at ffd00000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0xffd00000 0x0 0x25000>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges = <0x0 0x0 0x0 0xffd00000 0x0 0x25000>;
-+
-+		};
-+
-+		gic: interrupt-controller at ffc01000 {
-+			compatible = "arm,gic-400";
-+			reg = <0x0 0xffc01000 0 0x1000>,
-+			      <0x0 0xffc02000 0 0x2000>,
-+			      <0x0 0xffc04000 0 0x2000>,
-+			      <0x0 0xffc06000 0 0x2000>;
-+			interrupt-controller;
-+			interrupts = <GIC_PPI 9
-+				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+		};
-+
-+		hiubus: bus at ff63c000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0xff63c000 0x0 0x1c00>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges = <0x0 0x0 0x0 0xff63c000 0x0 0x1c00>;
-+
-+		};
-+
-+		periphs: periphs at ff634000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0xff634000 0x0 0x2000>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges = <0x0 0x0 0x0 0xff634000 0x0 0x2000>;
-+		};
-+
-+		aobus: bus at ff800000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0xff800000 0x0 0x100000>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges = <0x0 0x0 0x0 0xff800000 0x0 0x100000>;
-+
-+			uart_AO: serial at 3000 {
-+				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
-+				reg = <0x0 0x3000 0x0 0x18>;
-+				interrupts = <GIC_SPI 193 IRQ_TYPE_EDGE_RISING>;
-+				clocks = <&xtal>, <&xtal>, <&xtal>;
-+				clock-names = "xtal", "pclk", "baud";
-+				status = "disabled";
-+			};
-+
-+			uart_AO_B: serial at 4000 {
-+				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
-+				reg = <0x0 0x4000 0x0 0x18>;
-+				interrupts = <GIC_SPI 197 IRQ_TYPE_EDGE_RISING>;
-+				clocks = <&xtal>, <&xtal>, <&xtal>;
-+				clock-names = "xtal", "pclk", "baud";
-+				status = "disabled";
-+			};
-+
-+		};
-+	};
-+};
--- 
-1.9.1
+Thanks for confirming.
+
+I'm happy to add a patch updating x86 use of kzalloc_node() as
+well. I'll post something once the merge window closes.
+
+>
+> Bjorn
