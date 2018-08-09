@@ -1,64 +1,90 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 9 Aug 2018 16:07:53 +0200
-Subject: [GIT PULL 5/5] arm64: tegra: Device tree changes for v4.19-rc1
-In-Reply-To: <51a19ec3-8b34-56f5-d9c7-69397d3d11ff@kapsi.fi>
-References: <20180712154128.22705-1-thierry.reding@gmail.com>
- <20180712154128.22705-6-thierry.reding@gmail.com>
- <20180714212210.at4b2gcpopsznyxx@localhost>
- <20180803104318.GA28546@ulmo>
- <CAHMsQjU=nmpTnPK6Ryhui67YVANHExd=yRB4hp+upd7O-Tjn+Q@mail.gmail.com>
- <20180809102104.GB21639@ulmo>
- <51a19ec3-8b34-56f5-d9c7-69397d3d11ff@kapsi.fi>
-Message-ID: <20180809140753.GH21639@ulmo>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Thu, 9 Aug 2018 17:17:37 +0300
+Subject: [PATCH v7 8/8] interconnect: Allow endpoints translation via DT
+In-Reply-To: <37ac189618cda02567977f65570d15d3@codeaurora.org>
+References: <20180731161340.13000-1-georgi.djakov@linaro.org>
+ <20180731161340.13000-9-georgi.djakov@linaro.org>
+ <804925d5927ccb6927b16f7e9a4aa05c@codeaurora.org>
+ <3a7bb27a-0609-133b-08e9-8864f1ccc4bc@linaro.org>
+ <37ac189618cda02567977f65570d15d3@codeaurora.org>
+Message-ID: <df517d56-a181-b72b-2fb4-cb58bb817a99@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 09, 2018 at 01:34:37PM +0300, Mikko Perttunen wrote:
-> On 09.08.2018 13:21, Thierry Reding wrote:
-> > On Fri, Aug 03, 2018 at 07:26:04AM -0400, Anthony Eden wrote:
-> > > Mesa support aside- if I start a computationally intensive job on the
-> > > Jetson TX2 like building the Linux kernel on all cores, it will lock
-> > > up. My only work around has been to disable the Denver CPU's. I don't
-> > > think the tegra186 has upstream support to control the fan on the
-> > > Jetson TX2, could this be a thermal problem?
-> > 
-> > Yes, I suppose this could be a thermal problem. Or it could be something
-> > else entirely. We do support CPU frequency scaling on Tegra X2, so what
-> > you could do is keep the Denver CPUs enabled, but set the powersave CPU
-> > frequency governor. That way it should use all the CPUs but at a lower
-> > clock rate, which should also be able to avoid any thermal issues. This
-> > could help determine whether or not the problem is thermal or something
-> > else.
-> > 
-> > Also adding Mikko on Cc who wrote the Tegra186 driver, maybe he's aware
-> > of any issues.
+Hi Saravana,
+
+On 08/02/2018 10:12 PM, skannan at codeaurora.org wrote:
+> On 2018-08-02 05:07, Georgi Djakov wrote:
+>> Hi Saravana,
+>>
+>> On 08/02/2018 01:57 AM, skannan at codeaurora.org wrote:
+>>> On 2018-07-31 09:13, Georgi Djakov wrote:
+>>>> Currently we support only platform data for specifying the interconnect
+>>>> endpoints. As now the endpoints are hard-coded into the consumer driver
+>>>> this may lead to complications when a single driver is used by multiple
+>>>> SoCs, which may have different interconnect topology.
+>>>> To avoid cluttering the consumer drivers, introduce a translation
+>>>> function
+>>>> to help us get the board specific interconnect data from device-tree.
+>>>>
+>>>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>>>> ---
+>>>> ?drivers/interconnect/core.c? | 62 ++++++++++++++++++++++++++++++++++++
+>>>> ?include/linux/interconnect.h |? 7 ++++
+>>>> ?2 files changed, 69 insertions(+)
+>>>>
+>>>> diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
+>>>> index 9fef180cf77e..d1b6adff0a3d 100644
+>>>> --- a/drivers/interconnect/core.c
+>>>> +++ b/drivers/interconnect/core.c
+>> [..]
+>>>> --- a/include/linux/interconnect.h
+>>>> +++ b/include/linux/interconnect.h
+>>>> @@ -17,6 +17,7 @@ struct device;
+>>>>
+>>>> ?struct icc_path *icc_get(struct device *dev, const int src_id,
+>>>> ????????????? const int dst_id);
+>>>> +struct icc_path *of_icc_get(struct device *dev, const char *name);
+>>>> ?void icc_put(struct icc_path *path);
+>>>> ?int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
+>>>>
+>>>> @@ -28,6 +29,12 @@ static inline struct icc_path *icc_get(struct
+>>>> device *dev, const int src_id,
+>>>> ???? return NULL;
+>>>> ?}
+>>>>
+>>>> +static inline struct icc_path *of_icc_get(struct device *dev,
+>>>> +????????????????????? const char *name)
+>>>> +{
+>>>> +??? return NULL;
+>>>> +}
+>>>> +
+>>>
+>>> Might want to return PTR(-ENODEV) or some error code so that client
+>>> doesn't have to do NULL check AND an error check?
+>>>
+>>> -Saravana
+>>
+>> NULL is returned when CONFIG_INTERCONNECT=n. Configuration of
+>> interconnects by consumer drivers could be optional and that's why null
+>> is returned instead of an error. The consumer drivers decide how to
+>> proceed in this case and if there is a hard requirement for interconnect
+>> support, then i would suggest to express it as a dependency in Kconfig.
 > 
-> I haven't seen any issues myself, though I haven't stressed the CPU too
-> heavily. We also have a thermal driver for Tegra186, so we could set up
-> thermal throttling with a device tree change.
+> Ehh... you could make the same argument with an error. If it's not
+> mandatory for functioning, they can ignore a specific error and
+> continue? At a minimum, these stub functions returning NULL doesn't
+> match with the documentation that says these APIs will only ever return
+> ERR_PTR().
+> 
+> -Saravana
 
-Do you have an example of how that would work? The DT bindings are a
-little sparse on the specifics. It seems like something similar to what
-we did on Tegra124 could be done on Tegra186.
+Here i am trying to align with other frameworks, which provide some
+resources to consumers. The regulator/clock/reset frameworks return
+NULL, so i prefer to do the same here. Drivers are free to handle NULL
+specifically, but they don't have to. This NULL may also mean that
+interconnects have been already configured by bootloader or firmware.
+Of course i accept the comment to update the documentation to mention this.
 
-Anthony: do you think you could come up with something suitable based on
-what arch/arm/boot/dts/tegra124{.dtsi,-jetson-tk1.dts} and the device
-tree bindings for Tegra186 contain in
-
-	Documentation/devicetree/bindings/thermal/nvidia,tegra186-bpmp-thermal.txt
-
-as well as
-
-	include/dt-bindings/thermal/tegra186-bpmp-thermal.h
-
-? That's provided that reducing the CPU frequency does indeed prevent
-the lock up that you were seeing.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180809/f71f237b/attachment.sig>
+Thanks,
+Georgi
