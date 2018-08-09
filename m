@@ -1,143 +1,116 @@
 From: stu.hsieh@mediatek.com (Stu Hsieh)
-Date: Thu, 9 Aug 2018 10:15:48 +0800
-Subject: [PATCH v4 13/14] drm/mediatek: update some variable name from ovl to
- comp
+Date: Thu, 9 Aug 2018 10:15:47 +0800
+Subject: [PATCH v4 12/14] drm/mediatek: use layer_nr function to get layer
+ number to init plane
 In-Reply-To: <1533780949-30141-1-git-send-email-stu.hsieh@mediatek.com>
 References: <1533780949-30141-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1533780949-30141-14-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1533780949-30141-13-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch update some variable name from ovl to comp
+This patch use layer_nr function to get layer number to init plane
 
-Because RDMA would be first HW in ddp, the naming ovl
-should be change to comp.
+When plane init in crtc create,
+it use the number of OVL layer to init plane.
+That's OVL can read 4 memory address.
+
+For mt2712 third ddp, it use RDMA to read memory.
+RDMA can read 1 memory address, so it just init one plane.
+
+For compatibility, this patch use mtk_ddp_comp_layer_nr function
+to get layer number from their HW component in ddp for plane init.
 
 Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c | 26 +++++++++++++-------------
- drivers/gpu/drm/mediatek/mtk_drm_crtc.h |  2 +-
- 2 files changed, 14 insertions(+), 14 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c | 21 ++++++++++++++-------
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.h |  1 -
+ 2 files changed, 14 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-index 845d1608465e..0b976dfd04df 100644
+index 2d6aa150a9ff..845d1608465e 100644
 --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
 +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-@@ -172,9 +172,9 @@ static void mtk_drm_crtc_mode_set_nofb(struct drm_crtc *crtc)
- static int mtk_drm_crtc_enable_vblank(struct drm_crtc *crtc)
- {
- 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
--	struct mtk_ddp_comp *ovl = mtk_crtc->ddp_comp[0];
-+	struct mtk_ddp_comp *comp = mtk_crtc->ddp_comp[0];
+@@ -45,7 +45,8 @@ struct mtk_drm_crtc {
+ 	bool				pending_needs_vblank;
+ 	struct drm_pending_vblank_event	*event;
  
--	mtk_ddp_comp_enable_vblank(ovl, &mtk_crtc->base);
-+	mtk_ddp_comp_enable_vblank(comp, &mtk_crtc->base);
+-	struct drm_plane		planes[OVL_LAYER_NR];
++	struct drm_plane		*planes;
++	unsigned int			layer_nr;
+ 	bool				pending_planes;
  
- 	return 0;
- }
-@@ -182,9 +182,9 @@ static int mtk_drm_crtc_enable_vblank(struct drm_crtc *crtc)
- static void mtk_drm_crtc_disable_vblank(struct drm_crtc *crtc)
- {
- 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
--	struct mtk_ddp_comp *ovl = mtk_crtc->ddp_comp[0];
-+	struct mtk_ddp_comp *comp = mtk_crtc->ddp_comp[0];
- 
--	mtk_ddp_comp_disable_vblank(ovl);
-+	mtk_ddp_comp_disable_vblank(comp);
- }
- 
- static int mtk_crtc_ddp_clk_enable(struct mtk_drm_crtc *mtk_crtc)
-@@ -335,7 +335,7 @@ static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
- {
- 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
- 	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
--	struct mtk_ddp_comp *ovl = mtk_crtc->ddp_comp[0];
-+	struct mtk_ddp_comp *comp = mtk_crtc->ddp_comp[0];
- 	unsigned int i;
- 
- 	/*
-@@ -344,7 +344,7 @@ static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
- 	 * queue update module registers on vblank.
- 	 */
- 	if (state->pending_config) {
--		mtk_ddp_comp_config(ovl, state->pending_width,
-+		mtk_ddp_comp_config(comp, state->pending_width,
- 				    state->pending_height,
- 				    state->pending_vrefresh, 0);
- 
-@@ -359,7 +359,7 @@ static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
- 			plane_state = to_mtk_plane_state(plane->state);
- 
- 			if (plane_state->pending.config) {
--				mtk_ddp_comp_layer_config(ovl, i, plane_state);
-+				mtk_ddp_comp_layer_config(comp, i, plane_state);
- 				plane_state->pending.config = false;
- 			}
- 		}
-@@ -371,12 +371,12 @@ static void mtk_drm_crtc_atomic_enable(struct drm_crtc *crtc,
- 				       struct drm_crtc_state *old_state)
- {
- 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
--	struct mtk_ddp_comp *ovl = mtk_crtc->ddp_comp[0];
-+	struct mtk_ddp_comp *comp = mtk_crtc->ddp_comp[0];
- 	int ret;
- 
- 	DRM_DEBUG_DRIVER("%s %d\n", __func__, crtc->base.id);
- 
--	ret = mtk_smi_larb_get(ovl->larb_dev);
-+	ret = mtk_smi_larb_get(comp->larb_dev);
- 	if (ret) {
- 		DRM_ERROR("Failed to get larb: %d\n", ret);
- 		return;
-@@ -384,7 +384,7 @@ static void mtk_drm_crtc_atomic_enable(struct drm_crtc *crtc,
- 
- 	ret = mtk_crtc_ddp_hw_init(mtk_crtc);
- 	if (ret) {
--		mtk_smi_larb_put(ovl->larb_dev);
-+		mtk_smi_larb_put(comp->larb_dev);
- 		return;
+ 	void __iomem			*config_regs;
+@@ -286,7 +287,7 @@ static int mtk_crtc_ddp_hw_init(struct mtk_drm_crtc *mtk_crtc)
  	}
  
-@@ -396,7 +396,7 @@ static void mtk_drm_crtc_atomic_disable(struct drm_crtc *crtc,
- 					struct drm_crtc_state *old_state)
- {
- 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
--	struct mtk_ddp_comp *ovl = mtk_crtc->ddp_comp[0];
-+	struct mtk_ddp_comp *comp = mtk_crtc->ddp_comp[0];
- 	int i;
+ 	/* Initially configure all planes */
+-	for (i = 0; i < OVL_LAYER_NR; i++) {
++	for (i = 0; i < mtk_crtc->layer_nr; i++) {
+ 		struct drm_plane *plane = &mtk_crtc->planes[i];
+ 		struct mtk_plane_state *plane_state;
  
- 	DRM_DEBUG_DRIVER("%s %d\n", __func__, crtc->base.id);
-@@ -419,7 +419,7 @@ static void mtk_drm_crtc_atomic_disable(struct drm_crtc *crtc,
+@@ -351,7 +352,7 @@ static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
+ 	}
  
- 	drm_crtc_vblank_off(crtc);
- 	mtk_crtc_ddp_hw_fini(mtk_crtc);
--	mtk_smi_larb_put(ovl->larb_dev);
-+	mtk_smi_larb_put(comp->larb_dev);
+ 	if (mtk_crtc->pending_planes) {
+-		for (i = 0; i < OVL_LAYER_NR; i++) {
++		for (i = 0; i < mtk_crtc->layer_nr; i++) {
+ 			struct drm_plane *plane = &mtk_crtc->planes[i];
+ 			struct mtk_plane_state *plane_state;
  
- 	mtk_crtc->enabled = false;
- }
-@@ -517,7 +517,7 @@ static int mtk_drm_crtc_init(struct drm_device *drm,
- 	return ret;
- }
+@@ -403,7 +404,7 @@ static void mtk_drm_crtc_atomic_disable(struct drm_crtc *crtc,
+ 		return;
  
--void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *ovl)
-+void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *comp)
- {
- 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
- 	struct mtk_drm_private *priv = crtc->dev->dev_private;
+ 	/* Set all pending plane state to disabled */
+-	for (i = 0; i < OVL_LAYER_NR; i++) {
++	for (i = 0; i < mtk_crtc->layer_nr; i++) {
+ 		struct drm_plane *plane = &mtk_crtc->planes[i];
+ 		struct mtk_plane_state *plane_state;
+ 
+@@ -450,7 +451,7 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+ 
+ 	if (mtk_crtc->event)
+ 		mtk_crtc->pending_needs_vblank = true;
+-	for (i = 0; i < OVL_LAYER_NR; i++) {
++	for (i = 0; i < mtk_crtc->layer_nr; i++) {
+ 		struct drm_plane *plane = &mtk_crtc->planes[i];
+ 		struct mtk_plane_state *plane_state;
+ 
+@@ -598,7 +599,12 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+ 		mtk_crtc->ddp_comp[i] = comp;
+ 	}
+ 
+-	for (zpos = 0; zpos < OVL_LAYER_NR; zpos++) {
++	mtk_crtc->layer_nr = mtk_ddp_comp_layer_nr(mtk_crtc->ddp_comp[0]);
++	mtk_crtc->planes = devm_kzalloc(dev, mtk_crtc->layer_nr *
++					sizeof(struct drm_plane),
++					GFP_KERNEL);
++
++	for (zpos = 0; zpos < mtk_crtc->layer_nr; zpos++) {
+ 		type = (zpos == 0) ? DRM_PLANE_TYPE_PRIMARY :
+ 				(zpos == 1) ? DRM_PLANE_TYPE_CURSOR :
+ 						DRM_PLANE_TYPE_OVERLAY;
+@@ -609,7 +615,8 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+ 	}
+ 
+ 	ret = mtk_drm_crtc_init(drm_dev, mtk_crtc, &mtk_crtc->planes[0],
+-				&mtk_crtc->planes[1], pipe);
++				mtk_crtc->layer_nr > 1 ? &mtk_crtc->planes[1] :
++				NULL, pipe);
+ 	if (ret < 0)
+ 		goto unprepare;
+ 	drm_mode_crtc_set_gamma_size(&mtk_crtc->base, MTK_LUT_SIZE);
 diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.h b/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
-index 60bcc8aba8e3..091adb2087eb 100644
+index 9d9410c67ae9..60bcc8aba8e3 100644
 --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
 +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
-@@ -23,7 +23,7 @@
- #define MTK_MIN_BPC	3
+@@ -18,7 +18,6 @@
+ #include "mtk_drm_ddp_comp.h"
+ #include "mtk_drm_plane.h"
  
- void mtk_drm_crtc_commit(struct drm_crtc *crtc);
--void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *ovl);
-+void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *comp);
- int mtk_drm_crtc_create(struct drm_device *drm_dev,
- 			const enum mtk_ddp_comp_id *path,
- 			unsigned int path_len);
+-#define OVL_LAYER_NR	4
+ #define MTK_LUT_SIZE	512
+ #define MTK_MAX_BPC	10
+ #define MTK_MIN_BPC	3
 -- 
 2.12.5.2.gbdf23ab
