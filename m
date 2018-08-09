@@ -1,47 +1,102 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Thu, 9 Aug 2018 10:27:59 +0800
-Subject: [PATCH mmc-next v3 0/3] solve SDHCI DWC MSHC 128MB DMA boundary
- limitation
-In-Reply-To: <20180730104228.28b58bd0@xhacker.debian>
-References: <20180730104228.28b58bd0@xhacker.debian>
-Message-ID: <20180809102759.191d211e@xhacker.debian>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Thu, 9 Aug 2018 10:36:32 +0800
+Subject: [PATCH v4 06/14] drm/mediatek: add RGB color format support for
+ RDMA
+In-Reply-To: <1533780949-30141-7-git-send-email-stu.hsieh@mediatek.com>
+References: <1533780949-30141-1-git-send-email-stu.hsieh@mediatek.com>
+ <1533780949-30141-7-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1533782192.29986.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adrian, Ulf,
+Hi, Stu:
 
-could you please review these patches? Any comments are welcome.
+On Thu, 2018-08-09 at 10:15 +0800, Stu Hsieh wrote:
+> This patch add RGB color format support for RDMA,
+> including RGB565, RGB888, RGBA8888 and ARGB8888.
+> 
+> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 
-Thanks in advance,
-Jisheng
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
 
-On Mon, 30 Jul 2018 10:42:28 +0800 Jisheng Zhang wrote:
-
-> When using DMA, if the DMA addr spans 128MB boundary, we have to split
-> the DMA transfer into two so that each one doesn't exceed the boundary.
+> ---
+>  drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 46 ++++++++++++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
 > 
-> patch1 adds adma_table_num to struct sdhci_host so that driver can
-> control the ADMA table number.
-> patch2 introduces adma_write_desc() hook to struct sdhci_ops so that
-> driver can override it.
-> patch3 finally solves the 128MB boundary limitation.
-> 
-> since v2:
->   - make use of "likely" to check (!len || BOUNDARY_OK(addr, len))
->   - explictly include <linux/sizes.h> for SZ_128M
-> 
-> since v1:
->   - fix BOUNDARY_OK macro if addr+len is aligned to 128MB
->   - use DIV_ROUND_UP to cal extra desc num
->   - fix !len for dwcmshc_adma_write_desc()
-> 
-> Jisheng Zhang (3):
->   mmc: sdhci: add adma_table_num member to struct sdhci_host
->   mmc: sdhci: introduce adma_write_desc() hook to struct sdhci_ops
->   mmc: sdhci-of-dwcmshc: solve 128MB DMA boundary limitation
-> 
->  drivers/mmc/host/sdhci-of-dwcmshc.c | 43 ++++++++++++++++++++++++++
->  drivers/mmc/host/sdhci.c            | 48 +++++++++++++++++++----------
->  drivers/mmc/host/sdhci.h            |  8 +++++
->  3 files changed, 83 insertions(+), 16 deletions(-)
-> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> index 08866550740f..1f57f86c7910 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> @@ -35,6 +35,8 @@
+>  #define DISP_REG_RDMA_SIZE_CON_0		0x0014
+>  #define DISP_REG_RDMA_SIZE_CON_1		0x0018
+>  #define DISP_REG_RDMA_TARGET_LINE		0x001c
+> +#define DISP_RDMA_MEM_CON			0x0024
+> +#define MEM_MODE_INPUT_SWAP				BIT(8)
+>  #define DISP_RDMA_MEM_SRC_PITCH			0x002c
+>  #define DISP_RDMA_MEM_GMC_SETTING_0		0x0030
+>  #define DISP_REG_RDMA_FIFO_CON			0x0040
+> @@ -46,6 +48,11 @@
+>  
+>  #define RDMA_MEM_GMC				0x40402020
+>  
+> +#define MEM_MODE_INPUT_FORMAT_RGB565		0x0
+> +#define MEM_MODE_INPUT_FORMAT_RGB888		(0x001 << 4)
+> +#define MEM_MODE_INPUT_FORMAT_RGBA8888		(0x002 << 4)
+> +#define MEM_MODE_INPUT_FORMAT_ARGB8888		(0x003 << 4)
+> +
+>  struct mtk_disp_rdma_data {
+>  	unsigned int fifo_size;
+>  };
+> @@ -144,12 +151,51 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
+>  	writel(reg, comp->regs + DISP_REG_RDMA_FIFO_CON);
+>  }
+>  
+> +static unsigned int rdma_fmt_convert(struct mtk_disp_rdma *rdma,
+> +				     unsigned int fmt)
+> +{
+> +	/* The return value in switch "MEM_MODE_INPUT_FORMAT_XXX"
+> +	 * is defined in mediatek HW data sheet.
+> +	 * The alphabet order in XXX is no relation to data
+> +	 * arrangement in memory.
+> +	 */
+> +	switch (fmt) {
+> +	default:
+> +	case DRM_FORMAT_RGB565:
+> +		return MEM_MODE_INPUT_FORMAT_RGB565;
+> +	case DRM_FORMAT_BGR565:
+> +		return MEM_MODE_INPUT_FORMAT_RGB565 | MEM_MODE_INPUT_SWAP;
+> +	case DRM_FORMAT_RGB888:
+> +		return MEM_MODE_INPUT_FORMAT_RGB888;
+> +	case DRM_FORMAT_BGR888:
+> +		return MEM_MODE_INPUT_FORMAT_RGB888 | MEM_MODE_INPUT_SWAP;
+> +	case DRM_FORMAT_RGBX8888:
+> +	case DRM_FORMAT_RGBA8888:
+> +		return MEM_MODE_INPUT_FORMAT_ARGB8888;
+> +	case DRM_FORMAT_BGRX8888:
+> +	case DRM_FORMAT_BGRA8888:
+> +		return MEM_MODE_INPUT_FORMAT_ARGB8888 | MEM_MODE_INPUT_SWAP;
+> +	case DRM_FORMAT_XRGB8888:
+> +	case DRM_FORMAT_ARGB8888:
+> +		return MEM_MODE_INPUT_FORMAT_RGBA8888;
+> +	case DRM_FORMAT_XBGR8888:
+> +	case DRM_FORMAT_ABGR8888:
+> +		return MEM_MODE_INPUT_FORMAT_RGBA8888 | MEM_MODE_INPUT_SWAP;
+> +	}
+> +}
+> +
+>  static void mtk_rdma_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
+>  				  struct mtk_plane_state *state)
+>  {
+> +	struct mtk_disp_rdma *rdma = comp_to_rdma(comp);
+>  	struct mtk_plane_pending_state *pending = &state->pending;
+>  	unsigned int addr = pending->addr;
+>  	unsigned int pitch = pending->pitch & 0xffff;
+> +	unsigned int fmt = pending->format;
+> +	unsigned int con;
+> +
+> +	con = rdma_fmt_convert(rdma, fmt);
+> +	writel_relaxed(con, comp->regs + DISP_RDMA_MEM_CON);
+>  
+>  	writel_relaxed(addr, comp->regs + DISP_RDMA_MEM_START_ADDR);
+>  	writel_relaxed(pitch, comp->regs + DISP_RDMA_MEM_SRC_PITCH);
