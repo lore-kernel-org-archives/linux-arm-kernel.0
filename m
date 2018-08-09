@@ -1,135 +1,190 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 9 Aug 2018 12:59:09 +0100
-Subject: [PATCH 2/4] KVM: arm/arm64: vgic-v3: Add core support for Group0
- SGIs
-In-Reply-To: <20180809074034.GC20606@e113682-lin.lund.arm.com>
-References: <20180808131501.584-1-marc.zyngier@arm.com>
- <20180808131501.584-3-marc.zyngier@arm.com>
- <20180809074034.GC20606@e113682-lin.lund.arm.com>
-Message-ID: <7a6b9fb5-7078-12fd-573c-b3f88e482b0b@arm.com>
+From: gnomes@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Thu, 9 Aug 2018 12:59:39 +0100
+Subject: [RFC net-next 00/15] net: A socket API for LoRa
+In-Reply-To: <a70e9715-beac-d9a8-145e-de00175e56fa@suse.de>
+References: <20180701110804.32415-1-afaerber@suse.de>
+ <CAC=mGzgUCopz2xTOA0R-WD8a1DOaOOUn=YpfdMiJ33y3hnh6kg@mail.gmail.com>
+ <92ee4016-1da9-826b-3674-b2d604a64848@suse.de>
+ <20180808213640.10a1d76f@alans-desktop>
+ <a70e9715-beac-d9a8-145e-de00175e56fa@suse.de>
+Message-ID: <20180809125939.39ac2cc9@alans-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/18 08:40, Christoffer Dall wrote:
-> On Wed, Aug 08, 2018 at 02:14:59PM +0100, Marc Zyngier wrote:
->> Although vgic-v3 now supports Group0 interrupts, it still doesn't
->> deal with Group0 SGIs. As usually with the GIC, nothing is simple:
->>
->> - ICC_SGI1R can signal SGIs of both groups, since GICD_CTLR.DS==1
->>   with KVM (as per 8.1.10, Non-secure EL1 access)
->>
->> - ICC_SGI0R can only generate Group0 SGIs
->>
->> - ICC_ASGI1R sees its scope refocussed to generate only Group0
->>   SGIs (as per the note at the bottom of Table 8-14)
->>
->> One way to look at this is that an SGI can be generated if the
->> group implied by the CPU interface is lower or equal to the
->> group specified by the interrupt.
-> 
-> This sentence hurts my brain. Another way to look at it is that with
-> DS=1, only SGI1R allows signaling group1 interrupts.  See below.
+> Yes, and we are talking about that concrete sx1276 driver here, whose
+> chipset has a state machine that only allows either rx or tx and also
+> has standby and sleep modes with differing levels of data retention.
 
-Fair enough.
+It's a hardware limit, it should never influence the protocol stack
+itself just the driver. Linux always tries to design to optimize the
+non-crappy case. In the long term that works out best because hardware
+improves and you don't want to be tied to an old limit.
 
->>
->> We only support Group1 SGIs so far, so no material change.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/kvm/coproc.c            |  2 +-
->>  arch/arm64/kvm/sys_regs.c        |  2 +-
->>  include/kvm/arm_vgic.h           |  2 +-
->>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 16 +++++++++++++---
->>  4 files changed, 16 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
->> index 3a02e76699a6..ec517992c12d 100644
->> --- a/arch/arm/kvm/coproc.c
->> +++ b/arch/arm/kvm/coproc.c
->> @@ -253,7 +253,7 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
->>  	reg = (u64)*vcpu_reg(vcpu, p->Rt2) << 32;
->>  	reg |= *vcpu_reg(vcpu, p->Rt1) ;
->>  
->> -	vgic_v3_dispatch_sgi(vcpu, reg);
->> +	vgic_v3_dispatch_sgi(vcpu, reg, 1);
->>  
->>  	return true;
->>  }
->> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->> index e04aacb2a24c..a09139b97e81 100644
->> --- a/arch/arm64/kvm/sys_regs.c
->> +++ b/arch/arm64/kvm/sys_regs.c
->> @@ -255,7 +255,7 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
->>  	if (!p->is_write)
->>  		return read_from_write_only(vcpu, p, r);
->>  
->> -	vgic_v3_dispatch_sgi(vcpu, p->regval);
->> +	vgic_v3_dispatch_sgi(vcpu, p->regval, 1);
->>  
->>  	return true;
->>  }
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index c134790be32c..06a25b11efa7 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -373,7 +373,7 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
->>  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
->>  void kvm_vgic_reset_mapped_irq(struct kvm_vcpu *vcpu, u32 vintid);
->>  
->> -void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg, int group);
->>  
->>  /**
->>   * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
->> index 88e78b582139..11d321f7ad71 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
->> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
->> @@ -901,6 +901,7 @@ static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
->>   * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
->>   * @vcpu: The VCPU requesting a SGI
->>   * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
->> + * @group: Interrupt group requested by the sender
->>   *
->>   * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
->>   * This will trap in sys_regs.c and call this function.
->> @@ -910,7 +911,7 @@ static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
->>   * check for matching ones. If this bit is set, we signal all, but not the
->>   * calling VCPU.
->>   */
->> -void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
->> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg, int group)
->>  {
->>  	struct kvm *kvm = vcpu->kvm;
->>  	struct kvm_vcpu *c_vcpu;
->> @@ -959,9 +960,18 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
->>  		irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
->>  
->>  		spin_lock_irqsave(&irq->irq_lock, flags);
->> -		irq->pending_latch = true;
->>  
->> -		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
->> +		/*
->> +		 * A Group0 access can only generate a Group0 SGI,
->> +		 * while a Group1 access can generate either group.
->> +		 */
+> > (Some ancient ethernet cards do this btw.. they can't listen and transmit
+> > at the same time)  
 > 
-> nit: "Is a Group 0 access" a well-defined term?
-> 
-> I think it may be clearer if the parameter was: bool allow_group1
-> 
-> and the condition was:
-> 
-> if (irq->group && allow_group1) {
-> 	...
-> 
-> At least that would match the comment.
+> So when do they start receiving?
 
-Indeed, that's better. Let me respin that.
+When they are not transmitting. The transmit path switches modes and when
+the frame send is done it goes back to receiving. As old ethernet was
+also half duplex that worked.
 
-Thanks,
+> The issue here was that my original description, which you appear to
+> have cut, suggested a continuous listen mode, interrupted by transmit.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I don't think I cut it but if so I didn't mean to and your approach is
+the one I agree with.
+
+> Jian-Hong didn't like that, with reference to the LoRaWAN spec that
+> supposedly asks for only being in receive mode when expecting a message,
+> likely to save on battery. So the question is, could we cleanly
+> implement receiving only when the user asks us to, or is that a no-go?
+
+Why would you do so ? You can't run Linux on a tiny little
+micro-controller where that would matter. Sure it makes sense for some
+tiny spec of embedded silicon buried in a sensor - but not a Linux box.
+
+Now you might power it down when the interface is down, or when there is
+nobody using that interface but that's really more about long term idle
+power.
+
+> bands and 2.) duty-cycle limits for some of those bands. No maintainer
+> commented on that so far. Thus I am working in tiny steps on providing
+> netlink-layer commands in nllora that can dispatch the individual radio
+> settings to drivers, which then upper layers can instrument as needed.
+
+Sounds right to me.
+> 
+> And making my very first steps with netlink here, it appeared as if each
+> technology has its own enums of commands and attributes, so I don't see
+> how to reuse anything from Wifi here apart from some design inspiration.
+
+That seems reasonable - you aren't likely to want to manage them with the
+same tool.
+
+> > That's a hardware question. Imagine a software defined radio. If your
+> > limitation wouldn't exist in a pure software defined radio then it's
+> > almost certainly a device level detal.  
+> 
+> An SDR would not be using this sx1276 device driver, I imagine.
+> 
+> In fact I would expect an SDR device not to be in drivers/net/lora/ at
+> all but to live in drivers/net/sdr/ and to consume ETH_P_LORA etc. skbs
+> and just do the right thing for them depending on their type...
+
+The point I was trying to make was that if you want to decide whether
+something is driver level or protocol level ask 'is this something you
+can't do even with an SDR'. Some things are protocol properties that no
+fancy hardware will change. Others are hardware limits, in which case you
+want them driver level - because at some point the hardware will get
+better.
+
+> > If you've got something listening to data but without the structure
+> > needed to identify multiple listeners and split out the data meaningfully
+> > to those listeners according to parts of the packet then you've got no
+> > reason to make it a protocol just use SOCK_PACKET and if need be BPF.  
+> 
+> Sorry, that doesn't parse for me. SOCK_PACKET must be a protocol on some
+> PF_ protocol family, no? Are you suggesting I use SOCK_PACKET instead of
+> SOCK_DGRAM in what is now net/lora/dgram.c? Or are you saying there's
+> some generic implementation that we can reuse and scratch mine?
+
+There is a heirarchy. Let me us IP for an example
+
+(historically it was SOCK_PACKET nowdays PF_PACKET - the layering got
+sorted better)
+
+PF_PACKET SOCK_RAW ETH_P_ALL		
+
+Everything on that device minus some things like hardware pre-ambles
+
+PF_PACKET SOCK_RAW ETH_P_SOMETHING
+
+Everything on that device that has the underlying protocol (and the
+protocol might not be in the packet but a property of the interface
+because it only does that format - simple example SLIP is IP packets over
+a serial link a SLIP interface is IP, not because there is anything
+saying it is but because that is *all* it can be)
+
+You get the two above for free. PF_PACKET is built into the stack so
+providing you label packets with the ETH_P_xxx you have for Lora, you can
+use PF_PACKET interfaces to dump them and write raw packets at the kernel
+layer.
+
+PF_INET SOCK_RAW
+
+Split the messages by protocol number in IP between multiple
+listeners/writers
+
+PF_INET SOCK_UDP / TCP etc
+
+Split the messages by port numbers in the higher level protocol
+
+
+For PF_LORA these would map to whatever goes on at the LORA protocol
+level and divide LORA messages up between multiple processes on the
+Linux system that are interested in some of the messages.
+
+
+> > The reason we have a socket layer not /dev/ethernet0 is that it's
+> > meaningful to divide messages up into flows, and to partition those flows
+> > securely amongst multiple consumers/generators.  
+> 
+> For me the distinction is that a /dev/whatever0 would seem more suited
+> for a stream of data to read/write, whereas sockets give us a bounded
+> skb for packets at device driver level.
+
+You could equally do that in a simple character device *if* you didn't
+need to split messages up and share between users. Some protocol stacks
+actually do that and then sort it out in user space, either because they
+are really obscure or they are incredibly complicated and broken so want
+to be out of kernel 8)
+
+> These PHYs all broadcast something over the antenna when sending, with
+> any addressing of listeners or senders being optional and MAC-specific,
+> apart from the LoRa/FSK SyncWord as well as the various frequency etc.
+> settings that determine what the receiver listens for.
+> 
+> None of these PHYs define any mechanism like EtherType through which to
+> identify upper-layer protocols.
+> 
+> So in a way, listening is always in a promiscuous mode, and I guess we
+> would need to try to parse each incoming packet as e.g. a LoRaWAN packet
+> and just give up if it's too short or checksums don't match. Only at the
+> layer of LoRaWAN and competing proprietary or custom protocols can we
+> split received packets out to individual listeners.
+
+My vote would be in that case that you either
+
+1. Set the protocol type on the interface assuming you don't mix and
+match (and if it's relying on random bits not looking like other packets
+then it sounds a complete mess at the moment - but yeah its new tech)
+
+2. You pass everything up to some magical agent which somehow splits them
+up and labels them ETH_P_LORA / ETH_P_FOO etc
+
+3. You do what ethernet does (which admittedly is *way* simpler for
+ethernet) and you have a library routine you can pass an skbuff in the
+driver itself which figures out wtf to label the packet. Look how
+eth_type_trans() is used. Drivers then just do
+
+           skb->protocol = xxx_type_trans(skb, dev);
+
+and the basic labelling gets done and any header pulls (you probably won't
+have any given you don't have anything wrapping LORA), and
+multicast/broadcast labelling - again meaningless I suspect.
+
+#3 Is probably the nicest because you update it all in one place as
+standards change and the market hopefully conslidates and develops some
+kind of sane packet formats. It's also effectively covering #1 and it's
+easy to start with because an initial implementation can just do 'return
+htons(ETH_P_LORA)'.
+
+> 
+> Does that give us any further clues for the design discussion here?
+> 
+I think so yes
+
+How do you plan to deal with routing if you've got multiple devices ?
+
+Alan
