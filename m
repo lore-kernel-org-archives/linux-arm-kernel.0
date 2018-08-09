@@ -1,100 +1,77 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Thu, 9 Aug 2018 09:30:51 +0800
-Subject: [PATCH 1/1] iommu/arm-smmu-v3: fix unexpected CMD_SYNC timeout
-In-Reply-To: <20180808101215.GB28557@arm.com>
-References: <1533558689-3000-1-git-send-email-thunder.leizhen@huawei.com>
- <20180808101215.GB28557@arm.com>
-Message-ID: <5B6B994B.10208@huawei.com>
+From: stu.hsieh@mediatek.com (Stu Hsieh)
+Date: Thu, 9 Aug 2018 10:15:40 +0800
+Subject: [PATCH v4 05/14] drm/mediatek: add memory mode and layer_config for
+ RDMA
+In-Reply-To: <1533780949-30141-1-git-send-email-stu.hsieh@mediatek.com>
+References: <1533780949-30141-1-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1533780949-30141-6-git-send-email-stu.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch add memory mode for RDMA and layer_config for RDMA
 
+If use RDMA to read data from memory, it should set memory mode to RDMA
 
-On 2018/8/8 18:12, Will Deacon wrote:
-> Hi Thunder,
-> 
-> On Mon, Aug 06, 2018 at 08:31:29PM +0800, Zhen Lei wrote:
->> The condition "(int)(VAL - sync_idx) >= 0" to break loop in function
->> __arm_smmu_sync_poll_msi requires that sync_idx must be increased
->> monotonously according to the sequence of the CMDs in the cmdq.
->>
->> But ".msidata = atomic_inc_return_relaxed(&smmu->sync_nr)" is not protected
->> by spinlock, so the following scenarios may appear:
->> cpu0			cpu1
->> msidata=0
->> 			msidata=1
->> 			insert cmd1
->> insert cmd0
->> 			smmu execute cmd1
->> smmu execute cmd0
->> 			poll timeout, because msidata=1 is overridden by
->> 			cmd0, that means VAL=0, sync_idx=1.
-> 
-> Oh yuck, you're right! We probably want a CC stable on this. Did you see
-> this go wrong in practice?
-Just misreported and make the caller wait for a long time until TIMEOUT. It's
-rare to happen, because any other CMD_SYNC during the waiting period will break
-it.
+Layer config set the data address and pitch to RDMA from plane setting.
 
-> 
-> One comment on your patch...
-> 
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>  drivers/iommu/arm-smmu-v3.c | 7 +++----
->>  1 file changed, 3 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 1d64710..4810f61 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -566,7 +566,7 @@ struct arm_smmu_device {
->>
->>  	int				gerr_irq;
->>  	int				combined_irq;
->> -	atomic_t			sync_nr;
->> +	u32				sync_nr;
->>
->>  	unsigned long			ias; /* IPA */
->>  	unsigned long			oas; /* PA */
->> @@ -836,7 +836,6 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
->>  			cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_SEV);
->>  		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSH, ARM_SMMU_SH_ISH);
->>  		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIATTR, ARM_SMMU_MEMATTR_OIWB);
->> -		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIDATA, ent->sync.msidata);
->>  		cmd[1] |= ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
->>  		break;
->>  	default:
->> @@ -947,7 +946,6 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
->>  	struct arm_smmu_cmdq_ent ent = {
->>  		.opcode = CMDQ_OP_CMD_SYNC,
->>  		.sync	= {
->> -			.msidata = atomic_inc_return_relaxed(&smmu->sync_nr),
->>  			.msiaddr = virt_to_phys(&smmu->sync_count),
->>  		},
->>  	};
->> @@ -955,6 +953,8 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
->>  	arm_smmu_cmdq_build_cmd(cmd, &ent);
->>
->>  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
->> +	ent.sync.msidata = ++smmu->sync_nr;
->> +	cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIDATA, ent.sync.msidata);
-> 
-> I really don't like splitting this out from building the rest of the
-> command. Can you just move the call to arm_smmu_cmdq_build_cmd into the
-> critical section, please?
-OK. I have considered that before, just worry it will increase the compition of spinlock.
+Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-In addition, I will append a optimization patch: the adjacent CMD_SYNCs, we only need one.
-
-> 
-> Thanks,
-> 
-> Will
-> 
-> .
-> 
-
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+index 585943c81e1f..08866550740f 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+@@ -31,14 +31,20 @@
+ #define RDMA_REG_UPDATE_INT				BIT(0)
+ #define DISP_REG_RDMA_GLOBAL_CON		0x0010
+ #define RDMA_ENGINE_EN					BIT(0)
++#define RDMA_MODE_MEMORY				BIT(1)
+ #define DISP_REG_RDMA_SIZE_CON_0		0x0014
+ #define DISP_REG_RDMA_SIZE_CON_1		0x0018
+ #define DISP_REG_RDMA_TARGET_LINE		0x001c
++#define DISP_RDMA_MEM_SRC_PITCH			0x002c
++#define DISP_RDMA_MEM_GMC_SETTING_0		0x0030
+ #define DISP_REG_RDMA_FIFO_CON			0x0040
+ #define RDMA_FIFO_UNDERFLOW_EN				BIT(31)
+ #define RDMA_FIFO_PSEUDO_SIZE(bytes)			(((bytes) / 16) << 16)
+ #define RDMA_OUTPUT_VALID_FIFO_THRESHOLD(bytes)		((bytes) / 16)
+ #define RDMA_FIFO_SIZE(rdma)			((rdma)->data->fifo_size)
++#define DISP_RDMA_MEM_START_ADDR		0x0f00
++
++#define RDMA_MEM_GMC				0x40402020
+ 
+ struct mtk_disp_rdma_data {
+ 	unsigned int fifo_size;
+@@ -138,12 +144,27 @@ static void mtk_rdma_config(struct mtk_ddp_comp *comp, unsigned int width,
+ 	writel(reg, comp->regs + DISP_REG_RDMA_FIFO_CON);
+ }
+ 
++static void mtk_rdma_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
++				  struct mtk_plane_state *state)
++{
++	struct mtk_plane_pending_state *pending = &state->pending;
++	unsigned int addr = pending->addr;
++	unsigned int pitch = pending->pitch & 0xffff;
++
++	writel_relaxed(addr, comp->regs + DISP_RDMA_MEM_START_ADDR);
++	writel_relaxed(pitch, comp->regs + DISP_RDMA_MEM_SRC_PITCH);
++	writel(RDMA_MEM_GMC, comp->regs + DISP_RDMA_MEM_GMC_SETTING_0);
++	rdma_update_bits(comp, DISP_REG_RDMA_GLOBAL_CON,
++			 RDMA_MODE_MEMORY, RDMA_MODE_MEMORY);
++}
++
+ static const struct mtk_ddp_comp_funcs mtk_disp_rdma_funcs = {
+ 	.config = mtk_rdma_config,
+ 	.start = mtk_rdma_start,
+ 	.stop = mtk_rdma_stop,
+ 	.enable_vblank = mtk_rdma_enable_vblank,
+ 	.disable_vblank = mtk_rdma_disable_vblank,
++	.layer_config = mtk_rdma_layer_config,
+ };
+ 
+ static int mtk_disp_rdma_bind(struct device *dev, struct device *master,
 -- 
-Thanks!
-BestRegards
+2.12.5.2.gbdf23ab
