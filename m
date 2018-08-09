@@ -1,101 +1,425 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Thu,  9 Aug 2018 18:02:41 +0530
-Subject: [PATCH v1 09/10] arm64: dts: qcom: Add reg-names for all tsens nodes
-In-Reply-To: <cover.1533815718.git.amit.kucheria@linaro.org>
-References: <cover.1533815718.git.amit.kucheria@linaro.org>
-Message-ID: <188c07144d98bfbe2bbbb7d1f2941acdcf4e6682.1533815718.git.amit.kucheria@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 9 Aug 2018 15:08:54 +0200
+Subject: [PATCH] arm64: dts: renesas: r8a77980: add CSI2/VIN support
+In-Reply-To: <758a8c87-272c-e861-4aab-01309cff2f84@cogentembedded.com>
+References: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
+ <758a8c87-272c-e861-4aab-01309cff2f84@cogentembedded.com>
+Message-ID: <20180809130854.65nvmnuuz6gffjjr@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of showing up as thermal-sensor@<addr>, the nodes will show up as
-tsens0_tm, tsen1_tm, tsens1_srot, etc. in /proc/iomem making it easier to
-read.
+On Mon, Aug 06, 2018 at 10:55:00PM +0300, Sergei Shtylyov wrote:
+> Describe the CSI2 and VIN (and their interconnections) in the R8A77980
+> device tree.
+> 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> ---
+> This patch is against the 'renesas-devel-20180802v2-v4.18-rc7' branch of
+> Simon Horman's 'renesas.git' repo.
+> 
+> The R8A77980 CSI2/VIN DT binding updates have been posted earlier today...
+> 
+>  arch/arm64/boot/dts/renesas/r8a77980.dtsi |  374 ++++++++++++++++++++++++++++++
+>  1 file changed, 374 insertions(+)
+> 
+> Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> ===================================================================
+> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> @@ -579,6 +579,302 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		vin0: video at e6ef0000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6ef0000 0 0x1000>;
+> +			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 811>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 811>;
+> +			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +
+> +					reg = <1>;
+> +
+> +					vin0csi40: endpoint at 2 {
+> +						reg = <2>;
+> +						remote-endpoint= <&csi40vin0>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		vin1: video at e6ef1000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6ef1000 0 0x1000>;
+> +			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 810>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			status = "disabled";
+> +			resets = <&cpg 810>;
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +
+> +					reg = <1>;
+> +
+> +					vin1csi40: endpoint at 2 {
+> +						reg = <2>;
+> +						remote-endpoint= <&csi40vin1>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		vin2: video at e6ef2000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6ef2000 0 0x1000>;
+> +			interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 809>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 809>;
+> +			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +
+> +					reg = <1>;
+> +
+> +					vin2csi40: endpoint at 2 {
+> +						reg = <2>;
+> +						remote-endpoint= <&csi40vin2>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		vin3: video at e6ef3000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6ef3000 0 0x1000>;
+> +			interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 808>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 808>;
+> +			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +
+> +					reg = <1>;
+> +
+> +					vin3csi40: endpoint at 2 {
+> +						reg = <2>;
+> +						remote-endpoint= <&csi40vin3>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		vin4: video at e6ef4000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6ef4000 0 0x1000>;
+> +			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 807>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 807>;
+> +			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +
+> +					reg = <1>;
+> +
+> +					vin4csi41: endpoint at 2 {
+> +						reg = <2>;
+> +						remote-endpoint= <&csi41vin4>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		vin5: video at e6ef5000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6ef5000 0 0x1000>;
+> +			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 806>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 806>;
+> +			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +
+> +					reg = <1>;
+> +
+> +					vin5csi41: endpoint at 2 {
+> +						reg = <2>;
+> +						remote-endpoint= <&csi41vin5>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		vin6: video at e6ef6000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6ef6000 0 0x1000>;
+> +			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 805>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 805>;
+> +			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +
+> +					reg = <1>;
+> +
+> +					vin6csi41: endpoint at 2 {
+> +						reg = <2>;
+> +						remote-endpoint= <&csi41vin6>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		vin7: video at e6ef7000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6ef7000 0 0x1000>;
+> +			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 804>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 804>;
+> +			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +
+> +					reg = <1>;
+> +
+> +					vin7csi41: endpoint at 2 {
+> +						reg = <2>;
+> +						remote-endpoint= <&csi41vin7>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		vin8: video at e6ef8000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6ef8000 0 0x1000>;
+> +			interrupts = <GIC_SPI 268 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 628>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 628>;
+> +			status = "disabled";
+> +		};
+> +
+> +		vin9: video at e6ef9000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6ef9000 0 0x1000>;
+> +			interrupts = <GIC_SPI 269 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 627>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 627>;
+> +			status = "disabled";
+> +		};
+> +
+> +		vin10: video at e6efa000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6efa000 0 0x1000>;
+> +			interrupts = <GIC_SPI 289 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 625>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 625>;
+> +			status = "disabled";
+> +		};
+> +
+> +		vin11: video at e6efb000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6efb000 0 0x1000>;
+> +			interrupts = <GIC_SPI 296 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 618>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 618>;
+> +			status = "disabled";
+> +		};
+> +
+> +		vin12: video at e6efc000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6efc000 0 0x1000>;
+> +			interrupts = <GIC_SPI 298 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 612>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 612>;
+> +			status = "disabled";
+> +		};
+> +
+> +		vin13: video at e6efd000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6efd000 0 0x1000>;
+> +			interrupts = <GIC_SPI 299 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 608>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 608>;
+> +			status = "disabled";
+> +		};
+> +
+> +		vin14: video at e6efe000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6efe000 0 0x1000>;
+> +			interrupts = <GIC_SPI 301 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 605>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 605>;
+> +			status = "disabled";
+> +		};
+> +
+> +		vin15: video at e6eff000 {
+> +			compatible = "renesas,vin-r8a77980";
+> +			reg = <0 0xe6eff000 0 0x1000>;
+> +			interrupts = <GIC_SPI 302 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 604>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 604>;
+> +			status = "disabled";
+> +		};
+> +
+>  		dmac1: dma-controller at e7300000 {
+>  			compatible = "renesas,dmac-r8a77980",
+>  				     "renesas,rcar-dmac";
+> @@ -769,6 +1065,84 @@
+>  			resets = <&cpg 603>;
+>  		};
+>  
+> +		csi40: csi2 at feaa0000 {
+> +			compatible = "renesas,r8a77980-csi2";
+> +			reg = <0 0xfeaa0000 0 0x10000>;
+> +			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 716>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 716>;
+> +			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +
+> +					reg = <1>;
+> +
+> +					csi40vin0: endpoint at 0 {
+> +						reg = <0>;
+> +						remote-endpoint = <&vin0csi40>;
+> +					};
+> +					csi40vin1: endpoint at 1 {
+> +						reg = <1>;
+> +						remote-endpoint = <&vin1csi40>;
+> +					};
+> +					csi40vin2: endpoint at 2 {
+> +						reg = <2>;
+> +						remote-endpoint = <&vin2csi40>;
+> +					};
+> +					csi40vin3: endpoint at 3 {
+> +						reg = <3>;
+> +						remote-endpoint = <&vin3csi40>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		csi41: csi2 at feab0000 {
+> +			compatible = "renesas,r8a77980-csi2";
+> +			reg = <0 0xfeab0000 0 0x10000>;
+> +			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
 
-IOW,
+The use of GIC_SPI 246 for both csi40 and csi41 seems suspicious.
+Is this intentional?
 
-0c222000-0c2221fe : thermal-sensor at c263000
-0c223000-0c2231fe : thermal-sensor at c265000
-0c263000-0c2631fe : thermal-sensor at c263000
-0c265000-0c2651fe : thermal-sensor at c265000
+> +			clocks = <&cpg CPG_MOD 716>;
 
-becomes
+Should this clock be 715 rather than 716?
 
-0c222000-0c2221fe : tsens0_srot
-0c223000-0c2231fe : tsens1_srot
-0c263000-0c2631fe : tsens0_tm
-0c265000-0c2651fe : tsens1_tm
-
-Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
----
- arch/arm/boot/dts/qcom-msm8974.dtsi   | 1 +
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 1 +
- arch/arm64/boot/dts/qcom/msm8996.dtsi | 2 ++
- arch/arm64/boot/dts/qcom/sdm845.dtsi  | 2 ++
- 4 files changed, 6 insertions(+)
-
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 3c4b81c29798..64c9f81ddd90 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -431,6 +431,7 @@
- 			compatible = "qcom,msm8974-tsens";
- 			reg = <0xfc4a9000 0x1000>, /* TM */
- 			      <0xfc4a8000 0x1000>; /* SROT */
-+			reg-names = "tsens_tm", "tsens_srot";
- 			nvmem-cells = <&tsens_calib>, <&tsens_backup>;
- 			nvmem-cell-names = "calib", "calib_backup";
- 			#qcom,sensors = <11>;
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index abf84df5a7bc..4e6a5e462a91 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -778,6 +778,7 @@
- 			compatible = "qcom,msm8916-tsens";
- 			reg = <0x4a9000 0x1000>, /* TM */
- 			      <0x4a8000 0x1000>; /* SROT */
-+			reg-names = "tsens_tm", "tsens_srot";
- 			nvmem-cells = <&tsens_caldata>, <&tsens_calsel>;
- 			nvmem-cell-names = "calib", "calib_sel";
- 			#qcom,sensors = <5>;
-diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index c2dca3a30091..7e5982daa2ed 100644
---- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -969,6 +969,7 @@
- 			compatible = "qcom,msm8996-tsens";
- 			reg = <0x4a9000 0x1000>, /* TM */
- 			      <0x4a8000 0x1000>; /* SROT */
-+			reg-names = "tsens0_tm", "tsens0_srot";
- 			#qcom,sensors = <13>;
- 			#thermal-sensor-cells = <1>;
- 		};
-@@ -977,6 +978,7 @@
- 			compatible = "qcom,msm8996-tsens";
- 			reg = <0x4ad000 0x1000>, /* TM */
- 			      <0x4ac000 0x1000>; /* SROT */
-+			reg-names = "tsens1_tm", "tsens1_srot";
- 			#qcom,sensors = <8>;
- 			#thermal-sensor-cells = <1>;
- 		};
-diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-index f722785df26b..efd5d7abd1cd 100644
---- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-@@ -1531,6 +1531,7 @@
- 			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
- 			reg = <0xc263000 0x1ff>, /* TM */
- 			      <0xc222000 0x1ff>; /* SROT */
-+			reg-names = "tsens0_tm", "tsens0_srot";
- 			#qcom,sensors = <13>;
- 			#thermal-sensor-cells = <1>;
- 		};
-@@ -1539,6 +1540,7 @@
- 			compatible = "qcom,sdm845-tsens", "qcom,tsens-v2";
- 			reg = <0xc265000 0x1ff>, /* TM */
- 			      <0xc223000 0x1ff>; /* SROT */
-+			reg-names = "tsens1_tm", "tsens1_srot";
- 			#qcom,sensors = <8>;
- 			#thermal-sensor-cells = <1>;
- 		};
--- 
-2.17.1
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 716>;
+> +			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +
+> +					reg = <1>;
+> +
+> +					csi41vin4: endpoint at 0 {
+> +						reg = <0>;
+> +						remote-endpoint = <&vin4csi41>;
+> +					};
+> +					csi41vin5: endpoint at 1 {
+> +						reg = <1>;
+> +						remote-endpoint = <&vin5csi41>;
+> +					};
+> +					csi41vin6: endpoint at 2 {
+> +						reg = <2>;
+> +						remote-endpoint = <&vin6csi41>;
+> +					};
+> +					csi41vin7: endpoint at 3 {
+> +						reg = <3>;
+> +						remote-endpoint = <&vin7csi41>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+>  		du: display at feb00000 {
+>  			compatible = "renesas,du-r8a77980",
+>  				     "renesas,du-r8a77970";
+> 
