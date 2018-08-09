@@ -1,44 +1,209 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 09 Aug 2018 16:41:26 -0600
-Subject: [PATCH 4/4] drm/meson: convert to the new canvas module
-In-Reply-To: <20180801185128.23440-5-maxi.jourdan@wanadoo.fr>
-References: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
- <20180801185128.23440-5-maxi.jourdan@wanadoo.fr>
-Message-ID: <5b6cc316.1c69fb81.682d3.1216@mx.google.com>
+From: angelo@sysam.it (Angelo Dureghello)
+Date: Fri, 10 Aug 2018 00:37:14 +0200
+Subject: [PATCH v8 1/3] dmaengine: fsl-edma: extract common fsl-edma code
+ (no changes in behavior intended)
+In-Reply-To: <fbf2faba97ca1d6f5887e0192139c6fa@agner.ch>
+References: <20180803193244.12084-1-angelo@sysam.it>
+ <326d1fd7010c34488af6a874011d5280@agner.ch>
+ <CAJKOXPchX3H9JVf1VyA+m9waLz74DnWRb2xLBg4yp=YbrEGu0Q@mail.gmail.com>
+ <fbf2faba97ca1d6f5887e0192139c6fa@agner.ch>
+Message-ID: <20180809223714.GA6467@jerusalem>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, this is an automated email from Rob's (experimental) review bot. I
-found a couple of common problems with your patch. Please see below.
+Hi Stefan,
 
-On Wed,  1 Aug 2018 20:51:28 +0200, Maxime Jourdan wrote:
-> This removes the meson_canvas files within the meson/drm layer
-> and makes use of the new canvas module that is referenced in the dts.
+i am about to post a v9 in short.
+
+On Tue, Aug 07, 2018 at 07:47:19PM +0200, Stefan Agner wrote:
+> On 07.08.2018 14:14, Krzysztof Kozlowski wrote:
+> > On 7 August 2018 at 10:08, Stefan Agner <stefan@agner.ch> wrote:
+> >> On 03.08.2018 21:32, Angelo Dureghello wrote:
+> >>> This patch adds a new fsl-edma-common module to allow new
+> >>> mcf-edma module code to use most of the fsl-edma code.
+> >>>
+> >>> Signed-off-by: Angelo Dureghello <angelo@sysam.it>
+> >>> ---
+> >>> Changes for v2:
+> >>> - patch splitted into 4
+> >>> - add mcf-edma as minimal different parts from fsl-edma
+> >>>
+> >>> Changes for v3:
+> >>> none
+> >>>
+> >>> Changes for v4:
+> >>> - patch simplified from 4/4 into 2/2
+> >>> - collecting all the mcf-edma-related changes
+> >>>
+> >>> Changes for v5:
+> >>> none
+> >>>
+> >>> Changes for v6:
+> >>> - adjusted comment header
+> >>> - fixed bit shift with BIT()
+> >>> - we need to free the interrupts at remove(), so removed all devm_
+> >>>   interrupt related calls
+> >>>
+> >>> Changes for v7:
+> >>> none
+> >>>
+> >>> Changes for v8:
+> >>> - patch rewritten from scratch, splitted into 3, common code isolated,
+> >>>   minimal changes from the original Freescale code have been done.
+> >>>   The patch has been tested with both Iris + Colibri Vybrid VF50 and
+> >>>   stmark2/mcf54415 Coldfire boards.
+> >>> ---
+> >>>  drivers/dma/Makefile          |   2 +-
+> >>>  drivers/dma/fsl-edma-common.c | 576 ++++++++++++++++++++++++++++
+> >>>  drivers/dma/fsl-edma-common.h | 196 ++++++++++
+> >>>  drivers/dma/fsl-edma.c        | 697 +---------------------------------
+> >>>  4 files changed, 774 insertions(+), 697 deletions(-)
+> >>>  create mode 100644 drivers/dma/fsl-edma-common.c
+> >>>  create mode 100644 drivers/dma/fsl-edma-common.h
+> >>>
+> >>> diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
+> >>> index 203a99d68315..66022f59fca4 100644
+> >>> --- a/drivers/dma/Makefile
+> >>> +++ b/drivers/dma/Makefile
+> >>> @@ -31,7 +31,7 @@ obj-$(CONFIG_DW_AXI_DMAC) += dw-axi-dmac/
+> >>>  obj-$(CONFIG_DW_DMAC_CORE) += dw/
+> >>>  obj-$(CONFIG_EP93XX_DMA) += ep93xx_dma.o
+> >>>  obj-$(CONFIG_FSL_DMA) += fsldma.o
+> >>> -obj-$(CONFIG_FSL_EDMA) += fsl-edma.o
+> >>> +obj-$(CONFIG_FSL_EDMA) += fsl-edma.o fsl-edma-common.o
+> >>>  obj-$(CONFIG_FSL_RAID) += fsl_raid.o
+> >>>  obj-$(CONFIG_HSU_DMA) += hsu/
+> >>>  obj-$(CONFIG_IMG_MDC_DMA) += img-mdc-dma.o
+> >>> diff --git a/drivers/dma/fsl-edma-common.c b/drivers/dma/fsl-edma-common.c
+> >>> new file mode 100644
+> >>> index 000000000000..0ae7094f477a
+> >>> --- /dev/null
+> >>> +++ b/drivers/dma/fsl-edma-common.c
+> >>> @@ -0,0 +1,576 @@
+> >>> +// SPDX-License-Identifier: GPL-2.0
+> >>> +//
+> >>> +// Copyright (c) 2013-2014 Freescale Semiconductor, Inc
+> >>> +// Copyright (c) 2017 Sysam, Angelo Dureghello  <angelo@sysam.it>
+> >>> +
+> >>> +#include <linux/dmapool.h>
+> >>> +#include <linux/module.h>
+> >>> +#include <linux/slab.h>
+> >>> +
+> >>> +#include "fsl-edma-common.h"
+> >>> +
+> >>> +/*
+> >>> + * R/W functions for big- or little-endian registers:
+> >>> + * The eDMA controller's endian is independent of the CPU core's endian.
+> >>> + * For the big-endian IP module, the offset for 8-bit or 16-bit registers
+> >>> + * should also be swapped opposite to that in little-endian IP.
+> >>> + */
+> >>> +u32 edma_readl(struct fsl_edma_engine *edma, void __iomem *addr)
+> >>> +{
+> >>> +     if (edma->big_endian)
+> >>> +             return ioread32be(addr);
+> >>> +     else
+> >>> +             return ioread32(addr);
+> >>> +}
+> >>> +EXPORT_SYMBOL_GPL(edma_readl);
+> >>
+> >> In 3/3 you link the common object into the two modules individually:
+> >>
+> >> obj-$(CONFIG_FSL_EDMA) += fsl-edma.o fsl-edma-common.o
+> >> obj-$(CONFIG_MCF_EDMA) += mcf-edma.o fsl-edma-common.o
+> >>
+> >> Therefor you do not access those functions from another module (they are
+> >> within the module). No exporting should be necessary. Drop all those
+> >> exports.
+> > 
+> > The fsl-edma-common will be its own module so the exports are
+> > necessary for proper linking/modpost.
 > 
-> Canvases can be used by different IPs and modules, and it is as such
-> preferable to rely on a module that can safely dispatch canvases on
-> demand.
+> Hm, oh I see, I got that wrong.
 > 
-> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
-
-The preferred subject prefix is "dt-bindings: <binding dir>: ...".
-
-> ---
->  .../bindings/display/amlogic,meson-vpu.txt    |  9 +--
->  arch/arm64/boot/dts/amlogic/meson-gx.dtsi     |  7 +-
->  drivers/gpu/drm/meson/Kconfig                 |  1 +
->  drivers/gpu/drm/meson/Makefile                |  2 +-
->  drivers/gpu/drm/meson/meson_canvas.c          | 70 -------------------
->  drivers/gpu/drm/meson/meson_canvas.h          | 42 -----------
->  drivers/gpu/drm/meson/meson_crtc.c            |  5 +-
->  drivers/gpu/drm/meson/meson_drv.c             | 35 ++++++----
->  drivers/gpu/drm/meson/meson_drv.h             |  5 +-
->  drivers/gpu/drm/meson/meson_plane.c           |  3 +-
->  drivers/gpu/drm/meson/meson_viu.c             |  1 -
->  11 files changed, 39 insertions(+), 141 deletions(-)
->  delete mode 100644 drivers/gpu/drm/meson/meson_canvas.c
->  delete mode 100644 drivers/gpu/drm/meson/meson_canvas.h
+> We could use
+> fsl-edma-all-y = fsl-edma.o fsl-edma-common.o
+> obj-$(CONFIG_FSL_EDMA) += fsl-edma-all.o
+> mcf-edma-all-y = mcf-edma.o fsl-edma-common.o
+> obj-$(CONFIG_MCF_EDMA) += mcf-edma-all.o
 > 
+> to create two modules but that duplicates some code. It probably
+> wouldn't matter in practise since the two IPs are used on different
+> architecture...
+> 
+> However, if we stay with the three modules approach, we should introduce
+> a hidden config symbol, e.g.
+> 
+> config FSL_EDMA_COMMON
+> 	tristate
+> 
+> In FSL_EDMA/MCF_EDMA use
+> 	select FSL_EDMA_COMMON
+> 
+> And in the Makefile
+> obj-$(CONFIG_FSL_EDMA_COMMON) += fsl-edma-common.o
+> obj-$(CONFIG_FSL_EDMA) += fsl-edma.o
+> obj-$(CONFIG_MCF_EDMA) += mcf-edma.o
+> 
+> 
+There was already a discussion with Vinod and Geert on this, and i 
+finally previously changed things in this way 
 
-DT bindings (including binding headers) should be a separate patch. See
-Documentation/devicetree/bindings/submitting-patches.txt.
+obj-$(CONFIG_FSL_EDMA) += fsl-edma.o fsl-edma-common.o
+
+The idea was to simplify things avoiding to use an additional
+config symbol, as i did initially. It's a common pattern in 
+several Makefiles (e.g.drivers/net/ethernet/8390/Makefile and 
+drivers/scsi/Makefile).
+Also we have a single common code part since obj-y is a list, 
+and IIRC it's filtered for duplicates.
+So if can be ok for you too, i would not roll back again.
+
+> However, I do not like that the compiler can no longer inline simple
+> acesors like edma_(readl|writel). So if we stay with the three modules
+> approach then move at least the accesors and
+> to_fsl_edma_chan/to_fsl_edma_desc as inline functions to the header
+> file.
+> 
+I agree too, my initial patch was a single separate driver. But it
+resulted in too much duplicated code, so a common module has been
+required. Btw, seems i cannot inline those functions. fsl-edma-common.h 
+is included from both fsl-edma-common.c and mcf/fsl-edma.c resulting
+in multiple definitions linking error.
+
+Mainly until v7 there was several discussions and a first approval, 
+if possible i would not change again heavily the patch structure for
+a bug that seemss already been fixed.
+
+So i fixed all the possible points of this thread and organized next 
+patch as 
+
+1/4 dmaengine: fsl-edma: extract common fsl-edma code (no changes ..
+2/4 dmaengine: fsl-edma: add edma version and configurable registers
+3/4 dmaengine: fsl-edma: fix macros
+4/4 dmaengine: fsl-edma: add ColdFire mcf5441x edma support
+
+Let me know if you have any other point or if can proceed.
+
+Best regards,
+Angelo Dureghello
+
+> --
+> Stefan
+> 
+> > 
+> > Best regards,
+> > Krzysztof
+> > 
+> >> If possible I would prefer if you start with cleanup/conversions, then
+> >> split-up and finally add functionality.
+> >>
+> >> So ideally:
+> >> 1. Use macros for preprocessor defines (where you move to BIT/GENMASK)
+> >> 2. Split
+> >> 3. Add EDMA macros etc.
+> >> 4. Add ColdFire mcf5441x edma support
+> >>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-m68k" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
