@@ -1,77 +1,31 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Thu, 9 Aug 2018 13:30:35 +0200
-Subject: [PATCH v3 2/2] tty/serial: atmel: add ISO7816 support
-In-Reply-To: <d66c4318-1d31-5c4e-3952-6b69a010b028@sorico.fr>
-References: <20180807130049.5957-1-ludovic.desroches@microchip.com>
- <20180807130049.5957-3-ludovic.desroches@microchip.com>
- <d66c4318-1d31-5c4e-3952-6b69a010b028@sorico.fr>
-Message-ID: <20180809113035.kftvdalca7zsf4ly@M43218.corp.atmel.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Thu, 9 Aug 2018 13:33:25 +0200
+Subject: [PATCH 28/28] eeprom: at24: kill at24_platform_data
+In-Reply-To: <CAHp75Veiop-0xAbs7MtdhOrX_vzDz7v=xAUSDnEhTYVfMovFQA@mail.gmail.com>
+References: <20180808153150.23444-1-brgl@bgdev.pl>
+ <20180808153150.23444-29-brgl@bgdev.pl>
+ <CAHp75Veiop-0xAbs7MtdhOrX_vzDz7v=xAUSDnEhTYVfMovFQA@mail.gmail.com>
+Message-ID: <CAMRc=MdTgr-CTia55cRS-Ob8eOVBQom-nXB670nxjf89U_ZEvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
-
-On Thu, Aug 09, 2018 at 10:47:17AM +0200, Richard Genoud wrote:
-> Hi !
-> 
-> On 07/08/2018 15:00, Ludovic Desroches wrote:
-> > From: Nicolas Ferre <nicolas.ferre@microchip.com>
-> > 
-> > When mode is set in atmel_config_iso7816() we backup last RS232 mode
-> > for coming back to this mode if requested.
-> > Also allow setup of T=0 and T=1 parameter and basic support in set_termios
-> > function as well.
-> > 
-> > Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> > [ludovic.desroches at microchip.com: rebase, add check on fidi ratio, checkpatch fixes]
-> > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> > ---
-> >  drivers/tty/serial/atmel_serial.c | 211 +++++++++++++++++++++++++++++++++++---
-> >  drivers/tty/serial/atmel_serial.h |   6 +-
-> >  2 files changed, 201 insertions(+), 16 deletions(-)
-> > 
-> > diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> > index 8e4428725848..4a7ec44b0ace 100644
-> > --- a/drivers/tty/serial/atmel_serial.c
-> > +++ b/drivers/tty/serial/atmel_serial.c
-
-[...]
-
-> >  #if defined(CONFIG_OF)
-> > +static struct atmel_uart_pdata at91rm9200_pdata = {
-> > +	.fidi_min = 1,
-> > +	.fidi_max = 2047,
-> > +};
-> > +
-> > +static struct atmel_uart_pdata at91sam9260_pdata = {
-> > +	.fidi_min = 1,
-> > +	.fidi_max = 2047,
-> > +};
-> > +
-> > +static struct atmel_uart_pdata sama5d3_pdata = {
-> > +	.fidi_min = 3,
-> > +	.fidi_max = 65535,
-> Are you sure this is for sama5d3 ?
-> From the datasheets I have, 65535 is for sama5d4/sama5d2
-
-I checked it and I missed it. What a pity... In fact, it's a bit more
-tricky since the min value for d3 is 3 and no longer 1.
-
-> And also, you'll have to s/atmel,at91sam9260-usart/atmel,sama5d2-usart/g
-> in sama5d{2,4}.dtsi
+2018-08-08 20:03 GMT+02:00 Andy Shevchenko <andy.shevchenko@gmail.com>:
+> On Wed, Aug 8, 2018 at 6:31 PM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> There are no more users of at24_platform_data. Remove the relevant
+>> header and modify the driver code to not use it anymore.
+>>
+>
+>
+> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+>
+> If you want me to test this on Intel Galileo Gen 2 board, give me a
+> public tree from where I can pull.
+> Thanks.
 >
 
-Yes, I planed to send it later but I can add those patches within this
-set of patches. 
+Yes, you can pull from git at github.com:brgl/linux.git
+davinci-remove-at24-platform-data
 
-> But I wonder if it could be detected via ATMEL_US_VERSION instead ?
-> 
-
-I have not checked, I tend to prefer the compatible string for this kind
-of thing. But as we already use the version number, I can investigate
-this solution if it's the one you prefer.
-
-
-Regards
-
-Ludovic
+Bart
