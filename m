@@ -1,142 +1,170 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 9 Aug 2018 14:56:56 +0530
-Subject: [PATCH v3 3/8] mailbox: Add transmit done by blocking option
-In-Reply-To: <b3045f85-eacb-a5ec-1690-b9c63d0f3373@kapsi.fi>
-References: <20180702114033.15654-1-mperttunen@nvidia.com>
- <20180702114033.15654-4-mperttunen@nvidia.com>
- <CABb+yY0_dKC_cYFwwb-aeRgrx=sjv=8VLP=C6DJEecFf=v+mkQ@mail.gmail.com>
- <907bac36-0c54-8f38-0f5e-f59196d414c6@kapsi.fi>
- <afc8a305-79ea-2194-0af0-919bbb8f675e@kapsi.fi>
- <CABb+yY2mpNV186=M2anmZANgMOra4JM7ybyUT4yCxhqAG6-AZg@mail.gmail.com>
- <b5a91f9e-c3ff-371c-d355-4a5e8a147796@kapsi.fi>
- <CABb+yY3Ng+rbKRYXTncfHKv6HXBW5hHjMKDpepz31MxpE9bwRQ@mail.gmail.com>
- <a57fccaa-fcfe-6611-45a5-8c224f4ee2b6@kapsi.fi>
- <b3045f85-eacb-a5ec-1690-b9c63d0f3373@kapsi.fi>
-Message-ID: <CABb+yY3fVGX_aegHhJCNN2ftyz1NA9ejHqZrB=qbDRm+bLaY9A@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 9 Aug 2018 10:46:00 +0100
+Subject: [PATCH 2/2] arm64: dts: sdm845: Add gpu and gmu device nodes
+In-Reply-To: <20180808224701.7527-3-jcrouse@codeaurora.org>
+References: <20180808224701.7527-1-jcrouse@codeaurora.org>
+ <20180808224701.7527-3-jcrouse@codeaurora.org>
+Message-ID: <ae18847e-a4dc-4a75-d033-682ee88456d9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[dropping everyone else while we discuss the code]
+On 08/08/18 23:47, Jordan Crouse wrote:
+> Add the nodes to describe the Adreno GPU and GMU devices.
+> 
+> Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+> ---
+>   arch/arm64/boot/dts/qcom/sdm845.dtsi | 121 +++++++++++++++++++++++++++
+>   1 file changed, 121 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> index cdaabeb3c995..9fb90bb4ea1f 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -323,5 +323,126 @@
+>   				status = "disabled";
+>   			};
+>   		};
+> +
+> +		adreno_smmu: arm,smmu-adreno at 5040000 {
+> +			compatible = "qcom,msm8996-smmu-v2";
 
-Thanks. I assume that branch as all the code that there is. Let me
-look and get back to you.
+Per the binding, this should be:
 
-On Thu, Aug 9, 2018 at 2:19 PM, Mikko Perttunen <cyndis@kapsi.fi> wrote:
-> Here's my current code:
->
-> https://github.com/cyndis/linux/commits/wip/t194-tcu-4
->
-> "fixup! mailbox: tegra-hsp: Add support for shared mailboxes" splits up the
-> controller into two. "tegra-hsp: use polling" changes it to use polling.
->
-> There are two lines in the top patch with comments:
->
-> - at the end of tegra_hsp_mailbox_send_data, I left a "while
-> (!tegra_hsp_mailbox_last_tx_done(chan));". Without it I wasn't able to see
-> even a few garbled characters in the output.
->
-> - as mentioned, if I enable tx_block on the client side, I get a BUG:
-> scheduling while atomic. I assume this gets printed through the earlycon as
-> it's printing out correctly.
->
-> Thanks,
-> Mikko
->
->
-> On 08.08.2018 17:46, Mikko Perttunen wrote:
->>
->> On 08/08/2018 05:39 PM, Jassi Brar wrote:
->>>
->>> On Wed, Aug 8, 2018 at 8:04 PM, Mikko Perttunen <cyndis@kapsi.fi> wrote:
->>>>
->>>>
->>>>
->>>> On 08/08/2018 05:10 PM, Jassi Brar wrote:
->>>>>
->>>>>
->>>>> On Wed, Aug 8, 2018 at 5:08 PM, Mikko Perttunen <cyndis@kapsi.fi>
->>>>> wrote:
->>>>>>
->>>>>>
->>>>>>
->>>>>>
->>>>>> On 04.08.2018 13:45, Mikko Perttunen wrote:
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> On 08/03/2018 03:54 PM, Jassi Brar wrote:
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>> On Mon, Jul 2, 2018 at 5:10 PM, Mikko Perttunen
->>>>>>>> <mperttunen@nvidia.com>
->>>>>>>> wrote:
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> Add a new TXDONE option, TXDONE_BY_BLOCK. With this option, the
->>>>>>>>> send_data function of the mailbox driver is expected to block until
->>>>>>>>> the message has been sent. The new option is used with the Tegra
->>>>>>>>> Combined UART driver to minimize unnecessary overhead when
->>>>>>>>> transmitting
->>>>>>>>> data.
->>>>>>>>>
->>>>>>>> 1) TXDONE_BY_BLOCK flag :-
->>>>>>>>            Have you tried setting the flag
->>>>>>>> mbox_chan->mbox_client->tx_block
->>>>>>>> ?
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> No - I suppose I should have done that. I'm a bit concerned about
->>>>>>> overhead
->>>>>>> as send_data may be called thousands of times per second, so I tried
->>>>>>> to
->>>>>>> make
->>>>>>> it as close as possible to the downstream driver that just pokes the
->>>>>>> mailbox
->>>>>>> register directly.
->>>>>>
->>>>>>
->>>>>>
->>>>>>
->>>>>> I tried using polling in the mailbox framework. Some printing is done
->>>>>> from
->>>>>> atomic context so it seems tx_block cannot be used -
->>>>>> wait_for_completion_timeout understandably does not work in atomic
->>>>>> context.
->>>>>> I also tried without tx_block, in which case I got some horribly
->>>>>> garbled
->>>>>> output, but "Try increasing MBOX_TX_QUEUE_LEN" was readable there.
->>>>>>
->>>>>> Any opinions?
->>>>>>
->>>>> The problems arise because your hardware (SM) supports TXDONE_BY_POLL,
->>>>> but your client drives it by TXDONE_BY_ACK because the older DB
->>>>> channels are so.
->>>>>
->>>>> Please populate SM channels as a separate controller than DB.
->>>>> The DB controller, as is, run by ACK method.
->>>>> The SM controller should be run by polling, i.e, set txdone_poll =
->>>>> true and the poll period small enough. The virtual tty client driver
->>>>> should be able to safely set tx_block from appropriate context.
->>>>>
->>>>
->>>> Sorry, I should have clarified that I already split up the controllers.
->>>> The
->>>> SM controller has txdone_poll = true. I didn't adjust txpoll_period so I
->>>> guess it's zero.
->>>>
->>> Can you please share your code (controller and client) ? Maybe offline
->>> if you wish.
->>>
->>
->> I'll upload a git branch tomorrow -- I'm not at the machine with the code
->> now.
->>
->> Mikko
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+	compatible = "qcom,msm8996-smmu-v2", "qcom,smmu-v2";
+
+(note that even with Vivek's series the driver won't actually match the 
+SoC-specific string until we find a real need to)
+
+> +			reg = <0x5040000 0x10000>;
+> +			#iommu-cells = <1>;
+> +		#global-interrupts = <2>;
+
+Indentation?
+
+> +			interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
+
+And here?
+
+Otherwise, assuming the table walk really isn't cache-coherent, and the 
+global and CB interrupts really do have different triggers (yuck :P), 
+the SMMU parts look fine to me.
+
+Robin.
+
+> +			     <GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
+> +			     <GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
+> +			     <GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
+> +			     <GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
+> +			     <GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
+> +			     <GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
+> +			     <GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
+> +			     <GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
+> +			clocks = <&clock_gcc GCC_GPU_MEMNOC_GFX_CLK>,
+> +				<&clock_gcc GCC_GPU_CFG_AHB_CLK>;
+> +			clock-names = "bus", "iface";
+> +
+> +			power-domains = <&clock_gpucc GPU_CX_GDSC>;
+> +		};
+> +
+> +		gpu_opp_table: adreno-opp-table {
+> +			compatible = "operating-points-v2";
+> +
+> +			opp-710000000 {
+> +				opp-hz = /bits/ 64 <710000000>;
+> +				qcom,level = <416>;
+> +			};
+> +
+> +			opp-675000000 {
+> +				opp-hz = /bits/ 64 <675000000>;
+> +				qcom,level = <384>;
+> +			};
+> +
+> +			opp-596000000 {
+> +				opp-hz = /bits/ 64 <596000000>;
+> +				qcom,level = <320>;
+> +			};
+> +
+> +			opp-520000000 {
+> +				opp-hz = /bits/ 64 <520000000>;
+> +				qcom,level = <256>;
+> +			};
+> +
+> +			opp-414000000 {
+> +				opp-hz = /bits/ 64 <414000000>;
+> +				qcom,level = <192>;
+> +			};
+> +
+> +			opp-342000000 {
+> +				opp-hz = /bits/ 64 <342000000>;
+> +				qcom,level = <128>;
+> +			};
+> +
+> +			opp-257000000 {
+> +				opp-hz = /bits/ 64 <257000000>;
+> +				qcom,level = <64>;
+> +			};
+> +		};
+> +
+> +		gpu at 5000000 {
+> +			compatible = "qcom,adreno-630.2", "qcom,adreno";
+> +			#stream-id-cells = <16>;
+> +
+> +			reg = <0x5000000 0x40000>;
+> +			reg-names = "kgsl_3d0_reg_memory";
+> +
+> +			/*
+> +			 * Look ma, no clocks! The GPU clocks and power are
+> +			 * controlled entirely by the GMU
+> +			 */
+> +
+> +			interrupts = <0 300 0>;
+> +			interrupt-names = "kgsl_3d0_irq";
+> +
+> +			iommus = <&adreno_smmu 0>;
+> +
+> +			operating-points-v2 = <&gpu_opp_table>;
+> +
+> +			qcom,gmu = <&gmu>;
+> +		};
+> +
+> +		gmu_opp_table: adreno-gmu-opp-table {
+> +			compatible = "operating-points-v2";
+> +
+> +			opp-400000000 {
+> +				opp-hz = /bits/ 64 <400000000>;
+> +				qcom,level = <128>;
+> +			};
+> +
+> +			opp-200000000 {
+> +				opp-hz = /bits/ 64 <200000000>;
+> +				qcom,level = <48>;
+> +			};
+> +		};
+> +
+> +		gmu: gmu at 506a000 {
+> +			compatible="qcom,adreno-gmu";
+> +
+> +			reg = <0x506a000 0x30000>,
+> +				<0xb280000 0x10000>,
+> +				<0xb480000 0x10000>;
+> +			reg-names = "gmu", "gmu_pdc", "gmu_pdc_seq";
+> +
+> +			interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-names = "hfi", "gmu";
+> +
+> +			clocks = <&clock_gpucc GPU_CC_CX_GMU_CLK>,
+> +				<&clock_gpucc GPU_CC_CXO_CLK>,
+> +				<&gcc GCC_DDRSS_GPU_AXI_CLK>,
+> +				<&gcc GCC_GPU_MEMNOC_GFX_CLK>;
+> +			clock-names = "gmu", "cxo", "axi", "memnoc";
+> +
+> +			power-domains = <&clock_gpucc GPU_CX_GDSC>;
+> +			iommus = <&adreno_smmu 5>;
+> +
+> +			operating-points-v2 = <&gmu_opp_table>;
+> +		};
+>   	};
+>   };
+> 
