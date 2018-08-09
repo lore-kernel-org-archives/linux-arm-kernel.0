@@ -1,142 +1,48 @@
 From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Thu,  9 Aug 2018 09:48:51 +0530
-Subject: [PATCH v8 1/6] Uprobes: Simplify uprobe_register() body
+Date: Thu,  9 Aug 2018 09:48:54 +0530
+Subject: [PATCH v8 4/6] Uprobes/sdt: Prevent multiple reference counter for
+ same uprobe
 In-Reply-To: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
 References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
-Message-ID: <20180809041856.1547-2-ravi.bangoria@linux.ibm.com>
+Message-ID: <20180809041856.1547-5-ravi.bangoria@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify uprobe_register() function body and let __uprobe_register()
-handle everything. Also move dependency functions around to fix build
-failures.
+We assume to have only one reference counter for one uprobe.
+Don't allow user to register multiple uprobes having same
+inode+offset but different reference counter.
 
 Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
 ---
- kernel/events/uprobes.c | 69 ++++++++++++++++++++++++++-----------------------
- 1 file changed, 36 insertions(+), 33 deletions(-)
+ kernel/events/uprobes.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-index ccc579a7d32e..471eac896635 100644
+index 61b0481ef417..492a0e005b4d 100644
 --- a/kernel/events/uprobes.c
 +++ b/kernel/events/uprobes.c
-@@ -840,13 +840,8 @@ register_for_each_vma(struct uprobe *uprobe, struct uprobe_consumer *new)
- 	return err;
- }
- 
--static int __uprobe_register(struct uprobe *uprobe, struct uprobe_consumer *uc)
--{
--	consumer_add(uprobe, uc);
--	return register_for_each_vma(uprobe, uc);
--}
--
--static void __uprobe_unregister(struct uprobe *uprobe, struct uprobe_consumer *uc)
-+static void
-+__uprobe_unregister(struct uprobe *uprobe, struct uprobe_consumer *uc)
- {
- 	int err;
- 
-@@ -860,24 +855,46 @@ static void __uprobe_unregister(struct uprobe *uprobe, struct uprobe_consumer *u
- }
- 
- /*
-- * uprobe_register - register a probe
-+ * uprobe_unregister - unregister a already registered probe.
-+ * @inode: the file in which the probe has to be removed.
-+ * @offset: offset from the start of the file.
-+ * @uc: identify which probe if multiple probes are colocated.
-+ */
-+void uprobe_unregister(struct inode *inode, loff_t offset, struct uprobe_consumer *uc)
-+{
-+	struct uprobe *uprobe;
-+
-+	uprobe = find_uprobe(inode, offset);
-+	if (WARN_ON(!uprobe))
-+		return;
-+
-+	down_write(&uprobe->register_rwsem);
-+	__uprobe_unregister(uprobe, uc);
-+	up_write(&uprobe->register_rwsem);
-+	put_uprobe(uprobe);
-+}
-+EXPORT_SYMBOL_GPL(uprobe_unregister);
-+
-+/*
-+ * __uprobe_register - register a probe
-  * @inode: the file in which the probe has to be placed.
-  * @offset: offset from the start of the file.
-  * @uc: information on howto handle the probe..
-  *
-- * Apart from the access refcount, uprobe_register() takes a creation
-+ * Apart from the access refcount, __uprobe_register() takes a creation
-  * refcount (thro alloc_uprobe) if and only if this @uprobe is getting
-  * inserted into the rbtree (i.e first consumer for a @inode:@offset
-  * tuple).  Creation refcount stops uprobe_unregister from freeing the
-  * @uprobe even before the register operation is complete. Creation
-  * refcount is released when the last @uc for the @uprobe
-- * unregisters. Caller of uprobe_register() is required to keep @inode
-+ * unregisters. Caller of __uprobe_register() is required to keep @inode
-  * (and the containing mount) referenced.
-  *
-  * Return errno if it cannot successully install probes
-  * else return 0 (success)
-  */
--int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *uc)
-+static int __uprobe_register(struct inode *inode, loff_t offset,
-+			     struct uprobe_consumer *uc)
- {
- 	struct uprobe *uprobe;
- 	int ret;
-@@ -904,7 +921,8 @@ int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *
- 	down_write(&uprobe->register_rwsem);
- 	ret = -EAGAIN;
- 	if (likely(uprobe_is_active(uprobe))) {
--		ret = __uprobe_register(uprobe, uc);
-+		consumer_add(uprobe, uc);
-+		ret = register_for_each_vma(uprobe, uc);
- 		if (ret)
- 			__uprobe_unregister(uprobe, uc);
+@@ -689,6 +689,12 @@ static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset,
+ 	cur_uprobe = insert_uprobe(uprobe);
+ 	/* a uprobe exists for this inode:offset combination */
+ 	if (cur_uprobe) {
++		if (cur_uprobe->ref_ctr_offset != uprobe->ref_ctr_offset) {
++			pr_warn("Reference counter offset mismatch.\n");
++			put_uprobe(cur_uprobe);
++			kfree(uprobe);
++			return ERR_PTR(-EINVAL);
++		}
+ 		kfree(uprobe);
+ 		uprobe = cur_uprobe;
  	}
-@@ -915,6 +933,12 @@ int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *
- 		goto retry;
- 	return ret;
- }
+@@ -1103,6 +1109,9 @@ static int __uprobe_register(struct inode *inode, loff_t offset,
+ 	uprobe = alloc_uprobe(inode, offset, ref_ctr_offset);
+ 	if (!uprobe)
+ 		return -ENOMEM;
++	if (IS_ERR(uprobe))
++		return PTR_ERR(uprobe);
 +
-+int uprobe_register(struct inode *inode, loff_t offset,
-+		    struct uprobe_consumer *uc)
-+{
-+	return __uprobe_register(inode, offset, uc);
-+}
- EXPORT_SYMBOL_GPL(uprobe_register);
- 
- /*
-@@ -946,27 +970,6 @@ int uprobe_apply(struct inode *inode, loff_t offset,
- 	return ret;
- }
- 
--/*
-- * uprobe_unregister - unregister a already registered probe.
-- * @inode: the file in which the probe has to be removed.
-- * @offset: offset from the start of the file.
-- * @uc: identify which probe if multiple probes are colocated.
-- */
--void uprobe_unregister(struct inode *inode, loff_t offset, struct uprobe_consumer *uc)
--{
--	struct uprobe *uprobe;
--
--	uprobe = find_uprobe(inode, offset);
--	if (WARN_ON(!uprobe))
--		return;
--
--	down_write(&uprobe->register_rwsem);
--	__uprobe_unregister(uprobe, uc);
--	up_write(&uprobe->register_rwsem);
--	put_uprobe(uprobe);
--}
--EXPORT_SYMBOL_GPL(uprobe_unregister);
--
- static int unapply_uprobe(struct uprobe *uprobe, struct mm_struct *mm)
- {
- 	struct vm_area_struct *vma;
+ 	/*
+ 	 * We can race with uprobe_unregister()->delete_uprobe().
+ 	 * Check uprobe_is_active() and retry if it is false.
 -- 
 2.14.4
