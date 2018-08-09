@@ -1,83 +1,121 @@
 From: ck.hu@mediatek.com (CK Hu)
-Date: Thu, 9 Aug 2018 10:41:26 +0800
-Subject: [PATCH v4 08/14] drm/mediatek: add YUYV/UYVY color format
- support for RDMA
-In-Reply-To: <1533780949-30141-9-git-send-email-stu.hsieh@mediatek.com>
+Date: Thu, 9 Aug 2018 10:46:30 +0800
+Subject: [PATCH v4 12/14] drm/mediatek: use layer_nr function to get
+ layer number to init plane
+In-Reply-To: <1533780949-30141-13-git-send-email-stu.hsieh@mediatek.com>
 References: <1533780949-30141-1-git-send-email-stu.hsieh@mediatek.com>
- <1533780949-30141-9-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1533782486.29986.2.camel@mtksdaap41>
+ <1533780949-30141-13-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1533782790.29986.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi, Stu:
 
 On Thu, 2018-08-09 at 10:15 +0800, Stu Hsieh wrote:
-> This patch add YUYV/UYVY color format support for RDMA
-> and transform matrix for YUYV/UYVY.
+> This patch use layer_nr function to get layer number to init plane
+> 
+> When plane init in crtc create,
+> it use the number of OVL layer to init plane.
+> That's OVL can read 4 memory address.
+> 
+> For mt2712 third ddp, it use RDMA to read memory.
+> RDMA can read 1 memory address, so it just init one plane.
+> 
+> For compatibility, this patch use mtk_ddp_comp_layer_nr function
+> to get layer number from their HW component in ddp for plane init.
 > 
 > Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
 
 Reviewed-by: CK Hu <ck.hu@mediatek.com>
 
 > ---
->  drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c | 21 ++++++++++++++-------
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.h |  1 -
+>  2 files changed, 14 insertions(+), 8 deletions(-)
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> index 1f57f86c7910..8b015c2d4418 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> @@ -33,6 +33,8 @@
->  #define RDMA_ENGINE_EN					BIT(0)
->  #define RDMA_MODE_MEMORY				BIT(1)
->  #define DISP_REG_RDMA_SIZE_CON_0		0x0014
-> +#define RDMA_MATRIX_ENABLE				BIT(17)
-> +#define RDMA_MATRIX_INT_MTX_BT601_to_RGB		(6 << 20)
->  #define DISP_REG_RDMA_SIZE_CON_1		0x0018
->  #define DISP_REG_RDMA_TARGET_LINE		0x001c
->  #define DISP_RDMA_MEM_CON			0x0024
-> @@ -46,12 +48,15 @@
->  #define RDMA_FIFO_SIZE(rdma)			((rdma)->data->fifo_size)
->  #define DISP_RDMA_MEM_START_ADDR		0x0f00
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> index 2d6aa150a9ff..845d1608465e 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
+> @@ -45,7 +45,8 @@ struct mtk_drm_crtc {
+>  	bool				pending_needs_vblank;
+>  	struct drm_pending_vblank_event	*event;
 >  
-> +#define RDMA_MATRIX_INT_MTX_SEL			GENMASK(23, 20)
->  #define RDMA_MEM_GMC				0x40402020
+> -	struct drm_plane		planes[OVL_LAYER_NR];
+> +	struct drm_plane		*planes;
+> +	unsigned int			layer_nr;
+>  	bool				pending_planes;
 >  
->  #define MEM_MODE_INPUT_FORMAT_RGB565		0x0
->  #define MEM_MODE_INPUT_FORMAT_RGB888		(0x001 << 4)
->  #define MEM_MODE_INPUT_FORMAT_RGBA8888		(0x002 << 4)
->  #define MEM_MODE_INPUT_FORMAT_ARGB8888		(0x003 << 4)
-> +#define MEM_MODE_INPUT_FORMAT_UYVY		(0x004 << 4)
-> +#define MEM_MODE_INPUT_FORMAT_YUYV		(0x005 << 4)
->  
->  struct mtk_disp_rdma_data {
->  	unsigned int fifo_size;
-> @@ -181,6 +186,10 @@ static unsigned int rdma_fmt_convert(struct mtk_disp_rdma *rdma,
->  	case DRM_FORMAT_XBGR8888:
->  	case DRM_FORMAT_ABGR8888:
->  		return MEM_MODE_INPUT_FORMAT_RGBA8888 | MEM_MODE_INPUT_SWAP;
-> +	case DRM_FORMAT_UYVY:
-> +		return MEM_MODE_INPUT_FORMAT_UYVY;
-> +	case DRM_FORMAT_YUYV:
-> +		return MEM_MODE_INPUT_FORMAT_YUYV;
+>  	void __iomem			*config_regs;
+> @@ -286,7 +287,7 @@ static int mtk_crtc_ddp_hw_init(struct mtk_drm_crtc *mtk_crtc)
 >  	}
->  }
 >  
-> @@ -197,6 +206,17 @@ static void mtk_rdma_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
->  	con = rdma_fmt_convert(rdma, fmt);
->  	writel_relaxed(con, comp->regs + DISP_RDMA_MEM_CON);
+>  	/* Initially configure all planes */
+> -	for (i = 0; i < OVL_LAYER_NR; i++) {
+> +	for (i = 0; i < mtk_crtc->layer_nr; i++) {
+>  		struct drm_plane *plane = &mtk_crtc->planes[i];
+>  		struct mtk_plane_state *plane_state;
 >  
-> +	if (fmt == DRM_FORMAT_UYVY || fmt == DRM_FORMAT_YUYV) {
-> +		rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0,
-> +				 RDMA_MATRIX_ENABLE, RDMA_MATRIX_ENABLE);
-> +		rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0,
-> +				 RDMA_MATRIX_INT_MTX_SEL,
-> +				 RDMA_MATRIX_INT_MTX_BT601_to_RGB);
-> +	} else {
-> +		rdma_update_bits(comp, DISP_REG_RDMA_SIZE_CON_0,
-> +				 RDMA_MATRIX_ENABLE, 0);
-> +	}
+> @@ -351,7 +352,7 @@ static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
+>  	}
+>  
+>  	if (mtk_crtc->pending_planes) {
+> -		for (i = 0; i < OVL_LAYER_NR; i++) {
+> +		for (i = 0; i < mtk_crtc->layer_nr; i++) {
+>  			struct drm_plane *plane = &mtk_crtc->planes[i];
+>  			struct mtk_plane_state *plane_state;
+>  
+> @@ -403,7 +404,7 @@ static void mtk_drm_crtc_atomic_disable(struct drm_crtc *crtc,
+>  		return;
+>  
+>  	/* Set all pending plane state to disabled */
+> -	for (i = 0; i < OVL_LAYER_NR; i++) {
+> +	for (i = 0; i < mtk_crtc->layer_nr; i++) {
+>  		struct drm_plane *plane = &mtk_crtc->planes[i];
+>  		struct mtk_plane_state *plane_state;
+>  
+> @@ -450,7 +451,7 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
+>  
+>  	if (mtk_crtc->event)
+>  		mtk_crtc->pending_needs_vblank = true;
+> -	for (i = 0; i < OVL_LAYER_NR; i++) {
+> +	for (i = 0; i < mtk_crtc->layer_nr; i++) {
+>  		struct drm_plane *plane = &mtk_crtc->planes[i];
+>  		struct mtk_plane_state *plane_state;
+>  
+> @@ -598,7 +599,12 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+>  		mtk_crtc->ddp_comp[i] = comp;
+>  	}
+>  
+> -	for (zpos = 0; zpos < OVL_LAYER_NR; zpos++) {
+> +	mtk_crtc->layer_nr = mtk_ddp_comp_layer_nr(mtk_crtc->ddp_comp[0]);
+> +	mtk_crtc->planes = devm_kzalloc(dev, mtk_crtc->layer_nr *
+> +					sizeof(struct drm_plane),
+> +					GFP_KERNEL);
 > +
->  	writel_relaxed(addr, comp->regs + DISP_RDMA_MEM_START_ADDR);
->  	writel_relaxed(pitch, comp->regs + DISP_RDMA_MEM_SRC_PITCH);
->  	writel(RDMA_MEM_GMC, comp->regs + DISP_RDMA_MEM_GMC_SETTING_0);
+> +	for (zpos = 0; zpos < mtk_crtc->layer_nr; zpos++) {
+>  		type = (zpos == 0) ? DRM_PLANE_TYPE_PRIMARY :
+>  				(zpos == 1) ? DRM_PLANE_TYPE_CURSOR :
+>  						DRM_PLANE_TYPE_OVERLAY;
+> @@ -609,7 +615,8 @@ int mtk_drm_crtc_create(struct drm_device *drm_dev,
+>  	}
+>  
+>  	ret = mtk_drm_crtc_init(drm_dev, mtk_crtc, &mtk_crtc->planes[0],
+> -				&mtk_crtc->planes[1], pipe);
+> +				mtk_crtc->layer_nr > 1 ? &mtk_crtc->planes[1] :
+> +				NULL, pipe);
+>  	if (ret < 0)
+>  		goto unprepare;
+>  	drm_mode_crtc_set_gamma_size(&mtk_crtc->base, MTK_LUT_SIZE);
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.h b/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
+> index 9d9410c67ae9..60bcc8aba8e3 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.h
+> @@ -18,7 +18,6 @@
+>  #include "mtk_drm_ddp_comp.h"
+>  #include "mtk_drm_plane.h"
+>  
+> -#define OVL_LAYER_NR	4
+>  #define MTK_LUT_SIZE	512
+>  #define MTK_MAX_BPC	10
+>  #define MTK_MIN_BPC	3
