@@ -1,54 +1,38 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Thu, 9 Aug 2018 16:38:28 +0200
-Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
-References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
- <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
-Message-ID: <20180809143827.GC22636@redhat.com>
+From: abel.vesa@nxp.com (Abel Vesa)
+Date: Thu,  9 Aug 2018 17:45:37 +0300
+Subject: [PATCH v3 0/4] Add i.MX8MQ clock driver
+Message-ID: <1533825941-17224-1-git-send-email-abel.vesa@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I need to read this (hopefully final) version carefully. I'll try to do
-this before next Monday.
+This is basically just a resend of the following patchset:
 
-just one note,
+https://www.spinics.net/lists/linux-clk/msg23141.html
 
-On 08/09, Ravi Bangoria wrote:
->
-> +static void delayed_uprobe_remove(struct uprobe *uprobe, struct mm_struct *mm)
-> +{
-> +	struct list_head *pos, *q;
-> +	struct delayed_uprobe *du;
-> +
-> +	if (!uprobe && !mm)
-> +		return;
-> +
-> +	list_for_each_safe(pos, q, &delayed_uprobe_list) {
-> +		du = list_entry(pos, struct delayed_uprobe, list);
-> +
-> +		if (uprobe && mm && du->uprobe == uprobe && du->mm == mm)
-> +			delayed_uprobe_delete(du);
-> +		else if (!uprobe && du->mm == mm)
-> +			delayed_uprobe_delete(du);
-> +		else if (!mm && du->uprobe == uprobe)
-> +			delayed_uprobe_delete(du);
-> +	}
+I've just updated the patchset and implemented Shawn's
+and Aisheng's comments.
 
-Sorry, I can't resist... this doesn't look very nice. How about
+I hope I haven't missed any of their comments.
 
-	list_for_each_safe(pos, q, &delayed_uprobe_list) {
-		du = list_entry(pos, struct delayed_uprobe, list);
+Lucas Stach (4):
+  dt-bindings: add binding for i.MX8MQ CCM
+  clk: imx: add fractional PLL output clock
+  clk: imx: add SCCG PLL type
+  clk: imx: add clock driver for i.MX8MQ CCM
 
-		if (uprobe && du->uprobe != uprobe)
-			continue;
-		if (mm && du->mm != mm)
-			continue;
+ .../devicetree/bindings/clock/imx8mq-clock.txt     |  20 +
+ drivers/clk/imx/Makefile                           |   5 +-
+ drivers/clk/imx/clk-frac-pll.c                     | 230 ++++++
+ drivers/clk/imx/clk-imx8mq.c                       | 856 +++++++++++++++++++++
+ drivers/clk/imx/clk-sccg-pll.c                     | 231 ++++++
+ drivers/clk/imx/clk.h                              |  48 ++
+ include/dt-bindings/clock/imx8mq-clock.h           | 629 +++++++++++++++
+ 7 files changed, 2018 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx8mq-clock.txt
+ create mode 100644 drivers/clk/imx/clk-frac-pll.c
+ create mode 100644 drivers/clk/imx/clk-imx8mq.c
+ create mode 100644 drivers/clk/imx/clk-sccg-pll.c
+ create mode 100644 include/dt-bindings/clock/imx8mq-clock.h
 
-		delayed_uprobe_delete();
-	}
-
-I won't insist, this is cosmetic after all, but please consider this change
-in case you will need to send v9.
-
-Oleg.
+-- 
+2.7.4
