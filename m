@@ -1,55 +1,48 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu,  9 Aug 2018 16:26:37 +0100
-Subject: [PATCH 2/8] ARM: spectre-v1.1: force address sanitizing for
- __put_user*()
+Date: Thu,  9 Aug 2018 16:26:36 +0100
+Subject: [PATCH 1/8] ARM: uaccess: Prevent speculative use of the current
+ addr_limit
 In-Reply-To: <1533828403-21323-1-git-send-email-julien.thierry@arm.com>
 References: <1533828403-21323-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1533828403-21323-3-git-send-email-julien.thierry@arm.com>
+Message-ID: <1533828403-21323-2-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When Spectre mitigation is required, define __put_user() and
-__put_user_error() to include check_uaccess, ensuring user address
-is sanitized.
+A mispredicted conditional call to set_fs could result in the wrong
+addr_limit being forwarded under speculation to a subsequent access_ok
+check, potentially forming part of a spectre-v1 attack using uaccess
+routines.
+
+This patch prevents this forwarding from taking place, but putting heavy
+barriers in set_fs after writing the addr_limit.
+
+Porting commit c2f0ad4fc089cff8 ("arm64: uaccess: Prevent speculative use
+of the current addr_limit").
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 Cc: Russell King <linux@armlinux.org.uk>
 ---
- arch/arm/include/asm/uaccess.h | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/include/asm/uaccess.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index d65ef85..2e18b91 100644
+index 5451e1f..d65ef85 100644
 --- a/arch/arm/include/asm/uaccess.h
 +++ b/arch/arm/include/asm/uaccess.h
-@@ -370,6 +370,20 @@ static inline void set_fs(mm_segment_t fs)
- 	__pu_err;							\
- })
-
-+#ifdef CONFIG_CPU_SPECTRE
-+/*
-+ * When mitigating Spectre variant 1.1, all accessors need to include
-+ * verification of the address space.
-+ */
-+#define __put_user(x, ptr) put_user(x, ptr)
+@@ -69,6 +69,14 @@ static inline void uaccess_restore(unsigned int flags)
+ static inline void set_fs(mm_segment_t fs)
+ {
+ 	current_thread_info()->addr_limit = fs;
 +
-+#define __put_user_error(x, ptr, err)					\
-+({									\
-+	__put_user_switch((x), (ptr), (err), __put_user_check);		\
-+	(void) 0;							\
-+})
++	/*
++	 * Prevent a mispredicted conditional call to set_fs from forwarding
++	 * the wrong address limit to access_ok under speculation.
++	 */
++	dsb(nsh);
++	isb();
 +
-+#else
- #define __put_user(x, ptr)						\
- ({									\
- 	long __pu_err = 0;						\
-@@ -462,6 +476,7 @@ static inline void set_fs(mm_segment_t fs)
- 	: "r" (x), "i" (-EFAULT)				\
- 	: "cc")
+ 	modify_domain(DOMAIN_KERNEL, fs ? DOMAIN_CLIENT : DOMAIN_MANAGER);
+ }
 
-+#endif /* !CONFIG_CPU_SPECTRE */
-
- #ifdef CONFIG_MMU
- extern unsigned long __must_check
 --
 1.9.1
