@@ -1,65 +1,44 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Thu,  9 Aug 2018 18:52:14 +0200
-Subject: [PATCH 2/5] clk: sunxi-ng: h3/h5: Add max. rate constraint to
- pll-video
+Date: Thu,  9 Aug 2018 18:52:17 +0200
+Subject: [PATCH 5/5] clk: sunxi-ng: a83t: Add max. rate constraint to video
+ PLLs
 In-Reply-To: <20180809165217.30680-1-jernej.skrabec@siol.net>
 References: <20180809165217.30680-1-jernej.skrabec@siol.net>
-Message-ID: <20180809165217.30680-3-jernej.skrabec@siol.net>
+Message-ID: <20180809165217.30680-6-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As it turns out, pll-video can be set to higher rate that it is really
-supported by HW.
+It may happen that clock framework finds optimal video PLL rate above
+that which is really supported by HW.
 
-For example, one monitor requested 185.58 MHz pixel clock. Clock
-framework calculated that minimum rate error would be when pll-video
-is set to 2040 MHz. This is clearly out of specs.
-
-Both H3 and H5 user manuals specify 600 MHz as maximum supported rate.
-However, BSP clock drivers allow up to 912 MHz and 1008 MHz
-respectively. Here 912 MHz is chosen because user manuals were already
-proven wrong once for lower limits.
+User manual doesn't really say what is upper limit for video PLLs on
+A83T. Because of that, use the maximum rate defined in BSP clk driver
+which is 3 GHz.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 25 +++++++++++++------------
- 1 file changed, 13 insertions(+), 12 deletions(-)
+ drivers/clk/sunxi-ng/ccu-sun8i-a83t.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-index 77ed0b0ba681..eb5c608428fa 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
-@@ -69,18 +69,19 @@ static SUNXI_CCU_NM_WITH_SDM_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
- 				       BIT(28),	/* lock */
- 				       CLK_SET_RATE_UNGATE);
- 
--static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN(pll_video_clk, "pll-video",
--					    "osc24M", 0x0010,
--					    192000000,	/* Minimum rate */
--					    8, 7,	/* N */
--					    0, 4,	/* M */
--					    BIT(24),	/* frac enable */
--					    BIT(25),	/* frac select */
--					    270000000,	/* frac rate 0 */
--					    297000000,	/* frac rate 1 */
--					    BIT(31),	/* gate */
--					    BIT(28),	/* lock */
--					    CLK_SET_RATE_UNGATE);
-+static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK_MIN_MAX(pll_video_clk, "pll-video",
-+						"osc24M", 0x0010,
-+						192000000, /* Minimum rate */
-+						912000000, /* Maximum rate */
-+						8, 7,      /* N */
-+						0, 4,	   /* M */
-+						BIT(24),   /* frac enable */
-+						BIT(25),   /* frac select */
-+						270000000, /* frac rate 0 */
-+						297000000, /* frac rate 1 */
-+						BIT(31),   /* gate */
-+						BIT(28),   /* lock */
-+						CLK_SET_RATE_UNGATE);
- 
- static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_ve_clk, "pll-ve",
- 					"osc24M", 0x0018,
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+index 7d08015b980d..2d6555d73170 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+@@ -108,6 +108,7 @@ static struct ccu_nkmp pll_video0_clk = {
+ 	.n		= _SUNXI_CCU_MULT_OFFSET_MIN_MAX(8, 8, 0, 12, 0),
+ 	.m		= _SUNXI_CCU_DIV(16, 1), /* input divider */
+ 	.p		= _SUNXI_CCU_DIV(0, 2), /* output divider */
++	.max_rate	= 3000000000UL,
+ 	.common		= {
+ 		.reg		= 0x010,
+ 		.lock_reg	= CCU_SUN8I_A83T_LOCK_REG,
+@@ -220,6 +221,7 @@ static struct ccu_nkmp pll_video1_clk = {
+ 	.n		= _SUNXI_CCU_MULT_OFFSET_MIN_MAX(8, 8, 0, 12, 0),
+ 	.m		= _SUNXI_CCU_DIV(16, 1), /* input divider */
+ 	.p		= _SUNXI_CCU_DIV(0, 2), /* external divider p */
++	.max_rate	= 3000000000UL,
+ 	.common		= {
+ 		.reg		= 0x04c,
+ 		.lock_reg	= CCU_SUN8I_A83T_LOCK_REG,
 -- 
 2.18.0
