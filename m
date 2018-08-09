@@ -1,58 +1,104 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Thu, 9 Aug 2018 10:15:14 -0700
-Subject: qemu machine settings and root fs for armv8?
-In-Reply-To: <5d585df0-abbe-c95f-adff-c4c2e3962832@redhat.com>
-References: <CAKwvOdkGatK1HbXG0hDr=a1DtnoCXUbVppLdR6uN5tAKzKdDDQ@mail.gmail.com>
- <CAKwvOdnA5OTcBuRVbcBv8oYHR-mU3+Ee_iFjqbHx4UQxVnpxtQ@mail.gmail.com>
- <5d585df0-abbe-c95f-adff-c4c2e3962832@redhat.com>
-Message-ID: <CAKwvOdnaknwFshVAk=G0x44RxZyrMPp+O2yFBauAe9-3C4DpTQ@mail.gmail.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Thu, 9 Aug 2018 12:10:59 -0700
+Subject: [PATCH v1 01/10] arm/arm64: dts: msm8974/msm8916: thermal: Split
+ address space into two
+In-Reply-To: <d01f560abed221b536b27bfaa42a530257642974.1533815718.git.amit.kucheria@linaro.org>
+References: <cover.1533815718.git.amit.kucheria@linaro.org>
+ <d01f560abed221b536b27bfaa42a530257642974.1533815718.git.amit.kucheria@linaro.org>
+Message-ID: <20180809191059.GI160295@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 9, 2018 at 12:36 AM Laura Abbott <labbott@redhat.com> wrote:
->
-> I usually use a buildroot environment and just boot as an initramfs:
+On Thu, Aug 09, 2018 at 06:02:33PM +0530, Amit Kucheria wrote:
+> We've earlier added support to split the register address space into TM
+> and SROT regions.
+> 
+> Split up the regmap address space into two for the remaining platforms that
+> have a similar register layout and make corresponding changes to the
+> get_temp_common() function used by these platforms.
+> 
+> Since tsens-common.c/init_common() currently only registers one address
+> space, the order is important (TM before SROT).  This is OK since the code
+> doesn't really use the SROT functionality yet.
+> 
+> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+> ---
+>  arch/arm/boot/dts/qcom-msm8974.dtsi   | 6 ++++--
+>  arch/arm64/boot/dts/qcom/msm8916.dtsi | 6 ++++--
+>  drivers/thermal/qcom/tsens-common.c   | 5 +++--
+>  3 files changed, 11 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> index d9019a49b292..3c4b81c29798 100644
+> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> @@ -427,11 +427,13 @@
+>  			};
+>  		};
+>  
+> -		tsens: thermal-sensor at fc4a8000 {
+> +		tsens: thermal-sensor at fc4a9000 {
+>  			compatible = "qcom,msm8974-tsens";
+> -			reg = <0xfc4a8000 0x2000>;
+> +			reg = <0xfc4a9000 0x1000>, /* TM */
+> +			      <0xfc4a8000 0x1000>; /* SROT */
+>  			nvmem-cells = <&tsens_calib>, <&tsens_backup>;
+>  			nvmem-cell-names = "calib", "calib_backup";
+> +			#qcom,sensors = <11>;
 
-I need to play around more with buildroot, but I'll bet that's an
-option to make a ramdisk instead of a full disk image?
+nit: adding the number of sensors isn't directly related and probably
+should be in a separate patch. Not important enough to re-spin just
+for this though ;-)
 
-> qemu-system-aarch64 \
->         -s \
->         -smp 8 \
->         -machine virt \
->         -cpu cortex-a57 \
->         -machine type=virt \
->         -nographic \
->         -m 1024 \
->         -kernel /path/to/kernel \
->         --append "nokaslr slub_debug=- console=ttyAMA0 debug_pagealloc=on
-> earlycon=pl011,0x9000000" \
+>  			#thermal-sensor-cells = <1>;
+>  		};
+>  
+> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> index cc1040eacdf5..abf84df5a7bc 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> @@ -774,11 +774,13 @@
+>  			};
+>  		};
+>  
+> -		tsens: thermal-sensor at 4a8000 {
+> +		tsens: thermal-sensor at 4a9000 {
+>  			compatible = "qcom,msm8916-tsens";
+> -			reg = <0x4a8000 0x2000>;
+> +			reg = <0x4a9000 0x1000>, /* TM */
+> +			      <0x4a8000 0x1000>; /* SROT */
+>  			nvmem-cells = <&tsens_caldata>, <&tsens_calsel>;
+>  			nvmem-cell-names = "calib", "calib_sel";
+> +			#qcom,sensors = <5>;
 
-Very cool, thank you for sharing!
+ditto
 
-I'm guessing that kaslr makes it difficult to keep track of addresses
-in between reboots?  There's a parameter "panic=-1" that will reboot
-the kernel on panic that probably works well with this.
+>  			#thermal-sensor-cells = <1>;
+>  		};
+>  
+> diff --git a/drivers/thermal/qcom/tsens-common.c b/drivers/thermal/qcom/tsens-common.c
+> index 6207d8d92351..478739543bbc 100644
+> --- a/drivers/thermal/qcom/tsens-common.c
+> +++ b/drivers/thermal/qcom/tsens-common.c
+> @@ -21,7 +21,7 @@
+>  #include <linux/regmap.h>
+>  #include "tsens.h"
+>  
+> -#define S0_ST_ADDR		0x1030
+> +#define STATUS_OFFSET		0x30
+>  #define SN_ADDR_OFFSET		0x4
+>  #define SN_ST_TEMP_MASK		0x3ff
+>  #define CAL_DEGC_PT1		30
+> @@ -107,8 +107,9 @@ int get_temp_common(struct tsens_device *tmdev, int id, int *temp)
+>  	unsigned int status_reg;
+>  	int last_temp = 0, ret;
+>  
+> -	status_reg = S0_ST_ADDR + s->hw_id * SN_ADDR_OFFSET;
+> +	status_reg = tmdev->tm_offset + STATUS_OFFSET + s->hw_id * SN_ADDR_OFFSET;
+>  	ret = regmap_read(tmdev->map, status_reg, &code);
+> +
+>  	if (ret)
+>  		return ret;
+>  	last_temp = code & SN_ST_TEMP_MASK;
 
->         -initrd /path/to/arm64_rootfs.cpio \
->         -fsdev local,security_model=passthrough,id=fsdev0,path=/tmp/share \
->         -device virtio-9p-pci,id=fs0,fsdev=fsdev0,mount_tag=hostshare
->
-> I'll note that this setup makes using kernel modules a big pain but
-
-How come?
-
-> it's useful for certain types of testing.
-> The virtio settings are from https://www.linux-kvm.org/page/9p_virtio
-> for sharing files.
-
-Wow, that's super cool!  That probably helps so that you don't need to
-keep rebuilding your ramdisk.  For binaries I'd guess that any
-dynamically linked dependencies would have to be in that dir, too,
-otherwise the VM wouldn't be able to load them.  But maybe nice for
-statically linked cross compiled binaries.
-
-Thanks again.
--- 
-Thanks,
-~Nick Desaulniers
+Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
