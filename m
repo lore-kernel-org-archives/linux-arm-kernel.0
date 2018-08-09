@@ -1,76 +1,77 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Thu, 9 Aug 2018 19:27:55 +0800
-Subject: [PATCH v1 6/7] net: mvneta: Don't use GRO on Armada 3720
-In-Reply-To: <20180809124022.790f1784@xhacker.debian>
-References: <20180808152706.21727-1-marek.behun@nic.cz>
- <20180808152706.21727-7-marek.behun@nic.cz>
- <20180809124022.790f1784@xhacker.debian>
-Message-ID: <20180809192755.24e57782@xhacker.debian>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Thu, 9 Aug 2018 13:30:35 +0200
+Subject: [PATCH v3 2/2] tty/serial: atmel: add ISO7816 support
+In-Reply-To: <d66c4318-1d31-5c4e-3952-6b69a010b028@sorico.fr>
+References: <20180807130049.5957-1-ludovic.desroches@microchip.com>
+ <20180807130049.5957-3-ludovic.desroches@microchip.com>
+ <d66c4318-1d31-5c4e-3952-6b69a010b028@sorico.fr>
+Message-ID: <20180809113035.kftvdalca7zsf4ly@M43218.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Richard,
 
-On Thu, 9 Aug 2018 12:40:41 +0800 Jisheng Zhang wrote:
-
-> + more people
+On Thu, Aug 09, 2018 at 10:47:17AM +0200, Richard Genoud wrote:
+> Hi !
 > 
-> On Wed,  8 Aug 2018 17:27:05 +0200 Marek Beh?n wrote:
-> 
-> > For some reason on Armada 3720 boards (EspressoBin and Turris Mox) the
-> > networking driver behaves weirdly when using napi_gro_receive.
+> On 07/08/2018 15:00, Ludovic Desroches wrote:
+> > From: Nicolas Ferre <nicolas.ferre@microchip.com>
 > > 
-> > For example downloading a big file from a local network (low ping) is
-> > fast, but when downloading from a remote server (higher ping), the
-> > download speed is at first high but drops rapidly to almost nothing or
-> > absolutely nothing.  
-> 
-> We also met this issue on some berlin platforms. I tried to fix the bug,
-> but no clue so far.
-> 
+> > When mode is set in atmel_config_iso7816() we backup last RS232 mode
+> > for coming back to this mode if requested.
+> > Also allow setup of T=0 and T=1 parameter and basic support in set_termios
+> > function as well.
 > > 
-> > This is fixed when using netif_receive_skb instead of napi_gro_receive.  
-> 
-> This is a workaround. The good news is this workaround also fixes the issue
-> we saw on berlin.
-> 
+> > Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> > [ludovic.desroches at microchip.com: rebase, add check on fidi ratio, checkpatch fixes]
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> > ---
+> >  drivers/tty/serial/atmel_serial.c | 211 +++++++++++++++++++++++++++++++++++---
+> >  drivers/tty/serial/atmel_serial.h |   6 +-
+> >  2 files changed, 201 insertions(+), 16 deletions(-)
 > > 
-> > Signed-off-by: Marek Behun <marek.behun@nic.cz>
-> > Cc: Russell King - ARM Linux <linux@armlinux.org.uk>
-> > Cc: netdev at vger.kernel.org
-> > 
-> > diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> > index 0ad2f3f7da85..27f3017d94c5 100644
-> > --- a/drivers/net/ethernet/marvell/mvneta.c
-> > +++ b/drivers/net/ethernet/marvell/mvneta.c
-> > @@ -1959,7 +1959,10 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
-> >  
-> >  			skb->protocol = eth_type_trans(skb, dev);
-> >  			mvneta_rx_csum(pp, rx_status, skb);
-> > -			napi_gro_receive(&port->napi, skb);
-> > +			if (pp->neta_armada3700)
-> > +				netif_receive_skb(skb);
-> > +			else
-> > +				napi_gro_receive(&port->napi, skb);
+> > diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> > index 8e4428725848..4a7ec44b0ace 100644
+> > --- a/drivers/tty/serial/atmel_serial.c
+> > +++ b/drivers/tty/serial/atmel_serial.c
 
-I think I found the root cause, if neta_armada3700 is true, the port got from
-this_cpu_ptr(pp->ports) is invalid, this is bug... I'll cook a patch for this
+[...]
 
-Thanks
+> >  #if defined(CONFIG_OF)
+> > +static struct atmel_uart_pdata at91rm9200_pdata = {
+> > +	.fidi_min = 1,
+> > +	.fidi_max = 2047,
+> > +};
+> > +
+> > +static struct atmel_uart_pdata at91sam9260_pdata = {
+> > +	.fidi_min = 1,
+> > +	.fidi_max = 2047,
+> > +};
+> > +
+> > +static struct atmel_uart_pdata sama5d3_pdata = {
+> > +	.fidi_min = 3,
+> > +	.fidi_max = 65535,
+> Are you sure this is for sama5d3 ?
+> From the datasheets I have, 65535 is for sama5d4/sama5d2
 
-> >  
-> >  			rcvd_pkts++;
-> >  			rcvd_bytes += rx_bytes;
-> > @@ -2001,7 +2004,10 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
-> >  
-> >  		mvneta_rx_csum(pp, rx_status, skb);
-> >  
-> > -		napi_gro_receive(&port->napi, skb);
-> > +		if (pp->neta_armada3700)
-> > +			netif_receive_skb(skb);
-> > +		else
-> > +			napi_gro_receive(&port->napi, skb);
-> >  	}
-> >  
-> >  	if (rcvd_pkts) {  
+I checked it and I missed it. What a pity... In fact, it's a bit more
+tricky since the min value for d3 is 3 and no longer 1.
+
+> And also, you'll have to s/atmel,at91sam9260-usart/atmel,sama5d2-usart/g
+> in sama5d{2,4}.dtsi
+>
+
+Yes, I planed to send it later but I can add those patches within this
+set of patches. 
+
+> But I wonder if it could be detected via ATMEL_US_VERSION instead ?
 > 
+
+I have not checked, I tend to prefer the compatible string for this kind
+of thing. But as we already use the version number, I can investigate
+this solution if it's the one you prefer.
+
+
+Regards
+
+Ludovic
