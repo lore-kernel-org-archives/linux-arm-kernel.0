@@ -1,111 +1,819 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 9 Aug 2018 11:25:04 +0100
-Subject: [PATCH v8 09/26] kernel/cpu_pm: Manage runtime PM in the idle
- path for CPUs
-In-Reply-To: <20180808180248.GC27850@codeaurora.org>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <2056372.NMt4aPaF4h@aspire.rjw.lan>
- <2205807.cU2puvubpP@aspire.rjw.lan>
- <1726374.375PCQfjLZ@aspire.rjw.lan>
- <CAPDyKFrmP15+_hyRp44Jw-wsTmsNFKORdCeGJEgW8o0OoKiHhA@mail.gmail.com>
- <CAJZ5v0hk1wfm10fyycmddKF6wR4D51r30fD_-J5UDMbtB3+V-Q@mail.gmail.com>
- <20180808105619.GB25150@e107981-ln.cambridge.arm.com>
- <20180808180248.GC27850@codeaurora.org>
-Message-ID: <20180809102504.GB13428@e107981-ln.cambridge.arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 9 Aug 2018 16:00:19 +0530
+Subject: [PATCH v2 2/4] phy: socionext: add USB3 PHY driver for UniPhier
+ SoC
+In-Reply-To: <1533290045-18969-3-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1533290045-18969-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1533290045-18969-3-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <312d10ae-7909-bede-ea0a-5d92a497f639@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2018 at 12:02:48PM -0600, Lina Iyer wrote:
-> On Wed, Aug 08 2018 at 04:56 -0600, Lorenzo Pieralisi wrote:
-> >On Mon, Aug 06, 2018 at 11:37:55AM +0200, Rafael J. Wysocki wrote:
-> >>On Fri, Aug 3, 2018 at 1:42 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> >>> [...]
-> >>>
-> >>>>>
-> >>>>> Assuming that I have got that right, there are concerns, mostly regarding
-> >>>>> patch [07/26], but I will reply to that directly.
-> >>>>
-> >>>> Well, I haven't got that right, so never mind.
-> >>>>
-> >>>> There are a few minor things to address, but apart from that the general
-> >>>> genpd patches look ready.
-> >>>
-> >>> Alright, thanks!
-> >>>
-> >>> I will re-spin the series and post a new version once 4.19 rc1 is out.
-> >>> Hopefully we can queue it up early in next cycle to get it tested in
-> >>> next for a while.
-> >>>
-> >>>>
-> >>>>> The $subject patch is fine by me by itself, but it obviously depends on the
-> >>>>> previous ones.  Patches [01-02/26] are fine too, but they don't seem to be
-> >>>>> particularly useful without the rest of the series.
-> >>>>>
-> >>>>> As far as patches [10-26/26] go, I'd like to see some review comments and/or
-> >>>>> tags from the people with vested interest in there, in particular from Daniel
-> >>>>> on patch [12/26] and from Sudeep on the PSCI ones.
-> >>>>
-> >>>> But this still holds.
-> >>>
-> >>> Actually, patch 10 and patch11 is ready to go as well. I ping Daniel
-> >>> on patch 12.
-> >>>
-> >>> In regards to the rest of the series, some of the PSCI/ARM changes
-> >>> have been reviewed by Mark Rutland, however several changes have not
-> >>> been acked.
-> >>>
-> >>> On the other hand, one can also interpret the long silence in regards
-> >>> to PSCI/ARM changes as they are good to go. :-)
-> >>
-> >>Well, in that case giving an ACK to them should not be an issue for
-> >>the people with a vested interest I suppose.
-> >
-> >Apologies to everyone for the delay in replying.
-> >
-> >Side note: cpu_pm_enter()/exit() are also called through syscore ops in
-> >s2RAM/IDLE, you know that but I just wanted to mention it to compound
-> >the discussion.
-> >
-> >As for PSCI patches I do not personally think PSCI OSI enablement is
-> >beneficial (and my position has always been the same since PSCI OSI was
-> >added to the specification, I am not even talking about this patchset)
-> >and Arm Trusted Firmware does not currently support it for the same
-> >reason.
-> >
-> >We (if Mark and Sudeep agree) will enable PSCI OSI if and when we have a
-> >definitive and constructive answer to *why* we have to do that that is
-> >not a dogmatic "the kernel knows better" but rather a comprehensive
-> >power benchmark evaluation - I thought that was the agreement reached
-> >at OSPM but apparently I was mistaken.
-> >
-> I will not speak to any comparison of benchmarks between OSI and PC.
-> AFAIK, there are no platforms supporting both.
+Hi,
 
-PSCI specifications, 5.20.1:
+On Friday 03 August 2018 03:24 PM, Kunihiko Hayashi wrote:
+> Add a driver for PHY interface built into USB3 controller
+> implemented in UniPhier SoCs.
+> This driver supports High-Speed PHY and Super-Speed PHY.
+> 
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Signed-off-by: Motoya Tanigawa <tanigawa.motoya@socionext.com>
+> Signed-off-by: Masami Hiramatsu <masami.hiramatsu@linaro.org>
+> ---
+>  drivers/phy/Kconfig                         |   1 +
+>  drivers/phy/Makefile                        |   1 +
+>  drivers/phy/socionext/Kconfig               |  12 +
+>  drivers/phy/socionext/Makefile              |   6 +
+>  drivers/phy/socionext/phy-uniphier-usb3hs.c | 423 ++++++++++++++++++++++++++++
+>  drivers/phy/socionext/phy-uniphier-usb3ss.c | 350 +++++++++++++++++++++++
+>  6 files changed, 793 insertions(+)
+>  create mode 100644 drivers/phy/socionext/Kconfig
+>  create mode 100644 drivers/phy/socionext/Makefile
+>  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3hs.c
+>  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3ss.c
+> 
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 5c8d452..b752589 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -53,6 +53,7 @@ source "drivers/phy/ralink/Kconfig"
+>  source "drivers/phy/renesas/Kconfig"
+>  source "drivers/phy/rockchip/Kconfig"
+>  source "drivers/phy/samsung/Kconfig"
+> +source "drivers/phy/socionext/Kconfig"
+>  source "drivers/phy/st/Kconfig"
+>  source "drivers/phy/tegra/Kconfig"
+>  source "drivers/phy/ti/Kconfig"
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index 84e3bd9..5539cde 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -21,5 +21,6 @@ obj-y					+= broadcom/	\
+>  					   qualcomm/	\
+>  					   ralink/	\
+>  					   samsung/	\
+> +					   socionext/	\
+>  					   st/		\
+>  					   ti/
+> diff --git a/drivers/phy/socionext/Kconfig b/drivers/phy/socionext/Kconfig
+> new file mode 100644
+> index 0000000..4a172fc
+> --- /dev/null
+> +++ b/drivers/phy/socionext/Kconfig
+> @@ -0,0 +1,12 @@
+> +#
+> +# PHY drivers for Socionext platforms.
+> +#
+> +
+> +config PHY_UNIPHIER_USB3
+> +	tristate "UniPhier USB3 PHY driver"
+> +	depends on ARCH_UNIPHIER || COMPILE_TEST
+> +	depends on OF && HAS_IOMEM
+> +	select GENERIC_PHY
+> +	help
+> +	  Enable this to support USB PHY implemented in USB3 controller
+> +	  on UniPhier SoCs. This controller supports USB3.0 and lower speed.
+> diff --git a/drivers/phy/socionext/Makefile b/drivers/phy/socionext/Makefile
+> new file mode 100644
+> index 0000000..e230fa31
+> --- /dev/null
+> +++ b/drivers/phy/socionext/Makefile
+> @@ -0,0 +1,6 @@
+> +# SPDX-License-Identifier: GPL-2.0
+> +#
+> +# Makefile for the phy drivers.
+> +#
+> +
+> +obj-$(CONFIG_PHY_UNIPHIER_USB3)	+= phy-uniphier-usb3hs.o phy-uniphier-usb3ss.o
+> diff --git a/drivers/phy/socionext/phy-uniphier-usb3hs.c b/drivers/phy/socionext/phy-uniphier-usb3hs.c
+> new file mode 100644
+> index 0000000..d5f5d895
+> --- /dev/null
+> +++ b/drivers/phy/socionext/phy-uniphier-usb3hs.c
+> @@ -0,0 +1,423 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +//
+> +// phy-uniphier-usb3hs.c - HS-PHY driver for Socionext UniPhier USB3 controller
+> +// Copyright 2015-2018 Socionext Inc.
+> +// Author:
+> +//      Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> +// Contributors:
+> +//      Motoya Tanigawa <tanigawa.motoya@socionext.com>
+> +//      Masami Hiramatsu <masami.hiramatsu@linaro.org>
+> +
 
-"The platform will boot in platform-coordinated mode."
+I'm not sure if there is a standard format for adding SPDX identifiers. But
+other PHY drivers seems to have used single line comment style only for the
+first line. (see drivers/phy/amlogic/phy-meson-gxl-usb3.c)
+> +#include <linux/bitfield.h>
+> +#include <linux/bitops.h>
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/nvmem-consumer.h>
+> +#include <linux/of.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/reset.h>
+> +#include <linux/slab.h>
+> +
+> +#define HSPHY_CFG0		0x0
+> +#define HSPHY_CFG0_HS_I_MASK	GENMASK(31, 28)
+> +#define HSPHY_CFG0_HSDISC_MASK	GENMASK(27, 26)
+> +#define HSPHY_CFG0_SWING_MASK	GENMASK(17, 16)
+> +#define HSPHY_CFG0_SEL_T_MASK	GENMASK(15, 12)
+> +#define HSPHY_CFG0_RTERM_MASK	GENMASK(7, 6)
+> +#define HSPHY_CFG0_TRIMMASK	(HSPHY_CFG0_HS_I_MASK \
+> +				 | HSPHY_CFG0_SEL_T_MASK \
+> +				 | HSPHY_CFG0_RTERM_MASK)
+> +
+> +#define HSPHY_CFG1		0x4
+> +#define HSPHY_CFG1_DAT_EN	BIT(29)
+> +#define HSPHY_CFG1_ADR_EN	BIT(28)
+> +#define HSPHY_CFG1_ADR_MASK	GENMASK(27, 16)
+> +#define HSPHY_CFG1_DAT_MASK	GENMASK(23, 16)
+> +
+> +#define PHY_F(regno, msb, lsb) { (regno), (msb), (lsb) }
+> +
+> +#define LS_SLEW		PHY_F(10, 6, 6)	/* LS mode slew rate */
+> +#define FS_LS_DRV	PHY_F(10, 5, 5)	/* FS/LS slew rate */
+> +
+> +#define MAX_PHY_PARAMS	2
+> +
+> +struct uniphier_u3hsphy_param {
+> +	struct {
+> +		int reg_no;
+> +		int msb;
+> +		int lsb;
+> +	} field;
+> +	u8 value;
+> +};
+> +
+> +struct uniphier_u3hsphy_trim_param {
+> +	unsigned int rterm;
+> +	unsigned int sel_t;
+> +	unsigned int hs_i;
+> +};
+> +
+> +#define trim_param_is_valid(p)	((p)->rterm || (p)->sel_t || (p)->hs_i)
+> +
+> +struct uniphier_u3hsphy_priv {
+> +	struct device *dev;
+> +	void __iomem *base;
+> +	struct clk *clk, *clk_parent, *clk_ext;
+> +	struct reset_control *rst, *rst_parent;
+> +	struct regulator *vbus;
+> +	const struct uniphier_u3hsphy_soc_data *data;
+> +};
+> +
+> +struct uniphier_u3hsphy_soc_data {
+> +	int nparams;
+> +	const struct uniphier_u3hsphy_param param[MAX_PHY_PARAMS];
+> +	u32 config0;
+> +	u32 config1;
+> +	void (*trim_func)(struct uniphier_u3hsphy_priv *priv, u32 *pconfig,
+> +			  struct uniphier_u3hsphy_trim_param *pt);
+> +};
+> +
+> +static void uniphier_u3hsphy_trim_ld20(struct uniphier_u3hsphy_priv *priv,
+> +				       u32 *pconfig,
+> +				       struct uniphier_u3hsphy_trim_param *pt)
+> +{
+> +	*pconfig &= ~HSPHY_CFG0_RTERM_MASK;
+> +	*pconfig |= FIELD_PREP(HSPHY_CFG0_RTERM_MASK, pt->rterm);
+> +
+> +	*pconfig &= ~HSPHY_CFG0_SEL_T_MASK;
+> +	*pconfig |= FIELD_PREP(HSPHY_CFG0_SEL_T_MASK, pt->sel_t);
+> +
+> +	*pconfig &= ~HSPHY_CFG0_HS_I_MASK;
+> +	*pconfig |= FIELD_PREP(HSPHY_CFG0_HS_I_MASK,  pt->hs_i);
+> +}
+> +
+> +static int uniphier_u3hsphy_get_nvparam(struct uniphier_u3hsphy_priv *priv,
+> +					const char *name, unsigned int *val)
+> +{
+> +	struct nvmem_cell *cell;
+> +	u8 *buf;
+> +
+> +	cell = devm_nvmem_cell_get(priv->dev, name);
+> +	if (IS_ERR(cell))
+> +		return PTR_ERR(cell);
+> +
+> +	buf = nvmem_cell_read(cell, NULL);
+> +	if (IS_ERR(buf))
+> +		return PTR_ERR(buf);
+> +
+> +	*val = *buf;
+> +
+> +	kfree(buf);
+> +
+> +	return 0;
+> +}
+> +
+> +static int uniphier_u3hsphy_get_nvparams(struct uniphier_u3hsphy_priv *priv,
+> +					 struct uniphier_u3hsphy_trim_param *pt)
+> +{
+> +	int ret;
+> +
+> +	ret = uniphier_u3hsphy_get_nvparam(priv, "rterm", &pt->rterm);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = uniphier_u3hsphy_get_nvparam(priv, "sel_t", &pt->sel_t);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = uniphier_u3hsphy_get_nvparam(priv, "hs_i", &pt->hs_i);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return 0;
+> +}
+> +
+> +static int uniphier_u3hsphy_update_config(struct uniphier_u3hsphy_priv *priv,
+> +					  u32 *pconfig)
+> +{
+> +	struct uniphier_u3hsphy_trim_param trim;
+> +	int ret, trimmed = 0;
+> +
+> +	if (priv->data->trim_func) {
+> +		ret = uniphier_u3hsphy_get_nvparams(priv, &trim);
+> +		if (ret == -EPROBE_DEFER)
+> +			return ret;
+> +
+> +		/*
+> +		 * call trim_func only when trimming parameters that aren't
+> +		 * all-zero can be acquired. All-zero parameters mean nothing
+> +		 * has been written to nvmem.
+> +		 */
+> +		if (!ret && trim_param_is_valid(&trim)) {
+> +			priv->data->trim_func(priv, pconfig, &trim);
+> +			trimmed = 1;
+> +		} else {
+> +			dev_dbg(priv->dev, "can't get parameter from nvmem\n");
+> +		}
+> +	}
+> +
+> +	/* use default parameters without trimming values */
+> +	if (!trimmed) {
+> +		*pconfig &= ~HSPHY_CFG0_HSDISC_MASK;
+> +		*pconfig |= FIELD_PREP(HSPHY_CFG0_HSDISC_MASK, 3);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void uniphier_u3hsphy_set_param(struct uniphier_u3hsphy_priv *priv,
+> +				       const struct uniphier_u3hsphy_param *p)
+> +{
+> +	u32 val;
+> +	u32 field_mask = GENMASK(p->field.msb, p->field.lsb);
+> +	u8 data;
+> +
+> +	val = readl(priv->base + HSPHY_CFG1);
+> +	val &= ~HSPHY_CFG1_ADR_MASK;
+> +	val |= FIELD_PREP(HSPHY_CFG1_ADR_MASK, p->field.reg_no)
+> +		| HSPHY_CFG1_ADR_EN;
+> +	writel(val, priv->base + HSPHY_CFG1);
+> +
+> +	val = readl(priv->base + HSPHY_CFG1);
+> +	val &= ~HSPHY_CFG1_ADR_EN;
+> +	writel(val, priv->base + HSPHY_CFG1);
+> +
+> +	val = readl(priv->base + HSPHY_CFG1);
+> +	val &= ~FIELD_PREP(HSPHY_CFG1_DAT_MASK, field_mask);
+> +	data = field_mask & (p->value << p->field.lsb);
+> +	val |=  FIELD_PREP(HSPHY_CFG1_DAT_MASK, data) | HSPHY_CFG1_DAT_EN;
+> +	writel(val, priv->base + HSPHY_CFG1);
+> +
+> +	val = readl(priv->base + HSPHY_CFG1);
+> +	val &= ~HSPHY_CFG1_DAT_EN;
+> +	writel(val, priv->base + HSPHY_CFG1);
+> +}
+> +
+> +static int uniphier_u3hsphy_power_on(struct phy *phy)
+> +{
+> +	struct uniphier_u3hsphy_priv *priv = phy_get_drvdata(phy);
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(priv->clk_ext);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = clk_prepare_enable(priv->clk);
+> +	if (ret)
+> +		goto out_clk_ext_disable;
+> +
+> +	ret = reset_control_deassert(priv->rst);
+> +	if (ret)
+> +		goto out_clk_disable;
+> +
+> +	if (priv->vbus) {
+> +		ret = regulator_enable(priv->vbus);
+> +		if (ret)
+> +			goto out_rst_assert;
+> +	}
+> +
+> +	return 0;
+> +
+> +out_rst_assert:
+> +	reset_control_assert(priv->rst);
+> +out_clk_disable:
+> +	clk_disable_unprepare(priv->clk);
+> +out_clk_ext_disable:
+> +	clk_disable_unprepare(priv->clk_ext);
+> +
+> +	return ret;
+> +}
+> +
+> +static int uniphier_u3hsphy_power_off(struct phy *phy)
+> +{
+> +	struct uniphier_u3hsphy_priv *priv = phy_get_drvdata(phy);
+> +
+> +	if (priv->vbus)
+> +		regulator_disable(priv->vbus);
+> +
+> +	reset_control_assert(priv->rst);
+> +	clk_disable_unprepare(priv->clk);
+> +	clk_disable_unprepare(priv->clk_ext);
+> +
+> +	return 0;
+> +}
+> +
+> +static int uniphier_u3hsphy_init(struct phy *phy)
+> +{
+> +	struct uniphier_u3hsphy_priv *priv = phy_get_drvdata(phy);
+> +	u32 config0, config1;
+> +	int i, ret;
+> +
+> +	ret = clk_prepare_enable(priv->clk_parent);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = reset_control_deassert(priv->rst_parent);
+> +	if (ret)
+> +		goto out_clk_disable;
+> +
+> +	if (!priv->data->config0 && !priv->data->config1)
+> +		return 0;
+> +
+> +	config0 = priv->data->config0;
+> +	config1 = priv->data->config1;
+> +
+> +	ret = uniphier_u3hsphy_update_config(priv, &config0);
+> +	if (ret)
+> +		goto out_rst_assert;
+> +
+> +	writel(config0, priv->base + HSPHY_CFG0);
+> +	writel(config1, priv->base + HSPHY_CFG1);
+> +
+> +	for (i = 0; i < priv->data->nparams; i++)
+> +		uniphier_u3hsphy_set_param(priv, &priv->data->param[i]);
+> +
+> +	return 0;
+> +
+> +out_rst_assert:
+> +	reset_control_assert(priv->rst_parent);
+> +out_clk_disable:
+> +	clk_disable_unprepare(priv->clk_parent);
+> +
+> +	return ret;
+> +}
+> +
+> +static int uniphier_u3hsphy_exit(struct phy *phy)
+> +{
+> +	struct uniphier_u3hsphy_priv *priv = phy_get_drvdata(phy);
+> +
+> +	reset_control_assert(priv->rst_parent);
+> +	clk_disable_unprepare(priv->clk_parent);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct phy_ops uniphier_u3hsphy_ops = {
+> +	.init           = uniphier_u3hsphy_init,
+> +	.exit           = uniphier_u3hsphy_exit,
+> +	.power_on       = uniphier_u3hsphy_power_on,
+> +	.power_off      = uniphier_u3hsphy_power_off,
+> +	.owner          = THIS_MODULE,
+> +};
+> +
+> +static int uniphier_u3hsphy_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct uniphier_u3hsphy_priv *priv;
+> +	struct phy_provider *phy_provider;
+> +	struct resource *res;
+> +	struct phy *phy;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	priv->dev = dev;
+> +	priv->data = of_device_get_match_data(dev);
+> +	if (WARN_ON(!priv->data ||
+> +		    priv->data->nparams > MAX_PHY_PARAMS))
+> +		return -EINVAL;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	priv->base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(priv->base))
+> +		return PTR_ERR(priv->base);
+> +
+> +	priv->clk = devm_clk_get(dev, "phy");
+> +	if (IS_ERR(priv->clk))
+> +		return PTR_ERR(priv->clk);
+> +
+> +	priv->clk_parent = devm_clk_get(dev, "link");
+> +	if (IS_ERR(priv->clk_parent))
+> +		return PTR_ERR(priv->clk_parent);
+> +
+> +	priv->clk_ext = devm_clk_get(dev, "phy-ext");
+> +	if (IS_ERR(priv->clk_ext)) {
+> +		if (PTR_ERR(priv->clk_ext) == -ENOENT)
+> +			priv->clk_ext = NULL;
+> +		else
+> +			return PTR_ERR(priv->clk_ext);
+> +	}
+> +
+> +	priv->rst = devm_reset_control_get_shared(dev, "phy");
+> +	if (IS_ERR(priv->rst))
+> +		return PTR_ERR(priv->rst);
+> +
+> +	priv->rst_parent = devm_reset_control_get_shared(dev, "link");
+> +	if (IS_ERR(priv->rst_parent))
+> +		return PTR_ERR(priv->rst_parent);
+> +
+> +	priv->vbus = devm_regulator_get_optional(dev, "vbus");
+> +	if (IS_ERR(priv->vbus)) {
+> +		if (PTR_ERR(priv->vbus) == -EPROBE_DEFER)
+> +			return PTR_ERR(priv->vbus);
+> +		priv->vbus = NULL;
+> +	}
+> +
+> +	phy = devm_phy_create(dev, dev->of_node, &uniphier_u3hsphy_ops);
+> +	if (IS_ERR(phy))
+> +		return PTR_ERR(phy);
+> +
+> +	phy_set_drvdata(phy, priv);
+> +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+> +	if (IS_ERR(phy_provider))
+> +		return PTR_ERR(phy_provider);
 
-So all platforms implementing OSI have to support both.
+return PTR_ERR_OR_ZERO()?
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct uniphier_u3hsphy_soc_data uniphier_pxs2_data = {
+> +	.nparams = 0,
+> +};
+> +
+> +static const struct uniphier_u3hsphy_soc_data uniphier_ld20_data = {
+> +	.nparams = 2,
+> +	.param = {
+> +		{ LS_SLEW, 1 },
+> +		{ FS_LS_DRV, 1 },
+> +	},
+> +	.trim_func = uniphier_u3hsphy_trim_ld20,
+> +	.config0 = 0x92316680,
+> +	.config1 = 0x00000106,
+> +};
+> +
+> +static const struct uniphier_u3hsphy_soc_data uniphier_pxs3_data = {
+> +	.nparams = 0,
+> +	.trim_func = uniphier_u3hsphy_trim_ld20,
+> +	.config0 = 0x92316680,
+> +	.config1 = 0x00000106,
+> +};
+> +
+> +static const struct of_device_id uniphier_u3hsphy_match[] = {
+> +	{
+> +		.compatible = "socionext,uniphier-pxs2-usb3-hsphy",
+> +		.data = &uniphier_pxs2_data,
+> +	},
+> +	{
+> +		.compatible = "socionext,uniphier-ld20-usb3-hsphy",
+> +		.data = &uniphier_ld20_data,
+> +	},
+> +	{
+> +		.compatible = "socionext,uniphier-pxs3-usb3-hsphy",
+> +		.data = &uniphier_pxs3_data,
+> +	},
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, uniphier_u3hsphy_match);
+> +
+> +static struct platform_driver uniphier_u3hsphy_driver = {
+> +	.probe = uniphier_u3hsphy_probe,
+> +	.driver	= {
+> +		.name = "uniphier-usb3-hsphy",
+> +		.of_match_table	= uniphier_u3hsphy_match,
+> +	},
+> +};
+> +
+> +module_platform_driver(uniphier_u3hsphy_driver);
+> +
+> +MODULE_AUTHOR("Kunihiko Hayashi <hayashi.kunihiko@socionext.com>");
+> +MODULE_DESCRIPTION("UniPhier HS-PHY driver for USB3 controller");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/drivers/phy/socionext/phy-uniphier-usb3ss.c b/drivers/phy/socionext/phy-uniphier-usb3ss.c
+> new file mode 100644
+> index 0000000..9456653
+> --- /dev/null
+> +++ b/drivers/phy/socionext/phy-uniphier-usb3ss.c
+> @@ -0,0 +1,350 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +//
+> +// phy-uniphier-usb3ss.c - SS-PHY driver for Socionext UniPhier USB3 controller
+> +// Copyright 2015-2018 Socionext Inc.
+> +// Author:
+> +//      Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> +// Contributors:
+> +//      Motoya Tanigawa <tanigawa.motoya@socionext.com>
+> +//      Masami Hiramatsu <masami.hiramatsu@linaro.org>
+> +
 
-> But, the OSI feature is critical for QCOM mobile platforms. The
-> last man activities during cpuidle save quite a lot of power.
+Same here..
+> +#include <linux/bitfield.h>
+> +#include <linux/bitops.h>
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/reset.h>
+> +
+> +#define SSPHY_TESTI		0x0
+> +#define SSPHY_TESTO		0x4
+> +#define TESTI_DAT_MASK		GENMASK(13, 6)
+> +#define TESTI_ADR_MASK		GENMASK(5, 1)
+> +#define TESTI_WR_EN		BIT(0)
+> +
+> +#define PHY_F(regno, msb, lsb) { (regno), (msb), (lsb) }
+> +
+> +#define CDR_CPD_TRIM	PHY_F(7, 3, 0)	/* RxPLL charge pump current */
+> +#define CDR_CPF_TRIM	PHY_F(8, 3, 0)	/* RxPLL charge pump current 2 */
+> +#define TX_PLL_TRIM	PHY_F(9, 3, 0)	/* TxPLL charge pump current */
+> +#define BGAP_TRIM	PHY_F(11, 3, 0)	/* Bandgap voltage */
+> +#define CDR_TRIM	PHY_F(13, 6, 5)	/* Clock Data Recovery setting */
+> +#define VCO_CTRL	PHY_F(26, 7, 4)	/* VCO control */
+> +#define VCOPLL_CTRL	PHY_F(27, 2, 0)	/* TxPLL VCO tuning */
+> +#define VCOPLL_CM	PHY_F(28, 1, 0)	/* TxPLL voltage */
+> +
+> +#define MAX_PHY_PARAMS	7
+> +
+> +struct uniphier_u3ssphy_param {
+> +	struct {
+> +		int reg_no;
+> +		int msb;
+> +		int lsb;
+> +	} field;
+> +	u8 value;
+> +};
+> +
+> +struct uniphier_u3ssphy_priv {
+> +	struct device *dev;
+> +	void __iomem *base;
+> +	struct clk *clk, *clk_ext, *clk_parent, *clk_parent_gio;
+> +	struct reset_control *rst, *rst_parent, *rst_parent_gio;
+> +	struct regulator *vbus;
+> +	const struct uniphier_u3ssphy_soc_data *data;
+> +};
+> +
+> +struct uniphier_u3ssphy_soc_data {
+> +	bool is_legacy;
+> +	int nparams;
+> +	const struct uniphier_u3ssphy_param param[MAX_PHY_PARAMS];
+> +};
+> +
+> +static void uniphier_u3ssphy_testio_write(struct uniphier_u3ssphy_priv *priv,
+> +					  u32 data)
+> +{
+> +	/* need to read TESTO twice after accessing TESTI */
+> +	writel(data, priv->base + SSPHY_TESTI);
+> +	readl(priv->base + SSPHY_TESTI);
+> +	readl(priv->base + SSPHY_TESTI);
+> +}
+> +
+> +static void uniphier_u3ssphy_set_param(struct uniphier_u3ssphy_priv *priv,
+> +				       const struct uniphier_u3ssphy_param *p)
+> +{
+> +	u32 val;
+> +	u8 field_mask = GENMASK(p->field.msb, p->field.lsb);
+> +	u8 data;
+> +
+> +	/* read previous data */
+> +	val  = FIELD_PREP(TESTI_DAT_MASK, 1);
+> +	val |= FIELD_PREP(TESTI_ADR_MASK, p->field.reg_no);
+> +	uniphier_u3ssphy_testio_write(priv, val);
+> +	val = readl(priv->base + SSPHY_TESTO);
+> +
+> +	/* update value */
+> +	val &= ~FIELD_PREP(TESTI_DAT_MASK, field_mask);
+> +	data = field_mask & (p->value << p->field.lsb);
+> +	val  = FIELD_PREP(TESTI_DAT_MASK, data);
+> +	val |= FIELD_PREP(TESTI_ADR_MASK, p->field.reg_no);
+> +	uniphier_u3ssphy_testio_write(priv, val);
+> +	uniphier_u3ssphy_testio_write(priv, val | TESTI_WR_EN);
+> +	uniphier_u3ssphy_testio_write(priv, val);
+> +
+> +	/* read current data as dummy */
+> +	val  = FIELD_PREP(TESTI_DAT_MASK, 1);
+> +	val |= FIELD_PREP(TESTI_ADR_MASK, p->field.reg_no);
+> +	uniphier_u3ssphy_testio_write(priv, val);
+> +	readl(priv->base + SSPHY_TESTO);
+> +}
+> +
+> +static int uniphier_u3ssphy_power_on(struct phy *phy)
+> +{
+> +	struct uniphier_u3ssphy_priv *priv = phy_get_drvdata(phy);
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(priv->clk_ext);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = clk_prepare_enable(priv->clk);
+> +	if (ret)
+> +		goto out_clk_ext_disable;
+> +
+> +	ret = reset_control_deassert(priv->rst);
+> +	if (ret)
+> +		goto out_clk_disable;
+> +
+> +	if (priv->vbus) {
+> +		ret = regulator_enable(priv->vbus);
+> +		if (ret)
+> +			goto out_rst_assert;
+> +	}
+> +
+> +	return 0;
+> +
+> +out_rst_assert:
+> +	reset_control_assert(priv->rst);
+> +out_clk_disable:
+> +	clk_disable_unprepare(priv->clk);
+> +out_clk_ext_disable:
+> +	clk_disable_unprepare(priv->clk_ext);
+> +
+> +	return ret;
+> +}
+> +
+> +static int uniphier_u3ssphy_power_off(struct phy *phy)
+> +{
+> +	struct uniphier_u3ssphy_priv *priv = phy_get_drvdata(phy);
+> +
+> +	if (priv->vbus)
+> +		regulator_disable(priv->vbus);
+> +
+> +	reset_control_assert(priv->rst);
+> +	clk_disable_unprepare(priv->clk);
+> +	clk_disable_unprepare(priv->clk_ext);
+> +
+> +	return 0;
+> +}
+> +
+> +static int uniphier_u3ssphy_init(struct phy *phy)
+> +{
+> +	struct uniphier_u3ssphy_priv *priv = phy_get_drvdata(phy);
+> +	int i, ret;
+> +
+> +	ret = clk_prepare_enable(priv->clk_parent);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = clk_prepare_enable(priv->clk_parent_gio);
+> +	if (ret)
+> +		goto out_clk_disable;
+> +
+> +	ret = reset_control_deassert(priv->rst_parent);
+> +	if (ret)
+> +		goto out_clk_gio_disable;
+> +
+> +	ret = reset_control_deassert(priv->rst_parent_gio);
+> +	if (ret)
+> +		goto out_rst_assert;
+> +
+> +	if (priv->data->is_legacy)
+> +		return 0;
+> +
+> +	for (i = 0; i < priv->data->nparams; i++)
+> +		uniphier_u3ssphy_set_param(priv, &priv->data->param[i]);
+> +
+> +	return 0;
+> +
+> +out_rst_assert:
+> +	reset_control_assert(priv->rst_parent);
+> +out_clk_gio_disable:
+> +	clk_disable_unprepare(priv->clk_parent_gio);
+> +out_clk_disable:
+> +	clk_disable_unprepare(priv->clk_parent);
+> +
+> +	return ret;
+> +}
+> +
+> +static int uniphier_u3ssphy_exit(struct phy *phy)
+> +{
+> +	struct uniphier_u3ssphy_priv *priv = phy_get_drvdata(phy);
+> +
+> +	reset_control_assert(priv->rst_parent_gio);
+> +	reset_control_assert(priv->rst_parent);
+> +	clk_disable_unprepare(priv->clk_parent_gio);
+> +	clk_disable_unprepare(priv->clk_parent);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct phy_ops uniphier_u3ssphy_ops = {
+> +	.init           = uniphier_u3ssphy_init,
+> +	.exit           = uniphier_u3ssphy_exit,
+> +	.power_on       = uniphier_u3ssphy_power_on,
+> +	.power_off      = uniphier_u3ssphy_power_off,
+> +	.owner          = THIS_MODULE,
+> +};
+> +
+> +static int uniphier_u3ssphy_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct uniphier_u3ssphy_priv *priv;
+> +	struct phy_provider *phy_provider;
+> +	struct resource *res;
+> +	struct phy *phy;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	priv->dev = dev;
+> +	priv->data = of_device_get_match_data(dev);
+> +	if (WARN_ON(!priv->data ||
+> +		    priv->data->nparams > MAX_PHY_PARAMS))
+> +		return -EINVAL;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	priv->base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(priv->base))
+> +		return PTR_ERR(priv->base);
+> +
+> +	if (!priv->data->is_legacy) {
+> +		priv->clk = devm_clk_get(dev, "phy");
+> +		if (IS_ERR(priv->clk))
+> +			return PTR_ERR(priv->clk);
+> +
+> +		priv->clk_ext = devm_clk_get(dev, "phy-ext");
+> +		if (IS_ERR(priv->clk_ext)) {
+> +			if (PTR_ERR(priv->clk_ext) == -ENOENT)
+> +				priv->clk_ext = NULL;
+> +			else
+> +				return PTR_ERR(priv->clk_ext);
+> +		}
+> +
+> +		priv->rst = devm_reset_control_get_shared(dev, "phy");
+> +		if (IS_ERR(priv->rst))
+> +			return PTR_ERR(priv->rst);
+> +	} else {
+> +		priv->clk_parent_gio = devm_clk_get(dev, "gio");
+> +		if (IS_ERR(priv->clk_parent_gio))
+> +			return PTR_ERR(priv->clk_parent_gio);
+> +
+> +		priv->rst_parent_gio =
+> +			devm_reset_control_get_shared(dev, "gio");
+> +		if (IS_ERR(priv->rst_parent_gio))
+> +			return PTR_ERR(priv->rst_parent_gio);
+> +	}
+> +
+> +	priv->clk_parent = devm_clk_get(dev, "link");
+> +	if (IS_ERR(priv->clk_parent))
+> +		return PTR_ERR(priv->clk_parent);
+> +
+> +	priv->rst_parent = devm_reset_control_get_shared(dev, "link");
+> +	if (IS_ERR(priv->rst_parent))
+> +		return PTR_ERR(priv->rst_parent);
+> +
+> +	priv->vbus = devm_regulator_get_optional(dev, "vbus");
+> +	if (IS_ERR(priv->vbus)) {
+> +		if (PTR_ERR(priv->vbus) == -EPROBE_DEFER)
+> +			return PTR_ERR(priv->vbus);
+> +		priv->vbus = NULL;
+> +	}
+> +
+> +	phy = devm_phy_create(dev, dev->of_node, &uniphier_u3ssphy_ops);
+> +	if (IS_ERR(phy))
+> +		return PTR_ERR(phy);
+> +
+> +	phy_set_drvdata(phy, priv);
+> +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+> +	if (IS_ERR(phy_provider))
+> +		return PTR_ERR(phy_provider);
 
-What I expressed above was that, in PSCI based systems (OSI or PC
-alike), it is up to firmware/hardware to detect "the last man" not
-the kernel.
+here too return PTR_ERR_OR_ZERO()
 
-I need to understand what you mean by "last man activities" to
-provide feedback here.
-
-> Powering off the clocks, busses, regulators and even the oscillator is
-> very important to have a reasonable battery life when using the phone.
-> Platform coordinated approach falls quite short of the needs of a
-> powerful processor with a desired battery efficiency.
-
-I am sorry but if you want us to merge PSCI patches in this series you
-will have to back the claim above with a detailed technical explanation
-of *why* platform-coordination falls short of QCOM (or whoever else)
-needs wrt PSCI OSI.
-
-Thanks,
-Lorenzo
+Thanks
+Kishon
