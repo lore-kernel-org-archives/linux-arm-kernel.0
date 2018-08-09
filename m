@@ -1,33 +1,56 @@
-From: aring@mojatatu.com (Alexander Aring)
-Date: Thu, 9 Aug 2018 11:21:34 -0400
-Subject: [RFC net-next 00/15] net: A socket API for LoRa
-In-Reply-To: <CAC=mGzjn4Kc-q9NFwX6NhU4V_thnzBP8SHtFQKyRbpSKR=yx3w@mail.gmail.com>
-References: <20180701110804.32415-1-afaerber@suse.de>
- <CAC=mGzgUCopz2xTOA0R-WD8a1DOaOOUn=YpfdMiJ33y3hnh6kg@mail.gmail.com>
- <92ee4016-1da9-826b-3674-b2d604a64848@suse.de>
- <20180808213640.10a1d76f@alans-desktop>
- <a70e9715-beac-d9a8-145e-de00175e56fa@suse.de>
- <20180809125939.39ac2cc9@alans-desktop>
- <CAC=mGzjn4Kc-q9NFwX6NhU4V_thnzBP8SHtFQKyRbpSKR=yx3w@mail.gmail.com>
-Message-ID: <20180809152134.gcql2lsh4sigx3hg@x220t>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu,  9 Aug 2018 16:26:39 +0100
+Subject: [PATCH 4/8] ARM: spectre-v1.1: harden __copy_to_user
+In-Reply-To: <1533828403-21323-1-git-send-email-julien.thierry@arm.com>
+References: <1533828403-21323-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1533828403-21323-5-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Sanitize user pointer given to __copy_to_user, both for standard version
+and memcopy version of the user accessor.
 
-On Thu, Aug 09, 2018 at 11:02:45PM +0800, Jian-Hong Pan wrote:
-...
-> 
-> For LoRaWAN, it is a star topology.
-> 
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+---
+ arch/arm/lib/copy_to_user.S        | 6 +++++-
+ arch/arm/lib/uaccess_with_memcpy.c | 3 ++-
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
-In sense of 6LoWPAN that means "border router" in the middle which runs
-radvd on it and sending RA messages. Then doing a route (or even allow nd
-proxy) between capable $IPv6 (ethernet?) and LoRa 6LoWPAN interface.
+diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
+index caf5019..970abe5 100644
+--- a/arch/arm/lib/copy_to_user.S
++++ b/arch/arm/lib/copy_to_user.S
+@@ -94,6 +94,11 @@
 
-All others listen for RA messages with PIO and doing autoconfiguration.
-(In 6LoWPAN you would also pass a 6CO option to compress the PIO
-prefix, which would make sense to fully elide all IP addresses in the
-header).
+ ENTRY(__copy_to_user_std)
+ WEAK(arm_copy_to_user)
++#ifdef CONFIG_CPU_SPECTRE
++	get_thread_info r3
++	ldr	r3, [r3, #TI_ADDR_LIMIT]
++	uaccess_mask_range_ptr r0, r2, r3, ip
++#endif
 
-- Alex
+ #include "copy_template.S"
+
+@@ -108,4 +113,3 @@ ENDPROC(__copy_to_user_std)
+ 	rsb	r0, r0, r2
+ 	copy_abort_end
+ 	.popsection
+-
+diff --git a/arch/arm/lib/uaccess_with_memcpy.c b/arch/arm/lib/uaccess_with_memcpy.c
+index 9b4ed17..73dc736 100644
+--- a/arch/arm/lib/uaccess_with_memcpy.c
++++ b/arch/arm/lib/uaccess_with_memcpy.c
+@@ -152,7 +152,8 @@
+ 		n = __copy_to_user_std(to, from, n);
+ 		uaccess_restore(ua_flags);
+ 	} else {
+-		n = __copy_to_user_memcpy(to, from, n);
++		n = __copy_to_user_memcpy(uaccess_mask_range_ptr(to, n),
++					  from, n);
+ 	}
+ 	return n;
+ }
+--
+1.9.1
