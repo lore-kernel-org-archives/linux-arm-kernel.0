@@ -1,170 +1,47 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 9 Aug 2018 10:46:00 +0100
-Subject: [PATCH 2/2] arm64: dts: sdm845: Add gpu and gmu device nodes
-In-Reply-To: <20180808224701.7527-3-jcrouse@codeaurora.org>
-References: <20180808224701.7527-1-jcrouse@codeaurora.org>
- <20180808224701.7527-3-jcrouse@codeaurora.org>
-Message-ID: <ae18847e-a4dc-4a75-d033-682ee88456d9@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 9 Aug 2018 10:58:44 +0100
+Subject: [PATCH v8 09/26] kernel/cpu_pm: Manage runtime PM in the idle
+ path for CPUs
+In-Reply-To: <20180808180248.GC27850@codeaurora.org>
+References: <20180620172226.15012-1-ulf.hansson@linaro.org>
+ <2056372.NMt4aPaF4h@aspire.rjw.lan>
+ <2205807.cU2puvubpP@aspire.rjw.lan>
+ <1726374.375PCQfjLZ@aspire.rjw.lan>
+ <CAPDyKFrmP15+_hyRp44Jw-wsTmsNFKORdCeGJEgW8o0OoKiHhA@mail.gmail.com>
+ <CAJZ5v0hk1wfm10fyycmddKF6wR4D51r30fD_-J5UDMbtB3+V-Q@mail.gmail.com>
+ <20180808105619.GB25150@e107981-ln.cambridge.arm.com>
+ <20180808180248.GC27850@codeaurora.org>
+Message-ID: <20180809095844.GA3444@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/18 23:47, Jordan Crouse wrote:
-> Add the nodes to describe the Adreno GPU and GMU devices.
-> 
-> Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
-> ---
->   arch/arm64/boot/dts/qcom/sdm845.dtsi | 121 +++++++++++++++++++++++++++
->   1 file changed, 121 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> index cdaabeb3c995..9fb90bb4ea1f 100644
-> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> @@ -323,5 +323,126 @@
->   				status = "disabled";
->   			};
->   		};
-> +
-> +		adreno_smmu: arm,smmu-adreno at 5040000 {
-> +			compatible = "qcom,msm8996-smmu-v2";
+On Wed, Aug 08, 2018 at 12:02:48PM -0600, Lina Iyer wrote:
 
-Per the binding, this should be:
+[...]
 
-	compatible = "qcom,msm8996-smmu-v2", "qcom,smmu-v2";
+> I will not speak to any comparison of benchmarks between OSI and PC.
+> AFAIK, there are no platforms supporting both.
+>
 
-(note that even with Vivek's series the driver won't actually match the 
-SoC-specific string until we find a real need to)
+That's the fundamental issue here. So we have never ever done a proper
+comparison.
 
-> +			reg = <0x5040000 0x10000>;
-> +			#iommu-cells = <1>;
-> +		#global-interrupts = <2>;
+> But, the OSI feature is critical for QCOM mobile platforms. The
+> last man activities during cpuidle save quite a lot of power. Powering
+> off the clocks, busses, regulators and even the oscillator is very
+> important to have a reasonable battery life when using the phone.
+> Platform coordinated approach falls quite short of the needs of a
+> powerful processor with a desired battery efficiency.
+>
 
-Indentation?
+As mentioned above, without the actual comparison it's hard to justify
+that. While there are corner cases where OSI is able to make better
+judgement, may be we can add ways to deal with that in the firmware
+with PC mode, have we explored that before adding complexity to the OSPM ?
+Since the firmware complexity with OSI remains same as PC mode, isn't it
+worth checking if the corner case we are talking here can be handled in
+the firmware.
 
-> +			interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
-
-And here?
-
-Otherwise, assuming the table walk really isn't cache-coherent, and the 
-global and CB interrupts really do have different triggers (yuck :P), 
-the SMMU parts look fine to me.
-
-Robin.
-
-> +			     <GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
-> +			     <GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
-> +			     <GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
-> +			     <GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
-> +			     <GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
-> +			     <GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
-> +			     <GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
-> +			     <GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
-> +			clocks = <&clock_gcc GCC_GPU_MEMNOC_GFX_CLK>,
-> +				<&clock_gcc GCC_GPU_CFG_AHB_CLK>;
-> +			clock-names = "bus", "iface";
-> +
-> +			power-domains = <&clock_gpucc GPU_CX_GDSC>;
-> +		};
-> +
-> +		gpu_opp_table: adreno-opp-table {
-> +			compatible = "operating-points-v2";
-> +
-> +			opp-710000000 {
-> +				opp-hz = /bits/ 64 <710000000>;
-> +				qcom,level = <416>;
-> +			};
-> +
-> +			opp-675000000 {
-> +				opp-hz = /bits/ 64 <675000000>;
-> +				qcom,level = <384>;
-> +			};
-> +
-> +			opp-596000000 {
-> +				opp-hz = /bits/ 64 <596000000>;
-> +				qcom,level = <320>;
-> +			};
-> +
-> +			opp-520000000 {
-> +				opp-hz = /bits/ 64 <520000000>;
-> +				qcom,level = <256>;
-> +			};
-> +
-> +			opp-414000000 {
-> +				opp-hz = /bits/ 64 <414000000>;
-> +				qcom,level = <192>;
-> +			};
-> +
-> +			opp-342000000 {
-> +				opp-hz = /bits/ 64 <342000000>;
-> +				qcom,level = <128>;
-> +			};
-> +
-> +			opp-257000000 {
-> +				opp-hz = /bits/ 64 <257000000>;
-> +				qcom,level = <64>;
-> +			};
-> +		};
-> +
-> +		gpu at 5000000 {
-> +			compatible = "qcom,adreno-630.2", "qcom,adreno";
-> +			#stream-id-cells = <16>;
-> +
-> +			reg = <0x5000000 0x40000>;
-> +			reg-names = "kgsl_3d0_reg_memory";
-> +
-> +			/*
-> +			 * Look ma, no clocks! The GPU clocks and power are
-> +			 * controlled entirely by the GMU
-> +			 */
-> +
-> +			interrupts = <0 300 0>;
-> +			interrupt-names = "kgsl_3d0_irq";
-> +
-> +			iommus = <&adreno_smmu 0>;
-> +
-> +			operating-points-v2 = <&gpu_opp_table>;
-> +
-> +			qcom,gmu = <&gmu>;
-> +		};
-> +
-> +		gmu_opp_table: adreno-gmu-opp-table {
-> +			compatible = "operating-points-v2";
-> +
-> +			opp-400000000 {
-> +				opp-hz = /bits/ 64 <400000000>;
-> +				qcom,level = <128>;
-> +			};
-> +
-> +			opp-200000000 {
-> +				opp-hz = /bits/ 64 <200000000>;
-> +				qcom,level = <48>;
-> +			};
-> +		};
-> +
-> +		gmu: gmu at 506a000 {
-> +			compatible="qcom,adreno-gmu";
-> +
-> +			reg = <0x506a000 0x30000>,
-> +				<0xb280000 0x10000>,
-> +				<0xb480000 0x10000>;
-> +			reg-names = "gmu", "gmu_pdc", "gmu_pdc_seq";
-> +
-> +			interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-names = "hfi", "gmu";
-> +
-> +			clocks = <&clock_gpucc GPU_CC_CX_GMU_CLK>,
-> +				<&clock_gpucc GPU_CC_CXO_CLK>,
-> +				<&gcc GCC_DDRSS_GPU_AXI_CLK>,
-> +				<&gcc GCC_GPU_MEMNOC_GFX_CLK>;
-> +			clock-names = "gmu", "cxo", "axi", "memnoc";
-> +
-> +			power-domains = <&clock_gpucc GPU_CX_GDSC>;
-> +			iommus = <&adreno_smmu 5>;
-> +
-> +			operating-points-v2 = <&gmu_opp_table>;
-> +		};
->   	};
->   };
-> 
+--
+Regards,
+Sudeep
