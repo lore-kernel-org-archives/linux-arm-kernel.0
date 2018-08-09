@@ -1,38 +1,43 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 09 Aug 2018 16:41:24 -0600
-Subject: [PATCH 2/3] clk: imx6q: optionally get CCM inputs via standard
- clock handles
-In-Reply-To: <20180731102009.6710-2-l.stach@pengutronix.de>
-References: <20180731102009.6710-1-l.stach@pengutronix.de>
- <20180731102009.6710-2-l.stach@pengutronix.de>
-Message-ID: <5b6cc315.1c69fb81.3b2b4.137c@mx.google.com>
+Date: Thu, 09 Aug 2018 16:41:26 -0600
+Subject: [PATCH 4/4] drm/meson: convert to the new canvas module
+In-Reply-To: <20180801185128.23440-5-maxi.jourdan@wanadoo.fr>
+References: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
+ <20180801185128.23440-5-maxi.jourdan@wanadoo.fr>
+Message-ID: <5b6cc316.1c69fb81.682d3.1216@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi, this is an automated email from Rob's (experimental) review bot. I
 found a couple of common problems with your patch. Please see below.
 
-On Tue, 31 Jul 2018 12:20:08 +0200, Lucas Stach wrote:
-> When specifying external clock inputs to the CCM the current code
-> requires the clocks to be in a "clocks" child node of the DT root.
-> This is not really conformant with DT best practices.
+On Wed,  1 Aug 2018 20:51:28 +0200, Maxime Jourdan wrote:
+> This removes the meson_canvas files within the meson/drm layer
+> and makes use of the new canvas module that is referenced in the dts.
 > 
-> To avoid the need to deviate from those best practices, allow the
-> clock inputs to be specifies via standard clock handles. This is
-> in line with how drivers of the later CCM driver revisions on
-> newer i.MX SoCs handle this.
+> Canvases can be used by different IPs and modules, and it is as such
+> preferable to rely on a module that can safely dispatch canvases on
+> demand.
 > 
-> As we can't retroactively change the DT binding, allow this as an
-> option with a fallback to the old way of how this has been handled.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
 
 The preferred subject prefix is "dt-bindings: <binding dir>: ...".
 
 > ---
->  .../devicetree/bindings/clock/imx6q-clock.txt |  5 +++++
->  drivers/clk/imx/clk-imx6q.c                   | 22 ++++++++++++++-----
->  2 files changed, 22 insertions(+), 5 deletions(-)
+>  .../bindings/display/amlogic,meson-vpu.txt    |  9 +--
+>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi     |  7 +-
+>  drivers/gpu/drm/meson/Kconfig                 |  1 +
+>  drivers/gpu/drm/meson/Makefile                |  2 +-
+>  drivers/gpu/drm/meson/meson_canvas.c          | 70 -------------------
+>  drivers/gpu/drm/meson/meson_canvas.h          | 42 -----------
+>  drivers/gpu/drm/meson/meson_crtc.c            |  5 +-
+>  drivers/gpu/drm/meson/meson_drv.c             | 35 ++++++----
+>  drivers/gpu/drm/meson/meson_drv.h             |  5 +-
+>  drivers/gpu/drm/meson/meson_plane.c           |  3 +-
+>  drivers/gpu/drm/meson/meson_viu.c             |  1 -
+>  11 files changed, 39 insertions(+), 141 deletions(-)
+>  delete mode 100644 drivers/gpu/drm/meson/meson_canvas.c
+>  delete mode 100644 drivers/gpu/drm/meson/meson_canvas.h
 > 
 
 DT bindings (including binding headers) should be a separate patch. See
