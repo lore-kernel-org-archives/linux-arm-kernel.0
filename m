@@ -1,75 +1,47 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 10 Aug 2018 09:41:49 +0100
-Subject: [PATCH v2 00/29] at24: remove at24_platform_data
-In-Reply-To: <20180810080526.27207-1-brgl@bgdev.pl>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
-Message-ID: <e3e2e350-f520-8af5-b5d7-6844a58ca479@linaro.org>
+From: jian.hu@amlogic.com (Jian Hu)
+Date: Fri, 10 Aug 2018 16:47:36 +0800
+Subject: [PATCH v3 0/2] clk: meson-g12a: Add EE clock controller driver
+Message-ID: <1533890858-113020-1-git-send-email-jian.hu@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add a Clock driver for the Everything-Else part of
+the Amlogic Meson-G12A SoC.
 
+Changes since v2 at[2]
+-fix fixed clocks's descriptions
+-fix aligment
+-add enable bit for plls base on [3] patches
+-add fix clock gate bit
 
-On 10/08/18 09:04, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> This is a follow-up to the previously rejected series[1] which partially
-> removed the at24_platform_data structure. After further development and
-> taking reviews into account, this series finally removes that struct
-> completely but not without touching many different parts of the code
-> base.
-> 
-> Since I took over maintainership of the at24 driver I've been working
-> towards removing at24_platform_data in favor for device properties.
-> 
-> DaVinci is the only platform that's still using it - all other users
-> have already been converted.
-> 
-> One of the obstacles in case of DaVinci is removing the setup() callback
-> from the pdata struct, the only user of which are some davinci boards.
-> 
-> Most boards use the EEPROM to store the MAC address. This series adds
-> support for cell lookups to the nvmem framework, registers relevant
-> cells for all users, adds nvmem support to eth_platform_get_mac_address(),
-> converts davinci_emac driver to using it and replaces at24_platform_data
-> with device properties.
-> 
-> There's also one board (da850-evm) which uses MTD for reading the MAC
-> address. I used the patch from Alban Bedel's previous submission[2] to
-> add support for nvmem to the MTD framework. Since this user doesn't
-> need device tree, I dropped Alban's patches modifying the DT bindings.
-> We can add that later once an agreement is reached. For the time being
-> MTD devices are registered as nvmem devices and we're registering the
-> mac-address cell using the cell lookup mechanism.
-> 
-> This series adds a blocking notifier chain to the nvmem framework, so
-> that we can keep the EEPROM reading code in the mityomapl138 board file
-> with only slight modifications.
-> 
-> I also included some minor fixes to the modified code.
-> 
-> Tested on da850-evm & dm365-evm.
-> 
-> [1] https://lkml.org/lkml/2018/6/29/153
-> [2] https://lkml.org/lkml/2018/3/24/312
-> 
-...
+Changes since v1 at[1]
+-fix typo of 'Everything'.
+-change the word 'AmLogic' to 'Amlogic'
+-squash patch 1 and 2.
+-delete usless message of "Trying obsolete regs".
+-delete the empty line in include/dt-bindings/clock/g12a-clkc.h.
+-rebase on top of the "next/drivers" branch, and add g12a clock patch.
+-add CLK_MUX_ROUND_CLOSEST for g12a_sd_emmc_b_clk0_sel and
+ g12a_sd_emmc_c_clk0_sel.
 
-> Bartosz Golaszewski (28):
->    nvmem: add support for cell lookups
->    Documentation: nvmem: document lookup entries
->    nvmem: add a notifier chain
->    nvmem: provide nvmem_dev_name()
->    nvmem: remove the name field from struct nvmem_device
-> 
->   Documentation/nvmem/nvmem.txt              |  28 +++++
-..
->   drivers/nvmem/core.c                       | 106 ++++++++++++++++-
+[1]https://lkml.kernel.org/r/1531133549-25806-2-git-send-email-jian.hu at amlogic.com
+[2]https://lkml.kernel.org/r/1531728707-192230-2-git-send-email-jian.hu at amlogic.com
+[3]https://lkml.kernel.org/r/20180717095617.12240-1-jbrunet at baylibre.com
 
-nvmem parts looks good to me other then few trivial kernel doc comments!
-I can either Ack those patches or Send them after rc3-4 to Greg KH as 
-4.20 material.
+Jian Hu (2):
+  dt-bindings: clk: meson-g12a: Add G12A EE Clock Bindings
+  clk: meson-g12a: Add EE Clock controller driver
 
-Thanks
-srini
+ .../bindings/clock/amlogic,gxbb-clkc.txt           |    1 +
+ drivers/clk/meson/Kconfig                          |   10 +
+ drivers/clk/meson/Makefile                         |    1 +
+ drivers/clk/meson/g12a.c                           | 1128 ++++++++++++++++++++
+ drivers/clk/meson/g12a.h                           |  128 +++
+ include/dt-bindings/clock/g12a-clkc.h              |   93 ++
+ 6 files changed, 1361 insertions(+)
+ create mode 100644 drivers/clk/meson/g12a.c
+ create mode 100644 drivers/clk/meson/g12a.h
+ create mode 100644 include/dt-bindings/clock/g12a-clkc.h
 
-> 
+-- 
+1.9.1
