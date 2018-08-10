@@ -1,272 +1,85 @@
-From: jianxin.pan@amlogic.com (Jianxin Pan)
-Date: Sat, 11 Aug 2018 02:07:54 +0800
-Subject: [PATCH 2/2] arm64: dts: meson-g12a: add initial g12a s905d2 SoC
- DT support
-In-Reply-To: <f21f60423cbc43797e2465f1a734f715795c30b6.camel@baylibre.com>
-References: <1533802951-49919-1-git-send-email-jianxin.pan@amlogic.com>
- <1533802951-49919-3-git-send-email-jianxin.pan@amlogic.com>
- <f21f60423cbc43797e2465f1a734f715795c30b6.camel@baylibre.com>
-Message-ID: <ae4a9444-9946-578f-0eed-8b235eaa6b4a@amlogic.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 10 Aug 2018 11:13:11 -0700
+Subject: ioremap() use with specific mailbox drivers and SCMI
+In-Reply-To: <CAK8P3a08jN_KF0SY2Vvi2V_f26_s44ReCB4vh1sdfz1-tgXjBQ@mail.gmail.com>
+References: <be5f7ed4-4b2c-2a6a-0a41-19e30172a048@gmail.com>
+ <c51e5750-eabd-6728-0a2c-8b1146ca5fab@gmail.com>
+ <9d9a2894-3f9f-8a7b-d53f-36f3c8e91aa6@arm.com>
+ <CAK8P3a08jN_KF0SY2Vvi2V_f26_s44ReCB4vh1sdfz1-tgXjBQ@mail.gmail.com>
+Message-ID: <fac4529f-cfd6-9b0a-2383-90c0a2e1aded@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/10/2018 7:58 PM, Jerome Brunet wrote:
-> On Thu, 2018-08-09 at 16:22 +0800, Jianxin Pan wrote:
->> Try to add basic DT support for the Amlogic's Meson-G12A S905D2 SoC,
->> which describe components as follows: Reserve Memory, CPU, GIC, IRQ,
->> Timer, UART. It's capable of booting up into the serial console.
+On 04/19/2018 02:05 PM, Arnd Bergmann wrote:
+> On Thu, Apr 19, 2018 at 7:09 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> On 19/04/18 17:35, Florian Fainelli wrote:
 >>
->> Signed-off-by: Jianxin <jianxin.pan@amlogic.com>
+>>>> Using a reserved-memory entry would be far less error prone, would
+>>>> clearly show the intents of the specific regions being declared, and
+>>>> could, through the use of additional properties (e.g: "map", as opposed
+>>>> to "no-map") indicate a possible need to map that DRAM region into
+>>>> kernel virtual memory and using e.g: memremap() APIs.
+>>>>
+>>
+>> Sorry for missing this. For some reasons, I had assumed memremap was
+>> specifically for DRAM and when I wrote the driver, I was testing on
+>> our internal Juno dev platform which has dedicated SRAM for the
+>> communication with remote control processor. However having a quick look
+>> at the API, I see no reasons to not use that as it takes care of using
+>> ioremap if required. But I am wondering why the generic SRAM driver in
+>> drivers/misc/sram.c uses ioremap.
+>>
+>>>> Also the semantics of ioremap() are not particularly portable from one
+>>>> architecture to another whereas memremap() is IMHO.
+>>>>
+>>
+>> Again, wasn't aware of that.
+>>
+>> Arnd,
+>>
+>> Do you see any issues moving from ioremap to memremap for SCMI ?
+>> I am asking you as you would have seen various platforms having multiple
+>> options for shared IPC memory and wanted to get you feedback.
 > 
-> Could please fix your signoff here ? Your last name went missing
+> Good question. The important point here is that whatever way the
+> kernel maps the buffer must match whatever the other end does:
 > 
-OK, I will fix this mistake. Thank you for your review.
+> - If you have regular RAM that is accessed using the CPU cache from
+>   firmware running on the same CPU, or using a cache-coherent method
+>   from a remote processor, you need to use memremap().
+> 
+> - If you have device registers somewhere, you must use ioremap()
+>   or possibly ioremap_wc().
+> 
+> - A dedicated SRAM is a bit tricky, usually that kind of buffer is accessed
+>   without going through the cache, so memremap() would be wrong.
+>   ioremap() is probably safe here.
+> 
+> - The last case would get you into real trouble: a memory buffer at
+>   a fixed location that is physicall in system RAM and excluded from
+>   the memory visible to the OS, but accessed from a remote processor
+>   that is not cache-coherent with your CPU caches. Here, you can't
+>   use memremap() since you want an uncached mapping, but ioremap()
+>   is probably also wrong. You could construct something using
+>   dma_map_single() that might work, but that's not what this API is
+>   meant for either.
 
->> ---
->>  arch/arm64/boot/dts/amlogic/Makefile            |   1 +
->>  arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts |  22 +++
->>  arch/arm64/boot/dts/amlogic/meson-g12a.dtsi     | 174 ++++++++++++++++++++++++
->>  3 files changed, 197 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
->>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
->>
->> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
->> index a97c0e2..c31f29d6 100644
->> --- a/arch/arm64/boot/dts/amlogic/Makefile
->> +++ b/arch/arm64/boot/dts/amlogic/Makefile
->> @@ -1,5 +1,6 @@
->>  # SPDX-License-Identifier: GPL-2.0
->>  dtb-$(CONFIG_ARCH_MESON) += meson-axg-s400.dtb
->> +dtb-$(CONFIG_ARCH_MESON) += meson-g12a-u200.dtb
->>  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nanopi-k2.dtb
->>  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nexbox-a95x.dtb
->>  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-odroidc2.dtb
->> diff --git a/arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts b/arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
->> new file mode 100644
->> index 0000000..d267a37
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
->> @@ -0,0 +1,22 @@
->> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->> +/*
->> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include "meson-g12a.dtsi"
->> +
->> +/ {
->> +	compatible = "amlogic,u200", "amlogic,g12a";
->> +	model = "Amlogic Meson G12A U200 Development Board";
->> +
->> +	aliases {
->> +		serial0 = &uart_AO;
->> +	};
->> +};
->> +
->> +&uart_AO {
->> +	status = "okay";
->> +};
->> +
->> diff --git a/arch/arm64/boot/dts/amlogic/meson-g12a.dtsi b/arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
->> new file mode 100644
->> index 0000000..64a0f2e
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
->> @@ -0,0 +1,174 @@
->> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->> +/*
->> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
->> + */
->> +
->> +#include <dt-bindings/gpio/gpio.h>
->> +#include <dt-bindings/interrupt-controller/irq.h>
->> +#include <dt-bindings/interrupt-controller/arm-gic.h>
->> +
->> +/ {
-> 
-> Could you please order the subnodes alphabetically ?
-> 
-> In general, we should try to order nodes by addresses when there is one and
-> alphabetically when there is none. This is something we have to fix for the AXG
-> as well.
-> 
-> 
-OK, I will fix this in g12a first.>> +	compatible = "amlogic,g12a";
->> +
->> +	interrupt-parent = <&gic>;
->> +	#address-cells = <2>;
->> +	#size-cells = <2>;
->> +
->> +	reserved-memory {
->> +		#address-cells = <2>;
->> +		#size-cells = <2>;
->> +		ranges;
->> +
->> +		/* Alternate 3 MiB reserved for ARM Trusted Firmware (BL31) */
-> 
-> It's the only one (for now at least) so it's not really an alternate, isn't it ?
-> 
-Yes, the reserved memory for BL31 is a must. I will remove 'Alternate' in V2. 
->> +		secmon_reserved: secmon at 5000000 {
->> +			reg = <0x0 0x05000000 0x0 0x300000>;
->> +			no-map;
->> +		};
->> +	};
->> +
->> +	cpus {
->> +		#address-cells = <0x2>;
->> +		#size-cells = <0x0>;
->> +
->> +		cpu0: cpu at 0 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a53", "arm,armv8";
->> +			reg = <0x0 0x0>;
->> +			enable-method = "psci";
->> +			next-level-cache = <&l2>;
->> +		};
->> +
->> +		cpu1: cpu at 1 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a53", "arm,armv8";
->> +			reg = <0x0 0x1>;
->> +			enable-method = "psci";
->> +			next-level-cache = <&l2>;
->> +		};
->> +
->> +		cpu2: cpu at 2 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a53", "arm,armv8";
->> +			reg = <0x0 0x2>;
->> +			enable-method = "psci";
->> +			next-level-cache = <&l2>;
->> +		};
->> +
->> +		cpu3: cpu at 3 {
->> +			device_type = "cpu";
->> +			compatible = "arm,cortex-a53", "arm,armv8";
->> +			reg = <0x0 0x3>;
->> +			enable-method = "psci";
->> +			next-level-cache = <&l2>;
->> +		};
->> +
->> +		l2: l2-cache0 {
->> +			compatible = "cache";
->> +		};
->> +	};
->> +
->> +	psci {
->> +		compatible = "arm,psci-1.0";
->> +		method = "smc";
->> +	};
->> +
->> +	timer {
->> +		compatible = "arm,armv8-timer";
->> +		interrupts = <GIC_PPI 13
->> +			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>,
->> +			     <GIC_PPI 14
->> +			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>,
->> +			     <GIC_PPI 11
->> +			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>,
->> +			     <GIC_PPI 10
->> +			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>;
->> +	};
->> +
->> +	xtal: xtal-clk {
->> +		compatible = "fixed-clock";
->> +		clock-frequency = <24000000>;
->> +		clock-output-names = "xtal";
->> +		#clock-cells = <0>;
->> +	};
->> +
->> +	soc {
->> +		compatible = "simple-bus";
->> +		#address-cells = <2>;
->> +		#size-cells = <2>;
->> +		ranges;
-> 
-> Could you please order the different bus by ascending addresses ?
-> 
-> 
-OK, I will change it in v2. Thank you.
->> +
->> +		apb: apb at ffe00000 {
->> +			compatible = "simple-bus";
->> +			reg = <0x0 0xffe00000 0x0 0x200000>;
->> +			#address-cells = <2>;
->> +			#size-cells = <2>;
->> +			ranges = <0x0 0x0 0x0 0xffe00000 0x0 0x200000>;
->> +		};
->> +
->> +		cbus: bus at ffd00000 {
->> +			compatible = "simple-bus";
->> +			reg = <0x0 0xffd00000 0x0 0x25000>;
->> +			#address-cells = <2>;
->> +			#size-cells = <2>;
->> +			ranges = <0x0 0x0 0x0 0xffd00000 0x0 0x25000>;
->> +
->> +		};
->> +
->> +		gic: interrupt-controller at ffc01000 {
->> +			compatible = "arm,gic-400";
->> +			reg = <0x0 0xffc01000 0 0x1000>,
->> +			      <0x0 0xffc02000 0 0x2000>,
->> +			      <0x0 0xffc04000 0 0x2000>,
->> +			      <0x0 0xffc06000 0 0x2000>;
->> +			interrupt-controller;
->> +			interrupts = <GIC_PPI 9
->> +				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
->> +			#interrupt-cells = <3>;
->> +			#address-cells = <0>;
->> +		};
->> +
->> +		hiubus: bus at ff63c000 {
->> +			compatible = "simple-bus";
->> +			reg = <0x0 0xff63c000 0x0 0x1c00>;
->> +			#address-cells = <2>;
->> +			#size-cells = <2>;
->> +			ranges = <0x0 0x0 0x0 0xff63c000 0x0 0x1c00>;
->> +
->> +		};
->> +
->> +		periphs: periphs at ff634000 {
->> +			compatible = "simple-bus";
->> +			reg = <0x0 0xff634000 0x0 0x2000>;
->> +			#address-cells = <2>;
->> +			#size-cells = <2>;
->> +			ranges = <0x0 0x0 0x0 0xff634000 0x0 0x2000>;
->> +		};
->> +
->> +		aobus: bus at ff800000 {
->> +			compatible = "simple-bus";
->> +			reg = <0x0 0xff800000 0x0 0x100000>;
->> +			#address-cells = <2>;
->> +			#size-cells = <2>;
->> +			ranges = <0x0 0x0 0x0 0xff800000 0x0 0x100000>;
->> +
->> +			uart_AO: serial at 3000 {
->> +				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
->> +				reg = <0x0 0x3000 0x0 0x18>;
->> +				interrupts = <GIC_SPI 193 IRQ_TYPE_EDGE_RISING>;
->> +				clocks = <&xtal>, <&xtal>, <&xtal>;
->> +				clock-names = "xtal", "pclk", "baud";
->> +				status = "disabled";
->> +			};
->> +
->> +			uart_AO_B: serial at 4000 {
->> +				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
->> +				reg = <0x0 0x4000 0x0 0x18>;
->> +				interrupts = <GIC_SPI 197 IRQ_TYPE_EDGE_RISING>;
->> +				clocks = <&xtal>, <&xtal>, <&xtal>;
->> +				clock-names = "xtal", "pclk", "baud";
->> +				status = "disabled";
->> +			};
->> +
->> +		};
->> +	};
->> +};
-> 
-> 
-> .
-> 
+I suppose as long as you have a struct page created for that memory area
+you should be fine with the DMA-API, right? Would have to that to
+happen, otherwise the reserved memory region is flagged with "nomap" and
+then you won't have any, and it's truly invisible to the Linux.
+
+Part of the problem is that, when using a "shmem" phandle, we have no
+clue about what address space we might be come from, we might be able to
+figure it out somehow, like, are within a node, within a bus, which
+appears to map to register space, or are we within a reserved-memory
+node, in which case, we likely point to RAM.
+
+ioremap() is actually quite conservative but what the HiSilicon DTS file
+I referred to is doing seems like a hack because it carves out the
+mailbox area from it's memory node's "reg" property, and besides
+silencing the warning in arch/arm*/mmm/ioremap.c about remapping RAM, I
+am not sure how this is any safer than ignoring the warning and still
+doing ioremap() against a region of RAM?
+-- 
+Florian
