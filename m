@@ -1,33 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 10 Aug 2018 12:11:19 +0200
-Subject: [RFC PATCH v2 04/12] mtd: rawnand: ams-delta: request data port
- GPIO resource
-In-Reply-To: <20180806222918.12644-5-jmkrzyszt@gmail.com>
-References: <20180718235710.18242-1-jmkrzyszt@gmail.com>
- <20180806222918.12644-1-jmkrzyszt@gmail.com>
- <20180806222918.12644-5-jmkrzyszt@gmail.com>
-Message-ID: <CACRpkdZFq3AfH6ehCzMYqwptyfpdd3NLurx3kgj==DmKRASuiA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 10 Aug 2018 11:14:18 +0100
+Subject: [PATCH v2 0/4] KVM: arm/arm64: vgic-v3: Group0 SGI support
+Message-ID: <20180810101422.3569-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 7, 2018 at 12:29 AM Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
+Although we now have Group0 support, we still miss support for Group0
+SGIs (which amounts to handling ICC_SGI0R_EL1 and ICC_ASGI1R_EL1
+traps), and this small series adds such support.
 
-> Data port used by the driver is actually an OMAP MPUIO device, already
-> under control of gpio-omap driver.  For that reason we used to not
-> request the memory region of the port as that would fail because the
-> region is already busy.  Despite that, we are still accessing the port
-> by just ioremapping it and performing read/write operations.  Moreover,
-> we are doing that without any proteciton from other users legally
-> manipulating the port pins over GPIO API.
->
-> The plan is to convert the driver to access the port over functions
-> exposed by the gpio-omap driver.  Before that happens, already prevent
-> from other users accessing the port pins by requesting an array of its
-> GPIO descriptors.
->
-> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+I appreciate this is *very* late for 4.19, yet I'd like to take it in
+as they complement Christoffer's Group0 support, and It'd be annoying
+to have something incomplete in 4.19.
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Please shout if you spot something that doesn't look quite right.
 
-Yours,
-Linus Walleij
+Thanks,
+
+	M.
+
+* From v1:
+  - Clarified the condition for which a G1 SGI can be queued
+  - Added ABs abd RBs from Christoffer and Eric
+
+Marc Zyngier (4):
+  KVM: arm64: Remove non-existent AArch32 ICC_SGI1R encoding
+  KVM: arm/arm64: vgic-v3: Add core support for Group0 SGIs
+  KVM: arm64: vgic-v3: Add support for ICC_SGI0R_EL1 and ICC_ASGI1R_EL1
+    accesses
+  KVM: arm: vgic-v3: Add support for ICC_SGI0R and ICC_ASGI1R accesses
+
+ arch/arm/kvm/coproc.c            | 25 ++++++++++++++++++-
+ arch/arm64/include/asm/sysreg.h  |  2 ++
+ arch/arm64/kvm/sys_regs.c        | 43 +++++++++++++++++++++++++++++---
+ include/kvm/arm_vgic.h           |  2 +-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 19 +++++++++++---
+ 5 files changed, 81 insertions(+), 10 deletions(-)
+
+-- 
+2.18.0
