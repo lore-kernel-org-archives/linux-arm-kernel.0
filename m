@@ -1,63 +1,59 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 10 Aug 2018 10:05:09 +0200
-Subject: [PATCH v2 12/29] ARM: davinci: da850-evm: use nvmem lookup for mac
- address
+Date: Fri, 10 Aug 2018 10:04:59 +0200
+Subject: [PATCH v2 02/29] Documentation: nvmem: document lookup entries
 In-Reply-To: <20180810080526.27207-1-brgl@bgdev.pl>
 References: <20180810080526.27207-1-brgl@bgdev.pl>
-Message-ID: <20180810080526.27207-13-brgl@bgdev.pl>
+Message-ID: <20180810080526.27207-3-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We now support nvmem lookups for machine code. Add a lookup for
-mac-address.
+Describe the usage of nvmem cell lookup tables.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-da850-evm.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ Documentation/nvmem/nvmem.txt | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 6d5beb11bd96..5a634a04ec69 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -29,6 +29,7 @@
- #include <linux/mtd/rawnand.h>
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/physmap.h>
-+#include <linux/nvmem-provider.h>
- #include <linux/platform_device.h>
- #include <linux/platform_data/gpio-davinci.h>
- #include <linux/platform_data/mtd-davinci.h>
-@@ -99,6 +100,19 @@ static struct mtd_partition da850evm_spiflash_part[] = {
- 	},
- };
+diff --git a/Documentation/nvmem/nvmem.txt b/Documentation/nvmem/nvmem.txt
+index 8d8d8f58f96f..9d5e3ca2b4f3 100644
+--- a/Documentation/nvmem/nvmem.txt
++++ b/Documentation/nvmem/nvmem.txt
+@@ -58,6 +58,34 @@ static int qfprom_probe(struct platform_device *pdev)
+ It is mandatory that the NVMEM provider has a regmap associated with its
+ struct device. Failure to do would return error code from nvmem_register().
  
-+static struct nvmem_cell_lookup da850evm_mac_address_cell = {
++Additionally it is possible to create nvmem cell lookup entries and register
++them with the nvmem framework from machine code as shown in the example below:
++
++static struct nvmem_cell_lookup foobar_lookup = {
 +	.info = {
 +		.name = "mac-address",
-+		.offset = 0x0,
-+		.bytes = ETH_ALEN,
++		.offset = 0xd000,
++		.bytes = ERH_ALEN,
 +	},
-+	/*
-+	 * The nvmem name differs from the partition name because of the
-+	 * internal works of the nvmem framework.
-+	 */
-+	.nvmem_name = "MAC-Address0",
++	.nvmem_name = "foobar",
 +};
 +
- static struct flash_platform_data da850evm_spiflash_data = {
- 	.name		= "m25p80",
- 	.parts		= da850evm_spiflash_part,
-@@ -1447,6 +1461,8 @@ static __init void da850_evm_init(void)
- 		pr_warn("%s: spi info registration failed: %d\n", __func__,
- 			ret);
- 
-+	nvmem_add_lookup_table(&da850evm_mac_address_cell, 1);
++static void foobar_register(void)
++{
++	...
++	nvmem_add_lookup_table(&foobar_lookup, 1);
++	...
++}
 +
- 	ret = da8xx_register_spi_bus(1, ARRAY_SIZE(da850evm_spi_info));
- 	if (ret)
- 		pr_warn("%s: SPI 1 registration failed: %d\n", __func__, ret);
++A lookup entry table can be later removed if needed:
++
++static void foobar_fini(void)
++{
++	...
++	nvmem_del_lookup_table(&foobar_lookup, 1);
++	...
++}
++
+ NVMEM Consumers
+ +++++++++++++++
+ 
 -- 
 2.18.0
