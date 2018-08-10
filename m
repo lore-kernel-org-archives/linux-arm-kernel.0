@@ -1,85 +1,129 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 10 Aug 2018 11:13:11 -0700
-Subject: ioremap() use with specific mailbox drivers and SCMI
-In-Reply-To: <CAK8P3a08jN_KF0SY2Vvi2V_f26_s44ReCB4vh1sdfz1-tgXjBQ@mail.gmail.com>
-References: <be5f7ed4-4b2c-2a6a-0a41-19e30172a048@gmail.com>
- <c51e5750-eabd-6728-0a2c-8b1146ca5fab@gmail.com>
- <9d9a2894-3f9f-8a7b-d53f-36f3c8e91aa6@arm.com>
- <CAK8P3a08jN_KF0SY2Vvi2V_f26_s44ReCB4vh1sdfz1-tgXjBQ@mail.gmail.com>
-Message-ID: <fac4529f-cfd6-9b0a-2383-90c0a2e1aded@gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 10 Aug 2018 19:51:17 +0100
+Subject: [PATCH] KVM: arm/arm64: Skip updating page table entry if no
+ change
+In-Reply-To: <86mutup9mu.wl-marc.zyngier@arm.com> (Marc Zyngier's message of
+ "Fri, 10 Aug 2018 15:40:57 +0100")
+References: <20180810111300.17144-1-punit.agrawal@arm.com>
+ <86mutup9mu.wl-marc.zyngier@arm.com>
+Message-ID: <871sb62gyi.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2018 02:05 PM, Arnd Bergmann wrote:
-> On Thu, Apr 19, 2018 at 7:09 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> On 19/04/18 17:35, Florian Fainelli wrote:
->>
->>>> Using a reserved-memory entry would be far less error prone, would
->>>> clearly show the intents of the specific regions being declared, and
->>>> could, through the use of additional properties (e.g: "map", as opposed
->>>> to "no-map") indicate a possible need to map that DRAM region into
->>>> kernel virtual memory and using e.g: memremap() APIs.
->>>>
->>
->> Sorry for missing this. For some reasons, I had assumed memremap was
->> specifically for DRAM and when I wrote the driver, I was testing on
->> our internal Juno dev platform which has dedicated SRAM for the
->> communication with remote control processor. However having a quick look
->> at the API, I see no reasons to not use that as it takes care of using
->> ioremap if required. But I am wondering why the generic SRAM driver in
->> drivers/misc/sram.c uses ioremap.
->>
->>>> Also the semantics of ioremap() are not particularly portable from one
->>>> architecture to another whereas memremap() is IMHO.
->>>>
->>
->> Again, wasn't aware of that.
->>
->> Arnd,
->>
->> Do you see any issues moving from ioremap to memremap for SCMI ?
->> I am asking you as you would have seen various platforms having multiple
->> options for shared IPC memory and wanted to get you feedback.
-> 
-> Good question. The important point here is that whatever way the
-> kernel maps the buffer must match whatever the other end does:
-> 
-> - If you have regular RAM that is accessed using the CPU cache from
->   firmware running on the same CPU, or using a cache-coherent method
->   from a remote processor, you need to use memremap().
-> 
-> - If you have device registers somewhere, you must use ioremap()
->   or possibly ioremap_wc().
-> 
-> - A dedicated SRAM is a bit tricky, usually that kind of buffer is accessed
->   without going through the cache, so memremap() would be wrong.
->   ioremap() is probably safe here.
-> 
-> - The last case would get you into real trouble: a memory buffer at
->   a fixed location that is physicall in system RAM and excluded from
->   the memory visible to the OS, but accessed from a remote processor
->   that is not cache-coherent with your CPU caches. Here, you can't
->   use memremap() since you want an uncached mapping, but ioremap()
->   is probably also wrong. You could construct something using
->   dma_map_single() that might work, but that's not what this API is
->   meant for either.
+Marc Zyngier <marc.zyngier@arm.com> writes:
 
-I suppose as long as you have a struct page created for that memory area
-you should be fine with the DMA-API, right? Would have to that to
-happen, otherwise the reserved memory region is flagged with "nomap" and
-then you won't have any, and it's truly invisible to the Linux.
+> Hi Punit,
+>
+> On Fri, 10 Aug 2018 12:13:00 +0100,
+> Punit Agrawal <punit.agrawal@arm.com> wrote:
+>> 
+>> Contention on updating a page table entry by a large number of vcpus
+>> can lead to duplicate work when handling stage 2 page faults. As the
+>> page table update follows the break-before-make requirement of the
+>> architecture, it can lead to repeated refaults due to clearing the
+>> entry and flushing the tlbs.
+>> 
+>> This problem is more likely when -
+>> 
+>> * there are large number of vcpus
+>> * the mapping is large block mapping
+>>  
+>> such as when using PMD hugepages (512MB) with 64k pages.
+>> 
+>> Fix this by skipping the page table update if there is no change in
+>> the entry being updated.
+>> 
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@arm.com>
+>> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+>
+> This definitely deserves a Cc to stable, and a Fixes: tag.
 
-Part of the problem is that, when using a "shmem" phandle, we have no
-clue about what address space we might be come from, we might be able to
-figure it out somehow, like, are within a node, within a bus, which
-appears to map to register space, or are we within a reserved-memory
-node, in which case, we likely point to RAM.
+Agreed.
 
-ioremap() is actually quite conservative but what the HiSilicon DTS file
-I referred to is doing seems like a hack because it carves out the
-mailbox area from it's memory node's "reg" property, and besides
-silencing the warning in arch/arm*/mmm/ioremap.c about remapping RAM, I
-am not sure how this is any safer than ignoring the warning and still
-doing ioremap() against a region of RAM?
--- 
-Florian
+For PMD the issue exists since commit ad361f093c1e ("KVM: ARM: Support
+hugetlbfs backed huge pages") when the file lived in arch/arm/kvm. (v3.12+)
+
+For PTE the issue exists since commit d5d8184d35c9 ("KVM: ARM: Memory
+virtualization setup"). (v3.8+)
+
+I'll split the fix into two patches and add a cc to stable.
+
+>> --
+>> Hi,
+>> 
+>> This problem was reported by a user when testing PUD hugepages. During
+>> VM restore when all threads are running cpu intensive workload, the
+>> refauting was causing the VM to not make any forward progress.
+>> 
+>> This patch fixes the problem for PMD and PTE page fault handling.
+>> 
+>> Thanks,
+>> Punit
+>> 
+>> Change-Id: I04c9aa8b9fbada47deb1a171c9959f400a0d2a21
+
+Just noticed this. Looks like the commit hook has escaped it's worktree.
+
+>> ---
+>>  virt/kvm/arm/mmu.c | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>> 
+>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>> index 1d90d79706bd..a66a5441ca2f 100644
+>> --- a/virt/kvm/arm/mmu.c
+>> +++ b/virt/kvm/arm/mmu.c
+>> @@ -1027,6 +1027,18 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+>>  	VM_BUG_ON(pmd_present(*pmd) && pmd_pfn(*pmd) != pmd_pfn(*new_pmd));
+>>  
+>>  	old_pmd = *pmd;
+>> +	/*
+>> +	 * Multiple vcpus faulting on the same PMD entry, can lead to
+>> +	 * them sequentially updating the PMD with the same
+>> +	 * value. Following the break-before-make (pmd_clear()
+>> +	 * followed by tlb_flush()) process can hinder forward
+>> +	 * progress due to refaults generated on missing translations.
+>> +	 *
+>> +	 * Skip updating the page table if the entry is unchanged.
+>> +	 */
+>> +	if (pmd_val(old_pmd) == pmd_val(*new_pmd))
+>> +		return 0;
+>
+> Shouldn't you take this opportunity to also refactor it with the above
+> VM_BUG_ON and the below pmd_present? At the moment, we end-up testing
+> pmd_present twice, and your patch is awfully similar to the VM_BUG_ON
+> one.
+
+I went for the minimal change keeping a backport in mind.
+
+The VM_BUG_ON() is enabled only when CONFIG_DEBUG_VM is selected and
+checks for pfn ignoring the attributes, while this fix checks for the
+entire entry. Maybe I'm missing something, but I can't see an obvious
+way to combine the checks.
+
+I've eliminated the duplicate pmd_present() check and will post the
+updated patches.
+
+Thanks,
+Punit
+
+>> +
+>>  	if (pmd_present(old_pmd)) {
+>>  		pmd_clear(pmd);
+>>  		kvm_tlb_flush_vmid_ipa(kvm, addr);
+>> @@ -1101,6 +1113,10 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>>  
+>>  	/* Create 2nd stage page table mapping - Level 3 */
+>>  	old_pte = *pte;
+>> +	/* Skip page table update if there is no change */
+>> +	if (pte_val(old_pte) == pte_val(*new_pte))
+>> +		return 0;
+>> +
+>>  	if (pte_present(old_pte)) {
+>>  		kvm_set_pte(pte, __pte(0));
+>>  		kvm_tlb_flush_vmid_ipa(kvm, addr);
+>
+> Thanks,
+>
+> 	M.
