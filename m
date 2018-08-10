@@ -1,262 +1,181 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 10 Aug 2018 13:58:34 +0200
-Subject: [PATCH 2/2] arm64: dts: meson-g12a: add initial g12a s905d2 SoC
- DT support
-In-Reply-To: <1533802951-49919-3-git-send-email-jianxin.pan@amlogic.com>
-References: <1533802951-49919-1-git-send-email-jianxin.pan@amlogic.com>
- <1533802951-49919-3-git-send-email-jianxin.pan@amlogic.com>
-Message-ID: <f21f60423cbc43797e2465f1a734f715795c30b6.camel@baylibre.com>
+Date: Fri, 10 Aug 2018 14:27:21 +0200
+Subject: [PATCH v4 1/3] clk: meson: add emmc sub clock phase delay driver
+In-Reply-To: <20180809070724.11935-2-yixun.lan@amlogic.com>
+References: <20180809070724.11935-1-yixun.lan@amlogic.com>
+ <20180809070724.11935-2-yixun.lan@amlogic.com>
+Message-ID: <8ba84364847ae800fcfcab34573a25996d8724fd.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-08-09 at 16:22 +0800, Jianxin Pan wrote:
-> Try to add basic DT support for the Amlogic's Meson-G12A S905D2 SoC,
-> which describe components as follows: Reserve Memory, CPU, GIC, IRQ,
-> Timer, UART. It's capable of booting up into the serial console.
+On Thu, 2018-08-09 at 15:07 +0800, Yixun Lan wrote:
+> Export the emmc sub clock phase delay ops which will be used
+> by the emmc sub clock driver itself.
 > 
-> Signed-off-by: Jianxin <jianxin.pan@amlogic.com>
-
-Could please fix your signoff here ? Your last name went missing
-
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 > ---
->  arch/arm64/boot/dts/amlogic/Makefile            |   1 +
->  arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts |  22 +++
->  arch/arm64/boot/dts/amlogic/meson-g12a.dtsi     | 174 ++++++++++++++++++++++++
->  3 files changed, 197 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
+>  drivers/clk/meson/Makefile          |  2 +-
+>  drivers/clk/meson/clk-phase-delay.c | 96 +++++++++++++++++++++++++++++
+>  drivers/clk/meson/clkc.h            | 13 ++++
+>  3 files changed, 110 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/clk/meson/clk-phase-delay.c
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-> index a97c0e2..c31f29d6 100644
-> --- a/arch/arm64/boot/dts/amlogic/Makefile
-> +++ b/arch/arm64/boot/dts/amlogic/Makefile
-> @@ -1,5 +1,6 @@
->  # SPDX-License-Identifier: GPL-2.0
->  dtb-$(CONFIG_ARCH_MESON) += meson-axg-s400.dtb
-> +dtb-$(CONFIG_ARCH_MESON) += meson-g12a-u200.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nanopi-k2.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nexbox-a95x.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-odroidc2.dtb
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts b/arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
+> diff --git a/drivers/clk/meson/Makefile b/drivers/clk/meson/Makefile
+> index 72ec8c40d848..39ce5661b654 100644
+> --- a/drivers/clk/meson/Makefile
+> +++ b/drivers/clk/meson/Makefile
+> @@ -2,7 +2,7 @@
+>  # Makefile for Meson specific clk
+>  #
+>  
+> -obj-$(CONFIG_COMMON_CLK_AMLOGIC) += clk-pll.o clk-mpll.o clk-phase.o
+> +obj-$(CONFIG_COMMON_CLK_AMLOGIC) += clk-pll.o clk-mpll.o clk-phase.o clk-phase-delay.o
+>  obj-$(CONFIG_COMMON_CLK_AMLOGIC_AUDIO)	+= clk-triphase.o sclk-div.o
+>  obj-$(CONFIG_COMMON_CLK_MESON_AO) += meson-aoclk.o
+>  obj-$(CONFIG_COMMON_CLK_MESON8B) += meson8b.o
+> diff --git a/drivers/clk/meson/clk-phase-delay.c b/drivers/clk/meson/clk-phase-delay.c
 > new file mode 100644
-> index 0000000..d267a37
+> index 000000000000..6f226814cfec
 > --- /dev/null
-> +++ b/arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
-> @@ -0,0 +1,22 @@
+> +++ b/drivers/clk/meson/clk-phase-delay.c
+> @@ -0,0 +1,96 @@
 > +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 > +/*
-> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
+> + * Amlogic Meson MMC Sub Clock Controller Driver
+> + *
+> + * Copyright (c) 2017 Baylibre SAS.
+> + * Author: Jerome Brunet <jbrunet@baylibre.com>
+> + *
+> + * Copyright (c) 2018 Amlogic, inc.
+> + * Author: Yixun Lan <yixun.lan@amlogic.com>
 > + */
 > +
-> +/dts-v1/;
+> +#include <linux/clk-provider.h>
+> +#include "clkc.h"
 > +
-> +#include "meson-g12a.dtsi"
+> +#define SD_EMMC_CLOCK			0
+
+Drop this and use struct parm please.
+
 > +
-> +/ {
-> +	compatible = "amlogic,u200", "amlogic,g12a";
-> +	model = "Amlogic Meson G12A U200 Development Board";
+> +static int meson_clk_phase_delay_get_phase(struct clk_hw *hw)
+> +{
+> +	struct clk_regmap *clk = to_clk_regmap(hw);
+> +	struct meson_clk_phase_delay_data *ph =
+> +		meson_clk_get_phase_delay_data(clk);
+> +	unsigned int phase_num = 1 <<  hweight_long(ph->phase_mask);
+> +	unsigned long period_ps, p, d;
+> +	int degrees;
+> +	u32 val;
 > +
-> +	aliases {
-> +		serial0 = &uart_AO;
-> +	};
+> +	regmap_read(clk->map, SD_EMMC_CLOCK, &val);
+> +	p = (val & ph->phase_mask) >> __ffs(ph->phase_mask);
+> +	degrees = p * 360 / phase_num;
+> +
+> +	if (ph->delay_mask) {
+> +		period_ps = DIV_ROUND_UP((unsigned long)NSEC_PER_SEC * 1000,
+> +					 clk_hw_get_rate(hw));
+> +		d = (val & ph->delay_mask) >> __ffs(ph->delay_mask);
+> +		degrees += d * ph->delay_step_ps * 360 / period_ps;
+> +		degrees %= 360;
+> +	}
+> +
+> +	return degrees;
+> +}
+> +
+> +static void meson_clk_apply_phase_delay(struct clk_regmap *clk,
+> +					unsigned int phase,
+> +					unsigned int delay)
+> +{
+> +	struct meson_clk_phase_delay_data *ph = clk->data;
+> +	u32 val;
+> +
+> +	regmap_read(clk->map, SD_EMMC_CLOCK, &val);
+> +
+> +	val &= ~ph->phase_mask;
+> +	val |= phase << __ffs(ph->phase_mask);
+> +
+> +	if (ph->delay_mask) {
+
+This imply that delay is delay is optional. In such case, it would be a regular
+"phase" and we already have a  driver for this. Please remove all the related
+code and make this parameter required for this clock type.
+
+In the future, maybe we'll merge the 2 drivers.
+
+> +		val &= ~ph->delay_mask;
+> +		val |= delay << __ffs(ph->delay_mask);
+> +	}
+> +
+> +	regmap_write(clk->map, SD_EMMC_CLOCK, val);
+> +}
+> +
+> +static int meson_clk_phase_delay_set_phase(struct clk_hw *hw, int degrees)
+> +{
+> +	struct clk_regmap *clk = to_clk_regmap(hw);
+> +	struct meson_clk_phase_delay_data *ph =
+> +		meson_clk_get_phase_delay_data(clk);
+> +	unsigned int phase_num = 1 <<  hweight_long(ph->phase_mask);
+> +	unsigned long period_ps, d = 0, r;
+> +	u64 p;
+> +
+> +	p = degrees % 360;
+> +
+> +	if (!ph->delay_mask) {
+> +		p = DIV_ROUND_CLOSEST_ULL(p, 360 / phase_num);
+> +	} else {
+> +		period_ps = DIV_ROUND_UP((unsigned long)NSEC_PER_SEC * 1000,
+> +					 clk_hw_get_rate(hw));
+> +
+> +		/* First compute the phase index (p), the remainder (r) is the
+> +		 * part we'll try to acheive using the delays (d).
+> +		 */
+> +		r = do_div(p, 360 / phase_num);
+> +		d = DIV_ROUND_CLOSEST(r * period_ps,
+> +				      360 * ph->delay_step_ps);
+> +		d = min(d, ph->delay_mask >> __ffs(ph->delay_mask));
+> +	}
+> +
+> +	meson_clk_apply_phase_delay(clk, p, d);
+> +	return 0;
+> +}
+> +
+> +const struct clk_ops meson_clk_phase_delay_ops = {
+> +	.get_phase = meson_clk_phase_delay_get_phase,
+> +	.set_phase = meson_clk_phase_delay_set_phase,
+> +};
+> +EXPORT_SYMBOL_GPL(meson_clk_phase_delay_ops);
+> diff --git a/drivers/clk/meson/clkc.h b/drivers/clk/meson/clkc.h
+> index 24cec16b6038..499834dd34f2 100644
+> --- a/drivers/clk/meson/clkc.h
+> +++ b/drivers/clk/meson/clkc.h
+> @@ -113,6 +113,18 @@ struct clk_regmap _name = {						\
+>  	},								\
+>  };
+>  
+> +struct meson_clk_phase_delay_data {
+> +	unsigned long			phase_mask;
+> +	unsigned long			delay_mask;
+
+Like every other clock drivers in the amlogic directory, please use struct parm
+to decribe the fields.
+
+> +	unsigned int			delay_step_ps;
 > +};
 > +
-> +&uart_AO {
-> +	status = "okay";
-> +};
+> +static inline struct meson_clk_phase_delay_data *
+> +meson_clk_get_phase_delay_data(struct clk_regmap *clk)
+> +{
+> +	return (struct meson_clk_phase_delay_data *)clk->data;
+> +}
 > +
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-g12a.dtsi b/arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
-> new file mode 100644
-> index 0000000..64a0f2e
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
-> @@ -0,0 +1,174 @@
-> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> +/*
-> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
-> + */
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-
-Could you please order the subnodes alphabetically ?
-
-In general, we should try to order nodes by addresses when there is one and
-alphabetically when there is none. This is something we have to fix for the AXG
-as well.
-
-
-> +	compatible = "amlogic,g12a";
-> +
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	reserved-memory {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		/* Alternate 3 MiB reserved for ARM Trusted Firmware (BL31) */
-
-It's the only one (for now at least) so it's not really an alternate, isn't it ?
-
-> +		secmon_reserved: secmon at 5000000 {
-> +			reg = <0x0 0x05000000 0x0 0x300000>;
-> +			no-map;
-> +		};
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <0x2>;
-> +		#size-cells = <0x0>;
-> +
-> +		cpu0: cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			reg = <0x0 0x0>;
-> +			enable-method = "psci";
-> +			next-level-cache = <&l2>;
-> +		};
-> +
-> +		cpu1: cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			reg = <0x0 0x1>;
-> +			enable-method = "psci";
-> +			next-level-cache = <&l2>;
-> +		};
-> +
-> +		cpu2: cpu at 2 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			reg = <0x0 0x2>;
-> +			enable-method = "psci";
-> +			next-level-cache = <&l2>;
-> +		};
-> +
-> +		cpu3: cpu at 3 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			reg = <0x0 0x3>;
-> +			enable-method = "psci";
-> +			next-level-cache = <&l2>;
-> +		};
-> +
-> +		l2: l2-cache0 {
-> +			compatible = "cache";
-> +		};
-> +	};
-> +
-> +	psci {
-> +		compatible = "arm,psci-1.0";
-> +		method = "smc";
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <GIC_PPI 13
-> +			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 14
-> +			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 11
-> +			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 10
-> +			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>;
-> +	};
-> +
-> +	xtal: xtal-clk {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <24000000>;
-> +		clock-output-names = "xtal";
-> +		#clock-cells = <0>;
-> +	};
-> +
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-
-Could you please order the different bus by ascending addresses ?
-
-
-> +
-> +		apb: apb at ffe00000 {
-> +			compatible = "simple-bus";
-> +			reg = <0x0 0xffe00000 0x0 0x200000>;
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			ranges = <0x0 0x0 0x0 0xffe00000 0x0 0x200000>;
-> +		};
-> +
-> +		cbus: bus at ffd00000 {
-> +			compatible = "simple-bus";
-> +			reg = <0x0 0xffd00000 0x0 0x25000>;
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			ranges = <0x0 0x0 0x0 0xffd00000 0x0 0x25000>;
-> +
-> +		};
-> +
-> +		gic: interrupt-controller at ffc01000 {
-> +			compatible = "arm,gic-400";
-> +			reg = <0x0 0xffc01000 0 0x1000>,
-> +			      <0x0 0xffc02000 0 0x2000>,
-> +			      <0x0 0xffc04000 0 0x2000>,
-> +			      <0x0 0xffc06000 0 0x2000>;
-> +			interrupt-controller;
-> +			interrupts = <GIC_PPI 9
-> +				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
-> +			#interrupt-cells = <3>;
-> +			#address-cells = <0>;
-> +		};
-> +
-> +		hiubus: bus at ff63c000 {
-> +			compatible = "simple-bus";
-> +			reg = <0x0 0xff63c000 0x0 0x1c00>;
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			ranges = <0x0 0x0 0x0 0xff63c000 0x0 0x1c00>;
-> +
-> +		};
-> +
-> +		periphs: periphs at ff634000 {
-> +			compatible = "simple-bus";
-> +			reg = <0x0 0xff634000 0x0 0x2000>;
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			ranges = <0x0 0x0 0x0 0xff634000 0x0 0x2000>;
-> +		};
-> +
-> +		aobus: bus at ff800000 {
-> +			compatible = "simple-bus";
-> +			reg = <0x0 0xff800000 0x0 0x100000>;
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			ranges = <0x0 0x0 0x0 0xff800000 0x0 0x100000>;
-> +
-> +			uart_AO: serial at 3000 {
-> +				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
-> +				reg = <0x0 0x3000 0x0 0x18>;
-> +				interrupts = <GIC_SPI 193 IRQ_TYPE_EDGE_RISING>;
-> +				clocks = <&xtal>, <&xtal>, <&xtal>;
-> +				clock-names = "xtal", "pclk", "baud";
-> +				status = "disabled";
-> +			};
-> +
-> +			uart_AO_B: serial at 4000 {
-> +				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
-> +				reg = <0x0 0x4000 0x0 0x18>;
-> +				interrupts = <GIC_SPI 197 IRQ_TYPE_EDGE_RISING>;
-> +				clocks = <&xtal>, <&xtal>, <&xtal>;
-> +				clock-names = "xtal", "pclk", "baud";
-> +				status = "disabled";
-> +			};
-> +
-> +		};
-> +	};
-> +};
+>  /* clk_ops */
+>  extern const struct clk_ops meson_clk_pll_ro_ops;
+>  extern const struct clk_ops meson_clk_pll_ops;
+> @@ -120,5 +132,6 @@ extern const struct clk_ops meson_clk_cpu_ops;
+>  extern const struct clk_ops meson_clk_mpll_ro_ops;
+>  extern const struct clk_ops meson_clk_mpll_ops;
+>  extern const struct clk_ops meson_clk_phase_ops;
+> +extern const struct clk_ops meson_clk_phase_delay_ops;
+>  
+>  #endif /* __CLKC_H */
