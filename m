@@ -1,61 +1,107 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Fri, 10 Aug 2018 14:51:47 -0700
-Subject: [PATCH 0/3] arm64: dts: sdm845: Add RPMh-regulators and usb
-Message-ID: <20180810215150.82490-1-dianders@chromium.org>
+Date: Fri, 10 Aug 2018 14:51:50 -0700
+Subject: [PATCH 3/3] arm64: dts: qcom: sdm845-mtp: Add nodes for USB
+In-Reply-To: <20180810215150.82490-1-dianders@chromium.org>
+References: <20180810215150.82490-1-dianders@chromium.org>
+Message-ID: <20180810215150.82490-4-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Set the various nodes to "okay" and hook up the regulators.
 
-This series adds device tree nodes for the RPMh regulators and USB.
-These patches are based on patches in various downstream kernels from
-Manu Gautam, David Collins, and Vivek Gautam.
+NOTE: For now the main USB port (the one that goes out the Type C
+connector) is forced to host.  Eventually someone will need to get the
+Type C detection hooked up and get this all integrated with the
+PMI8998 PMIC.  The reason for forcing to "host" in the meantime is
+that this will leave us with one "host" and one "peripheral" port.
 
-This series was tested on SDM845-MTP (with no-AC firmware) atop Andy
-Gross's current "for-next" branch at commit 76b9e7f947f1 ("Merge tag
-'qcom-defconfig-for-4.19' into all-for-4.19") with some extra patches:
+In order for host mode this to work, we assume that the bootloader
+left things configured enough for us.  Apparently the magic for that
+is is to do these writes on pmi8998:
+- pm_comm_write_byte(2, 0x1153, 0x2C, 0);
+- pm_comm_write_byte(2, 0x1152, 0x07, 0);
+- pm_comm_write_byte(2, 0x1140, 0x00, 0);
+- pm_comm_write_byte(2, 0x1140, 0x01, 0);
 
->From mainline:
-- 87ed1405ef09 ("nvmem: Don't let a NULL cell_id for nvmem_cell_get() crash us")
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
 
->From clk-next:
-- 9c7e47025a6b ("clk: qcom: clk-rpmh: Add QCOM RPMh clock driver")
+Changes in v2: None
 
->From regulator/for-next:
-- 46fc033eba42 ("regulator: add QCOM RPMh regulator driver")
-- 0db021f7a273 ("regulator: dt-bindings: add QCOM RPMh regulator bindings")
+ arch/arm64/boot/dts/qcom/sdm845-mtp.dts | 61 +++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
 
->From Will Deacon's tree (for-joerg/arm-smmu/updates):
-- d1e20222d537 ("iommu/arm-smmu: Error out only if not enough context interrupts")
-
->From the mailing list (needs to be spun but works OK):
-- dts: arm64/sdm845: Add node for arm,mmu-500
-  https://lore.kernel.org/patchwork/patch/964814/
-
-As you can see from the above all the dependencies except the addition
-of the MMU node have landed so this series should be about ready to
-land too.
-
-If anyone would like to see the tree I used for test, it can be found
-at:
-  https://chromium.googlesource.com/chromiumos/third_party/kernel/+log/refs/sandbox/dianders/180810-agross-usbv2
-
-
-Changes in v2:
-- Use "0x784000" for qfprom rather than "0x780000" as per docs.
-- Add calibration for 2nd USB port too
-- LDO14 initial mode is LPM and shouldn't be always on (Vivek G)
-- LDO25 should have min voltage of 3.3V
-
-Douglas Anderson (2):
-  arm64: dts: qcom: sdm845-mtp: Add RPMh VRM/XOB regulators
-  arm64: dts: qcom: sdm845-mtp: Add nodes for USB
-
-Manu Gautam (1):
-  arm64: dts: qcom: sdm845: Add USB-related nodes
-
- arch/arm64/boot/dts/qcom/sdm845-mtp.dts | 506 ++++++++++++++++++++++++
- arch/arm64/boot/dts/qcom/sdm845.dtsi    | 196 +++++++++
- 2 files changed, 702 insertions(+)
-
+diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+index 839ef9125bf4..eb9400bf2cbf 100644
+--- a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
++++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+@@ -480,6 +480,67 @@
+ 	status = "okay";
+ };
+ 
++&usb_1 {
++	status = "okay";
++};
++
++&usb_1_dwc3 {
++	/* Until we have Type C hooked up we'll force this as host. */
++	dr_mode = "host";
++};
++
++&usb_1_hsphy {
++	status = "okay";
++
++	vdd-supply = <&vdda_usb1_ss_core>;
++	vdda-pll-supply = <&vdda_qusb_hs0_1p8>;
++	vdda-phy-dpdm-supply = <&vdda_qusb_hs0_3p1>;
++
++	qcom,imp-res-offset-value = <8>;
++	qcom,hstx-trim-value = <QUSB2_V2_HSTX_TRIM_21_6_MA>;
++	qcom,preemphasis-level = <QUSB2_V2_PREEMPHASIS_5_PERCENT>;
++	qcom,preemphasis-width = <QUSB2_V2_PREEMPHASIS_WIDTH_HALF_BIT>;
++};
++
++&usb_1_qmpphy {
++	status = "okay";
++
++	vdda-phy-supply = <&vdda_usb1_ss_1p2>;
++	vdda-pll-supply = <&vdda_usb1_ss_core>;
++};
++
++&usb_2 {
++	status = "okay";
++};
++
++&usb_2_dwc3 {
++	/*
++	 * Though the USB block on SDM845 can support host, there's no vbus
++	 * signal for this port on MTP.  Thus (unless you have a non-compliant
++	 * hub that works without vbus) the only sensible thing is to force
++	 * peripheral mode.
++	 */
++	dr_mode = "peripheral";
++};
++
++&usb_2_hsphy {
++	status = "okay";
++
++	vdd-supply = <&vdda_usb2_ss_core>;
++	vdda-pll-supply = <&vdda_qusb_hs0_1p8>;
++	vdda-phy-dpdm-supply = <&vdda_qusb_hs0_3p1>;
++
++	qcom,imp-res-offset-value = <8>;
++	qcom,hstx-trim-value = <QUSB2_V2_HSTX_TRIM_22_8_MA>;
++};
++
++&usb_2_qmpphy {
++	status = "okay";
++
++	vdda-phy-supply = <&vdda_usb2_ss_1p2>;
++	vdda-pll-supply = <&vdda_usb2_ss_core>;
++};
++
+ /* PINCTRL - additions to nodes defined in sdm845.dtsi */
+ 
+ &qup_i2c10_default {
 -- 
 2.18.0.597.ga71716f1ad-goog
