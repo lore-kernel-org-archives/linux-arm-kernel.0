@@ -1,43 +1,103 @@
-From: baicar.tyler@gmail.com (Tyler Baicar)
-Date: Thu, 9 Aug 2018 22:14:12 -0400
-Subject: [PATCH RESEND v2] arm64: clean the additional checks before
- calling ghes_notify_sea()
-In-Reply-To: <CAMj-D2De_LzxMjNT_w-N2iiqBYq4wbdY6vEvjxr5yaAuhBg+jw@mail.gmail.com>
-References: <1533659175-47076-1-git-send-email-gengdongjiu@huawei.com>
- <CAMj-D2Arv-ZxUMTB_zKKy58CghWsZJbTOcNdiD3KVzxJ-v973g@mail.gmail.com>
- <CABo9ajBKEWmgh6tBbUnrY8zM3vAH+TKWwBHn-Vz556Up+614Zw@mail.gmail.com>
- <CAMj-D2De_LzxMjNT_w-N2iiqBYq4wbdY6vEvjxr5yaAuhBg+jw@mail.gmail.com>
-Message-ID: <CABo9ajB-FYDxubuJ6=PnoX5D_x4ujm7Snc+OA=AQ-K564JUJoQ@mail.gmail.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Fri, 10 Aug 2018 11:30:08 +0900
+Subject: [PATCH v2 2/4] phy: socionext: add USB3 PHY driver for UniPhier
+ SoC
+In-Reply-To: <312d10ae-7909-bede-ea0a-5d92a497f639@ti.com>
+References: <1533290045-18969-3-git-send-email-hayashi.kunihiko@socionext.com>
+ <312d10ae-7909-bede-ea0a-5d92a497f639@ti.com>
+Message-ID: <20180810113007.0746.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 9, 2018 at 6:16 PM, gengdongjiu <gengdj.1984@gmail.com> wrote:
-> 2018-08-10 5:05 GMT+08:00 Tyler Baicar <baicar.tyler@gmail.com>:
->> On Thu, Aug 9, 2018 at 8:32 AM, gengdongjiu <gengdj.1984@gmail.com> wrote:
->>>
->>> 2018-08-08 0:26 GMT+08:00 Dongjiu Geng <gengdongjiu@huawei.com>:
->>> > In order to remove the additional check before calling the
->>> > ghes_notify_sea(), make stub definition when !CONFIG_ACPI_APEI_SEA.
->>> >
->>> > After this cleanup, we can simply call the ghes_notify_sea() to let
->>> > APEI driver handle the SEA notification.
->>> >
->>> > CC: Tyler Baicar <tbaicar@codeaurora.org>
->>> > CC: James Morse <james.morse@arm.com>
->>> > Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
->>> > Acked-by: Will Deacon <will.deacon@arm.com>
->>> > ---
->>> > This cleanup is ever mentioned by Mark Rutland in [1]
->>> >
->>> > [1]:
->>> > https://lkml.org/lkml/2018/5/31/289
->>> >
->>
->> FWIW - Looks good to me!
->
-> Thanks very much for this comments and review,
-> whether I can get your "Acked-by" or "Reviewed-by"? thanks
->
-Sorry, yes!
+Hi Kishon,
 
-Reviewed-by: Tyler Baicar <baicar.tyler@gmail.com>
+On Thu, 9 Aug 2018 16:00:19 +0530
+Kishon Vijay Abraham I <kishon@ti.com> wrote:
+
+> Hi,
+> 
+> On Friday 03 August 2018 03:24 PM, Kunihiko Hayashi wrote:
+> > Add a driver for PHY interface built into USB3 controller
+> > implemented in UniPhier SoCs.
+> > This driver supports High-Speed PHY and Super-Speed PHY.
+> > 
+> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > Signed-off-by: Motoya Tanigawa <tanigawa.motoya@socionext.com>
+> > Signed-off-by: Masami Hiramatsu <masami.hiramatsu@linaro.org>
+> > ---
+> >  drivers/phy/Kconfig                         |   1 +
+> >  drivers/phy/Makefile                        |   1 +
+> >  drivers/phy/socionext/Kconfig               |  12 +
+> >  drivers/phy/socionext/Makefile              |   6 +
+> >  drivers/phy/socionext/phy-uniphier-usb3hs.c | 423 ++++++++++++++++++++++++++++
+> >  drivers/phy/socionext/phy-uniphier-usb3ss.c | 350 +++++++++++++++++++++++
+> >  6 files changed, 793 insertions(+)
+> >  create mode 100644 drivers/phy/socionext/Kconfig
+> >  create mode 100644 drivers/phy/socionext/Makefile
+> >  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3hs.c
+> >  create mode 100644 drivers/phy/socionext/phy-uniphier-usb3ss.c
+
+[snip]
+
+> > --- /dev/null
+> > +++ b/drivers/phy/socionext/phy-uniphier-usb3hs.c
+> > @@ -0,0 +1,423 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +//
+> > +// phy-uniphier-usb3hs.c - HS-PHY driver for Socionext UniPhier USB3 controller
+> > +// Copyright 2015-2018 Socionext Inc.
+> > +// Author:
+> > +//      Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > +// Contributors:
+> > +//      Motoya Tanigawa <tanigawa.motoya@socionext.com>
+> > +//      Masami Hiramatsu <masami.hiramatsu@linaro.org>
+> > +
+> 
+> I'm not sure if there is a standard format for adding SPDX identifiers. But
+> other PHY drivers seems to have used single line comment style only for the
+> first line. (see drivers/phy/amlogic/phy-meson-gxl-usb3.c)
+
+Okay, I understand that the format differs depending on each sub-system so far.
+I'll rewrite it according to other PHY drivers.
+
+Same as phy-uniphier-usb3ss.c.
+
+> > +#include <linux/bitfield.h>
+> > +#include <linux/bitops.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/io.h>
+> > +#include <linux/module.h>
+> > +#include <linux/nvmem-consumer.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_platform.h>
+> > +#include <linux/phy/phy.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/regulator/consumer.h>
+> > +#include <linux/reset.h>
+> > +#include <linux/slab.h>
+
+[snip]
+
+> > +	phy = devm_phy_create(dev, dev->of_node, &uniphier_u3hsphy_ops);
+> > +	if (IS_ERR(phy))
+> > +		return PTR_ERR(phy);
+> > +
+> > +	phy_set_drvdata(phy, priv);
+> > +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+> > +	if (IS_ERR(phy_provider))
+> > +		return PTR_ERR(phy_provider);
+> 
+> return PTR_ERR_OR_ZERO()?
+
+Indeed. I'll replace it as follows.
+
+	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+	return PTR_ERR_OR_ZERO(phy_provider);
+
+Same as phy-uniphier-usb3ss.c.
+
+Thank you,
+
+---
+Best Regards,
+Kunihiko Hayashi
