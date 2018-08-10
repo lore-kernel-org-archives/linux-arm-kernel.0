@@ -1,10 +1,10 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 10 Aug 2018 10:05:22 +0200
-Subject: [PATCH v2 25/29] ARM: davinci: sffsdr: use device properties for at24
- eeprom
+Date: Fri, 10 Aug 2018 10:05:20 +0200
+Subject: [PATCH v2 23/29] ARM: davinci: dm646x-evm: use device properties for
+ at24 eeprom
 In-Reply-To: <20180810080526.27207-1-brgl@bgdev.pl>
 References: <20180810080526.27207-1-brgl@bgdev.pl>
-Message-ID: <20180810080526.27207-26-brgl@bgdev.pl>
+Message-ID: <20180810080526.27207-24-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,42 +22,46 @@ already implies the EEPROM's size.
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 ---
- arch/arm/mach-davinci/board-sffsdr.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+ arch/arm/mach-davinci/board-dm646x-evm.c | 13 +++++--------
+ 1 file changed, 5 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
-index f6a4d094cbc3..4f3bc78e8154 100644
---- a/arch/arm/mach-davinci/board-sffsdr.c
-+++ b/arch/arm/mach-davinci/board-sffsdr.c
-@@ -26,7 +26,7 @@
- #include <linux/init.h>
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index 943ab0ca6db8..04d293096962 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -22,7 +22,7 @@
+ #include <linux/gpio.h>
  #include <linux/platform_device.h>
  #include <linux/i2c.h>
 -#include <linux/platform_data/at24.h>
 +#include <linux/property.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/rawnand.h>
- #include <linux/mtd/partitions.h>
-@@ -92,16 +92,15 @@ static struct platform_device davinci_sffsdr_nandflash_device = {
- 	.resource	= davinci_sffsdr_nandflash_resource,
+ #include <linux/platform_data/pcf857x.h>
+ 
+ #include <media/i2c/tvp514x.h>
+@@ -320,12 +320,9 @@ static struct nvmem_cell_lookup dm646x_evm_mac_address_cell = {
+ 	.nvmem_name = "1-00500",
  };
  
 -static struct at24_platform_data eeprom_info = {
--	.byte_len	= (64*1024) / 8,
--	.page_size	= 32,
--	.flags		= AT24_FLAG_ADDR16,
+-	.byte_len       = (256*1024) / 8,
+-	.page_size      = 64,
+-	.flags          = AT24_FLAG_ADDR16,
+-	.setup          = davinci_get_mac_addr,
+-	.context	= (void *)0x7f00,
 +static const struct property_entry eeprom_properties[] = {
-+	PROPERTY_ENTRY_U32("pagesize", 32),
++	PROPERTY_ENTRY_U32("pagesize", 64),
 +	{ }
  };
+ #endif
  
+@@ -396,7 +393,7 @@ static void evm_init_cpld(void)
  static struct i2c_board_info __initdata i2c_info[] =  {
  	{
- 		I2C_BOARD_INFO("24c64", 0x50),
--		.platform_data	= &eeprom_info,
-+		.properties = eeprom_properties,
+ 		I2C_BOARD_INFO("24c256", 0x50),
+-		.platform_data  = &eeprom_info,
++		.properties  = eeprom_properties,
  	},
- 	/* Other I2C devices:
- 	 * MSP430,  addr 0x23 (not used)
+ 	{
+ 		I2C_BOARD_INFO("pcf8574a", 0x38),
 -- 
 2.18.0
