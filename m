@@ -1,252 +1,51 @@
-From: jian.hu@amlogic.com (Jian Hu)
-Date: Fri, 10 Aug 2018 17:54:28 +0800
-Subject: [PATCH 2/2] clk: meson-g12a: Add AO Clock controller driver
-In-Reply-To: <1533894868-85815-1-git-send-email-jian.hu@amlogic.com>
-References: <1533894868-85815-1-git-send-email-jian.hu@amlogic.com>
-Message-ID: <1533894868-85815-3-git-send-email-jian.hu@amlogic.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 10 Aug 2018 11:06:58 +0100
+Subject: [PATCH v2] arm64: Trap WFI executed in userspace
+In-Reply-To: <a71ad7e3-8584-36b2-3912-dac3c38db204@arm.com>
+References: <20180810091939.2773-1-marc.zyngier@arm.com>
+ <a71ad7e3-8584-36b2-3912-dac3c38db204@arm.com>
+Message-ID: <20180810100656.GP9097@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a Clock driver for the ALways-On part
-of the Amlogic Meson-G12A SoC.
+On Fri, Aug 10, 2018 at 10:43:13AM +0100, Robin Murphy wrote:
+> On 10/08/18 10:19, Marc Zyngier wrote:
+> >It recently came to light that userspace can execute WFI, and that
+> >the arm64 kernel doesn trap this event. This sounds rather benign,
+> 
+>                         't
+> 
+> >but the kernel should decide when it wants to wait for an interrupt,
+> >and not userspace.
+> >
+> >Let's trap WFI and immediately return after having skipped the
+> >instruction. This effectively makes WFI a rather expensive NOP.
+> 
+> ...which is still a perfectly valid behaviour, given that it's a hint.
+> That's fine by me :)
 
-Signed-off-by: Jian Hu <jian.hu@amlogic.com>
----
- drivers/clk/meson/Makefile     |   2 +-
- drivers/clk/meson/g12a-aoclk.c | 170 +++++++++++++++++++++++++++++++++++++++++
- drivers/clk/meson/g12a-aoclk.h |  36 +++++++++
- 3 files changed, 207 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/meson/g12a-aoclk.c
- create mode 100644 drivers/clk/meson/g12a-aoclk.h
+The only plausible use of WFI that I can see is in a polling or idle
+loop of some description.  So turning WFI into a NOP will likely create
+a userspace busy-wait that never explicitly blocks or yields, which may
+be considered pathological behaviour.
 
-diff --git a/drivers/clk/meson/Makefile b/drivers/clk/meson/Makefile
-index 2b1a562..d5c2dcd 100644
---- a/drivers/clk/meson/Makefile
-+++ b/drivers/clk/meson/Makefile
-@@ -9,5 +9,5 @@ obj-$(CONFIG_COMMON_CLK_MESON8B) += meson8b.o
- obj-$(CONFIG_COMMON_CLK_GXBB)	 += gxbb.o gxbb-aoclk.o gxbb-aoclk-32k.o
- obj-$(CONFIG_COMMON_CLK_AXG)	 += axg.o axg-aoclk.o
- obj-$(CONFIG_COMMON_CLK_AXG_AUDIO)	+= axg-audio.o
--obj-$(CONFIG_COMMON_CLK_G12A)	 += g12a.o
-+obj-$(CONFIG_COMMON_CLK_G12A)	 += g12a.o g12a-aoclk.c
- obj-$(CONFIG_COMMON_CLK_REGMAP_MESON)	+= clk-regmap.o
-diff --git a/drivers/clk/meson/g12a-aoclk.c b/drivers/clk/meson/g12a-aoclk.c
-new file mode 100644
-index 0000000..a5cd95c
---- /dev/null
-+++ b/drivers/clk/meson/g12a-aoclk.c
-@@ -0,0 +1,170 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Amlogic Meson-G12A Clock Controller Driver
-+ *
-+ * Copyright (c) 2016 Baylibre SAS.
-+ * Author: Michael Turquette <mturquette@baylibre.com>
-+ *
-+ * Copyright (c) 2018 Amlogic, inc.
-+ * Author: Jian Hu <jian.hu@amlogic.com>
-+ */
-+#include <linux/clk-provider.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/init.h>
-+#include "clkc.h"
-+#include "g12a-aoclk.h"
-+
-+#define G12A_AO_GATE0(_name, _bit)					\
-+static struct clk_regmap _name##_ao = {					\
-+	.data = &(struct clk_regmap_gate_data) {			\
-+		.offset = (AO_CLK_GATE0),			\
-+		.bit_idx = (_bit),					\
-+	},								\
-+	.hw.init = &(struct clk_init_data) {				\
-+		.name = #_name "_ao",					\
-+		.ops = &clk_regmap_gate_ops,				\
-+		.parent_names = (const char *[]){ "clk81" },		\
-+		.num_parents = 1,					\
-+	},								\
-+}
-+
-+G12A_AO_GATE0(ahb_bus,		0);
-+G12A_AO_GATE0(remote,		1);
-+G12A_AO_GATE0(i2c_master,	2);
-+G12A_AO_GATE0(i2c_slave,	3);
-+G12A_AO_GATE0(uart1,		4);
-+G12A_AO_GATE0(prod_i2c,		5);
-+G12A_AO_GATE0(uart2,		6);
-+G12A_AO_GATE0(ir_blaster,	7);
-+G12A_AO_GATE0(saradc,		8);
-+
-+static struct clk_regmap ao_clk81 = {
-+	.data = &(struct clk_regmap_mux_data) {
-+		.offset = AO_RTI_PWR_CNTL_REG0,
-+		.mask = 0x1,
-+		.shift = 8,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "ao_clk81",
-+		.ops = &clk_regmap_mux_ro_ops,
-+		.parent_names = (const char *[]){ "clk81", "ao_alt_xtal"},
-+		.num_parents = 2,
-+	},
-+};
-+
-+static struct clk_regmap g12a_saradc_mux = {
-+	.data = &(struct clk_regmap_mux_data) {
-+		.offset = AO_SAR_CLK,
-+		.mask = 0x3,
-+		.shift = 9,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_saradc_mux",
-+		.ops = &clk_regmap_mux_ops,
-+		.parent_names = (const char *[]){ "xtal", "ao_clk81" },
-+		.num_parents = 2,
-+	},
-+};
-+
-+static struct clk_regmap g12a_saradc_div = {
-+	.data = &(struct clk_regmap_div_data) {
-+		.offset = AO_SAR_CLK,
-+		.shift = 0,
-+		.width = 8,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_saradc_div",
-+		.ops = &clk_regmap_divider_ops,
-+		.parent_names = (const char *[]){ "g12a_saradc_mux" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap g12a_saradc_gate = {
-+	.data = &(struct clk_regmap_gate_data) {
-+		.offset = AO_SAR_CLK,
-+		.bit_idx = 8,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "g12a_saradc_gate",
-+		.ops = &clk_regmap_gate_ops,
-+		.parent_names = (const char *[]){ "g12a_saradc_div" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static unsigned int g12a_aoclk_reset[] = {
-+	[RESET_AO_REMOTE] =	16,
-+	[RESET_AO_UART1] =	17,
-+	[RESET_AO_I2C_MASTER] = 18,
-+	[RESET_AO_I2C_SLAVE] =	19,
-+	[RESET_AO_SARADC] =	20,
-+	[RESET_AO_UART2] =	22,
-+	[RESET_AO_IR_BLASTER] = 23,
-+};
-+
-+static struct clk_regmap *g12a_aoclk_regmap[] = {
-+	[CLKID_AO_AHB_BUS]	= &ahb_bus_ao,
-+	[CLKID_AO_REMOTE]	= &remote_ao,
-+	[CLKID_AO_I2C_MASTER]	= &i2c_master_ao,
-+	[CLKID_AO_I2C_SLAVE]	= &i2c_slave_ao,
-+	[CLKID_AO_UART1]	= &uart1_ao,
-+	[CLKID_AO_PROD_I2C]	= &prod_i2c_ao,
-+	[CLKID_AO_UART2]	= &uart2_ao,
-+	[CLKID_AO_IR_BLASTER]	= &ir_blaster_ao,
-+	[CLKID_AO_SAR_ADC]	= &saradc_ao,
-+	[CLKID_AO_CLK81]	= &ao_clk81,
-+	[CLKID_AO_SAR_ADC_SEL]	= &g12a_saradc_mux,
-+	[CLKID_AO_SAR_ADC_DIV]	= &g12a_saradc_div,
-+	[CLKID_AO_SAR_ADC_CLK]	= &g12a_saradc_gate,
-+};
-+
-+static struct clk_hw_onecell_data g12a_aoclk_onecell_data = {
-+	.hws = {
-+		[CLKID_AO_AHB_BUS]	= &ahb_bus_ao.hw,
-+		[CLKID_AO_REMOTE]	= &remote_ao.hw,
-+		[CLKID_AO_I2C_MASTER]	= &i2c_master_ao.hw,
-+		[CLKID_AO_I2C_SLAVE]	= &i2c_slave_ao.hw,
-+		[CLKID_AO_UART1]	= &uart1_ao.hw,
-+		[CLKID_AO_PROD_I2C]	= &prod_i2c_ao.hw,
-+		[CLKID_AO_UART2]	= &uart2_ao.hw,
-+		[CLKID_AO_IR_BLASTER]	= &ir_blaster_ao.hw,
-+		[CLKID_AO_SAR_ADC]	= &saradc_ao.hw,
-+		[CLKID_AO_CLK81]	= &ao_clk81.hw,
-+		[CLKID_AO_SAR_ADC_SEL]	= &g12a_saradc_mux.hw,
-+		[CLKID_AO_SAR_ADC_DIV]	= &g12a_saradc_div.hw,
-+		[CLKID_AO_SAR_ADC_CLK]	= &g12a_saradc_gate.hw,
-+	},
-+	.num = NR_CLKS,
-+};
-+
-+static struct meson_aoclk_data g12a_aoclkc_data = {
-+	.reset_reg	= AO_RTI_GEN_CNTL_REG0,
-+	.num_reset	= ARRAY_SIZE(g12a_aoclk_reset),
-+	.reset		= g12a_aoclk_reset,
-+	.num_clks	= ARRAY_SIZE(g12a_aoclk_regmap),
-+	.clks		= g12a_aoclk_regmap,
-+	.hw_data	= &g12a_aoclk_onecell_data,
-+};
-+
-+static const struct of_device_id g12a_aoclkc_match_table[] = {
-+	{
-+		.compatible	= "amlogic,g12a-aoclkc",
-+		.data		= &g12a_aoclkc_data,
-+	},
-+	{ }
-+};
-+
-+static struct platform_driver g12a_aoclkc_driver = {
-+	.probe		= meson_aoclkc_probe,
-+	.driver		= {
-+		.name	= "g12a-aoclkc",
-+		.of_match_table = g12a_aoclkc_match_table,
-+	},
-+};
-+
-+builtin_platform_driver(g12a_aoclkc_driver);
-diff --git a/drivers/clk/meson/g12a-aoclk.h b/drivers/clk/meson/g12a-aoclk.h
-new file mode 100644
-index 0000000..007183e
---- /dev/null
-+++ b/drivers/clk/meson/g12a-aoclk.h
-@@ -0,0 +1,36 @@
-+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-+/*
-+ * Copyright (c) 2017 BayLibre, SAS
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * Copyright (c) 2018 Amlogic, inc.
-+ * Author: Jian Hu <Jian.Hu@amlogic.com>
-+ */
-+
-+#ifndef __G12A_AOCLKC_H
-+#define __G12A_AOCLKC_H
-+
-+//#include "meson-aoclk.h"
-+
-+#define NR_CLKS				14
-+
-+/* AO Configuration Clock registers offsets
-+ * Register offsets from the data sheet must be multiplied by 4.
-+ */
-+#define AO_RTI_PWR_CNTL_REG0		0x10
-+#define AO_RTI_GEN_CNTL_REG0		0x40
-+#define AO_OSCIN_CNTL			0x58
-+#define AO_CRT_CLK_CNTL1		0x68
-+#define AO_SAR_CLK			0x90
-+#define AO_RTC_ALT_CLK_CNTL0		0x94
-+#define AO_RTC_ALT_CLK_CNTL1		0x98
-+
-+/*
-+ *AO CLK81 gate clocks
-+ */
-+#define AO_CLK_GATE0			0x4c
-+
-+#include <dt-bindings/clock/g12a-aoclkc.h>
-+#include <dt-bindings/reset/g12a-aoclkc.h>
-+
-+#endif /* __G12A_AOCLKC_H */
--- 
-1.9.1
+If there is junk is some app store that does this it may lead to
+power wastage and thermal throttling, damaging performance of the whole
+system the rogue app runs on.
+
+That kind of consequence is partly why I suggested breaking rogue apps
+cleanly (via SIGILL) rather than breaking the system hosting those apps
+in messier ways.  I accept that SIGILL is a step to far.
+
+So, I continue to favour the sched_yield() approach over all.
+
+Should this be discussed with the security folks?  It feels like we're
+speculating about whether sched_yield() is a security concern.
+
+If it is, could we not NOP or SIGILL WFI if sched_yield() is disallowed
+by seccomp, and treat it as a sched_yield() otherwise?
+
+[...]
+
+Cheers
+---Dave
