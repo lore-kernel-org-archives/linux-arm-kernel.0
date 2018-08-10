@@ -1,75 +1,79 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Fri, 10 Aug 2018 15:03:57 +0200
-Subject: [PATCH v8 2/4] dt-bindings: display: atmel: optional video-interface
- of endpoints
+Date: Fri, 10 Aug 2018 15:03:58 +0200
+Subject: [PATCH v8 3/4] drm/atmel-hlcdc: iterate over all output endpoints
 In-Reply-To: <20180810130359.9882-1-peda@axentia.se>
 References: <20180810130359.9882-1-peda@axentia.se>
-Message-ID: <20180810130359.9882-3-peda@axentia.se>
+Message-ID: <20180810130359.9882-4-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With bus-type/bus-width properties in the endpoint nodes, the video-
-interface of the connection can be specified for cases where the
-heuristic fails to select the correct output mode. This can happen
-e.g. if not all RGB pins are routed on the PCB; the driver has no
-way of knowing this, and needs to be told explicitly.
+This enables more flexible devicetrees. You can e.g. have two output
+nodes where one is not enabled, without the ordering affecting things.
 
-This is critical for the devices that have the "conflicting output
-formats" issue (SAM9N12, SAM9X5, SAMA5D3), since the most significant
-RGB bits move around depending on the selected output mode. For
-devices that do not have the "conflicting output formats" issue
-(SAMA5D2, SAMA5D4), this is completely irrelevant.
+Prior to this patch the active node had to have endpoint id zero.
 
-Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- .../devicetree/bindings/display/atmel/hlcdc-dc.txt | 28 ++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 32 ++++++++++++++++++------
+ 1 file changed, 25 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
-index 82f2acb3d374..d29e1e425518 100644
---- a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
-+++ b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
-@@ -15,6 +15,13 @@ Required children nodes:
-  to external devices using the OF graph reprensentation (see ../graph.txt).
-  At least one port node is required.
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+index 8db51fb131db..16c1b2f54b42 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+@@ -31,14 +31,16 @@ static const struct drm_encoder_funcs atmel_hlcdc_panel_encoder_funcs = {
+ 	.destroy = drm_encoder_cleanup,
+ };
  
-+Optional properties in grandchild nodes:
-+ Any endpoint grandchild node may specify a desired video interface
-+ according to ../../media/video-interfaces.txt, specifically
-+ - bus-width: recognized values are <12>, <16>, <18> and <24>, and
-+   override any output mode selection heuristic, forcing "rgb444",
-+   "rgb565", "rgb666" and "rgb888" respectively.
-+
- Example:
+-static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
++static int atmel_hlcdc_attach_endpoint(struct drm_device *dev,
++				       struct of_endpoint *endpoint)
+ {
+ 	struct drm_encoder *encoder;
+ 	struct drm_panel *panel;
+ 	struct drm_bridge *bridge;
+ 	int ret;
  
- 	hlcdc: hlcdc at f0030000 {
-@@ -50,3 +57,24 @@ Example:
- 			#pwm-cells = <3>;
- 		};
- 	};
+-	ret = drm_of_find_panel_or_bridge(dev->dev->of_node, 0, endpoint,
++	ret = drm_of_find_panel_or_bridge(dev->dev->of_node,
++					  endpoint->port, endpoint->id,
+ 					  &panel, &bridge);
+ 	if (ret)
+ 		return ret;
+@@ -77,13 +79,29 @@ static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
+ 
+ int atmel_hlcdc_create_outputs(struct drm_device *dev)
+ {
+-	int endpoint, ret = 0;
+-
+-	for (endpoint = 0; !ret; endpoint++)
+-		ret = atmel_hlcdc_attach_endpoint(dev, endpoint);
++	struct of_endpoint endpoint;
++	struct device_node *node = NULL;
++	int count = 0;
++	int ret = 0;
 +
-+Example 2: With a video interface override to force rgb565; as above
-+but with these changes/additions:
++	for_each_endpoint_of_node(dev->dev->of_node, node) {
++		of_graph_parse_endpoint(node, &endpoint);
 +
-+	&hlcdc {
-+		hlcdc-display-controller {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb565>;
++		if (endpoint.port)
++			continue;
 +
-+			port at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0>;
-+
-+				hlcdc_panel_output: endpoint at 0 {
-+					reg = <0>;
-+					bus-width = <16>;
-+				};
-+			};
-+		};
-+	};
++		ret = atmel_hlcdc_attach_endpoint(dev, &endpoint);
++		if (ret == -ENODEV)
++			continue;
++		if (ret) {
++			of_node_put(node);
++			break;
++		}
++		count++;
++	}
+ 
+ 	/* At least one device was successfully attached.*/
+-	if (ret == -ENODEV && endpoint)
++	if (ret == -ENODEV && count)
+ 		return 0;
+ 
+ 	return ret;
 -- 
 2.11.0
