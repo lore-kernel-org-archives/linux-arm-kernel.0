@@ -1,153 +1,192 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 10 Aug 2018 10:04:57 +0200
-Subject: [PATCH v2 00/29] at24: remove at24_platform_data
-Message-ID: <20180810080526.27207-1-brgl@bgdev.pl>
+Date: Fri, 10 Aug 2018 10:04:58 +0200
+Subject: [PATCH v2 01/29] nvmem: add support for cell lookups
+In-Reply-To: <20180810080526.27207-1-brgl@bgdev.pl>
+References: <20180810080526.27207-1-brgl@bgdev.pl>
+Message-ID: <20180810080526.27207-2-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-This is a follow-up to the previously rejected series[1] which partially
-removed the at24_platform_data structure. After further development and
-taking reviews into account, this series finally removes that struct
-completely but not without touching many different parts of the code
-base.
+We can currently only register nvmem cells from device tree or by
+manually calling nvmem_add_cells(). The latter options however forces
+users to make sure that the nvmem provider with which the cells are
+associated is registered before the call.
 
-Since I took over maintainership of the at24 driver I've been working
-towards removing at24_platform_data in favor for device properties.
+This patch proposes a new solution inspired by other frameworks that
+offer resource lookups (GPIO, PWM etc.). It adds functions that allow
+machine code to register nvmem lookup which are later lazily used to
+add corresponding nvmem cells and remove them if no longer needed.
 
-DaVinci is the only platform that's still using it - all other users
-have already been converted.
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Acked-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/nvmem/core.c           | 77 +++++++++++++++++++++++++++++++++-
+ include/linux/nvmem-consumer.h |  6 +++
+ include/linux/nvmem-provider.h | 10 +++++
+ 3 files changed, 92 insertions(+), 1 deletion(-)
 
-One of the obstacles in case of DaVinci is removing the setup() callback
-from the pdata struct, the only user of which are some davinci boards.
-
-Most boards use the EEPROM to store the MAC address. This series adds
-support for cell lookups to the nvmem framework, registers relevant
-cells for all users, adds nvmem support to eth_platform_get_mac_address(),
-converts davinci_emac driver to using it and replaces at24_platform_data
-with device properties.
-
-There's also one board (da850-evm) which uses MTD for reading the MAC
-address. I used the patch from Alban Bedel's previous submission[2] to
-add support for nvmem to the MTD framework. Since this user doesn't
-need device tree, I dropped Alban's patches modifying the DT bindings.
-We can add that later once an agreement is reached. For the time being
-MTD devices are registered as nvmem devices and we're registering the
-mac-address cell using the cell lookup mechanism.
-
-This series adds a blocking notifier chain to the nvmem framework, so
-that we can keep the EEPROM reading code in the mityomapl138 board file
-with only slight modifications.
-
-I also included some minor fixes to the modified code.
-
-Tested on da850-evm & dm365-evm.
-
-[1] https://lkml.org/lkml/2018/6/29/153
-[2] https://lkml.org/lkml/2018/3/24/312
-
-v1 -> v2:
-
-  PATCH 4/29:
-  - change name to nvmem_dev_name()
-  - return NULL instead of ERR_PTR(-ENOSYS) from nvmem_dev_name() if nvmem is
-    not configured
-
-  PATCH 5/29:
-  - s/nvmem_device_name/nvmem_dev_name/
-
-  PATCH 6/29:
-  - fix the commit message: remove the part mentioning the OF systems
-
-  PATCH 7/29:
-  - fix ordering of includes
-
-  PATCH 8/29:
-  - fix ordering of includes
-
-  PATCH 9/29:
-  - fix ordering of includes
-
-  PATCH 10/29:
-  - fix ordering of includes
-
-  PATCH 11/29:
-  - fix ordering of includes
-
-  PATCH 14/29:
-  - new patch
-
-  PATCH 22/29:
-  - added missing terminator
-
-  PATCH 25/29:
-  - removed unneeded coma
-
-  PATCH 27/29:
-  - s/nvmem_device_name/nvmem_dev_name/
-  - fix ordering of includes
-
-  PATCH 28/29:
-  - added missing terminator
-
-Alban Bedel (1):
-  mtd: Add support for reading MTD devices via the nvmem API
-
-Bartosz Golaszewski (28):
-  nvmem: add support for cell lookups
-  Documentation: nvmem: document lookup entries
-  nvmem: add a notifier chain
-  nvmem: provide nvmem_dev_name()
-  nvmem: remove the name field from struct nvmem_device
-  ARM: davinci: dm365-evm: use nvmem lookup for mac address
-  ARM: davinci: dm644-evm: use nvmem lookup for mac address
-  ARM: davinci: dm646x-evm: use nvmem lookup for mac address
-  ARM: davinci: da830-evm: use nvmem lookup for mac address
-  ARM: davinci: mityomapl138: add nvmem cells lookup entries
-  ARM: davinci: da850-evm: use nvmem lookup for mac address
-  ARM: davinci: da850-evm: remove unnecessary include
-  net: simplify eth_platform_get_mac_address()
-  net: split eth_platform_get_mac_address() into subroutines
-  net: add support for nvmem to eth_platform_get_mac_address()
-  net: davinci_emac: use eth_platform_get_mac_address()
-  ARM: davinci: da850-evm: remove dead MTD code
-  ARM: davinci: mityomapl138: don't read the MAC address from machine
-    code
-  ARM: davinci: dm365-evm: use device properties for at24 eeprom
-  ARM: davinci: da830-evm: use device properties for at24 eeprom
-  ARM: davinci: dm644x-evm: use device properties for at24 eeprom
-  ARM: davinci: dm646x-evm: use device properties for at24 eeprom
-  ARM: davinci: sffsdr: fix the at24 eeprom device name
-  ARM: davinci: sffsdr: use device properties for at24 eeprom
-  ARM: davinci: remove dead code related to MAC address reading
-  ARM: davinci: mityomapl138: use nvmem notifiers
-  ARM: davinci: mityomapl138: use device properties for at24 eeprom
-  eeprom: at24: kill at24_platform_data
-
- Documentation/nvmem/nvmem.txt              |  28 +++++
- MAINTAINERS                                |   1 -
- arch/arm/mach-davinci/board-da830-evm.c    |  25 ++--
- arch/arm/mach-davinci/board-da850-evm.c    |  45 +++-----
- arch/arm/mach-davinci/board-dm365-evm.c    |  25 ++--
- arch/arm/mach-davinci/board-dm644x-evm.c   |  25 ++--
- arch/arm/mach-davinci/board-dm646x-evm.c   |  25 ++--
- arch/arm/mach-davinci/board-mityomapl138.c |  60 +++++++---
- arch/arm/mach-davinci/board-sffsdr.c       |  13 +--
- arch/arm/mach-davinci/common.c             |  15 ---
- drivers/misc/eeprom/at24.c                 | 127 +++++++++------------
- drivers/mtd/Kconfig                        |   1 +
- drivers/mtd/mtdcore.c                      |  50 ++++++++
- drivers/net/ethernet/ti/davinci_emac.c     |  12 +-
- drivers/nvmem/core.c                       | 106 ++++++++++++++++-
- include/linux/davinci_emac.h               |   2 -
- include/linux/mtd/mtd.h                    |   2 +
- include/linux/nvmem-consumer.h             |  31 +++++
- include/linux/nvmem-provider.h             |  10 ++
- include/linux/platform_data/at24.h         |  60 ----------
- net/ethernet/eth.c                         |  84 ++++++++++++--
- 21 files changed, 492 insertions(+), 255 deletions(-)
- delete mode 100644 include/linux/platform_data/at24.h
-
+diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+index 514d1dfc5630..329ea5b8f809 100644
+--- a/drivers/nvmem/core.c
++++ b/drivers/nvmem/core.c
+@@ -62,6 +62,9 @@ static DEFINE_IDA(nvmem_ida);
+ static LIST_HEAD(nvmem_cells);
+ static DEFINE_MUTEX(nvmem_cells_mutex);
+ 
++static LIST_HEAD(nvmem_cell_lookups);
++static DEFINE_MUTEX(nvmem_lookup_mutex);
++
+ #ifdef CONFIG_DEBUG_LOCK_ALLOC
+ static struct lock_class_key eeprom_lock_key;
+ #endif
+@@ -247,6 +250,41 @@ static const struct attribute_group *nvmem_ro_root_dev_groups[] = {
+ 	NULL,
+ };
+ 
++/**
++ * nvmem_add_lookup_table() - register a number of nvmem cell lookup entries
++ *
++ * @lookup: array of nvmem cell lookup entries
++ * @nentries: number of lookup entries in the array
++ */
++void nvmem_add_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries)
++{
++	int i;
++
++	mutex_lock(&nvmem_lookup_mutex);
++	for (i = 0; i < nentries; i++)
++		list_add_tail(&lookup[i].list, &nvmem_cell_lookups);
++	mutex_unlock(&nvmem_lookup_mutex);
++}
++EXPORT_SYMBOL_GPL(nvmem_add_lookup_table);
++
++/**
++ * nvmem_del_lookup_table() - unregister a set of previously added nvmem cell
++ *                            lookup entries
++ *
++ * @lookup: array of nvmem cell lookup entries
++ * @nentries: number of lookup entries in the array
++ */
++void nvmem_del_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries)
++{
++	int i;
++
++	mutex_lock(&nvmem_lookup_mutex);
++	for (i = 0; i < nentries; i++)
++		list_del(&lookup[i].list);
++	mutex_unlock(&nvmem_lookup_mutex);
++}
++EXPORT_SYMBOL_GPL(nvmem_del_lookup_table);
++
+ static void nvmem_release(struct device *dev)
+ {
+ 	struct nvmem_device *nvmem = to_nvmem_device(dev);
+@@ -916,6 +954,39 @@ struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+ EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
+ #endif
+ 
++static struct nvmem_cell *nvmem_cell_from_lookup(const char *cell_id)
++{
++	struct nvmem_cell *cell = ERR_PTR(-ENOENT);
++	struct nvmem_cell_lookup *lookup;
++	struct nvmem_device *nvmem;
++	int rc;
++
++	mutex_lock(&nvmem_lookup_mutex);
++
++	list_for_each_entry(lookup, &nvmem_cell_lookups, list) {
++		if (strcmp(cell_id, lookup->info.name) == 0) {
++			nvmem = nvmem_find(lookup->nvmem_name);
++			if (!nvmem) {
++				cell = ERR_PTR(-EPROBE_DEFER);
++				goto out;
++			}
++
++			rc = nvmem_add_cells(nvmem, &lookup->info, 1);
++			if (rc) {
++				cell = ERR_PTR(rc);
++				goto out;
++			}
++
++			cell = nvmem_cell_get_from_list(cell_id);
++			break;
++		}
++	}
++
++out:
++	mutex_unlock(&nvmem_lookup_mutex);
++	return cell;
++}
++
+ /**
+  * nvmem_cell_get() - Get nvmem cell of device form a given cell name
+  *
+@@ -940,7 +1011,11 @@ struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *cell_id)
+ 	if (!cell_id)
+ 		return ERR_PTR(-EINVAL);
+ 
+-	return nvmem_cell_get_from_list(cell_id);
++	cell = nvmem_cell_get_from_list(cell_id);
++	if (!IS_ERR(cell) || PTR_ERR(cell) == -EPROBE_DEFER)
++		return cell;
++
++	return nvmem_cell_from_lookup(cell_id);
+ }
+ EXPORT_SYMBOL_GPL(nvmem_cell_get);
+ 
+diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
+index 4e85447f7860..f4b5d3186e94 100644
+--- a/include/linux/nvmem-consumer.h
++++ b/include/linux/nvmem-consumer.h
+@@ -29,6 +29,12 @@ struct nvmem_cell_info {
+ 	unsigned int		nbits;
+ };
+ 
++struct nvmem_cell_lookup {
++	struct nvmem_cell_info	info;
++	struct list_head	list;
++	const char		*nvmem_name;
++};
++
+ #if IS_ENABLED(CONFIG_NVMEM)
+ 
+ /* Cell based interface */
+diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
+index 24def6ad09bb..6a17d722062b 100644
+--- a/include/linux/nvmem-provider.h
++++ b/include/linux/nvmem-provider.h
+@@ -17,6 +17,7 @@
+ 
+ struct nvmem_device;
+ struct nvmem_cell_info;
++struct nvmem_cell_lookup;
+ typedef int (*nvmem_reg_read_t)(void *priv, unsigned int offset,
+ 				void *val, size_t bytes);
+ typedef int (*nvmem_reg_write_t)(void *priv, unsigned int offset,
+@@ -72,6 +73,9 @@ struct nvmem_config {
+ struct nvmem_device *nvmem_register(const struct nvmem_config *cfg);
+ int nvmem_unregister(struct nvmem_device *nvmem);
+ 
++void nvmem_add_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries);
++void nvmem_del_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries);
++
+ struct nvmem_device *devm_nvmem_register(struct device *dev,
+ 					 const struct nvmem_config *cfg);
+ 
+@@ -92,6 +96,12 @@ static inline int nvmem_unregister(struct nvmem_device *nvmem)
+ 	return -ENOSYS;
+ }
+ 
++static inline void
++nvmem_add_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries) {}
++
++static inline void
++nvmem_del_lookup_table(struct nvmem_cell_lookup *lookup, size_t nentries) {}
++
+ static inline struct nvmem_device *
+ devm_nvmem_register(struct device *dev, const struct nvmem_config *c)
+ {
 -- 
 2.18.0
