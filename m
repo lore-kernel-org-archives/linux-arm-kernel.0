@@ -1,52 +1,24 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 10 Aug 2018 12:49:21 -0700
-Subject: [PATCH 2/2] arm64: dts: sdm845: Add gpu and gmu device nodes
-In-Reply-To: <20180808224701.7527-3-jcrouse@codeaurora.org>
-References: <20180808224701.7527-1-jcrouse@codeaurora.org>
- <20180808224701.7527-3-jcrouse@codeaurora.org>
-Message-ID: <153393056178.37448.16084112653118820084@swboyd.mtv.corp.google.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 10 Aug 2018 15:58:13 -0400
+Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <20180809143827.GC22636@redhat.com>
+References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
+ <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
+ <20180809143827.GC22636@redhat.com>
+Message-ID: <20180810155813.49259913@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jordan Crouse (2018-08-08 15:47:01)
-> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> index cdaabeb3c995..9fb90bb4ea1f 100644
-> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> @@ -323,5 +323,126 @@
->                                 status = "disabled";
->                         };
->                 };
-> +
-> +               adreno_smmu: arm,smmu-adreno at 5040000 {
-> +                       compatible = "qcom,msm8996-smmu-v2";
-> +                       reg = <0x5040000 0x10000>;
-> +                       #iommu-cells = <1>;
-> +               #global-interrupts = <2>;
-> +                       interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
-> +                            <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
-> +                            <GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
-> +                            <GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
-> +                            <GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
-> +                            <GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
-> +                            <GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
-> +                            <GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
-> +                            <GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
-> +                            <GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
-> +                       clocks = <&clock_gcc GCC_GPU_MEMNOC_GFX_CLK>,
-> +                               <&clock_gcc GCC_GPU_CFG_AHB_CLK>;
-> +                       clock-names = "bus", "iface";
-> +
-> +                       power-domains = <&clock_gpucc GPU_CX_GDSC>;
-> +               };
-> +
-> +               gpu_opp_table: adreno-opp-table {
+On Thu, 9 Aug 2018 16:38:28 +0200
+Oleg Nesterov <oleg@redhat.com> wrote:
 
-The OPP tables should be moved into the root of the tree. Nothing should
-be under the SoC node without a reg property.
+> I need to read this (hopefully final) version carefully. I'll try to do
+> this before next Monday.
+> 
 
-> +                       compatible = "operating-points-v2";
-> +
-> +                       opp-710000000 {
-> +                               opp-hz = /bits/ 64 <710000000>;
-> +                               qcom,level = <416>;
+Monday may be the opening of the merge window (more likely Sunday). Do
+you think this is good enough for pushing it in this late in the game,
+or do you think we should wait another cycle?
+
+-- Steve
