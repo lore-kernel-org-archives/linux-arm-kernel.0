@@ -1,52 +1,80 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Fri, 10 Aug 2018 11:11:55 +0000
-Subject: [PATCH v3 0/2] PCI: imx: Initial imx7d pm support
-In-Reply-To: <20180808152741.GA31808@e107981-ln.cambridge.arm.com>
-References: <cover.1532448745.git.leonard.crestez@nxp.com>
- <bac2cb70b16d81f589915fc0900126b516414243.camel@nxp.com>
- <20180808111429.GC25150@e107981-ln.cambridge.arm.com>
- <a5556be9a5f62ea0472a1a2336bce8d71df0dcaa.camel@nxp.com>
- <20180808141938.GA30428@e107981-ln.cambridge.arm.com>
- <efd9c1d560cae84e2a4ee7585a4c61d5d40ba755.camel@nxp.com>
- <20180808152741.GA31808@e107981-ln.cambridge.arm.com>
-Message-ID: <52ee6376fa15d3a9a62bcfa5d87173e454ccc024.camel@nxp.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 10 Aug 2018 12:13:00 +0100
+Subject: [PATCH] KVM: arm/arm64: Skip updating page table entry if no change
+Message-ID: <20180810111300.17144-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-08-08 at 16:27 +0100, Lorenzo Pieralisi wrote:
-> On Wed, Aug 08, 2018 at 02:58:15PM +0000, Leonard Crestez wrote:
-> > On Wed, 2018-08-08 at 15:19 +0100, Lorenzo Pieralisi wrote:
-> > > On Wed, Aug 08, 2018 at 11:37:14AM +0000, Leonard Crestez wrote:
-> > > > On Wed, 2018-08-08 at 12:14 +0100, Lorenzo Pieralisi wrote:
-> > > > > On Wed, Aug 08, 2018 at 10:53:52AM +0000, Leonard Crestez wrote:
-> > > > > > On Tue, 2018-07-24 at 19:14 +0300, Leonard Crestez wrote:
-> > > > > > > Changes since v2:
-> > > > > > >  * Print with dev_info if link fails on resume (Lucas)
-> > > > > > >  * Add a comment on imx7d pci irq mappings (Andrey)
-> > > > > > >  * Make imx6_pcie_ltssm_disable print an error on IMX6Q (Lucas)
-> > > > > > > 
-> > > > > > > The ltssm_disable does not return an error because it can't be usefully
-> > > > > > > handled, reversing partial suspend is a nightmare and unlikely to work.
-> > > > > > > 
-> > > > > > >  * Drop "reset: imx7: Fix always writing bits as 0 (accepted by Philipp)
-> > > > > > > 
-> > > > > > > Series is against linux-next tag next-20180724 where the reset patch was
-> > > > > > > already accepted. The imx7d.dtsi patch is also useful standalone.
-> > > > > > 
-> > > > > > This is a gentle reminder that this series was reviewed by Lucas two
-> > > > > > weeks ago but not yet included.
-> > > > > 
-> > > > > Does this series have a functional dependency on the reset fix ? If yes
-> > > > > we can have a bisection proplem depending on which tree gets merged
-> > > > > first.
-> > > > 
-> > > > Yes, without the reset fix I expect hangs.
+Contention on updating a page table entry by a large number of vcpus
+can lead to duplicate work when handling stage 2 page faults. As the
+page table update follows the break-before-make requirement of the
+architecture, it can lead to repeated refaults due to clearing the
+entry and flushing the tlbs.
 
-This needs further clarification: without the reset patch this will
-hang on imx7 suspend/resume but this is the current behavior anyway.
+This problem is more likely when -
 
-Both patches are required for imx7 pci suspend and including them out
-of order shouldn't break unrelated functionality.
+* there are large number of vcpus
+* the mapping is large block mapping
 
-So it should actually be fine to just include the pci changes now,
-right?
+such as when using PMD hugepages (512MB) with 64k pages.
+
+Fix this by skipping the page table update if there is no change in
+the entry being updated.
+
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+--
+Hi,
+
+This problem was reported by a user when testing PUD hugepages. During
+VM restore when all threads are running cpu intensive workload, the
+refauting was causing the VM to not make any forward progress.
+
+This patch fixes the problem for PMD and PTE page fault handling.
+
+Thanks,
+Punit
+
+Change-Id: I04c9aa8b9fbada47deb1a171c9959f400a0d2a21
+---
+ virt/kvm/arm/mmu.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 1d90d79706bd..a66a5441ca2f 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1027,6 +1027,18 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+ 	VM_BUG_ON(pmd_present(*pmd) && pmd_pfn(*pmd) != pmd_pfn(*new_pmd));
+ 
+ 	old_pmd = *pmd;
++	/*
++	 * Multiple vcpus faulting on the same PMD entry, can lead to
++	 * them sequentially updating the PMD with the same
++	 * value. Following the break-before-make (pmd_clear()
++	 * followed by tlb_flush()) process can hinder forward
++	 * progress due to refaults generated on missing translations.
++	 *
++	 * Skip updating the page table if the entry is unchanged.
++	 */
++	if (pmd_val(old_pmd) == pmd_val(*new_pmd))
++		return 0;
++
+ 	if (pmd_present(old_pmd)) {
+ 		pmd_clear(pmd);
+ 		kvm_tlb_flush_vmid_ipa(kvm, addr);
+@@ -1101,6 +1113,10 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 
+ 	/* Create 2nd stage page table mapping - Level 3 */
+ 	old_pte = *pte;
++	/* Skip page table update if there is no change */
++	if (pte_val(old_pte) == pte_val(*new_pte))
++		return 0;
++
+ 	if (pte_present(old_pte)) {
+ 		kvm_set_pte(pte, __pte(0));
+ 		kvm_tlb_flush_vmid_ipa(kvm, addr);
+-- 
+2.18.0
