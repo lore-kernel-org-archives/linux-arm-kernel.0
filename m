@@ -1,117 +1,97 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 10 Aug 2018 17:20:35 +0200
-Subject: [PATCH 3/3] media: imx-pxp: add i.MX Pixel Pipeline driver
-In-Reply-To: <20180810151822.18650-4-p.zabel@pengutronix.de>
-References: <20180810151822.18650-1-p.zabel@pengutronix.de>
- <20180810151822.18650-4-p.zabel@pengutronix.de>
-Message-ID: <1533914435.15515.8.camel@pengutronix.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 10 Aug 2018 18:53:38 +0300
+Subject: [PATCH] arm64: dts: renesas: r8a77980: add CSI2/VIN support
+In-Reply-To: <20180809130854.65nvmnuuz6gffjjr@verge.net.au>
+References: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
+ <758a8c87-272c-e861-4aab-01309cff2f84@cogentembedded.com>
+ <20180809130854.65nvmnuuz6gffjjr@verge.net.au>
+Message-ID: <6032159b-ad2b-9a19-77f1-fc7a0ce3c5b0@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-08-10 at 17:18 +0200, Philipp Zabel wrote:
-> Add a V4L2 mem-to-mem scaler/CSC driver for the Pixel Pipeline (PXP)
-> version found on i.MX6ULL SoCs. A similar variant is used on i.MX7D.
+On 08/09/2018 04:08 PM, Simon Horman wrote:
+
+>> Describe the CSI2 and VIN (and their interconnections) in the R8A77980
+>> device tree.
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> ---
+>> This patch is against the 'renesas-devel-20180802v2-v4.18-rc7' branch of
+>> Simon Horman's 'renesas.git' repo.
+>>
+>> The R8A77980 CSI2/VIN DT binding updates have been posted earlier today...
+>>
+>>  arch/arm64/boot/dts/renesas/r8a77980.dtsi |  374 ++++++++++++++++++++++++++++++
+>>  1 file changed, 374 insertions(+)
+>>
+>> Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+>> ===================================================================
+>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+[...]
+>> @@ -769,6 +1065,84 @@
+>>  			resets = <&cpg 603>;
+>>  		};
+>>  
+>> +		csi40: csi2 at feaa0000 {
+>> +			compatible = "renesas,r8a77980-csi2";
+>> +			reg = <0 0xfeaa0000 0 0x10000>;
+>> +			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&cpg CPG_MOD 716>;
+>> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+>> +			resets = <&cpg 716>;
+>> +			status = "disabled";
+>> +
+>> +			ports {
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +
+>> +				port at 1 {
+>> +					#address-cells = <1>;
+>> +					#size-cells = <0>;
+>> +
+>> +					reg = <1>;
+>> +
+>> +					csi40vin0: endpoint at 0 {
+>> +						reg = <0>;
+>> +						remote-endpoint = <&vin0csi40>;
+>> +					};
+>> +					csi40vin1: endpoint at 1 {
+>> +						reg = <1>;
+>> +						remote-endpoint = <&vin1csi40>;
+>> +					};
+>> +					csi40vin2: endpoint at 2 {
+>> +						reg = <2>;
+>> +						remote-endpoint = <&vin2csi40>;
+>> +					};
+>> +					csi40vin3: endpoint at 3 {
+>> +						reg = <3>;
+>> +						remote-endpoint = <&vin3csi40>;
+>> +					};
+>> +				};
+>> +			};
+>> +		};
+>> +
+>> +		csi41: csi2 at feab0000 {
+>> +			compatible = "renesas,r8a77980-csi2";
+>> +			reg = <0 0xfeab0000 0 0x10000>;
+>> +			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
 > 
-> Since this driver only uses the legacy pipeline, it should be reasonably
-> easy to extend it to work with the older PXP versions found on i.MX6UL,
-> i.MX6SX, i.MX6SL, i.MX28, and i.MX23.
+> The use of GIC_SPI 246 for both csi40 and csi41 seems suspicious.
+> Is this intentional?
+
+    No, must be copy/paste artefact... Sorry about that, it should be 241 instead.
+
+>> +			clocks = <&cpg CPG_MOD 716>;
 > 
-> The driver supports scaling and colorspace conversion. There is
-> currently no support for rotation, alpha-blending, and the LUTs.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Should this clock be 715 rather than 716?
 
-FWIW for mem2mem devices, here is the output of v4l2-compliance, built
-from v4l-utils-1.14.0-249-g70b13df426d3:
+   Yes, sure.
 
-----------8<----------
-v4l2-compliance SHA: not available, 32 bits
+   I'm seeing this patch merged despite your remarks. Please either fix it up or
+pull it out!
 
-Compliance test for device /dev/video0:
+[...]
 
-Driver Info:
-	Driver name      : pxp
-	Card type        : pxp
-	Bus info         : platform:pxp
-	Driver version   : 4.18.0
-	Capabilities     : 0x84208000
-		Video Memory-to-Memory
-		Streaming
-		Extended Pix Format
-		Device Capabilities
-	Device Caps      : 0x04208000
-		Video Memory-to-Memory
-		Streaming
-		Extended Pix Format
-
-Required ioctls:
-	test VIDIOC_QUERYCAP: OK
-
-Allow for multiple opens:
-	test second /dev/video0 open: OK
-	test VIDIOC_QUERYCAP: OK
-	test VIDIOC_G/S_PRIORITY: OK
-	test for unlimited opens: OK
-
-Debug ioctls:
-	test VIDIOC_DBG_G/S_REGISTER: OK
-	test VIDIOC_LOG_STATUS: OK (Not Supported)
-
-Input ioctls:
-	test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
-	test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-	test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
-	test VIDIOC_ENUMAUDIO: OK (Not Supported)
-	test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
-	test VIDIOC_G/S_AUDIO: OK (Not Supported)
-	Inputs: 0 Audio Inputs: 0 Tuners: 0
-
-Output ioctls:
-	test VIDIOC_G/S_MODULATOR: OK (Not Supported)
-	test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-	test VIDIOC_ENUMAUDOUT: OK (Not Supported)
-	test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
-	test VIDIOC_G/S_AUDOUT: OK (Not Supported)
-	Outputs: 0 Audio Outputs: 0 Modulators: 0
-
-Input/Output configuration ioctls:
-	test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
-	test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
-	test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
-	test VIDIOC_G/S_EDID: OK (Not Supported)
-
-Control ioctls:
-	test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK
-	test VIDIOC_QUERYCTRL: OK
-	test VIDIOC_G/S_CTRL: OK
-	test VIDIOC_G/S/TRY_EXT_CTRLS: OK
-	test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
-	test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
-	Standard Controls: 4 Private Controls: 0
-
-Format ioctls:
-	test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
-	test VIDIOC_G/S_PARM: OK (Not Supported)
-	test VIDIOC_G_FBUF: OK (Not Supported)
-	test VIDIOC_G_FMT: OK
-	test VIDIOC_TRY_FMT: OK
-	test VIDIOC_S_FMT: OK
-	test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
-	test Cropping: OK (Not Supported)
-	test Composing: OK (Not Supported)
-	test Scaling: OK
-
-Codec ioctls:
-	test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
-	test VIDIOC_G_ENC_INDEX: OK (Not Supported)
-	test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
-
-Buffer ioctls:
-	test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
-	test VIDIOC_EXPBUF: OK
-
-Total: 43, Succeeded: 43, Failed: 0, Warnings: 0
----------->8----------
-
-regards
-Philipp
+MBR, Sergei
