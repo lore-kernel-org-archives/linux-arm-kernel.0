@@ -1,60 +1,42 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Fri, 10 Aug 2018 10:40:55 +0800
-Subject: [PATCH] net: mvneta: use the correct napi pointer
-In-Reply-To: <20180809121308.GC16359@lunn.ch>
-References: <20180809200242.1166f86c@xhacker.debian>
- <20180809121308.GC16359@lunn.ch>
-Message-ID: <20180810104055.0f009ed0@xhacker.debian>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Fri, 10 Aug 2018 10:40:51 +0800
+Subject: [PATCH] arm:pm: Use kmemdup to replace duplicating its implementation
+Message-ID: <1533868851-316-1-git-send-email-zhongjiang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+kmemdup is better than kmalloc() + memcpy(), and we do not like
+open code. So just use kmemdup instead.
 
-On Thu, 9 Aug 2018 14:13:08 +0200 Andrew Lunn wrote:
+Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+---
+ arch/arm/mach-lpc32xx/pm.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-> On Thu, Aug 09, 2018 at 08:02:42PM +0800, Jisheng Zhang wrote:
-> > if neta_armada3700 is true, the mvneta_pcpu_port's napi is invalid, we
-> > should use pp->napi instead. Fix mvneta_config_rss() with this method.
-> > Although we can fix mvneta_rx_hwbm() and mvneta_rx_swbm() in the same
-> > manner, the napi parm of mvneta_poll() is always correct, so we can
-> > pass the correct napi param to mvneta_rx_hwbm() and mvneta_rx_swbm()
-> > 
-> > Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>  
-> 
-> Hi Jisheng
-> 
-> How does this differ from
-
-oops, I didn't monitor the net-next tree recently, glad to see it's fixed.
-But the mvneta_config_rss() also need the fix. Since your patch is already
-merged, so I will submit one separate patch to fix mvneta_config_rss().
-
-Thanks a lot,
-Jisheng
-
-> 
-> commit 7a86f05faf112463cfbbdfd222012e247de461a1
-> Author: Andrew Lunn <andrew@lunn.ch>
-> Date:   Wed Jul 18 18:10:50 2018 +0200
-> 
->     net: ethernet: mvneta: Fix napi structure mixup on armada 3700
->     
->     The mvneta Ethernet driver is used on a few different Marvell SoCs.
->     Some SoCs have per cpu interrupts for Ethernet events. Some SoCs have
->     a single interrupt, independent of the CPU. The driver handles this by
->     having a per CPU napi structure when there are per CPU interrupts, and
->     a global napi structure when there is a single interrupt.
->     
->     When the napi core calls mvneta_poll(), it passes the napi
->     instance. This was not being propagated through the call chain, and
->     instead the per-cpu napi instance was passed to napi_gro_receive()
->     call. This breaks when there is a single global napi instance.
->     
->     Signed-off-by: Andrew Lunn <andrew@lunn.ch>
->     Fixes: 2636ac3cc2b4 ("net: mvneta: Add network support for Armada 3700 SoC")
->     Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
->     Signed-off-by: David S. Miller <davem@davemloft.net>
-> 
-> which is already in net-next, and i hope net?
-> 
->       Andrew
+diff --git a/arch/arm/mach-lpc32xx/pm.c b/arch/arm/mach-lpc32xx/pm.c
+index 6247157..6eefff8 100644
+--- a/arch/arm/mach-lpc32xx/pm.c
++++ b/arch/arm/mach-lpc32xx/pm.c
+@@ -86,7 +86,8 @@ static int lpc32xx_pm_enter(suspend_state_t state)
+ 	void *iram_swap_area;
+ 
+ 	/* Allocate some space for temporary IRAM storage */
+-	iram_swap_area = kmalloc(lpc32xx_sys_suspend_sz, GFP_KERNEL);
++	iram_swap_area = kmemdup((void *)TEMP_IRAM_AREA,
++				lpc32xx_sys_suspend_sz, GFP_KERNEL);
+ 	if (!iram_swap_area) {
+ 		printk(KERN_ERR
+ 		       "PM Suspend: cannot allocate memory to save portion "
+@@ -94,10 +95,6 @@ static int lpc32xx_pm_enter(suspend_state_t state)
+ 		return -ENOMEM;
+ 	}
+ 
+-	/* Backup a small area of IRAM used for the suspend code */
+-	memcpy(iram_swap_area, (void *) TEMP_IRAM_AREA,
+-		lpc32xx_sys_suspend_sz);
+-
+ 	/*
+ 	 * Copy code to suspend system into IRAM. The suspend code
+ 	 * needs to run from IRAM as DRAM may no longer be available
+-- 
+1.7.12.4
