@@ -1,59 +1,59 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 10 Aug 2018 10:04:59 +0200
-Subject: [PATCH v2 02/29] Documentation: nvmem: document lookup entries
+Date: Fri, 10 Aug 2018 10:05:06 +0200
+Subject: [PATCH v2 09/29] ARM: davinci: dm646x-evm: use nvmem lookup for mac
+ address
 In-Reply-To: <20180810080526.27207-1-brgl@bgdev.pl>
 References: <20180810080526.27207-1-brgl@bgdev.pl>
-Message-ID: <20180810080526.27207-3-brgl@bgdev.pl>
+Message-ID: <20180810080526.27207-10-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Describe the usage of nvmem cell lookup tables.
+We now support nvmem lookups for machine code. Add a lookup for
+mac-address.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- Documentation/nvmem/nvmem.txt | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/arm/mach-davinci/board-dm646x-evm.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/Documentation/nvmem/nvmem.txt b/Documentation/nvmem/nvmem.txt
-index 8d8d8f58f96f..9d5e3ca2b4f3 100644
---- a/Documentation/nvmem/nvmem.txt
-+++ b/Documentation/nvmem/nvmem.txt
-@@ -58,6 +58,34 @@ static int qfprom_probe(struct platform_device *pdev)
- It is mandatory that the NVMEM provider has a regmap associated with its
- struct device. Failure to do would return error code from nvmem_register().
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index 584064fdabf5..943ab0ca6db8 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -31,6 +31,7 @@
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/rawnand.h>
+ #include <linux/mtd/partitions.h>
++#include <linux/nvmem-provider.h>
+ #include <linux/clk.h>
+ #include <linux/export.h>
+ #include <linux/platform_data/gpio-davinci.h>
+@@ -310,6 +311,15 @@ static struct pcf857x_platform_data pcf_data = {
+  *  - ... newer boards may have more
+  */
  
-+Additionally it is possible to create nvmem cell lookup entries and register
-+them with the nvmem framework from machine code as shown in the example below:
-+
-+static struct nvmem_cell_lookup foobar_lookup = {
++static struct nvmem_cell_lookup dm646x_evm_mac_address_cell = {
 +	.info = {
 +		.name = "mac-address",
-+		.offset = 0xd000,
-+		.bytes = ERH_ALEN,
++		.offset = 0x7f00,
++		.bytes = ETH_ALEN,
 +	},
-+	.nvmem_name = "foobar",
++	.nvmem_name = "1-00500",
 +};
 +
-+static void foobar_register(void)
-+{
-+	...
-+	nvmem_add_lookup_table(&foobar_lookup, 1);
-+	...
-+}
-+
-+A lookup entry table can be later removed if needed:
-+
-+static void foobar_fini(void)
-+{
-+	...
-+	nvmem_del_lookup_table(&foobar_lookup, 1);
-+	...
-+}
-+
- NVMEM Consumers
- +++++++++++++++
+ static struct at24_platform_data eeprom_info = {
+ 	.byte_len       = (256*1024) / 8,
+ 	.page_size      = 64,
+@@ -802,6 +812,8 @@ static __init void evm_init(void)
+ 		davinci_init_ide();
  
+ 	soc_info->emac_pdata->phy_id = DM646X_EVM_PHY_ID;
++
++	nvmem_add_lookup_table(&dm646x_evm_mac_address_cell, 1);
+ }
+ 
+ MACHINE_START(DAVINCI_DM6467_EVM, "DaVinci DM646x EVM")
 -- 
 2.18.0
