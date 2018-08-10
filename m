@@ -1,44 +1,27 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 10 Aug 2018 18:17:47 +0200
-Subject: [PATCH v2 14/29] net: simplify eth_platform_get_mac_address()
-In-Reply-To: <CAHp75Ve28aNe+FCK3p4OLsDf7dNo-iJ1VR=pyx+Y9OUn3sjYBw@mail.gmail.com>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180810080526.27207-15-brgl@bgdev.pl>
- <CAHp75Ve28aNe+FCK3p4OLsDf7dNo-iJ1VR=pyx+Y9OUn3sjYBw@mail.gmail.com>
-Message-ID: <CAMRc=Mc536v+L_u0garWbeyQ78Q6tyEEzhR9pRGf5mBU+daE+w@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 10 Aug 2018 17:29:20 +0100
+Subject: [PATCH v9 2/2] regulator: add QCOM RPMh regulator driver
+In-Reply-To: <acfc014f3ae3d7feea30be6beaec3e64d96a2723.1531531808.git.collinsd@codeaurora.org>
+References: <cover.1531531808.git.collinsd@codeaurora.org>
+ <acfc014f3ae3d7feea30be6beaec3e64d96a2723.1531531808.git.collinsd@codeaurora.org>
+Message-ID: <20180810162920.GG20971@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-08-10 16:39 GMT+02:00 Andy Shevchenko <andy.shevchenko@gmail.com>:
-> On Fri, Aug 10, 2018 at 11:05 AM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> We don't need to use pci_device_to_OF_node() - we can retrieve
->> dev->of_node directly even for pci devices.
->>
->
->>         struct device_node *dp;
->>
->> -       if (dev_is_pci(dev))
->> -               dp = pci_device_to_OF_node(to_pci_dev(dev));
->> -       else
->> -               dp = dev->of_node;
->> -
->> +       dp = dev->of_node;
->>         addr = NULL;
->>         if (dp)
->>                 addr = of_get_mac_address(dp);
->
-> Looking more at this I could even propose to change all above by
->
-> addr = device_get_mac_address(dev, mac_addr, ETH_ALEN);
->
-> Thoughts?
->
-> --
-> With Best Regards,
-> Andy Shevchenko
+On Fri, Jul 13, 2018 at 06:50:59PM -0700, David Collins wrote:
 
-Indeed seems like it's even more generalized. Thanks for spotting that.
+> +	switch (rpmh_mode) {
 
-Bart
+> +	default:
+> +		mode = REGULATOR_MODE_INVALID;
+> +	}
+
+I'm not sure why the break statements are being omitted in default
+cases, but I do find myself stopping and trying to figure it out?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180810/9f783c72/attachment.sig>
