@@ -1,52 +1,44 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 10 Aug 2018 17:18:20 +0200
-Subject: [PATCH 1/3] dt-bindings: media: Add i.MX Pixel Pipeline binding
-In-Reply-To: <20180810151822.18650-1-p.zabel@pengutronix.de>
-References: <20180810151822.18650-1-p.zabel@pengutronix.de>
-Message-ID: <20180810151822.18650-2-p.zabel@pengutronix.de>
+Date: Fri, 10 Aug 2018 17:18:19 +0200
+Subject: [PATCH 0/3] i.MX PXP scaler/CSC driver
+Message-ID: <20180810151822.18650-1-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT binding documentation for the Pixel Pipeline (PXP) found on
-various NXP i.MX SoCs.
+The Pixel Pipeline (PXP) is a memory-to-memory graphics processing
+engine that supports scaling, colorspace conversion, alpha blending,
+rotation, and pixel conversion via lookup table. Different versions are
+present on various i.MX SoCs from i.MX23 to i.MX7. The latest versions
+on i.MX6ULL and i.MX7D have grown an additional pipeline for dithering
+and e-ink update processing that is ignored by this driver.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- .../devicetree/bindings/media/fsl-pxp.txt     | 26 +++++++++++++++++++
- 1 file changed, 26 insertions(+)
+This series adds a V4L2 mem-to-mem scaler/CSC driver for the PXP version
+found on i.MX6ULL SoCs which is a size reduced variant of the i.MX7 PXP.
+The driver uses only the legacy pipeline, so it should be reasonably
+easy to extend it to work with the older PXP versions found on i.MX6UL,
+i.MX6SX, i.MX6SL, i.MX28, and i.MX23. The driver supports scaling and
+colorspace conversion. There is currently no support for rotation,
+alpha-blending, and the LUTs.
+
+regards
+Philipp
+
+Philipp Zabel (3):
+  dt-bindings: media: Add i.MX Pixel Pipeline binding
+  ARM: dts: imx6ull: add pxp support
+  media: imx-pxp: add i.MX Pixel Pipeline driver
+
+ .../devicetree/bindings/media/fsl-pxp.txt     |   26 +
+ arch/arm/boot/dts/imx6ul.dtsi                 |    8 +
+ arch/arm/boot/dts/imx6ull.dtsi                |    6 +
+ drivers/media/platform/Kconfig                |    9 +
+ drivers/media/platform/Makefile               |    2 +
+ drivers/media/platform/imx-pxp.c              | 1455 ++++++++++++++
+ drivers/media/platform/imx-pxp.h              | 1685 +++++++++++++++++
+ 7 files changed, 3191 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/media/fsl-pxp.txt
+ create mode 100644 drivers/media/platform/imx-pxp.c
+ create mode 100644 drivers/media/platform/imx-pxp.h
 
-diff --git a/Documentation/devicetree/bindings/media/fsl-pxp.txt b/Documentation/devicetree/bindings/media/fsl-pxp.txt
-new file mode 100644
-index 000000000000..2477e7f87381
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/fsl-pxp.txt
-@@ -0,0 +1,26 @@
-+Freescale Pixel Pipeline
-+========================
-+
-+The Pixel Pipeline (PXP) is a memory-to-memory graphics processing engine
-+that supports scaling, colorspace conversion, alpha blending, rotation, and
-+pixel conversion via lookup table. Different versions are present on various
-+i.MX SoCs from i.MX23 to i.MX7.
-+
-+Required properties:
-+- compatible: should be "fsl,<soc>-pxp", where SoC can be one of imx23, imx28,
-+  imx6dl, imx6sl, imx6ul, imx6sx, imx6ull, or imx7d.
-+- reg: the register base and size for the device registers
-+- interrupts: the PXP interrupt, two interrupts for imx6ull and imx7d.
-+- clock-names: should be "axi"
-+- clocks: the PXP AXI clock
-+
-+Example:
-+
-+pxp at 21cc000 {
-+	compatible = "fsl,imx6ull-pxp";
-+	reg = <0x021cc000 0x4000>;
-+	interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-+	clock-names = "axi";
-+	clocks = <&clks IMX6UL_CLK_PXP>;
-+};
 -- 
 2.18.0
