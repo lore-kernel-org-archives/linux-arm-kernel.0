@@ -1,28 +1,38 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 10 Aug 2018 15:36:31 +0200
-Subject: [PATCH net-next] net: mvneta: fix mvneta_config_rss on armada 3700
-In-Reply-To: <20180810113627.5dec5d40@xhacker.debian>
-References: <20180810113627.5dec5d40@xhacker.debian>
-Message-ID: <20180810133631.GA11350@lunn.ch>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 10 Aug 2018 17:39:17 +0300
+Subject: [PATCH v2 14/29] net: simplify eth_platform_get_mac_address()
+In-Reply-To: <20180810080526.27207-15-brgl@bgdev.pl>
+References: <20180810080526.27207-1-brgl@bgdev.pl>
+ <20180810080526.27207-15-brgl@bgdev.pl>
+Message-ID: <CAHp75Ve28aNe+FCK3p4OLsDf7dNo-iJ1VR=pyx+Y9OUn3sjYBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2018 at 11:36:27AM +0800, Jisheng Zhang wrote:
-> The mvneta Ethernet driver is used on a few different Marvell SoCs.
-> Some SoCs have per cpu interrupts for Ethernet events, the driver uses
-> a per CPU napi structure for this case. Some SoCs such as armada 3700
-> have a single interrupt for Ethernet events, the driver uses a global
-> napi structure for this case.
-> 
-> Current mvneta_config_rss() always operates the per cpu napi structure.
-> Fix it by operating a global napi for "single interrupt" case, and per
-> cpu napi structure for remaining cases.
-> 
-> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-> Fixes: 2636ac3cc2b4 ("net: mvneta: Add network support for Armada 3700 SoC")
+On Fri, Aug 10, 2018 at 11:05 AM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>
+> We don't need to use pci_device_to_OF_node() - we can retrieve
+> dev->of_node directly even for pci devices.
+>
 
-Looks reasonable.
+>         struct device_node *dp;
+>
+> -       if (dev_is_pci(dev))
+> -               dp = pci_device_to_OF_node(to_pci_dev(dev));
+> -       else
+> -               dp = dev->of_node;
+> -
+> +       dp = dev->of_node;
+>         addr = NULL;
+>         if (dp)
+>                 addr = of_get_mac_address(dp);
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Looking more at this I could even propose to change all above by
 
-    Andrew
+addr = device_get_mac_address(dev, mac_addr, ETH_ALEN);
+
+Thoughts?
+
+-- 
+With Best Regards,
+Andy Shevchenko
