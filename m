@@ -1,30 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 10 Aug 2018 23:08:21 +0200
-Subject: [PATCH] pinctrl: uniphier: drop meaningless pin from SD1 pin-mux
- of Pro4
-In-Reply-To: <1533610179-13885-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1533610179-13885-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdYNEhq_3nO1OWokhuop83WAmURHmy0k=xyJRT32UFBSOQ@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 10 Aug 2018 14:40:31 -0700 (PDT)
+Subject: [PATCH net-next] net: mvneta: fix mvneta_config_rss on armada 3700
+In-Reply-To: <20180810113627.5dec5d40@xhacker.debian>
+References: <20180810113627.5dec5d40@xhacker.debian>
+Message-ID: <20180810.144031.861564620036768413.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 7, 2018 at 4:50 AM Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+From: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+Date: Fri, 10 Aug 2018 11:36:27 +0800
 
-> The pin 327 was supposed to be used as a voltage control line for the
-> SD card regulator, but the SD card port1 does not support UHS-I.  It
-> only supports 3.3V signaling, hence this pin is pointless.
->
-> Just a note about the background.  At first, hardware engineers tried
-> to implement the UHS for this port.  Then, they needed to shrink the
-> silicon die size, and gave up the UHS, but forgot to remove the pin
-> assignment.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> The mvneta Ethernet driver is used on a few different Marvell SoCs.
+> Some SoCs have per cpu interrupts for Ethernet events, the driver uses
+> a per CPU napi structure for this case. Some SoCs such as armada 3700
+> have a single interrupt for Ethernet events, the driver uses a global
+> napi structure for this case.
+> 
+> Current mvneta_config_rss() always operates the per cpu napi structure.
+> Fix it by operating a global napi for "single interrupt" case, and per
+> cpu napi structure for remaining cases.
+> 
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> Fixes: 2636ac3cc2b4 ("net: mvneta: Add network support for Armada 3700 SoC")
 
-This patch does not apply against my devel branch for v4.19.
-
-Please rebase and resend.
-
-Yours,
-Linus Walleij
+Applied, thanks.
