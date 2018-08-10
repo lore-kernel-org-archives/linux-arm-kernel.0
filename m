@@ -1,92 +1,46 @@
-From: maxi.jourdan@wanadoo.fr (Maxime Jourdan)
-Date: Fri, 10 Aug 2018 08:42:58 +0200
-Subject: [PATCH v2 3/4] ARM64: dts: meson-gx: add dmcbus and canvas nodes.
-In-Reply-To: <fcbfff13-aec5-c571-3a5e-a3d571505342@baylibre.com>
-References: <20180807220011.24436-1-maxi.jourdan@wanadoo.fr>
- <20180807220011.24436-4-maxi.jourdan@wanadoo.fr>
- <3221c65f87f8fd3541e0188186cb0259327cb671.camel@baylibre.com>
- <fcbfff13-aec5-c571-3a5e-a3d571505342@baylibre.com>
-Message-ID: <CAHStOZ5RrB_=vhHwN22ajcbmWW_F04RdJTiE1ZLSDqhvwT5Zkg@mail.gmail.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Fri, 10 Aug 2018 14:58:28 +0800
+Subject: [query] about recent mvneta patches
+Message-ID: <20180810145828.6d05b776@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-08-09 9:53 GMT+02:00 Neil Armstrong <narmstrong@baylibre.com>:
-> On 08/08/2018 10:41, Jerome Brunet wrote:
->> On Wed, 2018-08-08 at 00:00 +0200, Maxime Jourdan wrote:
->>> Wrap the canvas node in a syscon node.
->>>
->>> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
->>> ---
->>>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 17 +++++++++++++++++
->>>  1 file changed, 17 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
->>> index b8dc4dbb391b..c98198662ae2 100644
->>> --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
->>> +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
->>> @@ -423,6 +423,23 @@
->>>                      };
->>>              };
->>>
->>> +            dmcbus: bus at c8838000 {
->>> +                    compatible = "simple-bus";
->>> +                    reg = <0x0 0xc8838000 0x0 0x1000>;
->>> +                    #address-cells = <2>;
->>> +                    #size-cells = <2>;
->>> +                    ranges = <0x0 0x0 0x0 0xc8838000 0x0 0x1000>;
->>> +
->>> +                    sysctrl_DMC: system-controller at 0 {
->>> +                            compatible = "amlogic,gx-dmc-sysctrl", "syscon", "simple-mfd";
->>> +                            reg = <0x0 0x0 0x0 0x1000>;
->>> +
->>> +                            canvas: canvas-provider at 0 {
->>> +                                    compatible = "amlogic,canvas";
->>
->> If there is only one canvas provider under "sysctrl_DMC" and it has no reg
->> property , you should not put a unit-address (@0) here. (same for the
->> documentation patch)
->>
->> You may have seen unit-address without a reg property used elsewhere (ASoC
->> simple-card, my recent axg-sound-card), when there is multiple node with the
->> same node-name (ex: dai-link).
+Hi,
 
-Ack.
+Today I have a look at recent mvneta patches in net-next, I worried two patches:
 
->> As Martin pointed out, the DT spec says we should not use unit-address unless
->> there is a reg property. We did not get Rob's view on this and we might have to
->> update this later on. In your case, unless I missed something, you should
->> definitely not have it
->>
->> nitpick regarding the node-name (canvas-provider). If appropriate, we should try
->> to stick to one of the generic names proposed in the spec. I wonder if the
->> canvas provider could be viewed as a "memory" or "memory-controller"
->
-> It's not really a memory or memory-controller, it's a Lookup Table on top of the memory controller,
-> nothing really matches here...
+1. commit 562e2f467e71 ("net: mvneta: Improve the buffer allocation method
+for SWBM") sets rx_offset_correction as 0 for SW BM, but IIRC, the offset
+is introduced to support 64bit platforms. So in theory the commit could break
+arm64 platforms with mvneta SW BM.
 
-Thanks for the comments. It will be "video-lut" as suggested.
+Fortunately, commit d93277b9839b ("Revert "arm64: Increase the max granular
+size") makes arm64 L1_CACHE_BYTES equal to 64 again, thus NET_SKB_PAD is 64
+too, so the commit 562e2f467e71 doesn't introduce regression, but it hides
+the bug we tried to fix in commit 8d5047cf9ca ("net: mvneta: Convert to be 64
+bits compatible)
 
->>
->> So, what about this ? Just a proposition, feel free to comment ;)
->>
->>       sysctrl_DMC: system-controller at 0 {                                                      compatib
->> le = "amlogic,gx-dmc-sysctrl", "syscon", "simple-mfd";>               reg =
->> <0x0 0x0 0x0 0x1000>;
->>
->>               canvas: memory-controller {
->>                       compatible = "amlogic,canvas";
->>               }
->>
->> [...]
->>
->>
->>> +                            };
->>> +                    };
->>> +            };
->>> +
->>>              hiubus: bus at c883c000 {
->>>                      compatible = "simple-bus";
->>>                      reg = <0x0 0xc883c000 0x0 0x2000>;
->>
->>
->
+IMHO, this patch need to be updated to not introduce regression even the
+L1_CACHE_BYTES is larger than 64B, what do you think?
+
+2. commit f945cec88cb ("net: mvneta: Verify hardware checksum only when
+offload checksum feature is set"), I agree with the point. But
+MVNETA_RX_CSUM_WITH_PSEUDO_HDR bit is always set, so the RX CSUM is always
+generated no matter we set NETIF_F_RXCSUM or not, so IMHO, we should
+always set NETIF_F_RXCSUM. And since we enabled GRO, so what about something
+as below:
+
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index bc80a678abc3..a5043b27bf37 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -4598,7 +4598,8 @@ static int mvneta_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	dev->features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | NETIF_F_TSO;
++	dev->features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
++			NETIF_F_RXCSUM | NETIF_F_TSO | NETIF_F_GRO;
+ 	dev->hw_features |= dev->features;
+ 	dev->vlan_features |= dev->features;
+ 	dev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
