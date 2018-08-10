@@ -1,181 +1,270 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 10 Aug 2018 14:27:21 +0200
-Subject: [PATCH v4 1/3] clk: meson: add emmc sub clock phase delay driver
-In-Reply-To: <20180809070724.11935-2-yixun.lan@amlogic.com>
-References: <20180809070724.11935-1-yixun.lan@amlogic.com>
- <20180809070724.11935-2-yixun.lan@amlogic.com>
-Message-ID: <8ba84364847ae800fcfcab34573a25996d8724fd.camel@baylibre.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 10 Aug 2018 14:47:18 +0200
+Subject: [PATCH v7 3/3] drm/atmel-hlcdc: support bus-width (12/16/18/24)
+ in endpoint nodes
+In-Reply-To: <20180804111439.7455-4-peda@axentia.se>
+References: <20180804111439.7455-1-peda@axentia.se>
+ <20180804111439.7455-4-peda@axentia.se>
+Message-ID: <73d5efe8-4589-5a84-7660-c952f22387a1@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-08-09 at 15:07 +0800, Yixun Lan wrote:
-> Export the emmc sub clock phase delay ops which will be used
-> by the emmc sub clock driver itself.
+On 2018-08-04 13:14, Peter Rosin wrote:
+> This beats the heuristic that the connector is involved in what format
+> should be output for cases where this fails.
+
+Sorry to reply to self, but...
+
+> E.g. if there is a bridge that changes format between the encoder and the
+> connector, or if some of the RGB pins between the lcd controller and the
+> encoder are not routed on the PCB.
 > 
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> This is critical for the devices that have the "conflicting output
+> formats" issue (SAM9N12, SAM9X5, SAMA5D3), since the most significant
+> RGB bits move around depending on the selected output mode. For
+> devices that do not have the "conflicting output formats" issue
+> (SAMA5D2, SAMA5D4), this is completely irrelevant.
+> 
+> Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
+> Reviewed-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+> Signed-off-by: Peter Rosin <peda@axentia.se>
 > ---
->  drivers/clk/meson/Makefile          |  2 +-
->  drivers/clk/meson/clk-phase-delay.c | 96 +++++++++++++++++++++++++++++
->  drivers/clk/meson/clkc.h            | 13 ++++
->  3 files changed, 110 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/clk/meson/clk-phase-delay.c
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c   | 70 +++++++++++++++++-------
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h     |  1 +
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 70 +++++++++++++++++++++---
+>  3 files changed, 114 insertions(+), 27 deletions(-)
 > 
-> diff --git a/drivers/clk/meson/Makefile b/drivers/clk/meson/Makefile
-> index 72ec8c40d848..39ce5661b654 100644
-> --- a/drivers/clk/meson/Makefile
-> +++ b/drivers/clk/meson/Makefile
-> @@ -2,7 +2,7 @@
->  # Makefile for Meson specific clk
->  #
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> index d73281095fac..c38a479ada98 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> @@ -226,6 +226,55 @@ static void atmel_hlcdc_crtc_atomic_enable(struct drm_crtc *c,
+>  #define ATMEL_HLCDC_RGB888_OUTPUT	BIT(3)
+>  #define ATMEL_HLCDC_OUTPUT_MODE_MASK	GENMASK(3, 0)
 >  
-> -obj-$(CONFIG_COMMON_CLK_AMLOGIC) += clk-pll.o clk-mpll.o clk-phase.o
-> +obj-$(CONFIG_COMMON_CLK_AMLOGIC) += clk-pll.o clk-mpll.o clk-phase.o clk-phase-delay.o
->  obj-$(CONFIG_COMMON_CLK_AMLOGIC_AUDIO)	+= clk-triphase.o sclk-div.o
->  obj-$(CONFIG_COMMON_CLK_MESON_AO) += meson-aoclk.o
->  obj-$(CONFIG_COMMON_CLK_MESON8B) += meson8b.o
-> diff --git a/drivers/clk/meson/clk-phase-delay.c b/drivers/clk/meson/clk-phase-delay.c
-> new file mode 100644
-> index 000000000000..6f226814cfec
-> --- /dev/null
-> +++ b/drivers/clk/meson/clk-phase-delay.c
-> @@ -0,0 +1,96 @@
-> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> +/*
-> + * Amlogic Meson MMC Sub Clock Controller Driver
-> + *
-> + * Copyright (c) 2017 Baylibre SAS.
-> + * Author: Jerome Brunet <jbrunet@baylibre.com>
-> + *
-> + * Copyright (c) 2018 Amlogic, inc.
-> + * Author: Yixun Lan <yixun.lan@amlogic.com>
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include "clkc.h"
-> +
-> +#define SD_EMMC_CLOCK			0
-
-Drop this and use struct parm please.
-
-> +
-> +static int meson_clk_phase_delay_get_phase(struct clk_hw *hw)
+> +static int atmel_hlcdc_connector_output_mode(struct drm_connector_state *state)
 > +{
-> +	struct clk_regmap *clk = to_clk_regmap(hw);
-> +	struct meson_clk_phase_delay_data *ph =
-> +		meson_clk_get_phase_delay_data(clk);
-> +	unsigned int phase_num = 1 <<  hweight_long(ph->phase_mask);
-> +	unsigned long period_ps, p, d;
-> +	int degrees;
-> +	u32 val;
+> +	struct drm_connector *connector = state->connector;
+> +	struct drm_display_info *info = &connector->display_info;
+> +	struct drm_encoder *encoder;
+> +	unsigned int supported_fmts = 0;
+> +	int j;
 > +
-> +	regmap_read(clk->map, SD_EMMC_CLOCK, &val);
-> +	p = (val & ph->phase_mask) >> __ffs(ph->phase_mask);
-> +	degrees = p * 360 / phase_num;
+> +	encoder = state->best_encoder;
+> +	if (!encoder)
+> +		encoder = connector->encoder;
 > +
-> +	if (ph->delay_mask) {
-> +		period_ps = DIV_ROUND_UP((unsigned long)NSEC_PER_SEC * 1000,
-> +					 clk_hw_get_rate(hw));
-> +		d = (val & ph->delay_mask) >> __ffs(ph->delay_mask);
-> +		degrees += d * ph->delay_step_ps * 360 / period_ps;
-> +		degrees %= 360;
+> +	switch (atmel_hlcdc_encoder_get_bus_fmt(encoder)) {
+> +	case 0:
+> +		break;
+> +	case MEDIA_BUS_FMT_RGB444_1X12:
+> +		return ATMEL_HLCDC_RGB444_OUTPUT;
+> +	case MEDIA_BUS_FMT_RGB565_1X16:
+> +		return ATMEL_HLCDC_RGB565_OUTPUT;
+> +	case MEDIA_BUS_FMT_RGB666_1X18:
+> +		return ATMEL_HLCDC_RGB666_OUTPUT;
+> +	case MEDIA_BUS_FMT_RGB888_1X24:
+> +		return ATMEL_HLCDC_RGB888_OUTPUT;
+> +	default:
+> +		return -EINVAL;
 > +	}
 > +
-> +	return degrees;
-> +}
-> +
-> +static void meson_clk_apply_phase_delay(struct clk_regmap *clk,
-> +					unsigned int phase,
-> +					unsigned int delay)
-> +{
-> +	struct meson_clk_phase_delay_data *ph = clk->data;
-> +	u32 val;
-> +
-> +	regmap_read(clk->map, SD_EMMC_CLOCK, &val);
-> +
-> +	val &= ~ph->phase_mask;
-> +	val |= phase << __ffs(ph->phase_mask);
-> +
-> +	if (ph->delay_mask) {
-
-This imply that delay is delay is optional. In such case, it would be a regular
-"phase" and we already have a  driver for this. Please remove all the related
-code and make this parameter required for this clock type.
-
-In the future, maybe we'll merge the 2 drivers.
-
-> +		val &= ~ph->delay_mask;
-> +		val |= delay << __ffs(ph->delay_mask);
+> +	for (j = 0; j < info->num_bus_formats; j++) {
+> +		switch (info->bus_formats[j]) {
+> +		case MEDIA_BUS_FMT_RGB444_1X12:
+> +			supported_fmts |= ATMEL_HLCDC_RGB444_OUTPUT;
+> +			break;
+> +		case MEDIA_BUS_FMT_RGB565_1X16:
+> +			supported_fmts |= ATMEL_HLCDC_RGB565_OUTPUT;
+> +			break;
+> +		case MEDIA_BUS_FMT_RGB666_1X18:
+> +			supported_fmts |= ATMEL_HLCDC_RGB666_OUTPUT;
+> +			break;
+> +		case MEDIA_BUS_FMT_RGB888_1X24:
+> +			supported_fmts |= ATMEL_HLCDC_RGB888_OUTPUT;
+> +			break;
+> +		default:
+> +			break;
+> +		}
 > +	}
 > +
-> +	regmap_write(clk->map, SD_EMMC_CLOCK, val);
+> +	return supported_fmts;
 > +}
 > +
-> +static int meson_clk_phase_delay_set_phase(struct clk_hw *hw, int degrees)
-> +{
-> +	struct clk_regmap *clk = to_clk_regmap(hw);
-> +	struct meson_clk_phase_delay_data *ph =
-> +		meson_clk_get_phase_delay_data(clk);
-> +	unsigned int phase_num = 1 <<  hweight_long(ph->phase_mask);
-> +	unsigned long period_ps, d = 0, r;
-> +	u64 p;
-> +
-> +	p = degrees % 360;
-> +
-> +	if (!ph->delay_mask) {
-> +		p = DIV_ROUND_CLOSEST_ULL(p, 360 / phase_num);
-> +	} else {
-> +		period_ps = DIV_ROUND_UP((unsigned long)NSEC_PER_SEC * 1000,
-> +					 clk_hw_get_rate(hw));
-> +
-> +		/* First compute the phase index (p), the remainder (r) is the
-> +		 * part we'll try to acheive using the delays (d).
-> +		 */
-> +		r = do_div(p, 360 / phase_num);
-> +		d = DIV_ROUND_CLOSEST(r * period_ps,
-> +				      360 * ph->delay_step_ps);
-> +		d = min(d, ph->delay_mask >> __ffs(ph->delay_mask));
-> +	}
-> +
-> +	meson_clk_apply_phase_delay(clk, p, d);
-> +	return 0;
-> +}
-> +
-> +const struct clk_ops meson_clk_phase_delay_ops = {
-> +	.get_phase = meson_clk_phase_delay_get_phase,
-> +	.set_phase = meson_clk_phase_delay_set_phase,
+>  static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
+>  {
+>  	unsigned int output_fmts = ATMEL_HLCDC_OUTPUT_MODE_MASK;
+> @@ -238,31 +287,12 @@ static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
+>  	crtc = drm_crtc_to_atmel_hlcdc_crtc(state->crtc);
+>  
+>  	for_each_new_connector_in_state(state->state, connector, cstate, i) {
+> -		struct drm_display_info *info = &connector->display_info;
+>  		unsigned int supported_fmts = 0;
+> -		int j;
+>  
+>  		if (!cstate->crtc)
+>  			continue;
+>  
+> -		for (j = 0; j < info->num_bus_formats; j++) {
+> -			switch (info->bus_formats[j]) {
+> -			case MEDIA_BUS_FMT_RGB444_1X12:
+> -				supported_fmts |= ATMEL_HLCDC_RGB444_OUTPUT;
+> -				break;
+> -			case MEDIA_BUS_FMT_RGB565_1X16:
+> -				supported_fmts |= ATMEL_HLCDC_RGB565_OUTPUT;
+> -				break;
+> -			case MEDIA_BUS_FMT_RGB666_1X18:
+> -				supported_fmts |= ATMEL_HLCDC_RGB666_OUTPUT;
+> -				break;
+> -			case MEDIA_BUS_FMT_RGB888_1X24:
+> -				supported_fmts |= ATMEL_HLCDC_RGB888_OUTPUT;
+> -				break;
+> -			default:
+> -				break;
+> -			}
+> -		}
+> +		supported_fmts = atmel_hlcdc_connector_output_mode(cstate);
+>  
+>  		if (crtc->dc->desc->conflicting_output_formats)
+>  			output_fmts &= supported_fmts;
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+> index 60c937f42114..4cc1e03f0aee 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+> @@ -441,5 +441,6 @@ void atmel_hlcdc_crtc_irq(struct drm_crtc *c);
+>  int atmel_hlcdc_crtc_create(struct drm_device *dev);
+>  
+>  int atmel_hlcdc_create_outputs(struct drm_device *dev);
+> +int atmel_hlcdc_encoder_get_bus_fmt(struct drm_encoder *encoder);
+>  
+>  #endif /* DRM_ATMEL_HLCDC_H */
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> index 8db51fb131db..f587ae596791 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> @@ -27,33 +27,89 @@
+>  
+>  #include "atmel_hlcdc_dc.h"
+>  
+> +struct atmel_hlcdc_rgb_output {
+> +	struct drm_encoder encoder;
+> +	int bus_fmt;
 > +};
-> +EXPORT_SYMBOL_GPL(meson_clk_phase_delay_ops);
-> diff --git a/drivers/clk/meson/clkc.h b/drivers/clk/meson/clkc.h
-> index 24cec16b6038..499834dd34f2 100644
-> --- a/drivers/clk/meson/clkc.h
-> +++ b/drivers/clk/meson/clkc.h
-> @@ -113,6 +113,18 @@ struct clk_regmap _name = {						\
->  	},								\
+> +
+>  static const struct drm_encoder_funcs atmel_hlcdc_panel_encoder_funcs = {
+>  	.destroy = drm_encoder_cleanup,
 >  };
 >  
-> +struct meson_clk_phase_delay_data {
-> +	unsigned long			phase_mask;
-> +	unsigned long			delay_mask;
-
-Like every other clock drivers in the amlogic directory, please use struct parm
-to decribe the fields.
-
-> +	unsigned int			delay_step_ps;
-> +};
-> +
-> +static inline struct meson_clk_phase_delay_data *
-> +meson_clk_get_phase_delay_data(struct clk_regmap *clk)
+> +static struct atmel_hlcdc_rgb_output *
+> +atmel_hlcdc_encoder_to_rgb_output(struct drm_encoder *encoder)
 > +{
-> +	return (struct meson_clk_phase_delay_data *)clk->data;
+> +	return container_of(encoder, struct atmel_hlcdc_rgb_output, encoder);
 > +}
 > +
->  /* clk_ops */
->  extern const struct clk_ops meson_clk_pll_ro_ops;
->  extern const struct clk_ops meson_clk_pll_ops;
-> @@ -120,5 +132,6 @@ extern const struct clk_ops meson_clk_cpu_ops;
->  extern const struct clk_ops meson_clk_mpll_ro_ops;
->  extern const struct clk_ops meson_clk_mpll_ops;
->  extern const struct clk_ops meson_clk_phase_ops;
-> +extern const struct clk_ops meson_clk_phase_delay_ops;
+> +int atmel_hlcdc_encoder_get_bus_fmt(struct drm_encoder *encoder)
+> +{
+> +	struct atmel_hlcdc_rgb_output *output;
+> +
+> +	output = atmel_hlcdc_encoder_to_rgb_output(encoder);
+> +
+> +	return output->bus_fmt;
+> +}
+> +
+> +static int atmel_hlcdc_of_bus_fmt(struct device_node *ep)
+> +{
+> +	u32 bus_width;
+> +	int ret;
+> +
+> +	ret = of_property_read_u32(ep, "bus-width", &bus_width);
+> +	if (ret == -EINVAL)
+> +		return 0;
+> +	if (ret)
+> +		return ret;
+> +
+> +	switch (bus_width) {
+> +	case 12:
+> +		return MEDIA_BUS_FMT_RGB444_1X12;
+> +	case 16:
+> +		return MEDIA_BUS_FMT_RGB565_1X16;
+> +	case 18:
+> +		return MEDIA_BUS_FMT_RGB666_1X18;
+> +	case 24:
+> +		return MEDIA_BUS_FMT_RGB888_1X24;
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +}
+> +
+>  static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
+>  {
+> -	struct drm_encoder *encoder;
+> +	struct atmel_hlcdc_rgb_output *output;
+> +	struct device_node *ep;
+>  	struct drm_panel *panel;
+>  	struct drm_bridge *bridge;
+>  	int ret;
 >  
->  #endif /* __CLKC_H */
+> +	ep = of_graph_get_endpoint_by_regs(dev->dev->of_node, 0, endpoint);
+
+
+...I just noticed that the ep device_node is never put away...
+
+> +	if (!ep)
+> +		return -ENODEV;
+> +
+>  	ret = drm_of_find_panel_or_bridge(dev->dev->of_node, 0, endpoint,
+>  					  &panel, &bridge);
+>  	if (ret)
+>  		return ret;
+>  
+> -	encoder = devm_kzalloc(dev->dev, sizeof(*encoder), GFP_KERNEL);
+> -	if (!encoder)
+> +	output = devm_kzalloc(dev->dev, sizeof(*output), GFP_KERNEL);
+> +	if (!output)
+>  		return -EINVAL;
+
+...and this should be -ENOMEM. Not that this latter buglet is a problem
+with this series, but since I noticed it and am going to resend anyway
+I'm going to fix that too.
+
+Cheers,
+Peter
+
+>  
+> -	ret = drm_encoder_init(dev, encoder,
+> +	output->bus_fmt = atmel_hlcdc_of_bus_fmt(ep);
+> +	if (output->bus_fmt < 0) {
+> +		dev_err(dev->dev, "invalid bus width\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = drm_encoder_init(dev, &output->encoder,
+>  			       &atmel_hlcdc_panel_encoder_funcs,
+>  			       DRM_MODE_ENCODER_NONE, NULL);
+>  	if (ret)
+>  		return ret;
+>  
+> -	encoder->possible_crtcs = 0x1;
+> +	output->encoder.possible_crtcs = 0x1;
+>  
+>  	if (panel) {
+>  		bridge = drm_panel_bridge_add(panel, DRM_MODE_CONNECTOR_Unknown);
+> @@ -62,7 +118,7 @@ static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
+>  	}
+>  
+>  	if (bridge) {
+> -		ret = drm_bridge_attach(encoder, bridge, NULL);
+> +		ret = drm_bridge_attach(&output->encoder, bridge, NULL);
+>  		if (!ret)
+>  			return 0;
+>  
+> @@ -70,7 +126,7 @@ static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
+>  			drm_panel_bridge_remove(bridge);
+>  	}
+>  
+> -	drm_encoder_cleanup(encoder);
+> +	drm_encoder_cleanup(&output->encoder);
+>  
+>  	return ret;
+>  }
+> 
