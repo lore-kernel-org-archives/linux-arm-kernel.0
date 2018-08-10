@@ -1,45 +1,81 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 10 Aug 2018 10:46:13 +0100
-Subject: [RFC PATCH] arm64: lse: use register variables instead of
- -ffixed, -fcall flags
-In-Reply-To: <20180810020751.44859-1-trong@android.com>
-References: <20180810020751.44859-1-trong@android.com>
-Message-ID: <20180810094611.GA12273@arm.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Fri, 10 Aug 2018 15:21:04 +0530
+Subject: [PATCH v3 0/9] Add Reset Controller support for Actions Semi Owl SoCs
+Message-ID: <20180810095113.25292-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 09, 2018 at 07:07:51PM -0700, Tri Vo wrote:
-> -ffixed, -fcall-used, -fcall-saved flags are used to build LL/SC
-> fallback atomic implementations in such a way that:
-> 1. LSE implementations only assume x16, x17, x30 to be clobbered by a
-> function call to LL/SC fallbacks.
-> 2. LL/SC fallbacks are responsible for saving/restoring the rest of the
-> GPRs.
-> 3. LL/SC fallbacks always prefer to allocate in x16, x17 since there is
-> no need to save/restore them.
-> 
-> Same result can be achieved without -ffixed, -fcall-used, -fcall-saved
-> flags by explicitly telling the compiler where to allocate each variable
-> in LL/SC atomic implementations. This patch makes all functions use x16,
-> x17 registers. 'fetch' variants of the functions need one more scratch
-> register, so we allocate one from the PCS's set of callee-saved
-> registers (in this case x19).
-> 
-> With this patch:
-> 1. the desired register allocation is reflected in the code rather than
-> in compiler flags.
-> 2. LSE atomic support can be built with both clang and gcc.
-> 3. Number of preserved registers in LL/SC fallbacks is unchanged.
-> 
-> The tradeoff is that the compiler loses flexibility in allocating
-> registers for inline LL/SC atomic implementations.
+This patchset adds Reset Controller (RMU) support for Actions Semi
+Owl SoCs, S900 and S700. For the Owl SoCs, RMU has been integrated into
+the clock subsystem in hardware. Hence, in software we integrate RMU
+support into common clock driver inorder to maintain compatibility. The
+syscon approach is not taken into account based on the review by Rob.
 
-This impacts the atomics code when !CONFIG_LSE, and causes the fetch*
-variants to spill x19 in most cases.
+This patch series depends on the recently posted S700 clk series:
+"[PATCH v7 0/5] Add clock driver for Actions S700 SoC". For the S700 clk
+series, driver and bindings patches are applied through the clk tree.
+But the DTS patches are not yet picked up by the platform maintainer,
+Andreas.
 
-Please just fix clang, or augment the lseinstr check in our Makefile to
-check for ffixed support as well.
+Hence, Andreas is expected to pick the DTS patches in this series once
+reviewed by the maintainers along with S700 clk DTS patches.
+
+Because of the absence of the S500 SoC clk support, the reset controller
+registration code is added to both S700 and S900 SoC clk drivers for now.
+But once S500 clk support is added, the reset controller registration part
+will be moved to Owl SoCs common clk code.
 
 Thanks,
+Mani
 
-Will
+Changes in v3:
+
+* Reverted back the syscon approach based on the review by Rob Herring
+* Dropped the MAINTAINERS patch
+* Converted reset_map struct definitions to const based on the review by
+  Philipp
+* Fixed S700 header in DT spotted by Parthiban
+* Added Reviewed-by tags from Rob for 3 bindings patches
+
+Changes in v2:
+
+* Converted the CMU and RMU drivers to syscon for a more cleaner
+  approach
+* Declared the owl_reset_map structs to const
+* Used regmap_update_bits instead of a combined regmap_read and write
+* Removed unused headers in RMU drivers
+* Added MAINTAINERS entry for the RMU driver and bindings
+
+Manivannan Sadhasivam (9):
+  clk: actions: Cache regmap info in private clock descriptor
+  dt-bindings: clock: Add reset controller bindings for Actions Semi Owl
+    SoCs
+  dt-bindings: reset: Add binding constants for Actions Semi S700 RMU
+  dt-bindings: reset: Add binding constants for Actions Semi S900 RMU
+  arm64: dts: actions: Add Reset Controller support for S700 SoC
+  arm64: dts: actions: Add Reset Controller support for S900 SoC
+  clk: actions: Add Actions Semi Owl SoCs Reset Management Unit support
+  clk: actions: Add Actions Semi S700 SoC Reset Management Unit support
+  clk: actions: Add Actions Semi S900 SoC Reset Management Unit support
+
+ .../bindings/clock/actions,owl-cmu.txt        |  2 +
+ arch/arm64/boot/dts/actions/s700.dtsi         |  2 +
+ arch/arm64/boot/dts/actions/s900.dtsi         |  2 +
+ drivers/clk/actions/Kconfig                   |  1 +
+ drivers/clk/actions/Makefile                  |  1 +
+ drivers/clk/actions/owl-common.c              |  3 +-
+ drivers/clk/actions/owl-common.h              |  5 +-
+ drivers/clk/actions/owl-reset.c               | 66 ++++++++++++++
+ drivers/clk/actions/owl-reset.h               | 31 +++++++
+ drivers/clk/actions/owl-s700.c                | 55 +++++++++++-
+ drivers/clk/actions/owl-s900.c                | 86 ++++++++++++++++++-
+ .../dt-bindings/reset/actions,s700-reset.h    | 34 ++++++++
+ .../dt-bindings/reset/actions,s900-reset.h    | 65 ++++++++++++++
+ 13 files changed, 347 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/clk/actions/owl-reset.c
+ create mode 100644 drivers/clk/actions/owl-reset.h
+ create mode 100644 include/dt-bindings/reset/actions,s700-reset.h
+ create mode 100644 include/dt-bindings/reset/actions,s900-reset.h
+
+-- 
+2.17.1
