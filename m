@@ -1,76 +1,116 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Fri, 10 Aug 2018 11:36:27 +0800
-Subject: [PATCH net-next] net: mvneta: fix mvneta_config_rss on armada 3700
-Message-ID: <20180810113627.5dec5d40@xhacker.debian>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Fri, 10 Aug 2018 10:20:38 +0530
+Subject: [PATCH v1 01/10] arm/arm64: dts: msm8974/msm8916: thermal: Split
+ address space into two
+In-Reply-To: <20180809191059.GI160295@google.com>
+References: <cover.1533815718.git.amit.kucheria@linaro.org>
+ <d01f560abed221b536b27bfaa42a530257642974.1533815718.git.amit.kucheria@linaro.org>
+ <20180809191059.GI160295@google.com>
+Message-ID: <CAP245DUtn=dzfaNPTmYdHZBRDzmKJ9q4EZw-n9-zgeoeBPGr2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvneta Ethernet driver is used on a few different Marvell SoCs.
-Some SoCs have per cpu interrupts for Ethernet events, the driver uses
-a per CPU napi structure for this case. Some SoCs such as armada 3700
-have a single interrupt for Ethernet events, the driver uses a global
-napi structure for this case.
+On Fri, Aug 10, 2018 at 12:41 AM Matthias Kaehlcke <mka@chromium.org> wrote:
+>
+> On Thu, Aug 09, 2018 at 06:02:33PM +0530, Amit Kucheria wrote:
+> > We've earlier added support to split the register address space into TM
+> > and SROT regions.
+> >
+> > Split up the regmap address space into two for the remaining platforms that
+> > have a similar register layout and make corresponding changes to the
+> > get_temp_common() function used by these platforms.
+> >
+> > Since tsens-common.c/init_common() currently only registers one address
+> > space, the order is important (TM before SROT).  This is OK since the code
+> > doesn't really use the SROT functionality yet.
+> >
+> > Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/qcom-msm8974.dtsi   | 6 ++++--
+> >  arch/arm64/boot/dts/qcom/msm8916.dtsi | 6 ++++--
+> >  drivers/thermal/qcom/tsens-common.c   | 5 +++--
+> >  3 files changed, 11 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> > index d9019a49b292..3c4b81c29798 100644
+> > --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+> > +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> > @@ -427,11 +427,13 @@
+> >                       };
+> >               };
+> >
+> > -             tsens: thermal-sensor at fc4a8000 {
+> > +             tsens: thermal-sensor at fc4a9000 {
+> >                       compatible = "qcom,msm8974-tsens";
+> > -                     reg = <0xfc4a8000 0x2000>;
+> > +                     reg = <0xfc4a9000 0x1000>, /* TM */
+> > +                           <0xfc4a8000 0x1000>; /* SROT */
+> >                       nvmem-cells = <&tsens_calib>, <&tsens_backup>;
+> >                       nvmem-cell-names = "calib", "calib_backup";
+> > +                     #qcom,sensors = <11>;
+>
+> nit: adding the number of sensors isn't directly related and probably
+> should be in a separate patch. Not important enough to re-spin just
+> for this though ;-)
 
-Current mvneta_config_rss() always operates the per cpu napi structure.
-Fix it by operating a global napi for "single interrupt" case, and per
-cpu napi structure for remaining cases.
+Hi Matthias,
 
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-Fixes: 2636ac3cc2b4 ("net: mvneta: Add network support for Armada 3700 SoC")
----
- drivers/net/ethernet/marvell/mvneta.c | 31 +++++++++++++++++----------
- 1 file changed, 20 insertions(+), 11 deletions(-)
+Sometimes the urge to avoid frivolous patches takes over too strongly. :-)
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 55c2a56c5dae..bc80a678abc3 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -4107,13 +4107,18 @@ static int  mvneta_config_rss(struct mvneta_port *pp)
- 
- 	on_each_cpu(mvneta_percpu_mask_interrupt, pp, true);
- 
--	/* We have to synchronise on the napi of each CPU */
--	for_each_online_cpu(cpu) {
--		struct mvneta_pcpu_port *pcpu_port =
--			per_cpu_ptr(pp->ports, cpu);
-+	if (!pp->neta_armada3700) {
-+		/* We have to synchronise on the napi of each CPU */
-+		for_each_online_cpu(cpu) {
-+			struct mvneta_pcpu_port *pcpu_port =
-+				per_cpu_ptr(pp->ports, cpu);
- 
--		napi_synchronize(&pcpu_port->napi);
--		napi_disable(&pcpu_port->napi);
-+			napi_synchronize(&pcpu_port->napi);
-+			napi_disable(&pcpu_port->napi);
-+		}
-+	} else {
-+		napi_synchronize(&pp->napi);
-+		napi_disable(&pp->napi);
- 	}
- 
- 	pp->rxq_def = pp->indir[0];
-@@ -4130,12 +4135,16 @@ static int  mvneta_config_rss(struct mvneta_port *pp)
- 	mvneta_percpu_elect(pp);
- 	spin_unlock(&pp->lock);
- 
--	/* We have to synchronise on the napi of each CPU */
--	for_each_online_cpu(cpu) {
--		struct mvneta_pcpu_port *pcpu_port =
--			per_cpu_ptr(pp->ports, cpu);
-+	if (!pp->neta_armada3700) {
-+		/* We have to synchronise on the napi of each CPU */
-+		for_each_online_cpu(cpu) {
-+			struct mvneta_pcpu_port *pcpu_port =
-+				per_cpu_ptr(pp->ports, cpu);
- 
--		napi_enable(&pcpu_port->napi);
-+			napi_enable(&pcpu_port->napi);
-+		}
-+	} else {
-+		napi_enable(&pp->napi);
- 	}
- 
- 	netif_tx_start_all_queues(pp->dev);
--- 
-2.18.0
+I'll split it out in a respin. Thanks for the quick review of the series.
+
+Regards,
+Amit
+
+> >                       #thermal-sensor-cells = <1>;
+> >               };
+> >
+> > diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> > index cc1040eacdf5..abf84df5a7bc 100644
+> > --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> > +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> > @@ -774,11 +774,13 @@
+> >                       };
+> >               };
+> >
+> > -             tsens: thermal-sensor at 4a8000 {
+> > +             tsens: thermal-sensor at 4a9000 {
+> >                       compatible = "qcom,msm8916-tsens";
+> > -                     reg = <0x4a8000 0x2000>;
+> > +                     reg = <0x4a9000 0x1000>, /* TM */
+> > +                           <0x4a8000 0x1000>; /* SROT */
+> >                       nvmem-cells = <&tsens_caldata>, <&tsens_calsel>;
+> >                       nvmem-cell-names = "calib", "calib_sel";
+> > +                     #qcom,sensors = <5>;
+>
+> ditto
+>
+> >                       #thermal-sensor-cells = <1>;
+> >               };
+> >
+> > diff --git a/drivers/thermal/qcom/tsens-common.c b/drivers/thermal/qcom/tsens-common.c
+> > index 6207d8d92351..478739543bbc 100644
+> > --- a/drivers/thermal/qcom/tsens-common.c
+> > +++ b/drivers/thermal/qcom/tsens-common.c
+> > @@ -21,7 +21,7 @@
+> >  #include <linux/regmap.h>
+> >  #include "tsens.h"
+> >
+> > -#define S0_ST_ADDR           0x1030
+> > +#define STATUS_OFFSET                0x30
+> >  #define SN_ADDR_OFFSET               0x4
+> >  #define SN_ST_TEMP_MASK              0x3ff
+> >  #define CAL_DEGC_PT1         30
+> > @@ -107,8 +107,9 @@ int get_temp_common(struct tsens_device *tmdev, int id, int *temp)
+> >       unsigned int status_reg;
+> >       int last_temp = 0, ret;
+> >
+> > -     status_reg = S0_ST_ADDR + s->hw_id * SN_ADDR_OFFSET;
+> > +     status_reg = tmdev->tm_offset + STATUS_OFFSET + s->hw_id * SN_ADDR_OFFSET;
+> >       ret = regmap_read(tmdev->map, status_reg, &code);
+> > +
+> >       if (ret)
+> >               return ret;
+> >       last_temp = code & SN_ST_TEMP_MASK;
+>
+> Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
