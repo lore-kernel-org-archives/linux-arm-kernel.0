@@ -1,129 +1,148 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 10 Aug 2018 19:51:17 +0100
-Subject: [PATCH] KVM: arm/arm64: Skip updating page table entry if no
- change
-In-Reply-To: <86mutup9mu.wl-marc.zyngier@arm.com> (Marc Zyngier's message of
- "Fri, 10 Aug 2018 15:40:57 +0100")
-References: <20180810111300.17144-1-punit.agrawal@arm.com>
- <86mutup9mu.wl-marc.zyngier@arm.com>
-Message-ID: <871sb62gyi.fsf@e105922-lin.cambridge.arm.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 10 Aug 2018 15:27:38 -0400
+Subject: [PATCH 1/3] arm64: implement ftrace with regs
+In-Reply-To: <20180810160223.D360D68C76@newverein.lst.de>
+References: <20180810160043.9E45568C76@newverein.lst.de>
+ <20180810160223.D360D68C76@newverein.lst.de>
+Message-ID: <20180810152738.695cff07@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Zyngier <marc.zyngier@arm.com> writes:
+On Fri, 10 Aug 2018 18:02:23 +0200 (CEST)
+Torsten Duwe <duwe@lst.de> wrote:
 
-> Hi Punit,
->
-> On Fri, 10 Aug 2018 12:13:00 +0100,
-> Punit Agrawal <punit.agrawal@arm.com> wrote:
->> 
->> Contention on updating a page table entry by a large number of vcpus
->> can lead to duplicate work when handling stage 2 page faults. As the
->> page table update follows the break-before-make requirement of the
->> architecture, it can lead to repeated refaults due to clearing the
->> entry and flushing the tlbs.
->> 
->> This problem is more likely when -
->> 
->> * there are large number of vcpus
->> * the mapping is large block mapping
->>  
->> such as when using PMD hugepages (512MB) with 64k pages.
->> 
->> Fix this by skipping the page table update if there is no change in
->> the entry being updated.
->> 
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@arm.com>
->> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
->
-> This definitely deserves a Cc to stable, and a Fixes: tag.
+> --- a/arch/arm64/kernel/entry-ftrace.S
+> +++ b/arch/arm64/kernel/entry-ftrace.S
+> @@ -13,6 +13,8 @@
+>  #include <asm/assembler.h>
+>  #include <asm/ftrace.h>
+>  #include <asm/insn.h>
+> +#include <asm/asm-offsets.h>
+> +#include <asm/assembler.h>
+>  
+>  /*
+>   * Gcc with -pg will put the following code in the beginning of each function:
+> @@ -123,6 +125,7 @@ skip_ftrace_call:			// }
+>  ENDPROC(_mcount)
+>  
+>  #else /* CONFIG_DYNAMIC_FTRACE */
+> +#ifndef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+>  /*
+>   * _mcount() is used to build the kernel with -pg option, but all the branch
+>   * instructions to _mcount() are replaced to NOP initially at kernel start up,
+> @@ -162,6 +165,84 @@ ftrace_graph_call:			// ftrace_graph_cal
+>  
+>  	mcount_exit
+>  ENDPROC(ftrace_caller)
+> +#else /* CONFIG_DYNAMIC_FTRACE_WITH_REGS */
+> +ENTRY(_mcount)
+> +	mov     x10, lr
+> +	mov     lr, x9
+> +	ret     x10
+> +ENDPROC(_mcount)
+> +
+> +ENTRY(ftrace_caller)
+> +	stp	x29, x9, [sp, #-16]!
+> +	sub	sp, sp, #S_FRAME_SIZE
+> +
+> +	stp	x0, x1, [sp]
+> +	stp	x2, x3, [sp, #16]
+> +	stp	x4, x5, [sp, #32]
+> +	stp	x6, x7, [sp, #48]
+> +	stp	x8, x9, [sp, #64]
+> +	stp	x10, x11, [sp, #80]
+> +	stp	x12, x13, [sp, #96]
+> +	stp	x14, x15, [sp, #112]
+> +	stp	x16, x17, [sp, #128]
+> +	stp	x18, x19, [sp, #144]
+> +	stp	x20, x21, [sp, #160]
+> +	stp	x22, x23, [sp, #176]
+> +	stp	x24, x25, [sp, #192]
+> +	stp	x26, x27, [sp, #208]
+> +	stp	x28, x29, [sp, #224]
 
-Agreed.
+Wait! You are having ftrace_caller *always* perform the regs save? Why?
+This is why I have a ftrace_caller and a ftrace_regs_caller, so that
+normal function tracing doesn't take the overhead hit of tracing all
+functions. And note, the generic code will differentiate per function.
+The regs calling is usually only done for a handful of functions, the
+normal tracing of all functions doesn't need it.
 
-For PMD the issue exists since commit ad361f093c1e ("KVM: ARM: Support
-hugetlbfs backed huge pages") when the file lived in arch/arm/kvm. (v3.12+)
+Or am I missing something?
 
-For PTE the issue exists since commit d5d8184d35c9 ("KVM: ARM: Memory
-virtualization setup"). (v3.8+)
 
-I'll split the fix into two patches and add a cc to stable.
-
->> --
->> Hi,
->> 
->> This problem was reported by a user when testing PUD hugepages. During
->> VM restore when all threads are running cpu intensive workload, the
->> refauting was causing the VM to not make any forward progress.
->> 
->> This patch fixes the problem for PMD and PTE page fault handling.
->> 
->> Thanks,
->> Punit
->> 
->> Change-Id: I04c9aa8b9fbada47deb1a171c9959f400a0d2a21
-
-Just noticed this. Looks like the commit hook has escaped it's worktree.
-
->> ---
->>  virt/kvm/arm/mmu.c | 16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
->> 
->> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
->> index 1d90d79706bd..a66a5441ca2f 100644
->> --- a/virt/kvm/arm/mmu.c
->> +++ b/virt/kvm/arm/mmu.c
->> @@ -1027,6 +1027,18 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
->>  	VM_BUG_ON(pmd_present(*pmd) && pmd_pfn(*pmd) != pmd_pfn(*new_pmd));
->>  
->>  	old_pmd = *pmd;
->> +	/*
->> +	 * Multiple vcpus faulting on the same PMD entry, can lead to
->> +	 * them sequentially updating the PMD with the same
->> +	 * value. Following the break-before-make (pmd_clear()
->> +	 * followed by tlb_flush()) process can hinder forward
->> +	 * progress due to refaults generated on missing translations.
->> +	 *
->> +	 * Skip updating the page table if the entry is unchanged.
->> +	 */
->> +	if (pmd_val(old_pmd) == pmd_val(*new_pmd))
->> +		return 0;
->
-> Shouldn't you take this opportunity to also refactor it with the above
-> VM_BUG_ON and the below pmd_present? At the moment, we end-up testing
-> pmd_present twice, and your patch is awfully similar to the VM_BUG_ON
-> one.
-
-I went for the minimal change keeping a backport in mind.
-
-The VM_BUG_ON() is enabled only when CONFIG_DEBUG_VM is selected and
-checks for pfn ignoring the attributes, while this fix checks for the
-entire entry. Maybe I'm missing something, but I can't see an obvious
-way to combine the checks.
-
-I've eliminated the duplicate pmd_present() check and will post the
-updated patches.
-
-Thanks,
-Punit
-
->> +
->>  	if (pmd_present(old_pmd)) {
->>  		pmd_clear(pmd);
->>  		kvm_tlb_flush_vmid_ipa(kvm, addr);
->> @@ -1101,6 +1113,10 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
->>  
->>  	/* Create 2nd stage page table mapping - Level 3 */
->>  	old_pte = *pte;
->> +	/* Skip page table update if there is no change */
->> +	if (pte_val(old_pte) == pte_val(*new_pte))
->> +		return 0;
->> +
->>  	if (pte_present(old_pte)) {
->>  		kvm_set_pte(pte, __pte(0));
->>  		kvm_tlb_flush_vmid_ipa(kvm, addr);
->
-> Thanks,
->
-> 	M.
+> +	/* The link Register at callee entry */
+> +	str	x9, [sp, #S_LR]
+> +	/* The program counter just after the ftrace call site */
+> +	str	lr, [sp, #S_PC]
+> +	/* The stack pointer as it was on ftrace_caller entry... */
+> +	add	x29, sp, #S_FRAME_SIZE+16	/* ...is also our new FP */
+> +	str	x29, [sp, #S_SP]
+> +
+> +	adrp    x0, function_trace_op
+> +	ldr     x2, [x0, #:lo12:function_trace_op]
+> +	mov	x1, x9		/* saved LR == parent IP */
+> +	sub	x0, lr, #8	/* function entry == IP */
+> +	mov	x3, sp		/* complete pt_regs are @sp */
+> +
+> +	.global ftrace_call
+> +ftrace_call:
+> +
+> +	bl	ftrace_stub
+> +
+> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> +	.global ftrace_graph_call
+> +ftrace_graph_call:			// ftrace_graph_caller();
+> +	nop				// If enabled, this will be replaced
+> +					// "b ftrace_graph_caller"
+> +#endif
+> +
+> +ftrace_regs_return:
+> +	ldp	x0, x1, [sp]
+> +	ldp	x2, x3, [sp, #16]
+> +	ldp	x4, x5, [sp, #32]
+> +	ldp	x6, x7, [sp, #48]
+> +	ldp	x8, x9, [sp, #64]
+> +	ldp	x10, x11, [sp, #80]
+> +	ldp	x12, x13, [sp, #96]
+> +	ldp	x14, x15, [sp, #112]
+> +	ldp	x16, x17, [sp, #128]
+> +	ldp	x18, x19, [sp, #144]
+> +	ldp	x20, x21, [sp, #160]
+> +	ldp	x22, x23, [sp, #176]
+> +	ldp	x24, x25, [sp, #192]
+> +	ldp	x26, x27, [sp, #208]
+> +	ldp	x28, x29, [sp, #224]
+> +
+> +	ldr	x9, [sp, #S_PC]
+> +	ldr	lr, [sp, #S_LR]
+> +	add	sp, sp, #S_FRAME_SIZE+16
+> +
+> +	ret	x9
+> +
+> +ENDPROC(ftrace_caller)
+> +
+> +#endif /* CONFIG_DYNAMIC_FTRACE_WITH_REGS */
+>  #endif /* CONFIG_DYNAMIC_FTRACE */
+>  
+>  ENTRY(ftrace_stub)
+> @@ -197,12 +278,20 @@ ENDPROC(ftrace_stub)
+>   * and run return_to_handler() later on its exit.
+>   */
+>  ENTRY(ftrace_graph_caller)
+> +#ifndef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+>  	mcount_get_lr_addr	  x0	//     pointer to function's saved lr
+>  	mcount_get_pc		  x1	//     function's pc
+>  	mcount_get_parent_fp	  x2	//     parent's fp
+>  	bl	prepare_ftrace_return	// prepare_ftrace_return(&lr, pc, fp)
+>  
+>  	mcount_exit
+> +#else
+> +	add	x0, sp, #S_LR	/* address of (LR pointing into caller) */
+> +	ldr	x1, [sp, #S_PC]
+> +	ldr	x2, [sp, #232]	/* caller's frame pointer */
+> +	bl	prepare_ftrace_return
+> +	b	ftrace_regs_return
+> +#endif
+>  ENDPROC(ftrace_graph_caller)
+>  
