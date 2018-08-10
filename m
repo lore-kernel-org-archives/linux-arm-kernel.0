@@ -1,106 +1,62 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 10 Aug 2018 11:14:21 +0100
-Subject: [PATCH v2 3/4] KVM: arm64: vgic-v3: Add support for ICC_SGI0R_EL1 and
- ICC_ASGI1R_EL1 accesses
-In-Reply-To: <20180810101422.3569-1-marc.zyngier@arm.com>
-References: <20180810101422.3569-1-marc.zyngier@arm.com>
-Message-ID: <20180810101422.3569-4-marc.zyngier@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 10 Aug 2018 11:25:17 +0100
+Subject: [PATCH v2] arm64: Trap WFI executed in userspace
+In-Reply-To: <20180810100656.GP9097@e103592.cambridge.arm.com>
+References: <20180810091939.2773-1-marc.zyngier@arm.com>
+ <a71ad7e3-8584-36b2-3912-dac3c38db204@arm.com>
+ <20180810100656.GP9097@e103592.cambridge.arm.com>
+Message-ID: <e6afa776-b8f1-a9e9-3dcb-1c0fb830e9d5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to generate Group0 SGIs, let's add some decoding logic to
-access_gic_sgi(), and pass the generating group accordingly.
+On 10/08/18 11:06, Dave Martin wrote:
+> On Fri, Aug 10, 2018 at 10:43:13AM +0100, Robin Murphy wrote:
+>> On 10/08/18 10:19, Marc Zyngier wrote:
+>>> It recently came to light that userspace can execute WFI, and that
+>>> the arm64 kernel doesn trap this event. This sounds rather benign,
+>>
+>>                          't
+>>
+>>> but the kernel should decide when it wants to wait for an interrupt,
+>>> and not userspace.
+>>>
+>>> Let's trap WFI and immediately return after having skipped the
+>>> instruction. This effectively makes WFI a rather expensive NOP.
+>>
+>> ...which is still a perfectly valid behaviour, given that it's a hint.
+>> That's fine by me :)
+> 
+> The only plausible use of WFI that I can see is in a polling or idle
+> loop of some description.  So turning WFI into a NOP will likely create
+> a userspace busy-wait that never explicitly blocks or yields, which may
+> be considered pathological behaviour.
 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/sysreg.h |  2 ++
- arch/arm64/kvm/sys_regs.c       | 41 +++++++++++++++++++++++++++++++--
- 2 files changed, 41 insertions(+), 2 deletions(-)
+But that might be the case anyway, if the CPU doesn't have a WFI 
+implementation, or has an "execute WFI as a NOP" chicken bit set for any 
+reason.
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 98af0b37fb31..b0d2a52a71a3 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -314,6 +314,8 @@
- #define SYS_ICC_DIR_EL1			sys_reg(3, 0, 12, 11, 1)
- #define SYS_ICC_RPR_EL1			sys_reg(3, 0, 12, 11, 3)
- #define SYS_ICC_SGI1R_EL1		sys_reg(3, 0, 12, 11, 5)
-+#define SYS_ICC_ASGI1R_EL1		sys_reg(3, 0, 12, 11, 6)
-+#define SYS_ICC_SGI0R_EL1		sys_reg(3, 0, 12, 11, 7)
- #define SYS_ICC_IAR1_EL1		sys_reg(3, 0, 12, 12, 0)
- #define SYS_ICC_EOIR1_EL1		sys_reg(3, 0, 12, 12, 1)
- #define SYS_ICC_HPPIR1_EL1		sys_reg(3, 0, 12, 12, 2)
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index aba6755c816d..22fbbdbece3c 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -252,10 +252,43 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
- 			   struct sys_reg_params *p,
- 			   const struct sys_reg_desc *r)
- {
-+	bool g1;
-+
- 	if (!p->is_write)
- 		return read_from_write_only(vcpu, p, r);
- 
--	vgic_v3_dispatch_sgi(vcpu, p->regval, true);
-+	/*
-+	 * In a system where GICD_CTLR.DS=1, a ICC_SGI0R_EL1 access generates
-+	 * Group0 SGIs only, while ICC_SGI1R_EL1 can generate either group,
-+	 * depending on the SGI configuration. ICC_ASGI1R_EL1 is effectively
-+	 * equivalent to ICC_SGI0R_EL1, as there is no "alternative" secure
-+	 * group.
-+	 */
-+	if (p->is_aarch32) {
-+		switch (p->Op1) {
-+		default:		/* Keep GCC quiet */
-+		case 0:			/* ICC_SGI1R */
-+			g1 = true;
-+			break;
-+		case 1:			/* ICC_ASGI1R */
-+		case 2:			/* ICC_SGI0R */
-+			g1 = false;
-+			break;
-+		}
-+	} else {
-+		switch (p->Op2) {
-+		default:		/* Keep GCC quiet */
-+		case 5:			/* ICC_SGI1R_EL1 */
-+			g1 = true;
-+			break;
-+		case 6:			/* ICC_ASGI1R_EL1 */
-+		case 7:			/* ICC_SGI0R_EL1 */
-+			g1 = false;
-+			break;
-+		}
-+	}
-+
-+	vgic_v3_dispatch_sgi(vcpu, p->regval, g1);
- 
- 	return true;
- }
-@@ -1312,6 +1345,8 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ SYS_DESC(SYS_ICC_DIR_EL1), read_from_write_only },
- 	{ SYS_DESC(SYS_ICC_RPR_EL1), write_to_read_only },
- 	{ SYS_DESC(SYS_ICC_SGI1R_EL1), access_gic_sgi },
-+	{ SYS_DESC(SYS_ICC_ASGI1R_EL1), access_gic_sgi },
-+	{ SYS_DESC(SYS_ICC_SGI0R_EL1), access_gic_sgi },
- 	{ SYS_DESC(SYS_ICC_IAR1_EL1), write_to_read_only },
- 	{ SYS_DESC(SYS_ICC_EOIR1_EL1), read_from_write_only },
- 	{ SYS_DESC(SYS_ICC_HPPIR1_EL1), write_to_read_only },
-@@ -1744,8 +1779,10 @@ static const struct sys_reg_desc cp15_regs[] = {
- static const struct sys_reg_desc cp15_64_regs[] = {
- 	{ Op1( 0), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
- 	{ Op1( 0), CRn( 0), CRm( 9), Op2( 0), access_pmu_evcntr },
--	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
-+	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi }, /* ICC_SGI1R */
- 	{ Op1( 1), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR1 },
-+	{ Op1( 1), CRn( 0), CRm(12), Op2( 0), access_gic_sgi }, /* ICC_ASGI1R */
-+	{ Op1( 2), CRn( 0), CRm(12), Op2( 0), access_gic_sgi }, /* ICC_SGI0R */
- 	{ Op1( 2), CRn( 0), CRm(14), Op2( 0), access_cntp_cval },
- };
- 
--- 
-2.18.0
+> If there is junk is some app store that does this it may lead to
+> power wastage and thermal throttling, damaging performance of the whole
+> system the rogue app runs on.
+> 
+> That kind of consequence is partly why I suggested breaking rogue apps
+> cleanly (via SIGILL) rather than breaking the system hosting those apps
+> in messier ways.  I accept that SIGILL is a step to far.
+> 
+> So, I continue to favour the sched_yield() approach over all.
+> 
+> Should this be discussed with the security folks?  It feels like we're
+> speculating about whether sched_yield() is a security concern.
+> 
+> If it is, could we not NOP or SIGILL WFI if sched_yield() is disallowed
+> by seccomp, and treat it as a sched_yield() otherwise?
+
+There's also the caveat in the trap itself (which I only remembered on a 
+second look), where the exact definition says "..., if the instruction 
+would otherwise have caused the PE to enter a low-power state." That 
+implies that we may never trap on CPUs which ignore WFI, and even on 
+those which don't it seems permissible for the CPU to not trap if it 
+knows it's just about to respond to a pending interrupt. Thus the only 
+behaviour we can consistently enforce with the trap is in fact NOP. Oh well.
+
+Robin.
