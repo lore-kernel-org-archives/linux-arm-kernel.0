@@ -1,47 +1,39 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 10 Aug 2018 10:05:16 +0200
-Subject: [PATCH v2 19/29] ARM: davinci: mityomapl138: don't read the MAC
- address from machine code
+Date: Fri, 10 Aug 2018 10:05:11 +0200
+Subject: [PATCH v2 14/29] net: simplify eth_platform_get_mac_address()
 In-Reply-To: <20180810080526.27207-1-brgl@bgdev.pl>
 References: <20180810080526.27207-1-brgl@bgdev.pl>
-Message-ID: <20180810080526.27207-20-brgl@bgdev.pl>
+Message-ID: <20180810080526.27207-15-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-This is now done by the emac driver using a registered nvmem cell.
+We don't need to use pci_device_to_OF_node() - we can retrieve
+dev->of_node directly even for pci devices.
 
+Suggested-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-mityomapl138.c | 8 --------
- 1 file changed, 8 deletions(-)
+ net/ethernet/eth.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 48a9bae76e4a..35b2b6068a7a 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -120,7 +120,6 @@ static void read_factory_config(struct nvmem_device *nvmem, void *context)
- {
- 	int ret;
- 	const char *partnum = NULL;
--	struct davinci_soc_info *soc_info = &davinci_soc_info;
+diff --git a/net/ethernet/eth.c b/net/ethernet/eth.c
+index ee28440f57c5..7f08105402c8 100644
+--- a/net/ethernet/eth.c
++++ b/net/ethernet/eth.c
+@@ -530,11 +530,7 @@ int eth_platform_get_mac_address(struct device *dev, u8 *mac_addr)
+ 	const unsigned char *addr;
+ 	struct device_node *dp;
  
- 	if (!IS_BUILTIN(CONFIG_NVMEM)) {
- 		pr_warn("Factory Config not available without CONFIG_NVMEM\n");
-@@ -146,13 +145,6 @@ static void read_factory_config(struct nvmem_device *nvmem, void *context)
- 		goto bad_config;
- 	}
- 
--	pr_info("Found MAC = %pM\n", factory_config.mac);
--	if (is_valid_ether_addr(factory_config.mac))
--		memcpy(soc_info->emac_pdata->mac_addr,
--			factory_config.mac, ETH_ALEN);
+-	if (dev_is_pci(dev))
+-		dp = pci_device_to_OF_node(to_pci_dev(dev));
 -	else
--		pr_warn("Invalid MAC found in factory config block\n");
+-		dp = dev->of_node;
 -
- 	partnum = factory_config.partnum;
- 	pr_info("Part Number = %s\n", partnum);
- 
++	dp = dev->of_node;
+ 	addr = NULL;
+ 	if (dp)
+ 		addr = of_get_mac_address(dp);
 -- 
 2.18.0
