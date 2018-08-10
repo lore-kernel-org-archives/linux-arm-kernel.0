@@ -1,55 +1,76 @@
-From: maxi.jourdan@wanadoo.fr (Maxime Jourdan)
-Date: Fri, 10 Aug 2018 08:35:58 +0200
-Subject: [PATCH 4/4] drm/meson: convert to the new canvas module
-In-Reply-To: <5b6cc316.1c69fb81.682d3.1216@mx.google.com>
-References: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
- <20180801185128.23440-5-maxi.jourdan@wanadoo.fr>
- <5b6cc316.1c69fb81.682d3.1216@mx.google.com>
-Message-ID: <CAHStOZ6oemCwYWb7dW6SS_ZaWEiVWSfrF=dB_G6CkVb6KS96nA@mail.gmail.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 10 Aug 2018 08:38:37 +0200
+Subject: qemu machine settings and root fs for armv8?
+In-Reply-To: <CAKwvOdnaknwFshVAk=G0x44RxZyrMPp+O2yFBauAe9-3C4DpTQ@mail.gmail.com>
+References: <CAKwvOdkGatK1HbXG0hDr=a1DtnoCXUbVppLdR6uN5tAKzKdDDQ@mail.gmail.com>
+ <CAKwvOdnA5OTcBuRVbcBv8oYHR-mU3+Ee_iFjqbHx4UQxVnpxtQ@mail.gmail.com>
+ <5d585df0-abbe-c95f-adff-c4c2e3962832@redhat.com>
+ <CAKwvOdnaknwFshVAk=G0x44RxZyrMPp+O2yFBauAe9-3C4DpTQ@mail.gmail.com>
+Message-ID: <f2ad3497-5176-d319-1c4a-7b91651d2473@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-08-10 0:41 GMT+02:00 Rob Herring <robh@kernel.org>:
-> Hi, this is an automated email from Rob's (experimental) review bot. I
-> found a couple of common problems with your patch. Please see below.
->
-> On Wed,  1 Aug 2018 20:51:28 +0200, Maxime Jourdan wrote:
->> This removes the meson_canvas files within the meson/drm layer
->> and makes use of the new canvas module that is referenced in the dts.
+On 08/09/2018 07:15 PM, Nick Desaulniers wrote:
+> On Thu, Aug 9, 2018 at 12:36 AM Laura Abbott <labbott@redhat.com> wrote:
 >>
->> Canvases can be used by different IPs and modules, and it is as such
->> preferable to rely on a module that can safely dispatch canvases on
->> demand.
+>> I usually use a buildroot environment and just boot as an initramfs:
+> 
+> I need to play around more with buildroot, but I'll bet that's an
+> option to make a ramdisk instead of a full disk image?
+> 
+>> qemu-system-aarch64 \
+>>          -s \
+>>          -smp 8 \
+>>          -machine virt \
+>>          -cpu cortex-a57 \
+>>          -machine type=virt \
+>>          -nographic \
+>>          -m 1024 \
+>>          -kernel /path/to/kernel \
+>>          --append "nokaslr slub_debug=- console=ttyAMA0 debug_pagealloc=on
+>> earlycon=pl011,0x9000000" \
+> 
+> Very cool, thank you for sharing!
+> 
+> I'm guessing that kaslr makes it difficult to keep track of addresses
+> in between reboots?  There's a parameter "panic=-1" that will reboot
+> the kernel on panic that probably works well with this >
+
+Yes, I just disable nokaslr for most testing to make looking
+at the addresses easier since I'm often staring at kernel panics
+and dumps.
+
+>>          -initrd /path/to/arm64_rootfs.cpio \
+>>          -fsdev local,security_model=passthrough,id=fsdev0,path=/tmp/share \
+>>          -device virtio-9p-pci,id=fs0,fsdev=fsdev0,mount_tag=hostshare
 >>
->> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
->
-> The preferred subject prefix is "dt-bindings: <binding dir>: ...".
->
->> ---
->>  .../bindings/display/amlogic,meson-vpu.txt    |  9 +--
->>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi     |  7 +-
->>  drivers/gpu/drm/meson/Kconfig                 |  1 +
->>  drivers/gpu/drm/meson/Makefile                |  2 +-
->>  drivers/gpu/drm/meson/meson_canvas.c          | 70 -------------------
->>  drivers/gpu/drm/meson/meson_canvas.h          | 42 -----------
->>  drivers/gpu/drm/meson/meson_crtc.c            |  5 +-
->>  drivers/gpu/drm/meson/meson_drv.c             | 35 ++++++----
->>  drivers/gpu/drm/meson/meson_drv.h             |  5 +-
->>  drivers/gpu/drm/meson/meson_plane.c           |  3 +-
->>  drivers/gpu/drm/meson/meson_viu.c             |  1 -
->>  11 files changed, 39 insertions(+), 141 deletions(-)
->>  delete mode 100644 drivers/gpu/drm/meson/meson_canvas.c
->>  delete mode 100644 drivers/gpu/drm/meson/meson_canvas.h
->>
->
-> DT bindings (including binding headers) should be a separate patch. See
-> Documentation/devicetree/bindings/submitting-patches.txt.
->
+>> I'll note that this setup makes using kernel modules a big pain but
+> 
+> How come?
+> 
 
-Hi, What's the standard procedure here ? The reason I kept
-devicetree+drm changes together is because I didn't want to have
-floating commits that would break the drm module.
+I build the buildroot initrd separately from the kernel. This means that
+to include modules in the initrd I have to rebuild the initrd which is
+yet another step.
 
-Should I split the changes anyway ?
+>> it's useful for certain types of testing.
+>> The virtio settings are from https://www.linux-kvm.org/page/9p_virtio
+>> for sharing files.
+> 
+> Wow, that's super cool!  That probably helps so that you don't need to
+> keep rebuilding your ramdisk.  For binaries I'd guess that any
+> dynamically linked dependencies would have to be in that dir, too,
+> otherwise the VM wouldn't be able to load them.  But maybe nice for
+> statically linked cross compiled binaries.
+> 
 
-Maxime
+Yes, binaries are a bit of a pain. buildroot has a good selection of
+libraries available to include so I can rebuild the ramdisk to include
+those. It's still a lot of trial and error so if I can get away with
+it I prefer to have everything statically linked.
+
+> Thanks again.
+> 
+
+Thanks,
+Laura
