@@ -1,66 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 10 Aug 2018 11:28:52 +0100
-Subject: [PATCH v2] arm64: Trap WFI executed in userspace
-In-Reply-To: <a71ad7e3-8584-36b2-3912-dac3c38db204@arm.com>
-References: <20180810091939.2773-1-marc.zyngier@arm.com>
- <a71ad7e3-8584-36b2-3912-dac3c38db204@arm.com>
-Message-ID: <86r2j6plaz.wl-marc.zyngier@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 10 Aug 2018 12:43:18 +0200
+Subject: Droid 4: suspend to RAM?
+In-Reply-To: <20180808090512.GQ99251@atomide.com>
+References: <20180725200205.GA29594@amd>
+ <CAOf5uwkyPoDT8TZe9V24p+nQMiee9XfD=943xwx0ThGi9_cPng@mail.gmail.com>
+ <20180725212853.GA1965@amd> <20180727113214.GA32069@amd>
+ <20180808090512.GQ99251@atomide.com>
+Message-ID: <20180810104318.GA3671@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Aug 2018 10:43:13 +0100,
-Robin Murphy <robin.murphy@arm.com> wrote:
-> 
-> On 10/08/18 10:19, Marc Zyngier wrote:
-> > It recently came to light that userspace can execute WFI, and that
-> > the arm64 kernel doesn trap this event. This sounds rather benign,
-> 
->                         't
-
-Damn! Catalin had the same remark on v1, and I missed it.
-
-> 
-> > but the kernel should decide when it wants to wait for an interrupt,
-> > and not userspace.
+On Wed 2018-08-08 02:05:12, Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [180727 11:35]:
+> > Hi!
+> > > > > high even before modem (and thus USB) is enabled.
+> > > > >
+> > > > > Interestingly, CyanogenMod and Jolla seem to have higher power
+> > > > > consumption than stock operating system.
+> > > > >
+> > > > > (My Linux can survive for 10 hours, stock system could survive for 4
+> > > > > days if I'm not mistaken).
+> > > > >
+> > > > > I thought I would experiment with suspend to RAM.. and it indeed
+> > > > > seemed to suspend ok, but I could not wake it up. Do I need to set up
+> > > > > wakeup with button somehow? Is suspend to RAM required for good power
+> > > > > consumption?
+> > > > 
+> > > > Sorry but pm subsystem has debug mode that you can test in a easy way.
+> > > > You can even wakeup by any rtc alarm easily.
+> > > 
+> > > Yes, that is how it works on PC (but there power button works,
+> > > too). Is it expected to work on Droid in v4.18?
 > > 
-> > Let's trap WFI and immediately return after having skipped the
-> > instruction. This effectively makes WFI a rather expensive NOP.
-> 
-> ...which is still a perfectly valid behaviour, given that it's a
-> hint. That's fine by me :)
-> 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >   arch/arm64/include/asm/esr.h    |  4 ++++
-> >   arch/arm64/include/asm/sysreg.h |  4 ++--
-> >   arch/arm64/kernel/entry.S       |  1 +
-> >   arch/arm64/kernel/traps.c       | 11 +++++++++++
-> >   4 files changed, 18 insertions(+), 2 deletions(-)
+> > I tried setting up wakeup using RTC, but no, it does not seem to work:
 > > 
-> > diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-> > index ce70c3ffb993..9a2b6cee4e2b 100644
-> > --- a/arch/arm64/include/asm/esr.h
-> > +++ b/arch/arm64/include/asm/esr.h
-> > @@ -137,6 +137,7 @@
-> >   #define ESR_ELx_CV		(UL(1) << 24)
-> >   #define ESR_ELx_COND_SHIFT	(20)
-> >   #define ESR_ELx_COND_MASK	(UL(0xF) << ESR_ELx_COND_SHIFT)
-> > +#define ESR_ELx_WFx_ISS_WFI	(UL(0) << 0)
-> >   #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
-> >   #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
-> >   @@ -148,6 +149,9 @@
-> >   #define DISR_EL1_ESR_MASK	(ESR_ELx_AET | ESR_ELx_EA | ESR_ELx_FSC)
-> >     /* ESR value templates for specific events */
-> > +#define ESR_ELx_WFx_MASK	(ESR_ELx_EC_MASK | 1)
+> > root at devuan:/my/tui/d4# rtcwake -m no -s 5
+> > rtcwake: wakeup using /dev/rtc0 at Fri Jul 27 11:28:44 2018
+> > root at devuan:/my/tui/d4# echo mem > /sys/power/state
 > 
-> Super-nit: is it worth defining ESR_ELx_WFx_ISS_TI rather than
-> open-coding 1?
+> Works for me here as tested on next-20180808, maybe you don't have
+> CONFIG_RTC_DRV_CPCAP? Maybe you are trying to use
+CONFIG_RTC_DRV_OMAP?
 
-Could do!
+I have right config, and it works for me on next-20180808. Power
+button wakes it up, as expected, and even usbnet connections survive,
+which is good.
 
-Thanks,
-
-	M.
+Unfortunately, next-20180808 has no video support, which may also be
+reason why it works. I guess I'll need to dust off serial cable and
+look for logs...
+									Pavel
 
 -- 
-Jazz is not dead, it just smell funny.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180810/e11be57d/attachment.sig>
