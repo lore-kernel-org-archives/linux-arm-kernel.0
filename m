@@ -1,81 +1,110 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Fri, 10 Aug 2018 15:21:04 +0530
-Subject: [PATCH v3 0/9] Add Reset Controller support for Actions Semi Owl SoCs
-Message-ID: <20180810095113.25292-1-manivannan.sadhasivam@linaro.org>
+Date: Fri, 10 Aug 2018 15:21:05 +0530
+Subject: [PATCH v3 1/9] clk: actions: Cache regmap info in private clock
+ descriptor
+In-Reply-To: <20180810095113.25292-1-manivannan.sadhasivam@linaro.org>
+References: <20180810095113.25292-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180810095113.25292-2-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds Reset Controller (RMU) support for Actions Semi
-Owl SoCs, S900 and S700. For the Owl SoCs, RMU has been integrated into
-the clock subsystem in hardware. Hence, in software we integrate RMU
-support into common clock driver inorder to maintain compatibility. The
-syscon approach is not taken into account based on the review by Rob.
+In order to support the reset controller, regmap info needs to
+be cached in the private clock descriptor, owl_clk_desc. Hence,
+save that and also make the clock descriptor struct non const.
 
-This patch series depends on the recently posted S700 clk series:
-"[PATCH v7 0/5] Add clock driver for Actions S700 SoC". For the S700 clk
-series, driver and bindings patches are applied through the clk tree.
-But the DTS patches are not yet picked up by the platform maintainer,
-Andreas.
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ drivers/clk/actions/owl-common.c | 3 ++-
+ drivers/clk/actions/owl-common.h | 3 ++-
+ drivers/clk/actions/owl-s700.c   | 4 ++--
+ drivers/clk/actions/owl-s900.c   | 4 ++--
+ 4 files changed, 8 insertions(+), 6 deletions(-)
 
-Hence, Andreas is expected to pick the DTS patches in this series once
-reviewed by the maintainers along with S700 clk DTS patches.
-
-Because of the absence of the S500 SoC clk support, the reset controller
-registration code is added to both S700 and S900 SoC clk drivers for now.
-But once S500 clk support is added, the reset controller registration part
-will be moved to Owl SoCs common clk code.
-
-Thanks,
-Mani
-
-Changes in v3:
-
-* Reverted back the syscon approach based on the review by Rob Herring
-* Dropped the MAINTAINERS patch
-* Converted reset_map struct definitions to const based on the review by
-  Philipp
-* Fixed S700 header in DT spotted by Parthiban
-* Added Reviewed-by tags from Rob for 3 bindings patches
-
-Changes in v2:
-
-* Converted the CMU and RMU drivers to syscon for a more cleaner
-  approach
-* Declared the owl_reset_map structs to const
-* Used regmap_update_bits instead of a combined regmap_read and write
-* Removed unused headers in RMU drivers
-* Added MAINTAINERS entry for the RMU driver and bindings
-
-Manivannan Sadhasivam (9):
-  clk: actions: Cache regmap info in private clock descriptor
-  dt-bindings: clock: Add reset controller bindings for Actions Semi Owl
-    SoCs
-  dt-bindings: reset: Add binding constants for Actions Semi S700 RMU
-  dt-bindings: reset: Add binding constants for Actions Semi S900 RMU
-  arm64: dts: actions: Add Reset Controller support for S700 SoC
-  arm64: dts: actions: Add Reset Controller support for S900 SoC
-  clk: actions: Add Actions Semi Owl SoCs Reset Management Unit support
-  clk: actions: Add Actions Semi S700 SoC Reset Management Unit support
-  clk: actions: Add Actions Semi S900 SoC Reset Management Unit support
-
- .../bindings/clock/actions,owl-cmu.txt        |  2 +
- arch/arm64/boot/dts/actions/s700.dtsi         |  2 +
- arch/arm64/boot/dts/actions/s900.dtsi         |  2 +
- drivers/clk/actions/Kconfig                   |  1 +
- drivers/clk/actions/Makefile                  |  1 +
- drivers/clk/actions/owl-common.c              |  3 +-
- drivers/clk/actions/owl-common.h              |  5 +-
- drivers/clk/actions/owl-reset.c               | 66 ++++++++++++++
- drivers/clk/actions/owl-reset.h               | 31 +++++++
- drivers/clk/actions/owl-s700.c                | 55 +++++++++++-
- drivers/clk/actions/owl-s900.c                | 86 ++++++++++++++++++-
- .../dt-bindings/reset/actions,s700-reset.h    | 34 ++++++++
- .../dt-bindings/reset/actions,s900-reset.h    | 65 ++++++++++++++
- 13 files changed, 347 insertions(+), 6 deletions(-)
- create mode 100644 drivers/clk/actions/owl-reset.c
- create mode 100644 drivers/clk/actions/owl-reset.h
- create mode 100644 include/dt-bindings/reset/actions,s700-reset.h
- create mode 100644 include/dt-bindings/reset/actions,s900-reset.h
-
+diff --git a/drivers/clk/actions/owl-common.c b/drivers/clk/actions/owl-common.c
+index 61c1071b5180..32dd29e0a37e 100644
+--- a/drivers/clk/actions/owl-common.c
++++ b/drivers/clk/actions/owl-common.c
+@@ -39,7 +39,7 @@ static void owl_clk_set_regmap(const struct owl_clk_desc *desc,
+ }
+ 
+ int owl_clk_regmap_init(struct platform_device *pdev,
+-			 const struct owl_clk_desc *desc)
++			struct owl_clk_desc *desc)
+ {
+ 	void __iomem *base;
+ 	struct regmap *regmap;
+@@ -57,6 +57,7 @@ int owl_clk_regmap_init(struct platform_device *pdev,
+ 	}
+ 
+ 	owl_clk_set_regmap(desc, regmap);
++	desc->regmap = regmap;
+ 
+ 	return 0;
+ }
+diff --git a/drivers/clk/actions/owl-common.h b/drivers/clk/actions/owl-common.h
+index 4fd726ec54a6..56f01f7774aa 100644
+--- a/drivers/clk/actions/owl-common.h
++++ b/drivers/clk/actions/owl-common.h
+@@ -26,6 +26,7 @@ struct owl_clk_desc {
+ 	struct owl_clk_common		**clks;
+ 	unsigned long			num_clks;
+ 	struct clk_hw_onecell_data	*hw_clks;
++	struct regmap			*regmap;
+ };
+ 
+ static inline struct owl_clk_common *
+@@ -35,7 +36,7 @@ static inline struct owl_clk_common *
+ }
+ 
+ int owl_clk_regmap_init(struct platform_device *pdev,
+-			 const struct owl_clk_desc *desc);
++			struct owl_clk_desc *desc);
+ int owl_clk_probe(struct device *dev, struct clk_hw_onecell_data *hw_clks);
+ 
+ #endif /* _OWL_COMMON_H_ */
+diff --git a/drivers/clk/actions/owl-s700.c b/drivers/clk/actions/owl-s700.c
+index 5e9531392ee5..e7cacd677275 100644
+--- a/drivers/clk/actions/owl-s700.c
++++ b/drivers/clk/actions/owl-s700.c
+@@ -569,7 +569,7 @@ static struct clk_hw_onecell_data s700_hw_clks = {
+ 		.num    = CLK_NR_CLKS,
+ };
+ 
+-static const struct owl_clk_desc s700_clk_desc = {
++static struct owl_clk_desc s700_clk_desc = {
+ 	.clks       = s700_clks,
+ 	.num_clks   = ARRAY_SIZE(s700_clks),
+ 
+@@ -578,7 +578,7 @@ static const struct owl_clk_desc s700_clk_desc = {
+ 
+ static int s700_clk_probe(struct platform_device *pdev)
+ {
+-	const struct owl_clk_desc *desc;
++	struct owl_clk_desc *desc;
+ 
+ 	desc = &s700_clk_desc;
+ 	owl_clk_regmap_init(pdev, desc);
+diff --git a/drivers/clk/actions/owl-s900.c b/drivers/clk/actions/owl-s900.c
+index 7f60ed6afe63..bb7ee872d316 100644
+--- a/drivers/clk/actions/owl-s900.c
++++ b/drivers/clk/actions/owl-s900.c
+@@ -684,7 +684,7 @@ static struct clk_hw_onecell_data s900_hw_clks = {
+ 	.num	= CLK_NR_CLKS,
+ };
+ 
+-static const struct owl_clk_desc s900_clk_desc = {
++static struct owl_clk_desc s900_clk_desc = {
+ 	.clks	    = s900_clks,
+ 	.num_clks   = ARRAY_SIZE(s900_clks),
+ 
+@@ -693,7 +693,7 @@ static const struct owl_clk_desc s900_clk_desc = {
+ 
+ static int s900_clk_probe(struct platform_device *pdev)
+ {
+-	const struct owl_clk_desc *desc;
++	struct owl_clk_desc *desc;
+ 
+ 	desc = &s900_clk_desc;
+ 	owl_clk_regmap_init(pdev, desc);
 -- 
 2.17.1
