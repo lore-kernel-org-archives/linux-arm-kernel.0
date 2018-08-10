@@ -1,42 +1,76 @@
-From: zhongjiang@huawei.com (zhong jiang)
-Date: Fri, 10 Aug 2018 10:40:51 +0800
-Subject: [PATCH] arm:pm: Use kmemdup to replace duplicating its implementation
-Message-ID: <1533868851-316-1-git-send-email-zhongjiang@huawei.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Fri, 10 Aug 2018 11:36:27 +0800
+Subject: [PATCH net-next] net: mvneta: fix mvneta_config_rss on armada 3700
+Message-ID: <20180810113627.5dec5d40@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kmemdup is better than kmalloc() + memcpy(), and we do not like
-open code. So just use kmemdup instead.
+The mvneta Ethernet driver is used on a few different Marvell SoCs.
+Some SoCs have per cpu interrupts for Ethernet events, the driver uses
+a per CPU napi structure for this case. Some SoCs such as armada 3700
+have a single interrupt for Ethernet events, the driver uses a global
+napi structure for this case.
 
-Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+Current mvneta_config_rss() always operates the per cpu napi structure.
+Fix it by operating a global napi for "single interrupt" case, and per
+cpu napi structure for remaining cases.
+
+Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+Fixes: 2636ac3cc2b4 ("net: mvneta: Add network support for Armada 3700 SoC")
 ---
- arch/arm/mach-lpc32xx/pm.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ drivers/net/ethernet/marvell/mvneta.c | 31 +++++++++++++++++----------
+ 1 file changed, 20 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-lpc32xx/pm.c b/arch/arm/mach-lpc32xx/pm.c
-index 6247157..6eefff8 100644
---- a/arch/arm/mach-lpc32xx/pm.c
-+++ b/arch/arm/mach-lpc32xx/pm.c
-@@ -86,7 +86,8 @@ static int lpc32xx_pm_enter(suspend_state_t state)
- 	void *iram_swap_area;
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 55c2a56c5dae..bc80a678abc3 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -4107,13 +4107,18 @@ static int  mvneta_config_rss(struct mvneta_port *pp)
  
- 	/* Allocate some space for temporary IRAM storage */
--	iram_swap_area = kmalloc(lpc32xx_sys_suspend_sz, GFP_KERNEL);
-+	iram_swap_area = kmemdup((void *)TEMP_IRAM_AREA,
-+				lpc32xx_sys_suspend_sz, GFP_KERNEL);
- 	if (!iram_swap_area) {
- 		printk(KERN_ERR
- 		       "PM Suspend: cannot allocate memory to save portion "
-@@ -94,10 +95,6 @@ static int lpc32xx_pm_enter(suspend_state_t state)
- 		return -ENOMEM;
+ 	on_each_cpu(mvneta_percpu_mask_interrupt, pp, true);
+ 
+-	/* We have to synchronise on the napi of each CPU */
+-	for_each_online_cpu(cpu) {
+-		struct mvneta_pcpu_port *pcpu_port =
+-			per_cpu_ptr(pp->ports, cpu);
++	if (!pp->neta_armada3700) {
++		/* We have to synchronise on the napi of each CPU */
++		for_each_online_cpu(cpu) {
++			struct mvneta_pcpu_port *pcpu_port =
++				per_cpu_ptr(pp->ports, cpu);
+ 
+-		napi_synchronize(&pcpu_port->napi);
+-		napi_disable(&pcpu_port->napi);
++			napi_synchronize(&pcpu_port->napi);
++			napi_disable(&pcpu_port->napi);
++		}
++	} else {
++		napi_synchronize(&pp->napi);
++		napi_disable(&pp->napi);
  	}
  
--	/* Backup a small area of IRAM used for the suspend code */
--	memcpy(iram_swap_area, (void *) TEMP_IRAM_AREA,
--		lpc32xx_sys_suspend_sz);
--
- 	/*
- 	 * Copy code to suspend system into IRAM. The suspend code
- 	 * needs to run from IRAM as DRAM may no longer be available
+ 	pp->rxq_def = pp->indir[0];
+@@ -4130,12 +4135,16 @@ static int  mvneta_config_rss(struct mvneta_port *pp)
+ 	mvneta_percpu_elect(pp);
+ 	spin_unlock(&pp->lock);
+ 
+-	/* We have to synchronise on the napi of each CPU */
+-	for_each_online_cpu(cpu) {
+-		struct mvneta_pcpu_port *pcpu_port =
+-			per_cpu_ptr(pp->ports, cpu);
++	if (!pp->neta_armada3700) {
++		/* We have to synchronise on the napi of each CPU */
++		for_each_online_cpu(cpu) {
++			struct mvneta_pcpu_port *pcpu_port =
++				per_cpu_ptr(pp->ports, cpu);
+ 
+-		napi_enable(&pcpu_port->napi);
++			napi_enable(&pcpu_port->napi);
++		}
++	} else {
++		napi_enable(&pp->napi);
+ 	}
+ 
+ 	netif_tx_start_all_queues(pp->dev);
 -- 
-1.7.12.4
+2.18.0
