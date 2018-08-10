@@ -1,61 +1,55 @@
-From: chuhu@redhat.com (Chunyu Hu)
-Date: Fri, 10 Aug 2018 02:30:20 -0400 (EDT)
-Subject: Bug report: Bad mode in FIQ handler detected on CPU0, code
- 0x56000000
-In-Reply-To: <20180809131622.GC29785@arm.com>
-References: <1426298268.23978174.1533818483053.JavaMail.zimbra@redhat.com>
- <381494229.23979617.1533818858635.JavaMail.zimbra@redhat.com>
- <20180809131622.GC29785@arm.com>
-Message-ID: <70910961.24172948.1533882620742.JavaMail.zimbra@redhat.com>
+From: maxi.jourdan@wanadoo.fr (Maxime Jourdan)
+Date: Fri, 10 Aug 2018 08:35:58 +0200
+Subject: [PATCH 4/4] drm/meson: convert to the new canvas module
+In-Reply-To: <5b6cc316.1c69fb81.682d3.1216@mx.google.com>
+References: <20180801185128.23440-1-maxi.jourdan@wanadoo.fr>
+ <20180801185128.23440-5-maxi.jourdan@wanadoo.fr>
+ <5b6cc316.1c69fb81.682d3.1216@mx.google.com>
+Message-ID: <CAHStOZ6oemCwYWb7dW6SS_ZaWEiVWSfrF=dB_G6CkVb6KS96nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2018-08-10 0:41 GMT+02:00 Rob Herring <robh@kernel.org>:
+> Hi, this is an automated email from Rob's (experimental) review bot. I
+> found a couple of common problems with your patch. Please see below.
+>
+> On Wed,  1 Aug 2018 20:51:28 +0200, Maxime Jourdan wrote:
+>> This removes the meson_canvas files within the meson/drm layer
+>> and makes use of the new canvas module that is referenced in the dts.
+>>
+>> Canvases can be used by different IPs and modules, and it is as such
+>> preferable to rely on a module that can safely dispatch canvases on
+>> demand.
+>>
+>> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
+>
+> The preferred subject prefix is "dt-bindings: <binding dir>: ...".
+>
+>> ---
+>>  .../bindings/display/amlogic,meson-vpu.txt    |  9 +--
+>>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi     |  7 +-
+>>  drivers/gpu/drm/meson/Kconfig                 |  1 +
+>>  drivers/gpu/drm/meson/Makefile                |  2 +-
+>>  drivers/gpu/drm/meson/meson_canvas.c          | 70 -------------------
+>>  drivers/gpu/drm/meson/meson_canvas.h          | 42 -----------
+>>  drivers/gpu/drm/meson/meson_crtc.c            |  5 +-
+>>  drivers/gpu/drm/meson/meson_drv.c             | 35 ++++++----
+>>  drivers/gpu/drm/meson/meson_drv.h             |  5 +-
+>>  drivers/gpu/drm/meson/meson_plane.c           |  3 +-
+>>  drivers/gpu/drm/meson/meson_viu.c             |  1 -
+>>  11 files changed, 39 insertions(+), 141 deletions(-)
+>>  delete mode 100644 drivers/gpu/drm/meson/meson_canvas.c
+>>  delete mode 100644 drivers/gpu/drm/meson/meson_canvas.h
+>>
+>
+> DT bindings (including binding headers) should be a separate patch. See
+> Documentation/devicetree/bindings/submitting-patches.txt.
+>
 
+Hi, What's the standard procedure here ? The reason I kept
+devicetree+drm changes together is because I didn't want to have
+floating commits that would break the drm module.
 
------ Original Message -----
-> From: "Will Deacon" <will.deacon@arm.com>
-> To: "Chunyu Hu" <chuhu@redhat.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Sent: Thursday, August 9, 2018 9:16:22 PM
-> Subject: Re: Bug report: Bad mode in FIQ handler detected on CPU0, code 0x56000000
-> 
-> Hi Chunyu,
-> 
-> On Thu, Aug 09, 2018 at 08:47:38AM -0400, Chunyu Hu wrote:
-> > I hit an 100% panic when I executed:
-> > 
-> > perf &
-> > perf top
-> > 
-> > Logs are as below,
-> > 
-> > [  123.234492] Bad mode in FIQ handler detected on CPU0, code 0x56000000 --
-> > SVC (AArch64)
-> 
-> Oh dear...
-> 
-> We don't support FIQ in Linux, since:
-> 
-> (a) It's seldom available on the non-secure side
-> (b) It's not necessarily "fast", despite the name
-> (c) We'd be opening up a can of worms if we allow FIQ to preempt IRQ. Better
->     off using SDEI or GIC priorities to implement NMIs.
-> (d) I don't think FIQs can be described in ACPI or DT
-> 
-> In this case, it looks like the PMU interrupt has been configured as a FIQ.
-> It should be possible to configure the GIC in firmware (not sure you have
-> EL3, so maybe in the bootloader) to treat this interrupt as an IRQ instead,
-> in which case perf top will work correctly as long as the ACPI tables / FDT
-> accurately describe the interrupt.
+Should I split the changes anyway ?
 
-Will,
-
-Thank you so much for the explanation. 
-
-> 
-> Will
-> 
-
--- 
-Regards,
-Chunyu Hu
+Maxime
