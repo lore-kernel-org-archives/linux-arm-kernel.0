@@ -1,56 +1,44 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Fri, 10 Aug 2018 12:11:05 -0400
-Subject: [PATCH v2 4/7] drm/i2c: tda998x: convert to bridge driver
-In-Reply-To: <20180808221547.GN30658@n2100.armlinux.org.uk>
-References: <20180730164137.GD17271@n2100.armlinux.org.uk>
- <E1fkBFV-00048s-O2@rmk-PC.armlinux.org.uk>
- <20180808190930.GQ20303@art_vandelay>
- <20180808221547.GN30658@n2100.armlinux.org.uk>
-Message-ID: <20180810161105.GT20303@art_vandelay>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Fri, 10 Aug 2018 18:17:47 +0200
+Subject: [PATCH v2 14/29] net: simplify eth_platform_get_mac_address()
+In-Reply-To: <CAHp75Ve28aNe+FCK3p4OLsDf7dNo-iJ1VR=pyx+Y9OUn3sjYBw@mail.gmail.com>
+References: <20180810080526.27207-1-brgl@bgdev.pl>
+ <20180810080526.27207-15-brgl@bgdev.pl>
+ <CAHp75Ve28aNe+FCK3p4OLsDf7dNo-iJ1VR=pyx+Y9OUn3sjYBw@mail.gmail.com>
+Message-ID: <CAMRc=Mc536v+L_u0garWbeyQ78Q6tyEEzhR9pRGf5mBU+daE+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2018 at 11:15:47PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Aug 08, 2018 at 03:09:30PM -0400, Sean Paul wrote:
-> > > -static const struct drm_encoder_helper_funcs tda998x_encoder_helper_funcs = {
-> > > -	.dpms = tda998x_encoder_dpms,
-> > > -	.prepare = tda998x_encoder_prepare,
-> > > -	.commit = tda998x_encoder_commit,
-> > > -	.mode_set = tda998x_encoder_mode_set,
-> > > -};
-> > 
-> > Now that encoder is a stub, it should really be removed from here. The encoder
-> > should be instantiated elsewhere and attach the bridge to itself. There are a
-> > bunch of examples of this in bridge/
-> 
-> That's not possible at present - this driver has to remain compatible
-> with Armada and TI LCDC, both of which expect this driver to create
-> the encoder.
+2018-08-10 16:39 GMT+02:00 Andy Shevchenko <andy.shevchenko@gmail.com>:
+> On Fri, Aug 10, 2018 at 11:05 AM, Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> We don't need to use pci_device_to_OF_node() - we can retrieve
+>> dev->of_node directly even for pci devices.
+>>
+>
+>>         struct device_node *dp;
+>>
+>> -       if (dev_is_pci(dev))
+>> -               dp = pci_device_to_OF_node(to_pci_dev(dev));
+>> -       else
+>> -               dp = dev->of_node;
+>> -
+>> +       dp = dev->of_node;
+>>         addr = NULL;
+>>         if (dp)
+>>                 addr = of_get_mac_address(dp);
+>
+> Looking more at this I could even propose to change all above by
+>
+> addr = device_get_mac_address(dev, mac_addr, ETH_ALEN);
+>
+> Thoughts?
+>
+> --
+> With Best Regards,
+> Andy Shevchenko
 
-Hmm, yeah, I just read that thread. I suppose once bridges play nice with
-components the encoder can migrate into the drivers?
+Indeed seems like it's even more generalized. Thanks for spotting that.
 
-> 
-> In any case, bridges are buggy with unbinding/rebinding as I've pointed
-> out several times in the past, but TDA998x used with Armada and TI LCDC
-> as it currently stands are not.  So, to do this as a full conversion to
-> bridge and pushing the encoders into the DRM drivers results in a
-> regression for these two DRM drivers.  I'm not willing to accept such
-> a regression, sorry.
-> 
-> Thanks for the other cleanup suggestions, they can be done with a
-> later patch (these changes have already been been merged.)
-
-I still think you should get review from a bridge maintainer before it goes to
-drm-next.
-
-Sean
-
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-> According to speedtest.net: 13Mbps down 490kbps up
-
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+Bart
