@@ -1,173 +1,38 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Fri, 10 Aug 2018 17:52:31 +0300
-Subject: [PATCH v8 6/8] dt-bindings: interconnect: Document qcom,
- msm8916 NoC bindings
-In-Reply-To: <20180810145233.16466-1-georgi.djakov@linaro.org>
-References: <20180810145233.16466-1-georgi.djakov@linaro.org>
-Message-ID: <20180810145233.16466-7-georgi.djakov@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 10 Aug 2018 16:13:41 +0100
+Subject: [PATCH v3 0/2] PCI: imx: Initial imx7d pm support
+In-Reply-To: <52ee6376fa15d3a9a62bcfa5d87173e454ccc024.camel@nxp.com>
+References: <cover.1532448745.git.leonard.crestez@nxp.com>
+ <bac2cb70b16d81f589915fc0900126b516414243.camel@nxp.com>
+ <20180808111429.GC25150@e107981-ln.cambridge.arm.com>
+ <a5556be9a5f62ea0472a1a2336bce8d71df0dcaa.camel@nxp.com>
+ <20180808141938.GA30428@e107981-ln.cambridge.arm.com>
+ <efd9c1d560cae84e2a4ee7585a4c61d5d40ba755.camel@nxp.com>
+ <20180808152741.GA31808@e107981-ln.cambridge.arm.com>
+ <52ee6376fa15d3a9a62bcfa5d87173e454ccc024.camel@nxp.com>
+Message-ID: <20180810151341.GA6863@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device-tree bindings of the Network-On-Chip interconnect
-hardware found on Qualcomm msm8916 platforms.
+On Fri, Aug 10, 2018 at 11:11:55AM +0000, Leonard Crestez wrote:
 
-Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-Reviewed-by: Evan Green <evgreen@chromium.org>
----
- .../bindings/interconnect/qcom-msm8916.txt    | 41 ++++++++
- include/dt-bindings/interconnect/qcom.h       | 98 +++++++++++++++++++
- 2 files changed, 139 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interconnect/qcom-msm8916.txt
- create mode 100644 include/dt-bindings/interconnect/qcom.h
+[...]
 
-diff --git a/Documentation/devicetree/bindings/interconnect/qcom-msm8916.txt b/Documentation/devicetree/bindings/interconnect/qcom-msm8916.txt
-new file mode 100644
-index 000000000000..744df51df4ed
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interconnect/qcom-msm8916.txt
-@@ -0,0 +1,41 @@
-+Qualcomm MSM8916 Network-On-Chip interconnect driver binding
-+----------------------------------------------------
-+
-+Required properties :
-+- compatible : shall contain only one of the following:
-+			"qcom,msm8916-bimc"
-+			"qcom,msm8916-pnoc"
-+			"qcom,msm8916-snoc"
-+- #interconnect-cells : should contain 1
-+- reg : shall contain base register location and length
-+
-+Optional properties :
-+clocks : list of phandles and specifiers to all interconnect bus clocks
-+clock-names : clock names should include both "bus_clk" and "bus_a_clk"
-+
-+Examples:
-+
-+		snoc: snoc at 580000 {
-+			compatible = "qcom,msm8916-snoc";
-+			#interconnect-cells = <1>;
-+			reg = <0x580000 0x14000>;
-+			clock-names = "bus_clk", "bus_a_clk";
-+			clocks = <&rpmcc RPM_SMD_SNOC_CLK>,
-+				 <&rpmcc RPM_SMD_SNOC_A_CLK>;
-+		};
-+		bimc: bimc at 400000 {
-+			compatible = "qcom,msm8916-bimc";
-+			#interconnect-cells = <1>;
-+			reg = <0x400000 0x62000>;
-+			clock-names = "bus_clk", "bus_a_clk";
-+			clocks = <&rpmcc RPM_SMD_BIMC_CLK>,
-+				 <&rpmcc RPM_SMD_BIMC_A_CLK>;
-+		};
-+		pnoc: pnoc at 500000 {
-+			compatible = "qcom,msm8916-pnoc";
-+			#interconnect-cells = <1>;
-+			reg = <0x500000 0x11000>;
-+			clock-names = "bus_clk", "bus_a_clk";
-+			clocks = <&rpmcc RPM_SMD_PCNOC_CLK>,
-+				 <&rpmcc RPM_SMD_PCNOC_A_CLK>;
-+		};
-diff --git a/include/dt-bindings/interconnect/qcom.h b/include/dt-bindings/interconnect/qcom.h
-new file mode 100644
-index 000000000000..f4d154f0afbf
---- /dev/null
-+++ b/include/dt-bindings/interconnect/qcom.h
-@@ -0,0 +1,98 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Qualcomm interconnect IDs
-+ *
-+ * Copyright (c) 2018, Linaro Ltd.
-+ * Author: Georgi Djakov <georgi.djakov@linaro.org>
-+ */
-+
-+#ifndef __DT_BINDINGS_INTERCONNECT_QCOM_H
-+#define __DT_BINDINGS_INTERCONNECT_QCOM_H
-+
-+#define BIMC_SNOC_MAS			0
-+#define BIMC_SNOC_SLV			1
-+#define MASTER_AMPSS_M0			2
-+#define MASTER_BLSP_1			3
-+#define MASTER_CRYPTO_CORE0		4
-+#define MASTER_DEHR			5
-+#define MASTER_GRAPHICS_3D		6
-+#define MASTER_JPEG			7
-+#define MASTER_LPASS			8
-+#define MASTER_MDP_PORT0		9
-+#define MASTER_QDSS_BAM			10
-+#define MASTER_QDSS_ETR			11
-+#define MASTER_SDCC_1			12
-+#define MASTER_SDCC_2			13
-+#define MASTER_SNOC_CFG			14
-+#define MASTER_SPDM			15
-+#define MASTER_TCU_0			16
-+#define MASTER_TCU_1			17
-+#define MASTER_USB_HS			18
-+#define MASTER_VFE			19
-+#define MASTER_VIDEO_P0			20
-+#define PNOC_INT_0			21
-+#define PNOC_INT_1			22
-+#define PNOC_M_0			23
-+#define PNOC_M_1			24
-+#define PNOC_SLV_0			25
-+#define PNOC_SLV_1			26
-+#define PNOC_SLV_2			27
-+#define PNOC_SLV_3			28
-+#define PNOC_SLV_4			29
-+#define PNOC_SLV_8			30
-+#define PNOC_SLV_9			31
-+#define PNOC_SNOC_MAS			32
-+#define PNOC_SNOC_SLV			33
-+#define SLAVE_AMPSS_L2			34
-+#define SLAVE_BIMC_CFG			35
-+#define SLAVE_BLSP_1			36
-+#define SLAVE_BOOT_ROM			37
-+#define SLAVE_CAMERA_CFG		38
-+#define SLAVE_CATS_128			39
-+#define SLAVE_CLK_CTL			40
-+#define SLAVE_CRYPTO_0_CFG		41
-+#define SLAVE_DEHR_CFG			42
-+#define SLAVE_DISPLAY_CFG		43
-+#define SLAVE_EBI_CH0			44
-+#define SLAVE_GRAPHICS_3D_CFG		45
-+#define SLAVE_IMEM_CFG			46
-+#define SLAVE_LPASS			47
-+#define SLAVE_MPM			48
-+#define SLAVE_MSM_PDM			49
-+#define SLAVE_MSM_TCSR			50
-+#define SLAVE_MSS			51
-+#define SLAVE_OCMEM_64			52
-+#define SLAVE_PMIC_ARB			53
-+#define SLAVE_PNOC_CFG			54
-+#define SLAVE_PRNG			55
-+#define SLAVE_QDSS_CFG			56
-+#define SLAVE_QDSS_STM			57
-+#define SLAVE_RBCPR_CFG			58
-+#define SLAVE_RPM_MSG_RAM		59
-+#define SLAVE_SDCC_1			60
-+#define SLAVE_SDCC_4			61
-+#define SLAVE_SECURITY			62
-+#define SLAVE_SERVICE_SNOC		63
-+#define SLAVE_SNOC_CFG			64
-+#define SLAVE_SPDM			65
-+#define SLAVE_SYSTEM_IMEM		66
-+#define SLAVE_TLMM			67
-+#define SLAVE_USB_HS			68
-+#define SLAVE_VENUS_CFG			69
-+#define SNOC_BIMC_0_MAS			70
-+#define SNOC_BIMC_0_SLV			71
-+#define SNOC_BIMC_1_MAS			72
-+#define SNOC_BIMC_1_SLV			73
-+#define SNOC_INT_0			74
-+#define SNOC_INT_1			75
-+#define SNOC_INT_BIMC			76
-+#define SNOC_MM_INT_0			77
-+#define SNOC_MM_INT_1			78
-+#define SNOC_MM_INT_2			79
-+#define SNOC_MM_INT_BIMC		80
-+#define SNOC_PNOC_MAS			81
-+#define SNOC_PNOC_SLV			82
-+#define SNOC_QDSS_INT			83
-+#define SYSTEM_SLAVE_FAB_APPS		84
-+
-+#endif
+> This needs further clarification: without the reset patch this will
+> hang on imx7 suspend/resume but this is the current behavior anyway.
+> 
+> Both patches are required for imx7 pci suspend and including them out
+> of order shouldn't break unrelated functionality.
+> 
+> So it should actually be fine to just include the pci changes now,
+> right?
+
+It is a bit late for v4.19 but before considering that, this series
+is actually a set of fixes, correct ? If that's the case I think
+Shawn can send them upstream for a v4.19-rc*, I can ACK them if that
+sounds reasonable.
+
+Patch (2) subject must make clear you are actually fixing a problem if
+we choose this course of action.
+
+Lorenzo
