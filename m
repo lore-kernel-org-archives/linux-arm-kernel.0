@@ -1,51 +1,104 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 10 Aug 2018 11:06:58 +0100
-Subject: [PATCH v2] arm64: Trap WFI executed in userspace
-In-Reply-To: <a71ad7e3-8584-36b2-3912-dac3c38db204@arm.com>
-References: <20180810091939.2773-1-marc.zyngier@arm.com>
- <a71ad7e3-8584-36b2-3912-dac3c38db204@arm.com>
-Message-ID: <20180810100656.GP9097@e103592.cambridge.arm.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Fri, 10 Aug 2018 15:21:12 +0530
+Subject: [PATCH v3 8/9] clk: actions: Add Actions Semi S700 SoC Reset
+ Management Unit support
+In-Reply-To: <20180810095113.25292-1-manivannan.sadhasivam@linaro.org>
+References: <20180810095113.25292-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180810095113.25292-9-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2018 at 10:43:13AM +0100, Robin Murphy wrote:
-> On 10/08/18 10:19, Marc Zyngier wrote:
-> >It recently came to light that userspace can execute WFI, and that
-> >the arm64 kernel doesn trap this event. This sounds rather benign,
-> 
->                         't
-> 
-> >but the kernel should decide when it wants to wait for an interrupt,
-> >and not userspace.
-> >
-> >Let's trap WFI and immediately return after having skipped the
-> >instruction. This effectively makes WFI a rather expensive NOP.
-> 
-> ...which is still a perfectly valid behaviour, given that it's a hint.
-> That's fine by me :)
+Add Reset Management Unit (RMU) support for Actions Semi S700 SoC.
 
-The only plausible use of WFI that I can see is in a polling or idle
-loop of some description.  So turning WFI into a NOP will likely create
-a userspace busy-wait that never explicitly blocks or yields, which may
-be considered pathological behaviour.
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ drivers/clk/actions/owl-s700.c | 51 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
 
-If there is junk is some app store that does this it may lead to
-power wastage and thermal throttling, damaging performance of the whole
-system the rogue app runs on.
-
-That kind of consequence is partly why I suggested breaking rogue apps
-cleanly (via SIGILL) rather than breaking the system hosting those apps
-in messier ways.  I accept that SIGILL is a step to far.
-
-So, I continue to favour the sched_yield() approach over all.
-
-Should this be discussed with the security folks?  It feels like we're
-speculating about whether sched_yield() is a security concern.
-
-If it is, could we not NOP or SIGILL WFI if sched_yield() is disallowed
-by seccomp, and treat it as a sched_yield() otherwise?
-
-[...]
-
-Cheers
----Dave
+diff --git a/drivers/clk/actions/owl-s700.c b/drivers/clk/actions/owl-s700.c
+index e7cacd677275..a2f34d13fb54 100644
+--- a/drivers/clk/actions/owl-s700.c
++++ b/drivers/clk/actions/owl-s700.c
+@@ -20,8 +20,10 @@
+ #include "owl-gate.h"
+ #include "owl-mux.h"
+ #include "owl-pll.h"
++#include "owl-reset.h"
+ 
+ #include <dt-bindings/clock/actions,s700-cmu.h>
++#include <dt-bindings/reset/actions,s700-reset.h>
+ 
+ #define CMU_COREPLL		(0x0000)
+ #define CMU_DEVPLL		(0x0004)
+@@ -569,20 +571,69 @@ static struct clk_hw_onecell_data s700_hw_clks = {
+ 		.num    = CLK_NR_CLKS,
+ };
+ 
++static const struct owl_reset_map s700_resets[] = {
++	[RESET_DE]	= { CMU_DEVRST0, BIT(0) },
++	[RESET_LCD0]	= { CMU_DEVRST0, BIT(1) },
++	[RESET_DSI]	= { CMU_DEVRST0, BIT(2) },
++	[RESET_CSI]	= { CMU_DEVRST0, BIT(13) },
++	[RESET_SI]	= { CMU_DEVRST0, BIT(14) },
++	[RESET_I2C0]	= { CMU_DEVRST1, BIT(0) },
++	[RESET_I2C1]	= { CMU_DEVRST1, BIT(1) },
++	[RESET_I2C2]	= { CMU_DEVRST1, BIT(2) },
++	[RESET_I2C3]	= { CMU_DEVRST1, BIT(3) },
++	[RESET_SPI0]	= { CMU_DEVRST1, BIT(4) },
++	[RESET_SPI1]	= { CMU_DEVRST1, BIT(5) },
++	[RESET_SPI2]	= { CMU_DEVRST1, BIT(6) },
++	[RESET_SPI3]	= { CMU_DEVRST1, BIT(7) },
++	[RESET_UART0]	= { CMU_DEVRST1, BIT(8) },
++	[RESET_UART1]	= { CMU_DEVRST1, BIT(9) },
++	[RESET_UART2]	= { CMU_DEVRST1, BIT(10) },
++	[RESET_UART3]	= { CMU_DEVRST1, BIT(11) },
++	[RESET_UART4]	= { CMU_DEVRST1, BIT(12) },
++	[RESET_UART5]	= { CMU_DEVRST1, BIT(13) },
++	[RESET_UART6]	= { CMU_DEVRST1, BIT(14) },
++	[RESET_KEY]	= { CMU_DEVRST1, BIT(24) },
++	[RESET_GPIO]	= { CMU_DEVRST1, BIT(25) },
++	[RESET_AUDIO]	= { CMU_DEVRST1, BIT(29) },
++};
++
+ static struct owl_clk_desc s700_clk_desc = {
+ 	.clks       = s700_clks,
+ 	.num_clks   = ARRAY_SIZE(s700_clks),
+ 
+ 	.hw_clks    = &s700_hw_clks,
++
++	.resets     = s700_resets,
++	.num_resets = ARRAY_SIZE(s700_resets),
+ };
+ 
+ static int s700_clk_probe(struct platform_device *pdev)
+ {
+ 	struct owl_clk_desc *desc;
++	struct owl_reset *reset;
++	int ret;
+ 
+ 	desc = &s700_clk_desc;
+ 	owl_clk_regmap_init(pdev, desc);
+ 
++	/*
++	 * FIXME: Reset controller registration should be moved to
++	 * common code, once all SoCs of Owl family supports it.
++	 */
++	reset = devm_kzalloc(&pdev->dev, sizeof(*reset), GFP_KERNEL);
++	if (!reset)
++		return -ENOMEM;
++
++	reset->rcdev.of_node = pdev->dev.of_node;
++	reset->rcdev.ops = &owl_reset_ops;
++	reset->rcdev.nr_resets = desc->num_resets;
++	reset->reset_map = desc->resets;
++	reset->regmap = desc->regmap;
++
++	ret = devm_reset_controller_register(&pdev->dev, &reset->rcdev);
++	if (ret)
++		dev_err(&pdev->dev, "Failed to register reset controller\n");
++
+ 	return owl_clk_probe(&pdev->dev, desc->hw_clks);
+ }
+ 
+-- 
+2.17.1
