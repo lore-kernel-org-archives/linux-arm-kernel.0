@@ -1,38 +1,61 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 10 Aug 2018 08:03:34 +0200
-Subject: [PATCH v3 0/4] Add i.MX8MQ clock driver
-In-Reply-To: <1533825941-17224-1-git-send-email-abel.vesa@nxp.com>
-References: <1533825941-17224-1-git-send-email-abel.vesa@nxp.com>
-Message-ID: <20180810060334.ookq3dm3vylp623o@pengutronix.de>
+From: chuhu@redhat.com (Chunyu Hu)
+Date: Fri, 10 Aug 2018 02:30:20 -0400 (EDT)
+Subject: Bug report: Bad mode in FIQ handler detected on CPU0, code
+ 0x56000000
+In-Reply-To: <20180809131622.GC29785@arm.com>
+References: <1426298268.23978174.1533818483053.JavaMail.zimbra@redhat.com>
+ <381494229.23979617.1533818858635.JavaMail.zimbra@redhat.com>
+ <20180809131622.GC29785@arm.com>
+Message-ID: <70910961.24172948.1533882620742.JavaMail.zimbra@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abel,
 
-On Thu, Aug 09, 2018 at 05:45:37PM +0300, Abel Vesa wrote:
-> This is basically just a resend of the following patchset:
+
+----- Original Message -----
+> From: "Will Deacon" <will.deacon@arm.com>
+> To: "Chunyu Hu" <chuhu@redhat.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Sent: Thursday, August 9, 2018 9:16:22 PM
+> Subject: Re: Bug report: Bad mode in FIQ handler detected on CPU0, code 0x56000000
 > 
-> https://www.spinics.net/lists/linux-clk/msg23141.html
+> Hi Chunyu,
 > 
-> I've just updated the patchset and implemented Shawn's
-> and Aisheng's comments.
+> On Thu, Aug 09, 2018 at 08:47:38AM -0400, Chunyu Hu wrote:
+> > I hit an 100% panic when I executed:
+> > 
+> > perf &
+> > perf top
+> > 
+> > Logs are as below,
+> > 
+> > [  123.234492] Bad mode in FIQ handler detected on CPU0, code 0x56000000 --
+> > SVC (AArch64)
 > 
-> I hope I haven't missed any of their comments.
+> Oh dear...
+> 
+> We don't support FIQ in Linux, since:
+> 
+> (a) It's seldom available on the non-secure side
+> (b) It's not necessarily "fast", despite the name
+> (c) We'd be opening up a can of worms if we allow FIQ to preempt IRQ. Better
+>     off using SDEI or GIC priorities to implement NMIs.
+> (d) I don't think FIQs can be described in ACPI or DT
+> 
+> In this case, it looks like the PMU interrupt has been configured as a FIQ.
+> It should be possible to configure the GIC in firmware (not sure you have
+> EL3, so maybe in the bootloader) to treat this interrupt as an IRQ instead,
+> in which case perf top will work correctly as long as the ACPI tables / FDT
+> accurately describe the interrupt.
 
-I think what I said to v2 back in march still stays valid:
+Will,
 
-> A general thought: The i.MX8M finally has a consistent clock tree. We
-> have for example 70 Peripheral clock slices consisting of a mux, a gate
-> and two dividers, all 70 looking the same.
-> For these it might make sense to create a more complex clock type
-> providing mux, gate and set rate functionality in one clock. This would
-> drastically reduce the number of clocks we have to handle.
+Thank you so much for the explanation. 
 
-Sascha
-
+> 
+> Will
+> 
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Chunyu Hu
