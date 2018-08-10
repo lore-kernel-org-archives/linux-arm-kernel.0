@@ -1,116 +1,36 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Fri, 10 Aug 2018 10:20:38 +0530
-Subject: [PATCH v1 01/10] arm/arm64: dts: msm8974/msm8916: thermal: Split
- address space into two
-In-Reply-To: <20180809191059.GI160295@google.com>
-References: <cover.1533815718.git.amit.kucheria@linaro.org>
- <d01f560abed221b536b27bfaa42a530257642974.1533815718.git.amit.kucheria@linaro.org>
- <20180809191059.GI160295@google.com>
-Message-ID: <CAP245DUtn=dzfaNPTmYdHZBRDzmKJ9q4EZw-n9-zgeoeBPGr2g@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Fri, 10 Aug 2018 09:00:57 +0300
+Subject: qemu machine settings and root fs for armv8?
+In-Reply-To: <CAKwvOdnaknwFshVAk=G0x44RxZyrMPp+O2yFBauAe9-3C4DpTQ@mail.gmail.com>
+References: <CAKwvOdkGatK1HbXG0hDr=a1DtnoCXUbVppLdR6uN5tAKzKdDDQ@mail.gmail.com>
+ <CAKwvOdnA5OTcBuRVbcBv8oYHR-mU3+Ee_iFjqbHx4UQxVnpxtQ@mail.gmail.com>
+ <5d585df0-abbe-c95f-adff-c4c2e3962832@redhat.com>
+ <CAKwvOdnaknwFshVAk=G0x44RxZyrMPp+O2yFBauAe9-3C4DpTQ@mail.gmail.com>
+Message-ID: <871sb6bw12.fsf@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2018 at 12:41 AM Matthias Kaehlcke <mka@chromium.org> wrote:
->
-> On Thu, Aug 09, 2018 at 06:02:33PM +0530, Amit Kucheria wrote:
-> > We've earlier added support to split the register address space into TM
-> > and SROT regions.
-> >
-> > Split up the regmap address space into two for the remaining platforms that
-> > have a similar register layout and make corresponding changes to the
-> > get_temp_common() function used by these platforms.
-> >
-> > Since tsens-common.c/init_common() currently only registers one address
-> > space, the order is important (TM before SROT).  This is OK since the code
-> > doesn't really use the SROT functionality yet.
-> >
-> > Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/qcom-msm8974.dtsi   | 6 ++++--
-> >  arch/arm64/boot/dts/qcom/msm8916.dtsi | 6 ++++--
-> >  drivers/thermal/qcom/tsens-common.c   | 5 +++--
-> >  3 files changed, 11 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> > index d9019a49b292..3c4b81c29798 100644
-> > --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-> > +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> > @@ -427,11 +427,13 @@
-> >                       };
-> >               };
-> >
-> > -             tsens: thermal-sensor at fc4a8000 {
-> > +             tsens: thermal-sensor at fc4a9000 {
-> >                       compatible = "qcom,msm8974-tsens";
-> > -                     reg = <0xfc4a8000 0x2000>;
-> > +                     reg = <0xfc4a9000 0x1000>, /* TM */
-> > +                           <0xfc4a8000 0x1000>; /* SROT */
-> >                       nvmem-cells = <&tsens_calib>, <&tsens_backup>;
-> >                       nvmem-cell-names = "calib", "calib_backup";
-> > +                     #qcom,sensors = <11>;
->
-> nit: adding the number of sensors isn't directly related and probably
-> should be in a separate patch. Not important enough to re-spin just
-> for this though ;-)
+Hi Nick,
 
-Hi Matthias,
-
-Sometimes the urge to avoid frivolous patches takes over too strongly. :-)
-
-I'll split it out in a respin. Thanks for the quick review of the series.
-
-Regards,
-Amit
-
-> >                       #thermal-sensor-cells = <1>;
-> >               };
-> >
-> > diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > index cc1040eacdf5..abf84df5a7bc 100644
-> > --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > @@ -774,11 +774,13 @@
-> >                       };
-> >               };
-> >
-> > -             tsens: thermal-sensor at 4a8000 {
-> > +             tsens: thermal-sensor at 4a9000 {
-> >                       compatible = "qcom,msm8916-tsens";
-> > -                     reg = <0x4a8000 0x2000>;
-> > +                     reg = <0x4a9000 0x1000>, /* TM */
-> > +                           <0x4a8000 0x1000>; /* SROT */
-> >                       nvmem-cells = <&tsens_caldata>, <&tsens_calsel>;
-> >                       nvmem-cell-names = "calib", "calib_sel";
-> > +                     #qcom,sensors = <5>;
+Nick Desaulniers writes:
+> On Thu, Aug 9, 2018 at 12:36 AM Laura Abbott <labbott@redhat.com> wrote:
+>> I usually use a buildroot environment and just boot as an initramfs:
 >
-> ditto
->
-> >                       #thermal-sensor-cells = <1>;
-> >               };
-> >
-> > diff --git a/drivers/thermal/qcom/tsens-common.c b/drivers/thermal/qcom/tsens-common.c
-> > index 6207d8d92351..478739543bbc 100644
-> > --- a/drivers/thermal/qcom/tsens-common.c
-> > +++ b/drivers/thermal/qcom/tsens-common.c
-> > @@ -21,7 +21,7 @@
-> >  #include <linux/regmap.h>
-> >  #include "tsens.h"
-> >
-> > -#define S0_ST_ADDR           0x1030
-> > +#define STATUS_OFFSET                0x30
-> >  #define SN_ADDR_OFFSET               0x4
-> >  #define SN_ST_TEMP_MASK              0x3ff
-> >  #define CAL_DEGC_PT1         30
-> > @@ -107,8 +107,9 @@ int get_temp_common(struct tsens_device *tmdev, int id, int *temp)
-> >       unsigned int status_reg;
-> >       int last_temp = 0, ret;
-> >
-> > -     status_reg = S0_ST_ADDR + s->hw_id * SN_ADDR_OFFSET;
-> > +     status_reg = tmdev->tm_offset + STATUS_OFFSET + s->hw_id * SN_ADDR_OFFSET;
-> >       ret = regmap_read(tmdev->map, status_reg, &code);
-> > +
-> >       if (ret)
-> >               return ret;
-> >       last_temp = code & SN_ST_TEMP_MASK;
->
-> Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+> I need to play around more with buildroot, but I'll bet that's an
+> option to make a ramdisk instead of a full disk image?
+
+The BR2_TARGET_ROOTFS_CPIO config option of Buildroot enables build of
+.cpio archive which is suitable for use as initramfs/initrd. See under
+'Filesystem images' -> 'cpio the root filesystem'.
+
+In case you also build your kernel under Buildroot, then
+BR2_TARGET_ROOTFS_CPIO would automatically make your kernel embed the
+cpio initramfs (using the kernel CONFIG_INITRAMFS_SOURCE). With that, you
+don't need to pass a separate -initrd option to qemu.
+
+baruch
+
+--
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
