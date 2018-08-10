@@ -1,74 +1,72 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 10 Aug 2018 12:27:24 +0100
-Subject: [PATCH] KVM: arm/arm64: Skip updating page table entry if no
- change
-In-Reply-To: <20180810111300.17144-1-punit.agrawal@arm.com>
-References: <20180810111300.17144-1-punit.agrawal@arm.com>
-Message-ID: <23d3c76f-e839-dbab-227c-f6bc068d3ba0@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 10 Aug 2018 13:57:28 +0200
+Subject: [PATCH V2] ARM: dts: silk: Add DA9063 PMIC node
+In-Reply-To: <CAMuHMdU8=pb1V9gPxTe6JX5waXr0aRg5PW6t_bDY2fij0PVr5A@mail.gmail.com>
+References: <20180804163818.23360-1-marek.vasut+renesas@gmail.com>
+ <CAMuHMdU8=pb1V9gPxTe6JX5waXr0aRg5PW6t_bDY2fij0PVr5A@mail.gmail.com>
+Message-ID: <20180810115727.r4iqqrkujzhih4vo@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2018 12:13 PM, Punit Agrawal wrote:
-> Contention on updating a page table entry by a large number of vcpus
-> can lead to duplicate work when handling stage 2 page faults. As the
-> page table update follows the break-before-make requirement of the
-> architecture, it can lead to repeated refaults due to clearing the
-> entry and flushing the tlbs.
+On Tue, Aug 07, 2018 at 10:16:16AM +0200, Geert Uytterhoeven wrote:
+> Hi Marek,
 > 
-> This problem is more likely when -
+> On Sat, Aug 4, 2018 at 6:38 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+> > Add DA9063 PMIC node to the I2C bus.
+> >
+> > Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> > Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> > Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > Cc: Simon Horman <horms+renesas@verge.net.au>
+> > Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > Cc: linux-renesas-soc at vger.kernel.org
+> > ---
+> > V2: - Replace shmobile with dts since it's a DT patch in subject
+> >     - Connect the 9063_IRQ# line to GP3_31
+> >     - Since the DA9063 is connected to both i2c1 and i2c7, connect
+> >       it to i2c7, which is the dedicated dvfs i2c.
 > 
-> * there are large number of vcpus
-> * the mapping is large block mapping
+> Thanks for the update!
 > 
-> such as when using PMD hugepages (512MB) with 64k pages.
+> > --- a/arch/arm/boot/dts/r8a7794-silk.dts
+> > +++ b/arch/arm/boot/dts/r8a7794-silk.dts
+> > @@ -405,6 +405,23 @@
+> >         clock-frequency = <400000>;
+> >  };
+> >
+> > +&i2c7 {
+> > +       status = "okay";
+> > +       clock-frequency = <100000>;
+> > +
+> > +       pmic at 58 {
+> > +               compatible = "dlg,da9063";
+> > +               reg = <0x58>;
+> > +               interrupt-parent = <&gpio3>;
+> > +               interrupts = <31 IRQ_TYPE_LEVEL_LOW>;
+> > +               interrupt-controller;
+> > +
+> > +               wdt {
+> > +                       compatible = "dlg,da9063-watchdog";
+> > +               };
 > 
-> Fix this by skipping the page table update if there is no change in
-> the entry being updated.
+> Given Silk has the full da9063 (unlike the "L" version on Porter), shouldn't
+> you add an rtc subnode?
 > 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-> --
+> Oh, Silk also has the onkey pin wired, so perhaps you want to add an onkey
+> subnode, too? Does that feature work?
+> 
+> BTW, Stout also has the onkey wired, but lacks the onkey subnode.
+> 
+> > +       };
+> > +};
+> > +
+> 
+> Nevertheless:
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
+Thanks, I have applied this patch for v4.20.
 
->   virt/kvm/arm/mmu.c | 16 ++++++++++++++++
->   1 file changed, 16 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 1d90d79706bd..a66a5441ca2f 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -1027,6 +1027,18 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
->   	VM_BUG_ON(pmd_present(*pmd) && pmd_pfn(*pmd) != pmd_pfn(*new_pmd));
->   
->   	old_pmd = *pmd;
-> +	/*
-> +	 * Multiple vcpus faulting on the same PMD entry, can lead to
-> +	 * them sequentially updating the PMD with the same
-> +	 * value. Following the break-before-make (pmd_clear()
-> +	 * followed by tlb_flush()) process can hinder forward
-> +	 * progress due to refaults generated on missing translations.
-> +	 *
-> +	 * Skip updating the page table if the entry is unchanged.
-> +	 */
-> +	if (pmd_val(old_pmd) == pmd_val(*new_pmd))
-> +		return 0;
-> +
->   	if (pmd_present(old_pmd)) {
->   		pmd_clear(pmd);
->   		kvm_tlb_flush_vmid_ipa(kvm, addr);
-> @@ -1101,6 +1113,10 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
->   
->   	/* Create 2nd stage page table mapping - Level 3 */
->   	old_pte = *pte;
-> +	/* Skip page table update if there is no change */
-> +	if (pte_val(old_pte) == pte_val(*new_pte))
-> +		return 0;
-> +
->   	if (pte_present(old_pte)) {
->   		kvm_set_pte(pte, __pte(0));
->   		kvm_tlb_flush_vmid_ipa(kvm, addr);
-> 
+Marek,
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+please consider some follow-up patches to address the issues
+raised by Geert.
