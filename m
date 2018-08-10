@@ -1,68 +1,69 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 10 Aug 2018 10:05:19 +0200
-Subject: [PATCH v2 22/29] ARM: davinci: dm644x-evm: use device properties for
- at24 eeprom
-In-Reply-To: <20180810080526.27207-1-brgl@bgdev.pl>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
-Message-ID: <20180810080526.27207-23-brgl@bgdev.pl>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 10 Aug 2018 13:42:26 +0530
+Subject: [PATCH 00/28] at24: remove at24_platform_data
+In-Reply-To: <CAMRc=McfSZQvdXgrKDagb_TE1g-WzEhSpst1z_o5Z994cv3MjA@mail.gmail.com>
+References: <20180808153150.23444-1-brgl@bgdev.pl>
+ <20180808155548.s7p4xqsjywz3psrj@ninjato>
+ <CAMpxmJXVNiyqF4qaYtNhPUG3mSZVdvBSGUqDYK-nh59BKeh=Gw@mail.gmail.com>
+ <20180808164402.GH7275@lunn.ch>
+ <CAMRc=McfSZQvdXgrKDagb_TE1g-WzEhSpst1z_o5Z994cv3MjA@mail.gmail.com>
+Message-ID: <78917b7c-fb9b-2f88-1813-8cf951e60677@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Hi Bart,
 
-We want to work towards phasing out the at24_platform_data structure.
-There are few users and its contents can be represented using generic
-device properties. Using device properties only will allow us to
-significantly simplify the at24 configuration code.
+On Wednesday 08 August 2018 10:22 PM, Bartosz Golaszewski wrote:
+> 2018-08-08 18:44 GMT+02:00 Andrew Lunn <andrew@lunn.ch>:
+>> On Wed, Aug 08, 2018 at 06:27:25PM +0200, Bartosz Golaszewski wrote:
+>>> 2018-08-08 17:55 GMT+02:00 Wolfram Sang <wsa@the-dreams.de>:
+>>>> On Wed, Aug 08, 2018 at 05:31:22PM +0200, Bartosz Golaszewski wrote:
+>>>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>>>
+>>>>> This is a follow-up to the previously rejected series[1] which partially
+>>>>> removed the at24_platform_data structure. After further development and
+>>>>> taking reviews into account, this series finally removes that struct
+>>>>> completely but not without touching many different parts of the code
+>>>>> base.
+>>>>>
+>>>>> Since I took over maintainership of the at24 driver I've been working
+>>>>> towards removing at24_platform_data in favor for device properties.
+>>>>
+>>>> Wooha, nice work. I can't really comment on it but wondered how you want
+>>>> to upstream it (after reviews)? Pull request of an immutable branch for
+>>>> nvmem-tree sounds best to me. Then I could also pull it in if i2c needs
+>>>> it. Probably same situation for arm-soc...
+>>>>
+>>>
+>>> I initially wanted to merge small parts of it starting with v4.18, but
+>>> there were some voices against merging APIs without users. I'm not
+>>> sure how it should go in. There'll be a need for multiple immutable
+>>> branches most probably...
+>>
+>> Hi Bartosz
+>>
+>> What this series does is show all the different parts are now
+>> available, and can be reviewed as a whole. Once that review is
+>> completed, merging in parts then becomes possible.
+>>
+>> It looks like you could probably merge the nvmem, mtd and net parts
+>> independently via there maintainers for 4.20, since i don't think
+>> there are any dependencies. The arm-soc changes in 4.21, and the
+>> removal of the platform data in 4.22?
+>>
+>>      Andrew
+> 
+> We need the first batch of SoC changes for the net part and then the
+> second batch depends on those net changes. Also: dragging the merge
+> for this over a year is a bit overkill.
+> 
+> Sekhar: I know you're usually provided with immutable branches from
+> framework maintainers for the SoC changes - is it ok for you to
+> provide the net maintainers with an immutable branch after applying
+> the first part of davinci board file changes?
 
-Remove the at24_platform_data structure and replace it with an array
-of property entries. Drop the byte_len/size property, as the model name
-already implies the EEPROM's size.
+Yeah, sure. I will be happy to do that to speed merging. Will take a
+look at v2 you posted.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
----
- arch/arm/mach-davinci/board-dm644x-evm.c | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
-index 829fa1c8d0b4..954296d23297 100644
---- a/arch/arm/mach-davinci/board-dm644x-evm.c
-+++ b/arch/arm/mach-davinci/board-dm644x-evm.c
-@@ -16,8 +16,8 @@
- #include <linux/gpio/machine.h>
- #include <linux/i2c.h>
- #include <linux/platform_data/pcf857x.h>
--#include <linux/platform_data/at24.h>
- #include <linux/platform_data/gpio-davinci.h>
-+#include <linux/property.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/rawnand.h>
- #include <linux/mtd/partitions.h>
-@@ -486,12 +486,9 @@ static struct nvmem_cell_lookup dm6446evm_mac_address_cell = {
- 	.nvmem_name = "1-00500",
- };
- 
--static struct at24_platform_data eeprom_info = {
--	.byte_len	= (256*1024) / 8,
--	.page_size	= 64,
--	.flags		= AT24_FLAG_ADDR16,
--	.setup          = davinci_get_mac_addr,
--	.context	= (void *)0x7f00,
-+static const struct property_entry eeprom_properties[] = {
-+	PROPERTY_ENTRY_U32("pagesize", 64),
-+	{ }
- };
- 
- /*
-@@ -601,7 +598,7 @@ static struct i2c_board_info __initdata i2c_info[] =  {
- 	},
- 	{
- 		I2C_BOARD_INFO("24c256", 0x50),
--		.platform_data	= &eeprom_info,
-+		.properties = eeprom_properties,
- 	},
- 	{
- 		I2C_BOARD_INFO("tlv320aic33", 0x1b),
--- 
-2.18.0
+Thanks,
+Sekhar
