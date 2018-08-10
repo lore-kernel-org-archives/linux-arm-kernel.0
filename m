@@ -1,194 +1,79 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Fri, 10 Aug 2018 23:23:37 +0530
-Subject: [PATCH 2/4] arm64: dts: Add devicetree for Hisilicon Hi3670 SoC
+Date: Fri, 10 Aug 2018 23:23:39 +0530
+Subject: [PATCH 4/4] arm64: dts: Add devicetree support for HiKey970 board
 In-Reply-To: <20180810175339.25421-1-manivannan.sadhasivam@linaro.org>
 References: <20180810175339.25421-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180810175339.25421-3-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180810175339.25421-5-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial devicetree support for Hisilicon Hi3670 SoC which
-is similar to Hi3660 SoC with NPU support.
+Add devicetree support for HiKey970 development board which
+based on Hi3670 SoC and is also one of the 96Boards Consumer
+Edition and AI platform.
 
-This SoC has Octal core BigLittle CPUs in two clusters(4 * A53 & 4 * A73).
+Only UART6 is enabled which is the default console required
+by the 96Boards Consumer Edition Specification.
 
-Only UART6 has been added for console support which is
-pre configured by the bootloader. A fixed clock is sourcing
-the UART6 which will get replaced by the clock driver when available.
+This patch has been tested on HiKey970 Board.
 
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- arch/arm64/boot/dts/hisilicon/hi3670.dtsi | 162 ++++++++++++++++++++++
- 1 file changed, 162 insertions(+)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi3670.dtsi
+ arch/arm64/boot/dts/hisilicon/Makefile        |  1 +
+ .../boot/dts/hisilicon/hi3670-hikey970.dts    | 35 +++++++++++++++++++
+ 2 files changed, 36 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi3670-hikey970.dts
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3670.dtsi b/arch/arm64/boot/dts/hisilicon/hi3670.dtsi
+diff --git a/arch/arm64/boot/dts/hisilicon/Makefile b/arch/arm64/boot/dts/hisilicon/Makefile
+index 03d93f8ef8a9..f4d68caeba83 100644
+--- a/arch/arm64/boot/dts/hisilicon/Makefile
++++ b/arch/arm64/boot/dts/hisilicon/Makefile
+@@ -1,5 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0
+ dtb-$(CONFIG_ARCH_HISI) += hi3660-hikey960.dtb
++dtb-$(CONFIG_ARCH_HISI) += hi3670-hikey970.dtb
+ dtb-$(CONFIG_ARCH_HISI) += hi3798cv200-poplar.dtb
+ dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb
+ dtb-$(CONFIG_ARCH_HISI) += hip05-d02.dtb
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3670-hikey970.dts b/arch/arm64/boot/dts/hisilicon/hi3670-hikey970.dts
 new file mode 100644
-index 000000000000..c90e6f6a34ec
+index 000000000000..4f5118642024
 --- /dev/null
-+++ b/arch/arm64/boot/dts/hisilicon/hi3670.dtsi
-@@ -0,0 +1,162 @@
++++ b/arch/arm64/boot/dts/hisilicon/hi3670-hikey970.dts
+@@ -0,0 +1,35 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * dts file for Hisilicon Hi3670 SoC
++ * dts file for Hisilicon HiKey970 Development Board
 + *
 + * Copyright (C) 2016, Hisilicon Ltd.
 + * Copyright (C) 2018, Linaro Ltd.
++ *
 + */
 +
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
++/dts-v1/;
++
++#include "hi3670.dtsi"
 +
 +/ {
-+	compatible = "hisilicon,hi3670";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
++	model = "HiKey970";
++	compatible = "hisilicon,hi3670-hikey970", "hisilicon,hi3670";
 +
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
++	aliases {
++		serial6 = &uart6;       /* console UART */
 +	};
 +
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu-map {
-+			cluster0 {
-+				core0 {
-+					cpu = <&cpu0>;
-+				};
-+				core1 {
-+					cpu = <&cpu1>;
-+				};
-+				core2 {
-+					cpu = <&cpu2>;
-+				};
-+				core3 {
-+					cpu = <&cpu3>;
-+				};
-+			};
-+			cluster1 {
-+				core0 {
-+					cpu = <&cpu4>;
-+				};
-+				core1 {
-+					cpu = <&cpu5>;
-+				};
-+				core2 {
-+					cpu = <&cpu6>;
-+				};
-+				core3 {
-+					cpu = <&cpu7>;
-+				};
-+			};
-+		};
-+
-+		cpu0: cpu at 0 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu1: cpu at 1 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu2: cpu at 2 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu3: cpu at 3 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu4: cpu at 100 {
-+			compatible = "arm,cortex-a73", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x100>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu5: cpu at 101 {
-+			compatible = "arm,cortex-a73", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x101>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu6: cpu at 102 {
-+			compatible = "arm,cortex-a73", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x102>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu7: cpu at 103 {
-+			compatible = "arm,cortex-a73", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0 0x103>;
-+			enable-method = "psci";
-+		};
++	chosen {
++		stdout-path = "serial6:115200n8";
 +	};
 +
-+	gic: interrupt-controller at e82b0000 {
-+		compatible = "arm,gic-400";
-+		reg = <0x0 0xe82b1000 0 0x1000>, /* GICD */
-+		      <0x0 0xe82b2000 0 0x2000>, /* GICC */
-+		      <0x0 0xe82b4000 0 0x2000>, /* GICH */
-+		      <0x0 0xe82b6000 0 0x2000>; /* GICV */
-+		#interrupt-cells = <3>;
-+		#address-cells = <0>;
-+		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) |
-+					 IRQ_TYPE_LEVEL_HIGH)>;
-+		interrupt-controller;
++	memory at 0 {
++		device_type = "memory";
++		/* expect bootloader to fill in this region */
++		reg = <0x0 0x0 0x0 0x0>;
 +	};
++};
 +
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) |
-+					  IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) |
-+					  IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) |
-+					  IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) |
-+					  IRQ_TYPE_LEVEL_LOW)>;
-+		clock-frequency = <1920000>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		uart6_clk: clk_19_2M {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <19200000>;
-+		};
-+
-+		uart6: serial at fff32000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x0 0xfff32000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&uart6_clk &uart6_clk>;
-+			clock-names = "uartclk", "apb_pclk";
-+			status = "disabled";
-+		};
-+	};
++&uart6 {
++	status = "okay";
 +};
 -- 
 2.17.1
