@@ -1,24 +1,39 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sat, 11 Aug 2018 12:44:02 +0300
-Subject: [PATCH v2] media: i2c: lm3560: use conservative defaults
-In-Reply-To: <3a9ece34-baad-a19d-c3bd-96aa458ea70b@gmail.com>
-References: <20180506080250.GA24114@amd> <20180716090814.GA4505@amd>
- <3a9ece34-baad-a19d-c3bd-96aa458ea70b@gmail.com>
-Message-ID: <CAHp75Vf4PZW8A+uj8V5uL2LkTSzSogQDcR8JTqVh4jzVecgtRQ@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 11 Aug 2018 11:52:35 +0200
+Subject: [PATCH] ARM: require GCC for FRAME_POINTER
+Message-ID: <20180811095235.1938-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 11, 2018 at 9:10 AM, Daniel Jeong <gshark.jeong@gmail.com> wrote:
-> Hi Pavel,
->
-> I think if there is not exist pdata, it should be set to the value of power
-> on reset (POR) to sync with the chip.
->
-> According to the LM3560 datasheet, Flash Timeout is 512ms, Flash current is
-> 875mA and Torch Current is 93.75mA.
+To produce a meaningful backtrace with FRAME_POINTER enabled the
+kernel needs a specific function prologue:
+    mov    ip, sp
+    stmfd    sp!, {fp, ip, lr, pc}
+    sub    fp, ip, #4
 
-Can't we simple read back?
+To get to the required prologue gcc uses apcs and no-sched-prolog.
+This compiler options are not available on clang, and clang is not
+able to generate the required prologue. Make the FRAME_POINTER
+config symbol dependent on GCC.
 
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/Kconfig.debug | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 693f84392f1b..cb65cf67dfa2 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -54,7 +54,7 @@ config DEBUG_WX
+ # n, but then RMK will have to kill you ;).
+ config FRAME_POINTER
+ 	bool
+-	depends on !THUMB2_KERNEL
++	depends on !THUMB2_KERNEL && CC_IS_GCC
+ 	default y if !ARM_UNWIND || FUNCTION_GRAPH_TRACER
+ 	help
+ 	  If you say N here, the resulting kernel will be slightly smaller and
 -- 
-With Best Regards,
-Andy Shevchenko
+2.18.0
