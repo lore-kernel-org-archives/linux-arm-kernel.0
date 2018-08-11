@@ -1,471 +1,128 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Sat, 11 Aug 2018 11:37:56 -0400
-Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <CAPhsuW49+qA7kT7yE4tgbnAuox-iOzssg-jc2abG8XDo6XeX8A@mail.gmail.com>
-References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
- <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
- <CAPhsuW49+qA7kT7yE4tgbnAuox-iOzssg-jc2abG8XDo6XeX8A@mail.gmail.com>
-Message-ID: <20180811113756.494a10f7@vmware.local.home>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Sat, 11 Aug 2018 18:22:32 +0200
+Subject: [PATCH v2 2/4] KVM: arm/arm64: vgic-v3: Add core support for
+ Group0 SGIs
+In-Reply-To: <20180810101422.3569-3-marc.zyngier@arm.com>
+References: <20180810101422.3569-1-marc.zyngier@arm.com>
+ <20180810101422.3569-3-marc.zyngier@arm.com>
+Message-ID: <20180811162232.GG20606@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 11 Aug 2018 00:57:12 -0700
-Song Liu <liu.song.a23@gmail.com> wrote:
-
-> > +
-> > +static void delayed_uprobe_delete(struct delayed_uprobe *du)
-> > +{
-> > +       if (!du)
-> > +               return;  
-> Do we really need this check?
-
-I'd suggest we keep it. It's not a fast path, and operations like this
-should really check for NULL.
-
-
+On Fri, Aug 10, 2018 at 11:14:20AM +0100, Marc Zyngier wrote:
+> Although vgic-v3 now supports Group0 interrupts, it still doesn't
+> deal with Group0 SGIs. As usually with the GIC, nothing is simple:
 > 
-> > +       list_del(&du->list);
-> > +       kfree(du);
-> > +}
-> > +
-> > +static void delayed_uprobe_remove(struct uprobe *uprobe, struct mm_struct *mm)
-> > +{
-> > +       struct list_head *pos, *q;
-> > +       struct delayed_uprobe *du;
-> > +
-> > +       if (!uprobe && !mm)
-> > +               return;  
-> And do we really need this check?
-
-Same here, as it's not a fast path, and it prevents kernel oops if a
-NULL is passed in.
-
+> - ICC_SGI1R can signal SGIs of both groups, since GICD_CTLR.DS==1
+>   with KVM (as per 8.1.10, Non-secure EL1 access)
 > 
-> > +
-> > +       list_for_each_safe(pos, q, &delayed_uprobe_list) {
-> > +               du = list_entry(pos, struct delayed_uprobe, list);
-> > +
-> > +               if (uprobe && mm && du->uprobe == uprobe && du->mm == mm)
-> > +                       delayed_uprobe_delete(du);
-> > +               else if (!uprobe && du->mm == mm)
-> > +                       delayed_uprobe_delete(du);
-> > +               else if (!mm && du->uprobe == uprobe)
-> > +                       delayed_uprobe_delete(du);
-> > +       }
-> > +}
-> > +
-> > +static bool valid_ref_ctr_vma(struct uprobe *uprobe,
-> > +                             struct vm_area_struct *vma)
-> > +{
-> > +       unsigned long vaddr = offset_to_vaddr(vma, uprobe->ref_ctr_offset);
-> > +
-> > +       return uprobe->ref_ctr_offset &&
-> > +               vma->vm_file &&
-> > +               file_inode(vma->vm_file) == uprobe->inode &&
-> > +               (vma->vm_flags & (VM_WRITE|VM_SHARED)) == VM_WRITE &&
-> > +               vma->vm_start <= vaddr &&
-> > +               vma->vm_end > vaddr;
-> > +}
-> > +
-> > +static struct vm_area_struct *
-> > +find_ref_ctr_vma(struct uprobe *uprobe, struct mm_struct *mm)
-> > +{
-> > +       struct vm_area_struct *tmp;
-> > +
-> > +       for (tmp = mm->mmap; tmp; tmp = tmp->vm_next)
-> > +               if (valid_ref_ctr_vma(uprobe, tmp))
-> > +                       return tmp;
-> > +
-> > +       return NULL;
-> > +}
-> > +
-> > +static int
-> > +__update_ref_ctr(struct mm_struct *mm, unsigned long vaddr, short d)
-> > +{
-> > +       void *kaddr;
-> > +       struct page *page;
-> > +       struct vm_area_struct *vma;
-> > +       int ret = 0;  
-> It is not necessary to initialize ret here.
-
-Agreed.
-
+> - ICC_SGI0R can only generate Group0 SGIs
 > 
-> > +       short *ptr;
-> > +
-> > +       if (vaddr == 0 || d == 0)
-> > +               return -EINVAL;
-> > +
-> > +       ret = get_user_pages_remote(NULL, mm, vaddr, 1,
-> > +                       FOLL_WRITE, &page, &vma, NULL);
-> > +       if (unlikely(ret <= 0)) {
-> > +               /*
-> > +                * We are asking for 1 page. If get_user_pages_remote() fails,
-> > +                * it may return 0, in that case we have to return error.
-> > +                */
-> > +               ret = (ret == 0) ? -EBUSY : ret;
-> > +               pr_warn("Failed to %s ref_ctr. (%d)\n",
-> > +                       d > 0 ? "increment" : "decrement", ret);  
-> This warning is not really useful. Seems this function has little information
-> about which uprobe is failing here. Maybe we only need warning in the caller
-> (or caller of caller).
-
-I'm fine with or without this.
-
+> - ICC_ASGI1R sees its scope refocussed to generate only Group0
+>   SGIs (as per the note at the bottom of Table 8-14)
 > 
-> > +               return ret;
-> > +       }
-> > +
-> > +       kaddr = kmap_atomic(page);
-> > +       ptr = kaddr + (vaddr & ~PAGE_MASK);
-> > +
-> > +       if (unlikely(*ptr + d < 0)) {
-> > +               pr_warn("ref_ctr going negative. vaddr: 0x%lx, "
-> > +                       "curr val: %d, delta: %d\n", vaddr, *ptr, d);
-> > +               ret = -EINVAL;
-> > +               goto out;
-> > +       }
-> > +
-> > +       *ptr += d;
-> > +       ret = 0;
-> > +out:
-> > +       kunmap_atomic(kaddr);
-> > +       put_page(page);
-> > +       return ret;
-> > +}
-> > +
-> > +static int update_ref_ctr(struct uprobe *uprobe, struct mm_struct *mm,
-> > +                         bool is_register)  
-> What's the reason of bool is_register here vs. short d in __update_ref_ctr()?
-> Can we use short for both?
+> We only support Group1 SGIs so far, so no material change.
+> 
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/kvm/coproc.c            |  2 +-
+>  arch/arm64/kvm/sys_regs.c        |  2 +-
+>  include/kvm/arm_vgic.h           |  2 +-
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 19 +++++++++++++++----
+>  4 files changed, 18 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+> index 3a02e76699a6..b17c52608a19 100644
+> --- a/arch/arm/kvm/coproc.c
+> +++ b/arch/arm/kvm/coproc.c
+> @@ -253,7 +253,7 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
+>  	reg = (u64)*vcpu_reg(vcpu, p->Rt2) << 32;
+>  	reg |= *vcpu_reg(vcpu, p->Rt1) ;
+>  
+> -	vgic_v3_dispatch_sgi(vcpu, reg);
+> +	vgic_v3_dispatch_sgi(vcpu, reg, true);
+>  
+>  	return true;
+>  }
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index e04aacb2a24c..aba6755c816d 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -255,7 +255,7 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
+>  	if (!p->is_write)
+>  		return read_from_write_only(vcpu, p, r);
+>  
+> -	vgic_v3_dispatch_sgi(vcpu, p->regval);
+> +	vgic_v3_dispatch_sgi(vcpu, p->regval, true);
+>  
+>  	return true;
+>  }
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index c134790be32c..4f31f96bbfab 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -373,7 +373,7 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+>  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+>  void kvm_vgic_reset_mapped_irq(struct kvm_vcpu *vcpu, u32 vintid);
+>  
+> -void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg, bool allow_group1);
+>  
+>  /**
+>   * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 88e78b582139..9482b4cbdd4f 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -900,7 +900,8 @@ static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
+>  /**
+>   * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
+>   * @vcpu: The VCPU requesting a SGI
+> - * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
+> + * @reg: The value written into ICC_{ASGI1,SGI0,SGI1}R by that VCPU
+> + * @allow_group1: Does the sysreg access access allow generation of G0 SGIs
 
-bool has more control, but I agree that this function is a bit
-confusing.
+nit: access access
 
--- Steve
+>   *
+>   * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
+>   * This will trap in sys_regs.c and call this function.
+> @@ -910,7 +911,7 @@ static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
+>   * check for matching ones. If this bit is set, we signal all, but not the
+>   * calling VCPU.
+>   */
+> -void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg, bool allow_group1)
+>  {
+>  	struct kvm *kvm = vcpu->kvm;
+>  	struct kvm_vcpu *c_vcpu;
+> @@ -959,9 +960,19 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+>  		irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
+>  
+>  		spin_lock_irqsave(&irq->irq_lock, flags);
+> -		irq->pending_latch = true;
+>  
+> -		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
+> +		/*
+> +		 * An access targetting Group0 SGIs can only generate
+> +		 * those, while an access targetting Group1 SGIs can
+> +		 * generate interrupts of either group.
+> +		 */
+> +		if (!irq->group || allow_group1) {
+> +			irq->pending_latch = true;
+> +			vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
+> +		} else {
+> +			spin_unlock_irqrestore(&irq->irq_lock, flags);
+> +		}
+> +
+>  		vgic_put_irq(vcpu->kvm, irq);
+>  	}
+>  }
+> -- 
+> 2.18.0
+> 
 
-> 
-> > +{
-> > +       struct vm_area_struct *rc_vma;
-> > +       unsigned long rc_vaddr;
-> > +       int ret = 0;
-> > +
-> > +       rc_vma = find_ref_ctr_vma(uprobe, mm);
-> > +
-> > +       if (rc_vma) {
-> > +               rc_vaddr = offset_to_vaddr(rc_vma, uprobe->ref_ctr_offset);
-> > +               ret = __update_ref_ctr(mm, rc_vaddr, is_register ? 1 : -1);
-> > +
-> > +               if (is_register)
-> > +                       return ret;
-> > +       }  
-> Mixing __update_ref_ctr() here and delayed_uprobe_add() in the same
-> function is a little confusing (at least for me). How about we always use
-> delayed uprobe for uprobe_mmap() and use non-delayed in other case(s)?
-> 
-> > +
-> > +       mutex_lock(&delayed_uprobe_lock);
-> > +       if (is_register)
-> > +               ret = delayed_uprobe_add(uprobe, mm);
-> > +       else
-> > +               delayed_uprobe_remove(uprobe, mm);
-> > +       mutex_unlock(&delayed_uprobe_lock);
-> > +
-> > +       return ret;
-> > +}
-> > +
-> >  /*
-> >   * NOTE:
-> >   * Expect the breakpoint instruction to be the smallest size instruction for
-> > @@ -302,9 +463,13 @@ static int verify_opcode(struct page *page, unsigned long vaddr, uprobe_opcode_t
-> >  int uprobe_write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm,
-> >                         unsigned long vaddr, uprobe_opcode_t opcode)
-> >  {
-> > +       struct uprobe *uprobe;
-> >         struct page *old_page, *new_page;
-> >         struct vm_area_struct *vma;
-> > -       int ret;
-> > +       int ret, is_register, ref_ctr_updated = 0;
-> > +
-> > +       is_register = is_swbp_insn(&opcode);
-> > +       uprobe = container_of(auprobe, struct uprobe, arch);
-> >
-> >  retry:
-> >         /* Read the page with vaddr into memory */
-> > @@ -317,6 +482,15 @@ int uprobe_write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm,
-> >         if (ret <= 0)
-> >                 goto put_old;
-> >
-> > +       /* We are going to replace instruction, update ref_ctr. */
-> > +       if (!ref_ctr_updated && uprobe->ref_ctr_offset) {
-> > +               ret = update_ref_ctr(uprobe, mm, is_register);
-> > +               if (ret)
-> > +                       goto put_old;
-> > +
-> > +               ref_ctr_updated = 1;
-> > +       }
-> > +
-> >         ret = anon_vma_prepare(vma);
-> >         if (ret)
-> >                 goto put_old;
-> > @@ -337,6 +511,11 @@ int uprobe_write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm,
-> >
-> >         if (unlikely(ret == -EAGAIN))
-> >                 goto retry;
-> > +
-> > +       /* Revert back reference counter if instruction update failed. */
-> > +       if (ret && is_register && ref_ctr_updated)
-> > +               update_ref_ctr(uprobe, mm, false);
-> > +
-> >         return ret;
-> >  }
-> >
-> > @@ -378,8 +557,15 @@ static struct uprobe *get_uprobe(struct uprobe *uprobe)
-> >
-> >  static void put_uprobe(struct uprobe *uprobe)
-> >  {
-> > -       if (atomic_dec_and_test(&uprobe->ref))
-> > +       if (atomic_dec_and_test(&uprobe->ref)) {
-> > +               /*
-> > +                * If application munmap(exec_vma) before uprobe_unregister()
-> > +                * gets called, we don't get a chance to remove uprobe from
-> > +                * delayed_uprobe_list in remove_breakpoint(). Do it here.
-> > +                */
-> > +               delayed_uprobe_remove(uprobe, NULL);
-> >                 kfree(uprobe);
-> > +       }
-> >  }
-> >
-> >  static int match_uprobe(struct uprobe *l, struct uprobe *r)
-> > @@ -484,7 +670,8 @@ static struct uprobe *insert_uprobe(struct uprobe *uprobe)
-> >         return u;
-> >  }
-> >
-> > -static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset)
-> > +static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset,
-> > +                                  loff_t ref_ctr_offset)
-> >  {
-> >         struct uprobe *uprobe, *cur_uprobe;
-> >
-> > @@ -494,6 +681,7 @@ static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset)
-> >
-> >         uprobe->inode = inode;
-> >         uprobe->offset = offset;
-> > +       uprobe->ref_ctr_offset = ref_ctr_offset;
-> >         init_rwsem(&uprobe->register_rwsem);
-> >         init_rwsem(&uprobe->consumer_rwsem);
-> >
-> > @@ -895,7 +1083,7 @@ EXPORT_SYMBOL_GPL(uprobe_unregister);
-> >   * else return 0 (success)
-> >   */
-> >  static int __uprobe_register(struct inode *inode, loff_t offset,
-> > -                            struct uprobe_consumer *uc)
-> > +                            loff_t ref_ctr_offset, struct uprobe_consumer *uc)
-> >  {
-> >         struct uprobe *uprobe;
-> >         int ret;
-> > @@ -912,7 +1100,7 @@ static int __uprobe_register(struct inode *inode, loff_t offset,
-> >                 return -EINVAL;
-> >
-> >   retry:
-> > -       uprobe = alloc_uprobe(inode, offset);
-> > +       uprobe = alloc_uprobe(inode, offset, ref_ctr_offset);
-> >         if (!uprobe)
-> >                 return -ENOMEM;
-> >         /*
-> > @@ -938,10 +1126,17 @@ static int __uprobe_register(struct inode *inode, loff_t offset,
-> >  int uprobe_register(struct inode *inode, loff_t offset,
-> >                     struct uprobe_consumer *uc)
-> >  {
-> > -       return __uprobe_register(inode, offset, uc);
-> > +       return __uprobe_register(inode, offset, 0, uc);
-> >  }
-> >  EXPORT_SYMBOL_GPL(uprobe_register);
-> >
-> > +int uprobe_register_refctr(struct inode *inode, loff_t offset,
-> > +                          loff_t ref_ctr_offset, struct uprobe_consumer *uc)
-> > +{
-> > +       return __uprobe_register(inode, offset, ref_ctr_offset, uc);
-> > +}
-> > +EXPORT_SYMBOL_GPL(uprobe_register_refctr);
-> > +
-> >  /*
-> >   * uprobe_apply - unregister a already registered probe.
-> >   * @inode: the file in which the probe has to be removed.
-> > @@ -1060,6 +1255,31 @@ static void build_probe_list(struct inode *inode,
-> >         spin_unlock(&uprobes_treelock);
-> >  }
-> >
-> > +static int delayed_uprobe_install(struct vm_area_struct *vma)  
-> This function name is confusing. How about we call it delayed_ref_ctr_incr() or
-> something similar? Also, we should add comments to highlight this is vma is not
-> the vma containing the uprobe, but the vma containing the ref_ctr.
-> 
-> > +{
-> > +       struct list_head *pos, *q;
-> > +       struct delayed_uprobe *du;
-> > +       unsigned long vaddr;
-> > +       int ret = 0, err = 0;
-> > +
-> > +       mutex_lock(&delayed_uprobe_lock);
-> > +       list_for_each_safe(pos, q, &delayed_uprobe_list) {
-> > +               du = list_entry(pos, struct delayed_uprobe, list);
-> > +
-> > +               if (!valid_ref_ctr_vma(du->uprobe, vma))
-> > +                       continue;
-> > +
-> > +               vaddr = offset_to_vaddr(vma, du->uprobe->ref_ctr_offset);
-> > +               ret = __update_ref_ctr(vma->vm_mm, vaddr, 1);
-> > +               /* Record an error and continue. */
-> > +               if (ret && !err)
-> > +                       err = ret;  
-> I think this is a good place (when ret != 0) to call pr_warn(). I guess we can
-> print which mm get error for which uprobe (inode+offset).
-> 
-> > +               delayed_uprobe_delete(du);
-> > +       }
-> > +       mutex_unlock(&delayed_uprobe_lock);
-> > +       return err;
-> > +}
-> > +
-> >  /*
-> >   * Called from mmap_region/vma_adjust with mm->mmap_sem acquired.
-> >   *
-> > @@ -1072,7 +1292,15 @@ int uprobe_mmap(struct vm_area_struct *vma)
-> >         struct uprobe *uprobe, *u;
-> >         struct inode *inode;
-> >
-> > -       if (no_uprobe_events() || !valid_vma(vma, true))
-> > +       if (no_uprobe_events())
-> > +               return 0;
-> > +
-> > +       if (vma->vm_file &&
-> > +           (vma->vm_flags & (VM_WRITE|VM_SHARED)) == VM_WRITE &&
-> > +           test_bit(MMF_HAS_UPROBES, &vma->vm_mm->flags))
-> > +               delayed_uprobe_install(vma);
-> > +
-> > +       if (!valid_vma(vma, true))
-> >                 return 0;
-> >
-> >         inode = file_inode(vma->vm_file);
-> > @@ -1246,6 +1474,10 @@ void uprobe_clear_state(struct mm_struct *mm)
-> >  {
-> >         struct xol_area *area = mm->uprobes_state.xol_area;
-> >
-> > +       mutex_lock(&delayed_uprobe_lock);
-> > +       delayed_uprobe_remove(NULL, mm);
-> > +       mutex_unlock(&delayed_uprobe_lock);
-> > +
-> >         if (!area)
-> >                 return;
-> >
-> > diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
-> > index 823687997b01..616160b85860 100644
-> > --- a/kernel/trace/trace.c
-> > +++ b/kernel/trace/trace.c
-> > @@ -4620,7 +4620,7 @@ static const char readme_msg[] =
-> >    "place (kretprobe): [<module>:]<symbol>[+<offset>]|<memaddr>\n"
-> >  #endif
-> >  #ifdef CONFIG_UPROBE_EVENTS
-> > -       "\t    place: <path>:<offset>\n"
-> > +  "   place (uprobe): <path>:<offset>[(ref_ctr_offset)]\n"
-> >  #endif
-> >         "\t     args: <name>=fetcharg[:type]\n"
-> >         "\t fetcharg: %<register>, @<address>, @<symbol>[+|-<offset>],\n"
-> > diff --git a/kernel/trace/trace_uprobe.c b/kernel/trace/trace_uprobe.c
-> > index bf89a51e740d..bf2be098eb08 100644
-> > --- a/kernel/trace/trace_uprobe.c
-> > +++ b/kernel/trace/trace_uprobe.c
-> > @@ -59,6 +59,7 @@ struct trace_uprobe {
-> >         struct inode                    *inode;
-> >         char                            *filename;
-> >         unsigned long                   offset;
-> > +       unsigned long                   ref_ctr_offset;
-> >         unsigned long                   nhit;
-> >         struct trace_probe              tp;
-> >  };
-> > @@ -364,10 +365,10 @@ static int register_trace_uprobe(struct trace_uprobe *tu)
-> >  static int create_trace_uprobe(int argc, char **argv)
-> >  {
-> >         struct trace_uprobe *tu;
-> > -       char *arg, *event, *group, *filename;
-> > +       char *arg, *event, *group, *filename, *rctr, *rctr_end;
-> >         char buf[MAX_EVENT_NAME_LEN];
-> >         struct path path;
-> > -       unsigned long offset;
-> > +       unsigned long offset, ref_ctr_offset;
-> >         bool is_delete, is_return;
-> >         int i, ret;
-> >
-> > @@ -376,6 +377,7 @@ static int create_trace_uprobe(int argc, char **argv)
-> >         is_return = false;
-> >         event = NULL;
-> >         group = NULL;
-> > +       ref_ctr_offset = 0;
-> >
-> >         /* argc must be >= 1 */
-> >         if (argv[0][0] == '-')
-> > @@ -450,6 +452,26 @@ static int create_trace_uprobe(int argc, char **argv)
-> >                 goto fail_address_parse;
-> >         }
-> >
-> > +       /* Parse reference counter offset if specified. */
-> > +       rctr = strchr(arg, '(');
-> > +       if (rctr) {
-> > +               rctr_end = strchr(rctr, ')');
-> > +               if (rctr > rctr_end || *(rctr_end + 1) != 0) {
-> > +                       ret = -EINVAL;
-> > +                       pr_info("Invalid reference counter offset.\n");
-> > +                       goto fail_address_parse;
-> > +               }
-> > +
-> > +               *rctr++ = '\0';
-> > +               *rctr_end = '\0';
-> > +               ret = kstrtoul(rctr, 0, &ref_ctr_offset);
-> > +               if (ret) {
-> > +                       pr_info("Invalid reference counter offset.\n");
-> > +                       goto fail_address_parse;
-> > +               }
-> > +       }
-> > +
-> > +       /* Parse uprobe offset. */
-> >         ret = kstrtoul(arg, 0, &offset);
-> >         if (ret)
-> >                 goto fail_address_parse;
-> > @@ -484,6 +506,7 @@ static int create_trace_uprobe(int argc, char **argv)
-> >                 goto fail_address_parse;
-> >         }
-> >         tu->offset = offset;
-> > +       tu->ref_ctr_offset = ref_ctr_offset;
-> >         tu->path = path;
-> >         tu->filename = kstrdup(filename, GFP_KERNEL);
-> >
-> > @@ -602,6 +625,9 @@ static int probes_seq_show(struct seq_file *m, void *v)
-> >                         trace_event_name(&tu->tp.call), tu->filename,
-> >                         (int)(sizeof(void *) * 2), tu->offset);
-> >
-> > +       if (tu->ref_ctr_offset)
-> > +               seq_printf(m, "(0x%lx)", tu->ref_ctr_offset);
-> > +
-> >         for (i = 0; i < tu->tp.nr_args; i++)
-> >                 seq_printf(m, " %s=%s", tu->tp.args[i].name, tu->tp.args[i].comm);
-> >
-> > @@ -917,7 +943,13 @@ probe_event_enable(struct trace_uprobe *tu, struct trace_event_file *file,
-> >
-> >         tu->consumer.filter = filter;
-> >         tu->inode = d_real_inode(tu->path.dentry);
-> > -       ret = uprobe_register(tu->inode, tu->offset, &tu->consumer);
-> > +       if (tu->ref_ctr_offset) {
-> > +               ret = uprobe_register_refctr(tu->inode, tu->offset,
-> > +                               tu->ref_ctr_offset, &tu->consumer);
-> > +       } else {
-> > +               ret = uprobe_register(tu->inode, tu->offset, &tu->consumer);
-> > +       }
-> > +
-> >         if (ret)
-> >                 goto err_buffer;
-> >
-> > --
-> > 2.14.4
-> >  
+Despite the nit (which you can fix locally):
+
+Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
