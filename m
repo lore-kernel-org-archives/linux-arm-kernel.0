@@ -1,128 +1,505 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Sat, 11 Aug 2018 18:22:32 +0200
-Subject: [PATCH v2 2/4] KVM: arm/arm64: vgic-v3: Add core support for
- Group0 SGIs
-In-Reply-To: <20180810101422.3569-3-marc.zyngier@arm.com>
-References: <20180810101422.3569-1-marc.zyngier@arm.com>
- <20180810101422.3569-3-marc.zyngier@arm.com>
-Message-ID: <20180811162232.GG20606@e113682-lin.lund.arm.com>
+From: ctatlor97@gmail.com (Craig Tatlor)
+Date: Sat, 11 Aug 2018 17:25:47 +0100
+Subject: [PATCH] arm64: dts: sdm630 SoC and Sony Pioneer (Xperia XA2) support
+Message-ID: <20180811162549.12312-1-ctatlor97@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2018 at 11:14:20AM +0100, Marc Zyngier wrote:
-> Although vgic-v3 now supports Group0 interrupts, it still doesn't
-> deal with Group0 SGIs. As usually with the GIC, nothing is simple:
-> 
-> - ICC_SGI1R can signal SGIs of both groups, since GICD_CTLR.DS==1
->   with KVM (as per 8.1.10, Non-secure EL1 access)
-> 
-> - ICC_SGI0R can only generate Group0 SGIs
-> 
-> - ICC_ASGI1R sees its scope refocussed to generate only Group0
->   SGIs (as per the note at the bottom of Table 8-14)
-> 
-> We only support Group1 SGIs so far, so no material change.
-> 
-> Reviewed-by: Eric Auger <eric.auger@redhat.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/coproc.c            |  2 +-
->  arch/arm64/kvm/sys_regs.c        |  2 +-
->  include/kvm/arm_vgic.h           |  2 +-
->  virt/kvm/arm/vgic/vgic-mmio-v3.c | 19 +++++++++++++++----
->  4 files changed, 18 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> index 3a02e76699a6..b17c52608a19 100644
-> --- a/arch/arm/kvm/coproc.c
-> +++ b/arch/arm/kvm/coproc.c
-> @@ -253,7 +253,7 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
->  	reg = (u64)*vcpu_reg(vcpu, p->Rt2) << 32;
->  	reg |= *vcpu_reg(vcpu, p->Rt1) ;
->  
-> -	vgic_v3_dispatch_sgi(vcpu, reg);
-> +	vgic_v3_dispatch_sgi(vcpu, reg, true);
->  
->  	return true;
->  }
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index e04aacb2a24c..aba6755c816d 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -255,7 +255,7 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
->  	if (!p->is_write)
->  		return read_from_write_only(vcpu, p, r);
->  
-> -	vgic_v3_dispatch_sgi(vcpu, p->regval);
-> +	vgic_v3_dispatch_sgi(vcpu, p->regval, true);
->  
->  	return true;
->  }
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index c134790be32c..4f31f96bbfab 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -373,7 +373,7 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
->  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
->  void kvm_vgic_reset_mapped_irq(struct kvm_vcpu *vcpu, u32 vintid);
->  
-> -void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
-> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg, bool allow_group1);
->  
->  /**
->   * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index 88e78b582139..9482b4cbdd4f 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -900,7 +900,8 @@ static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
->  /**
->   * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
->   * @vcpu: The VCPU requesting a SGI
-> - * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
-> + * @reg: The value written into ICC_{ASGI1,SGI0,SGI1}R by that VCPU
-> + * @allow_group1: Does the sysreg access access allow generation of G0 SGIs
+Initial device tree support for Qualcomm SDM630 SoC and
+Sony Pioneer (Xperia XA2).
 
-nit: access access
+SDM630 is based off of the SDM660 soc and all SDM660 specific drivers are
+compatible with it. SDM660 is also based off of MSM8998 so it uses some
+of its drivers aswell.
 
->   *
->   * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
->   * This will trap in sys_regs.c and call this function.
-> @@ -910,7 +911,7 @@ static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
->   * check for matching ones. If this bit is set, we signal all, but not the
->   * calling VCPU.
->   */
-> -void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
-> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg, bool allow_group1)
->  {
->  	struct kvm *kvm = vcpu->kvm;
->  	struct kvm_vcpu *c_vcpu;
-> @@ -959,9 +960,19 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
->  		irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
->  
->  		spin_lock_irqsave(&irq->irq_lock, flags);
-> -		irq->pending_latch = true;
->  
-> -		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
-> +		/*
-> +		 * An access targetting Group0 SGIs can only generate
-> +		 * those, while an access targetting Group1 SGIs can
-> +		 * generate interrupts of either group.
-> +		 */
-> +		if (!irq->group || allow_group1) {
-> +			irq->pending_latch = true;
-> +			vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
-> +		} else {
-> +			spin_unlock_irqrestore(&irq->irq_lock, flags);
-> +		}
-> +
->  		vgic_put_irq(vcpu->kvm, irq);
->  	}
->  }
-> -- 
-> 2.18.0
-> 
+The device tree is based on the CAF 4.4 kernel tree.
 
-Despite the nit (which you can fix locally):
+The device can be booted into the initrd with a shell over UART.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+Signed-off-by: Craig Tatlor <ctatlor97@gmail.com>
+---
+ arch/arm64/boot/dts/qcom/Makefile            |   1 +
+ arch/arm64/boot/dts/qcom/sdm630-pins.dtsi    |  17 +
+ arch/arm64/boot/dts/qcom/sdm630-pioneer.dts  |  16 +
+ arch/arm64/boot/dts/qcom/sdm630-pioneer.dtsi |  22 ++
+ arch/arm64/boot/dts/qcom/sdm630.dtsi         | 383 +++++++++++++++++++
+ 5 files changed, 439 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/qcom/sdm630-pins.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/sdm630-pioneer.dts
+ create mode 100644 arch/arm64/boot/dts/qcom/sdm630-pioneer.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/sdm630.dtsi
+
+diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
+index 9319e74b8906..80f98bb19998 100644
+--- a/arch/arm64/boot/dts/qcom/Makefile
++++ b/arch/arm64/boot/dts/qcom/Makefile
+@@ -6,4 +6,5 @@ dtb-$(CONFIG_ARCH_QCOM)	+= msm8916-mtp.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= msm8992-bullhead-rev-101.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= msm8994-angler-rev-101.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb
++dtb-$(CONFIG_ARCH_QCOM)	+= sdm630-pioneer.dtb
+ dtb-$(CONFIG_ARCH_QCOM)	+= sdm845-mtp.dtb
+diff --git a/arch/arm64/boot/dts/qcom/sdm630-pins.dtsi b/arch/arm64/boot/dts/qcom/sdm630-pins.dtsi
+new file mode 100644
+index 000000000000..78b79c1076f1
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sdm630-pins.dtsi
+@@ -0,0 +1,17 @@
++// SPDX-License-Identifier: GPL-2.0
++/* Copyright (c) 2018, Craig Tatlor. */
++
++&tlmm {
++	blsp1_uart1_default: blsp1_uart1_default {
++		pinmux {
++			pins = "gpio0", "gpio1", "gpio2", "gpio3";
++			function = "gpio";
++		};
++
++		pinconf {
++			pins = "gpio0", "gpio1", "gpio2", "gpio3";
++			drive-strength = <2>;
++			bias-disable;
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/qcom/sdm630-pioneer.dts b/arch/arm64/boot/dts/qcom/sdm630-pioneer.dts
+new file mode 100644
+index 000000000000..67c7e3b57739
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sdm630-pioneer.dts
+@@ -0,0 +1,16 @@
++// SPDX-License-Identifier: GPL-2.0
++/* Copyright (c) 2018, Craig Tatlor. */
++
++/dts-v1/;
++
++#include "sdm630-pioneer.dtsi"
++
++/ {
++	model = "Sony Xperia XA2";
++	compatible = "sony,pioneer", "qcom,sdm630";
++
++	/* required for bootloader to select correct board */
++	qcom,board-id = <8 0>;
++	qcom,pmic-id = <0x0001001b 0x0101011a 0x0 0x0>,
++			<0x0001001b 0x0201011a 0x0 0x0>;
++};
+diff --git a/arch/arm64/boot/dts/qcom/sdm630-pioneer.dtsi b/arch/arm64/boot/dts/qcom/sdm630-pioneer.dtsi
+new file mode 100644
+index 000000000000..512792c23369
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sdm630-pioneer.dtsi
+@@ -0,0 +1,22 @@
++// SPDX-License-Identifier: GPL-2.0
++/* Copyright (c) 2018, Craig Tatlor. */
++
++#include "sdm630.dtsi"
++
++/ {
++	aliases {
++		serial0 = &blsp1_uart1;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&soc {
++	serial at c170000 {
++		status = "okay";
++		pinctrl-names = "default";
++		pinctrl-0 = <&blsp1_uart1_default>;
++	};
++};
+diff --git a/arch/arm64/boot/dts/qcom/sdm630.dtsi b/arch/arm64/boot/dts/qcom/sdm630.dtsi
+new file mode 100644
+index 000000000000..8a544979b7c0
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sdm630.dtsi
+@@ -0,0 +1,383 @@
++// SPDX-License-Identifier: GPL-2.0
++/* Copyright (c) 2018, Craig Tatlor. */
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/qcom,gcc-sdm660.h>
++
++/ {
++	model = "Qualcomm Technologies, Inc. SDM630";
++
++	interrupt-parent = <&intc>;
++
++	qcom,msm-id = <318 0x0>;
++
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	chosen { };
++
++	memory {
++		device_type = "memory";
++		/* We expect the bootloader to fill in the reg */
++		reg = <0 0 0 0>;
++	};
++
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		CPU0: cpu at 100 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x100>;
++			enable-method = "psci";
++			efficiency = <1126>;
++			next-level-cache = <&L2_1>;
++			L2_1: l2-cache {
++				compatible = "arm,arch-cache";
++				cache-level = <2>;
++			};
++			L1_I_100: l1-icache {
++				compatible = "arm,arch-cache";
++			};
++			L1_D_100: l1-dcache {
++				compatible = "arm,arch-cache";
++			};
++		};
++
++		CPU1: cpu at 101 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x101>;
++			enable-method = "psci";
++			efficiency = <1126>;
++			next-level-cache = <&L2_1>;
++			L1_I_101: l1-icache {
++				compatible = "arm,arch-cache";
++			};
++			L1_D_101: l1-dcache {
++				compatible = "arm,arch-cache";
++			};
++		};
++
++		CPU2: cpu at 102 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x102>;
++			enable-method = "psci";
++			efficiency = <1126>;
++			next-level-cache = <&L2_1>;
++			L1_I_102: l1-icache {
++				compatible = "arm,arch-cache";
++			};
++			L1_D_102: l1-dcache {
++				compatible = "arm,arch-cache";
++			};
++		};
++
++		CPU3: cpu at 103 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x103>;
++			enable-method = "psci";
++			efficiency = <1126>;
++			next-level-cache = <&L2_1>;
++			L1_I_103: l1-icache {
++				compatible = "arm,arch-cache";
++			};
++			L1_D_103: l1-dcache {
++				compatible = "arm,arch-cache";
++			};
++		};
++
++		CPU4: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x0>;
++			enable-method = "psci";
++			efficiency = <1024>;
++			next-level-cache = <&L2_0>;
++			L2_0: l2-cache {
++				compatible = "arm,arch-cache";
++				cache-level = <2>;
++			};
++			L1_I_0: l1-icache {
++				compatible = "arm,arch-cache";
++			};
++			L1_D_0: l1-dcache {
++				compatible = "arm,arch-cache";
++			};
++		};
++
++		CPU5: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x1>;
++			enable-method = "psci";
++			efficiency = <1024>;
++			next-level-cache = <&L2_0>;
++			L1_I_1: l1-icache {
++				compatible = "arm,arch-cache";
++			};
++			L1_D_1: l1-dcache {
++				compatible = "arm,arch-cache";
++			};
++		};
++
++		CPU6: cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x2>;
++			enable-method = "psci";
++			efficiency = <1024>;
++			next-level-cache = <&L2_0>;
++			L1_I_2: l1-icache {
++				compatible = "arm,arch-cache";
++			};
++			L1_D_2: l1-dcache {
++				compatible = "arm,arch-cache";
++			};
++		};
++
++		CPU7: cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,armv8";
++			reg = <0x0 0x3>;
++			enable-method = "psci";
++			efficiency = <1024>;
++			next-level-cache = <&L2_0>;
++			L1_I_3: l1-icache {
++				compatible = "arm,arch-cache";
++			};
++			L1_D_3: l1-dcache {
++				compatible = "arm,arch-cache";
++			};
++		};
++
++		cpu-map {
++			cluster0 {
++				core0 {
++					cpu = <&CPU4>;
++				};
++
++				core1 {
++					cpu = <&CPU5>;
++				};
++
++				core2 {
++					cpu = <&CPU6>;
++				};
++
++				core3 {
++					cpu = <&CPU7>;
++				};
++			};
++
++			cluster1 {
++				core0 {
++					cpu = <&CPU0>;
++				};
++
++				core1 {
++					cpu = <&CPU1>;
++				};
++
++				core2 {
++					cpu = <&CPU2>;
++				};
++
++				core3 {
++					cpu = <&CPU3>;
++				};
++			};
++		};
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 1 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 2 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 3 IRQ_TYPE_LEVEL_LOW>,
++			     <GIC_PPI 0 IRQ_TYPE_LEVEL_LOW>;
++	};
++
++	clocks {
++		xo_board {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <19200000>;
++			clock-output-names = "xo_board";
++		};
++
++		sleep_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <32764>;
++			clock-output-names = "sleep_clk";
++		};
++	};
++
++	psci {
++		compatible = "arm,psci-1.0";
++		method = "smc";
++	};
++
++	firmware {
++		scm {
++			compatible = "qcom,scm-sdm660";
++		};
++	};
++
++
++	rpm-glink {
++		compatible = "qcom,glink-rpm";
++
++		interrupts = <GIC_SPI 168 IRQ_TYPE_EDGE_RISING>;
++
++		qcom,rpm-msg-ram = <&rpm_msg_ram>;
++
++		mboxes = <&apcs_glb 0>;
++	};
++
++	soc: soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0 0 0xffffffff>;
++		compatible = "simple-bus";
++
++		intc: interrupt-controller at 17a00000 {
++			compatible = "arm,gic-v3";
++			reg = <0x17a00000 0x10000>,
++			      <0x17b00000 0x100000>;
++			#interrupt-cells = <3>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			interrupt-controller;
++			#redistributor-regions = <1>;
++			redistributor-stride = <0x0 0x20000>;
++			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		gcc: clock-controller at 100000 {
++			compatible = "qcom,gcc-sdm660";
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++			#power-domain-cells = <1>;
++			reg = <0x100000 0x94000>;
++		};
++
++		tlmm: pinctrl at 3000000 {
++			compatible = "qcom,sdm660-pinctrl";
++			reg = <0x3000000 0xc00000>;
++			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		blsp1_uart1: serial at c170000 {
++			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
++			reg = <0xc170000 0x1000>;
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>,
++				 <&gcc GCC_BLSP1_AHB_CLK>;
++			clock-names = "core", "iface";
++			status = "disabled";
++		};
++
++		timer at 17920000 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			compatible = "arm,armv7-timer-mem";
++			reg = <0x17920000 0x1000>;
++
++			frame at 17921000 {
++				frame-number = <0>;
++				interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17921000 0x1000>,
++				      <0x17922000 0x1000>;
++			};
++
++			frame at 17923000 {
++				frame-number = <1>;
++				interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17923000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at 17924000 {
++				frame-number = <2>;
++				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17924000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at 17925000 {
++				frame-number = <3>;
++				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17925000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at 17926000 {
++				frame-number = <4>;
++				interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17926000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at 17927000 {
++				frame-number = <5>;
++				interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17927000 0x1000>;
++				status = "disabled";
++			};
++
++			frame at 17928000 {
++				frame-number = <6>;
++				interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
++				reg = <0x17928000 0x1000>;
++				status = "disabled";
++			};
++		};
++
++		spmi_bus: qcom,spmi at 800f000 {
++			compatible = "qcom,spmi-pmic-arb";
++			reg =	<0x800f000 0x1000>,
++				<0x8400000 0x1000000>,
++				<0x9400000 0x1000000>,
++				<0xa400000 0x220000>,
++				<0x800a000 0x3000>;
++			reg-names = "core", "chnls", "obsrvr", "intr", "cnfg";
++			interrupt-names = "periph_irq";
++			interrupts = <GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH>;
++			qcom,ee = <0>;
++			qcom,channel = <0>;
++			#address-cells = <2>;
++			#size-cells = <0>;
++			interrupt-controller;
++			#interrupt-cells = <4>;
++			cell-index = <0>;
++		};
++
++		rpm_msg_ram: memory at 778000 {
++			compatible = "qcom,rpm-msg-ram";
++			reg = <0x778000 0x7000>;
++		};
++
++		apcs_glb: mailbox at 17911000 {
++			compatible = "qcom,msm8998-apcs-hmss-global";
++			reg = <0x17911000 0x1000>;
++
++			#mbox-cells = <1>;
++		};
++
++	};
++};
++
++#include "sdm630-pins.dtsi"
+-- 
+2.18.0
