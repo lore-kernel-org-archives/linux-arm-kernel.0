@@ -1,103 +1,55 @@
 From: liu.song.a23@gmail.com (Song Liu)
-Date: Sat, 11 Aug 2018 01:01:48 -0700
-Subject: [PATCH v8 2/6] Uprobe: Additional argument arch_uprobe to
- uprobe_write_opcode()
-In-Reply-To: <20180809041856.1547-3-ravi.bangoria@linux.ibm.com>
+Date: Sat, 11 Aug 2018 01:04:19 -0700
+Subject: [PATCH v8 4/6] Uprobes/sdt: Prevent multiple reference counter
+ for same uprobe
+In-Reply-To: <20180809041856.1547-5-ravi.bangoria@linux.ibm.com>
 References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
- <20180809041856.1547-3-ravi.bangoria@linux.ibm.com>
-Message-ID: <CAPhsuW71ysLTafz2y=v_dY_=0BOn0MDL0TKD6eEBQ2ZQUTBuvw@mail.gmail.com>
+ <20180809041856.1547-5-ravi.bangoria@linux.ibm.com>
+Message-ID: <CAPhsuW5GXqS3Ce326Uf2PQQO8qfMkWU3MxOeUDKaCeG3b0euAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Aug 8, 2018 at 9:18 PM, Ravi Bangoria
 <ravi.bangoria@linux.ibm.com> wrote:
-> Add addition argument 'arch_uprobe' to uprobe_write_opcode().
-> We need this in later set of patches.
+> We assume to have only one reference counter for one uprobe.
+> Don't allow user to register multiple uprobes having same
+> inode+offset but different reference counter.
 >
 > Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
-
-Reviewed-by: Song Liu <songliubraving@fb.com>
-
 > ---
->  arch/arm/probes/uprobes/core.c | 2 +-
->  arch/mips/kernel/uprobes.c     | 2 +-
->  include/linux/uprobes.h        | 2 +-
->  kernel/events/uprobes.c        | 9 +++++----
->  4 files changed, 8 insertions(+), 7 deletions(-)
+>  kernel/events/uprobes.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 >
-> diff --git a/arch/arm/probes/uprobes/core.c b/arch/arm/probes/uprobes/core.c
-> index d1329f1ba4e4..bf992264060e 100644
-> --- a/arch/arm/probes/uprobes/core.c
-> +++ b/arch/arm/probes/uprobes/core.c
-> @@ -32,7 +32,7 @@ bool is_swbp_insn(uprobe_opcode_t *insn)
->  int set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm,
->              unsigned long vaddr)
->  {
-> -       return uprobe_write_opcode(mm, vaddr,
-> +       return uprobe_write_opcode(auprobe, mm, vaddr,
->                    __opcode_to_mem_arm(auprobe->bpinsn));
->  }
->
-> diff --git a/arch/mips/kernel/uprobes.c b/arch/mips/kernel/uprobes.c
-> index f7a0645ccb82..4aaff3b3175c 100644
-> --- a/arch/mips/kernel/uprobes.c
-> +++ b/arch/mips/kernel/uprobes.c
-> @@ -224,7 +224,7 @@ unsigned long arch_uretprobe_hijack_return_addr(
->  int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm,
->         unsigned long vaddr)
->  {
-> -       return uprobe_write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
-> +       return uprobe_write_opcode(auprobe, mm, vaddr, UPROBE_SWBP_INSN);
->  }
->
->  void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
-> diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-> index 0a294e950df8..bb9d2084af03 100644
-> --- a/include/linux/uprobes.h
-> +++ b/include/linux/uprobes.h
-> @@ -121,7 +121,7 @@ extern bool is_swbp_insn(uprobe_opcode_t *insn);
->  extern bool is_trap_insn(uprobe_opcode_t *insn);
->  extern unsigned long uprobe_get_swbp_addr(struct pt_regs *regs);
->  extern unsigned long uprobe_get_trap_addr(struct pt_regs *regs);
-> -extern int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr, uprobe_opcode_t);
-> +extern int uprobe_write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr, uprobe_opcode_t);
->  extern int uprobe_register(struct inode *inode, loff_t offset, struct uprobe_consumer *uc);
->  extern int uprobe_apply(struct inode *inode, loff_t offset, struct uprobe_consumer *uc, bool);
->  extern void uprobe_unregister(struct inode *inode, loff_t offset, struct uprobe_consumer *uc);
 > diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-> index 471eac896635..c0418ba52ba8 100644
+> index 61b0481ef417..492a0e005b4d 100644
 > --- a/kernel/events/uprobes.c
 > +++ b/kernel/events/uprobes.c
-> @@ -299,8 +299,8 @@ static int verify_opcode(struct page *page, unsigned long vaddr, uprobe_opcode_t
->   * Called with mm->mmap_sem held for write.
->   * Return 0 (success) or a negative errno.
->   */
-> -int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr,
-> -                       uprobe_opcode_t opcode)
-> +int uprobe_write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm,
-> +                       unsigned long vaddr, uprobe_opcode_t opcode)
->  {
->         struct page *old_page, *new_page;
->         struct vm_area_struct *vma;
-> @@ -351,7 +351,7 @@ int uprobe_write_opcode(struct mm_struct *mm, unsigned long vaddr,
->   */
->  int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr)
->  {
-> -       return uprobe_write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
-> +       return uprobe_write_opcode(auprobe, mm, vaddr, UPROBE_SWBP_INSN);
->  }
->
->  /**
-> @@ -366,7 +366,8 @@ int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned
->  int __weak
->  set_orig_insn(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr)
->  {
-> -       return uprobe_write_opcode(mm, vaddr, *(uprobe_opcode_t *)&auprobe->insn);
-> +       return uprobe_write_opcode(auprobe, mm, vaddr,
-> +                       *(uprobe_opcode_t *)&auprobe->insn);
->  }
->
->  static struct uprobe *get_uprobe(struct uprobe *uprobe)
+> @@ -689,6 +689,12 @@ static struct uprobe *alloc_uprobe(struct inode *inode, loff_t offset,
+>         cur_uprobe = insert_uprobe(uprobe);
+>         /* a uprobe exists for this inode:offset combination */
+>         if (cur_uprobe) {
+> +               if (cur_uprobe->ref_ctr_offset != uprobe->ref_ctr_offset) {
+> +                       pr_warn("Reference counter offset mismatch.\n");
+We should print more information here, including the inode, the offset
+and both ref_ctr_offset.
+
+> +                       put_uprobe(cur_uprobe);
+> +                       kfree(uprobe);
+> +                       return ERR_PTR(-EINVAL);
+> +               }
+>                 kfree(uprobe);
+>                 uprobe = cur_uprobe;
+>         }
+> @@ -1103,6 +1109,9 @@ static int __uprobe_register(struct inode *inode, loff_t offset,
+>         uprobe = alloc_uprobe(inode, offset, ref_ctr_offset);
+>         if (!uprobe)
+>                 return -ENOMEM;
+> +       if (IS_ERR(uprobe))
+> +               return PTR_ERR(uprobe);
+> +
+>         /*
+>          * We can race with uprobe_unregister()->delete_uprobe().
+>          * Check uprobe_is_active() and retry if it is false.
 > --
 > 2.14.4
 >
