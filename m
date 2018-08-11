@@ -1,21 +1,44 @@
-From: shubhrajyoti.datta@gmail.com (Shubhrajyoti Datta)
-Date: Sat, 11 Aug 2018 16:18:54 +0530
-Subject: [PATCH 2/2] dt-bindings: clock: Add bindings for the Clocking
- Wizard IP
-In-Reply-To: <20180801081950.10497-2-boris.brezillon@bootlin.com>
-References: <20180801081950.10497-1-boris.brezillon@bootlin.com>
- <20180801081950.10497-2-boris.brezillon@bootlin.com>
-Message-ID: <CAKfKVtGHwafCtPo2MR-dw-61UYH3A4H3bRZ9ipGuGx5bLBNp3Q@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 11 Aug 2018 13:02:57 +0200
+Subject: [PATCH] ARM: dts: silk: Add DA9063 RTC and OnKey node
+Message-ID: <20180811110257.31690-1-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi  Boris,
+Add DA9063 RTC and OnKey subnode to DA9063 PMIC node on Silk.
 
+Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Cc: Simon Horman <horms+renesas@verge.net.au>
+Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Cc: linux-renesas-soc at vger.kernel.org
+---
+NOTE: Pressing the POWER Switch SW11 triggers KEY_POWER event, which
+      ie. systemd interprets as shutdown command.
+NOTE: The RTC is verified to work with hwclock -w / hwclock -r .
+---
+ arch/arm/boot/dts/r8a7794-silk.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-On Wed, Aug 1, 2018 at 1:49 PM, Boris Brezillon
-<boris.brezillon@bootlin.com> wrote:
-> Document Xilinx Clocking Wizard bindings.
->
-
-Thanks for the patches.
-Are you planning to post another version patching the staging?
+diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
+index 6ea60e1faf75..60e91ebfa65d 100644
+--- a/arch/arm/boot/dts/r8a7794-silk.dts
++++ b/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -416,6 +416,14 @@
+ 		interrupts = <31 IRQ_TYPE_LEVEL_LOW>;
+ 		interrupt-controller;
+ 
++		onkey {
++			compatible = "dlg,da9063-onkey";
++		};
++
++		rtc {
++			compatible = "dlg,da9063-rtc";
++		};
++
+ 		wdt {
+ 			compatible = "dlg,da9063-watchdog";
+ 		};
+-- 
+2.16.2
