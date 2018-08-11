@@ -1,72 +1,56 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Sat, 11 Aug 2018 12:35:47 +0800
-Subject: [PATCH RESEND v3] arm64: clean the additional checks before calling
- ghes_notify_sea()
-Message-ID: <20180811043547.560-1-gengdongjiu@huawei.com>
+From: gshark.jeong@gmail.com (Daniel Jeong)
+Date: Sat, 11 Aug 2018 15:10:14 +0900
+Subject: [PATCH v2] media: i2c: lm3560: use conservative defaults
+In-Reply-To: <20180716090814.GA4505@amd>
+References: <20180506080250.GA24114@amd> <20180716090814.GA4505@amd>
+Message-ID: <3a9ece34-baad-a19d-c3bd-96aa458ea70b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to remove the additional check before calling the
-ghes_notify_sea(), make stub definition when !CONFIG_ACPI_APEI_SEA.
+Hi Pavel,
 
-After this cleanup, we can simply call the ghes_notify_sea() to let
-APEI driver handle the SEA notification.
+I think if there is not exist pdata, it should be set to the value of power on reset (POR) to sync with the chip.
 
-CC: Tyler Baicar <tbaicar@codeaurora.org>
-CC: James Morse <james.morse@arm.com>
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Reviewed-by: Tyler Baicar <baicar.tyler@gmail.com>
----
-This cleanup is ever mentioned by Mark Rutland in [1]
+According to the LM3560 datasheet, Flash Timeout is 512ms, Flash current is 875mA and Torch Current is 93.75mA.
 
-[1]:
-https://lkml.org/lkml/2018/5/31/289
+Daniel Jeong.
 
-change since v2:
-1. Add 'Reviewed-by' of Tyler
+On 07/016/2018 18:08 PM, Pavel Machek wrote:
 
-change since v1:
-1. Update the commit messages
-2. CC Tyler and James
-3. Add 'Acked-by' of Will
----
- arch/arm64/mm/fault.c | 7 +------
- include/acpi/ghes.h   | 4 ++++
- 2 files changed, 5 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index b8eecc7..9ffe01d 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -727,12 +727,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
- 
- int handle_guest_sea(phys_addr_t addr, unsigned int esr)
- {
--	int ret = -ENOENT;
--
--	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA))
--		ret = ghes_notify_sea();
--
--	return ret;
-+	return ghes_notify_sea();
- }
- 
- asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
-diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-index 1624e2b..82cb4eb 100644
---- a/include/acpi/ghes.h
-+++ b/include/acpi/ghes.h
-@@ -118,6 +118,10 @@ static inline void *acpi_hest_get_next(struct acpi_hest_generic_data *gdata)
- 	     (void *)section - (void *)(estatus + 1) < estatus->data_length; \
- 	     section = acpi_hest_get_next(section))
- 
-+#ifdef CONFIG_ACPI_APEI_SEA
- int ghes_notify_sea(void);
-+#else
-+static inline int ghes_notify_sea(void) { return -ENOENT; }
-+#endif
- 
- #endif /* GHES_H */
--- 
-1.9.1
+> If no pdata is found, we should use lowest current settings, not highest.
+>
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+>
+> ---
+>
+> v2: I got notification from patchwork that patch no longer applies, so
+> I'm rediffing the patch.
+>
+> diff --git a/drivers/media/i2c/lm3560.c b/drivers/media/i2c/lm3560.c
+> index b600e03a..c4e5ed5 100644
+> --- a/drivers/media/i2c/lm3560.c
+> +++ b/drivers/media/i2c/lm3560.c
+> @@ -420,14 +434,14 @@ static int lm3560_probe(struct i2c_client *client,
+>   		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
+>   		if (pdata == NULL)
+>   			return -ENODEV;
+> -		pdata->peak = LM3560_PEAK_3600mA;
+> -		pdata->max_flash_timeout = LM3560_FLASH_TOUT_MAX;
+> +		pdata->peak = LM3560_PEAK_1600mA;
+> +		pdata->max_flash_timeout = LM3560_FLASH_TOUT_MIN;
+>   		/* led 1 */
+> -		pdata->max_flash_brt[LM3560_LED0] = LM3560_FLASH_BRT_MAX;
+> -		pdata->max_torch_brt[LM3560_LED0] = LM3560_TORCH_BRT_MAX;
+> +		pdata->max_flash_brt[LM3560_LED0] = LM3560_FLASH_BRT_MIN;
+> +		pdata->max_torch_brt[LM3560_LED0] = LM3560_TORCH_BRT_MIN;
+>   		/* led 2 */
+> -		pdata->max_flash_brt[LM3560_LED1] = LM3560_FLASH_BRT_MAX;
+> -		pdata->max_torch_brt[LM3560_LED1] = LM3560_TORCH_BRT_MAX;
+> +		pdata->max_flash_brt[LM3560_LED1] = LM3560_FLASH_BRT_MIN;
+> +		pdata->max_torch_brt[LM3560_LED1] = LM3560_TORCH_BRT_MIN;
+>   	}
+>   	flash->pdata = pdata;
+>   	flash->dev = &client->dev;
+>
+>
+>
