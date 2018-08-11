@@ -1,77 +1,83 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 11 Aug 2018 15:58:31 +0200
-Subject: [PATCH] ARM: spectre-v2: Try to set IBE bit for Cortex-A15 and
- Brahma-B15
-In-Reply-To: <20180607225804.28771-1-f.fainelli@gmail.com>
-References: <20180607225804.28771-1-f.fainelli@gmail.com>
-Message-ID: <e4db9ef9-398f-114a-b5a8-8d8de0b0f85e@gmail.com>
+From: angelo@sysam.it (Angelo Dureghello)
+Date: Sat, 11 Aug 2018 13:26:48 +0200
+Subject: [PATCH v9 3/4] dmaengine: fsl-edma: fix macros
+In-Reply-To: <20180811112649.20752-1-angelo@sysam.it>
+References: <20180811112649.20752-1-angelo@sysam.it>
+Message-ID: <20180811112649.20752-3-angelo@sysam.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2018 12:58 AM, Florian Fainelli wrote:
-> Per the ARM reference manual for the Cortex-A15, The ACTLR:
-> 
->  Is a read/write register.
-> 
->  Common to the Secure and Non-secure states.
-> 
->  Is only accessible from PL1 or higher, with access rights that depend
->  on the mode:
-> 
->     * Read/write in Secure PL1 modes.
-> 
->     * Read-only and write-ignored in Non-secure PL1 and PL2 modes
->       if NSACR.NS_SMP is 0.
-> 
->     * Read/write in Non-secure PL1 and PL2 modes if NSACR.NS_SMP
->       is 1. In this case, all bits are write-ignored except for the SMP bit.
-> 
-> We can attempt to set this bit from within the kernel, which helps
-> avoiding firmware side modifications to set the IBE bit when that is
-> impractical. We do this within __v7_ca15mp_setup and __v7_b15mp_setup
-> because by then we already took those labels because the processors we
-> run on do match.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+This patch fixes macros to use BIT() and GENMASK(), removing
+also some unneeded.
 
-I believe this would help on selected R-Car Gen2 SoCs which have CA15
-cores. Those cores are released from reset by Linux directly and jump to
-the reset vector set up by Linux in Secure mode.
+Signed-off-by: Angelo Dureghello <angelo@sysam.it>
+---
+Changes for v9:
+- this patch (3/4) has just been added.
+---
+ drivers/dma/fsl-edma-common.h | 50 +++++++++++++++--------------------
+ 1 file changed, 22 insertions(+), 28 deletions(-)
 
-I was looking for a generic solution after discussing how to mitigate
-the spectrev2 on such SoCs with Catalin on IRC and this seems to be one
-option. There was also a suggestion that Russell is working on some sort
-of generic solution too. Can you comment on that please ?
-
-> ---
->  arch/arm/mm/proc-v7.S | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 6fe52819e014..a21cf3729efa 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -284,10 +284,16 @@ __v7_cr8mp_setup:
->  	b	1f
->  __v7_ca7mp_setup:
->  __v7_ca12mp_setup:
-> +	b	2f
->  __v7_ca15mp_setup:
->  __v7_b15mp_setup:
-> +#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
-> +	mrc	p15, 0, r0, c1, c0, 1
-> +	orr	r0, r0, #1			@ Enable IBE bit
-> +	mcr	p15, 0, r0, c1, c0, 1
-> +#endif
->  __v7_ca17mp_setup:
-> -	mov	r10, #0
-> +2:	mov	r10, #0
->  1:	adr	r0, __v7_setup_stack_ptr
->  	ldr	r12, [r0]
->  	add	r12, r12, r0			@ the local stack
-> 
-
-
+diff --git a/drivers/dma/fsl-edma-common.h b/drivers/dma/fsl-edma-common.h
+index b2ee89ea895a..a6f5b99ee95f 100644
+--- a/drivers/dma/fsl-edma-common.h
++++ b/drivers/dma/fsl-edma-common.h
+@@ -18,34 +18,28 @@
+ #define EDMA_CR_ECX		BIT(16)
+ #define EDMA_CR_CX		BIT(17)
+ 
+-#define EDMA_SEEI_SEEI(x)	((x) & 0x1F)
+-#define EDMA_CEEI_CEEI(x)	((x) & 0x1F)
+-#define EDMA_CINT_CINT(x)	((x) & 0x1F)
+-#define EDMA_CERR_CERR(x)	((x) & 0x1F)
+-
+-#define EDMA_TCD_ATTR_DSIZE(x)		(((x) & 0x0007))
+-#define EDMA_TCD_ATTR_DMOD(x)		(((x) & 0x001F) << 3)
+-#define EDMA_TCD_ATTR_SSIZE(x)		(((x) & 0x0007) << 8)
+-#define EDMA_TCD_ATTR_SMOD(x)		(((x) & 0x001F) << 11)
+-#define EDMA_TCD_ATTR_SSIZE_8BIT	(0x0000)
+-#define EDMA_TCD_ATTR_SSIZE_16BIT	(0x0100)
+-#define EDMA_TCD_ATTR_SSIZE_32BIT	(0x0200)
+-#define EDMA_TCD_ATTR_SSIZE_64BIT	(0x0300)
+-#define EDMA_TCD_ATTR_SSIZE_32BYTE	(0x0500)
+-#define EDMA_TCD_ATTR_DSIZE_8BIT	(0x0000)
+-#define EDMA_TCD_ATTR_DSIZE_16BIT	(0x0001)
+-#define EDMA_TCD_ATTR_DSIZE_32BIT	(0x0002)
+-#define EDMA_TCD_ATTR_DSIZE_64BIT	(0x0003)
+-#define EDMA_TCD_ATTR_DSIZE_32BYTE	(0x0005)
+-
+-#define EDMA_TCD_SOFF_SOFF(x)		(x)
+-#define EDMA_TCD_NBYTES_NBYTES(x)	(x)
+-#define EDMA_TCD_SLAST_SLAST(x)		(x)
+-#define EDMA_TCD_DADDR_DADDR(x)		(x)
+-#define EDMA_TCD_CITER_CITER(x)		((x) & 0x7FFF)
+-#define EDMA_TCD_DOFF_DOFF(x)		(x)
+-#define EDMA_TCD_DLAST_SGA_DLAST_SGA(x)	(x)
+-#define EDMA_TCD_BITER_BITER(x)		((x) & 0x7FFF)
++#define EDMA_SEEI_SEEI(x)	((x) & GENMASK(4, 0))
++#define EDMA_CEEI_CEEI(x)	((x) & GENMASK(4, 0))
++#define EDMA_CINT_CINT(x)	((x) & GENMASK(4, 0))
++#define EDMA_CERR_CERR(x)	((x) & GENMASK(4, 0))
++
++#define EDMA_TCD_ATTR_DSIZE(x)		(((x) & GENMASK(2, 0)))
++#define EDMA_TCD_ATTR_DMOD(x)		(((x) & GENMASK(4, 0)) << 3)
++#define EDMA_TCD_ATTR_SSIZE(x)		(((x) & GENMASK(2, 0)) << 8)
++#define EDMA_TCD_ATTR_SMOD(x)		(((x) & GENMASK(4, 0)) << 11)
++#define EDMA_TCD_ATTR_DSIZE_8BIT	0
++#define EDMA_TCD_ATTR_DSIZE_16BIT	BIT(0)
++#define EDMA_TCD_ATTR_DSIZE_32BIT	BIT(1)
++#define EDMA_TCD_ATTR_DSIZE_64BIT	(BIT(0) | BIT(1))
++#define EDMA_TCD_ATTR_DSIZE_32BYTE	(BIT(3) | BIT(0))
++#define EDMA_TCD_ATTR_SSIZE_8BIT	0
++#define EDMA_TCD_ATTR_SSIZE_16BIT	(EDMA_TCD_ATTR_DSIZE_16BIT << 8)
++#define EDMA_TCD_ATTR_SSIZE_32BIT	(EDMA_TCD_ATTR_DSIZE_32BIT << 8)
++#define EDMA_TCD_ATTR_SSIZE_64BIT	(EDMA_TCD_ATTR_DSIZE_64BIT << 8)
++#define EDMA_TCD_ATTR_SSIZE_32BYTE	(EDMA_TCD_ATTR_DSIZE_32BYTE << 8)
++
++#define EDMA_TCD_CITER_CITER(x)		((x) & GENMASK(14, 0))
++#define EDMA_TCD_BITER_BITER(x)		((x) & GENMASK(14, 0))
+ 
+ #define EDMA_TCD_CSR_START		BIT(0)
+ #define EDMA_TCD_CSR_INT_MAJOR		BIT(1)
 -- 
-Best regards,
-Marek Vasut
+2.18.0
