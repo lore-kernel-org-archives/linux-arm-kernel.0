@@ -1,80 +1,36 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 11 Aug 2018 13:03:37 +0200
-Subject: [PATCH V2] ARM: dts: silk: Add DA9063 PMIC node
-In-Reply-To: <20180810115727.r4iqqrkujzhih4vo@verge.net.au>
-References: <20180804163818.23360-1-marek.vasut+renesas@gmail.com>
- <CAMuHMdU8=pb1V9gPxTe6JX5waXr0aRg5PW6t_bDY2fij0PVr5A@mail.gmail.com>
- <20180810115727.r4iqqrkujzhih4vo@verge.net.au>
-Message-ID: <afeac488-bb6e-3675-f621-14c7df7cee4a@gmail.com>
+Date: Sat, 11 Aug 2018 13:25:10 +0200
+Subject: [PATCH] ARM: dts: stout: Add DA9063 OnKey node
+Message-ID: <20180811112510.18299-1-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2018 01:57 PM, Simon Horman wrote:
-> On Tue, Aug 07, 2018 at 10:16:16AM +0200, Geert Uytterhoeven wrote:
->> Hi Marek,
->>
->> On Sat, Aug 4, 2018 at 6:38 PM Marek Vasut <marek.vasut@gmail.com> wrote:
->>> Add DA9063 PMIC node to the I2C bus.
->>>
->>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
->>> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
->>> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->>> Cc: Simon Horman <horms+renesas@verge.net.au>
->>> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
->>> Cc: linux-renesas-soc at vger.kernel.org
->>> ---
->>> V2: - Replace shmobile with dts since it's a DT patch in subject
->>>     - Connect the 9063_IRQ# line to GP3_31
->>>     - Since the DA9063 is connected to both i2c1 and i2c7, connect
->>>       it to i2c7, which is the dedicated dvfs i2c.
->>
->> Thanks for the update!
->>
->>> --- a/arch/arm/boot/dts/r8a7794-silk.dts
->>> +++ b/arch/arm/boot/dts/r8a7794-silk.dts
->>> @@ -405,6 +405,23 @@
->>>         clock-frequency = <400000>;
->>>  };
->>>
->>> +&i2c7 {
->>> +       status = "okay";
->>> +       clock-frequency = <100000>;
->>> +
->>> +       pmic at 58 {
->>> +               compatible = "dlg,da9063";
->>> +               reg = <0x58>;
->>> +               interrupt-parent = <&gpio3>;
->>> +               interrupts = <31 IRQ_TYPE_LEVEL_LOW>;
->>> +               interrupt-controller;
->>> +
->>> +               wdt {
->>> +                       compatible = "dlg,da9063-watchdog";
->>> +               };
->>
->> Given Silk has the full da9063 (unlike the "L" version on Porter), shouldn't
->> you add an rtc subnode?
->>
->> Oh, Silk also has the onkey pin wired, so perhaps you want to add an onkey
->> subnode, too? Does that feature work?
->>
->> BTW, Stout also has the onkey wired, but lacks the onkey subnode.
->>
->>> +       };
->>> +};
->>> +
->>
->> Nevertheless:
->> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> Thanks, I have applied this patch for v4.20.
-> 
-> Marek,
-> 
-> please consider some follow-up patches to address the issues
-> raised by Geert.
+Add DA9063 OnKey subnode to DA9063 PMIC node on Stout.
 
-Thanks for the reminder, I missed the email. Patch is out.
+Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Cc: Simon Horman <horms+renesas@verge.net.au>
+Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Cc: linux-renesas-soc at vger.kernel.org
+---
+ arch/arm/boot/dts/r8a7790-stout.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
+diff --git a/arch/arm/boot/dts/r8a7790-stout.dts b/arch/arm/boot/dts/r8a7790-stout.dts
+index a13a92c26645..629da4cee1b9 100644
+--- a/arch/arm/boot/dts/r8a7790-stout.dts
++++ b/arch/arm/boot/dts/r8a7790-stout.dts
+@@ -318,6 +318,10 @@
+ 		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
+ 		interrupt-controller;
+ 
++		onkey {
++			compatible = "dlg,da9063-onkey";
++		};
++
+ 		rtc {
+ 			compatible = "dlg,da9063-rtc";
+ 		};
 -- 
-Best regards,
-Marek Vasut
+2.16.2
