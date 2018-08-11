@@ -1,44 +1,72 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 11 Aug 2018 11:16:13 +0900
-Subject: [PATCH v2] pinctrl: uniphier: drop meaningless pin from SD1 pin-mux
- of Pro4
-Message-ID: <1533953773-29424-1-git-send-email-yamada.masahiro@socionext.com>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Sat, 11 Aug 2018 12:35:47 +0800
+Subject: [PATCH RESEND v3] arm64: clean the additional checks before calling
+ ghes_notify_sea()
+Message-ID: <20180811043547.560-1-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pin 327 was supposed to be used as a voltage control line for the
-SD card regulator, but the SD card port1 does not support UHS-I.  It
-only supports 3.3V signaling, hence this pin is pointless.
+In order to remove the additional check before calling the
+ghes_notify_sea(), make stub definition when !CONFIG_ACPI_APEI_SEA.
 
-Just a note about the background.  At first, hardware engineers tried
-to implement the UHS for this port.  Then, they needed to shrink the
-silicon die size, and gave up the UHS, but forgot to remove the pin
-assignment.
+After this cleanup, we can simply call the ghes_notify_sea() to let
+APEI driver handle the SEA notification.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+CC: Tyler Baicar <tbaicar@codeaurora.org>
+CC: James Morse <james.morse@arm.com>
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Tyler Baicar <baicar.tyler@gmail.com>
 ---
+This cleanup is ever mentioned by Mark Rutland in [1]
 
-Changes in v2:
- - rebase onto linux-pinctrl/devel branch
+[1]:
+https://lkml.org/lkml/2018/5/31/289
 
- drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+change since v2:
+1. Add 'Reviewed-by' of Tyler
 
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-index 89148f8..6fca8d5 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-@@ -1047,9 +1047,8 @@ static const unsigned nand_cs1_pins[] = {131, 132};
- static const int nand_cs1_muxvals[] = {1, 1};
- static const unsigned sd_pins[] = {150, 151, 152, 153, 154, 155, 156, 157, 158};
- static const int sd_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
--static const unsigned sd1_pins[] = {319, 320, 321, 322, 323, 324, 325, 326,
--				    327};
--static const int sd1_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-+static const unsigned int sd1_pins[] = {319, 320, 321, 322, 323, 324, 325, 326};
-+static const int sd1_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0};
- static const unsigned spi0_pins[] = {199, 200, 201, 202};
- static const int spi0_muxvals[] = {11, 11, 11, 11};
- static const unsigned spi1_pins[] = {195, 196, 197, 198, 235, 238, 239};
+change since v1:
+1. Update the commit messages
+2. CC Tyler and James
+3. Add 'Acked-by' of Will
+---
+ arch/arm64/mm/fault.c | 7 +------
+ include/acpi/ghes.h   | 4 ++++
+ 2 files changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index b8eecc7..9ffe01d 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -727,12 +727,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+ 
+ int handle_guest_sea(phys_addr_t addr, unsigned int esr)
+ {
+-	int ret = -ENOENT;
+-
+-	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA))
+-		ret = ghes_notify_sea();
+-
+-	return ret;
++	return ghes_notify_sea();
+ }
+ 
+ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+index 1624e2b..82cb4eb 100644
+--- a/include/acpi/ghes.h
++++ b/include/acpi/ghes.h
+@@ -118,6 +118,10 @@ static inline void *acpi_hest_get_next(struct acpi_hest_generic_data *gdata)
+ 	     (void *)section - (void *)(estatus + 1) < estatus->data_length; \
+ 	     section = acpi_hest_get_next(section))
+ 
++#ifdef CONFIG_ACPI_APEI_SEA
+ int ghes_notify_sea(void);
++#else
++static inline int ghes_notify_sea(void) { return -ENOENT; }
++#endif
+ 
+ #endif /* GHES_H */
 -- 
-2.7.4
+1.9.1
