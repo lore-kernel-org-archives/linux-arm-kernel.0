@@ -1,36 +1,42 @@
-From: liu.song.a23@gmail.com (Song Liu)
-Date: Fri, 10 Aug 2018 23:14:01 -0700
-Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180810155813.49259913@gandalf.local.home>
-References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
- <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
- <20180809143827.GC22636@redhat.com>
- <20180810155813.49259913@gandalf.local.home>
-Message-ID: <CAPhsuW4ymZAxLdDOAz-rKkyb_POA3ibNW7+2G3BE5Mxtntyqsg@mail.gmail.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Sat, 11 Aug 2018 12:09:31 +0530
+Subject: [PATCH 1/4] ARM: dts: exynos: Add missing used PMIC regulators on
+ Exynos5422 Odroid boards
+In-Reply-To: <20180806160933.6578-1-krzk@kernel.org>
+References: <20180806160933.6578-1-krzk@kernel.org>
+Message-ID: <CANAwSgTYviRnLjVU50w_o5k6=iMjxqU5qQ+7RW9K43KrrqRKPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2018 at 12:58 PM, Steven Rostedt <rostedt@goodmis.org> wrote:
-> On Thu, 9 Aug 2018 16:38:28 +0200
-> Oleg Nesterov <oleg@redhat.com> wrote:
->
->> I need to read this (hopefully final) version carefully. I'll try to do
->> this before next Monday.
->>
->
-> Monday may be the opening of the merge window (more likely Sunday). Do
-> you think this is good enough for pushing it in this late in the game,
-> or do you think we should wait another cycle?
->
-> -- Steve
+Hi Krzysztof,
 
-We (Facebook) have use cases in production that would benefit from this work, so
-I would rather see this gets in sooner than later. After a brief
-review (I will more
-careful review before Monday), I think this set is not likely to break
-existing uprobes
-(those w/o ref_ctr). Therefore, I think it is safe to put it in this cycle.
+These patches should also be ported to u-boot to enable PMIC.
 
-Thanks,
-Song
+I was just looking into S2MPS11B data sheet
+According to the 1.2 Key Features of  S2MPS11
+
+BUCK1, BUCK2, BUCK3, BUCK4, BUCK6 have (0.65 V to 1.6 V) min /max range.
+BUCK5 have (0.65 V to 2.0 V) min /max range.
+BUCK7 have (1.2 V to 1.5 V) min / max range.
+BUCK8 have (1.8 V to 2.1 V) min / max range.
+BUCK10 have (0.75 V to 1.4 V) min / max range.
+
+BUCKBOST9 (3.0 V to 3.75 V) min / max range.
+
+LDO1, LDO6, LDO11, LDO22, LDO23, LDO27, LDO35 (0.8 V to 2.375 V) min / max range
+
+LDO2, LDO3, LDO5, LDO7, LDO9, LDO10, LD012, LDO13, LDO14, LDO15,
+LDO16, LDO17, LDO18, LDO19, LDO20, LD021, LDO24, LDO25, LDO26,
+LDO28, LDO29, LDO30, LDO31, LDO32, LDO33, LDO34, LDO36, LDO37, LDO38
+(0.8 V to 3.95 V) min / max range
+
+I am aware off we have configures the min/max range as per board schematics.
+but each regulator support dynamic voltage scale and have different
+turn on/off voltage and current rating.
+
+So why are we not setting the regulator-min-microvolt /
+regulator-max-microvolt as per datasheets.
+Please correct me if I am wrong.
+
+Best Regards
+-Anand
