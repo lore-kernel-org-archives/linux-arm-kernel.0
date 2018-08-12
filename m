@@ -1,22 +1,23 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Sun, 12 Aug 2018 09:23:07 +0800
-Subject: [PATCH 2/2] arm64: dts: sdm845: Add gpu and gmu device nodes
-In-Reply-To: <20180808224701.7527-3-jcrouse@codeaurora.org>
-References: <20180808224701.7527-3-jcrouse@codeaurora.org>
-Message-ID: <201808120903.eouXQvf0%fengguang.wu@intel.com>
+Date: Sun, 12 Aug 2018 10:11:49 +0800
+Subject: [PATCH] arm64: dts: sdm630 SoC and Sony Pioneer (Xperia XA2)
+ support
+In-Reply-To: <20180811162549.12312-1-ctatlor97@gmail.com>
+References: <20180811162549.12312-1-ctatlor97@gmail.com>
+Message-ID: <201808120959.98WQBsJj%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jordan,
+Hi Craig,
 
 Thank you for the patch! Yet something to improve:
 
-[auto build test ERROR on robclark/msm-next]
+[auto build test ERROR on agross/for-next]
 [also build test ERROR on v4.18-rc8 next-20180810]
 [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/Jordan-Crouse/arm64-dts-Add-sdm845-GPU-GMU-and-SMMU/20180811-082810
-base:   git://people.freedesktop.org/~robclark/linux msm-next
+url:    https://github.com/0day-ci/linux/commits/Craig-Tatlor/arm64-dts-sdm630-SoC-and-Sony-Pioneer-Xperia-XA2-support/20180812-061913
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git for-next
 config: arm64-defconfig (attached as .config)
 compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
 reproduce:
@@ -27,8 +28,19 @@ reproduce:
 
 All errors (new ones prefixed by >>):
 
->> Error: arch/arm64/boot/dts/qcom/sdm845.dtsi:342.25-26 syntax error
-   FATAL ERROR: Unable to parse input tree
+   In file included from arch/arm64/boot/dts/qcom/sdm630-pioneer.dtsi:4:0,
+                    from arch/arm64/boot/dts/qcom/sdm630-pioneer.dts:6:
+>> arch/arm64/boot/dts/qcom/sdm630.dtsi:5:10: fatal error: dt-bindings/clock/qcom,gcc-sdm660.h: No such file or directory
+    #include <dt-bindings/clock/qcom,gcc-sdm660.h>
+             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   compilation terminated.
+
+vim +5 arch/arm64/boot/dts/qcom/sdm630.dtsi
+
+     3	
+     4	#include <dt-bindings/interrupt-controller/arm-gic.h>
+   > 5	#include <dt-bindings/clock/qcom,gcc-sdm660.h>
+     6	
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -37,6 +49,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 38795 bytes
+Size: 38888 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180812/a4aafbe1/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180812/0c16cf00/attachment-0001.gz>
