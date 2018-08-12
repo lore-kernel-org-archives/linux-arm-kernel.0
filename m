@@ -1,52 +1,35 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 12 Aug 2018 15:06:44 +0800
-Subject: [PATCH 2/3] arm64: dts: qcom: sdm845-mtp: Add RPMh VRM/XOB
- regulators
-In-Reply-To: <20180810215150.82490-3-dianders@chromium.org>
-References: <20180810215150.82490-3-dianders@chromium.org>
-Message-ID: <201808121444.cbLObD3h%fengguang.wu@intel.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Sun, 12 Aug 2018 11:43:17 +0200
+Subject: [PATCH RESEND v3] arm64: clean the additional checks before
+ calling ghes_notify_sea()
+In-Reply-To: <20180811043547.560-1-gengdongjiu@huawei.com>
+References: <20180811043547.560-1-gengdongjiu@huawei.com>
+Message-ID: <CAJZ5v0j=2-h8YggK8w6qjn9qKrDX8jAJ87Axox8LBdnn95Xkvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Douglas,
+On Sat, Aug 11, 2018 at 6:36 AM Dongjiu Geng <gengdongjiu@huawei.com> wrote:
+>
+> In order to remove the additional check before calling the
+> ghes_notify_sea(), make stub definition when !CONFIG_ACPI_APEI_SEA.
+>
+> After this cleanup, we can simply call the ghes_notify_sea() to let
+> APEI driver handle the SEA notification.
+>
+> CC: Tyler Baicar <tbaicar@codeaurora.org>
+> CC: James Morse <james.morse@arm.com>
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Reviewed-by: Tyler Baicar <baicar.tyler@gmail.com>
+> ---
+> This cleanup is ever mentioned by Mark Rutland in [1]
+>
+> [1]:
+> https://lkml.org/lkml/2018/5/31/289
+>
+> change since v2:
+> 1. Add 'Reviewed-by' of Tyler
 
-Thank you for the patch! Yet something to improve:
+I have applied the v2 already.
 
-[auto build test ERROR on agross/for-next]
-[cannot apply to v4.18-rc8 next-20180810]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Douglas-Anderson/arm64-dts-sdm845-Add-RPMh-regulators-and-usb/20180811-164836
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git for-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
-
-All errors (new ones prefixed by >>):
-
->> arch/arm64/boot/dts/qcom/sdm845-mtp.dts:10:10: fatal error: dt-bindings/regulator/qcom,rpmh-regulator.h: No such file or directory
-    #include <dt-bindings/regulator/qcom,rpmh-regulator.h>
-             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   compilation terminated.
-
-vim +10 arch/arm64/boot/dts/qcom/sdm845-mtp.dts
-
-     9	
-  > 10	#include <dt-bindings/regulator/qcom,rpmh-regulator.h>
-    11	#include "sdm845.dtsi"
-    12	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 38888 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180812/c4fd4724/attachment-0001.gz>
+Thanks!
