@@ -1,42 +1,46 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 12 Aug 2018 15:24:35 +0200
-Subject: [PATCH v9 4/4] dmaengine: fsl-edma: add ColdFire mcf5441x edma
- support
-In-Reply-To: <20180811112649.20752-4-angelo@sysam.it>
-References: <20180811112649.20752-1-angelo@sysam.it>
- <20180811112649.20752-4-angelo@sysam.it>
-Message-ID: <CAJKOXPeb9pYssvhYFnRMTn4r8vK4AtR8TQCR45po9=0491z44g@mail.gmail.com>
+Date: Sun, 12 Aug 2018 15:25:53 +0200
+Subject: [PATCH 1/4] ARM: dts: exynos: Add missing used PMIC regulators on
+ Exynos5422 Odroid boards
+In-Reply-To: <CANAwSgTYviRnLjVU50w_o5k6=iMjxqU5qQ+7RW9K43KrrqRKPA@mail.gmail.com>
+References: <20180806160933.6578-1-krzk@kernel.org>
+ <CANAwSgTYviRnLjVU50w_o5k6=iMjxqU5qQ+7RW9K43KrrqRKPA@mail.gmail.com>
+Message-ID: <CAJKOXPds5s8omeR7UOB4u4HrYCZBTJX3t4YU4PSWBGb-9MG7iw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 August 2018 at 13:26, Angelo Dureghello <angelo@sysam.it> wrote:
-> This patch adds support for ColdFire mcf5441x-family edma
-> module.
+On 11 August 2018 at 08:39, Anand Moon <linux.amoon@gmail.com> wrote:
+> Hi Krzysztof,
 >
-> The ColdFire edma module is slightly different from fsl-edma,
-> so a new driver is added. But most of the code is common
-> between fsl-edma and mcf-edma so it has been collected into a
-> separate common module fsl-edma-common (patch 1/3).
+> These patches should also be ported to u-boot to enable PMIC.
 >
-> Signed-off-by: Angelo Dureghello <angelo@sysam.it>
-> ---
-> Changes for v8:
-> - patch rewritten from scratch, this patch (3/3) has just been added.
+> I was just looking into S2MPS11B data sheet
+> According to the 1.2 Key Features of  S2MPS11
 >
-> Changes for v9:
-> - add compile test for Kconfig,
-> - fix include guard.
-> ---
->  drivers/dma/Kconfig                        |  11 +
->  drivers/dma/Makefile                       |   1 +
->  drivers/dma/fsl-edma-common.c              |  24 +-
->  drivers/dma/mcf-edma.c                     | 315 +++++++++++++++++++++
->  include/linux/platform_data/dma-mcf-edma.h |  38 +++
->  5 files changed, 385 insertions(+), 4 deletions(-)
->  create mode 100644 drivers/dma/mcf-edma.c
->  create mode 100644 include/linux/platform_data/dma-mcf-edma.h
+> BUCK1, BUCK2, BUCK3, BUCK4, BUCK6 have (0.65 V to 1.6 V) min /max range.
+> BUCK5 have (0.65 V to 2.0 V) min /max range.
+> BUCK7 have (1.2 V to 1.5 V) min / max range.
+> BUCK8 have (1.8 V to 2.1 V) min / max range.
+> BUCK10 have (0.75 V to 1.4 V) min / max range.
+>
+> BUCKBOST9 (3.0 V to 3.75 V) min / max range.
+>
+> LDO1, LDO6, LDO11, LDO22, LDO23, LDO27, LDO35 (0.8 V to 2.375 V) min / max range
+>
+> LDO2, LDO3, LDO5, LDO7, LDO9, LDO10, LD012, LDO13, LDO14, LDO15,
+> LDO16, LDO17, LDO18, LDO19, LDO20, LD021, LDO24, LDO25, LDO26,
+> LDO28, LDO29, LDO30, LDO31, LDO32, LDO33, LDO34, LDO36, LDO37, LDO38
+> (0.8 V to 3.95 V) min / max range
+>
+> I am aware off we have configures the min/max range as per board schematics.
+> but each regulator support dynamic voltage scale and have different
+> turn on/off voltage and current rating.
+>
+> So why are we not setting the regulator-min-microvolt /
+> regulator-max-microvolt as per datasheets.
+> Please correct me if I am wrong.
 
-Here and in other patches I already gave you my Tested-by tags...
+Which regulators are not configured as in datasheet?
 
 Best regards,
 Krzysztof
