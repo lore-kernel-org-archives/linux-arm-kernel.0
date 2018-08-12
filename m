@@ -1,36 +1,42 @@
-From: stefan@datenfreihafen.org (Stefan Schmidt)
-Date: Sat, 11 Aug 2018 20:30:29 +0200
-Subject: [RFC net-next 00/15] net: A socket API for LoRa
-In-Reply-To: <20180810165711.59bf26f7@alans-desktop>
-References: <20180701110804.32415-1-afaerber@suse.de>
- <CAC=mGzgUCopz2xTOA0R-WD8a1DOaOOUn=YpfdMiJ33y3hnh6kg@mail.gmail.com>
- <92ee4016-1da9-826b-3674-b2d604a64848@suse.de>
- <20180808213640.10a1d76f@alans-desktop>
- <a70e9715-beac-d9a8-145e-de00175e56fa@suse.de>
- <20180809125939.39ac2cc9@alans-desktop>
- <CAC=mGzjn4Kc-q9NFwX6NhU4V_thnzBP8SHtFQKyRbpSKR=yx3w@mail.gmail.com>
- <20180810165711.59bf26f7@alans-desktop>
-Message-ID: <e703bd38-f45d-6dda-b0e3-404598fd4bab@datenfreihafen.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 12 Aug 2018 09:23:07 +0800
+Subject: [PATCH 2/2] arm64: dts: sdm845: Add gpu and gmu device nodes
+In-Reply-To: <20180808224701.7527-3-jcrouse@codeaurora.org>
+References: <20180808224701.7527-3-jcrouse@codeaurora.org>
+Message-ID: <201808120903.eouXQvf0%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Jordan,
 
-On 08/10/2018 05:57 PM, Alan Cox wrote:
-> 
-> Long term yes I think Alexander is right the inevitable fate of all
-> networks is to become a link layer in order to transmit IP frames 8)
+Thank you for the patch! Yet something to improve:
 
-There should be a niche for both at the same time. LoRaWAN is relevant
-right now and we should aim for making it possible to run a native Linux
-gateway for it.
+[auto build test ERROR on robclark/msm-next]
+[also build test ERROR on v4.18-rc8 next-20180810]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-As for IP for long range low power there is the static context header
-compression draft to adapt IPv6 to the characteristics for some use
-cases of such networks. Implementing it within the existing 6lwopan
-subsystem should be possible.
+url:    https://github.com/0day-ci/linux/commits/Jordan-Crouse/arm64-dts-Add-sdm845-GPU-GMU-and-SMMU/20180811-082810
+base:   git://people.freedesktop.org/~robclark/linux msm-next
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
 
-https://tools.ietf.org/html/draft-ietf-lpwan-ipv6-static-context-hc-16
+All errors (new ones prefixed by >>):
 
-regards
-Stefan Schmidt
+>> Error: arch/arm64/boot/dts/qcom/sdm845.dtsi:342.25-26 syntax error
+   FATAL ERROR: Unable to parse input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 38795 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180812/a4aafbe1/attachment-0001.gz>
