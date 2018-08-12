@@ -1,47 +1,76 @@
 From: pn@denx.de (Parthiban Nallathambi)
-Date: Sun, 12 Aug 2018 14:22:15 +0200
-Subject: [PATCH v2 3/3] arm64: dts: actions: Add sirq node for Actions Semi
- S700
+Date: Sun, 12 Aug 2018 14:22:13 +0200
+Subject: [PATCH v2 1/3] dt-bindings: interrupt-controller: Actions external
+ interrupt controller
 In-Reply-To: <20180812122215.1079590-1-pn@denx.de>
 References: <20180812122215.1079590-1-pn@denx.de>
-Message-ID: <20180812122215.1079590-4-pn@denx.de>
+Message-ID: <20180812122215.1079590-2-pn@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add sirq node for Actions Semi S700 SoC with 3 SIRQ pins support,
-in which external interrupt controllers can be connected.
-
-Example:
-atc260x: atc2603c at 65 {
-	interrupt-parent = <&sirq>;
-	interrupts = <2 IRQ_TYPE_LEVEL_HIGH>;
-};
+Actions Semi OWL family SoC's provides support for external interrupt
+controller to be connected and controlled using SIRQ pins. S500, S700
+and S900 provides 3 SIRQ lines and works independently for 3 external
+interrupt controllers.
 
 Signed-off-by: Parthiban Nallathambi <pn@denx.de>
 Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
 ---
- arch/arm64/boot/dts/actions/s700.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ .../interrupt-controller/actions,owl-sirq.txt      | 46 ++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
 
-diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
-index 66dd5309f0a2..c5aef5ac7f46 100644
---- a/arch/arm64/boot/dts/actions/s700.dtsi
-+++ b/arch/arm64/boot/dts/actions/s700.dtsi
-@@ -153,6 +153,15 @@
- 			status = "disabled";
- 		};
- 
-+		sirq: interrupt-controller at e01b0000 {
-+			compatible = "actions,owl-sirq";
-+			reg = <0 0xe01b0000 0 0x1000>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			actions,sirq-shared-reg;
-+			actions,sirq-offset = <0x200 0x200 0x200>;
-+		};
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
+new file mode 100644
+index 000000000000..4b8437751331
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
+@@ -0,0 +1,46 @@
++Actions Semi Owl SoCs SIRQ interrupt controller
 +
- 		sps: power-controller at e01b0100 {
- 			compatible = "actions,s700-sps";
- 			reg = <0x0 0xe01b0100 0x0 0x100>;
++S500, S700 and S900 SoC's from Actions provides 3 SPI's from GIC,
++in which external interrupt controller can be connected. 3 SPI's
++45, 46, 47 from GIC are directly exposed as SIRQ. It has
++the following properties:
++
++- inputs three interrupt signal from external interrupt controller
++
++Required properties:
++
++- compatible: should be "actions,owl-sirq"
++- reg: physical base address of the controller and length of memory mapped.
++- interrupt-controller: identifies the node as an interrupt controller
++- #interrupt-cells: specifies the number of cells needed to encode an interrupt
++  source, should be 2.
++- actions,sirq-shared-reg: Applicable for S500 and S700 where SIRQ register
++  details are maintained at same offset/register.
++- actions,sirq-offset: register offset for SIRQ interrupts. When registers are
++  shared, all the three offsets will be same (S500 and S700).
++- actions,sirq-clk-sel: external interrupt controller can be either
++  connected to 32Khz or 24Mhz external/internal clock. This needs
++  to be configured for per SIRQ line. Failing defaults to 32Khz clock.
++
++Example for S900:
++
++sirq: interrupt-controller at e01b0000 {
++	compatible = "actions,owl-sirq";
++	reg = <0 0xe01b0000 0 0x1000>;
++	interrupt-controller;
++	#interrupt-cells = <2>;
++	actions,sirq-clk-sel = <0 0 0>;
++	actions,sirq-offset = <0x200 0x528 0x52c>;
++};
++
++Example for S500 and S700:
++
++sirq: interrupt-controller at e01b0000 {
++	compatible = "actions,owl-sirq";
++	reg = <0 0xe01b0000 0 0x1000>;
++	interrupt-controller;
++	#interrupt-cells = <2>;
++	actions,sirq-shared-reg;
++	actions,sirq-clk-sel = <0 0 0>;
++	actions,sirq-offset = <0x200 0x200 0x200>;
++};
 -- 
 2.14.4
