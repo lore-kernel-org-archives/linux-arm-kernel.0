@@ -1,130 +1,350 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Sun, 12 Aug 2018 11:53:40 +0200
-Subject: [PATCH v8 09/26] kernel/cpu_pm: Manage runtime PM in the idle
- path for CPUs
-In-Reply-To: <20180810203604.GF5081@codeaurora.org>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <2056372.NMt4aPaF4h@aspire.rjw.lan> <2205807.cU2puvubpP@aspire.rjw.lan>
- <1726374.375PCQfjLZ@aspire.rjw.lan>
- <CAPDyKFrmP15+_hyRp44Jw-wsTmsNFKORdCeGJEgW8o0OoKiHhA@mail.gmail.com>
- <CAJZ5v0hk1wfm10fyycmddKF6wR4D51r30fD_-J5UDMbtB3+V-Q@mail.gmail.com>
- <20180808105619.GB25150@e107981-ln.cambridge.arm.com>
- <20180808180248.GC27850@codeaurora.org>
- <CAJZ5v0gnZCmfgERSJfAFM6Y+jLX4V3Rsr4D5gBACWRNbGcEN-A@mail.gmail.com>
- <20180810203604.GF5081@codeaurora.org>
-Message-ID: <CAJZ5v0j67GcGZ+iUctTw2=Yjrr1jBH_BEZhCdtKpTffmsXzMHA@mail.gmail.com>
+From: pn@denx.de (Parthiban Nallathambi)
+Date: Sun, 12 Aug 2018 14:22:14 +0200
+Subject: [PATCH v2 2/3] drivers/irqchip: Add Actions external interrupts
+ support
+In-Reply-To: <20180812122215.1079590-1-pn@denx.de>
+References: <20180812122215.1079590-1-pn@denx.de>
+Message-ID: <20180812122215.1079590-3-pn@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2018 at 10:36 PM Lina Iyer <ilina@codeaurora.org> wrote:
->
-> On Thu, Aug 09 2018 at 02:16 -0600, Rafael J. Wysocki wrote:
-> >On Wed, Aug 8, 2018 at 8:02 PM, Lina Iyer <ilina@codeaurora.org> wrote:
-> >> On Wed, Aug 08 2018 at 04:56 -0600, Lorenzo Pieralisi wrote:
-> >>>
-> >>> On Mon, Aug 06, 2018 at 11:37:55AM +0200, Rafael J. Wysocki wrote:
-> >>>>
-> >>>> On Fri, Aug 3, 2018 at 1:42 PM, Ulf Hansson <ulf.hansson@linaro.org>
-> >>>> wrote:
-> >>>> > [...]
-> >>>> >
-> >>>> >>>
-> >>>> >>> Assuming that I have got that right, there are concerns, mostly
-> >>>> >>> regarding
-> >>>> >>> patch [07/26], but I will reply to that directly.
-> >>>> >>
-> >>>> >> Well, I haven't got that right, so never mind.
-> >>>> >>
-> >>>> >> There are a few minor things to address, but apart from that the
-> >>>> >> general
-> >>>> >> genpd patches look ready.
-> >>>> >
-> >>>> > Alright, thanks!
-> >>>> >
-> >>>> > I will re-spin the series and post a new version once 4.19 rc1 is out.
-> >>>> > Hopefully we can queue it up early in next cycle to get it tested in
-> >>>> > next for a while.
-> >>>> >
-> >>>> >>
-> >>>> >>> The $subject patch is fine by me by itself, but it obviously depends
-> >>>> >>> on the
-> >>>> >>> previous ones.  Patches [01-02/26] are fine too, but they don't seem
-> >>>> >>> to be
-> >>>> >>> particularly useful without the rest of the series.
-> >>>> >>>
-> >>>> >>> As far as patches [10-26/26] go, I'd like to see some review comments
-> >>>> >>> and/or
-> >>>> >>> tags from the people with vested interest in there, in particular
-> >>>> >>> from Daniel
-> >>>> >>> on patch [12/26] and from Sudeep on the PSCI ones.
-> >>>> >>
-> >>>> >> But this still holds.
-> >>>> >
-> >>>> > Actually, patch 10 and patch11 is ready to go as well. I ping Daniel
-> >>>> > on patch 12.
-> >>>> >
-> >>>> > In regards to the rest of the series, some of the PSCI/ARM changes
-> >>>> > have been reviewed by Mark Rutland, however several changes have not
-> >>>> > been acked.
-> >>>> >
-> >>>> > On the other hand, one can also interpret the long silence in regards
-> >>>> > to PSCI/ARM changes as they are good to go. :-)
-> >>>>
-> >>>> Well, in that case giving an ACK to them should not be an issue for
-> >>>> the people with a vested interest I suppose.
-> >>>
-> >>>
-> >>> Apologies to everyone for the delay in replying.
-> >>>
-> >>> Side note: cpu_pm_enter()/exit() are also called through syscore ops in
-> >>> s2RAM/IDLE, you know that but I just wanted to mention it to compound
-> >>> the discussion.
-> >>>
-> >>> As for PSCI patches I do not personally think PSCI OSI enablement is
-> >>> beneficial (and my position has always been the same since PSCI OSI was
-> >>> added to the specification, I am not even talking about this patchset)
-> >>> and Arm Trusted Firmware does not currently support it for the same
-> >>> reason.
-> >>>
-> >>> We (if Mark and Sudeep agree) will enable PSCI OSI if and when we have a
-> >>> definitive and constructive answer to *why* we have to do that that is
-> >>> not a dogmatic "the kernel knows better" but rather a comprehensive
-> >>> power benchmark evaluation - I thought that was the agreement reached
-> >>> at OSPM but apparently I was mistaken.
-> >>>
-> >> I will not speak to any comparison of benchmarks between OSI and PC.
-> >> AFAIK, there are no platforms supporting both.
-> >>
-> >> But, the OSI feature is critical for QCOM mobile platforms. The
-> >> last man activities during cpuidle save quite a lot of power. Powering
-> >> off the clocks, busses, regulators and even the oscillator is very
-> >> important to have a reasonable battery life when using the phone.
-> >> Platform coordinated approach falls quite short of the needs of a
-> >> powerful processor with a desired battery efficiency.
-> >
-> >Even so, you still need firmware (or hardware) to do the right thing
-> >in the concurrent wakeup via an edge-triggered interrupt case AFAICS.
-> >That is, you need the domain to be prevented from being turned off if
-> >one of the CPUs in it has just been woken up and the interrupt is
-> >still pending.
-> Yes, that is true and we have been doing this on pretty much every QC
-> SoC there is, for CPU domains. Generally, there is a handshake of sorts
-> with the power domain controller when the core executes WFI. It
-> decrements the reference on the controller when going down and
-> increments when coming up. The controller is only turned off when the
-> reference count is 0 and is turned back on before the CPU is ready to
-> exit the WFI.
->
-> What we are doing here is hand the domain's ->power_off and ->power_on
-> over to the platform firmware, which needs to make sure the races are
-> handled correctly either in h/w or through mechanisms like MCPM or in
-> the firmware. I would consider what happens during the power on/off of
-> the domains beyond the realm of the genpd at least for CPU specific PM
-> domains.
+Actions Semi Owl family SoC's S500, S700 and S900 provides support
+for 3 external interrupt controllers through SIRQ pins.
 
-I see.
+Each line can be independently configured as interrupt and triggers
+on either of the edges (raising or falling) or either of the levels
+(high or low) . Each line can also be masked independently.
 
-The dependency on this FW/HW behavior should be clearly documented,
-though, preferably next to the code in question, or people will try to
-use it on systems where this requirement is not met and will be
-wondering what's wrong and/or complaining.
+Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+---
+ drivers/irqchip/Makefile       |   1 +
+ drivers/irqchip/irq-owl-sirq.c | 305 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 306 insertions(+)
+ create mode 100644 drivers/irqchip/irq-owl-sirq.c
+
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 15f268f646bf..072c4409e7c4 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -7,6 +7,7 @@ obj-$(CONFIG_ATH79)			+= irq-ath79-misc.o
+ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
+ obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
+ obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
++obj-$(CONFIG_ARCH_ACTIONS)		+= irq-owl-sirq.o
+ obj-$(CONFIG_FARADAY_FTINTC010)		+= irq-ftintc010.o
+ obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
+ obj-$(CONFIG_ARCH_LPC32XX)		+= irq-lpc32xx.o
+diff --git a/drivers/irqchip/irq-owl-sirq.c b/drivers/irqchip/irq-owl-sirq.c
+new file mode 100644
+index 000000000000..b69301388300
+--- /dev/null
++++ b/drivers/irqchip/irq-owl-sirq.c
+@@ -0,0 +1,305 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ *
++ * Actions Semi Owl SoCs SIRQ interrupt controller driver
++ *
++ * Copyright (C) 2014 Actions Semi Inc.
++ * David Liu <liuwei@actions-semi.com>
++ *
++ * Author: Parthiban Nallathambi <pn@denx.de>
++ * Author: Saravanan Sekar <sravanhome@gmail.com>
++ */
++
++#include <linux/interrupt.h>
++#include <linux/irqchip.h>
++#include <linux/of_irq.h>
++#include <linux/of_address.h>
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++#define INTC_GIC_INTERRUPT_PIN		13
++#define INTC_EXTCTL_PENDING		BIT(0)
++#define INTC_EXTCTL_CLK_SEL		BIT(4)
++#define INTC_EXTCTL_EN			BIT(5)
++#define	INTC_EXTCTL_TYPE_MASK		GENMASK(6, 7)
++#define	INTC_EXTCTL_TYPE_HIGH		0
++#define	INTC_EXTCTL_TYPE_LOW		BIT(6)
++#define	INTC_EXTCTL_TYPE_RISING		BIT(7)
++#define	INTC_EXTCTL_TYPE_FALLING	(BIT(6) | BIT(7))
++
++#define get_sirq_offset(x)	chip_data->sirq[x].offset
++
++/* Per SIRQ data */
++struct owl_sirq {
++	u16 offset;
++	/* software is responsible to clear interrupt pending bit when
++	 * type is edge triggered. This value is for per SIRQ line.
++	 */
++	bool type_edge;
++};
++
++struct owl_sirq_chip_data {
++	void __iomem *base;
++	raw_spinlock_t lock;
++	/* some SoC's share the register for all SIRQ lines, so maintain
++	 * register is shared or not here. This value is from DT.
++	 */
++	bool shared_reg;
++	struct owl_sirq *sirq;
++};
++
++static struct owl_sirq_chip_data *sirq_data;
++
++static unsigned int sirq_read_extctl(struct irq_data *data)
++{
++	struct owl_sirq_chip_data *chip_data = data->chip_data;
++	unsigned int val;
++
++	val = readl_relaxed(chip_data->base + get_sirq_offset(data->hwirq));
++	if (chip_data->shared_reg)
++		val = (val >> (2 - data->hwirq) * 8) & 0xff;
++
++	return val;
++}
++
++static void sirq_write_extctl(struct irq_data *data, unsigned int extctl)
++{
++	struct owl_sirq_chip_data *chip_data = data->chip_data;
++	unsigned int val;
++
++	if (chip_data->shared_reg) {
++		val = readl_relaxed(chip_data->base +
++				get_sirq_offset(data->hwirq));
++		val &= ~(0xff << (2 - data->hwirq) * 8);
++		extctl &= 0xff;
++		extctl = (extctl << (2 - data->hwirq) * 8) | val;
++	}
++
++	writel_relaxed(extctl, chip_data->base +
++			get_sirq_offset(data->hwirq));
++}
++
++static void owl_sirq_ack(struct irq_data *data)
++{
++	struct owl_sirq_chip_data *chip_data = data->chip_data;
++	unsigned int extctl;
++	unsigned long flags;
++
++	/* software must clear external interrupt pending, when interrupt type
++	 * is edge triggered, so we need per SIRQ based clearing.
++	 */
++	if (chip_data->sirq[data->hwirq].type_edge) {
++		raw_spin_lock_irqsave(&chip_data->lock, flags);
++
++		extctl = sirq_read_extctl(data);
++		extctl |= INTC_EXTCTL_PENDING;
++		sirq_write_extctl(data, extctl);
++
++		raw_spin_unlock_irqrestore(&chip_data->lock, flags);
++	}
++	irq_chip_ack_parent(data);
++}
++
++static void owl_sirq_mask(struct irq_data *data)
++{
++	struct owl_sirq_chip_data *chip_data = data->chip_data;
++	unsigned int extctl;
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&chip_data->lock, flags);
++
++	extctl = sirq_read_extctl(data);
++	extctl &= ~(INTC_EXTCTL_EN);
++	sirq_write_extctl(data, extctl);
++
++	raw_spin_unlock_irqrestore(&chip_data->lock, flags);
++	irq_chip_mask_parent(data);
++}
++
++static void owl_sirq_unmask(struct irq_data *data)
++{
++	struct owl_sirq_chip_data *chip_data = data->chip_data;
++	unsigned int extctl;
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&chip_data->lock, flags);
++
++	extctl = sirq_read_extctl(data);
++	extctl |= INTC_EXTCTL_EN;
++	sirq_write_extctl(data, extctl);
++
++	raw_spin_unlock_irqrestore(&chip_data->lock, flags);
++	irq_chip_unmask_parent(data);
++}
++
++/* PAD_PULLCTL needs to be defined in pinctrl */
++static int owl_sirq_set_type(struct irq_data *data, unsigned int flow_type)
++{
++	struct owl_sirq_chip_data *chip_data = data->chip_data;
++	unsigned int extctl, type;
++	unsigned long flags;
++
++	switch (flow_type) {
++	case IRQF_TRIGGER_LOW:
++		type = INTC_EXTCTL_TYPE_LOW;
++		break;
++	case IRQF_TRIGGER_HIGH:
++		type = INTC_EXTCTL_TYPE_HIGH;
++		break;
++	case IRQF_TRIGGER_FALLING:
++		type = INTC_EXTCTL_TYPE_FALLING;
++		chip_data->sirq[data->hwirq].type_edge = true;
++		break;
++	case IRQF_TRIGGER_RISING:
++		type = INTC_EXTCTL_TYPE_RISING;
++		chip_data->sirq[data->hwirq].type_edge = true;
++		break;
++	default:
++		return  -EINVAL;
++	}
++
++	raw_spin_lock_irqsave(&chip_data->lock, flags);
++
++	extctl = sirq_read_extctl(data);
++	extctl &= ~INTC_EXTCTL_TYPE_MASK;
++	extctl |= type;
++	sirq_write_extctl(data, extctl);
++
++	raw_spin_unlock_irqrestore(&chip_data->lock, flags);
++	data = data->parent_data;
++	return irq_chip_set_type_parent(data, flow_type);
++}
++
++static struct irq_chip owl_sirq_chip = {
++	.name		= "owl-sirq",
++	.irq_ack	= owl_sirq_ack,
++	.irq_mask	= owl_sirq_mask,
++	.irq_unmask	= owl_sirq_unmask,
++	.irq_set_type	= owl_sirq_set_type,
++	.irq_eoi	= irq_chip_eoi_parent,
++	.irq_retrigger	= irq_chip_retrigger_hierarchy,
++};
++
++static int owl_sirq_domain_alloc(struct irq_domain *domain, unsigned int virq,
++				 unsigned int nr_irqs, void *arg)
++{
++	struct irq_fwspec *fwspec = arg;
++	struct irq_fwspec parent_fwspec = {
++		.param_count	= 3,
++		.param[0]	= GIC_SPI,
++		.param[1]	= fwspec->param[0] + INTC_GIC_INTERRUPT_PIN,
++		.param[2]	= fwspec->param[1],
++		.fwnode		= domain->parent->fwnode,
++	};
++
++	if (WARN_ON(nr_irqs != 1))
++		return -EINVAL;
++
++	irq_domain_set_hwirq_and_chip(domain, virq, fwspec->param[0],
++				      &owl_sirq_chip,
++				      domain->host_data);
++
++	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs,
++					    &parent_fwspec);
++}
++
++static const struct irq_domain_ops sirq_domain_ops = {
++	.alloc	= owl_sirq_domain_alloc,
++	.free	= irq_domain_free_irqs_common,
++};
++
++static void owl_sirq_clk_init(int offset, int hwirq)
++{
++	unsigned int val;
++
++	/* register default clock is 32Khz, change to 24Mhz only when defined */
++	val = readl_relaxed(sirq_data->base + offset);
++	if (sirq_data->shared_reg)
++		val |= INTC_EXTCTL_CLK_SEL << (2 - hwirq) * 8;
++	else
++		val |= INTC_EXTCTL_CLK_SEL;
++
++	writel_relaxed(val, sirq_data->base + offset);
++}
++
++static int __init owl_sirq_of_init(struct device_node *node,
++					struct device_node *parent)
++{
++	struct irq_domain *domain, *domain_parent;
++	int ret = 0, i, sirq_cnt = 0;
++	struct owl_sirq_chip_data *chip_data;
++
++	sirq_cnt = of_property_count_u32_elems(node, "actions,sirq-offset");
++	if (sirq_cnt <= 0) {
++		pr_err("owl_sirq: register offset not specified\n");
++		return -EINVAL;
++	}
++
++	chip_data = kzalloc(sizeof(*chip_data), GFP_KERNEL);
++	if (!chip_data)
++		return -ENOMEM;
++	sirq_data = chip_data;
++
++	chip_data->sirq = kcalloc(sirq_cnt, sizeof(*chip_data->sirq),
++				GFP_KERNEL);
++	if (!chip_data->sirq)
++		goto out_free;
++
++	raw_spin_lock_init(&chip_data->lock);
++	chip_data->base = of_iomap(node, 0);
++	if (!chip_data->base) {
++		pr_err("owl_sirq: unable to map sirq register\n");
++		ret = -ENXIO;
++		goto out_free;
++	}
++
++	chip_data->shared_reg = of_property_read_bool(node,
++						"actions,sirq-shared-reg");
++	for (i = 0; i < sirq_cnt; i++) {
++		u32 value;
++
++		ret = of_property_read_u32_index(node, "actions,sirq-offset",
++						i, &value);
++		if (ret)
++			goto out_unmap;
++
++		get_sirq_offset(i) = (u16)value;
++
++		ret = of_property_read_u32_index(node, "actions,sirq-clk-sel",
++						i, &value);
++		if (ret || !value)
++			continue;
++
++		/* external interrupt controller can be either connect to 32Khz/
++		 * 24Mhz external/internal clock. This shall be configured for
++		 * per SIRQ line. It can be defined from DT, failing defaults to
++		 * 24Mhz clock.
++		 */
++		owl_sirq_clk_init(get_sirq_offset(i), i);
++	}
++
++	domain_parent = irq_find_host(parent);
++	if (!domain_parent) {
++		pr_err("owl_sirq: interrupt-parent not found\n");
++		goto out_unmap;
++	}
++
++	domain = irq_domain_add_hierarchy(domain_parent, 0,
++			sirq_cnt, node,
++			&sirq_domain_ops, chip_data);
++	if (!domain) {
++		ret = -ENOMEM;
++		goto out_unmap;
++	}
++
++	return 0;
++
++out_unmap:
++	iounmap(chip_data->base);
++out_free:
++	kfree(chip_data);
++	kfree(chip_data->sirq);
++	return ret;
++}
++
++IRQCHIP_DECLARE(owl_sirq, "actions,owl-sirq", owl_sirq_of_init);
+-- 
+2.14.4
