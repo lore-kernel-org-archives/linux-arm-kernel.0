@@ -1,114 +1,79 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 13 Aug 2018 14:52:03 -0600
-Subject: [PATCH v8 3/4] drm/atmel-hlcdc: iterate over all output endpoints
-In-Reply-To: <0baac94e-f3d2-53fd-4af9-854bb4498345@axentia.se>
-References: <20180810130359.9882-1-peda@axentia.se>
- <20180810130359.9882-4-peda@axentia.se>
- <20180813135949.32vrlrevtazr5x7d@apu3b.nibble.pw>
- <0baac94e-f3d2-53fd-4af9-854bb4498345@axentia.se>
-Message-ID: <CAL_JsqJPzwpN2TFghy-FfHZppexG9gW4qBy6iYtGpyP_Bp6dUA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 13 Aug 2018 23:12:55 +0200
+Subject: [PATCH] ARM: require GCC for FRAME_POINTER
+In-Reply-To: <20180811095235.1938-1-stefan@agner.ch>
+References: <20180811095235.1938-1-stefan@agner.ch>
+Message-ID: <CAK8P3a1SOAYkbMV-YvQ9pVhAk7J6jt9Sc23gc1idj8u5ftyp=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 13, 2018 at 8:25 AM Peter Rosin <peda@axentia.se> wrote:
+On Sat, Aug 11, 2018 at 11:52 AM Stefan Agner <stefan@agner.ch> wrote:
 >
-> On 2018-08-13 15:59, jacopo mondi wrote:
-> > Hi Peter,
-> >
-> > On Fri, Aug 10, 2018 at 03:03:58PM +0200, Peter Rosin wrote:
-> >> This enables more flexible devicetrees. You can e.g. have two output
-> >> nodes where one is not enabled, without the ordering affecting things.
 
-Your DTs are not supposed to be flexible. They should be well defined
-by the binding.
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 693f84392f1b..cb65cf67dfa2 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -54,7 +54,7 @@ config DEBUG_WX
+>  # n, but then RMK will have to kill you ;).
+>  config FRAME_POINTER
+>         bool
+> -       depends on !THUMB2_KERNEL
+> +       depends on !THUMB2_KERNEL && CC_IS_GCC
+>         default y if !ARM_UNWIND || FUNCTION_GRAPH_TRACER
+>         help
+>           If you say N here, the resulting kernel will be slightly smaller and
 
-> >>
-> >> Prior to this patch the active node had to have endpoint id zero.
-> >>
-> >> Signed-off-by: Peter Rosin <peda@axentia.se>
-> >> ---
-> >>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 32 ++++++++++++++++++------
-> >>  1 file changed, 25 insertions(+), 7 deletions(-)
-> >>
-> >> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-> >> index 8db51fb131db..16c1b2f54b42 100644
-> >> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-> >> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-> >> @@ -31,14 +31,16 @@ static const struct drm_encoder_funcs atmel_hlcdc_panel_encoder_funcs = {
-> >>      .destroy = drm_encoder_cleanup,
-> >>  };
-> >>
-> >> -static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
-> >> +static int atmel_hlcdc_attach_endpoint(struct drm_device *dev,
-> >> +                                   struct of_endpoint *endpoint)
-> >>  {
-> >>      struct drm_encoder *encoder;
-> >>      struct drm_panel *panel;
-> >>      struct drm_bridge *bridge;
-> >>      int ret;
-> >>
-> >> -    ret = drm_of_find_panel_or_bridge(dev->dev->of_node, 0, endpoint,
-> >> +    ret = drm_of_find_panel_or_bridge(dev->dev->of_node,
-> >> +                                      endpoint->port, endpoint->id,
-> >
-> > You are refusing endpoint->port != 0 in the caller, so that could be
-> > 0.
->
-> Yes, it could. However, I intentionally did not write 0 here, so that
-> the logic related to "port has to be zero" was in one place and not
-> scattered about. I guess it's up to Boris?
->
-> Maybe the port do not actually have to be zero at all? With the old
-> code, it was kind of understandable that the port number was fixed,
-> but for the code in my patch it does not matter at all AFAICT. There
-> is nothing in the binding docs (except for the example) that hints
-> that port has to be zero, so that's one thing in favor of just getting
-> rid of the port number checking altogether...
+I suspect we actually need a bit more complexity here, as we have a couple
+of options that do something like:
 
-The port numbering must be defined and fixed. If that is not clear in
-the binding, fix the binding.
+       select FRAME_POINTER if !MIPS && !PPC && !ARM_UNWIND && !S390
+&& !MICROBLAZE && !ARC && !X86
 
-> >> @@ -77,13 +79,29 @@ static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
-> >>
-> >>  int atmel_hlcdc_create_outputs(struct drm_device *dev)
-> >>  {
-> >> -    int endpoint, ret = 0;
-> >> -
-> >> -    for (endpoint = 0; !ret; endpoint++)
-> >> -            ret = atmel_hlcdc_attach_endpoint(dev, endpoint);
-> >> +    struct of_endpoint endpoint;
-> >> +    struct device_node *node = NULL;
-> >> +    int count = 0;
-> >> +    int ret = 0;
-> >> +
-> >> +    for_each_endpoint_of_node(dev->dev->of_node, node) {
-> >> +            of_graph_parse_endpoint(node, &endpoint);
+This means that in configurations without ARM_UNWIND, we still
+fail to build with clang. Maybe something like x86 would work, this currently
+has
 
-I'd really like to kill off of_graph_parse_endpoint, not add more
-users (check the git history on this code). You should know what are
-possible port and endpoint numbers, so iterate over those.
+choice
+        prompt "Choose kernel unwinder"
+        default UNWINDER_ORC if X86_64
+        default UNWINDER_FRAME_POINTER if X86_32
 
-> >> +
-> >> +            if (endpoint.port)
-> >> +                    continue;
-> >> +
-> >> +            ret = atmel_hlcdc_attach_endpoint(dev, &endpoint);
-> >> +            if (ret == -ENODEV)
-> >> +                    continue;
-> >> +            if (ret) {
-> >> +                    of_node_put(node);
-> >> +                    break;
-> >> +            }
-> >> +            count++;
-> >> +    }
-> >>
-> >>      /* At least one device was successfully attached.*/
-> >> -    if (ret == -ENODEV && endpoint)
-> >> +    if (ret == -ENODEV && count)
-> >>              return 0;
-> >>
-> >>      return ret;
-> >> --
-> >> 2.11.0
-> >>
->
+config UNWINDER_ORC
+        bool "ORC unwinder"
+        depends on X86_64
+        select STACK_VALIDATION
+
+config UNWINDER_FRAME_POINTER
+        bool "Frame pointer unwinder"
+        select FRAME_POINTER
+
+config UNWINDER_GUESS
+        bool "Guess unwinder"
+        depends on EXPERT
+        depends on !STACKDEPOT
+
+endchoice
+
+so we always get some form of unwinding, but have different levels of
+functionality in them. Implementing ORC on ARM might be nice, but
+that's a lot of work, so I'm not expecting you to do that.
+
+The simplest approach would be to always force ARM_UNWIND=y
+when not building with gcc:
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 43d598c9b1f9..b390ac99ba20 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -60,7 +60,7 @@ config FRAME_POINTER
+          reported is severely limited.
+
+ config ARM_UNWIND
+-       bool "Enable stack unwinding support (EXPERIMENTAL)"
++       bool "Enable stack unwinding support (EXPERIMENTAL)" if CC_IS_GCC
+        depends on AEABI
+        default y
+        help
+
+      Arnd
