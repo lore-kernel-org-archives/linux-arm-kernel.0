@@ -1,54 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 13 Aug 2018 18:28:21 +0100
-Subject: [RFC PATCH] arm64: lse: use register variables instead of
- -ffixed, -fcall flags
-In-Reply-To: <CANA+-vDPp=tSBq_2U7T1RD8BpDs6DWm=pkVp73HGdehbhcc-tQ@mail.gmail.com>
-References: <20180810020751.44859-1-trong@android.com>
- <20180810094611.GA12273@arm.com>
- <CANA+-vDPp=tSBq_2U7T1RD8BpDs6DWm=pkVp73HGdehbhcc-tQ@mail.gmail.com>
-Message-ID: <20180813172820.GA25548@arm.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Mon, 13 Aug 2018 12:46:42 -0500
+Subject: [PATCH v3 0/7] perf: Add ioctl for PMU driver configuration
+In-Reply-To: <1531950487-24554-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1531950487-24554-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20180813124642.3d49c082a95fc294d926016e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2018 at 03:04:55PM -0700, Tri Vo wrote:
-> On Fri, Aug 10, 2018 at 2:46 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Thu, Aug 09, 2018 at 07:07:51PM -0700, Tri Vo wrote:
-> >> -ffixed, -fcall-used, -fcall-saved flags are used to build LL/SC
-> >> fallback atomic implementations in such a way that:
-> >> 1. LSE implementations only assume x16, x17, x30 to be clobbered by a
-> >> function call to LL/SC fallbacks.
-> >> 2. LL/SC fallbacks are responsible for saving/restoring the rest of the
-> >> GPRs.
-> >> 3. LL/SC fallbacks always prefer to allocate in x16, x17 since there is
-> >> no need to save/restore them.
-> >>
-> >> Same result can be achieved without -ffixed, -fcall-used, -fcall-saved
-> >> flags by explicitly telling the compiler where to allocate each variable
-> >> in LL/SC atomic implementations. This patch makes all functions use x16,
-> >> x17 registers. 'fetch' variants of the functions need one more scratch
-> >> register, so we allocate one from the PCS's set of callee-saved
-> >> registers (in this case x19).
-> >>
-> >> With this patch:
-> >> 1. the desired register allocation is reflected in the code rather than
-> >> in compiler flags.
-> >> 2. LSE atomic support can be built with both clang and gcc.
-> >> 3. Number of preserved registers in LL/SC fallbacks is unchanged.
-> >>
-> >> The tradeoff is that the compiler loses flexibility in allocating
-> >> registers for inline LL/SC atomic implementations.
-> >
-> > This impacts the atomics code when !CONFIG_LSE, and causes the fetch*
-> > variants to spill x19 in most cases.
+On Wed, 18 Jul 2018 15:48:00 -0600
+Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+
+> This set adds the capability to communiate event specific configuration
+> to the PMU kernel driver using an ioctl().  The functionatlity is made
+> generic enough for anyone to use but is targeted at the identification
+> of CoreSight sinks when operating in CPU-wide trace scenarios.
 > 
-> Is it OK if I wrap that x19 register variable in an #ifdef so it's
-> only allocated to x19 when CONFIG_LSE and is allocated normally for
-> !CONFIG_LSE? That should keep the number of spills unchanged for both
-> inline and out-of-line implementations.
+> ---
+> Changes for V3:
+> . Return an error for CPU-wide scenarios while the feature is being
+>   implemented (Kim)
 
-I would much prefer you to:
+Hi, I'm giving this series a short test-drive on Juno.
 
-> > Please just fix clang, or augment the lseinstr check in our Makefile to
-> > check for ffixed support as well.
+It yields success for the --per-thread case..:
 
-Will
+$ sudo taskset -c 0 ./perf record -e cs_etm/@20010000.etf/ --per-thread uname -a
+Linux juno 4.18.0-rc8-00011-gb82af52c4b35-dirty #147 SMP PREEMPT Thu Aug 9 11:20:37 CDT 2018 aarch64 GNU/Linux
+[ perf record: Woken up 0 times to write data ]
+Warning:
+AUX data lost 1 times out of 2!
+
+[ perf record: Captured and wrote 0.067 MB perf.data ]
+$ 
+
+..but not for CPU-wide?:
+
+$ sudo taskset -c 0 ./perf record -e cs_etm/@20010000.etf/ uname -a
+failed to mmap with 12 (Cannot allocate memory)
+$ sudo taskset -c 0 ./perf record -e cs_etm/@20010000.etf/ -C 0 uname -a
+failed to mmap with 12 (Cannot allocate memory)
+$ 
+
+Thanks,
+
+Kim
