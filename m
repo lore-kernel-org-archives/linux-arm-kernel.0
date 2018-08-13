@@ -1,72 +1,36 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Aug 2018 15:57:50 +0100
-Subject: [PATCH 32/37] KVM: arm: vgic-v3: Add support for ICC_SGI0R and
- ICC_ASGI1R accesses
+Date: Mon, 13 Aug 2018 15:57:47 +0100
+Subject: [PATCH 29/37] KVM: arm64: Remove non-existent AArch32 ICC_SGI1R
+ encoding
 In-Reply-To: <20180813145755.16566-1-marc.zyngier@arm.com>
 References: <20180813145755.16566-1-marc.zyngier@arm.com>
-Message-ID: <20180813145755.16566-33-marc.zyngier@arm.com>
+Message-ID: <20180813145755.16566-30-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to generate Group0 SGIs, let's add some decoding logic to
-access_gic_sgi(), and pass the generating group accordingly.
+ICC_SGI1R is a 64bit system register, even on AArch32. It is thus
+pointless to have such an encoding in the 32bit cp15 array. Let's
+drop it.
 
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/coproc.c | 25 ++++++++++++++++++++++++-
- 1 file changed, 24 insertions(+), 1 deletion(-)
+ arch/arm64/kvm/sys_regs.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index b17c52608a19..450c7a4fbc8a 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -246,6 +246,7 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
- 			   const struct coproc_reg *r)
- {
- 	u64 reg;
-+	bool g1;
- 
- 	if (!p->is_write)
- 		return read_from_write_only(vcpu, p);
-@@ -253,7 +254,25 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
- 	reg = (u64)*vcpu_reg(vcpu, p->Rt2) << 32;
- 	reg |= *vcpu_reg(vcpu, p->Rt1) ;
- 
--	vgic_v3_dispatch_sgi(vcpu, reg, true);
-+	/*
-+	 * In a system where GICD_CTLR.DS=1, a ICC_SGI0R access generates
-+	 * Group0 SGIs only, while ICC_SGI1R can generate either group,
-+	 * depending on the SGI configuration. ICC_ASGI1R is effectively
-+	 * equivalent to ICC_SGI0R, as there is no "alternative" secure
-+	 * group.
-+	 */
-+	switch (p->Op1) {
-+	default:		/* Keep GCC quiet */
-+	case 0:			/* ICC_SGI1R */
-+		g1 = true;
-+		break;
-+	case 1:			/* ICC_ASGI1R */
-+	case 2:			/* ICC_SGI0R */
-+		g1 = false;
-+		break;
-+	}
-+
-+	vgic_v3_dispatch_sgi(vcpu, reg, g1);
- 
- 	return true;
- }
-@@ -459,6 +478,10 @@ static const struct coproc_reg cp15_regs[] = {
- 
- 	/* ICC_SGI1R */
- 	{ CRm64(12), Op1( 0), is64, access_gic_sgi},
-+	/* ICC_ASGI1R */
-+	{ CRm64(12), Op1( 1), is64, access_gic_sgi},
-+	/* ICC_SGI0R */
-+	{ CRm64(12), Op1( 2), is64, access_gic_sgi},
- 
- 	/* VBAR: swapped by interrupt.S. */
- 	{ CRn(12), CRm( 0), Op1( 0), Op2( 0), is32,
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 774d72155904..e04aacb2a24c 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1622,8 +1622,6 @@ static const struct sys_reg_desc cp14_64_regs[] = {
+  * register).
+  */
+ static const struct sys_reg_desc cp15_regs[] = {
+-	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
+-
+ 	{ Op1( 0), CRn( 1), CRm( 0), Op2( 0), access_vm_reg, NULL, c1_SCTLR },
+ 	{ Op1( 0), CRn( 2), CRm( 0), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
+ 	{ Op1( 0), CRn( 2), CRm( 0), Op2( 1), access_vm_reg, NULL, c2_TTBR1 },
 -- 
 2.18.0
