@@ -1,321 +1,450 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon, 13 Aug 2018 11:44:30 +0000
-Subject: [PATCH] arm64: dts: renesas: Initial r8a774a1 SoC device tree
-In-Reply-To: <OSBPR01MB2103F387973ECD078290E060B8390@OSBPR01MB2103.jpnprd01.prod.outlook.com>
-References: <1534146093-1651-1-git-send-email-biju.das@bp.renesas.com>
- <TY1PR01MB1770D16DDB50BF579ADF8335C0390@TY1PR01MB1770.jpnprd01.prod.outlook.com>
- <OSBPR01MB2103F339F8BB36042C8AD0E1B8390@OSBPR01MB2103.jpnprd01.prod.outlook.com>
- <TY1PR01MB1770CD5C853AA5E765961B11C0390@TY1PR01MB1770.jpnprd01.prod.outlook.com>
- <OSBPR01MB2103F387973ECD078290E060B8390@OSBPR01MB2103.jpnprd01.prod.outlook.com>
-Message-ID: <TY1PR01MB1770F5E92353FD04FC49102AC0390@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 13 Aug 2018 12:46:55 +0100
+Subject: [PATCH v2 2/3] drivers/irqchip: Add Actions external interrupts
+ support
+In-Reply-To: <20180812122215.1079590-3-pn@denx.de>
+References: <20180812122215.1079590-1-pn@denx.de>
+ <20180812122215.1079590-3-pn@denx.de>
+Message-ID: <64b9ae63-c2b9-a2e0-f648-4bf80f34a57a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Biju,
+On 12/08/18 13:22, Parthiban Nallathambi wrote:
+> Actions Semi Owl family SoC's S500, S700 and S900 provides support
+> for 3 external interrupt controllers through SIRQ pins.
+> 
+> Each line can be independently configured as interrupt and triggers
+> on either of the edges (raising or falling) or either of the levels
+> (high or low) . Each line can also be masked independently.
+> 
+> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+> ---
+>  drivers/irqchip/Makefile       |   1 +
+>  drivers/irqchip/irq-owl-sirq.c | 305 +++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 306 insertions(+)
+>  create mode 100644 drivers/irqchip/irq-owl-sirq.c
+> 
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index 15f268f646bf..072c4409e7c4 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -7,6 +7,7 @@ obj-$(CONFIG_ATH79)			+= irq-ath79-misc.o
+>  obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
+>  obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
+>  obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
+> +obj-$(CONFIG_ARCH_ACTIONS)		+= irq-owl-sirq.o
+>  obj-$(CONFIG_FARADAY_FTINTC010)		+= irq-ftintc010.o
+>  obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
+>  obj-$(CONFIG_ARCH_LPC32XX)		+= irq-lpc32xx.o
+> diff --git a/drivers/irqchip/irq-owl-sirq.c b/drivers/irqchip/irq-owl-sirq.c
+> new file mode 100644
+> index 000000000000..b69301388300
+> --- /dev/null
+> +++ b/drivers/irqchip/irq-owl-sirq.c
+> @@ -0,0 +1,305 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + *
+> + * Actions Semi Owl SoCs SIRQ interrupt controller driver
+> + *
+> + * Copyright (C) 2014 Actions Semi Inc.
+> + * David Liu <liuwei@actions-semi.com>
+> + *
+> + * Author: Parthiban Nallathambi <pn@denx.de>
+> + * Author: Saravanan Sekar <sravanhome@gmail.com>
+> + */
+> +
+> +#include <linux/interrupt.h>
+> +#include <linux/irqchip.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_address.h>
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +#define INTC_GIC_INTERRUPT_PIN		13
 
-> Subject: RE: [PATCH] arm64: dts: renesas: Initial r8a774a1 SoC device tree
->
->
-> Hello Fab,
->
-> > > Subject: RE: [PATCH] arm64: dts: renesas: Initial r8a774a1 SoC device
-> > > tree
-> > >
-> > > Hello Fabrizio,
-> > >
-> > > > Hello Biju,
-> > > >
-> > > > Thank you for your patch.
-> > > >
-> > > > > -----Original Message-----
-> > > > > From: Biju Das <biju.das@bp.renesas.com>
-> > > > > Sent: 13 August 2018 08:42
-> > > > > To: Rob Herring <robh+dt@kernel.org>; Mark Rutland
-> > > > > <mark.rutland@arm.com>; Catalin Marinas
-> > <catalin.marinas@arm.com>;
-> > > > > Will Deacon <will.deacon@arm.com>
-> > > > > Cc: Biju Das <biju.das@bp.renesas.com>; Simon Horman
-> > > > > <horms@verge.net.au>; Magnus Damm <magnus.damm@gmail.com>;
-> > > > > linux-renesas-soc at vger.kernel.org; devicetree at vger.kernel.org;
-> > > > > linux-arm-kernel at lists.infradead.org; Geert Uytterhoeven
-> > > > > <geert+renesas@glider.be>; Chris Paterson
-> > > > > <Chris.Paterson2@renesas.com>; Fabrizio Castro
-> > > > > <fabrizio.castro@bp.renesas.com>
-> > > > > Subject: [PATCH] arm64: dts: renesas: Initial r8a774a1 SoC device
-> > > > > tree
-> > > > >
-> > > > > Basic support for the RZ/G2M SoC.
-> > > > >
-> > > > > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > > > > ---
-> > > > >  arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 192
-> > > > > ++++++++++++++++++++++++++++++
-> > > > >  1 file changed, 192 insertions(+)  create mode 100644
-> > > > > arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-> > > > >
-> > > > > diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-> > > > > b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-> > > > > new file mode 100644
-> > > > > index 0000000..f3641c0
-> > > > > --- /dev/null
-> > > > > +++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-> > > > > @@ -0,0 +1,192 @@
-> > > > > +// SPDX-License-Identifier: GPL-2.0
-> > > > > +/*
-> > > > > + * Device Tree Source for the r8a774a1 SoC
-> > > > > + *
-> > > > > + * Copyright (C) 2018 Renesas Electronics Corp.
-> > > > > + */
-> > > > > +
-> > > > > +#include <dt-bindings/interrupt-controller/irq.h>
-> > > > > +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> > > > > +#include <dt-bindings/clock/renesas-cpg-mssr.h>
-> > > > > +
-> > > > > +#define CPG_AUDIO_CLK_I10
-> > > >
-> > > > I believe there is no use case for this macro, therefore I think
-> > > > this device tree can live without it.
-> > > > With that fixed:
-> > >
-> > > This clock is SoC specific clock similar to R-Car Gen-3 H3/M3/M3N.
-> > > Also the same clock is mentioned in Table  8.2b List of clocks of RZ/G2M
-> > hardware manual. So I think it is ok.
-> > >
-> > >  If you think defining SoC specific clock is wrong in this file , we need to fix
-> > other boards as well.
-> >
-> > I believe that macro is used on other platforms to provide a little bit of
-> > abstraction when defin ing the clocks of rcar_sound, therefore it's ok for the
-> > other boards.
->
-> May be I am missing something here. Can you please clarify the use case of
-> Other boards?
+Why isn't that coming from the DT?
 
-For example:
-* r8a7796-salvator-xs.dts includes r8a7796.dtsi and salvator-xs.dtsi which in
-   turn includes salvator-common.dtsi. CPG_AUDIO_CLK_I is defined in r8a7796.dtsi
-   (with value R8A7796_CLK_S0D4, which translates to 11) and used in salvator-common.dtsi
-* r8a77965-salvator-xs.dts includes r8a77965.dtsi and salvator-xs.dtsi which in
-   turn includes salvator-common.dtsi. CPG_AUDIO_CLK_I is defined in r8a77965.dtsi
-   (with value 10) and used in salvator-common.dtsi
+> +#define INTC_EXTCTL_PENDING		BIT(0)
+> +#define INTC_EXTCTL_CLK_SEL		BIT(4)
+> +#define INTC_EXTCTL_EN			BIT(5)
+> +#define	INTC_EXTCTL_TYPE_MASK		GENMASK(6, 7)
+> +#define	INTC_EXTCTL_TYPE_HIGH		0
+> +#define	INTC_EXTCTL_TYPE_LOW		BIT(6)
+> +#define	INTC_EXTCTL_TYPE_RISING		BIT(7)
+> +#define	INTC_EXTCTL_TYPE_FALLING	(BIT(6) | BIT(7))
+> +
+> +#define get_sirq_offset(x)	chip_data->sirq[x].offset
+> +
+> +/* Per SIRQ data */
+> +struct owl_sirq {
+> +	u16 offset;
+> +	/* software is responsible to clear interrupt pending bit when
+> +	 * type is edge triggered. This value is for per SIRQ line.
+> +	 */
 
-That is just an example, salvator-common.dtsi is included from salvator-x.dtsi as well,
-and both salvator-xs.dtsi and salvator-x.dtsi are included by several board specific
-device trees.
+Please follow the normal multi-line comment style:
 
-My understanding is that the DT architecture for the Salvator family of boards
-allows for maximum reuse of dtsi, macro CPG_AUDIO_CLK_I allows for SoC
-specific definitions while having only one common version of salvator-common.dtsi
-using the value.
+/*
+ * This is a comment, starting with a capital letter and ending with
+ * a full stop.
+ */
 
-So, with the Salvator family of boards they had the need for this, I am not too
-sure we are going to need the same thing here. For the time being we have no use
-case for it (as we are going to upstream the DT for only one board once we know more
-about the HW design), that's why I think we shouldn't put this in. And maybe add it
-later on if the need arises. But as I said, it's just a macro and it's not going to hurt
-anybody...
+> +	bool type_edge;
+> +};
+> +
+> +struct owl_sirq_chip_data {
+> +	void __iomem *base;
+> +	raw_spinlock_t lock;
+> +	/* some SoC's share the register for all SIRQ lines, so maintain
+> +	 * register is shared or not here. This value is from DT.
+> +	 */
+> +	bool shared_reg;
+> +	struct owl_sirq *sirq;
 
-Cheers,
-Fab
+Given that this driver handles at most 3 interrupts, do we need the
+overhead of a pointer and an additional allocation, while we could store
+all of this data in the space taken by the pointer itself?
 
->
-> > We could provide the same thing here, it's not going to hurt anybody, but at
-> > the moment there is no reference design for this new SoC therefore there is
-> > no use case for this, so maybe we could wait until we have a use case for
-> > this?
->
-> > >
-> > >
-> > > > > +
-> > > > > +/ {
-> > > > > +compatible = "renesas,r8a774a1";
-> > > > > +#address-cells = <2>;
-> > > > > +#size-cells = <2>;
-> > > > > +
-> > > > > +/*
-> > > > > + * The external audio clocks are configured as 0 Hz fixed frequency
-> > > > > + * clocks by default.
-> > > > > + * Boards that provide audio clocks should override them.
-> > > > > + */
-> > > > > +audio_clk_a: audio_clk_a {
-> > > > > +compatible = "fixed-clock";
-> > > > > +#clock-cells = <0>;
-> > > > > +clock-frequency = <0>;
-> > > > > +};
-> > > > > +
-> > > > > +audio_clk_b: audio_clk_b {
-> > > > > +compatible = "fixed-clock";
-> > > > > +#clock-cells = <0>;
-> > > > > +clock-frequency = <0>;
-> > > > > +};
-> > > > > +
-> > > > > +audio_clk_c: audio_clk_c {
-> > > > > +compatible = "fixed-clock";
-> > > > > +#clock-cells = <0>;
-> > > > > +clock-frequency = <0>;
-> > > > > +};
-> > > > > +
-> > > > > +/* External CAN clock - to be overridden by boards that provide it */
-> > > > > +can_clk: can {
-> > > > > +compatible = "fixed-clock";
-> > > > > +#clock-cells = <0>;
-> > > > > +clock-frequency = <0>;
-> > > > > +};
-> > > > > +
-> > > > > +cpus {
-> > > > > +#address-cells = <1>;
-> > > > > +#size-cells = <0>;
-> > > > > +
-> > > > > +a57_0: cpu at 0 {
-> > > > > +compatible = "arm,cortex-a57", "arm,armv8";
-> > > > > +reg = <0x0>;
-> > > > > +device_type = "cpu";
-> > > > > +power-domains = <&sysc 0>;
-> > > > > +next-level-cache = <&L2_CA57>;
-> > > > > +enable-method = "psci";
-> > > > > +clocks =<&cpg CPG_CORE 0>;
-> > > > > +};
-> > > > > +
-> > > > > +a57_1: cpu at 1 {
-> > > > > +compatible = "arm,cortex-a57", "arm,armv8";
-> > > > > +reg = <0x1>;
-> > > > > +device_type = "cpu";
-> > > > > +power-domains = <&sysc 1>;
-> > > > > +next-level-cache = <&L2_CA57>;
-> > > > > +enable-method = "psci";
-> > > > > +clocks =<&cpg CPG_CORE 0>;
-> > > > > +};
-> > > > > +
-> > > > > +L2_CA57: cache-controller-0 {
-> > > > > +compatible = "cache";
-> > > > > +power-domains = <&sysc 12>;
-> > > > > +cache-unified;
-> > > > > +cache-level = <2>;
-> > > > > +};
-> > > > > +};
-> > > > > +
-> > > > > +extal_clk: extal {
-> > > > > +compatible = "fixed-clock";
-> > > > > +#clock-cells = <0>;
-> > > > > +/* This value must be overridden by the board */
-> > > > > +clock-frequency = <0>;
-> > > > > +};
-> > > > > +
-> > > > > +extalr_clk: extalr {
-> > > > > +compatible = "fixed-clock";
-> > > > > +#clock-cells = <0>;
-> > > > > +/* This value must be overridden by the board */
-> > > > > +clock-frequency = <0>;
-> > > > > +};
-> > > > > +
-> > > > > +/* External PCIe clock - can be overridden by the board */
-> > > > > +pcie_bus_clk: pcie_bus {
-> > > > > +compatible = "fixed-clock";
-> > > > > +#clock-cells = <0>;
-> > > > > +clock-frequency = <0>;
-> > > > > +};
-> > > > > +
-> > > > > +pmu_a57 {
-> > > > > +compatible = "arm,cortex-a57-pmu";
-> > > > > +interrupts-extended = <&gic GIC_SPI 72
-> > > > IRQ_TYPE_LEVEL_HIGH>,
-> > > > > +      <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-> > > > > +interrupt-affinity = <&a57_0>, <&a57_1>;
-> > > > > +};
-> > > > > +
-> > > > > +psci {
-> > > > > +compatible = "arm,psci-1.0", "arm,psci-0.2";
-> > > > > +method = "smc";
-> > > > > +};
-> > > > > +
-> > > > > +/* External SCIF clock - to be overridden by boards that provide it */
-> > > > > +scif_clk: scif {
-> > > > > +compatible = "fixed-clock";
-> > > > > +#clock-cells = <0>;
-> > > > > +clock-frequency = <0>;
-> > > > > +};
-> > > > > +
-> > > > > +soc {
-> > > > > +compatible = "simple-bus";
-> > > > > +interrupt-parent = <&gic>;
-> > > > > +#address-cells = <2>;
-> > > > > +#size-cells = <2>;
-> > > > > +ranges;
-> > > > > +
-> > > > > +cpg: clock-controller at e6150000 {
-> > > > > +compatible = "renesas,r8a774a1-cpg-mssr";
-> > > > > +reg = <0 0xe6150000 0 0x0bb0>;
-> > > > > +clocks = <&extal_clk>, <&extalr_clk>;
-> > > > > +clock-names = "extal", "extalr";
-> > > > > +#clock-cells = <2>;
-> > > > > +#power-domain-cells = <0>;
-> > > > > +#reset-cells = <1>;
-> > > > > +};
-> > > > > +
-> > > > > +rst: reset-controller at e6160000 {
-> > > > > +compatible = "renesas,r8a774a1-rst";
-> > > > > +reg = <0 0xe6160000 0 0x018c>;
-> > > > > +};
-> > > > > +
-> > > > > +sysc: system-controller at e6180000 {
-> > > > > +compatible = "renesas,r8a774a1-sysc";
-> > > > > +reg = <0 0xe6180000 0 0x0400>;
-> > > > > +#power-domain-cells = <1>;
-> > > > > +};
-> > > > > +
-> > > > > +gic: interrupt-controller at f1010000 {
-> > > > > +compatible = "arm,gic-400";
-> > > > > +#interrupt-cells = <3>;
-> > > > > +#address-cells = <0>;
-> > > > > +interrupt-controller;
-> > > > > +reg = <0x0 0xf1010000 0 0x1000>,
-> > > > > +      <0x0 0xf1020000 0 0x20000>,
-> > > > > +      <0x0 0xf1040000 0 0x20000>,
-> > > > > +      <0x0 0xf1060000 0 0x20000>;
-> > > > > +interrupts = <GIC_PPI 9
-> > > > > +(GIC_CPU_MASK_SIMPLE(2) |
-> > > > IRQ_TYPE_LEVEL_HIGH)>;
-> > > > > +clocks = <&cpg CPG_MOD 408>;
-> > > > > +clock-names = "clk";
-> > > > > +power-domains = <&sysc 32>;
-> > > > > +resets = <&cpg 408>;
-> > > > > +};
-> > > > > +
-> > > > > +prr: chipid at fff00044 {
-> > > > > +compatible = "renesas,prr";
-> > > > > +reg = <0 0xfff00044 0 4>;
-> > > > > +};
-> > > > > +};
-> > > > > +
-> > > > > +timer {
-> > > > > +compatible = "arm,armv8-timer";
-> > > > > +interrupts-extended = <&gic GIC_PPI 13
-> > > > (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-> > > > > +      <&gic GIC_PPI 14
-> > > > (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-> > > > > +      <&gic GIC_PPI 11
-> > > > (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-> > > > > +      <&gic GIC_PPI 10
-> > > > (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
-> > > > > +};
-> > > > > +
-> > > > > +/* External USB clocks - can be overridden by the board */
-> > > > > +usb3s0_clk: usb3s0 {
-> > > > > +compatible = "fixed-clock";
-> > > > > +#clock-cells = <0>;
-> > > > > +clock-frequency = <0>;
-> > > > > +};
-> > > > > +
-> > > > > +usb_extal_clk: usb_extal {
-> > > > > +compatible = "fixed-clock";
-> > > > > +#clock-cells = <0>;
-> > > > > +clock-frequency = <0>;
-> > > > > +};
-> > > > > +};
-> > > > > --
-> > > > > 2.7.4
+Something like:
 
+	u16 offset[3];
+	u8  trigger; // Bit mask indicating edge-triggered interrupts
 
+and we're done.
 
+> +};
+> +
+> +static struct owl_sirq_chip_data *sirq_data;
+> +
+> +static unsigned int sirq_read_extctl(struct irq_data *data)
 
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+Why isn't this taking a struct owl_sirq_chip_data as a parameter instead
+of always passing irq_data?
+
+Also, this should return a well defined size, which "unsigned int"
+isn't. Make that u32.
+
+> +{
+> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
+> +	unsigned int val;
+
+u32;
+
+> +
+> +	val = readl_relaxed(chip_data->base + get_sirq_offset(data->hwirq));
+> +	if (chip_data->shared_reg)
+> +		val = (val >> (2 - data->hwirq) * 8) & 0xff;
+> +
+> +	return val;
+> +}
+> +
+> +static void sirq_write_extctl(struct irq_data *data, unsigned int extctl)
+
+Same comments.
+
+> +{
+> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
+> +	unsigned int val;
+
+u32;
+
+> +
+> +	if (chip_data->shared_reg) {
+> +		val = readl_relaxed(chip_data->base +
+> +				get_sirq_offset(data->hwirq));
+
+Single line, please.
+
+> +		val &= ~(0xff << (2 - data->hwirq) * 8);
+> +		extctl &= 0xff;
+> +		extctl = (extctl << (2 - data->hwirq) * 8) | val;
+> +	}
+> +
+> +	writel_relaxed(extctl, chip_data->base +
+> +			get_sirq_offset(data->hwirq));
+
+Single line.
+
+> +}
+> +
+> +static void owl_sirq_ack(struct irq_data *data)
+> +{
+> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
+> +	unsigned int extctl;
+> +	unsigned long flags;
+> +
+> +	/* software must clear external interrupt pending, when interrupt type
+> +	 * is edge triggered, so we need per SIRQ based clearing.
+> +	 */
+> +	if (chip_data->sirq[data->hwirq].type_edge) {
+> +		raw_spin_lock_irqsave(&chip_data->lock, flags);
+> +
+> +		extctl = sirq_read_extctl(data);
+> +		extctl |= INTC_EXTCTL_PENDING;
+> +		sirq_write_extctl(data, extctl);
+> +
+> +		raw_spin_unlock_irqrestore(&chip_data->lock, flags);
+
+It would make a lot more sense if the lock was taken inside the accessor
+so that the rest of the driver doesn't have to deal with it. Something
+along of the line of:
+
+static void sirq_clear_set_extctl(struct owl_sirq_chip_data *d,
+                                  u32 clear, u32 set)
+{
+	unsigned long flags;
+	u32 val;
+
+	raw_spin_lock_irqsave(&d->lock, flags);
+	val = sirq_read_extctl(d);
+	val &= ~clear;
+	val |= set;
+	sirq_write_extctl(d, val);
+	raw_spin_unlock_irqrestore(&d->lock, flags)
+}
+
+And use that throughout the driver.
+
+> +	}
+> +	irq_chip_ack_parent(data);
+
+That being said, I'm terribly sceptical about this whole function. At
+the end of the day, the flow handler used by the GIC is
+handle_fasteoi_irq, which doesn't call the ack callback at all. So how
+does this work?
+
+> +}
+> +
+> +static void owl_sirq_mask(struct irq_data *data)
+> +{
+> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
+> +	unsigned int extctl;
+> +	unsigned long flags;
+> +
+> +	raw_spin_lock_irqsave(&chip_data->lock, flags);
+> +
+> +	extctl = sirq_read_extctl(data);
+> +	extctl &= ~(INTC_EXTCTL_EN);
+> +	sirq_write_extctl(data, extctl);
+> +
+> +	raw_spin_unlock_irqrestore(&chip_data->lock, flags);
+> +	irq_chip_mask_parent(data);
+> +}
+> +
+> +static void owl_sirq_unmask(struct irq_data *data)
+> +{
+> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
+> +	unsigned int extctl;
+> +	unsigned long flags;
+> +
+> +	raw_spin_lock_irqsave(&chip_data->lock, flags);
+> +
+> +	extctl = sirq_read_extctl(data);
+> +	extctl |= INTC_EXTCTL_EN;
+> +	sirq_write_extctl(data, extctl);
+> +
+> +	raw_spin_unlock_irqrestore(&chip_data->lock, flags);
+> +	irq_chip_unmask_parent(data);
+> +}
+> +
+> +/* PAD_PULLCTL needs to be defined in pinctrl */
+> +static int owl_sirq_set_type(struct irq_data *data, unsigned int flow_type)
+> +{
+> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
+> +	unsigned int extctl, type;
+> +	unsigned long flags;
+> +
+> +	switch (flow_type) {
+> +	case IRQF_TRIGGER_LOW:
+> +		type = INTC_EXTCTL_TYPE_LOW;
+> +		break;
+> +	case IRQF_TRIGGER_HIGH:
+> +		type = INTC_EXTCTL_TYPE_HIGH;
+> +		break;
+> +	case IRQF_TRIGGER_FALLING:
+> +		type = INTC_EXTCTL_TYPE_FALLING;
+> +		chip_data->sirq[data->hwirq].type_edge = true;
+> +		break;
+> +	case IRQF_TRIGGER_RISING:
+> +		type = INTC_EXTCTL_TYPE_RISING;
+> +		chip_data->sirq[data->hwirq].type_edge = true;
+> +		break;
+
+So let's say I configure an interrupt as edge, then switch it to level.
+The edge setting remains and bad things will happen.
+
+> +	default:
+> +		return  -EINVAL;
+> +	}
+> +
+> +	raw_spin_lock_irqsave(&chip_data->lock, flags);
+> +
+> +	extctl = sirq_read_extctl(data);
+> +	extctl &= ~INTC_EXTCTL_TYPE_MASK;
+> +	extctl |= type;
+> +	sirq_write_extctl(data, extctl);
+> +
+> +	raw_spin_unlock_irqrestore(&chip_data->lock, flags);
+> +	data = data->parent_data;
+> +	return irq_chip_set_type_parent(data, flow_type);
+> +}
+> +
+> +static struct irq_chip owl_sirq_chip = {
+> +	.name		= "owl-sirq",
+> +	.irq_ack	= owl_sirq_ack,
+> +	.irq_mask	= owl_sirq_mask,
+> +	.irq_unmask	= owl_sirq_unmask,
+> +	.irq_set_type	= owl_sirq_set_type,
+> +	.irq_eoi	= irq_chip_eoi_parent,
+> +	.irq_retrigger	= irq_chip_retrigger_hierarchy,
+> +};
+> +
+> +static int owl_sirq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+> +				 unsigned int nr_irqs, void *arg)
+> +{
+> +	struct irq_fwspec *fwspec = arg;
+> +	struct irq_fwspec parent_fwspec = {
+> +		.param_count	= 3,
+> +		.param[0]	= GIC_SPI,
+> +		.param[1]	= fwspec->param[0] + INTC_GIC_INTERRUPT_PIN,
+> +		.param[2]	= fwspec->param[1],
+
+param[2] is supposed to be the trigger configuration. Your driver
+supports LEVEL_LOW and EDGE_FALLING, which the GIC cannot handle. And
+yet you're passing it directly.
+
+> +		.fwnode		= domain->parent->fwnode,
+> +	};
+> +
+> +	if (WARN_ON(nr_irqs != 1))
+> +		return -EINVAL;
+> +
+> +	irq_domain_set_hwirq_and_chip(domain, virq, fwspec->param[0],
+> +				      &owl_sirq_chip,
+> +				      domain->host_data);
+> +
+> +	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs,
+> +					    &parent_fwspec);
+> +}
+> +
+> +static const struct irq_domain_ops sirq_domain_ops = {
+> +	.alloc	= owl_sirq_domain_alloc,
+> +	.free	= irq_domain_free_irqs_common,
+
+No translation method? Again, how does this work?
+
+> +};
+> +
+> +static void owl_sirq_clk_init(int offset, int hwirq)
+> +{
+> +	unsigned int val;
+> +
+> +	/* register default clock is 32Khz, change to 24Mhz only when defined */
+> +	val = readl_relaxed(sirq_data->base + offset);
+> +	if (sirq_data->shared_reg)
+> +		val |= INTC_EXTCTL_CLK_SEL << (2 - hwirq) * 8;
+> +	else
+> +		val |= INTC_EXTCTL_CLK_SEL;
+> +
+> +	writel_relaxed(val, sirq_data->base + offset);
+> +}
+
+I've asked questions about this in the first review, and you didn't
+answer. Why is it even configurable? How do you choose the sample rate?
+What's the drawback of always setting it one way or the other?
+
+> +
+> +static int __init owl_sirq_of_init(struct device_node *node,
+> +					struct device_node *parent)
+> +{
+> +	struct irq_domain *domain, *domain_parent;
+> +	int ret = 0, i, sirq_cnt = 0;
+> +	struct owl_sirq_chip_data *chip_data;
+> +
+> +	sirq_cnt = of_property_count_u32_elems(node, "actions,sirq-offset");
+> +	if (sirq_cnt <= 0) {
+> +		pr_err("owl_sirq: register offset not specified\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	chip_data = kzalloc(sizeof(*chip_data), GFP_KERNEL);
+> +	if (!chip_data)
+> +		return -ENOMEM;
+> +	sirq_data = chip_data;
+> +
+> +	chip_data->sirq = kcalloc(sirq_cnt, sizeof(*chip_data->sirq),
+> +				GFP_KERNEL);
+> +	if (!chip_data->sirq)
+> +		goto out_free;
+> +
+> +	raw_spin_lock_init(&chip_data->lock);
+> +	chip_data->base = of_iomap(node, 0);
+> +	if (!chip_data->base) {
+> +		pr_err("owl_sirq: unable to map sirq register\n");
+> +		ret = -ENXIO;
+> +		goto out_free;
+> +	}
+> +
+> +	chip_data->shared_reg = of_property_read_bool(node,
+> +						"actions,sirq-shared-reg");
+> +	for (i = 0; i < sirq_cnt; i++) {
+> +		u32 value;
+> +
+> +		ret = of_property_read_u32_index(node, "actions,sirq-offset",
+> +						i, &value);
+> +		if (ret)
+> +			goto out_unmap;
+> +
+> +		get_sirq_offset(i) = (u16)value;
+> +
+> +		ret = of_property_read_u32_index(node, "actions,sirq-clk-sel",
+> +						i, &value);
+> +		if (ret || !value)
+> +			continue;
+> +
+> +		/* external interrupt controller can be either connect to 32Khz/
+> +		 * 24Mhz external/internal clock. This shall be configured for
+> +		 * per SIRQ line. It can be defined from DT, failing defaults to
+> +		 * 24Mhz clock.
+> +		 */
+> +		owl_sirq_clk_init(get_sirq_offset(i), i);
+> +	}
+> +
+> +	domain_parent = irq_find_host(parent);
+> +	if (!domain_parent) {
+> +		pr_err("owl_sirq: interrupt-parent not found\n");
+> +		goto out_unmap;
+> +	}
+> +
+> +	domain = irq_domain_add_hierarchy(domain_parent, 0,
+> +			sirq_cnt, node,
+> +			&sirq_domain_ops, chip_data);
+> +	if (!domain) {
+> +		ret = -ENOMEM;
+> +		goto out_unmap;
+> +	}
+> +
+> +	return 0;
+> +
+> +out_unmap:
+> +	iounmap(chip_data->base);
+> +out_free:
+> +	kfree(chip_data);
+> +	kfree(chip_data->sirq);
+> +	return ret;
+> +}
+> +
+> +IRQCHIP_DECLARE(owl_sirq, "actions,owl-sirq", owl_sirq_of_init);
+> 
+
+As it stands, this driver is nowhere near ready. I don't even understand
+how edge signalling works. Also, I'd appreciate if you could answer my
+comments before respining another version.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
