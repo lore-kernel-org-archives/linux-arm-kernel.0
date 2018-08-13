@@ -1,53 +1,51 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Mon, 13 Aug 2018 16:51:22 +0200
-Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180813131723.GC28360@redhat.com>
-References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
- <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
- <CAPhsuW49+qA7kT7yE4tgbnAuox-iOzssg-jc2abG8XDo6XeX8A@mail.gmail.com>
- <95a1221e-aecc-42be-5239-a2c2429be176@linux.ibm.com>
- <20180813115019.GB28360@redhat.com>
- <fa85d19f-b22c-e09c-b8d2-f68f0c79de15@linux.ibm.com>
- <20180813131723.GC28360@redhat.com>
-Message-ID: <20180813145121.GD28360@redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 13 Aug 2018 15:57:20 +0100
+Subject: [PATCH 02/37] arm64: KVM: Handle Set/Way CMOs as NOPs if FWB is
+ present
+In-Reply-To: <20180813145755.16566-1-marc.zyngier@arm.com>
+References: <20180813145755.16566-1-marc.zyngier@arm.com>
+Message-ID: <20180813145755.16566-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/13, Oleg Nesterov wrote:
->
-> On 08/13, Ravi Bangoria wrote:
-> >
-> > > But damn, process creation (exec) is trivial. We could add a new uprobe_exec()
-> > > hook and avoid delayed_uprobe_install() in uprobe_mmap().
-> >
-> > I'm sorry. I didn't get this.
->
-> Sorry for confusion...
->
-> I meant, if only exec*( could race with _register(), we could add another uprobe
-> hook which updates all (delayed) counters before return to user-mode.
->
-> > > Afaics, the really problematic case is dlopen() which can race with _register()
-> > > too, right?
-> >
-> > dlopen() should internally use mmap() right? So what is the problem here? Can
-> > you please elaborate.
->
-> What I tried to say is that we can't avoid uprobe_mmap()->delayed_uprobe_install()
-> because dlopen() can race with _register() too, just like exec.
+Set/Way handling is one of the ugliest corners of KVM. We shouldn't
+have to handle that, but better safe than sorry.
 
-I'm afraid I added even more confusion... so let me clarify although I am sure you
-understand this better than me ;)
+Thankfully, FWB fixes this for us by not requiering any maintenance
+(the guest is forced to use cacheable memory, no matter what it says,
+and the whole system is garanteed to be cache coherent), which means
+we don't have to emulate S/W CMOs, and don't have to track VM ops either.
 
-of course, the main reason why we can't avoid uprobe_mmap()->delayed_uprobe_install()
-is not the race with _register(), the main reason is that dlopen() can mmap the code
-first, then mmap the counter we need to increment.
+We still have to trap S/W though, if only to prevent the guest from
+doing something bad.
 
-Again, just like exec, but exec is "atomic" in that it can't return to user-mode until
-evrything is done, so we could add another uprobe hook and avoid delayed_uprobe_install
-in uprobe_mmap().
+Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/sys_regs.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-Just in case my previous email was not clear.
-
-Oleg.
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index a4363735d3f8..774d72155904 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -194,7 +194,16 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
+ 	if (!p->is_write)
+ 		return read_from_write_only(vcpu, p, r);
+ 
+-	kvm_set_way_flush(vcpu);
++	/*
++	 * Only track S/W ops if we don't have FWB. It still indicates
++	 * that the guest is a bit broken (S/W operations should only
++	 * be done by firmware, knowing that there is only a single
++	 * CPU left in the system, and certainly not from non-secure
++	 * software).
++	 */
++	if (!cpus_have_const_cap(ARM64_HAS_STAGE2_FWB))
++		kvm_set_way_flush(vcpu);
++
+ 	return true;
+ }
+ 
+-- 
+2.18.0
