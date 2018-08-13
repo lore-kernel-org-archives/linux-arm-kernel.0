@@ -1,127 +1,66 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Mon, 13 Aug 2018 16:11:07 +0900
-Subject: [PATCH] drm/rockchip: update cursors asynchronously through
- atomic.
-In-Reply-To: <20180806155339.9473-1-enric.balletbo@collabora.com>
-References: <20180806155339.9473-1-enric.balletbo@collabora.com>
-Message-ID: <CAAFQd5CGhkfTRzSdTqtFh4zuQuFH0H5SVyKWtk98Ceh_izo4=A@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 13 Aug 2018 09:13:29 +0200
+Subject: [PATCH 1/4] ARM: dts: exynos: Add missing used PMIC regulators on
+ Exynos5422 Odroid boards
+In-Reply-To: <CANAwSgQBthsKMKBBnKBnCJdKwKOMm0XKRn5r=gnpdbC6Eu9=ag@mail.gmail.com>
+References: <20180806160933.6578-1-krzk@kernel.org>
+ <CANAwSgTYviRnLjVU50w_o5k6=iMjxqU5qQ+7RW9K43KrrqRKPA@mail.gmail.com>
+ <CAJKOXPds5s8omeR7UOB4u4HrYCZBTJX3t4YU4PSWBGb-9MG7iw@mail.gmail.com>
+ <CANAwSgQBthsKMKBBnKBnCJdKwKOMm0XKRn5r=gnpdbC6Eu9=ag@mail.gmail.com>
+Message-ID: <CAJKOXPdcyRavWHEowbg3Ob=55F5ta6xRUb9_A_e7sG_MFy-k7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Enric,
+On 13 August 2018 at 08:37, Anand Moon <linux.amoon@gmail.com> wrote:
+> Hi Krzysztof,
+>
+> On Sun, 12 Aug 2018 at 18:55, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>>
+>> On 11 August 2018 at 08:39, Anand Moon <linux.amoon@gmail.com> wrote:
+>> > Hi Krzysztof,
+>> >
+>> > These patches should also be ported to u-boot to enable PMIC.
+>> >
+>> > I was just looking into S2MPS11B data sheet
+>> > According to the 1.2 Key Features of  S2MPS11
+>> >
+>> > BUCK1, BUCK2, BUCK3, BUCK4, BUCK6 have (0.65 V to 1.6 V) min /max range.
+>> > BUCK5 have (0.65 V to 2.0 V) min /max range.
+>> > BUCK7 have (1.2 V to 1.5 V) min / max range.
+>> > BUCK8 have (1.8 V to 2.1 V) min / max range.
+>> > BUCK10 have (0.75 V to 1.4 V) min / max range.
+>> >
+>> > BUCKBOST9 (3.0 V to 3.75 V) min / max range.
+>> >
+>> > LDO1, LDO6, LDO11, LDO22, LDO23, LDO27, LDO35 (0.8 V to 2.375 V) min / max range
+>> >
+>> > LDO2, LDO3, LDO5, LDO7, LDO9, LDO10, LD012, LDO13, LDO14, LDO15,
+>> > LDO16, LDO17, LDO18, LDO19, LDO20, LD021, LDO24, LDO25, LDO26,
+>> > LDO28, LDO29, LDO30, LDO31, LDO32, LDO33, LDO34, LDO36, LDO37, LDO38
+>> > (0.8 V to 3.95 V) min / max range
+>> >
+>> > I am aware off we have configures the min/max range as per board schematics.
+>> > but each regulator support dynamic voltage scale and have different
+>> > turn on/off voltage and current rating.
+>> >
+>> > So why are we not setting the regulator-min-microvolt /
+>> > regulator-max-microvolt as per datasheets.
+>> > Please correct me if I am wrong.
+>>
+>> Which regulators are not configured as in datasheet?
+>>
+>> Best regards,
+>> Krzysztof
+>
+> Almost all the regulator have some miss default match of min/max setting.
+> I have tried to adjust the setting on top your above patches.
+>
+> I am attaching my patch diff for testing.
+> I have have perform some stress testing and found no issue at my end.
 
-On Tue, Aug 7, 2018 at 12:53 AM Enric Balletbo i Serra
-<enric.balletbo@collabora.com> wrote:
->
-> Add support to async updates of cursors by using the new atomic
-> interface for that.
->
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> ---
-> Hi,
->
-> This first version is slightly different from the RFC, note that I did
-> not maintain the Sean reviewed tag for that reason. With this version I
-> don't touch the atomic_update function and all is implemented in the
-> async_check/update functions. See the changelog for a list of changes.
->
-> The patch was tested on a Samsung Chromebook Plus in two ways.
->
->  1. Running all igt kms_cursor_legacy and kms_atomic at plane_cursor_legacy
->     tests and see that there is no regression after the patch.
->
->  2. Running weston using the atomic API.
-
-Thanks for the patch. This feature might look like a really minor
-thing, but we really had hard time dealing with users complaints, so
-having this in upstream would be a really useful thing.
-
-Let me post some comments inline.
-
->
-> Best regards,
->   Enric
->
-> Changes in v1:
-> - Rebased on top of drm-misc
-> - In async_check call drm_atomic_helper_check_plane_state to check that
->   the desired plane is valid and update various bits of derived state
->   (clipped coordinates etc.)
-> - In async_check allow to configure new scaling in the fast path.
-> - In async_update force to flush all registered PSR encoders.
-> - In async_update call atomic_update directly.
-> - In async_update call vop_cfg_done needed to set the vop registers and take effect.
->
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 53 +++++++++++++++++++++
->  1 file changed, 53 insertions(+)
->
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index e9f91278137d..dab70056ee73 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -811,10 +811,63 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
->         spin_unlock(&vop->reg_lock);
->  }
->
-> +static int vop_plane_atomic_async_check(struct drm_plane *plane,
-> +                                       struct drm_plane_state *state)
-> +{
-> +       struct vop_win *vop_win = to_vop_win(plane);
-> +       const struct vop_win_data *win = vop_win->data;
-> +       int min_scale = win->phy->scl ? FRAC_16_16(1, 8) :
-> +                                       DRM_PLANE_HELPER_NO_SCALING;
-> +       int max_scale = win->phy->scl ? FRAC_16_16(8, 1) :
-> +                                       DRM_PLANE_HELPER_NO_SCALING;
-> +       int ret;
-> +
-> +       if (plane != state->crtc->cursor)
-> +               return -EINVAL;
-> +
-> +       if (!plane->state)
-> +               return -EINVAL;
-> +
-> +       if (!plane->state->fb ||
-> +           plane->state->fb != state->fb)
-> +               return -EINVAL;
-
-While it covers for quite a big part of cursor movements, you may
-still expect jumpy cursor when hoovering text boxes or hyperlinks,
-since it changes the cursor image. Our downstream patch [1] actually
-took care of changing the framebuffer as well, although with the added
-complexity of referencing the old buffer at update time and releasing
-it in a flip work.
-
-[1] https://chromium.git.corp.google.com/chromiumos/third_party/kernel/+/1ad887e1a1349991c9e137b48cb32086e65347fc%5E%21/
-
-> +
-> +       ret = drm_atomic_helper_check_plane_state(plane->state,
-> +                                                 plane->crtc->state,
-> +                                                 min_scale, max_scale,
-> +                                                 true, true);
-> +       return ret;
-> +}
-> +
-> +static void vop_plane_atomic_async_update(struct drm_plane *plane,
-> +                                         struct drm_plane_state *new_state)
-> +{
-> +       struct vop *vop = to_vop(plane->state->crtc);
-> +
-> +       plane->state->crtc_x = new_state->crtc_x;
-> +       plane->state->crtc_y = new_state->crtc_y;
-> +       plane->state->crtc_h = new_state->crtc_h;
-> +       plane->state->crtc_w = new_state->crtc_w;
-> +       plane->state->src_x = new_state->src_x;
-> +       plane->state->src_y = new_state->src_y;
-> +       plane->state->src_h = new_state->src_h;
-> +       plane->state->src_w = new_state->src_w;
-> +
-> +       if (vop->is_enabled) {
-> +               rockchip_drm_psr_flush_all(plane->dev);
-
-We should use the inhibit mechanism when accessing VOP hardware. While
-the flush is expected to keep the PSR disabled for at least 100 ms,
-we're not in any atomic (pun not intended) context here and might get
-preempted for some unspecified time in very high load conditions.
+All the regulators you touched in this patch have proper setting of
+min and max values. They are configured to the values required by
+hardware, as in schematics.
 
 Best regards,
-Tomasz
+Krzysztof
