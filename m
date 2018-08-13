@@ -1,98 +1,52 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Mon, 13 Aug 2018 15:50:17 +0800
-Subject: [PATCH v4 5/5] iommu/arm-smmu-v3: add bootup option "arm_iommu"
-In-Reply-To: <c46fa263-2dfa-b8fc-b2c1-0b1bf6029748@arm.com>
-References: <1533558424-16748-1-git-send-email-thunder.leizhen@huawei.com>
- <1533558424-16748-6-git-send-email-thunder.leizhen@huawei.com>
- <c46fa263-2dfa-b8fc-b2c1-0b1bf6029748@arm.com>
-Message-ID: <5B713839.1010609@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 13 Aug 2018 08:51:54 +0100
+Subject: [PATCH v2 1/3] dt-bindings: interrupt-controller: Actions
+ external interrupt controller
+In-Reply-To: <20180813043406.GA16275@Mani-XPS-13-9360>
+References: <20180812122215.1079590-1-pn@denx.de>
+ <20180812122215.1079590-2-pn@denx.de>
+ <20180813043406.GA16275@Mani-XPS-13-9360>
+Message-ID: <f1043a48-6c8d-cf08-d6a1-582d84ea2530@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2018/8/9 19:08, Robin Murphy wrote:
-> On 06/08/18 13:27, Zhen Lei wrote:
->> Add a bootup option to make the system manager can choose which mode to
->> be used. The default mode is strict.
+On 13/08/18 05:34, Manivannan Sadhasivam wrote:
+> Hi Parthiban,
+> 
+> On Sun, Aug 12, 2018 at 02:22:13PM +0200, Parthiban Nallathambi wrote:
+>> Actions Semi OWL family SoC's provides support for external interrupt
+>> controller to be connected and controlled using SIRQ pins. S500, S700
+>> and S900 provides 3 SIRQ lines and works independently for 3 external
+>> interrupt controllers.
 >>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+>> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
 >> ---
->>   Documentation/admin-guide/kernel-parameters.txt |  9 +++++++++
->>   drivers/iommu/arm-smmu-v3.c                     | 17 ++++++++++++++++-
->>   2 files changed, 25 insertions(+), 1 deletion(-)
+>>  .../interrupt-controller/actions,owl-sirq.txt      | 46 ++++++++++++++++++++++
+>>  1 file changed, 46 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
 >>
->> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
->> index 533ff5c..426e989 100644
->> --- a/Documentation/admin-guide/kernel-parameters.txt
->> +++ b/Documentation/admin-guide/kernel-parameters.txt
->> @@ -1720,6 +1720,15 @@
->>           nobypass    [PPC/POWERNV]
->>               Disable IOMMU bypass, using IOMMU for PCI devices.
->>
->> +    arm_iommu=    [ARM64]
->> +        non-strict    [Default Off]
+>> diff --git a/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
+>> new file mode 100644
+>> index 000000000000..4b8437751331
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
+>> @@ -0,0 +1,46 @@
+>> +Actions Semi Owl SoCs SIRQ interrupt controller
+>> +
+>> +S500, S700 and S900 SoC's from Actions provides 3 SPI's from GIC,
+>> +in which external interrupt controller can be connected. 3 SPI's
+>> +45, 46, 47 from GIC are directly exposed as SIRQ. It has
+>> +the following properties:
 > 
-> Again, I'd much rather have "iommu.non_strict= { "0" | "1" }" in line with the passthrough option.
+> We should really document the driver here. What it does? and how the
+> hierarchy is handled with GIC? etc...
 
-OK?I will change it in the next version.
+Absolutely not. This should document the binding, irrespective of the
+operating system. The word "driver" is completely out of place here.
 
-> 
-> Robin.
-> 
->> +            Put off TLBs invalidation and release memory first.
->> +            It's good for scatter-gather performance but lacks full
->> +            isolation, an untrusted device can access the reused
->> +            memory because the TLBs may still valid. Please take
->> +            full consideration before choosing this mode.
->> +            Note that, VFIO will always use strict mode.
->> +
->>       iommu.passthrough=
->>               [ARM64] Configure DMA to bypass the IOMMU by default.
->>               Format: { "0" | "1" }
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 904bc1e..9a30892 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -631,6 +631,21 @@ struct arm_smmu_option_prop {
->>       { 0, NULL},
->>   };
->>
->> +static u32 smmu_non_strict __read_mostly;
->> +
->> +static int __init arm_smmu_setup(char *str)
->> +{
->> +    if (!strncmp(str, "non-strict", 10)) {
->> +        smmu_non_strict = 1;
->> +        pr_warn("WARNING: iommu non-strict mode is chosen.\n"
->> +            "It's good for scatter-gather performance but lacks full isolation\n");
->> +        add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
->> +    }
->> +
->> +    return 0;
->> +}
->> +early_param("arm_iommu", arm_smmu_setup);
->> +
->>   static inline void __iomem *arm_smmu_page1_fixup(unsigned long offset,
->>                            struct arm_smmu_device *smmu)
->>   {
->> @@ -1622,7 +1637,7 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
->>       if (smmu->features & ARM_SMMU_FEAT_COHERENCY)
->>           pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
->>
->> -    if (domain->type == IOMMU_DOMAIN_DMA) {
->> +    if ((domain->type == IOMMU_DOMAIN_DMA) && smmu_non_strict) {
->>           domain->non_strict = 1;
->>           pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
->>       }
->> -- 
->> 1.8.3
->>
->>
-> 
-> .
-> 
+Thanks,
 
+	M.
 -- 
-Thanks!
-BestRegards
+Jazz is not dead. It just smells funny...
