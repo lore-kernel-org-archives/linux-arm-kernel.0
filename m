@@ -1,148 +1,119 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Aug 2018 15:57:52 +0100
-Subject: [PATCH 34/37] KVM: arm/arm64: vgic: Do not use
- spin_lock_irqsave/restore with irq disabled
+Date: Mon, 13 Aug 2018 15:57:48 +0100
+Subject: [PATCH 30/37] KVM: arm/arm64: vgic-v3: Add core support for Group0
+ SGIs
 In-Reply-To: <20180813145755.16566-1-marc.zyngier@arm.com>
 References: <20180813145755.16566-1-marc.zyngier@arm.com>
-Message-ID: <20180813145755.16566-35-marc.zyngier@arm.com>
+Message-ID: <20180813145755.16566-31-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jia He <hejianet@gmail.com>
+Although vgic-v3 now supports Group0 interrupts, it still doesn't
+deal with Group0 SGIs. As usually with the GIC, nothing is simple:
 
-kvm_vgic_sync_hwstate is only called with IRQ being disabled.
-There is thus no need to call spin_lock_irqsave/restore in
-vgic_fold_lr_state and vgic_prune_ap_list.
+- ICC_SGI1R can signal SGIs of both groups, since GICD_CTLR.DS==1
+  with KVM (as per 8.1.10, Non-secure EL1 access)
 
-This patch replace them with the non irq-safe version.
+- ICC_SGI0R can only generate Group0 SGIs
 
-Signed-off-by: Jia He <jia.he@hxt-semitech.com>
-Acked-by: Christoffer Dall <christoffer.dall@arm.com>
-[maz: commit message tidy-up]
+- ICC_ASGI1R sees its scope refocussed to generate only Group0
+  SGIs (as per the note at the bottom of Table 8-14)
+
+We only support Group1 SGIs so far, so no material change.
+
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-v2.c |  7 ++++---
- virt/kvm/arm/vgic/vgic-v3.c |  7 ++++---
- virt/kvm/arm/vgic/vgic.c    | 13 +++++++------
- 3 files changed, 15 insertions(+), 12 deletions(-)
+ arch/arm/kvm/coproc.c            |  2 +-
+ arch/arm64/kvm/sys_regs.c        |  2 +-
+ include/kvm/arm_vgic.h           |  2 +-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 19 +++++++++++++++----
+ 4 files changed, 18 insertions(+), 7 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index df5e6a6e3186..69b892abd7dc 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -62,7 +62,8 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	struct vgic_v2_cpu_if *cpuif = &vgic_cpu->vgic_v2;
- 	int lr;
--	unsigned long flags;
-+
-+	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index 3a02e76699a6..b17c52608a19 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -253,7 +253,7 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
+ 	reg = (u64)*vcpu_reg(vcpu, p->Rt2) << 32;
+ 	reg |= *vcpu_reg(vcpu, p->Rt1) ;
  
- 	cpuif->vgic_hcr &= ~GICH_HCR_UIE;
+-	vgic_v3_dispatch_sgi(vcpu, reg);
++	vgic_v3_dispatch_sgi(vcpu, reg, true);
  
-@@ -83,7 +84,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
- 
- 		irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
- 
--		spin_lock_irqsave(&irq->irq_lock, flags);
-+		spin_lock(&irq->irq_lock);
- 
- 		/* Always preserve the active bit */
- 		irq->active = !!(val & GICH_LR_ACTIVE_BIT);
-@@ -126,7 +127,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
- 				vgic_irq_set_phys_active(irq, false);
- 		}
- 
--		spin_unlock_irqrestore(&irq->irq_lock, flags);
-+		spin_unlock(&irq->irq_lock);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
- 
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 530b8491c892..9c0dd234ebe8 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -46,7 +46,8 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
- 	struct vgic_v3_cpu_if *cpuif = &vgic_cpu->vgic_v3;
- 	u32 model = vcpu->kvm->arch.vgic.vgic_model;
- 	int lr;
--	unsigned long flags;
-+
-+	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
- 
- 	cpuif->vgic_hcr &= ~ICH_HCR_UIE;
- 
-@@ -75,7 +76,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
- 		if (!irq)	/* An LPI could have been unmapped. */
- 			continue;
- 
--		spin_lock_irqsave(&irq->irq_lock, flags);
-+		spin_lock(&irq->irq_lock);
- 
- 		/* Always preserve the active bit */
- 		irq->active = !!(val & ICH_LR_ACTIVE_BIT);
-@@ -118,7 +119,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
- 				vgic_irq_set_phys_active(irq, false);
- 		}
- 
--		spin_unlock_irqrestore(&irq->irq_lock, flags);
-+		spin_unlock(&irq->irq_lock);
- 		vgic_put_irq(vcpu->kvm, irq);
- 	}
- 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index c22cea678a66..7cfdfbc910e0 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -593,10 +593,11 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
- 	struct vgic_irq *irq, *tmp;
--	unsigned long flags;
-+
-+	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
- 
- retry:
--	spin_lock_irqsave(&vgic_cpu->ap_list_lock, flags);
-+	spin_lock(&vgic_cpu->ap_list_lock);
- 
- 	list_for_each_entry_safe(irq, tmp, &vgic_cpu->ap_list_head, ap_list) {
- 		struct kvm_vcpu *target_vcpu, *vcpuA, *vcpuB;
-@@ -637,7 +638,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
- 		/* This interrupt looks like it has to be migrated. */
- 
- 		spin_unlock(&irq->irq_lock);
--		spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
-+		spin_unlock(&vgic_cpu->ap_list_lock);
- 
- 		/*
- 		 * Ensure locking order by always locking the smallest
-@@ -651,7 +652,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
- 			vcpuB = vcpu;
- 		}
- 
--		spin_lock_irqsave(&vcpuA->arch.vgic_cpu.ap_list_lock, flags);
-+		spin_lock(&vcpuA->arch.vgic_cpu.ap_list_lock);
- 		spin_lock_nested(&vcpuB->arch.vgic_cpu.ap_list_lock,
- 				 SINGLE_DEPTH_NESTING);
- 		spin_lock(&irq->irq_lock);
-@@ -676,7 +677,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
- 
- 		spin_unlock(&irq->irq_lock);
- 		spin_unlock(&vcpuB->arch.vgic_cpu.ap_list_lock);
--		spin_unlock_irqrestore(&vcpuA->arch.vgic_cpu.ap_list_lock, flags);
-+		spin_unlock(&vcpuA->arch.vgic_cpu.ap_list_lock);
- 
- 		if (target_vcpu_needs_kick) {
- 			kvm_make_request(KVM_REQ_IRQ_PENDING, target_vcpu);
-@@ -686,7 +687,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
- 		goto retry;
- 	}
- 
--	spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
-+	spin_unlock(&vgic_cpu->ap_list_lock);
+ 	return true;
  }
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index e04aacb2a24c..aba6755c816d 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -255,7 +255,7 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
+ 	if (!p->is_write)
+ 		return read_from_write_only(vcpu, p, r);
  
- static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
+-	vgic_v3_dispatch_sgi(vcpu, p->regval);
++	vgic_v3_dispatch_sgi(vcpu, p->regval, true);
+ 
+ 	return true;
+ }
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index c134790be32c..4f31f96bbfab 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -373,7 +373,7 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_vgic_reset_mapped_irq(struct kvm_vcpu *vcpu, u32 vintid);
+ 
+-void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
++void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg, bool allow_group1);
+ 
+ /**
+  * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 88e78b582139..a2a175b08b17 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -900,7 +900,8 @@ static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
+ /**
+  * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
+  * @vcpu: The VCPU requesting a SGI
+- * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
++ * @reg: The value written into ICC_{ASGI1,SGI0,SGI1}R by that VCPU
++ * @allow_group1: Does the sysreg access allow generation of G1 SGIs
+  *
+  * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
+  * This will trap in sys_regs.c and call this function.
+@@ -910,7 +911,7 @@ static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
+  * check for matching ones. If this bit is set, we signal all, but not the
+  * calling VCPU.
+  */
+-void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
++void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg, bool allow_group1)
+ {
+ 	struct kvm *kvm = vcpu->kvm;
+ 	struct kvm_vcpu *c_vcpu;
+@@ -959,9 +960,19 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+ 		irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
+ 
+ 		spin_lock_irqsave(&irq->irq_lock, flags);
+-		irq->pending_latch = true;
+ 
+-		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
++		/*
++		 * An access targetting Group0 SGIs can only generate
++		 * those, while an access targetting Group1 SGIs can
++		 * generate interrupts of either group.
++		 */
++		if (!irq->group || allow_group1) {
++			irq->pending_latch = true;
++			vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
++		} else {
++			spin_unlock_irqrestore(&irq->irq_lock, flags);
++		}
++
+ 		vgic_put_irq(vcpu->kvm, irq);
+ 	}
+ }
 -- 
 2.18.0
