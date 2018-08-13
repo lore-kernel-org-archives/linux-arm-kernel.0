@@ -1,135 +1,45 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Aug 2018 15:57:42 +0100
-Subject: [PATCH 24/37] KVM: arm64: Share the parts of get/set events useful to
- 32bit
+Date: Mon, 13 Aug 2018 15:57:55 +0100
+Subject: [PATCH 37/37] KVM: arm/arm64: Skip updating PTE entry if no change
 In-Reply-To: <20180813145755.16566-1-marc.zyngier@arm.com>
 References: <20180813145755.16566-1-marc.zyngier@arm.com>
-Message-ID: <20180813145755.16566-25-marc.zyngier@arm.com>
+Message-ID: <20180813145755.16566-38-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+From: Punit Agrawal <punit.agrawal@arm.com>
 
-The get/set events helpers to do some work to check reserved
-and padding fields are zero. This is useful on 32bit too.
+When there is contention on faulting in a particular page table entry
+at stage 2, the break-before-make requirement of the architecture can
+lead to additional refaulting due to TLB invalidation.
 
-Move this code into virt/kvm/arm/arm.c, and give the arch
-code some underscores.
+Avoid this by skipping a page table update if the new value of the PTE
+matches the previous value.
 
-This is temporarily hidden behind __KVM_HAVE_VCPU_EVENTS until
-32bit is wired up.
-
-Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Dongjiu Geng <gengdongjiu@huawei.com>
+Cc: stable at vger.kernel.org
+Fixes: d5d8184d35c9 ("KVM: ARM: Memory virtualization setup")
+Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_host.h |  8 ++++----
- arch/arm64/kvm/guest.c            | 21 ++++-----------------
- virt/kvm/arm/arm.c                | 28 ++++++++++++++++++++++++++++
- 3 files changed, 36 insertions(+), 21 deletions(-)
+ virt/kvm/arm/mmu.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index bc244cc6e451..f26055f2306e 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -350,11 +350,11 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
- int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
- int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
- int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
--int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
--			    struct kvm_vcpu_events *events);
-+int __kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
-+			      struct kvm_vcpu_events *events);
- 
--int kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
--			    struct kvm_vcpu_events *events);
-+int __kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
-+			      struct kvm_vcpu_events *events);
- 
- #define KVM_ARCH_WANT_MMU_NOTIFIER
- int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index dd05be96d981..725c7545e91a 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -289,11 +289,9 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
- 	return -EINVAL;
- }
- 
--int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
--			struct kvm_vcpu_events *events)
-+int __kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
-+			      struct kvm_vcpu_events *events)
- {
--	memset(events, 0, sizeof(*events));
--
- 	events->exception.serror_pending = !!(vcpu->arch.hcr_el2 & HCR_VSE);
- 	events->exception.serror_has_esr = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
- 
-@@ -303,23 +301,12 @@ int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
- 	return 0;
- }
- 
--int kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
--			struct kvm_vcpu_events *events)
-+int __kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
-+			      struct kvm_vcpu_events *events)
- {
--	int i;
- 	bool serror_pending = events->exception.serror_pending;
- 	bool has_esr = events->exception.serror_has_esr;
- 
--	/* check whether the reserved field is zero */
--	for (i = 0; i < ARRAY_SIZE(events->reserved); i++)
--		if (events->reserved[i])
--			return -EINVAL;
--
--	/* check whether the pad field is zero */
--	for (i = 0; i < ARRAY_SIZE(events->exception.pad); i++)
--		if (events->exception.pad[i])
--			return -EINVAL;
--
- 	if (serror_pending && has_esr) {
- 		if (!cpus_have_const_cap(ARM64_HAS_RAS_EXTN))
- 			return -EINVAL;
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 1c72247aeb1d..14f8fad1c7ae 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -1050,6 +1050,34 @@ static int kvm_arm_vcpu_has_attr(struct kvm_vcpu *vcpu,
- 	return ret;
- }
- 
-+#ifdef __KVM_HAVE_VCPU_EVENTS	/* temporary: until 32bit is wired up */
-+static int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
-+				   struct kvm_vcpu_events *events)
-+{
-+	memset(events, 0, sizeof(*events));
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 13dfe36501aa..91aaf73b00df 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1147,6 +1147,10 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 	/* Create 2nd stage page table mapping - Level 3 */
+ 	old_pte = *pte;
+ 	if (pte_present(old_pte)) {
++		/* Skip page table update if there is no change */
++		if (pte_val(old_pte) == pte_val(*new_pte))
++			return 0;
 +
-+	return __kvm_arm_vcpu_get_events(vcpu, events);
-+}
-+
-+static int kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
-+				   struct kvm_vcpu_events *events)
-+{
-+	int i;
-+
-+	/* check whether the reserved field is zero */
-+	for (i = 0; i < ARRAY_SIZE(events->reserved); i++)
-+		if (events->reserved[i])
-+			return -EINVAL;
-+
-+	/* check whether the pad field is zero */
-+	for (i = 0; i < ARRAY_SIZE(events->exception.pad); i++)
-+		if (events->exception.pad[i])
-+			return -EINVAL;
-+
-+	return __kvm_arm_vcpu_set_events(vcpu, events);
-+}
-+#endif /* __KVM_HAVE_VCPU_EVENTS */
-+
- long kvm_arch_vcpu_ioctl(struct file *filp,
- 			 unsigned int ioctl, unsigned long arg)
- {
+ 		kvm_set_pte(pte, __pte(0));
+ 		kvm_tlb_flush_vmid_ipa(kvm, addr);
+ 	} else {
 -- 
 2.18.0
