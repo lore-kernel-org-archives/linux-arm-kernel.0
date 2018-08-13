@@ -1,35 +1,52 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 13 Aug 2018 10:40:47 +0100
-Subject: [PATCH v2 0/2] KVM: Fix refaulting due to page table update
-Message-ID: <20180813094049.3726-1-punit.agrawal@arm.com>
+Date: Mon, 13 Aug 2018 10:40:49 +0100
+Subject: [PATCH v2 2/2] KVM: arm/arm64: Skip updating PTE entry if no change
+In-Reply-To: <20180813094049.3726-1-punit.agrawal@arm.com>
+References: <20180813094049.3726-1-punit.agrawal@arm.com>
+Message-ID: <20180813094049.3726-3-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When there is contention on faulting in a particular page table entry
+at stage 2, the break-before-make requirement of the architecture can
+lead to additional refaulting due to TLB invalidation.
 
-Here's a couple of patches to fix an issue when multiple vcpus fault
-on a page table entry[0]. The issue was reported by a user when testing
-PUD hugepage support[1] but also exists for PMD and PTE updates though
-with a lower probability.
+Avoid this by skipping a page table update if the new value of the PTE
+matches the previous value.
 
-In this version -
+Fixes: d5d8184d35c9 ("KVM: ARM: Memory virtualization setup")
+Change-Id: I28e17daf394a4821b13c2cf8726bf72bf30434f9
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+Cc: stable at vger.kernel.org
+---
+ virt/kvm/arm/mmu.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-* the fix has been split for PMD hugepage and PTE update
-* refactored the PMD fix
-* applied fixes tag and cc'ing to stable
-
-Thanks,
-Punit
-
-[0] https://lkml.org/lkml/2018/8/10/256
-[1] https://lkml.org/lkml/2018/7/16/482
-
-Punit Agrawal (2):
-  KVM: arm/arm64: Skip updating PMD entry if no change
-  KVM: arm/arm64: Skip updating PTE entry if no change
-
- virt/kvm/arm/mmu.c | 45 ++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 34 insertions(+), 11 deletions(-)
-
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 2ab977edc63c..d0a9dccc3793 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1120,6 +1120,10 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 	/* Create 2nd stage page table mapping - Level 3 */
+ 	old_pte = *pte;
+ 	if (pte_present(old_pte)) {
++		/* Skip page table update if there is no change */
++		if (pte_val(old_pte) == pte_val(*new_pte))
++			goto out;
++
+ 		kvm_set_pte(pte, __pte(0));
+ 		kvm_tlb_flush_vmid_ipa(kvm, addr);
+ 	} else {
+@@ -1127,6 +1131,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 	}
+ 
+ 	kvm_set_pte(pte, *new_pte);
++out:
+ 	return 0;
+ }
+ 
 -- 
 2.18.0
