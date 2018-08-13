@@ -1,106 +1,155 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Aug 2018 15:57:36 +0100
-Subject: [PATCH 18/37] KVM: arm/arm64: vgic: Return error on incompatible
- uaccess GICD_IIDR writes
-In-Reply-To: <20180813145755.16566-1-marc.zyngier@arm.com>
-References: <20180813145755.16566-1-marc.zyngier@arm.com>
-Message-ID: <20180813145755.16566-19-marc.zyngier@arm.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Mon, 13 Aug 2018 17:54:48 +0200
+Subject: [RFC PATCH 0/7] add at91sam9 LCDC DRM driver
+In-Reply-To: <20180812184152.GA22343@ravnborg.org>
+References: <20180812184152.GA22343@ravnborg.org>
+Message-ID: <f1f2a2d7-ae27-87af-8041-93d3f8fe07cc@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@arm.com>
+On 12/08/2018 at 20:41, Sam Ravnborg wrote:
+> New DRM based driver for at91sam9 SOC's that uses the
+> Atmel LCDC IP core.
 
-If userspace attempts to write a GICD_IIDR that does not match the
-kernel version, return an error to userspace.  The intention is to allow
-implementation changes inside KVM while avoiding silently breaking
-migration resulting in guests not running without any clear indication
-of what went wrong.
+I'm delighted to see this work: Thanks a lot Sam!
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 21 ++++++++++++++++++---
- virt/kvm/arm/vgic/vgic-mmio-v3.c | 21 ++++++++++++++++++---
- 2 files changed, 36 insertions(+), 6 deletions(-)
+> This is first version of a patch set that adds
+> drivers for the Atmel LCDC IP core.
+> Posted for review as the basics works now.
+> 
+> The LCDC IP core contains two devices:
+> - a PWM often used for backlight
+> - a LCD display controller
+> 
+> Both devices are supported today by the atmel_lcdfb driver.
+> For this new set of drivers the compatible strings was
+> selected to avoid clash with the existing compatible
+> strings used for the atmel_lcdfb driver to allow them
+> to co-exist.
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index db646f140e7d..4f0f2c4165ec 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -75,6 +75,20 @@ static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
- 	}
- }
- 
-+static int vgic_mmio_uaccess_write_v2_misc(struct kvm_vcpu *vcpu,
-+					   gpa_t addr, unsigned int len,
-+					   unsigned long val)
-+{
-+	switch (addr & 0x0c) {
-+	case GIC_DIST_IIDR:
-+		if (val != vgic_mmio_read_v2_misc(vcpu, addr, len))
-+			return -EINVAL;
-+	}
-+
-+	vgic_mmio_write_v2_misc(vcpu, addr, len, val);
-+	return 0;
-+}
-+
- static void vgic_mmio_write_sgir(struct kvm_vcpu *source_vcpu,
- 				 gpa_t addr, unsigned int len,
- 				 unsigned long val)
-@@ -367,9 +381,10 @@ static void vgic_mmio_write_apr(struct kvm_vcpu *vcpu,
- }
- 
- static const struct vgic_register_region vgic_v2_dist_registers[] = {
--	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
--		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
--		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_LENGTH_UACCESS(GIC_DIST_CTRL,
-+		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc,
-+		NULL, vgic_mmio_uaccess_write_v2_misc,
-+		12, VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, NULL, NULL, 1,
- 		VGIC_ACCESS_32bit),
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index ef57a1aa0b14..abdb0ec77b38 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -113,6 +113,20 @@ static void vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
- 	}
- }
- 
-+static int vgic_mmio_uaccess_write_v3_misc(struct kvm_vcpu *vcpu,
-+					   gpa_t addr, unsigned int len,
-+					   unsigned long val)
-+{
-+	switch (addr & 0x0c) {
-+	case GICD_IIDR:
-+		if (val != vgic_mmio_read_v3_misc(vcpu, addr, len))
-+			return -EINVAL;
-+	}
-+
-+	vgic_mmio_write_v3_misc(vcpu, addr, len, val);
-+	return 0;
-+}
-+
- static unsigned long vgic_mmio_read_irouter(struct kvm_vcpu *vcpu,
- 					    gpa_t addr, unsigned int len)
- {
-@@ -449,9 +463,10 @@ static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
- 	}
- 
- static const struct vgic_register_region vgic_v3_dist_registers[] = {
--	REGISTER_DESC_WITH_LENGTH(GICD_CTLR,
--		vgic_mmio_read_v3_misc, vgic_mmio_write_v3_misc, 16,
--		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_LENGTH_UACCESS(GICD_CTLR,
-+		vgic_mmio_read_v3_misc, vgic_mmio_write_v3_misc,
-+		NULL, vgic_mmio_uaccess_write_v3_misc,
-+		16, VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GICD_STATUSR,
- 		vgic_mmio_read_rao, vgic_mmio_write_wi, 4,
- 		VGIC_ACCESS_32bit),
+Would be good to have a plan to phase-out the old atmel_lcdfb fbdev 
+driver when this one addresses some TODO items that make sense.
+
+The mfd suffix seems strange to me. What about "atmel,at91sam9263-lcdc-mfd"
+=> "atmel,at91sam9263-lcd" (or "microchip,at91sam9263-lcdc").
+
+> This patchset implements three drivers.
+> - A MFD driver that include the generic parts.
+> - A PWM driver.
+> - A DRM display controller driver.
+> This is the same split as used for the Atmel hlcdc IP.
+
+Good, this is why I would use the same type of compatibility string for 
+the split mfd/pwm/lcd (just without the "h").
+
+> The hlcdc and lcdc has only a few things in common and
+> trying to share the code for them was not a viable solution.
+
+Yes, I agree.
+
+> The DRM implementation has a few shortcomings compared to the
+> existing fbdev based driver:
+>      - STN displays are not supported
+>              Binding support is missing but most of the
+>              STN specific functionality is otherwise ported
+>              from the fbdev driver.
+>              I assume the info should come from the panel
+>              but as I lack HW I have not looked too much
+>              into what is required.
+
+Yes, I'm not even sure if STN displays are still available those days... 
+Might not be worth it spending time on this.
+
+>      - gamma support is missing
+>              The driver utilises drm_simple_kms_helper and
+>              this helper lacks support for setting up gamma.
+>              If this is useful please let me know and I
+>              will extend drm_simple_kms_helper to support this
+>              and update the driver.
+>      - modesetting is not checked (see TODO in file)
+>              Is this required for such a simple setup?
+>      - support for extra modes as applicable (and lcd-wiring-mode)
+>      - support for AVR32 (is it relevant?)
+
+No, AVR32 is not relevant anymore as the core and SoC were removed some 
+years ago from Linux.
+All mention of AT32 or AVR32 can be remove then.
+
+> The first patch renames .../drm/atmel-hlcdc to .../drm/atmel
+> to have a nice home for both drivers.
+> 
+> The drivers _works_ on a proprietary at91sam9263 based board
+> and I will eventually migrate the at91sam9263ek over
+> to use it as well.
+
+We'll be able to test it on other SoCs and boards.
+
+> Works is maybe a stretch - the following was tested:
+>    modetest shows reasonable output
+>    modetest -s shows some nice colored squares
+
+You must see something like this (without the overlay additional black 
+square):
+http://www.at91.com/linux4sam/bin/view/Linux4SAM/UsingAtmelDRMDriver#Some_modetest_commands
+
+>    vbltest shows 45.70 Hz (after terminating modetest -s with SIGINT)
+>    drmdevice shows reasonable output
+>    brightness can be controlled
+> 
+> Anything else that can be recommended for some basic tests?
+> How to test suspend/resume?
+> 
+> REVIEW
+> Please give feedback on general structure/architecture
+> Please check if the drm framework is used in the optimal way
+> And then the usual review from spelling errors, names, style etc.
+> 
+> All feedback (from spelling errors to general structure) appreciated!
+
+On my side, it's mostly Nitpicking ;-)
+Now that we're Microchip for a little bit more than 2 years, I tend to 
+make this name prevalent compared to Atmel for new work around our 
+products... But I know this driver is for older SoCs and that it got 
+inspired by two former drivers that have this "atmel" naming everywhere. 
+MAINTAINERS and Kconfig changes could include Microchip name, so that 
+it's obvious for the newcomers...
+
+> 	Sam
+> 
+> Sam Ravnborg (7):
+>        atmel-hlcdc: renamed directory to drm/atmel/
+>        dt-binding: add bindings for Atmel LCDC mfd
+>        mfd: add atmel-lcdc driver
+>        dt-bindings: add bindings for Atmel LCDC pwm
+>        pwm: add pwm-atmel-lcdc driver
+>        dt-bindings: add bindings for Atmel lcdc-display-controller
+>        drm: add Atmel LCDC display controller support
+> 
+>   .../display/atmel/lcdc-display-controller.txt      |   40 +
+>   .../devicetree/bindings/mfd/atmel-lcdc.txt         |   75 ++
+>   .../devicetree/bindings/pwm/atmel-lcdc-pwm.txt     |   30 +
+>   MAINTAINERS                                        |    9 +-
+>   drivers/gpu/drm/Kconfig                            |    2 +-
+>   drivers/gpu/drm/Makefile                           |    2 +-
+>   drivers/gpu/drm/atmel-hlcdc/Kconfig                |   10 -
+>   drivers/gpu/drm/atmel/Kconfig                      |   28 +
+>   drivers/gpu/drm/{atmel-hlcdc => atmel}/Makefile    |    2 +
+>   .../drm/{atmel-hlcdc => atmel}/atmel_hlcdc_crtc.c  |    0
+>   .../drm/{atmel-hlcdc => atmel}/atmel_hlcdc_dc.c    |    0
+>   .../drm/{atmel-hlcdc => atmel}/atmel_hlcdc_dc.h    |    0
+>   .../{atmel-hlcdc => atmel}/atmel_hlcdc_output.c    |    0
+>   .../drm/{atmel-hlcdc => atmel}/atmel_hlcdc_plane.c |    0
+>   drivers/gpu/drm/atmel/atmel_lcdc-dc.c              | 1094 ++++++++++++++++++++
+>   drivers/mfd/Kconfig                                |   10 +
+>   drivers/mfd/Makefile                               |    1 +
+>   drivers/mfd/atmel-lcdc.c                           |  158 +++
+>   drivers/pwm/Kconfig                                |   13 +
+>   drivers/pwm/Makefile                               |    1 +
+>   drivers/pwm/pwm-atmel-lcdc.c                       |  178 ++++
+>   include/linux/mfd/atmel-lcdc.h                     |  184 ++++
+>   22 files changed, 1824 insertions(+), 13 deletions(-)
+> 
+
+
 -- 
-2.18.0
+Nicolas Ferre
