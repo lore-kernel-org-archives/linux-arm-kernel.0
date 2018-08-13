@@ -1,106 +1,58 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Aug 2018 15:57:49 +0100
-Subject: [PATCH 31/37] KVM: arm64: vgic-v3: Add support for ICC_SGI0R_EL1 and
- ICC_ASGI1R_EL1 accesses
+Date: Mon, 13 Aug 2018 15:57:46 +0100
+Subject: [PATCH 28/37] KVM: arm/arm64: Fix lost IRQs from emulated physcial
+ timer when blocked
 In-Reply-To: <20180813145755.16566-1-marc.zyngier@arm.com>
 References: <20180813145755.16566-1-marc.zyngier@arm.com>
-Message-ID: <20180813145755.16566-32-marc.zyngier@arm.com>
+Message-ID: <20180813145755.16566-29-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to generate Group0 SGIs, let's add some decoding logic to
-access_gic_sgi(), and pass the generating group accordingly.
+From: Christoffer Dall <christoffer.dall@arm.com>
 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+When the VCPU is blocked (for example from WFI) we don't inject the
+physical timer interrupt if it should fire while the CPU is blocked, but
+instead we just wake up the VCPU and expect kvm_timer_vcpu_load to take
+care of injecting the interrupt.
+
+Unfortunately, kvm_timer_vcpu_load() doesn't actually do that, it only
+has support to schedule a soft timer if the emulated phys timer is
+expected to fire in the future.
+
+Follow the same pattern as kvm_timer_update_state() and update the irq
+state after potentially scheduling a soft timer.
+
+Reported-by: Andre Przywara <andre.przywara@arm.com>
+Cc: Stable <stable@vger.kernel.org> # 4.15+
+Fixes: bbdd52cfcba29 ("KVM: arm/arm64: Avoid phys timer emulation in vcpu entry/exit")
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/sysreg.h |  2 ++
- arch/arm64/kvm/sys_regs.c       | 41 +++++++++++++++++++++++++++++++--
- 2 files changed, 41 insertions(+), 2 deletions(-)
+ virt/kvm/arm/arch_timer.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 98af0b37fb31..b0d2a52a71a3 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -314,6 +314,8 @@
- #define SYS_ICC_DIR_EL1			sys_reg(3, 0, 12, 11, 1)
- #define SYS_ICC_RPR_EL1			sys_reg(3, 0, 12, 11, 3)
- #define SYS_ICC_SGI1R_EL1		sys_reg(3, 0, 12, 11, 5)
-+#define SYS_ICC_ASGI1R_EL1		sys_reg(3, 0, 12, 11, 6)
-+#define SYS_ICC_SGI0R_EL1		sys_reg(3, 0, 12, 11, 7)
- #define SYS_ICC_IAR1_EL1		sys_reg(3, 0, 12, 12, 0)
- #define SYS_ICC_EOIR1_EL1		sys_reg(3, 0, 12, 12, 1)
- #define SYS_ICC_HPPIR1_EL1		sys_reg(3, 0, 12, 12, 2)
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index aba6755c816d..22fbbdbece3c 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -252,10 +252,43 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
- 			   struct sys_reg_params *p,
- 			   const struct sys_reg_desc *r)
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 18ff6203079d..17cecc96f735 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -487,6 +487,7 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
  {
-+	bool g1;
-+
- 	if (!p->is_write)
- 		return read_from_write_only(vcpu, p, r);
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
++	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
  
--	vgic_v3_dispatch_sgi(vcpu, p->regval, true);
-+	/*
-+	 * In a system where GICD_CTLR.DS=1, a ICC_SGI0R_EL1 access generates
-+	 * Group0 SGIs only, while ICC_SGI1R_EL1 can generate either group,
-+	 * depending on the SGI configuration. ICC_ASGI1R_EL1 is effectively
-+	 * equivalent to ICC_SGI0R_EL1, as there is no "alternative" secure
-+	 * group.
-+	 */
-+	if (p->is_aarch32) {
-+		switch (p->Op1) {
-+		default:		/* Keep GCC quiet */
-+		case 0:			/* ICC_SGI1R */
-+			g1 = true;
-+			break;
-+		case 1:			/* ICC_ASGI1R */
-+		case 2:			/* ICC_SGI0R */
-+			g1 = false;
-+			break;
-+		}
-+	} else {
-+		switch (p->Op2) {
-+		default:		/* Keep GCC quiet */
-+		case 5:			/* ICC_SGI1R_EL1 */
-+			g1 = true;
-+			break;
-+		case 6:			/* ICC_ASGI1R_EL1 */
-+		case 7:			/* ICC_SGI0R_EL1 */
-+			g1 = false;
-+			break;
-+		}
-+	}
-+
-+	vgic_v3_dispatch_sgi(vcpu, p->regval, g1);
+ 	if (unlikely(!timer->enabled))
+ 		return;
+@@ -502,6 +503,10 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
  
- 	return true;
+ 	/* Set the background timer for the physical timer emulation. */
+ 	phys_timer_emulate(vcpu);
++
++	/* If the timer fired while we weren't running, inject it now */
++	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
++		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
  }
-@@ -1312,6 +1345,8 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ SYS_DESC(SYS_ICC_DIR_EL1), read_from_write_only },
- 	{ SYS_DESC(SYS_ICC_RPR_EL1), write_to_read_only },
- 	{ SYS_DESC(SYS_ICC_SGI1R_EL1), access_gic_sgi },
-+	{ SYS_DESC(SYS_ICC_ASGI1R_EL1), access_gic_sgi },
-+	{ SYS_DESC(SYS_ICC_SGI0R_EL1), access_gic_sgi },
- 	{ SYS_DESC(SYS_ICC_IAR1_EL1), write_to_read_only },
- 	{ SYS_DESC(SYS_ICC_EOIR1_EL1), read_from_write_only },
- 	{ SYS_DESC(SYS_ICC_HPPIR1_EL1), write_to_read_only },
-@@ -1744,8 +1779,10 @@ static const struct sys_reg_desc cp15_regs[] = {
- static const struct sys_reg_desc cp15_64_regs[] = {
- 	{ Op1( 0), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR0 },
- 	{ Op1( 0), CRn( 0), CRm( 9), Op2( 0), access_pmu_evcntr },
--	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi },
-+	{ Op1( 0), CRn( 0), CRm(12), Op2( 0), access_gic_sgi }, /* ICC_SGI1R */
- 	{ Op1( 1), CRn( 0), CRm( 2), Op2( 0), access_vm_reg, NULL, c2_TTBR1 },
-+	{ Op1( 1), CRn( 0), CRm(12), Op2( 0), access_gic_sgi }, /* ICC_ASGI1R */
-+	{ Op1( 2), CRn( 0), CRm(12), Op2( 0), access_gic_sgi }, /* ICC_SGI0R */
- 	{ Op1( 2), CRn( 0), CRm(14), Op2( 0), access_cntp_cval },
- };
  
+ bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu)
 -- 
 2.18.0
