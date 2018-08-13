@@ -1,87 +1,177 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Aug 2018 15:57:38 +0100
-Subject: [PATCH 20/37] KVM: arm/arm64: vgic: Let userspace opt-in to writable
- v2 IGROUPR
+Date: Mon, 13 Aug 2018 15:57:35 +0100
+Subject: [PATCH 17/37] KVM: arm/arm64: vgic: Permit uaccess writes to return
+ errors
 In-Reply-To: <20180813145755.16566-1-marc.zyngier@arm.com>
 References: <20180813145755.16566-1-marc.zyngier@arm.com>
-Message-ID: <20180813145755.16566-21-marc.zyngier@arm.com>
+Message-ID: <20180813145755.16566-18-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@arm.com>
 
-Simply letting IGROUPR be writable from userspace would break
-migration from old kernels to newer kernels, because old kernels
-incorrectly report interrupt groups as group 1.  This would not be a big
-problem if userspace wrote GICD_IIDR as read from the kernel, because we
-could detect the incompatibility and return an error to userspace.
-Unfortunately, this is not the case with current userspace
-implementations and simply letting IGROUPR be writable from userspace for
-an emulated GICv2 silently breaks migration and causes the destination
-VM to no longer run after migration.
-
-We now encourage userspace to write the read and expected value of
-GICD_IIDR as the first part of a GIC register restore, and if we observe
-a write to GICD_IIDR we know that userspace has been updated and has had
-a chance to cope with older kernels (VGICv2 IIDR.Revision == 0)
-incorrectly reporting interrupts as group 1, and therefore we now allow
-groups to be user writable.
+Currently we do not allow any vgic mmio write operations to fail, which
+makes sense from mmio traps from the guest.  However, we should be able
+to report failures to userspace, if userspace writes incompatible values
+to read-only registers.  Rework the internal interface to allow errors
+to be returned on the write side for userspace writes.
 
 Reviewed-by: Andrew Jones <drjones@redhat.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_vgic.h           |  3 +++
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 16 +++++++++++++++-
- 2 files changed, 18 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 12 +++++++-----
+ virt/kvm/arm/vgic/vgic-mmio.c    | 18 +++++++++++++-----
+ virt/kvm/arm/vgic/vgic-mmio.h    | 19 +++++++++++--------
+ 3 files changed, 31 insertions(+), 18 deletions(-)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index c661d0ee6628..c134790be32c 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -221,6 +221,9 @@ struct vgic_dist {
- 	/* Implementation revision as reported in the GICD_IIDR */
- 	u32			implementation_rev;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index ebe10a015bfb..ef57a1aa0b14 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -249,9 +249,9 @@ static unsigned long vgic_v3_uaccess_read_pending(struct kvm_vcpu *vcpu,
+ 	return value;
+ }
  
-+	/* Userspace can write to GICv2 IGROUPR */
-+	bool			v2_groups_user_writable;
-+
- 	/* Do injected MSIs require an additional device ID? */
- 	bool			msis_require_devid;
- 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index ee164f831401..26654f4140ed 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -85,6 +85,18 @@ static int vgic_mmio_uaccess_write_v2_misc(struct kvm_vcpu *vcpu,
- 	case GIC_DIST_IIDR:
- 		if (val != vgic_mmio_read_v2_misc(vcpu, addr, len))
- 			return -EINVAL;
-+
-+		/*
-+		 * If we observe a write to GICD_IIDR we know that userspace
-+		 * has been updated and has had a chance to cope with older
-+		 * kernels (VGICv2 IIDR.Revision == 0) incorrectly reporting
-+		 * interrupts as group 1, and therefore we now allow groups to
-+		 * be user writable.  Doing this by default would break
-+		 * migration from old kernels to new kernels with legacy
-+		 * userspace.
-+		 */
-+		vcpu->kvm->arch.vgic.v2_groups_user_writable = true;
-+		return 0;
- 	}
- 
- 	vgic_mmio_write_v2_misc(vcpu, addr, len, val);
-@@ -95,7 +107,9 @@ static int vgic_mmio_uaccess_write_v2_group(struct kvm_vcpu *vcpu,
- 					    gpa_t addr, unsigned int len,
- 					    unsigned long val)
+-static void vgic_v3_uaccess_write_pending(struct kvm_vcpu *vcpu,
+-					  gpa_t addr, unsigned int len,
+-					  unsigned long val)
++static int vgic_v3_uaccess_write_pending(struct kvm_vcpu *vcpu,
++					 gpa_t addr, unsigned int len,
++					 unsigned long val)
  {
--	/* Ignore writes from userspace */
-+	if (vcpu->kvm->arch.vgic.v2_groups_user_writable)
-+		vgic_mmio_write_group(vcpu, addr, len, val);
+ 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+ 	int i;
+@@ -276,6 +276,8 @@ static void vgic_v3_uaccess_write_pending(struct kvm_vcpu *vcpu,
+ 
+ 		vgic_put_irq(vcpu->kvm, irq);
+ 	}
 +
++	return 0;
+ }
+ 
+ /* We want to avoid outer shareable. */
+@@ -468,7 +470,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICPENDR,
+ 		vgic_mmio_read_pending, vgic_mmio_write_cpending,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
++		vgic_mmio_read_raz, vgic_mmio_uaccess_write_wi, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISACTIVER,
+ 		vgic_mmio_read_active, vgic_mmio_write_sactive,
+@@ -541,7 +543,7 @@ static const struct vgic_register_region vgic_v3_sgibase_registers[] = {
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH_UACCESS(GICR_ICPENDR0,
+ 		vgic_mmio_read_pending, vgic_mmio_write_cpending,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
++		vgic_mmio_read_raz, vgic_mmio_uaccess_write_wi, 4,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH_UACCESS(GICR_ISACTIVER0,
+ 		vgic_mmio_read_active, vgic_mmio_write_sactive,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index ff9655cfeb2f..e1e79989d473 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -40,6 +40,13 @@ void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
+ 	/* Ignore */
+ }
+ 
++int vgic_mmio_uaccess_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
++			       unsigned int len, unsigned long val)
++{
++	/* Ignore */
++	return 0;
++}
++
+ /*
+  * Read accesses to both GICD_ICENABLER and GICD_ISENABLER return the value
+  * of the enabled bit, so there is only one function for both here.
+@@ -363,11 +370,12 @@ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
+ 	mutex_unlock(&vcpu->kvm->lock);
+ }
+ 
+-void vgic_mmio_uaccess_write_cactive(struct kvm_vcpu *vcpu,
++int vgic_mmio_uaccess_write_cactive(struct kvm_vcpu *vcpu,
+ 				     gpa_t addr, unsigned int len,
+ 				     unsigned long val)
+ {
+ 	__vgic_mmio_write_cactive(vcpu, addr, len, val);
++	return 0;
+ }
+ 
+ static void __vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+@@ -399,11 +407,12 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+ 	mutex_unlock(&vcpu->kvm->lock);
+ }
+ 
+-void vgic_mmio_uaccess_write_sactive(struct kvm_vcpu *vcpu,
++int vgic_mmio_uaccess_write_sactive(struct kvm_vcpu *vcpu,
+ 				     gpa_t addr, unsigned int len,
+ 				     unsigned long val)
+ {
+ 	__vgic_mmio_write_sactive(vcpu, addr, len, val);
++	return 0;
+ }
+ 
+ unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
+@@ -735,10 +744,9 @@ static int vgic_uaccess_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+ 
+ 	r_vcpu = iodev->redist_vcpu ? iodev->redist_vcpu : vcpu;
+ 	if (region->uaccess_write)
+-		region->uaccess_write(r_vcpu, addr, sizeof(u32), *val);
+-	else
+-		region->write(r_vcpu, addr, sizeof(u32), *val);
++		return region->uaccess_write(r_vcpu, addr, sizeof(u32), *val);
+ 
++	region->write(r_vcpu, addr, sizeof(u32), *val);
  	return 0;
  }
  
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 5693f6df45ec..9c3d6d358014 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -37,8 +37,8 @@ struct vgic_register_region {
+ 	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
+ 				      unsigned int len);
+ 	union {
+-		void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+-				      unsigned int len, unsigned long val);
++		int (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
++				     unsigned int len, unsigned long val);
+ 		int (*uaccess_its_write)(struct kvm *kvm, struct vgic_its *its,
+ 					 gpa_t addr, unsigned int len,
+ 					 unsigned long val);
+@@ -134,6 +134,9 @@ unsigned long vgic_mmio_read_rao(struct kvm_vcpu *vcpu,
+ void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
+ 			unsigned int len, unsigned long val);
+ 
++int vgic_mmio_uaccess_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
++			       unsigned int len, unsigned long val);
++
+ unsigned long vgic_mmio_read_enable(struct kvm_vcpu *vcpu,
+ 				    gpa_t addr, unsigned int len);
+ 
+@@ -167,13 +170,13 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+ 			     gpa_t addr, unsigned int len,
+ 			     unsigned long val);
+ 
+-void vgic_mmio_uaccess_write_cactive(struct kvm_vcpu *vcpu,
+-				     gpa_t addr, unsigned int len,
+-				     unsigned long val);
++int vgic_mmio_uaccess_write_cactive(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len,
++				    unsigned long val);
+ 
+-void vgic_mmio_uaccess_write_sactive(struct kvm_vcpu *vcpu,
+-				     gpa_t addr, unsigned int len,
+-				     unsigned long val);
++int vgic_mmio_uaccess_write_sactive(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len,
++				    unsigned long val);
+ 
+ unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
+ 				      gpa_t addr, unsigned int len);
 -- 
 2.18.0
