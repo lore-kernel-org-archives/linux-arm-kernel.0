@@ -1,48 +1,54 @@
-From: liu.song.a23@gmail.com (Song Liu)
-Date: Mon, 13 Aug 2018 10:12:14 -0700
-Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180813131723.GC28360@redhat.com>
-References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
- <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
- <CAPhsuW49+qA7kT7yE4tgbnAuox-iOzssg-jc2abG8XDo6XeX8A@mail.gmail.com>
- <95a1221e-aecc-42be-5239-a2c2429be176@linux.ibm.com>
- <20180813115019.GB28360@redhat.com>
- <fa85d19f-b22c-e09c-b8d2-f68f0c79de15@linux.ibm.com>
- <20180813131723.GC28360@redhat.com>
-Message-ID: <CAPhsuW4KT=6vR_0ogTy_+Fwcz7cZ0Rac8sYohLngQmEBCd0HLw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 13 Aug 2018 18:28:21 +0100
+Subject: [RFC PATCH] arm64: lse: use register variables instead of
+ -ffixed, -fcall flags
+In-Reply-To: <CANA+-vDPp=tSBq_2U7T1RD8BpDs6DWm=pkVp73HGdehbhcc-tQ@mail.gmail.com>
+References: <20180810020751.44859-1-trong@android.com>
+ <20180810094611.GA12273@arm.com>
+ <CANA+-vDPp=tSBq_2U7T1RD8BpDs6DWm=pkVp73HGdehbhcc-tQ@mail.gmail.com>
+Message-ID: <20180813172820.GA25548@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 13, 2018 at 6:17 AM, Oleg Nesterov <oleg@redhat.com> wrote:
-> On 08/13, Ravi Bangoria wrote:
->>
->> > But damn, process creation (exec) is trivial. We could add a new uprobe_exec()
->> > hook and avoid delayed_uprobe_install() in uprobe_mmap().
->>
->> I'm sorry. I didn't get this.
->
-> Sorry for confusion...
->
-> I meant, if only exec*( could race with _register(), we could add another uprobe
-> hook which updates all (delayed) counters before return to user-mode.
->
->> > Afaics, the really problematic case is dlopen() which can race with _register()
->> > too, right?
->>
->> dlopen() should internally use mmap() right? So what is the problem here? Can
->> you please elaborate.
->
-> What I tried to say is that we can't avoid uprobe_mmap()->delayed_uprobe_install()
-> because dlopen() can race with _register() too, just like exec.
->
-> Oleg.
->
+On Fri, Aug 10, 2018 at 03:04:55PM -0700, Tri Vo wrote:
+> On Fri, Aug 10, 2018 at 2:46 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, Aug 09, 2018 at 07:07:51PM -0700, Tri Vo wrote:
+> >> -ffixed, -fcall-used, -fcall-saved flags are used to build LL/SC
+> >> fallback atomic implementations in such a way that:
+> >> 1. LSE implementations only assume x16, x17, x30 to be clobbered by a
+> >> function call to LL/SC fallbacks.
+> >> 2. LL/SC fallbacks are responsible for saving/restoring the rest of the
+> >> GPRs.
+> >> 3. LL/SC fallbacks always prefer to allocate in x16, x17 since there is
+> >> no need to save/restore them.
+> >>
+> >> Same result can be achieved without -ffixed, -fcall-used, -fcall-saved
+> >> flags by explicitly telling the compiler where to allocate each variable
+> >> in LL/SC atomic implementations. This patch makes all functions use x16,
+> >> x17 registers. 'fetch' variants of the functions need one more scratch
+> >> register, so we allocate one from the PCS's set of callee-saved
+> >> registers (in this case x19).
+> >>
+> >> With this patch:
+> >> 1. the desired register allocation is reflected in the code rather than
+> >> in compiler flags.
+> >> 2. LSE atomic support can be built with both clang and gcc.
+> >> 3. Number of preserved registers in LL/SC fallbacks is unchanged.
+> >>
+> >> The tradeoff is that the compiler loses flexibility in allocating
+> >> registers for inline LL/SC atomic implementations.
+> >
+> > This impacts the atomics code when !CONFIG_LSE, and causes the fetch*
+> > variants to spill x19 in most cases.
+> 
+> Is it OK if I wrap that x19 register variable in an #ifdef so it's
+> only allocated to x19 when CONFIG_LSE and is allocated normally for
+> !CONFIG_LSE? That should keep the number of spills unchanged for both
+> inline and out-of-line implementations.
 
-How about we do delayed_uprobe_install() per file? Say we keep a list
-of delayed_uprobe
-in load_elf_binary(). Then we can install delayed_uprobe after loading
-all sections of the
-file.
+I would much prefer you to:
 
-Song
+> > Please just fix clang, or augment the lseinstr check in our Makefile to
+> > check for ffixed support as well.
+
+Will
