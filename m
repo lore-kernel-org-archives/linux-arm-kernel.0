@@ -1,41 +1,30 @@
-From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Mon, 13 Aug 2018 13:08:34 +0530
-Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <95a1221e-aecc-42be-5239-a2c2429be176@linux.ibm.com>
-References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
- <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
- <CAPhsuW49+qA7kT7yE4tgbnAuox-iOzssg-jc2abG8XDo6XeX8A@mail.gmail.com>
- <95a1221e-aecc-42be-5239-a2c2429be176@linux.ibm.com>
-Message-ID: <5b693a28-5a0b-1adc-a805-b66dfbe7bdd7@linux.ibm.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Mon, 13 Aug 2018 08:41:33 +0100
+Subject: [PATCH] arm64: defconfig: enable R8A774A1 SoC
+In-Reply-To: <1534146093-1651-1-git-send-email-biju.das@bp.renesas.com>
+References: <1534146093-1651-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <1534146093-1651-2-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Song,
+Enable the Renesas RZ/G2M (R8A774A1) SoC in the ARM64 defconfig.
 
-On 08/13/2018 11:17 AM, Ravi Bangoria wrote:
->>> +
->>> +static void delayed_uprobe_remove(struct uprobe *uprobe, struct mm_struct *mm)
->>> +{
->>> +       struct list_head *pos, *q;
->>> +       struct delayed_uprobe *du;
->>> +
->>> +       if (!uprobe && !mm)
->>> +               return;
->> And do we really need this check?
-> 
-> 
-> Yes. delayed_uprobe_remove(uprobe=NULL, mm=NULL) is an invalid case. If I remove
-> this check, code below (or more accurately code suggested by Oleg) will remove
-> all entries from delayed_uprobe_list. So I will keep this check but put a comment
-> above function.
-> 
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Sorry, my bad. Please ignore above comment. Even though, it saves us
-to unnecessary loop over entire delayed_uprobe_list when both uprobe
-and mm are NULL, that case is not possible with current code. Also,
-I'm not dereferencing any of them. So, IMHO it's fine to remove this
-check.
-
-Thanks,
-Ravi
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 4327f62..1c953ff 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -49,6 +49,7 @@ CONFIG_ARCH_ROCKCHIP=y
+ CONFIG_ARCH_SEATTLE=y
+ CONFIG_ARCH_SYNQUACER=y
+ CONFIG_ARCH_RENESAS=y
++CONFIG_ARCH_R8A774A1=y
+ CONFIG_ARCH_R8A7795=y
+ CONFIG_ARCH_R8A7796=y
+ CONFIG_ARCH_R8A77965=y
+-- 
+2.7.4
