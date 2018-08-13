@@ -1,67 +1,37 @@
-From: zhongjiang@huawei.com (zhong jiang)
-Date: Mon, 13 Aug 2018 21:07:28 +0800
-Subject: [PATCH] arm:pm: Use kmemdup to replace duplicating its
- implementation
-In-Reply-To: <37f8ff09-b0c2-5cc6-87d4-8138e7b66b32@mleia.com>
-References: <1533868851-316-1-git-send-email-zhongjiang@huawei.com>
- <37f8ff09-b0c2-5cc6-87d4-8138e7b66b32@mleia.com>
-Message-ID: <5B718290.4010302@huawei.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Mon, 13 Aug 2018 15:17:24 +0200
+Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <fa85d19f-b22c-e09c-b8d2-f68f0c79de15@linux.ibm.com>
+References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
+ <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
+ <CAPhsuW49+qA7kT7yE4tgbnAuox-iOzssg-jc2abG8XDo6XeX8A@mail.gmail.com>
+ <95a1221e-aecc-42be-5239-a2c2429be176@linux.ibm.com>
+ <20180813115019.GB28360@redhat.com>
+ <fa85d19f-b22c-e09c-b8d2-f68f0c79de15@linux.ibm.com>
+Message-ID: <20180813131723.GC28360@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/8/13 20:28, Vladimir Zapolskiy wrote:
-> Hi zhong jiang,
+On 08/13, Ravi Bangoria wrote:
 >
-> On 08/10/2018 05:40 AM, zhong jiang wrote:
->> kmemdup is better than kmalloc() + memcpy(), and we do not like
->> open code. So just use kmemdup instead.
->>
->> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
->> ---
->>  arch/arm/mach-lpc32xx/pm.c | 7 ++-----
->>  1 file changed, 2 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/mach-lpc32xx/pm.c b/arch/arm/mach-lpc32xx/pm.c
->> index 6247157..6eefff8 100644
->> --- a/arch/arm/mach-lpc32xx/pm.c
->> +++ b/arch/arm/mach-lpc32xx/pm.c
->> @@ -86,7 +86,8 @@ static int lpc32xx_pm_enter(suspend_state_t state)
->>  	void *iram_swap_area;
->>  
->>  	/* Allocate some space for temporary IRAM storage */
->> -	iram_swap_area = kmalloc(lpc32xx_sys_suspend_sz, GFP_KERNEL);
->> +	iram_swap_area = kmemdup((void *)TEMP_IRAM_AREA,
->> +				lpc32xx_sys_suspend_sz, GFP_KERNEL);
-> there is a minor coding style issue, which is reported by checkpatch:
+> > But damn, process creation (exec) is trivial. We could add a new uprobe_exec()
+> > hook and avoid delayed_uprobe_install() in uprobe_mmap().
 >
-> CHECK: Alignment should match open parenthesis
-> #53: FILE: arch/arm/mach-lpc32xx/pm.c:90:
->
-> Other than that the change is valid, I'll fix the indentation issue
-> myself and apply the change for v4.19.
- Thank you for doing this. I will notice that for next time.
+> I'm sorry. I didn't get this.
 
- Sincerely,
- zhong jiang
-> --
-> Best wishes,
-> Vladimir
+Sorry for confusion...
+
+I meant, if only exec*( could race with _register(), we could add another uprobe
+hook which updates all (delayed) counters before return to user-mode.
+
+> > Afaics, the really problematic case is dlopen() which can race with _register()
+> > too, right?
 >
->>  	if (!iram_swap_area) {
->>  		printk(KERN_ERR
->>  		       "PM Suspend: cannot allocate memory to save portion "
->> @@ -94,10 +95,6 @@ static int lpc32xx_pm_enter(suspend_state_t state)
->>  		return -ENOMEM;
->>  	}
->>  
->> -	/* Backup a small area of IRAM used for the suspend code */
->> -	memcpy(iram_swap_area, (void *) TEMP_IRAM_AREA,
->> -		lpc32xx_sys_suspend_sz);
->> -
->>  	/*
->>  	 * Copy code to suspend system into IRAM. The suspend code
->>  	 * needs to run from IRAM as DRAM may no longer be available
->>
->
-> .
->
+> dlopen() should internally use mmap() right? So what is the problem here? Can
+> you please elaborate.
+
+What I tried to say is that we can't avoid uprobe_mmap()->delayed_uprobe_install()
+because dlopen() can race with _register() too, just like exec.
+
+Oleg.
