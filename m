@@ -1,111 +1,47 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Mon, 13 Aug 2018 16:24:49 +0200
-Subject: [PATCH v8 3/4] drm/atmel-hlcdc: iterate over all output endpoints
-In-Reply-To: <20180813135949.32vrlrevtazr5x7d@apu3b.nibble.pw>
-References: <20180810130359.9882-1-peda@axentia.se>
- <20180810130359.9882-4-peda@axentia.se>
- <20180813135949.32vrlrevtazr5x7d@apu3b.nibble.pw>
-Message-ID: <0baac94e-f3d2-53fd-4af9-854bb4498345@axentia.se>
+From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
+Date: Mon, 13 Aug 2018 19:56:53 +0530
+Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <20180813131723.GC28360@redhat.com>
+References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
+ <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
+ <CAPhsuW49+qA7kT7yE4tgbnAuox-iOzssg-jc2abG8XDo6XeX8A@mail.gmail.com>
+ <95a1221e-aecc-42be-5239-a2c2429be176@linux.ibm.com>
+ <20180813115019.GB28360@redhat.com>
+ <fa85d19f-b22c-e09c-b8d2-f68f0c79de15@linux.ibm.com>
+ <20180813131723.GC28360@redhat.com>
+Message-ID: <a532988a-c530-7df8-f059-dd7a4b22abc2@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-08-13 15:59, jacopo mondi wrote:
-> Hi Peter,
-> 
-> On Fri, Aug 10, 2018 at 03:03:58PM +0200, Peter Rosin wrote:
->> This enables more flexible devicetrees. You can e.g. have two output
->> nodes where one is not enabled, without the ordering affecting things.
+
+
+On 08/13/2018 06:47 PM, Oleg Nesterov wrote:
+> On 08/13, Ravi Bangoria wrote:
 >>
->> Prior to this patch the active node had to have endpoint id zero.
+>>> But damn, process creation (exec) is trivial. We could add a new uprobe_exec()
+>>> hook and avoid delayed_uprobe_install() in uprobe_mmap().
 >>
->> Signed-off-by: Peter Rosin <peda@axentia.se>
->> ---
->>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 32 ++++++++++++++++++------
->>  1 file changed, 25 insertions(+), 7 deletions(-)
+>> I'm sorry. I didn't get this.
+> 
+> Sorry for confusion...
+> 
+> I meant, if only exec*( could race with _register(), we could add another uprobe
+> hook which updates all (delayed) counters before return to user-mode.
+
+Ok.
+
+> 
+>>> Afaics, the really problematic case is dlopen() which can race with _register()
+>>> too, right?
 >>
->> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
->> index 8db51fb131db..16c1b2f54b42 100644
->> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
->> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
->> @@ -31,14 +31,16 @@ static const struct drm_encoder_funcs atmel_hlcdc_panel_encoder_funcs = {
->>  	.destroy = drm_encoder_cleanup,
->>  };
->>  
->> -static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
->> +static int atmel_hlcdc_attach_endpoint(struct drm_device *dev,
->> +				       struct of_endpoint *endpoint)
->>  {
->>  	struct drm_encoder *encoder;
->>  	struct drm_panel *panel;
->>  	struct drm_bridge *bridge;
->>  	int ret;
->>  
->> -	ret = drm_of_find_panel_or_bridge(dev->dev->of_node, 0, endpoint,
->> +	ret = drm_of_find_panel_or_bridge(dev->dev->of_node,
->> +					  endpoint->port, endpoint->id,
+>> dlopen() should internally use mmap() right? So what is the problem here? Can
+>> you please elaborate.
 > 
-> You are refusing endpoint->port != 0 in the caller, so that could be
-> 0.
+> What I tried to say is that we can't avoid uprobe_mmap()->delayed_uprobe_install()
+> because dlopen() can race with _register() too, just like exec.
 
-Yes, it could. However, I intentionally did not write 0 here, so that
-the logic related to "port has to be zero" was in one place and not
-scattered about. I guess it's up to Boris?
+Right :)
 
-Maybe the port do not actually have to be zero at all? With the old
-code, it was kind of understandable that the port number was fixed,
-but for the code in my patch it does not matter at all AFAICT. There
-is nothing in the binding docs (except for the example) that hints
-that port has to be zero, so that's one thing in favor of just getting
-rid of the port number checking altogether...
-
-Cheers,
-Peter
-
-
-> Apart from that small nit:
-> Reviewed-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-> 
-> Thanks
->   j
-> 
->>  					  &panel, &bridge);
->>  	if (ret)
->>  		return ret;
->> @@ -77,13 +79,29 @@ static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
->>  
->>  int atmel_hlcdc_create_outputs(struct drm_device *dev)
->>  {
->> -	int endpoint, ret = 0;
->> -
->> -	for (endpoint = 0; !ret; endpoint++)
->> -		ret = atmel_hlcdc_attach_endpoint(dev, endpoint);
->> +	struct of_endpoint endpoint;
->> +	struct device_node *node = NULL;
->> +	int count = 0;
->> +	int ret = 0;
->> +
->> +	for_each_endpoint_of_node(dev->dev->of_node, node) {
->> +		of_graph_parse_endpoint(node, &endpoint);
->> +
->> +		if (endpoint.port)
->> +			continue;
->> +
->> +		ret = atmel_hlcdc_attach_endpoint(dev, &endpoint);
->> +		if (ret == -ENODEV)
->> +			continue;
->> +		if (ret) {
->> +			of_node_put(node);
->> +			break;
->> +		}
->> +		count++;
->> +	}
->>  
->>  	/* At least one device was successfully attached.*/
->> -	if (ret == -ENODEV && endpoint)
->> +	if (ret == -ENODEV && count)
->>  		return 0;
->>  
->>  	return ret;
->> -- 
->> 2.11.0
->>
+Thanks,
+Ravi
