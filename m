@@ -1,218 +1,83 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Mon, 13 Aug 2018 13:41:48 +0100
-Subject: [PATCH v2] arm64: dts: renesas: Initial r8a774a1 SoC device tree
-Message-ID: <1534164108-19983-1-git-send-email-biju.das@bp.renesas.com>
+From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
+Date: Mon, 13 Aug 2018 18:31:00 +0530
+Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <20180813115019.GB28360@redhat.com>
+References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
+ <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
+ <CAPhsuW49+qA7kT7yE4tgbnAuox-iOzssg-jc2abG8XDo6XeX8A@mail.gmail.com>
+ <95a1221e-aecc-42be-5239-a2c2429be176@linux.ibm.com>
+ <20180813115019.GB28360@redhat.com>
+Message-ID: <fa85d19f-b22c-e09c-b8d2-f68f0c79de15@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Basic support for the RZ/G2M SoC.
+Hi Oleg,
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
----
-V1-->V2
-   * Removed the macro CPG_AUDIO_CLK_I, since at this point we don't
-     know whether we will have a common board for RZ/G2 H/M/N.
----
- arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 190 ++++++++++++++++++++++++++++++
- 1 file changed, 190 insertions(+)
- create mode 100644 arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+On 08/13/2018 05:20 PM, Oleg Nesterov wrote:
+> On 08/13, Ravi Bangoria wrote:
+>>
+>> On 08/11/2018 01:27 PM, Song Liu wrote:
+>>>> +
+>>>> +static void delayed_uprobe_delete(struct delayed_uprobe *du)
+>>>> +{
+>>>> +       if (!du)
+>>>> +               return;
+>>> Do we really need this check?
+>>
+>> Not necessary though, but I would still like to keep it for a safety.
+> 
+> Heh. I tried to ignore all minor problems in this version, but now that Song
+> mentioned this unnecessary check...
+> 
+> Personally I really dislike the checks like this one.
+> 
+> 	- It can confuse the reader who will try to understand the purpose
+> 
+> 	- it can hide a bug if delayed_uprobe_delete(du) is actually called
+> 	  with du == NULL.
+> 
+> IMO, you should either remove it and let the kernel crash (to notice the
+> problem), or turn it into
+> 
+> 	if (WARN_ON(!du))
+> 		return;
+> 
+> which is self-documented and reports the problem without kernel crash.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-new file mode 100644
-index 0000000..8e63e9a
---- /dev/null
-+++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-@@ -0,0 +1,190 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Device Tree Source for the r8a774a1 SoC
-+ *
-+ * Copyright (C) 2018 Renesas Electronics Corp.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/renesas-cpg-mssr.h>
-+
-+/ {
-+	compatible = "renesas,r8a774a1";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	/*
-+	 * The external audio clocks are configured as 0 Hz fixed frequency
-+	 * clocks by default.
-+	 * Boards that provide audio clocks should override them.
-+	 */
-+	audio_clk_a: audio_clk_a {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	audio_clk_b: audio_clk_b {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	audio_clk_c: audio_clk_c {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External CAN clock - to be overridden by boards that provide it */
-+	can_clk: can {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		a57_0: cpu at 0 {
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0x0>;
-+			device_type = "cpu";
-+			power-domains = <&sysc 0>;
-+			next-level-cache = <&L2_CA57>;
-+			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE 0>;
-+		};
-+
-+		a57_1: cpu at 1 {
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0x1>;
-+			device_type = "cpu";
-+			power-domains = <&sysc 1>;
-+			next-level-cache = <&L2_CA57>;
-+			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE 0>;
-+		};
-+
-+		L2_CA57: cache-controller-0 {
-+			compatible = "cache";
-+			power-domains = <&sysc 12>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+	};
-+
-+	extal_clk: extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board */
-+		clock-frequency = <0>;
-+	};
-+
-+	extalr_clk: extalr {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board */
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External PCIe clock - can be overridden by the board */
-+	pcie_bus_clk: pcie_bus {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	pmu_a57 {
-+		compatible = "arm,cortex-a57-pmu";
-+		interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
-+				      <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&a57_0>, <&a57_1>;
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-1.0", "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	/* External SCIF clock - to be overridden by boards that provide it */
-+	scif_clk: scif {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		cpg: clock-controller at e6150000 {
-+			compatible = "renesas,r8a774a1-cpg-mssr";
-+			reg = <0 0xe6150000 0 0x0bb0>;
-+			clocks = <&extal_clk>, <&extalr_clk>;
-+			clock-names = "extal", "extalr";
-+			#clock-cells = <2>;
-+			#power-domain-cells = <0>;
-+			#reset-cells = <1>;
-+		};
-+
-+		rst: reset-controller at e6160000 {
-+			compatible = "renesas,r8a774a1-rst";
-+			reg = <0 0xe6160000 0 0x018c>;
-+		};
-+
-+		sysc: system-controller at e6180000 {
-+			compatible = "renesas,r8a774a1-sysc";
-+			reg = <0 0xe6180000 0 0x0400>;
-+			#power-domain-cells = <1>;
-+		};
-+
-+		gic: interrupt-controller at f1010000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+			interrupt-controller;
-+			reg = <0x0 0xf1010000 0 0x1000>,
-+			      <0x0 0xf1020000 0 0x20000>,
-+			      <0x0 0xf1040000 0 0x20000>,
-+			      <0x0 0xf1060000 0 0x20000>;
-+			interrupts = <GIC_PPI 9
-+					(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+			clocks = <&cpg CPG_MOD 408>;
-+			clock-names = "clk";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 408>;
-+		};
-+
-+		prr: chipid at fff00044 {
-+			compatible = "renesas,prr";
-+			reg = <0 0xfff00044 0 4>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	/* External USB clocks - can be overridden by the board */
-+	usb3s0_clk: usb3s0 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	usb_extal_clk: usb_extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+};
--- 
-2.7.4
+Ok. I'll remove that check.
+
+> 
+>>>> +       rc_vma = find_ref_ctr_vma(uprobe, mm);
+>>>> +
+>>>> +       if (rc_vma) {
+>>>> +               rc_vaddr = offset_to_vaddr(rc_vma, uprobe->ref_ctr_offset);
+>>>> +               ret = __update_ref_ctr(mm, rc_vaddr, is_register ? 1 : -1);
+>>>> +
+>>>> +               if (is_register)
+>>>> +                       return ret;
+>>>> +       }
+>>> Mixing __update_ref_ctr() here and delayed_uprobe_add() in the same
+>>> function is a little confusing (at least for me). How about we always use
+>>> delayed uprobe for uprobe_mmap() and use non-delayed in other case(s)?
+>>
+>>
+>> No. delayed_uprobe_add() is needed for uprobe_register() case to handle race
+>> between uprobe_register() and process creation.
+> 
+> Yes.
+> 
+> But damn, process creation (exec) is trivial. We could add a new uprobe_exec()
+> hook and avoid delayed_uprobe_install() in uprobe_mmap().
+
+I'm sorry. I didn't get this.
+
+> 
+> Afaics, the really problematic case is dlopen() which can race with _register()
+> too, right?
+
+dlopen() should internally use mmap() right? So what is the problem here? Can
+you please elaborate.
+
+Thanks,
+Ravi
