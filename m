@@ -1,89 +1,109 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 13 Aug 2018 19:05:57 +0530
-Subject: [PATCH 04/14] dt-bindings: clock: Document qcom,hfpll
+Date: Mon, 13 Aug 2018 19:06:02 +0530
+Subject: [PATCH 09/14] dt-bindings: arm: Document qcom,kpss-gcc
 In-Reply-To: <1534167367-17545-1-git-send-email-sricharan@codeaurora.org>
 References: <1534167367-17545-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1534167367-17545-5-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1534167367-17545-10-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Boyd <sboyd@codeaurora.org>
 
-Adds bindings document for qcom,hfpll instantiated within
-the Krait processor subsystem as separate register region.
+The ACC and GCC regions present in KPSSv1 contain registers to
+control clocks and power to each Krait CPU and L2. Documenting
+the bindings here.
 
 Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- .../devicetree/bindings/clock/qcom,hfpll.txt       | 60 ++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/qcom,hfpll.txt
+ .../devicetree/bindings/arm/msm/qcom,kpss-acc.txt  | 19 ++++++++++
+ .../devicetree/bindings/arm/msm/qcom,kpss-gcc.txt  | 44 ++++++++++++++++++++++
+ 2 files changed, 63 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt
 
-diff --git a/Documentation/devicetree/bindings/clock/qcom,hfpll.txt b/Documentation/devicetree/bindings/clock/qcom,hfpll.txt
+diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
+index 1333db9..7f69636 100644
+--- a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
++++ b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
+@@ -21,10 +21,29 @@ PROPERTIES
+ 		    the register region. An optional second element specifies
+ 		    the base address and size of the alias register region.
+ 
++- clocks:
++        Usage: required
++        Value type: <prop-encoded-array>
++        Definition: reference to the pll parents.
++
++- clock-names:
++        Usage: required
++        Value type: <stringlist>
++        Definition: must be "pll8_vote", "pxo".
++
++- clock-output-names:
++	Usage: optional
++	Value type: <string>
++	Definition: Name of the output clock. Typically acpuX_aux where X is a
++		    CPU number starting at 0.
++
+ Example:
+ 
+ 	clock-controller at 2088000 {
+ 		compatible = "qcom,kpss-acc-v2";
+ 		reg = <0x02088000 0x1000>,
+ 		      <0x02008000 0x1000>;
++		clocks = <&gcc PLL8_VOTE>, <&gcc PXO_SRC>;
++		clock-names = "pll8_vote", "pxo";
++		clock-output-names = "acpu0_aux";
+ 	};
+diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt
 new file mode 100644
-index 0000000..ec02a02
+index 0000000..e628758
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/qcom,hfpll.txt
-@@ -0,0 +1,60 @@
-+High-Frequency PLL (HFPLL)
++++ b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt
+@@ -0,0 +1,44 @@
++Krait Processor Sub-system (KPSS) Global Clock Controller (GCC)
 +
 +PROPERTIES
 +
 +- compatible:
 +	Usage: required
-+	Value type: <string>:
-+		shall contain only one of the following. The generic
-+		compatible "qcom,hfpll" should be also included.
-+
-+                        "qcom,hfpll-ipq8064", "qcom,hfpll"
-+                        "qcom,hfpll-apq8064", "qcom,hfpll"
-+                        "qcom,hfpll-msm8974", "qcom,hfpll"
-+                        "qcom,hfpll-msm8960", "qcom,hfpll"
++	Value type: <string>
++	Definition: should be one of the following. The generic compatible
++			"qcom,kpss-gcc" should also be included.
++			"qcom,kpss-gcc-ipq8064", "qcom,kpss-gcc"
++			"qcom,kpss-gcc-apq8064", "qcom,kpss-gcc"
++			"qcom,kpss-gcc-msm8974", "qcom,kpss-gcc"
++			"qcom,kpss-gcc-msm8960", "qcom,kpss-gcc"
 +
 +- reg:
 +	Usage: required
 +	Value type: <prop-encoded-array>
-+	Definition: address and size of HPLL registers. An optional second
-+		    element specifies the address and size of the alias
-+		    register region.
++	Definition: base address and size of the register region
 +
 +- clocks:
 +	Usage: required
 +	Value type: <prop-encoded-array>
-+	Definition: reference to the xo clock.
++	Definition: reference to the pll parents.
 +
 +- clock-names:
 +	Usage: required
 +	Value type: <stringlist>
-+	Definition: must be "xo".
++	Definition: must be "pll8_vote", "pxo".
 +
 +- clock-output-names:
 +	Usage: required
 +	Value type: <string>
-+	Definition: Name of the PLL. Typically hfpllX where X is a CPU number
-+		    starting at 0. Otherwise hfpll_Y where Y is more specific
-+		    such as "l2".
++	Definition: Name of the output clock. Typically acpu_l2_aux indicating
++		    an L2 cache auxiliary clock.
 +
 +Example:
 +
-+1) An HFPLL for the L2 cache.
-+
-+	clock-controller at f9016000 {
-+		compatible = "qcom,hfpll-ipq8064", "qcom,hfpll";
-+		reg = <0xf9016000 0x30>;
-+		clocks = <&xo_board>;
-+		clock-names = "xo";
-+		clock-output-names = "hfpll_l2";
-+	};
-+
-+2) An HFPLL for CPU0. This HFPLL has the alias register region.
-+
-+	clock-controller at f908a000 {
-+		compatible = "qcom,hfpll-ipq8064", "qcom,hfpll";
-+		reg = <0xf908a000 0x30>, <0xf900a000 0x30>;
-+		clocks = <&xo_board>;
-+		clock-names = "xo";
-+		clock-output-names = "hfpll0";
++	l2cc: clock-controller at 2011000 {
++		compatible = "qcom,kpss-gcc-ipq8064", "qcom,kpss-gcc";
++		reg = <0x2011000 0x1000>;
++		clocks = <&gcc PLL8_VOTE>, <&gcc PXO_SRC>;
++		clock-names = "pll8_vote", "pxo";
++		clock-output-names = "acpu_l2_aux";
 +	};
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
