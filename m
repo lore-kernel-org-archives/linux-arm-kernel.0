@@ -1,329 +1,288 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 13 Aug 2018 11:54:06 +0100
-Subject: [PATCH 1/3] arm64: implement ftrace with regs
-In-Reply-To: <20180810160223.D360D68C76@newverein.lst.de>
-References: <20180810160043.9E45568C76@newverein.lst.de>
- <20180810160223.D360D68C76@newverein.lst.de>
-Message-ID: <2b5c1092-2cc0-00ec-ba3d-341dc61452b4@arm.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Mon, 13 Aug 2018 11:04:17 +0000
+Subject: [PATCH] arm64: dts: renesas: Initial r8a774a1 SoC device tree
+In-Reply-To: <TY1PR01MB1770CD5C853AA5E765961B11C0390@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+References: <1534146093-1651-1-git-send-email-biju.das@bp.renesas.com>
+ <TY1PR01MB1770D16DDB50BF579ADF8335C0390@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+ <OSBPR01MB2103F339F8BB36042C8AD0E1B8390@OSBPR01MB2103.jpnprd01.prod.outlook.com>
+ <TY1PR01MB1770CD5C853AA5E765961B11C0390@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+Message-ID: <OSBPR01MB2103F387973ECD078290E060B8390@OSBPR01MB2103.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Torsten,
 
-On 10/08/18 17:02, Torsten Duwe wrote:
-> Check for compiler support of -fpatchable-function-entry and use it
-> to intercept functions immediately on entry, saving the LR in x9.
-> Disable ftracing in efi/libstub, because this triggers cross-section
-> linker errors now (-pg used to be disabled already).
-> Add an ftrace_caller which can handle LR in x9.
-> This code has successfully passed the FTRACE_STARTUP_TEST.
-> 
-> Signed-off-by: Torsten Duwe <duwe@suse.de>
-> 
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -110,6 +110,7 @@ config ARM64
->   	select HAVE_DEBUG_KMEMLEAK
->   	select HAVE_DMA_CONTIGUOUS
->   	select HAVE_DYNAMIC_FTRACE
-> +	select HAVE_DYNAMIC_FTRACE_WITH_REGS
->   	select HAVE_EFFICIENT_UNALIGNED_ACCESS
->   	select HAVE_FTRACE_MCOUNT_RECORD
->   	select HAVE_FUNCTION_TRACER
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -78,6 +78,15 @@ ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
->   KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
->   endif
->   
-> +ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> +  CC_FLAGS_FTRACE := -fpatchable-function-entry=2
-> +  KBUILD_CPPFLAGS += -DCC_USING_PATCHABLE_FUNCTION_ENTRY
-> +  ifeq ($(call cc-option,-fpatchable-function-entry=2),)
-> +    $(warning Cannot use CONFIG_DYNAMIC_FTRACE_WITH_REGS: \
-> +             -fpatchable-function-entry not supported by compiler)
+Hello Fab,
 
-Shouldn't this be an error? The option -fpatchable-function-entry has 
-been added to the CC_FLAGS_FTRACE, so any call to the compiler is gonna 
-break anyway. Or am I missing something?
+> > Subject: RE: [PATCH] arm64: dts: renesas: Initial r8a774a1 SoC device
+> > tree
+> >
+> > Hello Fabrizio,
+> >
+> > > Hello Biju,
+> > >
+> > > Thank you for your patch.
+> > >
+> > > > -----Original Message-----
+> > > > From: Biju Das <biju.das@bp.renesas.com>
+> > > > Sent: 13 August 2018 08:42
+> > > > To: Rob Herring <robh+dt@kernel.org>; Mark Rutland
+> > > > <mark.rutland@arm.com>; Catalin Marinas
+> <catalin.marinas@arm.com>;
+> > > > Will Deacon <will.deacon@arm.com>
+> > > > Cc: Biju Das <biju.das@bp.renesas.com>; Simon Horman
+> > > > <horms@verge.net.au>; Magnus Damm <magnus.damm@gmail.com>;
+> > > > linux-renesas-soc at vger.kernel.org; devicetree at vger.kernel.org;
+> > > > linux-arm-kernel at lists.infradead.org; Geert Uytterhoeven
+> > > > <geert+renesas@glider.be>; Chris Paterson
+> > > > <Chris.Paterson2@renesas.com>; Fabrizio Castro
+> > > > <fabrizio.castro@bp.renesas.com>
+> > > > Subject: [PATCH] arm64: dts: renesas: Initial r8a774a1 SoC device
+> > > > tree
+> > > >
+> > > > Basic support for the RZ/G2M SoC.
+> > > >
+> > > > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > > > ---
+> > > >  arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 192
+> > > > ++++++++++++++++++++++++++++++
+> > > >  1 file changed, 192 insertions(+)  create mode 100644
+> > > > arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> > > >
+> > > > diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> > > > b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> > > > new file mode 100644
+> > > > index 0000000..f3641c0
+> > > > --- /dev/null
+> > > > +++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> > > > @@ -0,0 +1,192 @@
+> > > > +// SPDX-License-Identifier: GPL-2.0
+> > > > +/*
+> > > > + * Device Tree Source for the r8a774a1 SoC
+> > > > + *
+> > > > + * Copyright (C) 2018 Renesas Electronics Corp.
+> > > > + */
+> > > > +
+> > > > +#include <dt-bindings/interrupt-controller/irq.h>
+> > > > +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> > > > +#include <dt-bindings/clock/renesas-cpg-mssr.h>
+> > > > +
+> > > > +#define CPG_AUDIO_CLK_I10
+> > >
+> > > I believe there is no use case for this macro, therefore I think
+> > > this device tree can live without it.
+> > > With that fixed:
+> >
+> > This clock is SoC specific clock similar to R-Car Gen-3 H3/M3/M3N.
+> > Also the same clock is mentioned in Table  8.2b List of clocks of RZ/G2M
+> hardware manual. So I think it is ok.
+> >
+> >  If you think defining SoC specific clock is wrong in this file , we need to fix
+> other boards as well.
+>
+> I believe that macro is used on other platforms to provide a little bit of
+> abstraction when defin ing the clocks of rcar_sound, therefore it's ok for the
+> other boards.
 
-> +  endif
-> +endif
-> +
->   # Default value
->   head-y		:= arch/arm64/kernel/head.o
->   
-> --- a/arch/arm64/include/asm/ftrace.h
-> +++ b/arch/arm64/include/asm/ftrace.h
-> @@ -16,6 +16,14 @@
->   #define MCOUNT_ADDR		((unsigned long)_mcount)
->   #define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
->   
-> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> +#define ARCH_SUPPORTS_FTRACE_OPS 1
-> +#define REC_IP_BRANCH_OFFSET 4
-> +#define FTRACE_REGS_ADDR FTRACE_ADDR
-> +#else
-> +#define REC_IP_BRANCH_OFFSET 0
-> +#endif
-> +
->   #ifndef __ASSEMBLY__
->   #include <linux/compat.h>
->   
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -7,9 +7,9 @@ CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(
->   AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
->   CFLAGS_armv8_deprecated.o := -I$(src)
->   
-> -CFLAGS_REMOVE_ftrace.o = -pg
-> -CFLAGS_REMOVE_insn.o = -pg
-> -CFLAGS_REMOVE_return_address.o = -pg
-> +CFLAGS_REMOVE_ftrace.o = -pg $(CC_FLAGS_FTRACE)
-> +CFLAGS_REMOVE_insn.o = -pg $(CC_FLAGS_FTRACE)
-> +CFLAGS_REMOVE_return_address.o = -pg $(CC_FLAGS_FTRACE)
->   
->   # Object file lists.
->   arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
-> --- a/drivers/firmware/efi/libstub/Makefile
-> +++ b/drivers/firmware/efi/libstub/Makefile
-> @@ -11,7 +11,8 @@
->   				   -fPIC -fno-strict-aliasing -mno-red-zone \
->   				   -mno-mmx -mno-sse -fshort-wchar
->   
-> -cflags-$(CONFIG_ARM64)		:= $(subst -pg,,$(KBUILD_CFLAGS)) -fpie
-> +cflags-$(CONFIG_ARM64)		:= $(filter-out -pg $(CC_FLAGS_FTRACE)\
-> +				  ,$(KBUILD_CFLAGS)) -fpie
->   cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) \
->   				   -fno-builtin -fpic -mno-single-pic-base
->   
-> --- a/arch/arm64/kernel/entry-ftrace.S
-> +++ b/arch/arm64/kernel/entry-ftrace.S
-> @@ -13,6 +13,8 @@
->   #include <asm/assembler.h>
->   #include <asm/ftrace.h>
->   #include <asm/insn.h>
-> +#include <asm/asm-offsets.h>
-> +#include <asm/assembler.h>
->   
->   /*
->    * Gcc with -pg will put the following code in the beginning of each function:
-> @@ -123,6 +125,7 @@ skip_ftrace_call:			// }
->   ENDPROC(_mcount)
->   
->   #else /* CONFIG_DYNAMIC_FTRACE */
-> +#ifndef CONFIG_DYNAMIC_FTRACE_WITH_REGS
->   /*
->    * _mcount() is used to build the kernel with -pg option, but all the branch
->    * instructions to _mcount() are replaced to NOP initially at kernel start up,
-> @@ -162,6 +165,84 @@ ftrace_graph_call:			// ftrace_graph_cal
->   
->   	mcount_exit
->   ENDPROC(ftrace_caller)
-> +#else /* CONFIG_DYNAMIC_FTRACE_WITH_REGS */
-> +ENTRY(_mcount)
-> +	mov     x10, lr
-> +	mov     lr, x9
-> +	ret     x10
-> +ENDPROC(_mcount)
-> +
-> +ENTRY(ftrace_caller)
-> +	stp	x29, x9, [sp, #-16]!
-> +	sub	sp, sp, #S_FRAME_SIZE
-> +
-> +	stp	x0, x1, [sp]
-> +	stp	x2, x3, [sp, #16]
-> +	stp	x4, x5, [sp, #32]
-> +	stp	x6, x7, [sp, #48]
-> +	stp	x8, x9, [sp, #64]
-> +	stp	x10, x11, [sp, #80]
-> +	stp	x12, x13, [sp, #96]
-> +	stp	x14, x15, [sp, #112]
-> +	stp	x16, x17, [sp, #128]
-> +	stp	x18, x19, [sp, #144]
-> +	stp	x20, x21, [sp, #160]
-> +	stp	x22, x23, [sp, #176]
-> +	stp	x24, x25, [sp, #192]
-> +	stp	x26, x27, [sp, #208]
-> +	stp	x28, x29, [sp, #224]
-> +	/* The link Register at callee entry */
-> +	str	x9, [sp, #S_LR]
-> +	/* The program counter just after the ftrace call site */
-> +	str	lr, [sp, #S_PC]
-> +	/* The stack pointer as it was on ftrace_caller entry... */
-> +	add	x29, sp, #S_FRAME_SIZE+16	/* ...is also our new FP */
-> +	str	x29, [sp, #S_SP]
-> +
-> +	adrp    x0, function_trace_op
-> +	ldr     x2, [x0, #:lo12:function_trace_op]
-> +	mov	x1, x9		/* saved LR == parent IP */
-> +	sub	x0, lr, #8	/* function entry == IP */
-> +	mov	x3, sp		/* complete pt_regs are @sp */
-> +
-> +	.global ftrace_call
-> +ftrace_call:
-> +
-> +	bl	ftrace_stub
-> +
-> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> +	.global ftrace_graph_call
-> +ftrace_graph_call:			// ftrace_graph_caller();
-> +	nop				// If enabled, this will be replaced
-> +					// "b ftrace_graph_caller"
-> +#endif
-> +
-> +ftrace_regs_return:
-> +	ldp	x0, x1, [sp]
-> +	ldp	x2, x3, [sp, #16]
-> +	ldp	x4, x5, [sp, #32]
-> +	ldp	x6, x7, [sp, #48]
-> +	ldp	x8, x9, [sp, #64]
-> +	ldp	x10, x11, [sp, #80]
-> +	ldp	x12, x13, [sp, #96]
-> +	ldp	x14, x15, [sp, #112]
-> +	ldp	x16, x17, [sp, #128]
-> +	ldp	x18, x19, [sp, #144]
-> +	ldp	x20, x21, [sp, #160]
-> +	ldp	x22, x23, [sp, #176]
-> +	ldp	x24, x25, [sp, #192]
-> +	ldp	x26, x27, [sp, #208]
-> +	ldp	x28, x29, [sp, #224]
-> +
-> +	ldr	x9, [sp, #S_PC]
-> +	ldr	lr, [sp, #S_LR]
-> +	add	sp, sp, #S_FRAME_SIZE+16
-> +
-> +	ret	x9
-> +
-> +ENDPROC(ftrace_caller)
-> +
-> +#endif /* CONFIG_DYNAMIC_FTRACE_WITH_REGS */
->   #endif /* CONFIG_DYNAMIC_FTRACE */
->   
->   ENTRY(ftrace_stub)
-> @@ -197,12 +278,20 @@ ENDPROC(ftrace_stub)
->    * and run return_to_handler() later on its exit.
->    */
->   ENTRY(ftrace_graph_caller)
-> +#ifndef CONFIG_DYNAMIC_FTRACE_WITH_REGS
->   	mcount_get_lr_addr	  x0	//     pointer to function's saved lr
->   	mcount_get_pc		  x1	//     function's pc
->   	mcount_get_parent_fp	  x2	//     parent's fp
->   	bl	prepare_ftrace_return	// prepare_ftrace_return(&lr, pc, fp)
->   
->   	mcount_exit
-> +#else
-> +	add	x0, sp, #S_LR	/* address of (LR pointing into caller) */
-> +	ldr	x1, [sp, #S_PC]
-> +	ldr	x2, [sp, #232]	/* caller's frame pointer */
+May be I am missing something here. Can you please clarify the use case of
+Other boards?
 
-Nit:
-Can we change the offset to #S_X28 + 8 ?
+> We could provide the same thing here, it's not going to hurt anybody, but at
+> the moment there is no reference design for this new SoC therefore there is
+> no use case for this, so maybe we could wait until we have a use case for
+> this?
 
-> +	bl	prepare_ftrace_return
-> +	b	ftrace_regs_return
-> +#endif
->   ENDPROC(ftrace_graph_caller)
->   
->   /*
-> --- a/arch/arm64/kernel/ftrace.c
-> +++ b/arch/arm64/kernel/ftrace.c
-> @@ -70,7 +70,8 @@ int ftrace_update_ftrace_func(ftrace_fun
->    */
->   int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
->   {
-> -	unsigned long pc = rec->ip;
-> +	unsigned long pc = rec->ip+REC_IP_BRANCH_OFFSET;
-> +	int ret;
->   	u32 old, new;
->   	long offset = (long)pc - (long)addr;
->   
-> @@ -127,23 +128,51 @@ int ftrace_make_call(struct dyn_ftrace *
->   #endif /* CONFIG_ARM64_MODULE_PLTS */
->   	}
->   
-> -	old = aarch64_insn_gen_nop();
-> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> +	old = aarch64_insn_gen_nop();
+> >
+> >
+> > > > +
+> > > > +/ {
+> > > > +compatible = "renesas,r8a774a1";
+> > > > +#address-cells = <2>;
+> > > > +#size-cells = <2>;
+> > > > +
+> > > > +/*
+> > > > + * The external audio clocks are configured as 0 Hz fixed frequency
+> > > > + * clocks by default.
+> > > > + * Boards that provide audio clocks should override them.
+> > > > + */
+> > > > +audio_clk_a: audio_clk_a {
+> > > > +compatible = "fixed-clock";
+> > > > +#clock-cells = <0>;
+> > > > +clock-frequency = <0>;
+> > > > +};
+> > > > +
+> > > > +audio_clk_b: audio_clk_b {
+> > > > +compatible = "fixed-clock";
+> > > > +#clock-cells = <0>;
+> > > > +clock-frequency = <0>;
+> > > > +};
+> > > > +
+> > > > +audio_clk_c: audio_clk_c {
+> > > > +compatible = "fixed-clock";
+> > > > +#clock-cells = <0>;
+> > > > +clock-frequency = <0>;
+> > > > +};
+> > > > +
+> > > > +/* External CAN clock - to be overridden by boards that provide it */
+> > > > +can_clk: can {
+> > > > +compatible = "fixed-clock";
+> > > > +#clock-cells = <0>;
+> > > > +clock-frequency = <0>;
+> > > > +};
+> > > > +
+> > > > +cpus {
+> > > > +#address-cells = <1>;
+> > > > +#size-cells = <0>;
+> > > > +
+> > > > +a57_0: cpu at 0 {
+> > > > +compatible = "arm,cortex-a57", "arm,armv8";
+> > > > +reg = <0x0>;
+> > > > +device_type = "cpu";
+> > > > +power-domains = <&sysc 0>;
+> > > > +next-level-cache = <&L2_CA57>;
+> > > > +enable-method = "psci";
+> > > > +clocks =<&cpg CPG_CORE 0>;
+> > > > +};
+> > > > +
+> > > > +a57_1: cpu at 1 {
+> > > > +compatible = "arm,cortex-a57", "arm,armv8";
+> > > > +reg = <0x1>;
+> > > > +device_type = "cpu";
+> > > > +power-domains = <&sysc 1>;
+> > > > +next-level-cache = <&L2_CA57>;
+> > > > +enable-method = "psci";
+> > > > +clocks =<&cpg CPG_CORE 0>;
+> > > > +};
+> > > > +
+> > > > +L2_CA57: cache-controller-0 {
+> > > > +compatible = "cache";
+> > > > +power-domains = <&sysc 12>;
+> > > > +cache-unified;
+> > > > +cache-level = <2>;
+> > > > +};
+> > > > +};
+> > > > +
+> > > > +extal_clk: extal {
+> > > > +compatible = "fixed-clock";
+> > > > +#clock-cells = <0>;
+> > > > +/* This value must be overridden by the board */
+> > > > +clock-frequency = <0>;
+> > > > +};
+> > > > +
+> > > > +extalr_clk: extalr {
+> > > > +compatible = "fixed-clock";
+> > > > +#clock-cells = <0>;
+> > > > +/* This value must be overridden by the board */
+> > > > +clock-frequency = <0>;
+> > > > +};
+> > > > +
+> > > > +/* External PCIe clock - can be overridden by the board */
+> > > > +pcie_bus_clk: pcie_bus {
+> > > > +compatible = "fixed-clock";
+> > > > +#clock-cells = <0>;
+> > > > +clock-frequency = <0>;
+> > > > +};
+> > > > +
+> > > > +pmu_a57 {
+> > > > +compatible = "arm,cortex-a57-pmu";
+> > > > +interrupts-extended = <&gic GIC_SPI 72
+> > > IRQ_TYPE_LEVEL_HIGH>,
+> > > > +      <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+> > > > +interrupt-affinity = <&a57_0>, <&a57_1>;
+> > > > +};
+> > > > +
+> > > > +psci {
+> > > > +compatible = "arm,psci-1.0", "arm,psci-0.2";
+> > > > +method = "smc";
+> > > > +};
+> > > > +
+> > > > +/* External SCIF clock - to be overridden by boards that provide it */
+> > > > +scif_clk: scif {
+> > > > +compatible = "fixed-clock";
+> > > > +#clock-cells = <0>;
+> > > > +clock-frequency = <0>;
+> > > > +};
+> > > > +
+> > > > +soc {
+> > > > +compatible = "simple-bus";
+> > > > +interrupt-parent = <&gic>;
+> > > > +#address-cells = <2>;
+> > > > +#size-cells = <2>;
+> > > > +ranges;
+> > > > +
+> > > > +cpg: clock-controller at e6150000 {
+> > > > +compatible = "renesas,r8a774a1-cpg-mssr";
+> > > > +reg = <0 0xe6150000 0 0x0bb0>;
+> > > > +clocks = <&extal_clk>, <&extalr_clk>;
+> > > > +clock-names = "extal", "extalr";
+> > > > +#clock-cells = <2>;
+> > > > +#power-domain-cells = <0>;
+> > > > +#reset-cells = <1>;
+> > > > +};
+> > > > +
+> > > > +rst: reset-controller at e6160000 {
+> > > > +compatible = "renesas,r8a774a1-rst";
+> > > > +reg = <0 0xe6160000 0 0x018c>;
+> > > > +};
+> > > > +
+> > > > +sysc: system-controller at e6180000 {
+> > > > +compatible = "renesas,r8a774a1-sysc";
+> > > > +reg = <0 0xe6180000 0 0x0400>;
+> > > > +#power-domain-cells = <1>;
+> > > > +};
+> > > > +
+> > > > +gic: interrupt-controller at f1010000 {
+> > > > +compatible = "arm,gic-400";
+> > > > +#interrupt-cells = <3>;
+> > > > +#address-cells = <0>;
+> > > > +interrupt-controller;
+> > > > +reg = <0x0 0xf1010000 0 0x1000>,
+> > > > +      <0x0 0xf1020000 0 0x20000>,
+> > > > +      <0x0 0xf1040000 0 0x20000>,
+> > > > +      <0x0 0xf1060000 0 0x20000>;
+> > > > +interrupts = <GIC_PPI 9
+> > > > +(GIC_CPU_MASK_SIMPLE(2) |
+> > > IRQ_TYPE_LEVEL_HIGH)>;
+> > > > +clocks = <&cpg CPG_MOD 408>;
+> > > > +clock-names = "clk";
+> > > > +power-domains = <&sysc 32>;
+> > > > +resets = <&cpg 408>;
+> > > > +};
+> > > > +
+> > > > +prr: chipid at fff00044 {
+> > > > +compatible = "renesas,prr";
+> > > > +reg = <0 0xfff00044 0 4>;
+> > > > +};
+> > > > +};
+> > > > +
+> > > > +timer {
+> > > > +compatible = "arm,armv8-timer";
+> > > > +interrupts-extended = <&gic GIC_PPI 13
+> > > (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+> > > > +      <&gic GIC_PPI 14
+> > > (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+> > > > +      <&gic GIC_PPI 11
+> > > (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+> > > > +      <&gic GIC_PPI 10
+> > > (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
+> > > > +};
+> > > > +
+> > > > +/* External USB clocks - can be overridden by the board */
+> > > > +usb3s0_clk: usb3s0 {
+> > > > +compatible = "fixed-clock";
+> > > > +#clock-cells = <0>;
+> > > > +clock-frequency = <0>;
+> > > > +};
+> > > > +
+> > > > +usb_extal_clk: usb_extal {
+> > > > +compatible = "fixed-clock";
+> > > > +#clock-cells = <0>;
+> > > > +clock-frequency = <0>;
+> > > > +};
+> > > > +};
+> > > > --
+> > > > 2.7.4
 
-Doesn't moving 'old' in the #ifdef break things when 
-CONFIG_DYNAMIC_FTRACE_WITH_REGS is not defined? I think the last 
-ftrace_modifyi_code() is using it uninitialized in that case.
 
-> +	new = 0xaa1e03e9;       /* mov x9,x30 */
 
-I see there isn't a aarch64_insn_get_mov function, maybe it would be 
-worth adding it. If not you could use:
 
-aarch64_insn_gen_add_sub_imm(AARCH64_INSN_REG_9, AARCH64_INSN_REG_30, 0,
-			     AARCH64_INSN_VARIANT_64BIT,
-			     AARCH64_INSN_ADSB_ADD);
-
-> +	ret = ftrace_modify_code(pc-REC_IP_BRANCH_OFFSET, old, new, true);
-> +	if (ret)
-> +		return ret;
-> +	smp_wmb();	/* ensure LR saver is in place before ftrace call */
-> +#endif
->   	new = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
->   
->   	return ftrace_modify_code(pc, old, new, true);
->   }
->   
-> +int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
-> +			unsigned long addr)
-
-Is this getting called? I don't see it being referenced.
-
-> +{
-> +	unsigned long pc = rec->ip+REC_IP_BRANCH_OFFSET;
-> +	u32 old, new;
-> +
-> +	old = aarch64_insn_gen_branch_imm(pc, old_addr, true);
-> +	new = aarch64_insn_gen_branch_imm(pc, addr, true);
-> +
-> +	return ftrace_modify_code(pc, old, new, true);
-> +}
-> +
->   /*
->    * Turn off the call to ftrace_caller() in instrumented function
->    */
->   int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
->   		    unsigned long addr)
->   {
-> -	unsigned long pc = rec->ip;
-> +	unsigned long pc = rec->ip+REC_IP_BRANCH_OFFSET;
->   	bool validate = true;
-> +	int ret;
->   	u32 old = 0, new;
->   	long offset = (long)pc - (long)addr;
->   
-> +#ifdef CC_USING_PATCHABLE_FUNCTION_ENTRY
-> +	/* -fpatchable-function-entry= does not generate a profiling call
-> +	 *  initially; the NOPs are already there.
-> +	 */
-> +	if (addr == MCOUNT_ADDR)
-> +		return 0;
-> +#endif
-> +
->   	if (offset < -SZ_128M || offset >= SZ_128M) {
->   #ifdef CONFIG_ARM64_MODULE_PLTS
->   		u32 replaced;
-> @@ -188,7 +218,16 @@ int ftrace_make_nop(struct module *mod,
->   
->   	new = aarch64_insn_gen_nop();
->   
-> -	return ftrace_modify_code(pc, old, new, validate);
-> +	ret = ftrace_modify_code(pc, old, new, validate);
-> +	if (ret)
-> +		return ret;
-> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> +	smp_wmb();	/* ftrace call must not remain without LR saver. */
-> +	old = 0xaa1e03e9;       /* mov x9,x30 */
-> +	new = aarch64_insn_gen_nop();
-
-'new' is already a nop here.
-
-Cheers,
-
--- 
-Julien Thierry
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
