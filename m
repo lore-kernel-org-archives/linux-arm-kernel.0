@@ -1,208 +1,90 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Aug 2018 15:57:28 +0100
-Subject: [PATCH 10/37] KVM: arm/arm64: vgic-debug: Show LPI status
+Date: Mon, 13 Aug 2018 15:57:54 +0100
+Subject: [PATCH 36/37] KVM: arm/arm64: Skip updating PMD entry if no change
 In-Reply-To: <20180813145755.16566-1-marc.zyngier@arm.com>
 References: <20180813145755.16566-1-marc.zyngier@arm.com>
-Message-ID: <20180813145755.16566-11-marc.zyngier@arm.com>
+Message-ID: <20180813145755.16566-37-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vgic debugfs file only knows about SGI/PPI/SPI interrupts, and
-completely ignores LPIs. Let's fix that.
+From: Punit Agrawal <punit.agrawal@arm.com>
 
+Contention on updating a PMD entry by a large number of vcpus can lead
+to duplicate work when handling stage 2 page faults. As the page table
+update follows the break-before-make requirement of the architecture,
+it can lead to repeated refaults due to clearing the entry and
+flushing the tlbs.
+
+This problem is more likely when -
+
+* there are large number of vcpus
+* the mapping is large block mapping
+
+such as when using PMD hugepages (512MB) with 64k pages.
+
+Fix this by skipping the page table update if there is no change in
+the entry being updated.
+
+Cc: stable at vger.kernel.org
+Fixes: ad361f093c1e ("KVM: ARM: Support hugetlbfs backed huge pages")
+Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-debug.c | 42 ++++++++++++++++++++++++++--------
- virt/kvm/arm/vgic/vgic-its.c   | 12 +++++-----
- virt/kvm/arm/vgic/vgic.h       |  1 +
- 3 files changed, 39 insertions(+), 16 deletions(-)
+ virt/kvm/arm/mmu.c | 38 +++++++++++++++++++++++++++-----------
+ 1 file changed, 27 insertions(+), 11 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
-index c589d4c2b478..9279e35fefb1 100644
---- a/virt/kvm/arm/vgic/vgic-debug.c
-+++ b/virt/kvm/arm/vgic/vgic-debug.c
-@@ -36,9 +36,12 @@
- struct vgic_state_iter {
- 	int nr_cpus;
- 	int nr_spis;
-+	int nr_lpis;
- 	int dist_id;
- 	int vcpu_id;
- 	int intid;
-+	int lpi_idx;
-+	u32 *lpi_array;
- };
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 97d27cd9c654..13dfe36501aa 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1044,19 +1044,35 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+ 	pmd = stage2_get_pmd(kvm, cache, addr);
+ 	VM_BUG_ON(!pmd);
  
- static void iter_next(struct vgic_state_iter *iter)
-@@ -52,6 +55,12 @@ static void iter_next(struct vgic_state_iter *iter)
- 	if (iter->intid == VGIC_NR_PRIVATE_IRQS &&
- 	    ++iter->vcpu_id < iter->nr_cpus)
- 		iter->intid = 0;
-+
-+	if (iter->intid >= (iter->nr_spis + VGIC_NR_PRIVATE_IRQS)) {
-+		if (iter->lpi_idx < iter->nr_lpis)
-+			iter->intid = iter->lpi_array[iter->lpi_idx];
-+		iter->lpi_idx++;
-+	}
- }
- 
- static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
-@@ -63,6 +72,11 @@ static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
- 
- 	iter->nr_cpus = nr_cpus;
- 	iter->nr_spis = kvm->arch.vgic.nr_spis;
-+	if (kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) {
-+		iter->nr_lpis = vgic_copy_lpi_list(kvm, NULL, &iter->lpi_array);
-+		if (iter->nr_lpis < 0)
-+			iter->nr_lpis = 0;
-+	}
- 
- 	/* Fast forward to the right position if needed */
- 	while (pos--)
-@@ -73,7 +87,8 @@ static bool end_of_vgic(struct vgic_state_iter *iter)
- {
- 	return iter->dist_id > 0 &&
- 		iter->vcpu_id == iter->nr_cpus &&
--		(iter->intid - VGIC_NR_PRIVATE_IRQS) == iter->nr_spis;
-+		iter->intid >= (iter->nr_spis + VGIC_NR_PRIVATE_IRQS) &&
-+		iter->lpi_idx > iter->nr_lpis;
- }
- 
- static void *vgic_debug_start(struct seq_file *s, loff_t *pos)
-@@ -130,6 +145,7 @@ static void vgic_debug_stop(struct seq_file *s, void *v)
- 
- 	mutex_lock(&kvm->lock);
- 	iter = kvm->arch.vgic.iter;
-+	kfree(iter->lpi_array);
- 	kfree(iter);
- 	kvm->arch.vgic.iter = NULL;
- 	mutex_unlock(&kvm->lock);
-@@ -137,12 +153,14 @@ static void vgic_debug_stop(struct seq_file *s, void *v)
- 
- static void print_dist_state(struct seq_file *s, struct vgic_dist *dist)
- {
-+	bool v3 = dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3;
-+
- 	seq_printf(s, "Distributor\n");
- 	seq_printf(s, "===========\n");
--	seq_printf(s, "vgic_model:\t%s\n",
--		   (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) ?
--		   "GICv3" : "GICv2");
-+	seq_printf(s, "vgic_model:\t%s\n", v3 ? "GICv3" : "GICv2");
- 	seq_printf(s, "nr_spis:\t%d\n", dist->nr_spis);
-+	if (v3)
-+		seq_printf(s, "nr_lpis:\t%d\n", dist->lpi_list_count);
- 	seq_printf(s, "enabled:\t%d\n", dist->enabled);
- 	seq_printf(s, "\n");
- 
-@@ -174,8 +192,10 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
- 		type = "SGI";
- 	else if (irq->intid < VGIC_NR_PRIVATE_IRQS)
- 		type = "PPI";
--	else
-+	else if (irq->intid < VGIC_MAX_SPI)
- 		type = "SPI";
-+	else
-+		type = "LPI";
- 
- 	if (irq->intid ==0 || irq->intid == VGIC_NR_PRIVATE_IRQS)
- 		print_header(s, irq, vcpu);
-@@ -202,7 +222,6 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
- 			irq->source,
- 			irq->priority,
- 			(irq->vcpu) ? irq->vcpu->vcpu_id : -1);
+-	/*
+-	 * Mapping in huge pages should only happen through a fault.  If a
+-	 * page is merged into a transparent huge page, the individual
+-	 * subpages of that huge page should be unmapped through MMU
+-	 * notifiers before we get here.
+-	 *
+-	 * Merging of CompoundPages is not supported; they should become
+-	 * splitting first, unmapped, merged, and mapped back in on-demand.
+-	 */
+-	VM_BUG_ON(pmd_present(*pmd) && pmd_pfn(*pmd) != pmd_pfn(*new_pmd));
 -
- }
- 
- static int vgic_debug_show(struct seq_file *s, void *v)
-@@ -221,17 +240,20 @@ static int vgic_debug_show(struct seq_file *s, void *v)
- 	if (!kvm->arch.vgic.initialized)
- 		return 0;
- 
--	if (iter->vcpu_id < iter->nr_cpus) {
-+	if (iter->vcpu_id < iter->nr_cpus)
- 		vcpu = kvm_get_vcpu(kvm, iter->vcpu_id);
--		irq = &vcpu->arch.vgic_cpu.private_irqs[iter->intid];
--	} else {
--		irq = &kvm->arch.vgic.spis[iter->intid - VGIC_NR_PRIVATE_IRQS];
+ 	old_pmd = *pmd;
+ 	if (pmd_present(old_pmd)) {
++		/*
++		 * Multiple vcpus faulting on the same PMD entry, can
++		 * lead to them sequentially updating the PMD with the
++		 * same value. Following the break-before-make
++		 * (pmd_clear() followed by tlb_flush()) process can
++		 * hinder forward progress due to refaults generated
++		 * on missing translations.
++		 *
++		 * Skip updating the page table if the entry is
++		 * unchanged.
++		 */
++		if (pmd_val(old_pmd) == pmd_val(*new_pmd))
++			return 0;
 +
-+	irq = vgic_get_irq(kvm, vcpu, iter->intid);
-+	if (!irq) {
-+		seq_printf(s, "       LPI %4d freed\n", iter->intid);
-+		return 0;
- 	}
- 
- 	spin_lock_irqsave(&irq->irq_lock, flags);
- 	print_irq_state(s, irq, vcpu);
- 	spin_unlock_irqrestore(&irq->irq_lock, flags);
- 
-+	vgic_put_irq(kvm, irq);
- 	return 0;
- }
- 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 1d88010f6b61..cee2c3c5519c 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -318,9 +318,9 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
-  * enumerate those LPIs without holding any lock.
-  * Returns their number and puts the kmalloc'ed array into intid_ptr.
-  */
--static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
-+int vgic_copy_lpi_list(struct kvm *kvm, struct kvm_vcpu *vcpu, u32 **intid_ptr)
- {
--	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	struct vgic_dist *dist = &kvm->arch.vgic;
- 	struct vgic_irq *irq;
- 	unsigned long flags;
- 	u32 *intids;
-@@ -343,7 +343,7 @@ static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
- 		if (i == irq_count)
- 			break;
- 		/* We don't need to "get" the IRQ, as we hold the list lock. */
--		if (irq->target_vcpu != vcpu)
-+		if (vcpu && irq->target_vcpu != vcpu)
- 			continue;
- 		intids[i++] = irq->intid;
- 	}
-@@ -435,7 +435,7 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
- 	unsigned long flags;
- 	u8 pendmask;
- 
--	nr_irqs = vgic_copy_lpi_list(vcpu, &intids);
-+	nr_irqs = vgic_copy_lpi_list(vcpu->kvm, vcpu, &intids);
- 	if (nr_irqs < 0)
- 		return nr_irqs;
- 
-@@ -1160,7 +1160,7 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
- 
- 	vcpu = kvm_get_vcpu(kvm, collection->target_addr);
- 
--	irq_count = vgic_copy_lpi_list(vcpu, &intids);
-+	irq_count = vgic_copy_lpi_list(kvm, vcpu, &intids);
- 	if (irq_count < 0)
- 		return irq_count;
- 
-@@ -1208,7 +1208,7 @@ static int vgic_its_cmd_handle_movall(struct kvm *kvm, struct vgic_its *its,
- 	vcpu1 = kvm_get_vcpu(kvm, target1_addr);
- 	vcpu2 = kvm_get_vcpu(kvm, target2_addr);
- 
--	irq_count = vgic_copy_lpi_list(vcpu1, &intids);
-+	irq_count = vgic_copy_lpi_list(kvm, vcpu1, &intids);
- 	if (irq_count < 0)
- 		return irq_count;
- 
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index ead00b2072b2..ed9d9d9e2fc5 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -305,6 +305,7 @@ static inline bool vgic_dist_overlap(struct kvm *kvm, gpa_t base, size_t size)
- 		(base < d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE);
- }
- 
-+int vgic_copy_lpi_list(struct kvm *kvm, struct kvm_vcpu *vcpu, u32 **intid_ptr);
- int vgic_its_resolve_lpi(struct kvm *kvm, struct vgic_its *its,
- 			 u32 devid, u32 eventid, struct vgic_irq **irq);
- struct vgic_its *vgic_msi_to_its(struct kvm *kvm, struct kvm_msi *msi);
++		/*
++		 * Mapping in huge pages should only happen through a
++		 * fault.  If a page is merged into a transparent huge
++		 * page, the individual subpages of that huge page
++		 * should be unmapped through MMU notifiers before we
++		 * get here.
++		 *
++		 * Merging of CompoundPages is not supported; they
++		 * should become splitting first, unmapped, merged,
++		 * and mapped back in on-demand.
++		 */
++		VM_BUG_ON(pmd_pfn(old_pmd) != pmd_pfn(*new_pmd));
++
+ 		pmd_clear(pmd);
+ 		kvm_tlb_flush_vmid_ipa(kvm, addr);
+ 	} else {
 -- 
 2.18.0
