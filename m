@@ -1,54 +1,74 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 13 Aug 2018 11:52:24 -0700
-Subject: [PATCH] remoteproc/davinci: Mark error recovery as disabled
-In-Reply-To: <0550997f-8e32-fb56-2a70-74235b969ce2@ti.com>
-References: <20180723232757.9147-1-s-anna@ti.com>
- <0550997f-8e32-fb56-2a70-74235b969ce2@ti.com>
-Message-ID: <20180813185224.GG5090@builder>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 13 Aug 2018 13:07:21 -0600
+Subject: [PATCH v2 2/4] dt-bindings: soc: amlogic: add meson-canvas
+ documentation
+In-Reply-To: <20180807220011.24436-3-maxi.jourdan@wanadoo.fr>
+References: <20180807220011.24436-1-maxi.jourdan@wanadoo.fr>
+ <20180807220011.24436-3-maxi.jourdan@wanadoo.fr>
+Message-ID: <20180813190721.GA27621@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 13 Aug 08:11 PDT 2018, Suman Anna wrote:
+On Wed, Aug 08, 2018 at 12:00:09AM +0200, Maxime Jourdan wrote:
+> DT bindings doc for amlogic,meson-canvas
+> 
+> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
+> ---
+>  .../soc/amlogic/amlogic,meson-canvas.txt      | 36 +++++++++++++++++++
+>  1 file changed, 36 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt b/Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt
+> new file mode 100644
+> index 000000000000..5f0351717bee
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt
+> @@ -0,0 +1,36 @@
+> +Amlogic Canvas
+> +================================
+> +
+> +A canvas is a collection of metadata that describes a pixel buffer.
+> +Those metadata include: width, height, phyaddr, wrapping, block mode
+> +and endianness.
+> +
+> +Many IPs within Amlogic SoCs rely on canvas indexes to read/write pixel data
+> +rather than use the phy addresses directly. For instance, this is the case for
+> +the video decoders and the display.
+> +
+> +Amlogic SoCs have 256 canvas.
+> +
+> +Device Tree Bindings:
+> +---------------------
+> +
+> +Canvas Provider
+> +--------------------------
+> +
+> +Required properties:
+> +- compatible: "amlogic,canvas"
+> +
+> +Parent node should have the following properties :
+> +- compatible: "amlogic,gx-dmc-sysctrl", "syscon", "simple-mfd"
 
-> Hi Bjorn,
-> 
-> On 07/23/2018 06:27 PM, Suman Anna wrote:
-> > The Davinci remoteproc driver does not support error recovery at
-> > present, so mark the corresponding remoteproc flag appropriately
-> > so that the debugfs flag shows the value as 'disabled' by default.
-> > 
-> > Signed-off-by: Suman Anna <s-anna@ti.com>
-> 
-> Can you pick up this minor patch for 4.19 please, I do not see this in
-> your rproc-next branch?
-> 
+Is this documented somewhere? One child function is not a reason for an 
+MFD and child nodes. And child nodes like this with no resources are 
+unnecessary.
 
-Of course, the patch is applied now, will send my pull request in a few
-days.
-
-Regards,
-Bjorn
-
-> Thanks,
-> Suman
+> +- reg: base address and size of the DMC system control register space.
+> +
+> +Example:
+> +
+> +sysctrl_DMC: system-controller at 0 {
+> +	compatible = "amlogic,gx-dmc-sysctrl", "syscon", "simple-mfd";
+> +	reg = <0x0 0x0 0x0 0x1000>;
+> +
+> +	canvas: canvas-provider at 0 {
+> +		compatible = "amlogic,canvas";
+> +	};
+> +};
+> -- 
+> 2.18.0
 > 
-> > ---
-> >  drivers/remoteproc/da8xx_remoteproc.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
-> > index b668e32996e2..53160d5ed543 100644
-> > --- a/drivers/remoteproc/da8xx_remoteproc.c
-> > +++ b/drivers/remoteproc/da8xx_remoteproc.c
-> > @@ -284,6 +284,9 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
-> >  		goto free_mem;
-> >  	}
-> >  
-> > +	/* error recovery is not supported at present */
-> > +	rproc->recovery_disabled = true;
-> > +
-> >  	drproc = rproc->priv;
-> >  	drproc->rproc = rproc;
-> >  	drproc->dsp_clk = dsp_clk;
-> > 
-> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
