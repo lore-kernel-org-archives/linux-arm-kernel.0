@@ -1,142 +1,116 @@
 From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Tue, 14 Aug 2018 00:34:46 +0200
-Subject: [PATCH v3 5/7] mtd: rawnand: ams-delta: Set port direction when needed
+Date: Tue, 14 Aug 2018 00:34:47 +0200
+Subject: [PATCH v3 6/7] mtd: rawnand: ams-delta: Simplify pointer resolution
+ on read/write
 In-Reply-To: <20180813223448.21316-1-jmkrzyszt@gmail.com>
 References: <20180806222918.12644-1-jmkrzyszt@gmail.com>
  <20180813223448.21316-1-jmkrzyszt@gmail.com>
-Message-ID: <20180813223448.21316-6-jmkrzyszt@gmail.com>
+Message-ID: <20180813223448.21316-7-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In its current shape, the driver sets data port direction before each
-byte read/write operation, even during multi-byte transfers.  Improve
-performance of the driver by setting the port direction only when
-needed.
-
-This optimisation will become particularly important as soon as
-planned conversion of the driver to GPIO API for data I/O will be
-implemented.
+Simplify data read/write sub-functions by making them accept private
+structure pointer instead of resolving it again from mtd_info.
 
 Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
 ---
- drivers/mtd/nand/raw/ams-delta.c | 59 ++++++++++++++++++++++++++++++++--------
- 1 file changed, 47 insertions(+), 12 deletions(-)
+ drivers/mtd/nand/raw/ams-delta.c | 30 +++++++++++++++---------------
+ 1 file changed, 15 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/mtd/nand/raw/ams-delta.c b/drivers/mtd/nand/raw/ams-delta.c
-index 09d6901fc94d..5f9180fe4f8b 100644
+index 5f9180fe4f8b..59fc417e8fa9 100644
 --- a/drivers/mtd/nand/raw/ams-delta.c
 +++ b/drivers/mtd/nand/raw/ams-delta.c
-@@ -45,6 +45,7 @@ struct ams_delta_nand {
- 	struct gpio_desc	*gpiod_ale;
- 	struct gpio_desc	*gpiod_cle;
- 	void __iomem		*io_base;
-+	bool			data_in;
- };
- 
- /*
-@@ -72,50 +73,83 @@ static const struct mtd_partition partition_info[] = {
+@@ -73,10 +73,9 @@ static const struct mtd_partition partition_info[] = {
  	  .size		=  3 * SZ_256K },
  };
  
--static void ams_delta_write_byte(struct mtd_info *mtd, u_char byte)
-+static void ams_delta_write_next_byte(struct mtd_info *mtd, u_char byte)
+-static void ams_delta_write_next_byte(struct mtd_info *mtd, u_char byte)
++static void ams_delta_write_next_byte(struct ams_delta_nand *priv, u_char byte)
  {
- 	struct nand_chip *this = mtd_to_nand(mtd);
- 	struct ams_delta_nand *priv = nand_get_controller_data(this);
--	void __iomem *io_base = priv->io_base;
+-	struct nand_chip *this = mtd_to_nand(mtd);
+-	struct ams_delta_nand *priv = nand_get_controller_data(this);
++	struct nand_chip *this = &priv->nand_chip;
  
--	writew(0, io_base + OMAP_MPUIO_IO_CNTL);
  	writew(byte, this->IO_ADDR_W);
-+
- 	gpiod_set_value(priv->gpiod_nwe, 0);
- 	ndelay(40);
+ 
+@@ -85,10 +84,8 @@ static void ams_delta_write_next_byte(struct mtd_info *mtd, u_char byte)
  	gpiod_set_value(priv->gpiod_nwe, 1);
  }
  
--static u_char ams_delta_read_byte(struct mtd_info *mtd)
-+static void ams_delta_write_byte(struct mtd_info *mtd, u_char byte)
+-static void ams_delta_write_byte(struct mtd_info *mtd, u_char byte)
++static void ams_delta_write_byte(struct ams_delta_nand *priv, u_char byte)
  {
--	u_char res;
- 	struct nand_chip *this = mtd_to_nand(mtd);
- 	struct ams_delta_nand *priv = nand_get_controller_data(this);
+-	struct nand_chip *this = mtd_to_nand(mtd);
+-	struct ams_delta_nand *priv = nand_get_controller_data(this);
  	void __iomem *io_base = priv->io_base;
  
-+	if (priv->data_in) {
-+		writew(0, io_base + OMAP_MPUIO_IO_CNTL);
-+		priv->data_in = false;
-+	}
-+
-+	ams_delta_write_next_byte(mtd, byte);
-+}
-+
-+static u_char ams_delta_read_next_byte(struct mtd_info *mtd)
-+{
-+	struct nand_chip *this = mtd_to_nand(mtd);
-+	struct ams_delta_nand *priv = nand_get_controller_data(this);
-+	u_char res;
-+
- 	gpiod_set_value(priv->gpiod_nre, 0);
- 	ndelay(40);
--	writew(~0, io_base + OMAP_MPUIO_IO_CNTL);
-+
- 	res = readw(this->IO_ADDR_R);
-+
- 	gpiod_set_value(priv->gpiod_nre, 1);
+ 	if (priv->data_in) {
+@@ -96,13 +93,12 @@ static void ams_delta_write_byte(struct mtd_info *mtd, u_char byte)
+ 		priv->data_in = false;
+ 	}
  
- 	return res;
+-	ams_delta_write_next_byte(mtd, byte);
++	ams_delta_write_next_byte(priv, byte);
  }
  
-+static u_char ams_delta_read_byte(struct mtd_info *mtd)
-+{
-+	struct nand_chip *this = mtd_to_nand(mtd);
-+	struct ams_delta_nand *priv = nand_get_controller_data(this);
-+	void __iomem *io_base = priv->io_base;
-+
-+	if (!priv->data_in) {
-+		writew(~0, io_base + OMAP_MPUIO_IO_CNTL);
-+		priv->data_in = true;
-+	}
-+
-+	return ams_delta_read_next_byte(mtd);
-+}
-+
+-static u_char ams_delta_read_next_byte(struct mtd_info *mtd)
++static u_char ams_delta_read_next_byte(struct ams_delta_nand *priv)
+ {
+-	struct nand_chip *this = mtd_to_nand(mtd);
+-	struct ams_delta_nand *priv = nand_get_controller_data(this);
++	struct nand_chip *this = &priv->nand_chip;
+ 	u_char res;
+ 
+ 	gpiod_set_value(priv->gpiod_nre, 0);
+@@ -126,30 +122,34 @@ static u_char ams_delta_read_byte(struct mtd_info *mtd)
+ 		priv->data_in = true;
+ 	}
+ 
+-	return ams_delta_read_next_byte(mtd);
++	return ams_delta_read_next_byte(priv);
+ }
+ 
  static void ams_delta_write_buf(struct mtd_info *mtd, const u_char *buf,
  				int len)
  {
--	int i;
-+	int i = 0;
-+
-+	if (len > 0)
-+		ams_delta_write_byte(mtd, buf[i++]);
++	struct nand_chip *this = mtd_to_nand(mtd);
++	struct ams_delta_nand *priv = nand_get_controller_data(this);
+ 	int i = 0;
  
--	for (i=0; i<len; i++)
--		ams_delta_write_byte(mtd, buf[i]);
-+	while (i < len)
-+		ams_delta_write_next_byte(mtd, buf[i++]);
+ 	if (len > 0)
+-		ams_delta_write_byte(mtd, buf[i++]);
++		ams_delta_write_byte(priv, buf[i++]);
+ 
+ 	while (i < len)
+-		ams_delta_write_next_byte(mtd, buf[i++]);
++		ams_delta_write_next_byte(priv, buf[i++]);
  }
  
  static void ams_delta_read_buf(struct mtd_info *mtd, u_char *buf, int len)
  {
--	int i;
-+	int i = 0;
-+
-+	if (len > 0)
-+		buf[i++] = ams_delta_read_byte(mtd);
++	struct nand_chip *this = mtd_to_nand(mtd);
++	struct ams_delta_nand *priv = nand_get_controller_data(this);
+ 	int i = 0;
  
--	for (i=0; i<len; i++)
--		buf[i] = ams_delta_read_byte(mtd);
-+	while (i < len)
-+		buf[i++] = ams_delta_read_next_byte(mtd);
+ 	if (len > 0)
+ 		buf[i++] = ams_delta_read_byte(mtd);
+ 
+ 	while (i < len)
+-		buf[i++] = ams_delta_read_next_byte(mtd);
++		buf[i++] = ams_delta_read_next_byte(priv);
  }
  
  /*
-@@ -269,6 +303,7 @@ static int ams_delta_init(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "data GPIO request failed: %d\n", err);
- 		goto out_mtd;
+@@ -173,7 +173,7 @@ static void ams_delta_hwcontrol(struct mtd_info *mtd, int cmd,
  	}
-+	priv->data_in = true;
  
- 	/* Scan to find existence of the device */
- 	err = nand_scan(mtd, 1);
+ 	if (cmd != NAND_CMD_NONE)
+-		ams_delta_write_byte(mtd, cmd);
++		ams_delta_write_byte(priv, cmd);
+ }
+ 
+ static int ams_delta_nand_ready(struct mtd_info *mtd)
 -- 
 2.16.4
