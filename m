@@ -1,43 +1,35 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 13 Aug 2018 10:11:51 -0500
-Subject: [PATCH] remoteproc/davinci: Mark error recovery as disabled
-In-Reply-To: <20180723232757.9147-1-s-anna@ti.com>
-References: <20180723232757.9147-1-s-anna@ti.com>
-Message-ID: <0550997f-8e32-fb56-2a70-74235b969ce2@ti.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 13 Aug 2018 17:11:44 +0200
+Subject: [PATCH] irqchip/s3c24xx: Remove unneeded comparison of unsigned long
+ to 0
+Message-ID: <20180813151144.12407-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+irq_data->hwirq is unsigned long.  This fixes GCC warning:
 
-On 07/23/2018 06:27 PM, Suman Anna wrote:
-> The Davinci remoteproc driver does not support error recovery at
-> present, so mark the corresponding remoteproc flag appropriately
-> so that the debugfs flag shows the value as 'disabled' by default.
-> 
-> Signed-off-by: Suman Anna <s-anna@ti.com>
+    drivers/irqchip/irq-s3c24xx.c: In function 's3c_irqext0_type':
+    drivers/irqchip/irq-s3c24xx.c:253:19: warning: comparison of unsigned expression >= 0 is always true [-Wtype-limits]
+      if ((data->hwirq >= 0) && (data->hwirq <= 3)) {
+                       ^~
 
-Can you pick up this minor patch for 4.19 please, I do not see this in
-your rproc-next branch?
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ drivers/irqchip/irq-s3c24xx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Suman
-
-> ---
->  drivers/remoteproc/da8xx_remoteproc.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
-> index b668e32996e2..53160d5ed543 100644
-> --- a/drivers/remoteproc/da8xx_remoteproc.c
-> +++ b/drivers/remoteproc/da8xx_remoteproc.c
-> @@ -284,6 +284,9 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
->  		goto free_mem;
->  	}
->  
-> +	/* error recovery is not supported at present */
-> +	rproc->recovery_disabled = true;
-> +
->  	drproc = rproc->priv;
->  	drproc->rproc = rproc;
->  	drproc->dsp_clk = dsp_clk;
-> 
+diff --git a/drivers/irqchip/irq-s3c24xx.c b/drivers/irqchip/irq-s3c24xx.c
+index f6fd57ebe6e6..c19766fe8a1a 100644
+--- a/drivers/irqchip/irq-s3c24xx.c
++++ b/drivers/irqchip/irq-s3c24xx.c
+@@ -250,7 +250,7 @@ static int s3c_irqext0_type(struct irq_data *data, unsigned int type)
+ 	void __iomem *gpcon_reg;
+ 	unsigned long gpcon_offset, extint_offset;
+ 
+-	if ((data->hwirq >= 0) && (data->hwirq <= 3)) {
++	if (data->hwirq <= 3) {
+ 		gpcon_reg = S3C2410_GPFCON;
+ 		extint_reg = S3C24XX_EXTINT0;
+ 		gpcon_offset = (data->hwirq) * 2;
+-- 
+2.14.1
