@@ -1,98 +1,35 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 13 Aug 2018 10:40:48 +0100
-Subject: [PATCH v2 1/2] KVM: arm/arm64: Skip updating PMD entry if no change
-In-Reply-To: <20180813094049.3726-1-punit.agrawal@arm.com>
-References: <20180813094049.3726-1-punit.agrawal@arm.com>
-Message-ID: <20180813094049.3726-2-punit.agrawal@arm.com>
+Date: Mon, 13 Aug 2018 10:40:47 +0100
+Subject: [PATCH v2 0/2] KVM: Fix refaulting due to page table update
+Message-ID: <20180813094049.3726-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Contention on updating a PMD entry by a large number of vcpus can lead
-to duplicate work when handling stage 2 page faults. As the page table
-update follows the break-before-make requirement of the architecture,
-it can lead to repeated refaults due to clearing the entry and
-flushing the tlbs.
+Hi,
 
-This problem is more likely when -
+Here's a couple of patches to fix an issue when multiple vcpus fault
+on a page table entry[0]. The issue was reported by a user when testing
+PUD hugepage support[1] but also exists for PMD and PTE updates though
+with a lower probability.
 
-* there are large number of vcpus
-* the mapping is large block mapping
+In this version -
 
-such as when using PMD hugepages (512MB) with 64k pages.
+* the fix has been split for PMD hugepage and PTE update
+* refactored the PMD fix
+* applied fixes tag and cc'ing to stable
 
-Fix this by skipping the page table update if there is no change in
-the entry being updated.
+Thanks,
+Punit
 
-Fixes: ad361f093c1e ("KVM: ARM: Support hugetlbfs backed huge pages")
-Change-Id: Ib417957c842ef67a6f4b786f68df62048d202c24
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-Cc: stable at vger.kernel.org
----
- virt/kvm/arm/mmu.c | 40 +++++++++++++++++++++++++++++-----------
- 1 file changed, 29 insertions(+), 11 deletions(-)
+[0] https://lkml.org/lkml/2018/8/10/256
+[1] https://lkml.org/lkml/2018/7/16/482
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 1d90d79706bd..2ab977edc63c 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1015,19 +1015,36 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
- 	pmd = stage2_get_pmd(kvm, cache, addr);
- 	VM_BUG_ON(!pmd);
- 
--	/*
--	 * Mapping in huge pages should only happen through a fault.  If a
--	 * page is merged into a transparent huge page, the individual
--	 * subpages of that huge page should be unmapped through MMU
--	 * notifiers before we get here.
--	 *
--	 * Merging of CompoundPages is not supported; they should become
--	 * splitting first, unmapped, merged, and mapped back in on-demand.
--	 */
--	VM_BUG_ON(pmd_present(*pmd) && pmd_pfn(*pmd) != pmd_pfn(*new_pmd));
--
- 	old_pmd = *pmd;
-+
- 	if (pmd_present(old_pmd)) {
-+		/*
-+		 * Mapping in huge pages should only happen through a
-+		 * fault.  If a page is merged into a transparent huge
-+		 * page, the individual subpages of that huge page
-+		 * should be unmapped through MMU notifiers before we
-+		 * get here.
-+		 *
-+		 * Merging of CompoundPages is not supported; they
-+		 * should become splitting first, unmapped, merged,
-+		 * and mapped back in on-demand.
-+		 */
-+		VM_BUG_ON(pmd_pfn(old_pmd) != pmd_pfn(*new_pmd));
-+
-+		/*
-+		 * Multiple vcpus faulting on the same PMD entry, can
-+		 * lead to them sequentially updating the PMD with the
-+		 * same value. Following the break-before-make
-+		 * (pmd_clear() followed by tlb_flush()) process can
-+		 * hinder forward progress due to refaults generated
-+		 * on missing translations.
-+		 *
-+		 * Skip updating the page table if the entry is
-+		 * unchanged.
-+		 */
-+		if (pmd_val(old_pmd) == pmd_val(*new_pmd))
-+			goto out;
-+
- 		pmd_clear(pmd);
- 		kvm_tlb_flush_vmid_ipa(kvm, addr);
- 	} else {
-@@ -1035,6 +1052,7 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
- 	}
- 
- 	kvm_set_pmd(pmd, *new_pmd);
-+out:
- 	return 0;
- }
- 
+Punit Agrawal (2):
+  KVM: arm/arm64: Skip updating PMD entry if no change
+  KVM: arm/arm64: Skip updating PTE entry if no change
+
+ virt/kvm/arm/mmu.c | 45 ++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 34 insertions(+), 11 deletions(-)
+
 -- 
 2.18.0
