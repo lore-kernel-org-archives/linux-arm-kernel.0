@@ -1,101 +1,61 @@
-From: owen.chen@mediatek.com (Owen Chen)
-Date: Mon, 13 Aug 2018 17:12:03 +0800
-Subject: [PATCH v5 01/11] dt-bindings: clock: mediatek: document clk
- bindings for Mediatek MT6765 SoC
-In-Reply-To: <20180720174331.GA26945@rob-hp-laptop>
-References: <1531817552-17221-1-git-send-email-mars.cheng@mediatek.com>
- <1531817552-17221-2-git-send-email-mars.cheng@mediatek.com>
- <20180720174331.GA26945@rob-hp-laptop>
-Message-ID: <1534151523.17494.48.camel@mtkswgap22>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 13 Aug 2018 14:45:47 +0530
+Subject: [PATCH v2 1/3] dt-bindings: interrupt-controller: Actions
+ external interrupt controller
+In-Reply-To: <f1043a48-6c8d-cf08-d6a1-582d84ea2530@arm.com>
+References: <20180812122215.1079590-1-pn@denx.de>
+ <20180812122215.1079590-2-pn@denx.de>
+ <20180813043406.GA16275@Mani-XPS-13-9360>
+ <f1043a48-6c8d-cf08-d6a1-582d84ea2530@arm.com>
+Message-ID: <20180813091547.GA22149@mani>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-07-20 at 11:43 -0600, Rob Herring wrote:
-> On Tue, Jul 17, 2018 at 04:52:22PM +0800, Mars Cheng wrote:
-> > This patch adds the binding documentation for apmixedsys, audsys, camsys,
-> > imgsys, infracfg, mipi0a, topckgen, vcodecsys
+On Mon, Aug 13, 2018 at 08:51:54AM +0100, Marc Zyngier wrote:
+> On 13/08/18 05:34, Manivannan Sadhasivam wrote:
+> > Hi Parthiban,
 > > 
-> > Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
-> > Signed-off-by: Owen Chen <owen.chen@mediatek.com>
-> > ---
-> >  .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |    1 +
-> >  .../bindings/arm/mediatek/mediatek,audsys.txt      |    1 +
-> >  .../bindings/arm/mediatek/mediatek,camsys.txt      |   27 ++++++++++++++++++++
-> >  .../bindings/arm/mediatek/mediatek,imgsys.txt      |    1 +
-> >  .../bindings/arm/mediatek/mediatek,infracfg.txt    |    1 +
-> >  .../bindings/arm/mediatek/mediatek,mipi0a.txt      |   23 +++++++++++++++++
-> >  .../bindings/arm/mediatek/mediatek,mmsys.txt       |    1 +
-> >  .../bindings/arm/mediatek/mediatek,pericfg.txt     |    1 +
-> >  .../bindings/arm/mediatek/mediatek,topckgen.txt    |    1 +
-> >  .../bindings/arm/mediatek/mediatek,vcodecsys.txt   |   22 ++++++++++++++++
-> >  10 files changed, 79 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt
-> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mipi0a.txt
-> >  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vcodecsys.txt
+> > On Sun, Aug 12, 2018 at 02:22:13PM +0200, Parthiban Nallathambi wrote:
+> >> Actions Semi OWL family SoC's provides support for external interrupt
+> >> controller to be connected and controlled using SIRQ pins. S500, S700
+> >> and S900 provides 3 SIRQ lines and works independently for 3 external
+> >> interrupt controllers.
+> >>
+> >> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+> >> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+> >> ---
+> >>  .../interrupt-controller/actions,owl-sirq.txt      | 46 ++++++++++++++++++++++
+> >>  1 file changed, 46 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
+> >> new file mode 100644
+> >> index 000000000000..4b8437751331
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
+> >> @@ -0,0 +1,46 @@
+> >> +Actions Semi Owl SoCs SIRQ interrupt controller
+> >> +
+> >> +S500, S700 and S900 SoC's from Actions provides 3 SPI's from GIC,
+> >> +in which external interrupt controller can be connected. 3 SPI's
+> >> +45, 46, 47 from GIC are directly exposed as SIRQ. It has
+> >> +the following properties:
 > > 
-> > diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-> > index b404d59..44eaeac 100644
-> > --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-> > @@ -8,6 +8,7 @@ Required Properties:
-> >  - compatible: Should be one of:
-> >  	- "mediatek,mt2701-apmixedsys"
-> >  	- "mediatek,mt2712-apmixedsys", "syscon"
-> > +	- "mediatek,mt6765-apmixedsys", "syscon"
-> >  	- "mediatek,mt6797-apmixedsys"
-> >  	- "mediatek,mt7622-apmixedsys"
-> >  	- "mediatek,mt8135-apmixedsys"
-> > diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
-> > index 34a69ba..9a8672a 100644
-> > --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
-> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,audsys.txt
-> > @@ -7,6 +7,7 @@ Required Properties:
-> >  
-> >  - compatible: Should be one of:
-> >  	- "mediatek,mt2701-audsys", "syscon"
-> > +	- "mediatek,mt6765-audsys", "syscon"
-> >  	- "mediatek,mt7622-audsys", "syscon"
-> >  - #clock-cells: Must be 1
-> >  
-> > diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt
-> > new file mode 100644
-> > index 0000000..dc75783
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,camsys.txt
-> > @@ -0,0 +1,27 @@
-> > +MediaTek CAMSYS controller
-> > +============================
-> > +
-> > +The MediaTek CAMSYS controller provides various clocks to the system.
+> > We should really document the driver here. What it does? and how the
+> > hierarchy is handled with GIC? etc...
 > 
-> Only clocks? If so, then this should be moved to bindings/clocks/.
-> 
+> Absolutely not. This should document the binding, irrespective of the
+> operating system. The word "driver" is completely out of place here.
+>
 
-camsys conclude not only clks but also mtcmos, so it's better to put
-this node in this path.
+Oops, my bad. I meant to say that we should add it as a description in the
+commit message.
 
-> > +
-> > +Required Properties:
-> > +
-> > +- compatible: Should be one of:
-> > +	- "mediatek,mt6765-camsys", "syscon"
-> > +- #clock-cells: Must be 1
-> > +
-> > +The AUDSYS controller uses the common clk binding from
-> > +Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-> > +
-> > +Required sub-nodes:
-> > +-------
-> > +For common binding part and usage, refer to
-> > +../sonud/mt2701-afe-pcm.txt.
-> > +
-> > +Example:
-> > +
-> > +camsys: camsys at 1a000000  {
+Thanks,
+Mani
+
+> Thanks,
 > 
-> clock-controller at ...
-> 
-> if the above answer is yes.
-> 
-> Same comments on the other docs.
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny...
