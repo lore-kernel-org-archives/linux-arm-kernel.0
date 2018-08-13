@@ -1,244 +1,104 @@
-From: peng.fan@nxp.com (Peng Fan)
-Date: Mon, 13 Aug 2018 01:15:41 +0000
-Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
-In-Reply-To: <DB3PR0402MB3916F8BC381BBA01DB21D1C0F5260@DB3PR0402MB3916.eurprd04.prod.outlook.com>
-References: <1533703167-26583-1-git-send-email-Anson.Huang@nxp.com>
- <1533703167-26583-2-git-send-email-Anson.Huang@nxp.com>
- <AM0PR04MB4481FC2BAD71B75D7BE84C0788260@AM0PR04MB4481.eurprd04.prod.outlook.com>
- <DB3PR0402MB3916F8BC381BBA01DB21D1C0F5260@DB3PR0402MB3916.eurprd04.prod.outlook.com>
-Message-ID: <AM0PR04MB44813C7A3E0AF4F3BCFFCF0088390@AM0PR04MB4481.eurprd04.prod.outlook.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Mon, 13 Aug 2018 10:04:06 +0530
+Subject: [PATCH v2 1/3] dt-bindings: interrupt-controller: Actions
+ external interrupt controller
+In-Reply-To: <20180812122215.1079590-2-pn@denx.de>
+References: <20180812122215.1079590-1-pn@denx.de>
+ <20180812122215.1079590-2-pn@denx.de>
+Message-ID: <20180813043406.GA16275@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anson,
+Hi Parthiban,
 
-> > > -----Original Message-----
-> > > From: Anson Huang
-> > > Sent: 2018?8?8? 12:39
-> > > To: shawnguo at kernel.org; s.hauer at pengutronix.de;
-> > > kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> > > mturquette at baylibre.com; sboyd at kernel.org;
-> > > linux-arm-kernel at lists.infradead.org;
-> > > linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org
-> > > Cc: dl-linux-imx <linux-imx@nxp.com>
-> > > Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
-> > >
-> > > Clock framework will enable those clocks registered with
-> > > CLK_IS_CRITICAL flag, so no need to have clks_init_on array during
-> > > clock
-> > initialization now.
-> >
-> > Will it be more flexible to parse dts saying "critical-clocks = <xxx>"
-> > or "init-on-arrary=<xxx>"
-> > and enable those clocks?
+On Sun, Aug 12, 2018 at 02:22:13PM +0200, Parthiban Nallathambi wrote:
+> Actions Semi OWL family SoC's provides support for external interrupt
+> controller to be connected and controlled using SIRQ pins. S500, S700
+> and S900 provides 3 SIRQ lines and works independently for 3 external
+> interrupt controllers.
 > 
-> Parsing the clocks arrays from dtb is another way of enabling critical clocks, but
-> for current i.MX6/7 platforms, we implement it in same way as most of other
-> SoCs, currently I did NOT see any necessity of putting them in dtb, just adding
-> flag during clock registering is more simple, if there is any special requirement
-> for different clocks set to be enabled, then we can add support to enable the
-> method of parsing critical-clocks from dtb. Just my two cents.
-
-Thinking about OP-TEE want to use one device, but it's clocks are registered
-by Linux, because there is no module in Linux side use it, it will shutdown the clock,
-which cause OP-TEE could not access the device.
-
-Then people have to modify clk code to add CLK_IS_CRITICAL flag to make sure
-the clocks are not shutdown by Linux.
-
-However adding a new property in clk node and let driver code parse the dts,
-there is no need to modify clk driver code when OP-TEE needs another device clock.
-
-Regards,
-Peng.
-
+> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+> ---
+>  .../interrupt-controller/actions,owl-sirq.txt      | 46 ++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
 > 
-> Anson.
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
+> new file mode 100644
+> index 000000000000..4b8437751331
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
+> @@ -0,0 +1,46 @@
+> +Actions Semi Owl SoCs SIRQ interrupt controller
+> +
+> +S500, S700 and S900 SoC's from Actions provides 3 SPI's from GIC,
+> +in which external interrupt controller can be connected. 3 SPI's
+> +45, 46, 47 from GIC are directly exposed as SIRQ. It has
+> +the following properties:
+
+We should really document the driver here. What it does? and how the
+hierarchy is handled with GIC? etc...
+
+> +
+> +- inputs three interrupt signal from external interrupt controller
+> +
+> +Required properties:
+> +
+> +- compatible: should be "actions,owl-sirq"
+> +- reg: physical base address of the controller and length of memory mapped.
+
+...length of memory mapped region?
+
+> +- interrupt-controller: identifies the node as an interrupt controller
+> +- #interrupt-cells: specifies the number of cells needed to encode an interrupt
+> +  source, should be 2.
+> +- actions,sirq-shared-reg: Applicable for S500 and S700 where SIRQ register
+> +  details are maintained at same offset/register.
+> +- actions,sirq-offset: register offset for SIRQ interrupts. When registers are
+> +  shared, all the three offsets will be same (S500 and S700).
+> +- actions,sirq-clk-sel: external interrupt controller can be either
+> +  connected to 32Khz or 24Mhz external/internal clock. This needs
+
+Hertz should be specified as Hz.
+
+> +  to be configured for per SIRQ line. Failing defaults to 32Khz clock.
+
+What value needs to be specified for selecting 24MHz clock? You should
+mention the available options this property supports.
+
+> +
+> +Example for S900:
+> +
+> +sirq: interrupt-controller at e01b0000 {
+> +	compatible = "actions,owl-sirq";
+> +	reg = <0 0xe01b0000 0 0x1000>;
+
+could be: reg = <0x0 0xe01b0000 0x0 0x1000>;
+
+> +	interrupt-controller;
+> +	#interrupt-cells = <2>;
+> +	actions,sirq-clk-sel = <0 0 0>;
+> +	actions,sirq-offset = <0x200 0x528 0x52c>;
+> +};
+> +
+> +Example for S500 and S700:
+> +
+> +sirq: interrupt-controller at e01b0000 {
+> +	compatible = "actions,owl-sirq";
+> +	reg = <0 0xe01b0000 0 0x1000>;
+
+For S500, reg base is 0xb01b0000.
+
+Thanks
+Mani
+
+> +	interrupt-controller;
+> +	#interrupt-cells = <2>;
+> +	actions,sirq-shared-reg;
+> +	actions,sirq-clk-sel = <0 0 0>;
+> +	actions,sirq-offset = <0x200 0x200 0x200>;
+> +};
+> -- 
+> 2.14.4
 > 
-> >
-> > Regards,
-> > Peng.
-> >
-> > >
-> > > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > > ---
-> > >  drivers/clk/imx/clk-imx7d.c | 27 ++++++++-------------------
-> > >  drivers/clk/imx/clk.h       |  7 +++++++
-> > >  2 files changed, 15 insertions(+), 19 deletions(-)
-> > >
-> > > diff --git a/drivers/clk/imx/clk-imx7d.c
-> > > b/drivers/clk/imx/clk-imx7d.c index c4518d7..076460b 100644
-> > > --- a/drivers/clk/imx/clk-imx7d.c
-> > > +++ b/drivers/clk/imx/clk-imx7d.c
-> > > @@ -379,13 +379,6 @@ static const char *pll_enet_bypass_sel[] = {
-> > > "pll_enet_main", "pll_enet_main_src  static const char
-> > > *pll_audio_bypass_sel[] = { "pll_audio_main", "pll_audio_main_src",
-> > > }; static const char *pll_video_bypass_sel[] = { "pll_video_main",
-> > > "pll_video_main_src", };
-> > >
-> > > -static int const clks_init_on[] __initconst = {
-> > > -	IMX7D_ARM_A7_ROOT_CLK, IMX7D_MAIN_AXI_ROOT_CLK,
-> > > -	IMX7D_PLL_SYS_MAIN_480M_CLK, IMX7D_IPG_ROOT_CLK,
-> > > -	IMX7D_DRAM_PHYM_ROOT_CLK, IMX7D_DRAM_ROOT_CLK,
-> > > -	IMX7D_DRAM_PHYM_ALT_ROOT_CLK, IMX7D_DRAM_ALT_ROOT_CLK,
-> > > -};
-> > > -
-> > >  static struct clk_onecell_data clk_data;
-> > >
-> > >  static struct clk ** const uart_clks[] __initconst = { @@ -403,7
-> > > +396,6 @@ static void __init imx7d_clocks_init(struct device_node
-> > *ccm_node)  {
-> > >  	struct device_node *np;
-> > >  	void __iomem *base;
-> > > -	int i;
-> > >
-> > >  	clks[IMX7D_CLK_DUMMY] = imx_clk_fixed("dummy", 0);
-> > >  	clks[IMX7D_OSC_24M_CLK] = of_clk_get_by_name(ccm_node, "osc");
-> > @@
-> > > -466,7 +458,7 @@ static void __init imx7d_clocks_init(struct
-> > > device_node
-> > > *ccm_node)
-> > >  	clks[IMX7D_PLL_SYS_MAIN_120M] =
-> > > imx_clk_fixed_factor("pll_sys_main_120m", "pll_sys_main_clk", 1, 4);
-> > >  	clks[IMX7D_PLL_DRAM_MAIN_533M] =
-> > > imx_clk_fixed_factor("pll_dram_533m", "pll_dram_main_clk", 1, 2);
-> > >
-> > > -	clks[IMX7D_PLL_SYS_MAIN_480M_CLK] =
-> > > imx_clk_gate_dis("pll_sys_main_480m_clk", "pll_sys_main_480m", base
-> > > + 0xb0, 4);
-> > > +	clks[IMX7D_PLL_SYS_MAIN_480M_CLK] =
-> > > +imx_clk_gate_dis_flags("pll_sys_main_480m_clk",
-> > > +"pll_sys_main_480m", base + 0xb0, 4, CLK_IS_CRITICAL);
-> > >  	clks[IMX7D_PLL_SYS_MAIN_240M_CLK] =
-> > > imx_clk_gate_dis("pll_sys_main_240m_clk", "pll_sys_main_240m", base
-> > > + 0xb0, 5);
-> > >  	clks[IMX7D_PLL_SYS_MAIN_120M_CLK] =
-> > > imx_clk_gate_dis("pll_sys_main_120m_clk", "pll_sys_main_120m", base
-> > > + 0xb0, 6);
-> > >  	clks[IMX7D_PLL_DRAM_MAIN_533M_CLK] =
-> > > imx_clk_gate("pll_dram_533m_clk", "pll_dram_533m", base + 0x70, 12);
-> > > @@
-> > > -719,7 +711,7 @@ static void __init imx7d_clocks_init(struct
-> > > device_node
-> > > *ccm_node)
-> > >  	clks[IMX7D_ENET_AXI_ROOT_DIV] =
-> > > imx_clk_divider2("enet_axi_post_div", "enet_axi_pre_div", base +
-> > > 0x8900, 0,
-> > 6);
-> > >  	clks[IMX7D_NAND_USDHC_BUS_ROOT_CLK] =
-> > > imx_clk_divider2("nand_usdhc_root_clk", "nand_usdhc_pre_div", base +
-> > > 0x8980, 0, 6);
-> > >  	clks[IMX7D_AHB_CHANNEL_ROOT_DIV] =
-> > > imx_clk_divider2("ahb_root_clk", "ahb_pre_div", base + 0x9000, 0, 6);
-> > > -	clks[IMX7D_IPG_ROOT_CLK] = imx_clk_divider2("ipg_root_clk",
-> > > "ahb_root_clk", base + 0x9080, 0, 2);
-> > > +	clks[IMX7D_IPG_ROOT_CLK] = imx_clk_divider_flags("ipg_root_clk",
-> > > +"ahb_root_clk", base + 0x9080, 0, 2, CLK_IS_CRITICAL |
-> > > +CLK_OPS_PARENT_ENABLE | CLK_SET_RATE_PARENT);
-> > >  	clks[IMX7D_DRAM_ROOT_DIV] = imx_clk_divider2("dram_post_div",
-> > > "dram_cg", base + 0x9880, 0, 3);
-> > >  	clks[IMX7D_DRAM_PHYM_ALT_ROOT_DIV] =
-> > > imx_clk_divider2("dram_phym_alt_post_div", "dram_phym_alt_pre_div",
-> > > base
-> > > + 0xa000, 0, 3);
-> > >  	clks[IMX7D_DRAM_ALT_ROOT_DIV] =
-> > > imx_clk_divider2("dram_alt_post_div", "dram_alt_pre_div", base +
-> > > 0xa080, 0, 3); @@ -783,17 +775,17 @@ static void __init
-> > > imx7d_clocks_init(struct device_node *ccm_node)
-> > >  	clks[IMX7D_CLKO1_ROOT_DIV] = imx_clk_divider2("clko1_post_div",
-> > > "clko1_pre_div", base + 0xbd80, 0, 6);
-> > >  	clks[IMX7D_CLKO2_ROOT_DIV] = imx_clk_divider2("clko2_post_div",
-> > > "clko2_pre_div", base + 0xbe00, 0, 6);
-> > >
-> > > -	clks[IMX7D_ARM_A7_ROOT_CLK] = imx_clk_gate4("arm_a7_root_clk",
-> > > "arm_a7_div", base + 0x4000, 0);
-> > > +	clks[IMX7D_ARM_A7_ROOT_CLK] =
-> > > imx_clk_gate2_flags("arm_a7_root_clk",
-> > > +"arm_a7_div", base + 0x4000, 0, CLK_IS_CRITICAL |
-> > > +CLK_OPS_PARENT_ENABLE);
-> > >  	clks[IMX7D_ARM_M4_ROOT_CLK] =
-> imx_clk_gate4("arm_m4_root_clk",
-> > > "arm_m4_div", base + 0x4010, 0);
-> > > -	clks[IMX7D_MAIN_AXI_ROOT_CLK] = imx_clk_gate4("main_axi_root_clk",
-> > > "axi_post_div", base + 0x4040, 0);
-> > > +	clks[IMX7D_MAIN_AXI_ROOT_CLK] =
-> > > +imx_clk_gate2_flags("main_axi_root_clk", "axi_post_div", base +
-> > > +0x4040, 0, CLK_IS_CRITICAL | CLK_OPS_PARENT_ENABLE);
-> > >  	clks[IMX7D_DISP_AXI_ROOT_CLK] =
-> imx_clk_gate4("disp_axi_root_clk",
-> > > "disp_axi_post_div", base + 0x4050, 0);
-> > >  	clks[IMX7D_ENET_AXI_ROOT_CLK] =
-> imx_clk_gate4("enet_axi_root_clk",
-> > > "enet_axi_post_div", base + 0x4060, 0);
-> > >  	clks[IMX7D_OCRAM_CLK] = imx_clk_gate4("ocram_clk",
-> > > "main_axi_root_clk", base + 0x4110, 0);
-> > >  	clks[IMX7D_OCRAM_S_CLK] = imx_clk_gate4("ocram_s_clk",
-> > > "ahb_root_clk", base + 0x4120, 0);
-> > > -	clks[IMX7D_DRAM_ROOT_CLK] = imx_clk_gate4("dram_root_clk",
-> > > "dram_post_div", base + 0x4130, 0);
-> > > -	clks[IMX7D_DRAM_PHYM_ROOT_CLK] =
-> > > imx_clk_gate4("dram_phym_root_clk", "dram_phym_cg", base + 0x4130,
-> 0);
-> > > -	clks[IMX7D_DRAM_PHYM_ALT_ROOT_CLK] =
-> > > imx_clk_gate4("dram_phym_alt_root_clk", "dram_phym_alt_post_div",
-> > > base
-> > > + 0x4130, 0);
-> > > -	clks[IMX7D_DRAM_ALT_ROOT_CLK] =
-> > imx_clk_gate4("dram_alt_root_clk",
-> > > "dram_alt_post_div", base + 0x4130, 0);
-> > > +	clks[IMX7D_DRAM_ROOT_CLK] =
-> imx_clk_gate2_flags("dram_root_clk",
-> > > "dram_post_div", base + 0x4130, 0, CLK_IS_CRITICAL |
-> > > CLK_OPS_PARENT_ENABLE);
-> > > +	clks[IMX7D_DRAM_PHYM_ROOT_CLK] =
-> > > imx_clk_gate2_flags("dram_phym_root_clk", "dram_phym_cg", base +
-> > > 0x4130, 0, CLK_IS_CRITICAL | CLK_OPS_PARENT_ENABLE);
-> > > +	clks[IMX7D_DRAM_PHYM_ALT_ROOT_CLK] =
-> > > imx_clk_gate2_flags("dram_phym_alt_root_clk",
-> > > "dram_phym_alt_post_div", base + 0x4130, 0, CLK_IS_CRITICAL |
-> > > CLK_OPS_PARENT_ENABLE);
-> > > +	clks[IMX7D_DRAM_ALT_ROOT_CLK] =
-> > > +imx_clk_gate2_flags("dram_alt_root_clk", "dram_alt_post_div", base
-> > > ++ 0x4130, 0, CLK_IS_CRITICAL | CLK_OPS_PARENT_ENABLE);
-> > >  	clks[IMX7D_OCOTP_CLK] = imx_clk_gate4("ocotp_clk",
-> "ipg_root_clk",
-> > > base + 0x4230, 0);
-> > >  	clks[IMX7D_SNVS_CLK] = imx_clk_gate4("snvs_clk", "ipg_root_clk",
-> > > base + 0x4250, 0);
-> > >  	clks[IMX7D_MU_ROOT_CLK] = imx_clk_gate4("mu_root_clk",
-> > > "ipg_root_clk", base + 0x4270, 0); @@ -882,9 +874,6 @@ static void
-> > > __init imx7d_clocks_init(struct device_node *ccm_node)
-> > >  	clk_data.clk_num = ARRAY_SIZE(clks);
-> > >  	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-> > >
-> > > -	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
-> > > -		clk_prepare_enable(clks[clks_init_on[i]]);
-> > > -
-> > >  	clk_set_parent(clks[IMX7D_PLL_ARM_MAIN_BYPASS],
-> > > clks[IMX7D_PLL_ARM_MAIN]);
-> > >  	clk_set_parent(clks[IMX7D_PLL_DRAM_MAIN_BYPASS],
-> > > clks[IMX7D_PLL_DRAM_MAIN]);
-> > >  	clk_set_parent(clks[IMX7D_PLL_SYS_MAIN_BYPASS],
-> > > clks[IMX7D_PLL_SYS_MAIN]); diff --git a/drivers/clk/imx/clk.h
-> > > b/drivers/clk/imx/clk.h index 8076ec0..5895e223 100644
-> > > --- a/drivers/clk/imx/clk.h
-> > > +++ b/drivers/clk/imx/clk.h
-> > > @@ -137,6 +137,13 @@ static inline struct clk
-> > > *imx_clk_gate_dis(const char *name, const char *parent,
-> > >  			shift, CLK_GATE_SET_TO_DISABLE, &imx_ccm_lock);  }
-> > >
-> > > +static inline struct clk *imx_clk_gate_dis_flags(const char *name,
-> > > +const char
-> > > *parent,
-> > > +		void __iomem *reg, u8 shift, unsigned long flags) {
-> > > +	return clk_register_gate(NULL, name, parent, flags |
-> > > CLK_SET_RATE_PARENT, reg,
-> > > +			shift, CLK_GATE_SET_TO_DISABLE, &imx_ccm_lock); }
-> > > +
-> > >  static inline struct clk *imx_clk_gate2(const char *name, const
-> > > char
-> > *parent,
-> > >  		void __iomem *reg, u8 shift)
-> > >  {
-> > > --
-> > > 2.7.4
