@@ -1,76 +1,99 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Aug 2018 15:57:45 +0100
-Subject: [PATCH 27/37] KVM: arm/arm64: Fix potential loss of ptimer interrupts
+Date: Mon, 13 Aug 2018 15:57:41 +0100
+Subject: [PATCH 23/37] arm64: KVM: export the capability to set guest SError
+ syndrome
 In-Reply-To: <20180813145755.16566-1-marc.zyngier@arm.com>
 References: <20180813145755.16566-1-marc.zyngier@arm.com>
-Message-ID: <20180813145755.16566-28-marc.zyngier@arm.com>
+Message-ID: <20180813145755.16566-24-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@arm.com>
+From: Dongjiu Geng <gengdongjiu@huawei.com>
 
-kvm_timer_update_state() is called when changing the phys timer
-configuration registers, either via vcpu reset, as a result of a trap
-from the guest, or when userspace programs the registers.
+For the arm64 RAS Extension, user space can inject a virtual-SError
+with specified ESR. So user space needs to know whether KVM support
+to inject such SError, this interface adds this query for this capability.
 
-phys_timer_emulate() is in turn called by kvm_timer_update_state() to
-either cancel an existing software timer, or program a new software
-timer, to emulate the behavior of a real phys timer, based on the change
-in configuration registers.
+KVM will check whether system support RAS Extension, if supported, KVM
+returns true to user space, otherwise returns false.
 
-Unfortunately, the interaction between these two functions left a small
-race; if the conceptual emulated phys timer should actually fire, but
-the soft timer hasn't executed its callback yet, we cancel the timer in
-phys_timer_emulate without injecting an irq.  This only happens if the
-check in kvm_timer_update_state is called before the timer should fire,
-which is relatively unlikely, but possible.
-
-The solution is to update the state of the phys timer after calling
-phys_timer_emulate, which will pick up the pending timer state and
-update the interrupt value.
-
-Note that this leaves the opportunity of raising the interrupt twice,
-once in the just-programmed soft timer, and once in
-kvm_timer_update_state.  Since this always happens synchronously with
-the VCPU execution, there is no harm in this, and the guest ever only
-sees a single timer interrupt.
-
-Cc: Stable <stable@vger.kernel.org> # 4.15+
-Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+Reviewed-by: James Morse <james.morse@arm.com>
+[expanded documentation wording]
+Signed-off-by: James Morse <james.morse@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/arch_timer.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ Documentation/virtual/kvm/api.txt | 26 ++++++++++++++++++++++++++
+ arch/arm64/kvm/reset.c            |  3 +++
+ include/uapi/linux/kvm.h          |  1 +
+ 3 files changed, 30 insertions(+)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index bd3d57f40f1b..18ff6203079d 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -295,9 +295,9 @@ static void phys_timer_emulate(struct kvm_vcpu *vcpu)
- 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 284d36e72f28..dbbb95d5798a 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -907,6 +907,18 @@ SError is pending, the architecture's 'Multiple SError interrupts' rules should
+ be followed. (2.5.3 of DDI0587.a "ARM Reliability, Availability, and
+ Serviceability (RAS) Specification").
  
- 	/*
--	 * If the timer can fire now we have just raised the IRQ line and we
--	 * don't need to have a soft timer scheduled for the future.  If the
--	 * timer cannot fire at all, then we also don't need a soft timer.
-+	 * If the timer can fire now, we don't need to have a soft timer
-+	 * scheduled for the future.  If the timer cannot fire at all,
-+	 * then we also don't need a soft timer.
- 	 */
- 	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
- 		soft_timer_cancel(&timer->phys_timer, NULL);
-@@ -332,10 +332,10 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	level = kvm_timer_should_fire(vtimer);
- 	kvm_timer_update_irq(vcpu, level, vtimer);
- 
-+	phys_timer_emulate(vcpu);
++SError exceptions always have an ESR value. Some CPUs have the ability to
++specify what the virtual SError's ESR value should be. These systems will
++advertise KVM_CAP_ARM_SET_SERROR_ESR. In this case exception.has_esr will
++always have a non-zero value when read, and the agent making an SError pending
++should specify the ISS field in the lower 24 bits of exception.serror_esr. If
++the system supports KVM_CAP_ARM_SET_SERROR_ESR, but user-space sets the events
++with exception.has_esr as zero, KVM will choose an ESR.
 +
- 	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
- 		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
--
--	phys_timer_emulate(vcpu);
- }
++Specifying exception.has_esr on a system that does not support it will return
++-EINVAL. Setting anything other than the lower 24bits of exception.serror_esr
++will return -EINVAL.
++
+ struct kvm_vcpu_events {
+ 	struct {
+ 		__u8 serror_pending;
+@@ -4664,3 +4676,17 @@ This capability indicates that KVM supports paravirtualized Hyper-V TLB Flush
+ hypercalls:
+ HvFlushVirtualAddressSpace, HvFlushVirtualAddressSpaceEx,
+ HvFlushVirtualAddressList, HvFlushVirtualAddressListEx.
++
++8.19 KVM_CAP_ARM_SET_SERROR_ESR
++
++Architectures: arm, arm64
++
++This capability indicates that userspace can specify (via the
++KVM_SET_VCPU_EVENTS ioctl) the syndrome value reported to the guest when it
++takes a virtual SError interrupt exception.
++If KVM advertises this capability, userspace can only specify the ISS field for
++the ESR syndrome. Other parts of the ESR, such as the EC are generated by the
++CPU when the exception is taken. If this virtual SError is taken to EL1 using
++AArch64, this value will be reported in the ISS field of ESR_ELx.
++
++See KVM_CAP_VCPU_EVENTS for more details.
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index a3db01a28062..067c6ba969bd 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	case KVM_CAP_ARM_PMU_V3:
+ 		r = kvm_arm_support_pmu_v3();
+ 		break;
++	case KVM_CAP_ARM_INJECT_SERROR_ESR:
++		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
++		break;
+ 	case KVM_CAP_SET_GUEST_DEBUG:
+ 	case KVM_CAP_VCPU_ATTRIBUTES:
+ 	case KVM_CAP_VCPU_EVENTS:
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index b6270a3b38e9..a7d9bc4e4068 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -949,6 +949,7 @@ struct kvm_ppc_resize_hpt {
+ #define KVM_CAP_GET_MSR_FEATURES 153
+ #define KVM_CAP_HYPERV_EVENTFD 154
+ #define KVM_CAP_HYPERV_TLBFLUSH 155
++#define KVM_CAP_ARM_INJECT_SERROR_ESR 156
  
- static void vtimer_save_state(struct kvm_vcpu *vcpu)
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
 -- 
 2.18.0
