@@ -1,215 +1,98 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Mon, 13 Aug 2018 08:41:32 +0100
-Subject: [PATCH] arm64: dts: renesas: Initial r8a774a1 SoC device tree
-Message-ID: <1534146093-1651-1-git-send-email-biju.das@bp.renesas.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Mon, 13 Aug 2018 15:50:17 +0800
+Subject: [PATCH v4 5/5] iommu/arm-smmu-v3: add bootup option "arm_iommu"
+In-Reply-To: <c46fa263-2dfa-b8fc-b2c1-0b1bf6029748@arm.com>
+References: <1533558424-16748-1-git-send-email-thunder.leizhen@huawei.com>
+ <1533558424-16748-6-git-send-email-thunder.leizhen@huawei.com>
+ <c46fa263-2dfa-b8fc-b2c1-0b1bf6029748@arm.com>
+Message-ID: <5B713839.1010609@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Basic support for the RZ/G2M SoC.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
----
- arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 192 ++++++++++++++++++++++++++++++
- 1 file changed, 192 insertions(+)
- create mode 100644 arch/arm64/boot/dts/renesas/r8a774a1.dtsi
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-new file mode 100644
-index 0000000..f3641c0
---- /dev/null
-+++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-@@ -0,0 +1,192 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Device Tree Source for the r8a774a1 SoC
-+ *
-+ * Copyright (C) 2018 Renesas Electronics Corp.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/renesas-cpg-mssr.h>
-+
-+#define CPG_AUDIO_CLK_I		10
-+
-+/ {
-+	compatible = "renesas,r8a774a1";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	/*
-+	 * The external audio clocks are configured as 0 Hz fixed frequency
-+	 * clocks by default.
-+	 * Boards that provide audio clocks should override them.
-+	 */
-+	audio_clk_a: audio_clk_a {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	audio_clk_b: audio_clk_b {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	audio_clk_c: audio_clk_c {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External CAN clock - to be overridden by boards that provide it */
-+	can_clk: can {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		a57_0: cpu at 0 {
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0x0>;
-+			device_type = "cpu";
-+			power-domains = <&sysc 0>;
-+			next-level-cache = <&L2_CA57>;
-+			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE 0>;
-+		};
-+
-+		a57_1: cpu at 1 {
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0x1>;
-+			device_type = "cpu";
-+			power-domains = <&sysc 1>;
-+			next-level-cache = <&L2_CA57>;
-+			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE 0>;
-+		};
-+
-+		L2_CA57: cache-controller-0 {
-+			compatible = "cache";
-+			power-domains = <&sysc 12>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+	};
-+
-+	extal_clk: extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board */
-+		clock-frequency = <0>;
-+	};
-+
-+	extalr_clk: extalr {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board */
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External PCIe clock - can be overridden by the board */
-+	pcie_bus_clk: pcie_bus {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	pmu_a57 {
-+		compatible = "arm,cortex-a57-pmu";
-+		interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
-+				      <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&a57_0>, <&a57_1>;
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-1.0", "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	/* External SCIF clock - to be overridden by boards that provide it */
-+	scif_clk: scif {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		cpg: clock-controller at e6150000 {
-+			compatible = "renesas,r8a774a1-cpg-mssr";
-+			reg = <0 0xe6150000 0 0x0bb0>;
-+			clocks = <&extal_clk>, <&extalr_clk>;
-+			clock-names = "extal", "extalr";
-+			#clock-cells = <2>;
-+			#power-domain-cells = <0>;
-+			#reset-cells = <1>;
-+		};
-+
-+		rst: reset-controller at e6160000 {
-+			compatible = "renesas,r8a774a1-rst";
-+			reg = <0 0xe6160000 0 0x018c>;
-+		};
-+
-+		sysc: system-controller at e6180000 {
-+			compatible = "renesas,r8a774a1-sysc";
-+			reg = <0 0xe6180000 0 0x0400>;
-+			#power-domain-cells = <1>;
-+		};
-+
-+		gic: interrupt-controller at f1010000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+			interrupt-controller;
-+			reg = <0x0 0xf1010000 0 0x1000>,
-+			      <0x0 0xf1020000 0 0x20000>,
-+			      <0x0 0xf1040000 0 0x20000>,
-+			      <0x0 0xf1060000 0 0x20000>;
-+			interrupts = <GIC_PPI 9
-+					(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+			clocks = <&cpg CPG_MOD 408>;
-+			clock-names = "clk";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 408>;
-+		};
-+
-+		prr: chipid at fff00044 {
-+			compatible = "renesas,prr";
-+			reg = <0 0xfff00044 0 4>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	/* External USB clocks - can be overridden by the board */
-+	usb3s0_clk: usb3s0 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	usb_extal_clk: usb_extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+};
+On 2018/8/9 19:08, Robin Murphy wrote:
+> On 06/08/18 13:27, Zhen Lei wrote:
+>> Add a bootup option to make the system manager can choose which mode to
+>> be used. The default mode is strict.
+>>
+>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> ---
+>>   Documentation/admin-guide/kernel-parameters.txt |  9 +++++++++
+>>   drivers/iommu/arm-smmu-v3.c                     | 17 ++++++++++++++++-
+>>   2 files changed, 25 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+>> index 533ff5c..426e989 100644
+>> --- a/Documentation/admin-guide/kernel-parameters.txt
+>> +++ b/Documentation/admin-guide/kernel-parameters.txt
+>> @@ -1720,6 +1720,15 @@
+>>           nobypass    [PPC/POWERNV]
+>>               Disable IOMMU bypass, using IOMMU for PCI devices.
+>>
+>> +    arm_iommu=    [ARM64]
+>> +        non-strict    [Default Off]
+> 
+> Again, I'd much rather have "iommu.non_strict= { "0" | "1" }" in line with the passthrough option.
+
+OK?I will change it in the next version.
+
+> 
+> Robin.
+> 
+>> +            Put off TLBs invalidation and release memory first.
+>> +            It's good for scatter-gather performance but lacks full
+>> +            isolation, an untrusted device can access the reused
+>> +            memory because the TLBs may still valid. Please take
+>> +            full consideration before choosing this mode.
+>> +            Note that, VFIO will always use strict mode.
+>> +
+>>       iommu.passthrough=
+>>               [ARM64] Configure DMA to bypass the IOMMU by default.
+>>               Format: { "0" | "1" }
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 904bc1e..9a30892 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -631,6 +631,21 @@ struct arm_smmu_option_prop {
+>>       { 0, NULL},
+>>   };
+>>
+>> +static u32 smmu_non_strict __read_mostly;
+>> +
+>> +static int __init arm_smmu_setup(char *str)
+>> +{
+>> +    if (!strncmp(str, "non-strict", 10)) {
+>> +        smmu_non_strict = 1;
+>> +        pr_warn("WARNING: iommu non-strict mode is chosen.\n"
+>> +            "It's good for scatter-gather performance but lacks full isolation\n");
+>> +        add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
+>> +    }
+>> +
+>> +    return 0;
+>> +}
+>> +early_param("arm_iommu", arm_smmu_setup);
+>> +
+>>   static inline void __iomem *arm_smmu_page1_fixup(unsigned long offset,
+>>                            struct arm_smmu_device *smmu)
+>>   {
+>> @@ -1622,7 +1637,7 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
+>>       if (smmu->features & ARM_SMMU_FEAT_COHERENCY)
+>>           pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
+>>
+>> -    if (domain->type == IOMMU_DOMAIN_DMA) {
+>> +    if ((domain->type == IOMMU_DOMAIN_DMA) && smmu_non_strict) {
+>>           domain->non_strict = 1;
+>>           pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
+>>       }
+>> -- 
+>> 1.8.3
+>>
+>>
+> 
+> .
+> 
+
 -- 
-2.7.4
+Thanks!
+BestRegards
