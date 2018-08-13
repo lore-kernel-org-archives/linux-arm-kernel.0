@@ -1,37 +1,148 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Aug 2018 15:57:53 +0100
-Subject: [PATCH 35/37] KVM: arm: Use true and false for boolean values
+Date: Mon, 13 Aug 2018 15:57:52 +0100
+Subject: [PATCH 34/37] KVM: arm/arm64: vgic: Do not use
+ spin_lock_irqsave/restore with irq disabled
 In-Reply-To: <20180813145755.16566-1-marc.zyngier@arm.com>
 References: <20180813145755.16566-1-marc.zyngier@arm.com>
-Message-ID: <20180813145755.16566-36-marc.zyngier@arm.com>
+Message-ID: <20180813145755.16566-35-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+From: Jia He <hejianet@gmail.com>
 
-Return statements in functions returning bool should use true or false
-instead of an integer value.
+kvm_vgic_sync_hwstate is only called with IRQ being disabled.
+There is thus no need to call spin_lock_irqsave/restore in
+vgic_fold_lr_state and vgic_prune_ap_list.
 
-This code was detected with the help of Coccinelle.
+This patch replace them with the non irq-safe version.
 
-Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+[maz: commit message tidy-up]
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_emulate.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-v2.c |  7 ++++---
+ virt/kvm/arm/vgic/vgic-v3.c |  7 ++++---
+ virt/kvm/arm/vgic/vgic.c    | 13 +++++++------
+ 3 files changed, 15 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index b50fe8380868..2b7eed21b20e 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -119,7 +119,7 @@ static inline void vcpu_set_wfe_traps(struct kvm_vcpu *vcpu)
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index df5e6a6e3186..69b892abd7dc 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -62,7 +62,8 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	struct vgic_v2_cpu_if *cpuif = &vgic_cpu->vgic_v2;
+ 	int lr;
+-	unsigned long flags;
++
++	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
  
- static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
+ 	cpuif->vgic_hcr &= ~GICH_HCR_UIE;
+ 
+@@ -83,7 +84,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+ 
+ 		irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
+ 
+-		spin_lock_irqsave(&irq->irq_lock, flags);
++		spin_lock(&irq->irq_lock);
+ 
+ 		/* Always preserve the active bit */
+ 		irq->active = !!(val & GICH_LR_ACTIVE_BIT);
+@@ -126,7 +127,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+ 				vgic_irq_set_phys_active(irq, false);
+ 		}
+ 
+-		spin_unlock_irqrestore(&irq->irq_lock, flags);
++		spin_unlock(&irq->irq_lock);
+ 		vgic_put_irq(vcpu->kvm, irq);
+ 	}
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 530b8491c892..9c0dd234ebe8 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -46,7 +46,8 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+ 	struct vgic_v3_cpu_if *cpuif = &vgic_cpu->vgic_v3;
+ 	u32 model = vcpu->kvm->arch.vgic.vgic_model;
+ 	int lr;
+-	unsigned long flags;
++
++	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
+ 
+ 	cpuif->vgic_hcr &= ~ICH_HCR_UIE;
+ 
+@@ -75,7 +76,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+ 		if (!irq)	/* An LPI could have been unmapped. */
+ 			continue;
+ 
+-		spin_lock_irqsave(&irq->irq_lock, flags);
++		spin_lock(&irq->irq_lock);
+ 
+ 		/* Always preserve the active bit */
+ 		irq->active = !!(val & ICH_LR_ACTIVE_BIT);
+@@ -118,7 +119,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+ 				vgic_irq_set_phys_active(irq, false);
+ 		}
+ 
+-		spin_unlock_irqrestore(&irq->irq_lock, flags);
++		spin_unlock(&irq->irq_lock);
+ 		vgic_put_irq(vcpu->kvm, irq);
+ 	}
+ 
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index c22cea678a66..7cfdfbc910e0 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -593,10 +593,11 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
  {
--	return 1;
-+	return true;
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 	struct vgic_irq *irq, *tmp;
+-	unsigned long flags;
++
++	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
+ 
+ retry:
+-	spin_lock_irqsave(&vgic_cpu->ap_list_lock, flags);
++	spin_lock(&vgic_cpu->ap_list_lock);
+ 
+ 	list_for_each_entry_safe(irq, tmp, &vgic_cpu->ap_list_head, ap_list) {
+ 		struct kvm_vcpu *target_vcpu, *vcpuA, *vcpuB;
+@@ -637,7 +638,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+ 		/* This interrupt looks like it has to be migrated. */
+ 
+ 		spin_unlock(&irq->irq_lock);
+-		spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
++		spin_unlock(&vgic_cpu->ap_list_lock);
+ 
+ 		/*
+ 		 * Ensure locking order by always locking the smallest
+@@ -651,7 +652,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+ 			vcpuB = vcpu;
+ 		}
+ 
+-		spin_lock_irqsave(&vcpuA->arch.vgic_cpu.ap_list_lock, flags);
++		spin_lock(&vcpuA->arch.vgic_cpu.ap_list_lock);
+ 		spin_lock_nested(&vcpuB->arch.vgic_cpu.ap_list_lock,
+ 				 SINGLE_DEPTH_NESTING);
+ 		spin_lock(&irq->irq_lock);
+@@ -676,7 +677,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+ 
+ 		spin_unlock(&irq->irq_lock);
+ 		spin_unlock(&vcpuB->arch.vgic_cpu.ap_list_lock);
+-		spin_unlock_irqrestore(&vcpuA->arch.vgic_cpu.ap_list_lock, flags);
++		spin_unlock(&vcpuA->arch.vgic_cpu.ap_list_lock);
+ 
+ 		if (target_vcpu_needs_kick) {
+ 			kvm_make_request(KVM_REQ_IRQ_PENDING, target_vcpu);
+@@ -686,7 +687,7 @@ static void vgic_prune_ap_list(struct kvm_vcpu *vcpu)
+ 		goto retry;
+ 	}
+ 
+-	spin_unlock_irqrestore(&vgic_cpu->ap_list_lock, flags);
++	spin_unlock(&vgic_cpu->ap_list_lock);
  }
  
- static inline unsigned long *vcpu_pc(struct kvm_vcpu *vcpu)
+ static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
 -- 
 2.18.0
