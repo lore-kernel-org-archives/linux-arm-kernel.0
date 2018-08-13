@@ -1,122 +1,89 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Mon, 13 Aug 2018 20:18:08 +0200
-Subject: [RFC PATCH 0/7] add at91sam9 LCDC DRM driver
-In-Reply-To: <f1f2a2d7-ae27-87af-8041-93d3f8fe07cc@microchip.com>
-References: <20180812184152.GA22343@ravnborg.org>
- <f1f2a2d7-ae27-87af-8041-93d3f8fe07cc@microchip.com>
-Message-ID: <20180813181808.GA2357@ravnborg.org>
+From: alex@ghiti.fr (Alex Ghiti)
+Date: Mon, 13 Aug 2018 18:35:53 +0000
+Subject: [PATCH v6 00/11] hugetlb: Factorize hugetlb architecture
+ primitives
+In-Reply-To: <20180806175711.24438-1-alex@ghiti.fr>
+References: <20180806175711.24438-1-alex@ghiti.fr>
+Message-ID: <55833b7d-3c29-d7ac-41f1-82f1ac228e4a@ghiti.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicholas.
+Hi everyone,
 
-On Mon, Aug 13, 2018 at 05:54:48PM +0200, Nicolas Ferre wrote:
-> On 12/08/2018 at 20:41, Sam Ravnborg wrote:
-> >New DRM based driver for at91sam9 SOC's that uses the
-> >Atmel LCDC IP core.
-> 
-> I'm delighted to see this work: Thanks a lot Sam!
-Glad to hear.
-I was a bit worried that the response would be "this is
-waste of time as we have a working driver already".
+Does someone need anything more to be done regarding this series ?
 
-> 
-> >This is first version of a patch set that adds
-> >drivers for the Atmel LCDC IP core.
-> >Posted for review as the basics works now.
-> >
-> >The LCDC IP core contains two devices:
-> >- a PWM often used for backlight
-> >- a LCD display controller
-> >
-> >Both devices are supported today by the atmel_lcdfb driver.
-> >For this new set of drivers the compatible strings was
-> >selected to avoid clash with the existing compatible
-> >strings used for the atmel_lcdfb driver to allow them
-> >to co-exist.
-> 
-> Would be good to have a plan to phase-out the old atmel_lcdfb fbdev
-> driver when this one addresses some TODO items that make sense.
-Agree on this.
-One approach could be to say that when all in-kernel users of atmel_lcdfb
-are ported, then the old driver could be dropped after a kernel release.
+Thanks,
 
-> The mfd suffix seems strange to me. What about "atmel,at91sam9263-lcdc-mfd"
-> => "atmel,at91sam9263-lcd" (or "microchip,at91sam9263-lcdc").
-The "-mfd" suffix was added to avoid clashing with the current
-compatible string used by the atmel_lcdfb driver.
+Alex
 
-I susggest we do the following:
-- use the microchip prefix, as this is now owned by microchip
-- and add the driver to a drm/microchip/ directory
-(Then we can only hope that microchip do not change name or
-are purchased by someone else).
 
-> 
-> >The DRM implementation has a few shortcomings compared to the
-> >existing fbdev based driver:
-> >     - STN displays are not supported
-> >             Binding support is missing but most of the
-> >             STN specific functionality is otherwise ported
-> >             from the fbdev driver.
-> >             I assume the info should come from the panel
-> >             but as I lack HW I have not looked too much
-> >             into what is required.
-> 
-> Yes, I'm not even sure if STN displays are still available those
-> days... Might not be worth it spending time on this.
-Then I will delete all the STN bits that was ported over.
-If we need them later they can be found on the mailign list.
-
-> 
-> >     - gamma support is missing
-> >             The driver utilises drm_simple_kms_helper and
-> >             this helper lacks support for setting up gamma.
-> >             If this is useful please let me know and I
-> >             will extend drm_simple_kms_helper to support this
-> >             and update the driver.
-> >     - modesetting is not checked (see TODO in file)
-> >             Is this required for such a simple setup?
-> >     - support for extra modes as applicable (and lcd-wiring-mode)
-> >     - support for AVR32 (is it relevant?)
-> 
-> No, AVR32 is not relevant anymore as the core and SoC were removed
-> some years ago from Linux.
-> All mention of AT32 or AVR32 can be remove then.
-Ok, I will delete these.
-
-> >The drivers _works_ on a proprietary at91sam9263 based board
-> >and I will eventually migrate the at91sam9263ek over
-> >to use it as well.
-> 
-> We'll be able to test it on other SoCs and boards.
-Thanks!
-
-> 
-> >Works is maybe a stretch - the following was tested:
-> >   modetest shows reasonable output
-> >   modetest -s shows some nice colored squares
-> 
-> You must see something like this (without the overlay additional
-> black square):
-> http://www.at91.com/linux4sam/bin/view/Linux4SAM/UsingAtmelDRMDriver#Some_modetest_commands
-I posted a picture to G+ here:
-https://plus.google.com/+SamRavnborg/posts/YBt4jUGLgWa
-
-They look similar but are not equal. For now I assume this is OK.
-I will do some testing with a Qt app, and will test colors with this too.
-
-> >All feedback (from spelling errors to general structure) appreciated!
-> 
-> On my side, it's mostly Nitpicking ;-)
-> Now that we're Microchip for a little bit more than 2 years, I tend
-> to make this name prevalent compared to Atmel for new work around
-> our products... But I know this driver is for older SoCs and that it
-> got inspired by two former drivers that have this "atmel" naming
-> everywhere. MAINTAINERS and Kconfig changes could include Microchip
-> name, so that it's obvious for the newcomers...
-Will fix, as described above.
-
-Thanks for the inputs!
-
-	Sam
+On 08/06/2018 05:57 PM, Alexandre Ghiti wrote:
+> [CC linux-mm for inclusion in -mm tree]
+>                                                                                   
+> In order to reduce copy/paste of functions across architectures and then
+> make riscv hugetlb port (and future ports) simpler and smaller, this
+> patchset intends to factorize the numerous hugetlb primitives that are
+> defined across all the architectures.
+>                                                                                   
+> Except for prepare_hugepage_range, this patchset moves the versions that
+> are just pass-through to standard pte primitives into
+> asm-generic/hugetlb.h by using the same #ifdef semantic that can be
+> found in asm-generic/pgtable.h, i.e. __HAVE_ARCH_***.
+>                                                                                   
+> s390 architecture has not been tackled in this serie since it does not
+> use asm-generic/hugetlb.h at all.
+>                                                                                   
+> This patchset has been compiled on all addressed architectures with
+> success (except for parisc, but the problem does not come from this
+> series).
+>                                                                                   
+> v6:
+>    - Remove nohash/32 and book3s/32 powerpc specific implementations in
+>      order to use the generic ones.
+>    - Add all the Reviewed-by, Acked-by and Tested-by in the commits,
+>      thanks to everyone.
+>                                                                                   
+> v5:
+>    As suggested by Mike Kravetz, no need to move the #include
+>    <asm-generic/hugetlb.h> for arm and x86 architectures, let it live at
+>    the top of the file.
+>                                                                                   
+> v4:
+>    Fix powerpc build error due to misplacing of #include
+>    <asm-generic/hugetlb.h> outside of #ifdef CONFIG_HUGETLB_PAGE, as
+>    pointed by Christophe Leroy.
+>                                                                                   
+> v1, v2, v3:
+>    Same version, just problems with email provider and misuse of
+>    --batch-size option of git send-email
+>
+> Alexandre Ghiti (11):
+>    hugetlb: Harmonize hugetlb.h arch specific defines with pgtable.h
+>    hugetlb: Introduce generic version of hugetlb_free_pgd_range
+>    hugetlb: Introduce generic version of set_huge_pte_at
+>    hugetlb: Introduce generic version of huge_ptep_get_and_clear
+>    hugetlb: Introduce generic version of huge_ptep_clear_flush
+>    hugetlb: Introduce generic version of huge_pte_none
+>    hugetlb: Introduce generic version of huge_pte_wrprotect
+>    hugetlb: Introduce generic version of prepare_hugepage_range
+>    hugetlb: Introduce generic version of huge_ptep_set_wrprotect
+>    hugetlb: Introduce generic version of huge_ptep_set_access_flags
+>    hugetlb: Introduce generic version of huge_ptep_get
+>
+>   arch/arm/include/asm/hugetlb-3level.h        | 32 +---------
+>   arch/arm/include/asm/hugetlb.h               | 30 ----------
+>   arch/arm64/include/asm/hugetlb.h             | 39 +++---------
+>   arch/ia64/include/asm/hugetlb.h              | 47 ++-------------
+>   arch/mips/include/asm/hugetlb.h              | 40 +++----------
+>   arch/parisc/include/asm/hugetlb.h            | 33 +++--------
+>   arch/powerpc/include/asm/book3s/32/pgtable.h |  6 --
+>   arch/powerpc/include/asm/book3s/64/pgtable.h |  1 +
+>   arch/powerpc/include/asm/hugetlb.h           | 43 ++------------
+>   arch/powerpc/include/asm/nohash/32/pgtable.h |  6 --
+>   arch/powerpc/include/asm/nohash/64/pgtable.h |  1 +
+>   arch/sh/include/asm/hugetlb.h                | 54 ++---------------
+>   arch/sparc/include/asm/hugetlb.h             | 40 +++----------
+>   arch/x86/include/asm/hugetlb.h               | 69 ----------------------
+>   include/asm-generic/hugetlb.h                | 88 +++++++++++++++++++++++++++-
+>   15 files changed, 135 insertions(+), 394 deletions(-)
+>
