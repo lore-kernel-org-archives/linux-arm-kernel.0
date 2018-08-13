@@ -1,74 +1,56 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 13 Aug 2018 13:07:21 -0600
-Subject: [PATCH v2 2/4] dt-bindings: soc: amlogic: add meson-canvas
- documentation
-In-Reply-To: <20180807220011.24436-3-maxi.jourdan@wanadoo.fr>
-References: <20180807220011.24436-1-maxi.jourdan@wanadoo.fr>
- <20180807220011.24436-3-maxi.jourdan@wanadoo.fr>
-Message-ID: <20180813190721.GA27621@rob-hp-laptop>
+From: ghackmann@android.com (Greg Hackmann)
+Date: Mon, 13 Aug 2018 12:30:11 -0700
+Subject: [PATCH] arm64: mm: check for upper PAGE_SHIFT bits in pfn_valid()
+Message-ID: <20180813193013.236362-1-ghackmann@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 08, 2018 at 12:00:09AM +0200, Maxime Jourdan wrote:
-> DT bindings doc for amlogic,meson-canvas
-> 
-> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
-> ---
->  .../soc/amlogic/amlogic,meson-canvas.txt      | 36 +++++++++++++++++++
->  1 file changed, 36 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt b/Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt
-> new file mode 100644
-> index 000000000000..5f0351717bee
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt
-> @@ -0,0 +1,36 @@
-> +Amlogic Canvas
-> +================================
-> +
-> +A canvas is a collection of metadata that describes a pixel buffer.
-> +Those metadata include: width, height, phyaddr, wrapping, block mode
-> +and endianness.
-> +
-> +Many IPs within Amlogic SoCs rely on canvas indexes to read/write pixel data
-> +rather than use the phy addresses directly. For instance, this is the case for
-> +the video decoders and the display.
-> +
-> +Amlogic SoCs have 256 canvas.
-> +
-> +Device Tree Bindings:
-> +---------------------
-> +
-> +Canvas Provider
-> +--------------------------
-> +
-> +Required properties:
-> +- compatible: "amlogic,canvas"
-> +
-> +Parent node should have the following properties :
-> +- compatible: "amlogic,gx-dmc-sysctrl", "syscon", "simple-mfd"
+ARM64's pfn_valid() shifts away the upper PAGE_SHIFT bits of the input
+before seeing if the PFN is valid.  This leads to false positives when
+some of the upper bits are set, but the lower bits match a valid PFN.
 
-Is this documented somewhere? One child function is not a reason for an 
-MFD and child nodes. And child nodes like this with no resources are 
-unnecessary.
+For example, the following userspace code looks up a bogus entry in
+/proc/kpageflags:
 
-> +- reg: base address and size of the DMC system control register space.
-> +
-> +Example:
-> +
-> +sysctrl_DMC: system-controller at 0 {
-> +	compatible = "amlogic,gx-dmc-sysctrl", "syscon", "simple-mfd";
-> +	reg = <0x0 0x0 0x0 0x1000>;
-> +
-> +	canvas: canvas-provider at 0 {
-> +		compatible = "amlogic,canvas";
-> +	};
-> +};
-> -- 
-> 2.18.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+    int pagemap = open("/proc/self/pagemap", O_RDONLY);
+    int pageflags = open("/proc/kpageflags", O_RDONLY);
+    uint64_t pfn, val;
+
+    lseek64(pagemap, [...], SEEK_SET);
+    read(pagemap, &pfn, sizeof(pfn));
+    if (pfn & (1UL << 63)) {        /* valid PFN */
+        pfn &= ((1UL << 55) - 1);   /* clear flag bits */
+        pfn |= (1UL << 55);
+        lseek64(pageflags, pfn * sizeof(uint64_t), SEEK_SET);
+        read(pageflags, &val, sizeof(val));
+    }
+
+On ARM64 this causes the userspace process to crash with SIGSEGV rather
+than reading (1 << KPF_NOPAGE).  kpageflags_read() treats the offset as
+valid, and stable_page_flags() will try to access an address between the
+user and kernel address ranges.
+
+Signed-off-by: Greg Hackmann <ghackmann@google.com>
+---
+ arch/arm64/mm/init.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 9abf8a1e7b25..787e27964ab9 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -287,7 +287,11 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+ #ifdef CONFIG_HAVE_ARCH_PFN_VALID
+ int pfn_valid(unsigned long pfn)
+ {
+-	return memblock_is_map_memory(pfn << PAGE_SHIFT);
++	phys_addr_t addr = pfn << PAGE_SHIFT;
++
++	if ((addr >> PAGE_SHIFT) != pfn)
++		return 0;
++	return memblock_is_map_memory(addr);
+ }
+ EXPORT_SYMBOL(pfn_valid);
+ #endif
+-- 
+2.18.0.597.ga71716f1ad-goog
