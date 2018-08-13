@@ -1,104 +1,72 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 13 Aug 2018 10:04:06 +0530
-Subject: [PATCH v2 1/3] dt-bindings: interrupt-controller: Actions
- external interrupt controller
-In-Reply-To: <20180812122215.1079590-2-pn@denx.de>
-References: <20180812122215.1079590-1-pn@denx.de>
- <20180812122215.1079590-2-pn@denx.de>
-Message-ID: <20180813043406.GA16275@Mani-XPS-13-9360>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Mon, 13 Aug 2018 10:59:47 +0530
+Subject: [PATCH 1/3] dts: arm64/sdm845: Add node for arm,mmu-500
+In-Reply-To: <CAD=FV=XqBU0dc6smZsEssXAro5UMqqrgLudBQKqG1zznpg9cSA@mail.gmail.com>
+References: <20180719175356.14753-1-vivek.gautam@codeaurora.org>
+ <20180719175356.14753-2-vivek.gautam@codeaurora.org>
+ <CAD=FV=Vmn40CmLLLEfrE-eq2sj4CYnx2E2-k-dimk24CDTU1jQ@mail.gmail.com>
+ <CAD=FV=XqBU0dc6smZsEssXAro5UMqqrgLudBQKqG1zznpg9cSA@mail.gmail.com>
+Message-ID: <249d07c0-a2fb-b25e-84aa-ee820bace847@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Parthiban,
+Hi Doug,
 
-On Sun, Aug 12, 2018 at 02:22:13PM +0200, Parthiban Nallathambi wrote:
-> Actions Semi OWL family SoC's provides support for external interrupt
-> controller to be connected and controlled using SIRQ pins. S500, S700
-> and S900 provides 3 SIRQ lines and works independently for 3 external
-> interrupt controllers.
-> 
-> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
-> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
-> ---
->  .../interrupt-controller/actions,owl-sirq.txt      | 46 ++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
-> new file mode 100644
-> index 000000000000..4b8437751331
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
-> @@ -0,0 +1,46 @@
-> +Actions Semi Owl SoCs SIRQ interrupt controller
-> +
-> +S500, S700 and S900 SoC's from Actions provides 3 SPI's from GIC,
-> +in which external interrupt controller can be connected. 3 SPI's
-> +45, 46, 47 from GIC are directly exposed as SIRQ. It has
-> +the following properties:
 
-We should really document the driver here. What it does? and how the
-hierarchy is handled with GIC? etc...
+On 8/11/2018 4:00 AM, Doug Anderson wrote:
+> Hi,
+>
+> On Fri, Aug 10, 2018 at 3:18 PM, Doug Anderson <dianders@chromium.org> wrote:
+>> Hi,
+>>
+>> On Thu, Jul 19, 2018 at 10:53 AM, Vivek Gautam
+>> <vivek.gautam@codeaurora.org> wrote:
+>>> Add device node for arm,mmu-500 available on sdm845.
+>>> This MMU-500 with single TCU and multiple TBU architecture
+>>> is shared among all the peripherals except gpu on sdm845.
+>>>
+>>> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+>>> ---
+>>>   arch/arm64/boot/dts/qcom/sdm845-mtp.dts |  4 ++
+>>>   arch/arm64/boot/dts/qcom/sdm845.dtsi    | 73 +++++++++++++++++++++++++++++++++
+>>>   2 files changed, 77 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+>>> index 6d651f314193..13b50dff440f 100644
+>>> --- a/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+>>> +++ b/arch/arm64/boot/dts/qcom/sdm845-mtp.dts
+>>> @@ -58,3 +58,7 @@
+>>>                  bias-pull-up;
+>>>          };
+>>>   };
+>>> +
+>>> +&apps_smmu {
+>>> +       status = "okay";
+>>> +};
+>> When you spin this patch please put the above in the correct place.
+>> Since "a" sorts alphabetically before "i" then this should be just
+>> before the line:
+>>
+>> &i2c10 {
+> Sorry--one more thing I thought of after I sent this out...
+>
+> Possibly you can drop this part of the patch completely and get rid of
+> the 'status = "disabled";' in sdm845.dtsi.  As I understand it you
+> really only want to mark things as disabled in the SoC dtsi file if
+> some boards might use this device and other boards wouldn't.  For
+> instance not all boards will have the SD card controller hooked up /
+> enabled so having that set to "disabled" in the SoC device tree file
+> makes sense.  ...but it's not a board-level question about whether the
+> SMMU is present--it's always there.  You don't gain anything by
+> forcing all boards to set status to "okay".
 
-> +
-> +- inputs three interrupt signal from external interrupt controller
-> +
-> +Required properties:
-> +
-> +- compatible: should be "actions,owl-sirq"
-> +- reg: physical base address of the controller and length of memory mapped.
+Thanks for reviewing the patches.
+Will sort the node as per alphabetical order.
+Also as you pointed, it makes sense to not have the 'status' property
+in SMMU. Will remove that. Thanks.
 
-...length of memory mapped region?
-
-> +- interrupt-controller: identifies the node as an interrupt controller
-> +- #interrupt-cells: specifies the number of cells needed to encode an interrupt
-> +  source, should be 2.
-> +- actions,sirq-shared-reg: Applicable for S500 and S700 where SIRQ register
-> +  details are maintained at same offset/register.
-> +- actions,sirq-offset: register offset for SIRQ interrupts. When registers are
-> +  shared, all the three offsets will be same (S500 and S700).
-> +- actions,sirq-clk-sel: external interrupt controller can be either
-> +  connected to 32Khz or 24Mhz external/internal clock. This needs
-
-Hertz should be specified as Hz.
-
-> +  to be configured for per SIRQ line. Failing defaults to 32Khz clock.
-
-What value needs to be specified for selecting 24MHz clock? You should
-mention the available options this property supports.
-
-> +
-> +Example for S900:
-> +
-> +sirq: interrupt-controller at e01b0000 {
-> +	compatible = "actions,owl-sirq";
-> +	reg = <0 0xe01b0000 0 0x1000>;
-
-could be: reg = <0x0 0xe01b0000 0x0 0x1000>;
-
-> +	interrupt-controller;
-> +	#interrupt-cells = <2>;
-> +	actions,sirq-clk-sel = <0 0 0>;
-> +	actions,sirq-offset = <0x200 0x528 0x52c>;
-> +};
-> +
-> +Example for S500 and S700:
-> +
-> +sirq: interrupt-controller at e01b0000 {
-> +	compatible = "actions,owl-sirq";
-> +	reg = <0 0xe01b0000 0 0x1000>;
-
-For S500, reg base is 0xb01b0000.
-
-Thanks
-Mani
-
-> +	interrupt-controller;
-> +	#interrupt-cells = <2>;
-> +	actions,sirq-shared-reg;
-> +	actions,sirq-clk-sel = <0 0 0>;
-> +	actions,sirq-offset = <0x200 0x200 0x200>;
-> +};
-> -- 
-> 2.14.4
-> 
+Best regards
+Vivek
+>
+>
+> -Doug
