@@ -1,48 +1,135 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Aug 2018 15:57:44 +0100
-Subject: [PATCH 26/37] KVM: arm/arm64: vgic: Fix possible spectre-v1 write in
- vgic_mmio_write_apr()
+Date: Mon, 13 Aug 2018 15:57:42 +0100
+Subject: [PATCH 24/37] KVM: arm64: Share the parts of get/set events useful to
+ 32bit
 In-Reply-To: <20180813145755.16566-1-marc.zyngier@arm.com>
 References: <20180813145755.16566-1-marc.zyngier@arm.com>
-Message-ID: <20180813145755.16566-27-marc.zyngier@arm.com>
+Message-ID: <20180813145755.16566-25-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+From: James Morse <james.morse@arm.com>
 
-It's possible for userspace to control n. Sanitize n when using it as an
-array index, to inhibit the potential spectre-v1 write gadget.
+The get/set events helpers to do some work to check reserved
+and padding fields are zero. This is useful on 32bit too.
 
-Note that while it appears that n must be bound to the interval [0,3]
-due to the way it is extracted from addr, we cannot guarantee that
-compiler transformations (and/or future refactoring) will ensure this is
-the case, and given this is a slow path it's better to always perform
-the masking.
+Move this code into virt/kvm/arm/arm.c, and give the arch
+code some underscores.
 
-Found by smatch.
+This is temporarily hidden behind __KVM_HAVE_VCPU_EVENTS until
+32bit is wired up.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
+Signed-off-by: James Morse <james.morse@arm.com>
+Reviewed-by: Dongjiu Geng <gengdongjiu@huawei.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/include/asm/kvm_host.h |  8 ++++----
+ arch/arm64/kvm/guest.c            | 21 ++++-----------------
+ virt/kvm/arm/arm.c                | 28 ++++++++++++++++++++++++++++
+ 3 files changed, 36 insertions(+), 21 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index 26654f4140ed..738b65d2d0e7 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -399,6 +399,9 @@ static void vgic_mmio_write_apr(struct kvm_vcpu *vcpu,
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index bc244cc6e451..f26055f2306e 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -350,11 +350,11 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
+ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
+ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
+ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
+-int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
+-			    struct kvm_vcpu_events *events);
++int __kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
++			      struct kvm_vcpu_events *events);
  
- 		if (n > vgic_v3_max_apr_idx(vcpu))
- 			return;
+-int kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
+-			    struct kvm_vcpu_events *events);
++int __kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
++			      struct kvm_vcpu_events *events);
+ 
+ #define KVM_ARCH_WANT_MMU_NOTIFIER
+ int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index dd05be96d981..725c7545e91a 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -289,11 +289,9 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
+ 	return -EINVAL;
+ }
+ 
+-int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
+-			struct kvm_vcpu_events *events)
++int __kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
++			      struct kvm_vcpu_events *events)
+ {
+-	memset(events, 0, sizeof(*events));
+-
+ 	events->exception.serror_pending = !!(vcpu->arch.hcr_el2 & HCR_VSE);
+ 	events->exception.serror_has_esr = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
+ 
+@@ -303,23 +301,12 @@ int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
+ 	return 0;
+ }
+ 
+-int kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
+-			struct kvm_vcpu_events *events)
++int __kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
++			      struct kvm_vcpu_events *events)
+ {
+-	int i;
+ 	bool serror_pending = events->exception.serror_pending;
+ 	bool has_esr = events->exception.serror_has_esr;
+ 
+-	/* check whether the reserved field is zero */
+-	for (i = 0; i < ARRAY_SIZE(events->reserved); i++)
+-		if (events->reserved[i])
+-			return -EINVAL;
+-
+-	/* check whether the pad field is zero */
+-	for (i = 0; i < ARRAY_SIZE(events->exception.pad); i++)
+-		if (events->exception.pad[i])
+-			return -EINVAL;
+-
+ 	if (serror_pending && has_esr) {
+ 		if (!cpus_have_const_cap(ARM64_HAS_RAS_EXTN))
+ 			return -EINVAL;
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 1c72247aeb1d..14f8fad1c7ae 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -1050,6 +1050,34 @@ static int kvm_arm_vcpu_has_attr(struct kvm_vcpu *vcpu,
+ 	return ret;
+ }
+ 
++#ifdef __KVM_HAVE_VCPU_EVENTS	/* temporary: until 32bit is wired up */
++static int kvm_arm_vcpu_get_events(struct kvm_vcpu *vcpu,
++				   struct kvm_vcpu_events *events)
++{
++	memset(events, 0, sizeof(*events));
 +
-+		n = array_index_nospec(n, 4);
++	return __kvm_arm_vcpu_get_events(vcpu, events);
++}
 +
- 		/* GICv3 only uses ICH_AP1Rn for memory mapped (GICv2) guests */
- 		vgicv3->vgic_ap1r[n] = val;
- 	}
++static int kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
++				   struct kvm_vcpu_events *events)
++{
++	int i;
++
++	/* check whether the reserved field is zero */
++	for (i = 0; i < ARRAY_SIZE(events->reserved); i++)
++		if (events->reserved[i])
++			return -EINVAL;
++
++	/* check whether the pad field is zero */
++	for (i = 0; i < ARRAY_SIZE(events->exception.pad); i++)
++		if (events->exception.pad[i])
++			return -EINVAL;
++
++	return __kvm_arm_vcpu_set_events(vcpu, events);
++}
++#endif /* __KVM_HAVE_VCPU_EVENTS */
++
+ long kvm_arch_vcpu_ioctl(struct file *filp,
+ 			 unsigned int ioctl, unsigned long arg)
+ {
 -- 
 2.18.0
