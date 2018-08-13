@@ -1,88 +1,32 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 13 Aug 2018 11:43:50 +0100
-Subject: [PATCH v3 1/2] KVM: arm/arm64: Skip updating PMD entry if no change
-In-Reply-To: <20180813104351.24595-1-punit.agrawal@arm.com>
-References: <20180813104351.24595-1-punit.agrawal@arm.com>
-Message-ID: <20180813104351.24595-2-punit.agrawal@arm.com>
+Date: Mon, 13 Aug 2018 11:43:49 +0100
+Subject: [PATCH v3 0/2] KVM: Fix refaulting due to page table update
+Message-ID: <20180813104351.24595-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Contention on updating a PMD entry by a large number of vcpus can lead
-to duplicate work when handling stage 2 page faults. As the page table
-update follows the break-before-make requirement of the architecture,
-it can lead to repeated refaults due to clearing the entry and
-flushing the tlbs.
+Contention when updating a page table entry can lead to unnecessary
+refaults. The issue was reported by a user when testing PUD hugepage
+support[1] but also exists for PMD and PTE updates though with a lower
+probability.
 
-This problem is more likely when -
+This version -
 
-* there are large number of vcpus
-* the mapping is large block mapping
+* fixes a nit reported by Suzuki
+* Re-orders the checks when setting PMD hugepage
+* drops mistakenly introduced Change-id in the commit message
 
-such as when using PMD hugepages (512MB) with 64k pages.
+Thanks,
+Punit
 
-Fix this by skipping the page table update if there is no change in
-the entry being updated.
+[1] https://lkml.org/lkml/2018/7/16/482
 
-Fixes: ad361f093c1e ("KVM: ARM: Support hugetlbfs backed huge pages")
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: stable at vger.kernel.org
----
- virt/kvm/arm/mmu.c | 38 +++++++++++++++++++++++++++-----------
- 1 file changed, 27 insertions(+), 11 deletions(-)
+Punit Agrawal (2):
+  KVM: arm/arm64: Skip updating PMD entry if no change
+  KVM: arm/arm64: Skip updating PTE entry if no change
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 1d90d79706bd..2bb0b5dba412 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1015,19 +1015,35 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
- 	pmd = stage2_get_pmd(kvm, cache, addr);
- 	VM_BUG_ON(!pmd);
- 
--	/*
--	 * Mapping in huge pages should only happen through a fault.  If a
--	 * page is merged into a transparent huge page, the individual
--	 * subpages of that huge page should be unmapped through MMU
--	 * notifiers before we get here.
--	 *
--	 * Merging of CompoundPages is not supported; they should become
--	 * splitting first, unmapped, merged, and mapped back in on-demand.
--	 */
--	VM_BUG_ON(pmd_present(*pmd) && pmd_pfn(*pmd) != pmd_pfn(*new_pmd));
--
- 	old_pmd = *pmd;
- 	if (pmd_present(old_pmd)) {
-+		/*
-+		 * Multiple vcpus faulting on the same PMD entry, can
-+		 * lead to them sequentially updating the PMD with the
-+		 * same value. Following the break-before-make
-+		 * (pmd_clear() followed by tlb_flush()) process can
-+		 * hinder forward progress due to refaults generated
-+		 * on missing translations.
-+		 *
-+		 * Skip updating the page table if the entry is
-+		 * unchanged.
-+		 */
-+		if (pmd_val(old_pmd) == pmd_val(*new_pmd))
-+			return 0;
-+
-+		/*
-+		 * Mapping in huge pages should only happen through a
-+		 * fault.  If a page is merged into a transparent huge
-+		 * page, the individual subpages of that huge page
-+		 * should be unmapped through MMU notifiers before we
-+		 * get here.
-+		 *
-+		 * Merging of CompoundPages is not supported; they
-+		 * should become splitting first, unmapped, merged,
-+		 * and mapped back in on-demand.
-+		 */
-+		VM_BUG_ON(pmd_pfn(old_pmd) != pmd_pfn(*new_pmd));
-+
- 		pmd_clear(pmd);
- 		kvm_tlb_flush_vmid_ipa(kvm, addr);
- 	} else {
+ virt/kvm/arm/mmu.c | 43 ++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 32 insertions(+), 11 deletions(-)
+
 -- 
 2.18.0
