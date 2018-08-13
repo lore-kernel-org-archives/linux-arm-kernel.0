@@ -1,35 +1,92 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 13 Aug 2018 17:11:44 +0200
-Subject: [PATCH] irqchip/s3c24xx: Remove unneeded comparison of unsigned long
- to 0
-Message-ID: <20180813151144.12407-1-krzk@kernel.org>
+Date: Mon, 13 Aug 2018 17:13:10 +0200
+Subject: [PATCH] ARM: s3c24xx: Remove empty gta02_pmu children probe
+Message-ID: <20180813151310.21960-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-irq_data->hwirq is unsigned long.  This fixes GCC warning:
+Since commit 67e67df8da72 ("gta02: Use pcf50633 backlight driver instead
+of platform backlight driver.") the list of gta02 pmu children is empty
+therefore looping through it and adding devices is a no-op.
 
-    drivers/irqchip/irq-s3c24xx.c: In function 's3c_irqext0_type':
-    drivers/irqchip/irq-s3c24xx.c:253:19: warning: comparison of unsigned expression >= 0 is always true [-Wtype-limits]
-      if ((data->hwirq >= 0) && (data->hwirq <= 3)) {
-                       ^~
+This also fixes the GCC v8.1 W=1 warning:
+
+    arch/arm/mach-s3c24xx/mach-gta02.c: In function 'gta02_pmu_attach_child_devices':
+    arch/arm/mach-s3c24xx/mach-gta02.c:538:16: warning: comparison of unsigned expression < 0 is always false [-Wtype-limits]
+      for (n = 0; n < ARRAY_SIZE(gta02_devices_pmu_children); n++)
+                    ^
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- drivers/irqchip/irq-s3c24xx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-s3c24xx/mach-gta02.c | 42 --------------------------------------
+ 1 file changed, 42 deletions(-)
 
-diff --git a/drivers/irqchip/irq-s3c24xx.c b/drivers/irqchip/irq-s3c24xx.c
-index f6fd57ebe6e6..c19766fe8a1a 100644
---- a/drivers/irqchip/irq-s3c24xx.c
-+++ b/drivers/irqchip/irq-s3c24xx.c
-@@ -250,7 +250,7 @@ static int s3c_irqext0_type(struct irq_data *data, unsigned int type)
- 	void __iomem *gpcon_reg;
- 	unsigned long gpcon_offset, extint_offset;
+diff --git a/arch/arm/mach-s3c24xx/mach-gta02.c b/arch/arm/mach-s3c24xx/mach-gta02.c
+index 9d5595c4ad99..594901f3b8e5 100644
+--- a/arch/arm/mach-s3c24xx/mach-gta02.c
++++ b/arch/arm/mach-s3c24xx/mach-gta02.c
+@@ -219,17 +219,6 @@ static void gta02_udc_vbus_draw(unsigned int ma)
+ #define gta02_udc_vbus_draw		NULL
+ #endif
  
--	if ((data->hwirq >= 0) && (data->hwirq <= 3)) {
-+	if (data->hwirq <= 3) {
- 		gpcon_reg = S3C2410_GPFCON;
- 		extint_reg = S3C24XX_EXTINT0;
- 		gpcon_offset = (data->hwirq) * 2;
+-/*
+- * This is called when pc50633 is probed, unfortunately quite late in the
+- * day since it is an I2C bus device. Here we can belatedly define some
+- * platform devices with the advantage that we can mark the pcf50633 as the
+- * parent. This makes them get suspended and resumed with their parent
+- * the pcf50633 still around.
+- */
+-
+-static void gta02_pmu_attach_child_devices(struct pcf50633 *pcf);
+-
+-
+ static char *gta02_batteries[] = {
+ 	"battery",
+ };
+@@ -355,7 +344,6 @@ static struct pcf50633_platform_data gta02_pcf_pdata = {
+ 		},
+ 
+ 	},
+-	.probe_done = gta02_pmu_attach_child_devices,
+ 	.mbc_event_callback = gta02_pmu_event_callback,
+ };
+ 
+@@ -512,36 +500,6 @@ static struct platform_device *gta02_devices[] __initdata = {
+ 	&s3c_device_ts,
+ };
+ 
+-/* These guys DO need to be children of PMU. */
+-
+-static struct platform_device *gta02_devices_pmu_children[] = {
+-};
+-
+-
+-/*
+- * This is called when pc50633 is probed, quite late in the day since it is an
+- * I2C bus device.  Here we can define platform devices with the advantage that
+- * we can mark the pcf50633 as the parent.  This makes them get suspended and
+- * resumed with their parent the pcf50633 still around.  All devices whose
+- * operation depends on something from pcf50633 must have this relationship
+- * made explicit like this, or suspend and resume will become an unreliable
+- * hellworld.
+- */
+-
+-static void gta02_pmu_attach_child_devices(struct pcf50633 *pcf)
+-{
+-	int n;
+-
+-	/* Grab a copy of the now probed PMU pointer. */
+-	gta02_pcf = pcf;
+-
+-	for (n = 0; n < ARRAY_SIZE(gta02_devices_pmu_children); n++)
+-		gta02_devices_pmu_children[n]->dev.parent = pcf->dev;
+-
+-	platform_add_devices(gta02_devices_pmu_children,
+-			     ARRAY_SIZE(gta02_devices_pmu_children));
+-}
+-
+ static void gta02_poweroff(void)
+ {
+ 	pcf50633_reg_set_bit_mask(gta02_pcf, PCF50633_REG_OOCSHDWN, 1, 1);
 -- 
 2.14.1
