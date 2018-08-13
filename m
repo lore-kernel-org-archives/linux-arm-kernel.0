@@ -1,97 +1,208 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Aug 2018 16:22:44 +0100
-Subject: [PATCH] irqchip/stm32: fix init error handling
-In-Reply-To: <20180808120319.akmstg3ads325xcy@kili.mountain>
-References: <20180808120319.akmstg3ads325xcy@kili.mountain>
-Message-ID: <99d66ae8-f497-0108-8168-6e46fdf2fe1d@arm.com>
+Date: Mon, 13 Aug 2018 15:57:28 +0100
+Subject: [PATCH 10/37] KVM: arm/arm64: vgic-debug: Show LPI status
+In-Reply-To: <20180813145755.16566-1-marc.zyngier@arm.com>
+References: <20180813145755.16566-1-marc.zyngier@arm.com>
+Message-ID: <20180813145755.16566-11-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/18 13:03, Dan Carpenter wrote:
-> If there are any errors in stm32_exti_host_init() then it leads to a
-> NULL dereference in the callers.  The function should clean up after
-> itself.
-> 
-> Fixes: f9fc1745501e ("irqchip/stm32: Add host and driver data structures")
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-> 
-> diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
-> index 3df527fcf4e1..0a2088e12d96 100644
-> --- a/drivers/irqchip/irq-stm32-exti.c
-> +++ b/drivers/irqchip/irq-stm32-exti.c
-> @@ -603,17 +603,24 @@ stm32_exti_host_data *stm32_exti_host_init(const struct stm32_exti_drv_data *dd,
->  					sizeof(struct stm32_exti_chip_data),
->  					GFP_KERNEL);
->  	if (!host_data->chips_data)
-> -		return NULL;
-> +		goto free_host_data;
->  
->  	host_data->base = of_iomap(node, 0);
->  	if (!host_data->base) {
->  		pr_err("%pOF: Unable to map registers\n", node);
-> -		return NULL;
-> +		goto free_chips_data;
->  	}
->  
->  	stm32_host_data = host_data;
->  
->  	return host_data;
-> +
-> +free_chips_data:
-> +	kfree(host_data->chips_data);
-> +free_host_data:
-> +	kfree(host_data);
-> +
-> +	return NULL;
->  }
->  
->  static struct
-> @@ -665,10 +672,8 @@ static int __init stm32_exti_init(const struct stm32_exti_drv_data *drv_data,
->  	struct irq_domain *domain;
->  
->  	host_data = stm32_exti_host_init(drv_data, node);
-> -	if (!host_data) {
-> -		ret = -ENOMEM;
-> -		goto out_free_mem;
-> -	}
-> +	if (!host_data)
-> +		return -ENOMEM;
->  
->  	domain = irq_domain_add_linear(node, drv_data->bank_nr * IRQS_PER_BANK,
->  				       &irq_exti_domain_ops, NULL);
-> @@ -725,7 +730,6 @@ static int __init stm32_exti_init(const struct stm32_exti_drv_data *drv_data,
->  	irq_domain_remove(domain);
->  out_unmap:
->  	iounmap(host_data->base);
-> -out_free_mem:
->  	kfree(host_data->chips_data);
->  	kfree(host_data);
->  	return ret;
-> @@ -752,10 +756,8 @@ __init stm32_exti_hierarchy_init(const struct stm32_exti_drv_data *drv_data,
->  	}
->  
->  	host_data = stm32_exti_host_init(drv_data, node);
-> -	if (!host_data) {
-> -		ret = -ENOMEM;
-> -		goto out_free_mem;
-> -	}
-> +	if (!host_data)
-> +		return -ENOMEM;
->  
->  	for (i = 0; i < drv_data->bank_nr; i++)
->  		stm32_exti_chip_init(host_data, i, node);
-> @@ -777,7 +779,6 @@ __init stm32_exti_hierarchy_init(const struct stm32_exti_drv_data *drv_data,
->  
->  out_unmap:
->  	iounmap(host_data->base);
-> -out_free_mem:
->  	kfree(host_data->chips_data);
->  	kfree(host_data);
->  	return ret;
-> 
+The vgic debugfs file only knows about SGI/PPI/SPI interrupts, and
+completely ignores LPIs. Let's fix that.
 
-Queued, thanks,
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-debug.c | 42 ++++++++++++++++++++++++++--------
+ virt/kvm/arm/vgic/vgic-its.c   | 12 +++++-----
+ virt/kvm/arm/vgic/vgic.h       |  1 +
+ 3 files changed, 39 insertions(+), 16 deletions(-)
 
-	M.
+diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
+index c589d4c2b478..9279e35fefb1 100644
+--- a/virt/kvm/arm/vgic/vgic-debug.c
++++ b/virt/kvm/arm/vgic/vgic-debug.c
+@@ -36,9 +36,12 @@
+ struct vgic_state_iter {
+ 	int nr_cpus;
+ 	int nr_spis;
++	int nr_lpis;
+ 	int dist_id;
+ 	int vcpu_id;
+ 	int intid;
++	int lpi_idx;
++	u32 *lpi_array;
+ };
+ 
+ static void iter_next(struct vgic_state_iter *iter)
+@@ -52,6 +55,12 @@ static void iter_next(struct vgic_state_iter *iter)
+ 	if (iter->intid == VGIC_NR_PRIVATE_IRQS &&
+ 	    ++iter->vcpu_id < iter->nr_cpus)
+ 		iter->intid = 0;
++
++	if (iter->intid >= (iter->nr_spis + VGIC_NR_PRIVATE_IRQS)) {
++		if (iter->lpi_idx < iter->nr_lpis)
++			iter->intid = iter->lpi_array[iter->lpi_idx];
++		iter->lpi_idx++;
++	}
+ }
+ 
+ static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
+@@ -63,6 +72,11 @@ static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
+ 
+ 	iter->nr_cpus = nr_cpus;
+ 	iter->nr_spis = kvm->arch.vgic.nr_spis;
++	if (kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) {
++		iter->nr_lpis = vgic_copy_lpi_list(kvm, NULL, &iter->lpi_array);
++		if (iter->nr_lpis < 0)
++			iter->nr_lpis = 0;
++	}
+ 
+ 	/* Fast forward to the right position if needed */
+ 	while (pos--)
+@@ -73,7 +87,8 @@ static bool end_of_vgic(struct vgic_state_iter *iter)
+ {
+ 	return iter->dist_id > 0 &&
+ 		iter->vcpu_id == iter->nr_cpus &&
+-		(iter->intid - VGIC_NR_PRIVATE_IRQS) == iter->nr_spis;
++		iter->intid >= (iter->nr_spis + VGIC_NR_PRIVATE_IRQS) &&
++		iter->lpi_idx > iter->nr_lpis;
+ }
+ 
+ static void *vgic_debug_start(struct seq_file *s, loff_t *pos)
+@@ -130,6 +145,7 @@ static void vgic_debug_stop(struct seq_file *s, void *v)
+ 
+ 	mutex_lock(&kvm->lock);
+ 	iter = kvm->arch.vgic.iter;
++	kfree(iter->lpi_array);
+ 	kfree(iter);
+ 	kvm->arch.vgic.iter = NULL;
+ 	mutex_unlock(&kvm->lock);
+@@ -137,12 +153,14 @@ static void vgic_debug_stop(struct seq_file *s, void *v)
+ 
+ static void print_dist_state(struct seq_file *s, struct vgic_dist *dist)
+ {
++	bool v3 = dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3;
++
+ 	seq_printf(s, "Distributor\n");
+ 	seq_printf(s, "===========\n");
+-	seq_printf(s, "vgic_model:\t%s\n",
+-		   (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) ?
+-		   "GICv3" : "GICv2");
++	seq_printf(s, "vgic_model:\t%s\n", v3 ? "GICv3" : "GICv2");
+ 	seq_printf(s, "nr_spis:\t%d\n", dist->nr_spis);
++	if (v3)
++		seq_printf(s, "nr_lpis:\t%d\n", dist->lpi_list_count);
+ 	seq_printf(s, "enabled:\t%d\n", dist->enabled);
+ 	seq_printf(s, "\n");
+ 
+@@ -174,8 +192,10 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
+ 		type = "SGI";
+ 	else if (irq->intid < VGIC_NR_PRIVATE_IRQS)
+ 		type = "PPI";
+-	else
++	else if (irq->intid < VGIC_MAX_SPI)
+ 		type = "SPI";
++	else
++		type = "LPI";
+ 
+ 	if (irq->intid ==0 || irq->intid == VGIC_NR_PRIVATE_IRQS)
+ 		print_header(s, irq, vcpu);
+@@ -202,7 +222,6 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
+ 			irq->source,
+ 			irq->priority,
+ 			(irq->vcpu) ? irq->vcpu->vcpu_id : -1);
+-
+ }
+ 
+ static int vgic_debug_show(struct seq_file *s, void *v)
+@@ -221,17 +240,20 @@ static int vgic_debug_show(struct seq_file *s, void *v)
+ 	if (!kvm->arch.vgic.initialized)
+ 		return 0;
+ 
+-	if (iter->vcpu_id < iter->nr_cpus) {
++	if (iter->vcpu_id < iter->nr_cpus)
+ 		vcpu = kvm_get_vcpu(kvm, iter->vcpu_id);
+-		irq = &vcpu->arch.vgic_cpu.private_irqs[iter->intid];
+-	} else {
+-		irq = &kvm->arch.vgic.spis[iter->intid - VGIC_NR_PRIVATE_IRQS];
++
++	irq = vgic_get_irq(kvm, vcpu, iter->intid);
++	if (!irq) {
++		seq_printf(s, "       LPI %4d freed\n", iter->intid);
++		return 0;
+ 	}
+ 
+ 	spin_lock_irqsave(&irq->irq_lock, flags);
+ 	print_irq_state(s, irq, vcpu);
+ 	spin_unlock_irqrestore(&irq->irq_lock, flags);
+ 
++	vgic_put_irq(kvm, irq);
+ 	return 0;
+ }
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 1d88010f6b61..cee2c3c5519c 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -318,9 +318,9 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+  * enumerate those LPIs without holding any lock.
+  * Returns their number and puts the kmalloc'ed array into intid_ptr.
+  */
+-static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
++int vgic_copy_lpi_list(struct kvm *kvm, struct kvm_vcpu *vcpu, u32 **intid_ptr)
+ {
+-	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++	struct vgic_dist *dist = &kvm->arch.vgic;
+ 	struct vgic_irq *irq;
+ 	unsigned long flags;
+ 	u32 *intids;
+@@ -343,7 +343,7 @@ static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
+ 		if (i == irq_count)
+ 			break;
+ 		/* We don't need to "get" the IRQ, as we hold the list lock. */
+-		if (irq->target_vcpu != vcpu)
++		if (vcpu && irq->target_vcpu != vcpu)
+ 			continue;
+ 		intids[i++] = irq->intid;
+ 	}
+@@ -435,7 +435,7 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
+ 	unsigned long flags;
+ 	u8 pendmask;
+ 
+-	nr_irqs = vgic_copy_lpi_list(vcpu, &intids);
++	nr_irqs = vgic_copy_lpi_list(vcpu->kvm, vcpu, &intids);
+ 	if (nr_irqs < 0)
+ 		return nr_irqs;
+ 
+@@ -1160,7 +1160,7 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
+ 
+ 	vcpu = kvm_get_vcpu(kvm, collection->target_addr);
+ 
+-	irq_count = vgic_copy_lpi_list(vcpu, &intids);
++	irq_count = vgic_copy_lpi_list(kvm, vcpu, &intids);
+ 	if (irq_count < 0)
+ 		return irq_count;
+ 
+@@ -1208,7 +1208,7 @@ static int vgic_its_cmd_handle_movall(struct kvm *kvm, struct vgic_its *its,
+ 	vcpu1 = kvm_get_vcpu(kvm, target1_addr);
+ 	vcpu2 = kvm_get_vcpu(kvm, target2_addr);
+ 
+-	irq_count = vgic_copy_lpi_list(vcpu1, &intids);
++	irq_count = vgic_copy_lpi_list(kvm, vcpu1, &intids);
+ 	if (irq_count < 0)
+ 		return irq_count;
+ 
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index ead00b2072b2..ed9d9d9e2fc5 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -305,6 +305,7 @@ static inline bool vgic_dist_overlap(struct kvm *kvm, gpa_t base, size_t size)
+ 		(base < d->vgic_dist_base + KVM_VGIC_V3_DIST_SIZE);
+ }
+ 
++int vgic_copy_lpi_list(struct kvm *kvm, struct kvm_vcpu *vcpu, u32 **intid_ptr);
+ int vgic_its_resolve_lpi(struct kvm *kvm, struct vgic_its *its,
+ 			 u32 devid, u32 eventid, struct vgic_irq **irq);
+ struct vgic_its *vgic_msi_to_its(struct kvm *kvm, struct kvm_msi *msi);
 -- 
-Jazz is not dead. It just smells funny...
+2.18.0
