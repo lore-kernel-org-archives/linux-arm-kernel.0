@@ -1,242 +1,69 @@
-From: jianxin.pan@amlogic.com (Jianxin Pan)
-Date: Mon, 13 Aug 2018 19:48:20 +0800
-Subject: [PATCH v2 2/2] arm64: dts: meson-g12a: add initial g12a s905d2 SoC DT
- support
-In-Reply-To: <1534160901-22889-1-git-send-email-jianxin.pan@amlogic.com>
-References: <1534160901-22889-1-git-send-email-jianxin.pan@amlogic.com>
-Message-ID: <1534160901-22889-3-git-send-email-jianxin.pan@amlogic.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Mon, 13 Aug 2018 13:50:19 +0200
+Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <95a1221e-aecc-42be-5239-a2c2429be176@linux.ibm.com>
+References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
+ <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
+ <CAPhsuW49+qA7kT7yE4tgbnAuox-iOzssg-jc2abG8XDo6XeX8A@mail.gmail.com>
+ <95a1221e-aecc-42be-5239-a2c2429be176@linux.ibm.com>
+Message-ID: <20180813115019.GB28360@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Try to add basic DT support for the Amlogic's Meson-G12A S905D2 SoC,
-which describe components as follows: Reserve Memory, CPU, GIC, IRQ,
-Timer, UART. It's capable of booting up into the serial console.
+On 08/13, Ravi Bangoria wrote:
+>
+> On 08/11/2018 01:27 PM, Song Liu wrote:
+> >> +
+> >> +static void delayed_uprobe_delete(struct delayed_uprobe *du)
+> >> +{
+> >> +       if (!du)
+> >> +               return;
+> > Do we really need this check?
+>
+> Not necessary though, but I would still like to keep it for a safety.
 
-Signed-off-by: Jianxin Pan <jianxin.pan@amlogic.com>
----
- arch/arm64/boot/dts/amlogic/Makefile            |   1 +
- arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts |  22 +++
- arch/arm64/boot/dts/amlogic/meson-g12a.dtsi     | 172 ++++++++++++++++++++++++
- 3 files changed, 195 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
+Heh. I tried to ignore all minor problems in this version, but now that Song
+mentioned this unnecessary check...
 
-diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-index a97c0e2..c31f29d6 100644
---- a/arch/arm64/boot/dts/amlogic/Makefile
-+++ b/arch/arm64/boot/dts/amlogic/Makefile
-@@ -1,5 +1,6 @@
- # SPDX-License-Identifier: GPL-2.0
- dtb-$(CONFIG_ARCH_MESON) += meson-axg-s400.dtb
-+dtb-$(CONFIG_ARCH_MESON) += meson-g12a-u200.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nanopi-k2.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nexbox-a95x.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-odroidc2.dtb
-diff --git a/arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts b/arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
-new file mode 100644
-index 0000000..d267a37
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
-@@ -0,0 +1,22 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
-+ */
-+
-+/dts-v1/;
-+
-+#include "meson-g12a.dtsi"
-+
-+/ {
-+	compatible = "amlogic,u200", "amlogic,g12a";
-+	model = "Amlogic Meson G12A U200 Development Board";
-+
-+	aliases {
-+		serial0 = &uart_AO;
-+	};
-+};
-+
-+&uart_AO {
-+	status = "okay";
-+};
-+
-diff --git a/arch/arm64/boot/dts/amlogic/meson-g12a.dtsi b/arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
-new file mode 100644
-index 0000000..c5a32d1
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
-@@ -0,0 +1,172 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
-+ */
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "amlogic,g12a";
-+
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	cpus {
-+		#address-cells = <0x2>;
-+		#size-cells = <0x0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+		};
-+
-+		cpu2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+		};
-+
-+		cpu3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+		};
-+
-+		l2: l2-cache0 {
-+			compatible = "cache";
-+		};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-1.0";
-+		method = "smc";
-+	};
-+
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		/* 3 MiB reserved for ARM Trusted Firmware (BL31) */
-+		secmon_reserved: secmon at 5000000 {
-+			reg = <0x0 0x05000000 0x0 0x300000>;
-+			no-map;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13
-+			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14
-+			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11
-+			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10
-+			(GIC_CPU_MASK_RAW(0xff) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		periphs: periphs at ff634000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0xff634000 0x0 0x2000>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges = <0x0 0x0 0x0 0xff634000 0x0 0x2000>;
-+		};
-+
-+		hiubus: bus at ff63c000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0xff63c000 0x0 0x1c00>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges = <0x0 0x0 0x0 0xff63c000 0x0 0x1c00>;
-+		};
-+
-+		aobus: bus at ff800000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0xff800000 0x0 0x100000>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges = <0x0 0x0 0x0 0xff800000 0x0 0x100000>;
-+
-+			uart_AO: serial at 3000 {
-+				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
-+				reg = <0x0 0x3000 0x0 0x18>;
-+				interrupts = <GIC_SPI 193 IRQ_TYPE_EDGE_RISING>;
-+				clocks = <&xtal>, <&xtal>, <&xtal>;
-+				clock-names = "xtal", "pclk", "baud";
-+				status = "disabled";
-+			};
-+
-+			uart_AO_B: serial at 4000 {
-+				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
-+				reg = <0x0 0x4000 0x0 0x18>;
-+				interrupts = <GIC_SPI 197 IRQ_TYPE_EDGE_RISING>;
-+				clocks = <&xtal>, <&xtal>, <&xtal>;
-+				clock-names = "xtal", "pclk", "baud";
-+				status = "disabled";
-+			};
-+		};
-+
-+		gic: interrupt-controller at ffc01000 {
-+			compatible = "arm,gic-400";
-+			reg = <0x0 0xffc01000 0 0x1000>,
-+			      <0x0 0xffc02000 0 0x2000>,
-+			      <0x0 0xffc04000 0 0x2000>,
-+			      <0x0 0xffc06000 0 0x2000>;
-+			interrupt-controller;
-+			interrupts = <GIC_PPI 9
-+				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+		};
-+
-+		cbus: bus at ffd00000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0xffd00000 0x0 0x25000>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges = <0x0 0x0 0x0 0xffd00000 0x0 0x25000>;
-+		};
-+
-+		apb: apb at ffe00000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0xffe00000 0x0 0x200000>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges = <0x0 0x0 0x0 0xffe00000 0x0 0x200000>;
-+		};
-+	};
-+
-+	xtal: xtal-clk {
-+		compatible = "fixed-clock";
-+		clock-frequency = <24000000>;
-+		clock-output-names = "xtal";
-+		#clock-cells = <0>;
-+	};
-+
-+};
--- 
-1.9.1
+Personally I really dislike the checks like this one.
+
+	- It can confuse the reader who will try to understand the purpose
+
+	- it can hide a bug if delayed_uprobe_delete(du) is actually called
+	  with du == NULL.
+
+IMO, you should either remove it and let the kernel crash (to notice the
+problem), or turn it into
+
+	if (WARN_ON(!du))
+		return;
+
+which is self-documented and reports the problem without kernel crash.
+
+> >> +       rc_vma = find_ref_ctr_vma(uprobe, mm);
+> >> +
+> >> +       if (rc_vma) {
+> >> +               rc_vaddr = offset_to_vaddr(rc_vma, uprobe->ref_ctr_offset);
+> >> +               ret = __update_ref_ctr(mm, rc_vaddr, is_register ? 1 : -1);
+> >> +
+> >> +               if (is_register)
+> >> +                       return ret;
+> >> +       }
+> > Mixing __update_ref_ctr() here and delayed_uprobe_add() in the same
+> > function is a little confusing (at least for me). How about we always use
+> > delayed uprobe for uprobe_mmap() and use non-delayed in other case(s)?
+>
+>
+> No. delayed_uprobe_add() is needed for uprobe_register() case to handle race
+> between uprobe_register() and process creation.
+
+Yes.
+
+But damn, process creation (exec) is trivial. We could add a new uprobe_exec()
+hook and avoid delayed_uprobe_install() in uprobe_mmap().
+
+Afaics, the really problematic case is dlopen() which can race with _register()
+too, right?
+
+Oleg.
