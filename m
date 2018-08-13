@@ -1,93 +1,115 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Aug 2018 15:57:25 +0100
-Subject: [PATCH 07/37] KVM: arm/arm64: Enable adaptative WFE trapping
+Date: Mon, 13 Aug 2018 15:57:31 +0100
+Subject: [PATCH 13/37] KVM: arm/arm64: vgic: Keep track of implementation
+ revision
 In-Reply-To: <20180813145755.16566-1-marc.zyngier@arm.com>
 References: <20180813145755.16566-1-marc.zyngier@arm.com>
-Message-ID: <20180813145755.16566-8-marc.zyngier@arm.com>
+Message-ID: <20180813145755.16566-14-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Trapping blocking WFE is extremely beneficial in situations where
-the system is oversubscribed, as it allows another thread to run
-while being blocked. In a non-oversubscribed environment, this is
-the complete opposite, and trapping WFE is just unnecessary overhead.
+From: Christoffer Dall <christoffer.dall@arm.com>
 
-Let's only enable WFE trapping if the CPU has more than a single task
-to run (that is, more than just the vcpu thread).
+As we are about to tweak implementation aspects of the VGIC emulation,
+while still preserving some level of backwards compatibility support,
+add a field to keep track of the implementation revision field which is
+reported to the VM and to userspace.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_emulate.h   | 10 ++++++++++
- arch/arm64/include/asm/kvm_emulate.h | 10 ++++++++++
- virt/kvm/arm/arm.c                   |  6 ++++++
- 3 files changed, 26 insertions(+)
+ include/kvm/arm_vgic.h           | 3 +++
+ virt/kvm/arm/vgic/vgic-init.c    | 1 +
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 6 ++++--
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 6 ++++--
+ 4 files changed, 12 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 6493bd479ddc..b50fe8380868 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -107,6 +107,16 @@ static inline unsigned long *vcpu_hcr(const struct kvm_vcpu *vcpu)
- 	return (unsigned long *)&vcpu->arch.hcr;
- }
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index cfdd2484cc42..7e64c463ab4d 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -217,6 +217,9 @@ struct vgic_dist {
+ 	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
+ 	u32			vgic_model;
  
-+static inline void vcpu_clear_wfe_traps(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.hcr &= ~HCR_TWE;
-+}
++	/* Implementation revision as reported in the GICD_IIDR */
++	u32			implementation_rev;
 +
-+static inline void vcpu_set_wfe_traps(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.hcr |= HCR_TWE;
-+}
-+
- static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
+ 	/* Do injected MSIs require an additional device ID? */
+ 	bool			msis_require_devid;
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index b71417913741..8b6fc45c42fe 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -298,6 +298,7 @@ int vgic_init(struct kvm *kvm)
+ 
+ 	vgic_debug_init(kvm);
+ 
++	dist->implementation_rev = 0;
+ 	dist->initialized = true;
+ 
+ out:
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index af44e569373a..f0c5351805b6 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -25,19 +25,21 @@
+ static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
+ 					    gpa_t addr, unsigned int len)
  {
- 	return 1;
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index dd98fdf33d99..bfefdd9a72eb 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -83,6 +83,16 @@ static inline unsigned long *vcpu_hcr(struct kvm_vcpu *vcpu)
- 	return (unsigned long *)&vcpu->arch.hcr_el2;
- }
++	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
+ 	u32 value;
  
-+static inline void vcpu_clear_wfe_traps(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.hcr_el2 &= ~HCR_TWE;
-+}
-+
-+static inline void vcpu_set_wfe_traps(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.hcr_el2 |= HCR_TWE;
-+}
-+
- static inline void vcpu_set_vsesr(struct kvm_vcpu *vcpu, u64 vsesr)
+ 	switch (addr & 0x0c) {
+ 	case GIC_DIST_CTRL:
+-		value = vcpu->kvm->arch.vgic.enabled ? GICD_ENABLE : 0;
++		value = vgic->enabled ? GICD_ENABLE : 0;
+ 		break;
+ 	case GIC_DIST_CTR:
+-		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
++		value = vgic->nr_spis + VGIC_NR_PRIVATE_IRQS;
+ 		value = (value >> 5) - 1;
+ 		value |= (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
+ 		break;
+ 	case GIC_DIST_IIDR:
+ 		value = (PRODUCT_ID_KVM << GICD_IIDR_PRODUCT_ID_SHIFT) |
++			(vgic->implementation_rev << GICD_IIDR_REVISION_SHIFT) |
+ 			(IMPLEMENTER_ARM << GICD_IIDR_IMPLEMENTER_SHIFT);
+ 		break;
+ 	default:
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index c03f42409b98..ebe10a015bfb 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -62,16 +62,17 @@ bool vgic_supports_direct_msis(struct kvm *kvm)
+ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+ 					    gpa_t addr, unsigned int len)
  {
- 	vcpu->arch.vsesr_el2 = vsesr;
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 04e554cae3a2..8e66b89a3db2 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -30,6 +30,7 @@
- #include <linux/kvm.h>
- #include <linux/kvm_irqfd.h>
- #include <linux/irqbypass.h>
-+#include <linux/sched/stat.h>
- #include <trace/events/kvm.h>
- #include <kvm/arm_pmu.h>
- #include <kvm/arm_psci.h>
-@@ -380,6 +381,11 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
- 	kvm_timer_vcpu_load(vcpu);
- 	kvm_vcpu_load_sysregs(vcpu);
- 	kvm_arch_vcpu_load_fp(vcpu);
-+
-+	if (single_task_running())
-+		vcpu_clear_wfe_traps(vcpu);
-+	else
-+		vcpu_set_wfe_traps(vcpu);
- }
++	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
+ 	u32 value = 0;
  
- void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+ 	switch (addr & 0x0c) {
+ 	case GICD_CTLR:
+-		if (vcpu->kvm->arch.vgic.enabled)
++		if (vgic->enabled)
+ 			value |= GICD_CTLR_ENABLE_SS_G1;
+ 		value |= GICD_CTLR_ARE_NS | GICD_CTLR_DS;
+ 		break;
+ 	case GICD_TYPER:
+-		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
++		value = vgic->nr_spis + VGIC_NR_PRIVATE_IRQS;
+ 		value = (value >> 5) - 1;
+ 		if (vgic_has_its(vcpu->kvm)) {
+ 			value |= (INTERRUPT_ID_BITS_ITS - 1) << 19;
+@@ -82,6 +83,7 @@ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+ 		break;
+ 	case GICD_IIDR:
+ 		value = (PRODUCT_ID_KVM << GICD_IIDR_PRODUCT_ID_SHIFT) |
++			(vgic->implementation_rev << GICD_IIDR_REVISION_SHIFT) |
+ 			(IMPLEMENTER_ARM << GICD_IIDR_IMPLEMENTER_SHIFT);
+ 		break;
+ 	default:
 -- 
 2.18.0
