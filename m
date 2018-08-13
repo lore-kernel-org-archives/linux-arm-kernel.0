@@ -1,66 +1,245 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 13 Aug 2018 14:53:10 +0530
-Subject: [PATCH v2 1/3] dt-bindings: interrupt-controller: Actions
- external interrupt controller
-In-Reply-To: <20180813091547.GA22149@mani>
-References: <20180812122215.1079590-1-pn@denx.de>
- <20180812122215.1079590-2-pn@denx.de>
- <20180813043406.GA16275@Mani-XPS-13-9360>
- <f1043a48-6c8d-cf08-d6a1-582d84ea2530@arm.com>
- <20180813091547.GA22149@mani>
-Message-ID: <20180813092310.GA27215@mani>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Mon, 13 Aug 2018 09:38:16 +0000
+Subject: [PATCH] arm64: dts: renesas: Initial r8a774a1 SoC device tree
+In-Reply-To: <1534146093-1651-1-git-send-email-biju.das@bp.renesas.com>
+References: <1534146093-1651-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <TY1PR01MB1770D16DDB50BF579ADF8335C0390@TY1PR01MB1770.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 13, 2018 at 02:45:47PM +0530, Manivannan Sadhasivam wrote:
-> On Mon, Aug 13, 2018 at 08:51:54AM +0100, Marc Zyngier wrote:
-> > On 13/08/18 05:34, Manivannan Sadhasivam wrote:
-> > > Hi Parthiban,
-> > > 
-> > > On Sun, Aug 12, 2018 at 02:22:13PM +0200, Parthiban Nallathambi wrote:
-> > >> Actions Semi OWL family SoC's provides support for external interrupt
-> > >> controller to be connected and controlled using SIRQ pins. S500, S700
-> > >> and S900 provides 3 SIRQ lines and works independently for 3 external
-> > >> interrupt controllers.
-> > >>
-> > >> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
-> > >> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
-> > >> ---
-> > >>  .../interrupt-controller/actions,owl-sirq.txt      | 46 ++++++++++++++++++++++
-> > >>  1 file changed, 46 insertions(+)
-> > >>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
-> > >>
-> > >> diff --git a/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
-> > >> new file mode 100644
-> > >> index 000000000000..4b8437751331
-> > >> --- /dev/null
-> > >> +++ b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
-> > >> @@ -0,0 +1,46 @@
-> > >> +Actions Semi Owl SoCs SIRQ interrupt controller
-> > >> +
-> > >> +S500, S700 and S900 SoC's from Actions provides 3 SPI's from GIC,
-> > >> +in which external interrupt controller can be connected. 3 SPI's
-> > >> +45, 46, 47 from GIC are directly exposed as SIRQ. It has
-> > >> +the following properties:
-> > > 
-> > > We should really document the driver here. What it does? and how the
-> > > hierarchy is handled with GIC? etc...
-> > 
-> > Absolutely not. This should document the binding, irrespective of the
-> > operating system. The word "driver" is completely out of place here.
-> >
-> 
-> Oops, my bad. I meant to say that we should add it as a description in the
-> commit message.
->
+Hello Biju,
 
-...commit message of the driver patch (to be more explicit)
- 
-> Thanks,
-> Mani
-> 
-> > Thanks,
-> > 
-> > 	M.
-> > -- 
-> > Jazz is not dead. It just smells funny...
+Thank you for your patch.
+
+> -----Original Message-----
+> From: Biju Das <biju.das@bp.renesas.com>
+> Sent: 13 August 2018 08:42
+> To: Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Catalin Marinas <catalin.marinas@arm.com>; Will
+> Deacon <will.deacon@arm.com>
+> Cc: Biju Das <biju.das@bp.renesas.com>; Simon Horman <horms@verge.net.au>; Magnus Damm <magnus.damm@gmail.com>;
+> linux-renesas-soc at vger.kernel.org; devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Geert Uytterhoeven
+> <geert+renesas@glider.be>; Chris Paterson <Chris.Paterson2@renesas.com>; Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Subject: [PATCH] arm64: dts: renesas: Initial r8a774a1 SoC device tree
+>
+> Basic support for the RZ/G2M SoC.
+>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> ---
+>  arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 192 ++++++++++++++++++++++++++++++
+>  1 file changed, 192 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+>
+> diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> new file mode 100644
+> index 0000000..f3641c0
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> @@ -0,0 +1,192 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Device Tree Source for the r8a774a1 SoC
+> + *
+> + * Copyright (C) 2018 Renesas Electronics Corp.
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/clock/renesas-cpg-mssr.h>
+> +
+> +#define CPG_AUDIO_CLK_I10
+
+I believe there is no use case for this macro, therefore I think this device tree can live without it.
+With that fixed:
+
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+
+Thanks,
+Fab
+
+> +
+> +/ {
+> +compatible = "renesas,r8a774a1";
+> +#address-cells = <2>;
+> +#size-cells = <2>;
+> +
+> +/*
+> + * The external audio clocks are configured as 0 Hz fixed frequency
+> + * clocks by default.
+> + * Boards that provide audio clocks should override them.
+> + */
+> +audio_clk_a: audio_clk_a {
+> +compatible = "fixed-clock";
+> +#clock-cells = <0>;
+> +clock-frequency = <0>;
+> +};
+> +
+> +audio_clk_b: audio_clk_b {
+> +compatible = "fixed-clock";
+> +#clock-cells = <0>;
+> +clock-frequency = <0>;
+> +};
+> +
+> +audio_clk_c: audio_clk_c {
+> +compatible = "fixed-clock";
+> +#clock-cells = <0>;
+> +clock-frequency = <0>;
+> +};
+> +
+> +/* External CAN clock - to be overridden by boards that provide it */
+> +can_clk: can {
+> +compatible = "fixed-clock";
+> +#clock-cells = <0>;
+> +clock-frequency = <0>;
+> +};
+> +
+> +cpus {
+> +#address-cells = <1>;
+> +#size-cells = <0>;
+> +
+> +a57_0: cpu at 0 {
+> +compatible = "arm,cortex-a57", "arm,armv8";
+> +reg = <0x0>;
+> +device_type = "cpu";
+> +power-domains = <&sysc 0>;
+> +next-level-cache = <&L2_CA57>;
+> +enable-method = "psci";
+> +clocks =<&cpg CPG_CORE 0>;
+> +};
+> +
+> +a57_1: cpu at 1 {
+> +compatible = "arm,cortex-a57", "arm,armv8";
+> +reg = <0x1>;
+> +device_type = "cpu";
+> +power-domains = <&sysc 1>;
+> +next-level-cache = <&L2_CA57>;
+> +enable-method = "psci";
+> +clocks =<&cpg CPG_CORE 0>;
+> +};
+> +
+> +L2_CA57: cache-controller-0 {
+> +compatible = "cache";
+> +power-domains = <&sysc 12>;
+> +cache-unified;
+> +cache-level = <2>;
+> +};
+> +};
+> +
+> +extal_clk: extal {
+> +compatible = "fixed-clock";
+> +#clock-cells = <0>;
+> +/* This value must be overridden by the board */
+> +clock-frequency = <0>;
+> +};
+> +
+> +extalr_clk: extalr {
+> +compatible = "fixed-clock";
+> +#clock-cells = <0>;
+> +/* This value must be overridden by the board */
+> +clock-frequency = <0>;
+> +};
+> +
+> +/* External PCIe clock - can be overridden by the board */
+> +pcie_bus_clk: pcie_bus {
+> +compatible = "fixed-clock";
+> +#clock-cells = <0>;
+> +clock-frequency = <0>;
+> +};
+> +
+> +pmu_a57 {
+> +compatible = "arm,cortex-a57-pmu";
+> +interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+> +      <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+> +interrupt-affinity = <&a57_0>, <&a57_1>;
+> +};
+> +
+> +psci {
+> +compatible = "arm,psci-1.0", "arm,psci-0.2";
+> +method = "smc";
+> +};
+> +
+> +/* External SCIF clock - to be overridden by boards that provide it */
+> +scif_clk: scif {
+> +compatible = "fixed-clock";
+> +#clock-cells = <0>;
+> +clock-frequency = <0>;
+> +};
+> +
+> +soc {
+> +compatible = "simple-bus";
+> +interrupt-parent = <&gic>;
+> +#address-cells = <2>;
+> +#size-cells = <2>;
+> +ranges;
+> +
+> +cpg: clock-controller at e6150000 {
+> +compatible = "renesas,r8a774a1-cpg-mssr";
+> +reg = <0 0xe6150000 0 0x0bb0>;
+> +clocks = <&extal_clk>, <&extalr_clk>;
+> +clock-names = "extal", "extalr";
+> +#clock-cells = <2>;
+> +#power-domain-cells = <0>;
+> +#reset-cells = <1>;
+> +};
+> +
+> +rst: reset-controller at e6160000 {
+> +compatible = "renesas,r8a774a1-rst";
+> +reg = <0 0xe6160000 0 0x018c>;
+> +};
+> +
+> +sysc: system-controller at e6180000 {
+> +compatible = "renesas,r8a774a1-sysc";
+> +reg = <0 0xe6180000 0 0x0400>;
+> +#power-domain-cells = <1>;
+> +};
+> +
+> +gic: interrupt-controller at f1010000 {
+> +compatible = "arm,gic-400";
+> +#interrupt-cells = <3>;
+> +#address-cells = <0>;
+> +interrupt-controller;
+> +reg = <0x0 0xf1010000 0 0x1000>,
+> +      <0x0 0xf1020000 0 0x20000>,
+> +      <0x0 0xf1040000 0 0x20000>,
+> +      <0x0 0xf1060000 0 0x20000>;
+> +interrupts = <GIC_PPI 9
+> +(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
+> +clocks = <&cpg CPG_MOD 408>;
+> +clock-names = "clk";
+> +power-domains = <&sysc 32>;
+> +resets = <&cpg 408>;
+> +};
+> +
+> +prr: chipid at fff00044 {
+> +compatible = "renesas,prr";
+> +reg = <0 0xfff00044 0 4>;
+> +};
+> +};
+> +
+> +timer {
+> +compatible = "arm,armv8-timer";
+> +interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+> +      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+> +      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+> +      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
+> +};
+> +
+> +/* External USB clocks - can be overridden by the board */
+> +usb3s0_clk: usb3s0 {
+> +compatible = "fixed-clock";
+> +#clock-cells = <0>;
+> +clock-frequency = <0>;
+> +};
+> +
+> +usb_extal_clk: usb_extal {
+> +compatible = "fixed-clock";
+> +#clock-cells = <0>;
+> +clock-frequency = <0>;
+> +};
+> +};
+> --
+> 2.7.4
+
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
