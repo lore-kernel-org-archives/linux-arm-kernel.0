@@ -1,60 +1,49 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon, 13 Aug 2018 15:28:33 +0300
-Subject: [PATCH] arm:pm: Use kmemdup to replace duplicating its
- implementation
-In-Reply-To: <1533868851-316-1-git-send-email-zhongjiang@huawei.com>
-References: <1533868851-316-1-git-send-email-zhongjiang@huawei.com>
-Message-ID: <37f8ff09-b0c2-5cc6-87d4-8138e7b66b32@mleia.com>
+From: gnomes@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Mon, 13 Aug 2018 13:36:00 +0100
+Subject: [RFC net-next 00/15] net: A socket API for LoRa
+In-Reply-To: <11276f7d-0175-05e9-a9bd-c72868067081@suse.de>
+References: <20180701110804.32415-1-afaerber@suse.de>
+ <CAC=mGzgUCopz2xTOA0R-WD8a1DOaOOUn=YpfdMiJ33y3hnh6kg@mail.gmail.com>
+ <92ee4016-1da9-826b-3674-b2d604a64848@suse.de>
+ <20180808213640.10a1d76f@alans-desktop>
+ <a70e9715-beac-d9a8-145e-de00175e56fa@suse.de>
+ <20180809125939.39ac2cc9@alans-desktop>
+ <CAC=mGzjn4Kc-q9NFwX6NhU4V_thnzBP8SHtFQKyRbpSKR=yx3w@mail.gmail.com>
+ <20180810165711.59bf26f7@alans-desktop>
+ <CAC=mGzhaLiSj5-+euM-YTRLwNDi8QJY0fAbiZbUadkPhZGRh_Q@mail.gmail.com>
+ <11276f7d-0175-05e9-a9bd-c72868067081@suse.de>
+Message-ID: <20180813133600.180abc03@alans-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi zhong jiang,
-
-On 08/10/2018 05:40 AM, zhong jiang wrote:
-> kmemdup is better than kmalloc() + memcpy(), and we do not like
-> open code. So just use kmemdup instead.
+> The simple answer is that, inspired by CAN, it uses an ifindex to select
+> the interface the user asked to use. That then also answers Alan's next
+> question: This ifindex determines which interface it goes out to.
 > 
-> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
-> ---
->  arch/arm/mach-lpc32xx/pm.c | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-lpc32xx/pm.c b/arch/arm/mach-lpc32xx/pm.c
-> index 6247157..6eefff8 100644
-> --- a/arch/arm/mach-lpc32xx/pm.c
-> +++ b/arch/arm/mach-lpc32xx/pm.c
-> @@ -86,7 +86,8 @@ static int lpc32xx_pm_enter(suspend_state_t state)
->  	void *iram_swap_area;
->  
->  	/* Allocate some space for temporary IRAM storage */
-> -	iram_swap_area = kmalloc(lpc32xx_sys_suspend_sz, GFP_KERNEL);
-> +	iram_swap_area = kmemdup((void *)TEMP_IRAM_AREA,
-> +				lpc32xx_sys_suspend_sz, GFP_KERNEL);
+> sockaddr_lora was in patch 02/15, latest code here:
+> https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-lora.git/tree/include/uapi/linux/lora.h?h=lora-next
 
-there is a minor coding style issue, which is reported by checkpatch:
+And any loopback just becomes an ifindex, likewise any virtual lorawan
+device (eg when testing in a cloud or simulating radio properties).
 
-CHECK: Alignment should match open parenthesis
-#53: FILE: arch/arm/mach-lpc32xx/pm.c:90:
+> I still think the user will need to explicitly say which interface they
+> want to bind their socket to. AFAIU the device EUI is more comparable to
 
-Other than that the change is valid, I'll fix the indentation issue
-myself and apply the change for v4.19.
+It does make it very hard for any vaguely complex environment because if
+for example you have two interfaces enumerated via USB they will appear
+in random order each boot.
 
---
-Best wishes,
-Vladimir
+CANbus is a bit of a mess in this sense but it's so statically configured
+and embedded into industrial devices it's less of a problem.
 
->  	if (!iram_swap_area) {
->  		printk(KERN_ERR
->  		       "PM Suspend: cannot allocate memory to save portion "
-> @@ -94,10 +95,6 @@ static int lpc32xx_pm_enter(suspend_state_t state)
->  		return -ENOMEM;
->  	}
->  
-> -	/* Backup a small area of IRAM used for the suspend code */
-> -	memcpy(iram_swap_area, (void *) TEMP_IRAM_AREA,
-> -		lpc32xx_sys_suspend_sz);
-> -
->  	/*
->  	 * Copy code to suspend system into IRAM. The suspend code
->  	 * needs to run from IRAM as DRAM may no longer be available
-> 
+I just wonder if the name would be a better binding (so you can sort the
+order out), or a local physical identifier of some kind so that your
+enumeration is consistent.
+
+> Loopback mode would require a separate virtual device driver such as
+> fakelr or vlora.
+
+And a tunnel device, which is easy enough if you've got tap support or
+similar.
+
+Alan
