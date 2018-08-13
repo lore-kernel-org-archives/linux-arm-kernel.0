@@ -1,47 +1,87 @@
-From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Mon, 13 Aug 2018 19:56:53 +0530
-Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180813131723.GC28360@redhat.com>
-References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
- <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
- <CAPhsuW49+qA7kT7yE4tgbnAuox-iOzssg-jc2abG8XDo6XeX8A@mail.gmail.com>
- <95a1221e-aecc-42be-5239-a2c2429be176@linux.ibm.com>
- <20180813115019.GB28360@redhat.com>
- <fa85d19f-b22c-e09c-b8d2-f68f0c79de15@linux.ibm.com>
- <20180813131723.GC28360@redhat.com>
-Message-ID: <a532988a-c530-7df8-f059-dd7a4b22abc2@linux.ibm.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Mon, 13 Aug 2018 16:27:11 +0200
+Subject: [PATCH] KVM: arm/arm64: Skip updating page table entry if no
+ change
+In-Reply-To: <20180810111300.17144-1-punit.agrawal@arm.com>
+References: <20180810111300.17144-1-punit.agrawal@arm.com>
+Message-ID: <20180813142711.GJ20606@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 08/13/2018 06:47 PM, Oleg Nesterov wrote:
-> On 08/13, Ravi Bangoria wrote:
->>
->>> But damn, process creation (exec) is trivial. We could add a new uprobe_exec()
->>> hook and avoid delayed_uprobe_install() in uprobe_mmap().
->>
->> I'm sorry. I didn't get this.
+On Fri, Aug 10, 2018 at 12:13:00PM +0100, Punit Agrawal wrote:
+> Contention on updating a page table entry by a large number of vcpus
+> can lead to duplicate work when handling stage 2 page faults. As the
+> page table update follows the break-before-make requirement of the
+> architecture, it can lead to repeated refaults due to clearing the
+> entry and flushing the tlbs.
 > 
-> Sorry for confusion...
+> This problem is more likely when -
 > 
-> I meant, if only exec*( could race with _register(), we could add another uprobe
-> hook which updates all (delayed) counters before return to user-mode.
-
-Ok.
-
+> * there are large number of vcpus
+> * the mapping is large block mapping
 > 
->>> Afaics, the really problematic case is dlopen() which can race with _register()
->>> too, right?
->>
->> dlopen() should internally use mmap() right? So what is the problem here? Can
->> you please elaborate.
+> such as when using PMD hugepages (512MB) with 64k pages.
 > 
-> What I tried to say is that we can't avoid uprobe_mmap()->delayed_uprobe_install()
-> because dlopen() can race with _register() too, just like exec.
+> Fix this by skipping the page table update if there is no change in
+> the entry being updated.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+> --
+> Hi,
+> 
+> This problem was reported by a user when testing PUD hugepages. During
+> VM restore when all threads are running cpu intensive workload, the
+> refauting was causing the VM to not make any forward progress.
+> 
+> This patch fixes the problem for PMD and PTE page fault handling.
+> 
+> Thanks,
+> Punit
+> 
+> Change-Id: I04c9aa8b9fbada47deb1a171c9959f400a0d2a21
+> ---
+>  virt/kvm/arm/mmu.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index 1d90d79706bd..a66a5441ca2f 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -1027,6 +1027,18 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
+>  	VM_BUG_ON(pmd_present(*pmd) && pmd_pfn(*pmd) != pmd_pfn(*new_pmd));
+>  
+>  	old_pmd = *pmd;
+> +	/*
+> +	 * Multiple vcpus faulting on the same PMD entry, can lead to
+> +	 * them sequentially updating the PMD with the same
+> +	 * value. Following the break-before-make (pmd_clear()
+> +	 * followed by tlb_flush()) process can hinder forward
+> +	 * progress due to refaults generated on missing translations.
+> +	 *
+> +	 * Skip updating the page table if the entry is unchanged.
+> +	 */
+> +	if (pmd_val(old_pmd) == pmd_val(*new_pmd))
+> +		return 0;
+> +
+>  	if (pmd_present(old_pmd)) {
+>  		pmd_clear(pmd);
+>  		kvm_tlb_flush_vmid_ipa(kvm, addr);
+> @@ -1101,6 +1113,10 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+>  
+>  	/* Create 2nd stage page table mapping - Level 3 */
+>  	old_pte = *pte;
+> +	/* Skip page table update if there is no change */
+> +	if (pte_val(old_pte) == pte_val(*new_pte))
+> +		return 0;
+> +
+>  	if (pte_present(old_pte)) {
+>  		kvm_set_pte(pte, __pte(0));
+>  		kvm_tlb_flush_vmid_ipa(kvm, addr);
+> -- 
+> 2.18.0
+> 
 
-Right :)
-
-Thanks,
-Ravi
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
