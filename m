@@ -1,69 +1,62 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 13 Aug 2018 16:04:54 -0600
-Subject: [RFC PATCH 0/7] add at91sam9 LCDC DRM driver
-In-Reply-To: <20180813181808.GA2357@ravnborg.org>
-References: <20180812184152.GA22343@ravnborg.org>
- <f1f2a2d7-ae27-87af-8041-93d3f8fe07cc@microchip.com>
- <20180813181808.GA2357@ravnborg.org>
-Message-ID: <20180813220454.GA28913@rob-hp-laptop>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Tue, 14 Aug 2018 00:34:44 +0200
+Subject: [PATCH v3 3/7] ARM: OMAP1: ams-delta: Provide GPIO lookup table for
+ NAND data port
+In-Reply-To: <20180813223448.21316-1-jmkrzyszt@gmail.com>
+References: <20180806222918.12644-1-jmkrzyszt@gmail.com>
+ <20180813223448.21316-1-jmkrzyszt@gmail.com>
+Message-ID: <20180813223448.21316-4-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 13, 2018 at 08:18:08PM +0200, Sam Ravnborg wrote:
-> Hi Nicholas.
-> 
-> On Mon, Aug 13, 2018 at 05:54:48PM +0200, Nicolas Ferre wrote:
-> > On 12/08/2018 at 20:41, Sam Ravnborg wrote:
-> > >New DRM based driver for at91sam9 SOC's that uses the
-> > >Atmel LCDC IP core.
-> > 
-> > I'm delighted to see this work: Thanks a lot Sam!
-> Glad to hear.
-> I was a bit worried that the response would be "this is
-> waste of time as we have a working driver already".
-> 
-> > 
-> > >This is first version of a patch set that adds
-> > >drivers for the Atmel LCDC IP core.
-> > >Posted for review as the basics works now.
-> > >
-> > >The LCDC IP core contains two devices:
-> > >- a PWM often used for backlight
-> > >- a LCD display controller
-> > >
-> > >Both devices are supported today by the atmel_lcdfb driver.
-> > >For this new set of drivers the compatible strings was
-> > >selected to avoid clash with the existing compatible
-> > >strings used for the atmel_lcdfb driver to allow them
-> > >to co-exist.
-> > 
-> > Would be good to have a plan to phase-out the old atmel_lcdfb fbdev
-> > driver when this one addresses some TODO items that make sense.
-> Agree on this.
-> One approach could be to say that when all in-kernel users of atmel_lcdfb
-> are ported, then the old driver could be dropped after a kernel release.
-> 
-> > The mfd suffix seems strange to me. What about "atmel,at91sam9263-lcdc-mfd"
-> > => "atmel,at91sam9263-lcd" (or "microchip,at91sam9263-lcdc").
-> The "-mfd" suffix was added to avoid clashing with the current
-> compatible string used by the atmel_lcdfb driver.
+Data port used by Amstrad Delta NAND driver is actually an OMAP MPUIO
+device, already under control of gpio-omap driver.  The NAND driver
+gets access to the port by ioremapping it and performs read/write
+operations.  That is done without any proteciton from other users
+legally manipulating the port pins over GPIO API.
 
-I don't know that 2 registers for a backlight PWM constitute an MFD. A 
-single node can be both an LCD controller and a PWM.
+The plan is to convert the driver to access the port over GPIO consumer
+API.  Before that is implemented, the driver can already obtain
+exclusive access to the port by requesting an array of its GPIO
+descriptors.
 
-The fact that the OS has 2 drivers is irrelevant to the binding and DT 
-is not a way to select drivers. Your choice with Linux is either kconfig 
-or manual module loading.
+Add respective entries to the NAND GPIO lookup table.
 
-> I susggest we do the following:
-> - use the microchip prefix, as this is now owned by microchip
-> - and add the driver to a drm/microchip/ directory
-> (Then we can only hope that microchip do not change name or
-> are purchased by someone else).
+Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-omap1/board-ams-delta.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-I would not do that. Then you have a dts with a mixture based on when 
-you got around to writing each binding. i.MX has continued using 'fsl' 
-even on new chips today. Probably a good choice had the QCom acq had 
-gone thru.
-
-Rob
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index eedacdfe9725..16f7bbe47607 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -337,7 +337,8 @@ static struct platform_device ams_delta_nand_device = {
+ 	.resource	= ams_delta_nand_resources,
+ };
+ 
+-#define OMAP_GPIO_LABEL	"gpio-0-15"
++#define OMAP_GPIO_LABEL		"gpio-0-15"
++#define OMAP_MPUIO_LABEL	"mpuio"
+ 
+ static struct gpiod_lookup_table ams_delta_nand_gpio_table = {
+ 	.table = {
+@@ -349,6 +350,14 @@ static struct gpiod_lookup_table ams_delta_nand_gpio_table = {
+ 		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_NWE, "nwe", 0),
+ 		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_ALE, "ale", 0),
+ 		GPIO_LOOKUP(LATCH2_LABEL, LATCH2_PIN_NAND_CLE, "cle", 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 0, "data", 0, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 1, "data", 1, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 2, "data", 2, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 3, "data", 3, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 4, "data", 4, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 5, "data", 5, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 6, "data", 6, 0),
++		GPIO_LOOKUP_IDX(OMAP_MPUIO_LABEL, 7, "data", 7, 0),
+ 		{ },
+ 	},
+ };
+-- 
+2.16.4
