@@ -1,55 +1,53 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Mon, 13 Aug 2018 16:47:26 +0200
-Subject: [RFC PATCH 0/7] add at91sam9 LCDC DRM driver
-In-Reply-To: <20180812195536.GA29811@ravnborg.org>
-References: <20180812184152.GA22343@ravnborg.org>
- <20180812195536.GA29811@ravnborg.org>
-Message-ID: <264d51a0-7e41-6c27-d438-9ae337e6dcf0@microchip.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Mon, 13 Aug 2018 16:51:22 +0200
+Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <20180813131723.GC28360@redhat.com>
+References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
+ <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
+ <CAPhsuW49+qA7kT7yE4tgbnAuox-iOzssg-jc2abG8XDo6XeX8A@mail.gmail.com>
+ <95a1221e-aecc-42be-5239-a2c2429be176@linux.ibm.com>
+ <20180813115019.GB28360@redhat.com>
+ <fa85d19f-b22c-e09c-b8d2-f68f0c79de15@linux.ibm.com>
+ <20180813131723.GC28360@redhat.com>
+Message-ID: <20180813145121.GD28360@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/08/2018 at 21:55, Sam Ravnborg wrote:
-> The at91sam9263 has a few interesting "GPU" features:
-> 
-> - 2D memory addressing
->    Data sheet says:
-> 	The LCDC can be configured to work on a frame buffer
-> 	larger than the actual screen size. By changing the
-> 	values in a few registers, it is easy to move the
-> 	displayed area along the frame buffer width and height
-> 
-> - 2D Graphics controller
->    Data sheet says:
-> 	The Two D Graphics Controller (TDGC) features a
-> 	hardware accelerator which highly simplifies drawing
-> 	tasks and graphic management operations.
-> 	The hardware accelerator makes it easy to draw lines
-> 	and complex polygons and to perform block transfers
-> 	within the frame buffer.
-> 	The TDGC also features a draw command queue that
-> 	automatically executes a more complex drawing function
-> 	that is composed of several register accesses.
-> 
-> The datasheet text is from: chapter 43.9 + chapter 44:
-> http://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-6249-32-bit-ARM926EJ-S-Embedded-Microprocessor-SAM9263_Datasheet.pdf
-> (No NDA required)
+On 08/13, Oleg Nesterov wrote:
+>
+> On 08/13, Ravi Bangoria wrote:
+> >
+> > > But damn, process creation (exec) is trivial. We could add a new uprobe_exec()
+> > > hook and avoid delayed_uprobe_install() in uprobe_mmap().
+> >
+> > I'm sorry. I didn't get this.
+>
+> Sorry for confusion...
+>
+> I meant, if only exec*( could race with _register(), we could add another uprobe
+> hook which updates all (delayed) counters before return to user-mode.
+>
+> > > Afaics, the really problematic case is dlopen() which can race with _register()
+> > > too, right?
+> >
+> > dlopen() should internally use mmap() right? So what is the problem here? Can
+> > you please elaborate.
+>
+> What I tried to say is that we can't avoid uprobe_mmap()->delayed_uprobe_install()
+> because dlopen() can race with _register() too, just like exec.
 
-(old memories) this 2D engine prove itself of being quite limited as the 
-fill polygon and clipping functions are not working.
+I'm afraid I added even more confusion... so let me clarify although I am sure you
+understand this better than me ;)
 
-> Based on the above, would it be possible to utilise some
-> of these features without any dedicated userspace (mesa) support?
-> Any other driver that has something similar that can be used
-> for inspiration?
+of course, the main reason why we can't avoid uprobe_mmap()->delayed_uprobe_install()
+is not the race with _register(), the main reason is that dlopen() can mmap the code
+first, then mmap the counter we need to increment.
 
-This is really an interesting question indeed.
+Again, just like exec, but exec is "atomic" in that it can't return to user-mode until
+evrything is done, so we could add another uprobe hook and avoid delayed_uprobe_install
+in uprobe_mmap().
 
-> Or is this in reality a simple GPU that requires a
-> dedicated GPU driver?
-> 
-> 	Sam
-> 
+Just in case my previous email was not clear.
 
-
--- 
-Nicolas Ferre
+Oleg.
