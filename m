@@ -1,58 +1,197 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 14 Aug 2018 16:57:51 -0600
-Subject: [PATCH v2 3/3] dts: arm64/sdm845: Add node for qcom,smmu-v2
-In-Reply-To: <CAFp+6iG8HohQ5=gwL37OuykK+R4U407yfrp=WN6pSgOK-mdzzA@mail.gmail.com>
-References: <20180814102740.30222-1-vivek.gautam@codeaurora.org>
- <20180814102740.30222-4-vivek.gautam@codeaurora.org>
- <27372288-447d-6c9a-504a-8b8ef40e3d58@arm.com>
- <CAFp+6iG8HohQ5=gwL37OuykK+R4U407yfrp=WN6pSgOK-mdzzA@mail.gmail.com>
-Message-ID: <20180814225750.GA31263@rob-hp-laptop>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 14 Aug 2018 17:20:53 -0600
+Subject: [PATCH 08/13] coresight: Add support for CLAIM tag protocol
+In-Reply-To: <1533562915-21558-9-git-send-email-suzuki.poulose@arm.com>
+References: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
+ <1533562915-21558-9-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180814232053.GA5131@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2018 at 01:09:43AM +0530, Vivek Gautam wrote:
-> Adding Jordan here.
-> 
-> On Tue, Aug 14, 2018 at 4:19 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> > Hi Vivek,
-> >
-> > On 14/08/18 11:27, Vivek Gautam wrote:
-> >>
-> >> Add device node for qcom,smmu-v2 available on sdm845.
-> >> This smmu is available only to GPU device.
-> >>
-> >> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
-> >> ---
-> >>   arch/arm64/boot/dts/qcom/sdm845.dtsi | 23 +++++++++++++++++++++++
-> >>   1 file changed, 23 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> >> b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> >> index 1c2be2082f33..bd1ec5fa5146 100644
-> >> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> >> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-> >> @@ -6,6 +6,7 @@
-> >>    */
-> >>     #include <dt-bindings/clock/qcom,gcc-sdm845.h>
-> >> +#include <dt-bindings/clock/qcom,gpucc-sdm845.h>
-> >>   #include <dt-bindings/clock/qcom,rpmh.h>
-> >>   #include <dt-bindings/interrupt-controller/arm-gic.h>
-> >>   #include <dt-bindings/soc/qcom,rpmh-rsc.h>
-> >> @@ -989,6 +990,28 @@
-> >>                         cell-index = <0>;
-> >>                 };
-> >>   +             gpu_smmu: iommu at 5040000 {
-> >> +                       compatible = "qcom,sdm845-smmu-v2",
-> >> "qcom,smmu-v2";
-> >
-> >
-> > Which of "sdm845" or "msm8996"[1] is the actual SoC name here?
-> 
-> Well, the bindings use the SoC prefix with smmu-v2, so it should be
-> sdm845 for this SoC. This is same as I posted in my v1 of the series [2].
-> Using 8996 based string in sdm845 makes things look awful.
+On Mon, Aug 06, 2018 at 02:41:50PM +0100, Suzuki K Poulose wrote:
+> Add support for the CLAIM tag protocol for negotiating the
+> device ownership with other agents trying to use the coresight
+> component (internal vs. external). The Coresight architecture
+> specifies CLAIM tags (managed via CLAIMSET CLAIMCLR registers)
+> to negotiate the ownership of the device. PSCI recommends the
+> reservation of the bits in CLAIM tags for self-hosted and external
+> debug use. This patch implements the protocol for claiming
+> the devices before they are actually used.
 
-You need to list valid values of '<soc>' in the binding. Otherwise we 
-get this confusion.
+I think the first paragraph of the cover letter (minus the reference to the
+documentation since you've included it below) would be perfect instead of the
+above.
 
-Rob
+> 
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-priv.h |  7 +++
+>  drivers/hwtracing/coresight/coresight.c      | 85 ++++++++++++++++++++++++++++
+>  include/linux/coresight.h                    | 20 +++++++
+>  3 files changed, 112 insertions(+)
+> 
+> diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+> index c11da55..579f349 100644
+> --- a/drivers/hwtracing/coresight/coresight-priv.h
+> +++ b/drivers/hwtracing/coresight/coresight-priv.h
+> @@ -25,6 +25,13 @@
+>  #define CORESIGHT_DEVID		0xfc8
+>  #define CORESIGHT_DEVTYPE	0xfcc
+>  
+> +
+> +/*
+> + * Coresight device CLAIM protocol.
+> + * See PSCI - ARM DEN 0022D, Section: 6.8.1 Debug and Trace save and restore.
+> + */
+> +#define CORESIGHT_CLAIM_SELF_HOSTED	BIT(1)
+> +
+>  #define TIMEOUT_US		100
+>  #define BMVAL(val, lsb, msb)	((val & GENMASK(msb, lsb)) >> lsb)
+>  
+> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+> index e73ca6a..8f06866 100644
+> --- a/drivers/hwtracing/coresight/coresight.c
+> +++ b/drivers/hwtracing/coresight/coresight.c
+> @@ -128,6 +128,91 @@ static int coresight_find_link_outport(struct coresight_device *csdev,
+>  	return -ENODEV;
+>  }
+>  
+> +static inline u32 coresight_read_claim_tags(void __iomem *base)
+> +{
+> +	return readl_relaxed(base + CORESIGHT_CLAIMCLR);
+> +}
+> +
+> +static inline bool coresight_is_claimed_self_hosted(void __iomem *base)
+> +{
+> +	return coresight_read_claim_tags(base) == CORESIGHT_CLAIM_SELF_HOSTED;
+> +}
+> +
+> +static inline bool coresight_is_claimed_any(void __iomem *base)
+> +{
+> +	return coresight_read_claim_tags(base) != 0;
+> +}
+> +
+> +static inline void coresight_set_claim_tags(void __iomem *base)
+> +{
+> +	writel_relaxed(CORESIGHT_CLAIM_SELF_HOSTED, base + CORESIGHT_CLAIMSET);
+> +	isb();
+> +}
+> +
+> +static inline void coresight_clear_claim_tags(void __iomem *base)
+> +{
+> +	writel_relaxed(CORESIGHT_CLAIM_SELF_HOSTED, base + CORESIGHT_CLAIMCLR);
+> +	isb();
+> +}
+> +
+> +/*
+> + * coresight_claim_device_unlocked : Claim the device for self-hosted usage
+> + * to prevent an external tool from touching this device. As per PSCI
+> + * standards, section "Preserving the execution context" => "Debug and Trace
+> + * save and Restore", DBGCLAIM[1] is reserved for Self-hosted debug/trace and
+> + * DBGCLAIM[0] is reserved for external tools.
+> + *
+> + * Called with CS_UNLOCKed for the component.
+> + * Returns : 0 on success
+> + */
+> +int coresight_claim_device_unlocked(void __iomem *base)
+> +{
+> +	if (coresight_is_claimed_any(base))
+> +		return -EBUSY;
+> +
+> +	coresight_set_claim_tags(base);
+> +	if (coresight_is_claimed_self_hosted(base))
+> +		return 0;
+> +	/* There was a race setting the tags, clean up and fail */
+> +	coresight_clear_claim_tags(base);
+> +	return -EBUSY;
+> +}
+> +
+> +int coresight_claim_device(void __iomem *base)
+> +{
+> +	int rc;
+> +
+> +	CS_UNLOCK(base);
+> +	rc = coresight_claim_device_unlocked(base);
+> +	CS_LOCK(base);
+> +
+> +	return rc;
+> +}
+> +
+> +/*
+> + * coresight_disclaim_device_unlocked : Clear the claim tags for the device.
+> + * Called with CS_UNLOCKed for the component.
+> + */
+> +void coresight_disclaim_device_unlocked(void __iomem *base)
+> +{
+> +
+> +	if (coresight_is_claimed_self_hosted(base))
+> +		coresight_clear_claim_tags(base);
+> +	else
+> +		/*
+> +		 * Either we or the external agent doesn't follow
+> +		 * the protocol.
+> +		 */
+> +		WARN_ON_ONCE(1);
+
+When writing "... or the external agent doesn't follow the protocol", I deduce
+that an external agent would have trampled our claim tag.  I think this needs
+to be said explicitly in the comment.
+
+> +}
+> +
+> +void coresight_disclaim_device(void __iomem *base)
+> +{
+> +	CS_UNLOCK(base);
+> +	coresight_disclaim_device_unlocked(base);
+> +	CS_LOCK(base);
+> +}
+> +
+>  static int coresight_enable_sink(struct coresight_device *csdev,
+>  				 u32 mode, void *data)
+>  {
+> diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+> index 5353582..16151a2 100644
+> --- a/include/linux/coresight.h
+> +++ b/include/linux/coresight.h
+> @@ -257,6 +257,13 @@ extern int coresight_enable(struct coresight_device *csdev);
+>  extern void coresight_disable(struct coresight_device *csdev);
+>  extern int coresight_timeout(void __iomem *addr, u32 offset,
+>  			     int position, int value);
+> +
+> +extern int coresight_claim_device(void __iomem *base);
+> +extern int coresight_claim_device_unlocked(void __iomem *base);
+> +
+> +extern void coresight_disclaim_device(void __iomem *base);
+> +extern void coresight_disclaim_device_unlocked(void __iomem *base);
+> +
+>  #else
+>  static inline struct coresight_device *
+>  coresight_register(struct coresight_desc *desc) { return NULL; }
+> @@ -266,6 +273,19 @@ coresight_enable(struct coresight_device *csdev) { return -ENOSYS; }
+>  static inline void coresight_disable(struct coresight_device *csdev) {}
+>  static inline int coresight_timeout(void __iomem *addr, u32 offset,
+>  				     int position, int value) { return 1; }
+> +static inline int coresight_claim_device_unlocked(void __iomem *base)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline int coresight_claim_device(void __iomem *base)
+> +{
+> +	return 0;
+> +}
+
+Returning 0 would give a caller the impression the operation has succeeded when
+in fact it didn't.  I think we should return an error code here.
+
+> +
+> +static inline void coresight_disclaim_device(void __iomem *base) {}
+> +static inline void coresight_disclaim_device_unlocked(void __iomem *base) {}
+> +
+>  #endif
+>  
+>  #ifdef CONFIG_OF
+> -- 
+> 2.7.4
+> 
