@@ -1,39 +1,43 @@
-From: golf@perches.com (Joe Perches)
-Date: Tue, 14 Aug 2018 07:16:29 -0700
-Subject: [RESEND PATCH 1/6] ARM: config: multi_v5: enable dynamic debug
-In-Reply-To: <20180814140612.12554-1-marcel@ziswiler.com>
-References: <20180814140612.12554-1-marcel@ziswiler.com>
-Message-ID: <9461e62248cc7c1b5585004ff8cf7268b823e29c.camel@perches.com>
+From: jwboyer@kernel.org (Josh Boyer)
+Date: Tue, 14 Aug 2018 10:32:58 -0400
+Subject: qcom: update firmware file for Venus on SDM845
+In-Reply-To: <1533894263-10692-1-git-send-email-vgarodia@codeaurora.org>
+References: <1533894263-10692-1-git-send-email-vgarodia@codeaurora.org>
+Message-ID: <CA+5PVA6Q_Z2d1te6gMDfeJXWAjV7YFp_coxCxQQE5O7aoYn5yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-08-14 at 16:06 +0200, Marcel Ziswiler wrote:
-> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> 
-> Dynamic debug is really helpful.
+On Fri, Aug 10, 2018 at 5:44 AM Vikash Garodia <vgarodia@codeaurora.org> wrote:
+>
+> hi,
+>
+> This pull request updates firmware files for Venus h/w codec found on the Qualcomm SDM845 chipset.
+>
+> The following changes since commit 7b5835fd37630d18ac0c755329172f6a17c1af29:
+>
+>   linux-firmware: add firmware for mt76x2u (2018-07-30 07:20:31 -0400)
+>
+> are available in the git repository at:
+>
+>   https://github.com/vgarodia/venus_firmware_23 master
+>
+> for you to fetch changes up to 6ae7a5bf57f035aecc7613943528e52ada7e1e03:
+>
+>   qcom: update venus firmware files for v5.2 (2018-08-10 12:57:47 +0530)
+>
+> ----------------------------------------------------------------
+> Vikash Garodia (1):
+>       qcom: update venus firmware files for v5.2
+>
+>  WHENCE                   |   2 +-
+>  qcom/venus-5.2/venus.b00 | Bin 212 -> 212 bytes
+>  qcom/venus-5.2/venus.b01 | Bin 6600 -> 6600 bytes
+>  qcom/venus-5.2/venus.b02 | Bin 819552 -> 837304 bytes
+>  qcom/venus-5.2/venus.b03 | Bin 33536 -> 33640 bytes
+>  qcom/venus-5.2/venus.mbn | Bin 865408 -> 883264 bytes
+>  qcom/venus-5.2/venus.mdt | Bin 6812 -> 6812 bytes
+>  7 files changed, 1 insertion(+), 1 deletion(-)
 
-It's useful, but perhaps not appropriate.
+Pulled and pushed out.  Thanks.
 
-Most arm configs are for small resource constrained systems.
-dynamic_debug adds a lot of additional text and a fair amount of data.
-
-
-> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> 
-> ---
-> 
->  arch/arm/configs/multi_v5_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-> index 318b76fa26d1..b302ac68d587 100644
-> --- a/arch/arm/configs/multi_v5_defconfig
-> +++ b/arch/arm/configs/multi_v5_defconfig
-> @@ -275,6 +275,7 @@ CONFIG_NLS_CODEPAGE_850=y
->  CONFIG_NLS_ISO8859_1=y
->  CONFIG_NLS_ISO8859_2=y
->  CONFIG_NLS_UTF8=y
-> +CONFIG_DYNAMIC_DEBUG=y
->  CONFIG_DEBUG_INFO=y
->  CONFIG_DEBUG_FS=y
->  CONFIG_MAGIC_SYSRQ=y
+josh
