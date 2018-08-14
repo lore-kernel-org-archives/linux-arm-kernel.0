@@ -1,98 +1,53 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Tue, 14 Aug 2018 18:43:43 +0200
-Subject: [RFC PATCH 0/7] add at91sam9 LCDC DRM driver
-In-Reply-To: <20180813220454.GA28913@rob-hp-laptop>
-References: <20180812184152.GA22343@ravnborg.org>
- <f1f2a2d7-ae27-87af-8041-93d3f8fe07cc@microchip.com>
- <20180813181808.GA2357@ravnborg.org>
- <20180813220454.GA28913@rob-hp-laptop>
-Message-ID: <20180814164343.GA13848@ravnborg.org>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 14 Aug 2018 19:50:14 +0300
+Subject: [PATCH v4 0/6] PCI: imx: Initial imx7d suspend/resume support
+Message-ID: <cover.1534264292.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob.
+On imx7d the pcie-phy power domain is turned off in suspend and this can
+make the system hang on resume when attempting any read from PCI.
 
-> I don't know that 2 registers for a backlight PWM constitute an MFD. A 
-> single node can be both an LCD controller and a PWM.
+Fix this by adding PM_SLEEP support to the imx6 pci driver. This is
+currently only enabled for imx7d but the suspend/resume sequence also
+applies to other socs.
 
-Current suggestion from v1 patchset looks like this:
-	lcdc0: lcdc at 700000 {
-		compatible = "atmel,at91sam9263-lcdc-mfd";
-		reg = <0x700000 0x1000>;
-		interrupts = <26 IRQ_TYPE_LEVEL_HIGH 3>;
-		clocks = <&lcd_clk>, <&lcd_clk>;
-		clock-names = "lcdc_clk", "hclk";
+V3 of this series was reviewed by Lucas but stalled because the merge
+window opened.
 
-		lcdc-display-controller {
-			compatible = "atmel,lcdc-display-controller";
-			lcd-supply = <&lcdc_reg>;
-
-			port at 0 {
-			};
-		};
-
-		lcdc_pwm: lcdc-pwm {
-			compatible = "atmel,lcdc-pwm";
-			#pwm-cells = <3>;
-		};
-
-	};
-
-        backlight: backlight {
-                compatible = "pwm-backlight";
-                pwms = <&lcdc_pwm 0 50000 0>;
-        };
+There was also some confusion about how to deal with the dependence on
+commit 26fce0557fa6 ("reset: imx7: Fix always writing bits as 0"). To
+clarify: both patch 2 and 26fce0557fa6 are required to fix imx7d suspend
+but merging one without the other shouldn't cause other issues.
 
 
-We could have described the full binding in one file, rather than in
-three files like it is done in v1. But the structure was done so it matched
-what was done for hlcdc.
+V4 adds 4 more patches with PME_Turn_Off support on top, using a new
+reset bit. I generally try to keep series short but in this case some
+planning might be needed to get patches into 4.20.
+
+Since the new reset is treated as optional with old DTB there should be
+again no problem if reset and pci are merged out of order.
 
 
-If I understand the proposal from you correct an example binding would
-look like this:
+Shawn/Philipp/Lorenzo: Would it make sense to merge this series through a
+single specific tree, such as the one for imx?
 
-       lcdc0: lcdc at 700000 {
-                compatible = "atmel,at91sam9263-lcdc";
-                reg = <0x700000 0x1000>;
-                interrupts = <26 IRQ_TYPE_LEVEL_HIGH 3>;
-                clocks = <&lcd_clk>, <&lcd_clk>;
-                clock-names = "lcdc_clk", "hclk";
+Link to v3: https://lkml.org/lkml/2018/7/24/713
 
-                lcd-supply = <&lcdc_reg>;
+Leonard Crestez (6):
+  Revert "ARM: dts: imx7d: Invert legacy PCI irq mapping"
+  PCI: imx: Initial imx7d pm support
+  reset: imx7: Add PCIE_CTRL_APPS_TURNOFF
+  dt-bindings: imx6q-pcie: Add turnoff reset for imx7d
+  ARM: dts: imx7d: Add turnoff reset
+  PCI: imx: Add PME_Turn_Off support
 
-                port at 0 {
-                };
+ .../bindings/pci/fsl,imx6q-pcie.txt           |   1 +
+ arch/arm/boot/dts/imx7d.dtsi                  |  17 ++-
+ drivers/pci/controller/dwc/pci-imx6.c         | 112 +++++++++++++++++-
+ drivers/reset/reset-imx7.c                    |   1 +
+ include/dt-bindings/reset/imx7-reset.h        |   4 +-
+ 5 files changed, 123 insertions(+), 12 deletions(-)
 
-                #pwm-cells = <3>;
-        };
-
-        backlight: backlight {
-                compatible = "pwm-backlight";
-                pwms = <&lcd0 0 50000 0>;
-        };
-
-
-This is doable, but IMO it is less obvious that the LCDC IP core implements
-two different features - a PWM and a LCD controller.
-Right now the preference is to stay with the v1 approach:
-- It is a mirror of what we do today for hlcdc, so no suprises
-- It shows in a nice way that the LCDC IP core implments both an LCD controller and a PWM
-- The pwm functionality is not hiddin inside the lcdc stuff, and it is thus
-  simpler to add good pin-ctrl handles with nice names that matches the usage.
-  (I could always add more pin-ctrl, but it is common to refer to a single pin-ctrl.
-
-
-One DT related Q:
-The LCD Controller supports BGR565, but as this is less common some HW implmentations
-exchange R and B, expessed in the old binding as wiring-mode like this:
-
-	atmel,lcd-wiring-mode: lcd wiring mode "RGB" or "BRG"
-
-How can we express this wiring-mode in a generic way, both in DT and in code?
-Is it something that in DRM belongs to the panel, the encoder, the connector, or?
-And can any of the exisitng flags be used?
-
-Thanks in advance,
-
-	Sam
+-- 
+2.17.1
