@@ -1,49 +1,43 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 14 Aug 2018 09:33:52 +0100
-Subject: [PATCH 1/3] arm64: implement ftrace with regs
-In-Reply-To: <20180813220315.6e8dfc9c@vmware.local.home>
-References: <20180810160043.9E45568C76@newverein.lst.de>
- <20180810160223.D360D68C76@newverein.lst.de>
- <2b5c1092-2cc0-00ec-ba3d-341dc61452b4@arm.com>
- <20180813220315.6e8dfc9c@vmware.local.home>
-Message-ID: <a19d9e23-3dfa-ba9b-a177-cdc0d1035964@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 14 Aug 2018 09:35:01 +0100
+Subject: [PATCH v3 4/6] iommu/io-pgtable-arm: add support for non-strict
+ mode
+In-Reply-To: <5B7293E5.7040702@huawei.com>
+References: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
+ <1531376312-2192-5-git-send-email-thunder.leizhen@huawei.com>
+ <89cc2201-99ab-3f3b-a2d1-1766515d4375@arm.com>
+ <5B597628.2020103@huawei.com>
+ <04239cfa-bcf2-a33a-e662-ebc75e66782b@arm.com>
+ <1d24541340334954969c58980ef85444@HXTBJIDCEMVIW01.hxtcorp.net>
+ <5B7293E5.7040702@huawei.com>
+Message-ID: <20180814083500.GA28101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 14/08/18 03:03, Steven Rostedt wrote:
-> On Mon, 13 Aug 2018 11:54:06 +0100
-> Julien Thierry <julien.thierry@arm.com> wrote:
+On Tue, Aug 14, 2018 at 04:33:41PM +0800, Leizhen (ThunderTown) wrote:
+> On 2018/8/6 9:32, Yang, Shunyong wrote:
+> > On 2018/7/26 22:37, Robin Murphy wrote:
+> >> Because DMA code is not the only caller of iommu_map/unmap. It's 
+> >> perfectly legal in the IOMMU API to partially unmap a previous mapping 
+> >> such that a block entry needs to be split. The DMA API, however, is a 
+> >> lot more constrined, and thus by construction the iommu-dma layer will 
+> >> never generate a block-splitting iommu_unmap() except as a result of 
+> >> illegal DMA API usage, and we obviously do not need to optimise for that 
+> >> (you will get a warning about mismatched unmaps under dma-debug, but 
+> >> it's a bit too expensive to police in the general case).
+> >>
+> > 
+> > When I was reading the code around arm_lpae_split_blk_unmap(), I was
+> > curious in which scenario a block will be split. Now with your comments
+> > "Because DMA code is not the only caller of iommu_map/unmap", it seems
+> > depending on the user.
+> > 
+> > Would you please explain this further? I mean besides DMA, which user
+> > will use iommu_map/umap and how it split a block.
 > 
->>> --- a/arch/arm64/Makefile
->>> +++ b/arch/arm64/Makefile
->>> @@ -78,6 +78,15 @@ ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
->>>    KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
->>>    endif
->>>    
->>> +ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
->>> +  CC_FLAGS_FTRACE := -fpatchable-function-entry=2
->>> +  KBUILD_CPPFLAGS += -DCC_USING_PATCHABLE_FUNCTION_ENTRY
->>> +  ifeq ($(call cc-option,-fpatchable-function-entry=2),)
->>> +    $(warning Cannot use CONFIG_DYNAMIC_FTRACE_WITH_REGS: \
->>> +             -fpatchable-function-entry not supported by compiler)
->>
->> Shouldn't this be an error? The option -fpatchable-function-entry has
->> been added to the CC_FLAGS_FTRACE, so any call to the compiler is gonna
->> break anyway. Or am I missing something?
-> 
-> I'm guessing this adds a more informative message on that error. One
-> will know why -fpatchable-function-entry was added to the CFLAGS. I'm
-> for more informative error messages being a victim of poor error
-> messages causing me to dig deep into the guts of the build
-> infrastructure to figure out simple issues.
-> 
+> I also think that arm_lpae_split_blk_unmap() scenario is not exist, maybe
+> we should remove it, and give a warning for this wrong usage.
 
-Yes, I agree it is better to have this message. My point was that we 
-could have "$error" instead of "$warning" to stop the compilation right 
-away since we know everything is gonna break (and on parallel builds 
-this warning is gonna be drowned in compiler errors).
+Can't it happen with VFIO?
 
--- 
-Julien Thierry
+Will
