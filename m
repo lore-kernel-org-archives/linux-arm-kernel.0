@@ -1,67 +1,38 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Tue, 14 Aug 2018 09:49:11 +0800
-Subject: [PATCH v4 4/5] iommu/arm-smmu-v3: add support for non-strict mode
-In-Reply-To: <94c88d9e-818e-f893-9ee2-7a0cf425bd9a@arm.com>
-References: <1533558424-16748-1-git-send-email-thunder.leizhen@huawei.com>
- <1533558424-16748-5-git-send-email-thunder.leizhen@huawei.com>
- <94c88d9e-818e-f893-9ee2-7a0cf425bd9a@arm.com>
-Message-ID: <5B723517.3010603@huawei.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 13 Aug 2018 22:03:15 -0400
+Subject: [PATCH 1/3] arm64: implement ftrace with regs
+In-Reply-To: <2b5c1092-2cc0-00ec-ba3d-341dc61452b4@arm.com>
+References: <20180810160043.9E45568C76@newverein.lst.de>
+ <20180810160223.D360D68C76@newverein.lst.de>
+ <2b5c1092-2cc0-00ec-ba3d-341dc61452b4@arm.com>
+Message-ID: <20180813220315.6e8dfc9c@vmware.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 13 Aug 2018 11:54:06 +0100
+Julien Thierry <julien.thierry@arm.com> wrote:
 
+> > --- a/arch/arm64/Makefile
+> > +++ b/arch/arm64/Makefile
+> > @@ -78,6 +78,15 @@ ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
+> >   KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
+> >   endif
+> >   
+> > +ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+> > +  CC_FLAGS_FTRACE := -fpatchable-function-entry=2
+> > +  KBUILD_CPPFLAGS += -DCC_USING_PATCHABLE_FUNCTION_ENTRY
+> > +  ifeq ($(call cc-option,-fpatchable-function-entry=2),)
+> > +    $(warning Cannot use CONFIG_DYNAMIC_FTRACE_WITH_REGS: \
+> > +             -fpatchable-function-entry not supported by compiler)  
+> 
+> Shouldn't this be an error? The option -fpatchable-function-entry has 
+> been added to the CC_FLAGS_FTRACE, so any call to the compiler is gonna 
+> break anyway. Or am I missing something?
 
-On 2018/8/9 19:06, Robin Murphy wrote:
-> On 06/08/18 13:27, Zhen Lei wrote:
->> Dynamically choose strict or non-strict mode for page table config based
->> on the iommu domain type.
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>   drivers/iommu/arm-smmu-v3.c | 7 ++++++-
->>   1 file changed, 6 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 2f1304b..904bc1e 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -1622,6 +1622,11 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
->>       if (smmu->features & ARM_SMMU_FEAT_COHERENCY)
->>           pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
->>
->> +    if (domain->type == IOMMU_DOMAIN_DMA) {
->> +        domain->non_strict = 1;
->> +        pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
->> +    }
->> +
->>       pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
->>       if (!pgtbl_ops)
->>           return -ENOMEM;
->> @@ -1782,7 +1787,7 @@ static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
->>   {
->>       struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
->>
->> -    if (smmu)
->> +    if (smmu && !domain->non_strict)
-> 
-> That doesn't smell right - even in non-strict domains we still need stuff like walk cache invalidations for non-leaf unmaps to be synchronous, so we can't just ignore all sync operations at the driver level. I think the right thing to do to elide the "normal" sync on unmap is to first convert __iommu_dma_unmap to use iommu_unmap_fast()/iommu_tlb_sync(), then make it not issue that sync at all for non-strict domains.
+I'm guessing this adds a more informative message on that error. One
+will know why -fpatchable-function-entry was added to the CFLAGS. I'm
+for more informative error messages being a victim of poor error
+messages causing me to dig deep into the guts of the build
+infrastructure to figure out simple issues.
 
-OK, I will try it.
-
-> 
-> Robin.
-> 
->>           __arm_smmu_tlb_sync(smmu);
->>   }
->>
->> -- 
->> 1.8.3
->>
->>
-> 
-> .
-> 
-
--- 
-Thanks!
-BestRegards
+-- Steve
