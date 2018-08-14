@@ -1,90 +1,54 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 14 Aug 2018 11:40:36 -0600
-Subject: [PATCH 06/13] coresight: etb10: Handle errors enabling the device
-In-Reply-To: <1533562915-21558-7-git-send-email-suzuki.poulose@arm.com>
-References: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
- <1533562915-21558-7-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180814174035.GA13135@xps15>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Wed, 15 Aug 2018 02:45:20 +0800
+Subject: [PATCH] Bluetooth: mediatek: Fix memory leak
+In-Reply-To: <20180814151031.GA25096@embeddedor.com>
+References: <20180814151031.GA25096@embeddedor.com>
+Message-ID: <1534272320.31978.28.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+Hi, Gustavo
 
-On Mon, Aug 06, 2018 at 02:41:48PM +0100, Suzuki K Poulose wrote:
-> Prepare the etb10 driver to return errors in enabling
-> the device.
+thanks for the catch up
+
+Acked-by: Sean Wang <sean.wang@mediatek.com>
+
+
+On Tue, 2018-08-14 at 10:10 -0500, Gustavo A. R. Silva wrote:
+> In case memory resources for *fw* were allocated, release them before
+> return.
 > 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Addresses-Coverity-ID: 1472611 ("Resource leak")
+> Fixes: 7237c4c9ec92 ("Bluetooth: mediatek: Add protocol support for MediaTek serial devices")
+> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
 > ---
->  drivers/hwtracing/coresight/coresight-etb10.c | 18 +++++++++++++-----
->  1 file changed, 13 insertions(+), 5 deletions(-)
+>  drivers/bluetooth/btmtkuart.c | 8 +++++---
+>  1 file changed, 5 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-> index 9fd77fd..37d2c88 100644
-> --- a/drivers/hwtracing/coresight/coresight-etb10.c
-> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
-> @@ -107,7 +107,7 @@ static unsigned int etb_get_buffer_depth(struct etb_drvdata *drvdata)
->  	return depth;
->  }
+> diff --git a/drivers/bluetooth/btmtkuart.c b/drivers/bluetooth/btmtkuart.c
+> index ed2a5c7..4593baf 100644
+> --- a/drivers/bluetooth/btmtkuart.c
+> +++ b/drivers/bluetooth/btmtkuart.c
+> @@ -144,8 +144,10 @@ static int mtk_setup_fw(struct hci_dev *hdev)
+>  	fw_size = fw->size;
 >  
-> -static void etb_enable_hw(struct etb_drvdata *drvdata)
-> +static void __etb_enable_hw(struct etb_drvdata *drvdata)
->  {
->  	int i;
->  	u32 depth;
-> @@ -135,6 +135,12 @@ static void etb_enable_hw(struct etb_drvdata *drvdata)
->  	CS_LOCK(drvdata->base);
->  }
+>  	/* The size of patch header is 30 bytes, should be skip */
+> -	if (fw_size < 30)
+> -		return -EINVAL;
+> +	if (fw_size < 30) {
+> +		err = -EINVAL;
+> +		goto free_fw;
+> +	}
 >  
-> +static int etb_enable_hw(struct etb_drvdata *drvdata)
-> +{
-> +	__etb_enable_hw(drvdata);
-> +	return 0;
-> +}
-> +
->  static int etb_enable(struct coresight_device *csdev, u32 mode, void *data)
->  {
->  	int ret = 0;
-> @@ -150,7 +156,7 @@ static int etb_enable(struct coresight_device *csdev, u32 mode, void *data)
->  	if (mode == CS_MODE_PERF) {
->  		ret = etb_set_buffer(csdev, (struct perf_output_handle *)data);
->  		if (ret)
-> -			goto out;
-> +			return ret;
+>  	fw_size -= 30;
+>  	fw_ptr += 30;
+> @@ -172,8 +174,8 @@ static int mtk_setup_fw(struct hci_dev *hdev)
+>  		fw_ptr += dlen;
 >  	}
 >  
->  	val = local_cmpxchg(&drvdata->mode,
-> @@ -172,12 +178,14 @@ static int etb_enable(struct coresight_device *csdev, u32 mode, void *data)
->  		goto out;
->  
->  	spin_lock_irqsave(&drvdata->spinlock, flags);
-> -	etb_enable_hw(drvdata);
-> +	ret = etb_enable_hw(drvdata);
->  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
->  
-> -out:
-> -	if (!ret)
-> +	if (ret)
-> +		local_cmpxchg(&drvdata->mode, mode, CS_MODE_DISABLED);
-> +	else
-
-I also have to do hackish things with my work on
-CPU-wide trace scenarios because drvdata->mode is of type local_t.  Instead of
-living with it I'll send out a patch later today that moves it to a u32 like ETF
-and ETR.
-
-Please look at it and if you're happy, add it to this patchset and do your 
-modifications on top of it.
-
-Thanks,
-Mathieu
-
->  		dev_dbg(drvdata->dev, "ETB enabled\n");
-> +
->  	return ret;
+> +free_fw:
+>  	release_firmware(fw);
+> -
+>  	return err;
 >  }
 >  
-> -- 
-> 2.7.4
-> 
