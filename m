@@ -1,64 +1,54 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Tue, 14 Aug 2018 10:48:37 -0500
-Subject: [PATCH10 0/3] Intel FPGA Video and Image Processing Suite
-In-Reply-To: <1534237029-2648-1-git-send-email-hean.loong.ong@intel.com>
-References: <1534237029-2648-1-git-send-email-hean.loong.ong@intel.com>
-Message-ID: <3720ba74-947a-1b5d-5f5b-1ef03d5941aa@kernel.org>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 14 Aug 2018 12:04:33 -0400
+Subject: [PATCH 1/3] arm64: implement ftrace with regs
+In-Reply-To: <a19d9e23-3dfa-ba9b-a177-cdc0d1035964@arm.com>
+References: <20180810160043.9E45568C76@newverein.lst.de>
+ <20180810160223.D360D68C76@newverein.lst.de>
+ <2b5c1092-2cc0-00ec-ba3d-341dc61452b4@arm.com>
+ <20180813220315.6e8dfc9c@vmware.local.home>
+ <a19d9e23-3dfa-ba9b-a177-cdc0d1035964@arm.com>
+Message-ID: <20180814120433.1f5e8da1@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 14 Aug 2018 09:33:52 +0100
+Julien Thierry <julien.thierry@arm.com> wrote:
 
-
-On 08/14/2018 03:57 AM, Hean-Loong, Ong wrote:
-> From: Ong, Hean Loong <hean.loong.ong@intel.com>
+> On 14/08/18 03:03, Steven Rostedt wrote:
+> > On Mon, 13 Aug 2018 11:54:06 +0100
+> > Julien Thierry <julien.thierry@arm.com> wrote:
+> >   
+> >>> --- a/arch/arm64/Makefile
+> >>> +++ b/arch/arm64/Makefile
+> >>> @@ -78,6 +78,15 @@ ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
+> >>>    KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
+> >>>    endif
+> >>>    
+> >>> +ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+> >>> +  CC_FLAGS_FTRACE := -fpatchable-function-entry=2
+> >>> +  KBUILD_CPPFLAGS += -DCC_USING_PATCHABLE_FUNCTION_ENTRY
+> >>> +  ifeq ($(call cc-option,-fpatchable-function-entry=2),)
+> >>> +    $(warning Cannot use CONFIG_DYNAMIC_FTRACE_WITH_REGS: \
+> >>> +             -fpatchable-function-entry not supported by compiler)  
+> >>
+> >> Shouldn't this be an error? The option -fpatchable-function-entry has
+> >> been added to the CC_FLAGS_FTRACE, so any call to the compiler is gonna
+> >> break anyway. Or am I missing something?  
+> > 
+> > I'm guessing this adds a more informative message on that error. One
+> > will know why -fpatchable-function-entry was added to the CFLAGS. I'm
+> > for more informative error messages being a victim of poor error
+> > messages causing me to dig deep into the guts of the build
+> > infrastructure to figure out simple issues.
+> >   
 > 
-> The FPGA FrameBuffer Soft IP could be seen  as the GPU and the DRM driver patch 
-> here is allocating memory for information to be streamed from the ARM/Linux 
-> to the display port. Basically the driver just wraps the information such as 
-> the pixels to be drawn by the FPGA FrameBuffer 2.
-> 
-> The piece of hardware in discussion is the SoC FPGA where Linux runs on the 
-> ARM chip and the FGPA is driven by its NIOS soft core with its own proprietary firmware.
-
-This driver doesn't have to ARM specific does it?
-
-> 
-> For example the application from the ARM Linux would have to write information 
-> on the /dev/fb0 with the information stored in the SDRAM to be fetched by the 
-> FPGA framebuffer IP and displayed on the Display Port Monitor.
-> 
-> 
-> Ong Hean Loong (2):
->   ARM:socfpga-defconfig Intel FPGA Video and Image Processing Suite
->   ARM:drm ivip Intel FPGA Video and Image Processing Suite
-> 
-> Ong, Hean Loong (1):
->   ARM:dt-bindings:display Intel FPGA Video and Image Processing Suite
-> 
->  .../devicetree/bindings/display/altr,vip-fb2.txt   |   63 +++++++
->  arch/arm/configs/socfpga_defconfig                 |    5 +
->  drivers/gpu/drm/Kconfig                            |    2 +
->  drivers/gpu/drm/Makefile                           |    1 +
->  drivers/gpu/drm/ivip/Kconfig                       |   14 ++
->  drivers/gpu/drm/ivip/Makefile                      |    9 +
->  drivers/gpu/drm/ivip/intel_vip_conn.c              |   95 ++++++++++
->  drivers/gpu/drm/ivip/intel_vip_core.c              |  161 ++++++++++++++++
->  drivers/gpu/drm/ivip/intel_vip_drv.h               |   52 ++++++
->  drivers/gpu/drm/ivip/intel_vip_of.c                |  193 ++++++++++++++++++++
->  10 files changed, 595 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/display/altr,vip-fb2.txt
->  create mode 100644 drivers/gpu/drm/ivip/Kconfig
->  create mode 100644 drivers/gpu/drm/ivip/Makefile
->  create mode 100644 drivers/gpu/drm/ivip/intel_vip_conn.c
->  create mode 100644 drivers/gpu/drm/ivip/intel_vip_core.c
->  create mode 100644 drivers/gpu/drm/ivip/intel_vip_drv.h
->  create mode 100644 drivers/gpu/drm/ivip/intel_vip_of.c
+> Yes, I agree it is better to have this message. My point was that we 
+> could have "$error" instead of "$warning" to stop the compilation right 
+> away since we know everything is gonna break (and on parallel builds 
+> this warning is gonna be drowned in compiler errors).
 > 
 
-Can you clarify your commit header? What is "PATCH10", is it version 10?
-If so, it should be "PATCHv10".
+OK, I see what you mean. If the resulting build wont boot, then yes
+this should be an error and not a warning.
 
-You're also missing a few other maintainers in your CC list, the "DRM
-DRIVERS AND MISC GPU PATCHES" people.
-
-Dinh
+-- Steve
