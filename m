@@ -1,116 +1,49 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 14 Aug 2018 14:04:17 +0100
-Subject: [PATCH 2/3] iommu/dma: Use fast DMA domain lookup
-In-Reply-To: <cover.1534250425.git.robin.murphy@arm.com>
-References: <cover.1534250425.git.robin.murphy@arm.com>
-Message-ID: <9223183f5ec32a0a88b9b70800ca7eef8819874a.1534250425.git.robin.murphy@arm.com>
+From: jacopo+renesas@jmondi.org (Jacopo Mondi)
+Date: Tue, 14 Aug 2018 15:21:46 +0200
+Subject: [PATCH v2 2/2] ARM: dts: imx6q-icore-mipi: Use 1.5 version of i.Core
+ MX6
+In-Reply-To: <1534252906-29554-1-git-send-email-jacopo+renesas@jmondi.org>
+References: <1534252906-29554-1-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <1534252906-29554-3-git-send-email-jacopo+renesas@jmondi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most parts of iommu-dma already assume they are operating on a default
-domain set up by iommu_dma_init_domain(), and can be converted straight
-over to avoid the refcounting bottleneck. MSI page mappings may be in
-an unmanaged domain with an explicit MSI-only cookie, so retain the
-non-specific lookup, but that's OK since they're far from a contended
-fast path either way.
+From: Jacopo Mondi <jacopo@jmondi.org>
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+The "EDIMM STARTER KIT i.Core 1.5 MIPI Evaluation" is based on the 1.5 version
+of the i.Core MX6 cpu module. The 1.5 version differs from the original one for
+a few details, including the ethernet PHY interface clock provider.
+
+With this commit, the ethernet interface works properly:
+SMSC LAN8710/LAN8720 2188000.ethernet-1:00: attached PHY driver
+
+While before using the 1.5 version, ethernet failed to startup do to un-clocked
+PHY interface:
+fec 2188000.ethernet eth0: could not attach to PHY
+
+Fixes: 3fe088357731 ("ARM: dts: imx6q: Add Engicam i.CoreM6 1.5 Quad/Dual MIPI starter kit support")
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Jacopo Mondi <jacopo@jmondi.org>
 ---
- drivers/iommu/dma-iommu.c | 23 ++++++++++++-----------
- 1 file changed, 12 insertions(+), 11 deletions(-)
+ arch/arm/boot/dts/imx6q-icore-mipi.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 8f549bdb866d..a27eedc16b32 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -510,7 +510,7 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
- void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
- 		dma_addr_t *handle)
- {
--	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), *handle, size);
-+	__iommu_dma_unmap(iommu_get_dma_domain(dev), *handle, size);
- 	__iommu_dma_free_pages(pages, PAGE_ALIGN(size) >> PAGE_SHIFT);
- 	*handle = IOMMU_MAPPING_ERROR;
- }
-@@ -537,7 +537,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
- 		unsigned long attrs, int prot, dma_addr_t *handle,
- 		void (*flush_page)(struct device *, const void *, phys_addr_t))
- {
--	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
-+	struct iommu_domain *domain = iommu_get_dma_domain(dev);
- 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
- 	struct iova_domain *iovad = &cookie->iovad;
- 	struct page **pages;
-@@ -625,9 +625,8 @@ int iommu_dma_mmap(struct page **pages, size_t size, struct vm_area_struct *vma)
- }
+diff --git a/arch/arm/boot/dts/imx6q-icore-mipi.dts b/arch/arm/boot/dts/imx6q-icore-mipi.dts
+index 95b2efd..1f15882 100644
+--- a/arch/arm/boot/dts/imx6q-icore-mipi.dts
++++ b/arch/arm/boot/dts/imx6q-icore-mipi.dts
+@@ -8,10 +8,10 @@
+ /dts-v1/;
  
- static dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
--		size_t size, int prot)
-+		size_t size, int prot, struct iommu_domain *domain)
- {
--	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
- 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
- 	size_t iova_off = 0;
- 	dma_addr_t iova;
-@@ -651,13 +650,14 @@ static dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
- dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
- 		unsigned long offset, size_t size, int prot)
- {
--	return __iommu_dma_map(dev, page_to_phys(page) + offset, size, prot);
-+	return __iommu_dma_map(dev, page_to_phys(page) + offset, size, prot,
-+			iommu_get_dma_domain(dev));
- }
+ #include "imx6q.dtsi"
+-#include "imx6qdl-icore.dtsi"
++#include "imx6qdl-icore-1.5.dtsi"
  
- void iommu_dma_unmap_page(struct device *dev, dma_addr_t handle, size_t size,
- 		enum dma_data_direction dir, unsigned long attrs)
- {
--	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), handle, size);
-+	__iommu_dma_unmap(iommu_get_dma_domain(dev), handle, size);
- }
- 
- /*
-@@ -745,7 +745,7 @@ static void __invalidate_sg(struct scatterlist *sg, int nents)
- int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
- 		int nents, int prot)
- {
--	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
-+	struct iommu_domain *domain = iommu_get_dma_domain(dev);
- 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
- 	struct iova_domain *iovad = &cookie->iovad;
- 	struct scatterlist *s, *prev = NULL;
-@@ -830,20 +830,21 @@ void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
- 		sg = tmp;
- 	}
- 	end = sg_dma_address(sg) + sg_dma_len(sg);
--	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), start, end - start);
-+	__iommu_dma_unmap(iommu_get_dma_domain(dev), start, end - start);
- }
- 
- dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
- 		size_t size, enum dma_data_direction dir, unsigned long attrs)
- {
- 	return __iommu_dma_map(dev, phys, size,
--			dma_info_to_prot(dir, false, attrs) | IOMMU_MMIO);
-+			dma_info_to_prot(dir, false, attrs) | IOMMU_MMIO,
-+			iommu_get_dma_domain(dev));
- }
- 
- void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
- 		size_t size, enum dma_data_direction dir, unsigned long attrs)
- {
--	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), handle, size);
-+	__iommu_dma_unmap(iommu_get_dma_domain(dev), handle, size);
- }
- 
- int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
-@@ -869,7 +870,7 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
- 	if (!msi_page)
- 		return NULL;
- 
--	iova = __iommu_dma_map(dev, msi_addr, size, prot);
-+	iova = __iommu_dma_map(dev, msi_addr, size, prot, domain);
- 	if (iommu_dma_mapping_error(dev, iova))
- 		goto out_free_page;
+ / {
+-	model = "Engicam i.CoreM6 Quad/Dual MIPI Starter Kit";
++	model = "Engicam i.CoreM6 1.5 Quad/Dual MIPI Starter Kit";
+ 	compatible = "engicam,imx6-icore", "fsl,imx6q";
+ };
  
 -- 
-2.17.1.dirty
+2.7.4
