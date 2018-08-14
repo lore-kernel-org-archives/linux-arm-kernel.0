@@ -1,61 +1,40 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Tue, 14 Aug 2018 15:57:40 +0530
-Subject: [PATCH v2 3/3] dts: arm64/sdm845: Add node for qcom,smmu-v2
-In-Reply-To: <20180814102740.30222-1-vivek.gautam@codeaurora.org>
-References: <20180814102740.30222-1-vivek.gautam@codeaurora.org>
-Message-ID: <20180814102740.30222-4-vivek.gautam@codeaurora.org>
+From: julien.grall@arm.com (Julien Grall)
+Date: Tue, 14 Aug 2018 11:33:32 +0100
+Subject: [PATCH] Documentation/arm64/sve: Couple of improvements and typoes
+Message-ID: <20180814103332.28836-1-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device node for qcom,smmu-v2 available on sdm845.
-This smmu is available only to GPU device.
+    - Fix mismatch between SVE registers (Z) and FPSIMD register (V)
+    - Don't prefix the path for [3] with Linux to stay consistent with
+    [1] and [2].
 
-Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+Signed-off-by: Julien Grall <julien.grall@arm.com>
 ---
- arch/arm64/boot/dts/qcom/sdm845.dtsi | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ Documentation/arm64/sve.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-index 1c2be2082f33..bd1ec5fa5146 100644
---- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-@@ -6,6 +6,7 @@
-  */
+diff --git a/Documentation/arm64/sve.txt b/Documentation/arm64/sve.txt
+index f128f736b4a5..7169a0ec41d8 100644
+--- a/Documentation/arm64/sve.txt
++++ b/Documentation/arm64/sve.txt
+@@ -200,7 +200,7 @@ prctl(PR_SVE_SET_VL, unsigned long arg)
+       thread.
  
- #include <dt-bindings/clock/qcom,gcc-sdm845.h>
-+#include <dt-bindings/clock/qcom,gpucc-sdm845.h>
- #include <dt-bindings/clock/qcom,rpmh.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/soc/qcom,rpmh-rsc.h>
-@@ -989,6 +990,28 @@
- 			cell-index = <0>;
- 		};
+     * Changing the vector length causes all of P0..P15, FFR and all bits of
+-      Z0..V31 except for Z0 bits [127:0] .. Z31 bits [127:0] to become
++      Z0..Z31 except for Z0 bits [127:0] .. Z31 bits [127:0] to become
+       unspecified.  Calling PR_SVE_SET_VL with vl equal to the thread's current
+       vector length, or calling PR_SVE_SET_VL with the PR_SVE_SET_VL_ONEXEC
+       flag, does not constitute a change to the vector length for this purpose.
+@@ -500,7 +500,7 @@ References
+ [2] arch/arm64/include/uapi/asm/ptrace.h
+     AArch64 Linux ptrace ABI definitions
  
-+		gpu_smmu: iommu at 5040000 {
-+			compatible = "qcom,sdm845-smmu-v2", "qcom,smmu-v2";
-+			reg = <0x5040000 0x10000>;
-+			#iommu-cells = <1>;
-+			#global-interrupts = <2>;
-+			interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
-+			clock-names = "bus", "iface";
-+			clocks = <&gcc GCC_GPU_MEMNOC_GFX_CLK>,
-+				 <&gcc GCC_GPU_CFG_AHB_CLK>;
-+
-+			/*power-domains = <&gpucc GPU_CX_GDSC>;*/
-+		};
-+
- 		apps_smmu: iommu at 15000000 {
- 			compatible = "qcom,sdm845-smmu-500", "arm,mmu-500";
- 			reg = <0x15000000 0x80000>;
+-[3] linux/Documentation/arm64/cpu-feature-registers.txt
++[3] Documentation/arm64/cpu-feature-registers.txt
+ 
+ [4] ARM IHI0055C
+     http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055c/IHI0055C_beta_aapcs64.pdf
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+2.11.0
