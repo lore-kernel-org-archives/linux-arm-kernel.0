@@ -1,33 +1,45 @@
 From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Tue, 14 Aug 2018 15:57:37 +0530
-Subject: [PATCH v2 0/3] Enable smmu support on sdm845
-Message-ID: <20180814102740.30222-1-vivek.gautam@codeaurora.org>
+Date: Tue, 14 Aug 2018 15:57:38 +0530
+Subject: [PATCH v2 1/3] dt-bindings: arm-smmu: Add binding doc for Qcom
+ smmu-500
+In-Reply-To: <20180814102740.30222-1-vivek.gautam@codeaurora.org>
+References: <20180814102740.30222-1-vivek.gautam@codeaurora.org>
+Message-ID: <20180814102740.30222-2-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series enables apps-smmu (arm,mmu-500) and gpu-smmu (qcom,smmu-v2)
-on sdm845. gpu-smmu needs one power domain from gpu clock controller
-whose driver was sent by Amit [1].
+Qcom's implementation of arm,mmu-500 works well with current
+arm-smmu driver implementation. Adding a soc specific compatible
+along with arm,mmu-500 makes the bindings future safe.
 
-Changes since v1:
- - Addressed Rob's review comments by adding a SoC specific compatible.
-   Have added a new dt-bindings patch for this.
- - Updated node name to 'iommu'.
- - Addressed Doug's review comment about removing status property from
-   smmu's nodes, as smmu is either present on the soc or not. Enabling
-   it is not a board-level decision.
+Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+---
+ Documentation/devicetree/bindings/iommu/arm,smmu.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-[1] https://lore.kernel.org/patchwork/patch/973839/
-
-Vivek Gautam (3):
-  dt-bindings: arm-smmu: Add binding doc for Qcom smmu-500
-  dts: arm64/sdm845: Add node for arm,mmu-500
-  dts: arm64/sdm845: Add node for qcom,smmu-v2
-
- .../devicetree/bindings/iommu/arm,smmu.txt         |  5 ++
- arch/arm64/boot/dts/qcom/sdm845.dtsi               | 95 ++++++++++++++++++++++
- 2 files changed, 100 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+index 7c71a6ed465a..7d73b2a259fc 100644
+--- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
++++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+@@ -18,6 +18,7 @@ conditions.
+                         "arm,mmu-500"
+                         "cavium,smmu-v2"
+                         "qcom,<soc>-smmu-v2", "qcom,smmu-v2"
++                        "qcom,<soc>-smmu-500", "arm,mmu-500"
+ 
+                   depending on the particular implementation and/or the
+                   version of the architecture implemented.
+@@ -30,6 +31,10 @@ conditions.
+                   An example string would be -
+                   "qcom,msm8996-smmu-v2", "qcom,smmu-v2".
+ 
++		  "qcom,<soc>-smmu-500" compatible string represents qcom's soc
++		  specific implementation of arm,mmu-500, and should be present
++		  along with "arm,mmu-500".
++
+ - reg           : Base address and size of the SMMU.
+ 
+ - #global-interrupts : The number of global interrupts exposed by the
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
