@@ -1,85 +1,61 @@
-From: maxi.jourdan@wanadoo.fr (Maxime Jourdan)
-Date: Tue, 14 Aug 2018 04:42:25 +0200
-Subject: [PATCH v2 2/4] dt-bindings: soc: amlogic: add meson-canvas
- documentation
-In-Reply-To: <20180813190721.GA27621@rob-hp-laptop>
-References: <20180807220011.24436-1-maxi.jourdan@wanadoo.fr>
- <20180807220011.24436-3-maxi.jourdan@wanadoo.fr>
- <20180813190721.GA27621@rob-hp-laptop>
-Message-ID: <CAHStOZ5i_SzamBsWk-b+X2n_gxdNJUPCHL1U0M-d6rdJgXkzrg@mail.gmail.com>
+From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
+Date: Tue, 14 Aug 2018 10:07:29 +0530
+Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <CAPhsuW4KT=6vR_0ogTy_+Fwcz7cZ0Rac8sYohLngQmEBCd0HLw@mail.gmail.com>
+References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
+ <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
+ <CAPhsuW49+qA7kT7yE4tgbnAuox-iOzssg-jc2abG8XDo6XeX8A@mail.gmail.com>
+ <95a1221e-aecc-42be-5239-a2c2429be176@linux.ibm.com>
+ <20180813115019.GB28360@redhat.com>
+ <fa85d19f-b22c-e09c-b8d2-f68f0c79de15@linux.ibm.com>
+ <20180813131723.GC28360@redhat.com>
+ <CAPhsuW4KT=6vR_0ogTy_+Fwcz7cZ0Rac8sYohLngQmEBCd0HLw@mail.gmail.com>
+Message-ID: <58d21bac-5a31-85df-4b9f-05815b64f465@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-08-13 21:07 GMT+02:00 Rob Herring <robh@kernel.org>:
-> On Wed, Aug 08, 2018 at 12:00:09AM +0200, Maxime Jourdan wrote:
->> DT bindings doc for amlogic,meson-canvas
->>
->> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
->> ---
->>  .../soc/amlogic/amlogic,meson-canvas.txt      | 36 +++++++++++++++++++
->>  1 file changed, 36 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt
->>
->> diff --git a/Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt b/Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt
->> new file mode 100644
->> index 000000000000..5f0351717bee
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt
->> @@ -0,0 +1,36 @@
->> +Amlogic Canvas
->> +================================
->> +
->> +A canvas is a collection of metadata that describes a pixel buffer.
->> +Those metadata include: width, height, phyaddr, wrapping, block mode
->> +and endianness.
->> +
->> +Many IPs within Amlogic SoCs rely on canvas indexes to read/write pixel data
->> +rather than use the phy addresses directly. For instance, this is the case for
->> +the video decoders and the display.
->> +
->> +Amlogic SoCs have 256 canvas.
->> +
->> +Device Tree Bindings:
->> +---------------------
->> +
->> +Canvas Provider
->> +--------------------------
->> +
->> +Required properties:
->> +- compatible: "amlogic,canvas"
->> +
->> +Parent node should have the following properties :
->> +- compatible: "amlogic,gx-dmc-sysctrl", "syscon", "simple-mfd"
->
-> Is this documented somewhere? One child function is not a reason for an
-> MFD and child nodes. And child nodes like this with no resources are
-> unnecessary.
->
+Hi Song,
 
-Hi Rob, this was done to follow the same path as other buses on the
-platform that have sysctrls in order to provide regmaps to the
-devices.
-
-I can see how it's not really necessary here though, would it be okay
-with you if I turned "canvas" into a simple bus subnode, using __iomem
-in the device ?
-
->> +- reg: base address and size of the DMC system control register space.
->> +
->> +Example:
->> +
->> +sysctrl_DMC: system-controller at 0 {
->> +     compatible = "amlogic,gx-dmc-sysctrl", "syscon", "simple-mfd";
->> +     reg = <0x0 0x0 0x0 0x1000>;
->> +
->> +     canvas: canvas-provider at 0 {
->> +             compatible = "amlogic,canvas";
->> +     };
->> +};
->> --
->> 2.18.0
+On 08/13/2018 10:42 PM, Song Liu wrote:
+> On Mon, Aug 13, 2018 at 6:17 AM, Oleg Nesterov <oleg@redhat.com> wrote:
+>> On 08/13, Ravi Bangoria wrote:
+>>>
+>>>> But damn, process creation (exec) is trivial. We could add a new uprobe_exec()
+>>>> hook and avoid delayed_uprobe_install() in uprobe_mmap().
+>>>
+>>> I'm sorry. I didn't get this.
 >>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Sorry for confusion...
+>>
+>> I meant, if only exec*( could race with _register(), we could add another uprobe
+>> hook which updates all (delayed) counters before return to user-mode.
+>>
+>>>> Afaics, the really problematic case is dlopen() which can race with _register()
+>>>> too, right?
+>>>
+>>> dlopen() should internally use mmap() right? So what is the problem here? Can
+>>> you please elaborate.
+>>
+>> What I tried to say is that we can't avoid uprobe_mmap()->delayed_uprobe_install()
+>> because dlopen() can race with _register() too, just like exec.
+>>
+>> Oleg.
+>>
+> 
+> How about we do delayed_uprobe_install() per file? Say we keep a list
+> of delayed_uprobe
+> in load_elf_binary(). Then we can install delayed_uprobe after loading
+> all sections of the
+> file.
+
+I'm not sure if I totally understood the idea. But how this approach can
+solve dlopen() race with _register()?
+
+Rather, making delayed_uprobe_list an mm field seems simple and effective
+idea to me. The only overhead will be list_empty(mm->delayed_list) check.
+
+Please let me know if I misunderstood you.
+
+Thanks,
+Ravi
