@@ -1,38 +1,40 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 13 Aug 2018 22:03:15 -0400
-Subject: [PATCH 1/3] arm64: implement ftrace with regs
-In-Reply-To: <2b5c1092-2cc0-00ec-ba3d-341dc61452b4@arm.com>
-References: <20180810160043.9E45568C76@newverein.lst.de>
- <20180810160223.D360D68C76@newverein.lst.de>
- <2b5c1092-2cc0-00ec-ba3d-341dc61452b4@arm.com>
-Message-ID: <20180813220315.6e8dfc9c@vmware.local.home>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Tue, 14 Aug 2018 09:54:56 +0800
+Subject: [PATCH] arm/mach-at91/pm: Do not double put the device node
+Message-ID: <1534211696-4221-1-git-send-email-zhongjiang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Aug 2018 11:54:06 +0100
-Julien Thierry <julien.thierry@arm.com> wrote:
+Device node iterators put the previous value of the index variable,
+so an explicit put causes a double put.
 
-> > --- a/arch/arm64/Makefile
-> > +++ b/arch/arm64/Makefile
-> > @@ -78,6 +78,15 @@ ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
-> >   KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
-> >   endif
-> >   
-> > +ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> > +  CC_FLAGS_FTRACE := -fpatchable-function-entry=2
-> > +  KBUILD_CPPFLAGS += -DCC_USING_PATCHABLE_FUNCTION_ENTRY
-> > +  ifeq ($(call cc-option,-fpatchable-function-entry=2),)
-> > +    $(warning Cannot use CONFIG_DYNAMIC_FTRACE_WITH_REGS: \
-> > +             -fpatchable-function-entry not supported by compiler)  
-> 
-> Shouldn't this be an error? The option -fpatchable-function-entry has 
-> been added to the CC_FLAGS_FTRACE, so any call to the compiler is gonna 
-> break anyway. Or am I missing something?
+I detect the issue with the help of Coccinelle.
 
-I'm guessing this adds a more informative message on that error. One
-will know why -fpatchable-function-entry was added to the CFLAGS. I'm
-for more informative error messages being a victim of poor error
-messages causing me to dig deep into the guts of the build
-infrastructure to figure out simple issues.
+Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+---
+ arch/arm/mach-at91/pm.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
--- Steve
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 32fae4d..a5ec35f 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -143,15 +143,12 @@ static int at91_pm_config_ws(unsigned int pm_mode, bool set)
+ 
+ 			/* Check if enabled on SHDWC. */
+ 			if (wsi->shdwc_mr_bit && !(val & wsi->shdwc_mr_bit))
+-				goto put_node;
++				continue;
+ 
+ 			mode |= wsi->pmc_fsmr_bit;
+ 			if (wsi->set_polarity)
+ 				polarity |= wsi->pmc_fsmr_bit;
+ 		}
+-
+-put_node:
+-		of_node_put(np);
+ 	}
+ 
+ 	if (mode) {
+-- 
+1.7.12.4
