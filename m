@@ -1,21 +1,22 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 14 Aug 2018 14:54:06 -0600
-Subject: [PATCH 3/4] dt-bindings: arm: hisilicon: Add binding for
- HiKey970 board
-In-Reply-To: <20180810175339.25421-4-manivannan.sadhasivam@linaro.org>
-References: <20180810175339.25421-1-manivannan.sadhasivam@linaro.org>
- <20180810175339.25421-4-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180814205406.GA19066@rob-hp-laptop>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Wed, 15 Aug 2018 00:19:08 +0300
+Subject: [PATCH v2 1/5] ARM: trusted_foundations: Implement L2 cache
+ initialization callback
+In-Reply-To: <20180619110027.16935-2-digetx@gmail.com>
+References: <20180619110027.16935-1-digetx@gmail.com>
+ <20180619110027.16935-2-digetx@gmail.com>
+Message-ID: <1581737.LbIJYaB7YW@dimapc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Aug 2018 23:23:38 +0530, Manivannan Sadhasivam wrote:
-> Add devicetree binding for HiKey970 board.
+On Tuesday, 19 June 2018 14:00:23 MSK Dmitry Osipenko wrote:
+> Implement L2 cache initialization firmware callback that should be invoked
+> early in boot to enable cache HW.
 > 
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
 > ---
->  Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
+>  arch/arm/firmware/trusted_foundations.c | 27 +++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Russell, could you please take a look at the arm/firmware/ patches and ACK 
+them if they are good to you?
