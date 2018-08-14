@@ -1,41 +1,74 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Tue, 14 Aug 2018 16:36:03 +0200
-Subject: [RFC PATCH 0/7] add at91sam9 LCDC DRM driver
-In-Reply-To: <20180813181808.GA2357@ravnborg.org>
-References: <20180812184152.GA22343@ravnborg.org>
- <f1f2a2d7-ae27-87af-8041-93d3f8fe07cc@microchip.com>
- <20180813181808.GA2357@ravnborg.org>
-Message-ID: <20180814143603.GO943@piout.net>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 14 Aug 2018 08:39:00 -0600
+Subject: [PATCH v2 2/4] dt-bindings: soc: amlogic: add meson-canvas
+ documentation
+In-Reply-To: <CAHStOZ5i_SzamBsWk-b+X2n_gxdNJUPCHL1U0M-d6rdJgXkzrg@mail.gmail.com>
+References: <20180807220011.24436-1-maxi.jourdan@wanadoo.fr>
+ <20180807220011.24436-3-maxi.jourdan@wanadoo.fr>
+ <20180813190721.GA27621@rob-hp-laptop>
+ <CAHStOZ5i_SzamBsWk-b+X2n_gxdNJUPCHL1U0M-d6rdJgXkzrg@mail.gmail.com>
+Message-ID: <CAL_JsqJFmhKpcSKGfym+YtVAP24sPi1VLkM5EuRoJ-rkBG6EsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/08/2018 20:18:08+0200, Sam Ravnborg wrote:
-> > Would be good to have a plan to phase-out the old atmel_lcdfb fbdev
-> > driver when this one addresses some TODO items that make sense.
-> Agree on this.
-> One approach could be to say that when all in-kernel users of atmel_lcdfb
-> are ported, then the old driver could be dropped after a kernel release.
-> 
+On Mon, Aug 13, 2018 at 8:42 PM Maxime Jourdan <maxi.jourdan@wanadoo.fr> wrote:
+>
+> 2018-08-13 21:07 GMT+02:00 Rob Herring <robh@kernel.org>:
+> > On Wed, Aug 08, 2018 at 12:00:09AM +0200, Maxime Jourdan wrote:
+> >> DT bindings doc for amlogic,meson-canvas
+> >>
+> >> Signed-off-by: Maxime Jourdan <maxi.jourdan@wanadoo.fr>
+> >> ---
+> >>  .../soc/amlogic/amlogic,meson-canvas.txt      | 36 +++++++++++++++++++
+> >>  1 file changed, 36 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt b/Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt
+> >> new file mode 100644
+> >> index 000000000000..5f0351717bee
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/soc/amlogic/amlogic,meson-canvas.txt
+> >> @@ -0,0 +1,36 @@
+> >> +Amlogic Canvas
+> >> +================================
+> >> +
+> >> +A canvas is a collection of metadata that describes a pixel buffer.
+> >> +Those metadata include: width, height, phyaddr, wrapping, block mode
+> >> +and endianness.
+> >> +
+> >> +Many IPs within Amlogic SoCs rely on canvas indexes to read/write pixel data
+> >> +rather than use the phy addresses directly. For instance, this is the case for
+> >> +the video decoders and the display.
+> >> +
+> >> +Amlogic SoCs have 256 canvas.
+> >> +
+> >> +Device Tree Bindings:
+> >> +---------------------
+> >> +
+> >> +Canvas Provider
+> >> +--------------------------
+> >> +
+> >> +Required properties:
+> >> +- compatible: "amlogic,canvas"
+> >> +
+> >> +Parent node should have the following properties :
+> >> +- compatible: "amlogic,gx-dmc-sysctrl", "syscon", "simple-mfd"
+> >
+> > Is this documented somewhere? One child function is not a reason for an
+> > MFD and child nodes. And child nodes like this with no resources are
+> > unnecessary.
+> >
+>
+> Hi Rob, this was done to follow the same path as other buses on the
+> platform that have sysctrls in order to provide regmaps to the
+> devices.
+>
+> I can see how it's not really necessary here though, would it be okay
+> with you if I turned "canvas" into a simple bus subnode, using __iomem
+> in the device ?
 
-I would drop it only after an LTS release.
+That's a driver issue that has little to do with the binding. You can
+create a regmap for any node, "syscon" just does that automagically
+for you.
 
-> > The mfd suffix seems strange to me. What about "atmel,at91sam9263-lcdc-mfd"
-> > => "atmel,at91sam9263-lcd" (or "microchip,at91sam9263-lcdc").
-> The "-mfd" suffix was added to avoid clashing with the current
-> compatible string used by the atmel_lcdfb driver.
-> 
-> I susggest we do the following:
-> - use the microchip prefix, as this is now owned by microchip
-> - and add the driver to a drm/microchip/ directory
-> (Then we can only hope that microchip do not change name or
-> are purchased by someone else).
-> 
-
-The compatible string should remain the same but the drivers have to be
-mutually exclusive in Kconfig.
-
-
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Rob
