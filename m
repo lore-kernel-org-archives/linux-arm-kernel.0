@@ -1,93 +1,39 @@
-From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
-Date: Tue, 14 Aug 2018 23:12:41 +0900
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77965: Add OPPs table for cpu
- devices
-Message-ID: <1534255961-23326-1-git-send-email-ykaneko0929@gmail.com>
+From: golf@perches.com (Joe Perches)
+Date: Tue, 14 Aug 2018 07:16:29 -0700
+Subject: [RESEND PATCH 1/6] ARM: config: multi_v5: enable dynamic debug
+In-Reply-To: <20180814140612.12554-1-marcel@ziswiler.com>
+References: <20180814140612.12554-1-marcel@ziswiler.com>
+Message-ID: <9461e62248cc7c1b5585004ff8cf7268b823e29c.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dien Pham <dien.pham.ry@renesas.com>
+On Tue, 2018-08-14 at 16:06 +0200, Marcel Ziswiler wrote:
+> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> 
+> Dynamic debug is really helpful.
 
-This patch adds OPPs table for CA57{0,1} cpu devices
+It's useful, but perhaps not appropriate.
 
-Signed-off-by: Dien Pham <dien.pham.ry@renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
----
+Most arm configs are for small resource constrained systems.
+dynamic_debug adds a lot of additional text and a fair amount of data.
 
-This patch is based on the devel branch of Simon Horman's renesas tree.
 
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 44 +++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index 52205be..c5fb35b 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -60,6 +60,46 @@
- 		clock-frequency = <0>;
- 	};
- 
-+	cluster0_opp: opp_table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 500000000 {
-+			opp-hz = /bits/ 64 <500000000>;
-+			opp-microvolt = <830000>;
-+			clock-latency-ns = <300000>;
-+		};
-+		opp at 1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			opp-microvolt = <830000>;
-+			clock-latency-ns = <300000>;
-+		};
-+		opp at 1500000000 {
-+			opp-hz = /bits/ 64 <1500000000>;
-+			opp-microvolt = <830000>;
-+			clock-latency-ns = <300000>;
-+			opp-suspend;
-+		};
-+		opp at 1600000000 {
-+			opp-hz = /bits/ 64 <1600000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <300000>;
-+			turbo-mode;
-+		};
-+		opp at 1700000000 {
-+			opp-hz = /bits/ 64 <1700000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <300000>;
-+			turbo-mode;
-+		};
-+		opp at 1800000000 {
-+			opp-hz = /bits/ 64 <1800000000>;
-+			opp-microvolt = <960000>;
-+			clock-latency-ns = <300000>;
-+			turbo-mode;
-+		};
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -71,6 +111,8 @@
- 			power-domains = <&sysc R8A77965_PD_CA57_CPU0>;
- 			next-level-cache = <&L2_CA57>;
- 			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE R8A77965_CLK_Z>;
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		a57_1: cpu at 1 {
-@@ -80,6 +122,8 @@
- 			power-domains = <&sysc R8A77965_PD_CA57_CPU1>;
- 			next-level-cache = <&L2_CA57>;
- 			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE R8A77965_CLK_Z>;
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		L2_CA57: cache-controller-0 {
--- 
-1.9.1
+> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> 
+> ---
+> 
+>  arch/arm/configs/multi_v5_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
+> index 318b76fa26d1..b302ac68d587 100644
+> --- a/arch/arm/configs/multi_v5_defconfig
+> +++ b/arch/arm/configs/multi_v5_defconfig
+> @@ -275,6 +275,7 @@ CONFIG_NLS_CODEPAGE_850=y
+>  CONFIG_NLS_ISO8859_1=y
+>  CONFIG_NLS_ISO8859_2=y
+>  CONFIG_NLS_UTF8=y
+> +CONFIG_DYNAMIC_DEBUG=y
+>  CONFIG_DEBUG_INFO=y
+>  CONFIG_DEBUG_FS=y
+>  CONFIG_MAGIC_SYSRQ=y
