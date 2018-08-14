@@ -1,37 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Aug 2018 11:18:46 +0200
-Subject: [PATCH 2/2] ARM: rpc: mark ecard_devices_proc_show as __maybe_unused
-In-Reply-To: <20180814091904.2186262-1-arnd@arndb.de>
-References: <20180814091904.2186262-1-arnd@arndb.de>
-Message-ID: <20180814091904.2186262-2-arnd@arndb.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 14 Aug 2018 11:02:52 +0100
+Subject: [PATCH v3 4/6] iommu/io-pgtable-arm: add support for non-strict
+ mode
+In-Reply-To: <20180814083500.GA28101@arm.com>
+References: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
+ <1531376312-2192-5-git-send-email-thunder.leizhen@huawei.com>
+ <89cc2201-99ab-3f3b-a2d1-1766515d4375@arm.com> <5B597628.2020103@huawei.com>
+ <04239cfa-bcf2-a33a-e662-ebc75e66782b@arm.com>
+ <1d24541340334954969c58980ef85444@HXTBJIDCEMVIW01.hxtcorp.net>
+ <5B7293E5.7040702@huawei.com> <20180814083500.GA28101@arm.com>
+Message-ID: <feabf4a3-db1e-a22b-daab-fad831b473f9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new build error appeared with CONFIG_PROC_FS disabled:
+On 14/08/18 09:35, Will Deacon wrote:
+> On Tue, Aug 14, 2018 at 04:33:41PM +0800, Leizhen (ThunderTown) wrote:
+>> On 2018/8/6 9:32, Yang, Shunyong wrote:
+>>> On 2018/7/26 22:37, Robin Murphy wrote:
+>>>> Because DMA code is not the only caller of iommu_map/unmap. It's
+>>>> perfectly legal in the IOMMU API to partially unmap a previous mapping
+>>>> such that a block entry needs to be split. The DMA API, however, is a
+>>>> lot more constrined, and thus by construction the iommu-dma layer will
+>>>> never generate a block-splitting iommu_unmap() except as a result of
+>>>> illegal DMA API usage, and we obviously do not need to optimise for that
+>>>> (you will get a warning about mismatched unmaps under dma-debug, but
+>>>> it's a bit too expensive to police in the general case).
+>>>>
+>>>
+>>> When I was reading the code around arm_lpae_split_blk_unmap(), I was
+>>> curious in which scenario a block will be split. Now with your comments
+>>> "Because DMA code is not the only caller of iommu_map/unmap", it seems
+>>> depending on the user.
+>>>
+>>> Would you please explain this further? I mean besides DMA, which user
+>>> will use iommu_map/umap and how it split a block.
+>>
+>> I also think that arm_lpae_split_blk_unmap() scenario is not exist, maybe
+>> we should remove it, and give a warning for this wrong usage.
+> 
+> Can't it happen with VFIO?
 
-arch/arm/mach-rpc/ecard.c:646:12: error: 'ecard_devices_proc_show' defined but not used [-Werror=unused-function]
+...or GPU drivers, or anyone else managing their own IOMMU domain 
+directly. A sequence like this is perfectly legal:
 
-This marks the function as __maybe_unused to let the compiler drop
-it silently.
+	iommu_map(domain, iova, paddr, SZ_8M, prot);
+	...
+	iommu_unmap(domain, iova + SZ_1M * 5, SZ_1M * 3);
 
-Fixes: 3f3942aca6da ("proc: introduce proc_create_single{,_data}")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-rpc/ecard.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+where if iova and paddr happen to be suitably aligned, the map will lay 
+down blocks, and the unmap will then have to split one of them into 
+pages to remove half of it. We don't tear our hair out maintaining 
+split_blk_unmap() for the fun of it :(
 
-diff --git a/arch/arm/mach-rpc/ecard.c b/arch/arm/mach-rpc/ecard.c
-index 6fb51d49ad26..761a629f9e9d 100644
---- a/arch/arm/mach-rpc/ecard.c
-+++ b/arch/arm/mach-rpc/ecard.c
-@@ -643,7 +643,7 @@ static int ecard_prints(struct seq_file *m, ecard_t *ec)
- 	return 0;
- }
- 
--static int ecard_devices_proc_show(struct seq_file *m, void *v)
-+static int __maybe_unused ecard_devices_proc_show(struct seq_file *m, void *v)
- {
- 	ecard_t *ec = cards;
- 
--- 
-2.18.0
+Robin.
