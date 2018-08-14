@@ -1,33 +1,35 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Tue, 14 Aug 2018 18:19:52 +0200
-Subject: [PATCH v1 1/7] atmel-hlcdc: renamed directory to drm/atmel/
-In-Reply-To: <20180814083913.GD21634@phenom.ffwll.local>
-References: <20180812184152.GA22343@ravnborg.org>
- <20180812184629.3808-1-sam@ravnborg.org>
- <20180814083913.GD21634@phenom.ffwll.local>
-Message-ID: <20180814161952.GA27951@ravnborg.org>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Tue, 14 Aug 2018 09:22:10 -0700
+Subject: Warning when using eMMC and partprobe: generic_make_request:
+ Trying to write to read-only block-device
+In-Reply-To: <CAOi1vP9Y5Nrr7kVo5GAKnS4casbXPa+LSgY=si=mAW6OHs7-BA@mail.gmail.com>
+References: <7f57199f45df7212fdbba0bd1e78142a@agner.ch>
+ <CAOi1vP9Y5Nrr7kVo5GAKnS4casbXPa+LSgY=si=mAW6OHs7-BA@mail.gmail.com>
+Message-ID: <CA+55aFwyCmYfUrGt61d-6B=1XiTLoudNO=_bQ9-g_rDg8Ao_VA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel.
+On Tue, Aug 14, 2018 at 8:24 AM Ilya Dryomov <idryomov@gmail.com> wrote:
+>
+> Looks like it's coming from that fsync():
+>
+>   sys_fsync
+>     do_fsync
+>       vfs_fsync_range
+>         blkdev_fsync
+>           blkdev_issue_flush
+>
+> I think we need to teach blkdev_issue_flush() to bail out if the bdev
+> is read-only, similar to blkdev_issue_discard(), _write_zeroes(), etc.
+> The question is which error code to use.  blkdev_fsync() already skips
+> over EOPNOTSUPP, so it is a (no-so-good) option.  Other blkdev_issue_
+> functions return EPERM.
 
-> >  rename drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_plane.c (100%)
-> > 
-> > diff --git a/MAINTAINERS b/MAINTAINERS
-> > index 96e98e206b0d..09ce76a9a1dc 100644
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -4681,7 +4681,7 @@ DRM DRIVERS FOR ATMEL HLCDC
-> >  M:	Boris Brezillon <boris.brezillon@bootlin.com>
-> >  L:	dri-devel at lists.freedesktop.org
-> >  S:	Supported
-> > -F:	drivers/gpu/drm/atmel-hlcdc/
-> > +F:	drivers/gpu/drm/atmel/atmel-hlcdc*
-> 
-> I'd strongly suggest you group-maintain the entire atmel stuff in
-> drm-misc instead of only atmel-hlcdc.
+Oh, just make issue_flush() return EROFS for a read-only device.
 
-If OK with Boris then I am fine with this too.
-Will suggest so in v2.
+Or maybe we should even just consider the flush to be a read operation?
 
-	Sam
+But I guess the error code gets percolated all the way to user space?
+The safest option might just be to return 0.
+
+               Linus
