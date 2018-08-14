@@ -1,51 +1,93 @@
-From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Tue, 14 Aug 2018 16:06:12 +0200
-Subject: [RESEND PATCH 6/6] ARM: defconfig: tegra: enable tegra raw nand driver
-In-Reply-To: <20180814140612.12554-1-marcel@ziswiler.com>
-References: <20180814140612.12554-1-marcel@ziswiler.com>
-Message-ID: <20180814140612.12554-6-marcel@ziswiler.com>
+From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
+Date: Tue, 14 Aug 2018 23:12:41 +0900
+Subject: [PATCH/RFT] arm64: dts: renesas: r8a77965: Add OPPs table for cpu
+ devices
+Message-ID: <1534255961-23326-1-git-send-email-ykaneko0929@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+From: Dien Pham <dien.pham.ry@renesas.com>
 
-Now with everything being merged actually enable it. Also enable
-MTD_OF_PARTS, MTD_BLOCK, MTD_NAND, MTD_UBI and UBIFS without which
-the former would not make much sense and is also in-line with
-multi_v7_defconfig.
+This patch adds OPPs table for CA57{0,1} cpu devices
 
-Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-
+Signed-off-by: Dien Pham <dien.pham.ry@renesas.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 ---
 
- arch/arm/configs/tegra_defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+This patch is based on the devel branch of Simon Horman's renesas tree.
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 24e297659b55..b248e231900f 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -79,8 +79,13 @@ CONFIG_DMA_CMA=y
- CONFIG_CMA_SIZE_MBYTES=64
- CONFIG_TEGRA_GMI=y
- CONFIG_MTD=y
-+CONFIG_MTD_OF_PARTS=y
-+CONFIG_MTD_BLOCK=y
- CONFIG_MTD_M25P80=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_TEGRA=y
- CONFIG_MTD_SPI_NOR=y
-+CONFIG_MTD_UBI=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_AD525X_DPOT=y
- CONFIG_AD525X_DPOT_I2C=y
-@@ -280,6 +285,7 @@ CONFIG_EXT3_FS_SECURITY=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
-+CONFIG_UBIFS_FS=y
- CONFIG_SQUASHFS=y
- CONFIG_SQUASHFS_LZO=y
- CONFIG_SQUASHFS_XZ=y
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 44 +++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+index 52205be..c5fb35b 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+@@ -60,6 +60,46 @@
+ 		clock-frequency = <0>;
+ 	};
+ 
++	cluster0_opp: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <830000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <830000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1500000000 {
++			opp-hz = /bits/ 64 <1500000000>;
++			opp-microvolt = <830000>;
++			clock-latency-ns = <300000>;
++			opp-suspend;
++		};
++		opp at 1600000000 {
++			opp-hz = /bits/ 64 <1600000000>;
++			opp-microvolt = <900000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++		opp at 1700000000 {
++			opp-hz = /bits/ 64 <1700000000>;
++			opp-microvolt = <900000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++		opp at 1800000000 {
++			opp-hz = /bits/ 64 <1800000000>;
++			opp-microvolt = <960000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -71,6 +111,8 @@
+ 			power-domains = <&sysc R8A77965_PD_CA57_CPU0>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
++			clocks =<&cpg CPG_CORE R8A77965_CLK_Z>;
++			operating-points-v2 = <&cluster0_opp>;
+ 		};
+ 
+ 		a57_1: cpu at 1 {
+@@ -80,6 +122,8 @@
+ 			power-domains = <&sysc R8A77965_PD_CA57_CPU1>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
++			clocks =<&cpg CPG_CORE R8A77965_CLK_Z>;
++			operating-points-v2 = <&cluster0_opp>;
+ 		};
+ 
+ 		L2_CA57: cache-controller-0 {
 -- 
-2.14.4
+1.9.1
