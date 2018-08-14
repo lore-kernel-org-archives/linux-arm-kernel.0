@@ -1,264 +1,85 @@
-From: prime.zeng@hisilicon.com (Zengtao (B))
-Date: Tue, 14 Aug 2018 05:56:29 +0000
-Subject: [RESEND PATCH] tee: add kernel internal client interface
-In-Reply-To: <20180709061549.24382-1-jens.wiklander@linaro.org>
-References: <20180709061549.24382-1-jens.wiklander@linaro.org>
-Message-ID: <678F3D1BB717D949B966B68EAEB446ED0C9B0F72@dggemm526-mbx.china.huawei.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 13 Aug 2018 23:10:12 -0700
+Subject: [PATCH 2/6] ARM: vfp: use __copy_from_user() when restoring VFP
+ state
+In-Reply-To: <20180726123244.x7klflacdykdtjbj@lakrids.cambridge.arm.com>
+References: <20180710141322.GL17271@n2100.armlinux.org.uk>
+ <E1fctOq-0005us-Ar@rmk-PC.armlinux.org.uk>
+ <20180726123244.x7klflacdykdtjbj@lakrids.cambridge.arm.com>
+Message-ID: <CAGXu5jKYoqoFUEojawWQZAzCDMvtWTtW5AQB48OYTYVhm5nSfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi jens:
+On Thu, Jul 26, 2018 at 5:32 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Jul 10, 2018 at 03:13:52PM +0100, Russell King wrote:
+>> Use __copy_from_user() rather than __get_user_err() for individual
+>> members when restoring VFP state.
+>
+> Same comment as for patch 1: I assume this is to amortize the cost of
+> the __user pointer santiziation, and if so it'd be good to mention that
+> in the commit message.
+>
+>>
+>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+>> ---
+>>  arch/arm/include/asm/thread_info.h |  2 +-
+>>  arch/arm/kernel/signal.c           | 20 ++++++++------------
+>>  arch/arm/vfp/vfpmodule.c           | 16 +++++++---------
+>>  3 files changed, 16 insertions(+), 22 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+>> index e71cc35de163..341f6eb9b8be 100644
+>> --- a/arch/arm/include/asm/thread_info.h
+>> +++ b/arch/arm/include/asm/thread_info.h
+>> @@ -123,7 +123,7 @@ struct user_vfp_exc;
+>>
+>>  extern int vfp_preserve_user_clear_hwstate(struct user_vfp __user *,
+>>                                          struct user_vfp_exc __user *);
+>> -extern int vfp_restore_user_hwstate(struct user_vfp __user *,
+>> +extern int vfp_restore_user_hwstate(struct user_vfp *,
+>>                                   struct user_vfp_exc __user *);
+>>  #endif
+>>
+>> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+>> index 0ae74207e43e..db62c51250ad 100644
+>> --- a/arch/arm/kernel/signal.c
+>> +++ b/arch/arm/kernel/signal.c
+>> @@ -150,22 +150,18 @@ static int preserve_vfp_context(struct vfp_sigframe __user *frame)
+>>
+>>  static int restore_vfp_context(char __user **auxp)
+>>  {
+>> -     struct vfp_sigframe __user *frame =
+>> -             (struct vfp_sigframe __user *)*auxp;
+>> -     unsigned long magic;
+>> -     unsigned long size;
+>> -     int err = 0;
+>> -
+>> -     __get_user_error(magic, &frame->magic, err);
+>> -     __get_user_error(size, &frame->size, err);
+>> +     struct vfp_sigframe frame;
+>> +     int err;
+>>
+>> +     err = __copy_from_user(&frame, *auxp, sizeof(frame));
+>>       if (err)
+>> -             return -EFAULT;
+>> -     if (magic != VFP_MAGIC || size != VFP_STORAGE_SIZE)
+>> +             return err;
 
-Actually, we have already used the kernel client api in our product(poplar board).
-Thank you for the upstream.
+While this appears not to have a behavior change (everything is
+checking non-zero), why return "err" here instead of -EFAULT?
+__copy_from_user() is returning a count, not a negative return code.
+Seems weird to mix that with the -EINVAL below...
 
-Tested-by: Zeng Tao <prime.zeng@hisilicon.com>
+>> +
+>> +     if (frame.magic != VFP_MAGIC || frame.size != VFP_STORAGE_SIZE)
+>>               return -EINVAL;
+>
+> I think that in a few cases, trying to load the whole vfp_sigframe size
+> first means that we can now fault and return -EFAULT when previously
+> we'd have returned -EINVAL.
 
-Regards
-Zengtao 
+-Kees
 
->-----Original Message-----
->From: Jens Wiklander [mailto:jens.wiklander at linaro.org]
->Sent: Monday, July 09, 2018 2:16 PM
->To: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->tee-dev at lists.linaro.org
->Cc: Zengtao (B) <prime.zeng@hisilicon.com>; Victor Chong
-><victor.chong@linaro.org>; Jerome Forissier <jerome.forissier@linaro.org>;
->Jens Wiklander <jens.wiklander@linaro.org>
->Subject: [RESEND PATCH] tee: add kernel internal client interface
->
->Adds a kernel internal TEE client interface to be used by other drivers.
->
->Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
->---
-> drivers/tee/tee_core.c  | 113 +++++++++++++++++++++++++++++++++++++---
-> include/linux/tee_drv.h |  73 ++++++++++++++++++++++++++
-> 2 files changed, 179 insertions(+), 7 deletions(-)
->
->diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c index
->dd46b758852a..7b2bb4c50058 100644
->--- a/drivers/tee/tee_core.c
->+++ b/drivers/tee/tee_core.c
->@@ -38,15 +38,13 @@ static DEFINE_SPINLOCK(driver_lock);  static struct
->class *tee_class;  static dev_t tee_devt;
->
->-static int tee_open(struct inode *inode, struct file *filp)
->+static struct tee_context *teedev_open(struct tee_device *teedev)
-> {
-> 	int rc;
->-	struct tee_device *teedev;
-> 	struct tee_context *ctx;
->
->-	teedev = container_of(inode->i_cdev, struct tee_device, cdev);
-> 	if (!tee_device_get(teedev))
->-		return -EINVAL;
->+		return ERR_PTR(-EINVAL);
->
-> 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
-> 	if (!ctx) {
->@@ -57,16 +55,16 @@ static int tee_open(struct inode *inode, struct file *filp)
-> 	kref_init(&ctx->refcount);
-> 	ctx->teedev = teedev;
-> 	INIT_LIST_HEAD(&ctx->list_shm);
->-	filp->private_data = ctx;
-> 	rc = teedev->desc->ops->open(ctx);
-> 	if (rc)
-> 		goto err;
->
->-	return 0;
->+	return ctx;
-> err:
-> 	kfree(ctx);
-> 	tee_device_put(teedev);
->-	return rc;
->+	return ERR_PTR(rc);
->+
-> }
->
-> void teedev_ctx_get(struct tee_context *ctx) @@ -100,6 +98,18 @@ static
->void teedev_close_context(struct tee_context *ctx)
-> 	teedev_ctx_put(ctx);
-> }
->
->+static int tee_open(struct inode *inode, struct file *filp) {
->+	struct tee_context *ctx;
->+
->+	ctx = teedev_open(container_of(inode->i_cdev, struct tee_device, cdev));
->+	if (IS_ERR(ctx))
->+		return PTR_ERR(ctx);
->+
->+	filp->private_data = ctx;
->+	return 0;
->+}
->+
-> static int tee_release(struct inode *inode, struct file *filp)  {
-> 	teedev_close_context(filp->private_data);
->@@ -928,6 +938,95 @@ void *tee_get_drvdata(struct tee_device *teedev)  }
->EXPORT_SYMBOL_GPL(tee_get_drvdata);
->
->+struct match_dev_data {
->+	struct tee_ioctl_version_data *vers;
->+	const void *data;
->+	int (*match)(struct tee_ioctl_version_data *, const void *); };
->+
->+static int match_dev(struct device *dev, const void *data) {
->+	const struct match_dev_data *match_data = data;
->+	struct tee_device *teedev = container_of(dev, struct tee_device, dev);
->+
->+	teedev->desc->ops->get_version(teedev, match_data->vers);
->+	return match_data->match(match_data->vers, match_data->data); }
->+
->+struct tee_context *
->+tee_client_open_context(struct tee_context *start,
->+			int (*match)(struct tee_ioctl_version_data *,
->+				     const void *),
->+			const void *data, struct tee_ioctl_version_data *vers) {
->+	struct device *dev = NULL;
->+	struct device *put_dev = NULL;
->+	struct tee_context *ctx = NULL;
->+	struct tee_ioctl_version_data v;
->+	struct match_dev_data match_data = { vers ? vers : &v, data, match };
->+
->+	if (start)
->+		dev = &start->teedev->dev;
->+
->+	do {
->+		dev = class_find_device(tee_class, dev, &match_data, match_dev);
->+		if (!dev) {
->+			ctx = ERR_PTR(-ENOENT);
->+			break;
->+		}
->+
->+		put_device(put_dev);
->+		put_dev = dev;
->+
->+		ctx = teedev_open(container_of(dev, struct tee_device, dev));
->+	} while (IS_ERR(ctx) && PTR_ERR(ctx) != -ENOMEM);
->+
->+	put_device(put_dev);
->+	return ctx;
->+}
->+EXPORT_SYMBOL_GPL(tee_client_open_context);
->+
->+void tee_client_close_context(struct tee_context *ctx) {
->+	teedev_close_context(ctx);
->+}
->+EXPORT_SYMBOL_GPL(tee_client_close_context);
->+
->+void tee_client_get_version(struct tee_context *ctx,
->+			    struct tee_ioctl_version_data *vers) {
->+	ctx->teedev->desc->ops->get_version(ctx->teedev, vers); }
->+EXPORT_SYMBOL_GPL(tee_client_get_version);
->+
->+int tee_client_open_session(struct tee_context *ctx,
->+			    struct tee_ioctl_open_session_arg *arg,
->+			    struct tee_param *param)
->+{
->+	if (!ctx->teedev->desc->ops->open_session)
->+		return -EINVAL;
->+	return ctx->teedev->desc->ops->open_session(ctx, arg, param); }
->+EXPORT_SYMBOL_GPL(tee_client_open_session);
->+
->+int tee_client_close_session(struct tee_context *ctx, u32 session) {
->+	if (!ctx->teedev->desc->ops->close_session)
->+		return -EINVAL;
->+	return ctx->teedev->desc->ops->close_session(ctx, session); }
->+EXPORT_SYMBOL_GPL(tee_client_close_session);
->+
->+int tee_client_invoke_func(struct tee_context *ctx,
->+			   struct tee_ioctl_invoke_arg *arg,
->+			   struct tee_param *param)
->+{
->+	if (!ctx->teedev->desc->ops->invoke_func)
->+		return -EINVAL;
->+	return ctx->teedev->desc->ops->invoke_func(ctx, arg, param); }
->+EXPORT_SYMBOL_GPL(tee_client_invoke_func);
->+
-> static int __init tee_init(void)
-> {
-> 	int rc;
->diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h index
->a2b3dfcee0b5..6cfe05893a76 100644
->--- a/include/linux/tee_drv.h
->+++ b/include/linux/tee_drv.h
->@@ -453,6 +453,79 @@ static inline int tee_shm_get_id(struct tee_shm *shm)
->  */
-> struct tee_shm *tee_shm_get_from_id(struct tee_context *ctx, int id);
->
->+/**
->+ * tee_client_open_context() - Open a TEE context
->+ * @start:	if not NULL, continue search after this context
->+ * @match:	function to check TEE device
->+ * @data:	data for match function
->+ * @vers:	if not NULL, version data of TEE device of the context returned
->+ *
->+ * This function does an operation similar to open("/dev/teeX") in user space.
->+ * A returned context must be released with tee_client_close_context().
->+ *
->+ * Returns a TEE context of the first TEE device matched by the match()
->+ * callback or an ERR_PTR.
->+ */
->+struct tee_context *
->+tee_client_open_context(struct tee_context *start,
->+			int (*match)(struct tee_ioctl_version_data *,
->+				     const void *),
->+			const void *data, struct tee_ioctl_version_data *vers);
->+
->+/**
->+ * tee_client_close_context() - Close a TEE context
->+ * @ctx:	TEE context to close
->+ *
->+ * Note that all sessions previously opened with this context will be
->+ * closed when this function is called.
->+ */
->+void tee_client_close_context(struct tee_context *ctx);
->+
->+/**
->+ * tee_client_get_version() - Query version of TEE
->+ * @ctx:	TEE context to TEE to query
->+ * @vers:	Pointer to version data
->+ */
->+void tee_client_get_version(struct tee_context *ctx,
->+			    struct tee_ioctl_version_data *vers);
->+
->+/**
->+ * tee_client_open_session() - Open a session to a Trusted Application
->+ * @ctx:	TEE context
->+ * @arg:	Open session arguments, see description of
->+ *		struct tee_ioctl_open_session_arg
->+ * @param:	Parameters passed to the Trusted Application
->+ *
->+ * Returns < 0 on error else see @arg->ret for result. If @arg->ret
->+ * is TEEC_SUCCESS the session identifier is available in @arg->session.
->+ */
->+int tee_client_open_session(struct tee_context *ctx,
->+			    struct tee_ioctl_open_session_arg *arg,
->+			    struct tee_param *param);
->+
->+/**
->+ * tee_client_close_session() - Close a session to a Trusted Application
->+ * @ctx:	TEE Context
->+ * @session:	Session id
->+ *
->+ * Return < 0 on error else 0, regardless the session will not be
->+ * valid after this function has returned.
->+ */
->+int tee_client_close_session(struct tee_context *ctx, u32 session);
->+
->+/**
->+ * tee_client_invoke_func() - Invoke a function in a Trusted Application
->+ * @ctx:	TEE Context
->+ * @arg:	Invoke arguments, see description of
->+ *		struct tee_ioctl_invoke_arg
->+ * @param:	Parameters passed to the Trusted Application
->+ *
->+ * Returns < 0 on error else see @arg->ret for result.
->+ */
->+int tee_client_invoke_func(struct tee_context *ctx,
->+			   struct tee_ioctl_invoke_arg *arg,
->+			   struct tee_param *param);
->+
-> static inline bool tee_param_is_memref(struct tee_param *param)  {
-> 	switch (param->attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) {
->--
->2.17.1
+-- 
+Kees Cook
+Pixel Security
