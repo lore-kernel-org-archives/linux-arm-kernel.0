@@ -1,162 +1,128 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 14 Aug 2018 17:42:31 +0530
-Subject: [PATCH v12 12/14] clk: qcom: Add safe switch hook for krait mux clocks
+Date: Tue, 14 Aug 2018 17:42:25 +0530
+Subject: [PATCH v12 06/14] clk: qcom: Add IPQ806X's HFPLLs
 In-Reply-To: <1534248753-2440-1-git-send-email-sricharan@codeaurora.org>
 References: <1534248753-2440-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1534248753-2440-13-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1534248753-2440-7-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the Hfplls are reprogrammed during the rate change,
-the primary muxes which are sourced from the same hfpll
-for higher frequencies, needs to be switched to the 'safe
-secondary mux' as the parent for that small window. This
-is done by registering a clk notifier for the muxes and
-switching to the safe parent in the PRE_RATE_CHANGE notifier
-and back to the original parent in the POST_RATE_CHANGE notifier.
+From: Stephen Boyd <sboyd@codeaurora.org>
 
+Describe the HFPLLs present on IPQ806X devices.
+
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- drivers/clk/qcom/clk-krait.c |  2 ++
- drivers/clk/qcom/clk-krait.h |  3 +++
- drivers/clk/qcom/krait-cc.c  | 56 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 61 insertions(+)
+ drivers/clk/qcom/gcc-ipq806x.c | 82 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 82 insertions(+)
 
-diff --git a/drivers/clk/qcom/clk-krait.c b/drivers/clk/qcom/clk-krait.c
-index 7ede744..59f1af4 100644
---- a/drivers/clk/qcom/clk-krait.c
-+++ b/drivers/clk/qcom/clk-krait.c
-@@ -50,6 +50,8 @@ static int krait_mux_set_parent(struct clk_hw *hw, u8 index)
- 	if (__clk_is_enabled(hw->clk))
- 		__krait_mux_set_sel(mux, sel);
+diff --git a/drivers/clk/qcom/gcc-ipq806x.c b/drivers/clk/qcom/gcc-ipq806x.c
+index 5f61225..33d1bc5 100644
+--- a/drivers/clk/qcom/gcc-ipq806x.c
++++ b/drivers/clk/qcom/gcc-ipq806x.c
+@@ -30,6 +30,7 @@
+ #include "clk-pll.h"
+ #include "clk-rcg.h"
+ #include "clk-branch.h"
++#include "clk-hfpll.h"
+ #include "reset.h"
  
-+	mux->reparent = true;
-+
- 	return 0;
- }
- 
-diff --git a/drivers/clk/qcom/clk-krait.h b/drivers/clk/qcom/clk-krait.h
-index 441ba1e..9120bd2 100644
---- a/drivers/clk/qcom/clk-krait.h
-+++ b/drivers/clk/qcom/clk-krait.h
-@@ -12,6 +12,9 @@ struct krait_mux_clk {
- 	u32		shift;
- 	u32		en_mask;
- 	bool		lpl;
-+	u8		safe_sel;
-+	u8		old_index;
-+	bool		reparent;
- 
- 	struct clk_hw	hw;
- 	struct notifier_block   clk_nb;
-diff --git a/drivers/clk/qcom/krait-cc.c b/drivers/clk/qcom/krait-cc.c
-index 7c9dfb0..4d4b657 100644
---- a/drivers/clk/qcom/krait-cc.c
-+++ b/drivers/clk/qcom/krait-cc.c
-@@ -26,6 +26,49 @@
- 	0,
+ static struct clk_pll pll0 = {
+@@ -113,6 +114,84 @@
+ 	},
  };
  
-+/*
-+ * Notifier function for switching the muxes to safe parent
-+ * while the hfpll is getting reprogrammed.
-+ */
-+static int krait_notifier_cb(struct notifier_block *nb,
-+			     unsigned long event,
-+			     void *data)
-+{
-+	int ret = 0;
-+	struct krait_mux_clk *mux = container_of(nb, struct krait_mux_clk,
-+						 clk_nb);
-+	/* Switch to safe parent */
-+	if (event == PRE_RATE_CHANGE) {
-+		mux->old_index = krait_mux_clk_ops.get_parent(&mux->hw);
-+		ret = krait_mux_clk_ops.set_parent(&mux->hw, mux->safe_sel);
-+		mux->reparent = false;
-+	/*
-+	 * By the time POST_RATE_CHANGE notifier is called,
-+	 * clk framework itself would have changed the parent for the new rate.
-+	 * Only otherwise, put back to the old parent.
-+	 */
-+	} else if (event == POST_RATE_CHANGE) {
-+		if (!mux->reparent)
-+			ret = krait_mux_clk_ops.set_parent(&mux->hw,
-+							   mux->old_index);
-+	}
++static struct hfpll_data hfpll0_data = {
++	.mode_reg = 0x3200,
++	.l_reg = 0x3208,
++	.m_reg = 0x320c,
++	.n_reg = 0x3210,
++	.config_reg = 0x3204,
++	.status_reg = 0x321c,
++	.config_val = 0x7845c665,
++	.droop_reg = 0x3214,
++	.droop_val = 0x0108c000,
++	.min_rate = 600000000UL,
++	.max_rate = 1800000000UL,
++};
 +
-+	return notifier_from_errno(ret);
-+}
++static struct clk_hfpll hfpll0 = {
++	.d = &hfpll0_data,
++	.clkr.hw.init = &(struct clk_init_data){
++		.parent_names = (const char *[]){ "pxo" },
++		.num_parents = 1,
++		.name = "hfpll0",
++		.ops = &clk_ops_hfpll,
++		.flags = CLK_IGNORE_UNUSED,
++	},
++	.lock = __SPIN_LOCK_UNLOCKED(hfpll0.lock),
++};
 +
-+static int krait_notifier_register(struct device *dev, struct clk *clk,
-+				   struct krait_mux_clk *mux)
-+{
-+	int ret = 0;
++static struct hfpll_data hfpll1_data = {
++	.mode_reg = 0x3240,
++	.l_reg = 0x3248,
++	.m_reg = 0x324c,
++	.n_reg = 0x3250,
++	.config_reg = 0x3244,
++	.status_reg = 0x325c,
++	.config_val = 0x7845c665,
++	.droop_reg = 0x3314,
++	.droop_val = 0x0108c000,
++	.min_rate = 600000000UL,
++	.max_rate = 1800000000UL,
++};
 +
-+	mux->clk_nb.notifier_call = krait_notifier_cb;
-+	ret = clk_notifier_register(clk, &mux->clk_nb);
-+	if (ret)
-+		dev_err(dev, "failed to register clock notifier: %d\n", ret);
++static struct clk_hfpll hfpll1 = {
++	.d = &hfpll1_data,
++	.clkr.hw.init = &(struct clk_init_data){
++		.parent_names = (const char *[]){ "pxo" },
++		.num_parents = 1,
++		.name = "hfpll1",
++		.ops = &clk_ops_hfpll,
++		.flags = CLK_IGNORE_UNUSED,
++	},
++	.lock = __SPIN_LOCK_UNLOCKED(hfpll1.lock),
++};
 +
-+	return ret;
-+}
++static struct hfpll_data hfpll_l2_data = {
++	.mode_reg = 0x3300,
++	.l_reg = 0x3308,
++	.m_reg = 0x330c,
++	.n_reg = 0x3310,
++	.config_reg = 0x3304,
++	.status_reg = 0x331c,
++	.config_val = 0x7845c665,
++	.droop_reg = 0x3314,
++	.droop_val = 0x0108c000,
++	.min_rate = 600000000UL,
++	.max_rate = 1800000000UL,
++};
 +
- static int
- krait_add_div(struct device *dev, int id, const char *s, unsigned int offset)
- {
-@@ -70,6 +113,7 @@
- krait_add_sec_mux(struct device *dev, int id, const char *s,
- 		  unsigned int offset, bool unique_aux)
- {
-+	int ret;
- 	struct krait_mux_clk *mux;
- 	static const char *sec_mux_list[] = {
- 		"acpu_aux",
-@@ -93,6 +137,7 @@
- 	mux->shift = 2;
- 	mux->parent_map = sec_mux_map;
- 	mux->hw.init = &init;
-+	mux->safe_sel = 0;
- 
- 	init.name = kasprintf(GFP_KERNEL, "krait%s_sec_mux", s);
- 	if (!init.name)
-@@ -108,6 +153,11 @@
- 
- 	clk = devm_clk_register(dev, &mux->hw);
- 
-+	ret = krait_notifier_register(dev, clk, mux);
-+	if (ret)
-+		goto unique_aux;
++static struct clk_hfpll hfpll_l2 = {
++	.d = &hfpll_l2_data,
++	.clkr.hw.init = &(struct clk_init_data){
++		.parent_names = (const char *[]){ "pxo" },
++		.num_parents = 1,
++		.name = "hfpll_l2",
++		.ops = &clk_ops_hfpll,
++		.flags = CLK_IGNORE_UNUSED,
++	},
++	.lock = __SPIN_LOCK_UNLOCKED(hfpll_l2.lock),
++};
 +
-+unique_aux:
- 	if (unique_aux)
- 		kfree(sec_mux_list[0]);
- err_aux:
-@@ -119,6 +169,7 @@
- krait_add_pri_mux(struct device *dev, int id, const char *s,
- 		  unsigned int offset)
- {
-+	int ret;
- 	struct krait_mux_clk *mux;
- 	const char *p_names[3];
- 	struct clk_init_data init = {
-@@ -139,6 +190,7 @@
- 	mux->lpl = id >= 0;
- 	mux->parent_map = pri_mux_map;
- 	mux->hw.init = &init;
-+	mux->safe_sel = 2;
+ static struct clk_pll pll14 = {
+ 	.l_reg = 0x31c4,
+ 	.m_reg = 0x31c8,
+@@ -2797,6 +2876,9 @@ enum {
+ 	[UBI32_CORE2_CLK_SRC] = &ubi32_core2_src_clk.clkr,
+ 	[NSSTCM_CLK_SRC] = &nss_tcm_src.clkr,
+ 	[NSSTCM_CLK] = &nss_tcm_clk.clkr,
++	[PLL9] = &hfpll0.clkr,
++	[PLL10] = &hfpll1.clkr,
++	[PLL12] = &hfpll_l2.clkr,
+ };
  
- 	init.name = kasprintf(GFP_KERNEL, "krait%s_pri_mux", s);
- 	if (!init.name)
-@@ -164,6 +216,10 @@
- 
- 	clk = devm_clk_register(dev, &mux->hw);
- 
-+	ret = krait_notifier_register(dev, clk, mux);
-+	if (ret)
-+		goto err_p3;
-+err_p3:
- 	kfree(p_names[2]);
- err_p2:
- 	kfree(p_names[1]);
+ static const struct qcom_reset_map gcc_ipq806x_resets[] = {
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
