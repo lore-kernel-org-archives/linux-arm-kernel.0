@@ -1,25 +1,88 @@
 From: hanjie.lin@amlogic.com (Hanjie Lin)
-Date: Tue, 14 Aug 2018 02:18:40 -0400
-Subject: [PATCH 0/2] add the Amlogic Meson PCIe controller driver.
-Message-ID: <1534227522-186798-1-git-send-email-hanjie.lin@amlogic.com>
+Date: Tue, 14 Aug 2018 02:18:41 -0400
+Subject: [PATCH 1/2] dt-bindings: PCI: meson: add DT bindings for Amlogic
+ Meson PCIe controller
+In-Reply-To: <1534227522-186798-1-git-send-email-hanjie.lin@amlogic.com>
+References: <1534227522-186798-1-git-send-email-hanjie.lin@amlogic.com>
+Message-ID: <1534227522-186798-2-git-send-email-hanjie.lin@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Yue Wang <yue.wang@amlogic.com>
+
 The Amlogic Meson PCIe host controller is based on the Synopsys DesignWare
-PCI core. This patchset add the driver and dt-bindings of the controller.
+PCI core. This patch adds documentation for the DT bindings in Meson PCIe
+controller.
 
-Yue Wang (2):
-  dt-bindings: PCI: meson: add DT bindings for Amlogic Meson PCIe
-    controller
-  PCI: meson: add the Amlogic Meson PCIe controller driver
-
- .../devicetree/bindings/pci/amlogic,meson-pcie.txt |  57 ++
- drivers/pci/controller/dwc/Kconfig                 |  12 +
- drivers/pci/controller/dwc/Makefile                |   1 +
- drivers/pci/controller/dwc/pci-meson.c             | 588 +++++++++++++++++++++
- 4 files changed, 658 insertions(+)
+Signed-off-by: Yue Wang <hanjie.lin@amlogic.com>
+Signed-off-by: Hanjie Lin <hanjie.lin@amlogic.com>
+---
+ .../devicetree/bindings/pci/amlogic,meson-pcie.txt | 57 ++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
- create mode 100644 drivers/pci/controller/dwc/pci-meson.c
 
+diff --git a/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
+new file mode 100644
+index 0000000..48233e4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
+@@ -0,0 +1,57 @@
++Amlogic Meson AXG DWC PCIE SoC controller
++
++Amlogic Meson PCIe host controller is based on the Synopsys DesignWare PCI core.
++It shares common functions with the PCIe DesignWare core driver and
++inherits common properties defined in
++Documentation/devicetree/bindings/pci/designware-pci.txt.
++
++Additional properties are described here:
++
++Required properties:
++- compatible:
++	should contain "amlogic,axg-pcie" to identify the core.
++- reg:
++	Should contain the configuration address space.
++- reg-names: Must be
++	- "elbi"	External local bus interface registers
++	- "cfg"		Meson specific registers
++	- "config"	PCIe configuration space
++- clocks: Must contain an entry for each entry in clock-names.
++- clock-names: Must include the following entries:
++	- "pcie"
++	- "pcie_bus"
++	- "pcie_general"
++	- "pcie_mipi_en"
++
++Example configuration:
++
++	pcie: pcie at dffff000 {
++			compatible = "amlogic,axg-pcie", "snps,dw-pcie";
++			reg = <0x0 0xf9800000 0x0 0x400000
++					0x0 0xff646000 0x0 0x2000
++					0x0 0xf9f00000 0x0 0x100000>;
++			reg-names = "elbi", "cfg", "config";
++			reset-gpio = <&gpio GPIOX_19 GPIO_ACTIVE_HIGH>;
++			interrupts = <0 177 IRQ_TYPE_EDGE_RISING>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0 0 0 0 &gic GIC_SPI 179 IRQ_TYPE_EDGE_RISING>;
++			bus-range = <0x0 0xff>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			phys = <&pcie_phy>;
++			ranges = <0x82000000 0 0 0x0 0xf9c00000 0 0x00300000>;
++			num-lanes = <1>;
++			pcie-num = <1>;
++
++			clocks = <&clkc CLKID_USB
++					&clkc CLKID_MIPI_ENABLE
++					&clkc CLKID_PCIE_A
++					&clkc CLKID_PCIE_CML_EN0>;
++			clock-names = "pcie_general",
++					"pcie_refpll",
++					"pcie_mipi_en",
++					"pcie",
++					"port";
++	};
 -- 
 2.7.4
