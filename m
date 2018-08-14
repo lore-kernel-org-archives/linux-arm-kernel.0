@@ -1,43 +1,136 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 14 Aug 2018 09:35:01 +0100
-Subject: [PATCH v3 4/6] iommu/io-pgtable-arm: add support for non-strict
- mode
-In-Reply-To: <5B7293E5.7040702@huawei.com>
-References: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
- <1531376312-2192-5-git-send-email-thunder.leizhen@huawei.com>
- <89cc2201-99ab-3f3b-a2d1-1766515d4375@arm.com>
- <5B597628.2020103@huawei.com>
- <04239cfa-bcf2-a33a-e662-ebc75e66782b@arm.com>
- <1d24541340334954969c58980ef85444@HXTBJIDCEMVIW01.hxtcorp.net>
- <5B7293E5.7040702@huawei.com>
-Message-ID: <20180814083500.GA28101@arm.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 14 Aug 2018 10:39:13 +0200
+Subject: [PATCH v1 1/7] atmel-hlcdc: renamed directory to drm/atmel/
+In-Reply-To: <20180812184629.3808-1-sam@ravnborg.org>
+References: <20180812184152.GA22343@ravnborg.org>
+ <20180812184629.3808-1-sam@ravnborg.org>
+Message-ID: <20180814083913.GD21634@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2018 at 04:33:41PM +0800, Leizhen (ThunderTown) wrote:
-> On 2018/8/6 9:32, Yang, Shunyong wrote:
-> > On 2018/7/26 22:37, Robin Murphy wrote:
-> >> Because DMA code is not the only caller of iommu_map/unmap. It's 
-> >> perfectly legal in the IOMMU API to partially unmap a previous mapping 
-> >> such that a block entry needs to be split. The DMA API, however, is a 
-> >> lot more constrined, and thus by construction the iommu-dma layer will 
-> >> never generate a block-splitting iommu_unmap() except as a result of 
-> >> illegal DMA API usage, and we obviously do not need to optimise for that 
-> >> (you will get a warning about mismatched unmaps under dma-debug, but 
-> >> it's a bit too expensive to police in the general case).
-> >>
-> > 
-> > When I was reading the code around arm_lpae_split_blk_unmap(), I was
-> > curious in which scenario a block will be split. Now with your comments
-> > "Because DMA code is not the only caller of iommu_map/unmap", it seems
-> > depending on the user.
-> > 
-> > Would you please explain this further? I mean besides DMA, which user
-> > will use iommu_map/umap and how it split a block.
+On Sun, Aug 12, 2018 at 08:46:23PM +0200, Sam Ravnborg wrote:
+> Use vendor name for directory, adding a suitable place
+> for more atmel DRM drivers.
 > 
-> I also think that arm_lpae_split_blk_unmap() scenario is not exist, maybe
-> we should remove it, and give a warning for this wrong usage.
+> Signed-off-by: Sam Ravnborg <sam@ravnborg.org>
+> Cc: Boris Brezillon <boris.brezillon@bootlin.com>
+> ---
+>  MAINTAINERS                                                 | 2 +-
+>  drivers/gpu/drm/Kconfig                                     | 2 +-
+>  drivers/gpu/drm/Makefile                                    | 2 +-
+>  drivers/gpu/drm/{atmel-hlcdc => atmel}/Kconfig              | 6 ++++++
+>  drivers/gpu/drm/{atmel-hlcdc => atmel}/Makefile             | 0
+>  drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_crtc.c   | 0
+>  drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_dc.c     | 0
+>  drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_dc.h     | 0
+>  drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_output.c | 0
+>  drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_plane.c  | 0
+>  10 files changed, 9 insertions(+), 3 deletions(-)
+>  rename drivers/gpu/drm/{atmel-hlcdc => atmel}/Kconfig (83%)
+>  rename drivers/gpu/drm/{atmel-hlcdc => atmel}/Makefile (100%)
+>  rename drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_crtc.c (100%)
+>  rename drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_dc.c (100%)
+>  rename drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_dc.h (100%)
+>  rename drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_output.c (100%)
+>  rename drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_plane.c (100%)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 96e98e206b0d..09ce76a9a1dc 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -4681,7 +4681,7 @@ DRM DRIVERS FOR ATMEL HLCDC
+>  M:	Boris Brezillon <boris.brezillon@bootlin.com>
+>  L:	dri-devel at lists.freedesktop.org
+>  S:	Supported
+> -F:	drivers/gpu/drm/atmel-hlcdc/
+> +F:	drivers/gpu/drm/atmel/atmel-hlcdc*
 
-Can't it happen with VFIO?
+I'd strongly suggest you group-maintain the entire atmel stuff in
+drm-misc instead of only atmel-hlcdc.
+-Daniel
 
-Will
+>  F:	Documentation/devicetree/bindings/display/atmel/
+>  T:	git git://anongit.freedesktop.org/drm/drm-misc
+>  
+> diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
+> index 2a72d2feb76d..4130df0c0dba 100644
+> --- a/drivers/gpu/drm/Kconfig
+> +++ b/drivers/gpu/drm/Kconfig
+> @@ -232,7 +232,7 @@ source "drivers/gpu/drm/cirrus/Kconfig"
+>  
+>  source "drivers/gpu/drm/armada/Kconfig"
+>  
+> -source "drivers/gpu/drm/atmel-hlcdc/Kconfig"
+> +source "drivers/gpu/drm/atmel/Kconfig"
+>  
+>  source "drivers/gpu/drm/rcar-du/Kconfig"
+>  
+> diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+> index ef9f3dab287f..ce9829967128 100644
+> --- a/drivers/gpu/drm/Makefile
+> +++ b/drivers/gpu/drm/Makefile
+> @@ -76,7 +76,7 @@ obj-$(CONFIG_DRM_GMA500) += gma500/
+>  obj-$(CONFIG_DRM_UDL) += udl/
+>  obj-$(CONFIG_DRM_AST) += ast/
+>  obj-$(CONFIG_DRM_ARMADA) += armada/
+> -obj-$(CONFIG_DRM_ATMEL_HLCDC)	+= atmel-hlcdc/
+> +obj-$(CONFIG_DRM_ATMEL)	+= atmel/
+>  obj-$(CONFIG_DRM_RCAR_DU) += rcar-du/
+>  obj-$(CONFIG_DRM_SHMOBILE) +=shmobile/
+>  obj-y			+= omapdrm/
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/Kconfig b/drivers/gpu/drm/atmel/Kconfig
+> similarity index 83%
+> rename from drivers/gpu/drm/atmel-hlcdc/Kconfig
+> rename to drivers/gpu/drm/atmel/Kconfig
+> index 32bcc4bad06a..7cd3862f9d18 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/Kconfig
+> +++ b/drivers/gpu/drm/atmel/Kconfig
+> @@ -1,6 +1,12 @@
+> +config DRM_ATMEL
+> +	bool
+> +	help
+> +	  Enable Atmel DRM support
+> +
+>  config DRM_ATMEL_HLCDC
+>  	tristate "DRM Support for ATMEL HLCDC Display Controller"
+>  	depends on DRM && OF && COMMON_CLK && MFD_ATMEL_HLCDC && ARM
+> +	select DRM_ATMEL
+>  	select DRM_GEM_CMA_HELPER
+>  	select DRM_KMS_HELPER
+>  	select DRM_KMS_CMA_HELPER
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/Makefile b/drivers/gpu/drm/atmel/Makefile
+> similarity index 100%
+> rename from drivers/gpu/drm/atmel-hlcdc/Makefile
+> rename to drivers/gpu/drm/atmel/Makefile
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel/atmel_hlcdc_crtc.c
+> similarity index 100%
+> rename from drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> rename to drivers/gpu/drm/atmel/atmel_hlcdc_crtc.c
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel/atmel_hlcdc_dc.c
+> similarity index 100%
+> rename from drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> rename to drivers/gpu/drm/atmel/atmel_hlcdc_dc.c
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel/atmel_hlcdc_dc.h
+> similarity index 100%
+> rename from drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+> rename to drivers/gpu/drm/atmel/atmel_hlcdc_dc.h
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel/atmel_hlcdc_output.c
+> similarity index 100%
+> rename from drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> rename to drivers/gpu/drm/atmel/atmel_hlcdc_output.c
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel/atmel_hlcdc_plane.c
+> similarity index 100%
+> rename from drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+> rename to drivers/gpu/drm/atmel/atmel_hlcdc_plane.c
+> -- 
+> 2.12.0
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
