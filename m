@@ -1,45 +1,131 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 14 Aug 2018 13:58:41 +0200
-Subject: [PATCH v3 0/2] arm64: dts: meson-g12a: Introduce new DT files
- for Meson-G12A SoC
-In-Reply-To: <1534243121-33589-1-git-send-email-jianxin.pan@amlogic.com>
-References: <1534243121-33589-1-git-send-email-jianxin.pan@amlogic.com>
-Message-ID: <170648ffb748c7b3890f5d7293920873efd16e30.camel@baylibre.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Tue, 14 Aug 2018 17:42:20 +0530
+Subject: [PATCH v12 01/14] ARM: Add Krait L2 register accessor functions
+In-Reply-To: <1534248753-2440-1-git-send-email-sricharan@codeaurora.org>
+References: <1534248753-2440-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1534248753-2440-2-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-08-14 at 18:38 +0800, Jianxin Pan wrote:
-> This attempt will try to add new DT files to support Meson-G12A SoC.
-> 
-> 1) first, Please notice that, in this patch series, the DT node about 16M reserved
-> memory for hwrom is removed, since it's not needed by G12A SoC.
-> 2) second, the pclk for uart_AO need to be fixed once G12A clock_ao driver is
-> merged. In this version, it rely on bootloader to enable the pclk gate which 
-> belong to AO clock domain. Please add clk_ignore_unused to bootargs.
-> 
-> Changes since v2 [1]:
->  - reorder subnodes
->  - collect Rob's Reviewed-by
-> 
-> Changes since v1 [0]:
->  - fix signoff typo
->  - order subnodes by addresses when there is one and alphabetically when there is none
-> 
-> [0] https://lore.kernel.org/lkml/1533802951-49919-2-git-send-email-jianxin.pan at amlogic.com/
-> 
-> Jianxin Pan (2):
->   dt-bindings: arm: amlogic: Add Meson G12A binding
->   arm64: dts: meson-g12a: add initial g12a s905d2 SoC DT support
-> 
->  Documentation/devicetree/bindings/arm/amlogic.txt |   6 +
->  arch/arm64/boot/dts/amlogic/Makefile              |   1 +
->  arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts   |  22 +++
->  arch/arm64/boot/dts/amlogic/meson-g12a.dtsi       | 172 ++++++++++++++++++++++
->  4 files changed, 201 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
-> 
+From: Stephen Boyd <sboyd@codeaurora.org>
 
-Series looks good as far as I can tell
+Krait CPUs have a handful of L2 cache controller registers that
+live behind a cp15 based indirection register. First you program
+the indirection register (l2cpselr) to point the L2 'window'
+register (l2cpdr) at what you want to read/write.  Then you
+read/write the 'window' register to do what you want. The
+l2cpselr register is not banked per-cpu so we must lock around
+accesses to it to prevent other CPUs from re-pointing l2cpdr
+underneath us.
 
-Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+---
+ arch/arm/common/Kconfig                   |  3 ++
+ arch/arm/common/Makefile                  |  1 +
+ arch/arm/common/krait-l2-accessors.c      | 48 +++++++++++++++++++++++++++++++
+ arch/arm/include/asm/krait-l2-accessors.h |  9 ++++++
+ 4 files changed, 61 insertions(+)
+ create mode 100644 arch/arm/common/krait-l2-accessors.c
+ create mode 100644 arch/arm/include/asm/krait-l2-accessors.h
+
+diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+index e5ad070..c8e1986 100644
+--- a/arch/arm/common/Kconfig
++++ b/arch/arm/common/Kconfig
+@@ -7,6 +7,9 @@ config DMABOUNCE
+ 	bool
+ 	select ZONE_DMA
+ 
++config KRAIT_L2_ACCESSORS
++	bool
++
+ config SHARP_LOCOMO
+ 	bool
+ 
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index 3157be4..219a260 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -7,6 +7,7 @@ obj-y				+= firmware.o
+ 
+ obj-$(CONFIG_SA1111)		+= sa1111.o
+ obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
++obj-$(CONFIG_KRAIT_L2_ACCESSORS) += krait-l2-accessors.o
+ obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
+ obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+diff --git a/arch/arm/common/krait-l2-accessors.c b/arch/arm/common/krait-l2-accessors.c
+new file mode 100644
+index 0000000..9a97dda
+--- /dev/null
++++ b/arch/arm/common/krait-l2-accessors.c
+@@ -0,0 +1,48 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2018, The Linux Foundation. All rights reserved.
++
++#include <linux/spinlock.h>
++#include <linux/export.h>
++
++#include <asm/barrier.h>
++#include <asm/krait-l2-accessors.h>
++
++static DEFINE_RAW_SPINLOCK(krait_l2_lock);
++
++void krait_set_l2_indirect_reg(u32 addr, u32 val)
++{
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&krait_l2_lock, flags);
++	/*
++	 * Select the L2 window by poking l2cpselr, then write to the window
++	 * via l2cpdr.
++	 */
++	asm volatile ("mcr p15, 3, %0, c15, c0, 6 @ l2cpselr" : : "r" (addr));
++	isb();
++	asm volatile ("mcr p15, 3, %0, c15, c0, 7 @ l2cpdr" : : "r" (val));
++	isb();
++
++	raw_spin_unlock_irqrestore(&krait_l2_lock, flags);
++}
++EXPORT_SYMBOL(krait_set_l2_indirect_reg);
++
++u32 krait_get_l2_indirect_reg(u32 addr)
++{
++	u32 val;
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&krait_l2_lock, flags);
++	/*
++	 * Select the L2 window by poking l2cpselr, then read from the window
++	 * via l2cpdr.
++	 */
++	asm volatile ("mcr p15, 3, %0, c15, c0, 6 @ l2cpselr" : : "r" (addr));
++	isb();
++	asm volatile ("mrc p15, 3, %0, c15, c0, 7 @ l2cpdr" : "=r" (val));
++
++	raw_spin_unlock_irqrestore(&krait_l2_lock, flags);
++
++	return val;
++}
++EXPORT_SYMBOL(krait_get_l2_indirect_reg);
+diff --git a/arch/arm/include/asm/krait-l2-accessors.h b/arch/arm/include/asm/krait-l2-accessors.h
+new file mode 100644
+index 0000000..a5f2cdd
+--- /dev/null
++++ b/arch/arm/include/asm/krait-l2-accessors.h
+@@ -0,0 +1,9 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++
++#ifndef __ASMARM_KRAIT_L2_ACCESSORS_H
++#define __ASMARM_KRAIT_L2_ACCESSORS_H
++
++extern void krait_set_l2_indirect_reg(u32 addr, u32 val);
++extern u32 krait_get_l2_indirect_reg(u32 addr);
++
++#endif
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
