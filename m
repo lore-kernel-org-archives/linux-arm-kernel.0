@@ -1,52 +1,38 @@
 From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 13 Aug 2018 20:05:19 -0400
-Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180813200141.601a44e0@gandalf.local.home>
+Date: Mon, 13 Aug 2018 20:07:45 -0400
+Subject: [PATCH v8 1/6] Uprobes: Simplify uprobe_register() body
+In-Reply-To: <20180813085612.GE44470@linux.vnet.ibm.com>
 References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
- <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
- <20180809143827.GC22636@redhat.com>
- <20180810155813.49259913@gandalf.local.home>
- <CAPhsuW4ymZAxLdDOAz-rKkyb_POA3ibNW7+2G3BE5Mxtntyqsg@mail.gmail.com>
- <20180813200141.601a44e0@gandalf.local.home>
-Message-ID: <20180813200519.09ca5e9c@gandalf.local.home>
+ <20180809041856.1547-2-ravi.bangoria@linux.ibm.com>
+ <20180813085612.GE44470@linux.vnet.ibm.com>
+Message-ID: <20180813200745.2d0d5bb3@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Aug 2018 20:01:41 -0400
-Steven Rostedt <rostedt@goodmis.org> wrote:
+On Mon, 13 Aug 2018 01:56:12 -0700
+Srikar Dronamraju <srikar@linux.vnet.ibm.com> wrote:
 
-> On Fri, 10 Aug 2018 23:14:01 -0700
-> Song Liu <liu.song.a23@gmail.com> wrote:
+> * Ravi Bangoria <ravi.bangoria@linux.ibm.com> [2018-08-09 09:48:51]:
 > 
-> > On Fri, Aug 10, 2018 at 12:58 PM, Steven Rostedt <rostedt@goodmis.org> wrote:  
-> > > On Thu, 9 Aug 2018 16:38:28 +0200
-> > > Oleg Nesterov <oleg@redhat.com> wrote:
-> > >    
-> > >> I need to read this (hopefully final) version carefully. I'll try to do
-> > >> this before next Monday.
-> > >>    
-> > >
-> > > Monday may be the opening of the merge window (more likely Sunday). Do
-> > > you think this is good enough for pushing it in this late in the game,
-> > > or do you think we should wait another cycle?
-> > >
-> > > -- Steve    
-> > 
-> > We (Facebook) have use cases in production that would benefit from this work, so
-> > I would rather see this gets in sooner than later. After a brief
-> > review (I will more
-> > careful review before Monday), I think this set is not likely to break
-> > existing uprobes
-> > (those w/o ref_ctr). Therefore, I think it is safe to put it in this cycle.
+> > Simplify uprobe_register() function body and let __uprobe_register()
+> > handle everything. Also move dependency functions around to fix build
+> > failures.
 > >   
 > 
-> It's still going under review, and the merge window is now open. I'd
-> prefer that this waits till the next merge window.
-> 
-> 
+> One nit:
+> s/to fix build/failures/to avoid build failures/
 
-But this said, patch 1&2 look simple enough to include this merge
-window. I'll pull them in and start testing.
+I pulled in this patch with the above update to the change log.
+
+> 
+> 
+> 
+> > Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
+> > ---  
+> 
+> 
+> Acked-by: Srikar Dronamraju <srikar@linux.vnet.ibm.com>
+
+Thanks, I added your ack and Song's Reviewed-by tags.
 
 -- Steve
