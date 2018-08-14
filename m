@@ -1,37 +1,38 @@
 From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 14 Aug 2018 19:50:18 +0300
-Subject: [PATCH v4 4/6] dt-bindings: imx6q-pcie: Add turnoff reset for imx7d
+Date: Tue, 14 Aug 2018 19:50:19 +0300
+Subject: [PATCH v4 5/6] ARM: dts: imx7d: Add turnoff reset
 In-Reply-To: <cover.1534264292.git.leonard.crestez@nxp.com>
 References: <cover.1534264292.git.leonard.crestez@nxp.com>
-Message-ID: <e4e35d89f8e393cd291cb612a95faf1653a26f9b.1534264292.git.leonard.crestez@nxp.com>
+Message-ID: <c305d4da96ead7d570bf755fde9f0e0cc68f88e0.1534264292.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is documented as "required" but won't be present in old dtbs.
-
-These resets are also present on other imx chips but right now only
-imx7d implements them through the reset controller subsystem.
+This is required for the imx pci driver to send the PME_Turn_Off TLP.
 
 Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 ---
- Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx7d.dtsi | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-index cb33421184a0..f37494d5a7be 100644
---- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-@@ -48,10 +48,11 @@ Additional required properties for imx7d-pcie:
- - resets: Must contain phandles to PCIe-related reset lines exposed by SRC
-   IP block
- - reset-names: Must contain the following entires:
- 	       - "pciephy"
- 	       - "apps"
-+	       - "turnoff"
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index 7234e8330a57..efbdeaaa8dcd 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -144,12 +144,13 @@
+ 					 <&clks IMX7D_PLL_ENET_MAIN_100M_CLK>;
  
- Example:
+ 		fsl,max-link-speed = <2>;
+ 		power-domains = <&pgc_pcie_phy>;
+ 		resets = <&src IMX7_RESET_PCIEPHY>,
+-			 <&src IMX7_RESET_PCIE_CTRL_APPS_EN>;
+-		reset-names = "pciephy", "apps";
++			 <&src IMX7_RESET_PCIE_CTRL_APPS_EN>,
++			 <&src IMX7_RESET_PCIE_CTRL_APPS_TURNOFF>;
++		reset-names = "pciephy", "apps", "turnoff";
+ 		status = "disabled";
+ 	};
+ };
  
- 	pcie at 01000000 {
- 		compatible = "fsl,imx6q-pcie", "snps,dw-pcie";
+ &ca_funnel_ports {
 -- 
 2.17.1
