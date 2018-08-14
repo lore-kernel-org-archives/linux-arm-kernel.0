@@ -1,100 +1,58 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 14 Aug 2018 16:53:40 -0600
-Subject: [PATCH 1/2] dt-bindings: PCI: meson: add DT bindings for Amlogic
- Meson PCIe controller
-In-Reply-To: <1534227522-186798-2-git-send-email-hanjie.lin@amlogic.com>
-References: <1534227522-186798-1-git-send-email-hanjie.lin@amlogic.com>
- <1534227522-186798-2-git-send-email-hanjie.lin@amlogic.com>
-Message-ID: <20180814225340.GA25470@rob-hp-laptop>
+Date: Tue, 14 Aug 2018 16:57:51 -0600
+Subject: [PATCH v2 3/3] dts: arm64/sdm845: Add node for qcom,smmu-v2
+In-Reply-To: <CAFp+6iG8HohQ5=gwL37OuykK+R4U407yfrp=WN6pSgOK-mdzzA@mail.gmail.com>
+References: <20180814102740.30222-1-vivek.gautam@codeaurora.org>
+ <20180814102740.30222-4-vivek.gautam@codeaurora.org>
+ <27372288-447d-6c9a-504a-8b8ef40e3d58@arm.com>
+ <CAFp+6iG8HohQ5=gwL37OuykK+R4U407yfrp=WN6pSgOK-mdzzA@mail.gmail.com>
+Message-ID: <20180814225750.GA31263@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2018 at 02:18:41AM -0400, Hanjie Lin wrote:
-> From: Yue Wang <yue.wang@amlogic.com>
+On Wed, Aug 15, 2018 at 01:09:43AM +0530, Vivek Gautam wrote:
+> Adding Jordan here.
 > 
-> The Amlogic Meson PCIe host controller is based on the Synopsys DesignWare
-> PCI core. This patch adds documentation for the DT bindings in Meson PCIe
-> controller.
+> On Tue, Aug 14, 2018 at 4:19 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> > Hi Vivek,
+> >
+> > On 14/08/18 11:27, Vivek Gautam wrote:
+> >>
+> >> Add device node for qcom,smmu-v2 available on sdm845.
+> >> This smmu is available only to GPU device.
+> >>
+> >> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> >> ---
+> >>   arch/arm64/boot/dts/qcom/sdm845.dtsi | 23 +++++++++++++++++++++++
+> >>   1 file changed, 23 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> >> b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> >> index 1c2be2082f33..bd1ec5fa5146 100644
+> >> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> >> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> >> @@ -6,6 +6,7 @@
+> >>    */
+> >>     #include <dt-bindings/clock/qcom,gcc-sdm845.h>
+> >> +#include <dt-bindings/clock/qcom,gpucc-sdm845.h>
+> >>   #include <dt-bindings/clock/qcom,rpmh.h>
+> >>   #include <dt-bindings/interrupt-controller/arm-gic.h>
+> >>   #include <dt-bindings/soc/qcom,rpmh-rsc.h>
+> >> @@ -989,6 +990,28 @@
+> >>                         cell-index = <0>;
+> >>                 };
+> >>   +             gpu_smmu: iommu at 5040000 {
+> >> +                       compatible = "qcom,sdm845-smmu-v2",
+> >> "qcom,smmu-v2";
+> >
+> >
+> > Which of "sdm845" or "msm8996"[1] is the actual SoC name here?
 > 
-> Signed-off-by: Yue Wang <hanjie.lin@amlogic.com>
-> Signed-off-by: Hanjie Lin <hanjie.lin@amlogic.com>
-> ---
->  .../devicetree/bindings/pci/amlogic,meson-pcie.txt | 57 ++++++++++++++++++++++
->  1 file changed, 57 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
-> new file mode 100644
-> index 0000000..48233e4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
-> @@ -0,0 +1,57 @@
-> +Amlogic Meson AXG DWC PCIE SoC controller
-> +
-> +Amlogic Meson PCIe host controller is based on the Synopsys DesignWare PCI core.
-> +It shares common functions with the PCIe DesignWare core driver and
-> +inherits common properties defined in
-> +Documentation/devicetree/bindings/pci/designware-pci.txt.
-> +
-> +Additional properties are described here:
-> +
-> +Required properties:
-> +- compatible:
-> +	should contain "amlogic,axg-pcie" to identify the core.
-> +- reg:
-> +	Should contain the configuration address space.
-> +- reg-names: Must be
-> +	- "elbi"	External local bus interface registers
-> +	- "cfg"		Meson specific registers
-> +	- "config"	PCIe configuration space
-> +- clocks: Must contain an entry for each entry in clock-names.
-> +- clock-names: Must include the following entries:
-> +	- "pcie"
-> +	- "pcie_bus"
-> +	- "pcie_general"
-> +	- "pcie_mipi_en"
-> +
-> +Example configuration:
-> +
-> +	pcie: pcie at dffff000 {
+> Well, the bindings use the SoC prefix with smmu-v2, so it should be
+> sdm845 for this SoC. This is same as I posted in my v1 of the series [2].
+> Using 8996 based string in sdm845 makes things look awful.
 
-Unit-address is wrong.
+You need to list valid values of '<soc>' in the binding. Otherwise we 
+get this confusion.
 
-> +			compatible = "amlogic,axg-pcie", "snps,dw-pcie";
-> +			reg = <0x0 0xf9800000 0x0 0x400000
-> +					0x0 0xff646000 0x0 0x2000
-> +					0x0 0xf9f00000 0x0 0x100000>;
-> +			reg-names = "elbi", "cfg", "config";
-> +			reset-gpio = <&gpio GPIOX_19 GPIO_ACTIVE_HIGH>;
-
-Not documented and should be reset-gpios.
-
-> +			interrupts = <0 177 IRQ_TYPE_EDGE_RISING>;
-> +			#interrupt-cells = <1>;
-> +			interrupt-map-mask = <0 0 0 0>;
-> +			interrupt-map = <0 0 0 0 &gic GIC_SPI 179 IRQ_TYPE_EDGE_RISING>;
-> +			bus-range = <0x0 0xff>;
-> +			#address-cells = <3>;
-> +			#size-cells = <2>;
-> +			device_type = "pci";
-> +			phys = <&pcie_phy>;
-> +			ranges = <0x82000000 0 0 0x0 0xf9c00000 0 0x00300000>;
-> +			num-lanes = <1>;
-> +			pcie-num = <1>;
-
-Not documented. What's this?
-
-> +
-> +			clocks = <&clkc CLKID_USB
-> +					&clkc CLKID_MIPI_ENABLE
-> +					&clkc CLKID_PCIE_A
-> +					&clkc CLKID_PCIE_CML_EN0>;
-> +			clock-names = "pcie_general",
-> +					"pcie_refpll",
-> +					"pcie_mipi_en",
-> +					"pcie",
-> +					"port";
-> +	};
-> -- 
-> 2.7.4
-> 
+Rob
