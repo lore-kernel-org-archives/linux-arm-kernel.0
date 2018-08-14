@@ -1,68 +1,264 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 14 Aug 2018 13:47:20 +0800
-Subject: [linux-sunxi] Re: [PATCH v2 00/18] Allwinner R40 HDMI refactoring
-In-Reply-To: <87f1db37e70473cd1a77f5e0d2f9a779c6afe7db.camel@aosc.io>
-References: <20180710203511.18454-1-jernej.skrabec@siol.net>
- <20180711083036.7attjq4hm5ay5gmn@flea> <2309112.TTVI9Fv1ar@jernej-laptop>
- <20180724123741.bbkjgy2uwmzsj45k@flea>
- <87f1db37e70473cd1a77f5e0d2f9a779c6afe7db.camel@aosc.io>
-Message-ID: <CAGb2v644n_CLYkLVqu6ALhpQ+nF-OQ=JRR0KcLENs4LQbDcPHg@mail.gmail.com>
+From: prime.zeng@hisilicon.com (Zengtao (B))
+Date: Tue, 14 Aug 2018 05:56:29 +0000
+Subject: [RESEND PATCH] tee: add kernel internal client interface
+In-Reply-To: <20180709061549.24382-1-jens.wiklander@linaro.org>
+References: <20180709061549.24382-1-jens.wiklander@linaro.org>
+Message-ID: <678F3D1BB717D949B966B68EAEB446ED0C9B0F72@dggemm526-mbx.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2018 at 1:43 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> ? 2018-07-24?? 14:37 +0200?Maxime Ripard???
->> On Sun, Jul 22, 2018 at 04:43:56PM +0200, Jernej ?krabec wrote:
->> > Hi Maxime,
->> >
->> > Dne sreda, 11. julij 2018 ob 10:30:36 CEST je Maxime Ripard
->> > napisal(a):
->> > > On Tue, Jul 10, 2018 at 10:34:53PM +0200, Jernej Skrabec wrote:
->> > > > This series fixes several issues found in R40 HDMI patch series
->> > > > after
->> > > > it was applied. Conversation can be found here:
->> > > >
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-June/586011.htm
->> > > > l
->> > > >
->> > > > Patches are based on latest linux-next (next-20180710) and are
->> > > > ordered
->> > > > in such way that they don't break R40 HDMI at any time. Because
->> > > > of that
->> > > > I suggest that whole series goes through drm-misc to preserve
->> > > > that order.
->> > > >
->> > > > I also tested those patches on H3 to make sure it doesn't break
->> > > > other
->> > > > platforms. However, it would be nice to test for regressions
->> > > > also on
->> > > > older SoCs (with DE1).
->> > > >
->> > > > Best regards,
->> > > > Jernej
->> > >
->> > > Applied all patches but the patch 10, thanks!
->> > > Maxime
->> >
->> > It seems that you forgot to merge some patches:
->> >
->> > [PATCH v2 12/18] drm/sun4i: tcon: Add another way for matching
->> > mixers with
->> > tcon
->> > [PATCH v2 13/18] drm/sun4i: tcon: Add support for R40 TCON
->> >
->> > Without them, R40 display pipeline can't work.
->> >
->> > Maybe they are in your spam folder?
->>
->> Thanks for telling me, I'm not quite sure what happened.
->>
->> I've applied them.
+Hi jens:
+
+Actually, we have already used the kernel client api in our product(poplar board).
+Thank you for the upstream.
+
+Tested-by: Zeng Tao <prime.zeng@hisilicon.com>
+
+Regards
+Zengtao 
+
+>-----Original Message-----
+>From: Jens Wiklander [mailto:jens.wiklander at linaro.org]
+>Sent: Monday, July 09, 2018 2:16 PM
+>To: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>tee-dev at lists.linaro.org
+>Cc: Zengtao (B) <prime.zeng@hisilicon.com>; Victor Chong
+><victor.chong@linaro.org>; Jerome Forissier <jerome.forissier@linaro.org>;
+>Jens Wiklander <jens.wiklander@linaro.org>
+>Subject: [RESEND PATCH] tee: add kernel internal client interface
 >
-> Sorry, but I still didn't find them in linux-next/master.
-
-They were applied too late and missed the -rc6 deadline for drm-misc.
-We either have to revert the DT changes in 4.19-rc or somehow sneak
-in a patch that prevents it from crashing.
-
-ChenYu
+>Adds a kernel internal TEE client interface to be used by other drivers.
+>
+>Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+>---
+> drivers/tee/tee_core.c  | 113 +++++++++++++++++++++++++++++++++++++---
+> include/linux/tee_drv.h |  73 ++++++++++++++++++++++++++
+> 2 files changed, 179 insertions(+), 7 deletions(-)
+>
+>diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c index
+>dd46b758852a..7b2bb4c50058 100644
+>--- a/drivers/tee/tee_core.c
+>+++ b/drivers/tee/tee_core.c
+>@@ -38,15 +38,13 @@ static DEFINE_SPINLOCK(driver_lock);  static struct
+>class *tee_class;  static dev_t tee_devt;
+>
+>-static int tee_open(struct inode *inode, struct file *filp)
+>+static struct tee_context *teedev_open(struct tee_device *teedev)
+> {
+> 	int rc;
+>-	struct tee_device *teedev;
+> 	struct tee_context *ctx;
+>
+>-	teedev = container_of(inode->i_cdev, struct tee_device, cdev);
+> 	if (!tee_device_get(teedev))
+>-		return -EINVAL;
+>+		return ERR_PTR(-EINVAL);
+>
+> 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+> 	if (!ctx) {
+>@@ -57,16 +55,16 @@ static int tee_open(struct inode *inode, struct file *filp)
+> 	kref_init(&ctx->refcount);
+> 	ctx->teedev = teedev;
+> 	INIT_LIST_HEAD(&ctx->list_shm);
+>-	filp->private_data = ctx;
+> 	rc = teedev->desc->ops->open(ctx);
+> 	if (rc)
+> 		goto err;
+>
+>-	return 0;
+>+	return ctx;
+> err:
+> 	kfree(ctx);
+> 	tee_device_put(teedev);
+>-	return rc;
+>+	return ERR_PTR(rc);
+>+
+> }
+>
+> void teedev_ctx_get(struct tee_context *ctx) @@ -100,6 +98,18 @@ static
+>void teedev_close_context(struct tee_context *ctx)
+> 	teedev_ctx_put(ctx);
+> }
+>
+>+static int tee_open(struct inode *inode, struct file *filp) {
+>+	struct tee_context *ctx;
+>+
+>+	ctx = teedev_open(container_of(inode->i_cdev, struct tee_device, cdev));
+>+	if (IS_ERR(ctx))
+>+		return PTR_ERR(ctx);
+>+
+>+	filp->private_data = ctx;
+>+	return 0;
+>+}
+>+
+> static int tee_release(struct inode *inode, struct file *filp)  {
+> 	teedev_close_context(filp->private_data);
+>@@ -928,6 +938,95 @@ void *tee_get_drvdata(struct tee_device *teedev)  }
+>EXPORT_SYMBOL_GPL(tee_get_drvdata);
+>
+>+struct match_dev_data {
+>+	struct tee_ioctl_version_data *vers;
+>+	const void *data;
+>+	int (*match)(struct tee_ioctl_version_data *, const void *); };
+>+
+>+static int match_dev(struct device *dev, const void *data) {
+>+	const struct match_dev_data *match_data = data;
+>+	struct tee_device *teedev = container_of(dev, struct tee_device, dev);
+>+
+>+	teedev->desc->ops->get_version(teedev, match_data->vers);
+>+	return match_data->match(match_data->vers, match_data->data); }
+>+
+>+struct tee_context *
+>+tee_client_open_context(struct tee_context *start,
+>+			int (*match)(struct tee_ioctl_version_data *,
+>+				     const void *),
+>+			const void *data, struct tee_ioctl_version_data *vers) {
+>+	struct device *dev = NULL;
+>+	struct device *put_dev = NULL;
+>+	struct tee_context *ctx = NULL;
+>+	struct tee_ioctl_version_data v;
+>+	struct match_dev_data match_data = { vers ? vers : &v, data, match };
+>+
+>+	if (start)
+>+		dev = &start->teedev->dev;
+>+
+>+	do {
+>+		dev = class_find_device(tee_class, dev, &match_data, match_dev);
+>+		if (!dev) {
+>+			ctx = ERR_PTR(-ENOENT);
+>+			break;
+>+		}
+>+
+>+		put_device(put_dev);
+>+		put_dev = dev;
+>+
+>+		ctx = teedev_open(container_of(dev, struct tee_device, dev));
+>+	} while (IS_ERR(ctx) && PTR_ERR(ctx) != -ENOMEM);
+>+
+>+	put_device(put_dev);
+>+	return ctx;
+>+}
+>+EXPORT_SYMBOL_GPL(tee_client_open_context);
+>+
+>+void tee_client_close_context(struct tee_context *ctx) {
+>+	teedev_close_context(ctx);
+>+}
+>+EXPORT_SYMBOL_GPL(tee_client_close_context);
+>+
+>+void tee_client_get_version(struct tee_context *ctx,
+>+			    struct tee_ioctl_version_data *vers) {
+>+	ctx->teedev->desc->ops->get_version(ctx->teedev, vers); }
+>+EXPORT_SYMBOL_GPL(tee_client_get_version);
+>+
+>+int tee_client_open_session(struct tee_context *ctx,
+>+			    struct tee_ioctl_open_session_arg *arg,
+>+			    struct tee_param *param)
+>+{
+>+	if (!ctx->teedev->desc->ops->open_session)
+>+		return -EINVAL;
+>+	return ctx->teedev->desc->ops->open_session(ctx, arg, param); }
+>+EXPORT_SYMBOL_GPL(tee_client_open_session);
+>+
+>+int tee_client_close_session(struct tee_context *ctx, u32 session) {
+>+	if (!ctx->teedev->desc->ops->close_session)
+>+		return -EINVAL;
+>+	return ctx->teedev->desc->ops->close_session(ctx, session); }
+>+EXPORT_SYMBOL_GPL(tee_client_close_session);
+>+
+>+int tee_client_invoke_func(struct tee_context *ctx,
+>+			   struct tee_ioctl_invoke_arg *arg,
+>+			   struct tee_param *param)
+>+{
+>+	if (!ctx->teedev->desc->ops->invoke_func)
+>+		return -EINVAL;
+>+	return ctx->teedev->desc->ops->invoke_func(ctx, arg, param); }
+>+EXPORT_SYMBOL_GPL(tee_client_invoke_func);
+>+
+> static int __init tee_init(void)
+> {
+> 	int rc;
+>diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h index
+>a2b3dfcee0b5..6cfe05893a76 100644
+>--- a/include/linux/tee_drv.h
+>+++ b/include/linux/tee_drv.h
+>@@ -453,6 +453,79 @@ static inline int tee_shm_get_id(struct tee_shm *shm)
+>  */
+> struct tee_shm *tee_shm_get_from_id(struct tee_context *ctx, int id);
+>
+>+/**
+>+ * tee_client_open_context() - Open a TEE context
+>+ * @start:	if not NULL, continue search after this context
+>+ * @match:	function to check TEE device
+>+ * @data:	data for match function
+>+ * @vers:	if not NULL, version data of TEE device of the context returned
+>+ *
+>+ * This function does an operation similar to open("/dev/teeX") in user space.
+>+ * A returned context must be released with tee_client_close_context().
+>+ *
+>+ * Returns a TEE context of the first TEE device matched by the match()
+>+ * callback or an ERR_PTR.
+>+ */
+>+struct tee_context *
+>+tee_client_open_context(struct tee_context *start,
+>+			int (*match)(struct tee_ioctl_version_data *,
+>+				     const void *),
+>+			const void *data, struct tee_ioctl_version_data *vers);
+>+
+>+/**
+>+ * tee_client_close_context() - Close a TEE context
+>+ * @ctx:	TEE context to close
+>+ *
+>+ * Note that all sessions previously opened with this context will be
+>+ * closed when this function is called.
+>+ */
+>+void tee_client_close_context(struct tee_context *ctx);
+>+
+>+/**
+>+ * tee_client_get_version() - Query version of TEE
+>+ * @ctx:	TEE context to TEE to query
+>+ * @vers:	Pointer to version data
+>+ */
+>+void tee_client_get_version(struct tee_context *ctx,
+>+			    struct tee_ioctl_version_data *vers);
+>+
+>+/**
+>+ * tee_client_open_session() - Open a session to a Trusted Application
+>+ * @ctx:	TEE context
+>+ * @arg:	Open session arguments, see description of
+>+ *		struct tee_ioctl_open_session_arg
+>+ * @param:	Parameters passed to the Trusted Application
+>+ *
+>+ * Returns < 0 on error else see @arg->ret for result. If @arg->ret
+>+ * is TEEC_SUCCESS the session identifier is available in @arg->session.
+>+ */
+>+int tee_client_open_session(struct tee_context *ctx,
+>+			    struct tee_ioctl_open_session_arg *arg,
+>+			    struct tee_param *param);
+>+
+>+/**
+>+ * tee_client_close_session() - Close a session to a Trusted Application
+>+ * @ctx:	TEE Context
+>+ * @session:	Session id
+>+ *
+>+ * Return < 0 on error else 0, regardless the session will not be
+>+ * valid after this function has returned.
+>+ */
+>+int tee_client_close_session(struct tee_context *ctx, u32 session);
+>+
+>+/**
+>+ * tee_client_invoke_func() - Invoke a function in a Trusted Application
+>+ * @ctx:	TEE Context
+>+ * @arg:	Invoke arguments, see description of
+>+ *		struct tee_ioctl_invoke_arg
+>+ * @param:	Parameters passed to the Trusted Application
+>+ *
+>+ * Returns < 0 on error else see @arg->ret for result.
+>+ */
+>+int tee_client_invoke_func(struct tee_context *ctx,
+>+			   struct tee_ioctl_invoke_arg *arg,
+>+			   struct tee_param *param);
+>+
+> static inline bool tee_param_is_memref(struct tee_param *param)  {
+> 	switch (param->attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) {
+>--
+>2.17.1
