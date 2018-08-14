@@ -1,54 +1,34 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 14 Aug 2018 12:04:33 -0400
-Subject: [PATCH 1/3] arm64: implement ftrace with regs
-In-Reply-To: <a19d9e23-3dfa-ba9b-a177-cdc0d1035964@arm.com>
-References: <20180810160043.9E45568C76@newverein.lst.de>
- <20180810160223.D360D68C76@newverein.lst.de>
- <2b5c1092-2cc0-00ec-ba3d-341dc61452b4@arm.com>
- <20180813220315.6e8dfc9c@vmware.local.home>
- <a19d9e23-3dfa-ba9b-a177-cdc0d1035964@arm.com>
-Message-ID: <20180814120433.1f5e8da1@gandalf.local.home>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 14 Aug 2018 10:08:57 -0600
+Subject: [PATCH 2/3] clk: imx6q: optionally get CCM inputs via standard
+ clock handles
+In-Reply-To: <20180731102009.6710-2-l.stach@pengutronix.de>
+References: <20180731102009.6710-1-l.stach@pengutronix.de>
+ <20180731102009.6710-2-l.stach@pengutronix.de>
+Message-ID: <20180814160857.GA11979@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Aug 2018 09:33:52 +0100
-Julien Thierry <julien.thierry@arm.com> wrote:
-
-> On 14/08/18 03:03, Steven Rostedt wrote:
-> > On Mon, 13 Aug 2018 11:54:06 +0100
-> > Julien Thierry <julien.thierry@arm.com> wrote:
-> >   
-> >>> --- a/arch/arm64/Makefile
-> >>> +++ b/arch/arm64/Makefile
-> >>> @@ -78,6 +78,15 @@ ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
-> >>>    KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
-> >>>    endif
-> >>>    
-> >>> +ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> >>> +  CC_FLAGS_FTRACE := -fpatchable-function-entry=2
-> >>> +  KBUILD_CPPFLAGS += -DCC_USING_PATCHABLE_FUNCTION_ENTRY
-> >>> +  ifeq ($(call cc-option,-fpatchable-function-entry=2),)
-> >>> +    $(warning Cannot use CONFIG_DYNAMIC_FTRACE_WITH_REGS: \
-> >>> +             -fpatchable-function-entry not supported by compiler)  
-> >>
-> >> Shouldn't this be an error? The option -fpatchable-function-entry has
-> >> been added to the CC_FLAGS_FTRACE, so any call to the compiler is gonna
-> >> break anyway. Or am I missing something?  
-> > 
-> > I'm guessing this adds a more informative message on that error. One
-> > will know why -fpatchable-function-entry was added to the CFLAGS. I'm
-> > for more informative error messages being a victim of poor error
-> > messages causing me to dig deep into the guts of the build
-> > infrastructure to figure out simple issues.
-> >   
+On Tue, Jul 31, 2018 at 12:20:08PM +0200, Lucas Stach wrote:
+> When specifying external clock inputs to the CCM the current code
+> requires the clocks to be in a "clocks" child node of the DT root.
+> This is not really conformant with DT best practices.
 > 
-> Yes, I agree it is better to have this message. My point was that we 
-> could have "$error" instead of "$warning" to stop the compilation right 
-> away since we know everything is gonna break (and on parallel builds 
-> this warning is gonna be drowned in compiler errors).
+> To avoid the need to deviate from those best practices, allow the
+> clock inputs to be specifies via standard clock handles. This is
+> in line with how drivers of the later CCM driver revisions on
+> newer i.MX SoCs handle this.
 > 
+> As we can't retroactively change the DT binding, allow this as an
+> option with a fallback to the old way of how this has been handled.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  .../devicetree/bindings/clock/imx6q-clock.txt |  5 +++++
 
-OK, I see what you mean. If the resulting build wont boot, then yes
-this should be an error and not a warning.
+Ignoring what my bot said if there's no other changes needed,
 
--- Steve
+Acked-by: Rob Herring <robh@kernel.org>
+
+>  drivers/clk/imx/clk-imx6q.c                   | 22 ++++++++++++++-----
+>  2 files changed, 22 insertions(+), 5 deletions(-)
