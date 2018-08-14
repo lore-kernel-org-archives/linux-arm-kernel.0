@@ -1,54 +1,26 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 15 Aug 2018 02:45:20 +0800
+From: gustavo@embeddedor.com (Gustavo A. R. Silva)
+Date: Tue, 14 Aug 2018 13:59:18 -0500
 Subject: [PATCH] Bluetooth: mediatek: Fix memory leak
-In-Reply-To: <20180814151031.GA25096@embeddedor.com>
+In-Reply-To: <1534272320.31978.28.camel@mtkswgap22>
 References: <20180814151031.GA25096@embeddedor.com>
-Message-ID: <1534272320.31978.28.camel@mtkswgap22>
+ <1534272320.31978.28.camel@mtkswgap22>
+Message-ID: <129805ff-0408-f4f5-a8df-97ec54f20041@embeddedor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Gustavo
-
-thanks for the catch up
-
-Acked-by: Sean Wang <sean.wang@mediatek.com>
 
 
-On Tue, 2018-08-14 at 10:10 -0500, Gustavo A. R. Silva wrote:
-> In case memory resources for *fw* were allocated, release them before
-> return.
+On 8/14/18 1:45 PM, Sean Wang wrote:
+> Hi, Gustavo
 > 
-> Addresses-Coverity-ID: 1472611 ("Resource leak")
-> Fixes: 7237c4c9ec92 ("Bluetooth: mediatek: Add protocol support for MediaTek serial devices")
-> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
-> ---
->  drivers/bluetooth/btmtkuart.c | 8 +++++---
->  1 file changed, 5 insertions(+), 3 deletions(-)
+> thanks for the catch up
+
+Glad to help. :)
+
 > 
-> diff --git a/drivers/bluetooth/btmtkuart.c b/drivers/bluetooth/btmtkuart.c
-> index ed2a5c7..4593baf 100644
-> --- a/drivers/bluetooth/btmtkuart.c
-> +++ b/drivers/bluetooth/btmtkuart.c
-> @@ -144,8 +144,10 @@ static int mtk_setup_fw(struct hci_dev *hdev)
->  	fw_size = fw->size;
->  
->  	/* The size of patch header is 30 bytes, should be skip */
-> -	if (fw_size < 30)
-> -		return -EINVAL;
-> +	if (fw_size < 30) {
-> +		err = -EINVAL;
-> +		goto free_fw;
-> +	}
->  
->  	fw_size -= 30;
->  	fw_ptr += 30;
-> @@ -172,8 +174,8 @@ static int mtk_setup_fw(struct hci_dev *hdev)
->  		fw_ptr += dlen;
->  	}
->  
-> +free_fw:
->  	release_firmware(fw);
-> -
->  	return err;
->  }
->  
+> Acked-by: Sean Wang <sean.wang@mediatek.com>
+> 
+
+Thanks
+--
+Gustavo
