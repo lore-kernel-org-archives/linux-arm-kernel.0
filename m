@@ -1,72 +1,59 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 14 Aug 2018 10:13:26 -0600
-Subject: [RFC PATCH 1/2] dt-bindings: dmaengine: xilinx_dma: Add binding
- for Xilinx MCDMA IP
-In-Reply-To: <1533059173-21405-2-git-send-email-radhey.shyam.pandey@xilinx.com>
-References: <1533059173-21405-1-git-send-email-radhey.shyam.pandey@xilinx.com>
- <1533059173-21405-2-git-send-email-radhey.shyam.pandey@xilinx.com>
-Message-ID: <20180814161326.GA17341@rob-hp-laptop>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 14 Aug 2018 10:15:56 -0600
+Subject: [PATCH v3 0/7] perf: Add ioctl for PMU driver configuration
+In-Reply-To: <20180813124642.3d49c082a95fc294d926016e@arm.com>
+References: <1531950487-24554-1-git-send-email-mathieu.poirier@linaro.org>
+ <20180813124642.3d49c082a95fc294d926016e@arm.com>
+Message-ID: <CANLsYkx=tjCG-eb4qRoGz0SvG4qCMDz1ajR9Mo9VK5XTAn_WdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 11:16:12PM +0530, Radhey Shyam Pandey wrote:
-> Add devicetree binding for Xilinx AXI Multichannel Direct Memory Access
-> (AXI MCDMA) IP. The AXI MCDMA provides high-bandwidth direct memory
-> access between memory and AXI4-Stream target peripherals. The AXI MCDMA
-> core provides scatter-gather interface with multiple channel support.
-> 
-> Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> ---
->  Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> index 174af2c..57bb02e 100644
-> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> @@ -11,9 +11,13 @@ is to receive from the device.
->  Xilinx AXI CDMA engine, it does transfers between memory-mapped source
->  address and a memory-mapped destination address.
->  
-> +Xilinx AXI MCDMA engine, it does transfer between memory and AXI4 stream
-> +target devices. It can be configured to have up to 16 independent transmit
-> +and receive channels.
-> +
->  Required properties:
->  - compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a" or
-> -	      "xlnx,axi-cdma-1.00.a""
-> +	      "xlnx,axi-cdma-1.00.a" or "xlnx,axi-mcdma-1.00.a".
+On Mon, 13 Aug 2018 at 11:46, Kim Phillips <kim.phillips@arm.com> wrote:
+>
+> On Wed, 18 Jul 2018 15:48:00 -0600
+> Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+>
+> > This set adds the capability to communiate event specific configuration
+> > to the PMU kernel driver using an ioctl().  The functionatlity is made
+> > generic enough for anyone to use but is targeted at the identification
+> > of CoreSight sinks when operating in CPU-wide trace scenarios.
+> >
+> > ---
+> > Changes for V3:
+> > . Return an error for CPU-wide scenarios while the feature is being
+> >   implemented (Kim)
+>
+> Hi, I'm giving this series a short test-drive on Juno.
 
-Please reformat to 1 per line.
+Hi,
 
->  - #dma-cells: Should be <1>, see "dmas" property below
->  - reg: Should contain VDMA registers location and length.
->  - xlnx,addrwidth: Should be the vdma addressing size in bits(ex: 32 bits).
-> @@ -56,6 +60,8 @@ Required child node properties:
->  	For CDMA: It should be "xlnx,axi-cdma-channel".
->  	For AXIDMA: It should be either "xlnx,axi-dma-mm2s-channel" or
->  	"xlnx,axi-dma-s2mm-channel".
-> +	For MCDMA: It should be either "xlnx,axi-mcdma-mm2s-channel" or
-> +	"xlnx,axi-mcdma-s2mm-channel".
+>
+> It yields success for the --per-thread case..:
+>
+> $ sudo taskset -c 0 ./perf record -e cs_etm/@20010000.etf/ --per-thread uname -a
+> Linux juno 4.18.0-rc8-00011-gb82af52c4b35-dirty #147 SMP PREEMPT Thu Aug 9 11:20:37 CDT 2018 aarch64 GNU/Linux
+> [ perf record: Woken up 0 times to write data ]
+> Warning:
+> AUX data lost 1 times out of 2!
+>
+> [ perf record: Captured and wrote 0.067 MB perf.data ]
+> $
+>
+> ..but not for CPU-wide?:
+>
+> $ sudo taskset -c 0 ./perf record -e cs_etm/@20010000.etf/ uname -a
+> failed to mmap with 12 (Cannot allocate memory)
+> $ sudo taskset -c 0 ./perf record -e cs_etm/@20010000.etf/ -C 0 uname -a
+> failed to mmap with 12 (Cannot allocate memory)
+> $
 
-What's wrong with reusing the existing xlnx,axi-dma-* names? 
+This patchset is getting very old and a fair amount of things have
+changed since then.  I'm hoping to be coming out with a new one
+shortly.  Nonetheless the above is returning an error in CPU-wide
+scenarios while the feature is being implemented.  Isn't what you
+requested or have I misunderstood your comment?
 
->  - interrupts: Should contain per channel VDMA interrupts.
->  - xlnx,datawidth: Should contain the stream data width, take values
->  	{32,64...1024}.
-> @@ -68,7 +74,7 @@ Optional child node properties for VDMA:
->  	enabled/disabled in hardware.
->  - xlnx,enable-vert-flip: Tells vertical flip is
->  	enabled/disabled in hardware(S2MM path).
-> -Optional child node properties for AXI DMA:
-> +Optional child node properties for AXI DMA and MCDMA:
->  -dma-channels: Number of dma channels in child node.
->  
->  Example:
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> Thanks,
+>
+> Kim
