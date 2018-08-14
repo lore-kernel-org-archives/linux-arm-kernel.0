@@ -1,68 +1,45 @@
-From: jacopo+renesas@jmondi.org (Jacopo Mondi)
-Date: Tue, 14 Aug 2018 15:21:45 +0200
-Subject: [PATCH v2 1/2] ARM: dts: imx6qdl: Add Engicam i.Core 1.5 MX6
-In-Reply-To: <1534252906-29554-1-git-send-email-jacopo+renesas@jmondi.org>
-References: <1534252906-29554-1-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <1534252906-29554-2-git-send-email-jacopo+renesas@jmondi.org>
+From: john.garry@huawei.com (John Garry)
+Date: Tue, 14 Aug 2018 14:38:39 +0100
+Subject: [PATCH 0/3] iommu: Avoid DMA ops domain refcount contention
+In-Reply-To: <cover.1534250425.git.robin.murphy@arm.com>
+References: <cover.1534250425.git.robin.murphy@arm.com>
+Message-ID: <5424f7f4-6aba-1bec-73dd-0294cebbed9b@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jacopo Mondi <jacopo@jmondi.org>
+On 14/08/2018 14:04, Robin Murphy wrote:
+> John raised the issue[1] that we have some unnecessary refcount contention
+> in the DMA ops path which shows scalability problems now that we have more
+> real high-performance hardware using iommu-dma. The x86 IOMMU drivers are
+> sidestepping this by stashing domain references in archdata, but since
+> that's not very nice for architecture-agnostic code, I think it's time to
+> look at a generic API-level solution.
+>
+> These are a couple of quick patches based on the idea I had back when
+> first implementing this lot, but didn't have any way to justify at the
+> time. The third patch can be ignored for the sake of API discussion, but
+> is included for completeness.
+>
+> Robin.
+>
+>
+> [1] https://lists.linuxfoundation.org/pipermail/iommu/2018-August/029303.html
+>
+> Robin Murphy (3):
+>   iommu: Add fast hook for getting DMA domains
+>   iommu/dma: Use fast DMA domain lookup
+>   arm64/dma-mapping: Mildly optimise non-coherent IOMMU ops
+>
+>  arch/arm64/mm/dma-mapping.c | 10 +++++-----
+>  drivers/iommu/dma-iommu.c   | 23 ++++++++++++-----------
+>  drivers/iommu/iommu.c       |  9 +++++++++
+>  include/linux/iommu.h       |  1 +
+>  4 files changed, 27 insertions(+), 16 deletions(-)
+>
 
-The 1.5 version of Engicam's i.Core MX6 CPU module features a different clock
-provider for the ethernet's PHY interface. Adjust the FEC ptp clock to
-reference CLK_ENET_REF clock source, and set SION bit of
-MX6QDL_PAD_GPIO_16__ENET_REF_CLK to adjust the input path of that pin.
+Thanks Robin. So we'll test this now. I anticipate a decent improvement 
+across the board since we are now simply dereferencing the device's 
+iommu group directly.
 
-The newly introduced imx6ql-icore-1.5.dtsi allows to collect in a single
-place differences between version '1.0' and '1.5' of the module.
-
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-Signed-off-by: Jacopo Mondi <jacopo@jmondi.org>
----
- arch/arm/boot/dts/imx6qdl-icore-1.5.dtsi | 34 ++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6qdl-icore-1.5.dtsi
-
-diff --git a/arch/arm/boot/dts/imx6qdl-icore-1.5.dtsi b/arch/arm/boot/dts/imx6qdl-icore-1.5.dtsi
-new file mode 100644
-index 0000000..d91d46b
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-icore-1.5.dtsi
-@@ -0,0 +1,34 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (C) 2018 Jacopo Mondi <jacopo@jmondi.org>
-+ */
-+
-+#include "imx6qdl-icore.dtsi"
-+
-+&iomuxc {
-+	pinctrl_enet: enetgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN	0x1b0b0
-+			MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0b0
-+			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x1b0b0
-+			MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1	0x1b0b0
-+			MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0	0x1b0b0
-+			MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1	0x1b0b0
-+			MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0	0x1b0b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-+			MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x1b0b0
-+		>;
-+	};
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet>;
-+	phy-reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+	clocks = <&clks IMX6QDL_CLK_ENET>,
-+		 <&clks IMX6QDL_CLK_ENET>,
-+		 <&clks IMX6QDL_CLK_ENET_REF>;
-+	phy-mode = "rmii";
-+	status = "okay";
-+};
--- 
-2.7.4
+Cheers,
+John
