@@ -1,75 +1,60 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 14 Aug 2018 13:42:27 -0600
-Subject: [PATCH v3 0/7] perf: Add ioctl for PMU driver configuration
-In-Reply-To: <20180814120910.ed225bbc462c58b09e5d68de@arm.com>
-References: <1531950487-24554-1-git-send-email-mathieu.poirier@linaro.org>
- <20180813124642.3d49c082a95fc294d926016e@arm.com>
- <CANLsYkx=tjCG-eb4qRoGz0SvG4qCMDz1ajR9Mo9VK5XTAn_WdQ@mail.gmail.com>
- <20180814120910.ed225bbc462c58b09e5d68de@arm.com>
-Message-ID: <CANLsYkxZ_Wts6k9yqJhJf_R5oh74svpcuoNxhtFf6h3mz8U4ZA@mail.gmail.com>
+From: atull@kernel.org (Alan Tull)
+Date: Tue, 14 Aug 2018 15:05:54 -0500
+Subject: [RFC PATCH 1/2] ARM: dt: fpga: Added binding docs for Xilinx
+ zynqmp FPGA manager
+In-Reply-To: <20180814161917.GA26926@rob-hp-laptop>
+References: <20180801100457.25614-1-nava.manne@xilinx.com>
+ <20180814161917.GA26926@rob-hp-laptop>
+Message-ID: <CANk1AXT6RkuFhWoFBy127j2Q=h9P-1S=0Mhyh9=PMJyC72sciQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Aug 2018 at 11:09, Kim Phillips <kim.phillips@arm.com> wrote:
->
-> On Tue, 14 Aug 2018 10:15:56 -0600
-> Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
->
-> > On Mon, 13 Aug 2018 at 11:46, Kim Phillips <kim.phillips@arm.com> wrote:
-> > > It yields success for the --per-thread case..:
-> > >
-> > > $ sudo taskset -c 0 ./perf record -e cs_etm/@20010000.etf/ --per-thread uname -a
-> > > Linux juno 4.18.0-rc8-00011-gb82af52c4b35-dirty #147 SMP PREEMPT Thu Aug 9 11:20:37 CDT 2018 aarch64 GNU/Linux
-> > > [ perf record: Woken up 0 times to write data ]
-> > > Warning:
-> > > AUX data lost 1 times out of 2!
-> > >
-> > > [ perf record: Captured and wrote 0.067 MB perf.data ]
-> > > $
-> > >
-> > > ..but not for CPU-wide?:
-> > >
-> > > $ sudo taskset -c 0 ./perf record -e cs_etm/@20010000.etf/ uname -a
-> > > failed to mmap with 12 (Cannot allocate memory)
-> > > $ sudo taskset -c 0 ./perf record -e cs_etm/@20010000.etf/ -C 0 uname -a
-> > > failed to mmap with 12 (Cannot allocate memory)
-> > > $
-> >
-> > This patchset is getting very old and a fair amount of things have
-> > changed since then.  I'm hoping to be coming out with a new one
-> > shortly.  Nonetheless the above is returning an error in CPU-wide
-> > scenarios while the feature is being implemented.  Isn't what you
-> > requested or have I misunderstood your comment?
->
-> No, sigh, I just automatically assumed the patchset would include
-> CPU-wide support again.  If it were being done that way, we'd all know
-> that the feature(s) this patchset adds would be doing the right thing
-> for that purpose, guaranteed.
+On Tue, Aug 14, 2018 at 11:19 AM, Rob Herring <robh@kernel.org> wrote:
 
-The patchset published on this list never had support for CPU-wide scenarios.
+Hi Nava,
 
-This is only a preparatory step, the first one in a few more to come.
-Sending the whole thing in one go would be way too heavy and is not
-realistic.
+I didn't see this posting because it wasn't sent to my current email
+address or to the linux-fpga mailing list.  People's email address
+change at random times, so the easiest way to keep up is to always
+check out the linux-next repo's master branch and look at the latest
+MAINTAINERS file there.  Also there's a handy
+./scripts/get_maintainer.pl script to make sure you include the right
+people.
 
+Alan
+
+> On Wed, Aug 01, 2018 at 03:34:56PM +0530, Nava kishore Manne wrote:
+>> New bindings document for zynqmp fpga manager.
+>>
+>> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+>> ---
+>>  .../devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt   | 9 +++++++++
+>>  1 file changed, 9 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt b/Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
+>> new file mode 100644
+>> index 000000000000..0eac747747f5
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/fpga/xlnx,zynqmp-pcap-fpga.txt
+>> @@ -0,0 +1,9 @@
+>> +Xilinx Zynqmp FPGA Manager
+>> +
+>> +Required properties:
+>> +- compatible:                should contain "xlnx,zynqmp-pcap-fpga"
+>> +
+>> +Example:
+>> +     pcap: pcap at 00 {
+>> +             compatible = "xlnx,zynqmp-pcap-fpga";
 >
-> The other thing that's going on here is that I'm becoming numb to the
-> loathsome "failed to mmap with 12 (Cannot allocate memory)" being
-> returned no matter what the error is/was. E.g., an error that would
-> indicate a sense of non-implementation would be much better
-> appreciated than presumably what the above is doing, i.e., returning
-> -ENOMEM.  That, backed up with specific details in the form of human
-> readable text in dmesg would be *most* welcome.
-
-As part of the refactoring of the code to support CPU-wide scenarios I
-intend to emit better diagnostic messages from the driver.  Modifying
-rb_alloc_aux() to propagate the error message generated by the
-architecture specific PMUs doesn't look hard either and I _may_ get to
-it as part of this work.
-
-Mathieu
-
+> How is this accessed? Via firmware interface? If so, need to define it
+> is a child of the firmware node.
 >
-> Thanks,
->
-> Kim
+>> +     };
+>> --
+>> 2.18.0
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
