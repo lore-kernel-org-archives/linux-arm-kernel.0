@@ -1,273 +1,143 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 14 Aug 2018 14:40:31 +0200
-Subject: [PATCH 2/2] clk: meson-g12a: Add AO Clock controller driver
-In-Reply-To: <1533894868-85815-3-git-send-email-jian.hu@amlogic.com>
-References: <1533894868-85815-1-git-send-email-jian.hu@amlogic.com>
- <1533894868-85815-3-git-send-email-jian.hu@amlogic.com>
-Message-ID: <6c855dc62fe6ed1a01216bd708d401a280f8762c.camel@baylibre.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 14 Aug 2018 14:52:00 +0200
+Subject: [PATCH v3 RESEND 2/2] phy: add Rockchip Innosilicon hdmi phy
+In-Reply-To: <a0a84907-c51f-b484-33fa-592a23c756f9@ti.com>
+References: <20180710134949.25203-1-heiko@sntech.de>
+ <20180710134949.25203-2-heiko@sntech.de>
+ <a0a84907-c51f-b484-33fa-592a23c756f9@ti.com>
+Message-ID: <4194245.uYZyAYm7Hd@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-08-10 at 17:54 +0800, Jian Hu wrote:
-> Add a Clock driver for the ALways-On part
-> of the Amlogic Meson-G12A SoC.
+Hi Kishon,
+
+thanks for your review.
+
+
+Am Freitag, 3. August 2018, 11:24:06 CEST schrieb Kishon Vijay Abraham I:
+> On Tuesday 10 July 2018 07:19 PM, Heiko Stuebner wrote:
+> > +config PHY_ROCKCHIP_INNO_HDMI
+> > +	tristate "Rockchip INNO HDMI PHY Driver"
+> > +	depends on (ARCH_ROCKCHIP || COMPILE_TEST) && OF
 > 
-> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
-> ---
->  drivers/clk/meson/Makefile     |   2 +-
->  drivers/clk/meson/g12a-aoclk.c | 170 +++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/meson/g12a-aoclk.h |  36 +++++++++
->  3 files changed, 207 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/clk/meson/g12a-aoclk.c
->  create mode 100644 drivers/clk/meson/g12a-aoclk.h
+> depends on COMMON_CLK since the phy registers a clock provider?
+
+ok
+
+> > +static const struct phy_config rk3228_phy_cfg[] = {
+> > +	{	165000000, {
+> > +			0xaa, 0x00, 0x44, 0x44, 0x00, 0x00, 0x00, 0x00, 0x00,
+> > +			0x00, 0x00, 0x00, 0x00, 0x00,
 > 
-> diff --git a/drivers/clk/meson/Makefile b/drivers/clk/meson/Makefile
-> index 2b1a562..d5c2dcd 100644
-> --- a/drivers/clk/meson/Makefile
-> +++ b/drivers/clk/meson/Makefile
-> @@ -9,5 +9,5 @@ obj-$(CONFIG_COMMON_CLK_MESON8B) += meson8b.o
->  obj-$(CONFIG_COMMON_CLK_GXBB)	 += gxbb.o gxbb-aoclk.o gxbb-aoclk-32k.o
->  obj-$(CONFIG_COMMON_CLK_AXG)	 += axg.o axg-aoclk.o
->  obj-$(CONFIG_COMMON_CLK_AXG_AUDIO)	+= axg-audio.o
-> -obj-$(CONFIG_COMMON_CLK_G12A)	 += g12a.o
-> +obj-$(CONFIG_COMMON_CLK_G12A)	 += g12a.o g12a-aoclk.c
->  obj-$(CONFIG_COMMON_CLK_REGMAP_MESON)	+= clk-regmap.o
-> diff --git a/drivers/clk/meson/g12a-aoclk.c b/drivers/clk/meson/g12a-aoclk.c
-> new file mode 100644
-> index 0000000..a5cd95c
-> --- /dev/null
-> +++ b/drivers/clk/meson/g12a-aoclk.c
-> @@ -0,0 +1,170 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Amlogic Meson-G12A Clock Controller Driver
-> + *
-> + * Copyright (c) 2016 Baylibre SAS.
-> + * Author: Michael Turquette <mturquette@baylibre.com>
-> + *
-> + * Copyright (c) 2018 Amlogic, inc.
-> + * Author: Jian Hu <jian.hu@amlogic.com>
-> + */
-> +#include <linux/clk-provider.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reset-controller.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/init.h>
-> +#include "clkc.h"
-> +#include "g12a-aoclk.h"
-> +
-> +#define G12A_AO_GATE0(_name, _bit)					\
-> +static struct clk_regmap _name##_ao = {					\
-> +	.data = &(struct clk_regmap_gate_data) {			\
-> +		.offset = (AO_CLK_GATE0),			\
-> +		.bit_idx = (_bit),					\
-> +	},								\
-> +	.hw.init = &(struct clk_init_data) {				\
-> +		.name = #_name "_ao",					\
-> +		.ops = &clk_regmap_gate_ops,				\
-> +		.parent_names = (const char *[]){ "clk81" },		\
-> +		.num_parents = 1,					\
-> +	},								\
-> +}
-> +
-> +G12A_AO_GATE0(ahb_bus,		0);
-> +G12A_AO_GATE0(remote,		1);
-> +G12A_AO_GATE0(i2c_master,	2);
-> +G12A_AO_GATE0(i2c_slave,	3);
-> +G12A_AO_GATE0(uart1,		4);
-> +G12A_AO_GATE0(prod_i2c,		5);
-> +G12A_AO_GATE0(uart2,		6);
-> +G12A_AO_GATE0(ir_blaster,	7);
-> +G12A_AO_GATE0(saradc,		8);
-> +
-> +static struct clk_regmap ao_clk81 = {
-> +	.data = &(struct clk_regmap_mux_data) {
-> +		.offset = AO_RTI_PWR_CNTL_REG0,
-> +		.mask = 0x1,
-> +		.shift = 8,
-> +	},
-> +	.hw.init = &(struct clk_init_data){
-> +		.name = "ao_clk81",
-> +		.ops = &clk_regmap_mux_ro_ops,
-> +		.parent_names = (const char *[]){ "clk81", "ao_alt_xtal"},
+> If these register configurations are not a tuning value or dividers (which can
+> have absolute values), then we should have macros for each of these configurations.
 
-I think it is time we stop taking clock input from nowhere.
-With the addition of the axg audio clock controller, there is now an example of
-how do so.
+That might get difficult.
 
-This clock controller apparently has 3 inputs:
-* xtal
-* ao_xtal
-* clk_81
+That phy register set is completely undocumented even in the vendor TRMs
+of the 2 socs. I pieced together most existing macros from code comments
+and such from the vendor kernel. And Innosilicon is not known to willingly
+share much of their register documentation it seems.
 
-I'd like to see that appear this DT bindings and the probe function
 
-Same goes for the EE controller which should only take the xtal.
+> > +static unsigned long inno_hdmi_phy_get_tmdsclk(struct inno_hdmi_phy *inno,
+> > +					       unsigned long rate)
+> > +{
+> > +	int bus_width = phy_get_bus_width(inno->phy);
+> 
+> hmm, the bus_width could be a member of struct inno_hdmi_phy. PHY API's don't
+> have to be used for getting data within the PHY driver itself.
+> Looking at the phy_get_bus_width() implementation, we should have protected
+> bus-width set and get with mutex. With that there might be a deadlock here.
 
-> +		.num_parents = 2,
-> +	},
-> +};
-> +
-> +static struct clk_regmap g12a_saradc_mux = {
-> +	.data = &(struct clk_regmap_mux_data) {
-> +		.offset = AO_SAR_CLK,
-> +		.mask = 0x3,
-> +		.shift = 9,
-> +	},
-> +	.hw.init = &(struct clk_init_data){
-> +		.name = "g12a_saradc_mux",
-> +		.ops = &clk_regmap_mux_ops,
-> +		.parent_names = (const char *[]){ "xtal", "ao_clk81" },
-> +		.num_parents = 2,
-> +	},
-> +};
-> +
-> +static struct clk_regmap g12a_saradc_div = {
-> +	.data = &(struct clk_regmap_div_data) {
-> +		.offset = AO_SAR_CLK,
-> +		.shift = 0,
-> +		.width = 8,
-> +	},
-> +	.hw.init = &(struct clk_init_data){
-> +		.name = "g12a_saradc_div",
-> +		.ops = &clk_regmap_divider_ops,
-> +		.parent_names = (const char *[]){ "g12a_saradc_mux" },
-> +		.num_parents = 1,
-> +		.flags = CLK_SET_RATE_PARENT,
-> +	},
-> +};
-> +
-> +static struct clk_regmap g12a_saradc_gate = {
-> +	.data = &(struct clk_regmap_gate_data) {
-> +		.offset = AO_SAR_CLK,
-> +		.bit_idx = 8,
-> +	},
-> +	.hw.init = &(struct clk_init_data){
-> +		.name = "g12a_saradc_gate",
-> +		.ops = &clk_regmap_gate_ops,
-> +		.parent_names = (const char *[]){ "g12a_saradc_div" },
-> +		.num_parents = 1,
-> +		.flags = CLK_SET_RATE_PARENT,
-> +	},
-> +};
-> +
-> +static unsigned int g12a_aoclk_reset[] = {
-> +	[RESET_AO_REMOTE] =	16,
-> +	[RESET_AO_UART1] =	17,
-> +	[RESET_AO_I2C_MASTER] = 18,
-> +	[RESET_AO_I2C_SLAVE] =	19,
-> +	[RESET_AO_SARADC] =	20,
-> +	[RESET_AO_UART2] =	22,
-> +	[RESET_AO_IR_BLASTER] = 23,
-> +};
-> +
-> +static struct clk_regmap *g12a_aoclk_regmap[] = {
-> +	[CLKID_AO_AHB_BUS]	= &ahb_bus_ao,
-> +	[CLKID_AO_REMOTE]	= &remote_ao,
-> +	[CLKID_AO_I2C_MASTER]	= &i2c_master_ao,
-> +	[CLKID_AO_I2C_SLAVE]	= &i2c_slave_ao,
-> +	[CLKID_AO_UART1]	= &uart1_ao,
-> +	[CLKID_AO_PROD_I2C]	= &prod_i2c_ao,
-> +	[CLKID_AO_UART2]	= &uart2_ao,
-> +	[CLKID_AO_IR_BLASTER]	= &ir_blaster_ao,
-> +	[CLKID_AO_SAR_ADC]	= &saradc_ao,
-> +	[CLKID_AO_CLK81]	= &ao_clk81,
-> +	[CLKID_AO_SAR_ADC_SEL]	= &g12a_saradc_mux,
-> +	[CLKID_AO_SAR_ADC_DIV]	= &g12a_saradc_div,
-> +	[CLKID_AO_SAR_ADC_CLK]	= &g12a_saradc_gate,
+ok, so just read phy->attrs.bus_width directly here?
 
-Please be consistent while naming the clock, either prefix all with g12a, or
-none.
+I don't see how this can be part of struct inno_hdmi_phy, as the bus-width
+depends on the color-depth used on the hdmi-controller side, so
+depending on that it will want to adapt the phy's bus_width.
 
-> +};
-> +
-> +static struct clk_hw_onecell_data g12a_aoclk_onecell_data = {
-> +	.hws = {
-> +		[CLKID_AO_AHB_BUS]	= &ahb_bus_ao.hw,
-> +		[CLKID_AO_REMOTE]	= &remote_ao.hw,
-> +		[CLKID_AO_I2C_MASTER]	= &i2c_master_ao.hw,
-> +		[CLKID_AO_I2C_SLAVE]	= &i2c_slave_ao.hw,
-> +		[CLKID_AO_UART1]	= &uart1_ao.hw,
-> +		[CLKID_AO_PROD_I2C]	= &prod_i2c_ao.hw,
-> +		[CLKID_AO_UART2]	= &uart2_ao.hw,
-> +		[CLKID_AO_IR_BLASTER]	= &ir_blaster_ao.hw,
-> +		[CLKID_AO_SAR_ADC]	= &saradc_ao.hw,
-> +		[CLKID_AO_CLK81]	= &ao_clk81.hw,
-> +		[CLKID_AO_SAR_ADC_SEL]	= &g12a_saradc_mux.hw,
-> +		[CLKID_AO_SAR_ADC_DIV]	= &g12a_saradc_div.hw,
-> +		[CLKID_AO_SAR_ADC_CLK]	= &g12a_saradc_gate.hw,
-> +	},
-> +	.num = NR_CLKS,
-> +};
-> +
-> +static struct meson_aoclk_data g12a_aoclkc_data = {
-> +	.reset_reg	= AO_RTI_GEN_CNTL_REG0,
-> +	.num_reset	= ARRAY_SIZE(g12a_aoclk_reset),
-> +	.reset		= g12a_aoclk_reset,
-> +	.num_clks	= ARRAY_SIZE(g12a_aoclk_regmap),
-> +	.clks		= g12a_aoclk_regmap,
-> +	.hw_data	= &g12a_aoclk_onecell_data,
-> +};
-> +
-> +static const struct of_device_id g12a_aoclkc_match_table[] = {
-> +	{
-> +		.compatible	= "amlogic,g12a-aoclkc",
-> +		.data		= &g12a_aoclkc_data,
-> +	},
-> +	{ }
-> +};
-> +
-> +static struct platform_driver g12a_aoclkc_driver = {
-> +	.probe		= meson_aoclkc_probe,
-> +	.driver		= {
-> +		.name	= "g12a-aoclkc",
-> +		.of_match_table = g12a_aoclkc_match_table,
-> +	},
-> +};
-> +
-> +builtin_platform_driver(g12a_aoclkc_driver);
-> diff --git a/drivers/clk/meson/g12a-aoclk.h b/drivers/clk/meson/g12a-aoclk.h
-> new file mode 100644
-> index 0000000..007183e
-> --- /dev/null
-> +++ b/drivers/clk/meson/g12a-aoclk.h
-> @@ -0,0 +1,36 @@
-> +/* SPDX-License-Identifier: (GPL-2.0+ OR MIT) */
-> +/*
-> + * Copyright (c) 2017 BayLibre, SAS
-> + * Author: Neil Armstrong <narmstrong@baylibre.com>
-> + *
-> + * Copyright (c) 2018 Amlogic, inc.
-> + * Author: Jian Hu <Jian.Hu@amlogic.com>
-> + */
-> +
-> +#ifndef __G12A_AOCLKC_H
-> +#define __G12A_AOCLKC_H
-> +
-> +//#include "meson-aoclk.h"
+Right now our dw_hdmi in mainline only supports one output format
+requiring a bus_width of 8, but the vendor kernel shows [0] how this
+wants to be used with multiple output formats.
 
-??? Do you need this or not ?
+[0] https://github.com/rockchip-linux/kernel/blob/release-4.4/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c#L817
 
-> +
-> +#define NR_CLKS				14
-> +
-> +/* AO Configuration Clock registers offsets
-> + * Register offsets from the data sheet must be multiplied by 4.
-> + */
-> +#define AO_RTI_PWR_CNTL_REG0		0x10
-> +#define AO_RTI_GEN_CNTL_REG0		0x40
-> +#define AO_OSCIN_CNTL			0x58
-> +#define AO_CRT_CLK_CNTL1		0x68
-> +#define AO_SAR_CLK			0x90
-> +#define AO_RTC_ALT_CLK_CNTL0		0x94
-> +#define AO_RTC_ALT_CLK_CNTL1		0x98
-> +
-> +/*
-> + *AO CLK81 gate clocks
-> + */
-> +#define AO_CLK_GATE0			0x4c
-> +
-> +#include <dt-bindings/clock/g12a-aoclkc.h>
-> +#include <dt-bindings/reset/g12a-aoclkc.h>
-> +
-> +#endif /* __G12A_AOCLKC_H */
+
+> > +static irqreturn_t inno_hdmi_phy_rk3328_irq(int irq, void *dev_id)
+> > +{
+> > +	struct inno_hdmi_phy *inno = dev_id;
+> > +
+> > +	inno_update_bits(inno, 0x02, RK3328_PDATA_EN, 0);
+> > +	usleep_range(9, 10);
+> 
+> This range looks very narrow. 10 to 20 should be okay?
+
+ok
+
+
+> > +static void inno_hdmi_phy_action(void *data)
+> > +{
+> > +	struct inno_hdmi_phy *inno = data;
+> > +
+> > +	clk_disable_unprepare(inno->refpclk);
+> > +	clk_disable_unprepare(inno->sysclk);
+> > +}
+> > +
+> > +static int inno_hdmi_phy_probe(struct platform_device *pdev)
+> > +{
+> > +	struct inno_hdmi_phy *inno;
+> > +	const struct of_device_id *match;
+> > +	struct phy_provider *phy_provider;
+> > +	struct resource *res;
+> > +	void __iomem *regs;
+> > +	int ret;
+> > +
+
+[...]
+
+> > +	/*
+> > +	 * Refpclk needs to be on, on at least the rk3328 for still
+> > +	 * unknown reasons.
+> > +	 */
+> > +	ret = clk_prepare_enable(inno->refpclk);
+> > +	if (ret) {
+> > +		dev_err(inno->dev, "failed to enable refpclk\n");
+> > +		clk_disable_unprepare(inno->sysclk);
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = devm_add_action_or_reset(inno->dev, inno_hdmi_phy_action,
+> > +				       inno);
+> > +	if (ret) {
+> > +		clk_disable_unprepare(inno->refpclk);
+> > +		clk_disable_unprepare(inno->sysclk);
+> > +		return ret;
+> > +	}
+> > +
+> > +	inno->regmap = devm_regmap_init_mmio(inno->dev, regs,
+> > +					     &inno_hdmi_phy_regmap_config);
+> > +	if (IS_ERR(inno->regmap))
+> 
+> here too clk_disable_unprepare and all error handling below?
+> It's better if we just handle error handling at the bottom of the function.
+
+Nope ;-) ... I.e. the goal of registering the devm_action above is to have
+the clocks get disabled in the correct order when devm undoes the other
+things in sequence.
+
+Manual error handling for the clocks would also break devm, as then
+the clocks would get disabled before the devm cleanup kicks in.
+
+
+> > +	phy_provider = devm_of_phy_provider_register(inno->dev,
+> > +						     of_phy_simple_xlate);
+> > +	if (IS_ERR(phy_provider)) {
+> > +		dev_err(inno->dev, "failed to register PHY provider\n");
+> > +		return PTR_ERR(phy_provider);
+> > +	}
+> return PTR_ERR_OR_ZERO(phy_provider);?
+
+ok
+
+Thanks
+Heiko
