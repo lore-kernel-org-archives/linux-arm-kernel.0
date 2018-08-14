@@ -1,51 +1,87 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 14 Aug 2018 13:11:21 +0200
-Subject: [PATCH v2 4/7] drm/i2c: tda998x: convert to bridge driver
-In-Reply-To: <20180814104812.GV30658@n2100.armlinux.org.uk>
-References: <20180730164137.GD17271@n2100.armlinux.org.uk>
- <E1fkBFV-00048s-O2@rmk-PC.armlinux.org.uk>
- <20180808190930.GQ20303@art_vandelay>
- <20180808221547.GN30658@n2100.armlinux.org.uk>
- <20180810161105.GT20303@art_vandelay>
- <20180810165037.GQ30658@n2100.armlinux.org.uk>
- <20180810170229.GU20303@art_vandelay>
- <20180810171630.GR30658@n2100.armlinux.org.uk>
- <20180814104242.GO21634@phenom.ffwll.local>
- <20180814104812.GV30658@n2100.armlinux.org.uk>
-Message-ID: <CAKMK7uGjWKZ_FM71dzNqwopx3y7EGuuM9MEJ_fJL3UN4pjyx4g@mail.gmail.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Tue, 14 Aug 2018 16:25:27 +0530
+Subject: [PATCH 4/5] iommu/arm-smmu: Make way to add Qcom's smmu-500 errata
+ handling
+In-Reply-To: <20180814105528.20592-1-vivek.gautam@codeaurora.org>
+References: <20180814105528.20592-1-vivek.gautam@codeaurora.org>
+Message-ID: <20180814105528.20592-5-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2018 at 12:48 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Aug 14, 2018 at 12:42:42PM +0200, Daniel Vetter wrote:
->> Given your past track record of handling other contributors I think it's
->> entirely understandably that people do not choose to collaborate with you
->> voluntarily. Fixing that is entirely up to you though.
->
-> I do not work piecemeal.  I work in blocks, so at some point, I'll
-> switch to working on X, and then I'll work on X until that's complete
-> before moving on to Y.  It's more efficient use of my time, otherwise
-> I have to constantly context switch - and that leads to mistakes.
->
-> I'm sorry that you don't think that's a good way of working, and you
-> find that unacceptable, and you blame this on lack of collaboration.
+Cleanup to re-use some of the stuff
 
-Maybe it's not clear, but I'm not referring to how you schedule your
-own time here. I've referred to your downright abuse behaviour in past
-years here on dri-devel, which only stopped once we've put a full
-formal Code of Conduct into place, including enforcement. Up to and
-including simply throwing existing maintainers out.
+Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+---
+ drivers/iommu/arm-smmu.c | 32 +++++++++++++++++++++++++-------
+ 1 file changed, 25 insertions(+), 7 deletions(-)
 
-You blaming others for not reviewing your patches in this context is
-simply victim blaming. You do not get to blame others for the
-consequence of your past actions. It took you years of abuse emails to
-get there, it will take you years of hard constructive work and
-showing your best behaviour only, with no blaming others, to restore
-your reputation.
-
-Thanks, Daniel
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 32e86df80428..75c146751c87 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -391,21 +391,31 @@ static void __arm_smmu_free_bitmap(unsigned long *map, int idx)
+ 	clear_bit(idx, map);
+ }
+ 
+-/* Wait for any pending TLB invalidations to complete */
+-static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu,
+-				void __iomem *sync, void __iomem *status)
++static int __arm_smmu_tlb_sync_wait(void __iomem *status)
+ {
+ 	unsigned int spin_cnt, delay;
+ 
+-	writel_relaxed(0, sync);
+ 	for (delay = 1; delay < TLB_LOOP_TIMEOUT; delay *= 2) {
+ 		for (spin_cnt = TLB_SPIN_COUNT; spin_cnt > 0; spin_cnt--) {
+ 			if (!(readl_relaxed(status) & sTLBGSTATUS_GSACTIVE))
+-				return;
++				return 0;
+ 			cpu_relax();
+ 		}
+ 		udelay(delay);
+ 	}
++
++	return -EBUSY;
++}
++
++/* Wait for any pending TLB invalidations to complete */
++static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu,
++				void __iomem *sync, void __iomem *status)
++{
++	writel_relaxed(0, sync);
++
++	if (!__arm_smmu_tlb_sync_wait(status))
++		return;
++
+ 	dev_err_ratelimited(smmu->dev,
+ 			    "TLB sync timed out -- SMMU may be deadlocked\n");
+ }
+@@ -461,8 +471,9 @@ static void arm_smmu_tlb_inv_context_s2(void *cookie)
+ 	arm_smmu_tlb_sync_global(smmu);
+ }
+ 
+-static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+-					  size_t granule, bool leaf, void *cookie)
++static void __arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
++					    size_t granule, bool leaf,
++					    void *cookie)
+ {
+ 	struct arm_smmu_domain *smmu_domain = cookie;
+ 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+@@ -498,6 +509,13 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+ 	}
+ }
+ 
++static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
++					  size_t granule, bool leaf,
++					  void *cookie)
++{
++	__arm_smmu_tlb_inv_range_nosync(iova, size, granule, leaf, cookie);
++}
++
+ /*
+  * On MMU-401 at least, the cost of firing off multiple TLBIVMIDs appears
+  * almost negligible, but the benefit of getting the first one in as far ahead
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
