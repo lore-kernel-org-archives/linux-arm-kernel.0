@@ -1,7 +1,9 @@
 From: marcel@ziswiler.com (Marcel Ziswiler)
-Date: Tue, 14 Aug 2018 16:06:07 +0200
-Subject: [RESEND PATCH 1/6] ARM: config: multi_v5: enable dynamic debug
-Message-ID: <20180814140612.12554-1-marcel@ziswiler.com>
+Date: Tue, 14 Aug 2018 16:06:09 +0200
+Subject: [RESEND PATCH 3/6] ARM: multi_v7_defconfig: enable dynamic debug
+In-Reply-To: <20180814140612.12554-1-marcel@ziswiler.com>
+References: <20180814140612.12554-1-marcel@ziswiler.com>
+Message-ID: <20180814140612.12554-3-marcel@ziswiler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,20 +15,20 @@ Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 
 ---
 
- arch/arm/configs/multi_v5_defconfig | 1 +
+ arch/arm/configs/multi_v7_defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-index 318b76fa26d1..b302ac68d587 100644
---- a/arch/arm/configs/multi_v5_defconfig
-+++ b/arch/arm/configs/multi_v5_defconfig
-@@ -275,6 +275,7 @@ CONFIG_NLS_CODEPAGE_850=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 1299c0cf2f3a..65646b39430b 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -976,6 +976,7 @@ CONFIG_NLS_CODEPAGE_437=y
  CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_ISO8859_2=y
  CONFIG_NLS_UTF8=y
+ CONFIG_PRINTK_TIME=y
 +CONFIG_DYNAMIC_DEBUG=y
- CONFIG_DEBUG_INFO=y
- CONFIG_DEBUG_FS=y
  CONFIG_MAGIC_SYSRQ=y
+ CONFIG_CRYPTO_USER=m
+ CONFIG_CRYPTO_USER_API_HASH=m
 -- 
 2.14.4
