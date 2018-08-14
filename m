@@ -1,155 +1,167 @@
-From: kyeongdon.kim@lge.com (Kyeongdon Kim)
-Date: Tue, 14 Aug 2018 16:55:22 +0900
-Subject: [PATCH] arm64: lib: use c string functions for KASAN support
-Message-ID: <1534233322-106271-1-git-send-email-kyeongdon.kim@lge.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Tue, 14 Aug 2018 16:33:41 +0800
+Subject: [PATCH v3 4/6] iommu/io-pgtable-arm: add support for non-strict
+ mode
+In-Reply-To: <1d24541340334954969c58980ef85444@HXTBJIDCEMVIW01.hxtcorp.net>
+References: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
+ <1531376312-2192-5-git-send-email-thunder.leizhen@huawei.com>
+ <89cc2201-99ab-3f3b-a2d1-1766515d4375@arm.com> <5B597628.2020103@huawei.com>
+ <04239cfa-bcf2-a33a-e662-ebc75e66782b@arm.com>
+ <1d24541340334954969c58980ef85444@HXTBJIDCEMVIW01.hxtcorp.net>
+Message-ID: <5B7293E5.7040702@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Assembly optimized string functions cannot detect KASan bug.
-This might have been the intention of the original author.
-(not too much important to catch)
 
-But, I found the obvious uaf problem in strcmp() function.
- - in this case, using 32bit KASan patchset helps
 
-Since I used c string function, I believe I could find this bug.
-After using the patch, can see the report & backtrace the below:
+On 2018/8/6 9:32, Yang, Shunyong wrote:
+> Hi, Robin,
+> 
+> On 2018/7/26 22:37, Robin Murphy wrote:
+>> On 2018-07-26 8:20 AM, Leizhen (ThunderTown) wrote:
+>>> On 2018/7/25 6:25, Robin Murphy wrote:
+>>>> On 2018-07-12 7:18 AM, Zhen Lei wrote:
+>>>>> To support the non-strict mode, now we only tlbi and sync for the strict
+>>>>> mode. But for the non-leaf case, always follow strict mode.
+>>>>>
+>>>>> Use the lowest bit of the iova parameter to pass the strict mode:
+>>>>> 0, IOMMU_STRICT;
+>>>>> 1, IOMMU_NON_STRICT;
+>>>>> Treat 0 as IOMMU_STRICT, so that the unmap operation can compatible with
+>>>>> other IOMMUs which still use strict mode.
+>>>>>
+>>>>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>>>>> ---
+>>>>>    drivers/iommu/io-pgtable-arm.c | 23 ++++++++++++++---------
+>>>>>    1 file changed, 14 insertions(+), 9 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+>>>>> index 010a254..9234db3 100644
+>>>>> --- a/drivers/iommu/io-pgtable-arm.c
+>>>>> +++ b/drivers/iommu/io-pgtable-arm.c
+>>>>> @@ -292,7 +292,7 @@ static void __arm_lpae_set_pte(arm_lpae_iopte *ptep, arm_lpae_iopte pte,
+>>>>>      static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+>>>>>                       unsigned long iova, size_t size, int lvl,
+>>>>> -                   arm_lpae_iopte *ptep);
+>>>>> +                   arm_lpae_iopte *ptep, int strict);
+>>>>>      static void __arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
+>>>>>                    phys_addr_t paddr, arm_lpae_iopte prot,
+>>>>> @@ -334,7 +334,7 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
+>>>>>            size_t sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
+>>>>>              tblp = ptep - ARM_LPAE_LVL_IDX(iova, lvl, data);
+>>>>> -        if (WARN_ON(__arm_lpae_unmap(data, iova, sz, lvl, tblp) != sz))
+>>>>> +        if (WARN_ON(__arm_lpae_unmap(data, iova, sz, lvl, tblp, IOMMU_STRICT) != sz))
+>>>>>                return -EINVAL;
+>>>>>        }
+>>>>>    @@ -531,7 +531,7 @@ static void arm_lpae_free_pgtable(struct io_pgtable *iop)
+>>>>>    static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
+>>>>>                           unsigned long iova, size_t size,
+>>>>>                           arm_lpae_iopte blk_pte, int lvl,
+>>>>> -                       arm_lpae_iopte *ptep)
+>>>>> +                       arm_lpae_iopte *ptep, int strict)
+>>>>
+>>>> DMA code should never ever be splitting blocks anyway, and frankly the TLB maintenance here is dodgy enough (since we can't reasonably do break-before make as VMSA says we should) that I *really* don't want to introduce any possibility of making it more asynchronous. I'd much rather just hard-code the expectation of strict == true for this.
+>>>
+>>> OK, I will hard-code strict=true for it.
+>>>
+>>> But since it never ever be happened, why did not give a warning at the beginning?
+>>
+>> Because DMA code is not the only caller of iommu_map/unmap. It's 
+>> perfectly legal in the IOMMU API to partially unmap a previous mapping 
+>> such that a block entry needs to be split. The DMA API, however, is a 
+>> lot more constrined, and thus by construction the iommu-dma layer will 
+>> never generate a block-splitting iommu_unmap() except as a result of 
+>> illegal DMA API usage, and we obviously do not need to optimise for that 
+>> (you will get a warning about mismatched unmaps under dma-debug, but 
+>> it's a bit too expensive to police in the general case).
+>>
+> 
+> When I was reading the code around arm_lpae_split_blk_unmap(), I was
+> curious in which scenario a block will be split. Now with your comments
+> "Because DMA code is not the only caller of iommu_map/unmap", it seems
+> depending on the user.
+> 
+> Would you please explain this further? I mean besides DMA, which user
+> will use iommu_map/umap and how it split a block.
 
-==================================================================
-BUG: KASAN: use-after-free in strcmp+0x1c/0x5c at addr ffffffc0ad313500
-Read of size 1 by task swapper/0/1
-CPU: 3 PID: 1 Comm: swapper/0 Tainted: G    B           4.9.77+ #1
-Hardware name: Generic (DT) based system
-Call trace:
-[<ffffff880808aa7c>] dump_backtrace+0x0/0x2e0
-[<ffffff880808ad70>] show_stack+0x14/0x1c
-[<ffffff880848f5ec>] dump_stack+0x88/0xb0
-[<ffffff8808275d3c>] kasan_object_err+0x24/0x7c
-[<ffffff8808276164>] kasan_report+0x2f0/0x484
-[<ffffff8808274c80>] __asan_load1+0x24/0x50
-[<ffffff880849baec>] strcmp+0x1c/0x5c
-[<ffffff88085ab734>] platform_match+0x40/0xe4
-[<ffffff88085a8740>] __driver_attach+0x40/0x130
-[<ffffff88085a573c>] bus_for_each_dev+0xc4/0xe0
-[<ffffff88085a7afc>] driver_attach+0x30/0x3c
-[<ffffff88085a7490>] bus_add_driver+0x2dc/0x328
-[<ffffff88085a996c>] driver_register+0x118/0x160
-[<ffffff88085ab0d8>] __platform_driver_register+0x7c/0x88
-[<ffffff8809ad2430>] alarmtimer_init+0x154/0x1e4
-[<ffffff88080832dc>] do_one_initcall+0x184/0x1a4
-[<ffffff8809ac1080>] kernel_init_freeable+0x2ec/0x2f0
-[<ffffff880907e0a8>] kernel_init+0x18/0x10c
-[<ffffff8808082f00>] ret_from_fork+0x10/0x50
-Object at ffffffc0ad313500, in cache kmalloc-64 size: 64
-Allocated:
-PID = 1
- save_stack_trace_tsk+0x0/0x194
- save_stack_trace+0x18/0x20
- kasan_kmalloc+0xa8/0x154
- kasan_slab_alloc+0x14/0x1c
- __kmalloc_track_caller+0x178/0x2a0
- kvasprintf+0x80/0x104
- kvasprintf_const+0xcc/0xd0
- kobject_set_name_vargs+0x54/0xd4
- dev_set_name+0x64/0x84
- of_device_make_bus_id+0xc4/0x140
- of_device_alloc+0x1e0/0x200
- of_platform_device_create_pdata+0x70/0xf4
- of_platform_bus_create+0x448/0x508
- of_platform_populate+0xf4/0x104
- of_platform_default_populate+0x20/0x28
- of_platform_default_populate_init+0x68/0x78
-Freed:
-PID = 1
- save_stack_trace_tsk+0x0/0x194
- save_stack_trace+0x18/0x20
- kasan_slab_free+0xa0/0x14c
- kfree+0x174/0x288
- kfree_const+0x2c/0x38
- kobject_rename+0x12c/0x160
- device_rename+0xa8/0x110
- mt_usb_probe+0x218/0x760
- platform_drv_probe+0x74/0xd0
- driver_probe_device+0x3d4/0x614
- __driver_attach+0xc8/0x130
- bus_for_each_dev+0xc4/0xe0
- driver_attach+0x30/0x3c
- bus_add_driver+0x2dc/0x328
- driver_register+0x118/0x160
- __platform_driver_register+0x7c/0x88
-Memory state around the buggy address:
- ffffffc0ad313300: fb fb fb fb fc fc fc fc fc fc fc fc fc fc fc fc
- ffffffc0ad313400: 00 00 00 00 fc fc fc fc fc fc fc fc fc fc fc fc
->ffffffc0ad313500: fb fb fb fb fc fc fc fc fc fc fc fc fc fc fc fc
-                   ^
- ffffffc0ad313600: 00 00 00 00 fc fc fc fc fc fc fc fc fc fc fc fc
- ffffffc0ad313700: 00 00 00 00 fc fc fc fc fc fc fc fc fc fc fc fc
-==================================================================
+I also think that arm_lpae_split_blk_unmap() scenario is not exist, maybe
+we should remove it, and give a warning for this wrong usage.
 
-Signed-off-by: Kyeongdon Kim <kyeongdon.kim@lge.com>
----
- arch/arm64/include/asm/string.h | 2 ++
- arch/arm64/kernel/arm64ksyms.c  | 2 ++
- arch/arm64/lib/Makefile         | 8 +++++---
- 3 files changed, 9 insertions(+), 3 deletions(-)
+> 
+> Thanks.
+> Shunyong.
+> 
+>>
+>>>>>    {
+>>>>>        struct io_pgtable_cfg *cfg = &data->iop.cfg;
+>>>>>        arm_lpae_iopte pte, *tablep;
+>>>>> @@ -576,15 +576,18 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
+>>>>>        }
+>>>>>          if (unmap_idx < 0)
+>>>>> -        return __arm_lpae_unmap(data, iova, size, lvl, tablep);
+>>>>> +        return __arm_lpae_unmap(data, iova, size, lvl, tablep, strict);
+>>>>>          io_pgtable_tlb_add_flush(&data->iop, iova, size, size, true);
+>>>>> +    if (!strict)
+>>>>> +        io_pgtable_tlb_sync(&data->iop);
+>>>>> +
+>>>>>        return size;
+>>>>>    }
+>>>>>      static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+>>>>>                       unsigned long iova, size_t size, int lvl,
+>>>>> -                   arm_lpae_iopte *ptep)
+>>>>> +                   arm_lpae_iopte *ptep, int strict)
+>>>>>    {
+>>>>>        arm_lpae_iopte pte;
+>>>>>        struct io_pgtable *iop = &data->iop;
+>>>>> @@ -609,7 +612,7 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+>>>>>                io_pgtable_tlb_sync(iop);
+>>>>>                ptep = iopte_deref(pte, data);
+>>>>>                __arm_lpae_free_pgtable(data, lvl + 1, ptep);
+>>>>> -        } else {
+>>>>> +        } else if (strict) {
+>>>>>                io_pgtable_tlb_add_flush(iop, iova, size, size, true);
+>>>>>            }
+>>>>>    @@ -620,25 +623,27 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+>>>>>             * minus the part we want to unmap
+>>>>>             */
+>>>>>            return arm_lpae_split_blk_unmap(data, iova, size, pte,
+>>>>> -                        lvl + 1, ptep);
+>>>>> +                        lvl + 1, ptep, strict);
+>>>>>        }
+>>>>>          /* Keep on walkin' */
+>>>>>        ptep = iopte_deref(pte, data);
+>>>>> -    return __arm_lpae_unmap(data, iova, size, lvl + 1, ptep);
+>>>>> +    return __arm_lpae_unmap(data, iova, size, lvl + 1, ptep, strict);
+>>>>>    }
+>>>>>      static size_t arm_lpae_unmap(struct io_pgtable_ops *ops, unsigned long iova,
+>>>>>                     size_t size)
+>>>>>    {
+>>>>> +    int strict = ((iova & IOMMU_STRICT_MODE_MASK) == IOMMU_STRICT);
+>>>>>        struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
+>>>>>        arm_lpae_iopte *ptep = data->pgd;
+>>>>>        int lvl = ARM_LPAE_START_LVL(data);
+>>>>>    +    iova &= ~IOMMU_STRICT_MODE_MASK;
+>>>>>        if (WARN_ON(iova >= (1ULL << data->iop.cfg.ias)))
+>>>>>            return 0;
+>>>>>    -    return __arm_lpae_unmap(data, iova, size, lvl, ptep);
+>>>>> +    return __arm_lpae_unmap(data, iova, size, lvl, ptep, strict);
+>>>>>    }
+>>>>>      static phys_addr_t arm_lpae_iova_to_phys(struct io_pgtable_ops *ops,
+>>>>>
+>>>>
+>>>> .
+>>>>
+>>>
+>> _______________________________________________
+>> iommu mailing list
+>> iommu at lists.linux-foundation.org
+>> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+>>
+> 
+> 
+> .
+> 
 
-diff --git a/arch/arm64/include/asm/string.h b/arch/arm64/include/asm/string.h
-index dd95d33..5c5219a 100644
---- a/arch/arm64/include/asm/string.h
-+++ b/arch/arm64/include/asm/string.h
-@@ -16,6 +16,7 @@
- #ifndef __ASM_STRING_H
- #define __ASM_STRING_H
- 
-+#if !defined(CONFIG_KASAN)
- #define __HAVE_ARCH_STRRCHR
- extern char *strrchr(const char *, int c);
- 
-@@ -33,6 +34,7 @@ extern __kernel_size_t strlen(const char *);
- 
- #define __HAVE_ARCH_STRNLEN
- extern __kernel_size_t strnlen(const char *, __kernel_size_t);
-+#endif
- 
- #define __HAVE_ARCH_MEMCPY
- extern void *memcpy(void *, const void *, __kernel_size_t);
-diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-index d894a20..eb9bf20 100644
---- a/arch/arm64/kernel/arm64ksyms.c
-+++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -44,12 +44,14 @@ EXPORT_SYMBOL(__arch_copy_in_user);
- EXPORT_SYMBOL(memstart_addr);
- 
- 	/* string / mem functions */
-+#if !defined(CONFIG_KASAN)
- EXPORT_SYMBOL(strchr);
- EXPORT_SYMBOL(strrchr);
- EXPORT_SYMBOL(strcmp);
- EXPORT_SYMBOL(strncmp);
- EXPORT_SYMBOL(strlen);
- EXPORT_SYMBOL(strnlen);
-+#endif
- EXPORT_SYMBOL(memset);
- EXPORT_SYMBOL(memcpy);
- EXPORT_SYMBOL(memmove);
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index 68755fd..aa2d457 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -2,9 +2,11 @@
- lib-y		:= clear_user.o delay.o copy_from_user.o		\
- 		   copy_to_user.o copy_in_user.o copy_page.o		\
- 		   clear_page.o memchr.o memcpy.o memmove.o memset.o	\
--		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
--		   strchr.o strrchr.o tishift.o
--
-+		   memcmp.o tishift.o
-+ifndef CONFIG_KASAN
-+lib-y		:= strcmp.o strncmp.o strlen.o strnlen.o	\
-+		   strchr.o strrchr.o
-+endif
- # Tell the compiler to treat all general purpose registers (with the
- # exception of the IP registers, which are already handled by the caller
- # in case of a PLT) as callee-saved, which allows for efficient runtime
 -- 
-2.6.2
+Thanks!
+BestRegards
