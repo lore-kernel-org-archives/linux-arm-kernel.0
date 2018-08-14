@@ -1,61 +1,37 @@
-From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Tue, 14 Aug 2018 10:07:29 +0530
-Subject: [PATCH v8 3/6] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <CAPhsuW4KT=6vR_0ogTy_+Fwcz7cZ0Rac8sYohLngQmEBCd0HLw@mail.gmail.com>
-References: <20180809041856.1547-1-ravi.bangoria@linux.ibm.com>
- <20180809041856.1547-4-ravi.bangoria@linux.ibm.com>
- <CAPhsuW49+qA7kT7yE4tgbnAuox-iOzssg-jc2abG8XDo6XeX8A@mail.gmail.com>
- <95a1221e-aecc-42be-5239-a2c2429be176@linux.ibm.com>
- <20180813115019.GB28360@redhat.com>
- <fa85d19f-b22c-e09c-b8d2-f68f0c79de15@linux.ibm.com>
- <20180813131723.GC28360@redhat.com>
- <CAPhsuW4KT=6vR_0ogTy_+Fwcz7cZ0Rac8sYohLngQmEBCd0HLw@mail.gmail.com>
-Message-ID: <58d21bac-5a31-85df-4b9f-05815b64f465@linux.ibm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 14 Aug 2018 10:50:54 +0530
+Subject: [PATCH] remoteproc/davinci: Mark error recovery as disabled
+In-Reply-To: <20180813185224.GG5090@builder>
+References: <20180723232757.9147-1-s-anna@ti.com>
+ <0550997f-8e32-fb56-2a70-74235b969ce2@ti.com> <20180813185224.GG5090@builder>
+Message-ID: <5a6e69f7-7da1-1b8e-d082-18f39d5139dc@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Song,
+Hi Bjorn,
 
-On 08/13/2018 10:42 PM, Song Liu wrote:
-> On Mon, Aug 13, 2018 at 6:17 AM, Oleg Nesterov <oleg@redhat.com> wrote:
->> On 08/13, Ravi Bangoria wrote:
+On Tuesday 14 August 2018 12:22 AM, Bjorn Andersson wrote:
+> On Mon 13 Aug 08:11 PDT 2018, Suman Anna wrote:
+> 
+>> Hi Bjorn,
+>>
+>> On 07/23/2018 06:27 PM, Suman Anna wrote:
+>>> The Davinci remoteproc driver does not support error recovery at
+>>> present, so mark the corresponding remoteproc flag appropriately
+>>> so that the debugfs flag shows the value as 'disabled' by default.
 >>>
->>>> But damn, process creation (exec) is trivial. We could add a new uprobe_exec()
->>>> hook and avoid delayed_uprobe_install() in uprobe_mmap().
->>>
->>> I'm sorry. I didn't get this.
+>>> Signed-off-by: Suman Anna <s-anna@ti.com>
 >>
->> Sorry for confusion...
->>
->> I meant, if only exec*( could race with _register(), we could add another uprobe
->> hook which updates all (delayed) counters before return to user-mode.
->>
->>>> Afaics, the really problematic case is dlopen() which can race with _register()
->>>> too, right?
->>>
->>> dlopen() should internally use mmap() right? So what is the problem here? Can
->>> you please elaborate.
->>
->> What I tried to say is that we can't avoid uprobe_mmap()->delayed_uprobe_install()
->> because dlopen() can race with _register() too, just like exec.
->>
->> Oleg.
+>> Can you pick up this minor patch for 4.19 please, I do not see this in
+>> your rproc-next branch?
 >>
 > 
-> How about we do delayed_uprobe_install() per file? Say we keep a list
-> of delayed_uprobe
-> in load_elf_binary(). Then we can install delayed_uprobe after loading
-> all sections of the
-> file.
+> Of course, the patch is applied now, will send my pull request in a few
+> days.
 
-I'm not sure if I totally understood the idea. But how this approach can
-solve dlopen() race with _register()?
+Can you also please pick patch 1/4 here:
 
-Rather, making delayed_uprobe_list an mm field seems simple and effective
-idea to me. The only overhead will be list_empty(mm->delayed_list) check.
-
-Please let me know if I misunderstood you.
+https://patchwork.kernel.org/patch/10479365/
 
 Thanks,
-Ravi
+Sekhar
