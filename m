@@ -1,34 +1,71 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Aug 2018 11:48:13 +0100
-Subject: [PATCH v2 4/7] drm/i2c: tda998x: convert to bridge driver
-In-Reply-To: <20180814104242.GO21634@phenom.ffwll.local>
-References: <20180730164137.GD17271@n2100.armlinux.org.uk>
- <E1fkBFV-00048s-O2@rmk-PC.armlinux.org.uk>
- <20180808190930.GQ20303@art_vandelay>
- <20180808221547.GN30658@n2100.armlinux.org.uk>
- <20180810161105.GT20303@art_vandelay>
- <20180810165037.GQ30658@n2100.armlinux.org.uk>
- <20180810170229.GU20303@art_vandelay>
- <20180810171630.GR30658@n2100.armlinux.org.uk>
- <20180814104242.GO21634@phenom.ffwll.local>
-Message-ID: <20180814104812.GV30658@n2100.armlinux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 14 Aug 2018 11:49:42 +0100
+Subject: [PATCH v2 3/3] dts: arm64/sdm845: Add node for qcom,smmu-v2
+In-Reply-To: <20180814102740.30222-4-vivek.gautam@codeaurora.org>
+References: <20180814102740.30222-1-vivek.gautam@codeaurora.org>
+ <20180814102740.30222-4-vivek.gautam@codeaurora.org>
+Message-ID: <27372288-447d-6c9a-504a-8b8ef40e3d58@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2018 at 12:42:42PM +0200, Daniel Vetter wrote:
-> Given your past track record of handling other contributors I think it's
-> entirely understandably that people do not choose to collaborate with you
-> voluntarily. Fixing that is entirely up to you though.
+Hi Vivek,
 
-I do not work piecemeal.  I work in blocks, so at some point, I'll
-switch to working on X, and then I'll work on X until that's complete
-before moving on to Y.  It's more efficient use of my time, otherwise
-I have to constantly context switch - and that leads to mistakes.
+On 14/08/18 11:27, Vivek Gautam wrote:
+> Add device node for qcom,smmu-v2 available on sdm845.
+> This smmu is available only to GPU device.
+> 
+> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+> ---
+>   arch/arm64/boot/dts/qcom/sdm845.dtsi | 23 +++++++++++++++++++++++
+>   1 file changed, 23 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> index 1c2be2082f33..bd1ec5fa5146 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -6,6 +6,7 @@
+>    */
+>   
+>   #include <dt-bindings/clock/qcom,gcc-sdm845.h>
+> +#include <dt-bindings/clock/qcom,gpucc-sdm845.h>
+>   #include <dt-bindings/clock/qcom,rpmh.h>
+>   #include <dt-bindings/interrupt-controller/arm-gic.h>
+>   #include <dt-bindings/soc/qcom,rpmh-rsc.h>
+> @@ -989,6 +990,28 @@
+>   			cell-index = <0>;
+>   		};
+>   
+> +		gpu_smmu: iommu at 5040000 {
+> +			compatible = "qcom,sdm845-smmu-v2", "qcom,smmu-v2";
 
-I'm sorry that you don't think that's a good way of working, and you
-find that unacceptable, and you blame this on lack of collaboration.
+Which of "sdm845" or "msm8996"[1] is the actual SoC name here?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+Robin.
+
+[1] 
+https://www.mail-archive.com/freedreno at lists.freedesktop.org/msg02659.html
+
+> +			reg = <0x5040000 0x10000>;
+> +			#iommu-cells = <1>;
+> +			#global-interrupts = <2>;
+> +			interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
+> +				     <GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
+> +				     <GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
+> +				     <GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
+> +				     <GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
+> +				     <GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
+> +				     <GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
+> +				     <GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
+> +			clock-names = "bus", "iface";
+> +			clocks = <&gcc GCC_GPU_MEMNOC_GFX_CLK>,
+> +				 <&gcc GCC_GPU_CFG_AHB_CLK>;
+> +
+> +			/*power-domains = <&gpucc GPU_CX_GDSC>;*/
+> +		};
+> +
+>   		apps_smmu: iommu at 15000000 {
+>   			compatible = "qcom,sdm845-smmu-500", "arm,mmu-500";
+>   			reg = <0x15000000 0x80000>;
+> 
