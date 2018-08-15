@@ -1,171 +1,65 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 15 Aug 2018 13:22:46 -0600
-Subject: [PATCH 03/13] coresight: tmc-etb/etf: Prepare to handle errors
- enabling
-In-Reply-To: <1533562915-21558-4-git-send-email-suzuki.poulose@arm.com>
-References: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
- <1533562915-21558-4-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180815192246.GA11625@xps15>
+From: ghackmann@google.com (Greg Hackmann)
+Date: Wed, 15 Aug 2018 12:30:19 -0700
+Subject: [PATCH] arm64: mm: check for upper PAGE_SHIFT bits in pfn_valid()
+In-Reply-To: <20180814152958.GD567@arm.com>
+References: <20180813193013.236362-1-ghackmann@google.com>
+ <20180814104041.GB28664@arm.com>
+ <eb90a28e-893c-e02e-a9c2-1d988f08cf3a@google.com>
+ <20180814152958.GD567@arm.com>
+Message-ID: <e5585e80-8c5a-fd39-adc2-3eccd42cae07@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2018 at 02:41:45PM +0100, Suzuki K Poulose wrote:
-> Prepare to handle errors in enabling the hardware and
-> report it back to the core driver.
+On 08/14/2018 08:29 AM, Will Deacon wrote:
+> On Tue, Aug 14, 2018 at 08:17:48AM -0700, Greg Hackmann wrote:
+>> On 08/14/2018 03:40 AM, Will Deacon wrote:
+>>> Hi Greg,
+>>>
+>>> On Mon, Aug 13, 2018 at 12:30:11PM -0700, Greg Hackmann wrote:
+>>>> ARM64's pfn_valid() shifts away the upper PAGE_SHIFT bits of the input
+>>>> before seeing if the PFN is valid.  This leads to false positives when
+>>>> some of the upper bits are set, but the lower bits match a valid PFN.
+>>>>
+>>>> For example, the following userspace code looks up a bogus entry in
+>>>> /proc/kpageflags:
+>>>>
+>>>>     int pagemap = open("/proc/self/pagemap", O_RDONLY);
+>>>>     int pageflags = open("/proc/kpageflags", O_RDONLY);
+>>>>     uint64_t pfn, val;
+>>>>
+>>>>     lseek64(pagemap, [...], SEEK_SET);
+>>>>     read(pagemap, &pfn, sizeof(pfn));
+>>>>     if (pfn & (1UL << 63)) {        /* valid PFN */
+>>>>         pfn &= ((1UL << 55) - 1);   /* clear flag bits */
+>>>>         pfn |= (1UL << 55);
+>>>>         lseek64(pageflags, pfn * sizeof(uint64_t), SEEK_SET);
+>>>>         read(pageflags, &val, sizeof(val));
+>>>>     }
+>>>>
+>>>> On ARM64 this causes the userspace process to crash with SIGSEGV rather
+>>>> than reading (1 << KPF_NOPAGE).  kpageflags_read() treats the offset as
+>>>> valid, and stable_page_flags() will try to access an address between the
+>>>> user and kernel address ranges.
+>>>>
+>>>> Signed-off-by: Greg Hackmann <ghackmann@google.com>
+>>>> ---
+>>>>  arch/arm64/mm/init.c | 6 +++++-
+>>>>  1 file changed, 5 insertions(+), 1 deletion(-)
+>>>
+>>> Thanks, this looks like a sensible fix to me. Do you think it warrants a
+>>> CC stable?
+>>>
+>>> Will
+>>
+>> Yes, I think so.  Should I resend with a "Fixes" field?
 > 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/hwtracing/coresight/coresight-tmc-etf.c | 71 +++++++++++++++----------
->  1 file changed, 44 insertions(+), 27 deletions(-)
+> Could do, but I think this goes all the way back to day 1! Doesn't arch/arm/
+> also suffer from the same issue?
 > 
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> index 4156c95..ceb4b30 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> @@ -15,7 +15,7 @@
->  static int tmc_set_etf_buffer(struct coresight_device *csdev,
->  			      struct perf_output_handle *handle);
->  
-> -static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
-> +static void __tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
->  {
->  	CS_UNLOCK(drvdata->base);
->  
-> @@ -34,6 +34,12 @@ static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
->  	CS_LOCK(drvdata->base);
->  }
->  
-> +static int tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
-> +{
-> +	__tmc_etb_enable_hw(drvdata);
-> +	return 0;
-> +}
-> +
->  static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
->  {
->  	char *bufp;
-> @@ -76,7 +82,7 @@ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
->  	CS_LOCK(drvdata->base);
->  }
->  
-> -static void tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
-> +static void __tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
->  {
->  	CS_UNLOCK(drvdata->base);
->  
-> @@ -92,6 +98,12 @@ static void tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
->  	CS_LOCK(drvdata->base);
->  }
->  
-> +static int tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
-> +{
-> +	__tmc_etf_enable_hw(drvdata);
-> +	return 0;
-> +}
-> +
->  static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
->  {
->  	CS_UNLOCK(drvdata->base);
-> @@ -174,8 +186,12 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev)
->  		drvdata->buf = buf;
->  	}
->  
-> -	drvdata->mode = CS_MODE_SYSFS;
-> -	tmc_etb_enable_hw(drvdata);
-> +	ret = tmc_etb_enable_hw(drvdata);
-> +	if (!ret)
-> +		drvdata->mode = CS_MODE_SYSFS;
-> +	else
-> +		/* Free up the buffer if we failed to enable */
-> +		used = false;
->  out:
->  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
->  
-> @@ -194,27 +210,25 @@ static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, void *data)
->  	struct perf_output_handle *handle = data;
->  
->  	spin_lock_irqsave(&drvdata->spinlock, flags);
-> -	if (drvdata->reading) {
-> +	do {
->  		ret = -EINVAL;
-> -		goto out;
-> -	}
-> +		if (drvdata->reading)
-> +			break;
-> +		/*
-> +		 * In Perf mode there can be only one writer per sink.  There
-> +		 * is also no need to continue if the ETB/ETF is already
-> +		 * operated from sysFS.
-> +		 */
-> +		if (drvdata->mode != CS_MODE_DISABLED)
-> +			break;
->  
-> -	/*
-> -	 * In Perf mode there can be only one writer per sink.  There
-> -	 * is also no need to continue if the ETB/ETR is already operated
-> -	 * from sysFS.
-> -	 */
-> -	if (drvdata->mode != CS_MODE_DISABLED) {
-> -		ret = -EINVAL;
-> -		goto out;
-> -	}
-> -
-> -	ret = tmc_set_etf_buffer(csdev, handle);
-> -	if (!ret) {
-> -		drvdata->mode = CS_MODE_PERF;
-> -		tmc_etb_enable_hw(drvdata);
-> -	}
-> -out:
-> +		ret = tmc_set_etf_buffer(csdev, handle);
-> +		if (ret)
-> +			break;
-> +		ret  = tmc_etb_enable_hw(drvdata);
-> +		if (!ret)
-> +			drvdata->mode = CS_MODE_PERF;
-> +	} while (0);
->  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
->  
->  	return ret;
-> @@ -271,6 +285,7 @@ static void tmc_disable_etf_sink(struct coresight_device *csdev)
->  static int tmc_enable_etf_link(struct coresight_device *csdev,
->  			       int inport, int outport)
->  {
-> +	int ret;
->  	unsigned long flags;
->  	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
->  
-> @@ -280,11 +295,13 @@ static int tmc_enable_etf_link(struct coresight_device *csdev,
->  		return -EBUSY;
->  	}
->  
-> -	tmc_etf_enable_hw(drvdata);
-> -	drvdata->mode = CS_MODE_SYSFS;
-> +	ret = tmc_etf_enable_hw(drvdata);
-> +	if (!ret)
-> +		drvdata->mode = CS_MODE_SYSFS;
->  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
->  
-> -	dev_dbg(drvdata->dev, "TMC-ETF enabled\n");
-> +	if (!ret)
-> +		dev_dbg(drvdata->dev, "TMC-ETF enabled\n");
->  	return 0;
-
-We need to tell the caller if an error as occured:
-
-        return ret;
-
->  }
->  
-> @@ -579,7 +596,7 @@ int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata)
->  		 * can't be NULL.
->  		 */
->  		memset(drvdata->buf, 0, drvdata->size);
-> -		tmc_etb_enable_hw(drvdata);
-> +		__tmc_etb_enable_hw(drvdata);
->  	} else {
->  		/*
->  		 * The ETB/ETF is not tracing and the buffer was just read.
-> -- 
-> 2.7.4
+> Will
 > 
+
+Yeah, it looks like this happens on non-LPAE 32-bit kernels too.  LPAE
+kernels aren't affected since __pfn_to_phys() promotes to a 64-bit type.
+
+I can submit a fix for that too while I'm at it.
