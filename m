@@ -1,22 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 15 Aug 2018 14:24:55 -0600
-Subject: [PATCH v4 3/6] reset: imx7: Add PCIE_CTRL_APPS_TURNOFF
-In-Reply-To: <88a5997e37d048cfc2dabb44cc13dce89c93d5eb.1534264292.git.leonard.crestez@nxp.com>
+Date: Wed, 15 Aug 2018 14:26:31 -0600
+Subject: [PATCH v4 4/6] dt-bindings: imx6q-pcie: Add turnoff reset for
+ imx7d
+In-Reply-To: <e4e35d89f8e393cd291cb612a95faf1653a26f9b.1534264292.git.leonard.crestez@nxp.com>
 References: <cover.1534264292.git.leonard.crestez@nxp.com>
- <88a5997e37d048cfc2dabb44cc13dce89c93d5eb.1534264292.git.leonard.crestez@nxp.com>
-Message-ID: <20180815202455.GA15583@rob-hp-laptop>
+ <e4e35d89f8e393cd291cb612a95faf1653a26f9b.1534264292.git.leonard.crestez@nxp.com>
+Message-ID: <20180815202630.GA18952@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2018 at 07:50:17PM +0300, Leonard Crestez wrote:
-> This is required for the imx pci driver to send the PME_Turn_Off TLP.
+On Tue, 14 Aug 2018 19:50:18 +0300, Leonard Crestez wrote:
+> This is documented as "required" but won't be present in old dtbs.
+> 
+> These resets are also present on other imx chips but right now only
+> imx7d implements them through the reset controller subsystem.
 > 
 > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 > ---
->  drivers/reset/reset-imx7.c             | 1 +
+>  Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
 
->  include/dt-bindings/reset/imx7-reset.h | 4 +++-
-
-Acked-by: Rob Herring <robh@kernel.org>
-
->  2 files changed, 4 insertions(+), 1 deletion(-)
+Reviewed-by: Rob Herring <robh@kernel.org>
