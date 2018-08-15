@@ -1,68 +1,99 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 15 Aug 2018 13:22:35 +0200
-Subject: [PATCH 2/4] dt-bindings: phy-rockchip-inno-usb2: add
- documentation for extcon and utmi-avalid properties.
-In-Reply-To: <37512ec9-8d9a-6c0c-8808-6351b8501002@collabora.com>
-References: <20180815095934.11205-1-enric.balletbo@collabora.com>
- <2023816.cqyDmH3see@phil>
- <37512ec9-8d9a-6c0c-8808-6351b8501002@collabora.com>
-Message-ID: <4665926.GcjFtTh8TS@phil>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Wed, 15 Aug 2018 20:07:45 +0800
+Subject: [PATCH] drm: sun4i: exclusively set HDMI-related clocks for dw-hdmi
+Message-ID: <20180815120745.36593-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Enric,
+The glue in sun4i-drm of dw-hdmi currently doesn't set the clocks of
+dw-hdmi exclusively, which will lead the display fails to initialize in
+some situations.
 
-Am Mittwoch, 15. August 2018, 13:08:00 CEST schrieb Enric Balletbo i Serra:
-> On 15/08/18 12:29, Heiko Stuebner wrote:
-> > Am Mittwoch, 15. August 2018, 11:59:32 CEST schrieb Enric Balletbo i Serra:
-> >> Commit 98898f3bc83c8 ("phy: rockchip-inno-usb2: support otg-port for
-> >> rk3399") introduces two new properties. The extcon property is used to
-> >> detect the cable-state, and the rockchip,utmi-avalid is used to indicate
-> >> which register should be used to detect the vbus state.
-> >>
-> >> Document these properties in the documentation binding.
-> >>
-> >> Fixes: 98898f3bc83c8 ("phy: rockchip-inno-usb2: support otg-port for rk3399")
-> >> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Add the exclusivity to sun8i-dw-hdmi and sun8i-hdmi-phy.
 
-[...]
+Cc: stable at vger.kernel.org # v4.17+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c  | 11 ++++++++++-
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c |  7 +++++--
+ 2 files changed, 15 insertions(+), 3 deletions(-)
 
-> >> @@ -45,6 +46,8 @@ Required properties (port (child) node):
-> >>  Optional properties:
-> >>   - phy-supply : phandle to a regulator that provides power to VBUS.
-> >>  		See ./phy-bindings.txt for details.
-> >> + - rockchip,utmi-avalid : boolean, use the avalid register to get vbus status.
-> >> +			  Otherwise, use the bvalid register.
-> > 
-> > Not having looked to deeply into the usb2 phy, this might raise questions
-> > on why this is a hardware-description? Is this needed when something is not
-> > connected on the board?
-> 
-> I asked myself the same question and even I thought in just remove that code.
-> 
-> After some investigation, though, I saw that the UTMI+ specification [1] has two
-> signals similar to ID signal (page 11), the AValid signal is used to indicate if
-> the session for an A-peripheral is valid and the BValid signal that is used to
-> indicate if the session for a B-peripheral is valid. I suppose that use of one
-> or the other matters in some cases, but AFAICT this is not used and I didn't see
-> any binding using it.
-> 
-> Maybe someone else can give us more clues on the importance or not of this property?
-
-so I've looked in mainline, chromeos-4.4 and the Rockchip vendor-kernel
-and the only board using that property at all is the rk3399-evb-rev1
-and -rev2 in the vendor kernel.
-
-The existence of a further -rev3 (which also looks way better cared for
-compared rev1+2) indicates that the older ones are probably some sort
-of preproduction models, where some wiring (on the soc or board) may
-have gone wrong.
-
-So while I would keep all the avalid settings in the driver, we could just
-drop reading that property quietly - as Rob wrote some days ago
-"it's only an incompatible change if someone notices" [0] and from the
-above it doesn't look like it ;-) .
-
-Heiko
-
-[0] https://www.spinics.net/lists/devicetree/msg243978.html
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+index 31875b636434..a10220518548 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+@@ -137,10 +137,16 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
+ 		goto err_assert_ctrl_reset;
+ 	}
+ 
++	ret = clk_rate_exclusive_get(hdmi->clk_tmds);
++	if (ret) {
++		dev_err(dev, "Could not get exclusivity over the tmds clock\n");
++		goto err_disable_clk_tmds;
++	}
++
+ 	phy_node = of_parse_phandle(dev->of_node, "phys", 0);
+ 	if (!phy_node) {
+ 		dev_err(dev, "Can't found PHY phandle\n");
+-		goto err_disable_clk_tmds;
++		goto err_put_clk_tmds_exclusivity;
+ 	}
+ 
+ 	ret = sun8i_hdmi_phy_probe(hdmi, phy_node);
+@@ -179,6 +185,8 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
+ cleanup_encoder:
+ 	drm_encoder_cleanup(encoder);
+ 	sun8i_hdmi_phy_remove(hdmi);
++err_put_clk_tmds_exclusivity:
++	clk_rate_exclusive_put(hdmi->clk_tmds);
+ err_disable_clk_tmds:
+ 	clk_disable_unprepare(hdmi->clk_tmds);
+ err_assert_ctrl_reset:
+@@ -194,6 +202,7 @@ static void sun8i_dw_hdmi_unbind(struct device *dev, struct device *master,
+ 
+ 	dw_hdmi_unbind(hdmi->hdmi);
+ 	sun8i_hdmi_phy_remove(hdmi);
++	clk_rate_exclusive_put(hdmi->clk_tmds);
+ 	clk_disable_unprepare(hdmi->clk_tmds);
+ 	reset_control_assert(hdmi->rst_ctrl);
+ }
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+index 82502b351aec..1e0b1d9bc0fb 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+@@ -511,13 +511,14 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
+ 		}
+ 
+ 		clk_prepare_enable(phy->clk_phy);
++		clk_rate_exclusive_get(phy->clk_phy);
+ 	}
+ 
+ 	phy->rst_phy = of_reset_control_get_shared(node, "phy");
+ 	if (IS_ERR(phy->rst_phy)) {
+ 		dev_err(dev, "Could not get phy reset control\n");
+ 		ret = PTR_ERR(phy->rst_phy);
+-		goto err_disable_clk_phy;
++		goto err_put_clk_phy_exclusivity;
+ 	}
+ 
+ 	ret = reset_control_deassert(phy->rst_phy);
+@@ -548,7 +549,8 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node)
+ 	reset_control_assert(phy->rst_phy);
+ err_put_rst_phy:
+ 	reset_control_put(phy->rst_phy);
+-err_disable_clk_phy:
++err_put_clk_phy_exclusivity:
++	clk_rate_exclusive_put(phy->clk_phy);
+ 	clk_disable_unprepare(phy->clk_phy);
+ err_put_clk_pll1:
+ 	clk_put(phy->clk_pll1);
+@@ -568,6 +570,7 @@ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi)
+ 
+ 	clk_disable_unprepare(phy->clk_mod);
+ 	clk_disable_unprepare(phy->clk_bus);
++	clk_rate_exclusive_put(phy->clk_phy);
+ 	clk_disable_unprepare(phy->clk_phy);
+ 
+ 	reset_control_assert(phy->rst_phy);
+-- 
+2.18.0
