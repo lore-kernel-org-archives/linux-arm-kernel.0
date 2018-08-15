@@ -1,84 +1,145 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Wed, 15 Aug 2018 10:39:57 +0300
-Subject: [PATCH mmc-next v3 1/3] mmc: sdhci: add adma_table_num member to
- struct sdhci_host
-In-Reply-To: <20180730104424.44fa39a5@xhacker.debian>
-References: <20180730104424.44fa39a5@xhacker.debian>
-Message-ID: <553759fd-cf6d-a79d-1670-8bf94079725e@intel.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 15 Aug 2018 16:11:23 +0800
+Subject: [PATCH v1 3/7] mfd: add atmel-lcdc driver
+In-Reply-To: <20180812184629.3808-3-sam@ravnborg.org>
+References: <20180812184629.3808-3-sam@ravnborg.org>
+Message-ID: <201808151504.b80cHxfz%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/07/18 05:44, Jisheng Zhang wrote:
-> This patch adds adma_table_num member to struct sdhci_host to give more
-> flexibility to drivers to control the ADMA table number.
-> 
-> Default value of adma_table_num is set to (SDHCI_MAX_SEGS * 2 + 1).
-> 
-> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-> ---
->  drivers/mmc/host/sdhci.c | 17 +++++++++--------
->  drivers/mmc/host/sdhci.h |  2 ++
->  2 files changed, 11 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index a7b5602ef6f7..14dd4a49e03b 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -3316,6 +3316,13 @@ struct sdhci_host *sdhci_alloc_host(struct device *dev,
->  
->  	host->sdma_boundary = SDHCI_DEFAULT_BOUNDARY_ARG;
->  
-> +	/*
-> +	 * The DMA descriptor table number is calculated as the maximum
+Hi Sam,
 
-	 * The DMA table descriptor count is calculated as the maximum
+Thank you for the patch! Perhaps something to improve:
 
-> +	 * number of segments times 2, to allow for an alignment
-> +	 * descriptor for each segment, plus 1 for a nop end descriptor.
-> +	 */
-> +	host->adma_table_num = SDHCI_MAX_SEGS * 2 + 1;
+[auto build test WARNING on at91/at91-next]
+[also build test WARNING on v4.18 next-20180814]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Let's make this adma_table_cnt
+url:    https://github.com/0day-ci/linux/commits/Sam-Ravnborg/add-at91sam9-LCDC-DRM-driver/20180814-163056
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git at91-next
+config: x86_64-randconfig-g0-08151425 (attached as .config)
+compiler: gcc-4.9 (Debian 4.9.4-2) 4.9.4
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-> +
->  	return host;
->  }
->  
-> @@ -3561,18 +3568,12 @@ int sdhci_setup_host(struct sdhci_host *host)
->  		dma_addr_t dma;
->  		void *buf;
->  
-> -		/*
-> -		 * The DMA descriptor table size is calculated as the maximum
-> -		 * number of segments times 2, to allow for an alignment
-> -		 * descriptor for each segment, plus 1 for a nop end descriptor,
-> -		 * all multipled by the descriptor size.
-> -		 */
->  		if (host->flags & SDHCI_USE_64_BIT_DMA) {
-> -			host->adma_table_sz = (SDHCI_MAX_SEGS * 2 + 1) *
-> +			host->adma_table_sz = host->adma_table_num *
->  					      SDHCI_ADMA2_64_DESC_SZ;
->  			host->desc_sz = SDHCI_ADMA2_64_DESC_SZ;
->  		} else {
-> -			host->adma_table_sz = (SDHCI_MAX_SEGS * 2 + 1) *
-> +			host->adma_table_sz = host->adma_table_num *
->  					      SDHCI_ADMA2_32_DESC_SZ;
->  			host->desc_sz = SDHCI_ADMA2_32_DESC_SZ;
->  		}
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index 23966f887da6..d55fd7033e93 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -563,6 +563,8 @@ struct sdhci_host {
->  	/* Host SDMA buffer boundary. */
->  	u32			sdma_boundary;
->  
-> +	u32			adma_table_num;
+All warnings (new ones prefixed by >>):
 
-Could use a comment
+   In file included from include/linux/kernel.h:15:0,
+                    from include/linux/list.h:9,
+                    from include/linux/regmap.h:16,
+                    from include/linux/mfd/atmel-lcdc.h:11,
+                    from drivers/mfd/atmel-lcdc.c:13:
+   drivers/mfd/atmel-lcdc.c: In function 'lcdc_probe':
+>> include/linux/build_bug.h:29:45: warning: format '%d' expects argument of type 'int', but argument 3 has type 'long unsigned int' [-Wformat=]
+    #define BUILD_BUG_ON_ZERO(e) (sizeof(struct { int:(-!!(e)); }))
+                                                ^
+   include/linux/compiler-gcc.h:65:28: note: in expansion of macro 'BUILD_BUG_ON_ZERO'
+    #define __must_be_array(a) BUILD_BUG_ON_ZERO(__same_type((a), &(a)[0]))
+                               ^
+   include/linux/kernel.h:72:59: note: in expansion of macro '__must_be_array'
+    #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
+                                                              ^
+>> drivers/mfd/atmel-lcdc.c:128:4: note: in expansion of macro 'ARRAY_SIZE'
+       ARRAY_SIZE(lcdc_cells), ret);
+       ^
+--
+   In file included from include/linux/kernel.h:15:0,
+                    from include/linux/list.h:9,
+                    from include/linux/regmap.h:16,
+                    from include/linux/mfd/atmel-lcdc.h:11,
+                    from drivers//mfd/atmel-lcdc.c:13:
+   drivers//mfd/atmel-lcdc.c: In function 'lcdc_probe':
+>> include/linux/build_bug.h:29:45: warning: format '%d' expects argument of type 'int', but argument 3 has type 'long unsigned int' [-Wformat=]
+    #define BUILD_BUG_ON_ZERO(e) (sizeof(struct { int:(-!!(e)); }))
+                                                ^
+   include/linux/compiler-gcc.h:65:28: note: in expansion of macro 'BUILD_BUG_ON_ZERO'
+    #define __must_be_array(a) BUILD_BUG_ON_ZERO(__same_type((a), &(a)[0]))
+                               ^
+   include/linux/kernel.h:72:59: note: in expansion of macro '__must_be_array'
+    #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
+                                                              ^
+   drivers//mfd/atmel-lcdc.c:128:4: note: in expansion of macro 'ARRAY_SIZE'
+       ARRAY_SIZE(lcdc_cells), ret);
+       ^
 
-> +
->  	u64			data_timeout;
->  
->  	unsigned long private[0] ____cacheline_aligned;
-> 
+vim +/ARRAY_SIZE +128 drivers/mfd/atmel-lcdc.c
+
+    66	
+    67	static int lcdc_probe(struct platform_device *pdev)
+    68	{
+    69		struct atmel_mfd_lcdc *lcdc;
+    70		struct lcdc_regmap *regmap;
+    71		struct resource *res;
+    72		struct device *dev;
+    73		int ret;
+    74	
+    75		dev = &pdev->dev;
+    76	
+    77		regmap = devm_kzalloc(dev, sizeof(*regmap), GFP_KERNEL);
+    78		if (!regmap)
+    79			return -ENOMEM;
+    80	
+    81		lcdc = devm_kzalloc(dev, sizeof(*lcdc), GFP_KERNEL);
+    82		if (!lcdc)
+    83			return -ENOMEM;
+    84	
+    85		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+    86		regmap->regs = devm_ioremap_resource(dev, res);
+    87		if (IS_ERR(regmap->regs)) {
+    88			dev_err(dev, "Failed to allocate IO mem (%ld)\n",
+    89				PTR_ERR(regmap->regs));
+    90			return PTR_ERR(regmap->regs);
+    91		}
+    92	
+    93		lcdc->irq = platform_get_irq(pdev, 0);
+    94		if (lcdc->irq < 0) {
+    95			dev_err(dev, "Failed to get irq (%d)\n", lcdc->irq);
+    96			return lcdc->irq;
+    97		}
+    98	
+    99		lcdc->lcdc_clk = devm_clk_get(dev, "lcdc_clk");
+   100		if (IS_ERR(lcdc->lcdc_clk)) {
+   101			dev_err(dev, "failed to get lcdc clock (%ld)\n",
+   102				PTR_ERR(lcdc->lcdc_clk));
+   103			return PTR_ERR(lcdc->lcdc_clk);
+   104		}
+   105	
+   106		lcdc->bus_clk = devm_clk_get(dev, "hclk");
+   107		if (IS_ERR(lcdc->bus_clk)) {
+   108			dev_err(dev, "failed to get bus clock (%ld)\n",
+   109				PTR_ERR(lcdc->bus_clk));
+   110			return PTR_ERR(lcdc->bus_clk);
+   111		}
+   112	
+   113		lcdc->regmap = devm_regmap_init(dev, NULL, regmap,
+   114						 &lcdc_regmap_config);
+   115		if (IS_ERR(lcdc->regmap)) {
+   116			dev_err(dev, "Failed to init regmap (%ld)\n",
+   117				PTR_ERR(lcdc->regmap));
+   118			return PTR_ERR(lcdc->regmap);
+   119		}
+   120	
+   121		dev_set_drvdata(dev, lcdc);
+   122	
+   123		ret = devm_mfd_add_devices(dev, PLATFORM_DEVID_NONE,
+   124					   lcdc_cells, ARRAY_SIZE(lcdc_cells),
+   125					   NULL, 0, NULL);
+   126		if (ret < 0)
+   127			dev_err(dev, "Failed to add %d mfd devices (%d)\n",
+ > 128				ARRAY_SIZE(lcdc_cells), ret);
+   129	
+   130		return ret;
+   131	}
+   132	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 29238 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180815/88dc0654/attachment-0001.gz>
