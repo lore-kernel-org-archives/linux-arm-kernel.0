@@ -1,68 +1,127 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 Aug 2018 14:00:47 +0100
-Subject: [PATCH v3 1/2] iommu/arm-smmu-v3: fix unexpected CMD_SYNC timeout
-In-Reply-To: <6027cd67-7c76-673c-082f-8dd0b7a575b0@arm.com>
-References: <1534328582-17664-1-git-send-email-thunder.leizhen@huawei.com>
- <1534328582-17664-2-git-send-email-thunder.leizhen@huawei.com>
- <6027cd67-7c76-673c-082f-8dd0b7a575b0@arm.com>
-Message-ID: <20180815130046.GA19402@arm.com>
+From: jernej.skrabec@gmail.com (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Wed, 15 Aug 2018 15:39:44 +0200
+Subject: [linux-sunxi] [PATCH] drm: sun4i: exclusively set HDMI-related
+ clocks for dw-hdmi
+In-Reply-To: <20180815120745.36593-1-icenowy@aosc.io>
+References: <20180815120745.36593-1-icenowy@aosc.io>
+Message-ID: <5309847.hPHKHXY3qr@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2018 at 01:26:31PM +0100, Robin Murphy wrote:
-> On 15/08/18 11:23, Zhen Lei wrote:
-> >The condition "(int)(VAL - sync_idx) >= 0" to break loop in function
-> >__arm_smmu_sync_poll_msi requires that sync_idx must be increased
-> >monotonously according to the sequence of the CMDs in the cmdq.
-> >
-> >But ".msidata = atomic_inc_return_relaxed(&smmu->sync_nr)" is not protected
-> >by spinlock, so the following scenarios may appear:
-> >cpu0			cpu1
-> >msidata=0
-> >			msidata=1
-> >			insert cmd1
-> >insert cmd0
-> >			smmu execute cmd1
-> >smmu execute cmd0
-> >			poll timeout, because msidata=1 is overridden by
-> >			cmd0, that means VAL=0, sync_idx=1.
-> >
-> >This is not a functional problem, just make the caller wait for a long
-> >time until TIMEOUT. It's rare to happen, because any other CMD_SYNCs
-> >during the waiting period will break it.
-> >
-> >Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> >---
-> >  drivers/iommu/arm-smmu-v3.c | 12 ++++++++----
-> >  1 file changed, 8 insertions(+), 4 deletions(-)
-> >
-> >diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> >index 1d64710..3f5c236 100644
-> >--- a/drivers/iommu/arm-smmu-v3.c
-> >+++ b/drivers/iommu/arm-smmu-v3.c
-> >@@ -566,7 +566,7 @@ struct arm_smmu_device {
-> >
-> >  	int				gerr_irq;
-> >  	int				combined_irq;
-> >-	atomic_t			sync_nr;
-> >+	u32				sync_nr;
-> >
-> >  	unsigned long			ias; /* IPA */
-> >  	unsigned long			oas; /* PA */
-> >@@ -775,6 +775,11 @@ static int queue_remove_raw(struct arm_smmu_queue *q, u64 *ent)
-> >  	return 0;
-> >  }
-> >
-> >+static inline void arm_smmu_cmdq_sync_set_msidata(u64 *cmd, u32 msidata)
+Hi!
+
+Dne sreda, 15. avgust 2018 ob 14:07:45 CEST je Icenowy Zheng napisal(a):
+> The glue in sun4i-drm of dw-hdmi currently doesn't set the clocks of
+> dw-hdmi exclusively, which will lead the display fails to initialize in
+> some situations.
 > 
-> If we *are* going to go down this route then I think it would make sense to
-> move the msiaddr and CMDQ_SYNC_0_CS_MSI logic here as well; i.e.
-> arm_smmu_cmdq_build_cmd() always generates a "normal" SEV-based sync
-> command, then calling this guy would convert it to an MSI-based one. As-is,
-> having bits of mutually-dependent data handled across two separate places
-> just seems too messy and error-prone.
+> Add the exclusivity to sun8i-dw-hdmi and sun8i-hdmi-phy.
+> 
+> Cc: stable at vger.kernel.org # v4.17+
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Yeah, but I'd first like to see some number showing that doing all of this
-under the lock actually has an impact.
+Given that you want this patch to be merged in stable, I have to ask what kind 
+of tests did you run to prove it works as expected?
 
-Will
+In the past, there were some issues with TCON exclusive rate setting. It turns 
+out that as many scenarios as possible have to be tested before you can say 
+it's working.
+
+I imagine that it has to be tested on at least A83T, H3 (or H5) and R40 (or 
+A64). They all have their own specifics which needs to be covered.
+
+Tests which I remember from top of my head:
+- run with monitor connected at boot
+- run with monitor disconnected at boot and connect it later
+- playing with resolution switching (at least a few non-standard, e.g 
+something other than 1080p or 720p)
+
+Best regards,
+Jernej
+
+
+> ---
+>  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c  | 11 ++++++++++-
+>  drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c |  7 +++++--
+>  2 files changed, 15 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+> b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c index 31875b636434..a10220518548
+> 100644
+> --- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+> +++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+> @@ -137,10 +137,16 @@ static int sun8i_dw_hdmi_bind(struct device *dev,
+> struct device *master, goto err_assert_ctrl_reset;
+>  	}
+> 
+> +	ret = clk_rate_exclusive_get(hdmi->clk_tmds);
+> +	if (ret) {
+> +		dev_err(dev, "Could not get exclusivity over the tmds clock\n");
+> +		goto err_disable_clk_tmds;
+> +	}
+> +
+>  	phy_node = of_parse_phandle(dev->of_node, "phys", 0);
+>  	if (!phy_node) {
+>  		dev_err(dev, "Can't found PHY phandle\n");
+> -		goto err_disable_clk_tmds;
+> +		goto err_put_clk_tmds_exclusivity;
+>  	}
+> 
+>  	ret = sun8i_hdmi_phy_probe(hdmi, phy_node);
+> @@ -179,6 +185,8 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct
+> device *master, cleanup_encoder:
+>  	drm_encoder_cleanup(encoder);
+>  	sun8i_hdmi_phy_remove(hdmi);
+> +err_put_clk_tmds_exclusivity:
+> +	clk_rate_exclusive_put(hdmi->clk_tmds);
+>  err_disable_clk_tmds:
+>  	clk_disable_unprepare(hdmi->clk_tmds);
+>  err_assert_ctrl_reset:
+> @@ -194,6 +202,7 @@ static void sun8i_dw_hdmi_unbind(struct device *dev,
+> struct device *master,
+> 
+>  	dw_hdmi_unbind(hdmi->hdmi);
+>  	sun8i_hdmi_phy_remove(hdmi);
+> +	clk_rate_exclusive_put(hdmi->clk_tmds);
+>  	clk_disable_unprepare(hdmi->clk_tmds);
+>  	reset_control_assert(hdmi->rst_ctrl);
+>  }
+> diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+> b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c index 82502b351aec..1e0b1d9bc0fb
+> 100644
+> --- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+> +++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+> @@ -511,13 +511,14 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi,
+> struct device_node *node) }
+> 
+>  		clk_prepare_enable(phy->clk_phy);
+> +		clk_rate_exclusive_get(phy->clk_phy);
+>  	}
+> 
+>  	phy->rst_phy = of_reset_control_get_shared(node, "phy");
+>  	if (IS_ERR(phy->rst_phy)) {
+>  		dev_err(dev, "Could not get phy reset control\n");
+>  		ret = PTR_ERR(phy->rst_phy);
+> -		goto err_disable_clk_phy;
+> +		goto err_put_clk_phy_exclusivity;
+>  	}
+> 
+>  	ret = reset_control_deassert(phy->rst_phy);
+> @@ -548,7 +549,8 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi,
+> struct device_node *node) reset_control_assert(phy->rst_phy);
+>  err_put_rst_phy:
+>  	reset_control_put(phy->rst_phy);
+> -err_disable_clk_phy:
+> +err_put_clk_phy_exclusivity:
+> +	clk_rate_exclusive_put(phy->clk_phy);
+>  	clk_disable_unprepare(phy->clk_phy);
+>  err_put_clk_pll1:
+>  	clk_put(phy->clk_pll1);
+> @@ -568,6 +570,7 @@ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi)
+> 
+>  	clk_disable_unprepare(phy->clk_mod);
+>  	clk_disable_unprepare(phy->clk_bus);
+> +	clk_rate_exclusive_put(phy->clk_phy);
+>  	clk_disable_unprepare(phy->clk_phy);
+> 
+>  	reset_control_assert(phy->rst_phy);
