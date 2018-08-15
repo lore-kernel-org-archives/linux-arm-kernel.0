@@ -1,79 +1,59 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 15 Aug 2018 13:38:07 -0600
-Subject: [PATCH 06/13] coresight: etb10: Handle errors enabling the device
-In-Reply-To: <1533562915-21558-7-git-send-email-suzuki.poulose@arm.com>
-References: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
- <1533562915-21558-7-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180815193807.GB17954@xps15>
+From: ghackmann@android.com (Greg Hackmann)
+Date: Wed, 15 Aug 2018 12:51:21 -0700
+Subject: [PATCH v2 1/2] arm64: mm: check for upper PAGE_SHIFT bits in
+ pfn_valid()
+Message-ID: <20180815195123.187373-1-ghackmann@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2018 at 02:41:48PM +0100, Suzuki K Poulose wrote:
-> Prepare the etb10 driver to return errors in enabling
-> the device.
-> 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/hwtracing/coresight/coresight-etb10.c | 18 +++++++++++++-----
->  1 file changed, 13 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-> index 9fd77fd..37d2c88 100644
-> --- a/drivers/hwtracing/coresight/coresight-etb10.c
-> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
-> @@ -107,7 +107,7 @@ static unsigned int etb_get_buffer_depth(struct etb_drvdata *drvdata)
->  	return depth;
->  }
->  
-> -static void etb_enable_hw(struct etb_drvdata *drvdata)
-> +static void __etb_enable_hw(struct etb_drvdata *drvdata)
->  {
->  	int i;
->  	u32 depth;
-> @@ -135,6 +135,12 @@ static void etb_enable_hw(struct etb_drvdata *drvdata)
->  	CS_LOCK(drvdata->base);
->  }
->  
-> +static int etb_enable_hw(struct etb_drvdata *drvdata)
-> +{
-> +	__etb_enable_hw(drvdata);
-> +	return 0;
-> +}
-> +
->  static int etb_enable(struct coresight_device *csdev, u32 mode, void *data)
->  {
->  	int ret = 0;
-> @@ -150,7 +156,7 @@ static int etb_enable(struct coresight_device *csdev, u32 mode, void *data)
->  	if (mode == CS_MODE_PERF) {
->  		ret = etb_set_buffer(csdev, (struct perf_output_handle *)data);
->  		if (ret)
-> -			goto out;
-> +			return ret;
->  	}
->  
->  	val = local_cmpxchg(&drvdata->mode,
-> @@ -172,12 +178,14 @@ static int etb_enable(struct coresight_device *csdev, u32 mode, void *data)
->  		goto out;
+ARM64's pfn_valid() shifts away the upper PAGE_SHIFT bits of the input
+before seeing if the PFN is valid.  This leads to false positives when
+some of the upper bits are set, but the lower bits match a valid PFN.
 
-Leaving this here doesn't compile when 'out' is removed below.
+For example, the following userspace code looks up a bogus entry in
+/proc/kpageflags:
 
->  
->  	spin_lock_irqsave(&drvdata->spinlock, flags);
-> -	etb_enable_hw(drvdata);
-> +	ret = etb_enable_hw(drvdata);
->  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
->  
-> -out:
-> -	if (!ret)
-> +	if (ret)
-> +		local_cmpxchg(&drvdata->mode, mode, CS_MODE_DISABLED);
-> +	else
->  		dev_dbg(drvdata->dev, "ETB enabled\n");
-> +
->  	return ret;
->  }
->  
-> -- 
-> 2.7.4
-> 
+    int pagemap = open("/proc/self/pagemap", O_RDONLY);
+    int pageflags = open("/proc/kpageflags", O_RDONLY);
+    uint64_t pfn, val;
+
+    lseek64(pagemap, [...], SEEK_SET);
+    read(pagemap, &pfn, sizeof(pfn));
+    if (pfn & (1UL << 63)) {        /* valid PFN */
+        pfn &= ((1UL << 55) - 1);   /* clear flag bits */
+        pfn |= (1UL << 55);
+        lseek64(pageflags, pfn * sizeof(uint64_t), SEEK_SET);
+        read(pageflags, &val, sizeof(val));
+    }
+
+On ARM64 this causes the userspace process to crash with SIGSEGV rather
+than reading (1 << KPF_NOPAGE).  kpageflags_read() treats the offset as
+valid, and stable_page_flags() will try to access an address between the
+user and kernel address ranges.
+
+Fixes: c1cc1552616d ("arm64: MMU initialisation")
+Cc: stable at vger.kernel.org
+Signed-off-by: Greg Hackmann <ghackmann@google.com>
+---
+ arch/arm64/mm/init.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 9abf8a1e7b25..787e27964ab9 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -287,7 +287,11 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+ #ifdef CONFIG_HAVE_ARCH_PFN_VALID
+ int pfn_valid(unsigned long pfn)
+ {
+-	return memblock_is_map_memory(pfn << PAGE_SHIFT);
++	phys_addr_t addr = pfn << PAGE_SHIFT;
++
++	if ((addr >> PAGE_SHIFT) != pfn)
++		return 0;
++	return memblock_is_map_memory(addr);
+ }
+ EXPORT_SYMBOL(pfn_valid);
+ #endif
+-- 
+2.18.0.865.gffc8e1a3cd6-goog
