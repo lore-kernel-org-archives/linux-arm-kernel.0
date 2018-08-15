@@ -1,118 +1,123 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 15 Aug 2018 19:08:45 +0100
-Subject: [PATCH v3 1/2] iommu/arm-smmu-v3: fix unexpected CMD_SYNC timeout
-In-Reply-To: <20180815130046.GA19402@arm.com>
-References: <1534328582-17664-1-git-send-email-thunder.leizhen@huawei.com>
- <1534328582-17664-2-git-send-email-thunder.leizhen@huawei.com>
- <6027cd67-7c76-673c-082f-8dd0b7a575b0@arm.com>
- <20180815130046.GA19402@arm.com>
-Message-ID: <5961191f-f913-9bbf-5d0d-81800bec36a1@huawei.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 15 Aug 2018 20:21:50 +0200
+Subject: serdev: How to attach serdev devices to USB based tty devices?
+In-Reply-To: <3639955d-5990-1c82-7158-ac07b33c41f2@suse.de>
+References: <3639955d-5990-1c82-7158-ac07b33c41f2@suse.de>
+Message-ID: <20180815182150.wsd5oxlucsox2qig@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/08/2018 14:00, Will Deacon wrote:
-> On Wed, Aug 15, 2018 at 01:26:31PM +0100, Robin Murphy wrote:
->> On 15/08/18 11:23, Zhen Lei wrote:
->>> The condition "(int)(VAL - sync_idx) >= 0" to break loop in function
->>> __arm_smmu_sync_poll_msi requires that sync_idx must be increased
->>> monotonously according to the sequence of the CMDs in the cmdq.
->>>
->>> But ".msidata = atomic_inc_return_relaxed(&smmu->sync_nr)" is not protected
->>> by spinlock, so the following scenarios may appear:
->>> cpu0			cpu1
->>> msidata=0
->>> 			msidata=1
->>> 			insert cmd1
->>> insert cmd0
->>> 			smmu execute cmd1
->>> smmu execute cmd0
->>> 			poll timeout, because msidata=1 is overridden by
->>> 			cmd0, that means VAL=0, sync_idx=1.
->>>
->>> This is not a functional problem, just make the caller wait for a long
->>> time until TIMEOUT. It's rare to happen, because any other CMD_SYNCs
->>> during the waiting period will break it.
->>>
->>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->>> ---
->>>  drivers/iommu/arm-smmu-v3.c | 12 ++++++++----
->>>  1 file changed, 8 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->>> index 1d64710..3f5c236 100644
->>> --- a/drivers/iommu/arm-smmu-v3.c
->>> +++ b/drivers/iommu/arm-smmu-v3.c
->>> @@ -566,7 +566,7 @@ struct arm_smmu_device {
->>>
->>>  	int				gerr_irq;
->>>  	int				combined_irq;
->>> -	atomic_t			sync_nr;
->>> +	u32				sync_nr;
->>>
->>>  	unsigned long			ias; /* IPA */
->>>  	unsigned long			oas; /* PA */
->>> @@ -775,6 +775,11 @@ static int queue_remove_raw(struct arm_smmu_queue *q, u64 *ent)
->>>  	return 0;
->>>  }
->>>
->>> +static inline void arm_smmu_cmdq_sync_set_msidata(u64 *cmd, u32 msidata)
->>
->> If we *are* going to go down this route then I think it would make sense to
->> move the msiaddr and CMDQ_SYNC_0_CS_MSI logic here as well; i.e.
->> arm_smmu_cmdq_build_cmd() always generates a "normal" SEV-based sync
->> command, then calling this guy would convert it to an MSI-based one. As-is,
->> having bits of mutually-dependent data handled across two separate places
->> just seems too messy and error-prone.
->
-> Yeah, but I'd first like to see some number showing that doing all of this
-> under the lock actually has an impact.
+Hi,
 
-Update:
++cc Johan Hovold <johan@kernel.org>
 
-I tested this patch versus a modified version which builds the command 
-under the queue spinlock (* below). From my testing there is a small 
-difference:
+Johan told me, that he is working on this at ELCE 2017. Also he is
+the subsystem maintainer of the USB serial subsystem.
 
-Setup:
-Testing Single NVME card
-fio 15 processes
-No process pinning
+-- Sebastian
 
-Average Results:
-v3 patch read/r,w/write (IOPS): 301K/149K,149K/307K
-Build under lock version read/r,w/write (IOPS): 304K/150K,150K/311K
-
-I don't know why it's better to build under the lock. We can test more.
-
-I suppose there is no justification to build the command outside the 
-spinlock based on these results alone...
-
-Cheers,
-John
-
-* Modified version:
-static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
-{
-     u64 cmd[CMDQ_ENT_DWORDS];
-     unsigned long flags;
-     struct arm_smmu_cmdq_ent ent = {
-         .opcode = CMDQ_OP_CMD_SYNC,
-         .sync    = {
-             .msiaddr = virt_to_phys(&smmu->sync_count),
-         },
-     };
-
-     spin_lock_irqsave(&smmu->cmdq.lock, flags);
-     ent.sync.msidata = ++smmu->sync_nr;
-     arm_smmu_cmdq_build_cmd(cmd, &ent);
-     arm_smmu_cmdq_insert_cmd(smmu, cmd);
-     spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
-
-     return __arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
-}
-
-
-> Will
->
-> .
->
+On Tue, Aug 14, 2018 at 04:28:20AM +0200, Andreas F?rber wrote:
+> Hi Rob et al.,
+> 
+> For my LoRa network driver project [1] I have found your serdev
+> framework to be a valuable help for dealing with hardware modules
+> exposing some textual or binary UART interface.
+> 
+> In particular on arm(64) and mips this allows to define an unlimited
+> number of serdev drivers [2] that are associated via their Device Tree
+> compatible string and can optionally be configured via DT properties.
+> 
+> And in theory it seems serdev has also grown support for ACPI.
+> 
+> Now, a growing number of vendors are placing such modules on a USB stick
+> for easy evaluation on x86_64 PC hardware, or are designing mPCIe or M.2
+> cards using their USB pins. While I do not yet have access to such a
+> device myself, it is my understanding that devices with USB-UART bridge
+> chipsets (e.g., FTDI) will show up as /dev/ttyUSBx and devices with an
+> MCU implementing the CDC USB protocol (e.g., Pico-cell gateway = picoGW)
+> will show up as /dev/ttyACMx.
+> On the Raspberry Pi I've seen that Device Tree nodes can be used to pass
+> information to on-board devices such as MAC address to Ethernet chipset,
+> but that does not seem all that useful for passing a serdev child node
+> to hot-plugged devices at unpredictable hub/port location (where it
+> should not interfere with regular USB-UART cables for debugging), nor
+> would it help ACPI based platforms such as x86_64.
+> 
+> My idea then was that if we had some unique criteria like vendor and
+> product IDs (or whatever is supported in usb_device_id), we could write
+> a usb_driver with suitable USB_DEVICE*() macro. In its probe function we
+> could call into the existing tty driver's probe function and afterwards
+> try creating and attaching the appropriate serdev device, i.e. a fixed
+> USB-to-serdev driver mapping. Problem is that most devices don't seem to
+> implement any unique identifier I could make this depend on - either by
+> using a standard FT232/FT2232/CH340G chip or by using STMicroelectronics
+> virtual com port identifiers in CDC firmware and only differing in the
+> textual description [3] the usb_device_id does not seem to match on.
+> 
+> The obvious solution would of course be if hardware vendors could revise
+> their designs to configure FTDI/etc. chips uniquely. I hear that that
+> may involve exchanging the chipset, increasing costs, and may impact
+> existing drivers. Wouldn't help for devices out there today either.
+> 
+> For the picoGW CDC firmware, Semtech does appear to own a USB vendor ID,
+> so it would seem possible to allocate their own product IDs for SX1301
+> and SX1308 respectively to replace the generic STMicroelectronics IDs,
+> which the various vendors could offer as firmware updates.
+> 
+> All outside my control though.
+> 
+> Oliver therefore suggested to not mess with USB drivers and instead use
+> a line discipline (ldisc). It seems that for example the userspace tool
+> slattach takes a tty device and performs an ioctl to switch the generic
+> tty device into a special N_SLIP protocol mode, implemented in [4].
+> 
+> However, the existing number of such ldisc modes appears to be below 30,
+> with hardly any vendor-specific implementation, so polluting its number
+> space seems undesirable? And in some cases I would like to use the same
+> protocol implementation over direct UART and over USB, so would like to
+> avoid duplicate serdev_device_driver and tty_ldisc_ops implementations.
+> 
+> Long story short, has there been any thinking about a userspace
+> interface to attach a given serdev driver to a tty device?
+> 
+> Or is there, on OF_DYNAMIC platforms, a way from userspace to associate
+> a DT fragment (!= DT Overlay) with a given USB device dynamically, to
+> attach a serdev node with sub-nodes?
+> 
+> Any other ideas how to cleanly solve this?
+> 
+> In some cases we're talking about a "simple" AT-like command interface;
+> the picoGW implements a semi-generic USB-SPI bridge that may host a
+> choice of 2+ chipsets, which in turn has two further sub-devices with 3+
+> chipset choices (theoretically clk output and rx/tx options etc.) each.
+> (For the latter I'm thinking we'll need a serdev driver exposing a
+> regmap_bus and then implement regmap_bus based versions of the SPI
+> drivers like Ben and I refactored SX1257 in [2] last weekend.)
+> 
+> Thanks,
+> Andreas
+> 
+> [1] https://patchwork.ozlabs.org/cover/937545/
+> [2]
+> https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-lora.git/tree/drivers/net/lora?h=lora-next
+> [3]
+> https://github.com/Lora-net/picoGW_mcu/blob/master/src/usb_cdc/Src/usbd_desc.cpp#L59
+> [4]
+> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/net/slip/slip.c#n1281
+> 
+> -- 
+> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+> HRB 21284 (AG N?rnberg)
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180815/bad148ee/attachment.sig>
