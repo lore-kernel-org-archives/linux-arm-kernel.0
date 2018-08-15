@@ -1,93 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 Aug 2018 08:35:01 +0100
-Subject: [PATCH v3 4/6] iommu/io-pgtable-arm: add support for non-strict
- mode
-In-Reply-To: <20180815073300.GA2100@arm.com>
-References: <1531376312-2192-5-git-send-email-thunder.leizhen@huawei.com>
- <89cc2201-99ab-3f3b-a2d1-1766515d4375@arm.com>
- <5B597628.2020103@huawei.com>
- <04239cfa-bcf2-a33a-e662-ebc75e66782b@arm.com>
- <1d24541340334954969c58980ef85444@HXTBJIDCEMVIW01.hxtcorp.net>
- <5B7293E5.7040702@huawei.com> <20180814083500.GA28101@arm.com>
- <feabf4a3-db1e-a22b-daab-fad831b473f9@arm.com>
- <7a2dedda98aa9e677eb7f85b6b55e34e0128d2d9.camel@hxt-semitech.com>
- <20180815073300.GA2100@arm.com>
-Message-ID: <20180815073501.GA2375@arm.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Wed, 15 Aug 2018 10:39:57 +0300
+Subject: [PATCH mmc-next v3 1/3] mmc: sdhci: add adma_table_num member to
+ struct sdhci_host
+In-Reply-To: <20180730104424.44fa39a5@xhacker.debian>
+References: <20180730104424.44fa39a5@xhacker.debian>
+Message-ID: <553759fd-cf6d-a79d-1670-8bf94079725e@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2018 at 08:33:01AM +0100, Will Deacon wrote:
-> On Wed, Aug 15, 2018 at 01:43:37AM +0000, Yang, Shunyong wrote:
-> > On Tue, 2018-08-14 at 11:02 +0100, Robin Murphy wrote:
-> > > On 14/08/18 09:35, Will Deacon wrote:
-> > > > On Tue, Aug 14, 2018 at 04:33:41PM +0800, Leizhen (ThunderTown)
-> > > > wrote:
-> > > > > On 2018/8/6 9:32, Yang, Shunyong wrote:
-> > > > > > On 2018/7/26 22:37, Robin Murphy wrote:
-> > > > > > > Because DMA code is not the only caller of iommu_map/unmap.
-> > > > > > > It's
-> > > > > > > perfectly legal in the IOMMU API to partially unmap a
-> > > > > > > previous mapping
-> > > > > > > such that a block entry needs to be split. The DMA API,
-> > > > > > > however, is a
-> > > > > > > lot more constrined, and thus by construction the iommu-dma
-> > > > > > > layer will
-> > > > > > > never generate a block-splitting iommu_unmap() except as a
-> > > > > > > result of
-> > > > > > > illegal DMA API usage, and we obviously do not need to
-> > > > > > > optimise for that
-> > > > > > > (you will get a warning about mismatched unmaps under dma-
-> > > > > > > debug, but
-> > > > > > > it's a bit too expensive to police in the general case).
-> > > > > > >
-> > > > > >
-> > > > > > When I was reading the code around arm_lpae_split_blk_unmap(),
-> > > > > > I was
-> > > > > > curious in which scenario a block will be split. Now with your
-> > > > > > comments
-> > > > > > "Because DMA code is not the only caller of iommu_map/unmap",
-> > > > > > it seems
-> > > > > > depending on the user.
-> > > > > >
-> > > > > > Would you please explain this further? I mean besides DMA,
-> > > > > > which user
-> > > > > > will use iommu_map/umap and how it split a block.
-> > > > >
-> > > > > I also think that arm_lpae_split_blk_unmap() scenario is not
-> > > > > exist, maybe
-> > > > > we should remove it, and give a warning for this wrong usage.
-> > > >
-> > > > Can't it happen with VFIO?
-> > >
-> > > ...or GPU drivers, or anyone else managing their own IOMMU domain
-> > > directly. A sequence like this is perfectly legal:
-> > >
-> > >     iommu_map(domain, iova, paddr, SZ_8M, prot);
-> > >     ...
-> > >     iommu_unmap(domain, iova + SZ_1M * 5, SZ_1M * 3);
-> > >
-> > > where if iova and paddr happen to be suitably aligned, the map will
-> > > lay
-> > > down blocks, and the unmap will then have to split one of them into
-> > > pages to remove half of it. We don't tear our hair out maintaining
-> > > split_blk_unmap() for the fun of it :(
-> >
-> > Thank you for the GPU example. But for VFIO, I remember all memory will
-> > be   pinned in the early stage of emulator (such as qemu) start. So,
-> > the split will occur at which operation? Maybe virtio balloon inflate?
+On 30/07/18 05:44, Jisheng Zhang wrote:
+> This patch adds adma_table_num member to struct sdhci_host to give more
+> flexibility to drivers to control the ADMA table number.
 > 
-> My memory is pretty hazy here, but I was fairly sure that VFIO didn't
-> always unmap() with the same granularity as it map()'d, at least for
-> the v1 interface. Either way, split_blk_unmap() was written because it was
-> necessary at the time, rather than just for fun!
+> Default value of adma_table_num is set to (SDHCI_MAX_SEGS * 2 + 1).
 > 
-> Will
-> IMPORTANT NOTICE: The contents of this email and any attachments are
-> confidential and may also be privileged. If you are not the intended
-> recipient, please notify the sender immediately and do not disclose the
-> contents to any other person, use it for any purpose, or store or copy the
-> information in any medium. Thank you.
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> ---
+>  drivers/mmc/host/sdhci.c | 17 +++++++++--------
+>  drivers/mmc/host/sdhci.h |  2 ++
+>  2 files changed, 11 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index a7b5602ef6f7..14dd4a49e03b 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -3316,6 +3316,13 @@ struct sdhci_host *sdhci_alloc_host(struct device *dev,
+>  
+>  	host->sdma_boundary = SDHCI_DEFAULT_BOUNDARY_ARG;
+>  
+> +	/*
+> +	 * The DMA descriptor table number is calculated as the maximum
 
-Urgh, sorry about this threatening disclaimer ^^. Please disregard.
+	 * The DMA table descriptor count is calculated as the maximum
 
-Will
+> +	 * number of segments times 2, to allow for an alignment
+> +	 * descriptor for each segment, plus 1 for a nop end descriptor.
+> +	 */
+> +	host->adma_table_num = SDHCI_MAX_SEGS * 2 + 1;
+
+Let's make this adma_table_cnt
+
+> +
+>  	return host;
+>  }
+>  
+> @@ -3561,18 +3568,12 @@ int sdhci_setup_host(struct sdhci_host *host)
+>  		dma_addr_t dma;
+>  		void *buf;
+>  
+> -		/*
+> -		 * The DMA descriptor table size is calculated as the maximum
+> -		 * number of segments times 2, to allow for an alignment
+> -		 * descriptor for each segment, plus 1 for a nop end descriptor,
+> -		 * all multipled by the descriptor size.
+> -		 */
+>  		if (host->flags & SDHCI_USE_64_BIT_DMA) {
+> -			host->adma_table_sz = (SDHCI_MAX_SEGS * 2 + 1) *
+> +			host->adma_table_sz = host->adma_table_num *
+>  					      SDHCI_ADMA2_64_DESC_SZ;
+>  			host->desc_sz = SDHCI_ADMA2_64_DESC_SZ;
+>  		} else {
+> -			host->adma_table_sz = (SDHCI_MAX_SEGS * 2 + 1) *
+> +			host->adma_table_sz = host->adma_table_num *
+>  					      SDHCI_ADMA2_32_DESC_SZ;
+>  			host->desc_sz = SDHCI_ADMA2_32_DESC_SZ;
+>  		}
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index 23966f887da6..d55fd7033e93 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -563,6 +563,8 @@ struct sdhci_host {
+>  	/* Host SDMA buffer boundary. */
+>  	u32			sdma_boundary;
+>  
+> +	u32			adma_table_num;
+
+Could use a comment
+
+> +
+>  	u64			data_timeout;
+>  
+>  	unsigned long private[0] ____cacheline_aligned;
+> 
