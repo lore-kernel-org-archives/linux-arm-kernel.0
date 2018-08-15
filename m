@@ -1,58 +1,40 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 15 Aug 2018 17:04:47 +0200
-Subject: [RFC PATCH 0/7] add at91sam9 LCDC DRM driver
-In-Reply-To: <CAL_JsqLwazj=7hOwSeAtcyvnYCmMDP-Nw3H8xHSr0n3YGUS21A@mail.gmail.com>
-References: <20180812184152.GA22343@ravnborg.org>
- <f1f2a2d7-ae27-87af-8041-93d3f8fe07cc@microchip.com>
- <20180813181808.GA2357@ravnborg.org> <20180813220454.GA28913@rob-hp-laptop>
- <20180814164343.GA13848@ravnborg.org> <20180814224252.GA20667@rob-hp-laptop>
- <20180815044808.GA1806@ravnborg.org>
- <CAL_JsqLwazj=7hOwSeAtcyvnYCmMDP-Nw3H8xHSr0n3YGUS21A@mail.gmail.com>
-Message-ID: <CAKMK7uHm03UxLNUieJFR4TD3ppTMHwkitbQTrVq67K=Mjh6OYA@mail.gmail.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Wed, 15 Aug 2018 10:08:24 -0500
+Subject: [PATCH] arm64: dts: stratix10: i2c clock running out of spec
+In-Reply-To: <20180808154241.3760-1-atull@kernel.org>
+References: <20180808154241.3760-1-atull@kernel.org>
+Message-ID: <dd109cc6-00a8-244b-07e9-97e29739d804@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2018 at 4:45 PM, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Aug 14, 2018 at 10:48 PM Sam Ravnborg <sam@ravnborg.org> wrote:
->>
->
-> [...]
->
->> > > One DT related Q:
->> > > The LCD Controller supports BGR565, but as this is less common some HW implmentations
->> > > exchange R and B, expessed in the old binding as wiring-mode like this:
->> > >
->> > >     atmel,lcd-wiring-mode: lcd wiring mode "RGB" or "BRG"
->> > >
->> > > How can we express this wiring-mode in a generic way, both in DT and in code?
->> > > Is it something that in DRM belongs to the panel, the encoder, the connector, or?
->> > > And can any of the exisitng flags be used?
->> >
->> > I thought we had come up with a common definition, but I guess it didn't
->> > make it upstream. It's definitely needed and I've been rejecting
->> > anything new that's vendor specific.
->> I found this: https://patchwork.ozlabs.org/patch/659570/
->> The suggestion with a boolean seems simple and I will try that.
->
-> That's really too simple to be common. There's been a few other
-> attempts[1][2][3] (for Atmel HLCDC in fact) with [3] probably being
-> the closest to merging. The binding looked fine to me, but looks like
-> the DRM implementation had some issues.
->
-> Rob
->
-> [1] https://lists.freedesktop.org/archives/dri-devel/2018-April/173089.html
-> [2] https://patchwork.kernel.org/patch/9965079/
-> [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-March/568731.html
 
-There's a standardized bus_format for drm_panel. IIrc there's been
-discussions to add something similar to drm_bridge, but didn't go all
-that far for reasons.
 
-Lots of drivers just handle this internally in some way. So no idea
-why this all got stalled.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+On 08/08/2018 10:42 AM, Alan Tull wrote:
+> DesignWare I2C controller was observed running at 105.93kHz rather
+> than the specified 100kHz.  Adjust device tree settings to bring it
+> within spec (a slightly conservative 98 MHz).
+> 
+> Signed-off-by: Alan Tull <atull@kernel.org>
+> ---
+>  arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+> index 6edc4fa..53cf195 100644
+> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
+> @@ -124,6 +124,8 @@
+>  &i2c1 {
+>  	status = "okay";
+>  	clock-frequency = <100000>;
+> +	i2c-sda-falling-time-ns = <890>;  /* hcnt */
+> +	i2c-sdl-falling-time-ns = <890>;  /* lcnt */
+>  
+>  	adc at 14 {
+>  		compatible = "lltc,ltc2497";
+> 
+
+Applied!
+
+Thanks,
+Dinh
