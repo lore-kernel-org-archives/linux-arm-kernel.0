@@ -1,80 +1,82 @@
-From: hean.loong.ong@intel.com (Ong, Hean Loong)
-Date: Wed, 15 Aug 2018 01:42:45 +0000
-Subject: [PATCH10 0/3] Intel FPGA Video and Image Processing Suite
-In-Reply-To: <3720ba74-947a-1b5d-5f5b-1ef03d5941aa@kernel.org>
-References: <1534237029-2648-1-git-send-email-hean.loong.ong@intel.com>
- <3720ba74-947a-1b5d-5f5b-1ef03d5941aa@kernel.org>
-Message-ID: <1534297365.3035.0.camel@intel.com>
+From: shunyong.yang@hxt-semitech.com (Yang, Shunyong)
+Date: Wed, 15 Aug 2018 01:43:37 +0000
+Subject: [PATCH v3 4/6] iommu/io-pgtable-arm: add support for non-strict
+ mode
+In-Reply-To: <feabf4a3-db1e-a22b-daab-fad831b473f9@arm.com>
+References: <1531376312-2192-1-git-send-email-thunder.leizhen@huawei.com>
+ <1531376312-2192-5-git-send-email-thunder.leizhen@huawei.com>
+ <89cc2201-99ab-3f3b-a2d1-1766515d4375@arm.com>
+ <5B597628.2020103@huawei.com>
+ <04239cfa-bcf2-a33a-e662-ebc75e66782b@arm.com>
+ <1d24541340334954969c58980ef85444@HXTBJIDCEMVIW01.hxtcorp.net>
+ <5B7293E5.7040702@huawei.com> <20180814083500.GA28101@arm.com>
+ <feabf4a3-db1e-a22b-daab-fad831b473f9@arm.com>
+Message-ID: <7a2dedda98aa9e677eb7f85b6b55e34e0128d2d9.camel@hxt-semitech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-08-14 at 10:48 -0500, Dinh Nguyen wrote:
-> 
-> On 08/14/2018 03:57 AM, Hean-Loong, Ong wrote:
-> > 
-> > From: Ong, Hean Loong <hean.loong.ong@intel.com>
-> > 
-> > The FPGA FrameBuffer Soft IP could be seen??as the GPU and the DRM
-> > driver patch?
-> > here is allocating memory for information to be streamed from the
-> > ARM/Linux?
-> > to the display port. Basically the driver just wraps the
-> > information such as?
-> > the pixels to be drawn by the FPGA FrameBuffer 2.
-> > 
-> > The piece of hardware in discussion is the SoC FPGA where Linux
-> > runs on the?
-> > ARM chip and the FGPA is driven by its NIOS soft core with its own
-> > proprietary firmware.
-> This driver doesn't have to ARM specific does it?
-> 
-> > 
-> > 
-> > For example the application from the ARM Linux would have to write
-> > information?
-> > on the /dev/fb0 with the information stored in the SDRAM to be
-> > fetched by the?
-> > FPGA framebuffer IP and displayed on the Display Port Monitor.
-> > 
-> > 
-> > Ong Hean Loong (2):
-> > ? ARM:socfpga-defconfig Intel FPGA Video and Image Processing Suite
-> > ? ARM:drm ivip Intel FPGA Video and Image Processing Suite
-> > 
-> > Ong, Hean Loong (1):
-> > ? ARM:dt-bindings:display Intel FPGA Video and Image Processing
-> > Suite
-> > 
-> > ?.../devicetree/bindings/display/altr,vip-fb2.txt???|???63 +++++++
-> > ?arch/arm/configs/socfpga_defconfig?????????????????|????5 +
-> > ?drivers/gpu/drm/Kconfig????????????????????????????|????2 +
-> > ?drivers/gpu/drm/Makefile???????????????????????????|????1 +
-> > ?drivers/gpu/drm/ivip/Kconfig???????????????????????|???14 ++
-> > ?drivers/gpu/drm/ivip/Makefile??????????????????????|????9 +
-> > ?drivers/gpu/drm/ivip/intel_vip_conn.c??????????????|???95
-> > ++++++++++
-> > ?drivers/gpu/drm/ivip/intel_vip_core.c??????????????|??161
-> > ++++++++++++++++
-> > ?drivers/gpu/drm/ivip/intel_vip_drv.h???????????????|???52 ++++++
-> > ?drivers/gpu/drm/ivip/intel_vip_of.c????????????????|??193
-> > ++++++++++++++++++++
-> > ?10 files changed, 595 insertions(+), 0 deletions(-)
-> > ?create mode 100644
-> > Documentation/devicetree/bindings/display/altr,vip-fb2.txt
-> > ?create mode 100644 drivers/gpu/drm/ivip/Kconfig
-> > ?create mode 100644 drivers/gpu/drm/ivip/Makefile
-> > ?create mode 100644 drivers/gpu/drm/ivip/intel_vip_conn.c
-> > ?create mode 100644 drivers/gpu/drm/ivip/intel_vip_core.c
-> > ?create mode 100644 drivers/gpu/drm/ivip/intel_vip_drv.h
-> > ?create mode 100644 drivers/gpu/drm/ivip/intel_vip_of.c
-> > 
-> Can you clarify your commit header? What is "PATCH10", is it version
-> 10?
-> If so, it should be "PATCHv10".
-> 
-> You're also missing a few other maintainers in your CC list, the "DRM
-> DRIVERS AND MISC GPU PATCHES" people.
-> 
-Noted
+Hi, Robin,
 
-> Dinh
+On Tue, 2018-08-14 at 11:02 +0100, Robin Murphy wrote:
+> On 14/08/18 09:35, Will Deacon wrote:
+> > On Tue, Aug 14, 2018 at 04:33:41PM +0800, Leizhen (ThunderTown)
+> > wrote:
+> > > On 2018/8/6 9:32, Yang, Shunyong wrote:
+> > > > On 2018/7/26 22:37, Robin Murphy wrote:
+> > > > > Because DMA code is not the only caller of iommu_map/unmap.
+> > > > > It's
+> > > > > perfectly legal in the IOMMU API to partially unmap a
+> > > > > previous mapping
+> > > > > such that a block entry needs to be split. The DMA API,
+> > > > > however, is a
+> > > > > lot more constrined, and thus by construction the iommu-dma
+> > > > > layer will
+> > > > > never generate a block-splitting iommu_unmap() except as a
+> > > > > result of
+> > > > > illegal DMA API usage, and we obviously do not need to
+> > > > > optimise for that
+> > > > > (you will get a warning about mismatched unmaps under dma-
+> > > > > debug, but
+> > > > > it's a bit too expensive to police in the general case).
+> > > > > 
+> > > > 
+> > > > When I was reading the code around arm_lpae_split_blk_unmap(),
+> > > > I was
+> > > > curious in which scenario a block will be split. Now with your
+> > > > comments
+> > > > "Because DMA code is not the only caller of iommu_map/unmap",
+> > > > it seems
+> > > > depending on the user.
+> > > > 
+> > > > Would you please explain this further? I mean besides DMA,
+> > > > which user
+> > > > will use iommu_map/umap and how it split a block.
+> > > 
+> > > I also think that arm_lpae_split_blk_unmap() scenario is not
+> > > exist, maybe
+> > > we should remove it, and give a warning for this wrong usage.
+> > 
+> > Can't it happen with VFIO?
+> 
+> ...or GPU drivers, or anyone else managing their own IOMMU domain 
+> directly. A sequence like this is perfectly legal:
+> 
+> 	iommu_map(domain, iova, paddr, SZ_8M, prot);
+> 	...
+> 	iommu_unmap(domain, iova + SZ_1M * 5, SZ_1M * 3);
+> 
+> where if iova and paddr happen to be suitably aligned, the map will
+> lay 
+> down blocks, and the unmap will then have to split one of them into 
+> pages to remove half of it. We don't tear our hair out maintaining 
+> split_blk_unmap() for the fun of it :(
+
+Thank you for the GPU example. But for VFIO, I remember all memory will
+be   pinned in the early stage of emulator (such as qemu) start. So,
+the split will occur at which operation? Maybe virtio balloon inflate?
+
+Thanks.
+Shunyong.
+
+> 
+> Robin.
