@@ -1,123 +1,178 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 15 Aug 2018 20:21:50 +0200
-Subject: serdev: How to attach serdev devices to USB based tty devices?
-In-Reply-To: <3639955d-5990-1c82-7158-ac07b33c41f2@suse.de>
-References: <3639955d-5990-1c82-7158-ac07b33c41f2@suse.de>
-Message-ID: <20180815182150.wsd5oxlucsox2qig@earth.universe>
+From: hoan.tran@amperecomputing.com (Hoan Tran)
+Date: Wed, 15 Aug 2018 11:31:35 -0700
+Subject: [PATCH] perf: xgene: Add CPU hotplug support
+Message-ID: <1534357895-19031-1-git-send-email-hoan.tran@amperecomputing.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds CPU hotplug support where the PMU migrates the context to
+another online CPU when its CPU is offline.
 
-+cc Johan Hovold <johan@kernel.org>
+It fixes the below issue where the user does offline the CPU which is assigned
+to this PMU.
 
-Johan told me, that he is working on this at ELCE 2017. Also he is
-the subsystem maintainer of the USB serial subsystem.
+Assuming, CPU0 is assigned for this PMU. When the user does offline CPU0
+        [root@(none) ~]# echo 0 > /sys/devices/system/cpu/cpu0/online
+This PMU does not work anymore and shows the below error.
+        [root@(none) ~]# perf stat -a -e l3c0/cycle-count/,l3c0/write/ sleep 1
+        Error:
+        The sys_perf_event_open() syscall returned with 19 (No such device) for event (l3c0/cycle-count/).
+        /bin/dmesg may provide additional information.
+        No CONFIG_PERF_EVENTS=y kernel support configured?
 
--- Sebastian
+With this patch, when CPU0 is offline, PMU migrates to another online CPU and
+works on that CPU.
 
-On Tue, Aug 14, 2018 at 04:28:20AM +0200, Andreas F?rber wrote:
-> Hi Rob et al.,
-> 
-> For my LoRa network driver project [1] I have found your serdev
-> framework to be a valuable help for dealing with hardware modules
-> exposing some textual or binary UART interface.
-> 
-> In particular on arm(64) and mips this allows to define an unlimited
-> number of serdev drivers [2] that are associated via their Device Tree
-> compatible string and can optionally be configured via DT properties.
-> 
-> And in theory it seems serdev has also grown support for ACPI.
-> 
-> Now, a growing number of vendors are placing such modules on a USB stick
-> for easy evaluation on x86_64 PC hardware, or are designing mPCIe or M.2
-> cards using their USB pins. While I do not yet have access to such a
-> device myself, it is my understanding that devices with USB-UART bridge
-> chipsets (e.g., FTDI) will show up as /dev/ttyUSBx and devices with an
-> MCU implementing the CDC USB protocol (e.g., Pico-cell gateway = picoGW)
-> will show up as /dev/ttyACMx.
-> On the Raspberry Pi I've seen that Device Tree nodes can be used to pass
-> information to on-board devices such as MAC address to Ethernet chipset,
-> but that does not seem all that useful for passing a serdev child node
-> to hot-plugged devices at unpredictable hub/port location (where it
-> should not interfere with regular USB-UART cables for debugging), nor
-> would it help ACPI based platforms such as x86_64.
-> 
-> My idea then was that if we had some unique criteria like vendor and
-> product IDs (or whatever is supported in usb_device_id), we could write
-> a usb_driver with suitable USB_DEVICE*() macro. In its probe function we
-> could call into the existing tty driver's probe function and afterwards
-> try creating and attaching the appropriate serdev device, i.e. a fixed
-> USB-to-serdev driver mapping. Problem is that most devices don't seem to
-> implement any unique identifier I could make this depend on - either by
-> using a standard FT232/FT2232/CH340G chip or by using STMicroelectronics
-> virtual com port identifiers in CDC firmware and only differing in the
-> textual description [3] the usb_device_id does not seem to match on.
-> 
-> The obvious solution would of course be if hardware vendors could revise
-> their designs to configure FTDI/etc. chips uniquely. I hear that that
-> may involve exchanging the chipset, increasing costs, and may impact
-> existing drivers. Wouldn't help for devices out there today either.
-> 
-> For the picoGW CDC firmware, Semtech does appear to own a USB vendor ID,
-> so it would seem possible to allocate their own product IDs for SX1301
-> and SX1308 respectively to replace the generic STMicroelectronics IDs,
-> which the various vendors could offer as firmware updates.
-> 
-> All outside my control though.
-> 
-> Oliver therefore suggested to not mess with USB drivers and instead use
-> a line discipline (ldisc). It seems that for example the userspace tool
-> slattach takes a tty device and performs an ioctl to switch the generic
-> tty device into a special N_SLIP protocol mode, implemented in [4].
-> 
-> However, the existing number of such ldisc modes appears to be below 30,
-> with hardly any vendor-specific implementation, so polluting its number
-> space seems undesirable? And in some cases I would like to use the same
-> protocol implementation over direct UART and over USB, so would like to
-> avoid duplicate serdev_device_driver and tty_ldisc_ops implementations.
-> 
-> Long story short, has there been any thinking about a userspace
-> interface to attach a given serdev driver to a tty device?
-> 
-> Or is there, on OF_DYNAMIC platforms, a way from userspace to associate
-> a DT fragment (!= DT Overlay) with a given USB device dynamically, to
-> attach a serdev node with sub-nodes?
-> 
-> Any other ideas how to cleanly solve this?
-> 
-> In some cases we're talking about a "simple" AT-like command interface;
-> the picoGW implements a semi-generic USB-SPI bridge that may host a
-> choice of 2+ chipsets, which in turn has two further sub-devices with 3+
-> chipset choices (theoretically clk output and rx/tx options etc.) each.
-> (For the latter I'm thinking we'll need a serdev driver exposing a
-> regmap_bus and then implement regmap_bus based versions of the SPI
-> drivers like Ben and I refactored SX1257 in [2] last weekend.)
-> 
-> Thanks,
-> Andreas
-> 
-> [1] https://patchwork.ozlabs.org/cover/937545/
-> [2]
-> https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-lora.git/tree/drivers/net/lora?h=lora-next
-> [3]
-> https://github.com/Lora-net/picoGW_mcu/blob/master/src/usb_cdc/Src/usbd_desc.cpp#L59
-> [4]
-> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/net/slip/slip.c#n1281
-> 
-> -- 
-> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-> HRB 21284 (AG N?rnberg)
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180815/bad148ee/attachment.sig>
+Signed-off-by: Hoan Tran <hoan.tran@amperecomputing.com>
+---
+ drivers/perf/xgene_pmu.c   | 71 ++++++++++++++++++++++++++++++++++++++++++----
+ include/linux/cpuhotplug.h |  1 +
+ 2 files changed, 66 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
+index 0e31f13..248a3f7 100644
+--- a/drivers/perf/xgene_pmu.c
++++ b/drivers/perf/xgene_pmu.c
+@@ -21,6 +21,7 @@
+
+ #include <linux/acpi.h>
+ #include <linux/clk.h>
++#include <linux/cpuhotplug.h>
+ #include <linux/cpumask.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+@@ -130,12 +131,14 @@ struct xgene_pmu_ops {
+
+ struct xgene_pmu {
+        struct device *dev;
++       struct hlist_node node;
+        int version;
+        void __iomem *pcppmu_csr;
+        u32 mcb_active_mask;
+        u32 mc_active_mask;
+        u32 l3c_active_mask;
+        cpumask_t cpu;
++       int irq;
+        raw_spinlock_t lock;
+        const struct xgene_pmu_ops *ops;
+        struct list_head l3cpmus;
+@@ -1806,6 +1809,53 @@ static const struct acpi_device_id xgene_pmu_acpi_match[] = {
+ MODULE_DEVICE_TABLE(acpi, xgene_pmu_acpi_match);
+ #endif
+
++static int xgene_pmu_online_cpu(unsigned int cpu, struct hlist_node *node)
++{
++       struct xgene_pmu *xgene_pmu = hlist_entry_safe(node, struct xgene_pmu,
++                                                      node);
++
++       if (cpumask_empty(&xgene_pmu->cpu))
++               cpumask_set_cpu(cpu, &xgene_pmu->cpu);
++
++       /* Overflow interrupt also should use the same CPU */
++       WARN_ON(irq_set_affinity(xgene_pmu->irq, &xgene_pmu->cpu));
++
++       return 0;
++}
++
++static int xgene_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
++{
++       struct xgene_pmu *xgene_pmu = hlist_entry_safe(node, struct xgene_pmu,
++                                                      node);
++       struct xgene_pmu_dev_ctx *ctx;
++       unsigned int target;
++
++       if (!cpumask_test_and_clear_cpu(cpu, &xgene_pmu->cpu))
++               return 0;
++       target = cpumask_any_but(cpu_online_mask, cpu);
++       if (target >= nr_cpu_ids)
++               return 0;
++
++       list_for_each_entry(ctx, &xgene_pmu->mcpmus, next) {
++               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
++       }
++       list_for_each_entry(ctx, &xgene_pmu->mcbpmus, next) {
++               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
++       }
++       list_for_each_entry(ctx, &xgene_pmu->l3cpmus, next) {
++               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
++       }
++       list_for_each_entry(ctx, &xgene_pmu->iobpmus, next) {
++               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
++       }
++
++       cpumask_set_cpu(target, &xgene_pmu->cpu);
++       /* Overflow interrupt also should use the same CPU */
++       WARN_ON(irq_set_affinity(xgene_pmu->irq, &xgene_pmu->cpu));
++
++       return 0;
++}
++
+ static int xgene_pmu_probe(struct platform_device *pdev)
+ {
+        const struct xgene_pmu_data *dev_data;
+@@ -1815,6 +1865,14 @@ static int xgene_pmu_probe(struct platform_device *pdev)
+        int irq, rc;
+        int version;
+
++       /* Install a hook to update the reader CPU in case it goes offline */
++       rc = cpuhp_setup_state_multi(CPUHP_AP_PERF_XGENE_ONLINE,
++                                     "CPUHP_AP_PERF_XGENE_ONLINE",
++                                     xgene_pmu_online_cpu,
++                                     xgene_pmu_offline_cpu);
++       if (rc)
++               return rc;
++
+        xgene_pmu = devm_kzalloc(&pdev->dev, sizeof(*xgene_pmu), GFP_KERNEL);
+        if (!xgene_pmu)
+                return -ENOMEM;
+@@ -1865,6 +1923,7 @@ static int xgene_pmu_probe(struct platform_device *pdev)
+                dev_err(&pdev->dev, "No IRQ resource\n");
+                return -EINVAL;
+        }
++
+        rc = devm_request_irq(&pdev->dev, irq, xgene_pmu_isr,
+                                IRQF_NOBALANCING | IRQF_NO_THREAD,
+                                dev_name(&pdev->dev), xgene_pmu);
+@@ -1873,6 +1932,8 @@ static int xgene_pmu_probe(struct platform_device *pdev)
+                return rc;
+        }
+
++       xgene_pmu->irq = irq;
++
+        raw_spin_lock_init(&xgene_pmu->lock);
+
+        /* Check for active MCBs and MCUs */
+@@ -1883,13 +1944,11 @@ static int xgene_pmu_probe(struct platform_device *pdev)
+                xgene_pmu->mc_active_mask = 0x1;
+        }
+
+-       /* Pick one core to use for cpumask attributes */
+-       cpumask_set_cpu(smp_processor_id(), &xgene_pmu->cpu);
+-
+-       /* Make sure that the overflow interrupt is handled by this CPU */
+-       rc = irq_set_affinity(irq, &xgene_pmu->cpu);
++       /* Add this instance to the list used by the hotplug callback */
++       rc = cpuhp_state_add_instance(CPUHP_AP_PERF_XGENE_ONLINE,
++                                     &xgene_pmu->node);
+        if (rc) {
+-               dev_err(&pdev->dev, "Failed to set interrupt affinity!\n");
++               dev_err(&pdev->dev, "Error %d registering hotplug", rc);
+                return rc;
+        }
+
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index 8796ba3..afefca8a 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -164,6 +164,7 @@ enum cpuhp_state {
+        CPUHP_AP_PERF_POWERPC_NEST_IMC_ONLINE,
+        CPUHP_AP_PERF_POWERPC_CORE_IMC_ONLINE,
+        CPUHP_AP_PERF_POWERPC_THREAD_IMC_ONLINE,
++       CPUHP_AP_PERF_XGENE_ONLINE,
+        CPUHP_AP_WORKQUEUE_ONLINE,
+        CPUHP_AP_RCUTREE_ONLINE,
+        CPUHP_AP_ONLINE_DYN,
+--
+2.7.4
+
+CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, is for the sole use of the intended recipient(s) and contains information that is confidential and proprietary to Ampere Computing or its subsidiaries. It is to be used solely for the purpose of furthering the parties' business relationship. Any review, copying, or distribution of this email (or any attachments thereto) is strictly prohibited. If you are not the intended recipient, please contact the sender immediately and permanently delete the original and any copies of this email and any attachments thereto.
