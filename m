@@ -1,47 +1,58 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Wed, 15 Aug 2018 09:48:09 -0500
-Subject: [PATCH] ARM: dts: socfpga: Add fpga2hps and fpga2sdram bridges
-In-Reply-To: <20180815125910.24097-1-s.trumtrar@pengutronix.de>
-References: <20180815125910.24097-1-s.trumtrar@pengutronix.de>
-Message-ID: <6625681f-f64b-462e-7d8c-b48a9437f2e6@kernel.org>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 15 Aug 2018 17:04:47 +0200
+Subject: [RFC PATCH 0/7] add at91sam9 LCDC DRM driver
+In-Reply-To: <CAL_JsqLwazj=7hOwSeAtcyvnYCmMDP-Nw3H8xHSr0n3YGUS21A@mail.gmail.com>
+References: <20180812184152.GA22343@ravnborg.org>
+ <f1f2a2d7-ae27-87af-8041-93d3f8fe07cc@microchip.com>
+ <20180813181808.GA2357@ravnborg.org> <20180813220454.GA28913@rob-hp-laptop>
+ <20180814164343.GA13848@ravnborg.org> <20180814224252.GA20667@rob-hp-laptop>
+ <20180815044808.GA1806@ravnborg.org>
+ <CAL_JsqLwazj=7hOwSeAtcyvnYCmMDP-Nw3H8xHSr0n3YGUS21A@mail.gmail.com>
+Message-ID: <CAKMK7uHm03UxLNUieJFR4TD3ppTMHwkitbQTrVq67K=Mjh6OYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC'd Alan Tull
+On Wed, Aug 15, 2018 at 4:45 PM, Rob Herring <robh@kernel.org> wrote:
+> On Tue, Aug 14, 2018 at 10:48 PM Sam Ravnborg <sam@ravnborg.org> wrote:
+>>
+>
+> [...]
+>
+>> > > One DT related Q:
+>> > > The LCD Controller supports BGR565, but as this is less common some HW implmentations
+>> > > exchange R and B, expessed in the old binding as wiring-mode like this:
+>> > >
+>> > >     atmel,lcd-wiring-mode: lcd wiring mode "RGB" or "BRG"
+>> > >
+>> > > How can we express this wiring-mode in a generic way, both in DT and in code?
+>> > > Is it something that in DRM belongs to the panel, the encoder, the connector, or?
+>> > > And can any of the exisitng flags be used?
+>> >
+>> > I thought we had come up with a common definition, but I guess it didn't
+>> > make it upstream. It's definitely needed and I've been rejecting
+>> > anything new that's vendor specific.
+>> I found this: https://patchwork.ozlabs.org/patch/659570/
+>> The suggestion with a boolean seems simple and I will try that.
+>
+> That's really too simple to be common. There's been a few other
+> attempts[1][2][3] (for Atmel HLCDC in fact) with [3] probably being
+> the closest to merging. The binding looked fine to me, but looks like
+> the DRM implementation had some issues.
+>
+> Rob
+>
+> [1] https://lists.freedesktop.org/archives/dri-devel/2018-April/173089.html
+> [2] https://patchwork.kernel.org/patch/9965079/
+> [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-March/568731.html
 
-Alan, do you have any comments?
+There's a standardized bus_format for drm_panel. IIrc there's been
+discussions to add something similar to drm_bridge, but didn't go all
+that far for reasons.
 
-Dinh
-
-On 08/15/2018 07:59 AM, Steffen Trumtrar wrote:
-> Add the remaining two bridges on the Cyclone-V SoCFPGA SoCs.
-> 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
->  arch/arm/boot/dts/socfpga.dtsi | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index b38f8c240558..e0fb76107f34 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -543,6 +543,18 @@
->  			clocks = <&l4_main_clk>;
->  		};
->  
-> +		fpga_bridge2: fpga-bridge at ff600000 {
-> +			compatible = "altr,socfpga-fpga2hps-bridge";
-> +			reg = <0xff600000 0x100000>;
-> +			resets = <&rst FPGA2HPS_RESET>;
-> +			clocks = <&l4_main_clk>;
-> +		};
-> +
-> +		fpga_bridge3: fpga-bridge at ffc25080 {
-> +			compatible = "altr,socfpga-fpga2sdram-bridge";
-> +			reg = <0xffc25080 0x4>;
-> +		};
-> +
->  		fpgamgr0: fpgamgr at ff706000 {
->  			compatible = "altr,socfpga-fpga-mgr";
->  			reg = <0xff706000 0x1000
-> 
+Lots of drivers just handle this internally in some way. So no idea
+why this all got stalled.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
