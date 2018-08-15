@@ -1,49 +1,80 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Wed, 15 Aug 2018 09:28:26 +0800
-Subject: [PATCH v5 1/5] iommu/arm-smmu-v3: fix the implementation of
- flush_iotlb_all hook
-In-Reply-To: <1534296510-12888-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1534296510-12888-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1534296510-12888-2-git-send-email-thunder.leizhen@huawei.com>
+From: hean.loong.ong@intel.com (Ong, Hean Loong)
+Date: Wed, 15 Aug 2018 01:42:45 +0000
+Subject: [PATCH10 0/3] Intel FPGA Video and Image Processing Suite
+In-Reply-To: <3720ba74-947a-1b5d-5f5b-1ef03d5941aa@kernel.org>
+References: <1534237029-2648-1-git-send-email-hean.loong.ong@intel.com>
+ <3720ba74-947a-1b5d-5f5b-1ef03d5941aa@kernel.org>
+Message-ID: <1534297365.3035.0.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-.flush_iotlb_all can not just wait for previous tlbi operations to be
-completed, but should also invalid all TLBs of the related domain.
+On Tue, 2018-08-14 at 10:48 -0500, Dinh Nguyen wrote:
+> 
+> On 08/14/2018 03:57 AM, Hean-Loong, Ong wrote:
+> > 
+> > From: Ong, Hean Loong <hean.loong.ong@intel.com>
+> > 
+> > The FPGA FrameBuffer Soft IP could be seen??as the GPU and the DRM
+> > driver patch?
+> > here is allocating memory for information to be streamed from the
+> > ARM/Linux?
+> > to the display port. Basically the driver just wraps the
+> > information such as?
+> > the pixels to be drawn by the FPGA FrameBuffer 2.
+> > 
+> > The piece of hardware in discussion is the SoC FPGA where Linux
+> > runs on the?
+> > ARM chip and the FGPA is driven by its NIOS soft core with its own
+> > proprietary firmware.
+> This driver doesn't have to ARM specific does it?
+> 
+> > 
+> > 
+> > For example the application from the ARM Linux would have to write
+> > information?
+> > on the /dev/fb0 with the information stored in the SDRAM to be
+> > fetched by the?
+> > FPGA framebuffer IP and displayed on the Display Port Monitor.
+> > 
+> > 
+> > Ong Hean Loong (2):
+> > ? ARM:socfpga-defconfig Intel FPGA Video and Image Processing Suite
+> > ? ARM:drm ivip Intel FPGA Video and Image Processing Suite
+> > 
+> > Ong, Hean Loong (1):
+> > ? ARM:dt-bindings:display Intel FPGA Video and Image Processing
+> > Suite
+> > 
+> > ?.../devicetree/bindings/display/altr,vip-fb2.txt???|???63 +++++++
+> > ?arch/arm/configs/socfpga_defconfig?????????????????|????5 +
+> > ?drivers/gpu/drm/Kconfig????????????????????????????|????2 +
+> > ?drivers/gpu/drm/Makefile???????????????????????????|????1 +
+> > ?drivers/gpu/drm/ivip/Kconfig???????????????????????|???14 ++
+> > ?drivers/gpu/drm/ivip/Makefile??????????????????????|????9 +
+> > ?drivers/gpu/drm/ivip/intel_vip_conn.c??????????????|???95
+> > ++++++++++
+> > ?drivers/gpu/drm/ivip/intel_vip_core.c??????????????|??161
+> > ++++++++++++++++
+> > ?drivers/gpu/drm/ivip/intel_vip_drv.h???????????????|???52 ++++++
+> > ?drivers/gpu/drm/ivip/intel_vip_of.c????????????????|??193
+> > ++++++++++++++++++++
+> > ?10 files changed, 595 insertions(+), 0 deletions(-)
+> > ?create mode 100644
+> > Documentation/devicetree/bindings/display/altr,vip-fb2.txt
+> > ?create mode 100644 drivers/gpu/drm/ivip/Kconfig
+> > ?create mode 100644 drivers/gpu/drm/ivip/Makefile
+> > ?create mode 100644 drivers/gpu/drm/ivip/intel_vip_conn.c
+> > ?create mode 100644 drivers/gpu/drm/ivip/intel_vip_core.c
+> > ?create mode 100644 drivers/gpu/drm/ivip/intel_vip_drv.h
+> > ?create mode 100644 drivers/gpu/drm/ivip/intel_vip_of.c
+> > 
+> Can you clarify your commit header? What is "PATCH10", is it version
+> 10?
+> If so, it should be "PATCHv10".
+> 
+> You're also missing a few other maintainers in your CC list, the "DRM
+> DRIVERS AND MISC GPU PATCHES" people.
+> 
+Noted
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/arm-smmu-v3.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 1d64710..4402187 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1770,6 +1770,14 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
- 	return ops->unmap(ops, iova, size);
- }
-
-+static void arm_smmu_flush_iotlb_all(struct iommu_domain *domain)
-+{
-+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-+
-+	if (smmu_domain->smmu)
-+		arm_smmu_tlb_inv_context(smmu_domain);
-+}
-+
- static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
- {
- 	struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
-@@ -1998,7 +2006,7 @@ static void arm_smmu_put_resv_regions(struct device *dev,
- 	.map			= arm_smmu_map,
- 	.unmap			= arm_smmu_unmap,
- 	.map_sg			= default_iommu_map_sg,
--	.flush_iotlb_all	= arm_smmu_iotlb_sync,
-+	.flush_iotlb_all	= arm_smmu_flush_iotlb_all,
- 	.iotlb_sync		= arm_smmu_iotlb_sync,
- 	.iova_to_phys		= arm_smmu_iova_to_phys,
- 	.add_device		= arm_smmu_add_device,
---
-1.8.3
+> Dinh
