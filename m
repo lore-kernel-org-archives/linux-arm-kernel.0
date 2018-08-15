@@ -1,66 +1,81 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 15 Aug 2018 11:44:50 +0100
-Subject: [PATCH v8 09/26] kernel/cpu_pm: Manage runtime PM in the idle
- path for CPUs
-In-Reply-To: <20180810201815.GE5081@codeaurora.org>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <2056372.NMt4aPaF4h@aspire.rjw.lan>
- <2205807.cU2puvubpP@aspire.rjw.lan>
- <1726374.375PCQfjLZ@aspire.rjw.lan>
- <CAPDyKFrmP15+_hyRp44Jw-wsTmsNFKORdCeGJEgW8o0OoKiHhA@mail.gmail.com>
- <CAJZ5v0hk1wfm10fyycmddKF6wR4D51r30fD_-J5UDMbtB3+V-Q@mail.gmail.com>
- <20180808105619.GB25150@e107981-ln.cambridge.arm.com>
- <20180808180248.GC27850@codeaurora.org>
- <20180809102504.GB13428@e107981-ln.cambridge.arm.com>
- <20180810201815.GE5081@codeaurora.org>
-Message-ID: <20180815104449.GA29108@red-moon>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Wed, 15 Aug 2018 13:08:00 +0200
+Subject: [PATCH 2/4] dt-bindings: phy-rockchip-inno-usb2: add
+ documentation for extcon and utmi-avalid properties.
+In-Reply-To: <2023816.cqyDmH3see@phil>
+References: <20180815095934.11205-1-enric.balletbo@collabora.com>
+ <20180815095934.11205-3-enric.balletbo@collabora.com>
+ <2023816.cqyDmH3see@phil>
+Message-ID: <37512ec9-8d9a-6c0c-8808-6351b8501002@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2018 at 02:18:15PM -0600, Lina Iyer wrote:
+Hi Heiko,
 
-[...]
-
-> >>But, the OSI feature is critical for QCOM mobile platforms. The
-> >>last man activities during cpuidle save quite a lot of power.
-> >
-> >What I expressed above was that, in PSCI based systems (OSI or PC
-> >alike), it is up to firmware/hardware to detect "the last man" not
-> >the kernel.
-> >
-> >I need to understand what you mean by "last man activities" to
-> >provide feedback here.
-> >
-> When the last CPU goes down during deep sleep, the following would be
-> done
-> - Lower resource requirements for shared resources such as clocks,
->  busses and regulators that were used by drivers in AP. These shared
->  resources when not used by other processors in the SoC may be turned
->  off and put in low power state by a remote processor. [1][2]
-> - Enable and setup wakeup capable interrupts on an always-on interrupt
->  controller, so the GIC and the GPIO controllers may be put in low
->  power state. [3][4]
-> - Write next known wakeup value to the timer, so the blocks that were
->  powered off, may be brought back into operational before the wakeup.
->  [4][5]
+On 15/08/18 12:29, Heiko Stuebner wrote:
+> Hi Enric,
 > 
-> These are commonly done during suspend, but to achieve a good power
-> efficiency, we have to do this when all the CPUs are just executing CPU
-> idle. Also, they cannot be done from the firmware (because the data
-> required for all this is part of Linux). OSI plays a crucial role in
-> determining when to do all this.
+> Am Mittwoch, 15. August 2018, 11:59:32 CEST schrieb Enric Balletbo i Serra:
+>> Commit 98898f3bc83c8 ("phy: rockchip-inno-usb2: support otg-port for
+>> rk3399") introduces two new properties. The extcon property is used to
+>> detect the cable-state, and the rockchip,utmi-avalid is used to indicate
+>> which register should be used to detect the vbus state.
+>>
+>> Document these properties in the documentation binding.
+>>
+>> Fixes: 98898f3bc83c8 ("phy: rockchip-inno-usb2: support otg-port for rk3399")
+>> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+>> ---
+>>
+>>  .../devicetree/bindings/phy/phy-rockchip-inno-usb2.txt         | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+>> index 074a7b3b0425..2d4808d3920b 100644
+>> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+>> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+>> @@ -23,6 +23,7 @@ Optional properties:
+>>  		 register files". When set driver will request its
+>>  		 phandle as one companion-grf for some special SoCs
+>>  		 (e.g RV1108).
+>> + - extcon : phandle to the extcon device for the otg phy.
+> 
+> That should probably mention that this is the extcon providing the cable-state?
 
-No it does not. It is the power domain cpumasks that allow this code to
-make an educated guess on the last cpu running (the kernel), PSCI OSI is
-not crucial at all (it is crucial in QC platforms because that's the
-only mode supported but that's not a reason I accept as valid since it
-does not comply with the PSCI specifications).
+ack.
 
-As I mentioned in another thread[1] the generic part of this
-series may be applicable in a platform agnostic way to the
-CPUidle framework, whether that's beneficial it has to be proven
-and it is benchmark specific anyway.
+> 
+> 
+>>  Required nodes : a sub-node is required for each port the phy provides.
+>>  		 The sub-node name is used to identify host or otg port,
+>> @@ -45,6 +46,8 @@ Required properties (port (child) node):
+>>  Optional properties:
+>>   - phy-supply : phandle to a regulator that provides power to VBUS.
+>>  		See ./phy-bindings.txt for details.
+>> + - rockchip,utmi-avalid : boolean, use the avalid register to get vbus status.
+>> +			  Otherwise, use the bvalid register.
+> 
+> Not having looked to deeply into the usb2 phy, this might raise questions
+> on why this is a hardware-description? Is this needed when something is not
+> connected on the board?
 
-Lorenzo
+I asked myself the same question and even I thought in just remove that code.
 
-[1]: https://marc.info/?l=linux-pm&m=153382916513032&w=2 
+After some investigation, though, I saw that the UTMI+ specification [1] has two
+signals similar to ID signal (page 11), the AValid signal is used to indicate if
+the session for an A-peripheral is valid and the BValid signal that is used to
+indicate if the session for a B-peripheral is valid. I suppose that use of one
+or the other matters in some cases, but AFAICT this is not used and I didn't see
+any binding using it.
+
+Maybe someone else can give us more clues on the importance or not of this property?
+
+[1] https://www.nxp.com/docs/en/brochure/UTMI-PLUS-SPECIFICATION.pdf
+
+Enric
+
+> 
+> 
+> Heiko
+> 
+> 
