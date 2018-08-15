@@ -1,220 +1,136 @@
-From: jernej.skrabec@gmail.com (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Wed, 15 Aug 2018 15:53:45 +0200
-Subject: [linux-sunxi] [PATCH] drm: sun4i: exclusively set HDMI-related
- clocks for dw-hdmi
-In-Reply-To: <2890910B-FFBD-4B05-8275-270B2DB73DEA@aosc.io>
-References: <20180815120745.36593-1-icenowy@aosc.io>
- <5309847.hPHKHXY3qr@jernej-laptop>
- <2890910B-FFBD-4B05-8275-270B2DB73DEA@aosc.io>
-Message-ID: <4239222.d0pFiuuR7S@jernej-laptop>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Wed, 15 Aug 2018 17:07:11 +0300
+Subject: [PATCH mmc-next v3 2/3] mmc: sdhci: introduce adma_write_desc()
+ hook to struct sdhci_ops
+In-Reply-To: <20180730104531.388b4f39@xhacker.debian>
+References: <20180730104228.28b58bd0@xhacker.debian>
+ <20180730104531.388b4f39@xhacker.debian>
+Message-ID: <0bf86945-d2da-3e04-0cfc-b7bc1a2c1702@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-Dne sreda, 15. avgust 2018 ob 15:43:19 CEST je Icenowy Zheng napisal(a):
-> ? 2018?8?15? GMT+08:00 ??9:39:44, "Jernej ?krabec" 
-<jernej.skrabec@gmail.com> ??:
-> >Hi!
-> >
-> >Dne sreda, 15. avgust 2018 ob 14:07:45 CEST je Icenowy Zheng
-> >
-> >napisal(a):
-> >> The glue in sun4i-drm of dw-hdmi currently doesn't set the clocks of
-> >> dw-hdmi exclusively, which will lead the display fails to initialize
-> >
-> >in
-> >
-> >> some situations.
-> >> 
-> >> Add the exclusivity to sun8i-dw-hdmi and sun8i-hdmi-phy.
-> >> 
-> >> Cc: stable at vger.kernel.org # v4.17+
-> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> >
-> >Given that you want this patch to be merged in stable, I have to ask
-> >what kind
-> >of tests did you run to prove it works as expected?
-> >
-> >In the past, there were some issues with TCON exclusive rate setting.
-> >It turns
-> >out that as many scenarios as possible have to be tested before you can
-> >say
-> >it's working.
-> >
-> >I imagine that it has to be tested on at least A83T, H3 (or H5) and R40
-> >(or
-> >A64). They all have their own specifics which needs to be covered.
-> >
-> >Tests which I remember from top of my head:
-> >- run with monitor connected at boot
+On 30/07/18 05:45, Jisheng Zhang wrote:
+> Add this hook so that it can be overridden with driver specific
+> implementations. We also rename the original sdhci_adma_write_desc()
+> to _sdhci_adma_write_desc() and export it, so that it could be reused
+> by driver's specific implementations.
 > 
-> BTW I think the bootloader will affect the state of displsy even
-> without the patch.
-
-I know it can be an issue. For this test I imagine you can just disable 
-display driver in U-Boot so the PLL doesn't get set.
-
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> ---
+>  drivers/mmc/host/sdhci.c | 31 +++++++++++++++++++++++--------
+>  drivers/mmc/host/sdhci.h |  6 ++++++
+>  2 files changed, 29 insertions(+), 8 deletions(-)
 > 
-> When could your U-Boot tweaks patchset to be done? I think they will
-> be needed for a really reliable test.
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 14dd4a49e03b..50c846d99182 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -554,8 +554,8 @@ static void sdhci_kunmap_atomic(void *buffer, unsigned long *flags)
+>  	local_irq_restore(*flags);
+>  }
+>  
+> -static void sdhci_adma_write_desc(struct sdhci_host *host, void *desc,
+> -				  dma_addr_t addr, int len, unsigned cmd)
+> +unsigned int _sdhci_adma_write_desc(struct sdhci_host *host, void *desc,
+> +				    dma_addr_t addr, int len, unsigned int cmd)
+>  {
+>  	struct sdhci_adma2_64_desc *dma_desc = desc;
+>  
+> @@ -566,6 +566,19 @@ static void sdhci_adma_write_desc(struct sdhci_host *host, void *desc,
+>  
+>  	if (host->flags & SDHCI_USE_64_BIT_DMA)
+>  		dma_desc->addr_hi = cpu_to_le32((u64)addr >> 32);
+> +
+> +	return host->desc_sz;
+> +}
+> +EXPORT_SYMBOL_GPL(_sdhci_adma_write_desc);
 
-I plan to do them after A64 driver is merged, so I can sync up dts files and 
-switch driver to be enabled trough them. AFAIK, A64 patches are more or less 
-ready and they will be merged after 4.19-rc1, right?
+Let's make the exported name without the _ i.e.sdhci_adma_write_desc
 
+> +
+> +static unsigned int sdhci_adma_write_desc(struct sdhci_host *host, void *desc,
+
+Let's inline this and use __ i.e.
+
+static inline void __sdhci_adma_write_desc(struct sdhci_host *host,
+
+> +					  dma_addr_t addr, int len,
+> +					  unsigned int cmd)
+> +{
+> +	if (host->ops->adma_write_desc)
+> +		return host->ops->adma_write_desc(host, desc, addr, len, cmd);
+> +
+> +	return _sdhci_adma_write_desc(host, desc, addr, len, cmd);
+>  }
+>  
+>  static void sdhci_adma_mark_end(void *desc)
+> @@ -585,6 +598,7 @@ static void sdhci_adma_table_pre(struct sdhci_host *host,
+>  	void *desc, *align;
+>  	char *buffer;
+>  	int len, offset, i;
+> +	unsigned int desc_sz;
+>  
+>  	/*
+>  	 * The spec does not specify endianness of descriptor table.
+> @@ -618,15 +632,16 @@ static void sdhci_adma_table_pre(struct sdhci_host *host,
+>  			}
+>  
+>  			/* tran, valid */
+> -			sdhci_adma_write_desc(host, desc, align_addr, offset,
+> -					      ADMA2_TRAN_VALID);
+> +			desc_sz = sdhci_adma_write_desc(host, desc,
+
+Instead of returning desc_sz, might just as well pass &desc and have the
+function set its new value.
+
+> +							align_addr, offset,
+> +							ADMA2_TRAN_VALID);
+>  
+>  			BUG_ON(offset > 65536);
+>  
+>  			align += SDHCI_ADMA2_ALIGN;
+>  			align_addr += SDHCI_ADMA2_ALIGN;
+>  
+> -			desc += host->desc_sz;
+> +			desc += desc_sz;
+>  
+>  			addr += offset;
+>  			len -= offset;
+> @@ -636,9 +651,9 @@ static void sdhci_adma_table_pre(struct sdhci_host *host,
+>  
+>  		if (len) {
+>  			/* tran, valid */
+> -			sdhci_adma_write_desc(host, desc, addr, len,
+> -					      ADMA2_TRAN_VALID);
+> -			desc += host->desc_sz;
+> +			desc_sz = sdhci_adma_write_desc(host, desc, addr, len,
+> +							ADMA2_TRAN_VALID);
+> +			desc += desc_sz;
+>  		}
+>  
+>  		/*
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index d55fd7033e93..0aad0ee8f63b 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -605,6 +605,9 @@ struct sdhci_ops {
+>  	void    (*adma_workaround)(struct sdhci_host *host, u32 intmask);
+>  	void    (*card_event)(struct sdhci_host *host);
+>  	void	(*voltage_switch)(struct sdhci_host *host);
+> +	unsigned int	(*adma_write_desc)(struct sdhci_host *host, void *desc,
+> +					   dma_addr_t addr, int len,
+> +					   unsigned int cmd);
+>  };
+>  
+>  #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
+> @@ -735,6 +738,9 @@ void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
+>  int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+>  				      struct mmc_ios *ios);
+>  void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable);
+> +unsigned int _sdhci_adma_write_desc(struct sdhci_host *host, void *desc,
+> +				    dma_addr_t addr, int len,
+> +				    unsigned int cmd);
+>  
+>  #ifdef CONFIG_PM
+>  int sdhci_suspend_host(struct sdhci_host *host);
 > 
-> >- run with monitor disconnected at boot and connect it later
-> >- playing with resolution switching (at least a few non-standard, e.g
-> >something other than 1080p or 720p)
-> 
-> How to do it without starting a X server?
-
-libdrm has in it's source superb testing tool called modetest. It is useful 
-for resolution testing, plane testing (scaling, positioning, color formats, 
-blending, ...) and setting atomic properties (like zpos). While it doesn't 
-recognize sun4i-drm driver automatically, you can specify it through command 
-line parameter.
-
-Best regards,
-Jernej
-
-> 
-> >Best regards,
-> >Jernej
-> >
-> >> ---
-> >> 
-> >>  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c  | 11 ++++++++++-
-> >>  drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c |  7 +++++--
-> >>  2 files changed, 15 insertions(+), 3 deletions(-)
-> >> 
-> >> diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-> >> b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c index
-> >
-> >31875b636434..a10220518548
-> >
-> >> 100644
-> >> --- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-> >> +++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-> >> @@ -137,10 +137,16 @@ static int sun8i_dw_hdmi_bind(struct device
-> >
-> >*dev,
-> >
-> >> struct device *master, goto err_assert_ctrl_reset;
-> >> 
-> >>  	}
-> >> 
-> >> +	ret = clk_rate_exclusive_get(hdmi->clk_tmds);
-> >> +	if (ret) {
-> >> +		dev_err(dev, "Could not get exclusivity over the tmds clock\n");
-> >> +		goto err_disable_clk_tmds;
-> >> +	}
-> >> +
-> >> 
-> >>  	phy_node = of_parse_phandle(dev->of_node, "phys", 0);
-> >>  	if (!phy_node) {
-> >>  	
-> >>  		dev_err(dev, "Can't found PHY phandle\n");
-> >> 
-> >> -		goto err_disable_clk_tmds;
-> >> +		goto err_put_clk_tmds_exclusivity;
-> >> 
-> >>  	}
-> >>  	
-> >>  	ret = sun8i_hdmi_phy_probe(hdmi, phy_node);
-> >> 
-> >> @@ -179,6 +185,8 @@ static int sun8i_dw_hdmi_bind(struct device *dev,
-> >
-> >struct
-> >
-> >> device *master, cleanup_encoder:
-> >>  	drm_encoder_cleanup(encoder);
-> >>  	sun8i_hdmi_phy_remove(hdmi);
-> >> 
-> >> +err_put_clk_tmds_exclusivity:
-> >> +	clk_rate_exclusive_put(hdmi->clk_tmds);
-> >> 
-> >>  err_disable_clk_tmds:
-> >>  	clk_disable_unprepare(hdmi->clk_tmds);
-> >>  
-> >>  err_assert_ctrl_reset:
-> >> @@ -194,6 +202,7 @@ static void sun8i_dw_hdmi_unbind(struct device
-> >
-> >*dev,
-> >
-> >> struct device *master,
-> >> 
-> >>  	dw_hdmi_unbind(hdmi->hdmi);
-> >>  	sun8i_hdmi_phy_remove(hdmi);
-> >> 
-> >> +	clk_rate_exclusive_put(hdmi->clk_tmds);
-> >> 
-> >>  	clk_disable_unprepare(hdmi->clk_tmds);
-> >>  	reset_control_assert(hdmi->rst_ctrl);
-> >>  
-> >>  }
-> >> 
-> >> diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-> >> b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c index
-> >
-> >82502b351aec..1e0b1d9bc0fb
-> >
-> >> 100644
-> >> --- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-> >> +++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-> >> @@ -511,13 +511,14 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi
-> >
-> >*hdmi,
-> >
-> >> struct device_node *node) }
-> >> 
-> >>  		clk_prepare_enable(phy->clk_phy);
-> >> 
-> >> +		clk_rate_exclusive_get(phy->clk_phy);
-> >> 
-> >>  	}
-> >>  	
-> >>  	phy->rst_phy = of_reset_control_get_shared(node, "phy");
-> >>  	if (IS_ERR(phy->rst_phy)) {
-> >>  	
-> >>  		dev_err(dev, "Could not get phy reset control\n");
-> >>  		ret = PTR_ERR(phy->rst_phy);
-> >> 
-> >> -		goto err_disable_clk_phy;
-> >> +		goto err_put_clk_phy_exclusivity;
-> >> 
-> >>  	}
-> >>  	
-> >>  	ret = reset_control_deassert(phy->rst_phy);
-> >> 
-> >> @@ -548,7 +549,8 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi
-> >
-> >*hdmi,
-> >
-> >> struct device_node *node) reset_control_assert(phy->rst_phy);
-> >> 
-> >>  err_put_rst_phy:
-> >>  	reset_control_put(phy->rst_phy);
-> >> 
-> >> -err_disable_clk_phy:
-> >> +err_put_clk_phy_exclusivity:
-> >> +	clk_rate_exclusive_put(phy->clk_phy);
-> >> 
-> >>  	clk_disable_unprepare(phy->clk_phy);
-> >>  
-> >>  err_put_clk_pll1:
-> >>  	clk_put(phy->clk_pll1);
-> >> 
-> >> @@ -568,6 +570,7 @@ void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi
-> >
-> >*hdmi)
-> >
-> >>  	clk_disable_unprepare(phy->clk_mod);
-> >>  	clk_disable_unprepare(phy->clk_bus);
-> >> 
-> >> +	clk_rate_exclusive_put(phy->clk_phy);
-> >> 
-> >>  	clk_disable_unprepare(phy->clk_phy);
-> >>  	
-> >>  	reset_control_assert(phy->rst_phy);
