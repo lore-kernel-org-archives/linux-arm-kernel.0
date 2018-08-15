@@ -1,94 +1,67 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Wed, 15 Aug 2018 18:23:01 +0800
-Subject: [PATCH v3 1/2] iommu/arm-smmu-v3: fix unexpected CMD_SYNC timeout
-In-Reply-To: <1534328582-17664-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1534328582-17664-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1534328582-17664-2-git-send-email-thunder.leizhen@huawei.com>
+From: yaojun8558363@gmail.com (Jun Yao)
+Date: Wed, 15 Aug 2018 18:26:06 +0800
+Subject: [PATCH v3 3/5] arm64/mm: Create initial page tables in init_pg_dir
+In-Reply-To: <41a18121-c91d-f9ec-87c3-8dba7931b517@arm.com>
+References: <20180702111659.25570-1-yaojun8558363@gmail.com>
+ <20180702111659.25570-4-yaojun8558363@gmail.com>
+ <3977afaa-63ae-e390-7660-4d25146140b8@arm.com>
+ <41a18121-c91d-f9ec-87c3-8dba7931b517@arm.com>
+Message-ID: <20180815102606.GA2274@toy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The condition "(int)(VAL - sync_idx) >= 0" to break loop in function
-__arm_smmu_sync_poll_msi requires that sync_idx must be increased
-monotonously according to the sequence of the CMDs in the cmdq.
+Hi James,
 
-But ".msidata = atomic_inc_return_relaxed(&smmu->sync_nr)" is not protected
-by spinlock, so the following scenarios may appear:
-cpu0			cpu1
-msidata=0
-			msidata=1
-			insert cmd1
-insert cmd0
-			smmu execute cmd1
-smmu execute cmd0
-			poll timeout, because msidata=1 is overridden by
-			cmd0, that means VAL=0, sync_idx=1.
+On Fri, Jul 06, 2018 at 03:41:07PM +0100, James Morse wrote:
+> I missed one: head.S has a call to kasan_early_init() before start_kernel(),
+> this goes messing with the page tables, and calls pgd_offset_k(), which pulls in
+> swapper_pg_dir. This one is enabled by CONFIG_KASAN.
+> 
+> Something like that same hunk [0] in kasan_early_init() fixes it. This is still
+> within arch/arm64, so I still think we should get away without some #ifdeffery
+> to override the core-code's initial setup of swapper_pg_dir...
 
-This is not a functional problem, just make the caller wait for a long
-time until TIMEOUT. It's rare to happen, because any other CMD_SYNCs
-during the waiting period will break it.
+I'm sorry to reply you so late, I missed this email before.
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/iommu/arm-smmu-v3.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+In order to ensure that pgd_offset_k() works properly, I update
+init_mm.pgd by introducing set_init_mm_pgd(). And its implementation is
+like this:
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 1d64710..3f5c236 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -566,7 +566,7 @@ struct arm_smmu_device {
+>diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>index 65f86271f02b..e4f0868b4cfd 100644
+>--- a/arch/arm64/mm/mmu.c
+>+++ b/arch/arm64/mm/mmu.c
+>@@ -623,6 +623,19 @@ static void __init map_kernel(pgd_t *pgdp)
+>        kasan_copy_shadow(pgdp);
+> }
+>
+>+void __init set_init_mm_pgd(pgd_t *pgd)
+>+{
+>+       pgd_t **addr = &(init_mm.pgd);
+>+
+>+       asm volatile("str %x0, [%1]\n"
+>+                   : : "r" (pgd), "r" (addr) : "memory");
+>+}
+> /*
+>  * paging_init() sets up the page tables, initialises the zone memory
+>  * maps and sets up the zero page.
 
- 	int				gerr_irq;
- 	int				combined_irq;
--	atomic_t			sync_nr;
-+	u32				sync_nr;
+The purpose of using assembly is to prevent KASAN instrumentation, as
+KASAN has not been initialized when this function is called:
 
- 	unsigned long			ias; /* IPA */
- 	unsigned long			oas; /* PA */
-@@ -775,6 +775,11 @@ static int queue_remove_raw(struct arm_smmu_queue *q, u64 *ent)
- 	return 0;
- }
+>diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+>index c3e4b1886cde..ede2e964592b 100644
+>--- a/arch/arm64/kernel/head.S
+>+++ b/arch/arm64/kernel/head.S
+>@@ -439,6 +438,9 @@ __primary_switched:
+>        bl      __pi_memset
+>        dsb     ishst                           // Make zero page visible to PTW
+>
+>+       adrp    x0, init_pg_dir
+>+       bl      set_init_mm_pgd
+>+
+> #ifdef CONFIG_KASAN
+>        bl      kasan_early_init
+> #endif
 
-+static inline void arm_smmu_cmdq_sync_set_msidata(u64 *cmd, u32 msidata)
-+{
-+	cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIDATA, msidata);
-+}
-+
- /* High-level queue accessors */
- static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
- {
-@@ -836,7 +841,6 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
- 			cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_SEV);
- 		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSH, ARM_SMMU_SH_ISH);
- 		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIATTR, ARM_SMMU_MEMATTR_OIWB);
--		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIDATA, ent->sync.msidata);
- 		cmd[1] |= ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
- 		break;
- 	default:
-@@ -947,7 +951,6 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
- 	struct arm_smmu_cmdq_ent ent = {
- 		.opcode = CMDQ_OP_CMD_SYNC,
- 		.sync	= {
--			.msidata = atomic_inc_return_relaxed(&smmu->sync_nr),
- 			.msiaddr = virt_to_phys(&smmu->sync_count),
- 		},
- 	};
-@@ -955,6 +958,8 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
- 	arm_smmu_cmdq_build_cmd(cmd, &ent);
-
- 	spin_lock_irqsave(&smmu->cmdq.lock, flags);
-+	ent.sync.msidata = ++smmu->sync_nr;
-+	arm_smmu_cmdq_sync_set_msidata(cmd, ent.sync.msidata);
- 	arm_smmu_cmdq_insert_cmd(smmu, cmd);
- 	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
-
-@@ -2179,7 +2184,6 @@ static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
- {
- 	int ret;
-
--	atomic_set(&smmu->sync_nr, 0);
- 	ret = arm_smmu_init_queues(smmu);
- 	if (ret)
- 		return ret;
---
-1.8.3
+What do you think?
