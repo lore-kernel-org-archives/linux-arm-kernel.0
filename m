@@ -1,35 +1,49 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Wed, 15 Aug 2018 09:28:29 +0800
-Subject: [PATCH v5 4/5] iommu/arm-smmu-v3: add support for non-strict mode
+Date: Wed, 15 Aug 2018 09:28:26 +0800
+Subject: [PATCH v5 1/5] iommu/arm-smmu-v3: fix the implementation of
+ flush_iotlb_all hook
 In-Reply-To: <1534296510-12888-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1534296510-12888-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1534296510-12888-5-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1534296510-12888-2-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dynamically choose strict or non-strict mode for page table config based
-on the iommu domain type.
+.flush_iotlb_all can not just wait for previous tlbi operations to be
+completed, but should also invalid all TLBs of the related domain.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/iommu/arm-smmu-v3.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 4402187..61eb7ec 100644
+index 1d64710..4402187 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1622,6 +1622,11 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
- 	if (smmu->features & ARM_SMMU_FEAT_COHERENCY)
- 		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
+@@ -1770,6 +1770,14 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
+ 	return ops->unmap(ops, iova, size);
+ }
 
-+	if (domain->type == IOMMU_DOMAIN_DMA) {
-+		domain->non_strict = true;
-+		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
-+	}
++static void arm_smmu_flush_iotlb_all(struct iommu_domain *domain)
++{
++	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 +
- 	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
- 	if (!pgtbl_ops)
- 		return -ENOMEM;
++	if (smmu_domain->smmu)
++		arm_smmu_tlb_inv_context(smmu_domain);
++}
++
+ static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
+ {
+ 	struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
+@@ -1998,7 +2006,7 @@ static void arm_smmu_put_resv_regions(struct device *dev,
+ 	.map			= arm_smmu_map,
+ 	.unmap			= arm_smmu_unmap,
+ 	.map_sg			= default_iommu_map_sg,
+-	.flush_iotlb_all	= arm_smmu_iotlb_sync,
++	.flush_iotlb_all	= arm_smmu_flush_iotlb_all,
+ 	.iotlb_sync		= arm_smmu_iotlb_sync,
+ 	.iova_to_phys		= arm_smmu_iova_to_phys,
+ 	.add_device		= arm_smmu_add_device,
 --
 1.8.3
