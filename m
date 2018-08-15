@@ -1,49 +1,40 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 15 Aug 2018 12:18:08 +0200
-Subject: [PATCH 3/4] phy: rockchip-inno-usb2: allow to force the B-Device
- Session Valid bit.
-In-Reply-To: <20180815095934.11205-4-enric.balletbo@collabora.com>
-References: <20180815095934.11205-1-enric.balletbo@collabora.com>
- <20180815095934.11205-4-enric.balletbo@collabora.com>
-Message-ID: <2209969.yNeHebgXRl@phil>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Wed, 15 Aug 2018 18:23:00 +0800
+Subject: [PATCH v3 0/2] bugfix and optimization about CMD_SYNC
+Message-ID: <1534328582-17664-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Enric,
+v2 -> v3:
+Although I have no data to show how many performance will be impacted
+because of arm_smmu_cmdq_build_cmd is protected by spinlock. But it's
+clear that the performance is bound to drop, a memset operation and 
+a complicate switch..case in the function arm_smmu_cmdq_build_cmd.
 
-Am Mittwoch, 15. August 2018, 11:59:33 CEST schrieb Enric Balletbo i Serra:
-> The OTG disconnection event is generated after the presence/abscense of
-> an ID connection, but some platforms doesn't have the ID pin connected, so
-> the event is not generated. In such case, for detecting the disconnection
-> event, we can get the cable state from an extcon driver. We need, though,
-> to force to set the B-Device Session Valid bit on the PHY to have the
-> device respond to setup address. Otherwise, the following error is
-> shown:
-> 
->     usb 2-2: Device not responding to setup address.
->     usb 2-2: device not accepting address 14, error -71
->     usb usb2-port2: unable to enumerate USB device
-> 
-> The patch allows to tell the PHY to force the B-Device Session Valid bit
-> when the OTG role is device and clear that bit if the OTG role is host.
-> 
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+v1 -> v2:
+1. move the call to arm_smmu_cmdq_build_cmd into the critical section,
+   and keep itself unchange.
+2. Although patch2 can make sure no two CMD_SYNCs will be adjacent,
+but patch1 is still needed, see below:
 
-> @@ -1024,6 +1051,12 @@ static int rockchip_usb2phy_otg_port_init(struct rockchip_usb2phy *rphy,
->  	INIT_DELAYED_WORK(&rport->chg_work, rockchip_chg_detect_work);
->  	INIT_DELAYED_WORK(&rport->otg_sm_work, rockchip_usb2phy_otg_sm_work);
->  
-> +	rport->force_bvalid = false;
-> +	if (of_device_is_compatible(rphy->dev->of_node,
-> +				    "rockchip,rk3399-usb2phy"))
-> +		rport->force_bvalid = of_property_read_bool(child_np,
-> +						"rockchip,force-bvalid");
+cpu0			cpu1			cpu2
+msidata=0
+			msidata=1
+			insert cmd1
+						insert a TLBI command
+insert cmd0
+			smmu execute cmd1
+						smmu execute TLBI
+smmu execute cmd0
+			poll timeout, because msidata=1 is overridden by
+			cmd0, that means VAL=0, sync_idx=1.
 
-That feels a bit clumsy, especially as the rk3399 seems to have the id
-connection in general ... maybe you could just make that conditional
-on the presence of the extcon?
+Zhen Lei (2):
+  iommu/arm-smmu-v3: fix unexpected CMD_SYNC timeout
+  iommu/arm-smmu-v3: avoid redundant CMD_SYNCs if possible
 
-Or alternatively if needed put that in the soc-specific data struct we
-have already instead open-coding soc compatible checks.
+ drivers/iommu/arm-smmu-v3.c | 30 +++++++++++++++++++++++++-----
+ 1 file changed, 25 insertions(+), 5 deletions(-)
 
-Heiko
+-- 
+1.8.3
