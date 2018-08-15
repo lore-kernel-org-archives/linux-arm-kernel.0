@@ -1,84 +1,119 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Wed, 15 Aug 2018 09:28:30 +0800
-Subject: [PATCH v5 5/5] iommu/arm-smmu-v3: add bootup option "iommu.non_strict"
+Date: Wed, 15 Aug 2018 09:28:27 +0800
+Subject: [PATCH v5 2/5] iommu/dma: add support for non-strict mode
 In-Reply-To: <1534296510-12888-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1534296510-12888-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1534296510-12888-6-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1534296510-12888-3-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a bootup option to make the system manager can choose which mode to
-be used. The default mode is strict.
+1. Save the related domain pointer in struct iommu_dma_cookie, make iovad
+   capable call domain->ops->flush_iotlb_all to flush TLB.
+2. During the iommu domain initialization phase, base on domain->non_strict
+   field to check whether non-strict mode is supported or not. If so, call
+   init_iova_flush_queue to register iovad->flush_cb callback.
+3. All unmap(contains iova-free) APIs will finally invoke __iommu_dma_unmap
+   -->iommu_dma_free_iova. If the domain is non-strict, call queue_iova to
+   put off iova freeing, and omit iommu_tlb_sync operation.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- Documentation/admin-guide/kernel-parameters.txt | 13 +++++++++++++
- drivers/iommu/arm-smmu-v3.c                     | 22 +++++++++++++++++++++-
- 2 files changed, 34 insertions(+), 1 deletion(-)
+ drivers/iommu/dma-iommu.c | 29 ++++++++++++++++++++++++++++-
+ drivers/iommu/iommu.c     |  1 +
+ include/linux/iommu.h     |  1 +
+ 3 files changed, 30 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index 5cde1ff..cb9d043e 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -1720,6 +1720,19 @@
- 		nobypass	[PPC/POWERNV]
- 			Disable IOMMU bypass, using IOMMU for PCI devices.
-
-+	iommu.non_strict=	[ARM64]
-+			Format: { "0" | "1" }
-+			0 - strict mode, default.
-+			    Release IOVAs after the related TLBs are invalid
-+			    completely.
-+			1 - non-strict mode.
-+			    Put off TLBs invalidation and release memory first.
-+			    It's good for scatter-gather performance but lacks
-+			    full isolation, an untrusted device can access the
-+			    reused memory because the TLBs may still valid.
-+			    Please take	full consideration before choosing this
-+			    mode. Note that, VFIO will always use strict mode.
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index ddcbbdb..f0257e9 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -55,6 +55,9 @@ struct iommu_dma_cookie {
+ 	};
+ 	struct list_head		msi_page_list;
+ 	spinlock_t			msi_lock;
 +
- 	iommu.passthrough=
- 			[ARM64] Configure DMA to bypass the IOMMU by default.
- 			Format: { "0" | "1" }
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 61eb7ec..0eda90e 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -631,6 +631,26 @@ struct arm_smmu_option_prop {
- 	{ 0, NULL},
++	/* Only be assigned in non-strict mode, otherwise it's NULL */
++	struct iommu_domain		*domain;
  };
 
-+static bool smmu_non_strict __read_mostly;
-+
-+static int __init arm_smmu_setup(char *str)
+ static inline size_t cookie_msi_granule(struct iommu_dma_cookie *cookie)
+@@ -257,6 +260,17 @@ static int iova_reserve_iommu_regions(struct device *dev,
+ 	return ret;
+ }
+
++static void iommu_dma_flush_iotlb_all(struct iova_domain *iovad)
 +{
-+	int ret;
++	struct iommu_dma_cookie *cookie;
++	struct iommu_domain *domain;
 +
-+	ret = kstrtobool(str, &smmu_non_strict);
-+	if (ret)
-+		return ret;
++	cookie = container_of(iovad, struct iommu_dma_cookie, iovad);
++	domain = cookie->domain;
 +
-+	if (smmu_non_strict) {
-+		pr_warn("WARNING: iommu non-strict mode is chosen.\n"
-+			"It's good for scatter-gather performance but lacks full isolation\n");
-+		add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
++	domain->ops->flush_iotlb_all(domain);
++}
++
+ /**
+  * iommu_dma_init_domain - Initialise a DMA mapping domain
+  * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie()
+@@ -308,6 +322,14 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
+ 	}
+
+ 	init_iova_domain(iovad, 1UL << order, base_pfn);
++
++	if (domain->non_strict) {
++		BUG_ON(!domain->ops->flush_iotlb_all);
++
++		cookie->domain = domain;
++		init_iova_flush_queue(iovad, iommu_dma_flush_iotlb_all, NULL);
 +	}
 +
-+	return 0;
-+}
-+early_param("iommu.non_strict", arm_smmu_setup);
-+
- static inline void __iomem *arm_smmu_page1_fixup(unsigned long offset,
- 						 struct arm_smmu_device *smmu)
- {
-@@ -1622,7 +1642,7 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
- 	if (smmu->features & ARM_SMMU_FEAT_COHERENCY)
- 		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
+ 	if (!dev)
+ 		return 0;
 
--	if (domain->type == IOMMU_DOMAIN_DMA) {
-+	if ((domain->type == IOMMU_DOMAIN_DMA) && smmu_non_strict) {
- 		domain->non_strict = true;
- 		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
- 	}
+@@ -390,6 +412,9 @@ static void iommu_dma_free_iova(struct iommu_dma_cookie *cookie,
+ 	/* The MSI case is only ever cleaning up its most recent allocation */
+ 	if (cookie->type == IOMMU_DMA_MSI_COOKIE)
+ 		cookie->msi_iova -= size;
++	else if (cookie->domain)	/* non-strict mode */
++		queue_iova(iovad, iova_pfn(iovad, iova),
++				size >> iova_shift(iovad), 0);
+ 	else
+ 		free_iova_fast(iovad, iova_pfn(iovad, iova),
+ 				size >> iova_shift(iovad));
+@@ -405,7 +430,9 @@ static void __iommu_dma_unmap(struct iommu_domain *domain, dma_addr_t dma_addr,
+ 	dma_addr -= iova_off;
+ 	size = iova_align(iovad, size + iova_off);
+
+-	WARN_ON(iommu_unmap(domain, dma_addr, size) != size);
++	WARN_ON(iommu_unmap_fast(domain, dma_addr, size) != size);
++	if (!domain->non_strict)
++		iommu_tlb_sync(domain);
+ 	iommu_dma_free_iova(cookie, dma_addr, size);
+ }
+
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index 63b3756..6255a69 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -1263,6 +1263,7 @@ static struct iommu_domain *__iommu_domain_alloc(struct bus_type *bus,
+
+ 	domain->ops  = bus->iommu_ops;
+ 	domain->type = type;
++	domain->non_strict = false;
+ 	/* Assume all sizes by default; the driver may override this later */
+ 	domain->pgsize_bitmap  = bus->iommu_ops->pgsize_bitmap;
+
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 19938ee..4bbcf39 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -88,6 +88,7 @@ struct iommu_domain_geometry {
+
+ struct iommu_domain {
+ 	unsigned type;
++	bool non_strict;
+ 	const struct iommu_ops *ops;
+ 	unsigned long pgsize_bitmap;	/* Bitmap of page sizes in use */
+ 	iommu_fault_handler_t handler;
 --
 1.8.3
