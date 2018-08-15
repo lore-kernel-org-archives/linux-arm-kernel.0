@@ -1,101 +1,84 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Wed, 15 Aug 2018 09:28:28 +0800
-Subject: [PATCH v5 3/5] iommu/io-pgtable-arm: add support for non-strict mode
+Date: Wed, 15 Aug 2018 09:28:30 +0800
+Subject: [PATCH v5 5/5] iommu/arm-smmu-v3: add bootup option "iommu.non_strict"
 In-Reply-To: <1534296510-12888-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1534296510-12888-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1534296510-12888-4-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1534296510-12888-6-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support the non-strict mode, now we only tlbi and sync for the strict
-mode. But for the non-leaf case, always follow strict mode.
+Add a bootup option to make the system manager can choose which mode to
+be used. The default mode is strict.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- drivers/iommu/io-pgtable-arm.c | 20 ++++++++++++++------
- drivers/iommu/io-pgtable.h     |  3 +++
- 2 files changed, 17 insertions(+), 6 deletions(-)
+ Documentation/admin-guide/kernel-parameters.txt | 13 +++++++++++++
+ drivers/iommu/arm-smmu-v3.c                     | 22 +++++++++++++++++++++-
+ 2 files changed, 34 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 010a254..20d3e98 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -538,6 +538,7 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
- 	phys_addr_t blk_paddr;
- 	size_t tablesz = ARM_LPAE_GRANULE(data);
- 	size_t split_sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
-+	size_t unmapped = size;
- 	int i, unmap_idx = -1;
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 5cde1ff..cb9d043e 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -1720,6 +1720,19 @@
+ 		nobypass	[PPC/POWERNV]
+ 			Disable IOMMU bypass, using IOMMU for PCI devices.
 
- 	if (WARN_ON(lvl == ARM_LPAE_MAX_LEVELS))
-@@ -575,11 +576,16 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
- 		tablep = iopte_deref(pte, data);
- 	}
-
--	if (unmap_idx < 0)
--		return __arm_lpae_unmap(data, iova, size, lvl, tablep);
-+	if (unmap_idx < 0) {
-+		unmapped = __arm_lpae_unmap(data, iova, size, lvl, tablep);
-+		if (!(data->iop.cfg.quirks & IO_PGTABLE_QUIRK_NON_STRICT))
-+			return unmapped;
-+	}
-
- 	io_pgtable_tlb_add_flush(&data->iop, iova, size, size, true);
--	return size;
-+	io_pgtable_tlb_sync(&data->iop);
++	iommu.non_strict=	[ARM64]
++			Format: { "0" | "1" }
++			0 - strict mode, default.
++			    Release IOVAs after the related TLBs are invalid
++			    completely.
++			1 - non-strict mode.
++			    Put off TLBs invalidation and release memory first.
++			    It's good for scatter-gather performance but lacks
++			    full isolation, an untrusted device can access the
++			    reused memory because the TLBs may still valid.
++			    Please take	full consideration before choosing this
++			    mode. Note that, VFIO will always use strict mode.
 +
-+	return unmapped;
- }
+ 	iommu.passthrough=
+ 			[ARM64] Configure DMA to bypass the IOMMU by default.
+ 			Format: { "0" | "1" }
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 61eb7ec..0eda90e 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -631,6 +631,26 @@ struct arm_smmu_option_prop {
+ 	{ 0, NULL},
+ };
 
- static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
-@@ -609,7 +615,7 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
- 			io_pgtable_tlb_sync(iop);
- 			ptep = iopte_deref(pte, data);
- 			__arm_lpae_free_pgtable(data, lvl + 1, ptep);
--		} else {
-+		} else if (!(iop->cfg.quirks & IO_PGTABLE_QUIRK_NON_STRICT)) {
- 			io_pgtable_tlb_add_flush(iop, iova, size, size, true);
- 		}
++static bool smmu_non_strict __read_mostly;
++
++static int __init arm_smmu_setup(char *str)
++{
++	int ret;
++
++	ret = kstrtobool(str, &smmu_non_strict);
++	if (ret)
++		return ret;
++
++	if (smmu_non_strict) {
++		pr_warn("WARNING: iommu non-strict mode is chosen.\n"
++			"It's good for scatter-gather performance but lacks full isolation\n");
++		add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
++	}
++
++	return 0;
++}
++early_param("iommu.non_strict", arm_smmu_setup);
++
+ static inline void __iomem *arm_smmu_page1_fixup(unsigned long offset,
+ 						 struct arm_smmu_device *smmu)
+ {
+@@ -1622,7 +1642,7 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
+ 	if (smmu->features & ARM_SMMU_FEAT_COHERENCY)
+ 		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
 
-@@ -771,7 +777,8 @@ static void arm_lpae_restrict_pgsizes(struct io_pgtable_cfg *cfg)
- 	u64 reg;
- 	struct arm_lpae_io_pgtable *data;
-
--	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA))
-+	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA |
-+			IO_PGTABLE_QUIRK_NON_STRICT))
- 		return NULL;
-
- 	data = arm_lpae_alloc_pgtable(cfg);
-@@ -863,7 +870,8 @@ static void arm_lpae_restrict_pgsizes(struct io_pgtable_cfg *cfg)
- 	struct arm_lpae_io_pgtable *data;
-
- 	/* The NS quirk doesn't apply at stage 2 */
--	if (cfg->quirks & ~IO_PGTABLE_QUIRK_NO_DMA)
-+	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_NO_DMA |
-+		IO_PGTABLE_QUIRK_NON_STRICT))
- 		return NULL;
-
- 	data = arm_lpae_alloc_pgtable(cfg);
-diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-index 2df7909..beb14a3 100644
---- a/drivers/iommu/io-pgtable.h
-+++ b/drivers/iommu/io-pgtable.h
-@@ -71,12 +71,15 @@ struct io_pgtable_cfg {
- 	 *	be accessed by a fully cache-coherent IOMMU or CPU (e.g. for a
- 	 *	software-emulated IOMMU), such that pagetable updates need not
- 	 *	be treated as explicit DMA data.
-+	 * IO_PGTABLE_QUIRK_NON_STRICT: Put off TLBs invalidation and release
-+	 *	memory first.
- 	 */
- 	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
- 	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
- 	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2)
- 	#define IO_PGTABLE_QUIRK_ARM_MTK_4GB	BIT(3)
- 	#define IO_PGTABLE_QUIRK_NO_DMA		BIT(4)
-+	#define IO_PGTABLE_QUIRK_NON_STRICT	BIT(5)
- 	unsigned long			quirks;
- 	unsigned long			pgsize_bitmap;
- 	unsigned int			ias;
+-	if (domain->type == IOMMU_DOMAIN_DMA) {
++	if ((domain->type == IOMMU_DOMAIN_DMA) && smmu_non_strict) {
+ 		domain->non_strict = true;
+ 		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
+ 	}
 --
 1.8.3
