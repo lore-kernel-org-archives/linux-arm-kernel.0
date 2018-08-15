@@ -1,83 +1,39 @@
-From: jian.hu@amlogic.com (Jian Hu)
-Date: Wed, 15 Aug 2018 13:35:08 +0800
-Subject: [PATCH 1/2] dt-bindings: clk: meson-g12a: Add G12A AO Clock
- Bindings
-In-Reply-To: <20180814204801.GA9362@rob-hp-laptop>
-References: <1533894868-85815-1-git-send-email-jian.hu@amlogic.com>
- <1533894868-85815-2-git-send-email-jian.hu@amlogic.com>
- <20180814204801.GA9362@rob-hp-laptop>
-Message-ID: <486c8771-ccbe-2f9b-e1e6-1ac9549432f0@amlogic.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Wed, 15 Aug 2018 14:54:01 +0800
+Subject: [PATCH 2/5] arm64: dts: mt7622: add a bluetooth 5 device node
+In-Reply-To: <aba82b5c68c840a36b902e7cb7eab4ed4516f003.1534130854.git.ryder.lee@mediatek.com>
+References: <68c4ca0158518d6bf50f2f7becfcb87ff3ce158a.1534130854.git.ryder.lee@mediatek.com>
+ <aba82b5c68c840a36b902e7cb7eab4ed4516f003.1534130854.git.ryder.lee@mediatek.com>
+Message-ID: <1534316041.31978.30.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 2018-08-15 at 13:18 +0800, Ryder Lee wrote:
+> Add a built-in bluetooth 5 support for MT7622.
+> 
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> ---
+>  arch/arm64/boot/dts/mediatek/mt7622.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/mt7622.dtsi b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> index b235df7..f8c3495 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt7622.dtsi
+> @@ -515,6 +515,13 @@
+>  		reg-shift = <2>;
+>  		reg-io-width = <4>;
+>  		status = "disabled";
+> +
+> +		bluetooth {
+> +			compatible = "mediatek,mt7622-bluetooth";
+> +			power-domains = <&scpsys MT7622_POWER_DOMAIN_WB>;
+> +			clocks = <&clk25m>;
+> +			clock-names = "ref";
+> +		};
+>  	};
+>  
 
+Acked-by: Sean Wang <sean.wang@mediatek.com>
 
-On 2018/8/15 4:48, Rob Herring wrote:
-> On Fri, Aug 10, 2018 at 05:54:27PM +0800, Jian Hu wrote:
->> Add new clock controller compatible and dt-bingdings headers
->> for the Always-On domain of the g12a SoC
->>
->> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
->> ---
->>   .../bindings/clock/amlogic,gxbb-aoclkc.txt         |  1 +
->>   include/dt-bindings/clock/g12a-aoclkc.h            | 28 ++++++++++++++++++++++
->>   2 files changed, 29 insertions(+)
->>   create mode 100755 include/dt-bindings/clock/g12a-aoclkc.h
-> 
-> checkpatch says wrong mode.
-Yes, I have checked the g12a-aoclk.h file,It is wrong mode. I will chmod 
-a-x for it.Thank you for review.
-> 
->>
->> diff --git a/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt b/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
->> index 3a88052..6f02288 100644
->> --- a/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
->> +++ b/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
->> @@ -10,6 +10,7 @@ Required Properties:
->>   	- GXL (S905X, S905D) : "amlogic,meson-gxl-aoclkc"
->>   	- GXM (S912) : "amlogic,meson-gxm-aoclkc"
->>   	- AXG (A113D, A113X) : "amlogic,meson-axg-aoclkc"
->> +	- G12A (S905D2, S905X2) : "amlogic,g12a-aoclkc"
->>   	followed by the common "amlogic,meson-gx-aoclkc"
->>   
->>   - #clock-cells: should be 1.
->> diff --git a/include/dt-bindings/clock/g12a-aoclkc.h b/include/dt-bindings/clock/g12a-aoclkc.h
->> new file mode 100755
->> index 0000000..6b3f921
->> --- /dev/null
->> +++ b/include/dt-bindings/clock/g12a-aoclkc.h
->> @@ -0,0 +1,28 @@
->> +/* SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause) */
->> +/*
->> + * Copyright (c) 2016 BayLibre, SAS
->> + * Author: Neil Armstrong <narmstrong@baylibre.com>
->> + *
->> + * Copyright (c) 2018 Amlogic, inc.
->> + * Author: Jian Hu<jian.hu@amlogic.com>
->> + */
->> +
->> +#ifndef DT_BINDINGS_CLOCK_AMLOGIC_MESON_G12A_AOCLK
->> +#define DT_BINDINGS_CLOCK_AMLOGIC_MESON_G12A_AOCLK
->> +
->> +#define CLKID_AO_AHB_BUS		0
->> +#define CLKID_AO_REMOTE			1
->> +#define CLKID_AO_I2C_MASTER		2
->> +#define CLKID_AO_I2C_SLAVE		3
->> +#define CLKID_AO_UART1			4
->> +#define CLKID_AO_PROD_I2C		5
->> +#define CLKID_AO_UART2			6
->> +#define CLKID_AO_IR_BLASTER		7
->> +#define CLKID_AO_SAR_ADC		8
->> +#define CLKID_AO_CLK81			9
->> +#define CLKID_AO_SAR_ADC_SEL		10
->> +#define CLKID_AO_SAR_ADC_DIV		11
->> +#define CLKID_AO_SAR_ADC_CLK		12
->> +#define CLKID_AO_ALT_XTAL		13
->> +
->> +#endif
->> -- 
->> 1.9.1
->>
-> 
-> .
-> 
+>  	nandc: nfi at 1100d000 {
