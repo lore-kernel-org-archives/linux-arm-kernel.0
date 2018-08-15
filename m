@@ -1,55 +1,35 @@
 From: ghackmann@android.com (Greg Hackmann)
-Date: Wed, 15 Aug 2018 12:51:21 -0700
-Subject: [PATCH v2 1/2] arm64: mm: check for upper PAGE_SHIFT bits in
- pfn_valid()
-Message-ID: <20180815195123.187373-1-ghackmann@google.com>
+Date: Wed, 15 Aug 2018 12:51:22 -0700
+Subject: [PATCH v2 2/2] arm: mm: check for upper PAGE_SHIFT bits in pfn_valid()
+In-Reply-To: <20180815195123.187373-1-ghackmann@google.com>
+References: <20180815195123.187373-1-ghackmann@google.com>
+Message-ID: <20180815195123.187373-2-ghackmann@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64's pfn_valid() shifts away the upper PAGE_SHIFT bits of the input
-before seeing if the PFN is valid.  This leads to false positives when
-some of the upper bits are set, but the lower bits match a valid PFN.
+ARM's pfn_valid() has a similar shifting bug to the ARM64 bug fixed in
+the previous patch.  This only affects non-LPAE kernels, since LPAE
+kernels will promote to 64 bits inside __pfn_to_phys().
 
-For example, the following userspace code looks up a bogus entry in
-/proc/kpageflags:
-
-    int pagemap = open("/proc/self/pagemap", O_RDONLY);
-    int pageflags = open("/proc/kpageflags", O_RDONLY);
-    uint64_t pfn, val;
-
-    lseek64(pagemap, [...], SEEK_SET);
-    read(pagemap, &pfn, sizeof(pfn));
-    if (pfn & (1UL << 63)) {        /* valid PFN */
-        pfn &= ((1UL << 55) - 1);   /* clear flag bits */
-        pfn |= (1UL << 55);
-        lseek64(pageflags, pfn * sizeof(uint64_t), SEEK_SET);
-        read(pageflags, &val, sizeof(val));
-    }
-
-On ARM64 this causes the userspace process to crash with SIGSEGV rather
-than reading (1 << KPF_NOPAGE).  kpageflags_read() treats the offset as
-valid, and stable_page_flags() will try to access an address between the
-user and kernel address ranges.
-
-Fixes: c1cc1552616d ("arm64: MMU initialisation")
+Fixes: 5e6f6aa1c243 ("memblock/arm: pfn_valid uses memblock_is_memory()")
 Cc: stable at vger.kernel.org
 Signed-off-by: Greg Hackmann <ghackmann@google.com>
 ---
- arch/arm64/mm/init.c | 6 +++++-
+ arch/arm/mm/init.c | 6 +++++-
  1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 9abf8a1e7b25..787e27964ab9 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -287,7 +287,11 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 0cc8e04295a4..bee1f2e4ecf3 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -196,7 +196,11 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max_low,
  #ifdef CONFIG_HAVE_ARCH_PFN_VALID
  int pfn_valid(unsigned long pfn)
  {
--	return memblock_is_map_memory(pfn << PAGE_SHIFT);
-+	phys_addr_t addr = pfn << PAGE_SHIFT;
+-	return memblock_is_map_memory(__pfn_to_phys(pfn));
++	phys_addr_t addr = __pfn_to_phys(pfn);
 +
-+	if ((addr >> PAGE_SHIFT) != pfn)
++	if (__phys_to_pfn(addr) != pfn)
 +		return 0;
 +	return memblock_is_map_memory(addr);
  }
