@@ -1,68 +1,97 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 15 Aug 2018 09:55:29 +0800
-Subject: [PATCH v4 00/14] Add RDMA memory mode support for mediatek SOC
- MT2712
-In-Reply-To: <1533780949-30141-1-git-send-email-stu.hsieh@mediatek.com>
-References: <1533780949-30141-1-git-send-email-stu.hsieh@mediatek.com>
-Message-ID: <1534298129.29201.3.camel@mtksdaap41>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Wed, 15 Aug 2018 06:48:08 +0200
+Subject: [RFC PATCH 0/7] add at91sam9 LCDC DRM driver
+In-Reply-To: <20180814224252.GA20667@rob-hp-laptop>
+References: <20180812184152.GA22343@ravnborg.org>
+ <f1f2a2d7-ae27-87af-8041-93d3f8fe07cc@microchip.com>
+ <20180813181808.GA2357@ravnborg.org>
+ <20180813220454.GA28913@rob-hp-laptop>
+ <20180814164343.GA13848@ravnborg.org>
+ <20180814224252.GA20667@rob-hp-laptop>
+Message-ID: <20180815044808.GA1806@ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stu:
+Hi Rob.
 
-For the series, applied to mediatek-drm-next-4.19 [1], but I modified
-'drm/mediatek: add RGB color format support for RDMA' and 'drm/mediatek:
-add YUYV/UYVY color format support for RDMA' because I would like to
-place related register definition together.
+Thanks for the feedback, as I am rather new to this DT stuff
+a few iterations are no suprise.
 
-[1]
-https://github.com/ckhu-mediatek/linux.git-tags/commits/mediatek-drm-fixes-4.19
+> > If I understand the proposal from you correct an example binding would
+> > look like this:
+> > 
+> >        lcdc0: lcdc at 700000 {
+> >                 compatible = "atmel,at91sam9263-lcdc";
+> >                 reg = <0x700000 0x1000>;
+> >                 interrupts = <26 IRQ_TYPE_LEVEL_HIGH 3>;
+> >                 clocks = <&lcd_clk>, <&lcd_clk>;
+> >                 clock-names = "lcdc_clk", "hclk";
+> > 
+> >                 lcd-supply = <&lcdc_reg>;
+> > 
+> >                 port at 0 {
+> >                 };
+> > 
+> >                 #pwm-cells = <3>;
+> >         };
+> > 
+> >         backlight: backlight {
+> >                 compatible = "pwm-backlight";
+> >                 pwms = <&lcd0 0 50000 0>;
+> >         };
+> > 
+> > 
+> > This is doable, but IMO it is less obvious that the LCDC IP core implements
+> > two different features - a PWM and a LCD controller.
+> 
+> Features don't equate to nodes. If the sub-blocks can be separately 
+> instantiated or have their own resources then sub-nodes make sense. 
+> Otherwise, it's a single device (node) with multiple providers.
+> 
+> > Right now the preference is to stay with the v1 approach:
+> > - It is a mirror of what we do today for hlcdc, so no suprises
+> 
+> Which BTW doesn't appear to have actually been reviewed.
+> 
+> Do these IP blocks actually share anything? 
+They have registers in the same memory area - and I think that it.
 
-Regards,
-CK
+ 
+> Consistency is nice, but keeping compatibility with the existing binding 
+> by extending things in a backwards compatible way is more important. 
+> Implementing a new driver is not license to change the binding. Shall I 
+> let u-boot or *BSD developers change the binding too for their driver?
 
-On Thu, 2018-08-09 at 10:15 +0800, Stu Hsieh wrote:
-> This patch series add RDMA memory mode support for mediatek SOC MT2712.
-> MT2712 has three display data path, including three HW engine,
-> two OVL and one RDMA.
+So in other words - the existing binding in atmel,lcdc.txt needs to be extended in
+a backward compatible way.
+I will take a look at that and post a proposal in v2.
+
+
+> > - It shows in a nice way that the LCDC IP core implments both an LCD controller and a PWM
+> > - The pwm functionality is not hiddin inside the lcdc stuff, and it is thus
+> >   simpler to add good pin-ctrl handles with nice names that matches the usage.
+> >   (I could always add more pin-ctrl, but it is common to refer to a single pin-ctrl.
 > 
-> The RDMA used in third ddp and it need to be set memory mode,
-> then RDMA could read data from memory and output to panel.
+> Does anyone actually use this for a non-backlight PWM? I'm not sure the 
+> abstraction is worth it. The driver could just register itself as a 
+> backlight provider rather than a PWM provider.
+Makes sense.
+
 > 
-> Change in v4:
-> - Add the comment about naming color format definition for RDMA in patch
->   "drm/mediatek: add memory mode and layer_config for RDMA"
-> - Add the comment about naming color format definition for OVL in patch
->   "drm/mediatek: add the comment about color format setting for OVL"
-> - Update the naming about matrix definition and Symbolize the mask in patch
->   "drm/mediatek: add YUYV/UYVY color format support for RDMA"
-> - remove the word "callback" for title in patch
->   "drm/mediatek: add function to return OVL layer number" and
->   "drm/mediatek: add function to return RDMA layer number"
-> - Use single pointer to declare the planes array in patch
->   "drm/mediatek: use layer_nr function to get layer number to init plane"
+> > One DT related Q:
+> > The LCD Controller supports BGR565, but as this is less common some HW implmentations
+> > exchange R and B, expessed in the old binding as wiring-mode like this:
+> > 
+> > 	atmel,lcd-wiring-mode: lcd wiring mode "RGB" or "BRG"
+> > 
+> > How can we express this wiring-mode in a generic way, both in DT and in code?
+> > Is it something that in DRM belongs to the panel, the encoder, the connector, or?
+> > And can any of the exisitng flags be used?
 > 
-> Stu Hsieh (14):
->   drm/mediatek: add connection from RDMA0 to DPI1
->   drm/mediatek: add connection from RDMA0 to DSI1
->   drm/mediatek: add connection from RDMA1 to DSI0
->   drm/mediatek: add connection from RDMA2 to DSI0
->   drm/mediatek: add memory mode and layer_config for RDMA
->   drm/mediatek: add RGB color format support for RDMA
->   drm/mediatek: add the comment about color format setting for OVL
->   drm/mediatek: add YUYV/UYVY color format support for RDMA
->   drm/mediatek: add function to get layer number for component
->   drm/mediatek: add function to return OVL layer number
->   drm/mediatek: add function to return RDMA layer number
->   drm/mediatek: use layer_nr function to get layer number to init plane
->   drm/mediatek: update some variable name from ovl to comp
->   drm/mediatek: fix connection from RDMA2 to DSI1
-> 
->  drivers/gpu/drm/mediatek/mtk_disp_ovl.c     | 11 ++++
->  drivers/gpu/drm/mediatek/mtk_disp_rdma.c    | 93 +++++++++++++++++++++++++++++
->  drivers/gpu/drm/mediatek/mtk_drm_crtc.c     | 47 ++++++++-------
->  drivers/gpu/drm/mediatek/mtk_drm_crtc.h     |  3 +-
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 18 +++++-
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |  9 +++
->  6 files changed, 158 insertions(+), 23 deletions(-)
-> 
+> I thought we had come up with a common definition, but I guess it didn't 
+> make it upstream. It's definitely needed and I've been rejecting 
+> anything new that's vendor specific.
+I found this: https://patchwork.ozlabs.org/patch/659570/
+The suggestion with a boolean seems simple and I will try that.
+
+	Sam
