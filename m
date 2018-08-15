@@ -1,110 +1,76 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 15 Aug 2018 13:34:56 -0600
-Subject: [PATCH 05/13] coresight: etm3: Add support for handling errors
-In-Reply-To: <1533562915-21558-6-git-send-email-suzuki.poulose@arm.com>
+Date: Wed, 15 Aug 2018 13:38:07 -0600
+Subject: [PATCH 06/13] coresight: etb10: Handle errors enabling the device
+In-Reply-To: <1533562915-21558-7-git-send-email-suzuki.poulose@arm.com>
 References: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
- <1533562915-21558-6-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180815193456.GA17954@xps15>
+ <1533562915-21558-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180815193807.GB17954@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 06, 2018 at 02:41:47PM +0100, Suzuki K Poulose wrote:
-> Add support for reporting errors back from the SMP cross
-> function call for enabling ETM.
+On Mon, Aug 06, 2018 at 02:41:48PM +0100, Suzuki K Poulose wrote:
+> Prepare the etb10 driver to return errors in enabling
+> the device.
 > 
 > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
->  drivers/hwtracing/coresight/coresight-etm3x.c | 42 ++++++++++++++++++---------
->  1 file changed, 28 insertions(+), 14 deletions(-)
+>  drivers/hwtracing/coresight/coresight-etb10.c | 18 +++++++++++++-----
+>  1 file changed, 13 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-> index 9ce8fba..771691c 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-> @@ -355,11 +355,10 @@ static int etm_parse_event_config(struct etm_drvdata *drvdata,
->  	return 0;
+> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+> index 9fd77fd..37d2c88 100644
+> --- a/drivers/hwtracing/coresight/coresight-etb10.c
+> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
+> @@ -107,7 +107,7 @@ static unsigned int etb_get_buffer_depth(struct etb_drvdata *drvdata)
+>  	return depth;
 >  }
 >  
-> -static void etm_enable_hw(void *info)
-> +static int etm_enable_hw(struct etm_drvdata *drvdata)
+> -static void etb_enable_hw(struct etb_drvdata *drvdata)
+> +static void __etb_enable_hw(struct etb_drvdata *drvdata)
 >  {
 >  	int i;
->  	u32 etmcr;
-> -	struct etm_drvdata *drvdata = info;
->  	struct etm_config *config = &drvdata->config;
->  
->  	CS_UNLOCK(drvdata->base);
-> @@ -421,6 +420,21 @@ static void etm_enable_hw(void *info)
+>  	u32 depth;
+> @@ -135,6 +135,12 @@ static void etb_enable_hw(struct etb_drvdata *drvdata)
 >  	CS_LOCK(drvdata->base);
+>  }
 >  
->  	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
+> +static int etb_enable_hw(struct etb_drvdata *drvdata)
+> +{
+> +	__etb_enable_hw(drvdata);
 > +	return 0;
 > +}
 > +
-> +struct etm_enable_arg {
-> +	struct etm_drvdata *drvdata;
-> +	int rc;
-> +}
-
-This doesn't compile a ';' is missing.
-
-> +
-> +static void etm_enable_hw_smp_call(void *info)
-> +{
-> +	struct etm_enable_arg *arg = info;
-> +
-> +	if (WARN_ON(!arg))
-> +		return;
-> +	arg->rc = etm_enable_hw(arg->drvdata);
->  }
->  
->  static int etm_cpu_id(struct coresight_device *csdev)
-> @@ -475,14 +489,13 @@ static int etm_enable_perf(struct coresight_device *csdev,
->  	/* Configure the tracer based on the session's specifics */
->  	etm_parse_event_config(drvdata, event);
->  	/* And enable it */
-> -	etm_enable_hw(drvdata);
-> -
-> -	return 0;
-> +	return etm_enable_hw(drvdata);
->  }
->  
->  static int etm_enable_sysfs(struct coresight_device *csdev)
+>  static int etb_enable(struct coresight_device *csdev, u32 mode, void *data)
 >  {
->  	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-> +	struct etm_enable_arg arg = { 0 };
->  	int ret;
->  
->  	spin_lock(&drvdata->spinlock);
-> @@ -492,20 +505,21 @@ static int etm_enable_sysfs(struct coresight_device *csdev)
->  	 * hw configuration will take place on the local CPU during bring up.
->  	 */
->  	if (cpu_online(drvdata->cpu)) {
-> +		arg.drvdata = drvdata;
->  		ret = smp_call_function_single(drvdata->cpu,
-> -					       etm_enable_hw, drvdata, 1);
-> -		if (ret)
-> -			goto err;
-> +					       etm_enable_hw_smp_call, &arg, 1);
-> +		if (!ret)
-> +			ret = arg.rc;
-> +		if (!ret)
-> +			drvdata->sticky_enable = true;
-> +	} else {
-> +		ret = -ENODEV;
+>  	int ret = 0;
+> @@ -150,7 +156,7 @@ static int etb_enable(struct coresight_device *csdev, u32 mode, void *data)
+>  	if (mode == CS_MODE_PERF) {
+>  		ret = etb_set_buffer(csdev, (struct perf_output_handle *)data);
+>  		if (ret)
+> -			goto out;
+> +			return ret;
 >  	}
 >  
-> -	drvdata->sticky_enable = true;
->  	spin_unlock(&drvdata->spinlock);
+>  	val = local_cmpxchg(&drvdata->mode,
+> @@ -172,12 +178,14 @@ static int etb_enable(struct coresight_device *csdev, u32 mode, void *data)
+>  		goto out;
+
+Leaving this here doesn't compile when 'out' is removed below.
+
 >  
-> -	dev_dbg(drvdata->dev, "ETM tracing enabled\n");
-> -	return 0;
-> -
-> -err:
-> -	spin_unlock(&drvdata->spinlock);
-> +	if (!ret)
-> +		dev_dbg(drvdata->dev, "ETM tracing enabled\n");
+>  	spin_lock_irqsave(&drvdata->spinlock, flags);
+> -	etb_enable_hw(drvdata);
+> +	ret = etb_enable_hw(drvdata);
+>  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>  
+> -out:
+> -	if (!ret)
+> +	if (ret)
+> +		local_cmpxchg(&drvdata->mode, mode, CS_MODE_DISABLED);
+> +	else
+>  		dev_dbg(drvdata->dev, "ETB enabled\n");
+> +
 >  	return ret;
 >  }
 >  
