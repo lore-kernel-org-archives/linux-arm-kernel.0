@@ -1,178 +1,171 @@
-From: hoan.tran@amperecomputing.com (Hoan Tran)
-Date: Wed, 15 Aug 2018 11:31:35 -0700
-Subject: [PATCH] perf: xgene: Add CPU hotplug support
-Message-ID: <1534357895-19031-1-git-send-email-hoan.tran@amperecomputing.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 15 Aug 2018 13:22:46 -0600
+Subject: [PATCH 03/13] coresight: tmc-etb/etf: Prepare to handle errors
+ enabling
+In-Reply-To: <1533562915-21558-4-git-send-email-suzuki.poulose@arm.com>
+References: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
+ <1533562915-21558-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180815192246.GA11625@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds CPU hotplug support where the PMU migrates the context to
-another online CPU when its CPU is offline.
+On Mon, Aug 06, 2018 at 02:41:45PM +0100, Suzuki K Poulose wrote:
+> Prepare to handle errors in enabling the hardware and
+> report it back to the core driver.
+> 
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-tmc-etf.c | 71 +++++++++++++++----------
+>  1 file changed, 44 insertions(+), 27 deletions(-)
+> 
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> index 4156c95..ceb4b30 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> @@ -15,7 +15,7 @@
+>  static int tmc_set_etf_buffer(struct coresight_device *csdev,
+>  			      struct perf_output_handle *handle);
+>  
+> -static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
+> +static void __tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
+>  {
+>  	CS_UNLOCK(drvdata->base);
+>  
+> @@ -34,6 +34,12 @@ static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
+>  	CS_LOCK(drvdata->base);
+>  }
+>  
+> +static int tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
+> +{
+> +	__tmc_etb_enable_hw(drvdata);
+> +	return 0;
+> +}
+> +
+>  static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
+>  {
+>  	char *bufp;
+> @@ -76,7 +82,7 @@ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+>  	CS_LOCK(drvdata->base);
+>  }
+>  
+> -static void tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
+> +static void __tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
+>  {
+>  	CS_UNLOCK(drvdata->base);
+>  
+> @@ -92,6 +98,12 @@ static void tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
+>  	CS_LOCK(drvdata->base);
+>  }
+>  
+> +static int tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
+> +{
+> +	__tmc_etf_enable_hw(drvdata);
+> +	return 0;
+> +}
+> +
+>  static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
+>  {
+>  	CS_UNLOCK(drvdata->base);
+> @@ -174,8 +186,12 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev)
+>  		drvdata->buf = buf;
+>  	}
+>  
+> -	drvdata->mode = CS_MODE_SYSFS;
+> -	tmc_etb_enable_hw(drvdata);
+> +	ret = tmc_etb_enable_hw(drvdata);
+> +	if (!ret)
+> +		drvdata->mode = CS_MODE_SYSFS;
+> +	else
+> +		/* Free up the buffer if we failed to enable */
+> +		used = false;
+>  out:
+>  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>  
+> @@ -194,27 +210,25 @@ static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, void *data)
+>  	struct perf_output_handle *handle = data;
+>  
+>  	spin_lock_irqsave(&drvdata->spinlock, flags);
+> -	if (drvdata->reading) {
+> +	do {
+>  		ret = -EINVAL;
+> -		goto out;
+> -	}
+> +		if (drvdata->reading)
+> +			break;
+> +		/*
+> +		 * In Perf mode there can be only one writer per sink.  There
+> +		 * is also no need to continue if the ETB/ETF is already
+> +		 * operated from sysFS.
+> +		 */
+> +		if (drvdata->mode != CS_MODE_DISABLED)
+> +			break;
+>  
+> -	/*
+> -	 * In Perf mode there can be only one writer per sink.  There
+> -	 * is also no need to continue if the ETB/ETR is already operated
+> -	 * from sysFS.
+> -	 */
+> -	if (drvdata->mode != CS_MODE_DISABLED) {
+> -		ret = -EINVAL;
+> -		goto out;
+> -	}
+> -
+> -	ret = tmc_set_etf_buffer(csdev, handle);
+> -	if (!ret) {
+> -		drvdata->mode = CS_MODE_PERF;
+> -		tmc_etb_enable_hw(drvdata);
+> -	}
+> -out:
+> +		ret = tmc_set_etf_buffer(csdev, handle);
+> +		if (ret)
+> +			break;
+> +		ret  = tmc_etb_enable_hw(drvdata);
+> +		if (!ret)
+> +			drvdata->mode = CS_MODE_PERF;
+> +	} while (0);
+>  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>  
+>  	return ret;
+> @@ -271,6 +285,7 @@ static void tmc_disable_etf_sink(struct coresight_device *csdev)
+>  static int tmc_enable_etf_link(struct coresight_device *csdev,
+>  			       int inport, int outport)
+>  {
+> +	int ret;
+>  	unsigned long flags;
+>  	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>  
+> @@ -280,11 +295,13 @@ static int tmc_enable_etf_link(struct coresight_device *csdev,
+>  		return -EBUSY;
+>  	}
+>  
+> -	tmc_etf_enable_hw(drvdata);
+> -	drvdata->mode = CS_MODE_SYSFS;
+> +	ret = tmc_etf_enable_hw(drvdata);
+> +	if (!ret)
+> +		drvdata->mode = CS_MODE_SYSFS;
+>  	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>  
+> -	dev_dbg(drvdata->dev, "TMC-ETF enabled\n");
+> +	if (!ret)
+> +		dev_dbg(drvdata->dev, "TMC-ETF enabled\n");
+>  	return 0;
 
-It fixes the below issue where the user does offline the CPU which is assigned
-to this PMU.
+We need to tell the caller if an error as occured:
 
-Assuming, CPU0 is assigned for this PMU. When the user does offline CPU0
-        [root@(none) ~]# echo 0 > /sys/devices/system/cpu/cpu0/online
-This PMU does not work anymore and shows the below error.
-        [root@(none) ~]# perf stat -a -e l3c0/cycle-count/,l3c0/write/ sleep 1
-        Error:
-        The sys_perf_event_open() syscall returned with 19 (No such device) for event (l3c0/cycle-count/).
-        /bin/dmesg may provide additional information.
-        No CONFIG_PERF_EVENTS=y kernel support configured?
+        return ret;
 
-With this patch, when CPU0 is offline, PMU migrates to another online CPU and
-works on that CPU.
-
-Signed-off-by: Hoan Tran <hoan.tran@amperecomputing.com>
----
- drivers/perf/xgene_pmu.c   | 71 ++++++++++++++++++++++++++++++++++++++++++----
- include/linux/cpuhotplug.h |  1 +
- 2 files changed, 66 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
-index 0e31f13..248a3f7 100644
---- a/drivers/perf/xgene_pmu.c
-+++ b/drivers/perf/xgene_pmu.c
-@@ -21,6 +21,7 @@
-
- #include <linux/acpi.h>
- #include <linux/clk.h>
-+#include <linux/cpuhotplug.h>
- #include <linux/cpumask.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
-@@ -130,12 +131,14 @@ struct xgene_pmu_ops {
-
- struct xgene_pmu {
-        struct device *dev;
-+       struct hlist_node node;
-        int version;
-        void __iomem *pcppmu_csr;
-        u32 mcb_active_mask;
-        u32 mc_active_mask;
-        u32 l3c_active_mask;
-        cpumask_t cpu;
-+       int irq;
-        raw_spinlock_t lock;
-        const struct xgene_pmu_ops *ops;
-        struct list_head l3cpmus;
-@@ -1806,6 +1809,53 @@ static const struct acpi_device_id xgene_pmu_acpi_match[] = {
- MODULE_DEVICE_TABLE(acpi, xgene_pmu_acpi_match);
- #endif
-
-+static int xgene_pmu_online_cpu(unsigned int cpu, struct hlist_node *node)
-+{
-+       struct xgene_pmu *xgene_pmu = hlist_entry_safe(node, struct xgene_pmu,
-+                                                      node);
-+
-+       if (cpumask_empty(&xgene_pmu->cpu))
-+               cpumask_set_cpu(cpu, &xgene_pmu->cpu);
-+
-+       /* Overflow interrupt also should use the same CPU */
-+       WARN_ON(irq_set_affinity(xgene_pmu->irq, &xgene_pmu->cpu));
-+
-+       return 0;
-+}
-+
-+static int xgene_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
-+{
-+       struct xgene_pmu *xgene_pmu = hlist_entry_safe(node, struct xgene_pmu,
-+                                                      node);
-+       struct xgene_pmu_dev_ctx *ctx;
-+       unsigned int target;
-+
-+       if (!cpumask_test_and_clear_cpu(cpu, &xgene_pmu->cpu))
-+               return 0;
-+       target = cpumask_any_but(cpu_online_mask, cpu);
-+       if (target >= nr_cpu_ids)
-+               return 0;
-+
-+       list_for_each_entry(ctx, &xgene_pmu->mcpmus, next) {
-+               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
-+       }
-+       list_for_each_entry(ctx, &xgene_pmu->mcbpmus, next) {
-+               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
-+       }
-+       list_for_each_entry(ctx, &xgene_pmu->l3cpmus, next) {
-+               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
-+       }
-+       list_for_each_entry(ctx, &xgene_pmu->iobpmus, next) {
-+               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
-+       }
-+
-+       cpumask_set_cpu(target, &xgene_pmu->cpu);
-+       /* Overflow interrupt also should use the same CPU */
-+       WARN_ON(irq_set_affinity(xgene_pmu->irq, &xgene_pmu->cpu));
-+
-+       return 0;
-+}
-+
- static int xgene_pmu_probe(struct platform_device *pdev)
- {
-        const struct xgene_pmu_data *dev_data;
-@@ -1815,6 +1865,14 @@ static int xgene_pmu_probe(struct platform_device *pdev)
-        int irq, rc;
-        int version;
-
-+       /* Install a hook to update the reader CPU in case it goes offline */
-+       rc = cpuhp_setup_state_multi(CPUHP_AP_PERF_XGENE_ONLINE,
-+                                     "CPUHP_AP_PERF_XGENE_ONLINE",
-+                                     xgene_pmu_online_cpu,
-+                                     xgene_pmu_offline_cpu);
-+       if (rc)
-+               return rc;
-+
-        xgene_pmu = devm_kzalloc(&pdev->dev, sizeof(*xgene_pmu), GFP_KERNEL);
-        if (!xgene_pmu)
-                return -ENOMEM;
-@@ -1865,6 +1923,7 @@ static int xgene_pmu_probe(struct platform_device *pdev)
-                dev_err(&pdev->dev, "No IRQ resource\n");
-                return -EINVAL;
-        }
-+
-        rc = devm_request_irq(&pdev->dev, irq, xgene_pmu_isr,
-                                IRQF_NOBALANCING | IRQF_NO_THREAD,
-                                dev_name(&pdev->dev), xgene_pmu);
-@@ -1873,6 +1932,8 @@ static int xgene_pmu_probe(struct platform_device *pdev)
-                return rc;
-        }
-
-+       xgene_pmu->irq = irq;
-+
-        raw_spin_lock_init(&xgene_pmu->lock);
-
-        /* Check for active MCBs and MCUs */
-@@ -1883,13 +1944,11 @@ static int xgene_pmu_probe(struct platform_device *pdev)
-                xgene_pmu->mc_active_mask = 0x1;
-        }
-
--       /* Pick one core to use for cpumask attributes */
--       cpumask_set_cpu(smp_processor_id(), &xgene_pmu->cpu);
--
--       /* Make sure that the overflow interrupt is handled by this CPU */
--       rc = irq_set_affinity(irq, &xgene_pmu->cpu);
-+       /* Add this instance to the list used by the hotplug callback */
-+       rc = cpuhp_state_add_instance(CPUHP_AP_PERF_XGENE_ONLINE,
-+                                     &xgene_pmu->node);
-        if (rc) {
--               dev_err(&pdev->dev, "Failed to set interrupt affinity!\n");
-+               dev_err(&pdev->dev, "Error %d registering hotplug", rc);
-                return rc;
-        }
-
-diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-index 8796ba3..afefca8a 100644
---- a/include/linux/cpuhotplug.h
-+++ b/include/linux/cpuhotplug.h
-@@ -164,6 +164,7 @@ enum cpuhp_state {
-        CPUHP_AP_PERF_POWERPC_NEST_IMC_ONLINE,
-        CPUHP_AP_PERF_POWERPC_CORE_IMC_ONLINE,
-        CPUHP_AP_PERF_POWERPC_THREAD_IMC_ONLINE,
-+       CPUHP_AP_PERF_XGENE_ONLINE,
-        CPUHP_AP_WORKQUEUE_ONLINE,
-        CPUHP_AP_RCUTREE_ONLINE,
-        CPUHP_AP_ONLINE_DYN,
---
-2.7.4
-
-CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, is for the sole use of the intended recipient(s) and contains information that is confidential and proprietary to Ampere Computing or its subsidiaries. It is to be used solely for the purpose of furthering the parties' business relationship. Any review, copying, or distribution of this email (or any attachments thereto) is strictly prohibited. If you are not the intended recipient, please contact the sender immediately and permanently delete the original and any copies of this email and any attachments thereto.
+>  }
+>  
+> @@ -579,7 +596,7 @@ int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata)
+>  		 * can't be NULL.
+>  		 */
+>  		memset(drvdata->buf, 0, drvdata->size);
+> -		tmc_etb_enable_hw(drvdata);
+> +		__tmc_etb_enable_hw(drvdata);
+>  	} else {
+>  		/*
+>  		 * The ETB/ETF is not tracing and the buffer was just read.
+> -- 
+> 2.7.4
+> 
