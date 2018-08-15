@@ -1,46 +1,71 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 15 Aug 2018 12:34:34 +0200
-Subject: [PATCH 4/4] dt-bindings: phy-rockchip-inno-usb2: add new rockchip,
- force-bvalid property.
-In-Reply-To: <20180815095934.11205-5-enric.balletbo@collabora.com>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Wed, 15 Aug 2018 12:34:42 +0200
+Subject: [PATCH 3/4] phy: rockchip-inno-usb2: allow to force the B-Device
+ Session Valid bit.
+In-Reply-To: <2209969.yNeHebgXRl@phil>
 References: <20180815095934.11205-1-enric.balletbo@collabora.com>
- <20180815095934.11205-5-enric.balletbo@collabora.com>
-Message-ID: <6944969.kWmPjI4VuS@phil>
+ <20180815095934.11205-4-enric.balletbo@collabora.com>
+ <2209969.yNeHebgXRl@phil>
+Message-ID: <72ca2b54-785c-8fe3-b472-5b8837afe00a@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 15. August 2018, 11:59:34 CEST schrieb Enric Balletbo i Serra:
-> This property is used when the otg-id pin is not connected. When this
-> property is set it forces to set the B-Device Session Valid bit when the
-> port works as device and clears that bit when the port works as host.
-> 
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> ---
-> 
->  .../devicetree/bindings/phy/phy-rockchip-inno-usb2.txt       | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-> index 2d4808d3920b..55761f466c41 100644
-> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-> @@ -48,6 +48,11 @@ Optional properties:
->  		See ./phy-bindings.txt for details.
->   - rockchip,utmi-avalid : boolean, use the avalid register to get vbus status.
->  			  Otherwise, use the bvalid register.
-> + - rockchip,force-bvalid : boolean, set this to force the B-Device Session
-> +			  Valid bit when the usb port is in device mode. This
-> +			  is used when the otg-id pin is not connected.
-> +			  Only supported in case of compatible being:
-> +			  * "rockchip,rk3399-usb2phy"
+Hi Heiko,
 
-I guess you could drop that rk3399 mention instead make the
-driver complain? Trying to keep that list up to date will get hard
-and I guess the other socs may very well hide that setting somewhere
-in their undocumented phy registers as well.
+On 15/08/18 12:18, Heiko Stuebner wrote:
+> Hi Enric,
+> 
+> Am Mittwoch, 15. August 2018, 11:59:33 CEST schrieb Enric Balletbo i Serra:
+>> The OTG disconnection event is generated after the presence/abscense of
+>> an ID connection, but some platforms doesn't have the ID pin connected, so
+>> the event is not generated. In such case, for detecting the disconnection
+>> event, we can get the cable state from an extcon driver. We need, though,
+>> to force to set the B-Device Session Valid bit on the PHY to have the
+>> device respond to setup address. Otherwise, the following error is
+>> shown:
+>>
+>>     usb 2-2: Device not responding to setup address.
+>>     usb 2-2: device not accepting address 14, error -71
+>>     usb usb2-port2: unable to enumerate USB device
+>>
+>> The patch allows to tell the PHY to force the B-Device Session Valid bit
+>> when the OTG role is device and clear that bit if the OTG role is host.
+>>
+>> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> 
+>> @@ -1024,6 +1051,12 @@ static int rockchip_usb2phy_otg_port_init(struct rockchip_usb2phy *rphy,
+>>  	INIT_DELAYED_WORK(&rport->chg_work, rockchip_chg_detect_work);
+>>  	INIT_DELAYED_WORK(&rport->otg_sm_work, rockchip_usb2phy_otg_sm_work);
+>>  
+>> +	rport->force_bvalid = false;
+>> +	if (of_device_is_compatible(rphy->dev->of_node,
+>> +				    "rockchip,rk3399-usb2phy"))
+>> +		rport->force_bvalid = of_property_read_bool(child_np,
+>> +						"rockchip,force-bvalid");
+> 
+> That feels a bit clumsy, especially as the rk3399 seems to have the id
 
-I guess a bit of alphabetical ordering might also be nice,
-rockchip,force-bvalid above rockchip,utmi-avalid
-Makes it easier to read ;-)
+Agree, It is, let me explain :)
 
-Heiko
+Ideally we shouldn't have this check, to get rid of this check I only need the
+offsets for bvalid_session register for all the compatibles and fill in phy
+configuration data (rk3228_phy_cfgs, &rk3328_phy_cfgs, rk3366_phy_cfgs,
+rv1108_phy_cfgs)
+
+To be honest I didn't look if all the datasheets are public available, let me do
+some research. Or, if anyone has the datasheet and can tell where the
+bvalid_session bit is I can fill all the data.
+
+Best regards,
+ Enric
+
+> connection in general ... maybe you could just make that conditional
+> on the presence of the extcon?
+> 
+> Or alternatively if needed put that in the soc-specific data struct we
+> have already instead open-coding soc compatible checks.
+> 
+> Heiko
+> 
+> 
+> 
