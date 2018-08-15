@@ -1,136 +1,51 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Wed, 15 Aug 2018 17:07:11 +0300
-Subject: [PATCH mmc-next v3 2/3] mmc: sdhci: introduce adma_write_desc()
- hook to struct sdhci_ops
-In-Reply-To: <20180730104531.388b4f39@xhacker.debian>
-References: <20180730104228.28b58bd0@xhacker.debian>
- <20180730104531.388b4f39@xhacker.debian>
-Message-ID: <0bf86945-d2da-3e04-0cfc-b7bc1a2c1702@intel.com>
+From: petrcvekcz@gmail.com (Petr Cvek)
+Date: Wed, 15 Aug 2018 16:29:10 +0200
+Subject: ASoC: pxa: possible regressions
+In-Reply-To: <d803b938-3212-6485-8786-43dff6e46e6a@zonque.org>
+References: <5be00a36-d54b-e8ab-2d5f-4c1870f14aac@gmail.com>
+ <58f65d89-c342-026f-6e24-a67fcd625a26@zonque.org>
+ <3ff3c732-b598-f2c3-9a0a-cc92f234326b@gmail.com>
+ <d803b938-3212-6485-8786-43dff6e46e6a@zonque.org>
+Message-ID: <41991989-8f9f-9ca5-94fb-8c0a09c51ada@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/07/18 05:45, Jisheng Zhang wrote:
-> Add this hook so that it can be overridden with driver specific
-> implementations. We also rename the original sdhci_adma_write_desc()
-> to _sdhci_adma_write_desc() and export it, so that it could be reused
-> by driver's specific implementations.
+Dne 13.8.2018 v 07:54 Daniel Mack napsal(a):
+> Hi Petr,
 > 
-> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-> ---
->  drivers/mmc/host/sdhci.c | 31 +++++++++++++++++++++++--------
->  drivers/mmc/host/sdhci.h |  6 ++++++
->  2 files changed, 29 insertions(+), 8 deletions(-)
+> On Wednesday, August 08, 2018 11:07 AM, Petr Cvek wrote:
+>> Dne 8.8.2018 v 07:38 Daniel Mack napsal(a):
 > 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 14dd4a49e03b..50c846d99182 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -554,8 +554,8 @@ static void sdhci_kunmap_atomic(void *buffer, unsigned long *flags)
->  	local_irq_restore(*flags);
->  }
->  
-> -static void sdhci_adma_write_desc(struct sdhci_host *host, void *desc,
-> -				  dma_addr_t addr, int len, unsigned cmd)
-> +unsigned int _sdhci_adma_write_desc(struct sdhci_host *host, void *desc,
-> +				    dma_addr_t addr, int len, unsigned int cmd)
->  {
->  	struct sdhci_adma2_64_desc *dma_desc = desc;
->  
-> @@ -566,6 +566,19 @@ static void sdhci_adma_write_desc(struct sdhci_host *host, void *desc,
->  
->  	if (host->flags & SDHCI_USE_64_BIT_DMA)
->  		dma_desc->addr_hi = cpu_to_le32((u64)addr >> 32);
-> +
-> +	return host->desc_sz;
-> +}
-> +EXPORT_SYMBOL_GPL(_sdhci_adma_write_desc);
-
-Let's make the exported name without the _ i.e.sdhci_adma_write_desc
-
-> +
-> +static unsigned int sdhci_adma_write_desc(struct sdhci_host *host, void *desc,
-
-Let's inline this and use __ i.e.
-
-static inline void __sdhci_adma_write_desc(struct sdhci_host *host,
-
-> +					  dma_addr_t addr, int len,
-> +					  unsigned int cmd)
-> +{
-> +	if (host->ops->adma_write_desc)
-> +		return host->ops->adma_write_desc(host, desc, addr, len, cmd);
-> +
-> +	return _sdhci_adma_write_desc(host, desc, addr, len, cmd);
->  }
->  
->  static void sdhci_adma_mark_end(void *desc)
-> @@ -585,6 +598,7 @@ static void sdhci_adma_table_pre(struct sdhci_host *host,
->  	void *desc, *align;
->  	char *buffer;
->  	int len, offset, i;
-> +	unsigned int desc_sz;
->  
->  	/*
->  	 * The spec does not specify endianness of descriptor table.
-> @@ -618,15 +632,16 @@ static void sdhci_adma_table_pre(struct sdhci_host *host,
->  			}
->  
->  			/* tran, valid */
-> -			sdhci_adma_write_desc(host, desc, align_addr, offset,
-> -					      ADMA2_TRAN_VALID);
-> +			desc_sz = sdhci_adma_write_desc(host, desc,
-
-Instead of returning desc_sz, might just as well pass &desc and have the
-function set its new value.
-
-> +							align_addr, offset,
-> +							ADMA2_TRAN_VALID);
->  
->  			BUG_ON(offset > 65536);
->  
->  			align += SDHCI_ADMA2_ALIGN;
->  			align_addr += SDHCI_ADMA2_ALIGN;
->  
-> -			desc += host->desc_sz;
-> +			desc += desc_sz;
->  
->  			addr += offset;
->  			len -= offset;
-> @@ -636,9 +651,9 @@ static void sdhci_adma_table_pre(struct sdhci_host *host,
->  
->  		if (len) {
->  			/* tran, valid */
-> -			sdhci_adma_write_desc(host, desc, addr, len,
-> -					      ADMA2_TRAN_VALID);
-> -			desc += host->desc_sz;
-> +			desc_sz = sdhci_adma_write_desc(host, desc, addr, len,
-> +							ADMA2_TRAN_VALID);
-> +			desc += desc_sz;
->  		}
->  
->  		/*
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index d55fd7033e93..0aad0ee8f63b 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -605,6 +605,9 @@ struct sdhci_ops {
->  	void    (*adma_workaround)(struct sdhci_host *host, u32 intmask);
->  	void    (*card_event)(struct sdhci_host *host);
->  	void	(*voltage_switch)(struct sdhci_host *host);
-> +	unsigned int	(*adma_write_desc)(struct sdhci_host *host, void *desc,
-> +					   dma_addr_t addr, int len,
-> +					   unsigned int cmd);
->  };
->  
->  #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
-> @@ -735,6 +738,9 @@ void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
->  int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
->  				      struct mmc_ios *ios);
->  void sdhci_enable_sdio_irq(struct mmc_host *mmc, int enable);
-> +unsigned int _sdhci_adma_write_desc(struct sdhci_host *host, void *desc,
-> +				    dma_addr_t addr, int len,
-> +				    unsigned int cmd);
->  
->  #ifdef CONFIG_PM
->  int sdhci_suspend_host(struct sdhci_host *host);
+>> I was planning to send patches before I've found regressions in the
+>> current -next.
+>>
+>> I think I've had the first working version somewhere around 3.13, but I
+>> was updating versions only sporadically and fixing audio had low
+>> priority (higher priority got iwmmxt compiler, platform init source
+>> code, charger, USB, MMC and IrDA). Some versions until now worked, some
+>> didn't.
+>>
+>> The last version I've used and where the sound worked was
+>> 4.14.0-rc7-next from somewhere around 3rd November 2017. The patch for
+>> sound subsystem should be the same as the current one.
 > 
+> That's strange, because as I said, the SSP rework went in in 4.0, so
+> without my regression fix (737e370a57e4e8 "ASoC: pxa-ssp: allow more
+> flexible setup order"), I doubt SSP had worked for you.
+> 
+
+OK I found the problem I've had compiled and load (on both v4.14 and
+v4.18) snd-soc-pxa2xx driver (from linux/sound/arm/pxa2xx-pcm.c). This
+component calls pxa2xx_soc_pcm_new() which is already called by
+snd_soc_pxa_ssp (pxa-ssp-dai.0) or snd_soc_pxa2xx_i2s (pxa2xx-i2s). In
+the function the dma gets registered twice, which is a wrong behavior
+(kernel oops on DMA stopping). Without snd-soc-pxa2xx driver loaded the
+playback works (after the rest of my patches) so it seems in the old
+version DMA wasn't registered twice.
+
+So the easy solution for snd_soc_pxa_ssp OR snd_soc_pxa2xx_i2s would be
+a mutual exclusivity with snd_soc_pxa_ssp. I don't know about other
+users, but I can add a condition to magician Kconfig entry.
+
+Best regards,
+Petr
