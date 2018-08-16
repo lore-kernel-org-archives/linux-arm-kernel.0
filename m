@@ -1,215 +1,96 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 15 Aug 2018 22:59:55 -0400
-Subject: [RFC PATCH 1/3] tracing: Add support for logging data to
- uncached buffer
-In-Reply-To: <6b62fd3a5abf1baf48a07ba8a31a92d17f501f77.1533211509.git.saiprakash.ranjan@codeaurora.org>
-References: <cover.1533211508.git.saiprakash.ranjan@codeaurora.org>
- <6b62fd3a5abf1baf48a07ba8a31a92d17f501f77.1533211509.git.saiprakash.ranjan@codeaurora.org>
-Message-ID: <20180815225955.38d21271@vmware.local.home>
+From: hanjie.lin@amlogic.com (Hanjie Lin)
+Date: Thu, 16 Aug 2018 11:01:26 +0800
+Subject: [PATCH 1/2] dt-bindings: PCI: meson: add DT bindings for Amlogic
+ Meson PCIe Phy controller
+In-Reply-To: <20180814225012.GA19305@rob-hp-laptop>
+References: <1534227134-151584-1-git-send-email-hanjie.lin@amlogic.com>
+ <1534227134-151584-2-git-send-email-hanjie.lin@amlogic.com>
+ <20180814225012.GA19305@rob-hp-laptop>
+Message-ID: <60f152b4-39b3-0205-794b-13a1617956d8@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Sorry for the late reply, I actually wrote this email over a week ago,
-but never hit send. And the email was pushed back behind other
-windows. :-/
 
+On 2018/8/15 6:50, Rob Herring wrote:
+> On Tue, Aug 14, 2018 at 02:12:13AM -0400, Hanjie Lin wrote:
+>> From: Yue Wang <yue.wang@amlogic.com>
+> 
+> Subject should be "dt-bindings: phy: ..."
+> 
+>> The Meson-PCIE-PHY controller supports the 5-Gbps data rate
+>> of the PCI Express Gen 2 specification and is backwardcompatible
+> 
+> space    
 
-On Fri,  3 Aug 2018 19:58:42 +0530
-Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org> wrote:
+yes, I will fix
+                                               ^
+> 
+>> with the 2.5-Gbps Gen 1.1 specification with only
+>> inferred idle detection supported on AMLOGIC SoCs.
+> 
+> AMLOGIC or Amlogic? 
+> 
 
-> diff --git a/kernel/trace/trace_rtb.c b/kernel/trace/trace_rtb.c
-> new file mode 100644
-> index 000000000000..e8c24db71a2d
-> --- /dev/null
-> +++ b/kernel/trace/trace_rtb.c
-> @@ -0,0 +1,160 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (C) 2018 The Linux Foundation. All rights reserved.
-> + */
-> +#include <linux/atomic.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/export.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/rtb.h>
-> +#include <linux/sched/clock.h>
-> +
-> +static struct platform_device *rtb_dev;
-> +static atomic_t rtb_idx;
-> +
-> +struct rtb_state {
-> +	struct rtb_layout *rtb;
-> +	phys_addr_t phys;
-> +	unsigned int nentries;
-> +	unsigned int size;
-> +	int enabled;
-> +};
-> +
-> +static struct rtb_state rtb = {
-> +	.enabled = 0,
-> +};
+yes, we will stick to 'Amlogic'
 
-No need for the initialization, you could just have:
+>>
+>> Signed-off-by: Hanjie Lin <hanjie.lin@amlogic.com>
+>> Signed-off-by: Yue Wang <yue.wang@amlogic.com>
+>> ---
+>>  .../bindings/phy/amlogic,meson-pcie-phy.txt        | 31 ++++++++++++++++++++++
+>>  1 file changed, 31 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/phy/amlogic,meson-pcie-phy.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/amlogic,meson-pcie-phy.txt b/Documentation/devicetree/bindings/phy/amlogic,meson-pcie-phy.txt
+>> new file mode 100644
+>> index 0000000..db99085
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/phy/amlogic,meson-pcie-phy.txt
+>> @@ -0,0 +1,31 @@
+>> +* Amlogic Meson AXG PCIE PHY binding
+>> +
+>> +Required properties:
+>> +- compatible:	Should be
+>> +	- "amlogic,axg-pcie-phy"
+>> +- #phys-cells:	must be 0 (see phy-bindings.txt in this directory)
+> 
+> You don't need to distinguish port A and B?
 
-static struct rtb_state rtb;
+No, we don't. Theoretically there is only one phy in the chip,
+and we have distinguished ports by reset lines.
 
-And it will be initialized to all zeros. Or did you do that to document
-that it is not enabled at boot?
+Thanks for all corrections and suggestions.
 
-> +
-> +static int rtb_panic_notifier(struct notifier_block *this,
-> +					unsigned long event, void *ptr)
-> +{
-> +	rtb.enabled = 0;
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static struct notifier_block rtb_panic_blk = {
-> +	.notifier_call  = rtb_panic_notifier,
-> +	.priority = INT_MAX,
-> +};
-> +
-> +static void rtb_write_type(const char *log_type,
-> +			struct rtb_layout *start)
-> +{
-> +	start->log_type = log_type;
-> +}
-> +
-> +static void rtb_write_caller(u64 caller, struct rtb_layout *start)
-> +{
-> +	start->caller = caller;
-> +}
-> +
-> +static void rtb_write_data(u64 data, struct rtb_layout *start)
-> +{
-> +	start->data = data;
-> +}
-> +
-> +static void rtb_write_timestamp(struct rtb_layout *start)
-> +{
-> +	start->timestamp = sched_clock();
-> +}
-
-Why have the above static functions? They are not very helpful, and
-appear to be actually confusing. They are used once.
-
-> +
-> +static void uncached_logk_pc_idx(const char *log_type, u64 caller,
-> +				u64 data, int idx)
-> +{
-> +	struct rtb_layout *start;
-> +
-> +	start = &rtb.rtb[idx & (rtb.nentries - 1)];
-> +
-> +	rtb_write_type(log_type, start);
-> +	rtb_write_caller(caller, start);
-> +	rtb_write_data(data, start);
-> +	rtb_write_timestamp(start);
-
-How is the above better than:
-
-	start->log_type = log_type;
-	start->caller = caller;
-	start->data = data;
- 	start->timestamp = sched_clock();
-
-??
-
-> +	/* Make sure data is written */
-> +	mb();
-> +}
-> +
-> +static int rtb_get_idx(void)
-> +{
-> +	int i, offset;
-> +
-> +	i = atomic_inc_return(&rtb_idx);
-> +	i--;
-> +
-> +	/* Check if index has wrapped around */
-> +	offset = (i & (rtb.nentries - 1)) -
-> +		 ((i - 1) & (rtb.nentries - 1));
-> +	if (offset < 0) {
-> +		i = atomic_inc_return(&rtb_idx);
-> +		i--;
-> +	}
-> +
-> +	return i;
-> +}
-> +
-> +noinline void notrace uncached_logk(const char *log_type, void *data)
-
-BTW, all files in this directory have their functions notrace by
-default.
-
--- Steve
-
-
-> +{
-> +	int i;
-> +
-> +	if (!rtb.enabled)
-> +		return;
-> +
-> +	i = rtb_get_idx();
-> +	uncached_logk_pc_idx(log_type, (u64)(__builtin_return_address(0)),
-> +				(u64)(data), i);
-> +}
-> +EXPORT_SYMBOL(uncached_logk);
-> +
-> +int rtb_init(void)
-> +{
-> +	struct device_node *np;
-> +	u32 size;
-> +	int ret;
-> +
-> +	np = of_find_node_by_name(NULL, "ramoops");
-> +	if (!np)
-> +		return -ENODEV;
-> +
-> +	ret = of_property_read_u32(np, "rtb-size", &size);
-> +	if (ret) {
-> +		of_node_put(np);
-> +		return ret;
-> +	}
-> +
-> +	rtb.size = size;
-> +
-> +	/* Create a dummy platform device to use dma api */
-> +	rtb_dev = platform_device_register_simple("rtb", -1, NULL, 0);
-> +	if (IS_ERR(rtb_dev))
-> +		return PTR_ERR(rtb_dev);
-> +
-> +	/*
-> +	 * The device is a dummy, so arch_setup_dma_ops
-> +	 * is not called, thus leaving the device with dummy DMA ops
-> +	 * which returns null in case of arm64.
-> +	 */
-> +	of_dma_configure(&rtb_dev->dev, NULL, true);
-> +	rtb.rtb = dma_alloc_coherent(&rtb_dev->dev, rtb.size,
-> +					&rtb.phys, GFP_KERNEL);
-> +	if (!rtb.rtb)
-> +		return -ENOMEM;
-> +
-> +	rtb.nentries = rtb.size / sizeof(struct rtb_layout);
-> +	/* Round this down to a power of 2 */
-> +	rtb.nentries = __rounddown_pow_of_two(rtb.nentries);
-> +
-> +	memset(rtb.rtb, 0, rtb.size);
-> +	atomic_set(&rtb_idx, 0);
-> +
-> +	atomic_notifier_chain_register(&panic_notifier_list,
-> +						&rtb_panic_blk);
-> +	rtb.enabled = 1;
-> +	return 0;
-> +}
-> +
-> +void rtb_exit(void)
-> +{
-> +	dma_free_coherent(&rtb_dev->dev, rtb.size, rtb.rtb, rtb.phys);
-> +	platform_device_unregister(rtb_dev);
-> +}
+> 
+>> +- reg:		The base address and length of the registers
+>> +- resets:	phandle to the reset lines
+>> +- reset-names:	must contain "phy" and "peripheral"
+>> +	- "port_a" Port A reset
+>> +	- "port_b" Port B reset
+>> +	- "phy"	PHY reset
+>> +	- "apb"	APB reset
+>> +Optional properties:
+>> +- phy-supply:	see phy-bindings.txt in this directory
+>> +
+>> +Example:
+>> +	pcie_phy: pcie-phy at ff644000 {
+>> +		#phy-cells = <0>;
+>> +		compatible = "amlogic,axg-pcie-phy";
+>> +		reg = <0x0 0xff644000 0x0 0x2000>;
+>> +		resets = <&reset RESET_PCIE_A>,
+>> +				<&reset RESET_PCIE_B>,
+>> +				<&reset RESET_PCIE_PHY>,
+>> +				<&reset RESET_PCIE_APB>;
+>> +		reset-names =
+>> +				"port_a",
+>> +				"port_b",
+>> +				"phy",
+>> +				"apb";
+>> +	};
+>> -- 
+>> 2.7.4
+>>
+> 
+> .
+> 
