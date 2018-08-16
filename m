@@ -1,69 +1,45 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 16 Aug 2018 16:47:30 +0100
-Subject: [PATCH 08/13] coresight: Add support for CLAIM tag protocol
-In-Reply-To: <20180814232053.GA5131@xps15>
-References: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
- <1533562915-21558-9-git-send-email-suzuki.poulose@arm.com>
- <20180814232053.GA5131@xps15>
-Message-ID: <4aff79b4-593e-a19b-5e3f-de2a6d5bacb7@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 16 Aug 2018 09:48:17 -0600
+Subject: [PATCH 1/2] coresight: etb10: Refactor etb_drvdata::mode handling
+In-Reply-To: <5cd6b8a8-2370-517d-deb1-378bff6e362b@arm.com>
+References: <1534284866-2523-1-git-send-email-mathieu.poirier@linaro.org>
+ <5cd6b8a8-2370-517d-deb1-378bff6e362b@arm.com>
+Message-ID: <20180816154817.GA14955@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/08/18 00:20, Mathieu Poirier wrote:
-> On Mon, Aug 06, 2018 at 02:41:50PM +0100, Suzuki K Poulose wrote:
->> Add support for the CLAIM tag protocol for negotiating the
->> device ownership with other agents trying to use the coresight
->> component (internal vs. external). The Coresight architecture
->> specifies CLAIM tags (managed via CLAIMSET CLAIMCLR registers)
->> to negotiate the ownership of the device. PSCI recommends the
->> reservation of the bits in CLAIM tags for self-hosted and external
->> debug use. This patch implements the protocol for claiming
->> the devices before they are actually used.
+On Thu, Aug 16, 2018 at 04:13:03PM +0100, Suzuki K Poulose wrote:
+> Hi Mathieu,
 > 
-> I think the first paragraph of the cover letter (minus the reference to the
-> documentation since you've included it below) would be perfect instead of the
-> above.
+> The patch looks good to me. One minor nit below.
+
+You have not included any comment - did you change your mind?
+
 > 
->>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   drivers/hwtracing/coresight/coresight-priv.h |  7 +++
->>   drivers/hwtracing/coresight/coresight.c      | 85 ++++++++++++++++++++++++++++
->>   include/linux/coresight.h                    | 20 +++++++
->>   3 files changed, 112 insertions(+)
-
->> +void coresight_disclaim_device_unlocked(void __iomem *base)
->> +{
->> +
->> +	if (coresight_is_claimed_self_hosted(base))
->> +		coresight_clear_claim_tags(base);
->> +	else
->> +		/*
->> +		 * Either we or the external agent doesn't follow
->> +		 * the protocol.
->> +		 */
->> +		WARN_ON_ONCE(1);
+> On 14/08/18 23:14, Mathieu Poirier wrote:
+> >This patch moves the etb_drvdata::mode from a locat_t to a simple u32,
+> >as it is for the ETF and ETR drivers.  This streamlines the code and adds
+> >commonality with the other drivers when dealing with similar operations.
+> >
+> >Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> >---
+> >  drivers/hwtracing/coresight/coresight-etb10.c | 62 +++++++++++++++------------
+> >  1 file changed, 34 insertions(+), 28 deletions(-)
+> >
+> >diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+> >index 9fd77fdc1244..69287163ce4e 100644
+> >--- a/drivers/hwtracing/coresight/coresight-etb10.c
+> >+++ b/drivers/hwtracing/coresight/coresight-etb10.c
 > 
-> When writing "... or the external agent doesn't follow the protocol", I deduce
-> that an external agent would have trampled our claim tag.  I think this needs
-> to be said explicitly in the comment.
+> >@@ -488,7 +494,7 @@ static void etb_dump(struct etb_drvdata *drvdata)
+> >  	unsigned long flags;
+> >  	spin_lock_irqsave(&drvdata->spinlock, flags);
+> >-	if (local_read(&drvdata->mode) == CS_MODE_SYSFS) {
+> >+	if (drvdata->mode == CS_MODE_SYSFS) {
+> >  		etb_disable_hw(drvdata);
+> >  		etb_dump_hw(drvdata);
+> >  		etb_enable_hw(drvdata);
 > 
-
->> +static inline int coresight_claim_device_unlocked(void __iomem *base)
->> +{
->> +	return 0;
->> +}
->> +
->> +static inline int coresight_claim_device(void __iomem *base)
->> +{
->> +	return 0;
->> +}
+> Looks good to me.
 > 
-> Returning 0 would give a caller the impression the operation has succeeded when
-> in fact it didn't.  I think we should return an error code here.
-
-
-Agreed on all points, will respin.
-
-Suzuki
+> Reviewed-by : Suzuki K Poulose <suzuki.poulose@arm.com>
