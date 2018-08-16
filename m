@@ -1,43 +1,52 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Thu, 16 Aug 2018 10:28:54 +0200
-Subject: [PATCH v1 3/7] mfd: add atmel-lcdc driver
-In-Reply-To: <20180815204041.GA29041@ravnborg.org>
-References: <20180812184152.GA22343@ravnborg.org>
- <20180812184629.3808-3-sam@ravnborg.org> <20180815052435.GA6412@dell>
- <20180815204041.GA29041@ravnborg.org>
-Message-ID: <1afc6d63-094b-3bff-87e9-d2354602ba76@microchip.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu, 16 Aug 2018 10:33:39 +0200
+Subject: [PATCH 2/2] PCI: meson: add the Amlogic Meson PCIe phy driver
+In-Reply-To: <2b87e834-41e3-e418-95f0-c6d695cd8b3f@amlogic.com>
+References: <1534227134-151584-1-git-send-email-hanjie.lin@amlogic.com>
+ <1534227134-151584-3-git-send-email-hanjie.lin@amlogic.com>
+ <486e8ab477cc22ff231d2e18d7de22efba2c5abd.camel@baylibre.com>
+ <2b87e834-41e3-e418-95f0-c6d695cd8b3f@amlogic.com>
+Message-ID: <e5d9d89e79f8ec37b6337e54912f49a0b0856874.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/08/2018 at 22:40, Sam Ravnborg wrote:
-> Hi Lee.
+On Thu, 2018-08-16 at 11:05 +0800, Hanjie Lin wrote:
 > 
->>> +
->>> +static const struct mfd_cell lcdc_cells[] = {
->>> +	{
->>> +		.name = "atmel-lcdc-pwm",
->>> +		.of_compatible = "atmel,lcdc-pwm",
->>> +	},
->>> +	{
->>> +		.name = "atmel-lcdc-dc",
->>> +		.of_compatible = "atmel,lcdc-display-controller",
->>> +	},
->>> +};
->>
->> Will you be adding any more devices, or is this the entirety of the
->> device?  If the latter, I suggest that this doesn't warrant being an
->> MFD.
-> Thats it. And others agree with you that this is not a good approach.
-> So in v2 there will be no MFD.
+> On 2018/8/14 18:41, Jerome Brunet wrote:
+> > On Tue, 2018-08-14 at 02:12 -0400, Hanjie Lin wrote:
+> > > From: Yue Wang <yue.wang@amlogic.com>
+> > > 
+> > > The Meson-PCIE-PHY controller supports the 5-Gbps data rate
+> > > of the PCI Express Gen 2 specification and is backwardcompatible
+> > > with the 2.5-Gbps Gen 1.1 specification with only
+> > > inferred idle detection supported on AMLOGIC SoCs.
+> > 
+> > It looks like the sole purpose of this driver is to provide the reset lines to
+> > pcie driver.
+> > 
+> > I wonder why we need this ? Can't the pcie driver claim the reset lines itself.
+> > 
+> > Also, an init of this phy will always reset both port. What will happen if the
+> > first port is in use and the 2nd port comes up ?? 
+> > 
+> > Looks the the pcie driver should claim 'apb' and 'phy' reset lines as "shared"
+> > reset and the required 'port' as 'exclusive'
+> > 
 > 
-> Thanks for confirming that the non-mfd way is the better approach.
+> Thank you for your response.
+> 
+> Yes, 'apb' and 'phy' reset lines are shared, and ?port' reset line is exclusive.
+> If we handle all reset lines during the first port initial sequence, 
+> and when the second port comes up, we will do nothing about the rest lines, 
+> and don't need a extra API to do ?port' reset;
 
-MFD approach would have had the benefit of keeping this driver series 
-architecture close to the HLCD one. This would have been easier to 
-understand and use one SoC or another one from the AT91 product line....
+With which other driver are your control shared ?
 
-Anyway, I'd wait for Boris' feedback for making a decision.
+Looks it is the answer is none since this phy driver will reset both port
+already, even if one is used.
 
-Best regards,
--- 
-Nicolas Ferre
+In this case the fact that you are using shared control is just abusing the
+framework to reset once.
+
+As far as I can tell, this driver makes no sense. The appropriate reset lines
+should be given directly to your pcie driver. 
