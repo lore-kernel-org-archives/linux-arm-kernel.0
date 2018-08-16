@@ -1,41 +1,51 @@
 From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 16 Aug 2018 16:13:03 +0100
-Subject: [PATCH 1/2] coresight: etb10: Refactor etb_drvdata::mode handling
-In-Reply-To: <1534284866-2523-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Thu, 16 Aug 2018 16:44:47 +0100
+Subject: [PATCH 2/2] coresight: etb10: Splitting function etb_enable()
+In-Reply-To: <1534284866-2523-2-git-send-email-mathieu.poirier@linaro.org>
 References: <1534284866-2523-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <5cd6b8a8-2370-517d-deb1-378bff6e362b@arm.com>
+ <1534284866-2523-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <500292f8-d2ef-534d-9331-6a4ea7471c19@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
-
-The patch looks good to me. One minor nit below.
-
 On 14/08/18 23:14, Mathieu Poirier wrote:
-> This patch moves the etb_drvdata::mode from a locat_t to a simple u32,
-> as it is for the ETF and ETR drivers.  This streamlines the code and adds
-> commonality with the other drivers when dealing with similar operations.
+> Up until now the relative simplicity of enabling the ETB made it
+> possible to accommodate processing for both sysFS and perf methods.
+> But work on claimtags and CPU-wide trace scenarios is adding some
+> complexity, making the current code messy and hard to maintain.
+> 
+> As such follow what has been done for ETF and ETR components and split
+> function etb_enable() so that processing for both API can be done
+> cleanly.
 > 
 > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 > ---
->   drivers/hwtracing/coresight/coresight-etb10.c | 62 +++++++++++++++------------
->   1 file changed, 34 insertions(+), 28 deletions(-)
-> 
-> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-> index 9fd77fdc1244..69287163ce4e 100644
-> --- a/drivers/hwtracing/coresight/coresight-etb10.c
-> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
 
-> @@ -488,7 +494,7 @@ static void etb_dump(struct etb_drvdata *drvdata)
->   	unsigned long flags;
->   
->   	spin_lock_irqsave(&drvdata->spinlock, flags);
-> -	if (local_read(&drvdata->mode) == CS_MODE_SYSFS) {
-> +	if (drvdata->mode == CS_MODE_SYSFS) {
->   		etb_disable_hw(drvdata);
->   		etb_dump_hw(drvdata);
->   		etb_enable_hw(drvdata);
+> +static int etb_enable(struct coresight_device *csdev, u32 mode, void *data)
+> +{
+> +	int ret;
+> +	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+> +
+> +	switch (mode) {
+> +	case CS_MODE_SYSFS:
+> +		ret = etb_enable_sysfs(csdev);
+> +		break;
+> +	case CS_MODE_PERF:
+> +		ret = etb_enable_perf(csdev, data);
+> +		break;
+> +	default:
+> +		ret = -EINVAL;
+> +		break;
+> +	}
+> +
+> +	if (ret)
+> +		return ret;
+> +
+> +	dev_dbg(drvdata->dev, "ETB enabled\n");
+> +	return 0;
+> +}
+> +
 
-Looks good to me.
+Looks good.
 
-Reviewed-by : Suzuki K Poulose <suzuki.poulose@arm.com>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
