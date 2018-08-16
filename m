@@ -1,42 +1,47 @@
-From: Pavel.Tatashin@microsoft.com (Pasha Tatashin)
-Date: Thu, 16 Aug 2018 22:54:38 +0000
-Subject: [RESEND PATCH v10 2/6] mm: page_alloc: remain
- memblock_next_valid_pfn() on arm/arm64
-In-Reply-To: <1530867675-9018-3-git-send-email-hejianet@gmail.com>
-References: <1530867675-9018-1-git-send-email-hejianet@gmail.com>
- <1530867675-9018-3-git-send-email-hejianet@gmail.com>
-Message-ID: <20180816225437.5zkchip422esdqwh@xakep.localdomain>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Aug 2018 23:58:44 +0100
+Subject: [offlist] Re: Crash in netlink/sk_filter_trim_cap on ARMv7 on
+ 4.18rc1
+In-Reply-To: <20180816203515.GA7688@torres.zugschlus.de>
+References: <CALeDE9PP__kPHX_aW24kwzGf9BgA0gQOQJSY+Qw0yFMOLn4Pcw@mail.gmail.com>
+ <7ff516fd-1d01-4d7a-1d5d-b58932c0c69d@gmail.com>
+ <CALeDE9Nkz+cbueruiez_43ZS1ebAiQHDaVZRARE8raypYz323A@mail.gmail.com>
+ <ad98d60c-bd60-b495-c4bd-507fc29c8bcd@iogearbox.net>
+ <CALeDE9PBZWJBp8KB0mB4zoNXqscmzxWzz+LnuqRA-z4t1e9T8g@mail.gmail.com>
+ <CALeDE9OOrZUnaNpzkYPU30iN=4HFQaqEomjf14EO5EtcnHu8OQ@mail.gmail.com>
+ <20180816203515.GA7688@torres.zugschlus.de>
+Message-ID: <20180816225844.GW30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18-07-06 17:01:11, Jia He wrote:
-> From: Jia He <jia.he@hxt-semitech.com>
+On Thu, Aug 16, 2018 at 10:35:16PM +0200, Marc Haber wrote:
+> On Mon, Jun 25, 2018 at 05:41:27PM +0100, Peter Robinson wrote:
+> > So with that and the other fix there was no improvement, with those
+> > and the BPF JIT disabled it works, I'm not sure if the two patches
+> > have any effect with the JIT disabled though.
 > 
-> Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
-> where possible") optimized the loop in memmap_init_zone(). But it causes
-> possible panic bug. So Daniel Vacek reverted it later.
-> 
-> But as suggested by Daniel Vacek, it is fine to using memblock to skip
-> gaps and finding next valid frame with CONFIG_HAVE_ARCH_PFN_VALID.
-> Daniel said:
-> "On arm and arm64, memblock is used by default. But generic version of
-> pfn_valid() is based on mem sections and memblock_next_valid_pfn() does
-> not always return the next valid one but skips more resulting in some
-> valid frames to be skipped (as if they were invalid). And that's why
-> kernel was eventually crashing on some !arm machines."
-> 
-> About the performance consideration:
-> As said by James in b92df1de5,
-> "I have tested this patch on a virtual model of a Samurai CPU
-> with a sparse memory map.  The kernel boot time drops from 109 to
-> 62 seconds."
-> 
-> Thus it would be better if we remain memblock_next_valid_pfn on arm/arm64.
-> 
-> Suggested-by: Daniel Vacek <neelx@redhat.com>
-> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+> I can confirm the crash with the released 4.18.1 on Banana Pi, and I can
+> also confirm that disabling BPF JIT makes the Banana Pi work again.,
 
-The version of this patch in linux-next has few fixes, I reviewed that one
-looks good to me.
+Hi,
 
-Reviewed-by: Pavel Tatashin <pavel.tatashin@microsoft.com>
+I'm afraid that the information in the crash dumps is insufficient
+to be able to work very much out about these crashes.
+
+We need a recipe (kernel configuration and what userspace is doing)
+so that it's possible to recreate the crash, or we need responses
+to requests for information - I requested the disassembly of
+sk_filter_trim_cap and the BPF code dump via setting a sysctl back
+in early July.  Without this, as I say, I don't see how this problem
+can be progressed.
+
+If the problem is at boot, one way to set the sysctl would be to
+hack the kernel and explicitly initialise the sysctl to '2', or
+boot with init=/bin/sh, then manually mount /proc, set the sysctl,
+and then "exec /sbin/init" from that shell.  (Remember there's no
+job control in that shell, so ^z, ^c, etc do not work.)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
