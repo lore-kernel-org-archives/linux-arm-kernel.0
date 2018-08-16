@@ -1,8 +1,8 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Thu, 16 Aug 2018 19:02:32 +0200
+Date: Thu, 16 Aug 2018 19:02:15 +0200
 Subject: Patch "ioremap: Update pgtable free interfaces with addr" has been
- added to the 4.9-stable tree
-Message-ID: <1534438952237187@kroah.com>
+ added to the 4.4-stable tree
+Message-ID: <153443893517238@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,12 +11,12 @@ This is a note to let you know that I've just added the patch titled
 
     ioremap: Update pgtable free interfaces with addr
 
-to the 4.9-stable tree which can be found at:
+to the 4.4-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
      ioremap-update-pgtable-free-interfaces-with-addr.patch
-and it can be found in the queue-4.9 subdirectory.
+and it can be found in the queue-4.4 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
@@ -70,7 +70,6 @@ Cc: "H. Peter Anvin" <hpa@zytor.com>
 Cc: <stable@vger.kernel.org>
 Link: https://lkml.kernel.org/r/20180627141348.21777-3-toshi.kani at hpe.com
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
 ---
  arch/arm64/mm/mmu.c           |    4 ++--
  arch/x86/mm/pgtable.c         |   12 +++++++-----
@@ -80,10 +79,10 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -804,12 +804,12 @@ int pmd_clear_huge(pmd_t *pmd)
- 	return 1;
+@@ -699,12 +699,12 @@ void *__init fixmap_remap_fdt(phys_addr_
  }
  
+ #ifdef CONFIG_HAVE_ARCH_HUGE_VMAP
 -int pud_free_pmd_page(pud_t *pud)
 +int pud_free_pmd_page(pud_t *pud, unsigned long addr)
  {
@@ -97,7 +96,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  }
 --- a/arch/x86/mm/pgtable.c
 +++ b/arch/x86/mm/pgtable.c
-@@ -657,11 +657,12 @@ int pmd_clear_huge(pmd_t *pmd)
+@@ -680,11 +680,12 @@ int pmd_clear_huge(pmd_t *pmd)
  /**
   * pud_free_pmd_page - Clear pud entry and free pmd page.
   * @pud: Pointer to a PUD.
@@ -111,7 +110,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  {
  	pmd_t *pmd;
  	int i;
-@@ -672,7 +673,7 @@ int pud_free_pmd_page(pud_t *pud)
+@@ -695,7 +696,7 @@ int pud_free_pmd_page(pud_t *pud)
  	pmd = (pmd_t *)pud_page_vaddr(*pud);
  
  	for (i = 0; i < PTRS_PER_PMD; i++)
@@ -120,7 +119,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  			return 0;
  
  	pud_clear(pud);
-@@ -684,11 +685,12 @@ int pud_free_pmd_page(pud_t *pud)
+@@ -707,11 +708,12 @@ int pud_free_pmd_page(pud_t *pud)
  /**
   * pmd_free_pte_page - Clear pmd entry and free pte page.
   * @pmd: Pointer to a PMD.
@@ -134,7 +133,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  {
  	pte_t *pte;
  
-@@ -704,7 +706,7 @@ int pmd_free_pte_page(pmd_t *pmd)
+@@ -727,7 +729,7 @@ int pmd_free_pte_page(pmd_t *pmd)
  
  #else /* !CONFIG_X86_64 */
  
@@ -143,7 +142,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  {
  	return pud_none(*pud);
  }
-@@ -713,7 +715,7 @@ int pud_free_pmd_page(pud_t *pud)
+@@ -736,7 +738,7 @@ int pud_free_pmd_page(pud_t *pud)
   * Disable free page handling on x86-PAE. This assures that ioremap()
   * does not update sync'd pmd entries. See vmalloc_sync_one().
   */
@@ -154,7 +153,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  }
 --- a/include/asm-generic/pgtable.h
 +++ b/include/asm-generic/pgtable.h
-@@ -779,8 +779,8 @@ int pud_set_huge(pud_t *pud, phys_addr_t
+@@ -770,8 +770,8 @@ int pud_set_huge(pud_t *pud, phys_addr_t
  int pmd_set_huge(pmd_t *pmd, phys_addr_t addr, pgprot_t prot);
  int pud_clear_huge(pud_t *pud);
  int pmd_clear_huge(pmd_t *pmd);
@@ -165,7 +164,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  #else	/* !CONFIG_HAVE_ARCH_HUGE_VMAP */
  static inline int pud_set_huge(pud_t *pud, phys_addr_t addr, pgprot_t prot)
  {
-@@ -798,11 +798,11 @@ static inline int pmd_clear_huge(pmd_t *
+@@ -789,11 +789,11 @@ static inline int pmd_clear_huge(pmd_t *
  {
  	return 0;
  }
@@ -203,6 +202,6 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 Patches currently in stable-queue which might be from cpandya@codeaurora.org are
 
-queue-4.9/x86-mm-disable-ioremap-free-page-handling-on-x86-pae.patch
-queue-4.9/ioremap-update-pgtable-free-interfaces-with-addr.patch
-queue-4.9/x86-mm-add-tlb-purge-to-free-pmd-pte-page-interfaces.patch
+queue-4.4/x86-mm-disable-ioremap-free-page-handling-on-x86-pae.patch
+queue-4.4/ioremap-update-pgtable-free-interfaces-with-addr.patch
+queue-4.4/x86-mm-add-tlb-purge-to-free-pmd-pte-page-interfaces.patch
