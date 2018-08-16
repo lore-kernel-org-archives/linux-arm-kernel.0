@@ -1,63 +1,99 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 16 Aug 2018 10:27:38 +0100
-Subject: [PATCH v3 1/2] iommu/arm-smmu-v3: fix unexpected CMD_SYNC timeout
-In-Reply-To: <20180816091805.GB31093@arm.com>
-References: <1534328582-17664-1-git-send-email-thunder.leizhen@huawei.com>
- <1534328582-17664-2-git-send-email-thunder.leizhen@huawei.com>
- <6027cd67-7c76-673c-082f-8dd0b7a575b0@arm.com> <5B7533FD.20903@huawei.com>
- <20180816091805.GB31093@arm.com>
-Message-ID: <ad5bd6c0-20bd-9581-a12a-4464e5ec69f6@arm.com>
+From: Claudiu.Beznea@microchip.com (Claudiu Beznea)
+Date: Thu, 16 Aug 2018 12:32:57 +0300
+Subject: [PATCH] arm/mach-at91/pm: Do not double put the device node
+In-Reply-To: <20180814125954.GM943@piout.net>
+References: <1534211696-4221-1-git-send-email-zhongjiang@huawei.com>
+ <20180814125954.GM943@piout.net>
+Message-ID: <59e252e6-6027-9f52-9ee8-8d0bd32659d2@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-08-16 10:18 AM, Will Deacon wrote:
-> On Thu, Aug 16, 2018 at 04:21:17PM +0800, Leizhen (ThunderTown) wrote:
->> On 2018/8/15 20:26, Robin Murphy wrote:
->>> On 15/08/18 11:23, Zhen Lei wrote:
->>>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->>>> index 1d64710..3f5c236 100644
->>>> --- a/drivers/iommu/arm-smmu-v3.c
->>>> +++ b/drivers/iommu/arm-smmu-v3.c
->>>> @@ -566,7 +566,7 @@ struct arm_smmu_device {
->>>>
->>>>        int                gerr_irq;
->>>>        int                combined_irq;
->>>> -    atomic_t            sync_nr;
->>>> +    u32                sync_nr;
->>>>
->>>>        unsigned long            ias; /* IPA */
->>>>        unsigned long            oas; /* PA */
->>>> @@ -775,6 +775,11 @@ static int queue_remove_raw(struct arm_smmu_queue *q, u64 *ent)
->>>>        return 0;
->>>>    }
->>>>
->>>> +static inline void arm_smmu_cmdq_sync_set_msidata(u64 *cmd, u32 msidata)
->>>
->>> If we *are* going to go down this route then I think it would make sense
->>> to move the msiaddr and CMDQ_SYNC_0_CS_MSI logic here as well; i.e.
->>> arm_smmu_cmdq_build_cmd() always generates a "normal" SEV-based sync
->>> command, then calling this guy would convert it to an MSI-based one.
->>> As-is, having bits of mutually-dependent data handled across two
->>> separate places just seems too messy and error-prone.
+Hi Alexandre,
+
+On 14.08.2018 15:59, Alexandre Belloni wrote:
+> On 14/08/2018 09:54:56+0800, zhong jiang wrote:
+>> Device node iterators put the previous value of the index variable,
+>> so an explicit put causes a double put.
 >>
->> Yes, How about create a new function "arm_smmu_cmdq_build_sync_msi_cmd"?
->>
->> static inline
->> void arm_smmu_cmdq_build_sync_msi_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
->> {
->> 	cmd[0]  = FIELD_PREP(CMDQ_0_OP, ent->opcode);
->> 	cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_IRQ);
->> 	cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSH, ARM_SMMU_SH_ISH);
->> 	cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIATTR, ARM_SMMU_MEMATTR_OIWB);
->> 	cmd[1]  = ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
->> }
 > 
-> None of this seems justified given the numbers from John, so please just do
-> the simple thing and build the command with the lock held.
+> While for_each_matching_node_and_match will get and put the node
+> properly, there is also a call to of_find_device_by_node that will get a
+> reference to the node.
+> 
 
-Agreed - sorry if my wording was unclear, but that suggestion was only 
-for the possibility of it proving genuinely worthwhile to build the 
-command outside the lock. Since that isn't the case, I definitely prefer 
-the simpler approach too.
+Looking through of_find_device_by_node() it seems that a put_device() on the
+struct device member of the returned struct platform_device has to be called
+instead of of_node_put().
 
-Robin.
+of_find_device_by_node() calls bus_find_device():
+
+dev = bus_find_device(&platform_bus_type, NULL, np, of_dev_node_match); 
+
+the match function, of_dev_node_match(), is just as follows:
+
+static int of_dev_node_match(struct device *dev, void *data)                    
+{                                                                               
+        return dev->of_node == data;                                            
+}                                                                               
+
+but bus_find_device() takes a reference to the struct device returned in case it
+founds a match, via get_device():
+
+struct device *bus_find_device(struct bus_type *bus,                            
+                               struct device *start, void *data,                
+                               int (*match)(struct device *dev,
+			       void*data))    
+{                                                                               
+        struct klist_iter i;                                                    
+        struct device *dev;                                                     
+                                                                                
+        if (!bus || !bus->p)                                                    
+                return NULL;                                                    
+                                                                                
+        klist_iter_init_node(&bus->p->klist_devices, &i,                        
+                             (start ? &start->p->knode_bus : NULL));            
+        while ((dev = next_device(&i)))                                         
+                if (match(dev, data) && get_device(dev))                        
+                        break;                                                  
+        klist_iter_exit(&i);                                                    
+        return dev;                                                             
+}                                                                               
+
+So, I think a put_device(&pdev->dev) has to be called in at91_pm_config_ws()
+instead of of_node_put(np). My bad!
+
+Thank you,
+Claudiu Beznea
+
+>> I detect the issue with the help of Coccinelle.
+>>
+>> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+>> ---
+>>  arch/arm/mach-at91/pm.c | 5 +----
+>>  1 file changed, 1 insertion(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+>> index 32fae4d..a5ec35f 100644
+>> --- a/arch/arm/mach-at91/pm.c
+>> +++ b/arch/arm/mach-at91/pm.c
+>> @@ -143,15 +143,12 @@ static int at91_pm_config_ws(unsigned int pm_mode, bool set)
+>>  
+>>  			/* Check if enabled on SHDWC. */
+>>  			if (wsi->shdwc_mr_bit && !(val & wsi->shdwc_mr_bit))
+>> -				goto put_node;
+>> +				continue;
+>>  
+>>  			mode |= wsi->pmc_fsmr_bit;
+>>  			if (wsi->set_polarity)
+>>  				polarity |= wsi->pmc_fsmr_bit;
+>>  		}
+>> -
+>> -put_node:
+>> -		of_node_put(np);
+>>  	}
+>>  
+>>  	if (mode) {
+>> -- 
+>> 1.7.12.4
+>>
+> 
