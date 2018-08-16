@@ -1,92 +1,106 @@
 From: wendy.liang@xilinx.com (Wendy Liang)
-Date: Thu, 16 Aug 2018 00:06:27 -0700
-Subject: [PATCH 4/7] firmware: xlnx-zynqmp: Add request/release node
+Date: Thu, 16 Aug 2018 00:06:30 -0700
+Subject: [PATCH 7/7] Documentation: devicetree: Add Xilinx R5 rproc binding
 In-Reply-To: <1534403190-28523-1-git-send-email-jliang@xilinx.com>
 References: <1534403190-28523-1-git-send-email-jliang@xilinx.com>
-Message-ID: <1534403190-28523-5-git-send-email-jliang@xilinx.com>
+Message-ID: <1534403190-28523-8-git-send-email-jliang@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add request/release resource node EEMI operations.
+Add device tree binding for Xilinx Cortex-r5 remoteproc.
 
 Signed-off-by: Wendy Liang <jliang@xilinx.com>
 ---
- drivers/firmware/xilinx/zynqmp.c     | 30 ++++++++++++++++++++++++++++++
- include/linux/firmware/xlnx-zynqmp.h |  7 +++++++
- 2 files changed, 37 insertions(+)
+ .../remoteproc/xlnx,zynqmp-r5-remoteproc.txt       | 81 ++++++++++++++++++++++
+ 1 file changed, 81 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt
 
-diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
-index ce6c746..2e97f60 100644
---- a/drivers/firmware/xilinx/zynqmp.c
-+++ b/drivers/firmware/xilinx/zynqmp.c
-@@ -447,6 +447,34 @@ static int zynqmp_pm_clock_getparent(u32 clock_id, u32 *parent_id)
- 	return ret;
- }
- 
-+/**
-+ * zynqmp_pm_request_node - PM call to request a node with specific capabilities
-+ * @node:		Node ID of the slave
-+ * @capabilities:	Requested capabilities of the slave
-+ * @qos:		Quality of service (not supported)
-+ * @ack:		Flag to specify whether acknowledge is requested
-+ *
-+ * Return:		Returns status, either success or error+reason
-+ */
-+static int zynqmp_pm_request_node(const u32 node, const u32 capabilities,
-+				  const u32 qos,
-+				  const enum zynqmp_pm_request_ack ack)
-+{
-+	return zynqmp_pm_invoke_fn(PM_REQUEST_NODE, node, capabilities,
-+				   qos, ack, NULL);
-+}
+diff --git a/Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt b/Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt
+new file mode 100644
+index 0000000..3940019
+--- /dev/null
++++ b/Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt
+@@ -0,0 +1,81 @@
++Xilinx ARM Cortex A53-R5 remoteproc driver
++==========================================
 +
-+/**
-+ * zynqmp_pm_release_node - PM call to release a node
-+ * @node:	Node ID of the slave
-+ *
-+ * Return:	Returns status, either success or error+reason
-+ */
-+static int zynqmp_pm_release_node(const u32 node)
-+{
-+	return zynqmp_pm_invoke_fn(PM_RELEASE_NODE, node, 0, 0, 0, NULL);
-+}
++ZynqMP family of devices use two Cortex R5 processors to help with various
++low power / real time tasks.
 +
- static const struct zynqmp_eemi_ops eemi_ops = {
- 	.get_api_version = zynqmp_pm_get_api_version,
- 	.ioctl = zynqmp_pm_ioctl,
-@@ -460,6 +488,8 @@ static const struct zynqmp_eemi_ops eemi_ops = {
- 	.clock_getrate = zynqmp_pm_clock_getrate,
- 	.clock_setparent = zynqmp_pm_clock_setparent,
- 	.clock_getparent = zynqmp_pm_clock_getparent,
-+	.request_node = zynqmp_pm_request_node,
-+	.release_node = zynqmp_pm_release_node,
- };
- 
- /**
-diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
-index 83ebadf..02067a3 100644
---- a/include/linux/firmware/xlnx-zynqmp.h
-+++ b/include/linux/firmware/xlnx-zynqmp.h
-@@ -54,6 +54,8 @@ enum pm_api_id {
- 	PM_CLOCK_GETRATE,
- 	PM_CLOCK_SETPARENT,
- 	PM_CLOCK_GETPARENT,
-+	PM_REQUEST_NODE = 13,
-+	PM_RELEASE_NODE = 14,
- };
- 
- /* PMU-FW return status codes */
-@@ -130,6 +132,11 @@ struct zynqmp_eemi_ops {
- 	int (*clock_getrate)(u32 clock_id, u64 *rate);
- 	int (*clock_setparent)(u32 clock_id, u32 parent_id);
- 	int (*clock_getparent)(u32 clock_id, u32 *parent_id);
-+	int (*request_node)(const u32 node,
-+			    const u32 capabilities,
-+			    const u32 qos,
-+			    const enum zynqmp_pm_request_ack ack);
-+	int (*release_node)(const u32 node);
- };
- 
- #if IS_REACHABLE(CONFIG_ARCH_ZYNQMP)
++This driver requires specific ZynqMP hardware design.
++
++ZynqMP R5 RemoteProc Device Node:
++=================================
++A zynqmp_r5_remoteproc device node is used to represent a R5 IP instance
++within ZynqMP SoC.
++
++Required properties:
++--------------------
++ - compatible : Should be "xlnx,zynqmp-r5-remoteproc-1.0"
++ - reg : Address and length of the register set for the device. It
++        contains in the same order as described reg-names
++ - reg-names: Contain the register set names.
++              "tcm_a" and "tcm_b" for TCM memories.
++              If the user uses the remoteproc driver with the RPMsg kernel
++              driver,"ipi" for the IPI register used to communicate with RPU
++              is also required.
++              Otherwise, if user only uses the remoteproc driver to boot RPU
++              firmware, "ipi" is not required.
++ - tcm-pnode-id: TCM resources power nodes IDs which are used to request TCM
++                 resources for the remoteproc driver to access.
++ - rpu-pnode-id : RPU power node id which is used by the remoteproc driver
++                  to start RPU or shut it down.
++
++Optional properties:
++--------------------
++ - core_conf : R5 core configuration (valid string - split0 or split1 or
++               lock-step), default is lock-step.
++ - memory-region: memories regions for RPU executable and DMA memory.
++ - interrupts : Interrupt mapping for remoteproc IPI. It is required if the
++                user uses the remoteproc driver with the RPMsg kernel driver.
++ - interrupt-parent : Phandle for the interrupt controller. It is required if
++                      the user uses the remoteproc driver with the RPMsg kernel
++                      kernel driver.
++
++Example:
++--------
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		rproc_0_fw_reserved: rproc at 3ed000000 {
++			compatible = "rproc-prog-memory";
++			no-map;
++			reg = <0x0 0x3ed00000 0x0 0x40000>;
++		};
++		rproc_0_dma_reserved: rproc at 3ed400000 {
++			compatible = "shared-dma-pool";
++			no-map;
++			reg = <0x0 0x3ed40000 0x0 0x80000>;
++		};
++	};
++
++	firmware {
++		zynqmp_firmware: zynqmp-firmware {
++			compatible = "xlnx,zynqmp-firmware";
++			method = "smc";
++		};
++	};
++
++	zynqmp-r5-remoteproc at 0 {
++		compatible = "xlnx,zynqmp-r5-remoteproc-1.0";
++		reg = <0x0 0xFFE00000 0x0 0x10000>,
++			<0x0 0xFFE20000 0x0 0x10000>,
++			<0x0 0xff340000 0x0 0x100>;
++		reg-names = "tcm_a", "tcm_b", "ipi";
++		dma-ranges;
++		core_conf = "split0";
++		memory-region = <&rproc_0_fw_reserved>,
++				<&rproc_0_dma_reserved>;
++		tcm-pnode-id = <0xf>, <0x10>;
++		rpu-pnode-id = <0x7>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 29 4>;
++	} ;
 -- 
 2.7.4
