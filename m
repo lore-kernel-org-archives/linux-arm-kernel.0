@@ -1,75 +1,72 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 15 Aug 2018 17:11:33 -0700
-Subject: [PATCH 1/1] arm64: dts: Stingray: Adjust SMMU non-secure context
- interrupt
-In-Reply-To: <CAOA9gs3qHV9UazZKuxtgijpDVUJN18LkGxFAkv8=YMb8RepxHQ@mail.gmail.com>
-References: <1533632824-17436-1-git-send-email-jitendra.bhivare@broadcom.com>
- <77afc740-7fbb-7d6d-6a9a-594c5b09d30a@broadcom.com>
- <CAOA9gs3qHV9UazZKuxtgijpDVUJN18LkGxFAkv8=YMb8RepxHQ@mail.gmail.com>
-Message-ID: <b1ef8e46-34d1-23c4-52b6-424f40b132a6@gmail.com>
+Date: Wed, 15 Aug 2018 17:14:05 -0700
+Subject: [PATCH] gpio: brcmstb: allow 0 width GPIO banks
+In-Reply-To: <1534289517-1805-1-git-send-email-justinpopo6@gmail.com>
+References: <1534289517-1805-1-git-send-email-justinpopo6@gmail.com>
+Message-ID: <d52fd4f0-1589-86e5-9dfd-4748bdab9bde@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2018 04:20 AM, Jitendra Bhivare wrote:
-> Thanks Robin, Vivek commit should do. For older kernels will push that
-> commit.
+On 08/14/2018 04:31 PM, justinpopo6 at gmail.com wrote:
+> From: Justin Chen <justinpopo6@gmail.com>
+> 
+> Sometimes we have empty banks within the GPIO block. This commit allows
+> proper handling of 0 width GPIO banks. We handle 0 width GPIO banks by
+> incrementing the bank and number of GPIOs, but not initializing them.
+> This will mean a call into the non-existent GPIOs will return an error.
+> 
+> Also remove banks and GPIO information from the dev_info print. This
+> information is misleading since the incremented banks and gpio_base do
+> not reflect the actual GPIOs that got initialized. We leave this
+> information out since it is already printed with dev_dbg.
+> 
+> Signed-off-by: Justin Chen <justinpopo6@gmail.com>
+> ---
+>  drivers/gpio/gpio-brcmstb.c | 15 +++++++++++++--
+>  1 file changed, 13 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
+> index 16c7f9f..8658910 100644
+> --- a/drivers/gpio/gpio-brcmstb.c
+> +++ b/drivers/gpio/gpio-brcmstb.c
+> @@ -664,6 +664,18 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
+>  		struct brcmstb_gpio_bank *bank;
+>  		struct gpio_chip *gc;
+>  
+> +		/*
+> +		 * If bank_width is 0, then there is an empty bank in the
+> +		 * register block. Special handling for this case.
+> +		 */
+> +		if (bank_width == 0) {
+> +			dev_dbg(dev, "Width 0 found: Empty bank @ %d\n",
+> +					num_banks);
 
-Do you mean you are going to keep this patch downstream and apply it to
-the relevant kernel versions you maintain, or do you expect to resubmit
-this very patch with a Fixes: tag and include information as to which
-stable tree this should be applied to?
+Stylistic nit: you would want the second line to be aligned at the start
+of the opening parenthesis
 
-> 
-> On Tuesday, August 7, 2018, Ray Jui <ray.jui@broadcom.com
-> <mailto:ray.jui@broadcom.com>> wrote:
-> 
-> 
-> 
->     On 8/7/2018 2:07 AM, Jitendra Bhivare wrote:
-> 
->         From: Pramod Kumar <pramod.kumar@broadcom.com
->         <mailto:pramod.kumar@broadcom.com>>
-> 
->         One context bank has been reserved for secure master, CRMU.
->         hence need to remove context interrupt accordingly. Doing
->         the same in this patch.
-> 
-> 
->     I thought you need proper "Fixes" tag so this can be back ported to
->     older kernels.
-> 
-> 
->         Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com
->         <mailto:pramod.kumar@broadcom.com>>
->         Reviewed-by: Ray Jui <ray.jui@broadcom.com
->         <mailto:ray.jui@broadcom.com>>
->         Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com
->         <mailto:vikram.prakash@broadcom.com>>
->         ---
->         ? arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi | 3 +--
->         ? 1 file changed, 1 insertion(+), 2 deletions(-)
-> 
->         diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
->         b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
->         index b203152..7fcaf38 100644
->         --- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
->         +++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
->         @@ -244,8 +244,7 @@
->         ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?<GIC_SPI 770
->         IRQ_TYPE_LEVEL_HIGH>,
->         ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?<GIC_SPI 771
->         IRQ_TYPE_LEVEL_HIGH>,
->         ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?<GIC_SPI 772
->         IRQ_TYPE_LEVEL_HIGH>,
->         -? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? <GIC_SPI 773
->         IRQ_TYPE_LEVEL_HIGH>,
->         -? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? <GIC_SPI 774
->         IRQ_TYPE_LEVEL_HIGH>;
->         +? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? <GIC_SPI 773
->         IRQ_TYPE_LEVEL_HIGH>;
->         ? ? ? ? ? ? ? ? ? ? ? ? #iommu-cells = <2>;
->         ? ? ? ? ? ? ? ? };
->         ? ? ? ? };
+> +			num_banks++;
+> +			gpio_base += MAX_GPIO_PER_BANK;
+> +			continue;
+> +		}
+> +
+>  		bank = devm_kzalloc(dev, sizeof(*bank), GFP_KERNEL);
+>  		if (!bank) {
+>  			err = -ENOMEM;
+> @@ -740,8 +752,7 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
+>  			goto fail;
+>  	}
+>  
+> -	dev_info(dev, "Registered %d banks (GPIO(s): %d-%d)\n",
+> -			num_banks, priv->gpio_base, gpio_base - 1);
+> +	dev_info(dev, "Brcmstb GPIO registered\n");
+
+Not sure if there much value in preserving that message anymore, if the
+controller is not there, nothing will show up in /sys/class/gpio, so you
+would pretty quickly find out that something went wrong?
+
+>  
+>  	if (priv->parent_wake_irq && need_wakeup_event)
+>  		pm_wakeup_event(dev, 0);
 > 
 
 
