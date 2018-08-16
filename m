@@ -1,8 +1,8 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Thu, 16 Aug 2018 13:57:49 +0200
+Date: Thu, 16 Aug 2018 13:58:05 +0200
 Subject: Patch "x86/mm: Disable ioremap free page handling on x86-PAE" has
- been added to the 4.4-stable tree
-Message-ID: <1534420669170195@kroah.com>
+ been added to the 4.9-stable tree
+Message-ID: <1534420685211199@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,12 +11,12 @@ This is a note to let you know that I've just added the patch titled
 
     x86/mm: Disable ioremap free page handling on x86-PAE
 
-to the 4.4-stable tree which can be found at:
+to the 4.9-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
      x86-mm-disable-ioremap-free-page-handling-on-x86-pae.patch
-and it can be found in the queue-4.4 subdirectory.
+and it can be found in the queue-4.9 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
@@ -65,7 +65,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 --- a/arch/x86/mm/pgtable.c
 +++ b/arch/x86/mm/pgtable.c
-@@ -676,6 +676,7 @@ int pmd_clear_huge(pmd_t *pmd)
+@@ -653,6 +653,7 @@ int pmd_clear_huge(pmd_t *pmd)
  	return 0;
  }
  
@@ -73,7 +73,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  /**
   * pud_free_pmd_page - Clear pud entry and free pmd page.
   * @pud: Pointer to a PUD.
-@@ -723,4 +724,22 @@ int pmd_free_pte_page(pmd_t *pmd)
+@@ -700,4 +701,22 @@ int pmd_free_pte_page(pmd_t *pmd)
  
  	return 1;
  }
@@ -100,4 +100,4 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 Patches currently in stable-queue which might be from toshi.kani at hpe.com are
 
-queue-4.4/x86-mm-disable-ioremap-free-page-handling-on-x86-pae.patch
+queue-4.9/x86-mm-disable-ioremap-free-page-handling-on-x86-pae.patch
