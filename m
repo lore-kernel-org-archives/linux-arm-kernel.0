@@ -1,56 +1,42 @@
-From: baicar.tyler@gmail.com (Tyler Baicar)
-Date: Thu, 16 Aug 2018 17:24:29 -0400
-Subject: [RFC PATCH] edac: armv8_edac: Add ARMv8 EDAC driver
-In-Reply-To: <20180816073559.GA2111@nazgul.tnic>
-References: <1533242990-12828-1-git-send-email-tbaicar@codeaurora.org>
- <20180816073559.GA2111@nazgul.tnic>
-Message-ID: <CABo9ajBeXnuS4GQep9GTP8zeQrYENXtY6Pp7FHgbTbf5wFD4ag@mail.gmail.com>
+From: Pavel.Tatashin@microsoft.com (Pasha Tatashin)
+Date: Thu, 16 Aug 2018 22:54:38 +0000
+Subject: [RESEND PATCH v10 2/6] mm: page_alloc: remain
+ memblock_next_valid_pfn() on arm/arm64
+In-Reply-To: <1530867675-9018-3-git-send-email-hejianet@gmail.com>
+References: <1530867675-9018-1-git-send-email-hejianet@gmail.com>
+ <1530867675-9018-3-git-send-email-hejianet@gmail.com>
+Message-ID: <20180816225437.5zkchip422esdqwh@xakep.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 16, 2018 at 3:35 AM, Borislav Petkov <bp@alien8.de> wrote:
->
-> Remember to always run your stuff through checkpatch to catch legit issues:
->
+On 18-07-06 17:01:11, Jia He wrote:
+> From: Jia He <jia.he@hxt-semitech.com>
+> 
+> Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
+> where possible") optimized the loop in memmap_init_zone(). But it causes
+> possible panic bug. So Daniel Vacek reverted it later.
+> 
+> But as suggested by Daniel Vacek, it is fine to using memblock to skip
+> gaps and finding next valid frame with CONFIG_HAVE_ARCH_PFN_VALID.
+> Daniel said:
+> "On arm and arm64, memblock is used by default. But generic version of
+> pfn_valid() is based on mem sections and memblock_next_valid_pfn() does
+> not always return the next valid one but skips more resulting in some
+> valid frames to be skipped (as if they were invalid). And that's why
+> kernel was eventually crashing on some !arm machines."
+> 
+> About the performance consideration:
+> As said by James in b92df1de5,
+> "I have tested this patch on a virtual model of a Samurai CPU
+> with a sparse memory map.  The kernel boot time drops from 109 to
+> 62 seconds."
+> 
+> Thus it would be better if we remain memblock_next_valid_pfn on arm/arm64.
+> 
+> Suggested-by: Daniel Vacek <neelx@redhat.com>
+> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
 
-Sorry about that, I will clean those up!
+The version of this patch in linux-next has few fixes, I reviewed that one
+looks good to me.
 
->
->> diff --git a/arch/arm64/kernel/ras.c b/arch/arm64/kernel/ras.c
->> new file mode 100644
->> index 0000000..2cb0265
->> --- /dev/null
->> +++ b/arch/arm64/kernel/ras.c
->> @@ -731,6 +732,9 @@ asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
->>  {
->>       nmi_enter();
->>
->> +     if (IS_ENABLED(CONFIG_EDAC_ARMV8))
->> +             armv8_edac_report_error();
->
-> I would strongly advise against that - calling driver code from arch
-> core code. You've made armv8_edac bool as it cannot be a module because
-> of it, which is silly. I was lucky that we were able to remove that ugly
-> dependency from x86 traps code. Hint: use a notifier and this way the
-> edac driver can be a module too.
->
-> And looking at armv8_edac.c - this is making the whole error reporting
-> unnecessarily complicated. Why? Why aren't you doing everything in
-> ras.c?!
->
-> I don't see the need for adding anything to drivers/edac/ *at* *all*!
->
-
-I agree with this for now, but I wanted to tie it into edac from the start since
-this driver will have extended capabilities in the future. This
-current patch only
-deals with the RAS extension nodes accessible by the CPU SRs; however,
-there will be memory mapped error nodes for things like platform memory.
-These will then need to go through the proper software intervention similar
-to the handling in other EDAC drivers (e.g. ghes_edac_report_mem_error).
-For these we will probably also like to tie them into the DIMM counters that
-are exposed through the EDAC sysfs nodes. That was the main motivation
-for creating this as an armv8_edac driver :)
-
-Thanks,
-Tyler
+Reviewed-by: Pavel Tatashin <pavel.tatashin@microsoft.com>
