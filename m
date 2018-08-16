@@ -1,10 +1,10 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 16 Aug 2018 20:41:48 +0200
-Subject: [PATCH 4.4 01/13] x86/mm: Disable ioremap free page handling on
- x86-PAE
+Date: Thu, 16 Aug 2018 20:42:00 +0200
+Subject: [PATCH 4.4 13/13] x86/mm: Add TLB purge to free pmd/pte page
+ interfaces
 In-Reply-To: <20180816171628.554317013@linuxfoundation.org>
 References: <20180816171628.554317013@linuxfoundation.org>
-Message-ID: <20180816171628.612166526@linuxfoundation.org>
+Message-ID: <20180816171629.211063632@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,20 +14,29 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Toshi Kani <toshi.kani@hpe.com>
 
-commit f967db0b9ed44ec3057a28f3b28efc51df51b835 upstream.
+commit 5e0fb5df2ee871b841f96f9cb6a7f2784e96aa4e upstream.
 
-ioremap() supports pmd mappings on x86-PAE.  However, kernel's pmd
-tables are not shared among processes on x86-PAE.  Therefore, any
-update to sync'd pmd entries need re-syncing.  Freeing a pte page
-also leads to a vmalloc fault and hits the BUG_ON in vmalloc_sync_one().
+ioremap() calls pud_free_pmd_page() / pmd_free_pte_page() when it creates
+a pud / pmd map.  The following preconditions are met at their entry.
+ - All pte entries for a target pud/pmd address range have been cleared.
+ - System-wide TLB purges have been peformed for a target pud/pmd address
+   range.
 
-Disable free page handling on x86-PAE.  pud_free_pmd_page() and
-pmd_free_pte_page() simply return 0 if a given pud/pmd entry is present.
-This assures that ioremap() does not update sync'd pmd entries at the
-cost of falling back to pte mappings.
+The preconditions assure that there is no stale TLB entry for the range.
+Speculation may not cache TLB entries since it requires all levels of page
+entries, including ptes, to have P & A-bits set for an associated address.
+However, speculation may cache pud/pmd entries (paging-structure caches)
+when they have P-bit set.
+
+Add a system-wide TLB purge (INVLPG) to a single page after clearing
+pud/pmd entry's P-bit.
+
+SDM 4.10.4.1, Operation that Invalidate TLBs and Paging-Structure Caches,
+states that:
+  INVLPG invalidates all paging-structure caches associated with the
+  current PCID regardless of the liner addresses to which they correspond.
 
 Fixes: 28ee90fe6048 ("x86/mm: implement free pmd/pte page interfaces")
-Reported-by: Joerg Roedel <joro@8bytes.org>
 Signed-off-by: Toshi Kani <toshi.kani@hpe.com>
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Cc: mhocko at suse.com
@@ -36,48 +45,89 @@ Cc: hpa at zytor.com
 Cc: cpandya at codeaurora.org
 Cc: linux-mm at kvack.org
 Cc: linux-arm-kernel at lists.infradead.org
+Cc: Joerg Roedel <joro@8bytes.org>
 Cc: stable at vger.kernel.org
 Cc: Andrew Morton <akpm@linux-foundation.org>
 Cc: Michal Hocko <mhocko@suse.com>
 Cc: "H. Peter Anvin" <hpa@zytor.com>
 Cc: <stable@vger.kernel.org>
-Link: https://lkml.kernel.org/r/20180627141348.21777-2-toshi.kani at hpe.com
+Link: https://lkml.kernel.org/r/20180627141348.21777-4-toshi.kani at hpe.com
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- arch/x86/mm/pgtable.c |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/x86/mm/pgtable.c |   38 +++++++++++++++++++++++++++++++-------
+ 1 file changed, 31 insertions(+), 7 deletions(-)
 
 --- a/arch/x86/mm/pgtable.c
 +++ b/arch/x86/mm/pgtable.c
-@@ -676,6 +676,7 @@ int pmd_clear_huge(pmd_t *pmd)
- 	return 0;
- }
- 
-+#ifdef CONFIG_X86_64
- /**
-  * pud_free_pmd_page - Clear pud entry and free pmd page.
+@@ -682,24 +682,44 @@ int pmd_clear_huge(pmd_t *pmd)
   * @pud: Pointer to a PUD.
-@@ -723,4 +724,22 @@ int pmd_free_pte_page(pmd_t *pmd)
+  * @addr: Virtual address associated with pud.
+  *
+- * Context: The pud range has been unmaped and TLB purged.
++ * Context: The pud range has been unmapped and TLB purged.
+  * Return: 1 if clearing the entry succeeded. 0 otherwise.
++ *
++ * NOTE: Callers must allow a single page allocation.
+  */
+ int pud_free_pmd_page(pud_t *pud, unsigned long addr)
+ {
+-	pmd_t *pmd;
++	pmd_t *pmd, *pmd_sv;
++	pte_t *pte;
+ 	int i;
+ 
+ 	if (pud_none(*pud))
+ 		return 1;
+ 
+ 	pmd = (pmd_t *)pud_page_vaddr(*pud);
+-
+-	for (i = 0; i < PTRS_PER_PMD; i++)
+-		if (!pmd_free_pte_page(&pmd[i], addr + (i * PMD_SIZE)))
+-			return 0;
++	pmd_sv = (pmd_t *)__get_free_page(GFP_KERNEL);
++	if (!pmd_sv)
++		return 0;
++
++	for (i = 0; i < PTRS_PER_PMD; i++) {
++		pmd_sv[i] = pmd[i];
++		if (!pmd_none(pmd[i]))
++			pmd_clear(&pmd[i]);
++	}
+ 
+ 	pud_clear(pud);
++
++	/* INVLPG to clear all paging-structure caches */
++	flush_tlb_kernel_range(addr, addr + PAGE_SIZE-1);
++
++	for (i = 0; i < PTRS_PER_PMD; i++) {
++		if (!pmd_none(pmd_sv[i])) {
++			pte = (pte_t *)pmd_page_vaddr(pmd_sv[i]);
++			free_page((unsigned long)pte);
++		}
++	}
++
++	free_page((unsigned long)pmd_sv);
+ 	free_page((unsigned long)pmd);
  
  	return 1;
- }
+@@ -710,7 +730,7 @@ int pud_free_pmd_page(pud_t *pud, unsign
+  * @pmd: Pointer to a PMD.
+  * @addr: Virtual address associated with pmd.
+  *
+- * Context: The pmd range has been unmaped and TLB purged.
++ * Context: The pmd range has been unmapped and TLB purged.
+  * Return: 1 if clearing the entry succeeded. 0 otherwise.
+  */
+ int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
+@@ -722,6 +742,10 @@ int pmd_free_pte_page(pmd_t *pmd, unsign
+ 
+ 	pte = (pte_t *)pmd_page_vaddr(*pmd);
+ 	pmd_clear(pmd);
 +
-+#else /* !CONFIG_X86_64 */
++	/* INVLPG to clear all paging-structure caches */
++	flush_tlb_kernel_range(addr, addr + PAGE_SIZE-1);
 +
-+int pud_free_pmd_page(pud_t *pud)
-+{
-+	return pud_none(*pud);
-+}
-+
-+/*
-+ * Disable free page handling on x86-PAE. This assures that ioremap()
-+ * does not update sync'd pmd entries. See vmalloc_sync_one().
-+ */
-+int pmd_free_pte_page(pmd_t *pmd)
-+{
-+	return pmd_none(*pmd);
-+}
-+
-+#endif /* CONFIG_X86_64 */
- #endif	/* CONFIG_HAVE_ARCH_HUGE_VMAP */
+ 	free_page((unsigned long)pte);
+ 
+ 	return 1;
