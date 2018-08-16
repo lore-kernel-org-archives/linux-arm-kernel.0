@@ -1,65 +1,69 @@
 From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 16 Aug 2018 16:46:14 +0100
-Subject: [PATCH 06/13] coresight: etb10: Handle errors enabling the device
-In-Reply-To: <20180815193807.GB17954@xps15>
+Date: Thu, 16 Aug 2018 16:47:30 +0100
+Subject: [PATCH 08/13] coresight: Add support for CLAIM tag protocol
+In-Reply-To: <20180814232053.GA5131@xps15>
 References: <1533562915-21558-1-git-send-email-suzuki.poulose@arm.com>
- <1533562915-21558-7-git-send-email-suzuki.poulose@arm.com>
- <20180815193807.GB17954@xps15>
-Message-ID: <b62fec35-ca6b-acf3-4201-0a2776672798@arm.com>
+ <1533562915-21558-9-git-send-email-suzuki.poulose@arm.com>
+ <20180814232053.GA5131@xps15>
+Message-ID: <4aff79b4-593e-a19b-5e3f-de2a6d5bacb7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/08/18 20:38, Mathieu Poirier wrote:
-> On Mon, Aug 06, 2018 at 02:41:48PM +0100, Suzuki K Poulose wrote:
->> Prepare the etb10 driver to return errors in enabling
->> the device.
+On 15/08/18 00:20, Mathieu Poirier wrote:
+> On Mon, Aug 06, 2018 at 02:41:50PM +0100, Suzuki K Poulose wrote:
+>> Add support for the CLAIM tag protocol for negotiating the
+>> device ownership with other agents trying to use the coresight
+>> component (internal vs. external). The Coresight architecture
+>> specifies CLAIM tags (managed via CLAIMSET CLAIMCLR registers)
+>> to negotiate the ownership of the device. PSCI recommends the
+>> reservation of the bits in CLAIM tags for self-hosted and external
+>> debug use. This patch implements the protocol for claiming
+>> the devices before they are actually used.
+> 
+> I think the first paragraph of the cover letter (minus the reference to the
+> documentation since you've included it below) would be perfect instead of the
+> above.
+> 
 >>
 >> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 >> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 >> ---
->>   drivers/hwtracing/coresight/coresight-etb10.c | 18 +++++++++++++-----
->>   1 file changed, 13 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
->> index 9fd77fd..37d2c88 100644
->> --- a/drivers/hwtracing/coresight/coresight-etb10.c
->> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
->> @@ -107,7 +107,7 @@ static unsigned int etb_get_buffer_depth(struct etb_drvdata *drvdata)
->>   	return depth;
->>   }
->>   
->> -static void etb_enable_hw(struct etb_drvdata *drvdata)
->> +static void __etb_enable_hw(struct etb_drvdata *drvdata)
->>   {
->>   	int i;
->>   	u32 depth;
->> @@ -135,6 +135,12 @@ static void etb_enable_hw(struct etb_drvdata *drvdata)
->>   	CS_LOCK(drvdata->base);
->>   }
->>   
->> +static int etb_enable_hw(struct etb_drvdata *drvdata)
+>>   drivers/hwtracing/coresight/coresight-priv.h |  7 +++
+>>   drivers/hwtracing/coresight/coresight.c      | 85 ++++++++++++++++++++++++++++
+>>   include/linux/coresight.h                    | 20 +++++++
+>>   3 files changed, 112 insertions(+)
+
+>> +void coresight_disclaim_device_unlocked(void __iomem *base)
 >> +{
->> +	__etb_enable_hw(drvdata);
+>> +
+>> +	if (coresight_is_claimed_self_hosted(base))
+>> +		coresight_clear_claim_tags(base);
+>> +	else
+>> +		/*
+>> +		 * Either we or the external agent doesn't follow
+>> +		 * the protocol.
+>> +		 */
+>> +		WARN_ON_ONCE(1);
+> 
+> When writing "... or the external agent doesn't follow the protocol", I deduce
+> that an external agent would have trampled our claim tag.  I think this needs
+> to be said explicitly in the comment.
+> 
+
+>> +static inline int coresight_claim_device_unlocked(void __iomem *base)
+>> +{
 >> +	return 0;
 >> +}
 >> +
->>   static int etb_enable(struct coresight_device *csdev, u32 mode, void *data)
->>   {
->>   	int ret = 0;
->> @@ -150,7 +156,7 @@ static int etb_enable(struct coresight_device *csdev, u32 mode, void *data)
->>   	if (mode == CS_MODE_PERF) {
->>   		ret = etb_set_buffer(csdev, (struct perf_output_handle *)data);
->>   		if (ret)
->> -			goto out;
->> +			return ret;
->>   	}
->>   
->>   	val = local_cmpxchg(&drvdata->mode,
->> @@ -172,12 +178,14 @@ static int etb_enable(struct coresight_device *csdev, u32 mode, void *data)
->>   		goto out;
+>> +static inline int coresight_claim_device(void __iomem *base)
+>> +{
+>> +	return 0;
+>> +}
 > 
-> Leaving this here doesn't compile when 'out' is removed below.
+> Returning 0 would give a caller the impression the operation has succeeded when
+> in fact it didn't.  I think we should return an error code here.
 
-I will fix it for arm32. Sorry about that.
+
+Agreed on all points, will respin.
 
 Suzuki
