@@ -1,8 +1,8 @@
 From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Thu, 16 Aug 2018 19:01:21 +0200
+Date: Thu, 16 Aug 2018 19:01:39 +0200
 Subject: Patch "x86/mm: Add TLB purge to free pmd/pte page interfaces" has
- been added to the 4.14-stable tree
-Message-ID: <1534438881213152@kroah.com>
+ been added to the 4.17-stable tree
+Message-ID: <153443889914125@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,12 +11,12 @@ This is a note to let you know that I've just added the patch titled
 
     x86/mm: Add TLB purge to free pmd/pte page interfaces
 
-to the 4.14-stable tree which can be found at:
+to the 4.17-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
      x86-mm-add-tlb-purge-to-free-pmd-pte-page-interfaces.patch
-and it can be found in the queue-4.14 subdirectory.
+and it can be found in the queue-4.17 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
@@ -75,7 +75,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 --- a/arch/x86/mm/pgtable.c
 +++ b/arch/x86/mm/pgtable.c
-@@ -718,24 +718,44 @@ int pmd_clear_huge(pmd_t *pmd)
+@@ -721,24 +721,44 @@ int pmd_clear_huge(pmd_t *pmd)
   * @pud: Pointer to a PUD.
   * @addr: Virtual address associated with pud.
   *
@@ -126,7 +126,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  	free_page((unsigned long)pmd);
  
  	return 1;
-@@ -746,7 +766,7 @@ int pud_free_pmd_page(pud_t *pud, unsign
+@@ -749,7 +769,7 @@ int pud_free_pmd_page(pud_t *pud, unsign
   * @pmd: Pointer to a PMD.
   * @addr: Virtual address associated with pmd.
   *
@@ -135,7 +135,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
   * Return: 1 if clearing the entry succeeded. 0 otherwise.
   */
  int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
-@@ -758,6 +778,10 @@ int pmd_free_pte_page(pmd_t *pmd, unsign
+@@ -761,6 +781,10 @@ int pmd_free_pte_page(pmd_t *pmd, unsign
  
  	pte = (pte_t *)pmd_page_vaddr(*pmd);
  	pmd_clear(pmd);
@@ -150,6 +150,6 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 Patches currently in stable-queue which might be from toshi.kani@hpe.com are
 
-queue-4.14/x86-mm-disable-ioremap-free-page-handling-on-x86-pae.patch
-queue-4.14/ioremap-update-pgtable-free-interfaces-with-addr.patch
-queue-4.14/x86-mm-add-tlb-purge-to-free-pmd-pte-page-interfaces.patch
+queue-4.17/x86-mm-disable-ioremap-free-page-handling-on-x86-pae.patch
+queue-4.17/ioremap-update-pgtable-free-interfaces-with-addr.patch
+queue-4.17/x86-mm-add-tlb-purge-to-free-pmd-pte-page-interfaces.patch
