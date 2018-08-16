@@ -1,62 +1,215 @@
-From: leo.yan@linaro.org (leo.yan at linaro.org)
-Date: Thu, 16 Aug 2018 10:25:06 +0800
-Subject: AArch64 boot failure on Hikey960 on latest master after "arm64:
- insn: Don't fallback on nosync path for general insn patching"
-In-Reply-To: <462f8ae6-9948-a8e5-7504-623d40344336@iki.fi>
-References: <462f8ae6-9948-a8e5-7504-623d40344336@iki.fi>
-Message-ID: <20180816022506.GB13920@leoy-ThinkPad-X240s>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 15 Aug 2018 22:59:55 -0400
+Subject: [RFC PATCH 1/3] tracing: Add support for logging data to
+ uncached buffer
+In-Reply-To: <6b62fd3a5abf1baf48a07ba8a31a92d17f501f77.1533211509.git.saiprakash.ranjan@codeaurora.org>
+References: <cover.1533211508.git.saiprakash.ranjan@codeaurora.org>
+ <6b62fd3a5abf1baf48a07ba8a31a92d17f501f77.1533211509.git.saiprakash.ranjan@codeaurora.org>
+Message-ID: <20180815225955.38d21271@vmware.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 16, 2018 at 02:38:51AM +0300, Tuomas Tynkkynen wrote:
-> Hello,
-> 
-> Booting Linus's master of today with the usual arm64 defconfig fails for
-> me on the Hikey960 board. I've bisected it down to:
-> 
-> commit 693350a7998018391852c48f68956cf0f855b2b9 (HEAD, refs/bisect/bad)
-> Author: Will Deacon <will.deacon@arm.com>
-> Date:   Tue Jun 19 17:55:28 2018 +0100
-> 
->     arm64: insn: Don't fallback on nosync path for general insn patching
-> 
-> Here's the boot log with earlycon enabled after which the boot hangs:
 
-[...]
+Sorry for the late reply, I actually wrote this email over a week ago,
+but never hit send. And the email was pushed back behind other
+windows. :-/
 
-> [    0.207583] CPU features: SANITY CHECK: Unexpected variation in SYS_ID_AA64MMFR0_EL1. Boot CPU: 0x00000000001122, CPU4: 0x00000000101122
-> [    0.207614] CPU features: Unsupported CPU feature variation detected.
-> [    0.207643] BUG: scheduling while atomic: swapper/4/0/0x00000002
-> [    0.207645] Modules linked in:
-> [    0.207652] CPU: 4 PID: 0 Comm: swapper/4 Tainted: G S                4.18.0-rc3-00017-g693350a79980 #17
-> [    0.207654] Hardware name: HiKey960 (DT)
-> [    0.207656] Call trace:
-> [    0.207670]  dump_backtrace+0x0/0x150
-> [    0.207674]  show_stack+0x14/0x20
-> [    0.207680]  dump_stack+0x90/0xbc
-> [    0.207685]  __schedule_bug+0x58/0x70
-> [    0.207690]  __schedule+0x51c/0x5b0
-> [    0.207693]  schedule+0x38/0xa0
-> [    0.207694]  schedule_timeout+0x23c/0x340
-> [    0.207698]  wait_for_common+0x140/0x170
-> [    0.207701]  wait_for_completion+0x14/0x20
-> [    0.207704]  __stop_cpus+0x68/0xa0
-> [    0.207706]  stop_cpus+0x40/0x60
-> [    0.207708]  stop_machine_cpuslocked+0xd4/0xf0
-> [    0.207711]  aarch64_insn_patch_text+0x48/0x70
-> [    0.207715]  arch_jump_label_transform+0x48/0x80
-> [    0.207718]  __jump_label_update+0xa4/0xf0
-> [    0.207721]  jump_label_update+0xe8/0x120
-> [    0.207724]  static_key_enable_cpuslocked+0x7c/0xc0
-> [    0.207730]  arch_timer_check_ool_workaround+0x190/0x1f0
-> [    0.207732]  arch_timer_starting_cpu+0xd8/0x290
-> [    0.207737]  cpuhp_invoke_callback+0x90/0x220
-> [    0.207739]  notify_cpu_starting+0x68/0xa0
-> [    0.207742]  secondary_start_kernel+0xe8/0x160
 
->From this part log, it's quite likely related with CPU4 (CA73) with
-arch timer workaround ERRATUM_858921, before I reported another
-similiar lockup issue: https://lkml.org/lkml/2017/7/24/346.
+On Fri,  3 Aug 2018 19:58:42 +0530
+Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org> wrote:
 
-Thanks,
-Leo Yan
+> diff --git a/kernel/trace/trace_rtb.c b/kernel/trace/trace_rtb.c
+> new file mode 100644
+> index 000000000000..e8c24db71a2d
+> --- /dev/null
+> +++ b/kernel/trace/trace_rtb.c
+> @@ -0,0 +1,160 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (C) 2018 The Linux Foundation. All rights reserved.
+> + */
+> +#include <linux/atomic.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/export.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/rtb.h>
+> +#include <linux/sched/clock.h>
+> +
+> +static struct platform_device *rtb_dev;
+> +static atomic_t rtb_idx;
+> +
+> +struct rtb_state {
+> +	struct rtb_layout *rtb;
+> +	phys_addr_t phys;
+> +	unsigned int nentries;
+> +	unsigned int size;
+> +	int enabled;
+> +};
+> +
+> +static struct rtb_state rtb = {
+> +	.enabled = 0,
+> +};
+
+No need for the initialization, you could just have:
+
+static struct rtb_state rtb;
+
+And it will be initialized to all zeros. Or did you do that to document
+that it is not enabled at boot?
+
+> +
+> +static int rtb_panic_notifier(struct notifier_block *this,
+> +					unsigned long event, void *ptr)
+> +{
+> +	rtb.enabled = 0;
+> +	return NOTIFY_DONE;
+> +}
+> +
+> +static struct notifier_block rtb_panic_blk = {
+> +	.notifier_call  = rtb_panic_notifier,
+> +	.priority = INT_MAX,
+> +};
+> +
+> +static void rtb_write_type(const char *log_type,
+> +			struct rtb_layout *start)
+> +{
+> +	start->log_type = log_type;
+> +}
+> +
+> +static void rtb_write_caller(u64 caller, struct rtb_layout *start)
+> +{
+> +	start->caller = caller;
+> +}
+> +
+> +static void rtb_write_data(u64 data, struct rtb_layout *start)
+> +{
+> +	start->data = data;
+> +}
+> +
+> +static void rtb_write_timestamp(struct rtb_layout *start)
+> +{
+> +	start->timestamp = sched_clock();
+> +}
+
+Why have the above static functions? They are not very helpful, and
+appear to be actually confusing. They are used once.
+
+> +
+> +static void uncached_logk_pc_idx(const char *log_type, u64 caller,
+> +				u64 data, int idx)
+> +{
+> +	struct rtb_layout *start;
+> +
+> +	start = &rtb.rtb[idx & (rtb.nentries - 1)];
+> +
+> +	rtb_write_type(log_type, start);
+> +	rtb_write_caller(caller, start);
+> +	rtb_write_data(data, start);
+> +	rtb_write_timestamp(start);
+
+How is the above better than:
+
+	start->log_type = log_type;
+	start->caller = caller;
+	start->data = data;
+ 	start->timestamp = sched_clock();
+
+??
+
+> +	/* Make sure data is written */
+> +	mb();
+> +}
+> +
+> +static int rtb_get_idx(void)
+> +{
+> +	int i, offset;
+> +
+> +	i = atomic_inc_return(&rtb_idx);
+> +	i--;
+> +
+> +	/* Check if index has wrapped around */
+> +	offset = (i & (rtb.nentries - 1)) -
+> +		 ((i - 1) & (rtb.nentries - 1));
+> +	if (offset < 0) {
+> +		i = atomic_inc_return(&rtb_idx);
+> +		i--;
+> +	}
+> +
+> +	return i;
+> +}
+> +
+> +noinline void notrace uncached_logk(const char *log_type, void *data)
+
+BTW, all files in this directory have their functions notrace by
+default.
+
+-- Steve
+
+
+> +{
+> +	int i;
+> +
+> +	if (!rtb.enabled)
+> +		return;
+> +
+> +	i = rtb_get_idx();
+> +	uncached_logk_pc_idx(log_type, (u64)(__builtin_return_address(0)),
+> +				(u64)(data), i);
+> +}
+> +EXPORT_SYMBOL(uncached_logk);
+> +
+> +int rtb_init(void)
+> +{
+> +	struct device_node *np;
+> +	u32 size;
+> +	int ret;
+> +
+> +	np = of_find_node_by_name(NULL, "ramoops");
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	ret = of_property_read_u32(np, "rtb-size", &size);
+> +	if (ret) {
+> +		of_node_put(np);
+> +		return ret;
+> +	}
+> +
+> +	rtb.size = size;
+> +
+> +	/* Create a dummy platform device to use dma api */
+> +	rtb_dev = platform_device_register_simple("rtb", -1, NULL, 0);
+> +	if (IS_ERR(rtb_dev))
+> +		return PTR_ERR(rtb_dev);
+> +
+> +	/*
+> +	 * The device is a dummy, so arch_setup_dma_ops
+> +	 * is not called, thus leaving the device with dummy DMA ops
+> +	 * which returns null in case of arm64.
+> +	 */
+> +	of_dma_configure(&rtb_dev->dev, NULL, true);
+> +	rtb.rtb = dma_alloc_coherent(&rtb_dev->dev, rtb.size,
+> +					&rtb.phys, GFP_KERNEL);
+> +	if (!rtb.rtb)
+> +		return -ENOMEM;
+> +
+> +	rtb.nentries = rtb.size / sizeof(struct rtb_layout);
+> +	/* Round this down to a power of 2 */
+> +	rtb.nentries = __rounddown_pow_of_two(rtb.nentries);
+> +
+> +	memset(rtb.rtb, 0, rtb.size);
+> +	atomic_set(&rtb_idx, 0);
+> +
+> +	atomic_notifier_chain_register(&panic_notifier_list,
+> +						&rtb_panic_blk);
+> +	rtb.enabled = 1;
+> +	return 0;
+> +}
+> +
+> +void rtb_exit(void)
+> +{
+> +	dma_free_coherent(&rtb_dev->dev, rtb.size, rtb.rtb, rtb.phys);
+> +	platform_device_unregister(rtb_dev);
+> +}
