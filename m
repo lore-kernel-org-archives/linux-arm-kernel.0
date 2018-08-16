@@ -1,103 +1,168 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Thu, 16 Aug 2018 13:58:05 +0200
-Subject: Patch "x86/mm: Disable ioremap free page handling on x86-PAE" has
- been added to the 4.9-stable tree
-Message-ID: <1534420685211199@kroah.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Thu, 16 Aug 2018 14:52:41 +0200
+Subject: [RESEND PATCH v5 2/3] dt-bindings: display: atmel: optional
+ video-interface of endpoints
+In-Reply-To: <20180803085143.GC4528@w540>
+References: <20180803072308.14962-1-peda@axentia.se>
+ <20180803072308.14962-3-peda@axentia.se> <20180803081128.GA4528@w540>
+ <6fe3e84e-bd9d-0894-df8b-1b40c0f9477d@axentia.se>
+ <20180803085143.GC4528@w540>
+Message-ID: <061a99d5-4fe6-795c-7e91-cf7127fb8472@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2018-08-03 10:51, jacopo mondi wrote:
+> On Fri, Aug 03, 2018 at 10:40:02AM +0200, Peter Rosin wrote:
+>> On 2018-08-03 10:11, jacopo mondi wrote:
+>>> Hi Peter!
+>>>
+>>> On Fri, Aug 03, 2018 at 09:23:07AM +0200, Peter Rosin wrote:
+>>>> With bus-type/bus-width properties in the endpoint nodes, the video-
+>>>> interface of the connection can be specified for cases where the
+>>>> heuristic fails to select the correct output mode. This can happen
+>>>> e.g. if not all RGB pins are routed on the PCB; the driver has no
+>>>> way of knowing this, and needs to be told explicitly.
+>>>>
+>>>> This is critical for the devices that have the "conflicting output
+>>>> formats" issue (SAM9N12, SAM9X5, SAMA5D3), since the most significant
+>>>> RGB bits move around depending on the selected output mode. For
+>>>> devices that do not have the "conflicting output formats" issue
+>>>> (SAMA5D2, SAMA5D4), this is completely irrelevant.
+>>>>
+>>>> Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
+>>>> Reviewed-by: Rob Herring <robh@kernel.org>
+>>>> Signed-off-by: Peter Rosin <peda@axentia.se>
+>>>> ---
+>>>>  .../devicetree/bindings/display/atmel/hlcdc-dc.txt | 26 ++++++++++++++++++++++
+>>>>  1 file changed, 26 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
+>>>> index 82f2acb3d374..9de434a8f523 100644
+>>>> --- a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
+>>>> +++ b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
+>>>> @@ -15,6 +15,14 @@ Required children nodes:
+>>>>   to external devices using the OF graph reprensentation (see ../graph.txt).
+>>>>   At least one port node is required.
+>>>>
+>>>> +Optional properties in grandchild nodes:
+>>>> + Any endpoint grandchild node may specify a desired video interface
+>>>> + according to ../../media/video-interfaces.txt, specifically
+>>>> + - bus-type: must be <0>.
+>>>
+>>> Is there any value in specifying this, if it has a fixed value to
+>>> "autodetect"? I understand it's optional, so if nobody else objects,
+>>> feels free to keep it there.
+>>
+>> That's just how media/video-interfaces.txt works.
+>>
+>> bus-type 0 means that other properties describe the bus type. In this
+>> case bus-width is specified, so that means a parallel bus. But bus-width
+>> has no meaning (or may not have) if bus-type is non-zero. But checking
+>> that bus-type for zero in the code seemed like overkill to me since the
+>> driver already knows that it is a parallel bus...
+>>
+> 
+> Yeah, I felt like pointing that out since you're not cheking for its value,
+> and that property is only used by v4l2-fwnode to handle some
+> not-that-used-anymore bus as CCP2 is.
+> 
+>> TL;DR I'd like to keep it.
+>>
+> 
+> Fine with me then.
+> 
+>>>
+>>>> + - bus-width: recognized values are <12>, <16>, <18> and <24>, and
+>>>> +   override any output mode selection heuristic, forcing "rgb444",
+>>>> +   "rgb565", "rgb666" and "rgb888" respectively.
+>>>> +
+>>>>  Example:
+>>>>
+>>>>  	hlcdc: hlcdc at f0030000 {
+>>>> @@ -50,3 +58,21 @@ Example:
+>>>>  			#pwm-cells = <3>;
+>>>>  		};
+>>>>  	};
+>>>> +
+>>>
+>>> Two blank lines here.
+>>>
+>>>> +
+>>>> +Example 2: With a video interface override to force rgb565; as above
+>>>> +but with these changes/additions:
+>>>> +
+>>>> +	&hlcdc {
+>>>> +		hlcdc-display-controller {
+>>>> +			pinctrl-names = "default";
+>>>> +			pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb565>;
+>>>> +
+>>>> +			port at 0 {
+>>>
+>>> The node has a unit address specified, you're missing a reg = <0>
+>>> property (no big deal, it's an example, but the other one has it)
+>>>
+>>>> +				hlcdc_panel_output: endpoint at 0 {
+>>>
+>>> Missing reg here too.
+>>
+>> I'll fix those (I think they appeared for the original example after I
+>> wrote the patch).
+>>
+> 
+> Ok, then please consider also describing the port at 0 node cell sizes too
+> since it has a child endpoint node.
 
-This is a note to let you know that I've just added the patch titled
+Ok, I have now figured out why this was as it were, and I no longer agree
+with adding the extra properties. The whole of example 2 is inside a
+reference (using the &hlcdc notation) to the hlcdc node in example 1, and
+therefore these "missing" properties are not missing. I think they are
+just clutter that hides what is really needed/different between example 1
+and 2, and apparently Boris and Rob agreed when they acked/reviewed. The
+description of example 2 also clearly states that example 2 is changes
+and additions on top of example 1. So, I plan to have this in the next
+iteration:
 
-    x86/mm: Disable ioremap free page handling on x86-PAE
+	&hlcdc {
+		hlcdc-display-controller {
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb565>;
 
-to the 4.9-stable tree which can be found at:
-    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
+			port at 0 {
+				hlcdc_panel_output: endpoint at 0 {
+					bus-width = <16>;
+				};
+			};
+		};
+	};
 
-The filename of the patch is:
-     x86-mm-disable-ioremap-free-page-handling-on-x86-pae.patch
-and it can be found in the queue-4.9 subdirectory.
-
-If you, or anyone else, feels it should not be added to the stable tree,
-please let <stable@vger.kernel.org> know about it.
-
-
->From f967db0b9ed44ec3057a28f3b28efc51df51b835 Mon Sep 17 00:00:00 2001
-From: Toshi Kani <toshi.kani@hpe.com>
-Date: Wed, 27 Jun 2018 08:13:46 -0600
-Subject: x86/mm: Disable ioremap free page handling on x86-PAE
-
-From: Toshi Kani <toshi.kani@hpe.com>
-
-commit f967db0b9ed44ec3057a28f3b28efc51df51b835 upstream.
-
-ioremap() supports pmd mappings on x86-PAE.  However, kernel's pmd
-tables are not shared among processes on x86-PAE.  Therefore, any
-update to sync'd pmd entries need re-syncing.  Freeing a pte page
-also leads to a vmalloc fault and hits the BUG_ON in vmalloc_sync_one().
-
-Disable free page handling on x86-PAE.  pud_free_pmd_page() and
-pmd_free_pte_page() simply return 0 if a given pud/pmd entry is present.
-This assures that ioremap() does not update sync'd pmd entries at the
-cost of falling back to pte mappings.
-
-Fixes: 28ee90fe6048 ("x86/mm: implement free pmd/pte page interfaces")
-Reported-by: Joerg Roedel <joro@8bytes.org>
-Signed-off-by: Toshi Kani <toshi.kani@hpe.com>
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: mhocko at suse.com
-Cc: akpm at linux-foundation.org
-Cc: hpa at zytor.com
-Cc: cpandya at codeaurora.org
-Cc: linux-mm at kvack.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: stable at vger.kernel.org
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Michal Hocko <mhocko@suse.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: <stable@vger.kernel.org>
-Link: https://lkml.kernel.org/r/20180627141348.21777-2-toshi.kani at hpe.com
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- arch/x86/mm/pgtable.c |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
-
---- a/arch/x86/mm/pgtable.c
-+++ b/arch/x86/mm/pgtable.c
-@@ -653,6 +653,7 @@ int pmd_clear_huge(pmd_t *pmd)
- 	return 0;
- }
- 
-+#ifdef CONFIG_X86_64
- /**
-  * pud_free_pmd_page - Clear pud entry and free pmd page.
-  * @pud: Pointer to a PUD.
-@@ -700,4 +701,22 @@ int pmd_free_pte_page(pmd_t *pmd)
- 
- 	return 1;
- }
-+
-+#else /* !CONFIG_X86_64 */
-+
-+int pud_free_pmd_page(pud_t *pud)
-+{
-+	return pud_none(*pud);
-+}
-+
-+/*
-+ * Disable free page handling on x86-PAE. This assures that ioremap()
-+ * does not update sync'd pmd entries. See vmalloc_sync_one().
-+ */
-+int pmd_free_pte_page(pmd_t *pmd)
-+{
-+	return pmd_none(*pmd);
-+}
-+
-+#endif /* CONFIG_X86_64 */
- #endif	/* CONFIG_HAVE_ARCH_HUGE_VMAP */
+Jacopo, please let me know if you want me to keep your review tag anyway...
 
 
-Patches currently in stable-queue which might be from toshi.kani at hpe.com are
+>> Cheers,
+>> Peter
+>>
+>>> Minors apart:
 
-queue-4.9/x86-mm-disable-ioremap-free-page-handling-on-x86-pae.patch
+...because I interpret this to mean that I could add your tag if I made the
+changes you suggested. Or did it mean that I could add your tag regardless
+because the issues were minor?
+
+Cheers,
+Peter
+
+>>>
+>>> Reviewed-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+>>>
+>>> Thanks
+>>>    j
+>>>
+>>>> +					bus-type = <0>;
+>>>> +					bus-width = <16>;
+>>>> +				};
+>>>> +			};
+>>>> +		};
+>>>> +	};
+>>>> --
+>>>> 2.11.0
+>>>>
+>>
