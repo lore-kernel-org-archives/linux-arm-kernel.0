@@ -1,50 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 16 Aug 2018 11:22:20 +0100
-Subject: AArch64 boot failure on Hikey960 on latest master after "arm64:
- insn: Don't fallback on nosync path for general insn patching"
-In-Reply-To: <462f8ae6-9948-a8e5-7504-623d40344336@iki.fi>
-References: <462f8ae6-9948-a8e5-7504-623d40344336@iki.fi>
-Message-ID: <20180816102219.GF31093@arm.com>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Thu, 16 Aug 2018 18:26:22 +0800
+Subject: [PATCH] arm: pm: call put_device instead of of_node_put in
+ at91_pm_config_ws
+Message-ID: <1534415182-34970-1-git-send-email-zhongjiang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tuomas, [+John]
+of_find_device_by_node takes a reference to the struct device when it
+finds a match via get_device. but it fails to put_device in
+at91_pm_config_ws, for_each_matching_node_and_match will get and put
+the node properly, there is no need to call the of_put_node. Therefore,
+just call put_device instead of of_node_put in at91_pm_config_ws.
 
-On Thu, Aug 16, 2018 at 02:38:51AM +0300, Tuomas Tynkkynen wrote:
-> Booting Linus's master of today with the usual arm64 defconfig fails for
-> me on the Hikey960 board. I've bisected it down to:
-> 
-> commit 693350a7998018391852c48f68956cf0f855b2b9 (HEAD, refs/bisect/bad)
-> Author: Will Deacon <will.deacon@arm.com>
-> Date:   Tue Jun 19 17:55:28 2018 +0100
-> 
->     arm64: insn: Don't fallback on nosync path for general insn patching
-> 
-> Here's the boot log with earlycon enabled after which the boot hangs:
+Fixes: d7484f5c6b3b ("ARM: at91: pm: configure wakeup sources for ULP1 mode")
+Suggested-by: Claudiu Beznea <Claudiu.Beznea@microchip.com>
+Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+---
+ arch/arm/mach-at91/pm.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Thanks for the boot log, that's really helpful. Please can you try the diff
-below?
-
-Out of interest -- do you know if Hikey960 is used by any boot-testing
-farms? The patch above has been in linux-next for ages, but we didn't see
-any complaints until it hit mainline :(
-
-Cheers,
-
-Will
-
---->8
-
-diff --git a/arch/arm64/kernel/jump_label.c b/arch/arm64/kernel/jump_label.c
-index c2dd1ad3e648..e0756416e567 100644
---- a/arch/arm64/kernel/jump_label.c
-+++ b/arch/arm64/kernel/jump_label.c
-@@ -36,7 +36,7 @@ void arch_jump_label_transform(struct jump_entry *entry,
- 		insn = aarch64_insn_gen_nop();
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 32fae4d..6574f00 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -143,15 +143,15 @@ static int at91_pm_config_ws(unsigned int pm_mode, bool set)
+ 
+ 			/* Check if enabled on SHDWC. */
+ 			if (wsi->shdwc_mr_bit && !(val & wsi->shdwc_mr_bit))
+-				goto put_node;
++				goto put_device;
+ 
+ 			mode |= wsi->pmc_fsmr_bit;
+ 			if (wsi->set_polarity)
+ 				polarity |= wsi->pmc_fsmr_bit;
+ 		}
+ 
+-put_node:
+-		of_node_put(np);
++put_device:
++		put_device(&pdev->dev);
  	}
  
--	aarch64_insn_patch_text(&addr, &insn, 1);
-+	aarch64_insn_patch_text_nosync(addr, insn);
- }
- 
- void arch_jump_label_transform_static(struct jump_entry *entry,
+ 	if (mode) {
+-- 
+1.7.12.4
