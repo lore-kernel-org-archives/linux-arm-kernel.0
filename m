@@ -1,106 +1,147 @@
-From: wendy.liang@xilinx.com (Wendy Liang)
-Date: Thu, 16 Aug 2018 00:06:30 -0700
-Subject: [PATCH 7/7] Documentation: devicetree: Add Xilinx R5 rproc binding
-In-Reply-To: <1534403190-28523-1-git-send-email-jliang@xilinx.com>
-References: <1534403190-28523-1-git-send-email-jliang@xilinx.com>
-Message-ID: <1534403190-28523-8-git-send-email-jliang@xilinx.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Thu, 16 Aug 2018 09:30:52 +0200
+Subject: [PATCH v3 5/7] mtd: rawnand: ams-delta: Set port direction when
+ needed
+In-Reply-To: <20180813223448.21316-6-jmkrzyszt@gmail.com>
+References: <20180806222918.12644-1-jmkrzyszt@gmail.com>
+ <20180813223448.21316-1-jmkrzyszt@gmail.com>
+ <20180813223448.21316-6-jmkrzyszt@gmail.com>
+Message-ID: <20180816093052.2bcbf004@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree binding for Xilinx Cortex-r5 remoteproc.
+On Tue, 14 Aug 2018 00:34:46 +0200
+Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
 
-Signed-off-by: Wendy Liang <jliang@xilinx.com>
----
- .../remoteproc/xlnx,zynqmp-r5-remoteproc.txt       | 81 ++++++++++++++++++++++
- 1 file changed, 81 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt
+> In its current shape, the driver sets data port direction before each
+> byte read/write operation, even during multi-byte transfers.  Improve
+> performance of the driver by setting the port direction only when
+> needed.
+> 
+> This optimisation will become particularly important as soon as
+> planned conversion of the driver to GPIO API for data I/O will be
+> implemented.
+> 
+> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+> ---
+>  drivers/mtd/nand/raw/ams-delta.c | 59 ++++++++++++++++++++++++++++++++--------
+>  1 file changed, 47 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/raw/ams-delta.c b/drivers/mtd/nand/raw/ams-delta.c
+> index 09d6901fc94d..5f9180fe4f8b 100644
+> --- a/drivers/mtd/nand/raw/ams-delta.c
+> +++ b/drivers/mtd/nand/raw/ams-delta.c
+> @@ -45,6 +45,7 @@ struct ams_delta_nand {
+>  	struct gpio_desc	*gpiod_ale;
+>  	struct gpio_desc	*gpiod_cle;
+>  	void __iomem		*io_base;
+> +	bool			data_in;
+>  };
+>  
+>  /*
+> @@ -72,50 +73,83 @@ static const struct mtd_partition partition_info[] = {
+>  	  .size		=  3 * SZ_256K },
+>  };
+>  
+> -static void ams_delta_write_byte(struct mtd_info *mtd, u_char byte)
+> +static void ams_delta_write_next_byte(struct mtd_info *mtd, u_char byte)
+>  {
+>  	struct nand_chip *this = mtd_to_nand(mtd);
+>  	struct ams_delta_nand *priv = nand_get_controller_data(this);
+> -	void __iomem *io_base = priv->io_base;
+>  
+> -	writew(0, io_base + OMAP_MPUIO_IO_CNTL);
+>  	writew(byte, this->IO_ADDR_W);
+> +
+>  	gpiod_set_value(priv->gpiod_nwe, 0);
+>  	ndelay(40);
+>  	gpiod_set_value(priv->gpiod_nwe, 1);
+>  }
+>  
+> -static u_char ams_delta_read_byte(struct mtd_info *mtd)
+> +static void ams_delta_write_byte(struct mtd_info *mtd, u_char byte)
+>  {
+> -	u_char res;
+>  	struct nand_chip *this = mtd_to_nand(mtd);
+>  	struct ams_delta_nand *priv = nand_get_controller_data(this);
+>  	void __iomem *io_base = priv->io_base;
+>  
+> +	if (priv->data_in) {
+> +		writew(0, io_base + OMAP_MPUIO_IO_CNTL);
+> +		priv->data_in = false;
+> +	}
+> +
+> +	ams_delta_write_next_byte(mtd, byte);
+> +}
 
-diff --git a/Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt b/Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt
-new file mode 100644
-index 0000000..3940019
---- /dev/null
-+++ b/Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt
-@@ -0,0 +1,81 @@
-+Xilinx ARM Cortex A53-R5 remoteproc driver
-+==========================================
-+
-+ZynqMP family of devices use two Cortex R5 processors to help with various
-+low power / real time tasks.
-+
-+This driver requires specific ZynqMP hardware design.
-+
-+ZynqMP R5 RemoteProc Device Node:
-+=================================
-+A zynqmp_r5_remoteproc device node is used to represent a R5 IP instance
-+within ZynqMP SoC.
-+
-+Required properties:
-+--------------------
-+ - compatible : Should be "xlnx,zynqmp-r5-remoteproc-1.0"
-+ - reg : Address and length of the register set for the device. It
-+        contains in the same order as described reg-names
-+ - reg-names: Contain the register set names.
-+              "tcm_a" and "tcm_b" for TCM memories.
-+              If the user uses the remoteproc driver with the RPMsg kernel
-+              driver,"ipi" for the IPI register used to communicate with RPU
-+              is also required.
-+              Otherwise, if user only uses the remoteproc driver to boot RPU
-+              firmware, "ipi" is not required.
-+ - tcm-pnode-id: TCM resources power nodes IDs which are used to request TCM
-+                 resources for the remoteproc driver to access.
-+ - rpu-pnode-id : RPU power node id which is used by the remoteproc driver
-+                  to start RPU or shut it down.
-+
-+Optional properties:
-+--------------------
-+ - core_conf : R5 core configuration (valid string - split0 or split1 or
-+               lock-step), default is lock-step.
-+ - memory-region: memories regions for RPU executable and DMA memory.
-+ - interrupts : Interrupt mapping for remoteproc IPI. It is required if the
-+                user uses the remoteproc driver with the RPMsg kernel driver.
-+ - interrupt-parent : Phandle for the interrupt controller. It is required if
-+                      the user uses the remoteproc driver with the RPMsg kernel
-+                      kernel driver.
-+
-+Example:
-+--------
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+		rproc_0_fw_reserved: rproc at 3ed000000 {
-+			compatible = "rproc-prog-memory";
-+			no-map;
-+			reg = <0x0 0x3ed00000 0x0 0x40000>;
-+		};
-+		rproc_0_dma_reserved: rproc at 3ed400000 {
-+			compatible = "shared-dma-pool";
-+			no-map;
-+			reg = <0x0 0x3ed40000 0x0 0x80000>;
-+		};
-+	};
-+
-+	firmware {
-+		zynqmp_firmware: zynqmp-firmware {
-+			compatible = "xlnx,zynqmp-firmware";
-+			method = "smc";
-+		};
-+	};
-+
-+	zynqmp-r5-remoteproc at 0 {
-+		compatible = "xlnx,zynqmp-r5-remoteproc-1.0";
-+		reg = <0x0 0xFFE00000 0x0 0x10000>,
-+			<0x0 0xFFE20000 0x0 0x10000>,
-+			<0x0 0xff340000 0x0 0x100>;
-+		reg-names = "tcm_a", "tcm_b", "ipi";
-+		dma-ranges;
-+		core_conf = "split0";
-+		memory-region = <&rproc_0_fw_reserved>,
-+				<&rproc_0_dma_reserved>;
-+		tcm-pnode-id = <0xf>, <0x10>;
-+		rpu-pnode-id = <0x7>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 29 4>;
-+	} ;
--- 
-2.7.4
+I'm not a big fan of this {read,write}_byte/next_byte() approach.
+
+Can't we do something like:
+
+static void ams_delta_io_write(struct ams_delta_nand *priv, u8 data)
+{
+	writew(byte, priv->nand_chip.IO_ADDR_W);
+  	gpiod_set_value(priv->gpiod_nwe, 0);
+  	ndelay(40);
+  	gpiod_set_value(priv->gpiod_nwe, 1);
+}
+
+static u8 ams_delta_io_read(struct ams_delta_nand *priv)
+{
+	u8 res;
+
+  	gpiod_set_value(priv->gpiod_nre, 0);
+  	ndelay(40);
+	res = readw(priv->nand_chip.IO_ADDR_R);
+ 	gpiod_set_value(priv->gpiod_nre, 1);
+ 
+ 	return res;
+}
+
+static void ams_delta_set_io_dir(struct ams_delta_nand *priv, bool in)
+{
+	if (in == priv->data_in)
+		return;
+
+	writew(in ? ~0 : 0, priv->io_base + OMAP_MPUIO_IO_CNTL);
+	priv->data_in = in;
+}
+
+static void ams_delta_write_buf(struct mtd_info *mtd, const u8 *buf,
+				int len)
+{
+	struct nand_chip *this = mtd_to_nand(mtd);
+	struct ams_delta_nand *priv = nand_get_controller_data(this);
+	int i;
+
+	ams_delta_set_io_dir(priv, false);
+
+	for (i =0; i < len; i++)
+		ams_delta_io_write(priv, buf[i]);
+}
+
+static void ams_delta_write_byte(struct mtd_info *mtd, u8 byte)
+{
+	ams_delta_write_buf(mtd, &byte, 1);
+}
+
+static void ams_delta_read_buf(struct mtd_info *mtd, u8 *buf, int len)
+{
+	struct nand_chip *this = mtd_to_nand(mtd);
+	struct ams_delta_nand *priv = nand_get_controller_data(this);
+	int i;
+
+	ams_delta_set_io_dir(priv, true);
+
+	for (i = 0; i < len; i++)
+		buf[i] = ams_delta_io_read(priv);
+}
+
+static u8 ams_delta_read_byte(struct mtd_info *mtd)
+{
+	u8 res;
+
+	ams_delta_read_buf(mtd, &res, 1);
+
+	return res;
+}
