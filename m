@@ -1,19 +1,19 @@
 From: hanjie.lin@amlogic.com (Hanjie Lin)
-Date: Thu, 16 Aug 2018 11:11:26 +0800
+Date: Thu, 16 Aug 2018 11:14:25 +0800
 Subject: [PATCH 1/2] dt-bindings: PCI: meson: add DT bindings for Amlogic
  Meson PCIe controller
-In-Reply-To: <fd6b76f0c6f5b4dfd1527440b0f6275417e434c1.camel@baylibre.com>
+In-Reply-To: <20180814225340.GA25470@rob-hp-laptop>
 References: <1534227522-186798-1-git-send-email-hanjie.lin@amlogic.com>
  <1534227522-186798-2-git-send-email-hanjie.lin@amlogic.com>
- <fd6b76f0c6f5b4dfd1527440b0f6275417e434c1.camel@baylibre.com>
-Message-ID: <e83998fa-a4d2-5593-1a41-70bd232b4123@amlogic.com>
+ <20180814225340.GA25470@rob-hp-laptop>
+Message-ID: <4095e5f8-9c3b-0eb6-f803-105a2e5c1941@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2018/8/14 18:41, Jerome Brunet wrote:
-> On Tue, 2018-08-14 at 02:18 -0400, Hanjie Lin wrote:
+On 2018/8/15 6:53, Rob Herring wrote:
+> On Tue, Aug 14, 2018 at 02:18:41AM -0400, Hanjie Lin wrote:
 >> From: Yue Wang <yue.wang@amlogic.com>
 >>
 >> The Amlogic Meson PCIe host controller is based on the Synopsys DesignWare
@@ -57,38 +57,30 @@ On 2018/8/14 18:41, Jerome Brunet wrote:
 >> +	- "pcie_bus"
 >> +	- "pcie_general"
 >> +	- "pcie_mipi_en"
-> 
-> Could you briefly describe what each clock is needed for ?
-> 
-
-Yes, is this more clear?
-
-- clock-names:  Amlogic Meson AXG
-Usage: required for  
-Value type: <stringlist>
-Definition: Should contain the following entries
-- "pclk"       PCIe GEN 100M PLL clock
-- "port"       PCIe_x(A 0r B) RC clock gate 
-- "general"    PCIe Phy clock 
-- "mipi"       PCIe_x(A or B) 100M ref clock gate
-
 >> +
 >> +Example configuration:
 >> +
 >> +	pcie: pcie at dffff000 {
+> 
+> Unit-address is wrong.
+
+Yes, I will fix it.
+
+> 
 >> +			compatible = "amlogic,axg-pcie", "snps,dw-pcie";
 >> +			reg = <0x0 0xf9800000 0x0 0x400000
 >> +					0x0 0xff646000 0x0 0x2000
 >> +					0x0 0xf9f00000 0x0 0x100000>;
 >> +			reg-names = "elbi", "cfg", "config";
 >> +			reset-gpio = <&gpio GPIOX_19 GPIO_ACTIVE_HIGH>;
+> 
+> Not documented and should be reset-gpios.
+
+Yes, is this more clear?
+reset-gpios: The GPIO to generate PCIe PERST# assert and deassert signal.
+
+> 
 >> +			interrupts = <0 177 IRQ_TYPE_EDGE_RISING>;
-> 
-> replace 0 with GIC_SPI please
-
-Right, I will fix it.
-
-> 
 >> +			#interrupt-cells = <1>;
 >> +			interrupt-map-mask = <0 0 0 0>;
 >> +			interrupt-map = <0 0 0 0 &gic GIC_SPI 179 IRQ_TYPE_EDGE_RISING>;
@@ -100,6 +92,14 @@ Right, I will fix it.
 >> +			ranges = <0x82000000 0 0 0x0 0xf9c00000 0 0x00300000>;
 >> +			num-lanes = <1>;
 >> +			pcie-num = <1>;
+> 
+> Not documented. What's this?
+
+Yes, pcie-num is an useless parameter. I will delete it.
+
+Thanks for your comments.
+
+> 
 >> +
 >> +			clocks = <&clkc CLKID_USB
 >> +					&clkc CLKID_MIPI_ENABLE
@@ -110,23 +110,10 @@ Right, I will fix it.
 >> +					"pcie_mipi_en",
 >> +					"pcie",
 >> +					"port";
-> 
-> Several things are disturbing above:
-> * pcie_general is provided by the USB clock gate ???
-> * pcie_refpll: I suppose this is a copy/paste error, not used in your driver
-> (and shouldn't be need BTW)
-> 
-> suggested names:
-> * pcie_general -> general
-> * pcie_mipi_en -> mipi
-> * pcie -> pclk
-> * port (OK)
-> 
-
-Thanks, we will follow your suggestion.
-
 >> +	};
-> 
+>> -- 
+>> 2.7.4
+>>
 > 
 > .
 > 
