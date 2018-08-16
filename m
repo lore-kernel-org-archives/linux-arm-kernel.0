@@ -1,168 +1,64 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 16 Aug 2018 14:52:41 +0200
-Subject: [RESEND PATCH v5 2/3] dt-bindings: display: atmel: optional
- video-interface of endpoints
-In-Reply-To: <20180803085143.GC4528@w540>
-References: <20180803072308.14962-1-peda@axentia.se>
- <20180803072308.14962-3-peda@axentia.se> <20180803081128.GA4528@w540>
- <6fe3e84e-bd9d-0894-df8b-1b40c0f9477d@axentia.se>
- <20180803085143.GC4528@w540>
-Message-ID: <061a99d5-4fe6-795c-7e91-cf7127fb8472@axentia.se>
+From: valentin.schneider@arm.com (Valentin Schneider)
+Date: Thu, 16 Aug 2018 14:58:59 +0100
+Subject: AArch64 boot failure on Hikey960 on latest master after "arm64:
+ insn: Don't fallback on nosync path for general insn patching"
+In-Reply-To: <20180816102219.GF31093@arm.com>
+References: <462f8ae6-9948-a8e5-7504-623d40344336@iki.fi>
+ <20180816102219.GF31093@arm.com>
+Message-ID: <6490931d-65b6-e524-f2d0-65cbac0a263b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-08-03 10:51, jacopo mondi wrote:
-> On Fri, Aug 03, 2018 at 10:40:02AM +0200, Peter Rosin wrote:
->> On 2018-08-03 10:11, jacopo mondi wrote:
->>> Hi Peter!
->>>
->>> On Fri, Aug 03, 2018 at 09:23:07AM +0200, Peter Rosin wrote:
->>>> With bus-type/bus-width properties in the endpoint nodes, the video-
->>>> interface of the connection can be specified for cases where the
->>>> heuristic fails to select the correct output mode. This can happen
->>>> e.g. if not all RGB pins are routed on the PCB; the driver has no
->>>> way of knowing this, and needs to be told explicitly.
->>>>
->>>> This is critical for the devices that have the "conflicting output
->>>> formats" issue (SAM9N12, SAM9X5, SAMA5D3), since the most significant
->>>> RGB bits move around depending on the selected output mode. For
->>>> devices that do not have the "conflicting output formats" issue
->>>> (SAMA5D2, SAMA5D4), this is completely irrelevant.
->>>>
->>>> Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
->>>> Reviewed-by: Rob Herring <robh@kernel.org>
->>>> Signed-off-by: Peter Rosin <peda@axentia.se>
->>>> ---
->>>>  .../devicetree/bindings/display/atmel/hlcdc-dc.txt | 26 ++++++++++++++++++++++
->>>>  1 file changed, 26 insertions(+)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
->>>> index 82f2acb3d374..9de434a8f523 100644
->>>> --- a/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
->>>> +++ b/Documentation/devicetree/bindings/display/atmel/hlcdc-dc.txt
->>>> @@ -15,6 +15,14 @@ Required children nodes:
->>>>   to external devices using the OF graph reprensentation (see ../graph.txt).
->>>>   At least one port node is required.
->>>>
->>>> +Optional properties in grandchild nodes:
->>>> + Any endpoint grandchild node may specify a desired video interface
->>>> + according to ../../media/video-interfaces.txt, specifically
->>>> + - bus-type: must be <0>.
->>>
->>> Is there any value in specifying this, if it has a fixed value to
->>> "autodetect"? I understand it's optional, so if nobody else objects,
->>> feels free to keep it there.
->>
->> That's just how media/video-interfaces.txt works.
->>
->> bus-type 0 means that other properties describe the bus type. In this
->> case bus-width is specified, so that means a parallel bus. But bus-width
->> has no meaning (or may not have) if bus-type is non-zero. But checking
->> that bus-type for zero in the code seemed like overkill to me since the
->> driver already knows that it is a parallel bus...
->>
+Hi,
+
+On 16/08/18 11:22, Will Deacon wrote:
+> Hi Tuomas, [+John]
 > 
-> Yeah, I felt like pointing that out since you're not cheking for its value,
-> and that property is only used by v4l2-fwnode to handle some
-> not-that-used-anymore bus as CCP2 is.
+> On Thu, Aug 16, 2018 at 02:38:51AM +0300, Tuomas Tynkkynen wrote:
+>> Booting Linus's master of today with the usual arm64 defconfig fails for
+>> me on the Hikey960 board. I've bisected it down to:
+>>
+>> commit 693350a7998018391852c48f68956cf0f855b2b9 (HEAD, refs/bisect/bad)
+>> Author: Will Deacon <will.deacon@arm.com>
+>> Date:   Tue Jun 19 17:55:28 2018 +0100
+>>
+>>     arm64: insn: Don't fallback on nosync path for general insn patching
+>>
+>> Here's the boot log with earlycon enabled after which the boot hangs:
 > 
->> TL;DR I'd like to keep it.
->>
+> Thanks for the boot log, that's really helpful. Please can you try the diff
+> below?
 > 
-> Fine with me then.
+
+I get the same "BUG: scheduling while atomic" when running the current master
+(f91e654474d413201ae578820fb63f8a811f6c4e), and confirmed that I don't get
+it on my setup when checking out the direct parent of 693350a7998018391852c48f68956cf0f855b2b9.
+
+Tried out the diff and the board doesn't seem to die anymore, so FWIW:
+
+Tested-by: Valentin Schneider <valentin.schneider@arm.com>
+
+> Out of interest -- do you know if Hikey960 is used by any boot-testing
+> farms? The patch above has been in linux-next for ages, but we didn't see
+> any complaints until it hit mainline :(
 > 
->>>
->>>> + - bus-width: recognized values are <12>, <16>, <18> and <24>, and
->>>> +   override any output mode selection heuristic, forcing "rgb444",
->>>> +   "rgb565", "rgb666" and "rgb888" respectively.
->>>> +
->>>>  Example:
->>>>
->>>>  	hlcdc: hlcdc at f0030000 {
->>>> @@ -50,3 +58,21 @@ Example:
->>>>  			#pwm-cells = <3>;
->>>>  		};
->>>>  	};
->>>> +
->>>
->>> Two blank lines here.
->>>
->>>> +
->>>> +Example 2: With a video interface override to force rgb565; as above
->>>> +but with these changes/additions:
->>>> +
->>>> +	&hlcdc {
->>>> +		hlcdc-display-controller {
->>>> +			pinctrl-names = "default";
->>>> +			pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb565>;
->>>> +
->>>> +			port at 0 {
->>>
->>> The node has a unit address specified, you're missing a reg = <0>
->>> property (no big deal, it's an example, but the other one has it)
->>>
->>>> +				hlcdc_panel_output: endpoint at 0 {
->>>
->>> Missing reg here too.
->>
->> I'll fix those (I think they appeared for the original example after I
->> wrote the patch).
->>
+> Cheers,
 > 
-> Ok, then please consider also describing the port at 0 node cell sizes too
-> since it has a child endpoint node.
-
-Ok, I have now figured out why this was as it were, and I no longer agree
-with adding the extra properties. The whole of example 2 is inside a
-reference (using the &hlcdc notation) to the hlcdc node in example 1, and
-therefore these "missing" properties are not missing. I think they are
-just clutter that hides what is really needed/different between example 1
-and 2, and apparently Boris and Rob agreed when they acked/reviewed. The
-description of example 2 also clearly states that example 2 is changes
-and additions on top of example 1. So, I plan to have this in the next
-iteration:
-
-	&hlcdc {
-		hlcdc-display-controller {
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb565>;
-
-			port at 0 {
-				hlcdc_panel_output: endpoint at 0 {
-					bus-width = <16>;
-				};
-			};
-		};
-	};
-
-Jacopo, please let me know if you want me to keep your review tag anyway...
-
-
->> Cheers,
->> Peter
->>
->>> Minors apart:
-
-...because I interpret this to mean that I could add your tag if I made the
-changes you suggested. Or did it mean that I could add your tag regardless
-because the issues were minor?
-
-Cheers,
-Peter
-
->>>
->>> Reviewed-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
->>>
->>> Thanks
->>>    j
->>>
->>>> +					bus-type = <0>;
->>>> +					bus-width = <16>;
->>>> +				};
->>>> +			};
->>>> +		};
->>>> +	};
->>>> --
->>>> 2.11.0
->>>>
->>
+> Will
+> 
+> --->8
+> 
+> diff --git a/arch/arm64/kernel/jump_label.c b/arch/arm64/kernel/jump_label.c
+> index c2dd1ad3e648..e0756416e567 100644
+> --- a/arch/arm64/kernel/jump_label.c
+> +++ b/arch/arm64/kernel/jump_label.c
+> @@ -36,7 +36,7 @@ void arch_jump_label_transform(struct jump_entry *entry,
+>  		insn = aarch64_insn_gen_nop();
+>  	}
+>  
+> -	aarch64_insn_patch_text(&addr, &insn, 1);
+> +	aarch64_insn_patch_text_nosync(addr, insn);
+>  }
+>  
+>  void arch_jump_label_transform_static(struct jump_entry *entry,
+> 
