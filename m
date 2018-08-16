@@ -1,46 +1,55 @@
-From: Pavel.Tatashin@microsoft.com (Pasha Tatashin)
-Date: Thu, 16 Aug 2018 19:02:42 +0000
-Subject: [RESEND PATCH v10 0/6] optimize memblock_next_valid_pfn and
- early_pfn_valid on arm and arm64
-In-Reply-To: <20180815153456.974798c62dd5a5e4628db8f5@linux-foundation.org>
-References: <1530867675-9018-1-git-send-email-hejianet@gmail.com>
- <20180815153456.974798c62dd5a5e4628db8f5@linux-foundation.org>
-Message-ID: <20180816190241.o6ctjypmbd65jdpl@xakep.localdomain>
+From: jolly.shah@xilinx.com (Jolly Shah)
+Date: Thu, 16 Aug 2018 12:08:01 -0700
+Subject: [PATCH v2 1/3] dt-bindings: soc: Add ZynqMP PM bindings
+In-Reply-To: <1534446483-12156-1-git-send-email-jollys@xilinx.com>
+References: <1534446483-12156-1-git-send-email-jollys@xilinx.com>
+Message-ID: <1534446483-12156-2-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18-08-15 15:34:56, Andrew Morton wrote:
-> On Fri,  6 Jul 2018 17:01:09 +0800 Jia He <hejianet@gmail.com> wrote:
-> 
-> > Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
-> > where possible") optimized the loop in memmap_init_zone(). But it causes
-> > possible panic bug. So Daniel Vacek reverted it later.
-> > 
-> > But as suggested by Daniel Vacek, it is fine to using memblock to skip
-> > gaps and finding next valid frame with CONFIG_HAVE_ARCH_PFN_VALID.
-> > 
-> > More from what Daniel said:
-> > "On arm and arm64, memblock is used by default. But generic version of
-> > pfn_valid() is based on mem sections and memblock_next_valid_pfn() does
-> > not always return the next valid one but skips more resulting in some
-> > valid frames to be skipped (as if they were invalid). And that's why
-> > kernel was eventually crashing on some !arm machines."
-> > 
-> > About the performance consideration:
-> > As said by James in b92df1de5,
-> > "I have tested this patch on a virtual model of a Samurai CPU with a
-> > sparse memory map.  The kernel boot time drops from 109 to 62 seconds."
-> > Thus it would be better if we remain memblock_next_valid_pfn on arm/arm64.
-> > 
-> > Besides we can remain memblock_next_valid_pfn, there is still some room
-> > for improvement. After this set, I can see the time overhead of memmap_init
-> > is reduced from 27956us to 13537us in my armv8a server(QDF2400 with 96G
-> > memory, pagesize 64k). I believe arm server will benefit more if memory is
-> > larger than TBs
-> 
-> This patchset is basically unreviewed at this stage.  Could people
-> please find some time to check it carefully?
+From: Rajan Vaja <rajan.vaja@xilinx.com>
 
-Working on it.
+Add documentation to describe Xilinx ZynqMP power management
+bindings.
 
-Pavel
+Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
+Signed-off-by: Jolly Shah <jollys@xilinx.com>
+---
+ .../bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt    | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+index d215d15..cb9a6b7 100644
+--- a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
++++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+@@ -64,6 +64,17 @@ Output clocks are registered based on clock information received
+ from firmware. Output clocks indexes are mentioned in
+ include/dt-bindings/clock/xlnx,zynqmp-clk.h.
+ 
++--------------------------------------------------------------------
++Device Tree Bindings for the Xilinx Zynq MPSoC Power Management
++--------------------------------------------------------------------
++The zynqmp-power node describes the power management configurations.
++It will control remote suspend/shutdown interfaces.
++
++Required properties:
++ - compatible:		Must contain:	"xlnx,zynqmp-power"
++ - interrupt-parent:	Interrupt controller the interrupt is routed through
++ - interrupts:		Interrupt specifier
++
+ -------
+ Example
+ -------
+@@ -78,5 +89,10 @@ firmware {
+ 			clocks = <&pss_ref_clk>, <&video_clk>, <&pss_alt_ref_clk>, <&aux_ref_clk>, <&gt_crx_ref_clk>;
+ 			clock-names = "pss_ref_clk", "video_clk", "pss_alt_ref_clk","aux_ref_clk", "gt_crx_ref_clk";
+ 		};
++		zynqmp_power: zynqmp-power {
++			compatible = "xlnx,zynqmp-power";
++			interrupt-parent = <&gic>;
++			interrupts = <0 35 4>;
++		};
+ 	};
+ };
+-- 
+2.7.4
