@@ -1,173 +1,54 @@
-From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
-Date: Thu, 16 Aug 2018 14:05:05 +0530
-Subject: [RFC PATCH 1/3] tracing: Add support for logging data to uncached
- buffer
-In-Reply-To: <20180815225955.38d21271@vmware.local.home>
-References: <cover.1533211508.git.saiprakash.ranjan@codeaurora.org>
- <6b62fd3a5abf1baf48a07ba8a31a92d17f501f77.1533211509.git.saiprakash.ranjan@codeaurora.org>
- <20180815225955.38d21271@vmware.local.home>
-Message-ID: <56b9f127-3d11-9997-c34b-bc542fdbd52a@codeaurora.org>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Thu, 16 Aug 2018 10:38:13 +0200
+Subject: [PATCH 2/4] dt-bindings: phy-rockchip-inno-usb2: add
+ documentation for extcon and utmi-avalid properties.
+In-Reply-To: <20180815222157.GA8193@rob-hp-laptop>
+References: <20180815095934.11205-1-enric.balletbo@collabora.com>
+ <20180815095934.11205-3-enric.balletbo@collabora.com>
+ <20180815222157.GA8193@rob-hp-laptop>
+Message-ID: <a71af5b8-cdc1-cf26-8c01-beb523e7c332@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/16/2018 8:29 AM, Steven Rostedt wrote:
+Hi Rob,
+
+On 16/08/18 00:21, Rob Herring wrote:
+> On Wed, Aug 15, 2018 at 11:59:32AM +0200, Enric Balletbo i Serra wrote:
+>> Commit 98898f3bc83c8 ("phy: rockchip-inno-usb2: support otg-port for
+>> rk3399") introduces two new properties. The extcon property is used to
+>> detect the cable-state, and the rockchip,utmi-avalid is used to indicate
+>> which register should be used to detect the vbus state.
+>>
+>> Document these properties in the documentation binding.
+>>
+>> Fixes: 98898f3bc83c8 ("phy: rockchip-inno-usb2: support otg-port for rk3399")
+>> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+>> ---
+>>
+>>  .../devicetree/bindings/phy/phy-rockchip-inno-usb2.txt         | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+>> index 074a7b3b0425..2d4808d3920b 100644
+>> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+>> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+>> @@ -23,6 +23,7 @@ Optional properties:
+>>  		 register files". When set driver will request its
+>>  		 phandle as one companion-grf for some special SoCs
+>>  		 (e.g RV1108).
+>> + - extcon : phandle to the extcon device for the otg phy.
 > 
-> Sorry for the late reply, I actually wrote this email over a week ago,
-> but never hit send. And the email was pushed back behind other
-> windows. :-/
-> 
+> extcon is not a good binding. The usb connector binding should be used 
+> instead for new users.
 > 
 
-Thanks for the review Steven.
-And no problem on late reply, I was working on Will's comment about 
-instrumentation in arch code and was about to respin a v2 patch. I have 
-replied inline, let me know if any more corrections or improvements can 
-be done. I would also like if Kees or someone from pstore could comment 
-on patch 2.
+Ok, although the extcon thing is implemented in the driver, so I was trying to
+just describe how is implemented now, looks like nobody is using it apart from
+me (patches not upstreamed yet). I suppose switch to the usb connector binding
+will imply some driver modifications. I will take a look.
 
-> On Fri,  3 Aug 2018 19:58:42 +0530
-> Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org> wrote:
-> 
->> diff --git a/kernel/trace/trace_rtb.c b/kernel/trace/trace_rtb.c
->> new file mode 100644
->> index 000000000000..e8c24db71a2d
->> --- /dev/null
->> +++ b/kernel/trace/trace_rtb.c
->> @@ -0,0 +1,160 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * Copyright (C) 2018 The Linux Foundation. All rights reserved.
->> + */
->> +#include <linux/atomic.h>
->> +#include <linux/dma-mapping.h>
->> +#include <linux/export.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/of_device.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/rtb.h>
->> +#include <linux/sched/clock.h>
->> +
->> +static struct platform_device *rtb_dev;
->> +static atomic_t rtb_idx;
->> +
->> +struct rtb_state {
->> +	struct rtb_layout *rtb;
->> +	phys_addr_t phys;
->> +	unsigned int nentries;
->> +	unsigned int size;
->> +	int enabled;
->> +};
->> +
->> +static struct rtb_state rtb = {
->> +	.enabled = 0,
->> +};
-> 
-> No need for the initialization, you could just have:
-> 
-> static struct rtb_state rtb;
-> 
-> And it will be initialized to all zeros. Or did you do that to document
-> that it is not enabled at boot?
->
+Thanks,
+ Enric
 
-I will correct it in v2. RTB will not be enabled until pstore is 
-registered since we use pstore for logs. I will add a comment above the 
-static declaration saying so.
-
->> +
->> +static int rtb_panic_notifier(struct notifier_block *this,
->> +					unsigned long event, void *ptr)
->> +{
->> +	rtb.enabled = 0;
->> +	return NOTIFY_DONE;
->> +}
->> +
->> +static struct notifier_block rtb_panic_blk = {
->> +	.notifier_call  = rtb_panic_notifier,
->> +	.priority = INT_MAX,
->> +};
->> +
->> +static void rtb_write_type(const char *log_type,
->> +			struct rtb_layout *start)
->> +{
->> +	start->log_type = log_type;
->> +}
->> +
->> +static void rtb_write_caller(u64 caller, struct rtb_layout *start)
->> +{
->> +	start->caller = caller;
->> +}
->> +
->> +static void rtb_write_data(u64 data, struct rtb_layout *start)
->> +{
->> +	start->data = data;
->> +}
->> +
->> +static void rtb_write_timestamp(struct rtb_layout *start)
->> +{
->> +	start->timestamp = sched_clock();
->> +}
+> Rob
 > 
-> Why have the above static functions? They are not very helpful, and
-> appear to be actually confusing. They are used once.
-> 
-
-Yes you are right, will remove those.
-
->> +
->> +static void uncached_logk_pc_idx(const char *log_type, u64 caller,
->> +				u64 data, int idx)
->> +{
->> +	struct rtb_layout *start;
->> +
->> +	start = &rtb.rtb[idx & (rtb.nentries - 1)];
->> +
->> +	rtb_write_type(log_type, start);
->> +	rtb_write_caller(caller, start);
->> +	rtb_write_data(data, start);
->> +	rtb_write_timestamp(start);
-> 
-> How is the above better than:
-> 
-> 	start->log_type = log_type;
-> 	start->caller = caller;
-> 	start->data = data;
->   	start->timestamp = sched_clock();
-> 
-> ??
-> 
-
-Sure, will change it to above and post v2.
-
->> +	/* Make sure data is written */
->> +	mb();
->> +}
->> +
->> +static int rtb_get_idx(void)
->> +{
->> +	int i, offset;
->> +
->> +	i = atomic_inc_return(&rtb_idx);
->> +	i--;
->> +
->> +	/* Check if index has wrapped around */
->> +	offset = (i & (rtb.nentries - 1)) -
->> +		 ((i - 1) & (rtb.nentries - 1));
->> +	if (offset < 0) {
->> +		i = atomic_inc_return(&rtb_idx);
->> +		i--;
->> +	}
->> +
->> +	return i;
->> +}
->> +
->> +noinline void notrace uncached_logk(const char *log_type, void *data)
-> 
-> BTW, all files in this directory have their functions notrace by
-> default.
-> 
-
-Oh I missed it. Will remove notrace.
-
-- Sai Prakash
