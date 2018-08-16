@@ -1,38 +1,34 @@
 From: tuomas.tynkkynen@iki.fi (Tuomas Tynkkynen)
-Date: Thu, 16 Aug 2018 21:31:07 +0300
+Date: Thu, 16 Aug 2018 21:37:22 +0300
 Subject: AArch64 boot failure on Hikey960 on latest master after "arm64:
  insn: Don't fallback on nosync path for general insn patching"
-In-Reply-To: <20180816102219.GF31093@arm.com>
+In-Reply-To: <CALAqxLWJzpV2Mqkz_ed_5zYX3SFyMZTBgTzyRAden7ab3VNm-Q@mail.gmail.com>
 References: <462f8ae6-9948-a8e5-7504-623d40344336@iki.fi>
  <20180816102219.GF31093@arm.com>
-Message-ID: <66fdd8a7-22ed-71f8-f0a0-119f9b495a94@iki.fi>
+ <CALAqxLWJzpV2Mqkz_ed_5zYX3SFyMZTBgTzyRAden7ab3VNm-Q@mail.gmail.com>
+Message-ID: <95c5c8b6-35f9-b1b4-0153-591b000c0a79@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 08/16/2018 01:22 PM, Will Deacon wrote:
-> Hi Tuomas, [+John]
+On 08/16/2018 08:57 PM, John Stultz wrote:
+> On Thu, Aug 16, 2018 at 3:22 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> Hi Tuomas, [+John]
+...
+>>
+>> Out of interest -- do you know if Hikey960 is used by any boot-testing
+>> farms? The patch above has been in linux-next for ages, but we didn't see
+>> any complaints until it hit mainline :(
 > 
-> On Thu, Aug 16, 2018 at 02:38:51AM +0300, Tuomas Tynkkynen wrote:
->> Booting Linus's master of today with the usual arm64 defconfig fails for
->> me on the Hikey960 board. I've bisected it down to:
->>
->> commit 693350a7998018391852c48f68956cf0f855b2b9 (HEAD, refs/bisect/bad)
->> Author: Will Deacon <will.deacon@arm.com>
->> Date:   Tue Jun 19 17:55:28 2018 +0100
->>
->>      arm64: insn: Don't fallback on nosync path for general insn patching
->>
->> Here's the boot log with earlycon enabled after which the boot hangs:
-> 
-> Thanks for the boot log, that's really helpful. Please can you try the diff
-> below?
+> Unfortunately not yet. HiKey960 upstreaming is ongoing, and the UFS
+> support patches should land in the 4.19 merge window.
+> After which, it will enable more mainline testing as folks won't have
+> to carry patches just to get the system to boot.
 > 
 
-Thanks for the quick response, that indeed fixes it. If you need more tags:
-
-Reported-by: Tuomas Tynkkynen <tuomas@tuxera.com>
-Tested-by: Tuomas Tynkkynen <tuomas@tuxera.com>
+A microSD rootfs gets me a working system on e.g. v4.17... except that
+even there the system hangs if I don't have 'clk_ignore_unused' on
+the kernel command line. I wonder if this is a known problem?
 
 - Tuomas
