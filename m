@@ -1,88 +1,208 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 16 Aug 2018 21:42:03 +0530
-Subject: [GIT PULL] Mailbox changes for v4.19
-Message-ID: <CABb+yY10OBQaidRYXrGfi=n-PaaJU+sb6J3dJjZ0rjP+6AXB5w@mail.gmail.com>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Thu, 16 Aug 2018 19:01:20 +0200
+Subject: Patch "ioremap: Update pgtable free interfaces with addr" has been
+ added to the 4.14-stable tree
+Message-ID: <153443888034240@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
 
-The following changes since commit 0585df468e8f4481b78256a2bf09449290bfcbf3:
+This is a note to let you know that I've just added the patch titled
 
-  Merge tag 'media/v4.18-3' of
-git://git.kernel.org/pub/scm/linux/kernel/git/mchehab/linux-media
-(2018-08-02 16:55:42 -0700)
+    ioremap: Update pgtable free interfaces with addr
 
-are available in the Git repository at:
+to the 4.14-stable tree which can be found at:
+    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
-  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
-tags/mailbox-v4.19
+The filename of the patch is:
+     ioremap-update-pgtable-free-interfaces-with-addr.patch
+and it can be found in the queue-4.14 subdirectory.
 
-for you to fetch changes up to 2bb7005696e2246baa88772341ca032ff09a63cb:
+If you, or anyone else, feels it should not be added to the stable tree,
+please let <stable@vger.kernel.org> know about it.
 
-  mailbox: Add support for i.MX messaging unit (2018-08-15 09:53:07 +0530)
 
-----------------------------------------------------------------
-- xgene : potential null pointer fix
+>From 785a19f9d1dd8a4ab2d0633be4656653bd3de1fc Mon Sep 17 00:00:00 2001
+From: Chintan Pandya <cpandya@codeaurora.org>
+Date: Wed, 27 Jun 2018 08:13:47 -0600
+Subject: ioremap: Update pgtable free interfaces with addr
 
-- omap : switch to spdx license and use of_device_get_match_data() to match data
+From: Chintan Pandya <cpandya@codeaurora.org>
 
-- ti-msgmgr : cleanup and optimisation. New TI specific feature -
-secure proxy thread.
+commit 785a19f9d1dd8a4ab2d0633be4656653bd3de1fc upstream.
 
-- mediatek : add driver for CMDQ controller.
+The following kernel panic was observed on ARM64 platform due to a stale
+TLB entry.
 
-- nxp : add driver for MU controller
+ 1. ioremap with 4K size, a valid pte page table is set.
+ 2. iounmap it, its pte entry is set to 0.
+ 3. ioremap the same address with 2M size, update its pmd entry with
+    a new value.
+ 4. CPU may hit an exception because the old pmd entry is still in TLB,
+    which leads to a kernel panic.
 
-----------------------------------------------------------------
-Dong Aisheng (1):
-      dt-bindings: arm: fsl: add mu binding doc
+Commit b6bdb7517c3d ("mm/vmalloc: add interfaces to free unmapped page
+table") has addressed this panic by falling to pte mappings in the above
+case on ARM64.
 
-Gustavo A. R. Silva (1):
-      mailbox: xgene-slimpro: Fix potential NULL pointer dereference
+To support pmd mappings in all cases, TLB purge needs to be performed
+in this case on ARM64.
 
-Houlong Wei (2):
-      dt-bindings: soc: Add documentation for the MediaTek GCE unit
-      mailbox: mediatek: Add Mediatek CMDQ driver
+Add a new arg, 'addr', to pud_free_pmd_page() and pmd_free_pte_page()
+so that TLB purge can be added later in seprate patches.
 
-Nishanth Menon (6):
-      mailbox: ti-msgmgr: Get rid of unused structure members
-      mailbox: ti-msgmgr: Allocate Rx channel resources only on request
-      mailbox: ti-msgmgr: Change message count mask to be descriptor based
-      mailbox: ti-msgmgr: Move the memory region name to descriptor
-      dt-bindings: mailbox: Add support for secure proxy threads
-      mailbox: ti-msgmgr: Add support for Secure Proxy
+[toshi.kani at hpe.com: merge changes, rewrite patch description]
+Fixes: 28ee90fe6048 ("x86/mm: implement free pmd/pte page interfaces")
+Signed-off-by: Chintan Pandya <cpandya@codeaurora.org>
+Signed-off-by: Toshi Kani <toshi.kani@hpe.com>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: mhocko at suse.com
+Cc: akpm at linux-foundation.org
+Cc: hpa at zytor.com
+Cc: linux-mm at kvack.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: stable at vger.kernel.org
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Michal Hocko <mhocko@suse.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: <stable@vger.kernel.org>
+Link: https://lkml.kernel.org/r/20180627141348.21777-3-toshi.kani at hpe.com
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-Oleksij Rempel (2):
-      dt-bindings: mailbox: imx-mu: add generic MU channel support
-      mailbox: Add support for i.MX messaging unit
+---
+ arch/arm64/mm/mmu.c           |    4 ++--
+ arch/x86/mm/pgtable.c         |   12 +++++++-----
+ include/asm-generic/pgtable.h |    8 ++++----
+ lib/ioremap.c                 |    4 ++--
+ 4 files changed, 15 insertions(+), 13 deletions(-)
 
-Randy Dunlap (1):
-      mailbox: add MODULE_LICENSE() for mtk-cmdq-mailbox.c
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -938,12 +938,12 @@ int pmd_clear_huge(pmd_t *pmd)
+ 	return 1;
+ }
+ 
+-int pud_free_pmd_page(pud_t *pud)
++int pud_free_pmd_page(pud_t *pud, unsigned long addr)
+ {
+ 	return pud_none(*pud);
+ }
+ 
+-int pmd_free_pte_page(pmd_t *pmd)
++int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
+ {
+ 	return pmd_none(*pmd);
+ }
+--- a/arch/x86/mm/pgtable.c
++++ b/arch/x86/mm/pgtable.c
+@@ -716,11 +716,12 @@ int pmd_clear_huge(pmd_t *pmd)
+ /**
+  * pud_free_pmd_page - Clear pud entry and free pmd page.
+  * @pud: Pointer to a PUD.
++ * @addr: Virtual address associated with pud.
+  *
+  * Context: The pud range has been unmaped and TLB purged.
+  * Return: 1 if clearing the entry succeeded. 0 otherwise.
+  */
+-int pud_free_pmd_page(pud_t *pud)
++int pud_free_pmd_page(pud_t *pud, unsigned long addr)
+ {
+ 	pmd_t *pmd;
+ 	int i;
+@@ -731,7 +732,7 @@ int pud_free_pmd_page(pud_t *pud)
+ 	pmd = (pmd_t *)pud_page_vaddr(*pud);
+ 
+ 	for (i = 0; i < PTRS_PER_PMD; i++)
+-		if (!pmd_free_pte_page(&pmd[i]))
++		if (!pmd_free_pte_page(&pmd[i], addr + (i * PMD_SIZE)))
+ 			return 0;
+ 
+ 	pud_clear(pud);
+@@ -743,11 +744,12 @@ int pud_free_pmd_page(pud_t *pud)
+ /**
+  * pmd_free_pte_page - Clear pmd entry and free pte page.
+  * @pmd: Pointer to a PMD.
++ * @addr: Virtual address associated with pmd.
+  *
+  * Context: The pmd range has been unmaped and TLB purged.
+  * Return: 1 if clearing the entry succeeded. 0 otherwise.
+  */
+-int pmd_free_pte_page(pmd_t *pmd)
++int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
+ {
+ 	pte_t *pte;
+ 
+@@ -763,7 +765,7 @@ int pmd_free_pte_page(pmd_t *pmd)
+ 
+ #else /* !CONFIG_X86_64 */
+ 
+-int pud_free_pmd_page(pud_t *pud)
++int pud_free_pmd_page(pud_t *pud, unsigned long addr)
+ {
+ 	return pud_none(*pud);
+ }
+@@ -772,7 +774,7 @@ int pud_free_pmd_page(pud_t *pud)
+  * Disable free page handling on x86-PAE. This assures that ioremap()
+  * does not update sync'd pmd entries. See vmalloc_sync_one().
+  */
+-int pmd_free_pte_page(pmd_t *pmd)
++int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
+ {
+ 	return pmd_none(*pmd);
+ }
+--- a/include/asm-generic/pgtable.h
++++ b/include/asm-generic/pgtable.h
+@@ -991,8 +991,8 @@ int pud_set_huge(pud_t *pud, phys_addr_t
+ int pmd_set_huge(pmd_t *pmd, phys_addr_t addr, pgprot_t prot);
+ int pud_clear_huge(pud_t *pud);
+ int pmd_clear_huge(pmd_t *pmd);
+-int pud_free_pmd_page(pud_t *pud);
+-int pmd_free_pte_page(pmd_t *pmd);
++int pud_free_pmd_page(pud_t *pud, unsigned long addr);
++int pmd_free_pte_page(pmd_t *pmd, unsigned long addr);
+ #else	/* !CONFIG_HAVE_ARCH_HUGE_VMAP */
+ static inline int p4d_set_huge(p4d_t *p4d, phys_addr_t addr, pgprot_t prot)
+ {
+@@ -1018,11 +1018,11 @@ static inline int pmd_clear_huge(pmd_t *
+ {
+ 	return 0;
+ }
+-static inline int pud_free_pmd_page(pud_t *pud)
++static inline int pud_free_pmd_page(pud_t *pud, unsigned long addr)
+ {
+ 	return 0;
+ }
+-static inline int pmd_free_pte_page(pmd_t *pmd)
++static inline int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
+ {
+ 	return 0;
+ }
+--- a/lib/ioremap.c
++++ b/lib/ioremap.c
+@@ -92,7 +92,7 @@ static inline int ioremap_pmd_range(pud_
+ 		if (ioremap_pmd_enabled() &&
+ 		    ((next - addr) == PMD_SIZE) &&
+ 		    IS_ALIGNED(phys_addr + addr, PMD_SIZE) &&
+-		    pmd_free_pte_page(pmd)) {
++		    pmd_free_pte_page(pmd, addr)) {
+ 			if (pmd_set_huge(pmd, phys_addr + addr, prot))
+ 				continue;
+ 		}
+@@ -119,7 +119,7 @@ static inline int ioremap_pud_range(p4d_
+ 		if (ioremap_pud_enabled() &&
+ 		    ((next - addr) == PUD_SIZE) &&
+ 		    IS_ALIGNED(phys_addr + addr, PUD_SIZE) &&
+-		    pud_free_pmd_page(pud)) {
++		    pud_free_pmd_page(pud, addr)) {
+ 			if (pud_set_huge(pud, phys_addr + addr, prot))
+ 				continue;
+ 		}
 
-Suman Anna (2):
-      mailbox/omap: switch to SPDX license identifier
-      mailbox/omap: use of_device_get_match_data() to get match data
 
- .../devicetree/bindings/mailbox/fsl,mu.txt         |  54 ++
- .../devicetree/bindings/mailbox/mtk-gce.txt        |  57 ++
- .../bindings/mailbox/ti,secure-proxy.txt           |  50 ++
- drivers/mailbox/Kconfig                            |  16 +
- drivers/mailbox/Makefile                           |   4 +
- drivers/mailbox/imx-mailbox.c                      | 358 +++++++++++++
- drivers/mailbox/mailbox-xgene-slimpro.c            |   6 +-
- drivers/mailbox/mtk-cmdq-mailbox.c                 | 571 +++++++++++++++++++++
- drivers/mailbox/omap-mailbox.c                     |  31 +-
- drivers/mailbox/ti-msgmgr.c                        | 353 ++++++++++---
- include/dt-bindings/gce/mt8173-gce.h               |  44 ++
- include/linux/mailbox/mtk-cmdq-mailbox.h           |  77 +++
- include/linux/omap-mailbox.h                       |   5 +-
- 13 files changed, 1536 insertions(+), 90 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mailbox/fsl,mu.txt
- create mode 100644 Documentation/devicetree/bindings/mailbox/mtk-gce.txt
- create mode 100644
-Documentation/devicetree/bindings/mailbox/ti,secure-proxy.txt
- create mode 100644 drivers/mailbox/imx-mailbox.c
- create mode 100644 drivers/mailbox/mtk-cmdq-mailbox.c
- create mode 100644 include/dt-bindings/gce/mt8173-gce.h
- create mode 100644 include/linux/mailbox/mtk-cmdq-mailbox.h
+Patches currently in stable-queue which might be from cpandya@codeaurora.org are
+
+queue-4.14/x86-mm-disable-ioremap-free-page-handling-on-x86-pae.patch
+queue-4.14/ioremap-update-pgtable-free-interfaces-with-addr.patch
+queue-4.14/x86-mm-add-tlb-purge-to-free-pmd-pte-page-interfaces.patch
