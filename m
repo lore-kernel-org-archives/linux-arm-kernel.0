@@ -1,170 +1,148 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 16 Aug 2018 09:35:59 +0200
-Subject: [RFC PATCH] edac: armv8_edac: Add ARMv8 EDAC driver
-In-Reply-To: <1533242990-12828-1-git-send-email-tbaicar@codeaurora.org>
-References: <1533242990-12828-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20180816073559.GA2111@nazgul.tnic>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Thu, 16 Aug 2018 09:39:49 +0200
+Subject: [PATCH v3 7/7] mtd: rawnand: ams-delta: use GPIO API for data I/O
+In-Reply-To: <20180813223448.21316-8-jmkrzyszt@gmail.com>
+References: <20180806222918.12644-1-jmkrzyszt@gmail.com>
+ <20180813223448.21316-1-jmkrzyszt@gmail.com>
+ <20180813223448.21316-8-jmkrzyszt@gmail.com>
+Message-ID: <20180816093949.7f59519a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ James.
+On Tue, 14 Aug 2018 00:34:48 +0200
+Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
 
-On Thu, Aug 02, 2018 at 04:49:50PM -0400, Tyler Baicar wrote:
-> Add ARMv8 EDAC driver to detect and report errors that are reported
-> through the ARMv8.2 RAS extensions.
+> Don't readw()/writew() data directly from/to GPIO port which is under
+> control of gpio-omap driver, use GPIO API instead.
 > 
-> This is by no means complete hence the RFC. At minimum, this should
-> also have support to check the SRs of each CPU during boot time to
-> check for anything pending. Also, the SEI code flow could be improved
-> to separate the check for uncontained errors and panic ASAP before
-> doing any of this reporting.
+> Degrade of performance on Amstrad Delta is significant, can be
+> recognized as a regression, that's why I'm still submitting this patch
+> as RFC.
 > 
-> This is also limited to SR based RAS extension nodes. There is not
-> currently a way to detect memory mapped RAS extension nodes. The
-> initialization which prints the FR registers only does so for a
-> single CPU, so the assumption is that all CPUs are identical from
-> a RAS extension node perspective.
+> The driver should work with any 8+-bit bidirectional GPIO port, not
+> only OMAP.
 > 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  arch/arm64/include/asm/ras.h | 26 +++++++++++++++++++
->  arch/arm64/kernel/Makefile   |  1 +
->  arch/arm64/kernel/ras.c      | 54 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm64/kernel/traps.c    |  4 +++
->  arch/arm64/mm/fault.c        |  4 +++
->  drivers/edac/Kconfig         |  9 +++++++
->  drivers/edac/Makefile        |  2 ++
->  drivers/edac/armv8_edac.c    | 59 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/armv8_edac.h   | 20 +++++++++++++++
->  9 files changed, 179 insertions(+)
->  create mode 100644 arch/arm64/include/asm/ras.h
->  create mode 100644 arch/arm64/kernel/ras.c
->  create mode 100644 drivers/edac/armv8_edac.c
->  create mode 100644 include/linux/armv8_edac.h
+> Exceprts fro timestamped boot logs showing performance degrade.
+> Before the change:
+> [    5.469426] Creating 6 MTD partitions on "ams-delta-nand":
+> [    5.480909] 0x000000000000-0x000000380000 : "Kernel"
+> [    5.502659] 0x000000380000-0x0000003c0000 : "u-boot"
+> [    5.523055] 0x0000003c0000-0x000000400000 : "u-boot params"
+> [    5.543612] 0x000000400000-0x000000440000 : "Amstrad LDR"
+> [    5.564607] 0x000000440000-0x000001f40000 : "File system"
+> [    5.601760] 0x000001f40000-0x000002000000 : "PBL reserved"
+> [    5.624369] usbcore: registered new interface driver dm9601
+> [    5.636233] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+> [    5.649191] ohci-omap: OHCI OMAP driver
+> [    5.660713] ohci ohci: OMAP OHCI
+> [    5.671299] ohci ohci: new USB bus registered, assigned bus number 1
+> [    5.686862] ohci ohci: irq 54, io mem 0xfffba000
+> [    5.785897] hub 1-0:1.0: USB hub found
+> [    5.797856] hub 1-0:1.0: 3 ports detected
+> [    5.817576] usbcore: registered new interface driver usb-storage
+> [    5.832551] ams-delta-serio ams-delta-serio: incomplete constraints, dummy supplies not allowed
+> [    5.858588] ams-delta-serio ams-delta-serio: regulator request failed (-19)
+> [    5.879312] input: omap-keypad as /devices/platform/omap-keypad/input/input0
+> [    5.902490] omap_rtc omap_rtc: already running
+> [    5.922929] omap_rtc omap_rtc: registered as rtc0
+> [    5.945570] softdog: initialized. soft_noboot=0 soft_margin=60 sec soft_panic=0 (nowayout=0)
+> [    5.976712] usbcore: registered new interface driver btusb
+> [    6.007348] cx20442-codec cx20442-codec: incomplete constraints, dummy supplies not allowed
+> [    6.040575] cx20442-codec cx20442-codec: failed to get POR supply (-19)
+> [    6.060916] cx20442-codec cx20442-codec: ASoC: failed to probe component -517
+> [    6.083486] ams-delta-audio ams-delta-audio: ASoC: failed to instantiate card -517
+> [    6.121850] ams-delta-audio ams-delta-audio: snd_soc_register_card failed (-517)
+> [    6.163047] NET: Registered protocol family 17
+> [    6.182770] Bluetooth: BNEP (Ethernet Emulation) ver 1.3
+> [    6.203517] Bluetooth: BNEP socket layer initialized
+> [    6.283017] serial8250 serial8250.1: Linked as a consumer to regulator.1
+> [    6.306113] usb 1-1: new full-speed USB device number 2 using ohci
+> [    6.328825] clock: disabling unused clocks to save power
+> [    6.350426] Skipping reset check for DSP domain clock "dsptim_ck"
+> [    6.372272] Skipping reset check for DSP domain clock "dspxor_ck"
+> [    6.393712] Skipping reset check for DSP domain clock "dspper_ck"
+> [    6.428311] ams-delta-serio ams-delta-serio: Linked as a consumer to regulator.2
+> [    6.467801] serio serio0: AMS DELTA keyboard adapter
+> [    6.492511] cx20442-codec cx20442-codec: Linked as a consumer to regulator.1
+> [    6.527382] ams-delta-audio ams-delta-audio: cx20442-voice <-> omap-mcbsp.1 mapping ok
+> [    6.577387] input: AMS_DELTA hook_switch as /devices/platform/ams-delta-audio/sound/card0/input1
+> [    6.627497] input: AT Raw Set 2 keyboard as /devices/platform/ams-delta-serio/serio0/input/input2
+> [    6.673663] omap_rtc omap_rtc: setting system clock to 2013-02-09 07:22:13 UTC (1360394533)
+> [    6.715895] modem_nreset: incomplete constraints, leaving on
+> [    6.738677] ALSA device list:
+> [    6.758398]   #0: AMS_DELTA
+> [    7.036234] dm9601 1-1:1.0 eth0: register 'dm9601' at usb-ohci-1, Davicom DM96xx USB 10/100 Ethernet, 00:60:6e:00:00:11
+> [  133.860599] random: crng init done
+> [  138.275853] VFS: Mounted root (jffs2 filesystem) on device 31:4.
+> 
+> After the change:
+> [    6.261107] Creating 6 MTD partitions on "ams-delta-nand":
+> [    6.272046] 0x000000000000-0x000000380000 : "Kernel"
+> [    6.294436] 0x000000380000-0x0000003c0000 : "u-boot"
+> [    6.314454] 0x0000003c0000-0x000000400000 : "u-boot params"
+> [    6.335353] 0x000000400000-0x000000440000 : "Amstrad LDR"
+> [    6.356669] 0x000000440000-0x000001f40000 : "File system"
+> [    6.393713] 0x000001f40000-0x000002000000 : "PBL reserved"
+> [    6.416771] usbcore: registered new interface driver dm9601
+> [    6.428631] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+> [    6.441533] ohci-omap: OHCI OMAP driver
+> [    6.452758] ohci ohci: OMAP OHCI
+> [    6.463300] ohci ohci: new USB bus registered, assigned bus number 1
+> [    6.478817] ohci ohci: irq 54, io mem 0xfffba000
+> [    6.580520] hub 1-0:1.0: USB hub found
+> [    6.592424] hub 1-0:1.0: 3 ports detected
+> [    6.612363] usbcore: registered new interface driver usb-storage
+> [    6.627358] ams-delta-serio ams-delta-serio: incomplete constraints, dummy supplies not allowed
+> [    6.653296] ams-delta-serio ams-delta-serio: regulator request failed (-19)
+> [    6.674219] input: omap-keypad as /devices/platform/omap-keypad/input/input0
+> [    6.697910] omap_rtc omap_rtc: already running
+> [    6.718376] omap_rtc omap_rtc: registered as rtc0
+> [    6.740942] softdog: initialized. soft_noboot=0 soft_margin=60 sec soft_panic=0 (nowayout=0)
+> [    6.772085] usbcore: registered new interface driver btusb
+> [    6.803187] cx20442-codec cx20442-codec: incomplete constraints, dummy supplies not allowed
+> [    6.836386] cx20442-codec cx20442-codec: failed to get POR supply (-19)
+> [    6.856730] cx20442-codec cx20442-codec: ASoC: failed to probe component -517
+> [    6.879234] ams-delta-audio ams-delta-audio: ASoC: failed to instantiate card -517
+> [    6.917325] ams-delta-audio ams-delta-audio: snd_soc_register_card failed (-517)
+> [    6.958519] NET: Registered protocol family 17
+> [    6.978224] Bluetooth: BNEP (Ethernet Emulation) ver 1.3
+> [    6.998989] Bluetooth: BNEP socket layer initialized
+> [    7.077593] serial8250 serial8250.1: Linked as a consumer to regulator.1
+> [    7.100678] usb 1-1: new full-speed USB device number 2 using ohci
+> [    7.123429] clock: disabling unused clocks to save power
+> [    7.145074] Skipping reset check for DSP domain clock "dsptim_ck"
+> [    7.166983] Skipping reset check for DSP domain clock "dspxor_ck"
+> [    7.188434] Skipping reset check for DSP domain clock "dspper_ck"
+> [    7.223321] ams-delta-serio ams-delta-serio: Linked as a consumer to regulator.2
+> [    7.262882] serio serio0: AMS DELTA keyboard adapter
+> [    7.287656] cx20442-codec cx20442-codec: Linked as a consumer to regulator.1
+> [    7.322824] ams-delta-audio ams-delta-audio: cx20442-voice <-> omap-mcbsp.1 mapping ok
+> [    7.373165] input: AMS_DELTA hook_switch as /devices/platform/ams-delta-audio/sound/card0/input1
+> [    7.423520] input: AT Raw Set 2 keyboard as /devices/platform/ams-delta-serio/serio0/input/input2
+> [    7.469578] omap_rtc omap_rtc: setting system clock to 2013-02-09 07:34:10 UTC (1360395250)
+> [    7.511830] modem_nreset: incomplete constraints, leaving on
+> [    7.534812] ALSA device list:
+> [    7.554541]   #0: AMS_DELTA
+> [    7.971899] dm9601 1-1:1.0 eth0: register 'dm9601' at usb-ohci-1, Davicom DM96xx USB 10/100 Ethernet, 00:60:6e:00:00:11
+> [  133.935226] random: crng init done
+> [  320.764645] VFS: Mounted root (jffs2 filesystem) on device 31:4.
+> 
+> I think most of the overhead is in iterations performed both inside and
+>  outside get/set array functions:
+> - building a mask for get_multiple() and transfering results to value array
+>  in gpiod_get_array_value_complex(), then again from the array by a caller, 
+> - building a value array by the caller, the building a mask and tranferiing
+>  values from array to bitmap for .set_multiple() in
+>  gpiod_set_array_value_comples().
 
-Remember to always run your stuff through checkpatch to catch legit issues:
+Sorry but we need more than just speculations here, and using
+bootlog timestamps is clearly not enough to prove any of these
+suppositions. You'll have to setup ftrace/perf and trigger read/write
+requests (using nanddump/nandwrite) to figure out where the overhead
+comes from.
 
-WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
-#48: 
-new file mode 100644
-
-Yes it does - I need a MAINTAINERS entry for the edac driver so that you
-get all the bug reports. :)
-
-And then more:
-
-WARNING: Missing or malformed SPDX-License-Identifier tag in line 1
-#53: FILE: arch/arm64/include/asm/ras.h:1:
-+// SPDX-License-Identifier: GPL-2.0
-
-WARNING: please write a paragraph that describes the config symbol fully
-#203: FILE: drivers/edac/Kconfig:77:
-+config EDAC_ARMV8
-
-WARNING: braces {} are not necessary for single statement blocks
-#284: FILE: drivers/edac/armv8_edac.c:51:
-+	for (i = 0; i < num_nodes; i++) {
-+		arch_ras_node_setup(i);
-+	}
-
-WARNING: Missing or malformed SPDX-License-Identifier tag in line 1
-#299: FILE: include/linux/armv8_edac.h:1:
-+// SPDX-License-Identifier: GPL-2.0
-
-> diff --git a/arch/arm64/kernel/ras.c b/arch/arm64/kernel/ras.c
-> new file mode 100644
-> index 0000000..2cb0265
-> --- /dev/null
-> +++ b/arch/arm64/kernel/ras.c
-> @@ -0,0 +1,54 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (c) 2018, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/cpu.h>
-> +#include <linux/smp.h>
-> +
-> +#include <asm/ras.h>
-> +
-> +bool arch_cpu_has_ras_extensions(void)
-> +{
-> +	return this_cpu_has_cap(ARM64_HAS_RAS_EXTN);
-> +}
-> +
-> +u64 arch_cpu_num_ras_nodes(void)
-> +{
-> +	return read_sysreg_s(SYS_ERRIDR_EL1);
-> +}
-> +
-> +void arch_report_ras_error_on_node(unsigned int cpu_num, unsigned int i)
-> +{
-> +	u64 status;
-> +
-> +	write_sysreg_s(i, SYS_ERRSELR_EL1);
-> +	status = read_sysreg_s(SYS_ERXSTATUS_EL1);
-> +	if (status) {
-> +		pr_err("cpu #%u: ERR%uSTATUS = 0x%llx\n", cpu_num, i, status);
-> +		pr_err("cpu #%u: ERR%uCTLR   = 0x%llx\n",
-> +			cpu_num, i, read_sysreg_s(SYS_ERXCTLR_EL1));
-> +		pr_err("cpu #%u: ERR%uADDR   = 0x%llx\n",
-> +			cpu_num, i, read_sysreg_s(SYS_ERXADDR_EL1));
-> +		pr_err("cpu #%u: ERR%uMISC0  = 0x%llx\n",
-> +			cpu_num, i, read_sysreg_s(SYS_ERXMISC0_EL1));
-> +		pr_err("cpu #%u: ERR%uMISC1  = 0x%llx\n",
-> +			cpu_num, i, read_sysreg_s(SYS_ERXMISC1_EL1));
-> +	}
-> +}
-> +
-> +void arch_ras_node_setup(unsigned int i)
-> +{
-> +	write_sysreg_s(i, SYS_ERRSELR_EL1);
-> +	pr_info("ERR%uFR = 0x%llx\n", i, read_sysreg_s(SYS_ERXFR_EL1));
-> +}
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index d399d45..53ed974 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -35,6 +35,7 @@
->  #include <linux/sizes.h>
->  #include <linux/syscalls.h>
->  #include <linux/mm_types.h>
-> +#include <linux/armv8_edac.h>
->  
->  #include <asm/atomic.h>
->  #include <asm/bug.h>
-> @@ -731,6 +732,9 @@ asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
->  {
->  	nmi_enter();
->  
-> +	if (IS_ENABLED(CONFIG_EDAC_ARMV8))
-> +		armv8_edac_report_error();
-
-I would strongly advise against that - calling driver code from arch
-core code. You've made armv8_edac bool as it cannot be a module because
-of it, which is silly. I was lucky that we were able to remove that ugly
-dependency from x86 traps code. Hint: use a notifier and this way the
-edac driver can be a module too.
-
-And looking at armv8_edac.c - this is making the whole error reporting
-unnecessarily complicated. Why? Why aren't you doing everything in
-ras.c?!
-
-I don't see the need for adding anything to drivers/edac/ *at* *all*!
-
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+Also, I'd recommend keeping this patch for the series changing the GPIO
+API.
