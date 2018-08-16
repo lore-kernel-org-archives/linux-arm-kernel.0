@@ -1,83 +1,46 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 16 Aug 2018 20:45:23 +0200
-Subject: [PATCH 4.18 07/22] x86/mm: Disable ioremap free page handling on
- x86-PAE
-In-Reply-To: <20180816171556.502583508@linuxfoundation.org>
-References: <20180816171556.502583508@linuxfoundation.org>
-Message-ID: <20180816171556.786084738@linuxfoundation.org>
+From: Pavel.Tatashin@microsoft.com (Pasha Tatashin)
+Date: Thu, 16 Aug 2018 19:02:42 +0000
+Subject: [RESEND PATCH v10 0/6] optimize memblock_next_valid_pfn and
+ early_pfn_valid on arm and arm64
+In-Reply-To: <20180815153456.974798c62dd5a5e4628db8f5@linux-foundation.org>
+References: <1530867675-9018-1-git-send-email-hejianet@gmail.com>
+ <20180815153456.974798c62dd5a5e4628db8f5@linux-foundation.org>
+Message-ID: <20180816190241.o6ctjypmbd65jdpl@xakep.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.18-stable review patch.  If anyone has any objections, please let me know.
+On 18-08-15 15:34:56, Andrew Morton wrote:
+> On Fri,  6 Jul 2018 17:01:09 +0800 Jia He <hejianet@gmail.com> wrote:
+> 
+> > Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
+> > where possible") optimized the loop in memmap_init_zone(). But it causes
+> > possible panic bug. So Daniel Vacek reverted it later.
+> > 
+> > But as suggested by Daniel Vacek, it is fine to using memblock to skip
+> > gaps and finding next valid frame with CONFIG_HAVE_ARCH_PFN_VALID.
+> > 
+> > More from what Daniel said:
+> > "On arm and arm64, memblock is used by default. But generic version of
+> > pfn_valid() is based on mem sections and memblock_next_valid_pfn() does
+> > not always return the next valid one but skips more resulting in some
+> > valid frames to be skipped (as if they were invalid). And that's why
+> > kernel was eventually crashing on some !arm machines."
+> > 
+> > About the performance consideration:
+> > As said by James in b92df1de5,
+> > "I have tested this patch on a virtual model of a Samurai CPU with a
+> > sparse memory map.  The kernel boot time drops from 109 to 62 seconds."
+> > Thus it would be better if we remain memblock_next_valid_pfn on arm/arm64.
+> > 
+> > Besides we can remain memblock_next_valid_pfn, there is still some room
+> > for improvement. After this set, I can see the time overhead of memmap_init
+> > is reduced from 27956us to 13537us in my armv8a server(QDF2400 with 96G
+> > memory, pagesize 64k). I believe arm server will benefit more if memory is
+> > larger than TBs
+> 
+> This patchset is basically unreviewed at this stage.  Could people
+> please find some time to check it carefully?
 
-------------------
+Working on it.
 
-From: Toshi Kani <toshi.kani@hpe.com>
-
-commit f967db0b9ed44ec3057a28f3b28efc51df51b835 upstream.
-
-ioremap() supports pmd mappings on x86-PAE.  However, kernel's pmd
-tables are not shared among processes on x86-PAE.  Therefore, any
-update to sync'd pmd entries need re-syncing.  Freeing a pte page
-also leads to a vmalloc fault and hits the BUG_ON in vmalloc_sync_one().
-
-Disable free page handling on x86-PAE.  pud_free_pmd_page() and
-pmd_free_pte_page() simply return 0 if a given pud/pmd entry is present.
-This assures that ioremap() does not update sync'd pmd entries at the
-cost of falling back to pte mappings.
-
-Fixes: 28ee90fe6048 ("x86/mm: implement free pmd/pte page interfaces")
-Reported-by: Joerg Roedel <joro@8bytes.org>
-Signed-off-by: Toshi Kani <toshi.kani@hpe.com>
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: mhocko at suse.com
-Cc: akpm at linux-foundation.org
-Cc: hpa at zytor.com
-Cc: cpandya at codeaurora.org
-Cc: linux-mm at kvack.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: stable at vger.kernel.org
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Michal Hocko <mhocko@suse.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: <stable@vger.kernel.org>
-Link: https://lkml.kernel.org/r/20180627141348.21777-2-toshi.kani at hpe.com
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- arch/x86/mm/pgtable.c |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
-
---- a/arch/x86/mm/pgtable.c
-+++ b/arch/x86/mm/pgtable.c
-@@ -719,6 +719,7 @@ int pmd_clear_huge(pmd_t *pmd)
- 	return 0;
- }
- 
-+#ifdef CONFIG_X86_64
- /**
-  * pud_free_pmd_page - Clear pud entry and free pmd page.
-  * @pud: Pointer to a PUD.
-@@ -766,4 +767,22 @@ int pmd_free_pte_page(pmd_t *pmd)
- 
- 	return 1;
- }
-+
-+#else /* !CONFIG_X86_64 */
-+
-+int pud_free_pmd_page(pud_t *pud)
-+{
-+	return pud_none(*pud);
-+}
-+
-+/*
-+ * Disable free page handling on x86-PAE. This assures that ioremap()
-+ * does not update sync'd pmd entries. See vmalloc_sync_one().
-+ */
-+int pmd_free_pte_page(pmd_t *pmd)
-+{
-+	return pmd_none(*pmd);
-+}
-+
-+#endif /* CONFIG_X86_64 */
- #endif	/* CONFIG_HAVE_ARCH_HUGE_VMAP */
+Pavel
