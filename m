@@ -1,83 +1,55 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 16 Aug 2018 20:45:16 +0200
-Subject: [PATCH 4.17 06/21] x86/mm: Disable ioremap free page handling on
- x86-PAE
-In-Reply-To: <20180816171612.136242278@linuxfoundation.org>
-References: <20180816171612.136242278@linuxfoundation.org>
-Message-ID: <20180816171612.669302985@linuxfoundation.org>
+From: john.stultz@linaro.org (John Stultz)
+Date: Thu, 16 Aug 2018 11:47:47 -0700
+Subject: AArch64 boot failure on Hikey960 on latest master after "arm64:
+ insn: Don't fallback on nosync path for general insn patching"
+In-Reply-To: <95c5c8b6-35f9-b1b4-0153-591b000c0a79@iki.fi>
+References: <462f8ae6-9948-a8e5-7504-623d40344336@iki.fi>
+ <20180816102219.GF31093@arm.com>
+ <CALAqxLWJzpV2Mqkz_ed_5zYX3SFyMZTBgTzyRAden7ab3VNm-Q@mail.gmail.com>
+ <95c5c8b6-35f9-b1b4-0153-591b000c0a79@iki.fi>
+Message-ID: <CALAqxLUZiSyi0f365B-QRTT1gkWq9RP-4n2950NcF0w9oSXYEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.17-stable review patch.  If anyone has any objections, please let me know.
+On Thu, Aug 16, 2018 at 11:37 AM, Tuomas Tynkkynen
+<tuomas.tynkkynen@iki.fi> wrote:
+> Hi,
+>
+> On 08/16/2018 08:57 PM, John Stultz wrote:
+>>
+>> On Thu, Aug 16, 2018 at 3:22 AM, Will Deacon <will.deacon@arm.com> wrote:
+>>>
+>>> Hi Tuomas, [+John]
+>
+> ...
+>>>
+>>>
+>>> Out of interest -- do you know if Hikey960 is used by any boot-testing
+>>> farms? The patch above has been in linux-next for ages, but we didn't see
+>>> any complaints until it hit mainline :(
+>>
+>>
+>> Unfortunately not yet. HiKey960 upstreaming is ongoing, and the UFS
+>> support patches should land in the 4.19 merge window.
+>> After which, it will enable more mainline testing as folks won't have
+>> to carry patches just to get the system to boot.
+>>
+>
+> A microSD rootfs gets me a working system on e.g. v4.17... except that
+> even there the system hangs if I don't have 'clk_ignore_unused' on
+> the kernel command line. I wonder if this is a known problem?
 
-------------------
+Oh, good point. I'm usually focusing on AOSP, so I've not tried
+booting from the uSD slot.
 
-From: Toshi Kani <toshi.kani@hpe.com>
+As for the  clk_ignore_unused, I've not seen it, but I'm usually
+testing with a much larger patch stack targeting AOSP (only
+occasionally trying with a smaller set to validate patches being
+prepped for upstream).  So if you want to file a bug, please do so
+here: https://bugs.96boards.org/
 
-commit f967db0b9ed44ec3057a28f3b28efc51df51b835 upstream.
+Appreciate your testing! Please do feel free to reach out/cc me if you
+run into other issues.
 
-ioremap() supports pmd mappings on x86-PAE.  However, kernel's pmd
-tables are not shared among processes on x86-PAE.  Therefore, any
-update to sync'd pmd entries need re-syncing.  Freeing a pte page
-also leads to a vmalloc fault and hits the BUG_ON in vmalloc_sync_one().
-
-Disable free page handling on x86-PAE.  pud_free_pmd_page() and
-pmd_free_pte_page() simply return 0 if a given pud/pmd entry is present.
-This assures that ioremap() does not update sync'd pmd entries at the
-cost of falling back to pte mappings.
-
-Fixes: 28ee90fe6048 ("x86/mm: implement free pmd/pte page interfaces")
-Reported-by: Joerg Roedel <joro@8bytes.org>
-Signed-off-by: Toshi Kani <toshi.kani@hpe.com>
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: mhocko at suse.com
-Cc: akpm at linux-foundation.org
-Cc: hpa at zytor.com
-Cc: cpandya at codeaurora.org
-Cc: linux-mm at kvack.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: stable at vger.kernel.org
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Michal Hocko <mhocko@suse.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: <stable@vger.kernel.org>
-Link: https://lkml.kernel.org/r/20180627141348.21777-2-toshi.kani at hpe.com
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- arch/x86/mm/pgtable.c |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
-
---- a/arch/x86/mm/pgtable.c
-+++ b/arch/x86/mm/pgtable.c
-@@ -715,6 +715,7 @@ int pmd_clear_huge(pmd_t *pmd)
- 	return 0;
- }
- 
-+#ifdef CONFIG_X86_64
- /**
-  * pud_free_pmd_page - Clear pud entry and free pmd page.
-  * @pud: Pointer to a PUD.
-@@ -762,4 +763,22 @@ int pmd_free_pte_page(pmd_t *pmd)
- 
- 	return 1;
- }
-+
-+#else /* !CONFIG_X86_64 */
-+
-+int pud_free_pmd_page(pud_t *pud)
-+{
-+	return pud_none(*pud);
-+}
-+
-+/*
-+ * Disable free page handling on x86-PAE. This assures that ioremap()
-+ * does not update sync'd pmd entries. See vmalloc_sync_one().
-+ */
-+int pmd_free_pte_page(pmd_t *pmd)
-+{
-+	return pmd_none(*pmd);
-+}
-+
-+#endif /* CONFIG_X86_64 */
- #endif	/* CONFIG_HAVE_ARCH_HUGE_VMAP */
+thanks
+-john
