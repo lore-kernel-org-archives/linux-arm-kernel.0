@@ -1,14 +1,14 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 16 Aug 2018 20:45:23 +0200
-Subject: [PATCH 4.14 22/22] x86/mm: Add TLB purge to free pmd/pte page
+Date: Thu, 16 Aug 2018 20:45:31 +0200
+Subject: [PATCH 4.17 21/21] x86/mm: Add TLB purge to free pmd/pte page
  interfaces
-In-Reply-To: <20180816171622.831964729@linuxfoundation.org>
-References: <20180816171622.831964729@linuxfoundation.org>
-Message-ID: <20180816171625.887193919@linuxfoundation.org>
+In-Reply-To: <20180816171612.136242278@linuxfoundation.org>
+References: <20180816171612.136242278@linuxfoundation.org>
+Message-ID: <20180816171614.266666560@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.14-stable review patch.  If anyone has any objections, please let me know.
+4.17-stable review patch.  If anyone has any objections, please let me know.
 
 ------------------
 
@@ -60,7 +60,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 --- a/arch/x86/mm/pgtable.c
 +++ b/arch/x86/mm/pgtable.c
-@@ -718,24 +718,44 @@ int pmd_clear_huge(pmd_t *pmd)
+@@ -721,24 +721,44 @@ int pmd_clear_huge(pmd_t *pmd)
   * @pud: Pointer to a PUD.
   * @addr: Virtual address associated with pud.
   *
@@ -111,7 +111,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  	free_page((unsigned long)pmd);
  
  	return 1;
-@@ -746,7 +766,7 @@ int pud_free_pmd_page(pud_t *pud, unsign
+@@ -749,7 +769,7 @@ int pud_free_pmd_page(pud_t *pud, unsign
   * @pmd: Pointer to a PMD.
   * @addr: Virtual address associated with pmd.
   *
@@ -120,7 +120,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
   * Return: 1 if clearing the entry succeeded. 0 otherwise.
   */
  int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
-@@ -758,6 +778,10 @@ int pmd_free_pte_page(pmd_t *pmd, unsign
+@@ -761,6 +781,10 @@ int pmd_free_pte_page(pmd_t *pmd, unsign
  
  	pte = (pte_t *)pmd_page_vaddr(*pmd);
  	pmd_clear(pmd);
