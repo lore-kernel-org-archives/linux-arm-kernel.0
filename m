@@ -1,27 +1,39 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Fri, 17 Aug 2018 05:01:13 -0700
-Subject: [PATCH 0/3] iommu: Avoid DMA ops domain refcount contention
-In-Reply-To: <74796f9d-5320-ea26-630a-207f4c537c55@arm.com>
-References: <cover.1534250425.git.robin.murphy@arm.com>
- <20180817072415.GA22241@infradead.org>
- <74796f9d-5320-ea26-630a-207f4c537c55@arm.com>
-Message-ID: <20180817120113.GA31542@infradead.org>
+From: martin@kaiser.cx (Martin Kaiser)
+Date: Fri, 17 Aug 2018 14:10:27 +0200
+Subject: [PATCH resend] irqchip/tango: Set irq handler and data in one go
+In-Reply-To: <1532282533-26507-1-git-send-email-martin@kaiser.cx>
+References: <1532282533-26507-1-git-send-email-martin@kaiser.cx>
+Message-ID: <1534507827-7230-1-git-send-email-martin@kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 17, 2018 at 12:30:31PM +0100, Robin Murphy wrote:
-> On 17/08/18 08:24, Christoph Hellwig wrote:
-> > I plan to make the arm iommu dma ops generic and move them to
-> > drivers/iommu for the 4.20 merge window.
-> 
-> You mean 32-bit arm?
+Replace the two separate calls for setting the irq handler and data with
+a single irq_set_chained_handler_and_data() call.
 
-Sorry, I meant the arm64 wrappers for dma-iommu of course.
+Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+---
+Resending this, it seems this got lost along the way. Not a major change,
+of course. But should also be simple to review.
 
-> The only place that code should move to is /dev/null ;)
-> - the plan has always been to convert it to use groups and default domains
-> so it can just plug iommu-dma in. The tricky bit is either weaning the users
-> of the private arm_iommu_*() API onto generic IOMMU API usage, or at least
-> implementing transitional wrappers in a way that doesn't break anything.
+Thanks & Best regards,
+Martin
 
-Agreed on the arm32 iommu code.
+ drivers/irqchip/irq-tango.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/irqchip/irq-tango.c b/drivers/irqchip/irq-tango.c
+index 0c085303a583..580e2d72b9ba 100644
+--- a/drivers/irqchip/irq-tango.c
++++ b/drivers/irqchip/irq-tango.c
+@@ -205,8 +205,7 @@ static int __init tangox_irq_init(void __iomem *base, struct resource *baseres,
+ 
+ 	tangox_irq_domain_init(dom);
+ 
+-	irq_set_chained_handler(irq, tangox_irq_handler);
+-	irq_set_handler_data(irq, dom);
++	irq_set_chained_handler_and_data(irq, tangox_irq_handler, dom);
+ 
+ 	return 0;
+ }
+-- 
+2.1.4
