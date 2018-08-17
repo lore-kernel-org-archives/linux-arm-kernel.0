@@ -1,74 +1,50 @@
-From: pbrobinson@gmail.com (Peter Robinson)
-Date: Fri, 17 Aug 2018 22:15:01 +0100
-Subject: [offlist] Re: Crash in netlink/sk_filter_trim_cap on ARMv7 on
- 4.18rc1
-In-Reply-To: <1425110527.374417.1534531889127@email.1und1.de>
-References: <CALeDE9PP__kPHX_aW24kwzGf9BgA0gQOQJSY+Qw0yFMOLn4Pcw@mail.gmail.com>
- <7ff516fd-1d01-4d7a-1d5d-b58932c0c69d@gmail.com>
- <CALeDE9Nkz+cbueruiez_43ZS1ebAiQHDaVZRARE8raypYz323A@mail.gmail.com>
- <ad98d60c-bd60-b495-c4bd-507fc29c8bcd@iogearbox.net>
- <CALeDE9PBZWJBp8KB0mB4zoNXqscmzxWzz+LnuqRA-z4t1e9T8g@mail.gmail.com>
- <CALeDE9OOrZUnaNpzkYPU30iN=4HFQaqEomjf14EO5EtcnHu8OQ@mail.gmail.com>
- <20180816203515.GA7688@torres.zugschlus.de>
- <20180816225844.GW30658@n2100.armlinux.org.uk>
- <CALeDE9Pm7nsqDFL0m0ZsNdnEti6YAbEPhtfbNMPe=UZCUyyHMA@mail.gmail.com>
- <1c2218cb-63bf-1528-6156-8ce93f46169c@iogearbox.net>
- <20180817161743.GX30658@n2100.armlinux.org.uk>
- <adf49ea9-09a3-80f8-8c85-a62d028e21a3@iogearbox.net>
- <1425110527.374417.1534531889127@email.1und1.de>
-Message-ID: <CALeDE9NYxp34Dx_fZ66=7XQ5u7grm-UU=LisR3EDfTF8vYUctw@mail.gmail.com>
+From: texier.pj2@gmail.com (Pierre-Jean Texier)
+Date: Fri, 17 Aug 2018 23:23:17 +0200
+Subject: [PATCH] ARM: dts: imx7s-warp: enable i2c3 device support
+Message-ID: <1534540997-20094-1-git-send-email-texier.pj2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+The WaRP7 has one mikroBUS socket on the back to plug click boards.
+This patch allows to interact with some of these
+i2c modules (EEPROM, RTC and so on).
 
->> On 08/17/2018 06:17 PM, Russell King - ARM Linux wrote:
->> > On Fri, Aug 17, 2018 at 02:40:19PM +0200, Daniel Borkmann wrote:
->> >> I'd have one potential bug suspicion, for the 4.18 one you were trying,
->> >> could you run with the below patch to see whether it would help?
->> >
->> > I think this is almost certainly the problem - looking at the history,
->> > it seems that the "-4" was assumed to be part of the scratch stuff in
->> > commit 38ca93060163 ("bpf, arm32: save 4 bytes of unneeded stack space")
->> > but it isn't - it's because "off" of zero refers to the top word in the
->> > stack (iow at STACK_SIZE-4).
->>
->> Yeah agree, my thinking as well (albeit bit late, sigh, sorry about that).
->> Waiting for Peter to get back with results for definite confirmation. Your
->> rework in 1c35ba122d4a ("ARM: net: bpf: use negative numbers for stacked
->> registers") and 96cced4e774a ("ARM: net: bpf: access eBPF scratch space using
->> ARM FP register") fixes this in mainline, so unless I'm missing something this
->> would only need a stand-alone fix for 4.18/stable which I can cook up and
->> submit then.
->
-> i was able to reproduce this issue on RPi 3 with Linux 4.18.1 + multi_v7_defconfig and the following  config changes:
->
->  --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -2,7 +2,10 @@ CONFIG_SYSVIPC=y
->  CONFIG_NO_HZ=y
->  CONFIG_HIGH_RES_TIMERS=y
->  CONFIG_CGROUPS=y
-> +CONFIG_CGROUP_BPF=y
->  CONFIG_BLK_DEV_INITRD=y
-> +CONFIG_BPF_SYSCALL=y
-> +CONFIG_BPF_JIT_ALWAYS_ON=y
->  CONFIG_EMBEDDED=y
->  CONFIG_PERF_EVENTS=y
->  CONFIG_MODULES=y
-> @@ -153,6 +156,8 @@ CONFIG_IPV6_MIP6=m
->  CONFIG_IPV6_TUNNEL=m
->  CONFIG_IPV6_MULTIPLE_TABLES=y
->  CONFIG_NET_DSA=m
-> +CONFIG_BPF_JIT=y
-> +CONFIG_BPF_STREAM_PARSER=y
->  CONFIG_CAN=y
->  CONFIG_CAN_AT91=m
->  CONFIG_CAN_FLEXCAN=m
->
-> After applying the "-4" patch the oopses doesn't appear during boot anymore.
+Signed-off-by: Pierre-Jean Texier <texier.pj2@gmail.com>
+---
+ arch/arm/boot/dts/imx7s-warp.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-Would be fab to get that into the kernel so this is widely tested
-moving forward.
-
-Peter
+diff --git a/arch/arm/boot/dts/imx7s-warp.dts b/arch/arm/boot/dts/imx7s-warp.dts
+index fa390da..b3d0951 100644
+--- a/arch/arm/boot/dts/imx7s-warp.dts
++++ b/arch/arm/boot/dts/imx7s-warp.dts
+@@ -216,6 +216,13 @@
+ 	status = "okay";
+ };
+ 
++&i2c3 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "okay";
++};
++
+ &i2c4 {
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
+@@ -346,6 +353,13 @@
+ 		>;
+ 	};
+ 
++	pinctrl_i2c3: i2c3grp {
++		fsl,pins = <
++			MX7D_PAD_I2C3_SDA__I2C3_SDA	0x4000007f
++			MX7D_PAD_I2C3_SCL__I2C3_SCL	0x4000007f
++		>;
++	};
++
+ 	pinctrl_i2c4: i2c4grp {
+ 		fsl,pins = <
+ 			MX7D_PAD_I2C4_SCL__I2C4_SCL	0x4000007f
+-- 
+2.7.4
