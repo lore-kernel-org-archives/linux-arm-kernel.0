@@ -1,82 +1,39 @@
-From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
-Date: Fri, 17 Aug 2018 15:49:20 +0530
-Subject: [PATCH 3/3] arm64: dts: Add big-endian in nor node for ls104xa
-In-Reply-To: <20180817101920.20503-1-prabhakar.kushwaha@nxp.com>
-References: <20180817101920.20503-1-prabhakar.kushwaha@nxp.com>
-Message-ID: <20180817101920.20503-3-prabhakar.kushwaha@nxp.com>
+From: duwe@lst.de (Torsten Duwe)
+Date: Fri, 17 Aug 2018 12:25:44 +0200 (CEST)
+Subject: [PATCH v2 0/3] arm64 live patching
+Message-ID: <20180817102544.C628D68EF4@newverein.lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NOR and IFC controller connectivity is big-endian.
-So add big-endian field in nor device tree node allowing
-IFC controller to read/write data from/to the flash correctly.
+Hi all!
 
-Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts | 2 ++
- arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 2 ++
- arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts | 2 ++
- 3 files changed, 6 insertions(+)
+Here's v2; I hope I have incorporated all feedback properly.
+Julien: #S_X28 + 8 is in, but ftrace_modify_call() is referenced
+from generic code: kernel/trace/ftrace.c __ftrace_replace_code()
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-index c7b8d2c009cd..dff3d648172e 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-@@ -3,6 +3,7 @@
-  * Device Tree Include file for Freescale Layerscape-1043A family SoC.
-  *
-  * Copyright 2014-2015 Freescale Semiconductor, Inc.
-+ * Copyright 2018 NXP
-  *
-  * Mingkai Hu <Mingkai.hu@freescale.com>
-  */
-@@ -50,6 +51,7 @@
- 	nor at 0,0 {
- 		compatible = "cfi-flash";
- 		reg = <0x0 0x0 0x8000000>;
-+		big-endian;
- 		bank-width = <2>;
- 		device-width = <1>;
- 	};
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-index 7b01ba8d3b7e..17ca357e854f 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-@@ -3,6 +3,7 @@
-  * Device Tree Include file for Freescale Layerscape-1043A family SoC.
-  *
-  * Copyright 2014-2015 Freescale Semiconductor, Inc.
-+ * Copyright 2018 NXP
-  *
-  * Mingkai Hu <Mingkai.hu@freescale.com>
-  */
-@@ -65,6 +66,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			reg = <0x0 0x0 0x8000000>;
-+			big-endian;
- 			bank-width = <2>;
- 			device-width = <1>;
- 		};
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
-index e69306e6b0b1..e58a8ca1386c 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
-@@ -3,6 +3,7 @@
-  * Device Tree Include file for Freescale Layerscape-1046A family SoC.
-  *
-  * Copyright 2016 Freescale Semiconductor, Inc.
-+ * Copyright 2018 NXP
-  *
-  * Shaohui Xie <Shaohui.Xie@nxp.com>
-  */
-@@ -141,6 +142,7 @@
- 	nor at 0,0 {
- 		compatible = "cfi-flash";
- 		reg = <0x0 0x0 0x8000000>;
-+		big-endian;
- 		bank-width = <2>;
- 		device-width = <1>;
- 	};
--- 
-2.14.1
+And I'd *really* like some feedback from ARM/Linaro/... on the stack
+unwinder!
+
+[Changes from v1]:
+
+* Missing compiler support is now a Makefile error, instead
+  of a warning. This will keep the compile log shorter and
+  it will thus be easier to spot the problem.
+
+* A separate ftrace_regs_caller. Only that one will write out
+  a complete pt_regs, for efficiency.
+
+* Replace the use of X19 with X28 to remember the old PC during
+  live patch detection, as only that is saved&restored now for
+  non-regs ftrace.
+
+* CONFIG_DYNAMIC_FTRACE_WITH_REGS and CC_USING_PATCHABLE_FUNCTION_ENTRY
+  are currently synonymous on arm64, but differentiate better for
+  the future when this is no longer the case.
+
+* Clean up "old"/"new" insn value setting vs. #ifdefs.
+
+* #define a INSN_MOV_X9_X30 with suggested aarch64_insn_gen call
+  and use that instead of an immediate hex value.
+
+	Torsten
