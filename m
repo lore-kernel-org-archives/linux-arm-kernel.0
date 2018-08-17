@@ -1,149 +1,125 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Fri, 17 Aug 2018 18:27:20 +0200
-Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via
- the nvmem API
-In-Reply-To: <20180810080526.27207-7-brgl@bgdev.pl>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180810080526.27207-7-brgl@bgdev.pl>
-Message-ID: <20180817182720.6a6e5e8e@bbrezillon>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Fri, 17 Aug 2018 09:31:55 -0700
+Subject: [PATCH 7/7] Documentation: devicetree: Add Xilinx R5 rproc binding
+In-Reply-To: <1534403190-28523-8-git-send-email-jliang@xilinx.com>
+References: <1534403190-28523-1-git-send-email-jliang@xilinx.com>
+ <1534403190-28523-8-git-send-email-jliang@xilinx.com>
+Message-ID: <CAAtXAHd0jmV32bSyxCyMSh9fcP63sM+6-SkTMS=gA1fJKGKtig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartosz,
+Hi Wendy,
 
-On Fri, 10 Aug 2018 10:05:03 +0200
-Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+couple of minor stuff inline.
 
-> From: Alban Bedel <albeu@free.fr>
-> 
-> Allow drivers that use the nvmem API to read data stored on MTD devices.
-> For this the mtd devices are registered as read-only NVMEM providers.
-> 
-> Signed-off-by: Alban Bedel <albeu@free.fr>
-> [Bartosz:
->   - use the managed variant of nvmem_register(),
->   - set the nvmem name]
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-
-What happened to the 2 other patches of Alban's series? I'd really like
-the DT case to be handled/agreed on in the same patchset, but IIRC,
-Alban and Srinivas disagreed on how this should be represented. I
-hope this time we'll come to an agreement, because the MTD <-> NVMEM
-glue has been floating around for quite some time...
-
-Regards,
-
-Boris
-
+On Thu, Aug 16, 2018 at 12:06 AM, Wendy Liang <wendy.liang@xilinx.com> wrote:
+> Add device tree binding for Xilinx Cortex-r5 remoteproc.
+>
+> Signed-off-by: Wendy Liang <jliang@xilinx.com>
 > ---
->  drivers/mtd/Kconfig     |  1 +
->  drivers/mtd/mtdcore.c   | 50 +++++++++++++++++++++++++++++++++++++++++
->  include/linux/mtd/mtd.h |  2 ++
->  3 files changed, 53 insertions(+)
-> 
-> diff --git a/drivers/mtd/Kconfig b/drivers/mtd/Kconfig
-> index 46ab7feec6b6..f5549482d0df 100644
-> --- a/drivers/mtd/Kconfig
-> +++ b/drivers/mtd/Kconfig
-> @@ -1,5 +1,6 @@
->  menuconfig MTD
->  	tristate "Memory Technology Device (MTD) support"
-> +	imply NVMEM
->  	help
->  	  Memory Technology Devices are flash, RAM and similar chips, often
->  	  used for solid state file systems on embedded devices. This option
-> diff --git a/drivers/mtd/mtdcore.c b/drivers/mtd/mtdcore.c
-> index 42395df06be9..a57302eaceb5 100644
-> --- a/drivers/mtd/mtdcore.c
-> +++ b/drivers/mtd/mtdcore.c
-> @@ -488,6 +488,49 @@ int mtd_pairing_groups(struct mtd_info *mtd)
->  }
->  EXPORT_SYMBOL_GPL(mtd_pairing_groups);
->  
-> +static int mtd_nvmem_reg_read(void *priv, unsigned int offset,
-> +			      void *val, size_t bytes)
-> +{
-> +	struct mtd_info *mtd = priv;
-> +	size_t retlen;
-> +	int err;
+>  .../remoteproc/xlnx,zynqmp-r5-remoteproc.txt       | 81 ++++++++++++++++++++++
+>  1 file changed, 81 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt b/Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt
+> new file mode 100644
+> index 0000000..3940019
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt
+> @@ -0,0 +1,81 @@
+> +Xilinx ARM Cortex A53-R5 remoteproc driver
+> +==========================================
 > +
-> +	err = mtd_read(mtd, offset, bytes, &retlen, val);
-> +	if (err && err != -EUCLEAN)
-> +		return err;
+> +ZynqMP family of devices use two Cortex R5 processors to help with various
+> +low power / real time tasks.
+
+The ZynqMP family [..] uses [..]
 > +
-> +	return retlen == bytes ? 0 : -EIO;
-> +}
+> +This driver requires specific ZynqMP hardware design.
+
+*a* specific ZynqMP hardware design. What does that mean?
 > +
-> +static int mtd_nvmem_add(struct mtd_info *mtd)
-> +{
-> +	struct nvmem_config config = { };
+> +ZynqMP R5 RemoteProc Device Node:
+> +=================================
+> +A zynqmp_r5_remoteproc device node is used to represent a R5 IP instance
+> +within ZynqMP SoC.
 > +
-> +	config.dev = &mtd->dev;
-> +	config.owner = THIS_MODULE;
-> +	config.name = mtd->name;
-> +	config.reg_read = mtd_nvmem_reg_read;
-> +	config.size = mtd->size;
-> +	config.word_size = 1;
-> +	config.stride = 1;
-> +	config.read_only = true;
-> +	config.root_only = true;
-> +	config.priv = mtd;
+> +Required properties:
+> +--------------------
+> + - compatible : Should be "xlnx,zynqmp-r5-remoteproc-1.0"
+> + - reg : Address and length of the register set for the device. It
+> +        contains in the same order as described reg-names
+
+?
+> + - reg-names: Contain the register set names.
+
+Contains
+
+> +              "tcm_a" and "tcm_b" for TCM memories.
+> +              If the user uses the remoteproc driver with the RPMsg kernel
+> +              driver,"ipi" for the IPI register used to communicate with RPU
+> +              is also required.
+> +              Otherwise, if user only uses the remoteproc driver to boot RPU
+> +              firmware, "ipi" is not required.
+> + - tcm-pnode-id: TCM resources power nodes IDs which are used to request TCM
+> +                 resources for the remoteproc driver to access.
+> + - rpu-pnode-id : RPU power node id which is used by the remoteproc driver
+> +                  to start RPU or shut it down.
 > +
-> +	mtd->nvmem = devm_nvmem_register(&mtd->dev, &config);
-> +	if (IS_ERR(mtd->nvmem)) {
-> +		/* Just ignore if there is no NVMEM support in the kernel */
-> +		if (PTR_ERR(mtd->nvmem) == -ENOSYS) {
-> +			mtd->nvmem = NULL;
-> +		} else {
-> +			dev_err(&mtd->dev, "Failed to register NVMEM device\n");
-> +			return PTR_ERR(mtd->nvmem);
-> +		}
-> +	}
+> +Optional properties:
+> +--------------------
+> + - core_conf : R5 core configuration (valid string - split0 or split1 or
+> +               lock-step), default is lock-step.
+> + - memory-region: memories regions for RPU executable and DMA memory.
+> + - interrupts : Interrupt mapping for remoteproc IPI. It is required if the
+> +                user uses the remoteproc driver with the RPMsg kernel driver.
+> + - interrupt-parent : Phandle for the interrupt controller. It is required if
+> +                      the user uses the remoteproc driver with the RPMsg kernel
+> +                      kernel driver.
 > +
-> +	return 0;
-> +}
+> +Example:
+> +--------
+> +       reserved-memory {
+> +               #address-cells = <2>;
+> +               #size-cells = <2>;
+> +               ranges;
+> +               rproc_0_fw_reserved: rproc at 3ed000000 {
+> +                       compatible = "rproc-prog-memory";
+> +                       no-map;
+> +                       reg = <0x0 0x3ed00000 0x0 0x40000>;
+> +               };
+> +               rproc_0_dma_reserved: rproc at 3ed400000 {
+> +                       compatible = "shared-dma-pool";
+> +                       no-map;
+> +                       reg = <0x0 0x3ed40000 0x0 0x80000>;
+> +               };
+> +       };
 > +
->  static struct dentry *dfs_dir_mtd;
->  
->  /**
-> @@ -570,6 +613,11 @@ int add_mtd_device(struct mtd_info *mtd)
->  	if (error)
->  		goto fail_added;
->  
-> +	/* Add the nvmem provider */
-> +	error = mtd_nvmem_add(mtd);
-> +	if (error)
-> +		goto fail_nvmem_add;
+> +       firmware {
+> +               zynqmp_firmware: zynqmp-firmware {
+> +                       compatible = "xlnx,zynqmp-firmware";
+> +                       method = "smc";
+> +               };
+> +       };
 > +
->  	if (!IS_ERR_OR_NULL(dfs_dir_mtd)) {
->  		mtd->dbg.dfs_dir = debugfs_create_dir(dev_name(&mtd->dev), dfs_dir_mtd);
->  		if (IS_ERR_OR_NULL(mtd->dbg.dfs_dir)) {
-> @@ -595,6 +643,8 @@ int add_mtd_device(struct mtd_info *mtd)
->  	__module_get(THIS_MODULE);
->  	return 0;
->  
-> +fail_nvmem_add:
-> +	device_unregister(&mtd->dev);
->  fail_added:
->  	of_node_put(mtd_get_of_node(mtd));
->  	idr_remove(&mtd_idr, i);
-> diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
-> index a86c4fa93115..8121c6582285 100644
-> --- a/include/linux/mtd/mtd.h
-> +++ b/include/linux/mtd/mtd.h
-> @@ -25,6 +25,7 @@
->  #include <linux/notifier.h>
->  #include <linux/device.h>
->  #include <linux/of.h>
-> +#include <linux/nvmem-provider.h>
->  
->  #include <mtd/mtd-abi.h>
->  
-> @@ -339,6 +340,7 @@ struct mtd_info {
->  	struct device dev;
->  	int usecount;
->  	struct mtd_debug_info dbg;
-> +	struct nvmem_device *nvmem;
->  };
->  
->  int mtd_ooblayout_ecc(struct mtd_info *mtd, int section,
+> +       zynqmp-r5-remoteproc at 0 {
+> +               compatible = "xlnx,zynqmp-r5-remoteproc-1.0";
+> +               reg = <0x0 0xFFE00000 0x0 0x10000>,
+> +                       <0x0 0xFFE20000 0x0 0x10000>,
+> +                       <0x0 0xff340000 0x0 0x100>;
+> +               reg-names = "tcm_a", "tcm_b", "ipi";
+> +               dma-ranges;
+> +               core_conf = "split0";
+> +               memory-region = <&rproc_0_fw_reserved>,
+> +                               <&rproc_0_dma_reserved>;
+> +               tcm-pnode-id = <0xf>, <0x10>;
+> +               rpu-pnode-id = <0x7>;
+> +               interrupt-parent = <&gic>;
+> +               interrupts = <0 29 4>;
+> +       } ;
+> --
+> 2.7.4
+>
+
+Cheers,
+Moritz
