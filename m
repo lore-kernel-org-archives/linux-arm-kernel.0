@@ -1,80 +1,214 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 17 Aug 2018 02:33:52 +0000
-Subject: [PATCH V3 0/4] clk: new APIs to handle all available clocks
-In-Reply-To: <AM0PR04MB421114F8AFAE56B6D7C2D1E480770@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1527244643-10736-1-git-send-email-aisheng.dong@nxp.com>
- <AM0PR04MB421114F8AFAE56B6D7C2D1E480770@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <AM0PR04MB4211368561A415B255782CBE803D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: thor.thayer@linux.intel.com (Thor Thayer)
+Date: Thu, 16 Aug 2018 22:33:31 -0500
+Subject: [PATCH 1/2] arm64: dts: stratix10: Add Stratix10 SMMU support
+In-Reply-To: <db4d8290-c015-aa8b-6058-11fd3d25464b@arm.com>
+References: <1532543077-8933-1-git-send-email-thor.thayer@linux.intel.com>
+ <1532543077-8933-2-git-send-email-thor.thayer@linux.intel.com>
+ <db4d8290-c015-aa8b-6058-11fd3d25464b@arm.com>
+Message-ID: <cfe958b8-2711-4dbf-5f32-d777166c305a@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Robin,
 
-Do you want me to resend this series for review?
-It seems have been pending for quite a long time.
-
-Thor just pinged me for its status as he wants to use it.
-
-Regards
-Dong Aisheng
-
-> -----Original Message-----
-> From: A.s. Dong
-> Sent: Wednesday, June 20, 2018 10:54 AM
-> To: linux-clk at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org; dl-
-> linux-imx <linux-imx@nxp.com>
-> Subject: RE: [PATCH V3 0/4] clk: new APIs to handle all available clocks
+On 08/08/2018 12:38 PM, Robin Murphy wrote:
+> On 25/07/18 19:24, thor.thayer at linux.intel.com wrote:
+>> From: Thor Thayer <thor.thayer@linux.intel.com>
+>>
+>> Add SMMU support to the Stratix10 Device Tree which
+>> includes adding the SMMU node and adding IOMMU stream
+>> ids to the SMMU peripherals. Update bindings.
+>>
+>> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+>> ---
+>> This patch is dependent on the patch series
+>> "iommu/arm-smmu: Add runtime pm/sleep support"
+>> (https://patchwork.ozlabs.org/cover/946160/)
+>> ---
+>> ? .../devicetree/bindings/iommu/arm,smmu.txt???????? | 25 
+>> ++++++++++++++++++
+>> ? arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi? | 30 
+>> ++++++++++++++++++++++
+>> ? 2 files changed, 55 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt 
+>> b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> index 7c71a6ed465a..8e3fe0594e3e 100644
+>> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>> @@ -18,6 +18,7 @@ conditions.
+>> ????????????????????????? "arm,mmu-500"
+>> ????????????????????????? "cavium,smmu-v2"
+>> ????????????????????????? "qcom,<soc>-smmu-v2", "qcom,smmu-v2"
+>> +??????????????????????? "altr,smmu-v2"
 > 
-> Ping....
+> Can we guarantee that no Altera SoC will ever exist with a different 
+> SMMU implementation, configuration, or clock tree? If we must have 
+> compatibles for SoC-specific integrations, I'd be a lot happier if they 
+> were actually SoC-specific, i.e. at least "altr,stratix10-smmu", or even 
+> something like "altr,gx5500-smmu" if there's a chance of new 
+> incompatible designs being added to the Stratix 10 family in future.
 > 
-> > -----Original Message-----
-> > From: A.s. Dong
-> > Sent: Friday, May 25, 2018 6:37 PM
-> > To: linux-clk at vger.kernel.org
-> > Cc: linux-kernel at vger.kernel.org;
-> > linux-arm-kernel at lists.infradead.org;
-> > sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org; dl-
-> > linux-imx <linux-imx@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
-> > Subject: [PATCH V3 0/4] clk: new APIs to handle all available clocks
-> >
-> > This patch series is a continue of discussion from here,
-> > https://patchwork.kernel.org/patch/9986293/
-> > that some users may want to handle all available clocks from device
-> > tree without need to know the detailed clock information likes clock
-> > numbers and names. This is useful in writing some generic drivers to handle
-> clock part.
-> >
-> > Note:
-> > This patch series is tested on MX6Q SDB cpufreq driver with a minor
-> > change to switch to use clk_bulk_get_all.
-> > But patch 4 only test compiling. Hopefully someone could help test the
-> > function.
-> >
-> > v2->v3:
-> >  * address all comments from Stephen
-> >  * fix build warnings on other architectures.
-> > v1->v2:
-> >  * add clk_bulk_{get|put}_all() which only supports DT platform
-> > currently
-> >  * remove _all variants and the wrapper struct clk_bulk
-> >  * make of_clk_bulk_get and of_clk_bulk_get_all private until someone
-> >    proves they need it because they don't have a struct device pointer.
-> >
-> > Dong Aisheng (4):
-> >   clk: bulk: add of_clk_bulk_get()
-> >   clk: add new APIs to operate on all available clocks
-> >   clk: add managed version of clk_bulk_get_all
-> >   video: simplefb: switch to use clk_bulk API to simplify clock
-> >     operations
-> >
-> >  drivers/clk/clk-bulk.c         | 80
-> > ++++++++++++++++++++++++++++++++++++++++++
-> >  drivers/clk/clk-devres.c       | 24 +++++++++++++
-> >  drivers/video/fbdev/simplefb.c | 66 +++++++---------------------------
-> >  include/linux/clk.h            | 65 +++++++++++++++++++++++++++++++++-
-> >  4 files changed, 180 insertions(+), 55 deletions(-)
-> >
-> > --
-> > 2.7.4
+
+Good point. I'll get a better compatible string if I pursue this.
+
+> I'm still dubious that we actually need this for MMU-500, though, since 
+> we will always need the TCU clock enabled to do anything, and given the 
+> difficulty in associating particular TBU clocks with whichever domains 
+> might cause allocations into which TBU's TLBs, it seems highly unlikely 
+> that it'll ever be feasible to work at a granularity finer than "all of 
+> the clocks". And at that point the names don't really matter, and we 
+> merely need something like the proposed of_clk_bulk_get()[1], which 
+> works fine regardless of how many TBUs and distinct clocks exist for a 
+> particular MMU-500 configuration and integration.
+> 
+
+Yes, I would prefer to use the standard arm,mmu-500 but with the changes 
+proposed by [2] that this patch was dependent on, it seemed I would need 
+to make a new structure and type.
+
+I like the patch series for devm_clk_bulk_get_all() that includes 
+of_clk_bulk_get(). That would enable my patch to work with minor changes 
+to add bulk_clk to arm-smmu.c. However, the patchset doesn't seem to 
+have been accepted yet.
+
+>> ??????????????????? depending on the particular implementation and/or the
+>> ??????????????????? version of the architecture implemented.
+>> @@ -179,3 +180,27 @@ conditions.
+>> ?????????????? <&mmcc SMMU_MDP_AHB_CLK>;
+>> ????????? clock-names = "bus", "iface";
+>> ????? };
+>> +
+>> +??? /* Stratix10 arm,smmu-v2 implementation */
+>> +??? smmu5: iommu at fa000000 {
+>> +??????? compatible = "altr,smmu-v2", "arm,mmu-500",
+>> +???????????????? "arm,smmu-v2";
+>> +??????? reg = <0xfa000000 0x40000>;
+>> +??????? #global-interrupts = <2>;
+>> +??????? #iommu-cells = <1>;
+>> +??????? clocks = <&clkmgr STRATIX10_L4_MAIN_CLK>;
+>> +??????? clock-names = "masters";
+> 
+> This isn't documented as an actual property, and if it also clocks the 
+> TCU then I'm not sure it's really the most accurate name.
+> 
+> Robin.
+> 
+> [1] https://patchwork.kernel.org/patch/10427095/
+
+In the patch I'll remove the clock-names.
+
+I'll keep track of the status of this patch (and [3] from the same 
+patchset). I tested a simple patch that uses devm_clk_bulk_get_all() 
+from these bulk_clk patches and it works well with the standard 
+"arm,mmu-500" compatible.
+
+This patch has dependencies on [2]. It seems like [2] could use the 
+bulk_clk patches in [1] above (in particular [2]'s patch 1/4).  The 
+function arm_smmu_fill_clk_data() wouldn't be needed because everything 
+happens in devm_clk_bulk_get_all(). However, those bulk_clk patches have 
+been hanging out there since May.
+
+I'm unclear on how to proceed. Do I continue with dependency on [2] or 
+create a new patch adding the bulk clocks changes in [1] (and [3])?
+
+Thanks for reviewing!
+
+Thor
+
+[2] https://patchwork.kernel.org/patch/10546677/
+[3] https://patchwork.kernel.org/patch/10427079/
+> 
+>> +??????? interrupt-parent = <&intc>;
+>> +??????? interrupts = <0 128 4>,??? /* Global Secure Fault */
+>> +??????????? <0 129 4>, /* Global Non-secure Fault */
+>> +??????????? /* Non-secure Context Interrupts (32) */
+>> +??????????? <0 138 4>, <0 139 4>, <0 140 4>, <0 141 4>,
+>> +??????????? <0 142 4>, <0 143 4>, <0 144 4>, <0 145 4>,
+>> +??????????? <0 146 4>, <0 147 4>, <0 148 4>, <0 149 4>,
+>> +??????????? <0 150 4>, <0 151 4>, <0 152 4>, <0 153 4>,
+>> +??????????? <0 154 4>, <0 155 4>, <0 156 4>, <0 157 4>,
+>> +??????????? <0 158 4>, <0 159 4>, <0 160 4>, <0 161 4>,
+>> +??????????? <0 162 4>, <0 163 4>, <0 164 4>, <0 165 4>,
+>> +??????????? <0 166 4>, <0 167 4>, <0 168 4>, <0 169 4>;
+>> +??????? stream-match-mask = <0x7ff0>;
+>> +??? };
+>> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi 
+>> b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+>> index d033da401c26..e38ca86d48f6 100644
+>> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+>> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+>> @@ -137,6 +137,7 @@
+>> ????????????? reset-names = "stmmaceth", "stmmaceth-ocp";
+>> ????????????? clocks = <&clkmgr STRATIX10_EMAC0_CLK>;
+>> ????????????? clock-names = "stmmaceth";
+>> +??????????? iommus = <&smmu 1>;
+>> ????????????? status = "disabled";
+>> ????????? };
+>> @@ -150,6 +151,7 @@
+>> ????????????? reset-names = "stmmaceth", "stmmaceth-ocp";
+>> ????????????? clocks = <&clkmgr STRATIX10_EMAC1_CLK>;
+>> ????????????? clock-names = "stmmaceth";
+>> +??????????? iommus = <&smmu 2>;
+>> ????????????? status = "disabled";
+>> ????????? };
+>> @@ -163,6 +165,7 @@
+>> ????????????? reset-names = "stmmaceth", "stmmaceth-ocp";
+>> ????????????? clocks = <&clkmgr STRATIX10_EMAC2_CLK>;
+>> ????????????? clock-names = "stmmaceth";
+>> +??????????? iommus = <&smmu 3>;
+>> ????????????? status = "disabled";
+>> ????????? };
+>> @@ -273,6 +276,7 @@
+>> ????????????? clocks = <&clkmgr STRATIX10_L4_MP_CLK>,
+>> ?????????????????? <&clkmgr STRATIX10_SDMMC_CLK>;
+>> ????????????? clock-names = "biu", "ciu";
+>> +??????????? iommus = <&smmu 5>;
+>> ????????????? status = "disabled";
+>> ????????? };
+>> @@ -307,6 +311,30 @@
+>> ????????????? altr,modrst-offset = <0x20>;
+>> ????????? };
+>> +??????? smmu: iommu at fa000000 {
+>> +??????????? compatible = "altr,smmu-v2", "arm,mmu-500",
+>> +???????????????????? "arm,smmu-v2";
+>> +??????????? reg = <0xfa000000 0x40000>;
+>> +??????????? #global-interrupts = <2>;
+>> +??????????? #iommu-cells = <1>;
+>> +??????????? clocks = <&clkmgr STRATIX10_L4_MAIN_CLK>;
+>> +??????????? clock-names = "masters";
+>> +??????????? interrupt-parent = <&intc>;
+>> +??????????? interrupts = <0 128 4>,??? /* Global Secure Fault */
+>> +??????????????? <0 129 4>, /* Global Non-secure Fault */
+>> +??????????????? /* Non-secure Context Interrupts (32) */
+>> +??????????????? <0 138 4>, <0 139 4>, <0 140 4>, <0 141 4>,
+>> +??????????????? <0 142 4>, <0 143 4>, <0 144 4>, <0 145 4>,
+>> +??????????????? <0 146 4>, <0 147 4>, <0 148 4>, <0 149 4>,
+>> +??????????????? <0 150 4>, <0 151 4>, <0 152 4>, <0 153 4>,
+>> +??????????????? <0 154 4>, <0 155 4>, <0 156 4>, <0 157 4>,
+>> +??????????????? <0 158 4>, <0 159 4>, <0 160 4>, <0 161 4>,
+>> +??????????????? <0 162 4>, <0 163 4>, <0 164 4>, <0 165 4>,
+>> +??????????????? <0 166 4>, <0 167 4>, <0 168 4>, <0 169 4>;
+>> +??????????? stream-match-mask = <0x7ff0>;
+>> +??????????? status = "disabled";
+>> +??????? };
+>> +
+>> ????????? spi0: spi at ffda4000 {
+>> ????????????? compatible = "snps,dw-apb-ssi";
+>> ????????????? #address-cells = <1>;
+>> @@ -416,6 +444,7 @@
+>> ????????????? resets = <&rst USB0_RESET>, <&rst USB0_OCP_RESET>;
+>> ????????????? reset-names = "dwc2", "dwc2-ecc";
+>> ????????????? clocks = <&clkmgr STRATIX10_USB_CLK>;
+>> +??????????? iommus = <&smmu 6>;
+>> ????????????? status = "disabled";
+>> ????????? };
+>> @@ -428,6 +457,7 @@
+>> ????????????? resets = <&rst USB1_RESET>, <&rst USB1_OCP_RESET>;
+>> ????????????? reset-names = "dwc2", "dwc2-ecc";
+>> ????????????? clocks = <&clkmgr STRATIX10_USB_CLK>;
+>> +??????????? iommus = <&smmu 7>;
+>> ????????????? status = "disabled";
+>> ????????? };
+>>
+> 
