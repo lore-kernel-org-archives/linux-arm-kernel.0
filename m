@@ -1,40 +1,80 @@
-From: pasha.tatashin@gmail.com (Pavel Tatashin)
-Date: Thu, 16 Aug 2018 21:38:15 -0400
-Subject: [RESEND PATCH v10 6/6] mm: page_alloc: reduce unnecessary binary
- search in early_pfn_valid()
-In-Reply-To: <c6ed43ee-b09e-1f75-43b3-6cd2808d13f3@microsoft.com>
-References: <1530867675-9018-1-git-send-email-hejianet@gmail.com>
- <1530867675-9018-7-git-send-email-hejianet@gmail.com>
- <c6ed43ee-b09e-1f75-43b3-6cd2808d13f3@microsoft.com>
-Message-ID: <831be9a1-6401-3af0-b68b-b3e25db806f9@gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Fri, 17 Aug 2018 02:33:52 +0000
+Subject: [PATCH V3 0/4] clk: new APIs to handle all available clocks
+In-Reply-To: <AM0PR04MB421114F8AFAE56B6D7C2D1E480770@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1527244643-10736-1-git-send-email-aisheng.dong@nxp.com>
+ <AM0PR04MB421114F8AFAE56B6D7C2D1E480770@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <AM0PR04MB4211368561A415B255782CBE803D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Stephen,
 
+Do you want me to resend this series for review?
+It seems have been pending for quite a long time.
 
-On 8/16/18 9:35 PM, Pasha Tatashin wrote:
-> 
-> 
-> On 7/6/18 5:01 AM, Jia He wrote:
->> Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
->> where possible") optimized the loop in memmap_init_zone(). But there is
->> still some room for improvement. E.g. in early_pfn_valid(), if pfn and
->> pfn+1 are in the same memblock region, we can record the last returned
->> memblock region index and check whether pfn++ is still in the same
->> region.
->>
->> Currently it only improve the performance on arm/arm64 and will have no
->> impact on other arches.
->>
->> For the performance improvement, after this set, I can see the time
->> overhead of memmap_init() is reduced from 27956us to 13537us in my
->> armv8a server(QDF2400 with 96G memory, pagesize 64k).
-> 
-> This series would be a lot simpler if patches 4, 5, and 6 were dropped.
-> The extra complexity does not make sense to save 0.0001s/T during not.
-s/not/boot
+Thor just pinged me for its status as he wants to use it.
 
+Regards
+Dong Aisheng
+
+> -----Original Message-----
+> From: A.s. Dong
+> Sent: Wednesday, June 20, 2018 10:54 AM
+> To: linux-clk at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org; dl-
+> linux-imx <linux-imx@nxp.com>
+> Subject: RE: [PATCH V3 0/4] clk: new APIs to handle all available clocks
 > 
-> Patches 1-3, look OK, but without patches 4-5 __init_memblock should be
-> made local static as I suggested earlier.
-s/__init_memblock/early_region_idx
+> Ping....
+> 
+> > -----Original Message-----
+> > From: A.s. Dong
+> > Sent: Friday, May 25, 2018 6:37 PM
+> > To: linux-clk at vger.kernel.org
+> > Cc: linux-kernel at vger.kernel.org;
+> > linux-arm-kernel at lists.infradead.org;
+> > sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org; dl-
+> > linux-imx <linux-imx@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
+> > Subject: [PATCH V3 0/4] clk: new APIs to handle all available clocks
+> >
+> > This patch series is a continue of discussion from here,
+> > https://patchwork.kernel.org/patch/9986293/
+> > that some users may want to handle all available clocks from device
+> > tree without need to know the detailed clock information likes clock
+> > numbers and names. This is useful in writing some generic drivers to handle
+> clock part.
+> >
+> > Note:
+> > This patch series is tested on MX6Q SDB cpufreq driver with a minor
+> > change to switch to use clk_bulk_get_all.
+> > But patch 4 only test compiling. Hopefully someone could help test the
+> > function.
+> >
+> > v2->v3:
+> >  * address all comments from Stephen
+> >  * fix build warnings on other architectures.
+> > v1->v2:
+> >  * add clk_bulk_{get|put}_all() which only supports DT platform
+> > currently
+> >  * remove _all variants and the wrapper struct clk_bulk
+> >  * make of_clk_bulk_get and of_clk_bulk_get_all private until someone
+> >    proves they need it because they don't have a struct device pointer.
+> >
+> > Dong Aisheng (4):
+> >   clk: bulk: add of_clk_bulk_get()
+> >   clk: add new APIs to operate on all available clocks
+> >   clk: add managed version of clk_bulk_get_all
+> >   video: simplefb: switch to use clk_bulk API to simplify clock
+> >     operations
+> >
+> >  drivers/clk/clk-bulk.c         | 80
+> > ++++++++++++++++++++++++++++++++++++++++++
+> >  drivers/clk/clk-devres.c       | 24 +++++++++++++
+> >  drivers/video/fbdev/simplefb.c | 66 +++++++---------------------------
+> >  include/linux/clk.h            | 65 +++++++++++++++++++++++++++++++++-
+> >  4 files changed, 180 insertions(+), 55 deletions(-)
+> >
+> > --
+> > 2.7.4
