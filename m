@@ -1,90 +1,135 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 17 Aug 2018 12:11:57 +0100
-Subject: [PATCH 1/3] iommu: Add fast hook for getting DMA domains
-In-Reply-To: <d31ca4b3-5cb3-8ba3-485b-3fee58807cae@huawei.com>
-References: <cover.1534250425.git.robin.murphy@arm.com>
- <4d50587e62c16f7b5cfc45dee808d774655155cf.1534250425.git.robin.murphy@arm.com>
- <d31ca4b3-5cb3-8ba3-485b-3fee58807cae@huawei.com>
-Message-ID: <29a126d2-4bbe-1750-5265-d3dbfcb658ae@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 17 Aug 2018 14:13:55 +0300
+Subject: [PATCH] arm64: dts: renesas: r8a77980: add CSI2/VIN support
+In-Reply-To: <20180817085109.ekvnhcuei5aexpx4@verge.net.au>
+References: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
+ <758a8c87-272c-e861-4aab-01309cff2f84@cogentembedded.com>
+ <20180809130854.65nvmnuuz6gffjjr@verge.net.au>
+ <6032159b-ad2b-9a19-77f1-fc7a0ce3c5b0@cogentembedded.com>
+ <20180817085109.ekvnhcuei5aexpx4@verge.net.au>
+Message-ID: <ea1ae505-d03a-6993-73f1-0ee2ad935c44@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/08/18 10:36, John Garry wrote:
-> On 14/08/2018 14:04, Robin Murphy wrote:
->> While iommu_get_domain_for_dev() is the robust way for arbitrary IOMMU
->> API callers to retrieve the domain pointer, for DMA ops domains it
->> doesn't scale well for large systems and multi-queue devices, since the
->> momentary refcount adjustment will lead to exclusive cacheline contention
->> when multiple CPUs are operating in parallel on different mappings for
->> the same device.
->>
->> In the case of DMA ops domains, however, this refcounting is actually
->> unnecessary, since they already imply that the group exists and is
->> managed by platform code and IOMMU internals (by virtue of
->> iommu_group_get_for_dev()) such that a reference will already be held
->> for the lifetime of the device. Thus we can avoid the bottleneck by
->> providing a fast lookup specifically for the DMA code to retrieve the
->> default domain it already knows it has set up - a simple read-only
->> dereference plays much nicer with cache-coherency protocols.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->> ?drivers/iommu/iommu.c | 9 +++++++++
->> ?include/linux/iommu.h | 1 +
->> ?2 files changed, 10 insertions(+)
->>
->> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->> index 63b37563db7e..63c586875df5 100644
->> --- a/drivers/iommu/iommu.c
->> +++ b/drivers/iommu/iommu.c
->> @@ -1379,6 +1379,15 @@ struct iommu_domain 
->> *iommu_get_domain_for_dev(struct device *dev)
->> ?}
->> ?EXPORT_SYMBOL_GPL(iommu_get_domain_for_dev);
->>
->> +/*
->> + * For IOMMU_DOMAIN_DMA implementations which already provide their own
->> + * guarantees that the group and its default domain are valid and 
->> correct.
->> + */
->> +struct iommu_domain *iommu_get_dma_domain(struct device *dev)
->> +{
->> +??? return dev->iommu_group->default_domain;
->> +}
->> +
->> ?/*
->> ? * IOMMU groups are really the natrual working unit of the IOMMU, but
->> ? * the IOMMU API works on domains and devices.? Bridge that gap by
->> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
->> index 19938ee6eb31..16f2172698e5 100644
->> --- a/include/linux/iommu.h
->> +++ b/include/linux/iommu.h
->> @@ -297,6 +297,7 @@ extern int iommu_attach_device(struct iommu_domain 
->> *domain,
->> ?extern void iommu_detach_device(struct iommu_domain *domain,
->> ???????????????? struct device *dev);
->> ?extern struct iommu_domain *iommu_get_domain_for_dev(struct device 
->> *dev);
->> +extern struct iommu_domain *iommu_get_dma_domain(struct device *dev);
-> 
-> Hi Robin,
-> 
-> I was wondering whether it's standard to provide a stubbed version of 
-> this function for !CONFIG_IOMMU_API?
+On 08/17/2018 11:51 AM, Simon Horman wrote:
 
-Nope, that's deliberate - this is one of those hooks where any 
-legitimate caller will already be dependent on IOMMU_API itself.
-
-Robin.
-
-> 
-> Cheers,
-> John
-> 
->> ?extern int iommu_map(struct iommu_domain *domain, unsigned long iova,
->> ????????????? phys_addr_t paddr, size_t size, int prot);
->> ?extern size_t iommu_unmap(struct iommu_domain *domain, unsigned long 
->> iova,
+>>>> Describe the CSI2 and VIN (and their interconnections) in the R8A77980
+>>>> device tree.
+>>>>
+>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>>>
+>>>> ---
+>>>> This patch is against the 'renesas-devel-20180802v2-v4.18-rc7' branch of
+>>>> Simon Horman's 'renesas.git' repo.
+>>>>
+>>>> The R8A77980 CSI2/VIN DT binding updates have been posted earlier today...
+>>>>
+>>>>  arch/arm64/boot/dts/renesas/r8a77980.dtsi |  374 ++++++++++++++++++++++++++++++
+>>>>  1 file changed, 374 insertions(+)
+>>>>
+>>>> Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+>>>> ===================================================================
+>>>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+>>>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+[...]
+>>>> +		csi41: csi2 at feab0000 {
+>>>> +			compatible = "renesas,r8a77980-csi2";
+>>>> +			reg = <0 0xfeab0000 0 0x10000>;
+>>>> +			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
+>>>
+>>> The use of GIC_SPI 246 for both csi40 and csi41 seems suspicious.
+>>> Is this intentional?
 >>
+>>     No, must be copy/paste artefact... Sorry about that, it should be 241 instead.
+>>
+>>>> +			clocks = <&cpg CPG_MOD 716>;
+>>>
+>>> Should this clock be 715 rather than 716?
+>>
+>>    Yes, sure.
+>>
+>>    I'm seeing this patch merged despite your remarks. Please either fix it up or
+>> pull it out!
 > 
+> Oops, that was not intended.
 > 
+> I have fixed up the patch as you suggested.
+> The result is as follows:
+
+   Still buggy... :-)
+
+> From c703c196b847c654b392f027d3fa995e378792ac Mon Sep 17 00:00:00 2001
+> From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Date: Mon, 6 Aug 2018 22:55:00 +0300
+> Subject: [PATCH] arm64: dts: renesas: r8a77980: add CSI2/VIN support
+> 
+> Describe the CSI2 and VIN (and their interconnections) in the R8A77980
+> device tree.
+> 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm64/boot/dts/renesas/r8a77980.dtsi | 374 ++++++++++++++++++++++++++++++
+>  1 file changed, 374 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> index 4bc99d6763ce..71636fd1a819 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+[...]
+> @@ -769,6 +1065,84 @@
+>  			resets = <&cpg 603>;
+>  		};
+>  
+> +		csi40: csi2 at feaa0000 {
+> +			compatible = "renesas,r8a77980-csi2";
+> +			reg = <0 0xfeaa0000 0 0x10000>;
+> +			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 716>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 716>;
+> +			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +
+> +					reg = <1>;
+> +
+> +					csi40vin0: endpoint at 0 {
+> +						reg = <0>;
+> +						remote-endpoint = <&vin0csi40>;
+> +					};
+> +					csi40vin1: endpoint at 1 {
+> +						reg = <1>;
+> +						remote-endpoint = <&vin1csi40>;
+> +					};
+> +					csi40vin2: endpoint at 2 {
+> +						reg = <2>;
+> +						remote-endpoint = <&vin2csi40>;
+> +					};
+> +					csi40vin3: endpoint at 3 {
+> +						reg = <3>;
+> +						remote-endpoint = <&vin3csi40>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		csi41: csi2 at feab0000 {
+> +			compatible = "renesas,r8a77980-csi2";
+> +			reg = <0 0xfeab0000 0 0x10000>;
+> +			interrupts = <GIC_SPI 241 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 715>;
+> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
+> +			resets = <&cpg 716>;
+
+   You forgot to fix up this prop...
+
+[...]
+
+MBR, Sergei
