@@ -1,59 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 17 Aug 2018 15:50:53 +0100
-Subject: [RESEND PATCH v10 1/6] arm: arm64: introduce
- CONFIG_HAVE_MEMBLOCK_PFN_VALID
-In-Reply-To: <1530867675-9018-2-git-send-email-hejianet@gmail.com>
-References: <1530867675-9018-1-git-send-email-hejianet@gmail.com>
- <1530867675-9018-2-git-send-email-hejianet@gmail.com>
-Message-ID: <20180817145052.aizhi6n66vxblriq@armageddon.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 17 Aug 2018 09:09:02 -0600
+Subject: [PATCH v12 13/14] cpufreq: qcom: Re-organise kryo cpufreq to use
+ it for other nvmem based qcom socs
+In-Reply-To: <1534248753-2440-14-git-send-email-sricharan@codeaurora.org>
+References: <1534248753-2440-1-git-send-email-sricharan@codeaurora.org>
+ <1534248753-2440-14-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20180817150902.GA19164@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 06, 2018 at 05:01:10PM +0800, Jia He wrote:
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 42c090c..26d75f4 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -778,6 +778,10 @@ config ARCH_SELECT_MEMORY_MODEL
->  config HAVE_ARCH_PFN_VALID
->  	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
->  
-> +config HAVE_MEMBLOCK_PFN_VALID
-> +	def_bool y
-> +	depends on HAVE_ARCH_PFN_VALID
-> +
->  config HW_PERF_EVENTS
->  	def_bool y
->  	depends on ARM_PMU
-> diff --git a/mm/Kconfig b/mm/Kconfig
-> index 94af022..28fcf54 100644
-> --- a/mm/Kconfig
-> +++ b/mm/Kconfig
-> @@ -137,6 +137,9 @@ config HAVE_MEMBLOCK_NODE_MAP
->  config HAVE_MEMBLOCK_PHYS_MAP
->  	bool
->  
-> +config HAVE_MEMBLOCK_PFN_VALID
-> +	bool
+Hi, this email is from Rob's (experimental) review bot. I found a couple
+of common problems with your patch. Please see below.
 
-Since you defined HAVE_MEMBLOCK_PFN_VALID here, do we need to define it
-in the arch code as well? If kept it in the mm/Kconfig only, you could
-just select it in the arch HAVE_ARCH_PFN_VALID entry:
+On Tue, 14 Aug 2018 17:42:32 +0530, Sricharan R wrote:
+> The kryo cpufreq driver reads the nvmem cell and uses that data to
+> populate the opps. There are other qcom cpufreq socs like krait which
+> does similar thing. Except for the interpretation of the read data,
+> rest of the driver is same for both the cases. So pull the common things
+> out for reuse.
+> 
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index d0a53cc6293a..cd230c77e122 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -787,6 +787,7 @@ config ARCH_FLATMEM_ENABLE
- 
- config HAVE_ARCH_PFN_VALID
- 	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
-+	select HAVE_MEMBLOCK_PFN_VALID
- 
- config HW_PERF_EVENTS
- 	def_bool y
+The preferred subject prefix is "dt-bindings: <binding dir>: ...".
 
-(similarly for arch/arm)
+> ---
+>  .../{kryo-cpufreq.txt => qcom-nvmem-cpufreq.txt}   |   6 +-
+>  drivers/cpufreq/Kconfig.arm                        |   4 +-
+>  drivers/cpufreq/Makefile                           |   2 +-
+>  .../{qcom-cpufreq-kryo.c => qcom-cpufreq-nvmem.c}  | 124 ++++++++++++---------
+>  4 files changed, 80 insertions(+), 56 deletions(-)
+>  rename Documentation/devicetree/bindings/opp/{kryo-cpufreq.txt => qcom-nvmem-cpufreq.txt} (99%)
+>  rename drivers/cpufreq/{qcom-cpufreq-kryo.c => qcom-cpufreq-nvmem.c} (65%)
+> 
 
--- 
-Catalin
+DT bindings (including binding headers) should be a separate patch. See
+Documentation/devicetree/bindings/submitting-patches.txt.
