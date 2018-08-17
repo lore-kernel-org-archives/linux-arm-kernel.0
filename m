@@ -1,37 +1,33 @@
-From: john.garry@huawei.com (John Garry)
-Date: Fri, 17 Aug 2018 23:42:22 +0800
-Subject: [PATCH] iommu/arm-smmu-v3: Fix a couple of minor comment typos
-Message-ID: <1534520542-92851-1-git-send-email-john.garry@huawei.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 Aug 2018 17:17:43 +0100
+Subject: [offlist] Re: Crash in netlink/sk_filter_trim_cap on ARMv7 on
+ 4.18rc1
+In-Reply-To: <1c2218cb-63bf-1528-6156-8ce93f46169c@iogearbox.net>
+References: <CALeDE9PP__kPHX_aW24kwzGf9BgA0gQOQJSY+Qw0yFMOLn4Pcw@mail.gmail.com>
+ <7ff516fd-1d01-4d7a-1d5d-b58932c0c69d@gmail.com>
+ <CALeDE9Nkz+cbueruiez_43ZS1ebAiQHDaVZRARE8raypYz323A@mail.gmail.com>
+ <ad98d60c-bd60-b495-c4bd-507fc29c8bcd@iogearbox.net>
+ <CALeDE9PBZWJBp8KB0mB4zoNXqscmzxWzz+LnuqRA-z4t1e9T8g@mail.gmail.com>
+ <CALeDE9OOrZUnaNpzkYPU30iN=4HFQaqEomjf14EO5EtcnHu8OQ@mail.gmail.com>
+ <20180816203515.GA7688@torres.zugschlus.de>
+ <20180816225844.GW30658@n2100.armlinux.org.uk>
+ <CALeDE9Pm7nsqDFL0m0ZsNdnEti6YAbEPhtfbNMPe=UZCUyyHMA@mail.gmail.com>
+ <1c2218cb-63bf-1528-6156-8ce93f46169c@iogearbox.net>
+Message-ID: <20180817161743.GX30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix some comment typos spotted.
+On Fri, Aug 17, 2018 at 02:40:19PM +0200, Daniel Borkmann wrote:
+> I'd have one potential bug suspicion, for the 4.18 one you were trying,
+> could you run with the below patch to see whether it would help?
 
-Signed-off-by: John Garry <john.garry@huawei.com>
+I think this is almost certainly the problem - looking at the history,
+it seems that the "-4" was assumed to be part of the scratch stuff in
+commit 38ca93060163 ("bpf, arm32: save 4 bytes of unneeded stack space")
+but it isn't - it's because "off" of zero refers to the top word in the
+stack (iow at STACK_SIZE-4).
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 5059d09..feef122 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -708,7 +708,7 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
- }
- 
- /*
-- * Wait for the SMMU to consume items. If drain is true, wait until the queue
-+ * Wait for the SMMU to consume items. If sync is true, wait until the queue
-  * is empty. Otherwise, wait until there is at least one free slot.
-  */
- static int queue_poll_cons(struct arm_smmu_queue *q, bool sync, bool wfe)
-@@ -2353,8 +2353,8 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
- 	irq = smmu->combined_irq;
- 	if (irq) {
- 		/*
--		 * Cavium ThunderX2 implementation doesn't not support unique
--		 * irq lines. Use single irq line for all the SMMUv3 interrupts.
-+		 * Cavium ThunderX2 implementation doesn't support unique irq
-+		 * lines. Use a single irq line for all the SMMUv3 interrupts.
- 		 */
- 		ret = devm_request_threaded_irq(smmu->dev, irq,
- 					arm_smmu_combined_irq_handler,
 -- 
-1.9.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
