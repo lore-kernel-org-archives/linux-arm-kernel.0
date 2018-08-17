@@ -1,27 +1,168 @@
-From: jasonwood2031@gmail.com (Jiecheng Wu)
-Date: Fri, 17 Aug 2018 16:12:55 +0800
-Subject: [PATCH] coherency.c: fix missing return value check of kzalloc()
-Message-ID: <20180817081255.4668-1-jasonwood2031@gmail.com>
+From: kyeongdon.kim@lge.com (Kyeongdon Kim)
+Date: Fri, 17 Aug 2018 17:37:55 +0900
+Subject: [PATCH] arm64: kasan: add interceptors for strcmp/strncmp functions
+Message-ID: <1534495075-82167-1-git-send-email-kyeongdon.kim@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function armada_375_380_coherency_init() defined in arch/arm/mach-mvebu/coherency.c calls kzalloc() to allocate memory for struct property which is dereferenced immediately. As kzalloc() may return NULL on failure, this code piece may cause NULL pointer dereference bug.
----
- arch/arm/mach-mvebu/coherency.c | 2 ++
- 1 file changed, 2 insertions(+)
+This patch declares strcmp/strncmp as weak symbols.
+(2 of them are the most used string operations)
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 8f8748a..d3bc8a6 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -194,6 +194,8 @@ static void __init armada_375_380_coherency_init(struct device_node *np)
- 		struct property *p;
+Original functions declared as weak symbols and
+strong ones in mm/kasan/kasan.c could replace them.
+
+Assembly optimized strcmp/strncmp functions cannot detect KASan bug.
+But, now we can detect them.
+
+==================================================================
+BUG: KASAN: use-after-free in platform_match+0x1c/0x5c at addr ffffffc0ad313500
+Read of size 1 by task swapper/0/1
+CPU: 3 PID: 1 Comm: swapper/0 Tainted: G    B           4.9.77+ #1
+Hardware name: Generic (DT) based system
+Call trace:
+ dump_backtrace+0x0/0x2e0
+ show_stack+0x14/0x1c
+ dump_stack+0x88/0xb0
+ kasan_object_err+0x24/0x7c
+ kasan_report+0x2f0/0x484
+ check_memory_region+0x20/0x14c
+ strcmp+0x1c/0x5c
+ platform_match+0x40/0xe4
+ __driver_attach+0x40/0x130
+ bus_for_each_dev+0xc4/0xe0
+ driver_attach+0x30/0x3c
+ bus_add_driver+0x2dc/0x328
+ driver_register+0x118/0x160
+ __platform_driver_register+0x7c/0x88
+ alarmtimer_init+0x154/0x1e4
+ do_one_initcall+0x184/0x1a4
+ kernel_init_freeable+0x2ec/0x2f0
+ kernel_init+0x18/0x10c
+ ret_from_fork+0x10/0x50
+
+Signed-off-by: Kyeongdon Kim <kyeongdon.kim@lge.com>
+---
+ arch/arm64/include/asm/string.h |  4 ++++
+ arch/arm64/kernel/arm64ksyms.c  |  2 ++
+ arch/arm64/kernel/image.h       |  2 ++
+ arch/arm64/lib/strcmp.S         |  3 +++
+ arch/arm64/lib/strncmp.S        |  3 +++
+ mm/kasan/kasan.c                | 15 +++++++++++++++
+ 6 files changed, 29 insertions(+)
+
+diff --git a/arch/arm64/include/asm/string.h b/arch/arm64/include/asm/string.h
+index dd95d33..d546605 100644
+--- a/arch/arm64/include/asm/string.h
++++ b/arch/arm64/include/asm/string.h
+@@ -24,9 +24,11 @@ extern char *strchr(const char *, int c);
  
- 		p = kzalloc(sizeof(*p), GFP_KERNEL);
-+		if (!p)
-+			return;
- 		p->name = kstrdup("arm,io-coherent", GFP_KERNEL);
- 		of_add_property(cache_dn, p);
- 	}
+ #define __HAVE_ARCH_STRCMP
+ extern int strcmp(const char *, const char *);
++extern int __strcmp(const char *, const char *);
+ 
+ #define __HAVE_ARCH_STRNCMP
+ extern int strncmp(const char *, const char *, __kernel_size_t);
++extern int __strncmp(const char *, const char *, __kernel_size_t);
+ 
+ #define __HAVE_ARCH_STRLEN
+ extern __kernel_size_t strlen(const char *);
+@@ -67,6 +69,8 @@ void memcpy_flushcache(void *dst, const void *src, size_t cnt);
+ #define memcpy(dst, src, len) __memcpy(dst, src, len)
+ #define memmove(dst, src, len) __memmove(dst, src, len)
+ #define memset(s, c, n) __memset(s, c, n)
++#define strcmp(cs, ct) __strcmp(cs, ct)
++#define strncmp(cs, ct, n) __strncmp(cs, ct, n)
+ 
+ #ifndef __NO_FORTIFY
+ #define __NO_FORTIFY /* FORTIFY_SOURCE uses __builtin_memcpy, etc. */
+diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
+index d894a20..10b1164 100644
+--- a/arch/arm64/kernel/arm64ksyms.c
++++ b/arch/arm64/kernel/arm64ksyms.c
+@@ -50,6 +50,8 @@ EXPORT_SYMBOL(strcmp);
+ EXPORT_SYMBOL(strncmp);
+ EXPORT_SYMBOL(strlen);
+ EXPORT_SYMBOL(strnlen);
++EXPORT_SYMBOL(__strcmp);
++EXPORT_SYMBOL(__strncmp);
+ EXPORT_SYMBOL(memset);
+ EXPORT_SYMBOL(memcpy);
+ EXPORT_SYMBOL(memmove);
+diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+index a820ed0..5ef7a57 100644
+--- a/arch/arm64/kernel/image.h
++++ b/arch/arm64/kernel/image.h
+@@ -110,6 +110,8 @@ __efistub___flush_dcache_area	= KALLSYMS_HIDE(__pi___flush_dcache_area);
+ __efistub___memcpy		= KALLSYMS_HIDE(__pi_memcpy);
+ __efistub___memmove		= KALLSYMS_HIDE(__pi_memmove);
+ __efistub___memset		= KALLSYMS_HIDE(__pi_memset);
++__efistub___strcmp		= KALLSYMS_HIDE(__pi_strcmp);
++__efistub___strncmp		= KALLSYMS_HIDE(__pi_strncmp);
+ #endif
+ 
+ __efistub__text			= KALLSYMS_HIDE(_text);
+diff --git a/arch/arm64/lib/strcmp.S b/arch/arm64/lib/strcmp.S
+index 471fe61..0dffef7 100644
+--- a/arch/arm64/lib/strcmp.S
++++ b/arch/arm64/lib/strcmp.S
+@@ -60,6 +60,8 @@ tmp3		.req	x9
+ zeroones	.req	x10
+ pos		.req	x11
+ 
++.weak strcmp
++ENTRY(__strcmp)
+ ENTRY(strcmp)
+ 	eor	tmp1, src1, src2
+ 	mov	zeroones, #REP8_01
+@@ -232,3 +234,4 @@ CPU_BE(	orr	syndrome, diff, has_nul )
+ 	sub	result, data1, data2, lsr #56
+ 	ret
+ ENDPIPROC(strcmp)
++ENDPROC(__strcmp)
+diff --git a/arch/arm64/lib/strncmp.S b/arch/arm64/lib/strncmp.S
+index e267044..b2648c7 100644
+--- a/arch/arm64/lib/strncmp.S
++++ b/arch/arm64/lib/strncmp.S
+@@ -64,6 +64,8 @@ limit_wd	.req	x13
+ mask		.req	x14
+ endloop		.req	x15
+ 
++.weak strncmp
++ENTRY(__strncmp)
+ ENTRY(strncmp)
+ 	cbz	limit, .Lret0
+ 	eor	tmp1, src1, src2
+@@ -308,3 +310,4 @@ CPU_BE( orr	syndrome, diff, has_nul )
+ 	mov	result, #0
+ 	ret
+ ENDPIPROC(strncmp)
++ENDPROC(__strncmp)
+diff --git a/mm/kasan/kasan.c b/mm/kasan/kasan.c
+index c3bd520..eae43e6 100644
+--- a/mm/kasan/kasan.c
++++ b/mm/kasan/kasan.c
+@@ -304,7 +304,22 @@ void *memcpy(void *dest, const void *src, size_t len)
+ 
+ 	return __memcpy(dest, src, len);
+ }
++#undef strcmp
++int strcmp(const char *cs, const char *ct)
++{
++	check_memory_region((unsigned long)cs, 1, false, _RET_IP_);
++	check_memory_region((unsigned long)ct, 1, false, _RET_IP_);
+ 
++	return __strcmp(cs, ct);
++}
++#undef strncmp
++int strncmp(const char *cs, const char *ct, size_t len)
++{
++	check_memory_region((unsigned long)cs, len, false, _RET_IP_);
++	check_memory_region((unsigned long)ct, len, false, _RET_IP_);
++
++	return __strncmp(cs, ct, len);
++}
+ void kasan_alloc_pages(struct page *page, unsigned int order)
+ {
+ 	if (likely(!PageHighMem(page)))
 -- 
-2.6.4
+2.6.2
