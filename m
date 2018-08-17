@@ -1,33 +1,149 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Aug 2018 17:17:43 +0100
-Subject: [offlist] Re: Crash in netlink/sk_filter_trim_cap on ARMv7 on
- 4.18rc1
-In-Reply-To: <1c2218cb-63bf-1528-6156-8ce93f46169c@iogearbox.net>
-References: <CALeDE9PP__kPHX_aW24kwzGf9BgA0gQOQJSY+Qw0yFMOLn4Pcw@mail.gmail.com>
- <7ff516fd-1d01-4d7a-1d5d-b58932c0c69d@gmail.com>
- <CALeDE9Nkz+cbueruiez_43ZS1ebAiQHDaVZRARE8raypYz323A@mail.gmail.com>
- <ad98d60c-bd60-b495-c4bd-507fc29c8bcd@iogearbox.net>
- <CALeDE9PBZWJBp8KB0mB4zoNXqscmzxWzz+LnuqRA-z4t1e9T8g@mail.gmail.com>
- <CALeDE9OOrZUnaNpzkYPU30iN=4HFQaqEomjf14EO5EtcnHu8OQ@mail.gmail.com>
- <20180816203515.GA7688@torres.zugschlus.de>
- <20180816225844.GW30658@n2100.armlinux.org.uk>
- <CALeDE9Pm7nsqDFL0m0ZsNdnEti6YAbEPhtfbNMPe=UZCUyyHMA@mail.gmail.com>
- <1c2218cb-63bf-1528-6156-8ce93f46169c@iogearbox.net>
-Message-ID: <20180817161743.GX30658@n2100.armlinux.org.uk>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Fri, 17 Aug 2018 18:27:20 +0200
+Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via
+ the nvmem API
+In-Reply-To: <20180810080526.27207-7-brgl@bgdev.pl>
+References: <20180810080526.27207-1-brgl@bgdev.pl>
+ <20180810080526.27207-7-brgl@bgdev.pl>
+Message-ID: <20180817182720.6a6e5e8e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 17, 2018 at 02:40:19PM +0200, Daniel Borkmann wrote:
-> I'd have one potential bug suspicion, for the 4.18 one you were trying,
-> could you run with the below patch to see whether it would help?
+Hi Bartosz,
 
-I think this is almost certainly the problem - looking at the history,
-it seems that the "-4" was assumed to be part of the scratch stuff in
-commit 38ca93060163 ("bpf, arm32: save 4 bytes of unneeded stack space")
-but it isn't - it's because "off" of zero refers to the top word in the
-stack (iow at STACK_SIZE-4).
+On Fri, 10 Aug 2018 10:05:03 +0200
+Bartosz Golaszewski <brgl@bgdev.pl> wrote:
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+> From: Alban Bedel <albeu@free.fr>
+> 
+> Allow drivers that use the nvmem API to read data stored on MTD devices.
+> For this the mtd devices are registered as read-only NVMEM providers.
+> 
+> Signed-off-by: Alban Bedel <albeu@free.fr>
+> [Bartosz:
+>   - use the managed variant of nvmem_register(),
+>   - set the nvmem name]
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+
+What happened to the 2 other patches of Alban's series? I'd really like
+the DT case to be handled/agreed on in the same patchset, but IIRC,
+Alban and Srinivas disagreed on how this should be represented. I
+hope this time we'll come to an agreement, because the MTD <-> NVMEM
+glue has been floating around for quite some time...
+
+Regards,
+
+Boris
+
+> ---
+>  drivers/mtd/Kconfig     |  1 +
+>  drivers/mtd/mtdcore.c   | 50 +++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mtd/mtd.h |  2 ++
+>  3 files changed, 53 insertions(+)
+> 
+> diff --git a/drivers/mtd/Kconfig b/drivers/mtd/Kconfig
+> index 46ab7feec6b6..f5549482d0df 100644
+> --- a/drivers/mtd/Kconfig
+> +++ b/drivers/mtd/Kconfig
+> @@ -1,5 +1,6 @@
+>  menuconfig MTD
+>  	tristate "Memory Technology Device (MTD) support"
+> +	imply NVMEM
+>  	help
+>  	  Memory Technology Devices are flash, RAM and similar chips, often
+>  	  used for solid state file systems on embedded devices. This option
+> diff --git a/drivers/mtd/mtdcore.c b/drivers/mtd/mtdcore.c
+> index 42395df06be9..a57302eaceb5 100644
+> --- a/drivers/mtd/mtdcore.c
+> +++ b/drivers/mtd/mtdcore.c
+> @@ -488,6 +488,49 @@ int mtd_pairing_groups(struct mtd_info *mtd)
+>  }
+>  EXPORT_SYMBOL_GPL(mtd_pairing_groups);
+>  
+> +static int mtd_nvmem_reg_read(void *priv, unsigned int offset,
+> +			      void *val, size_t bytes)
+> +{
+> +	struct mtd_info *mtd = priv;
+> +	size_t retlen;
+> +	int err;
+> +
+> +	err = mtd_read(mtd, offset, bytes, &retlen, val);
+> +	if (err && err != -EUCLEAN)
+> +		return err;
+> +
+> +	return retlen == bytes ? 0 : -EIO;
+> +}
+> +
+> +static int mtd_nvmem_add(struct mtd_info *mtd)
+> +{
+> +	struct nvmem_config config = { };
+> +
+> +	config.dev = &mtd->dev;
+> +	config.owner = THIS_MODULE;
+> +	config.name = mtd->name;
+> +	config.reg_read = mtd_nvmem_reg_read;
+> +	config.size = mtd->size;
+> +	config.word_size = 1;
+> +	config.stride = 1;
+> +	config.read_only = true;
+> +	config.root_only = true;
+> +	config.priv = mtd;
+> +
+> +	mtd->nvmem = devm_nvmem_register(&mtd->dev, &config);
+> +	if (IS_ERR(mtd->nvmem)) {
+> +		/* Just ignore if there is no NVMEM support in the kernel */
+> +		if (PTR_ERR(mtd->nvmem) == -ENOSYS) {
+> +			mtd->nvmem = NULL;
+> +		} else {
+> +			dev_err(&mtd->dev, "Failed to register NVMEM device\n");
+> +			return PTR_ERR(mtd->nvmem);
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static struct dentry *dfs_dir_mtd;
+>  
+>  /**
+> @@ -570,6 +613,11 @@ int add_mtd_device(struct mtd_info *mtd)
+>  	if (error)
+>  		goto fail_added;
+>  
+> +	/* Add the nvmem provider */
+> +	error = mtd_nvmem_add(mtd);
+> +	if (error)
+> +		goto fail_nvmem_add;
+> +
+>  	if (!IS_ERR_OR_NULL(dfs_dir_mtd)) {
+>  		mtd->dbg.dfs_dir = debugfs_create_dir(dev_name(&mtd->dev), dfs_dir_mtd);
+>  		if (IS_ERR_OR_NULL(mtd->dbg.dfs_dir)) {
+> @@ -595,6 +643,8 @@ int add_mtd_device(struct mtd_info *mtd)
+>  	__module_get(THIS_MODULE);
+>  	return 0;
+>  
+> +fail_nvmem_add:
+> +	device_unregister(&mtd->dev);
+>  fail_added:
+>  	of_node_put(mtd_get_of_node(mtd));
+>  	idr_remove(&mtd_idr, i);
+> diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
+> index a86c4fa93115..8121c6582285 100644
+> --- a/include/linux/mtd/mtd.h
+> +++ b/include/linux/mtd/mtd.h
+> @@ -25,6 +25,7 @@
+>  #include <linux/notifier.h>
+>  #include <linux/device.h>
+>  #include <linux/of.h>
+> +#include <linux/nvmem-provider.h>
+>  
+>  #include <mtd/mtd-abi.h>
+>  
+> @@ -339,6 +340,7 @@ struct mtd_info {
+>  	struct device dev;
+>  	int usecount;
+>  	struct mtd_debug_info dbg;
+> +	struct nvmem_device *nvmem;
+>  };
+>  
+>  int mtd_ooblayout_ecc(struct mtd_info *mtd, int section,
