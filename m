@@ -1,135 +1,102 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 17 Aug 2018 14:13:55 +0300
-Subject: [PATCH] arm64: dts: renesas: r8a77980: add CSI2/VIN support
-In-Reply-To: <20180817085109.ekvnhcuei5aexpx4@verge.net.au>
-References: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
- <758a8c87-272c-e861-4aab-01309cff2f84@cogentembedded.com>
- <20180809130854.65nvmnuuz6gffjjr@verge.net.au>
- <6032159b-ad2b-9a19-77f1-fc7a0ce3c5b0@cogentembedded.com>
- <20180817085109.ekvnhcuei5aexpx4@verge.net.au>
-Message-ID: <ea1ae505-d03a-6993-73f1-0ee2ad935c44@cogentembedded.com>
+From: hanjie.lin@amlogic.com (Hanjie Lin)
+Date: Fri, 17 Aug 2018 19:17:09 +0800
+Subject: [PATCH 2/2] PCI: meson: add the Amlogic Meson PCIe phy driver
+In-Reply-To: <8eb76c5b173a8e8f8f90b9d2204c1b3b0de06c51.camel@baylibre.com>
+References: <1534227134-151584-1-git-send-email-hanjie.lin@amlogic.com>
+ <1534227134-151584-3-git-send-email-hanjie.lin@amlogic.com>
+ <486e8ab477cc22ff231d2e18d7de22efba2c5abd.camel@baylibre.com>
+ <2b87e834-41e3-e418-95f0-c6d695cd8b3f@amlogic.com>
+ <e5d9d89e79f8ec37b6337e54912f49a0b0856874.camel@baylibre.com>
+ <91658f21-6934-6085-8deb-b85a1f6b7815@amlogic.com>
+ <8eb76c5b173a8e8f8f90b9d2204c1b3b0de06c51.camel@baylibre.com>
+Message-ID: <d6f7e1bf-bbfa-01a0-e86b-d7d8e27c097c@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2018 11:51 AM, Simon Horman wrote:
 
->>>> Describe the CSI2 and VIN (and their interconnections) in the R8A77980
->>>> device tree.
+
+On 2018/8/17 16:09, Jerome Brunet wrote:
+> On Fri, 2018-08-17 at 14:12 +0800, Hanjie Lin wrote:
+>>
+>> On 2018/8/16 16:33, Jerome Brunet wrote:
+>>> On Thu, 2018-08-16 at 11:05 +0800, Hanjie Lin wrote:
 >>>>
->>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>>> On 2018/8/14 18:41, Jerome Brunet wrote:
+>>>>> On Tue, 2018-08-14 at 02:12 -0400, Hanjie Lin wrote:
+>>>>>> From: Yue Wang <yue.wang@amlogic.com>
+>>>>>>
+>>>>>> The Meson-PCIE-PHY controller supports the 5-Gbps data rate
+>>>>>> of the PCI Express Gen 2 specification and is backwardcompatible
+>>>>>> with the 2.5-Gbps Gen 1.1 specification with only
+>>>>>> inferred idle detection supported on AMLOGIC SoCs.
+>>>>>
+>>>>> It looks like the sole purpose of this driver is to provide the reset lines to
+>>>>> pcie driver.
+>>>>>
+>>>>> I wonder why we need this ? Can't the pcie driver claim the reset lines itself.
+>>>>>
+>>>>> Also, an init of this phy will always reset both port. What will happen if the
+>>>>> first port is in use and the 2nd port comes up ?? 
+>>>>>
+>>>>> Looks the the pcie driver should claim 'apb' and 'phy' reset lines as "shared"
+>>>>> reset and the required 'port' as 'exclusive'
+>>>>>
 >>>>
->>>> ---
->>>> This patch is against the 'renesas-devel-20180802v2-v4.18-rc7' branch of
->>>> Simon Horman's 'renesas.git' repo.
+>>>> Thank you for your response.
 >>>>
->>>> The R8A77980 CSI2/VIN DT binding updates have been posted earlier today...
->>>>
->>>>  arch/arm64/boot/dts/renesas/r8a77980.dtsi |  374 ++++++++++++++++++++++++++++++
->>>>  1 file changed, 374 insertions(+)
->>>>
->>>> Index: renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
->>>> ===================================================================
->>>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77980.dtsi
->>>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-[...]
->>>> +		csi41: csi2 at feab0000 {
->>>> +			compatible = "renesas,r8a77980-csi2";
->>>> +			reg = <0 0xfeab0000 0 0x10000>;
->>>> +			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
+>>>> Yes, 'apb' and 'phy' reset lines are shared, and ?port' reset line is exclusive.
+>>>> If we handle all reset lines during the first port initial sequence, 
+>>>> and when the second port comes up, we will do nothing about the rest lines, 
+>>>> and don't need a extra API to do ?port' reset;
 >>>
->>> The use of GIC_SPI 246 for both csi40 and csi41 seems suspicious.
->>> Is this intentional?
->>
->>     No, must be copy/paste artefact... Sorry about that, it should be 241 instead.
->>
->>>> +			clocks = <&cpg CPG_MOD 716>;
+>>> With which other driver are your control shared ?
 >>>
->>> Should this clock be 715 rather than 716?
+>>> Looks it is the answer is none since this phy driver will reset both port
+>>> already, even if one is used.
+>>>
+>>> In this case the fact that you are using shared control is just abusing the
+>>> framework to reset once.
+>>>
+>>> As far as I can tell, this driver makes no sense. The appropriate reset lines
+>>> should be given directly to your pcie driver. 
+>>>
+>>>
+>>>
+>>> .
+>>>
 >>
->>    Yes, sure.
+>> Amlogic AXG SOC includes two pcie controllers and pipes when only one pcie phy: 
 >>
->>    I'm seeing this patch merged despite your remarks. Please either fix it up or
->> pull it out!
+>>                                     (port_a reset)
+>>                       |PCIE_RC_A---->PCIE_PIPE_A------| 
+>>     (apb_reset)       |                               |  (phy reset)
+>>     APB BUS--->       |                               |   PCIE_PHY
+>>                       |                               |
+>>                       |             (port_b_reset)    |
+>>                       |PCIE_RC_B---->PCIE_PIPE_B------|
+>>
+>> The phy_reset affect the PCIE_PHY.
+>> The port_a_reset affect the PCIE_PIPE_A, port_b_reset affect the PCIE_PIPE_B. 
+>>
+>> As your suggestion we will move the 'port' reset to controller driver,
+>> and keeping the phy driver to process the 'apb' and 'phy' reset or any
+>> more changes of the phy in future.
 > 
-> Oops, that was not intended.
+> As far as I can tell from this diagram, It would only make sense for the "phy"
+> reset line to be controlled by your phy driver.
 > 
-> I have fixed up the patch as you suggested.
-> The result is as follows:
-
-   Still buggy... :-)
-
-> From c703c196b847c654b392f027d3fa995e378792ac Mon Sep 17 00:00:00 2001
-> From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Date: Mon, 6 Aug 2018 22:55:00 +0300
-> Subject: [PATCH] arm64: dts: renesas: r8a77980: add CSI2/VIN support
+> The apb and port is obviously related to the pcie device/driver itself, not the
+> PHY. And whether you 1 or 2 reset lines in it, IMO it is overkill and
+> unnecessary to make a phy driver for this. 
 > 
-> Describe the CSI2 and VIN (and their interconnections) in the R8A77980
-> device tree.
+
+Yeah, that makes sense.
+We will move 'apb' reset to controller driver in next version too.
+
+Thanks.
+
+>>
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm64/boot/dts/renesas/r8a77980.dtsi | 374 ++++++++++++++++++++++++++++++
->  1 file changed, 374 insertions(+)
 > 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-> index 4bc99d6763ce..71636fd1a819 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-[...]
-> @@ -769,6 +1065,84 @@
->  			resets = <&cpg 603>;
->  		};
->  
-> +		csi40: csi2 at feaa0000 {
-> +			compatible = "renesas,r8a77980-csi2";
-> +			reg = <0 0xfeaa0000 0 0x10000>;
-> +			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&cpg CPG_MOD 716>;
-> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-> +			resets = <&cpg 716>;
-> +			status = "disabled";
-> +
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				port at 1 {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +
-> +					reg = <1>;
-> +
-> +					csi40vin0: endpoint at 0 {
-> +						reg = <0>;
-> +						remote-endpoint = <&vin0csi40>;
-> +					};
-> +					csi40vin1: endpoint at 1 {
-> +						reg = <1>;
-> +						remote-endpoint = <&vin1csi40>;
-> +					};
-> +					csi40vin2: endpoint at 2 {
-> +						reg = <2>;
-> +						remote-endpoint = <&vin2csi40>;
-> +					};
-> +					csi40vin3: endpoint at 3 {
-> +						reg = <3>;
-> +						remote-endpoint = <&vin3csi40>;
-> +					};
-> +				};
-> +			};
-> +		};
-> +
-> +		csi41: csi2 at feab0000 {
-> +			compatible = "renesas,r8a77980-csi2";
-> +			reg = <0 0xfeab0000 0 0x10000>;
-> +			interrupts = <GIC_SPI 241 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&cpg CPG_MOD 715>;
-> +			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-> +			resets = <&cpg 716>;
-
-   You forgot to fix up this prop...
-
-[...]
-
-MBR, Sergei
+> .
+> 
