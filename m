@@ -1,61 +1,37 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Fri, 17 Aug 2018 18:32:11 +0300
-Subject: [PATCH] pinctrl: lpc18xx: mark expected switch fall-throughs
-In-Reply-To: <20180815171035.GA17360@embeddedor.com>
-References: <20180815171035.GA17360@embeddedor.com>
-Message-ID: <57a0c7c7-e2a2-3586-b683-f854120eeee7@mleia.com>
+From: john.garry@huawei.com (John Garry)
+Date: Fri, 17 Aug 2018 23:42:22 +0800
+Subject: [PATCH] iommu/arm-smmu-v3: Fix a couple of minor comment typos
+Message-ID: <1534520542-92851-1-git-send-email-john.garry@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2018 08:10 PM, Gustavo A. R. Silva wrote:
-> In preparation to enabling -Wimplicit-fallthrough, mark switch cases
-> where we are expecting to fall through.
-> 
-> Addresses-Coverity-ID: 1292308 ("Missing break in switch")
-> Addresses-Coverity-ID: 1292309 ("Missing break in switch")
-> Addresses-Coverity-ID: 1309546 ("Missing break in switch")
-> Addresses-Coverity-ID: 1357369 ("Missing break in switch")
-> Addresses-Coverity-ID: 1357389 ("Missing break in switch")
-> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
-> ---
->  drivers/pinctrl/pinctrl-lpc18xx.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-lpc18xx.c b/drivers/pinctrl/pinctrl-lpc18xx.c
-> index 190f17e..a14bc5e 100644
-> --- a/drivers/pinctrl/pinctrl-lpc18xx.c
-> +++ b/drivers/pinctrl/pinctrl-lpc18xx.c
-> @@ -844,8 +844,11 @@ static int lpc18xx_pconf_get_pin(struct pinctrl_dev *pctldev, unsigned param,
->  		*arg = (reg & LPC18XX_SCU_PIN_EHD_MASK) >> LPC18XX_SCU_PIN_EHD_POS;
->  		switch (*arg) {
->  		case 3: *arg += 5;
-> +			/* fall through */
->  		case 2: *arg += 5;
-> +			/* fall through */
->  		case 1: *arg += 3;
-> +			/* fall through */
->  		case 0: *arg += 4;
->  		}
->  		break;
-> @@ -1060,8 +1063,11 @@ static int lpc18xx_pconf_set_pin(struct pinctrl_dev *pctldev, unsigned param,
->  
->  		switch (param_val) {
->  		case 20: param_val -= 5;
-> +			 /* fall through */
->  		case 14: param_val -= 5;
-> +			 /* fall through */
->  		case  8: param_val -= 3;
-> +			 /* fall through */
->  		case  4: param_val -= 4;
->  			 break;
->  		default:
-> 
+Fix some comment typos spotted.
 
-The code snippets are about a mind-blowing hyper-optimization, but I took
-it as a chance to verify the correctness, and there are no issues found.
+Signed-off-by: John Garry <john.garry@huawei.com>
 
-Reviewed-by: Vladimir Zapolskiy <vz@mleia.com>
-
---
-Best wishes,
-Vladimir
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 5059d09..feef122 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -708,7 +708,7 @@ static void queue_inc_prod(struct arm_smmu_queue *q)
+ }
+ 
+ /*
+- * Wait for the SMMU to consume items. If drain is true, wait until the queue
++ * Wait for the SMMU to consume items. If sync is true, wait until the queue
+  * is empty. Otherwise, wait until there is at least one free slot.
+  */
+ static int queue_poll_cons(struct arm_smmu_queue *q, bool sync, bool wfe)
+@@ -2353,8 +2353,8 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
+ 	irq = smmu->combined_irq;
+ 	if (irq) {
+ 		/*
+-		 * Cavium ThunderX2 implementation doesn't not support unique
+-		 * irq lines. Use single irq line for all the SMMUv3 interrupts.
++		 * Cavium ThunderX2 implementation doesn't support unique irq
++		 * lines. Use a single irq line for all the SMMUv3 interrupts.
+ 		 */
+ 		ret = devm_request_threaded_irq(smmu->dev, irq,
+ 					arm_smmu_combined_irq_handler,
+-- 
+1.9.1
