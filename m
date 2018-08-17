@@ -1,111 +1,330 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Fri, 17 Aug 2018 09:51:00 +0200
-Subject: [PATCH] ARM: dts: socfpga: Add fpga2hps and fpga2sdram bridges
-In-Reply-To: <CANk1AXTSE5AF=8HaGuHGKhT-qxepvZSRsjLROtOKiUwvv0jcZA@mail.gmail.com>
-References: <20180815125910.24097-1-s.trumtrar@pengutronix.de>
- <6625681f-f64b-462e-7d8c-b48a9437f2e6@kernel.org>
- <CANk1AXTSE5AF=8HaGuHGKhT-qxepvZSRsjLROtOKiUwvv0jcZA@mail.gmail.com>
-Message-ID: <73pnyhbfdn.fsf@pengutronix.de>
+From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
+Date: Fri, 17 Aug 2018 16:53:21 +0900
+Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: Add Audio-DMAC and Sound
+ device nodes
+Message-ID: <1534492401-17801-1-git-send-email-ykaneko0929@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds Audio-DMAC0 device node and Sound device node
+for the R8A77990 SoC.
 
-Hi!
+The following patches were squashed into this patch:
+* Takeshi Kihara <takeshi.kihara.df@renesas.com>
+  arm64: dts: r8a77990: Add Audio-DMAC device nodes
+  arm64: dts: r8a77990: Add Sound device node and SSI support
+  arm64: dts: r8a77990: Add Sound SRC support
+  arm64: dts: r8a77990: Add Sound DVC device nodes
+  arm64: dts: r8a77990: Add Sound CTU support
+  arm64: dts: r8a77990: Add Sound MIX support
+* Hai Nguyen Pham <hai.pham.ud@renesas.com>
+  arm64: dts: r8a77990: Tie Audio-DMAC to IPMMU-MP
 
-Alan Tull <atull@kernel.org> writes:
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+---
 
-> On Wed, Aug 15, 2018 at 9:48 AM, Dinh Nguyen 
-> <dinguyen@kernel.org> wrote:
->> CC'd Alan Tull
->>
->> Alan, do you have any comments?
->>
->> Dinh
->>
->> On 08/15/2018 07:59 AM, Steffen Trumtrar wrote:
->>> Add the remaining two bridges on the Cyclone-V SoCFPGA SoCs.
->
-> I left these out on purpose, see below.
->
->>>
->>> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->>> ---
->>>  arch/arm/boot/dts/socfpga.dtsi | 12 ++++++++++++
->>>  1 file changed, 12 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/socfpga.dtsi 
->>> b/arch/arm/boot/dts/socfpga.dtsi
->>> index b38f8c240558..e0fb76107f34 100644
->>> --- a/arch/arm/boot/dts/socfpga.dtsi
->>> +++ b/arch/arm/boot/dts/socfpga.dtsi
->>> @@ -543,6 +543,18 @@
->>>                       clocks = <&l4_main_clk>;
->>>               };
->>>
->>> +             fpga_bridge2: fpga-bridge at ff600000 {
->>> +                     compatible = 
->>> "altr,socfpga-fpga2hps-bridge";
->>> +                     reg = <0xff600000 0x100000>;
->>> +                     resets = <&rst FPGA2HPS_RESET>;
->>> +                     clocks = <&l4_main_clk>;
->
-> The FPGA has to be programmed before this bridge can be enabled.
-> Since we can't guarantee that, we shouldn't add that here.
->
+This patch is based on the devel branch of Simon Horman's renesas tree.
 
-The hardware is there, that is what the binding describes. Maybe a
-    status = "disabled";
-would be justified here. But the same goes for the other bridges. 
-You can't use any of them without a programmed FPGA.
+ arch/arm64/boot/dts/renesas/r8a77990.dtsi | 273 +++++++++++++++++++++++++++++-
+ 1 file changed, 272 insertions(+), 1 deletion(-)
 
->>> +             };
->>> +
->>> +             fpga_bridge3: fpga-bridge at ffc25080 {
->>> +                     compatible = 
->>> "altr,socfpga-fpga2sdram-bridge";
->>> +                     reg = <0xffc25080 0x4>;
->
-> Missing altr,sdr-ctl and altr,sys-mgr which will cause probe 
-> failures
-> with error messages.  I checked the binding document, I see that 
-> these
-> properties weren't added and that should be corrected in the 
-> bindings
-> doc.
->
-
-It doesn't, because the driver uses 
-syscon_regmap_lookup_by_compatible and not 
-syscon_regmap_lookup_by_phandle.
-I don't see any probe failures. Nevertheless, the dependency 
-should be documented, yes.
-
-> But the larger issue is this bridge needs to be configured by 
-> the
-> bootloader before Linux boots.  This requirement is documented 
-> at the
-> top of drivers/fpga/altera-fpga2sdram.c  Also it needs a handoff 
-> from
-> the bootloader that may or may not be happening depending on 
-> whether
-> the bootloader does this or not.  That's why I left this out.
->
-
-Although registration of the driver works fine, you are right, 
-that it shouldn't be used without the correct setup.
-So, I'd go for status=disabled in the dtsi and would leave 
-enabling of the bridges to the board-specific dts file.
-
-
-Best regards,
-Steffen
-
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+index 2ee0edf..bc64e0f 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+@@ -5,7 +5,7 @@
+  * Copyright (C) 2018 Renesas Electronics Corp.
+  */
+ 
+-#include <dt-bindings/clock/renesas-cpg-mssr.h>
++#include <dt-bindings/clock/r8a77990-cpg-mssr.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/power/r8a77990-sysc.h>
+ 
+@@ -14,6 +14,29 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 
++	/*
++	 * The external audio clocks are configured as 0 Hz fixed frequency
++	 * clocks by default.
++	 * Boards that provide audio clocks should override them.
++	 */
++	audio_clk_a: audio_clk_a {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	audio_clk_b: audio_clk_b {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	audio_clk_c: audio_clk_c {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -419,6 +442,254 @@
+ 			status = "disabled";
+ 		};
+ 
++		rcar_sound: sound at ec500000 {
++			/*
++			 * #sound-dai-cells is required
++			 *
++			 * Single DAI : #sound-dai-cells = <0>;	<&rcar_sound>;
++			 * Multi  DAI : #sound-dai-cells = <1>;	<&rcar_sound N>;
++			 */
++			/*
++			 * #clock-cells is required for audio_clkout0/1/2/3
++			 *
++			 * clkout	: #clock-cells = <0>;	<&rcar_sound>;
++			 * clkout0/1/2/3: #clock-cells = <1>;	<&rcar_sound N>;
++			 */
++			compatible =  "renesas,rcar_sound-r8a77990", "renesas,rcar_sound-gen3";
++			reg =	<0 0xec500000 0 0x1000>, /* SCU */
++				<0 0xec5a0000 0 0x100>,  /* ADG */
++				<0 0xec540000 0 0x1000>, /* SSIU */
++				<0 0xec541000 0 0x280>,  /* SSI */
++				<0 0xec760000 0 0x200>;  /* Audio DMAC peri peri*/
++			reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
++
++			clocks = <&cpg CPG_MOD 1005>,
++				 <&cpg CPG_MOD 1006>, <&cpg CPG_MOD 1007>,
++				 <&cpg CPG_MOD 1008>, <&cpg CPG_MOD 1009>,
++				 <&cpg CPG_MOD 1010>, <&cpg CPG_MOD 1011>,
++				 <&cpg CPG_MOD 1012>, <&cpg CPG_MOD 1013>,
++				 <&cpg CPG_MOD 1014>, <&cpg CPG_MOD 1015>,
++				 <&cpg CPG_MOD 1022>, <&cpg CPG_MOD 1023>,
++				 <&cpg CPG_MOD 1024>, <&cpg CPG_MOD 1025>,
++				 <&cpg CPG_MOD 1026>, <&cpg CPG_MOD 1027>,
++				 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
++				 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
++				 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
++				 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
++				 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
++				 <&audio_clk_a>, <&audio_clk_b>,
++				 <&audio_clk_c>,
++				 <&cpg CPG_CORE R8A77990_CLK_ZA2>;
++			clock-names = "ssi-all",
++				      "ssi.9", "ssi.8", "ssi.7", "ssi.6",
++				      "ssi.5", "ssi.4", "ssi.3", "ssi.2",
++				      "ssi.1", "ssi.0",
++				      "src.9", "src.8", "src.7", "src.6",
++				      "src.5", "src.4", "src.3", "src.2",
++				      "src.1", "src.0",
++				      "mix.1", "mix.0",
++				      "ctu.1", "ctu.0",
++				      "dvc.0", "dvc.1",
++				      "clk_a", "clk_b", "clk_c", "clk_i";
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
++			resets = <&cpg 1005>,
++				 <&cpg 1006>, <&cpg 1007>,
++				 <&cpg 1008>, <&cpg 1009>,
++				 <&cpg 1010>, <&cpg 1011>,
++				 <&cpg 1012>, <&cpg 1013>,
++				 <&cpg 1014>, <&cpg 1015>;
++			reset-names = "ssi-all",
++				      "ssi.9", "ssi.8", "ssi.7", "ssi.6",
++				      "ssi.5", "ssi.4", "ssi.3", "ssi.2",
++				      "ssi.1", "ssi.0";
++			status = "disabled";
++
++			rcar_sound,dvc {
++				dvc0: dvc-0 {
++					dmas = <&audma0 0xbc>;
++					dma-names = "tx";
++				};
++				dvc1: dvc-1 {
++					dmas = <&audma0 0xbe>;
++					dma-names = "tx";
++				};
++			};
++
++			rcar_sound,mix {
++				mix0: mix-0 { };
++				mix1: mix-1 { };
++			};
++
++			rcar_sound,ctu {
++				ctu00: ctu-0 { };
++				ctu01: ctu-1 { };
++				ctu02: ctu-2 { };
++				ctu03: ctu-3 { };
++				ctu10: ctu-4 { };
++				ctu11: ctu-5 { };
++				ctu12: ctu-6 { };
++				ctu13: ctu-7 { };
++			};
++
++			rcar_sound,src {
++				src0: src-0 {
++					interrupts = <GIC_SPI 352 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x85>, <&audma0 0x9a>;
++					dma-names = "rx", "tx";
++				};
++				src1: src-1 {
++					interrupts = <GIC_SPI 353 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x87>, <&audma0 0x9c>;
++					dma-names = "rx", "tx";
++				};
++				src2: src-2 {
++					interrupts = <GIC_SPI 354 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x89>, <&audma0 0x9e>;
++					dma-names = "rx", "tx";
++				};
++				src3: src-3 {
++					interrupts = <GIC_SPI 355 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x8b>, <&audma0 0xa0>;
++					dma-names = "rx", "tx";
++				};
++				src4: src-4 {
++					interrupts = <GIC_SPI 356 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x8d>, <&audma0 0xb0>;
++					dma-names = "rx", "tx";
++				};
++				src5: src-5 {
++					interrupts = <GIC_SPI 357 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x8f>, <&audma0 0xb2>;
++					dma-names = "rx", "tx";
++				};
++				src6: src-6 {
++					interrupts = <GIC_SPI 358 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x91>, <&audma0 0xb4>;
++					dma-names = "rx", "tx";
++				};
++				src7: src-7 {
++					interrupts = <GIC_SPI 359 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x93>, <&audma0 0xb6>;
++					dma-names = "rx", "tx";
++				};
++				src8: src-8 {
++					interrupts = <GIC_SPI 360 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x95>, <&audma0 0xb8>;
++					dma-names = "rx", "tx";
++				};
++				src9: src-9 {
++					interrupts = <GIC_SPI 361 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x97>, <&audma0 0xba>;
++					dma-names = "rx", "tx";
++				};
++			};
++
++			rcar_sound,ssi {
++				ssi0: ssi-0 {
++					interrupts = <GIC_SPI 370 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x01>, <&audma0 0x02>,
++					       <&audma0 0x15>, <&audma0 0x16>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi1: ssi-1 {
++					interrupts = <GIC_SPI 371 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x03>, <&audma0 0x04>,
++					       <&audma0 0x49>, <&audma0 0x4a>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi2: ssi-2 {
++					interrupts = <GIC_SPI 372 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x05>, <&audma0 0x06>,
++					       <&audma0 0x63>, <&audma0 0x64>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi3: ssi-3 {
++					interrupts = <GIC_SPI 373 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x07>, <&audma0 0x08>,
++					       <&audma0 0x6f>, <&audma0 0x70>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi4: ssi-4 {
++					interrupts = <GIC_SPI 374 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x09>, <&audma0 0x0a>,
++					       <&audma0 0x71>, <&audma0 0x72>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi5: ssi-5 {
++					interrupts = <GIC_SPI 375 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x0b>, <&audma0 0x0c>,
++					       <&audma0 0x73>, <&audma0 0x74>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi6: ssi-6 {
++					interrupts = <GIC_SPI 376 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x0d>, <&audma0 0x0e>,
++					       <&audma0 0x75>, <&audma0 0x76>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi7: ssi-7 {
++					interrupts = <GIC_SPI 377 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x0f>, <&audma0 0x10>,
++					       <&audma0 0x79>, <&audma0 0x7a>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi8: ssi-8 {
++					interrupts = <GIC_SPI 378 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x11>, <&audma0 0x12>,
++					       <&audma0 0x7b>, <&audma0 0x7c>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++				ssi9: ssi-9 {
++					interrupts = <GIC_SPI 379 IRQ_TYPE_LEVEL_HIGH>;
++					dmas = <&audma0 0x13>, <&audma0 0x14>,
++					       <&audma0 0x7d>, <&audma0 0x7e>;
++					dma-names = "rx", "tx", "rxu", "txu";
++				};
++			};
++		};
++
++		audma0: dma-controller at ec700000 {
++			compatible = "renesas,dmac-r8a77990",
++				     "renesas,rcar-dmac";
++			reg = <0 0xec700000 0 0x10000>;
++			interrupts = <GIC_SPI 350 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 333 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 334 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 335 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					"ch0", "ch1", "ch2", "ch3",
++					"ch4", "ch5", "ch6", "ch7",
++					"ch8", "ch9", "ch10", "ch11",
++					"ch12", "ch13", "ch14", "ch15";
++			clocks = <&cpg CPG_MOD 502>;
++			clock-names = "fck";
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
++			resets = <&cpg 502>;
++			#dma-cells = <1>;
++			dma-channels = <16>;
++			iommus = <&ipmmu_mp 0>, <&ipmmu_mp 1>,
++				 <&ipmmu_mp 2>, <&ipmmu_mp 3>,
++				 <&ipmmu_mp 4>, <&ipmmu_mp 5>,
++				 <&ipmmu_mp 6>, <&ipmmu_mp 7>,
++				 <&ipmmu_mp 8>, <&ipmmu_mp 9>,
++				 <&ipmmu_mp 10>, <&ipmmu_mp 11>,
++				 <&ipmmu_mp 12>, <&ipmmu_mp 13>,
++				 <&ipmmu_mp 14>, <&ipmmu_mp 15>;
++		};
++
+ 		xhci0: usb at ee000000 {
+ 			compatible = "renesas,xhci-r8a77990",
+ 				     "renesas,rcar-gen3-xhci";
 -- 
-Pengutronix e.K.                          | Steffen Trumtrar 
-|
-Industrial Linux Solutions                | 
-http://www.pengutronix.de/ |
-Peiner Str. 6-8, 31137 Hildesheim, Germany| Phone: 
-+49-5121-206917-0   |
-Amtsgericht Hildesheim, HRA 2686          | Fax: 
-+49-5121-206917-5555|
+1.9.1
