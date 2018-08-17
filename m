@@ -1,24 +1,46 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 17 Aug 2018 15:18:06 +0200
-Subject: [RFC PATCH] edac: armv8_edac: Add ARMv8 EDAC driver
-In-Reply-To: <CABo9ajBeXnuS4GQep9GTP8zeQrYENXtY6Pp7FHgbTbf5wFD4ag@mail.gmail.com>
-References: <1533242990-12828-1-git-send-email-tbaicar@codeaurora.org>
- <20180816073559.GA2111@nazgul.tnic>
- <CABo9ajBeXnuS4GQep9GTP8zeQrYENXtY6Pp7FHgbTbf5wFD4ag@mail.gmail.com>
-Message-ID: <20180817131806.GC13594@nazgul.tnic>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 17 Aug 2018 14:45:49 +0100
+Subject: [PATCH resend] irqchip/tango: Set irq handler and data in one go
+In-Reply-To: <1534507827-7230-1-git-send-email-martin@kaiser.cx>
+References: <1532282533-26507-1-git-send-email-martin@kaiser.cx>
+ <1534507827-7230-1-git-send-email-martin@kaiser.cx>
+Message-ID: <9ad15cc2-2a53-fc42-1643-3c91c4190709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 16, 2018 at 05:24:29PM -0400, Tyler Baicar wrote:
-> I agree with this for now, but I wanted to tie it into edac from the start since
-> this driver will have extended capabilities in the future.
+On 17/08/18 13:10, Martin Kaiser wrote:
+> Replace the two separate calls for setting the irq handler and data with
+> a single irq_set_chained_handler_and_data() call.
+> 
+> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+> ---
+> Resending this, it seems this got lost along the way. Not a major change,
+> of course. But should also be simple to review.
+> 
+> Thanks & Best regards,
+> Martin
+> 
+>  drivers/irqchip/irq-tango.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-tango.c b/drivers/irqchip/irq-tango.c
+> index 0c085303a583..580e2d72b9ba 100644
+> --- a/drivers/irqchip/irq-tango.c
+> +++ b/drivers/irqchip/irq-tango.c
+> @@ -205,8 +205,7 @@ static int __init tangox_irq_init(void __iomem *base, struct resource *baseres,
+>  
+>  	tangox_irq_domain_init(dom);
+>  
+> -	irq_set_chained_handler(irq, tangox_irq_handler);
+> -	irq_set_handler_data(irq, dom);
+> +	irq_set_chained_handler_and_data(irq, tangox_irq_handler, dom);
+>  
+>  	return 0;
+>  }
+> 
 
-We'll cross that bridge when we get to it so please add the EDAC bits
-only when there is something concrete to add.
+Queued, thanks.
 
+	M.
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+Jazz is not dead. It just smells funny...
