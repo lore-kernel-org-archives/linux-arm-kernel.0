@@ -1,59 +1,61 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Fri, 17 Aug 2018 15:27:16 +0000
-Subject: [PATCH 1/3] iommu: Add fast hook for getting DMA domains
-In-Reply-To: <4d50587e62c16f7b5cfc45dee808d774655155cf.1534250425.git.robin.murphy@arm.com>
-References: <cover.1534250425.git.robin.murphy@arm.com>
- <4d50587e62c16f7b5cfc45dee808d774655155cf.1534250425.git.robin.murphy@arm.com>
-Message-ID: <b2b043f7-6f28-42e4-d630-d9694d34b5b6@nxp.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Fri, 17 Aug 2018 18:32:11 +0300
+Subject: [PATCH] pinctrl: lpc18xx: mark expected switch fall-throughs
+In-Reply-To: <20180815171035.GA17360@embeddedor.com>
+References: <20180815171035.GA17360@embeddedor.com>
+Message-ID: <57a0c7c7-e2a2-3586-b683-f854120eeee7@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
-On 14.08.2018 16:04, Robin Murphy wrote:
-> While iommu_get_domain_for_dev() is the robust way for arbitrary IOMMU
-> API callers to retrieve the domain pointer, for DMA ops domains it
-> doesn't scale well for large systems and multi-queue devices, since the
-> momentary refcount adjustment will lead to exclusive cacheline contention
-> when multiple CPUs are operating in parallel on different mappings for
-> the same device.
+On 08/15/2018 08:10 PM, Gustavo A. R. Silva wrote:
+> In preparation to enabling -Wimplicit-fallthrough, mark switch cases
+> where we are expecting to fall through.
 > 
-> In the case of DMA ops domains, however, this refcounting is actually
-> unnecessary, since they already imply that the group exists and is
-> managed by platform code and IOMMU internals (by virtue of
-> iommu_group_get_for_dev()) such that a reference will already be held
-> for the lifetime of the device. Thus we can avoid the bottleneck by
-> providing a fast lookup specifically for the DMA code to retrieve the
-> default domain it already knows it has set up - a simple read-only
-> dereference plays much nicer with cache-coherency protocols.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Addresses-Coverity-ID: 1292308 ("Missing break in switch")
+> Addresses-Coverity-ID: 1292309 ("Missing break in switch")
+> Addresses-Coverity-ID: 1309546 ("Missing break in switch")
+> Addresses-Coverity-ID: 1357369 ("Missing break in switch")
+> Addresses-Coverity-ID: 1357389 ("Missing break in switch")
+> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
 > ---
->   drivers/iommu/iommu.c | 9 +++++++++
->   include/linux/iommu.h | 1 +
->   2 files changed, 10 insertions(+)
+>  drivers/pinctrl/pinctrl-lpc18xx.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index 63b37563db7e..63c586875df5 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -1379,6 +1379,15 @@ struct iommu_domain *iommu_get_domain_for_dev(struct device *dev)
->   }
->   EXPORT_SYMBOL_GPL(iommu_get_domain_for_dev);
->   
-> +/*
-> + * For IOMMU_DOMAIN_DMA implementations which already provide their own
-> + * guarantees that the group and its default domain are valid and correct.
-> + */
-> +struct iommu_domain *iommu_get_dma_domain(struct device *dev)
-> +{
-> +	return dev->iommu_group->default_domain;
-> +}
+> diff --git a/drivers/pinctrl/pinctrl-lpc18xx.c b/drivers/pinctrl/pinctrl-lpc18xx.c
+> index 190f17e..a14bc5e 100644
+> --- a/drivers/pinctrl/pinctrl-lpc18xx.c
+> +++ b/drivers/pinctrl/pinctrl-lpc18xx.c
+> @@ -844,8 +844,11 @@ static int lpc18xx_pconf_get_pin(struct pinctrl_dev *pctldev, unsigned param,
+>  		*arg = (reg & LPC18XX_SCU_PIN_EHD_MASK) >> LPC18XX_SCU_PIN_EHD_POS;
+>  		switch (*arg) {
+>  		case 3: *arg += 5;
+> +			/* fall through */
+>  		case 2: *arg += 5;
+> +			/* fall through */
+>  		case 1: *arg += 3;
+> +			/* fall through */
+>  		case 0: *arg += 4;
+>  		}
+>  		break;
+> @@ -1060,8 +1063,11 @@ static int lpc18xx_pconf_set_pin(struct pinctrl_dev *pctldev, unsigned param,
+>  
+>  		switch (param_val) {
+>  		case 20: param_val -= 5;
+> +			 /* fall through */
+>  		case 14: param_val -= 5;
+> +			 /* fall through */
+>  		case  8: param_val -= 3;
+> +			 /* fall through */
+>  		case  4: param_val -= 4;
+>  			 break;
+>  		default:
+> 
 
-After some preliminary tests I'm seeing a ~10% performance improvement 
-on one of our chips (nxp ls1046a) which is pretty nice. :-)
-Any chance of making the function inline?
-If not, shouldn't an EXPORT_SYMBOL_GPL be added?
+The code snippets are about a mind-blowing hyper-optimization, but I took
+it as a chance to verify the correctness, and there are no issues found.
 
----
-Thanks & Best Regards, Laurentiu
+Reviewed-by: Vladimir Zapolskiy <vz@mleia.com>
+
+--
+Best wishes,
+Vladimir
