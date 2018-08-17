@@ -1,88 +1,27 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 17 Aug 2018 10:09:37 +0200
-Subject: [PATCH 2/2] PCI: meson: add the Amlogic Meson PCIe phy driver
-In-Reply-To: <91658f21-6934-6085-8deb-b85a1f6b7815@amlogic.com>
-References: <1534227134-151584-1-git-send-email-hanjie.lin@amlogic.com>
- <1534227134-151584-3-git-send-email-hanjie.lin@amlogic.com>
- <486e8ab477cc22ff231d2e18d7de22efba2c5abd.camel@baylibre.com>
- <2b87e834-41e3-e418-95f0-c6d695cd8b3f@amlogic.com>
- <e5d9d89e79f8ec37b6337e54912f49a0b0856874.camel@baylibre.com>
- <91658f21-6934-6085-8deb-b85a1f6b7815@amlogic.com>
-Message-ID: <8eb76c5b173a8e8f8f90b9d2204c1b3b0de06c51.camel@baylibre.com>
+From: jasonwood2031@gmail.com (Jiecheng Wu)
+Date: Fri, 17 Aug 2018 16:12:55 +0800
+Subject: [PATCH] coherency.c: fix missing return value check of kzalloc()
+Message-ID: <20180817081255.4668-1-jasonwood2031@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-08-17 at 14:12 +0800, Hanjie Lin wrote:
-> 
-> On 2018/8/16 16:33, Jerome Brunet wrote:
-> > On Thu, 2018-08-16 at 11:05 +0800, Hanjie Lin wrote:
-> > > 
-> > > On 2018/8/14 18:41, Jerome Brunet wrote:
-> > > > On Tue, 2018-08-14 at 02:12 -0400, Hanjie Lin wrote:
-> > > > > From: Yue Wang <yue.wang@amlogic.com>
-> > > > > 
-> > > > > The Meson-PCIE-PHY controller supports the 5-Gbps data rate
-> > > > > of the PCI Express Gen 2 specification and is backwardcompatible
-> > > > > with the 2.5-Gbps Gen 1.1 specification with only
-> > > > > inferred idle detection supported on AMLOGIC SoCs.
-> > > > 
-> > > > It looks like the sole purpose of this driver is to provide the reset lines to
-> > > > pcie driver.
-> > > > 
-> > > > I wonder why we need this ? Can't the pcie driver claim the reset lines itself.
-> > > > 
-> > > > Also, an init of this phy will always reset both port. What will happen if the
-> > > > first port is in use and the 2nd port comes up ?? 
-> > > > 
-> > > > Looks the the pcie driver should claim 'apb' and 'phy' reset lines as "shared"
-> > > > reset and the required 'port' as 'exclusive'
-> > > > 
-> > > 
-> > > Thank you for your response.
-> > > 
-> > > Yes, 'apb' and 'phy' reset lines are shared, and ?port' reset line is exclusive.
-> > > If we handle all reset lines during the first port initial sequence, 
-> > > and when the second port comes up, we will do nothing about the rest lines, 
-> > > and don't need a extra API to do ?port' reset;
-> > 
-> > With which other driver are your control shared ?
-> > 
-> > Looks it is the answer is none since this phy driver will reset both port
-> > already, even if one is used.
-> > 
-> > In this case the fact that you are using shared control is just abusing the
-> > framework to reset once.
-> > 
-> > As far as I can tell, this driver makes no sense. The appropriate reset lines
-> > should be given directly to your pcie driver. 
-> > 
-> > 
-> > 
-> > .
-> > 
-> 
-> Amlogic AXG SOC includes two pcie controllers and pipes when only one pcie phy: 
-> 
->                                     (port_a reset)
->                       |PCIE_RC_A---->PCIE_PIPE_A------| 
->     (apb_reset)       |                               |  (phy reset)
->     APB BUS--->       |                               |   PCIE_PHY
->                       |                               |
->                       |             (port_b_reset)    |
->                       |PCIE_RC_B---->PCIE_PIPE_B------|
-> 
-> The phy_reset affect the PCIE_PHY.
-> The port_a_reset affect the PCIE_PIPE_A, port_b_reset affect the PCIE_PIPE_B. 
-> 
-> As your suggestion we will move the 'port' reset to controller driver,
-> and keeping the phy driver to process the 'apb' and 'phy' reset or any
-> more changes of the phy in future.
+Function armada_375_380_coherency_init() defined in arch/arm/mach-mvebu/coherency.c calls kzalloc() to allocate memory for struct property which is dereferenced immediately. As kzalloc() may return NULL on failure, this code piece may cause NULL pointer dereference bug.
+---
+ arch/arm/mach-mvebu/coherency.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-As far as I can tell from this diagram, It would only make sense for the "phy"
-reset line to be controlled by your phy driver.
-
-The apb and port is obviously related to the pcie device/driver itself, not the
-PHY. And whether you 1 or 2 reset lines in it, IMO it is overkill and
-unnecessary to make a phy driver for this. 
-
-> 
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 8f8748a..d3bc8a6 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -194,6 +194,8 @@ static void __init armada_375_380_coherency_init(struct device_node *np)
+ 		struct property *p;
+ 
+ 		p = kzalloc(sizeof(*p), GFP_KERNEL);
++		if (!p)
++			return;
+ 		p->name = kstrdup("arm,io-coherent", GFP_KERNEL);
+ 		of_add_property(cache_dn, p);
+ 	}
+-- 
+2.6.4
