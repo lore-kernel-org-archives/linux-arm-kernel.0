@@ -1,50 +1,59 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Sat, 18 Aug 2018 00:06:02 +0200
-Subject: [offlist] Re: Crash in netlink/sk_filter_trim_cap on ARMv7 on
- 4.18rc1
-In-Reply-To: <CALeDE9N=EjaHAqOrw8Hi=EK15f65j0bKFOSbFZaLtjSG20Aytg@mail.gmail.com>
-References: <CALeDE9PP__kPHX_aW24kwzGf9BgA0gQOQJSY+Qw0yFMOLn4Pcw@mail.gmail.com>
- <7ff516fd-1d01-4d7a-1d5d-b58932c0c69d@gmail.com>
- <CALeDE9Nkz+cbueruiez_43ZS1ebAiQHDaVZRARE8raypYz323A@mail.gmail.com>
- <ad98d60c-bd60-b495-c4bd-507fc29c8bcd@iogearbox.net>
- <CALeDE9PBZWJBp8KB0mB4zoNXqscmzxWzz+LnuqRA-z4t1e9T8g@mail.gmail.com>
- <CALeDE9OOrZUnaNpzkYPU30iN=4HFQaqEomjf14EO5EtcnHu8OQ@mail.gmail.com>
- <20180816203515.GA7688@torres.zugschlus.de>
- <20180816225844.GW30658@n2100.armlinux.org.uk>
- <CALeDE9Pm7nsqDFL0m0ZsNdnEti6YAbEPhtfbNMPe=UZCUyyHMA@mail.gmail.com>
- <1c2218cb-63bf-1528-6156-8ce93f46169c@iogearbox.net>
- <20180817161743.GX30658@n2100.armlinux.org.uk>
- <adf49ea9-09a3-80f8-8c85-a62d028e21a3@iogearbox.net>
- <CALeDE9N=EjaHAqOrw8Hi=EK15f65j0bKFOSbFZaLtjSG20Aytg@mail.gmail.com>
-Message-ID: <5ee111e1-1ee5-d9e4-9915-283f98204d16@iogearbox.net>
+From: justinpopo6@gmail.com (justinpopo6 at gmail.com)
+Date: Fri, 17 Aug 2018 16:47:39 -0700
+Subject: [PATCH v2] gpio: brcmstb: allow 0 width GPIO banks
+Message-ID: <1534549659-15883-1-git-send-email-justinpopo6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2018 11:13 PM, Peter Robinson wrote:
-> On Fri, Aug 17, 2018 at 7:30 PM, Daniel Borkmann <daniel@iogearbox.net> wrote:
->> On 08/17/2018 06:17 PM, Russell King - ARM Linux wrote:
->>> On Fri, Aug 17, 2018 at 02:40:19PM +0200, Daniel Borkmann wrote:
->>>> I'd have one potential bug suspicion, for the 4.18 one you were trying,
->>>> could you run with the below patch to see whether it would help?
->>>
->>> I think this is almost certainly the problem - looking at the history,
->>> it seems that the "-4" was assumed to be part of the scratch stuff in
->>> commit 38ca93060163 ("bpf, arm32: save 4 bytes of unneeded stack space")
->>> but it isn't - it's because "off" of zero refers to the top word in the
->>> stack (iow at STACK_SIZE-4).
->>
->> Yeah agree, my thinking as well (albeit bit late, sigh, sorry about that).
->> Waiting for Peter to get back with results for definite confirmation. Your
->> rework in 1c35ba122d4a ("ARM: net: bpf: use negative numbers for stacked
->> registers") and 96cced4e774a ("ARM: net: bpf: access eBPF scratch space using
->> ARM FP register") fixes this in mainline, so unless I'm missing something this
->> would only need a stand-alone fix for 4.18/stable which I can cook up and
->> submit then.
-> 
-> I can confirm that fixes the problems I was seeing on Fedora 29.
-> 
-> Feel free to add a tested by from me:
-> 
-> Tested-by: Peter Robinson <pbrobinson@gmail.com>
+From: Justin Chen <justinpopo6@gmail.com>
 
-Great, thanks everyone! Will get it out asap.
+Sometimes we have empty banks within the GPIO block. This commit allows
+proper handling of 0 width GPIO banks. We handle 0 width GPIO banks by
+incrementing the bank and number of GPIOs, but not initializing them.
+This will mean a call into the non-existent GPIOs will return an error.
+
+Also remove "GPIO registered" dev print. This information is misleading
+since the incremented banks and gpio_base do not reflect the actual GPIOs
+that get initialized. We leave this information out since it is already
+printed with dev_dbg.
+
+Signed-off-by: Justin Chen <justinpopo6@gmail.com>
+---
+ drivers/gpio/gpio-brcmstb.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
+index 16c7f9f..af936dc 100644
+--- a/drivers/gpio/gpio-brcmstb.c
++++ b/drivers/gpio/gpio-brcmstb.c
+@@ -664,6 +664,18 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
+ 		struct brcmstb_gpio_bank *bank;
+ 		struct gpio_chip *gc;
+ 
++		/*
++		 * If bank_width is 0, then there is an empty bank in the
++		 * register block. Special handling for this case.
++		 */
++		if (bank_width == 0) {
++			dev_dbg(dev, "Width 0 found: Empty bank @ %d\n",
++				num_banks);
++			num_banks++;
++			gpio_base += MAX_GPIO_PER_BANK;
++			continue;
++		}
++
+ 		bank = devm_kzalloc(dev, sizeof(*bank), GFP_KERNEL);
+ 		if (!bank) {
+ 			err = -ENOMEM;
+@@ -740,9 +752,6 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
+ 			goto fail;
+ 	}
+ 
+-	dev_info(dev, "Registered %d banks (GPIO(s): %d-%d)\n",
+-			num_banks, priv->gpio_base, gpio_base - 1);
+-
+ 	if (priv->parent_wake_irq && need_wakeup_event)
+ 		pm_wakeup_event(dev, 0);
+ 
+-- 
+2.7.4
