@@ -1,16 +1,39 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 17 Aug 2018 12:20:11 +0200
-Subject: [PATCH] arm64: defconfig: enable R8A774A1 SoC
-In-Reply-To: <1534146093-1651-2-git-send-email-biju.das@bp.renesas.com>
-References: <1534146093-1651-1-git-send-email-biju.das@bp.renesas.com>
- <1534146093-1651-2-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <20180817102011.ru7erhoytvd6gqsw@verge.net.au>
+From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
+Date: Fri, 17 Aug 2018 15:49:18 +0530
+Subject: [PATCH 1/3] ARM: dts: Add big-endian for IFC on LS1021A
+Message-ID: <20180817101920.20503-1-prabhakar.kushwaha@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 13, 2018 at 08:41:33AM +0100, Biju Das wrote:
-> Enable the Renesas RZ/G2M (R8A774A1) SoC in the ARM64 defconfig.
-> 
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Register space of IFC controller is big-endian.
 
-Thanks, applied for v4.20.
+So add big-endian in IFC device tree node.
+
+Signed-off-by: Alison Wang <alison.wang@nxp.com>
+Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
+Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+---
+ arch/arm/boot/dts/ls1021a.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index f18490548c78..1f9cae75bad3 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright 2013-2014 Freescale Semiconductor, Inc.
++ * Copyright 2018 NXP
+  *
+  * This file is dual-licensed: you can use it either under the terms
+  * of the GPL or the X11 license, at your option. Note that this dual
+@@ -154,6 +155,7 @@
+ 		ifc: ifc at 1530000 {
+ 			compatible = "fsl,ifc", "simple-bus";
+ 			reg = <0x0 0x1530000 0x0 0x10000>;
++			big-endian;
+ 			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
+-- 
+2.14.1
