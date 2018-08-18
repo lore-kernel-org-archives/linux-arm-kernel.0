@@ -1,64 +1,35 @@
-From: petrcvekcz@gmail.com (Petr Cvek)
-Date: Sat, 18 Aug 2018 15:00:29 +0200
-Subject: ASoC: pxa: remove pxa2xx-pcm driver, which caused regression
-In-Reply-To: <87r2iwau3u.fsf@belgarion.home>
-References: <f12148b7c9102c67d92a0467f1d653e37c6548ee.1534534854.git.petrcvekcz@gmail.com>
- <87r2iwau3u.fsf@belgarion.home>
-Message-ID: <4deb5304-8efc-3093-7f8e-0dfe50781790@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 18 Aug 2018 15:40:27 +0100
+Subject: why =?UTF-8?Q?TTBR=30=5FEL=31/VBAR=5FEL=31=20not=20banked=20i?=
+ =?UTF-8?Q?n=20aarch=36=34?=
+In-Reply-To: <CADUS3onm_h6aq_sQP_pdtrHpbiCok3ofjwd0yTMWFpGxHWstow@mail.gmail.com>
+References: <CADUS3onm_h6aq_sQP_pdtrHpbiCok3ofjwd0yTMWFpGxHWstow@mail.gmail.com>
+Message-ID: <5c1fdcd956b1c73d546010add8430f79@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2018-08-18 11:01, yoma sophian wrote:
+> hi all:
+> in ARM DDI 0487C.a, it seems TBR0_EL1/VBAR_EL1 are not banked in 
+> aarch64.
+> (The paragraph, Accessibility,  in section G7.2.160 (TTBR0,
+> Translation Table Base Register 0)
+>  and section G7.2.162 (VBAR, Vector Base Address Register.)
+>
+> if so, will it not make any secure issue?
+> suppose EL1_NS change TTBR0 to let EL1_S access wrong page table?
+> thanks for your kind help in advance,
 
+[reposting with the list on cc and with my ARM email address]
 
-Dne 18.8.2018 v 11:42 Robert Jarzmik napsal(a):
-> petrcvekcz at gmail.com writes:
-> 
->> From: Petr Cvek <petrcvekcz@gmail.com>
->>
->> The switch of PXA to dmaengine caused a regression for devices which are
->> using SSP/I2S and probably AC97. The problem is in multiple allocation
->> of DMA by function pxa2xx_soc_pcm_new() called by pxa-pcm-audio and
->> (SSP/I2S/AC97). The regression was found on HTC Magician and after playback
->> kernel generates an oops:
-> With AC97, this is still continuously tested and works fine, and the pcm part is
-> what makes aplay happy for playing music. This is used both in a devicetree and
-> non devicetree build, which makes me thing the AC97 part is fine, and the
-> SSP/I2S needs some love.
-> 
-I was looking into the code and if there is no .platform_name present
-soc_bind_dai_link() will just use "snd-soc-dummy" as the name.
+Switching between EL1_S and EL1_NS implies that EL3 is performing a 
+full
+context switch of the system, similar to EL2 performing a switch 
+between
+guests running at EL1_NS.
 
-> With your patch, a compilation of mioa701 fails with [1].
-> 
-My bad I've forgot to add "select SND_PXA2XX_LIB" from removed
-SND_PXA2XX_SOC, now it should compile, can you test it if it works now?
-fixed patch in [1].
+Hope this helps,
 
-BTW can you try insmod-aplay-stop-rmmod with the current -next on your
-board?
-
-> Therefore, I'll NAK this patch, as removing SND_PAX2XX_SOC config is a bad idea.
-> 
-> As a way forward, please submit a patch for magician only, which makes it work
-> again (by work I mean you can play and hear a song with aplay or equivalent).
-> 
-> Then hopefully Daniel can interpolate to all the SSP/I2S platforms. And maybe
-> Daniel can test on his platform too so that we're safe on both pxa2xx and pxa3xx
-> side.
-> 
-
-OK I can do that, (I can speak only for I2S and SSP) but if fixed patch
-work it should be fine.
-
-best regards
-Petr
-
-Attached:
-[1] Fixed patch v2, forgotten "select SND_PXA2XX_LIB"
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ASoC-pxa-remove-pxa2xx-pcm-driver-which-caused-regre.patch
-Type: text/x-patch
-Size: 23727 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180818/86106b7e/attachment-0001.bin>
+         M.
+-- 
+Fast, cheap, reliable. Pick two.
