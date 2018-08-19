@@ -1,81 +1,62 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Sun, 19 Aug 2018 15:51:11 +0800
-Subject: [PATCH v4 2/2] iommu/arm-smmu-v3: avoid redundant CMD_SYNCs if
- possible
-In-Reply-To: <1534665071-7976-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1534665071-7976-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1534665071-7976-3-git-send-email-thunder.leizhen@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 19 Aug 2018 11:29:36 +0100
+Subject: why TTBR0_EL1/VBAR_EL1 not banked in aarch64
+In-Reply-To: <CADUS3o=getrG8E+CF9PC5sdcPQwxE3r2XWfSy=H_-mYEacaLdQ@mail.gmail.com>
+References: <CADUS3onm_h6aq_sQP_pdtrHpbiCok3ofjwd0yTMWFpGxHWstow@mail.gmail.com>
+ <5c1fdcd956b1c73d546010add8430f79@www.loen.fr>
+ <CADUS3okx-PWqP3N2rCy-WdCMy38oT3sUqtxOqYgbOCbAMmCEpg@mail.gmail.com>
+ <CADUS3okzvPoe_xBNDOPtc+kx=0D=r+Rsh2zXM+vOuGaBiuje3w@mail.gmail.com>
+ <868t53pj5i.wl-marc.zyngier@arm.com>
+ <CADUS3o=getrG8E+CF9PC5sdcPQwxE3r2XWfSy=H_-mYEacaLdQ@mail.gmail.com>
+Message-ID: <867ekmps33.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-More than two CMD_SYNCs maybe adjacent in the command queue, and the first
-one has done what others want to do. Drop the redundant CMD_SYNCs can
-improve IO performance especially under the pressure scene.
+On Sun, 19 Aug 2018 05:45:03 +0100,
+yoma sophian <sophian.yoma@gmail.com> wrote:
+> 
+> hi marc:
+> > On Sat, 18 Aug 2018 17:01:33 +0100,
+> > You missed the essential part of my answer: Switching from EL1_S to
+> > EL1_NS (or the other way around) implies that you're transitioning via
+> > EL3, which is entirely responsible for switching all non-banked system
+> > registers, which includes TTBR0_EL1.
+> >
+> > EL1_S and EL1_NS do not run concurrently. They are multiplexed by EL3,
+> > which gives the illusion of concurrent execution.
+> so you mean:
+> a) EL1_NS modify TTBR0_EL1
+> b) SMC to EL3
+> c) EL3 will restore TTBR0_EL1 of EL1_S
 
-I did the statistics in my test environment, the number of CMD_SYNCs can
-be reduced about 1/3. See below:
-CMD_SYNCs reduced:	19542181
-CMD_SYNCs total:	58098548	(include reduced)
-CMDs total:		116197099	(TLBI:SYNC about 1:1)
+Only if it has to switch to EL1_S. Services that are handled at EL3
+directly do not need any additional save/restore.
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/iommu/arm-smmu-v3.c | 22 +++++++++++++++++++---
- 1 file changed, 19 insertions(+), 3 deletions(-)
+> EL1_S will always using its own TTBR0_EL1 that saved by EL3, right?
+> if so, that mean EL3 has also need to restore back EL1_S's VBAR_EL1.
+> Since both TTBR0_EL1 and VBAR_EL1 are not banked.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index ac6d6df..f3a56e1 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -567,6 +567,7 @@ struct arm_smmu_device {
- 	int				gerr_irq;
- 	int				combined_irq;
- 	u32				sync_nr;
-+	u8				prev_cmd_opcode;
+Exactly. Together with TTBR1_EL1 and all similar registers. In
+general, AArch64 doesn't offer banked registers, as all the switching
+can be handled in SW.
 
- 	unsigned long			ias; /* IPA */
- 	unsigned long			oas; /* PA */
-@@ -786,6 +787,11 @@ void arm_smmu_cmdq_build_sync_msi_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
- 	cmd[1]  = ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
- }
+> Why aarch64 not just follow aarch32's design for banking TTBR0_EL1
+> and VBAR_EL1?  ( that will saving time on context switching between
+> S and NS right?)
 
-+static inline u8 arm_smmu_cmd_opcode_get(u64 *cmd)
-+{
-+	return cmd[0] & CMDQ_0_OP;
-+}
-+
- /* High-level queue accessors */
- static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
- {
-@@ -906,6 +912,8 @@ static void arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
- 	struct arm_smmu_queue *q = &smmu->cmdq.q;
- 	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+These registers are banked on AArch32 because there is no EL3 with its
+own translation regime, meaning that both S and NS TTBRs have to be
+live at the same time for the exception to be handled.
 
-+	smmu->prev_cmd_opcode = arm_smmu_cmd_opcode_get(cmd);
-+
- 	while (queue_insert_raw(q, cmd) == -ENOSPC) {
- 		if (queue_poll_cons(q, false, wfe))
- 			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
-@@ -958,9 +966,17 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
- 	};
+Having the monitor mode turned into a proper exception level has
+allowed to remove that constraint, making the architecture simpler
+(which is a very important goal for both HW and SW).
 
- 	spin_lock_irqsave(&smmu->cmdq.lock, flags);
--	ent.sync.msidata = ++smmu->sync_nr;
--	arm_smmu_cmdq_build_sync_msi_cmd(cmd, &ent);
--	arm_smmu_cmdq_insert_cmd(smmu, cmd);
-+	if (smmu->prev_cmd_opcode == CMDQ_OP_CMD_SYNC) {
-+		/*
-+		 * Previous command is CMD_SYNC also, there is no need to add
-+		 * one more. Just poll it.
-+		 */
-+		ent.sync.msidata = smmu->sync_nr;
-+	} else {
-+		ent.sync.msidata = ++smmu->sync_nr;
-+		arm_smmu_cmdq_build_sync_msi_cmd(cmd, &ent);
-+		arm_smmu_cmdq_insert_cmd(smmu, cmd);
-+	}
- 	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+As for "saving time", if context switching system registers becomes
+the bottleneck on your system, then you're doing something that is
+pathologically wrong.
 
- 	return __arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
---
-1.8.3
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
