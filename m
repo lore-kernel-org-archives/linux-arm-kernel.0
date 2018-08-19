@@ -1,47 +1,37 @@
-From: petrcvekcz@gmail.com (Petr Cvek)
-Date: Sat, 18 Aug 2018 22:59:27 +0200
-Subject: ASoC: pxa: remove pxa2xx-pcm driver, which caused regression
-In-Reply-To: <87mutjbidr.fsf@belgarion.home>
-References: <f12148b7c9102c67d92a0467f1d653e37c6548ee.1534534854.git.petrcvekcz@gmail.com>
- <87r2iwau3u.fsf@belgarion.home>
- <4deb5304-8efc-3093-7f8e-0dfe50781790@gmail.com>
- <87mutjbidr.fsf@belgarion.home>
-Message-ID: <16bb94b6-089d-f78e-1bb7-2550414be2fb@gmail.com>
+From: sophian.yoma@gmail.com (yoma sophian)
+Date: Sun, 19 Aug 2018 12:45:03 +0800
+Subject: why TTBR0_EL1/VBAR_EL1 not banked in aarch64
+In-Reply-To: <868t53pj5i.wl-marc.zyngier@arm.com>
+References: <CADUS3onm_h6aq_sQP_pdtrHpbiCok3ofjwd0yTMWFpGxHWstow@mail.gmail.com>
+ <5c1fdcd956b1c73d546010add8430f79@www.loen.fr>
+ <CADUS3okx-PWqP3N2rCy-WdCMy38oT3sUqtxOqYgbOCbAMmCEpg@mail.gmail.com>
+ <CADUS3okzvPoe_xBNDOPtc+kx=0D=r+Rsh2zXM+vOuGaBiuje3w@mail.gmail.com>
+ <868t53pj5i.wl-marc.zyngier@arm.com>
+Message-ID: <CADUS3o=getrG8E+CF9PC5sdcPQwxE3r2XWfSy=H_-mYEacaLdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+hi marc:
+> On Sat, 18 Aug 2018 17:01:33 +0100,
+> You missed the essential part of my answer: Switching from EL1_S to
+> EL1_NS (or the other way around) implies that you're transitioning via
+> EL3, which is entirely responsible for switching all non-banked system
+> registers, which includes TTBR0_EL1.
+>
+> EL1_S and EL1_NS do not run concurrently. They are multiplexed by EL3,
+> which gives the illusion of concurrent execution.
+so you mean:
+a) EL1_NS modify TTBR0_EL1
+b) SMC to EL3
+c) EL3 will restore TTBR0_EL1 of EL1_S
+EL1_S will always using its own TTBR0_EL1 that saved by EL3, right?
+if so, that mean EL3 has also need to restore back EL1_S's VBAR_EL1.
+Since both TTBR0_EL1 and VBAR_EL1 are not banked.
 
+Why aarch64 not just follow aarch32's design for banking TTBR0_EL1 and VBAR_EL1?
+( that will saving time on context switching between S and NS right?)
 
-Dne 18.8.2018 v 21:10 Robert Jarzmik napsal(a):
-> Petr Cvek <petrcvekcz@gmail.com> writes:
-> 
->> My bad I've forgot to add "select SND_PXA2XX_LIB" from removed
->> SND_PXA2XX_SOC, now it should compile, can you test it if it works now?
->> fixed patch in [1].
-> Still NAK.
-> 
-> You must realise that as long as you will delete sound/soc/pxa/pxa2xx-pcm.c,
-> I'll block the patch, as it is being used for music playback on several pxa
-> platforms, at least the AC97 based ones.
-> 
-I know I will send the magician only patch. I've just wanted to know how
-it is working with AC97 ;-) (+ it is still a good test for possible
-future changes).
-
->> BTW can you try insmod-aplay-stop-rmmod with the current -next on your
->> board?
-> Insmod/rmmod which module exactly ?
-> 	regmap-ac97.ko
-> 	ac97.ko
-> 	snd-pcm-dmaengine.ko
-> 	snd-pxa2xx-lib.ko
-> 	snd-soc-wm9713.ko
-> 	snd-soc-pxa2xx.ko
-> 	snd-soc-pxa2xx-ac97.ko
-> 	snd-soc-mioa701.ko
-> 
-This one: snd-soc-pxa2xx-ac97.ko, but the kernel makes oops right after
-you terminate aplay.
-
-best regards,
-Petr
+thanks for your kind help,
+>
+> So there is no need for a banked register. All you need is a
+> save/restore mechanism at EL3.
