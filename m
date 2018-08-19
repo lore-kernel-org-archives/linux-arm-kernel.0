@@ -1,37 +1,69 @@
-From: sophian.yoma@gmail.com (yoma sophian)
-Date: Sun, 19 Aug 2018 12:45:03 +0800
-Subject: why TTBR0_EL1/VBAR_EL1 not banked in aarch64
-In-Reply-To: <868t53pj5i.wl-marc.zyngier@arm.com>
-References: <CADUS3onm_h6aq_sQP_pdtrHpbiCok3ofjwd0yTMWFpGxHWstow@mail.gmail.com>
- <5c1fdcd956b1c73d546010add8430f79@www.loen.fr>
- <CADUS3okx-PWqP3N2rCy-WdCMy38oT3sUqtxOqYgbOCbAMmCEpg@mail.gmail.com>
- <CADUS3okzvPoe_xBNDOPtc+kx=0D=r+Rsh2zXM+vOuGaBiuje3w@mail.gmail.com>
- <868t53pj5i.wl-marc.zyngier@arm.com>
-Message-ID: <CADUS3o=getrG8E+CF9PC5sdcPQwxE3r2XWfSy=H_-mYEacaLdQ@mail.gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Sun, 19 Aug 2018 14:27:37 +0800
+Subject: [PATCH 4.4 2/6] irqchip/gic-v3-its: Recompute the number of pages on
+ page size change
+In-Reply-To: <1534660061-51980-1-git-send-email-guohanjun@huawei.com>
+References: <1534660061-51980-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <1534660061-51980-3-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi marc:
-> On Sat, 18 Aug 2018 17:01:33 +0100,
-> You missed the essential part of my answer: Switching from EL1_S to
-> EL1_NS (or the other way around) implies that you're transitioning via
-> EL3, which is entirely responsible for switching all non-banked system
-> registers, which includes TTBR0_EL1.
->
-> EL1_S and EL1_NS do not run concurrently. They are multiplexed by EL3,
-> which gives the illusion of concurrent execution.
-so you mean:
-a) EL1_NS modify TTBR0_EL1
-b) SMC to EL3
-c) EL3 will restore TTBR0_EL1 of EL1_S
-EL1_S will always using its own TTBR0_EL1 that saved by EL3, right?
-if so, that mean EL3 has also need to restore back EL1_S's VBAR_EL1.
-Since both TTBR0_EL1 and VBAR_EL1 are not banked.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Why aarch64 not just follow aarch32's design for banking TTBR0_EL1 and VBAR_EL1?
-( that will saving time on context switching between S and NS right?)
+commit 18aa60ce2751c95d3412ed06a58b8b6cfb6f88f2 upstream.
 
-thanks for your kind help,
->
-> So there is no need for a banked register. All you need is a
-> save/restore mechanism at EL3.
+When the programming of a GITS_BASERn register fails because of
+an unsupported ITS page size, we retry it with a smaller page size.
+Unfortunately, we don't recompute the number of allocated ITS pages,
+indicating the wrong value computed in the original allocation.
+
+A convenient fix is to free the pages we allocated, update the
+page size, and restart the allocation. This will ensure that
+we always allocate the right amount in the case of a device
+table, specially if we have to reduce the allocation order
+to stay within the boundaries of the ITS maximum allocation.
+
+Reported-and-tested-by: Ma Jun <majun258@huawei.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Jason Cooper <jason@lakedaemon.net>
+Link: http://lkml.kernel.org/r/1453818255-1289-1-git-send-email-marc.zyngier at arm.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ drivers/irqchip/irq-gic-v3-its.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 82e00e3..af61a2f 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -884,6 +884,7 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 		}
+ 
+ 		alloc_size = (1 << order) * PAGE_SIZE;
++retry_alloc_baser:
+ 		alloc_pages = (alloc_size / psz);
+ 		if (alloc_pages > GITS_BASER_PAGES_MAX) {
+ 			alloc_pages = GITS_BASER_PAGES_MAX;
+@@ -947,13 +948,16 @@ retry_baser:
+ 			 * size and retry. If we reach 4K, then
+ 			 * something is horribly wrong...
+ 			 */
++			free_pages((unsigned long)base, order);
++			its->tables[i] = NULL;
++
+ 			switch (psz) {
+ 			case SZ_16K:
+ 				psz = SZ_4K;
+-				goto retry_baser;
++				goto retry_alloc_baser;
+ 			case SZ_64K:
+ 				psz = SZ_16K;
+-				goto retry_baser;
++				goto retry_alloc_baser;
+ 			}
+ 		}
+ 
+-- 
+1.7.12.4
