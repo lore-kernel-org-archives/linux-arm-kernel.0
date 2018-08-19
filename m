@@ -1,111 +1,81 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Sun, 19 Aug 2018 15:51:10 +0800
-Subject: [PATCH v4 1/2] iommu/arm-smmu-v3: fix unexpected CMD_SYNC timeout
+Date: Sun, 19 Aug 2018 15:51:11 +0800
+Subject: [PATCH v4 2/2] iommu/arm-smmu-v3: avoid redundant CMD_SYNCs if
+ possible
 In-Reply-To: <1534665071-7976-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1534665071-7976-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1534665071-7976-2-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1534665071-7976-3-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The condition "(int)(VAL - sync_idx) >= 0" to break loop in function
-__arm_smmu_sync_poll_msi requires that sync_idx must be increased
-monotonously according to the sequence of the CMDs in the cmdq.
+More than two CMD_SYNCs maybe adjacent in the command queue, and the first
+one has done what others want to do. Drop the redundant CMD_SYNCs can
+improve IO performance especially under the pressure scene.
 
-But ".msidata = atomic_inc_return_relaxed(&smmu->sync_nr)" is not protected
-by spinlock, so the following scenarios may appear:
-cpu0			cpu1
-msidata=0
-			msidata=1
-			insert cmd1
-insert cmd0
-			smmu execute cmd1
-smmu execute cmd0
-			poll timeout, because msidata=1 is overridden by
-			cmd0, that means VAL=0, sync_idx=1.
-
-This is not a functional problem, just make the caller wait for a long
-time until TIMEOUT. It's rare to happen, because any other CMD_SYNCs
-during the waiting period will break it.
-
-Split the building of CMD_SYNC for SIG_IRQ mode into a single function,
-to ensure better performance and good coding style.
+I did the statistics in my test environment, the number of CMD_SYNCs can
+be reduced about 1/3. See below:
+CMD_SYNCs reduced:	19542181
+CMD_SYNCs total:	58098548	(include reduced)
+CMDs total:		116197099	(TLBI:SYNC about 1:1)
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 26 +++++++++++++++-----------
- 1 file changed, 15 insertions(+), 11 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 22 +++++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 1d64710..ac6d6df 100644
+index ac6d6df..f3a56e1 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -566,7 +566,7 @@ struct arm_smmu_device {
-
+@@ -567,6 +567,7 @@ struct arm_smmu_device {
  	int				gerr_irq;
  	int				combined_irq;
--	atomic_t			sync_nr;
-+	u32				sync_nr;
+ 	u32				sync_nr;
++	u8				prev_cmd_opcode;
 
  	unsigned long			ias; /* IPA */
  	unsigned long			oas; /* PA */
-@@ -775,6 +775,17 @@ static int queue_remove_raw(struct arm_smmu_queue *q, u64 *ent)
- 	return 0;
+@@ -786,6 +787,11 @@ void arm_smmu_cmdq_build_sync_msi_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
+ 	cmd[1]  = ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
  }
 
-+static inline
-+void arm_smmu_cmdq_build_sync_msi_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
++static inline u8 arm_smmu_cmd_opcode_get(u64 *cmd)
 +{
-+	cmd[0]  = FIELD_PREP(CMDQ_0_OP, ent->opcode);
-+	cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_IRQ);
-+	cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSH, ARM_SMMU_SH_ISH);
-+	cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIATTR, ARM_SMMU_MEMATTR_OIWB);
-+	cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIDATA, ent->sync.msidata);
-+	cmd[1]  = ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
++	return cmd[0] & CMDQ_0_OP;
 +}
 +
  /* High-level queue accessors */
  static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
  {
-@@ -830,14 +841,9 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
- 		cmd[1] |= FIELD_PREP(CMDQ_PRI_1_RESP, ent->pri.resp);
- 		break;
- 	case CMDQ_OP_CMD_SYNC:
--		if (ent->sync.msiaddr)
--			cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_IRQ);
--		else
--			cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_SEV);
-+		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_SEV);
- 		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSH, ARM_SMMU_SH_ISH);
- 		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIATTR, ARM_SMMU_MEMATTR_OIWB);
--		cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIDATA, ent->sync.msidata);
--		cmd[1] |= ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
- 		break;
- 	default:
- 		return -ENOENT;
-@@ -947,14 +953,13 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
- 	struct arm_smmu_cmdq_ent ent = {
- 		.opcode = CMDQ_OP_CMD_SYNC,
- 		.sync	= {
--			.msidata = atomic_inc_return_relaxed(&smmu->sync_nr),
- 			.msiaddr = virt_to_phys(&smmu->sync_count),
- 		},
+@@ -906,6 +912,8 @@ static void arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
+ 	struct arm_smmu_queue *q = &smmu->cmdq.q;
+ 	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+
++	smmu->prev_cmd_opcode = arm_smmu_cmd_opcode_get(cmd);
++
+ 	while (queue_insert_raw(q, cmd) == -ENOSPC) {
+ 		if (queue_poll_cons(q, false, wfe))
+ 			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
+@@ -958,9 +966,17 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
  	};
 
--	arm_smmu_cmdq_build_cmd(cmd, &ent);
--
  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
-+	ent.sync.msidata = ++smmu->sync_nr;
-+	arm_smmu_cmdq_build_sync_msi_cmd(cmd, &ent);
- 	arm_smmu_cmdq_insert_cmd(smmu, cmd);
+-	ent.sync.msidata = ++smmu->sync_nr;
+-	arm_smmu_cmdq_build_sync_msi_cmd(cmd, &ent);
+-	arm_smmu_cmdq_insert_cmd(smmu, cmd);
++	if (smmu->prev_cmd_opcode == CMDQ_OP_CMD_SYNC) {
++		/*
++		 * Previous command is CMD_SYNC also, there is no need to add
++		 * one more. Just poll it.
++		 */
++		ent.sync.msidata = smmu->sync_nr;
++	} else {
++		ent.sync.msidata = ++smmu->sync_nr;
++		arm_smmu_cmdq_build_sync_msi_cmd(cmd, &ent);
++		arm_smmu_cmdq_insert_cmd(smmu, cmd);
++	}
  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
 
-@@ -2179,7 +2184,6 @@ static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
- {
- 	int ret;
-
--	atomic_set(&smmu->sync_nr, 0);
- 	ret = arm_smmu_init_queues(smmu);
- 	if (ret)
- 		return ret;
+ 	return __arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
 --
 1.8.3
