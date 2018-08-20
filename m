@@ -1,41 +1,29 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 20 Aug 2018 16:18:10 +0200
-Subject: [PATCH] clk: sunxi-ng: sun50i: h6: Add 2x fixed post-divider to
- MMC module clocks
-In-Reply-To: <20180820134013.16527-1-icenowy@aosc.io>
-References: <20180820134013.16527-1-icenowy@aosc.io>
-Message-ID: <20180820141810.botskv2xkzpnd5t3@flea>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 20 Aug 2018 07:21:24 -0700
+Subject: [RFC PATCH 5/6] arm64: dts: ti: Add Support for AM654 SoC
+In-Reply-To: <a69fcb7a-f7a1-481b-8a02-1da7d1e20671@ti.com>
+References: <20180605060510.32473-1-nm@ti.com>
+ <CAL_JsqJusWTvr4A_-Bk81meYddMHBMJ4=Fch6L0MFoF7HfBW2w@mail.gmail.com>
+ <20180607233853.p7iw7nlxxuyi66og@kahuna>
+ <20180614123805.GF112168@atomide.com>
+ <20180614130435.j2bmzam6corrjylx@kahuna>
+ <20180615050108.GG112168@atomide.com>
+ <a69fcb7a-f7a1-481b-8a02-1da7d1e20671@ti.com>
+Message-ID: <20180820142124.GC7523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2018 at 09:40:13PM +0800, Icenowy Zheng wrote:
-> On the H6, the MMC module clocks are fixed in the new timing mode,
-> i.e. they do not have a bit to select the mode. These clocks have
-> a 2x divider somewhere between the clock and the MMC module.
+* Sekhar Nori <nsekhar@ti.com> [180615 13:41]:
 > 
-> To be consistent with other SoCs supporting the new timing mode,
-> we model the 2x divider as a fixed post-divider on the MMC module
-> clocks.
-> 
-> This patch adds the post-dividers to the MMC clocks, following the
-> approach on A64.
-> 
-> Fixes: 542353ea ("clk: sunxi-ng: add support for the Allwinner H6 CCU")
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> How well we can reuse individual interconnect segments is something I
+> have to think about / experiment. Will have to be wary of any "short
+> paths" or "cross connections".
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+These short paths and cross connections are almost certainly just
+additional ranges from the parent interconnect. See for example
+what we have in Linux next for wdt3 in omap4.dtsi for separate
+ranges for L4 and L3 interconnects.
 
-Thanks!
-Maxime
+Regards,
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180820/25b5fb99/attachment.sig>
+Tony
