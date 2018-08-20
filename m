@@ -1,81 +1,28 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 20 Aug 2018 21:40:13 +0800
-Subject: [PATCH] clk: sunxi-ng: sun50i: h6: Add 2x fixed post-divider to MMC
- module clocks
-Message-ID: <20180820134013.16527-1-icenowy@aosc.io>
+From: yannick.fertre@st.com (=?UTF-8?q?Yannick=20Fertr=C3=A9?=)
+Date: Mon, 20 Aug 2018 15:46:55 +0200
+Subject: [PATCH 1/6] ARM: multi_v7_defconfig: enable backlight gpio
+Message-ID: <1534772815-3083-1-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the H6, the MMC module clocks are fixed in the new timing mode,
-i.e. they do not have a bit to select the mode. These clocks have
-a 2x divider somewhere between the clock and the MMC module.
+Enable generic GPIO based backlight driver.
 
-To be consistent with other SoCs supporting the new timing mode,
-we model the 2x divider as a fixed post-divider on the MMC module
-clocks.
-
-This patch adds the post-dividers to the MMC clocks, following the
-approach on A64.
-
-Fixes: 542353ea ("clk: sunxi-ng: add support for the Allwinner H6 CCU")
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Yannick Fertr? <yannick.fertre@st.com>
 ---
- drivers/clk/sunxi-ng/ccu-sun50i-h6.c | 43 +++++++++++++++-------------
- 1 file changed, 23 insertions(+), 20 deletions(-)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-index bdbfe78fe133..3d60f7978506 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-@@ -408,26 +408,29 @@ static SUNXI_CCU_GATE(bus_nand_clk, "bus-nand", "ahb3", 0x82c, BIT(0), 0);
- 
- static const char * const mmc_parents[] = { "osc24M", "pll-periph0-2x",
- 					    "pll-periph1-2x" };
--static SUNXI_CCU_MP_WITH_MUX_GATE(mmc0_clk, "mmc0", mmc_parents, 0x830,
--					0, 4,	/* M */
--					8, 2,	/* N */
--					24, 3,	/* mux */
--					BIT(31),/* gate */
--					0);
--
--static SUNXI_CCU_MP_WITH_MUX_GATE(mmc1_clk, "mmc1", mmc_parents, 0x834,
--					0, 4,	/* M */
--					8, 2,	/* N */
--					24, 3,	/* mux */
--					BIT(31),/* gate */
--					0);
--
--static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_clk, "mmc2", mmc_parents, 0x838,
--					0, 4,	/* M */
--					8, 2,	/* N */
--					24, 3,	/* mux */
--					BIT(31),/* gate */
--					0);
-+static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc0_clk, "mmc0", mmc_parents, 0x830,
-+					  0, 4,		/* M */
-+					  8, 2,		/* N */
-+					  24, 3,	/* mux */
-+					  BIT(31),	/* gate */
-+					  2,		/* post-div */
-+					  0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc1_clk, "mmc1", mmc_parents, 0x834,
-+					  0, 4,		/* M */
-+					  8, 2,		/* N */
-+					  24, 3,	/* mux */
-+					  BIT(31),	/* gate */
-+					  2,		/* post-div */
-+					  0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc2_clk, "mmc2", mmc_parents, 0x838,
-+					  0, 4,		/* M */
-+					  8, 2,		/* N */
-+					  24, 3,	/* mux */
-+					  BIT(31),	/* gate */
-+					  2,		/* post-div */
-+					  0);
- 
- static SUNXI_CCU_GATE(bus_mmc0_clk, "bus-mmc0", "ahb3", 0x84c, BIT(0), 0);
- static SUNXI_CCU_GATE(bus_mmc1_clk, "bus-mmc1", "ahb3", 0x84c, BIT(1), 0);
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 23f5b67..bbd5c8c 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -664,6 +664,7 @@ CONFIG_BACKLIGHT_CLASS_DEVICE=y
+ CONFIG_LCD_PLATFORM=m
+ CONFIG_BACKLIGHT_PWM=y
+ CONFIG_BACKLIGHT_AS3711=y
++CONFIG_BACKLIGHT_GPIO=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
+ CONFIG_SOUND=m
 -- 
-2.18.0
+2.7.4
