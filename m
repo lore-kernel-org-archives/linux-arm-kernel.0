@@ -1,26 +1,60 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 20 Aug 2018 13:01:02 -0300
-Subject: [PATCH] ARM: dts: imx6: Add stdout-path to Wandboard
-In-Reply-To: <20180814204758.3049-1-tuomas@tuxera.com>
-References: <20180814204758.3049-1-tuomas@tuxera.com>
-Message-ID: <CAOMZO5A2U5vZkfCE7xaMfrTQCogBojBDAWUe3XDCr7-JipD2Wg@mail.gmail.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Tue, 21 Aug 2018 00:08:20 +0800
+Subject: [PATCH V5 0/5] soc: imx: add scu firmware api support
+Message-ID: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tuomas,
+Unlike the former i.MX Architectures, the new generation i.MX8 SoCs
+(e.g. MX8QXP and MX8QM) contain a system controller which runs on a
+dedicated Cortex-M core to provide power, clock, Pad, and resource
+management. Communication between the host processor running
+an OS and the system controller happens through a SCU protocol.
+This patchset adds the SCU APIs which is implemented based on MU
+and will be used by different system components.
 
-On Tue, Aug 14, 2018 at 5:47 PM, Tuomas Tynkkynen <tuomas@tuxera.com> wrote:
-> Setting a stdout-path in the .dtb is convenient because then the user
-> gets a serial console on the RS-232 connector without any extra effort
-> of figuring out the relevant 'console=' boot parameter.
->
-> Signed-off-by: Tuomas Tynkkynen <tuomas@tuxera.com>
+It mainly consists of below parts:
+1) SCU IPC
+   Basic IPC mechanism implemention based on mailbox which is used
+   for communication between AP and SCU firmware.
+2) SCU IPC Service API
 
-Patch looks good.
+Dong Aisheng (5):
+  dt-bindings: arm: fsl: add scu binding doc
+  soc: imx: add SC firmware IPC and APIs
+  soc: imx: sc: add pm svc support
+  soc: imx: sc: add pad svc support
+  soc: imx: sc: add misc svc support
 
-Only a minor nit on the Subject line: I would do it like this to make
-it consistent:
+ .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 179 ++++++
+ drivers/soc/imx/Kconfig                            |   4 +
+ drivers/soc/imx/Makefile                           |   1 +
+ drivers/soc/imx/sc/Makefile                        |   5 +
+ drivers/soc/imx/sc/main/ipc.c                      | 258 +++++++++
+ drivers/soc/imx/sc/main/rpc.h                      |  51 ++
+ drivers/soc/imx/sc/svc/misc/rpc_clnt.c             | 106 ++++
+ drivers/soc/imx/sc/svc/pad/rpc_clnt.c              |  82 +++
+ drivers/soc/imx/sc/svc/pm/rpc_clnt.c               | 275 +++++++++
+ include/soc/imx/sc/ipc.h                           |  46 ++
+ include/soc/imx/sc/sci.h                           |  20 +
+ include/soc/imx/sc/svc/misc/api.h                  |  60 ++
+ include/soc/imx/sc/svc/pad/api.h                   |  60 ++
+ include/soc/imx/sc/svc/pm/api.h                    | 229 ++++++++
+ include/soc/imx/sc/types.h                         | 636 +++++++++++++++++++++
+ 15 files changed, 2012 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+ create mode 100644 drivers/soc/imx/sc/Makefile
+ create mode 100644 drivers/soc/imx/sc/main/ipc.c
+ create mode 100644 drivers/soc/imx/sc/main/rpc.h
+ create mode 100644 drivers/soc/imx/sc/svc/misc/rpc_clnt.c
+ create mode 100644 drivers/soc/imx/sc/svc/pad/rpc_clnt.c
+ create mode 100644 drivers/soc/imx/sc/svc/pm/rpc_clnt.c
+ create mode 100644 include/soc/imx/sc/ipc.h
+ create mode 100644 include/soc/imx/sc/sci.h
+ create mode 100644 include/soc/imx/sc/svc/misc/api.h
+ create mode 100644 include/soc/imx/sc/svc/pad/api.h
+ create mode 100644 include/soc/imx/sc/svc/pm/api.h
+ create mode 100644 include/soc/imx/sc/types.h
 
-ARM: dts: imx6qdl-wandboard: Add stdout-path
-
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+-- 
+2.7.4
