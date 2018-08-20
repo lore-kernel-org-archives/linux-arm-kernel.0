@@ -1,166 +1,106 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 20 Aug 2018 09:28:20 +0100
-Subject: [PATCH v2 3/3] arm64: reliable stacktraces
-In-Reply-To: <20180817102733.B777568EF6@newverein.lst.de>
-References: <20180817102544.C628D68EF4@newverein.lst.de>
- <20180817102733.B777568EF6@newverein.lst.de>
-Message-ID: <b9985f25-1c85-cac1-8cd2-66f71cb0b40b@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 20 Aug 2018 16:41:09 +0800
+Subject: [PATCH v3 0/4] allwinner: a64: add SRAM controller / system
+ control
+In-Reply-To: <20180820094210.6d856029d51dad480782a783@bidouilliste.com>
+References: <20180614153548.9644-1-wens@csie.org>
+ <20180820094210.6d856029d51dad480782a783@bidouilliste.com>
+Message-ID: <CAGb2v66Eb4EoQs44cRwSKLf7MgwOtczNS0ufbtH5bLQBK24Lzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Torsten,
+On Mon, Aug 20, 2018 at 3:42 PM, Emmanuel Vadot <manu@bidouilliste.com> wrote:
+>
+>  Hello Chen-Yu,
+>
+> On Thu, 14 Jun 2018 23:35:44 +0800
+> Chen-Yu Tsai <wens@csie.org> wrote:
+>
+>> Hi,
+>>
+>> This series is the remaining A64 syscon changes from the R40 DWMAC
+>> series. The series aligns how the A64 system control exports a regmap
+>> for the sun8i DWMAC driver to access with what we've done for the R40.
+>>
+>> Originally the A64 used the generic syscon for this bit of hardware.
+>> But this block also contains mapping bits for the onboard SRAM, used
+>> by various peripherals, and other vendor specific bits we may use in
+>> the future. It is by no means generic. And we already have a device
+>> tree binding and driver for the SRAM part.
+>>
+>> The first patch make the SRAM control device export a regmap, exposing
+>> a single EMAC control register, for the DWMAC driver to consume.
+>>
+>> The second and third patches rename the A64 compatible string to read
+>> "system control", which is what the block is named in the user manual.
+>>
+>> The last patch fixes up the device node, and also adds the lone mappable
+>> SRAM block, which is needed by the Display Engine.
+>>
+>> Changes since v2:
+>>
+>>   - changed the compatible string from "*-sram-controller" to
+>>     "*-system-control"
+>>
+>>
+>> ChenYu
+>>
+>> Chen-Yu Tsai (2):
+>>   dt-bindings: sram: Rename A64 SRAM controller compatible
+>>   soc: sunxi: sram: Add updated compatible string for A64 system control
+>>
+>> Icenowy Zheng (2):
+>>   soc: sunxi: export a regmap for EMAC clock reg on A64
+>>   arm64: dts: allwinner: a64: add SRAM controller device tree node
+>>
+>>  .../devicetree/bindings/sram/sunxi-sram.txt   |  3 +-
+>>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 19 +++++-
+>>  drivers/soc/sunxi/sunxi_sram.c                | 61 ++++++++++++++++++-
+>>  3 files changed, 78 insertions(+), 5 deletions(-)
+>>
+>> --
+>> 2.17.1
+>
+>  I wish to have seen this serie before as it have some inconsistencies.
+>
+>  In patch 2 you renamed allwinner,sun50i-a64-sram-controller to
+> allwinner,sun50i-a64-system-control but the former was never used in
+> the DTS, the compatible used was allwinner,sun50i-a64-system-controller.
+>  You also say that you've never seen use of it. How can you make that
+> claim ? There is a lot of downstream users of DTS now (FreeBSD, NetBSD,
+> OpenBSD and even RiscOS and Haiku iirc), it's not just Linux.
 
-On 17/08/18 11:27, Torsten Duwe wrote:
-> This is more an RFC in the original sense: is this basically
-> the correct approach? (as I had to tweak the save_stack API a bit).
-> 
-> In particular the code does not detect interrupts and exception
-> frames, and does not yet check whether the code address is valid.
-> The latter check would also have to be omitted for the latest frame
-> on other tasks' stacks. This would require some more tweaking.
-> 
-> unwind_frame() now reports whether we had to stop normally or due to
-> an error condition; walk_stackframe() will pass that info.
-> __save_stack_trace() is used for a start to check the validity of a
-> frame; maybe save_stack_trace_tsk_reliable() will need its own callback.
-> 
-> The question is whether this change, once complete, is sufficient
-> (as on powerpc) or whether a port of objtool is needed, like x86.
-> 
+The original "a64-sram-controller" was never used in any upstream device
+tree, be it Linux or U-boot. Since the projects you listed all derive
+their device trees from U-boot, with maybe some extra devices on top,
+they would either have had the "system-controller" version, or the even
+earlier version in U-boot where the emac node just lists the syscon
+address range as its own.
 
-I'm not sure I understand the involvement of objtool in this.
-IIUC objtool just provides a way to check that the code manages stack 
-frames consistently. It gives you more confidence in how the code 
-manages the frame.
+U-boot has the latter "system-controller" because it was copied from Linux.
+The original use-case was a SoC-specific compatible string followed by the
+very generic "syscon". The latter "syscon" binding is what we actually
+support in Linux and U-boot. Same goes for NetBSD and OpenBSD.
 
-If the semantics of HAVE_RELIABLE_STACKTRACE is "are you able to tell 
-whether that stacktrace is good or corrupted?", the code looks mostly 
-fine to me.
+IMHO FreeBSD could also move to a generic syscon API, instead of
+"system-controller" for sunxi and "grf" for rockchip.
 
-> I can dig into this myself and draw conclusions, but I'd prefer
-> to have some input from ARM people here...
-> 
-> Signed-off-by: Torsten Duwe <duwe@suse.de>
-> 
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -127,8 +127,9 @@ config ARM64
->   	select HAVE_PERF_EVENTS
->   	select HAVE_PERF_REGS
->   	select HAVE_PERF_USER_STACK_DUMP
-> -	select HAVE_REGS_AND_STACK_ACCESS_API
->   	select HAVE_RCU_TABLE_FREE
-> +	select HAVE_REGS_AND_STACK_ACCESS_API
-> +	select HAVE_RELIABLE_STACKTRACE
->   	select HAVE_STACKPROTECTOR
->   	select HAVE_SYSCALL_TRACEPOINTS
->   	select HAVE_KPROBES
-> --- a/arch/arm64/include/asm/stacktrace.h
-> +++ b/arch/arm64/include/asm/stacktrace.h
-> @@ -33,7 +33,7 @@ struct stackframe {
->   };
->   
->   extern int unwind_frame(struct task_struct *tsk, struct stackframe *frame);
-> -extern void walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
-> +extern int walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
->   			    int (*fn)(struct stackframe *, void *), void *data);
->   extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk);
->   
-> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-> index d5718a060672..fe0dd4745ff3 100644
-> --- a/arch/arm64/kernel/stacktrace.c
-> +++ b/arch/arm64/kernel/stacktrace.c
-> @@ -81,23 +81,27 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
->   	 * both are NULL.
->   	 */
->   	if (!frame->fp && !frame->pc)
-> -		return -EINVAL;
-> +		return 1;
+You can continue to support old device trees and the unlisted compatible
+through the generic "syscon" fallback. For the updated device tree you will
+have to support the new compatible, along with supporting the SRAM mappings.
+The SRAM mappings are why the "syscon" compatible was removed. It just
+doesn't fit the semantics described by the "syscon" binding.
 
-unwind_frame is not static so we should take care of other callers.
+>  Also this compatible is currently the one used in the u-boot dts,
+> which mean that users of the embedded DTB use or can use it (which is
+> the default for EFI users of U-Boot).
 
-I can see one in arch/arm64/kernel/time.c, profile_pc which checks 
-"unwind_frame(...) < 0" to exit a loop, but now you have made 1 a valid 
-stop condition.
+As mentioned above, the old device tree uses the syscon binding, which
+you can continue to support. The new binding is add support for the SRAM
+mapping system. In addition, you probably don't want two device drivers
+supporting the same compatible string. On Linux it's even worse, because
+the "syscon" driver sidesteps the device model and isn't an actual device
+driver.
 
-I think the other callers are just checking "unwind_frame(...) != 0" as 
-stop condition so those should be fine.
-
-Perhaps adding a little comment on unwind_frame "0 -> Stack trace goes 
-on, 1 -> reached end of stack trace, 2 -> stack trace looks" would be nice.
-
->   
->   	return 0;
->   }
->   
-> -void notrace walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
-> +int notrace walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
->   		     int (*fn)(struct stackframe *, void *), void *data)
->   {
->   	while (1) {
->   		int ret;
->   
-> -		if (fn(frame, data))
-> -			break;
-> +		ret = fn(frame, data);
-> +		if (ret)
-> +			return ret;
->   		ret = unwind_frame(tsk, frame);
->   		if (ret < 0)
-> +			return ret;
-> +		if (ret > 0)
->   			break;
->   	}
-> +	return 0;
->   }
->   
->   #ifdef CONFIG_STACKTRACE
-> @@ -145,14 +149,15 @@ void save_stack_trace_regs(struct pt_regs *regs, struct stack_trace *trace)
->   		trace->entries[trace->nr_entries++] = ULONG_MAX;
->   }
->   
-> -static noinline void __save_stack_trace(struct task_struct *tsk,
-> +static noinline int __save_stack_trace(struct task_struct *tsk,
->   	struct stack_trace *trace, unsigned int nosched)
->   {
->   	struct stack_trace_data data;
->   	struct stackframe frame;
-> +	int ret;
->   
->   	if (!try_get_task_stack(tsk))
-> -		return;
-> +		return -EBUSY;
->   
->   	data.trace = trace;
->   	data.skip = trace->skip;
-> @@ -171,11 +176,12 @@ static noinline void __save_stack_trace(struct task_struct *tsk,
->   	frame.graph = tsk->curr_ret_stack;
->   #endif
->   
-> -	walk_stackframe(tsk, &frame, save_trace, &data);
-> +	ret = walk_stackframe(tsk, &frame, save_trace, &data);
->   	if (trace->nr_entries < trace->max_entries)
->   		trace->entries[trace->nr_entries++] = ULONG_MAX;
->   
->   	put_task_stack(tsk);
-> +	return ret;
->   }
->   EXPORT_SYMBOL_GPL(save_stack_trace_tsk);
->   
-> @@ -190,4 +196,12 @@ void save_stack_trace(struct stack_trace *trace)
->   }
->   
->   EXPORT_SYMBOL_GPL(save_stack_trace);
-> +
-> +int save_stack_trace_tsk_reliable(struct task_struct *tsk,
-> +				  struct stack_trace *trace)
-> +{
-> +	return __save_stack_trace(tsk, trace, 1);
-> +}
-> +EXPORT_SYMBOL_GPL(save_stack_trace_tsk_reliable);
-> +
->   #endif
-> 
-
--- 
-Julien Thierry
+Regards
+ChenYu
