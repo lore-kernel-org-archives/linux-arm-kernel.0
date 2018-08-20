@@ -1,77 +1,37 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Mon, 20 Aug 2018 09:42:10 +0200
-Subject: [PATCH v3 0/4] allwinner: a64: add SRAM controller / system
- control
-In-Reply-To: <20180614153548.9644-1-wens@csie.org>
-References: <20180614153548.9644-1-wens@csie.org>
-Message-ID: <20180820094210.6d856029d51dad480782a783@bidouilliste.com>
+From: sophian.yoma@gmail.com (yoma sophian)
+Date: Mon, 20 Aug 2018 15:55:52 +0800
+Subject: why TTBR0_EL1/VBAR_EL1 not banked in aarch64
+In-Reply-To: <867ekmps33.wl-marc.zyngier@arm.com>
+References: <CADUS3onm_h6aq_sQP_pdtrHpbiCok3ofjwd0yTMWFpGxHWstow@mail.gmail.com>
+ <5c1fdcd956b1c73d546010add8430f79@www.loen.fr>
+ <CADUS3okx-PWqP3N2rCy-WdCMy38oT3sUqtxOqYgbOCbAMmCEpg@mail.gmail.com>
+ <CADUS3okzvPoe_xBNDOPtc+kx=0D=r+Rsh2zXM+vOuGaBiuje3w@mail.gmail.com>
+ <868t53pj5i.wl-marc.zyngier@arm.com>
+ <CADUS3o=getrG8E+CF9PC5sdcPQwxE3r2XWfSy=H_-mYEacaLdQ@mail.gmail.com>
+ <867ekmps33.wl-marc.zyngier@arm.com>
+Message-ID: <CADUS3okU1dCJyhfZ7E+dg1Sjb5pqFyPQjwpO0jsq+noMNPoxZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+hi Marc
+> > Why aarch64 not just follow aarch32's design for banking TTBR0_EL1
+> > and VBAR_EL1?  ( that will saving time on context switching between
+> > S and NS right?)
+>
+> These registers are banked on AArch32 because there is no EL3 with its
+> own translation regime, meaning that both S and NS TTBRs have to be
+> live at the same time for the exception to be handled.
+so in aarch32:
+a) the secure world(EL1_S) has the same capability as monitor mode(EL3)
+     (Not only TTBR/VBAR are the same, the aarch32 secure world can
+even modify SCR as well)
+b) the monitor mode is nothing but a vector hook for SMC/FIQ/IRQ based
+on SCR's setting.
+right?
 
- Hello Chen-Yu,
+> Having the monitor mode turned into a proper exception level has
+> allowed to remove that constraint, making the architecture simpler
+> (which is a very important goal for both HW and SW).
+Got it.
 
-On Thu, 14 Jun 2018 23:35:44 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
-
-> Hi,
-> 
-> This series is the remaining A64 syscon changes from the R40 DWMAC
-> series. The series aligns how the A64 system control exports a regmap
-> for the sun8i DWMAC driver to access with what we've done for the R40.
-> 
-> Originally the A64 used the generic syscon for this bit of hardware.
-> But this block also contains mapping bits for the onboard SRAM, used
-> by various peripherals, and other vendor specific bits we may use in
-> the future. It is by no means generic. And we already have a device
-> tree binding and driver for the SRAM part.
-> 
-> The first patch make the SRAM control device export a regmap, exposing
-> a single EMAC control register, for the DWMAC driver to consume.
-> 
-> The second and third patches rename the A64 compatible string to read
-> "system control", which is what the block is named in the user manual.
-> 
-> The last patch fixes up the device node, and also adds the lone mappable
-> SRAM block, which is needed by the Display Engine.
-> 
-> Changes since v2:
-> 
->   - changed the compatible string from "*-sram-controller" to
->     "*-system-control"
-> 
-> 
-> ChenYu
-> 
-> Chen-Yu Tsai (2):
->   dt-bindings: sram: Rename A64 SRAM controller compatible
->   soc: sunxi: sram: Add updated compatible string for A64 system control
-> 
-> Icenowy Zheng (2):
->   soc: sunxi: export a regmap for EMAC clock reg on A64
->   arm64: dts: allwinner: a64: add SRAM controller device tree node
-> 
->  .../devicetree/bindings/sram/sunxi-sram.txt   |  3 +-
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 19 +++++-
->  drivers/soc/sunxi/sunxi_sram.c                | 61 ++++++++++++++++++-
->  3 files changed, 78 insertions(+), 5 deletions(-)
-> 
-> -- 
-> 2.17.1
-
- I wish to have seen this serie before as it have some inconsistencies.
-
- In patch 2 you renamed allwinner,sun50i-a64-sram-controller to
-allwinner,sun50i-a64-system-control but the former was never used in
-the DTS, the compatible used was allwinner,sun50i-a64-system-controller.
- You also say that you've never seen use of it. How can you make that
-claim ? There is a lot of downstream users of DTS now (FreeBSD, NetBSD,
-OpenBSD and even RiscOS and Haiku iirc), it's not just Linux.
- Also this compatible is currently the one used in the u-boot dts,
-which mean that users of the embedded DTB use or can use it (which is
-the default for EFI users of U-Boot).
-
- Cheers,
-
--- 
-Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+Appreciate ur kind help,
