@@ -1,45 +1,65 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 20 Aug 2018 13:47:35 -0500
-Subject: [PATCH 1/7] dt-bindings: Add DT bindings documentation for
- Allwinner Thermal Sensor Controller
-In-Reply-To: <20180820140737.xmqhu5ndqzehvkql@flea>
-References: <20180804070355.14857-1-manu@freebsd.org>
- <20180820111755.rzg7l2lznmbpuf2e@flea>
- <CAL_JsqLVQDRH1esAXghfQdxmp+iorWVCArM2qTwjbgmQzmhzQw@mail.gmail.com>
- <20180820140737.xmqhu5ndqzehvkql@flea>
-Message-ID: <CAL_JsqKzCySH0q=4Ly9tJBiDaW23Mz9Q0j-_qb55CcL2F5fYOA@mail.gmail.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 20 Aug 2018 20:50:55 +0200
+Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via the
+ nvmem API
+In-Reply-To: <20180820202038.5d3dc195@bbrezillon>
+References: <20180810080526.27207-1-brgl@bgdev.pl>
+ <20180810080526.27207-7-brgl@bgdev.pl>
+ <20180817182720.6a6e5e8e@bbrezillon> <20180819133106.0420df5f@tock>
+ <20180819184609.6dcdbb9a@bbrezillon>
+ <5b8c30b8-41e1-d59e-542b-fef6c6469ff0@linaro.org>
+ <20180820202038.5d3dc195@bbrezillon>
+Message-ID: <CAMRc=McwEjofZKP93DxPa8vJLE6NceLLGfcbcK9-Pfk-dav_Zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2018 at 9:07 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+2018-08-20 20:20 GMT+02:00 Boris Brezillon <boris.brezillon@bootlin.com>:
+> On Mon, 20 Aug 2018 11:43:34 +0100
+> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
 >
-> On Mon, Aug 20, 2018 at 07:41:22AM -0600, Rob Herring wrote:
-> > On Mon, Aug 20, 2018 at 5:17 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > >
-> > > On Sat, Aug 04, 2018 at 09:03:49AM +0200, Emmanuel Vadot wrote:
-> > > > This patch adds documentation for Device-Tree bindings for the Allwinner
-> > > > Thermal Sensor Controller found on the H3, H5 and A64 SoCs
-> > > >
-> > > > Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
-> > >
-> > > I'm not going to merge a binding for a device that doesn't have any
-> > > driver implemented at the moment in Linux.
-> >
-> > I'll take it then. Linux is not the only DT client.
+>>
+>> Overall am still not able to clear visualize on how MTD bindings with
+>> nvmem cells would look in both partition and un-partition usecases?
+>> An example DT would be nice here!!
 >
-> Then don't complain if we ever have to break the ABI.
+> Something along those lines:
+>
+>         mtdnode {
+>                 nvmem-cells {
+>                         #address-cells = <1>;
+>                         #size-cells = <1>;
+>
+>                         cell at 0 {
+>                                 reg = <0x0 0x14>;
+>                         };
+>                 };
+>
+>                 partitions {
+>                         compatible = "fixed-partitions";
+>                         #address-cells = <1>;
+>                         #size-cells = <1>;
+>
+>                         partition at 0 {
+>                                 reg = <0x0 0x20000>;
+>
+>                                 nvmem-cells {
+>                                         #address-cells = <1>;
+>                                         #size-cells = <1>;
+>
+>                                         cell at 0 {
+>                                                 reg = <0x0 0x10>;
+>                                         };
+>                                 };
+>                         };
+>                 };
+>         };
 
-My only complaint is when breaking ABIs and not being clear about
-doing so. Otherwise, it is up to platform maintainers to not upset
-their users (including if some of those users are FreeBSD).
+If there'll be an agreement on the bindings: will you be willing to
+merge Alban's patch even without support in the code for the above
+(with the assumption that it will be added later)? My use-case is on
+non-DT systems and creating nvmem devices corresponding to MTD
+partitions if fine by me. I also don't have the means to test the
+support for these bindings if I were to actually write them myself.
 
-> We never tested
-> that hardware, never had any code running on it, and it *will* cause
-> some issues. For example, the calibration data have never been used
-> and how they should be represented have never been described, since no
-> one ever actually tried to use it.
-
-Then perhaps that part of the binding should be omitted for now. But I
-don't see how if this works for FreeBSD how it wouldn't for Linux.
-
-Rob
+Best regards,
+Bartosz Golaszewski
