@@ -1,74 +1,79 @@
-From: albeu@free.fr (Alban)
-Date: Mon, 20 Aug 2018 23:27:48 +0200
-Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via
- the nvmem API
-In-Reply-To: <20180820202038.5d3dc195@bbrezillon>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180810080526.27207-7-brgl@bgdev.pl>
- <20180817182720.6a6e5e8e@bbrezillon> <20180819133106.0420df5f@tock>
- <20180819184609.6dcdbb9a@bbrezillon>
- <5b8c30b8-41e1-d59e-542b-fef6c6469ff0@linaro.org>
- <20180820202038.5d3dc195@bbrezillon>
-Message-ID: <20180820232748.608c3667@tock>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Mon, 20 Aug 2018 15:40:32 -0700
+Subject: [PATCH] arm64/crypto: remove non-standard notation
+Message-ID: <20180820224032.53194-1-ndesaulniers@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Aug 2018 20:20:38 +0200
-Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+It seems that:
+ldr q8, =0x30000000200000001
 
-> On Mon, 20 Aug 2018 11:43:34 +0100
-> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
-> 
-> > 
-> > Overall am still not able to clear visualize on how MTD bindings with 
-> > nvmem cells would look in both partition and un-partition usecases?
-> > An example DT would be nice here!!  
-> 
-> Something along those lines:
+is a GNU as convience notation for:
+ldr q8, .Lconstant
+.Lconstant
+.word 0x00000001
+.word 0x00000002
+.word 0x00000003
+.word 0x00000000
 
-We must also have a compatible string on the nvmem-cells node to make
-sure we don't clash with the old style MTD partitions, or some other
-device specific binding.
+based on this comment in binutils' source [0]. I've asked for this
+non-standard convience notation to be added to other assemblers [1], but
+until then, we can remove it and get equivalent disassembly:
 
-> 
-> 	mtdnode {
-> 		nvmem-cells {
-                        compatible = "nvmem-cells";
-> 			#address-cells = <1>;
-> 			#size-cells = <1>;
-> 
-> 			cell at 0 {
-> 				reg = <0x0 0x14>;
-> 			};
-> 		};
-> 
-> 		partitions {
-> 			compatible = "fixed-partitions";
-> 			#address-cells = <1>;
-> 			#size-cells = <1>;
-> 
-> 			partition at 0 {
-> 				reg = <0x0 0x20000>;
-> 
-> 				nvmem-cells {
-                                        compatible = "nvmem-cells";
-> 					#address-cells = <1>;
-> 					#size-cells = <1>;
-> 
-> 					cell at 0 {
-> 						reg = <0x0 0x10>;
-> 					};
-> 				};
-> 			};
-> 		};
-> 	};
+before:
+00000000000009d4 <neon_aes_ctr_encrypt>:
+...
+     a48:       9c000ac8        ldr     q8, ba0 <neon_aes_ctr_encrypt+0x1cc>
+...
+     ba0:       00000001        .word   0x00000001
+     ba4:       00000002        .word   0x00000002
+     ba8:       00000003        .word   0x00000003
+     bac:       00000000        .word   0x00000000
 
+after:
 
-Alban
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180820/57cbfe04/attachment.sig>
+00000000000009d4 <neon_aes_ctr_encrypt>:
+...
+     a48:       9c000aa8        ldr     q8, b9c <neon_aes_ctr_encrypt+0x1c8>
+...
+     b9c:       00000001        .word   0x00000001
+     ba0:       00000002        .word   0x00000002
+     ba4:       00000003        .word   0x00000003
+     ba8:       00000000        .word   0x00000000
+
+[0] https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=blob;f=gas/testsuite/gas/aarch64/programmer-friendly.s;h=6254c6476efdc848648b05068be0574e7addc85d;hb=HEAD#l11
+[1] https://bugs.llvm.org/show_bug.cgi?id=38642
+
+Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
+---
+ arch/arm64/crypto/aes-modes.S | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/crypto/aes-modes.S b/arch/arm64/crypto/aes-modes.S
+index 483a7130cf0e..9288c5b0eca2 100644
+--- a/arch/arm64/crypto/aes-modes.S
++++ b/arch/arm64/crypto/aes-modes.S
+@@ -232,7 +232,7 @@ AES_ENTRY(aes_ctr_encrypt)
+ 	bmi		.Lctr1x
+ 	cmn		w6, #4			/* 32 bit overflow? */
+ 	bcs		.Lctr1x
+-	ldr		q8, =0x30000000200000001	/* addends 1,2,3[,0] */
++	ldr		q8, .Laddends /* addends 1,2,3[,0] */
+ 	dup		v7.4s, w6
+ 	mov		v0.16b, v4.16b
+ 	add		v7.4s, v7.4s, v8.4s
+@@ -295,6 +295,12 @@ AES_ENTRY(aes_ctr_encrypt)
+ 	rev		x7, x7
+ 	ins		v4.d[0], x7
+ 	b		.Lctrcarrydone
++
++.Laddends:
++	.word	0x00000001
++	.word	0x00000002
++	.word	0x00000003
++	.word	0x00000000
+ AES_ENDPROC(aes_ctr_encrypt)
+ 	.ltorg
+ 
+-- 
+2.18.0.865.gffc8e1a3cd6-goog
