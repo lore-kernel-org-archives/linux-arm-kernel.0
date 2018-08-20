@@ -1,93 +1,83 @@
-From: thor.thayer@linux.intel.com (Thor Thayer)
-Date: Mon, 20 Aug 2018 11:32:15 -0500
-Subject: [PATCH V3 0/4] clk: new APIs to handle all available clocks
-In-Reply-To: <AM0PR04MB4211368561A415B255782CBE803D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1527244643-10736-1-git-send-email-aisheng.dong@nxp.com>
- <AM0PR04MB421114F8AFAE56B6D7C2D1E480770@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <AM0PR04MB4211368561A415B255782CBE803D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <ed7573b6-b8bf-9625-7c8f-7ee47a7be106@linux.intel.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 20 Aug 2018 16:31:39 +0000
+Subject: [PATCH V5 0/5] soc: imx: add scu firmware api support
+In-Reply-To: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
+References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <AM0PR04MB4211F68CCD399243613F8D7B80320@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jassi & Sascha,
 
-On 08/16/2018 09:33 PM, A.s. Dong wrote:
-> Hi Stephen,
-> 
-> Do you want me to resend this series for review?
-> It seems have been pending for quite a long time.
-> 
-> Thor just pinged me for its status as he wants to use it.
-> 
-> Regards
-> Dong Aisheng
-> 
->> -----Original Message-----
->> From: A.s. Dong
->> Sent: Wednesday, June 20, 2018 10:54 AM
->> To: linux-clk at vger.kernel.org
->> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org; dl-
->> linux-imx <linux-imx@nxp.com>
->> Subject: RE: [PATCH V3 0/4] clk: new APIs to handle all available clocks
->>
->> Ping....
->>
->>> -----Original Message-----
->>> From: A.s. Dong
->>> Sent: Friday, May 25, 2018 6:37 PM
->>> To: linux-clk at vger.kernel.org
->>> Cc: linux-kernel at vger.kernel.org;
->>> linux-arm-kernel at lists.infradead.org;
->>> sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org; dl-
->>> linux-imx <linux-imx@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
->>> Subject: [PATCH V3 0/4] clk: new APIs to handle all available clocks
->>>
->>> This patch series is a continue of discussion from here,
->>> https://patchwork.kernel.org/patch/9986293/
->>> that some users may want to handle all available clocks from device
->>> tree without need to know the detailed clock information likes clock
->>> numbers and names. This is useful in writing some generic drivers to handle
->> clock part.
->>>
->>> Note:
->>> This patch series is tested on MX6Q SDB cpufreq driver with a minor
->>> change to switch to use clk_bulk_get_all.
->>> But patch 4 only test compiling. Hopefully someone could help test the
->>> function.
->>>
->>> v2->v3:
->>>   * address all comments from Stephen
->>>   * fix build warnings on other architectures.
->>> v1->v2:
->>>   * add clk_bulk_{get|put}_all() which only supports DT platform
->>> currently
->>>   * remove _all variants and the wrapper struct clk_bulk
->>>   * make of_clk_bulk_get and of_clk_bulk_get_all private until someone
->>>     proves they need it because they don't have a struct device pointer.
->>>
->>> Dong Aisheng (4):
->>>    clk: bulk: add of_clk_bulk_get()
->>>    clk: add new APIs to operate on all available clocks
->>>    clk: add managed version of clk_bulk_get_all
->>>    video: simplefb: switch to use clk_bulk API to simplify clock
->>>      operations
->>>
->>>   drivers/clk/clk-bulk.c         | 80
->>> ++++++++++++++++++++++++++++++++++++++++++
->>>   drivers/clk/clk-devres.c       | 24 +++++++++++++
->>>   drivers/video/fbdev/simplefb.c | 66 +++++++---------------------------
->>>   include/linux/clk.h            | 65 +++++++++++++++++++++++++++++++++-
->>>   4 files changed, 180 insertions(+), 55 deletions(-)
->>>
->>> --
->>> 2.7.4
-> 
-> 
+Would you help review this new version patch series?
 
-Nice patchset!
+It's changed to generic MU driver using 8 separately MU channels
+according to Jassi's suggestion.
+Please help check if this is okay to you.
 
-FWIW, I've tested patches 1-3 on Stratix10 SOCFPGA for a SMMU driver I'm 
-working on.
+Regards
+Dong Aisheng
 
-Tested-by: Thor Thayer <thor.thayer@linux.intel.com>
+> -----Original Message-----
+> From: A.s. Dong
+> Sent: Tuesday, August 21, 2018 12:08 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: dongas86 at gmail.com; kernel at pengutronix.de; shawnguo at kernel.org;
+> Fabio Estevam <fabio.estevam@nxp.com>; dl-linux-imx <linux-
+> imx at nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
+> Subject: [PATCH V5 0/5] soc: imx: add scu firmware api support
+> 
+> Unlike the former i.MX Architectures, the new generation i.MX8 SoCs (e.g.
+> MX8QXP and MX8QM) contain a system controller which runs on a dedicated
+> Cortex-M core to provide power, clock, Pad, and resource management.
+> Communication between the host processor running an OS and the system
+> controller happens through a SCU protocol.
+> This patchset adds the SCU APIs which is implemented based on MU and will
+> be used by different system components.
+> 
+> It mainly consists of below parts:
+> 1) SCU IPC
+>    Basic IPC mechanism implemention based on mailbox which is used
+>    for communication between AP and SCU firmware.
+> 2) SCU IPC Service API
+> 
+> Dong Aisheng (5):
+>   dt-bindings: arm: fsl: add scu binding doc
+>   soc: imx: add SC firmware IPC and APIs
+>   soc: imx: sc: add pm svc support
+>   soc: imx: sc: add pad svc support
+>   soc: imx: sc: add misc svc support
+> 
+>  .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 179 ++++++
+>  drivers/soc/imx/Kconfig                            |   4 +
+>  drivers/soc/imx/Makefile                           |   1 +
+>  drivers/soc/imx/sc/Makefile                        |   5 +
+>  drivers/soc/imx/sc/main/ipc.c                      | 258 +++++++++
+>  drivers/soc/imx/sc/main/rpc.h                      |  51 ++
+>  drivers/soc/imx/sc/svc/misc/rpc_clnt.c             | 106 ++++
+>  drivers/soc/imx/sc/svc/pad/rpc_clnt.c              |  82 +++
+>  drivers/soc/imx/sc/svc/pm/rpc_clnt.c               | 275 +++++++++
+>  include/soc/imx/sc/ipc.h                           |  46 ++
+>  include/soc/imx/sc/sci.h                           |  20 +
+>  include/soc/imx/sc/svc/misc/api.h                  |  60 ++
+>  include/soc/imx/sc/svc/pad/api.h                   |  60 ++
+>  include/soc/imx/sc/svc/pm/api.h                    | 229 ++++++++
+>  include/soc/imx/sc/types.h                         | 636 +++++++++++++++++++++
+>  15 files changed, 2012 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+>  create mode 100644 drivers/soc/imx/sc/Makefile  create mode 100644
+> drivers/soc/imx/sc/main/ipc.c  create mode 100644
+> drivers/soc/imx/sc/main/rpc.h  create mode 100644
+> drivers/soc/imx/sc/svc/misc/rpc_clnt.c
+>  create mode 100644 drivers/soc/imx/sc/svc/pad/rpc_clnt.c
+>  create mode 100644 drivers/soc/imx/sc/svc/pm/rpc_clnt.c
+>  create mode 100644 include/soc/imx/sc/ipc.h  create mode 100644
+> include/soc/imx/sc/sci.h  create mode 100644
+> include/soc/imx/sc/svc/misc/api.h  create mode 100644
+> include/soc/imx/sc/svc/pad/api.h  create mode 100644
+> include/soc/imx/sc/svc/pm/api.h  create mode 100644
+> include/soc/imx/sc/types.h
+> 
+> --
+> 2.7.4
