@@ -1,165 +1,66 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Mon, 20 Aug 2018 16:29:15 +0200
-Subject: [PATCH v3 0/4] allwinner: a64: add SRAM controller / system
- control
-In-Reply-To: <CAGb2v67jB0kJSUE1wLgneAwgxr403Cb5nM1St2tBhW1aP9Db0A@mail.gmail.com>
-References: <20180614153548.9644-1-wens@csie.org>
- <20180820094210.6d856029d51dad480782a783@bidouilliste.com>
- <CAGb2v66Eb4EoQs44cRwSKLf7MgwOtczNS0ufbtH5bLQBK24Lzg@mail.gmail.com>
- <20180820160149.65771a35c5b46f5ddb483428@bidouilliste.com>
- <CAGb2v67jB0kJSUE1wLgneAwgxr403Cb5nM1St2tBhW1aP9Db0A@mail.gmail.com>
-Message-ID: <20180820162915.63f5298838819597e1047a1c@bidouilliste.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 20 Aug 2018 16:29:25 +0200
+Subject: [PATCH] KVM: Documentation: rename the capability of
+ KVM_CAP_ARM_SET_SERROR_ESR
+In-Reply-To: <1534801165-41525-1-git-send-email-gengdongjiu@huawei.com>
+References: <1534801165-41525-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <20180820142925.zw2vgplbutfcvvos@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Aug 2018 22:25:16 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
-
-> On Mon, Aug 20, 2018 at 10:01 PM, Emmanuel Vadot <manu@bidouilliste.com> wrote:
-> > On Mon, 20 Aug 2018 16:41:09 +0800
-> > Chen-Yu Tsai <wens@csie.org> wrote:
-> >
-> >> On Mon, Aug 20, 2018 at 3:42 PM, Emmanuel Vadot <manu@bidouilliste.com> wrote:
-> >> >
-> >> >  Hello Chen-Yu,
-> >> >
-> >> > On Thu, 14 Jun 2018 23:35:44 +0800
-> >> > Chen-Yu Tsai <wens@csie.org> wrote:
-> >> >
-> >> >> Hi,
-> >> >>
-> >> >> This series is the remaining A64 syscon changes from the R40 DWMAC
-> >> >> series. The series aligns how the A64 system control exports a regmap
-> >> >> for the sun8i DWMAC driver to access with what we've done for the R40.
-> >> >>
-> >> >> Originally the A64 used the generic syscon for this bit of hardware.
-> >> >> But this block also contains mapping bits for the onboard SRAM, used
-> >> >> by various peripherals, and other vendor specific bits we may use in
-> >> >> the future. It is by no means generic. And we already have a device
-> >> >> tree binding and driver for the SRAM part.
-> >> >>
-> >> >> The first patch make the SRAM control device export a regmap, exposing
-> >> >> a single EMAC control register, for the DWMAC driver to consume.
-> >> >>
-> >> >> The second and third patches rename the A64 compatible string to read
-> >> >> "system control", which is what the block is named in the user manual.
-> >> >>
-> >> >> The last patch fixes up the device node, and also adds the lone mappable
-> >> >> SRAM block, which is needed by the Display Engine.
-> >> >>
-> >> >> Changes since v2:
-> >> >>
-> >> >>   - changed the compatible string from "*-sram-controller" to
-> >> >>     "*-system-control"
-> >> >>
-> >> >>
-> >> >> ChenYu
-> >> >>
-> >> >> Chen-Yu Tsai (2):
-> >> >>   dt-bindings: sram: Rename A64 SRAM controller compatible
-> >> >>   soc: sunxi: sram: Add updated compatible string for A64 system control
-> >> >>
-> >> >> Icenowy Zheng (2):
-> >> >>   soc: sunxi: export a regmap for EMAC clock reg on A64
-> >> >>   arm64: dts: allwinner: a64: add SRAM controller device tree node
-> >> >>
-> >> >>  .../devicetree/bindings/sram/sunxi-sram.txt   |  3 +-
-> >> >>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 19 +++++-
-> >> >>  drivers/soc/sunxi/sunxi_sram.c                | 61 ++++++++++++++++++-
-> >> >>  3 files changed, 78 insertions(+), 5 deletions(-)
-> >> >>
-> >> >> --
-> >> >> 2.17.1
-> >> >
-> >> >  I wish to have seen this serie before as it have some inconsistencies.
-> >> >
-> >> >  In patch 2 you renamed allwinner,sun50i-a64-sram-controller to
-> >> > allwinner,sun50i-a64-system-control but the former was never used in
-> >> > the DTS, the compatible used was allwinner,sun50i-a64-system-controller.
-> >> >  You also say that you've never seen use of it. How can you make that
-> >> > claim ? There is a lot of downstream users of DTS now (FreeBSD, NetBSD,
-> >> > OpenBSD and even RiscOS and Haiku iirc), it's not just Linux.
-> >>
-> >> The original "a64-sram-controller" was never used in any upstream device
-> >> tree, be it Linux or U-boot. Since the projects you listed all derive
-> >> their device trees from U-boot, with maybe some extra devices on top,
-> >> they would either have had the "system-controller" version, or the even
-> >> earlier version in U-boot where the emac node just lists the syscon
-> >> address range as its own.
-> >>
-> >> U-boot has the latter "system-controller" because it was copied from Linux.
-> >> The original use-case was a SoC-specific compatible string followed by the
-> >> very generic "syscon". The latter "syscon" binding is what we actually
-> >> support in Linux and U-boot. Same goes for NetBSD and OpenBSD.
-> >>
-> >> IMHO FreeBSD could also move to a generic syscon API, instead of
-> >> "system-controller" for sunxi and "grf" for rockchip.
-> >
-> >  We decided to always implement a specific driver if the node have
-> > another compatible than syscon (I don't see the point of having a
-> > syscon compatible plus another one)
+On Mon, Aug 20, 2018 at 05:39:25PM -0400, Dongjiu Geng wrote:
+> In the documentation description, this capability's name is
+> KVM_CAP_ARM_SET_SERROR_ESR, but in the header file this
+> capability's name is KVM_CAP_ARM_INJECT_SERROR_ESR, so change
+> the documentation description to make it same.
 > 
-> In most cases, the fallback is there in situations when support for the
-> older or more generic device type can work with the new device, albeit
-> at lower efficiency or without full functionality.
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> ---
+> In the Documentation/virtual/kvm/api.txt:
 > 
-> Using a specific one with the "syscon" doesn't quite make sense to me
-> either, but some platforms, like Rockchip, do use it. I suppose it would
-> help them identify the type of syscon, but I think that is really tied
-> to the consumer.
-
- Maybe we should revised our decision then.
-
-> >> You can continue to support old device trees and the unlisted compatible
-> >> through the generic "syscon" fallback. For the updated device tree you will
-> >> have to support the new compatible, along with supporting the SRAM mappings.
-> >> The SRAM mappings are why the "syscon" compatible was removed. It just
-> >> doesn't fit the semantics described by the "syscon" binding.
-> >
-> >  I understand the removal of syscon since the sram addition, I just
-> > don't understand the strict renaming and why adding a new one couldn't
-> > work.
+> +8.19 KVM_CAP_ARM_SET_SERROR_ESR
 > 
-> You mean having something like the following?
+> In the include/uapi/linux/kvm.h:
+> +#define KVM_CAP_ARM_INJECT_SERROR_ESR 156
 > 
->     compatible = "allwinner,sun50i-a64-system-control",
->                  "allwinner,sun50i-a64-system-controller";
-
- Yes.
-
-> Well, the "system-controller" compatible was never listed in any binding,
-> and it shouldn't have been there in the first place. And I think having
-> the compatibles match up with the datasheet is better. Last, it is not
-> an actual "controller". It is just a set of control registers.
-
- Yes I think the main problem was that some non-documented binding was
-used.
-
-> ChenYu
+> So in above two files, the capability's name is not same, it
+> is better to use a same name.
+> ---
+>  Documentation/virtual/kvm/api.txt | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> >> >  Also this compatible is currently the one used in the u-boot dts,
-> >> > which mean that users of the embedded DTB use or can use it (which is
-> >> > the default for EFI users of U-Boot).
-> >>
-> >> As mentioned above, the old device tree uses the syscon binding, which
-> >> you can continue to support. The new binding is add support for the SRAM
-> >> mapping system. In addition, you probably don't want two device drivers
-> >> supporting the same compatible string. On Linux it's even worse, because
-> >> the "syscon" driver sidesteps the device model and isn't an actual device
-> >> driver.
-> >>
-> >> Regards
-> >> ChenYu
-> >>
-> >> _______________________________________________
-> >> linux-arm-kernel mailing list
-> >> linux-arm-kernel at lists.infradead.org
-> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
-> >
-> > --
-> > Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index 0acdbac..c664064 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -909,10 +909,10 @@ Serviceability (RAS) Specification").
+>  
+>  SError exceptions always have an ESR value. Some CPUs have the ability to
+>  specify what the virtual SError's ESR value should be. These systems will
+> -advertise KVM_CAP_ARM_SET_SERROR_ESR. In this case exception.has_esr will
+> +advertise KVM_CAP_ARM_INJECT_SERROR_ESR. In this case exception.has_esr will
+>  always have a non-zero value when read, and the agent making an SError pending
+>  should specify the ISS field in the lower 24 bits of exception.serror_esr. If
+> -the system supports KVM_CAP_ARM_SET_SERROR_ESR, but user-space sets the events
+> +the system supports KVM_CAP_ARM_INJECT_SERROR_ESR, but user-space sets the events
+>  with exception.has_esr as zero, KVM will choose an ESR.
+>  
+>  Specifying exception.has_esr on a system that does not support it will return
+> @@ -4749,7 +4749,7 @@ hypercalls:
+>  HvFlushVirtualAddressSpace, HvFlushVirtualAddressSpaceEx,
+>  HvFlushVirtualAddressList, HvFlushVirtualAddressListEx.
+>  
+> -8.19 KVM_CAP_ARM_SET_SERROR_ESR
+> +8.19 KVM_CAP_ARM_INJECT_SERROR_ESR
+>  
+>  Architectures: arm, arm64
+>  
+> -- 
+> 2.7.4
+>
 
+Reported-by: Andrew Jones <drjones@redhat.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
 
--- 
-Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+Thanks,
+drew
