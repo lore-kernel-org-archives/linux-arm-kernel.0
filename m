@@ -1,56 +1,44 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Mon, 20 Aug 2018 17:39:25 -0400
-Subject: [PATCH] KVM: Documentation: rename the capability of
- KVM_CAP_ARM_SET_SERROR_ESR
-Message-ID: <1534801165-41525-1-git-send-email-gengdongjiu@huawei.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 20 Aug 2018 15:36:47 +0200
+Subject: [PATCH 0/5] Set max rate for video PLLs
+In-Reply-To: <20180809165217.30680-1-jernej.skrabec@siol.net>
+References: <20180809165217.30680-1-jernej.skrabec@siol.net>
+Message-ID: <20180820133647.vpj7p36ir334g4am@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the documentation description, this capability's name is
-KVM_CAP_ARM_SET_SERROR_ESR, but in the header file this
-capability's name is KVM_CAP_ARM_INJECT_SERROR_ESR, so change
-the documentation description to make it same.
+On Thu, Aug 09, 2018 at 06:52:12PM +0200, Jernej Skrabec wrote:
+> This patch series implement maximum rate constraint for video PLLs,
+> because it is possible to set higher PLL rate that is actually
+> supported in HW.
+> 
+> Issue became apparent when user reported non-working monitor connected
+> to board with H5 SoC. Native monitor resolution in this case was
+> 2560x1080, with 185580 kHz pixel clock. Clock subsystem found out that
+> best matching pixel clock can be generated if video PLL is set to 2040
+> MHz, which is way out of specs for PLL. With this patch series applied,
+> everything worked just fine, with slightly higher rate error, but within
+> working limits for PLL and HDMI.
+> 
+> I'm not sure if "Fixes" tag should be added. It solves real world
+> problem, but there was nothing wrongly implemented, just upper limit
+> is missing.
+> 
+> While user reported that these patches solve the issue on H5, I added
+> similar fixes for other SoCs too. Since I don't have such monitor,
+> I only tested if board boots up and if HDMI works (H3, R40 and A83T).
 
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
----
-In the Documentation/virtual/kvm/api.txt:
+Queued for 4.20, thanks!
+Maxime
 
-+8.19 KVM_CAP_ARM_SET_SERROR_ESR
-
-In the include/uapi/linux/kvm.h:
-+#define KVM_CAP_ARM_INJECT_SERROR_ESR 156
-
-So in above two files, the capability's name is not same, it
-is better to use a same name.
----
- Documentation/virtual/kvm/api.txt | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 0acdbac..c664064 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -909,10 +909,10 @@ Serviceability (RAS) Specification").
- 
- SError exceptions always have an ESR value. Some CPUs have the ability to
- specify what the virtual SError's ESR value should be. These systems will
--advertise KVM_CAP_ARM_SET_SERROR_ESR. In this case exception.has_esr will
-+advertise KVM_CAP_ARM_INJECT_SERROR_ESR. In this case exception.has_esr will
- always have a non-zero value when read, and the agent making an SError pending
- should specify the ISS field in the lower 24 bits of exception.serror_esr. If
--the system supports KVM_CAP_ARM_SET_SERROR_ESR, but user-space sets the events
-+the system supports KVM_CAP_ARM_INJECT_SERROR_ESR, but user-space sets the events
- with exception.has_esr as zero, KVM will choose an ESR.
- 
- Specifying exception.has_esr on a system that does not support it will return
-@@ -4749,7 +4749,7 @@ hypercalls:
- HvFlushVirtualAddressSpace, HvFlushVirtualAddressSpaceEx,
- HvFlushVirtualAddressList, HvFlushVirtualAddressListEx.
- 
--8.19 KVM_CAP_ARM_SET_SERROR_ESR
-+8.19 KVM_CAP_ARM_INJECT_SERROR_ESR
- 
- Architectures: arm, arm64
- 
 -- 
-2.7.4
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180820/c01ca50c/attachment.sig>
