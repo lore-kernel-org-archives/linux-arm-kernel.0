@@ -1,30 +1,69 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 20 Aug 2018 19:53:58 +0800
-Subject: [PATCH] drm: sun4i: exclusively set HDMI-related clocks for
- dw-hdmi
-In-Reply-To: <20180820115244.x5z6lm4i7tpqptgs@flea>
-References: <20180815120745.36593-1-icenowy@aosc.io>
- <20180820115244.x5z6lm4i7tpqptgs@flea>
-Message-ID: <DA70F8EF-E64D-4295-A4A5-9F8EB616BB71@aosc.io>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 20 Aug 2018 14:00:46 +0200
+Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun8i: r40/v40: rewrite BPi
+ M2 Berry DTS to rebase on M2 Ultra
+In-Reply-To: <dc8a28bcfbe082158bac5b097badb3ddf0f51ce8.camel@aosc.io>
+References: <20180724163655.61365-1-icenowy@aosc.io>
+ <20180726124119.dwne2sncws2p3sdi@flea>
+ <dc8a28bcfbe082158bac5b097badb3ddf0f51ce8.camel@aosc.io>
+Message-ID: <20180820120046.7tonxtb52q43ocfq@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
+On Wed, Aug 08, 2018 at 06:36:56PM +0800, Icenowy Zheng wrote:
+> ? 2018-07-26?? 14:41 +0200?Maxime Ripard???
+> > On Wed, Jul 25, 2018 at 12:36:55AM +0800, Icenowy Zheng wrote:
+> > > Banana Pi designs the BPi M2 Berry board to be software compatible
+> > > with
+> > > BPi M2 Ultra,
+> > 
+> > Do you have a reference for this?
+> > 
+> > > so it's based on M2 Ultra with some function cuts, including:
+> > > 
+> > > - 2048MiB DRAM -> 1024MiB (this should be proceed by the
+> > > bootloader);
+> > > - dropped a LED;
+> > > - dropped eMMC;
+> > > - dropped USB2 and connect USB1 to a 4-port HUB.
+> > 
+> > Is it the exhaustive list?
+> 
+> I have asked Mikey from Sinovoip, and he has agreed this.
+> 
+> Here's a list provided by him, which covers some things I forgot:
+> - 2GiB -> 1GiB
+> - no eMMC
+> - no onboard microphone
+> - no IR
+> - no charging (and power jack to USB)
+> - USB change
+> - one less LED
+> 
+> Should I add this to the device tree's comment?
 
-? 2018?8?20? GMT+08:00 ??7:52:44, Maxime Ripard <maxime.ripard@bootlin.com> ??:
->Hi!
->
->On Wed, Aug 15, 2018 at 08:07:45PM +0800, Icenowy Zheng wrote:
->> The glue in sun4i-drm of dw-hdmi currently doesn't set the clocks of
->> dw-hdmi exclusively, which will lead the display fails to initialize
->in
->> some situations.
->
->Apart from the feedback already given, detailing which situations
->would be very helpful.
+Not really, because...
 
-This patched is rewritten now, and new version will come
-after -rc1.
+> > 
+> > I'm a bit reluctant to merge that kind of patches usually, since that
+> > would also imply that each time someone will commit something to the
+> > M2-Ultra, it would automatically apply to the M2-Berry, without any
+> > easy way to tell and / or test.
 
->
->Maxime
+... this still applies.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180820/31fb9ebc/attachment-0001.sig>
