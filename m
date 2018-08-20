@@ -1,1144 +1,561 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Tue, 21 Aug 2018 00:08:22 +0800
-Subject: [PATCH V5 2/5] soc: imx: add SC firmware IPC and APIs
+Date: Tue, 21 Aug 2018 00:08:23 +0800
+Subject: [PATCH V5 3/5] soc: imx: sc: add pm svc support
 In-Reply-To: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
 References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1534781305-4770-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1534781305-4770-4-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The System Controller Firmware (SCFW) is a low-level system function
-which runs on a dedicated Cortex-M core to provide power, clock, and
-resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
-(QM, QP), and i.MX8QX (QXP, DX).
-
-This patch adds the SC firmware service APIs used by the system.
-It mainly consists of two parts:
-1) Implementation of the IPC functions using MUs (client side).
-2) SCU firmware services APIs implemented based on RPC calls
+Add SCU PM SVC support which provides clock gate, rate, parent
+set support as well as resource power management.
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Jassi Brar <jassisinghbrar@gmail.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
-v4->v5:
- * switch to new generic MU binding.
-   Use 8 separate mu channels in one MU instance for SCU communication
- * create struct sc_rpc_msg to separate the msg header and service,
-   accordingly the old sc_rpc_msg_s with raw data union is removed.
-   This can gain better readability.
- * remove defines like RPC_XXX(MSG)
- * remove unused types
- * headfiles cleanup
- * NOTE:
-   With the new approach that uses 8 separate irq driven changes, i still
-   did not find a clean way to better support receiving msg over 4 words.
-   So the current driver does not support it.
-   As in current SCU protocol, there's only a minor of commands need
-   receiving msg over 4 words which is still not used by Linux, so it does
-   not affect the normal function.
- * Know issue:
-   The performance drops a lot after using 8 separate interrupt driven MUs
-   to send/receive msgs.
-   e.g. Sending a scu message with tx size 2 words and rx size 2 words:
-   Former (polling) : < 10us to handle a SCU msg
-   Now (irq) : 20~30 us to handle a SCU msg (Caused by interrupt latency)
-v3->v4:
- * change to use mailbox
- * separate the IPC part and RPC API for easy review
- * headfiles cleanup
-v2->v3:
- * add the ipc read/write error check
-v1->v2:
- * change the type of sc_ipc_t from uint32_t to unsigned long.
-   This can make it be capable of storing 64 bit pointer in ARMv8 system.
- * Update to use the new MU library implemenation (handle iomem privately)
- * remove unused delcarations e.g. sc_rpc_dispatch and sc_rpc_xlate.
- * remove unneeded pad ctl functions
----
- drivers/soc/imx/Kconfig       |   4 +
- drivers/soc/imx/Makefile      |   1 +
- drivers/soc/imx/sc/Makefile   |   2 +
- drivers/soc/imx/sc/main/ipc.c | 258 +++++++++++++++++
- drivers/soc/imx/sc/main/rpc.h |  51 ++++
- include/soc/imx/sc/ipc.h      |  46 +++
- include/soc/imx/sc/sci.h      |  16 ++
- include/soc/imx/sc/types.h    | 636 ++++++++++++++++++++++++++++++++++++++++++
- 8 files changed, 1014 insertions(+)
- create mode 100644 drivers/soc/imx/sc/Makefile
- create mode 100644 drivers/soc/imx/sc/main/ipc.c
- create mode 100644 drivers/soc/imx/sc/main/rpc.h
- create mode 100644 include/soc/imx/sc/ipc.h
- create mode 100644 include/soc/imx/sc/sci.h
- create mode 100644 include/soc/imx/sc/types.h
+ drivers/soc/imx/sc/Makefile          |   1 +
+ drivers/soc/imx/sc/svc/pm/rpc_clnt.c | 275 +++++++++++++++++++++++++++++++++++
+ include/soc/imx/sc/sci.h             |   2 +
+ include/soc/imx/sc/svc/pm/api.h      | 229 +++++++++++++++++++++++++++++
+ 4 files changed, 507 insertions(+)
+ create mode 100644 drivers/soc/imx/sc/svc/pm/rpc_clnt.c
+ create mode 100644 include/soc/imx/sc/svc/pm/api.h
 
-diff --git a/drivers/soc/imx/Kconfig b/drivers/soc/imx/Kconfig
-index a5b86a2..e3084d8 100644
---- a/drivers/soc/imx/Kconfig
-+++ b/drivers/soc/imx/Kconfig
-@@ -7,4 +7,8 @@ config IMX7_PM_DOMAINS
- 	select PM_GENERIC_DOMAINS
- 	default y if SOC_IMX7D
- 
-+config HAVE_IMX_SCU
-+	bool
-+	depends on IMX_MBOX
-+
- endmenu
-diff --git a/drivers/soc/imx/Makefile b/drivers/soc/imx/Makefile
-index aab41a5c..be79f67 100644
---- a/drivers/soc/imx/Makefile
-+++ b/drivers/soc/imx/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
- obj-$(CONFIG_IMX7_PM_DOMAINS) += gpcv2.o
-+obj-$(CONFIG_HAVE_IMX_SCU) += sc/
 diff --git a/drivers/soc/imx/sc/Makefile b/drivers/soc/imx/sc/Makefile
-new file mode 100644
-index 0000000..a3db142
---- /dev/null
+index a3db142..6898815 100644
+--- a/drivers/soc/imx/sc/Makefile
 +++ b/drivers/soc/imx/sc/Makefile
-@@ -0,0 +1,2 @@
-+# SPDX-License-Identifier: GPL-2.0
-+obj-y += main/ipc.o
-diff --git a/drivers/soc/imx/sc/main/ipc.c b/drivers/soc/imx/sc/main/ipc.c
+@@ -1,2 +1,3 @@
+ # SPDX-License-Identifier: GPL-2.0
+ obj-y += main/ipc.o
++obj-y += svc/pm/rpc_clnt.o
+diff --git a/drivers/soc/imx/sc/svc/pm/rpc_clnt.c b/drivers/soc/imx/sc/svc/pm/rpc_clnt.c
 new file mode 100644
-index 0000000..bc9e866
+index 0000000..32228fa
 --- /dev/null
-+++ b/drivers/soc/imx/sc/main/ipc.c
-@@ -0,0 +1,258 @@
++++ b/drivers/soc/imx/sc/svc/pm/rpc_clnt.c
+@@ -0,0 +1,275 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Copyright (C) 2016 Freescale Semiconductor, Inc.
 + * Copyright 2017~2018 NXP
-+ *	Dong Aisheng <aisheng.dong@nxp.com>
 + *
-+ * Implementation of the IPC functions using MUs (client side).
++ * File containing client-side RPC functions for the PM service. These
++ * function are ported to clients that communicate to the SC.
 + *
 + */
 +
-+#include <linux/err.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/kernel.h>
-+#include <linux/mailbox_client.h>
-+#include <linux/mutex.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
++#include <soc/imx/sc/svc/pm/api.h>
++#include "../../main/rpc.h"
 +
-+#include "rpc.h"
-+
-+#define SCU_MU_CHAN_NUM		8
-+#define MAX_RX_TIMEOUT		(msecs_to_jiffies(30))
-+
-+struct sc_chan {
-+	struct sc_ipc *sc_ipc;
-+
-+	struct mbox_client cl;
-+	struct mbox_chan *ch;
-+	int idx;
++/*
++ * This type is used to indicate RPC PM function calls.
++ */
++enum pm_func_e {
++	PM_FUNC_UNKNOWN = 0,
++	PM_FUNC_SET_SYS_POWER_MODE = 19,
++	PM_FUNC_SET_PARTITION_POWER_MODE = 1,
++	PM_FUNC_GET_SYS_POWER_MODE = 2,
++	PM_FUNC_SET_RESOURCE_POWER_MODE = 3,
++	PM_FUNC_GET_RESOURCE_POWER_MODE = 4,
++	PM_FUNC_REQ_LOW_POWER_MODE = 16,
++	PM_FUNC_SET_CPU_RESUME_ADDR = 17,
++	PM_FUNC_REQ_SYS_IF_POWER_MODE = 18,
++	PM_FUNC_SET_CLOCK_RATE = 5,
++	PM_FUNC_GET_CLOCK_RATE = 6,
++	PM_FUNC_CLOCK_ENABLE = 7,
++	PM_FUNC_SET_CLOCK_PARENT = 14,
++	PM_FUNC_GET_CLOCK_PARENT = 15,
++	PM_FUNC_RESET = 13,
++	PM_FUNC_RESET_REASON = 10,
++	PM_FUNC_BOOT = 8,
++	PM_FUNC_REBOOT = 9,
++	PM_FUNC_REBOOT_PARTITION = 12,
++	PM_FUNC_CPU_START = 11,
 +};
 +
-+struct sc_ipc {
-+	/* SCU uses 4 Tx and 4 Rx channels */
-+	struct sc_chan chans[SCU_MU_CHAN_NUM];
-+	struct device *dev;
-+	struct mutex lock;
-+	struct completion done;
++struct imx_sc_msg_req_set_resource_power_mode {
++	struct sc_rpc_msg hdr;
++	u16 resource;
++	u8 mode;
++} __packed;
 +
-+	/* temporarily store the SCU msg */
-+	u32 *msg;
-+	u8 rx_size;
-+	u8 count;
-+};
++struct imx_sc_msg_req_get_resource_power_mode {
++	struct sc_rpc_msg hdr;
++	u16 resource;
++} __packed;
 +
-+static sc_ipc_t scu_ipc_handle;
++struct imx_sc_msg_resp_get_resource_power_mode {
++	struct sc_rpc_msg hdr;
++	u8 mode;
++} __packed;
 +
-+/*
-+ * Get the default handle used by SCU
-+ */
-+int sc_ipc_get_handle(sc_ipc_t *ipc)
++struct imx_sc_msg_req_set_clock_rate {
++	struct sc_rpc_msg hdr;
++	u32 rate;
++	u16 resource;
++	u8 clk;
++} __packed;
++
++struct imx_sc_msg_req_get_clock_rate {
++	struct sc_rpc_msg hdr;
++	u16 resource;
++	u8 clk;
++} __packed;
++
++struct imx_sc_msg_resp_get_clock_rate {
++	struct sc_rpc_msg hdr;
++	u32 rate;
++} __packed;
++
++struct imx_sc_msg_req_clock_enable {
++	struct sc_rpc_msg hdr;
++	u16 resource;
++	u8 clk;
++	u8 enable;
++	u8 autog;
++} __packed;
++
++struct imx_sc_msg_req_set_clock_parent {
++	struct sc_rpc_msg hdr;
++	u16 resource;
++	u8 clk;
++	u8 parent;
++} __packed;
++
++struct imx_sc_msg_req_get_clock_parent {
++	struct sc_rpc_msg hdr;
++	u16 resource;
++	u8 clk;
++} __packed;
++
++struct imx_sc_msg_resp_get_clock_parent {
++	struct sc_rpc_msg hdr;
++	u8 parent;
++} __packed;
++
++sc_err_t sc_pm_set_resource_power_mode(sc_ipc_t ipc, sc_rsrc_t resource,
++				       sc_pm_power_mode_t mode)
 +{
-+	if (!scu_ipc_handle)
-+		return -EPROBE_DEFER;
-+
-+	*ipc = scu_ipc_handle;
-+	return 0;
-+}
-+EXPORT_SYMBOL(sc_ipc_get_handle);
-+
-+static void sc_rx_callback(struct mbox_client *c, void *msg)
-+{
-+	struct sc_chan *sc_chan = container_of(c, struct sc_chan, cl);
-+	struct sc_ipc *sc_ipc = sc_chan->sc_ipc;
-+	struct sc_rpc_msg *hdr;
-+	u32 *data = msg;
-+
-+	if (sc_chan->idx == 0) {
-+		hdr = msg;
-+		sc_ipc->rx_size = hdr->size;
-+		dev_dbg(sc_ipc->dev, "msg rx size %u\n", sc_ipc->rx_size);
-+		if (sc_ipc->rx_size > 4)
-+			dev_warn(sc_ipc->dev, "RPC does not support receiving over 4 words: %u\n",
-+				 sc_ipc->rx_size);
-+	}
-+
-+	sc_ipc->msg[sc_chan->idx] = *data;
-+	sc_ipc->count++;
-+
-+	dev_dbg(sc_ipc->dev, "mu %u msg %u 0x%x\n", sc_chan->idx,
-+		sc_ipc->count, *data);
-+
-+	if ((sc_ipc->rx_size != 0) && (sc_ipc->count == sc_ipc->rx_size))
-+		complete(&sc_ipc->done);
-+}
-+
-+int sc_ipc_write(struct sc_ipc *sc_ipc, void *msg)
-+{
-+	struct sc_rpc_msg *hdr = msg;
-+	struct sc_chan *sc_chan;
-+	u32 *data = msg;
-+	int ret;
-+	int i;
-+
-+	/* Check size */
-+	if (hdr->size > SC_RPC_MAX_MSG)
-+		return -EINVAL;
-+
-+	dev_dbg(sc_ipc->dev, "RPC SVC %u FUNC %u SIZE %u\n", hdr->svc,
-+		hdr->func, hdr->size);
-+
-+	for (i = 0; i < hdr->size; i++) {
-+		sc_chan = &sc_ipc->chans[i % 4];
-+		ret = mbox_send_message(sc_chan->ch, &data[i]);
-+		if (ret < 0)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-+ * RPC command/response
-+ */
-+int sc_call_rpc(sc_ipc_t ipc, void *msg, bool no_resp)
-+{
-+	struct sc_ipc *sc_ipc = (struct sc_ipc *)ipc;
++	struct imx_sc_msg_req_set_resource_power_mode msg;
++	struct sc_rpc_msg *hdr = &msg.hdr;
 +	int ret;
 +
-+	if (WARN_ON(!sc_ipc || !msg))
-+		return -EINVAL;
++	hdr->ver = SC_RPC_VERSION;
++	hdr->svc = (uint8_t)SC_RPC_SVC_PM;
++	hdr->func = (uint8_t)PM_FUNC_SET_RESOURCE_POWER_MODE;
++	hdr->size = 2;
 +
-+	mutex_lock(&sc_ipc->lock);
-+	reinit_completion(&sc_ipc->done);
++	msg.resource = resource;
++	msg.mode = mode;
 +
-+	sc_ipc->msg = msg;
-+	sc_ipc->count = 0;
-+	ret = sc_ipc_write(sc_ipc, msg);
-+	if (ret < 0) {
-+		dev_err(sc_ipc->dev, "RPC send msg failed: %d\n", ret);
-+		goto out;
-+	}
-+
-+	if (!no_resp) {
-+		if (!wait_for_completion_timeout(&sc_ipc->done,
-+						 MAX_RX_TIMEOUT)) {
-+			dev_err(sc_ipc->dev, "RPC send msg timeout\n");
-+			return -ETIMEDOUT;
-+		}
-+		ret = 0;
-+	}
-+out:
-+	mutex_unlock(&sc_ipc->lock);
-+
-+	dev_dbg(sc_ipc->dev, "RPC SVC done\n");
-+
-+	return ret;
-+}
-+
-+/*
-+ * Open an IPC channel
-+ */
-+int sc_ipc_open(sc_ipc_t *ipc, struct device *dev)
-+{
-+	struct sc_ipc *sc_ipc;
-+	struct sc_chan *sc_chan;
-+	struct mbox_client *cl;
-+	char *chan_name;
-+	int ret;
-+	int i;
-+
-+	sc_ipc = devm_kzalloc(dev, sizeof(*sc_ipc), GFP_KERNEL);
-+	if (!sc_ipc)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < SCU_MU_CHAN_NUM; i++) {
-+		if (i < 4)
-+			chan_name = kasprintf(GFP_KERNEL, "tx%d", i);
-+		else
-+			chan_name = kasprintf(GFP_KERNEL, "rx%d", i - 4);
-+
-+		if (!chan_name)
-+			return -ENOMEM;
-+
-+		sc_chan = &sc_ipc->chans[i];
-+		cl = &sc_chan->cl;
-+		cl->dev = dev;
-+		cl->tx_block = false;
-+		cl->knows_txdone = true;
-+		cl->rx_callback = sc_rx_callback;
-+
-+		sc_chan->sc_ipc = sc_ipc;
-+		sc_chan->idx = i % 4;
-+		sc_chan->ch = mbox_request_channel_byname(cl, chan_name);
-+		if (IS_ERR(sc_chan->ch)) {
-+			ret = PTR_ERR(sc_chan->ch);
-+			if (ret != -EPROBE_DEFER)
-+				dev_err(dev, "Failed to get mbox %d\n", ret);
-+
-+			return ret;
-+		}
-+
-+		dev_dbg(dev, "mbox request chan %s\n", chan_name);
-+		/* chan_name is not used anymore by framework */
-+		kfree(chan_name);
-+	}
-+
-+	sc_ipc->dev = dev;
-+	mutex_init(&sc_ipc->lock);
-+	init_completion(&sc_ipc->done);
-+
-+	*ipc = (sc_ipc_t)sc_ipc;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(sc_ipc_open);
-+
-+/*
-+ * Close an IPC channel
-+ */
-+void sc_ipc_close(sc_ipc_t ipc)
-+{
-+	struct sc_ipc *sc_ipc = (struct sc_ipc *)ipc;
-+	struct sc_chan *sc_chan;
-+	int i;
-+
-+	WARN_ON(!sc_ipc);
-+
-+	/* we do not free the default ipc handle */
-+	if (ipc == scu_ipc_handle)
-+		return;
-+
-+	for (i = 0; i < SCU_MU_CHAN_NUM; i++) {
-+		sc_chan = &sc_ipc->chans[i];
-+		mbox_free_channel(sc_chan->ch);
-+	}
-+
-+	devm_kfree(sc_ipc->dev, sc_ipc);
-+}
-+EXPORT_SYMBOL(sc_ipc_close);
-+
-+static int imx_sc_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	int ret;
-+
-+	ret = sc_ipc_open(&scu_ipc_handle, dev);
++	ret = sc_call_rpc(ipc, (void *)&msg, false);
 +	if (ret)
-+		return ret;
++		return SC_ERR_FAIL;
 +
-+	pr_info("NXP i.MX SCU Initialized\n");
-+
-+	return devm_of_platform_populate(dev);
++	return (sc_err_t)hdr->func;
 +}
 +
-+static const struct of_device_id imx_sc_match[] = {
-+	{ .compatible = "fsl,imx-scu", },
-+	{ /* Sentinel */ }
-+};
++sc_err_t sc_pm_get_resource_power_mode(sc_ipc_t ipc, sc_rsrc_t resource,
++				       sc_pm_power_mode_t *mode)
++{
++	struct imx_sc_msg_req_get_resource_power_mode msg;
++	struct imx_sc_msg_resp_get_resource_power_mode *resp;
++	struct sc_rpc_msg *hdr = &msg.hdr;
++	int ret;
 +
-+static struct platform_driver imx_sc_driver = {
-+	.driver = {
-+		.name = "imx-scu",
-+		.of_match_table = imx_sc_match,
-+	},
-+	.probe = imx_sc_probe,
-+};
-+builtin_platform_driver(imx_sc_driver);
-diff --git a/drivers/soc/imx/sc/main/rpc.h b/drivers/soc/imx/sc/main/rpc.h
-new file mode 100644
-index 0000000..93e66e5
---- /dev/null
-+++ b/drivers/soc/imx/sc/main/rpc.h
-@@ -0,0 +1,51 @@
-+/* SPDX-License-Identifier: GPL-2.0+ */
-+/*
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ * Copyright 2017~2018 NXP
-+ *
-+ * Header file for the RPC implementation.
-+ */
++	hdr->ver = SC_RPC_VERSION;
++	hdr->svc = (uint8_t)SC_RPC_SVC_PM;
++	hdr->func = (uint8_t)PM_FUNC_GET_RESOURCE_POWER_MODE;
++	hdr->size = 2;
 +
-+#ifndef _SC_RPC_H
-+#define _SC_RPC_H
++	msg.resource = resource;
 +
-+#include <soc/imx/sc/types.h>
-+#include <soc/imx/sc/ipc.h>
++	ret = sc_call_rpc(ipc, (void *)&msg, false);
++	if (ret)
++		return SC_ERR_FAIL;
 +
-+#define SC_RPC_VERSION		1
++	resp = (struct imx_sc_msg_resp_get_resource_power_mode *)&msg;
++	if (mode != NULL)
++		*mode = resp->mode;
 +
-+#define SC_RPC_MAX_MSG		8
++	return (sc_err_t)resp->hdr.func;
++}
 +
-+enum sc_rpc_svc_e {
-+	SC_RPC_SVC_UNKNOWN = 0,
-+	SC_RPC_SVC_RETURN = 1,
-+	SC_RPC_SVC_PM = 2,
-+	SC_RPC_SVC_RM = 3,
-+	SC_RPC_SVC_TIMER = 5,
-+	SC_RPC_SVC_PAD = 6,
-+	SC_RPC_SVC_MISC = 7,
-+	SC_RPC_SVC_IRQ = 8,
-+	SC_RPC_SVC_ABORT = 9
-+};
++sc_err_t sc_pm_set_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
++			      sc_pm_clk_t clk, sc_pm_clock_rate_t *rate)
++{
++	struct imx_sc_msg_req_set_clock_rate msg;
++	struct imx_sc_msg_resp_get_clock_rate *resp;
++	struct sc_rpc_msg *hdr = &msg.hdr;
++	int ret;
 +
-+struct sc_rpc_msg {
-+	uint8_t ver;
-+	uint8_t size;
-+	uint8_t svc;
-+	uint8_t func;
-+};
++	hdr->ver = SC_RPC_VERSION;
++	hdr->svc = (uint8_t)SC_RPC_SVC_PM;
++	hdr->func = (uint8_t)PM_FUNC_SET_CLOCK_RATE;
++	hdr->size = 3;
 +
-+/*
-+ * This is an internal function to send an RPC message over an IPC
-+ * channel. It is called by client-side SCFW API function shims.
-+ *
-+ * @param[in]     ipc         IPC handle
-+ * @param[in,out] msg         handle to a message
-+ * @param[in]     no_resp     response flag
-+ *
-+ * If no_resp is false then this function waits for a response
-+ * and returns the result in msg.
-+ */
-+int sc_call_rpc(sc_ipc_t ipc, void *msg, bool no_resp);
++	msg.rate = *rate;
++	msg.resource = resource;
++	msg.clk = clk;
 +
-+#endif /* _SC_RPC_H */
-diff --git a/include/soc/imx/sc/ipc.h b/include/soc/imx/sc/ipc.h
-new file mode 100644
-index 0000000..cb26935
---- /dev/null
-+++ b/include/soc/imx/sc/ipc.h
-@@ -0,0 +1,46 @@
-+/* SPDX-License-Identifier: GPL-2.0+ */
-+/*
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ * Copyright 2017~2018 NXP
-+ *
-+ * Header file for the IPC implementation.
-+ */
++	ret = sc_call_rpc(ipc, (void *)&msg, false);
++	if (ret)
++		return SC_ERR_FAIL;
 +
-+#ifndef _SC_IPC_H
-+#define _SC_IPC_H
++	resp = (struct imx_sc_msg_resp_get_clock_rate *)&msg;
++	if (rate != NULL)
++		*rate = resp->rate;
 +
-+#include <linux/device.h>
-+#include <linux/types.h>
++	return (sc_err_t)resp->hdr.func;
++}
 +
-+/*
-+ * This type is used to declare a handle for an IPC communication
-+ * channel. Its meaning is specific to the IPC implementation.
-+ */
-+typedef unsigned long sc_ipc_t;
++sc_err_t sc_pm_get_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
++			      sc_pm_clk_t clk, sc_pm_clock_rate_t *rate)
++{
++	struct imx_sc_msg_req_get_clock_rate msg;
++	struct imx_sc_msg_resp_get_clock_rate *resp;
++	struct sc_rpc_msg *hdr = &msg.hdr;
++	int ret;
 +
-+/*
-+ * This function opens an IPC channel.
-+ *
-+ * @param [out]	ipc	return pointer for ipc handle
-+ * @param [in]	dev	device to open mu channel
-+ *
-+ * @return Returns an error code (0 = success, failed if < 0)
-+ */
-+int sc_ipc_open(sc_ipc_t *ipc, struct device *dev);
++	hdr->ver = SC_RPC_VERSION;
++	hdr->svc = (uint8_t)SC_RPC_SVC_PM;
++	hdr->func = (uint8_t)PM_FUNC_GET_CLOCK_RATE;
++	hdr->size = 2;
 +
-+/*
-+ * This function closes an IPC channel.
-+ *
-+ * @param[in]	ipc	id of channel to close
-+ */
-+void sc_ipc_close(sc_ipc_t ipc);
++	msg.resource = resource;
++	msg.clk = clk;
 +
-+/*
-+ * This function gets the default ipc handle used by SCU
-+ *
-+ * @param[out]	ipc	id of channel to close
-+ *
-+ * @return Returns an error code (0 = success, failed if < 0)
-+ */
-+int sc_ipc_get_handle(sc_ipc_t *ipc);
-+#endif /* _SC_IPC_H */
++	ret = sc_call_rpc(ipc, (void *)&msg, false);
++	if (ret)
++		return SC_ERR_FAIL;
++
++	resp = (struct imx_sc_msg_resp_get_clock_rate *)&msg;
++	if (rate != NULL)
++		*rate = resp->rate;
++
++	return (sc_err_t)resp->hdr.func;
++}
++
++sc_err_t sc_pm_clock_enable(sc_ipc_t ipc, sc_rsrc_t resource,
++			    sc_pm_clk_t clk, bool enable, bool autog)
++{
++	struct imx_sc_msg_req_clock_enable msg;
++	struct sc_rpc_msg *hdr = &msg.hdr;
++	int ret;
++
++	hdr->ver = SC_RPC_VERSION;
++	hdr->svc = (uint8_t)SC_RPC_SVC_PM;
++	hdr->func = (uint8_t)PM_FUNC_CLOCK_ENABLE;
++	hdr->size = 3;
++
++	msg.resource = resource;
++	msg.clk = clk;
++	msg.enable = (uint8_t)enable;
++	msg.autog = (uint8_t)autog;
++
++	ret = sc_call_rpc(ipc, (void *)&msg, false);
++	if (ret)
++		return SC_ERR_FAIL;
++
++	return (sc_err_t)hdr->func;
++}
++
++sc_err_t sc_pm_set_clock_parent(sc_ipc_t ipc, sc_rsrc_t resource,
++				sc_pm_clk_t clk, sc_pm_clk_parent_t parent)
++{
++	struct imx_sc_msg_req_set_clock_parent msg;
++	struct sc_rpc_msg *hdr = &msg.hdr;
++	int ret;
++
++	hdr->ver = SC_RPC_VERSION;
++	hdr->svc = (uint8_t)SC_RPC_SVC_PM;
++	hdr->func = (uint8_t)PM_FUNC_SET_CLOCK_PARENT;
++	hdr->size = 2;
++
++	msg.resource = resource;
++	msg.clk = clk;
++	msg.parent = parent;
++
++	ret = sc_call_rpc(ipc, (void *)&msg, false);
++	if (ret)
++		return SC_ERR_FAIL;
++
++	return (sc_err_t)hdr->func;
++}
++
++sc_err_t sc_pm_get_clock_parent(sc_ipc_t ipc, sc_rsrc_t resource,
++				sc_pm_clk_t clk, sc_pm_clk_parent_t *parent)
++{
++	struct imx_sc_msg_req_get_clock_parent msg;
++	struct imx_sc_msg_resp_get_clock_parent *resp;
++	struct sc_rpc_msg *hdr = &msg.hdr;
++	int ret;
++
++	hdr->ver = SC_RPC_VERSION;
++	hdr->svc = (uint8_t)SC_RPC_SVC_PM;
++	hdr->func = (uint8_t)PM_FUNC_GET_CLOCK_PARENT;
++	hdr->size = 2;
++
++	msg.resource = resource;
++	msg.clk = clk;
++
++	ret = sc_call_rpc(ipc, (void *)&msg, false);
++	if (ret)
++		return SC_ERR_FAIL;
++
++	resp = (struct imx_sc_msg_resp_get_clock_parent *)&msg;
++	if (parent != NULL)
++		*parent = resp->parent;
++
++	return (sc_err_t)resp->hdr.func;
++}
 diff --git a/include/soc/imx/sc/sci.h b/include/soc/imx/sc/sci.h
-new file mode 100644
-index 0000000..de3892a
---- /dev/null
+index de3892a..b7248cf 100644
+--- a/include/soc/imx/sc/sci.h
 +++ b/include/soc/imx/sc/sci.h
-@@ -0,0 +1,16 @@
+@@ -13,4 +13,6 @@
+ #include <soc/imx/sc/ipc.h>
+ #include <soc/imx/sc/types.h>
+ 
++#include <soc/imx/sc/svc/pm/api.h>
++
+ #endif /* _SC_SCI_H */
+diff --git a/include/soc/imx/sc/svc/pm/api.h b/include/soc/imx/sc/svc/pm/api.h
+new file mode 100644
+index 0000000..2a9e4b9
+--- /dev/null
++++ b/include/soc/imx/sc/svc/pm/api.h
+@@ -0,0 +1,229 @@
 +/* SPDX-License-Identifier: GPL-2.0+ */
 +/*
 + * Copyright (C) 2016 Freescale Semiconductor, Inc.
 + * Copyright 2017~2018 NXP
 + *
-+ * Header file containing the public System Controller Interface (SCI)
-+ * definitions.
++ * Header file containing the public API for the System Controller (SC)
++ * Power Management (PM) function. This includes functions for power state
++ * control, clock control, reset control, and wake-up event control.
++ *
++ * PM_SVC (SVC) Power Management Service
++ *
++ * Module for the Power Management (PM) service.
 + */
 +
-+#ifndef _SC_SCI_H
-+#define _SC_SCI_H
++#ifndef _SC_PM_API_H
++#define _SC_PM_API_H
 +
 +#include <soc/imx/sc/ipc.h>
 +#include <soc/imx/sc/types.h>
 +
-+#endif /* _SC_SCI_H */
-diff --git a/include/soc/imx/sc/types.h b/include/soc/imx/sc/types.h
-new file mode 100644
-index 0000000..e56265e
---- /dev/null
-+++ b/include/soc/imx/sc/types.h
-@@ -0,0 +1,636 @@
-+/* SPDX-License-Identifier: GPL-2.0+ */
 +/*
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ * Copyright 2017~2018 NXP
++ * Defines for ALL parameters
++ */
++#define SC_PM_CLK_ALL   UINT8_MAX	/* All clocks */
++
++/*
++ * Defines for sc_pm_power_mode_t
++ */
++#define SC_PM_PW_MODE_OFF	0	/* Power off */
++#define SC_PM_PW_MODE_STBY	1	/* Power in standby */
++#define SC_PM_PW_MODE_LP	2	/* Power in low-power */
++#define SC_PM_PW_MODE_ON	3	/* Power on */
++
++/*
++ * Defines for sc_pm_clk_t
++ */
++#define SC_PM_CLK_SLV_BUS	0	/* Slave bus clock */
++#define SC_PM_CLK_MST_BUS	1	/* Master bus clock */
++#define SC_PM_CLK_PER		2	/* Peripheral clock */
++#define SC_PM_CLK_PHY		3	/* Phy clock */
++#define SC_PM_CLK_MISC		4	/* Misc clock */
++#define SC_PM_CLK_MISC0		0	/* Misc 0 clock */
++#define SC_PM_CLK_MISC1		1	/* Misc 1 clock */
++#define SC_PM_CLK_MISC2		2	/* Misc 2 clock */
++#define SC_PM_CLK_MISC3		3	/* Misc 3 clock */
++#define SC_PM_CLK_MISC4		4	/* Misc 4 clock */
++#define SC_PM_CLK_CPU		2	/* CPU clock */
++#define SC_PM_CLK_PLL		4	/* PLL */
++#define SC_PM_CLK_BYPASS	4	/* Bypass clock */
++
++/*
++ * Defines for sc_pm_clk_parent_t
++ */
++#define SC_PM_PARENT_XTAL	0	/* Parent is XTAL. */
++#define SC_PM_PARENT_PLL0	1	/* Parent is PLL0 */
++#define SC_PM_PARENT_PLL1	2	/* Parent is PLL1 or PLL0/2 */
++#define SC_PM_PARENT_PLL2	3	/* Parent in PLL2 or PLL0/4 */
++#define SC_PM_PARENT_BYPS	4	/* Parent is a bypass clock. */
++
++/*
++ * This type is used to declare a power mode. Note resources only use
++ * SC_PM_PW_MODE_OFF and SC_PM_PW_MODE_ON. The other modes are used only
++ * as system power modes.
++ */
++typedef uint8_t sc_pm_power_mode_t;
++
++/*
++ * This type is used to declare a clock.
++ */
++typedef uint8_t sc_pm_clk_t;
++
++/*
++ * This type is used to declare the clock parent.
++ */
++typedef uint8_t sc_pm_clk_parent_t;
++
++/*
++ * This type is used to declare clock rates.
++ */
++typedef uint32_t sc_pm_clock_rate_t;
++
++/*
++ * Power Functions
++ */
++
++/*
++ * This function sets the power mode of a resource.
 + *
-+ * Header file containing types used across multiple service APIs.
++ * @param [in]	ipc		IPC handle
++ * @param [in]	resource	ID of the resource
++ * @param [in]	mode		power mode to apply
++ *
++ * @return Returns an error code (SC_ERR_NONE = success).
++ *
++ * Return errors:
++ * - SC_ERR_PARM if invalid resource or mode,
++ * - SC_ERR_NOACCESS if caller's partition is not the resource owner
++ *   or parent of the owner
++ *
++ * Resources set to SC_PM_PW_MODE_ON will reflect the
++ * power mode of the partition and will change as that changes.
++ *
++ * Note some resources are still not accessible even when powered up if bus
++ * transactions go through a fabric not powered up. Examples of this are
++ * resources in display and capture subsystems which require the display
++ * controller or the imaging subsytem to be powered up first.
 + */
-+
-+#ifndef _SC_TYPES_H
-+#define _SC_TYPES_H
++sc_err_t sc_pm_set_resource_power_mode(sc_ipc_t ipc, sc_rsrc_t resource,
++				       sc_pm_power_mode_t mode);
 +
 +/*
-+ * This type is used to indicate error response for most functions.
++ * This function gets the power mode of a resource.
++ *
++ * @param [in]	ipc		IPC handle
++ * @param [in]	resource	ID of the resource
++ * @param [out]	mode		pointer to return power mode
++ *
++ * @return Returns an error code (SC_ERR_NONE = success).
++ *
++ * Note only SC_PM_PW_MODE_OFF and SC_PM_PW_MODE_ON are valid. The value
++ * returned does not reflect the power mode of the partition..
 + */
-+typedef enum sc_err_e {
-+	SC_ERR_NONE = 0,	/* Success */
-+	SC_ERR_VERSION = 1,	/* Incompatible API version */
-+	SC_ERR_CONFIG = 2,	/* Configuration error */
-+	SC_ERR_PARM = 3,	/* Bad parameter */
-+	SC_ERR_NOACCESS = 4,	/* Permission error (no access) */
-+	SC_ERR_LOCKED = 5,	/* Permission error (locked) */
-+	SC_ERR_UNAVAILABLE = 6,	/* Unavailable (out of resources) */
-+	SC_ERR_NOTFOUND = 7,	/* Not found */
-+	SC_ERR_NOPOWER = 8,	/* No power */
-+	SC_ERR_IPC = 9,		/* Generic IPC error */
-+	SC_ERR_BUSY = 10,	/* Resource is currently busy/active */
-+	SC_ERR_FAIL = 11,	/* General I/O failure */
-+	SC_ERR_LAST
-+} sc_err_t;
++sc_err_t sc_pm_get_resource_power_mode(sc_ipc_t ipc, sc_rsrc_t resource,
++				       sc_pm_power_mode_t *mode);
 +
 +/*
-+ * This type is used to indicate a resource. Resources include peripherals
-+ * and bus masters (but not memory regions). Note items from list should
-+ * never be changed or removed (only added to at the end of the list).
++ * Clock/PLL Functions
 + */
-+typedef enum sc_rsrc_e {
-+	SC_R_A53 = 0,
-+	SC_R_A53_0 = 1,
-+	SC_R_A53_1 = 2,
-+	SC_R_A53_2 = 3,
-+	SC_R_A53_3 = 4,
-+	SC_R_A72 = 5,
-+	SC_R_A72_0 = 6,
-+	SC_R_A72_1 = 7,
-+	SC_R_A72_2 = 8,
-+	SC_R_A72_3 = 9,
-+	SC_R_CCI = 10,
-+	SC_R_DB = 11,
-+	SC_R_DRC_0 = 12,
-+	SC_R_DRC_1 = 13,
-+	SC_R_GIC_SMMU = 14,
-+	SC_R_IRQSTR_M4_0 = 15,
-+	SC_R_IRQSTR_M4_1 = 16,
-+	SC_R_SMMU = 17,
-+	SC_R_GIC = 18,
-+	SC_R_DC_0_BLIT0 = 19,
-+	SC_R_DC_0_BLIT1 = 20,
-+	SC_R_DC_0_BLIT2 = 21,
-+	SC_R_DC_0_BLIT_OUT = 22,
-+	SC_R_DC_0_CAPTURE0 = 23,
-+	SC_R_DC_0_CAPTURE1 = 24,
-+	SC_R_DC_0_WARP = 25,
-+	SC_R_DC_0_INTEGRAL0 = 26,
-+	SC_R_DC_0_INTEGRAL1 = 27,
-+	SC_R_DC_0_VIDEO0 = 28,
-+	SC_R_DC_0_VIDEO1 = 29,
-+	SC_R_DC_0_FRAC0 = 30,
-+	SC_R_DC_0_FRAC1 = 31,
-+	SC_R_DC_0 = 32,
-+	SC_R_GPU_2_PID0 = 33,
-+	SC_R_DC_0_PLL_0 = 34,
-+	SC_R_DC_0_PLL_1 = 35,
-+	SC_R_DC_1_BLIT0 = 36,
-+	SC_R_DC_1_BLIT1 = 37,
-+	SC_R_DC_1_BLIT2 = 38,
-+	SC_R_DC_1_BLIT_OUT = 39,
-+	SC_R_DC_1_CAPTURE0 = 40,
-+	SC_R_DC_1_CAPTURE1 = 41,
-+	SC_R_DC_1_WARP = 42,
-+	SC_R_DC_1_INTEGRAL0 = 43,
-+	SC_R_DC_1_INTEGRAL1 = 44,
-+	SC_R_DC_1_VIDEO0 = 45,
-+	SC_R_DC_1_VIDEO1 = 46,
-+	SC_R_DC_1_FRAC0 = 47,
-+	SC_R_DC_1_FRAC1 = 48,
-+	SC_R_DC_1 = 49,
-+	SC_R_GPU_3_PID0 = 50,
-+	SC_R_DC_1_PLL_0 = 51,
-+	SC_R_DC_1_PLL_1 = 52,
-+	SC_R_SPI_0 = 53,
-+	SC_R_SPI_1 = 54,
-+	SC_R_SPI_2 = 55,
-+	SC_R_SPI_3 = 56,
-+	SC_R_UART_0 = 57,
-+	SC_R_UART_1 = 58,
-+	SC_R_UART_2 = 59,
-+	SC_R_UART_3 = 60,
-+	SC_R_UART_4 = 61,
-+	SC_R_EMVSIM_0 = 62,
-+	SC_R_EMVSIM_1 = 63,
-+	SC_R_DMA_0_CH0 = 64,
-+	SC_R_DMA_0_CH1 = 65,
-+	SC_R_DMA_0_CH2 = 66,
-+	SC_R_DMA_0_CH3 = 67,
-+	SC_R_DMA_0_CH4 = 68,
-+	SC_R_DMA_0_CH5 = 69,
-+	SC_R_DMA_0_CH6 = 70,
-+	SC_R_DMA_0_CH7 = 71,
-+	SC_R_DMA_0_CH8 = 72,
-+	SC_R_DMA_0_CH9 = 73,
-+	SC_R_DMA_0_CH10 = 74,
-+	SC_R_DMA_0_CH11 = 75,
-+	SC_R_DMA_0_CH12 = 76,
-+	SC_R_DMA_0_CH13 = 77,
-+	SC_R_DMA_0_CH14 = 78,
-+	SC_R_DMA_0_CH15 = 79,
-+	SC_R_DMA_0_CH16 = 80,
-+	SC_R_DMA_0_CH17 = 81,
-+	SC_R_DMA_0_CH18 = 82,
-+	SC_R_DMA_0_CH19 = 83,
-+	SC_R_DMA_0_CH20 = 84,
-+	SC_R_DMA_0_CH21 = 85,
-+	SC_R_DMA_0_CH22 = 86,
-+	SC_R_DMA_0_CH23 = 87,
-+	SC_R_DMA_0_CH24 = 88,
-+	SC_R_DMA_0_CH25 = 89,
-+	SC_R_DMA_0_CH26 = 90,
-+	SC_R_DMA_0_CH27 = 91,
-+	SC_R_DMA_0_CH28 = 92,
-+	SC_R_DMA_0_CH29 = 93,
-+	SC_R_DMA_0_CH30 = 94,
-+	SC_R_DMA_0_CH31 = 95,
-+	SC_R_I2C_0 = 96,
-+	SC_R_I2C_1 = 97,
-+	SC_R_I2C_2 = 98,
-+	SC_R_I2C_3 = 99,
-+	SC_R_I2C_4 = 100,
-+	SC_R_ADC_0 = 101,
-+	SC_R_ADC_1 = 102,
-+	SC_R_FTM_0 = 103,
-+	SC_R_FTM_1 = 104,
-+	SC_R_CAN_0 = 105,
-+	SC_R_CAN_1 = 106,
-+	SC_R_CAN_2 = 107,
-+	SC_R_DMA_1_CH0 = 108,
-+	SC_R_DMA_1_CH1 = 109,
-+	SC_R_DMA_1_CH2 = 110,
-+	SC_R_DMA_1_CH3 = 111,
-+	SC_R_DMA_1_CH4 = 112,
-+	SC_R_DMA_1_CH5 = 113,
-+	SC_R_DMA_1_CH6 = 114,
-+	SC_R_DMA_1_CH7 = 115,
-+	SC_R_DMA_1_CH8 = 116,
-+	SC_R_DMA_1_CH9 = 117,
-+	SC_R_DMA_1_CH10 = 118,
-+	SC_R_DMA_1_CH11 = 119,
-+	SC_R_DMA_1_CH12 = 120,
-+	SC_R_DMA_1_CH13 = 121,
-+	SC_R_DMA_1_CH14 = 122,
-+	SC_R_DMA_1_CH15 = 123,
-+	SC_R_DMA_1_CH16 = 124,
-+	SC_R_DMA_1_CH17 = 125,
-+	SC_R_DMA_1_CH18 = 126,
-+	SC_R_DMA_1_CH19 = 127,
-+	SC_R_DMA_1_CH20 = 128,
-+	SC_R_DMA_1_CH21 = 129,
-+	SC_R_DMA_1_CH22 = 130,
-+	SC_R_DMA_1_CH23 = 131,
-+	SC_R_DMA_1_CH24 = 132,
-+	SC_R_DMA_1_CH25 = 133,
-+	SC_R_DMA_1_CH26 = 134,
-+	SC_R_DMA_1_CH27 = 135,
-+	SC_R_DMA_1_CH28 = 136,
-+	SC_R_DMA_1_CH29 = 137,
-+	SC_R_DMA_1_CH30 = 138,
-+	SC_R_DMA_1_CH31 = 139,
-+	SC_R_UNUSED1 = 140,
-+	SC_R_UNUSED2 = 141,
-+	SC_R_UNUSED3 = 142,
-+	SC_R_UNUSED4 = 143,
-+	SC_R_GPU_0_PID0 = 144,
-+	SC_R_GPU_0_PID1 = 145,
-+	SC_R_GPU_0_PID2 = 146,
-+	SC_R_GPU_0_PID3 = 147,
-+	SC_R_GPU_1_PID0 = 148,
-+	SC_R_GPU_1_PID1 = 149,
-+	SC_R_GPU_1_PID2 = 150,
-+	SC_R_GPU_1_PID3 = 151,
-+	SC_R_PCIE_A = 152,
-+	SC_R_SERDES_0 = 153,
-+	SC_R_MATCH_0 = 154,
-+	SC_R_MATCH_1 = 155,
-+	SC_R_MATCH_2 = 156,
-+	SC_R_MATCH_3 = 157,
-+	SC_R_MATCH_4 = 158,
-+	SC_R_MATCH_5 = 159,
-+	SC_R_MATCH_6 = 160,
-+	SC_R_MATCH_7 = 161,
-+	SC_R_MATCH_8 = 162,
-+	SC_R_MATCH_9 = 163,
-+	SC_R_MATCH_10 = 164,
-+	SC_R_MATCH_11 = 165,
-+	SC_R_MATCH_12 = 166,
-+	SC_R_MATCH_13 = 167,
-+	SC_R_MATCH_14 = 168,
-+	SC_R_PCIE_B = 169,
-+	SC_R_SATA_0 = 170,
-+	SC_R_SERDES_1 = 171,
-+	SC_R_HSIO_GPIO = 172,
-+	SC_R_MATCH_15 = 173,
-+	SC_R_MATCH_16 = 174,
-+	SC_R_MATCH_17 = 175,
-+	SC_R_MATCH_18 = 176,
-+	SC_R_MATCH_19 = 177,
-+	SC_R_MATCH_20 = 178,
-+	SC_R_MATCH_21 = 179,
-+	SC_R_MATCH_22 = 180,
-+	SC_R_MATCH_23 = 181,
-+	SC_R_MATCH_24 = 182,
-+	SC_R_MATCH_25 = 183,
-+	SC_R_MATCH_26 = 184,
-+	SC_R_MATCH_27 = 185,
-+	SC_R_MATCH_28 = 186,
-+	SC_R_LCD_0 = 187,
-+	SC_R_LCD_0_PWM_0 = 188,
-+	SC_R_LCD_0_I2C_0 = 189,
-+	SC_R_LCD_0_I2C_1 = 190,
-+	SC_R_PWM_0 = 191,
-+	SC_R_PWM_1 = 192,
-+	SC_R_PWM_2 = 193,
-+	SC_R_PWM_3 = 194,
-+	SC_R_PWM_4 = 195,
-+	SC_R_PWM_5 = 196,
-+	SC_R_PWM_6 = 197,
-+	SC_R_PWM_7 = 198,
-+	SC_R_GPIO_0 = 199,
-+	SC_R_GPIO_1 = 200,
-+	SC_R_GPIO_2 = 201,
-+	SC_R_GPIO_3 = 202,
-+	SC_R_GPIO_4 = 203,
-+	SC_R_GPIO_5 = 204,
-+	SC_R_GPIO_6 = 205,
-+	SC_R_GPIO_7 = 206,
-+	SC_R_GPT_0 = 207,
-+	SC_R_GPT_1 = 208,
-+	SC_R_GPT_2 = 209,
-+	SC_R_GPT_3 = 210,
-+	SC_R_GPT_4 = 211,
-+	SC_R_KPP = 212,
-+	SC_R_MU_0A = 213,
-+	SC_R_MU_1A = 214,
-+	SC_R_MU_2A = 215,
-+	SC_R_MU_3A = 216,
-+	SC_R_MU_4A = 217,
-+	SC_R_MU_5A = 218,
-+	SC_R_MU_6A = 219,
-+	SC_R_MU_7A = 220,
-+	SC_R_MU_8A = 221,
-+	SC_R_MU_9A = 222,
-+	SC_R_MU_10A = 223,
-+	SC_R_MU_11A = 224,
-+	SC_R_MU_12A = 225,
-+	SC_R_MU_13A = 226,
-+	SC_R_MU_5B = 227,
-+	SC_R_MU_6B = 228,
-+	SC_R_MU_7B = 229,
-+	SC_R_MU_8B = 230,
-+	SC_R_MU_9B = 231,
-+	SC_R_MU_10B = 232,
-+	SC_R_MU_11B = 233,
-+	SC_R_MU_12B = 234,
-+	SC_R_MU_13B = 235,
-+	SC_R_ROM_0 = 236,
-+	SC_R_FSPI_0 = 237,
-+	SC_R_FSPI_1 = 238,
-+	SC_R_IEE = 239,
-+	SC_R_IEE_R0 = 240,
-+	SC_R_IEE_R1 = 241,
-+	SC_R_IEE_R2 = 242,
-+	SC_R_IEE_R3 = 243,
-+	SC_R_IEE_R4 = 244,
-+	SC_R_IEE_R5 = 245,
-+	SC_R_IEE_R6 = 246,
-+	SC_R_IEE_R7 = 247,
-+	SC_R_SDHC_0 = 248,
-+	SC_R_SDHC_1 = 249,
-+	SC_R_SDHC_2 = 250,
-+	SC_R_ENET_0 = 251,
-+	SC_R_ENET_1 = 252,
-+	SC_R_MLB_0 = 253,
-+	SC_R_DMA_2_CH0 = 254,
-+	SC_R_DMA_2_CH1 = 255,
-+	SC_R_DMA_2_CH2 = 256,
-+	SC_R_DMA_2_CH3 = 257,
-+	SC_R_DMA_2_CH4 = 258,
-+	SC_R_USB_0 = 259,
-+	SC_R_USB_1 = 260,
-+	SC_R_USB_0_PHY = 261,
-+	SC_R_USB_2 = 262,
-+	SC_R_USB_2_PHY = 263,
-+	SC_R_DTCP = 264,
-+	SC_R_NAND = 265,
-+	SC_R_LVDS_0 = 266,
-+	SC_R_LVDS_0_PWM_0 = 267,
-+	SC_R_LVDS_0_I2C_0 = 268,
-+	SC_R_LVDS_0_I2C_1 = 269,
-+	SC_R_LVDS_1 = 270,
-+	SC_R_LVDS_1_PWM_0 = 271,
-+	SC_R_LVDS_1_I2C_0 = 272,
-+	SC_R_LVDS_1_I2C_1 = 273,
-+	SC_R_LVDS_2 = 274,
-+	SC_R_LVDS_2_PWM_0 = 275,
-+	SC_R_LVDS_2_I2C_0 = 276,
-+	SC_R_LVDS_2_I2C_1 = 277,
-+	SC_R_M4_0_PID0 = 278,
-+	SC_R_M4_0_PID1 = 279,
-+	SC_R_M4_0_PID2 = 280,
-+	SC_R_M4_0_PID3 = 281,
-+	SC_R_M4_0_PID4 = 282,
-+	SC_R_M4_0_RGPIO = 283,
-+	SC_R_M4_0_SEMA42 = 284,
-+	SC_R_M4_0_TPM = 285,
-+	SC_R_M4_0_PIT = 286,
-+	SC_R_M4_0_UART = 287,
-+	SC_R_M4_0_I2C = 288,
-+	SC_R_M4_0_INTMUX = 289,
-+	SC_R_M4_0_SIM = 290,
-+	SC_R_M4_0_WDOG = 291,
-+	SC_R_M4_0_MU_0B = 292,
-+	SC_R_M4_0_MU_0A0 = 293,
-+	SC_R_M4_0_MU_0A1 = 294,
-+	SC_R_M4_0_MU_0A2 = 295,
-+	SC_R_M4_0_MU_0A3 = 296,
-+	SC_R_M4_0_MU_1A = 297,
-+	SC_R_M4_1_PID0 = 298,
-+	SC_R_M4_1_PID1 = 299,
-+	SC_R_M4_1_PID2 = 300,
-+	SC_R_M4_1_PID3 = 301,
-+	SC_R_M4_1_PID4 = 302,
-+	SC_R_M4_1_RGPIO = 303,
-+	SC_R_M4_1_SEMA42 = 304,
-+	SC_R_M4_1_TPM = 305,
-+	SC_R_M4_1_PIT = 306,
-+	SC_R_M4_1_UART = 307,
-+	SC_R_M4_1_I2C = 308,
-+	SC_R_M4_1_INTMUX = 309,
-+	SC_R_M4_1_SIM = 310,
-+	SC_R_M4_1_WDOG = 311,
-+	SC_R_M4_1_MU_0B = 312,
-+	SC_R_M4_1_MU_0A0 = 313,
-+	SC_R_M4_1_MU_0A1 = 314,
-+	SC_R_M4_1_MU_0A2 = 315,
-+	SC_R_M4_1_MU_0A3 = 316,
-+	SC_R_M4_1_MU_1A = 317,
-+	SC_R_SAI_0 = 318,
-+	SC_R_SAI_1 = 319,
-+	SC_R_SAI_2 = 320,
-+	SC_R_IRQSTR_SCU2 = 321,
-+	SC_R_IRQSTR_DSP = 322,
-+	SC_R_UNUSED5 = 323,
-+	SC_R_UNUSED6 = 324,
-+	SC_R_AUDIO_PLL_0 = 325,
-+	SC_R_PI_0 = 326,
-+	SC_R_PI_0_PWM_0 = 327,
-+	SC_R_PI_0_PWM_1 = 328,
-+	SC_R_PI_0_I2C_0 = 329,
-+	SC_R_PI_0_PLL = 330,
-+	SC_R_PI_1 = 331,
-+	SC_R_PI_1_PWM_0 = 332,
-+	SC_R_PI_1_PWM_1 = 333,
-+	SC_R_PI_1_I2C_0 = 334,
-+	SC_R_PI_1_PLL = 335,
-+	SC_R_SC_PID0 = 336,
-+	SC_R_SC_PID1 = 337,
-+	SC_R_SC_PID2 = 338,
-+	SC_R_SC_PID3 = 339,
-+	SC_R_SC_PID4 = 340,
-+	SC_R_SC_SEMA42 = 341,
-+	SC_R_SC_TPM = 342,
-+	SC_R_SC_PIT = 343,
-+	SC_R_SC_UART = 344,
-+	SC_R_SC_I2C = 345,
-+	SC_R_SC_MU_0B = 346,
-+	SC_R_SC_MU_0A0 = 347,
-+	SC_R_SC_MU_0A1 = 348,
-+	SC_R_SC_MU_0A2 = 349,
-+	SC_R_SC_MU_0A3 = 350,
-+	SC_R_SC_MU_1A = 351,
-+	SC_R_SYSCNT_RD = 352,
-+	SC_R_SYSCNT_CMP = 353,
-+	SC_R_DEBUG = 354,
-+	SC_R_SYSTEM = 355,
-+	SC_R_SNVS = 356,
-+	SC_R_OTP = 357,
-+	SC_R_VPU_PID0 = 358,
-+	SC_R_VPU_PID1 = 359,
-+	SC_R_VPU_PID2 = 360,
-+	SC_R_VPU_PID3 = 361,
-+	SC_R_VPU_PID4 = 362,
-+	SC_R_VPU_PID5 = 363,
-+	SC_R_VPU_PID6 = 364,
-+	SC_R_VPU_PID7 = 365,
-+	SC_R_VPU_UART = 366,
-+	SC_R_VPUCORE = 367,
-+	SC_R_VPUCORE_0 = 368,
-+	SC_R_VPUCORE_1 = 369,
-+	SC_R_VPUCORE_2 = 370,
-+	SC_R_VPUCORE_3 = 371,
-+	SC_R_DMA_4_CH0 = 372,
-+	SC_R_DMA_4_CH1 = 373,
-+	SC_R_DMA_4_CH2 = 374,
-+	SC_R_DMA_4_CH3 = 375,
-+	SC_R_DMA_4_CH4 = 376,
-+	SC_R_ISI_CH0 = 377,
-+	SC_R_ISI_CH1 = 378,
-+	SC_R_ISI_CH2 = 379,
-+	SC_R_ISI_CH3 = 380,
-+	SC_R_ISI_CH4 = 381,
-+	SC_R_ISI_CH5 = 382,
-+	SC_R_ISI_CH6 = 383,
-+	SC_R_ISI_CH7 = 384,
-+	SC_R_MJPEG_DEC_S0 = 385,
-+	SC_R_MJPEG_DEC_S1 = 386,
-+	SC_R_MJPEG_DEC_S2 = 387,
-+	SC_R_MJPEG_DEC_S3 = 388,
-+	SC_R_MJPEG_ENC_S0 = 389,
-+	SC_R_MJPEG_ENC_S1 = 390,
-+	SC_R_MJPEG_ENC_S2 = 391,
-+	SC_R_MJPEG_ENC_S3 = 392,
-+	SC_R_MIPI_0 = 393,
-+	SC_R_MIPI_0_PWM_0 = 394,
-+	SC_R_MIPI_0_I2C_0 = 395,
-+	SC_R_MIPI_0_I2C_1 = 396,
-+	SC_R_MIPI_1 = 397,
-+	SC_R_MIPI_1_PWM_0 = 398,
-+	SC_R_MIPI_1_I2C_0 = 399,
-+	SC_R_MIPI_1_I2C_1 = 400,
-+	SC_R_CSI_0 = 401,
-+	SC_R_CSI_0_PWM_0 = 402,
-+	SC_R_CSI_0_I2C_0 = 403,
-+	SC_R_CSI_1 = 404,
-+	SC_R_CSI_1_PWM_0 = 405,
-+	SC_R_CSI_1_I2C_0 = 406,
-+	SC_R_HDMI = 407,
-+	SC_R_HDMI_I2S = 408,
-+	SC_R_HDMI_I2C_0 = 409,
-+	SC_R_HDMI_PLL_0 = 410,
-+	SC_R_HDMI_RX = 411,
-+	SC_R_HDMI_RX_BYPASS = 412,
-+	SC_R_HDMI_RX_I2C_0 = 413,
-+	SC_R_ASRC_0 = 414,
-+	SC_R_ESAI_0 = 415,
-+	SC_R_SPDIF_0 = 416,
-+	SC_R_SPDIF_1 = 417,
-+	SC_R_SAI_3 = 418,
-+	SC_R_SAI_4 = 419,
-+	SC_R_SAI_5 = 420,
-+	SC_R_GPT_5 = 421,
-+	SC_R_GPT_6 = 422,
-+	SC_R_GPT_7 = 423,
-+	SC_R_GPT_8 = 424,
-+	SC_R_GPT_9 = 425,
-+	SC_R_GPT_10 = 426,
-+	SC_R_DMA_2_CH5 = 427,
-+	SC_R_DMA_2_CH6 = 428,
-+	SC_R_DMA_2_CH7 = 429,
-+	SC_R_DMA_2_CH8 = 430,
-+	SC_R_DMA_2_CH9 = 431,
-+	SC_R_DMA_2_CH10 = 432,
-+	SC_R_DMA_2_CH11 = 433,
-+	SC_R_DMA_2_CH12 = 434,
-+	SC_R_DMA_2_CH13 = 435,
-+	SC_R_DMA_2_CH14 = 436,
-+	SC_R_DMA_2_CH15 = 437,
-+	SC_R_DMA_2_CH16 = 438,
-+	SC_R_DMA_2_CH17 = 439,
-+	SC_R_DMA_2_CH18 = 440,
-+	SC_R_DMA_2_CH19 = 441,
-+	SC_R_DMA_2_CH20 = 442,
-+	SC_R_DMA_2_CH21 = 443,
-+	SC_R_DMA_2_CH22 = 444,
-+	SC_R_DMA_2_CH23 = 445,
-+	SC_R_DMA_2_CH24 = 446,
-+	SC_R_DMA_2_CH25 = 447,
-+	SC_R_DMA_2_CH26 = 448,
-+	SC_R_DMA_2_CH27 = 449,
-+	SC_R_DMA_2_CH28 = 450,
-+	SC_R_DMA_2_CH29 = 451,
-+	SC_R_DMA_2_CH30 = 452,
-+	SC_R_DMA_2_CH31 = 453,
-+	SC_R_ASRC_1 = 454,
-+	SC_R_ESAI_1 = 455,
-+	SC_R_SAI_6 = 456,
-+	SC_R_SAI_7 = 457,
-+	SC_R_AMIX = 458,
-+	SC_R_MQS_0 = 459,
-+	SC_R_DMA_3_CH0 = 460,
-+	SC_R_DMA_3_CH1 = 461,
-+	SC_R_DMA_3_CH2 = 462,
-+	SC_R_DMA_3_CH3 = 463,
-+	SC_R_DMA_3_CH4 = 464,
-+	SC_R_DMA_3_CH5 = 465,
-+	SC_R_DMA_3_CH6 = 466,
-+	SC_R_DMA_3_CH7 = 467,
-+	SC_R_DMA_3_CH8 = 468,
-+	SC_R_DMA_3_CH9 = 469,
-+	SC_R_DMA_3_CH10 = 470,
-+	SC_R_DMA_3_CH11 = 471,
-+	SC_R_DMA_3_CH12 = 472,
-+	SC_R_DMA_3_CH13 = 473,
-+	SC_R_DMA_3_CH14 = 474,
-+	SC_R_DMA_3_CH15 = 475,
-+	SC_R_DMA_3_CH16 = 476,
-+	SC_R_DMA_3_CH17 = 477,
-+	SC_R_DMA_3_CH18 = 478,
-+	SC_R_DMA_3_CH19 = 479,
-+	SC_R_DMA_3_CH20 = 480,
-+	SC_R_DMA_3_CH21 = 481,
-+	SC_R_DMA_3_CH22 = 482,
-+	SC_R_DMA_3_CH23 = 483,
-+	SC_R_DMA_3_CH24 = 484,
-+	SC_R_DMA_3_CH25 = 485,
-+	SC_R_DMA_3_CH26 = 486,
-+	SC_R_DMA_3_CH27 = 487,
-+	SC_R_DMA_3_CH28 = 488,
-+	SC_R_DMA_3_CH29 = 489,
-+	SC_R_DMA_3_CH30 = 490,
-+	SC_R_DMA_3_CH31 = 491,
-+	SC_R_AUDIO_PLL_1 = 492,
-+	SC_R_AUDIO_CLK_0 = 493,
-+	SC_R_AUDIO_CLK_1 = 494,
-+	SC_R_MCLK_OUT_0 = 495,
-+	SC_R_MCLK_OUT_1 = 496,
-+	SC_R_PMIC_0 = 497,
-+	SC_R_PMIC_1 = 498,
-+	SC_R_SECO = 499,
-+	SC_R_CAAM_JR1 = 500,
-+	SC_R_CAAM_JR2 = 501,
-+	SC_R_CAAM_JR3 = 502,
-+	SC_R_SECO_MU_2 = 503,
-+	SC_R_SECO_MU_3 = 504,
-+	SC_R_SECO_MU_4 = 505,
-+	SC_R_HDMI_RX_PWM_0 = 506,
-+	SC_R_A35 = 507,
-+	SC_R_A35_0 = 508,
-+	SC_R_A35_1 = 509,
-+	SC_R_A35_2 = 510,
-+	SC_R_A35_3 = 511,
-+	SC_R_DSP = 512,
-+	SC_R_DSP_RAM = 513,
-+	SC_R_CAAM_JR1_OUT = 514,
-+	SC_R_CAAM_JR2_OUT = 515,
-+	SC_R_CAAM_JR3_OUT = 516,
-+	SC_R_VPU_DEC_0 = 517,
-+	SC_R_VPU_ENC_0 = 518,
-+	SC_R_CAAM_JR0 = 519,
-+	SC_R_CAAM_JR0_OUT = 520,
-+	SC_R_PMIC_2 = 521,
-+	SC_R_DBLOGIC = 522,
-+	SC_R_HDMI_PLL_1 = 523,
-+	SC_R_BOARD_R0 = 524,
-+	SC_R_BOARD_R1 = 525,
-+	SC_R_BOARD_R2 = 526,
-+	SC_R_BOARD_R3 = 527,
-+	SC_R_BOARD_R4 = 528,
-+	SC_R_BOARD_R5 = 529,
-+	SC_R_BOARD_R6 = 530,
-+	SC_R_BOARD_R7 = 531,
-+	SC_R_MJPEG_DEC_MP = 532,
-+	SC_R_MJPEG_ENC_MP = 533,
-+	SC_R_VPU_TS_0 = 534,
-+	SC_R_VPU_MU_0 = 535,
-+	SC_R_VPU_MU_1 = 536,
-+	SC_R_VPU_MU_2 = 537,
-+	SC_R_VPU_MU_3 = 538,
-+	SC_R_VPU_ENC_1 = 539,
-+	SC_R_VPU = 540,
-+	SC_R_LAST
-+} sc_rsrc_t;
-+
-+/* NOTE - please add by replacing some of the UNUSED from above! */
 +
 +/*
-+ * This type is used to indicate a control.
++ * This function sets the rate of a resource's clock/PLL.
++ *
++ * @param [in]		ipc		IPC handle
++ * @param [in]		resource	ID of the resource
++ * @param [in]		clk		clock/PLL to affect
++ * @param [in,out]	rate		pointer to rate to set,
++ *					return actual rate
++ * @return Returns an error code (SC_ERR_NONE = success).
++ *
++ * Return errors:
++ * - SC_ERR_PARM if invalid resource or clock/PLL,
++ * - SC_ERR_NOACCESS if caller's partition is not the resource owner
++ *   or parent of the owner,
++ * - SC_ERR_UNAVAILABLE if clock/PLL not applicable to this resource,
++ * - SC_ERR_LOCKED if rate locked (usually because shared clock/PLL)
 + */
-+typedef enum sc_ctrl_e {
-+	SC_C_TEMP = 0,
-+	SC_C_TEMP_HI = 1,
-+	SC_C_TEMP_LOW = 2,
-+	SC_C_PXL_LINK_MST1_ADDR = 3,
-+	SC_C_PXL_LINK_MST2_ADDR = 4,
-+	SC_C_PXL_LINK_MST_ENB = 5,
-+	SC_C_PXL_LINK_MST1_ENB = 6,
-+	SC_C_PXL_LINK_MST2_ENB = 7,
-+	SC_C_PXL_LINK_SLV1_ADDR = 8,
-+	SC_C_PXL_LINK_SLV2_ADDR = 9,
-+	SC_C_PXL_LINK_MST_VLD = 10,
-+	SC_C_PXL_LINK_MST1_VLD = 11,
-+	SC_C_PXL_LINK_MST2_VLD = 12,
-+	SC_C_SINGLE_MODE = 13,
-+	SC_C_ID = 14,
-+	SC_C_PXL_CLK_POLARITY = 15,
-+	SC_C_LINESTATE = 16,
-+	SC_C_PCIE_G_RST = 17,
-+	SC_C_PCIE_BUTTON_RST = 18,
-+	SC_C_PCIE_PERST = 19,
-+	SC_C_PHY_RESET = 20,
-+	SC_C_PXL_LINK_RATE_CORRECTION = 21,
-+	SC_C_PANIC = 22,
-+	SC_C_PRIORITY_GROUP = 23,
-+	SC_C_TXCLK = 24,
-+	SC_C_CLKDIV = 25,
-+	SC_C_DISABLE_50 = 26,
-+	SC_C_DISABLE_125 = 27,
-+	SC_C_SEL_125 = 28,
-+	SC_C_MODE = 29,
-+	SC_C_SYNC_CTRL0 = 30,
-+	SC_C_KACHUNK_CNT = 31,
-+	SC_C_KACHUNK_SEL = 32,
-+	SC_C_SYNC_CTRL1 = 33,
-+	SC_C_DPI_RESET = 34,
-+	SC_C_MIPI_RESET = 35,
-+	SC_C_DUAL_MODE = 36,
-+	SC_C_VOLTAGE = 37,
-+	SC_C_PXL_LINK_SEL = 38,
-+	SC_C_OFS_SEL = 39,
-+	SC_C_OFS_AUDIO = 40,
-+	SC_C_OFS_PERIPH = 41,
-+	SC_C_OFS_IRQ = 42,
-+	SC_C_RST0 = 43,
-+	SC_C_RST1 = 44,
-+	SC_C_SEL0 = 45,
-+	SC_C_LAST
-+} sc_ctrl_t;
++sc_err_t sc_pm_set_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
++			      sc_pm_clk_t clk, sc_pm_clock_rate_t *rate);
 +
-+#endif /* _SC_TYPES_H */
++/*
++ * This function gets the rate of a resource's clock/PLL.
++ *
++ * @param [in]	ipc		IPC handle
++ * @param [in]	resource	ID of the resource
++ * @param [in]	clk		clock/PLL to affect
++ * @param [out]	rate		pointer to return rate
++ *
++ * @return Returns an error code (SC_ERR_NONE = success).
++ *
++ * Return errors:
++ * - SC_ERR_PARM if invalid resource or clock/PLL,
++ * - SC_ERR_NOACCESS if caller's partition is not the resource owner
++ *   or parent of the owner,
++ * - SC_ERR_UNAVAILABLE if clock/PLL not applicable to this resource
++ */
++sc_err_t sc_pm_get_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
++			      sc_pm_clk_t clk, sc_pm_clock_rate_t *rate);
++
++/*
++ * This function enables/disables a resource's clock.
++ *
++ * @param [in]	ipc		IPC handle
++ * @param [in]	resource	ID of the resource
++ * @param [in]	clk		clock to affect
++ * @param [in]	enable		enable if true; otherwise disabled
++ * @param [in]	autog		HW auto clock gating
++ *
++ * @return Returns an error code (SC_ERR_NONE = success).
++ *
++ * Return errors:
++ * - SC_ERR_PARM if invalid resource or clock,
++ * - SC_ERR_NOACCESS if caller's partition is not the resource owner
++ *   or parent of the owner,
++ * - SC_ERR_UNAVAILABLE if clock not applicable to this resource
++ */
++sc_err_t sc_pm_clock_enable(sc_ipc_t ipc, sc_rsrc_t resource,
++			    sc_pm_clk_t clk, bool enable, bool autog);
++
++/*
++ * This function sets the parent of a resource's clock.
++ * This function should only be called when the clock is disabled.
++ *
++ * @param [in]	ipc		IPC handle
++ * @param [in]	resource	ID of the resource
++ * @param [in]	clk		clock to affect
++ * @param [in]	parent		New parent of the clock.
++ *
++ * @return Returns an error code (SC_ERR_NONE = success).
++ *
++ * Return errors:
++ * - SC_ERR_PARM if invalid resource or clock,
++ * - SC_ERR_NOACCESS if caller's partition is not the resource owner
++ *   or parent of the owner,
++ * - SC_ERR_UNAVAILABLE if clock not applicable to this resource
++ * - SC_ERR_BUSY if clock is currently enabled.
++ */
++sc_err_t sc_pm_set_clock_parent(sc_ipc_t ipc, sc_rsrc_t resource,
++				sc_pm_clk_t clk, sc_pm_clk_parent_t parent);
++
++/*
++ * This function gets the parent of a resource's clock.
++ *
++ * @param [in]	ipc		IPC handle
++ * @param [in]	resource	ID of the resource
++ * @param [in]	clk		clock to affect
++ * @param [out]	parent		pointer to return parent of clock.
++ *
++ * @return Returns an error code (SC_ERR_NONE = success).
++ *
++ * Return errors:
++ * - SC_ERR_PARM if invalid resource or clock,
++ * - SC_ERR_NOACCESS if caller's partition is not the resource owner
++ *   or parent of the owner,
++ * - SC_ERR_UNAVAILABLE if clock not applicable to this resource
++ */
++sc_err_t sc_pm_get_clock_parent(sc_ipc_t ipc, sc_rsrc_t resource,
++				sc_pm_clk_t clk, sc_pm_clk_parent_t *parent);
++
++#endif /* _SC_PM_API_H */
 -- 
 2.7.4
