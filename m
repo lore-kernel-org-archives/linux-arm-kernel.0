@@ -1,18 +1,26 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 20 Aug 2018 12:58:04 -0300
-Subject: [PATCH] ARM: dts: imx7s-warp: enable i2c3 device support
-In-Reply-To: <1534540997-20094-1-git-send-email-texier.pj2@gmail.com>
-References: <1534540997-20094-1-git-send-email-texier.pj2@gmail.com>
-Message-ID: <CAOMZO5BGN4182yz3VO9-iddqRWPsy8BA+y81Kgdybq0O36w1ww@mail.gmail.com>
+Date: Mon, 20 Aug 2018 13:01:02 -0300
+Subject: [PATCH] ARM: dts: imx6: Add stdout-path to Wandboard
+In-Reply-To: <20180814204758.3049-1-tuomas@tuxera.com>
+References: <20180814204758.3049-1-tuomas@tuxera.com>
+Message-ID: <CAOMZO5A2U5vZkfCE7xaMfrTQCogBojBDAWUe3XDCr7-JipD2Wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 17, 2018 at 6:23 PM, Pierre-Jean Texier
-<texier.pj2@gmail.com> wrote:
-> The WaRP7 has one mikroBUS socket on the back to plug click boards.
-> This patch allows to interact with some of these
-> i2c modules (EEPROM, RTC and so on).
+Hi Tuomas,
+
+On Tue, Aug 14, 2018 at 5:47 PM, Tuomas Tynkkynen <tuomas@tuxera.com> wrote:
+> Setting a stdout-path in the .dtb is convenient because then the user
+> gets a serial console on the RS-232 connector without any extra effort
+> of figuring out the relevant 'console=' boot parameter.
 >
-> Signed-off-by: Pierre-Jean Texier <texier.pj2@gmail.com>
+> Signed-off-by: Tuomas Tynkkynen <tuomas@tuxera.com>
+
+Patch looks good.
+
+Only a minor nit on the Subject line: I would do it like this to make
+it consistent:
+
+ARM: dts: imx6qdl-wandboard: Add stdout-path
 
 Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
