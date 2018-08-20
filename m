@@ -1,70 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Aug 2018 12:15:34 +0100
-Subject: [PATCH] arm64: KVM: rename the capability to set guest SError
- syndrome
-In-Reply-To: <1534790251-15847-1-git-send-email-gengdongjiu@huawei.com>
-References: <1534790251-15847-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <07f6c4c9-0397-7e03-ba36-1b8086dc1ccf@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 20 Aug 2018 13:17:55 +0200
+Subject: [PATCH 1/7] dt-bindings: Add DT bindings documentation for
+ Allwinner Thermal Sensor Controller
+In-Reply-To: <20180804070355.14857-1-manu@freebsd.org>
+References: <20180804070355.14857-1-manu@freebsd.org>
+Message-ID: <20180820111755.rzg7l2lznmbpuf2e@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongjiu,
+On Sat, Aug 04, 2018 at 09:03:49AM +0200, Emmanuel Vadot wrote:
+> This patch adds documentation for Device-Tree bindings for the Allwinner
+> Thermal Sensor Controller found on the H3, H5 and A64 SoCs
+> 
+> Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
 
-On 20/08/18 19:37, Dongjiu Geng wrote:
-> In the documentation description, this capability's name is
-> KVM_CAP_ARM_SET_SERROR_ESR, but in the header file this
-> capability's name is KVM_CAP_ARM_INJECT_SERROR_ESR, so it
-> is better to use a same name.
-> 
-> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-> ---
-> In the Documentation/virtual/kvm/api.txt:
-> 
-> +8.19 KVM_CAP_ARM_SET_SERROR_ESR
-> 
-> In the include/uapi/linux/kvm.h:
-> +#define KVM_CAP_ARM_INJECT_SERROR_ESR 156
-> 
-> So in above two files, the capability's name is not same, it
-> is better to use a same name.
-> ---
->  arch/arm64/kvm/reset.c   | 2 +-
->  include/uapi/linux/kvm.h | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> index e37c78b..57dc6be 100644
-> --- a/arch/arm64/kvm/reset.c
-> +++ b/arch/arm64/kvm/reset.c
-> @@ -77,7 +77,7 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
->  	case KVM_CAP_ARM_PMU_V3:
->  		r = kvm_arm_support_pmu_v3();
->  		break;
-> -	case KVM_CAP_ARM_INJECT_SERROR_ESR:
-> +	case KVM_CAP_ARM_SET_SERROR_ESR:
->  		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
->  		break;
->  	case KVM_CAP_SET_GUEST_DEBUG:
-> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> index 07548de..fab7525 100644
-> --- a/include/uapi/linux/kvm.h
-> +++ b/include/uapi/linux/kvm.h
-> @@ -951,7 +951,7 @@ struct kvm_ppc_resize_hpt {
->  #define KVM_CAP_HYPERV_TLBFLUSH 155
->  #define KVM_CAP_S390_HPAGE_1M 156
->  #define KVM_CAP_NESTED_STATE 157
-> -#define KVM_CAP_ARM_INJECT_SERROR_ESR 158
-> +#define KVM_CAP_ARM_SET_SERROR_ESR 158
->  
->  #ifdef KVM_CAP_IRQ_ROUTING
->  
-> 
+I'm not going to merge a binding for a device that doesn't have any
+driver implemented at the moment in Linux.
 
-I'd prefer you fix the documentation rather than the code, as this would
-pointlessly break existing code.
+Maxime
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Bootlin (formerly Free Electrons)
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180820/6b5ecb09/attachment.sig>
