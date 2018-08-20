@@ -1,107 +1,69 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Mon, 20 Aug 2018 12:14:09 +0200
-Subject: [PATCH] ASoC: atmel: tse850: switch to SPDX license identifier
-Message-ID: <20180820101409.23328-1-peda@axentia.se>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Mon, 20 Aug 2018 12:20:41 +0200
+Subject: [PATCH] ARM: dts: at91/trivial: remove old NAND bindings leftover in
+ sama5d2
+Message-ID: <20180820102041.27476-1-nicolas.ferre@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert to // comments in the leading comment, drop the boilerplate
-license text and use the correct MODULE_LICENSE.
+As the new bindings are already in place in sama5d2.dtsi and that it's used
+in the only Mainline board for this product (at91-sama5d2_ptc_ek.dts), we can
+safely remove the old bindings.
 
-Signed-off-by: Peter Rosin <peda@axentia.se>
+Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 ---
- sound/soc/atmel/tse850-pcm5142.c | 78 +++++++++++++++++++---------------------
- 1 file changed, 36 insertions(+), 42 deletions(-)
+ arch/arm/boot/dts/sama5d2.dtsi | 38 --------------------------------------
+ 1 file changed, 38 deletions(-)
 
-diff --git a/sound/soc/atmel/tse850-pcm5142.c b/sound/soc/atmel/tse850-pcm5142.c
-index 3a1393283156..214adcad5419 100644
---- a/sound/soc/atmel/tse850-pcm5142.c
-+++ b/sound/soc/atmel/tse850-pcm5142.c
-@@ -1,44 +1,38 @@
--/*
-- * TSE-850 audio - ASoC driver for the Axentia TSE-850 with a PCM5142 codec
-- *
-- * Copyright (C) 2016 Axentia Technologies AB
-- *
-- * Author: Peter Rosin <peda@axentia.se>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--/*
-- *               loop1 relays
-- *   IN1 +---o  +------------+  o---+ OUT1
-- *            \                /
-- *             +              +
-- *             |   /          |
-- *             +--o  +--.     |
-- *             |  add   |     |
-- *             |        V     |
-- *             |      .---.   |
-- *   DAC +----------->|Sum|---+
-- *             |      '---'   |
-- *             |              |
-- *             +              +
-- *
-- *   IN2 +---o--+------------+--o---+ OUT2
-- *               loop2 relays
-- *
-- * The 'loop1' gpio pin controlls two relays, which are either in loop
-- * position, meaning that input and output are directly connected, or
-- * they are in mixer position, meaning that the signal is passed through
-- * the 'Sum' mixer. Similarly for 'loop2'.
-- *
-- * In the above, the 'loop1' relays are inactive, thus feeding IN1 to the
-- * mixer (if 'add' is active) and feeding the mixer output to OUT1. The
-- * 'loop2' relays are active, short-cutting the TSE-850 from channel 2.
-- * IN1, IN2, OUT1 and OUT2 are TSE-850 connectors and DAC is the PCB name
-- * of the (filtered) output from the PCM5142 codec.
-- */
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// TSE-850 audio - ASoC driver for the Axentia TSE-850 with a PCM5142 codec
-+//
-+// Copyright (C) 2016 Axentia Technologies AB
-+//
-+// Author: Peter Rosin <peda@axentia.se>
-+//
-+//               loop1 relays
-+//   IN1 +---o  +------------+  o---+ OUT1
-+//            \                /
-+//             +              +
-+//             |   /          |
-+//             +--o  +--.     |
-+//             |  add   |     |
-+//             |        V     |
-+//             |      .---.   |
-+//   DAC +----------->|Sum|---+
-+//             |      '---'   |
-+//             |              |
-+//             +              +
-+//
-+//   IN2 +---o--+------------+--o---+ OUT2
-+//               loop2 relays
-+//
-+// The 'loop1' gpio pin controlls two relays, which are either in loop
-+// position, meaning that input and output are directly connected, or
-+// they are in mixer position, meaning that the signal is passed through
-+// the 'Sum' mixer. Similarly for 'loop2'.
-+//
-+// In the above, the 'loop1' relays are inactive, thus feeding IN1 to the
-+// mixer (if 'add' is active) and feeding the mixer output to OUT1. The
-+// 'loop2' relays are active, short-cutting the TSE-850 from channel 2.
-+// IN1, IN2, OUT1 and OUT2 are TSE-850 connectors and DAC is the PCB name
-+// of the (filtered) output from the PCM5142 codec.
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index 61f68e5c48e9..fd1a401f2914 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -323,44 +323,6 @@
+ 			};
+ 		};
  
- #include <linux/clk.h>
- #include <linux/gpio.h>
-@@ -452,4 +446,4 @@ module_platform_driver(tse850_driver);
- /* Module information */
- MODULE_AUTHOR("Peter Rosin <peda@axentia.se>");
- MODULE_DESCRIPTION("ALSA SoC driver for TSE-850 with PCM5142 codec");
--MODULE_LICENSE("GPL");
-+MODULE_LICENSE("GPL v2");
+-		nand0: nand at 80000000 {
+-			compatible = "atmel,sama5d2-nand";
+-			#address-cells = <1>;
+-			#size-cells = <1>;
+-			ranges;
+-			reg = < /* EBI CS3 */
+-				0x80000000 0x08000000
+-				/* SMC PMECC regs */
+-				0xf8014070 0x00000490
+-				/* SMC PMECC Error Location regs */
+-				0xf8014500 0x00000200
+-				/* ROM Galois tables */
+-				0x00040000 0x00018000
+-				>;
+-			interrupts = <17 IRQ_TYPE_LEVEL_HIGH 6>;
+-			atmel,nand-addr-offset = <21>;
+-			atmel,nand-cmd-offset = <22>;
+-			atmel,nand-has-dma;
+-			atmel,has-pmecc;
+-			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
+-			status = "disabled";
+-
+-			nfc at c0000000 {
+-				compatible = "atmel,sama5d3-nfc";
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				reg = < /* NFC Command Registers */
+-					0xc0000000 0x08000000
+-					/* NFC HSMC regs */
+-					0xf8014000 0x00000070
+-					/* NFC SRAM banks */
+-					0x00100000 0x00100000
+-					>;
+-				clocks = <&hsmc_clk>;
+-				atmel,write-by-sram;
+-			};
+-		};
+-
+ 		sdmmc0: sdio-host at a0000000 {
+ 			compatible = "atmel,sama5d2-sdhci";
+ 			reg = <0xa0000000 0x300>;
 -- 
-2.11.0
+2.15.1
