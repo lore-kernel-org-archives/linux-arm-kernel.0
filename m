@@ -1,42 +1,56 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 20 Aug 2018 15:33:18 +0200
-Subject: [PATCH v3] ARM: dts: sun8i: Add initial Orangepi Zero Plus 2 H3
- support
-In-Reply-To: <20180803075625.13289-1-diego.rondini@kynetics.com>
-References: <20180730115223.14161-1-diego.rondini@kynetics.com>
- <20180803075625.13289-1-diego.rondini@kynetics.com>
-Message-ID: <20180820133318.pgkyoajf7il7o4e2@flea>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Mon, 20 Aug 2018 17:39:25 -0400
+Subject: [PATCH] KVM: Documentation: rename the capability of
+ KVM_CAP_ARM_SET_SERROR_ESR
+Message-ID: <1534801165-41525-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2018 at 09:56:25AM +0200, Diego Rondini wrote:
-> Orangepi Zero Plus 2 is an open-source single-board computer, available in two
-> Allwinner SOC variants, H3 and H5. We add support for H3 variant here, as the
-> H5 is already supported by sun50i-h5-orangepi-zero-plus2.dts.
-> 
-> H3 Orangepi Zero Plus 2 has:
-> - Quad-core Cortex-A7
-> - 512MB DDR3
-> - microSD slot and 8GB eMMC
-> - Debug TTL UART
-> - HDMI
-> - Wifi + BT
-> - OTG + power supply
-> 
-> Signed-off-by: Diego Rondini <diego.rondini@kynetics.com>
+In the documentation description, this capability's name is
+KVM_CAP_ARM_SET_SERROR_ESR, but in the header file this
+capability's name is KVM_CAP_ARM_INJECT_SERROR_ESR, so change
+the documentation description to make it same.
 
-queued for 4.20
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+---
+In the Documentation/virtual/kvm/api.txt:
 
-Maxime
++8.19 KVM_CAP_ARM_SET_SERROR_ESR
 
+In the include/uapi/linux/kvm.h:
++#define KVM_CAP_ARM_INJECT_SERROR_ESR 156
+
+So in above two files, the capability's name is not same, it
+is better to use a same name.
+---
+ Documentation/virtual/kvm/api.txt | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 0acdbac..c664064 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -909,10 +909,10 @@ Serviceability (RAS) Specification").
+ 
+ SError exceptions always have an ESR value. Some CPUs have the ability to
+ specify what the virtual SError's ESR value should be. These systems will
+-advertise KVM_CAP_ARM_SET_SERROR_ESR. In this case exception.has_esr will
++advertise KVM_CAP_ARM_INJECT_SERROR_ESR. In this case exception.has_esr will
+ always have a non-zero value when read, and the agent making an SError pending
+ should specify the ISS field in the lower 24 bits of exception.serror_esr. If
+-the system supports KVM_CAP_ARM_SET_SERROR_ESR, but user-space sets the events
++the system supports KVM_CAP_ARM_INJECT_SERROR_ESR, but user-space sets the events
+ with exception.has_esr as zero, KVM will choose an ESR.
+ 
+ Specifying exception.has_esr on a system that does not support it will return
+@@ -4749,7 +4749,7 @@ hypercalls:
+ HvFlushVirtualAddressSpace, HvFlushVirtualAddressSpaceEx,
+ HvFlushVirtualAddressList, HvFlushVirtualAddressListEx.
+ 
+-8.19 KVM_CAP_ARM_SET_SERROR_ESR
++8.19 KVM_CAP_ARM_INJECT_SERROR_ESR
+ 
+ Architectures: arm, arm64
+ 
 -- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180820/b2786860/attachment.sig>
+2.7.4
