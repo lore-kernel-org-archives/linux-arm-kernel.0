@@ -1,29 +1,33 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 20 Aug 2018 11:31:06 +0200
-Subject: [PATCH] pwm: stm32-lp: Remove useless loop in
- stm32_pwm_lp_remove()
-In-Reply-To: <1532070992-16831-1-git-send-email-fabrice.gasnier@st.com>
-References: <1532070992-16831-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20180820093106.GB8242@ulmo>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Mon, 20 Aug 2018 11:42:01 +0200
+Subject: [PATCH] ARM: dts: at91/trivial: Fix USART1 DT definition for
+ at91sam9g45 SOC
+Message-ID: <20180820094201.6490-1-nicolas.ferre@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 20, 2018 at 09:16:32AM +0200, Fabrice Gasnier wrote:
-> LPTimer has only one pwm channel (npwm = 1). Remove useless for loop
-> in remove routine.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
->  drivers/pwm/pwm-stm32-lp.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
+From: Jay Foster <jayfoster@ieee.org>
 
-Applied, thanks.
+Fix a typo. No functional change made by this patch.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180820/0b2deee1/attachment.sig>
+Signed-off-by: Jay Foster <jayfoster@ieee.org>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+---
+ arch/arm/boot/dts/at91sam9g45.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index 1ee25a475be8..d16db1fa7e15 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -570,7 +570,7 @@
+ 					};
+ 				};
+ 
+-				uart1 {
++				usart1 {
+ 					pinctrl_usart1: usart1-0 {
+ 						atmel,pins =
+ 							<AT91_PIOB 4 AT91_PERIPH_A AT91_PINCTRL_NONE
+-- 
+2.15.1
