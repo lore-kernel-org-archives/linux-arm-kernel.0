@@ -1,65 +1,35 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 20 Aug 2018 20:50:55 +0200
-Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via the
- nvmem API
-In-Reply-To: <20180820202038.5d3dc195@bbrezillon>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180810080526.27207-7-brgl@bgdev.pl>
- <20180817182720.6a6e5e8e@bbrezillon> <20180819133106.0420df5f@tock>
- <20180819184609.6dcdbb9a@bbrezillon>
- <5b8c30b8-41e1-d59e-542b-fef6c6469ff0@linaro.org>
- <20180820202038.5d3dc195@bbrezillon>
-Message-ID: <CAMRc=McwEjofZKP93DxPa8vJLE6NceLLGfcbcK9-Pfk-dav_Zg@mail.gmail.com>
+From: vabhav.sharma@nxp.com (Vabhav Sharma)
+Date: Mon, 20 Aug 2018 12:17:11 +0530
+Subject: [PATCH 0/5] arm64: dts: NXP: add basic dts file for LX2160A SoC
+Message-ID: <1534747636-20064-1-git-send-email-vabhav.sharma@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-08-20 20:20 GMT+02:00 Boris Brezillon <boris.brezillon@bootlin.com>:
-> On Mon, 20 Aug 2018 11:43:34 +0100
-> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
->
->>
->> Overall am still not able to clear visualize on how MTD bindings with
->> nvmem cells would look in both partition and un-partition usecases?
->> An example DT would be nice here!!
->
-> Something along those lines:
->
->         mtdnode {
->                 nvmem-cells {
->                         #address-cells = <1>;
->                         #size-cells = <1>;
->
->                         cell at 0 {
->                                 reg = <0x0 0x14>;
->                         };
->                 };
->
->                 partitions {
->                         compatible = "fixed-partitions";
->                         #address-cells = <1>;
->                         #size-cells = <1>;
->
->                         partition at 0 {
->                                 reg = <0x0 0x20000>;
->
->                                 nvmem-cells {
->                                         #address-cells = <1>;
->                                         #size-cells = <1>;
->
->                                         cell at 0 {
->                                                 reg = <0x0 0x10>;
->                                         };
->                                 };
->                         };
->                 };
->         };
+- Add compatible string for LX2160A clockgen support
+- Add compatible string to initialize LX2160A guts driver
+- Add compatible string for LX2160A support in dt-bindings
+- Add dts file to enable support for LX2160A SoC and LX2160A RDB
+  (Reference design board)
 
-If there'll be an agreement on the bindings: will you be willing to
-merge Alban's patch even without support in the code for the above
-(with the assumption that it will be added later)? My use-case is on
-non-DT systems and creating nvmem devices corresponding to MTD
-partitions if fine by me. I also don't have the means to test the
-support for these bindings if I were to actually write them myself.
+Vabhav Sharma (4):
+  dt-bindings: arm64: add compatible for LX2160A
+  soc/fsl/guts: Add compatible string for LX2160A
+  arm64: dts: add QorIQ LX2160A SoC support
+  arm64: dts: add LX2160ARDB board support
 
-Best regards,
-Bartosz Golaszewski
+Yogesh Gaur (1):
+  drivers: clk-qoriq: Add clockgen support for lx2160a
+
+ Documentation/devicetree/bindings/arm/fsl.txt     |  12 +
+ arch/arm64/boot/dts/freescale/Makefile            |   1 +
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |  95 ++++
+ arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi    | 572 ++++++++++++++++++++++
+ drivers/clk/clk-qoriq.c                           |  14 +-
+ drivers/cpufreq/qoriq-cpufreq.c                   |   1 +
+ drivers/soc/fsl/guts.c                            |   1 +
+ 7 files changed, 695 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+
+-- 
+2.7.4
