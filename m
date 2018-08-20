@@ -1,54 +1,116 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 20 Aug 2018 08:11:23 +0800
-Subject: [PATCH V2] arm64: dts: sdm630 SoC and Sony Pioneer (Xperia XA2)
- support
-In-Reply-To: <20180812142317.19991-1-ctatlor97@gmail.com>
-References: <20180812142317.19991-1-ctatlor97@gmail.com>
-Message-ID: <201808200732.CVi0qVep%fengguang.wu@intel.com>
+From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
+Date: Mon, 20 Aug 2018 10:12:46 +0530
+Subject: [PATCH v9 0/4] Uprobes: Support SDT markers having reference count
+ (semaphore)
+Message-ID: <20180820044250.11659-1-ravi.bangoria@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Craig,
+v8 -> v9:
+ - Rebased to rostedt/for-next (Commit bb730b5833b5 to be precise)
+ - Not including first two patches now. They are already pulled by
+   Steven.
+ - Change delayed_uprobe_remove() function as suggested by Oleg
+ - Dump inode, offset, ref_ctr_offset, mm etc if we fail to update
+   reference counter.
+ - Rename delayed_uprobe_install() to delayed_ref_ctr_inc()
+ - Use 'short d' (delta) in update_ref_ctr() in place of 'bool
+   is_register'.
 
-Thank you for the patch! Yet something to improve:
+v8: https://lkml.org/lkml/2018/8/9/81
 
-[auto build test ERROR on agross/for-next]
-[also build test ERROR on v4.18 next-20180817]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Future work:
+ - Optimize uprobe_mmap()->delayed_ref_ctr_inc() by making
+   delayed_uprobe_list per mm.
 
-url:    https://github.com/0day-ci/linux/commits/Craig-Tatlor/arm64-dts-sdm630-SoC-and-Sony-Pioneer-Xperia-XA2-support/20180813-040803
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git for-next
-config: arm64-allnoconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
+Description:
+Userspace Statically Defined Tracepoints[1] are dtrace style markers
+inside userspace applications. Applications like PostgreSQL, MySQL,
+Pthread, Perl, Python, Java, Ruby, Node.js, libvirt, QEMU, glib etc
+have these markers embedded in them. These markers are added by developer
+at important places in the code. Each marker source expands to a single
+nop instruction in the compiled code but there may be additional
+overhead for computing the marker arguments which expands to couple of
+instructions. In case the overhead is more, execution of it can be
+omitted by runtime if() condition when no one is tracing on the marker:
 
-All errors (new ones prefixed by >>):
+    if (reference_counter > 0) {
+        Execute marker instructions;
+    }
 
-   In file included from arch/arm64/boot/dts/qcom/sdm630-pioneer.dtsi:4:0,
-                    from arch/arm64/boot/dts/qcom/sdm630-pioneer.dts:6:
->> arch/arm64/boot/dts/qcom/sdm630.dtsi:5:10: fatal error: dt-bindings/clock/qcom,gcc-sdm660.h: No such file or directory
-    #include <dt-bindings/clock/qcom,gcc-sdm660.h>
-             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   compilation terminated.
+Default value of reference counter is 0. Tracer has to increment the 
+reference counter before tracing on a marker and decrement it when
+done with the tracing.
 
-vim +5 arch/arm64/boot/dts/qcom/sdm630.dtsi
+Currently, perf tool has limited supports for SDT markers. I.e. it
+can not trace markers surrounded by reference counter. Also, it's
+not easy to add reference counter logic in userspace tool like perf,
+so basic idea for this patchset is to add reference counter logic in
+the a uprobe infrastructure. Ex,[2]
 
-     3	
-     4	#include <dt-bindings/interrupt-controller/arm-gic.h>
-   > 5	#include <dt-bindings/clock/qcom,gcc-sdm660.h>
-     6	
+  # cat tick.c
+    ... 
+    for (i = 0; i < 100; i++) {
+	DTRACE_PROBE1(tick, loop1, i);
+        if (TICK_LOOP2_ENABLED()) {
+            DTRACE_PROBE1(tick, loop2, i); 
+        }
+        printf("hi: %d\n", i); 
+        sleep(1);
+    }   
+    ... 
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 6666 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180820/4fde0e3a/attachment.gz>
+Here tick:loop1 is marker without reference counter where as tick:loop2
+is surrounded by reference counter condition.
+
+  # perf buildid-cache --add /tmp/tick
+  # perf probe sdt_tick:loop1
+  # perf probe sdt_tick:loop2
+
+  # perf stat -e sdt_tick:loop1,sdt_tick:loop2 -- /tmp/tick
+  hi: 0
+  hi: 1
+  hi: 2
+  ^C
+  Performance counter stats for '/tmp/tick':
+             3      sdt_tick:loop1
+             0      sdt_tick:loop2
+     2.747086086 seconds time elapsed
+
+Perf failed to record data for tick:loop2. Same experiment with this
+patch series:
+
+  # ./perf buildid-cache --add /tmp/tick
+  # ./perf probe sdt_tick:loop2
+  # ./perf stat -e sdt_tick:loop2 /tmp/tick
+    hi: 0
+    hi: 1
+    hi: 2
+    ^C  
+     Performance counter stats for '/tmp/tick':
+                 3      sdt_tick:loop2
+       2.561851452 seconds time elapsed
+
+[1] https://sourceware.org/systemtap/wiki/UserSpaceProbeImplementation
+[2] https://github.com/iovisor/bcc/issues/327#issuecomment-200576506
+
+Ravi Bangoria (4):
+  Uprobes: Support SDT markers having reference count (semaphore)
+  Uprobes/sdt: Prevent multiple reference counter for same uprobe
+  trace_uprobe/sdt: Prevent multiple reference counter for same uprobe
+  perf probe: Support SDT markers having reference counter (semaphore)
+
+ include/linux/uprobes.h       |   5 +
+ kernel/events/uprobes.c       | 278 ++++++++++++++++++++++++++++++++++++++++--
+ kernel/trace/trace.c          |   2 +-
+ kernel/trace/trace_uprobe.c   |  75 +++++++++++-
+ tools/perf/util/probe-event.c |  39 +++++-
+ tools/perf/util/probe-event.h |   1 +
+ tools/perf/util/probe-file.c  |  34 +++++-
+ tools/perf/util/probe-file.h  |   1 +
+ tools/perf/util/symbol-elf.c  |  46 +++++--
+ tools/perf/util/symbol.h      |   7 ++
+ 10 files changed, 453 insertions(+), 35 deletions(-)
+
+-- 
+2.14.4
