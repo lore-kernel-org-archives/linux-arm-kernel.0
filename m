@@ -1,25 +1,81 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 20 Aug 2018 07:41:22 -0600
-Subject: [PATCH 1/7] dt-bindings: Add DT bindings documentation for
- Allwinner Thermal Sensor Controller
-In-Reply-To: <20180820111755.rzg7l2lznmbpuf2e@flea>
-References: <20180804070355.14857-1-manu@freebsd.org>
- <20180820111755.rzg7l2lznmbpuf2e@flea>
-Message-ID: <CAL_JsqLVQDRH1esAXghfQdxmp+iorWVCArM2qTwjbgmQzmhzQw@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Mon, 20 Aug 2018 21:40:13 +0800
+Subject: [PATCH] clk: sunxi-ng: sun50i: h6: Add 2x fixed post-divider to MMC
+ module clocks
+Message-ID: <20180820134013.16527-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2018 at 5:17 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Sat, Aug 04, 2018 at 09:03:49AM +0200, Emmanuel Vadot wrote:
-> > This patch adds documentation for Device-Tree bindings for the Allwinner
-> > Thermal Sensor Controller found on the H3, H5 and A64 SoCs
-> >
-> > Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
->
-> I'm not going to merge a binding for a device that doesn't have any
-> driver implemented at the moment in Linux.
+On the H6, the MMC module clocks are fixed in the new timing mode,
+i.e. they do not have a bit to select the mode. These clocks have
+a 2x divider somewhere between the clock and the MMC module.
 
-I'll take it then. Linux is not the only DT client.
+To be consistent with other SoCs supporting the new timing mode,
+we model the 2x divider as a fixed post-divider on the MMC module
+clocks.
 
-Rob
+This patch adds the post-dividers to the MMC clocks, following the
+approach on A64.
+
+Fixes: 542353ea ("clk: sunxi-ng: add support for the Allwinner H6 CCU")
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ drivers/clk/sunxi-ng/ccu-sun50i-h6.c | 43 +++++++++++++++-------------
+ 1 file changed, 23 insertions(+), 20 deletions(-)
+
+diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+index bdbfe78fe133..3d60f7978506 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
++++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+@@ -408,26 +408,29 @@ static SUNXI_CCU_GATE(bus_nand_clk, "bus-nand", "ahb3", 0x82c, BIT(0), 0);
+ 
+ static const char * const mmc_parents[] = { "osc24M", "pll-periph0-2x",
+ 					    "pll-periph1-2x" };
+-static SUNXI_CCU_MP_WITH_MUX_GATE(mmc0_clk, "mmc0", mmc_parents, 0x830,
+-					0, 4,	/* M */
+-					8, 2,	/* N */
+-					24, 3,	/* mux */
+-					BIT(31),/* gate */
+-					0);
+-
+-static SUNXI_CCU_MP_WITH_MUX_GATE(mmc1_clk, "mmc1", mmc_parents, 0x834,
+-					0, 4,	/* M */
+-					8, 2,	/* N */
+-					24, 3,	/* mux */
+-					BIT(31),/* gate */
+-					0);
+-
+-static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_clk, "mmc2", mmc_parents, 0x838,
+-					0, 4,	/* M */
+-					8, 2,	/* N */
+-					24, 3,	/* mux */
+-					BIT(31),/* gate */
+-					0);
++static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc0_clk, "mmc0", mmc_parents, 0x830,
++					  0, 4,		/* M */
++					  8, 2,		/* N */
++					  24, 3,	/* mux */
++					  BIT(31),	/* gate */
++					  2,		/* post-div */
++					  0);
++
++static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc1_clk, "mmc1", mmc_parents, 0x834,
++					  0, 4,		/* M */
++					  8, 2,		/* N */
++					  24, 3,	/* mux */
++					  BIT(31),	/* gate */
++					  2,		/* post-div */
++					  0);
++
++static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc2_clk, "mmc2", mmc_parents, 0x838,
++					  0, 4,		/* M */
++					  8, 2,		/* N */
++					  24, 3,	/* mux */
++					  BIT(31),	/* gate */
++					  2,		/* post-div */
++					  0);
+ 
+ static SUNXI_CCU_GATE(bus_mmc0_clk, "bus-mmc0", "ahb3", 0x84c, BIT(0), 0);
+ static SUNXI_CCU_GATE(bus_mmc1_clk, "bus-mmc1", "ahb3", 0x84c, BIT(1), 0);
+-- 
+2.18.0
