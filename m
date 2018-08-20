@@ -1,47 +1,49 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Mon, 20 Aug 2018 10:54:45 +0200
-Subject: [PATCH 2/2] mmc: android-goldfish: fix bad logic of sg_copy_{from,
- to}_buffer conversion
-In-Reply-To: <20180820085445.14632-1-ludovic.desroches@microchip.com>
-References: <20180820085445.14632-1-ludovic.desroches@microchip.com>
-Message-ID: <20180820085445.14632-3-ludovic.desroches@microchip.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 20 Aug 2018 11:25:36 +0200
+Subject: [PATCH v4] pwm: pwm-omap-dmtimer: return -EPROBE_DEFER if no
+ dmtimer platform data
+In-Reply-To: <20180801141729.2840-1-drivshin@awxrd.com>
+References: <20180801141729.2840-1-drivshin@awxrd.com>
+Message-ID: <20180820092536.GA8242@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The conversion to sg_copy_{from,to}_buffer has been done in the wrong
-way. sg_copy_to_buffer is a copy from an SG list to a linear buffer so
-it can't replace memcpy(dest, host->virt_base, data->sg->length) where
-dest is the virtual address of the SG. Same for sg_copy_from_buffer
-but in the opposite way.
+On Wed, Aug 01, 2018 at 10:17:29AM -0400, David Rivshin wrote:
+> From: David Rivshin <DRivshin@allworx.com>
+> 
+> If a pwm-omap-dmtimer is probed before the dmtimer it uses, the platform
+> data won't be set yet.
+> 
+> Fixes: ac30751df953 ("ARM: OMAP: pdata-quirks: Remove unused timer pdata")
+> Cc: <stable@vger.kernel.org> # 4.17+
+> Signed-off-by: David Rivshin <drivshin@allworx.com>
+> Acked-by: Pavel Machek <pavel@ucw.cz>
+> Tested-by: Pavel Machek <pavel@ucw.cz>
+> Acked-by: Ladislav Michl <ladis@linux-mips.org>
+> Tested-by: Andreas Kemnade <andreas@kemnade.info>
+> ---
+> Changes in v4:
+> * Added Ladislav's Acked-by [2]
+> * Added Andreas's Tested-by [3]
+> Changes in v3:
+> * Changed dev_info to dev_dbg
+> Changes in v2:
+> * Added Pavel's Acked-by/Tested-by [1]
+> 
+> [1] https://lkml.org/lkml/2018/7/16/346
+> [2] https://www.spinics.net/lists/arm-kernel/msg668768.html
+> [3] https://www.spinics.net/lists/arm-kernel/msg669302.html
+> 
+> drivers/pwm/pwm-omap-dmtimer.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-Suggested-by: Douglas Gilbert <dgilbert@interlog.com>
-Fixes: 53d7e098ba08 ("mmc: android-goldfish: use sg_copy_{from,to}_buffer")
----
- drivers/mmc/host/android-goldfish.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Applied, thanks.
 
-diff --git a/drivers/mmc/host/android-goldfish.c b/drivers/mmc/host/android-goldfish.c
-index 294de177632c..61e4e2a213c9 100644
---- a/drivers/mmc/host/android-goldfish.c
-+++ b/drivers/mmc/host/android-goldfish.c
-@@ -217,7 +217,7 @@ static void goldfish_mmc_xfer_done(struct goldfish_mmc_host *host,
- 			 * We don't really have DMA, so we need
- 			 * to copy from our platform driver buffer
- 			 */
--			sg_copy_to_buffer(data->sg, 1, host->virt_base,
-+			sg_copy_from_buffer(data->sg, 1, host->virt_base,
- 					data->sg->length);
- 		}
- 		host->data->bytes_xfered += data->sg->length;
-@@ -393,7 +393,7 @@ static void goldfish_mmc_prepare_data(struct goldfish_mmc_host *host,
- 		 * We don't really have DMA, so we need to copy to our
- 		 * platform driver buffer
- 		 */
--		sg_copy_from_buffer(data->sg, 1, host->virt_base,
-+		sg_copy_to_buffer(data->sg, 1, host->virt_base,
- 				data->sg->length);
- 	}
- }
--- 
-2.12.2
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180820/d8b05dca/attachment.sig>
