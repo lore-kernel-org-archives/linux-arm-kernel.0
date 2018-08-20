@@ -1,47 +1,77 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 20 Aug 2018 17:32:07 +0200
-Subject: [PATCH v7 2/8] dt-bindings: Introduce interconnect provider
- bindings
-In-Reply-To: <e114ed83-fd54-4952-f375-e1d94826ac6e@linaro.org>
-References: <20180731161340.13000-1-georgi.djakov@linaro.org>
- <20180731161340.13000-3-georgi.djakov@linaro.org>
- <CABGGisxq+hf91R18pnZ=VZ9f99GssWWPhpPCjNAROJmKg5-udA@mail.gmail.com>
- <e114ed83-fd54-4952-f375-e1d94826ac6e@linaro.org>
-Message-ID: <20180820153207.xx5outviph7ec76p@flea>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 20 Aug 2018 16:41:13 +0100
+Subject: [PATCH 3/3] arm64/dma-mapping: Mildly optimise non-coherent IOMMU
+ ops
+In-Reply-To: <52b017ead032f90e5f2b70b87747a49eb86209c8.1534250425.git.robin.murphy@arm.com>
+References: <cover.1534250425.git.robin.murphy@arm.com>
+ <52b017ead032f90e5f2b70b87747a49eb86209c8.1534250425.git.robin.murphy@arm.com>
+Message-ID: <40b5fd67-f38c-5c5d-b9e1-279bfb175311@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Georgi,
-
-On Tue, Aug 07, 2018 at 05:54:38PM +0300, Georgi Djakov wrote:
-> > There is also a patch series from Maxime Ripard that's addressing the
-> > same general area. See "dt-bindings: Add a dma-parent property". We
-> > don't need multiple ways to address describing the device to memory
-> > paths, so you all had better work out a common solution.
+On 14/08/18 14:04, Robin Murphy wrote:
+> Whilst the symmetry of deferring to the existing sync callback in
+> __iommu_map_page() is nice, taking a round-trip through
+> iommu_iova_to_phys() is a pretty heavyweight way to get an address we
+> can trivially compute from the page we already have. Tweaking it to just
+> perform the cache maintenance directly when appropriate doesn't really
+> make the code any more complicated, and the runtime efficiency gain can
+> only be a benefit.
 > 
-> Looks like this fits exactly into the interconnect API concept. I see
-> MBUS as interconnect provider and display/camera as consumers, that
-> report their bandwidth needs. I am also planning to add support for
-> priority.
+> Furthermore, the sync operations themselves know they can only be
+> invoked on a managed DMA ops domain, so can use the fast specific domain
+> lookup to avoid excessive manipulation of the group refcount
+> (particularly in the scatterlist cases).
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>   arch/arm64/mm/dma-mapping.c | 10 +++++-----
+>   1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 61e93f0b5482..5d4144093c20 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -712,7 +712,7 @@ static void __iommu_sync_single_for_cpu(struct device *dev,
+>   	if (is_device_dma_coherent(dev))
+>   		return;
+>   
+> -	phys = iommu_iova_to_phys(iommu_get_domain_for_dev(dev), dev_addr);
+> +	phys = iommu_iova_to_phys(iommu_get_dma_domain(dev), dev_addr);
+>   	__dma_unmap_area(phys_to_virt(phys), size, dir);
+>   }
+>   
+> @@ -725,7 +725,7 @@ static void __iommu_sync_single_for_device(struct device *dev,
+>   	if (is_device_dma_coherent(dev))
+>   		return;
+>   
+> -	phys = iommu_iova_to_phys(iommu_get_domain_for_dev(dev), dev_addr);
+> +	phys = iommu_iova_to_phys(iommu_get_dma_domain(dev), dev_addr);
+>   	__dma_map_area(phys_to_virt(phys), size, dir);
+>   }
+>   
+> @@ -738,9 +738,9 @@ static dma_addr_t __iommu_map_page(struct device *dev, struct page *page,
+>   	int prot = dma_info_to_prot(dir, coherent, attrs);
+>   	dma_addr_t dev_addr = iommu_dma_map_page(dev, page, offset, size, prot);
+>   
+> -	if (!iommu_dma_mapping_error(dev, dev_addr) &&
+> -	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
+> -		__iommu_sync_single_for_device(dev, dev_addr, size, dir);
+> +	if (!coherent && !(attrs & DMA_ATTR_SKIP_CPU_SYNC) &&
+> +	    !iommu_dma_mapping_error(dev, dev_addr))
+> +		__dma_map_area(page_address(page), size, dir);
 
-Thanks for working on this. After looking at your serie, the one thing
-I'm a bit uncertain about (and the most important one to us) is how we
-would be able to tell through which interconnect the DMA are done.
+                                                  + offset
 
-This is important to us since our topology is actually quite simple as
-you've seen, but the RAM is not mapped on that bus and on the CPU's,
-so we need to apply an offset to each buffer being DMA'd.
+Sigh...
 
-Maxime
+And there I was assuming that if I'd bothered to write up a proper 
+commit message for the 15-month-old change I was cherry-picking, I must 
+have actually tested it at the time.
 
--- 
-Maxime Ripard, Bootlin (formerly Free Electrons)
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180820/66f72c97/attachment.sig>
+Robin.
+
+>   
+>   	return dev_addr;
+>   }
+> 
