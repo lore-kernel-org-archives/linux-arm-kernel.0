@@ -1,69 +1,56 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Mon, 20 Aug 2018 12:20:41 +0200
-Subject: [PATCH] ARM: dts: at91/trivial: remove old NAND bindings leftover in
- sama5d2
-Message-ID: <20180820102041.27476-1-nicolas.ferre@microchip.com>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Mon, 20 Aug 2018 14:37:31 -0400
+Subject: [PATCH] arm64: KVM: rename the capability to set guest SError syndrome
+Message-ID: <1534790251-15847-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the new bindings are already in place in sama5d2.dtsi and that it's used
-in the only Mainline board for this product (at91-sama5d2_ptc_ek.dts), we can
-safely remove the old bindings.
+In the documentation description, this capability's name is
+KVM_CAP_ARM_SET_SERROR_ESR, but in the header file this
+capability's name is KVM_CAP_ARM_INJECT_SERROR_ESR, so it
+is better to use a same name.
 
-Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 ---
- arch/arm/boot/dts/sama5d2.dtsi | 38 --------------------------------------
- 1 file changed, 38 deletions(-)
+In the Documentation/virtual/kvm/api.txt:
 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 61f68e5c48e9..fd1a401f2914 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -323,44 +323,6 @@
- 			};
- 		};
++8.19 KVM_CAP_ARM_SET_SERROR_ESR
+
+In the include/uapi/linux/kvm.h:
++#define KVM_CAP_ARM_INJECT_SERROR_ESR 156
+
+So in above two files, the capability's name is not same, it
+is better to use a same name.
+---
+ arch/arm64/kvm/reset.c   | 2 +-
+ include/uapi/linux/kvm.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index e37c78b..57dc6be 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -77,7 +77,7 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	case KVM_CAP_ARM_PMU_V3:
+ 		r = kvm_arm_support_pmu_v3();
+ 		break;
+-	case KVM_CAP_ARM_INJECT_SERROR_ESR:
++	case KVM_CAP_ARM_SET_SERROR_ESR:
+ 		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
+ 		break;
+ 	case KVM_CAP_SET_GUEST_DEBUG:
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 07548de..fab7525 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -951,7 +951,7 @@ struct kvm_ppc_resize_hpt {
+ #define KVM_CAP_HYPERV_TLBFLUSH 155
+ #define KVM_CAP_S390_HPAGE_1M 156
+ #define KVM_CAP_NESTED_STATE 157
+-#define KVM_CAP_ARM_INJECT_SERROR_ESR 158
++#define KVM_CAP_ARM_SET_SERROR_ESR 158
  
--		nand0: nand at 80000000 {
--			compatible = "atmel,sama5d2-nand";
--			#address-cells = <1>;
--			#size-cells = <1>;
--			ranges;
--			reg = < /* EBI CS3 */
--				0x80000000 0x08000000
--				/* SMC PMECC regs */
--				0xf8014070 0x00000490
--				/* SMC PMECC Error Location regs */
--				0xf8014500 0x00000200
--				/* ROM Galois tables */
--				0x00040000 0x00018000
--				>;
--			interrupts = <17 IRQ_TYPE_LEVEL_HIGH 6>;
--			atmel,nand-addr-offset = <21>;
--			atmel,nand-cmd-offset = <22>;
--			atmel,nand-has-dma;
--			atmel,has-pmecc;
--			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
--			status = "disabled";
--
--			nfc at c0000000 {
--				compatible = "atmel,sama5d3-nfc";
--				#address-cells = <1>;
--				#size-cells = <1>;
--				reg = < /* NFC Command Registers */
--					0xc0000000 0x08000000
--					/* NFC HSMC regs */
--					0xf8014000 0x00000070
--					/* NFC SRAM banks */
--					0x00100000 0x00100000
--					>;
--				clocks = <&hsmc_clk>;
--				atmel,write-by-sram;
--			};
--		};
--
- 		sdmmc0: sdio-host at a0000000 {
- 			compatible = "atmel,sama5d2-sdhci";
- 			reg = <0xa0000000 0x300>;
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
 -- 
-2.15.1
+2.7.4
