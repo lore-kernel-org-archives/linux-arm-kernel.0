@@ -1,189 +1,123 @@
-From: liu.song.a23@gmail.com (Song Liu)
-Date: Mon, 20 Aug 2018 10:38:11 -0700
-Subject: [PATCH v9 0/4] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180820044250.11659-1-ravi.bangoria@linux.ibm.com>
-References: <20180820044250.11659-1-ravi.bangoria@linux.ibm.com>
-Message-ID: <CAPhsuW70nRkwM8C76m4c_XF4tjepdRWYezg15sTvkMUDtHZ8JQ@mail.gmail.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Mon, 20 Aug 2018 10:46:34 -0700
+Subject: How to remove warn msg "cache: parent cpui should not be
+ sleeping" i=1, 2, 3...
+In-Reply-To: <a793d088-2faf-3ea8-41b6-f0b614a71e19@arm.com>
+References: <20161221193703.6eac880c@xhacker>
+ <a793d088-2faf-3ea8-41b6-f0b614a71e19@arm.com>
+Message-ID: <2da4c81c-883c-6bc4-5fb0-cb17cd21fdce@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am testing the patch set with the following code:
+Hi Sudeep,
 
-#include <stdio.h>
-#include <unistd.h>
 
-volatile short semaphore = 0;
+On 12/21/2016 08:54 AM, Sudeep Holla wrote:
+>
+> On 21/12/16 11:37, Jisheng Zhang wrote:
+>> Hi all,
+>>
+>> I'm not sure this is a bug, when wake up from s2ram, I could get something
+>> like:
+>>
+>> [  313.271464] Enabling non-boot CPUs ...
+>> [  313.271551] CPU1: Booted secondary processor
+>> [  313.271556] Detected VIPT I-cache on CPU1
+>> [  313.301378]  cache: parent cpu1 should not be sleeping
+>> [  313.301504] CPU1 is up
+>> [  313.301582] CPU2: Booted secondary processor
+>> [  313.301585] Detected VIPT I-cache on CPU2
+>> [  313.331485]  cache: parent cpu2 should not be sleeping
+>> [  313.331605] CPU2 is up
+>> [  313.331683] CPU3: Booted secondary processor
+>> [  313.331686] Detected VIPT I-cache on CPU3
+>> [  313.361599]  cache: parent cpu3 should not be sleeping
+>> [  313.361719] CPU3 is up
+>>
+>> This is because we call cpu_device_create() when secondary cpu is brought
+>> online, the cpu_cache device's parent device: cpu device isn't already
+>> resumed, all device resume will resume after secondary cores are brought
+>> up.
+>>
+>> What's the elegant solution to remove this warning msg?
+>>
+> It is not a serious warning as you can see a comment in the code:
+> "/*
+>   * This is a fib.  But we'll allow new children to be added below
+>   * a resumed device, even if the device hasn't been completed yet.
+>   */"
+>
+> But if we think it needs to be removed, I have something like below in
+> my mind. I am not sure if this is hacky or not(completely untested, not
+> even compiled).
 
-int for_uprobe(int c)
-{
-        printf("%d\n", c + 10);
-        return c + 1;
-}
+This is an old thread, but this warning still exists in the code and 
+still occurs
+on resume from suspend-to-ram, as of 4.18-rc2.
 
-int main(int argc, char *argv[])
-{
-        for_uprobe(argc);
-        while (1) {
-                sleep(1);
-                printf("semaphore %d\n", semaphore);
-        }
-}
+I have tested the below patch on a Renesas Salvator-X ES2.0 and it does
+indeed remove this warning on S2RAM resume.
 
-I created a uprobe on function for_uprobe(), that uses semaphore as
-reference counter:
-
-  echo "p:uprobe_1 /root/a.out:0x49a(0x1036)" >> uprobe_events
-
-I found that if I start a.out before enabling the uprobe, the output
-of a.out is like:
-
-root at virt-test:~# ~/a.out
-11
-semaphore 0
-semaphore 0
-semaphore 2      <<<  when the uprobe is enabled
-semaphore 2
-semaphore 2
-semaphore 2
-semaphore 2
-semaphore 0     <<< when the uprobe is disabled
-semaphore 0
-semaphore 0
-
-I am not quite sure whether the value should be 1 or 2, but it works.
-
-However, if I start a.out AFTER enabling the uprobe, there is something wrong:
-
-root at virt-test:~# ~/a.out
-11
-semaphore 0       <<< this should be non-zero, as the uprobe is already enabled
-semaphore 0
-semaphore 0
-semaphore 0
-semaphore 0       <<< disabling the uprobe, the value is still 0,
-                            <<<  get warning "ref_ctr going negative"
-at the same time
-semaphore 0
-semaphore 0
-semaphore 1       <<< enable uprobe again, getting 1 this time
-semaphore 1
-semaphore 1
-
-I haven't spent much time debugging this, but I guess there is
-something wrong on the mmap path?
+I agree it is not serious, but the text of the warning does not sound 
+harmless.
+So IMHO the text should be modified or the below patch should be submitted
+for review/merge.
 
 Thanks,
-Song
+Steve
 
-On Sun, Aug 19, 2018 at 9:42 PM, Ravi Bangoria
-<ravi.bangoria@linux.ibm.com> wrote:
-> v8 -> v9:
->  - Rebased to rostedt/for-next (Commit bb730b5833b5 to be precise)
->  - Not including first two patches now. They are already pulled by
->    Steven.
->  - Change delayed_uprobe_remove() function as suggested by Oleg
->  - Dump inode, offset, ref_ctr_offset, mm etc if we fail to update
->    reference counter.
->  - Rename delayed_uprobe_install() to delayed_ref_ctr_inc()
->  - Use 'short d' (delta) in update_ref_ctr() in place of 'bool
->    is_register'.
+
+> Regards,
+> Sudeep
 >
-> v8: https://lkml.org/lkml/2018/8/9/81
+> -->8
 >
-> Future work:
->  - Optimize uprobe_mmap()->delayed_ref_ctr_inc() by making
->    delayed_uprobe_list per mm.
+> diff --git i/drivers/base/cpu.c w/drivers/base/cpu.c
+> index 4c28e1a09786..2a5c04377adf 100644
+> --- i/drivers/base/cpu.c
+> +++ w/drivers/base/cpu.c
+> @@ -344,6 +344,14 @@ static int cpu_uevent(struct device *dev, struct
+> kobj_uevent_env *env)
+>   }
+>   #endif
 >
-> Description:
-> Userspace Statically Defined Tracepoints[1] are dtrace style markers
-> inside userspace applications. Applications like PostgreSQL, MySQL,
-> Pthread, Perl, Python, Java, Ruby, Node.js, libvirt, QEMU, glib etc
-> have these markers embedded in them. These markers are added by developer
-> at important places in the code. Each marker source expands to a single
-> nop instruction in the compiled code but there may be additional
-> overhead for computing the marker arguments which expands to couple of
-> instructions. In case the overhead is more, execution of it can be
-> omitted by runtime if() condition when no one is tracing on the marker:
+> +static int cpu_dev_pm_unset_is_prepared(unsigned int cpu)
+> +{
+> +       struct device *cpu_dev = get_cpu_device(cpu);
+> +
+> +       if(cpu_dev)
+> +               cpu_dev->power.is_prepared = false;
+> +       return 0;
+> +}
+>   /*
+>    * register_cpu - Setup a sysfs device for a CPU.
+>    * @cpu - cpu->hotpluggable field set to 1 will generate a control file in
+> @@ -377,7 +385,9 @@ int register_cpu(struct cpu *cpu, int num)
+>          per_cpu(cpu_sys_devices, num) = &cpu->dev;
+>          register_cpu_under_node(num, cpu_to_node(num));
 >
->     if (reference_counter > 0) {
->         Execute marker instructions;
->     }
+> -       return 0;
+> +       return cpuhp_setup_state_nocalls(CPUHP_CPUDEV_PM_PREPARE,
+> +                                "base/cpu/dev_pm:prepare",
+> +                                cpu_dev_pm_unset_is_prepared, NULL);
+>   }
 >
-> Default value of reference counter is 0. Tracer has to increment the
-> reference counter before tracing on a marker and decrement it when
-> done with the tracing.
+>   struct device *get_cpu_device(unsigned cpu)
+> diff --git i/include/linux/cpuhotplug.h w/include/linux/cpuhotplug.h
+> index 2ab7bf53d529..5bfe3c1aa148 100644
+> --- i/include/linux/cpuhotplug.h
+> +++ w/include/linux/cpuhotplug.h
+> @@ -51,6 +51,7 @@ enum cpuhp_state {
+>          CPUHP_SLAB_PREPARE,
+>          CPUHP_MD_RAID5_PREPARE,
+>          CPUHP_RCUTREE_PREP,
+> +       CPUHP_CPUDEV_PM_PREPARE,
+>          CPUHP_CPUIDLE_COUPLED_PREPARE,
+>          CPUHP_POWERPC_PMAC_PREPARE,
+>          CPUHP_POWERPC_MMU_CTX_PREPARE,
 >
-> Currently, perf tool has limited supports for SDT markers. I.e. it
-> can not trace markers surrounded by reference counter. Also, it's
-> not easy to add reference counter logic in userspace tool like perf,
-> so basic idea for this patchset is to add reference counter logic in
-> the a uprobe infrastructure. Ex,[2]
->
->   # cat tick.c
->     ...
->     for (i = 0; i < 100; i++) {
->         DTRACE_PROBE1(tick, loop1, i);
->         if (TICK_LOOP2_ENABLED()) {
->             DTRACE_PROBE1(tick, loop2, i);
->         }
->         printf("hi: %d\n", i);
->         sleep(1);
->     }
->     ...
->
-> Here tick:loop1 is marker without reference counter where as tick:loop2
-> is surrounded by reference counter condition.
->
->   # perf buildid-cache --add /tmp/tick
->   # perf probe sdt_tick:loop1
->   # perf probe sdt_tick:loop2
->
->   # perf stat -e sdt_tick:loop1,sdt_tick:loop2 -- /tmp/tick
->   hi: 0
->   hi: 1
->   hi: 2
->   ^C
->   Performance counter stats for '/tmp/tick':
->              3      sdt_tick:loop1
->              0      sdt_tick:loop2
->      2.747086086 seconds time elapsed
->
-> Perf failed to record data for tick:loop2. Same experiment with this
-> patch series:
->
->   # ./perf buildid-cache --add /tmp/tick
->   # ./perf probe sdt_tick:loop2
->   # ./perf stat -e sdt_tick:loop2 /tmp/tick
->     hi: 0
->     hi: 1
->     hi: 2
->     ^C
->      Performance counter stats for '/tmp/tick':
->                  3      sdt_tick:loop2
->        2.561851452 seconds time elapsed
->
-> [1] https://sourceware.org/systemtap/wiki/UserSpaceProbeImplementation
-> [2] https://github.com/iovisor/bcc/issues/327#issuecomment-200576506
->
-> Ravi Bangoria (4):
->   Uprobes: Support SDT markers having reference count (semaphore)
->   Uprobes/sdt: Prevent multiple reference counter for same uprobe
->   trace_uprobe/sdt: Prevent multiple reference counter for same uprobe
->   perf probe: Support SDT markers having reference counter (semaphore)
->
->  include/linux/uprobes.h       |   5 +
->  kernel/events/uprobes.c       | 278 ++++++++++++++++++++++++++++++++++++++++--
->  kernel/trace/trace.c          |   2 +-
->  kernel/trace/trace_uprobe.c   |  75 +++++++++++-
->  tools/perf/util/probe-event.c |  39 +++++-
->  tools/perf/util/probe-event.h |   1 +
->  tools/perf/util/probe-file.c  |  34 +++++-
->  tools/perf/util/probe-file.h  |   1 +
->  tools/perf/util/symbol-elf.c  |  46 +++++--
->  tools/perf/util/symbol.h      |   7 ++
->  10 files changed, 453 insertions(+), 35 deletions(-)
->
-> --
-> 2.14.4
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
