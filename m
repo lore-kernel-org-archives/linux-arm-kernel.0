@@ -1,66 +1,48 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Mon, 20 Aug 2018 16:29:25 +0200
-Subject: [PATCH] KVM: Documentation: rename the capability of
- KVM_CAP_ARM_SET_SERROR_ESR
-In-Reply-To: <1534801165-41525-1-git-send-email-gengdongjiu@huawei.com>
-References: <1534801165-41525-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <20180820142925.zw2vgplbutfcvvos@kamzik.brq.redhat.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 20 Aug 2018 07:31:53 -0700
+Subject: [RFC PATCH 5/6] arm64: dts: ti: Add Support for AM654 SoC
+In-Reply-To: <454c277e-8a63-81cb-b341-a50f4e25cbea@ti.com>
+References: <20180605060510.32473-1-nm@ti.com>
+ <CAL_JsqJusWTvr4A_-Bk81meYddMHBMJ4=Fch6L0MFoF7HfBW2w@mail.gmail.com>
+ <454c277e-8a63-81cb-b341-a50f4e25cbea@ti.com>
+Message-ID: <20180820143153.GD7523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2018 at 05:39:25PM -0400, Dongjiu Geng wrote:
-> In the documentation description, this capability's name is
-> KVM_CAP_ARM_SET_SERROR_ESR, but in the header file this
-> capability's name is KVM_CAP_ARM_INJECT_SERROR_ESR, so change
-> the documentation description to make it same.
+* Kishon Vijay Abraham I <kishon@ti.com> [180808 06:35]:
+> On Tuesday 05 June 2018 07:35 PM, Rob Herring wrote:
+> > Really need 64-bit addresses and sizes? Use ranges to limit the
+> > address space if possible.
 > 
-> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-> ---
-> In the Documentation/virtual/kvm/api.txt:
+> We now have address-cells as <1>,
+> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/arch/arm64/boot/dts/ti/k3-am65.dtsi#n49
 > 
-> +8.19 KVM_CAP_ARM_SET_SERROR_ESR
+> However each PCIe instance has 2 data regions and one of the regions
+> (PCIE0_CORE_CORE_DAT_SLV_PCIE_DAT1/PCIE1_CORE_CORE_DAT_SLV_PCIE_DAT1 specified
+> in the "MAIN Domain Memory Map" table of TRM http://www.ti.com/lit/pdf/spruid7)
+> is above the 32bit region and requires 2 cells to specify the start address.
+> This region is used to access MEM_SPACE of PCIe endpoint when operating in root
+> complex mode and access memory of PCI root complex when operating in endpoint mode.
 > 
-> In the include/uapi/linux/kvm.h:
-> +#define KVM_CAP_ARM_INJECT_SERROR_ESR 156
-> 
-> So in above two files, the capability's name is not same, it
-> is better to use a same name.
-> ---
->  Documentation/virtual/kvm/api.txt | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index 0acdbac..c664064 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -909,10 +909,10 @@ Serviceability (RAS) Specification").
->  
->  SError exceptions always have an ESR value. Some CPUs have the ability to
->  specify what the virtual SError's ESR value should be. These systems will
-> -advertise KVM_CAP_ARM_SET_SERROR_ESR. In this case exception.has_esr will
-> +advertise KVM_CAP_ARM_INJECT_SERROR_ESR. In this case exception.has_esr will
->  always have a non-zero value when read, and the agent making an SError pending
->  should specify the ISS field in the lower 24 bits of exception.serror_esr. If
-> -the system supports KVM_CAP_ARM_SET_SERROR_ESR, but user-space sets the events
-> +the system supports KVM_CAP_ARM_INJECT_SERROR_ESR, but user-space sets the events
->  with exception.has_esr as zero, KVM will choose an ESR.
->  
->  Specifying exception.has_esr on a system that does not support it will return
-> @@ -4749,7 +4749,7 @@ hypercalls:
->  HvFlushVirtualAddressSpace, HvFlushVirtualAddressSpaceEx,
->  HvFlushVirtualAddressList, HvFlushVirtualAddressListEx.
->  
-> -8.19 KVM_CAP_ARM_SET_SERROR_ESR
-> +8.19 KVM_CAP_ARM_INJECT_SERROR_ESR
->  
->  Architectures: arm, arm64
->  
-> -- 
-> 2.7.4
->
+> In order to describe this, should we change the address-cells back to <2> or do
+> you suggest any other alternatives?
 
-Reported-by: Andrew Jones <drjones@redhat.com>
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+It's probably best to have the top level cbass interconnect use
+#size-cells = <2> and then have it's child interconnects have
+#size-cells = <1> if they don't need ranges above 4GB.
 
-Thanks,
-drew
+BTW, what's the difference between all these three similar PCIE
+ranges?
+
+PCIE0_CORE_CORE_DAT_SLV_PCIE_CORE 0x0005500000 0x0005600000 1 MB
+PCIE1_CORE_CORE_DAT_SLV_PCIE_CORE 0x0005600000 0x0005700000 1 MB
+
+PCIE0_CORE_CORE_DAT_SLV_PCIE_DAT0 0x0010000000 0x0018000000 128 MB
+PCIE1_CORE_CORE_DAT_SLV_PCIE_DAT0 0x0018000000 0x0020000000 128 MB
+
+PCIE0_CORE_CORE_DAT_SLV_PCIE_DAT1 0x4000000000 0x4100000000 4 GB
+PCIE1_CORE_CORE_DAT_SLV_PCIE_DAT1 0x4100000000 0x4200000000 4 GB
+
+Regards,
+
+Tony
