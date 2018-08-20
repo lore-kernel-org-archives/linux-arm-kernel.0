@@ -1,77 +1,18 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 20 Aug 2018 16:41:13 +0100
-Subject: [PATCH 3/3] arm64/dma-mapping: Mildly optimise non-coherent IOMMU
- ops
-In-Reply-To: <52b017ead032f90e5f2b70b87747a49eb86209c8.1534250425.git.robin.murphy@arm.com>
-References: <cover.1534250425.git.robin.murphy@arm.com>
- <52b017ead032f90e5f2b70b87747a49eb86209c8.1534250425.git.robin.murphy@arm.com>
-Message-ID: <40b5fd67-f38c-5c5d-b9e1-279bfb175311@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 20 Aug 2018 12:58:04 -0300
+Subject: [PATCH] ARM: dts: imx7s-warp: enable i2c3 device support
+In-Reply-To: <1534540997-20094-1-git-send-email-texier.pj2@gmail.com>
+References: <1534540997-20094-1-git-send-email-texier.pj2@gmail.com>
+Message-ID: <CAOMZO5BGN4182yz3VO9-iddqRWPsy8BA+y81Kgdybq0O36w1ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/08/18 14:04, Robin Murphy wrote:
-> Whilst the symmetry of deferring to the existing sync callback in
-> __iommu_map_page() is nice, taking a round-trip through
-> iommu_iova_to_phys() is a pretty heavyweight way to get an address we
-> can trivially compute from the page we already have. Tweaking it to just
-> perform the cache maintenance directly when appropriate doesn't really
-> make the code any more complicated, and the runtime efficiency gain can
-> only be a benefit.
-> 
-> Furthermore, the sync operations themselves know they can only be
-> invoked on a managed DMA ops domain, so can use the fast specific domain
-> lookup to avoid excessive manipulation of the group refcount
-> (particularly in the scatterlist cases).
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->   arch/arm64/mm/dma-mapping.c | 10 +++++-----
->   1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index 61e93f0b5482..5d4144093c20 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -712,7 +712,7 @@ static void __iommu_sync_single_for_cpu(struct device *dev,
->   	if (is_device_dma_coherent(dev))
->   		return;
->   
-> -	phys = iommu_iova_to_phys(iommu_get_domain_for_dev(dev), dev_addr);
-> +	phys = iommu_iova_to_phys(iommu_get_dma_domain(dev), dev_addr);
->   	__dma_unmap_area(phys_to_virt(phys), size, dir);
->   }
->   
-> @@ -725,7 +725,7 @@ static void __iommu_sync_single_for_device(struct device *dev,
->   	if (is_device_dma_coherent(dev))
->   		return;
->   
-> -	phys = iommu_iova_to_phys(iommu_get_domain_for_dev(dev), dev_addr);
-> +	phys = iommu_iova_to_phys(iommu_get_dma_domain(dev), dev_addr);
->   	__dma_map_area(phys_to_virt(phys), size, dir);
->   }
->   
-> @@ -738,9 +738,9 @@ static dma_addr_t __iommu_map_page(struct device *dev, struct page *page,
->   	int prot = dma_info_to_prot(dir, coherent, attrs);
->   	dma_addr_t dev_addr = iommu_dma_map_page(dev, page, offset, size, prot);
->   
-> -	if (!iommu_dma_mapping_error(dev, dev_addr) &&
-> -	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
-> -		__iommu_sync_single_for_device(dev, dev_addr, size, dir);
-> +	if (!coherent && !(attrs & DMA_ATTR_SKIP_CPU_SYNC) &&
-> +	    !iommu_dma_mapping_error(dev, dev_addr))
-> +		__dma_map_area(page_address(page), size, dir);
+On Fri, Aug 17, 2018 at 6:23 PM, Pierre-Jean Texier
+<texier.pj2@gmail.com> wrote:
+> The WaRP7 has one mikroBUS socket on the back to plug click boards.
+> This patch allows to interact with some of these
+> i2c modules (EEPROM, RTC and so on).
+>
+> Signed-off-by: Pierre-Jean Texier <texier.pj2@gmail.com>
 
-                                                  + offset
-
-Sigh...
-
-And there I was assuming that if I'd bothered to write up a proper 
-commit message for the 15-month-old change I was cherry-picking, I must 
-have actually tested it at the time.
-
-Robin.
-
->   
->   	return dev_addr;
->   }
-> 
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
