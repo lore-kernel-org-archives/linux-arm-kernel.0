@@ -1,130 +1,68 @@
-From: sunnyliangjy@gmail.com (Wendy Liang)
-Date: Sun, 19 Aug 2018 22:55:53 -0700
-Subject: [PATCH 7/7] Documentation: devicetree: Add Xilinx R5 rproc binding
-In-Reply-To: <CAAtXAHd0jmV32bSyxCyMSh9fcP63sM+6-SkTMS=gA1fJKGKtig@mail.gmail.com>
-References: <1534403190-28523-1-git-send-email-jliang@xilinx.com>
- <1534403190-28523-8-git-send-email-jliang@xilinx.com>
- <CAAtXAHd0jmV32bSyxCyMSh9fcP63sM+6-SkTMS=gA1fJKGKtig@mail.gmail.com>
-Message-ID: <CAA07jV8Bf5kxJPiPMGdpqs_6KhMnjnAC4=5GomJBKgTbVSXV4Q@mail.gmail.com>
+From: hejianet@gmail.com (Jia He)
+Date: Mon, 20 Aug 2018 14:27:22 +0800
+Subject: [RESEND PATCH v10 1/6] arm: arm64: introduce
+ CONFIG_HAVE_MEMBLOCK_PFN_VALID
+In-Reply-To: <20180817145052.aizhi6n66vxblriq@armageddon.cambridge.arm.com>
+References: <1530867675-9018-1-git-send-email-hejianet@gmail.com>
+ <1530867675-9018-2-git-send-email-hejianet@gmail.com>
+ <20180817145052.aizhi6n66vxblriq@armageddon.cambridge.arm.com>
+Message-ID: <73e1f356-2b6c-a7fd-2f04-e5b58ae79884@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 17, 2018 at 9:31 AM, Moritz Fischer
-<moritz.fischer@ettus.com> wrote:
-> Hi Wendy,
->
-> couple of minor stuff inline.
->
-> On Thu, Aug 16, 2018 at 12:06 AM, Wendy Liang <wendy.liang@xilinx.com> wrote:
->> Add device tree binding for Xilinx Cortex-r5 remoteproc.
->>
->> Signed-off-by: Wendy Liang <jliang@xilinx.com>
->> ---
->>  .../remoteproc/xlnx,zynqmp-r5-remoteproc.txt       | 81 ++++++++++++++++++++++
->>  1 file changed, 81 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt b/Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt
->> new file mode 100644
->> index 0000000..3940019
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-remoteproc.txt
->> @@ -0,0 +1,81 @@
->> +Xilinx ARM Cortex A53-R5 remoteproc driver
->> +==========================================
+
+
+On 8/17/2018 10:50 PM, Catalin Marinas Wrote:
+> On Fri, Jul 06, 2018 at 05:01:10PM +0800, Jia He wrote:
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 42c090c..26d75f4 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -778,6 +778,10 @@ config ARCH_SELECT_MEMORY_MODEL
+>>  config HAVE_ARCH_PFN_VALID
+>>  	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
+>>  
+>> +config HAVE_MEMBLOCK_PFN_VALID
+>> +	def_bool y
+>> +	depends on HAVE_ARCH_PFN_VALID
 >> +
->> +ZynqMP family of devices use two Cortex R5 processors to help with various
->> +low power / real time tasks.
->
-> The ZynqMP family [..] uses [..]
-Will update in next version
->> +
->> +This driver requires specific ZynqMP hardware design.
->
-> *a* specific ZynqMP hardware design. What does that mean?
->> +
->> +ZynqMP R5 RemoteProc Device Node:
->> +=================================
->> +A zynqmp_r5_remoteproc device node is used to represent a R5 IP instance
->> +within ZynqMP SoC.
->> +
->> +Required properties:
->> +--------------------
->> + - compatible : Should be "xlnx,zynqmp-r5-remoteproc-1.0"
->> + - reg : Address and length of the register set for the device. It
->> +        contains in the same order as described reg-names
->
-> ?
->> + - reg-names: Contain the register set names.
->
-> Contains
-Will update in next version
->
->> +              "tcm_a" and "tcm_b" for TCM memories.
->> +              If the user uses the remoteproc driver with the RPMsg kernel
->> +              driver,"ipi" for the IPI register used to communicate with RPU
->> +              is also required.
->> +              Otherwise, if user only uses the remoteproc driver to boot RPU
->> +              firmware, "ipi" is not required.
->> + - tcm-pnode-id: TCM resources power nodes IDs which are used to request TCM
->> +                 resources for the remoteproc driver to access.
->> + - rpu-pnode-id : RPU power node id which is used by the remoteproc driver
->> +                  to start RPU or shut it down.
->> +
->> +Optional properties:
->> +--------------------
->> + - core_conf : R5 core configuration (valid string - split0 or split1 or
->> +               lock-step), default is lock-step.
->> + - memory-region: memories regions for RPU executable and DMA memory.
->> + - interrupts : Interrupt mapping for remoteproc IPI. It is required if the
->> +                user uses the remoteproc driver with the RPMsg kernel driver.
->> + - interrupt-parent : Phandle for the interrupt controller. It is required if
->> +                      the user uses the remoteproc driver with the RPMsg kernel
->> +                      kernel driver.
->> +
->> +Example:
->> +--------
->> +       reserved-memory {
->> +               #address-cells = <2>;
->> +               #size-cells = <2>;
->> +               ranges;
->> +               rproc_0_fw_reserved: rproc at 3ed000000 {
->> +                       compatible = "rproc-prog-memory";
->> +                       no-map;
->> +                       reg = <0x0 0x3ed00000 0x0 0x40000>;
->> +               };
->> +               rproc_0_dma_reserved: rproc at 3ed400000 {
->> +                       compatible = "shared-dma-pool";
->> +                       no-map;
->> +                       reg = <0x0 0x3ed40000 0x0 0x80000>;
->> +               };
->> +       };
->> +
->> +       firmware {
->> +               zynqmp_firmware: zynqmp-firmware {
->> +                       compatible = "xlnx,zynqmp-firmware";
->> +                       method = "smc";
->> +               };
->> +       };
->> +
->> +       zynqmp-r5-remoteproc at 0 {
->> +               compatible = "xlnx,zynqmp-r5-remoteproc-1.0";
->> +               reg = <0x0 0xFFE00000 0x0 0x10000>,
->> +                       <0x0 0xFFE20000 0x0 0x10000>,
->> +                       <0x0 0xff340000 0x0 0x100>;
->> +               reg-names = "tcm_a", "tcm_b", "ipi";
->> +               dma-ranges;
->> +               core_conf = "split0";
->> +               memory-region = <&rproc_0_fw_reserved>,
->> +                               <&rproc_0_dma_reserved>;
->> +               tcm-pnode-id = <0xf>, <0x10>;
->> +               rpu-pnode-id = <0x7>;
->> +               interrupt-parent = <&gic>;
->> +               interrupts = <0 29 4>;
->> +       } ;
->> --
->> 2.7.4
->>
->
-> Cheers,
-> Moritz
+>>  config HW_PERF_EVENTS
+>>  	def_bool y
+>>  	depends on ARM_PMU
+>> diff --git a/mm/Kconfig b/mm/Kconfig
+>> index 94af022..28fcf54 100644
+>> --- a/mm/Kconfig
+>> +++ b/mm/Kconfig
+>> @@ -137,6 +137,9 @@ config HAVE_MEMBLOCK_NODE_MAP
+>>  config HAVE_MEMBLOCK_PHYS_MAP
+>>  	bool
+>>  
+>> +config HAVE_MEMBLOCK_PFN_VALID
+>> +	bool
+> 
+> Since you defined HAVE_MEMBLOCK_PFN_VALID here, do we need to define it
+> in the arch code as well? If kept it in the mm/Kconfig only, you could
+> just select it in the arch HAVE_ARCH_PFN_VALID entry:
+> 
+
+Ok, thanks for the comments
+It makes it more clean.
+-- 
+Cheers,
+Jia
+
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index d0a53cc6293a..cd230c77e122 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -787,6 +787,7 @@ config ARCH_FLATMEM_ENABLE
+>  
+>  config HAVE_ARCH_PFN_VALID
+>  	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
+> +	select HAVE_MEMBLOCK_PFN_VALID
+>  
+>  config HW_PERF_EVENTS
+>  	def_bool y
+> 
+> (similarly for arch/arm)
+> 
