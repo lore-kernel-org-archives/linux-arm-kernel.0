@@ -1,222 +1,195 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Tue, 21 Aug 2018 07:44:04 +0200
-Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via
- the nvmem API
-In-Reply-To: <20180821005327.0d312a85@tock>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180810080526.27207-7-brgl@bgdev.pl>
- <20180817182720.6a6e5e8e@bbrezillon> <20180819133106.0420df5f@tock>
- <20180819184609.6dcdbb9a@bbrezillon> <20180821005327.0d312a85@tock>
-Message-ID: <20180821074404.23aaeb6b@bbrezillon>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 21 Aug 2018 15:07:25 +0900
+Subject: [PATCH v4 1/5] arm64: export memblock_reserve()d regions via
+ /proc/iomem
+In-Reply-To: <CALAqxLU3+tu09M5=D-6xCqweKenfXtZuBGy6tqEP2DoGAs-LNA@mail.gmail.com>
+References: <20180723015732.24252-1-takahiro.akashi@linaro.org>
+ <20180723015732.24252-2-takahiro.akashi@linaro.org>
+ <CALAqxLU3+tu09M5=D-6xCqweKenfXtZuBGy6tqEP2DoGAs-LNA@mail.gmail.com>
+Message-ID: <20180821060723.GB12252@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Aug 2018 00:53:27 +0200
-Alban <albeu@free.fr> wrote:
+Hi John,
 
-> On Sun, 19 Aug 2018 18:46:09 +0200
-> Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+On Mon, Aug 20, 2018 at 09:39:01PM -0700, John Stultz wrote:
+> On Sun, Jul 22, 2018 at 6:57 PM, AKASHI Takahiro
+> <takahiro.akashi@linaro.org> wrote:
+> > From: James Morse <james.morse@arm.com>
+> >
+> > There has been some confusion around what is necessary to prevent kexec
+> > overwriting important memory regions. memblock: reserve, or nomap?
+> > Only memblock nomap regions are reported via /proc/iomem, kexec's
+> > user-space doesn't know about memblock_reserve()d regions.
+> >
+> > Until commit f56ab9a5b73ca ("efi/arm: Don't mark ACPI reclaim memory
+> > as MEMBLOCK_NOMAP") the ACPI tables were nomap, now they are reserved
+> > and thus possible for kexec to overwrite with the new kernel or initrd.
+> > But this was always broken, as the UEFI memory map is also reserved
+> > and not marked as nomap.
+> >
+> > Exporting both nomap and reserved memblock types is a nuisance as
+> > they live in different memblock structures which we can't walk at
+> > the same time.
+> >
+> > Take a second walk over memblock.reserved and add new 'reserved'
+> > subnodes for the memblock_reserved() regions that aren't already
+> > described by the existing code. (e.g. Kernel Code)
+> >
+> > We use reserve_region_with_split() to find the gaps in existing named
+> > regions. This handles the gap between 'kernel code' and 'kernel data'
+> > which is memblock_reserve()d, but already partially described by
+> > request_standard_resources(). e.g.:
+> > | 80000000-dfffffff : System RAM
+> > |   80080000-80ffffff : Kernel code
+> > |   81000000-8158ffff : reserved
+> > |   81590000-8237efff : Kernel data
+> > |   a0000000-dfffffff : Crash kernel
+> > | e00f0000-f949ffff : System RAM
+> >
+> > reserve_region_with_split needs kzalloc() which isn't available when
+> > request_standard_resources() is called, use an initcall.
+> >
+> > Reported-by: Bhupesh Sharma <bhsharma@redhat.com>
+> > Reported-by: Tyler Baicar <tbaicar@codeaurora.org>
+> > Suggested-by: Akashi Takahiro <takahiro.akashi@linaro.org>
+> > Signed-off-by: James Morse <james.morse@arm.com>
+> > Fixes: d28f6df1305a ("arm64/kexec: Add core kexec support")
+> > Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > CC: Mark Rutland <mark.rutland@arm.com>
+> > ---
+> >  arch/arm64/kernel/setup.c | 38 ++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 38 insertions(+)
+> >
+> > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> > index 30ad2f085d1f..5b4fac434c84 100644
+> > --- a/arch/arm64/kernel/setup.c
+> > +++ b/arch/arm64/kernel/setup.c
+> > @@ -241,6 +241,44 @@ static void __init request_standard_resources(void)
+> >         }
+> >  }
+> >
+> > +static int __init reserve_memblock_reserved_regions(void)
+> > +{
+> > +       phys_addr_t start, end, roundup_end = 0;
+> > +       struct resource *mem, *res;
+> > +       u64 i;
+> > +
+> > +       for_each_reserved_mem_region(i, &start, &end) {
+> > +               if (end <= roundup_end)
+> > +                       continue; /* done already */
+> > +
+> > +               start = __pfn_to_phys(PFN_DOWN(start));
+> > +               end = __pfn_to_phys(PFN_UP(end)) - 1;
+> > +               roundup_end = end;
+> > +
+> > +               res = kzalloc(sizeof(*res), GFP_ATOMIC);
+> > +               if (WARN_ON(!res))
+> > +                       return -ENOMEM;
+> > +               res->start = start;
+> > +               res->end = end;
+> > +               res->name  = "reserved";
+> > +               res->flags = IORESOURCE_MEM;
+> > +
+> > +               mem = request_resource_conflict(&iomem_resource, res);
+> > +               /*
+> > +                * We expected memblock_reserve() regions to conflict with
+> > +                * memory created by request_standard_resources().
+> > +                */
+> > +               if (WARN_ON_ONCE(!mem))
+> > +                       continue;
+> > +               kfree(res);
+> > +
+> > +               reserve_region_with_split(mem, start, end, "reserved");
+> > +       }
+> > +
+> > +       return 0;
+> > +}
+> > +arch_initcall(reserve_memblock_reserved_regions);
+> > +
 > 
-> > On Sun, 19 Aug 2018 13:31:06 +0200
-> > Alban <albeu@free.fr> wrote:
-> >   
-> > > On Fri, 17 Aug 2018 18:27:20 +0200
-> > > Boris Brezillon <boris.brezillon@bootlin.com> wrote:
-> > >     
-> > > > Hi Bartosz,
-> > > > 
-> > > > On Fri, 10 Aug 2018 10:05:03 +0200
-> > > > Bartosz Golaszewski <brgl@bgdev.pl> wrote:
-> > > >       
-> > > > > From: Alban Bedel <albeu@free.fr>
-> > > > > 
-> > > > > Allow drivers that use the nvmem API to read data stored on MTD devices.
-> > > > > For this the mtd devices are registered as read-only NVMEM providers.
-> > > > > 
-> > > > > Signed-off-by: Alban Bedel <albeu@free.fr>
-> > > > > [Bartosz:
-> > > > >   - use the managed variant of nvmem_register(),
-> > > > >   - set the nvmem name]
-> > > > > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>        
-> > > > 
-> > > > What happened to the 2 other patches of Alban's series? I'd really
-> > > > like the DT case to be handled/agreed on in the same patchset, but
-> > > > IIRC, Alban and Srinivas disagreed on how this should be represented.
-> > > > I hope this time we'll come to an agreement, because the MTD <-> NVMEM
-> > > > glue has been floating around for quite some time...      
-> > > 
-> > > These other patches were to fix what I consider a fundamental flaw in
-> > > the generic NVMEM bindings, however we couldn't agree on this point.
-> > > Bartosz later contacted me to take over this series and I suggested to
-> > > just change the MTD NVMEM binding to use a compatible string on the
-> > > NVMEM cells as an alternative solution to fix the clash with the old
-> > > style MTD partition.
-> > > 
-> > > However all this has no impact on the code needed to add NVMEM support
-> > > to MTD, so the above patch didn't change at all.    
-> > 
-> > It does have an impact on the supported binding though.
-> > nvmem->dev.of_node is automatically assigned to mtd->dev.of_node, which
-> > means people will be able to define their NVMEM cells directly under
-> > the MTD device and reference them from other nodes (even if it's not
-> > documented), and as you said, it conflict with the old MTD partition
-> > bindings. So we'd better agree on this binding before merging this
-> > patch.  
+> Since this patch landed, on the HiKey board at bootup I'm seeing:
 > 
-> Unless the nvmem cell node has a compatible string, then it won't be
-> considered as a partition by the MTD code. That is were the clash is,
-> both bindings allow free named child nodes without a compatible string.
-
-Except the current nvmem cells parsing code does not enforce that, and
-existing DTs rely on this behavior, so we're screwed. Or are you
-suggesting to add a new "bool check_cells_compat;" field to
-nvmem_config?
-
+> [    0.451884] WARNING: CPU: 1 PID: 1 at arch/arm64/kernel/setup.c:271
+> reserve_memblock_reserved_regions+0xd4/0x13c
+> [    0.451896] CPU: 1 PID: 1 Comm: swapper/0 Not tainted
+> 4.18.0-10758-ga534dc3 #709
+> [    0.451903] Hardware name: HiKey Development Board (DT)
+> [    0.451913] pstate: 80400005 (Nzcv daif +PAN -UAO)
+> [    0.451922] pc : reserve_memblock_reserved_regions+0xd4/0x13c
+> [    0.451931] lr : reserve_memblock_reserved_regions+0xcc/0x13c
+> [    0.451938] sp : ffffff8008053d30
+> [    0.451945] x29: ffffff8008053d30 x28: ffffff8008ebe650
+> [    0.451957] x27: ffffff8008ead060 x26: ffffff8008e113b0
+> [    0.451969] x25: 0000000000000000 x24: 0000000000488020
+> [    0.451981] x23: 0000000021ffffff x22: ffffff8008e0d860
+> [    0.451993] x21: ffffff8008d74370 x20: ffffff8009019000
+> [    0.452005] x19: ffffffc07507a400 x18: ffffff8009019a48
+> [    0.452017] x17: 0000000000000000 x16: 0000000000000000
+> [    0.452028] x15: ffffff80890e973f x14: 0000000000000006
+> [    0.452040] x13: 0000000000000000 x12: 0000000000000000
+> [    0.452051] x11: 0101010101010101 x10: 7f7f7f7f7f7f7f7f
+> [    0.452063] x9 : 0000000000000000 x8 : ffffffc07507a480
+> [    0.452074] x7 : 0000000000000000 x6 : ffffffc07ffffc30
+> [    0.452086] x5 : 0000000000000000 x4 : 0000000021ffffff
+> [    0.452097] x3 : 0000000000000001 x2 : 0000000000000001
+> [    0.452109] x1 : 0000000000000000 x0 : 0000000000000000
+> [    0.452121] Call trace:
+> [    0.452130]  reserve_memblock_reserved_regions+0xd4/0x13c
+> [    0.452140]  do_one_initcall+0x78/0x150
+> [    0.452148]  kernel_init_freeable+0x198/0x258
+> [    0.452159]  kernel_init+0x10/0x108
+> [    0.452170]  ret_from_fork+0x10/0x18
+> [    0.452181] ---[ end trace b4b78c443df3a750 ]---
 > 
-> > I see several options:
-> > 
-> > 1/ provide a way to tell the NVMEM framework not to use parent->of_node
-> >    even if it's != NULL. This way we really don't support defining
-> >    NVMEM cells in the DT, and also don't support referencing the nvmem
-> >    device using a phandle.  
-> 
-> I really don't get what the point of this would be. Make the whole API
-> useless?
+> From skimming the patch, it seems this is maybe expected? Or should
+> this warning raise eyebrows? I can't quite figure it out.
 
-No, just allow Bartosz to get his changes merged without waiting for you
-and Srinivas to agree on how to handle the new binding. As I said
-earlier, this mtd <-> nvmem stuff has been around for quite some time,
-and instead of trying to find an approach that makes everyone happy, you
-decided to let the patchset die.
-
-> 
-> > 2/ define a new binding where all nvmem-cells are placed in an
-> >    "nvmem" subnode (just like we have this "partitions" subnode for
-> >    partitions), and then add a config->of_node field so that the
-> >    nvmem provider can explicitly specify the DT node representing the
-> >    nvmem device. We'll also need to set this field to ERR_PTR(-ENOENT)
-> >    in case this node does not exist so that the nvmem framework knows
-> >    that it should not assign nvmem->dev.of_node to parent->of_node  
-> 
-> This is not good. First the NVMEM device is only a virtual concept of
-> the Linux kernel, it has no place in the DT.
-
-nvmem-cells is a virtual concept too, still, you define them in the DT.
-
-> Secondly the NVMEM
-> provider (here the MTD device) then has to manually parse its DT node to
-> find this subnode, pass it to the NVMEM framework to later again
-> resolve it back to the MTD device.
-
-We don't resolve it back to the MTD device, because the MTD device is
-just the parent of the nvmem device.
-
-> Not very complex but still a lot of
-> useless code, just registering the MTD device is a lot simpler and much
-> more inline with most other kernel API that register a "service"
-> available from a device.
-
-I'm not a big fan of this option either, but I thought I had to propose
-it.
-
-> 
-> > 3/ only declare partitions as nvmem providers. This would solve the
-> >    problem we have with partitions defined in the DT since
-> >    defining sub-partitions in the DT is not (yet?) supported and
-> >    partition nodes are supposed to be leaf nodes. Still, I'm not a big
-> >    fan of this solution because it will prevent us from supporting
-> >    sub-partitions if we ever want/need to.  
-> 
-> That sound like a poor workaround.
-
-Yes, that's a workaround. And the reason I propose it, is, again,
-because I don't want to block Bartosz.
-
-> Remember that this problem could
-> appear with any device that has a binding that use child nodes.
-
-I'm talking about partitions, and you're talking about mtd devices.
-Right now partitions don't have subnodes, and if we define that
-partition subnodes should describe nvmem-cells, then it becomes part of
-the official binding. So, no, the problem you mention does not (yet)
-exist.
-
-> 
-> > 4/ Add a ->of_xlate() hook that would be called if present by the
-> >    framework instead of using the default parsing we have right now.  
-> 
-> That is a bit cleaner, but I don't think it would be worse the
-> complexity.
-
-But it's way more flexible than putting everything in the nvmem
-framework. BTW, did you notice that nvmem-cells parsing does not work
-with flashes bigger than 4GB, because the framework assumes
-#address-cells and #size-cells are always 1. That's probably something
-we'll have to fix for the MTD case.
-
-> Furthermore xlate functions are more about converting
-> from hardware parameters to internal kernel representation than to hide
-> extra DT parsing.
-
-Hm, how is that different? ->of_xlate() is just a way for drivers to
-have their own DT representation, which is exactly what we want here.
+Yeah, somehow.
+This is the case where an inserted region has NOMAP attribute,
+which means that it has no use for system memory, but is yet
+"memblock_reserved." (doesn't make sense.)
 
 > 
-> > 5/ Tell the nvmem framework the name of the subnode containing nvmem
-> >    cell definitions (if NULL that means cells are directly defined
-> >    under the nvmem provider node). We would set it to "nvmem-cells" (or
-> >    whatever you like) for the MTD case.  
+> It seems to trigger on the pstore memory at 0x21f00000-0x21ffffff.
 > 
-> If so please match on compatible and not on the node name.
+> /proc/iomem now has:
+> ...
+> 07410000-21efffff : System RAM
+>   11000000-1113cfff : reserved
+> 21f00000-21ffffff : reserved
+>   21f00000-21f1ffff : persistent_ram
+>   21f20000-21f3ffff : persistent_ram
+>   21f40000-21f5ffff : persistent_ram
+>   21f60000-21f7ffff : persistent_ram
+>   21f80000-21f9ffff : persistent_ram
+>   21fa0000-21fbffff : persistent_ram
+>   21fc0000-21fdffff : persistent_ram
+>   21fe0000-21ffffff : persistent_ram
+> 22000000-34ffffff : System RAM
+> ...
 
-If you like.
+Please note that, after my patch set, there can appear a "reserved"
+entry at the top level, which implies that the whole range is NOMAP'ed.
+
+Thanks,
+-Takahiro AKASHI
 
 > 
-> 6/ Extend the current NVMEM cell lookup to check if the parent node of
-> the cell has a compatible string set to "nvmem-cells". If it doesn't it
-> mean we have the current binding and this node is the NVMEM device. If
-> it does the device node is just the next parent. This is trivial to
-> implement (literally 2 lines of code) and cover all the cases currently
-> known.
-
-Except Srinivas was not happy with this solution, and this stalled the
-discussion. I'm trying to find other options and you keep rejecting all
-of them to come back to this one.
-
+> Where previously it had:
+> ...
+> 07410000-21efffff : System RAM
+> 21f00000-21f1ffff : persistent_ram
+> 21f20000-21f3ffff : persistent_ram
+> 21f40000-21f5ffff : persistent_ram
+> 21f60000-21f7ffff : persistent_ram
+> 21f80000-21f9ffff : persistent_ram
+> 21fa0000-21fbffff : persistent_ram
+> 21fc0000-21fdffff : persistent_ram
+> 21fe0000-21ffffff : persistent_ram
+> 22000000-34ffffff : System RAM
+> ...
 > 
-> 7/ Just add a compatible string to the nvmem cell. No code change is
-> needed,
-
-That's not true!!! What forces people to add this compatible in their
-DT? Nothing. I'll tell you what will happen: people will start defining
-their nvmem cells directly under the MTD node because that *works*, and
-even if the binding is not documented and we consider it invalid, we'll
-be stuck supporting it forever. As said above, the very reason for
-option #1 to exist is to give you and Srinivas some more time to sort
-this out, while unblocking Bartosz in the meantime.
-
-> however as the nvmem cells have an address space (the offset in
-> byte in the storage) it might still clash with another address space
-> used by the main device biding (for example a number of child
-> functions).
 > 
-> > There are probably other options (some were proposed by Alban and
-> > Srinivas already), but I'd like to get this sorted out before we merge
-> > this patch.
-> > 
-> > Alban, Srinivas, any opinion?  
-> 
-> My preference goes to 6/ as it is trivial to implement, solves all
-> known shortcomings and is backward compatible with the current binding.
-> All other solutions have limitations and/or require too complex
-> implementations compared to what they try to solve.
-
-So we're back to square 1, and you're again blocking everything because
-you refuse to consider other options.
-
-There's obviously nothing more I can do to help, and that's unfortunate
-because other people are waiting for this feature.
-
-Regards,
-
-Boris
+> thanks
+> -john
