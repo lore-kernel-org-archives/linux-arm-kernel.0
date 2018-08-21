@@ -1,56 +1,30 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 21 Aug 2018 15:34:53 +0200
-Subject: [PATCH] efi/libstub: arm: support building with clang
-In-Reply-To: <32f5ce9b26a386e81857afcd7d135bad@agner.ch>
-References: <20180809164042.210675-1-astrachan@google.com>
- <32f5ce9b26a386e81857afcd7d135bad@agner.ch>
-Message-ID: <CAKv+Gu_3ePOs=Ng-vjD4_LE5vF_wCXZ74c7anQ=6fnYvj-vQng@mail.gmail.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Tue, 21 Aug 2018 15:35:14 +0200
+Subject: [PATCH v3 7/9] KVM: arm/arm64: Only clean the dcache on
+ translation fault
+In-Reply-To: <20171023161122.15291-8-marc.zyngier@arm.com>
+References: <20171023161122.15291-1-marc.zyngier@arm.com>
+ <20171023161122.15291-8-marc.zyngier@arm.com>
+Message-ID: <bfeee11e-f8bf-78f2-ab61-27e43781e2e3@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 August 2018 at 10:49, Stefan Agner <stefan@agner.ch> wrote:
-> On 09.08.2018 18:40, Alistair Strachan wrote:
->> When building with CONFIG_EFI and CONFIG_EFI_STUB on ARM, the libstub
->> Makefile would use -mno-single-pic-base without checking it was
->> supported by the compiler. As the ARM (32-bit) clang backend does not
->> support this flag, the build would fail.
->>
->> This changes the Makefile to check the compiler's support for
->> -mno-single-pic-base before using it, similar to c1c386681bd7 ("ARM:
->> 8767/1: add support for building ARM kernel with clang").
+On 10/23/2017 06:11 PM, Marc Zyngier wrote:
+> The only case where we actually need to perform a dcache maintenance
+> is when we map the page for the first time, and subsequent permission
+> faults do not require cache maintenance. Let's make it conditional
+> on not being a permission fault (and thus a translation fault).
 >
-> Looks good to me:
->
-> Reviewed-by: Stefan Agner <stefan@agner.ch>
->
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+This patch unfortunately breaks something on Hi1616 SoCs when running 
+32bit guests. With this patch applied (and thus with 4.18) I get random 
+illegal instruction warnings from 32bit code inside VMs. I do not know 
+at this point whether this affects other CPUs as well.
+
+If anyone is interested in a reproducer, I have something handy. But for 
+now I believe we should just revert this patch.
 
 
-Thanks. I will queue this after the merge window closes
-
->>
->> Cc: Stefan Agner <stefan@agner.ch>
->> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Russell King <linux@armlinux.org.uk>
->> Cc: linux-efi at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Signed-off-by: Alistair Strachan <astrachan@google.com>
->> ---
->>  drivers/firmware/efi/libstub/Makefile | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/firmware/efi/libstub/Makefile
->> b/drivers/firmware/efi/libstub/Makefile
->> index a34e9290a699..91339d13f2a1 100644
->> --- a/drivers/firmware/efi/libstub/Makefile
->> +++ b/drivers/firmware/efi/libstub/Makefile
->> @@ -13,7 +13,8 @@ cflags-$(CONFIG_X86)                += -m$(BITS) -D__KERNEL__ -O2 \
->>
->>  cflags-$(CONFIG_ARM64)               := $(subst -pg,,$(KBUILD_CFLAGS)) -fpie
->>  cflags-$(CONFIG_ARM)         := $(subst -pg,,$(KBUILD_CFLAGS)) \
->> -                                -fno-builtin -fpic -mno-single-pic-base
->> +                                -fno-builtin -fpic \
->> +                                $(call cc-option,-mno-single-pic-base)
->>
->>  cflags-$(CONFIG_EFI_ARMSTUB) += -I$(srctree)/scripts/dtc/libfdt
+Alex
