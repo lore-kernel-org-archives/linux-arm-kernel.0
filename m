@@ -1,118 +1,106 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 21 Aug 2018 11:11:58 +0100
-Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via the
- nvmem API
-In-Reply-To: <20180821115639.4894c1c9@bbrezillon>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180810080526.27207-7-brgl@bgdev.pl> <20180817182720.6a6e5e8e@bbrezillon>
- <20180819133106.0420df5f@tock> <20180819184609.6dcdbb9a@bbrezillon>
- <5b8c30b8-41e1-d59e-542b-fef6c6469ff0@linaro.org>
- <20180820202038.5d3dc195@bbrezillon>
- <e0ec3194-fd3a-9b3d-fba8-f88447eb56e9@linaro.org>
- <20180821115639.4894c1c9@bbrezillon>
-Message-ID: <bd4dd892-3b6c-a77e-b2f3-386600c8c9bd@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 21 Aug 2018 11:17:02 +0100
+Subject: [PATCH 4/5] arm64: dts: add QorIQ LX2160A SoC support
+In-Reply-To: <1534747636-20064-5-git-send-email-vabhav.sharma@nxp.com>
+References: <1534747636-20064-1-git-send-email-vabhav.sharma@nxp.com>
+ <1534747636-20064-5-git-send-email-vabhav.sharma@nxp.com>
+Message-ID: <20180821101652.GA18139@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 21/08/18 10:56, Boris Brezillon wrote:
-> On Tue, 21 Aug 2018 10:50:07 +0100
-> Srinivas Kandagatla<srinivas.kandagatla@linaro.org>  wrote:
+On Mon, Aug 20, 2018 at 12:17:15PM +0530, Vabhav Sharma wrote:
+> LX2160A SoC is based on Layerscape Chassis Generation 3.2 Architecture.
 > 
->> On 20/08/18 19:20, Boris Brezillon wrote:
->>> On Mon, 20 Aug 2018 11:43:34 +0100
->>> Srinivas Kandagatla<srinivas.kandagatla@linaro.org>  wrote:
->>>    
->>>> Overall am still not able to clear visualize on how MTD bindings with
->>>> nvmem cells would look in both partition and un-partition usecases?
->>>> An example DT would be nice here!!
->>> Something along those lines:
->>>    
->> This looks good to me.
->>> 	mtdnode {
->>> 		nvmem-cells {
->>> 			#address-cells = <1>;
->>> 			#size-cells = <1>;
->>>
->>> 			cell at 0 {
->>> 				reg = <0x0 0x14>;
->>> 			};
->>> 		};
->>>
->>> 		partitions {
->>> 			compatible = "fixed-partitions";
->>> 			#address-cells = <1>;
->>> 			#size-cells = <1>;
->>>
->>> 			partition at 0 {
->>> 				reg = <0x0 0x20000>;
->>>
->>> 				nvmem-cells {
->>> 					#address-cells = <1>;
->>> 					#size-cells = <1>;
->>>
->>> 					cell at 0 {
->>> 						reg = <0x0 0x10>;
->>> 					};
->>> 				};
->>> 			};
->>> 		};
->>> 	}; >
->> Just curious...Is there a reason why we can't do it like this?:
->> Is this because of issue of #address-cells and #size-cells Or mtd
->> bindings always prefer subnodes?
->>
->> 	mtdnode {
->> 		reg = <0x0123000 0x40000>;
->> 		#address-cells = <1>;
->> 		#size-cells = <1>;
->> 		cell at 0 {
->> 			compatible = "nvmem-cell";
->> 			reg = <0x0 0x14>;
->> 		};
->>
->> 		partitions {
->> 			compatible = "fixed-partitions";
->> 			#address-cells = <1>;
->> 			#size-cells = <1>;
->>
->> 			partition at 0 {
->> 				reg = <0x0 0x20000>;
->> 				cell at 0 {
->> 					compatible = "nvmem-cell";
->> 					reg = <0x0 0x10>;
->> 				};
->> 			};
->> 		};
->> 	};
-> It's because partitions were initially directly defined under the mtd
-> node, so, if you have an old DT you might have something like:
+> LX2160A features an advanced 16 64-bit ARM v8 CortexA72 processor cores
+> in 8 cluster, CCN508, GICv3,two 64-bit DDR4 memory controller, 8 I2C
+> controllers, 3 dspi, 2 esdhc,2 USB 3.0, mmu 500, 3 SATA, 4 PL011 SBSA
+> UARTs etc.
 > 
-> 	mtdnode {
-> 		reg = <0x0123000 0x40000>;
-> 		#address-cells = <1>;
-> 		#size-cells = <1>;
+> Signed-off-by: Ramneek Mehresh <ramneek.mehresh@nxp.com>
+> Signed-off-by: Zhang Ying-22455 <ying.zhang22455@nxp.com>
+> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+> Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
+> Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+> Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+> Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
+> ---
+>  arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi | 572 +++++++++++++++++++++++++
+>  1 file changed, 572 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
 > 
-> 		partition at 0 {
-> 			reg = <0x0 0x20000>;
-> 			...
-> 		};
-> 		...
-> 	};
-> 
-> If we use such a DT with this patch applied, the NVMEM framework will
-> consider MTD partitions as nvmem cells, which is not what we want.
-Yep, I agree.
-TBH, I wanted to add compatible string to nvmem-cell at some point in 
-time and it seems more natural update too. One of the reason we 
-discussed this in the past was parsers. Looks like mtd can make use of this.
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> new file mode 100644
+> index 0000000..e35e494
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> @@ -0,0 +1,572 @@
+> +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+> +//
+> +// Device Tree Include file for Layerscape-LX2160A family SoC.
+> +//
+> +// Copyright 2018 NXP
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +/memreserve/ 0x80000000 0x00010000;
+> +
+> +/ {
+> +	compatible = "fsl,lx2160a";
+> +	interrupt-parent = <&gic>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		// 8 clusters having 2 Cortex-A72 cores each
+> +		cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a72";
+> +			reg = <0x0>;
+> +			clocks = <&clockgen 1 0>;
+> +			next-level-cache = <&cluster0_l2>;
 
-We should be able to add this as an optional flag in nvmem_config to 
-enforce this check in case providers wanted to.
+If you expect to get cache properties in sysfs entries, you need to populate
+them here and for each L2 cache.
 
-Do you think that would help mtd nvmem case?
-Also I felt like nvmem-cells subnode seems to be a bit heavy!
+[...]
 
-thanks,
-srini
+> +
+> +	rstcr: syscon at 1e60000 {
+> +		compatible = "syscon";
+> +		reg = <0x0 0x1e60000 0x0 0x4>;
+> +	};
+> +
+> +	reboot {
+> +		compatible ="syscon-reboot";
+> +		regmap = <&rstcr>;
+> +		offset = <0x0>;
+> +		mask = <0x2>;
+
+Is this disabled in bootloader ? With PSCI, it's preferred to use
+SYSTEM_RESET/OFF. EL3 f/w may need to do some housekeeping on poweroff.
+
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupts = <1 13 4>, // Physical Secure PPI, active-low
+
+The comment says active low but the value 4 indicates it's HIGH from
+"include/dt-bindings/interrupt-controller/irq.h"
+
+> +			     <1 14 4>, // Physical Non-Secure PPI, active-low
+> +			     <1 11 4>, // Virtual PPI, active-low
+> +			     <1 10 4>; // Hypervisor PPI, active-low
+> +	};
+> +
+> +	pmu {
+> +		compatible = "arm,armv8-pmuv3";
+
+More specific compatible preferably "arm,cortex-a72-pmu" ?
+
+--
+Regards,
+Sudeep
