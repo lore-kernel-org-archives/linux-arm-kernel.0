@@ -1,69 +1,52 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 21 Aug 2018 18:25:18 +0100
-Subject: [PATCH] arm64/crypto: remove non-standard notation
-In-Reply-To: <CAKv+Gu8ZZYvh9ZthRH7mvG7_j3bvT=3st-aj0kdwpNQaAcs=-w@mail.gmail.com>
-References: <20180820224032.53194-1-ndesaulniers@google.com>
- <CAKv+Gu-xAmadr96vwStOxdeqi=rCEBrn8V6GofexBhpmA=JiuA@mail.gmail.com>
- <CAKwvOdkZR-MWuMU=j=kKXQwA0LEj1n0uoZQyTpwOzZuz9gjmJQ@mail.gmail.com>
- <CAKv+Gu8ZZYvh9ZthRH7mvG7_j3bvT=3st-aj0kdwpNQaAcs=-w@mail.gmail.com>
-Message-ID: <0dda3996-a4f3-33f8-ef4f-935943f132b4@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 Aug 2018 18:38:39 +0100
+Subject: [PATCH] arm64: fix for bad_mode() handler to always result in
+ panic
+In-Reply-To: <CAM5rFu-REAekjqEJ-BRJz7DJ5jTrF4qu6UrGMwEWGes=zzhmOQ@mail.gmail.com>
+References: <1533639828-19039-1-git-send-email-hari.vyas@broadcom.com>
+ <20180807122727.GA9359@kroah.com>
+ <CAM5rFu-_x1EfXE72X-4_5XcO6zK86itiny16mgwoRrDBB2=oAA@mail.gmail.com>
+ <1bfd65dc-3bf2-f40f-2337-d7f95f4c756e@gmail.com>
+ <CAM5rFu9bFxBRNkHEXDsPmjNDRoYi0iQc4WTBuW7bsVOzbXUtLg@mail.gmail.com>
+ <CAM5rFu-REAekjqEJ-BRJz7DJ5jTrF4qu6UrGMwEWGes=zzhmOQ@mail.gmail.com>
+Message-ID: <20180821173838.GB5168@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/08/18 18:00, Ard Biesheuvel wrote:
-> On 21 August 2018 at 18:50, Nick Desaulniers <ndesaulniers@google.com> wrote:
->> On Tue, Aug 21, 2018 at 5:23 AM Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>>
->>> Hi Nick,
->>>
->>> On 21 August 2018 at 00:40, Nick Desaulniers <ndesaulniers@google.com> wrote:
->>>> It seems that:
->>>> ldr q8, =0x30000000200000001
->>>>
->>>> is a GNU as convience notation for:
->>>> ldr q8, .Lconstant
->>>> .Lconstant
->>>> .word 0x00000001
->>>> .word 0x00000002
->>>> .word 0x00000003
->>>> .word 0x00000000
->>>>
->>>> based on this comment in binutils' source [0]. I've asked for this
->>>> non-standard convience notation to be added to other assemblers [1], but
->>>> until then, we can remove it and get equivalent disassembly:
->>>>
->>>
->>> What do you mean by 'non-standard convenience notation'? Which asm
->>> 'standard' does Clang actually claim to implement?
->>
->> Well, for assembly 'standard' is a bit nebulous.  But it's frustrating
->> when you can't find what the `=0x...` notation means in either the ARM
->> or GNU as manuals.  The source of truth happened to be a comment in
->> the source [0] that explained that this was a "programmer friendly
->> notation."  Sure, if you can find it.
->>
-> 
-> Well, it is documented in the ARM manuals as the 'ldr pseudo
-> instruction' for 32-bit ARM, and originally, it would only emit a
-> literal if the value could not be loaded using a ordinary mov.
+Hi Hari,
 
-FWIW It's certainly well-documented by common A64 assemblers too:
+Sorry, this has slipped through the cracks.
 
-http://infocenter.arm.com/help/topic/com.arm.doc.100069_0610_01_en/dom1395139540926.html
+On Tue, Aug 21, 2018 at 07:46:04PM +0530, Hari Vyas wrote:
+> On Fri, Aug 10, 2018 at 10:16 PM, Hari Vyas <hari.vyas@broadcom.com> wrote:
+> > As far as I know, bad mode was earlier(linux 3.14 onwards) also not
+> > resulting in panic always.
+> > Trap-exception framework is recently changed some time back but this
+> > concern remains same.
+> > I am also awaiting a response from ARM maintainers before proceeding.
+> > Just to be more clear, this
+> > concern was pointed out in one of my previous-and-some-what-relative
+> > patch about console-verbose
+> > level restoration issue.
+> >> Florian
+> Gentle reminder for Arm maintainers.
+> If concern can be taken care from your side in different ways then bug
+> can be resolved.
 
-https://sourceware.org/binutils/docs/as/AArch64-Opcodes.html#AArch64-Opcodes
+I've recently started trying to untangle much of our fatal trap handling
+code so that the decision between user-mode and kernel-mode actions is
+explicit in the caller, rather than buried deep in the bowels of some
+callchain. The aim is also to remove arm64_notify_die() entirely, which
+is a complete maze of crap that ultimately depends on what kgdb does in
+some cases!
 
-> For AArch64, I don't think that occurs any longer, i.e., a ldr is
-> always emitted as an ldr. However, it is used widely in the ARM code
-> (although not as much in arch/arm64) for loading compile time
-> constants and even symbol addresses into general purpose registers.
-> The FP variant may actually be a GNU invention, but given that there
-> is no standard to begin with, playing the 'GNU is non-standard' card
-> again is just a bit annoying.
+With that out of the way, die() itself could probably be simplified so that
+it (a) avoids the notifier chain [which is useless for us] and (b) is only
+intended to be called for kernel contexts, i.e. as a wrapper around a
+panic_on_oops check.
 
-I note that GAS just says "register" rather than explicitly calling out 
-GPRs as armasm does, so in some ways it's not even all that unexpected 
-that FP registers also work there, even if it is a bit funky.
+But this needn't affect your patch, which seems to be a small step in the
+right direction. I'll pick it up as part of my series when I send it out,
+if that's alright with you? I don't think any of this is especially urgent.
 
-Robin.
+Will
