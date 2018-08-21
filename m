@@ -1,55 +1,24 @@
-From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Tue, 21 Aug 2018 17:28:26 +0530
-Subject: [PATCH v9 0/4] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <1534836620.dp1nz6tfz0.naveen@linux.ibm.com>
-References: <20180820044250.11659-1-ravi.bangoria@linux.ibm.com>
- <CAPhsuW70nRkwM8C76m4c_XF4tjepdRWYezg15sTvkMUDtHZ8JQ@mail.gmail.com>
- <1534836620.dp1nz6tfz0.naveen@linux.ibm.com>
-Message-ID: <4445e941-551e-881f-c519-db82ed9b9b5c@linux.ibm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 21 Aug 2018 13:00:04 +0100
+Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via the
+ nvmem API
+In-Reply-To: <20180821133916.3a1c51b1@eos>
+References: <20180810080526.27207-1-brgl@bgdev.pl>
+ <20180810080526.27207-7-brgl@bgdev.pl> <20180817182720.6a6e5e8e@bbrezillon>
+ <20180819133106.0420df5f@tock> <20180819184609.6dcdbb9a@bbrezillon>
+ <5b8c30b8-41e1-d59e-542b-fef6c6469ff0@linaro.org>
+ <20180820202038.5d3dc195@bbrezillon>
+ <e0ec3194-fd3a-9b3d-fba8-f88447eb56e9@linaro.org>
+ <20180821133916.3a1c51b1@eos>
+Message-ID: <6db14f9c-edd3-5e43-839c-953bb03097ff@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 08/21/2018 01:04 PM, Naveen N. Rao wrote:
-> Song Liu wrote:
->> I am testing the patch set with the following code:
->>
->> #include <stdio.h>
->> #include <unistd.h>
->>
->> volatile short semaphore = 0;
->>
->> int for_uprobe(int c)
->> {
->> ??????? printf("%d\n", c + 10);
->> ??????? return c + 1;
->> }
->>
->> int main(int argc, char *argv[])
->> {
->> ??????? for_uprobe(argc);
->> ??????? while (1) {
->> ??????????????? sleep(1);
->> ??????????????? printf("semaphore %d\n", semaphore);
->> ??????? }
->> }
->>
->> I created a uprobe on function for_uprobe(), that uses semaphore as
->> reference counter:
->>
->> ? echo "p:uprobe_1 /root/a.out:0x49a(0x1036)" >> uprobe_events
-> 
-> Is that even valid? That _looks_ like a semaphore, but I'm not quite sure that it qualifies as an _SDT_ semaphore. Do you see this issue if you instead use the macros provided by <sys/sdt.h> to create SDT markers?
-> 
 
-Right. By default SDT reference counters(semaphore) goes into .probes
-section:
+On 21/08/18 12:39, Alban wrote:
+> However we still have the a potential address space clash between the
+> nvmem cells and the main device binding.
+Can you elaborate?
 
-  [25] .probes           PROGBITS        000000000060102c 00102c 000004 00  WA  0   0  2
-
-which has PROGBITS set. So this works fine. And there are many other
-things which are coded into <sys/sdt.h>. So the official way to use
-SDT markers should be through that.
-
-Ravi
+--srini
