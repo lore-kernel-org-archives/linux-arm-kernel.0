@@ -1,58 +1,47 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 21 Aug 2018 08:56:09 +0000
-Subject: [PATCH 2/3] clk: imx6q: optionally get CCM inputs via standard
- clock handles
-In-Reply-To: <20180731102009.6710-2-l.stach@pengutronix.de>
-References: <20180731102009.6710-1-l.stach@pengutronix.de>
- <20180731102009.6710-2-l.stach@pengutronix.de>
-Message-ID: <AM0PR04MB4211DE29E5644C8C9A33278780310@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Tue, 21 Aug 2018 11:08:25 +0200
+Subject: [PATCH v4 09/14] irqchip/irq-mvebu-icu: add support for System
+ Error Interrupts (SEI)
+In-Reply-To: <a88f62c0-7d7c-71da-fa45-487f7573dbb1@arm.com>
+References: <20180705124011.7661-1-miquel.raynal@bootlin.com>
+ <20180705124011.7661-10-miquel.raynal@bootlin.com>
+ <a88f62c0-7d7c-71da-fa45-487f7573dbb1@arm.com>
+Message-ID: <20180821110825.2fbec982@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+Hi Marc,
 
-> -----Original Message-----
-> From: Lucas Stach <l.stach@pengutronix.de>
-> Sent: Tuesday, July 31, 2018 6:20 PM
+I'm fine with the rest of the comments, please find just one last
+question below.
 
 [...]
 
-> When specifying external clock inputs to the CCM the current code requires
-> the clocks to be in a "clocks" child node of the DT root.
-> This is not really conformant with DT best practices.
+> > @@ -133,12 +164,36 @@ mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
+> >  		return -EINVAL;
+> >  	}
+> >  
+> > -	/* Mask the type to prevent wrong DT configuration */
+> > -	*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
+> > +	/*
+> > +	 * The ICU receives level-interrupts. MSI SEI are
+> > +	 * edge-interrupts while MSI NSR are level-interrupts. Update the type
+> > +	 * accordingly for the parent irqchip.
+> > +	 */
+> > +	if (msi_data->subset_data->icu_group == ICU_GRP_SEI)
+> > +		*type = IRQ_TYPE_EDGE_RISING;  
 > 
-> To avoid the need to deviate from those best practices, allow the clock inputs
-> to be specifies via standard clock handles. This is in line with how drivers of
-> the later CCM driver revisions on newer i.MX SoCs handle this.
-> 
-> As we can't retroactively change the DT binding, allow this as an option with a
-> fallback to the old way of how this has been handled.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  .../devicetree/bindings/clock/imx6q-clock.txt |  5 +++++
->  drivers/clk/imx/clk-imx6q.c                   | 22 ++++++++++++++-----
->  2 files changed, 22 insertions(+), 5 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-> b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-> index a45ca67a9d5f..ce6aa9920c05 100644
-> --- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-> @@ -6,6 +6,11 @@ Required properties:
->  - interrupts: Should contain CCM interrupt
->  - #clock-cells: Should be <1>
-> 
-> +Optional properties:
-> +- clocks: list of clock specifiers, must contain an entry for each entry
-> +          in clock-names
-> +- clock-names: valid names are "osc", "ckil", "ckil", "anaclk1" and "anaclk2"
+> That's interesting. How is the resampling done here?
 
-A minor issue: 
-The third name should be "ckih1".
+I'm not sure to understand the question. What does 'resampling' means
+in such context? MSI SEIs are of type "edge" and use the traditional
+MSI signalling infrastructure. I'm asking to be sure not to ignore
+something wrong in my code.
 
-Otherwise:
-Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
+> 
+> >  
+> >  	return 0;
+> >  }
 
-Regards
-Dong Aisheng
+Thanks,
+Miqu?l
