@@ -1,50 +1,92 @@
-From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
-Date: Tue, 21 Aug 2018 11:50:43 +0530
-Subject: [PATCH v9 0/4] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <2e997c62-371c-1d9d-97ab-65726f588ab5@linux.ibm.com>
-References: <20180820044250.11659-1-ravi.bangoria@linux.ibm.com>
- <CAPhsuW70nRkwM8C76m4c_XF4tjepdRWYezg15sTvkMUDtHZ8JQ@mail.gmail.com>
- <2e997c62-371c-1d9d-97ab-65726f588ab5@linux.ibm.com>
-Message-ID: <dbd74447-b3e2-6bcf-2d8b-717b403bdf11@linux.ibm.com>
+From: appanad@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Tue, 21 Aug 2018 07:31:11 +0000
+Subject: [PATCH 1/3] dmaengine: xilinx_dma: Refactor axidma channel
+ allocation
+In-Reply-To: <1532688639-32230-2-git-send-email-radhey.shyam.pandey@xilinx.com>
+References: <1532688639-32230-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+ <1532688639-32230-2-git-send-email-radhey.shyam.pandey@xilinx.com>
+Message-ID: <DM5PR02MB21872434D0054888E8CA1EC5DC310@DM5PR02MB2187.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Song,
+Hi,
 
-On 08/21/2018 10:53 AM, Ravi Bangoria wrote:
-> Hi Song,
+	Thanks for the patch... 
 > 
->> However, if I start a.out AFTER enabling the uprobe, there is something wrong:
->>
->> root at virt-test:~# ~/a.out
->> 11
->> semaphore 0       <<< this should be non-zero, as the uprobe is already enabled
+> In axidma alloc_chan_resources merge BD and cyclic BD allocation.
+> 
+> Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-In this testcase, semaphore variable is stored into .bss:
+Acked-for-series: Appana Durga Kedareswara rao <appana.durga.rao@xilinx.com>
 
-  $ nm test | grep semaphore
-  0000000010010c5e B semaphore
- 
-  $ readelf -SW ./test | grep "data\|bss"
-    [22] .data             PROGBITS        0000000010010c58 000c58 000004 00  WA  0   0  1
-    [23] .bss              NOBITS          0000000010010c5c 000c5c 000004 00  WA  0   0  2
+Regards,
+Kedar.
 
-I'm not so sure but I guess .bss data initialization happens after
-calling uprobe_mmap() and thus you are seeing semaphore as 0.
-
-To verify this, if I force to save semaphore into data section by
-assigning non-zero value to it:
-
-  volatile short semaphore = 1
-
- $ nm test | grep semaphore
- 0000000010010c5c D semaphore
-
- $ readelf -SW ./test | grep "data\|bss"
-    [22] .data             PROGBITS        0000000010010c58 000c58 000006 00  WA  0   0  2
-    [23] .bss              NOBITS          0000000010010c5e 000c5e 000002 00  WA  0   0  1 
-
-increment/decrement works fine.
-
-Ravi
+> ---
+>  drivers/dma/xilinx/xilinx_dma.c |   36 ++++++++++++++++++------------------
+>  1 files changed, 18 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/dma/xilinx/xilinx_dma.c
+> b/drivers/dma/xilinx/xilinx_dma.c index c124423..06d1632 100644
+> --- a/drivers/dma/xilinx/xilinx_dma.c
+> +++ b/drivers/dma/xilinx/xilinx_dma.c
+> @@ -887,6 +887,24 @@ static int xilinx_dma_alloc_chan_resources(struct
+> dma_chan *dchan)
+>  				chan->id);
+>  			return -ENOMEM;
+>  		}
+> +		/*
+> +		 * For cyclic DMA mode we need to program the tail
+> Descriptor
+> +		 * register with a value which is not a part of the BD chain
+> +		 * so allocating a desc segment during channel allocation for
+> +		 * programming tail descriptor.
+> +		 */
+> +		chan->cyclic_seg_v = dma_zalloc_coherent(chan->dev,
+> +					sizeof(*chan->cyclic_seg_v),
+> +					&chan->cyclic_seg_p, GFP_KERNEL);
+> +		if (!chan->cyclic_seg_v) {
+> +			dev_err(chan->dev,
+> +				"unable to allocate desc segment for cyclic
+> DMA\n");
+> +			dma_free_coherent(chan->dev, sizeof(*chan->seg_v)
+> *
+> +				XILINX_DMA_NUM_DESCS, chan->seg_v,
+> +				chan->seg_p);
+> +			return -ENOMEM;
+> +		}
+> +		chan->cyclic_seg_v->phys = chan->cyclic_seg_p;
+> 
+>  		for (i = 0; i < XILINX_DMA_NUM_DESCS; i++) {
+>  			chan->seg_v[i].hw.next_desc =
+> @@ -922,24 +940,6 @@ static int xilinx_dma_alloc_chan_resources(struct
+> dma_chan *dchan)
+>  		return -ENOMEM;
+>  	}
+> 
+> -	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
+> -		/*
+> -		 * For cyclic DMA mode we need to program the tail
+> Descriptor
+> -		 * register with a value which is not a part of the BD chain
+> -		 * so allocating a desc segment during channel allocation for
+> -		 * programming tail descriptor.
+> -		 */
+> -		chan->cyclic_seg_v = dma_zalloc_coherent(chan->dev,
+> -					sizeof(*chan->cyclic_seg_v),
+> -					&chan->cyclic_seg_p, GFP_KERNEL);
+> -		if (!chan->cyclic_seg_v) {
+> -			dev_err(chan->dev,
+> -				"unable to allocate desc segment for cyclic
+> DMA\n");
+> -			return -ENOMEM;
+> -		}
+> -		chan->cyclic_seg_v->phys = chan->cyclic_seg_p;
+> -	}
+> -
+>  	dma_cookie_init(dchan);
+> 
+>  	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
+> --
+> 1.7.1
