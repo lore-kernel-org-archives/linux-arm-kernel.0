@@ -1,60 +1,20 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Tue, 21 Aug 2018 12:38:09 -0700
-Subject: [PATCH v4 1/5] arm64: export memblock_reserve()d regions via
- /proc/iomem
-In-Reply-To: <38e0224a-46f8-85c3-abe2-5e89d16810ea@arm.com>
-References: <20180723015732.24252-1-takahiro.akashi@linaro.org>
- <20180723015732.24252-2-takahiro.akashi@linaro.org>
- <CALAqxLU3+tu09M5=D-6xCqweKenfXtZuBGy6tqEP2DoGAs-LNA@mail.gmail.com>
- <38e0224a-46f8-85c3-abe2-5e89d16810ea@arm.com>
-Message-ID: <CALAqxLX=BBcjR3kbK8nhddzdtv7tMiDs2OcvMA-e9QNw6Lv3hg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 21 Aug 2018 22:48:09 +0300
+Subject: [PATCH 0/2] Add R8A77980/Condor eMMC support
+Message-ID: <1af46bf9-d9e5-8dcf-0ac7-a85e7348a34e@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2018 at 3:22 AM, James Morse <james.morse@arm.com> wrote:
-> On 08/21/2018 05:39 AM, John Stultz wrote:
->>
->> Since this patch landed, on the HiKey board at bootup I'm seeing:
->>
->> [    0.451884] WARNING: CPU: 1 PID: 1 at arch/arm64/kernel/setup.c:271
->> reserve_memblock_reserved_regions+0xd4/0x13c
-...
->>  From skimming the patch, it seems this is maybe expected? Or should
->> this warning raise eyebrows? I can't quite figure it out.
->
-> Ugh, sorry for the noise! This is warning that there is something wrong
-> with our assumptions about what types of memory exist.
->
->
->> It seems to trigger on the pstore memory at 0x21f00000-0x21ffffff.
->
->
-> ... pmem ...
->
->>
->> /proc/iomem now has:
->> ...
->> 07410000-21efffff : System RAM
->>    11000000-1113cfff : reserved
->
->
->> 21f00000-21ffffff : reserved
->
->
-> ^ This entry is what triggered the warning.
->
-> It expects that meblock_reserved() memory is also described as memory.
-> (memblock keeps them as separate lists, so its possible to reserve
-> memory that doesn't exist... which it looks like your system is doing)
+Hello!
 
-So yea, I suspect the hikey dts isn't quite right here then. I've
-always thought how it setup the memory was a bit strange:
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts#n30
+Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
+'renesas-devel-20180810-v4.18-rc7' tag. We're adding the R8A77970 MMC0
+(SDHI2) device nodes and then enable eMMC support on the V3M Starter Kit
+board. The SDHI (w/internal DMA) driver patch white-listing the R8A77970
+was posted last Saturday; the R8A77970 CPG/MSSR driver patch and the SDHI
+bindings patch have been posted earlier today.
 
-So from your mail, I suspect the hole in the memory map for the pstore
-buffer isn't correct, and we should rework that.
+[1/2] arm64: dts: renesas: r8a77970: add MMC support
+[2/2] arm64: dts: renesas: v3msk: add eMMC support
 
-I'll give that a shot here and make sure pstore still works properly.
-
-thanks
--john
+WBR, Sergei
