@@ -1,20 +1,43 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 21 Aug 2018 22:48:09 +0300
-Subject: [PATCH 0/2] Add R8A77980/Condor eMMC support
-Message-ID: <1af46bf9-d9e5-8dcf-0ac7-a85e7348a34e@cogentembedded.com>
+Date: Tue, 21 Aug 2018 22:49:26 +0300
+Subject: [PATCH /2] arm64: dts: renesas: r8a77970: add MMC support
+In-Reply-To: <1af46bf9-d9e5-8dcf-0ac7-a85e7348a34e@cogentembedded.com>
+References: <1af46bf9-d9e5-8dcf-0ac7-a85e7348a34e@cogentembedded.com>
+Message-ID: <28c2a0ef-dc89-1fad-6502-9b33738b59a5@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+Define the generic R8A77970 part of the MMC0 (SDHI2) device node.
 
-Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
-'renesas-devel-20180810-v4.18-rc7' tag. We're adding the R8A77970 MMC0
-(SDHI2) device nodes and then enable eMMC support on the V3M Starter Kit
-board. The SDHI (w/internal DMA) driver patch white-listing the R8A77970
-was posted last Saturday; the R8A77970 CPG/MSSR driver patch and the SDHI
-bindings patch have been posted earlier today.
+Based on the original (and large) patches by Vladimir Barinov.
 
-[1/2] arm64: dts: renesas: r8a77970: add MMC support
-[2/2] arm64: dts: renesas: v3msk: add eMMC support
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-WBR, Sergei
+---
+ arch/arm64/boot/dts/renesas/r8a77970.dtsi |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+Index: renesas/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+===================================================================
+--- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970.dtsi
++++ renesas/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+@@ -754,6 +754,18 @@
+ 			#iommu-cells = <1>;
+ 		};
+ 
++		mmc0: mmc at ee140000 {
++			compatible = "renesas,sdhi-r8a77970",
++				     "renesas,rcar-gen3-sdhi";
++			reg = <0 0xee140000 0 0x2000>;
++			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 314>;
++			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
++			resets = <&cpg 314>;
++			max-frequency = <200000000>;
++			status = "disabled";
++		};
++
+ 		gic: interrupt-controller at f1010000 {
+ 			compatible = "arm,gic-400";
+ 			#interrupt-cells = <3>;
