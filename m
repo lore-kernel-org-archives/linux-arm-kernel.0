@@ -1,56 +1,30 @@
-From: vkoul@kernel.org (Vinod)
-Date: Tue, 21 Aug 2018 21:25:53 +0530
-Subject: [PATCH 3/3] dmaengine: xilinx_dma: Fix 64-bit simple CDMA transfer
-In-Reply-To: <1532688639-32230-4-git-send-email-radhey.shyam.pandey@xilinx.com>
-References: <1532688639-32230-1-git-send-email-radhey.shyam.pandey@xilinx.com>
- <1532688639-32230-4-git-send-email-radhey.shyam.pandey@xilinx.com>
-Message-ID: <20180821155553.GI2388@vkoul-mobl>
+From: refurbishedpc@daum.net (Refurbished Computers Depot)
+Date: Tue, 21 Aug 2018 21:29:18 +0530
+Subject: WTS: Apple MacBook Pro, Apple iPad and WS-C3850-48P-S
+Message-ID: <0643374d-43333-06dd8960204514@desktop-mf604ku>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27-07-18, 16:20, Radhey Shyam Pandey wrote:
-> In AXI CDMA simple mode also pass MSB bits of source and destination
-> address to xilinx_write function. This fixes simple CDMA operation
-> mode using 64-bit addressing.
-> 
-> Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
->  drivers/dma/xilinx/xilinx_dma.c |    6 ++++--
->  1 files changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> index a37871e..2e15d86 100644
-> --- a/drivers/dma/xilinx/xilinx_dma.c
-> +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -1245,8 +1245,10 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
->  
->  		hw = &segment->hw;
->  
-> -		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR, hw->src_addr);
-> -		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR, hw->dest_addr);
-> +		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR, (dma_addr_t)
-> +			     ((u64)hw->src_addr_msb << 32 | hw->src_addr));
+Hello ,
 
-so this is:
-        (dma_addr_t)((u64)hw->src_addr_msb << 32 | hw->src_addr)
+We have the following products with a very huge discounts and free shipping. Available to ship out the same day of purchase.
 
-what is src_addr data type? I think its u32. It would be better to
-update xilinx_write() to take u64 and not dma_addr_t.
+Grade A Apple MacBook Pro with charge / US Keyboard Apple MacBook Pro Core i5 2.5 13" 2012 model A1278 Part number MD101LL/A Specs INTEL CORE I5-3210M 2.5ghz 4GB 500GB DVDRW.
+QTY 36 @ $220 each.
 
+Grade A refurb Inbox Apple iPad 4 16GB wifi Part # MD510LL/A with charger.
+QTY 76 @ $80 each.
 
-> +		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR, (dma_addr_t)
-> +			     ((u64)hw->dest_addr_msb << 32 | hw->dest_addr));
->  
->  		/* Start the transfer */
->  		dma_ctrl_write(chan, XILINX_DMA_REG_BTT,
-> -- 
-> 1.7.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+WS-C3850-48P-S QTY 4 @ $1,750 each.
 
--- 
-~Vinod
+Contact us if you are interested.
+
+Best regards,
+Steven Anderson
+
+Sales Executive
+
+Email:sales at refurbishedcomputersdepot.com
+Phone:+1 (650) 618-9852
+Fax: +1 (650) 644-3252
+www.refurbishedcomputersdepot.com
