@@ -1,71 +1,148 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 21 Aug 2018 22:50:31 +0300
-Subject: [PATCH 2/2] arm64: dts: renesas: v3msk: add eMMC support
-In-Reply-To: <1af46bf9-d9e5-8dcf-0ac7-a85e7348a34e@cogentembedded.com>
-References: <1af46bf9-d9e5-8dcf-0ac7-a85e7348a34e@cogentembedded.com>
-Message-ID: <9da672a2-0269-4860-8912-189414b43d4c@cogentembedded.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 21 Aug 2018 15:45:20 -0500
+Subject: [PATCH 5/5] arm64: dts: add LX2160ARDB board support
+In-Reply-To: <1534747636-20064-6-git-send-email-vabhav.sharma@nxp.com>
+References: <1534747636-20064-1-git-send-email-vabhav.sharma@nxp.com>
+ <1534747636-20064-6-git-send-email-vabhav.sharma@nxp.com>
+Message-ID: <CAL_JsqKH4haGy2F2_2EP=evC8ip7DmGR8J4wzrO0wWnOLsaZqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the eMMC chip support for the V3M Started Kit board.
+On Mon, Aug 20, 2018 at 1:52 PM Vabhav Sharma <vabhav.sharma@nxp.com> wrote:
+>
+> LX2160A reference design board (RDB) is a high-performance
+> computing, evaluation, and development platform with LX2160A
+> SoC.
+>
+> Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
+> Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+> Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
+> ---
+>  arch/arm64/boot/dts/freescale/Makefile            |  1 +
+>  arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts | 95 +++++++++++++++++++++++
+>  2 files changed, 96 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+>
+> diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+> index 86e18ad..445b72b 100644
+> --- a/arch/arm64/boot/dts/freescale/Makefile
+> +++ b/arch/arm64/boot/dts/freescale/Makefile
+> @@ -13,3 +13,4 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
+>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
+>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
+>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
+> +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-rdb.dtb
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> new file mode 100644
+> index 0000000..70fad20
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> @@ -0,0 +1,95 @@
+> +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+> +//
+> +// Device Tree file for LX2160ARDB
+> +//
+> +// Copyright 2018 NXP
+> +
+> +/dts-v1/;
+> +
+> +#include "fsl-lx2160a.dtsi"
+> +
+> +/ {
+> +       model = "NXP Layerscape LX2160ARDB";
+> +       compatible = "fsl,lx2160a-rdb", "fsl,lx2160a";
+> +
+> +       aliases {
+> +               crypto = &crypto;
 
-Based on the original (and large) patches by Vladimir Barinov.
+Drop this. Aliases should be numbered, and this is not a standard
+alias name either.
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> +               serial0 = &uart0;
+> +               serial1 = &uart1;
+> +               serial2 = &uart2;
+> +               serial3 = &uart3;
+> +       };
+> +       chosen {
+> +               stdout-path = "serial0:115200n8";
+> +       };
+> +};
+> +
+> +&uart0 {
+> +       status = "okay";
+> +};
+> +
+> +&uart1 {
+> +       status = "okay";
+> +};
+> +
+> +&i2c0 {
+> +       status = "okay";
+> +       pca9547 at 77 {
 
----
- arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts |   26 +++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+i2c-mux at 77
 
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
-@@ -51,6 +51,15 @@
- 		regulator-always-on;
- 	};
- 
-+	vcc_vddq_vin0: regulator-2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC_VDDQ_VIN0";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
- 	lvds-decoder {
- 		compatible = "thine,thc63lvd1024";
- 		vcc-supply = <&vcc_d3_3v>;
-@@ -128,6 +137,12 @@
- 		function = "i2c0";
- 	};
- 
-+	mmc_pins: mmc_3_3v {
-+		groups = "mmc_data8", "mmc_ctrl";
-+		function = "mmc";
-+		power-source = <3300>;
-+	};
-+
- 	scif0_pins: scif0 {
- 		groups = "scif0_data";
- 		function = "scif0";
-@@ -192,6 +207,17 @@
- 	};
- };
- 
-+&mmc0 {
-+	pinctrl-0 = <&mmc_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&vcc_d3_3v>;
-+	vqmmc-supply = <&vcc_vddq_vin0>;
-+	bus-width = <8>;
-+	non-removable;
-+	status = "okay";
-+};
-+
- &scif0 {
- 	pinctrl-0 = <&scif0_pins>;
- 	pinctrl-names = "default";
+> +               compatible = "nxp,pca9547";
+> +               reg = <0x77>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               i2c at 2 {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       reg = <0x2>;
+> +
+> +                       ina220 at 40 {
+> +                               compatible = "ti,ina220";
+> +                               reg = <0x40>;
+> +                               shunt-resistor = <1000>;
+> +                       };
+> +               };
+> +
+> +               i2c at 3 {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       reg = <0x3>;
+> +
+> +                       sa56004 at 4c {
+
+temperature-sensor at 4c
+
+> +                               compatible = "nxp,sa56004";
+> +                               reg = <0x4c>;
+> +                       };
+> +
+> +                       sa56004 at 4d {
+> +                               compatible = "nxp,sa56004";
+> +                               reg = <0x4d>;
+> +                       };
+> +               };
+> +       };
+> +};
+> +
+> +&i2c4 {
+> +       status = "okay";
+> +
+> +       rtc at 51 {
+> +               compatible = "nxp,pcf2129";
+> +               reg = <0x51>;
+> +               // IRQ10_B
+> +               interrupts = <0 150 0x4>;
+> +               };
+> +
+> +};
+> +
+> +&usb0 {
+> +       status = "okay";
+> +};
+> +
+> +&usb1 {
+> +       status = "okay";
+> +};
+> +
+> +&crypto {
+> +       status = "okay";
+> +};
+> --
+> 2.7.4
+>
