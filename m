@@ -1,198 +1,179 @@
-From: liang.yang@amlogic.com (Liang Yang)
-Date: Tue, 21 Aug 2018 11:33:21 +0800
-Subject: [RFC PATCH v2 2/2] mtd: rawnand: meson: add support for Amlogic
- NAND flash controller
-In-Reply-To: <20180817155608.5929b37a@bbrezillon>
-References: <20180719094612.5833-1-yixun.lan@amlogic.com>
- <20180719094612.5833-3-yixun.lan@amlogic.com>
- <20180801235045.5b4d8211@bbrezillon>
- <42877a0d-9830-0626-3f64-e49a326eaa3c@amlogic.com>
- <20180817155608.5929b37a@bbrezillon>
-Message-ID: <e4d4d237-1f63-467e-d55c-b8cfba150767@amlogic.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Mon, 20 Aug 2018 21:39:01 -0700
+Subject: [PATCH v4 1/5] arm64: export memblock_reserve()d regions via
+ /proc/iomem
+In-Reply-To: <20180723015732.24252-2-takahiro.akashi@linaro.org>
+References: <20180723015732.24252-1-takahiro.akashi@linaro.org>
+ <20180723015732.24252-2-takahiro.akashi@linaro.org>
+Message-ID: <CALAqxLU3+tu09M5=D-6xCqweKenfXtZuBGy6tqEP2DoGAs-LNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Sun, Jul 22, 2018 at 6:57 PM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> From: James Morse <james.morse@arm.com>
+>
+> There has been some confusion around what is necessary to prevent kexec
+> overwriting important memory regions. memblock: reserve, or nomap?
+> Only memblock nomap regions are reported via /proc/iomem, kexec's
+> user-space doesn't know about memblock_reserve()d regions.
+>
+> Until commit f56ab9a5b73ca ("efi/arm: Don't mark ACPI reclaim memory
+> as MEMBLOCK_NOMAP") the ACPI tables were nomap, now they are reserved
+> and thus possible for kexec to overwrite with the new kernel or initrd.
+> But this was always broken, as the UEFI memory map is also reserved
+> and not marked as nomap.
+>
+> Exporting both nomap and reserved memblock types is a nuisance as
+> they live in different memblock structures which we can't walk at
+> the same time.
+>
+> Take a second walk over memblock.reserved and add new 'reserved'
+> subnodes for the memblock_reserved() regions that aren't already
+> described by the existing code. (e.g. Kernel Code)
+>
+> We use reserve_region_with_split() to find the gaps in existing named
+> regions. This handles the gap between 'kernel code' and 'kernel data'
+> which is memblock_reserve()d, but already partially described by
+> request_standard_resources(). e.g.:
+> | 80000000-dfffffff : System RAM
+> |   80080000-80ffffff : Kernel code
+> |   81000000-8158ffff : reserved
+> |   81590000-8237efff : Kernel data
+> |   a0000000-dfffffff : Crash kernel
+> | e00f0000-f949ffff : System RAM
+>
+> reserve_region_with_split needs kzalloc() which isn't available when
+> request_standard_resources() is called, use an initcall.
+>
+> Reported-by: Bhupesh Sharma <bhsharma@redhat.com>
+> Reported-by: Tyler Baicar <tbaicar@codeaurora.org>
+> Suggested-by: Akashi Takahiro <takahiro.akashi@linaro.org>
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Fixes: d28f6df1305a ("arm64/kexec: Add core kexec support")
+> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> CC: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  arch/arm64/kernel/setup.c | 38 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 30ad2f085d1f..5b4fac434c84 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -241,6 +241,44 @@ static void __init request_standard_resources(void)
+>         }
+>  }
+>
+> +static int __init reserve_memblock_reserved_regions(void)
+> +{
+> +       phys_addr_t start, end, roundup_end = 0;
+> +       struct resource *mem, *res;
+> +       u64 i;
+> +
+> +       for_each_reserved_mem_region(i, &start, &end) {
+> +               if (end <= roundup_end)
+> +                       continue; /* done already */
+> +
+> +               start = __pfn_to_phys(PFN_DOWN(start));
+> +               end = __pfn_to_phys(PFN_UP(end)) - 1;
+> +               roundup_end = end;
+> +
+> +               res = kzalloc(sizeof(*res), GFP_ATOMIC);
+> +               if (WARN_ON(!res))
+> +                       return -ENOMEM;
+> +               res->start = start;
+> +               res->end = end;
+> +               res->name  = "reserved";
+> +               res->flags = IORESOURCE_MEM;
+> +
+> +               mem = request_resource_conflict(&iomem_resource, res);
+> +               /*
+> +                * We expected memblock_reserve() regions to conflict with
+> +                * memory created by request_standard_resources().
+> +                */
+> +               if (WARN_ON_ONCE(!mem))
+> +                       continue;
+> +               kfree(res);
+> +
+> +               reserve_region_with_split(mem, start, end, "reserved");
+> +       }
+> +
+> +       return 0;
+> +}
+> +arch_initcall(reserve_memblock_reserved_regions);
+> +
 
-On 8/17/2018 9:56 PM, Boris Brezillon wrote:
-> On Fri, 17 Aug 2018 21:03:59 +0800
-> Liang Yang <liang.yang@amlogic.com> wrote:
-> 
->> Hi Boris,
->> On 2018/8/2 5:50, Boris Brezillon wrote:
->>
->>> Hi Yixun,
->>>
->>> On Thu, 19 Jul 2018 17:46:12 +0800
->>> Yixun Lan <yixun.lan@amlogic.com> wrote:
->>>
->>> I haven't finished reviewing the driver yet (I'll try to do that later
->>> this week), but I already pointed a few things to fix/improve.
->>>   
->>>> +
->>>> +static int meson_nfc_exec_op(struct nand_chip *chip,
->>>> +			     const struct nand_operation *op, bool check_only)
->>>> +{
->>>> +	struct mtd_info *mtd = nand_to_mtd(chip);
->>>> +	struct meson_nfc *nfc = nand_get_controller_data(chip);
->>>> +	const struct nand_op_instr *instr = NULL;
->>>> +	int ret = 0, cmd;
->>>> +	unsigned int op_id;
->>>> +	int i;
->>>> +
->>>> +	for (op_id = 0; op_id < op->ninstrs; op_id++) {
->>>> +		instr = &op->instrs[op_id];
->>>> +		switch (instr->type) {
->>>> +		case NAND_OP_CMD_INSTR:
->>>> +			cmd = nfc->param.chip_select | NFC_CMD_CLE;
->>>> +			cmd |= instr->ctx.cmd.opcode & 0xff;
->>>> +			writel(cmd, nfc->reg_base + NFC_REG_CMD);
->>>> +			meson_nfc_cmd_idle(nfc, NAND_TWB_TIME_CYCLE);
->>> This is not necessarily TWB you have to wait after a CMD cycle. It can
->>> be tWHR. And you should definitely not hardcode the value, since,
->>> AFAIR, it depends on the selected SDR timings. Probably something you
->>> should calculate in ->setup_data_interface().
->>
->> Indeed. TWB is not necessarily. And tWHR will be promised by NFC.
->> so I will delete it.
-> 
-> Are you sure the engine always applies a tWHR delay, even when tWB is
-> expected? tWB should be applied everytime you are about to wait for a
-> R/B transition. tWHR is about switching IO pins from input to output on
-> the NAND chip side.
-> 
+Since this patch landed, on the HiKey board at bootup I'm seeing:
 
-it seems work well even do not add tWHR, but software needs to promise 
-tWHR, also the same as TWB. I will check the code and add them.
+[    0.451884] WARNING: CPU: 1 PID: 1 at arch/arm64/kernel/setup.c:271
+reserve_memblock_reserved_regions+0xd4/0x13c
+[    0.451896] CPU: 1 PID: 1 Comm: swapper/0 Not tainted
+4.18.0-10758-ga534dc3 #709
+[    0.451903] Hardware name: HiKey Development Board (DT)
+[    0.451913] pstate: 80400005 (Nzcv daif +PAN -UAO)
+[    0.451922] pc : reserve_memblock_reserved_regions+0xd4/0x13c
+[    0.451931] lr : reserve_memblock_reserved_regions+0xcc/0x13c
+[    0.451938] sp : ffffff8008053d30
+[    0.451945] x29: ffffff8008053d30 x28: ffffff8008ebe650
+[    0.451957] x27: ffffff8008ead060 x26: ffffff8008e113b0
+[    0.451969] x25: 0000000000000000 x24: 0000000000488020
+[    0.451981] x23: 0000000021ffffff x22: ffffff8008e0d860
+[    0.451993] x21: ffffff8008d74370 x20: ffffff8009019000
+[    0.452005] x19: ffffffc07507a400 x18: ffffff8009019a48
+[    0.452017] x17: 0000000000000000 x16: 0000000000000000
+[    0.452028] x15: ffffff80890e973f x14: 0000000000000006
+[    0.452040] x13: 0000000000000000 x12: 0000000000000000
+[    0.452051] x11: 0101010101010101 x10: 7f7f7f7f7f7f7f7f
+[    0.452063] x9 : 0000000000000000 x8 : ffffffc07507a480
+[    0.452074] x7 : 0000000000000000 x6 : ffffffc07ffffc30
+[    0.452086] x5 : 0000000000000000 x4 : 0000000021ffffff
+[    0.452097] x3 : 0000000000000001 x2 : 0000000000000001
+[    0.452109] x1 : 0000000000000000 x0 : 0000000000000000
+[    0.452121] Call trace:
+[    0.452130]  reserve_memblock_reserved_regions+0xd4/0x13c
+[    0.452140]  do_one_initcall+0x78/0x150
+[    0.452148]  kernel_init_freeable+0x198/0x258
+[    0.452159]  kernel_init+0x10/0x108
+[    0.452170]  ret_from_fork+0x10/0x18
+[    0.452181] ---[ end trace b4b78c443df3a750 ]---
 
->>
->>>> +			meson_nfc_drain_cmd(nfc);
->>> I don't know exactly how the NAND controller works, but it's usually
->>> not a good idea to execute the operation right away, especially if you
->>> have address/cmd/data cycles following this cmd and those can be
->>> packed in the same controller operation.
->>
->> it doesn't need meson_nfc_drain_cmd(nfc) here. i will delete it next version
-> 
-> What's the CMD queue depth? I think you'll have to ensure the requested
-> op fits in the CMD FIFO and split things in several sub-ops if it does
-> not.
-> 
+>From skimming the patch, it seems this is maybe expected? Or should
+this warning raise eyebrows? I can't quite figure it out.
 
-there are maximum 32 commands.
-I think it should be enough to promise ONE maximum number of 
-operations(cmd - addr - dma - 2 ilde commands).
+It seems to trigger on the pstore memory at 0x21f00000-0x21ffffff.
 
->>
->>>> +			break;
->>>> +
->>>> +		case NAND_OP_ADDR_INSTR:
->>>> +			for (i = 0; i < instr->ctx.addr.naddrs; i++) {
->>>> +				cmd = nfc->param.chip_select | NFC_CMD_ALE;
->>>> +				cmd |= instr->ctx.addr.addrs[i] & 0xff;
->>>> +				writel(cmd, nfc->reg_base + NFC_REG_CMD);
->>>> +			}
->>>> +			break;
->>>> +
->>>> +		case NAND_OP_DATA_IN_INSTR:
->>>> +			meson_nfc_read_buf(mtd, instr->ctx.data.buf.in,
->>>> +					   instr->ctx.data.len);
->>>> +			break;
->>>> +
->>>> +		case NAND_OP_DATA_OUT_INSTR:
->>>> +			meson_nfc_write_buf(mtd, instr->ctx.data.buf.out,
->>>> +					    instr->ctx.data.len);
->>> Well, I'm not entirely sure what happens when you call
->>> read/write_buf(), but it seems you're doing that one byte at a time,
->>> and that sounds not so efficient given the operation you do for each
->>> byte read/written. Don't you have a way to tell the engine that you
->>> want to read/write X bytes?
->>
->> As i known, there is no way to read/write X bytes once.
-> 
-> Okay, then maybe you can queue several byte read/write reqs before
-> flushing the queue (meson_nfc_drain_cmd() +
-> meson_nfc_wait_cmd_finish()).
-> 
->>
->>>> +			break;
->>>> +
->>>> +		case NAND_OP_WAITRDY_INSTR:
->>>> +			mdelay(instr->ctx.waitrdy.timeout_ms);
->>>> +			ret = nand_soft_waitrdy(chip,
->>>> +						instr->ctx.waitrdy.timeout_ms);
->>> Hm, i'd be surprised if the controller does not have a way to optimize
->>> waits on R/B transitions.
->>
->> When i delete the delay here, erasing operation will be failed.
->> Does it mean NFC send 0x70 to nand device when rb is busy(low)?
-> 
-> I was not even talking about the delay, but yes, mdelay() seems way too
-> big. Remember that it's a timeout, and you usually don't have to wait
-> that much. You can do ndelay(instr->ctx.delay_ns) before calling
-> nand_soft_waitrdy() to make sure tWB is enforced.
-> 
-> Anyway, that's not what I was initially referring to. What I meant is
-> that nand_soft_waitrdy() should be replaced by native R/B pin or status
-> polling wait logic so that the CPU is released while waiting for a R/B
-> transition.
-> 
->> If so, i will ask our NFC designer for comfirmation or grasping the waveform.
-> 
-> You have to wait tWB, that's for sure.
-> 
+/proc/iomem now has:
+...
+07410000-21efffff : System RAM
+  11000000-1113cfff : reserved
+21f00000-21ffffff : reserved
+  21f00000-21f1ffff : persistent_ram
+  21f20000-21f3ffff : persistent_ram
+  21f40000-21f5ffff : persistent_ram
+  21f60000-21f7ffff : persistent_ram
+  21f80000-21f9ffff : persistent_ram
+  21fa0000-21fbffff : persistent_ram
+  21fc0000-21fdffff : persistent_ram
+  21fe0000-21ffffff : persistent_ram
+22000000-34ffffff : System RAM
+...
 
-Indeed.
+Where previously it had:
+...
+07410000-21efffff : System RAM
+21f00000-21f1ffff : persistent_ram
+21f20000-21f3ffff : persistent_ram
+21f40000-21f5ffff : persistent_ram
+21f60000-21f7ffff : persistent_ram
+21f80000-21f9ffff : persistent_ram
+21fa0000-21fbffff : persistent_ram
+21fc0000-21fdffff : persistent_ram
+21fe0000-21ffffff : persistent_ram
+22000000-34ffffff : System RAM
+...
 
->>
->>>> +			break;
->>>> +		}
->>>> +	}
->>>> +	return ret;
->>>> +}
->>>> +
->>>> +static int meson_ooblayout_ecc(struct mtd_info *mtd, int section,
->>>> +			       struct mtd_oob_region *oobregion)
->>>> +{
->>>> +	struct nand_chip *chip = mtd_to_nand(mtd);
->>>> +	int free_oob;
->>>> +
->>>> +	if (section >= chip->ecc.steps)
->>>> +		return -ERANGE;
->>>> +
->>>> +	free_oob = (section + 1) * 2;
->>>> +	oobregion->offset = section * chip->ecc.bytes + free_oob;
->>> Hm, this offset calculation looks weird. Are you sure it's correct?
->>> I'd bet on something like:
->>>
->>> 	oobregion->offset = 2 + (section * (chip->ecc.bytes + 4));
->>
->> Each ecc page have 2 user bytes. Assume one 2KB+64B page size nand
->> flash using ECC8/1KB which ecc parity bytes is 14B.
->>       _ _ _ _ _ _ _ _ _ _ _ _  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
->>      |             |  |      |             |  |     |  not  |
->>      |	1KB      |2B| 14B  |     1KB     |2B| 14B | used  |  (layout on nand)
->>      |_ _ _ _ _ _ _|_ |_ _ _ | _ _ _ _ _ _ |_ |_ _ _|_ _ _ _|
->> 		    (2KB + 64B)
->> when reading from nand, I will format the page as follow:
->>       _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _  _ _ _ _
->>      |             |             |  |     |  |      |  not  |
->>      |	1KB      |    1KB      |2B| 14B |2B|  14B | used  |(layout on ddr)
->>      |_ _ _ _ _ _ _|_ _ _ _ _ _ _|_ |_ _ _|_ |_ _ _ |_ _ _ _|
->> 		    (2KB + 64B)
->> So i get "oobregion->offset = section * chip->ecc.bytes + free_oob".
-> 
-> Okay, but I prefer when it's written like that:
-> 
-> 	oobregion->offset = 2 + (section * (2 + chip->ecc.bytes));
 
-em, I prefer too. it looks better.
-> >> Maybe i don't get what does 'section' mean. i think it means the ecc 
-page number.
-> 
-> Section is just the free OOB or ECC section number. It starts at 0 and
-> goes up to N - 1, where N usually is the number of ECC steps you have in
-> a page.
-> 
-> .
-> 
+
+thanks
+-john
