@@ -1,47 +1,152 @@
-From: ezequiel@collabora.com (Ezequiel Garcia)
-Date: Tue, 21 Aug 2018 13:58:38 -0300
-Subject: [PATCH 1/9] CHROMIUM: v4l: Add H264 low-level decoder API
- compound controls.
-In-Reply-To: <20180613140714.1686-2-maxime.ripard@bootlin.com>
-References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
- <20180613140714.1686-2-maxime.ripard@bootlin.com>
-Message-ID: <80e1d9cb49c6df06843e49332685f2b401023292.camel@collabora.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 21 Aug 2018 19:00:13 +0200
+Subject: [PATCH] arm64/crypto: remove non-standard notation
+In-Reply-To: <CAKwvOdkZR-MWuMU=j=kKXQwA0LEj1n0uoZQyTpwOzZuz9gjmJQ@mail.gmail.com>
+References: <20180820224032.53194-1-ndesaulniers@google.com>
+ <CAKv+Gu-xAmadr96vwStOxdeqi=rCEBrn8V6GofexBhpmA=JiuA@mail.gmail.com>
+ <CAKwvOdkZR-MWuMU=j=kKXQwA0LEj1n0uoZQyTpwOzZuz9gjmJQ@mail.gmail.com>
+Message-ID: <CAKv+Gu8ZZYvh9ZthRH7mvG7_j3bvT=3st-aj0kdwpNQaAcs=-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
-> From: Pawel Osciak <posciak@chromium.org>
-> 
-> Signed-off-by: Pawel Osciak <posciak@chromium.org>
-> Reviewed-by: Wu-cheng Li <wuchengli@chromium.org>
-> Tested-by: Tomasz Figa <tfiga@chromium.org>
-> [rebase44(groeck): include linux/types.h in v4l2-controls.h]
-> Signed-off-by: Guenter Roeck <groeck@chromium.org>
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
-> 
-[..]
-> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-> index 242a6bfa1440..4b4a1b25a0db 100644
-> --- a/include/uapi/linux/videodev2.h
-> +++ b/include/uapi/linux/videodev2.h
-> @@ -626,6 +626,7 @@ struct v4l2_pix_format {
->  #define V4L2_PIX_FMT_H264     v4l2_fourcc('H', '2', '6', '4') /* H264 with start codes */
->  #define V4L2_PIX_FMT_H264_NO_SC v4l2_fourcc('A', 'V', 'C', '1') /* H264 without start codes */
->  #define V4L2_PIX_FMT_H264_MVC v4l2_fourcc('M', '2', '6', '4') /* H264 MVC */
-> +#define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /* H264 parsed slices */
+On 21 August 2018 at 18:50, Nick Desaulniers <ndesaulniers@google.com> wrote:
+> On Tue, Aug 21, 2018 at 5:23 AM Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>>
+>> Hi Nick,
+>>
+>> On 21 August 2018 at 00:40, Nick Desaulniers <ndesaulniers@google.com> wrote:
+>> > It seems that:
+>> > ldr q8, =0x30000000200000001
+>> >
+>> > is a GNU as convience notation for:
+>> > ldr q8, .Lconstant
+>> > .Lconstant
+>> > .word 0x00000001
+>> > .word 0x00000002
+>> > .word 0x00000003
+>> > .word 0x00000000
+>> >
+>> > based on this comment in binutils' source [0]. I've asked for this
+>> > non-standard convience notation to be added to other assemblers [1], but
+>> > until then, we can remove it and get equivalent disassembly:
+>> >
+>>
+>> What do you mean by 'non-standard convenience notation'? Which asm
+>> 'standard' does Clang actually claim to implement?
+>
+> Well, for assembly 'standard' is a bit nebulous.  But it's frustrating
+> when you can't find what the `=0x...` notation means in either the ARM
+> or GNU as manuals.  The source of truth happened to be a comment in
+> the source [0] that explained that this was a "programmer friendly
+> notation."  Sure, if you can find it.
+>
 
-As pointed out by Tomasz, the Rockchip VPU driver expects start codes [1], so the userspace
-should be aware of it. Perhaps we could document this pixel format better as:
+Well, it is documented in the ARM manuals as the 'ldr pseudo
+instruction' for 32-bit ARM, and originally, it would only emit a
+literal if the value could not be loaded using a ordinary mov.
 
-#define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /* H264 parsed slices with start codes */
+For AArch64, I don't think that occurs any longer, i.e., a ldr is
+always emitted as an ldr. However, it is used widely in the ARM code
+(although not as much in arch/arm64) for loading compile time
+constants and even symbol addresses into general purpose registers.
+The FP variant may actually be a GNU invention, but given that there
+is no standard to begin with, playing the 'GNU is non-standard' card
+again is just a bit annoying.
 
-And introduce another pixel format:
+>>
+>> This 'GCC/binutils is broken and we are reluctant to subvert Clang'
+>> attitude is getting a bit old tbh. In the future, could you please
+>> mention clang explicitly in the patch subject so it is obvious what
+>> the purpose of the patch is? I think we should accommodate Clang in
+>> Linux, but the attitude has got to go.
+>
+> 'Reluctant?' Please assume good faith; I filed the bug/noticed
+> yesterday [1]. And I'm in favor of supporting the shorthand.  That's
+> not my argument at all; Strawman.
+>
 
-#define V4L2_PIX_FMT_H264_SLICE_NO_SC v4l2_fourcc(TODO) /* H264 parsed slices without start codes */
+OK, fair enough. But note that Clang already supports the syntax for GPRs.
 
-For cedrus to use, as it seems it doesn't need start codes.
+>>
+>>
+>> > before:
+>> > 00000000000009d4 <neon_aes_ctr_encrypt>:
+>> > ...
+>> >      a48:       9c000ac8        ldr     q8, ba0 <neon_aes_ctr_encrypt+0x1cc>
+>> > ...
+>> >      ba0:       00000001        .word   0x00000001
+>> >      ba4:       00000002        .word   0x00000002
+>> >      ba8:       00000003        .word   0x00000003
+>> >      bac:       00000000        .word   0x00000000
+>> >
+>> > after:
+>> >
+>> > 00000000000009d4 <neon_aes_ctr_encrypt>:
+>> > ...
+>> >      a48:       9c000aa8        ldr     q8, b9c <neon_aes_ctr_encrypt+0x1c8>
+>> > ...
+>> >      b9c:       00000001        .word   0x00000001
+>> >      ba0:       00000002        .word   0x00000002
+>> >      ba4:       00000003        .word   0x00000003
+>> >      ba8:       00000000        .word   0x00000000
+>> >
+>> > [0] https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=blob;f=gas/testsuite/gas/aarch64/programmer-friendly.s;h=6254c6476efdc848648b05068be0574e7addc85d;hb=HEAD#l11
+>> > [1] https://bugs.llvm.org/show_bug.cgi?id=38642
+>> >
+>> > Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
+>> > ---
+>> >  arch/arm64/crypto/aes-modes.S | 8 +++++++-
+>> >  1 file changed, 7 insertions(+), 1 deletion(-)
+>> >
+>> > diff --git a/arch/arm64/crypto/aes-modes.S b/arch/arm64/crypto/aes-modes.S
+>> > index 483a7130cf0e..9288c5b0eca2 100644
+>> > --- a/arch/arm64/crypto/aes-modes.S
+>> > +++ b/arch/arm64/crypto/aes-modes.S
+>> > @@ -232,7 +232,7 @@ AES_ENTRY(aes_ctr_encrypt)
+>> >         bmi             .Lctr1x
+>> >         cmn             w6, #4                  /* 32 bit overflow? */
+>> >         bcs             .Lctr1x
+>> > -       ldr             q8, =0x30000000200000001        /* addends 1,2,3[,0] */
+>> > +       ldr             q8, .Laddends /* addends 1,2,3[,0] */
+>> >         dup             v7.4s, w6
+>> >         mov             v0.16b, v4.16b
+>> >         add             v7.4s, v7.4s, v8.4s
+>> > @@ -295,6 +295,12 @@ AES_ENTRY(aes_ctr_encrypt)
+>> >         rev             x7, x7
+>> >         ins             v4.d[0], x7
+>> >         b               .Lctrcarrydone
+>> > +
+>> > +.Laddends:
+>> > +       .word   0x00000001
+>> > +       .word   0x00000002
+>> > +       .word   0x00000003
+>> > +       .word   0x00000000
+>>
+>
+>
+>> As Will points out, this breaks BE builds.
+>
+> Looks like -EB and -EL are the flags for me to test with in GNU as
+> (looks like a few different flags for this).  Is there a target triple
+> ABI for BE?  I'll ask around here too, and post my findings.
+>
+>>
+>> >  AES_ENDPROC(aes_ctr_encrypt)
+>> >         .ltorg
+>>
+>> You can drop this .ltorg if you get rid of all =xxx instances.
+>>
+>> Actually, though, I would prefer it if we could use some clever short
+>> sequence of movi+add instructions, and get rid of the literal
+>> altogether. Or otherwise, please use something like
+>>
+>> ldr_l q8, .Laddends, <temp register>
+>>
+>> instead, and move the literal into the .rodata section (and use .octa
+>> so you don't break BE)
+>
+> Ah, .octa, neat.  Ok, I'll take a look for v2.
+>
 
-How does it sound? 
-
-[1] https://cs.chromium.org/chromium/src/media/gpu/v4l2/v4l2_slice_video_decode_accelerator.cc?rcl=63129434aeacf0f54bbae96814f10cf64e3e6c35&l=2438
+Please check my solution first. I just sent it out.
