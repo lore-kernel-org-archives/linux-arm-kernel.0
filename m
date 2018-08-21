@@ -1,47 +1,39 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Tue, 21 Aug 2018 11:08:25 +0200
-Subject: [PATCH v4 09/14] irqchip/irq-mvebu-icu: add support for System
- Error Interrupts (SEI)
-In-Reply-To: <a88f62c0-7d7c-71da-fa45-487f7573dbb1@arm.com>
-References: <20180705124011.7661-1-miquel.raynal@bootlin.com>
- <20180705124011.7661-10-miquel.raynal@bootlin.com>
- <a88f62c0-7d7c-71da-fa45-487f7573dbb1@arm.com>
-Message-ID: <20180821110825.2fbec982@xps13>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 21 Aug 2018 17:08:50 +0800
+Subject: [PATCH 6/6] ARM: imx_v6_v7_defconfig: Select
+ CONFIG_DRM_PANEL_SEIKO_43WVF1G
+In-Reply-To: <CAOMZO5AycMPm4+THSHW02=Nnce+QEyQ4CJR9Jp6xyET00n_8+A@mail.gmail.com>
+References: <1532119161-16597-1-git-send-email-festevam@gmail.com>
+ <1532119161-16597-6-git-send-email-festevam@gmail.com>
+ <CAOMZO5AycMPm4+THSHW02=Nnce+QEyQ4CJR9Jp6xyET00n_8+A@mail.gmail.com>
+Message-ID: <20180821090848.GC31070@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-I'm fine with the rest of the comments, please find just one last
-question below.
-
-[...]
-
-> > @@ -133,12 +164,36 @@ mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
-> >  		return -EINVAL;
-> >  	}
-> >  
-> > -	/* Mask the type to prevent wrong DT configuration */
-> > -	*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
-> > +	/*
-> > +	 * The ICU receives level-interrupts. MSI SEI are
-> > +	 * edge-interrupts while MSI NSR are level-interrupts. Update the type
-> > +	 * accordingly for the parent irqchip.
-> > +	 */
-> > +	if (msi_data->subset_data->icu_group == ICU_GRP_SEI)
-> > +		*type = IRQ_TYPE_EDGE_RISING;  
+On Mon, Jul 23, 2018 at 10:57:22AM -0300, Fabio Estevam wrote:
+> Hi Shawn,
 > 
-> That's interesting. How is the resampling done here?
-
-I'm not sure to understand the question. What does 'resampling' means
-in such context? MSI SEIs are of type "edge" and use the traditional
-MSI signalling infrastructure. I'm asking to be sure not to ignore
-something wrong in my code.
-
+> On Fri, Jul 20, 2018 at 5:39 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> > From: Fabio Estevam <fabio.estevam@nxp.com>
+> >
+> > imx6sl-evk, imx6sll-evk and imx6sx-sdb boards use a Seiko 43WVF1G panel.
+> >
+> > Now that the DRM mxsfb driver is the one selected by default, let's
+> > also select CONFIG_DRM_PANEL_SEIKO_43WVF1G so that these boards continue
+> > to have a working display by default.
+> >
+> > Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> >  
-> >  	return 0;
-> >  }
+> I understand you have already submitted the imx 4.19 material to Olof
+> and he has already merged it.
+> 
+> Without this series we will have many NXP development boards without
+> functional display in 4.19 by default due to the drm mxsfb conversion
+> in defconfig, which would not be a very good user experience.
+> 
+> I would like to kindly ask you to consider applying this series to 4.19 as well.
 
-Thanks,
-Miqu?l
+I guess only the last two defconfig patches are necessary to keep those
+boards getting functional display for 4.19, no?
+
+Shawn
