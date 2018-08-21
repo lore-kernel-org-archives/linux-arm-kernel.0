@@ -1,76 +1,126 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Aug 2018 11:37:47 +0100
-Subject: [PATCH v4 09/14] irqchip/irq-mvebu-icu: add support for System
- Error Interrupts (SEI)
-In-Reply-To: <20180821122819.726c434b@xps13>
-References: <20180705124011.7661-1-miquel.raynal@bootlin.com>
- <20180705124011.7661-10-miquel.raynal@bootlin.com>
- <a88f62c0-7d7c-71da-fa45-487f7573dbb1@arm.com>
- <20180821110825.2fbec982@xps13>
- <07e90507-1d51-6435-b006-c46f865a636c@arm.com>
- <20180821122819.726c434b@xps13>
-Message-ID: <9c3168e2-3653-5359-7ddb-9e6ac1b47bb8@arm.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Tue, 21 Aug 2018 12:43:52 +0200
+Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via
+ the nvmem API
+In-Reply-To: <bd4dd892-3b6c-a77e-b2f3-386600c8c9bd@linaro.org>
+References: <20180810080526.27207-1-brgl@bgdev.pl>
+ <20180810080526.27207-7-brgl@bgdev.pl>
+ <20180817182720.6a6e5e8e@bbrezillon> <20180819133106.0420df5f@tock>
+ <20180819184609.6dcdbb9a@bbrezillon>
+ <5b8c30b8-41e1-d59e-542b-fef6c6469ff0@linaro.org>
+ <20180820202038.5d3dc195@bbrezillon>
+ <e0ec3194-fd3a-9b3d-fba8-f88447eb56e9@linaro.org>
+ <20180821115639.4894c1c9@bbrezillon>
+ <bd4dd892-3b6c-a77e-b2f3-386600c8c9bd@linaro.org>
+Message-ID: <20180821124352.21340939@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/08/18 11:28, Miquel Raynal wrote:
-> Hi Marc,
-> 
-> Marc Zyngier <marc.zyngier@arm.com> wrote on Tue, 21 Aug 2018 10:19:04
-> +0100:
-> 
->> On 21/08/18 10:08, Miquel Raynal wrote:
->>> Hi Marc,
->>>
->>> I'm fine with the rest of the comments, please find just one last
->>> question below.
->>>
->>> [...]
->>>   
->>>>> @@ -133,12 +164,36 @@ mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
->>>>>  		return -EINVAL;
->>>>>  	}
->>>>>  
->>>>> -	/* Mask the type to prevent wrong DT configuration */
->>>>> -	*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
->>>>> +	/*
->>>>> +	 * The ICU receives level-interrupts. MSI SEI are
->>>>> +	 * edge-interrupts while MSI NSR are level-interrupts. Update the type
->>>>> +	 * accordingly for the parent irqchip.
->>>>> +	 */
->>>>> +	if (msi_data->subset_data->icu_group == ICU_GRP_SEI)
->>>>> +		*type = IRQ_TYPE_EDGE_RISING;    
->>>>
->>>> That's interesting. How is the resampling done here?  
->>>
->>> I'm not sure to understand the question. What does 'resampling' means
->>> in such context? MSI SEIs are of type "edge" and use the traditional
->>> MSI signalling infrastructure. I'm asking to be sure not to ignore
->>> something wrong in my code.  
->>
->> You seems to be turning a level interrupt into an edge.
-> 
-> If is an SEI interrupt, it cannot be a level interrupt and the type
-> will be IRQ_TYPE_EDGE_RISING.
-> 
->> You can do that,
->> but only if you resample the level on EOI (and regenerate the
->> corresponding edge if the level is still high).
-> 
-> What is before is a '& IRQ_TYPE_SENSE_MASK' operation. In theory,
-> *type could be anything of IRQ_TYPE_{EDGE,LEVEL}_* at this moment. But,
-> as stated above, it cannot be anything else than IRQ_TYPE_EDGE_RISING.
-> I thought more clear to enforce it but if this unclear and useless,
-> let's drop it?
+On Tue, 21 Aug 2018 11:11:58 +0100
+Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
 
-I think overriding the trigger that way is very confusing. Either it
-comes from DT, or it comes from the MSI framwork. In both cases, it has
-to be correct, and overriding it is just papering over other bugs.
+> On 21/08/18 10:56, Boris Brezillon wrote:
+> > On Tue, 21 Aug 2018 10:50:07 +0100
+> > Srinivas Kandagatla<srinivas.kandagatla@linaro.org>  wrote:
+> >   
+> >> On 20/08/18 19:20, Boris Brezillon wrote:  
+> >>> On Mon, 20 Aug 2018 11:43:34 +0100
+> >>> Srinivas Kandagatla<srinivas.kandagatla@linaro.org>  wrote:
+> >>>      
+> >>>> Overall am still not able to clear visualize on how MTD bindings with
+> >>>> nvmem cells would look in both partition and un-partition usecases?
+> >>>> An example DT would be nice here!!  
+> >>> Something along those lines:
+> >>>      
+> >> This looks good to me.  
+> >>> 	mtdnode {
+> >>> 		nvmem-cells {
+> >>> 			#address-cells = <1>;
+> >>> 			#size-cells = <1>;
+> >>>
+> >>> 			cell at 0 {
+> >>> 				reg = <0x0 0x14>;
+> >>> 			};
+> >>> 		};
+> >>>
+> >>> 		partitions {
+> >>> 			compatible = "fixed-partitions";
+> >>> 			#address-cells = <1>;
+> >>> 			#size-cells = <1>;
+> >>>
+> >>> 			partition at 0 {
+> >>> 				reg = <0x0 0x20000>;
+> >>>
+> >>> 				nvmem-cells {
+> >>> 					#address-cells = <1>;
+> >>> 					#size-cells = <1>;
+> >>>
+> >>> 					cell at 0 {
+> >>> 						reg = <0x0 0x10>;
+> >>> 					};
+> >>> 				};
+> >>> 			};
+> >>> 		};
+> >>> 	}; >  
+> >> Just curious...Is there a reason why we can't do it like this?:
+> >> Is this because of issue of #address-cells and #size-cells Or mtd
+> >> bindings always prefer subnodes?
+> >>
+> >> 	mtdnode {
+> >> 		reg = <0x0123000 0x40000>;
+> >> 		#address-cells = <1>;
+> >> 		#size-cells = <1>;
+> >> 		cell at 0 {
+> >> 			compatible = "nvmem-cell";
+> >> 			reg = <0x0 0x14>;
+> >> 		};
+> >>
+> >> 		partitions {
+> >> 			compatible = "fixed-partitions";
+> >> 			#address-cells = <1>;
+> >> 			#size-cells = <1>;
+> >>
+> >> 			partition at 0 {
+> >> 				reg = <0x0 0x20000>;
+> >> 				cell at 0 {
+> >> 					compatible = "nvmem-cell";
+> >> 					reg = <0x0 0x10>;
+> >> 				};
+> >> 			};
+> >> 		};
+> >> 	};  
+> > It's because partitions were initially directly defined under the mtd
+> > node, so, if you have an old DT you might have something like:
+> > 
+> > 	mtdnode {
+> > 		reg = <0x0123000 0x40000>;
+> > 		#address-cells = <1>;
+> > 		#size-cells = <1>;
+> > 
+> > 		partition at 0 {
+> > 			reg = <0x0 0x20000>;
+> > 			...
+> > 		};
+> > 		...
+> > 	};
+> > 
+> > If we use such a DT with this patch applied, the NVMEM framework will
+> > consider MTD partitions as nvmem cells, which is not what we want.  
+> Yep, I agree.
+> TBH, I wanted to add compatible string to nvmem-cell at some point in 
+> time and it seems more natural update too. One of the reason we 
+> discussed this in the past was parsers. Looks like mtd can make use of this.
+> 
+> We should be able to add this as an optional flag in nvmem_config to 
+> enforce this check in case providers wanted to.
+> 
+> Do you think that would help mtd nvmem case?
 
-I'd rather you put a WARN_ON if you encounter an illegal interrupt trigger.
+Yes, it should work if nvmem cells are defined directly under the mtd
+node (or the partition they belong to).
 
-Thanks,
+> Also I felt like nvmem-cells subnode seems to be a bit heavy!
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I still think grouping nvmem cells in a subnode is cleaner (just like
+we do for partitions), but I won't object if all parties (you, Alban
+and Rob) agree on this solution.
