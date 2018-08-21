@@ -1,61 +1,18 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 21 Aug 2018 08:01:25 +0000
-Subject: [PATCH 1/3] clk: imx6q: reset exclusive gates on init
-In-Reply-To: <20180731102009.6710-1-l.stach@pengutronix.de>
-References: <20180731102009.6710-1-l.stach@pengutronix.de>
-Message-ID: <AM0PR04MB421125B3E115822BCA0B1C3E80310@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 21 Aug 2018 16:31:16 +0800
+Subject: [PATCH] ARM: dts: imx6sll: add gpio-ranges property
+In-Reply-To: <1532081217-17538-1-git-send-email-Anson.Huang@nxp.com>
+References: <1532081217-17538-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180821083115.GA31070@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Lucas Stach <l.stach@pengutronix.de>
-> Sent: Tuesday, July 31, 2018 6:20 PM
-
-[...]
-
+On Fri, Jul 20, 2018 at 06:06:57PM +0800, Anson Huang wrote:
+> Add "gpio-ranges" property to establish connections between GPIOs
+> and PINs on i.MX6SLL pinctrl driver, for details, please refer to
+> Documentation/devicetree/bindings/gpio/gpio.txt of "gpio-ranges"
+> property.
 > 
-> The exclusive gates may be set up in the wrong way by software running
-> before the clock driver comes up. In that case the exclusive setup is locked in
-> its initial state, as the complementary function can't be activated without
-> disabling the initial setup first.
-> 
-> To avoid this lock situation, reset the exclusive gates to the off state and
-> allow the kernel to provide the proper setup.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
-Reviewed-by: Dong Aisheng <Aisheng.dong@nxp.com>
-
-BTW, I'm just a bit curious what software may do a wrong setting before?
-
-Regards
-Dong Aisheng
-
-> ---
->  drivers/clk/imx/clk-imx6q.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c index
-> b9ea7037e193..9059a369ae95 100644
-> --- a/drivers/clk/imx/clk-imx6q.c
-> +++ b/drivers/clk/imx/clk-imx6q.c
-> @@ -515,8 +515,12 @@ static void __init imx6q_clocks_init(struct
-> device_node *ccm_node)
->  	 * lvds1_gate and lvds2_gate are pseudo-gates.  Both can be
->  	 * independently configured as clock inputs or outputs.  We treat
->  	 * the "output_enable" bit as a gate, even though it's really just
-> -	 * enabling clock output.
-> +	 * enabling clock output. Initially the gate bits are cleared, as
-> +	 * otherwise the exclusive configuration gets locked in the setup
-> done
-> +	 * by software running before the clock driver, with no way to change
-> +	 * it.
->  	 */
-> +	writel(readl(base + 0x160) & ~0x3c00, base + 0x160);
->  	clk[IMX6QDL_CLK_LVDS1_GATE] =
-> imx_clk_gate_exclusive("lvds1_gate", "lvds1_sel", base + 0x160, 10, BIT(12));
->  	clk[IMX6QDL_CLK_LVDS2_GATE] =
-> imx_clk_gate_exclusive("lvds2_gate", "lvds2_sel", base + 0x160, 11, BIT(13));
-> 
-> --
-> 2.18.0
+Applied, thanks.
