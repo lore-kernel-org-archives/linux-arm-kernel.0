@@ -1,84 +1,73 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Tue, 21 Aug 2018 17:41:51 +0200
-Subject: [PATCH v4 09/14] irqchip/irq-mvebu-icu: add support for System
- Error Interrupts (SEI)
-In-Reply-To: <9c3168e2-3653-5359-7ddb-9e6ac1b47bb8@arm.com>
-References: <20180705124011.7661-1-miquel.raynal@bootlin.com>
- <20180705124011.7661-10-miquel.raynal@bootlin.com>
- <a88f62c0-7d7c-71da-fa45-487f7573dbb1@arm.com>
- <20180821110825.2fbec982@xps13>
- <07e90507-1d51-6435-b006-c46f865a636c@arm.com>
- <20180821122819.726c434b@xps13>
- <9c3168e2-3653-5359-7ddb-9e6ac1b47bb8@arm.com>
-Message-ID: <20180821174151.7fc7314b@xps13>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 21 Aug 2018 17:45:43 +0200
+Subject: bcm2837: tons of DMA mask not set in 4.18.0-rc6-next-20180727
+In-Reply-To: <aee486c9-e503-ce1a-9102-82712be2db62@arm.com>
+References: <325098108.159647.1532708245242@email.1und1.de>
+ <aee486c9-e503-ce1a-9102-82712be2db62@arm.com>
+Message-ID: <CAMuHMdURr7nLs3d1G4KyM9MCtY2veP2jV6Fid4qhjDyo-A3F7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Robin,
 
-Marc Zyngier <marc.zyngier@arm.com> wrote on Tue, 21 Aug 2018 11:37:47
-+0100:
+CC Lee (mfd), Wolfram (i2c), Marek (bd9571wmv + recent da9063 hacking)
 
-> On 21/08/18 11:28, Miquel Raynal wrote:
-> > Hi Marc,
-> > 
-> > Marc Zyngier <marc.zyngier@arm.com> wrote on Tue, 21 Aug 2018 10:19:04
-> > +0100:
-> >   
-> >> On 21/08/18 10:08, Miquel Raynal wrote:  
-> >>> Hi Marc,
-> >>>
-> >>> I'm fine with the rest of the comments, please find just one last
-> >>> question below.
-> >>>
-> >>> [...]
-> >>>     
-> >>>>> @@ -133,12 +164,36 @@ mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
-> >>>>>  		return -EINVAL;
-> >>>>>  	}
-> >>>>>  
-> >>>>> -	/* Mask the type to prevent wrong DT configuration */
-> >>>>> -	*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
-> >>>>> +	/*
-> >>>>> +	 * The ICU receives level-interrupts. MSI SEI are
-> >>>>> +	 * edge-interrupts while MSI NSR are level-interrupts. Update the type
-> >>>>> +	 * accordingly for the parent irqchip.
-> >>>>> +	 */
-> >>>>> +	if (msi_data->subset_data->icu_group == ICU_GRP_SEI)
-> >>>>> +		*type = IRQ_TYPE_EDGE_RISING;      
-> >>>>
-> >>>> That's interesting. How is the resampling done here?    
-> >>>
-> >>> I'm not sure to understand the question. What does 'resampling' means
-> >>> in such context? MSI SEIs are of type "edge" and use the traditional
-> >>> MSI signalling infrastructure. I'm asking to be sure not to ignore
-> >>> something wrong in my code.    
-> >>
-> >> You seems to be turning a level interrupt into an edge.  
-> > 
-> > If is an SEI interrupt, it cannot be a level interrupt and the type
-> > will be IRQ_TYPE_EDGE_RISING.
-> >   
-> >> You can do that,
-> >> but only if you resample the level on EOI (and regenerate the
-> >> corresponding edge if the level is still high).  
-> > 
-> > What is before is a '& IRQ_TYPE_SENSE_MASK' operation. In theory,
-> > *type could be anything of IRQ_TYPE_{EDGE,LEVEL}_* at this moment. But,
-> > as stated above, it cannot be anything else than IRQ_TYPE_EDGE_RISING.
-> > I thought more clear to enforce it but if this unclear and useless,
-> > let's drop it?  
-> 
-> I think overriding the trigger that way is very confusing. Either it
-> comes from DT, or it comes from the MSI framwork. In both cases, it has
-> to be correct, and overriding it is just papering over other bugs.
-> 
-> I'd rather you put a WARN_ON if you encounter an illegal interrupt trigger.
+On Fri, Jul 27, 2018 at 6:28 PM Robin Murphy <robin.murphy@arm.com> wrote:
+> On 27/07/18 17:17, Stefan Wahren wrote:
+> > i was noticed that recent linux-next on Raspberry Pi 3 (32 bit) doesn't boot anymore. So i tested todays linux-next with multi_v7_defconfig and i'm getting a lot of DMA mask not set warnings. At least USB dwc2 is broken.
+> >
+> > Any suggestions before i start to bisect?
+>
+> https://patchwork.kernel.org/patch/10547231/
+>
+> Although the upside of this hiccup is that it should give us a fair view
+> of how many active drivers are still relying on implicit default DMA
+> masks - I'm now waiting for kernelci's boot chart to catch up with
+> today's -next to see the full fallout...
 
-Fine by me.
+I'm still seeing the following on r8a7791/koelsch with a DA9063 PMIC, which
+is an MFD device:
 
-Thanks for all the guidance, I'll send a new iteration ASAP (with the
-bindings updated).
+    da9063-watchdog da9063-watchdog: DMA mask not set
+    da9063-rtc da9063-rtc: DMA mask not set
 
-Thanks,
-Miqu?l
+The dma masks (both normal and coherent) are NULL, and inherited from the
+i2c parent device (6-0058):
+
+        pmic at 58 {
+                compatible = "dlg,da9063";
+                reg = <0x58>;
+                interrupt-parent = <&irqc0>;
+                interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
+                interrupt-controller;
+
+                rtc {
+                        compatible = "dlg,da9063-rtc";
+                };
+
+                wdt {
+                        compatible = "dlg,da9063-watchdog";
+                };
+        };
+
+The DA9063 MFD driver creates more subdevices than the two listed above,
+but the warning doesn't trigger for them, presumably because they don't
+have corresponding nodes in DT.
+
+On r8a779{5,6,65}*/salvator-x, there's also an MFD device (BD9571WMC PMIC)
+on an i2c bus, inheriting NULL DMA masks from its parent, but it doesn't
+have any subnodes in DT, and the warning isn't triggered neither.
+
+Anyone with a clue?
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
