@@ -1,35 +1,72 @@
-From: houlong.wei@mediatek.com (Houlong Wei)
-Date: Tue, 21 Aug 2018 18:22:44 +0800
-Subject: [PATCH] mailbox: mediatek: Add check for possible failure of kzalloc
-Message-ID: <1534846964-13224-1-git-send-email-houlong.wei@mediatek.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Tue, 21 Aug 2018 12:28:19 +0200
+Subject: [PATCH v4 09/14] irqchip/irq-mvebu-icu: add support for System
+ Error Interrupts (SEI)
+In-Reply-To: <07e90507-1d51-6435-b006-c46f865a636c@arm.com>
+References: <20180705124011.7661-1-miquel.raynal@bootlin.com>
+ <20180705124011.7661-10-miquel.raynal@bootlin.com>
+ <a88f62c0-7d7c-71da-fa45-487f7573dbb1@arm.com>
+ <20180821110825.2fbec982@xps13>
+ <07e90507-1d51-6435-b006-c46f865a636c@arm.com>
+Message-ID: <20180821122819.726c434b@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch 623a6143a845("mailbox: mediatek: Add Mediatek CMDQ driver")
-introduce the following static checker warning:
-  drivers/mailbox/mtk-cmdq-mailbox.c:366 cmdq_mbox_send_data()
-  error: potential null dereference 'task'.  (kzalloc returns null)
+Hi Marc,
 
-Fixes: 623a6143a845 ("mailbox: mediatek: Add Mediatek CMDQ driver")
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
----
- drivers/mailbox/mtk-cmdq-mailbox.c |    3 +++
- 1 file changed, 3 insertions(+)
+Marc Zyngier <marc.zyngier@arm.com> wrote on Tue, 21 Aug 2018 10:19:04
++0100:
 
-diff --git a/drivers/mailbox/mtk-cmdq-mailbox.c b/drivers/mailbox/mtk-cmdq-mailbox.c
-index aec46d5..f7cc29c 100644
---- a/drivers/mailbox/mtk-cmdq-mailbox.c
-+++ b/drivers/mailbox/mtk-cmdq-mailbox.c
-@@ -363,6 +363,9 @@ static int cmdq_mbox_send_data(struct mbox_chan *chan, void *data)
- 	WARN_ON(cmdq->suspended);
- 
- 	task = kzalloc(sizeof(*task), GFP_ATOMIC);
-+	if (!task)
-+		return -ENOMEM;
-+
- 	task->cmdq = cmdq;
- 	INIT_LIST_HEAD(&task->list_entry);
- 	task->pa_base = pkt->pa_base;
--- 
-1.7.9.5
+> On 21/08/18 10:08, Miquel Raynal wrote:
+> > Hi Marc,
+> > 
+> > I'm fine with the rest of the comments, please find just one last
+> > question below.
+> > 
+> > [...]
+> >   
+> >>> @@ -133,12 +164,36 @@ mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
+> >>>  		return -EINVAL;
+> >>>  	}
+> >>>  
+> >>> -	/* Mask the type to prevent wrong DT configuration */
+> >>> -	*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
+> >>> +	/*
+> >>> +	 * The ICU receives level-interrupts. MSI SEI are
+> >>> +	 * edge-interrupts while MSI NSR are level-interrupts. Update the type
+> >>> +	 * accordingly for the parent irqchip.
+> >>> +	 */
+> >>> +	if (msi_data->subset_data->icu_group == ICU_GRP_SEI)
+> >>> +		*type = IRQ_TYPE_EDGE_RISING;    
+> >>
+> >> That's interesting. How is the resampling done here?  
+> > 
+> > I'm not sure to understand the question. What does 'resampling' means
+> > in such context? MSI SEIs are of type "edge" and use the traditional
+> > MSI signalling infrastructure. I'm asking to be sure not to ignore
+> > something wrong in my code.  
+> 
+> You seems to be turning a level interrupt into an edge.
+
+If is an SEI interrupt, it cannot be a level interrupt and the type
+will be IRQ_TYPE_EDGE_RISING.
+
+> You can do that,
+> but only if you resample the level on EOI (and regenerate the
+> corresponding edge if the level is still high).
+
+What is before is a '& IRQ_TYPE_SENSE_MASK' operation. In theory,
+*type could be anything of IRQ_TYPE_{EDGE,LEVEL}_* at this moment. But,
+as stated above, it cannot be anything else than IRQ_TYPE_EDGE_RISING.
+I thought more clear to enforce it but if this unclear and useless,
+let's drop it?
+
+
+> 
+> Or am I reading it the wrong way?
+
+No, that's probably me not understanding correctly the purpose of the
+above function.
+
+Thanks,
+Miqu?l
