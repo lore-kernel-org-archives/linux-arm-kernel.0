@@ -1,195 +1,76 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 21 Aug 2018 22:34:48 +0300
-Subject: [RFC] clk: imx6: Mark imx_clk_mux as glitchy by default
-Message-ID: <e56c6f0acfe7afb885d2cb67e1e069f7edd0d2d7.1534879459.git.leonard.crestez@nxp.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 21 Aug 2018 21:37:13 +0200
+Subject: [PATCH/RFC 4/4] [WIP] ARM: shmobile: Enable ARM_GLOBAL_TIMER on
+ Cortex-A9 MPCore SoCs
+In-Reply-To: <20180731160855.6758-5-geert+renesas@glider.be>
+References: <20180731160855.6758-1-geert+renesas@glider.be>
+ <20180731160855.6758-5-geert+renesas@glider.be>
+Message-ID: <CAMuHMdWSsjO731VwMeLXqDjCboH=7k546PjovN5yPEHwn8zu9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With some exceptions clk muxes on imx6 are "glitchy": If the output
-is not gated before reparenting then high-frequency pulses can occur and
-cause unpredictable behavior. Only a very small subset of muxes are
-listed as "glitchless" in the reference manual.
+On Tue, Jul 31, 2018 at 6:08 PM Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> SH-Mobile AG5 and R-Car H1 SoCs are based on the Cortex-A9 MPCore, which
+> includes a global timer.
+>
+> Enable the ARM global timer on these SoCs, which will be used for:
+>   - the scheduler clock, improving scheduler accuracy from 10 ms to 3 or
+>     4 ns,
+>   - delay loops, allowing removal of calls to shmobile_init_delay() from
+>     the corresponding machine vectors.
+>
+> Note that when using an old DTB lacking the global timer, the kernel
+> will still work.  However, loops-per-jiffies will no longer be preset,
+> and the delay loop will need to be calibrated during boot.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Adapt to this by adding the CLK_SET_PARENT_GATE flag by default to
-imx_clk_mux. Add imx_clk_mux_glitchless for the muxes listed as
-glitchless and which don't already have have custom behavior.
+This seems to cause random system resume issues on the venerable SH-Mobile
+AG5, ranging from plain lockups to RCU warnings:
 
-The CLK_SET_PARENT_GATE flags enables a small check inside the clk core
-which make clk_set_parent return -EBUSY if the clock is active. Ensuring
-outputs are gated prior to calling set_parent is up to the clk
-consumers.
+WARNING: suspicious RCU usage
+4.18.0-kzm9g-00218-gaf4425056bd09e9e #38 Not tainted
+-----------------------------
+kernel/sched/fair.c:6231 suspicious rcu_dereference_check() usage!
 
-The effect of this patch is that drivers which perform unsafe operations
-which mostly work will receive errors instead, possibly breaking
-functionality.
+other info that might help us debug this:
 
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
----
+RCU used illegally from offline CPU!
+rcu_scheduler_active = 2, debug_locks = 1
+3 locks held by swapper/1/0:
+ #0: 6d7f5781 ((cpu_died).wait.lock){....}, at: complete+0x14/0x48
+ #1: 84ce6f8e (&p->pi_lock){-.-.}, at: try_to_wake_up+0x30/0x3cc
+ #2: 93591133 (rcu_read_lock){....}, at: select_task_rq_fair+0x5c/0xe8c
 
-Unfortunately one of the misbehaving drivers is ldb for LVDS display and
-it seems to be a real issue: ldb enable/disable does reparenting on an
-active clk used by IPU.
+stack backtrace:
+CPU: 1 PID: 0 Comm: swapper/1 Not tainted
+4.18.0-kzm9g-00218-gaf4425056bd09e9e #38
+Hardware name: Generic SH73A0 (Flattened Device Tree)
+[<c010f22c>] (unwind_backtrace) from [<c010bab0>] (show_stack+0x10/0x14)
+[<c010bab0>] (show_stack) from [<c0599750>] (dump_stack+0x9c/0xd4)
+[<c0599750>] (dump_stack) from [<c01542c8>] (select_task_rq_fair+0x140/0xe8c)
+[<c01542c8>] (select_task_rq_fair) from [<c0149494>]
+(try_to_wake_up+0x210/0x3cc)
+[<c0149494>] (try_to_wake_up) from [<c016355c>] (__wake_up_common+0xcc/0x140)
+[<c016355c>] (__wake_up_common) from [<c01636a8>] (__wake_up_locked+0x14/0x1c)
+[<c01636a8>] (__wake_up_locked) from [<c016450c>] (complete+0x38/0x48)
+[<c016450c>] (complete) from [<c010d66c>] (arch_cpu_idle_dead+0x2c/0x8c)
+[<c010d66c>] (arch_cpu_idle_dead) from [<c014edec>] (do_idle+0x98/0x148)
+[<c014edec>] (do_idle) from [<c014f1fc>] (cpu_startup_entry+0x18/0x1c)
+[<c014f1fc>] (cpu_startup_entry) from [<4010246c>] (0x4010246c)
 
-The imx_ldb_encoder_disable function will try to change the parent of
-clk_sel to what it was before enabling but at this point the crtc
-(inside ipu) is still active. With this patch it gets -EBUSY instead.
+Given secondary CPU startup is already quite flaky on this SoC, perhaps
+it's best to leave it alone?
 
-This happens because the DRM core disables encoders before crtc (and
-backwards on enable). This assumption is reasonable, having an "encoder"
-feed a clk back into the "crtc" is odd and needs special handling by the
-driver.
+Gr{oetje,eeting}s,
 
-Perhaps ipu_di_enable/disable should be handled in atomic_commit_tail
-instead of at the crtc level?
+                        Geert
 
-More concretely on 6qp-sdb blanking the display happens like this:
- * imx_ldb_encoder_disable switches ipu1_di0_sel to ipu1_di0_pre from ldb_di1_podf
- * reparenting to ipu1_di0_pre enables it and its parents up to pll5
- * possibly glitchy muxing
- * ipu_di_disable disables ipu1_di0 (and parents, up to pll5)
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
----
- drivers/clk/imx/clk-imx6q.c   |  4 ++--
- drivers/clk/imx/clk-imx6sl.c  |  2 +-
- drivers/clk/imx/clk-imx6sll.c |  2 +-
- drivers/clk/imx/clk-imx6sx.c  |  2 +-
- drivers/clk/imx/clk-imx6ul.c  |  2 +-
- drivers/clk/imx/clk.h         | 16 ++++++++++++----
- 6 files changed, 18 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
-index 8c7c2fcb8d94..0434d943b1bc 100644
---- a/drivers/clk/imx/clk-imx6q.c
-+++ b/drivers/clk/imx/clk-imx6q.c
-@@ -547,16 +547,16 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	base = of_iomap(np, 0);
- 	WARN_ON(!base);
- 
- 	/*                                              name                reg       shift width parent_names     num_parents */
- 	clk[IMX6QDL_CLK_STEP]             = imx_clk_mux("step",	            base + 0xc,  8,  1, step_sels,	   ARRAY_SIZE(step_sels));
--	clk[IMX6QDL_CLK_PLL1_SW]          = imx_clk_mux("pll1_sw",	    base + 0xc,  2,  1, pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
-+	clk[IMX6QDL_CLK_PLL1_SW]          = imx_clk_mux_glitchless("pll1_sw",           base + 0xc,  2,  1, pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
- 	clk[IMX6QDL_CLK_PERIPH_PRE]       = imx_clk_mux("periph_pre",       base + 0x18, 18, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
- 	clk[IMX6QDL_CLK_PERIPH2_PRE]      = imx_clk_mux("periph2_pre",      base + 0x18, 21, 2, periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
- 	clk[IMX6QDL_CLK_PERIPH_CLK2_SEL]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 2, periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
- 	clk[IMX6QDL_CLK_PERIPH2_CLK2_SEL] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph2_clk2_sels, ARRAY_SIZE(periph2_clk2_sels));
--	clk[IMX6QDL_CLK_AXI_SEL]          = imx_clk_mux("axi_sel",          base + 0x14, 6,  2, axi_sels,          ARRAY_SIZE(axi_sels));
-+	clk[IMX6QDL_CLK_AXI_SEL]          = imx_clk_mux_glitchless("axi_sel",           base + 0x14, 6,  2, axi_sels,          ARRAY_SIZE(axi_sels));
- 	clk[IMX6QDL_CLK_ESAI_SEL]         = imx_clk_mux("esai_sel",         base + 0x20, 19, 2, audio_sels,        ARRAY_SIZE(audio_sels));
- 	clk[IMX6QDL_CLK_ASRC_SEL]         = imx_clk_mux("asrc_sel",         base + 0x30, 7,  2, audio_sels,        ARRAY_SIZE(audio_sels));
- 	clk[IMX6QDL_CLK_SPDIF_SEL]        = imx_clk_mux("spdif_sel",        base + 0x30, 20, 2, audio_sels,        ARRAY_SIZE(audio_sels));
- 	if (clk_on_imx6q()) {
- 		clk[IMX6QDL_CLK_GPU2D_AXI]        = imx_clk_mux("gpu2d_axi",        base + 0x18, 0,  1, gpu_axi_sels,      ARRAY_SIZE(gpu_axi_sels));
-diff --git a/drivers/clk/imx/clk-imx6sl.c b/drivers/clk/imx/clk-imx6sl.c
-index eb6bcbf345a3..0d1aaaafd6f4 100644
---- a/drivers/clk/imx/clk-imx6sl.c
-+++ b/drivers/clk/imx/clk-imx6sl.c
-@@ -289,11 +289,11 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- 	WARN_ON(!base);
- 	ccm_base = base;
- 
- 	/*                                              name                reg       shift width parent_names     num_parents */
- 	clks[IMX6SL_CLK_STEP]             = imx_clk_mux("step",             base + 0xc,  8,  1, step_sels,         ARRAY_SIZE(step_sels));
--	clks[IMX6SL_CLK_PLL1_SW]          = imx_clk_mux("pll1_sw",          base + 0xc,  2,  1, pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
-+	clks[IMX6SL_CLK_PLL1_SW]          = imx_clk_mux_glitchless("pll1_sw",           base + 0xc,  2,  1, pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
- 	clks[IMX6SL_CLK_OCRAM_ALT_SEL]    = imx_clk_mux("ocram_alt_sel",    base + 0x14, 7,  1, ocram_alt_sels,    ARRAY_SIZE(ocram_alt_sels));
- 	clks[IMX6SL_CLK_OCRAM_SEL]        = imx_clk_mux("ocram_sel",        base + 0x14, 6,  1, ocram_sels,        ARRAY_SIZE(ocram_sels));
- 	clks[IMX6SL_CLK_PRE_PERIPH2_SEL]  = imx_clk_mux("pre_periph2_sel",  base + 0x18, 21, 2, pre_periph_sels,   ARRAY_SIZE(pre_periph_sels));
- 	clks[IMX6SL_CLK_PRE_PERIPH_SEL]   = imx_clk_mux("pre_periph_sel",   base + 0x18, 18, 2, pre_periph_sels,   ARRAY_SIZE(pre_periph_sels));
- 	clks[IMX6SL_CLK_PERIPH2_CLK2_SEL] = imx_clk_mux("periph2_clk2_sel", base + 0x18, 20, 1, periph2_clk2_sels, ARRAY_SIZE(periph2_clk2_sels));
-diff --git a/drivers/clk/imx/clk-imx6sll.c b/drivers/clk/imx/clk-imx6sll.c
-index 52379ee49aec..83bea3b1a416 100644
---- a/drivers/clk/imx/clk-imx6sll.c
-+++ b/drivers/clk/imx/clk-imx6sll.c
-@@ -182,11 +182,11 @@ static void __init imx6sll_clocks_init(struct device_node *ccm_node)
- 	np = ccm_node;
- 	base = of_iomap(np, 0);
- 	WARN_ON(!base);
- 
- 	clks[IMX6SLL_CLK_STEP] 	 	  = imx_clk_mux("step", base + 0x0c, 8, 1, step_sels, ARRAY_SIZE(step_sels));
--	clks[IMX6SLL_CLK_PLL1_SW] 	  = imx_clk_mux_flags("pll1_sw",   base + 0x0c, 2,  1, pll1_sw_sels, ARRAY_SIZE(pll1_sw_sels), 0);
-+	clks[IMX6SLL_CLK_PLL1_SW] 	  = imx_clk_mux_glitchless("pll1_sw",           base + 0x0c, 2,  1, pll1_sw_sels, ARRAY_SIZE(pll1_sw_sels));
- 	clks[IMX6SLL_CLK_AXI_ALT_SEL]	  = imx_clk_mux("axi_alt_sel",	   base + 0x14, 7,  1, axi_alt_sels, ARRAY_SIZE(axi_alt_sels));
- 	clks[IMX6SLL_CLK_AXI_SEL] 	  = imx_clk_mux_flags("axi_sel",   base + 0x14, 6,  1, axi_sels, ARRAY_SIZE(axi_sels), 0);
- 	clks[IMX6SLL_CLK_PERIPH_PRE]	  = imx_clk_mux("periph_pre",      base + 0x18, 18, 2, periph_pre_sels, ARRAY_SIZE(periph_pre_sels));
- 	clks[IMX6SLL_CLK_PERIPH2_PRE]	  = imx_clk_mux("periph2_pre",     base + 0x18, 21, 2, periph2_pre_sels, ARRAY_SIZE(periph2_pre_sels));
- 	clks[IMX6SLL_CLK_PERIPH_CLK2_SEL]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 2, periph_clk2_sels, ARRAY_SIZE(periph_clk2_sels));
-diff --git a/drivers/clk/imx/clk-imx6sx.c b/drivers/clk/imx/clk-imx6sx.c
-index d9f2890ffe62..c8f2d5aa8a74 100644
---- a/drivers/clk/imx/clk-imx6sx.c
-+++ b/drivers/clk/imx/clk-imx6sx.c
-@@ -265,11 +265,11 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
- 	base = of_iomap(np, 0);
- 	WARN_ON(!base);
- 
- 	/*                                                name                reg           shift   width   parent_names       num_parents */
- 	clks[IMX6SX_CLK_STEP]               = imx_clk_mux("step",             base + 0xc,   8,      1,      step_sels,         ARRAY_SIZE(step_sels));
--	clks[IMX6SX_CLK_PLL1_SW]            = imx_clk_mux("pll1_sw",          base + 0xc,   2,      1,      pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
-+	clks[IMX6SX_CLK_PLL1_SW]            = imx_clk_mux_glitchless("pll1_sw",             base + 0xc,   2,      1,      pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
- 	clks[IMX6SX_CLK_OCRAM_SEL]          = imx_clk_mux("ocram_sel",        base + 0x14,  6,      2,      ocram_sels,        ARRAY_SIZE(ocram_sels));
- 	clks[IMX6SX_CLK_PERIPH_PRE]         = imx_clk_mux("periph_pre",       base + 0x18,  18,     2,      periph_pre_sels,   ARRAY_SIZE(periph_pre_sels));
- 	clks[IMX6SX_CLK_PERIPH2_PRE]        = imx_clk_mux("periph2_pre",      base + 0x18,  21,     2,      periph2_pre_sels,   ARRAY_SIZE(periph2_pre_sels));
- 	clks[IMX6SX_CLK_PERIPH_CLK2_SEL]    = imx_clk_mux("periph_clk2_sel",  base + 0x18,  12,     2,      periph_clk2_sels,  ARRAY_SIZE(periph_clk2_sels));
- 	clks[IMX6SX_CLK_PERIPH2_CLK2_SEL]   = imx_clk_mux("periph2_clk2_sel", base + 0x18,  20,     1,      periph2_clk2_sels, ARRAY_SIZE(periph2_clk2_sels));
-diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
-index 361b43f9742e..085c35dfd262 100644
---- a/drivers/clk/imx/clk-imx6ul.c
-+++ b/drivers/clk/imx/clk-imx6ul.c
-@@ -234,11 +234,11 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
- 	base = of_iomap(np, 0);
- 	WARN_ON(!base);
- 
- 	clks[IMX6UL_CA7_SECONDARY_SEL]	  = imx_clk_mux("ca7_secondary_sel", base + 0xc, 3, 1, ca7_secondary_sels, ARRAY_SIZE(ca7_secondary_sels));
- 	clks[IMX6UL_CLK_STEP]		  = imx_clk_mux("step", base + 0x0c, 8, 1, step_sels, ARRAY_SIZE(step_sels));
--	clks[IMX6UL_CLK_PLL1_SW]	  = imx_clk_mux_flags("pll1_sw",   base + 0x0c, 2,  1, pll1_sw_sels, ARRAY_SIZE(pll1_sw_sels), 0);
-+	clks[IMX6UL_CLK_PLL1_SW]	  = imx_clk_mux_glitchless("pll1_sw",   base + 0x0c, 2,  1, pll1_sw_sels, ARRAY_SIZE(pll1_sw_sels));
- 	clks[IMX6UL_CLK_AXI_ALT_SEL]	  = imx_clk_mux("axi_alt_sel",		base + 0x14, 7,  1, axi_alt_sels, ARRAY_SIZE(axi_alt_sels));
- 	clks[IMX6UL_CLK_AXI_SEL]	  = imx_clk_mux_flags("axi_sel",	base + 0x14, 6,  1, axi_sels, ARRAY_SIZE(axi_sels), 0);
- 	clks[IMX6UL_CLK_PERIPH_PRE]	  = imx_clk_mux("periph_pre",       base + 0x18, 18, 2, periph_pre_sels, ARRAY_SIZE(periph_pre_sels));
- 	clks[IMX6UL_CLK_PERIPH2_PRE]	  = imx_clk_mux("periph2_pre",      base + 0x18, 21, 2, periph2_pre_sels, ARRAY_SIZE(periph2_pre_sels));
- 	clks[IMX6UL_CLK_PERIPH_CLK2_SEL]  = imx_clk_mux("periph_clk2_sel",  base + 0x18, 12, 2, periph_clk2_sels, ARRAY_SIZE(periph_clk2_sels));
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index 8076ec040f37..a28268e81824 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -193,12 +193,12 @@ static inline struct clk *imx_clk_gate4(const char *name, const char *parent,
- 
- static inline struct clk *imx_clk_mux(const char *name, void __iomem *reg,
- 		u8 shift, u8 width, const char **parents, int num_parents)
- {
- 	return clk_register_mux(NULL, name, parents, num_parents,
--			CLK_SET_RATE_NO_REPARENT, reg, shift,
--			width, 0, &imx_ccm_lock);
-+			CLK_SET_RATE_NO_REPARENT | CLK_SET_PARENT_GATE,
-+			reg, shift, width, 0, &imx_ccm_lock);
- }
- 
- static inline struct clk *imx_clk_mux2(const char *name, void __iomem *reg,
- 		u8 shift, u8 width, const char **parents, int num_parents)
- {
-@@ -210,12 +210,20 @@ static inline struct clk *imx_clk_mux2(const char *name, void __iomem *reg,
- static inline struct clk *imx_clk_mux_flags(const char *name,
- 		void __iomem *reg, u8 shift, u8 width, const char **parents,
- 		int num_parents, unsigned long flags)
- {
- 	return clk_register_mux(NULL, name, parents, num_parents,
--			flags | CLK_SET_RATE_NO_REPARENT, reg, shift, width, 0,
--			&imx_ccm_lock);
-+			flags | CLK_SET_RATE_NO_REPARENT | CLK_SET_PARENT_GATE,
-+			reg, shift, width, 0, &imx_ccm_lock);
-+}
-+
-+static inline struct clk *imx_clk_mux_glitchless(const char *name, void __iomem *reg,
-+		u8 shift, u8 width, const char **parents, int num_parents)
-+{
-+	return clk_register_mux(NULL, name, parents, num_parents,
-+			CLK_SET_RATE_NO_REPARENT,
-+			reg, shift, width, 0, &imx_ccm_lock);
- }
- 
- struct clk *imx_clk_cpu(const char *name, const char *parent_name,
- 		struct clk *div, struct clk *mux, struct clk *pll,
- 		struct clk *step);
--- 
-2.17.1
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
