@@ -1,37 +1,81 @@
-From: liu.song.a23@gmail.com (Song Liu)
-Date: Mon, 20 Aug 2018 21:55:38 -0700
-Subject: [PATCH v9 0/4] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <b0b9e181-0df7-dc8f-927a-a2cf52bed93d@linux.ibm.com>
-References: <20180820044250.11659-1-ravi.bangoria@linux.ibm.com>
- <CAPhsuW70nRkwM8C76m4c_XF4tjepdRWYezg15sTvkMUDtHZ8JQ@mail.gmail.com>
- <b0b9e181-0df7-dc8f-927a-a2cf52bed93d@linux.ibm.com>
-Message-ID: <CAPhsuW4SQA+uu9=a2jT+KW0Yq=yCyWqe13KtsB_ATTMiNzCXkQ@mail.gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Tue, 21 Aug 2018 07:07:34 +0200
+Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via
+ the nvmem API
+In-Reply-To: <20180820232748.608c3667@tock>
+References: <20180810080526.27207-1-brgl@bgdev.pl>
+ <20180810080526.27207-7-brgl@bgdev.pl>
+ <20180817182720.6a6e5e8e@bbrezillon> <20180819133106.0420df5f@tock>
+ <20180819184609.6dcdbb9a@bbrezillon>
+ <5b8c30b8-41e1-d59e-542b-fef6c6469ff0@linaro.org>
+ <20180820202038.5d3dc195@bbrezillon> <20180820232748.608c3667@tock>
+Message-ID: <20180821070734.6dd1734d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2018 at 9:42 PM, Ravi Bangoria
-<ravi.bangoria@linux.ibm.com> wrote:
-> Hi Song,
->
->> root at virt-test:~# ~/a.out
->> 11
->> semaphore 0
->> semaphore 0
->> semaphore 2      <<<  when the uprobe is enabled
->
-> Yes, this happens when multiple vmas points to the same file portion.
-> Can you check /proc/`pgrep a.out`/maps.
->
-> Logic is simple. If we are going to patch an instruction, increment the
-> reference counter. If we are going to unpatch an instruction, decrement
-> the reference counter. In this case, we patched instruction twice and
-> thus incremented reference counter twice as well.
+On Mon, 20 Aug 2018 23:27:48 +0200
+Alban <albeu@free.fr> wrote:
 
-Yes, this makes sense.
+> On Mon, 20 Aug 2018 20:20:38 +0200
+> Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+> 
+> > On Mon, 20 Aug 2018 11:43:34 +0100
+> > Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
+> >   
+> > > 
+> > > Overall am still not able to clear visualize on how MTD bindings with 
+> > > nvmem cells would look in both partition and un-partition usecases?
+> > > An example DT would be nice here!!    
+> > 
+> > Something along those lines:  
+> 
+> We must also have a compatible string on the nvmem-cells node to make
+> sure we don't clash with the old style MTD partitions,
 
-Song
+That's not possible, because we don't have a reg prop in the
+nvmem-cells node.
 
->
-> Ravi
->
+> or some other
+> device specific binding.
+
+This one might happen.
+
+Was Rob okay with this compatible? If he was, I guess we can go for
+this binding. Srinivas, any objection?
+
+> 
+> > 
+> > 	mtdnode {
+> > 		nvmem-cells {  
+>                         compatible = "nvmem-cells";
+> > 			#address-cells = <1>;
+> > 			#size-cells = <1>;
+> > 
+> > 			cell at 0 {
+> > 				reg = <0x0 0x14>;
+> > 			};
+> > 		};
+> > 
+> > 		partitions {
+> > 			compatible = "fixed-partitions";
+> > 			#address-cells = <1>;
+> > 			#size-cells = <1>;
+> > 
+> > 			partition at 0 {
+> > 				reg = <0x0 0x20000>;
+> > 
+> > 				nvmem-cells {  
+>                                         compatible = "nvmem-cells";
+> > 					#address-cells = <1>;
+> > 					#size-cells = <1>;
+> > 
+> > 					cell at 0 {
+> > 						reg = <0x0 0x10>;
+> > 					};
+> > 				};
+> > 			};
+> > 		};
+> > 	};  
+> 
+> 
+> Alban
