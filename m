@@ -1,51 +1,56 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 21 Aug 2018 14:34:44 +0100
-Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via the
- nvmem API
-In-Reply-To: <20180821133136.1fada1b6@bbrezillon>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180810080526.27207-7-brgl@bgdev.pl> <20180817182720.6a6e5e8e@bbrezillon>
- <20180819133106.0420df5f@tock> <20180819184609.6dcdbb9a@bbrezillon>
- <20180821005327.0d312a85@tock> <20180821074404.23aaeb6b@bbrezillon>
- <81407b4d-a02f-4085-f333-a96102bd96ce@linaro.org>
- <20180821133136.1fada1b6@bbrezillon>
-Message-ID: <6fb36da4-c985-6d6e-f9e1-572f5cd7609b@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 21 Aug 2018 15:34:53 +0200
+Subject: [PATCH] efi/libstub: arm: support building with clang
+In-Reply-To: <32f5ce9b26a386e81857afcd7d135bad@agner.ch>
+References: <20180809164042.210675-1-astrachan@google.com>
+ <32f5ce9b26a386e81857afcd7d135bad@agner.ch>
+Message-ID: <CAKv+Gu_3ePOs=Ng-vjD4_LE5vF_wCXZ74c7anQ=6fnYvj-vQng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 21/08/18 12:31, Boris Brezillon wrote:
->>     * struct nvmem_config - NVMEM device configuration
->> @@ -58,6 +62,7 @@ struct nvmem_config {
->>           bool                    root_only;
->>           nvmem_reg_read_t        reg_read;
->>           nvmem_reg_write_t       reg_write;
->> +       nvmem_match_t           match;
->>           int     size;
->>           int     word_size;
->>           int     stride;
+On 11 August 2018 at 10:49, Stefan Agner <stefan@agner.ch> wrote:
+> On 09.08.2018 18:40, Alistair Strachan wrote:
+>> When building with CONFIG_EFI and CONFIG_EFI_STUB on ARM, the libstub
+>> Makefile would use -mno-single-pic-base without checking it was
+>> supported by the compiler. As the ARM (32-bit) clang backend does not
+>> support this flag, the build would fail.
 >>
-> That might work if nvmem cells are defined directly under the mtdnode.
-Layout should not matter! which is the purpose of this callback.
+>> This changes the Makefile to check the compiler's support for
+>> -mno-single-pic-base before using it, similar to c1c386681bd7 ("ARM:
+>> 8767/1: add support for building ARM kernel with clang").
+>
+> Looks good to me:
+>
+> Reviewed-by: Stefan Agner <stefan@agner.ch>
+>
 
-The only purpose of this callback is to tell nvmem core that the 
-node(nvmem cell) belongs to that provider or not, if it is then we 
-successfully found the provider. Its up to the provider on which layout 
-it describes nvmem cells. Additionally the provider can add additional 
-sanity checks in this match function to ensure that cell is correctly 
-represented.
 
+Thanks. I will queue this after the merge window closes
 
-> If we go for this approach, I'd recommend replacing this ->match() hook
-> by ->is_nvmem_cell() and pass it the cell node instead of the nvmem
-> node, because what we're really after here is knowing which subnode is
-> an nvmem cell and which subnode is not.
-
-I agree on passing cell node instead of its parent. Regarding basic 
-validating if its nvmem cell or not, we can check compatible string in 
-nvmem core if we decide to use "nvmem-cell" compatible.
-
-Also just in case if you missed this, nvmem would not iterate the
-
---srini
+>>
+>> Cc: Stefan Agner <stefan@agner.ch>
+>> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Russell King <linux@armlinux.org.uk>
+>> Cc: linux-efi at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Signed-off-by: Alistair Strachan <astrachan@google.com>
+>> ---
+>>  drivers/firmware/efi/libstub/Makefile | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/firmware/efi/libstub/Makefile
+>> b/drivers/firmware/efi/libstub/Makefile
+>> index a34e9290a699..91339d13f2a1 100644
+>> --- a/drivers/firmware/efi/libstub/Makefile
+>> +++ b/drivers/firmware/efi/libstub/Makefile
+>> @@ -13,7 +13,8 @@ cflags-$(CONFIG_X86)                += -m$(BITS) -D__KERNEL__ -O2 \
+>>
+>>  cflags-$(CONFIG_ARM64)               := $(subst -pg,,$(KBUILD_CFLAGS)) -fpie
+>>  cflags-$(CONFIG_ARM)         := $(subst -pg,,$(KBUILD_CFLAGS)) \
+>> -                                -fno-builtin -fpic -mno-single-pic-base
+>> +                                -fno-builtin -fpic \
+>> +                                $(call cc-option,-mno-single-pic-base)
+>>
+>>  cflags-$(CONFIG_EFI_ARMSTUB) += -I$(srctree)/scripts/dtc/libfdt
