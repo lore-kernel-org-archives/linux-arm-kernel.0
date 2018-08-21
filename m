@@ -1,20 +1,106 @@
-From: fernando.ae2017@gmail.com (Fernando AE)
-Date: Tue, 21 Aug 2018 14:10:14 +0200
-Subject: Atmel AT91 support in mainstream kernel 4.4
-Message-ID: <CAK3Qp=UAex-68+oCk4v6WOERHiWtB5CEqDtQJvGj+xv2GonOhg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 21 Aug 2018 14:23:08 +0200
+Subject: [PATCH] arm64/crypto: remove non-standard notation
+In-Reply-To: <20180820224032.53194-1-ndesaulniers@google.com>
+References: <20180820224032.53194-1-ndesaulniers@google.com>
+Message-ID: <CAKv+Gu-xAmadr96vwStOxdeqi=rCEBrn8V6GofexBhpmA=JiuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+Hi Nick,
 
-I'd like to know if AT91 boards (more specifically AT91SAM9G20) is
-well supported in mainstream Kernel 4.4.
+On 21 August 2018 at 00:40, Nick Desaulniers <ndesaulniers@google.com> wrote:
+> It seems that:
+> ldr q8, =0x30000000200000001
+>
+> is a GNU as convience notation for:
+> ldr q8, .Lconstant
+> .Lconstant
+> .word 0x00000001
+> .word 0x00000002
+> .word 0x00000003
+> .word 0x00000000
+>
+> based on this comment in binutils' source [0]. I've asked for this
+> non-standard convience notation to be added to other assemblers [1], but
+> until then, we can remove it and get equivalent disassembly:
+>
 
-In more details, I'm working in a project of bringing up Linux 4.4 in
-a iMX6 based board, while trying to keep the same sources for our
-legacy AT91 based board. So, I'm wondering if it's a good idea to take
-Freescale's repo based on 4.4 as reference and compiling both for iMX
-and AT91.
+What do you mean by 'non-standard convenience notation'? Which asm
+'standard' does Clang actually claim to implement?
 
-Thanks in advance for your advices,
-Fernando A. E.
+This 'GCC/binutils is broken and we are reluctant to subvert Clang'
+attitude is getting a bit old tbh. In the future, could you please
+mention clang explicitly in the patch subject so it is obvious what
+the purpose of the patch is? I think we should accommodate Clang in
+Linux, but the attitude has got to go.
+
+
+> before:
+> 00000000000009d4 <neon_aes_ctr_encrypt>:
+> ...
+>      a48:       9c000ac8        ldr     q8, ba0 <neon_aes_ctr_encrypt+0x1cc>
+> ...
+>      ba0:       00000001        .word   0x00000001
+>      ba4:       00000002        .word   0x00000002
+>      ba8:       00000003        .word   0x00000003
+>      bac:       00000000        .word   0x00000000
+>
+> after:
+>
+> 00000000000009d4 <neon_aes_ctr_encrypt>:
+> ...
+>      a48:       9c000aa8        ldr     q8, b9c <neon_aes_ctr_encrypt+0x1c8>
+> ...
+>      b9c:       00000001        .word   0x00000001
+>      ba0:       00000002        .word   0x00000002
+>      ba4:       00000003        .word   0x00000003
+>      ba8:       00000000        .word   0x00000000
+>
+> [0] https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=blob;f=gas/testsuite/gas/aarch64/programmer-friendly.s;h=6254c6476efdc848648b05068be0574e7addc85d;hb=HEAD#l11
+> [1] https://bugs.llvm.org/show_bug.cgi?id=38642
+>
+> Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
+> ---
+>  arch/arm64/crypto/aes-modes.S | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/crypto/aes-modes.S b/arch/arm64/crypto/aes-modes.S
+> index 483a7130cf0e..9288c5b0eca2 100644
+> --- a/arch/arm64/crypto/aes-modes.S
+> +++ b/arch/arm64/crypto/aes-modes.S
+> @@ -232,7 +232,7 @@ AES_ENTRY(aes_ctr_encrypt)
+>         bmi             .Lctr1x
+>         cmn             w6, #4                  /* 32 bit overflow? */
+>         bcs             .Lctr1x
+> -       ldr             q8, =0x30000000200000001        /* addends 1,2,3[,0] */
+> +       ldr             q8, .Laddends /* addends 1,2,3[,0] */
+>         dup             v7.4s, w6
+>         mov             v0.16b, v4.16b
+>         add             v7.4s, v7.4s, v8.4s
+> @@ -295,6 +295,12 @@ AES_ENTRY(aes_ctr_encrypt)
+>         rev             x7, x7
+>         ins             v4.d[0], x7
+>         b               .Lctrcarrydone
+> +
+> +.Laddends:
+> +       .word   0x00000001
+> +       .word   0x00000002
+> +       .word   0x00000003
+> +       .word   0x00000000
+
+As Will points out, this breaks BE builds.
+
+>  AES_ENDPROC(aes_ctr_encrypt)
+>         .ltorg
+
+You can drop this .ltorg if you get rid of all =xxx instances.
+
+Actually, though, I would prefer it if we could use some clever short
+sequence of movi+add instructions, and get rid of the literal
+altogether. Or otherwise, please use something like
+
+ldr_l q8, .Laddends, <temp register>
+
+instead, and move the literal into the .rodata section (and use .octa
+so you don't break BE)
