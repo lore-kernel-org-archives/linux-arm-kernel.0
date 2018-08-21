@@ -1,135 +1,104 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Tue, 21 Aug 2018 09:50:44 -0700
-Subject: [PATCH] arm64/crypto: remove non-standard notation
-In-Reply-To: <CAKv+Gu-xAmadr96vwStOxdeqi=rCEBrn8V6GofexBhpmA=JiuA@mail.gmail.com>
-References: <20180820224032.53194-1-ndesaulniers@google.com>
- <CAKv+Gu-xAmadr96vwStOxdeqi=rCEBrn8V6GofexBhpmA=JiuA@mail.gmail.com>
-Message-ID: <CAKwvOdkZR-MWuMU=j=kKXQwA0LEj1n0uoZQyTpwOzZuz9gjmJQ@mail.gmail.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Tue, 21 Aug 2018 18:54:13 +0200
+Subject: [PATCH v3 7/9] KVM: arm/arm64: Only clean the dcache on
+ translation fault
+In-Reply-To: <4d1c7d3b-4abe-fa8d-31ac-7a98ec349db1@arm.com>
+References: <20171023161122.15291-1-marc.zyngier@arm.com>
+ <20171023161122.15291-8-marc.zyngier@arm.com>
+ <bfeee11e-f8bf-78f2-ab61-27e43781e2e3@suse.de>
+ <9fa7efdf-1c21-7b07-edb9-0c7d0d91eaed@arm.com>
+ <2686ddfc-935a-18e0-46bd-0cb608ae44e1@suse.de>
+ <4d1c7d3b-4abe-fa8d-31ac-7a98ec349db1@arm.com>
+Message-ID: <a92a365f-3ad1-587e-4919-3814aebe85b0@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2018 at 5:23 AM Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
+On 08/21/2018 05:08 PM, Marc Zyngier wrote:
+> On 21/08/18 15:08, Alexander Graf wrote:
+>> On 08/21/2018 03:57 PM, Marc Zyngier wrote:
+>>> On 21/08/18 14:35, Alexander Graf wrote:
+>>>> On 10/23/2017 06:11 PM, Marc Zyngier wrote:
+>>>>> The only case where we actually need to perform a dcache maintenance
+>>>>> is when we map the page for the first time, and subsequent permission
+>>>>> faults do not require cache maintenance. Let's make it conditional
+>>>>> on not being a permission fault (and thus a translation fault).
+>>>>>
+>>>>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> This patch unfortunately breaks something on Hi1616 SoCs when running
+>>>> 32bit guests. With this patch applied (and thus with 4.18) I get random
+>>>> illegal instruction warnings from 32bit code inside VMs. I do not know
+>>>> at this point whether this affects other CPUs as well.
+>>> Can you please give a few more details?
+>>>
+>>> - what are the CPUs on this Hi1616? At least a /proc/cpuinfo would help
+>> These are A72s:
+>>
+>> processor??? : 0
+>> BogoMIPS??? : 100.00
+>> Features??? : fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid
+>> CPU implementer??? : 0x41
+>> CPU architecture: 8
+>> CPU variant??? : 0x0
+>> CPU part??? : 0xd08
+>> CPU revision??? : 2
+>>
+>>> - an example of the crash? Is it within the decompressor? After? This
+>>> things do matter, given the number of crazy things the 32bit kernel does
+>> They are always in user space. My current reproducer is this:
+>>
+>>   ? $ while rpm -qa > /dev/null; do :; done
+>>
+>> If I run this in parallel with something that just populates RAM (dd
+>> if=/dev/nvme0n1 of=/dev/null bs=10G) I get an illegal instruction fault
+>> within seconds:
+>>
+>> sh-4.4# while rpm -qa > /dev/null; do true; done
+>> Illegal instruction (core dumped)
+>>
+>>
+>>> - a host kernel configuration?
+>> Host kernel configuration is just the normal openSUSE one:
+>>
+>> https://kernel.opensuse.org/cgit/kernel-source/plain/config/arm64/default?h=stable
+>>
+>>>> If anyone is interested in a reproducer, I have something handy. But for
+>>>> now I believe we should just revert this patch.
+>>> Before we revert anything, I'd like to understand what is happening.
+>> Yeah, I didn't realize the commit is already in since 4.16, so I agree.
+>> I'll bisect a bit, but it may take a while.
+> Do you mind giving this a try?
 >
-> Hi Nick,
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index 1d90d79706bd..df8f3d5eaa22 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -1531,7 +1536,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>   			kvm_set_pfn_dirty(pfn);
+>   		}
+>   
+> -		if (fault_status != FSC_PERM)
+> +		if (fault_status != FSC_PERM || write_fault)
+>   			clean_dcache_guest_page(pfn, PMD_SIZE);
+>   
+>   		if (exec_fault) {
+> @@ -1553,7 +1558,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>   			mark_page_dirty(kvm, gfn);
+>   		}
+>   
+> -		if (fault_status != FSC_PERM)
+> +		if (fault_status != FSC_PERM || write_fault)
+>   			clean_dcache_guest_page(pfn, PAGE_SIZE);
+>   
+>   		if (exec_fault) {
 >
-> On 21 August 2018 at 00:40, Nick Desaulniers <ndesaulniers@google.com> wrote:
-> > It seems that:
-> > ldr q8, =0x30000000200000001
-> >
-> > is a GNU as convience notation for:
-> > ldr q8, .Lconstant
-> > .Lconstant
-> > .word 0x00000001
-> > .word 0x00000002
-> > .word 0x00000003
-> > .word 0x00000000
-> >
-> > based on this comment in binutils' source [0]. I've asked for this
-> > non-standard convience notation to be added to other assemblers [1], but
-> > until then, we can remove it and get equivalent disassembly:
-> >
 >
-> What do you mean by 'non-standard convenience notation'? Which asm
-> 'standard' does Clang actually claim to implement?
+> The missing logic is that a write from the guest could have triggered
+> a CoW, meaning we definitely need to flush it in that case too. It
+> fixes a kvm-unit-test regression here.
 
-Well, for assembly 'standard' is a bit nebulous.  But it's frustrating
-when you can't find what the `=0x...` notation means in either the ARM
-or GNU as manuals.  The source of truth happened to be a comment in
-the source [0] that explained that this was a "programmer friendly
-notation."  Sure, if you can find it.
-
->
-> This 'GCC/binutils is broken and we are reluctant to subvert Clang'
-> attitude is getting a bit old tbh. In the future, could you please
-> mention clang explicitly in the patch subject so it is obvious what
-> the purpose of the patch is? I think we should accommodate Clang in
-> Linux, but the attitude has got to go.
-
-'Reluctant?' Please assume good faith; I filed the bug/noticed
-yesterday [1]. And I'm in favor of supporting the shorthand.  That's
-not my argument at all; Strawman.
-
->
->
-> > before:
-> > 00000000000009d4 <neon_aes_ctr_encrypt>:
-> > ...
-> >      a48:       9c000ac8        ldr     q8, ba0 <neon_aes_ctr_encrypt+0x1cc>
-> > ...
-> >      ba0:       00000001        .word   0x00000001
-> >      ba4:       00000002        .word   0x00000002
-> >      ba8:       00000003        .word   0x00000003
-> >      bac:       00000000        .word   0x00000000
-> >
-> > after:
-> >
-> > 00000000000009d4 <neon_aes_ctr_encrypt>:
-> > ...
-> >      a48:       9c000aa8        ldr     q8, b9c <neon_aes_ctr_encrypt+0x1c8>
-> > ...
-> >      b9c:       00000001        .word   0x00000001
-> >      ba0:       00000002        .word   0x00000002
-> >      ba4:       00000003        .word   0x00000003
-> >      ba8:       00000000        .word   0x00000000
-> >
-> > [0] https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=blob;f=gas/testsuite/gas/aarch64/programmer-friendly.s;h=6254c6476efdc848648b05068be0574e7addc85d;hb=HEAD#l11
-> > [1] https://bugs.llvm.org/show_bug.cgi?id=38642
-> >
-> > Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
-> > ---
-> >  arch/arm64/crypto/aes-modes.S | 8 +++++++-
-> >  1 file changed, 7 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm64/crypto/aes-modes.S b/arch/arm64/crypto/aes-modes.S
-> > index 483a7130cf0e..9288c5b0eca2 100644
-> > --- a/arch/arm64/crypto/aes-modes.S
-> > +++ b/arch/arm64/crypto/aes-modes.S
-> > @@ -232,7 +232,7 @@ AES_ENTRY(aes_ctr_encrypt)
-> >         bmi             .Lctr1x
-> >         cmn             w6, #4                  /* 32 bit overflow? */
-> >         bcs             .Lctr1x
-> > -       ldr             q8, =0x30000000200000001        /* addends 1,2,3[,0] */
-> > +       ldr             q8, .Laddends /* addends 1,2,3[,0] */
-> >         dup             v7.4s, w6
-> >         mov             v0.16b, v4.16b
-> >         add             v7.4s, v7.4s, v8.4s
-> > @@ -295,6 +295,12 @@ AES_ENTRY(aes_ctr_encrypt)
-> >         rev             x7, x7
-> >         ins             v4.d[0], x7
-> >         b               .Lctrcarrydone
-> > +
-> > +.Laddends:
-> > +       .word   0x00000001
-> > +       .word   0x00000002
-> > +       .word   0x00000003
-> > +       .word   0x00000000
->
+This patch unfortunately does not fix the issue. I still see illegal 
+instructions.
 
 
-> As Will points out, this breaks BE builds.
-
-Looks like -EB and -EL are the flags for me to test with in GNU as
-(looks like a few different flags for this).  Is there a target triple
-ABI for BE?  I'll ask around here too, and post my findings.
-
->
-> >  AES_ENDPROC(aes_ctr_encrypt)
-> >         .ltorg
->
-> You can drop this .ltorg if you get rid of all =xxx instances.
->
-> Actually, though, I would prefer it if we could use some clever short
-> sequence of movi+add instructions, and get rid of the literal
-> altogether. Or otherwise, please use something like
->
-> ldr_l q8, .Laddends, <temp register>
->
-> instead, and move the literal into the .rodata section (and use .octa
-> so you don't break BE)
-
-Ah, .octa, neat.  Ok, I'll take a look for v2.
-
--- 
-Thanks,
-~Nick Desaulniers
+Alex
