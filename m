@@ -1,38 +1,44 @@
 From: nhillery@codeaurora.org (Nathan Hillery)
-Date: Tue, 21 Aug 2018 17:44:58 -0400
-Subject: [RFC,V5,1/4] ACPI: Add support for sentinel-delimited probe tables
-In-Reply-To: <1534887901-24734-1-git-send-email-nhillery@codeaurora.org>
-References: <1534887901-24734-1-git-send-email-nhillery@codeaurora.org>
-Message-ID: <1534887901-24734-2-git-send-email-nhillery@codeaurora.org>
+Date: Tue, 21 Aug 2018 17:44:57 -0400
+Subject: [RFC, V5,
+ 0/4] arm_pmu: acpi: variant support and QCOM Falkor extensions
+Message-ID: <1534887901-24734-1-git-send-email-nhillery@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tables declared with the ACPI_PROBE_TABLE linker macro are typically
-traversed by using the start and end symbols created by the linker
-script. However, there are some APIs that use sentinel-delimited
-tables (e.g. acpi_match_device). To better support these APIs, this
-patch adds a section at the end of the probe table. This section can
-be used to add a sentinel for tables that require it.
+This series is a complete re-design of V1 of the QCOM Falkor extensions [1],
+it introduces a probe table based on the HID of a device nested under the CPU
+device to allow variant detection and arm_pmu customization.
 
-Signed-off-by: Nathan Hillery <nhillery@codeaurora.org>
----
- include/asm-generic/vmlinux.lds.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+The first patch adds an additional section at the end of each ACPI probe table.
+This allows probe tables to be sentinel-delimited and better accommodate some
+APIs that require such tables.
 
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index af24057..5894049 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -219,7 +219,8 @@
- 	. = ALIGN(8);							\
- 	VMLINUX_SYMBOL(__##name##_acpi_probe_table) = .;		\
- 	KEEP(*(__##name##_acpi_probe_table))				\
--	VMLINUX_SYMBOL(__##name##_acpi_probe_table_end) = .;
-+	VMLINUX_SYMBOL(__##name##_acpi_probe_table_end) = .;		\
-+	KEEP(*(__##name##_acpi_probe_table_end))
- #else
- #define ACPI_PROBE_TABLE(name)
- #endif
+The second patch adds the PMUv3 ACPI probe table and plumbing to allow drivers
+to plug into the ACPI PMUv3 probe sequence.
+
+The third patch adds the PC capture extension applicable to Falkor and Saphira
+CPUs. This shows how an extension that uses sampling events hooks. A similar
+approach can be used to add RBB support and populate the sample branch stack
+from it.
+
+The fourth patch adds the matrix-based events extension applicable to Falkor
+only.
+
+If this found to be a reasonable extension approach other patches will be
+added to the series to build on the base QCOM extensions.
+
+[1] https://lkml.org/lkml/2017/3/1/540
+
+Changes since V4:
+- Address V4 comments, to keep all extension attributes in config2
+
+Changes since V3:
+- Add PC capture support as first extension. Add matrix-based events on top.
+
+Changes since V2:
+- Address V2 comments, which resulted in removing all uses of the PMU lock.
+
 -- 
 Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
