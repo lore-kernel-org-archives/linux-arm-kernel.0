@@ -1,89 +1,50 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Tue, 21 Aug 2018 14:15:12 +0800
-Subject: [PATCH v2] PCI: dwc: fix scheduling while atomic issues
-Message-ID: <20180821141512.368e3df2@xhacker.debian>
+From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
+Date: Tue, 21 Aug 2018 11:50:43 +0530
+Subject: [PATCH v9 0/4] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <2e997c62-371c-1d9d-97ab-65726f588ab5@linux.ibm.com>
+References: <20180820044250.11659-1-ravi.bangoria@linux.ibm.com>
+ <CAPhsuW70nRkwM8C76m4c_XF4tjepdRWYezg15sTvkMUDtHZ8JQ@mail.gmail.com>
+ <2e997c62-371c-1d9d-97ab-65726f588ab5@linux.ibm.com>
+Message-ID: <dbd74447-b3e2-6bcf-2d8b-717b403bdf11@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When programming inbound/outbound atu, we call usleep_range() after
-each checking PCIE_ATU_ENABLE bit. Unfortunately, the atu programming
-can be called in atomic context:
+Hi Song,
 
-inbound atu programming could be called through
-pci_epc_write_header()
-  =>dw_pcie_ep_write_header()
-    =>dw_pcie_prog_inbound_atu()
+On 08/21/2018 10:53 AM, Ravi Bangoria wrote:
+> Hi Song,
+> 
+>> However, if I start a.out AFTER enabling the uprobe, there is something wrong:
+>>
+>> root at virt-test:~# ~/a.out
+>> 11
+>> semaphore 0       <<< this should be non-zero, as the uprobe is already enabled
 
-outbound atu programming could be called through
-pci_bus_read_config_dword()
-  =>dw_pcie_rd_conf()
-    =>dw_pcie_prog_outbound_atu()
+In this testcase, semaphore variable is stored into .bss:
 
-Fix this issue by calling mdelay() instead.
+  $ nm test | grep semaphore
+  0000000010010c5e B semaphore
+ 
+  $ readelf -SW ./test | grep "data\|bss"
+    [22] .data             PROGBITS        0000000010010c58 000c58 000004 00  WA  0   0  1
+    [23] .bss              NOBITS          0000000010010c5c 000c5c 000004 00  WA  0   0  2
 
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
----
+I'm not so sure but I guess .bss data initialization happens after
+calling uprobe_mmap() and thus you are seeing semaphore as 0.
 
-Since v1
- - use mdelay() instead of udelay() to avoid __bad_udelay()
+To verify this, if I force to save semaphore into data section by
+assigning non-zero value to it:
 
- drivers/pci/controller/dwc/pcie-designware.c | 8 ++++----
- drivers/pci/controller/dwc/pcie-designware.h | 3 +--
- 2 files changed, 5 insertions(+), 6 deletions(-)
+  volatile short semaphore = 1
 
-diff --git a/drivers/pci/controller/dwc/pcie-designware.c b/drivers/pci/controller/dwc/pcie-designware.c
-index 778c4f76a884..2153956a0b20 100644
---- a/drivers/pci/controller/dwc/pcie-designware.c
-+++ b/drivers/pci/controller/dwc/pcie-designware.c
-@@ -135,7 +135,7 @@ static void dw_pcie_prog_outbound_atu_unroll(struct dw_pcie *pci, int index,
- 		if (val & PCIE_ATU_ENABLE)
- 			return;
- 
--		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
-+		mdelay(LINK_WAIT_IATU);
- 	}
- 	dev_err(pci->dev, "Outbound iATU is not being enabled\n");
- }
-@@ -178,7 +178,7 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
- 		if (val & PCIE_ATU_ENABLE)
- 			return;
- 
--		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
-+		mdelay(LINK_WAIT_IATU);
- 	}
- 	dev_err(pci->dev, "Outbound iATU is not being enabled\n");
- }
-@@ -236,7 +236,7 @@ static int dw_pcie_prog_inbound_atu_unroll(struct dw_pcie *pci, int index,
- 		if (val & PCIE_ATU_ENABLE)
- 			return 0;
- 
--		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
-+		mdelay(LINK_WAIT_IATU);
- 	}
- 	dev_err(pci->dev, "Inbound iATU is not being enabled\n");
- 
-@@ -282,7 +282,7 @@ int dw_pcie_prog_inbound_atu(struct dw_pcie *pci, int index, int bar,
- 		if (val & PCIE_ATU_ENABLE)
- 			return 0;
- 
--		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
-+		mdelay(LINK_WAIT_IATU);
- 	}
- 	dev_err(pci->dev, "Inbound iATU is not being enabled\n");
- 
-diff --git a/drivers/pci/controller/dwc/pcie-designware.h b/drivers/pci/controller/dwc/pcie-designware.h
-index 96126fd8403c..9f1a5e399b70 100644
---- a/drivers/pci/controller/dwc/pcie-designware.h
-+++ b/drivers/pci/controller/dwc/pcie-designware.h
-@@ -26,8 +26,7 @@
- 
- /* Parameters for the waiting for iATU enabled routine */
- #define LINK_WAIT_MAX_IATU_RETRIES	5
--#define LINK_WAIT_IATU_MIN		9000
--#define LINK_WAIT_IATU_MAX		10000
-+#define LINK_WAIT_IATU			9
- 
- /* Synopsys-specific PCIe configuration registers */
- #define PCIE_PORT_LINK_CONTROL		0x710
--- 
-2.18.0
+ $ nm test | grep semaphore
+ 0000000010010c5c D semaphore
+
+ $ readelf -SW ./test | grep "data\|bss"
+    [22] .data             PROGBITS        0000000010010c58 000c58 000006 00  WA  0   0  2
+    [23] .bss              NOBITS          0000000010010c5e 000c5e 000002 00  WA  0   0  1 
+
+increment/decrement works fine.
+
+Ravi
