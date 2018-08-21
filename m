@@ -1,52 +1,105 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 21 Aug 2018 18:38:39 +0100
-Subject: [PATCH] arm64: fix for bad_mode() handler to always result in
- panic
-In-Reply-To: <CAM5rFu-REAekjqEJ-BRJz7DJ5jTrF4qu6UrGMwEWGes=zzhmOQ@mail.gmail.com>
-References: <1533639828-19039-1-git-send-email-hari.vyas@broadcom.com>
- <20180807122727.GA9359@kroah.com>
- <CAM5rFu-_x1EfXE72X-4_5XcO6zK86itiny16mgwoRrDBB2=oAA@mail.gmail.com>
- <1bfd65dc-3bf2-f40f-2337-d7f95f4c756e@gmail.com>
- <CAM5rFu9bFxBRNkHEXDsPmjNDRoYi0iQc4WTBuW7bsVOzbXUtLg@mail.gmail.com>
- <CAM5rFu-REAekjqEJ-BRJz7DJ5jTrF4qu6UrGMwEWGes=zzhmOQ@mail.gmail.com>
-Message-ID: <20180821173838.GB5168@brain-police>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 21 Aug 2018 13:01:33 -0500
+Subject: serdev: How to attach serdev devices to USB based tty devices?
+In-Reply-To: <b00d8330-dab4-e444-e02c-dee6b54abc81@kunz-im-inter.net>
+References: <3639955d-5990-1c82-7158-ac07b33c41f2@suse.de>
+ <b00d8330-dab4-e444-e02c-dee6b54abc81@kunz-im-inter.net>
+Message-ID: <CAL_JsqKasgjf5BkEN-ATbLQdDaWxMLoeACkVPUe4vjs+Z0ziGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hari,
+On Tue, Aug 21, 2018 at 11:33 AM Frank Kunz
+<mailinglists@kunz-im-inter.net> wrote:
+>
+> Am 14.08.2018 um 04:28 schrieb Andreas F?rber:
+> > Hi Rob et al.,
+> >
+> > For my LoRa network driver project [1] I have found your serdev
+> > framework to be a valuable help for dealing with hardware modules
+> > exposing some textual or binary UART interface.
+> >
+> > In particular on arm(64) and mips this allows to define an unlimited
+> > number of serdev drivers [2] that are associated via their Device Tree
+> > compatible string and can optionally be configured via DT properties.
+> >
+> > And in theory it seems serdev has also grown support for ACPI.
+> >
+> > Now, a growing number of vendors are placing such modules on a USB stick
+> > for easy evaluation on x86_64 PC hardware, or are designing mPCIe or M.2
+> > cards using their USB pins. While I do not yet have access to such a
+> > device myself, it is my understanding that devices with USB-UART bridge
+> > chipsets (e.g., FTDI) will show up as /dev/ttyUSBx and devices with an
+> > MCU implementing the CDC USB protocol (e.g., Pico-cell gateway = picoGW)
+> > will show up as /dev/ttyACMx.
+> > On the Raspberry Pi I've seen that Device Tree nodes can be used to pass
+> > information to on-board devices such as MAC address to Ethernet chipset,
+> > but that does not seem all that useful for passing a serdev child node
+> > to hot-plugged devices at unpredictable hub/port location (where it
+> > should not interfere with regular USB-UART cables for debugging), nor
+> > would it help ACPI based platforms such as x86_64.
+> >
+> > My idea then was that if we had some unique criteria like vendor and
+> > product IDs (or whatever is supported in usb_device_id), we could write
+> > a usb_driver with suitable USB_DEVICE*() macro. In its probe function we
+> > could call into the existing tty driver's probe function and afterwards
+> > try creating and attaching the appropriate serdev device, i.e. a fixed
+> > USB-to-serdev driver mapping. Problem is that most devices don't seem to
+> > implement any unique identifier I could make this depend on - either by
+> > using a standard FT232/FT2232/CH340G chip or by using STMicroelectronics
+> > virtual com port identifiers in CDC firmware and only differing in the
+> > textual description [3] the usb_device_id does not seem to match on.
+> >
+> > The obvious solution would of course be if hardware vendors could revise
+> > their designs to configure FTDI/etc. chips uniquely. I hear that that
+> > may involve exchanging the chipset, increasing costs, and may impact
+> > existing drivers. Wouldn't help for devices out there today either.
+>
+> They need to put an extra eeprom (cents) into their design and program it.
+>
+> >
+> > For the picoGW CDC firmware, Semtech does appear to own a USB vendor ID,
+> > so it would seem possible to allocate their own product IDs for SX1301
+> > and SX1308 respectively to replace the generic STMicroelectronics IDs,
+> > which the various vendors could offer as firmware updates.
+> >
+> > All outside my control though.
+> >
+> > Oliver therefore suggested to not mess with USB drivers and instead use
+> > a line discipline (ldisc). It seems that for example the userspace tool
+> > slattach takes a tty device and performs an ioctl to switch the generic
+> > tty device into a special N_SLIP protocol mode, implemented in [4].
+> >
+> > However, the existing number of such ldisc modes appears to be below 30,
+> > with hardly any vendor-specific implementation, so polluting its number
+> > space seems undesirable? And in some cases I would like to use the same
+> > protocol implementation over direct UART and over USB, so would like to
+> > avoid duplicate serdev_device_driver and tty_ldisc_ops implementations.
+> >
+> > Long story short, has there been any thinking about a userspace
+> > interface to attach a given serdev driver to a tty device?
+> >
+> > Or is there, on OF_DYNAMIC platforms, a way from userspace to associate
+> > a DT fragment (!= DT Overlay) with a given USB device dynamically, to
+> > attach a serdev node with sub-nodes?
+> >
+> > Any other ideas how to cleanly solve this?
+> >
+> > In some cases we're talking about a "simple" AT-like command interface;
+> > the picoGW implements a semi-generic USB-SPI bridge that may host a
+> > choice of 2+ chipsets, which in turn has two further sub-devices with 3+
+> > chipset choices (theoretically clk output and rx/tx options etc.) each.
+> > (For the latter I'm thinking we'll need a serdev driver exposing a
+> > regmap_bus and then implement regmap_bus based versions of the SPI
+> > drivers like Ben and I refactored SX1257 in [2] last weekend.)>
+>
+> There is a mPCIe module (RAK833) available by RAK wireless that uses a
+> FT2232 as USB-SPI bridge, not uart. I have one here for experiments. It
+> is detected as generic FT2232 device on usb. As far as I understood so
+> far the serdev does only support uart based communication, is there a
+> chance to get USB-SPI bridged modules also working?
 
-Sorry, this has slipped through the cracks.
+That should be somewhat easier than a UART because there's not the
+interactions with the tty layer to deal with. You still have the issue
+of what is the DT root for the FTDI device.
 
-On Tue, Aug 21, 2018 at 07:46:04PM +0530, Hari Vyas wrote:
-> On Fri, Aug 10, 2018 at 10:16 PM, Hari Vyas <hari.vyas@broadcom.com> wrote:
-> > As far as I know, bad mode was earlier(linux 3.14 onwards) also not
-> > resulting in panic always.
-> > Trap-exception framework is recently changed some time back but this
-> > concern remains same.
-> > I am also awaiting a response from ARM maintainers before proceeding.
-> > Just to be more clear, this
-> > concern was pointed out in one of my previous-and-some-what-relative
-> > patch about console-verbose
-> > level restoration issue.
-> >> Florian
-> Gentle reminder for Arm maintainers.
-> If concern can be taken care from your side in different ways then bug
-> can be resolved.
-
-I've recently started trying to untangle much of our fatal trap handling
-code so that the decision between user-mode and kernel-mode actions is
-explicit in the caller, rather than buried deep in the bowels of some
-callchain. The aim is also to remove arm64_notify_die() entirely, which
-is a complete maze of crap that ultimately depends on what kgdb does in
-some cases!
-
-With that out of the way, die() itself could probably be simplified so that
-it (a) avoids the notifier chain [which is useless for us] and (b) is only
-intended to be called for kernel contexts, i.e. as a wrapper around a
-panic_on_oops check.
-
-But this needn't affect your patch, which seems to be a small step in the
-right direction. I'll pick it up as part of my series when I send it out,
-if that's alright with you? I don't think any of this is especially urgent.
-
-Will
+Rob
