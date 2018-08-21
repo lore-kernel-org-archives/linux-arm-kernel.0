@@ -1,105 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 21 Aug 2018 13:01:33 -0500
-Subject: serdev: How to attach serdev devices to USB based tty devices?
-In-Reply-To: <b00d8330-dab4-e444-e02c-dee6b54abc81@kunz-im-inter.net>
-References: <3639955d-5990-1c82-7158-ac07b33c41f2@suse.de>
- <b00d8330-dab4-e444-e02c-dee6b54abc81@kunz-im-inter.net>
-Message-ID: <CAL_JsqKasgjf5BkEN-ATbLQdDaWxMLoeACkVPUe4vjs+Z0ziGw@mail.gmail.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Tue, 21 Aug 2018 18:03:25 +0000
+Subject: [RFC PATCH] ARM: Debug kernel copy by printing
+In-Reply-To: <20180821170252.GA30658@n2100.armlinux.org.uk>
+References: <1530022595-6806-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <TY1PR01MB177010920A6FC7FC1B61358BC0580@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+ <nycvar.YSQ.7.76.1807171552380.20892@knanqh.ubzr>
+ <TY1PR01MB1770DD78CD0DC472245FA6E9C0310@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+ <20180821170252.GA30658@n2100.armlinux.org.uk>
+Message-ID: <TY1PR01MB1770D9DACFC1635FA380EC34C0310@TY1PR01MB1770.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2018 at 11:33 AM Frank Kunz
-<mailinglists@kunz-im-inter.net> wrote:
+> Subject: Re: [RFC PATCH] ARM: Debug kernel copy by printing
 >
-> Am 14.08.2018 um 04:28 schrieb Andreas F?rber:
-> > Hi Rob et al.,
+> On Tue, Aug 21, 2018 at 04:56:19PM +0000, Fabrizio Castro wrote:
+> > Thank you Nicolas.
 > >
-> > For my LoRa network driver project [1] I have found your serdev
-> > framework to be a valuable help for dealing with hardware modules
-> > exposing some textual or binary UART interface.
-> >
-> > In particular on arm(64) and mips this allows to define an unlimited
-> > number of serdev drivers [2] that are associated via their Device Tree
-> > compatible string and can optionally be configured via DT properties.
-> >
-> > And in theory it seems serdev has also grown support for ACPI.
-> >
-> > Now, a growing number of vendors are placing such modules on a USB stick
-> > for easy evaluation on x86_64 PC hardware, or are designing mPCIe or M.2
-> > cards using their USB pins. While I do not yet have access to such a
-> > device myself, it is my understanding that devices with USB-UART bridge
-> > chipsets (e.g., FTDI) will show up as /dev/ttyUSBx and devices with an
-> > MCU implementing the CDC USB protocol (e.g., Pico-cell gateway = picoGW)
-> > will show up as /dev/ttyACMx.
-> > On the Raspberry Pi I've seen that Device Tree nodes can be used to pass
-> > information to on-board devices such as MAC address to Ethernet chipset,
-> > but that does not seem all that useful for passing a serdev child node
-> > to hot-plugged devices at unpredictable hub/port location (where it
-> > should not interfere with regular USB-UART cables for debugging), nor
-> > would it help ACPI based platforms such as x86_64.
-> >
-> > My idea then was that if we had some unique criteria like vendor and
-> > product IDs (or whatever is supported in usb_device_id), we could write
-> > a usb_driver with suitable USB_DEVICE*() macro. In its probe function we
-> > could call into the existing tty driver's probe function and afterwards
-> > try creating and attaching the appropriate serdev device, i.e. a fixed
-> > USB-to-serdev driver mapping. Problem is that most devices don't seem to
-> > implement any unique identifier I could make this depend on - either by
-> > using a standard FT232/FT2232/CH340G chip or by using STMicroelectronics
-> > virtual com port identifiers in CDC firmware and only differing in the
-> > textual description [3] the usb_device_id does not seem to match on.
-> >
-> > The obvious solution would of course be if hardware vendors could revise
-> > their designs to configure FTDI/etc. chips uniquely. I hear that that
-> > may involve exchanging the chipset, increasing costs, and may impact
-> > existing drivers. Wouldn't help for devices out there today either.
->
-> They need to put an extra eeprom (cents) into their design and program it.
->
-> >
-> > For the picoGW CDC firmware, Semtech does appear to own a USB vendor ID,
-> > so it would seem possible to allocate their own product IDs for SX1301
-> > and SX1308 respectively to replace the generic STMicroelectronics IDs,
-> > which the various vendors could offer as firmware updates.
-> >
-> > All outside my control though.
-> >
-> > Oliver therefore suggested to not mess with USB drivers and instead use
-> > a line discipline (ldisc). It seems that for example the userspace tool
-> > slattach takes a tty device and performs an ioctl to switch the generic
-> > tty device into a special N_SLIP protocol mode, implemented in [4].
-> >
-> > However, the existing number of such ldisc modes appears to be below 30,
-> > with hardly any vendor-specific implementation, so polluting its number
-> > space seems undesirable? And in some cases I would like to use the same
-> > protocol implementation over direct UART and over USB, so would like to
-> > avoid duplicate serdev_device_driver and tty_ldisc_ops implementations.
-> >
-> > Long story short, has there been any thinking about a userspace
-> > interface to attach a given serdev driver to a tty device?
-> >
-> > Or is there, on OF_DYNAMIC platforms, a way from userspace to associate
-> > a DT fragment (!= DT Overlay) with a given USB device dynamically, to
-> > attach a serdev node with sub-nodes?
-> >
-> > Any other ideas how to cleanly solve this?
-> >
-> > In some cases we're talking about a "simple" AT-like command interface;
-> > the picoGW implements a semi-generic USB-SPI bridge that may host a
-> > choice of 2+ chipsets, which in turn has two further sub-devices with 3+
-> > chipset choices (theoretically clk output and rx/tx options etc.) each.
-> > (For the latter I'm thinking we'll need a serdev driver exposing a
-> > regmap_bus and then implement regmap_bus based versions of the SPI
-> > drivers like Ben and I refactored SX1257 in [2] last weekend.)>
->
-> There is a mPCIe module (RAK833) available by RAK wireless that uses a
-> FT2232 as USB-SPI bridge, not uart. I have one here for experiments. It
-> is detected as generic FT2232 device on usb. As far as I understood so
-> far the serdev does only support uart based communication, is there a
-> chance to get USB-SPI bridged modules also working?
+> > Russel, does it look ok to you? Do you think you can apply this patch?
+>        ^^
+> Grr, please be more careful in the future, thanks.
 
-That should be somewhat easier than a UART because there's not the
-interactions with the tty layer to deal with. You still have the issue
-of what is the DT root for the FTDI device.
+Oooops, I am very sorry Russell! I'll be more careful the next time.
 
-Rob
+>
+> Patches need to end up in my patch system, otherwise they're likely to
+> be lost.  Details in my signature below.  Thanks.
+
+I have put the patch on your system now.
+
+Thank you,
+Fab
+
+>
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+> According to speedtest.net: 13Mbps down 490kbps up
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
