@@ -1,62 +1,40 @@
-From: albeu@free.fr (Alban)
-Date: Tue, 21 Aug 2018 13:39:16 +0200
-Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via
- the nvmem API
-In-Reply-To: <e0ec3194-fd3a-9b3d-fba8-f88447eb56e9@linaro.org>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180810080526.27207-7-brgl@bgdev.pl>
- <20180817182720.6a6e5e8e@bbrezillon> <20180819133106.0420df5f@tock>
- <20180819184609.6dcdbb9a@bbrezillon>
- <5b8c30b8-41e1-d59e-542b-fef6c6469ff0@linaro.org>
- <20180820202038.5d3dc195@bbrezillon>
- <e0ec3194-fd3a-9b3d-fba8-f88447eb56e9@linaro.org>
-Message-ID: <20180821133916.3a1c51b1@eos>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Tue, 21 Aug 2018 11:51:49 +0000
+Subject: [PATCH V5 1/5] dt-bindings: arm: fsl: add scu binding doc
+In-Reply-To: <AM0PR04MB4211B9113831B292110C709280310@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
+ <1534781305-4770-2-git-send-email-aisheng.dong@nxp.com>
+ <20180820181155.GA13901@bogus>
+ <AM0PR04MB4211B9113831B292110C709280310@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <AM0PR04MB421175C894CFA5F16C2CB79C80310@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Aug 2018 10:50:07 +0100
-Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
+Hi Rob,
 
-> Just curious...Is there a reason why we can't do it like this?:
-> Is this because of issue of #address-cells and #size-cells Or mtd 
-> bindings always prefer subnodes?
+> > > +Clock bindings based on SCU Message Protocol
+> > > +------------------------------------------------------------
+> > > +
+> > > +This binding uses the common clock binding[1].
+> > > +
+> > > +Required properties:
+> > > +- compatible:		Should be "fsl,imx8qxp-clock".
+> > > +- #clock-cells:		Should be 1. Contains the Clock ID value.
+> >
+> > There was a recent patch adding input clocks to other i.MX CCM bindings.
+> > Is that needed here?
+> >
 > 
-> 	mtdnode {
-> 		reg = <0x0123000 0x40000>;
-> 		#address-cells = <1>;
-> 		#size-cells = <1>;
-> 		cell at 0 {
-> 			compatible = "nvmem-cell";
-> 			reg = <0x0 0x14>;
-> 		};
-> 
-> 		partitions {
-> 			compatible = "fixed-partitions";
-> 			#address-cells = <1>;
-> 			#size-cells = <1>;
-> 
-> 			partition at 0 {
-> 				reg = <0x0 0x20000>;
-> 				cell at 0 {
-> 					compatible = "nvmem-cell";
-> 					reg = <0x0 0x10>;
-> 				};
-> 			};
-> 		};
-> 	};
+> Will double check it, thanks for reminder.
 
-That would work, the MTD partitions parser ignore child nodes with a
-compatible string when looking for "old style" partitions, see [1].
-However we still have the a potential address space clash between the
-nvmem cells and the main device binding.
+It should work for mx8 as well.
 
-Alban
+I will add them like below:
++- clocks:              List of clock specifiers, must contain an entry for
++                       each required entry in clock-names
++- clock-names:         Should include entries "xtal_32KHz", "xtal_24MHz"
 
-[1]: https://elixir.bootlin.com/linux/latest/source/drivers/mtd/ofpart.c#L28
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180821/1832621d/attachment.sig>
+Thanks for the suggestion.
+
+Regards
+Dong Aisheng
