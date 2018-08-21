@@ -1,75 +1,122 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 21 Aug 2018 18:46:14 +0200
-Subject: [PATCH] crypto: arm64/aes-modes - get rid of literal load of addend
- vector
-Message-ID: <20180821164614.31513-1-ard.biesheuvel@linaro.org>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 21 Aug 2018 17:48:05 +0100
+Subject: [PATCH v4 1/5] arm64: export memblock_reserve()d regions via
+ /proc/iomem
+In-Reply-To: <38e0224a-46f8-85c3-abe2-5e89d16810ea@arm.com>
+References: <20180723015732.24252-1-takahiro.akashi@linaro.org>
+ <20180723015732.24252-2-takahiro.akashi@linaro.org>
+ <CALAqxLU3+tu09M5=D-6xCqweKenfXtZuBGy6tqEP2DoGAs-LNA@mail.gmail.com>
+ <38e0224a-46f8-85c3-abe2-5e89d16810ea@arm.com>
+Message-ID: <55a21245-7bc2-a700-20ce-1103fbadf72b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the literal load of the addend vector with a sequence that
-composes it using immediates. While at it, tweak the code that refers
-to it so it does not clobber the register, so we can take the load
-out of the loop as well.
+On 08/21/2018 11:22 AM, James Morse wrote:
+> On 08/21/2018 05:39 AM, John Stultz wrote:
+>> On Sun, Jul 22, 2018 at 6:57 PM, AKASHI Takahiro
+>> <takahiro.akashi@linaro.org> wrote:
+>>> From: James Morse <james.morse@arm.com>
+>>>
+>>> There has been some confusion around what is necessary to prevent kexec
+>>> overwriting important memory regions. memblock: reserve, or nomap?
+>>> Only memblock nomap regions are reported via /proc/iomem, kexec's
+>>> user-space doesn't know about memblock_reserve()d regions.
+>>>
+>>> Until commit f56ab9a5b73ca ("efi/arm: Don't mark ACPI reclaim memory
+>>> as MEMBLOCK_NOMAP") the ACPI tables were nomap, now they are reserved
+>>> and thus possible for kexec to overwrite with the new kernel or initrd.
+>>> But this was always broken, as the UEFI memory map is also reserved
+>>> and not marked as nomap.
+>>>
+>>> Exporting both nomap and reserved memblock types is a nuisance as
+>>> they live in different memblock structures which we can't walk at
+>>> the same time.
+>>>
+>>> Take a second walk over memblock.reserved and add new 'reserved'
+>>> subnodes for the memblock_reserved() regions that aren't already
+>>> described by the existing code. (e.g. Kernel Code)
+>>>
+>>> We use reserve_region_with_split() to find the gaps in existing named
+>>> regions. This handles the gap between 'kernel code' and 'kernel data'
+>>> which is memblock_reserve()d, but already partially described by
+>>> request_standard_resources(). e.g.:
+>>> | 80000000-dfffffff : System RAM
+>>> |?? 80080000-80ffffff : Kernel code
+>>> |?? 81000000-8158ffff : reserved
+>>> |?? 81590000-8237efff : Kernel data
+>>> |?? a0000000-dfffffff : Crash kernel
+>>> | e00f0000-f949ffff : System RAM
+>>>
+>>> reserve_region_with_split needs kzalloc() which isn't available when
+>>> request_standard_resources() is called, use an initcall.
+> 
+>>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+>>> index 30ad2f085d1f..5b4fac434c84 100644
+>>> --- a/arch/arm64/kernel/setup.c
+>>> +++ b/arch/arm64/kernel/setup.c
+>>> @@ -241,6 +241,44 @@ static void __init request_standard_resources(void)
+> 
+>>> +static int __init reserve_memblock_reserved_regions(void)
+> 
+>>> +?????? for_each_reserved_mem_region(i, &start, &end) {
+>>> +?????????????? if (end <= roundup_end)
+>>> +?????????????????????? continue; /* done already */
+>>> +
+>>> +?????????????? start = __pfn_to_phys(PFN_DOWN(start));
+>>> +?????????????? end = __pfn_to_phys(PFN_UP(end)) - 1;
+>>> +?????????????? roundup_end = end;
+>>> +
+>>> +?????????????? res = kzalloc(sizeof(*res), GFP_ATOMIC);
+>>> +?????????????? if (WARN_ON(!res))
+>>> +?????????????????????? return -ENOMEM;
+>>> +?????????????? res->start = start;
+>>> +?????????????? res->end = end;
+>>> +?????????????? res->name? = "reserved";
+>>> +?????????????? res->flags = IORESOURCE_MEM;
+>>> +
+>>> +?????????????? mem = request_resource_conflict(&iomem_resource, res);
+>>> +?????????????? /*
+>>> +??????????????? * We expected memblock_reserve() regions to conflict with
+>>> +??????????????? * memory created by request_standard_resources().
+>>> +??????????????? */
+>>> +?????????????? if (WARN_ON_ONCE(!mem))
 
-This results in generally better code, but also works around a Clang
-issue, whose integrated assembler does not implement the GNU ARM asm
-syntax completely, and does not support the =literal notation for
-FP registers.
 
-Cc: Nick Desaulniers <ndesaulniers@google.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/crypto/aes-modes.S | 18 ++++++++++++------
- 1 file changed, 12 insertions(+), 6 deletions(-)
+>> Since this patch landed, on the HiKey board at bootup I'm seeing:
+>>
+>> [??? 0.451884] WARNING: CPU: 1 PID: 1 at arch/arm64/kernel/setup.c:271
+>> reserve_memblock_reserved_regions+0xd4/0x13c
 
-diff --git a/arch/arm64/crypto/aes-modes.S b/arch/arm64/crypto/aes-modes.S
-index 483a7130cf0e..e966620ee230 100644
---- a/arch/arm64/crypto/aes-modes.S
-+++ b/arch/arm64/crypto/aes-modes.S
-@@ -225,6 +225,14 @@ AES_ENTRY(aes_ctr_encrypt)
- 	enc_prepare	w22, x21, x6
- 	ld1		{v4.16b}, [x24]
- 
-+	/* compose addend vector { 1, 2, 3, 0 } in v8.4s */
-+	movi		v7.4h, #1
-+	movi		v8.4h, #2
-+	uaddl		v6.4s, v7.4h, v8.4h
-+	zip1		v8.8h, v7.8h, v8.8h
-+	zip1		v8.4s, v8.4s, v6.4s
-+	zip2		v8.8h, v8.8h, v7.8h
-+
- 	umov		x6, v4.d[1]		/* keep swabbed ctr in reg */
- 	rev		x6, x6
- .LctrloopNx:
-@@ -232,17 +240,16 @@ AES_ENTRY(aes_ctr_encrypt)
- 	bmi		.Lctr1x
- 	cmn		w6, #4			/* 32 bit overflow? */
- 	bcs		.Lctr1x
--	ldr		q8, =0x30000000200000001	/* addends 1,2,3[,0] */
- 	dup		v7.4s, w6
- 	mov		v0.16b, v4.16b
- 	add		v7.4s, v7.4s, v8.4s
- 	mov		v1.16b, v4.16b
--	rev32		v8.16b, v7.16b
-+	rev32		v7.16b, v7.16b
- 	mov		v2.16b, v4.16b
- 	mov		v3.16b, v4.16b
--	mov		v1.s[3], v8.s[0]
--	mov		v2.s[3], v8.s[1]
--	mov		v3.s[3], v8.s[2]
-+	mov		v1.s[3], v7.s[0]
-+	mov		v2.s[3], v7.s[1]
-+	mov		v3.s[3], v7.s[2]
- 	ld1		{v5.16b-v7.16b}, [x20], #48	/* get 3 input blocks */
- 	bl		aes_encrypt_block4x
- 	eor		v0.16b, v5.16b, v0.16b
-@@ -296,7 +303,6 @@ AES_ENTRY(aes_ctr_encrypt)
- 	ins		v4.d[0], x7
- 	b		.Lctrcarrydone
- AES_ENDPROC(aes_ctr_encrypt)
--	.ltorg
- 
- 
- 	/*
--- 
-2.17.1
+>> ?From skimming the patch, it seems this is maybe expected? Or should
+>> this warning raise eyebrows? I can't quite figure it out.
+> 
+> Ugh, sorry for the noise! This is warning that there is something wrong
+> with our assumptions about what types of memory exist.
+> 
+> 
+>> It seems to trigger on the pstore memory at 0x21f00000-0x21ffffff.
+> 
+> ... pmem ...
+
+
+> So, this is a memblock_reserved() range that isn't actually memory.
+> 
+> This happens because your DT has carved these regions out of the memory
+> node, but added a named 'reserved-memory' region for them, just in case?
+> I'm not sure what it means if 'reserved-memory' is not also described as
+> memory....
+> 
+> You do need the carve-out, otherwise this gets covered by the linear
+> map, and when you throw in that 'unbuffered' property you get both a
+> cacheable and uncacheable mapping of the same page.
+
+
+Hmm, looks like its (even) more complicated than I thought, of_reserved_mem.c's 
+definition of 'nomap' is memblock_remove(), not memblock_mark_nomap().
+
+This might be more common to all users of DTs memreserve.
+
+
+Thanks,
+
+James
