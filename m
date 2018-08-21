@@ -1,48 +1,89 @@
-From: hejianet@gmail.com (Jia He)
-Date: Tue, 21 Aug 2018 14:14:30 +0800
-Subject: [RESEND PATCH v10 3/6] mm: page_alloc: reduce unnecessary binary
- search in memblock_next_valid_pfn()
-In-Reply-To: <61ca29b9-a985-cce0-03e9-d216791c802c@microsoft.com>
-References: <1530867675-9018-1-git-send-email-hejianet@gmail.com>
- <1530867675-9018-4-git-send-email-hejianet@gmail.com>
- <61ca29b9-a985-cce0-03e9-d216791c802c@microsoft.com>
-Message-ID: <334337ca-811e-4a2e-09ff-65ebe37ef6df@gmail.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Tue, 21 Aug 2018 14:15:12 +0800
+Subject: [PATCH v2] PCI: dwc: fix scheduling while atomic issues
+Message-ID: <20180821141512.368e3df2@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pasha
+When programming inbound/outbound atu, we call usleep_range() after
+each checking PCIE_ATU_ENABLE bit. Unfortunately, the atu programming
+can be called in atomic context:
 
-On 8/17/2018 9:08 AM, Pasha Tatashin Wrote:
-> 
->> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
->> ---
->>  mm/memblock.c | 37 +++++++++++++++++++++++++++++--------
->>  1 file changed, 29 insertions(+), 8 deletions(-)
->>
->> diff --git a/mm/memblock.c b/mm/memblock.c
->> index ccad225..84f7fa7 100644
->> --- a/mm/memblock.c
->> +++ b/mm/memblock.c
->> @@ -1140,31 +1140,52 @@ int __init_memblock memblock_set_node(phys_addr_t base, phys_addr_t size,
->>  #endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
->>  
->>  #ifdef CONFIG_HAVE_MEMBLOCK_PFN_VALID
->> +static int early_region_idx __init_memblock = -1;
-> 
-> One comment:
-> 
-> This should be __initdata, but even better bring it inside the function
-> as local static variable.
-> 
-Seems it should be __initdata_memblock instead of __initdata?
+inbound atu programming could be called through
+pci_epc_write_header()
+  =>dw_pcie_ep_write_header()
+    =>dw_pcie_prog_inbound_atu()
 
+outbound atu programming could be called through
+pci_bus_read_config_dword()
+  =>dw_pcie_rd_conf()
+    =>dw_pcie_prog_outbound_atu()
+
+Fix this issue by calling mdelay() instead.
+
+Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+---
+
+Since v1
+ - use mdelay() instead of udelay() to avoid __bad_udelay()
+
+ drivers/pci/controller/dwc/pcie-designware.c | 8 ++++----
+ drivers/pci/controller/dwc/pcie-designware.h | 3 +--
+ 2 files changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/pci/controller/dwc/pcie-designware.c b/drivers/pci/controller/dwc/pcie-designware.c
+index 778c4f76a884..2153956a0b20 100644
+--- a/drivers/pci/controller/dwc/pcie-designware.c
++++ b/drivers/pci/controller/dwc/pcie-designware.c
+@@ -135,7 +135,7 @@ static void dw_pcie_prog_outbound_atu_unroll(struct dw_pcie *pci, int index,
+ 		if (val & PCIE_ATU_ENABLE)
+ 			return;
+ 
+-		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
++		mdelay(LINK_WAIT_IATU);
+ 	}
+ 	dev_err(pci->dev, "Outbound iATU is not being enabled\n");
+ }
+@@ -178,7 +178,7 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
+ 		if (val & PCIE_ATU_ENABLE)
+ 			return;
+ 
+-		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
++		mdelay(LINK_WAIT_IATU);
+ 	}
+ 	dev_err(pci->dev, "Outbound iATU is not being enabled\n");
+ }
+@@ -236,7 +236,7 @@ static int dw_pcie_prog_inbound_atu_unroll(struct dw_pcie *pci, int index,
+ 		if (val & PCIE_ATU_ENABLE)
+ 			return 0;
+ 
+-		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
++		mdelay(LINK_WAIT_IATU);
+ 	}
+ 	dev_err(pci->dev, "Inbound iATU is not being enabled\n");
+ 
+@@ -282,7 +282,7 @@ int dw_pcie_prog_inbound_atu(struct dw_pcie *pci, int index, int bar,
+ 		if (val & PCIE_ATU_ENABLE)
+ 			return 0;
+ 
+-		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
++		mdelay(LINK_WAIT_IATU);
+ 	}
+ 	dev_err(pci->dev, "Inbound iATU is not being enabled\n");
+ 
+diff --git a/drivers/pci/controller/dwc/pcie-designware.h b/drivers/pci/controller/dwc/pcie-designware.h
+index 96126fd8403c..9f1a5e399b70 100644
+--- a/drivers/pci/controller/dwc/pcie-designware.h
++++ b/drivers/pci/controller/dwc/pcie-designware.h
+@@ -26,8 +26,7 @@
+ 
+ /* Parameters for the waiting for iATU enabled routine */
+ #define LINK_WAIT_MAX_IATU_RETRIES	5
+-#define LINK_WAIT_IATU_MIN		9000
+-#define LINK_WAIT_IATU_MAX		10000
++#define LINK_WAIT_IATU			9
+ 
+ /* Synopsys-specific PCIe configuration registers */
+ #define PCIE_PORT_LINK_CONTROL		0x710
 -- 
-Cheers,
-Jia
->>  ulong __init_memblock memblock_next_valid_pfn(ulong pfn)
->>  {
-> 
-> Otherwise looks good:
-> 
-> Reviewed-by: Pavel Tatashin <pavel.tatashin@microsoft.com>
-> 
+2.18.0
