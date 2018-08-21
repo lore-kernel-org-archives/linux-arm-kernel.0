@@ -1,79 +1,56 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 21 Aug 2018 16:54:49 +0100
-Subject: bcm2837: tons of DMA mask not set in 4.18.0-rc6-next-20180727
-In-Reply-To: <CAMuHMdURr7nLs3d1G4KyM9MCtY2veP2jV6Fid4qhjDyo-A3F7w@mail.gmail.com>
-References: <325098108.159647.1532708245242@email.1und1.de>
- <aee486c9-e503-ce1a-9102-82712be2db62@arm.com>
- <CAMuHMdURr7nLs3d1G4KyM9MCtY2veP2jV6Fid4qhjDyo-A3F7w@mail.gmail.com>
-Message-ID: <cfee6fc6-9496-fdd3-1db4-4da9e20a775a@arm.com>
+From: vkoul@kernel.org (Vinod)
+Date: Tue, 21 Aug 2018 21:25:53 +0530
+Subject: [PATCH 3/3] dmaengine: xilinx_dma: Fix 64-bit simple CDMA transfer
+In-Reply-To: <1532688639-32230-4-git-send-email-radhey.shyam.pandey@xilinx.com>
+References: <1532688639-32230-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+ <1532688639-32230-4-git-send-email-radhey.shyam.pandey@xilinx.com>
+Message-ID: <20180821155553.GI2388@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On 27-07-18, 16:20, Radhey Shyam Pandey wrote:
+> In AXI CDMA simple mode also pass MSB bits of source and destination
+> address to xilinx_write function. This fixes simple CDMA operation
+> mode using 64-bit addressing.
+> 
+> Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+>  drivers/dma/xilinx/xilinx_dma.c |    6 ++++--
+>  1 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+> index a37871e..2e15d86 100644
+> --- a/drivers/dma/xilinx/xilinx_dma.c
+> +++ b/drivers/dma/xilinx/xilinx_dma.c
+> @@ -1245,8 +1245,10 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
+>  
+>  		hw = &segment->hw;
+>  
+> -		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR, hw->src_addr);
+> -		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR, hw->dest_addr);
+> +		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR, (dma_addr_t)
+> +			     ((u64)hw->src_addr_msb << 32 | hw->src_addr));
 
-On 21/08/18 16:45, Geert Uytterhoeven wrote:
-> Hi Robin,
-> 
-> CC Lee (mfd), Wolfram (i2c), Marek (bd9571wmv + recent da9063 hacking)
-> 
-> On Fri, Jul 27, 2018 at 6:28 PM Robin Murphy <robin.murphy@arm.com> wrote:
->> On 27/07/18 17:17, Stefan Wahren wrote:
->>> i was noticed that recent linux-next on Raspberry Pi 3 (32 bit) doesn't boot anymore. So i tested todays linux-next with multi_v7_defconfig and i'm getting a lot of DMA mask not set warnings. At least USB dwc2 is broken.
->>>
->>> Any suggestions before i start to bisect?
->>
->> https://patchwork.kernel.org/patch/10547231/
->>
->> Although the upside of this hiccup is that it should give us a fair view
->> of how many active drivers are still relying on implicit default DMA
->> masks - I'm now waiting for kernelci's boot chart to catch up with
->> today's -next to see the full fallout...
-> 
-> I'm still seeing the following on r8a7791/koelsch with a DA9063 PMIC, which
-> is an MFD device:
-> 
->      da9063-watchdog da9063-watchdog: DMA mask not set
->      da9063-rtc da9063-rtc: DMA mask not set
-> 
-> The dma masks (both normal and coherent) are NULL, and inherited from the
-> i2c parent device (6-0058):
-> 
->          pmic at 58 {
->                  compatible = "dlg,da9063";
->                  reg = <0x58>;
->                  interrupt-parent = <&irqc0>;
->                  interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
->                  interrupt-controller;
-> 
->                  rtc {
->                          compatible = "dlg,da9063-rtc";
->                  };
-> 
->                  wdt {
->                          compatible = "dlg,da9063-watchdog";
->                  };
->          };
-> 
-> The DA9063 MFD driver creates more subdevices than the two listed above,
-> but the warning doesn't trigger for them, presumably because they don't
-> have corresponding nodes in DT.
-> 
-> On r8a779{5,6,65}*/salvator-x, there's also an MFD device (BD9571WMC PMIC)
-> on an i2c bus, inheriting NULL DMA masks from its parent, but it doesn't
-> have any subnodes in DT, and the warning isn't triggered neither.
+so this is:
+        (dma_addr_t)((u64)hw->src_addr_msb << 32 | hw->src_addr)
 
-I think the question here is why I2C slave devices are getting the 
-chance to be configured as DMA masters at all :/
+what is src_addr data type? I think its u32. It would be better to
+update xilinx_write() to take u64 and not dma_addr_t.
 
-Are they getting added to the wrong bus somehow?
 
-Robin.
+> +		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR, (dma_addr_t)
+> +			     ((u64)hw->dest_addr_msb << 32 | hw->dest_addr));
+>  
+>  		/* Start the transfer */
+>  		dma_ctrl_write(chan, XILINX_DMA_REG_BTT,
+> -- 
+> 1.7.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-> 
-> Anyone with a clue?
-> Thanks!
-> 
-> Gr{oetje,eeting}s,
-> 
->                          Geert
-> 
+-- 
+~Vinod
