@@ -1,99 +1,81 @@
-From: liu.song.a23@gmail.com (Song Liu)
-Date: Tue, 21 Aug 2018 13:46:22 -0700
-Subject: [PATCH v9 3/4] trace_uprobe/sdt: Prevent multiple reference
- counter for same uprobe
-In-Reply-To: <20180820044250.11659-4-ravi.bangoria@linux.ibm.com>
-References: <20180820044250.11659-1-ravi.bangoria@linux.ibm.com>
- <20180820044250.11659-4-ravi.bangoria@linux.ibm.com>
-Message-ID: <CAPhsuW4hZv7cdF37aAUyfMR5e_Wb-25Drzjg7=MNNf8Gb9dOMQ@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 21 Aug 2018 14:08:29 -0700
+Subject: [RESEND PATCH v10 3/6] mm: page_alloc: reduce unnecessary
+ binary search in memblock_next_valid_pfn()
+In-Reply-To: <334337ca-811e-4a2e-09ff-65ebe37ef6df@gmail.com>
+References: <1530867675-9018-1-git-send-email-hejianet@gmail.com>
+ <1530867675-9018-4-git-send-email-hejianet@gmail.com>
+ <61ca29b9-a985-cce0-03e9-d216791c802c@microsoft.com>
+ <334337ca-811e-4a2e-09ff-65ebe37ef6df@gmail.com>
+Message-ID: <20180821140829.7d804678e9db8725f52180c2@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 19, 2018 at 9:42 PM, Ravi Bangoria
-<ravi.bangoria@linux.ibm.com> wrote:
-> We assume to have only one reference counter for one uprobe.
-> Don't allow user to add multiple trace_uprobe entries having
-> same inode+offset but different reference counter.
->
-> Ex,
->   # echo "p:sdt_tick/loop2 /home/ravi/tick:0x6e4(0x10036)" > uprobe_events
->   # echo "p:sdt_tick/loop2_1 /home/ravi/tick:0x6e4(0xfffff)" >> uprobe_events
->   bash: echo: write error: Invalid argument
->
->   # dmesg
->   trace_kprobe: Reference counter offset mismatch.
->
-> There is one exception though:
-> When user is trying to replace the old entry with the new
-> one, we allow this if the new entry does not conflict with
-> any other existing entries.
->
-> Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
-> Acked-by: Srikar Dronamraju <srikar@linux.vnet.ibm.com>
-> Reviewed-by: Song Liu <songliubraving@fb.com>
+On Tue, 21 Aug 2018 14:14:30 +0800 Jia He <hejianet@gmail.com> wrote:
 
-Reviewed-and-tested-by: Song Liu <songliubraving@fb.com>
+> Hi Pasha
+> 
+> On 8/17/2018 9:08 AM, Pasha Tatashin Wrote:
+> > 
+> >> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+> >> ---
+> >>  mm/memblock.c | 37 +++++++++++++++++++++++++++++--------
+> >>  1 file changed, 29 insertions(+), 8 deletions(-)
+> >>
+> >> diff --git a/mm/memblock.c b/mm/memblock.c
+> >> index ccad225..84f7fa7 100644
+> >> --- a/mm/memblock.c
+> >> +++ b/mm/memblock.c
+> >> @@ -1140,31 +1140,52 @@ int __init_memblock memblock_set_node(phys_addr_t base, phys_addr_t size,
+> >>  #endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
+> >>  
+> >>  #ifdef CONFIG_HAVE_MEMBLOCK_PFN_VALID
+> >> +static int early_region_idx __init_memblock = -1;
+> > 
+> > One comment:
+> > 
+> > This should be __initdata, but even better bring it inside the function
+> > as local static variable.
+> > 
+> Seems it should be __initdata_memblock instead of __initdata?
+> 
 
-> Reviewed-by: Oleg Nesterov <oleg@redhat.com>
-> ---
->  kernel/trace/trace_uprobe.c | 37 +++++++++++++++++++++++++++++++++++--
->  1 file changed, 35 insertions(+), 2 deletions(-)
->
-> diff --git a/kernel/trace/trace_uprobe.c b/kernel/trace/trace_uprobe.c
-> index a7ef6c4ca16e..21d9fffaa096 100644
-> --- a/kernel/trace/trace_uprobe.c
-> +++ b/kernel/trace/trace_uprobe.c
-> @@ -324,6 +324,35 @@ static int unregister_trace_uprobe(struct trace_uprobe *tu)
->         return 0;
->  }
->
-> +/*
-> + * Uprobe with multiple reference counter is not allowed. i.e.
-> + * If inode and offset matches, reference counter offset *must*
-> + * match as well. Though, there is one exception: If user is
-> + * replacing old trace_uprobe with new one(same group/event),
-> + * then we allow same uprobe with new reference counter as far
-> + * as the new one does not conflict with any other existing
-> + * ones.
-> + */
-> +static struct trace_uprobe *find_old_trace_uprobe(struct trace_uprobe *new)
-> +{
-> +       struct trace_uprobe *tmp, *old = NULL;
-> +       struct inode *new_inode = d_real_inode(new->path.dentry);
-> +
-> +       old = find_probe_event(trace_event_name(&new->tp.call),
-> +                               new->tp.call.class->system);
-> +
-> +       list_for_each_entry(tmp, &uprobe_list, list) {
-> +               if ((old ? old != tmp : true) &&
-> +                   new_inode == d_real_inode(tmp->path.dentry) &&
-> +                   new->offset == tmp->offset &&
-> +                   new->ref_ctr_offset != tmp->ref_ctr_offset) {
-> +                       pr_warn("Reference counter offset mismatch.");
-> +                       return ERR_PTR(-EINVAL);
-> +               }
-> +       }
-> +       return old;
-> +}
-> +
->  /* Register a trace_uprobe and probe_event */
->  static int register_trace_uprobe(struct trace_uprobe *tu)
->  {
-> @@ -333,8 +362,12 @@ static int register_trace_uprobe(struct trace_uprobe *tu)
->         mutex_lock(&uprobe_lock);
->
->         /* register as an event */
-> -       old_tu = find_probe_event(trace_event_name(&tu->tp.call),
-> -                       tu->tp.call.class->system);
-> +       old_tu = find_old_trace_uprobe(tu);
-> +       if (IS_ERR(old_tu)) {
-> +               ret = PTR_ERR(old_tu);
-> +               goto end;
-> +       }
-> +
->         if (old_tu) {
->                 /* delete old event */
->                 ret = unregister_trace_uprobe(old_tu);
-> --
-> 2.14.4
->
+Eh, it's 4 bytes.
+
+It should however be local to the sole function which uses it.
+
+And what's this "ulong" thing?  mm/ uses unsigned long.
+
+--- a/mm/memblock.c~mm-page_alloc-reduce-unnecessary-binary-search-in-memblock_next_valid_pfn-fix
++++ a/mm/memblock.c
+@@ -1232,15 +1232,15 @@ int __init_memblock memblock_set_node(ph
+ #endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
+ 
+ #ifdef CONFIG_HAVE_MEMBLOCK_PFN_VALID
+-static int early_region_idx __init_memblock = -1;
+-ulong __init_memblock memblock_next_valid_pfn(ulong pfn)
++unsigned long __init_memblock memblock_next_valid_pfn(unsigned long pfn)
+ {
+ 	struct memblock_type *type = &memblock.memory;
+ 	struct memblock_region *regions = type->regions;
+ 	uint right = type->cnt;
+ 	uint mid, left = 0;
+-	ulong start_pfn, end_pfn, next_start_pfn;
++	unsigned long start_pfn, end_pfn, next_start_pfn;
+ 	phys_addr_t addr = PFN_PHYS(++pfn);
++	static int early_region_idx __initdata_memblock = -1;
+ 
+ 	/* fast path, return pfn+1 if next pfn is in the same region */
+ 	if (early_region_idx != -1) {
+--- a/include/linux/mmzone.h~mm-page_alloc-reduce-unnecessary-binary-search-in-memblock_next_valid_pfn-fix
++++ a/include/linux/mmzone.h
+@@ -1269,7 +1269,7 @@ static inline int pfn_present(unsigned l
+ 
+ #define early_pfn_valid(pfn)	pfn_valid(pfn)
+ #ifdef CONFIG_HAVE_MEMBLOCK_PFN_VALID
+-extern ulong memblock_next_valid_pfn(ulong pfn);
++extern unsigned long memblock_next_valid_pfn(unsigned long pfn);
+ #define next_valid_pfn(pfn)	memblock_next_valid_pfn(pfn)
+ #endif
+ void sparse_init(void);
+_
