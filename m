@@ -1,329 +1,198 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 21 Aug 2018 03:00:34 +0000
-Subject: [PATCH V5 1/5] dt-bindings: arm: fsl: add scu binding doc
-In-Reply-To: <20180820181155.GA13901@bogus>
-References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
- <1534781305-4770-2-git-send-email-aisheng.dong@nxp.com>
- <20180820181155.GA13901@bogus>
-Message-ID: <AM0PR04MB4211B9113831B292110C709280310@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: liang.yang@amlogic.com (Liang Yang)
+Date: Tue, 21 Aug 2018 11:33:21 +0800
+Subject: [RFC PATCH v2 2/2] mtd: rawnand: meson: add support for Amlogic
+ NAND flash controller
+In-Reply-To: <20180817155608.5929b37a@bbrezillon>
+References: <20180719094612.5833-1-yixun.lan@amlogic.com>
+ <20180719094612.5833-3-yixun.lan@amlogic.com>
+ <20180801235045.5b4d8211@bbrezillon>
+ <42877a0d-9830-0626-3f64-e49a326eaa3c@amlogic.com>
+ <20180817155608.5929b37a@bbrezillon>
+Message-ID: <e4d4d237-1f63-467e-d55c-b8cfba150767@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Boris,
 
-> -----Original Message-----
-> From: Rob Herring <robh@kernel.org>
-> Sent: Tuesday, August 21, 2018 2:12 AM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com;
-> kernel at pengutronix.de; shawnguo at kernel.org; Fabio Estevam
-> <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>; Mark
-> Rutland <mark.rutland@arm.com>; Jassi Brar <jassisinghbrar@gmail.com>;
-> Linus Walleij <linus.walleij@linaro.org>; Stephen Boyd <sboyd@kernel.org>;
-> Rafael J. Wysocki <rjw@rjwysocki.net>; Ulf Hansson
-> <ulf.hansson@linaro.org>; devicetree at vger.kernel.org; linux-
-> clk at vger.kernel.org; linux-gpio at vger.kernel.org; linux-pm at vger.kernel.org
-> Subject: Re: [PATCH V5 1/5] dt-bindings: arm: fsl: add scu binding doc
+On 8/17/2018 9:56 PM, Boris Brezillon wrote:
+> On Fri, 17 Aug 2018 21:03:59 +0800
+> Liang Yang <liang.yang@amlogic.com> wrote:
 > 
-> On Tue, Aug 21, 2018 at 12:08:21AM +0800, Dong Aisheng wrote:
-> > The System Controller Firmware (SCFW) is a low-level system function
-> > which runs on a dedicated Cortex-M core to provide power, clock, and
-> > resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
-> > (QM, QP), and i.MX8QX (QXP, DX).
-> >
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Stephen Boyd <sboyd@kernel.org>
-> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: devicetree at vger.kernel.org
-> > Cc: linux-clk at vger.kernel.org
-> > Cc: linux-gpio at vger.kernel.org
-> > Cc: linux-pm at vger.kernel.org
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> > v4->v5:
-> >  * scu node should be under firmware node
-> >  * add pd/clk/pinctrl binding as well according to Rob's suggestion
-> >  * switch to new generic MU binding
-> >    Use 8 separate mu channels in one MU instance for SCU communication
-> > v3->v4:
-> >  * fully change to mailbox binding
-> >  * add child node description
-> > v2->v3:
-> >  * update a bit to mailbox binding
-> > v1->v2:
-> >  * remove status
-> >  * changed to mu1
-> > ---
-> >  .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 179
-> > +++++++++++++++++++++
-> >  1 file changed, 179 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> >
-> > diff --git
-> > a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> > b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> > new file mode 100644
-> > index 0000000..2cd7e4a
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> > @@ -0,0 +1,179 @@
-> > +NXP i.MX System Controller Firmware (SCFW)
-> > +--------------------------------------------------------------------
+>> Hi Boris,
+>> On 2018/8/2 5:50, Boris Brezillon wrote:
+>>
+>>> Hi Yixun,
+>>>
+>>> On Thu, 19 Jul 2018 17:46:12 +0800
+>>> Yixun Lan <yixun.lan@amlogic.com> wrote:
+>>>
+>>> I haven't finished reviewing the driver yet (I'll try to do that later
+>>> this week), but I already pointed a few things to fix/improve.
+>>>   
+>>>> +
+>>>> +static int meson_nfc_exec_op(struct nand_chip *chip,
+>>>> +			     const struct nand_operation *op, bool check_only)
+>>>> +{
+>>>> +	struct mtd_info *mtd = nand_to_mtd(chip);
+>>>> +	struct meson_nfc *nfc = nand_get_controller_data(chip);
+>>>> +	const struct nand_op_instr *instr = NULL;
+>>>> +	int ret = 0, cmd;
+>>>> +	unsigned int op_id;
+>>>> +	int i;
+>>>> +
+>>>> +	for (op_id = 0; op_id < op->ninstrs; op_id++) {
+>>>> +		instr = &op->instrs[op_id];
+>>>> +		switch (instr->type) {
+>>>> +		case NAND_OP_CMD_INSTR:
+>>>> +			cmd = nfc->param.chip_select | NFC_CMD_CLE;
+>>>> +			cmd |= instr->ctx.cmd.opcode & 0xff;
+>>>> +			writel(cmd, nfc->reg_base + NFC_REG_CMD);
+>>>> +			meson_nfc_cmd_idle(nfc, NAND_TWB_TIME_CYCLE);
+>>> This is not necessarily TWB you have to wait after a CMD cycle. It can
+>>> be tWHR. And you should definitely not hardcode the value, since,
+>>> AFAIR, it depends on the selected SDR timings. Probably something you
+>>> should calculate in ->setup_data_interface().
+>>
+>> Indeed. TWB is not necessarily. And tWHR will be promised by NFC.
+>> so I will delete it.
 > 
-> Think you wanted a newline here              ^?
-
-Yes, of course.
-It seems to be introduced by mistake.
-Thanks for reminder.
-
-> 
-> > +
-> > +The System Controller Firmware (SCFW) is a low-level system function
-> > +which runs on a dedicated Cortex-M core to provide power, clock, and
-> > +resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
-> > +(QM, QP), and i.MX8QX (QXP, DX).
-> > +
-> > +The AP communicates with the SC using a multi-ported MU module found
-> > +in the LSIO subsystem. The current definition of this MU module
-> > +provides
-> > +5 remote AP connections to the SC to support up to 5 execution
-> > +environments (TZ, HV, standard Linux, etc.). The SC side of this MU
-> > +module interfaces with the LSIO DSC IP bus. The SC firmware will
-> > +communicate with this MU using the MSI bus.
-> 
-> How are 5 users supported with only 4 channels defined below?
-
-There're 5 MU instances designed to be specifically communicate with
-SCU Firmware on MX8 hardware.
-
-With the new generic mu binding [1], each MU instance is abstracted
-Into 16 virtual MU channels. (4 Tx, 4 Rx, 4 Tx doorbell, 4 Rx doorbell).
-(MU has 4 pair of Tx/Rx data register which can be used to send/receive
-multi words. With new binding, each data register is abstracted into one
-MU channel, totally 8 channels for data transfer).
-
-SCU protocol is already designed to uses all data registers to send/receive
-multi words according to MU hardware reference manual. So it must
-use all channels in one MU instances with new binding.
-
-On MX8, it can be one of LSIO MU0~M4.
- 
-[1] https://patchwork.kernel.org/patch/10554565/
-
-> 
-> > +
-> > +System Controller Device Node:
-> >
-> +=========================================================
-> ===
-> > +
-> > +The scu node with the following properties shall be under the /firmware/
-> node.
-> > +
-> > +Required properties:
-> > +-------------------
-> > +- compatible:	should be "fsl,imx-scu".
-> > +- mbox-names:	should include "tx0", "tx1", "tx2", "tx3",
-> > +			       "rx0", "rx1", "rx2", "rx3".
-> > +- mboxes:	List of phandle of 4 MU channels for tx and 4 MU channels
-> > +		for rx. All 8 MU channels must be in the same MU instance.
-> > +		Cross instances are not allowed. The MU instance can only
-> > +		be one of LSIO MU0~M4 for imx8qxp and imx8qm. Users
-> need
-> > +		to make sure use the one which is not conflict with other
-> > +		execution environments. e.g. ATF.
-> 
-> How is one supposed to know what channels are in use already?
+> Are you sure the engine always applies a tWHR delay, even when tWB is
+> expected? tWB should be applied everytime you are about to wait for a
+> R/B transition. tWHR is about switching IO pins from input to output on
+> the NAND chip side.
 > 
 
-Currently it's simply predefined.
-E.g. ATF uses MU0 and u-Boot & Kernel uses MU1.
+it seems work well even do not add tWHR, but software needs to promise 
+tWHR, also the same as TWB. I will check the code and add them.
 
-> IMO, ATF should remove the channel it uses before passing the DT to the
-> next stage. 
-
-Sounds like a good idea.
-To be more specific, you mean simply marking the MU node status used in ATF
-to be "disabled" before passing to the next stage, am I understand correct?
-
-> That doesn't help if later stages get a different DT though.
-
-Doesn't help? Sorry a bit confusing...
-
+>>
+>>>> +			meson_nfc_drain_cmd(nfc);
+>>> I don't know exactly how the NAND controller works, but it's usually
+>>> not a good idea to execute the operation right away, especially if you
+>>> have address/cmd/data cycles following this cmd and those can be
+>>> packed in the same controller operation.
+>>
+>> it doesn't need meson_nfc_drain_cmd(nfc) here. i will delete it next version
 > 
-> > +		Note:
-> > +		Channel 0 must be "tx0" or "rx0".
-> > +		Channel 1 must be "tx1" or "rx1".
-> > +		Channel 2 must be "tx2" or "rx2".
-> > +		Channel 3 must be "tx3" or "rx3".
-> > +		e.g.
-> > +		mboxes = <&lsio_mu1 0 0
-> > +			  &lsio_mu1 0 1
-> > +			  &lsio_mu1 0 2
-> > +			  &lsio_mu1 0 3
-> > +			  &lsio_mu1 1 0
-> > +			  &lsio_mu1 1 1
-> > +			  &lsio_mu1 1 2
-> > +			  &lsio_mu1 1 3>;
-> > +		See Documentation/devicetree/bindings/mailbox/fsl,mu.txt
-> > +		for detailed mailbox binding.
-> > +
-> > +i.MX SCU Client Device Node:
-> >
-> +=========================================================
-> ===
-> > +
-> > +Client nodes are maintained as children of the relevant IMX-SCU device
-> node.
-> > +
-> > +Power domain bindings based on SCU Message Protocol
-> > +------------------------------------------------------------
-> > +
-> > +This binding for the SCU power domain providers uses the generic
-> > +power domain binding[2].
-> > +
-> > +Required properties:
-> > +- compatible:		Should be "fsl,scu-pd".
-> > +- #address-cells:	Should be 1.
-> > +- #size-cells:		Should be 0.
-> > +
-> > +Required properties for power domain sub nodes:
-> > +- #power-domain-cells:	Must be 0.
-> > +
-> > +Optional Properties:
-> > +- reg:			Resource ID of this power domain.
-> > +			No exist means uncontrollable by user.
-> > +			See detailed Resource ID list from:
-> > +			include/dt-bindings/power/imx-rsrc.h
-> > +- power-domains:	phandle pointing to the parent power domain.
-> > +
-> > +Clock bindings based on SCU Message Protocol
-> > +------------------------------------------------------------
-> > +
-> > +This binding uses the common clock binding[1].
-> > +
-> > +Required properties:
-> > +- compatible:		Should be "fsl,imx8qxp-clock".
-> > +- #clock-cells:		Should be 1. Contains the Clock ID value.
-> 
-> There was a recent patch adding input clocks to other i.MX CCM bindings.
-> Is that needed here?
+> What's the CMD queue depth? I think you'll have to ensure the requested
+> op fits in the CMD FIFO and split things in several sub-ops if it does
+> not.
 > 
 
-Will double check it, thanks for reminder.
+there are maximum 32 commands.
+I think it should be enough to promise ONE maximum number of 
+operations(cmd - addr - dma - 2 ilde commands).
 
-Regards
-Dong Aisheng
+>>
+>>>> +			break;
+>>>> +
+>>>> +		case NAND_OP_ADDR_INSTR:
+>>>> +			for (i = 0; i < instr->ctx.addr.naddrs; i++) {
+>>>> +				cmd = nfc->param.chip_select | NFC_CMD_ALE;
+>>>> +				cmd |= instr->ctx.addr.addrs[i] & 0xff;
+>>>> +				writel(cmd, nfc->reg_base + NFC_REG_CMD);
+>>>> +			}
+>>>> +			break;
+>>>> +
+>>>> +		case NAND_OP_DATA_IN_INSTR:
+>>>> +			meson_nfc_read_buf(mtd, instr->ctx.data.buf.in,
+>>>> +					   instr->ctx.data.len);
+>>>> +			break;
+>>>> +
+>>>> +		case NAND_OP_DATA_OUT_INSTR:
+>>>> +			meson_nfc_write_buf(mtd, instr->ctx.data.buf.out,
+>>>> +					    instr->ctx.data.len);
+>>> Well, I'm not entirely sure what happens when you call
+>>> read/write_buf(), but it seems you're doing that one byte at a time,
+>>> and that sounds not so efficient given the operation you do for each
+>>> byte read/written. Don't you have a way to tell the engine that you
+>>> want to read/write X bytes?
+>>
+>> As i known, there is no way to read/write X bytes once.
+> 
+> Okay, then maybe you can queue several byte read/write reqs before
+> flushing the queue (meson_nfc_drain_cmd() +
+> meson_nfc_wait_cmd_finish()).
+> 
+>>
+>>>> +			break;
+>>>> +
+>>>> +		case NAND_OP_WAITRDY_INSTR:
+>>>> +			mdelay(instr->ctx.waitrdy.timeout_ms);
+>>>> +			ret = nand_soft_waitrdy(chip,
+>>>> +						instr->ctx.waitrdy.timeout_ms);
+>>> Hm, i'd be surprised if the controller does not have a way to optimize
+>>> waits on R/B transitions.
+>>
+>> When i delete the delay here, erasing operation will be failed.
+>> Does it mean NFC send 0x70 to nand device when rb is busy(low)?
+> 
+> I was not even talking about the delay, but yes, mdelay() seems way too
+> big. Remember that it's a timeout, and you usually don't have to wait
+> that much. You can do ndelay(instr->ctx.delay_ns) before calling
+> nand_soft_waitrdy() to make sure tWB is enforced.
+> 
+> Anyway, that's not what I was initially referring to. What I meant is
+> that nand_soft_waitrdy() should be replaced by native R/B pin or status
+> polling wait logic so that the CPU is released while waiting for a R/B
+> transition.
+> 
+>> If so, i will ask our NFC designer for comfirmation or grasping the waveform.
+> 
+> You have to wait tWB, that's for sure.
+> 
 
-> > +
-> > +The clock consumer should specify the desired clock by having the
-> > +clock ID in its "clocks" phandle cell.
-> > +
-> > +See the full list of clock IDs from:
-> > +include/dt-bindings/clock/imx8qxp-clock.h
-> > +
-> > +Pinctrl bindings based on SCU Message Protocol
-> > +------------------------------------------------------------
-> > +
-> > +This binding uses the i.MX common pinctrl binding[3].
-> > +
-> > +Required properties:
-> > +- compatible:		Should be "fsl,imx8qxp-iomuxc".
-> > +
-> > +Required properties for Pinctrl sub nodes:
-> > +- fsl,pins:		Each entry consists of 3 integers which represents
-> > +			the mux and config setting for one pin. The first 2
-> > +			integers <pin_id mux_mode> are specified using a
-> > +			PIN_FUNC_ID macro, which can be found in
-> > +			<dt-bindings/pinctrl/pads-imx8qxp.h>.
-> > +			The last integer CONFIG is the pad setting value like
-> > +			pull-up on this pin.
-> > +
-> > +			Please refer to i.MX8QXP Reference Manual for
-> detailed
-> > +			CONFIG settings.
-> > +
-> > +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > +[2] Documentation/devicetree/bindings/power/power_domain.txt
-> > +[3] Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
-> > +
-> > +Example (imx8qxp):
-> > +-------------
-> > +lsio_mu1: mailbox at 5d1c0000 {
-> > +	...
-> > +	#mbox-cells = <2>;
-> > +};
-> > +
-> > +firmware {
-> > +	scu {
-> > +		compatible = "fsl,imx-scu";
-> > +		mbox-names = "tx0", "tx1", "tx2", "tx3",
-> > +			     "rx0", "rx1", "rx2", "rx3";
-> > +		mboxes = <&lsio_mu1 0 0
-> > +			  &lsio_mu1 0 1
-> > +			  &lsio_mu1 0 2
-> > +			  &lsio_mu1 0 3
-> > +			  &lsio_mu1 1 0
-> > +			  &lsio_mu1 1 1
-> > +			  &lsio_mu1 1 2
-> > +			  &lsio_mu1 1 3>;
-> > +
-> > +		clk: clk {
-> > +			compatible = "fsl,imx8qxp-clk";
-> > +			#clock-cells = <1>;
-> > +		};
-> > +
-> > +		iomuxc {
-> > +			compatible = "fsl,imx8qxp-iomuxc";
-> > +
-> > +			pinctrl_lpuart0: lpuart0grp {
-> > +				fsl,pins = <
-> > +					SC_P_UART0_RX_ADMA_UART0_RX
-> 	0x06000020
-> > +					SC_P_UART0_TX_ADMA_UART0_TX
-> 	0x06000020
-> > +				>;
-> > +			};
-> > +			...
-> > +		};
-> > +
-> > +		imx8qx-pm {
-> > +			compatible = "fsl,scu-pd";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +
-> > +			pd_dma: dma-power-domain {
-> > +				#power-domain-cells = <0>;
-> > +
-> > +				pd_dma_lpuart0: dma-lpuart0 at 57 {
-> > +					reg = <SC_R_UART_0>;
-> > +					#power-domain-cells = <0>;
-> > +					power-domains = <&pd_dma>;
-> > +				};
-> > +				...
-> > +			};
-> > +			...
-> > +		};
-> > +	};
-> > +};
-> > +
-> > +serial at 5a060000 {
-> > +	...
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_lpuart0>;
-> > +	clocks = <&clk IMX8QXP_UART0_CLK>,
-> > +		 <&clk IMX8QXP_UART0_IPG_CLK>;
-> > +	clock-names = "per", "ipg";
-> > +	power-domains = <&pd_dma_lpuart0>;
-> > +};
-> > --
-> > 2.7.4
-> >
+Indeed.
+
+>>
+>>>> +			break;
+>>>> +		}
+>>>> +	}
+>>>> +	return ret;
+>>>> +}
+>>>> +
+>>>> +static int meson_ooblayout_ecc(struct mtd_info *mtd, int section,
+>>>> +			       struct mtd_oob_region *oobregion)
+>>>> +{
+>>>> +	struct nand_chip *chip = mtd_to_nand(mtd);
+>>>> +	int free_oob;
+>>>> +
+>>>> +	if (section >= chip->ecc.steps)
+>>>> +		return -ERANGE;
+>>>> +
+>>>> +	free_oob = (section + 1) * 2;
+>>>> +	oobregion->offset = section * chip->ecc.bytes + free_oob;
+>>> Hm, this offset calculation looks weird. Are you sure it's correct?
+>>> I'd bet on something like:
+>>>
+>>> 	oobregion->offset = 2 + (section * (chip->ecc.bytes + 4));
+>>
+>> Each ecc page have 2 user bytes. Assume one 2KB+64B page size nand
+>> flash using ECC8/1KB which ecc parity bytes is 14B.
+>>       _ _ _ _ _ _ _ _ _ _ _ _  _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+>>      |             |  |      |             |  |     |  not  |
+>>      |	1KB      |2B| 14B  |     1KB     |2B| 14B | used  |  (layout on nand)
+>>      |_ _ _ _ _ _ _|_ |_ _ _ | _ _ _ _ _ _ |_ |_ _ _|_ _ _ _|
+>> 		    (2KB + 64B)
+>> when reading from nand, I will format the page as follow:
+>>       _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _  _ _ _ _
+>>      |             |             |  |     |  |      |  not  |
+>>      |	1KB      |    1KB      |2B| 14B |2B|  14B | used  |(layout on ddr)
+>>      |_ _ _ _ _ _ _|_ _ _ _ _ _ _|_ |_ _ _|_ |_ _ _ |_ _ _ _|
+>> 		    (2KB + 64B)
+>> So i get "oobregion->offset = section * chip->ecc.bytes + free_oob".
+> 
+> Okay, but I prefer when it's written like that:
+> 
+> 	oobregion->offset = 2 + (section * (2 + chip->ecc.bytes));
+
+em, I prefer too. it looks better.
+> >> Maybe i don't get what does 'section' mean. i think it means the ecc 
+page number.
+> 
+> Section is just the free OOB or ECC section number. It starts at 0 and
+> goes up to N - 1, where N usually is the number of ECC steps you have in
+> a page.
+> 
+> .
+> 
