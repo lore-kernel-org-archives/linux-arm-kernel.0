@@ -1,57 +1,82 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 22 Aug 2018 15:56:43 +0100
-Subject: [PATCH 0/4] numa, iommu/smmu: IOMMU/SMMU driver optimization for
- NUMA systems
-In-Reply-To: <452f1665-eb3a-5e8c-f671-099ef4a15d84@huawei.com>
-References: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
- <452f1665-eb3a-5e8c-f671-099ef4a15d84@huawei.com>
-Message-ID: <a7fc1e43-3652-562a-1e59-499be80b567c@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Aug 2018 17:03:56 +0200
+Subject: [PATCH] ARM: use choice for kernel unwinders
+In-Reply-To: <77d139d225e16b90d9b8da1982a11707@agner.ch>
+References: <20180821222416.7771-1-stefan@agner.ch>
+ <CAK8P3a0oaMS12R4tazChMHENQduO0-Wb-gw-inKjH0oz7_5s3g@mail.gmail.com>
+ <77d139d225e16b90d9b8da1982a11707@agner.ch>
+Message-ID: <CAK8P3a0xNM6CK=rUUGX9eeO+OVrNGSYxiQ96gMVh6CrcpxVheg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
+On Wed, Aug 22, 2018 at 4:38 PM Stefan Agner <stefan@agner.ch> wrote:
+> On 22.08.2018 12:02, Arnd Bergmann wrote:
+> > On Wed, Aug 22, 2018 at 12:24 AM Stefan Agner <stefan@agner.ch> wrote:
+> >
+> > Looks ok to me. I've added it to my randconfig test environment, you
+> > will hear from me within a day if I run into build regressions.
+> >
+> > We may still want to clean up these three lines:
+> >
+> > lib/Kconfig.debug:  select FRAME_POINTER if !MIPS && !PPC &&
+> > !ARM_UNWIND && !S390 && !MICROBLAZE && !ARC && !X86
+> > lib/Kconfig.debug:  select FRAME_POINTER if !MIPS && !PPC && !S390 &&
+> > !MICROBLAZE && !ARM_UNWIND && !ARC && !X86
+> > lib/Kconfig.debug:  select FRAME_POINTER if !MIPS && !PPC && !S390 &&
+> > !MICROBLAZE && !ARM_UNWIND && !ARC && !X86
+> >
+> > in which ARM is the odd case that currently depends on an architecture
+> > specific rather than the architecture itself.
+>
+> I guess we would just follow X86 lead by saying ARM is guaranteed to
+> have unwinding support, and hence we can add !ARM.
 
-On 22/08/18 14:44, John Garry wrote:
-> On 21/09/2017 09:59, Ganapatrao Kulkarni wrote:
->> Adding numa aware memory allocations used for iommu dma allocation and
->> memory allocated for SMMU stream tables, page walk tables and command 
->> queues.
->>
->> With this patch, iperf testing on ThunderX2, with 40G NIC card on
->> NODE 1 PCI shown same performance(around 30% improvement) as NODE 0.
->>
->> Ganapatrao Kulkarni (4):
->> ? mm: move function alloc_pages_exact_nid out of __meminit
->> ? numa, iommu/io-pgtable-arm: Use NUMA aware memory allocation for smmu
->> ??? translation tables
->> ? iommu/arm-smmu-v3: Use NUMA memory allocations for stream tables and
->> ??? comamnd queues
->> ? iommu/dma, numa: Use NUMA aware memory allocations in
->> ??? __iommu_dma_alloc_pages
->>
->> ?drivers/iommu/arm-smmu-v3.c??? | 57 
->> +++++++++++++++++++++++++++++++++++++-----
->> ?drivers/iommu/dma-iommu.c????? | 17 +++++++------
->> ?drivers/iommu/io-pgtable-arm.c |? 4 ++-
->> ?include/linux/gfp.h??????????? |? 2 +-
->> ?mm/page_alloc.c??????????????? |? 3 ++-
->> ?5 files changed, 67 insertions(+), 16 deletions(-)
->>
-> 
-> Hi Ganapatrao,
-> 
-> Have you any plans for further work on this patchset? I have not seen 
-> anything since this v1 was posted+discussed.
+Right, that was the idea.
 
-Looks like I ended up doing the version of the io-pgtable change that I 
-suggested here, which was merged recently (4b123757eeaa). Patch #3 
-should also be effectively obsolete now since the SWIOTLB/dma-direct 
-rework (21f237e4d085). Apparently I also started reworking patch #4 in 
-my tree at some point but sidelined it - I think that was at least 
-partly due to another thread[1] which made it seem less clear-cut 
-whether this is always the right thing to do.
+> > We could introduce a 'config ARCH_HAS_UNWINDER' symbol that gets
+> > selected by mips, ppc, s390, microblaze, arm and x86 unconditionally,
+> > and then simplify the 'select' statements here.
+>
+> Yeah I was thinking about something like that too.
+>
+> It seems to be a bit weird to me that lib/Kconfig.debug selects a
+> specific stack unwinding technique...
 
-Robin.
+This must be a historic artifact from the time when FRAME_POINTER
+was the only unwinding method that existed. We may also have some
+architectures that don't support any unwinding.
 
-[1] 
-https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1693026.html
+> Ideally other config symbol should just ask arch to make sure a
+> unwinding technique is available (NEED_STACK_UNWINDING?) and arch then
+> makes sure to provide a reasonable default.
+>
+> This then also would make it possible to select no stack unwinding in
+> case arch supports that and all the users of stack unwinding are
+> disabled too. Not sure how that exactly would look like in Kconfig, I
+> was thinking like:
+>
+> choice
+>     prompt "Choose kernel unwinder"
+>     optional if !NEED_STACK_UNWINDING
+>     default UNWINDER_ARM if AEABI && !FUNCTION_GRAPH_TRACER
+>     default UNWINDER_FRAME_POINTER if !AEABI || FUNCTION_GRAPH_TRACER
+>
+> But "optional if" does not exist yet :-)
+
+You can write that as
+
+choice
+      prompt "Choose kernel unwinder" if NEED_STACK_UNWINDING
+
+This will hide the prompt when NEED_STACK_UNWINDING is disabled,
+making it impossible to pick one of the two unwinders.
+
+> Reading the comments in arch/arm/Kconfig.debug seems to suggest that
+> once upon a time it was possible to disable stack unwinding on ARM.
+>
+> But then, maybe we don't really want to go there? Might be interesting
+> for tinification efforts.
+
+I'd leave that for another day ;-)
+
+      Arnd
