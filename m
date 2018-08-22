@@ -1,63 +1,98 @@
-From: srikar@linux.vnet.ibm.com (Srikar Dronamraju)
-Date: Wed, 22 Aug 2018 05:39:43 -0700
-Subject: [PATCH v9 1/4] Uprobes: Support SDT markers having reference
- count (semaphore)
-In-Reply-To: <20180820044250.11659-2-ravi.bangoria@linux.ibm.com>
-References: <20180820044250.11659-1-ravi.bangoria@linux.ibm.com>
- <20180820044250.11659-2-ravi.bangoria@linux.ibm.com>
-Message-ID: <20180822123943.GD2080@linux.vnet.ibm.com>
+From: radu.pirea@microchip.com (Radu Pirea)
+Date: Wed, 22 Aug 2018 15:55:39 +0300
+Subject: [PATCH v11 0/6] Driver for at91 usart in spi mode
+In-Reply-To: <20180713164736.26028-1-radu.pirea@microchip.com>
+References: <20180713164736.26028-1-radu.pirea@microchip.com>
+Message-ID: <ba108fbe-d3c4-a60e-a1c0-441fe3082212@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ravi Bangoria <ravi.bangoria@linux.ibm.com> [2018-08-20 10:12:47]:
+Hi Lee,
 
-> Userspace Statically Defined Tracepoints[1] are dtrace style markers
-> inside userspace applications. Applications like PostgreSQL, MySQL,
-> Pthread, Perl, Python, Java, Ruby, Node.js, libvirt, QEMU, glib etc
-> have these markers embedded in them. These markers are added by developer
-> at important places in the code. Each marker source expands to a single
-> nop instruction in the compiled code but there may be additional
-> overhead for computing the marker arguments which expands to couple of
-> instructions. In case the overhead is more, execution of it can be
-> omitted by runtime if() condition when no one is tracing on the marker:
-> 
->     if (reference_counter > 0) {
->         Execute marker instructions;
->     }
-> 
-> Default value of reference counter is 0. Tracer has to increment the
-> reference counter before tracing on a marker and decrement it when
-> done with the tracing.
-> 
-> Implement the reference counter logic in core uprobe. User will be
-> able to use it from trace_uprobe as well as from kernel module. New
-> trace_uprobe definition with reference counter will now be:
-> 
->     <path>:<offset>[(ref_ctr_offset)]
-> 
-> where ref_ctr_offset is an optional field. For kernel module, new
-> variant of uprobe_register() has been introduced:
-> 
->     uprobe_register_refctr(inode, offset, ref_ctr_offset, consumer)
-> 
-> No new variant for uprobe_unregister() because it's assumed to have
-> only one reference counter for one uprobe.
-> 
-> [1] https://sourceware.org/systemtap/wiki/UserSpaceProbeImplementation
-> 
-> Note: 'reference counter' is called as 'semaphore' in original Dtrace
-> (or Systemtap, bcc and even in ELF) documentation and code. But the
-> term 'semaphore' is misleading in this context. This is just a counter
-> used to hold number of tracers tracing on a marker. This is not really
-> used for any synchronization. So we are calling it a 'reference counter'
-> in kernel / perf code.
-> 
+I saw that the patches were not applied to your tree for this kernel 
+version. After the discussion with Nicolas, I remember that you said 
+that you will take the patches in your tree. I addressed Mark comments 
+related to the last version of patches. Is there something that must be 
+reworked in order to take the patches?
 
-
-Acked-by: Srikar Dronamraju <srikar@linux.vnet.ibm.com>
-
-> Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
-> Reviewed-by: Masami Hiramatsu <mhiramat@kernel.org>
-> [Only trace_uprobe.c]
-> Reviewed-by: Oleg Nesterov <oleg@redhat.com>
-> ---
+On 7/13/18 7:47 PM, Radu Pirea - M19893 wrote:
+> Hello,
+> 
+> This is the second version of driver. I added a mfd driver which by
+> default probes atmel_serial driver and if in dt is specified to probe
+> the spi driver, then the spi-at91-usart driver will be probed. The
+> compatible for atmel_serial is now the compatible for at91-usart mfd
+> driver and compatilbe for atmel_serial driver was changed in order to
+> keep the bindings for serial as they are.
+> 
+> @Lee, could you take this patch series into your tree? I addressed all Mark
+> remarks.
+> 
+> Changes in v11:
+> - removed "depends on HAS_DMA" from drivers/spi/Kconfig because the driver has
+> no dma support
+> - changed "selects MFD_AT91_USART" to "depends on MFD_AT91_USART" in
+> drivers/spi/Kconfig
+> - changed comment style in spi-at91-usart.c
+> 
+> Changes in v10:
+> -fixed kbuild test robot warning
+> 
+> Changes in v9:
+> - minor changes
+> - rebased on top of broonie/for-4.19
+> 
+> Changes in v8:
+> - fixed passing an empty mfd cell if "atmel,usart-mode" value is invalid
+> 
+> Changes in v7:
+> - synced up  SPDIX license with module license
+> - numbering of usart modes starts from 0 insteand of 1
+> 
+> Changes in v6:
+> - removed unused compatible strings from serial and spi drivers
+> 
+> Changes in v5:
+> - fixed usage of stdout-path property with atmel_serial driver
+> 
+> Changes in v4:
+> - modified the spi driver to use cs gpio support form spi subsystem
+> - fixed dma transfers for serial driver
+> - squashed binding for spi and serial and moved them to mfd/atmel-usart.txt
+> 
+> Changes in v3:
+> - fixed spi slaves probing
+> 
+> Changes in v2:
+> - added at91-usart mfd driver
+> - modified spi-at91-usart driver to work as mfd driver child
+> - modified atmel_serial driver to work as mfd driver child
+> 
+> Changes in v1:
+> - added spi-at91-usart driver
+> 
+> Radu Pirea (6):
+>    MAINTAINERS: add at91 usart mfd driver
+>    dt-bindings: add binding for atmel-usart in SPI mode
+>    mfd: at91-usart: added mfd driver for usart
+>    MAINTAINERS: add at91 usart spi driver
+>    spi: at91-usart: add driver for at91-usart as spi
+>    tty/serial: atmel: change the driver to work under at91-usart mfd
+> 
+>   .../bindings/{serial => mfd}/atmel-usart.txt  |  25 +-
+>   MAINTAINERS                                   |  16 +
+>   drivers/mfd/Kconfig                           |   9 +
+>   drivers/mfd/Makefile                          |   1 +
+>   drivers/mfd/at91-usart.c                      |  71 +++
+>   drivers/spi/Kconfig                           |   8 +
+>   drivers/spi/Makefile                          |   1 +
+>   drivers/spi/spi-at91-usart.c                  | 432 ++++++++++++++++++
+>   drivers/tty/serial/Kconfig                    |   1 +
+>   drivers/tty/serial/atmel_serial.c             |  42 +-
+>   include/dt-bindings/mfd/at91-usart.h          |  17 +
+>   11 files changed, 606 insertions(+), 17 deletions(-)
+>   rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
+>   create mode 100644 drivers/mfd/at91-usart.c
+>   create mode 100644 drivers/spi/spi-at91-usart.c
+>   create mode 100644 include/dt-bindings/mfd/at91-usart.h
+> 
