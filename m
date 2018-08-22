@@ -1,134 +1,96 @@
 From: yaojun8558363@gmail.com (Jun Yao)
-Date: Wed, 22 Aug 2018 17:54:27 +0800
-Subject: [RESEND PATCH v4 1/6] arm64/mm: Introduce the init_pg_dir.
+Date: Wed, 22 Aug 2018 17:54:28 +0800
+Subject: [RESEND PATCH v4 2/6] arm64/mm: Pass ttbr1 as a parameter to
+ __enable_mmu().
 In-Reply-To: <20180822095432.12125-1-yaojun8558363@gmail.com>
 References: <20180822095432.12125-1-yaojun8558363@gmail.com>
-Message-ID: <20180822095432.12125-2-yaojun8558363@gmail.com>
+Message-ID: <20180822095432.12125-3-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To make the swapper_pg_dir read only, we will move it to the rodata
-section. And force the kernel to set up the initial page table in
-the init_pg_dir. After generating all levels page table, we copy
-only the top level into the swapper_pg_dir during paging_init().
+The kernel sets up the initial page table in the init_pg_dir.
+However, it will create the final page table in the swapper_pg_dir
+during the initialization process. We need to let __enable_mmu()
+know which page table to use.
 
 Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
 ---
- arch/arm64/include/asm/assembler.h | 29 +++++++++++++++++++++++++++++
- arch/arm64/kernel/head.S           | 22 +++++++++++++++-------
- arch/arm64/kernel/vmlinux.lds.S    |  8 ++++++++
- 3 files changed, 52 insertions(+), 7 deletions(-)
+ arch/arm64/kernel/head.S  | 21 ++++++++++++---------
+ arch/arm64/kernel/sleep.S |  1 +
+ 2 files changed, 13 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 0bcc98dbba56..eb363a915c0e 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -456,6 +456,35 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
- 	b.ne	9998b
- 	.endm
- 
-+/*
-+ * clear_page - clear one page
-+ *
-+ *	start:	page aligned virtual address
-+ */
-+	.macro clear_page, start:req
-+9996:	stp	xzr, xzr, [\start], #16
-+	stp	xzr, xzr, [\start], #16
-+	stp	xzr, xzr, [\start], #16
-+	stp	xzr, xzr, [\start], #16
-+	tst	\start, #(PAGE_SIZE - 1)
-+	b.ne	9996b
-+	.endm
-+
-+/*
-+ * clear_pages - clear contiguous pages
-+ *
-+ *	start, end: page aligend virtual addresses
-+ */
-+	.macro clear_pages, start:req, end:req
-+	sub	\end, \end, \start
-+	lsr	\end, \end, #(PAGE_SHIFT)
-+9997:	cbz	\end, 9998f
-+	clear_page \start
-+	sub	\end, \end, #1
-+	b	9997b
-+9998:
-+	.endm
-+
- /*
-  * Annotate a function as position independent, i.e., safe to be called before
-  * the kernel virtual mapping is activated.
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index b0853069702f..2c83a8c47e3f 100644
+index 2c83a8c47e3f..c3e4b1886cde 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -295,18 +295,21 @@ __create_page_tables:
- 	sub	x1, x1, x0
- 	bl	__inval_dcache_area
- 
-+	adrp	x0, init_pg_dir
-+	adrp	x1, init_pg_end
-+	sub	x1, x1, x0
-+	bl	__inval_dcache_area
-+
- 	/*
- 	 * Clear the idmap and swapper page tables.
+@@ -714,6 +714,7 @@ secondary_startup:
+ 	 * Common entry point for secondary CPUs.
  	 */
- 	adrp	x0, idmap_pg_dir
- 	adrp	x1, swapper_pg_end
--	sub	x1, x1, x0
--1:	stp	xzr, xzr, [x0], #16
--	stp	xzr, xzr, [x0], #16
--	stp	xzr, xzr, [x0], #16
--	stp	xzr, xzr, [x0], #16
--	subs	x1, x1, #64
--	b.ne	1b
-+	clear_pages x0, x1
-+
-+	adrp	x0, init_pg_dir
-+	adrp	x1, init_pg_end
-+	clear_pages x0, x1
+ 	bl	__cpu_setup			// initialise processor
++	adrp	x1, swapper_pg_dir
+ 	bl	__enable_mmu
+ 	ldr	x8, =__secondary_switched
+ 	br	x8
+@@ -756,6 +757,7 @@ ENDPROC(__secondary_switched)
+  * Enable the MMU.
+  *
+  *  x0  = SCTLR_EL1 value for turning on the MMU.
++ *  x1  = TTBR1_EL1 value for turning on the MMU.
+  *
+  * Returns to the caller via x30/lr. This requires the caller to be covered
+  * by the .idmap.text section.
+@@ -764,15 +766,15 @@ ENDPROC(__secondary_switched)
+  * If it isn't, park the CPU
+  */
+ ENTRY(__enable_mmu)
+-	mrs	x1, ID_AA64MMFR0_EL1
+-	ubfx	x2, x1, #ID_AA64MMFR0_TGRAN_SHIFT, 4
+-	cmp	x2, #ID_AA64MMFR0_TGRAN_SUPPORTED
++	mrs	x5, ID_AA64MMFR0_EL1
++	ubfx	x6, x5, #ID_AA64MMFR0_TGRAN_SHIFT, 4
++	cmp	x6, #ID_AA64MMFR0_TGRAN_SUPPORTED
+ 	b.ne	__no_granule_support
+-	update_early_cpu_boot_status 0, x1, x2
+-	adrp	x1, idmap_pg_dir
+-	adrp	x2, swapper_pg_dir
+-	phys_to_ttbr x3, x1
+-	phys_to_ttbr x4, x2
++	update_early_cpu_boot_status 0, x5, x6
++	adrp	x5, idmap_pg_dir
++	mov	x6, x1
++	phys_to_ttbr x3, x5
++	phys_to_ttbr x4, x6
+ 	msr	ttbr0_el1, x3			// load TTBR0
+ 	msr	ttbr1_el1, x4			// load TTBR1
+ 	isb
+@@ -791,7 +793,7 @@ ENDPROC(__enable_mmu)
  
- 	mov	x7, SWAPPER_MM_MMUFLAGS
- 
-@@ -395,6 +398,11 @@ __create_page_tables:
- 	dmb	sy
- 	bl	__inval_dcache_area
- 
-+	adrp	x0, init_pg_dir
-+	adrp	x1, init_pg_end
-+	sub	x1, x1, x0
-+	bl	__inval_dcache_area
-+
- 	ret	x28
- ENDPROC(__create_page_tables)
- 	.ltorg
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 605d1b60469c..61d7cee3eaa6 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -68,6 +68,12 @@ jiffies = jiffies_64;
- #define TRAMP_TEXT
+ __no_granule_support:
+ 	/* Indicate that this CPU can't boot and is stuck in the kernel */
+-	update_early_cpu_boot_status CPU_STUCK_IN_KERNEL, x1, x2
++	update_early_cpu_boot_status CPU_STUCK_IN_KERNEL, x5, x6
+ 1:
+ 	wfe
+ 	wfi
+@@ -831,6 +833,7 @@ __primary_switch:
+ 	mrs	x20, sctlr_el1			// preserve old SCTLR_EL1 value
  #endif
  
-+#define INIT_PG_TABLES					\
-+	. = ALIGN(PAGE_SIZE);                           \
-+	init_pg_dir = .;                                \
-+	. += SWAPPER_DIR_SIZE;                          \
-+	init_pg_end = .;
-+
- /*
-  * The size of the PE/COFF section that covers the kernel image, which
-  * runs from stext to _edata, must be a round multiple of the PE/COFF
-@@ -161,6 +167,8 @@ SECTIONS
- 	__inittext_end = .;
- 	__initdata_begin = .;
- 
-+	INIT_PG_TABLES
-+
- 	.init.data : {
- 		INIT_DATA
- 		INIT_SETUP(16)
++	adrp	x1, swapper_pg_dir
+ 	bl	__enable_mmu
+ #ifdef CONFIG_RELOCATABLE
+ 	bl	__relocate_kernel
+diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+index bebec8ef9372..3e53ffa07994 100644
+--- a/arch/arm64/kernel/sleep.S
++++ b/arch/arm64/kernel/sleep.S
+@@ -101,6 +101,7 @@ ENTRY(cpu_resume)
+ 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
+ 	bl	__cpu_setup
+ 	/* enable the MMU early - so we can access sleep_save_stash by va */
++	adrp	x1, swapper_pg_dir
+ 	bl	__enable_mmu
+ 	ldr	x8, =_cpu_resume
+ 	br	x8
 -- 
 2.17.1
