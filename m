@@ -1,37 +1,34 @@
 From: sam@ravnborg.org (Sam Ravnborg)
-Date: Wed, 22 Aug 2018 22:09:42 +0200
-Subject: [PATCH v1 1/7] atmel-hlcdc: renamed directory to drm/atmel/
-In-Reply-To: <20180816074123.GB21634@phenom.ffwll.local>
+Date: Wed, 22 Aug 2018 22:12:26 +0200
+Subject: [RFC PATCH 0/7] add at91sam9 LCDC DRM driver
+In-Reply-To: <20180814084112.GE21634@phenom.ffwll.local>
 References: <20180812184152.GA22343@ravnborg.org>
- <20180812184629.3808-1-sam@ravnborg.org>
- <20180814083913.GD21634@phenom.ffwll.local>
- <20180814161952.GA27951@ravnborg.org>
- <20180816074123.GB21634@phenom.ffwll.local>
-Message-ID: <20180822200942.GA22148@ravnborg.org>
+ <20180812195536.GA29811@ravnborg.org>
+ <264d51a0-7e41-6c27-d438-9ae337e6dcf0@microchip.com>
+ <20180814084112.GE21634@phenom.ffwll.local>
+Message-ID: <20180822201226.GB22148@ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Daniel.
 
-> > > 
-> > > I'd strongly suggest you group-maintain the entire atmel stuff in
-> > > drm-misc instead of only atmel-hlcdc.
+> > > Based on the above, would it be possible to utilise some
+> > > of these features without any dedicated userspace (mesa) support?
+> > > Any other driver that has something similar that can be used
+> > > for inspiration?
 > > 
-> > If OK with Boris then I am fine with this too.
-> > Will suggest so in v2.
+> > This is really an interesting question indeed.
 > 
-> Boris acked too, but he's on vacation. He said on irc he'll review the
-> patches when he's back. Meanwhile I guess you can prep by getting the fd.o
-> account requested:
+> Needs userspace like everything else. There's unfortunately no real
+> standard for 2d apis in userspace, which means none of these efforts go
+> very far. Mostly it's just some custom-made X drivers.
 > 
-> https://www.freedesktop.org/wiki/AccountRequests/
-> 
-> And checking out the tooling we use to maintain drm-misc:
-> 
-> https://dri.freedesktop.org/docs/dim/getting-started.html
+> Adding a generic 2d api to drm is a FAQ, and the answer is "no".
 
-With enough on the plate already I decided to postpone this
-part until the migration to gitlab is done.
-Just to tell this was not ignored, only postponed.
+And then you went off writing a blog post about it - thanks.
+The blog post provided a lot of useful answers - great.
+
+(Or rather you will write the blog in 5 days, seems to be some time
+ machine involved. (Date is the 27th below the title)).
 
 	Sam
