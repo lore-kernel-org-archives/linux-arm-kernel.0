@@ -1,44 +1,18 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 22 Aug 2018 11:48:08 +0200
-Subject: [PATCH] mmc: sdhci-of-arasan: Do now show error message in case
- of deffered probe
-In-Reply-To: <c9688c600633ce9f4d7b6319366116e6e7c4b97d.1533544988.git.michal.simek@xilinx.com>
-References: <c9688c600633ce9f4d7b6319366116e6e7c4b97d.1533544988.git.michal.simek@xilinx.com>
-Message-ID: <CAPDyKFqS8k53TvQ8ON_+uQ3ynZ0JGGWxv1k9K5pDPMZ4hYkOpg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 22 Aug 2018 11:53:05 +0200
+Subject: [PATCH v2] arm64: dts: renesas: Initial r8a774a1 SoC device tree
+In-Reply-To: <1534164108-19983-1-git-send-email-biju.das@bp.renesas.com>
+References: <1534164108-19983-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <20180822095304.bmhcl2unelx7e22y@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2018 at 10:43, Michal Simek <michal.simek@xilinx.com> wrote:
-> When mmc-pwrseq property is passed mmc_pwrseq_alloc() can return
-> -EPROBE_DEFER because driver for power sequence provider is not probed
-> yet. Do not show error message when this situation happens.
->
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+On Mon, Aug 13, 2018 at 01:41:48PM +0100, Biju Das wrote:
+> Basic support for the RZ/G2M SoC.
+> 
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Thanks, queued for v4.20!
+Thanks Biju,
 
-Kind regards
-Uffe
-
-> ---
->
->  drivers/mmc/host/sdhci-of-arasan.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index e3332a522a5d..e65f3bce3643 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -772,7 +772,8 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->
->         ret = mmc_of_parse(host->mmc);
->         if (ret) {
-> -               dev_err(&pdev->dev, "parsing dt failed (%d)\n", ret);
-> +               if (ret != -EPROBE_DEFER)
-> +                       dev_err(&pdev->dev, "parsing dt failed (%d)\n", ret);
->                 goto unreg_clk;
->         }
->
-> --
-> 1.9.1
->
+applied for v4.20.
