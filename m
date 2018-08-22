@@ -1,150 +1,127 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 22 Aug 2018 22:43:03 +0200
-Subject: [PATCH 10/14] USB: gadget: mv-udc: use phy-pxa-usb
+Date: Wed, 22 Aug 2018 22:43:04 +0200
+Subject: [PATCH 11/14] USB: EHCI: ehci-mv: add DT support
 In-Reply-To: <20180822204307.13251-1-lkundrak@v3.sk>
 References: <20180822204307.13251-1-lkundrak@v3.sk>
-Message-ID: <20180822204307.13251-11-lkundrak@v3.sk>
+Message-ID: <20180822204307.13251-12-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a proper PHY driver, instead of hooks to a board support package.
+Add Device tree support.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 ---
- arch/arm/mach-mmp/devices.c          | 11 +-------
- drivers/usb/gadget/udc/mv_udc.h      |  7 ++++-
- drivers/usb/gadget/udc/mv_udc_core.c | 38 ++++++++--------------------
- 3 files changed, 17 insertions(+), 39 deletions(-)
+ drivers/usb/host/ehci-mv.c | 41 +++++++++++++++++++++-----------------
+ 1 file changed, 23 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/devices.c b/arch/arm/mach-mmp/devices.c
-index eb9b3c34e90a..d925be9f14a9 100644
---- a/arch/arm/mach-mmp/devices.c
-+++ b/arch/arm/mach-mmp/devices.c
-@@ -263,21 +263,12 @@ struct platform_device pxa168_device_usb_phy = {
+diff --git a/drivers/usb/host/ehci-mv.c b/drivers/usb/host/ehci-mv.c
+index 43b300c90875..f26109eafdbf 100644
+--- a/drivers/usb/host/ehci-mv.c
++++ b/drivers/usb/host/ehci-mv.c
+@@ -34,11 +34,11 @@ struct ehci_hcd_mv {
+ 	void __iomem *op_regs;
  
- #if IS_ENABLED(CONFIG_USB_MV_UDC)
- struct resource pxa168_u2o_resources[] = {
--	/* regbase */
- 	[0] = {
--		.start	= PXA168_U2O_REGBASE + U2x_CAPREGS_OFFSET,
-+		.start	= PXA168_U2O_REGBASE,
- 		.end	= PXA168_U2O_REGBASE + USB_REG_RANGE,
- 		.flags	= IORESOURCE_MEM,
--		.name	= "capregs",
- 	},
--	/* phybase */
- 	[1] = {
--		.start	= PXA168_U2O_PHYBASE,
--		.end	= PXA168_U2O_PHYBASE + USB_PHY_RANGE,
--		.flags	= IORESOURCE_MEM,
--		.name	= "phyregs",
--	},
--	[2] = {
- 		.start	= IRQ_PXA168_USB1,
- 		.end	= IRQ_PXA168_USB1,
- 		.flags	= IORESOURCE_IRQ,
-diff --git a/drivers/usb/gadget/udc/mv_udc.h b/drivers/usb/gadget/udc/mv_udc.h
-index b3f759c0962c..6f04f432964d 100644
---- a/drivers/usb/gadget/udc/mv_udc.h
-+++ b/drivers/usb/gadget/udc/mv_udc.h
-@@ -6,6 +6,9 @@
- #ifndef __MV_UDC_H
- #define __MV_UDC_H
+ 	struct usb_phy *otg;
++	struct clk *clk;
  
-+/* registers */
-+#define U2x_CAPREGS_OFFSET	0x100
-+
- #define VUSBHS_MAX_PORTS	8
+-	struct mv_usb_platform_data *pdata;
+ 	struct phy *phy;
  
- #define DQH_ALIGNMENT		2048
-@@ -174,9 +177,9 @@ struct mv_udc {
- 	struct platform_device		*dev;
- 	int				irq;
- 
-+	void __iomem                    *base;
- 	struct mv_cap_regs __iomem	*cap_regs;
- 	struct mv_op_regs __iomem	*op_regs;
--	void __iomem                    *phy_regs;
- 	unsigned int			max_eps;
- 	struct mv_dqh			*ep_dqh;
- 	size_t				ep_dqh_size;
-@@ -219,6 +222,8 @@ struct mv_udc {
- 
- 	/* some SOC has mutiple clock sources for USB*/
- 	struct clk      *clk;
-+
-+	struct phy	*phy;
+-	struct clk *clk;
++	int (*set_vbus)(unsigned int vbus);
  };
  
- /* endpoint data structure */
-diff --git a/drivers/usb/gadget/udc/mv_udc_core.c b/drivers/usb/gadget/udc/mv_udc_core.c
-index 95f52232493b..c701c83d3af5 100644
---- a/drivers/usb/gadget/udc/mv_udc_core.c
-+++ b/drivers/usb/gadget/udc/mv_udc_core.c
-@@ -1069,14 +1069,11 @@ static int mv_udc_enable_internal(struct mv_udc *udc)
- 	if (retval)
- 		return retval;
+ static void ehci_clock_enable(struct ehci_hcd_mv *ehci_mv)
+@@ -100,11 +100,6 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 	int retval = -ENODEV;
+ 	u32 offset;
  
--	if (udc->pdata->phy_init) {
--		retval = udc->pdata->phy_init(udc->phy_regs);
--		if (retval) {
--			dev_err(&udc->dev->dev,
--				"init phy error %d\n", retval);
--			udc_clock_disable(udc);
--			return retval;
--		}
-+	retval = phy_init(udc->phy);
-+	if (retval) {
-+		dev_err(&udc->dev->dev, "init phy error %d\n", retval);
-+		udc_clock_disable(udc);
-+		return retval;
- 	}
- 	udc->active = 1;
- 
-@@ -1095,8 +1092,7 @@ static void mv_udc_disable_internal(struct mv_udc *udc)
- {
- 	if (udc->active) {
- 		dev_dbg(&udc->dev->dev, "disable udc\n");
--		if (udc->pdata->phy_deinit)
--			udc->pdata->phy_deinit(udc->phy_regs);
-+		phy_exit(udc->phy);
- 		udc_clock_disable(udc);
- 		udc->active = 0;
- 	}
-@@ -2147,30 +2143,16 @@ static int mv_udc_probe(struct platform_device *pdev)
- 	if (IS_ERR(udc->clk))
- 		return PTR_ERR(udc->clk);
- 
--	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "capregs");
-+	r = platform_get_resource(udc->dev, IORESOURCE_MEM, 0);
- 	if (r == NULL) {
- 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
- 		return -ENODEV;
- 	}
- 
--	udc->cap_regs = (struct mv_cap_regs __iomem *)
--		devm_ioremap(&pdev->dev, r->start, resource_size(r));
--	if (udc->cap_regs == NULL) {
--		dev_err(&pdev->dev, "failed to map I/O memory\n");
--		return -EBUSY;
--	}
--
--	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "phyregs");
--	if (r == NULL) {
--		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
+-	if (!pdata) {
+-		dev_err(&pdev->dev, "missing platform_data\n");
 -		return -ENODEV;
 -	}
-+	udc->base = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+-
+ 	if (usb_disabled())
+ 		return -ENODEV;
  
--	udc->phy_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
--	if (udc->phy_regs == NULL) {
--		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
--		return -EBUSY;
--	}
-+	udc->cap_regs =
-+		(void __iomem *) ((unsigned long)udc->base + U2x_CAPREGS_OFFSET);
+@@ -114,7 +109,12 @@ static int mv_ehci_probe(struct platform_device *pdev)
  
- 	/* we will acces controller register, so enable the clk */
- 	retval = mv_udc_enable_internal(udc);
+ 	platform_set_drvdata(pdev, hcd);
+ 	ehci_mv = hcd_to_ehci_hcd_mv(hcd);
+-	ehci_mv->pdata = pdata;
++
++	ehci_mv->mode = MV_USB_MODE_HOST;
++	if (pdata) {
++		ehci_mv->mode = pdata->mode;
++		ehci_mv->set_vbus = pdata->set_vbus;
++	}
+ 
+ 	ehci_mv->phy = devm_phy_get(&pdev->dev, "usb");
+ 	if (IS_ERR(ehci_mv->phy)) {
+@@ -166,7 +166,6 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 	ehci = hcd_to_ehci(hcd);
+ 	ehci->caps = (struct ehci_caps *) ehci_mv->cap_regs;
+ 
+-	ehci_mv->mode = pdata->mode;
+ 	if (ehci_mv->mode == MV_USB_MODE_OTG) {
+ 		ehci_mv->otg = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
+ 		if (IS_ERR(ehci_mv->otg)) {
+@@ -191,8 +190,8 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 		/* otg will enable clock before use as host */
+ 		mv_ehci_disable(ehci_mv);
+ 	} else {
+-		if (pdata->set_vbus)
+-			pdata->set_vbus(1);
++		if (ehci_mv->set_vbus)
++			ehci_mv->set_vbus(1);
+ 
+ 		retval = usb_add_hcd(hcd, hcd->irq, IRQF_SHARED);
+ 		if (retval) {
+@@ -211,8 +210,8 @@ static int mv_ehci_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ err_set_vbus:
+-	if (pdata->set_vbus)
+-		pdata->set_vbus(0);
++	if (ehci_mv->set_vbus)
++		ehci_mv->set_vbus(0);
+ err_disable_clk:
+ 	mv_ehci_disable(ehci_mv);
+ err_put_hcd:
+@@ -233,8 +232,8 @@ static int mv_ehci_remove(struct platform_device *pdev)
+ 		otg_set_host(ehci_mv->otg->otg, NULL);
+ 
+ 	if (ehci_mv->mode == MV_USB_MODE_HOST) {
+-		if (ehci_mv->pdata->set_vbus)
+-			ehci_mv->pdata->set_vbus(0);
++		if (ehci_mv->set_vbus)
++			ehci_mv->set_vbus(0);
+ 
+ 		mv_ehci_disable(ehci_mv);
+ 	}
+@@ -265,14 +264,20 @@ static void mv_ehci_shutdown(struct platform_device *pdev)
+ 		hcd->driver->shutdown(hcd);
+ }
+ 
++static const struct of_device_id ehci_mv_dt_ids[] = {
++	{ .compatible = "marvell,pxau2o-ehci", },
++	{},
++};
++
+ static struct platform_driver ehci_mv_driver = {
+ 	.probe = mv_ehci_probe,
+ 	.remove = mv_ehci_remove,
+ 	.shutdown = mv_ehci_shutdown,
+ 	.driver = {
+-		   .name = "mv-ehci",
+-		   .bus = &platform_bus_type,
+-		   },
++		.name = "mv-ehci",
++		.bus = &platform_bus_type,
++		.of_match_table = ehci_mv_dt_ids,
++	},
+ 	.id_table = ehci_id_table,
+ };
+ 
 -- 
 2.17.1
