@@ -1,70 +1,86 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Wed, 22 Aug 2018 09:37:23 +0200
-Subject: Patch "clocksource/drivers/stm32: Fix error return code" has been
- added to the 4.17-stable tree
-Message-ID: <153492344324191@kroah.com>
+From: j-keerthy@ti.com (J, KEERTHY)
+Date: Wed, 22 Aug 2018 13:50:29 +0530
+Subject: [PATCH] soc: ti: pm33xx: Enable DS0 for the platforms on which it
+ is functional
+In-Reply-To: <20180822073719.GL14967@localhost>
+References: <1534915951-8783-1-git-send-email-j-keerthy@ti.com>
+ <20180822073409.GK14967@localhost> <20180822073719.GL14967@localhost>
+Message-ID: <ae71d45f-9260-3547-5ff2-355c084fcf8e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-This is a note to let you know that I've just added the patch titled
 
-    clocksource/drivers/stm32: Fix error return code
+On 8/22/2018 1:07 PM, Johan Hovold wrote:
+> On Wed, Aug 22, 2018 at 09:34:09AM +0200, Johan Hovold wrote:
+>> On Wed, Aug 22, 2018 at 11:02:31AM +0530, Keerthy wrote:
+>>> Enable DS0 for only those platforms on which it is functional
+>>>
+>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>>> ---
+>>>   arch/arm/mach-omap2/pm33xx-core.c    | 5 +++++
+>>>   drivers/soc/ti/pm33xx.c              | 9 +++++++++
+>>>   include/linux/platform_data/pm33xx.h | 2 ++
+>>>   3 files changed, 16 insertions(+)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/pm33xx-core.c b/arch/arm/mach-omap2/pm33xx-core.c
+>>> index f4971e4..f0f6e8e 100644
+>>> --- a/arch/arm/mach-omap2/pm33xx-core.c
+>>> +++ b/arch/arm/mach-omap2/pm33xx-core.c
+>>> @@ -135,6 +135,11 @@ static int am43xx_suspend(unsigned int state, int (*fn)(unsigned long),
+>>>   {
+>>>   	int ret = 0;
+>>>   
+>>> +	if (!(args & WFI_FLAG_DEEP_SLEEP0)) {
+>>> +		pr_err("DS0 mode not supported\n");
+>>> +		return -ENOTSUPP;
+>>> +	}
+>>> +
+>>>   	amx3_pre_suspend_common();
+>>>   	scu_power_mode(scu_base, SCU_PM_POWEROFF);
+>>>   	ret = cpu_suspend(args, fn);
+>>> diff --git a/drivers/soc/ti/pm33xx.c b/drivers/soc/ti/pm33xx.c
+>>> index d0dab32..53238d7 100644
+>>> --- a/drivers/soc/ti/pm33xx.c
+>>> +++ b/drivers/soc/ti/pm33xx.c
+>>> @@ -324,6 +324,15 @@ static int am33xx_pm_probe(struct platform_device *pdev)
+>>>   	suspend_wfi_flags |= WFI_FLAG_SAVE_EMIF;
+>>>   	suspend_wfi_flags |= WFI_FLAG_WAKE_M3;
+>>>   
+>>> +	/*
+>>> +	 * Deep Sleep0 mode is currently functional only on am437x-gp-evm,
+>>> +	 * am33xx-evm and boneblack family. Hence set the DS0 flag
+>>> +	 */
+>>> +	if (of_machine_is_compatible("ti,am437x-gp-evm") ||
+>>> +	    of_machine_is_compatible("ti,am335x-bone-black") ||
+>>> +	    of_machine_is_compatible("ti,am335x-evm"))
+>>> +		suspend_wfi_flags |= WFI_FLAG_DEEP_SLEEP0;
+>>
+>> What about other (out-of-tree) machines which supports DS0 and which
+>> this change would break?
+>>
+>> I think this needs to be a blacklist if anything.
+>>
+>> Please also expand in the commit message why you think this is needed.
 
-to the 4.17-stable tree which can be found at:
-    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
+Currently when one does echo mem > /sys/power/state on unsuppored 
+machines there can be a crash or a hang. So bail out with a message.
 
-The filename of the patch is:
-     clocksource-drivers-stm32-fix-error-return-code.patch
-and it can be found in the queue-4.17 subdirectory.
+>>
+>> Last, what tree is this against? There's no am43xx_suspend() in
+>> linux-next (and you add compatibles above for am33xx too).
+> 
+> Sorry, there is indeed an am43xx_suspend(), but you are adding
+> compatibles for am33xx which use am33xx_suspend().
 
-If you, or anyone else, feels it should not be added to the stable tree,
-please let <stable@vger.kernel.org> know about it.
+am33xx_pm_probe is a common probe function for both am33 and am43.
+AFAIK for am33 family am335x-evm and am335x-bone-black support Deep 
+Sleep mode. For am43 family am43tx-gp-evm alone supports at the moment.
 
+Can you let me know of other am33 machines that support DS0 mode?
+I could have simply used ti,am33xx compatible which covers entire am33 
+family but then am33xx-bone (bone white) does not support this mode.
 
->From foo at baz Wed Aug 22 09:16:55 CEST 2018
-From: Julia Lawall <Julia.Lawall@lip6.fr>
-Date: Sun, 10 Jun 2018 16:24:15 +0200
-Subject: clocksource/drivers/stm32: Fix error return code
-
-From: Julia Lawall <Julia.Lawall@lip6.fr>
-
-[ Upstream commit a26ed66c20f080c510fcf5bd448bce204f2c19d7 ]
-
-Return an error code on failure.
-
-Problem found using Coccinelle.
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: kernel-janitors at vger.kernel.org
-Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-Cc: Alexandre Torgue <alexandre.torgue@st.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Link: https://lkml.kernel.org/r1528640655-18948-3-git-send-email-Julia.Lawall at lip6.fr
-Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
----
- drivers/clocksource/timer-stm32.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
---- a/drivers/clocksource/timer-stm32.c
-+++ b/drivers/clocksource/timer-stm32.c
-@@ -304,8 +304,10 @@ static int __init stm32_timer_init(struc
- 
- 	to->private_data = kzalloc(sizeof(struct stm32_timer_private),
- 				   GFP_KERNEL);
--	if (!to->private_data)
-+	if (!to->private_data) {
-+		ret = -ENOMEM;
- 		goto deinit;
-+	}
- 
- 	rstc = of_reset_control_get(node, NULL);
- 	if (!IS_ERR(rstc)) {
-
-
-Patches currently in stable-queue which might be from Julia.Lawall at lip6.fr are
-
-queue-4.17/clocksource-drivers-stm32-fix-error-return-code.patch
+> 
+> Johan
+> 
