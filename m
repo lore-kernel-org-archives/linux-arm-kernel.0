@@ -1,36 +1,78 @@
 From: yaojun8558363@gmail.com (Jun Yao)
-Date: Wed, 22 Aug 2018 17:54:26 +0800
-Subject: [RESEND PATCH v4 0/6] arm64/mm: Move swapper_pg_dir to rodata
-Message-ID: <20180822095432.12125-1-yaojun8558363@gmail.com>
+Date: Wed, 22 Aug 2018 17:54:30 +0800
+Subject: [RESEND PATCH v4 4/6] arm64/mm: Create the final page table directly
+ in swapper_pg_dir.
+In-Reply-To: <20180822095432.12125-1-yaojun8558363@gmail.com>
+References: <20180822095432.12125-1-yaojun8558363@gmail.com>
+Message-ID: <20180822095432.12125-5-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The set_init_mm_pgd() is reimplemented using assembly in order to
-avoid being instrumented by kasan.
+As the initial page table is created in the init_pg_dir, we can set
+up the final page table directly in the swapper_pg_dir. And it only
+contains the top level page table, so we can reduce it to a page
+size.
 
-Test following configs with CONFIG_RANDOMIZE_BASE/UNMAP_KERNEL_AT_EL0/
-CONFIG_ARM64_SW_TTBR0_PAN/CONFIG_KASAN_OUTLINE enabled on qemu:
+Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
+---
+ arch/arm64/kernel/vmlinux.lds.S |  2 +-
+ arch/arm64/mm/mmu.c             | 29 ++---------------------------
+ 2 files changed, 3 insertions(+), 28 deletions(-)
 
-	1. CONFIG_ARM64_4K_PAGES/CONFIG_ARM64_VA_BITS_48
-	2. CONFIG_ARM64_4K_PAGES/CONFIG_ARM64_VA_BITS_39
-	3. CONFIG_ARM64_64K_PAGES/CONFIG_ARM64_VA_BITS_48
-	4. CONFIG_ARM64_64K_PAGES/CONFIG_ARM64_VA_BITS_42
-
-Jun Yao (6):
-  arm64/mm: Introduce the init_pg_dir.
-  arm64/mm: Pass ttbr1 as a parameter to __enable_mmu().
-  arm64/mm: Create the initial page table in the init_pg_dir.
-  arm64/mm: Create the final page table directly in swapper_pg_dir.
-  arm64/mm: Populate the swapper_pg_dir by fixmap.
-  arm64/mm: Move {idmap_pg_dir .. swapper_pg_dir} to rodata section.
-
- arch/arm64/include/asm/assembler.h | 29 +++++++++++++
- arch/arm64/include/asm/pgtable.h   | 66 ++++++++++++++++++++++++++----
- arch/arm64/kernel/head.S           | 48 ++++++++++++++--------
- arch/arm64/kernel/sleep.S          |  1 +
- arch/arm64/kernel/vmlinux.lds.S    | 47 ++++++++++++++-------
- arch/arm64/mm/mmu.c                | 45 ++++++++------------
- 6 files changed, 168 insertions(+), 68 deletions(-)
-
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 61d7cee3eaa6..2446911f4262 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -237,7 +237,7 @@ SECTIONS
+ 	. += RESERVED_TTBR0_SIZE;
+ #endif
+ 	swapper_pg_dir = .;
+-	. += SWAPPER_DIR_SIZE;
++	. += PAGE_SIZE;
+ 	swapper_pg_end = .;
+ 
+ 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index f7e544f6f3eb..b7f9afb628ac 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -642,35 +642,10 @@ void __init set_init_mm_pgd(pgd_t *pgd)
+  */
+ void __init paging_init(void)
+ {
+-	phys_addr_t pgd_phys = early_pgtable_alloc();
+-	pgd_t *pgdp = pgd_set_fixmap(pgd_phys);
+-
+-	map_kernel(pgdp);
+-	map_mem(pgdp);
+-
+-	/*
+-	 * We want to reuse the original swapper_pg_dir so we don't have to
+-	 * communicate the new address to non-coherent secondaries in
+-	 * secondary_entry, and so cpu_switch_mm can generate the address with
+-	 * adrp+add rather than a load from some global variable.
+-	 *
+-	 * To do this we need to go via a temporary pgd.
+-	 */
+-	cpu_replace_ttbr1(__va(pgd_phys));
+-	memcpy(swapper_pg_dir, pgdp, PGD_SIZE);
++	map_kernel(swapper_pg_dir);
++	map_mem(swapper_pg_dir);
+ 	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
+ 	set_init_mm_pgd(swapper_pg_dir);
+-
+-	pgd_clear_fixmap();
+-	memblock_free(pgd_phys, PAGE_SIZE);
+-
+-	/*
+-	 * We only reuse the PGD from the swapper_pg_dir, not the pud + pmd
+-	 * allocated with it.
+-	 */
+-	memblock_free(__pa_symbol(swapper_pg_dir) + PAGE_SIZE,
+-		      __pa_symbol(swapper_pg_end) - __pa_symbol(swapper_pg_dir)
+-		      - PAGE_SIZE);
+ }
+ 
+ /*
 -- 
 2.17.1
