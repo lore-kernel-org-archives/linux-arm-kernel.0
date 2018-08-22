@@ -1,38 +1,61 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 22 Aug 2018 22:41:03 +0200
-Subject: [PATCH 03/11] gpio: ep93xx: Switch to SPDX license tag
+Date: Wed, 22 Aug 2018 22:41:06 +0200
+Subject: [PATCH 06/11] gpio: ep93xx: Properly call the chained IRQ handler
 In-Reply-To: <20180822204111.9581-1-linus.walleij@linaro.org>
 References: <20180822204111.9581-1-linus.walleij@linaro.org>
-Message-ID: <20180822204111.9581-4-linus.walleij@linaro.org>
+Message-ID: <20180822204111.9581-7-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The subject says it all. Cut down on boilerplate.
+The chained irq handler should call chained_irq_enter()
+and chained_irq_exit() before/after handling the chained
+IRQ.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/gpio/gpio-ep93xx.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ drivers/gpio/gpio-ep93xx.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/drivers/gpio/gpio-ep93xx.c b/drivers/gpio/gpio-ep93xx.c
-index 3bfd0e46f7ed..3822d11e90ac 100644
+index a81d1e796912..ce7e88df9cc5 100644
 --- a/drivers/gpio/gpio-ep93xx.c
 +++ b/drivers/gpio/gpio-ep93xx.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Generic EP93xx GPIO handling
-  *
-@@ -6,10 +7,6 @@
-  *
-  * Based on code originally from:
-  *  linux/arch/arm/mach-ep93xx/core.c
-- *
-- *  This program is free software; you can redistribute it and/or modify
-- *  it under the terms of the GNU General Public License version 2 as
-- *  published by the Free Software Foundation.
-  */
+@@ -88,9 +88,12 @@ static void ep93xx_gpio_ab_irq_handler(struct irq_desc *desc)
+ {
+ 	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
+ 	struct ep93xx_gpio *epg = gpiochip_get_data(gc);
++	struct irq_chip *irqchip = irq_desc_get_chip(desc);
+ 	unsigned char status;
+ 	int i;
  
- #include <linux/init.h>
++	chained_irq_enter(irqchip, desc);
++
+ 	status = readb(epg->base + EP93XX_GPIO_A_INT_STATUS);
+ 	for (i = 0; i < 8; i++) {
+ 		if (status & (1 << i)) {
+@@ -106,6 +109,8 @@ static void ep93xx_gpio_ab_irq_handler(struct irq_desc *desc)
+ 			generic_handle_irq(gpio_irq);
+ 		}
+ 	}
++
++	chained_irq_exit(irqchip, desc);
+ }
+ 
+ static void ep93xx_gpio_f_irq_handler(struct irq_desc *desc)
+@@ -115,11 +120,14 @@ static void ep93xx_gpio_f_irq_handler(struct irq_desc *desc)
+ 	 *
+ 	 *  IRQ_EP93XX_GPIO{0..7}MUX -> gpio_to_irq(EP93XX_GPIO_LINE_F({0..7})
+ 	 */
++	struct irq_chip *irqchip = irq_desc_get_chip(desc);
+ 	unsigned int irq = irq_desc_get_irq(desc);
+ 	int port_f_idx = ((irq + 1) & 7) ^ 4; /* {19..22,47..50} -> {0..7} */
+ 	int gpio_irq = gpio_to_irq(16) + port_f_idx;
+ 
++	chained_irq_enter(irqchip, desc);
+ 	generic_handle_irq(gpio_irq);
++	chained_irq_exit(irqchip, desc);
+ }
+ 
+ static void ep93xx_gpio_irq_ack(struct irq_data *d)
 -- 
 2.17.1
