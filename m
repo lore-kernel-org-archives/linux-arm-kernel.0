@@ -1,74 +1,62 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 22 Aug 2018 11:02:31 +0530
-Subject: [PATCH] soc: ti: pm33xx: Enable DS0 for the platforms on which it is
- functional
-Message-ID: <1534915951-8783-1-git-send-email-j-keerthy@ti.com>
+From: hari.vyas@broadcom.com (Hari Vyas)
+Date: Wed, 22 Aug 2018 12:01:47 +0530
+Subject: [PATCH] arm64: fix for bad_mode() handler to always result in
+ panic
+In-Reply-To: <20180821173838.GB5168@brain-police>
+References: <1533639828-19039-1-git-send-email-hari.vyas@broadcom.com>
+ <20180807122727.GA9359@kroah.com>
+ <CAM5rFu-_x1EfXE72X-4_5XcO6zK86itiny16mgwoRrDBB2=oAA@mail.gmail.com>
+ <1bfd65dc-3bf2-f40f-2337-d7f95f4c756e@gmail.com>
+ <CAM5rFu9bFxBRNkHEXDsPmjNDRoYi0iQc4WTBuW7bsVOzbXUtLg@mail.gmail.com>
+ <CAM5rFu-REAekjqEJ-BRJz7DJ5jTrF4qu6UrGMwEWGes=zzhmOQ@mail.gmail.com>
+ <20180821173838.GB5168@brain-police>
+Message-ID: <CAM5rFu-dbtmc2buJAOQQg+vGSPvu4coxz7JXg-biiMBNAn4Mvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable DS0 for only those platforms on which it is functional
+On Tue, Aug 21, 2018 at 11:08 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Hari,
+>
+> Sorry, this has slipped through the cracks.
+>
+> On Tue, Aug 21, 2018 at 07:46:04PM +0530, Hari Vyas wrote:
+>> On Fri, Aug 10, 2018 at 10:16 PM, Hari Vyas <hari.vyas@broadcom.com> wrote:
+>> > As far as I know, bad mode was earlier(linux 3.14 onwards) also not
+>> > resulting in panic always.
+>> > Trap-exception framework is recently changed some time back but this
+>> > concern remains same.
+>> > I am also awaiting a response from ARM maintainers before proceeding.
+>> > Just to be more clear, this
+>> > concern was pointed out in one of my previous-and-some-what-relative
+>> > patch about console-verbose
+>> > level restoration issue.
+>> >> Florian
+>> Gentle reminder for Arm maintainers.
+>> If concern can be taken care from your side in different ways then bug
+>> can be resolved.
+>
+> I've recently started trying to untangle much of our fatal trap handling
+> code so that the decision between user-mode and kernel-mode actions is
+> explicit in the caller, rather than buried deep in the bowels of some
+> callchain. The aim is also to remove arm64_notify_die() entirely, which
+> is a complete maze of crap that ultimately depends on what kgdb does in
+> some cases!
+>
+> With that out of the way, die() itself could probably be simplified so that
+> it (a) avoids the notifier chain [which is useless for us] and (b) is only
+> intended to be called for kernel contexts, i.e. as a wrapper around a
+> panic_on_oops check.
+>
+> But this needn't affect your patch, which seems to be a small step in the
+> right direction. I'll pick it up as part of my series when I send it out,
+> if that's alright with you? I don't think any of this is especially urgent.
+>
+> Will
+Thanks Will for your reply. Issue should be just addressed. If it is
+being taken care from
+your end in better way, no issue from our end too. Please intimate
+once changes are
+available in kernel release so that we can pick it.
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
----
- arch/arm/mach-omap2/pm33xx-core.c    | 5 +++++
- drivers/soc/ti/pm33xx.c              | 9 +++++++++
- include/linux/platform_data/pm33xx.h | 2 ++
- 3 files changed, 16 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/pm33xx-core.c b/arch/arm/mach-omap2/pm33xx-core.c
-index f4971e4..f0f6e8e 100644
---- a/arch/arm/mach-omap2/pm33xx-core.c
-+++ b/arch/arm/mach-omap2/pm33xx-core.c
-@@ -135,6 +135,11 @@ static int am43xx_suspend(unsigned int state, int (*fn)(unsigned long),
- {
- 	int ret = 0;
- 
-+	if (!(args & WFI_FLAG_DEEP_SLEEP0)) {
-+		pr_err("DS0 mode not supported\n");
-+		return -ENOTSUPP;
-+	}
-+
- 	amx3_pre_suspend_common();
- 	scu_power_mode(scu_base, SCU_PM_POWEROFF);
- 	ret = cpu_suspend(args, fn);
-diff --git a/drivers/soc/ti/pm33xx.c b/drivers/soc/ti/pm33xx.c
-index d0dab32..53238d7 100644
---- a/drivers/soc/ti/pm33xx.c
-+++ b/drivers/soc/ti/pm33xx.c
-@@ -324,6 +324,15 @@ static int am33xx_pm_probe(struct platform_device *pdev)
- 	suspend_wfi_flags |= WFI_FLAG_SAVE_EMIF;
- 	suspend_wfi_flags |= WFI_FLAG_WAKE_M3;
- 
-+	/*
-+	 * Deep Sleep0 mode is currently functional only on am437x-gp-evm,
-+	 * am33xx-evm and boneblack family. Hence set the DS0 flag
-+	 */
-+	if (of_machine_is_compatible("ti,am437x-gp-evm") ||
-+	    of_machine_is_compatible("ti,am335x-bone-black") ||
-+	    of_machine_is_compatible("ti,am335x-evm"))
-+		suspend_wfi_flags |= WFI_FLAG_DEEP_SLEEP0;
-+
- 	ret = pm_ops->init();
- 	if (ret) {
- 		dev_err(dev, "Unable to call core pm init!\n");
-diff --git a/include/linux/platform_data/pm33xx.h b/include/linux/platform_data/pm33xx.h
-index fbf5ed7..5c54b64 100644
---- a/include/linux/platform_data/pm33xx.h
-+++ b/include/linux/platform_data/pm33xx.h
-@@ -28,12 +28,14 @@
-  * WFI_FLAG_WAKE_M3: Disable MPU clock or clockdomain to cause wkup_m3 to
-  *		     execute when WFI instruction executes.
-  * WFI_FLAG_RTC_ONLY: Configure the RTC to enter RTC+DDR mode.
-+ * WFI_FLAG_DEEP_SLEEP0: Configure to enter Depp Sleep 0 mode.
-  */
- #define WFI_FLAG_FLUSH_CACHE		BIT(0)
- #define WFI_FLAG_SELF_REFRESH		BIT(1)
- #define WFI_FLAG_SAVE_EMIF		BIT(2)
- #define WFI_FLAG_WAKE_M3		BIT(3)
- #define WFI_FLAG_RTC_ONLY		BIT(4)
-+#define WFI_FLAG_DEEP_SLEEP0		BIT(5)
- 
- #ifndef __ASSEMBLER__
- struct am33xx_pm_sram_addr {
--- 
-1.9.1
+Regards,
+hari
