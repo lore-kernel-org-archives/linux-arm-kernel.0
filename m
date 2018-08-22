@@ -1,47 +1,100 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 22 Aug 2018 10:38:28 -0700
-Subject: [PATCH 2/3] arm64: dts: qcom: sdm845-mtp: Add RPMh VRM/XOB
- regulators
-In-Reply-To: <153478912722.28926.1278085207557745493@swboyd.mtv.corp.google.com>
-References: <20180810215150.82490-1-dianders@chromium.org>
- <20180810215150.82490-3-dianders@chromium.org>
- <153478912722.28926.1278085207557745493@swboyd.mtv.corp.google.com>
-Message-ID: <CAD=FV=VY-n2maPD6Pyy-XQqppPrTnN2yM9SxsFEhmY0FZ9U8mg@mail.gmail.com>
+From: palmer@sifive.com (Palmer Dabbelt)
+Date: Wed, 22 Aug 2018 10:51:17 -0700 (PDT)
+Subject: [PATCH v2] kbuild: rename LDFLAGS to KBUILD_LDFLAGS
+In-Reply-To: <1534945405-16396-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <mhng-5d4b0f73-4c16-4111-a203-dc8076a2f3bc@palmer-si-x1c4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Aug 20, 2018 at 11:18 AM, Stephen Boyd <swboyd@chromium.org> wrote:
-> Quoting Douglas Anderson (2018-08-10 14:51:49)
->> @@ -20,6 +21,450 @@
->>         chosen {
->>                 stdout-path = "serial0:115200n8";
->>         };
->> +
->> +       vph_pwr: vph-pwr-regulator {
->> +               compatible = "regulator-fixed";
->> +               regulator-name = "vph_pwr";
->> +               regulator-min-microvolt = <3700000>;
->> +               regulator-max-microvolt = <3700000>;
->> +       };
->> +
->> +       /*
->> +        * Apparently RPMh does not provide support for PM8998 S4 because it
->> +        * is always-on; model it as a fixed regulator.
->> +        */
->> +       vreg_s4a_1p8: pm8998-smps4 {
->> +               compatible = "regulator-fixed";
->> +               regulator-name = "vreg_s4a_1p8";
->> +
->> +               regulator-min-microvolt = <1800000>;
->> +               regulator-max-microvolt = <1800000>;
->> +
->> +               regulator-always-on;
->> +               regulator-boot-on;
+On Wed, 22 Aug 2018 06:43:25 PDT (-0700), yamada.masahiro at socionext.com wrote:
+> Commit a0f97e06a43c ("kbuild: enable 'make CFLAGS=...' to add
+> additional options to CC") renamed CFLAGS to KBUILD_CFLAGS.
 >
-> Can vin be vph_pwr? That would properly model this.
+> Commit 222d394d30e7 ("kbuild: enable 'make AFLAGS=...' to add
+> additional options to AS") renamed AFLAGS to KBUILD_AFLAGS.
+>
+> Commit 06c5040cdb13 ("kbuild: enable 'make CPPFLAGS=...' to add
+> additional options to CPP") renamed CPPFLAGS to KBUILD_CPPFLAGS.
+>
+> For some reason, LDFLAGS was not renamed.
+>
+> Using a well-known variable like LDFLAGS may result in accidental
+> override of the variable.
+>
+> Kbuild generally uses KBUILD_ prefixed variables for the internally
+> appended options, so here is one more conversion to sanitize the
+> naming convention.
+>
+> I did not touch Makefiles under tools/ since the tools build system
+> is a different world.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+> ---
+>
+> Changes in v2:
+>   - Rebased on Linus's tree
+>
+>  Makefile                           | 6 +++---
+>  arch/arc/Makefile                  | 2 +-
+>  arch/arm/Makefile                  | 4 ++--
+>  arch/arm64/Makefile                | 4 ++--
+>  arch/c6x/Makefile                  | 3 +--
+>  arch/h8300/Makefile                | 2 +-
+>  arch/hexagon/Makefile              | 4 +---
+>  arch/m68k/Makefile                 | 2 +-
+>  arch/microblaze/Makefile           | 4 ++--
+>  arch/mips/Makefile                 | 2 +-
+>  arch/mips/boot/compressed/Makefile | 2 +-
+>  arch/mips/lasat/image/Makefile     | 2 +-
+>  arch/nds32/Makefile                | 4 ++--
+>  arch/powerpc/Makefile              | 6 +++---
+>  arch/riscv/Makefile                | 4 ++--
+>  arch/s390/Makefile                 | 2 +-
+>  arch/sh/Makefile                   | 4 ++--
+>  arch/sparc/Makefile                | 4 ++--
+>  arch/um/Makefile                   | 2 +-
+>  arch/x86/Makefile                  | 4 ++--
+>  arch/x86/Makefile.um               | 4 ++--
+>  arch/x86/boot/compressed/Makefile  | 6 +++---
+>  arch/xtensa/Makefile               | 2 +-
+>  arch/xtensa/boot/boot-elf/Makefile | 2 +-
+>  scripts/Kbuild.include             | 4 ++--
+>  scripts/Makefile.build             | 4 ++--
+>  scripts/Makefile.lib               | 2 +-
+>  scripts/Makefile.modpost           | 2 +-
+>  28 files changed, 45 insertions(+), 48 deletions(-)
 
-Yes, good suggestion.  Fixed in v3.
+[...]
 
--Doug
+> diff --git a/arch/riscv/Makefile b/arch/riscv/Makefile
+> index 9ddd88b..61ec424 100644
+> --- a/arch/riscv/Makefile
+> +++ b/arch/riscv/Makefile
+> @@ -29,7 +29,7 @@ ifeq ($(CONFIG_ARCH_RV64I),y)
+>  	KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
+>
+>  	KBUILD_MARCH = rv64im
+> -	LDFLAGS += -melf64lriscv
+> +	KBUILD_LDFLAGS += -melf64lriscv
+>  else
+>  	BITS := 32
+>  	UTS_MACHINE := riscv32
+> @@ -37,7 +37,7 @@ else
+>  	KBUILD_CFLAGS += -mabi=ilp32
+>  	KBUILD_AFLAGS += -mabi=ilp32
+>  	KBUILD_MARCH = rv32im
+> -	LDFLAGS += -melf32lriscv
+> +	KBUILD_LDFLAGS += -melf32lriscv
+>  endif
+>
+>  KBUILD_CFLAGS += -Wall
+
+Ah, thanks -- I'd noticed this when we were messing around in here recently and 
+assumed there was some reason for the non-orthogonality.  As far as the RISC-V 
+stuff goes, feel free to add a 
+
+Reviewed-by: Palmer Dabbelt <palmer@sifive.com>
+
+I can deal with the inevitable merge conflicts on our end, as they'll be 
+trivial :).
