@@ -1,24 +1,45 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 22 Aug 2018 13:31:19 +0200
-Subject: [PATCH /2] arm64: dts: renesas: r8a77970: add MMC support
-In-Reply-To: <28c2a0ef-dc89-1fad-6502-9b33738b59a5@cogentembedded.com>
-References: <1af46bf9-d9e5-8dcf-0ac7-a85e7348a34e@cogentembedded.com>
- <28c2a0ef-dc89-1fad-6502-9b33738b59a5@cogentembedded.com>
-Message-ID: <20180822113119.4p2utcbx5ati74na@verge.net.au>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 22 Aug 2018 14:02:13 +0200
+Subject: [PATCH 2/3] dt-bindings: firmware: coreboot: document board variant
+ properties
+In-Reply-To: <20180822120214.11848-1-heiko@sntech.de>
+References: <20180822120214.11848-1-heiko@sntech.de>
+Message-ID: <20180822120214.11848-2-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2018 at 10:49:26PM +0300, Sergei Shtylyov wrote:
-> Define the generic R8A77970 part of the MMC0 (SDHI2) device node.
-> 
-> Based on the original (and large) patches by Vladimir Barinov.
-> 
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Since at least 2014 coreboot exports board specific variant ids for
+board-revision, used ram-modules and component variants on the same board
+into the loaded devicetree.
 
-Thanks,
+These are set on all devicetree-based Chromebooks since then, so at
+least we can make the effort to document these long-used properties.
 
-This looks fine to me but I will wait to see if there are other reviews
-before applying.
+A case where these are used is for example to determine the touchscreen
+type that is only identifyable via the sku-id when updating its firmware
+on the Scarlet tablet from the Gru ChromeOS family.
 
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ Documentation/devicetree/bindings/firmware/coreboot.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/firmware/coreboot.txt b/Documentation/devicetree/bindings/firmware/coreboot.txt
+index 4c955703cea8..cfc7623e2577 100644
+--- a/Documentation/devicetree/bindings/firmware/coreboot.txt
++++ b/Documentation/devicetree/bindings/firmware/coreboot.txt
+@@ -21,6 +21,12 @@ Required properties:
+ 	0xc0389481 that resides in the topmost 8 bytes of the area.
+ 	See coreboot's src/include/imd.h for details.
+ 
++Board variant properties determined via strapping measures (like gpios):
++ - board-id: board-specific id indicating the board-revision
++ - ram-code: board-specific id identifying the used ram-module
++ - sku-id: board-specific id indicating a variant (using different
++           display panels for example)
++
+ Example:
+ 	firmware {
+ 		ranges;
+-- 
+2.17.0
