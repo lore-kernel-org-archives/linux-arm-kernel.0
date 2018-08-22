@@ -1,100 +1,135 @@
-From: palmer@sifive.com (Palmer Dabbelt)
-Date: Wed, 22 Aug 2018 10:51:17 -0700 (PDT)
-Subject: [PATCH v2] kbuild: rename LDFLAGS to KBUILD_LDFLAGS
-In-Reply-To: <1534945405-16396-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <mhng-5d4b0f73-4c16-4111-a203-dc8076a2f3bc@palmer-si-x1c4>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 22 Aug 2018 18:52:40 +0100
+Subject: [PATCH v5 3/5] iommu/io-pgtable-arm: add support for non-strict
+ mode
+In-Reply-To: <1534296510-12888-4-git-send-email-thunder.leizhen@huawei.com>
+References: <1534296510-12888-1-git-send-email-thunder.leizhen@huawei.com>
+ <1534296510-12888-4-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <88575452-d370-2488-dd3f-6c3d3ebe150d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Aug 2018 06:43:25 PDT (-0700), yamada.masahiro at socionext.com wrote:
-> Commit a0f97e06a43c ("kbuild: enable 'make CFLAGS=...' to add
-> additional options to CC") renamed CFLAGS to KBUILD_CFLAGS.
->
-> Commit 222d394d30e7 ("kbuild: enable 'make AFLAGS=...' to add
-> additional options to AS") renamed AFLAGS to KBUILD_AFLAGS.
->
-> Commit 06c5040cdb13 ("kbuild: enable 'make CPPFLAGS=...' to add
-> additional options to CPP") renamed CPPFLAGS to KBUILD_CPPFLAGS.
->
-> For some reason, LDFLAGS was not renamed.
->
-> Using a well-known variable like LDFLAGS may result in accidental
-> override of the variable.
->
-> Kbuild generally uses KBUILD_ prefixed variables for the internally
-> appended options, so here is one more conversion to sanitize the
-> naming convention.
->
-> I did not touch Makefiles under tools/ since the tools build system
-> is a different world.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Acked-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+On 15/08/18 02:28, Zhen Lei wrote:
+> To support the non-strict mode, now we only tlbi and sync for the strict
+> mode. But for the non-leaf case, always follow strict mode.
+> 
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 > ---
->
-> Changes in v2:
->   - Rebased on Linus's tree
->
->  Makefile                           | 6 +++---
->  arch/arc/Makefile                  | 2 +-
->  arch/arm/Makefile                  | 4 ++--
->  arch/arm64/Makefile                | 4 ++--
->  arch/c6x/Makefile                  | 3 +--
->  arch/h8300/Makefile                | 2 +-
->  arch/hexagon/Makefile              | 4 +---
->  arch/m68k/Makefile                 | 2 +-
->  arch/microblaze/Makefile           | 4 ++--
->  arch/mips/Makefile                 | 2 +-
->  arch/mips/boot/compressed/Makefile | 2 +-
->  arch/mips/lasat/image/Makefile     | 2 +-
->  arch/nds32/Makefile                | 4 ++--
->  arch/powerpc/Makefile              | 6 +++---
->  arch/riscv/Makefile                | 4 ++--
->  arch/s390/Makefile                 | 2 +-
->  arch/sh/Makefile                   | 4 ++--
->  arch/sparc/Makefile                | 4 ++--
->  arch/um/Makefile                   | 2 +-
->  arch/x86/Makefile                  | 4 ++--
->  arch/x86/Makefile.um               | 4 ++--
->  arch/x86/boot/compressed/Makefile  | 6 +++---
->  arch/xtensa/Makefile               | 2 +-
->  arch/xtensa/boot/boot-elf/Makefile | 2 +-
->  scripts/Kbuild.include             | 4 ++--
->  scripts/Makefile.build             | 4 ++--
->  scripts/Makefile.lib               | 2 +-
->  scripts/Makefile.modpost           | 2 +-
->  28 files changed, 45 insertions(+), 48 deletions(-)
+>   drivers/iommu/io-pgtable-arm.c | 20 ++++++++++++++------
+>   drivers/iommu/io-pgtable.h     |  3 +++
+>   2 files changed, 17 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+> index 010a254..20d3e98 100644
+> --- a/drivers/iommu/io-pgtable-arm.c
+> +++ b/drivers/iommu/io-pgtable-arm.c
+> @@ -538,6 +538,7 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
+>   	phys_addr_t blk_paddr;
+>   	size_t tablesz = ARM_LPAE_GRANULE(data);
+>   	size_t split_sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
+> +	size_t unmapped = size;
+>   	int i, unmap_idx = -1;
+> 
+>   	if (WARN_ON(lvl == ARM_LPAE_MAX_LEVELS))
+> @@ -575,11 +576,16 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
+>   		tablep = iopte_deref(pte, data);
+>   	}
+> 
+> -	if (unmap_idx < 0)
 
-[...]
+[ side note: the more I see this test the more it looks slightly wrong, 
+but that's a separate issue. I'll have to sit down and really remember 
+what's going on here... ]
 
-> diff --git a/arch/riscv/Makefile b/arch/riscv/Makefile
-> index 9ddd88b..61ec424 100644
-> --- a/arch/riscv/Makefile
-> +++ b/arch/riscv/Makefile
-> @@ -29,7 +29,7 @@ ifeq ($(CONFIG_ARCH_RV64I),y)
->  	KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
->
->  	KBUILD_MARCH = rv64im
-> -	LDFLAGS += -melf64lriscv
-> +	KBUILD_LDFLAGS += -melf64lriscv
->  else
->  	BITS := 32
->  	UTS_MACHINE := riscv32
-> @@ -37,7 +37,7 @@ else
->  	KBUILD_CFLAGS += -mabi=ilp32
->  	KBUILD_AFLAGS += -mabi=ilp32
->  	KBUILD_MARCH = rv32im
-> -	LDFLAGS += -melf32lriscv
-> +	KBUILD_LDFLAGS += -melf32lriscv
->  endif
->
->  KBUILD_CFLAGS += -Wall
+> -		return __arm_lpae_unmap(data, iova, size, lvl, tablep);
+> +	if (unmap_idx < 0) {
+> +		unmapped = __arm_lpae_unmap(data, iova, size, lvl, tablep);
+> +		if (!(data->iop.cfg.quirks & IO_PGTABLE_QUIRK_NON_STRICT))
+> +			return unmapped;
+> +	}
 
-Ah, thanks -- I'd noticed this when we were messing around in here recently and 
-assumed there was some reason for the non-orthogonality.  As far as the RISC-V 
-stuff goes, feel free to add a 
+I don't quite get this change - we should only be recursing back into 
+__arm_lpae_unmap() here if nothing's actually been unmapped at this 
+point - the block entry is simply replaced by a full next-level table 
+and we're going to come back and split another block at that next level, 
+or we raced against someone else splitting the same block and that's 
+their table instead. Since that's reverting back to a "regular" unmap, I 
+don't see where the need to introduce an additional flush to that path 
+comes from (relative to the existing behaviour, at least).
 
-Reviewed-by: Palmer Dabbelt <palmer@sifive.com>
+>   	io_pgtable_tlb_add_flush(&data->iop, iova, size, size, true);
 
-I can deal with the inevitable merge conflicts on our end, as they'll be 
-trivial :).
+This is the flush which corresponds to whatever page split_blk_unmap() 
+actually unmapped itself (and also covers any recursively-split 
+intermediate-level entries)...
+
+> -	return size;
+> +	io_pgtable_tlb_sync(&data->iop);
+
+...which does want this sync, but only technically for non-strict mode, 
+since it's otherwise covered by the sync in iommu_unmap().
+
+I'm not *against* tightening up the TLB maintenance here in general, but 
+if so that should be a separately-reasoned patch, not snuck in with 
+other changes.
+
+Robin.
+
+> +
+> +	return unmapped;
+>   }
+> 
+>   static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+> @@ -609,7 +615,7 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+>   			io_pgtable_tlb_sync(iop);
+>   			ptep = iopte_deref(pte, data);
+>   			__arm_lpae_free_pgtable(data, lvl + 1, ptep);
+> -		} else {
+> +		} else if (!(iop->cfg.quirks & IO_PGTABLE_QUIRK_NON_STRICT)) {
+>   			io_pgtable_tlb_add_flush(iop, iova, size, size, true);
+>   		}
+> 
+> @@ -771,7 +777,8 @@ static void arm_lpae_restrict_pgsizes(struct io_pgtable_cfg *cfg)
+>   	u64 reg;
+>   	struct arm_lpae_io_pgtable *data;
+> 
+> -	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA))
+> +	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA |
+> +			IO_PGTABLE_QUIRK_NON_STRICT))
+>   		return NULL;
+> 
+>   	data = arm_lpae_alloc_pgtable(cfg);
+> @@ -863,7 +870,8 @@ static void arm_lpae_restrict_pgsizes(struct io_pgtable_cfg *cfg)
+>   	struct arm_lpae_io_pgtable *data;
+> 
+>   	/* The NS quirk doesn't apply at stage 2 */
+> -	if (cfg->quirks & ~IO_PGTABLE_QUIRK_NO_DMA)
+> +	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_NO_DMA |
+> +		IO_PGTABLE_QUIRK_NON_STRICT))
+>   		return NULL;
+> 
+>   	data = arm_lpae_alloc_pgtable(cfg);
+> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+> index 2df7909..beb14a3 100644
+> --- a/drivers/iommu/io-pgtable.h
+> +++ b/drivers/iommu/io-pgtable.h
+> @@ -71,12 +71,15 @@ struct io_pgtable_cfg {
+>   	 *	be accessed by a fully cache-coherent IOMMU or CPU (e.g. for a
+>   	 *	software-emulated IOMMU), such that pagetable updates need not
+>   	 *	be treated as explicit DMA data.
+> +	 * IO_PGTABLE_QUIRK_NON_STRICT: Put off TLBs invalidation and release
+> +	 *	memory first.
+>   	 */
+>   	#define IO_PGTABLE_QUIRK_ARM_NS		BIT(0)
+>   	#define IO_PGTABLE_QUIRK_NO_PERMS	BIT(1)
+>   	#define IO_PGTABLE_QUIRK_TLBI_ON_MAP	BIT(2)
+>   	#define IO_PGTABLE_QUIRK_ARM_MTK_4GB	BIT(3)
+>   	#define IO_PGTABLE_QUIRK_NO_DMA		BIT(4)
+> +	#define IO_PGTABLE_QUIRK_NON_STRICT	BIT(5)
+>   	unsigned long			quirks;
+>   	unsigned long			pgsize_bitmap;
+>   	unsigned int			ias;
+> --
+> 1.8.3
+> 
+> 
