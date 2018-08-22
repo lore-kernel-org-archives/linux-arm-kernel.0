@@ -1,133 +1,25 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Wed, 22 Aug 2018 22:24:23 +0900
-Subject: [PATCH 1/9] CHROMIUM: v4l: Add H264 low-level decoder API
- compound controls.
-In-Reply-To: <e6324ea983d34403199044ae30e932cd728c8ad4.camel@bootlin.com>
-References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
- <20180613140714.1686-2-maxime.ripard@bootlin.com>
- <80e1d9cb49c6df06843e49332685f2b401023292.camel@collabora.com>
- <20180822091557.gtnlgoebyv6yttzf@flea>
- <CAAFQd5ANvKF2+GEXQTnRsdYVzJTtBOhv7nFahV=2W-9_QXwY4g@mail.gmail.com>
- <e6324ea983d34403199044ae30e932cd728c8ad4.camel@bootlin.com>
-Message-ID: <CAAFQd5AybueM-rhy8bMbRHHZmwBP08-cWB11NadcUQAb6XJ1SA@mail.gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 22 Aug 2018 15:34:57 +0200
+Subject: [PATCH v4 3/4] edac: synopsys: Add EDAC ECC support for ZynqMP
+ DDRC
+In-Reply-To: <DM6PR02MB522788F1286F18FBC6458E0EC1300@DM6PR02MB5227.namprd02.prod.outlook.com>
+References: <1533374735-16662-1-git-send-email-manish.narani@xilinx.com>
+ <1533374735-16662-4-git-send-email-manish.narani@xilinx.com>
+ <20180821130946.GD30528@nazgul.tnic>
+ <DM6PR02MB522788F1286F18FBC6458E0EC1300@DM6PR02MB5227.namprd02.prod.outlook.com>
+Message-ID: <20180822133457.GA6462@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2018 at 10:03 PM Paul Kocialkowski
-<paul.kocialkowski@bootlin.com> wrote:
->
-> Hi,
->
-> On Wed, 2018-08-22 at 18:54 +0900, Tomasz Figa wrote:
-> > On Wed, Aug 22, 2018 at 6:16 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > >
-> > > Hi,
-> > >
-> > > On Tue, Aug 21, 2018 at 01:58:38PM -0300, Ezequiel Garcia wrote:
-> > > > On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
-> > > > > From: Pawel Osciak <posciak@chromium.org>
-> > > > >
-> > > > > Signed-off-by: Pawel Osciak <posciak@chromium.org>
-> > > > > Reviewed-by: Wu-cheng Li <wuchengli@chromium.org>
-> > > > > Tested-by: Tomasz Figa <tfiga@chromium.org>
-> > > > > [rebase44(groeck): include linux/types.h in v4l2-controls.h]
-> > > > > Signed-off-by: Guenter Roeck <groeck@chromium.org>
-> > > > > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > > > > ---
-> > > > >
-> > > >
-> > > > [..]
-> > > > > diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-> > > > > index 242a6bfa1440..4b4a1b25a0db 100644
-> > > > > --- a/include/uapi/linux/videodev2.h
-> > > > > +++ b/include/uapi/linux/videodev2.h
-> > > > > @@ -626,6 +626,7 @@ struct v4l2_pix_format {
-> > > > >  #define V4L2_PIX_FMT_H264     v4l2_fourcc('H', '2', '6', '4') /* H264 with start codes */
-> > > > >  #define V4L2_PIX_FMT_H264_NO_SC v4l2_fourcc('A', 'V', 'C', '1') /* H264 without start codes */
-> > > > >  #define V4L2_PIX_FMT_H264_MVC v4l2_fourcc('M', '2', '6', '4') /* H264 MVC */
-> > > > > +#define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /* H264 parsed slices */
-> > > >
-> > > > As pointed out by Tomasz, the Rockchip VPU driver expects start codes [1], so the userspace
-> > > > should be aware of it. Perhaps we could document this pixel format better as:
-> > > >
-> > > > #define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /* H264 parsed slices with start codes */
-> > >
-> > > I'm not sure this is something we want to do at that point. libva
-> > > doesn't give the start code, so this is only going to make the life of
-> > > the sane controllers more difficult. And if you need to have the start
-> > > code and parse it, then you're not so stateless anymore.
-> >
-> > I might not remember correctly, but Rockchip decoder does some slice
-> > parsing on its own (despite not doing any higher level parsing).
-> > Probably that's why it needs those start codes.
->
-> The VPU found on Allwinner platforms also provides a mechanism to parse
-> the bitstream data via a dedicated interface through the VPU registers.
-> It is used in libvdpau-sunxi but not in our driver, because we don't
-> want to be doing bitstream parsing in the kernel.
->
-> It would be good to know if this is just a feature of the Rockchip VPU
-> hardware that can be skipped (like on Allwinner) or if it's a hard
-> requirement in its decoding pipeline.
+On Wed, Aug 22, 2018 at 01:02:40PM +0000, Manish Narani wrote:
+>  I could remove 'synps_enh' from the prefix and keep 'zynq' and
+> 'zynqmp' to differentiate. Please suggest.
 
-It's a hard requirement for its decoding pipeline, but...
+Makes sense and it is shorter, sure.
 
-> Also, maybe it only concerns the
-> slice header? It is already part of the slice data (provided by VAAPI)
-> for H.264/H.265 and an offset is provided to the beginning of the coded
-> video data.
+-- 
+Regards/Gruss,
+    Boris.
 
-Yes, it seems to be only the slice header.
-
->
-> > I wonder if libva is the best reference here. It's been designed
-> > almost entirely by Intel for Intel video hardware. We want something
-> > that could work with a wide range of devices and avoid something like
-> > a need to create a semi-stateless API few months later. In fact,
-> > hardware from another vendor, we're working with, also does parsing of
-> > slice headers internally. Moreover, we have some weird
-> > kind-of-stateful decoders, which cannot fully deal with bitstream on
-> > its own, e.g. cannot parse formats, cannot handle resolution changes,
-> > need H264 bitstream NALUs split into separate buffers, etc.
-> >
-> > As I suggested some time ago, having the full bitstream in the buffer,
-> > with offsets of particular units included in respective controls,
-> > would be the most scalable thing. If really needed, we could add flags
-> > telling the driver that particular units are present, so one's
-> > implementation of libva could put only raw slice data in the buffers.
-> > But perhaps it's libva which needs some amendment?
->
-> If the raw bitstream is needed, I think it would make more sense to use
-> the already-existing formats for stateful VPUs along with the controls
-> for stateless ones instead of having the full bitstream in the
-> V4L2_PIX_FMT_*_SLICE formats.
-
-It may indeed make sense to separate this based on pixel format.
-However, how do we tell the client that it needs to provide those
-controls? Current concept was based entirely on pixel format, so I
-guess that would mean creating something like
-V4L2_PIX_FMT_*_NOT_REALLY_SLICE (_PARSED, _STATELESS?). Might be okay,
-though...
-
->
-> I would also be tempted to say that reconstructing the needed parts of
-> the bitstream in-driver for these half-way VPUs would be a better
-> approach than blurrying the line between how (and what) data should be
-> passed for stateful and stateless VPUs at the API level. Stateless
-> should only cover what's in the slice NAL unit RBSP, which excludes the
-> start code detection bytes. It is no longer parsed data otherwise.
-
-I'm not sure where such decision comes from. In particular, Chromium,
-from which this code originates, includes start codes in
-V4L2_PIX_FMT_H264_SLICE. As I mentioned earlier, we can't design this
-API based only on 1 type of hardware semantics. The stateless API
-should cover any kind of codec that needs user space assistance in
-processing the stream, which in practice would be almost everything
-for which stateful API doesn't work.
-
-That said, since pixel format essentially specifies the buffer
-contents, having such cases differentiated based on the pixel format
-doesn't sound insane.
-
-Best regards,
-Tomasz
+ECO tip #101: Trim your mails when you reply.
+--
