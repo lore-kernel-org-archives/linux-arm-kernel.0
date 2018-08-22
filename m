@@ -1,51 +1,101 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Aug 2018 12:02:19 +0200
-Subject: [PATCH] ARM: use choice for kernel unwinders
-In-Reply-To: <20180821222416.7771-1-stefan@agner.ch>
-References: <20180821222416.7771-1-stefan@agner.ch>
-Message-ID: <CAK8P3a0oaMS12R4tazChMHENQduO0-Wb-gw-inKjH0oz7_5s3g@mail.gmail.com>
+From: Gustavo.Pimentel@synopsys.com (Gustavo Pimentel)
+Date: Wed, 22 Aug 2018 10:45:46 +0100
+Subject: [PATCH v2] PCI: dwc: fix scheduling while atomic issues
+In-Reply-To: <20180821141512.368e3df2@xhacker.debian>
+References: <20180821141512.368e3df2@xhacker.debian>
+Message-ID: <ae663623-6af5-9c53-0e4b-f48b9c517a46@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2018 at 12:24 AM Stefan Agner <stefan@agner.ch> wrote:
->
-> While in theory multiple unwinders could be compiled in, it does
-> not make sense in practise. Use a choice to make the unwinder
-> selection mutually exclusive and mandatory.
->
-> Already before this commit it has not been possible to deselect
-> FRAME_POINTER. Remove the obsolete comment.
->
-> Furthermore, to produce a meaningful backtrace with FRAME_POINTER
-> enabled the kernel needs a specific function prologue:
->     mov    ip, sp
->     stmfd    sp!, {fp, ip, lr, pc}
->     sub    fp, ip, #4
->
-> To get to the required prologue gcc uses apcs and no-sched-prolog.
-> This compiler options are not available on clang, and clang is not
-> able to generate the required prologue. Make the FRAME_POINTER
-> config symbol depending on !clang.
->
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+Hi Jisheng
 
-Looks ok to me. I've added it to my randconfig test environment, you
-will hear from me within a day if I run into build regressions.
+On 21/08/2018 07:15, Jisheng Zhang wrote:
+> When programming inbound/outbound atu, we call usleep_range() after
+> each checking PCIE_ATU_ENABLE bit. Unfortunately, the atu programming
+> can be called in atomic context:
+> 
+> inbound atu programming could be called through
+> pci_epc_write_header()
+>   =>dw_pcie_ep_write_header()
+>     =>dw_pcie_prog_inbound_atu()
+> 
+> outbound atu programming could be called through
+> pci_bus_read_config_dword()
+>   =>dw_pcie_rd_conf()
+>     =>dw_pcie_prog_outbound_atu()
+> 
+> Fix this issue by calling mdelay() instead.
 
-We may still want to clean up these three lines:
+Makes sense. Thanks.
 
-lib/Kconfig.debug:  select FRAME_POINTER if !MIPS && !PPC &&
-!ARM_UNWIND && !S390 && !MICROBLAZE && !ARC && !X86
-lib/Kconfig.debug:  select FRAME_POINTER if !MIPS && !PPC && !S390 &&
-!MICROBLAZE && !ARM_UNWIND && !ARC && !X86
-lib/Kconfig.debug:  select FRAME_POINTER if !MIPS && !PPC && !S390 &&
-!MICROBLAZE && !ARM_UNWIND && !ARC && !X86
+Acked-by: Gustavo Pimentel <gustavo.pimentel@synopsys.com>
 
-in which ARM is the odd case that currently depends on an architecture
-specific rather than the architecture itself.
-We could introduce a 'config ARCH_HAS_UNWINDER' symbol that gets
-selected by mips, ppc, s390, microblaze, arm and x86 unconditionally,
-and then simplify the 'select' statements here.
+Regards,
+Gustavo
 
-       Arnd
+> 
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> ---
+> 
+> Since v1
+>  - use mdelay() instead of udelay() to avoid __bad_udelay()
+> 
+>  drivers/pci/controller/dwc/pcie-designware.c | 8 ++++----
+>  drivers/pci/controller/dwc/pcie-designware.h | 3 +--
+>  2 files changed, 5 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/pci/controller/dwc/pcie-designware.c b/drivers/pci/controller/dwc/pcie-designware.c
+> index 778c4f76a884..2153956a0b20 100644
+> --- a/drivers/pci/controller/dwc/pcie-designware.c
+> +++ b/drivers/pci/controller/dwc/pcie-designware.c
+> @@ -135,7 +135,7 @@ static void dw_pcie_prog_outbound_atu_unroll(struct dw_pcie *pci, int index,
+>  		if (val & PCIE_ATU_ENABLE)
+>  			return;
+>  
+> -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> +		mdelay(LINK_WAIT_IATU);
+>  	}
+>  	dev_err(pci->dev, "Outbound iATU is not being enabled\n");
+>  }
+> @@ -178,7 +178,7 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
+>  		if (val & PCIE_ATU_ENABLE)
+>  			return;
+>  
+> -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> +		mdelay(LINK_WAIT_IATU);
+>  	}
+>  	dev_err(pci->dev, "Outbound iATU is not being enabled\n");
+>  }
+> @@ -236,7 +236,7 @@ static int dw_pcie_prog_inbound_atu_unroll(struct dw_pcie *pci, int index,
+>  		if (val & PCIE_ATU_ENABLE)
+>  			return 0;
+>  
+> -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> +		mdelay(LINK_WAIT_IATU);
+>  	}
+>  	dev_err(pci->dev, "Inbound iATU is not being enabled\n");
+>  
+> @@ -282,7 +282,7 @@ int dw_pcie_prog_inbound_atu(struct dw_pcie *pci, int index, int bar,
+>  		if (val & PCIE_ATU_ENABLE)
+>  			return 0;
+>  
+> -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> +		mdelay(LINK_WAIT_IATU);
+>  	}
+>  	dev_err(pci->dev, "Inbound iATU is not being enabled\n");
+>  
+> diff --git a/drivers/pci/controller/dwc/pcie-designware.h b/drivers/pci/controller/dwc/pcie-designware.h
+> index 96126fd8403c..9f1a5e399b70 100644
+> --- a/drivers/pci/controller/dwc/pcie-designware.h
+> +++ b/drivers/pci/controller/dwc/pcie-designware.h
+> @@ -26,8 +26,7 @@
+>  
+>  /* Parameters for the waiting for iATU enabled routine */
+>  #define LINK_WAIT_MAX_IATU_RETRIES	5
+> -#define LINK_WAIT_IATU_MIN		9000
+> -#define LINK_WAIT_IATU_MAX		10000
+> +#define LINK_WAIT_IATU			9
+>  
+>  /* Synopsys-specific PCIe configuration registers */
+>  #define PCIE_PORT_LINK_CONTROL		0x710
+>
