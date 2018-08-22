@@ -1,27 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 22 Aug 2018 16:41:18 +0200
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77965: Add OPPs table for
- cpu devices
-In-Reply-To: <1534255961-23326-1-git-send-email-ykaneko0929@gmail.com>
-References: <1534255961-23326-1-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <20180822144113.s7prdezkj5c3xjqm@verge.net.au>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 22 Aug 2018 17:43:11 +0300
+Subject: [PATCH 2/2] arm64: dts: renesas: v3msk: add eMMC support
+In-Reply-To: <20180822113100.edpyplj2kteomr2j@verge.net.au>
+References: <1af46bf9-d9e5-8dcf-0ac7-a85e7348a34e@cogentembedded.com>
+ <9da672a2-0269-4860-8912-189414b43d4c@cogentembedded.com>
+ <20180822113100.edpyplj2kteomr2j@verge.net.au>
+Message-ID: <9f94612a-5035-b006-f6af-6bafb7ff91f3@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2018 at 11:12:41PM +0900, Yoshihiro Kaneko wrote:
-> From: Dien Pham <dien.pham.ry@renesas.com>
+On 08/22/2018 02:31 PM, Simon Horman wrote:
+
+>> Add the eMMC chip support for the V3M Started Kit board.
+>>
+>> Based on the original (and large) patches by Vladimir Barinov.
+>>
+>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> This patch adds OPPs table for CA57{0,1} cpu devices
+> Thanks,
 > 
-> Signed-off-by: Dien Pham <dien.pham.ry@renesas.com>
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> This looks fine to me but I will wait to see if there are other reviews
+> before applying.
+> 
+> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> I am, however, curious to know about HS200.
+> Is it supported on the v3msk? If so, do you have any plans to enable it?
 
-Tested on r8a77965/Salvator-XS
+   As I've already said, the eMMC chip only receives 3.3V on all its voltage inputs.
 
-I see that CPUFreq is activated, that sysfs reports 3 possible
-CPU speeds; 1.5, 1.0 and 0.50GHz. That current CPU frequency can be manipulated
-by setting the maximum CPU frequency in sysfs. And that the frequency
-of Z clock changes accordingly.
-
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
+MBR, Sergei
