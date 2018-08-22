@@ -1,159 +1,114 @@
-From: nicolas.dufresne@collabora.com (Nicolas Dufresne)
-Date: Wed, 22 Aug 2018 10:03:05 -0400
-Subject: [PATCH 1/9] CHROMIUM: v4l: Add H264 low-level decoder API
- compound controls.
-In-Reply-To: <CAAFQd5AybueM-rhy8bMbRHHZmwBP08-cWB11NadcUQAb6XJ1SA@mail.gmail.com>
-References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
- <20180613140714.1686-2-maxime.ripard@bootlin.com>
- <80e1d9cb49c6df06843e49332685f2b401023292.camel@collabora.com>
- <20180822091557.gtnlgoebyv6yttzf@flea>
- <CAAFQd5ANvKF2+GEXQTnRsdYVzJTtBOhv7nFahV=2W-9_QXwY4g@mail.gmail.com>
- <e6324ea983d34403199044ae30e932cd728c8ad4.camel@bootlin.com>
- <CAAFQd5AybueM-rhy8bMbRHHZmwBP08-cWB11NadcUQAb6XJ1SA@mail.gmail.com>
-Message-ID: <2550f0d2fd955922c8d6508573ac78487315bf25.camel@collabora.com>
+From: liang.yang@amlogic.com (Liang Yang)
+Date: Wed, 22 Aug 2018 22:08:42 +0800
+Subject: [RFC PATCH v2 2/2] mtd: rawnand: meson: add support for Amlogic
+ NAND flash controller
+In-Reply-To: <20180817155608.5929b37a@bbrezillon>
+References: <20180719094612.5833-1-yixun.lan@amlogic.com>
+ <20180719094612.5833-3-yixun.lan@amlogic.com>
+ <20180801235045.5b4d8211@bbrezillon>
+ <42877a0d-9830-0626-3f64-e49a326eaa3c@amlogic.com>
+ <20180817155608.5929b37a@bbrezillon>
+Message-ID: <96e538a5-1232-11f2-8b9e-5ddb09dcc2de@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mercredi 22 ao?t 2018 ? 22:24 +0900, Tomasz Figa a ?crit :
-> On Wed, Aug 22, 2018 at 10:03 PM Paul Kocialkowski
-> <paul.kocialkowski@bootlin.com> wrote:
-> > 
-> > Hi,
-> > 
-> > On Wed, 2018-08-22 at 18:54 +0900, Tomasz Figa wrote:
-> > > On Wed, Aug 22, 2018 at 6:16 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > > 
-> > > > Hi,
-> > > > 
-> > > > On Tue, Aug 21, 2018 at 01:58:38PM -0300, Ezequiel Garcia wrote:
-> > > > > On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
-> > > > > > From: Pawel Osciak <posciak@chromium.org>
-> > > > > > 
-> > > > > > Signed-off-by: Pawel Osciak <posciak@chromium.org>
-> > > > > > Reviewed-by: Wu-cheng Li <wuchengli@chromium.org>
-> > > > > > Tested-by: Tomasz Figa <tfiga@chromium.org>
-> > > > > > [rebase44(groeck): include linux/types.h in v4l2-controls.h]
-> > > > > > Signed-off-by: Guenter Roeck <groeck@chromium.org>
-> > > > > > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > > > > > ---
-> > > > > > 
-> > > > > 
-> > > > > [..]
-> > > > > > diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-> > > > > > index 242a6bfa1440..4b4a1b25a0db 100644
-> > > > > > --- a/include/uapi/linux/videodev2.h
-> > > > > > +++ b/include/uapi/linux/videodev2.h
-> > > > > > @@ -626,6 +626,7 @@ struct v4l2_pix_format {
-> > > > > >  #define V4L2_PIX_FMT_H264     v4l2_fourcc('H', '2', '6', '4') /* H264 with start codes */
-> > > > > >  #define V4L2_PIX_FMT_H264_NO_SC v4l2_fourcc('A', 'V', 'C', '1') /* H264 without start codes */
-> > > > > >  #define V4L2_PIX_FMT_H264_MVC v4l2_fourcc('M', '2', '6', '4') /* H264 MVC */
-> > > > > > +#define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /* H264 parsed slices */
-> > > > > 
-> > > > > As pointed out by Tomasz, the Rockchip VPU driver expects start codes [1], so the userspace
-> > > > > should be aware of it. Perhaps we could document this pixel format better as:
-> > > > > 
-> > > > > #define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /* H264 parsed slices with start codes */
-> > > > 
-> > > > I'm not sure this is something we want to do at that point. libva
-> > > > doesn't give the start code, so this is only going to make the life of
-> > > > the sane controllers more difficult. And if you need to have the start
-> > > > code and parse it, then you're not so stateless anymore.
-> > > 
-> > > I might not remember correctly, but Rockchip decoder does some slice
-> > > parsing on its own (despite not doing any higher level parsing).
-> > > Probably that's why it needs those start codes.
-> > 
-> > The VPU found on Allwinner platforms also provides a mechanism to parse
-> > the bitstream data via a dedicated interface through the VPU registers.
-> > It is used in libvdpau-sunxi but not in our driver, because we don't
-> > want to be doing bitstream parsing in the kernel.
-> > 
-> > It would be good to know if this is just a feature of the Rockchip VPU
-> > hardware that can be skipped (like on Allwinner) or if it's a hard
-> > requirement in its decoding pipeline.
-> 
-> It's a hard requirement for its decoding pipeline, but...
-> 
-> > Also, maybe it only concerns the
-> > slice header? It is already part of the slice data (provided by VAAPI)
-> > for H.264/H.265 and an offset is provided to the beginning of the coded
-> > video data.
-> 
-> Yes, it seems to be only the slice header.
-> 
-> > 
-> > > I wonder if libva is the best reference here. It's been designed
-> > > almost entirely by Intel for Intel video hardware. We want something
-> > > that could work with a wide range of devices and avoid something like
-> > > a need to create a semi-stateless API few months later. In fact,
-> > > hardware from another vendor, we're working with, also does parsing of
-> > > slice headers internally. Moreover, we have some weird
-> > > kind-of-stateful decoders, which cannot fully deal with bitstream on
-> > > its own, e.g. cannot parse formats, cannot handle resolution changes,
-> > > need H264 bitstream NALUs split into separate buffers, etc.
-> > > 
-> > > As I suggested some time ago, having the full bitstream in the buffer,
-> > > with offsets of particular units included in respective controls,
-> > > would be the most scalable thing. If really needed, we could add flags
-> > > telling the driver that particular units are present, so one's
-> > > implementation of libva could put only raw slice data in the buffers.
-> > > But perhaps it's libva which needs some amendment?
-> > 
-> > If the raw bitstream is needed, I think it would make more sense to use
-> > the already-existing formats for stateful VPUs along with the controls
-> > for stateless ones instead of having the full bitstream in the
-> > V4L2_PIX_FMT_*_SLICE formats.
-> 
-> It may indeed make sense to separate this based on pixel format.
-> However, how do we tell the client that it needs to provide those
-> controls? Current concept was based entirely on pixel format, so I
-> guess that would mean creating something like
-> V4L2_PIX_FMT_*_NOT_REALLY_SLICE (_PARSED, _STATELESS?). Might be okay,
-> though...
-> 
-> > 
-> > I would also be tempted to say that reconstructing the needed parts of
-> > the bitstream in-driver for these half-way VPUs would be a better
-> > approach than blurrying the line between how (and what) data should be
-> > passed for stateful and stateless VPUs at the API level. Stateless
-> > should only cover what's in the slice NAL unit RBSP, which excludes the
-> > start code detection bytes. It is no longer parsed data otherwise.
-> 
-> I'm not sure where such decision comes from. In particular, Chromium,
-> from which this code originates, includes start codes in
-> V4L2_PIX_FMT_H264_SLICE. As I mentioned earlier, we can't design this
-> API based only on 1 type of hardware semantics. The stateless API
-> should cover any kind of codec that needs user space assistance in
-> processing the stream, which in practice would be almost everything
-> for which stateful API doesn't work.
+Hi Boris,
 
-Well, be aware that in most of today's use case, Chromium bitstream
-handling is suboptimal since the startcode are crafted by Chromium.
-Most of today's use case uses ISOMP4 container, which does not hold
-start codes but AVC headers.
+There is a question below. please see my comments.
 
-If we step back a little, the start codes are designed for randomly
-accessing bytes. It's a mark made to be able to randomly scan and find
-the start of a NAL. In a well framed stream, they are useless. Then AVC
-header is designed to announce the size of the following block, if we
-pass only one NAL by buffer, this is not very useful either. Both seems
-trivial to reconstruct if the HW requires it.
+Thanks.
 
+On 8/17/2018 9:56 PM, Boris Brezillon wrote:
+> On Fri, 17 Aug 2018 21:03:59 +0800
+> Liang Yang <liang.yang@amlogic.com> wrote:
 > 
-> That said, since pixel format essentially specifies the buffer
-> contents, having such cases differentiated based on the pixel format
-> doesn't sound insane.
-
-As of today, that's what the pixel formats tries to do with these
-_NO_SC postfix (the current naming is generally ambiguous though).
-
+>> Hi Boris,
+>> On 2018/8/2 5:50, Boris Brezillon wrote:
+>>
+>>> Hi Yixun,
+>>>
+>>> On Thu, 19 Jul 2018 17:46:12 +0800
+>>> Yixun Lan <yixun.lan@amlogic.com> wrote:
+>>>
+>>> I haven't finished reviewing the driver yet (I'll try to do that later
+>>> this week), but I already pointed a few things to fix/improve.
+>>>   
+>>>> +
+>>>> +static int meson_nfc_exec_op(struct nand_chip *chip,
+>>>> +			     const struct nand_operation *op, bool check_only)
+>>>> +{
+>>>> +	struct mtd_info *mtd = nand_to_mtd(chip);
+>>>> +	struct meson_nfc *nfc = nand_get_controller_data(chip);
+>>>> +	const struct nand_op_instr *instr = NULL;
+>>>> +	int ret = 0, cmd;
+>>>> +	unsigned int op_id;
+>>>> +	int i;
+>>>> +
+>>>> +	for (op_id = 0; op_id < op->ninstrs; op_id++) {
+>>>> +		instr = &op->instrs[op_id];
+>>>> +		switch (instr->type) {
+>>>> +		case NAND_OP_CMD_INSTR:
+>>>> +			cmd = nfc->param.chip_select | NFC_CMD_CLE;
+>>>> +			cmd |= instr->ctx.cmd.opcode & 0xff;
+>>>> +			writel(cmd, nfc->reg_base + NFC_REG_CMD);
+>>>> +			meson_nfc_cmd_idle(nfc, NAND_TWB_TIME_CYCLE);
+>>
+>>>> +			meson_nfc_drain_cmd(nfc);
+>>> I don't know exactly how the NAND controller works, but it's usually
+>>>> +			break;
+>>>> +
+>>>> +		case NAND_OP_ADDR_INSTR:
+>>>> +			for (i = 0; i < instr->ctx.addr.naddrs; i++) {
+>>>> +				cmd = nfc->param.chip_select | NFC_CMD_ALE;
+>>>> +				cmd |= instr->ctx.addr.addrs[i] & 0xff;
+>>>> +				writel(cmd, nfc->reg_base + NFC_REG_CMD);
+>>>> +			}
+>>>> +			break;
+>>>> +
+>>>> +		case NAND_OP_DATA_IN_INSTR:
+>>>> +			meson_nfc_read_buf(mtd, instr->ctx.data.buf.in,
+>>>> +					   instr->ctx.data.len);
+>>>> +			break;
+>>>> +
+>>>> +		case NAND_OP_DATA_OUT_INSTR:
+>>>> +			meson_nfc_write_buf(mtd, instr->ctx.data.buf.out,
+>>>> +					    instr->ctx.data.len);
 > 
-> Best regards,
-> Tomasz
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 195 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180822/7791baf8/attachment.sig>
+>>
+>>>> +			break;
+>>>> +
+>>>> +		case NAND_OP_WAITRDY_INSTR:
+>>>> +			mdelay(instr->ctx.waitrdy.timeout_ms);
+>>>> +			ret = nand_soft_waitrdy(chip,
+>>>> +						instr->ctx.waitrdy.timeout_ms);
+>>> Hm, i'd be surprised if the controller does not have a way to optimize
+>>> waits on R/B transitions.
+>>
+>> When i delete the delay here, erasing operation will be failed.
+>> Does it mean NFC send 0x70 to nand device when rb is busy(low)?
+> 
+> I was not even talking about the delay, but yes, mdelay() seems way too
+> big. Remember that it's a timeout, and you usually don't have to wait
+> that much. You can do ndelay(instr->ctx.delay_ns) before calling
+> nand_soft_waitrdy() to make sure tWB is enforced.
+> 
+> Anyway, that's not what I was initially referring to. What I meant is
+> that nand_soft_waitrdy() should be replaced by native R/B pin or status
+> polling wait logic so that the CPU is released while waiting for a R/B
+> transition.
+> 
+>> If so, i will ask our NFC designer for comfirmation or grasping the waveform.
+> 
+> You have to wait tWB, that's for sure.
+> 
+we have a maximum 32 commands fifo. when command is written into 
+NFC_REG_CMD, it doesn't mean that command is executing right now, maybe 
+it is buffering on the queue.Assume one ERASE operation, when 2nd 
+command(0xd0) is written into NFC_REG_CMD and then come into 
+NAND_OP_WAITRDY_INSTR, if I read the RB status by register, it may be 
+wrong because 0xd0 may not being executed. it is unusual unless 
+buffering two many command.
+so it seems that i still need to use nand_soft_waitrdy or wait cmd is 
+executed somewhere.
+>>
+> 
