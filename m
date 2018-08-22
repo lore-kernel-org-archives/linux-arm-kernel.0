@@ -1,86 +1,180 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 22 Aug 2018 10:57:07 -0700
-Subject: [PATCH 0/4] numa, iommu/smmu: IOMMU/SMMU driver optimization for
- NUMA systems
-In-Reply-To: <ec57224a-7673-97d8-bb0c-c612080625bc@huawei.com>
-References: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
- <452f1665-eb3a-5e8c-f671-099ef4a15d84@huawei.com>
- <a7fc1e43-3652-562a-1e59-499be80b567c@arm.com>
- <ec57224a-7673-97d8-bb0c-c612080625bc@huawei.com>
-Message-ID: <CAKTKpr7XbZAZ8XRJ2r97N+AQP_DM8_OrqYC=4Pstf-vRW85rng@mail.gmail.com>
+From: ggdavisiv@gmail.com (George G. Davis)
+Date: Wed, 22 Aug 2018 14:06:03 -0400
+Subject: [PATCH v3 1/3] Input: atmel_mxt_ts: Add support for optional
+ regulators.
+In-Reply-To: <1533050291-11502-2-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+References: <1533050291-11502-1-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+ <1533050291-11502-2-git-send-email-pawel.mikolaj.chmiel@gmail.com>
+Message-ID: <20180822180603.GA4102@gandalf.middle.earth.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2018 at 9:08 AM John Garry <john.garry@huawei.com> wrote:
->
-> On 22/08/2018 15:56, Robin Murphy wrote:
-> > Hi John,
-> >
-> > On 22/08/18 14:44, John Garry wrote:
-> >> On 21/09/2017 09:59, Ganapatrao Kulkarni wrote:
-> >>> Adding numa aware memory allocations used for iommu dma allocation and
-> >>> memory allocated for SMMU stream tables, page walk tables and command
-> >>> queues.
-> >>>
-> >>> With this patch, iperf testing on ThunderX2, with 40G NIC card on
-> >>> NODE 1 PCI shown same performance(around 30% improvement) as NODE 0.
-> >>>
-> >>> Ganapatrao Kulkarni (4):
-> >>>   mm: move function alloc_pages_exact_nid out of __meminit
-> >>>   numa, iommu/io-pgtable-arm: Use NUMA aware memory allocation for smmu
-> >>>     translation tables
-> >>>   iommu/arm-smmu-v3: Use NUMA memory allocations for stream tables and
-> >>>     comamnd queues
-> >>>   iommu/dma, numa: Use NUMA aware memory allocations in
-> >>>     __iommu_dma_alloc_pages
-> >>>
-> >>>  drivers/iommu/arm-smmu-v3.c    | 57
-> >>> +++++++++++++++++++++++++++++++++++++-----
-> >>>  drivers/iommu/dma-iommu.c      | 17 +++++++------
-> >>>  drivers/iommu/io-pgtable-arm.c |  4 ++-
-> >>>  include/linux/gfp.h            |  2 +-
-> >>>  mm/page_alloc.c                |  3 ++-
-> >>>  5 files changed, 67 insertions(+), 16 deletions(-)
-> >>>
-> >>
-> >> Hi Ganapatrao,
-> >>
-> >> Have you any plans for further work on this patchset? I have not seen
-> >> anything since this v1 was posted+discussed.
-> >
->
-> Hi Robin,
->
-> Thanks for the info. I thought I remembered 4b12 but couldn't put my
-> finger on it.
->
-> > Looks like I ended up doing the version of the io-pgtable change that I
-> > suggested here, which was merged recently (4b123757eeaa). Patch #3
-> > should also be effectively obsolete now since the SWIOTLB/dma-direct
-> > rework (21f237e4d085). Apparently I also started reworking patch #4 in
-> > my tree at some point but sidelined it - I think that was at least
-> > partly due to another thread[1] which made it seem less clear-cut
-> > whether this is always the right thing to do.
->
-> Right, so #4 seems less straightforward and not directly related to
-> IOMMU driver anyway.
->
+Hello Pawe?,
 
-thanks Robin for pulling up the patch. I couldn't followup with this
-due to other tasks.
 
-> Cheers,
-> John
->
-> >
-> > Robin.
-> >
-> > [1]
-> > https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1693026.html
-> >
-> > .
-> >
->
->
-thanks,
-Ganapat
+I would suggest dropping sentence punctuation in the patch subject line:
+
+Input: atmel_mxt_ts: Add support for optional regulators.
+
+More below...
+
+On Tue, Jul 31, 2018 at 05:18:09PM +0200, Pawe? Chmiel wrote:
+> This patch adds optional regulators, which can be used to power
+> up touchscreen. After enabling regulators, we need to wait 150msec.
+> This value is taken from official driver.
+> 
+> It was tested on Samsung Galaxy i9000 (based on Samsung S5PV210 SOC).
+> 
+> Signed-off-by: Pawe? Chmiel <pawel.mikolaj.chmiel@gmail.com>
+> ---
+> Changes from v2:
+>   - Move code enabling regulators into separate method,
+>     to make code more readable.
+> 
+> Changes from v1:
+>   - Enable regulators only if reset_gpio is present.
+>   - Switch from devm_regulator_get_optional to devm_regulator_get
+> ---
+>  drivers/input/touchscreen/atmel_mxt_ts.c | 65 +++++++++++++++++++++++++++++---
+>  1 file changed, 59 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/input/touchscreen/atmel_mxt_ts.c b/drivers/input/touchscreen/atmel_mxt_ts.c
+> index 54fe190fd4bc..2cd7f6db6ba9 100644
+> --- a/drivers/input/touchscreen/atmel_mxt_ts.c
+> +++ b/drivers/input/touchscreen/atmel_mxt_ts.c
+> @@ -27,6 +27,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/of.h>
+>  #include <linux/property.h>
+> +#include <linux/regulator/consumer.h>
+>  #include <linux/slab.h>
+>  #include <linux/gpio/consumer.h>
+>  #include <linux/property.h>
+> @@ -194,10 +195,10 @@ enum t100_type {
+>  
+>  /* Delay times */
+>  #define MXT_BACKUP_TIME		50	/* msec */
+> -#define MXT_RESET_GPIO_TIME	20	/* msec */
+>  #define MXT_RESET_INVALID_CHG	100	/* msec */
+>  #define MXT_RESET_TIME		200	/* msec */
+>  #define MXT_RESET_TIMEOUT	3000	/* msec */
+> +#define MXT_REGULATOR_DELAY	150	/* msec */
+>  #define MXT_CRC_TIMEOUT		1000	/* msec */
+>  #define MXT_FW_RESET_TIME	3000	/* msec */
+>  #define MXT_FW_CHG_TIMEOUT	300	/* msec */
+> @@ -310,6 +311,8 @@ struct mxt_data {
+>  	struct t7_config t7_cfg;
+>  	struct mxt_dbg dbg;
+>  	struct gpio_desc *reset_gpio;
+> +	struct regulator *vdd_reg;
+> +	struct regulator *avdd_reg;
+>  
+>  	/* Cached parameters from object table */
+>  	u16 T5_address;
+> @@ -3016,6 +3019,38 @@ static const struct dmi_system_id chromebook_T9_suspend_dmi[] = {
+>  	{ }
+>  };
+>  
+> +static int mxt_regulator_enable(struct mxt_data *data)
+> +{
+> +	int error;
+> +
+> +	if (data->reset_gpio) {
+> +		error = regulator_enable(data->vdd_reg);
+> +		if (error) {
+> +			dev_err(&data->client->dev, "Failed to enable vdd regulator: %d\n",
+> +				error);
+> +			return error;
+> +		}
+> +
+> +		error = regulator_enable(data->avdd_reg);
+> +		if (error) {
+> +			dev_err(&data->client->dev, "Failed to enable avdd regulator: %d\n",
+> +				error);
+> +			return error;
+> +		}
+> +
+> +		/*
+> +		 * According to maXTouch power sequencing specification, RESET line
+
+Please fix the following checkpatch issue:
+
+drivers/input/touchscreen/atmel_mxt_ts.c:3065: WARNING:LONG_LINE_COMMENT: line over 80 characters
+
+Thanks!
+
+--
+Regards,
+George
+
+> +		 * must be kept low until some time after regulators come up to
+> +		 * voltage
+> +		 */
+> +		msleep(MXT_REGULATOR_DELAY);
+> +		gpiod_set_value(data->reset_gpio, 1);
+> +		msleep(MXT_RESET_INVALID_CHG);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>  {
+>  	struct mxt_data *data;
+> @@ -3076,6 +3111,22 @@ static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>  		return error;
+>  	}
+>  
+> +	data->vdd_reg = devm_regulator_get(&client->dev, "vdd");
+> +	if (IS_ERR(data->vdd_reg)) {
+> +		error = PTR_ERR(data->vdd_reg);
+> +		dev_err(&client->dev, "Failed to get vdd regulator: %d\n",
+> +			error);
+> +		return error;
+> +	}
+> +
+> +	data->avdd_reg = devm_regulator_get(&client->dev, "avdd");
+> +	if (IS_ERR(data->avdd_reg)) {
+> +		error = PTR_ERR(data->avdd_reg);
+> +		dev_err(&client->dev, "Failed to get avdd regulator: %d\n",
+> +			error);
+> +		return error;
+> +	}
+> +
+>  	error = devm_request_threaded_irq(&client->dev, client->irq,
+>  					  NULL, mxt_interrupt, IRQF_ONESHOT,
+>  					  client->name, data);
+> @@ -3086,11 +3137,9 @@ static int mxt_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>  
+>  	disable_irq(client->irq);
+>  
+> -	if (data->reset_gpio) {
+> -		msleep(MXT_RESET_GPIO_TIME);
+> -		gpiod_set_value(data->reset_gpio, 1);
+> -		msleep(MXT_RESET_INVALID_CHG);
+> -	}
+> +	error = mxt_regulator_enable(data);
+> +	if (error)
+> +		return error;
+>  
+>  	error = mxt_initialize(data);
+>  	if (error)
+> @@ -3116,6 +3165,10 @@ static int mxt_remove(struct i2c_client *client)
+>  	struct mxt_data *data = i2c_get_clientdata(client);
+>  
+>  	disable_irq(data->irq);
+> +	if (data->reset_gpio) {
+> +		regulator_disable(data->avdd_reg);
+> +		regulator_disable(data->vdd_reg);
+> +	}
+>  	sysfs_remove_group(&client->dev.kobj, &mxt_attr_group);
+>  	mxt_free_input_device(data);
+>  	mxt_free_object_table(data);
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
