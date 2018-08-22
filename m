@@ -1,46 +1,33 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 22 Aug 2018 22:43:05 +0200
-Subject: [PATCH 12/14] dt-bindings: ehci-mv: add bindings
+Date: Wed, 22 Aug 2018 22:42:58 +0200
+Subject: [PATCH 05/14] ARM: ttc_dkb: add an instance of pxa-usb-phy
 In-Reply-To: <20180822204307.13251-1-lkundrak@v3.sk>
 References: <20180822204307.13251-1-lkundrak@v3.sk>
-Message-ID: <20180822204307.13251-13-lkundrak@v3.sk>
+Message-ID: <20180822204307.13251-6-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This will replace the ttc_usb_pdata.phy_{de,}init()>
+
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 ---
- .../devicetree/bindings/usb/ehci-mv.txt       | 23 +++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/ehci-mv.txt
+ arch/arm/mach-mmp/ttc_dkb.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/usb/ehci-mv.txt b/Documentation/devicetree/bindings/usb/ehci-mv.txt
-new file mode 100644
-index 000000000000..335589895763
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/ehci-mv.txt
-@@ -0,0 +1,23 @@
-+* Marvell PXA/MMP EHCI controller.
+diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
+index c7897fb2b6da..767dcb23ee1c 100644
+--- a/arch/arm/mach-mmp/ttc_dkb.c
++++ b/arch/arm/mach-mmp/ttc_dkb.c
+@@ -282,6 +282,10 @@ static void __init ttc_dkb_init(void)
+ 				 sizeof(struct pxa_gpio_platform_data));
+ 	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
+ 
++#if IS_ENABLED(CONFIG_PHY_PXA_USB)
++	platform_device_register(&pxa168_device_usb_phy);
++#endif
 +
-+Required properties:
-+
-+- compatible: must be "marvell,pxau2o-ehci"
-+- reg: physical base addresses of the controller and length of memory mapped region
-+- interrupts: one EHCI controller interrupt should be described here
-+- clocks: phandle list of usb clocks
-+- clock-names: should be "USBCLK"
-+- phys: phandle for the PHY device
-+- phy-names: should be "usb"
-+
-+Example:
-+
-+	ehci0: usb-ehci at d4208000 {
-+		compatible = "marvell,pxau2o-ehci";
-+		reg = <0xd4208000 0x200>;
-+		interrupts = <44>;
-+		clocks = <&soc_clocks MMP2_CLK_USB>;
-+		clock-names = "USBCLK";
-+		phys = <&usb_otg_phy>;
-+		phy-names = "usb";
-+	};
+ #if IS_ENABLED(CONFIG_USB_MV_UDC)
+ 	pxa168_device_u2o.dev.platform_data = &ttc_usb_pdata;
+ 	platform_device_register(&pxa168_device_u2o);
 -- 
 2.17.1
