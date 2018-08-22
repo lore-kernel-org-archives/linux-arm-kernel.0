@@ -1,63 +1,26 @@
-From: ezequiel@collabora.com (Ezequiel Garcia)
-Date: Wed, 22 Aug 2018 14:25:00 -0300
-Subject: [PATCH v7 0/8] Cedrus driver for the Allwinner Video Engine,
- using media requests
-In-Reply-To: <20180809090435.17248-1-paul.kocialkowski@bootlin.com>
-References: <20180809090435.17248-1-paul.kocialkowski@bootlin.com>
-Message-ID: <828bf3b9f5f2edc2f05b7982ccc5d9777f1a19e3.camel@collabora.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 22 Aug 2018 10:37:54 -0700
+Subject: [PATCH 1/3] arm64: dts: qcom: sdm845: Add USB-related nodes
+In-Reply-To: <153478902525.28926.6688429060107225232@swboyd.mtv.corp.google.com>
+References: <20180810215150.82490-1-dianders@chromium.org>
+ <20180810215150.82490-2-dianders@chromium.org>
+ <153478902525.28926.6688429060107225232@swboyd.mtv.corp.google.com>
+Message-ID: <CAD=FV=V=Me8g1MN1ZnV2JzHuLLppGr1JwnXZBBPDY1iHVivFFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Paul,
+Hi,
 
-On Thu, 2018-08-09 at 11:04 +0200, Paul Kocialkowski wrote:
-> This is the seventh iteration of the updated Cedrus driver,
-> that supports the Video Engine found on most Allwinner SoCs, starting
-> with the A10. It was tested on the A13, A20, A33 and H3.
-> 
-> The initial version of this driver[0] was originally written and
-> submitted by Florent Revest using a previous version of the request API
-> that is necessary to provide coherency between controls and the buffers
-> they apply to.
-> 
-> The driver was adapted to use the latest version of the media request
-> API[1], as submitted by Hans Verkuil. Media request API support is a
-> hard requirement for the Cedrus driver.
-> 
-> The driver itself currently only supports MPEG2 and more codecs will be
-> added eventually. The default output frame format provided by the Video
-> Engine is a multi-planar tiled YUV format (based on NV12). A specific
-> format is introduced in the V4L2 API to describe it. Starting with the
-> A33, the Video Engine can also output untiled YUV formats.
-> 
-> This implementation is based on the significant work that was conducted
-> by various members of the linux-sunxi community for understanding and
-> documenting the Video Engine's innards.
-> 
-> In addition to the media requests API, the following series are required
-> for Cedrus:
-> * vicodec: the Virtual Codec driver
-> * allwinner: a64: add SRAM controller / system control
-> * SRAM patches from the Cedrus VPU driver series version 5
-> 
-> Changes since v6:
-> * Reworked MPEG2 controls to stick closer to the bitstream;
-> * Updated controls documentation accordingly and added requested fixes;
-> * Renamed tiled format to V4L2_PIX_FMT_SUNXI_TILED_NV12;
-> * Added various minor driver fixes based on Hans' feedback;
-> * Fixed dst frame alignment based on Jernej's feedback and tests;
-> * Removed set bits for the disabled secondary output.
-> 
-> Changes since v5:
-> * Added MPEG2 quantization matrices definitions and support;
-> * Cleaned up registers definitions;
-> * Moved the driver to staging as requested;
-> 
+On Mon, Aug 20, 2018 at 11:17 AM, Stephen Boyd <swboyd@chromium.org> wrote:
+>> +               qfprom at 784000 {
+>
+> This doesn't match reg property.
+>
+>> +                       compatible = "qcom,qfprom";
+>> +                       reg = <0x780000 0x8ff>;
+>
+> Because this should be 0x784000?
 
-I tried to find the reason for moving this driver to staging,
-but couldn't find it in the discussion.
+Thank you for catching.  This ought to be fixed in v3.
 
-If there's a legitimate reason, shouldn't you add a TODO file?
-
-Thanks,
-Eze
+-Doug
