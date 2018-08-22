@@ -1,62 +1,65 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Wed, 22 Aug 2018 06:53:14 +0000
-Subject: [RFC] clk: imx6: Mark imx_clk_mux as glitchy by default
-In-Reply-To: <CAOMZO5Dr9NUXuu+LECp2QHZLRhfbymHK23yCCFW-9jB=VXNn+A@mail.gmail.com>
-References: <e56c6f0acfe7afb885d2cb67e1e069f7edd0d2d7.1534879459.git.leonard.crestez@nxp.com>
- <CAOMZO5Dr9NUXuu+LECp2QHZLRhfbymHK23yCCFW-9jB=VXNn+A@mail.gmail.com>
-Message-ID: <c0966648ef0a15672ddd617de87692f71a19bad4.camel@nxp.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 22 Aug 2018 09:34:09 +0200
+Subject: [PATCH] soc: ti: pm33xx: Enable DS0 for the platforms on which
+ it is functional
+In-Reply-To: <1534915951-8783-1-git-send-email-j-keerthy@ti.com>
+References: <1534915951-8783-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <20180822073409.GK14967@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-08-21 at 19:42 -0300, Fabio Estevam wrote:
-> Hi Leonard,
+On Wed, Aug 22, 2018 at 11:02:31AM +0530, Keerthy wrote:
+> Enable DS0 for only those platforms on which it is functional
 > 
-> On Tue, Aug 21, 2018 at 4:34 PM, Leonard Crestez
-> <leonard.crestez@nxp.com> wrote:
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
+>  arch/arm/mach-omap2/pm33xx-core.c    | 5 +++++
+>  drivers/soc/ti/pm33xx.c              | 9 +++++++++
+>  include/linux/platform_data/pm33xx.h | 2 ++
+>  3 files changed, 16 insertions(+)
 > 
-> > More concretely on 6qp-sdb blanking the display happens like this:
-> >  * imx_ldb_encoder_disable switches ipu1_di0_sel to ipu1_di0_pre from ldb_di1_podf
-> >  * reparenting to ipu1_di0_pre enables it and its parents up to pll5
-> >  * possibly glitchy muxing
-> >  * ipu_di_disable disables ipu1_di0 (and parents, up to pll5)
+> diff --git a/arch/arm/mach-omap2/pm33xx-core.c b/arch/arm/mach-omap2/pm33xx-core.c
+> index f4971e4..f0f6e8e 100644
+> --- a/arch/arm/mach-omap2/pm33xx-core.c
+> +++ b/arch/arm/mach-omap2/pm33xx-core.c
+> @@ -135,6 +135,11 @@ static int am43xx_suspend(unsigned int state, int (*fn)(unsigned long),
+>  {
+>  	int ret = 0;
+>  
+> +	if (!(args & WFI_FLAG_DEEP_SLEEP0)) {
+> +		pr_err("DS0 mode not supported\n");
+> +		return -ENOTSUPP;
+> +	}
+> +
+>  	amx3_pre_suspend_common();
+>  	scu_power_mode(scu_base, SCU_PM_POWEROFF);
+>  	ret = cpu_suspend(args, fn);
+> diff --git a/drivers/soc/ti/pm33xx.c b/drivers/soc/ti/pm33xx.c
+> index d0dab32..53238d7 100644
+> --- a/drivers/soc/ti/pm33xx.c
+> +++ b/drivers/soc/ti/pm33xx.c
+> @@ -324,6 +324,15 @@ static int am33xx_pm_probe(struct platform_device *pdev)
+>  	suspend_wfi_flags |= WFI_FLAG_SAVE_EMIF;
+>  	suspend_wfi_flags |= WFI_FLAG_WAKE_M3;
+>  
+> +	/*
+> +	 * Deep Sleep0 mode is currently functional only on am437x-gp-evm,
+> +	 * am33xx-evm and boneblack family. Hence set the DS0 flag
+> +	 */
+> +	if (of_machine_is_compatible("ti,am437x-gp-evm") ||
+> +	    of_machine_is_compatible("ti,am335x-bone-black") ||
+> +	    of_machine_is_compatible("ti,am335x-evm"))
+> +		suspend_wfi_flags |= WFI_FLAG_DEEP_SLEEP0;
 
-> We have already taken care of it in these commits:
->     clk: imx6: Fix procedure to switch the parent of LDB_DI_CLK
->     clk: imx6: Make the LDB_DI0 and LDB_DI1 clocks read-only
+What about other (out-of-tree) machines which supports DS0 and which
+this change would break?
 
-That's for ldb_di{0,1}_sel, this is for ipu{1,2}_di{0,1}_sel.
+I think this needs to be a blacklist if anything.
 
-On imx6q the ldb_di{0,1}_sel mux has an improperly placed gate and a
-special switch procedure needs to be performed at boot time. This
-design was fixed on 6qp by moving the ldb_di{0,1} gate immediately
-after the mux. My tests are on 6qp.
+Please also expand in the commit message why you think this is needed.
 
-For ipu{1,2}_di{0,1}_sel the ipu{1,2}_di{0,1} gate can be used on all
-chips, it's just that the drm driver doesn't do this. Adding the
-CLK_SET_RATE_PARENT flag exposes the issue by returning errors.
+Last, what tree is this against? There's no am43xx_suspend() in
+linux-next (and you add compatibles above for am33xx too).
 
-> I think we should also take care of the other glitchy muxes as
-> you propose here.
->
-> Have you seen such glitch issue in practice with the LDB clocks?
-
-If I run "while true; do rtcwake -m mem -s 5; done" it will hang in ~30
-minutes because the "suspend devices" takes too long and RTC alarm
-expires. I tracked this down to the clk_set_parent call inside
-imx_ldb_encoder_disable: sometimes this takes many seconds.
-
-As far as I can tell this live reparenting is unsafe (RM claims
-glitches are possible) and not useful (we're deactivating the display
-anyway). However I'm not sure this can be blamed on a "glitch".
-
-What seems to be happening is that this triggers the enabling of pll5
-(yes, on disable) and the usleep from clk_pllv3_wait_lock takes far too
-much time to return. This might be an unrelated timekeeping issue, I'll
-look into this further.
-
-According to the RM this reparenting is unsafe anyway so we should
-avoid it, probably by disabling ipu_di sooner.
-
---
-Regards,
-Leonard
+Thanks,
+Johan
