@@ -1,52 +1,139 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 22 Aug 2018 14:44:33 +0100
-Subject: [PATCH 0/4] numa, iommu/smmu: IOMMU/SMMU driver optimization for
- NUMA systems
-In-Reply-To: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
-References: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
-Message-ID: <452f1665-eb3a-5e8c-f671-099ef4a15d84@huawei.com>
+From: nicolas.dufresne@collabora.com (Nicolas Dufresne)
+Date: Wed, 22 Aug 2018 09:52:06 -0400
+Subject: [PATCH 1/9] CHROMIUM: v4l: Add H264 low-level decoder API
+ compound controls.
+In-Reply-To: <CAAFQd5B68ArBgSj-Oso8=MzSrvVGB=h+MVO12qqgACmBrZtRkw@mail.gmail.com>
+References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+ <20180613140714.1686-2-maxime.ripard@bootlin.com>
+ <80e1d9cb49c6df06843e49332685f2b401023292.camel@collabora.com>
+ <d8a30e78e6a33db10360995d800f2c0d19acc500.camel@collabora.com>
+ <53987ca7a536a21b2eb49626d777a9bf894d6910.camel@bootlin.com>
+ <CAAFQd5B68ArBgSj-Oso8=MzSrvVGB=h+MVO12qqgACmBrZtRkw@mail.gmail.com>
+Message-ID: <fa15feb80ff62f39dabfad9ec939d484fbf48148.camel@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/09/2017 09:59, Ganapatrao Kulkarni wrote:
-> Adding numa aware memory allocations used for iommu dma allocation and
-> memory allocated for SMMU stream tables, page walk tables and command queues.
->
-> With this patch, iperf testing on ThunderX2, with 40G NIC card on
-> NODE 1 PCI shown same performance(around 30% improvement) as NODE 0.
->
-> Ganapatrao Kulkarni (4):
->   mm: move function alloc_pages_exact_nid out of __meminit
->   numa, iommu/io-pgtable-arm: Use NUMA aware memory allocation for smmu
->     translation tables
->   iommu/arm-smmu-v3: Use NUMA memory allocations for stream tables and
->     comamnd queues
->   iommu/dma, numa: Use NUMA aware memory allocations in
->     __iommu_dma_alloc_pages
->
->  drivers/iommu/arm-smmu-v3.c    | 57 +++++++++++++++++++++++++++++++++++++-----
->  drivers/iommu/dma-iommu.c      | 17 +++++++------
->  drivers/iommu/io-pgtable-arm.c |  4 ++-
->  include/linux/gfp.h            |  2 +-
->  mm/page_alloc.c                |  3 ++-
->  5 files changed, 67 insertions(+), 16 deletions(-)
->
+Le mercredi 22 ao?t 2018 ? 22:38 +0900, Tomasz Figa a ?crit :
+> On Wed, Aug 22, 2018 at 10:07 PM Paul Kocialkowski
+> <paul.kocialkowski@bootlin.com> wrote:
+> > 
+> > Hi,
+> > 
+> > On Tue, 2018-08-21 at 13:07 -0400, Nicolas Dufresne wrote:
+> > > Le mardi 21 ao?t 2018 ? 13:58 -0300, Ezequiel Garcia a ?crit :
+> > > > On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
+> > > > > From: Pawel Osciak <posciak@chromium.org>
+> > > > > 
+> > > > > Signed-off-by: Pawel Osciak <posciak@chromium.org>
+> > > > > Reviewed-by: Wu-cheng Li <wuchengli@chromium.org>
+> > > > > Tested-by: Tomasz Figa <tfiga@chromium.org>
+> > > > > [rebase44(groeck): include linux/types.h in v4l2-controls.h]
+> > > > > Signed-off-by: Guenter Roeck <groeck@chromium.org>
+> > > > > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > > > > ---
+> > > > > 
+> > > > 
+> > > > [..]
+> > > > > diff --git a/include/uapi/linux/videodev2.h
+> > > > > b/include/uapi/linux/videodev2.h
+> > > > > index 242a6bfa1440..4b4a1b25a0db 100644
+> > > > > --- a/include/uapi/linux/videodev2.h
+> > > > > +++ b/include/uapi/linux/videodev2.h
+> > > > > @@ -626,6 +626,7 @@ struct v4l2_pix_format {
+> > > > >  #define V4L2_PIX_FMT_H264     v4l2_fourcc('H', '2', '6', '4') /*
+> > > > > H264 with start codes */
+> > > > >  #define V4L2_PIX_FMT_H264_NO_SC v4l2_fourcc('A', 'V', 'C', '1') /*
+> > > > > H264 without start codes */
+> > > > >  #define V4L2_PIX_FMT_H264_MVC v4l2_fourcc('M', '2', '6', '4') /*
+> > > > > H264 MVC */
+> > > > > +#define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /*
+> > > > > H264 parsed slices */
+> > > > 
+> > > > As pointed out by Tomasz, the Rockchip VPU driver expects start codes
+> > > > [1], so the userspace
+> > > > should be aware of it. Perhaps we could document this pixel format
+> > > > better as:
+> > > > 
+> > > > #define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /*
+> > > > H264 parsed slices with start codes */
+> > > > 
+> > > > And introduce another pixel format:
+> > > > 
+> > > > #define V4L2_PIX_FMT_H264_SLICE_NO_SC v4l2_fourcc(TODO) /* H264
+> > > > parsed slices without start codes */
+> > > > 
+> > > > For cedrus to use, as it seems it doesn't need start codes.
+> > > 
+> > > I must admit that this RK requirement is a bit weird for slice data.
+> > > Though, userspace wise, always adding start-code would be compatible,
+> > > as the driver can just offset to remove it.
+> > 
+> > This would mean that the stateless API no longer takes parsed bitstream
+> > data but effectively the full bitstream, which defeats the purpose of
+> > the _SLICE pixel formats.
+> > 
+> 
+> Not entirely. One of the purposes of the _SLICE pixel format was to
+> specify it in a way that adds a requirement of providing the required
+> controls by the client.
 
-Hi Ganapatrao,
+Slice is also a bitstream alignment requirement. In the default _H264
+format we pass an complete AU, while in _SLICE we will pass single NAL
+(along with the tables through controls of course). Though, H264 does
+not only support start codes, it also supports AVC headers (as stored
+in ISOMP4). That makes the sentence "passing the full bitstream" quite
+ambiguous, as whatever we require, userspace may endup having to
+replace that part of the NAL.
 
-Have you any plans for further work on this patchset? I have not seen 
-anything since this v1 was posted+discussed.
+> 
+> > > Another option, because I'm not fan of adding dedicated formats for
+> > > this, the RK driver could use data_offset (in mplane v4l2 buffers),
+> > > just write a start code there. I like this solution because I would not
+> > > be surprise if some drivers requires in fact an HW specific header,
+> > > that the driver can generate as needed.
+> > 
+> > I like this idea, because it implies that the driver should deal with
+> > the specificities of the hardware, instead of making the blurrying the
+> > lines of stateless API for covering these cases.
+> 
+> The spec says
+> 
+> "Offset in bytes to video data in the plane. Drivers must set this
+> field when type refers to a capture stream, applications when it
+> refers to an output stream."
+> 
+> which would mean that user space would have to know to reserve some
+> bytes at the beginning for the driver to add the start code there. (Or
+> the driver memmove()ing the data forward when the buffer is queued,
+> assuming that there is enough space in the buffer, but it should
+> normally be the case.)
+> 
+> Sounds like a pixel format with full bitstream data and some offsets
+> to particular parts inside given inside a control might be the most
+> flexible and cleanest solution.
 
-Thanks,
-John
+Yeah, that comment was miss-informed. But it's simpler then that, the
+prefix can be added internally to the driver, there is no need to
+communicate this prefix to userspace.
 
-> --
-> 2.9.4
->
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
->
-> .
->
+Again, if you go the pixel format way, you'll need to resolve the large
+ambiguity of saying "the full bitstream data". While dealing with a
+prefix in the driver, is just about writing couple of bytes, and then
+you can support HW that wants start-codes, AVC/AVC3 headers or HW
+specific headers. I've seen a totally custom header on Panasonic HW
+accelerator on some smart TV.
+
+The other important aspect, is that VAAPI won't provide any headers,
+just the raw NAL. So you'd be forcing userspace to handle a HW specific
+requirement, which is trivial to adapt.
+
+> 
+> Best regards,
+> Tomasz
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 195 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180822/ab0c6cf5/attachment.sig>
