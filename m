@@ -1,52 +1,51 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 22 Aug 2018 22:22:04 +0200
-Subject: [PATCH v1 1/7] atmel-hlcdc: renamed directory to drm/atmel/
-In-Reply-To: <20180822200942.GA22148@ravnborg.org>
-References: <20180812184152.GA22343@ravnborg.org>
- <20180812184629.3808-1-sam@ravnborg.org>
- <20180814083913.GD21634@phenom.ffwll.local>
- <20180814161952.GA27951@ravnborg.org>
- <20180816074123.GB21634@phenom.ffwll.local>
- <20180822200942.GA22148@ravnborg.org>
-Message-ID: <CAKMK7uE34rkpFhZu6J9BRpTej4y8icYFopsXsozgsQcpj9h7vA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 22 Aug 2018 22:41:00 +0200
+Subject: [PATCH 00/11] Reform EP93xx GPIO
+Message-ID: <20180822204111.9581-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2018 at 10:09 PM, Sam Ravnborg <sam@ravnborg.org> wrote:
-> Hi Daniel.
->
->> > >
->> > > I'd strongly suggest you group-maintain the entire atmel stuff in
->> > > drm-misc instead of only atmel-hlcdc.
->> >
->> > If OK with Boris then I am fine with this too.
->> > Will suggest so in v2.
->>
->> Boris acked too, but he's on vacation. He said on irc he'll review the
->> patches when he's back. Meanwhile I guess you can prep by getting the fd.o
->> account requested:
->>
->> https://www.freedesktop.org/wiki/AccountRequests/
->>
->> And checking out the tooling we use to maintain drm-misc:
->>
->> https://dri.freedesktop.org/docs/dim/getting-started.html
->
-> With enough on the plate already I decided to postpone this
-> part until the migration to gitlab is done.
-> Just to tell this was not ignored, only postponed.
+This series is a spin-off of a patch from Arnd that started to
+decouple the EP93xx GPIO driver from the code inside
+arch/arm.
 
-Migrating the drm repos will start earliest next year (because fd.o
-admins need to rework some of the infrastructure). And this is the
-optimistic estimate. We'll also try to make the transition as seamless
-as possible for committers (the scripting we're using will
-auto-upgrade remotes and everything, plus accounts will get migrated).
+The driver needed some modernization and in the end I managed
+to convert two of the banks to use GPIOLIB_IRQCHIP and use
+a proper irqdomain.
 
-Holding off imo doesn't make sense, just means your driver won't land
-for another 6 months or so, or at least be in some funny maintainer
-limbo state.
--Daniel
+The F bank presents a special problem that I need to think
+about, because since there is one IRQ per GPIO line it is
+essentially a hierarchical irqdomain.
+
+This was tested on the SIM.ONE where I rigged lines on some
+of the GPIOs on a board connector. It's crude but gives
+interrupts and behave as expected before and after these
+changes, the main visible change being that the hardware
+IRQ line on each port appears in /proc/interrupts.
+
+It would be great if some EP93xx users could test this
+(especially something using bank F) so I can get it into
+shape and merge as a baseline for further refactorings.
+
+Arnd Bergmann (1):
+  ARM/gpio: ep93xx: build standalone
+
+Linus Walleij (10):
+  gpio: ep93xx: Cut down variable names
+  gpio: ep93xx: Switch to SPDX license tag
+  gpio: ep93xx: Pass around struct gpio_chip
+  gpio: ep93xx: Rename has_debounce to has_irq
+  gpio: ep93xx: Properly call the chained IRQ handler
+  gpio: ep93xx: Do not pingpong irq numbers
+  gpio: ep93xx: Use the hwirq and port
+  gpio: ep93xx: Use for_each_set_bit() in IRQ handler
+  gpio: ep93xx: Cut gpio_to_irq() usage
+  gpio: ep93xx: Switch A and B to use GPIOLIB_IRQCHIP
+
+ arch/arm/mach-ep93xx/core.c |   9 ++
+ drivers/gpio/Kconfig        |   1 +
+ drivers/gpio/gpio-ep93xx.c  | 297 +++++++++++++++++++++---------------
+ 3 files changed, 181 insertions(+), 126 deletions(-)
+
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+2.17.1
