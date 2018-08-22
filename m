@@ -1,86 +1,36 @@
-From: j-keerthy@ti.com (J, KEERTHY)
-Date: Wed, 22 Aug 2018 13:50:29 +0530
-Subject: [PATCH] soc: ti: pm33xx: Enable DS0 for the platforms on which it
- is functional
-In-Reply-To: <20180822073719.GL14967@localhost>
-References: <1534915951-8783-1-git-send-email-j-keerthy@ti.com>
- <20180822073409.GK14967@localhost> <20180822073719.GL14967@localhost>
-Message-ID: <ae71d45f-9260-3547-5ff2-355c084fcf8e@ti.com>
+From: ada@thorsis.com (Alexander Dahl)
+Date: Wed, 22 Aug 2018 10:15:57 +0200
+Subject: Atmel AT91 support in mainstream kernel 4.4
+In-Reply-To: <CAK3Qp=UAex-68+oCk4v6WOERHiWtB5CEqDtQJvGj+xv2GonOhg@mail.gmail.com>
+References: <CAK3Qp=UAex-68+oCk4v6WOERHiWtB5CEqDtQJvGj+xv2GonOhg@mail.gmail.com>
+Message-ID: <2328896.ejRB43oxp2@ada>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hei hei,
 
+Am Dienstag, 21. August 2018, 14:10:14 CEST schrieb Fernando AE:
+> I'd like to know if AT91 boards (more specifically AT91SAM9G20) is
+> well supported in mainstream Kernel 4.4.
 
-On 8/22/2018 1:07 PM, Johan Hovold wrote:
-> On Wed, Aug 22, 2018 at 09:34:09AM +0200, Johan Hovold wrote:
->> On Wed, Aug 22, 2018 at 11:02:31AM +0530, Keerthy wrote:
->>> Enable DS0 for only those platforms on which it is functional
->>>
->>> Signed-off-by: Keerthy <j-keerthy@ti.com>
->>> ---
->>>   arch/arm/mach-omap2/pm33xx-core.c    | 5 +++++
->>>   drivers/soc/ti/pm33xx.c              | 9 +++++++++
->>>   include/linux/platform_data/pm33xx.h | 2 ++
->>>   3 files changed, 16 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-omap2/pm33xx-core.c b/arch/arm/mach-omap2/pm33xx-core.c
->>> index f4971e4..f0f6e8e 100644
->>> --- a/arch/arm/mach-omap2/pm33xx-core.c
->>> +++ b/arch/arm/mach-omap2/pm33xx-core.c
->>> @@ -135,6 +135,11 @@ static int am43xx_suspend(unsigned int state, int (*fn)(unsigned long),
->>>   {
->>>   	int ret = 0;
->>>   
->>> +	if (!(args & WFI_FLAG_DEEP_SLEEP0)) {
->>> +		pr_err("DS0 mode not supported\n");
->>> +		return -ENOTSUPP;
->>> +	}
->>> +
->>>   	amx3_pre_suspend_common();
->>>   	scu_power_mode(scu_base, SCU_PM_POWEROFF);
->>>   	ret = cpu_suspend(args, fn);
->>> diff --git a/drivers/soc/ti/pm33xx.c b/drivers/soc/ti/pm33xx.c
->>> index d0dab32..53238d7 100644
->>> --- a/drivers/soc/ti/pm33xx.c
->>> +++ b/drivers/soc/ti/pm33xx.c
->>> @@ -324,6 +324,15 @@ static int am33xx_pm_probe(struct platform_device *pdev)
->>>   	suspend_wfi_flags |= WFI_FLAG_SAVE_EMIF;
->>>   	suspend_wfi_flags |= WFI_FLAG_WAKE_M3;
->>>   
->>> +	/*
->>> +	 * Deep Sleep0 mode is currently functional only on am437x-gp-evm,
->>> +	 * am33xx-evm and boneblack family. Hence set the DS0 flag
->>> +	 */
->>> +	if (of_machine_is_compatible("ti,am437x-gp-evm") ||
->>> +	    of_machine_is_compatible("ti,am335x-bone-black") ||
->>> +	    of_machine_is_compatible("ti,am335x-evm"))
->>> +		suspend_wfi_flags |= WFI_FLAG_DEEP_SLEEP0;
->>
->> What about other (out-of-tree) machines which supports DS0 and which
->> this change would break?
->>
->> I think this needs to be a blacklist if anything.
->>
->> Please also expand in the commit message why you think this is needed.
+In general from my experience: yes, very well.
 
-Currently when one does echo mem > /sys/power/state on unsuppored 
-machines there can be a crash or a hang. So bail out with a message.
+In detail: we are using the external memory interface with some SRAM like 
+device on an at91sam9g20 based board with special timings and I remember DT 
+didn't support that fully until 4.12 IIRC, so depending on your hardware maybe 
+you might need some tweaks on the DT side, but that should all be straight 
+forward.
 
->>
->> Last, what tree is this against? There's no am43xx_suspend() in
->> linux-next (and you add compatibles above for am33xx too).
-> 
-> Sorry, there is indeed an am43xx_suspend(), but you are adding
-> compatibles for am33xx which use am33xx_suspend().
+Maybe use some newer LTS kernel like 4.9 or 4.14?
 
-am33xx_pm_probe is a common probe function for both am33 and am43.
-AFAIK for am33 family am335x-evm and am335x-bone-black support Deep 
-Sleep mode. For am43 family am43tx-gp-evm alone supports at the moment.
+> In more details, I'm working in a project of bringing up Linux 4.4 in
+> a iMX6 based board, while trying to keep the same sources for our
+> legacy AT91 based board. So, I'm wondering if it's a good idea to take
+> Freescale's repo based on 4.4 as reference and compiling both for iMX
+> and AT91.
 
-Can you let me know of other am33 machines that support DS0 mode?
-I could have simply used ti,am33xx compatible which covers entire am33 
-family but then am33xx-bone (bone white) does not support this mode.
+AFAIK i.MX6 is also well supported in mainline, so I would also opt for using 
+a recent vanilla kernel for both boards.
 
-> 
-> Johan
-> 
+HTH & Greets
+Alex
