@@ -1,36 +1,42 @@
-From: ada@thorsis.com (Alexander Dahl)
-Date: Wed, 22 Aug 2018 10:15:57 +0200
-Subject: Atmel AT91 support in mainstream kernel 4.4
-In-Reply-To: <CAK3Qp=UAex-68+oCk4v6WOERHiWtB5CEqDtQJvGj+xv2GonOhg@mail.gmail.com>
-References: <CAK3Qp=UAex-68+oCk4v6WOERHiWtB5CEqDtQJvGj+xv2GonOhg@mail.gmail.com>
-Message-ID: <2328896.ejRB43oxp2@ada>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Wed, 22 Aug 2018 10:41:10 +0200
+Subject: [PATCH v2 2/2] ARM: dts: socfgpa: set bridges status to disabled
+In-Reply-To: <20180822084110.14969-1-s.trumtrar@pengutronix.de>
+References: <20180822084110.14969-1-s.trumtrar@pengutronix.de>
+Message-ID: <20180822084110.14969-2-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hei hei,
+The hps-to-fpga bridges can't be used, when the FPGA is not programmed.
+Set the default state to disabled and leave enabling them to the board-specific
+dts files.
+Although this changes behavior, there are no in-tree users of the bridges, so
+this won't break anything.
 
-Am Dienstag, 21. August 2018, 14:10:14 CEST schrieb Fernando AE:
-> I'd like to know if AT91 boards (more specifically AT91SAM9G20) is
-> well supported in mainstream Kernel 4.4.
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ arch/arm/boot/dts/socfpga.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-In general from my experience: yes, very well.
-
-In detail: we are using the external memory interface with some SRAM like 
-device on an at91sam9g20 based board with special timings and I remember DT 
-didn't support that fully until 4.12 IIRC, so depending on your hardware maybe 
-you might need some tweaks on the DT side, but that should all be straight 
-forward.
-
-Maybe use some newer LTS kernel like 4.9 or 4.14?
-
-> In more details, I'm working in a project of bringing up Linux 4.4 in
-> a iMX6 based board, while trying to keep the same sources for our
-> legacy AT91 based board. So, I'm wondering if it's a good idea to take
-> Freescale's repo based on 4.4 as reference and compiling both for iMX
-> and AT91.
-
-AFAIK i.MX6 is also well supported in mainline, so I would also opt for using 
-a recent vanilla kernel for both boards.
-
-HTH & Greets
-Alex
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 11781f795de2..d923adf897a1 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -534,6 +534,7 @@
+ 			reg = <0xff400000 0x100000>;
+ 			resets = <&rst LWHPS2FPGA_RESET>;
+ 			clocks = <&l4_main_clk>;
++			status = "disabled";
+ 		};
+ 
+ 		fpga_bridge1: fpga_bridge at ff500000 {
+@@ -541,6 +542,7 @@
+ 			reg = <0xff500000 0x10000>;
+ 			resets = <&rst HPS2FPGA_RESET>;
+ 			clocks = <&l4_main_clk>;
++			status = "disabled";
+ 		};
+ 
+ 		fpga_bridge2: fpga-bridge at ff600000 {
+-- 
+2.11.0
