@@ -1,92 +1,112 @@
-From: sebastien.szymanski@armadeus.com (=?UTF-8?q?S=C3=A9bastien=20Szymanski?=)
-Date: Wed, 22 Aug 2018 13:38:03 +0200
-Subject: [PATCH v2 1/1] ARM: dts: imx6ull: keep IMX6UL_ prefix for signals on
+From: sebastien.szymanski@armadeus.com (=?UTF-8?Q?S=c3=a9bastien_Szymanski?=)
+Date: Wed, 22 Aug 2018 13:41:16 +0200
+Subject: [PATCH 1/1] ARM: dts: imx6ull: keep IMX6UL_ prefix for signals on
  both i.MX6UL and i.MX6ULL
-Message-ID: <20180822113803.20965-1-sebastien.szymanski@armadeus.com>
+In-Reply-To: <20180821085336.GB31070@dragon>
+References: <20180720102321.23291-1-sebastien.szymanski@armadeus.com>
+ <20180821085336.GB31070@dragon>
+Message-ID: <d2d5e3db-70ca-bf06-5b65-6428cc979520@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signals available on both i.MX6UL and i.MX6ULL should have the same name
-because it is the case of all others common signals, it avoids to make
-mistakes (use the wrong ones) and it makes writing device tree files
-less complicated. For example:
+On 08/21/2018 10:53 AM, Shawn Guo wrote:
+> On Fri, Jul 20, 2018 at 12:23:21PM +0200, S?bastien Szymanski wrote:
+>> Signals available on both i.MX6UL and i.MX6ULL should have the same name
+>> because it is the case of all others common signals, it avoids to make
+>> mistakes (use the wrong ones) and it makes writing device tree files
+>> less complicated. For example:
+>>
+>> imx6ul-imx6ull-board.dtsi:
+>>  ...
+>>  pinctrl_uart5: uart5grp {
+>> 	fsl,pins = <
+>> 		MX6UL_PAD_UART5_TX_DATA__UART5_DCE_TX   0x1b0b1
+>> 	 	MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX   0x1b0b1
+>>  	 >;
+>>  };
+>>
+>> imx6ul-board.dts:
+>>  #include <imx6ul.dtsi>
+>>  #include <imx6ul-imx6ull-board.dtsi>
+>>  ...
+>>
+>> imx6ull-board.dts:
+>>  #include <imx6ull.dtsi>
+>>  #include <imx6ul-imx6ull-board.dtsi>
+>>  ...
+>>
+>> Without this patch, the imx6ull-board.dtb will use
+>> MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX instead of
+>> MX6ULL_PAD_UART5_RX_DATA__UART5_DCE_RX and the uart5 will be
+>> misconfigured.
+>>
+>> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+>> ---
+>>  arch/arm/boot/dts/imx6ull-pinfunc.h | 27 +++++++++++++++++++--------
+>>  1 file changed, 19 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6ull-pinfunc.h b/arch/arm/boot/dts/imx6ull-pinfunc.h
+>> index fdc46bb09cc1..7d7f05f7ea77 100644
+>> --- a/arch/arm/boot/dts/imx6ull-pinfunc.h
+>> +++ b/arch/arm/boot/dts/imx6ull-pinfunc.h
+>> @@ -14,14 +14,25 @@
+>>   * The pin function ID is a tuple of
+>>   * <mux_reg conf_reg input_reg mux_mode input_val>
+>>   */
+>> -#define MX6ULL_PAD_UART1_TX_DATA__UART5_DTE_RX                    0x0084 0x0310 0x0644 0x9 0x4
+>> -#define MX6ULL_PAD_UART1_RX_DATA__UART5_DCE_RX                    0x0088 0x0314 0x0644 0x9 0x5
+>> -#define MX6ULL_PAD_UART1_CTS_B__UART5_DCE_RTS                     0x008C 0x0318 0x0640 0x9 0x3
+>> -#define MX6ULL_PAD_UART1_RTS_B__UART5_DTE_RTS                     0x0090 0x031C 0x0640 0x9 0x4
+>> -#define MX6ULL_PAD_UART5_TX_DATA__UART5_DTE_RX                    0x00BC 0x0348 0x0644 0x0 0x6
+>> -#define MX6ULL_PAD_UART5_RX_DATA__UART5_DCE_RX                    0x00C0 0x034C 0x0644 0x0 0x7
+>> -#define MX6ULL_PAD_ENET1_RX_EN__UART5_DCE_RTS                     0x00CC 0x0358 0x0640 0x1 0x5
+>> -#define MX6ULL_PAD_ENET1_TX_DATA0__UART5_DTE_RTS                  0x00D0 0x035C 0x0640 0x1 0x6
+>> +/* signals common for i.MX6UL and i.MX6ULL */
+>> +#undef MX6UL_PAD_UART1_TX_DATA__UART5_DTE_RX
+>> +#define MX6UL_PAD_UART1_TX_DATA__UART5_DTE_RX                    0x0084 0x0310 0x0644 0x9 0x4
+>> +#undef MX6UL_PAD_UART1_RX_DATA__UART5_DCE_RX
+>> +#define MX6UL_PAD_UART1_RX_DATA__UART5_DCE_RX                    0x0088 0x0314 0x0644 0x9 0x5
+>> +#undef MX6UL_PAD_UART1_CTS_B__UART5_DCE_RTS
+>> +#define MX6UL_PAD_UART1_CTS_B__UART5_DCE_RTS                     0x008C 0x0318 0x0640 0x9 0x3
+>> +#undef MX6UL_PAD_UART1_RTS_B__UART5_DTE_RTS
+>> +#define MX6UL_PAD_UART1_RTS_B__UART5_DTE_RTS                     0x0090 0x031C 0x0640 0x9 0x4
+> 
+> I do not see these 4 pinfunc in imx6ul-pinfunc.h.  Are they really
+> available for i.MX6UL?
 
-imx6ul-imx6ull-board.dtsi:
- ...
- pinctrl_uart5: uart5grp {
-	fsl,pins = <
-		MX6UL_PAD_UART5_TX_DATA__UART5_DCE_TX   0x1b0b1
-	 	MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX   0x1b0b1
- 	 >;
- };
+They are not. I've just sent a v2.
+Thanks.
 
-imx6ul-board.dts:
- #include <imx6ul.dtsi>
- #include <imx6ul-imx6ull-board.dtsi>
- ...
+Regards,
 
-imx6ull-board.dts:
- #include <imx6ull.dtsi>
- #include <imx6ul-imx6ull-board.dtsi>
- ...
+> 
+> Shawn
+> 
+>> +#undef MX6UL_PAD_UART5_TX_DATA__UART5_DTE_RX
+>> +#define MX6UL_PAD_UART5_TX_DATA__UART5_DTE_RX                    0x00BC 0x0348 0x0644 0x0 0x6
+>> +#undef MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX
+>> +#define MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX                    0x00C0 0x034C 0x0644 0x0 0x7
+>> +#undef MX6UL_PAD_ENET1_RX_EN__UART5_DCE_RTS
+>> +#define MX6UL_PAD_ENET1_RX_EN__UART5_DCE_RTS                     0x00CC 0x0358 0x0640 0x1 0x5
+>> +#undef MX6UL_PAD_ENET1_TX_DATA0__UART5_DTE_RTS
+>> +#define MX6UL_PAD_ENET1_TX_DATA0__UART5_DTE_RTS                  0x00D0 0x035C 0x0640 0x1 0x6
+>> +
+>> +/* signals for i.MX6ULL only */
+>>  #define MX6ULL_PAD_ENET2_RX_DATA0__EPDC_SDDO08                    0x00E4 0x0370 0x0000 0x9 0x0
+>>  #define MX6ULL_PAD_ENET2_RX_DATA1__EPDC_SDDO09                    0x00E8 0x0374 0x0000 0x9 0x0
+>>  #define MX6ULL_PAD_ENET2_RX_EN__EPDC_SDDO10                       0x00EC 0x0378 0x0000 0x9 0x0
+>> -- 
+>> 2.16.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Without this patch, the imx6ull-board.dtb will use
-MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX instead of
-MX6ULL_PAD_UART5_RX_DATA__UART5_DCE_RX and the uart5 will be
-misconfigured.
 
-Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
----
-
-Changes for v2:
- - The following signals are only available for i.MX6ULL:
-   UART1_TX_DATA__UART5_DTE_RX, UART1_RX_DATA__UART5_DCE_RX,
-   UART1_CTS_B__UART5_DCE_RTS, UART1_RTS_B__UART5_DTE_RTS
-
- - CSI_DATA02__UART5_DCE_RTS is available for i.MX6UL and i.MX6ULL
-
- arch/arm/boot/dts/imx6ull-pinfunc.h | 18 +++++++++++++-----
- 1 file changed, 13 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6ull-pinfunc.h b/arch/arm/boot/dts/imx6ull-pinfunc.h
-index fdc46bb09cc1..3c12a6fb0b61 100644
---- a/arch/arm/boot/dts/imx6ull-pinfunc.h
-+++ b/arch/arm/boot/dts/imx6ull-pinfunc.h
-@@ -14,14 +14,23 @@
-  * The pin function ID is a tuple of
-  * <mux_reg conf_reg input_reg mux_mode input_val>
-  */
-+/* signals common for i.MX6UL and i.MX6ULL */
-+#undef MX6UL_PAD_UART5_TX_DATA__UART5_DTE_RX
-+#define MX6UL_PAD_UART5_TX_DATA__UART5_DTE_RX                    0x00BC 0x0348 0x0644 0x0 0x6
-+#undef MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX
-+#define MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX                    0x00C0 0x034C 0x0644 0x0 0x7
-+#undef MX6UL_PAD_ENET1_RX_EN__UART5_DCE_RTS
-+#define MX6UL_PAD_ENET1_RX_EN__UART5_DCE_RTS                     0x00CC 0x0358 0x0640 0x1 0x5
-+#undef MX6UL_PAD_ENET1_TX_DATA0__UART5_DTE_RTS
-+#define MX6UL_PAD_ENET1_TX_DATA0__UART5_DTE_RTS                  0x00D0 0x035C 0x0640 0x1 0x6
-+#undef MX6UL_PAD_CSI_DATA02__UART5_DCE_RTS
-+#define MX6UL_PAD_CSI_DATA02__UART5_DCE_RTS                      0x01EC 0x0478 0x0640 0x8 0x7
-+
-+/* signals for i.MX6ULL only */
- #define MX6ULL_PAD_UART1_TX_DATA__UART5_DTE_RX                    0x0084 0x0310 0x0644 0x9 0x4
- #define MX6ULL_PAD_UART1_RX_DATA__UART5_DCE_RX                    0x0088 0x0314 0x0644 0x9 0x5
- #define MX6ULL_PAD_UART1_CTS_B__UART5_DCE_RTS                     0x008C 0x0318 0x0640 0x9 0x3
- #define MX6ULL_PAD_UART1_RTS_B__UART5_DTE_RTS                     0x0090 0x031C 0x0640 0x9 0x4
--#define MX6ULL_PAD_UART5_TX_DATA__UART5_DTE_RX                    0x00BC 0x0348 0x0644 0x0 0x6
--#define MX6ULL_PAD_UART5_RX_DATA__UART5_DCE_RX                    0x00C0 0x034C 0x0644 0x0 0x7
--#define MX6ULL_PAD_ENET1_RX_EN__UART5_DCE_RTS                     0x00CC 0x0358 0x0640 0x1 0x5
--#define MX6ULL_PAD_ENET1_TX_DATA0__UART5_DTE_RTS                  0x00D0 0x035C 0x0640 0x1 0x6
- #define MX6ULL_PAD_ENET2_RX_DATA0__EPDC_SDDO08                    0x00E4 0x0370 0x0000 0x9 0x0
- #define MX6ULL_PAD_ENET2_RX_DATA1__EPDC_SDDO09                    0x00E8 0x0374 0x0000 0x9 0x0
- #define MX6ULL_PAD_ENET2_RX_EN__EPDC_SDDO10                       0x00EC 0x0378 0x0000 0x9 0x0
-@@ -55,7 +64,6 @@
- #define MX6ULL_PAD_CSI_DATA00__ESAI_TX_HF_CLK                     0x01E4 0x0470 0x0000 0x9 0x0
- #define MX6ULL_PAD_CSI_DATA01__ESAI_RX_HF_CLK                     0x01E8 0x0474 0x0000 0x9 0x0
- #define MX6ULL_PAD_CSI_DATA02__ESAI_RX_FS                         0x01EC 0x0478 0x0000 0x9 0x0
--#define MX6ULL_PAD_CSI_DATA02__UART5_DCE_RTS                      0x01EC 0x0478 0x0640 0x8 0x7
- #define MX6ULL_PAD_CSI_DATA03__ESAI_RX_CLK                        0x01F0 0x047C 0x0000 0x9 0x0
- #define MX6ULL_PAD_CSI_DATA04__ESAI_TX_FS                         0x01F4 0x0480 0x0000 0x9 0x0
- #define MX6ULL_PAD_CSI_DATA05__ESAI_TX_CLK                        0x01F8 0x0484 0x0000 0x9 0x0
 -- 
-2.16.4
+S?bastien Szymanski
+Software engineer, Armadeus Systems
+Tel: +33 (0)9 72 29 41 44
+Fax: +33 (0)9 72 28 79 26
