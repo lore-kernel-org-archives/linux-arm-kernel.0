@@ -1,112 +1,27 @@
-From: sebastien.szymanski@armadeus.com (=?UTF-8?Q?S=c3=a9bastien_Szymanski?=)
-Date: Wed, 22 Aug 2018 13:41:16 +0200
-Subject: [PATCH 1/1] ARM: dts: imx6ull: keep IMX6UL_ prefix for signals on
- both i.MX6UL and i.MX6ULL
-In-Reply-To: <20180821085336.GB31070@dragon>
-References: <20180720102321.23291-1-sebastien.szymanski@armadeus.com>
- <20180821085336.GB31070@dragon>
-Message-ID: <d2d5e3db-70ca-bf06-5b65-6428cc979520@armadeus.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 22 Aug 2018 13:31:00 +0200
+Subject: [PATCH 2/2] arm64: dts: renesas: v3msk: add eMMC support
+In-Reply-To: <9da672a2-0269-4860-8912-189414b43d4c@cogentembedded.com>
+References: <1af46bf9-d9e5-8dcf-0ac7-a85e7348a34e@cogentembedded.com>
+ <9da672a2-0269-4860-8912-189414b43d4c@cogentembedded.com>
+Message-ID: <20180822113100.edpyplj2kteomr2j@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/21/2018 10:53 AM, Shawn Guo wrote:
-> On Fri, Jul 20, 2018 at 12:23:21PM +0200, S?bastien Szymanski wrote:
->> Signals available on both i.MX6UL and i.MX6ULL should have the same name
->> because it is the case of all others common signals, it avoids to make
->> mistakes (use the wrong ones) and it makes writing device tree files
->> less complicated. For example:
->>
->> imx6ul-imx6ull-board.dtsi:
->>  ...
->>  pinctrl_uart5: uart5grp {
->> 	fsl,pins = <
->> 		MX6UL_PAD_UART5_TX_DATA__UART5_DCE_TX   0x1b0b1
->> 	 	MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX   0x1b0b1
->>  	 >;
->>  };
->>
->> imx6ul-board.dts:
->>  #include <imx6ul.dtsi>
->>  #include <imx6ul-imx6ull-board.dtsi>
->>  ...
->>
->> imx6ull-board.dts:
->>  #include <imx6ull.dtsi>
->>  #include <imx6ul-imx6ull-board.dtsi>
->>  ...
->>
->> Without this patch, the imx6ull-board.dtb will use
->> MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX instead of
->> MX6ULL_PAD_UART5_RX_DATA__UART5_DCE_RX and the uart5 will be
->> misconfigured.
->>
->> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
->> ---
->>  arch/arm/boot/dts/imx6ull-pinfunc.h | 27 +++++++++++++++++++--------
->>  1 file changed, 19 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/imx6ull-pinfunc.h b/arch/arm/boot/dts/imx6ull-pinfunc.h
->> index fdc46bb09cc1..7d7f05f7ea77 100644
->> --- a/arch/arm/boot/dts/imx6ull-pinfunc.h
->> +++ b/arch/arm/boot/dts/imx6ull-pinfunc.h
->> @@ -14,14 +14,25 @@
->>   * The pin function ID is a tuple of
->>   * <mux_reg conf_reg input_reg mux_mode input_val>
->>   */
->> -#define MX6ULL_PAD_UART1_TX_DATA__UART5_DTE_RX                    0x0084 0x0310 0x0644 0x9 0x4
->> -#define MX6ULL_PAD_UART1_RX_DATA__UART5_DCE_RX                    0x0088 0x0314 0x0644 0x9 0x5
->> -#define MX6ULL_PAD_UART1_CTS_B__UART5_DCE_RTS                     0x008C 0x0318 0x0640 0x9 0x3
->> -#define MX6ULL_PAD_UART1_RTS_B__UART5_DTE_RTS                     0x0090 0x031C 0x0640 0x9 0x4
->> -#define MX6ULL_PAD_UART5_TX_DATA__UART5_DTE_RX                    0x00BC 0x0348 0x0644 0x0 0x6
->> -#define MX6ULL_PAD_UART5_RX_DATA__UART5_DCE_RX                    0x00C0 0x034C 0x0644 0x0 0x7
->> -#define MX6ULL_PAD_ENET1_RX_EN__UART5_DCE_RTS                     0x00CC 0x0358 0x0640 0x1 0x5
->> -#define MX6ULL_PAD_ENET1_TX_DATA0__UART5_DTE_RTS                  0x00D0 0x035C 0x0640 0x1 0x6
->> +/* signals common for i.MX6UL and i.MX6ULL */
->> +#undef MX6UL_PAD_UART1_TX_DATA__UART5_DTE_RX
->> +#define MX6UL_PAD_UART1_TX_DATA__UART5_DTE_RX                    0x0084 0x0310 0x0644 0x9 0x4
->> +#undef MX6UL_PAD_UART1_RX_DATA__UART5_DCE_RX
->> +#define MX6UL_PAD_UART1_RX_DATA__UART5_DCE_RX                    0x0088 0x0314 0x0644 0x9 0x5
->> +#undef MX6UL_PAD_UART1_CTS_B__UART5_DCE_RTS
->> +#define MX6UL_PAD_UART1_CTS_B__UART5_DCE_RTS                     0x008C 0x0318 0x0640 0x9 0x3
->> +#undef MX6UL_PAD_UART1_RTS_B__UART5_DTE_RTS
->> +#define MX6UL_PAD_UART1_RTS_B__UART5_DTE_RTS                     0x0090 0x031C 0x0640 0x9 0x4
+On Tue, Aug 21, 2018 at 10:50:31PM +0300, Sergei Shtylyov wrote:
+> Add the eMMC chip support for the V3M Started Kit board.
 > 
-> I do not see these 4 pinfunc in imx6ul-pinfunc.h.  Are they really
-> available for i.MX6UL?
-
-They are not. I've just sent a v2.
-Thanks.
-
-Regards,
-
+> Based on the original (and large) patches by Vladimir Barinov.
 > 
-> Shawn
-> 
->> +#undef MX6UL_PAD_UART5_TX_DATA__UART5_DTE_RX
->> +#define MX6UL_PAD_UART5_TX_DATA__UART5_DTE_RX                    0x00BC 0x0348 0x0644 0x0 0x6
->> +#undef MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX
->> +#define MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX                    0x00C0 0x034C 0x0644 0x0 0x7
->> +#undef MX6UL_PAD_ENET1_RX_EN__UART5_DCE_RTS
->> +#define MX6UL_PAD_ENET1_RX_EN__UART5_DCE_RTS                     0x00CC 0x0358 0x0640 0x1 0x5
->> +#undef MX6UL_PAD_ENET1_TX_DATA0__UART5_DTE_RTS
->> +#define MX6UL_PAD_ENET1_TX_DATA0__UART5_DTE_RTS                  0x00D0 0x035C 0x0640 0x1 0x6
->> +
->> +/* signals for i.MX6ULL only */
->>  #define MX6ULL_PAD_ENET2_RX_DATA0__EPDC_SDDO08                    0x00E4 0x0370 0x0000 0x9 0x0
->>  #define MX6ULL_PAD_ENET2_RX_DATA1__EPDC_SDDO09                    0x00E8 0x0374 0x0000 0x9 0x0
->>  #define MX6ULL_PAD_ENET2_RX_EN__EPDC_SDDO10                       0x00EC 0x0378 0x0000 0x9 0x0
->> -- 
->> 2.16.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
+Thanks,
 
--- 
-S?bastien Szymanski
-Software engineer, Armadeus Systems
-Tel: +33 (0)9 72 29 41 44
-Fax: +33 (0)9 72 28 79 26
+This looks fine to me but I will wait to see if there are other reviews
+before applying.
+
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+
+I am, however, curious to know about HS200.
+Is it supported on the v3msk? If so, do you have any plans to enable it?
