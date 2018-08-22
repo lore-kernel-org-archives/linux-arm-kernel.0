@@ -1,109 +1,60 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 22 Aug 2018 10:43:18 +0200
-Subject: [PATCH] soc: ti: pm33xx: Enable DS0 for the platforms on which
- it is functional
-In-Reply-To: <ae71d45f-9260-3547-5ff2-355c084fcf8e@ti.com>
-References: <1534915951-8783-1-git-send-email-j-keerthy@ti.com>
- <20180822073409.GK14967@localhost>
- <20180822073719.GL14967@localhost>
- <ae71d45f-9260-3547-5ff2-355c084fcf8e@ti.com>
-Message-ID: <20180822084318.GN14967@localhost>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 22 Aug 2018 11:15:57 +0200
+Subject: [PATCH 1/9] CHROMIUM: v4l: Add H264 low-level decoder API
+ compound controls.
+In-Reply-To: <80e1d9cb49c6df06843e49332685f2b401023292.camel@collabora.com>
+References: <20180613140714.1686-1-maxime.ripard@bootlin.com>
+ <20180613140714.1686-2-maxime.ripard@bootlin.com>
+ <80e1d9cb49c6df06843e49332685f2b401023292.camel@collabora.com>
+Message-ID: <20180822091557.gtnlgoebyv6yttzf@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2018 at 01:50:29PM +0530, J, KEERTHY wrote:
-> 
-> 
-> On 8/22/2018 1:07 PM, Johan Hovold wrote:
-> > On Wed, Aug 22, 2018 at 09:34:09AM +0200, Johan Hovold wrote:
-> >> On Wed, Aug 22, 2018 at 11:02:31AM +0530, Keerthy wrote:
-> >>> Enable DS0 for only those platforms on which it is functional
-> >>>
-> >>> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> >>> ---
-> >>>   arch/arm/mach-omap2/pm33xx-core.c    | 5 +++++
-> >>>   drivers/soc/ti/pm33xx.c              | 9 +++++++++
-> >>>   include/linux/platform_data/pm33xx.h | 2 ++
-> >>>   3 files changed, 16 insertions(+)
-> >>>
-> >>> diff --git a/arch/arm/mach-omap2/pm33xx-core.c b/arch/arm/mach-omap2/pm33xx-core.c
-> >>> index f4971e4..f0f6e8e 100644
-> >>> --- a/arch/arm/mach-omap2/pm33xx-core.c
-> >>> +++ b/arch/arm/mach-omap2/pm33xx-core.c
-> >>> @@ -135,6 +135,11 @@ static int am43xx_suspend(unsigned int state, int (*fn)(unsigned long),
-> >>>   {
-> >>>   	int ret = 0;
-> >>>   
-> >>> +	if (!(args & WFI_FLAG_DEEP_SLEEP0)) {
-> >>> +		pr_err("DS0 mode not supported\n");
-> >>> +		return -ENOTSUPP;
-> >>> +	}
-> >>> +
-> >>>   	amx3_pre_suspend_common();
-> >>>   	scu_power_mode(scu_base, SCU_PM_POWEROFF);
-> >>>   	ret = cpu_suspend(args, fn);
-> >>> diff --git a/drivers/soc/ti/pm33xx.c b/drivers/soc/ti/pm33xx.c
-> >>> index d0dab32..53238d7 100644
-> >>> --- a/drivers/soc/ti/pm33xx.c
-> >>> +++ b/drivers/soc/ti/pm33xx.c
-> >>> @@ -324,6 +324,15 @@ static int am33xx_pm_probe(struct platform_device *pdev)
-> >>>   	suspend_wfi_flags |= WFI_FLAG_SAVE_EMIF;
-> >>>   	suspend_wfi_flags |= WFI_FLAG_WAKE_M3;
-> >>>   
-> >>> +	/*
-> >>> +	 * Deep Sleep0 mode is currently functional only on am437x-gp-evm,
-> >>> +	 * am33xx-evm and boneblack family. Hence set the DS0 flag
-> >>> +	 */
-> >>> +	if (of_machine_is_compatible("ti,am437x-gp-evm") ||
-> >>> +	    of_machine_is_compatible("ti,am335x-bone-black") ||
-> >>> +	    of_machine_is_compatible("ti,am335x-evm"))
-> >>> +		suspend_wfi_flags |= WFI_FLAG_DEEP_SLEEP0;
-> >>
-> >> What about other (out-of-tree) machines which supports DS0 and which
-> >> this change would break?
-> >>
-> >> I think this needs to be a blacklist if anything.
-> >>
-> >> Please also expand in the commit message why you think this is needed.
-> 
-> Currently when one does echo mem > /sys/power/state on unsuppored 
-> machines there can be a crash or a hang. So bail out with a message.
+Hi,
 
-Yes, but why is this unsupported on some machines? Which machines, and
-why? Your commit messages should be self-contained and hold the
-information needed to determine whether your patch makes sense in the
-first place.
-
-> >> Last, what tree is this against? There's no am43xx_suspend() in
-> >> linux-next (and you add compatibles above for am33xx too).
+On Tue, Aug 21, 2018 at 01:58:38PM -0300, Ezequiel Garcia wrote:
+> On Wed, 2018-06-13 at 16:07 +0200, Maxime Ripard wrote:
+> > From: Pawel Osciak <posciak@chromium.org>
 > > 
-> > Sorry, there is indeed an am43xx_suspend(), but you are adding
-> > compatibles for am33xx which use am33xx_suspend().
+> > Signed-off-by: Pawel Osciak <posciak@chromium.org>
+> > Reviewed-by: Wu-cheng Li <wuchengli@chromium.org>
+> > Tested-by: Tomasz Figa <tfiga@chromium.org>
+> > [rebase44(groeck): include linux/types.h in v4l2-controls.h]
+> > Signed-off-by: Guenter Roeck <groeck@chromium.org>
+> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > ---
+> > 
+> [..]
+> > diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> > index 242a6bfa1440..4b4a1b25a0db 100644
+> > --- a/include/uapi/linux/videodev2.h
+> > +++ b/include/uapi/linux/videodev2.h
+> > @@ -626,6 +626,7 @@ struct v4l2_pix_format {
+> >  #define V4L2_PIX_FMT_H264     v4l2_fourcc('H', '2', '6', '4') /* H264 with start codes */
+> >  #define V4L2_PIX_FMT_H264_NO_SC v4l2_fourcc('A', 'V', 'C', '1') /* H264 without start codes */
+> >  #define V4L2_PIX_FMT_H264_MVC v4l2_fourcc('M', '2', '6', '4') /* H264 MVC */
+> > +#define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /* H264 parsed slices */
 > 
-> am33xx_pm_probe is a common probe function for both am33 and am43.
+> As pointed out by Tomasz, the Rockchip VPU driver expects start codes [1], so the userspace
+> should be aware of it. Perhaps we could document this pixel format better as:
+> 
+> #define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /* H264 parsed slices with start codes */
 
-Yes, but you add a check for your new flag only to am43xx_suspend(), not
-to am33xx_suspend() which is used by the am33xx compatibles you add.
+I'm not sure this is something we want to do at that point. libva
+doesn't give the start code, so this is only going to make the life of
+the sane controllers more difficult. And if you need to have the start
+code and parse it, then you're not so stateless anymore.
 
-> AFAIK for am33 family am335x-evm and am335x-bone-black support Deep 
-> Sleep mode. For am43 family am43tx-gp-evm alone supports at the moment.
+Maxime
 
-But these are development boards (EVKs), not SOC families (or
-chip revisions). What about all the products that customers to TI who
-have bought these SoCs have built?
-
-> Can you let me know of other am33 machines that support DS0 mode?
-
-I have a customer who use DS0, whose DTS is not yet in mainline, and
-whose setup this patch would break for example.
-
-> I could have simply used ti,am33xx compatible which covers entire am33 
-> family but then am33xx-bone (bone white) does not support this mode.
-
-Yes, and a blacklist would make much more sense for something like this
-if where talking about specific boards.
-
-Also note that your patch doesn't even handle bone-white as you didn't
-add a check to am33xx_suspend() as I pointed out above.
-
-Johan
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180822/07de23d0/attachment.sig>
