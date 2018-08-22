@@ -1,86 +1,59 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 22 Aug 2018 22:41:07 +0200
-Subject: [PATCH 07/11] gpio: ep93xx: Do not pingpong irq numbers
+Date: Wed, 22 Aug 2018 22:41:09 +0200
+Subject: [PATCH 09/11] gpio: ep93xx: Use for_each_set_bit() in IRQ handler
 In-Reply-To: <20180822204111.9581-1-linus.walleij@linaro.org>
 References: <20180822204111.9581-1-linus.walleij@linaro.org>
-Message-ID: <20180822204111.9581-8-linus.walleij@linaro.org>
+Message-ID: <20180822204111.9581-10-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For setting debounce config we want to write an offset in
-a per-gpiochip register, and we know which gpiochip we are
-on. Instead of a roundtrip over the IRQ number, figure out
-what port we are on for this GPIO chip, then index to the
-right register and write the value.
-
-This adds the ep93xx_gpio_port() that finds the port index
-from a struct gpio_chip * that we can later exploit to
-simplify more code.
+This simplifies and standardizes the AB IRQ handler by using
+the for_each_set_bit() library function.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/gpio/gpio-ep93xx.c | 35 +++++++++++++++++++++++------------
- 1 file changed, 23 insertions(+), 12 deletions(-)
+ drivers/gpio/gpio-ep93xx.c | 24 ++++++++++--------------
+ 1 file changed, 10 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/gpio/gpio-ep93xx.c b/drivers/gpio/gpio-ep93xx.c
-index ce7e88df9cc5..3b235b25c028 100644
+index b2139ec43ce2..1248d83f860b 100644
 --- a/drivers/gpio/gpio-ep93xx.c
 +++ b/drivers/gpio/gpio-ep93xx.c
-@@ -68,12 +68,29 @@ static void ep93xx_gpio_update_int_params(struct ep93xx_gpio *epg, unsigned port
- 	       epg->base + int_en_register_offset[port]);
- }
+@@ -105,25 +105,21 @@ static void ep93xx_gpio_ab_irq_handler(struct irq_desc *desc)
+ 	struct gpio_chip *gc = irq_desc_get_handler_data(desc);
+ 	struct ep93xx_gpio *epg = gpiochip_get_data(gc);
+ 	struct irq_chip *irqchip = irq_desc_get_chip(desc);
+-	unsigned char status;
+-	int i;
++	unsigned long stat;
++	int offset;
  
--static void ep93xx_gpio_int_debounce(struct ep93xx_gpio *epg,
--				     unsigned int irq, bool enable)
-+static int ep93xx_gpio_port(struct gpio_chip *gc)
- {
--	int line = irq_to_gpio(irq);
--	int port = line >> 3;
--	int port_mask = 1 << (line & 7);
-+	struct ep93xx_gpio *epg = gpiochip_get_data(gc);
-+	int port = 0;
-+
-+	while (gc != &epg->gc[port] && port < sizeof(epg->gc))
-+		port++;
-+
-+	/* This should not happen but is there as a last safeguard */
-+	if (gc != &epg->gc[port]) {
-+		pr_crit("can't find the GPIO port\n");
-+		return 0;
-+	}
-+
-+	return port;
-+}
-+
-+static void ep93xx_gpio_int_debounce(struct gpio_chip *gc,
-+				     unsigned int offset, bool enable)
-+{
-+	struct ep93xx_gpio *epg = gpiochip_get_data(gc);
-+	int port = ep93xx_gpio_port(gc);
-+	int port_mask = BIT(offset);
+ 	chained_irq_enter(irqchip, desc);
  
- 	if (enable)
- 		gpio_int_debounce[port] |= port_mask;
-@@ -331,19 +348,13 @@ static struct ep93xx_gpio_bank ep93xx_gpio_banks[] = {
- static int ep93xx_gpio_set_config(struct gpio_chip *gc, unsigned offset,
- 				  unsigned long config)
- {
--	struct ep93xx_gpio *epg = gpiochip_get_data(gc);
--	int gpio = gc->base + offset;
--	int irq = gpio_to_irq(gpio);
- 	u32 debounce;
+-	status = readb(epg->base + EP93XX_GPIO_A_INT_STATUS);
+-	for (i = 0; i < 8; i++) {
+-		if (status & (1 << i)) {
+-			int gpio_irq = gpio_to_irq(0) + i;
+-			generic_handle_irq(gpio_irq);
+-		}
++	stat = readb(epg->base + EP93XX_GPIO_A_INT_STATUS);
++	for_each_set_bit(offset, &stat, 8) {
++		int gpio_irq = gpio_to_irq(0) + offset;
++		generic_handle_irq(gpio_irq);
+ 	}
  
- 	if (pinconf_to_config_param(config) != PIN_CONFIG_INPUT_DEBOUNCE)
- 		return -ENOTSUPP;
+-	status = readb(epg->base + EP93XX_GPIO_B_INT_STATUS);
+-	for (i = 0; i < 8; i++) {
+-		if (status & (1 << i)) {
+-			int gpio_irq = gpio_to_irq(8) + i;
+-			generic_handle_irq(gpio_irq);
+-		}
++	stat = readb(epg->base + EP93XX_GPIO_B_INT_STATUS);
++	for_each_set_bit(offset, &stat, 8) {
++		int gpio_irq = gpio_to_irq(8) + offset;
++		generic_handle_irq(gpio_irq);
+ 	}
  
--	if (irq < 0)
--		return -EINVAL;
--
- 	debounce = pinconf_to_config_argument(config);
--	ep93xx_gpio_int_debounce(epg, irq, debounce ? true : false);
-+	ep93xx_gpio_int_debounce(gc, offset, debounce ? true : false);
- 
- 	return 0;
- }
+ 	chained_irq_exit(irqchip, desc);
 -- 
 2.17.1
