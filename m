@@ -1,199 +1,42 @@
-From: seanvk.dev@oregontracks.org (Sean V Kelley)
-Date: Thu, 23 Aug 2018 13:22:50 -0700
-Subject: [PATCH] perf vendor events arm64: Add to core JSON events for eMAG
-Message-ID: <20180823202250.30797-1-seanvk.dev@oregontracks.org>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Thu, 23 Aug 2018 15:46:47 -0500
+Subject: [PATCH] arm64: dts: Fix various entry-method properties to
+ reflect documentation
+In-Reply-To: <113f28acbc55f64762c9f0bcefe076a811f2ed82.1535014078.git.amit.kucheria@linaro.org>
+References: <113f28acbc55f64762c9f0bcefe076a811f2ed82.1535014078.git.amit.kucheria@linaro.org>
+Message-ID: <CADRPPNRpquUgwjft=vLNcxy223BLrS=toWii1XExPb7SghGr-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds the remainder of the supported ARMv8 recommended IMPLEMENTATION
-DEFINED events for the Ampere Computing eMAG file.
+On Thu, Aug 23, 2018 at 3:55 AM Amit Kucheria <amit.kucheria@linaro.org> wrote:
+>
+> The idle-states binding documentation[1] mentions that the
+> 'entry-method' property is required on 64-bit platforms and must be
+> set to "psci".
+>
+> commit a13f18f59d26 ("Documentation: arm: Fix typo in the idle-states
+> bindings examples") attempted to fix this earlier but clearly more is
+> needed.
+>
+> Fix the cpu-capacity.txt documentation that uses the incorrect value so
+> we don't get copy-paste errors like these. Clarify the language in
+> idle-states.txt by removing the reference to the psci bindings that
+> might be causing this confusion.
+>
+> Finally, fix devicetrees of various boards to reflect current
+> documentation.
+>
+> [1] Documentation/devicetree/bindings/arm/idle-states.txt (see
+> idle-states node)
+>
+> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
 
-Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: William Cohen <wcohen@redhat.com>
-Cc: linux-arm-kernel at lists.infradead.org
+Acked-by: Li Yang <leoyang.li@nxp.com>
 
-Signed-off-by: Sean V Kelley <seanvk.dev@oregontracks.org>
----
- .../arch/arm64/ampere/emag/core-imp-def.json  | 150 +++++++++++++++++-
- 1 file changed, 144 insertions(+), 6 deletions(-)
+For fsl/nxp device trees:
 
-diff --git a/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
-index bc03c06c3918..d95202dbe2b2 100644
---- a/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
-+++ b/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
-@@ -9,7 +9,7 @@
-         "ArchStdEvent": "L1D_CACHE_REFILL_RD",
-     },
-     {
--        "ArchStdEvent": "L1D_CACHE_REFILL_WR",
-+        "ArchStdEvent": "L1D_CACHE_INVAL",
-     },
-     {
-         "ArchStdEvent": "L1D_TLB_REFILL_RD",
-@@ -18,15 +18,153 @@
-         "ArchStdEvent": "L1D_TLB_REFILL_WR",
-     },
-     {
--        "ArchStdEvent": "L1D_TLB_RD",
-+        "ArchStdEvent": "L2D_CACHE_RD",
-     },
-     {
--        "ArchStdEvent": "L1D_TLB_WR",
-+        "ArchStdEvent": "L2D_CACHE_WR",
-+    },
-+    {
-+        "ArchStdEvent": "L2D_CACHE_REFILL_RD",
-+    },
-+    {
-+        "ArchStdEvent": "L2D_CACHE_REFILL_WR",
-+    },
-+    {
-+        "ArchStdEvent": "L2D_CACHE_WB_VICTIM",
-+    },
-+    {
-+        "ArchStdEvent": "L2D_CACHE_WB_CLEAN",
-+    },
-+    {
-+        "ArchStdEvent": "L2D_CACHE_INVAL",
-     },
-     {
-         "ArchStdEvent": "BUS_ACCESS_RD",
--   },
--   {
-+    },
-+    {
-         "ArchStdEvent": "BUS_ACCESS_WR",
--   }
-+    },
-+    {
-+        "ArchStdEvent": "BUS_ACCESS_SHARED",
-+    },
-+    {
-+        "ArchStdEvent": "BUS_ACCESS_NOT_SHARED",
-+    },
-+    {
-+        "ArchStdEvent": "BUS_ACCESS_NORMAL",
-+    },
-+    {
-+        "ArchStdEvent": "BUS_ACCESS_PERIPH",
-+    },
-+    {
-+        "ArchStdEvent": "MEM_ACCESS_RD",
-+    },
-+    {
-+        "ArchStdEvent": "MEM_ACCESS_WR",
-+    },
-+    {
-+        "ArchStdEvent": "UNALIGNED_LD_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "UNALIGNED_ST_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "UNALIGNED_LDST_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "LDREX_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "STREX_PASS_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "STREX_FAIL_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "STREX_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "LD_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "ST_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "LDST_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "DP_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "ASE_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "VFP_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "PC_WRITE_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "CRYPTO_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "BR_IMMED_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "BR_RETURN_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "BR_INDIRECT_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "ISB_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "DSB_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "DMB_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_UNDEF",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_SVC",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_PABORT",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_DABORT",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_IRQ",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_FIQ",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_HVC",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_TRAP_PABORT",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_TRAP_DABORT",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_TRAP_OTHER",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_TRAP_IRQ",
-+    },
-+    {
-+        "ArchStdEvent": "EXC_TRAP_FIQ",
-+    },
-+    {
-+        "ArchStdEvent": "RC_LD_SPEC",
-+    },
-+    {
-+        "ArchStdEvent": "RC_ST_SPEC",
-+    },
- ]
--- 
-2.17.1
+>  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi         | 2 +-
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi         | 2 +-
+>  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi         | 2 +-
+
+- Leo
