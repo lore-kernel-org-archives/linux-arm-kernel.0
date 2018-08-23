@@ -1,152 +1,60 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Thu, 23 Aug 2018 15:18:18 +0100
-Subject: [PATCH] arm64: dts: renesas: r8a774a1: Add GPIO device nodes
-Message-ID: <1535033898-23610-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Date: Thu, 23 Aug 2018 15:22:46 +0100
+Subject: [PATCH] arm64: dts: renesas: r8a774a1: Add CAN nodes
+Message-ID: <1535034166-24798-1-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add GPIO device nodes to the DT of the r8a774a1 SoC.
+From: Chris Paterson <chris.paterson2@renesas.com>
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Add the device nodes for both RZ/G2M CAN channels.
+
+Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 ---
 
 This patch depends on:
-https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg30549.html
+https://lkml.org/lkml/2018/8/23/1049
+https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg30550.html
 
- arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 120 ++++++++++++++++++++++++++++++
- 1 file changed, 120 insertions(+)
+
+ arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-index b9d2da4..5d0109a 100644
+index 5d0109a..cd204f5 100644
 --- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-@@ -200,6 +200,126 @@
+@@ -816,6 +816,30 @@
  			status = "disabled";
  		};
  
-+		gpio0: gpio at e6050000 {
-+			compatible = "renesas,gpio-r8a774a1",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6050000 0 0x50>;
-+			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 0 16>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 912>;
++		can0: can at e6c30000 {
++			compatible = "renesas,can-r8a774a1",
++				     "renesas,rzg-gen2-can";
++			reg = <0 0xe6c30000 0 0x1000>;
++			interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 916>, <&can_clk>;
++			clock-names = "clkp1", "can_clk";
 +			power-domains = <&sysc 32>;
-+			resets = <&cpg 912>;
++			resets = <&cpg 916>;
++			status = "disabled";
 +		};
 +
-+		gpio1: gpio at e6051000 {
-+			compatible = "renesas,gpio-r8a774a1",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6051000 0 0x50>;
-+			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 32 29>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 911>;
++		can1: can at e6c38000 {
++			compatible = "renesas,can-r8a774a1",
++				     "renesas,rzg-gen2-can";
++			reg = <0 0xe6c38000 0 0x1000>;
++			interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 915>, <&can_clk>;
++			clock-names = "clkp1", "can_clk";
 +			power-domains = <&sysc 32>;
-+			resets = <&cpg 911>;
++			resets = <&cpg 915>;
++			status = "disabled";
 +		};
 +
-+		gpio2: gpio at e6052000 {
-+			compatible = "renesas,gpio-r8a774a1",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6052000 0 0x50>;
-+			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 64 15>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 910>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 910>;
-+		};
-+
-+		gpio3: gpio at e6053000 {
-+			compatible = "renesas,gpio-r8a774a1",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6053000 0 0x50>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 96 16>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 909>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 909>;
-+		};
-+
-+		gpio4: gpio at e6054000 {
-+			compatible = "renesas,gpio-r8a774a1",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6054000 0 0x50>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 128 18>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 908>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 908>;
-+		};
-+
-+		gpio5: gpio at e6055000 {
-+			compatible = "renesas,gpio-r8a774a1",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6055000 0 0x50>;
-+			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 160 26>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 907>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 907>;
-+		};
-+
-+		gpio6: gpio at e6055400 {
-+			compatible = "renesas,gpio-r8a774a1",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6055400 0 0x50>;
-+			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 192 32>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 906>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 906>;
-+		};
-+
-+		gpio7: gpio at e6055800 {
-+			compatible = "renesas,gpio-r8a774a1",
-+				     "renesas,rcar-gen3-gpio";
-+			reg = <0 0xe6055800 0 0x50>;
-+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+			gpio-ranges = <&pfc 0 224 4>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			clocks = <&cpg CPG_MOD 905>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 905>;
-+		};
-+
- 		pfc: pin-controller at e6060000 {
- 			compatible = "renesas,pfc-r8a774a1";
- 			reg = <0 0xe6060000 0 0x50c>;
+ 		pwm0: pwm at e6e30000 {
+ 			compatible = "renesas,pwm-r8a774a1", "renesas,pwm-rcar";
+ 			reg = <0 0xe6e30000 0 0x8>;
 -- 
 2.7.4
