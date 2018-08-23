@@ -1,159 +1,113 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Aug 2018 16:38:05 +0100
-Subject: [PATCH] KVM: Remove obsolete kvm_unmap_hva notifier backend
-Message-ID: <20180823153805.158563-1-marc.zyngier@arm.com>
+From: baicar.tyler@gmail.com (Tyler Baicar)
+Date: Thu, 23 Aug 2018 11:46:59 -0400
+Subject: [RFC PATCH] EDAC, ghes: Enable per-layer error reporting for ARM
+In-Reply-To: <b568fdcc-ca39-67ea-2799-8ed246c8ffb6@arm.com>
+References: <1531762009-15112-1-git-send-email-tbaicar@codeaurora.org>
+ <20180719140102.GB25185@nazgul.tnic>
+ <94e3a0fb-9b7d-045f-733b-9f063dcb39e4@arm.com>
+ <45fefe7d-c6ea-5791-4477-13ecce39ce48@codeaurora.org>
+ <b568fdcc-ca39-67ea-2799-8ed246c8ffb6@arm.com>
+Message-ID: <CABo9ajA7SPrVE-oiG=RicH+nL9_pp7fVATCdMugY5fuNAPzHaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kvm_unmap_hva is long gone, and we only have kvm_unmap_hva_range to
-deal with. Drop the now obsolete code.
+Hello James,
 
-Fixes: fb1522e099f0 ("KVM: update to new mmu_notifier semantic v2")
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_host.h   |  1 -
- arch/arm64/include/asm/kvm_host.h |  1 -
- arch/mips/include/asm/kvm_host.h  |  1 -
- arch/mips/kvm/mmu.c               | 10 ----------
- arch/x86/include/asm/kvm_host.h   |  1 -
- arch/x86/kvm/mmu.c                |  5 -----
- virt/kvm/arm/mmu.c                | 12 ------------
- virt/kvm/arm/trace.h              | 15 ---------------
- 8 files changed, 46 deletions(-)
+On Thu, Aug 23, 2018 at 5:29 AM James Morse <james.morse@arm.com> wrote:
+> On 19/07/18 19:36, Tyler Baicar wrote:
+> > On 7/19/2018 10:46 AM, James Morse wrote:
+> >> On 19/07/18 15:01, Borislav Petkov wrote:
+> >>> On Mon, Jul 16, 2018 at 01:26:49PM -0400, Tyler Baicar wrote:
+> >>>> Enable per-layer error reporting for ARM systems so that the error
+> >>>> counters are incremented per-DIMM.
+>
+> This 'layer' term seems to be EDAC's artificial view of memory.
+>
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 1f1fe4109b02..dd282cc54e45 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -218,7 +218,6 @@ unsigned long kvm_call_hyp(void *hypfn, ...);
- void force_vm_exit(const cpumask_t *mask);
- 
- #define KVM_ARCH_WANT_MMU_NOTIFIER
--int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
- int kvm_unmap_hva_range(struct kvm *kvm,
- 			unsigned long start, unsigned long end);
- void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index fe8777b12f86..d6c68cf4f264 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -352,7 +352,6 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
- int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
- 
- #define KVM_ARCH_WANT_MMU_NOTIFIER
--int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
- int kvm_unmap_hva_range(struct kvm *kvm,
- 			unsigned long start, unsigned long end);
- void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
-diff --git a/arch/mips/include/asm/kvm_host.h b/arch/mips/include/asm/kvm_host.h
-index a9af1d2dcd69..2c1c53d12179 100644
---- a/arch/mips/include/asm/kvm_host.h
-+++ b/arch/mips/include/asm/kvm_host.h
-@@ -931,7 +931,6 @@ enum kvm_mips_fault_result kvm_trap_emul_gva_fault(struct kvm_vcpu *vcpu,
- 						   bool write);
- 
- #define KVM_ARCH_WANT_MMU_NOTIFIER
--int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
- int kvm_unmap_hva_range(struct kvm *kvm,
- 			unsigned long start, unsigned long end);
- void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
-diff --git a/arch/mips/kvm/mmu.c b/arch/mips/kvm/mmu.c
-index ee64db032793..d8dcdb350405 100644
---- a/arch/mips/kvm/mmu.c
-+++ b/arch/mips/kvm/mmu.c
-@@ -512,16 +512,6 @@ static int kvm_unmap_hva_handler(struct kvm *kvm, gfn_t gfn, gfn_t gfn_end,
- 	return 1;
- }
- 
--int kvm_unmap_hva(struct kvm *kvm, unsigned long hva)
--{
--	unsigned long end = hva + PAGE_SIZE;
--
--	handle_hva_to_gpa(kvm, hva, end, &kvm_unmap_hva_handler, NULL);
--
--	kvm_mips_callbacks->flush_shadow_all(kvm);
--	return 0;
--}
--
- int kvm_unmap_hva_range(struct kvm *kvm, unsigned long start, unsigned long end)
- {
- 	handle_hva_to_gpa(kvm, start, end, &kvm_unmap_hva_handler, NULL);
-diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
-index c13cd28d9d1b..9bf27626c167 100644
---- a/arch/x86/include/asm/kvm_host.h
-+++ b/arch/x86/include/asm/kvm_host.h
-@@ -1401,7 +1401,6 @@ asmlinkage void kvm_spurious_fault(void);
- 	____kvm_handle_fault_on_reboot(insn, "")
- 
- #define KVM_ARCH_WANT_MMU_NOTIFIER
--int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
- int kvm_unmap_hva_range(struct kvm *kvm, unsigned long start, unsigned long end);
- int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end);
- int kvm_test_age_hva(struct kvm *kvm, unsigned long hva);
-diff --git a/arch/x86/kvm/mmu.c b/arch/x86/kvm/mmu.c
-index 6b8f11521c41..0182a4ee799c 100644
---- a/arch/x86/kvm/mmu.c
-+++ b/arch/x86/kvm/mmu.c
-@@ -1801,11 +1801,6 @@ static int kvm_handle_hva(struct kvm *kvm, unsigned long hva,
- 	return kvm_handle_hva_range(kvm, hva, hva + 1, data, handler);
- }
- 
--int kvm_unmap_hva(struct kvm *kvm, unsigned long hva)
--{
--	return kvm_handle_hva(kvm, hva, 0, kvm_unmap_rmapp);
--}
--
- int kvm_unmap_hva_range(struct kvm *kvm, unsigned long start, unsigned long end)
- {
- 	return kvm_handle_hva_range(kvm, start, end, 0, kvm_unmap_rmapp);
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 287c8e274655..b5b9746af23c 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1768,18 +1768,6 @@ static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *dat
- 	return 0;
- }
- 
--int kvm_unmap_hva(struct kvm *kvm, unsigned long hva)
--{
--	unsigned long end = hva + PAGE_SIZE;
--
--	if (!kvm->arch.pgd)
--		return 0;
--
--	trace_kvm_unmap_hva(hva);
--	handle_hva_to_gpa(kvm, hva, end, &kvm_unmap_hva_handler, NULL);
--	return 0;
--}
--
- int kvm_unmap_hva_range(struct kvm *kvm,
- 			unsigned long start, unsigned long end)
- {
-diff --git a/virt/kvm/arm/trace.h b/virt/kvm/arm/trace.h
-index e53b596f483b..57b3edebbb40 100644
---- a/virt/kvm/arm/trace.h
-+++ b/virt/kvm/arm/trace.h
-@@ -134,21 +134,6 @@ TRACE_EVENT(kvm_mmio_emulate,
- 		  __entry->vcpu_pc, __entry->instr, __entry->cpsr)
- );
- 
--TRACE_EVENT(kvm_unmap_hva,
--	TP_PROTO(unsigned long hva),
--	TP_ARGS(hva),
--
--	TP_STRUCT__entry(
--		__field(	unsigned long,	hva		)
--	),
--
--	TP_fast_assign(
--		__entry->hva		= hva;
--	),
--
--	TP_printk("mmu notifier unmap hva: %#08lx", __entry->hva)
--);
--
- TRACE_EVENT(kvm_unmap_hva_range,
- 	TP_PROTO(unsigned long start, unsigned long end),
- 	TP_ARGS(start, end),
--- 
-2.18.0
+Yes, it's just the terminology that EDAC uses for locating a DIMM.
+
+"Layer" can mean several things here:
+
+https://elixir.bootlin.com/linux/latest/source/include/linux/edac.h#L318
+
+We should be able to avoid the layer definitions with the SMBIOS handles.
+
+>
+> >> Does this work on x86, and its just the dmi/cper fields have a subtle difference?
+>
+> > There are CPU specific EDAC drivers for a lot of x86 folks and those drivers
+> > populate the layer information in a custom way.
+>
+> Not for GHES surely?
+>
+
+Correct, the x86 drivers that properly increment the DIMM error counters are not
+tied to the ghes_edac driver.
+
+>
+> (DPC == DIMM per Channel?)
+>
+
+Yes.
+
+> > The goal is to be able to enable the per layer error reporting in the ghes_edac
+> > driver so that the per dimm counters exposed in the EDAC sysfs nodes are properly
+> > updated.
+>
+> What do you mean by layer? I can't find anything in the ACPI/UEFI/SMBIOS specs
+> that uses this term...
+>
+> If its just 'per dimm counters' you're after, this looks straightforward.
+>
+
+Yes, we just need a way to increment the per DIMM counters that are
+exposed by the
+EDAC sysfs nodes.
+
+> [re-ordered hunk:]
+> > This seems pretty hacky to me, so if anyone has other suggestions please share
+> > them.
+>
+> CPER's "Memory Error Record 2" thinks that "NODE, CARD and MODULE should provide
+> the information necessary to identify the failing FRU". As EDAC has three
+> 'levels', these are what they should correspond to for ghes-edac.
+>
+> I assume NODE means rack/chassis in some distributed system. Lets ignore it as
+> it doesn't seem to map to anything in the SMBIOS table.
+
+I believe NODE should map to socket number for multi-socket systems.
+
+> The CPER record's card and module numbers are useless to us, as we need to know
+> how many there will be in advance. (does this version of firmware count from 0
+> or 1?)
+>
+> ... but CPER also gives us a 'Card Handle' and 'Module Handle'.
+> 'Module Handle' maps to SMBIOS:17 Memory Device (aka, a DIMM). The Handle is a
+> word-value in the structure, so it doesn't depend on the layout/parse-order of
+> the SMBIOS tables. When we count the DIMMs in edac-ghes we can give them some
+> level-idx, then use the handle to find which level-idx to use for this DIMM.
+>
+> ghes_edac_report_mem_error() already picks up the module-handle, but only uses
+> it to print the bank/device.
+>
+> 'Card' doesn't mean much to me, but it maps to SMBIOS:17 "Memory Array
+> Structure", which the Memory Device structure also points to.
+> Card then must mean "a collection of memory devices (DIMMs) that operate
+> together to form an address space".
+>
+> This might be what I think of as a memory-controller, or it might be something
+> more complicated. Regardless, the CPER records think its relevant.
+>
+> For the edac:layers, we could walk the DMI table to find these structures, and
+> build the layers from them. If the Memory-array-structures are missing, we can
+> use the existing 1:NUM_DIMMS approach.
+>
+
+I think the proper way to get this working would be to use these handles. We can
+avoid populating this layer information and instead have a mapping of type 17
+index number (how edac is numbering the DIMMs today) to the handle number.
+Then we will need a new function to increment the counter based on the handle
+number rather than this layer information. Is that how you are envisioning it?
+
+Thanks,
+Tyler
