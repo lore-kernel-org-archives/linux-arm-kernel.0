@@ -1,114 +1,51 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 23 Aug 2018 14:51:26 +0300
-Subject: [PATCH v4 3/3] mmc: sdhci-of-dwcmshc: solve 128MB DMA boundary
- limitation
-In-Reply-To: <20180823180926.444b34b5@xhacker.debian>
-References: <20180823180549.78e508db@xhacker.debian>
- <20180823180926.444b34b5@xhacker.debian>
-Message-ID: <6302a5a4-35cf-3d8f-fcac-a15141fcf1d0@intel.com>
+From: mjourdan@baylibre.com (Maxime Jourdan)
+Date: Thu, 23 Aug 2018 13:49:51 +0200
+Subject: [PATCH v3 0/3] soc: amlogic: add meson-canvas
+Message-ID: <20180823114954.30704-1-mjourdan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/08/18 13:09, Jisheng Zhang wrote:
-> When using DMA, if the DMA addr spans 128MB boundary, we have to split
-> the DMA transfer into two so that each one doesn't exceed the boundary.
-> 
-> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-> ---
->  drivers/mmc/host/sdhci-of-dwcmshc.c | 39 +++++++++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/sdhci-of-dwcmshc.c b/drivers/mmc/host/sdhci-of-dwcmshc.c
-> index 1b7cd144fb01..df0a3aeabe19 100644
-> --- a/drivers/mmc/host/sdhci-of-dwcmshc.c
-> +++ b/drivers/mmc/host/sdhci-of-dwcmshc.c
-> @@ -8,21 +8,48 @@
->   */
->  
->  #include <linux/clk.h>
-> +#include <linux/mm.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/sizes.h>
->  
->  #include "sdhci-pltfm.h"
->  
-> +#define BOUNDARY_OK(addr, len) \
-> +	((addr | (SZ_128M - 1)) == ((addr + len - 1) | (SZ_128M - 1)))
-> +
->  struct dwcmshc_priv {
->  	struct clk	*bus_clk;
->  };
->  
-> +/*
-> + * If DMA addr spans 128MB boundary, we split the DMA transfer into two
-> + * so that the DMA transfer doesn't exceed the boundary.
-> + */
-> +static void dwcmshc_adma_write_desc(struct sdhci_host *host, void **desc,
-> +				    dma_addr_t addr, int len, unsigned int cmd)
-> +{
-> +	int tmplen, offset;
-> +
-> +	if (likely(!len || BOUNDARY_OK(addr, len)))
-> +		sdhci_adma_write_desc(host, desc, addr, len, cmd);
+Amlogic SoCs feature a set of 256 canvas that act as pixel buffer
+descriptors. Some IPs like the display and video decoders access those
+pixels by using canvas IDs rather than direct phy addresses.
 
-Doesn't this need a return? i.e.
+As such, allocating/manipulating canvases can be done concurrently and
+there is a need for a standalone, lock-aware canvas provider module.
 
-		return;
-	}
+Currently, canvas code lies in the drm/meson module as it is the sole
+user.
 
-> +
-> +	offset = addr & (SZ_128M - 1);
-> +	tmplen = SZ_128M - offset;
-> +	sdhci_adma_write_desc(host, desc, addr, tmplen, cmd);
-> +
-> +	addr += tmplen;
-> +	len -= tmplen;
-> +	sdhci_adma_write_desc(host, desc, addr, len, cmd);
-> +}
-> +
->  static const struct sdhci_ops sdhci_dwcmshc_ops = {
->  	.set_clock		= sdhci_set_clock,
->  	.set_bus_width		= sdhci_set_bus_width,
->  	.set_uhs_signaling	= sdhci_set_uhs_signaling,
->  	.get_max_clock		= sdhci_pltfm_clk_get_max_clock,
->  	.reset			= sdhci_reset,
-> +	.adma_write_desc	= dwcmshc_adma_write_desc,
->  };
->  
->  static const struct sdhci_pltfm_data sdhci_dwcmshc_pdata = {
-> @@ -36,12 +63,24 @@ static int dwcmshc_probe(struct platform_device *pdev)
->  	struct sdhci_host *host;
->  	struct dwcmshc_priv *priv;
->  	int err;
-> +	u32 extra;
->  
->  	host = sdhci_pltfm_init(pdev, &sdhci_dwcmshc_pdata,
->  				sizeof(struct dwcmshc_priv));
->  	if (IS_ERR(host))
->  		return PTR_ERR(host);
->  
-> +	/*
-> +	 * The DMA table descriptor count is calculated as the maximum
-> +	 * number of segments times 2, to allow for an alignment
-> +	 * descriptor for each segment, plus 1 for a nop end descriptor,
-> +	 * plus extra number for cross 128M boundary handling.
-> +	 */
-> +	extra = DIV_ROUND_UP(totalram_pages, SZ_128M / PAGE_SIZE);
+This patchset adds such canvas provider module.
 
-You are assuming here that totalram_pages gives you the highest physical
-page number.  Is that true?
+Changes since v2: [1]
+ - Don't include the drm changes in the serie.
+ - Remove the syscon node in the dts and doc
+ - Rename meson_canvas_setup to meson_canvas_config
 
-> +	if (extra > SDHCI_MAX_SEGS)
-> +		extra = SDHCI_MAX_SEGS;
-> +	host->adma_table_cnt = SDHCI_MAX_SEGS * 2 + 1 + extra;
+Changes since v1: [0]
+ - Convert ops struct to a public API
+ - Added comments
+ - Hid the of-node probe code behind meson_canvas_get
+ - Changed device lock to a spinlock with irqsave
 
-That should be:
+[0]: https://lkml.org/lkml/2018/8/1/1512
+[1]: https://lkml.org/lkml/2018/8/7/894
 
-	host->adma_table_cnt += extra;
+Maxime Jourdan (3):
+  dt-bindings: soc: amlogic: add meson-canvas documentation
+  soc: amlogic: add meson-canvas driver
+  ARM64: dts: meson-gx: add dmcbus and canvas nodes.
 
-> +
->  	pltfm_host = sdhci_priv(host);
->  	priv = sdhci_pltfm_priv(pltfm_host);
->  
-> 
+ .../bindings/soc/amlogic/amlogic,canvas.txt   |  29 +++
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi     |  13 ++
+ drivers/soc/amlogic/Kconfig                   |   7 +
+ drivers/soc/amlogic/Makefile                  |   1 +
+ drivers/soc/amlogic/meson-canvas.c            | 185 ++++++++++++++++++
+ include/linux/soc/amlogic/meson-canvas.h      |  65 ++++++
+ 6 files changed, 300 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/amlogic/amlogic,canvas.txt
+ create mode 100644 drivers/soc/amlogic/meson-canvas.c
+ create mode 100644 include/linux/soc/amlogic/meson-canvas.h
+
+-- 
+2.18.0
