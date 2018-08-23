@@ -1,33 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Aug 2018 12:42:27 +0200
-Subject: [PATCH 1/3] ARM: OMAP1: ams-delta: assign MODEM IRQ from GPIO
- descriptor
-In-Reply-To: <20180820181333.2527-2-jmkrzyszt@gmail.com>
-References: <20180820181333.2527-1-jmkrzyszt@gmail.com>
- <20180820181333.2527-2-jmkrzyszt@gmail.com>
-Message-ID: <CACRpkdb7E7cjZuYx6Cgxv2sNJmxvwqg0dNh3WpALwtnuCsezuw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 23 Aug 2018 12:43:40 +0200
+Subject: [PATCH v3 4/6] mmc: uniphier-sd: add UniPhier SD/eMMC controller
+ driver
+In-Reply-To: <1534999460-15111-5-git-send-email-yamada.masahiro@socionext.com>
+References: <1534999460-15111-1-git-send-email-yamada.masahiro@socionext.com>
+ <1534999460-15111-5-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAPDyKFoW=wuYZw+VV6TncLgtMbFdvJCfYOzL8xg7x2WimqNN2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 20, 2018 at 8:12 PM Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
+[...]
 
-> Don't request MODEM IRQ GPIO by its global number in
-> ams_delta_modem_init().  Instead, obtain its GPIO descriptor
-> and assign related IRQ to the MODEM.  Do that from
-> omap_gpio_deps_init(), where the chip is already looked up.  Then, in
-> ams_delta_modem_init(), just check for the IRQ number having been
-> already assigned.
->
-> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+> +static void uniphier_sd_external_dma_request(struct tmio_mmc_host *host,
+> +                                            struct tmio_mmc_data *pdata)
+> +{
+> +       struct uniphier_sd_priv *priv = uniphier_sd_priv(host);
+> +       struct dma_chan *chan;
+> +
+> +       chan = dma_request_chan(mmc_dev(host->mmc), "rx-tx");
+> +       if (IS_ERR(chan)) {
+> +               dev_warn(mmc_dev(host->mmc),
+> +                        "failed to request DMA channel. falling back to PIO\n");
+> +               return; /* just use PIO even for -EPROBE_DEFER */
+> +       }
+> +
+> +       /* this driver uses a single channel for both RX an TX */
+> +       priv->chan = chan;
+> +       host->chan_rx = chan;
+> +       host->chan_tx = chan;
+> +
+> +       tasklet_init(&host->dma_issue, uniphier_sd_external_dma_issue,
+> +                    (unsigned long)host);
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Isn't it time to get rid of tasklets for tmio?
 
-It's a bit unorthodox to have the board files intercept and poke
-around inside the gpio_chip like the code in this file does,
-I prefer to keep it encapsulated inside the GPIO driver.
-However this is the lesser evil... if OMAP1 is ever phased
-over to device tree it will go away, until then it is just nicely
-contained.
+No worries, I don't require that to be changed prior $subject patch,
+however using threaded IRQs is a justified modernization for the tmio
+variants.
 
-Yours,
-Linus Walleij
+[...]
+
+Kind regards
+Uffe
