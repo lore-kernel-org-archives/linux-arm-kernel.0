@@ -1,79 +1,102 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Aug 2018 12:33:31 +0200
-Subject: [PATCH 3/4] bus: Add DT bindings for 96Boards low speed connector
+Date: Thu, 23 Aug 2018 12:33:30 +0200
+Subject: [PATCH 2/4] spi: Make of_find_spi_device_by_node() available
 In-Reply-To: <20180823103332.32047-1-linus.walleij@linaro.org>
 References: <20180823103332.32047-1-linus.walleij@linaro.org>
-Message-ID: <20180823103332.32047-4-linus.walleij@linaro.org>
+Message-ID: <20180823103332.32047-3-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to be able to grab resources on a 96Boards low
-speed connector to populate and use a daughterboard, so
-define some very rudimentary properties simply passing
-phandles for the resources used on the low speed
-connector.
+This externalizes and exports the symbol
+of_find_spi_device_by_node() from the SPI core akin to how
+of_find_i2c_adapter_by_node() is already available. As we will
+need this also for non-dynamic OF setups, we move it under a
+CONFIG_OF check.
 
+Cc: Mark Brown <broonie@kernel.org>
+Cc: linux-spi at vger.kernel.org
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- .../bus/96boards,low-speed-connector.txt      | 50 +++++++++++++++++++
- 1 file changed, 50 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/bus/96boards,low-speed-connector.txt
+ChangeLog RFC->v1:
+- No changes
+- Requesting an ACK from the SPI mainatiner so that this patch
+  can be applied with the rest of the series.
+---
+ drivers/spi/spi.c       | 33 ++++++++++++++++++---------------
+ include/linux/spi/spi.h |  4 ++++
+ 2 files changed, 22 insertions(+), 15 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/bus/96boards,low-speed-connector.txt b/Documentation/devicetree/bindings/bus/96boards,low-speed-connector.txt
-new file mode 100644
-index 000000000000..6631b3edd01f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/bus/96boards,low-speed-connector.txt
-@@ -0,0 +1,50 @@
-+96Boards Low Speed Connectors
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index ec395a6baf9c..6a1085077317 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -3314,27 +3314,14 @@ EXPORT_SYMBOL_GPL(spi_write_then_read);
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-#if IS_ENABLED(CONFIG_OF_DYNAMIC)
+-static int __spi_of_device_match(struct device *dev, void *data)
+-{
+-	return dev->of_node == data;
+-}
+-
+-/* must call put_device() when done with returned spi_device device */
+-static struct spi_device *of_find_spi_device_by_node(struct device_node *node)
+-{
+-	struct device *dev = bus_find_device(&spi_bus_type, NULL, node,
+-						__spi_of_device_match);
+-	return dev ? to_spi_device(dev) : NULL;
+-}
+-
++#if IS_ENABLED(CONFIG_OF)
+ static int __spi_of_controller_match(struct device *dev, const void *data)
+ {
+ 	return dev->of_node == data;
+ }
+ 
+ /* the spi controllers are not using spi_bus, so we find it with another way */
+-static struct spi_controller *of_find_spi_controller_by_node(struct device_node *node)
++struct spi_controller *of_find_spi_controller_by_node(struct device_node *node)
+ {
+ 	struct device *dev;
+ 
+@@ -3349,6 +3336,22 @@ static struct spi_controller *of_find_spi_controller_by_node(struct device_node
+ 	/* reference got in class_find_device */
+ 	return container_of(dev, struct spi_controller, dev);
+ }
++EXPORT_SYMBOL_GPL(of_find_spi_controller_by_node);
++#endif
 +
-+The 96Boards connectors represent a non-dicoverable Low Speed (LS)
-+and High Speed (HS) external bus on the 96Board development
-+boards. Each 96Board presents both of these connectors.
++#if IS_ENABLED(CONFIG_OF_DYNAMIC)
++static int __spi_of_device_match(struct device *dev, void *data)
++{
++	return dev->of_node == data;
++}
 +
-+The Low Speed (LS) connector is a 40 pin 2x20 female pin header:
-+- Power
-+- Two buttons: power and reset
-+- 2 x UART one optional with just RX/TX, one required with modem
-+  CTS/RTS
-+- 2 x I2C
-+- 1 x SPI
-+- 1 x I2S (audio)
-+- 12 x GPIO lines named GPIO-A thru GPIO-L
++/* must call put_device() when done with returned spi_device device */
++static struct spi_device *of_find_spi_device_by_node(struct device_node *node)
++{
++	struct device *dev = bus_find_device(&spi_bus_type, NULL, node,
++						__spi_of_device_match);
++	return dev ? to_spi_device(dev) : NULL;
++}
+ 
+ static int of_spi_notify(struct notifier_block *nb, unsigned long action,
+ 			 void *arg)
+diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
+index a64235e05321..c2be93224bd1 100644
+--- a/include/linux/spi/spi.h
++++ b/include/linux/spi/spi.h
+@@ -639,6 +639,10 @@ extern int devm_spi_register_controller(struct device *dev,
+ 					struct spi_controller *ctlr);
+ extern void spi_unregister_controller(struct spi_controller *ctlr);
+ 
++#if IS_ENABLED(CONFIG_OF)
++struct spi_controller *of_find_spi_controller_by_node(struct device_node *node);
++#endif
 +
-+Further details on the electronics and signals are available in
-+"96Boards Consumer Edition, Low Cost Hardware Platform Specification"
-+As of writing version 1.0, January 2015.
-+
-+Required properties:
-+
-+- compatible: shall be "96boards,low-speed-connector"
-+- i2c0: phandle to the I2C0 bus
-+- i2c1: phandle to the I2C1 bus
-+- spi: phandle to the SPI bus
-+- gpios: a list of phandles to the GPIOs connected to the
-+  connector. The handles need to be uniformly specified with the
-+  0 flag as the connector is not the end consumer.
-+
-+Example:
-+
-+lscon: connector {
-+	compatible = "96boards,low-speed-connector";
-+	i2c0 = <&i2csw_0>;
-+	i2c1 = <&i2csw_1>;
-+	spi = <&spi0>;
-+	gpios = <&gpio 36 0>, /* GPIO-A */
-+	        <&gpio 37 0>, /* GPIO-B */
-+		<&gpio 39 0>, /* GPIO-C */
-+		<&gpio 40 0>, /* GPIO-D */
-+		<&gpio 44 0>, /* GPIO-E */
-+		<&gpio 45 0>, /* GPIO-F */
-+		<&gpio 78 0>, /* GPIO-G */
-+		<&gpio 79 0>, /* GPIO-H */
-+		<&gpio 80 0>, /* GPIO-I */
-+		<&gpio 81 0>, /* GPIO-J */
-+		<&gpio 82 0>, /* GPIO-K */
-+		<&gpio 83 0>; /* GPIO-L */
-+};
+ extern struct spi_controller *spi_busnum_to_master(u16 busnum);
+ 
+ /*
 -- 
 2.17.0
