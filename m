@@ -1,189 +1,178 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Thu, 23 Aug 2018 14:23:29 +0530
-Subject: [PATCH] arm64: dts: Fix various entry-method properties to reflect
- documentation
-Message-ID: <113f28acbc55f64762c9f0bcefe076a811f2ed82.1535014078.git.amit.kucheria@linaro.org>
+From: kyeongdon.kim@lge.com (Kyeongdon Kim)
+Date: Thu, 23 Aug 2018 17:56:46 +0900
+Subject: [PATCH v2] arm64: kasan: add interceptors for strcmp/strncmp functions
+Message-ID: <1535014606-176525-1-git-send-email-kyeongdon.kim@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The idle-states binding documentation[1] mentions that the
-'entry-method' property is required on 64-bit platforms and must be
-set to "psci".
+This patch declares strcmp/strncmp as weak symbols.
+(2 of them are the most used string operations)
 
-commit a13f18f59d26 ("Documentation: arm: Fix typo in the idle-states
-bindings examples") attempted to fix this earlier but clearly more is
-needed.
+Original functions declared as weak and
+strong ones in mm/kasan/kasan.c could replace them.
 
-Fix the cpu-capacity.txt documentation that uses the incorrect value so
-we don't get copy-paste errors like these. Clarify the language in
-idle-states.txt by removing the reference to the psci bindings that
-might be causing this confusion.
+Assembly optimized strcmp/strncmp functions cannot detect KASan bug.
+But, now we can detect them like the call trace below.
 
-Finally, fix devicetrees of various boards to reflect current
-documentation.
+==================================================================
+BUG: KASAN: use-after-free in platform_match+0x1c/0x5c at addr ffffffc0ad313500
+Read of size 1 by task swapper/0/1
+CPU: 3 PID: 1 Comm: swapper/0 Tainted: G    B           4.9.77+ #1
+Hardware name: Generic (DT) based system
+Call trace:
+ dump_backtrace+0x0/0x2e0
+ show_stack+0x14/0x1c
+ dump_stack+0x88/0xb0
+ kasan_object_err+0x24/0x7c
+ kasan_report+0x2f0/0x484
+ check_memory_region+0x20/0x14c
+ strcmp+0x1c/0x5c
+ platform_match+0x40/0xe4
+ __driver_attach+0x40/0x130
+ bus_for_each_dev+0xc4/0xe0
+ driver_attach+0x30/0x3c
+ bus_add_driver+0x2dc/0x328
+ driver_register+0x118/0x160
+ __platform_driver_register+0x7c/0x88
+ alarmtimer_init+0x154/0x1e4
+ do_one_initcall+0x184/0x1a4
+ kernel_init_freeable+0x2ec/0x2f0
+ kernel_init+0x18/0x10c
+ ret_from_fork+0x10/0x50
 
-[1] Documentation/devicetree/bindings/arm/idle-states.txt (see
-idle-states node)
+In case of xtensa and x86_64 kasan, no need to use this patch now.
 
-Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+Signed-off-by: Kyeongdon Kim <kyeongdon.kim@lge.com>
 ---
- Documentation/devicetree/bindings/arm/cpu-capacity.txt | 2 +-
- Documentation/devicetree/bindings/arm/idle-states.txt  | 4 ++--
- arch/arm64/boot/dts/arm/juno-r1.dts                    | 2 +-
- arch/arm64/boot/dts/arm/juno-r2.dts                    | 2 +-
- arch/arm64/boot/dts/arm/juno.dts                       | 2 +-
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi         | 2 +-
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi         | 2 +-
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi         | 2 +-
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi              | 2 +-
- arch/arm64/boot/dts/sprd/sc9860.dtsi                   | 2 +-
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi                 | 2 +-
- 11 files changed, 12 insertions(+), 12 deletions(-)
+ arch/arm64/include/asm/string.h |  5 +++++
+ arch/arm64/kernel/arm64ksyms.c  |  2 ++
+ arch/arm64/kernel/image.h       |  2 ++
+ arch/arm64/lib/strcmp.S         |  3 +++
+ arch/arm64/lib/strncmp.S        |  3 +++
+ mm/kasan/kasan.c                | 23 +++++++++++++++++++++++
+ 6 files changed, 38 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/cpu-capacity.txt b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
-index 7809fbe0cdb7..9b5685a1d15d 100644
---- a/Documentation/devicetree/bindings/arm/cpu-capacity.txt
-+++ b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
-@@ -94,7 +94,7 @@ cpus {
- 	};
+diff --git a/arch/arm64/include/asm/string.h b/arch/arm64/include/asm/string.h
+index dd95d33..ab60349 100644
+--- a/arch/arm64/include/asm/string.h
++++ b/arch/arm64/include/asm/string.h
+@@ -24,9 +24,11 @@ extern char *strchr(const char *, int c);
  
- 	idle-states {
--		entry-method = "arm,psci";
-+		entry-method = "psci";
+ #define __HAVE_ARCH_STRCMP
+ extern int strcmp(const char *, const char *);
++extern int __strcmp(const char *, const char *);
  
- 		CPU_SLEEP_0: cpu-sleep-0 {
- 			compatible = "arm,idle-state";
-diff --git a/Documentation/devicetree/bindings/arm/idle-states.txt b/Documentation/devicetree/bindings/arm/idle-states.txt
-index 7a591333f2b1..2c73847499ab 100644
---- a/Documentation/devicetree/bindings/arm/idle-states.txt
-+++ b/Documentation/devicetree/bindings/arm/idle-states.txt
-@@ -237,8 +237,8 @@ processor idle states, defined as device tree nodes, are listed.
- 		Value type: <stringlist>
- 		Usage and definition depend on ARM architecture version.
- 			# On ARM v8 64-bit this property is required and must
--			  be one of:
--			   - "psci" (see bindings in [2])
-+			  be:
-+			   - "psci"
- 			# On ARM 32-bit systems this property is optional
+ #define __HAVE_ARCH_STRNCMP
+ extern int strncmp(const char *, const char *, __kernel_size_t);
++extern int __strncmp(const char *, const char *, __kernel_size_t);
  
- The nodes describing the idle states (state) can only be defined within the
-diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-index 2c5db03f226c..b2b7ced633cf 100644
---- a/arch/arm64/boot/dts/arm/juno-r1.dts
-+++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-@@ -63,7 +63,7 @@
- 		};
+ #define __HAVE_ARCH_STRLEN
+ extern __kernel_size_t strlen(const char *);
+@@ -68,6 +70,9 @@ void memcpy_flushcache(void *dst, const void *src, size_t cnt);
+ #define memmove(dst, src, len) __memmove(dst, src, len)
+ #define memset(s, c, n) __memset(s, c, n)
  
- 		idle-states {
--			entry-method = "arm,psci";
-+			entry-method = "psci";
++#define strcmp(cs, ct) __strcmp(cs, ct)
++#define strncmp(cs, ct, n) __strncmp(cs, ct, n)
++
+ #ifndef __NO_FORTIFY
+ #define __NO_FORTIFY /* FORTIFY_SOURCE uses __builtin_memcpy, etc. */
+ #endif
+diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
+index d894a20..10b1164 100644
+--- a/arch/arm64/kernel/arm64ksyms.c
++++ b/arch/arm64/kernel/arm64ksyms.c
+@@ -50,6 +50,8 @@ EXPORT_SYMBOL(strcmp);
+ EXPORT_SYMBOL(strncmp);
+ EXPORT_SYMBOL(strlen);
+ EXPORT_SYMBOL(strnlen);
++EXPORT_SYMBOL(__strcmp);
++EXPORT_SYMBOL(__strncmp);
+ EXPORT_SYMBOL(memset);
+ EXPORT_SYMBOL(memcpy);
+ EXPORT_SYMBOL(memmove);
+diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+index a820ed0..5ef7a57 100644
+--- a/arch/arm64/kernel/image.h
++++ b/arch/arm64/kernel/image.h
+@@ -110,6 +110,8 @@ __efistub___flush_dcache_area	= KALLSYMS_HIDE(__pi___flush_dcache_area);
+ __efistub___memcpy		= KALLSYMS_HIDE(__pi_memcpy);
+ __efistub___memmove		= KALLSYMS_HIDE(__pi_memmove);
+ __efistub___memset		= KALLSYMS_HIDE(__pi_memset);
++__efistub___strcmp		= KALLSYMS_HIDE(__pi_strcmp);
++__efistub___strncmp		= KALLSYMS_HIDE(__pi_strncmp);
+ #endif
  
- 			CPU_SLEEP_0: cpu-sleep-0 {
- 				compatible = "arm,idle-state";
-diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
-index c51950f4a1b6..ab77adb4f3c2 100644
---- a/arch/arm64/boot/dts/arm/juno-r2.dts
-+++ b/arch/arm64/boot/dts/arm/juno-r2.dts
-@@ -63,7 +63,7 @@
- 		};
+ __efistub__text			= KALLSYMS_HIDE(_text);
+diff --git a/arch/arm64/lib/strcmp.S b/arch/arm64/lib/strcmp.S
+index 471fe61..0dffef7 100644
+--- a/arch/arm64/lib/strcmp.S
++++ b/arch/arm64/lib/strcmp.S
+@@ -60,6 +60,8 @@ tmp3		.req	x9
+ zeroones	.req	x10
+ pos		.req	x11
  
- 		idle-states {
--			entry-method = "arm,psci";
-+			entry-method = "psci";
++.weak strcmp
++ENTRY(__strcmp)
+ ENTRY(strcmp)
+ 	eor	tmp1, src1, src2
+ 	mov	zeroones, #REP8_01
+@@ -232,3 +234,4 @@ CPU_BE(	orr	syndrome, diff, has_nul )
+ 	sub	result, data1, data2, lsr #56
+ 	ret
+ ENDPIPROC(strcmp)
++ENDPROC(__strcmp)
+diff --git a/arch/arm64/lib/strncmp.S b/arch/arm64/lib/strncmp.S
+index e267044..b2648c7 100644
+--- a/arch/arm64/lib/strncmp.S
++++ b/arch/arm64/lib/strncmp.S
+@@ -64,6 +64,8 @@ limit_wd	.req	x13
+ mask		.req	x14
+ endloop		.req	x15
  
- 			CPU_SLEEP_0: cpu-sleep-0 {
- 				compatible = "arm,idle-state";
-diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-index 2b2bf39c30ef..1fb5c5a0f32e 100644
---- a/arch/arm64/boot/dts/arm/juno.dts
-+++ b/arch/arm64/boot/dts/arm/juno.dts
-@@ -62,7 +62,7 @@
- 		};
++.weak strncmp
++ENTRY(__strncmp)
+ ENTRY(strncmp)
+ 	cbz	limit, .Lret0
+ 	eor	tmp1, src1, src2
+@@ -308,3 +310,4 @@ CPU_BE( orr	syndrome, diff, has_nul )
+ 	mov	result, #0
+ 	ret
+ ENDPIPROC(strncmp)
++ENDPROC(__strncmp)
+diff --git a/mm/kasan/kasan.c b/mm/kasan/kasan.c
+index c3bd520..61ad7f1 100644
+--- a/mm/kasan/kasan.c
++++ b/mm/kasan/kasan.c
+@@ -304,6 +304,29 @@ void *memcpy(void *dest, const void *src, size_t len)
  
- 		idle-states {
--			entry-method = "arm,psci";
-+			entry-method = "psci";
+ 	return __memcpy(dest, src, len);
+ }
++#ifdef CONFIG_ARM64
++/*
++ * Arch arm64 use assembly variant for strcmp/strncmp,
++ * xtensa use inline asm operations and x86_64 use c one,
++ * so now this interceptors only for arm64 kasan.
++ */
++#undef strcmp
++int strcmp(const char *cs, const char *ct)
++{
++	check_memory_region((unsigned long)cs, 1, false, _RET_IP_);
++	check_memory_region((unsigned long)ct, 1, false, _RET_IP_);
++
++	return __strcmp(cs, ct);
++}
++#undef strncmp
++int strncmp(const char *cs, const char *ct, size_t len)
++{
++	check_memory_region((unsigned long)cs, len, false, _RET_IP_);
++	check_memory_region((unsigned long)ct, len, false, _RET_IP_);
++
++	return __strncmp(cs, ct, len);
++}
++#endif
  
- 			CPU_SLEEP_0: cpu-sleep-0 {
- 				compatible = "arm,idle-state";
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-index 205f0f4c5df0..3a2784117139 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
-@@ -79,7 +79,7 @@
- 		 * PSCI node is not added default, U-boot will add missing
- 		 * parts if it determines to use PSCI.
- 		 */
--		entry-method = "arm,psci";
-+		entry-method = "psci";
- 
- 		CPU_PH20: cpu-ph20 {
- 			compatible = "arm,idle-state";
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index 1109f22bda5e..e238b86e95fb 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -121,7 +121,7 @@
- 		 * PSCI node is not added default, U-boot will add missing
- 		 * parts if it determines to use PSCI.
- 		 */
--		entry-method = "arm,psci";
-+		entry-method = "psci";
- 
- 		CPU_PH20: cpu-ph20 {
- 			compatible = "arm,idle-state";
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 136ebfa9b333..1b200f7be0ba 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -117,7 +117,7 @@
- 		 * PSCI node is not added default, U-boot will add missing
- 		 * parts if it determines to use PSCI.
- 		 */
--		entry-method = "arm,psci";
-+		entry-method = "psci";
- 
- 		CPU_PH20: cpu-ph20 {
- 			compatible = "arm,idle-state";
-diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-index 6d8532af8346..75cc0f7cc088 100644
---- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-@@ -119,7 +119,7 @@
- 		};
- 
- 		idle-states {
--			entry-method = "arm,psci";
-+			entry-method = "psci";
- 
- 			CPU_SLEEP_0: cpu-sleep-0 {
- 				compatible = "arm,idle-state";
-diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
-index 3f5160d2f130..48f5928ed45c 100644
---- a/arch/arm64/boot/dts/sprd/sc9860.dtsi
-+++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
-@@ -114,7 +114,7 @@
- 	};
- 
- 	idle-states{
--		entry-method = "arm,psci";
-+		entry-method = "psci";
- 
- 		CORE_PD: core_pd {
- 			compatible = "arm,idle-state";
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-index a091e6f03014..29ce23422acf 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-@@ -58,7 +58,7 @@
- 		};
- 
- 		idle-states {
--			entry-method = "arm,psci";
-+			entry-method = "psci";
- 
- 			CPU_SLEEP_0: cpu-sleep-0 {
- 				compatible = "arm,idle-state";
+ void kasan_alloc_pages(struct page *page, unsigned int order)
+ {
 -- 
-2.17.1
+2.6.2
