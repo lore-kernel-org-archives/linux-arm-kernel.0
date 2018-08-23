@@ -1,68 +1,72 @@
-From: albeu@free.fr (Alban)
-Date: Thu, 23 Aug 2018 12:29:21 +0200
-Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via
- the nvmem API
-In-Reply-To: <20180821150121.4408672f@bbrezillon>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180810080526.27207-7-brgl@bgdev.pl>
- <20180817182720.6a6e5e8e@bbrezillon> <20180819133106.0420df5f@tock>
- <20180819184609.6dcdbb9a@bbrezillon>
- <5b8c30b8-41e1-d59e-542b-fef6c6469ff0@linaro.org>
- <20180820202038.5d3dc195@bbrezillon>
- <e0ec3194-fd3a-9b3d-fba8-f88447eb56e9@linaro.org>
- <20180821133916.3a1c51b1@eos>
- <6db14f9c-edd3-5e43-839c-953bb03097ff@linaro.org>
- <20180821150121.4408672f@bbrezillon>
-Message-ID: <20180823122921.6857d917@tock>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 23 Aug 2018 12:33:28 +0200
+Subject: [PATCH 0/4 v1] Mezzanine Low Speed connector bus
+Message-ID: <20180823103332.32047-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Aug 2018 15:01:21 +0200
-Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+I have been a bit hesitant to reiterate the series, but this is
+anyways a v1 of the 96Boards Mezzanine Low Speed connector
+driver framework.
 
-> On Tue, 21 Aug 2018 13:00:04 +0100
-> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
-> 
-> > On 21/08/18 12:39, Alban wrote:  
-> > > However we still have the a potential address space clash between
-> > > the nvmem cells and the main device binding.    
-> > Can you elaborate?
-> >   
-> 
-> Yes, I'd be interested in having a real example too, cause I don't see
-> what this address space clash is.
+I know the boards have a high speed connector as well, just
+trying to work stepwise and do the simple things first.
 
-Let say I have a device that use the following binding:
+What convinced me to continue was very real usecases that exist
+today, as this makes the secure96 Mezzanine work:
 
-device {
-    compatible = "example-device";
-    #address-cells = <2>;
-    #size-cells = <1>;
+- Get something upstream that makes it possible to without
+  any trouble or extensive ugly hacking probe and use the
+  secure96 mezzanine. This is motivated by the IoT design
+  space which needs a way to plug in proper security and the
+  secure96 offers a TPM chip for root of trust and key
+  handling.
 
-    child at 0,0 {
-        reg = <0x0 0x0>;
-        ...
-    };
+- A clear indication that the same approach will work just
+  as fine with ACPI without reinventing the universe. I do
+  not have a definitive proof of this, but it is more
+  plausible that this will be reusable for ACPI than any of
+  the DT-centric ideas I've seen for populating
+  daughterboards. There are 96boards using ACPI today.
+  A secure96 TPM is desireable for things like the ARM
+  developer box which has this LS connector:
+  https://www.96boards.org/product/developerbox/
 
-    child at 1,2 {
-        reg = <0x1 0x2>;
-        ...
-    };
+- Some indication that binding the connector like this will
+  not implicate or screw things up for the DT-overlays
+  idea, i.e. a both/and and not either/or approach.
 
-};
+The idea is for this to go upstream through ARM SoC the day
+noone actively NACK it and someone actively ACK it. Expect
+some more iterations.
 
-Now this binding already use the node address space for something,
-so putting a nvmem node as direct child would not work. Here it is
-quiet clear as we have 2 address cells, however even if the number of
-cells and the cells size would match it would still be conceptually
-wrong as both bindings then use the same address space for something
-different.
+Linus Walleij (4):
+  eeprom: at24: Allow passing gpiodesc from pdata
+  spi: Make of_find_spi_device_by_node() available
+  bus: Add DT bindings for 96Boards low speed connector
+  bus: 96boards Low-Speed Connector
 
-Alban
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180823/0c7d533f/attachment.sig>
+ .../bus/96boards,low-speed-connector.txt      |  50 +++
+ drivers/bus/Kconfig                           |   2 +
+ drivers/bus/Makefile                          |   4 +-
+ drivers/bus/daughterboards/96boards-ls-bus.c  |  39 ++
+ .../daughterboards/96boards-ls-connector.c    | 367 ++++++++++++++++++
+ .../bus/daughterboards/96boards-mezzanines.h  |  77 ++++
+ .../bus/daughterboards/96boards-secure96.c    | 265 +++++++++++++
+ drivers/bus/daughterboards/Kconfig            |  50 +++
+ drivers/bus/daughterboards/Makefile           |   6 +
+ drivers/misc/eeprom/at24.c                    |   6 +-
+ drivers/spi/spi.c                             |  33 +-
+ include/linux/platform_data/at24.h            |   2 +
+ include/linux/spi/spi.h                       |   4 +
+ 13 files changed, 888 insertions(+), 17 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/bus/96boards,low-speed-connector.txt
+ create mode 100644 drivers/bus/daughterboards/96boards-ls-bus.c
+ create mode 100644 drivers/bus/daughterboards/96boards-ls-connector.c
+ create mode 100644 drivers/bus/daughterboards/96boards-mezzanines.h
+ create mode 100644 drivers/bus/daughterboards/96boards-secure96.c
+ create mode 100644 drivers/bus/daughterboards/Kconfig
+ create mode 100644 drivers/bus/daughterboards/Makefile
+
+-- 
+2.17.0
