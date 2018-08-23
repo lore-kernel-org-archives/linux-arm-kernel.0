@@ -1,84 +1,49 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Thu, 23 Aug 2018 09:50:58 +0200
-Subject: [PATCH] cpufreq: ti-cpufreq: Only register platform_device when
- supported
-In-Reply-To: <20180823024432.7000-1-d-gerlach@ti.com>
-References: <20180823024432.7000-1-d-gerlach@ti.com>
-Message-ID: <20180823075058.GR14967@localhost>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 23 Aug 2018 09:51:15 +0200
+Subject: [PATCH 4.17 009/324] clocksource/drivers/stm32: Fix error return code
+In-Reply-To: <20180823074955.885811006@linuxfoundation.org>
+References: <20180823074955.885811006@linuxfoundation.org>
+Message-ID: <20180823074956.401371103@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2018 at 09:44:32PM -0500, Dave Gerlach wrote:
-> Currently the ti-cpufreq driver blindly registers a 'ti-cpufreq' to force
-> the driver to probe on any platforms where the driver is built in.
-> However, this should only happen on platforms that actually can make use
-> of the driver. There is already functionality in place to match the
-> SoC compatible so let's factor this out into a separate call and
-> make sure we find a match before creating the ti-cpufreq driver device.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
->  drivers/cpufreq/ti-cpufreq.c | 25 ++++++++++++++++++++-----
->  1 file changed, 20 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
-> index 3f0e2a14895a..541fdcf17b57 100644
-> --- a/drivers/cpufreq/ti-cpufreq.c
-> +++ b/drivers/cpufreq/ti-cpufreq.c
-> @@ -201,19 +201,31 @@ static const struct of_device_id ti_cpufreq_of_match[] = {
->  	{},
->  };
->  
-> +static const struct of_device_id *ti_cpufreq_match_node(void)
-> +{
-> +	struct device_node *np;
-> +	const struct of_device_id *match;
-> +
-> +	np = of_find_node_by_path("/");
-> +	match = of_match_node(ti_cpufreq_of_match, np);
-> +	of_node_put(np);
-> +
-> +	if (!match)
-> +		return NULL;
-> +	else
-> +		return match;
+4.17-stable review patch.  If anyone has any objections, please let me know.
 
-Shouldn't this just be "return match"?
+------------------
 
-> +}
-> +
->  static int ti_cpufreq_probe(struct platform_device *pdev)
->  {
->  	u32 version[VERSION_COUNT];
-> -	struct device_node *np;
->  	const struct of_device_id *match;
->  	struct opp_table *ti_opp_table;
->  	struct ti_cpufreq_data *opp_data;
->  	const char * const reg_names[] = {"vdd", "vbb"};
->  	int ret;
->  
-> -	np = of_find_node_by_path("/");
-> -	match = of_match_node(ti_cpufreq_of_match, np);
-> -	of_node_put(np);
-> +	match = ti_cpufreq_match_node();
->  	if (!match)
->  		return -ENODEV;
->  
-> @@ -290,7 +302,10 @@ static int ti_cpufreq_probe(struct platform_device *pdev)
->  
->  static int ti_cpufreq_init(void)
->  {
-> -	platform_device_register_simple("ti-cpufreq", -1, NULL, 0);
-> +	/* Check to ensure we are on a compatible platform */
-> +	if (ti_cpufreq_match_node())
-> +		platform_device_register_simple("ti-cpufreq", -1, NULL, 0);
-> +
->  	return 0;
->  }
->  module_init(ti_cpufreq_init);
+From: Julia Lawall <Julia.Lawall@lip6.fr>
 
-With that fixed, feel free to add:
+[ Upstream commit a26ed66c20f080c510fcf5bd448bce204f2c19d7 ]
 
-Reviewed-by: Johan Hovold <johan@kernel.org>
+Return an error code on failure.
 
-Johan
+Problem found using Coccinelle.
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: kernel-janitors at vger.kernel.org
+Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Cc: Alexandre Torgue <alexandre.torgue@st.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Link: https://lkml.kernel.org/r1528640655-18948-3-git-send-email-Julia.Lawall at lip6.fr
+Signed-off-by: Sasha Levin <alexander.levin@microsoft.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+ drivers/clocksource/timer-stm32.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+--- a/drivers/clocksource/timer-stm32.c
++++ b/drivers/clocksource/timer-stm32.c
+@@ -304,8 +304,10 @@ static int __init stm32_timer_init(struc
+ 
+ 	to->private_data = kzalloc(sizeof(struct stm32_timer_private),
+ 				   GFP_KERNEL);
+-	if (!to->private_data)
++	if (!to->private_data) {
++		ret = -ENOMEM;
+ 		goto deinit;
++	}
+ 
+ 	rstc = of_reset_control_get(node, NULL);
+ 	if (!IS_ERR(rstc)) {
