@@ -1,43 +1,96 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 23 Aug 2018 19:10:18 +0300
-Subject: [PATCH v3 2/2] arm64: dts: renesas: condor/v3hsk: add
- DU/LVDS/HDMI support
-In-Reply-To: <20180822095505.tobyblbwsg7rsvgo@verge.net.au>
-References: <95d0db34-713d-8206-00c2-ee9a42aab823@cogentembedded.com>
- <c78f1228-afb0-54cf-5d9e-5c812b678de3@cogentembedded.com>
- <2345061.kvOJ0NRlsT@avalon> <20180822095505.tobyblbwsg7rsvgo@verge.net.au>
-Message-ID: <4ccb5cf2-b737-2f6a-e80c-1a8f15f20212@cogentembedded.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 23 Aug 2018 11:24:58 -0500
+Subject: [PATCH] cpufreq: ti-cpufreq: Only register platform_device when
+ supported
+In-Reply-To: <20180823075058.GR14967@localhost>
+References: <20180823024432.7000-1-d-gerlach@ti.com>
+ <20180823075058.GR14967@localhost>
+Message-ID: <27e25e06-2721-87dd-3e9b-8d91f6c49449@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2018 12:55 PM, Simon Horman wrote:
-
->>> Define the Condor/V3HSK board dependent parts of the DU and  LVDS device
->>> nodes. Also add the device nodes for Thine THC63LVD1024 LVDS decoder and
->>> Analog Devices ADV7511W HDMI transmitter...
->>>
->>> Based on the original (and large) patch by Vladimir Barinov.
->>>
->>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>
->>> ---
->>> Changes in version 2:
->>> - added the V3HSK DT update, reworded the description, renamed the patch;
->>> - added a space between the HDMI node name and a brace.
->>>
->>>  arch/arm64/boot/dts/renesas/r8a77980-condor.dts |  106 ++++++++++++++++++++
->>>  arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts  |  120 ++++++++++++++++++++
->>>  2 files changed, 226 insertions(+)
+On 08/23/2018 02:50 AM, Johan Hovold wrote:
+> On Wed, Aug 22, 2018 at 09:44:32PM -0500, Dave Gerlach wrote:
+>> Currently the ti-cpufreq driver blindly registers a 'ti-cpufreq' to force
+>> the driver to probe on any platforms where the driver is built in.
+>> However, this should only happen on platforms that actually can make use
+>> of the driver. There is already functionality in place to match the
+>> SoC compatible so let's factor this out into a separate call and
+>> make sure we find a match before creating the ti-cpufreq driver device.
 >>
->> I would have split that in two patchees.
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> ---
+>>  drivers/cpufreq/ti-cpufreq.c | 25 ++++++++++++++++++++-----
+>>  1 file changed, 20 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
+>> index 3f0e2a14895a..541fdcf17b57 100644
+>> --- a/drivers/cpufreq/ti-cpufreq.c
+>> +++ b/drivers/cpufreq/ti-cpufreq.c
+>> @@ -201,19 +201,31 @@ static const struct of_device_id ti_cpufreq_of_match[] = {
+>>  	{},
+>>  };
+>>  
+>> +static const struct of_device_id *ti_cpufreq_match_node(void)
+>> +{
+>> +	struct device_node *np;
+>> +	const struct of_device_id *match;
+>> +
+>> +	np = of_find_node_by_path("/");
+>> +	match = of_match_node(ti_cpufreq_of_match, np);
+>> +	of_node_put(np);
+>> +
+>> +	if (!match)
+>> +		return NULL;
+>> +	else
+>> +		return match;
 > 
-> I take your point but I think one is fine.
+> Shouldn't this just be "return match"?
 
-   Yeah, one patch here fits Arnd's criterion. :-)
+Whoops, yes that's an entirely pointless check I added.
 
-> Sergei, will you address the other review items?
+> 
+>> +}
+>> +
+>>  static int ti_cpufreq_probe(struct platform_device *pdev)
+>>  {
+>>  	u32 version[VERSION_COUNT];
+>> -	struct device_node *np;
+>>  	const struct of_device_id *match;
+>>  	struct opp_table *ti_opp_table;
+>>  	struct ti_cpufreq_data *opp_data;
+>>  	const char * const reg_names[] = {"vdd", "vbb"};
+>>  	int ret;
+>>  
+>> -	np = of_find_node_by_path("/");
+>> -	match = of_match_node(ti_cpufreq_of_match, np);
+>> -	of_node_put(np);
+>> +	match = ti_cpufreq_match_node();
+>>  	if (!match)
+>>  		return -ENODEV;
+>>  
+>> @@ -290,7 +302,10 @@ static int ti_cpufreq_probe(struct platform_device *pdev)
+>>  
+>>  static int ti_cpufreq_init(void)
+>>  {
+>> -	platform_device_register_simple("ti-cpufreq", -1, NULL, 0);
+>> +	/* Check to ensure we are on a compatible platform */
+>> +	if (ti_cpufreq_match_node())
+>> +		platform_device_register_simple("ti-cpufreq", -1, NULL, 0);
+>> +
+>>  	return 0;
+>>  }
+>>  module_init(ti_cpufreq_init);
+> 
+> With that fixed, feel free to add:
+> 
+> Reviewed-by: Johan Hovold <johan@kernel.org>
 
-   Done, about to repost...
+Thanks for the review I will update and resend.
 
-MBR, Sergei
+Regards,
+Dave
+
+> 
+> Johan
+> 
