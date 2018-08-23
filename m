@@ -1,137 +1,178 @@
 From: vabhav.sharma@nxp.com (Vabhav Sharma)
-Date: Thu, 23 Aug 2018 15:00:03 +0000
-Subject: [PATCH 4/5] arm64: dts: add QorIQ LX2160A SoC support
-In-Reply-To: <20180821101652.GA18139@e107155-lin>
+Date: Thu, 23 Aug 2018 15:08:07 +0000
+Subject: [PATCH 5/5] arm64: dts: add LX2160ARDB board support
+In-Reply-To: <CAL_JsqKH4haGy2F2_2EP=evC8ip7DmGR8J4wzrO0wWnOLsaZqA@mail.gmail.com>
 References: <1534747636-20064-1-git-send-email-vabhav.sharma@nxp.com>
- <1534747636-20064-5-git-send-email-vabhav.sharma@nxp.com>
- <20180821101652.GA18139@e107155-lin>
-Message-ID: <AM6PR04MB47899CE5F871731749E59636F3370@AM6PR04MB4789.eurprd04.prod.outlook.com>
+ <1534747636-20064-6-git-send-email-vabhav.sharma@nxp.com>
+ <CAL_JsqKH4haGy2F2_2EP=evC8ip7DmGR8J4wzrO0wWnOLsaZqA@mail.gmail.com>
+Message-ID: <AM6PR04MB478980C90EE825D024D8B977F3370@AM6PR04MB4789.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 > -----Original Message-----
-> From: Sudeep Holla <sudeep.holla@arm.com>
-> Sent: Tuesday, August 21, 2018 3:47 PM
+> From: Rob Herring <robh+dt@kernel.org>
+> Sent: Wednesday, August 22, 2018 2:15 AM
 > To: Vabhav Sharma <vabhav.sharma@nxp.com>
-> Cc: linux-kernel at vger.kernel.org; devicetree at vger.kernel.org;
-> robh+dt at kernel.org; mark.rutland at arm.com; linuxppc-dev at lists.ozlabs.org;
-> linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com;
-> sboyd at kernel.org; rjw at rjwysocki.net; viresh.kumar at linaro.org; linux-
-> clk at vger.kernel.org; linux-pm at vger.kernel.org; linux-kernel-
-> owner at vger.kernel.org; catalin.marinas at arm.com; will.deacon at arm.com;
-> gregkh at linuxfoundation.org; arnd at arndb.de;
-> kstewart at linuxfoundation.org; yamada.masahiro at socionext.com;
-> linux at armlinux.org.uk; Varun Sethi <V.Sethi@nxp.com>; Udit Kumar
-> <udit.kumar@nxp.com>; Ramneek Mehresh <ramneek.mehresh@nxp.com>;
-> Ying Zhang <ying.zhang22455@nxp.com>; Nipun Gupta
-> <nipun.gupta@nxp.com>; Priyanka Jain <priyanka.jain@nxp.com>; Yogesh
-> Narayan Gaur <yogeshnarayan.gaur@nxp.com>; Sriram Dash
-> <sriram.dash@nxp.com>; Sudeep Holla <sudeep.holla@arm.com>
-> Subject: Re: [PATCH 4/5] arm64: dts: add QorIQ LX2160A SoC support
+> Cc: linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Mark Rutland
+> <mark.rutland@arm.com>; linuxppc-dev <linuxppc-dev@lists.ozlabs.org>;
+> moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE <linux-arm-
+> kernel at lists.infradead.org>; Michael Turquette <mturquette@baylibre.com>;
+> Stephen Boyd <sboyd@kernel.org>; Rafael J. Wysocki <rjw@rjwysocki.net>;
+> Viresh Kumar <viresh.kumar@linaro.org>; linux-clk <linux-
+> clk at vger.kernel.org>; open list:THERMAL <linux-pm@vger.kernel.org>; linux-
+> kernel-owner at vger.kernel.org; Catalin Marinas <catalin.marinas@arm.com>;
+> Will Deacon <will.deacon@arm.com>; Greg Kroah-Hartman
+> <gregkh@linuxfoundation.org>; Arnd Bergmann <arnd@arndb.de>; Kate
+> Stewart <kstewart@linuxfoundation.org>; Masahiro Yamada
+> <yamada.masahiro@socionext.com>; Russell King <linux@armlinux.org.uk>;
+> Varun Sethi <V.Sethi@nxp.com>; Udit Kumar <udit.kumar@nxp.com>;
+> Priyanka Jain <priyanka.jain@nxp.com>; Sriram Dash
+> <sriram.dash@nxp.com>
+> Subject: Re: [PATCH 5/5] arm64: dts: add LX2160ARDB board support
 > 
-> On Mon, Aug 20, 2018 at 12:17:15PM +0530, Vabhav Sharma wrote:
-> > LX2160A SoC is based on Layerscape Chassis Generation 3.2 Architecture.
+> On Mon, Aug 20, 2018 at 1:52 PM Vabhav Sharma
+> <vabhav.sharma@nxp.com> wrote:
 > >
-> > LX2160A features an advanced 16 64-bit ARM v8 CortexA72 processor
-> > cores in 8 cluster, CCN508, GICv3,two 64-bit DDR4 memory controller, 8
-> > I2C controllers, 3 dspi, 2 esdhc,2 USB 3.0, mmu 500, 3 SATA, 4 PL011
-> > SBSA UARTs etc.
+> > LX2160A reference design board (RDB) is a high-performance computing,
+> > evaluation, and development platform with LX2160A SoC.
 > >
-> > Signed-off-by: Ramneek Mehresh <ramneek.mehresh@nxp.com>
-> > Signed-off-by: Zhang Ying-22455 <ying.zhang22455@nxp.com>
-> > Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
 > > Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
-> > Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
 > > Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
 > > Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
 > > ---
-> >  arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi | 572
-> > +++++++++++++++++++++++++
-> >  1 file changed, 572 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> >  arch/arm64/boot/dts/freescale/Makefile            |  1 +
+> >  arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts | 95
+> > +++++++++++++++++++++++
+> >  2 files changed, 96 insertions(+)
+> >  create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
 > >
-> > diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-> > b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> > diff --git a/arch/arm64/boot/dts/freescale/Makefile
+> > b/arch/arm64/boot/dts/freescale/Makefile
+> > index 86e18ad..445b72b 100644
+> > --- a/arch/arm64/boot/dts/freescale/Makefile
+> > +++ b/arch/arm64/boot/dts/freescale/Makefile
+> > @@ -13,3 +13,4 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-
+> rdb.dtb
+> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
+> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
+> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
+> > +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-rdb.dtb
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> > b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
 > > new file mode 100644
-> > index 0000000..e35e494
+> > index 0000000..70fad20
 > > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-> > @@ -0,0 +1,572 @@
-> > +// SPDX-License-Identifier: (GPL-2.0 OR MIT) // // Device Tree
-> > +Include file for Layerscape-LX2160A family SoC.
-> > +//
-> > +// Copyright 2018 NXP
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> > @@ -0,0 +1,95 @@
+> > +// SPDX-License-Identifier: (GPL-2.0 OR MIT) // // Device Tree file
+> > +for LX2160ARDB // // Copyright 2018 NXP
 > > +
-> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> > +/dts-v1/;
 > > +
-> > +/memreserve/ 0x80000000 0x00010000;
+> > +#include "fsl-lx2160a.dtsi"
 > > +
 > > +/ {
-> > +	compatible = "fsl,lx2160a";
-> > +	interrupt-parent = <&gic>;
-> > +	#address-cells = <2>;
-> > +	#size-cells = <2>;
+> > +       model = "NXP Layerscape LX2160ARDB";
+> > +       compatible = "fsl,lx2160a-rdb", "fsl,lx2160a";
 > > +
-> > +	cpus {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
+> > +       aliases {
+> > +               crypto = &crypto;
+> 
+> Drop this. Aliases should be numbered, and this is not a standard alias name
+> either.
+Ok
+> 
+> > +               serial0 = &uart0;
+> > +               serial1 = &uart1;
+> > +               serial2 = &uart2;
+> > +               serial3 = &uart3;
+> > +       };
+> > +       chosen {
+> > +               stdout-path = "serial0:115200n8";
+> > +       };
+> > +};
 > > +
-> > +		// 8 clusters having 2 Cortex-A72 cores each
-> > +		cpu at 0 {
-> > +			device_type = "cpu";
-> > +			compatible = "arm,cortex-a72";
-> > +			reg = <0x0>;
-> > +			clocks = <&clockgen 1 0>;
-> > +			next-level-cache = <&cluster0_l2>;
-> 
-> If you expect to get cache properties in sysfs entries, you need to populate
-> them here and for each L2 cache.
-Rather sysfs, If Entry is not present then print  "cacheinfo: Unable to detect cache hierarchy for CPU 0" appears in boot log which is bad saying something is not present.
-Either this print is require change to debug instead of warning.
-> 
-> [...]
-> 
+> > +&uart0 {
+> > +       status = "okay";
+> > +};
 > > +
-> > +	rstcr: syscon at 1e60000 {
-> > +		compatible = "syscon";
-> > +		reg = <0x0 0x1e60000 0x0 0x4>;
-> > +	};
+> > +&uart1 {
+> > +       status = "okay";
+> > +};
 > > +
-> > +	reboot {
-> > +		compatible ="syscon-reboot";
-> > +		regmap = <&rstcr>;
-> > +		offset = <0x0>;
-> > +		mask = <0x2>;
+> > +&i2c0 {
+> > +       status = "okay";
+> > +       pca9547 at 77 {
 > 
-> Is this disabled in bootloader ? With PSCI, it's preferred to use
-> SYSTEM_RESET/OFF. EL3 f/w may need to do some housekeeping on
-> poweroff.
-No, PSCIv0.2 is used and control passes to EL3 fw via smc call, psci node is present in the file.
-This node is not required and keeping it in case PSCI is not used.
+> i2c-mux at 77
+Sure
 > 
-> > +	};
+> > +               compatible = "nxp,pca9547";
+> > +               reg = <0x77>;
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
 > > +
-> > +	timer {
-> > +		compatible = "arm,armv8-timer";
-> > +		interrupts = <1 13 4>, // Physical Secure PPI, active-low
-> 
-> The comment says active low but the value 4 indicates it's HIGH from
-> "include/dt-bindings/interrupt-controller/irq.h"
-Thanks, I will change the entries to existing definition IRQ_TYPE_LEVEL_LOW,GIC_PPI which is self-explanatory and not require comments
-> 
-> > +			     <1 14 4>, // Physical Non-Secure PPI, active-low
-> > +			     <1 11 4>, // Virtual PPI, active-low
-> > +			     <1 10 4>; // Hypervisor PPI, active-low
-> > +	};
+> > +               i2c at 2 {
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <0>;
+> > +                       reg = <0x2>;
 > > +
-> > +	pmu {
-> > +		compatible = "arm,armv8-pmuv3";
+> > +                       ina220 at 40 {
+power-sensor at 40
+> > +                               compatible = "ti,ina220";
+> > +                               reg = <0x40>;
+> > +                               shunt-resistor = <1000>;
+> > +                       };
+> > +               };
+> > +
+> > +               i2c at 3 {
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <0>;
+> > +                       reg = <0x3>;
+> > +
+> > +                       sa56004 at 4c {
 > 
-> More specific compatible preferably "arm,cortex-a72-pmu" ?
-Sure.
+> temperature-sensor at 4c
+Ok, temperature-sensor-1 at 4c
 > 
-> --
-> Regards,
-> Sudeep
+> > +                               compatible = "nxp,sa56004";
+> > +                               reg = <0x4c>;
+> > +                       };
+> > +
+> > +                       sa56004 at 4d {
+Ok,temperature-sensor-2 at 4d
+> > +                               compatible = "nxp,sa56004";
+> > +                               reg = <0x4d>;
+> > +                       };
+> > +               };
+> > +       };
+> > +};
+> > +
+> > +&i2c4 {
+> > +       status = "okay";
+> > +
+> > +       rtc at 51 {
+> > +               compatible = "nxp,pcf2129";
+> > +               reg = <0x51>;
+> > +               // IRQ10_B
+> > +               interrupts = <0 150 0x4>;
+> > +               };
+> > +
+> > +};
+> > +
+> > +&usb0 {
+> > +       status = "okay";
+> > +};
+> > +
+> > +&usb1 {
+> > +       status = "okay";
+> > +};
+> > +
+> > +&crypto {
+> > +       status = "okay";
+> > +};
+> > --
+> > 2.7.4
+> >
