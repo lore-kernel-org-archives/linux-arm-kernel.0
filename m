@@ -1,42 +1,56 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Thu, 23 Aug 2018 15:46:47 -0500
-Subject: [PATCH] arm64: dts: Fix various entry-method properties to
- reflect documentation
-In-Reply-To: <113f28acbc55f64762c9f0bcefe076a811f2ed82.1535014078.git.amit.kucheria@linaro.org>
-References: <113f28acbc55f64762c9f0bcefe076a811f2ed82.1535014078.git.amit.kucheria@linaro.org>
-Message-ID: <CADRPPNRpquUgwjft=vLNcxy223BLrS=toWii1XExPb7SghGr-A@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 23 Aug 2018 13:56:35 -0700
+Subject: [PATCH] rtc: sun6i: Use struct_size() in kzalloc()
+In-Reply-To: <20180823185140.GA29028@embeddedor.com>
+References: <20180823185140.GA29028@embeddedor.com>
+Message-ID: <CAGXu5jKPOVRk5DbFMKu0BV_K-ES+j+6_aApjyo0X8zXBfTYDnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2018 at 3:55 AM Amit Kucheria <amit.kucheria@linaro.org> wrote:
+On Thu, Aug 23, 2018 at 11:51 AM, Gustavo A. R. Silva
+<gustavo@embeddedor.com> wrote:
+> One of the more common cases of allocation size calculations is finding
+> the size of a structure that has a zero-sized array at the end, along
+> with memory for some number of elements for that array. For example:
 >
-> The idle-states binding documentation[1] mentions that the
-> 'entry-method' property is required on 64-bit platforms and must be
-> set to "psci".
+> struct foo {
+>         int stuff;
+>         void *entry[];
+> };
 >
-> commit a13f18f59d26 ("Documentation: arm: Fix typo in the idle-states
-> bindings examples") attempted to fix this earlier but clearly more is
-> needed.
+> instance = kzalloc(sizeof(struct foo) + sizeof(void *) * count, GFP_KERNEL);
 >
-> Fix the cpu-capacity.txt documentation that uses the incorrect value so
-> we don't get copy-paste errors like these. Clarify the language in
-> idle-states.txt by removing the reference to the psci bindings that
-> might be causing this confusion.
+> Instead of leaving these open-coded and prone to type mistakes, we can
+> now use the new struct_size() helper:
 >
-> Finally, fix devicetrees of various boards to reflect current
-> documentation.
+> instance = kzalloc(struct_size(instance, entry, count), GFP_KERNEL);
 >
-> [1] Documentation/devicetree/bindings/arm/idle-states.txt (see
-> idle-states node)
+> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+> ---
+>  drivers/rtc/rtc-sun6i.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 >
-> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+> diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+> index 2cd5a7b..fe07310 100644
+> --- a/drivers/rtc/rtc-sun6i.c
+> +++ b/drivers/rtc/rtc-sun6i.c
+> @@ -199,8 +199,7 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
+>         if (!rtc)
+>                 return;
+>
+> -       clk_data = kzalloc(sizeof(*clk_data) + (sizeof(*clk_data->hws) * 2),
+> -                          GFP_KERNEL);
+> +       clk_data = kzalloc(struct_size(clk_data, hws, 2), GFP_KERNEL);
+>         if (!clk_data) {
+>                 kfree(rtc);
+>                 return;
 
-Acked-by: Li Yang <leoyang.li@nxp.com>
+This looks like entirely correct to me, but I'm surprised the
+Coccinelle script didn't discover this. I guess the isomorphisms don't
+cover the parenthesis?
 
-For fsl/nxp device trees:
+-Kees
 
->  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi         | 2 +-
->  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi         | 2 +-
->  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi         | 2 +-
-
-- Leo
+-- 
+Kees Cook
+Pixel Security
