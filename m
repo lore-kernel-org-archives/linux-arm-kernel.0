@@ -1,72 +1,79 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Aug 2018 12:33:28 +0200
-Subject: [PATCH 0/4 v1] Mezzanine Low Speed connector bus
-Message-ID: <20180823103332.32047-1-linus.walleij@linaro.org>
+Date: Thu, 23 Aug 2018 12:33:31 +0200
+Subject: [PATCH 3/4] bus: Add DT bindings for 96Boards low speed connector
+In-Reply-To: <20180823103332.32047-1-linus.walleij@linaro.org>
+References: <20180823103332.32047-1-linus.walleij@linaro.org>
+Message-ID: <20180823103332.32047-4-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have been a bit hesitant to reiterate the series, but this is
-anyways a v1 of the 96Boards Mezzanine Low Speed connector
-driver framework.
+We need to be able to grab resources on a 96Boards low
+speed connector to populate and use a daughterboard, so
+define some very rudimentary properties simply passing
+phandles for the resources used on the low speed
+connector.
 
-I know the boards have a high speed connector as well, just
-trying to work stepwise and do the simple things first.
-
-What convinced me to continue was very real usecases that exist
-today, as this makes the secure96 Mezzanine work:
-
-- Get something upstream that makes it possible to without
-  any trouble or extensive ugly hacking probe and use the
-  secure96 mezzanine. This is motivated by the IoT design
-  space which needs a way to plug in proper security and the
-  secure96 offers a TPM chip for root of trust and key
-  handling.
-
-- A clear indication that the same approach will work just
-  as fine with ACPI without reinventing the universe. I do
-  not have a definitive proof of this, but it is more
-  plausible that this will be reusable for ACPI than any of
-  the DT-centric ideas I've seen for populating
-  daughterboards. There are 96boards using ACPI today.
-  A secure96 TPM is desireable for things like the ARM
-  developer box which has this LS connector:
-  https://www.96boards.org/product/developerbox/
-
-- Some indication that binding the connector like this will
-  not implicate or screw things up for the DT-overlays
-  idea, i.e. a both/and and not either/or approach.
-
-The idea is for this to go upstream through ARM SoC the day
-noone actively NACK it and someone actively ACK it. Expect
-some more iterations.
-
-Linus Walleij (4):
-  eeprom: at24: Allow passing gpiodesc from pdata
-  spi: Make of_find_spi_device_by_node() available
-  bus: Add DT bindings for 96Boards low speed connector
-  bus: 96boards Low-Speed Connector
-
- .../bus/96boards,low-speed-connector.txt      |  50 +++
- drivers/bus/Kconfig                           |   2 +
- drivers/bus/Makefile                          |   4 +-
- drivers/bus/daughterboards/96boards-ls-bus.c  |  39 ++
- .../daughterboards/96boards-ls-connector.c    | 367 ++++++++++++++++++
- .../bus/daughterboards/96boards-mezzanines.h  |  77 ++++
- .../bus/daughterboards/96boards-secure96.c    | 265 +++++++++++++
- drivers/bus/daughterboards/Kconfig            |  50 +++
- drivers/bus/daughterboards/Makefile           |   6 +
- drivers/misc/eeprom/at24.c                    |   6 +-
- drivers/spi/spi.c                             |  33 +-
- include/linux/platform_data/at24.h            |   2 +
- include/linux/spi/spi.h                       |   4 +
- 13 files changed, 888 insertions(+), 17 deletions(-)
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ .../bus/96boards,low-speed-connector.txt      | 50 +++++++++++++++++++
+ 1 file changed, 50 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/bus/96boards,low-speed-connector.txt
- create mode 100644 drivers/bus/daughterboards/96boards-ls-bus.c
- create mode 100644 drivers/bus/daughterboards/96boards-ls-connector.c
- create mode 100644 drivers/bus/daughterboards/96boards-mezzanines.h
- create mode 100644 drivers/bus/daughterboards/96boards-secure96.c
- create mode 100644 drivers/bus/daughterboards/Kconfig
- create mode 100644 drivers/bus/daughterboards/Makefile
 
+diff --git a/Documentation/devicetree/bindings/bus/96boards,low-speed-connector.txt b/Documentation/devicetree/bindings/bus/96boards,low-speed-connector.txt
+new file mode 100644
+index 000000000000..6631b3edd01f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/bus/96boards,low-speed-connector.txt
+@@ -0,0 +1,50 @@
++96Boards Low Speed Connectors
++
++The 96Boards connectors represent a non-dicoverable Low Speed (LS)
++and High Speed (HS) external bus on the 96Board development
++boards. Each 96Board presents both of these connectors.
++
++The Low Speed (LS) connector is a 40 pin 2x20 female pin header:
++- Power
++- Two buttons: power and reset
++- 2 x UART one optional with just RX/TX, one required with modem
++  CTS/RTS
++- 2 x I2C
++- 1 x SPI
++- 1 x I2S (audio)
++- 12 x GPIO lines named GPIO-A thru GPIO-L
++
++Further details on the electronics and signals are available in
++"96Boards Consumer Edition, Low Cost Hardware Platform Specification"
++As of writing version 1.0, January 2015.
++
++Required properties:
++
++- compatible: shall be "96boards,low-speed-connector"
++- i2c0: phandle to the I2C0 bus
++- i2c1: phandle to the I2C1 bus
++- spi: phandle to the SPI bus
++- gpios: a list of phandles to the GPIOs connected to the
++  connector. The handles need to be uniformly specified with the
++  0 flag as the connector is not the end consumer.
++
++Example:
++
++lscon: connector {
++	compatible = "96boards,low-speed-connector";
++	i2c0 = <&i2csw_0>;
++	i2c1 = <&i2csw_1>;
++	spi = <&spi0>;
++	gpios = <&gpio 36 0>, /* GPIO-A */
++	        <&gpio 37 0>, /* GPIO-B */
++		<&gpio 39 0>, /* GPIO-C */
++		<&gpio 40 0>, /* GPIO-D */
++		<&gpio 44 0>, /* GPIO-E */
++		<&gpio 45 0>, /* GPIO-F */
++		<&gpio 78 0>, /* GPIO-G */
++		<&gpio 79 0>, /* GPIO-H */
++		<&gpio 80 0>, /* GPIO-I */
++		<&gpio 81 0>, /* GPIO-J */
++		<&gpio 82 0>, /* GPIO-K */
++		<&gpio 83 0>; /* GPIO-L */
++};
 -- 
 2.17.0
