@@ -1,44 +1,76 @@
-From: gustavo@embeddedor.com (Gustavo A. R. Silva)
-Date: Thu, 23 Aug 2018 13:51:40 -0500
-Subject: [PATCH] rtc: sun6i: Use struct_size() in kzalloc()
-Message-ID: <20180823185140.GA29028@embeddedor.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 23 Aug 2018 14:20:35 -0500
+Subject: [PATCH v2] cpufreq: ti-cpufreq: Only register platform_device when
+ supported
+Message-ID: <20180823192035.22940-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the more common cases of allocation size calculations is finding
-the size of a structure that has a zero-sized array at the end, along
-with memory for some number of elements for that array. For example:
+Currently the ti-cpufreq driver blindly registers a 'ti-cpufreq' to force
+the driver to probe on any platforms where the driver is built in.
+However, this should only happen on platforms that actually can make use
+of the driver. There is already functionality in place to match the
+SoC compatible so let's factor this out into a separate call and
+make sure we find a match before creating the ti-cpufreq platform device.
 
-struct foo { 
-	int stuff;
-        void *entry[];
-};
-
-instance = kzalloc(sizeof(struct foo) + sizeof(void *) * count, GFP_KERNEL);
-
-Instead of leaving these open-coded and prone to type mistakes, we can
-now use the new struct_size() helper:
-
-instance = kzalloc(struct_size(instance, entry, count), GFP_KERNEL);
-
-Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+Reviewed-by: Johan Hovold <johan@kernel.org>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- drivers/rtc/rtc-sun6i.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+v1->v2:
+* Return 'match' directly in ti_cpufreq_match_node.
+* Add Johan's Reviewed-by.
 
-diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
-index 2cd5a7b..fe07310 100644
---- a/drivers/rtc/rtc-sun6i.c
-+++ b/drivers/rtc/rtc-sun6i.c
-@@ -199,8 +199,7 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
- 	if (!rtc)
- 		return;
+ drivers/cpufreq/ti-cpufreq.c | 22 +++++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
+index 3f0e2a14895a..6b025953ddee 100644
+--- a/drivers/cpufreq/ti-cpufreq.c
++++ b/drivers/cpufreq/ti-cpufreq.c
+@@ -201,19 +201,28 @@ static const struct of_device_id ti_cpufreq_of_match[] = {
+ 	{},
+ };
  
--	clk_data = kzalloc(sizeof(*clk_data) + (sizeof(*clk_data->hws) * 2),
--			   GFP_KERNEL);
-+	clk_data = kzalloc(struct_size(clk_data, hws, 2), GFP_KERNEL);
- 	if (!clk_data) {
- 		kfree(rtc);
- 		return;
++static const struct of_device_id *ti_cpufreq_match_node(void)
++{
++	struct device_node *np;
++	const struct of_device_id *match;
++
++	np = of_find_node_by_path("/");
++	match = of_match_node(ti_cpufreq_of_match, np);
++	of_node_put(np);
++
++	return match;
++}
++
+ static int ti_cpufreq_probe(struct platform_device *pdev)
+ {
+ 	u32 version[VERSION_COUNT];
+-	struct device_node *np;
+ 	const struct of_device_id *match;
+ 	struct opp_table *ti_opp_table;
+ 	struct ti_cpufreq_data *opp_data;
+ 	const char * const reg_names[] = {"vdd", "vbb"};
+ 	int ret;
+ 
+-	np = of_find_node_by_path("/");
+-	match = of_match_node(ti_cpufreq_of_match, np);
+-	of_node_put(np);
++	match = ti_cpufreq_match_node();
+ 	if (!match)
+ 		return -ENODEV;
+ 
+@@ -290,7 +299,10 @@ static int ti_cpufreq_probe(struct platform_device *pdev)
+ 
+ static int ti_cpufreq_init(void)
+ {
+-	platform_device_register_simple("ti-cpufreq", -1, NULL, 0);
++	/* Check to ensure we are on a compatible platform */
++	if (ti_cpufreq_match_node())
++		platform_device_register_simple("ti-cpufreq", -1, NULL, 0);
++
+ 	return 0;
+ }
+ module_init(ti_cpufreq_init);
 -- 
-2.7.4
+2.16.1
