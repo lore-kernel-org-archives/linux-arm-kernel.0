@@ -1,38 +1,35 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 23 Aug 2018 13:14:32 +0200
-Subject: [PATCH 1/4] eeprom: at24: Allow passing gpiodesc from pdata
-In-Reply-To: <20180823103332.32047-2-linus.walleij@linaro.org>
-References: <20180823103332.32047-1-linus.walleij@linaro.org>
- <20180823103332.32047-2-linus.walleij@linaro.org>
-Message-ID: <CAMRc=MeR242hFhk4Nts9Fo2110NYAKoULDZPpe_mTrpdA2CNSw@mail.gmail.com>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Thu, 23 Aug 2018 07:16:34 -0400 (EDT)
+Subject: A crash on ARM64 in move_freepages_block due to uninitialized
+ pages in reserved memory
+In-Reply-To: <20180823111024.GC29735@dhcp22.suse.cz>
+References: <alpine.LRH.2.02.1808171527220.2385@file01.intranet.prod.int.rdu2.redhat.com>
+ <20180821104418.GA16611@dhcp22.suse.cz>
+ <e35b7c14-c7ea-412d-2763-c961b74576f3@arm.com>
+ <alpine.LRH.2.02.1808220808050.17906@file01.intranet.prod.int.rdu2.redhat.com>
+ <20180823111024.GC29735@dhcp22.suse.cz>
+Message-ID: <alpine.LRH.2.02.1808230715050.30076@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-08-23 12:33 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
-> This makes it possible to pass an initialized GPIO descriptor
-> to the driver through platform data.
->
-> This is useful when we are dealing with EEPROMs on expansion
-> boards where the GPIO has to be looked up indirectly using a
-> connector abstraction (several systems using the same
-> connector) so the machine descriptor tables cannot be used
-> to associate the descriptor with the device and we then want
-> to pass this descriptor on to the EEPROM driver this way
-> instead.
->
 
-Ugh I don't like this at all. In fact I'm right now trying to *get
-rid* of platform_data from at24 in favor of device properties[1].
 
-Part of the changes from my series actually removes the setup function
-from at24 and replaces it with a notifier fired by the nvmem
-framework.
+On Thu, 23 Aug 2018, Michal Hocko wrote:
 
-I would really prefer that we introduce some generic way of handling
-write-protect mechanisms in nvmem. Maybe starting by moving the
-wp_gpio to nvmem and then passing it in nvmem_config?
+> On Thu 23-08-18 07:02:37, Mikulas Patocka wrote:
+> [...]
+> > This crash is not from -ENOENT. It crashes because page->compound_head is 
+> > 0xffffffffffffffff (see below).
+> > 
+> > If I enable CONFIG_DEBUG_VM, I also get VM_BUG.
+> 
+> This smells like the struct page is not initialized properly. How is
+> this memory range added? I mean is it brought up by the memory hotplug
+> or during the boot?
+> -- 
+> Michal Hocko
+> SUSE Labs
 
-Best regards,
-Bartosz Golaszewski
+During the boot. There's not hotplug.
 
-[1] https://patchwork.kernel.org/cover/10562365/
+Mikulas
