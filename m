@@ -1,160 +1,74 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 22 Aug 2018 17:48:48 -0700
-Subject: [PATCH v4 1/3] Input: edt-ft5x06 - Add support for regulator
-In-Reply-To: <20180807085944.337bf20b@dell-desktop.home>
-References: <20180725073410.730-1-mylene.josserand@bootlin.com>
- <20180725073410.730-2-mylene.josserand@bootlin.com>
- <20180726004732.GD80336@dtor-ws>
- <20180807085944.337bf20b@dell-desktop.home>
-Message-ID: <20180823004848.GA200828@dtor-ws>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 22 Aug 2018 21:44:32 -0500
+Subject: [PATCH] cpufreq: ti-cpufreq: Only register platform_device when
+ supported
+Message-ID: <20180823024432.7000-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2018 at 08:59:44AM +0200, Myl?ne Josserand wrote:
-> Hello Dmitry,
-> 
-> Thank you again for the review.
-> 
-> On Wed, 25 Jul 2018 17:47:32 -0700
-> Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
-> 
-> > Hi Myl?ne,
-> > 
-> > On Wed, Jul 25, 2018 at 09:34:08AM +0200, Myl?ne Josserand wrote:
-> > > Add the support of regulator to use it as VCC source.
-> > > 
-> > > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> > > Reviewed-by: Rob Herring <robh@kernel.org>
-> > > ---
-> > >  .../bindings/input/touchscreen/edt-ft5x06.txt      |  1 +
-> > >  drivers/input/touchscreen/edt-ft5x06.c             | 43 ++++++++++++++++++++++
-> > >  2 files changed, 44 insertions(+)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-> > > index 025cf8c9324a..48e975b9c1aa 100644
-> > > --- a/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-> > > +++ b/Documentation/devicetree/bindings/input/touchscreen/edt-ft5x06.txt
-> > > @@ -30,6 +30,7 @@ Required properties:
-> > >  Optional properties:
-> > >   - reset-gpios: GPIO specification for the RESET input
-> > >   - wake-gpios:  GPIO specification for the WAKE input
-> > > + - vcc-supply:  Regulator that supplies the touchscreen
-> > >  
-> > >   - pinctrl-names: should be "default"
-> > >   - pinctrl-0:   a phandle pointing to the pin settings for the
-> > > diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
-> > > index 1e18ca0d1b4e..dcde719094f7 100644
-> > > --- a/drivers/input/touchscreen/edt-ft5x06.c
-> > > +++ b/drivers/input/touchscreen/edt-ft5x06.c
-> > > @@ -39,6 +39,7 @@
-> > >  #include <linux/input/mt.h>
-> > >  #include <linux/input/touchscreen.h>
-> > >  #include <linux/of_device.h>
-> > > +#include <linux/regulator/consumer.h>
-> > >  
-> > >  #define WORK_REGISTER_THRESHOLD		0x00
-> > >  #define WORK_REGISTER_REPORT_RATE	0x08
-> > > @@ -91,6 +92,7 @@ struct edt_ft5x06_ts_data {
-> > >  	struct touchscreen_properties prop;
-> > >  	u16 num_x;
-> > >  	u16 num_y;
-> > > +	struct regulator *vcc;
-> > >  
-> > >  	struct gpio_desc *reset_gpio;
-> > >  	struct gpio_desc *wake_gpio;
-> > > @@ -963,6 +965,13 @@ edt_ft5x06_ts_set_regs(struct edt_ft5x06_ts_data *tsdata)
-> > >  	}
-> > >  }
-> > >  
-> > > +static void edt_ft5x06_disable_regulator(void *arg)
-> > > +{
-> > > +	struct edt_ft5x06_ts_data *data = arg;
-> > > +
-> > > +	regulator_disable(data->vcc);
-> > > +}
-> > > +
-> > >  static int edt_ft5x06_ts_probe(struct i2c_client *client,
-> > >  					 const struct i2c_device_id *id)
-> > >  {
-> > > @@ -991,6 +1000,28 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
-> > >  
-> > >  	tsdata->max_support_points = chip_data->max_support_points;
-> > >  
-> > > +	tsdata->vcc = devm_regulator_get(&client->dev, "vcc");
-> > > +	if (IS_ERR(tsdata->vcc)) {
-> > > +		error = PTR_ERR(tsdata->vcc);
-> > > +		if (error != -EPROBE_DEFER)
-> > > +			dev_err(&client->dev, "failed to request regulator: %d\n",
-> > > +				error);
-> > > +		return error;
-> > > +	}
-> > > +
-> > > +	error = regulator_enable(tsdata->vcc);
-> > > +	if (error < 0) {
-> > > +		dev_err(&client->dev, "failed to enable vcc: %d\n",
-> > > +			error);
-> > > +		return error;
-> > > +	}  
-> > 
-> > It is better to put the chip into reset and then power up the regulatori
-> > and take it out of the reset, rather than power up and then toggle reset
-> > on and off.
-> 
-> okay, thanks, I will update it.
-> 
-> > 
-> > > +
-> > > +	error = devm_add_action_or_reset(&client->dev,
-> > > +					 edt_ft5x06_disable_regulator,
-> > > +					 tsdata);
-> > > +	if (error)
-> > > +		return error;
-> > > +
-> > >  	tsdata->reset_gpio = devm_gpiod_get_optional(&client->dev,
-> > >  						     "reset", GPIOD_OUT_HIGH);
-> > >  	if (IS_ERR(tsdata->reset_gpio)) {
-> > > @@ -1120,9 +1151,12 @@ static int edt_ft5x06_ts_remove(struct i2c_client *client)
-> > >  static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
-> > >  {
-> > >  	struct i2c_client *client = to_i2c_client(dev);
-> > > +	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
-> > >  
-> > >  	if (device_may_wakeup(dev))
-> > >  		enable_irq_wake(client->irq);
-> > > +	else
-> > > +		regulator_disable(tsdata->vcc);
-> > >  
-> > >  	return 0;
-> > >  }
-> > > @@ -1130,9 +1164,18 @@ static int __maybe_unused edt_ft5x06_ts_suspend(struct device *dev)
-> > >  static int __maybe_unused edt_ft5x06_ts_resume(struct device *dev)
-> > >  {
-> > >  	struct i2c_client *client = to_i2c_client(dev);
-> > > +	struct edt_ft5x06_ts_data *tsdata = i2c_get_clientdata(client);
-> > > +	int ret;
-> > >  
-> > >  	if (device_may_wakeup(dev))
-> > >  		disable_irq_wake(client->irq);
-> > > +	else {
-> > > +		ret = regulator_enable(tsdata->vcc);
-> > > +		if (ret < 0) {
-> > > +			dev_err(dev, "failed to enable vcc: %d\n", ret);
-> > > +			return ret;
-> > > +		}
-> > > +	}  
-> > 
-> > I believe I mentioned in other review that once you powered up the
-> > device, you need to restore its settings, include switching to factory
-> > mode, if it was in factory mode, and restoring threshold/gain/offset
-> > settings.
-> 
-> Yes, I will update the driver with that but as I told you in a previous
-> mail, I can't test the suspend/resume :(
+Currently the ti-cpufreq driver blindly registers a 'ti-cpufreq' to force
+the driver to probe on any platforms where the driver is built in.
+However, this should only happen on platforms that actually can make use
+of the driver. There is already functionality in place to match the
+SoC compatible so let's factor this out into a separate call and
+make sure we find a match before creating the ti-cpufreq driver device.
 
-I wonder if Simon or Lothar or Franklin could help us with it (CCed). If
-not, then we'll have to go by review only.
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ drivers/cpufreq/ti-cpufreq.c | 25 ++++++++++++++++++++-----
+ 1 file changed, 20 insertions(+), 5 deletions(-)
 
-Thanks.
-
+diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
+index 3f0e2a14895a..541fdcf17b57 100644
+--- a/drivers/cpufreq/ti-cpufreq.c
++++ b/drivers/cpufreq/ti-cpufreq.c
+@@ -201,19 +201,31 @@ static const struct of_device_id ti_cpufreq_of_match[] = {
+ 	{},
+ };
+ 
++static const struct of_device_id *ti_cpufreq_match_node(void)
++{
++	struct device_node *np;
++	const struct of_device_id *match;
++
++	np = of_find_node_by_path("/");
++	match = of_match_node(ti_cpufreq_of_match, np);
++	of_node_put(np);
++
++	if (!match)
++		return NULL;
++	else
++		return match;
++}
++
+ static int ti_cpufreq_probe(struct platform_device *pdev)
+ {
+ 	u32 version[VERSION_COUNT];
+-	struct device_node *np;
+ 	const struct of_device_id *match;
+ 	struct opp_table *ti_opp_table;
+ 	struct ti_cpufreq_data *opp_data;
+ 	const char * const reg_names[] = {"vdd", "vbb"};
+ 	int ret;
+ 
+-	np = of_find_node_by_path("/");
+-	match = of_match_node(ti_cpufreq_of_match, np);
+-	of_node_put(np);
++	match = ti_cpufreq_match_node();
+ 	if (!match)
+ 		return -ENODEV;
+ 
+@@ -290,7 +302,10 @@ static int ti_cpufreq_probe(struct platform_device *pdev)
+ 
+ static int ti_cpufreq_init(void)
+ {
+-	platform_device_register_simple("ti-cpufreq", -1, NULL, 0);
++	/* Check to ensure we are on a compatible platform */
++	if (ti_cpufreq_match_node())
++		platform_device_register_simple("ti-cpufreq", -1, NULL, 0);
++
+ 	return 0;
+ }
+ module_init(ti_cpufreq_init);
 -- 
-Dmitry
+2.16.1
