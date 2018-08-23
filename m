@@ -1,73 +1,33 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 Aug 2018 12:33:29 +0200
-Subject: [PATCH 1/4] eeprom: at24: Allow passing gpiodesc from pdata
-In-Reply-To: <20180823103332.32047-1-linus.walleij@linaro.org>
-References: <20180823103332.32047-1-linus.walleij@linaro.org>
-Message-ID: <20180823103332.32047-2-linus.walleij@linaro.org>
+Date: Thu, 23 Aug 2018 12:42:27 +0200
+Subject: [PATCH 1/3] ARM: OMAP1: ams-delta: assign MODEM IRQ from GPIO
+ descriptor
+In-Reply-To: <20180820181333.2527-2-jmkrzyszt@gmail.com>
+References: <20180820181333.2527-1-jmkrzyszt@gmail.com>
+ <20180820181333.2527-2-jmkrzyszt@gmail.com>
+Message-ID: <CACRpkdb7E7cjZuYx6Cgxv2sNJmxvwqg0dNh3WpALwtnuCsezuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes it possible to pass an initialized GPIO descriptor
-to the driver through platform data.
+On Mon, Aug 20, 2018 at 8:12 PM Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
 
-This is useful when we are dealing with EEPROMs on expansion
-boards where the GPIO has to be looked up indirectly using a
-connector abstraction (several systems using the same
-connector) so the machine descriptor tables cannot be used
-to associate the descriptor with the device and we then want
-to pass this descriptor on to the EEPROM driver this way
-instead.
+> Don't request MODEM IRQ GPIO by its global number in
+> ams_delta_modem_init().  Instead, obtain its GPIO descriptor
+> and assign related IRQ to the MODEM.  Do that from
+> omap_gpio_deps_init(), where the chip is already looked up.  Then, in
+> ams_delta_modem_init(), just check for the IRQ number having been
+> already assigned.
+>
+> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 
-Cc: Bartosz Golaszewski <brgl@bgdev.pl>
-Cc: linux-i2c at vger.kernel.org
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- No changes
-- Requesting an ACK from the EEPROM maintainer (Bartosz) so
-  we can apply this to the ARM SoC tree with the series depending
-  on it.
----
- drivers/misc/eeprom/at24.c         | 6 +++++-
- include/linux/platform_data/at24.h | 2 ++
- 2 files changed, 7 insertions(+), 1 deletion(-)
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-diff --git a/drivers/misc/eeprom/at24.c b/drivers/misc/eeprom/at24.c
-index f5cc517d1131..d577cdbe221e 100644
---- a/drivers/misc/eeprom/at24.c
-+++ b/drivers/misc/eeprom/at24.c
-@@ -662,7 +662,11 @@ static int at24_probe(struct i2c_client *client)
- 	at24->client[0].client = client;
- 	at24->client[0].regmap = regmap;
- 
--	at24->wp_gpio = devm_gpiod_get_optional(dev, "wp", GPIOD_OUT_HIGH);
-+	if (pdata.wp_gpiod)
-+		at24->wp_gpio = pdata.wp_gpiod;
-+	else
-+		at24->wp_gpio =
-+			devm_gpiod_get_optional(dev, "wp", GPIOD_OUT_HIGH);
- 	if (IS_ERR(at24->wp_gpio))
- 		return PTR_ERR(at24->wp_gpio);
- 
-diff --git a/include/linux/platform_data/at24.h b/include/linux/platform_data/at24.h
-index 63507ff464ee..5606fb2ef76c 100644
---- a/include/linux/platform_data/at24.h
-+++ b/include/linux/platform_data/at24.h
-@@ -11,6 +11,7 @@
- #include <linux/types.h>
- #include <linux/nvmem-consumer.h>
- #include <linux/bitops.h>
-+#include <linux/gpio/consumer.h>
- 
- /**
-  * struct at24_platform_data - data to set up at24 (generic eeprom) driver
-@@ -55,6 +56,7 @@ struct at24_platform_data {
- 
- 	void		(*setup)(struct nvmem_device *nvmem, void *context);
- 	void		*context;
-+	struct gpio_desc *wp_gpiod;
- };
- 
- #endif /* _LINUX_AT24_H */
--- 
-2.17.0
+It's a bit unorthodox to have the board files intercept and poke
+around inside the gpio_chip like the code in this file does,
+I prefer to keep it encapsulated inside the GPIO driver.
+However this is the lesser evil... if OMAP1 is ever phased
+over to device tree it will go away, until then it is just nicely
+contained.
+
+Yours,
+Linus Walleij
