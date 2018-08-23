@@ -1,58 +1,55 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 23 Aug 2018 12:43:31 +0200
-Subject: [PATCH v3 0/6] mmc: tmio: refactor TMIO core a bit and add
- UniPhier SD/eMMC controller support
-In-Reply-To: <1534999460-15111-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1534999460-15111-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAPDyKFore4GkGyMn-4VA-2h1MbNp9sQ0Szif+Mjj5qtM-7autw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 23 Aug 2018 12:44:06 +0200
+Subject: [PATCH 2/3] ARM: OMAP1: ams-delta: initialize latch2 pins to safe
+ values
+In-Reply-To: <20180820181333.2527-3-jmkrzyszt@gmail.com>
+References: <20180820181333.2527-1-jmkrzyszt@gmail.com>
+ <20180820181333.2527-3-jmkrzyszt@gmail.com>
+Message-ID: <CACRpkdaEahLO=z4TxyNfUNOqnTvQWsTzvd-HEciZWX57tQ5-mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 August 2018 at 06:44, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
->
-> Add UniPhier SD/eMMC controller support.
->
-> As a preparation, I changed tmio_mmc_set_clock() to a platform hook.
-> The clock rate setting is platform-specific, and UniPhier variants
-> will add another way.  I thought it would be better to split this
-> to a hook to avoid a mess.
->
-> V3 is rebase on top of Linus' tree.
+On Mon, Aug 20, 2018 at 8:12 PM Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
 
-I have queued patch 1 -> 4, waiting for further reviews for patch 5 and 6.
+> Latch2 pins control a number of on-board devices, namely LCD, NAND,
+> MODEM and CODEC.  Those pins used to be initialized with safe values
+> from init_machine before that operation was:
+> 1) moved to late_initcall in preparation for conversion of latch2 to
+> GPIO device - see commit f7519d8c8290 ("ARM: OMAP1: ams-delta: register
+> latch dependent devices later"),
+> 2) replaced with non-atomic initialization performed by means of
+> gpio_request_array() - see commit 937eb4bb0058 ("ARM: OMAP1: ams-delta:
+> convert latches to basic_mmio_gpio"),
+> 3) made completely asynchronous by delegation of GPIO request
+> operations performed on subsets of pins to respective device drivers in
+> subsequent commits.
+>
+> One visible negative result of that disintegration was corrupt keyboard
+> data reported by serio driver, recently fixed by commit 41f8fee385a0
+> ("ARM: OMAP1: ams-delta: Hog "keybrd_dataout" GPIO pin").
+>
+> Moreover, initialization of LATCH2_PIN_MODEM_CODEC still performed with
+> ams_delta_latch2_write() wrapper from late_init() is now done on not
+> requested GPIO pin.
+>
+> Reintroduce atomic initialization of latch2 pins at machine_init to
+> prevent from random values potentially corrupting NAND data or maybe
+> even destroing other hardware.  Also take care of MODEM/CODEC related
+> pins so MODEM device probe succeeds even if latch2 GPIO device or
+> dependent regulator is not ready and CODEC can be reached over the
+> MODEM even if audio driver doesn't take control over
+> LATCH2_PIN_MODEM_CODEC.
+>
+> Once done, remove the no longer needed GPIO based implementation of
+> ams_delta_latch_write() and its frontend macro.
+>
+> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 
-One minor comment of patch 4, see separate email.
+This should turn into a nice pin control driver some day.
 
-Kind regards
-Uffe
+But until then, this looks way better after than before the patch,
+so:
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
->
-> I dropped 6/7 because Renesas added more quirks
-> in the current MW.
->
->
-> Masahiro Yamada (6):
->   mmc: tmio: replace tmio_mmc_clk_stop() calls with tmio_mmc_set_clock()
->   mmc: tmio: move tmio_mmc_set_clock() to platform hook
->   dt-bindings: mmc: add DT binding for UniPhier SD/eMMC controller
->   mmc: uniphier-sd: add UniPhier SD/eMMC controller driver
->   mmc: renesas_sdhi: merge clk_{start,stop} functions to set_clock
->   mmc: tmio: refactor CLK_CTL bit calculation
->
->  .../devicetree/bindings/mmc/uniphier-sd.txt        |  55 ++
->  MAINTAINERS                                        |   1 +
->  drivers/mmc/host/Kconfig                           |  10 +
->  drivers/mmc/host/Makefile                          |   1 +
->  drivers/mmc/host/renesas_sdhi_core.c               |  48 +-
->  drivers/mmc/host/tmio_mmc.c                        |  56 ++
->  drivers/mmc/host/tmio_mmc.h                        |   4 +-
->  drivers/mmc/host/tmio_mmc_core.c                   |  92 +--
->  drivers/mmc/host/uniphier-sd.c                     | 693 +++++++++++++++++++++
->  9 files changed, 871 insertions(+), 89 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mmc/uniphier-sd.txt
->  create mode 100644 drivers/mmc/host/uniphier-sd.c
->
-> --
-> 2.7.4
->
+Yours,
+Linus Walleij
