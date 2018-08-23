@@ -1,43 +1,66 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 23 Aug 2018 13:14:59 +0100
-Subject: [PATCH] iommu/io-pgtable-arm: Fix race handling in split_blk_unmap()
-Message-ID: <f6700817286f60597f2a93835bf658f3ef3585ef.1535026499.git.robin.murphy@arm.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Thu, 23 Aug 2018 14:19:21 +0200
+Subject: [PATCH] arm: pm: call put_device instead of of_node_put in
+ at91_pm_config_ws
+In-Reply-To: <5B7E9E26.3050209@huawei.com>
+References: <1534415182-34970-1-git-send-email-zhongjiang@huawei.com>
+ <5B7E9E26.3050209@huawei.com>
+Message-ID: <20180823121921.GE21707@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In removing the pagetable-wide lock, we gained the possibility of the
-vanishingly unlikely case where we have a race between two concurrent
-unmappers splitting the same block entry. The logic to handle this is
-fairly straightforward - whoever loses the race frees their partial
-next-level table and instead dereferences the winner's newly-installed
-entry in order to fall back to a regular unmap, which intentionally
-echoes the pre-existing case of recursively splitting a 1GB block down
-to 4KB pages by installing a full table of 2MB blocks first.
+On 23/08/2018 19:44:38+0800, zhong jiang wrote:
+> Hi, alexandre
+> 
+> Can you pick up the patch?  Thanks
+> 
 
-Unfortunately, the chump who implemented that logic failed to update the
-condition check for that fallback, meaning that if said race occurs at
-the last level (where the loser's unmap_idx is valid) then the unmap
-won't actually happen. Fix that to properly account for both the race
-and recursive cases.
+We are still in the merge window, this has to wait for v4.19-rc1.
 
-Fixes: 2c3d273eabe8 ("iommu/io-pgtable-arm: Support lockless operation")
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/io-pgtable-arm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Best wishes,
+> zhong jiang
+> 
+> On 2018/8/16 18:26, zhong jiang wrote:
+> > of_find_device_by_node takes a reference to the struct device when it
+> > finds a match via get_device. but it fails to put_device in
+> > at91_pm_config_ws, for_each_matching_node_and_match will get and put
+> > the node properly, there is no need to call the of_put_node. Therefore,
+> > just call put_device instead of of_node_put in at91_pm_config_ws.
+> >
+> > Fixes: d7484f5c6b3b ("ARM: at91: pm: configure wakeup sources for ULP1 mode")
+> > Suggested-by: Claudiu Beznea <Claudiu.Beznea@microchip.com>
+> > Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+> > ---
+> >  arch/arm/mach-at91/pm.c | 6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> > index 32fae4d..6574f00 100644
+> > --- a/arch/arm/mach-at91/pm.c
+> > +++ b/arch/arm/mach-at91/pm.c
+> > @@ -143,15 +143,15 @@ static int at91_pm_config_ws(unsigned int pm_mode, bool set)
+> >  
+> >  			/* Check if enabled on SHDWC. */
+> >  			if (wsi->shdwc_mr_bit && !(val & wsi->shdwc_mr_bit))
+> > -				goto put_node;
+> > +				goto put_device;
+> >  
+> >  			mode |= wsi->pmc_fsmr_bit;
+> >  			if (wsi->set_polarity)
+> >  				polarity |= wsi->pmc_fsmr_bit;
+> >  		}
+> >  
+> > -put_node:
+> > -		of_node_put(np);
+> > +put_device:
+> > +		put_device(&pdev->dev);
+> >  	}
+> >  
+> >  	if (mode) {
+> 
+> 
 
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 010a254305dd..93b4833cef73 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -575,7 +575,7 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
- 		tablep = iopte_deref(pte, data);
- 	}
- 
--	if (unmap_idx < 0)
-+	if (unmap_idx < 0 || pte != blk_pte)
- 		return __arm_lpae_unmap(data, iova, size, lvl, tablep);
- 
- 	io_pgtable_tlb_add_flush(&data->iop, iova, size, size, true);
 -- 
-2.17.1.dirty
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
