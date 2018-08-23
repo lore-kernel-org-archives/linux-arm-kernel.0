@@ -1,43 +1,76 @@
-From: starnight@g.ncu.edu.tw (Jian-Hong Pan)
-Date: Fri, 24 Aug 2018 01:15:43 +0800
-Subject: [RFC 3/3 net] lorawan: List LORAWAN in menuconfig
-In-Reply-To: <cover.1535039998.git.starnight@g.ncu.edu.tw>
-References: <cover.1535039998.git.starnight@g.ncu.edu.tw>
-Message-ID: <cd021897a590ee57605a497b23e7ea9341889aef.1535039998.git.starnight@g.ncu.edu.tw>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 23 Aug 2018 18:26:33 +0100
+Subject: [PATCH 1/2] arm64: dts: rockchip: fix vcc3v3_sys regulator
+ dependency for Firefly-RK3399
+In-Reply-To: <SLXP216MB0543F6A1789AC7DCD505D511D1370@SLXP216MB0543.KORP216.PROD.OUTLOOK.COM>
+References: <SLXP216MB0543F6A1789AC7DCD505D511D1370@SLXP216MB0543.KORP216.PROD.OUTLOOK.COM>
+Message-ID: <5f89bf34-e650-9274-b0e9-a99bb2a9d43d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-List LORAWAN in menuconfig and enable it to be built.
+On 23/08/18 18:07, Maruyama Shohei wrote:
+> From: Shohei Maruyama <cheat.sc.linux@outlook.com>
+> 
+> During booting the Firefly-RK3399, the following errors occur many times.
+> 
+> 	vcc3v3_sys: unable to resolve supply
+> 
+> vcc3v3_sys depends on vcc_sys, but vcc3v3_sys is described in front of
+> vcc_sys on the devicetree. Therefore, can't resolve the dependency.
+> This commit fixes the problem.
 
-Signed-off-by: Jian-Hong Pan <starnight@g.ncu.edu.tw>
----
- net/Kconfig  | 1 +
- net/Makefile | 1 +
- 2 files changed, 2 insertions(+)
+That sounds more like it's simply papering over a bug elsewhere - things 
+that depend on a specific ordering of nodes in the DTB are generally bad.
 
-diff --git a/net/Kconfig b/net/Kconfig
-index 053b36998c18..499c931ba0fa 100644
---- a/net/Kconfig
-+++ b/net/Kconfig
-@@ -224,6 +224,7 @@ source "net/6lowpan/Kconfig"
- source "net/ieee802154/Kconfig"
- source "net/mac802154/Kconfig"
- source "net/lora/Kconfig"
-+source "net/maclorawan/Kconfig"
- source "net/sched/Kconfig"
- source "net/dcb/Kconfig"
- source "net/dns_resolver/Kconfig"
-diff --git a/net/Makefile b/net/Makefile
-index e80b84313851..5341d0e23586 100644
---- a/net/Makefile
-+++ b/net/Makefile
-@@ -63,6 +63,7 @@ obj-$(CONFIG_6LOWPAN)		+= 6lowpan/
- obj-$(CONFIG_IEEE802154)	+= ieee802154/
- obj-$(CONFIG_MAC802154)		+= mac802154/
- obj-$(CONFIG_LORA)		+= lora/
-+obj-$(CONFIG_LORAWAN)		+= maclorawan/
- 
- ifeq ($(CONFIG_NET),y)
- obj-$(CONFIG_SYSCTL)		+= sysctl_net.o
--- 
-2.18.0
+That said, however, AFAICS both places that that particular message 
+appears are pr_debug() calls, so shouldn't be seen under normal usage 
+anyway (and are presumably benign if the relevant regulator does 
+eventually resolve). Have you simply got CONFIG_REGULATOR_DEBUG enabled 
+inadvertently?
+
+Robin.
+
+> Signed-off-by: Shohei Maruyama <cheat.sc.linux@outlook.com>
+> ---
+>   .../boot/dts/rockchip/rk3399-firefly.dts      | 20 +++++++++----------
+>   1 file changed, 10 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
+> index a9376a316f63..d124b65dc315 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
+> @@ -193,16 +193,6 @@
+>   		vin-supply = <&dc_12v>;
+>   	};
+>   
+> -	vcc3v3_sys: vcc3v3-sys {
+> -		compatible = "regulator-fixed";
+> -		regulator-name = "vcc3v3_sys";
+> -		regulator-always-on;
+> -		regulator-boot-on;
+> -		regulator-min-microvolt = <3300000>;
+> -		regulator-max-microvolt = <3300000>;
+> -		vin-supply = <&vcc_sys>;
+> -	};
+> -
+>   	/* Actually 3 regulators (host0, 1, 2) controlled by the same gpio */
+>   	vcc5v0_host: vcc5v0-host-regulator {
+>   		compatible = "regulator-fixed";
+> @@ -225,6 +215,16 @@
+>   		vin-supply = <&dc_12v>;
+>   	};
+>   
+> +	vcc3v3_sys: vcc3v3-sys {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc3v3_sys";
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		vin-supply = <&vcc_sys>;
+> +	};
+> +
+>   	vdd_log: vdd-log {
+>   		compatible = "pwm-regulator";
+>   		pwms = <&pwm2 0 25000 1>;
+> 
