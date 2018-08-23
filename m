@@ -1,33 +1,87 @@
-From: gustavo@embeddedor.com (Gustavo A. R. Silva)
-Date: Thu, 23 Aug 2018 17:01:11 -0500
-Subject: [PATCH] rtc: sun6i: Use struct_size() in kzalloc()
-In-Reply-To: <CAGXu5jKPOVRk5DbFMKu0BV_K-ES+j+6_aApjyo0X8zXBfTYDnw@mail.gmail.com>
-References: <20180823185140.GA29028@embeddedor.com>
- <CAGXu5jKPOVRk5DbFMKu0BV_K-ES+j+6_aApjyo0X8zXBfTYDnw@mail.gmail.com>
-Message-ID: <7a213f7c-354c-06d5-7b14-fc69e9bb8a31@embeddedor.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 23 Aug 2018 23:39:55 +0100
+Subject: [PATCH v2] crypto: arm64/aes-modes - get rid of literal load of
+ addend vector
+In-Reply-To: <CAKwvOdmar-LrU-B7kEo+t5fUS2LOLqX35d-p7v03qXwD8wtG_g@mail.gmail.com>
+References: <20180823164845.20055-1-ard.biesheuvel@linaro.org>
+ <CAKwvOdmar-LrU-B7kEo+t5fUS2LOLqX35d-p7v03qXwD8wtG_g@mail.gmail.com>
+Message-ID: <CAKv+Gu9Txzh+XvodgkduoFf2pvOom_=rDw_h9XS76oCnADPnpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 8/23/18 3:56 PM, Kees Cook wrote:
-
+On 23 August 2018 at 21:04, Nick Desaulniers <ndesaulniers@google.com> wrote:
+> On Thu, Aug 23, 2018 at 9:48 AM Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
 >>
->> -       clk_data = kzalloc(sizeof(*clk_data) + (sizeof(*clk_data->hws) * 2),
->> -                          GFP_KERNEL);
->> +       clk_data = kzalloc(struct_size(clk_data, hws, 2), GFP_KERNEL);
->>         if (!clk_data) {
->>                 kfree(rtc);
->>                 return;
-> 
-> This looks like entirely correct to me, but I'm surprised the
-> Coccinelle script didn't discover this. I guess the isomorphisms don't
-> cover the parenthesis?
-> 
+>> Replace the literal load of the addend vector with a sequence that
+>> performs each add individually. This sequence is only 2 instructions
+>> longer than the original, and 2% faster on Cortex-A53.
+>>
+>> This is an improvement by itself, but also works around a Clang issue,
+>> whose integrated assembler does not implement the GNU ARM asm syntax
+>> completely, and does not support the =literal notation for FP registers
+>> (more info at https://bugs.llvm.org/show_bug.cgi?id=38642)
+>>
+>> Cc: Nick Desaulniers <ndesaulniers@google.com>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>> v2: replace convoluted code involving a SIMD add to increment four BE counters
+>>     at once with individual add/rev/mov instructions
+>>
+>>  arch/arm64/crypto/aes-modes.S | 16 +++++++++-------
+>>  1 file changed, 9 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm64/crypto/aes-modes.S b/arch/arm64/crypto/aes-modes.S
+>> index 483a7130cf0e..496c243de4ac 100644
+>> --- a/arch/arm64/crypto/aes-modes.S
+>> +++ b/arch/arm64/crypto/aes-modes.S
+>> @@ -232,17 +232,19 @@ AES_ENTRY(aes_ctr_encrypt)
+>>         bmi             .Lctr1x
+>>         cmn             w6, #4                  /* 32 bit overflow? */
+>>         bcs             .Lctr1x
+>> -       ldr             q8, =0x30000000200000001        /* addends 1,2,3[,0] */
+>> -       dup             v7.4s, w6
+>> +       add             w7, w6, #1
+>>         mov             v0.16b, v4.16b
+>> -       add             v7.4s, v7.4s, v8.4s
+>> +       add             w8, w6, #2
+>>         mov             v1.16b, v4.16b
+>> -       rev32           v8.16b, v7.16b
+>> +       add             w9, w6, #3
+>>         mov             v2.16b, v4.16b
+>> +       rev             w7, w7
+>>         mov             v3.16b, v4.16b
+>> -       mov             v1.s[3], v8.s[0]
+>> -       mov             v2.s[3], v8.s[1]
+>> -       mov             v3.s[3], v8.s[2]
+>> +       rev             w8, w8
+>> +       mov             v1.s[3], w7
+>> +       rev             w9, w9
+>> +       mov             v2.s[3], w8
+>> +       mov             v3.s[3], w9
+>
+> Just curious about the order of movs and revs here, is this some kind
+> of manual scheduling?
+>
 
-Apparently.
+Yes. Interleaving ALU and SIMD instructions gives a speedup on some
+cores, and doesn't hurt others. Beyond that, it's just putting as much
+space between the write of a register and the subsequent read.
 
-If I manually remove the ()s, the cocci script successfully generates a patch.
+> Regardless,
+> Reviewed-by: Nick Desaulniers <ndesaulniers@google.com>
+>
 
---
-Gustavo
+Thanks!
+
+>>         ld1             {v5.16b-v7.16b}, [x20], #48     /* get 3 input blocks */
+>>         bl              aes_encrypt_block4x
+>>         eor             v0.16b, v5.16b, v0.16b
+>> --
+>> 2.18.0
+>>
+>
+>
+> --
+> Thanks,
+> ~Nick Desaulniers
