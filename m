@@ -1,98 +1,68 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Thu, 23 Aug 2018 18:09:26 +0800
-Subject: [PATCH v4 3/3] mmc: sdhci-of-dwcmshc: solve 128MB DMA boundary
- limitation
-In-Reply-To: <20180823180549.78e508db@xhacker.debian>
-References: <20180823180549.78e508db@xhacker.debian>
-Message-ID: <20180823180926.444b34b5@xhacker.debian>
+From: albeu@free.fr (Alban)
+Date: Thu, 23 Aug 2018 12:29:21 +0200
+Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via
+ the nvmem API
+In-Reply-To: <20180821150121.4408672f@bbrezillon>
+References: <20180810080526.27207-1-brgl@bgdev.pl>
+ <20180810080526.27207-7-brgl@bgdev.pl>
+ <20180817182720.6a6e5e8e@bbrezillon> <20180819133106.0420df5f@tock>
+ <20180819184609.6dcdbb9a@bbrezillon>
+ <5b8c30b8-41e1-d59e-542b-fef6c6469ff0@linaro.org>
+ <20180820202038.5d3dc195@bbrezillon>
+ <e0ec3194-fd3a-9b3d-fba8-f88447eb56e9@linaro.org>
+ <20180821133916.3a1c51b1@eos>
+ <6db14f9c-edd3-5e43-839c-953bb03097ff@linaro.org>
+ <20180821150121.4408672f@bbrezillon>
+Message-ID: <20180823122921.6857d917@tock>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using DMA, if the DMA addr spans 128MB boundary, we have to split
-the DMA transfer into two so that each one doesn't exceed the boundary.
+On Tue, 21 Aug 2018 15:01:21 +0200
+Boris Brezillon <boris.brezillon@bootlin.com> wrote:
 
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
----
- drivers/mmc/host/sdhci-of-dwcmshc.c | 39 +++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+> On Tue, 21 Aug 2018 13:00:04 +0100
+> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
+> 
+> > On 21/08/18 12:39, Alban wrote:  
+> > > However we still have the a potential address space clash between
+> > > the nvmem cells and the main device binding.    
+> > Can you elaborate?
+> >   
+> 
+> Yes, I'd be interested in having a real example too, cause I don't see
+> what this address space clash is.
 
-diff --git a/drivers/mmc/host/sdhci-of-dwcmshc.c b/drivers/mmc/host/sdhci-of-dwcmshc.c
-index 1b7cd144fb01..df0a3aeabe19 100644
---- a/drivers/mmc/host/sdhci-of-dwcmshc.c
-+++ b/drivers/mmc/host/sdhci-of-dwcmshc.c
-@@ -8,21 +8,48 @@
-  */
- 
- #include <linux/clk.h>
-+#include <linux/mm.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/sizes.h>
- 
- #include "sdhci-pltfm.h"
- 
-+#define BOUNDARY_OK(addr, len) \
-+	((addr | (SZ_128M - 1)) == ((addr + len - 1) | (SZ_128M - 1)))
-+
- struct dwcmshc_priv {
- 	struct clk	*bus_clk;
- };
- 
-+/*
-+ * If DMA addr spans 128MB boundary, we split the DMA transfer into two
-+ * so that the DMA transfer doesn't exceed the boundary.
-+ */
-+static void dwcmshc_adma_write_desc(struct sdhci_host *host, void **desc,
-+				    dma_addr_t addr, int len, unsigned int cmd)
-+{
-+	int tmplen, offset;
-+
-+	if (likely(!len || BOUNDARY_OK(addr, len)))
-+		sdhci_adma_write_desc(host, desc, addr, len, cmd);
-+
-+	offset = addr & (SZ_128M - 1);
-+	tmplen = SZ_128M - offset;
-+	sdhci_adma_write_desc(host, desc, addr, tmplen, cmd);
-+
-+	addr += tmplen;
-+	len -= tmplen;
-+	sdhci_adma_write_desc(host, desc, addr, len, cmd);
-+}
-+
- static const struct sdhci_ops sdhci_dwcmshc_ops = {
- 	.set_clock		= sdhci_set_clock,
- 	.set_bus_width		= sdhci_set_bus_width,
- 	.set_uhs_signaling	= sdhci_set_uhs_signaling,
- 	.get_max_clock		= sdhci_pltfm_clk_get_max_clock,
- 	.reset			= sdhci_reset,
-+	.adma_write_desc	= dwcmshc_adma_write_desc,
- };
- 
- static const struct sdhci_pltfm_data sdhci_dwcmshc_pdata = {
-@@ -36,12 +63,24 @@ static int dwcmshc_probe(struct platform_device *pdev)
- 	struct sdhci_host *host;
- 	struct dwcmshc_priv *priv;
- 	int err;
-+	u32 extra;
- 
- 	host = sdhci_pltfm_init(pdev, &sdhci_dwcmshc_pdata,
- 				sizeof(struct dwcmshc_priv));
- 	if (IS_ERR(host))
- 		return PTR_ERR(host);
- 
-+	/*
-+	 * The DMA table descriptor count is calculated as the maximum
-+	 * number of segments times 2, to allow for an alignment
-+	 * descriptor for each segment, plus 1 for a nop end descriptor,
-+	 * plus extra number for cross 128M boundary handling.
-+	 */
-+	extra = DIV_ROUND_UP(totalram_pages, SZ_128M / PAGE_SIZE);
-+	if (extra > SDHCI_MAX_SEGS)
-+		extra = SDHCI_MAX_SEGS;
-+	host->adma_table_cnt = SDHCI_MAX_SEGS * 2 + 1 + extra;
-+
- 	pltfm_host = sdhci_priv(host);
- 	priv = sdhci_pltfm_priv(pltfm_host);
- 
--- 
-2.18.0
+Let say I have a device that use the following binding:
+
+device {
+    compatible = "example-device";
+    #address-cells = <2>;
+    #size-cells = <1>;
+
+    child at 0,0 {
+        reg = <0x0 0x0>;
+        ...
+    };
+
+    child at 1,2 {
+        reg = <0x1 0x2>;
+        ...
+    };
+
+};
+
+Now this binding already use the node address space for something,
+so putting a nvmem node as direct child would not work. Here it is
+quiet clear as we have 2 address cells, however even if the number of
+cells and the cells size would match it would still be conceptually
+wrong as both bindings then use the same address space for something
+different.
+
+Alban
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180823/0c7d533f/attachment.sig>
