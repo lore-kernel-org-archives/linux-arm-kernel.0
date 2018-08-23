@@ -1,103 +1,54 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Thu, 23 Aug 2018 13:44:10 +0200
-Subject: [PATCH v4 09/14] irqchip/irq-mvebu-icu: add support for System
- Error Interrupts (SEI)
-In-Reply-To: <9c3168e2-3653-5359-7ddb-9e6ac1b47bb8@arm.com>
-References: <20180705124011.7661-1-miquel.raynal@bootlin.com>
- <20180705124011.7661-10-miquel.raynal@bootlin.com>
- <a88f62c0-7d7c-71da-fa45-487f7573dbb1@arm.com>
- <20180821110825.2fbec982@xps13>
- <07e90507-1d51-6435-b006-c46f865a636c@arm.com>
- <20180821122819.726c434b@xps13>
- <9c3168e2-3653-5359-7ddb-9e6ac1b47bb8@arm.com>
-Message-ID: <20180823134410.2df84fa4@xps13>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Thu, 23 Aug 2018 19:44:38 +0800
+Subject: [PATCH] arm: pm: call put_device instead of of_node_put in
+ at91_pm_config_ws
+In-Reply-To: <1534415182-34970-1-git-send-email-zhongjiang@huawei.com>
+References: <1534415182-34970-1-git-send-email-zhongjiang@huawei.com>
+Message-ID: <5B7E9E26.3050209@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi, alexandre
 
-Marc Zyngier <marc.zyngier@arm.com> wrote on Tue, 21 Aug 2018 11:37:47
-+0100:
+Can you pick up the patch?  Thanks
 
-> On 21/08/18 11:28, Miquel Raynal wrote:
-> > Hi Marc,
-> > 
-> > Marc Zyngier <marc.zyngier@arm.com> wrote on Tue, 21 Aug 2018 10:19:04
-> > +0100:
-> >   
-> >> On 21/08/18 10:08, Miquel Raynal wrote:  
-> >>> Hi Marc,
-> >>>
-> >>> I'm fine with the rest of the comments, please find just one last
-> >>> question below.
-> >>>
-> >>> [...]
-> >>>     
-> >>>>> @@ -133,12 +164,36 @@ mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
-> >>>>>  		return -EINVAL;
-> >>>>>  	}
-> >>>>>  
-> >>>>> -	/* Mask the type to prevent wrong DT configuration */
-> >>>>> -	*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
-> >>>>> +	/*
-> >>>>> +	 * The ICU receives level-interrupts. MSI SEI are
-> >>>>> +	 * edge-interrupts while MSI NSR are level-interrupts. Update the type
-> >>>>> +	 * accordingly for the parent irqchip.
-> >>>>> +	 */
-> >>>>> +	if (msi_data->subset_data->icu_group == ICU_GRP_SEI)
-> >>>>> +		*type = IRQ_TYPE_EDGE_RISING;      
-> >>>>
-> >>>> That's interesting. How is the resampling done here?    
-> >>>
-> >>> I'm not sure to understand the question. What does 'resampling' means
-> >>> in such context? MSI SEIs are of type "edge" and use the traditional
-> >>> MSI signalling infrastructure. I'm asking to be sure not to ignore
-> >>> something wrong in my code.    
-> >>
-> >> You seems to be turning a level interrupt into an edge.  
-> > 
-> > If is an SEI interrupt, it cannot be a level interrupt and the type
-> > will be IRQ_TYPE_EDGE_RISING.
-> >   
-> >> You can do that,
-> >> but only if you resample the level on EOI (and regenerate the
-> >> corresponding edge if the level is still high).  
-> > 
-> > What is before is a '& IRQ_TYPE_SENSE_MASK' operation. In theory,
-> > *type could be anything of IRQ_TYPE_{EDGE,LEVEL}_* at this moment. But,
-> > as stated above, it cannot be anything else than IRQ_TYPE_EDGE_RISING.
-> > I thought more clear to enforce it but if this unclear and useless,
-> > let's drop it?  
-> 
-> I think overriding the trigger that way is very confusing. Either it
-> comes from DT, or it comes from the MSI framwork. In both cases, it has
-> to be correct, and overriding it is just papering over other bugs.
-> 
-> I'd rather you put a WARN_ON if you encounter an illegal interrupt trigger.
+Best wishes,
+zhong jiang
 
-Actually I do remember now why I enforced the type:
-
-Let's say my thermal IP in a CP110 triggers an interrupt. This
-interrupt is of type LEVEL_HIGH, and it is declared in the DT as:
-
-    thermal: thermal-sensor at ... {
-        [...]
-        interrupts-extended = <&icu_sei 116 IRQ_TYPE_LEVEL_HIGH>;
-    };
-
-The ICU callback ->translate() will be called with fwspec being the C
-view of the above "interrupts-extended" property, so the interrupt type
-will be LEVEL_HIGH.
-
-However, the "icu_sei" parent is the SEI IP in the AP806 and this IP
-only receives edge interrupts. What happens is that the SEI's
-->set_type() callback is called with LEVEL_HIGH type (while it
-only supports EDGE_RISING interrupts) and I want the driver to throw an
-error in this case.
-
-My way of handling this was to force *type to be EDGE_RISING in the ICU
-->translate() callback whenever an SEI was triggered. As this seems not
-to be correct, how would you handle such situation?
-
-Thanks,
-Miqu?l
+On 2018/8/16 18:26, zhong jiang wrote:
+> of_find_device_by_node takes a reference to the struct device when it
+> finds a match via get_device. but it fails to put_device in
+> at91_pm_config_ws, for_each_matching_node_and_match will get and put
+> the node properly, there is no need to call the of_put_node. Therefore,
+> just call put_device instead of of_node_put in at91_pm_config_ws.
+>
+> Fixes: d7484f5c6b3b ("ARM: at91: pm: configure wakeup sources for ULP1 mode")
+> Suggested-by: Claudiu Beznea <Claudiu.Beznea@microchip.com>
+> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+> ---
+>  arch/arm/mach-at91/pm.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 32fae4d..6574f00 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -143,15 +143,15 @@ static int at91_pm_config_ws(unsigned int pm_mode, bool set)
+>  
+>  			/* Check if enabled on SHDWC. */
+>  			if (wsi->shdwc_mr_bit && !(val & wsi->shdwc_mr_bit))
+> -				goto put_node;
+> +				goto put_device;
+>  
+>  			mode |= wsi->pmc_fsmr_bit;
+>  			if (wsi->set_polarity)
+>  				polarity |= wsi->pmc_fsmr_bit;
+>  		}
+>  
+> -put_node:
+> -		of_node_put(np);
+> +put_device:
+> +		put_device(&pdev->dev);
+>  	}
+>  
+>  	if (mode) {
