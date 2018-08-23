@@ -1,113 +1,43 @@
-From: baicar.tyler@gmail.com (Tyler Baicar)
-Date: Thu, 23 Aug 2018 11:46:59 -0400
-Subject: [RFC PATCH] EDAC, ghes: Enable per-layer error reporting for ARM
-In-Reply-To: <b568fdcc-ca39-67ea-2799-8ed246c8ffb6@arm.com>
-References: <1531762009-15112-1-git-send-email-tbaicar@codeaurora.org>
- <20180719140102.GB25185@nazgul.tnic>
- <94e3a0fb-9b7d-045f-733b-9f063dcb39e4@arm.com>
- <45fefe7d-c6ea-5791-4477-13ecce39ce48@codeaurora.org>
- <b568fdcc-ca39-67ea-2799-8ed246c8ffb6@arm.com>
-Message-ID: <CABo9ajA7SPrVE-oiG=RicH+nL9_pp7fVATCdMugY5fuNAPzHaQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 23 Aug 2018 19:10:18 +0300
+Subject: [PATCH v3 2/2] arm64: dts: renesas: condor/v3hsk: add
+ DU/LVDS/HDMI support
+In-Reply-To: <20180822095505.tobyblbwsg7rsvgo@verge.net.au>
+References: <95d0db34-713d-8206-00c2-ee9a42aab823@cogentembedded.com>
+ <c78f1228-afb0-54cf-5d9e-5c812b678de3@cogentembedded.com>
+ <2345061.kvOJ0NRlsT@avalon> <20180822095505.tobyblbwsg7rsvgo@verge.net.au>
+Message-ID: <4ccb5cf2-b737-2f6a-e80c-1a8f15f20212@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello James,
+On 08/22/2018 12:55 PM, Simon Horman wrote:
 
-On Thu, Aug 23, 2018 at 5:29 AM James Morse <james.morse@arm.com> wrote:
-> On 19/07/18 19:36, Tyler Baicar wrote:
-> > On 7/19/2018 10:46 AM, James Morse wrote:
-> >> On 19/07/18 15:01, Borislav Petkov wrote:
-> >>> On Mon, Jul 16, 2018 at 01:26:49PM -0400, Tyler Baicar wrote:
-> >>>> Enable per-layer error reporting for ARM systems so that the error
-> >>>> counters are incremented per-DIMM.
->
-> This 'layer' term seems to be EDAC's artificial view of memory.
->
+>>> Define the Condor/V3HSK board dependent parts of the DU and  LVDS device
+>>> nodes. Also add the device nodes for Thine THC63LVD1024 LVDS decoder and
+>>> Analog Devices ADV7511W HDMI transmitter...
+>>>
+>>> Based on the original (and large) patch by Vladimir Barinov.
+>>>
+>>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>>
+>>> ---
+>>> Changes in version 2:
+>>> - added the V3HSK DT update, reworded the description, renamed the patch;
+>>> - added a space between the HDMI node name and a brace.
+>>>
+>>>  arch/arm64/boot/dts/renesas/r8a77980-condor.dts |  106 ++++++++++++++++++++
+>>>  arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts  |  120 ++++++++++++++++++++
+>>>  2 files changed, 226 insertions(+)
+>>
+>> I would have split that in two patchees.
+> 
+> I take your point but I think one is fine.
 
-Yes, it's just the terminology that EDAC uses for locating a DIMM.
+   Yeah, one patch here fits Arnd's criterion. :-)
 
-"Layer" can mean several things here:
+> Sergei, will you address the other review items?
 
-https://elixir.bootlin.com/linux/latest/source/include/linux/edac.h#L318
+   Done, about to repost...
 
-We should be able to avoid the layer definitions with the SMBIOS handles.
-
->
-> >> Does this work on x86, and its just the dmi/cper fields have a subtle difference?
->
-> > There are CPU specific EDAC drivers for a lot of x86 folks and those drivers
-> > populate the layer information in a custom way.
->
-> Not for GHES surely?
->
-
-Correct, the x86 drivers that properly increment the DIMM error counters are not
-tied to the ghes_edac driver.
-
->
-> (DPC == DIMM per Channel?)
->
-
-Yes.
-
-> > The goal is to be able to enable the per layer error reporting in the ghes_edac
-> > driver so that the per dimm counters exposed in the EDAC sysfs nodes are properly
-> > updated.
->
-> What do you mean by layer? I can't find anything in the ACPI/UEFI/SMBIOS specs
-> that uses this term...
->
-> If its just 'per dimm counters' you're after, this looks straightforward.
->
-
-Yes, we just need a way to increment the per DIMM counters that are
-exposed by the
-EDAC sysfs nodes.
-
-> [re-ordered hunk:]
-> > This seems pretty hacky to me, so if anyone has other suggestions please share
-> > them.
->
-> CPER's "Memory Error Record 2" thinks that "NODE, CARD and MODULE should provide
-> the information necessary to identify the failing FRU". As EDAC has three
-> 'levels', these are what they should correspond to for ghes-edac.
->
-> I assume NODE means rack/chassis in some distributed system. Lets ignore it as
-> it doesn't seem to map to anything in the SMBIOS table.
-
-I believe NODE should map to socket number for multi-socket systems.
-
-> The CPER record's card and module numbers are useless to us, as we need to know
-> how many there will be in advance. (does this version of firmware count from 0
-> or 1?)
->
-> ... but CPER also gives us a 'Card Handle' and 'Module Handle'.
-> 'Module Handle' maps to SMBIOS:17 Memory Device (aka, a DIMM). The Handle is a
-> word-value in the structure, so it doesn't depend on the layout/parse-order of
-> the SMBIOS tables. When we count the DIMMs in edac-ghes we can give them some
-> level-idx, then use the handle to find which level-idx to use for this DIMM.
->
-> ghes_edac_report_mem_error() already picks up the module-handle, but only uses
-> it to print the bank/device.
->
-> 'Card' doesn't mean much to me, but it maps to SMBIOS:17 "Memory Array
-> Structure", which the Memory Device structure also points to.
-> Card then must mean "a collection of memory devices (DIMMs) that operate
-> together to form an address space".
->
-> This might be what I think of as a memory-controller, or it might be something
-> more complicated. Regardless, the CPER records think its relevant.
->
-> For the edac:layers, we could walk the DMI table to find these structures, and
-> build the layers from them. If the Memory-array-structures are missing, we can
-> use the existing 1:NUM_DIMMS approach.
->
-
-I think the proper way to get this working would be to use these handles. We can
-avoid populating this layer information and instead have a mapping of type 17
-index number (how edac is numbering the DIMMs today) to the handle number.
-Then we will need a new function to increment the counter based on the handle
-number rather than this layer information. Is that how you are envisioning it?
-
-Thanks,
-Tyler
+MBR, Sergei
