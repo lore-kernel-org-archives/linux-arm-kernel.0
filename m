@@ -1,26 +1,86 @@
-From: kedare06@gmail.com (Kedareswararao Appana)
-Date: Thu, 23 Aug 2018 20:20:36 +0530
-Subject: Query on dma_set_mask_and_coherent() Usage
-Message-ID: <CANdmM3O_q_dAzVAd5Lk+u_OHqgEkHR2p1ucgEZ5v_tLQ6G+3Rw@mail.gmail.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Thu, 23 Aug 2018 14:43:08 +0100
+Subject: [PATCH 9/9] arm64: dts: renesas: r8a774a1: Add FCPF and FCPV instances
+In-Reply-To: <1535031788-19907-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1535031788-19907-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1535031788-19907-10-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Add FCPF and FCPV instances to the r8a774a1 dtsi, similarly
+to what was done for the r8a7796 with commits 41dbbf0c5 ("arm64: dts:
+r8a7796: Add FCPF and FCPV instances"), 69490bc96 ("arm64: dts:
+renesas: r8a7796: Point FDP1 via FCPF to IPMMU-VI0"), and cef942d0b
+("arm64: dts: renesas: r8a7796: Point VSPI via FCPVI to IPMMU-VC0").
 
-              On arm64 platform I have booted Linux only with > 32-bit
-Address i.e from 0x800000000 (reg =  <0x8 0x00000000 0x0 0x80000000>)
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+---
+ arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 52 +++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
-In my driver, I am using dma_set_mask_and_coherent(&pdev->dev,
-DMA_BIT_MASK(32)); which should fail if I boot Linux
-with the above configuration but the API is returning success.
-
-I have debugged it further and observed that, in the arm64
-dma-mapping.c swiotlb is zero resulting dma_supported ops always
-returning 1
-
-https://elixir.bootlin.com/linux/v4.17.8/source/arch/arm64/mm/dma-mapping.c#L321
-
- I will be grateful if someone can send me some pointers for fixing this issue
-
-Regards,
-Kedar.
+diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+index f23bbfd..5b2ee60 100644
+--- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+@@ -1260,6 +1260,58 @@
+ 			resets = <&cpg 408>;
+ 		};
+ 
++		fcpf0: fcp at fe950000 {
++			compatible = "renesas,fcpf";
++			reg = <0 0xfe950000 0 0x200>;
++			clocks = <&cpg CPG_MOD 615>;
++			power-domains = <&sysc 14>;
++			resets = <&cpg 615>;
++		};
++
++		fcpvb0: fcp at fe96f000 {
++			compatible = "renesas,fcpv";
++			reg = <0 0xfe96f000 0 0x200>;
++			clocks = <&cpg CPG_MOD 607>;
++			power-domains = <&sysc 14>;
++			resets = <&cpg 607>;
++		};
++
++		fcpvd0: fcp at fea27000 {
++			compatible = "renesas,fcpv";
++			reg = <0 0xfea27000 0 0x200>;
++			clocks = <&cpg CPG_MOD 603>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 603>;
++			iommus = <&ipmmu_vi0 8>;
++		};
++
++		fcpvd1: fcp at fea2f000 {
++			compatible = "renesas,fcpv";
++			reg = <0 0xfea2f000 0 0x200>;
++			clocks = <&cpg CPG_MOD 602>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 602>;
++			iommus = <&ipmmu_vi0 9>;
++		};
++
++		fcpvd2: fcp at fea37000 {
++			compatible = "renesas,fcpv";
++			reg = <0 0xfea37000 0 0x200>;
++			clocks = <&cpg CPG_MOD 601>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 601>;
++			iommus = <&ipmmu_vi0 10>;
++		};
++
++		fcpvi0: fcp at fe9af000 {
++			compatible = "renesas,fcpv";
++			reg = <0 0xfe9af000 0 0x200>;
++			clocks = <&cpg CPG_MOD 611>;
++			power-domains = <&sysc 14>;
++			resets = <&cpg 611>;
++			iommus = <&ipmmu_vc0 19>;
++		};
++
+ 		prr: chipid at fff00044 {
+ 			compatible = "renesas,prr";
+ 			reg = <0 0xfff00044 0 4>;
+-- 
+2.7.4
