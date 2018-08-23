@@ -1,47 +1,30 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 23 Aug 2018 08:16:47 +0200
-Subject: [RFC PATCH 0/7] add at91sam9 LCDC DRM driver
-In-Reply-To: <20180822201226.GB22148@ravnborg.org>
-References: <20180812184152.GA22343@ravnborg.org>
- <20180812195536.GA29811@ravnborg.org>
- <264d51a0-7e41-6c27-d438-9ae337e6dcf0@microchip.com>
- <20180814084112.GE21634@phenom.ffwll.local>
- <20180822201226.GB22148@ravnborg.org>
-Message-ID: <CAKMK7uFC-gmJQqJnDBNYJi0KXQ2=z9ukz2E+eQuSC2W+3QXRTw@mail.gmail.com>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Thu, 23 Aug 2018 14:30:49 +0800
+Subject: [PATCH] ARM: dts: imx6ull: correct machine model name
+Message-ID: <1535005849-14046-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2018 at 10:12 PM, Sam Ravnborg <sam@ravnborg.org> wrote:
-> Hi Daniel.
->
->> > > Based on the above, would it be possible to utilise some
->> > > of these features without any dedicated userspace (mesa) support?
->> > > Any other driver that has something similar that can be used
->> > > for inspiration?
->> >
->> > This is really an interesting question indeed.
->>
->> Needs userspace like everything else. There's unfortunately no real
->> standard for 2d apis in userspace, which means none of these efforts go
->> very far. Mostly it's just some custom-made X drivers.
->>
->> Adding a generic 2d api to drm is a FAQ, and the answer is "no".
->
-> And then you went off writing a blog post about it - thanks.
-> The blog post provided a lot of useful answers - great.
+i.MX6ULL is a lite version of i.MX6UL, its full name
+is i.MX6 UltraLiteLite, NOT UlltraLite.
 
-Yeah I figured more detail than this here would be good, but also
-wanted to avoid having to retype that ever again.
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/boot/dts/imx6ull-14x14-evk.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> (Or rather you will write the blog in 5 days, seems to be some time
->  machine involved. (Date is the 27th below the title)).
-
-My blog platform pulled one on me - pushed it out with a future date,
-with the idea to proof-read a bit more. Didn't work, so everyone read
-the slightly draft-ish version :-/ In the past this did work, and was
-very neat.
--Daniel
+diff --git a/arch/arm/boot/dts/imx6ull-14x14-evk.dts b/arch/arm/boot/dts/imx6ull-14x14-evk.dts
+index 30ef603..0ba6454 100644
+--- a/arch/arm/boot/dts/imx6ull-14x14-evk.dts
++++ b/arch/arm/boot/dts/imx6ull-14x14-evk.dts
+@@ -45,7 +45,7 @@
+ #include "imx6ul-14x14-evk.dtsi"
+ 
+ / {
+-	model = "Freescale i.MX6 UlltraLite 14x14 EVK Board";
++	model = "Freescale i.MX6 UltraLiteLite 14x14 EVK Board";
+ 	compatible = "fsl,imx6ull-14x14-evk", "fsl,imx6ull";
+ };
+ 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+2.7.4
