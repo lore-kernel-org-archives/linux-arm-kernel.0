@@ -1,70 +1,27 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 24 Aug 2018 11:16:28 -0500
-Subject: [PATCH 5/5] arm64: dts: add LX2160ARDB board support
-In-Reply-To: <AM6PR04MB478980C90EE825D024D8B977F3370@AM6PR04MB4789.eurprd04.prod.outlook.com>
-References: <1534747636-20064-1-git-send-email-vabhav.sharma@nxp.com>
- <1534747636-20064-6-git-send-email-vabhav.sharma@nxp.com>
- <CAL_JsqKH4haGy2F2_2EP=evC8ip7DmGR8J4wzrO0wWnOLsaZqA@mail.gmail.com>
- <AM6PR04MB478980C90EE825D024D8B977F3370@AM6PR04MB4789.eurprd04.prod.outlook.com>
-Message-ID: <CAL_Jsq+QrDR_YyZ+icftUrwOoMZcSCMkmj8cR=bqEJ-q+pdntg@mail.gmail.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 24 Aug 2018 09:20:00 -0700
+Subject: [RFC PATCH 00/11] Avoid synchronous TLB invalidation for
+ intermediate page-table entries on arm64
+In-Reply-To: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
+References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
+Message-ID: <CA+55aFxNs5B=j_g_OpAd=Xp_iiO_+idT-ogd_WM2EcL_6brbqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2018 at 10:08 AM Vabhav Sharma <vabhav.sharma@nxp.com> wrote:
+On Fri, Aug 24, 2018 at 8:52 AM Will Deacon <will.deacon@arm.com> wrote:
+>
+> I hacked up this RFC on the back of the recent changes to the mmu_gather
+> stuff in mainline. It's had a bit of testing and it looks pretty good so
+> far.
 
-[...]
+Looks good to me.
 
-> > > +               i2c at 3 {
-> > > +                       #address-cells = <1>;
-> > > +                       #size-cells = <0>;
-> > > +                       reg = <0x3>;
-> > > +
-> > > +                       sa56004 at 4c {
-> >
-> > temperature-sensor at 4c
-> Ok, temperature-sensor-1 at 4c
+Apart from the arm64-specific question I had, I wonder whether we need
+to have that single "freed_tables" bit at all, since you wanted to
+have the four individual bits for the different levels.
 
-No, that's not what I said. You don't need the '-1' because the
-unit-address makes the node name unique. Node names are supposed to be
-generic based on the class/type of device. See the DT spec.
+Even if somebody doesn't care about the individual bits, it's
+generally exactly as cheap to test four bits as it is to test one, so
+it seems unnecessary to have that summary bit.
 
-> >
-> > > +                               compatible = "nxp,sa56004";
-> > > +                               reg = <0x4c>;
-> > > +                       };
-> > > +
-> > > +                       sa56004 at 4d {
-> Ok,temperature-sensor-2 at 4d
-> > > +                               compatible = "nxp,sa56004";
-> > > +                               reg = <0x4d>;
-> > > +                       };
-> > > +               };
-> > > +       };
-> > > +};
-> > > +
-> > > +&i2c4 {
-> > > +       status = "okay";
-> > > +
-> > > +       rtc at 51 {
-> > > +               compatible = "nxp,pcf2129";
-> > > +               reg = <0x51>;
-> > > +               // IRQ10_B
-> > > +               interrupts = <0 150 0x4>;
-> > > +               };
-> > > +
-> > > +};
-> > > +
-> > > +&usb0 {
-> > > +       status = "okay";
-> > > +};
-> > > +
-> > > +&usb1 {
-> > > +       status = "okay";
-> > > +};
-> > > +
-> > > +&crypto {
-> > > +       status = "okay";
-> > > +};
-> > > --
-> > > 2.7.4
-> > >
+             Linus
