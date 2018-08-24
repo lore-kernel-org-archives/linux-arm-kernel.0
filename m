@@ -1,26 +1,45 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 24 Aug 2018 11:05:03 +0200
-Subject: [PATCH 5/5] arm64: dts: renesas: r8a774a1: Add RWDT node
-In-Reply-To: <1535014731-64472-6-git-send-email-biju.das@bp.renesas.com>
-References: <1535014731-64472-1-git-send-email-biju.das@bp.renesas.com>
- <1535014731-64472-6-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <20180824090502.kmip6uvom4zkhed2@verge.net.au>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Fri, 24 Aug 2018 09:26:31 +0000
+Subject: [PATCH 9/9] arm64: dts: renesas: r8a774a1: Add FCPF and FCPV
+ instances
+In-Reply-To: <c27a266e-3eaa-a879-85ab-0e0aeb5f8b31@cogentembedded.com>
+References: <1535031788-19907-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1535031788-19907-10-git-send-email-fabrizio.castro@bp.renesas.com>
+ <c27a266e-3eaa-a879-85ab-0e0aeb5f8b31@cogentembedded.com>
+Message-ID: <TY1PR01MB17703688D4E3F92734BADDD7C0360@TY1PR01MB1770.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2018 at 09:58:51AM +0100, Biju Das wrote:
-> Add a device node for the Watchdog Timer (RWDT) controller on the Renesas
-> RZ/G2M (r8a774a1) SoC.
-> 
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> ---
->  arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+Hello Sergei,
+
+Thank you for your feedback!
+
+> Subject: Re: [PATCH 9/9] arm64: dts: renesas: r8a774a1: Add FCPF and FCPV instances
+>
+> Hello!
+>
+> On 8/23/2018 4:43 PM, Fabrizio Castro wrote:
+>
+> > Add FCPF and FCPV instances to the r8a774a1 dtsi, similarly
+> > to what was done for the r8a7796 with commits 41dbbf0c5 ("arm64: dts:
+> > r8a7796: Add FCPF and FCPV instances"), 69490bc96 ("arm64: dts:
+> > renesas: r8a7796: Point FDP1 via FCPF to IPMMU-VI0"), and cef942d0b
+> > ("arm64: dts: renesas: r8a7796: Point VSPI via FCPVI to IPMMU-VC0").
+>
+>    Need to specify 12 hex digits of SHA1 when citing commits.
+
+I'll send a v2 to address that.
 
 Thanks,
+Fab
 
-This looks fine to me but I will wait to see if there are other reviews
-before applying.
+>
+> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+> [...]
+>
+> MBR, Sergei
 
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
