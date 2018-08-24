@@ -1,31 +1,28 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 24 Aug 2018 10:23:28 +0200
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77965: Add OPPs table for
- cpu devices
-In-Reply-To: <20180822144113.s7prdezkj5c3xjqm@verge.net.au>
-References: <1534255961-23326-1-git-send-email-ykaneko0929@gmail.com>
- <20180822144113.s7prdezkj5c3xjqm@verge.net.au>
-Message-ID: <20180824082327.5my3j4zujckqbe65@verge.net.au>
+Date: Fri, 24 Aug 2018 10:24:12 +0200
+Subject: [PATCH /2] arm64: dts: renesas: r8a77970: add MMC support
+In-Reply-To: <20180822113119.4p2utcbx5ati74na@verge.net.au>
+References: <1af46bf9-d9e5-8dcf-0ac7-a85e7348a34e@cogentembedded.com>
+ <28c2a0ef-dc89-1fad-6502-9b33738b59a5@cogentembedded.com>
+ <20180822113119.4p2utcbx5ati74na@verge.net.au>
+Message-ID: <20180824082412.c7hvqhnejijgzbei@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2018 at 04:41:18PM +0200, Simon Horman wrote:
-> On Tue, Aug 14, 2018 at 11:12:41PM +0900, Yoshihiro Kaneko wrote:
-> > From: Dien Pham <dien.pham.ry@renesas.com>
+On Wed, Aug 22, 2018 at 01:31:19PM +0200, Simon Horman wrote:
+> On Tue, Aug 21, 2018 at 10:49:26PM +0300, Sergei Shtylyov wrote:
+> > Define the generic R8A77970 part of the MMC0 (SDHI2) device node.
 > > 
-> > This patch adds OPPs table for CA57{0,1} cpu devices
+> > Based on the original (and large) patches by Vladimir Barinov.
 > > 
-> > Signed-off-by: Dien Pham <dien.pham.ry@renesas.com>
-> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> > Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> Tested on r8a77965/Salvator-XS
+> Thanks,
 > 
-> I see that CPUFreq is activated, that sysfs reports 3 possible
-> CPU speeds; 1.5, 1.0 and 0.50GHz. That current CPU frequency can be manipulated
-> by setting the maximum CPU frequency in sysfs. And that the frequency
-> of Z clock changes accordingly.
+> This looks fine to me but I will wait to see if there are other reviews
+> before applying.
 > 
-> Tested-by: Simon Horman <horms+renesas@verge.net.au>
+> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
 
-I have applied this for v4.20.
+I have now applied this for v4.20.
