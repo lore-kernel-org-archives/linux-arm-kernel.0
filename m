@@ -1,39 +1,33 @@
-From: roy.pledge@nxp.com (Roy Pledge)
-Date: Fri, 24 Aug 2018 14:52:02 +0000
-Subject: [PATCH 1/2] soc: fsl: qbman: qman_portal: defer probing when qman
- is not available
-References: <20180823213600.23426-1-alexandre.belloni@bootlin.com>
-Message-ID: <DB6PR0402MB27276B417034E7356B0CFA5886360@DB6PR0402MB2727.eurprd04.prod.outlook.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 24 Aug 2018 16:59:41 +0200
+Subject: [PATCH] arm64: dts: allwinner: h5: Add device node for Mali-450
+ GPU
+In-Reply-To: <20180824053849.7666-1-wens@csie.org>
+References: <20180824053849.7666-1-wens@csie.org>
+Message-ID: <20180824145941.xmz7bbrvwsj6eyoy@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/23/2018 5:36 PM, Alexandre Belloni wrote:
-> If the qman driver (qman_ccsr) doesn't probe or fail to probe before
-> qman_portal, qm_ccsr_start will be either NULL or a stale pointer to an
-> unmapped page.
->
-> This leads to a crash when probing  qman_portal as the init_pcfg function
-> calls qman_liodn_fixup that tries to read qman registers.
->
-> Assume that qman didn't probe when the pool mask is 0.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> ---
->  drivers/soc/fsl/qbman/qman_portal.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/soc/fsl/qbman/qman_portal.c b/drivers/soc/fsl/qbman/qman_portal.c
-> index a120002b630e..4fc80d2c8feb 100644
-> --- a/drivers/soc/fsl/qbman/qman_portal.c
-> +++ b/drivers/soc/fsl/qbman/qman_portal.c
-> @@ -277,6 +277,8 @@ static int qman_portal_probe(struct platform_device *pdev)
->  	}
->  
->  	pcfg->pools = qm_get_pools_sdqcr();
-> +	if (pcfg->pools == 0)
-> +		return -EPROBE_DEFER;
->  
->  	spin_lock(&qman_lock);
->  	cpu = cpumask_next_zero(-1, &portal_cpus);
+On Fri, Aug 24, 2018 at 01:38:49PM +0800, Chen-Yu Tsai wrote:
+> The H5 has a Mali-450 GPU with 4 Pixel Processor cores.
+> 
+> Interestingly, while the datasheet lists an interrupt line for the GPU's
+> PMU, the hardware block itself doesn't seem to have it. Reads from the
+> PMU address range all return zero, and writes are ignored.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Reviewed-by: Roy Pledge <roy.pledge@nxp.com>
+Queued for 4.20, thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180824/cc86409f/attachment.sig>
