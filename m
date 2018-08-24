@@ -1,33 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 24 Aug 2018 08:50:59 -0700
-Subject: [PATCH v2 0/4] iommu/rockchip: Runtime PM fixes
-In-Reply-To: <20180824150637.15316-1-marc.zyngier@arm.com>
-References: <20180824150637.15316-1-marc.zyngier@arm.com>
-Message-ID: <20180824155059.qskwdxmc6ws3hwtv@localhost>
+Date: Fri, 24 Aug 2018 08:51:57 -0700
+Subject: [PATCH 01/11] ARM/gpio: ep93xx: build standalone
+In-Reply-To: <20180822204111.9581-2-linus.walleij@linaro.org>
+References: <20180822204111.9581-1-linus.walleij@linaro.org>
+ <20180822204111.9581-2-linus.walleij@linaro.org>
+Message-ID: <20180824155157.lwgtq5m7q4e3hlvt@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2018 at 04:06:33PM +0100, Marc Zyngier wrote:
-> This small series addresses a couple of runtime PM issues I've spotted
-> while running 4.18 on a Chromebook Plus (kevin, rk3399) platform, and
-> specifically doing kexec.
+On Wed, Aug 22, 2018 at 10:41:01PM +0200, Linus Walleij wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
 > 
-> In order to avoid making a complete mess of the IOMMU code, Heiko has
-> requested that all RK platforms would select CONFIG_PM, which
-> simplifies a lot of things. I've kept 32 and 64bit patches separate,
-> but feel free to squash them into on if that's more convenient.
+> As a preparation for multiplatform support, this ensures
+> that the ep93xx gpio driver can be built without any of
+> the platform specific header files. We pass the IRQ numbers
+> as a resource now, and use the virtual mmio base from the
+> already existing resource, rather than relying on the
+> hardwired virtual address from the header file.
 > 
-> Note that even with these patches, kexec is still fairly broken on
-> rk3399, as the VOP is never turned off (see [1] for a fix).
+> Some numbers are now hardcoded that came from macros
+> in the past, but for all I can tell, the driver already
+> relied on the specific values.
 > 
-> [1] https://www.spinics.net/lists/arm-kernel/msg670229.html
-> 
-> * From v1:
->   - Collected RBs from Heiko
->   - Added two patches forcing CONFIG_PM on all Rockchip platforms at
->     Heiko's request, following the example set by Tegra platforms.
+> Cc: arm at kernel.org
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Arnd/other ARM SoC person:
+> Please provide an ACK for this patch so I can merge it
+> with the rest of the refactorings into the GPIO tree.
 
-Thanks, applied to our next/late branch which I plan to send in tomorrow.
+Acked-by: Olof Johansson <olof@lixom.net>
+
+(As Arnd said, isn't really needed but here's a redundant one anyway. :)
 
 
 -Olof
