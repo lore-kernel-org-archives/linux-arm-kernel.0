@@ -1,49 +1,27 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Fri, 24 Aug 2018 13:55:45 +0200
-Subject: [GIT PULL] tee subsystem for v4.20
-Message-ID: <20180824115545.GA4989@jax.lan>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 24 Aug 2018 13:44:04 +0300
+Subject: [PATCH v2 9/9] arm64: dts: renesas: r8a774a1: Add FCPF and FCPV
+ instances
+In-Reply-To: <1535103029-10576-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <c27a266e-3eaa-a879-85ab-0e0aeb5f8b31@cogentembedded.com>
+ <1535103029-10576-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <c91704ce-4eb1-4017-973d-a6cce88adfd1@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello arm-soc maintainers,
+On 08/24/2018 12:30 PM, Fabrizio Castro wrote:
 
-Please pull these tee driver enhancements. There's one small fix for the
-OP-TEE driver to take DT status into account. There's also a patch
-providing a kernel only tee client interface that can be used by other
-drivers etc. Currently there's no users of this interface in the kernel
-but there seems to be some work in the pipe as some has tested it with
-out of tree patches.
+> Add FCPF and FCPV instances to the r8a774a1 dtsi, similarly
+> to what was done for the r8a7796 with commits 41dbbf0c5 ("arm64: dts:
+                                                ^^^^^^^^^
+   Still 8 digits...
 
-Thanks,
-Jens
+> r8a7796: Add FCPF and FCPV instances"), 69490bc9665d ("arm64: dts:
+> renesas: r8a7796: Point FDP1 via FCPF to IPMMU-VI0"), and cef942d0bd89
+> ("arm64: dts: renesas: r8a7796: Point VSPI via FCPVI to IPMMU-VC0").
+> 
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+[...]
 
-The following changes since commit 94710cac0ef4ee177a63b5227664b38c95bbf703:
-
-  Linux 4.18 (2018-08-12 13:41:04 -0700)
-
-are available in the Git repository at:
-
-  git://git.linaro.org/people/jens.wiklander/linux-tee.git tags/tee-drv-for-4.20
-
-for you to fetch changes up to 25559c22cef879c5cf7119540bfe21fb379d29f3:
-
-  tee: add kernel internal client interface (2018-08-24 11:57:37 +0200)
-
-----------------------------------------------------------------
-Misc enhancement for tee driver subsystem
-
-* Adds a kernel internal tee client interface allowing other drivers
-  etc to access a TEE
-* OP-TEE driver takes DT status property into account
-
-----------------------------------------------------------------
-Ard Biesheuvel (1):
-      tee: optee: take DT status property into account
-
-Jens Wiklander (1):
-      tee: add kernel internal client interface
-
- drivers/tee/optee/core.c |   2 +-
- drivers/tee/tee_core.c   | 113 ++++++++++++++++++++++++++++++++++++++++++++---
- include/linux/tee_drv.h  |  73 ++++++++++++++++++++++++++++++
- 3 files changed, 180 insertions(+), 8 deletions(-)
+MBR, Sergei
