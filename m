@@ -1,53 +1,63 @@
-From: hanjie.lin@amlogic.com (Hanjie Lin)
-Date: Fri, 24 Aug 2018 15:33:25 +0800
-Subject: [PATCH v2 1/2] dt-bindings: phy: add DT bindings for Amlogic Meson
- PCIe Phy controller
-In-Reply-To: <1535096006-152091-1-git-send-email-hanjie.lin@amlogic.com>
-References: <1535096006-152091-1-git-send-email-hanjie.lin@amlogic.com>
-Message-ID: <1535096006-152091-2-git-send-email-hanjie.lin@amlogic.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Fri, 24 Aug 2018 09:47:01 +0200
+Subject: [PATCH v8 3/4] drm/atmel-hlcdc: iterate over all output endpoints
+In-Reply-To: <56016787-0487-1571-7c28-2767033cda23@axentia.se>
+References: <20180810130359.9882-1-peda@axentia.se>
+ <20180810130359.9882-4-peda@axentia.se>
+ <20180813135949.32vrlrevtazr5x7d@apu3b.nibble.pw>
+ <0baac94e-f3d2-53fd-4af9-854bb4498345@axentia.se>
+ <CAL_JsqJPzwpN2TFghy-FfHZppexG9gW4qBy6iYtGpyP_Bp6dUA@mail.gmail.com>
+ <5c9853fc-e2ea-6983-ac88-b52b6e9e6ecd@axentia.se>
+ <CAL_JsqJHRL0f2YwvOJBpggKRVQwPWy8j08-+_nd-VifOOKYqFA@mail.gmail.com>
+ <56016787-0487-1571-7c28-2767033cda23@axentia.se>
+Message-ID: <20180824094701.1f17393f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yue Wang <yue.wang@amlogic.com>
+On Tue, 14 Aug 2018 17:05:29 +0200
+Peter Rosin <peda@axentia.se> wrote:
 
-The Meson-PCIE-PHY controller supports the 5-Gbps data rate
-of the PCI Express Gen 2 specification and is backward compatible
-with the 2.5-Gbps Gen 1.1 specification with only
-inferred idle detection supported on Amlogic SoCs.
+> >>>>>> @@ -77,13 +79,29 @@ static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
+> >>>>>>
+> >>>>>>  int atmel_hlcdc_create_outputs(struct drm_device *dev)
+> >>>>>>  {
+> >>>>>> -    int endpoint, ret = 0;
+> >>>>>> -
+> >>>>>> -    for (endpoint = 0; !ret; endpoint++)
+> >>>>>> -            ret = atmel_hlcdc_attach_endpoint(dev, endpoint);
+> >>>>>> +    struct of_endpoint endpoint;
+> >>>>>> +    struct device_node *node = NULL;
+> >>>>>> +    int count = 0;
+> >>>>>> +    int ret = 0;
+> >>>>>> +
+> >>>>>> +    for_each_endpoint_of_node(dev->dev->of_node, node) {
+> >>>>>> +            of_graph_parse_endpoint(node, &endpoint);  
+> >>>
+> >>> I'd really like to kill off of_graph_parse_endpoint, not add more
+> >>> users (check the git history on this code). You should know what are
+> >>> possible port and endpoint numbers, so iterate over those.  
+> >>
+> >> So, add a comment to that effect in the docs of the of_graph_parse_endpoint
+> >> function.
+> >>
+> >> How can the hlcdc driver know the actual number of endpoints? It's a
+> >> one-way signal path out from that port, and it can easily be routed to
+> >> 1, 2, 3 or even more places. As shown above, forcing the endpoint id
+> >> to start at zero is a nuisance, and I don't see the point of it.
+> >>
+> >> But I welcome suggestions on how to arrange the above dtsi/dts fragments
+> >> in a world where the endpoint id absolutely has to start at zero.  
+> > 
+> > Your dts file arrangement seems fine. Can't you just not exit the loop
+> > on -ENODEV? IOW, just iterate til you find an enabled endpoint.  
+> 
+> That would regress cases where two (or more) endpoints are enabled
+> (which is currently supported). As I see it, the driver will have a
+> very hard time knowing when to stop iterating with any solution not
+> involving the equivalent of the functions for_each_endpoint_of_node
+> and of_graph_parse_endpoint. Open-coding of_graph_parse_endpoint just
+> to avoid it is a bit more than silly IMHO...
 
-Signed-off-by: Hanjie Lin <hanjie.lin@amlogic.com>
-Signed-off-by: Yue Wang <yue.wang@amlogic.com>
----
- .../bindings/phy/amlogic,meson-pcie-phy.txt         | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/amlogic,meson-pcie-phy.txt
-
-diff --git a/Documentation/devicetree/bindings/phy/amlogic,meson-pcie-phy.txt b/Documentation/devicetree/bindings/phy/amlogic,meson-pcie-phy.txt
-new file mode 100644
-index 0000000..e2f0a27
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/amlogic,meson-pcie-phy.txt
-@@ -0,0 +1,21 @@
-+* Amlogic Meson AXG PCIE PHY binding
-+
-+Required properties:
-+- compatible:	Should be
-+	- "amlogic,axg-pcie-phy"
-+- #phys-cells:	must be 0 (see phy-bindings.txt in this directory)
-+- reg:		The base address and length of the registers
-+- resets:	phandle to the reset lines
-+- reset-names:	must contain "phy" and "peripheral"
-+	- "phy"	PHY reset
-+Optional properties:
-+- phy-supply:	see phy-bindings.txt in this directory
-+
-+Example:
-+	pcie_phy: pcie-phy at ff644000 {
-+		#phy-cells = <0>;
-+		compatible = "amlogic,axg-pcie-phy";
-+		reg = <0x0 0xff644000 0x0 0x2000>;
-+		resets = <&reset RESET_PCIE_PHY>;
-+		reset-names = "phy";
-+	};
--- 
-2.7.4
+I agree, and actually, I think this is Rob who suggested to do what we
+do here :-) (iterate from 0 to X, and stop as soon as
+-ENODEV is returned).
