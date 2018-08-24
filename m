@@ -1,86 +1,46 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 23 Aug 2018 19:43:49 -0500
-Subject: [PATCH 3/5] arm: dts: OpenPower Palmetto system can use
- coprocessor for FSI
-In-Reply-To: <20180724042406.15374-4-benh@kernel.crashing.org>
-References: <20180724042406.15374-1-benh@kernel.crashing.org>
- <20180724042406.15374-4-benh@kernel.crashing.org>
-Message-ID: <CAL_JsqK_08Hq0pPGHAwL9NWWV4s66RpiTfvs+g3FV1FCkM_b2Q@mail.gmail.com>
+From: gustavo@embeddedor.com (Gustavo A. R. Silva)
+Date: Thu, 23 Aug 2018 20:05:21 -0500
+Subject: [PATCH] drm/sun4i: tcon-top: Use struct_size() in devm_kzalloc()
+Message-ID: <20180824010521.GA25451@embeddedor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 23, 2018 at 11:25 PM Benjamin Herrenschmidt
-<benh@kernel.crashing.org> wrote:
->
-> This switches away from userspace bitbanging to kernel FSI
-> using the coprocessor.
->
-> Signed-off-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> ---
->  arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 28 ++++++++++++++-----
->  1 file changed, 21 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> index c7084a819dc6..e6cfdf3c1a67 100644
-> --- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> @@ -26,6 +26,11 @@
->                         no-map;
->                         reg = <0x5f000000 0x01000000>; /* 16M */
->                 };
-> +
-> +               coldfire_memory: codefire_memory at 5ee00000 {
+One of the more common cases of allocation size calculations is finding
+the size of a structure that has a zero-sized array at the end, along
+with memory for some number of elements for that array. For example:
 
-typo
+struct foo {
+	int stuff;
+        void *entry[];
+};
 
-> +                       reg = <0x5ee00000 0x00200000>;
-> +                       no-map;
-> +               };
->         };
->
->         leds {
-> @@ -44,6 +49,22 @@
->                 };
->         };
->
-> +       fsi: gpio-fsi {
-> +               compatible = "aspeed,ast2400-cf-fsi-master", "fsi-master";
-> +               #address-cells = <2>;
-> +               #size-cells = <0>;
-> +
-> +               memory-region = <&coldfire_memory>;
-> +               aspeed,sram = <&sram>;
-> +               aspeed,cvic = <&cvic>;
-> +
-> +               clock-gpios = <&gpio ASPEED_GPIO(A, 4) GPIO_ACTIVE_HIGH>;
-> +               data-gpios = <&gpio ASPEED_GPIO(A, 5) GPIO_ACTIVE_HIGH>;
-> +               mux-gpios = <&gpio ASPEED_GPIO(A, 6) GPIO_ACTIVE_HIGH>;
-> +               enable-gpios = <&gpio ASPEED_GPIO(D, 0) GPIO_ACTIVE_HIGH>;
-> +               trans-gpios = <&gpio ASPEED_GPIO(H, 6) GPIO_ACTIVE_HIGH>;
-> +       };
-> +
->         gpio-keys {
->                 compatible = "gpio-keys";
->
-> @@ -303,13 +324,6 @@
->                 line-name = "SYS_PWROK_BMC";
->         };
->
-> -       pin_gpio_h6 {
-> -               gpio-hog;
-> -               gpios = <ASPEED_GPIO(H, 6) GPIO_ACTIVE_HIGH>;
-> -               output-high;
-> -               line-name = "SCM1_FSI0_DATA_EN";
-> -       };
-> -
->         pin_gpio_h7 {
->                 gpio-hog;
->                 gpios = <ASPEED_GPIO(H, 7) GPIO_ACTIVE_HIGH>;
-> --
-> 2.17.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+instance = devm_kzalloc(dev, sizeof(struct foo) + sizeof(void *) * count, GFP_KERNEL);
+
+Instead of leaving these open-coded and prone to type mistakes, we can
+now use the new struct_size() helper:
+
+instance = devm_kzalloc(dev, struct_size(instance, entry, count), GFP_KERNEL);
+
+This issue was detected with the help of Coccinelle.
+
+Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+---
+ drivers/gpu/drm/sun4i/sun8i_tcon_top.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+index 55fe398..3040a79 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
++++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+@@ -129,8 +129,7 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
+ 	if (!tcon_top)
+ 		return -ENOMEM;
+ 
+-	clk_data = devm_kzalloc(dev, sizeof(*clk_data) +
+-				sizeof(*clk_data->hws) * CLK_NUM,
++	clk_data = devm_kzalloc(dev, struct_size(clk_data, hws, CLK_NUM),
+ 				GFP_KERNEL);
+ 	if (!clk_data)
+ 		return -ENOMEM;
+-- 
+2.7.4
