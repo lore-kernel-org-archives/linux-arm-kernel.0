@@ -1,51 +1,40 @@
-From: starnight@g.ncu.edu.tw (Jian-Hong Pan)
-Date: Fri, 24 Aug 2018 23:58:29 +0800
-Subject: [RFC 1/3 net] lorawan: Add LoRaWAN class module
-In-Reply-To: <30b75248-7589-fc98-819f-2b68844522f1@infradead.org>
-References: <cover.1535039998.git.starnight@g.ncu.edu.tw>
- <fc737f3940bbe91341fb15d85ac11931eb56d1fc.1535039998.git.starnight@g.ncu.edu.tw>
- <30b75248-7589-fc98-819f-2b68844522f1@infradead.org>
-Message-ID: <CAC=mGzjMm6OdJJXB=G0NEBkGASWyJv1cgeS=_wiUhDn+WYaqGQ@mail.gmail.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 24 Aug 2018 09:15:17 -0700
+Subject: [RFC PATCH 03/11] arm64: pgtable: Implement p[mu]d_valid() and
+ check in set_p[mu]d()
+In-Reply-To: <1535125966-7666-4-git-send-email-will.deacon@arm.com>
+References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
+ <1535125966-7666-4-git-send-email-will.deacon@arm.com>
+Message-ID: <CA+55aFyAWyGTCzG8YtNwDdmS9TDVYoMCUYvxo0cj3V79w7hQ4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Randy Dunlap <rdunlap@infradead.org> ? 2018?8?24? ?? ??1:43???
+On Fri, Aug 24, 2018 at 8:52 AM Will Deacon <will.deacon@arm.com> wrote:
 >
-> Hi,
->
-> On 08/23/2018 10:15 AM, Jian-Hong Pan wrote:
-> > diff --git a/net/maclorawan/Kconfig b/net/maclorawan/Kconfig
-> > new file mode 100644
-> > index 000000000000..741992b059c6
-> > --- /dev/null
-> > +++ b/net/maclorawan/Kconfig
-> > @@ -0,0 +1,14 @@
-> > +config LORAWAN
-> > +     tristate "MAC layer of LoRaWAN Network support"
-> > +     select CRYPTO
-> > +     select CRYPTO_CMAC
-> > +     select CRYPTO_CBC
-> > +     select CRYPTO_AES
-> > +     ---help---
-> > +       LoRaWAN defines a low data rate, low power and long range wireless
-> > +       wide area networks. It was designed to organise networks of sensors,
-> > +       switches and actuators, etc automation devices.  It could operate as
-> > +       multiple kilometers wide.
->
-> There are several things that I would change.  How about this instead?
->
->
->           LoRaWAN defines low data rate, low power and long range wireless
->           wide area networks. It was designed to organise networks of automation
->           devices, such as sensors, switches and actuators. It can operate
->           multiple kilometers wide.
+> Now that our walk-cache invalidation routines imply a DSB before the
+> invalidation, we no longer need one when we are clearing an entry during
+> unmap.
 
-That becomes better!  Thank you
+Do you really still need it when *setting* it?
 
-> > +
-> > +       Say Y here to compile LoRaWAN support into the kernel or say M to
-> > +       compile it as modules.
->
->
-> --
-> ~Randy
+I'm wondering if you could just remove the thing unconditionally.
+
+Why would you need a barrier for another CPU for a mapping that is
+just being created? It's ok if they see the old lack of mapping until
+they are told about it, and that eventual "being told about it" must
+involve a data transfer already.
+
+And I'm assuming arm doesn't cache negative page table entries, so
+there's no issue with any stale tlb.
+
+And any other kernel thread looking at the page tables will have to
+honor the page table locking, so you don't need it for some direct
+page table lookup either.
+
+Hmm? It seems like you shouldn't need to order the "set page directory
+entry" with anything.
+
+But maybe there's some magic arm64 rule I'm not aware of. Maybe even
+the local TLB hardware walker isn't coherent with local stores?
+
+                Linus
