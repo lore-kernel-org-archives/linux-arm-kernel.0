@@ -1,45 +1,53 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Fri, 24 Aug 2018 09:26:31 +0000
-Subject: [PATCH 9/9] arm64: dts: renesas: r8a774a1: Add FCPF and FCPV
- instances
-In-Reply-To: <c27a266e-3eaa-a879-85ab-0e0aeb5f8b31@cogentembedded.com>
-References: <1535031788-19907-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1535031788-19907-10-git-send-email-fabrizio.castro@bp.renesas.com>
- <c27a266e-3eaa-a879-85ab-0e0aeb5f8b31@cogentembedded.com>
-Message-ID: <TY1PR01MB17703688D4E3F92734BADDD7C0360@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 24 Aug 2018 11:24:58 +0200
+Subject: [PATCH v2 2/2] drm/atmel-hlcdc: allow selecting a higher pixel-clock
+ than requested
+In-Reply-To: <20180824092458.13165-1-peda@axentia.se>
+References: <20180824092458.13165-1-peda@axentia.se>
+Message-ID: <20180824092458.13165-3-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sergei,
+But only if the highest pixel-clock frequency lower than requested
+is significantly less accurate than the lowest frequency higher than
+requested.
 
-Thank you for your feedback!
+I pulled "10 times" as the discriminator out of the hat, and went with
+that.
 
-> Subject: Re: [PATCH 9/9] arm64: dts: renesas: r8a774a1: Add FCPF and FCPV instances
->
-> Hello!
->
-> On 8/23/2018 4:43 PM, Fabrizio Castro wrote:
->
-> > Add FCPF and FCPV instances to the r8a774a1 dtsi, similarly
-> > to what was done for the r8a7796 with commits 41dbbf0c5 ("arm64: dts:
-> > r8a7796: Add FCPF and FCPV instances"), 69490bc96 ("arm64: dts:
-> > renesas: r8a7796: Point FDP1 via FCPF to IPMMU-VI0"), and cef942d0b
-> > ("arm64: dts: renesas: r8a7796: Point VSPI via FCPVI to IPMMU-VC0").
->
->    Need to specify 12 hex digits of SHA1 when citing commits.
+This is useful, if e.g. the target pixel-clock is 65MHz and the sys_clk
+is 132MHz. In this case the highest possible pixel-clock lower than the
+requested 65MHz is 52.8MHz, which is almost 20% off (and outside the
+spec for the panel). The lowest possible pixel-clock higher than 65MHz
+is 66MHz, which is a *much* better match, and only 1.5% off.
 
-I'll send a v2 to address that.
+Signed-off-by: Peter Rosin <peda@axentia.se>
+---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Thanks,
-Fab
-
->
-> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-> [...]
->
-> MBR, Sergei
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+index 0d9d1042752a..9e34bce089d0 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+@@ -116,6 +116,18 @@ static void atmel_hlcdc_crtc_mode_set_nofb(struct drm_crtc *c)
+ 		div = DIV_ROUND_UP(prate, mode_rate);
+ 		if (ATMEL_HLCDC_CLKDIV(div) & ~ATMEL_HLCDC_CLKDIV_MASK)
+ 			div = ATMEL_HLCDC_CLKDIV_MASK;
++	} else {
++		int div_low = prate / mode_rate;
++
++		if (div_low >= 2 &&
++		    ((prate / div_low - mode_rate) <
++		     10 * (mode_rate - prate / div)))
++			/*
++			 * At least 10 times better when using a higher
++			 * frequency than requested, instead of a lower.
++			 * So, go with that.
++			 */
++			div = div_low;
+ 	}
+ 
+ 	cfg |= ATMEL_HLCDC_CLKDIV(div);
+-- 
+2.11.0
