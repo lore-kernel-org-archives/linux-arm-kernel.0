@@ -1,35 +1,57 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Fri, 24 Aug 2018 09:51:31 +0200
-Subject: [PATCH v8 0/4] drm/atmel-hlcdc: bus-width override support
-In-Reply-To: <20180810130359.9882-1-peda@axentia.se>
-References: <20180810130359.9882-1-peda@axentia.se>
-Message-ID: <20180824095131.5d9cb33f@bbrezillon>
+From: tmricht@linux.ibm.com (Thomas-Mich Richter)
+Date: Fri, 24 Aug 2018 09:59:22 +0200
+Subject: [PATCH] perf annotate: fix parsing aarch64 branch instructions
+ after objdump update
+In-Reply-To: <20180823191047.9260992844205984b75e6721@arm.com>
+References: <20180823191047.9260992844205984b75e6721@arm.com>
+Message-ID: <18abf031-f803-b8e6-129e-ed50c63e73d0@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-On Fri, 10 Aug 2018 15:03:55 +0200
-Peter Rosin <peda@axentia.se> wrote:
-
-> Hi!
+On 08/24/2018 02:10 AM, Kim Phillips wrote:
+> Starting with binutils 2.28, aarch64 objdump adds comments to the
+> disassembly output to show the alternative names of a condition code [1].
 > 
-> The background for these patches is that our PCB interface between
-> the SAMA5D3 and the ds90c185 lvds encoder is only using 16 bits, and
-> this has to be described somewhere, or the atmel-hlcdc driver have no
-> chance of selecting the correct output mode. Since we have similar
-> problems with a tda19988 HDMI encoder I added patches to override
-> the atmel-hlcdc output format via DT properties compatible with the
-> media video-interface binding and things start to play together.
+> It is assumed that commas in objdump comments could occur in other arches
+> now or in the future, so this fix is arch-independent.
 > 
-> Cheers,
-> Peter
+> The fix could have been done with arm64 specific jump__parse and
+> jump__scnprintf functions, but the jump__scnprintf instruction would
+> have to have its comment character be a literal, since the scnprintf
+> functions cannot receive a struct arch easily.
 > 
-> Changes since v7  https://lkml.org/lkml/2018/8/4/288
-> - The ep device_node was leaked in v7 patch 3/3, so add patch 3/4
->   which simplifies fixing this in patch 4/4 (and adds flexibility)
->   and adjust patch 4/4 to the changes done in the new 3/4.
-> - return -ENOMEM on allocation failure in patch 4/4
+> This inconvenience also applies to the generic jump__scnprintf, which
+> is why we add a raw_comment pointer to struct ins_operands, so the
+> __parse function assigns it to be re-used by its corresponding __scnprintf
+> function.
+> 
+> Example differences in 'perf annotate --stdio2' output on an
+> aarch64 perf.data file:
+> 
+> BEFORE: ? b.cs   ffff200008133d1c <unwind_frame+0x18c>  // b.hs, dffff7ecc47b
+> AFTER : ? b.cs   18c
+> 
+> BEFORE: ? b.cc   ffff200008d8d9cc <get_alloc_profile+0x31c>  // b.lo, b.ul, dffff727295b
+> AFTER : ? b.cc   31c
+> 
+> The branch target labels 18c and 31c also now appear in the output:
+> 
+> BEFORE:        add    x26, x29, #0x80
+> AFTER : 18c:   add    x26, x29, #0x80
+> 
+> BEFORE:        add    x21, x21, #0x8
+> AFTER : 31c:   add    x21, x21, #0x8
+> 
+> The Fixes: tag below is added so stable branches will get the update; it
+> doesn't necessarily mean that commit was broken at the time, rather it
+> didn't withstand the aarch64 objdump update.
+> 
+> Tested no difference in output for sample x86_64, power arch perf.data files.
 
-I stopped following the discussion at some point. Are there any open
-issues or Ack you're waiting for?
+Tested,  no difference in output on s390. Just to let you know.
+-- 
+Thomas Richter, Dept 3303, IBM s390 Linux Development, Boeblingen, Germany
+--
+Vorsitzende des Aufsichtsrats: Martina Koederitz 
+Gesch?ftsf?hrung: Dirk Wittkopp
+Sitz der Gesellschaft: B?blingen / Registergericht: Amtsgericht Stuttgart, HRB 243294
