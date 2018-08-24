@@ -1,38 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 24 Aug 2018 08:51:57 -0700
-Subject: [PATCH 01/11] ARM/gpio: ep93xx: build standalone
-In-Reply-To: <20180822204111.9581-2-linus.walleij@linaro.org>
-References: <20180822204111.9581-1-linus.walleij@linaro.org>
- <20180822204111.9581-2-linus.walleij@linaro.org>
-Message-ID: <20180824155157.lwgtq5m7q4e3hlvt@localhost>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 24 Aug 2018 16:52:37 +0100
+Subject: [RFC PATCH 02/11] arm64: tlb: Add DSB ISHST prior to TLBI in
+ __flush_tlb_[kernel_]pgtable()
+In-Reply-To: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
+References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1535125966-7666-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2018 at 10:41:01PM +0200, Linus Walleij wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
-> 
-> As a preparation for multiplatform support, this ensures
-> that the ep93xx gpio driver can be built without any of
-> the platform specific header files. We pass the IRQ numbers
-> as a resource now, and use the virtual mmio base from the
-> already existing resource, rather than relying on the
-> hardwired virtual address from the header file.
-> 
-> Some numbers are now hardcoded that came from macros
-> in the past, but for all I can tell, the driver already
-> relied on the specific values.
-> 
-> Cc: arm at kernel.org
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Arnd/other ARM SoC person:
-> Please provide an ACK for this patch so I can merge it
-> with the rest of the refactorings into the GPIO tree.
+__flush_tlb_[kernel_]pgtable() rely on set_pXd() having a DSB after
+writing the new table entry and therefore avoid the barrier prior to the
+TLBI instruction.
 
-Acked-by: Olof Johansson <olof@lixom.net>
+In preparation for delaying our walk-cache invalidation on the unmap()
+path, move the DSB into the TLB invalidation routines.
 
-(As Arnd said, isn't really needed but here's a redundant one anyway. :)
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/tlbflush.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-
--Olof
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 7e2a35424ca4..e257f8655b84 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -213,6 +213,7 @@ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
+ {
+ 	unsigned long addr = __TLBI_VADDR(uaddr, ASID(mm));
+ 
++	dsb(ishst);
+ 	__tlbi(vae1is, addr);
+ 	__tlbi_user(vae1is, addr);
+ 	dsb(ish);
+@@ -222,6 +223,7 @@ static inline void __flush_tlb_kernel_pgtable(unsigned long kaddr)
+ {
+ 	unsigned long addr = __TLBI_VADDR(kaddr, 0);
+ 
++	dsb(ishst);
+ 	__tlbi(vaae1is, addr);
+ 	dsb(ish);
+ }
+-- 
+2.1.4
