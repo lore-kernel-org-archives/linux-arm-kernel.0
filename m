@@ -1,92 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 Aug 2018 14:23:08 +0200
-Subject: [PATCH 1/2] drm/bridge: Add virtual display DT bindings
-Message-ID: <20180824122308.3092-1-linus.walleij@linaro.org>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 24 Aug 2018 11:24:57 +0200
+Subject: [PATCH v2 1/2] drm/atmel-hlcdc: prefer a higher rate clock as
+ pixel-clock base
+In-Reply-To: <20180824092458.13165-1-peda@axentia.se>
+References: <20180824092458.13165-1-peda@axentia.se>
+Message-ID: <20180824092458.13165-2-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds bindings for a virtual display to be used with displays
-inside entirely virtual environments which do not emulate things
-like monitors but just need timing information to be supplied to
-its display controller.
+If the divider used to get the pixel-clock is small, the granularity
+of the frequencies possible for the pixel-clock is quite coarse. E.g.
+requesting a pixel-clock of 65MHz with a sys_clk of 132MHz results
+in the divider being set to 3 ending up with 44MHz.
 
-This is inspired by earlier work by Liviu Dudau.
+By preferring the doubled sys_clk as base, the divider instead ends
+up as 5 yielding a pixel-clock of 52.8Mhz, which is a definite
+improvement.
 
-Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-Cc: Ryan Harkin <ryan.harkin@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+While at it, clamp the divider so that it does not overflow in case
+it gets big.
+
+Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- .../display/bridge/virtual-display-bridge.txt | 62 +++++++++++++++++++
- 1 file changed, 62 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt b/Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt
-new file mode 100644
-index 000000000000..ea4f5a91ab94
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt
-@@ -0,0 +1,62 @@
-+Virtual Display Bridge
-+
-+This represents a display that is contained within an emulated
-+environment.
-+
-+This means that the display engine mainly expects some timing
-+parameters to be written into it, and after that the emulator will
-+respond by creating a virtual display with the requested
-+resolution characteristics.
-+
-+As the operating system cannot "detect" such a display, rather the
-+emulator will respond to what the controller outputs, a
-+chicken-and-egg problem needs to be solved: the resolution and
-+timing characteristics need to be defined and set up somewhere.
-+
-+The virtual display bridge solves this by defining a bridge with
-+all timing characteristics encoded into the device tree node.
-+
-+Required properies:
-+- compatible: shall be "virtual-display-bridge"
-+
-+Required subnodes:
-+- display-timings: contains in turn a display timing node
-+  see display-timing.txt
-+- ports: contains the display ports, see media/video-interfaces.txt
-+
-+Example:
-+
-+bridge {
-+	compatible = "virtual-display-bridge";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	display-timings {
-+		/* Some standard VGA timing */
-+		timing0 {
-+			clock-frequency = <23750>;
-+			hactive = <640>;
-+			vactive = <480>;
-+			hfront-porch = <48>;
-+			hback-porch = <16>;
-+			hsync-len = <96>;
-+			vfront-porch = <33>;
-+			vback-porch = <9>;
-+			vsync-len = <3>;
-+			vrefresh = <60>;
-+		};
-+	};
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		port at 0 {
-+			reg = <0>;
-+
-+			display_bridge_in: endpoint {
-+				remote-endpoint = <&foo>;
-+			};
-+		};
-+	};
-+};
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+index c38a479ada98..0d9d1042752a 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+@@ -101,18 +101,22 @@ static void atmel_hlcdc_crtc_mode_set_nofb(struct drm_crtc *c)
+ 		     (adj->crtc_hdisplay - 1) |
+ 		     ((adj->crtc_vdisplay - 1) << 16));
+ 
+-	cfg = 0;
++	cfg = ATMEL_HLCDC_CLKSEL;
+ 
+-	prate = clk_get_rate(crtc->dc->hlcdc->sys_clk);
++	prate = 2 * clk_get_rate(crtc->dc->hlcdc->sys_clk);
+ 	mode_rate = adj->crtc_clock * 1000;
+-	if ((prate / 2) < mode_rate) {
+-		prate *= 2;
+-		cfg |= ATMEL_HLCDC_CLKSEL;
+-	}
+ 
+ 	div = DIV_ROUND_UP(prate, mode_rate);
+-	if (div < 2)
++	if (div < 2) {
+ 		div = 2;
++	} else if (ATMEL_HLCDC_CLKDIV(div) & ~ATMEL_HLCDC_CLKDIV_MASK) {
++		/* The divider ended up too big, try a lower base rate. */
++		cfg &= ~ATMEL_HLCDC_CLKSEL;
++		prate /= 2;
++		div = DIV_ROUND_UP(prate, mode_rate);
++		if (ATMEL_HLCDC_CLKDIV(div) & ~ATMEL_HLCDC_CLKDIV_MASK)
++			div = ATMEL_HLCDC_CLKDIV_MASK;
++	}
+ 
+ 	cfg |= ATMEL_HLCDC_CLKDIV(div);
+ 
 -- 
-2.17.1
+2.11.0
