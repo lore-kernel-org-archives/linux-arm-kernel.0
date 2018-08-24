@@ -1,103 +1,226 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Fri, 24 Aug 2018 16:03:40 -0700
-Subject: [PATCH 1/7] dt-bindings: Add DT bindings documentation for
- Allwinner Thermal Sensor Controller
-In-Reply-To: <20180824215921.59d060b54eb3a1e7d1552bde@bidouilliste.com>
-References: <20180804070355.14857-1-manu@freebsd.org>
- <20180820111755.rzg7l2lznmbpuf2e@flea>
- <CAL_JsqLVQDRH1esAXghfQdxmp+iorWVCArM2qTwjbgmQzmhzQw@mail.gmail.com>
- <20180820140737.xmqhu5ndqzehvkql@flea>
- <20180820162715.49e6d8a469ece983f3c1d288@bidouilliste.com>
- <20180824145840.isdcg3fr6mw4ntzg@flea>
- <20180824215921.59d060b54eb3a1e7d1552bde@bidouilliste.com>
-Message-ID: <20180824230338.GA19399@localhost.localdomain>
+From: shuah@kernel.org (Shuah Khan (Samsung OSG))
+Date: Fri, 24 Aug 2018 17:05:59 -0600
+Subject: [PATCH] arm64: add NUMA emulation support
+Message-ID: <20180824230559.32336-1-shuah@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2018 at 09:59:21PM +0200, Emmanuel Vadot wrote:
-> 
->  Hi,
-> 
-> On Fri, 24 Aug 2018 16:58:40 +0200
-> Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> 
-> > Hi,
-> > 
-> > On Mon, Aug 20, 2018 at 04:27:15PM +0200, Emmanuel Vadot wrote:
-> > > On Mon, 20 Aug 2018 16:07:37 +0200
-> > > Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > 
-> > > > On Mon, Aug 20, 2018 at 07:41:22AM -0600, Rob Herring wrote:
-> > > > > On Mon, Aug 20, 2018 at 5:17 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > > > >
-> > > > > > On Sat, Aug 04, 2018 at 09:03:49AM +0200, Emmanuel Vadot wrote:
-> > > > > > > This patch adds documentation for Device-Tree bindings for the Allwinner
-> > > > > > > Thermal Sensor Controller found on the H3, H5 and A64 SoCs
-> > > > > > >
-> > > > > > > Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
-> > > > > >
-> > > > > > I'm not going to merge a binding for a device that doesn't have any
-> > > > > > driver implemented at the moment in Linux.
-> > > > > 
-> > > > > I'll take it then. Linux is not the only DT client.
-> > > > 
-> > > > Then don't complain if we ever have to break the ABI. We never tested
-> > > > that hardware, never had any code running on it, and it *will* cause
-> > > > some issues. For example, the calibration data have never been used
-> > > > and how they should be represented have never been described, since no
-> > > > one ever actually tried to use it.
-> > > > 
-> > > > And sure, Linux is not the only DT client. Just like FreeBSD isn't.
-> > > 
-> > >  What kind of data would you need for me to make things better ?
-> > >  We have the driver in FreeBSD for almost two years now, whne I started
-> > > to see how to upstream it I noticed a lot of problems and spent 4 or 5
-> > > days to try on all the SoCs mentionned in the serie, the only SoC I
-> > > didn't include it the A83T as for some reason I couldn't make the
-> > > driver work.
-> > 
-> > Do you have a link to that driver? 
-> 
->  https://github.com/freebsd/freebsd/blob/master/sys/arm/allwinner/aw_thermal.c
-> 
-> > How and how much did you test it?
-> 
->  Using a cheap IR thermometer as it's all I can afford.
->  Then running multiples cpufreq-a53 process and comparing the result.
->  Did the same without using the calibration data, result where closer
-> when I used them.
-> 
-> > Are you using the calibration data stored in the SID?
-> 
->  Yes, which is why the serie contain the nvmem cell for the SID.
-> 
-> > 
-> > > I just hope that you understand that we cannot wait for Linux to
-> > > have a driver to have some bindings.
-> > 
-> > Just like I'm sure you can understand that just merging the DT bits
-> > without testing anything caused some troubles in the past, and I don't
-> > want to discover it in a year from now.
-> 
->  I do, I don't like wrong DT info as much as you do I think. I had
-> the unfortunate event to find that the sun4i-a10-timer compatible used
-> in every soc is plain wrong for !A10 and !A13, patches comming soon.
->  I want those bits merged but I also want that they reflect reality,
-> this is not a hard driver to do, NetBSD also have one I think, maybe
-> OpenBSD do to.
+Add NUMA emulation support to emulate NUMA on non-NUMA platforms. A new
+CONFIG_NUMA_EMU option enables NUMA emulation and a new kernel command
+line option "numa=fake=N" allows users to specify the configuration for
+emulation.
 
+When NUMA emulation is enabled, a flat (non-NUMA) machine will be split
+into virtual NUMA nodes when booted with "numa=fake=N", where N is the
+number of nodes, the system RAM will be split into N equal chunks and
+assigned to each node.
 
-I would prefer to see a series of DT bindings + driver. Can you send
-your next iteration with the driver so we can review both together?
+Emulated nodes are bounded by MAX_NUMNODES and the number of memory block
+count to avoid splitting memory blocks across NUMA nodes.
 
-> 
-> > Maxime
-> > 
-> > -- 
-> > Maxime Ripard, Bootlin
-> > Embedded Linux and Kernel engineering
-> > https://bootlin.com
-> 
-> 
-> -- 
-> Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+If NUMA emulation init fails, it will fall back to dummy NUMA init.
+
+This is tested on Raspberry Pi3b+ with ltp NUMA test suite, numactl, and
+numastat tools. In addition, tested in conjunction with cpuset cgroup to
+verify cpuset.cpus and cpuset.mems assignments.
+
+Signed-off-by: Shuah Khan (Samsung OSG) <shuah@kernel.org>
+---
+ arch/arm64/Kconfig            |   9 +++
+ arch/arm64/include/asm/numa.h |   8 +++
+ arch/arm64/mm/Makefile        |   1 +
+ arch/arm64/mm/numa.c          |   4 ++
+ arch/arm64/mm/numa_emu.c      | 109 ++++++++++++++++++++++++++++++++++
+ 5 files changed, 131 insertions(+)
+ create mode 100644 arch/arm64/mm/numa_emu.c
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 29e75b47becd..6e74d9995d24 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -740,6 +740,15 @@ config NUMA
+ 	  local memory of the CPU and add some more
+ 	  NUMA awareness to the kernel.
+ 
++config NUMA_EMU
++	bool "NUMA emulation"
++	depends on NUMA
++	help
++	  Enable NUMA emulation. A flat machine will be split into virtual
++	  nodes when booted with "numa=fake=N", where N is the number of
++	  nodes, the system RAM will be split into N equal chunks, and
++	  assigned to each node.
++
+ config NODES_SHIFT
+ 	int "Maximum NUMA Nodes (as a power of 2)"
+ 	range 1 10
+diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
+index 626ad01e83bf..16e8cc035872 100644
+--- a/arch/arm64/include/asm/numa.h
++++ b/arch/arm64/include/asm/numa.h
+@@ -29,6 +29,14 @@ static inline const struct cpumask *cpumask_of_node(int node)
+ }
+ #endif
+ 
++#ifdef CONFIG_NUMA_EMU
++void arm64_numa_emu_cmdline(char *str);
++extern int arm64_numa_emu_init(void);
++#else
++static inline void arm64_numa_emu_cmdline(char *str) {}
++static inline int arm64_numa_emu_init(void) { return -1; }
++#endif /* CONFIG_NUMA_EMU */
++
+ void __init arm64_numa_init(void);
+ int __init numa_add_memblk(int nodeid, u64 start, u64 end);
+ void __init numa_set_distance(int from, int to, int distance);
+diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+index 849c1df3d214..2c8634daeffa 100644
+--- a/arch/arm64/mm/Makefile
++++ b/arch/arm64/mm/Makefile
+@@ -8,6 +8,7 @@ obj-$(CONFIG_ARM64_PTDUMP_CORE)	+= dump.o
+ obj-$(CONFIG_ARM64_PTDUMP_DEBUGFS)	+= ptdump_debugfs.o
+ obj-$(CONFIG_NUMA)		+= numa.o
+ obj-$(CONFIG_DEBUG_VIRTUAL)	+= physaddr.o
++obj-$(CONFIG_NUMA_EMU)		+= numa_emu.o
+ KASAN_SANITIZE_physaddr.o	+= n
+ 
+ obj-$(CONFIG_KASAN)		+= kasan_init.o
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index 146c04ceaa51..9232f18e3992 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -43,6 +43,8 @@ static __init int numa_parse_early_param(char *opt)
+ 		return -EINVAL;
+ 	if (!strncmp(opt, "off", 3))
+ 		numa_off = true;
++	if (!strncmp(opt, "fake=", 5))
++		arm64_numa_emu_cmdline(opt + 5);
+ 
+ 	return 0;
+ }
+@@ -460,6 +462,8 @@ void __init arm64_numa_init(void)
+ 			return;
+ 		if (acpi_disabled && !numa_init(of_numa_init))
+ 			return;
++		if (!numa_init(arm64_numa_emu_init))
++			return;
+ 	}
+ 
+ 	numa_init(dummy_numa_init);
+diff --git a/arch/arm64/mm/numa_emu.c b/arch/arm64/mm/numa_emu.c
+new file mode 100644
+index 000000000000..97217adb029e
+--- /dev/null
++++ b/arch/arm64/mm/numa_emu.c
+@@ -0,0 +1,109 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * NUMA Emulation for non-NUMA platforms.
++ */
++
++#include <linux/numa.h>
++#include <linux/nodemask.h>
++#include <linux/pfn.h>
++#include <linux/bootmem.h>
++#include <linux/memblock.h>
++
++#include <asm/numa.h>
++
++static char *emu_cmdline __initdata;
++
++/*
++ * arm64_numa_emu_cmdline - parse early NUMA Emulation params.
++ */
++void __init arm64_numa_emu_cmdline(char *str)
++{
++	emu_cmdline = str;
++}
++
++/*
++ * arm64_numa_emu_init - Initialize NUMA Emulation
++ *
++ * Used when NUMA Emulation is enabled on a platform without underlying
++ * NUMA architecture.
++ */
++int __init arm64_numa_emu_init(void)
++{
++	u64 node_size;
++	int node_cnt = 0;
++	int mblk_cnt = 0;
++	int node = 0;
++	struct memblock_region *mblk;
++	bool split = false;
++	int ret;
++
++	pr_info("NUMA emulation init begin\n");
++
++	if (!emu_cmdline)
++		return -EINVAL;
++	/*
++	 * Split the system RAM into N equal chunks.
++	 */
++	ret = kstrtoint(emu_cmdline, 0, &node_cnt);
++	if (ret || node_cnt <= 0)
++		return -EINVAL;
++
++	if (node_cnt > MAX_NUMNODES)
++		node_cnt = MAX_NUMNODES;
++
++	node_size = PFN_PHYS(max_pfn) / node_cnt;
++	pr_info("NUMA emu: Node Size = %#018Lx Node = %d\n",
++		node_size, node_cnt);
++
++	for_each_memblock(memory, mblk)
++		mblk_cnt++;
++
++	/*
++	 * Size the node count to match the memory block count to avoid
++	 * splitting memory blocks across nodes. If there is only one
++	 * memory block split it.
++	 */
++	if (mblk_cnt <= node_cnt) {
++		pr_info("NUMA emu: Nodes (%d) >= Memblocks (%d)\n",
++			node_cnt, mblk_cnt);
++		if (mblk_cnt == 1) {
++			split = true;
++			pr_info("NUMA emu: Splitting single Memory Block\n");
++		} else {
++			node_cnt = mblk_cnt;
++			pr_info("NUMA emu: Adjust Nodes = Memory Blocks\n");
++		}
++	}
++
++	for_each_memblock(memory, mblk) {
++
++		if (split) {
++			for (node = 0; node < node_cnt; node++) {
++				u64 start, end;
++
++				start = mblk->base + node * node_size;
++				end = start + node_size;
++				pr_info("Adding an emulation node %d for [mem %#018Lx-%#018Lx]\n",
++					node, start, end);
++				ret = numa_add_memblk(node, start, end);
++				if (!ret)
++					continue;
++				pr_err("NUMA emulation init failed\n");
++				return ret;
++			}
++			break;
++		}
++		pr_info("Adding a emulation node %d for [mem %#018Lx-%#018Lx]\n",
++			node, mblk->base, mblk->base + mblk->size);
++		ret = numa_add_memblk(node, mblk->base,
++				      mblk->base + mblk->size);
++		if (!ret)
++			continue;
++		pr_err("NUMA emulation init failed\n");
++		return ret;
++	}
++	pr_info("NUMA: added %d emulation nodes of %#018Lx size each\n",
++		node_cnt, node_size);
++
++	return 0;
++}
+-- 
+2.17.1
