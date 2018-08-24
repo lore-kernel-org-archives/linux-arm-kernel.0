@@ -1,25 +1,70 @@
-From: sz.lin@moxa.com (SZ Lin =?utf-8?B?KOael+S4iuaZuik=?=)
-Date: Fri, 24 Aug 2018 13:50:01 +0800
-Subject: [PATCH] Add DT support for Octavo Systems OSD3358-SM-RED based
- on TI AM335x
-In-Reply-To: <20180713163314.1099-1-neeraj.dantu@octavosystems.com>
-References: <20180713163314.1099-1-neeraj.dantu@octavosystems.com>
-Message-ID: <20180824055001.GA19335@localhost>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 24 Aug 2018 08:32:56 +0200
+Subject: [PATCH v3 4/6] mmc: uniphier-sd: add UniPhier SD/eMMC controller
+ driver
+In-Reply-To: <CAK7LNARYEf34cJG8=z4TgbuVAEzn=NMdOTH5tfMryHQX7uJrgg@mail.gmail.com>
+References: <1534999460-15111-1-git-send-email-yamada.masahiro@socionext.com>
+ <1534999460-15111-5-git-send-email-yamada.masahiro@socionext.com>
+ <CAPDyKFoW=wuYZw+VV6TncLgtMbFdvJCfYOzL8xg7x2WimqNN2A@mail.gmail.com>
+ <CAK7LNARYEf34cJG8=z4TgbuVAEzn=NMdOTH5tfMryHQX7uJrgg@mail.gmail.com>
+Message-ID: <CAPDyKFrx4rSE_SsQJYxT8UgPmKMhyXPQGz2-9Zt_ANh7Wy8VAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 24 August 2018 at 03:50, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> 2018-08-23 19:43 GMT+09:00 Ulf Hansson <ulf.hansson@linaro.org>:
+>> [...]
+>>
+>>> +static void uniphier_sd_external_dma_request(struct tmio_mmc_host *host,
+>>> +                                            struct tmio_mmc_data *pdata)
+>>> +{
+>>> +       struct uniphier_sd_priv *priv = uniphier_sd_priv(host);
+>>> +       struct dma_chan *chan;
+>>> +
+>>> +       chan = dma_request_chan(mmc_dev(host->mmc), "rx-tx");
+>>> +       if (IS_ERR(chan)) {
+>>> +               dev_warn(mmc_dev(host->mmc),
+>>> +                        "failed to request DMA channel. falling back to PIO\n");
+>>> +               return; /* just use PIO even for -EPROBE_DEFER */
+>>> +       }
+>>> +
+>>> +       /* this driver uses a single channel for both RX an TX */
+>>> +       priv->chan = chan;
+>>> +       host->chan_rx = chan;
+>>> +       host->chan_tx = chan;
+>>> +
+>>> +       tasklet_init(&host->dma_issue, uniphier_sd_external_dma_issue,
+>>> +                    (unsigned long)host);
+>>
+>> Isn't it time to get rid of tasklets for tmio?
+>>
+>> No worries, I don't require that to be changed prior $subject patch,
+>> however using threaded IRQs is a justified modernization for the tmio
+>> variants.
+>
+>
+> Yeah, I also thought this.
+>
+> But, the irq handler is in the TMIO common code,
+> so it would affect Renesas code.
 
-<snip>
+Yep.
 
-> diff --git a/arch/arm/boot/dts/am335x-osd3358-sm-red.dts b/arch/arm/boot/dts/am335x-osd3358-sm-red.dts
-> new file mode 100755
+>
+> tmio-mmc has lots to be improved.
+> Tasklet is not the only problem.
 
-I think the permission here should be 100644 instead of 100755.
+Sure.
 
-> index 0000000..4d96901
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/am335x-osd3358-sm-red.dts
+>
+>
+> Before investing more effort,
+> I want working code base for my platform.
 
--- 
-SZ Lin (???) 
+Totally acceptable!
+
+[...]
+
+Kind regards
+Uffe
