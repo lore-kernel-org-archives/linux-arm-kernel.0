@@ -1,112 +1,31 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 24 Aug 2018 08:47:21 +0200
-Subject: [PATCH v8 04/26] PM / Domains: Add support for CPU devices to
- genpd
-In-Reply-To: <CAJZ5v0jah=aiYoV_b_p=-x+puO0sxeGRBCtJnQAD8xb8p1QGfg@mail.gmail.com>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <20180620172226.15012-5-ulf.hansson@linaro.org>
- <1678369.6pMUSOvdlV@aspire.rjw.lan>
- <CAPDyKFq=m7ad66SwiOr+4ab=e7PNiXrXJ6c8G0ZTPOdO1RQ_6g@mail.gmail.com>
- <CAJZ5v0jah=aiYoV_b_p=-x+puO0sxeGRBCtJnQAD8xb8p1QGfg@mail.gmail.com>
-Message-ID: <CAPDyKFpatx81aMrbDtaeNPH=FXBYPCHsog3i=a0VN5=Q8if0=Q@mail.gmail.com>
+From: hanjie.lin@amlogic.com (Hanjie Lin)
+Date: Fri, 24 Aug 2018 15:33:24 +0800
+Subject: [PATCH v2 0/2] add the Amlogic Meson PCIe phy driver
+Message-ID: <1535096006-152091-1-git-send-email-hanjie.lin@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2018 at 11:36, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> On Fri, Aug 3, 2018 at 1:43 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 19 July 2018 at 12:25, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->>> On Wednesday, June 20, 2018 7:22:04 PM CEST Ulf Hansson wrote:
->>>> To enable a device belonging to a CPU to be attached to a PM domain managed
->>>> by genpd, let's do a few changes to genpd as to make it convenient to
->>>> manage the specifics around CPUs.
->>>>
->>>> First, as to be able to quickly find out what CPUs that are attached to a
->>>> genpd, which typically becomes useful from a genpd governor as following
->>>> changes is about to show, let's add a cpumask 'cpus' to the struct
->>>> generic_pm_domain.
->>>>
->>>> At the point when a device that belongs to a CPU, is attached/detached to
->>>> its corresponding PM domain via genpd_add_device(), let's update the
->>>> cpumask in genpd->cpus. Moreover, propagate the update of the cpumask to
->>>> the master domains, which makes the genpd->cpus to contain a cpumask that
->>>> hierarchically reflect all CPUs for a genpd, including CPUs attached to
->>>> subdomains.
->>>>
->>>> Second, to unconditionally manage CPUs and the cpumask in genpd->cpus, is
->>>> unnecessary for cases when only non-CPU devices are parts of a genpd.
->>>> Let's avoid this by adding a new configuration bit, GENPD_FLAG_CPU_DOMAIN.
->>>> Clients must set the bit before they call pm_genpd_init(), as to instruct
->>>> genpd that it shall deal with CPUs and thus manage the cpumask in
->>>> genpd->cpus.
->>>>
->>>> Cc: Lina Iyer <ilina@codeaurora.org>
->>>> Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
->>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>>> ---
->>>>  drivers/base/power/domain.c | 69 ++++++++++++++++++++++++++++++++++++-
->>>>  include/linux/pm_domain.h   |  3 ++
->>>>  2 files changed, 71 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->>>> index 21d298e1820b..6149ce0bfa7b 100644
->>>> --- a/drivers/base/power/domain.c
->>>> +++ b/drivers/base/power/domain.c
->>>> @@ -20,6 +20,7 @@
->>>>  #include <linux/sched.h>
->>>>  #include <linux/suspend.h>
->>>>  #include <linux/export.h>
->>>> +#include <linux/cpu.h>
->>>>
->>>>  #include "power.h"
->>>>
->>>> @@ -126,6 +127,7 @@ static const struct genpd_lock_ops genpd_spin_ops = {
->>>>  #define genpd_is_irq_safe(genpd)     (genpd->flags & GENPD_FLAG_IRQ_SAFE)
->>>>  #define genpd_is_always_on(genpd)    (genpd->flags & GENPD_FLAG_ALWAYS_ON)
->>>>  #define genpd_is_active_wakeup(genpd)        (genpd->flags & GENPD_FLAG_ACTIVE_WAKEUP)
->>>> +#define genpd_is_cpu_domain(genpd)   (genpd->flags & GENPD_FLAG_CPU_DOMAIN)
->>>>
->>>>  static inline bool irq_safe_dev_in_no_sleep_domain(struct device *dev,
->>>>               const struct generic_pm_domain *genpd)
->>>> @@ -1377,6 +1379,62 @@ static void genpd_free_dev_data(struct device *dev,
->>>>       dev_pm_put_subsys_data(dev);
->>>>  }
->>>>
->>>> +static void __genpd_update_cpumask(struct generic_pm_domain *genpd,
->>>> +                                int cpu, bool set, unsigned int depth)
->>>> +{
->>>> +     struct gpd_link *link;
->>>> +
->>>> +     if (!genpd_is_cpu_domain(genpd))
->>>> +             return;
->>>> +
->>>> +     list_for_each_entry(link, &genpd->slave_links, slave_node) {
->>>> +             struct generic_pm_domain *master = link->master;
->>>> +
->>>> +             genpd_lock_nested(master, depth + 1);
->>>> +             __genpd_update_cpumask(master, cpu, set, depth + 1);
->>>> +             genpd_unlock(master);
->>>> +     }
->>>> +
->>>> +     if (set)
->>>> +             cpumask_set_cpu(cpu, genpd->cpus);
->>>> +     else
->>>> +             cpumask_clear_cpu(cpu, genpd->cpus);
->>>> +}
->>>
->>> As noted elsewhere, there is a concern about the possible weight of this
->>> cpumask and I think that it would be good to explicitly put a limit on it.
->>
->> I have been digesting your comments on the series, but wonder if this
->> is still a relevant concern?
->
-> Well, there are systems with very large cpumasks and it is sort of
-> good to have that in mind when designing any code using them.
+This patcheset add the driver and dt-bindings for
+the Meson-PCIE-PHY controller.
 
-Right.
+Changes since v1: [0]
+ - move 'apb' and 'port' reset to ctrl driver
+ - format correcting
 
-So, if I avoid allocating the cpumask for those genpd structures that
-doesn't need it (those not having GENPD_FLAG_CPU_DOMAIN set), would
-that be sufficient to deal with your concern?
+[0] : https://lkml.org/lkml/2018/8/14/66 
 
-Kind regards
-Uffe
+Yue Wang (2):
+  dt-bindings: phy: add DT bindings for Amlogic Meson PCIe Phy
+    controller
+  PCI: meson: add the Amlogic Meson PCIe phy driver
+
+ .../bindings/phy/amlogic,meson-pcie-phy.txt        |  21 ++++
+ drivers/phy/amlogic/Kconfig                        |   8 ++
+ drivers/phy/amlogic/Makefile                       |   1 +
+ drivers/phy/amlogic/phy-meson-axg-pcie.c           | 124 +++++++++++++++++++++
+ 4 files changed, 154 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/amlogic,meson-pcie-phy.txt
+ create mode 100644 drivers/phy/amlogic/phy-meson-axg-pcie.c
+
+-- 
+2.7.4
