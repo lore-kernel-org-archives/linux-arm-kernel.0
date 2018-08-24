@@ -1,78 +1,36 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 24 Aug 2018 17:27:40 +0200
-Subject: [PATCH v2 01/29] nvmem: add support for cell lookups
-In-Reply-To: <20180824170848.29594318@bbrezillon>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180810080526.27207-2-brgl@bgdev.pl>
- <20180824170848.29594318@bbrezillon>
-Message-ID: <20180824152740.GD27483@lunn.ch>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 24 Aug 2018 08:28:39 -0700
+Subject: [GIT PULL] Reset controller changes for v4.19, part 2
+In-Reply-To: <1533551840.4204.11.camel@pengutronix.de>
+References: <1533551840.4204.11.camel@pengutronix.de>
+Message-ID: <CAOesGMiL=Vk1cZz9vbysT_ULd=grr0ij9QJiR7JPHMp+BvA3OQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2018 at 05:08:48PM +0200, Boris Brezillon wrote:
-> Hi Bartosz,
-> 
-> On Fri, 10 Aug 2018 10:04:58 +0200
-> Bartosz Golaszewski <brgl@bgdev.pl> wrote:
-> 
-> > +struct nvmem_cell_lookup {
-> > +	struct nvmem_cell_info	info;
-> > +	struct list_head	list;
-> > +	const char		*nvmem_name;
-> > +};
-> 
-> Hm, maybe I don't get it right, but this looks suspicious. Usually the
-> consumer lookup table is here to attach device specific names to
-> external resources.
-> 
-> So what I'd expect here is:
-> 
-> struct nvmem_cell_lookup {
-> 	/* The nvmem device name. */
-> 	const char *nvmem_name;
-> 
-> 	/* The nvmem cell name */
-> 	const char *nvmem_cell_name;
-> 
-> 	/*
-> 	 * The local resource name. Basically what you have in the
-> 	 * nvmem-cell-names prop.
-> 	 */
-> 	const char *conid;
-> };
-> 
-> struct nvmem_cell_lookup_table {
-> 	struct list_head list;
-> 
-> 	/* ID of the consumer device. */
-> 	const char *devid;
-> 
-> 	/* Array of cell lookup entries. */
-> 	unsigned int ncells;
-> 	const struct nvmem_cell_lookup *cells;
-> };
-> 
-> Looks like your nvmem_cell_lookup is more something used to attach cells
-> to an nvmem device, which is NVMEM provider's responsibility not the
-> consumer one.
+On Wed, Aug 8, 2018 at 4:47 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Dear arm-soc maintainers,
+>
+> The following changes since commit 6b39fd590aebca1a6a4c827f29f14d2b6df3939d:
+>
+>   reset: uniphier: add reset control support for SPI (2018-07-19 11:19:47 +0200)
+>
+> are available in the git repository at:
+>
+>   git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.19-2
+>
+> for you to fetch changes up to d903779b58be442f3afd2c51c46c7cf19c97684e:
+>
+>   reset: meson: add meson audio arb driver (2018-07-20 18:17:31 +0200)
+>
+> ----------------------------------------------------------------
+> Reset controller changes for v4.19, part 2
+>
+> This adds a single new driver for the Amlogic Meson Audio Memory Arbiter
+> resets.
 
-Hi Boris
+I didn't merge this in time for the main pull requests, but it's been
+sitting in -next through the reset tree so I merged it into a -late
+branch now and will send in tomorrow.
 
-There are cases where there is not a clear providier/consumer split. I
-have an x86 platform, with a few at24 EEPROMs on it. It uses an off
-the shelf Komtron module, placed on a custom carrier board. One of the
-EEPROMs contains the hardware variant information. Once i know the
-variant, i need to instantiate other I2C, SPI, MDIO devices, all using
-platform devices, since this is x86, no DT available.
 
-So the first thing my x86 platform device does is instantiate the
-first i2c device for the AT24. Once the EEPROM pops into existence, i
-need to add nvmem cells onto it. So at that point, the x86 platform
-driver is playing the provider role. Once the cells are added, i can
-then use nvmem consumer interfaces to get the contents of the cell,
-run a checksum, and instantiate the other devices.
-
-I wish the embedded world was all DT, but the reality is that it is
-not :-(
-
-    Andrew
+-Olof
