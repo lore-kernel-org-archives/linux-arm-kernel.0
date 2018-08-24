@@ -1,37 +1,41 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Fri, 24 Aug 2018 14:48:10 +0200
-Subject: [RFC PATCH v2 2/2] mtd: rawnand: meson: add support for Amlogic
- NAND flash controller
-In-Reply-To: <96e538a5-1232-11f2-8b9e-5ddb09dcc2de@amlogic.com>
-References: <20180719094612.5833-1-yixun.lan@amlogic.com>
- <20180719094612.5833-3-yixun.lan@amlogic.com>
- <20180801235045.5b4d8211@bbrezillon>
- <42877a0d-9830-0626-3f64-e49a326eaa3c@amlogic.com>
- <20180817155608.5929b37a@bbrezillon>
- <96e538a5-1232-11f2-8b9e-5ddb09dcc2de@amlogic.com>
-Message-ID: <20180824144810.31c929a5@bbrezillon>
+From: jan.tuerk@emtrion.com (Jan Tuerk)
+Date: Fri, 24 Aug 2018 15:26:11 +0200
+Subject: [PATCH v6 1/4] ARM: dts: imx: Add an cpu0 label for imx6dl devices.
+In-Reply-To: <20180822155137.10018-1-jan.tuerk@emtrion.com>
+References: <20180822155137.10018-1-jan.tuerk@emtrion.com>
+Message-ID: <20180824132617.43975-1-jan.tuerk@emtrion.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Aug 2018 22:08:42 +0800
-Liang Yang <liang.yang@amlogic.com> wrote:
+Adding the label cpu0 allows the adjustment of cpu-parameters
+by reference in overlaying dtsi files in the same way as it
+is possible for imx6q devices.
 
-> > You have to wait tWB, that's for sure.
-> >   
-> we have a maximum 32 commands fifo. when command is written into 
-> NFC_REG_CMD, it doesn't mean that command is executing right now, maybe 
-> it is buffering on the queue.Assume one ERASE operation, when 2nd 
-> command(0xd0) is written into NFC_REG_CMD and then come into 
-> NAND_OP_WAITRDY_INSTR, if I read the RB status by register, it may be 
-> wrong because 0xd0 may not being executed. it is unusual unless 
-> buffering two many command.
+Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
+---
+ arch/arm/boot/dts/imx6dl.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-You should flush the queue and wait for it to empty at the end of
-->exec_op().
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index f0607eb41df4..2ed10310a7b7 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -15,7 +15,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		cpu at 0 {
++		cpu0: cpu at 0 {
+ 			compatible = "arm,cortex-a9";
+ 			device_type = "cpu";
+ 			reg = <0>;
+-- 
+emtrion GmbH
+Alter Schlachthof 45
+76131 Karlsruhe
+GERMANY
+https://www.emtrion.de
 
-> so it seems that i still need to use nand_soft_waitrdy or wait cmd is 
-> executed somewhere.
-
-Don't you have a WAIT_FOR_RB instruction? What is NFC_CMD_RB for? Also,
-NFC_CMD_IDLE seems to allow you to add an arbitrary delay, and that's
-probably what you should use for tWB.
+Amtsgericht Mannheim
+HRB 110 300
+Gesch?ftsf?hrer: Dieter Baur, Ramona Maurer
