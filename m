@@ -1,75 +1,103 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Aug 2018 16:06:37 +0100
-Subject: [PATCH v2 4/4] iommu/rockchip: Move irq request past pm_runtime_enable
-In-Reply-To: <20180824150637.15316-1-marc.zyngier@arm.com>
-References: <20180824150637.15316-1-marc.zyngier@arm.com>
-Message-ID: <20180824150637.15316-5-marc.zyngier@arm.com>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Fri, 24 Aug 2018 17:58:24 +0200
+Subject: [PATCH v1 2/7] dt-binding: add bindings for Atmel LCDC mfd
+In-Reply-To: <20180824104517.29f24f44@bbrezillon>
+References: <20180812184152.GA22343@ravnborg.org>
+ <20180812184629.3808-2-sam@ravnborg.org>
+ <20180824104517.29f24f44@bbrezillon>
+Message-ID: <20180824155824.GC26678@ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling the interrupt early, before power has been applied to the
-device, can result in an interrupt being delivered too early if:
+Hi Boris.
 
-- the IOMMU shares an interrupt with a VOP
-- the VOP has a pending interrupt (after a kexec, for example)
+> > +The LCDC IP exposes two subdevices:
+> > + - a PWM chip: see ../pwm/atmel-lcdc-pwm.txt
+> > + - a Display Controller: see ../display/atmel/lcdc-display-controller.txt
+> > +
+> > +Example:
+> > +	lcdc0: lcdc at 700000 {
+> > +		compatible = "atmel,at91sam9263-lcdc-mfd";
+> > +		reg = <0x700000 0x1000>;
+> > +		interrupts = <26 IRQ_TYPE_LEVEL_HIGH 3>;
+> > +		clocks = <&lcd_clk>, <&lcd_clk>;
+> > +		clock-names = "lcdc_clk", "hclk";
+> > +
+> > +		lcdc-display-controller {
+> > +			compatible = "atmel,lcdc-display-controller";
+> > +			lcd-supply = <&lcdc_reg>;
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +
+> > +			port at 0 {
+> > +				reg = <0>;
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +				lcdc_panel_output: endpoint at 0 {
+> > +					reg = <0>;
+> > +					remote-endpoint = <&panel_input>;
+> > +				};
+> > +			};
+> > +		};
+> > +
+> > +		lcdc_pwm: lcdc-pwm {
+> > +			compatible = "atmel,lcdc-pwm";
+> > +			pinctrl-names = "default";
+> > +			pinctrl-0 = <&pinctrl_lcdc_pwm>;
+> > +			#pwm-cells = <3>;
+> > +		};
+> > +
+> > +	};
+> 
+> Also, I don't remember why I decided to declare distinct nodes for the
+> PWM and display controller, but you should probably try to only declare
+> the lcdc node. Something like that:
+> 
+> 	lcdc0: lcdc at 700000 {
+> 		compatible = "atmel,at91sam9263-lcdc";
+> 		reg = <0x700000 0x1000>;
+> 		interrupts = <26 IRQ_TYPE_LEVEL_HIGH 3>;
+> 		clocks = <&lcd_clk>, <&lcd_clk>;
+> 		clock-names = "lcdc_clk", "hclk";
+> 		pinctrl-names = "default";
+> 		pinctrl-0 = <&pinctrl_lcdc_pwm ...>;
+> 		#pwm-cells = <3>;
+> 		#address-cells = <1>;
+> 		#size-cells = <0>;
+> 
+> 		port at 0 {
+> 			reg = <0>;
+> 			#address-cells = <1>;
+> 			#size-cells = <0>;
+> 			lcdc_panel_output: endpoint at 0 {
+> 				reg = <0>;
+> 				remote-endpoint = <&panel_input>;
+> 			};
+> 		};
+> 	};
+> 
+> Note that this representation does not prevent us from having an MFD
+> which declares the PWM and Display Engine, it's just that all devs will
+> point to the same of_node.
 
-In these conditions, we end-up taking the interrupt without
-the IOMMU being ready to handle the interrupt (not powered on).
+I have something similar in my tree now, just need to figure out the mfd parts.
 
-Moving the interrupt request past the pm_runtime_enable() call
-makes sure we can at least access the IOMMU registers. Note that
-this is only a partial fix, and that the VOP interrupt will still
-be screaming until the VOP driver kicks in, which advocates for
-a more synchronized interrupt enabling/disabling approach.
+> 
+> > +
+> > +		lcdc-display-controller {
+> > +			compatible = "atmel,lcdc-display-controller";
+> > +			lcd-supply = <&lcdc_reg>;
+> 
+> Hm, is this a regulator for the LCD controller or the LCD? If it's for
+> the LCD it should be placed under the panel node.
+It was added only because I could do it and I was (and continue to be) a
+DT newbie.  Will drop it in v2 as this is just an example which this part do
+not add any value to.
 
-Fixes: 0f181d3cf7d98 ("iommu/rockchip: Add runtime PM support")
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/iommu/rockchip-iommu.c | 24 +++++++++++++-----------
- 1 file changed, 13 insertions(+), 11 deletions(-)
+> > +	panel: panel {
+> > +		compatible = "logictechnologies,lttd800480070-l2rt", "simple-panel";
+Reminds me that I need to dig out a panel-simple patch for a few
+displays I use (logic + seiko).
+But they are otherwise not related to this work.
 
-diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index 4e0f9b61cd7f..2b1724e8d307 100644
---- a/drivers/iommu/rockchip-iommu.c
-+++ b/drivers/iommu/rockchip-iommu.c
-@@ -1161,17 +1161,6 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 	if (iommu->num_mmu == 0)
- 		return PTR_ERR(iommu->bases[0]);
- 
--	i = 0;
--	while ((irq = platform_get_irq(pdev, i++)) != -ENXIO) {
--		if (irq < 0)
--			return irq;
--
--		err = devm_request_irq(iommu->dev, irq, rk_iommu_irq,
--				       IRQF_SHARED, dev_name(dev), iommu);
--		if (err)
--			return err;
--	}
--
- 	iommu->reset_disabled = device_property_read_bool(dev,
- 					"rockchip,disable-mmu-reset");
- 
-@@ -1228,6 +1217,19 @@ static int rk_iommu_probe(struct platform_device *pdev)
- 
- 	pm_runtime_enable(dev);
- 
-+	i = 0;
-+	while ((irq = platform_get_irq(pdev, i++)) != -ENXIO) {
-+		if (irq < 0)
-+			return irq;
-+
-+		err = devm_request_irq(iommu->dev, irq, rk_iommu_irq,
-+				       IRQF_SHARED, dev_name(dev), iommu);
-+		if (err) {
-+			pm_runtime_disable(dev);
-+			goto err_remove_sysfs;
-+		}
-+	}
-+
- 	return 0;
- err_remove_sysfs:
- 	iommu_device_sysfs_remove(&iommu->iommu);
--- 
-2.18.0
+	Sam
