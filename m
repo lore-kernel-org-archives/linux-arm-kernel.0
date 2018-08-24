@@ -1,103 +1,94 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 24 Aug 2018 07:36:38 +0000
-Subject: [PATCH V5 0/5] soc: imx: add scu firmware api support
-In-Reply-To: <AM0PR04MB4211F68CCD399243613F8D7B80320@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
- <AM0PR04MB4211F68CCD399243613F8D7B80320@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <AM0PR04MB4211F748DBD1FE64A2B2136980360@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: hanjie.lin@amlogic.com (Hanjie Lin)
+Date: Fri, 24 Aug 2018 15:36:03 +0800
+Subject: [PATCH v2 1/2] dt-bindings: PCI: meson: add DT bindings for Amlogic
+ Meson PCIe controller
+In-Reply-To: <1535096165-45827-1-git-send-email-hanjie.lin@amlogic.com>
+References: <1535096165-45827-1-git-send-email-hanjie.lin@amlogic.com>
+Message-ID: <1535096165-45827-2-git-send-email-hanjie.lin@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi & Sasha,
+From: Yue Wang <yue.wang@amlogic.com>
 
-Do you have some suggestions about this patch series?
+The Amlogic Meson PCIe host controller is based on the Synopsys DesignWare
+PCI core. This patch adds documentation for the DT bindings in Meson PCIe
+controller.
 
-Regards
-Dong Aisheng
+Signed-off-by: Yue Wang <yue.wang@amlogic.com>
+Signed-off-by: Hanjie Lin <hanjie.lin@amlogic.com>
+---
+ .../devicetree/bindings/pci/amlogic,meson-pcie.txt | 63 ++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
 
-> -----Original Message-----
-> From: A.s. Dong
-> Sent: Tuesday, August 21, 2018 12:32 AM
-> To: Jassi Brar <jassisinghbrar@gmail.com>; Sascha Hauer
-> <s.hauer@pengutronix.de>
-> Cc: dongas86 at gmail.com; kernel at pengutronix.de; shawnguo at kernel.org;
-> Fabio Estevam <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>;
-> linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH V5 0/5] soc: imx: add scu firmware api support
-> 
-> Hi Jassi & Sascha,
-> 
-> Would you help review this new version patch series?
-> 
-> It's changed to generic MU driver using 8 separately MU channels according to
-> Jassi's suggestion.
-> Please help check if this is okay to you.
-> 
-> Regards
-> Dong Aisheng
-> 
-> > -----Original Message-----
-> > From: A.s. Dong
-> > Sent: Tuesday, August 21, 2018 12:08 AM
-> > To: linux-arm-kernel at lists.infradead.org
-> > Cc: dongas86 at gmail.com; kernel at pengutronix.de; shawnguo at kernel.org;
-> > Fabio Estevam <fabio.estevam@nxp.com>; dl-linux-imx <linux-
-> > imx at nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
-> > Subject: [PATCH V5 0/5] soc: imx: add scu firmware api support
-> >
-> > Unlike the former i.MX Architectures, the new generation i.MX8 SoCs (e.g.
-> > MX8QXP and MX8QM) contain a system controller which runs on a
-> > dedicated Cortex-M core to provide power, clock, Pad, and resource
-> management.
-> > Communication between the host processor running an OS and the system
-> > controller happens through a SCU protocol.
-> > This patchset adds the SCU APIs which is implemented based on MU and
-> > will be used by different system components.
-> >
-> > It mainly consists of below parts:
-> > 1) SCU IPC
-> >    Basic IPC mechanism implemention based on mailbox which is used
-> >    for communication between AP and SCU firmware.
-> > 2) SCU IPC Service API
-> >
-> > Dong Aisheng (5):
-> >   dt-bindings: arm: fsl: add scu binding doc
-> >   soc: imx: add SC firmware IPC and APIs
-> >   soc: imx: sc: add pm svc support
-> >   soc: imx: sc: add pad svc support
-> >   soc: imx: sc: add misc svc support
-> >
-> >  .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 179 ++++++
-> >  drivers/soc/imx/Kconfig                            |   4 +
-> >  drivers/soc/imx/Makefile                           |   1 +
-> >  drivers/soc/imx/sc/Makefile                        |   5 +
-> >  drivers/soc/imx/sc/main/ipc.c                      | 258 +++++++++
-> >  drivers/soc/imx/sc/main/rpc.h                      |  51 ++
-> >  drivers/soc/imx/sc/svc/misc/rpc_clnt.c             | 106 ++++
-> >  drivers/soc/imx/sc/svc/pad/rpc_clnt.c              |  82 +++
-> >  drivers/soc/imx/sc/svc/pm/rpc_clnt.c               | 275 +++++++++
-> >  include/soc/imx/sc/ipc.h                           |  46 ++
-> >  include/soc/imx/sc/sci.h                           |  20 +
-> >  include/soc/imx/sc/svc/misc/api.h                  |  60 ++
-> >  include/soc/imx/sc/svc/pad/api.h                   |  60 ++
-> >  include/soc/imx/sc/svc/pm/api.h                    | 229 ++++++++
-> >  include/soc/imx/sc/types.h                         | 636
-> +++++++++++++++++++++
-> >  15 files changed, 2012 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-> >  create mode 100644 drivers/soc/imx/sc/Makefile  create mode 100644
-> > drivers/soc/imx/sc/main/ipc.c  create mode 100644
-> > drivers/soc/imx/sc/main/rpc.h  create mode 100644
-> > drivers/soc/imx/sc/svc/misc/rpc_clnt.c
-> >  create mode 100644 drivers/soc/imx/sc/svc/pad/rpc_clnt.c
-> >  create mode 100644 drivers/soc/imx/sc/svc/pm/rpc_clnt.c
-> >  create mode 100644 include/soc/imx/sc/ipc.h  create mode 100644
-> > include/soc/imx/sc/sci.h  create mode 100644
-> > include/soc/imx/sc/svc/misc/api.h  create mode 100644
-> > include/soc/imx/sc/svc/pad/api.h  create mode 100644
-> > include/soc/imx/sc/svc/pm/api.h  create mode 100644
-> > include/soc/imx/sc/types.h
-> >
-> > --
-> > 2.7.4
+diff --git a/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
+new file mode 100644
+index 0000000..8a831d1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
+@@ -0,0 +1,63 @@
++Amlogic Meson AXG DWC PCIE SoC controller
++
++Amlogic Meson PCIe host controller is based on the Synopsys DesignWare PCI core.
++It shares common functions with the PCIe DesignWare core driver and
++inherits common properties defined in
++Documentation/devicetree/bindings/pci/designware-pci.txt.
++
++Additional properties are described here:
++
++Required properties:
++- compatible:
++	should contain "amlogic,axg-pcie" to identify the core.
++- reg:
++	Should contain the configuration address space.
++- reg-names: Must be
++	- "elbi"	External local bus interface registers
++	- "cfg"		Meson specific registers
++	- "config"	PCIe configuration space
++- reset-gpios: The GPIO to generate PCIe PERST# assert and deassert signal.
++- clocks: Must contain an entry for each entry in clock-names.
++- clock-names: Must include the following entries:
++	- "pclk"       PCIe GEN 100M PLL clock
++	- "port"       PCIe_x(A or B) RC clock gate
++	- "general"    PCIe Phy clock
++	- "mipi"       PCIe_x(A or B) 100M ref clock gate
++- resets: phandle to the reset lines.
++- reset-names: must contain "phy" and "peripheral"
++       - "port" Port A or B reset
++       - "apb" APB reset
++
++Example configuration:
++
++	pcie: pcie at f9800000 {
++			compatible = "amlogic,axg-pcie", "snps,dw-pcie";
++			reg = <0x0 0xf9800000 0x0 0x400000
++					0x0 0xff646000 0x0 0x2000
++					0x0 0xf9f00000 0x0 0x100000>;
++			reg-names = "elbi", "cfg", "config";
++			reset-gpios = <&gpio GPIOX_19 GPIO_ACTIVE_HIGH>;
++			interrupts = <GIC_SPI 177 IRQ_TYPE_EDGE_RISING>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0 0 0 0 &gic GIC_SPI 179 IRQ_TYPE_EDGE_RISING>;
++			bus-range = <0x0 0xff>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			phys = <&pcie_phy>;
++			ranges = <0x82000000 0 0 0x0 0xf9c00000 0 0x00300000>;
++
++			clocks = <&clkc CLKID_USB
++					&clkc CLKID_MIPI_ENABLE
++					&clkc CLKID_PCIE_A
++					&clkc CLKID_PCIE_CML_EN0>;
++			clock-names = "general",
++					"mipi",
++					"pclk",
++					"port";
++			resets = <&reset RESET_PCIE_A>,
++				<&reset RESET_PCIE_APB>;
++			reset-names = "port",
++					"apb";
++	};
+-- 
+2.7.4
