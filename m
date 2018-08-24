@@ -1,78 +1,40 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Aug 2018 16:52:40 +0100
-Subject: [RFC PATCH 05/11] arm64: tlbflush: Allow stride to be specified for
- __flush_tlb_range()
+Date: Fri, 24 Aug 2018 16:52:42 +0100
+Subject: [RFC PATCH 07/11] asm-generic/tlb: Guard with #ifdef CONFIG_MMU
 In-Reply-To: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
 References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1535125966-7666-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1535125966-7666-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we are unmapping intermediate page-table entries or huge pages, we
-don't need to issue a TLBI instruction for every PAGE_SIZE chunk in the
-VA range being unmapped.
-
-Allow the invalidation stride to be passed to __flush_tlb_range(), and
-adjust our "just nuke the ASID" heuristic to take this into account.
+The inner workings of the mmu_gather-based TLB invalidation mechanism
+are not relevant to nommu configurations, so guard them with an ifdef.
+This allows us to implement future functions using static inlines
+without breaking the build.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/tlb.h      |  2 +-
- arch/arm64/include/asm/tlbflush.h | 11 +++++++----
- 2 files changed, 8 insertions(+), 5 deletions(-)
+ include/asm-generic/tlb.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
-index a3233167be60..1e1f68ce28f4 100644
---- a/arch/arm64/include/asm/tlb.h
-+++ b/arch/arm64/include/asm/tlb.h
-@@ -53,7 +53,7 @@ static inline void tlb_flush(struct mmu_gather *tlb)
- 	 * the __(pte|pmd|pud)_free_tlb() functions, so last level
- 	 * TLBI is sufficient here.
- 	 */
--	__flush_tlb_range(&vma, tlb->start, tlb->end, true);
-+	__flush_tlb_range(&vma, tlb->start, tlb->end, PAGE_SIZE, true);
- }
+diff --git a/include/asm-generic/tlb.h b/include/asm-generic/tlb.h
+index b3353e21f3b3..859f897d3d53 100644
+--- a/include/asm-generic/tlb.h
++++ b/include/asm-generic/tlb.h
+@@ -20,6 +20,8 @@
+ #include <asm/pgalloc.h>
+ #include <asm/tlbflush.h>
  
- static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index ddbf1718669d..1f77d08e638b 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -153,12 +153,15 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
- 
- static inline void __flush_tlb_range(struct vm_area_struct *vma,
- 				     unsigned long start, unsigned long end,
--				     bool last_level)
-+				     unsigned long stride, bool last_level)
- {
- 	unsigned long asid = ASID(vma->vm_mm);
- 	unsigned long addr;
- 
--	if ((end - start) > MAX_TLB_RANGE) {
-+	/* Convert the stride into units of 4k */
-+	stride >>= 12;
++#ifdef CONFIG_MMU
 +
-+	if ((end - start) > (MAX_TLB_RANGE * stride)) {
- 		flush_tlb_mm(vma->vm_mm);
- 		return;
- 	}
-@@ -167,7 +170,7 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
- 	end = __TLBI_VADDR(end, asid);
+ #ifdef CONFIG_HAVE_RCU_TABLE_FREE
+ /*
+  * Semi RCU freeing of the page directories.
+@@ -312,4 +314,5 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
  
- 	dsb(ishst);
--	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12)) {
-+	for (addr = start; addr < end; addr += stride) {
- 		if (last_level) {
- 			__tlbi(vale1is, addr);
- 			__tlbi_user(vale1is, addr);
-@@ -186,7 +189,7 @@ static inline void flush_tlb_range(struct vm_area_struct *vma,
- 	 * We cannot use leaf-only invalidation here, since we may be invalidating
- 	 * table entries as part of collapsing hugepages or moving page tables.
- 	 */
--	__flush_tlb_range(vma, start, end, false);
-+	__flush_tlb_range(vma, start, end, PAGE_SIZE, false);
- }
+ #define tlb_migrate_finish(mm) do {} while (0)
  
- static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end)
++#endif /* CONFIG_MMU */
+ #endif /* _ASM_GENERIC__TLB_H */
 -- 
 2.1.4
