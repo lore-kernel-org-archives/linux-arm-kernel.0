@@ -1,27 +1,38 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Fri, 24 Aug 2018 09:20:00 -0700
-Subject: [RFC PATCH 00/11] Avoid synchronous TLB invalidation for
- intermediate page-table entries on arm64
-In-Reply-To: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
-References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
-Message-ID: <CA+55aFxNs5B=j_g_OpAd=Xp_iiO_+idT-ogd_WM2EcL_6brbqg@mail.gmail.com>
+From: sebastien.szymanski@armadeus.com (=?UTF-8?q?S=C3=A9bastien=20Szymanski?=)
+Date: Fri, 24 Aug 2018 18:36:05 +0200
+Subject: [PATCH 1/1] ARM: dts: imx6ul: Add weim node
+Message-ID: <20180824163605.12521-1-sebastien.szymanski@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2018 at 8:52 AM Will Deacon <will.deacon@arm.com> wrote:
->
-> I hacked up this RFC on the back of the recent changes to the mmu_gather
-> stuff in mainline. It's had a bit of testing and it looks pretty good so
-> far.
+Add weim node for i.MX6UL SOC.
 
-Looks good to me.
+Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+---
+ arch/arm/boot/dts/imx6ul.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Apart from the arm64-specific question I had, I wonder whether we need
-to have that single "freed_tables" bit at all, since you wanted to
-have the four individual bits for the different levels.
-
-Even if somebody doesn't care about the individual bits, it's
-generally exactly as cheap to test four bits as it is to test one, so
-it seems unnecessary to have that summary bit.
-
-             Linus
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index 47a3453a4211..7b00efd93d18 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -912,6 +912,17 @@
+ 				reg = <0x021b0000 0x4000>;
+ 			};
+ 
++			weim: weim at 21b8000 {
++				#address-cells = <2>;
++				#size-cells = <1>;
++				compatible = "fsl,imx6ul-weim", "fsl,imx6q-weim";
++				reg = <0x021b8000 0x4000>;
++				interrupts = <0 14 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_EIM>;
++				fsl,weim-cs-gpr = <&gpr>;
++				status = "disabled";
++			};
++
+ 			ocotp: ocotp-ctrl at 21bc000 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-- 
+2.16.4
