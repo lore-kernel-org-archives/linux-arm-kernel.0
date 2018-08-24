@@ -1,76 +1,116 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 24 Aug 2018 08:38:04 -0700
-Subject: [PATCH] arm64: dts: Fix various entry-method properties to
- reflect documentation
-In-Reply-To: <CAHLCerNoRj6GQRF=NJXwc0U+mJNe=06JGADQr7uT-chD2W-J+A@mail.gmail.com>
-References: <113f28acbc55f64762c9f0bcefe076a811f2ed82.1535014078.git.amit.kucheria@linaro.org>
- <20180823153110.GA19131@e107155-lin>
- <CAHLCerNoRj6GQRF=NJXwc0U+mJNe=06JGADQr7uT-chD2W-J+A@mail.gmail.com>
-Message-ID: <CAOesGMjcs=h4DHn7coo5iixUUY2GR2wWeTyMWQ_SBE9rrPZQgg@mail.gmail.com>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Fri, 24 Aug 2018 17:43:29 +0200
+Subject: [PATCH v1 1/7] atmel-hlcdc: renamed directory to drm/atmel/
+In-Reply-To: <20180824102843.666bc465@bbrezillon>
+References: <20180812184152.GA22343@ravnborg.org>
+ <20180812184629.3808-1-sam@ravnborg.org>
+ <20180824102843.666bc465@bbrezillon>
+Message-ID: <20180824154329.GA26678@ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2018 at 1:02 PM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
-> (Adding arm-soc folks)
->
-> On Thu, Aug 23, 2018 at 9:01 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Hi Amit,
->>
->> Thanks for fixing this.
->>
->> On Thu, Aug 23, 2018 at 02:23:29PM +0530, Amit Kucheria wrote:
->>> The idle-states binding documentation[1] mentions that the
->>> 'entry-method' property is required on 64-bit platforms and must be
->>> set to "psci".
->>>
->>> commit a13f18f59d26 ("Documentation: arm: Fix typo in the idle-states
->>> bindings examples") attempted to fix this earlier but clearly more is
->>> needed.
->>>
->>
->> In fact, I assumed I fixed things with commit 978fa436231a ("drivers:
->> firmware: psci: unify enable-method binding on ARM {64,32}-bit systems"),
->> but I was wrong. I left quite a few instances including juno dtbs.
->>
->>> Fix the cpu-capacity.txt documentation that uses the incorrect value so
->>> we don't get copy-paste errors like these. Clarify the language in
->>> idle-states.txt by removing the reference to the psci bindings that
->>> might be causing this confusion.
->>>
->>> Finally, fix devicetrees of various boards to reflect current
->>> documentation.
->>>
->>> [1] Documentation/devicetree/bindings/arm/idle-states.txt (see
->>> idle-states node)
->>>
->>> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
->>> ---
->>>  Documentation/devicetree/bindings/arm/cpu-capacity.txt | 2 +-
->>>  Documentation/devicetree/bindings/arm/idle-states.txt  | 4 ++--
->>>  arch/arm64/boot/dts/arm/juno-r1.dts                    | 2 +-
->>>  arch/arm64/boot/dts/arm/juno-r2.dts                    | 2 +-
->>>  arch/arm64/boot/dts/arm/juno.dts                       | 2 +-
->>
->> For all the above files,
->>
->> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
->
-> Thanks for reviewing, Sudeep.
->
->> How do you plan to merge ? I prefer if you can send it via arm-soc as
->> fixes for this cycle with all the necessary acks. Otherwise you may have
->> to split this to send via platform maintainers which is bit mundane.
->
-> I was hoping to get this merged thru arm-soc tree instead of creating
-> a patch per platform. But if anybody feels strongly about it, I'm
-> happy to split them up and feed it through the platform maintainer
-> trees.
+Hi Boris.
 
-Given that we're at the tail end of the merge window, before -rc1,
-it's easiest if we just take it directly and platform maintainers base
-their new contents on top of it.
+On Fri, Aug 24, 2018 at 10:28:43AM +0200, Boris Brezillon wrote:
+> On Sun, 12 Aug 2018 20:46:23 +0200
+> Sam Ravnborg <sam@ravnborg.org> wrote:
+> 
+> > Use vendor name for directory, adding a suitable place
+> > for more atmel DRM drivers.
+> > 
+> > Signed-off-by: Sam Ravnborg <sam@ravnborg.org>
+> > Cc: Boris Brezillon <boris.brezillon@bootlin.com>
+> > ---
+> >  MAINTAINERS                                                 | 2 +-
+> >  drivers/gpu/drm/Kconfig                                     | 2 +-
+> >  drivers/gpu/drm/Makefile                                    | 2 +-
+> >  drivers/gpu/drm/{atmel-hlcdc => atmel}/Kconfig              | 6 ++++++
+> >  drivers/gpu/drm/{atmel-hlcdc => atmel}/Makefile             | 0
+> >  drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_crtc.c   | 0
+> >  drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_dc.c     | 0
+> >  drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_dc.h     | 0
+> >  drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_output.c | 0
+> >  drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_plane.c  | 0
+> >  10 files changed, 9 insertions(+), 3 deletions(-)
+> >  rename drivers/gpu/drm/{atmel-hlcdc => atmel}/Kconfig (83%)
+> >  rename drivers/gpu/drm/{atmel-hlcdc => atmel}/Makefile (100%)
+> >  rename drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_crtc.c (100%)
+> >  rename drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_dc.c (100%)
+> >  rename drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_dc.h (100%)
+> >  rename drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_output.c (100%)
+> >  rename drivers/gpu/drm/{atmel-hlcdc => atmel}/atmel_hlcdc_plane.c (100%)
+> > 
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index 96e98e206b0d..09ce76a9a1dc 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -4681,7 +4681,7 @@ DRM DRIVERS FOR ATMEL HLCDC
+> >  M:	Boris Brezillon <boris.brezillon@bootlin.com>
+> >  L:	dri-devel at lists.freedesktop.org
+> >  S:	Supported
+> > -F:	drivers/gpu/drm/atmel-hlcdc/
+> > +F:	drivers/gpu/drm/atmel/atmel-hlcdc*
+> 
+> 			      atmel_hlcdc*
+> 
+> Also, I think you can keep the whole directory, and add your name plus
+> update the entry description after adding code for the LCDC block.
 
-Applying to our next/late (i.e. merge-window-fixes) branch now.
+Thanks, will do so in v2.
 
+> 
+> >  F:	Documentation/devicetree/bindings/display/atmel/
+> >  T:	git git://anongit.freedesktop.org/drm/drm-misc
+> >  
+> > diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
+> > index 2a72d2feb76d..4130df0c0dba 100644
+> > --- a/drivers/gpu/drm/Kconfig
+> > +++ b/drivers/gpu/drm/Kconfig
+> > @@ -232,7 +232,7 @@ source "drivers/gpu/drm/cirrus/Kconfig"
+> >  
+> >  source "drivers/gpu/drm/armada/Kconfig"
+> >  
+> > -source "drivers/gpu/drm/atmel-hlcdc/Kconfig"
+> > +source "drivers/gpu/drm/atmel/Kconfig"
+> >  
+> >  source "drivers/gpu/drm/rcar-du/Kconfig"
+> >  
+> > diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+> > index ef9f3dab287f..ce9829967128 100644
+> > --- a/drivers/gpu/drm/Makefile
+> > +++ b/drivers/gpu/drm/Makefile
+> > @@ -76,7 +76,7 @@ obj-$(CONFIG_DRM_GMA500) += gma500/
+> >  obj-$(CONFIG_DRM_UDL) += udl/
+> >  obj-$(CONFIG_DRM_AST) += ast/
+> >  obj-$(CONFIG_DRM_ARMADA) += armada/
+> > -obj-$(CONFIG_DRM_ATMEL_HLCDC)	+= atmel-hlcdc/
+> > +obj-$(CONFIG_DRM_ATMEL)	+= atmel/
+> >  obj-$(CONFIG_DRM_RCAR_DU) += rcar-du/
+> >  obj-$(CONFIG_DRM_SHMOBILE) +=shmobile/
+> >  obj-y			+= omapdrm/
+> > diff --git a/drivers/gpu/drm/atmel-hlcdc/Kconfig b/drivers/gpu/drm/atmel/Kconfig
+> > similarity index 83%
+> > rename from drivers/gpu/drm/atmel-hlcdc/Kconfig
+> > rename to drivers/gpu/drm/atmel/Kconfig
+> > index 32bcc4bad06a..7cd3862f9d18 100644
+> > --- a/drivers/gpu/drm/atmel-hlcdc/Kconfig
+> > +++ b/drivers/gpu/drm/atmel/Kconfig
+> > @@ -1,6 +1,12 @@
+> > +config DRM_ATMEL
+> > +	bool
+> > +	help
+> > +	  Enable Atmel DRM support
+> > +
+> 
+> Not sure why you need an extra Kconfig option? And if you really do
+> (because you want to share common code), it should be implicitly
+> selected by DRM_ATMEL_HLCDC and DRM_ATMEL_LCDC.
 
--Olof
+The extra config option is to avoid exposing every single option
+to the drm makefile, and it is indeed selected by the individual
+drivers.
+Similar pattern used in arm/Kconfig.
+But I see most other places have a prompt that enable the drivers
+so I will change this to a prompt in v2.
+
+	Sam
