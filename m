@@ -1,108 +1,39 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 24 Aug 2018 11:38:28 +0100
-Subject: [PATCH v8 07/26] PM / Domains: Add genpd governor for CPUs
-In-Reply-To: <CAPDyKFp=AuqEPHKYgi-+DAhejQZSHixmtLORj_Rkn3m8fUoqJw@mail.gmail.com>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <20180620172226.15012-8-ulf.hansson@linaro.org>
- <3574880.GjmnMm1lMq@aspire.rjw.lan>
- <10360149.m4MlxDWZY5@aspire.rjw.lan>
- <CAPDyKFonHYSq32WxvB1x5PXissXZvraqazgU_ZyLR=tsyD9vAA@mail.gmail.com>
- <CAJZ5v0hX3gC0J_z1tMu-KkNBRf3GuJ91tbFC2Z+0D1BnHkY8kg@mail.gmail.com>
- <20180809153925.GA20329@red-moon>
- <CAPDyKFp=AuqEPHKYgi-+DAhejQZSHixmtLORj_Rkn3m8fUoqJw@mail.gmail.com>
-Message-ID: <20180824103828.GA11491@red-moon>
+From: Bhaskar.Upadhaya@nxp.com (Bhaskar Upadhaya)
+Date: Fri, 24 Aug 2018 12:32:07 +0530
+Subject: [PATCH] dt-bindings: Add compatible string for LS1028A-QDS
+Message-ID: <1535094127-5025-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2018 at 11:26:19AM +0200, Ulf Hansson wrote:
+Signed-off-by: Sudhanshu Gupta <sudhanshu.gupta@nxp.com>
+Signed-off-by: Rai Harninder <harninder.rai@nxp.com>
+Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+---
+ Documentation/devicetree/bindings/arm/fsl.txt | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-[...]
-
-> > That's a good question and it maybe gives a path towards a solution.
-> >
-> > AFAICS the genPD governor only selects the idle state parameter that
-> > determines the idle state at, say, GenPD cpumask level it does not touch
-> > the CPUidle decision, that works on a subset of idle states (at cpu
-> > level).
-> >
-> > That's my understanding, which can be wrong so please correct me
-> > if that's the case because that's a bit confusing.
-> >
-> > Let's imagine that we flattened out the list of idle states and feed
-> > CPUidle with it (all of them - cpu, cluster, package, system - as it is
-> > in the mainline _now_). Then the GenPD governor can run-through the
-> > CPUidle selection and _demote_ the idle state if necessary since it
-> > understands that some CPUs in the GenPD will wake up shortly and break
-> > the target residency hyphothesis the CPUidle governor is expecting.
-> >
-> > The whole idea about this series is improving CPUidle decision when
-> > the target idle state is _shared_ among groups of cpus (again, please
-> > do correct me if I am wrong).
-> 
-> Absolutely, this is one of the main reason for the series!
-> 
-> >
-> > It is obvious that a GenPD governor must only demote - never promote a
-> > CPU idle state selection given that hierarchy implies more power
-> > savings and higher target residencies required.
-> 
-> Absolutely. I apologize if I have been using the word "promote"
-> wrongly, I realize it may be a bit confusing.
-> 
-> >
-> > This whole series would become more generic and won't depend on
-> > PSCI OSI at all - actually that would become a hierarchical
-> > CPUidle governor.
-> 
-> Well, to me we need a first user of the new infrastructure code in
-> genpd and PSCI is probably the easiest one to start with. An option
-> would be to start with an old ARM32 platform, but it seems a bit silly
-> to me.
-
-If the code can be structured as described above as a hierarchical
-(possibly optional through a Kconfig entry or sysfs tuning) idle
-decision you can apply it to _any_ PSCI based platform out there,
-provided that the new governor improves power savings.
-
-> In regards to OS-initiated mode vs platform coordinated mode, let's
-> discuss that in details in the other email thread instead.
-
-I think that's crystal clear by now that IMHO PSCI OS-initiated mode is
-a red-herring, it has nothing to do with this series, it is there just
-because QC firmware does not support PSCI platform coordinated suspend
-mode.
-
-You can apply the concept in this series to _any_ arch provided
-the power domains representation is correct (and again, I would sound
-like a broken record but the series must improve power savings over
-vanilla CPUidle menu governor).
-
-> > I still think that PSCI firmware and most certainly mwait() play the
-> > role the GenPD governor does since they can detect in FW/HW whether
-> > that's worthwhile to switch off a domain, the information is obviously
-> > there and the kernel would just add latency to the idle path in that
-> > case but let's gloss over this for the sake of this discussion.
-> 
-> Yep, let's discuss that separately.
-> 
-> That said, can I interpret your comments on the series up until this
-> change, that you seems rather happy with where the series is going?
-
-It is something we have been discussing with Daniel since generic idle
-was merged for Arm a long while back. I have nothing against describing
-idle states with power domains but it must improve idle decisions
-against the mainline. As I said before, runtime PM can also be used
-to get rid of CPU PM notifiers (because with power domains we KNOW
-what devices eg PMU are switched off on idle entry, we do not guess
-any longer; replacing CPU PM notifiers is challenging and can be
-tackled - if required - in a different series).
-
-Bottom line (talk is cheap, I know and apologise about that): this
-series (up until this change) adds complexity to the idle path and lots
-of code; if its usage is made optional and can be switched on on systems
-where it saves power that's fine by me as long as we keep PSCI
-OS-initiated idle states out of the equation, that's an orthogonal
-discussion as, I hope, I managed to convey.
-
-Thanks,
-Lorenzo
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index ea08bf2..3e44804 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -163,6 +163,18 @@ LS1012A ARMv8 based QDS Board
+ Required root node properties:
+     - compatible = "fsl,ls1012a-qds", "fsl,ls1012a";
+ 
++LS1028A SoC
++Required root node properties:
++    - compatible = "fsl,ls1028a";
++
++LS1028A ARMv8 based RDB Board
++Required root node properties:
++    - compatible = "fsl,ls1028a-rdb", "fsl,ls1028a"
++
++LS1028A ARMv8 based QDS Board
++Required root node properties:
++    - compatible = "fsl,ls1028a-qds", "fsl,ls1028a";
++
+ LS1043A SoC
+ Required root node properties:
+     - compatible = "fsl,ls1043a";
+-- 
+1.9.1
