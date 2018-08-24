@@ -1,37 +1,54 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 24 Aug 2018 10:24:57 +0200
-Subject: [PATCH 2/2] arm64: dts: renesas: v3msk: add eMMC support
-In-Reply-To: <9f94612a-5035-b006-f6af-6bafb7ff91f3@cogentembedded.com>
-References: <1af46bf9-d9e5-8dcf-0ac7-a85e7348a34e@cogentembedded.com>
- <9da672a2-0269-4860-8912-189414b43d4c@cogentembedded.com>
- <20180822113100.edpyplj2kteomr2j@verge.net.au>
- <9f94612a-5035-b006-f6af-6bafb7ff91f3@cogentembedded.com>
-Message-ID: <20180824082456.d25w3kxyvkyouboh@verge.net.au>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 24 Aug 2018 10:55:01 +0200
+Subject: [PATCH 2/2] drm/atmel-hlcdc: allow selecting a higher pixel-clock
+ that requested
+In-Reply-To: <20180824085501.9740-1-peda@axentia.se>
+References: <20180824085501.9740-1-peda@axentia.se>
+Message-ID: <20180824085501.9740-3-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2018 at 05:43:11PM +0300, Sergei Shtylyov wrote:
-> On 08/22/2018 02:31 PM, Simon Horman wrote:
-> 
-> >> Add the eMMC chip support for the V3M Started Kit board.
-> >>
-> >> Based on the original (and large) patches by Vladimir Barinov.
-> >>
-> >> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> >> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > 
-> > Thanks,
-> > 
-> > This looks fine to me but I will wait to see if there are other reviews
-> > before applying.
-> > 
-> > Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > I am, however, curious to know about HS200.
-> > Is it supported on the v3msk? If so, do you have any plans to enable it?
-> 
->    As I've already said, the eMMC chip only receives 3.3V on all its voltage inputs.
+But only if the highest pixel-clock frequency lower than requested
+is significantly much less accurate that the lowest frequency higher
+than requested.
 
-Thanks Sergei, got it.
+I pulled "10 times" as the discriminator out of the hat, and went with
+that.
 
-I have applied this for v4.20.
+This is useful, if e.g. the target pixel-clock is 65MHz and the sys_clk
+is 132MHz. In this case the highest possible pixel-clock lower than the
+requested 65MHz is 52.8MHz, which is almost 20% off (and outside the
+spec for the panel). The lowest possible pixel-clock higher than 65MHz
+is 66MHz, which is a *much* better match, and only 1.5% off.
+
+Signed-off-by: Peter Rosin <peda@axentia.se>
+---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+index 71c9cd90d2ae..0c2717ed4ac6 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+@@ -116,6 +116,19 @@ static void atmel_hlcdc_crtc_mode_set_nofb(struct drm_crtc *c)
+ 		div = DIV_ROUND_UP(prate, mode_rate);
+ 		if (ATMEL_HLCDC_CLKDIV(div) & ~ATMEL_HLCDC_CLKDIV_MASK)
+ 			div = ATMEL_HLCDC_CLKDIV_MASK;
++	} else {
++		int div_low = prate / mode_rate;
++
++		if (div_low >= 2 &&
++		    ((prate / div_low - mode_rate) <
++		     10 * (mode_rate - prate / div)))
++			/*
++			 * At least 10 times better when
++			 * using a higher frequency than
++			 * requested, instead of a lower.
++			 * So, go with that.
++			 */
++			div = div_low;
+ 	}
+ 
+ 	cfg |= ATMEL_HLCDC_CLKDIV(div);
+-- 
+2.11.0
