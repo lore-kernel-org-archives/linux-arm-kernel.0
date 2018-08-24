@@ -1,28 +1,29 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 24 Aug 2018 11:48:13 +0300
-Subject: [PATCH 9/9] arm64: dts: renesas: r8a774a1: Add FCPF and FCPV
- instances
-In-Reply-To: <1535031788-19907-10-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1535031788-19907-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1535031788-19907-10-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <c27a266e-3eaa-a879-85ab-0e0aeb5f8b31@cogentembedded.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 24 Aug 2018 10:52:57 +0200
+Subject: [PATCH 2/5] arm64: dts: renesas: r8a774a1: Add SCIF and HSCIF
+ nodes
+In-Reply-To: <1535014731-64472-3-git-send-email-biju.das@bp.renesas.com>
+References: <1535014731-64472-1-git-send-email-biju.das@bp.renesas.com>
+ <1535014731-64472-3-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <20180824085257.uq4a34a3a6bw5w6g@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
-
-On 8/23/2018 4:43 PM, Fabrizio Castro wrote:
-
-> Add FCPF and FCPV instances to the r8a774a1 dtsi, similarly
-> to what was done for the r8a7796 with commits 41dbbf0c5 ("arm64: dts:
-> r8a7796: Add FCPF and FCPV instances"), 69490bc96 ("arm64: dts:
-> renesas: r8a7796: Point FDP1 via FCPF to IPMMU-VI0"), and cef942d0b
-> ("arm64: dts: renesas: r8a7796: Point VSPI via FCPVI to IPMMU-VC0").
-
-   Need to specify 12 hex digits of SHA1 when citing commits.
-
+On Thu, Aug 23, 2018 at 09:58:48AM +0100, Biju Das wrote:
+> From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> 
+> Add the device nodes for all RZ/G2M SCIF and HSCIF serial ports,
+> incl. clocks, power domains and DMAs.
+> According to the HW user manual, SCIF[015] and HSCIF[012] are
+> connected to both SYS-DMAC1 and SYS-DMAC2, while SCIF[34] and
+> HSCIF[34] are connected to SYS-DMAC0.
+> 
 > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-[...]
 
-MBR, Sergei
+Thanks,
+
+This looks fine to me but I will wait to see if there are other reviews
+before applying.
+
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
