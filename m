@@ -1,62 +1,31 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 24 Aug 2018 10:35:23 -0500
-Subject: [PATCH v7 2/8] dt-bindings: Introduce interconnect provider
- bindings
-In-Reply-To: <672e6c6c-222f-5e7f-5d0c-acc8da68b1ab@linaro.org>
-References: <20180731161340.13000-1-georgi.djakov@linaro.org>
- <20180731161340.13000-3-georgi.djakov@linaro.org>
- <CABGGisxq+hf91R18pnZ=VZ9f99GssWWPhpPCjNAROJmKg5-udA@mail.gmail.com>
- <e114ed83-fd54-4952-f375-e1d94826ac6e@linaro.org>
- <20180820153207.xx5outviph7ec76p@flea>
- <672e6c6c-222f-5e7f-5d0c-acc8da68b1ab@linaro.org>
-Message-ID: <CAL_JsqKMPm=qmfYMQH99_gqSv0-ynUSvbkoNjjeDKtyxfgE1tg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 24 Aug 2018 08:36:30 -0700
+Subject: [GIT PULL] Rockchip dts64 updates for 4.19 round 3
+In-Reply-To: <21611381.3gemCK5zcZ@phil>
+References: <2000491.bLgWuj0xar@phil> <2105931.jBd9xt4tCK@phil>
+ <21611381.3gemCK5zcZ@phil>
+Message-ID: <CAOesGMhYtxYQR5T_bD_GN6eBEfwzUS8YDbJiiL2eGDoQxnzSJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2018 at 9:51 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+On Tue, Aug 14, 2018 at 4:02 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Am Montag, 6. August 2018, 10:46:03 CEST schrieb Heiko Stuebner:
+>> Hi Arnd, Kevin, Olof,
+>>
+>> with Linus doing an -rc8 this time, I thought I send off some more
+>> things that became ready since the round2 pull from last week.
+>>
+>> As the tag describes a new soc, 2 new boards and 1 UHS support.
+>>
+>> No worries, if you haven't got the time to look at it. Then I'll just move
+>> things over to 4.20
 >
-> Hi Maxime,
->
-> On 08/20/2018 06:32 PM, Maxime Ripard wrote:
-> > Hi Georgi,
-> >
-> > On Tue, Aug 07, 2018 at 05:54:38PM +0300, Georgi Djakov wrote:
-> >>> There is also a patch series from Maxime Ripard that's addressing the
-> >>> same general area. See "dt-bindings: Add a dma-parent property". We
-> >>> don't need multiple ways to address describing the device to memory
-> >>> paths, so you all had better work out a common solution.
-> >>
-> >> Looks like this fits exactly into the interconnect API concept. I see
-> >> MBUS as interconnect provider and display/camera as consumers, that
-> >> report their bandwidth needs. I am also planning to add support for
-> >> priority.
-> >
-> > Thanks for working on this. After looking at your serie, the one thing
-> > I'm a bit uncertain about (and the most important one to us) is how we
-> > would be able to tell through which interconnect the DMA are done.
-> >
-> > This is important to us since our topology is actually quite simple as
-> > you've seen, but the RAM is not mapped on that bus and on the CPU's,
-> > so we need to apply an offset to each buffer being DMA'd.
->
-> Ok, i see - your problem is not about bandwidth scaling but about using
-> different memory ranges by the driver to access the same location. So
-> this is not really the same and your problem is different. Also the
-> interconnect bindings are describing a path and endpoints. However i am
-> open to any ideas.
+> For completeness sake:
+> I've dropped the tag and moved the patches over to my stack for 4.20 now.
 
-It may be different things you need, but both are related to the path
-between a bus master and memory. We can't have each 'problem'
-described in a different way. Well, we could as long as each platform
-has different problems, but that's unlikely.
+Ok, thanks. I had closed down most new contents by then (and I was on
+vacation). Happy to take for 4.20.
 
-It could turn out that the only commonality is property naming
-convention, but that's still better than 2 independent solutions.
 
-I know you each want to just fix your issues, but the fact that DT
-doesn't model the DMA side of the bus structure has been an issue at
-least since the start of DT on ARM. Either we should address this in a
-flexible way or we can just continue to manage without. So I'm not
-inclined to take something that only addresses one SoC family.
 
-Rob
+-Olof
