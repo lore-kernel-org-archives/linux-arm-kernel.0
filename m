@@ -1,59 +1,76 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 24 Aug 2018 08:29:46 -0700
-Subject: [RFC PATCH v2 2/3] pstore: Add register read/write{b,w,l,q}
- tracing support
-In-Reply-To: <65985f8df55b037283746559c1718a54d56e7ec4.1535119711.git.saiprakash.ranjan@codeaurora.org>
-References: <cover.1535119710.git.saiprakash.ranjan@codeaurora.org>
- <65985f8df55b037283746559c1718a54d56e7ec4.1535119711.git.saiprakash.ranjan@codeaurora.org>
-Message-ID: <CAGXu5jL6tGu9U_ANrZSfWREtySqFAJ+CQa3v5YRihZ2oHNMGGw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 24 Aug 2018 08:38:04 -0700
+Subject: [PATCH] arm64: dts: Fix various entry-method properties to
+ reflect documentation
+In-Reply-To: <CAHLCerNoRj6GQRF=NJXwc0U+mJNe=06JGADQr7uT-chD2W-J+A@mail.gmail.com>
+References: <113f28acbc55f64762c9f0bcefe076a811f2ed82.1535014078.git.amit.kucheria@linaro.org>
+ <20180823153110.GA19131@e107155-lin>
+ <CAHLCerNoRj6GQRF=NJXwc0U+mJNe=06JGADQr7uT-chD2W-J+A@mail.gmail.com>
+Message-ID: <CAOesGMjcs=h4DHn7coo5iixUUY2GR2wWeTyMWQ_SBE9rrPZQgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2018 at 7:45 AM, Sai Prakash Ranjan
-<saiprakash.ranjan@codeaurora.org> wrote:
-> read/write{b,w,l,q} are typically used for reading from memory
-> mapped registers, which can cause hangs if accessed
-> unclocked. Tracing these events can help in debugging
-> various issues faced during initial development.
+On Thu, Aug 23, 2018 at 1:02 PM, Amit Kucheria <amit.kucheria@linaro.org> wrote:
+> (Adding arm-soc folks)
 >
-> We log this trace information in persistent ram buffer which
-> can be viewed after reset.
+> On Thu, Aug 23, 2018 at 9:01 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> Hi Amit,
+>>
+>> Thanks for fixing this.
+>>
+>> On Thu, Aug 23, 2018 at 02:23:29PM +0530, Amit Kucheria wrote:
+>>> The idle-states binding documentation[1] mentions that the
+>>> 'entry-method' property is required on 64-bit platforms and must be
+>>> set to "psci".
+>>>
+>>> commit a13f18f59d26 ("Documentation: arm: Fix typo in the idle-states
+>>> bindings examples") attempted to fix this earlier but clearly more is
+>>> needed.
+>>>
+>>
+>> In fact, I assumed I fixed things with commit 978fa436231a ("drivers:
+>> firmware: psci: unify enable-method binding on ARM {64,32}-bit systems"),
+>> but I was wrong. I left quite a few instances including juno dtbs.
+>>
+>>> Fix the cpu-capacity.txt documentation that uses the incorrect value so
+>>> we don't get copy-paste errors like these. Clarify the language in
+>>> idle-states.txt by removing the reference to the psci bindings that
+>>> might be causing this confusion.
+>>>
+>>> Finally, fix devicetrees of various boards to reflect current
+>>> documentation.
+>>>
+>>> [1] Documentation/devicetree/bindings/arm/idle-states.txt (see
+>>> idle-states node)
+>>>
+>>> Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+>>> ---
+>>>  Documentation/devicetree/bindings/arm/cpu-capacity.txt | 2 +-
+>>>  Documentation/devicetree/bindings/arm/idle-states.txt  | 4 ++--
+>>>  arch/arm64/boot/dts/arm/juno-r1.dts                    | 2 +-
+>>>  arch/arm64/boot/dts/arm/juno-r2.dts                    | 2 +-
+>>>  arch/arm64/boot/dts/arm/juno.dts                       | 2 +-
+>>
+>> For all the above files,
+>>
+>> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 >
-> We use pstore_rtb_call() to write the RTB log to pstore.
-> RTB buffer size is taken from ramoops dt node with additional
-> property called rtb-size.
+> Thanks for reviewing, Sudeep.
 >
-> For reading the trace after mounting pstore, rtb-ramoops entry
-> can be seen in /sys/fs/pstore/ as in below sample output.
+>> How do you plan to merge ? I prefer if you can send it via arm-soc as
+>> fixes for this cycle with all the necessary acks. Otherwise you may have
+>> to split this to send via platform maintainers which is bit mundane.
 >
-> Sample output of tracing register reads/writes in drivers:
->
->  # mount -t pstore pstore /sys/fs/pstore
->  # tail /sys/fs/pstore/rtb-ramoops-0
->  [LOGK_READ ] ts:36468476204  data:ffff00000800d0fc  <ffff0000084e9ee0>  gic_check_gicv2+0x58/0x60
->  [LOGK_WRITE] ts:36468477715  data:ffff00000800d000  <ffff0000084e9fac>  gic_cpu_if_up+0xc4/0x110
->  [LOGK_READ ] ts:36468478548  data:ffff00000800d000  <ffff0000084e9fd8>  gic_cpu_if_up+0xf0/0x110
->  [LOGK_WRITE] ts:36468480319  data:ffff00000800d000  <ffff0000084e9fac>  gic_cpu_if_up+0xc4/0x110
->  [LOGK_READ ] ts:36468481048  data:ffff00000800d00c  <ffff000008081a34>  gic_handle_irq+0xac/0x128
->  [LOGK_WRITE] ts:36468482923  data:ffff00000800d010  <ffff000008081aac>  gic_handle_irq+0x124/0x128
->  [LOGK_READ ] ts:36468483184  data:ffff00000800d00c  <ffff000008081a34>  gic_handle_irq+0xac/0x128
->  [LOGK_WRITE] ts:36468485215  data:ffff00000800d010  <ffff000008081aac>  gic_handle_irq+0x124/0x128
->  [LOGK_READ ] ts:36468486309  data:ffff00000800d00c  <ffff000008081a34>  gic_handle_irq+0xac/0x128
->  [LOGK_WRITE] ts:36468488236  data:ffff00000800d010  <ffff000008081aac>  gic_handle_irq+0x124/0x128
->
-> Output has below 5 fields:
->
->  * Log type, Timestamp, Data from caller which is the address of
->    read/write{b,w,l,q}, Caller ip and Caller name.
->
-> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+> I was hoping to get this merged thru arm-soc tree instead of creating
+> a patch per platform. But if anybody feels strongly about it, I'm
+> happy to split them up and feed it through the platform maintainer
+> trees.
 
-As this is a tracing-like method, could this instead be added to
-ftrace? That would mean it could reuse all the ftrace tools and you'd
-get pstore storage for free.
+Given that we're at the tail end of the merge window, before -rc1,
+it's easiest if we just take it directly and platform maintainers base
+their new contents on top of it.
 
--Kees
+Applying to our next/late (i.e. merge-window-fixes) branch now.
 
--- 
-Kees Cook
-Pixel Security
+
+-Olof
