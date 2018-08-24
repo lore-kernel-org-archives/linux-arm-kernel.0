@@ -1,53 +1,60 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Fri, 24 Aug 2018 11:24:58 +0200
-Subject: [PATCH v2 2/2] drm/atmel-hlcdc: allow selecting a higher pixel-clock
- than requested
-In-Reply-To: <20180824092458.13165-1-peda@axentia.se>
-References: <20180824092458.13165-1-peda@axentia.se>
-Message-ID: <20180824092458.13165-3-peda@axentia.se>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Fri, 24 Aug 2018 09:51:47 +0000
+Subject: [PATCH V5 1/5] dt-bindings: arm: fsl: add scu binding doc
+In-Reply-To: <CABb+yY1+J+=nV2gNN30KLr2YQDy_g81-dJS1DJq8NgUv7Qqcog@mail.gmail.com>
+References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
+ <1534781305-4770-2-git-send-email-aisheng.dong@nxp.com>
+ <20180820181155.GA13901@bogus>
+ <AM0PR04MB4211B9113831B292110C709280310@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <CABb+yY1+J+=nV2gNN30KLr2YQDy_g81-dJS1DJq8NgUv7Qqcog@mail.gmail.com>
+Message-ID: <AM0PR04MB4211D1CB3DE05AF148E94AAD80360@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-But only if the highest pixel-clock frequency lower than requested
-is significantly less accurate than the lowest frequency higher than
-requested.
+> -----Original Message-----
+> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
+> On Tue, Aug 21, 2018 at 8:30 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
+> >
+> > > > +
+> > > > +The System Controller Firmware (SCFW) is a low-level system
+> > > > +function which runs on a dedicated Cortex-M core to provide
+> > > > +power, clock, and resource management. It exists on some i.MX8
+> > > > +processors. e.g. i.MX8QM (QM, QP), and i.MX8QX (QXP, DX).
+> > > > +
+> > > > +The AP communicates with the SC using a multi-ported MU module
+> > > > +found in the LSIO subsystem. The current definition of this MU
+> > > > +module provides
+> > > > +5 remote AP connections to the SC to support up to 5 execution
+> > > > +environments (TZ, HV, standard Linux, etc.). The SC side of this
+> > > > +MU module interfaces with the LSIO DSC IP bus. The SC firmware
+> > > > +will communicate with this MU using the MSI bus.
+> > >
+> > > How are 5 users supported with only 4 channels defined below?
+> >
+> > There're 5 MU instances designed to be specifically communicate with
+> > SCU Firmware on MX8 hardware.
+> >
+> This is correct.
+> 
+> > With the new generic mu binding [1], each MU instance is abstracted
+> > Into 16 virtual MU channels. (4 Tx, 4 Rx, 4 Tx doorbell, 4 Rx doorbell).
+> > (MU has 4 pair of Tx/Rx data register which can be used to
+> > send/receive multi words. With new binding, each data register is
+> > abstracted into one MU channel, totally 8 channels for data transfer).
+> >
+> > SCU protocol is already designed to uses all data registers to
+> > send/receive multi words according to MU hardware reference manual. So
+> > it must use all channels in one MU instances with new binding.
+> >
+> FYI, this is incorrect.
+> The 16 channels are physical and not virtual. In fact, all this is to avoid virtual
+> channels.
+> The physical resources required by new bindings are exactly the same as by old
+> bindings. Now you use 8 physical channels instead of 1 virtual.
 
-I pulled "10 times" as the discriminator out of the hat, and went with
-that.
+Okay, got it.
+I'm fine to refer to them all as physical channels.
+Thanks
 
-This is useful, if e.g. the target pixel-clock is 65MHz and the sys_clk
-is 132MHz. In this case the highest possible pixel-clock lower than the
-requested 65MHz is 52.8MHz, which is almost 20% off (and outside the
-spec for the panel). The lowest possible pixel-clock higher than 65MHz
-is 66MHz, which is a *much* better match, and only 1.5% off.
-
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-index 0d9d1042752a..9e34bce089d0 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-@@ -116,6 +116,18 @@ static void atmel_hlcdc_crtc_mode_set_nofb(struct drm_crtc *c)
- 		div = DIV_ROUND_UP(prate, mode_rate);
- 		if (ATMEL_HLCDC_CLKDIV(div) & ~ATMEL_HLCDC_CLKDIV_MASK)
- 			div = ATMEL_HLCDC_CLKDIV_MASK;
-+	} else {
-+		int div_low = prate / mode_rate;
-+
-+		if (div_low >= 2 &&
-+		    ((prate / div_low - mode_rate) <
-+		     10 * (mode_rate - prate / div)))
-+			/*
-+			 * At least 10 times better when using a higher
-+			 * frequency than requested, instead of a lower.
-+			 * So, go with that.
-+			 */
-+			div = div_low;
- 	}
- 
- 	cfg |= ATMEL_HLCDC_CLKDIV(div);
--- 
-2.11.0
+Regards
+Dong Aisheng
