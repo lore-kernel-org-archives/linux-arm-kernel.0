@@ -1,43 +1,103 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Fri, 24 Aug 2018 10:15:33 +0200
-Subject: [PATCH v1 3/7] mfd: add atmel-lcdc driver
-In-Reply-To: <20180815052435.GA6412@dell>
-References: <20180812184152.GA22343@ravnborg.org>
- <20180812184629.3808-3-sam@ravnborg.org>
- <20180815052435.GA6412@dell>
-Message-ID: <20180824101533.7728195a@bbrezillon>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri, 24 Aug 2018 10:22:55 +0200
+Subject: [PATCH v2 1/2] dt-bindings: PCI: meson: add DT bindings for
+ Amlogic Meson PCIe controller
+In-Reply-To: <1535096165-45827-2-git-send-email-hanjie.lin@amlogic.com>
+References: <1535096165-45827-1-git-send-email-hanjie.lin@amlogic.com>
+ <1535096165-45827-2-git-send-email-hanjie.lin@amlogic.com>
+Message-ID: <8c48964151d24758298ba935da336c0829e2b287.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Wed, 15 Aug 2018 06:24:35 +0100
-Lee Jones <lee.jones@linaro.org> wrote:
-
-> > +static const struct mfd_cell lcdc_cells[] = {
-> > +	{
-> > +		.name = "atmel-lcdc-pwm",
-> > +		.of_compatible = "atmel,lcdc-pwm",
-> > +	},
-> > +	{
-> > +		.name = "atmel-lcdc-dc",
-> > +		.of_compatible = "atmel,lcdc-display-controller",
-> > +	},
-> > +};  
+On Fri, 2018-08-24 at 15:36 +0800, Hanjie Lin wrote:
+> From: Yue Wang <yue.wang@amlogic.com>
 > 
-> Will you be adding any more devices, or is this the entirety of the
-> device?  If the latter, I suggest that this doesn't warrant being an
-> MFD.
+> The Amlogic Meson PCIe host controller is based on the Synopsys DesignWare
+> PCI core. This patch adds documentation for the DT bindings in Meson PCIe
+> controller.
 > 
+> Signed-off-by: Yue Wang <yue.wang@amlogic.com>
+> Signed-off-by: Hanjie Lin <hanjie.lin@amlogic.com>
+> ---
+>  .../devicetree/bindings/pci/amlogic,meson-pcie.txt | 63 ++++++++++++++++++++++
+>  1 file changed, 63 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
+> new file mode 100644
+> index 0000000..8a831d1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
+> @@ -0,0 +1,63 @@
+> +Amlogic Meson AXG DWC PCIE SoC controller
+> +
+> +Amlogic Meson PCIe host controller is based on the Synopsys DesignWare PCI core.
+> +It shares common functions with the PCIe DesignWare core driver and
+> +inherits common properties defined in
+> +Documentation/devicetree/bindings/pci/designware-pci.txt.
+> +
+> +Additional properties are described here:
+> +
+> +Required properties:
+> +- compatible:
+> +	should contain "amlogic,axg-pcie" to identify the core.
+> +- reg:
+> +	Should contain the configuration address space.
+> +- reg-names: Must be
+> +	- "elbi"	External local bus interface registers
+> +	- "cfg"		Meson specific registers
+> +	- "config"	PCIe configuration space
+> +- reset-gpios: The GPIO to generate PCIe PERST# assert and deassert signal.
+> +- clocks: Must contain an entry for each entry in clock-names.
+> +- clock-names: Must include the following entries:
+> +	- "pclk"       PCIe GEN 100M PLL clock
+> +	- "port"       PCIe_x(A or B) RC clock gate
+> +	- "general"    PCIe Phy clock
+> +	- "mipi"       PCIe_x(A or B) 100M ref clock gate
+> +- resets: phandle to the reset lines.
+> +- reset-names: must contain "phy" and "peripheral"
+> +       - "port" Port A or B reset
+> +       - "apb" APB reset
 
-Is there a lower limit to define when an MFD is recommended, or is it
-that you find a PWM (driving a backlight) and a display controller
-close enough to be implemented in a single driver?
+The above description is not coherent (phy <=> port)
 
-I personally prefer the separation we have today, because I can then
-place the drivers where they belong (PWM subsystem and DRM subsystem)
-and the respective maintainers know about these drivers.
+> +
+> +Example configuration:
+> +
+> +	pcie: pcie at f9800000 {
+> +			compatible = "amlogic,axg-pcie", "snps,dw-pcie";
+> +			reg = <0x0 0xf9800000 0x0 0x400000
+> +					0x0 0xff646000 0x0 0x2000
+> +					0x0 0xf9f00000 0x0 0x100000>;
+> +			reg-names = "elbi", "cfg", "config";
+> +			reset-gpios = <&gpio GPIOX_19 GPIO_ACTIVE_HIGH>;
+> +			interrupts = <GIC_SPI 177 IRQ_TYPE_EDGE_RISING>;
+> +			#interrupt-cells = <1>;
+> +			interrupt-map-mask = <0 0 0 0>;
+> +			interrupt-map = <0 0 0 0 &gic GIC_SPI 179 IRQ_TYPE_EDGE_RISING>;
+> +			bus-range = <0x0 0xff>;
+> +			#address-cells = <3>;
+> +			#size-cells = <2>;
+> +			device_type = "pci";
 
-Regards,
+Not described above - is it even used ?
 
-Boris
+> +			phys = <&pcie_phy>;
+
+Not documented and not necessary. Please remove this.
+
+> +			ranges = <0x82000000 0 0 0x0 0xf9c00000 0 0x00300000>;
+> +
+> +			clocks = <&clkc CLKID_USB
+> +					&clkc CLKID_MIPI_ENABLE
+> +					&clkc CLKID_PCIE_A
+> +					&clkc CLKID_PCIE_CML_EN0>;
+> +			clock-names = "general",
+> +					"mipi",
+> +					"pclk",
+> +					"port";
+> +			resets = <&reset RESET_PCIE_A>,
+> +				<&reset RESET_PCIE_APB>;
+> +			reset-names = "port",
+> +					"apb";
+> +	};
