@@ -1,15 +1,13 @@
 From: edubezval@gmail.com (Eduardo Valentin)
-Date: Fri, 24 Aug 2018 16:21:20 -0700
+Date: Fri, 24 Aug 2018 16:27:49 -0700
 Subject: [PATCH v1 01/10] arm/arm64: dts: msm8974/msm8916: thermal: Split
  address space into two
 In-Reply-To: <d01f560abed221b536b27bfaa42a530257642974.1533815718.git.amit.kucheria@linaro.org>
 References: <cover.1533815718.git.amit.kucheria@linaro.org>
  <d01f560abed221b536b27bfaa42a530257642974.1533815718.git.amit.kucheria@linaro.org>
-Message-ID: <20180824232118.GC25163@localhost.localdomain>
+Message-ID: <20180824232747.GE25163@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-hello,
 
 On Thu, Aug 09, 2018 at 06:02:33PM +0530, Amit Kucheria wrote:
 > We've earlier added support to split the register address space into TM
@@ -27,19 +25,7 @@ On Thu, Aug 09, 2018 at 06:02:33PM +0530, Amit Kucheria wrote:
 > ---
 >  arch/arm/boot/dts/qcom-msm8974.dtsi   | 6 ++++--
 >  arch/arm64/boot/dts/qcom/msm8916.dtsi | 6 ++++--
-
-
-
 >  drivers/thermal/qcom/tsens-common.c   | 5 +++--
-
-
-Can you please resend this with two separate patches, one with
-the driver changes another for the dts(i) changes. Just that
-I prefer taking only the driver changes once accepting the
-dts changes. Makes merging easier to avoid conflicts when sending
-pulls.
-
-Thanks.
 >  3 files changed, 11 insertions(+), 6 deletions(-)
 > 
 > diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
@@ -80,6 +66,10 @@ Thanks.
 >  			nvmem-cell-names = "calib", "calib_sel";
 > +			#qcom,sensors = <5>;
 >  			#thermal-sensor-cells = <1>;
+
+Looking closer to this, I fail to remember the reasoning why
+#qcom,sensors property was needed.
+
 >  		};
 >  
 > diff --git a/drivers/thermal/qcom/tsens-common.c b/drivers/thermal/qcom/tsens-common.c
