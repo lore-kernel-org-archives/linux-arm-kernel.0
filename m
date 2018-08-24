@@ -1,96 +1,75 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Fri, 24 Aug 2018 21:59:21 +0200
-Subject: [PATCH 1/7] dt-bindings: Add DT bindings documentation for
- Allwinner Thermal Sensor Controller
-In-Reply-To: <20180824145840.isdcg3fr6mw4ntzg@flea>
-References: <20180804070355.14857-1-manu@freebsd.org>
- <20180820111755.rzg7l2lznmbpuf2e@flea>
- <CAL_JsqLVQDRH1esAXghfQdxmp+iorWVCArM2qTwjbgmQzmhzQw@mail.gmail.com>
- <20180820140737.xmqhu5ndqzehvkql@flea>
- <20180820162715.49e6d8a469ece983f3c1d288@bidouilliste.com>
- <20180824145840.isdcg3fr6mw4ntzg@flea>
-Message-ID: <20180824215921.59d060b54eb3a1e7d1552bde@bidouilliste.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Fri, 24 Aug 2018 14:20:06 -0700
+Subject: Function Tracing with clang on ARM32
+In-Reply-To: <35ae3d464c7b77a5fe86a732079e32bc@agner.ch>
+References: <35ae3d464c7b77a5fe86a732079e32bc@agner.ch>
+Message-ID: <20180824212006.GS160295@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Stefan,
 
- Hi,
+A similar/related issue was fixed for arm64 by
+https://reviews.llvm.org/rL266039
 
-On Fri, 24 Aug 2018 16:58:40 +0200
-Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+The corresponding LLVM bug is
+https://bugs.llvm.org//show_bug.cgi?id=27311
 
+Apparently for arm32 the use of '-meabi gnu' was chosen as solution:
+
+http://llvm.org/viewvc/llvm-project?view=revision&revision=265888
+
+Cheers
+
+Matthias
+
+On Sat, Aug 11, 2018 at 02:29:24PM +0200, Stefan Agner wrote:
 > Hi,
 > 
-> On Mon, Aug 20, 2018 at 04:27:15PM +0200, Emmanuel Vadot wrote:
-> > On Mon, 20 Aug 2018 16:07:37 +0200
-> > Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > 
-> > > On Mon, Aug 20, 2018 at 07:41:22AM -0600, Rob Herring wrote:
-> > > > On Mon, Aug 20, 2018 at 5:17 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > > >
-> > > > > On Sat, Aug 04, 2018 at 09:03:49AM +0200, Emmanuel Vadot wrote:
-> > > > > > This patch adds documentation for Device-Tree bindings for the Allwinner
-> > > > > > Thermal Sensor Controller found on the H3, H5 and A64 SoCs
-> > > > > >
-> > > > > > Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
-> > > > >
-> > > > > I'm not going to merge a binding for a device that doesn't have any
-> > > > > driver implemented at the moment in Linux.
-> > > > 
-> > > > I'll take it then. Linux is not the only DT client.
-> > > 
-> > > Then don't complain if we ever have to break the ABI. We never tested
-> > > that hardware, never had any code running on it, and it *will* cause
-> > > some issues. For example, the calibration data have never been used
-> > > and how they should be represented have never been described, since no
-> > > one ever actually tried to use it.
-> > > 
-> > > And sure, Linux is not the only DT client. Just like FreeBSD isn't.
-> > 
-> >  What kind of data would you need for me to make things better ?
-> >  We have the driver in FreeBSD for almost two years now, whne I started
-> > to see how to upstream it I noticed a lot of problems and spent 4 or 5
-> > days to try on all the SoCs mentionned in the serie, the only SoC I
-> > didn't include it the A83T as for some reason I couldn't make the
-> > driver work.
+> I am currently looking into function tracing support when compiling an
+> ARM32 kernel with clang.
 > 
-> Do you have a link to that driver? 
-
- https://github.com/freebsd/freebsd/blob/master/sys/arm/allwinner/aw_thermal.c
-
-> How and how much did you test it?
-
- Using a cheap IR thermometer as it's all I can afford.
- Then running multiples cpufreq-a53 process and comparing the result.
- Did the same without using the calibration data, result where closer
-when I used them.
-
-> Are you using the calibration data stored in the SID?
-
- Yes, which is why the serie contain the nvmem cell for the SID.
-
+> With v4.18-rc1 and:
+> CONFIG_FTRACE=y                                                         
+>                                                                    
+> CONFIG_FUNCTION_TRACER=y
 > 
-> > I just hope that you understand that we cannot wait for Linux to
-> > have a driver to have some bindings.
+> Building fails:
 > 
-> Just like I'm sure you can understand that just merging the DT bits
-> without testing anything caused some troubles in the past, and I don't
-> want to discover it in a year from now.
-
- I do, I don't like wrong DT info as much as you do I think. I had
-the unfortunate event to find that the sun4i-a10-timer compatible used
-in every soc is plain wrong for !A10 and !A13, patches comming soon.
- I want those bits merged but I also want that they reflect reality,
-this is not a hard driver to do, NetBSD also have one I think, maybe
-OpenBSD do to.
-
-> Maxime
+>   LD      vmlinux.o                                                     
+>                                                                   
+>   MODPOST vmlinux.o
+> kernel/softirq.o: In function `_local_bh_enable':
+> /home/ags/projects/toradex/imx/linux-vanilla-llvm/kernel/softirq.c:152:
+> undefined reference to `mcount'
+> kernel/softirq.o: In function `__local_bh_enable_ip':
+> /home/ags/projects/toradex/imx/linux-vanilla-llvm/kernel/softirq.c:159:
+> undefined reference to `mcount'
+> kernel/softirq.o: In function `do_softirq':
+> /home/ags/projects/toradex/imx/linux-vanilla-llvm/kernel/softirq.c:316:
+> undefined reference to `mcount'
+> kernel/softirq.o: In function `irq_enter':
+> /home/ags/projects/toradex/imx/linux-vanilla-llvm/kernel/softirq.c:337:
+> undefined reference to `mcount'
+> kernel/softirq.o: In function `irq_exit':
+> /home/ags/projects/toradex/imx/linux-vanilla-llvm/kernel/softirq.c:395:
+> undefined reference to `mcount'
 > 
-> -- 
-> Maxime Ripard, Bootlin
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
-
-
--- 
-Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+> It seems that clang/LLVM uses a different mcount interface. However,
+> there is an option to use the gcc compatible symbol __gnu_mcount_nc when
+> using -meabi gnu. So adding
+> CFLAGS_ABI     +=-meabi gnu
+> 
+> Builds the kernel successfully. However, the kernel crashes immediately
+> on boot. Even with earlyprintk enabled, I only get:
+> 
+> Uncompressing Linux... done, booting the kernel.
+> 
+> I poked a bit around in arch/arm/kernel/entry-ftrace.S. Not calling
+> __mcount in __gnu_mcount_nc produces a bootable kernel. Removing the
+> call into the ftrace logic by only using mcount_enter/exit in the
+> __mcount macro does not boot...
+> 
+> I guess the mcount ABI is slightly different in LLVM/clang still then?
+> Before I dive deeper, maybe anyone has an idea?
+> 
