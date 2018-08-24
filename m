@@ -1,103 +1,51 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Fri, 24 Aug 2018 17:58:24 +0200
-Subject: [PATCH v1 2/7] dt-binding: add bindings for Atmel LCDC mfd
-In-Reply-To: <20180824104517.29f24f44@bbrezillon>
-References: <20180812184152.GA22343@ravnborg.org>
- <20180812184629.3808-2-sam@ravnborg.org>
- <20180824104517.29f24f44@bbrezillon>
-Message-ID: <20180824155824.GC26678@ravnborg.org>
+From: starnight@g.ncu.edu.tw (Jian-Hong Pan)
+Date: Fri, 24 Aug 2018 23:58:29 +0800
+Subject: [RFC 1/3 net] lorawan: Add LoRaWAN class module
+In-Reply-To: <30b75248-7589-fc98-819f-2b68844522f1@infradead.org>
+References: <cover.1535039998.git.starnight@g.ncu.edu.tw>
+ <fc737f3940bbe91341fb15d85ac11931eb56d1fc.1535039998.git.starnight@g.ncu.edu.tw>
+ <30b75248-7589-fc98-819f-2b68844522f1@infradead.org>
+Message-ID: <CAC=mGzjMm6OdJJXB=G0NEBkGASWyJv1cgeS=_wiUhDn+WYaqGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris.
+Randy Dunlap <rdunlap@infradead.org> ? 2018?8?24? ?? ??1:43???
+>
+> Hi,
+>
+> On 08/23/2018 10:15 AM, Jian-Hong Pan wrote:
+> > diff --git a/net/maclorawan/Kconfig b/net/maclorawan/Kconfig
+> > new file mode 100644
+> > index 000000000000..741992b059c6
+> > --- /dev/null
+> > +++ b/net/maclorawan/Kconfig
+> > @@ -0,0 +1,14 @@
+> > +config LORAWAN
+> > +     tristate "MAC layer of LoRaWAN Network support"
+> > +     select CRYPTO
+> > +     select CRYPTO_CMAC
+> > +     select CRYPTO_CBC
+> > +     select CRYPTO_AES
+> > +     ---help---
+> > +       LoRaWAN defines a low data rate, low power and long range wireless
+> > +       wide area networks. It was designed to organise networks of sensors,
+> > +       switches and actuators, etc automation devices.  It could operate as
+> > +       multiple kilometers wide.
+>
+> There are several things that I would change.  How about this instead?
+>
+>
+>           LoRaWAN defines low data rate, low power and long range wireless
+>           wide area networks. It was designed to organise networks of automation
+>           devices, such as sensors, switches and actuators. It can operate
+>           multiple kilometers wide.
 
-> > +The LCDC IP exposes two subdevices:
-> > + - a PWM chip: see ../pwm/atmel-lcdc-pwm.txt
-> > + - a Display Controller: see ../display/atmel/lcdc-display-controller.txt
-> > +
-> > +Example:
-> > +	lcdc0: lcdc at 700000 {
-> > +		compatible = "atmel,at91sam9263-lcdc-mfd";
-> > +		reg = <0x700000 0x1000>;
-> > +		interrupts = <26 IRQ_TYPE_LEVEL_HIGH 3>;
-> > +		clocks = <&lcd_clk>, <&lcd_clk>;
-> > +		clock-names = "lcdc_clk", "hclk";
-> > +
-> > +		lcdc-display-controller {
-> > +			compatible = "atmel,lcdc-display-controller";
-> > +			lcd-supply = <&lcdc_reg>;
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +
-> > +			port at 0 {
-> > +				reg = <0>;
-> > +				#address-cells = <1>;
-> > +				#size-cells = <0>;
-> > +				lcdc_panel_output: endpoint at 0 {
-> > +					reg = <0>;
-> > +					remote-endpoint = <&panel_input>;
-> > +				};
-> > +			};
-> > +		};
-> > +
-> > +		lcdc_pwm: lcdc-pwm {
-> > +			compatible = "atmel,lcdc-pwm";
-> > +			pinctrl-names = "default";
-> > +			pinctrl-0 = <&pinctrl_lcdc_pwm>;
-> > +			#pwm-cells = <3>;
-> > +		};
-> > +
-> > +	};
-> 
-> Also, I don't remember why I decided to declare distinct nodes for the
-> PWM and display controller, but you should probably try to only declare
-> the lcdc node. Something like that:
-> 
-> 	lcdc0: lcdc at 700000 {
-> 		compatible = "atmel,at91sam9263-lcdc";
-> 		reg = <0x700000 0x1000>;
-> 		interrupts = <26 IRQ_TYPE_LEVEL_HIGH 3>;
-> 		clocks = <&lcd_clk>, <&lcd_clk>;
-> 		clock-names = "lcdc_clk", "hclk";
-> 		pinctrl-names = "default";
-> 		pinctrl-0 = <&pinctrl_lcdc_pwm ...>;
-> 		#pwm-cells = <3>;
-> 		#address-cells = <1>;
-> 		#size-cells = <0>;
-> 
-> 		port at 0 {
-> 			reg = <0>;
-> 			#address-cells = <1>;
-> 			#size-cells = <0>;
-> 			lcdc_panel_output: endpoint at 0 {
-> 				reg = <0>;
-> 				remote-endpoint = <&panel_input>;
-> 			};
-> 		};
-> 	};
-> 
-> Note that this representation does not prevent us from having an MFD
-> which declares the PWM and Display Engine, it's just that all devs will
-> point to the same of_node.
+That becomes better!  Thank you
 
-I have something similar in my tree now, just need to figure out the mfd parts.
-
-> 
 > > +
-> > +		lcdc-display-controller {
-> > +			compatible = "atmel,lcdc-display-controller";
-> > +			lcd-supply = <&lcdc_reg>;
-> 
-> Hm, is this a regulator for the LCD controller or the LCD? If it's for
-> the LCD it should be placed under the panel node.
-It was added only because I could do it and I was (and continue to be) a
-DT newbie.  Will drop it in v2 as this is just an example which this part do
-not add any value to.
-
-> > +	panel: panel {
-> > +		compatible = "logictechnologies,lttd800480070-l2rt", "simple-panel";
-Reminds me that I need to dig out a panel-simple patch for a few
-displays I use (logic + seiko).
-But they are otherwise not related to this work.
-
-	Sam
+> > +       Say Y here to compile LoRaWAN support into the kernel or say M to
+> > +       compile it as modules.
+>
+>
+> --
+> ~Randy
