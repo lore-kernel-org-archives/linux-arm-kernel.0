@@ -1,51 +1,62 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 24 Aug 2018 08:29:44 -0700
-Subject: Reset controller fixes for v4.18
-In-Reply-To: <1533728841.19096.4.camel@pengutronix.de>
-References: <1533551833.4204.10.camel@pengutronix.de>
- <1533728841.19096.4.camel@pengutronix.de>
-Message-ID: <CAOesGMj+vSb+hBH3JFFU_gp5c6LiyJDgnrCPT2ksHWd6-=ACPg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 24 Aug 2018 10:35:23 -0500
+Subject: [PATCH v7 2/8] dt-bindings: Introduce interconnect provider
+ bindings
+In-Reply-To: <672e6c6c-222f-5e7f-5d0c-acc8da68b1ab@linaro.org>
+References: <20180731161340.13000-1-georgi.djakov@linaro.org>
+ <20180731161340.13000-3-georgi.djakov@linaro.org>
+ <CABGGisxq+hf91R18pnZ=VZ9f99GssWWPhpPCjNAROJmKg5-udA@mail.gmail.com>
+ <e114ed83-fd54-4952-f375-e1d94826ac6e@linaro.org>
+ <20180820153207.xx5outviph7ec76p@flea>
+ <672e6c6c-222f-5e7f-5d0c-acc8da68b1ab@linaro.org>
+Message-ID: <CAL_JsqKMPm=qmfYMQH99_gqSv0-ynUSvbkoNjjeDKtyxfgE1tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 8, 2018 at 4:47 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> On Mon, 2018-08-06 at 12:37 +0200, Philipp Zabel wrote:
->> Dear arm-soc maintainers,
->>
->> The following changes since commit ce397d215ccd07b8ae3f71db689aedb85d56ab40:
->>
->>   Linux 4.18-rc1 (2018-06-17 08:04:49 +0900)
->>
->> are available in the git repository at:
->>
->>   git://git.pengutronix.de/git/pza/linux.git tags/reset-fixes-for-4.18
->>
->> for you to fetch changes up to 26fce0557fa639fb7bbc33e31a57cff7df25c3a0:
->>
->>   reset: imx7: Fix always writing bits as 0 (2018-07-23 13:00:28 +0200)
->>
->> ----------------------------------------------------------------
->> Reset controller fixes for v4.18
->>
->> This tag fixes reset assertion on i.MX7 for all non-inverted reset
->> control bits. Currently only PCIE controller and PHY resets are used.
->>
->> ----------------------------------------------------------------
->> Leonard Crestez (1):
->>       reset: imx7: Fix always writing bits as 0
->>
->>  drivers/reset/reset-imx7.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
+On Fri, Aug 24, 2018 at 9:51 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
 >
-> I've resent the pull requests with the missing [GIT PULL] tag added,
-> sorry for the noise.
+> Hi Maxime,
+>
+> On 08/20/2018 06:32 PM, Maxime Ripard wrote:
+> > Hi Georgi,
+> >
+> > On Tue, Aug 07, 2018 at 05:54:38PM +0300, Georgi Djakov wrote:
+> >>> There is also a patch series from Maxime Ripard that's addressing the
+> >>> same general area. See "dt-bindings: Add a dma-parent property". We
+> >>> don't need multiple ways to address describing the device to memory
+> >>> paths, so you all had better work out a common solution.
+> >>
+> >> Looks like this fits exactly into the interconnect API concept. I see
+> >> MBUS as interconnect provider and display/camera as consumers, that
+> >> report their bandwidth needs. I am also planning to add support for
+> >> priority.
+> >
+> > Thanks for working on this. After looking at your serie, the one thing
+> > I'm a bit uncertain about (and the most important one to us) is how we
+> > would be able to tell through which interconnect the DMA are done.
+> >
+> > This is important to us since our topology is actually quite simple as
+> > you've seen, but the RAM is not mapped on that bus and on the CPU's,
+> > so we need to apply an offset to each buffer being DMA'd.
+>
+> Ok, i see - your problem is not about bandwidth scaling but about using
+> different memory ranges by the driver to access the same location. So
+> this is not really the same and your problem is different. Also the
+> interconnect bindings are describing a path and endpoints. However i am
+> open to any ideas.
 
-No worries. This came in very close to the close of the release and I
-foolishly held on waiting for more fixes instead of merging. I've done
-so now, this will go in with the rest of the late code for the merge
-window. It'll have to go to 4.18 through -stable.
+It may be different things you need, but both are related to the path
+between a bus master and memory. We can't have each 'problem'
+described in a different way. Well, we could as long as each platform
+has different problems, but that's unlikely.
 
+It could turn out that the only commonality is property naming
+convention, but that's still better than 2 independent solutions.
 
-Thanks,
+I know you each want to just fix your issues, but the fact that DT
+doesn't model the DMA side of the bus structure has been an issue at
+least since the start of DT on ARM. Either we should address this in a
+flexible way or we can just continue to manage without. So I'm not
+inclined to take something that only addresses one SoC family.
 
--Olof
+Rob
