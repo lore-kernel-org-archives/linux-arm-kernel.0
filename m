@@ -1,40 +1,70 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Fri, 24 Aug 2018 09:15:17 -0700
-Subject: [RFC PATCH 03/11] arm64: pgtable: Implement p[mu]d_valid() and
- check in set_p[mu]d()
-In-Reply-To: <1535125966-7666-4-git-send-email-will.deacon@arm.com>
-References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
- <1535125966-7666-4-git-send-email-will.deacon@arm.com>
-Message-ID: <CA+55aFyAWyGTCzG8YtNwDdmS9TDVYoMCUYvxo0cj3V79w7hQ4A@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 24 Aug 2018 11:16:28 -0500
+Subject: [PATCH 5/5] arm64: dts: add LX2160ARDB board support
+In-Reply-To: <AM6PR04MB478980C90EE825D024D8B977F3370@AM6PR04MB4789.eurprd04.prod.outlook.com>
+References: <1534747636-20064-1-git-send-email-vabhav.sharma@nxp.com>
+ <1534747636-20064-6-git-send-email-vabhav.sharma@nxp.com>
+ <CAL_JsqKH4haGy2F2_2EP=evC8ip7DmGR8J4wzrO0wWnOLsaZqA@mail.gmail.com>
+ <AM6PR04MB478980C90EE825D024D8B977F3370@AM6PR04MB4789.eurprd04.prod.outlook.com>
+Message-ID: <CAL_Jsq+QrDR_YyZ+icftUrwOoMZcSCMkmj8cR=bqEJ-q+pdntg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2018 at 8:52 AM Will Deacon <will.deacon@arm.com> wrote:
->
-> Now that our walk-cache invalidation routines imply a DSB before the
-> invalidation, we no longer need one when we are clearing an entry during
-> unmap.
+On Thu, Aug 23, 2018 at 10:08 AM Vabhav Sharma <vabhav.sharma@nxp.com> wrote:
 
-Do you really still need it when *setting* it?
+[...]
 
-I'm wondering if you could just remove the thing unconditionally.
+> > > +               i2c at 3 {
+> > > +                       #address-cells = <1>;
+> > > +                       #size-cells = <0>;
+> > > +                       reg = <0x3>;
+> > > +
+> > > +                       sa56004 at 4c {
+> >
+> > temperature-sensor at 4c
+> Ok, temperature-sensor-1 at 4c
 
-Why would you need a barrier for another CPU for a mapping that is
-just being created? It's ok if they see the old lack of mapping until
-they are told about it, and that eventual "being told about it" must
-involve a data transfer already.
+No, that's not what I said. You don't need the '-1' because the
+unit-address makes the node name unique. Node names are supposed to be
+generic based on the class/type of device. See the DT spec.
 
-And I'm assuming arm doesn't cache negative page table entries, so
-there's no issue with any stale tlb.
-
-And any other kernel thread looking at the page tables will have to
-honor the page table locking, so you don't need it for some direct
-page table lookup either.
-
-Hmm? It seems like you shouldn't need to order the "set page directory
-entry" with anything.
-
-But maybe there's some magic arm64 rule I'm not aware of. Maybe even
-the local TLB hardware walker isn't coherent with local stores?
-
-                Linus
+> >
+> > > +                               compatible = "nxp,sa56004";
+> > > +                               reg = <0x4c>;
+> > > +                       };
+> > > +
+> > > +                       sa56004 at 4d {
+> Ok,temperature-sensor-2 at 4d
+> > > +                               compatible = "nxp,sa56004";
+> > > +                               reg = <0x4d>;
+> > > +                       };
+> > > +               };
+> > > +       };
+> > > +};
+> > > +
+> > > +&i2c4 {
+> > > +       status = "okay";
+> > > +
+> > > +       rtc at 51 {
+> > > +               compatible = "nxp,pcf2129";
+> > > +               reg = <0x51>;
+> > > +               // IRQ10_B
+> > > +               interrupts = <0 150 0x4>;
+> > > +               };
+> > > +
+> > > +};
+> > > +
+> > > +&usb0 {
+> > > +       status = "okay";
+> > > +};
+> > > +
+> > > +&usb1 {
+> > > +       status = "okay";
+> > > +};
+> > > +
+> > > +&crypto {
+> > > +       status = "okay";
+> > > +};
+> > > --
+> > > 2.7.4
+> > >
