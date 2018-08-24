@@ -1,51 +1,62 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 24 Aug 2018 15:06:58 +0530
-Subject: [PATCH V5 1/5] dt-bindings: arm: fsl: add scu binding doc
-In-Reply-To: <AM0PR04MB4211B9113831B292110C709280310@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
- <1534781305-4770-2-git-send-email-aisheng.dong@nxp.com>
- <20180820181155.GA13901@bogus>
- <AM0PR04MB4211B9113831B292110C709280310@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <CABb+yY1+J+=nV2gNN30KLr2YQDy_g81-dJS1DJq8NgUv7Qqcog@mail.gmail.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Fri, 24 Aug 2018 10:55:00 +0200
+Subject: [PATCH 1/2] drm/atmel-hlcdc: prefer a higher rate clock as
+ pixel-clock base
+In-Reply-To: <20180824085501.9740-1-peda@axentia.se>
+References: <20180824085501.9740-1-peda@axentia.se>
+Message-ID: <20180824085501.9740-2-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 21, 2018 at 8:30 AM A.s. Dong <aisheng.dong@nxp.com> wrote:
->
-> > > +
-> > > +The System Controller Firmware (SCFW) is a low-level system function
-> > > +which runs on a dedicated Cortex-M core to provide power, clock, and
-> > > +resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
-> > > +(QM, QP), and i.MX8QX (QXP, DX).
-> > > +
-> > > +The AP communicates with the SC using a multi-ported MU module found
-> > > +in the LSIO subsystem. The current definition of this MU module
-> > > +provides
-> > > +5 remote AP connections to the SC to support up to 5 execution
-> > > +environments (TZ, HV, standard Linux, etc.). The SC side of this MU
-> > > +module interfaces with the LSIO DSC IP bus. The SC firmware will
-> > > +communicate with this MU using the MSI bus.
-> >
-> > How are 5 users supported with only 4 channels defined below?
->
-> There're 5 MU instances designed to be specifically communicate with
-> SCU Firmware on MX8 hardware.
->
-This is correct.
+If the divider used to get the pixel-clock is small, the granularity
+of the frequencies possible for the pixel-clock is quite coarse. E.g.
+requesting a pixel-clock of 65MHz with a sys_clk of 132MHz results
+in the divider being set to 3 ending up with 44MHz.
 
-> With the new generic mu binding [1], each MU instance is abstracted
-> Into 16 virtual MU channels. (4 Tx, 4 Rx, 4 Tx doorbell, 4 Rx doorbell).
-> (MU has 4 pair of Tx/Rx data register which can be used to send/receive
-> multi words. With new binding, each data register is abstracted into one
-> MU channel, totally 8 channels for data transfer).
->
-> SCU protocol is already designed to uses all data registers to send/receive
-> multi words according to MU hardware reference manual. So it must
-> use all channels in one MU instances with new binding.
->
-FYI, this is incorrect.
-The 16 channels are physical and not virtual. In fact, all this is to
-avoid virtual channels.
-The physical resources required by new bindings are exactly the same
-as by old bindings. Now you use 8 physical channels instead of 1
-virtual.
+By preferring the doubled sys_clk as base, the divider instead ends
+up as 5 yielding a pixel-clock of 52.8Mhz, which is a definite
+improvement.
+
+While at it, clamp the divider so that it does not overflow in case
+it gets big.
+
+Signed-off-by: Peter Rosin <peda@axentia.se>
+---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+index c38a479ada98..71c9cd90d2ae 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+@@ -101,18 +101,22 @@ static void atmel_hlcdc_crtc_mode_set_nofb(struct drm_crtc *c)
+ 		     (adj->crtc_hdisplay - 1) |
+ 		     ((adj->crtc_vdisplay - 1) << 16));
+ 
+-	cfg = 0;
++	cfg = ATMEL_HLCDC_CLKSEL;
+ 
+-	prate = clk_get_rate(crtc->dc->hlcdc->sys_clk);
++	prate = 2 * clk_get_rate(crtc->dc->hlcdc->sys_clk);
+ 	mode_rate = adj->crtc_clock * 1000;
+-	if ((prate / 2) < mode_rate) {
+-		prate *= 2;
+-		cfg |= ATMEL_HLCDC_CLKSEL;
+-	}
+ 
+ 	div = DIV_ROUND_UP(prate, mode_rate);
+ 	if (div < 2)
+ 		div = 2;
++	else if (ATMEL_HLCDC_CLKDIV(div) & ~ATMEL_HLCDC_CLKDIV_MASK) {
++		/* the divider ended up too big, try a lower base rate */
++		cfg &= ~ATMEL_HLCDC_CLKSEL;
++		prate /= 2;
++		div = DIV_ROUND_UP(prate, mode_rate);
++		if (ATMEL_HLCDC_CLKDIV(div) & ~ATMEL_HLCDC_CLKDIV_MASK)
++			div = ATMEL_HLCDC_CLKDIV_MASK;
++	}
+ 
+ 	cfg |= ATMEL_HLCDC_CLKDIV(div);
+ 
+-- 
+2.11.0
