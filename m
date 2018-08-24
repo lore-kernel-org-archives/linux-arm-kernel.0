@@ -1,70 +1,62 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 24 Aug 2018 10:50:26 +0900
-Subject: [PATCH v3 4/6] mmc: uniphier-sd: add UniPhier SD/eMMC controller
- driver
-In-Reply-To: <CAPDyKFoW=wuYZw+VV6TncLgtMbFdvJCfYOzL8xg7x2WimqNN2A@mail.gmail.com>
-References: <1534999460-15111-1-git-send-email-yamada.masahiro@socionext.com>
- <1534999460-15111-5-git-send-email-yamada.masahiro@socionext.com>
- <CAPDyKFoW=wuYZw+VV6TncLgtMbFdvJCfYOzL8xg7x2WimqNN2A@mail.gmail.com>
-Message-ID: <CAK7LNARYEf34cJG8=z4TgbuVAEzn=NMdOTH5tfMryHQX7uJrgg@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 23 Aug 2018 19:56:12 -0700
+Subject: [PATCH] drm/sun4i: tcon-top: Use struct_size() in devm_kzalloc()
+In-Reply-To: <20180824010521.GA25451@embeddedor.com>
+References: <20180824010521.GA25451@embeddedor.com>
+Message-ID: <CAGXu5j+TjY71LnCJhd=26Prigq8rhM0h59bY9KUh9=n6i3oQ-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-08-23 19:43 GMT+09:00 Ulf Hansson <ulf.hansson@linaro.org>:
-> [...]
+On Thu, Aug 23, 2018 at 6:05 PM, Gustavo A. R. Silva
+<gustavo@embeddedor.com> wrote:
+> One of the more common cases of allocation size calculations is finding
+> the size of a structure that has a zero-sized array at the end, along
+> with memory for some number of elements for that array. For example:
 >
->> +static void uniphier_sd_external_dma_request(struct tmio_mmc_host *host,
->> +                                            struct tmio_mmc_data *pdata)
->> +{
->> +       struct uniphier_sd_priv *priv = uniphier_sd_priv(host);
->> +       struct dma_chan *chan;
->> +
->> +       chan = dma_request_chan(mmc_dev(host->mmc), "rx-tx");
->> +       if (IS_ERR(chan)) {
->> +               dev_warn(mmc_dev(host->mmc),
->> +                        "failed to request DMA channel. falling back to PIO\n");
->> +               return; /* just use PIO even for -EPROBE_DEFER */
->> +       }
->> +
->> +       /* this driver uses a single channel for both RX an TX */
->> +       priv->chan = chan;
->> +       host->chan_rx = chan;
->> +       host->chan_tx = chan;
->> +
->> +       tasklet_init(&host->dma_issue, uniphier_sd_external_dma_issue,
->> +                    (unsigned long)host);
+> struct foo {
+>         int stuff;
+>         void *entry[];
+> };
 >
-> Isn't it time to get rid of tasklets for tmio?
+> instance = devm_kzalloc(dev, sizeof(struct foo) + sizeof(void *) * count, GFP_KERNEL);
 >
-> No worries, I don't require that to be changed prior $subject patch,
-> however using threaded IRQs is a justified modernization for the tmio
-> variants.
-
-
-Yeah, I also thought this.
-
-But, the irq handler is in the TMIO common code,
-so it would affect Renesas code.
-
-tmio-mmc has lots to be improved.
-Tasklet is not the only problem.
-
-
-Before investing more effort,
-I want working code base for my platform.
-
-
-Anyway, thanks for applying this!
-
-
-
-> [...]
+> Instead of leaving these open-coded and prone to type mistakes, we can
+> now use the new struct_size() helper:
 >
-> Kind regards
-> Uffe
+> instance = devm_kzalloc(dev, struct_size(instance, entry, count), GFP_KERNEL);
+>
+> This issue was detected with the help of Coccinelle.
+>
+> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+
+Reviewed-by: Kees Cook <keescook@chromium.org>
+
+-Kees
+
+> ---
+>  drivers/gpu/drm/sun4i/sun8i_tcon_top.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+> index 55fe398..3040a79 100644
+> --- a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+> +++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+> @@ -129,8 +129,7 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
+>         if (!tcon_top)
+>                 return -ENOMEM;
+>
+> -       clk_data = devm_kzalloc(dev, sizeof(*clk_data) +
+> -                               sizeof(*clk_data->hws) * CLK_NUM,
+> +       clk_data = devm_kzalloc(dev, struct_size(clk_data, hws, CLK_NUM),
+>                                 GFP_KERNEL);
+>         if (!clk_data)
+>                 return -ENOMEM;
+> --
+> 2.7.4
+>
 
 
 
 -- 
-Best Regards
-Masahiro Yamada
+Kees Cook
+Pixel Security
