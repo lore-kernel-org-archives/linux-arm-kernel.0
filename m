@@ -1,68 +1,122 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Fri, 24 Aug 2018 16:39:17 +0200
-Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via
- the nvmem API
-In-Reply-To: <20180823122921.6857d917@tock>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180810080526.27207-7-brgl@bgdev.pl>
- <20180817182720.6a6e5e8e@bbrezillon> <20180819133106.0420df5f@tock>
- <20180819184609.6dcdbb9a@bbrezillon>
- <5b8c30b8-41e1-d59e-542b-fef6c6469ff0@linaro.org>
- <20180820202038.5d3dc195@bbrezillon>
- <e0ec3194-fd3a-9b3d-fba8-f88447eb56e9@linaro.org>
- <20180821133916.3a1c51b1@eos>
- <6db14f9c-edd3-5e43-839c-953bb03097ff@linaro.org>
- <20180821150121.4408672f@bbrezillon> <20180823122921.6857d917@tock>
-Message-ID: <20180824163917.6bc349c9@bbrezillon>
+From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
+Date: Fri, 24 Aug 2018 20:15:24 +0530
+Subject: [RFC PATCH v2 0/3] Register read/write tracing with dynamic debug and
+ pstore
+Message-ID: <cover.1535119710.git.saiprakash.ranjan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Aug 2018 12:29:21 +0200
-Alban <albeu@free.fr> wrote:
+Hi,
 
-> On Tue, 21 Aug 2018 15:01:21 +0200
-> Boris Brezillon <boris.brezillon@bootlin.com> wrote:
-> 
-> > On Tue, 21 Aug 2018 13:00:04 +0100
-> > Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
-> >   
-> > > On 21/08/18 12:39, Alban wrote:    
-> > > > However we still have the a potential address space clash between
-> > > > the nvmem cells and the main device binding.      
-> > > Can you elaborate?
-> > >     
-> > 
-> > Yes, I'd be interested in having a real example too, cause I don't see
-> > what this address space clash is.  
-> 
-> Let say I have a device that use the following binding:
-> 
-> device {
->     compatible = "example-device";
->     #address-cells = <2>;
->     #size-cells = <1>;
-> 
->     child at 0,0 {
->         reg = <0x0 0x0>;
->         ...
->     };
-> 
->     child at 1,2 {
->         reg = <0x1 0x2>;
->         ...
->     };
-> 
-> };
-> 
-> Now this binding already use the node address space for something,
-> so putting a nvmem node as direct child would not work. Here it is
-> quiet clear as we have 2 address cells, however even if the number of
-> cells and the cells size would match it would still be conceptually
-> wrong as both bindings then use the same address space for something
-> different.
+This patch series adds a new tracing facility for register reads and writes called
+Register Trace Buffer(RTB).
 
-When would we end up in this situation? MTD/flash nodes are supposed to
-be leaf nodes (if you omit the partitions underneath). What would be
-the case for defining subnodes there?
+We also add pstore support through which we can save all register read/write logs into a
+persistent ram buffer that can be dumped after reboot.
 
-Do you know of any devices that uses such a representation?
+It can be used to determine from where register was read/written before unclocked
+access or some kind of bus hang or an unexpected reset caused by some buggy driver
+which happens a lot during initial development stages.
+
+In addition to this, we provide dynamic debug support to filter out unwanted logs
+and limit trace to only specific files or directories since there can be aweful
+lot of register events and we will be interested only in specific drivers or subsystems
+which we will be working on. Last few RTB entries will give us the hint for debugging.
+With dynamic debug, we are also reducing the overhead of tracing considerably.
+
+Also as a bonus, this tracing can be extended to include IRQ, printk, context switch
+and lot other things with proper hooks. It can be very helpful for real case debug scenarios.
+
+Below is a simple example of identifying cause for bus hang in qcom mdp tested on db410c.
+This hang was intentionally introduced just to show the usecase of RTB.
+The module used can be found here: https://github.com/saiprakash-ranjan/Bus-Hang which does
+an unclocked access and will reset db410c and later logs can be viewed through pstore.
+
+Note: I just copied bus_hang.c to drivers/soc/qcom and built it.
+
+1) Set bootargs with dyndbg parameter as below:
+
+   # dyndbg="file drivers/soc/qcom/* +p"
+
+2) Bus hang by reading below debugfs entry with bus_hang module.
+
+   # cat /sys/kernel/debug/hang/bus_hang
+
+3) After restart, we can find the cause in last entry i.e. (bus_hang_mdp+0x98/0xb0)
+
+   # cat /sys/fs/pstore/rtb-ramoops-0
+   [LOGK_WRITE] ts:1373101930  data:ffff00000cd065a4  <ffff00000867cb44>  qcom_smsm_probe+0x51c/0x668
+   [LOGK_WRITE] ts:1373311878  data:ffff00000cd06608  <ffff00000867cb44>  qcom_smsm_probe+0x51c/0x668
+   [LOGK_READ ] ts:18177142294  data:ffff00000ab85040 <ffff00000867cdc8>  bus_hang_mdp+0x98/0xb0
+
+4) Offending register access found as below:
+
+   # (gdb)
+   # (gdb) list *(bus_hang_mdp+0x98)
+   # 0xffff00000867cdc8 is in bus_hang_mdp (drivers/soc/qcom/bus_hang.c:10).
+   # 5       static int bus_hang_mdp(void *data, u64 *val)
+   # 6       {
+   # 7               void *p = ioremap(0x01a01000, SZ_4K);
+   # 8               unsigned int a;
+   # 9
+   # 10              a = __raw_readl((void *)((unsigned long)p + 0x40));  <----
+   # 11
+   # 12              *val = a;
+   # 13
+   # 14              return 0;
+   # (gdb)
+
+There will be a lot more real usecases where RTB can be used. Maybe we can test on other boards as well.
+
+This trace module is based on RTB driver in CAF.
+Link: https://source.codeaurora.org/quic/la/kernel/msm-4.9/tree/kernel/trace/msm_rtb.c
+
+Patchwise one line description is given below:
+
+Patch 1 provides the api called uncached_logk which is then called 
+within dynamic_rtb for logging register accesses, i.e. (read/write{b,w,l,q})
+
+Patch 2 adds the pstore support for displaying the logs after reset.
+
+Patch 3 adds dynamic debug support to filter the register read/write{b,w,l,q} access.
+Also this patch adds asm-generic/io-instrumented.h file for keeping instrumentation
+away from arch code as suggested by Will Deacon.
+
+v2:
+ * Addressed Will's comment to keep instrumentation out of arch code and also
+   remove duplicate code
+ * Addressed Steven's comments regarding code cleanup
+ * Fixed commit description to be more specific about register accesses i.e.,
+   use read/write{b,l,w,q} instead of readl/writel since we will be tracing all
+
+Sai Prakash Ranjan (3):
+  tracing: Add support for logging data to uncached buffer
+  pstore: Add register read/write{b,w,l,q} tracing support
+  dynamic_debug: Add support for dynamic register trace
+
+ .../bindings/reserved-memory/ramoops.txt      |   7 +-
+ arch/arm64/include/asm/io.h                   |  26 ++--
+ fs/pstore/Kconfig                             |  12 ++
+ fs/pstore/Makefile                            |   1 +
+ fs/pstore/inode.c                             |  71 ++++++++-
+ fs/pstore/internal.h                          |   8 +
+ fs/pstore/platform.c                          |   4 +
+ fs/pstore/ram.c                               |  42 ++++-
+ fs/pstore/rtb.c                               |  45 ++++++
+ include/asm-generic/io-instrumented.h         |  32 ++++
+ include/linux/dynamic_debug.h                 |  13 ++
+ include/linux/pstore.h                        |   2 +
+ include/linux/pstore_ram.h                    |   1 +
+ include/linux/rtb.h                           |  31 ++++
+ kernel/trace/Kconfig                          |   8 +
+ kernel/trace/Makefile                         |   2 +
+ kernel/trace/trace_rtb.c                      | 146 ++++++++++++++++++
+ 17 files changed, 430 insertions(+), 21 deletions(-)
+ create mode 100644 fs/pstore/rtb.c
+ create mode 100644 include/asm-generic/io-instrumented.h
+ create mode 100644 include/linux/rtb.h
+ create mode 100644 kernel/trace/trace_rtb.c
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
