@@ -1,63 +1,50 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 23 Aug 2018 19:57:35 -0700
-Subject: [PATCH] mtd: rawnand: atmel: use struct_size() in devm_kzalloc()
-In-Reply-To: <20180824010938.GA25581@embeddedor.com>
-References: <20180824010938.GA25581@embeddedor.com>
-Message-ID: <CAGXu5jL_p6Z863qq5=K2B+=AW6LuxmBu23bjhQe-1saz4kdeFA@mail.gmail.com>
+From: tony.xie@rock-chips.com (Tony Xie)
+Date: Fri, 24 Aug 2018 11:30:36 +0800
+Subject: [PATCH v3 0/5] support a new type of PMIC,
+ including two chips(rk817 and rk809)
+Message-ID: <1535081441-20718-1-git-send-email-tony.xie@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2018 at 6:09 PM, Gustavo A. R. Silva
-<gustavo@embeddedor.com> wrote:
-> One of the more common cases of allocation size calculations is finding
-> the size of a structure that has a zero-sized array at the end, along
-> with memory for some number of elements for that array. For example:
->
-> struct foo {
->         int stuff;
->         void *entry[];
-> };
->
-> instance = devm_kzalloc(dev, sizeof(struct foo) + sizeof(void *) * count, GFP_KERNEL);
->
-> Instead of leaving these open-coded and prone to type mistakes, we can
-> now use the new struct_size() helper:
->
-> instance = devm_kzalloc(dev, struct_size(instance, entry, count), GFP_KERNEL);
->
-> This issue was detected with the help of Coccinelle.
->
-> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+Most of functions and registers of the rk817 and rk808 are the same,
+so they can share allmost all codes.
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
+Their specifications are as follows?
+  1) The RK809 and RK809 consist of 5 DCDCs, 9 LDOs and have the same registers
+     for these components except dcdc5.
+  2) The dcdc5 is a boost dcdc for RK817 and is a buck for RK809.
+  3) The RK817 has one switch but The Rk809 has two.
 
--Kees
+Changes in V2:
+1. initialize the pm_pwroff_fn to NULL. 
+2. use EXPORT_SYMBOL_GPL to export pm_power_off_prepare.
+3. change patch 2/3/4/5 subjects. 
 
-> ---
->  drivers/mtd/nand/raw/atmel/nand-controller.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
->
-> diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
-> index a068b21..b17cfd0 100644
-> --- a/drivers/mtd/nand/raw/atmel/nand-controller.c
-> +++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
-> @@ -1586,9 +1586,7 @@ static struct atmel_nand *atmel_nand_create(struct atmel_nand_controller *nc,
->                 return ERR_PTR(-EINVAL);
->         }
->
-> -       nand = devm_kzalloc(nc->dev,
-> -                           sizeof(*nand) + (numcs * sizeof(*nand->cs)),
-> -                           GFP_KERNEL);
-> +       nand = devm_kzalloc(nc->dev, struct_size(nand, cs, numcs), GFP_KERNEL);
->         if (!nand) {
->                 dev_err(nc->dev, "Failed to allocate NAND object\n");
->                 return ERR_PTR(-ENOMEM);
-> --
-> 2.7.4
->
+Changes in V3?
+1. change patch 4 subjects
+2. replace pr_ with dev_ for printing in patch 2
+3. modify switch1 and switch2 configs in patch 2
+4. explain gpio information for rk809 and rk817 in patch 4
 
+Tony Xie (5):
+  mfd: rk808: Add RK817 and RK809 support
+  regulator: rk808: add RK809 and RK817 support.
+  dt-bindings: mfd: rk808: Add binding information for RK809 and RK817.
+  rtc: rk808: add RK809 and RK817 support.
+  clk: RK808: add RK809 and RK817 support.
 
+ Documentation/devicetree/bindings/mfd/rk808.txt |  56 +++
+ drivers/clk/Kconfig                             |   9 +-
+ drivers/clk/clk-rk808.c                         |  62 ++-
+ drivers/mfd/Kconfig                             |   6 +-
+ drivers/mfd/rk808.c                             | 218 +++++++-
+ drivers/regulator/Kconfig                       |   4 +-
+ drivers/regulator/rk808-regulator.c             | 639 +++++++++++++++++++++++-
+ drivers/rtc/Kconfig                             |   4 +-
+ drivers/rtc/rtc-rk808.c                         |  68 ++-
+ include/linux/mfd/rk808.h                       | 175 +++++++
+ kernel/reboot.c                                 |   1 +
+ 11 files changed, 1209 insertions(+), 33 deletions(-)
 
 -- 
-Kees Cook
-Pixel Security
+1.9.1
