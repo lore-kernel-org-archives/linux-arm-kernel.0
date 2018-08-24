@@ -1,208 +1,103 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 24 Aug 2018 10:29:39 +0200
-Subject: [PATCH v8 07/26] PM / Domains: Add genpd governor for CPUs
-In-Reply-To: <CAJZ5v0hX3gC0J_z1tMu-KkNBRf3GuJ91tbFC2Z+0D1BnHkY8kg@mail.gmail.com>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <20180620172226.15012-8-ulf.hansson@linaro.org>
- <3574880.GjmnMm1lMq@aspire.rjw.lan>
- <10360149.m4MlxDWZY5@aspire.rjw.lan>
- <CAPDyKFonHYSq32WxvB1x5PXissXZvraqazgU_ZyLR=tsyD9vAA@mail.gmail.com>
- <CAJZ5v0hX3gC0J_z1tMu-KkNBRf3GuJ91tbFC2Z+0D1BnHkY8kg@mail.gmail.com>
-Message-ID: <CAPDyKFqOv9d=w80s2W_+wcKEtBWnBKQ3CqGaG2yGJt8_qRTu6g@mail.gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Fri, 24 Aug 2018 07:36:38 +0000
+Subject: [PATCH V5 0/5] soc: imx: add scu firmware api support
+In-Reply-To: <AM0PR04MB4211F68CCD399243613F8D7B80320@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
+ <AM0PR04MB4211F68CCD399243613F8D7B80320@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <AM0PR04MB4211F748DBD1FE64A2B2136980360@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 August 2018 at 11:20, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> On Fri, Aug 3, 2018 at 4:28 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 26 July 2018 at 11:14, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->>> On Thursday, July 19, 2018 12:32:52 PM CEST Rafael J. Wysocki wrote:
->>>> On Wednesday, June 20, 2018 7:22:07 PM CEST Ulf Hansson wrote:
->>>> > As it's now perfectly possible that a PM domain managed by genpd contains
->>>> > devices belonging to CPUs, we should start to take into account the
->>>> > residency values for the idle states during the state selection process.
->>>> > The residency value specifies the minimum duration of time, the CPU or a
->>>> > group of CPUs, needs to spend in an idle state to not waste energy entering
->>>> > it.
->>>> >
->>>> > To deal with this, let's add a new genpd governor, pm_domain_cpu_gov, that
->>>> > may be used for a PM domain that have CPU devices attached or if the CPUs
->>>> > are attached through subdomains.
->>>> >
->>>> > The new governor computes the minimum expected idle duration time for the
->>>> > online CPUs being attached to the PM domain and its subdomains. Then in the
->>>> > state selection process, trying the deepest state first, it verifies that
->>>> > the idle duration time satisfies the state's residency value.
->>>> >
->>>> > It should be noted that, when computing the minimum expected idle duration
->>>> > time, we use the information from tick_nohz_get_next_wakeup(), to find the
->>>> > next wakeup for the related CPUs. Future wise, this may deserve to be
->>>> > improved, as there are more reasons to why a CPU may be woken up from idle.
->>>> >
->>>> > Cc: Thomas Gleixner <tglx@linutronix.de>
->>>> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>> > Cc: Lina Iyer <ilina@codeaurora.org>
->>>> > Cc: Frederic Weisbecker <fweisbec@gmail.com>
->>>> > Cc: Ingo Molnar <mingo@kernel.org>
->>>> > Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
->>>> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>>> > ---
->>>> >  drivers/base/power/domain_governor.c | 58 ++++++++++++++++++++++++++++
->>>> >  include/linux/pm_domain.h            |  2 +
->>>> >  2 files changed, 60 insertions(+)
->>>> >
->>>> > diff --git a/drivers/base/power/domain_governor.c b/drivers/base/power/domain_governor.c
->>>> > index 99896fbf18e4..1aad55719537 100644
->>>> > --- a/drivers/base/power/domain_governor.c
->>>> > +++ b/drivers/base/power/domain_governor.c
->>>> > @@ -10,6 +10,9 @@
->>>> >  #include <linux/pm_domain.h>
->>>> >  #include <linux/pm_qos.h>
->>>> >  #include <linux/hrtimer.h>
->>>> > +#include <linux/cpumask.h>
->>>> > +#include <linux/ktime.h>
->>>> > +#include <linux/tick.h>
->>>> >
->>>> >  static int dev_update_qos_constraint(struct device *dev, void *data)
->>>> >  {
->>>> > @@ -245,6 +248,56 @@ static bool always_on_power_down_ok(struct dev_pm_domain *domain)
->>>> >     return false;
->>>> >  }
->>>> >
->>>> > +static bool cpu_power_down_ok(struct dev_pm_domain *pd)
->>>> > +{
->>>> > +   struct generic_pm_domain *genpd = pd_to_genpd(pd);
->>>> > +   ktime_t domain_wakeup, cpu_wakeup;
->>>> > +   s64 idle_duration_ns;
->>>> > +   int cpu, i;
->>>> > +
->>>> > +   if (!(genpd->flags & GENPD_FLAG_CPU_DOMAIN))
->>>> > +           return true;
->>>> > +
->>>> > +   /*
->>>> > +    * Find the next wakeup for any of the online CPUs within the PM domain
->>>> > +    * and its subdomains. Note, we only need the genpd->cpus, as it already
->>>> > +    * contains a mask of all CPUs from subdomains.
->>>> > +    */
->>>> > +   domain_wakeup = ktime_set(KTIME_SEC_MAX, 0);
->>>> > +   for_each_cpu_and(cpu, genpd->cpus, cpu_online_mask) {
->>>> > +           cpu_wakeup = tick_nohz_get_next_wakeup(cpu);
->>>> > +           if (ktime_before(cpu_wakeup, domain_wakeup))
->>>> > +                   domain_wakeup = cpu_wakeup;
->>>> > +   }
->>>
->>> Here's a concern I have missed before. :-/
->>>
->>> Say, one of the CPUs you're walking here is woken up in the meantime.
->>
->> Yes, that can happen - when we miss-predicted "next wakeup".
->>
->>>
->>> I don't think it is valid to evaluate tick_nohz_get_next_wakeup() for it then
->>> to update domain_wakeup.  We really should just avoid the domain power off in
->>> that case at all IMO.
->>
->> Correct.
->>
->> However, we also want to avoid locking contentions in the idle path,
->> which is what this boils done to.
->
-> This already is done under genpd_lock() AFAICS, so I'm not quite sure
-> what exactly you mean.
->
-> Besides, this is not just about increased latency, which is a concern
-> by itself but maybe not so much in all environments, but also about
-> possibility of missing a CPU wakeup, which is a major issue.
->
-> If one of the CPUs sharing the domain with the current one is woken up
-> during cpu_power_down_ok() and the wakeup is an edge-triggered
-> interrupt and the domain is turned off regardless, the wakeup may be
-> missed entirely if I'm not mistaken.
->
-> It looks like there needs to be a way for the hardware to prevent a
-> domain poweroff when there's a pending interrupt or I don't quite see
-> how this can be handled correctly.
+Hi Jassi & Sasha,
 
-Well, the job of genpd and its new cpu governor is not directly to
-power off the PM domain, but rather to try to select/promote an idle
-state for it. Along the lines of what Lorenzo explained in the other
-thread.
+Do you have some suggestions about this patch series?
 
-Then what happens in the genpd backend driver's ->power_off()
-callback, is platform specific. In other words, it's the job of the
-backend driver to understand how its FW works and thus to correctly
-deal with the last man standing algorithm.
+Regards
+Dong Aisheng
 
-In regards to the PSCI FW, it supports the race condition you are
-referring to in the FW (which makes it easier), no matter if it's
-running in OS-initiated mode or platform-coordinated mode.
-
->
->>> Sure enough, if the domain power off is already started and one of the CPUs
->>> in the domain is woken up then, too bad, it will suffer the latency (but in
->>> that case the hardware should be able to help somewhat), but otherwise CPU
->>> wakeup should prevent domain power off from being carried out.
->>
->> The CPU is not prevented from waking up, as we rely on the FW to deal with that.
->>
->> Even if the above computation turns out to wrongly suggest that the
->> cluster can be powered off, the FW shall together with the genpd
->> backend driver prevent it.
->
-> Fine, but then the solution depends on specific FW/HW behavior, so I'm
-> not sure how generic it really is.  At least, that expectation should
-> be clearly documented somewhere, preferably in code comments.
-
-Alright, let me add some comments somewhere in the code, to explain a
-bit about what a genpd backend driver should expect when using the
-GENPD_FLAG_CPU_DOMAIN flag.
-
->
->> To cover this case for PSCI, we also use a per cpu variable for the
->> CPU's power off state, as can be seen later in the series.
->
-> Oh great, but the generic part should be independent on the underlying
-> implementation of the driver.  If it isn't, then it also is not
-> generic.
->
->> Hope this clarifies your concern, else tell and will to elaborate a bit more.
->
-> Not really.
->
-> There also is one more problem and that is the interaction between
-> this code and the idle governor.
->
-> Namely, the idle governor may select a shallower state for some
-> reason, for example due to an additional latency limit derived from
-> CPU utilization (like in the menu governor), and how does the code in
-> cpu_power_down_ok() know what state has been selected and how does it
-> honor the selection made by the idle governor?
-
-This is indeed a valid concern. I must have failed to explained this
-during various conferences, but at least I have tried. :-)
-
-Ideally, we need the menu idle governor and genpd's new cpu governor
-to share code or exchange information, somehow. I am looking into that
-as a next step of improvements, count on it!
-
-The idea at this point was instead to take a simplified approach to
-the problem, to at least get some support for cpu cluster idle
-management in place, then improve it on top.
-
-This means, for PSCI, we are using the new genpd cpu governor *only*
-for the cluster PM domain (master), but not for the genpd subdomains,
-which each contains of a single CPU device. So, the subdomains don't
-have a genpd governor assigned, but instead rely on the existing menu
-idle governor to select an idle state for the CPU. This means that
-*most* of the problem disappears, as its only when the last CPU in the
-cluster goes idle, when the selection could be "wrong". In worst case,
-genpd will promote an idle state for the cluster PM domain, while it
-shouldn't.
-
-Moreover, for the QCOM case in 410c, this isn't even a potential
-problem, because there is only *one* idle state to pick by the menu
-idle governor for the CPU (besides WFI). Hence, when the genpd cpu
-governor runs to pick and idle state, we know that the menu idle
-governor have already selected the deepest idle state for each CPU.
-
-Kind regards
-Uffe
+> -----Original Message-----
+> From: A.s. Dong
+> Sent: Tuesday, August 21, 2018 12:32 AM
+> To: Jassi Brar <jassisinghbrar@gmail.com>; Sascha Hauer
+> <s.hauer@pengutronix.de>
+> Cc: dongas86 at gmail.com; kernel at pengutronix.de; shawnguo at kernel.org;
+> Fabio Estevam <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>;
+> linux-arm-kernel at lists.infradead.org
+> Subject: RE: [PATCH V5 0/5] soc: imx: add scu firmware api support
+> 
+> Hi Jassi & Sascha,
+> 
+> Would you help review this new version patch series?
+> 
+> It's changed to generic MU driver using 8 separately MU channels according to
+> Jassi's suggestion.
+> Please help check if this is okay to you.
+> 
+> Regards
+> Dong Aisheng
+> 
+> > -----Original Message-----
+> > From: A.s. Dong
+> > Sent: Tuesday, August 21, 2018 12:08 AM
+> > To: linux-arm-kernel at lists.infradead.org
+> > Cc: dongas86 at gmail.com; kernel at pengutronix.de; shawnguo at kernel.org;
+> > Fabio Estevam <fabio.estevam@nxp.com>; dl-linux-imx <linux-
+> > imx at nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
+> > Subject: [PATCH V5 0/5] soc: imx: add scu firmware api support
+> >
+> > Unlike the former i.MX Architectures, the new generation i.MX8 SoCs (e.g.
+> > MX8QXP and MX8QM) contain a system controller which runs on a
+> > dedicated Cortex-M core to provide power, clock, Pad, and resource
+> management.
+> > Communication between the host processor running an OS and the system
+> > controller happens through a SCU protocol.
+> > This patchset adds the SCU APIs which is implemented based on MU and
+> > will be used by different system components.
+> >
+> > It mainly consists of below parts:
+> > 1) SCU IPC
+> >    Basic IPC mechanism implemention based on mailbox which is used
+> >    for communication between AP and SCU firmware.
+> > 2) SCU IPC Service API
+> >
+> > Dong Aisheng (5):
+> >   dt-bindings: arm: fsl: add scu binding doc
+> >   soc: imx: add SC firmware IPC and APIs
+> >   soc: imx: sc: add pm svc support
+> >   soc: imx: sc: add pad svc support
+> >   soc: imx: sc: add misc svc support
+> >
+> >  .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 179 ++++++
+> >  drivers/soc/imx/Kconfig                            |   4 +
+> >  drivers/soc/imx/Makefile                           |   1 +
+> >  drivers/soc/imx/sc/Makefile                        |   5 +
+> >  drivers/soc/imx/sc/main/ipc.c                      | 258 +++++++++
+> >  drivers/soc/imx/sc/main/rpc.h                      |  51 ++
+> >  drivers/soc/imx/sc/svc/misc/rpc_clnt.c             | 106 ++++
+> >  drivers/soc/imx/sc/svc/pad/rpc_clnt.c              |  82 +++
+> >  drivers/soc/imx/sc/svc/pm/rpc_clnt.c               | 275 +++++++++
+> >  include/soc/imx/sc/ipc.h                           |  46 ++
+> >  include/soc/imx/sc/sci.h                           |  20 +
+> >  include/soc/imx/sc/svc/misc/api.h                  |  60 ++
+> >  include/soc/imx/sc/svc/pad/api.h                   |  60 ++
+> >  include/soc/imx/sc/svc/pm/api.h                    | 229 ++++++++
+> >  include/soc/imx/sc/types.h                         | 636
+> +++++++++++++++++++++
+> >  15 files changed, 2012 insertions(+)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> >  create mode 100644 drivers/soc/imx/sc/Makefile  create mode 100644
+> > drivers/soc/imx/sc/main/ipc.c  create mode 100644
+> > drivers/soc/imx/sc/main/rpc.h  create mode 100644
+> > drivers/soc/imx/sc/svc/misc/rpc_clnt.c
+> >  create mode 100644 drivers/soc/imx/sc/svc/pad/rpc_clnt.c
+> >  create mode 100644 drivers/soc/imx/sc/svc/pm/rpc_clnt.c
+> >  create mode 100644 include/soc/imx/sc/ipc.h  create mode 100644
+> > include/soc/imx/sc/sci.h  create mode 100644
+> > include/soc/imx/sc/svc/misc/api.h  create mode 100644
+> > include/soc/imx/sc/svc/pad/api.h  create mode 100644
+> > include/soc/imx/sc/svc/pm/api.h  create mode 100644
+> > include/soc/imx/sc/types.h
+> >
+> > --
+> > 2.7.4
