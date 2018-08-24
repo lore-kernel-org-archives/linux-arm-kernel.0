@@ -1,60 +1,75 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Aug 2018 16:52:38 +0100
-Subject: [RFC PATCH 03/11] arm64: pgtable: Implement p[mu]d_valid() and check
- in set_p[mu]d()
-In-Reply-To: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
-References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1535125966-7666-4-git-send-email-will.deacon@arm.com>
+Date: Fri, 24 Aug 2018 16:52:35 +0100
+Subject: [RFC PATCH 00/11] Avoid synchronous TLB invalidation for intermediate
+ page-table entries on arm64
+Message-ID: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that our walk-cache invalidation routines imply a DSB before the
-invalidation, we no longer need one when we are clearing an entry during
-unmap.
+Hi all,
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/pgtable.h | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+I hacked up this RFC on the back of the recent changes to the mmu_gather
+stuff in mainline. It's had a bit of testing and it looks pretty good so
+far.
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 1bdeca8918a6..2ab2031b778c 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -360,6 +360,7 @@ static inline int pmd_protnone(pmd_t pmd)
- #define pmd_present(pmd)	pte_present(pmd_pte(pmd))
- #define pmd_dirty(pmd)		pte_dirty(pmd_pte(pmd))
- #define pmd_young(pmd)		pte_young(pmd_pte(pmd))
-+#define pmd_valid(pmd)		pte_valid(pmd_pte(pmd))
- #define pmd_wrprotect(pmd)	pte_pmd(pte_wrprotect(pmd_pte(pmd)))
- #define pmd_mkold(pmd)		pte_pmd(pte_mkold(pmd_pte(pmd)))
- #define pmd_mkwrite(pmd)	pte_pmd(pte_mkwrite(pmd_pte(pmd)))
-@@ -431,7 +432,9 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
- {
- 	WRITE_ONCE(*pmdp, pmd);
--	dsb(ishst);
-+
-+	if (pmd_valid(pmd))
-+		dsb(ishst);
- }
- 
- static inline void pmd_clear(pmd_t *pmdp)
-@@ -477,11 +480,14 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
- #define pud_none(pud)		(!pud_val(pud))
- #define pud_bad(pud)		(!(pud_val(pud) & PUD_TABLE_BIT))
- #define pud_present(pud)	pte_present(pud_pte(pud))
-+#define pud_valid(pud)		pte_valid(pud_pte(pud))
- 
- static inline void set_pud(pud_t *pudp, pud_t pud)
- {
- 	WRITE_ONCE(*pudp, pud);
--	dsb(ishst);
-+
-+	if (pud_valid(pud))
-+		dsb(ishst);
- }
- 
- static inline void pud_clear(pud_t *pudp)
+The main changes in the series are:
+
+  - Avoid emitting a DSB barrier after clearing each page-table entry.
+    Instead, we can have a single DSB prior to the actual TLB invalidation.
+
+  - Batch last-level TLB invalidation until the end of the VMA, and use
+    last-level-only invalidation instructions
+
+  - Batch intermediate TLB invalidation until the end of the gather, and
+    use all-level invalidation instructions
+
+  - Adjust the stride of TLB invalidation based upon the smallest unflushed
+    granule in the gather
+
+As a really stupid benchmark, unmapping a populated mapping of
+0x4_3333_3000 bytes using munmap() takes around 20% of the time it took
+before.
+
+The core changes now track the levels of page-table that have been visited
+by the mmu_gather since the last flush. It may be possible to use the
+page_size field instead if we decide to resurrect that from its current
+"debug" status, but I think I'd prefer to track the levels explicitly.
+
+Anyway, I wanted to post this before disappearing for the long weekend
+(Monday is a holiday in the UK) in the hope that it helps some of the
+ongoing discussions.
+
+Cheers,
+
+Will
+
+--->8
+
+Peter Zijlstra (1):
+  asm-generic/tlb: Track freeing of page-table directories in struct
+    mmu_gather
+
+Will Deacon (10):
+  arm64: tlb: Use last-level invalidation in flush_tlb_kernel_range()
+  arm64: tlb: Add DSB ISHST prior to TLBI in
+    __flush_tlb_[kernel_]pgtable()
+  arm64: pgtable: Implement p[mu]d_valid() and check in set_p[mu]d()
+  arm64: tlb: Justify non-leaf invalidation in flush_tlb_range()
+  arm64: tlbflush: Allow stride to be specified for __flush_tlb_range()
+  arm64: tlb: Remove redundant !CONFIG_HAVE_RCU_TABLE_FREE code
+  asm-generic/tlb: Guard with #ifdef CONFIG_MMU
+  asm-generic/tlb: Track which levels of the page tables have been
+    cleared
+  arm64: tlb: Adjust stride and type of TLBI according to mmu_gather
+  arm64: tlb: Avoid synchronous TLBIs when freeing page tables
+
+ arch/arm64/Kconfig                |  1 +
+ arch/arm64/include/asm/pgtable.h  | 10 ++++-
+ arch/arm64/include/asm/tlb.h      | 34 +++++++----------
+ arch/arm64/include/asm/tlbflush.h | 28 +++++++-------
+ include/asm-generic/tlb.h         | 79 +++++++++++++++++++++++++++++++++------
+ mm/memory.c                       |  4 +-
+ 6 files changed, 105 insertions(+), 51 deletions(-)
+
 -- 
 2.1.4
