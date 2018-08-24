@@ -1,136 +1,36 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Aug 2018 15:08:30 +0100
-Subject: [PATCH 2/2] arm/arm64: amccc-1.1: Handle function result as parameters
-In-Reply-To: <20180824140830.12747-1-marc.zyngier@arm.com>
-References: <20180824140830.12747-1-marc.zyngier@arm.com>
-Message-ID: <20180824140830.12747-3-marc.zyngier@arm.com>
+Date: Fri, 24 Aug 2018 16:06:34 +0100
+Subject: [PATCH v2 1/4] ARM: rockchip: Force CONFIG_PM on Rockchip systems
+In-Reply-To: <20180824150637.15316-1-marc.zyngier@arm.com>
+References: <20180824150637.15316-1-marc.zyngier@arm.com>
+Message-ID: <20180824150637.15316-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If someone has the silly idea to write something along those lines:
+A number of the Rockchip-specific drivers (IOMMU, display controllers)
+are now assuming that CONFIG_PM is set, and may completely misbehave
+if that's not the case.
 
-	extern u64 foo(void);
+Since there is hardly any reason for this configuration option not
+to be selected anyway, let's require it (in the same way Tegra already
+does).
 
-	void bar(struct arm_smccc_res *res)
-	{
-		arm_smccc_1_1_smc(0xbad, foo(), res);
-	}
-
-they are in for a surprise, as this gets compiled as:
-
-	0000000000000588 <bar>:
-	 588:   a9be7bfd        stp     x29, x30, [sp, #-32]!
-	 58c:   910003fd        mov     x29, sp
-	 590:   f9000bf3        str     x19, [sp, #16]
-	 594:   aa0003f3        mov     x19, x0
-	 598:   aa1e03e0        mov     x0, x30
-	 59c:   94000000        bl      0 <_mcount>
-	 5a0:   94000000        bl      0 <foo>
-	 5a4:   aa0003e1        mov     x1, x0
-	 5a8:   d4000003        smc     #0x0
-	 5ac:   b4000073        cbz     x19, 5b8 <bar+0x30>
-	 5b0:   a9000660        stp     x0, x1, [x19]
-	 5b4:   a9010e62        stp     x2, x3, [x19, #16]
-	 5b8:   f9400bf3        ldr     x19, [sp, #16]
-	 5bc:   a8c27bfd        ldp     x29, x30, [sp], #32
-	 5c0:   d65f03c0        ret
-	 5c4:   d503201f        nop
-
-The call to foo "overwrites" the x0 register for the return value,
-and we end up calling the wrong secure service.
-
-A solution is to evaluate all the parameters before assigning
-anything to specific registers, leading to the expected result:
-
-	0000000000000588 <bar>:
-	 588:   a9be7bfd        stp     x29, x30, [sp, #-32]!
-	 58c:   910003fd        mov     x29, sp
-	 590:   f9000bf3        str     x19, [sp, #16]
-	 594:   aa0003f3        mov     x19, x0
-	 598:   aa1e03e0        mov     x0, x30
-	 59c:   94000000        bl      0 <_mcount>
-	 5a0:   94000000        bl      0 <foo>
-	 5a4:   aa0003e1        mov     x1, x0
-	 5a8:   d28175a0        mov     x0, #0xbad
-	 5ac:   d4000003        smc     #0x0
-	 5b0:   b4000073        cbz     x19, 5bc <bar+0x34>
-	 5b4:   a9000660        stp     x0, x1, [x19]
-	 5b8:   a9010e62        stp     x2, x3, [x19, #16]
-	 5bc:   f9400bf3        ldr     x19, [sp, #16]
-	 5c0:   a8c27bfd        ldp     x29, x30, [sp], #32
-	 5c4:   d65f03c0        ret
-
-Reported-by: Julien Grall <julien.grall@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/arm-smccc.h | 30 ++++++++++++++++++++----------
- 1 file changed, 20 insertions(+), 10 deletions(-)
+ arch/arm/mach-rockchip/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-index 5a91ff33720b..18863d56273c 100644
---- a/include/linux/arm-smccc.h
-+++ b/include/linux/arm-smccc.h
-@@ -205,41 +205,51 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
- 	register unsigned long r3 asm("r3")
- 
- #define __declare_arg_1(a0, a1, res)					\
-+	typeof(a1) __a1 = a1;						\
- 	struct arm_smccc_res   *___res = res;				\
- 	register unsigned long r0 asm("r0") = (u32)a0;			\
--	register unsigned long r1 asm("r1") = a1;			\
-+	register unsigned long r1 asm("r1") = __a1;			\
- 	register unsigned long r2 asm("r2");				\
- 	register unsigned long r3 asm("r3")
- 
- #define __declare_arg_2(a0, a1, a2, res)				\
-+	typeof(a1) __a1 = a1;						\
-+	typeof(a2) __a2 = a2;						\
- 	struct arm_smccc_res   *___res = res;				\
- 	register unsigned long r0 asm("r0") = (u32)a0;			\
--	register unsigned long r1 asm("r1") = a1;			\
--	register unsigned long r2 asm("r2") = a2;			\
-+	register unsigned long r1 asm("r1") = __a1;			\
-+	register unsigned long r2 asm("r2") = __a2;			\
- 	register unsigned long r3 asm("r3")
- 
- #define __declare_arg_3(a0, a1, a2, a3, res)				\
-+	typeof(a1) __a1 = a1;						\
-+	typeof(a2) __a2 = a2;						\
-+	typeof(a3) __a3 = a3;						\
- 	struct arm_smccc_res   *___res = res;				\
- 	register unsigned long r0 asm("r0") = (u32)a0;			\
--	register unsigned long r1 asm("r1") = a1;			\
--	register unsigned long r2 asm("r2") = a2;			\
--	register unsigned long r3 asm("r3") = a3
-+	register unsigned long r1 asm("r1") = __a1;			\
-+	register unsigned long r2 asm("r2") = __a2;			\
-+	register unsigned long r3 asm("r3") = __a3
- 
- #define __declare_arg_4(a0, a1, a2, a3, a4, res)			\
-+	typeof(a4) __a4 = a4;						\
- 	__declare_arg_3(a0, a1, a2, a3, res);				\
--	register typeof(a4) r4 asm("r4") = a4
-+	register unsigned long r4 asm("r4") = __a4
- 
- #define __declare_arg_5(a0, a1, a2, a3, a4, a5, res)			\
-+	typeof(a5) __a5 = a5;						\
- 	__declare_arg_4(a0, a1, a2, a3, a4, res);			\
--	register typeof(a5) r5 asm("r5") = a5
-+	register unsigned long r5 asm("r5") = __a5
- 
- #define __declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res)		\
-+	typeof(a6) __a6 = a6;						\
- 	__declare_arg_5(a0, a1, a2, a3, a4, a5, res);			\
--	register typeof(a6) r6 asm("r6") = a6
-+	register unsigned long r6 asm("r6") = __a6
- 
- #define __declare_arg_7(a0, a1, a2, a3, a4, a5, a6, a7, res)		\
-+	typeof(a7) __a7 = a7;						\
- 	__declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res);		\
--	register typeof(a7) r7 asm("r7") = a7
-+	register unsigned long r7 asm("r7") = __a7
- 
- #define ___declare_args(count, ...) __declare_arg_ ## count(__VA_ARGS__)
- #define __declare_args(count, ...)  ___declare_args(count, __VA_ARGS__)
+diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
+index fafd3d7f9f8c..8ca926522026 100644
+--- a/arch/arm/mach-rockchip/Kconfig
++++ b/arch/arm/mach-rockchip/Kconfig
+@@ -17,6 +17,7 @@ config ARCH_ROCKCHIP
+ 	select ARM_GLOBAL_TIMER
+ 	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+ 	select ZONE_DMA if ARM_LPAE
++	select PM
+ 	help
+ 	  Support for Rockchip's Cortex-A9 Single-to-Quad-Core-SoCs
+ 	  containing the RK2928, RK30xx and RK31xx series.
 -- 
 2.18.0
