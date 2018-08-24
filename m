@@ -1,286 +1,217 @@
 From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
-Date: Fri, 24 Aug 2018 20:15:25 +0530
-Subject: [RFC PATCH v2 1/3] tracing: Add support for logging data to uncached
- buffer
+Date: Fri, 24 Aug 2018 20:15:27 +0530
+Subject: [RFC PATCH v2 3/3] dynamic_debug: Add support for dynamic register
+ trace
 In-Reply-To: <cover.1535119710.git.saiprakash.ranjan@codeaurora.org>
 References: <cover.1535119710.git.saiprakash.ranjan@codeaurora.org>
-Message-ID: <99bf205dd499ff916ce330f9a05c4d28f42c19e3.1535119711.git.saiprakash.ranjan@codeaurora.org>
+Message-ID: <9015a7a4aafa9935be769c07918743df63d6f648.1535119711.git.saiprakash.ranjan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add RTB trace support to write data to a small uncached buffer.
-When a system reset occurs, valuable data may still be remaining
-in the cache (e.g. last printks) and this data will probably
-be lost, giving an incomplete picture of what the system was last
-doing. By logging useful information to this uncached region
-(e.g. read/write{b,w,l,q}, last printk), a better picture of what the
-system was last doing can be obtained.
+Introduce dynamic debug filtering mechanism to register
+tracing as dynamic_rtb() which will reduce a lot of
+overhead otherwise of tracing all the register reads/writes
+in all files.
 
-Dummy platform device is created to use dma api to allocate
-uncached memory. Also initialize dma_mask and coherent_dma_mask after
-commit 4d8bde883bfb ("OF: Don't set default coherent DMA mask").
+Now we can just specify the file name or any wildcard pattern
+as any other dynamic debug facility in bootargs and dynamic rtb
+will just trace them and the output can be seen in pstore.
 
-We add an additional property called rtb-size in ramoops device
-tree node for pstore RTB buffer size and use the same in the
-trace module. DT documentation has been modified to include this.
+TODO: Now we use same 'p' flag but will add a separate flag for register trace
+later.
 
-Information logged in this buffer include log type(read/write{b,w,l,q}),
-timestamp, extra data from the caller, caller ip and name.
-This can be extented as needed to include more options(e.g. cpu)
-for better debugging.
+Also add asm-generic/io-instrumented.h file for instrumentation of IO
+operations such as read/write{b,w,l,q} as per Will's suggestion to not touch
+arch code and let core generate instrumentation.
+This can be extended to arm as well later for tracing.
 
-Also RTB panic notifier with high priority is used to make sure that RTB
-is disabled right after a kernel panic so that log buffer could be
-prevented from being flooded with some I/O operations.
+Example for tracing all register reads/writes in drivers/soc/qcom/* below:
 
-This is based on RTB driver in CAF. Link below:
-  * https://source.codeaurora.org/quic/la/kernel/msm-4.9
-Modified to support pstore for viewing traces.
+  # dyndbg="file drivers/soc/qcom/* +p" in bootargs
+  # reboot -f
+  # mount -t pstore pstore /sys/fs/pstore
+  # cat /sys/fs/pstore/rtb-ramoops-0
+    [LOGK_WRITE] ts:1373030419  data:ffff00000d5065a4  <ffff00000867cb44>  qcom_smsm_probe+0x51c/0x668
+    [LOGK_WRITE] ts:1373360576  data:ffff00000d506608  <ffff00000867cb44>  qcom_smsm_probe+0x51c/0x668
 
 Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
 ---
- .../bindings/reserved-memory/ramoops.txt      |   7 +-
- include/linux/rtb.h                           |  24 +++
- kernel/trace/Kconfig                          |   7 +
- kernel/trace/Makefile                         |   2 +
- kernel/trace/trace_rtb.c                      | 143 ++++++++++++++++++
- 5 files changed, 181 insertions(+), 2 deletions(-)
- create mode 100644 include/linux/rtb.h
- create mode 100644 kernel/trace/trace_rtb.c
+ arch/arm64/include/asm/io.h           | 26 +++++++++-------------
+ include/asm-generic/io-instrumented.h | 32 +++++++++++++++++++++++++++
+ include/linux/dynamic_debug.h         | 13 +++++++++++
+ kernel/trace/Kconfig                  |  1 +
+ 4 files changed, 56 insertions(+), 16 deletions(-)
+ create mode 100644 include/asm-generic/io-instrumented.h
 
-diff --git a/Documentation/devicetree/bindings/reserved-memory/ramoops.txt b/Documentation/devicetree/bindings/reserved-memory/ramoops.txt
-index 0eba562fe5c6..f99019d1119b 100644
---- a/Documentation/devicetree/bindings/reserved-memory/ramoops.txt
-+++ b/Documentation/devicetree/bindings/reserved-memory/ramoops.txt
-@@ -14,8 +14,8 @@ Any remaining space will be used for a circular buffer of oops and panic
- records.  These records have a configurable size, with a size of 0 indicating
- that they should be disabled.
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 35b2e50f17fb..aafd4b0be9f0 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -22,6 +22,7 @@
+ #ifdef __KERNEL__
  
--At least one of "record-size", "console-size", "ftrace-size", or "pmsg-size"
--must be set non-zero, but are otherwise optional as listed below.
-+At least one of "record-size", "console-size", "ftrace-size", "pmsg-size" or
-+"rtb-size" must be set non-zero, but are otherwise optional as listed below.
+ #include <linux/types.h>
++#include <linux/rtb.h>
  
+ #include <asm/byteorder.h>
+ #include <asm/barrier.h>
+@@ -36,32 +37,27 @@
+ /*
+  * Generic IO read/write.  These perform native-endian accesses.
+  */
+-#define __raw_writeb __raw_writeb
+-static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
++static inline void arch_raw_writeb(u8 val, volatile void __iomem *addr)
+ {
+ 	asm volatile("strb %w0, [%1]" : : "rZ" (val), "r" (addr));
+ }
  
- Required properties:
-@@ -42,6 +42,9 @@ Optional properties:
- - pmsg-size: size in bytes of log buffer reserved for userspace messages
-   (defaults to 0: disabled)
+-#define __raw_writew __raw_writew
+-static inline void __raw_writew(u16 val, volatile void __iomem *addr)
++static inline void arch_raw_writew(u16 val, volatile void __iomem *addr)
+ {
+ 	asm volatile("strh %w0, [%1]" : : "rZ" (val), "r" (addr));
+ }
  
-+- rtb-size: size in bytes of log buffer reserved for RTB buffer traces.
-+  (defaults to 0: disabled)
-+
- - unbuffered: if present, use unbuffered mappings to map the reserved region
-   (defaults to buffered mappings)
+-#define __raw_writel __raw_writel
+-static inline void __raw_writel(u32 val, volatile void __iomem *addr)
++static inline void arch_raw_writel(u32 val, volatile void __iomem *addr)
+ {
+ 	asm volatile("str %w0, [%1]" : : "rZ" (val), "r" (addr));
+ }
  
-diff --git a/include/linux/rtb.h b/include/linux/rtb.h
+-#define __raw_writeq __raw_writeq
+-static inline void __raw_writeq(u64 val, volatile void __iomem *addr)
++static inline void arch_raw_writeq(u64 val, volatile void __iomem *addr)
+ {
+ 	asm volatile("str %x0, [%1]" : : "rZ" (val), "r" (addr));
+ }
+ 
+-#define __raw_readb __raw_readb
+-static inline u8 __raw_readb(const volatile void __iomem *addr)
++static inline u8 arch_raw_readb(const volatile void __iomem *addr)
+ {
+ 	u8 val;
+ 	asm volatile(ALTERNATIVE("ldrb %w0, [%1]",
+@@ -71,8 +67,7 @@ static inline u8 __raw_readb(const volatile void __iomem *addr)
+ 	return val;
+ }
+ 
+-#define __raw_readw __raw_readw
+-static inline u16 __raw_readw(const volatile void __iomem *addr)
++static inline u16 arch_raw_readw(const volatile void __iomem *addr)
+ {
+ 	u16 val;
+ 
+@@ -83,8 +78,7 @@ static inline u16 __raw_readw(const volatile void __iomem *addr)
+ 	return val;
+ }
+ 
+-#define __raw_readl __raw_readl
+-static inline u32 __raw_readl(const volatile void __iomem *addr)
++static inline u32 arch_raw_readl(const volatile void __iomem *addr)
+ {
+ 	u32 val;
+ 	asm volatile(ALTERNATIVE("ldr %w0, [%1]",
+@@ -94,8 +88,7 @@ static inline u32 __raw_readl(const volatile void __iomem *addr)
+ 	return val;
+ }
+ 
+-#define __raw_readq __raw_readq
+-static inline u64 __raw_readq(const volatile void __iomem *addr)
++static inline u64 arch_raw_readq(const volatile void __iomem *addr)
+ {
+ 	u64 val;
+ 	asm volatile(ALTERNATIVE("ldr %0, [%1]",
+@@ -193,6 +186,7 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+ #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
+ #define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
+ 
++#include <asm-generic/io-instrumented.h>
+ #include <asm-generic/io.h>
+ 
+ /*
+diff --git a/include/asm-generic/io-instrumented.h b/include/asm-generic/io-instrumented.h
 new file mode 100644
-index 000000000000..a969bd020466
+index 000000000000..ce273742b98c
 --- /dev/null
-+++ b/include/linux/rtb.h
-@@ -0,0 +1,24 @@
++++ b/include/asm-generic/io-instrumented.h
+@@ -0,0 +1,32 @@
 +/* SPDX-License-Identifier: GPL-2.0 */
-+#ifndef _RTB_H
-+#define _RTB_H
 +
-+struct rtb_layout {
-+	const char *log_type;
-+	u32 idx;
-+	u64 caller;
-+	u64 data;
-+	u64 timestamp;
-+} __attribute__ ((__packed__));
++#ifndef _ASM_GENERIC_IO_INSTRUMENTED_H
++#define _ASM_GENERIC_IO_INSTRUMENTED_H
 +
++#include <linux/dynamic_debug.h>
++
++#define __raw_write(v, a, _t) ({			\
++	volatile void __iomem *_a = (a);		\
++	dynamic_rtb("LOGK_WRITE", (void __force *)(_a));\
++	arch_raw_write##_t((v), _a);			\
++	})
++
++#define __raw_writeb(v, a)	__raw_write((v), a, b)
++#define __raw_writew(v, a)	__raw_write((v), a, w)
++#define __raw_writel(v, a)	__raw_write((v), a, l)
++#define __raw_writeq(v, a)	__raw_write((v), a, q)
++
++#define __raw_read(a, _l, _t)    ({					\
++	_t __a;								\
++	const volatile void __iomem *_a = (const volatile void __iomem *)(a);\
++	dynamic_rtb("LOGK_READ", (void __force *)(_a));			\
++	__a = arch_raw_read##_l(_a);					\
++	__a;								\
++	})
++
++#define __raw_readb(a)	__raw_read((a), b, u8)
++#define __raw_readw(a)	__raw_read((a), w, u16)
++#define __raw_readl(a)	__raw_read((a), l, u32)
++#define __raw_readq(a)	__raw_read((a), q, u64)
++
++#endif
+diff --git a/include/linux/dynamic_debug.h b/include/linux/dynamic_debug.h
+index 2fd8006153c3..946b60f48401 100644
+--- a/include/linux/dynamic_debug.h
++++ b/include/linux/dynamic_debug.h
+@@ -155,6 +155,18 @@ do {								\
+ 			       buf, len, ascii);		\
+ } while (0)
+ 
 +#if defined(CONFIG_RTB)
-+void uncached_logk(const char *log_type, void *data);
-+int rtb_init(void);
-+void rtb_exit(void);
++#define dynamic_rtb(log_type, data)				\
++do {								\
++	DEFINE_DYNAMIC_DEBUG_METADATA(descriptor,		\
++		__builtin_constant_p(log_type) ? log_type : "rtb");\
++	if (DYNAMIC_DEBUG_BRANCH(descriptor))			\
++		uncached_logk(log_type, data);			\
++} while (0)
 +#else
-+static inline void uncached_logk(const char *log_type,
-+				void *data) { }
-+static inline int rtb_init(void) { return 0; }
-+static inline void rtb_exit(void) { }
++#define dynamic_rtb(log_type, data)
 +#endif
 +
-+#endif /* _RTB_H */
+ #else
+ 
+ #include <linux/string.h>
+@@ -181,6 +193,7 @@ static inline int ddebug_dyndbg_module_param_cb(char *param, char *val,
+ 	do { if (0) printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__); } while (0)
+ #define dynamic_dev_dbg(dev, fmt, ...)					\
+ 	do { if (0) dev_printk(KERN_DEBUG, dev, fmt, ##__VA_ARGS__); } while (0)
++#define dynamic_rtb(log_type, data)
+ #endif
+ 
+ #endif
 diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
-index c042a455afc6..fd46c7e0016f 100644
+index fd46c7e0016f..59f01091b5ee 100644
 --- a/kernel/trace/Kconfig
 +++ b/kernel/trace/Kconfig
-@@ -774,6 +774,13 @@ config TRACING_EVENTS_GPIO
+@@ -776,6 +776,7 @@ config TRACING_EVENTS_GPIO
+ 
+ config RTB
+ 	bool "Register Trace Buffer"
++	depends on DYNAMIC_DEBUG
  	help
- 	  Enable tracing events for gpio subsystem
- 
-+config RTB
-+	bool "Register Trace Buffer"
-+	help
-+	  Add support for logging different events to a small uncached
-+	  region. This is designed to aid in debugging reset cases where the
-+	  caches may not be flushed before the target resets.
-+
- endif # FTRACE
- 
- endif # TRACING_SUPPORT
-diff --git a/kernel/trace/Makefile b/kernel/trace/Makefile
-index 98d53b39a8ee..0b8167124354 100644
---- a/kernel/trace/Makefile
-+++ b/kernel/trace/Makefile
-@@ -78,4 +78,6 @@ obj-$(CONFIG_UPROBE_EVENTS) += trace_uprobe.o
- 
- obj-$(CONFIG_TRACEPOINT_BENCHMARK) += trace_benchmark.o
- 
-+obj-$(CONFIG_RTB) += trace_rtb.o
-+
- libftrace-y := ftrace.o
-diff --git a/kernel/trace/trace_rtb.c b/kernel/trace/trace_rtb.c
-new file mode 100644
-index 000000000000..3e0a85e7b504
---- /dev/null
-+++ b/kernel/trace/trace_rtb.c
-@@ -0,0 +1,143 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2018 The Linux Foundation. All rights reserved.
-+ */
-+#include <linux/atomic.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/export.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/rtb.h>
-+#include <linux/sched/clock.h>
-+
-+static struct platform_device *rtb_dev;
-+static atomic_t rtb_idx;
-+
-+struct rtb_state {
-+	struct rtb_layout *rtb;
-+	phys_addr_t phys;
-+	unsigned int nentries;
-+	unsigned int size;
-+	int enabled;
-+};
-+
-+/* RTB is enabled after pstore is registered, so let enabled flag be 0 */
-+static struct rtb_state rtb;
-+
-+static int rtb_panic_notifier(struct notifier_block *this,
-+					unsigned long event, void *ptr)
-+{
-+	rtb.enabled = 0;
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block rtb_panic_blk = {
-+	.notifier_call  = rtb_panic_notifier,
-+	.priority = INT_MAX,
-+};
-+
-+static void uncached_logk_pc_idx(const char *log_type, u64 caller,
-+				u64 data, int idx)
-+{
-+	struct rtb_layout *start;
-+
-+	start = &rtb.rtb[idx & (rtb.nentries - 1)];
-+
-+	start->log_type = log_type;
-+	start->caller = caller;
-+	start->data = data;
-+	start->timestamp = sched_clock();
-+	/* Make sure data is written */
-+	mb();
-+}
-+
-+static int rtb_get_idx(void)
-+{
-+	int i, offset;
-+
-+	i = atomic_inc_return(&rtb_idx);
-+	i--;
-+
-+	/* Check if index has wrapped around */
-+	offset = (i & (rtb.nentries - 1)) -
-+		 ((i - 1) & (rtb.nentries - 1));
-+	if (offset < 0) {
-+		i = atomic_inc_return(&rtb_idx);
-+		i--;
-+	}
-+
-+	return i;
-+}
-+
-+noinline void uncached_logk(const char *log_type, void *data)
-+{
-+	int i;
-+
-+	if (!rtb.enabled)
-+		return;
-+
-+	i = rtb_get_idx();
-+	uncached_logk_pc_idx(log_type, (u64)(__builtin_return_address(0)),
-+				(u64)(data), i);
-+}
-+EXPORT_SYMBOL(uncached_logk);
-+
-+int rtb_init(void)
-+{
-+	struct device_node *np;
-+	u64 rtb_dmamask = DMA_BIT_MASK(32);
-+	u32 size;
-+	int ret;
-+
-+	np = of_find_node_by_name(NULL, "ramoops");
-+	if (!np)
-+		return -ENODEV;
-+
-+	ret = of_property_read_u32(np, "rtb-size", &size);
-+	if (ret) {
-+		of_node_put(np);
-+		return ret;
-+	}
-+
-+	rtb.size = size;
-+
-+	/* Create a dummy platform device to use dma api */
-+	rtb_dev = platform_device_register_simple("rtb", -1, NULL, 0);
-+	if (IS_ERR(rtb_dev))
-+		return PTR_ERR(rtb_dev);
-+
-+	/* Initialize dma_mask and coherent_dma_mask to 32-bits */
-+	rtb_dev->dev.dma_mask = &rtb_dmamask;
-+	rtb_dev->dev.coherent_dma_mask = rtb_dmamask;
-+
-+	/*
-+	 * The device is a dummy, so arch_setup_dma_ops
-+	 * is not called, thus leaving the device with dummy DMA ops
-+	 * which returns null in case of arm64.
-+	 */
-+	of_dma_configure(&rtb_dev->dev, NULL, true);
-+	rtb.rtb = dma_alloc_coherent(&rtb_dev->dev, rtb.size,
-+					&rtb.phys, GFP_KERNEL);
-+	if (!rtb.rtb)
-+		return -ENOMEM;
-+
-+	rtb.nentries = rtb.size / sizeof(struct rtb_layout);
-+	/* Round this down to a power of 2 */
-+	rtb.nentries = __rounddown_pow_of_two(rtb.nentries);
-+
-+	memset(rtb.rtb, 0, rtb.size);
-+	atomic_set(&rtb_idx, 0);
-+
-+	atomic_notifier_chain_register(&panic_notifier_list,
-+						&rtb_panic_blk);
-+	rtb.enabled = 1;
-+	return 0;
-+}
-+
-+void rtb_exit(void)
-+{
-+	dma_free_coherent(&rtb_dev->dev, rtb.size, rtb.rtb, rtb.phys);
-+	platform_device_unregister(rtb_dev);
-+}
+ 	  Add support for logging different events to a small uncached
+ 	  region. This is designed to aid in debugging reset cases where the
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
