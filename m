@@ -1,28 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Aug 2018 15:08:28 +0100
-Subject: [PATCH 0/2] arm/arm64: smccc-1.1 fixes
-Message-ID: <20180824140830.12747-1-marc.zyngier@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 24 Aug 2018 16:32:47 +0200
+Subject: [PATCH] drm/sun4i: tcon-top: Use struct_size() in devm_kzalloc()
+In-Reply-To: <CAGXu5j+TjY71LnCJhd=26Prigq8rhM0h59bY9KUh9=n6i3oQ-w@mail.gmail.com>
+References: <20180824010521.GA25451@embeddedor.com>
+ <CAGXu5j+TjY71LnCJhd=26Prigq8rhM0h59bY9KUh9=n6i3oQ-w@mail.gmail.com>
+Message-ID: <20180824143247.7lxwsckmkyaiqzob@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Julien Grall recently reported that our smccc-1.1 helpers suffer from
-a couple of glaring problems:
+On Thu, Aug 23, 2018 at 07:56:12PM -0700, Kees Cook wrote:
+> On Thu, Aug 23, 2018 at 6:05 PM, Gustavo A. R. Silva
+> <gustavo@embeddedor.com> wrote:
+> > One of the more common cases of allocation size calculations is finding
+> > the size of a structure that has a zero-sized array at the end, along
+> > with memory for some number of elements for that array. For example:
+> >
+> > struct foo {
+> >         int stuff;
+> >         void *entry[];
+> > };
+> >
+> > instance = devm_kzalloc(dev, sizeof(struct foo) + sizeof(void *) * count, GFP_KERNEL);
+> >
+> > Instead of leaving these open-coded and prone to type mistakes, we can
+> > now use the new struct_size() helper:
+> >
+> > instance = devm_kzalloc(dev, struct_size(instance, entry, count), GFP_KERNEL);
+> >
+> > This issue was detected with the help of Coccinelle.
+> >
+> > Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+> 
+> Reviewed-by: Kees Cook <keescook@chromium.org>
 
-- the return values are not necessarily of the same type as the input,
-  and we may end-up truncating them
-
-- the macros are not safe in the presence of function calls passed as
-  parameters.
-
-These two patches are trying to handle that. Note that the current use
-of these macros in the kernel is safe, so this is not an urgent fix.
-
-Marc Zyngier (2):
-  arm/arm64: smccc-1.1: Make return values unsigned long
-  arm/arm64: amccc-1.1: Handle function result as parameters
-
- include/linux/arm-smccc.h | 38 ++++++++++++++++++++++++--------------
- 1 file changed, 24 insertions(+), 14 deletions(-)
+Applied, thanks!
+Maxime
 
 -- 
-2.18.0
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180824/dd2079b0/attachment.sig>
