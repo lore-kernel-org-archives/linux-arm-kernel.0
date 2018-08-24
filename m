@@ -1,36 +1,59 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Aug 2018 16:06:34 +0100
-Subject: [PATCH v2 1/4] ARM: rockchip: Force CONFIG_PM on Rockchip systems
-In-Reply-To: <20180824150637.15316-1-marc.zyngier@arm.com>
-References: <20180824150637.15316-1-marc.zyngier@arm.com>
-Message-ID: <20180824150637.15316-2-marc.zyngier@arm.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Fri, 24 Aug 2018 17:08:48 +0200
+Subject: [PATCH v2 01/29] nvmem: add support for cell lookups
+In-Reply-To: <20180810080526.27207-2-brgl@bgdev.pl>
+References: <20180810080526.27207-1-brgl@bgdev.pl>
+ <20180810080526.27207-2-brgl@bgdev.pl>
+Message-ID: <20180824170848.29594318@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A number of the Rockchip-specific drivers (IOMMU, display controllers)
-are now assuming that CONFIG_PM is set, and may completely misbehave
-if that's not the case.
+Hi Bartosz,
 
-Since there is hardly any reason for this configuration option not
-to be selected anyway, let's require it (in the same way Tegra already
-does).
+On Fri, 10 Aug 2018 10:04:58 +0200
+Bartosz Golaszewski <brgl@bgdev.pl> wrote:
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mach-rockchip/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+> +struct nvmem_cell_lookup {
+> +	struct nvmem_cell_info	info;
+> +	struct list_head	list;
+> +	const char		*nvmem_name;
+> +};
 
-diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
-index fafd3d7f9f8c..8ca926522026 100644
---- a/arch/arm/mach-rockchip/Kconfig
-+++ b/arch/arm/mach-rockchip/Kconfig
-@@ -17,6 +17,7 @@ config ARCH_ROCKCHIP
- 	select ARM_GLOBAL_TIMER
- 	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
- 	select ZONE_DMA if ARM_LPAE
-+	select PM
- 	help
- 	  Support for Rockchip's Cortex-A9 Single-to-Quad-Core-SoCs
- 	  containing the RK2928, RK30xx and RK31xx series.
--- 
-2.18.0
+Hm, maybe I don't get it right, but this looks suspicious. Usually the
+consumer lookup table is here to attach device specific names to
+external resources.
+
+So what I'd expect here is:
+
+struct nvmem_cell_lookup {
+	/* The nvmem device name. */
+	const char *nvmem_name;
+
+	/* The nvmem cell name */
+	const char *nvmem_cell_name;
+
+	/*
+	 * The local resource name. Basically what you have in the
+	 * nvmem-cell-names prop.
+	 */
+	const char *conid;
+};
+
+struct nvmem_cell_lookup_table {
+	struct list_head list;
+
+	/* ID of the consumer device. */
+	const char *devid;
+
+	/* Array of cell lookup entries. */
+	unsigned int ncells;
+	const struct nvmem_cell_lookup *cells;
+};
+
+Looks like your nvmem_cell_lookup is more something used to attach cells
+to an nvmem device, which is NVMEM provider's responsibility not the
+consumer one.
+
+Regards,
+
+Boris
