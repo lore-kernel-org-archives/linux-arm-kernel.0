@@ -1,13 +1,13 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Thu, 23 Aug 2018 19:56:55 -0700
-Subject: [PATCH] memory: atmel-ebi: Use struct_size() in devm_kzalloc()
-In-Reply-To: <20180824010706.GA25522@embeddedor.com>
-References: <20180824010706.GA25522@embeddedor.com>
-Message-ID: <CAGXu5jJa+ReO9DtsFXbTOWD6tNBFF4EKARULmGFLTUH7+viuaw@mail.gmail.com>
+Date: Thu, 23 Aug 2018 19:57:35 -0700
+Subject: [PATCH] mtd: rawnand: atmel: use struct_size() in devm_kzalloc()
+In-Reply-To: <20180824010938.GA25581@embeddedor.com>
+References: <20180824010938.GA25581@embeddedor.com>
+Message-ID: <CAGXu5jL_p6Z863qq5=K2B+=AW6LuxmBu23bjhQe-1saz4kdeFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2018 at 6:07 PM, Gustavo A. R. Silva
+On Thu, Aug 23, 2018 at 6:09 PM, Gustavo A. R. Silva
 <gustavo@embeddedor.com> wrote:
 > One of the more common cases of allocation size calculations is finding
 > the size of a structure that has a zero-sized array at the end, along
@@ -34,23 +34,24 @@ Reviewed-by: Kees Cook <keescook@chromium.org>
 -Kees
 
 > ---
->  drivers/memory/atmel-ebi.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
+>  drivers/mtd/nand/raw/atmel/nand-controller.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
 >
-> diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
-> index b907865..c3748b4 100644
-> --- a/drivers/memory/atmel-ebi.c
-> +++ b/drivers/memory/atmel-ebi.c
-> @@ -327,8 +327,7 @@ static int atmel_ebi_dev_setup(struct atmel_ebi *ebi, struct device_node *np,
->                 return -EINVAL;
+> diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
+> index a068b21..b17cfd0 100644
+> --- a/drivers/mtd/nand/raw/atmel/nand-controller.c
+> +++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
+> @@ -1586,9 +1586,7 @@ static struct atmel_nand *atmel_nand_create(struct atmel_nand_controller *nc,
+>                 return ERR_PTR(-EINVAL);
 >         }
 >
-> -       ebid = devm_kzalloc(ebi->dev,
-> -                           sizeof(*ebid) + (numcs * sizeof(*ebid->configs)),
-> +       ebid = devm_kzalloc(ebi->dev, struct_size(ebid, configs, numcs),
->                             GFP_KERNEL);
->         if (!ebid)
->                 return -ENOMEM;
+> -       nand = devm_kzalloc(nc->dev,
+> -                           sizeof(*nand) + (numcs * sizeof(*nand->cs)),
+> -                           GFP_KERNEL);
+> +       nand = devm_kzalloc(nc->dev, struct_size(nand, cs, numcs), GFP_KERNEL);
+>         if (!nand) {
+>                 dev_err(nc->dev, "Failed to allocate NAND object\n");
+>                 return ERR_PTR(-ENOMEM);
 > --
 > 2.7.4
 >
