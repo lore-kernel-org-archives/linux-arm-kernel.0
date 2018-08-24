@@ -1,58 +1,37 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 24 Aug 2018 19:56:09 +0200
-Subject: [RFC PATCH 02/11] arm64: tlb: Add DSB ISHST prior to TLBI in
- __flush_tlb_[kernel_]pgtable()
-In-Reply-To: <1535125966-7666-3-git-send-email-will.deacon@arm.com>
-References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
- <1535125966-7666-3-git-send-email-will.deacon@arm.com>
-Message-ID: <20180824175609.GR24124@hirez.programming.kicks-ass.net>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 24 Aug 2018 20:08:22 +0200
+Subject: [PATCH v2 0/4] iommu/rockchip: Runtime PM fixes
+In-Reply-To: <20180824155059.qskwdxmc6ws3hwtv@localhost>
+References: <20180824150637.15316-1-marc.zyngier@arm.com>
+ <20180824155059.qskwdxmc6ws3hwtv@localhost>
+Message-ID: <13492452.cxnNOAAFxb@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2018 at 04:52:37PM +0100, Will Deacon wrote:
-> __flush_tlb_[kernel_]pgtable() rely on set_pXd() having a DSB after
-> writing the new table entry and therefore avoid the barrier prior to the
-> TLBI instruction.
+Am Freitag, 24. August 2018, 17:50:59 CEST schrieb Olof Johansson:
+> On Fri, Aug 24, 2018 at 04:06:33PM +0100, Marc Zyngier wrote:
+> > This small series addresses a couple of runtime PM issues I've spotted
+> > while running 4.18 on a Chromebook Plus (kevin, rk3399) platform, and
+> > specifically doing kexec.
+> > 
+> > In order to avoid making a complete mess of the IOMMU code, Heiko has
+> > requested that all RK platforms would select CONFIG_PM, which
+> > simplifies a lot of things. I've kept 32 and 64bit patches separate,
+> > but feel free to squash them into on if that's more convenient.
+> > 
+> > Note that even with these patches, kexec is still fairly broken on
+> > rk3399, as the VOP is never turned off (see [1] for a fix).
+> > 
+> > [1] https://www.spinics.net/lists/arm-kernel/msg670229.html
+> > 
+> > * From v1:
+> >   - Collected RBs from Heiko
+> >   - Added two patches forcing CONFIG_PM on all Rockchip platforms at
+> >     Heiko's request, following the example set by Tegra platforms.
 > 
-> In preparation for delaying our walk-cache invalidation on the unmap()
-> path, move the DSB into the TLB invalidation routines.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/tlbflush.h | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-> index 7e2a35424ca4..e257f8655b84 100644
-> --- a/arch/arm64/include/asm/tlbflush.h
-> +++ b/arch/arm64/include/asm/tlbflush.h
-> @@ -213,6 +213,7 @@ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
->  {
->  	unsigned long addr = __TLBI_VADDR(uaddr, ASID(mm));
->  
-> +	dsb(ishst);
->  	__tlbi(vae1is, addr);
->  	__tlbi_user(vae1is, addr);
->  	dsb(ish);
-> @@ -222,6 +223,7 @@ static inline void __flush_tlb_kernel_pgtable(unsigned long kaddr)
->  {
->  	unsigned long addr = __TLBI_VADDR(kaddr, 0);
->  
-> +	dsb(ishst);
->  	__tlbi(vaae1is, addr);
->  	dsb(ish);
->  }
+> Thanks, applied to our next/late branch which I plan to send in tomorrow.
 
-I would suggest these barrier -- like any other barriers, carry a
-comment that explain the required ordering.
+that was a quick turn around :-) .
+Thanks for picking the series.
 
-I think this here reads like:
-
-	STORE: unhook page
-
-	DSB-ishst: wait for all stores to complete
-	TLBI: invalidate broadcast
-	DSB-ish: wait for TLBI to complete
-
-And the 'newly' placed DSB-ishst ensures the page is observed unlinked
-before we issue the invalidate.
+Heiko
