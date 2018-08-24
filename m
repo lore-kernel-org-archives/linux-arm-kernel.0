@@ -1,49 +1,30 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 24 Aug 2018 16:32:47 +0200
-Subject: [PATCH] drm/sun4i: tcon-top: Use struct_size() in devm_kzalloc()
-In-Reply-To: <CAGXu5j+TjY71LnCJhd=26Prigq8rhM0h59bY9KUh9=n6i3oQ-w@mail.gmail.com>
-References: <20180824010521.GA25451@embeddedor.com>
- <CAGXu5j+TjY71LnCJhd=26Prigq8rhM0h59bY9KUh9=n6i3oQ-w@mail.gmail.com>
-Message-ID: <20180824143247.7lxwsckmkyaiqzob@flea>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Fri, 24 Aug 2018 11:02:27 +0000
+Subject: [PATCH V5 0/5] soc: imx: add scu firmware api support
+In-Reply-To: <CABb+yY3jYcNhpS5CbW8kiLrmY8M-bYvdBdVQomuYKUbttuuLyQ@mail.gmail.com>
+References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
+ <AM0PR04MB4211F68CCD399243613F8D7B80320@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <AM0PR04MB4211F748DBD1FE64A2B2136980360@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <CABb+yY3jYcNhpS5CbW8kiLrmY8M-bYvdBdVQomuYKUbttuuLyQ@mail.gmail.com>
+Message-ID: <AM0PR04MB4211D35CECCA8155A7E8368C80360@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2018 at 07:56:12PM -0700, Kees Cook wrote:
-> On Thu, Aug 23, 2018 at 6:05 PM, Gustavo A. R. Silva
-> <gustavo@embeddedor.com> wrote:
-> > One of the more common cases of allocation size calculations is finding
-> > the size of a structure that has a zero-sized array at the end, along
-> > with memory for some number of elements for that array. For example:
+> -----Original Message-----
+> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
+> On Fri, Aug 24, 2018 at 1:06 PM A.s. Dong <aisheng.dong@nxp.com> wrote:
 > >
-> > struct foo {
-> >         int stuff;
-> >         void *entry[];
-> > };
+> > Hi Jassi & Sasha,
 > >
-> > instance = devm_kzalloc(dev, sizeof(struct foo) + sizeof(void *) * count, GFP_KERNEL);
+> > Do you have some suggestions about this patch series?
 > >
-> > Instead of leaving these open-coded and prone to type mistakes, we can
-> > now use the new struct_size() helper:
-> >
-> > instance = devm_kzalloc(dev, struct_size(instance, entry, count), GFP_KERNEL);
-> >
-> > This issue was detected with the help of Coccinelle.
-> >
-> > Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
-> 
-> Reviewed-by: Kees Cook <keescook@chromium.org>
+> The client uses the mailbox api as expected. And I leave the implementation
+> upto you. So, I am fine.
 
-Applied, thanks!
-Maxime
+Thanks
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180824/dd2079b0/attachment.sig>
+Sascha,
+What's your suggestion?
+
+Regards
+Dong Aisheng
