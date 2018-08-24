@@ -1,46 +1,39 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Fri, 24 Aug 2018 17:51:37 +0300
-Subject: [PATCH v7 2/8] dt-bindings: Introduce interconnect provider
- bindings
-In-Reply-To: <20180820153207.xx5outviph7ec76p@flea>
-References: <20180731161340.13000-1-georgi.djakov@linaro.org>
- <20180731161340.13000-3-georgi.djakov@linaro.org>
- <CABGGisxq+hf91R18pnZ=VZ9f99GssWWPhpPCjNAROJmKg5-udA@mail.gmail.com>
- <e114ed83-fd54-4952-f375-e1d94826ac6e@linaro.org>
- <20180820153207.xx5outviph7ec76p@flea>
-Message-ID: <672e6c6c-222f-5e7f-5d0c-acc8da68b1ab@linaro.org>
+From: roy.pledge@nxp.com (Roy Pledge)
+Date: Fri, 24 Aug 2018 14:52:02 +0000
+Subject: [PATCH 1/2] soc: fsl: qbman: qman_portal: defer probing when qman
+ is not available
+References: <20180823213600.23426-1-alexandre.belloni@bootlin.com>
+Message-ID: <DB6PR0402MB27276B417034E7356B0CFA5886360@DB6PR0402MB2727.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On 8/23/2018 5:36 PM, Alexandre Belloni wrote:
+> If the qman driver (qman_ccsr) doesn't probe or fail to probe before
+> qman_portal, qm_ccsr_start will be either NULL or a stale pointer to an
+> unmapped page.
+>
+> This leads to a crash when probing  qman_portal as the init_pcfg function
+> calls qman_liodn_fixup that tries to read qman registers.
+>
+> Assume that qman didn't probe when the pool mask is 0.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> ---
+>  drivers/soc/fsl/qbman/qman_portal.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/soc/fsl/qbman/qman_portal.c b/drivers/soc/fsl/qbman/qman_portal.c
+> index a120002b630e..4fc80d2c8feb 100644
+> --- a/drivers/soc/fsl/qbman/qman_portal.c
+> +++ b/drivers/soc/fsl/qbman/qman_portal.c
+> @@ -277,6 +277,8 @@ static int qman_portal_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	pcfg->pools = qm_get_pools_sdqcr();
+> +	if (pcfg->pools == 0)
+> +		return -EPROBE_DEFER;
+>  
+>  	spin_lock(&qman_lock);
+>  	cpu = cpumask_next_zero(-1, &portal_cpus);
 
-On 08/20/2018 06:32 PM, Maxime Ripard wrote:
-> Hi Georgi,
-> 
-> On Tue, Aug 07, 2018 at 05:54:38PM +0300, Georgi Djakov wrote:
->>> There is also a patch series from Maxime Ripard that's addressing the
->>> same general area. See "dt-bindings: Add a dma-parent property". We
->>> don't need multiple ways to address describing the device to memory
->>> paths, so you all had better work out a common solution.
->>
->> Looks like this fits exactly into the interconnect API concept. I see
->> MBUS as interconnect provider and display/camera as consumers, that
->> report their bandwidth needs. I am also planning to add support for
->> priority.
-> 
-> Thanks for working on this. After looking at your serie, the one thing
-> I'm a bit uncertain about (and the most important one to us) is how we
-> would be able to tell through which interconnect the DMA are done.
-> 
-> This is important to us since our topology is actually quite simple as
-> you've seen, but the RAM is not mapped on that bus and on the CPU's,
-> so we need to apply an offset to each buffer being DMA'd.
-
-Ok, i see - your problem is not about bandwidth scaling but about using
-different memory ranges by the driver to access the same location. So
-this is not really the same and your problem is different. Also the
-interconnect bindings are describing a path and endpoints. However i am
-open to any ideas.
-
-Thanks,
-Georgi
+Reviewed-by: Roy Pledge <roy.pledge@nxp.com>
