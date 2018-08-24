@@ -1,50 +1,56 @@
-From: hofrat@osadl.org (Nicholas Mc Guire)
-Date: Fri, 24 Aug 2018 12:28:54 +0200
-Subject: [PATCH] ARM: u300: add missing check for kmalloc
-Message-ID: <1535106534-983-1-git-send-email-hofrat@osadl.org>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 24 Aug 2018 14:01:02 +0200
+Subject: [RFC PATCH] EDAC, ghes: Enable per-layer error reporting for ARM
+In-Reply-To: <68a800c7-446e-9b6b-1847-6e45a1d17262@arm.com>
+References: <1531762009-15112-1-git-send-email-tbaicar@codeaurora.org>
+ <20180719140102.GB25185@nazgul.tnic>
+ <94e3a0fb-9b7d-045f-733b-9f063dcb39e4@arm.com>
+ <45fefe7d-c6ea-5791-4477-13ecce39ce48@codeaurora.org>
+ <b568fdcc-ca39-67ea-2799-8ed246c8ffb6@arm.com>
+ <CABo9ajA7SPrVE-oiG=RicH+nL9_pp7fVATCdMugY5fuNAPzHaQ@mail.gmail.com>
+ <68a800c7-446e-9b6b-1847-6e45a1d17262@arm.com>
+Message-ID: <20180824120102.GB29751@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- kmalloc return for bigrxbuf_virtual was not being checked - in case
-of failure set status, cleanup bigtxbuf_virtual and baile out.
+On Fri, Aug 24, 2018 at 10:48:24AM +0100, James Morse wrote:
+> Why get avoid the layer stuff? Isn't counting DIMM/memory-devices what
+> EDAC_MC_LAYER_SLOT is for?
 
-Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-Fixes: c7c8c78fdf6e ("ARM: 5667/3: U300 SSP/SPI board setup and test")
----
+Yap.
 
-Issue found with experimental coccinelle script
+> so edac_raw_mc_handle_error() has no clue where the error happened. (I haven't
+> read what it does with this information yet).
 
-Not sure about the checkpatch message: 
-CHECK: Comparison to NULL could be written "!bigrxbuf_virtual"
-#32: FILE: arch/arm/mach-u300/dummyspichip.c:67:
-+       if (bigrxbuf_virtual == NULL) {
-As the current check for bigtxbuf_virtual uses == NULL that 
-was retained for consistency here.
+See edac_inc_ce_error(), for example - it uses the layers which are not
+negative (-1) to increment the error counts of the respective layer. It
+all depends on what granularity of the hardware part you're reporting
+the error for: is it a DIMM rank, a whole DIMM or for a channel which
+can span multiple DIMM ranks. And so on...
 
-Patch was compile tested with: u300_defconfig (implies MACH_U300_SPIDUMMY=y)
+Look at some of the drivers and how they're doing that layering. It all
+depends on whether you can get the precise info from the hw.
 
-Patch is against 4.18 (localversion-next is next-20180824)
+> ghes_edac_report_mem_error() does check CPER_MEM_VALID_MODULE_HANDLE, and if its
+> set, it uses the handle to find the bank/device strings and prints them out.
 
- arch/arm/mach-u300/dummyspichip.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Yap, and the error counts are lumped together into
 
-diff --git a/arch/arm/mach-u300/dummyspichip.c b/arch/arm/mach-u300/dummyspichip.c
-index 68fe986..ff293ee 100644
---- a/arch/arm/mach-u300/dummyspichip.c
-+++ b/arch/arm/mach-u300/dummyspichip.c
-@@ -62,7 +62,13 @@ static ssize_t dummy_looptest(struct device *dev,
- 		status = -ENOMEM;
- 		goto out;
- 	}
-+
- 	bigrxbuf_virtual = kmalloc(DMA_TEST_SIZE, GFP_KERNEL);
-+	if (bigrxbuf_virtual == NULL) {
-+		kfree(bigtxbuf_virtual);
-+		status = -ENOMEM;
-+		goto out;
-+	}
- 
- 	/* Fill TXBUF with some happy pattern */
- 	memset(bigtxbuf_virtual, 0xAA, DMA_TEST_SIZE);
+  /sys/devices/system/edac/mc/mc*/ce_noinfo_count
+
+> Naively I thought we could generate some index during ghes_edac_count_dimms(),
+> and use this as e->${whichever}_layer. I hoped there would be something we could
+> already use as the index, but I can't spot it, so this will be more than the
+> one-liner I was hoping for!
+
+If you can get that info from the hardware and injecting an error into
+a DIMM gives you the correct DIMM number so that we can increment the
+proper counter, then you're golden. I don't think that works reliably on
+x86, though, therefore the lumping together.
+
 -- 
-2.1.4
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
