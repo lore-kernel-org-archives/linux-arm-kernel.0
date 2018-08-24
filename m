@@ -1,40 +1,57 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Aug 2018 16:52:42 +0100
-Subject: [RFC PATCH 07/11] asm-generic/tlb: Guard with #ifdef CONFIG_MMU
+Date: Fri, 24 Aug 2018 16:52:45 +0100
+Subject: [RFC PATCH 10/11] arm64: tlb: Adjust stride and type of TLBI
+ according to mmu_gather
 In-Reply-To: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
 References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1535125966-7666-8-git-send-email-will.deacon@arm.com>
+Message-ID: <1535125966-7666-11-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The inner workings of the mmu_gather-based TLB invalidation mechanism
-are not relevant to nommu configurations, so guard them with an ifdef.
-This allows us to implement future functions using static inlines
-without breaking the build.
+Now that the core mmu_gather code keeps track of both the levels of page
+table cleared and also whether or not these entries correspond to
+intermediate entries, we can use this in our tlb_flush() callback to
+reduce the number of invalidations we issue as well as their scope.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- include/asm-generic/tlb.h | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/include/asm/tlb.h | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/include/asm-generic/tlb.h b/include/asm-generic/tlb.h
-index b3353e21f3b3..859f897d3d53 100644
---- a/include/asm-generic/tlb.h
-+++ b/include/asm-generic/tlb.h
-@@ -20,6 +20,8 @@
- #include <asm/pgalloc.h>
- #include <asm/tlbflush.h>
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+index bd00017d529a..baca8dff6884 100644
+--- a/arch/arm64/include/asm/tlb.h
++++ b/arch/arm64/include/asm/tlb.h
+@@ -34,20 +34,21 @@ static void tlb_flush(struct mmu_gather *tlb);
+ static inline void tlb_flush(struct mmu_gather *tlb)
+ {
+ 	struct vm_area_struct vma = TLB_FLUSH_VMA(tlb->mm, 0);
++	bool last_level = !tlb->freed_tables;
++	unsigned long stride = tlb_get_unmap_granule(tlb);
  
-+#ifdef CONFIG_MMU
-+
- #ifdef CONFIG_HAVE_RCU_TABLE_FREE
- /*
-  * Semi RCU freeing of the page directories.
-@@ -312,4 +314,5 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
+ 	/*
+-	 * The ASID allocator will either invalidate the ASID or mark
+-	 * it as used.
++	 * If we're tearing down the address space then we only care about
++	 * invalidating the walk-cache, since the ASID allocator won't
++	 * reallocate our ASID without invalidating the entire TLB.
+ 	 */
+-	if (tlb->fullmm)
++	if (tlb->fullmm) {
++		if (!last_level)
++			flush_tlb_mm(tlb->mm);
+ 		return;
++	}
  
- #define tlb_migrate_finish(mm) do {} while (0)
+-	/*
+-	 * The intermediate page table levels are already handled by
+-	 * the __(pte|pmd|pud)_free_tlb() functions, so last level
+-	 * TLBI is sufficient here.
+-	 */
+-	__flush_tlb_range(&vma, tlb->start, tlb->end, PAGE_SIZE, true);
++	__flush_tlb_range(&vma, tlb->start, tlb->end, stride, last_level);
+ }
  
-+#endif /* CONFIG_MMU */
- #endif /* _ASM_GENERIC__TLB_H */
+ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
 -- 
 2.1.4
