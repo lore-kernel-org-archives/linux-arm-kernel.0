@@ -1,69 +1,60 @@
 From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Fri, 24 Aug 2018 10:59:39 +0200
-Subject: [PATCH 1/2] drm/atmel-hlcdc: prefer a higher rate clock as
- pixel-clock base
-In-Reply-To: <20180824085501.9740-2-peda@axentia.se>
+Date: Fri, 24 Aug 2018 11:07:13 +0200
+Subject: [PATCH 2/2] drm/atmel-hlcdc: allow selecting a higher
+ pixel-clock that requested
+In-Reply-To: <20180824085501.9740-3-peda@axentia.se>
 References: <20180824085501.9740-1-peda@axentia.se>
- <20180824085501.9740-2-peda@axentia.se>
-Message-ID: <20180824105939.24fe8013@bbrezillon>
+ <20180824085501.9740-3-peda@axentia.se>
+Message-ID: <20180824110713.3c801034@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Aug 2018 10:55:00 +0200
+On Fri, 24 Aug 2018 10:55:01 +0200
 Peter Rosin <peda@axentia.se> wrote:
 
-> If the divider used to get the pixel-clock is small, the granularity
-> of the frequencies possible for the pixel-clock is quite coarse. E.g.
-> requesting a pixel-clock of 65MHz with a sys_clk of 132MHz results
-> in the divider being set to 3 ending up with 44MHz.
+> But only if the highest pixel-clock frequency lower than requested
+> is significantly much less accurate that the lowest frequency higher
+> than requested.
 > 
-> By preferring the doubled sys_clk as base, the divider instead ends
-> up as 5 yielding a pixel-clock of 52.8Mhz, which is a definite
-> improvement.
+> I pulled "10 times" as the discriminator out of the hat, and went with
+> that.
+
+Okay, let's go with that until we have a way to properly expose display
+tolerance.
+
 > 
-> While at it, clamp the divider so that it does not overflow in case
-> it gets big.
+> This is useful, if e.g. the target pixel-clock is 65MHz and the sys_clk
+> is 132MHz. In this case the highest possible pixel-clock lower than the
+> requested 65MHz is 52.8MHz, which is almost 20% off (and outside the
+> spec for the panel). The lowest possible pixel-clock higher than 65MHz
+> is 66MHz, which is a *much* better match, and only 1.5% off.
 > 
 > Signed-off-by: Peter Rosin <peda@axentia.se>
 > ---
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 16 ++++++++++------
->  1 file changed, 10 insertions(+), 6 deletions(-)
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
 > diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-> index c38a479ada98..71c9cd90d2ae 100644
+> index 71c9cd90d2ae..0c2717ed4ac6 100644
 > --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
 > +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-> @@ -101,18 +101,22 @@ static void atmel_hlcdc_crtc_mode_set_nofb(struct drm_crtc *c)
->  		     (adj->crtc_hdisplay - 1) |
->  		     ((adj->crtc_vdisplay - 1) << 16));
->  
-> -	cfg = 0;
-> +	cfg = ATMEL_HLCDC_CLKSEL;
->  
-> -	prate = clk_get_rate(crtc->dc->hlcdc->sys_clk);
-> +	prate = 2 * clk_get_rate(crtc->dc->hlcdc->sys_clk);
->  	mode_rate = adj->crtc_clock * 1000;
-> -	if ((prate / 2) < mode_rate) {
-> -		prate *= 2;
-> -		cfg |= ATMEL_HLCDC_CLKSEL;
-> -	}
->  
->  	div = DIV_ROUND_UP(prate, mode_rate);
->  	if (div < 2)
->  		div = 2;
-
-I'm nitpicking, but can you add braces around the if() block?
-
-Looks good otherwise.
-
-> +	else if (ATMEL_HLCDC_CLKDIV(div) & ~ATMEL_HLCDC_CLKDIV_MASK) {
-> +		/* the divider ended up too big, try a lower base rate */
-> +		cfg &= ~ATMEL_HLCDC_CLKSEL;
-> +		prate /= 2;
-> +		div = DIV_ROUND_UP(prate, mode_rate);
-> +		if (ATMEL_HLCDC_CLKDIV(div) & ~ATMEL_HLCDC_CLKDIV_MASK)
-> +			div = ATMEL_HLCDC_CLKDIV_MASK;
-> +	}
+> @@ -116,6 +116,19 @@ static void atmel_hlcdc_crtc_mode_set_nofb(struct drm_crtc *c)
+>  		div = DIV_ROUND_UP(prate, mode_rate);
+>  		if (ATMEL_HLCDC_CLKDIV(div) & ~ATMEL_HLCDC_CLKDIV_MASK)
+>  			div = ATMEL_HLCDC_CLKDIV_MASK;
+> +	} else {
+> +		int div_low = prate / mode_rate;
+> +
+> +		if (div_low >= 2 &&
+> +		    ((prate / div_low - mode_rate) <
+> +		     10 * (mode_rate - prate / div)))
+> +			/*
+> +			 * At least 10 times better when
+> +			 * using a higher frequency than
+> +			 * requested, instead of a lower.
+> +			 * So, go with that.
+> +			 */
+> +			div = div_low;
+>  	}
 >  
 >  	cfg |= ATMEL_HLCDC_CLKDIV(div);
->  
