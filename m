@@ -1,23 +1,56 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sat, 25 Aug 2018 21:27:29 +0800
-Subject: [PATCH] crypto: arm64/sm4-ce - check for the right CPU feature bit
-In-Reply-To: <20180807211836.9899-1-ard.biesheuvel@linaro.org>
-References: <20180807211836.9899-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180825132728.i6rauxjalm6iuh4f@gondor.apana.org.au>
+From: manu@bidouilliste.com (Emmanuel Vadot)
+Date: Sat, 25 Aug 2018 17:42:48 +0200
+Subject: [PATCH 1/7] dt-bindings: Add DT bindings documentation for
+ Allwinner Thermal Sensor Controller
+In-Reply-To: <66249ae2a698cdc7@bloch.sibelius.xs4all.nl>
+References: <66249ae2a698cdc7@bloch.sibelius.xs4all.nl>
+Message-ID: <20180825174248.c76565fe20a3457e3c766d1a@bidouilliste.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2018 at 11:18:36PM +0200, Ard Biesheuvel wrote:
-> ARMv8.2 specifies special instructions for the SM3 cryptographic hash
-> and the SM4 symmetric cipher. While it is unlikely that a core would
-> implement one and not the other, we should only use SM4 instructions
-> if the SM4 CPU feature bit is set, and we currently check the SM3
-> feature bit instead. So fix that.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Patch applied.  Thanks.
+ Hi Mark,
+
+On Sat, 25 Aug 2018 13:07:40 +0200 (CEST)
+Mark Kettenis <mark.kettenis@xs4all.nl> wrote:
+
+> Hi Emmanuel,
+> 
+> I think the following bit in your proposed binding is wrong:
+> 
+> +- #thermal-sensor-cells : Depend on the SoC
+> +   For H3 should be 0
+> +   For H5 should be 1
+> +   For A64 should be 2
+> +   See ./thermal.txt for a description.
+> 
+> I think what you're trying to say here is that H3 has a single sensor
+> and that H5 and A64 have more sensors.  But even though the number of
+> sensors is different for H5 and A64 (two for H3, three for A64) you
+> need only a single cell to describe which sensor to read.  So
+> #thermal-sensors-cells should be 1 for both H5 and A64.
+
+ You might be right, this part wasn't really clear for me reading the
+thermal binding docs. Can someone double-confirm that ?
+
+> As far as I can see this proposed binding is compatible with the
+> OpenBSD's sxitemp(4) driver. 
+
+ Go to know.
+
+> That driver also supports the R40 with
+> "allwinner,sun8i-r40-ths" as the compatible string.  The R40 has two
+> sensors so #thermal-sensor-cells should be 1 for this SoC as well.
+
+ I don't have R40 board, I guess the best thing will be for you to send
+a patch to update the binding docs and dts when this serie will be
+merged/acked.
+
+> Cheers,
+> 
+> Mark
+
+ Cheers,
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
