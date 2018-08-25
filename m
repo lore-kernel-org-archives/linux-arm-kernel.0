@@ -1,116 +1,66 @@
 From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Sat, 25 Aug 2018 17:43:52 +0200
+Date: Sat, 25 Aug 2018 17:49:02 +0200
 Subject: [PATCH 1/7] dt-bindings: Add DT bindings documentation for
  Allwinner Thermal Sensor Controller
-In-Reply-To: <20180824230338.GA19399@localhost.localdomain>
-References: <20180804070355.14857-1-manu@freebsd.org>
- <20180820111755.rzg7l2lznmbpuf2e@flea>
- <CAL_JsqLVQDRH1esAXghfQdxmp+iorWVCArM2qTwjbgmQzmhzQw@mail.gmail.com>
- <20180820140737.xmqhu5ndqzehvkql@flea>
- <20180820162715.49e6d8a469ece983f3c1d288@bidouilliste.com>
- <20180824145840.isdcg3fr6mw4ntzg@flea>
- <20180824215921.59d060b54eb3a1e7d1552bde@bidouilliste.com>
- <20180824230338.GA19399@localhost.localdomain>
-Message-ID: <20180825174352.68de8a2720f4c91b987be914@bidouilliste.com>
+In-Reply-To: <20180825174248.c76565fe20a3457e3c766d1a@bidouilliste.com>
+References: <66249ae2a698cdc7@bloch.sibelius.xs4all.nl>
+ <20180825174248.c76565fe20a3457e3c766d1a@bidouilliste.com>
+Message-ID: <20180825174902.f23f704a67d1b0cc57a640f5@bidouilliste.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, 25 Aug 2018 17:42:48 +0200
+Emmanuel Vadot <manu@bidouilliste.com> wrote:
 
- Hi,
-
-On Fri, 24 Aug 2018 16:03:40 -0700
-Eduardo Valentin <edubezval@gmail.com> wrote:
-
-> On Fri, Aug 24, 2018 at 09:59:21PM +0200, Emmanuel Vadot wrote:
-> > 
-> >  Hi,
-> > 
-> > On Fri, 24 Aug 2018 16:58:40 +0200
-> > Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > 
-> > > Hi,
-> > > 
-> > > On Mon, Aug 20, 2018 at 04:27:15PM +0200, Emmanuel Vadot wrote:
-> > > > On Mon, 20 Aug 2018 16:07:37 +0200
-> > > > Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > > 
-> > > > > On Mon, Aug 20, 2018 at 07:41:22AM -0600, Rob Herring wrote:
-> > > > > > On Mon, Aug 20, 2018 at 5:17 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > > > > >
-> > > > > > > On Sat, Aug 04, 2018 at 09:03:49AM +0200, Emmanuel Vadot wrote:
-> > > > > > > > This patch adds documentation for Device-Tree bindings for the Allwinner
-> > > > > > > > Thermal Sensor Controller found on the H3, H5 and A64 SoCs
-> > > > > > > >
-> > > > > > > > Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
-> > > > > > >
-> > > > > > > I'm not going to merge a binding for a device that doesn't have any
-> > > > > > > driver implemented at the moment in Linux.
-> > > > > > 
-> > > > > > I'll take it then. Linux is not the only DT client.
-> > > > > 
-> > > > > Then don't complain if we ever have to break the ABI. We never tested
-> > > > > that hardware, never had any code running on it, and it *will* cause
-> > > > > some issues. For example, the calibration data have never been used
-> > > > > and how they should be represented have never been described, since no
-> > > > > one ever actually tried to use it.
-> > > > > 
-> > > > > And sure, Linux is not the only DT client. Just like FreeBSD isn't.
-> > > > 
-> > > >  What kind of data would you need for me to make things better ?
-> > > >  We have the driver in FreeBSD for almost two years now, whne I started
-> > > > to see how to upstream it I noticed a lot of problems and spent 4 or 5
-> > > > days to try on all the SoCs mentionned in the serie, the only SoC I
-> > > > didn't include it the A83T as for some reason I couldn't make the
-> > > > driver work.
-> > > 
-> > > Do you have a link to that driver? 
-> > 
-> >  https://github.com/freebsd/freebsd/blob/master/sys/arm/allwinner/aw_thermal.c
-> > 
-> > > How and how much did you test it?
-> > 
-> >  Using a cheap IR thermometer as it's all I can afford.
-> >  Then running multiples cpufreq-a53 process and comparing the result.
-> >  Did the same without using the calibration data, result where closer
-> > when I used them.
-> > 
-> > > Are you using the calibration data stored in the SID?
-> > 
-> >  Yes, which is why the serie contain the nvmem cell for the SID.
-> > 
-> > > 
-> > > > I just hope that you understand that we cannot wait for Linux to
-> > > > have a driver to have some bindings.
-> > > 
-> > > Just like I'm sure you can understand that just merging the DT bits
-> > > without testing anything caused some troubles in the past, and I don't
-> > > want to discover it in a year from now.
-> > 
-> >  I do, I don't like wrong DT info as much as you do I think. I had
-> > the unfortunate event to find that the sun4i-a10-timer compatible used
-> > in every soc is plain wrong for !A10 and !A13, patches comming soon.
-> >  I want those bits merged but I also want that they reflect reality,
-> > this is not a hard driver to do, NetBSD also have one I think, maybe
-> > OpenBSD do to.
 > 
+>  Hi Mark,
 > 
-> I would prefer to see a series of DT bindings + driver. Can you send
-> your next iteration with the driver so we can review both together?
+> On Sat, 25 Aug 2018 13:07:40 +0200 (CEST)
+> Mark Kettenis <mark.kettenis@xs4all.nl> wrote:
+> 
+> > Hi Emmanuel,
+> > 
+> > I think the following bit in your proposed binding is wrong:
+> > 
+> > +- #thermal-sensor-cells : Depend on the SoC
+> > +   For H3 should be 0
+> > +   For H5 should be 1
+> > +   For A64 should be 2
+> > +   See ./thermal.txt for a description.
+> > 
+> > I think what you're trying to say here is that H3 has a single sensor
+> > and that H5 and A64 have more sensors.  But even though the number of
+> > sensors is different for H5 and A64 (two for H3, three for A64) you
+> > need only a single cell to describe which sensor to read.  So
+> > #thermal-sensors-cells should be 1 for both H5 and A64.
+> 
+>  You might be right, this part wasn't really clear for me reading the
+> thermal binding docs. Can someone double-confirm that ?
 
- You mean a link to the FreeBSD driver (and OpenBSD since they have one
-too) in the cover letter ?
+ Re-reading the doc with this information and now it's clear, I'll
+correct this in the new serie.
 
+> > As far as I can see this proposed binding is compatible with the
+> > OpenBSD's sxitemp(4) driver. 
+> 
+>  Go to know.
+> 
+> > That driver also supports the R40 with
+> > "allwinner,sun8i-r40-ths" as the compatible string.  The R40 has two
+> > sensors so #thermal-sensor-cells should be 1 for this SoC as well.
+> 
+>  I don't have R40 board, I guess the best thing will be for you to send
+> a patch to update the binding docs and dts when this serie will be
+> merged/acked.
+> 
+> > Cheers,
 > > 
-> > > Maxime
-> > > 
-> > > -- 
-> > > Maxime Ripard, Bootlin
-> > > Embedded Linux and Kernel engineering
-> > > https://bootlin.com
-> > 
-> > 
-> > -- 
-> > Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+> > Mark
+> 
+>  Cheers,
+> 
+> -- 
+> Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
 > 
 > _______________________________________________
 > linux-arm-kernel mailing list
