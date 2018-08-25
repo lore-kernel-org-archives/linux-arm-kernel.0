@@ -1,162 +1,54 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 25 Aug 2018 10:46:18 +0200
-Subject: [PATCH v9] ASoC: pxa: switch to new ac97 bus support
-Message-ID: <20180825084618.13641-1-robert.jarzmik@free.fr>
+From: peda@axentia.se (Peter Rosin)
+Date: Sat, 25 Aug 2018 10:56:16 +0200
+Subject: [PATCH v9 0/4] drm/atmel-hlcdc: bus-width override support
+Message-ID: <20180825085620.10566-1-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to the new ac97 bus support in sound/ac97 instead of the legacy
-snd_ac97 one.
+Hi!
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
-Since v8: fixed the trivial compilation error
-          v7 was in https://patchwork.kernel.org/patch/9951919/
----
- sound/arm/Kconfig           |  1 -
- sound/soc/pxa/Kconfig       |  5 ++---
- sound/soc/pxa/pxa2xx-ac97.c | 48 +++++++++++++++++++++++----------------------
- 3 files changed, 27 insertions(+), 27 deletions(-)
+The background for these patches is that our PCB interface between
+the SAMA5D3 and the ds90c185 lvds encoder is only using 16 bits, and
+this has to be described somewhere, or the atmel-hlcdc driver have no
+chance of selecting the correct output mode. Since we have similar
+problems with a tda19988 HDMI encoder I added patches to override
+the atmel-hlcdc output format via DT properties compatible with the
+media video-interface binding and things start to play together.
 
-diff --git a/sound/arm/Kconfig b/sound/arm/Kconfig
-index 5fbd47a9177e..28867732a318 100644
---- a/sound/arm/Kconfig
-+++ b/sound/arm/Kconfig
-@@ -31,7 +31,6 @@ endif	# SND_ARM
- 
- config SND_PXA2XX_LIB
- 	tristate
--	select SND_AC97_CODEC if SND_PXA2XX_LIB_AC97
- 	select SND_DMAENGINE_PCM
- 
- config SND_PXA2XX_LIB_AC97
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index 776e148b0aa2..29f577e6dfc0 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -19,14 +19,13 @@ config SND_MMP_SOC
- 
- config SND_PXA2XX_AC97
- 	tristate
--	select SND_AC97_CODEC
- 
- config SND_PXA2XX_SOC_AC97
- 	tristate
--	select AC97_BUS
-+	select AC97_BUS_NEW
- 	select SND_PXA2XX_LIB
- 	select SND_PXA2XX_LIB_AC97
--	select SND_SOC_AC97_BUS
-+	select SND_SOC_AC97_BUS_NEW
- 
- config SND_PXA2XX_SOC_I2S
- 	select SND_PXA2XX_LIB
-diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
-index 9f779657bc86..f8a3aa6c6d4e 100644
---- a/sound/soc/pxa/pxa2xx-ac97.c
-+++ b/sound/soc/pxa/pxa2xx-ac97.c
-@@ -17,6 +17,7 @@
- #include <linux/dmaengine.h>
- #include <linux/dma/pxa-dma.h>
- 
-+#include <sound/ac97/controller.h>
- #include <sound/core.h>
- #include <sound/ac97_codec.h>
- #include <sound/soc.h>
-@@ -27,43 +28,35 @@
- #include <mach/regs-ac97.h>
- #include <mach/audio.h>
- 
--static void pxa2xx_ac97_warm_reset(struct snd_ac97 *ac97)
-+static void pxa2xx_ac97_warm_reset(struct ac97_controller *adrv)
- {
- 	pxa2xx_ac97_try_warm_reset();
- 
- 	pxa2xx_ac97_finish_reset();
- }
- 
--static void pxa2xx_ac97_cold_reset(struct snd_ac97 *ac97)
-+static void pxa2xx_ac97_cold_reset(struct ac97_controller *adrv)
- {
- 	pxa2xx_ac97_try_cold_reset();
- 
- 	pxa2xx_ac97_finish_reset();
- }
- 
--static unsigned short pxa2xx_ac97_legacy_read(struct snd_ac97 *ac97,
--					      unsigned short reg)
-+static int pxa2xx_ac97_read_actrl(struct ac97_controller *adrv, int slot,
-+				  unsigned short reg)
- {
--	int ret;
--
--	ret = pxa2xx_ac97_read(ac97->num, reg);
--	if (ret < 0)
--		return 0;
--	else
--		return (unsigned short)(ret & 0xffff);
-+	return pxa2xx_ac97_read(slot, reg);
- }
- 
--static void pxa2xx_ac97_legacy_write(struct snd_ac97 *ac97,
--				     unsigned short reg, unsigned short val)
-+static int pxa2xx_ac97_write_actrl(struct ac97_controller *adrv, int slot,
-+				   unsigned short reg, unsigned short val)
- {
--	int ret;
--
--	ret = pxa2xx_ac97_write(ac97->num, reg, val);
-+	return pxa2xx_ac97_write(slot, reg, val);
- }
- 
--static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
--	.read	= pxa2xx_ac97_legacy_read,
--	.write	= pxa2xx_ac97_legacy_write,
-+static struct ac97_controller_ops pxa2xx_ac97_ops = {
-+	.read	= pxa2xx_ac97_read_actrl,
-+	.write	= pxa2xx_ac97_write_actrl,
- 	.warm_reset	= pxa2xx_ac97_warm_reset,
- 	.reset	= pxa2xx_ac97_cold_reset,
- };
-@@ -233,6 +226,9 @@ MODULE_DEVICE_TABLE(of, pxa2xx_ac97_dt_ids);
- static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
- {
- 	int ret;
-+	struct ac97_controller *ctrl;
-+	pxa2xx_audio_ops_t *pdata = pdev->dev.platform_data;
-+	void **codecs_pdata;
- 
- 	if (pdev->id != -1) {
- 		dev_err(&pdev->dev, "PXA2xx has only one AC97 port.\n");
-@@ -245,10 +241,14 @@ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	ret = snd_soc_set_ac97_ops(&pxa2xx_ac97_ops);
--	if (ret != 0)
--		return ret;
-+	codecs_pdata = pdata ? pdata->codec_pdata : NULL;
-+	ctrl = snd_ac97_controller_register(&pxa2xx_ac97_ops, &pdev->dev,
-+					    AC97_SLOTS_AVAILABLE_ALL,
-+					    codecs_pdata);
-+	if (IS_ERR(ctrl))
-+		return PTR_ERR(ctrl);
- 
-+	platform_set_drvdata(pdev, ctrl);
- 	/* Punt most of the init to the SoC probe; we may need the machine
- 	 * driver to do interesting things with the clocking to get us up
- 	 * and running.
-@@ -259,8 +259,10 @@ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
- 
- static int pxa2xx_ac97_dev_remove(struct platform_device *pdev)
- {
-+	struct ac97_controller *ctrl = platform_get_drvdata(pdev);
-+
- 	snd_soc_unregister_component(&pdev->dev);
--	snd_soc_set_ac97_ops(NULL);
-+	snd_ac97_controller_unregister(ctrl);
- 	pxa2xx_ac97_hw_remove(pdev);
- 	return 0;
- }
+Cheers,
+Peter
+
+Changes since v8  https://lkml.org/lkml/2018/8/10/309
+- go back to the solution in v7 (but the ep device_node leak fixed)
+  for patch 4/4
+- redo (part of) 3/4 w/o using the disliked of_graph_parse_endpoint
+
+Changes since v7  https://lkml.org/lkml/2018/8/4/288
+- The ep device_node was leaked in v7 patch 3/3, so add patch 3/4
+  which simplifies fixing this in patch 4/4 (and adds flexibility)
+  and adjust patch 4/4 to the changes done in the new 3/4.
+- return -ENOMEM on allocation failure in patch 4/4
+
+Changes since v6  https://lkml.org/lkml/2018/8/3/333
+- zap bus-type from the binding in patch 2/3
+
+Changes since (the shortened) v5  https://lkml.org/lkml/2018/8/3/182
+- add reg properties (and #*-cells) to the example in patch 2/3
+- prohibit bus-width 0 in the device-tree in patch 3/3
+- added reviewed-by from Jacopo to patch 2/3 and 3/3
+
+Peter Rosin (4):
+  dt-bindings: display: bridge: lvds-transmitter: add ti,ds90c185
+  dt-bindings: display: atmel: optional video-interface of endpoints
+  drm/atmel-hlcdc: always iterate over the first 4 output endpoints
+  drm/atmel-hlcdc: support bus-width (12/16/18/24) in endpoint nodes
+
+ .../devicetree/bindings/display/atmel/hlcdc-dc.txt | 23 ++++++
+ .../bindings/display/bridge/lvds-transmitter.txt   |  8 +-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     | 70 +++++++++++-----
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h       |  1 +
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c   | 92 +++++++++++++++++++---
+ 5 files changed, 163 insertions(+), 31 deletions(-)
+
 -- 
 2.11.0
