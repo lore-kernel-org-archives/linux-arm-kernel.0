@@ -1,261 +1,53 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Sat, 25 Aug 2018 10:56:20 +0200
-Subject: [PATCH v9 4/4] drm/atmel-hlcdc: support bus-width (12/16/18/24) in
- endpoint nodes
+Date: Sat, 25 Aug 2018 10:56:19 +0200
+Subject: [PATCH v9 3/4] drm/atmel-hlcdc: always iterate over the first 4
+ output endpoints
 In-Reply-To: <20180825085620.10566-1-peda@axentia.se>
 References: <20180825085620.10566-1-peda@axentia.se>
-Message-ID: <20180825085620.10566-5-peda@axentia.se>
+Message-ID: <20180825085620.10566-4-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This beats the heuristic that the connector is involved in what format
-should be output for cases where this fails.
+This enables more flexible devicetrees. You can e.g. have two output
+nodes where one is not enabled, without the ordering affecting things.
 
-E.g. if there is a bridge that changes format between the encoder and the
-connector, or if some of the RGB pins between the lcd controller and the
-encoder are not routed on the PCB.
+Prior to this patch the active nodes had to have endpoint id zero and
+upwards consecutively.
 
-This is critical for the devices that have the "conflicting output
-formats" issue (SAM9N12, SAM9X5, SAMA5D3), since the most significant
-RGB bits move around depending on the selected output mode. For
-devices that do not have the "conflicting output formats" issue
-(SAMA5D2, SAMA5D4), this is completely irrelevant.
-
-Acked-by: Boris Brezillon <boris.brezillon@bootlin.com>
-Reviewed-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c   | 70 +++++++++++++++------
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h     |  1 +
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 77 +++++++++++++++++++++---
- 3 files changed, 120 insertions(+), 28 deletions(-)
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-index d73281095fac..c38a479ada98 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-@@ -226,6 +226,55 @@ static void atmel_hlcdc_crtc_atomic_enable(struct drm_crtc *c,
- #define ATMEL_HLCDC_RGB888_OUTPUT	BIT(3)
- #define ATMEL_HLCDC_OUTPUT_MODE_MASK	GENMASK(3, 0)
- 
-+static int atmel_hlcdc_connector_output_mode(struct drm_connector_state *state)
-+{
-+	struct drm_connector *connector = state->connector;
-+	struct drm_display_info *info = &connector->display_info;
-+	struct drm_encoder *encoder;
-+	unsigned int supported_fmts = 0;
-+	int j;
-+
-+	encoder = state->best_encoder;
-+	if (!encoder)
-+		encoder = connector->encoder;
-+
-+	switch (atmel_hlcdc_encoder_get_bus_fmt(encoder)) {
-+	case 0:
-+		break;
-+	case MEDIA_BUS_FMT_RGB444_1X12:
-+		return ATMEL_HLCDC_RGB444_OUTPUT;
-+	case MEDIA_BUS_FMT_RGB565_1X16:
-+		return ATMEL_HLCDC_RGB565_OUTPUT;
-+	case MEDIA_BUS_FMT_RGB666_1X18:
-+		return ATMEL_HLCDC_RGB666_OUTPUT;
-+	case MEDIA_BUS_FMT_RGB888_1X24:
-+		return ATMEL_HLCDC_RGB888_OUTPUT;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	for (j = 0; j < info->num_bus_formats; j++) {
-+		switch (info->bus_formats[j]) {
-+		case MEDIA_BUS_FMT_RGB444_1X12:
-+			supported_fmts |= ATMEL_HLCDC_RGB444_OUTPUT;
-+			break;
-+		case MEDIA_BUS_FMT_RGB565_1X16:
-+			supported_fmts |= ATMEL_HLCDC_RGB565_OUTPUT;
-+			break;
-+		case MEDIA_BUS_FMT_RGB666_1X18:
-+			supported_fmts |= ATMEL_HLCDC_RGB666_OUTPUT;
-+			break;
-+		case MEDIA_BUS_FMT_RGB888_1X24:
-+			supported_fmts |= ATMEL_HLCDC_RGB888_OUTPUT;
-+			break;
-+		default:
-+			break;
-+		}
-+	}
-+
-+	return supported_fmts;
-+}
-+
- static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
- {
- 	unsigned int output_fmts = ATMEL_HLCDC_OUTPUT_MODE_MASK;
-@@ -238,31 +287,12 @@ static int atmel_hlcdc_crtc_select_output_mode(struct drm_crtc_state *state)
- 	crtc = drm_crtc_to_atmel_hlcdc_crtc(state->crtc);
- 
- 	for_each_new_connector_in_state(state->state, connector, cstate, i) {
--		struct drm_display_info *info = &connector->display_info;
- 		unsigned int supported_fmts = 0;
--		int j;
- 
- 		if (!cstate->crtc)
- 			continue;
- 
--		for (j = 0; j < info->num_bus_formats; j++) {
--			switch (info->bus_formats[j]) {
--			case MEDIA_BUS_FMT_RGB444_1X12:
--				supported_fmts |= ATMEL_HLCDC_RGB444_OUTPUT;
--				break;
--			case MEDIA_BUS_FMT_RGB565_1X16:
--				supported_fmts |= ATMEL_HLCDC_RGB565_OUTPUT;
--				break;
--			case MEDIA_BUS_FMT_RGB666_1X18:
--				supported_fmts |= ATMEL_HLCDC_RGB666_OUTPUT;
--				break;
--			case MEDIA_BUS_FMT_RGB888_1X24:
--				supported_fmts |= ATMEL_HLCDC_RGB888_OUTPUT;
--				break;
--			default:
--				break;
--			}
--		}
-+		supported_fmts = atmel_hlcdc_connector_output_mode(cstate);
- 
- 		if (crtc->dc->desc->conflicting_output_formats)
- 			output_fmts &= supported_fmts;
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-index 60c937f42114..4cc1e03f0aee 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
-@@ -441,5 +441,6 @@ void atmel_hlcdc_crtc_irq(struct drm_crtc *c);
- int atmel_hlcdc_crtc_create(struct drm_device *dev);
- 
- int atmel_hlcdc_create_outputs(struct drm_device *dev);
-+int atmel_hlcdc_encoder_get_bus_fmt(struct drm_encoder *encoder);
- 
- #endif /* DRM_ATMEL_HLCDC_H */
 diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-index c05c2b744981..f73d8a92274e 100644
+index 8db51fb131db..c05c2b744981 100644
 --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
 +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-@@ -27,33 +27,94 @@
- 
- #include "atmel_hlcdc_dc.h"
- 
-+struct atmel_hlcdc_rgb_output {
-+	struct drm_encoder encoder;
-+	int bus_fmt;
-+};
-+
- static const struct drm_encoder_funcs atmel_hlcdc_panel_encoder_funcs = {
- 	.destroy = drm_encoder_cleanup,
- };
- 
-+static struct atmel_hlcdc_rgb_output *
-+atmel_hlcdc_encoder_to_rgb_output(struct drm_encoder *encoder)
-+{
-+	return container_of(encoder, struct atmel_hlcdc_rgb_output, encoder);
-+}
-+
-+int atmel_hlcdc_encoder_get_bus_fmt(struct drm_encoder *encoder)
-+{
-+	struct atmel_hlcdc_rgb_output *output;
-+
-+	output = atmel_hlcdc_encoder_to_rgb_output(encoder);
-+
-+	return output->bus_fmt;
-+}
-+
-+static int atmel_hlcdc_of_bus_fmt(const struct device_node *ep)
-+{
-+	u32 bus_width;
-+	int ret;
-+
-+	ret = of_property_read_u32(ep, "bus-width", &bus_width);
-+	if (ret == -EINVAL)
-+		return 0;
-+	if (ret)
-+		return ret;
-+
-+	switch (bus_width) {
-+	case 12:
-+		return MEDIA_BUS_FMT_RGB444_1X12;
-+	case 16:
-+		return MEDIA_BUS_FMT_RGB565_1X16;
-+	case 18:
-+		return MEDIA_BUS_FMT_RGB666_1X18;
-+	case 24:
-+		return MEDIA_BUS_FMT_RGB888_1X24;
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
- static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
+@@ -78,12 +78,23 @@ static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
+ int atmel_hlcdc_create_outputs(struct drm_device *dev)
  {
--	struct drm_encoder *encoder;
-+	struct atmel_hlcdc_rgb_output *output;
-+	struct device_node *ep;
- 	struct drm_panel *panel;
- 	struct drm_bridge *bridge;
- 	int ret;
+ 	int endpoint, ret = 0;
++	int attached = 0;
  
-+	ep = of_graph_get_endpoint_by_regs(dev->dev->of_node, 0, endpoint);
-+	if (!ep)
-+		return -ENODEV;
-+
- 	ret = drm_of_find_panel_or_bridge(dev->dev->of_node, 0, endpoint,
- 					  &panel, &bridge);
--	if (ret)
-+	if (ret) {
-+		of_node_put(ep);
- 		return ret;
+-	for (endpoint = 0; !ret; endpoint++)
++	/*
++	 * Always scan the first few endpoints even if we get -ENODEV,
++	 * but keep going after that as long as we keep getting hits.
++	 */
++	for (endpoint = 0; !ret || endpoint < 4; endpoint++) {
+ 		ret = atmel_hlcdc_attach_endpoint(dev, endpoint);
++		if (ret == -ENODEV)
++			continue;
++		if (ret)
++			break;
++		attached++;
 +	}
  
--	encoder = devm_kzalloc(dev->dev, sizeof(*encoder), GFP_KERNEL);
--	if (!encoder)
-+	output = devm_kzalloc(dev->dev, sizeof(*output), GFP_KERNEL);
-+	if (!output) {
-+		of_node_put(ep);
-+		return -ENOMEM;
-+	}
-+
-+	output->bus_fmt = atmel_hlcdc_of_bus_fmt(ep);
-+	of_node_put(ep);
-+	if (output->bus_fmt < 0) {
-+		dev_err(dev->dev, "endpoint %d: invalid bus width\n", endpoint);
- 		return -EINVAL;
-+	}
- 
--	ret = drm_encoder_init(dev, encoder,
-+	ret = drm_encoder_init(dev, &output->encoder,
- 			       &atmel_hlcdc_panel_encoder_funcs,
- 			       DRM_MODE_ENCODER_NONE, NULL);
- 	if (ret)
- 		return ret;
- 
--	encoder->possible_crtcs = 0x1;
-+	output->encoder.possible_crtcs = 0x1;
- 
- 	if (panel) {
- 		bridge = drm_panel_bridge_add(panel, DRM_MODE_CONNECTOR_Unknown);
-@@ -62,7 +123,7 @@ static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
- 	}
- 
- 	if (bridge) {
--		ret = drm_bridge_attach(encoder, bridge, NULL);
-+		ret = drm_bridge_attach(&output->encoder, bridge, NULL);
- 		if (!ret)
- 			return 0;
- 
-@@ -70,7 +131,7 @@ static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
- 			drm_panel_bridge_remove(bridge);
- 	}
- 
--	drm_encoder_cleanup(encoder);
-+	drm_encoder_cleanup(&output->encoder);
+ 	/* At least one device was successfully attached.*/
+-	if (ret == -ENODEV && endpoint)
++	if (ret == -ENODEV && attached)
+ 		return 0;
  
  	return ret;
- }
 -- 
 2.11.0
