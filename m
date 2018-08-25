@@ -1,48 +1,162 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 25 Aug 2018 10:39:33 +0200
-Subject: ASoC: pxa: remove pxa2xx-pcm driver, which caused regression
-In-Reply-To: <16bb94b6-089d-f78e-1bb7-2550414be2fb@gmail.com> (Petr Cvek's
- message of "Sat, 18 Aug 2018 22:59:27 +0200")
-References: <f12148b7c9102c67d92a0467f1d653e37c6548ee.1534534854.git.petrcvekcz@gmail.com>
- <87r2iwau3u.fsf@belgarion.home>
- <4deb5304-8efc-3093-7f8e-0dfe50781790@gmail.com>
- <87mutjbidr.fsf@belgarion.home>
- <16bb94b6-089d-f78e-1bb7-2550414be2fb@gmail.com>
-Message-ID: <878t4u96wq.fsf@belgarion.home>
+Date: Sat, 25 Aug 2018 10:46:18 +0200
+Subject: [PATCH v9] ASoC: pxa: switch to new ac97 bus support
+Message-ID: <20180825084618.13641-1-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petrcvekcz@gmail.com> writes:
+Switch to the new ac97 bus support in sound/ac97 instead of the legacy
+snd_ac97 one.
 
-> Dne 18.8.2018 v 21:10 Robert Jarzmik napsal(a):
->> Petr Cvek <petrcvekcz@gmail.com> writes:
->> 
->>> My bad I've forgot to add "select SND_PXA2XX_LIB" from removed
->>> SND_PXA2XX_SOC, now it should compile, can you test it if it works now?
->>> fixed patch in [1].
->> Still NAK.
->> 
->> You must realise that as long as you will delete sound/soc/pxa/pxa2xx-pcm.c,
->> I'll block the patch, as it is being used for music playback on several pxa
->> platforms, at least the AC97 based ones.
->> 
-> I know I will send the magician only patch. I've just wanted to know how
-> it is working with AC97 ;-) (+ it is still a good test for possible
-> future changes).
->
->>> BTW can you try insmod-aplay-stop-rmmod with the current -next on your
->>> board?
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+Since v8: fixed the trivial compilation error
+          v7 was in https://patchwork.kernel.org/patch/9951919/
+---
+ sound/arm/Kconfig           |  1 -
+ sound/soc/pxa/Kconfig       |  5 ++---
+ sound/soc/pxa/pxa2xx-ac97.c | 48 +++++++++++++++++++++++----------------------
+ 3 files changed, 27 insertions(+), 27 deletions(-)
 
-Ok, I just did that.
-I based my work on linux-next, plus one extra patch which
-was lost in my last submissions :
-https://groups.google.com/forum/#!topic/linux.kernel/0iw-VDxIyZk
-
-I insmoded the modules, called aplay, heard the music, rmmoded all the modules,
-then insmoded again, called aplay, and rmmoded again. Everything worked
-smoothly.
-
-Cheers.
-
+diff --git a/sound/arm/Kconfig b/sound/arm/Kconfig
+index 5fbd47a9177e..28867732a318 100644
+--- a/sound/arm/Kconfig
++++ b/sound/arm/Kconfig
+@@ -31,7 +31,6 @@ endif	# SND_ARM
+ 
+ config SND_PXA2XX_LIB
+ 	tristate
+-	select SND_AC97_CODEC if SND_PXA2XX_LIB_AC97
+ 	select SND_DMAENGINE_PCM
+ 
+ config SND_PXA2XX_LIB_AC97
+diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
+index 776e148b0aa2..29f577e6dfc0 100644
+--- a/sound/soc/pxa/Kconfig
++++ b/sound/soc/pxa/Kconfig
+@@ -19,14 +19,13 @@ config SND_MMP_SOC
+ 
+ config SND_PXA2XX_AC97
+ 	tristate
+-	select SND_AC97_CODEC
+ 
+ config SND_PXA2XX_SOC_AC97
+ 	tristate
+-	select AC97_BUS
++	select AC97_BUS_NEW
+ 	select SND_PXA2XX_LIB
+ 	select SND_PXA2XX_LIB_AC97
+-	select SND_SOC_AC97_BUS
++	select SND_SOC_AC97_BUS_NEW
+ 
+ config SND_PXA2XX_SOC_I2S
+ 	select SND_PXA2XX_LIB
+diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
+index 9f779657bc86..f8a3aa6c6d4e 100644
+--- a/sound/soc/pxa/pxa2xx-ac97.c
++++ b/sound/soc/pxa/pxa2xx-ac97.c
+@@ -17,6 +17,7 @@
+ #include <linux/dmaengine.h>
+ #include <linux/dma/pxa-dma.h>
+ 
++#include <sound/ac97/controller.h>
+ #include <sound/core.h>
+ #include <sound/ac97_codec.h>
+ #include <sound/soc.h>
+@@ -27,43 +28,35 @@
+ #include <mach/regs-ac97.h>
+ #include <mach/audio.h>
+ 
+-static void pxa2xx_ac97_warm_reset(struct snd_ac97 *ac97)
++static void pxa2xx_ac97_warm_reset(struct ac97_controller *adrv)
+ {
+ 	pxa2xx_ac97_try_warm_reset();
+ 
+ 	pxa2xx_ac97_finish_reset();
+ }
+ 
+-static void pxa2xx_ac97_cold_reset(struct snd_ac97 *ac97)
++static void pxa2xx_ac97_cold_reset(struct ac97_controller *adrv)
+ {
+ 	pxa2xx_ac97_try_cold_reset();
+ 
+ 	pxa2xx_ac97_finish_reset();
+ }
+ 
+-static unsigned short pxa2xx_ac97_legacy_read(struct snd_ac97 *ac97,
+-					      unsigned short reg)
++static int pxa2xx_ac97_read_actrl(struct ac97_controller *adrv, int slot,
++				  unsigned short reg)
+ {
+-	int ret;
+-
+-	ret = pxa2xx_ac97_read(ac97->num, reg);
+-	if (ret < 0)
+-		return 0;
+-	else
+-		return (unsigned short)(ret & 0xffff);
++	return pxa2xx_ac97_read(slot, reg);
+ }
+ 
+-static void pxa2xx_ac97_legacy_write(struct snd_ac97 *ac97,
+-				     unsigned short reg, unsigned short val)
++static int pxa2xx_ac97_write_actrl(struct ac97_controller *adrv, int slot,
++				   unsigned short reg, unsigned short val)
+ {
+-	int ret;
+-
+-	ret = pxa2xx_ac97_write(ac97->num, reg, val);
++	return pxa2xx_ac97_write(slot, reg, val);
+ }
+ 
+-static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
+-	.read	= pxa2xx_ac97_legacy_read,
+-	.write	= pxa2xx_ac97_legacy_write,
++static struct ac97_controller_ops pxa2xx_ac97_ops = {
++	.read	= pxa2xx_ac97_read_actrl,
++	.write	= pxa2xx_ac97_write_actrl,
+ 	.warm_reset	= pxa2xx_ac97_warm_reset,
+ 	.reset	= pxa2xx_ac97_cold_reset,
+ };
+@@ -233,6 +226,9 @@ MODULE_DEVICE_TABLE(of, pxa2xx_ac97_dt_ids);
+ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
+ {
+ 	int ret;
++	struct ac97_controller *ctrl;
++	pxa2xx_audio_ops_t *pdata = pdev->dev.platform_data;
++	void **codecs_pdata;
+ 
+ 	if (pdev->id != -1) {
+ 		dev_err(&pdev->dev, "PXA2xx has only one AC97 port.\n");
+@@ -245,10 +241,14 @@ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	ret = snd_soc_set_ac97_ops(&pxa2xx_ac97_ops);
+-	if (ret != 0)
+-		return ret;
++	codecs_pdata = pdata ? pdata->codec_pdata : NULL;
++	ctrl = snd_ac97_controller_register(&pxa2xx_ac97_ops, &pdev->dev,
++					    AC97_SLOTS_AVAILABLE_ALL,
++					    codecs_pdata);
++	if (IS_ERR(ctrl))
++		return PTR_ERR(ctrl);
+ 
++	platform_set_drvdata(pdev, ctrl);
+ 	/* Punt most of the init to the SoC probe; we may need the machine
+ 	 * driver to do interesting things with the clocking to get us up
+ 	 * and running.
+@@ -259,8 +259,10 @@ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
+ 
+ static int pxa2xx_ac97_dev_remove(struct platform_device *pdev)
+ {
++	struct ac97_controller *ctrl = platform_get_drvdata(pdev);
++
+ 	snd_soc_unregister_component(&pdev->dev);
+-	snd_soc_set_ac97_ops(NULL);
++	snd_ac97_controller_unregister(ctrl);
+ 	pxa2xx_ac97_hw_remove(pdev);
+ 	return 0;
+ }
 -- 
-Robert
+2.11.0
