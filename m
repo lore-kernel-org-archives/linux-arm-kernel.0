@@ -1,53 +1,23 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Sat, 25 Aug 2018 10:56:19 +0200
-Subject: [PATCH v9 3/4] drm/atmel-hlcdc: always iterate over the first 4
- output endpoints
-In-Reply-To: <20180825085620.10566-1-peda@axentia.se>
-References: <20180825085620.10566-1-peda@axentia.se>
-Message-ID: <20180825085620.10566-4-peda@axentia.se>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sat, 25 Aug 2018 21:27:29 +0800
+Subject: [PATCH] crypto: arm64/sm4-ce - check for the right CPU feature bit
+In-Reply-To: <20180807211836.9899-1-ard.biesheuvel@linaro.org>
+References: <20180807211836.9899-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180825132728.i6rauxjalm6iuh4f@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables more flexible devicetrees. You can e.g. have two output
-nodes where one is not enabled, without the ordering affecting things.
+On Tue, Aug 07, 2018 at 11:18:36PM +0200, Ard Biesheuvel wrote:
+> ARMv8.2 specifies special instructions for the SM3 cryptographic hash
+> and the SM4 symmetric cipher. While it is unlikely that a core would
+> implement one and not the other, we should only use SM4 instructions
+> if the SM4 CPU feature bit is set, and we currently check the SM3
+> feature bit instead. So fix that.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Prior to this patch the active nodes had to have endpoint id zero and
-upwards consecutively.
-
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-index 8db51fb131db..c05c2b744981 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-@@ -78,12 +78,23 @@ static int atmel_hlcdc_attach_endpoint(struct drm_device *dev, int endpoint)
- int atmel_hlcdc_create_outputs(struct drm_device *dev)
- {
- 	int endpoint, ret = 0;
-+	int attached = 0;
- 
--	for (endpoint = 0; !ret; endpoint++)
-+	/*
-+	 * Always scan the first few endpoints even if we get -ENODEV,
-+	 * but keep going after that as long as we keep getting hits.
-+	 */
-+	for (endpoint = 0; !ret || endpoint < 4; endpoint++) {
- 		ret = atmel_hlcdc_attach_endpoint(dev, endpoint);
-+		if (ret == -ENODEV)
-+			continue;
-+		if (ret)
-+			break;
-+		attached++;
-+	}
- 
- 	/* At least one device was successfully attached.*/
--	if (ret == -ENODEV && endpoint)
-+	if (ret == -ENODEV && attached)
- 		return 0;
- 
- 	return ret;
+Patch applied.  Thanks.
 -- 
-2.11.0
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
