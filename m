@@ -1,59 +1,82 @@
-From: stripathi@amperecomputing.com (Suman Tripathi)
-Date: Sat, 25 Aug 2018 13:29:58 -0700
-Subject: [PATCH] ata: Disable AHCI ALPM feature for Ampere Computing eMAG SATA
-Message-ID: <1535228998-9853-1-git-send-email-stripathi@amperecomputing.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 25 Aug 2018 12:29:27 -0700
+Subject: [GIT PULL] ARM: SoC late branch
+Message-ID: <20180825192927.votock3x5zpwplzo@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to hardware errata, Ampere Computing eMAG SATA can't support
-AHCI ALPM feature. This patch disables the AHCI ALPM feature for
-eMAG SATA.
+Hi Linus,
 
-Signed-off-by: Suman Tripathi <stripathi@amperecomputing.com>
-Signed-off-by: Rameshwar Prasad Sahu <rameshwar.sahu@amperecomputing.com>
----
- drivers/ata/ahci_platform.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+The following changes since commit 29ed45fff05899f6f39d05fe1c32b1bc51f8926b:
 
-diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index 99f9a89..0d0233e 100644
---- a/drivers/ata/ahci_platform.c
-+++ b/drivers/ata/ahci_platform.c
-@@ -26,7 +26,7 @@
+  Merge tag 'v4.18-next-soc' of https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux into next/drivers (2018-07-26 13:08:01 -0700)
 
- #define DRV_NAME "ahci"
+are available in the git repository at:
 
--static const struct ata_port_info ahci_port_info = {
-+static struct ata_port_info ahci_port_info = {
-        .flags          = AHCI_FLAG_COMMON,
-        .pio_mask       = ATA_PIO4,
-        .udma_mask      = ATA_UDMA6,
-@@ -41,6 +41,8 @@ static int ahci_probe(struct platform_device *pdev)
- {
-        struct device *dev = &pdev->dev;
-        struct ahci_host_priv *hpriv;
-+       struct acpi_device_info *info;
-+       acpi_status status;
-        int rc;
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-late
 
-        hpriv = ahci_platform_get_resources(pdev);
-@@ -57,6 +59,15 @@ static int ahci_probe(struct platform_device *pdev)
-        if (of_device_is_compatible(dev->of_node, "hisilicon,hisi-ahci"))
-                hpriv->flags |= AHCI_HFLAG_NO_FBS | AHCI_HFLAG_NO_NCQ;
+for you to fetch changes up to 1aa55ca9b14af6cfd987ce4fdaf548f7067a5d07:
 
-+       status = acpi_get_object_info(ACPI_HANDLE(dev), &info);
-+       if (ACPI_SUCCESS(status)) {
-+               if (info->valid & ACPI_VALID_HID) {
-+                       if (!strcmp("APMC0D33", info->hardware_id.string))
-+                               ahci_port_info.flags |= ATA_FLAG_NO_LPM;
-+               }
-+               ACPI_FREE(info);
-+       }
-+
-        rc = ahci_platform_init_host(pdev, hpriv, &ahci_port_info,
-                                     &ahci_platform_sht);
-        if (rc)
---
-1.8.3.1
+  iommu/rockchip: Move irq request past pm_runtime_enable (2018-08-24 08:50:32 -0700)
 
-CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, is for the sole use of the intended recipient(s) and contains information that is confidential and proprietary to Ampere Computing or its subsidiaries. It is to be used solely for the purpose of furthering the parties' business relationship. Any review, copying, or distribution of this email (or any attachments thereto) is strictly prohibited. If you are not the intended recipient, please contact the sender immediately and permanently delete the original and any copies of this email and any attachments thereto.
+----------------------------------------------------------------
+ARM: SoC: late updates
+
+A couple of late-merged changes that would be useful to get in this
+merge window:
+
+ - Driver support for reset of audio complex on Meson platforms. The
+   audio driver went in this merge window, and these changes have been
+   in -next for a while (just not in our tree).
+
+ - Power management fixes for IOMMU on Rockchip platforms, getting
+   closer to kexec working on them, including Chromebooks.
+
+ - Another pass updating "arm,psci" -> "psci" for some properties that
+   have snuck in since last time it was done.
+
+----------------------------------------------------------------
+Amit Kucheria (1):
+      arm64: dts: Fix various entry-method properties to reflect documentation
+
+Jerome Brunet (2):
+      reset: meson: add dt-bindings for meson-axg audio arb
+      reset: meson: add meson audio arb driver
+
+Leonard Crestez (1):
+      reset: imx7: Fix always writing bits as 0
+
+Marc Zyngier (4):
+      ARM: rockchip: Force CONFIG_PM on Rockchip systems
+      arm64: rockchip: Force CONFIG_PM on Rockchip systems
+      iommu/rockchip: Handle errors returned from PM framework
+      iommu/rockchip: Move irq request past pm_runtime_enable
+
+Olof Johansson (2):
+      Merge tag 'reset-for-4.19-2' of git://git.pengutronix.de/git/pza/linux into next/late
+      Merge tag 'reset-fixes-for-4.18' of git://git.pengutronix.de/git/pza/linux into next/late
+
+ .../devicetree/bindings/arm/cpu-capacity.txt       |   2 +-
+ .../devicetree/bindings/arm/idle-states.txt        |   4 +-
+ .../bindings/reset/amlogic,meson-axg-audio-arb.txt |  21 +++
+ arch/arm/mach-rockchip/Kconfig                     |   1 +
+ arch/arm64/Kconfig.platforms                       |   1 +
+ arch/arm64/boot/dts/arm/juno-r1.dts                |   2 +-
+ arch/arm64/boot/dts/arm/juno-r2.dts                |   2 +-
+ arch/arm64/boot/dts/arm/juno.dts                   |   2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     |   2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     |   2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     |   2 +-
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi          |   2 +-
+ arch/arm64/boot/dts/sprd/sc9860.dtsi               |   2 +-
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |   2 +-
+ drivers/iommu/rockchip-iommu.c                     |  45 +++---
+ drivers/reset/Kconfig                              |   7 +
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/reset-imx7.c                         |   2 +-
+ drivers/reset/reset-meson-audio-arb.c              | 168 +++++++++++++++++++++
+ .../reset/amlogic,meson-axg-audio-arb.h            |  17 +++
+ 20 files changed, 257 insertions(+), 30 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/reset/amlogic,meson-axg-audio-arb.txt
+ create mode 100644 drivers/reset/reset-meson-audio-arb.c
+ create mode 100644 include/dt-bindings/reset/amlogic,meson-axg-audio-arb.h
