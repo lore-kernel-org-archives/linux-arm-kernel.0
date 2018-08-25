@@ -1,72 +1,59 @@
-From: manu@bidouilliste.com (Emmanuel Vadot)
-Date: Sat, 25 Aug 2018 17:49:02 +0200
-Subject: [PATCH 1/7] dt-bindings: Add DT bindings documentation for
- Allwinner Thermal Sensor Controller
-In-Reply-To: <20180825174248.c76565fe20a3457e3c766d1a@bidouilliste.com>
-References: <66249ae2a698cdc7@bloch.sibelius.xs4all.nl>
- <20180825174248.c76565fe20a3457e3c766d1a@bidouilliste.com>
-Message-ID: <20180825174902.f23f704a67d1b0cc57a640f5@bidouilliste.com>
+From: stripathi@amperecomputing.com (Suman Tripathi)
+Date: Sat, 25 Aug 2018 13:29:58 -0700
+Subject: [PATCH] ata: Disable AHCI ALPM feature for Ampere Computing eMAG SATA
+Message-ID: <1535228998-9853-1-git-send-email-stripathi@amperecomputing.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 25 Aug 2018 17:42:48 +0200
-Emmanuel Vadot <manu@bidouilliste.com> wrote:
+Due to hardware errata, Ampere Computing eMAG SATA can't support
+AHCI ALPM feature. This patch disables the AHCI ALPM feature for
+eMAG SATA.
 
-> 
->  Hi Mark,
-> 
-> On Sat, 25 Aug 2018 13:07:40 +0200 (CEST)
-> Mark Kettenis <mark.kettenis@xs4all.nl> wrote:
-> 
-> > Hi Emmanuel,
-> > 
-> > I think the following bit in your proposed binding is wrong:
-> > 
-> > +- #thermal-sensor-cells : Depend on the SoC
-> > +   For H3 should be 0
-> > +   For H5 should be 1
-> > +   For A64 should be 2
-> > +   See ./thermal.txt for a description.
-> > 
-> > I think what you're trying to say here is that H3 has a single sensor
-> > and that H5 and A64 have more sensors.  But even though the number of
-> > sensors is different for H5 and A64 (two for H3, three for A64) you
-> > need only a single cell to describe which sensor to read.  So
-> > #thermal-sensors-cells should be 1 for both H5 and A64.
-> 
->  You might be right, this part wasn't really clear for me reading the
-> thermal binding docs. Can someone double-confirm that ?
+Signed-off-by: Suman Tripathi <stripathi@amperecomputing.com>
+Signed-off-by: Rameshwar Prasad Sahu <rameshwar.sahu@amperecomputing.com>
+---
+ drivers/ata/ahci_platform.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
- Re-reading the doc with this information and now it's clear, I'll
-correct this in the new serie.
+diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+index 99f9a89..0d0233e 100644
+--- a/drivers/ata/ahci_platform.c
++++ b/drivers/ata/ahci_platform.c
+@@ -26,7 +26,7 @@
 
-> > As far as I can see this proposed binding is compatible with the
-> > OpenBSD's sxitemp(4) driver. 
-> 
->  Go to know.
-> 
-> > That driver also supports the R40 with
-> > "allwinner,sun8i-r40-ths" as the compatible string.  The R40 has two
-> > sensors so #thermal-sensor-cells should be 1 for this SoC as well.
-> 
->  I don't have R40 board, I guess the best thing will be for you to send
-> a patch to update the binding docs and dts when this serie will be
-> merged/acked.
-> 
-> > Cheers,
-> > 
-> > Mark
-> 
->  Cheers,
-> 
-> -- 
-> Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ #define DRV_NAME "ahci"
 
+-static const struct ata_port_info ahci_port_info = {
++static struct ata_port_info ahci_port_info = {
+        .flags          = AHCI_FLAG_COMMON,
+        .pio_mask       = ATA_PIO4,
+        .udma_mask      = ATA_UDMA6,
+@@ -41,6 +41,8 @@ static int ahci_probe(struct platform_device *pdev)
+ {
+        struct device *dev = &pdev->dev;
+        struct ahci_host_priv *hpriv;
++       struct acpi_device_info *info;
++       acpi_status status;
+        int rc;
 
--- 
-Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+        hpriv = ahci_platform_get_resources(pdev);
+@@ -57,6 +59,15 @@ static int ahci_probe(struct platform_device *pdev)
+        if (of_device_is_compatible(dev->of_node, "hisilicon,hisi-ahci"))
+                hpriv->flags |= AHCI_HFLAG_NO_FBS | AHCI_HFLAG_NO_NCQ;
+
++       status = acpi_get_object_info(ACPI_HANDLE(dev), &info);
++       if (ACPI_SUCCESS(status)) {
++               if (info->valid & ACPI_VALID_HID) {
++                       if (!strcmp("APMC0D33", info->hardware_id.string))
++                               ahci_port_info.flags |= ATA_FLAG_NO_LPM;
++               }
++               ACPI_FREE(info);
++       }
++
+        rc = ahci_platform_init_host(pdev, hpriv, &ahci_port_info,
+                                     &ahci_platform_sht);
+        if (rc)
+--
+1.8.3.1
+
+CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, is for the sole use of the intended recipient(s) and contains information that is confidential and proprietary to Ampere Computing or its subsidiaries. It is to be used solely for the purpose of furthering the parties' business relationship. Any review, copying, or distribution of this email (or any attachments thereto) is strictly prohibited. If you are not the intended recipient, please contact the sender immediately and permanently delete the original and any copies of this email and any attachments thereto.
