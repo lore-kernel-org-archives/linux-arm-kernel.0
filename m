@@ -1,523 +1,107 @@
-From: pn@denx.de (Parthiban Nallathambi)
-Date: Sun, 26 Aug 2018 17:20:29 +0200
-Subject: [PATCH v2 2/3] drivers/irqchip: Add Actions external interrupts
- support
-In-Reply-To: <64b9ae63-c2b9-a2e0-f648-4bf80f34a57a@arm.com>
-References: <20180812122215.1079590-1-pn@denx.de>
- <20180812122215.1079590-3-pn@denx.de>
- <64b9ae63-c2b9-a2e0-f648-4bf80f34a57a@arm.com>
-Message-ID: <e8ff35c7-813c-2597-ab51-781336d551c5@denx.de>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Sun, 26 Aug 2018 20:41:21 +0200
+Subject: [PATCH v1 7/7] drm: add Atmel LCDC display controller support
+In-Reply-To: <20180824143125.4e99e791@bbrezillon>
+References: <20180812184152.GA22343@ravnborg.org>
+ <20180812184629.3808-7-sam@ravnborg.org>
+ <20180824143125.4e99e791@bbrezillon>
+Message-ID: <20180826184121.GA24867@ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marc,
+Hi Boris.
 
-Thanks for your feedback.
+Very usefull feedback!
+I am working on v2, and have addressed your review items.
+Just a few comments below to a few items.
+The rest is processed/done.
 
-On 8/13/18 1:46 PM, Marc Zyngier wrote:
-> On 12/08/18 13:22, Parthiban Nallathambi wrote:
->> Actions Semi Owl family SoC's S500, S700 and S900 provides support
->> for 3 external interrupt controllers through SIRQ pins.
->>
->> Each line can be independently configured as interrupt and triggers
->> on either of the edges (raising or falling) or either of the levels
->> (high or low) . Each line can also be masked independently.
->>
->> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
->> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
->> ---
->>  drivers/irqchip/Makefile       |   1 +
->>  drivers/irqchip/irq-owl-sirq.c | 305 +++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 306 insertions(+)
->>  create mode 100644 drivers/irqchip/irq-owl-sirq.c
->>
->> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
->> index 15f268f646bf..072c4409e7c4 100644
->> --- a/drivers/irqchip/Makefile
->> +++ b/drivers/irqchip/Makefile
->> @@ -7,6 +7,7 @@ obj-$(CONFIG_ATH79)			+= irq-ath79-misc.o
->>  obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
->>  obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
->>  obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
->> +obj-$(CONFIG_ARCH_ACTIONS)		+= irq-owl-sirq.o
->>  obj-$(CONFIG_FARADAY_FTINTC010)		+= irq-ftintc010.o
->>  obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
->>  obj-$(CONFIG_ARCH_LPC32XX)		+= irq-lpc32xx.o
->> diff --git a/drivers/irqchip/irq-owl-sirq.c b/drivers/irqchip/irq-owl-sirq.c
->> new file mode 100644
->> index 000000000000..b69301388300
->> --- /dev/null
->> +++ b/drivers/irqchip/irq-owl-sirq.c
->> @@ -0,0 +1,305 @@
->> +// SPDX-License-Identifier: GPL-2.0+
->> +/*
->> + *
->> + * Actions Semi Owl SoCs SIRQ interrupt controller driver
->> + *
->> + * Copyright (C) 2014 Actions Semi Inc.
->> + * David Liu <liuwei@actions-semi.com>
->> + *
->> + * Author: Parthiban Nallathambi <pn@denx.de>
->> + * Author: Saravanan Sekar <sravanhome@gmail.com>
->> + */
->> +
->> +#include <linux/interrupt.h>
->> +#include <linux/irqchip.h>
->> +#include <linux/of_irq.h>
->> +#include <linux/of_address.h>
->> +
->> +#include <dt-bindings/interrupt-controller/arm-gic.h>
->> +
->> +#define INTC_GIC_INTERRUPT_PIN		13
-> 
-> Why isn't that coming from the DT?
+I hope to post v2 in the week to come.
 
-DT numbering is taken irqchip local, by which hwirq is directly used to
-calculate the offset into register when it is shared. Even if this is 
-directly from DT, I need the value to offset into the register. So maintianed
-inside the driver.
+> > +static int lcdc_dc_load(struct drm_device *drm)
+> > +{
+> > +	const struct of_device_id *match;
+> > +	struct platform_device *pdev;
+> > +	struct lcdc_dc *lcdc_dc;
+> > +	struct device *dev;
+> > +	int ret;
+> > +
+> > +	dev = drm->dev;
+> > +	pdev = to_platform_device(dev);
+> > +
+> > +	match = of_match_node(atmel_lcdc_of_match, dev->parent->of_node);
+> > +	if (!match) {
+> > +		DRM_DEV_ERROR(dev, "invalid compatible string (node=%s)",
+> > +			      dev->parent->of_node->name);
+> > +		return -ENODEV;
+> > +	}
+> > +
+> > +	if (!match->data) {
+> > +		DRM_DEV_ERROR(dev, "invalid lcdc_dc description\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	lcdc_dc = devm_kzalloc(dev, sizeof(*lcdc_dc), GFP_KERNEL);
+> > +	if (!lcdc_dc) {
+> > +		DRM_DEV_ERROR(dev, "Failed to allocate lcdc_dc\n");
+> > +		return -ENOMEM;
+> > +	}
+> > +
+> > +	/* reset of lcdc might sleep and require a preemptible task context */
+> > +	INIT_WORK(&lcdc_dc->reset_lcdc_work, reset_lcdc_work);
+> > +
+> > +	platform_set_drvdata(pdev, drm);
+> > +	dev_set_drvdata(dev, lcdc_dc);
+> > +
+> > +	lcdc_dc->mfd_lcdc = dev_get_drvdata(dev->parent);
+> > +	drm->dev_private = lcdc_dc;
+> > +
+> > +	lcdc_dc->regmap = lcdc_dc->mfd_lcdc->regmap;
+> > +	lcdc_dc->desc = match->data;
+> > +	lcdc_dc->dev = dev;
+> > +
+> > +	lcdc_dc->lcd_supply = devm_regulator_get(dev, "lcd");
+> > +	if (IS_ERR(lcdc_dc->lcd_supply)) {
+> > +		DRM_DEV_ERROR(dev, "Failed to get lcd-supply (%ld)\n",
+> > +			      PTR_ERR(lcdc_dc->lcd_supply));
+> > +		lcdc_dc->lcd_supply = NULL;
+> > +	}
+> > +
+> > +	lcdc_dc_start_clock(lcdc_dc);
+> 
+> Hm, do you really need to call that here? I'd make it part of the
+> runtime PM resume hook, and put a lcdc_dc_stop_clock() in the suspend
+> hook.
 
-Should it make sense to move it to DT and use another macro (different name)
-for offsetting?
+As suggested I have introduced suspend/resume hooks and have included
+start/stop clock calls.
 
-> 
->> +#define INTC_EXTCTL_PENDING		BIT(0)
->> +#define INTC_EXTCTL_CLK_SEL		BIT(4)
->> +#define INTC_EXTCTL_EN			BIT(5)
->> +#define	INTC_EXTCTL_TYPE_MASK		GENMASK(6, 7)
->> +#define	INTC_EXTCTL_TYPE_HIGH		0
->> +#define	INTC_EXTCTL_TYPE_LOW		BIT(6)
->> +#define	INTC_EXTCTL_TYPE_RISING		BIT(7)
->> +#define	INTC_EXTCTL_TYPE_FALLING	(BIT(6) | BIT(7))
->> +
->> +#define get_sirq_offset(x)	chip_data->sirq[x].offset
->> +
->> +/* Per SIRQ data */
->> +struct owl_sirq {
->> +	u16 offset;
->> +	/* software is responsible to clear interrupt pending bit when
->> +	 * type is edge triggered. This value is for per SIRQ line.
->> +	 */
-> 
-> Please follow the normal multi-line comment style:
-> 
-> /*
->  * This is a comment, starting with a capital letter and ending with
->  * a full stop.
->  */
+But as the suspend/resume hooks depends on CONFIG_PM_SLEEP I
+still need the explicit call in this function.
 
-Sure, thanks.
+> > +
+> > +	pm_runtime_enable(dev);
+> > +
+> > +	ret = drm_vblank_init(drm, 1);
+> > +	if (ret) {
+> > +		DRM_DEV_ERROR(dev, "failed to initialize vblank (%d)\n",
+> > +			      ret);
+> > +		goto err_pm_runtime_disable;
+> > +	}
+> > +
+> > +	ret = lcdc_dc_modeset_init(lcdc_dc, drm);
+> > +	if (ret) {
+> > +		DRM_DEV_ERROR(dev, "modeset_init failed (%d)", ret);
+> > +		goto err_pm_runtime_disable;
+> > +	}
+> > +
+> > +	pm_runtime_get_sync(dev);
+> 
+> This call will automatically call the runtime PM resume hook, so if you
+> need the clk to be enabled before that point you should put it earlier.
+> 
+> Also, you should call pm_runtime_get_sync() in the ->enable() path and
+> pm_runtime_put() in the ->disable() path.
+Good catch! Added.
 
-> 
->> +	bool type_edge;
->> +};
->> +
->> +struct owl_sirq_chip_data {
->> +	void __iomem *base;
->> +	raw_spinlock_t lock;
->> +	/* some SoC's share the register for all SIRQ lines, so maintain
->> +	 * register is shared or not here. This value is from DT.
->> +	 */
->> +	bool shared_reg;
->> +	struct owl_sirq *sirq;
-> 
-> Given that this driver handles at most 3 interrupts, do we need the
-> overhead of a pointer and an additional allocation, while we could store
-> all of this data in the space taken by the pointer itself?
-> 
-> Something like:
-> 
-> 	u16 offset[3];
-> 	u8  trigger; // Bit mask indicating edge-triggered interrupts
-> 
-> and we're done.
-
-Sure, I will modify with one allocation.
-
-> 
->> +};
->> +
->> +static struct owl_sirq_chip_data *sirq_data;
->> +
->> +static unsigned int sirq_read_extctl(struct irq_data *data)
-> 
-> Why isn't this taking a struct owl_sirq_chip_data as a parameter instead
-> of always passing irq_data?
-> 
-> Also, this should return a well defined size, which "unsigned int"
-> isn't. Make that u32.
-
-Sure, will adapt this.
-
-> 
->> +{
->> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
->> +	unsigned int val;
-> 
-> u32;
-
-Sure.
-
-> 
->> +
->> +	val = readl_relaxed(chip_data->base + get_sirq_offset(data->hwirq));
->> +	if (chip_data->shared_reg)
->> +		val = (val >> (2 - data->hwirq) * 8) & 0xff;
->> +
->> +	return val;
->> +}
->> +
->> +static void sirq_write_extctl(struct irq_data *data, unsigned int extctl)
-> 
-> Same comments.
-
-Sure.
-
-> 
->> +{
->> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
->> +	unsigned int val;
-> 
-> u32;
-
-Sure.
-
-> 
->> +
->> +	if (chip_data->shared_reg) {
->> +		val = readl_relaxed(chip_data->base +
->> +				get_sirq_offset(data->hwirq));
-> 
-> Single line, please.
-
-Sure.
-
-> 
->> +		val &= ~(0xff << (2 - data->hwirq) * 8);
->> +		extctl &= 0xff;
->> +		extctl = (extctl << (2 - data->hwirq) * 8) | val;
->> +	}
->> +
->> +	writel_relaxed(extctl, chip_data->base +
->> +			get_sirq_offset(data->hwirq));
-> 
-> Single line.
-
-Sure.
-
-> 
->> +}
->> +
->> +static void owl_sirq_ack(struct irq_data *data)
->> +{
->> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
->> +	unsigned int extctl;
->> +	unsigned long flags;
->> +
->> +	/* software must clear external interrupt pending, when interrupt type
->> +	 * is edge triggered, so we need per SIRQ based clearing.
->> +	 */
->> +	if (chip_data->sirq[data->hwirq].type_edge) {
->> +		raw_spin_lock_irqsave(&chip_data->lock, flags);
->> +
->> +		extctl = sirq_read_extctl(data);
->> +		extctl |= INTC_EXTCTL_PENDING;
->> +		sirq_write_extctl(data, extctl);
->> +
->> +		raw_spin_unlock_irqrestore(&chip_data->lock, flags);
-> 
-> It would make a lot more sense if the lock was taken inside the accessor
-> so that the rest of the driver doesn't have to deal with it. Something
-> along of the line of:
-> 
-> static void sirq_clear_set_extctl(struct owl_sirq_chip_data *d,
->                                   u32 clear, u32 set)
-> {
-> 	unsigned long flags;
-> 	u32 val;
-> 
-> 	raw_spin_lock_irqsave(&d->lock, flags);
-> 	val = sirq_read_extctl(d);
-> 	val &= ~clear;
-> 	val |= set;
-> 	sirq_write_extctl(d, val);
-> 	raw_spin_unlock_irqrestore(&d->lock, flags)
-> }
-> 
-> And use that throughout the driver.
-
-Thanks for sharing the function with lock, will update it.
-
-> 
->> +	}
->> +	irq_chip_ack_parent(data);
-> 
-> That being said, I'm terribly sceptical about this whole function. At
-> the end of the day, the flow handler used by the GIC is
-> handle_fasteoi_irq, which doesn't call the ack callback at all. So how
-> does this work?
-
-That's my mistake. I will move this function for ".irq_eoi". Will that be fine?
-In short, all the devices/interrupt controller connected to sirq lines are level
-triggered in my board. So, I couldn't test this part last time.
-
-> 
->> +}
->> +
->> +static void owl_sirq_mask(struct irq_data *data)
->> +{
->> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
->> +	unsigned int extctl;
->> +	unsigned long flags;
->> +
->> +	raw_spin_lock_irqsave(&chip_data->lock, flags);
->> +
->> +	extctl = sirq_read_extctl(data);
->> +	extctl &= ~(INTC_EXTCTL_EN);
->> +	sirq_write_extctl(data, extctl);
->> +
->> +	raw_spin_unlock_irqrestore(&chip_data->lock, flags);
->> +	irq_chip_mask_parent(data);
->> +}
->> +
->> +static void owl_sirq_unmask(struct irq_data *data)
->> +{
->> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
->> +	unsigned int extctl;
->> +	unsigned long flags;
->> +
->> +	raw_spin_lock_irqsave(&chip_data->lock, flags);
->> +
->> +	extctl = sirq_read_extctl(data);
->> +	extctl |= INTC_EXTCTL_EN;
->> +	sirq_write_extctl(data, extctl);
->> +
->> +	raw_spin_unlock_irqrestore(&chip_data->lock, flags);
->> +	irq_chip_unmask_parent(data);
->> +}
->> +
->> +/* PAD_PULLCTL needs to be defined in pinctrl */
->> +static int owl_sirq_set_type(struct irq_data *data, unsigned int flow_type)
->> +{
->> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
->> +	unsigned int extctl, type;
->> +	unsigned long flags;
->> +
->> +	switch (flow_type) {
->> +	case IRQF_TRIGGER_LOW:
->> +		type = INTC_EXTCTL_TYPE_LOW;
->> +		break;
->> +	case IRQF_TRIGGER_HIGH:
->> +		type = INTC_EXTCTL_TYPE_HIGH;
->> +		break;
->> +	case IRQF_TRIGGER_FALLING:
->> +		type = INTC_EXTCTL_TYPE_FALLING;
->> +		chip_data->sirq[data->hwirq].type_edge = true;
->> +		break;
->> +	case IRQF_TRIGGER_RISING:
->> +		type = INTC_EXTCTL_TYPE_RISING;
->> +		chip_data->sirq[data->hwirq].type_edge = true;
->> +		break;
-> 
-> So let's say I configure an interrupt as edge, then switch it to level.
-> The edge setting remains and bad things will happen.
-
-Ok, I will update the value to false for edge cases.
-
-> 
->> +	default:
->> +		return  -EINVAL;
->> +	}
->> +
->> +	raw_spin_lock_irqsave(&chip_data->lock, flags);
->> +
->> +	extctl = sirq_read_extctl(data);
->> +	extctl &= ~INTC_EXTCTL_TYPE_MASK;
->> +	extctl |= type;
->> +	sirq_write_extctl(data, extctl);
->> +
->> +	raw_spin_unlock_irqrestore(&chip_data->lock, flags);
->> +	data = data->parent_data;
->> +	return irq_chip_set_type_parent(data, flow_type);
->> +}
->> +
->> +static struct irq_chip owl_sirq_chip = {
->> +	.name		= "owl-sirq",
->> +	.irq_ack	= owl_sirq_ack,
->> +	.irq_mask	= owl_sirq_mask,
->> +	.irq_unmask	= owl_sirq_unmask,
->> +	.irq_set_type	= owl_sirq_set_type,
->> +	.irq_eoi	= irq_chip_eoi_parent,
->> +	.irq_retrigger	= irq_chip_retrigger_hierarchy,
->> +};
->> +
->> +static int owl_sirq_domain_alloc(struct irq_domain *domain, unsigned int virq,
->> +				 unsigned int nr_irqs, void *arg)
->> +{
->> +	struct irq_fwspec *fwspec = arg;
->> +	struct irq_fwspec parent_fwspec = {
->> +		.param_count	= 3,
->> +		.param[0]	= GIC_SPI,
->> +		.param[1]	= fwspec->param[0] + INTC_GIC_INTERRUPT_PIN,
->> +		.param[2]	= fwspec->param[1],
-> 
-> param[2] is supposed to be the trigger configuration. Your driver
-> supports LEVEL_LOW and EDGE_FALLING, which the GIC cannot handle. And
-> yet you're passing it directly.
-
-That's my mistake. I will translate and restrict LEVEL_HIGH and EDGE_RISING
-for GIC here. Thanks.
-
-> 
->> +		.fwnode		= domain->parent->fwnode,
->> +	};
->> +
->> +	if (WARN_ON(nr_irqs != 1))
->> +		return -EINVAL;
->> +
->> +	irq_domain_set_hwirq_and_chip(domain, virq, fwspec->param[0],
->> +				      &owl_sirq_chip,
->> +				      domain->host_data);
->> +
->> +	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs,
->> +					    &parent_fwspec);
->> +}
->> +
->> +static const struct irq_domain_ops sirq_domain_ops = {
->> +	.alloc	= owl_sirq_domain_alloc,
->> +	.free	= irq_domain_free_irqs_common,
-> 
-> No translation method? Again, how does this work?
-
-Missed this part, I will update this next version.
-
-> 
->> +};
->> +
->> +static void owl_sirq_clk_init(int offset, int hwirq)
->> +{
->> +	unsigned int val;
->> +
->> +	/* register default clock is 32Khz, change to 24Mhz only when defined */
->> +	val = readl_relaxed(sirq_data->base + offset);
->> +	if (sirq_data->shared_reg)
->> +		val |= INTC_EXTCTL_CLK_SEL << (2 - hwirq) * 8;
->> +	else
->> +		val |= INTC_EXTCTL_CLK_SEL;
->> +
->> +	writel_relaxed(val, sirq_data->base + offset);
->> +}
-> 
-> I've asked questions about this in the first review, and you didn't
-> answer. Why is it even configurable? How do you choose the sample rate?
-> What's the drawback of always setting it one way or the other?
-
-The provision for selecting sampling rate here seems meant for power
-management, which I wasn't aware of. So this configuration doesn't need
-to come from DT.
-
-Possibly this needs to be implemented as "syscore_ops" suspend and resume
-calls. Should I register this as "register_syscore_ops" or leaving 32MHz
-is fine?
-
-> 
->> +
->> +static int __init owl_sirq_of_init(struct device_node *node,
->> +					struct device_node *parent)
->> +{
->> +	struct irq_domain *domain, *domain_parent;
->> +	int ret = 0, i, sirq_cnt = 0;
->> +	struct owl_sirq_chip_data *chip_data;
->> +
->> +	sirq_cnt = of_property_count_u32_elems(node, "actions,sirq-offset");
->> +	if (sirq_cnt <= 0) {
->> +		pr_err("owl_sirq: register offset not specified\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	chip_data = kzalloc(sizeof(*chip_data), GFP_KERNEL);
->> +	if (!chip_data)
->> +		return -ENOMEM;
->> +	sirq_data = chip_data;
->> +
->> +	chip_data->sirq = kcalloc(sirq_cnt, sizeof(*chip_data->sirq),
->> +				GFP_KERNEL);
->> +	if (!chip_data->sirq)
->> +		goto out_free;
->> +
->> +	raw_spin_lock_init(&chip_data->lock);
->> +	chip_data->base = of_iomap(node, 0);
->> +	if (!chip_data->base) {
->> +		pr_err("owl_sirq: unable to map sirq register\n");
->> +		ret = -ENXIO;
->> +		goto out_free;
->> +	}
->> +
->> +	chip_data->shared_reg = of_property_read_bool(node,
->> +						"actions,sirq-shared-reg");
->> +	for (i = 0; i < sirq_cnt; i++) {
->> +		u32 value;
->> +
->> +		ret = of_property_read_u32_index(node, "actions,sirq-offset",
->> +						i, &value);
->> +		if (ret)
->> +			goto out_unmap;
->> +
->> +		get_sirq_offset(i) = (u16)value;
->> +
->> +		ret = of_property_read_u32_index(node, "actions,sirq-clk-sel",
->> +						i, &value);
->> +		if (ret || !value)
->> +			continue;
->> +
->> +		/* external interrupt controller can be either connect to 32Khz/
->> +		 * 24Mhz external/internal clock. This shall be configured for
->> +		 * per SIRQ line. It can be defined from DT, failing defaults to
->> +		 * 24Mhz clock.
->> +		 */
->> +		owl_sirq_clk_init(get_sirq_offset(i), i);
->> +	}
->> +
->> +	domain_parent = irq_find_host(parent);
->> +	if (!domain_parent) {
->> +		pr_err("owl_sirq: interrupt-parent not found\n");
->> +		goto out_unmap;
->> +	}
->> +
->> +	domain = irq_domain_add_hierarchy(domain_parent, 0,
->> +			sirq_cnt, node,
->> +			&sirq_domain_ops, chip_data);
->> +	if (!domain) {
->> +		ret = -ENOMEM;
->> +		goto out_unmap;
->> +	}
->> +
->> +	return 0;
->> +
->> +out_unmap:
->> +	iounmap(chip_data->base);
->> +out_free:
->> +	kfree(chip_data);
->> +	kfree(chip_data->sirq);
->> +	return ret;
->> +}
->> +
->> +IRQCHIP_DECLARE(owl_sirq, "actions,owl-sirq", owl_sirq_of_init);
->>
-> 
-> As it stands, this driver is nowhere near ready. I don't even understand
-> how edge signalling works. Also, I'd appreciate if you could answer my
-> comments before respining another version.
-
-As the previous version wasn't based on hierarchy, which I was working on
-after your feedback. Apologize!
-
-> 
-> Thanks,
-> 
-> 	M.
-> 
-
--- 
-Thanks,
-Parthiban N
+	Sam
