@@ -1,69 +1,75 @@
-From: gustavo@embeddedor.com (Gustavo A. R. Silva)
-Date: Sun, 26 Aug 2018 13:47:12 -0500
-Subject: [PATCH] drm/rockchip: Use struct_size() in devm_kzalloc()
-Message-ID: <20180826184712.GA9330@embeddedor.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 26 Aug 2018 20:01:19 +0100
+Subject: [PATCH] irqchip/gic-v3-its: add allocation max order limitation
+ for lpi_id_bits
+In-Reply-To: <1535274051-2418-1-git-send-email-jia.he@hxt-semitech.com>
+References: <1535274051-2418-1-git-send-email-jia.he@hxt-semitech.com>
+Message-ID: <868t4tx88w.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the more common cases of allocation size calculations is finding
-the size of a structure that has a zero-sized array at the end, along
-with memory for some number of elements for that array. For example:
+[I'm travelling, so expect some major delays in responding to email]
 
-struct foo {
-	int stuff;
-        void *entry[];
-};
+Hi Jia,
 
-instance = devm_kzalloc(dev, sizeof(struct foo) + sizeof(void *) * count, GFP_KERNEL);
+On Sun, 26 Aug 2018 10:00:51 +0100,
+Jia He <hejianet@gmail.com> wrote:
+> 
+> There is a WARN_ON when my QDF2400 server boots up (pagesize is 4k)
 
-or, like in this particular case:
+[snip]
 
-size = sizeof(struct foo) + sizeof(void *) * count;
-instance = devm_kzalloc(dev, size, GFP_KERNEL);
+> In its_alloc_lpi_tables, lpi_id_bits is 24, without this patch,
+> its_allocate_prop_table will try to allocate 16M(order 12 if
+> pagesize=4k). Thus it causes the WARN_ON.
 
-Instead of leaving these open-coded and prone to type mistakes, we can
-now use the new struct_size() helper:
+Gah! QDF and its 24bit INTIDs... Making life hell for everyone ;-)
 
-instance = devm_kzalloc(dev, struct_size(instance, entry, count),
-GFP_KERNEL);
+Sorry for breaking it.
 
-This issue was detected with the help of Coccinelle.
+> 
+> This patch fixes it by limiting the lpi_id_bits.
+> 
+> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 316a575..79e6993 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1624,8 +1624,11 @@ static void its_free_prop_table(struct page *prop_page)
+>  static int __init its_alloc_lpi_tables(void)
+>  {
+>  	phys_addr_t paddr;
+> +	u32 max_bits;	 /*max order limitation in alloc_page*/
+>  
+> -	lpi_id_bits = GICD_TYPER_ID_BITS(gic_rdists->gicd_typer);
+> +	max_bits = PAGE_SHIFT + MAX_ORDER - 1;
+> +	lpi_id_bits = min_t(u32, max_bits,
+> +			GICD_TYPER_ID_BITS(gic_rdists->gicd_typer));
+>  	gic_rdists->prop_page = its_allocate_prop_table(GFP_NOWAIT);
+>  	if (!gic_rdists->prop_page) {
+>  		pr_err("Failed to allocate PROPBASE\n");
+> -- 
+> 1.8.3.1
+> 
 
-Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+I find it rather odd that we end-up with different interrupt ranges
+depending on the CPU page size. Also, allocating that much memory for
+LPIs is rather pointless, as we actually have a pretty low limit of
+interrupts the system can deal with (see IRQ_BITMAP_BITS, which is
+slightly more than 8k). I've so far seen *one* request to push it up,
+but I doubt that it is a real use case.
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 1359e5c..cf64e4d 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -32,6 +32,7 @@
- #include <linux/of_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/component.h>
-+#include <linux/overflow.h>
- 
- #include <linux/reset.h>
- #include <linux/delay.h>
-@@ -1561,7 +1562,6 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
- 	struct drm_device *drm_dev = data;
- 	struct vop *vop;
- 	struct resource *res;
--	size_t alloc_size;
- 	int ret, irq;
- 
- 	vop_data = of_device_get_match_data(dev);
-@@ -1569,8 +1569,8 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
- 		return -ENODEV;
- 
- 	/* Allocate vop struct and its vop_win array */
--	alloc_size = sizeof(*vop) + sizeof(*vop->win) * vop_data->win_size;
--	vop = devm_kzalloc(dev, alloc_size, GFP_KERNEL);
-+	vop = devm_kzalloc(dev, struct_size(vop, win, vop_data->win_size),
-+			   GFP_KERNEL);
- 	if (!vop)
- 		return -ENOMEM;
- 
+Capping lpi_id_bits at 16 (which is what we had before) is plenty,
+will save a some memory, and gives some margin before we need to push
+it up again.
+
+Thanks,
+
+	M.
+
 -- 
-2.7.4
+Jazz is not dead, it just smell funny.
