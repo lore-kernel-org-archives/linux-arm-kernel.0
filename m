@@ -1,2264 +1,564 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 26 Aug 2018 14:18:30 +0100
-Subject: [PATCH v2 15/17] zinc: Curve25519 ARM implementation
-In-Reply-To: <20180824213849.23647-16-Jason@zx2c4.com>
-References: <20180824213849.23647-1-Jason@zx2c4.com>
- <20180824213849.23647-16-Jason@zx2c4.com>
-Message-ID: <CAKv+Gu-WVOBZ1sQwOKo29P_jWL86wOnzd1-sB_6mTbPX1Lz0NQ@mail.gmail.com>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Sun, 26 Aug 2018 16:28:13 +0200
+Subject: [PATCH v1 7/7] drm: add Atmel LCDC display controller support
+In-Reply-To: <20180812184629.3808-7-sam@ravnborg.org>
+References: <20180812184152.GA22343@ravnborg.org>
+ <20180812184629.3808-7-sam@ravnborg.org>
+Message-ID: <8581453a-8abe-c321-17c1-493f805510b1@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 August 2018 at 22:38, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
-> This comes from Dan Bernstein and Peter Schwabe's public domain NEON
-> code, and has been modified to be friendly for kernel space.
+
+Den 12.08.2018 20.46, skrev Sam Ravnborg:
+> This is a DRM based driver for the Atmel LCDC IP.
+> There exist today a framebuffer based driver and
+> this is a re-implmentation of the same on top of DRM.
 >
-> Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
-> Cc: Andy Lutomirski <luto@kernel.org>
-> Cc: Greg KH <gregkh@linuxfoundation.org>
-> Cc: Samuel Neves <sneves@dei.uc.pt>
-> Cc: D. J. Bernstein <djb@cr.yp.to>
-> Cc: Jean-Philippe Aumasson <jeanphilippe.aumasson@gmail.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-crypto at vger.kernel.org
+> The rewrite was based on the original fbdev driver
+> but the driver has also seen inspiration from
+> the atmel-hlcdc_dc driver and others.
+>
+> The driver is not a full replacement:
+> - STN displays are not supported
+> 	Binding support is missing but most of the
+> 	STN specific functionality is otherwise ported
+> 	from the fbdev driver.
+> - gamma support is missing
+> 	The driver utilises drm_simple_kms_helper and
+> 	this helper lacks support for settting up gamma
+> - modesetting is not checked (see TODO in file)
+> - support for extra modes as applicable (and lcd-wiring-mode)
+> - support for AVR32 (is it relevant?)
+>
+> Signed-off-by: Sam Ravnborg <sam@ravnborg.org>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
 > ---
->  lib/zinc/Makefile                         |    4 +
->  lib/zinc/curve25519/curve25519-arm-glue.h |   33 +
->  lib/zinc/curve25519/curve25519-arm.S      | 2110 +++++++++++++++++++++
-
-As discussed in the context of patch #2, I have my doubts about the
-general approach you are taking. I think this code belongs in arch/arm
-somewhere, exposed in a way so it naturally supersedes a dummy
-implementation by library search order.
-
-In the mean time, let me comment on the code in this patch.
-
->  3 files changed, 2147 insertions(+)
->  create mode 100644 lib/zinc/curve25519/curve25519-arm-glue.h
->  create mode 100644 lib/zinc/curve25519/curve25519-arm.S
+>   MAINTAINERS                           |    7 +
+>   drivers/gpu/drm/atmel/Kconfig         |   12 +
+>   drivers/gpu/drm/atmel/Makefile        |    2 +
+>   drivers/gpu/drm/atmel/atmel_lcdc-dc.c | 1094 +++++++++++++++++++++++++++++++++
+>   4 files changed, 1115 insertions(+)
+>   create mode 100644 drivers/gpu/drm/atmel/atmel_lcdc-dc.c
 >
-> diff --git a/lib/zinc/Makefile b/lib/zinc/Makefile
-> index b6b0614f8743..13e403780ce0 100644
-> --- a/lib/zinc/Makefile
-> +++ b/lib/zinc/Makefile
-> @@ -52,6 +52,10 @@ endif
->
->  ifeq ($(CONFIG_ZINC_CURVE25519),y)
->  zinc-y += curve25519/curve25519.o
-> +ifeq ($(CONFIG_ARM)$(CONFIG_KERNEL_MODE_NEON),yy)
-> +zinc-y += curve25519/curve25519-arm.o
-> +CFLAGS_curve25519.o += -include $(srctree)/$(src)/curve25519/curve25519-arm-glue.h
 
-If you put the code below in arch/arm/lib/curve25519.c, you don't need
-this clunkiness.
+<snip>
 
-> +endif
->  endif
->
->  ifeq ($(CONFIG_ZINC_BLAKE2S),y)
-> diff --git a/lib/zinc/curve25519/curve25519-arm-glue.h b/lib/zinc/curve25519/curve25519-arm-glue.h
+> diff --git a/drivers/gpu/drm/atmel/atmel_lcdc-dc.c b/drivers/gpu/drm/atmel/atmel_lcdc-dc.c
 > new file mode 100644
-> index 000000000000..1d5c029e9195
+> index 000000000000..275a09e2e100
 > --- /dev/null
-> +++ b/lib/zinc/curve25519/curve25519-arm-glue.h
-> @@ -0,0 +1,33 @@
-> +/* SPDX-License-Identifier: GPL-2.0
+> +++ b/drivers/gpu/drm/atmel/atmel_lcdc-dc.c
+> @@ -0,0 +1,1094 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (C) 2018 Sam Ravnborg
 > + *
-> + * Copyright (C) 2015-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+> + * The driver is based on atmel_lcdfb which is:
+> + * Copyright (C) 2007 Atmel Corporation
+> + *
+> + * Atmel LCD Controller Display Controller.
+> + * A sub-device of the Atmel LCDC IP.
+> + *
+> + * The Atmel LCD Controller supports in the following configuration:
+> + * - TFT only, with BGR565, 8 bits/pixel
+> + * - Resolution up to 2048x2048
+> + * - Single plane, crtc, one fixed output
+> + *
+> + * Features not (yet) ported from atmel_lcdfb:
+> + * - Support for extra modes (and configurable intensify bit)
+> + * - Check modesetting support - lcdc_dc_display_check()
+> + * - set color / palette handling
+> + * - support for STN displays (partly implemented)
+> + * - AVR32 support (relevant?)
 > + */
 > +
-> +#include <zinc/curve25519.h>
-> +#include <asm/hwcap.h>
-> +#include <asm/neon.h>
-> +#include <asm/simd.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/mfd/atmel-lcdc.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/irqreturn.h>
+> +#include <linux/device.h>
+> +#include <linux/regmap.h>
 > +
-> +asmlinkage void curve25519_neon(u8 mypublic[CURVE25519_POINT_SIZE], const u8 secret[CURVE25519_POINT_SIZE], const u8 basepoint[CURVE25519_POINT_SIZE]);
+> +#include <video/videomode.h>
 > +
-
-Please follow the coding style of the kernel.
-
-> +static bool curve25519_use_neon __ro_after_init;
+> +#include <drm/drm_gem_framebuffer_helper.h>
+> +#include <drm/drm_simple_kms_helper.h>
+> +#include <drm/drm_gem_cma_helper.h>
+> +#include <drm/drm_atomic_helper.h>
+> +#include <drm/drm_fb_cma_helper.h>
+> +#include <drm/drm_crtc_helper.h>
+> +#include <drm/drm_fb_helper.h>
+> +#include <drm/drm_fourcc.h>
+> +#include <drm/drm_vblank.h>
+> +#include <drm/drm_modes.h>
+> +#include <drm/drm_panel.h>
+> +#include <drm/drm_print.h>
+> +#include <drm/drm_drv.h>
+> +#include <drm/drm_of.h>
 > +
-> +void __init curve25519_fpu_init(void)
-> +{
-> +       curve25519_use_neon = elf_hwcap & HWCAP_NEON;
-> +}
+> +/* Parameters */
+> +#define ATMEL_LCDC_DMA_BURST_LEN	8	/* words */
 > +
-> +static inline bool curve25519_arch(u8 mypublic[CURVE25519_POINT_SIZE], const u8 secret[CURVE25519_POINT_SIZE], const u8 basepoint[CURVE25519_POINT_SIZE])
-> +{
-> +       if (curve25519_use_neon && may_use_simd()) {
-> +               kernel_neon_begin();
-> +               curve25519_neon(mypublic, secret, basepoint);
-> +               kernel_neon_end();
-> +               return true;
-> +       }
-> +       return false;
-> +}
-> +
-> +static inline bool curve25519_base_arch(u8 pub[CURVE25519_POINT_SIZE], const u8 secret[CURVE25519_POINT_SIZE]) { return false; }
-> +
-> +#define HAVE_CURVE25519_ARCH_IMPLEMENTATION
-> diff --git a/lib/zinc/curve25519/curve25519-arm.S b/lib/zinc/curve25519/curve25519-arm.S
-> new file mode 100644
-> index 000000000000..2c02e66cc87c
-> --- /dev/null
-> +++ b/lib/zinc/curve25519/curve25519-arm.S
-> @@ -0,0 +1,2110 @@
-> +/* SPDX-License-Identifier: GPL-2.0
-> + *
-> + * Copyright (C) 2015-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
-> + *
-> + * Based on public domain code from Daniel J. Bernstein and Peter Schwabe.
+> +/**
+> + * struct atmel_lcdc_dc_desc - CPU specific configuration properties
 > + */
+> +struct atmel_lcdc_dc_desc {
+> +	int guard_time;
+> +	int fifo_size;
+> +	int min_width;
+> +	int min_height;
+> +	int max_width;
+> +	int max_height;
+> +	bool have_hozval;
+> +	bool have_alt_pixclock;
+> +};
 > +
-> +#if IS_ENABLED(CONFIG_KERNEL_MODE_NEON)
+> +/* private data */
+> +struct lcdc_dc {
+> +	const struct atmel_lcdc_dc_desc *desc;
+> +	struct atmel_mfd_lcdc *mfd_lcdc;
+> +	struct regulator *lcd_supply;
+> +	struct drm_fbdev_cma *fbdev;
+
+There's generic fbdev emulaton now, so you can drop this.
+More info further down.
+
+> +	struct drm_bridge *bridge;
+> +	struct drm_panel *panel;
+> +	struct regmap *regmap;
+> +	struct device *dev;
 > +
-
-This #if is redundant - you only build the file if it is true.
-
-> +#include <linux/linkage.h>
+> +	struct drm_simple_display_pipe pipe;
+> +	struct work_struct reset_lcdc_work;
+> +	struct drm_connector connector;
+> +};
 > +
-> +       .text
-> +       .fpu            neon
-> +       .align          4
+> +/* Configuration of individual CPU's */
+> +static const struct atmel_lcdc_dc_desc atmel_lcdc_dc_at91sam9261 = {
+> +	.guard_time = 1,
+> +	.fifo_size = 512,
+> +	.min_width = 0,
+> +	.min_height = 0,
+
+Looks like the minimum is always zero, maybe drop it?
+
+> +	.max_width = 2048,
+> +	.max_height = 2048,
+> +	.have_hozval = true,
+> +	.have_alt_pixclock = false,
+> +};
 > +
-> +ENTRY(curve25519_neon)
+> +static const struct atmel_lcdc_dc_desc atmel_lcdc_dc_at91sam9263 = {
+> +	.guard_time = 1,
+> +	.fifo_size = 2048,
+> +	.min_width = 0,
+> +	.min_height = 0,
+> +	.max_width = 2048,
+> +	.max_height = 2048,
+> +	.have_hozval = false,
+> +	.have_alt_pixclock = false,
+> +};
+> +
+> +static const struct atmel_lcdc_dc_desc atmel_lcdc_dc_at91sam9g10 = {
+> +	.guard_time = 1,
+> +	.fifo_size = 512,
+> +	.min_width = 0,
+> +	.min_height = 0,
+> +	.max_width = 2048,
+> +	.max_height = 2048,
+> +	.have_hozval = true,
+> +	.have_alt_pixclock = false,
+> +};
+> +
+> +static const struct atmel_lcdc_dc_desc atmel_lcdc_dc_at91sam9g45 = {
+> +	.guard_time = 1,
+> +	.fifo_size = 512,
+> +	.min_width = 0,
+> +	.min_height = 0,
+> +	.max_width = 2048,
+> +	.max_height = 2048,
+> +	.have_hozval = false,
+> +	.have_alt_pixclock = true,
+> +};
+> +
+> +static const struct atmel_lcdc_dc_desc atmel_lcdc_dc_at91sam9g46 = {
+> +	.guard_time = 1,
+> +	.fifo_size = 512,
+> +	.min_width = 0,
+> +	.min_height = 0,
+> +	.max_width = 2048,
+> +	.max_height = 2048,
+> +	.have_hozval = false,
+> +	.have_alt_pixclock = false,
+> +};
+> +
+> +static const struct atmel_lcdc_dc_desc atmel_lcdc_dc_at91sam9m10 = {
+> +	.guard_time = 1,
+> +	.fifo_size = 512,
+> +	.min_width = 0,
+> +	.min_height = 0,
+> +	.max_width = 2048,
+> +	.max_height = 2048,
+> +	.have_hozval = false,
+> +	.have_alt_pixclock = false,
+> +};
+> +
+> +static const struct atmel_lcdc_dc_desc atmel_lcdc_dc_at91sam9m11 = {
+> +	.guard_time = 1,
+> +	.fifo_size = 512,
+> +	.min_width = 0,
+> +	.min_height = 0,
+> +	.max_width = 2048,
+> +	.max_height = 2048,
+> +	.have_hozval = false,
+> +	.have_alt_pixclock = false,
+> +};
+> +
+> +static const struct atmel_lcdc_dc_desc atmel_lcdc_dc_at91sam9rl = {
+> +	.guard_time = 1,
+> +	.fifo_size = 512,
+> +	.min_width = 0,
+> +	.min_height = 0,
+> +	.max_width = 2048,
+> +	.max_height = 2048,
+> +	.have_hozval = false,
+> +	.have_alt_pixclock = false,
+> +};
 
-Could you please indent the asm with two tabs for legibility?
+<snip>
 
-> +       vpush {q4,q5,q6,q7}
+> +DEFINE_DRM_GEM_CMA_FOPS(lcdc_dc_drm_fops);
+> +
+> +static struct drm_driver lcdc_dc_drm_driver = {
+> +	.driver_features = DRIVER_HAVE_IRQ |
+> +			   DRIVER_GEM |
+> +			   DRIVER_MODESET |
+> +			   DRIVER_PRIME |
+> +			   DRIVER_ATOMIC,
+> +	.name = "atmel-lcdc",
+> +	.desc = "Atmel LCD Display Controller DRM",
+> +	.date = "20180808",
+> +	.major = 1,
+> +	.minor = 0,
+> +	.patchlevel = 0,
+> +
+> +	.lastclose = drm_fb_helper_lastclose,
 
-You can drop this
+You can drop this, lastclose is handled by the generic fbdev emulation.
 
-> +       mov r12,sp
-> +       sub r3,sp,#736
-> +       and r3,r3,#0xffffffe0
+> +	.fops = &lcdc_dc_drm_fops,
+> +
+> +	.irq_handler = lcdc_dc_irq_handler,
+> +	.irq_preinstall = lcdc_dc_irq_uninstall,
+> +	.irq_postinstall = lcdc_dc_irq_postinstall,
+> +	.irq_uninstall = lcdc_dc_irq_uninstall,
+> +
+> +	.dumb_create = drm_gem_cma_dumb_create,
+> +
+> +	.gem_print_info = drm_gem_cma_print_info,
+> +	.gem_vm_ops = &drm_gem_cma_vm_ops,
+> +
+> +	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
+> +	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
+> +
+> +	.gem_prime_import = drm_gem_prime_import,
+> +	.gem_prime_export = drm_gem_prime_export,
+> +
+> +	.gem_prime_get_sg_table	= drm_gem_cma_prime_get_sg_table,
+> +	.gem_free_object_unlocked = drm_gem_cma_free_object,
+> +
+> +	.gem_prime_import_sg_table = drm_gem_cma_prime_import_sg_table,
+> +	.gem_prime_vmap = drm_gem_cma_prime_vmap,
+> +	.gem_prime_vunmap = drm_gem_cma_prime_vunmap,
+> +	.gem_prime_mmap = drm_gem_cma_prime_mmap,
+> +};
+> +
+> +static int lcdc_dc_modeset_init(struct lcdc_dc *lcdc_dc, struct drm_device *drm)
+> +{
+> +	struct drm_bridge *bridge;
+> +	struct drm_panel *panel;
+> +	struct device_node *np;
+> +	struct device *dev;
+> +	int ret;
+> +
+> +	dev = drm->dev;
+> +
+> +	drm_mode_config_init(drm);
+> +	drm->mode_config.min_width  = lcdc_dc->desc->min_width;
+> +	drm->mode_config.min_height = lcdc_dc->desc->min_height;
+> +	drm->mode_config.max_width  = lcdc_dc->desc->max_width;
+> +	drm->mode_config.max_height = lcdc_dc->desc->max_height;
+> +	drm->mode_config.funcs	    = &mode_config_funcs;
+> +
+> +	np = dev->of_node;
+> +	/* port at 0 is the output port */
+> +	ret = drm_of_find_panel_or_bridge(np, 0, 0, &panel, &bridge);
+> +	if (ret && ret != -ENODEV) {
+> +		DRM_DEV_ERROR(dev, "Failed to find panel (%d)\n", ret);
+> +		goto err_out;
+> +	}
+> +
+> +	bridge = drm_panel_bridge_add(panel, DRM_MODE_CONNECTOR_Unknown);
+> +	if (IS_ERR(bridge)) {
+> +		ret = PTR_ERR(bridge);
+> +		DRM_DEV_ERROR(dev, "Failed to add bridge (%d)", ret);
+> +		goto err_panel_remove;
+> +	}
+> +
+> +	lcdc_dc->panel = panel;
+> +	lcdc_dc->bridge = bridge;
+> +
+> +	ret = drm_simple_display_pipe_init(drm,
+> +					   &lcdc_dc->pipe,
+> +					   &lcdc_dc_display_funcs,
+> +					   lcdc_dc_formats,
+> +					   ARRAY_SIZE(lcdc_dc_formats),
+> +					   NULL,
+> +					   &lcdc_dc->connector);
+> +	if (ret) {
+> +		DRM_DEV_ERROR(dev, "Failed to init display pipe (%d)\n", ret);
+> +		goto err_panel_remove;
+> +	}
+> +
+> +	ret = drm_simple_display_pipe_attach_bridge(&lcdc_dc->pipe, bridge);
+> +	if (ret) {
+> +		DRM_DEV_ERROR(dev, "failed to attach bridge (%d)", ret);
+> +		goto err_panel_remove;
+> +	}
+> +
+> +	drm_mode_config_reset(drm);
+> +
+> +	return 0;
+> +
+> +err_panel_remove:
+> +	if (panel)
+> +		drm_panel_bridge_remove(bridge);
+> +
+> +err_out:
+> +	return ret;
+> +}
+> +
+> +static int lcdc_dc_load(struct drm_device *drm)
+> +{
+> +	const struct of_device_id *match;
+> +	struct platform_device *pdev;
+> +	struct lcdc_dc *lcdc_dc;
+> +	struct device *dev;
+> +	int ret;
+> +
+> +	dev = drm->dev;
+> +	pdev = to_platform_device(dev);
+> +
+> +	match = of_match_node(atmel_lcdc_of_match, dev->parent->of_node);
+> +	if (!match) {
+> +		DRM_DEV_ERROR(dev, "invalid compatible string (node=%s)",
+> +			      dev->parent->of_node->name);
+> +		return -ENODEV;
+> +	}
+> +
+> +	if (!match->data) {
+> +		DRM_DEV_ERROR(dev, "invalid lcdc_dc description\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	lcdc_dc = devm_kzalloc(dev, sizeof(*lcdc_dc), GFP_KERNEL);
+> +	if (!lcdc_dc) {
+> +		DRM_DEV_ERROR(dev, "Failed to allocate lcdc_dc\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	/* reset of lcdc might sleep and require a preemptible task context */
+> +	INIT_WORK(&lcdc_dc->reset_lcdc_work, reset_lcdc_work);
+> +
+> +	platform_set_drvdata(pdev, drm);
+> +	dev_set_drvdata(dev, lcdc_dc);
+> +
+> +	lcdc_dc->mfd_lcdc = dev_get_drvdata(dev->parent);
+> +	drm->dev_private = lcdc_dc;
+> +
+> +	lcdc_dc->regmap = lcdc_dc->mfd_lcdc->regmap;
+> +	lcdc_dc->desc = match->data;
+> +	lcdc_dc->dev = dev;
+> +
+> +	lcdc_dc->lcd_supply = devm_regulator_get(dev, "lcd");
+> +	if (IS_ERR(lcdc_dc->lcd_supply)) {
+> +		DRM_DEV_ERROR(dev, "Failed to get lcd-supply (%ld)\n",
+> +			      PTR_ERR(lcdc_dc->lcd_supply));
+> +		lcdc_dc->lcd_supply = NULL;
+> +	}
+> +
+> +	lcdc_dc_start_clock(lcdc_dc);
+> +
+> +	pm_runtime_enable(dev);
+> +
+> +	ret = drm_vblank_init(drm, 1);
+> +	if (ret) {
+> +		DRM_DEV_ERROR(dev, "failed to initialize vblank (%d)\n",
+> +			      ret);
+> +		goto err_pm_runtime_disable;
+> +	}
+> +
+> +	ret = lcdc_dc_modeset_init(lcdc_dc, drm);
+> +	if (ret) {
+> +		DRM_DEV_ERROR(dev, "modeset_init failed (%d)", ret);
+> +		goto err_pm_runtime_disable;
+> +	}
+> +
+> +	pm_runtime_get_sync(dev);
+> +	ret = drm_irq_install(drm, lcdc_dc->mfd_lcdc->irq);
+> +	pm_runtime_put_sync(dev);
+> +	if (ret < 0) {
+> +		DRM_DEV_ERROR(dev, "Failed to install IRQ (%d)\n", ret);
+> +
+> +		goto err_pm_runtime_disable;
+> +	}
+> +
+> +	/*
+> +	 * Passing in 16 here will make the RGB656 mode the default
+> +	 * Passing in 32 will use XRGB8888 mode
+> +	 */
+> +	drm_fb_cma_fbdev_init(drm, 16, 0);
 
-I don't think you need 32 byte alignment, 16 bytes should be sufficient
+You are using both drm_fb_cma_fbdev_init() and drm_fbdev_cma_init() which
+does the same. I'm to blame for the confusion, the generic fbdev emulation
+idea came up during refactoring, so there's an old way and a new way, which
+is now obsolete (both will be removed when drivers have been converted to
+drm_fbdev_generic_setup()).
 
-> +       mov sp,r3
-> +       strd r4,[sp,#0]
-> +       strd r6,[sp,#8]
-> +       strd r8,[sp,#16]
-> +       strd r10,[sp,#24]
-> +       str r12,[sp,#480]
-> +       str r14,[sp,#484]
+You can use drm_fbdev_generic_setup(drm, 16) instead, and that's all you
+need to get fbdev emulation.
 
-This is a very odd way to create a stack frame.
+I see that many drivers register fbdev before they register the DRM device.
+Personally I find this strange to make the emulated device available
+before the real one. I suggest you call drm_fbdev_generic_setup() after
+drm_dev_register() and if it fails, just put a note in the log and let the
+driver succeed in probing.
 
-> +       mov r0,r0
-> +       mov r1,r1
-> +       mov r2,r2
+> +
+> +	drm_kms_helper_poll_init(drm);
+> +
+> +	lcdc_dc->fbdev = drm_fbdev_cma_init(drm, 8, 1);
+> +	if (IS_ERR(lcdc_dc->fbdev)) {
+> +		ret = PTR_ERR(lcdc_dc->fbdev);
+> +		DRM_DEV_ERROR(dev, "Failed to init FB CMA area (%d)", ret);
+> +		goto err_irq_uninstall;
+> +	}
+> +
+> +	drm_helper_hpd_irq_event(drm);
+> +
+> +	return 0;
+> +
+> +err_irq_uninstall:
+> +	pm_runtime_get_sync(dev);
+> +	drm_irq_uninstall(drm);
+> +	pm_runtime_put_sync(dev);
+> +
+> +err_pm_runtime_disable:
+> +	pm_runtime_disable(dev);
+> +	lcdc_dc_stop_clock(lcdc_dc);
+> +
+> +	cancel_work_sync(&lcdc_dc->reset_lcdc_work);
+> +
+> +	return ret;
+> +}
+> +
+> +static void lcdc_dc_unload(struct drm_device *dev)
+> +{
+> +	struct lcdc_dc *lcdc_dc = dev->dev_private;
+> +
+> +	drm_fb_cma_fbdev_fini(dev);
 
-Drop these
+You can remove this. fbdev is automatically unregistered by
+drm_dev_unregister().
 
-> +       add r3,sp,#32
-> +       ldr r4,=0
-> +       ldr r5,=254
+Noralf.
 
-NEON implies v7, so you can use movw for any 16-bit immediate. No need for ldr.
-
-> +       vmov.i32 q0,#1
-> +       vshr.u64 q1,q0,#7
-> +       vshr.u64 q0,q0,#8
-> +       vmov.i32 d4,#19
-> +       vmov.i32 d5,#38
-> +       add r6,sp,#512
-> +       vst1.8 {d2-d3},[r6,: 128]
-> +       add r6,sp,#528
-> +       vst1.8 {d0-d1},[r6,: 128]
-> +       add r6,sp,#544
-> +       vst1.8 {d4-d5},[r6,: 128]
-> +       add r6,r3,#0
-> +       vmov.i32 q2,#0
-> +       vst1.8 {d4-d5},[r6,: 128]!
-> +       vst1.8 {d4-d5},[r6,: 128]!
-> +       vst1.8 d4,[r6,: 64]
-> +       add r6,r3,#0
-
-> +       ldr r7,=960
-> +       sub r7,r7,#2
-> +       neg r7,r7
-> +       sub r7,r7,r7,LSL #7
-
-
-What is this little dance for?
-
-> +       str r7,[r6]
-> +       add r6,sp,#704
-> +       vld1.8 {d4-d5},[r1]!
-> +       vld1.8 {d6-d7},[r1]
-> +       vst1.8 {d4-d5},[r6,: 128]!
-> +       vst1.8 {d6-d7},[r6,: 128]
-> +       sub r1,r6,#16
-> +       ldrb r6,[r1]
-> +       and r6,r6,#248
-> +       strb r6,[r1]
-> +       ldrb r6,[r1,#31]
-> +       and r6,r6,#127
-> +       orr r6,r6,#64
-> +       strb r6,[r1,#31]
-> +       vmov.i64 q2,#0xffffffff
-> +       vshr.u64 q3,q2,#7
-> +       vshr.u64 q2,q2,#6
-> +       vld1.8 {d8},[r2]
-> +       vld1.8 {d10},[r2]
-> +       add r2,r2,#6
-> +       vld1.8 {d12},[r2]
-> +       vld1.8 {d14},[r2]
-> +       add r2,r2,#6
-> +       vld1.8 {d16},[r2]
-> +       add r2,r2,#4
-> +       vld1.8 {d18},[r2]
-> +       vld1.8 {d20},[r2]
-> +       add r2,r2,#6
-> +       vld1.8 {d22},[r2]
-> +       add r2,r2,#2
-> +       vld1.8 {d24},[r2]
-> +       vld1.8 {d26},[r2]
-> +       vshr.u64 q5,q5,#26
-> +       vshr.u64 q6,q6,#3
-> +       vshr.u64 q7,q7,#29
-> +       vshr.u64 q8,q8,#6
-> +       vshr.u64 q10,q10,#25
-> +       vshr.u64 q11,q11,#3
-> +       vshr.u64 q12,q12,#12
-> +       vshr.u64 q13,q13,#38
-> +       vand q4,q4,q2
-> +       vand q6,q6,q2
-> +       vand q8,q8,q2
-> +       vand q10,q10,q2
-> +       vand q2,q12,q2
-> +       vand q5,q5,q3
-> +       vand q7,q7,q3
-> +       vand q9,q9,q3
-> +       vand q11,q11,q3
-> +       vand q3,q13,q3
-> +       add r2,r3,#48
-> +       vadd.i64 q12,q4,q1
-> +       vadd.i64 q13,q10,q1
-> +       vshr.s64 q12,q12,#26
-> +       vshr.s64 q13,q13,#26
-> +       vadd.i64 q5,q5,q12
-> +       vshl.i64 q12,q12,#26
-> +       vadd.i64 q14,q5,q0
-> +       vadd.i64 q11,q11,q13
-> +       vshl.i64 q13,q13,#26
-> +       vadd.i64 q15,q11,q0
-> +       vsub.i64 q4,q4,q12
-> +       vshr.s64 q12,q14,#25
-> +       vsub.i64 q10,q10,q13
-> +       vshr.s64 q13,q15,#25
-> +       vadd.i64 q6,q6,q12
-> +       vshl.i64 q12,q12,#25
-> +       vadd.i64 q14,q6,q1
-> +       vadd.i64 q2,q2,q13
-> +       vsub.i64 q5,q5,q12
-> +       vshr.s64 q12,q14,#26
-> +       vshl.i64 q13,q13,#25
-> +       vadd.i64 q14,q2,q1
-> +       vadd.i64 q7,q7,q12
-> +       vshl.i64 q12,q12,#26
-> +       vadd.i64 q15,q7,q0
-> +       vsub.i64 q11,q11,q13
-> +       vshr.s64 q13,q14,#26
-> +       vsub.i64 q6,q6,q12
-> +       vshr.s64 q12,q15,#25
-> +       vadd.i64 q3,q3,q13
-> +       vshl.i64 q13,q13,#26
-> +       vadd.i64 q14,q3,q0
-> +       vadd.i64 q8,q8,q12
-> +       vshl.i64 q12,q12,#25
-> +       vadd.i64 q15,q8,q1
-> +       add r2,r2,#8
-> +       vsub.i64 q2,q2,q13
-> +       vshr.s64 q13,q14,#25
-> +       vsub.i64 q7,q7,q12
-> +       vshr.s64 q12,q15,#26
-> +       vadd.i64 q14,q13,q13
-> +       vadd.i64 q9,q9,q12
-> +       vtrn.32 d12,d14
-> +       vshl.i64 q12,q12,#26
-> +       vtrn.32 d13,d15
-> +       vadd.i64 q0,q9,q0
-> +       vadd.i64 q4,q4,q14
-> +       vst1.8 d12,[r2,: 64]!
-> +       vshl.i64 q6,q13,#4
-> +       vsub.i64 q7,q8,q12
-> +       vshr.s64 q0,q0,#25
-> +       vadd.i64 q4,q4,q6
-> +       vadd.i64 q6,q10,q0
-> +       vshl.i64 q0,q0,#25
-> +       vadd.i64 q8,q6,q1
-> +       vadd.i64 q4,q4,q13
-> +       vshl.i64 q10,q13,#25
-> +       vadd.i64 q1,q4,q1
-> +       vsub.i64 q0,q9,q0
-> +       vshr.s64 q8,q8,#26
-> +       vsub.i64 q3,q3,q10
-> +       vtrn.32 d14,d0
-> +       vshr.s64 q1,q1,#26
-> +       vtrn.32 d15,d1
-> +       vadd.i64 q0,q11,q8
-> +       vst1.8 d14,[r2,: 64]
-> +       vshl.i64 q7,q8,#26
-> +       vadd.i64 q5,q5,q1
-> +       vtrn.32 d4,d6
-> +       vshl.i64 q1,q1,#26
-> +       vtrn.32 d5,d7
-> +       vsub.i64 q3,q6,q7
-> +       add r2,r2,#16
-> +       vsub.i64 q1,q4,q1
-> +       vst1.8 d4,[r2,: 64]
-> +       vtrn.32 d6,d0
-> +       vtrn.32 d7,d1
-> +       sub r2,r2,#8
-> +       vtrn.32 d2,d10
-> +       vtrn.32 d3,d11
-> +       vst1.8 d6,[r2,: 64]
-> +       sub r2,r2,#24
-> +       vst1.8 d2,[r2,: 64]
-> +       add r2,r3,#96
-> +       vmov.i32 q0,#0
-> +       vmov.i64 d2,#0xff
-> +       vmov.i64 d3,#0
-> +       vshr.u32 q1,q1,#7
-> +       vst1.8 {d2-d3},[r2,: 128]!
-> +       vst1.8 {d0-d1},[r2,: 128]!
-> +       vst1.8 d0,[r2,: 64]
-> +       add r2,r3,#144
-> +       vmov.i32 q0,#0
-> +       vst1.8 {d0-d1},[r2,: 128]!
-> +       vst1.8 {d0-d1},[r2,: 128]!
-> +       vst1.8 d0,[r2,: 64]
-> +       add r2,r3,#240
-> +       vmov.i32 q0,#0
-> +       vmov.i64 d2,#0xff
-> +       vmov.i64 d3,#0
-> +       vshr.u32 q1,q1,#7
-> +       vst1.8 {d2-d3},[r2,: 128]!
-> +       vst1.8 {d0-d1},[r2,: 128]!
-> +       vst1.8 d0,[r2,: 64]
-> +       add r2,r3,#48
-> +       add r6,r3,#192
-> +       vld1.8 {d0-d1},[r2,: 128]!
-> +       vld1.8 {d2-d3},[r2,: 128]!
-> +       vld1.8 {d4},[r2,: 64]
-> +       vst1.8 {d0-d1},[r6,: 128]!
-> +       vst1.8 {d2-d3},[r6,: 128]!
-> +       vst1.8 d4,[r6,: 64]
-> +       .Lmainloop:
-
-Please put labels in the first column.
-
-> +       mov r2,r5,LSR #3
-> +       and r6,r5,#7
-> +       ldrb r2,[r1,r2]
-> +       mov r2,r2,LSR r6
-> +       and r2,r2,#1
-> +       str r5,[sp,#488]
-> +       eor r4,r4,r2
-> +       str r2,[sp,#492]
-> +       neg r2,r4
-> +       add r4,r3,#96
-> +       add r5,r3,#192
-> +       add r6,r3,#144
-> +       vld1.8 {d8-d9},[r4,: 128]!
-> +       add r7,r3,#240
-> +       vld1.8 {d10-d11},[r5,: 128]!
-> +       veor q6,q4,q5
-> +       vld1.8 {d14-d15},[r6,: 128]!
-> +       vdup.i32 q8,r2
-> +       vld1.8 {d18-d19},[r7,: 128]!
-> +       veor q10,q7,q9
-> +       vld1.8 {d22-d23},[r4,: 128]!
-> +       vand q6,q6,q8
-> +       vld1.8 {d24-d25},[r5,: 128]!
-> +       vand q10,q10,q8
-> +       vld1.8 {d26-d27},[r6,: 128]!
-> +       veor q4,q4,q6
-> +       vld1.8 {d28-d29},[r7,: 128]!
-> +       veor q5,q5,q6
-> +       vld1.8 {d0},[r4,: 64]
-> +       veor q6,q7,q10
-> +       vld1.8 {d2},[r5,: 64]
-> +       veor q7,q9,q10
-> +       vld1.8 {d4},[r6,: 64]
-> +       veor q9,q11,q12
-> +       vld1.8 {d6},[r7,: 64]
-> +       veor q10,q0,q1
-> +       sub r2,r4,#32
-> +       vand q9,q9,q8
-> +       sub r4,r5,#32
-> +       vand q10,q10,q8
-> +       sub r5,r6,#32
-> +       veor q11,q11,q9
-> +       sub r6,r7,#32
-> +       veor q0,q0,q10
-> +       veor q9,q12,q9
-> +       veor q1,q1,q10
-> +       veor q10,q13,q14
-> +       veor q12,q2,q3
-> +       vand q10,q10,q8
-> +       vand q8,q12,q8
-> +       veor q12,q13,q10
-> +       veor q2,q2,q8
-> +       veor q10,q14,q10
-> +       veor q3,q3,q8
-> +       vadd.i32 q8,q4,q6
-> +       vsub.i32 q4,q4,q6
-> +       vst1.8 {d16-d17},[r2,: 128]!
-> +       vadd.i32 q6,q11,q12
-> +       vst1.8 {d8-d9},[r5,: 128]!
-> +       vsub.i32 q4,q11,q12
-> +       vst1.8 {d12-d13},[r2,: 128]!
-> +       vadd.i32 q6,q0,q2
-> +       vst1.8 {d8-d9},[r5,: 128]!
-> +       vsub.i32 q0,q0,q2
-> +       vst1.8 d12,[r2,: 64]
-> +       vadd.i32 q2,q5,q7
-> +       vst1.8 d0,[r5,: 64]
-> +       vsub.i32 q0,q5,q7
-> +       vst1.8 {d4-d5},[r4,: 128]!
-> +       vadd.i32 q2,q9,q10
-> +       vst1.8 {d0-d1},[r6,: 128]!
-> +       vsub.i32 q0,q9,q10
-> +       vst1.8 {d4-d5},[r4,: 128]!
-> +       vadd.i32 q2,q1,q3
-> +       vst1.8 {d0-d1},[r6,: 128]!
-> +       vsub.i32 q0,q1,q3
-> +       vst1.8 d4,[r4,: 64]
-> +       vst1.8 d0,[r6,: 64]
-> +       add r2,sp,#544
-> +       add r4,r3,#96
-> +       add r5,r3,#144
-> +       vld1.8 {d0-d1},[r2,: 128]
-> +       vld1.8 {d2-d3},[r4,: 128]!
-> +       vld1.8 {d4-d5},[r5,: 128]!
-> +       vzip.i32 q1,q2
-> +       vld1.8 {d6-d7},[r4,: 128]!
-> +       vld1.8 {d8-d9},[r5,: 128]!
-> +       vshl.i32 q5,q1,#1
-> +       vzip.i32 q3,q4
-> +       vshl.i32 q6,q2,#1
-> +       vld1.8 {d14},[r4,: 64]
-> +       vshl.i32 q8,q3,#1
-> +       vld1.8 {d15},[r5,: 64]
-> +       vshl.i32 q9,q4,#1
-> +       vmul.i32 d21,d7,d1
-> +       vtrn.32 d14,d15
-> +       vmul.i32 q11,q4,q0
-> +       vmul.i32 q0,q7,q0
-> +       vmull.s32 q12,d2,d2
-> +       vmlal.s32 q12,d11,d1
-> +       vmlal.s32 q12,d12,d0
-> +       vmlal.s32 q12,d13,d23
-> +       vmlal.s32 q12,d16,d22
-> +       vmlal.s32 q12,d7,d21
-> +       vmull.s32 q10,d2,d11
-> +       vmlal.s32 q10,d4,d1
-> +       vmlal.s32 q10,d13,d0
-> +       vmlal.s32 q10,d6,d23
-> +       vmlal.s32 q10,d17,d22
-> +       vmull.s32 q13,d10,d4
-> +       vmlal.s32 q13,d11,d3
-> +       vmlal.s32 q13,d13,d1
-> +       vmlal.s32 q13,d16,d0
-> +       vmlal.s32 q13,d17,d23
-> +       vmlal.s32 q13,d8,d22
-> +       vmull.s32 q1,d10,d5
-> +       vmlal.s32 q1,d11,d4
-> +       vmlal.s32 q1,d6,d1
-> +       vmlal.s32 q1,d17,d0
-> +       vmlal.s32 q1,d8,d23
-> +       vmull.s32 q14,d10,d6
-> +       vmlal.s32 q14,d11,d13
-> +       vmlal.s32 q14,d4,d4
-> +       vmlal.s32 q14,d17,d1
-> +       vmlal.s32 q14,d18,d0
-> +       vmlal.s32 q14,d9,d23
-> +       vmull.s32 q11,d10,d7
-> +       vmlal.s32 q11,d11,d6
-> +       vmlal.s32 q11,d12,d5
-> +       vmlal.s32 q11,d8,d1
-> +       vmlal.s32 q11,d19,d0
-> +       vmull.s32 q15,d10,d8
-> +       vmlal.s32 q15,d11,d17
-> +       vmlal.s32 q15,d12,d6
-> +       vmlal.s32 q15,d13,d5
-> +       vmlal.s32 q15,d19,d1
-> +       vmlal.s32 q15,d14,d0
-> +       vmull.s32 q2,d10,d9
-> +       vmlal.s32 q2,d11,d8
-> +       vmlal.s32 q2,d12,d7
-> +       vmlal.s32 q2,d13,d6
-> +       vmlal.s32 q2,d14,d1
-> +       vmull.s32 q0,d15,d1
-> +       vmlal.s32 q0,d10,d14
-> +       vmlal.s32 q0,d11,d19
-> +       vmlal.s32 q0,d12,d8
-> +       vmlal.s32 q0,d13,d17
-> +       vmlal.s32 q0,d6,d6
-> +       add r2,sp,#512
-> +       vld1.8 {d18-d19},[r2,: 128]
-> +       vmull.s32 q3,d16,d7
-> +       vmlal.s32 q3,d10,d15
-> +       vmlal.s32 q3,d11,d14
-> +       vmlal.s32 q3,d12,d9
-> +       vmlal.s32 q3,d13,d8
-> +       add r2,sp,#528
-> +       vld1.8 {d8-d9},[r2,: 128]
-> +       vadd.i64 q5,q12,q9
-> +       vadd.i64 q6,q15,q9
-> +       vshr.s64 q5,q5,#26
-> +       vshr.s64 q6,q6,#26
-> +       vadd.i64 q7,q10,q5
-> +       vshl.i64 q5,q5,#26
-> +       vadd.i64 q8,q7,q4
-> +       vadd.i64 q2,q2,q6
-> +       vshl.i64 q6,q6,#26
-> +       vadd.i64 q10,q2,q4
-> +       vsub.i64 q5,q12,q5
-> +       vshr.s64 q8,q8,#25
-> +       vsub.i64 q6,q15,q6
-> +       vshr.s64 q10,q10,#25
-> +       vadd.i64 q12,q13,q8
-> +       vshl.i64 q8,q8,#25
-> +       vadd.i64 q13,q12,q9
-> +       vadd.i64 q0,q0,q10
-> +       vsub.i64 q7,q7,q8
-> +       vshr.s64 q8,q13,#26
-> +       vshl.i64 q10,q10,#25
-> +       vadd.i64 q13,q0,q9
-> +       vadd.i64 q1,q1,q8
-> +       vshl.i64 q8,q8,#26
-> +       vadd.i64 q15,q1,q4
-> +       vsub.i64 q2,q2,q10
-> +       vshr.s64 q10,q13,#26
-> +       vsub.i64 q8,q12,q8
-> +       vshr.s64 q12,q15,#25
-> +       vadd.i64 q3,q3,q10
-> +       vshl.i64 q10,q10,#26
-> +       vadd.i64 q13,q3,q4
-> +       vadd.i64 q14,q14,q12
-> +       add r2,r3,#288
-> +       vshl.i64 q12,q12,#25
-> +       add r4,r3,#336
-> +       vadd.i64 q15,q14,q9
-> +       add r2,r2,#8
-> +       vsub.i64 q0,q0,q10
-> +       add r4,r4,#8
-> +       vshr.s64 q10,q13,#25
-> +       vsub.i64 q1,q1,q12
-> +       vshr.s64 q12,q15,#26
-> +       vadd.i64 q13,q10,q10
-> +       vadd.i64 q11,q11,q12
-> +       vtrn.32 d16,d2
-> +       vshl.i64 q12,q12,#26
-> +       vtrn.32 d17,d3
-> +       vadd.i64 q1,q11,q4
-> +       vadd.i64 q4,q5,q13
-> +       vst1.8 d16,[r2,: 64]!
-> +       vshl.i64 q5,q10,#4
-> +       vst1.8 d17,[r4,: 64]!
-> +       vsub.i64 q8,q14,q12
-> +       vshr.s64 q1,q1,#25
-> +       vadd.i64 q4,q4,q5
-> +       vadd.i64 q5,q6,q1
-> +       vshl.i64 q1,q1,#25
-> +       vadd.i64 q6,q5,q9
-> +       vadd.i64 q4,q4,q10
-> +       vshl.i64 q10,q10,#25
-> +       vadd.i64 q9,q4,q9
-> +       vsub.i64 q1,q11,q1
-> +       vshr.s64 q6,q6,#26
-> +       vsub.i64 q3,q3,q10
-> +       vtrn.32 d16,d2
-> +       vshr.s64 q9,q9,#26
-> +       vtrn.32 d17,d3
-> +       vadd.i64 q1,q2,q6
-> +       vst1.8 d16,[r2,: 64]
-> +       vshl.i64 q2,q6,#26
-> +       vst1.8 d17,[r4,: 64]
-> +       vadd.i64 q6,q7,q9
-> +       vtrn.32 d0,d6
-> +       vshl.i64 q7,q9,#26
-> +       vtrn.32 d1,d7
-> +       vsub.i64 q2,q5,q2
-> +       add r2,r2,#16
-> +       vsub.i64 q3,q4,q7
-> +       vst1.8 d0,[r2,: 64]
-> +       add r4,r4,#16
-> +       vst1.8 d1,[r4,: 64]
-> +       vtrn.32 d4,d2
-> +       vtrn.32 d5,d3
-> +       sub r2,r2,#8
-> +       sub r4,r4,#8
-> +       vtrn.32 d6,d12
-> +       vtrn.32 d7,d13
-> +       vst1.8 d4,[r2,: 64]
-> +       vst1.8 d5,[r4,: 64]
-> +       sub r2,r2,#24
-> +       sub r4,r4,#24
-> +       vst1.8 d6,[r2,: 64]
-> +       vst1.8 d7,[r4,: 64]
-> +       add r2,r3,#240
-> +       add r4,r3,#96
-> +       vld1.8 {d0-d1},[r4,: 128]!
-> +       vld1.8 {d2-d3},[r4,: 128]!
-> +       vld1.8 {d4},[r4,: 64]
-> +       add r4,r3,#144
-> +       vld1.8 {d6-d7},[r4,: 128]!
-> +       vtrn.32 q0,q3
-> +       vld1.8 {d8-d9},[r4,: 128]!
-> +       vshl.i32 q5,q0,#4
-> +       vtrn.32 q1,q4
-> +       vshl.i32 q6,q3,#4
-> +       vadd.i32 q5,q5,q0
-> +       vadd.i32 q6,q6,q3
-> +       vshl.i32 q7,q1,#4
-> +       vld1.8 {d5},[r4,: 64]
-> +       vshl.i32 q8,q4,#4
-> +       vtrn.32 d4,d5
-> +       vadd.i32 q7,q7,q1
-> +       vadd.i32 q8,q8,q4
-> +       vld1.8 {d18-d19},[r2,: 128]!
-> +       vshl.i32 q10,q2,#4
-> +       vld1.8 {d22-d23},[r2,: 128]!
-> +       vadd.i32 q10,q10,q2
-> +       vld1.8 {d24},[r2,: 64]
-> +       vadd.i32 q5,q5,q0
-> +       add r2,r3,#192
-> +       vld1.8 {d26-d27},[r2,: 128]!
-> +       vadd.i32 q6,q6,q3
-> +       vld1.8 {d28-d29},[r2,: 128]!
-> +       vadd.i32 q8,q8,q4
-> +       vld1.8 {d25},[r2,: 64]
-> +       vadd.i32 q10,q10,q2
-> +       vtrn.32 q9,q13
-> +       vadd.i32 q7,q7,q1
-> +       vadd.i32 q5,q5,q0
-> +       vtrn.32 q11,q14
-> +       vadd.i32 q6,q6,q3
-> +       add r2,sp,#560
-> +       vadd.i32 q10,q10,q2
-> +       vtrn.32 d24,d25
-> +       vst1.8 {d12-d13},[r2,: 128]
-> +       vshl.i32 q6,q13,#1
-> +       add r2,sp,#576
-> +       vst1.8 {d20-d21},[r2,: 128]
-> +       vshl.i32 q10,q14,#1
-> +       add r2,sp,#592
-> +       vst1.8 {d12-d13},[r2,: 128]
-> +       vshl.i32 q15,q12,#1
-> +       vadd.i32 q8,q8,q4
-> +       vext.32 d10,d31,d30,#0
-> +       vadd.i32 q7,q7,q1
-> +       add r2,sp,#608
-> +       vst1.8 {d16-d17},[r2,: 128]
-> +       vmull.s32 q8,d18,d5
-> +       vmlal.s32 q8,d26,d4
-> +       vmlal.s32 q8,d19,d9
-> +       vmlal.s32 q8,d27,d3
-> +       vmlal.s32 q8,d22,d8
-> +       vmlal.s32 q8,d28,d2
-> +       vmlal.s32 q8,d23,d7
-> +       vmlal.s32 q8,d29,d1
-> +       vmlal.s32 q8,d24,d6
-> +       vmlal.s32 q8,d25,d0
-> +       add r2,sp,#624
-> +       vst1.8 {d14-d15},[r2,: 128]
-> +       vmull.s32 q2,d18,d4
-> +       vmlal.s32 q2,d12,d9
-> +       vmlal.s32 q2,d13,d8
-> +       vmlal.s32 q2,d19,d3
-> +       vmlal.s32 q2,d22,d2
-> +       vmlal.s32 q2,d23,d1
-> +       vmlal.s32 q2,d24,d0
-> +       add r2,sp,#640
-> +       vst1.8 {d20-d21},[r2,: 128]
-> +       vmull.s32 q7,d18,d9
-> +       vmlal.s32 q7,d26,d3
-> +       vmlal.s32 q7,d19,d8
-> +       vmlal.s32 q7,d27,d2
-> +       vmlal.s32 q7,d22,d7
-> +       vmlal.s32 q7,d28,d1
-> +       vmlal.s32 q7,d23,d6
-> +       vmlal.s32 q7,d29,d0
-> +       add r2,sp,#656
-> +       vst1.8 {d10-d11},[r2,: 128]
-> +       vmull.s32 q5,d18,d3
-> +       vmlal.s32 q5,d19,d2
-> +       vmlal.s32 q5,d22,d1
-> +       vmlal.s32 q5,d23,d0
-> +       vmlal.s32 q5,d12,d8
-> +       add r2,sp,#672
-> +       vst1.8 {d16-d17},[r2,: 128]
-> +       vmull.s32 q4,d18,d8
-> +       vmlal.s32 q4,d26,d2
-> +       vmlal.s32 q4,d19,d7
-> +       vmlal.s32 q4,d27,d1
-> +       vmlal.s32 q4,d22,d6
-> +       vmlal.s32 q4,d28,d0
-> +       vmull.s32 q8,d18,d7
-> +       vmlal.s32 q8,d26,d1
-> +       vmlal.s32 q8,d19,d6
-> +       vmlal.s32 q8,d27,d0
-> +       add r2,sp,#576
-> +       vld1.8 {d20-d21},[r2,: 128]
-> +       vmlal.s32 q7,d24,d21
-> +       vmlal.s32 q7,d25,d20
-> +       vmlal.s32 q4,d23,d21
-> +       vmlal.s32 q4,d29,d20
-> +       vmlal.s32 q8,d22,d21
-> +       vmlal.s32 q8,d28,d20
-> +       vmlal.s32 q5,d24,d20
-> +       add r2,sp,#576
-> +       vst1.8 {d14-d15},[r2,: 128]
-> +       vmull.s32 q7,d18,d6
-> +       vmlal.s32 q7,d26,d0
-> +       add r2,sp,#656
-> +       vld1.8 {d30-d31},[r2,: 128]
-> +       vmlal.s32 q2,d30,d21
-> +       vmlal.s32 q7,d19,d21
-> +       vmlal.s32 q7,d27,d20
-> +       add r2,sp,#624
-> +       vld1.8 {d26-d27},[r2,: 128]
-> +       vmlal.s32 q4,d25,d27
-> +       vmlal.s32 q8,d29,d27
-> +       vmlal.s32 q8,d25,d26
-> +       vmlal.s32 q7,d28,d27
-> +       vmlal.s32 q7,d29,d26
-> +       add r2,sp,#608
-> +       vld1.8 {d28-d29},[r2,: 128]
-> +       vmlal.s32 q4,d24,d29
-> +       vmlal.s32 q8,d23,d29
-> +       vmlal.s32 q8,d24,d28
-> +       vmlal.s32 q7,d22,d29
-> +       vmlal.s32 q7,d23,d28
-> +       add r2,sp,#608
-> +       vst1.8 {d8-d9},[r2,: 128]
-> +       add r2,sp,#560
-> +       vld1.8 {d8-d9},[r2,: 128]
-> +       vmlal.s32 q7,d24,d9
-> +       vmlal.s32 q7,d25,d31
-> +       vmull.s32 q1,d18,d2
-> +       vmlal.s32 q1,d19,d1
-> +       vmlal.s32 q1,d22,d0
-> +       vmlal.s32 q1,d24,d27
-> +       vmlal.s32 q1,d23,d20
-> +       vmlal.s32 q1,d12,d7
-> +       vmlal.s32 q1,d13,d6
-> +       vmull.s32 q6,d18,d1
-> +       vmlal.s32 q6,d19,d0
-> +       vmlal.s32 q6,d23,d27
-> +       vmlal.s32 q6,d22,d20
-> +       vmlal.s32 q6,d24,d26
-> +       vmull.s32 q0,d18,d0
-> +       vmlal.s32 q0,d22,d27
-> +       vmlal.s32 q0,d23,d26
-> +       vmlal.s32 q0,d24,d31
-> +       vmlal.s32 q0,d19,d20
-> +       add r2,sp,#640
-> +       vld1.8 {d18-d19},[r2,: 128]
-> +       vmlal.s32 q2,d18,d7
-> +       vmlal.s32 q2,d19,d6
-> +       vmlal.s32 q5,d18,d6
-> +       vmlal.s32 q5,d19,d21
-> +       vmlal.s32 q1,d18,d21
-> +       vmlal.s32 q1,d19,d29
-> +       vmlal.s32 q0,d18,d28
-> +       vmlal.s32 q0,d19,d9
-> +       vmlal.s32 q6,d18,d29
-> +       vmlal.s32 q6,d19,d28
-> +       add r2,sp,#592
-> +       vld1.8 {d18-d19},[r2,: 128]
-> +       add r2,sp,#512
-> +       vld1.8 {d22-d23},[r2,: 128]
-> +       vmlal.s32 q5,d19,d7
-> +       vmlal.s32 q0,d18,d21
-> +       vmlal.s32 q0,d19,d29
-> +       vmlal.s32 q6,d18,d6
-> +       add r2,sp,#528
-> +       vld1.8 {d6-d7},[r2,: 128]
-> +       vmlal.s32 q6,d19,d21
-> +       add r2,sp,#576
-> +       vld1.8 {d18-d19},[r2,: 128]
-> +       vmlal.s32 q0,d30,d8
-> +       add r2,sp,#672
-> +       vld1.8 {d20-d21},[r2,: 128]
-> +       vmlal.s32 q5,d30,d29
-> +       add r2,sp,#608
-> +       vld1.8 {d24-d25},[r2,: 128]
-> +       vmlal.s32 q1,d30,d28
-> +       vadd.i64 q13,q0,q11
-> +       vadd.i64 q14,q5,q11
-> +       vmlal.s32 q6,d30,d9
-> +       vshr.s64 q4,q13,#26
-> +       vshr.s64 q13,q14,#26
-> +       vadd.i64 q7,q7,q4
-> +       vshl.i64 q4,q4,#26
-> +       vadd.i64 q14,q7,q3
-> +       vadd.i64 q9,q9,q13
-> +       vshl.i64 q13,q13,#26
-> +       vadd.i64 q15,q9,q3
-> +       vsub.i64 q0,q0,q4
-> +       vshr.s64 q4,q14,#25
-> +       vsub.i64 q5,q5,q13
-> +       vshr.s64 q13,q15,#25
-> +       vadd.i64 q6,q6,q4
-> +       vshl.i64 q4,q4,#25
-> +       vadd.i64 q14,q6,q11
-> +       vadd.i64 q2,q2,q13
-> +       vsub.i64 q4,q7,q4
-> +       vshr.s64 q7,q14,#26
-> +       vshl.i64 q13,q13,#25
-> +       vadd.i64 q14,q2,q11
-> +       vadd.i64 q8,q8,q7
-> +       vshl.i64 q7,q7,#26
-> +       vadd.i64 q15,q8,q3
-> +       vsub.i64 q9,q9,q13
-> +       vshr.s64 q13,q14,#26
-> +       vsub.i64 q6,q6,q7
-> +       vshr.s64 q7,q15,#25
-> +       vadd.i64 q10,q10,q13
-> +       vshl.i64 q13,q13,#26
-> +       vadd.i64 q14,q10,q3
-> +       vadd.i64 q1,q1,q7
-> +       add r2,r3,#144
-> +       vshl.i64 q7,q7,#25
-> +       add r4,r3,#96
-> +       vadd.i64 q15,q1,q11
-> +       add r2,r2,#8
-> +       vsub.i64 q2,q2,q13
-> +       add r4,r4,#8
-> +       vshr.s64 q13,q14,#25
-> +       vsub.i64 q7,q8,q7
-> +       vshr.s64 q8,q15,#26
-> +       vadd.i64 q14,q13,q13
-> +       vadd.i64 q12,q12,q8
-> +       vtrn.32 d12,d14
-> +       vshl.i64 q8,q8,#26
-> +       vtrn.32 d13,d15
-> +       vadd.i64 q3,q12,q3
-> +       vadd.i64 q0,q0,q14
-> +       vst1.8 d12,[r2,: 64]!
-> +       vshl.i64 q7,q13,#4
-> +       vst1.8 d13,[r4,: 64]!
-> +       vsub.i64 q1,q1,q8
-> +       vshr.s64 q3,q3,#25
-> +       vadd.i64 q0,q0,q7
-> +       vadd.i64 q5,q5,q3
-> +       vshl.i64 q3,q3,#25
-> +       vadd.i64 q6,q5,q11
-> +       vadd.i64 q0,q0,q13
-> +       vshl.i64 q7,q13,#25
-> +       vadd.i64 q8,q0,q11
-> +       vsub.i64 q3,q12,q3
-> +       vshr.s64 q6,q6,#26
-> +       vsub.i64 q7,q10,q7
-> +       vtrn.32 d2,d6
-> +       vshr.s64 q8,q8,#26
-> +       vtrn.32 d3,d7
-> +       vadd.i64 q3,q9,q6
-> +       vst1.8 d2,[r2,: 64]
-> +       vshl.i64 q6,q6,#26
-> +       vst1.8 d3,[r4,: 64]
-> +       vadd.i64 q1,q4,q8
-> +       vtrn.32 d4,d14
-> +       vshl.i64 q4,q8,#26
-> +       vtrn.32 d5,d15
-> +       vsub.i64 q5,q5,q6
-> +       add r2,r2,#16
-> +       vsub.i64 q0,q0,q4
-> +       vst1.8 d4,[r2,: 64]
-> +       add r4,r4,#16
-> +       vst1.8 d5,[r4,: 64]
-> +       vtrn.32 d10,d6
-> +       vtrn.32 d11,d7
-> +       sub r2,r2,#8
-> +       sub r4,r4,#8
-> +       vtrn.32 d0,d2
-> +       vtrn.32 d1,d3
-> +       vst1.8 d10,[r2,: 64]
-> +       vst1.8 d11,[r4,: 64]
-> +       sub r2,r2,#24
-> +       sub r4,r4,#24
-> +       vst1.8 d0,[r2,: 64]
-> +       vst1.8 d1,[r4,: 64]
-> +       add r2,r3,#288
-> +       add r4,r3,#336
-> +       vld1.8 {d0-d1},[r2,: 128]!
-> +       vld1.8 {d2-d3},[r4,: 128]!
-> +       vsub.i32 q0,q0,q1
-> +       vld1.8 {d2-d3},[r2,: 128]!
-> +       vld1.8 {d4-d5},[r4,: 128]!
-> +       vsub.i32 q1,q1,q2
-> +       add r5,r3,#240
-> +       vld1.8 {d4},[r2,: 64]
-> +       vld1.8 {d6},[r4,: 64]
-> +       vsub.i32 q2,q2,q3
-> +       vst1.8 {d0-d1},[r5,: 128]!
-> +       vst1.8 {d2-d3},[r5,: 128]!
-> +       vst1.8 d4,[r5,: 64]
-> +       add r2,r3,#144
-> +       add r4,r3,#96
-> +       add r5,r3,#144
-> +       add r6,r3,#192
-> +       vld1.8 {d0-d1},[r2,: 128]!
-> +       vld1.8 {d2-d3},[r4,: 128]!
-> +       vsub.i32 q2,q0,q1
-> +       vadd.i32 q0,q0,q1
-> +       vld1.8 {d2-d3},[r2,: 128]!
-> +       vld1.8 {d6-d7},[r4,: 128]!
-> +       vsub.i32 q4,q1,q3
-> +       vadd.i32 q1,q1,q3
-> +       vld1.8 {d6},[r2,: 64]
-> +       vld1.8 {d10},[r4,: 64]
-> +       vsub.i32 q6,q3,q5
-> +       vadd.i32 q3,q3,q5
-> +       vst1.8 {d4-d5},[r5,: 128]!
-> +       vst1.8 {d0-d1},[r6,: 128]!
-> +       vst1.8 {d8-d9},[r5,: 128]!
-> +       vst1.8 {d2-d3},[r6,: 128]!
-> +       vst1.8 d12,[r5,: 64]
-> +       vst1.8 d6,[r6,: 64]
-> +       add r2,r3,#0
-> +       add r4,r3,#240
-> +       vld1.8 {d0-d1},[r4,: 128]!
-> +       vld1.8 {d2-d3},[r4,: 128]!
-> +       vld1.8 {d4},[r4,: 64]
-> +       add r4,r3,#336
-> +       vld1.8 {d6-d7},[r4,: 128]!
-> +       vtrn.32 q0,q3
-> +       vld1.8 {d8-d9},[r4,: 128]!
-> +       vshl.i32 q5,q0,#4
-> +       vtrn.32 q1,q4
-> +       vshl.i32 q6,q3,#4
-> +       vadd.i32 q5,q5,q0
-> +       vadd.i32 q6,q6,q3
-> +       vshl.i32 q7,q1,#4
-> +       vld1.8 {d5},[r4,: 64]
-> +       vshl.i32 q8,q4,#4
-> +       vtrn.32 d4,d5
-> +       vadd.i32 q7,q7,q1
-> +       vadd.i32 q8,q8,q4
-> +       vld1.8 {d18-d19},[r2,: 128]!
-> +       vshl.i32 q10,q2,#4
-> +       vld1.8 {d22-d23},[r2,: 128]!
-> +       vadd.i32 q10,q10,q2
-> +       vld1.8 {d24},[r2,: 64]
-> +       vadd.i32 q5,q5,q0
-> +       add r2,r3,#288
-> +       vld1.8 {d26-d27},[r2,: 128]!
-> +       vadd.i32 q6,q6,q3
-> +       vld1.8 {d28-d29},[r2,: 128]!
-> +       vadd.i32 q8,q8,q4
-> +       vld1.8 {d25},[r2,: 64]
-> +       vadd.i32 q10,q10,q2
-> +       vtrn.32 q9,q13
-> +       vadd.i32 q7,q7,q1
-> +       vadd.i32 q5,q5,q0
-> +       vtrn.32 q11,q14
-> +       vadd.i32 q6,q6,q3
-> +       add r2,sp,#560
-> +       vadd.i32 q10,q10,q2
-> +       vtrn.32 d24,d25
-> +       vst1.8 {d12-d13},[r2,: 128]
-> +       vshl.i32 q6,q13,#1
-> +       add r2,sp,#576
-> +       vst1.8 {d20-d21},[r2,: 128]
-> +       vshl.i32 q10,q14,#1
-> +       add r2,sp,#592
-> +       vst1.8 {d12-d13},[r2,: 128]
-> +       vshl.i32 q15,q12,#1
-> +       vadd.i32 q8,q8,q4
-> +       vext.32 d10,d31,d30,#0
-> +       vadd.i32 q7,q7,q1
-> +       add r2,sp,#608
-> +       vst1.8 {d16-d17},[r2,: 128]
-> +       vmull.s32 q8,d18,d5
-> +       vmlal.s32 q8,d26,d4
-> +       vmlal.s32 q8,d19,d9
-> +       vmlal.s32 q8,d27,d3
-> +       vmlal.s32 q8,d22,d8
-> +       vmlal.s32 q8,d28,d2
-> +       vmlal.s32 q8,d23,d7
-> +       vmlal.s32 q8,d29,d1
-> +       vmlal.s32 q8,d24,d6
-> +       vmlal.s32 q8,d25,d0
-> +       add r2,sp,#624
-> +       vst1.8 {d14-d15},[r2,: 128]
-> +       vmull.s32 q2,d18,d4
-> +       vmlal.s32 q2,d12,d9
-> +       vmlal.s32 q2,d13,d8
-> +       vmlal.s32 q2,d19,d3
-> +       vmlal.s32 q2,d22,d2
-> +       vmlal.s32 q2,d23,d1
-> +       vmlal.s32 q2,d24,d0
-> +       add r2,sp,#640
-> +       vst1.8 {d20-d21},[r2,: 128]
-> +       vmull.s32 q7,d18,d9
-> +       vmlal.s32 q7,d26,d3
-> +       vmlal.s32 q7,d19,d8
-> +       vmlal.s32 q7,d27,d2
-> +       vmlal.s32 q7,d22,d7
-> +       vmlal.s32 q7,d28,d1
-> +       vmlal.s32 q7,d23,d6
-> +       vmlal.s32 q7,d29,d0
-> +       add r2,sp,#656
-> +       vst1.8 {d10-d11},[r2,: 128]
-> +       vmull.s32 q5,d18,d3
-> +       vmlal.s32 q5,d19,d2
-> +       vmlal.s32 q5,d22,d1
-> +       vmlal.s32 q5,d23,d0
-> +       vmlal.s32 q5,d12,d8
-> +       add r2,sp,#672
-> +       vst1.8 {d16-d17},[r2,: 128]
-> +       vmull.s32 q4,d18,d8
-> +       vmlal.s32 q4,d26,d2
-> +       vmlal.s32 q4,d19,d7
-> +       vmlal.s32 q4,d27,d1
-> +       vmlal.s32 q4,d22,d6
-> +       vmlal.s32 q4,d28,d0
-> +       vmull.s32 q8,d18,d7
-> +       vmlal.s32 q8,d26,d1
-> +       vmlal.s32 q8,d19,d6
-> +       vmlal.s32 q8,d27,d0
-> +       add r2,sp,#576
-> +       vld1.8 {d20-d21},[r2,: 128]
-> +       vmlal.s32 q7,d24,d21
-> +       vmlal.s32 q7,d25,d20
-> +       vmlal.s32 q4,d23,d21
-> +       vmlal.s32 q4,d29,d20
-> +       vmlal.s32 q8,d22,d21
-> +       vmlal.s32 q8,d28,d20
-> +       vmlal.s32 q5,d24,d20
-> +       add r2,sp,#576
-> +       vst1.8 {d14-d15},[r2,: 128]
-> +       vmull.s32 q7,d18,d6
-> +       vmlal.s32 q7,d26,d0
-> +       add r2,sp,#656
-> +       vld1.8 {d30-d31},[r2,: 128]
-> +       vmlal.s32 q2,d30,d21
-> +       vmlal.s32 q7,d19,d21
-> +       vmlal.s32 q7,d27,d20
-> +       add r2,sp,#624
-> +       vld1.8 {d26-d27},[r2,: 128]
-> +       vmlal.s32 q4,d25,d27
-> +       vmlal.s32 q8,d29,d27
-> +       vmlal.s32 q8,d25,d26
-> +       vmlal.s32 q7,d28,d27
-> +       vmlal.s32 q7,d29,d26
-> +       add r2,sp,#608
-> +       vld1.8 {d28-d29},[r2,: 128]
-> +       vmlal.s32 q4,d24,d29
-> +       vmlal.s32 q8,d23,d29
-> +       vmlal.s32 q8,d24,d28
-> +       vmlal.s32 q7,d22,d29
-> +       vmlal.s32 q7,d23,d28
-> +       add r2,sp,#608
-> +       vst1.8 {d8-d9},[r2,: 128]
-> +       add r2,sp,#560
-> +       vld1.8 {d8-d9},[r2,: 128]
-> +       vmlal.s32 q7,d24,d9
-> +       vmlal.s32 q7,d25,d31
-> +       vmull.s32 q1,d18,d2
-> +       vmlal.s32 q1,d19,d1
-> +       vmlal.s32 q1,d22,d0
-> +       vmlal.s32 q1,d24,d27
-> +       vmlal.s32 q1,d23,d20
-> +       vmlal.s32 q1,d12,d7
-> +       vmlal.s32 q1,d13,d6
-> +       vmull.s32 q6,d18,d1
-> +       vmlal.s32 q6,d19,d0
-> +       vmlal.s32 q6,d23,d27
-> +       vmlal.s32 q6,d22,d20
-> +       vmlal.s32 q6,d24,d26
-> +       vmull.s32 q0,d18,d0
-> +       vmlal.s32 q0,d22,d27
-> +       vmlal.s32 q0,d23,d26
-> +       vmlal.s32 q0,d24,d31
-> +       vmlal.s32 q0,d19,d20
-> +       add r2,sp,#640
-> +       vld1.8 {d18-d19},[r2,: 128]
-> +       vmlal.s32 q2,d18,d7
-> +       vmlal.s32 q2,d19,d6
-> +       vmlal.s32 q5,d18,d6
-> +       vmlal.s32 q5,d19,d21
-> +       vmlal.s32 q1,d18,d21
-> +       vmlal.s32 q1,d19,d29
-> +       vmlal.s32 q0,d18,d28
-> +       vmlal.s32 q0,d19,d9
-> +       vmlal.s32 q6,d18,d29
-> +       vmlal.s32 q6,d19,d28
-> +       add r2,sp,#592
-> +       vld1.8 {d18-d19},[r2,: 128]
-> +       add r2,sp,#512
-> +       vld1.8 {d22-d23},[r2,: 128]
-> +       vmlal.s32 q5,d19,d7
-> +       vmlal.s32 q0,d18,d21
-> +       vmlal.s32 q0,d19,d29
-> +       vmlal.s32 q6,d18,d6
-> +       add r2,sp,#528
-> +       vld1.8 {d6-d7},[r2,: 128]
-> +       vmlal.s32 q6,d19,d21
-> +       add r2,sp,#576
-> +       vld1.8 {d18-d19},[r2,: 128]
-> +       vmlal.s32 q0,d30,d8
-> +       add r2,sp,#672
-> +       vld1.8 {d20-d21},[r2,: 128]
-> +       vmlal.s32 q5,d30,d29
-> +       add r2,sp,#608
-> +       vld1.8 {d24-d25},[r2,: 128]
-> +       vmlal.s32 q1,d30,d28
-> +       vadd.i64 q13,q0,q11
-> +       vadd.i64 q14,q5,q11
-> +       vmlal.s32 q6,d30,d9
-> +       vshr.s64 q4,q13,#26
-> +       vshr.s64 q13,q14,#26
-> +       vadd.i64 q7,q7,q4
-> +       vshl.i64 q4,q4,#26
-> +       vadd.i64 q14,q7,q3
-> +       vadd.i64 q9,q9,q13
-> +       vshl.i64 q13,q13,#26
-> +       vadd.i64 q15,q9,q3
-> +       vsub.i64 q0,q0,q4
-> +       vshr.s64 q4,q14,#25
-> +       vsub.i64 q5,q5,q13
-> +       vshr.s64 q13,q15,#25
-> +       vadd.i64 q6,q6,q4
-> +       vshl.i64 q4,q4,#25
-> +       vadd.i64 q14,q6,q11
-> +       vadd.i64 q2,q2,q13
-> +       vsub.i64 q4,q7,q4
-> +       vshr.s64 q7,q14,#26
-> +       vshl.i64 q13,q13,#25
-> +       vadd.i64 q14,q2,q11
-> +       vadd.i64 q8,q8,q7
-> +       vshl.i64 q7,q7,#26
-> +       vadd.i64 q15,q8,q3
-> +       vsub.i64 q9,q9,q13
-> +       vshr.s64 q13,q14,#26
-> +       vsub.i64 q6,q6,q7
-> +       vshr.s64 q7,q15,#25
-> +       vadd.i64 q10,q10,q13
-> +       vshl.i64 q13,q13,#26
-> +       vadd.i64 q14,q10,q3
-> +       vadd.i64 q1,q1,q7
-> +       add r2,r3,#288
-> +       vshl.i64 q7,q7,#25
-> +       add r4,r3,#96
-> +       vadd.i64 q15,q1,q11
-> +       add r2,r2,#8
-> +       vsub.i64 q2,q2,q13
-> +       add r4,r4,#8
-> +       vshr.s64 q13,q14,#25
-> +       vsub.i64 q7,q8,q7
-> +       vshr.s64 q8,q15,#26
-> +       vadd.i64 q14,q13,q13
-> +       vadd.i64 q12,q12,q8
-> +       vtrn.32 d12,d14
-> +       vshl.i64 q8,q8,#26
-> +       vtrn.32 d13,d15
-> +       vadd.i64 q3,q12,q3
-> +       vadd.i64 q0,q0,q14
-> +       vst1.8 d12,[r2,: 64]!
-> +       vshl.i64 q7,q13,#4
-> +       vst1.8 d13,[r4,: 64]!
-> +       vsub.i64 q1,q1,q8
-> +       vshr.s64 q3,q3,#25
-> +       vadd.i64 q0,q0,q7
-> +       vadd.i64 q5,q5,q3
-> +       vshl.i64 q3,q3,#25
-> +       vadd.i64 q6,q5,q11
-> +       vadd.i64 q0,q0,q13
-> +       vshl.i64 q7,q13,#25
-> +       vadd.i64 q8,q0,q11
-> +       vsub.i64 q3,q12,q3
-> +       vshr.s64 q6,q6,#26
-> +       vsub.i64 q7,q10,q7
-> +       vtrn.32 d2,d6
-> +       vshr.s64 q8,q8,#26
-> +       vtrn.32 d3,d7
-> +       vadd.i64 q3,q9,q6
-> +       vst1.8 d2,[r2,: 64]
-> +       vshl.i64 q6,q6,#26
-> +       vst1.8 d3,[r4,: 64]
-> +       vadd.i64 q1,q4,q8
-> +       vtrn.32 d4,d14
-> +       vshl.i64 q4,q8,#26
-> +       vtrn.32 d5,d15
-> +       vsub.i64 q5,q5,q6
-> +       add r2,r2,#16
-> +       vsub.i64 q0,q0,q4
-> +       vst1.8 d4,[r2,: 64]
-> +       add r4,r4,#16
-> +       vst1.8 d5,[r4,: 64]
-> +       vtrn.32 d10,d6
-> +       vtrn.32 d11,d7
-> +       sub r2,r2,#8
-> +       sub r4,r4,#8
-> +       vtrn.32 d0,d2
-> +       vtrn.32 d1,d3
-> +       vst1.8 d10,[r2,: 64]
-> +       vst1.8 d11,[r4,: 64]
-> +       sub r2,r2,#24
-> +       sub r4,r4,#24
-> +       vst1.8 d0,[r2,: 64]
-> +       vst1.8 d1,[r4,: 64]
-> +       add r2,sp,#544
-> +       add r4,r3,#144
-> +       add r5,r3,#192
-> +       vld1.8 {d0-d1},[r2,: 128]
-> +       vld1.8 {d2-d3},[r4,: 128]!
-> +       vld1.8 {d4-d5},[r5,: 128]!
-> +       vzip.i32 q1,q2
-> +       vld1.8 {d6-d7},[r4,: 128]!
-> +       vld1.8 {d8-d9},[r5,: 128]!
-> +       vshl.i32 q5,q1,#1
-> +       vzip.i32 q3,q4
-> +       vshl.i32 q6,q2,#1
-> +       vld1.8 {d14},[r4,: 64]
-> +       vshl.i32 q8,q3,#1
-> +       vld1.8 {d15},[r5,: 64]
-> +       vshl.i32 q9,q4,#1
-> +       vmul.i32 d21,d7,d1
-> +       vtrn.32 d14,d15
-> +       vmul.i32 q11,q4,q0
-> +       vmul.i32 q0,q7,q0
-> +       vmull.s32 q12,d2,d2
-> +       vmlal.s32 q12,d11,d1
-> +       vmlal.s32 q12,d12,d0
-> +       vmlal.s32 q12,d13,d23
-> +       vmlal.s32 q12,d16,d22
-> +       vmlal.s32 q12,d7,d21
-> +       vmull.s32 q10,d2,d11
-> +       vmlal.s32 q10,d4,d1
-> +       vmlal.s32 q10,d13,d0
-> +       vmlal.s32 q10,d6,d23
-> +       vmlal.s32 q10,d17,d22
-> +       vmull.s32 q13,d10,d4
-> +       vmlal.s32 q13,d11,d3
-> +       vmlal.s32 q13,d13,d1
-> +       vmlal.s32 q13,d16,d0
-> +       vmlal.s32 q13,d17,d23
-> +       vmlal.s32 q13,d8,d22
-> +       vmull.s32 q1,d10,d5
-> +       vmlal.s32 q1,d11,d4
-> +       vmlal.s32 q1,d6,d1
-> +       vmlal.s32 q1,d17,d0
-> +       vmlal.s32 q1,d8,d23
-> +       vmull.s32 q14,d10,d6
-> +       vmlal.s32 q14,d11,d13
-> +       vmlal.s32 q14,d4,d4
-> +       vmlal.s32 q14,d17,d1
-> +       vmlal.s32 q14,d18,d0
-> +       vmlal.s32 q14,d9,d23
-> +       vmull.s32 q11,d10,d7
-> +       vmlal.s32 q11,d11,d6
-> +       vmlal.s32 q11,d12,d5
-> +       vmlal.s32 q11,d8,d1
-> +       vmlal.s32 q11,d19,d0
-> +       vmull.s32 q15,d10,d8
-> +       vmlal.s32 q15,d11,d17
-> +       vmlal.s32 q15,d12,d6
-> +       vmlal.s32 q15,d13,d5
-> +       vmlal.s32 q15,d19,d1
-> +       vmlal.s32 q15,d14,d0
-> +       vmull.s32 q2,d10,d9
-> +       vmlal.s32 q2,d11,d8
-> +       vmlal.s32 q2,d12,d7
-> +       vmlal.s32 q2,d13,d6
-> +       vmlal.s32 q2,d14,d1
-> +       vmull.s32 q0,d15,d1
-> +       vmlal.s32 q0,d10,d14
-> +       vmlal.s32 q0,d11,d19
-> +       vmlal.s32 q0,d12,d8
-> +       vmlal.s32 q0,d13,d17
-> +       vmlal.s32 q0,d6,d6
-> +       add r2,sp,#512
-> +       vld1.8 {d18-d19},[r2,: 128]
-> +       vmull.s32 q3,d16,d7
-> +       vmlal.s32 q3,d10,d15
-> +       vmlal.s32 q3,d11,d14
-> +       vmlal.s32 q3,d12,d9
-> +       vmlal.s32 q3,d13,d8
-> +       add r2,sp,#528
-> +       vld1.8 {d8-d9},[r2,: 128]
-> +       vadd.i64 q5,q12,q9
-> +       vadd.i64 q6,q15,q9
-> +       vshr.s64 q5,q5,#26
-> +       vshr.s64 q6,q6,#26
-> +       vadd.i64 q7,q10,q5
-> +       vshl.i64 q5,q5,#26
-> +       vadd.i64 q8,q7,q4
-> +       vadd.i64 q2,q2,q6
-> +       vshl.i64 q6,q6,#26
-> +       vadd.i64 q10,q2,q4
-> +       vsub.i64 q5,q12,q5
-> +       vshr.s64 q8,q8,#25
-> +       vsub.i64 q6,q15,q6
-> +       vshr.s64 q10,q10,#25
-> +       vadd.i64 q12,q13,q8
-> +       vshl.i64 q8,q8,#25
-> +       vadd.i64 q13,q12,q9
-> +       vadd.i64 q0,q0,q10
-> +       vsub.i64 q7,q7,q8
-> +       vshr.s64 q8,q13,#26
-> +       vshl.i64 q10,q10,#25
-> +       vadd.i64 q13,q0,q9
-> +       vadd.i64 q1,q1,q8
-> +       vshl.i64 q8,q8,#26
-> +       vadd.i64 q15,q1,q4
-> +       vsub.i64 q2,q2,q10
-> +       vshr.s64 q10,q13,#26
-> +       vsub.i64 q8,q12,q8
-> +       vshr.s64 q12,q15,#25
-> +       vadd.i64 q3,q3,q10
-> +       vshl.i64 q10,q10,#26
-> +       vadd.i64 q13,q3,q4
-> +       vadd.i64 q14,q14,q12
-> +       add r2,r3,#144
-> +       vshl.i64 q12,q12,#25
-> +       add r4,r3,#192
-> +       vadd.i64 q15,q14,q9
-> +       add r2,r2,#8
-> +       vsub.i64 q0,q0,q10
-> +       add r4,r4,#8
-> +       vshr.s64 q10,q13,#25
-> +       vsub.i64 q1,q1,q12
-> +       vshr.s64 q12,q15,#26
-> +       vadd.i64 q13,q10,q10
-> +       vadd.i64 q11,q11,q12
-> +       vtrn.32 d16,d2
-> +       vshl.i64 q12,q12,#26
-> +       vtrn.32 d17,d3
-> +       vadd.i64 q1,q11,q4
-> +       vadd.i64 q4,q5,q13
-> +       vst1.8 d16,[r2,: 64]!
-> +       vshl.i64 q5,q10,#4
-> +       vst1.8 d17,[r4,: 64]!
-> +       vsub.i64 q8,q14,q12
-> +       vshr.s64 q1,q1,#25
-> +       vadd.i64 q4,q4,q5
-> +       vadd.i64 q5,q6,q1
-> +       vshl.i64 q1,q1,#25
-> +       vadd.i64 q6,q5,q9
-> +       vadd.i64 q4,q4,q10
-> +       vshl.i64 q10,q10,#25
-> +       vadd.i64 q9,q4,q9
-> +       vsub.i64 q1,q11,q1
-> +       vshr.s64 q6,q6,#26
-> +       vsub.i64 q3,q3,q10
-> +       vtrn.32 d16,d2
-> +       vshr.s64 q9,q9,#26
-> +       vtrn.32 d17,d3
-> +       vadd.i64 q1,q2,q6
-> +       vst1.8 d16,[r2,: 64]
-> +       vshl.i64 q2,q6,#26
-> +       vst1.8 d17,[r4,: 64]
-> +       vadd.i64 q6,q7,q9
-> +       vtrn.32 d0,d6
-> +       vshl.i64 q7,q9,#26
-> +       vtrn.32 d1,d7
-> +       vsub.i64 q2,q5,q2
-> +       add r2,r2,#16
-> +       vsub.i64 q3,q4,q7
-> +       vst1.8 d0,[r2,: 64]
-> +       add r4,r4,#16
-> +       vst1.8 d1,[r4,: 64]
-> +       vtrn.32 d4,d2
-> +       vtrn.32 d5,d3
-> +       sub r2,r2,#8
-> +       sub r4,r4,#8
-> +       vtrn.32 d6,d12
-> +       vtrn.32 d7,d13
-> +       vst1.8 d4,[r2,: 64]
-> +       vst1.8 d5,[r4,: 64]
-> +       sub r2,r2,#24
-> +       sub r4,r4,#24
-> +       vst1.8 d6,[r2,: 64]
-> +       vst1.8 d7,[r4,: 64]
-> +       add r2,r3,#336
-> +       add r4,r3,#288
-> +       vld1.8 {d0-d1},[r2,: 128]!
-> +       vld1.8 {d2-d3},[r4,: 128]!
-> +       vadd.i32 q0,q0,q1
-> +       vld1.8 {d2-d3},[r2,: 128]!
-> +       vld1.8 {d4-d5},[r4,: 128]!
-> +       vadd.i32 q1,q1,q2
-> +       add r5,r3,#288
-> +       vld1.8 {d4},[r2,: 64]
-> +       vld1.8 {d6},[r4,: 64]
-> +       vadd.i32 q2,q2,q3
-> +       vst1.8 {d0-d1},[r5,: 128]!
-> +       vst1.8 {d2-d3},[r5,: 128]!
-> +       vst1.8 d4,[r5,: 64]
-> +       add r2,r3,#48
-> +       add r4,r3,#144
-> +       vld1.8 {d0-d1},[r4,: 128]!
-> +       vld1.8 {d2-d3},[r4,: 128]!
-> +       vld1.8 {d4},[r4,: 64]
-> +       add r4,r3,#288
-> +       vld1.8 {d6-d7},[r4,: 128]!
-> +       vtrn.32 q0,q3
-> +       vld1.8 {d8-d9},[r4,: 128]!
-> +       vshl.i32 q5,q0,#4
-> +       vtrn.32 q1,q4
-> +       vshl.i32 q6,q3,#4
-> +       vadd.i32 q5,q5,q0
-> +       vadd.i32 q6,q6,q3
-> +       vshl.i32 q7,q1,#4
-> +       vld1.8 {d5},[r4,: 64]
-> +       vshl.i32 q8,q4,#4
-> +       vtrn.32 d4,d5
-> +       vadd.i32 q7,q7,q1
-> +       vadd.i32 q8,q8,q4
-> +       vld1.8 {d18-d19},[r2,: 128]!
-> +       vshl.i32 q10,q2,#4
-> +       vld1.8 {d22-d23},[r2,: 128]!
-> +       vadd.i32 q10,q10,q2
-> +       vld1.8 {d24},[r2,: 64]
-> +       vadd.i32 q5,q5,q0
-> +       add r2,r3,#240
-> +       vld1.8 {d26-d27},[r2,: 128]!
-> +       vadd.i32 q6,q6,q3
-> +       vld1.8 {d28-d29},[r2,: 128]!
-> +       vadd.i32 q8,q8,q4
-> +       vld1.8 {d25},[r2,: 64]
-> +       vadd.i32 q10,q10,q2
-> +       vtrn.32 q9,q13
-> +       vadd.i32 q7,q7,q1
-> +       vadd.i32 q5,q5,q0
-> +       vtrn.32 q11,q14
-> +       vadd.i32 q6,q6,q3
-> +       add r2,sp,#560
-> +       vadd.i32 q10,q10,q2
-> +       vtrn.32 d24,d25
-> +       vst1.8 {d12-d13},[r2,: 128]
-> +       vshl.i32 q6,q13,#1
-> +       add r2,sp,#576
-> +       vst1.8 {d20-d21},[r2,: 128]
-> +       vshl.i32 q10,q14,#1
-> +       add r2,sp,#592
-> +       vst1.8 {d12-d13},[r2,: 128]
-> +       vshl.i32 q15,q12,#1
-> +       vadd.i32 q8,q8,q4
-> +       vext.32 d10,d31,d30,#0
-> +       vadd.i32 q7,q7,q1
-> +       add r2,sp,#608
-> +       vst1.8 {d16-d17},[r2,: 128]
-> +       vmull.s32 q8,d18,d5
-> +       vmlal.s32 q8,d26,d4
-> +       vmlal.s32 q8,d19,d9
-> +       vmlal.s32 q8,d27,d3
-> +       vmlal.s32 q8,d22,d8
-> +       vmlal.s32 q8,d28,d2
-> +       vmlal.s32 q8,d23,d7
-> +       vmlal.s32 q8,d29,d1
-> +       vmlal.s32 q8,d24,d6
-> +       vmlal.s32 q8,d25,d0
-> +       add r2,sp,#624
-> +       vst1.8 {d14-d15},[r2,: 128]
-> +       vmull.s32 q2,d18,d4
-> +       vmlal.s32 q2,d12,d9
-> +       vmlal.s32 q2,d13,d8
-> +       vmlal.s32 q2,d19,d3
-> +       vmlal.s32 q2,d22,d2
-> +       vmlal.s32 q2,d23,d1
-> +       vmlal.s32 q2,d24,d0
-> +       add r2,sp,#640
-> +       vst1.8 {d20-d21},[r2,: 128]
-> +       vmull.s32 q7,d18,d9
-> +       vmlal.s32 q7,d26,d3
-> +       vmlal.s32 q7,d19,d8
-> +       vmlal.s32 q7,d27,d2
-> +       vmlal.s32 q7,d22,d7
-> +       vmlal.s32 q7,d28,d1
-> +       vmlal.s32 q7,d23,d6
-> +       vmlal.s32 q7,d29,d0
-> +       add r2,sp,#656
-> +       vst1.8 {d10-d11},[r2,: 128]
-> +       vmull.s32 q5,d18,d3
-> +       vmlal.s32 q5,d19,d2
-> +       vmlal.s32 q5,d22,d1
-> +       vmlal.s32 q5,d23,d0
-> +       vmlal.s32 q5,d12,d8
-> +       add r2,sp,#672
-> +       vst1.8 {d16-d17},[r2,: 128]
-> +       vmull.s32 q4,d18,d8
-> +       vmlal.s32 q4,d26,d2
-> +       vmlal.s32 q4,d19,d7
-> +       vmlal.s32 q4,d27,d1
-> +       vmlal.s32 q4,d22,d6
-> +       vmlal.s32 q4,d28,d0
-> +       vmull.s32 q8,d18,d7
-> +       vmlal.s32 q8,d26,d1
-> +       vmlal.s32 q8,d19,d6
-> +       vmlal.s32 q8,d27,d0
-> +       add r2,sp,#576
-> +       vld1.8 {d20-d21},[r2,: 128]
-> +       vmlal.s32 q7,d24,d21
-> +       vmlal.s32 q7,d25,d20
-> +       vmlal.s32 q4,d23,d21
-> +       vmlal.s32 q4,d29,d20
-> +       vmlal.s32 q8,d22,d21
-> +       vmlal.s32 q8,d28,d20
-> +       vmlal.s32 q5,d24,d20
-> +       add r2,sp,#576
-> +       vst1.8 {d14-d15},[r2,: 128]
-> +       vmull.s32 q7,d18,d6
-> +       vmlal.s32 q7,d26,d0
-> +       add r2,sp,#656
-> +       vld1.8 {d30-d31},[r2,: 128]
-> +       vmlal.s32 q2,d30,d21
-> +       vmlal.s32 q7,d19,d21
-> +       vmlal.s32 q7,d27,d20
-> +       add r2,sp,#624
-> +       vld1.8 {d26-d27},[r2,: 128]
-> +       vmlal.s32 q4,d25,d27
-> +       vmlal.s32 q8,d29,d27
-> +       vmlal.s32 q8,d25,d26
-> +       vmlal.s32 q7,d28,d27
-> +       vmlal.s32 q7,d29,d26
-> +       add r2,sp,#608
-> +       vld1.8 {d28-d29},[r2,: 128]
-> +       vmlal.s32 q4,d24,d29
-> +       vmlal.s32 q8,d23,d29
-> +       vmlal.s32 q8,d24,d28
-> +       vmlal.s32 q7,d22,d29
-> +       vmlal.s32 q7,d23,d28
-> +       add r2,sp,#608
-> +       vst1.8 {d8-d9},[r2,: 128]
-> +       add r2,sp,#560
-> +       vld1.8 {d8-d9},[r2,: 128]
-> +       vmlal.s32 q7,d24,d9
-> +       vmlal.s32 q7,d25,d31
-> +       vmull.s32 q1,d18,d2
-> +       vmlal.s32 q1,d19,d1
-> +       vmlal.s32 q1,d22,d0
-> +       vmlal.s32 q1,d24,d27
-> +       vmlal.s32 q1,d23,d20
-> +       vmlal.s32 q1,d12,d7
-> +       vmlal.s32 q1,d13,d6
-> +       vmull.s32 q6,d18,d1
-> +       vmlal.s32 q6,d19,d0
-> +       vmlal.s32 q6,d23,d27
-> +       vmlal.s32 q6,d22,d20
-> +       vmlal.s32 q6,d24,d26
-> +       vmull.s32 q0,d18,d0
-> +       vmlal.s32 q0,d22,d27
-> +       vmlal.s32 q0,d23,d26
-> +       vmlal.s32 q0,d24,d31
-> +       vmlal.s32 q0,d19,d20
-> +       add r2,sp,#640
-> +       vld1.8 {d18-d19},[r2,: 128]
-> +       vmlal.s32 q2,d18,d7
-> +       vmlal.s32 q2,d19,d6
-> +       vmlal.s32 q5,d18,d6
-> +       vmlal.s32 q5,d19,d21
-> +       vmlal.s32 q1,d18,d21
-> +       vmlal.s32 q1,d19,d29
-> +       vmlal.s32 q0,d18,d28
-> +       vmlal.s32 q0,d19,d9
-> +       vmlal.s32 q6,d18,d29
-> +       vmlal.s32 q6,d19,d28
-> +       add r2,sp,#592
-> +       vld1.8 {d18-d19},[r2,: 128]
-> +       add r2,sp,#512
-> +       vld1.8 {d22-d23},[r2,: 128]
-> +       vmlal.s32 q5,d19,d7
-> +       vmlal.s32 q0,d18,d21
-> +       vmlal.s32 q0,d19,d29
-> +       vmlal.s32 q6,d18,d6
-> +       add r2,sp,#528
-> +       vld1.8 {d6-d7},[r2,: 128]
-> +       vmlal.s32 q6,d19,d21
-> +       add r2,sp,#576
-> +       vld1.8 {d18-d19},[r2,: 128]
-> +       vmlal.s32 q0,d30,d8
-> +       add r2,sp,#672
-> +       vld1.8 {d20-d21},[r2,: 128]
-> +       vmlal.s32 q5,d30,d29
-> +       add r2,sp,#608
-> +       vld1.8 {d24-d25},[r2,: 128]
-> +       vmlal.s32 q1,d30,d28
-> +       vadd.i64 q13,q0,q11
-> +       vadd.i64 q14,q5,q11
-> +       vmlal.s32 q6,d30,d9
-> +       vshr.s64 q4,q13,#26
-> +       vshr.s64 q13,q14,#26
-> +       vadd.i64 q7,q7,q4
-> +       vshl.i64 q4,q4,#26
-> +       vadd.i64 q14,q7,q3
-> +       vadd.i64 q9,q9,q13
-> +       vshl.i64 q13,q13,#26
-> +       vadd.i64 q15,q9,q3
-> +       vsub.i64 q0,q0,q4
-> +       vshr.s64 q4,q14,#25
-> +       vsub.i64 q5,q5,q13
-> +       vshr.s64 q13,q15,#25
-> +       vadd.i64 q6,q6,q4
-> +       vshl.i64 q4,q4,#25
-> +       vadd.i64 q14,q6,q11
-> +       vadd.i64 q2,q2,q13
-> +       vsub.i64 q4,q7,q4
-> +       vshr.s64 q7,q14,#26
-> +       vshl.i64 q13,q13,#25
-> +       vadd.i64 q14,q2,q11
-> +       vadd.i64 q8,q8,q7
-> +       vshl.i64 q7,q7,#26
-> +       vadd.i64 q15,q8,q3
-> +       vsub.i64 q9,q9,q13
-> +       vshr.s64 q13,q14,#26
-> +       vsub.i64 q6,q6,q7
-> +       vshr.s64 q7,q15,#25
-> +       vadd.i64 q10,q10,q13
-> +       vshl.i64 q13,q13,#26
-> +       vadd.i64 q14,q10,q3
-> +       vadd.i64 q1,q1,q7
-> +       add r2,r3,#240
-> +       vshl.i64 q7,q7,#25
-> +       add r4,r3,#144
-> +       vadd.i64 q15,q1,q11
-> +       add r2,r2,#8
-> +       vsub.i64 q2,q2,q13
-> +       add r4,r4,#8
-> +       vshr.s64 q13,q14,#25
-> +       vsub.i64 q7,q8,q7
-> +       vshr.s64 q8,q15,#26
-> +       vadd.i64 q14,q13,q13
-> +       vadd.i64 q12,q12,q8
-> +       vtrn.32 d12,d14
-> +       vshl.i64 q8,q8,#26
-> +       vtrn.32 d13,d15
-> +       vadd.i64 q3,q12,q3
-> +       vadd.i64 q0,q0,q14
-> +       vst1.8 d12,[r2,: 64]!
-> +       vshl.i64 q7,q13,#4
-> +       vst1.8 d13,[r4,: 64]!
-> +       vsub.i64 q1,q1,q8
-> +       vshr.s64 q3,q3,#25
-> +       vadd.i64 q0,q0,q7
-> +       vadd.i64 q5,q5,q3
-> +       vshl.i64 q3,q3,#25
-> +       vadd.i64 q6,q5,q11
-> +       vadd.i64 q0,q0,q13
-> +       vshl.i64 q7,q13,#25
-> +       vadd.i64 q8,q0,q11
-> +       vsub.i64 q3,q12,q3
-> +       vshr.s64 q6,q6,#26
-> +       vsub.i64 q7,q10,q7
-> +       vtrn.32 d2,d6
-> +       vshr.s64 q8,q8,#26
-> +       vtrn.32 d3,d7
-> +       vadd.i64 q3,q9,q6
-> +       vst1.8 d2,[r2,: 64]
-> +       vshl.i64 q6,q6,#26
-> +       vst1.8 d3,[r4,: 64]
-> +       vadd.i64 q1,q4,q8
-> +       vtrn.32 d4,d14
-> +       vshl.i64 q4,q8,#26
-> +       vtrn.32 d5,d15
-> +       vsub.i64 q5,q5,q6
-> +       add r2,r2,#16
-> +       vsub.i64 q0,q0,q4
-> +       vst1.8 d4,[r2,: 64]
-> +       add r4,r4,#16
-> +       vst1.8 d5,[r4,: 64]
-> +       vtrn.32 d10,d6
-> +       vtrn.32 d11,d7
-> +       sub r2,r2,#8
-> +       sub r4,r4,#8
-> +       vtrn.32 d0,d2
-> +       vtrn.32 d1,d3
-> +       vst1.8 d10,[r2,: 64]
-> +       vst1.8 d11,[r4,: 64]
-> +       sub r2,r2,#24
-> +       sub r4,r4,#24
-> +       vst1.8 d0,[r2,: 64]
-> +       vst1.8 d1,[r4,: 64]
-> +       ldr r2,[sp,#488]
-> +       ldr r4,[sp,#492]
-> +       subs r5,r2,#1
-> +       bge .Lmainloop
-> +       add r1,r3,#144
-> +       add r2,r3,#336
-> +       vld1.8 {d0-d1},[r1,: 128]!
-> +       vld1.8 {d2-d3},[r1,: 128]!
-> +       vld1.8 {d4},[r1,: 64]
-> +       vst1.8 {d0-d1},[r2,: 128]!
-> +       vst1.8 {d2-d3},[r2,: 128]!
-> +       vst1.8 d4,[r2,: 64]
-> +       ldr r1,=0
-> +       .Linvertloop:
-> +       add r2,r3,#144
-> +       ldr r4,=0
-> +       ldr r5,=2
-> +       cmp r1,#1
-> +       ldreq r5,=1
-> +       addeq r2,r3,#336
-> +       addeq r4,r3,#48
-> +       cmp r1,#2
-> +       ldreq r5,=1
-> +       addeq r2,r3,#48
-> +       cmp r1,#3
-> +       ldreq r5,=5
-> +       addeq r4,r3,#336
-> +       cmp r1,#4
-> +       ldreq r5,=10
-> +       cmp r1,#5
-> +       ldreq r5,=20
-> +       cmp r1,#6
-> +       ldreq r5,=10
-> +       addeq r2,r3,#336
-> +       addeq r4,r3,#336
-> +       cmp r1,#7
-> +       ldreq r5,=50
-> +       cmp r1,#8
-> +       ldreq r5,=100
-> +       cmp r1,#9
-> +       ldreq r5,=50
-> +       addeq r2,r3,#336
-> +       cmp r1,#10
-> +       ldreq r5,=5
-> +       addeq r2,r3,#48
-> +       cmp r1,#11
-> +       ldreq r5,=0
-> +       addeq r2,r3,#96
-> +       add r6,r3,#144
-> +       add r7,r3,#288
-> +       vld1.8 {d0-d1},[r6,: 128]!
-> +       vld1.8 {d2-d3},[r6,: 128]!
-> +       vld1.8 {d4},[r6,: 64]
-> +       vst1.8 {d0-d1},[r7,: 128]!
-> +       vst1.8 {d2-d3},[r7,: 128]!
-> +       vst1.8 d4,[r7,: 64]
-> +       cmp r5,#0
-> +       beq .Lskipsquaringloop
-> +       .Lsquaringloop:
-> +       add r6,r3,#288
-> +       add r7,r3,#288
-> +       add r8,r3,#288
-> +       vmov.i32 q0,#19
-> +       vmov.i32 q1,#0
-> +       vmov.i32 q2,#1
-> +       vzip.i32 q1,q2
-> +       vld1.8 {d4-d5},[r7,: 128]!
-> +       vld1.8 {d6-d7},[r7,: 128]!
-> +       vld1.8 {d9},[r7,: 64]
-> +       vld1.8 {d10-d11},[r6,: 128]!
-> +       add r7,sp,#416
-> +       vld1.8 {d12-d13},[r6,: 128]!
-> +       vmul.i32 q7,q2,q0
-> +       vld1.8 {d8},[r6,: 64]
-> +       vext.32 d17,d11,d10,#1
-> +       vmul.i32 q9,q3,q0
-> +       vext.32 d16,d10,d8,#1
-> +       vshl.u32 q10,q5,q1
-> +       vext.32 d22,d14,d4,#1
-> +       vext.32 d24,d18,d6,#1
-> +       vshl.u32 q13,q6,q1
-> +       vshl.u32 d28,d8,d2
-> +       vrev64.i32 d22,d22
-> +       vmul.i32 d1,d9,d1
-> +       vrev64.i32 d24,d24
-> +       vext.32 d29,d8,d13,#1
-> +       vext.32 d0,d1,d9,#1
-> +       vrev64.i32 d0,d0
-> +       vext.32 d2,d9,d1,#1
-> +       vext.32 d23,d15,d5,#1
-> +       vmull.s32 q4,d20,d4
-> +       vrev64.i32 d23,d23
-> +       vmlal.s32 q4,d21,d1
-> +       vrev64.i32 d2,d2
-> +       vmlal.s32 q4,d26,d19
-> +       vext.32 d3,d5,d15,#1
-> +       vmlal.s32 q4,d27,d18
-> +       vrev64.i32 d3,d3
-> +       vmlal.s32 q4,d28,d15
-> +       vext.32 d14,d12,d11,#1
-> +       vmull.s32 q5,d16,d23
-> +       vext.32 d15,d13,d12,#1
-> +       vmlal.s32 q5,d17,d4
-> +       vst1.8 d8,[r7,: 64]!
-> +       vmlal.s32 q5,d14,d1
-> +       vext.32 d12,d9,d8,#0
-> +       vmlal.s32 q5,d15,d19
-> +       vmov.i64 d13,#0
-> +       vmlal.s32 q5,d29,d18
-> +       vext.32 d25,d19,d7,#1
-> +       vmlal.s32 q6,d20,d5
-> +       vrev64.i32 d25,d25
-> +       vmlal.s32 q6,d21,d4
-> +       vst1.8 d11,[r7,: 64]!
-> +       vmlal.s32 q6,d26,d1
-> +       vext.32 d9,d10,d10,#0
-> +       vmlal.s32 q6,d27,d19
-> +       vmov.i64 d8,#0
-> +       vmlal.s32 q6,d28,d18
-> +       vmlal.s32 q4,d16,d24
-> +       vmlal.s32 q4,d17,d5
-> +       vmlal.s32 q4,d14,d4
-> +       vst1.8 d12,[r7,: 64]!
-> +       vmlal.s32 q4,d15,d1
-> +       vext.32 d10,d13,d12,#0
-> +       vmlal.s32 q4,d29,d19
-> +       vmov.i64 d11,#0
-> +       vmlal.s32 q5,d20,d6
-> +       vmlal.s32 q5,d21,d5
-> +       vmlal.s32 q5,d26,d4
-> +       vext.32 d13,d8,d8,#0
-> +       vmlal.s32 q5,d27,d1
-> +       vmov.i64 d12,#0
-> +       vmlal.s32 q5,d28,d19
-> +       vst1.8 d9,[r7,: 64]!
-> +       vmlal.s32 q6,d16,d25
-> +       vmlal.s32 q6,d17,d6
-> +       vst1.8 d10,[r7,: 64]
-> +       vmlal.s32 q6,d14,d5
-> +       vext.32 d8,d11,d10,#0
-> +       vmlal.s32 q6,d15,d4
-> +       vmov.i64 d9,#0
-> +       vmlal.s32 q6,d29,d1
-> +       vmlal.s32 q4,d20,d7
-> +       vmlal.s32 q4,d21,d6
-> +       vmlal.s32 q4,d26,d5
-> +       vext.32 d11,d12,d12,#0
-> +       vmlal.s32 q4,d27,d4
-> +       vmov.i64 d10,#0
-> +       vmlal.s32 q4,d28,d1
-> +       vmlal.s32 q5,d16,d0
-> +       sub r6,r7,#32
-> +       vmlal.s32 q5,d17,d7
-> +       vmlal.s32 q5,d14,d6
-> +       vext.32 d30,d9,d8,#0
-> +       vmlal.s32 q5,d15,d5
-> +       vld1.8 {d31},[r6,: 64]!
-> +       vmlal.s32 q5,d29,d4
-> +       vmlal.s32 q15,d20,d0
-> +       vext.32 d0,d6,d18,#1
-> +       vmlal.s32 q15,d21,d25
-> +       vrev64.i32 d0,d0
-> +       vmlal.s32 q15,d26,d24
-> +       vext.32 d1,d7,d19,#1
-> +       vext.32 d7,d10,d10,#0
-> +       vmlal.s32 q15,d27,d23
-> +       vrev64.i32 d1,d1
-> +       vld1.8 {d6},[r6,: 64]
-> +       vmlal.s32 q15,d28,d22
-> +       vmlal.s32 q3,d16,d4
-> +       add r6,r6,#24
-> +       vmlal.s32 q3,d17,d2
-> +       vext.32 d4,d31,d30,#0
-> +       vmov d17,d11
-> +       vmlal.s32 q3,d14,d1
-> +       vext.32 d11,d13,d13,#0
-> +       vext.32 d13,d30,d30,#0
-> +       vmlal.s32 q3,d15,d0
-> +       vext.32 d1,d8,d8,#0
-> +       vmlal.s32 q3,d29,d3
-> +       vld1.8 {d5},[r6,: 64]
-> +       sub r6,r6,#16
-> +       vext.32 d10,d6,d6,#0
-> +       vmov.i32 q1,#0xffffffff
-> +       vshl.i64 q4,q1,#25
-> +       add r7,sp,#512
-> +       vld1.8 {d14-d15},[r7,: 128]
-> +       vadd.i64 q9,q2,q7
-> +       vshl.i64 q1,q1,#26
-> +       vshr.s64 q10,q9,#26
-> +       vld1.8 {d0},[r6,: 64]!
-> +       vadd.i64 q5,q5,q10
-> +       vand q9,q9,q1
-> +       vld1.8 {d16},[r6,: 64]!
-> +       add r6,sp,#528
-> +       vld1.8 {d20-d21},[r6,: 128]
-> +       vadd.i64 q11,q5,q10
-> +       vsub.i64 q2,q2,q9
-> +       vshr.s64 q9,q11,#25
-> +       vext.32 d12,d5,d4,#0
-> +       vand q11,q11,q4
-> +       vadd.i64 q0,q0,q9
-> +       vmov d19,d7
-> +       vadd.i64 q3,q0,q7
-> +       vsub.i64 q5,q5,q11
-> +       vshr.s64 q11,q3,#26
-> +       vext.32 d18,d11,d10,#0
-> +       vand q3,q3,q1
-> +       vadd.i64 q8,q8,q11
-> +       vadd.i64 q11,q8,q10
-> +       vsub.i64 q0,q0,q3
-> +       vshr.s64 q3,q11,#25
-> +       vand q11,q11,q4
-> +       vadd.i64 q3,q6,q3
-> +       vadd.i64 q6,q3,q7
-> +       vsub.i64 q8,q8,q11
-> +       vshr.s64 q11,q6,#26
-> +       vand q6,q6,q1
-> +       vadd.i64 q9,q9,q11
-> +       vadd.i64 d25,d19,d21
-> +       vsub.i64 q3,q3,q6
-> +       vshr.s64 d23,d25,#25
-> +       vand q4,q12,q4
-> +       vadd.i64 d21,d23,d23
-> +       vshl.i64 d25,d23,#4
-> +       vadd.i64 d21,d21,d23
-> +       vadd.i64 d25,d25,d21
-> +       vadd.i64 d4,d4,d25
-> +       vzip.i32 q0,q8
-> +       vadd.i64 d12,d4,d14
-> +       add r6,r8,#8
-> +       vst1.8 d0,[r6,: 64]
-> +       vsub.i64 d19,d19,d9
-> +       add r6,r6,#16
-> +       vst1.8 d16,[r6,: 64]
-> +       vshr.s64 d22,d12,#26
-> +       vand q0,q6,q1
-> +       vadd.i64 d10,d10,d22
-> +       vzip.i32 q3,q9
-> +       vsub.i64 d4,d4,d0
-> +       sub r6,r6,#8
-> +       vst1.8 d6,[r6,: 64]
-> +       add r6,r6,#16
-> +       vst1.8 d18,[r6,: 64]
-> +       vzip.i32 q2,q5
-> +       sub r6,r6,#32
-> +       vst1.8 d4,[r6,: 64]
-> +       subs r5,r5,#1
-> +       bhi .Lsquaringloop
-> +       .Lskipsquaringloop:
-> +       mov r2,r2
-> +       add r5,r3,#288
-> +       add r6,r3,#144
-> +       vmov.i32 q0,#19
-> +       vmov.i32 q1,#0
-> +       vmov.i32 q2,#1
-> +       vzip.i32 q1,q2
-> +       vld1.8 {d4-d5},[r5,: 128]!
-> +       vld1.8 {d6-d7},[r5,: 128]!
-> +       vld1.8 {d9},[r5,: 64]
-> +       vld1.8 {d10-d11},[r2,: 128]!
-> +       add r5,sp,#416
-> +       vld1.8 {d12-d13},[r2,: 128]!
-> +       vmul.i32 q7,q2,q0
-> +       vld1.8 {d8},[r2,: 64]
-> +       vext.32 d17,d11,d10,#1
-> +       vmul.i32 q9,q3,q0
-> +       vext.32 d16,d10,d8,#1
-> +       vshl.u32 q10,q5,q1
-> +       vext.32 d22,d14,d4,#1
-> +       vext.32 d24,d18,d6,#1
-> +       vshl.u32 q13,q6,q1
-> +       vshl.u32 d28,d8,d2
-> +       vrev64.i32 d22,d22
-> +       vmul.i32 d1,d9,d1
-> +       vrev64.i32 d24,d24
-> +       vext.32 d29,d8,d13,#1
-> +       vext.32 d0,d1,d9,#1
-> +       vrev64.i32 d0,d0
-> +       vext.32 d2,d9,d1,#1
-> +       vext.32 d23,d15,d5,#1
-> +       vmull.s32 q4,d20,d4
-> +       vrev64.i32 d23,d23
-> +       vmlal.s32 q4,d21,d1
-> +       vrev64.i32 d2,d2
-> +       vmlal.s32 q4,d26,d19
-> +       vext.32 d3,d5,d15,#1
-> +       vmlal.s32 q4,d27,d18
-> +       vrev64.i32 d3,d3
-> +       vmlal.s32 q4,d28,d15
-> +       vext.32 d14,d12,d11,#1
-> +       vmull.s32 q5,d16,d23
-> +       vext.32 d15,d13,d12,#1
-> +       vmlal.s32 q5,d17,d4
-> +       vst1.8 d8,[r5,: 64]!
-> +       vmlal.s32 q5,d14,d1
-> +       vext.32 d12,d9,d8,#0
-> +       vmlal.s32 q5,d15,d19
-> +       vmov.i64 d13,#0
-> +       vmlal.s32 q5,d29,d18
-> +       vext.32 d25,d19,d7,#1
-> +       vmlal.s32 q6,d20,d5
-> +       vrev64.i32 d25,d25
-> +       vmlal.s32 q6,d21,d4
-> +       vst1.8 d11,[r5,: 64]!
-> +       vmlal.s32 q6,d26,d1
-> +       vext.32 d9,d10,d10,#0
-> +       vmlal.s32 q6,d27,d19
-> +       vmov.i64 d8,#0
-> +       vmlal.s32 q6,d28,d18
-> +       vmlal.s32 q4,d16,d24
-> +       vmlal.s32 q4,d17,d5
-> +       vmlal.s32 q4,d14,d4
-> +       vst1.8 d12,[r5,: 64]!
-> +       vmlal.s32 q4,d15,d1
-> +       vext.32 d10,d13,d12,#0
-> +       vmlal.s32 q4,d29,d19
-> +       vmov.i64 d11,#0
-> +       vmlal.s32 q5,d20,d6
-> +       vmlal.s32 q5,d21,d5
-> +       vmlal.s32 q5,d26,d4
-> +       vext.32 d13,d8,d8,#0
-> +       vmlal.s32 q5,d27,d1
-> +       vmov.i64 d12,#0
-> +       vmlal.s32 q5,d28,d19
-> +       vst1.8 d9,[r5,: 64]!
-> +       vmlal.s32 q6,d16,d25
-> +       vmlal.s32 q6,d17,d6
-> +       vst1.8 d10,[r5,: 64]
-> +       vmlal.s32 q6,d14,d5
-> +       vext.32 d8,d11,d10,#0
-> +       vmlal.s32 q6,d15,d4
-> +       vmov.i64 d9,#0
-> +       vmlal.s32 q6,d29,d1
-> +       vmlal.s32 q4,d20,d7
-> +       vmlal.s32 q4,d21,d6
-> +       vmlal.s32 q4,d26,d5
-> +       vext.32 d11,d12,d12,#0
-> +       vmlal.s32 q4,d27,d4
-> +       vmov.i64 d10,#0
-> +       vmlal.s32 q4,d28,d1
-> +       vmlal.s32 q5,d16,d0
-> +       sub r2,r5,#32
-> +       vmlal.s32 q5,d17,d7
-> +       vmlal.s32 q5,d14,d6
-> +       vext.32 d30,d9,d8,#0
-> +       vmlal.s32 q5,d15,d5
-> +       vld1.8 {d31},[r2,: 64]!
-> +       vmlal.s32 q5,d29,d4
-> +       vmlal.s32 q15,d20,d0
-> +       vext.32 d0,d6,d18,#1
-> +       vmlal.s32 q15,d21,d25
-> +       vrev64.i32 d0,d0
-> +       vmlal.s32 q15,d26,d24
-> +       vext.32 d1,d7,d19,#1
-> +       vext.32 d7,d10,d10,#0
-> +       vmlal.s32 q15,d27,d23
-> +       vrev64.i32 d1,d1
-> +       vld1.8 {d6},[r2,: 64]
-> +       vmlal.s32 q15,d28,d22
-> +       vmlal.s32 q3,d16,d4
-> +       add r2,r2,#24
-> +       vmlal.s32 q3,d17,d2
-> +       vext.32 d4,d31,d30,#0
-> +       vmov d17,d11
-> +       vmlal.s32 q3,d14,d1
-> +       vext.32 d11,d13,d13,#0
-> +       vext.32 d13,d30,d30,#0
-> +       vmlal.s32 q3,d15,d0
-> +       vext.32 d1,d8,d8,#0
-> +       vmlal.s32 q3,d29,d3
-> +       vld1.8 {d5},[r2,: 64]
-> +       sub r2,r2,#16
-> +       vext.32 d10,d6,d6,#0
-> +       vmov.i32 q1,#0xffffffff
-> +       vshl.i64 q4,q1,#25
-> +       add r5,sp,#512
-> +       vld1.8 {d14-d15},[r5,: 128]
-> +       vadd.i64 q9,q2,q7
-> +       vshl.i64 q1,q1,#26
-> +       vshr.s64 q10,q9,#26
-> +       vld1.8 {d0},[r2,: 64]!
-> +       vadd.i64 q5,q5,q10
-> +       vand q9,q9,q1
-> +       vld1.8 {d16},[r2,: 64]!
-> +       add r2,sp,#528
-> +       vld1.8 {d20-d21},[r2,: 128]
-> +       vadd.i64 q11,q5,q10
-> +       vsub.i64 q2,q2,q9
-> +       vshr.s64 q9,q11,#25
-> +       vext.32 d12,d5,d4,#0
-> +       vand q11,q11,q4
-> +       vadd.i64 q0,q0,q9
-> +       vmov d19,d7
-> +       vadd.i64 q3,q0,q7
-> +       vsub.i64 q5,q5,q11
-> +       vshr.s64 q11,q3,#26
-> +       vext.32 d18,d11,d10,#0
-> +       vand q3,q3,q1
-> +       vadd.i64 q8,q8,q11
-> +       vadd.i64 q11,q8,q10
-> +       vsub.i64 q0,q0,q3
-> +       vshr.s64 q3,q11,#25
-> +       vand q11,q11,q4
-> +       vadd.i64 q3,q6,q3
-> +       vadd.i64 q6,q3,q7
-> +       vsub.i64 q8,q8,q11
-> +       vshr.s64 q11,q6,#26
-> +       vand q6,q6,q1
-> +       vadd.i64 q9,q9,q11
-> +       vadd.i64 d25,d19,d21
-> +       vsub.i64 q3,q3,q6
-> +       vshr.s64 d23,d25,#25
-> +       vand q4,q12,q4
-> +       vadd.i64 d21,d23,d23
-> +       vshl.i64 d25,d23,#4
-> +       vadd.i64 d21,d21,d23
-> +       vadd.i64 d25,d25,d21
-> +       vadd.i64 d4,d4,d25
-> +       vzip.i32 q0,q8
-> +       vadd.i64 d12,d4,d14
-> +       add r2,r6,#8
-> +       vst1.8 d0,[r2,: 64]
-> +       vsub.i64 d19,d19,d9
-> +       add r2,r2,#16
-> +       vst1.8 d16,[r2,: 64]
-> +       vshr.s64 d22,d12,#26
-> +       vand q0,q6,q1
-> +       vadd.i64 d10,d10,d22
-> +       vzip.i32 q3,q9
-> +       vsub.i64 d4,d4,d0
-> +       sub r2,r2,#8
-> +       vst1.8 d6,[r2,: 64]
-> +       add r2,r2,#16
-> +       vst1.8 d18,[r2,: 64]
-> +       vzip.i32 q2,q5
-> +       sub r2,r2,#32
-> +       vst1.8 d4,[r2,: 64]
-> +       cmp r4,#0
-> +       beq .Lskippostcopy
-> +       add r2,r3,#144
-> +       mov r4,r4
-> +       vld1.8 {d0-d1},[r2,: 128]!
-> +       vld1.8 {d2-d3},[r2,: 128]!
-> +       vld1.8 {d4},[r2,: 64]
-> +       vst1.8 {d0-d1},[r4,: 128]!
-> +       vst1.8 {d2-d3},[r4,: 128]!
-> +       vst1.8 d4,[r4,: 64]
-> +       .Lskippostcopy:
-> +       cmp r1,#1
-> +       bne .Lskipfinalcopy
-> +       add r2,r3,#288
-> +       add r4,r3,#144
-> +       vld1.8 {d0-d1},[r2,: 128]!
-> +       vld1.8 {d2-d3},[r2,: 128]!
-> +       vld1.8 {d4},[r2,: 64]
-> +       vst1.8 {d0-d1},[r4,: 128]!
-> +       vst1.8 {d2-d3},[r4,: 128]!
-> +       vst1.8 d4,[r4,: 64]
-> +       .Lskipfinalcopy:
-> +       add r1,r1,#1
-> +       cmp r1,#12
-> +       blo .Linvertloop
-> +       add r1,r3,#144
-> +       ldr r2,[r1],#4
-> +       ldr r3,[r1],#4
-> +       ldr r4,[r1],#4
-> +       ldr r5,[r1],#4
-> +       ldr r6,[r1],#4
-> +       ldr r7,[r1],#4
-> +       ldr r8,[r1],#4
-> +       ldr r9,[r1],#4
-> +       ldr r10,[r1],#4
-> +       ldr r1,[r1]
-> +       add r11,r1,r1,LSL #4
-> +       add r11,r11,r1,LSL #1
-> +       add r11,r11,#16777216
-> +       mov r11,r11,ASR #25
-> +       add r11,r11,r2
-> +       mov r11,r11,ASR #26
-> +       add r11,r11,r3
-> +       mov r11,r11,ASR #25
-> +       add r11,r11,r4
-> +       mov r11,r11,ASR #26
-> +       add r11,r11,r5
-> +       mov r11,r11,ASR #25
-> +       add r11,r11,r6
-> +       mov r11,r11,ASR #26
-> +       add r11,r11,r7
-> +       mov r11,r11,ASR #25
-> +       add r11,r11,r8
-> +       mov r11,r11,ASR #26
-> +       add r11,r11,r9
-> +       mov r11,r11,ASR #25
-> +       add r11,r11,r10
-> +       mov r11,r11,ASR #26
-> +       add r11,r11,r1
-> +       mov r11,r11,ASR #25
-> +       add r2,r2,r11
-> +       add r2,r2,r11,LSL #1
-> +       add r2,r2,r11,LSL #4
-> +       mov r11,r2,ASR #26
-> +       add r3,r3,r11
-> +       sub r2,r2,r11,LSL #26
-> +       mov r11,r3,ASR #25
-> +       add r4,r4,r11
-> +       sub r3,r3,r11,LSL #25
-> +       mov r11,r4,ASR #26
-> +       add r5,r5,r11
-> +       sub r4,r4,r11,LSL #26
-> +       mov r11,r5,ASR #25
-> +       add r6,r6,r11
-> +       sub r5,r5,r11,LSL #25
-> +       mov r11,r6,ASR #26
-> +       add r7,r7,r11
-> +       sub r6,r6,r11,LSL #26
-> +       mov r11,r7,ASR #25
-> +       add r8,r8,r11
-> +       sub r7,r7,r11,LSL #25
-> +       mov r11,r8,ASR #26
-> +       add r9,r9,r11
-> +       sub r8,r8,r11,LSL #26
-> +       mov r11,r9,ASR #25
-> +       add r10,r10,r11
-> +       sub r9,r9,r11,LSL #25
-> +       mov r11,r10,ASR #26
-> +       add r1,r1,r11
-> +       sub r10,r10,r11,LSL #26
-> +       mov r11,r1,ASR #25
-> +       sub r1,r1,r11,LSL #25
-> +       add r2,r2,r3,LSL #26
-> +       mov r3,r3,LSR #6
-> +       add r3,r3,r4,LSL #19
-> +       mov r4,r4,LSR #13
-> +       add r4,r4,r5,LSL #13
-> +       mov r5,r5,LSR #19
-> +       add r5,r5,r6,LSL #6
-> +       add r6,r7,r8,LSL #25
-> +       mov r7,r8,LSR #7
-> +       add r7,r7,r9,LSL #19
-> +       mov r8,r9,LSR #13
-> +       add r8,r8,r10,LSL #12
-> +       mov r9,r10,LSR #20
-> +       add r1,r9,r1,LSL #6
-> +       str r2,[r0],#4
-> +       str r3,[r0],#4
-> +       str r4,[r0],#4
-> +       str r5,[r0],#4
-> +       str r6,[r0],#4
-> +       str r7,[r0],#4
-> +       str r8,[r0],#4
-> +       str r1,[r0]
-
-Why the post increment? Although it hardly matters here, this should
-be more efficient
-
-str r2, [r0]
-str r3, [r0, #4]
-str r4, [r0, #8]
-str r5, [r0, #12]
-str r6, [r0, #16]
-str r7, [r0, #20]
-str r8, [r0, #24]
-str r1, [r0, #28]
-
-> +       ldrd r4,[sp,#0]
-> +       ldrd r6,[sp,#8]
-> +       ldrd r8,[sp,#16]
-> +       ldrd r10,[sp,#24]
-> +       ldr r12,[sp,#480]
-> +       ldr r14,[sp,#484]
-> +       ldr r0,=0
-> +       mov sp,r12
-> +       vpop {q4,q5,q6,q7}
-
-Drop this
-
-> +       bx lr
-> +ENDPROC(curve25519_neon)
-> +#endif
-> --
-> 2.18.0
->
+> +	flush_work(&lcdc_dc->reset_lcdc_work);
+> +	drm_kms_helper_poll_fini(dev);
+> +	if (lcdc_dc->panel)
+> +		drm_panel_bridge_remove(lcdc_dc->bridge);
+> +	drm_mode_config_cleanup(dev);
+> +
+> +	pm_runtime_get_sync(dev->dev);
+> +	drm_irq_uninstall(dev);
+> +	pm_runtime_put_sync(dev->dev);
+> +
+> +	dev->dev_private = NULL;
+> +
+> +	pm_runtime_disable(dev->dev);
+> +	lcdc_dc_stop_clock(lcdc_dc);
+> +	cancel_work_sync(&lcdc_dc->reset_lcdc_work);
+> +}
+> +
+> +
+> +static int lcdc_dc_probe(struct platform_device *pdev)
+> +{
+> +	struct drm_device *drm;
+> +	struct device *dev;
+> +	int ret;
+> +
+> +	dev = &pdev->dev;
+> +
+> +	drm = drm_dev_alloc(&lcdc_dc_drm_driver, dev);
+> +	if (IS_ERR(drm)) {
+> +		DRM_DEV_ERROR(dev, "Failed to allocate drm device\n");
+> +		return PTR_ERR(drm);
+> +	}
+> +
+> +	ret = lcdc_dc_load(drm);
+> +	if (ret)
+> +		goto err_put_ref;
+> +
+> +	ret = drm_dev_register(drm, 0);
+> +	if (ret) {
+> +		DRM_DEV_ERROR(dev, "Failed to register drm (%d)\n", ret);
+> +		goto err_unload;
+> +	}
+> +
+> +	return 0;
+> +
+> +err_unload:
+> +	lcdc_dc_unload(drm);
+> +
+> +err_put_ref:
+> +	drm_dev_put(drm);
+> +	return ret;
+> +}
+> +
+> +static int lcdc_dc_remove(struct platform_device *pdev)
+> +{
+> +	struct drm_device *drm;
+> +
+> +	drm = platform_get_drvdata(pdev);
+> +
+> +	drm_dev_unregister(drm);
+> +	lcdc_dc_unload(drm);
+> +	drm_dev_unref(drm);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id lcdc_dc_dt_ids[] = {
+> +	{ .compatible = "atmel,lcdc-display-controller", },
+> +	{ /* sentinel */ }
+> +};
+> +MODULE_DEVICE_TABLE(of, lcdc_dc_dt_ids);
+> +
+> +static struct platform_driver lcdc_dc_driver = {
+> +	.probe		= lcdc_dc_probe,
+> +	.remove		= lcdc_dc_remove,
+> +	.driver		= {
+> +		.of_match_table = lcdc_dc_dt_ids,
+> +		.name	= "atmel-lcdc-dc",
+> +	},
+> +};
+> +
+> +module_platform_driver(lcdc_dc_driver);
+> +
+> +MODULE_AUTHOR("Sam Ravnborg <sam@ravnborg.org>");
+> +MODULE_DESCRIPTION("Atmel LCDC Display Controller DRM Driver");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_ALIAS("platform:atmel-lcdc-dc");
