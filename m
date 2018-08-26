@@ -1,29 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Aug 2018 00:46:25 +0200
-Subject: [PATCH 1/2] gpio: ftgpio: Support optional silicon clock
-In-Reply-To: <20180826190445.GB7359@lunn.ch>
-References: <20180826110321.17723-1-linus.walleij@linaro.org>
- <20180826190445.GB7359@lunn.ch>
-Message-ID: <CACRpkdYeyNzZ2XM=Rj4igKF7t+TLk3veteRXeO4D4XYLaSN4FQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 26 Aug 2018 16:37:11 -0700
+Subject: [GIT PULL] tee subsystem for v4.20
+In-Reply-To: <20180824115545.GA4989@jax.lan>
+References: <20180824115545.GA4989@jax.lan>
+Message-ID: <CAOesGMikN1eAzpLMSgY+PwQ0cdgA_Vp9nU+P8BHcacLdh52-iA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 26, 2018 at 9:04 PM Andrew Lunn <andrew@lunn.ch> wrote:
-
-> > +     g->clk = devm_clk_get(dev, NULL);
-> > +     if (!IS_ERR(g->clk)) {
-> > +             ret = clk_prepare_enable(g->clk);
-> > +             if (ret)
-> > +                     return ret;
-> > +     }
+On Fri, Aug 24, 2018 at 4:55 AM, Jens Wiklander
+<jens.wiklander@linaro.org> wrote:
+> Hello arm-soc maintainers,
 >
-> Hi Linus
+> Please pull these tee driver enhancements. There's one small fix for the
+> OP-TEE driver to take DT status into account. There's also a patch
+> providing a kernel only tee client interface that can be used by other
+> drivers etc. Currently there's no users of this interface in the kernel
+> but there seems to be some work in the pipe as some has tested it with
+> out of tree patches.
 >
-> Is there any chance devm_clk_get() could return -EPROBE_DIFFERED?
+> Thanks,
+> Jens
+>
+> The following changes since commit 94710cac0ef4ee177a63b5227664b38c95bbf703:
+>
+>   Linux 4.18 (2018-08-12 13:41:04 -0700)
+>
+> are available in the Git repository at:
+>
+>   git://git.linaro.org/people/jens.wiklander/linux-tee.git tags/tee-drv-for-4.20
+>
+> for you to fetch changes up to 25559c22cef879c5cf7119540bfe21fb379d29f3:
+>
+>   tee: add kernel internal client interface (2018-08-24 11:57:37 +0200)
 
-Not practically but I was convinced to move the bulk of clocks out of
-CLK_OF_DECLARE_DRIVER so I guess theoretically it could happen.
-So I guess I should re-spin with that as explict bailout condition.
+Merged into next/drivers. Thanks!
 
-Yours,
-Linus Walleij
+
+-Olof
