@@ -1,82 +1,244 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 25 Aug 2018 12:29:27 -0700
-Subject: [GIT PULL] ARM: SoC late branch
-Message-ID: <20180825192927.votock3x5zpwplzo@localhost>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 26 Aug 2018 11:05:43 +0900
+Subject: [PATCH 6/8] kbuild: consolidate Devicetree dtb build rules
+In-Reply-To: <20180821215524.23040-7-robh@kernel.org>
+References: <20180821215524.23040-1-robh@kernel.org>
+ <20180821215524.23040-7-robh@kernel.org>
+Message-ID: <CAK7LNATcYSvwh0BEEdyUuDa_Y9X-AqQAzA5MrbNhOSMmSzqhTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Rob,
 
-The following changes since commit 29ed45fff05899f6f39d05fe1c32b1bc51f8926b:
 
-  Merge tag 'v4.18-next-soc' of https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux into next/drivers (2018-07-26 13:08:01 -0700)
+2018-08-22 6:55 GMT+09:00 Rob Herring <robh@kernel.org>:
+> There is nothing arch specific about building dtb files other than their
+> location under /arch/*/boot/dts/. Keeping each arch aligned is a pain.
+> The dependencies and supported targets are all slightly different.
+> Also, a cross-compiler for each arch is needed, but really the host
+> compiler preprocessor is perfectly fine for building dtbs. Move the
+> build rules to a common location and remove the arch specific ones. This
+> is done in a single step to avoid warnings about overriding rules.
+>
+> The build dependencies had been a mixture of 'scripts' and/or 'prepare'.
+> These pull in several dependencies some of which need a target compiler
+> (specifically devicetable-offsets.h) and aren't needed to build dtbs.
+> All that is really needed is dtc, so adjust the dependencies to only be
+> dtc.
+>
+> This change enables support 'dtbs_install' on some arches which were
+> missing the target.
+>
+> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Cc: Michal Marek <michal.lkml@markovi.net>
+> Cc: Vineet Gupta <vgupta@synopsys.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+> Cc: Michal Simek <monstr@monstr.eu>
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Cc: Paul Burton <paul.burton@mips.com>
+> Cc: James Hogan <jhogan@kernel.org>
+> Cc: Ley Foon Tan <lftan@altera.com>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Michael Ellerman <mpe@ellerman.id.au>
+> Cc: Chris Zankel <chris@zankel.net>
+> Cc: Max Filippov <jcmvbkbc@gmail.com>
+> Cc: linux-kbuild at vger.kernel.org
+> Cc: linux-snps-arc at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: uclinux-h8-devel at lists.sourceforge.jp
+> Cc: linux-mips at linux-mips.org
+> Cc: nios2-dev at lists.rocketboards.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-xtensa at linux-xtensa.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>  Makefile                 | 30 ++++++++++++++++++++++++++++++
+>  arch/arc/Makefile        |  6 ------
+>  arch/arm/Makefile        | 20 +-------------------
+>  arch/arm64/Makefile      | 17 +----------------
+>  arch/c6x/Makefile        |  2 --
+>  arch/h8300/Makefile      | 11 +----------
+>  arch/microblaze/Makefile |  4 +---
+>  arch/mips/Makefile       | 15 +--------------
+>  arch/nds32/Makefile      |  2 +-
+>  arch/nios2/Makefile      |  7 -------
+>  arch/nios2/boot/Makefile |  4 ----
+>  arch/powerpc/Makefile    |  3 ---
+>  arch/xtensa/Makefile     | 12 +-----------
+>  scripts/Makefile         |  1 -
+>  scripts/Makefile.lib     |  2 +-
+>  15 files changed, 38 insertions(+), 98 deletions(-)
+>
+> diff --git a/Makefile b/Makefile
+> index c13f8b85ba60..6d89e673f192 100644
+> --- a/Makefile
+> +++ b/Makefile
+> @@ -1212,6 +1212,30 @@ kselftest-merge:
+>                 $(srctree)/tools/testing/selftests/*/config
+>         +$(Q)$(MAKE) -f $(srctree)/Makefile olddefconfig
+>
+> +# ---------------------------------------------------------------------------
+> +# Devicetree files
+> +
+> +dtstree := $(wildcard arch/$(SRCARCH)/boot/dts)
+> +
+> +ifdef CONFIG_OF_EARLY_FLATTREE
+> +
+> +%.dtb %.dtb.S %.dtb.o: | dtc
 
-are available in the git repository at:
+I think the pipe operator is unnecessary
+because Kbuild will descend to $(dtstree) anyway.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-late
 
-for you to fetch changes up to 1aa55ca9b14af6cfd987ce4fdaf548f7067a5d07:
+> +       $(Q)$(MAKE) $(build)=$(dtstree) $(dtstree)/$@
+> +
+> +PHONY += dtbs
+> +dtbs: | dtc
 
-  iommu/rockchip: Move irq request past pm_runtime_enable (2018-08-24 08:50:32 -0700)
+Ditto.
 
-----------------------------------------------------------------
-ARM: SoC: late updates
 
-A couple of late-merged changes that would be useful to get in this
-merge window:
+> +       $(Q)$(MAKE) $(build)=$(dtstree)
+> +
+> +dtbs_install: dtbs
+> +       $(Q)$(MAKE) $(dtbinst)=$(dtstree)
+> +
+> +all: dtbs
+> +
+> +dtc:
+> +       $(Q)$(MAKE) $(build)=scripts/dtc
+> +
+> +endif
+> +
 
- - Driver support for reset of audio complex on Meson platforms. The
-   audio driver went in this merge window, and these changes have been
-   in -next for a while (just not in our tree).
 
- - Power management fixes for IOMMU on Rockchip platforms, getting
-   closer to kexec working on them, including Chromebooks.
+arch/*/boot/dts/ are not only directories that
+require dtc.
 
- - Another pass updating "arm,psci" -> "psci" for some properties that
-   have snuck in since last time it was done.
 
-----------------------------------------------------------------
-Amit Kucheria (1):
-      arm64: dts: Fix various entry-method properties to reflect documentation
+$ find  drivers/  -name '*.dts'
+drivers/staging/mt7621-dts/gbpc1.dts
+drivers/staging/pi433/Documentation/devicetree/pi433-overlay.dts
+drivers/of/unittest-data/overlay_12.dts
+drivers/of/unittest-data/overlay.dts
+drivers/of/unittest-data/overlay_5.dts
+drivers/of/unittest-data/overlay_bad_symbol.dts
+drivers/of/unittest-data/overlay_1.dts
+drivers/of/unittest-data/overlay_bad_phandle.dts
+drivers/of/unittest-data/overlay_2.dts
+drivers/of/unittest-data/overlay_15.dts
+drivers/of/unittest-data/overlay_10.dts
+drivers/of/unittest-data/testcases.dts
+drivers/of/unittest-data/overlay_6.dts
+drivers/of/unittest-data/overlay_13.dts
+drivers/of/unittest-data/overlay_4.dts
+drivers/of/unittest-data/overlay_9.dts
+drivers/of/unittest-data/overlay_3.dts
+drivers/of/unittest-data/overlay_8.dts
+drivers/of/unittest-data/overlay_7.dts
+drivers/of/unittest-data/overlay_11.dts
+drivers/of/unittest-data/overlay_0.dts
+drivers/of/unittest-data/overlay_base.dts
+drivers/gpu/drm/rcar-du/rcar_du_of_lvds_r8a7796.dts
+drivers/gpu/drm/rcar-du/rcar_du_of_lvds_r8a7795.dts
+drivers/gpu/drm/rcar-du/rcar_du_of_lvds_r8a7793.dts
+drivers/gpu/drm/rcar-du/rcar_du_of_lvds_r8a7790.dts
+drivers/gpu/drm/rcar-du/rcar_du_of_lvds_r8a7791.dts
 
-Jerome Brunet (2):
-      reset: meson: add dt-bindings for meson-axg audio arb
-      reset: meson: add meson audio arb driver
 
-Leonard Crestez (1):
-      reset: imx7: Fix always writing bits as 0
 
-Marc Zyngier (4):
-      ARM: rockchip: Force CONFIG_PM on Rockchip systems
-      arm64: rockchip: Force CONFIG_PM on Rockchip systems
-      iommu/rockchip: Handle errors returned from PM framework
-      iommu/rockchip: Move irq request past pm_runtime_enable
 
-Olof Johansson (2):
-      Merge tag 'reset-for-4.19-2' of git://git.pengutronix.de/git/pza/linux into next/late
-      Merge tag 'reset-fixes-for-4.18' of git://git.pengutronix.de/git/pza/linux into next/late
 
- .../devicetree/bindings/arm/cpu-capacity.txt       |   2 +-
- .../devicetree/bindings/arm/idle-states.txt        |   4 +-
- .../bindings/reset/amlogic,meson-axg-audio-arb.txt |  21 +++
- arch/arm/mach-rockchip/Kconfig                     |   1 +
- arch/arm64/Kconfig.platforms                       |   1 +
- arch/arm64/boot/dts/arm/juno-r1.dts                |   2 +-
- arch/arm64/boot/dts/arm/juno-r2.dts                |   2 +-
- arch/arm64/boot/dts/arm/juno.dts                   |   2 +-
- arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi     |   2 +-
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     |   2 +-
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     |   2 +-
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi          |   2 +-
- arch/arm64/boot/dts/sprd/sc9860.dtsi               |   2 +-
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |   2 +-
- drivers/iommu/rockchip-iommu.c                     |  45 +++---
- drivers/reset/Kconfig                              |   7 +
- drivers/reset/Makefile                             |   1 +
- drivers/reset/reset-imx7.c                         |   2 +-
- drivers/reset/reset-meson-audio-arb.c              | 168 +++++++++++++++++++++
- .../reset/amlogic,meson-axg-audio-arb.h            |  17 +++
- 20 files changed, 257 insertions(+), 30 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/reset/amlogic,meson-axg-audio-arb.txt
- create mode 100644 drivers/reset/reset-meson-audio-arb.c
- create mode 100644 include/dt-bindings/reset/amlogic,meson-axg-audio-arb.h
+dtc must be built before descending into any directory.
+
+
+
+
+
+$ git clean -f -x
+$ make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf-  defconfig
+drivers/gpu/drm/rcar-du/
+  HOSTCC  scripts/basic/fixdep
+  HOSTCC  scripts/kconfig/conf.o
+  YACC    scripts/kconfig/zconf.tab.c
+  LEX     scripts/kconfig/zconf.lex.c
+  HOSTCC  scripts/kconfig/zconf.tab.o
+  HOSTLD  scripts/kconfig/conf
+*** Default configuration is based on 'multi_v7_defconfig'
+#
+# configuration written to .config
+#
+scripts/kconfig/conf  --syncconfig Kconfig
+  CC      kernel/bounds.s
+  CC      arch/arm/kernel/asm-offsets.s
+  CALL    scripts/checksyscalls.sh
+<stdin>:1332:2: warning: #warning syscall io_pgetevents not implemented [-Wcpp]
+  CC      scripts/mod/empty.o
+  HOSTCC  scripts/mod/mk_elfconfig
+  MKELF   scripts/mod/elfconfig.h
+  HOSTCC  scripts/mod/modpost.o
+  CC      scripts/mod/devicetable-offsets.s
+  UPD     scripts/mod/devicetable-offsets.h
+  HOSTCC  scripts/mod/file2alias.o
+  HOSTCC  scripts/mod/sumversion.o
+  HOSTLD  scripts/mod/modpost
+  HOSTCC  scripts/kallsyms
+  HOSTCC  scripts/conmakehash
+  HOSTCC  scripts/sortextable
+  HOSTCC  scripts/asn1_compiler
+  HOSTCC  scripts/extract-cert
+  CC      drivers/gpu/drm/rcar-du/rcar_lvds.o
+  AR      drivers/gpu/drm/rcar-du/built-in.a
+  CC [M]  drivers/gpu/drm/rcar-du/rcar_du_crtc.o
+  CC [M]  drivers/gpu/drm/rcar-du/rcar_du_drv.o
+  CC [M]  drivers/gpu/drm/rcar-du/rcar_du_encoder.o
+  CC [M]  drivers/gpu/drm/rcar-du/rcar_du_group.o
+  CC [M]  drivers/gpu/drm/rcar-du/rcar_du_kms.o
+  CC [M]  drivers/gpu/drm/rcar-du/rcar_du_plane.o
+  CC [M]  drivers/gpu/drm/rcar-du/rcar_du_of.o
+make[2]: *** No rule to make target
+'drivers/gpu/drm/rcar-du/rcar_du_of_lvds_r8a7790.dtb', needed by
+'drivers/gpu/drm/rcar-du/rcar_du_of_lvds_r8a7790.dtb.S'.  Stop.
+Makefile:1721: recipe for target 'drivers/gpu/drm/rcar-du/' failed
+make[1]: *** [drivers/gpu/drm/rcar-du/] Error 2
+Makefile:286: recipe for target '__build_one_by_one' failed
+make: *** [__build_one_by_one] Error 2
+
+
+
+
+
+
+
+
+> diff --git a/scripts/Makefile b/scripts/Makefile
+> index 61affa300d25..a716a6b10954 100644
+> --- a/scripts/Makefile
+> +++ b/scripts/Makefile
+> @@ -39,7 +39,6 @@ build_unifdef: $(obj)/unifdef
+>  subdir-$(CONFIG_MODVERSIONS) += genksyms
+>  subdir-y                     += mod
+>  subdir-$(CONFIG_SECURITY_SELINUX) += selinux
+> -subdir-$(CONFIG_DTC)         += dtc
+>  subdir-$(CONFIG_GDB_SCRIPTS) += gdb
+>
+>  # Let clean descend into subdirs
+
+
+You need to 'dtc' here to clean-up scripts/dtc by "make mrproper".
+
+subdir- += basic kconfig package gcc-plugins dtc
+
+
+
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
