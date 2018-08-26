@@ -1,137 +1,265 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 26 Aug 2018 21:22:25 +0200
-Subject: Function Tracing with clang on ARM32
-In-Reply-To: <20180824212006.GS160295@google.com>
-References: <35ae3d464c7b77a5fe86a732079e32bc@agner.ch>
- <20180824212006.GS160295@google.com>
-Message-ID: <71400574f8e914ee994c82564485b79e@agner.ch>
+Date: Sun, 26 Aug 2018 23:40:22 +0200
+Subject: [PATCH] ARM: ftrace: remove old mcount support
+Message-ID: <20180826214022.4889-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.08.2018 23:20, Matthias Kaehlcke wrote:
-> Hi Stefan,
-> 
-> A similar/related issue was fixed for arm64 by
-> https://reviews.llvm.org/rL266039
-> 
-> The corresponding LLVM bug is
-> https://bugs.llvm.org//show_bug.cgi?id=27311
-> 
-> Apparently for arm32 the use of '-meabi gnu' was chosen as solution:
-> 
-> http://llvm.org/viewvc/llvm-project?view=revision&revision=265888
+Commit cafa0010cd51 ("Raise the minimum required gcc version to 4.6")
+raised the minimum GCC version to 4.6. Old mcount is only required for
+GCC versions older than 4.4.0. Hence old mcount support can be dropped
+too.
 
-Yes I did saw that, and using -meabi gnu allows to compile the kernel
-with CONFIG_FUNCTION_TRACER=y (see below). Unfortunately, when trying to
-boot the kernel crashes very early.
-
-I dig a bit deeper and found that the function entry looks slightly
-different when using clang:
-
-clang v6.0.1 with 
-
-0000026c <proc_caches_init>:
- 26c:   b5d0            push    {r4, r6, r7, lr}
- 26e:   af02            add     r7, sp, #8
- 270:   b084            sub     sp, #16
- 272:   f7ff fffe       bl      0 <__gnu_mcount_nc>
-
-GCC 7.2.1:
-
-000001d6 <proc_caches_init>:
- 1d6:   b530            push    {r4, r5, lr}
- 1d8:   b085            sub     sp, #20
- 1da:   b500            push    {lr}
- 1dc:   f7ff fffe       bl      0 <__gnu_mcount_nc>
-
-
-It seems that GCC stores the link register on the stack, whereas clang
-stores a reference to the location of the stack where r7/lr has been
-stored.
-
-Changing mcount_exit to not restore lr seems to help:
-
-.macro mcount_exit
-	ldmia	sp!, {r0-r3, ip}
-	ret	ip
-.endm
-
-
-However, this leads to a broken trace, since mcount_get_lr can't find
-the link register...
-
-...
-          <idle>-0     [000] dn..    59.055202: hrtimer_start_range_ns
-<-init_stack
-          <idle>-0     [000] dn..    59.055203: _raw_spin_lock_irqsave
-<-__gnu_mcount_nc
-          <idle>-0     [000] dn..    59.055205: hrtimer_reprogram
-<-0xdf946580
-          <idle>-0     [000] dn..    59.055206: tick_program_event
-<-0x0000000d
-          <idle>-0     [000] dn..    59.055208:
-clockevents_program_event <-0xdf946860
-...
-
-It seems somewhat odd that clang uses the GCC function name but does not
-provide lr on the stack...
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+Besides cleaning up code it also simplifies changes changes for
+clang support, if added...
 
 --
 Stefan
 
+ arch/arm/Kconfig.debug         |  5 ---
+ arch/arm/include/asm/ftrace.h  |  3 --
+ arch/arm/kernel/armksyms.c     |  3 --
+ arch/arm/kernel/entry-ftrace.S | 75 ++--------------------------------
+ arch/arm/kernel/ftrace.c       | 51 -----------------------
+ 5 files changed, 4 insertions(+), 133 deletions(-)
 
-> 
-> Cheers
-> 
-> Matthias
-> 
-> On Sat, Aug 11, 2018 at 02:29:24PM +0200, Stefan Agner wrote:
->> Hi,
->>
->> I am currently looking into function tracing support when compiling an
->> ARM32 kernel with clang.
->>
->> With v4.18-rc1 and:
->> CONFIG_FTRACE=y
->>
->> CONFIG_FUNCTION_TRACER=y
->>
->> Building fails:
->>
->>   LD      vmlinux.o
->>
->>   MODPOST vmlinux.o
->> kernel/softirq.o: In function `_local_bh_enable':
->> /home/ags/projects/toradex/imx/linux-vanilla-llvm/kernel/softirq.c:152:
->> undefined reference to `mcount'
->> kernel/softirq.o: In function `__local_bh_enable_ip':
->> /home/ags/projects/toradex/imx/linux-vanilla-llvm/kernel/softirq.c:159:
->> undefined reference to `mcount'
->> kernel/softirq.o: In function `do_softirq':
->> /home/ags/projects/toradex/imx/linux-vanilla-llvm/kernel/softirq.c:316:
->> undefined reference to `mcount'
->> kernel/softirq.o: In function `irq_enter':
->> /home/ags/projects/toradex/imx/linux-vanilla-llvm/kernel/softirq.c:337:
->> undefined reference to `mcount'
->> kernel/softirq.o: In function `irq_exit':
->> /home/ags/projects/toradex/imx/linux-vanilla-llvm/kernel/softirq.c:395:
->> undefined reference to `mcount'
->>
->> It seems that clang/LLVM uses a different mcount interface. However,
->> there is an option to use the gcc compatible symbol __gnu_mcount_nc when
->> using -meabi gnu. So adding
->> CFLAGS_ABI     +=-meabi gnu
->>
->> Builds the kernel successfully. However, the kernel crashes immediately
->> on boot. Even with earlyprintk enabled, I only get:
->>
->> Uncompressing Linux... done, booting the kernel.
->>
->> I poked a bit around in arch/arm/kernel/entry-ftrace.S. Not calling
->> __mcount in __gnu_mcount_nc produces a bootable kernel. Removing the
->> call into the ftrace logic by only using mcount_enter/exit in the
->> __mcount macro does not boot...
->>
->> I guess the mcount ABI is slightly different in LLVM/clang still then?
->> Before I dive deeper, maybe anyone has an idea?
->>
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 693f84392f1b..da690e2972d6 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -73,11 +73,6 @@ config ARM_UNWIND
+ 	  the performance is not affected. Currently, this feature
+ 	  only works with EABI compilers. If unsure say Y.
+ 
+-config OLD_MCOUNT
+-	bool
+-	depends on FUNCTION_TRACER && FRAME_POINTER
+-	default y
+-
+ config DEBUG_USER
+ 	bool "Verbose user fault messages"
+ 	help
+diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+index 9e842ff41768..18b0197f2384 100644
+--- a/arch/arm/include/asm/ftrace.h
++++ b/arch/arm/include/asm/ftrace.h
+@@ -16,9 +16,6 @@ extern void __gnu_mcount_nc(void);
+ 
+ #ifdef CONFIG_DYNAMIC_FTRACE
+ struct dyn_arch_ftrace {
+-#ifdef CONFIG_OLD_MCOUNT
+-	bool	old_mcount;
+-#endif
+ };
+ 
+ static inline unsigned long ftrace_call_adjust(unsigned long addr)
+diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
+index 783fbb4de5f9..8fa2dc21d332 100644
+--- a/arch/arm/kernel/armksyms.c
++++ b/arch/arm/kernel/armksyms.c
+@@ -167,9 +167,6 @@ EXPORT_SYMBOL(_find_next_bit_be);
+ #endif
+ 
+ #ifdef CONFIG_FUNCTION_TRACER
+-#ifdef CONFIG_OLD_MCOUNT
+-EXPORT_SYMBOL(mcount);
+-#endif
+ EXPORT_SYMBOL(__gnu_mcount_nc);
+ #endif
+ 
+diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
+index efcd9f25a14b..0be69e551a64 100644
+--- a/arch/arm/kernel/entry-ftrace.S
++++ b/arch/arm/kernel/entry-ftrace.S
+@@ -15,23 +15,8 @@
+  * start of every function.  In mcount, apart from the function's address (in
+  * lr), we need to get hold of the function's caller's address.
+  *
+- * Older GCCs (pre-4.4) inserted a call to a routine called mcount like this:
+- *
+- *	bl	mcount
+- *
+- * These versions have the limitation that in order for the mcount routine to
+- * be able to determine the function's caller's address, an APCS-style frame
+- * pointer (which is set up with something like the code below) is required.
+- *
+- *	mov     ip, sp
+- *	push    {fp, ip, lr, pc}
+- *	sub     fp, ip, #4
+- *
+- * With EABI, these frame pointers are not available unless -mapcs-frame is
+- * specified, and if building as Thumb-2, not even then.
+- *
+- * Newer GCCs (4.4+) solve this problem by introducing a new version of mcount,
+- * with call sites like:
++ * Newer GCCs (4.4+) solve this problem by using a version of mcount with call
++ * sites like:
+  *
+  *	push	{lr}
+  *	bl	__gnu_mcount_nc
+@@ -46,17 +31,10 @@
+  * allows it to be clobbered in subroutines and doesn't use it to hold
+  * parameters.)
+  *
+- * When using dynamic ftrace, we patch out the mcount call by a "mov r0, r0"
+- * for the mcount case, and a "pop {lr}" for the __gnu_mcount_nc case (see
+- * arch/arm/kernel/ftrace.c).
++ * When using dynamic ftrace, we patch out the mcount call by a "pop {lr}"
++ * instead of the __gnu_mcount_nc call (see arch/arm/kernel/ftrace.c).
+  */
+ 
+-#ifndef CONFIG_OLD_MCOUNT
+-#if (__GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 4))
+-#error Ftrace requires CONFIG_FRAME_POINTER=y with GCC older than 4.4.0.
+-#endif
+-#endif
+-
+ .macro mcount_adjust_addr rd, rn
+ 	bic	\rd, \rn, #1		@ clear the Thumb bit if present
+ 	sub	\rd, \rd, #MCOUNT_INSN_SIZE
+@@ -209,51 +187,6 @@ ftrace_graph_call\suffix:
+ 	mcount_exit
+ .endm
+ 
+-#ifdef CONFIG_OLD_MCOUNT
+-/*
+- * mcount
+- */
+-
+-.macro mcount_enter
+-	stmdb	sp!, {r0-r3, lr}
+-.endm
+-
+-.macro mcount_get_lr reg
+-	ldr	\reg, [fp, #-4]
+-.endm
+-
+-.macro mcount_exit
+-	ldr	lr, [fp, #-4]
+-	ldmia	sp!, {r0-r3, pc}
+-.endm
+-
+-ENTRY(mcount)
+-#ifdef CONFIG_DYNAMIC_FTRACE
+-	stmdb	sp!, {lr}
+-	ldr	lr, [fp, #-4]
+-	ldmia	sp!, {pc}
+-#else
+-	__mcount _old
+-#endif
+-ENDPROC(mcount)
+-
+-#ifdef CONFIG_DYNAMIC_FTRACE
+-ENTRY(ftrace_caller_old)
+-	__ftrace_caller _old
+-ENDPROC(ftrace_caller_old)
+-#endif
+-
+-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-ENTRY(ftrace_graph_caller_old)
+-	__ftrace_graph_caller
+-ENDPROC(ftrace_graph_caller_old)
+-#endif
+-
+-.purgem mcount_enter
+-.purgem mcount_get_lr
+-.purgem mcount_exit
+-#endif
+-
+ /*
+  * __gnu_mcount_nc
+  */
+diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+index 5617932a83df..0142fcfcc3d3 100644
+--- a/arch/arm/kernel/ftrace.c
++++ b/arch/arm/kernel/ftrace.c
+@@ -47,30 +47,6 @@ void arch_ftrace_update_code(int command)
+ 	stop_machine(__ftrace_modify_code, &command, NULL);
+ }
+ 
+-#ifdef CONFIG_OLD_MCOUNT
+-#define OLD_MCOUNT_ADDR	((unsigned long) mcount)
+-#define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
+-
+-#define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
+-
+-static unsigned long ftrace_nop_replace(struct dyn_ftrace *rec)
+-{
+-	return rec->arch.old_mcount ? OLD_NOP : NOP;
+-}
+-
+-static unsigned long adjust_address(struct dyn_ftrace *rec, unsigned long addr)
+-{
+-	if (!rec->arch.old_mcount)
+-		return addr;
+-
+-	if (addr == MCOUNT_ADDR)
+-		addr = OLD_MCOUNT_ADDR;
+-	else if (addr == FTRACE_ADDR)
+-		addr = OLD_FTRACE_ADDR;
+-
+-	return addr;
+-}
+-#else
+ static unsigned long ftrace_nop_replace(struct dyn_ftrace *rec)
+ {
+ 	return NOP;
+@@ -80,7 +56,6 @@ static unsigned long adjust_address(struct dyn_ftrace *rec, unsigned long addr)
+ {
+ 	return addr;
+ }
+-#endif
+ 
+ int ftrace_arch_code_modify_prepare(void)
+ {
+@@ -150,15 +125,6 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
+ 	}
+ #endif
+ 
+-#ifdef CONFIG_OLD_MCOUNT
+-	if (!ret) {
+-		pc = (unsigned long)&ftrace_call_old;
+-		new = ftrace_call_replace(pc, (unsigned long)func);
+-
+-		ret = ftrace_modify_code(pc, 0, new, false);
+-	}
+-#endif
+-
+ 	return ret;
+ }
+ 
+@@ -203,16 +169,6 @@ int ftrace_make_nop(struct module *mod,
+ 	new = ftrace_nop_replace(rec);
+ 	ret = ftrace_modify_code(ip, old, new, true);
+ 
+-#ifdef CONFIG_OLD_MCOUNT
+-	if (ret == -EINVAL && addr == MCOUNT_ADDR) {
+-		rec->arch.old_mcount = true;
+-
+-		old = ftrace_call_replace(ip, adjust_address(rec, addr));
+-		new = ftrace_nop_replace(rec);
+-		ret = ftrace_modify_code(ip, old, new, true);
+-	}
+-#endif
+-
+ 	return ret;
+ }
+ 
+@@ -290,13 +246,6 @@ static int ftrace_modify_graph_caller(bool enable)
+ #endif
+ 
+ 
+-#ifdef CONFIG_OLD_MCOUNT
+-	if (!ret)
+-		ret = __ftrace_modify_caller(&ftrace_graph_call_old,
+-					     ftrace_graph_caller_old,
+-					     enable);
+-#endif
+-
+ 	return ret;
+ }
+ 
+-- 
+2.18.0
