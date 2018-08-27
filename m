@@ -1,87 +1,93 @@
 From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Mon, 27 Aug 2018 14:10:41 +0300
-Subject: [RESEND 5/5] drm/mxsfb: Switch to drm_atomic_helper_commit_tail_rpm
+Date: Mon, 27 Aug 2018 14:10:37 +0300
+Subject: [RESEND 1/5] drm/mxsfb: Move axi clk enable/disable to crtc
+ enable/disable
 In-Reply-To: <cover.1535367027.git.leonard.crestez@nxp.com>
 References: <cover.1535367027.git.leonard.crestez@nxp.com>
-Message-ID: <1dcf9e3b25ddff3906491a2ce43ac5c1a3f2167a.1535367027.git.leonard.crestez@nxp.com>
+Message-ID: <58ec6338ada7fd46af99675dc1268d31d2a15464.1535367027.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The lcdif block is only powered on when display is active so plane
-updates when not enabled are not valid. Writing to an unpowered IP block
-is mostly ignored but can trigger bus errors on some chips.
+The main axi clk is disabled at the end of mxsfb_crtc_mode_set_nofb and
+immediately reenabled in mxsfb_enable_controller.
 
-Prevent this situation by switching to drm_atomic_helper_commit_tail_rpm
-and having the drm core ensure atomic_plane_update is only called while
-the crtc is active. This avoids having to keep track of "enabled" bits
-inside the mxsfb driver.
+Avoid this by moving the handling of axi clk one level up to
+mxsfb_crtc_enable. Do the same for mxsfb_crtc_disable for symmetry.
 
-This also requires handling the vblank event for disable from
-mxsfb_pipe_disable.
+This shouldn't have any functional effect.
 
 Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-Suggested-by: Stefan Agner <stefan@agner.ch>
 Reviewed-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/gpu/drm/mxsfb/mxsfb_drv.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ drivers/gpu/drm/mxsfb/mxsfb_crtc.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/mxsfb/mxsfb_drv.c b/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-index d797dfd40d98..5777e730085b 100644
---- a/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-+++ b/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-@@ -96,10 +96,14 @@ static const struct drm_mode_config_funcs mxsfb_mode_config_funcs = {
- 	.fb_create		= drm_gem_fb_create,
- 	.atomic_check		= drm_atomic_helper_check,
- 	.atomic_commit		= drm_atomic_helper_commit,
- };
+diff --git a/drivers/gpu/drm/mxsfb/mxsfb_crtc.c b/drivers/gpu/drm/mxsfb/mxsfb_crtc.c
+index 0abe77675b76..e4fcbb65b969 100644
+--- a/drivers/gpu/drm/mxsfb/mxsfb_crtc.c
++++ b/drivers/gpu/drm/mxsfb/mxsfb_crtc.c
+@@ -127,11 +127,10 @@ static void mxsfb_enable_controller(struct mxsfb_drm_private *mxsfb)
+ 	u32 reg;
  
-+static const struct drm_mode_config_helper_funcs mxsfb_mode_config_helpers = {
-+	.atomic_commit_tail = drm_atomic_helper_commit_tail_rpm,
-+};
-+
- static void mxsfb_pipe_enable(struct drm_simple_display_pipe *pipe,
- 			      struct drm_crtc_state *crtc_state,
- 			      struct drm_plane_state *plane_state)
- {
- 	struct mxsfb_drm_private *mxsfb = drm_pipe_to_mxsfb_drm_private(pipe);
-@@ -113,15 +117,25 @@ static void mxsfb_pipe_enable(struct drm_simple_display_pipe *pipe,
+ 	if (mxsfb->clk_disp_axi)
+ 		clk_prepare_enable(mxsfb->clk_disp_axi);
+ 	clk_prepare_enable(mxsfb->clk);
+-	mxsfb_enable_axi_clk(mxsfb);
  
- static void mxsfb_pipe_disable(struct drm_simple_display_pipe *pipe)
- {
- 	struct mxsfb_drm_private *mxsfb = drm_pipe_to_mxsfb_drm_private(pipe);
- 	struct drm_device *drm = pipe->plane.dev;
-+	struct drm_crtc *crtc = &pipe->crtc;
-+	struct drm_pending_vblank_event *event;
+ 	/* If it was disabled, re-enable the mode again */
+ 	writel(CTRL_DOTCLK_MODE, mxsfb->base + LCDC_CTRL + REG_SET);
  
- 	drm_panel_disable(mxsfb->panel);
- 	mxsfb_crtc_disable(mxsfb);
- 	drm_panel_unprepare(mxsfb->panel);
- 	pm_runtime_put_sync(drm->dev);
-+
-+	spin_lock_irq(&drm->event_lock);
-+	event = crtc->state->event;
-+	if (event) {
-+		crtc->state->event = NULL;
-+		drm_crtc_send_vblank_event(crtc, event);
-+	}
-+	spin_unlock_irq(&drm->event_lock);
+ 	/* Enable the SYNC signals first, then the DMA engine */
+@@ -157,12 +156,10 @@ static void mxsfb_disable_controller(struct mxsfb_drm_private *mxsfb)
+ 
+ 	reg = readl(mxsfb->base + LCDC_VDCTRL4);
+ 	reg &= ~VDCTRL4_SYNC_SIGNALS_ON;
+ 	writel(reg, mxsfb->base + LCDC_VDCTRL4);
+ 
+-	mxsfb_disable_axi_clk(mxsfb);
+-
+ 	clk_disable_unprepare(mxsfb->clk);
+ 	if (mxsfb->clk_disp_axi)
+ 		clk_disable_unprepare(mxsfb->clk_disp_axi);
  }
  
- static void mxsfb_pipe_update(struct drm_simple_display_pipe *pipe,
- 			      struct drm_plane_state *plane_state)
+@@ -206,11 +203,10 @@ static void mxsfb_crtc_mode_set_nofb(struct mxsfb_drm_private *mxsfb)
+ 	/*
+ 	 * It seems, you can't re-program the controller if it is still
+ 	 * running. This may lead to shifted pictures (FIFO issue?), so
+ 	 * first stop the controller and drain its FIFOs.
+ 	 */
+-	mxsfb_enable_axi_clk(mxsfb);
+ 
+ 	/* Mandatory eLCDIF reset as per the Reference Manual */
+ 	err = mxsfb_reset_block(mxsfb->base);
+ 	if (err)
+ 		return;
+@@ -267,23 +263,23 @@ static void mxsfb_crtc_mode_set_nofb(struct mxsfb_drm_private *mxsfb)
+ 	       SET_VERT_WAIT_CNT(m->crtc_vtotal - m->crtc_vsync_start),
+ 	       mxsfb->base + LCDC_VDCTRL3);
+ 
+ 	writel(SET_DOTCLK_H_VALID_DATA_CNT(m->hdisplay),
+ 	       mxsfb->base + LCDC_VDCTRL4);
+-
+-	mxsfb_disable_axi_clk(mxsfb);
+ }
+ 
+ void mxsfb_crtc_enable(struct mxsfb_drm_private *mxsfb)
  {
-@@ -232,10 +246,11 @@ static int mxsfb_load(struct drm_device *drm, unsigned long flags)
- 	drm->mode_config.min_width	= MXSFB_MIN_XRES;
- 	drm->mode_config.min_height	= MXSFB_MIN_YRES;
- 	drm->mode_config.max_width	= MXSFB_MAX_XRES;
- 	drm->mode_config.max_height	= MXSFB_MAX_YRES;
- 	drm->mode_config.funcs		= &mxsfb_mode_config_funcs;
-+	drm->mode_config.helper_private	= &mxsfb_mode_config_helpers;
++	mxsfb_enable_axi_clk(mxsfb);
+ 	mxsfb_crtc_mode_set_nofb(mxsfb);
+ 	mxsfb_enable_controller(mxsfb);
+ }
  
- 	drm_mode_config_reset(drm);
+ void mxsfb_crtc_disable(struct mxsfb_drm_private *mxsfb)
+ {
+ 	mxsfb_disable_controller(mxsfb);
++	mxsfb_disable_axi_clk(mxsfb);
+ }
  
- 	pm_runtime_get_sync(drm->dev);
- 	ret = drm_irq_install(drm, platform_get_irq(pdev, 0));
+ void mxsfb_plane_atomic_update(struct mxsfb_drm_private *mxsfb,
+ 			       struct drm_plane_state *state)
+ {
 -- 
 2.17.1
