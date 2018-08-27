@@ -1,157 +1,47 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 27 Aug 2018 20:21:52 +0800
-Subject: [nomadik:ftgpio010-debounce 3/4]
- drivers/gpio/gpio-ftgpio010.c:292:2: note: in expansion of macro 'writel'
-Message-ID: <201808272030.TIalk2sm%fengguang.wu@intel.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Mon, 27 Aug 2018 15:32:39 +0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Make usbnet drivers builtin for boot
+Message-ID: <ab02224d560e09e96af2e41fbfa155e40e8bbb75.1535373073.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git ftgpio010-debounce
-head:   a03e32e926f66481611b7c6a66de194dd9fb7cb7
-commit: bcf606de43c663ce0f1913fe5712c138b5989341 [3/4] gpio: ftgpio: Support debounce timer
-config: arm-moxart_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout bcf606de43c663ce0f1913fe5712c138b5989341
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm 
+Chips such as imx6sll and imx7ulp have no ethernet support so the common
+development usecase of nfs boot is supported via usb ethernet dongles.
 
-All warnings (new ones prefixed by >>):
+Add drivers for additional usbnet device directly into the kernel image
+image produced by the imx defconfig.
 
-   In file included from include/linux/byteorder/little_endian.h:5:0,
-                    from arch/arm/include/uapi/asm/byteorder.h:22,
-                    from include/asm-generic/bitops/le.h:6,
-                    from arch/arm/include/asm/bitops.h:268,
-                    from include/linux/bitops.h:19,
-                    from include/linux/kernel.h:11,
-                    from include/linux/list.h:9,
-                    from include/linux/kobject.h:19,
-                    from include/linux/device.h:16,
-                    from include/linux/gpio/driver.h:5,
-                    from drivers/gpio/gpio-ftgpio010.c:13:
-   drivers/gpio/gpio-ftgpio010.c: In function 'ftgpio_gpio_probe':
-   drivers/gpio/gpio-ftgpio010.c:292:9: error: 'val' undeclared (first use in this function); did you mean 'vmap'?
-     writel(val, g->base + GPIO_DEBOUNCE_EN);
-            ^
-   include/uapi/linux/byteorder/little_endian.h:33:51: note: in definition of macro '__cpu_to_le32'
-    #define __cpu_to_le32(x) ((__force __le32)(__u32)(x))
-                                                      ^
-   arch/arm/include/asm/io.h:314:36: note: in expansion of macro 'writel_relaxed'
-    #define writel(v,c)  ({ __iowmb(); writel_relaxed(v,c); })
-                                       ^~~~~~~~~~~~~~
->> drivers/gpio/gpio-ftgpio010.c:292:2: note: in expansion of macro 'writel'
-     writel(val, g->base + GPIO_DEBOUNCE_EN);
-     ^~~~~~
-   drivers/gpio/gpio-ftgpio010.c:292:9: note: each undeclared identifier is reported only once for each function it appears in
-     writel(val, g->base + GPIO_DEBOUNCE_EN);
-            ^
-   include/uapi/linux/byteorder/little_endian.h:33:51: note: in definition of macro '__cpu_to_le32'
-    #define __cpu_to_le32(x) ((__force __le32)(__u32)(x))
-                                                      ^
-   arch/arm/include/asm/io.h:314:36: note: in expansion of macro 'writel_relaxed'
-    #define writel(v,c)  ({ __iowmb(); writel_relaxed(v,c); })
-                                       ^~~~~~~~~~~~~~
->> drivers/gpio/gpio-ftgpio010.c:292:2: note: in expansion of macro 'writel'
-     writel(val, g->base + GPIO_DEBOUNCE_EN);
-     ^~~~~~
+This list is based on the usbnet devices supported by uboot.
 
-vim +/writel +292 drivers/gpio/gpio-ftgpio010.c
-
-   230	
-   231	static int ftgpio_gpio_probe(struct platform_device *pdev)
-   232	{
-   233		struct device *dev = &pdev->dev;
-   234		struct resource *res;
-   235		struct ftgpio_gpio *g;
-   236		int irq;
-   237		int ret;
-   238	
-   239		g = devm_kzalloc(dev, sizeof(*g), GFP_KERNEL);
-   240		if (!g)
-   241			return -ENOMEM;
-   242	
-   243		g->dev = dev;
-   244	
-   245		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-   246		g->base = devm_ioremap_resource(dev, res);
-   247		if (IS_ERR(g->base))
-   248			return PTR_ERR(g->base);
-   249	
-   250		irq = platform_get_irq(pdev, 0);
-   251		if (irq <= 0)
-   252			return irq ? irq : -EINVAL;
-   253	
-   254		g->clk = devm_clk_get(dev, NULL);
-   255		if (!IS_ERR(g->clk)) {
-   256			ret = clk_prepare_enable(g->clk);
-   257			if (ret)
-   258				return ret;
-   259		}
-   260	
-   261		ret = bgpio_init(&g->gc, dev, 4,
-   262				 g->base + GPIO_DATA_IN,
-   263				 g->base + GPIO_DATA_SET,
-   264				 g->base + GPIO_DATA_CLR,
-   265				 g->base + GPIO_DIR,
-   266				 NULL,
-   267				 0);
-   268		if (ret) {
-   269			dev_err(dev, "unable to init generic GPIO\n");
-   270			goto dis_clk;
-   271		}
-   272		g->gc.label = "FTGPIO010";
-   273		g->gc.base = -1;
-   274		g->gc.parent = dev;
-   275		g->gc.owner = THIS_MODULE;
-   276		/* ngpio is set by bgpio_init() */
-   277	
-   278		/* We need a silicon clock to do debounce */
-   279		if (!IS_ERR(g->clk))
-   280			g->gc.set_config = ftgpio_gpio_set_config;
-   281	
-   282		ret = devm_gpiochip_add_data(dev, &g->gc, g);
-   283		if (ret)
-   284			goto dis_clk;
-   285	
-   286		/* Disable, unmask and clear all interrupts */
-   287		writel(0x0, g->base + GPIO_INT_EN);
-   288		writel(0x0, g->base + GPIO_INT_MASK);
-   289		writel(~0x0, g->base + GPIO_INT_CLR);
-   290	
-   291		/* Clear any use of debounce */
- > 292		writel(val, g->base + GPIO_DEBOUNCE_EN);
-   293	
-   294		ret = gpiochip_irqchip_add(&g->gc, &ftgpio_gpio_irqchip,
-   295					   0, handle_bad_irq,
-   296					   IRQ_TYPE_NONE);
-   297		if (ret) {
-   298			dev_info(dev, "could not add irqchip\n");
-   299			goto dis_clk;
-   300		}
-   301		gpiochip_set_chained_irqchip(&g->gc, &ftgpio_gpio_irqchip,
-   302					     irq, ftgpio_gpio_irq_handler);
-   303	
-   304		platform_set_drvdata(pdev, g);
-   305		dev_info(dev, "FTGPIO010 @%p registered\n", g->base);
-   306	
-   307		return 0;
-   308	
-   309	dis_clk:
-   310		if (!IS_ERR(g->clk))
-   311			clk_disable_unprepare(g->clk);
-   312		return ret;
-   313	}
-   314	
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 12782 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180827/ef982471/attachment.gz>
+This is not a very pretty solution but very convenient.
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index e2c127608bcc..7474bb5b3a6f 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -147,13 +147,16 @@ CONFIG_SMSC911X=y
+ CONFIG_AT803X_PHY=y
+ CONFIG_MICREL_PHY=y
+ CONFIG_SMSC_PHY=y
+ CONFIG_USB_PEGASUS=m
+ CONFIG_USB_RTL8150=m
+-CONFIG_USB_RTL8152=m
++CONFIG_USB_RTL8152=y
++CONFIG_USB_LAN78XX=y
+ CONFIG_USB_USBNET=y
+ CONFIG_USB_NET_CDC_EEM=m
++CONFIG_USB_NET_SMSC95XX=y
++CONFIG_USB_NET_MCS7830=y
+ CONFIG_BRCMFMAC=m
+ CONFIG_MWIFIEX=m
+ CONFIG_MWIFIEX_SDIO=m
+ CONFIG_MWIFIEX_PCIE=m
+ CONFIG_WL12XX=m
+-- 
+2.17.1
