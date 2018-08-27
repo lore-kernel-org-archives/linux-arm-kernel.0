@@ -1,52 +1,173 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Mon, 27 Aug 2018 15:44:55 -0700
-Subject: assembly syntax
-In-Reply-To: <CAKv+Gu8ztQ0mhyKJjT4Q2USF6G5VoBco2Ngv=aWz9DqQCEVOiQ@mail.gmail.com>
-References: <CAKwvOdkr4UCvxVYLoCamUkYKj5ZszW=zxrwG243-Jk6P_DKUGQ@mail.gmail.com>
- <CAKv+Gu8ztQ0mhyKJjT4Q2USF6G5VoBco2Ngv=aWz9DqQCEVOiQ@mail.gmail.com>
-Message-ID: <CAKwvOdkDoTJYSxxXDHoLZ_BdyR_aL9eE28Q=U5SYKXeTadyi9g@mail.gmail.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Mon, 27 Aug 2018 15:51:21 -0700
+Subject: [PATCH 2/2] soc: imx: gpcv2: make pgc driver more generic for
+ other i.MX platforms
+In-Reply-To: <1533537589-7202-2-git-send-email-Anson.Huang@nxp.com>
+References: <1533537589-7202-1-git-send-email-Anson.Huang@nxp.com>
+ <1533537589-7202-2-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <CAHQ1cqGA37RNoo3KcESCOFeYZxAQCOFkuQQhRPRKCTp=gKLdKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2018 at 3:41 PM Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
+On Sun, Aug 5, 2018 at 11:45 PM Anson Huang <Anson.Huang@nxp.com> wrote:
 >
-> On 28 August 2018 at 00:33, Nick Desaulniers <ndesaulniers@google.com> wrote:
-> > Hi Ard,
-> > Trying to file bugs for clang's integrated assembler, I'm hitting a
-> > syntax error with clang, but I don't understand how the notation is
-> > supposed to work.
-> >
-> > arch/arm64/kernel/reloc_test_syms.S
-> > 39: movz x0, #:abs_g3:sym64_abs
-> >
-> > arch/arm64/include/asm/assembler.h
-> > 504: movz \reg, :abs_g3:\val
-> >
-> > Clang is not happy with :abs_g3:, but I'm not sure how that code is
-> > supposed to work? Is it supposed to be a prefix for a relocation?
-> >
-> > I *think* R_AARCH64_MOVW_UABS_G3 is somehow related, but I'm
-> > unfamiliar with this syntax.  Your name was on the `git blame` for
-> > those lines but I still don't understand, even while looking at
-> > commit 214fad550772 ("arm64: relocation testing module").
-> >
-> > Are there docs you can point me at for this?
+> i.MX8MQ and i.MX8MM share same gpc module with i.MX7D, they
+> can reuse gpcv2 pgc driver for power domain control, this
+> patch renames all functions and structure definitions started
+> with "imx7" to "imx", and check machine type to pass platform
+> specific power domain data for power domain driver, thus make
+> gpcv2 pgc driver more generic for i.MX platforms.
 >
-> As you have guessed, it is used to annotate the instruction with the
-> correct relocation. You'll have to dig into the binutils sources for
-> the details, I'm afraid.
 
-Ah, this has everything I need:
-https://stackoverflow.com/questions/38570495/aarch64-relocation-prefixes
+Just for the sake of
 
+
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> ---
+>  drivers/soc/imx/gpcv2.c | 68 +++++++++++++++++++++++++++++--------------------
+>  1 file changed, 40 insertions(+), 28 deletions(-)
 >
-> But if I may ask, what is the point of using Clang's integrated
-> assembler? Surely, you don't need it for things like CFI and other
-> Clang goodies?
+> diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c
+> index 0e31465..0e33cb5 100644
+> --- a/drivers/soc/imx/gpcv2.c
+> +++ b/drivers/soc/imx/gpcv2.c
+> @@ -53,7 +53,7 @@
+>
+>  #define GPC_PGC_CTRL_PCR               BIT(0)
+>
+> -struct imx7_pgc_domain {
+> +struct imx_pgc_domain {
+>         struct generic_pm_domain genpd;
+>         struct regmap *regmap;
+>         struct regulator *regulator;
+> @@ -69,11 +69,11 @@ struct imx7_pgc_domain {
+>         struct device *dev;
+>  };
+>
+> -static int imx7_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain *genpd,
+> +static int imx_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain *genpd,
+>                                       bool on)
+>  {
+> -       struct imx7_pgc_domain *domain = container_of(genpd,
+> -                                                     struct imx7_pgc_domain,
+> +       struct imx_pgc_domain *domain = container_of(genpd,
+> +                                                     struct imx_pgc_domain,
+>                                                       genpd);
+>         unsigned int offset = on ?
+>                 GPC_PU_PGC_SW_PUP_REQ : GPC_PU_PGC_SW_PDN_REQ;
+> @@ -150,17 +150,17 @@ static int imx7_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain *genpd,
+>         return ret;
+>  }
+>
+> -static int imx7_gpc_pu_pgc_sw_pup_req(struct generic_pm_domain *genpd)
+> +static int imx_gpc_pu_pgc_sw_pup_req(struct generic_pm_domain *genpd)
+>  {
+> -       return imx7_gpc_pu_pgc_sw_pxx_req(genpd, true);
+> +       return imx_gpc_pu_pgc_sw_pxx_req(genpd, true);
+>  }
+>
+> -static int imx7_gpc_pu_pgc_sw_pdn_req(struct generic_pm_domain *genpd)
+> +static int imx_gpc_pu_pgc_sw_pdn_req(struct generic_pm_domain *genpd)
+>  {
+> -       return imx7_gpc_pu_pgc_sw_pxx_req(genpd, false);
+> +       return imx_gpc_pu_pgc_sw_pxx_req(genpd, false);
+>  }
+>
+> -static const struct imx7_pgc_domain imx7_pgc_domains[] = {
+> +static const struct imx_pgc_domain imx7_pgc_domains[] = {
+>         [IMX7_POWER_DOMAIN_MIPI_PHY] = {
+>                 .genpd = {
+>                         .name      = "mipi-phy",
+> @@ -198,9 +198,9 @@ static const struct imx7_pgc_domain imx7_pgc_domains[] = {
+>         },
+>  };
+>
+> -static int imx7_pgc_domain_probe(struct platform_device *pdev)
+> +static int imx_pgc_domain_probe(struct platform_device *pdev)
+>  {
+> -       struct imx7_pgc_domain *domain = pdev->dev.platform_data;
+> +       struct imx_pgc_domain *domain = pdev->dev.platform_data;
+>         int ret;
+>
+>         domain->dev = &pdev->dev;
+> @@ -233,9 +233,9 @@ static int imx7_pgc_domain_probe(struct platform_device *pdev)
+>         return ret;
+>  }
+>
+> -static int imx7_pgc_domain_remove(struct platform_device *pdev)
+> +static int imx_pgc_domain_remove(struct platform_device *pdev)
+>  {
+> -       struct imx7_pgc_domain *domain = pdev->dev.platform_data;
+> +       struct imx_pgc_domain *domain = pdev->dev.platform_data;
+>
+>         of_genpd_del_provider(domain->dev->of_node);
+>         pm_genpd_remove(&domain->genpd);
+> @@ -243,23 +243,24 @@ static int imx7_pgc_domain_remove(struct platform_device *pdev)
+>         return 0;
+>  }
+>
+> -static const struct platform_device_id imx7_pgc_domain_id[] = {
+> -       { "imx7-pgc-domain", },
+> +static const struct platform_device_id imx_pgc_domain_id[] = {
+> +       { "imx-pgc-domain", },
+>         { },
+>  };
+>
+> -static struct platform_driver imx7_pgc_domain_driver = {
+> +static struct platform_driver imx_pgc_domain_driver = {
+>         .driver = {
+> -               .name = "imx7-pgc",
+> +               .name = "imx-pgc",
+>         },
+> -       .probe    = imx7_pgc_domain_probe,
+> -       .remove   = imx7_pgc_domain_remove,
+> -       .id_table = imx7_pgc_domain_id,
+> +       .probe    = imx_pgc_domain_probe,
+> +       .remove   = imx_pgc_domain_remove,
+> +       .id_table = imx_pgc_domain_id,
+>  };
+> -builtin_platform_driver(imx7_pgc_domain_driver)
+> +builtin_platform_driver(imx_pgc_domain_driver)
+>
+>  static int imx_gpcv2_probe(struct platform_device *pdev)
+>  {
+> +       static const struct imx_pgc_domain *imx_pgc_domains;
+>         static const struct regmap_range yes_ranges[] = {
+>                 regmap_reg_range(GPC_LPCR_A_CORE_BSC,
+>                                  GPC_M4_PU_PDN_FLG),
+> @@ -287,6 +288,7 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
+>         struct regmap *regmap;
+>         struct resource *res;
+>         void __iomem *base;
+> +       int pgc_max_index;
+>         int ret;
+>
+>         pgc_np = of_get_child_by_name(dev->of_node, "pgc");
+> @@ -307,9 +309,19 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
+>                 return ret;
+>         }
+>
+> +       if (of_machine_is_compatible("fsl,imx7d")) {
+> +               pgc_max_index = ARRAY_SIZE(imx7_pgc_domains);
+> +               imx_pgc_domains = imx7_pgc_domains;
+> +       }
 
-Just trying to improve Clang's assembler.
+Is there any reason to do this explicit call to
+of_machine_is_compatible() as opposed to passing necessary data via
+.data in imx_gpcv2_dt_ids[]? The latter seems like a more
+straightforward way of passing variant specific driver info
 
--- 
+> +
+> +       if (!imx_pgc_domains) {
+> +               dev_err(&pdev->dev, "no device match found\n");
+> +               return -ENODEV;
+> +       }
+
+And doing so would also allow you to drop the check above.
+
+Other that this seems like a reasonable change:
+
+Acked-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+
 Thanks,
-~Nick Desaulniers
+Andrey Smirnov
