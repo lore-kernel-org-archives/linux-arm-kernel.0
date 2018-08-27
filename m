@@ -1,62 +1,128 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Mon, 27 Aug 2018 03:42:52 +0000
+Date: Mon, 27 Aug 2018 03:45:51 +0000
 Subject: [PATCH V4 0/9] clk: add imx7ulp clk support
-In-Reply-To: <5a5950a4-e164-a604-ccb4-ae6d5bbe1708@baylibre.com>
+In-Reply-To: <AM0PR04MB421169829CFE1A6A32DCC209802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 References: <1531921023-18497-1-git-send-email-aisheng.dong@nxp.com>
  <AM0PR04MB421169829CFE1A6A32DCC209802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <5a5950a4-e164-a604-ccb4-ae6d5bbe1708@baylibre.com>
-Message-ID: <AM0PR04MB4211EB200D335FCEC382BD0E800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <AM0PR04MB421153E1441FBE356E1B859E800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+Kindly ping again...  This is really pending too long...
 
-> -----Original Message-----
-> From: Alexandre Bailon [mailto:abailon at baylibre.com]
-> Sent: Wednesday, August 8, 2018 6:01 PM
-> To: A.s. Dong <aisheng.dong@nxp.com>; linux-clk at vger.kernel.org;
-> sboyd at kernel.org
-> Cc: Jacky Bai <ping.bai@nxp.com>; Anson Huang <anson.huang@nxp.com>;
-> mturquette at baylibre.com; linux-kernel at vger.kernel.org; dl-linux-imx
-> <linux-imx@nxp.com>; shawnguo at kernel.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH V4 0/9] clk: add imx7ulp clk support
-> 
-> Hi Dong Aisheng,
-> 
-> On 07/26/2018 03:50 AM, A.s. Dong wrote:
-> > Hi Stephen,
-> >
-> > Do you have a chance to look at it?
-> > This patch series has been pending for quite a long time without much
-> comments.
-> I'm not a kernel maintainer but I would not review a series that has checkpatch
-> errors.
-> Please run checkpatch, fix the errors and the warnings, and then resubmit a
-> series.
-
-Yes, I did it. There're some warnings. But unlike errors, normally warnings are judgable.
-For this patch set, all known warnings seems to me not need the fix. 
-E.g. line over 80 or missing maintainer for new files....
-
-BTW there's one special warning I don't see how to fix, seems reported wrongly.
-
-0005-clk-imx-add-composite-clk-support.patch
---------------------------------------------
-WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
-#47: 
-new file mode 100644
-
-WARNING: function definition argument 'const char * const' should also have an identifier name
-#145: FILE: drivers/clk/imx/clk.h:74:
-+struct clk_hw *imx_clk_composite(const char *name,
-
-total: 0 errors, 2 warnings, 104 lines checked
-
-NOTE: For some of the reported defects, checkpatch may be able to
-      mechanically convert to the typical style using --fix or --fix-inplace.
-
-If you have better suggestions please let me know.
+Stephen & Shawn,
+Any suggestion on how to proceed this patch set?
 
 Regards
 Dong Aisheng
+
+> -----Original Message-----
+> From: A.s. Dong
+> Sent: Thursday, July 26, 2018 9:51 AM
+> To: linux-clk at vger.kernel.org; sboyd at kernel.org
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> mturquette at baylibre.com; shawnguo at kernel.org; Anson Huang
+> <anson.huang@nxp.com>; Jacky Bai <ping.bai@nxp.com>; dl-linux-imx
+> <linux-imx@nxp.com>
+> Subject: RE: [PATCH V4 0/9] clk: add imx7ulp clk support
+> 
+> Hi Stephen,
+> 
+> Do you have a chance to look at it?
+> This patch series has been pending for quite a long time without much
+> comments.
+> 
+> Regards
+> Dong Aisheng
+> 
+> > -----Original Message-----
+> > From: A.s. Dong
+> > Sent: Wednesday, July 18, 2018 9:37 PM
+> > To: linux-clk at vger.kernel.org
+> > Cc: linux-kernel at vger.kernel.org;
+> > linux-arm-kernel at lists.infradead.org;
+> > sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org;
+> Anson
+> > Huang <anson.huang@nxp.com>; Jacky Bai <ping.bai@nxp.com>; dl-
+> > linux-imx <linux-imx@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
+> > Subject: [PATCH V4 0/9] clk: add imx7ulp clk support
+> >
+> > This is a rebased version of below patch series against latest clk tree.
+> > [PATCH RESEND V3 0/9] clk: add imx7ulp clk support
+> > https://lkml.org/lkml/2018/3/16/310
+> >
+> > This patch series intends to add imx7ulp clk support.
+> >
+> > i.MX7ULP Clock functions are under joint control of the System Clock
+> > Generation (SCG) modules, Peripheral Clock Control (PCC) modules, and
+> > Core Mode Controller (CMC)1 blocks
+> >
+> > The clocking scheme provides clear separation between M4 domain and A7
+> > domain. Except for a few clock sources shared between two domains,
+> > such as the System Oscillator clock, the Slow IRC (SIRC), and and the
+> > Fast IRC clock (FIRCLK), clock sources and clock management are
+> > separated and contained within each domain.
+> >
+> > M4 clock management consists of SCG0, PCC0, PCC1, and CMC0 modules.
+> > A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
+> >
+> > Note: this series only adds A7 clock domain support as M4 clock domain
+> > will be handled by M4 seperately.
+> >
+> > Change Log:
+> > v3->v4:
+> >  * rebased to latest kernel
+> >  * make scg and pcc separate nodes according to Rob's suggestion
+> >
+> > v2->v3:
+> >  * Patch 1 changed on: 1) split normal and gate ops 2) fix the possible racy
+> >    Others no changes.
+> >
+> > v1->v2:
+> >  * add enable/disable for the type of CLK_DIVIDER_ZERO_GATE dividers
+> >  * use clk_hw apis to register clocks
+> >  * use of_clk_add_hw_provider
+> >  * split the clocks register process into two parts: early part for possible
+> >    timers clocks registered by CLK_OF_DECLARE_DRIVER and the later part
+> for
+> >    the left normal peripheral clocks registered by a platform driver.
+> >
+> > Dong Aisheng (9):
+> >   clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk support
+> >   clk: fractional-divider: add CLK_FRAC_DIVIDER_ZERO_BASED flag support
+> >   clk: imx: add pllv4 support
+> >   clk: imx: add pfdv2 support
+> >   clk: imx: add composite clk support
+> >   dt-bindings: clock: add imx7ulp clock binding doc
+> >   clk: imx: make mux parent strings const
+> >   clk: imx: implement new clk_hw based APIs
+> >   clk: imx: add imx7ulp clk driver
+> >
+> >  .../devicetree/bindings/clock/imx7ulp-clock.txt    |  87 +++++++++
+> >  drivers/clk/clk-divider.c                          | 152
+> +++++++++++++++
+> >  drivers/clk/clk-fractional-divider.c               |  10 +
+> >  drivers/clk/imx/Makefile                           |   6 +-
+> >  drivers/clk/imx/clk-busy.c                         |   2 +-
+> >  drivers/clk/imx/clk-composite.c                    |  85 +++++++++
+> >  drivers/clk/imx/clk-fixup-mux.c                    |   2 +-
+> >  drivers/clk/imx/clk-imx7ulp.c                      | 209
+> +++++++++++++++++++++
+> >  drivers/clk/imx/clk-pfdv2.c                        | 201
+> ++++++++++++++++++++
+> >  drivers/clk/imx/clk-pllv4.c                        | 182
+> ++++++++++++++++++
+> >  drivers/clk/imx/clk.c                              |  22 +++
+> >  drivers/clk/imx/clk.h                              |  92 ++++++++-
+> >  include/dt-bindings/clock/imx7ulp-clock.h          | 109 +++++++++++
+> >  include/linux/clk-provider.h                       |  17 ++
+> >  14 files changed, 1166 insertions(+), 10 deletions(-)  create mode
+> > 100644 Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
+> >  create mode 100644 drivers/clk/imx/clk-composite.c  create mode
+> > 100644 drivers/clk/imx/clk-imx7ulp.c  create mode 100644
+> > drivers/clk/imx/clk- pfdv2.c  create mode 100644
+> > drivers/clk/imx/clk-pllv4.c  create mode 100644
+> > include/dt-bindings/clock/imx7ulp-clock.h
+> >
+> > --
+> > 2.7.4
