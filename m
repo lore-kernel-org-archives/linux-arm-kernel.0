@@ -1,26 +1,106 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 27 Aug 2018 10:33:10 +0200
-Subject: [PATCH V5 0/5] soc: imx: add scu firmware api support
-In-Reply-To: <AM0PR04MB4211F748DBD1FE64A2B2136980360@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
- <AM0PR04MB4211F68CCD399243613F8D7B80320@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <AM0PR04MB4211F748DBD1FE64A2B2136980360@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <20180827083310.omqa3kpmj542fu3b@pengutronix.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 27 Aug 2018 16:39:50 +0800
+Subject: [PATCH] drm/sun4i: Remove R40 display pipeline compatibles
+Message-ID: <20180827083950.602-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2018 at 07:36:38AM +0000, A.s. Dong wrote:
-> Hi Jassi & Sasha,
-> 
-> Do you have some suggestions about this patch series?
+Two patches from the R40 display pipeline support series weren't applied
+with the rest of the series. When they did get applied, the -rc6
+deadline for drm-misc-next had past, so they didn't get into 4.19-rc1
+with the rest of the series. However, the two patches are crucial in
+the parsing of the R40's display pipeline graph in the device tree.
+Without them, the driver crashes because it can't follow the odd graph
+structure.
 
-I still think that the users like clk and pinctrl should directly call
-sc_call_rpc(), no need for this shim at all.
+This patch removes the R40 compatibles from the sun4i-drm driver,
+effectively disabling DRM support for the R40 for one release cycle.
+This will prevent the driver from crashing upon probing.
 
-Sascha
+The compatibles should be reinstated for the next release.
 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+
+This is for 4.19-rc to fix the boot crash seen on the R40.
+
+This should go in drm-misc-fixes and into Linus' tree ASAP.
+Once merged, the branch should also be merged into drm-misc-next,
+and then we can revert it.
+
+Thanks
+
+---
+ drivers/gpu/drm/sun4i/sun4i_drv.c      |  1 -
+ drivers/gpu/drm/sun4i/sun8i_mixer.c    | 24 ------------------------
+ drivers/gpu/drm/sun4i/sun8i_tcon_top.c |  1 -
+ 3 files changed, 26 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index dd19d674055c..8b0cd08034e0 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -418,7 +418,6 @@ static const struct of_device_id sun4i_drv_of_table[] = {
+ 	{ .compatible = "allwinner,sun8i-a33-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-a83t-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-h3-display-engine" },
+-	{ .compatible = "allwinner,sun8i-r40-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
+ 	{ .compatible = "allwinner,sun9i-a80-display-engine" },
+ 	{ }
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index fc3713608f78..cb65b0ed53fd 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -545,22 +545,6 @@ static const struct sun8i_mixer_cfg sun8i_h3_mixer0_cfg = {
+ 	.vi_num		= 1,
+ };
+ 
+-static const struct sun8i_mixer_cfg sun8i_r40_mixer0_cfg = {
+-	.ccsc		= 0,
+-	.mod_rate	= 297000000,
+-	.scaler_mask	= 0xf,
+-	.ui_num		= 3,
+-	.vi_num		= 1,
+-};
+-
+-static const struct sun8i_mixer_cfg sun8i_r40_mixer1_cfg = {
+-	.ccsc		= 1,
+-	.mod_rate	= 297000000,
+-	.scaler_mask	= 0x3,
+-	.ui_num		= 1,
+-	.vi_num		= 1,
+-};
+-
+ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
+ 	.vi_num = 2,
+ 	.ui_num = 1,
+@@ -582,14 +566,6 @@ static const struct of_device_id sun8i_mixer_of_table[] = {
+ 		.compatible = "allwinner,sun8i-h3-de2-mixer-0",
+ 		.data = &sun8i_h3_mixer0_cfg,
+ 	},
+-	{
+-		.compatible = "allwinner,sun8i-r40-de2-mixer-0",
+-		.data = &sun8i_r40_mixer0_cfg,
+-	},
+-	{
+-		.compatible = "allwinner,sun8i-r40-de2-mixer-1",
+-		.data = &sun8i_r40_mixer1_cfg,
+-	},
+ 	{
+ 		.compatible = "allwinner,sun8i-v3s-de2-mixer",
+ 		.data = &sun8i_v3s_mixer_cfg,
+diff --git a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+index 55fe398d8290..d5240b777a8f 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
++++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+@@ -253,7 +253,6 @@ static int sun8i_tcon_top_remove(struct platform_device *pdev)
+ 
+ /* sun4i_drv uses this list to check if a device node is a TCON TOP */
+ const struct of_device_id sun8i_tcon_top_of_table[] = {
+-	{ .compatible = "allwinner,sun8i-r40-tcon-top" },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, sun8i_tcon_top_of_table);
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.18.0
