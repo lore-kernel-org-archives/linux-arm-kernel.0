@@ -1,157 +1,566 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 26 Aug 2018 18:56:14 -0500
-Subject: [PATCH 6/8] kbuild: consolidate Devicetree dtb build rules
-In-Reply-To: <CAK7LNATcYSvwh0BEEdyUuDa_Y9X-AqQAzA5MrbNhOSMmSzqhTg@mail.gmail.com>
-References: <20180821215524.23040-1-robh@kernel.org>
- <20180821215524.23040-7-robh@kernel.org>
- <CAK7LNATcYSvwh0BEEdyUuDa_Y9X-AqQAzA5MrbNhOSMmSzqhTg@mail.gmail.com>
-Message-ID: <CAL_JsqJJ6DCT8AjVYqkbFuJ+fO0VmVch24B=XRp4pJPkUQYAww@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 27 Aug 2018 09:13:30 +0800
+Subject: [PATCH v6 3/4] ARM: dts: Add support for emtrion emCON-MX6 series
+In-Reply-To: <20180824132617.43975-3-jan.tuerk@emtrion.com>
+References: <20180822155137.10018-1-jan.tuerk@emtrion.com>
+ <20180824132617.43975-1-jan.tuerk@emtrion.com>
+ <20180824132617.43975-3-jan.tuerk@emtrion.com>
+Message-ID: <20180827011328.GA29208@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 25, 2018 at 9:06 PM Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
->
-> Hi Rob,
->
->
-> 2018-08-22 6:55 GMT+09:00 Rob Herring <robh@kernel.org>:
-> > There is nothing arch specific about building dtb files other than their
-> > location under /arch/*/boot/dts/. Keeping each arch aligned is a pain.
-> > The dependencies and supported targets are all slightly different.
-> > Also, a cross-compiler for each arch is needed, but really the host
-> > compiler preprocessor is perfectly fine for building dtbs. Move the
-> > build rules to a common location and remove the arch specific ones. This
-> > is done in a single step to avoid warnings about overriding rules.
-> >
-> > The build dependencies had been a mixture of 'scripts' and/or 'prepare'.
-> > These pull in several dependencies some of which need a target compiler
-> > (specifically devicetable-offsets.h) and aren't needed to build dtbs.
-> > All that is really needed is dtc, so adjust the dependencies to only be
-> > dtc.
-> >
-> > This change enables support 'dtbs_install' on some arches which were
-> > missing the target.
-> >
-> > Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-> > Cc: Michal Marek <michal.lkml@markovi.net>
-> > Cc: Vineet Gupta <vgupta@synopsys.com>
-> > Cc: Russell King <linux@armlinux.org.uk>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
-> > Cc: Michal Simek <monstr@monstr.eu>
-> > Cc: Ralf Baechle <ralf@linux-mips.org>
-> > Cc: Paul Burton <paul.burton@mips.com>
-> > Cc: James Hogan <jhogan@kernel.org>
-> > Cc: Ley Foon Tan <lftan@altera.com>
-> > Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> > Cc: Paul Mackerras <paulus@samba.org>
-> > Cc: Michael Ellerman <mpe@ellerman.id.au>
-> > Cc: Chris Zankel <chris@zankel.net>
-> > Cc: Max Filippov <jcmvbkbc@gmail.com>
-> > Cc: linux-kbuild at vger.kernel.org
-> > Cc: linux-snps-arc at lists.infradead.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: uclinux-h8-devel at lists.sourceforge.jp
-> > Cc: linux-mips at linux-mips.org
-> > Cc: nios2-dev at lists.rocketboards.org
-> > Cc: linuxppc-dev at lists.ozlabs.org
-> > Cc: linux-xtensa at linux-xtensa.org
-> > Signed-off-by: Rob Herring <robh@kernel.org>
-> > ---
-> >  Makefile                 | 30 ++++++++++++++++++++++++++++++
-> >  arch/arc/Makefile        |  6 ------
-> >  arch/arm/Makefile        | 20 +-------------------
-> >  arch/arm64/Makefile      | 17 +----------------
-> >  arch/c6x/Makefile        |  2 --
-> >  arch/h8300/Makefile      | 11 +----------
-> >  arch/microblaze/Makefile |  4 +---
-> >  arch/mips/Makefile       | 15 +--------------
-> >  arch/nds32/Makefile      |  2 +-
-> >  arch/nios2/Makefile      |  7 -------
-> >  arch/nios2/boot/Makefile |  4 ----
-> >  arch/powerpc/Makefile    |  3 ---
-> >  arch/xtensa/Makefile     | 12 +-----------
-> >  scripts/Makefile         |  1 -
-> >  scripts/Makefile.lib     |  2 +-
-> >  15 files changed, 38 insertions(+), 98 deletions(-)
-> >
-> > diff --git a/Makefile b/Makefile
-> > index c13f8b85ba60..6d89e673f192 100644
-> > --- a/Makefile
-> > +++ b/Makefile
-> > @@ -1212,6 +1212,30 @@ kselftest-merge:
-> >                 $(srctree)/tools/testing/selftests/*/config
-> >         +$(Q)$(MAKE) -f $(srctree)/Makefile olddefconfig
-> >
-> > +# ---------------------------------------------------------------------------
-> > +# Devicetree files
-> > +
-> > +dtstree := $(wildcard arch/$(SRCARCH)/boot/dts)
+On Fri, Aug 24, 2018 at 03:26:13PM +0200, Jan Tuerk wrote:
+> This patch adds support for the emtrion GmbH emCON-MX6 modules.
+> They are available with imx.6 Solo, Dual-Lite, Dual and Quad
+> equipped with Memory from 512MB to 2GB (configured by U-Boot).
+> 
+> Our default developer-Kit ships with the Avari baseboard and the
+> EDT ETM0700G0BDH6 Display (imx6[q|dl]-emcon-avari).
+> 
+> The devicetree is split into the common part providing all module
+> components and the basic support for all SoC versions
+> (imx6qdl-emcon.dtsi) and parts which are i.mx6 S|DL and D|Q relevant.
+> Finally the support for the avari baseboard in the developer-kit
+> configuration is provided by the emcon-avari dts files.
+> 
+> Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
+> ---
+>  arch/arm/boot/dts/Makefile                 |   2 +
+>  arch/arm/boot/dts/imx6dl-emcon-avari.dts   |  14 +
+>  arch/arm/boot/dts/imx6q-emcon-avari.dts    |  14 +
+>  arch/arm/boot/dts/imx6qdl-emcon-avari.dtsi | 177 +++++
+>  arch/arm/boot/dts/imx6qdl-emcon.dtsi       | 832 +++++++++++++++++++++
+>  5 files changed, 1039 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6dl-emcon-avari.dts
+>  create mode 100644 arch/arm/boot/dts/imx6q-emcon-avari.dts
+>  create mode 100644 arch/arm/boot/dts/imx6qdl-emcon-avari.dtsi
+>  create mode 100644 arch/arm/boot/dts/imx6qdl-emcon.dtsi
+> 
+> Changes in v6: 
+>   - none (PATCH 4/4 - fix typo)
+> 
+> Changes for v5:
+>   - rename boardID -> boardid.
+>   - remove Author info.
+>   - rename regulators from reg_xxx to reg-xxx.
+>   - delete mx6q/mx6dl specific camera pinmux and the corresponding file.
+>   - delete defaults in hoggrp.
+>   - rename parallel-display to display and panel to lcd.
+>   - rename rtc label to ds1307.
+>   - add alias for rtc0 pointing to ds1307.
+>   - move memory and stdout from the baseboard to the module description.
+>   - reviewed the pinmux names for more consitent nameing.
+>     => pin-groups -> postfix grp (..audmux -> audmuxgrp)
+>     => single-pin -> non-postfix (..emcon_gpio1)
+>   - rename label wdt to watchdog
+>   - coding-style 
+>     -> remove end of file new-lines
+>     -> clean-up new-lines between nodes
+>     -> re-align brightness values for the backlights.
+> 
+> Unchanged in v5:
+>   - pinctrl for emcon_gpio0..8, emcon_irqa..c, etc. => they're used 
+>     with different functions for different (customer) baseboards. Having
+>     them in a single pinctrl it could only be referenced in a single
+>     entity.
+>   - keep "unused" pinctrls in the module-description. They're matching 
+>     the connector spec and are intended to be defined for upcoming or
+>     customer baseboards without defining them again and again. 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index b5bd3de87c33..f7d1a2bd28ef 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -394,6 +394,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+>  	imx6dl-cubox-i-emmc-som-v15.dtb \
+>  	imx6dl-cubox-i-som-v15.dtb \
+>  	imx6dl-dfi-fs700-m60.dtb \
+> +	imx6dl-emcon-avari.dtb \
+>  	imx6dl-gw51xx.dtb \
+>  	imx6dl-gw52xx.dtb \
+>  	imx6dl-gw53xx.dtb \
+> @@ -458,6 +459,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+>  	imx6q-display5-tianma-tm070-1280x768.dtb \
+>  	imx6q-dmo-edmqmx6.dtb \
+>  	imx6q-dms-ba16.dtb \
+> +	imx6q-emcon-avari.dtb \
+>  	imx6q-evi.dtb \
+>  	imx6q-gk802.dtb \
+>  	imx6q-gw51xx.dtb \
+> diff --git a/arch/arm/boot/dts/imx6dl-emcon-avari.dts b/arch/arm/boot/dts/imx6dl-emcon-avari.dts
+> new file mode 100644
+> index 000000000000..46eb7c2c7344
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6dl-emcon-avari.dts
+> @@ -0,0 +1,14 @@
+> +// SPDX-License-Identifier: (GPL-2.0 or MIT)
+> +/*
+> + * Copyright (C) 2018 emtrion GmbH
+> + */
+> +
+> +/dts-v1/;
+> +#include "imx6dl.dtsi"
+> +#include "imx6qdl-emcon.dtsi"
+> +#include "imx6qdl-emcon-avari.dtsi"
+> +
+> +/ {
+> +	model = "emtrion SoM emCON-MX6 Solo/Dual-Lite Avari";
+> +	compatible = "emtrion,emcon-mx6-avari", "fsl,imx6dl";
+> +};
+> diff --git a/arch/arm/boot/dts/imx6q-emcon-avari.dts b/arch/arm/boot/dts/imx6q-emcon-avari.dts
+> new file mode 100644
+> index 000000000000..fe719e0f8cae
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-emcon-avari.dts
+> @@ -0,0 +1,14 @@
+> +// SPDX-License-Identifier: (GPL-2.0 or MIT)
+> +/*
+> + * Copyright (C) 2018 emtrion GmbH
+> + */
+> +
+> +/dts-v1/;
+> +#include "imx6q.dtsi"
+> +#include "imx6qdl-emcon.dtsi"
+> +#include "imx6qdl-emcon-avari.dtsi"
+> +
+> +/ {
+> +	model = "emtrion SoM emCON-MX6 Dual/Quad on Avari";
+> +	compatible = "emtrion,emcon-mx6-avari", "fsl,imx6q";
+> +};
+> diff --git a/arch/arm/boot/dts/imx6qdl-emcon-avari.dtsi b/arch/arm/boot/dts/imx6qdl-emcon-avari.dtsi
+> new file mode 100644
+> index 000000000000..b6bbb30ca538
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6qdl-emcon-avari.dtsi
+> @@ -0,0 +1,177 @@
+> +// SPDX-License-Identifier: (GPL-2.0 or MIT)
+> +/*
+> + * Copyright (C) 2018 emtrion GmbH
+> + */
+> +
+> +/ {
+> +	aliases {
+> +		mmc0 = &usdhc3;
+> +		mmc2 = &usdhc1;
+> +		mmc1 = &usdhc2;
+> +		mmc3 = &usdhc4;
+> +		boardid = &boardid;
 
-BTW, there's an error here too. It doesn't work right with
-KBUILD_OUTPUT set and should be:
+Please keep them alphabetically sorted.
 
-ifneq ($(wildcard $(srctree)/arch/$(SRCARCH)/boot/dts/),)
-dtstree := arch/$(SRCARCH)/boot/dts
-endif
+> +	};
+> +
+> +	reg_wall_5p0: reg-wall5p0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "Main-Supply";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +	};
+> +
+> +	reg_base3p3: reg-base3p3 {
+> +		compatible = "regulator-fixed";
+> +		vin-supply = <&reg_wall_5p0>;
+> +		regulator-name = "3V3-avari";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +	};
+> +
+> +	reg_base1p5: reg-base1p5 {
+> +		compatible = "regulator-fixed";
+> +		vin-supply = <&reg_base3p3>;
+> +		regulator-name = "1V5-avari";
+> +		regulator-min-microvolt = <1500000>;
+> +		regulator-max-microvolt = <1500000>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +	};
+> +
+> +	reg_usb_otg: reg-otgvbus {
+> +		compatible = "regulator-fixed";
+> +		vin-supply = <&reg_wall_5p0>;
+> +		regulator-name = "OTG_VBUS";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		gpio = <&gpio1 8 GPIO_ACTIVE_LOW>;
+> +		regulator-always-on;
+> +	};
+> +
+> +	clk_codec: clock-codec {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency  = <12000000>;
+> +	};
+> +
+> +	sound {
+> +		compatible = "fsl,imx-audio-sgtl5000";
+> +		model = "emCON-avari-sgtl5000";
+> +		ssi-controller = <&ssi2>;
+> +		audio-codec = <&sgtl5000>;
+> +		audio-routing =
+> +			"Headphone Jack", "HP_OUT";
+> +		mux-int-port = <2>;
+> +		mux-ext-port = <3>;
+> +	};
+> +};
+> +
+> +&audmux {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_audmux>;
+> +	status = "okay";
+> +};
+> +
+> +&can1 {
+> +	status = "okay";
+> +};
+> +
+> +&can2 {
+> +	status = "okay";
+> +};
+> +
+> +&ecspi2 {
+> +	status = "okay";
+> +};
+> +
+> +&hdmi {
+> +	ddc-i2c-bus = <&i2c2>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c2 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c3 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c3>;
+> +	status = "okay";
+> +
+> +	sgtl5000: audio-codec at a {
+> +		compatible = "fsl,sgtl5000";
+> +		reg = <0x0a>;
+> +		#sound-dai-cells = <0>;
+> +		clocks = <&clk_codec>;
+> +		VDDA-supply = <&reg_base3p3>;
+> +		VDDIO-supply = <&reg_base3p3>;
+> +	};
+> +
+> +	boardid: gpio at 3a {
+> +		compatible = "nxp,pca8574";
+> +		reg = <0x3a>;
+> +		gpio-controller;
+> +		#gpio-cells = <1>;
+> +	};
+> +
+> +	captouch: touchscreen at 38 {
 
-> > +
-> > +ifdef CONFIG_OF_EARLY_FLATTREE
-> > +
-> > +%.dtb %.dtb.S %.dtb.o: | dtc
->
-> I think the pipe operator is unnecessary
-> because Kbuild will descend to $(dtstree) anyway.
+The I2C device nodes should be arranged in order of device/unit address.
+That said, touchscreen at 38 should go before gpio at 3a.
 
-The pipe means 'order-only', right? So it is just a weaker dependency
-for things which are not input files as dtc is not. The 'dtc' here is
-just the dtc rule below, not the actual executable. Or am I missing
-something?
+> +		compatible = "edt,edt-ft5406";
+> +		reg = <0x38>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_irq_touch2 &pinctrl_emcon_gpio4>;
+> +		interrupt-parent = <&gpio6>;
+> +		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
+> +		wake-gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
+> +		wakeup-source;
+> +	};
+> +};
+> +
+> +&pcie {
+> +	status = "okay";
+> +};
+> +
+> +&rgb_encoder {
+> +	status = "okay";
+> +};
+> +
+> +&rgb_panel {
+> +	compatible = "edt,etm0700g0bdh6";
+> +	status = "okay";
+> +};
+> +
+> +&ssi2 {
+> +	status = "okay";
+> +};
+> +
+> +&uart2 {
+> +	status = "okay";
+> +	uart-has-rtscts;
+> +};
+> +
+> +&uart3 {
+> +	status = "okay";
+> +};
+> +
+> +&uart4 {
+> +	status = "okay";
+> +};
+> +
+> +&uart5 {
+> +	status = "okay";
+> +};
+> +
+> +&usbh1 {
+> +	status = "okay";
+> +};
+> +
+> +&usbotg {
+> +	status = "okay";
+> +};
+> +
+> +&usdhc1 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/imx6qdl-emcon.dtsi b/arch/arm/boot/dts/imx6qdl-emcon.dtsi
+> new file mode 100644
+> index 000000000000..4958ae3b924c
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6qdl-emcon.dtsi
+> @@ -0,0 +1,832 @@
+> +// SPDX-License-Identifier: (GPL-2.0 or MIT)
+> +/*
+> + * Copyright (C) 2018 emtrion GmbH
+> + */
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/pwm/pwm.h>
+> +#include <dt-bindings/input/input.h>
+> +
+> +/ {
+> +
+> +	model = "emtrion SoM emCON-MX6";
+> +	compatible = "emtrion,emcon-mx6";
+> +
+> +	aliases {
+> +		mmc0 = &usdhc3;
+> +		mmc2 = &usdhc1;
+> +		mmc1 = &usdhc2;
+> +		rtc0 = &ds1307;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = &uart1;
+> +	};
+> +
+> +	memory at 10000000 {
+> +		reg = <0x10000000 0x40000000>;
+> +	};
+> +
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_emcon_wake>;
+> +
+> +		wake {
+> +			label = "Wake";
+> +			linux,code = <KEY_WAKEUP>;
+> +			gpios = <&gpio3 2 GPIO_ACTIVE_LOW>;
+> +			wakeup-source;
+> +		};
+> +	};
+> +
+> +	som_leds: leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_som_leds>;
+> +
+> +		green {
+> +			label = "som:green";
+> +			gpios = <&gpio3 0 GPIO_ACTIVE_HIGH>;
+> +			linux,default-trigger = "heartbeat";
+> +			default-state = "on";
+> +		};
+> +
+> +		red {
+> +			label = "som:red";
+> +			gpios = <&gpio3 1 GPIO_ACTIVE_LOW>;
+> +			default-state = "keep";
+> +		};
+> +
+> +	};
+> +
+> +	lvds_backlight: lvds-backlight {
+> +		compatible = "pwm-backlight";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_lvds_bl>;
+> +		enable-gpios = <&gpio6 9 GPIO_ACTIVE_HIGH>;
+> +		pwms = <&pwm1 0 50000>;
+> +		brightness-levels = <
+> +			0 4 8 16 32 64 80 96 112
+> +			128 144 160 176 250
+> +		>;
+> +		default-brightness-level = <13>;
+> +		status = "okay";
+> +	};
+> +
+> +	pwm_fan: pwm-fan {
+> +		compatible = "pwm-fan";
+> +		cooling-min-state = <0>;
+> +		cooling-max-state = <4>;
+> +		#cooling-cells = <2>;
+> +		pwms = <&pwm4 0 50000>;
+> +		cooling-levels = <0 64 127 191 255>;
+> +		status = "disabled";
+> +	};
+> +
+> +
+> +	rgb_encoder: display {
+> +		compatible = "fsl,imx-parallel-display";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_rgb24_display>;
+> +		status = "disabled";
+> +
+> +		port at 0 {
+> +			reg = <0>;
+> +
+> +			rgb_encoder_in: endpoint {
+> +				remote-endpoint = <&ipu1_di0_disp0>;
+> +			};
+> +		};
+> +
+> +		port at 1 {
+> +			reg = <1>;
+> +
+> +			rgb_encoder_out: endpoint {
+> +				remote-endpoint = <&rgb_panel_in>;
+> +			};
+> +		};
+> +	};
+> +
+> +	rgb_panel: lcd {
+> +		backlight = <&rgb_backlight>;
+> +		power-supply = <&reg_parallel_disp>;
+> +
+> +		port {
+> +			rgb_panel_in: endpoint {
+> +				remote-endpoint = <&rgb_encoder_out>;
+> +			};
+> +		};
+> +	};
+> +
+> +	reg_parallel_disp: reg-parallel-display {
+> +		compatible = "regulator-fixed";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_rgb_bl_en>;
+> +		regulator-name = "LCD-Supply";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		gpio = <&gpio7 9 GPIO_ACTIVE_HIGH>;
+> +		enable-active-high;
+> +	};
+> +
+> +	reg_lvds_disp: reg-lvds-display {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "LVDS-Supply";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		gpio = <&gpio7 10 GPIO_ACTIVE_HIGH>;
+> +		enable-active-high;
+> +	};
+> +
+> +	rgb_backlight: rgb-backlight {
+> +		compatible = "pwm-backlight";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_rgb_bl>;
+> +		enable-gpios = <&gpio6 8 GPIO_ACTIVE_HIGH>;
+> +		pwms = <&pwm3 0 5000000>;
+> +		brightness-levels = <
+> +			250 176 160 144 128 112
+> +			96 80 64 48 32 16 8 1
+> +		>;
+> +		default-brightness-level = <13>;
+> +		status = "okay";
+> +	};
+> +};
+> +
+> +&can1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_can1>;
+> +};
+> +
+> +&can2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_can2>;
+> +};
+> +
+> +&ecspi2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi2>;
+> +	cs-gpios = <&gpio2 25 GPIO_ACTIVE_HIGH>,
+> +	<&gpio2 26 GPIO_ACTIVE_HIGH>;
 
-> > +       $(Q)$(MAKE) $(build)=$(dtstree) $(dtstree)/$@
-> > +
-> > +PHONY += dtbs
-> > +dtbs: | dtc
->
-> Ditto.
->
->
-> > +       $(Q)$(MAKE) $(build)=$(dtstree)
-> > +
-> > +dtbs_install: dtbs
-> > +       $(Q)$(MAKE) $(dtbinst)=$(dtstree)
-> > +
-> > +all: dtbs
-> > +
-> > +dtc:
-> > +       $(Q)$(MAKE) $(build)=scripts/dtc
-> > +
-> > +endif
-> > +
->
->
-> arch/*/boot/dts/ are not only directories that
-> require dtc.
+This line needs a proper indentation.
 
-Ah yes, of course...
+> +};
+> +
+> +&ecspi4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_nor_flash>;
+> +};
+> +
+> +&fec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_enet>;
+> +	phy-mode = "rgmii";
+> +	phy-reset-gpios = <&gpio5 20 GPIO_ACTIVE_LOW>;
+> +	phy-reset-duration = <50>;
+> +	phy-supply = <&vdd_1V8_reg>;
+> +	phy-handle = <&ksz9031>;
+> +	status = "okay";
+> +
+> +	mdio {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		ksz9031: phy at 0 {
+> +			compatible = "ethernet-phy-ieee802.3-c22";
+> +			reg = <0>;
+> +			interrupt-parent = <&gpio1>;
+> +			interrupts = <30 IRQ_TYPE_EDGE_FALLING>;
+> +			rxdv-skew-ps = <480>;
+> +			txen-skew-ps = <480>;
+> +			rxd0-skew-ps = <480>;
+> +			rxd1-skew-ps = <480>;
+> +			rxd2-skew-ps = <480>;
+> +			rxd3-skew-ps = <480>;
+> +			txd0-skew-ps = <420>;
+> +			txd1-skew-ps = <420>;
+> +			txd2-skew-ps = <360>;
+> +			txd3-skew-ps = <360>;
+> +			txc-skew-ps = <1020>;
+> +			rxc-skew-ps = <960>;
+> +		};
+> +	};
+> +};
+> +
+> +&i2c1 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c1>;
+> +	status = "okay";
+> +
+> +	ds1307: rtc at 68 {
+> +		compatible = "dallas,ds1307";
+> +		reg = <0x68>;
+> +	};
+> +
+> +	da9063: pmic at 58 {
 
-> > diff --git a/scripts/Makefile b/scripts/Makefile
-> > index 61affa300d25..a716a6b10954 100644
-> > --- a/scripts/Makefile
-> > +++ b/scripts/Makefile
-> > @@ -39,7 +39,6 @@ build_unifdef: $(obj)/unifdef
-> >  subdir-$(CONFIG_MODVERSIONS) += genksyms
-> >  subdir-y                     += mod
-> >  subdir-$(CONFIG_SECURITY_SELINUX) += selinux
-> > -subdir-$(CONFIG_DTC)         += dtc
-> >  subdir-$(CONFIG_GDB_SCRIPTS) += gdb
-> >
-> >  # Let clean descend into subdirs
+Sort I2C devices in address.
 
-Looks like I need to leave this line to fix the above and cleaning.
+Shawn
 
-Thanks for the review.
-
-Rob
+> +		compatible = "dlg,da9063";
+> +		reg = <0x58>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_pmic>;
+> +		interrupt-parent = <&gpio2>;
+> +		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
+> +		interrupt-controller;
