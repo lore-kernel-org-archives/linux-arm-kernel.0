@@ -1,42 +1,123 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Mon, 27 Aug 2018 09:05:06 +0200
-Subject: [PATCH] soc: ti: pm33xx: Enable DS0 for the platforms on which
- it is functional
-In-Reply-To: <20180822142220.GG7523@atomide.com>
-References: <1534915951-8783-1-git-send-email-j-keerthy@ti.com>
- <20180822073409.GK14967@localhost>
- <20180822073719.GL14967@localhost>
- <ae71d45f-9260-3547-5ff2-355c084fcf8e@ti.com>
- <20180822084318.GN14967@localhost>
- <335b4efe-ab18-df83-35f2-ee232c09f2e3@ti.com>
- <20180822142220.GG7523@atomide.com>
-Message-ID: <20180827070506.GW14967@localhost>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Mon, 27 Aug 2018 15:05:28 +0800
+Subject: [PATCH v5 5/5] iommu/arm-smmu-v3: add bootup option
+ "iommu.non_strict"
+In-Reply-To: <29330cf7-d269-c4db-2f5a-632509058987@arm.com>
+References: <1534296510-12888-1-git-send-email-thunder.leizhen@huawei.com>
+ <1534296510-12888-6-git-send-email-thunder.leizhen@huawei.com>
+ <29330cf7-d269-c4db-2f5a-632509058987@arm.com>
+Message-ID: <5B83A2B8.7030909@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2018 at 07:22:20AM -0700, Tony Lindgren wrote:
-> * J, KEERTHY <j-keerthy@ti.com> [180822 11:11]:
-> > On 8/22/2018 2:13 PM, Johan Hovold wrote:
-> > > Yes, and a blacklist would make much more sense for something like this
-> > > if where talking about specific boards.
-> >
-> > Black list is easier here?
-> 
-> After thinking about this a bit more I think the boards supporting
-> deep sleep should add a PM related dts property to enable deep sleep.
-> 
-> The board maintainers need to test and verify deep sleep for each
-> board, it's not something that just works for the SoC in general.
-> Some boards may use different powering for things like DDR where
-> it's power might be controlled by a GPIO regulator. And in some
-> cases deeper idle states may depend also on the PMIC being used.
-> 
-> Maybe we already have some dts property we can use to describe
-> the idle states the board hardware supports?
 
-Yeah, unless you can infer this from an existing tree I guess you need
-to add a new property. And indeed, a driver blacklist would suffer from the
-same fundamental problem (with an ever expanding list of machines) as a
-whitelist even if it would avoid regressing currently working systems.
 
-Johan
+On 2018/8/23 1:02, Robin Murphy wrote:
+> On 15/08/18 02:28, Zhen Lei wrote:
+>> Add a bootup option to make the system manager can choose which mode to
+>> be used. The default mode is strict.
+>>
+>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> ---
+>>   Documentation/admin-guide/kernel-parameters.txt | 13 +++++++++++++
+>>   drivers/iommu/arm-smmu-v3.c                     | 22 +++++++++++++++++++++-
+>>   2 files changed, 34 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+>> index 5cde1ff..cb9d043e 100644
+>> --- a/Documentation/admin-guide/kernel-parameters.txt
+>> +++ b/Documentation/admin-guide/kernel-parameters.txt
+>> @@ -1720,6 +1720,19 @@
+>>           nobypass    [PPC/POWERNV]
+>>               Disable IOMMU bypass, using IOMMU for PCI devices.
+>>
+>> +    iommu.non_strict=    [ARM64]
+>> +            Format: { "0" | "1" }
+>> +            0 - strict mode, default.
+>> +                Release IOVAs after the related TLBs are invalid
+>> +                completely.
+>> +            1 - non-strict mode.
+>> +                Put off TLBs invalidation and release memory first.
+>> +                It's good for scatter-gather performance but lacks
+>> +                full isolation, an untrusted device can access the
+>> +                reused memory because the TLBs may still valid.
+>> +                Please take    full consideration before choosing this
+>> +                mode. Note that, VFIO will always use strict mode.
+>> +
+>>       iommu.passthrough=
+>>               [ARM64] Configure DMA to bypass the IOMMU by default.
+>>               Format: { "0" | "1" }
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 61eb7ec..0eda90e 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -631,6 +631,26 @@ struct arm_smmu_option_prop {
+>>       { 0, NULL},
+>>   };
+>>
+>> +static bool smmu_non_strict __read_mostly;
+>> +
+>> +static int __init arm_smmu_setup(char *str)
+>> +{
+>> +    int ret;
+>> +
+>> +    ret = kstrtobool(str, &smmu_non_strict);
+>> +    if (ret)
+>> +        return ret;
+>> +
+>> +    if (smmu_non_strict) {
+>> +        pr_warn("WARNING: iommu non-strict mode is chosen.\n"
+>> +            "It's good for scatter-gather performance but lacks full isolation\n");
+>> +        add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
+>> +    }
+>> +
+>> +    return 0;
+>> +}
+>> +early_param("iommu.non_strict", arm_smmu_setup);
+> 
+> As I said on v3, the option should be parsed by iommu-dma, since that's where it takes effect, and I'm sure SMMUv2 users will be interested in trying it out too.
+
+OK, I am so sorry that I have not understood your opinion correctly.
+
+> 
+> In other words, if iommu_dma_init_domain() does something like:
+> 
+>     if (iommu_dma_non_strict && domain->ops->flush_iotlb_all) {
+>         domain->non_strict = true;
+>         cookie->domain = domain;
+>         init_iova_flush_queue(...);
+>     }
+> 
+>> +
+>>   static inline void __iomem *arm_smmu_page1_fixup(unsigned long offset,
+>>                            struct arm_smmu_device *smmu)
+>>   {
+>> @@ -1622,7 +1642,7 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
+>>       if (smmu->features & ARM_SMMU_FEAT_COHERENCY)
+>>           pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
+>>
+>> -    if (domain->type == IOMMU_DOMAIN_DMA) {
+>> +    if ((domain->type == IOMMU_DOMAIN_DMA) && smmu_non_strict) {
+>>           domain->non_strict = true;
+>>           pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
+>>       }
+> 
+> ...then all the driver should need to do is:
+> 
+>     if (domain->non_strict)
+>         pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
+> 
+> 
+> Now, that would make it possible to request non-strict mode even with drivers which *don't* understand it, but I think that's not actually harmful, just means that some TLBIs will still get issued synchronously and the flush queue might not do much. If you wanted to avoid even that, you could replace domain->non_strict with an iommu_domain_set_attr() call, so iommu_dma could tell up-front whether the driver understands non-strict mode and it's worth setting the queue up or not.
+
+OK, I will think seriously about it, thanks. I've been busy these days, I will reply to you as soon as possible.
+
+> 
+> Robin.
+> 
+> .
+> 
+
+-- 
+Thanks!
+BestRegards
