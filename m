@@ -1,24 +1,27 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 27 Aug 2018 17:18:26 +0200
-Subject: [PATCH 0/4] arm64: wire CRC32 instructions into core crc32
- routines
-In-Reply-To: <20180827145352.GF2311@thunk.org>
-References: <20180827110245.14812-1-ard.biesheuvel@linaro.org>
- <20180827145352.GF2311@thunk.org>
-Message-ID: <CAKv+Gu_qz+HbU2HQ2ep0cN-9V5hA46sBNVoxvkyjDQ=ZGk8yfw@mail.gmail.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Mon, 27 Aug 2018 17:26:42 +0200
+Subject: [PATCH] ARM: dts: at91/trivial: Fix USART1 DT definition for
+ at91sam9g45 SOC
+In-Reply-To: <20180820094201.6490-1-nicolas.ferre@microchip.com>
+References: <20180820094201.6490-1-nicolas.ferre@microchip.com>
+Message-ID: <20180827152642.GF23428@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 August 2018 at 16:53, Theodore Y. Ts'o <tytso@mit.edu> wrote:
-> On Mon, Aug 27, 2018 at 01:02:41PM +0200, Ard Biesheuvel wrote:
->> While this is not known to cause performance issues, calling a table based
->> time variant implementation with a non-negligible D-cache footprint (8 KB)
->> is wasteful in any case, and now that the crc32 instructions have been made
->> mandatory in the architecture, let's wire them up into the core crc routines.
->
-> Stupid question --- are there any arm64 SOC's out there which do *not*
-> have the crc32 instructions?  Presumably there won't be in the future,
-> because it's now mandatory --- but where there any in the past?
->
+On 20/08/2018 11:42:01+0200, Nicolas Ferre wrote:
+> From: Jay Foster <jayfoster@ieee.org>
+> 
+> Fix a typo. No functional change made by this patch.
+> 
+> Signed-off-by: Jay Foster <jayfoster@ieee.org>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> ---
+>  arch/arm/boot/dts/at91sam9g45.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+Applied, thanks.
 
-Yes, the APM Xgene for instance.
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
