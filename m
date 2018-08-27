@@ -1,60 +1,56 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 27 Aug 2018 14:59:29 +0800
-Subject: [PATCH 2/3] ARM: dts: imx6ull: add pxp support
-In-Reply-To: <20180810151822.18650-3-p.zabel@pengutronix.de>
-References: <20180810151822.18650-1-p.zabel@pengutronix.de>
- <20180810151822.18650-3-p.zabel@pengutronix.de>
-Message-ID: <20180827065927.GE3850@dragon>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Mon, 27 Aug 2018 09:02:04 +0200
+Subject: [PATCH] drm/rockchip: fix coding style and incorrect description
+In-Reply-To: <1535351378-128643-1-git-send-email-hjc@rock-chips.com>
+References: <1535351378-128643-1-git-send-email-hjc@rock-chips.com>
+Message-ID: <CAFqH_514pyvKTNHYM=wDab6yAPB+cDCNy8shHPpOP5aeLkyafg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2018 at 05:18:21PM +0200, Philipp Zabel wrote:
-> Add the device node for the i.MX6ULL Pixel Pipeline (PXP).
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Hi Sandy,
+
+Just noticed a typo that I think will be good fix also
+Missatge de Sandy Huang <hjc@rock-chips.com> del dia dl., 27 d?ag.
+2018 a les 8:31:
+>
+> Align with other drivers, tab + 2 space key for description.
+> and this option should be enabled on both rk3288 and rk3399.
+>
+> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
 > ---
->  arch/arm/boot/dts/imx6ul.dtsi  | 8 ++++++++
->  arch/arm/boot/dts/imx6ull.dtsi | 6 ++++++
->  2 files changed, 14 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-> index 47a3453a4211..e80a660c14f2 100644
-> --- a/arch/arm/boot/dts/imx6ul.dtsi
-> +++ b/arch/arm/boot/dts/imx6ul.dtsi
-> @@ -928,6 +928,14 @@
->  				};
->  			};
->  
-> +			pxp: pxp at 21cc000 {
-> +				compatible = "fsl,imx6ul-pxp";
-> +				reg = <0x021cc000 0x4000>;
-> +				interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-> +				clock-names = "axi";
-> +				clocks = <&clks IMX6UL_CLK_PXP>;
-> +			};
-> +
->  			lcdif: lcdif at 21c8000 {
+>  drivers/gpu/drm/rockchip/Kconfig | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+> index 0ccc762..601234b 100644
+> --- a/drivers/gpu/drm/rockchip/Kconfig
+> +++ b/drivers/gpu/drm/rockchip/Kconfig
+> @@ -45,10 +45,10 @@ config ROCKCHIP_DW_HDMI
+>  config ROCKCHIP_DW_MIPI_DSI
+>         bool "Rockchip specific extensions for Synopsys DW MIPI DSI"
+>         help
+> -        This selects support for Rockchip SoC specific extensions
+> -        for the Synopsys DesignWare HDMI driver. If you want to
+> -        enable MIPI DSI on RK3288 based SoC, you should selet this
+> -        option.
+> +         This selects support for Rockchip SoC specific extensions
+> +         for the Synopsys DesignWare HDMI driver. If you want to
+> +         enable MIPI DSI on RK3288 or RK3399 based SoC, you should
+> +         selet this option.
 
-In order of unit-address, pxp at 21cc000 should go after lcdif at 21c8000.
+s/selet/select/
 
-Shawn
+Cheers,
+ Enric
 
->  				compatible = "fsl,imx6ul-lcdif", "fsl,imx28-lcdif";
->  				reg = <0x021c8000 0x4000>;
-> diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
-> index ebc25c98e5e1..91d2b6dd9b1b 100644
-> --- a/arch/arm/boot/dts/imx6ull.dtsi
-> +++ b/arch/arm/boot/dts/imx6ull.dtsi
-> @@ -75,3 +75,9 @@
->  		};
->  	};
->  };
-> +
-> +&pxp {
-> +	compatible = "fsl,imx6ull-pxp";
-> +	interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
-> +		     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-> +};
-> -- 
-> 2.18.0
-> 
+>
+>  config ROCKCHIP_INNO_HDMI
+>         bool "Rockchip specific extensions for Innosilicon HDMI"
+> --
+> 2.7.4
+>
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
