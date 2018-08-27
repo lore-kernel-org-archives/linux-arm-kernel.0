@@ -1,68 +1,70 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 27 Aug 2018 08:55:35 -0700
-Subject: [RFC PATCH 5/6] arm64: dts: ti: Add Support for AM654 SoC
-In-Reply-To: <40cecb47-bd32-04aa-b7cd-ff16c1eb28f3@ti.com>
-References: <20180605060510.32473-1-nm@ti.com>
- <CAL_JsqJusWTvr4A_-Bk81meYddMHBMJ4=Fch6L0MFoF7HfBW2w@mail.gmail.com>
- <454c277e-8a63-81cb-b341-a50f4e25cbea@ti.com>
- <20180820143153.GD7523@atomide.com>
- <40cecb47-bd32-04aa-b7cd-ff16c1eb28f3@ti.com>
-Message-ID: <20180827155535.GJ7523@atomide.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 27 Aug 2018 12:15:30 -0400
+Subject: [RFC PATCH v2 2/3] pstore: Add register read/write{b,w,l,q}
+ tracing support
+In-Reply-To: <7b212c02-d7ce-4309-155f-22b36963e41c@codeaurora.org>
+References: <cover.1535119710.git.saiprakash.ranjan@codeaurora.org>
+ <65985f8df55b037283746559c1718a54d56e7ec4.1535119711.git.saiprakash.ranjan@codeaurora.org>
+ <CAGXu5jL6tGu9U_ANrZSfWREtySqFAJ+CQa3v5YRihZ2oHNMGGw@mail.gmail.com>
+ <7b212c02-d7ce-4309-155f-22b36963e41c@codeaurora.org>
+Message-ID: <20180827121530.525299e3@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [180827 03:06]:
-> Hi Tony,
+On Sat, 25 Aug 2018 12:54:07 +0530
+Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org> wrote:
+
+
+> Ftrace does not trace __raw{read,write}{b,l,w,q}() functions. I am not 
+> sure why and how it is filtered out because I do not see any notrace 
+> flag in those functions, maybe that whole directory is filtered out.
+> So adding this functionality to ftrace would mean removing the notrace 
+> for these functions i.e., something like using 
+> __raw{read,write}{b,l,w,q}() as the available filter functions. Also 
+> pstore ftrace does not filter functions to trace I suppose?
+
+It's not traced because it is inlined. Simply make the __raw_read
+function a normal function and it will be traced. And then you could
+use ftrace to read the function.
+
+If this has to be per arch, you can register your callback with the
+REGS flags, and pt_regs will be passed to your callback function you
+attached to __raw_read*() as if you inserted a break point at that
+location, and you can get any reg data you want there.
+
+
 > 
-> On Monday 20 August 2018 08:01 PM, Tony Lindgren wrote:
-> > * Kishon Vijay Abraham I <kishon@ti.com> [180808 06:35]:
-> >> On Tuesday 05 June 2018 07:35 PM, Rob Herring wrote:
-> >>> Really need 64-bit addresses and sizes? Use ranges to limit the
-> >>> address space if possible.
-> >>
-> >> We now have address-cells as <1>,
-> >> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/arch/arm64/boot/dts/ti/k3-am65.dtsi#n49
-> >>
-> >> However each PCIe instance has 2 data regions and one of the regions
-> >> (PCIE0_CORE_CORE_DAT_SLV_PCIE_DAT1/PCIE1_CORE_CORE_DAT_SLV_PCIE_DAT1 specified
-> >> in the "MAIN Domain Memory Map" table of TRM http://www.ti.com/lit/pdf/spruid7)
-> >> is above the 32bit region and requires 2 cells to specify the start address.
-> >> This region is used to access MEM_SPACE of PCIe endpoint when operating in root
-> >> complex mode and access memory of PCI root complex when operating in endpoint mode.
-> >>
-> >> In order to describe this, should we change the address-cells back to <2> or do
-> >> you suggest any other alternatives?
-> > 
-> > It's probably best to have the top level cbass interconnect use
-> > #size-cells = <2> and then have it's child interconnects have
-> > #size-cells = <1> if they don't need ranges above 4GB.
+> Coming to the reason as to why it would be good to keep this separate 
+> from ftrace would be:
+> * Ftrace can get ip and parent ip, but suppose we need extra data (field 
+> data) as in above sample output we would not be able to get through ftrace.
+
+As mentioned above, you can get regs (and ftrace is being expanded now
+to get parameters of functions).
+
 > 
-> PCIe has a region starting at 0x40_00000000 and size 4GB. We need 2 address
-> cells and 2 size cells to describe this no?
+> * Although this patch is for tracing register read/write, we can easily
+> add more functionality since we have dynamic_rtb api which can be hooked 
+> to functions and start tracing events(IRQ, Context ID) something similar 
+> to tracepoints.
+> Initially thought of having tracepoints for logging register read/write 
+> but I do not know if we can export tracepoint data to pstore since the 
+> main usecase is to debug unknown resets and hangs.
 
-Yes.
+I don't know why not? We have read/write tracepoints for
+read/write_msr() calls in x86.
 
-> > BTW, what's the difference between all these three similar PCIE
-> > ranges?
-> > 
-> > PCIE0_CORE_CORE_DAT_SLV_PCIE_CORE 0x0005500000 0x0005600000 1 MB
-> > PCIE1_CORE_CORE_DAT_SLV_PCIE_CORE 0x0005600000 0x0005700000 1 MB
+Anything can add a hook to the callback of the tracepoints, and use
+that infrastructure instead of creating yet another dynamic code
+modification infrastructure.
+
+
 > 
-> This is the register space for the two instances of PCIe controller.
-> > 
-> > PCIE0_CORE_CORE_DAT_SLV_PCIE_DAT0 0x0010000000 0x0018000000 128 MB
-> > PCIE1_CORE_CORE_DAT_SLV_PCIE_DAT0 0x0018000000 0x0020000000 128 MB
-> > 
-> > PCIE0_CORE_CORE_DAT_SLV_PCIE_DAT1 0x4000000000 0x4100000000 4 GB
-> > PCIE1_CORE_CORE_DAT_SLV_PCIE_DAT1 0x4100000000 0x4200000000 4 GB
-> 
-> The above are regions which can be used by CPU/DMA to access the PCIe address
-> space. The mapping from the above regions to the PCIe address space will be
-> programmed in the PCIe controller.
+> * This can be something similar to mmiotrace in x86 and kept seperate 
+> from function tracer.
 
-OK so not just somethng for dma-ranges but also accessible by
-the CPU.
 
-Regards,
+mmiotrace is separate because it faults on writes so that we can
+capture any reads and writes to the system that a binary driver does.
 
-Tony
+-- Steve
