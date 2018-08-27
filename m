@@ -1,125 +1,70 @@
-From: hanjie.lin@amlogic.com (Hanjie Lin)
-Date: Mon, 27 Aug 2018 16:55:20 +0800
-Subject: [PATCH v2 1/2] dt-bindings: PCI: meson: add DT bindings for
- Amlogic Meson PCIe controller
-In-Reply-To: <8c48964151d24758298ba935da336c0829e2b287.camel@baylibre.com>
-References: <1535096165-45827-1-git-send-email-hanjie.lin@amlogic.com>
- <1535096165-45827-2-git-send-email-hanjie.lin@amlogic.com>
- <8c48964151d24758298ba935da336c0829e2b287.camel@baylibre.com>
-Message-ID: <11d7547b-feb4-6ecb-cef3-db46ce8ee2ef@amlogic.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Mon, 27 Aug 2018 14:26:21 +0530
+Subject: [PATCH v2 3/3] dts: arm64/sdm845: Add node for qcom,smmu-v2
+In-Reply-To: <20180814225750.GA31263@rob-hp-laptop>
+References: <20180814102740.30222-1-vivek.gautam@codeaurora.org>
+ <20180814102740.30222-4-vivek.gautam@codeaurora.org>
+ <27372288-447d-6c9a-504a-8b8ef40e3d58@arm.com>
+ <CAFp+6iG8HohQ5=gwL37OuykK+R4U407yfrp=WN6pSgOK-mdzzA@mail.gmail.com>
+ <20180814225750.GA31263@rob-hp-laptop>
+Message-ID: <f8d638bd-d0cb-e03d-bac2-3bc2e30c5422@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rob, Robin,
 
 
-On 2018/8/24 16:22, Jerome Brunet wrote:
-> On Fri, 2018-08-24 at 15:36 +0800, Hanjie Lin wrote:
->> From: Yue Wang <yue.wang@amlogic.com>
+On 8/15/2018 4:27 AM, Rob Herring wrote:
+> On Wed, Aug 15, 2018 at 01:09:43AM +0530, Vivek Gautam wrote:
+>> Adding Jordan here.
 >>
->> The Amlogic Meson PCIe host controller is based on the Synopsys DesignWare
->> PCI core. This patch adds documentation for the DT bindings in Meson PCIe
->> controller.
->>
->> Signed-off-by: Yue Wang <yue.wang@amlogic.com>
->> Signed-off-by: Hanjie Lin <hanjie.lin@amlogic.com>
->> ---
->>  .../devicetree/bindings/pci/amlogic,meson-pcie.txt | 63 ++++++++++++++++++++++
->>  1 file changed, 63 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
->>
->> diff --git a/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
->> new file mode 100644
->> index 0000000..8a831d1
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
->> @@ -0,0 +1,63 @@
->> +Amlogic Meson AXG DWC PCIE SoC controller
->> +
->> +Amlogic Meson PCIe host controller is based on the Synopsys DesignWare PCI core.
->> +It shares common functions with the PCIe DesignWare core driver and
->> +inherits common properties defined in
->> +Documentation/devicetree/bindings/pci/designware-pci.txt.
->> +
->> +Additional properties are described here:
->> +
->> +Required properties:
->> +- compatible:
->> +	should contain "amlogic,axg-pcie" to identify the core.
->> +- reg:
->> +	Should contain the configuration address space.
->> +- reg-names: Must be
->> +	- "elbi"	External local bus interface registers
->> +	- "cfg"		Meson specific registers
->> +	- "config"	PCIe configuration space
->> +- reset-gpios: The GPIO to generate PCIe PERST# assert and deassert signal.
->> +- clocks: Must contain an entry for each entry in clock-names.
->> +- clock-names: Must include the following entries:
->> +	- "pclk"       PCIe GEN 100M PLL clock
->> +	- "port"       PCIe_x(A or B) RC clock gate
->> +	- "general"    PCIe Phy clock
->> +	- "mipi"       PCIe_x(A or B) 100M ref clock gate
->> +- resets: phandle to the reset lines.
->> +- reset-names: must contain "phy" and "peripheral"
->> +       - "port" Port A or B reset
->> +       - "apb" APB reset
-> 
-> The above description is not coherent (phy <=> port)
-> 
+>> On Tue, Aug 14, 2018 at 4:19 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+>>> Hi Vivek,
+>>>
+>>> On 14/08/18 11:27, Vivek Gautam wrote:
+>>>> Add device node for qcom,smmu-v2 available on sdm845.
+>>>> This smmu is available only to GPU device.
+>>>>
+>>>> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+>>>> ---
+>>>>    arch/arm64/boot/dts/qcom/sdm845.dtsi | 23 +++++++++++++++++++++++
+>>>>    1 file changed, 23 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>>>> b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>>>> index 1c2be2082f33..bd1ec5fa5146 100644
+>>>> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>>>> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+>>>> @@ -6,6 +6,7 @@
+>>>>     */
+>>>>      #include <dt-bindings/clock/qcom,gcc-sdm845.h>
+>>>> +#include <dt-bindings/clock/qcom,gpucc-sdm845.h>
+>>>>    #include <dt-bindings/clock/qcom,rpmh.h>
+>>>>    #include <dt-bindings/interrupt-controller/arm-gic.h>
+>>>>    #include <dt-bindings/soc/qcom,rpmh-rsc.h>
+>>>> @@ -989,6 +990,28 @@
+>>>>                          cell-index = <0>;
+>>>>                  };
+>>>>    +             gpu_smmu: iommu at 5040000 {
+>>>> +                       compatible = "qcom,sdm845-smmu-v2",
+>>>> "qcom,smmu-v2";
+>>>
+>>> Which of "sdm845" or "msm8996"[1] is the actual SoC name here?
+>> Well, the bindings use the SoC prefix with smmu-v2, so it should be
+>> sdm845 for this SoC. This is same as I posted in my v1 of the series [2].
+>> Using 8996 based string in sdm845 makes things look awful.
+> You need to list valid values of '<soc>' in the binding. Otherwise we
+> get this confusion.
 
-Yes, this should be port and apb here.
-We'll integrate phy driver into ctrl driver, and move phy reset to here also.
+Sorry for delayed response, I was away on vacation.
+I will list down the valid values for '<soc>' as suggested, and respin 
+this series, and
+smmu bindings patch that comes as part of the runtime pm series [1].
 
->> +
->> +Example configuration:
->> +
->> +	pcie: pcie at f9800000 {
->> +			compatible = "amlogic,axg-pcie", "snps,dw-pcie";
->> +			reg = <0x0 0xf9800000 0x0 0x400000
->> +					0x0 0xff646000 0x0 0x2000
->> +					0x0 0xf9f00000 0x0 0x100000>;
->> +			reg-names = "elbi", "cfg", "config";
->> +			reset-gpios = <&gpio GPIOX_19 GPIO_ACTIVE_HIGH>;
->> +			interrupts = <GIC_SPI 177 IRQ_TYPE_EDGE_RISING>;
->> +			#interrupt-cells = <1>;
->> +			interrupt-map-mask = <0 0 0 0>;
->> +			interrupt-map = <0 0 0 0 &gic GIC_SPI 179 IRQ_TYPE_EDGE_RISING>;
->> +			bus-range = <0x0 0xff>;
->> +			#address-cells = <3>;
->> +			#size-cells = <2>;
->> +			device_type = "pci";
-> 
-> Not described above - is it even used ?
-> 
+[1] https://lore.kernel.org/patchwork/patch/968017/
 
-It's necessary, specified in designware-pcie.txt:
- - device_type:
-  Usage: required
-  Value type: <string>
-  Definition: Should be "pci". 
+Best regards
+Vivek
 
->> +			phys = <&pcie_phy>;
-> 
-> Not documented and not necessary. Please remove this.
-> 
-
-We'll remove phy driver and this also.
-
->> +			ranges = <0x82000000 0 0 0x0 0xf9c00000 0 0x00300000>;
->> +
->> +			clocks = <&clkc CLKID_USB
->> +					&clkc CLKID_MIPI_ENABLE
->> +					&clkc CLKID_PCIE_A
->> +					&clkc CLKID_PCIE_CML_EN0>;
->> +			clock-names = "general",
->> +					"mipi",
->> +					"pclk",
->> +					"port";
->> +			resets = <&reset RESET_PCIE_A>,
->> +				<&reset RESET_PCIE_APB>;
->> +			reset-names = "port",
->> +					"apb";
->> +	};
-> 
-> 
-> .
-> 
+>
+> Rob
