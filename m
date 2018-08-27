@@ -1,127 +1,84 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 27 Aug 2018 14:52:39 +0200
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77965: Add OPPs table for
- cpu devices
-In-Reply-To: <20180824082327.5my3j4zujckqbe65@verge.net.au>
-References: <1534255961-23326-1-git-send-email-ykaneko0929@gmail.com>
- <20180822144113.s7prdezkj5c3xjqm@verge.net.au>
- <20180824082327.5my3j4zujckqbe65@verge.net.au>
-Message-ID: <20180827125238.ayaw7z3odnkzid4d@verge.net.au>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Mon, 27 Aug 2018 18:24:55 +0530
+Subject: [PATCH v1 01/10] arm/arm64: dts: msm8974/msm8916: thermal: Split
+ address space into two
+In-Reply-To: <20180824232747.GE25163@localhost.localdomain>
+References: <cover.1533815718.git.amit.kucheria@linaro.org>
+ <d01f560abed221b536b27bfaa42a530257642974.1533815718.git.amit.kucheria@linaro.org>
+ <20180824232747.GE25163@localhost.localdomain>
+Message-ID: <CAP245DWcQ1DQCoMv_92wJweySUDaH60+ySwGeQHR9hL1PpD0uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2018 at 10:23:28AM +0200, Simon Horman wrote:
-> On Wed, Aug 22, 2018 at 04:41:18PM +0200, Simon Horman wrote:
-> > On Tue, Aug 14, 2018 at 11:12:41PM +0900, Yoshihiro Kaneko wrote:
-> > > From: Dien Pham <dien.pham.ry@renesas.com>
-> > > 
-> > > This patch adds OPPs table for CA57{0,1} cpu devices
-> > > 
-> > > Signed-off-by: Dien Pham <dien.pham.ry@renesas.com>
-> > > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> > 
-> > Tested on r8a77965/Salvator-XS
-> > 
-> > I see that CPUFreq is activated, that sysfs reports 3 possible
-> > CPU speeds; 1.5, 1.0 and 0.50GHz. That current CPU frequency can be manipulated
-> > by setting the maximum CPU frequency in sysfs. And that the frequency
-> > of Z clock changes accordingly.
-> > 
-> > Tested-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> I have applied this for v4.20.
+On Sat, Aug 25, 2018 at 4:58 AM Eduardo Valentin <edubezval@gmail.com> wrote:
+>
+> On Thu, Aug 09, 2018 at 06:02:33PM +0530, Amit Kucheria wrote:
+> > We've earlier added support to split the register address space into TM
+> > and SROT regions.
+> >
+> > Split up the regmap address space into two for the remaining platforms that
+> > have a similar register layout and make corresponding changes to the
+> > get_temp_common() function used by these platforms.
+> >
+> > Since tsens-common.c/init_common() currently only registers one address
+> > space, the order is important (TM before SROT).  This is OK since the code
+> > doesn't really use the SROT functionality yet.
+> >
+> > Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/qcom-msm8974.dtsi   | 6 ++++--
+> >  arch/arm64/boot/dts/qcom/msm8916.dtsi | 6 ++++--
+> >  drivers/thermal/qcom/tsens-common.c   | 5 +++--
+> >  3 files changed, 11 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> > index d9019a49b292..3c4b81c29798 100644
+> > --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+> > +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> > @@ -427,11 +427,13 @@
+> >                       };
+> >               };
+> >
+> > -             tsens: thermal-sensor at fc4a8000 {
+> > +             tsens: thermal-sensor at fc4a9000 {
+> >                       compatible = "qcom,msm8974-tsens";
+> > -                     reg = <0xfc4a8000 0x2000>;
+> > +                     reg = <0xfc4a9000 0x1000>, /* TM */
+> > +                           <0xfc4a8000 0x1000>; /* SROT */
+> >                       nvmem-cells = <&tsens_calib>, <&tsens_backup>;
+> >                       nvmem-cell-names = "calib", "calib_backup";
+> > +                     #qcom,sensors = <11>;
+> >                       #thermal-sensor-cells = <1>;
+> >               };
+> >
+> > diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> > index cc1040eacdf5..abf84df5a7bc 100644
+> > --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> > +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> > @@ -774,11 +774,13 @@
+> >                       };
+> >               };
+> >
+> > -             tsens: thermal-sensor at 4a8000 {
+> > +             tsens: thermal-sensor at 4a9000 {
+> >                       compatible = "qcom,msm8916-tsens";
+> > -                     reg = <0x4a8000 0x2000>;
+> > +                     reg = <0x4a9000 0x1000>, /* TM */
+> > +                           <0x4a8000 0x1000>; /* SROT */
+> >                       nvmem-cells = <&tsens_caldata>, <&tsens_calsel>;
+> >                       nvmem-cell-names = "calib", "calib_sel";
+> > +                     #qcom,sensors = <5>;
+> >                       #thermal-sensor-cells = <1>;
+>
+> Looking closer to this, I fail to remember the reasoning why
+> #qcom,sensors property was needed.
 
-I noticed that this patch included unit numbers for the opps nodes.
-This is not correct as there is no bus that the nodes live on.
-I fixed this using s/@/-/.
-The result is below:
+It is necessary for platforms that have multiple TSENS blocks. This
+then allows us to specify the number of connected sensors per block.
+See commit 6d7c70d1cd65 ("thermal: qcom: tsens: Allow number of
+sensors to come from DT") for details.
 
->From cd889b86ce3fba300ce82b0ec22bf310cd2f361d Mon Sep 17 00:00:00 2001
-From: Dien Pham <dien.pham.ry@renesas.com>
-Date: Tue, 14 Aug 2018 23:12:41 +0900
-Subject: [PATCH] arm64: dts: renesas: r8a77965: Add OPPs table for cpu devices
+As requested by Matthias, I'm moving this bit to its own patch in v2.
 
-This patch adds OPPs table for CA57{0,1} cpu devices
-
-Signed-off-by: Dien Pham <dien.pham.ry@renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
-[simon: do not give nodes unit names as they have no bus addresses]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 44 +++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index e7128fb65e33..5ce978502ee9 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -60,6 +60,46 @@
- 		clock-frequency = <0>;
- 	};
- 
-+	cluster0_opp: opp_table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp-500000000 {
-+			opp-hz = /bits/ 64 <500000000>;
-+			opp-microvolt = <830000>;
-+			clock-latency-ns = <300000>;
-+		};
-+		opp-1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			opp-microvolt = <830000>;
-+			clock-latency-ns = <300000>;
-+		};
-+		opp-1500000000 {
-+			opp-hz = /bits/ 64 <1500000000>;
-+			opp-microvolt = <830000>;
-+			clock-latency-ns = <300000>;
-+			opp-suspend;
-+		};
-+		opp-1600000000 {
-+			opp-hz = /bits/ 64 <1600000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <300000>;
-+			turbo-mode;
-+		};
-+		opp-1700000000 {
-+			opp-hz = /bits/ 64 <1700000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <300000>;
-+			turbo-mode;
-+		};
-+		opp-1800000000 {
-+			opp-hz = /bits/ 64 <1800000000>;
-+			opp-microvolt = <960000>;
-+			clock-latency-ns = <300000>;
-+			turbo-mode;
-+		};
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -71,6 +111,8 @@
- 			power-domains = <&sysc R8A77965_PD_CA57_CPU0>;
- 			next-level-cache = <&L2_CA57>;
- 			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE R8A77965_CLK_Z>;
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		a57_1: cpu at 1 {
-@@ -80,6 +122,8 @@
- 			power-domains = <&sysc R8A77965_PD_CA57_CPU1>;
- 			next-level-cache = <&L2_CA57>;
- 			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE R8A77965_CLK_Z>;
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		L2_CA57: cache-controller-0 {
--- 
-2.11.0
+Regards,
+Amit
