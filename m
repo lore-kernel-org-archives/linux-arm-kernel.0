@@ -1,31 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Aug 2018 22:22:19 +0200
-Subject: [PATCH] ata: ftide010: Add a quirk for SQ201
-In-Reply-To: <20180716191757.GO72677@devbig577.frc2.facebook.com>
-References: <20180715200929.10116-1-linus.walleij@linaro.org>
- <20180716191757.GO72677@devbig577.frc2.facebook.com>
-Message-ID: <CACRpkdbj1XU68xEuNy4yF_Tyo+Axup4vP4GpGYH0cnGZR59UGA@mail.gmail.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Mon, 27 Aug 2018 13:23:54 -0700
+Subject: [PATCH] clk: sunxi-ng: sun50i: h6: Add 2x fixed post-divider to
+ MMC module clocks
+In-Reply-To: <20180820134013.16527-1-icenowy@aosc.io>
+References: <20180820134013.16527-1-icenowy@aosc.io>
+Message-ID: <153540143478.129321.8502068006504989469@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 16, 2018 at 9:18 PM Tejun Heo <tj@kernel.org> wrote:
-> On Sun, Jul 15, 2018 at 10:09:29PM +0200, Linus Walleij wrote:
-> > The DMA is broken on this specific device for some unknown
-> > reason (probably badly designed or plain broken interface
-> > electronics) and will only work with PIO. Other users of
-> > the same hardware does not have this problem.
-> >
-> > Add a specific quirk so that this Gemini device gets
-> > DMA turned off. Also fix up some code around passing the
-> > port information around in probe while we're at it.
-> >
-> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Applied to libata/for-4.18-fixes.
+Quoting Icenowy Zheng (2018-08-20 06:40:13)
+> On the H6, the MMC module clocks are fixed in the new timing mode,
+> i.e. they do not have a bit to select the mode. These clocks have
+> a 2x divider somewhere between the clock and the MMC module.
+> 
+> To be consistent with other SoCs supporting the new timing mode,
+> we model the 2x divider as a fixed post-divider on the MMC module
+> clocks.
+> 
+> This patch adds the post-dividers to the MMC clocks, following the
+> approach on A64.
+> 
+> Fixes: 542353ea ("clk: sunxi-ng: add support for the Allwinner H6 CCU")
 
-This never appeared in the tree, it's still not there in v4.19-rc1!
+This commit doesn't exist. Did you mean:
 
-Jens can you apply it?
+524353ea48
 
-Yours,
-Linus Walleij
+instead?
