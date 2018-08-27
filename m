@@ -1,32 +1,63 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Mon, 27 Aug 2018 20:05:28 +0800
+Date: Mon, 27 Aug 2018 20:21:52 +0800
 Subject: [nomadik:ftgpio010-debounce 3/4]
- drivers/gpio/gpio-ftgpio010.c:292:9: error: 'val' undeclared; did you mean
- 'vmap'?
-Message-ID: <201808272025.9k1svC4o%fengguang.wu@intel.com>
+ drivers/gpio/gpio-ftgpio010.c:292:2: note: in expansion of macro 'writel'
+Message-ID: <201808272030.TIalk2sm%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git ftgpio010-debounce
 head:   a03e32e926f66481611b7c6a66de194dd9fb7cb7
 commit: bcf606de43c663ce0f1913fe5712c138b5989341 [3/4] gpio: ftgpio: Support debounce timer
-config: x86_64-randconfig-a0-08271634 (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+config: arm-moxart_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
 reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
         git checkout bcf606de43c663ce0f1913fe5712c138b5989341
         # save the attached .config to linux build tree
-        make ARCH=x86_64 
+        GCC_VERSION=7.2.0 make.cross ARCH=arm 
 
-All errors (new ones prefixed by >>):
+All warnings (new ones prefixed by >>):
 
+   In file included from include/linux/byteorder/little_endian.h:5:0,
+                    from arch/arm/include/uapi/asm/byteorder.h:22,
+                    from include/asm-generic/bitops/le.h:6,
+                    from arch/arm/include/asm/bitops.h:268,
+                    from include/linux/bitops.h:19,
+                    from include/linux/kernel.h:11,
+                    from include/linux/list.h:9,
+                    from include/linux/kobject.h:19,
+                    from include/linux/device.h:16,
+                    from include/linux/gpio/driver.h:5,
+                    from drivers/gpio/gpio-ftgpio010.c:13:
    drivers/gpio/gpio-ftgpio010.c: In function 'ftgpio_gpio_probe':
->> drivers/gpio/gpio-ftgpio010.c:292:9: error: 'val' undeclared (first use in this function); did you mean 'vmap'?
+   drivers/gpio/gpio-ftgpio010.c:292:9: error: 'val' undeclared (first use in this function); did you mean 'vmap'?
      writel(val, g->base + GPIO_DEBOUNCE_EN);
-            ^~~
-            vmap
+            ^
+   include/uapi/linux/byteorder/little_endian.h:33:51: note: in definition of macro '__cpu_to_le32'
+    #define __cpu_to_le32(x) ((__force __le32)(__u32)(x))
+                                                      ^
+   arch/arm/include/asm/io.h:314:36: note: in expansion of macro 'writel_relaxed'
+    #define writel(v,c)  ({ __iowmb(); writel_relaxed(v,c); })
+                                       ^~~~~~~~~~~~~~
+>> drivers/gpio/gpio-ftgpio010.c:292:2: note: in expansion of macro 'writel'
+     writel(val, g->base + GPIO_DEBOUNCE_EN);
+     ^~~~~~
    drivers/gpio/gpio-ftgpio010.c:292:9: note: each undeclared identifier is reported only once for each function it appears in
+     writel(val, g->base + GPIO_DEBOUNCE_EN);
+            ^
+   include/uapi/linux/byteorder/little_endian.h:33:51: note: in definition of macro '__cpu_to_le32'
+    #define __cpu_to_le32(x) ((__force __le32)(__u32)(x))
+                                                      ^
+   arch/arm/include/asm/io.h:314:36: note: in expansion of macro 'writel_relaxed'
+    #define writel(v,c)  ({ __iowmb(); writel_relaxed(v,c); })
+                                       ^~~~~~~~~~~~~~
+>> drivers/gpio/gpio-ftgpio010.c:292:2: note: in expansion of macro 'writel'
+     writel(val, g->base + GPIO_DEBOUNCE_EN);
+     ^~~~~~
 
-vim +292 drivers/gpio/gpio-ftgpio010.c
+vim +/writel +292 drivers/gpio/gpio-ftgpio010.c
 
    230	
    231	static int ftgpio_gpio_probe(struct platform_device *pdev)
@@ -121,6 +152,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 26061 bytes
+Size: 12782 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180827/9292badc/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180827/ef982471/attachment.gz>
