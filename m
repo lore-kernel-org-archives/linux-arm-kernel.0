@@ -1,18 +1,20 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 27 Aug 2018 09:51:27 +0800
-Subject: [PATCH v10 3/4] ARM: dts: imx7s: add i.MX7 messaging unit support
-In-Reply-To: <20180803052919.820-4-o.rempel@pengutronix.de>
-References: <20180803052919.820-1-o.rempel@pengutronix.de>
- <20180803052919.820-4-o.rempel@pengutronix.de>
-Message-ID: <20180827015125.GE29208@dragon>
+Date: Mon, 27 Aug 2018 09:52:50 +0800
+Subject: [PATCH] ARM: dts: imx7s: remove snvs_poweroff node
+In-Reply-To: <1533534005-18736-1-git-send-email-Anson.Huang@nxp.com>
+References: <1533534005-18736-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180827015249.GF29208@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 03, 2018 at 07:29:18AM +0200, Oleksij Rempel wrote:
-> Define the Messaging Unit (MU) for i.MX7 in the processor's dtsi.
-> The respective driver is added in the next commit.
+On Mon, Aug 06, 2018 at 01:40:05PM +0800, Anson Huang wrote:
+> System poweroff is already supported by PSCI on i.MX7D,
+> remove "snvs_poweroff" node to avoid below debug message
+> from syscon-poweroff driver:
 > 
-> Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> [    1.831414] syscon-poweroff 30370000.snvs:snvs-poweroff: pm_power_off already claimed (ptrval) psci_sys_poweroff
+> [    1.841707] syscon-poweroff: probe of 30370000.snvs:snvs-poweroff failed with error -16
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
 Applied, thanks.
