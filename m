@@ -1,188 +1,107 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Mon, 27 Aug 2018 14:28:37 +0300
-Subject: [RESEND] PCI: imx: Initial imx7d pm support
-Message-ID: <d577303de61fb060aa428898f5df1d0bc9be89b8.1535369231.git.leonard.crestez@nxp.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 27 Aug 2018 13:53:00 +0200
+Subject: [PATCH 1/2] drm/bridge: Add virtual display DT bindings
+In-Reply-To: <20180824122308.3092-1-linus.walleij@linaro.org>
+References: <CGME20180824122324epcas3p2922f3e5415dacf4c89cfb136fa5c77b2@epcas3p2.samsung.com>
+ <20180824122308.3092-1-linus.walleij@linaro.org>
+Message-ID: <20180827115302eucas1p24d36cfaf9835ccb217ac81e508484aa1~Ou5eTkYW-3006130061eucas1p2Z@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On imx7d the pcie-phy power domain is turned off in suspend and this can
-make the system hang after resume when attempting any read from PCI.
+On 24.08.2018 14:23, Linus Walleij wrote:
+> This adds bindings for a virtual display to be used with displays
+> inside entirely virtual environments which do not emulate things
+> like monitors but just need timing information to be supplied to
+> its display controller.
+>
+> This is inspired by earlier work by Liviu Dudau.
 
-Fix this by adding minimal suspend/resume code from the nxp internal
-tree. This will prepare for powering down on suspend and reset the block
-on resume.
+If this is pure virtual then it should be connected to other pure
+virtual components.
+What will be this virtual bridge attached to? I expect some virtual
+encoder, virtual crtc? If yes then why don't you create whole virtual
+drm pipeline in one patchset?
+Could you describe more what do you want to do.
+And one more thing, you are defining virtual panel but you are using
+drm_bridge framework, why not drm_panel?
 
-Code is only for imx7d but a very similar sequence can be used for
-other socs.
+Regards
+Andrzej
 
-The original author is mostly Richard Zhu <hongxing.zhu@nxp.com>, this
-patch adjusts the code to the upstream imx7d implemention using reset
-controls and power domains.
-
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
----
- drivers/pci/controller/dwc/pci-imx6.c | 97 +++++++++++++++++++++++++--
- 1 file changed, 92 insertions(+), 5 deletions(-)
-
-Resending after RC1 as suggested here: https://lkml.org/lkml/2018/8/8/496
-
-This was initially sent together with a dts fix, that was already
-accepted by Shawn: https://lkml.org/lkml/2018/8/21/529
-
-Some dependencies in this area are complicated but as far as I know
-including this patch without others should not break anything that was
-not already broken. Since this is a patch for something that has never
-worked before it should be treated as a feature not a bugfix.
-
-I have a few other patches for imx pci but it's better to deal with them
-separately. This initial patch adding suspend support is useful by
-itself.
-
-diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-index 4a9a673b4777..65b6d1015723 100644
---- a/drivers/pci/controller/dwc/pci-imx6.c
-+++ b/drivers/pci/controller/dwc/pci-imx6.c
-@@ -540,10 +540,28 @@ static int imx6_pcie_wait_for_speed_change(struct imx6_pcie *imx6_pcie)
- 
- 	dev_err(dev, "Speed change timeout\n");
- 	return -EINVAL;
- }
- 
-+static void imx6_pcie_ltssm_enable(struct device *dev)
-+{
-+	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-+
-+	switch (imx6_pcie->variant) {
-+	case IMX6Q:
-+	case IMX6SX:
-+	case IMX6QP:
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-+				   IMX6Q_GPR12_PCIE_CTL_2,
-+				   IMX6Q_GPR12_PCIE_CTL_2);
-+		break;
-+	case IMX7D:
-+		reset_control_deassert(imx6_pcie->apps_reset);
-+		break;
-+	}
-+}
-+
- static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
- {
- 	struct dw_pcie *pci = imx6_pcie->pci;
- 	struct device *dev = pci->dev;
- 	u32 tmp;
-@@ -558,15 +576,11 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
- 	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
- 	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN1;
- 	dw_pcie_writel_dbi(pci, PCIE_RC_LCR, tmp);
- 
- 	/* Start LTSSM. */
--	if (imx6_pcie->variant == IMX7D)
--		reset_control_deassert(imx6_pcie->apps_reset);
--	else
--		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
--				   IMX6Q_GPR12_PCIE_CTL_2, 1 << 10);
-+	imx6_pcie_ltssm_enable(dev);
- 
- 	ret = imx6_pcie_wait_for_link(imx6_pcie);
- 	if (ret)
- 		goto err_reset_phy;
- 
-@@ -680,10 +694,82 @@ static int imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
- 
- static const struct dw_pcie_ops dw_pcie_ops = {
- 	.link_up = imx6_pcie_link_up,
- };
- 
-+#ifdef CONFIG_PM_SLEEP
-+static void imx6_pcie_ltssm_disable(struct device *dev)
-+{
-+	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-+
-+	switch (imx6_pcie->variant) {
-+	case IMX6SX:
-+	case IMX6QP:
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-+				   IMX6Q_GPR12_PCIE_CTL_2, 0);
-+		break;
-+	case IMX7D:
-+		reset_control_assert(imx6_pcie->apps_reset);
-+		break;
-+	default:
-+		dev_err(dev, "ltssm_disable not supported\n");
-+	}
-+}
-+
-+static void imx6_pcie_clk_disable(struct imx6_pcie *imx6_pcie)
-+{
-+	clk_disable_unprepare(imx6_pcie->pcie);
-+	clk_disable_unprepare(imx6_pcie->pcie_phy);
-+	clk_disable_unprepare(imx6_pcie->pcie_bus);
-+
-+	if (imx6_pcie->variant == IMX7D) {
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-+				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
-+				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL);
-+	}
-+}
-+
-+static int imx6_pcie_suspend_noirq(struct device *dev)
-+{
-+	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-+
-+	if (imx6_pcie->variant != IMX7D)
-+		return 0;
-+
-+	imx6_pcie_clk_disable(imx6_pcie);
-+	imx6_pcie_ltssm_disable(dev);
-+
-+	return 0;
-+}
-+
-+static int imx6_pcie_resume_noirq(struct device *dev)
-+{
-+	int ret;
-+	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-+	struct pcie_port *pp = &imx6_pcie->pci->pp;
-+
-+	if (imx6_pcie->variant != IMX7D)
-+		return 0;
-+
-+	imx6_pcie_assert_core_reset(imx6_pcie);
-+	imx6_pcie_init_phy(imx6_pcie);
-+	imx6_pcie_deassert_core_reset(imx6_pcie);
-+	dw_pcie_setup_rc(pp);
-+
-+	ret = imx6_pcie_establish_link(imx6_pcie);
-+	if (ret < 0)
-+		dev_info(dev, "pcie link is down after resume.\n");
-+
-+	return 0;
-+}
-+#endif
-+
-+static const struct dev_pm_ops imx6_pcie_pm_ops = {
-+	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(imx6_pcie_suspend_noirq,
-+				      imx6_pcie_resume_noirq)
-+};
-+
- static int imx6_pcie_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct dw_pcie *pci;
- 	struct imx6_pcie *imx6_pcie;
-@@ -846,10 +932,11 @@ static const struct of_device_id imx6_pcie_of_match[] = {
- static struct platform_driver imx6_pcie_driver = {
- 	.driver = {
- 		.name	= "imx6q-pcie",
- 		.of_match_table = imx6_pcie_of_match,
- 		.suppress_bind_attrs = true,
-+		.pm = &imx6_pcie_pm_ops,
- 	},
- 	.probe    = imx6_pcie_probe,
- 	.shutdown = imx6_pcie_shutdown,
- };
- 
--- 
-2.17.1
+>
+> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+> Cc: Ryan Harkin <ryan.harkin@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  .../display/bridge/virtual-display-bridge.txt | 62 +++++++++++++++++++
+>  1 file changed, 62 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt
+>
+> diff --git a/Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt b/Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt
+> new file mode 100644
+> index 000000000000..ea4f5a91ab94
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt
+> @@ -0,0 +1,62 @@
+> +Virtual Display Bridge
+> +
+> +This represents a display that is contained within an emulated
+> +environment.
+> +
+> +This means that the display engine mainly expects some timing
+> +parameters to be written into it, and after that the emulator will
+> +respond by creating a virtual display with the requested
+> +resolution characteristics.
+> +
+> +As the operating system cannot "detect" such a display, rather the
+> +emulator will respond to what the controller outputs, a
+> +chicken-and-egg problem needs to be solved: the resolution and
+> +timing characteristics need to be defined and set up somewhere.
+> +
+> +The virtual display bridge solves this by defining a bridge with
+> +all timing characteristics encoded into the device tree node.
+> +
+> +Required properies:
+> +- compatible: shall be "virtual-display-bridge"
+> +
+> +Required subnodes:
+> +- display-timings: contains in turn a display timing node
+> +  see display-timing.txt
+> +- ports: contains the display ports, see media/video-interfaces.txt
+> +
+> +Example:
+> +
+> +bridge {
+> +	compatible = "virtual-display-bridge";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	display-timings {
+> +		/* Some standard VGA timing */
+> +		timing0 {
+> +			clock-frequency = <23750>;
+> +			hactive = <640>;
+> +			vactive = <480>;
+> +			hfront-porch = <48>;
+> +			hback-porch = <16>;
+> +			hsync-len = <96>;
+> +			vfront-porch = <33>;
+> +			vback-porch = <9>;
+> +			vsync-len = <3>;
+> +			vrefresh = <60>;
+> +		};
+> +	};
+> +
+> +	ports {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		port at 0 {
+> +			reg = <0>;
+> +
+> +			display_bridge_in: endpoint {
+> +				remote-endpoint = <&foo>;
+> +			};
+> +		};
+> +	};
+> +};
