@@ -1,57 +1,56 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Mon, 27 Aug 2018 22:48:11 +0200
-Subject: [PATCH v9 0/4] drm/atmel-hlcdc: bus-width override support
-In-Reply-To: <20180827224055.3ab63c43@bbrezillon>
-References: <20180825085620.10566-1-peda@axentia.se>
- <20180827212449.723bdc99@bbrezillon>
- <ca38bd82-09d2-8e55-a3a2-e0e559abdf7f@axentia.se>
- <20180827223505.7e2fe6f6@bbrezillon> <20180827224055.3ab63c43@bbrezillon>
-Message-ID: <26d4d0c2-b59a-40ad-57d1-ab2677253b71@axentia.se>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 27 Aug 2018 13:52:42 -0700
+Subject: [PATCH 1/3] ARM: dts: NSP: Enable SFP on bcm958625hr
+In-Reply-To: <20180827203500.GN27483@lunn.ch>
+References: <20180827200344.16158-1-f.fainelli@gmail.com>
+ <20180827200344.16158-2-f.fainelli@gmail.com>
+ <20180827203500.GN27483@lunn.ch>
+Message-ID: <4a0e7b46-f7b6-3e9a-5f67-8160537482c8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-08-27 22:40, Boris Brezillon wrote:
-> On Mon, 27 Aug 2018 22:35:05 +0200
-> Boris Brezillon <boris.brezillon@bootlin.com> wrote:
+On 08/27/2018 01:35 PM, Andrew Lunn wrote:
+>> @@ -210,6 +228,17 @@
+>>  			reg = <4>;
+>>  		};
+>>  
+>> +		port at 5 {
+>> +			label = "sfp";
+>> +			phy-mode = "sgmii";
+>> +			reg = <5>;
+>> +			sfp = <&sfp>;
+>> +			fixed-link {
+>> +				speed = <1000>;
+>> +				full-duplex;
+>> +			};
 > 
->> On Mon, 27 Aug 2018 22:31:22 +0200
->> Peter Rosin <peda@axentia.se> wrote:
->>
->>> On 2018-08-27 21:24, Boris Brezillon wrote:  
->>>> On Sat, 25 Aug 2018 10:56:16 +0200
->>>> Peter Rosin <peda@axentia.se> wrote:
->>>>     
->>>>> Hi!
->>>>>
->>>>> The background for these patches is that our PCB interface between
->>>>> the SAMA5D3 and the ds90c185 lvds encoder is only using 16 bits, and
->>>>> this has to be described somewhere, or the atmel-hlcdc driver have no
->>>>> chance of selecting the correct output mode. Since we have similar
->>>>> problems with a tda19988 HDMI encoder I added patches to override
->>>>> the atmel-hlcdc output format via DT properties compatible with the
->>>>> media video-interface binding and things start to play together.    
->>>>
->>>> Queued to drm-misc-next.    
->>>
->>> Thanks!
->>>
->>> Minute issue, you seem to have some spell-check going on or something,
->>> because the subject of patch 1/4 has been "corrected" from
->>> "...add ti,ds90c185" to "...add ti, ds90c185"
->>>
->>> You might want to evaluate if that auto-correction "feature" should be
->>> disabled/tweaked/whatever...  
->>
->> Hm, weird. I just downloaded the mbox from dri-devel's patchwork and
->> passed it to dim apply. dim tends to do a lot of things behind the
->> scene, so maybe it's also trying to fix typos :-).
+> Hi Florian
 > 
-> Nope, looks like it was already wrong on patchwork [1], don't know what
-> happened, because the version I have in my mailbox is correct.
-> 
-> [1]https://patchwork.freedesktop.org/patch/246039/
+> You might want to add a comment about why you are using fixed-link and
+> sgmii, which seems very odd. Is it even correct?
 
-Apparently a known issue: https://github.com/getpatchwork/patchwork/issues/197
+Probably not, this is kind of left over from before adding the sfp
+phandle, but if I do remove it, and I can see the DSA slave network
+device fail to initialize, likely because we destroy the PHYLINK instance.
 
-Cheers,
-Peter
+AFAIR, when we talked about this with Russell, I did not see why we had
+to comment out the following:
+
+diff --git a/net/dsa/slave.c b/net/dsa/slave.c
+index 962c4fd338ba..f3ae16dbf8d8 100644
+--- a/net/dsa/slave.c
++++ b/net/dsa/slave.c
+@@ -1227,7 +1227,7 @@ static int dsa_slave_phy_setup(struct net_device
+*slave_dev)
+                        netdev_err(slave_dev,
+                                   "failed to connect to port %d: %d\n",
+                                   dp->index, ret);
+-                       phylink_destroy(dp->pl);
++                       //phylink_destroy(dp->pl);
+                        return ret;
+                }
+        }
+
+maybe you know?
+-- 
+Florian
