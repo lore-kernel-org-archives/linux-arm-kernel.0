@@ -1,64 +1,51 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 27 Aug 2018 21:24:49 +0200
-Subject: [PATCH v9 0/4] drm/atmel-hlcdc: bus-width override support
-In-Reply-To: <20180825085620.10566-1-peda@axentia.se>
-References: <20180825085620.10566-1-peda@axentia.se>
-Message-ID: <20180827212449.723bdc99@bbrezillon>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Mon, 27 Aug 2018 14:29:56 -0500
+Subject: [PATCH 1/3] ARM: dts: Add big-endian for IFC on LS1021A
+In-Reply-To: <20180817101920.20503-1-prabhakar.kushwaha@nxp.com>
+References: <20180817101920.20503-1-prabhakar.kushwaha@nxp.com>
+Message-ID: <CADRPPNRkJ0Hz0yyB8jKqGPn2+zq+xJa1L9Vc3_8ai06+tO7t1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 25 Aug 2018 10:56:16 +0200
-Peter Rosin <peda@axentia.se> wrote:
+On Fri, Aug 17, 2018 at 5:20 AM Prabhakar Kushwaha
+<prabhakar.kushwaha@nxp.com> wrote:
+>
+> Register space of IFC controller is big-endian.
+>
+> So add big-endian in IFC device tree node.
 
-> Hi!
-> 
-> The background for these patches is that our PCB interface between
-> the SAMA5D3 and the ds90c185 lvds encoder is only using 16 bits, and
-> this has to be described somewhere, or the atmel-hlcdc driver have no
-> chance of selecting the correct output mode. Since we have similar
-> problems with a tda19988 HDMI encoder I added patches to override
-> the atmel-hlcdc output format via DT properties compatible with the
-> media video-interface binding and things start to play together.
+Is this change necessary?  The current binding of IFC says:
 
-Queued to drm-misc-next.
+- little-endian : If this property is absent, the big-endian mode will
+                  be in use as default for registers.
 
-Thanks,
-
-Boris
-
-> 
-> Cheers,
-> Peter
-> 
-> Changes since v8  https://lkml.org/lkml/2018/8/10/309
-> - go back to the solution in v7 (but the ep device_node leak fixed)
->   for patch 4/4
-> - redo (part of) 3/4 w/o using the disliked of_graph_parse_endpoint
-> 
-> Changes since v7  https://lkml.org/lkml/2018/8/4/288
-> - The ep device_node was leaked in v7 patch 3/3, so add patch 3/4
->   which simplifies fixing this in patch 4/4 (and adds flexibility)
->   and adjust patch 4/4 to the changes done in the new 3/4.
-> - return -ENOMEM on allocation failure in patch 4/4
-> 
-> Changes since v6  https://lkml.org/lkml/2018/8/3/333
-> - zap bus-type from the binding in patch 2/3
-> 
-> Changes since (the shortened) v5  https://lkml.org/lkml/2018/8/3/182
-> - add reg properties (and #*-cells) to the example in patch 2/3
-> - prohibit bus-width 0 in the device-tree in patch 3/3
-> - added reviewed-by from Jacopo to patch 2/3 and 3/3
-> 
-> Peter Rosin (4):
->   dt-bindings: display: bridge: lvds-transmitter: add ti,ds90c185
->   dt-bindings: display: atmel: optional video-interface of endpoints
->   drm/atmel-hlcdc: always iterate over the first 4 output endpoints
->   drm/atmel-hlcdc: support bus-width (12/16/18/24) in endpoint nodes
-> 
->  .../devicetree/bindings/display/atmel/hlcdc-dc.txt | 23 ++++++
->  .../bindings/display/bridge/lvds-transmitter.txt   |  8 +-
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c     | 70 +++++++++++-----
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h       |  1 +
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c   | 92 +++++++++++++++++++---
->  5 files changed, 163 insertions(+), 31 deletions(-)
-> 
+>
+> Signed-off-by: Alison Wang <alison.wang@nxp.com>
+> Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
+> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+> ---
+>  arch/arm/boot/dts/ls1021a.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index f18490548c78..1f9cae75bad3 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -1,5 +1,6 @@
+>  /*
+>   * Copyright 2013-2014 Freescale Semiconductor, Inc.
+> + * Copyright 2018 NXP
+>   *
+>   * This file is dual-licensed: you can use it either under the terms
+>   * of the GPL or the X11 license, at your option. Note that this dual
+> @@ -154,6 +155,7 @@
+>                 ifc: ifc at 1530000 {
+>                         compatible = "fsl,ifc", "simple-bus";
+>                         reg = <0x0 0x1530000 0x0 0x10000>;
+> +                       big-endian;
+>                         interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+>                 };
+>
+> --
+> 2.14.1
+>
