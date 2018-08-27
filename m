@@ -1,107 +1,29 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 27 Aug 2018 13:53:00 +0200
-Subject: [PATCH 1/2] drm/bridge: Add virtual display DT bindings
-In-Reply-To: <20180824122308.3092-1-linus.walleij@linaro.org>
-References: <CGME20180824122324epcas3p2922f3e5415dacf4c89cfb136fa5c77b2@epcas3p2.samsung.com>
- <20180824122308.3092-1-linus.walleij@linaro.org>
-Message-ID: <20180827115302eucas1p24d36cfaf9835ccb217ac81e508484aa1~Ou5eTkYW-3006130061eucas1p2Z@eucas1p2.samsung.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 27 Aug 2018 14:02:00 +0200
+Subject: [RESEND 0/5] drm/mxsfb: Fix runtime PM for unpowering lcdif block
+In-Reply-To: <cover.1535367027.git.leonard.crestez@nxp.com>
+References: <cover.1535367027.git.leonard.crestez@nxp.com>
+Message-ID: <1535371320.5076.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.08.2018 14:23, Linus Walleij wrote:
-> This adds bindings for a virtual display to be used with displays
-> inside entirely virtual environments which do not emulate things
-> like monitors but just need timing information to be supplied to
-> its display controller.
->
-> This is inspired by earlier work by Liviu Dudau.
+Hi Leonard,
 
-If this is pure virtual then it should be connected to other pure
-virtual components.
-What will be this virtual bridge attached to? I expect some virtual
-encoder, virtual crtc? If yes then why don't you create whole virtual
-drm pipeline in one patchset?
-Could you describe more what do you want to do.
-And one more thing, you are defining virtual panel but you are using
-drm_bridge framework, why not drm_panel?
+On Mon, 2018-08-27 at 14:10 +0300, Leonard Crestez wrote:
+> Adding lcdif nodes to a power domain currently doesn't work, it results
+> in black/corrupted screens or hangs. While the driver does enable
+> runtime pm it does not deal correctly with the block being unpowered.
+> 
+> All patches in this series have review tags from a few weeks ago. I'm
+> resending this today because 4.19 rc1 was released. I'm not sure if this
+> matters for DRM but in some areas unrelated series get lost during the
+> merge window.
+> 
+> Marek/Phillip: Is one of you going to pick up these patches?
 
-Regards
-Andrzej
+I assumed Marek would pick them up.
 
->
-> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-> Cc: Ryan Harkin <ryan.harkin@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  .../display/bridge/virtual-display-bridge.txt | 62 +++++++++++++++++++
->  1 file changed, 62 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt
->
-> diff --git a/Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt b/Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt
-> new file mode 100644
-> index 000000000000..ea4f5a91ab94
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt
-> @@ -0,0 +1,62 @@
-> +Virtual Display Bridge
-> +
-> +This represents a display that is contained within an emulated
-> +environment.
-> +
-> +This means that the display engine mainly expects some timing
-> +parameters to be written into it, and after that the emulator will
-> +respond by creating a virtual display with the requested
-> +resolution characteristics.
-> +
-> +As the operating system cannot "detect" such a display, rather the
-> +emulator will respond to what the controller outputs, a
-> +chicken-and-egg problem needs to be solved: the resolution and
-> +timing characteristics need to be defined and set up somewhere.
-> +
-> +The virtual display bridge solves this by defining a bridge with
-> +all timing characteristics encoded into the device tree node.
-> +
-> +Required properies:
-> +- compatible: shall be "virtual-display-bridge"
-> +
-> +Required subnodes:
-> +- display-timings: contains in turn a display timing node
-> +  see display-timing.txt
-> +- ports: contains the display ports, see media/video-interfaces.txt
-> +
-> +Example:
-> +
-> +bridge {
-> +	compatible = "virtual-display-bridge";
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +
-> +	display-timings {
-> +		/* Some standard VGA timing */
-> +		timing0 {
-> +			clock-frequency = <23750>;
-> +			hactive = <640>;
-> +			vactive = <480>;
-> +			hfront-porch = <48>;
-> +			hback-porch = <16>;
-> +			hsync-len = <96>;
-> +			vfront-porch = <33>;
-> +			vback-porch = <9>;
-> +			vsync-len = <3>;
-> +			vrefresh = <60>;
-> +		};
-> +	};
-> +
-> +	ports {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		port at 0 {
-> +			reg = <0>;
-> +
-> +			display_bridge_in: endpoint {
-> +				remote-endpoint = <&foo>;
-> +			};
-> +		};
-> +	};
-> +};
+Marek, should I push these patches to drm-misc-fixes?
+
+regards
+Philipp
