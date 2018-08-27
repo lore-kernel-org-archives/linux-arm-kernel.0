@@ -1,46 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 27 Aug 2018 13:02:41 +0200
-Subject: [PATCH 0/4] arm64: wire CRC32 instructions into core crc32 routines
-Message-ID: <20180827110245.14812-1-ard.biesheuvel@linaro.org>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Mon, 27 Aug 2018 14:10:36 +0300
+Subject: [RESEND 0/5] drm/mxsfb: Fix runtime PM for unpowering lcdif block
+Message-ID: <cover.1535367027.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are many crc32 users in the kernel that call the library routine
-rather than the crypto API wrapper, and so none of these callers use the
-accelerated arm64 instructions when available.
+Adding lcdif nodes to a power domain currently doesn't work, it results
+in black/corrupted screens or hangs. While the driver does enable
+runtime pm it does not deal correctly with the block being unpowered.
 
-While this is not known to cause performance issues, calling a table based
-time variant implementation with a non-negligible D-cache footprint (8 KB)
-is wasteful in any case, and now that the crc32 instructions have been made
-mandatory in the architecture, let's wire them up into the core crc routines.
+All patches in this series have review tags from a few weeks ago. I'm
+resending this today because 4.19 rc1 was released. I'm not sure if this
+matters for DRM but in some areas unrelated series get lost during the
+merge window.
 
-This also means that they will be exposed to the crypto API via the generic
-CRC32 driver, and so we can remove the scalar routines from the crypto API
-driver. This leaves the PMULL code, which will only be useful on systems
-that implement 64x64 PMULL but not the CRC32 instructions. Given that no
-such systems are known to exist, this driver is removed entirely in patch #4.
+Marek/Phillip: Is one of you going to pick up these patches?
 
-Ard Biesheuvel (4):
-  lib/crc32: make core crc32() routines weak so they can be overridden
-  arm64: cpufeature: add feature for CRC32 instructions
-  arm64/lib: add accelerated crc32 routines
-  crypto: arm64/crc32 - remove PMULL based CRC32 driver
+Link to v4: https://lkml.org/lkml/2018/8/8/573
 
- arch/arm64/Kconfig                |   1 +
- arch/arm64/configs/defconfig      |   1 -
- arch/arm64/crypto/Kconfig         |   5 -
- arch/arm64/crypto/Makefile        |   3 -
- arch/arm64/crypto/crc32-ce-core.S | 287 --------------------
- arch/arm64/crypto/crc32-ce-glue.c | 244 -----------------
- arch/arm64/include/asm/cpucaps.h  |   3 +-
- arch/arm64/kernel/cpufeature.c    |   9 +
- arch/arm64/lib/Makefile           |   2 +
- arch/arm64/lib/crc32.S            |  60 ++++
- lib/crc32.c                       |  11 +-
- 11 files changed, 81 insertions(+), 545 deletions(-)
- delete mode 100644 arch/arm64/crypto/crc32-ce-core.S
- delete mode 100644 arch/arm64/crypto/crc32-ce-glue.c
- create mode 100644 arch/arm64/lib/crc32.S
+Leonard Crestez (5):
+  drm/mxsfb: Move axi clk enable/disable to crtc enable/disable
+  drm/mxsfb: Fix initial corrupt frame when activating display
+  drm/mxsfb: Add pm_runtime calls to pipe_enable/disable
+  drm/mxsfb: Add PM_SLEEP support
+  drm/mxsfb: Switch to drm_atomic_helper_commit_tail_rpm
+
+ drivers/gpu/drm/mxsfb/mxsfb_crtc.c | 53 +++++++++++++++++++-----------
+ drivers/gpu/drm/mxsfb/mxsfb_drv.c  | 40 ++++++++++++++++++++++
+ 2 files changed, 74 insertions(+), 19 deletions(-)
 
 -- 
-2.18.0
+2.17.1
