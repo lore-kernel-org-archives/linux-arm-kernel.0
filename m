@@ -1,47 +1,29 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Mon, 27 Aug 2018 15:32:39 +0300
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Make usbnet drivers builtin for boot
-Message-ID: <ab02224d560e09e96af2e41fbfa155e40e8bbb75.1535373073.git.leonard.crestez@nxp.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 27 Aug 2018 14:35:44 +0200
+Subject: [PATCH v4] arm64: dts: renesas: condor/v3hsk: add DU/LVDS/HDMI
+ support
+In-Reply-To: <fe3794e1-2452-d1af-5c30-203fcbb9932e@cogentembedded.com>
+References: <95d0db34-713d-8206-00c2-ee9a42aab823@cogentembedded.com>
+ <fe3794e1-2452-d1af-5c30-203fcbb9932e@cogentembedded.com>
+Message-ID: <20180827123544.awqip3mbevjvzh7i@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chips such as imx6sll and imx7ulp have no ethernet support so the common
-development usecase of nfs boot is supported via usb ethernet dongles.
+On Thu, Aug 23, 2018 at 07:59:20PM +0300, Sergei Shtylyov wrote:
+> Define the Condor/V3HSK board dependent parts of the DU and  LVDS device
+> nodes. Also add the device nodes for Thine THC63LVD1024 LVDS decoder and
+> Analog Devices ADV7511W HDMI transmitter...
+> 
+> Based on the original (and large) patch by Vladimir Barinov.
+> 
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Reviewed-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> 
+> ---
+> The patch is against the 'renesas-devel-20180822-v4.18' tag of Simon Horman's
+> 'renesas.git' repo. The only driver support still unmerged seems to be the
+> R8A77980 LVDS support patches...
 
-Add drivers for additional usbnet device directly into the kernel image
-image produced by the imx defconfig.
-
-This list is based on the usbnet devices supported by uboot.
-
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-
----
-This is not a very pretty solution but very convenient.
----
- arch/arm/configs/imx_v6_v7_defconfig | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index e2c127608bcc..7474bb5b3a6f 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -147,13 +147,16 @@ CONFIG_SMSC911X=y
- CONFIG_AT803X_PHY=y
- CONFIG_MICREL_PHY=y
- CONFIG_SMSC_PHY=y
- CONFIG_USB_PEGASUS=m
- CONFIG_USB_RTL8150=m
--CONFIG_USB_RTL8152=m
-+CONFIG_USB_RTL8152=y
-+CONFIG_USB_LAN78XX=y
- CONFIG_USB_USBNET=y
- CONFIG_USB_NET_CDC_EEM=m
-+CONFIG_USB_NET_SMSC95XX=y
-+CONFIG_USB_NET_MCS7830=y
- CONFIG_BRCMFMAC=m
- CONFIG_MWIFIEX=m
- CONFIG_MWIFIEX_SDIO=m
- CONFIG_MWIFIEX_PCIE=m
- CONFIG_WL12XX=m
--- 
-2.17.1
+Thanks, applied for v4.20.
