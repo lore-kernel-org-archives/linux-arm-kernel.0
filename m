@@ -1,83 +1,53 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 27 Aug 2018 09:11:37 +0200
-Subject: [PATCH v4 1/2] devicetree/bindings: display: Add document for
- rockchip RGB output
-In-Reply-To: <725cc93f-a441-22bc-ef58-b4b38ec34e17@rock-chips.com>
-References: <1529997340-156879-1-git-send-email-hjc@rock-chips.com>
- <20180703182559.GA12809@rob-hp-laptop>
- <725cc93f-a441-22bc-ef58-b4b38ec34e17@rock-chips.com>
-Message-ID: <7915686.3ERLj9EHQN@phil>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 27 Aug 2018 15:24:55 +0800
+Subject: [PATCH 1/3] ARM: dts: Add big-endian for IFC on LS1021A
+In-Reply-To: <20180817101920.20503-1-prabhakar.kushwaha@nxp.com>
+References: <20180817101920.20503-1-prabhakar.kushwaha@nxp.com>
+Message-ID: <20180827072452.GH3850@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sandy,
+On Fri, Aug 17, 2018 at 03:49:18PM +0530, Prabhakar Kushwaha wrote:
 
-trying to move this forward a bit :-)
+Please resend the series with Li Yang <leoyang.li@nxp.com> on copy.
 
-Am Mittwoch, 4. Juli 2018, 14:09:56 CEST schrieb Sandy Huang:
-> Hi Rob Herring,
-> Thanks for your review.
+Shawn
+
+> Register space of IFC controller is big-endian.
 > 
-> ? 2018/7/4 2:25, Rob Herring ??:
-> > On Tue, Jun 26, 2018 at 03:15:39PM +0800, Sandy Huang wrote:
-> >> This path add support rv1108 and px30 rgb output interface driver.
-> > 
-> > Bindings are for h/w, not drivers.
-> > 
-> I will update at next version as following:
-> This patch add support rv1108 and px30 rgb output interface
-> >>
-> >> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
-> >> Link: https://patchwork.freedesktop.org/patch/msgid/1509522765-118759-1-git-send-email-hjc at rock-chips.com
-> >> ---
-> >>
-> >> Changes in v4: Add support px30
-> >> Changes in v3: None
-> >> Changes in v2: None
-> >>
-> >> .../bindings/display/rockchip/rockchip-rgb.txt     | 73 ++++++++++++++++++++++
-> >>   1 file changed, 73 insertions(+)
-> >>   create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
-> >> new file mode 100644
-> >> index 0000000..077b9ad
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
-> >> @@ -0,0 +1,73 @@
-> >> +Rockchip RV1108 RGB interface
-> >> +================================
-> >> +
-> >> +Required properties:
-> >> +- compatible: matching the soc type:
-> >> +	- "rockchip,px30-rgb";
-> >> +	- "rockchip,rv1108-rgb";
-> > 
-> > This doesn't look right? What (and how) is getting programmed here
-> > because you don't have any register interface.
-> > 
-> This is register for DRM encoder and connecter or bridge for some RGB 
-> convert chips driver.
-> so far we don't have any register for rgb interface, but it's most 
-> probable need to config some register for rgb interface in feauture for 
-> rockchip platform.
-
-I think the basic-issue Rob was pointing out is that the devicetree
-describes hardware blocks and not the software representation.
-
-And the rgb output is not a separate block, but instead just a property
-of the vop itself, hence should possibly not have a separate "device".
-
-As I'm currently tinkering with rk3188 display support [0] - which only has
-rgb output at all - I modified your patch a bit to to showcase how that
-could look [1], where the soc vop struct simply has a feature flag
-indicating indicating a raw rgb output and the rgb driver then
-looks for bridges in the vop endpoints to distinguish them from
-soc-internals output encoders.
-
-Let me know what you think :-)
-Heiko
-
-[0] https://github.com/mmind/linux-rockchip/commits/wip/rk3188-lcdc
-[1] https://github.com/mmind/linux-rockchip/commit/fe74d2c4d76bcb6035b7207753e6afb85335b6cd
-needs also https://github.com/mmind/linux-rockchip/commit/c5a48c772f3564211dcd1ec71004de1d6dbb0307
+> So add big-endian in IFC device tree node.
+> 
+> Signed-off-by: Alison Wang <alison.wang@nxp.com>
+> Signed-off-by: Jagdish Gediya <jagdish.gediya@nxp.com>
+> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+> ---
+>  arch/arm/boot/dts/ls1021a.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index f18490548c78..1f9cae75bad3 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -1,5 +1,6 @@
+>  /*
+>   * Copyright 2013-2014 Freescale Semiconductor, Inc.
+> + * Copyright 2018 NXP
+>   *
+>   * This file is dual-licensed: you can use it either under the terms
+>   * of the GPL or the X11 license, at your option. Note that this dual
+> @@ -154,6 +155,7 @@
+>  		ifc: ifc at 1530000 {
+>  			compatible = "fsl,ifc", "simple-bus";
+>  			reg = <0x0 0x1530000 0x0 0x10000>;
+> +			big-endian;
+>  			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
+>  		};
+>  
+> -- 
+> 2.14.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
