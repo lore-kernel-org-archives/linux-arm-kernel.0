@@ -1,44 +1,58 @@
-From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Mon, 27 Aug 2018 16:57:13 +0300
-Subject: [PATCH v7 RESEND 2/2] ARM: dts: at91: sama5d2: Add resistive touch
- device
-In-Reply-To: <1535378233-10901-1-git-send-email-eugen.hristev@microchip.com>
-References: <1535378233-10901-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <1535378233-10901-2-git-send-email-eugen.hristev@microchip.com>
+From: ykaukab@suse.de (Mian Yousaf Kaukab)
+Date: Mon, 27 Aug 2018 16:33:06 +0200
+Subject: [PATCH RESEND 2/6] arm64: add sysfs vulnerability show for meltdown
+In-Reply-To: <20180827143310.641-1-ykaukab@suse.de>
+References: <20180827143310.641-1-ykaukab@suse.de>
+Message-ID: <20180827143310.641-3-ykaukab@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add generic resistive touch device which is connected to ADC block
-inside the SAMA5D2 SoC
+Checking CSV3 support directly in case CONFIG_UNMAP_KERNEL_AT_EL0
+is not enabled.
 
-Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+Signed-off-by: Mian Yousaf Kaukab <ykaukab@suse.de>
 ---
-Resending after merge window that includes the bindings was closed.
-Rebased on 4.19-rc1 : no changes
+ arch/arm64/kernel/cpu_errata.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
- arch/arm/boot/dts/sama5d2.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index f06ba99..a44f325 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -1442,6 +1442,16 @@
- 				status = "disabled";
- 			};
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index dec10898d688..996edb4e18ad 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -22,6 +22,7 @@
+ #include <asm/cpu.h>
+ #include <asm/cputype.h>
+ #include <asm/cpufeature.h>
++#include <asm/mmu.h>
  
-+			resistive_touch: resistive-touch {
-+				compatible = "resistive-adc-touch";
-+				io-channels = <&adc AT91_SAMA5D2_ADC_X_CHANNEL>,
-+					      <&adc AT91_SAMA5D2_ADC_Y_CHANNEL>,
-+					      <&adc AT91_SAMA5D2_ADC_P_CHANNEL>;
-+				io-channel-names = "x", "y", "pressure";
-+				touchscreen-min-pressure = <50000>;
-+				status = "disabled";
-+			};
+ static bool __maybe_unused
+ is_affected_midr_range(const struct arm64_cpu_capabilities *entry, int scope)
+@@ -683,3 +684,26 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 	{
+ 	}
+ };
 +
- 			pioA: pinctrl at fc038000 {
- 				compatible = "atmel,sama5d2-pinctrl";
- 				reg = <0xfc038000 0x600>;
++#ifdef CONFIG_GENERIC_CPU_VULNERABILITIES
++
++ssize_t cpu_show_meltdown(struct device *dev, struct device_attribute *attr,
++		char *buf)
++{
++	u64 pfr0;
++	u32 csv3;
++
++	if (arm64_kernel_unmapped_at_el0())
++		return sprintf(buf, "Mitigation: KPTI\n");
++
++	pfr0 = read_cpuid(ID_AA64PFR0_EL1);
++	csv3 = cpuid_feature_extract_unsigned_field(pfr0,
++			ID_AA64PFR0_CSV3_SHIFT);
++
++	if (csv3 || is_cpu_meltdown_safe())
++		return sprintf(buf, "Not affected\n");
++
++	return sprintf(buf, "Vulnerable\n");
++}
++
++#endif
 -- 
-2.7.4
+2.11.0
