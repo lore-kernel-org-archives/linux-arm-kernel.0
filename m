@@ -1,29 +1,30 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Aug 2018 23:26:46 +0100
-Subject: [PATCH 1/3] ARM: dts: NSP: Enable SFP on bcm958625hr
-In-Reply-To: <20180827200344.16158-2-f.fainelli@gmail.com>
-References: <20180827200344.16158-1-f.fainelli@gmail.com>
- <20180827200344.16158-2-f.fainelli@gmail.com>
-Message-ID: <20180827222646.GF30658@n2100.armlinux.org.uk>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Mon, 27 Aug 2018 15:33:57 -0700
+Subject: assembly syntax
+Message-ID: <CAKwvOdkr4UCvxVYLoCamUkYKj5ZszW=zxrwG243-Jk6P_DKUGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2018 at 01:03:42PM -0700, Florian Fainelli wrote:
-> Enable the SFP connected to port 5 of the switch and wire up all GPIOs
-> to the SFP cage. Because of a hardware limitation of the i2c controller
-> on the iProc SoCs which prevents large i2c (> 256 bytes) transactions to
-> work, we use the i2c-gpio interface instead, which does not have that
-> limitation. This allows us to read the SFP module EEPROM, which would
-> not be possible otherwise since it exceeds that size during a single
-> read transfer.
+Hi Ard,
+Trying to file bugs for clang's integrated assembler, I'm hitting a
+syntax error with clang, but I don't understand how the notation is
+supposed to work.
 
-We shouldn't exceed 256 bytes, since 256 bytes is the "page" size
-of the EEPROM.  The most that we read in one block is either
-ETH_MODULE_SFF_8079_LEN or (ETH_MODULE_SFF_8472_LEN - 
-ETH_MODULE_SFF_8079_LEN), both of which result in no more than 256
-byte reads.
+arch/arm64/kernel/reloc_test_syms.S
+39: movz x0, #:abs_g3:sym64_abs
 
+arch/arm64/include/asm/assembler.h
+504: movz \reg, :abs_g3:\val
+
+Clang is not happy with :abs_g3:, but I'm not sure how that code is
+supposed to work? Is it supposed to be a prefix for a relocation?
+
+I *think* R_AARCH64_MOVW_UABS_G3 is somehow related, but I'm
+unfamiliar with this syntax.  Your name was on the `git blame` for
+those lines but I still don't understand, even while looking at
+commit 214fad550772 ("arm64: relocation testing module").
+
+Are there docs you can point me at for this?
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+Thanks,
+~Nick Desaulniers
