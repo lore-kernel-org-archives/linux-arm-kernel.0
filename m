@@ -1,279 +1,621 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Mon, 27 Aug 2018 18:10:15 +0800
-Subject: [PATCH 16/16] pinctrl: mediatek: extend struct mtk_pin_desc which
- per-pin driver depends on
+Date: Mon, 27 Aug 2018 18:10:00 +0800
+Subject: [PATCH 01/16] pinctrl: mediatek: add pinctrl-mtk-common-v2 for all
+ MediaTek pinctrls
 In-Reply-To: <cover.1535363951.git.sean.wang@mediatek.com>
 References: <cover.1535363951.git.sean.wang@mediatek.com>
-Message-ID: <bca2f2a6bfb41dfc5eeae18dc7ab367da3751dbe.1535363951.git.sean.wang@mediatek.com>
+Message-ID: <96f6610254f1d932c65f81416e5aaa7de3c4676f.1535363951.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Because the pincrl-mtk-common.c is an implementation for per-pin binding,
-its pin descriptor includes more information than pinctrl-mtk-common-v2
-so far can support. So, we complement these data before writing a driver
-using pincrl-mtk-common-v2.c for per-pin binding. By the way, the size of
-struct mtk_pin_desc would be larger than struct pinctrl_pin_desc can hold,
-so it's necessary to have a copy before the pins information is being
-registered into the core.
+Irregular register arrangement and distinct logic access from various
+MediaTek SoCs would cause pinctrl-mtk-common to bloat and really hard to
+maintain in the future so that the patch creates pinctrl-mtk-common-v2
+based on the core of mt7622-pinctrl.
 
+The goals pinctrl-mtk-common-v2 want to achieve are to hopefully support
+all of MediaTek SoCs, and two kinds of dt-bindings being supported,
+Linux generic pinctrl dt-binding mt7622 supports and MediaTek per-pin
+dt-binding the other SoCs support the MT8183 and MT6765 incline to make
+use of.
+
+The patch starts to refactor MT7622 pinctrl driver first with splitting
+out these portable ways from there such as table-based register operation
+and drive strength control that is common in both kinds of driver.
+
+Signed-off-by: Ryder.Lee <ryder.lee@mediatek.com>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- drivers/pinctrl/mediatek/pinctrl-moore.c         | 28 ++++++++++++------
- drivers/pinctrl/mediatek/pinctrl-moore.h         |  8 ++++--
- drivers/pinctrl/mediatek/pinctrl-mt7622.c        |  5 ++--
- drivers/pinctrl/mediatek/pinctrl-mt7623.c        |  5 ++--
- drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h | 36 +++++++++++++++++++++---
- 5 files changed, 62 insertions(+), 20 deletions(-)
+ drivers/pinctrl/mediatek/Makefile                |   2 +-
+ drivers/pinctrl/mediatek/pinctrl-mt7622.c        | 253 +----------------------
+ drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c | 160 ++++++++++++++
+ drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h | 108 ++++++++++
+ 4 files changed, 273 insertions(+), 250 deletions(-)
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-moore.c b/drivers/pinctrl/mediatek/pinctrl-moore.c
-index 2817e47..f0390b3 100644
---- a/drivers/pinctrl/mediatek/pinctrl-moore.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-moore.c
-@@ -475,10 +475,10 @@ static int mtk_gpio_to_irq(struct gpio_chip *chip, unsigned int offset)
- 
- 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[offset];
- 
--	if (desc->eint_n == EINT_NA)
-+	if (desc->eint.eint_n == EINT_NA)
- 		return -ENOTSUPP;
- 
--	return mtk_eint_find_irq(hw->eint, desc->eint_n);
-+	return mtk_eint_find_irq(hw->eint, desc->eint.eint_n);
- }
- 
- static int mtk_gpio_set_config(struct gpio_chip *chip, unsigned int offset,
-@@ -492,12 +492,12 @@ static int mtk_gpio_set_config(struct gpio_chip *chip, unsigned int offset,
- 
- 	if (!hw->eint ||
- 	    pinconf_to_config_param(config) != PIN_CONFIG_INPUT_DEBOUNCE ||
--	    desc->eint_n == EINT_NA)
-+	    desc->eint.eint_n == EINT_NA)
- 		return -ENOTSUPP;
- 
- 	debounce = pinconf_to_config_argument(config);
- 
--	return mtk_eint_set_debounce(hw->eint, desc->eint_n, debounce);
-+	return mtk_eint_set_debounce(hw->eint, desc->eint.eint_n, debounce);
- }
- 
- static int mtk_build_gpiochip(struct mtk_pinctrl *hw, struct device_node *np)
-@@ -593,7 +593,7 @@ static int mtk_xt_find_eint_num(struct mtk_pinctrl *hw,
- 	desc = (const struct mtk_pin_desc *)hw->soc->pins;
- 
- 	while (i < hw->soc->npins) {
--		if (desc[i].eint_n == eint_n)
-+		if (desc[i].eint.eint_n == eint_n)
- 			return desc[i].number;
- 		i++;
- 	}
-@@ -612,7 +612,7 @@ static int mtk_xt_get_gpio_n(void *data, unsigned long eint_n,
- 	*gpio_chip = &hw->chip;
- 
- 	/* Be greedy to guess first gpio_n is equal to eint_n */
--	if (desc[eint_n].eint_n == eint_n)
-+	if (desc[eint_n].eint.eint_n == eint_n)
- 		*gpio_n = eint_n;
- 	else
- 		*gpio_n = mtk_xt_find_eint_num(hw, eint_n);
-@@ -649,7 +649,7 @@ static int mtk_xt_set_gpio_as_eint(void *data, unsigned long eint_n)
- 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[gpio_n];
- 
- 	err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_MODE,
--			       hw->soc->eint_m);
-+			       desc->eint.eint_m);
- 	if (err)
- 		return err;
- 
-@@ -711,6 +711,7 @@ mtk_build_eint(struct mtk_pinctrl *hw, struct platform_device *pdev)
- int mtk_moore_pinctrl_probe(struct platform_device *pdev,
- 			    const struct mtk_pin_soc *soc)
- {
-+	struct pinctrl_pin_desc *pins;
- 	struct resource *res;
- 	struct mtk_pinctrl *hw;
- 	int err, i;
-@@ -748,8 +749,19 @@ int mtk_moore_pinctrl_probe(struct platform_device *pdev,
- 
- 	hw->nbase = hw->soc->nbase_names;
- 
-+	/* Copy from internal struct mtk_pin_desc to register to the core */
-+	pins = devm_kmalloc_array(&pdev->dev, hw->soc->npins, sizeof(*pins),
-+				  GFP_KERNEL);
-+	if (IS_ERR(pins))
-+		return PTR_ERR(pins);
-+
-+	for (i = 0; i < hw->soc->npins; i++) {
-+		pins[i].number = hw->soc->pins[i].number;
-+		pins[i].name = hw->soc->pins[i].name;
-+	}
-+
- 	/* Setup pins descriptions per SoC types */
--	mtk_desc.pins = (const struct pinctrl_pin_desc *)hw->soc->pins;
-+	mtk_desc.pins = (const struct pinctrl_pin_desc *)pins;
- 	mtk_desc.npins = hw->soc->npins;
- 	mtk_desc.num_custom_params = ARRAY_SIZE(mtk_custom_bindings);
- 	mtk_desc.custom_params = mtk_custom_bindings;
-diff --git a/drivers/pinctrl/mediatek/pinctrl-moore.h b/drivers/pinctrl/mediatek/pinctrl-moore.h
-index 6b1d051..d754f1f 100644
---- a/drivers/pinctrl/mediatek/pinctrl-moore.h
-+++ b/drivers/pinctrl/mediatek/pinctrl-moore.h
-@@ -31,11 +31,15 @@
- 
- #define MTK_RANGE(_a)		{ .range = (_a), .nranges = ARRAY_SIZE(_a), }
- 
--#define MTK_PIN(_number, _name, _eint_n, _drv_n) {	\
-+#define MTK_PIN(_number, _name, _eint_m, _eint_n, _drv_n) {	\
- 		.number = _number,			\
- 		.name = _name,				\
--		.eint_n = _eint_n,			\
-+		.eint = {				\
-+			.eint_m = _eint_m,		\
-+			.eint_n = _eint_n,		\
-+		},					\
- 		.drv_n = _drv_n,			\
-+		.funcs = NULL,				\
- 	}
- 
- #define PINCTRL_PIN_GROUP(name, id)			\
+diff --git a/drivers/pinctrl/mediatek/Makefile b/drivers/pinctrl/mediatek/Makefile
+index 3de7156..e3c4ffa 100644
+--- a/drivers/pinctrl/mediatek/Makefile
++++ b/drivers/pinctrl/mediatek/Makefile
+@@ -8,6 +8,6 @@ obj-$(CONFIG_PINCTRL_MT2701)	+= pinctrl-mt2701.o
+ obj-$(CONFIG_PINCTRL_MT2712)	+= pinctrl-mt2712.o
+ obj-$(CONFIG_PINCTRL_MT8135)	+= pinctrl-mt8135.o
+ obj-$(CONFIG_PINCTRL_MT8127)	+= pinctrl-mt8127.o
+-obj-$(CONFIG_PINCTRL_MT7622)	+= pinctrl-mt7622.o
++obj-$(CONFIG_PINCTRL_MT7622)	+= pinctrl-mtk-common-v2.o pinctrl-mt7622.o
+ obj-$(CONFIG_PINCTRL_MT8173)	+= pinctrl-mt8173.o
+ obj-$(CONFIG_PINCTRL_MT6397)	+= pinctrl-mt6397.o
 diff --git a/drivers/pinctrl/mediatek/pinctrl-mt7622.c b/drivers/pinctrl/mediatek/pinctrl-mt7622.c
-index 0922f04..79e59a0 100644
+index 6f931b8..c69dfd7 100644
 --- a/drivers/pinctrl/mediatek/pinctrl-mt7622.c
 +++ b/drivers/pinctrl/mediatek/pinctrl-mt7622.c
-@@ -9,7 +9,7 @@
- #include "pinctrl-moore.h"
- 
- #define MT7622_PIN(_number, _name)					\
--	MTK_PIN(_number, _name, _number, DRV_GRP0)
-+	MTK_PIN(_number, _name, 1, _number, DRV_GRP0)
- 
- static const struct mtk_pin_field_calc mt7622_pin_mode_range[] = {
- 	PIN_FIELD(0, 0, 0x320, 0x10, 16, 4),
-@@ -758,7 +758,7 @@ static const struct mtk_eint_hw mt7622_eint_hw = {
- 
- static const struct mtk_pin_soc mt7622_data = {
- 	.reg_cal = mt7622_reg_cals,
--	.pins = (const struct pinctrl_pin_desc *)mt7622_pins,
-+	.pins = mt7622_pins,
- 	.npins = ARRAY_SIZE(mt7622_pins),
- 	.grps = mt7622_groups,
- 	.ngrps = ARRAY_SIZE(mt7622_groups),
-@@ -766,7 +766,6 @@ static const struct mtk_pin_soc mt7622_data = {
- 	.nfuncs = ARRAY_SIZE(mt7622_functions),
- 	.eint_hw = &mt7622_eint_hw,
- 	.gpio_m	= 1,
--	.eint_m = 1,
- 	.ies_present = false,
- 	.base_names = mtk_pinctrl_default_register_base_names,
- 	.nbase_names = ARRAY_SIZE(mtk_pinctrl_default_register_base_names),
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mt7623.c b/drivers/pinctrl/mediatek/pinctrl-mt7623.c
-index b31bbe9..84a1848 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mt7623.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mt7623.c
-@@ -30,7 +30,7 @@
- 		       _x_bits, 16, 1)
- 
- #define MT7623_PIN(_number, _name, _eint_n, _drv_grp)			\
--	MTK_PIN(_number, _name, _eint_n, _drv_grp)
-+	MTK_PIN(_number, _name, 0, _eint_n, _drv_grp)
- 
- static const struct mtk_pin_field_calc mt7623_pin_mode_range[] = {
- 	PIN_FIELD15(0, 278, 0x760, 0x10, 0, 3),
-@@ -1373,7 +1373,7 @@ static const struct mtk_eint_hw mt7623_eint_hw = {
- 
- static struct mtk_pin_soc mt7623_data = {
- 	.reg_cal = mt7623_reg_cals,
--	.pins = (const struct pinctrl_pin_desc *)mt7623_pins,
-+	.pins = mt7623_pins,
- 	.npins = ARRAY_SIZE(mt7623_pins),
- 	.grps = mt7623_groups,
- 	.ngrps = ARRAY_SIZE(mt7623_groups),
-@@ -1381,7 +1381,6 @@ static struct mtk_pin_soc mt7623_data = {
- 	.nfuncs = ARRAY_SIZE(mt7623_functions),
- 	.eint_hw = &mt7623_eint_hw,
- 	.gpio_m = 0,
--	.eint_m = 0,
- 	.ies_present = true,
- 	.base_names = mtk_pinctrl_default_register_base_names,
- 	.nbase_names = ARRAY_SIZE(mtk_pinctrl_default_register_base_names),
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
-index 02e3062..8ee4ce3 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
-@@ -137,18 +137,44 @@ struct mtk_pin_reg_calc {
- };
- 
- /**
-+ * struct mtk_func_desc - the structure that providing information
-+ *			  all the funcs for this pin
-+ * @name:		the name of function
-+ * @muxval:		the mux to the function
-+ */
-+struct mtk_func_desc {
-+	const char *name;
-+	u8 muxval;
-+};
-+
-+/**
-+ * struct mtk_eint_desc - the structure that providing information
-+ *			       for eint data per pin
-+ * @eint_m:		the eint mux for this pin
-+ * @eitn_n:		the eint number for this pin
-+ */
-+struct mtk_eint_desc {
-+	u8 eint_m;
-+	u8 eint_n;
-+};
-+
-+/**
-  * struct mtk_pin_desc - the structure that providing information
-  *			       for each pin of chips
-  * @number:		unique pin number from the global pin number space
-  * @name:		name for this pin
-- * @eint_n:		the eint number for this pin
-+ * @eint:		the eint data for this pin
-  * @drv_n:		the index with the driving group
-+ * @funcs:		all available functions for this pins (only used in
-+ *			those drivers compatible to pinctrl-mtk-common.c-like
-+ *			ones)
+@@ -1,16 +1,9 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+- * MediaTek MT7622 Pinctrl Driver
++ * Copyright (C) 2017-2018 MediaTek Inc.
+  *
+- * Copyright (C) 2017 Sean Wang <sean.wang@mediatek.com>
++ * Author: Sean Wang <sean.wang@mediatek.com>
+  *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
   */
- struct mtk_pin_desc {
- 	unsigned int number;
- 	const char *name;
--	u8 eint_n;
-+	struct mtk_eint_desc eint;
- 	u8 drv_n;
-+	struct mtk_func_desc *funcs;
- };
  
- struct mtk_pinctrl;
-@@ -156,7 +182,7 @@ struct mtk_pinctrl;
- /* struct mtk_pin_soc - the structure that holds SoC-specific data */
- struct mtk_pin_soc {
- 	const struct mtk_pin_reg_calc	*reg_cal;
+ #include <linux/gpio.h>
+@@ -32,6 +25,7 @@
+ #include "../pinconf.h"
+ #include "../pinmux.h"
+ #include "mtk-eint.h"
++#include "pinctrl-mtk-common-v2.h"
+ 
+ #define PINCTRL_PINCTRL_DEV		KBUILD_MODNAME
+ #define MTK_RANGE(_a)		{ .range = (_a), .nranges = ARRAY_SIZE(_a), }
+@@ -43,101 +37,10 @@
+ 		id##_funcs,				\
+ 	}
+ 
+-#define MTK_GPIO_MODE	1
+-#define MTK_INPUT	0
+-#define MTK_OUTPUT	1
+-#define MTK_DISABLE	0
+-#define MTK_ENABLE	1
+-
+ /* Custom pinconf parameters */
+ #define MTK_PIN_CONFIG_TDSEL	(PIN_CONFIG_END + 1)
+ #define MTK_PIN_CONFIG_RDSEL	(PIN_CONFIG_END + 2)
+ 
+-/* List these attributes which could be modified for the pin */
+-enum {
+-	PINCTRL_PIN_REG_MODE,
+-	PINCTRL_PIN_REG_DIR,
+-	PINCTRL_PIN_REG_DI,
+-	PINCTRL_PIN_REG_DO,
+-	PINCTRL_PIN_REG_SR,
+-	PINCTRL_PIN_REG_SMT,
+-	PINCTRL_PIN_REG_PD,
+-	PINCTRL_PIN_REG_PU,
+-	PINCTRL_PIN_REG_E4,
+-	PINCTRL_PIN_REG_E8,
+-	PINCTRL_PIN_REG_TDSEL,
+-	PINCTRL_PIN_REG_RDSEL,
+-	PINCTRL_PIN_REG_MAX,
+-};
+-
+-/* struct mtk_pin_field - the structure that holds the information of the field
+- *			  used to describe the attribute for the pin
+- * @offset:		the register offset relative to the base address
+- * @mask:		the mask used to filter out the field from the register
+- * @bitpos:		the start bit relative to the register
+- * @next:		the indication that the field would be extended to the
+-			next register
+- */
+-struct mtk_pin_field {
+-	u32 offset;
+-	u32 mask;
+-	u8  bitpos;
+-	u8  next;
+-};
+-
+-/* struct mtk_pin_field_calc - the structure that holds the range providing
+- *			       the guide used to look up the relevant field
+- * @s_pin:		the start pin within the range
+- * @e_pin:		the end pin within the range
+- * @s_addr:		the start address for the range
+- * @x_addrs:		the address distance between two consecutive registers
+- *			within the range
+- * @s_bit:		the start bit for the first register within the range
+- * @x_bits:		the bit distance between two consecutive pins within
+- *			the range
+- */
+-struct mtk_pin_field_calc {
+-	u16 s_pin;
+-	u16 e_pin;
+-	u32 s_addr;
+-	u8  x_addrs;
+-	u8  s_bit;
+-	u8  x_bits;
+-};
+-
+-/* struct mtk_pin_reg_calc - the structure that holds all ranges used to
+- *			     determine which register the pin would make use of
+- *			     for certain pin attribute.
+- * @range:		     the start address for the range
+- * @nranges:		     the number of items in the range
+- */
+-struct mtk_pin_reg_calc {
+-	const struct mtk_pin_field_calc *range;
+-	unsigned int nranges;
+-};
+-
+-/* struct mtk_pin_soc - the structure that holds SoC-specific data */
+-struct mtk_pin_soc {
+-	const struct mtk_pin_reg_calc	*reg_cal;
 -	const struct pinctrl_pin_desc	*pins;
-+	const struct mtk_pin_desc	*pins;
- 	unsigned int			npins;
- 	const struct group_desc		*grps;
- 	unsigned int			ngrps;
-@@ -167,7 +193,6 @@ struct mtk_pin_soc {
- 
- 	/* Specific parameters per SoC */
- 	u8				gpio_m;
--	u8				eint_m;
- 	bool				ies_present;
- 	const char * const		*base_names;
- 	unsigned int			nbase_names;
-@@ -193,6 +218,9 @@ struct mtk_pin_soc {
- 	int (*adv_pull_get)(struct mtk_pinctrl *hw,
- 			    const struct mtk_pin_desc *desc, bool pullup,
- 			    u32 *val);
-+
-+	/* Specific driver data */
-+	void				*driver_data;
+-	unsigned int			npins;
+-	const struct group_desc		*grps;
+-	unsigned int			ngrps;
+-	const struct function_desc	*funcs;
+-	unsigned int			nfuncs;
+-	const struct mtk_eint_regs	*eint_regs;
+-	const struct mtk_eint_hw	*eint_hw;
+-};
+-
+-struct mtk_pinctrl {
+-	struct pinctrl_dev		*pctrl;
+-	void __iomem			*base;
+-	struct device			*dev;
+-	struct gpio_chip		chip;
+-	const struct mtk_pin_soc	*soc;
+-	struct mtk_eint			*eint;
+-};
+-
+ static const struct mtk_pin_field_calc mt7622_pin_mode_range[] = {
+ 	{0, 0, 0x320, 0x10, 16, 4},
+ 	{1, 4, 0x3a0, 0x10,  16, 4},
+@@ -936,154 +839,6 @@ static const struct mtk_pin_soc mt7622_data = {
+ 	.eint_hw = &mt7622_eint_hw,
  };
  
- struct mtk_pinctrl {
+-static void mtk_w32(struct mtk_pinctrl *pctl, u32 reg, u32 val)
+-{
+-	writel_relaxed(val, pctl->base + reg);
+-}
+-
+-static u32 mtk_r32(struct mtk_pinctrl *pctl, u32 reg)
+-{
+-	return readl_relaxed(pctl->base + reg);
+-}
+-
+-static void mtk_rmw(struct mtk_pinctrl *pctl, u32 reg, u32 mask, u32 set)
+-{
+-	u32 val;
+-
+-	val = mtk_r32(pctl, reg);
+-	val &= ~mask;
+-	val |= set;
+-	mtk_w32(pctl, reg, val);
+-}
+-
+-static int mtk_hw_pin_field_lookup(struct mtk_pinctrl *hw, int pin,
+-				   const struct mtk_pin_reg_calc *rc,
+-				   struct mtk_pin_field *pfd)
+-{
+-	const struct mtk_pin_field_calc *c, *e;
+-	u32 bits;
+-
+-	c = rc->range;
+-	e = c + rc->nranges;
+-
+-	while (c < e) {
+-		if (pin >= c->s_pin && pin <= c->e_pin)
+-			break;
+-		c++;
+-	}
+-
+-	if (c >= e) {
+-		dev_err(hw->dev, "Out of range for pin = %d\n", pin);
+-		return -EINVAL;
+-	}
+-
+-	/* Caculated bits as the overall offset the pin is located at */
+-	bits = c->s_bit + (pin - c->s_pin) * (c->x_bits);
+-
+-	/* Fill pfd from bits and 32-bit register applied is assumed */
+-	pfd->offset = c->s_addr + c->x_addrs * (bits / 32);
+-	pfd->bitpos = bits % 32;
+-	pfd->mask = (1 << c->x_bits) - 1;
+-
+-	/* pfd->next is used for indicating that bit wrapping-around happens
+-	 * which requires the manipulation for bit 0 starting in the next
+-	 * register to form the complete field read/write.
+-	 */
+-	pfd->next = pfd->bitpos + c->x_bits - 1 > 31 ? c->x_addrs : 0;
+-
+-	return 0;
+-}
+-
+-static int mtk_hw_pin_field_get(struct mtk_pinctrl *hw, int pin,
+-				int field, struct mtk_pin_field *pfd)
+-{
+-	const struct mtk_pin_reg_calc *rc;
+-
+-	if (field < 0 || field >= PINCTRL_PIN_REG_MAX) {
+-		dev_err(hw->dev, "Invalid Field %d\n", field);
+-		return -EINVAL;
+-	}
+-
+-	if (hw->soc->reg_cal && hw->soc->reg_cal[field].range) {
+-		rc = &hw->soc->reg_cal[field];
+-	} else {
+-		dev_err(hw->dev, "Undefined range for field %d\n", field);
+-		return -EINVAL;
+-	}
+-
+-	return mtk_hw_pin_field_lookup(hw, pin, rc, pfd);
+-}
+-
+-static void mtk_hw_bits_part(struct mtk_pin_field *pf, int *h, int *l)
+-{
+-	*l = 32 - pf->bitpos;
+-	*h = get_count_order(pf->mask) - *l;
+-}
+-
+-static void mtk_hw_write_cross_field(struct mtk_pinctrl *hw,
+-				     struct mtk_pin_field *pf, int value)
+-{
+-	int nbits_l, nbits_h;
+-
+-	mtk_hw_bits_part(pf, &nbits_h, &nbits_l);
+-
+-	mtk_rmw(hw, pf->offset, pf->mask << pf->bitpos,
+-		(value & pf->mask) << pf->bitpos);
+-
+-	mtk_rmw(hw, pf->offset + pf->next, BIT(nbits_h) - 1,
+-		(value & pf->mask) >> nbits_l);
+-}
+-
+-static void mtk_hw_read_cross_field(struct mtk_pinctrl *hw,
+-				    struct mtk_pin_field *pf, int *value)
+-{
+-	int nbits_l, nbits_h, h, l;
+-
+-	mtk_hw_bits_part(pf, &nbits_h, &nbits_l);
+-
+-	l  = (mtk_r32(hw, pf->offset) >> pf->bitpos) & (BIT(nbits_l) - 1);
+-	h  = (mtk_r32(hw, pf->offset + pf->next)) & (BIT(nbits_h) - 1);
+-
+-	*value = (h << nbits_l) | l;
+-}
+-
+-static int mtk_hw_set_value(struct mtk_pinctrl *hw, int pin, int field,
+-			    int value)
+-{
+-	struct mtk_pin_field pf;
+-	int err;
+-
+-	err = mtk_hw_pin_field_get(hw, pin, field, &pf);
+-	if (err)
+-		return err;
+-
+-	if (!pf.next)
+-		mtk_rmw(hw, pf.offset, pf.mask << pf.bitpos,
+-			(value & pf.mask) << pf.bitpos);
+-	else
+-		mtk_hw_write_cross_field(hw, &pf, value);
+-
+-	return 0;
+-}
+-
+-static int mtk_hw_get_value(struct mtk_pinctrl *hw, int pin, int field,
+-			    int *value)
+-{
+-	struct mtk_pin_field pf;
+-	int err;
+-
+-	err = mtk_hw_pin_field_get(hw, pin, field, &pf);
+-	if (err)
+-		return err;
+-
+-	if (!pf.next)
+-		*value = (mtk_r32(hw, pf.offset) >> pf.bitpos) & pf.mask;
+-	else
+-		mtk_hw_read_cross_field(hw, &pf, value);
+-
+-	return 0;
+-}
+-
+ static int mtk_pinmux_set_mux(struct pinctrl_dev *pctldev,
+ 			      unsigned int selector, unsigned int group)
+ {
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
+new file mode 100644
+index 0000000..a74c3ff
+--- /dev/null
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
+@@ -0,0 +1,160 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2018 MediaTek Inc.
++ *
++ * Author: Sean Wang <sean.wang@mediatek.com>
++ *
++ */
++
++#include <linux/device.h>
++#include <linux/err.h>
++#include <linux/gpio.h>
++#include <linux/io.h>
++
++#include "pinctrl-mtk-common-v2.h"
++
++static void mtk_w32(struct mtk_pinctrl *pctl, u32 reg, u32 val)
++{
++	writel_relaxed(val, pctl->base + reg);
++}
++
++static u32 mtk_r32(struct mtk_pinctrl *pctl, u32 reg)
++{
++	return readl_relaxed(pctl->base + reg);
++}
++
++void mtk_rmw(struct mtk_pinctrl *pctl, u32 reg, u32 mask, u32 set)
++{
++	u32 val;
++
++	val = mtk_r32(pctl, reg);
++	val &= ~mask;
++	val |= set;
++	mtk_w32(pctl, reg, val);
++}
++
++static int mtk_hw_pin_field_lookup(struct mtk_pinctrl *hw, int pin,
++				   const struct mtk_pin_reg_calc *rc,
++				   struct mtk_pin_field *pfd)
++{
++	const struct mtk_pin_field_calc *c, *e;
++	u32 bits;
++
++	c = rc->range;
++	e = c + rc->nranges;
++
++	while (c < e) {
++		if (pin >= c->s_pin && pin <= c->e_pin)
++			break;
++		c++;
++	}
++
++	if (c >= e) {
++		dev_err(hw->dev, "Out of range for pin = %d\n", pin);
++		return -EINVAL;
++	}
++
++	/* Caculated bits as the overall offset the pin is located at */
++	bits = c->s_bit + (pin - c->s_pin) * (c->x_bits);
++
++	/* Fill pfd from bits and 32-bit register applied is assumed */
++	pfd->offset = c->s_addr + c->x_addrs * (bits / 32);
++	pfd->bitpos = bits % 32;
++	pfd->mask = (1 << c->x_bits) - 1;
++
++	/* pfd->next is used for indicating that bit wrapping-around happens
++	 * which requires the manipulation for bit 0 starting in the next
++	 * register to form the complete field read/write.
++	 */
++	pfd->next = pfd->bitpos + c->x_bits - 1 > 31 ? c->x_addrs : 0;
++
++	return 0;
++}
++
++static int mtk_hw_pin_field_get(struct mtk_pinctrl *hw, int pin,
++				int field, struct mtk_pin_field *pfd)
++{
++	const struct mtk_pin_reg_calc *rc;
++
++	if (field < 0 || field >= PINCTRL_PIN_REG_MAX) {
++		dev_err(hw->dev, "Invalid Field %d\n", field);
++		return -EINVAL;
++	}
++
++	if (hw->soc->reg_cal && hw->soc->reg_cal[field].range) {
++		rc = &hw->soc->reg_cal[field];
++	} else {
++		dev_err(hw->dev, "Undefined range for field %d\n", field);
++		return -EINVAL;
++	}
++
++	return mtk_hw_pin_field_lookup(hw, pin, rc, pfd);
++}
++
++static void mtk_hw_bits_part(struct mtk_pin_field *pf, int *h, int *l)
++{
++	*l = 32 - pf->bitpos;
++	*h = get_count_order(pf->mask) - *l;
++}
++
++static void mtk_hw_write_cross_field(struct mtk_pinctrl *hw,
++				     struct mtk_pin_field *pf, int value)
++{
++	int nbits_l, nbits_h;
++
++	mtk_hw_bits_part(pf, &nbits_h, &nbits_l);
++
++	mtk_rmw(hw, pf->offset, pf->mask << pf->bitpos,
++		(value & pf->mask) << pf->bitpos);
++
++	mtk_rmw(hw, pf->offset + pf->next, BIT(nbits_h) - 1,
++		(value & pf->mask) >> nbits_l);
++}
++
++static void mtk_hw_read_cross_field(struct mtk_pinctrl *hw,
++				    struct mtk_pin_field *pf, int *value)
++{
++	int nbits_l, nbits_h, h, l;
++
++	mtk_hw_bits_part(pf, &nbits_h, &nbits_l);
++
++	l  = (mtk_r32(hw, pf->offset) >> pf->bitpos) & (BIT(nbits_l) - 1);
++	h  = (mtk_r32(hw, pf->offset + pf->next)) & (BIT(nbits_h) - 1);
++
++	*value = (h << nbits_l) | l;
++}
++
++int mtk_hw_set_value(struct mtk_pinctrl *hw, int pin, int field, int value)
++{
++	struct mtk_pin_field pf;
++	int err;
++
++	err = mtk_hw_pin_field_get(hw, pin, field, &pf);
++	if (err)
++		return err;
++
++	if (!pf.next)
++		mtk_rmw(hw, pf.offset, pf.mask << pf.bitpos,
++			(value & pf.mask) << pf.bitpos);
++	else
++		mtk_hw_write_cross_field(hw, &pf, value);
++
++	return 0;
++}
++
++int mtk_hw_get_value(struct mtk_pinctrl *hw, int pin, int field, int *value)
++{
++	struct mtk_pin_field pf;
++	int err;
++
++	err = mtk_hw_pin_field_get(hw, pin, field, &pf);
++	if (err)
++		return err;
++
++	if (!pf.next)
++		*value = (mtk_r32(hw, pf.offset) >> pf.bitpos) & pf.mask;
++	else
++		mtk_hw_read_cross_field(hw, &pf, value);
++
++	return 0;
++}
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
+new file mode 100644
+index 0000000..b7800c9
+--- /dev/null
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
+@@ -0,0 +1,108 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (C) 2018 MediaTek Inc.
++ *
++ * Author: Sean Wang <sean.wang@mediatek.com>
++ *
++ */
++
++#ifndef __PINCTRL_MTK_COMMON_V2_H
++#define __PINCTRL_MTK_COMMON_V2_H
++
++#define MTK_GPIO_MODE  1
++#define MTK_INPUT      0
++#define MTK_OUTPUT     1
++#define MTK_DISABLE    0
++#define MTK_ENABLE     1
++
++/* List these attributes which could be modified for the pin */
++enum {
++	PINCTRL_PIN_REG_MODE,
++	PINCTRL_PIN_REG_DIR,
++	PINCTRL_PIN_REG_DI,
++	PINCTRL_PIN_REG_DO,
++	PINCTRL_PIN_REG_SR,
++	PINCTRL_PIN_REG_SMT,
++	PINCTRL_PIN_REG_PD,
++	PINCTRL_PIN_REG_PU,
++	PINCTRL_PIN_REG_E4,
++	PINCTRL_PIN_REG_E8,
++	PINCTRL_PIN_REG_TDSEL,
++	PINCTRL_PIN_REG_RDSEL,
++	PINCTRL_PIN_REG_MAX,
++};
++
++/* struct mtk_pin_field - the structure that holds the information of the field
++ *			  used to describe the attribute for the pin
++ * @offset:		the register offset relative to the base address
++ * @mask:		the mask used to filter out the field from the register
++ * @bitpos:		the start bit relative to the register
++ * @next:		the indication that the field would be extended to the
++			next register
++ */
++struct mtk_pin_field {
++	u32 offset;
++	u32 mask;
++	u8  bitpos;
++	u8  next;
++};
++
++/* struct mtk_pin_field_calc - the structure that holds the range providing
++ *			       the guide used to look up the relevant field
++ * @s_pin:		the start pin within the range
++ * @e_pin:		the end pin within the range
++ * @s_addr:		the start address for the range
++ * @x_addrs:		the address distance between two consecutive registers
++ *			within the range
++ * @s_bit:		the start bit for the first register within the range
++ * @x_bits:		the bit distance between two consecutive pins within
++ *			the range
++ */
++struct mtk_pin_field_calc {
++	u16 s_pin;
++	u16 e_pin;
++	u32 s_addr;
++	u8  x_addrs;
++	u8  s_bit;
++	u8  x_bits;
++};
++
++/* struct mtk_pin_reg_calc - the structure that holds all ranges used to
++ *			     determine which register the pin would make use of
++ *			     for certain pin attribute.
++ * @range:		     the start address for the range
++ * @nranges:		     the number of items in the range
++ */
++struct mtk_pin_reg_calc {
++	const struct mtk_pin_field_calc *range;
++	unsigned int nranges;
++};
++
++/* struct mtk_pin_soc - the structure that holds SoC-specific data */
++struct mtk_pin_soc {
++	const struct mtk_pin_reg_calc	*reg_cal;
++	const struct pinctrl_pin_desc	*pins;
++	unsigned int			npins;
++	const struct group_desc		*grps;
++	unsigned int			ngrps;
++	const struct function_desc	*funcs;
++	unsigned int			nfuncs;
++	const struct mtk_eint_regs	*eint_regs;
++	const struct mtk_eint_hw	*eint_hw;
++};
++
++struct mtk_pinctrl {
++	struct pinctrl_dev		*pctrl;
++	void __iomem			*base;
++	struct device			*dev;
++	struct gpio_chip		chip;
++	const struct mtk_pin_soc        *soc;
++	struct mtk_eint			*eint;
++};
++
++void mtk_rmw(struct mtk_pinctrl *pctl, u32 reg, u32 mask, u32 set);
++
++int mtk_hw_set_value(struct mtk_pinctrl *hw, int pin, int field, int value);
++int mtk_hw_get_value(struct mtk_pinctrl *hw, int pin, int field, int *value);
++
++#endif /* __PINCTRL_MTK_COMMON_V2_H */
 -- 
 2.7.4
