@@ -1,156 +1,89 @@
 From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Mon, 27 Aug 2018 09:11:08 -0600
-Subject: [PATCH 5/9] arm64: dts: sdm845: Add gpu and gmu device nodes
+Date: Mon, 27 Aug 2018 09:11:10 -0600
+Subject: [PATCH 7/9] OPP: Add dev_pm_opp_get_interconnect_bw()
 In-Reply-To: <20180827151112.25211-1-jcrouse@codeaurora.org>
 References: <20180827151112.25211-1-jcrouse@codeaurora.org>
-Message-ID: <20180827151112.25211-6-jcrouse@codeaurora.org>
+Message-ID: <20180827151112.25211-8-jcrouse@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the nodes to describe the Adreno GPU and GMU devices.
+Add dev_pm_opp_get_interconnect_bw() to read the interconnect
+bandwidth values for a given OPP.
 
 Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
 ---
- arch/arm64/boot/dts/qcom/sdm845.dtsi | 121 +++++++++++++++++++++++++++
- 1 file changed, 121 insertions(+)
+ drivers/opp/of.c       | 36 ++++++++++++++++++++++++++++++++++++
+ include/linux/pm_opp.h |  7 +++++++
+ 2 files changed, 43 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-index cdaabeb3c995..10db0ceb3699 100644
---- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-@@ -192,6 +192,59 @@
- 		method = "smc";
- 	};
+diff --git a/drivers/opp/of.c b/drivers/opp/of.c
+index 7af0ddec936b..6a5eecaaf8c1 100644
+--- a/drivers/opp/of.c
++++ b/drivers/opp/of.c
+@@ -777,3 +777,39 @@ struct device_node *dev_pm_opp_get_of_node(struct dev_pm_opp *opp)
+ 	return of_node_get(opp->np);
+ }
+ EXPORT_SYMBOL_GPL(dev_pm_opp_get_of_node);
++
++/**
++ * dev_pm_opp_get_interconnect_bw() - Get the interconnect bandwidth for the opp
++ * @opp:	opp containing the bandwidth values
++ * @pathname:	name of the interconnect path for the bandwidth values
++ * @avgbw:	Pointer for the value to hold the average BW defined for the OPP
++ * @peakbw:	Pointer for the value to hold the peak BW defined for the OPP
++ *
++ * Return: Negative value on error or 0 on success
++ */
++int dev_pm_opp_get_interconnect_bw(struct dev_pm_opp *opp,
++		const char *pathname, u64 *avgbw, u64 *peakbw)
++{
++	char name[NAME_MAX];
++	struct property *prop;
++	int count;
++
++	if (IS_ERR_OR_NULL(opp))
++		return -ENOENT;
++
++	snprintf(name, NAME_MAX, "opp-interconnect-bw-%s", pathname);
++	prop = of_find_property(opp->np, name, NULL);
++
++	if (!prop)
++		return -ENOENT;
++
++	count = of_property_count_u64_elems(opp->np, name);
++	if (count != 2)
++		return -EINVAL;
++
++	of_property_read_u64_index(opp->np, name, 0, avgbw);
++	of_property_read_u64_index(opp->np, name, 0, peakbw);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(dev_pm_opp_get_interconnect_bw);
+diff --git a/include/linux/pm_opp.h b/include/linux/pm_opp.h
+index 099b31960dec..70e49e259d0e 100644
+--- a/include/linux/pm_opp.h
++++ b/include/linux/pm_opp.h
+@@ -301,6 +301,7 @@ int dev_pm_opp_of_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpuma
+ struct device_node *dev_pm_opp_of_get_opp_desc_node(struct device *dev);
+ struct dev_pm_opp *of_dev_pm_opp_find_required_opp(struct device *dev, struct device_node *np);
+ struct device_node *dev_pm_opp_get_of_node(struct dev_pm_opp *opp);
++int dev_pm_opp_get_interconnect_bw(struct dev_pm_opp *opp, const char *pathname, u64 *avgbw, u64 *peakbw);
+ #else
+ static inline int dev_pm_opp_of_add_table(struct device *dev)
+ {
+@@ -343,6 +344,12 @@ static inline struct device_node *dev_pm_opp_get_of_node(struct dev_pm_opp *opp)
+ {
+ 	return NULL;
+ }
++
++static inline int dev_pm_opp_get_interconnect_bw(struct dev_pm_opp *opp, const char *pathname,
++		u64 *avgbw, u64 *peakbw)
++{
++	return -ENOTSUPP;
++}
+ #endif
  
-+gpu_opp_table: adreno-opp-table {
-+		compatible = "operating-points-v2-qcom-level";
-+
-+		opp-710000000 {
-+			opp-hz = /bits/ 64 <710000000>;
-+			qcom,level = <416>;
-+		};
-+
-+		opp-675000000 {
-+			opp-hz = /bits/ 64 <675000000>;
-+			qcom,level = <384>;
-+		};
-+
-+		opp-596000000 {
-+			opp-hz = /bits/ 64 <596000000>;
-+			qcom,level = <320>;
-+		};
-+
-+		opp-520000000 {
-+			opp-hz = /bits/ 64 <520000000>;
-+			qcom,level = <256>;
-+		};
-+
-+		opp-414000000 {
-+			opp-hz = /bits/ 64 <414000000>;
-+			qcom,level = <192>;
-+		};
-+
-+		opp-342000000 {
-+			opp-hz = /bits/ 64 <342000000>;
-+			qcom,level = <128>;
-+		};
-+
-+		opp-257000000 {
-+			opp-hz = /bits/ 64 <257000000>;
-+			qcom,level = <64>;
-+		};
-+	};
-+
-+	gmu_opp_table: adreno-gmu-opp-table {
-+		compatible = "operating-points-v2-qcom-level";
-+
-+		opp-400000000 {
-+			opp-hz = /bits/ 64 <400000000>;
-+			qcom,level = <128>;
-+		};
-+
-+		opp-200000000 {
-+			opp-hz = /bits/ 64 <200000000>;
-+			qcom,level = <48>;
-+		};
-+	};
-+
- 	soc: soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -323,5 +376,73 @@
- 				status = "disabled";
- 			};
- 		};
-+
-+		adreno_smmu: adreno-smmu at 5040000 {
-+			compatible = "qcom,sdm845-smmu-v2", "qcom,smmu-v2";
-+			reg = <0x5040000 0x10000>;
-+			#iommu-cells = <1>;
-+			#global-interrupts = <2>;
-+			interrupts = <GIC_SPI 229 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 231 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 364 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 365 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 366 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 367 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 368 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 369 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 370 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 371 IRQ_TYPE_EDGE_RISING>;
-+			clocks = <&gcc GCC_GPU_MEMNOC_GFX_CLK>,
-+				<&gcc GCC_GPU_CFG_AHB_CLK>;
-+			clock-names = "bus", "iface";
-+
-+			power-domains = <&gpucc GPU_CX_GDSC>;
-+		};
-+
-+		gpu at 5000000 {
-+			compatible = "qcom,adreno-630.2", "qcom,adreno";
-+			#stream-id-cells = <16>;
-+
-+			reg = <0x5000000 0x40000>;
-+			reg-names = "kgsl_3d0_reg_memory";
-+
-+			/*
-+			 * Look ma, no clocks! The GPU clocks and power are
-+			 * controlled entirely by the GMU
-+			 */
-+
-+			interrupts = <0 300 0>;
-+			interrupt-names = "kgsl_3d0_irq";
-+
-+			iommus = <&adreno_smmu 0>;
-+
-+			operating-points-v2 = <&gpu_opp_table>;
-+
-+			qcom,gmu = <&gmu>;
-+		};
-+
-+		gmu: gmu at 506a000 {
-+			compatible="qcom,adreno-gmu";
-+
-+			reg = <0x506a000 0x30000>,
-+				<0xb280000 0x10000>,
-+				<0xb480000 0x10000>;
-+			reg-names = "gmu", "gmu_pdc", "gmu_pdc_seq";
-+
-+			interrupts = <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "hfi", "gmu";
-+
-+			clocks = <&gpucc GPU_CC_CX_GMU_CLK>,
-+				<&gpucc GPU_CC_CXO_CLK>,
-+				<&gcc GCC_DDRSS_GPU_AXI_CLK>,
-+				<&gcc GCC_GPU_MEMNOC_GFX_CLK>;
-+			clock-names = "gmu", "cxo", "axi", "memnoc";
-+
-+			power-domains = <&gpucc GPU_CX_GDSC>;
-+			iommus = <&adreno_smmu 5>;
-+
-+			operating-points-v2 = <&gmu_opp_table>;
-+		};
- 	};
- };
+ #endif		/* __LINUX_OPP_H__ */
 -- 
 2.18.0
