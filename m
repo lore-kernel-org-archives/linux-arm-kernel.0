@@ -1,54 +1,62 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 27 Aug 2018 13:02:43 +0200
-Subject: [PATCH 2/4] arm64: cpufeature: add feature for CRC32 instructions
+Date: Mon, 27 Aug 2018 13:02:42 +0200
+Subject: [PATCH 1/4] lib/crc32: make core crc32() routines weak so they can be
+ overridden
 In-Reply-To: <20180827110245.14812-1-ard.biesheuvel@linaro.org>
 References: <20180827110245.14812-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180827110245.14812-3-ard.biesheuvel@linaro.org>
+Message-ID: <20180827110245.14812-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a CRC32 feature bit and wire it up to the CPU id register so we
-will be able to use alternatives patching for CRC32 operations.
+Allow architectures to drop in accelerated CRC32 routines by making
+the crc32_le/__crc32c_le entry points weak, and exposing non-weak
+aliases for them that may be used by the accelerated versions as
+fallbacks in case the instructions they rely upon are not available.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/cpucaps.h | 3 ++-
- arch/arm64/kernel/cpufeature.c   | 9 +++++++++
- 2 files changed, 11 insertions(+), 1 deletion(-)
+ lib/crc32.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index ae1f70450fb2..9932aca9704b 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -51,7 +51,8 @@
- #define ARM64_SSBD				30
- #define ARM64_MISMATCHED_CACHE_TYPE		31
- #define ARM64_HAS_STAGE2_FWB			32
-+#define ARM64_HAS_CRC32				33
+diff --git a/lib/crc32.c b/lib/crc32.c
+index a6c9afafc8c8..45b1d67a1767 100644
+--- a/lib/crc32.c
++++ b/lib/crc32.c
+@@ -183,21 +183,21 @@ static inline u32 __pure crc32_le_generic(u32 crc, unsigned char const *p,
+ }
  
--#define ARM64_NCAPS				33
-+#define ARM64_NCAPS				34
+ #if CRC_LE_BITS == 1
+-u32 __pure crc32_le(u32 crc, unsigned char const *p, size_t len)
++u32 __pure __weak crc32_le(u32 crc, unsigned char const *p, size_t len)
+ {
+ 	return crc32_le_generic(crc, p, len, NULL, CRC32_POLY_LE);
+ }
+-u32 __pure __crc32c_le(u32 crc, unsigned char const *p, size_t len)
++u32 __pure __weak __crc32c_le(u32 crc, unsigned char const *p, size_t len)
+ {
+ 	return crc32_le_generic(crc, p, len, NULL, CRC32C_POLY_LE);
+ }
+ #else
+-u32 __pure crc32_le(u32 crc, unsigned char const *p, size_t len)
++u32 __pure __weak crc32_le(u32 crc, unsigned char const *p, size_t len)
+ {
+ 	return crc32_le_generic(crc, p, len,
+ 			(const u32 (*)[256])crc32table_le, CRC32_POLY_LE);
+ }
+-u32 __pure __crc32c_le(u32 crc, unsigned char const *p, size_t len)
++u32 __pure __weak __crc32c_le(u32 crc, unsigned char const *p, size_t len)
+ {
+ 	return crc32_le_generic(crc, p, len,
+ 			(const u32 (*)[256])crc32ctable_le, CRC32C_POLY_LE);
+@@ -206,6 +206,9 @@ u32 __pure __crc32c_le(u32 crc, unsigned char const *p, size_t len)
+ EXPORT_SYMBOL(crc32_le);
+ EXPORT_SYMBOL(__crc32c_le);
  
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index e238b7932096..7626b80128f5 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1222,6 +1222,15 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.cpu_enable = cpu_enable_hw_dbm,
- 	},
- #endif
-+	{
-+		.desc = "CRC32 instructions",
-+		.capability = ARM64_HAS_CRC32,
-+		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
-+		.matches = has_cpuid_feature,
-+		.sys_reg = SYS_ID_AA64ISAR0_EL1,
-+		.field_pos = ID_AA64ISAR0_CRC32_SHIFT,
-+		.min_field_value = 1,
-+	},
- 	{},
- };
- 
++u32 crc32_le_base(u32, unsigned char const *, size_t) __alias(crc32_le);
++u32 __crc32c_le_base(u32, unsigned char const *, size_t) __alias(__crc32c_le);
++
+ /*
+  * This multiplies the polynomials x and y modulo the given modulus.
+  * This follows the "little-endian" CRC convention that the lsbit
 -- 
 2.18.0
