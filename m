@@ -1,151 +1,127 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Mon, 27 Aug 2018 09:50:49 -0300
-Subject: [PATCH] perf annotate: fix parsing aarch64 branch instructions
- after objdump update
-In-Reply-To: <20180823191047.9260992844205984b75e6721@arm.com>
-References: <20180823191047.9260992844205984b75e6721@arm.com>
-Message-ID: <20180827125049.GD22309@kernel.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 27 Aug 2018 14:52:39 +0200
+Subject: [PATCH/RFT] arm64: dts: renesas: r8a77965: Add OPPs table for
+ cpu devices
+In-Reply-To: <20180824082327.5my3j4zujckqbe65@verge.net.au>
+References: <1534255961-23326-1-git-send-email-ykaneko0929@gmail.com>
+ <20180822144113.s7prdezkj5c3xjqm@verge.net.au>
+ <20180824082327.5my3j4zujckqbe65@verge.net.au>
+Message-ID: <20180827125238.ayaw7z3odnkzid4d@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, Aug 23, 2018 at 07:10:47PM -0500, Kim Phillips escreveu:
-> Starting with binutils 2.28, aarch64 objdump adds comments to the
-> disassembly output to show the alternative names of a condition code [1].
+On Fri, Aug 24, 2018 at 10:23:28AM +0200, Simon Horman wrote:
+> On Wed, Aug 22, 2018 at 04:41:18PM +0200, Simon Horman wrote:
+> > On Tue, Aug 14, 2018 at 11:12:41PM +0900, Yoshihiro Kaneko wrote:
+> > > From: Dien Pham <dien.pham.ry@renesas.com>
+> > > 
+> > > This patch adds OPPs table for CA57{0,1} cpu devices
+> > > 
+> > > Signed-off-by: Dien Pham <dien.pham.ry@renesas.com>
+> > > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> > > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> > 
+> > Tested on r8a77965/Salvator-XS
+> > 
+> > I see that CPUFreq is activated, that sysfs reports 3 possible
+> > CPU speeds; 1.5, 1.0 and 0.50GHz. That current CPU frequency can be manipulated
+> > by setting the maximum CPU frequency in sysfs. And that the frequency
+> > of Z clock changes accordingly.
+> > 
+> > Tested-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> It is assumed that commas in objdump comments could occur in other arches
-> now or in the future, so this fix is arch-independent.
-> 
-> The fix could have been done with arm64 specific jump__parse and
-> jump__scnprintf functions, but the jump__scnprintf instruction would
-> have to have its comment character be a literal, since the scnprintf
-> functions cannot receive a struct arch easily.
-> 
-> This inconvenience also applies to the generic jump__scnprintf, which
-> is why we add a raw_comment pointer to struct ins_operands, so the
-> __parse function assigns it to be re-used by its corresponding __scnprintf
-> function.
-> 
-> Example differences in 'perf annotate --stdio2' output on an
-> aarch64 perf.data file:
-> 
-> BEFORE: ? b.cs   ffff200008133d1c <unwind_frame+0x18c>  // b.hs, dffff7ecc47b
-> AFTER : ? b.cs   18c
-> 
-> BEFORE: ? b.cc   ffff200008d8d9cc <get_alloc_profile+0x31c>  // b.lo, b.ul, dffff727295b
-> AFTER : ? b.cc   31c
-> 
-> The branch target labels 18c and 31c also now appear in the output:
-> 
-> BEFORE:        add    x26, x29, #0x80
-> AFTER : 18c:   add    x26, x29, #0x80
-> 
-> BEFORE:        add    x21, x21, #0x8
-> AFTER : 31c:   add    x21, x21, #0x8
-> 
-> The Fixes: tag below is added so stable branches will get the update; it
-> doesn't necessarily mean that commit was broken at the time, rather it
-> didn't withstand the aarch64 objdump update.
-> 
-> Tested no difference in output for sample x86_64, power arch perf.data files.
-> 
-> [1] https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=bb7eff5206e4795ac79c177a80fe9f4630aaf730
-> 
-> Cc: Ravi Bangoria <ravi.bangoria@linux.vnet.ibm.com>
-> Cc: Anton Blanchard <anton@samba.org>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Taeung Song <treeze.taeung@gmail.com>
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> Cc: Jiri Olsa <jolsa@redhat.com>
-> Cc: Namhyung Kim <namhyung@kernel.org>
-> Fixes: b13bbeee5ee6 ("perf annotate: Fix branch instruction with multiple operands")
-> Signed-off-by: Kim Phillips <kim.phillips@arm.com>
-> ---
->  tools/perf/util/annotate.c | 17 ++++++++++++++++-
->  tools/perf/util/annotate.h |  1 +
->  2 files changed, 17 insertions(+), 1 deletion(-)
-> 
-> diff --git a/tools/perf/util/annotate.c b/tools/perf/util/annotate.c
-> index e32ead4744bd..b83897dafbb0 100644
-> --- a/tools/perf/util/annotate.c
-> +++ b/tools/perf/util/annotate.c
-> @@ -282,7 +282,8 @@ bool ins__is_call(const struct ins *ins)
->  	return ins->ops == &call_ops || ins->ops == &s390_call_ops;
->  }
->  
-> -static int jump__parse(struct arch *arch __maybe_unused, struct ins_operands *ops, struct map_symbol *ms)
-> +static int jump__parse(struct arch *arch, struct ins_operands *ops,
-> +		       struct map_symbol *ms)
+> I have applied this for v4.20.
 
-Try to refrain from reflowing, what you need to do here is just to
-remove that __maybe_unused.
+I noticed that this patch included unit numbers for the opps nodes.
+This is not correct as there is no bus that the nodes live on.
+I fixed this using s/@/-/.
+The result is below:
 
->  {
->  	struct map *map = ms->map;
->  	struct symbol *sym = ms->sym;
-> @@ -291,6 +292,15 @@ static int jump__parse(struct arch *arch __maybe_unused, struct ins_operands *op
->  	};
->  	const char *c = strchr(ops->raw, ',');
->  	u64 start, end;
-> +
-> +	/*
-> +	 * Prevent from matching commas in the comment section, e.g.:
-> +	 * ffff200008446e70:       b.cs    ffff2000084470f4 <generic_exec_single+0x314>  // b.hs, b.nlast
-> +	 */
-> +	ops->raw_comment = strchr(ops->raw, arch->objdump.comment_char);
-> +	if (c && ops->raw_comment && c > ops->raw_comment)
-> +		c = NULL;
-> +
->  	/*
->  	 * Examples of lines to parse for the _cpp_lex_token@@Base
->  	 * function:
-> @@ -367,6 +377,11 @@ static int jump__scnprintf(struct ins *ins, char *bf, size_t size,
->  		return scnprintf(bf, size, "%-6s %s", ins->name, ops->target.sym->name);
->  
->  	c = strchr(ops->raw, ',');
-> +
-> +	/* Prevent from matching commas in the comment section */
-> +	if (ops->raw_comment && c && c > ops->raw_comment)
-> +		c = NULL;
+>From cd889b86ce3fba300ce82b0ec22bf310cd2f361d Mon Sep 17 00:00:00 2001
+From: Dien Pham <dien.pham.ry@renesas.com>
+Date: Tue, 14 Aug 2018 23:12:41 +0900
+Subject: [PATCH] arm64: dts: renesas: r8a77965: Add OPPs table for cpu devices
 
-This is equivalent to the previous test, but why do it differently?
+This patch adds OPPs table for CA57{0,1} cpu devices
 
-Since both are open coded equivalents, why not do something like:
+Signed-off-by: Dien Pham <dien.pham.ry@renesas.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
+[simon: do not give nodes unit names as they have no bus addresses]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 44 +++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-	c = validate_comma(c, ops);
-
-That would translate to:
-
-static inline const char *validate_comma(const char *c, ops)
-{
-	return c > ops->raw_comment ? NULL : c;
-}
-
-Which should be a third equivalent form to check if c, having been
-found, is after ops->raw_comment, if there is a raw_comment?
-
-- Arnaldo
-
-> +
->  	if (c != NULL) {
->  		const char *c2 = strchr(c + 1, ',');
->  
-> diff --git a/tools/perf/util/annotate.h b/tools/perf/util/annotate.h
-> index 005a5fe8a8c6..5399ba2321bb 100644
-> --- a/tools/perf/util/annotate.h
-> +++ b/tools/perf/util/annotate.h
-> @@ -22,6 +22,7 @@ struct ins {
->  
->  struct ins_operands {
->  	char	*raw;
-> +	char	*raw_comment;
->  	struct {
->  		char	*raw;
->  		char	*name;
-> -- 
-> 2.17.1
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+index e7128fb65e33..5ce978502ee9 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+@@ -60,6 +60,46 @@
+ 		clock-frequency = <0>;
+ 	};
+ 
++	cluster0_opp: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp-500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <830000>;
++			clock-latency-ns = <300000>;
++		};
++		opp-1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <830000>;
++			clock-latency-ns = <300000>;
++		};
++		opp-1500000000 {
++			opp-hz = /bits/ 64 <1500000000>;
++			opp-microvolt = <830000>;
++			clock-latency-ns = <300000>;
++			opp-suspend;
++		};
++		opp-1600000000 {
++			opp-hz = /bits/ 64 <1600000000>;
++			opp-microvolt = <900000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++		opp-1700000000 {
++			opp-hz = /bits/ 64 <1700000000>;
++			opp-microvolt = <900000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++		opp-1800000000 {
++			opp-hz = /bits/ 64 <1800000000>;
++			opp-microvolt = <960000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -71,6 +111,8 @@
+ 			power-domains = <&sysc R8A77965_PD_CA57_CPU0>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
++			clocks =<&cpg CPG_CORE R8A77965_CLK_Z>;
++			operating-points-v2 = <&cluster0_opp>;
+ 		};
+ 
+ 		a57_1: cpu at 1 {
+@@ -80,6 +122,8 @@
+ 			power-domains = <&sysc R8A77965_PD_CA57_CPU1>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
++			clocks =<&cpg CPG_CORE R8A77965_CLK_Z>;
++			operating-points-v2 = <&cluster0_opp>;
+ 		};
+ 
+ 		L2_CA57: cache-controller-0 {
+-- 
+2.11.0
