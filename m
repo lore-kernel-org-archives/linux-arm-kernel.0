@@ -1,32 +1,41 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 27 Aug 2018 12:51:21 +0200
-Subject: 4.19-rc1 on droid 4: screen not updating
-Message-ID: <20180827105121.GA8283@amd>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 27 Aug 2018 12:56:24 +0200
+Subject: [PATCH] iommu/rockchip: Free irqs in shutdown handler
+Message-ID: <20180827105624.5593-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+In the iommu's shutdown handler we disable runtime-pm which could
+result in the irq-handler running unclocked and since commit
+    3fc7c5c0cff3 ("iommu/rockchip: Handle errors returned from PM framework")
+we warn about that fact.
 
-With Sebastian's patches, display works on Droid 4 in v4.18.
+This can cause warnings on shutdown on some Rockchip machines, so
+free the irqs in the shutdown handler before we disable runtime-pm.
 
-I had to do some manual merging, and I see kernel messages in
-v4.19-rc1, but they are frozen -- no updates.
+Reported-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Fixes: 3fc7c5c0cff3 ("iommu/rockchip: Handle errors returned from PM framework")
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/iommu/rockchip-iommu.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-a) does someone have it working?
-
-b) is there some way I can help to get it working in mainline? Droid 4
-is not exactly new, and this is painful point that makes it hard to
-use.
-
-Best regards,
-									Pavel
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index 258115b10fa9..ad3e2b97469e 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -1241,6 +1241,12 @@ static int rk_iommu_probe(struct platform_device *pdev)
+ 
+ static void rk_iommu_shutdown(struct platform_device *pdev)
+ {
++	struct rk_iommu *iommu = platform_get_drvdata(pdev);
++	int i = 0, irq;
++
++	while ((irq = platform_get_irq(pdev, i++)) != -ENXIO)
++		devm_free_irq(iommu->dev, irq, iommu);
++
+ 	pm_runtime_force_suspend(&pdev->dev);
+ }
+ 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180827/85126d75/attachment.sig>
+2.17.0
