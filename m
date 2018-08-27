@@ -1,21 +1,71 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 27 Aug 2018 15:21:40 +0200
-Subject: [PATCH] clk: meson-axg: pcie: drop the mpll3 clock parent
-In-Reply-To: <20180801121625.9488-1-yixun.lan@amlogic.com>
-References: <20180801121625.9488-1-yixun.lan@amlogic.com>
-Message-ID: <9dd477896f4dc3b354d5875f8c4ecce1807c375c.camel@baylibre.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 Aug 2018 15:27:08 +0200
+Subject: [PATCH] ARM: defconfig: Update the ARM Versatile defconfig
+Message-ID: <20180827132708.31446-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-08-01 at 12:16 +0000, Yixun Lan wrote:
-> We found the PCIe driver doesn't really work with
-> the mpll3 clock which is actually reserved for debug,
-> So drop it from the mux list.
-> 
-> Fixes: 33b89db68236 ("clk: meson-axg: add clocks required by pcie driver")
-> Tested-by: Jianxin Qin <jianxin.qin@amlogic.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> 
-> ---
+This updates the ARM Versatile defconfig to the latest
+Kconfig structural changes and adds the DUMB VGA bridge
+driver so that VGA works out of the box, e.g. with QEMU.
 
-Applied, Thx
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks:
+Please apply this directly wherever post-mergewindow
+defconfig changes should go.
+---
+ arch/arm/configs/versatile_defconfig | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/configs/versatile_defconfig b/arch/arm/configs/versatile_defconfig
+index df68dc4056e5..5282324c7cef 100644
+--- a/arch/arm/configs/versatile_defconfig
++++ b/arch/arm/configs/versatile_defconfig
+@@ -5,19 +5,19 @@ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_LOG_BUF_SHIFT=14
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_SLAB=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-CONFIG_PARTITION_ADVANCED=y
+ # CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_VERSATILE=y
+ CONFIG_AEABI=y
+ CONFIG_OABI_COMPAT=y
+-CONFIG_CMA=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_CMDLINE="root=1f03 mem=32M"
+ CONFIG_FPE_NWFPE=y
+ CONFIG_VFP=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_PARTITION_ADVANCED=y
++CONFIG_CMA=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+@@ -59,6 +59,7 @@ CONFIG_GPIO_PL061=y
+ CONFIG_DRM=y
+ CONFIG_DRM_PANEL_ARM_VERSATILE=y
+ CONFIG_DRM_PANEL_SIMPLE=y
++CONFIG_DRM_DUMB_VGA_DAC=y
+ CONFIG_DRM_PL111=y
+ CONFIG_FB_MODE_HELPERS=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+@@ -89,9 +90,10 @@ CONFIG_NFSD=y
+ CONFIG_NFSD_V3=y
+ CONFIG_NLS_CODEPAGE_850=m
+ CONFIG_NLS_ISO8859_1=m
++CONFIG_FONTS=y
++CONFIG_FONT_ACORN_8x8=y
++CONFIG_DEBUG_FS=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
+ CONFIG_DEBUG_USER=y
+ CONFIG_DEBUG_LL=y
+-CONFIG_FONTS=y
+-CONFIG_FONT_ACORN_8x8=y
+-- 
+2.17.1
