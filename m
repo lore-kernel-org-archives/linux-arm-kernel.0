@@ -1,49 +1,88 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 27 Aug 2018 23:31:53 +0200
-Subject: [PATCH 1/3] ARM: dts: NSP: Enable SFP on bcm958625hr
-In-Reply-To: <cd82f8a8-ddd2-dda9-95ad-38265fa406c9@gmail.com>
-References: <20180827200344.16158-1-f.fainelli@gmail.com>
- <20180827200344.16158-2-f.fainelli@gmail.com>
- <20180827203500.GN27483@lunn.ch>
- <4a0e7b46-f7b6-3e9a-5f67-8160537482c8@gmail.com>
- <20180827210916.GP27483@lunn.ch>
- <cd82f8a8-ddd2-dda9-95ad-38265fa406c9@gmail.com>
-Message-ID: <20180827213153.GQ27483@lunn.ch>
+Date: Mon, 27 Aug 2018 23:52:06 +0200
+Subject: [PATCH 1/2 v2] gpio: ftgpio: Support optional silicon clock
+In-Reply-To: <20180827201540.15957-1-linus.walleij@linaro.org>
+References: <20180827201540.15957-1-linus.walleij@linaro.org>
+Message-ID: <20180827215206.GS27483@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Hi Florian
-> > 
-> > I didn't need anything like this for the mv88e6xxx. I had patches
-> > merged in -rc1 to make SFF work connected to the mv88e6390. The DT
-> > change was not merged, but it is here:
-> > 
-> > https://patchwork.ozlabs.org/patch/955635/
-> > 
-> > +					port at 9 {
-> > +						reg = <9>;
-> > +						label = "sff2";
-> > +						phy-mode = "sgmii";
-> > +						managed = "in-band-status";
+On Mon, Aug 27, 2018 at 10:15:40PM +0200, Linus Walleij wrote:
+> The GPIO silicon is clocked with a PCLK (peripheral clock)
+> on all systems, however not all platforms model it and include
+> it in e.g. the device tree, so add clock handling but make it
+> optional so we bail out safely if it is e.g. always on.
 > 
-> 						^=====
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Bail out properly for -EPROBE_DEFER from the clock.
+> ---
+>  drivers/gpio/gpio-ftgpio010.c | 41 +++++++++++++++++++++++++++++++----
+>  1 file changed, 37 insertions(+), 4 deletions(-)
 > 
-> Yes that is what I was missing, thanks Andrew! Still not 100% sure why
-> having a "sfp" phandle is not enough, but I suppose there are
-> problematic cases like the ZII Devel Rev. B where we have a SFF and we
-> are not able to auto-negotiate the fiber connection.
+> diff --git a/drivers/gpio/gpio-ftgpio010.c b/drivers/gpio/gpio-ftgpio010.c
+> index 868bf8501560..f548bc92e1d1 100644
+> --- a/drivers/gpio/gpio-ftgpio010.c
+> +++ b/drivers/gpio/gpio-ftgpio010.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/bitops.h>
+> +#include <linux/clk.h>
+>  
+>  /* GPIO registers definition */
+>  #define GPIO_DATA_OUT		0x00
+> @@ -40,11 +41,14 @@
+>   * struct ftgpio_gpio - Gemini GPIO state container
+>   * @dev: containing device for this instance
+>   * @gc: gpiochip for this instance
+> + * @base: remapped I/O-memory base
+> + * @clk: silicon clock
+>   */
+>  struct ftgpio_gpio {
+>  	struct device *dev;
+>  	struct gpio_chip gc;
+>  	void __iomem *base;
+> +	struct clk *clk;
+>  };
+>  
+>  static void ftgpio_gpio_ack_irq(struct irq_data *d)
+> @@ -180,6 +184,19 @@ static int ftgpio_gpio_probe(struct platform_device *pdev)
+>  	if (irq <= 0)
+>  		return irq ? irq : -EINVAL;
+>  
+> +	g->clk = devm_clk_get(dev, NULL);
+> +	if (!IS_ERR(g->clk)) {
+> +		ret = clk_prepare_enable(g->clk);
+> +		if (ret)
+> +			return ret;
+> +	} else if (PTR_ERR(g->clk) == -EPROBE_DEFER) {
+> +		/*
+> +		 * Percolate deferrals, for anything else,
+> +		 * just live without the clocking.
+> +		 */
+> +		return PTR_ERR(g->clk);
 
-ZII Devel Rev. B is actually broken, should not work, but does
-somehow. The SFF 3 and 4 are connected to switch ports which cannot do
-1000Base-X. They are using something like SGMII. So the link partner
-needs to be very forgiving. But it happens that the link partners i'm
-testing against are forgiving. SFF 1 and 2 are generally not
-populated. If they are, i think you need to remove a resistor, to make
-them work. But they are then connected to a switch port which does use
-1000Base-X.
+Hi Linus
 
-Now, since ZII devel B is technically broken, i would not be too
-unhappy if "sfp" phandle implies managed = "in-band-status" by
-default, so long as we can still use fixed-link somehow.
+This is O.K. But you could also do
 
-	 Andrew
+               	} else {
+	       		g->clk = NULL;
+ 		}
+
+And then:
+
+> +dis_clk:
+> +	if (!IS_ERR(g->clk))
+> +		clk_disable_unprepare(g->clk);
+
+you don't need the test, the clk API is happy with a NULL pointer, and
+does a NOP.
+
+But you can keep it as is.
+
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+
+    Andrew
