@@ -1,43 +1,59 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 27 Aug 2018 20:05:48 +0200
-Subject: [PATCH V2 3/3] arm64: dts: broadcom: Add reference to Compute Module
- IO Board V3
-In-Reply-To: <1535393148-24163-1-git-send-email-stefan.wahren@i2se.com>
-References: <1535393148-24163-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1535393148-24163-4-git-send-email-stefan.wahren@i2se.com>
+From: stripathi@amperecomputing.com (Suman Tripathi)
+Date: Mon, 27 Aug 2018 11:47:53 -0700
+Subject: [PATCH] ata: Disable AHCI ALPM feature for Ampere Computing eMAG SATA
+Message-ID: <1535395673-30649-1-git-send-email-stripathi@amperecomputing.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a reference to the dts of the Compute Module IO Board V3 in arm,
-so we don't need to maintain the content in arm64.
+Due to hardware errata, Ampere Computing eMAG SATA can't support
+AHCI ALPM feature. This patch disables the AHCI ALPM feature for
+eMAG SATA.
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Signed-off-by: Suman Tripathi <stripathi@amperecomputing.com>
+Signed-off-by: Rameshwar Prasad Sahu <rameshwar.sahu@amperecomputing.com>
 ---
- arch/arm64/boot/dts/broadcom/Makefile                | 3 ++-
- arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3-io3.dts | 2 ++
- 2 files changed, 4 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3-io3.dts
+ drivers/ata/ahci_platform.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/broadcom/Makefile b/arch/arm64/boot/dts/broadcom/Makefile
-index 1193a9e..3d98f5f 100644
---- a/arch/arm64/boot/dts/broadcom/Makefile
-+++ b/arch/arm64/boot/dts/broadcom/Makefile
-@@ -1,6 +1,7 @@
- # SPDX-License-Identifier: GPL-2.0
- dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-3-b.dtb \
--			      bcm2837-rpi-3-b-plus.dtb
-+			      bcm2837-rpi-3-b-plus.dtb \
-+			      bcm2837-rpi-cm3-io3.dts
- 
- subdir-y	+= northstar2
- subdir-y	+= stingray
-diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3-io3.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3-io3.dts
-new file mode 100644
-index 0000000..b1c4ab2
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3-io3.dts
-@@ -0,0 +1,2 @@
-+// SPDX-License-Identifier: GPL-2.0
-+#include "arm/bcm2837-rpi-cm3-io3.dts"
--- 
-2.7.4
+diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+index 99f9a89..0d0233e 100644
+--- a/drivers/ata/ahci_platform.c
++++ b/drivers/ata/ahci_platform.c
+@@ -26,7 +26,7 @@
+
+ #define DRV_NAME "ahci"
+
+-static const struct ata_port_info ahci_port_info = {
++static struct ata_port_info ahci_port_info = {
+        .flags          = AHCI_FLAG_COMMON,
+        .pio_mask       = ATA_PIO4,
+        .udma_mask      = ATA_UDMA6,
+@@ -41,6 +41,8 @@ static int ahci_probe(struct platform_device *pdev)
+ {
+        struct device *dev = &pdev->dev;
+        struct ahci_host_priv *hpriv;
++       struct acpi_device_info *info;
++       acpi_status status;
+        int rc;
+
+        hpriv = ahci_platform_get_resources(pdev);
+@@ -57,6 +59,15 @@ static int ahci_probe(struct platform_device *pdev)
+        if (of_device_is_compatible(dev->of_node, "hisilicon,hisi-ahci"))
+                hpriv->flags |= AHCI_HFLAG_NO_FBS | AHCI_HFLAG_NO_NCQ;
+
++       status = acpi_get_object_info(ACPI_HANDLE(dev), &info);
++       if (ACPI_SUCCESS(status)) {
++               if (info->valid & ACPI_VALID_HID) {
++                       if (!strcmp("APMC0D33", info->hardware_id.string))
++                               ahci_port_info.flags |= ATA_FLAG_NO_LPM;
++               }
++               ACPI_FREE(info);
++       }
++
+        rc = ahci_platform_init_host(pdev, hpriv, &ahci_port_info,
+                                     &ahci_platform_sht);
+        if (rc)
+--
+1.8.3.1
+
+CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, is for the sole use of the intended recipient(s) and contains information that is confidential and proprietary to Ampere Computing or its subsidiaries. It is to be used solely for the purpose of furthering the parties' business relationship. Any review, copying, or distribution of this email (or any attachments thereto) is strictly prohibited. If you are not the intended recipient, please contact the sender immediately and permanently delete the original and any copies of this email and any attachments thereto.
