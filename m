@@ -1,151 +1,99 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Mon, 27 Aug 2018 12:53:40 -0500
-Subject: [PATCH v2] perf annotate: fix parsing aarch64 branch instructions
- after objdump update
-In-Reply-To: <20180827125049.GD22309@kernel.org>
-References: <20180823191047.9260992844205984b75e6721@arm.com>
- <20180827125049.GD22309@kernel.org>
-Message-ID: <20180827125340.a2f7e291901d17cea05daba4@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Aug 2018 18:59:47 +0100
+Subject: [PATCH v2 4/7] drm/i2c: tda998x: convert to bridge driver
+In-Reply-To: <20180827161601eucas1p2951c1ce0eeeabbcf9d190d7dca28c91c~OyfFOhdDv1363313633eucas1p2b@eucas1p2.samsung.com>
+References: <20180730164137.GD17271@n2100.armlinux.org.uk>
+ <CGME20180731072333epcas3p152812eff8bdb2390ea482a4a20d34438@epcas3p1.samsung.com>
+ <E1fkBFV-00048s-O2@rmk-PC.armlinux.org.uk>
+ <20180827161601eucas1p2951c1ce0eeeabbcf9d190d7dca28c91c~OyfFOhdDv1363313633eucas1p2b@eucas1p2.samsung.com>
+Message-ID: <20180827175947.GE30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Starting with binutils 2.28, aarch64 objdump adds comments to the
-disassembly output to show the alternative names of a condition code [1].
+Hi Andrzej,
 
-It is assumed that commas in objdump comments could occur in other arches
-now or in the future, so this fix is arch-independent.
+On Mon, Aug 27, 2018 at 06:15:59PM +0200, Andrzej Hajda wrote:
+> On 30.07.2018 18:42, Russell King wrote:
+> >  static void tda998x_destroy(struct tda998x_priv *priv)
+> >  {
+> > +	drm_bridge_remove(&priv->bridge);
+> > +
+> >  	/* disable all IRQs and free the IRQ handler */
+> >  	cec_write(priv, REG_CEC_RXSHPDINTENA, 0);
+> >  	reg_clear(priv, REG_INT_FLAGS_2, INT_FLAGS_2_EDID_BLK_RD);
+> > @@ -1650,6 +1663,7 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
+> >  	mutex_init(&priv->mutex);	/* protect the page access */
+> >  	mutex_init(&priv->audio_mutex); /* protect access from audio thread */
+> >  	mutex_init(&priv->edid_mutex);
+> > +	INIT_LIST_HEAD(&priv->bridge.list);
+> 
+> This line can be probably removed, unless there is a reason I am not
+> aware of.
 
-The fix could have been done with arm64 specific jump__parse and
-jump__scnprintf functions, but the jump__scnprintf instruction would
-have to have its comment character be a literal, since the scnprintf
-functions cannot receive a struct arch easily.
+The addition above of drm_bridge_remove() to tda998x_destroy() means
+that we end up calling this function in the error cleanup path.  This
+avoids unnecessary complexity with lots of different gotos - tda998x
+has had a long history of not cleaning up stuff properly.
 
-This inconvenience also applies to the generic jump__scnprintf, which
-is why we add a raw_comment pointer to struct ins_operands, so the
-__parse function assigns it to be re-used by its corresponding __scnprintf
-function.
+devm interfaces for bridge do not help avoid that - devm stuff only
+works if everything that is registered previously is cleaned up via
+devm mechanisms to ensure that a device's interface becomes unavailable
+before stuff (eg, edid timers, detect work) is started to be cleaned up.
+Otherwise, there's a chance of this stuff being triggered during
+tear-down.
 
-Example differences in 'perf annotate --stdio2' output on an
-aarch64 perf.data file:
+> > +static int tda998x_bind(struct device *dev, struct device *master, void *data)
+> > +{
+> > +	struct i2c_client *client = to_i2c_client(dev);
+> > +	struct drm_device *drm = data;
+> > +	struct tda998x_priv *priv;
+> > +	int ret;
+> > +
+> > +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> > +	if (!priv)
+> > +		return -ENOMEM;
+> > +
+> > +	dev_set_drvdata(dev, priv);
+> > +
+> > +	ret = tda998x_create(client, priv);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	ret = tda998x_encoder_init(dev, drm);
+> > +	if (ret) {
+> > +		tda998x_destroy(priv);
+> > +		return ret;
+> > +	}
+> > +	return 0;
+> 
+> It could be replaced by:
+> ??? ret = tda998x_encoder_init(dev, drm);
+> ??? if (ret)
+> ??? ??? tda998x_destroy(priv);
+> ??? return ret;
+> 
+> but this is probably matter of taste.
 
-BEFORE: ? b.cs   ffff200008133d1c <unwind_frame+0x18c>  // b.hs, dffff7ecc47b
-AFTER : ? b.cs   18c
+It's not clear to me what "It" is - I think you're suggesting combining
+tda998x_create() and tda998x_encoder_init() ?
 
-BEFORE: ? b.cc   ffff200008d8d9cc <get_alloc_profile+0x31c>  // b.lo, b.ul, dffff727295b
-AFTER : ? b.cc   31c
+The code is structured this way to make the following patches easier -
+there is no point of combining things only to have to then break them
+apart again in a later patch.  Please see patch 7, where tda998x_create()
+moves out of this function, where exactly this happens.
 
-The branch target labels 18c and 31c also now appear in the output:
+> Moreover I guess priv->is_on could be removed if enable/disable
+> callbacks are called only by drm_core, but this is for another patch.
 
-BEFORE:        add    x26, x29, #0x80
-AFTER : 18c:   add    x26, x29, #0x80
+Is it guaranteed that a bridge ->enable or ->disable callback won't be
+called twice, even for legacy drivers?  I think atomic guarantees this
+but I don't think it's guaranteed for legacy drivers.
 
-BEFORE:        add    x21, x21, #0x8
-AFTER : 31c:   add    x21, x21, #0x8
+I'm guessing Rob had a reason why he added the check when he originally
+created the driver (encoder ->dpms can be called for the same dpms
+state multiple times?)
 
-The Fixes: tag below is added so stable branches will get the update; it
-doesn't necessarily mean that commit was broken at the time, rather it
-didn't withstand the aarch64 objdump update.
-
-Tested no difference in output for sample x86_64, power arch perf.data files.
-
-[1] https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=bb7eff5206e4795ac79c177a80fe9f4630aaf730
-
-Cc: Ravi Bangoria <ravi.bangoria@linux.vnet.ibm.com>
-Cc: Anton Blanchard <anton@samba.org>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Christian Borntraeger <borntraeger@de.ibm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Taeung Song <treeze.taeung@gmail.com>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Fixes: b13bbeee5ee6 ("perf annotate: Fix branch instruction with multiple operands")
-Signed-off-by: Kim Phillips <kim.phillips@arm.com>
----
-v2: address acme's comments:
-    - consolidate into a validate_comma()
-    - call from an additional couple of places necessary
-    - don't listen to checkpatch wrt reflowing jump__parse definition
-      line to less than 80 characters, just rm the __maybe_unused
-    - re-tested no diff on x86_64 and power arch, arm64 conditional
-      branches fixed.
-
- tools/perf/util/annotate.c | 22 +++++++++++++++++++++-
- tools/perf/util/annotate.h |  1 +
- 2 files changed, 22 insertions(+), 1 deletion(-)
-
-diff --git a/tools/perf/util/annotate.c b/tools/perf/util/annotate.c
-index e4268b948e0e..4a2525524e52 100644
---- a/tools/perf/util/annotate.c
-+++ b/tools/perf/util/annotate.c
-@@ -276,7 +276,19 @@ bool ins__is_call(const struct ins *ins)
- 	return ins->ops == &call_ops || ins->ops == &s390_call_ops;
- }
- 
--static int jump__parse(struct arch *arch __maybe_unused, struct ins_operands *ops, struct map_symbol *ms)
-+/*
-+ * Prevents from matching commas in the comment section, e.g.:
-+ * ffff200008446e70:       b.cs    ffff2000084470f4 <generic_exec_single+0x314>  // b.hs, b.nlast
-+ */
-+static inline const char *validate_comma(const char *c, struct ins_operands *ops)
-+{
-+	if (ops->raw_comment && c > ops->raw_comment)
-+		return NULL;
-+
-+	return c;
-+}
-+
-+static int jump__parse(struct arch *arch, struct ins_operands *ops, struct map_symbol *ms)
- {
- 	struct map *map = ms->map;
- 	struct symbol *sym = ms->sym;
-@@ -285,6 +297,10 @@ static int jump__parse(struct arch *arch __maybe_unused, struct ins_operands *op
- 	};
- 	const char *c = strchr(ops->raw, ',');
- 	u64 start, end;
-+
-+	ops->raw_comment = strchr(ops->raw, arch->objdump.comment_char);
-+	c = validate_comma(c, ops);
-+
- 	/*
- 	 * Examples of lines to parse for the _cpp_lex_token@@Base
- 	 * function:
-@@ -304,6 +320,7 @@ static int jump__parse(struct arch *arch __maybe_unused, struct ins_operands *op
- 		ops->target.addr = strtoull(c, NULL, 16);
- 		if (!ops->target.addr) {
- 			c = strchr(c, ',');
-+			c = validate_comma(c, ops);
- 			if (c++ != NULL)
- 				ops->target.addr = strtoull(c, NULL, 16);
- 		}
-@@ -361,9 +378,12 @@ static int jump__scnprintf(struct ins *ins, char *bf, size_t size,
- 		return scnprintf(bf, size, "%-6s %s", ins->name, ops->target.sym->name);
- 
- 	c = strchr(ops->raw, ',');
-+	c = validate_comma(c, ops);
-+
- 	if (c != NULL) {
- 		const char *c2 = strchr(c + 1, ',');
- 
-+		c2 = validate_comma(c2, ops);
- 		/* check for 3-op insn */
- 		if (c2 != NULL)
- 			c = c2;
-diff --git a/tools/perf/util/annotate.h b/tools/perf/util/annotate.h
-index 005a5fe8a8c6..5399ba2321bb 100644
---- a/tools/perf/util/annotate.h
-+++ b/tools/perf/util/annotate.h
-@@ -22,6 +22,7 @@ struct ins {
- 
- struct ins_operands {
- 	char	*raw;
-+	char	*raw_comment;
- 	struct {
- 		char	*raw;
- 		char	*name;
 -- 
-2.17.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
