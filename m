@@ -1,83 +1,133 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 27 Aug 2018 17:11:40 +0200
-Subject: [PATCH v7 2/8] dt-bindings: Introduce interconnect provider
- bindings
-In-Reply-To: <CAL_JsqKMPm=qmfYMQH99_gqSv0-ynUSvbkoNjjeDKtyxfgE1tg@mail.gmail.com>
-References: <20180731161340.13000-1-georgi.djakov@linaro.org>
- <20180731161340.13000-3-georgi.djakov@linaro.org>
- <CABGGisxq+hf91R18pnZ=VZ9f99GssWWPhpPCjNAROJmKg5-udA@mail.gmail.com>
- <e114ed83-fd54-4952-f375-e1d94826ac6e@linaro.org>
- <20180820153207.xx5outviph7ec76p@flea>
- <672e6c6c-222f-5e7f-5d0c-acc8da68b1ab@linaro.org>
- <CAL_JsqKMPm=qmfYMQH99_gqSv0-ynUSvbkoNjjeDKtyxfgE1tg@mail.gmail.com>
-Message-ID: <20180827151140.luysp2kfbcq6patg@flea>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Mon, 27 Aug 2018 09:11:11 -0600
+Subject: [PATCH 8/9] drm/msm/a6xx: Add support for an interconnect path
+In-Reply-To: <20180827151112.25211-1-jcrouse@codeaurora.org>
+References: <20180827151112.25211-1-jcrouse@codeaurora.org>
+Message-ID: <20180827151112.25211-9-jcrouse@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2018 at 10:35:23AM -0500, Rob Herring wrote:
-> On Fri, Aug 24, 2018 at 9:51 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
-> >
-> > Hi Maxime,
-> >
-> > On 08/20/2018 06:32 PM, Maxime Ripard wrote:
-> > > Hi Georgi,
-> > >
-> > > On Tue, Aug 07, 2018 at 05:54:38PM +0300, Georgi Djakov wrote:
-> > >>> There is also a patch series from Maxime Ripard that's addressing the
-> > >>> same general area. See "dt-bindings: Add a dma-parent property". We
-> > >>> don't need multiple ways to address describing the device to memory
-> > >>> paths, so you all had better work out a common solution.
-> > >>
-> > >> Looks like this fits exactly into the interconnect API concept. I see
-> > >> MBUS as interconnect provider and display/camera as consumers, that
-> > >> report their bandwidth needs. I am also planning to add support for
-> > >> priority.
-> > >
-> > > Thanks for working on this. After looking at your serie, the one thing
-> > > I'm a bit uncertain about (and the most important one to us) is how we
-> > > would be able to tell through which interconnect the DMA are done.
-> > >
-> > > This is important to us since our topology is actually quite simple as
-> > > you've seen, but the RAM is not mapped on that bus and on the CPU's,
-> > > so we need to apply an offset to each buffer being DMA'd.
-> >
-> > Ok, i see - your problem is not about bandwidth scaling but about using
-> > different memory ranges by the driver to access the same location. So
-> > this is not really the same and your problem is different. Also the
-> > interconnect bindings are describing a path and endpoints. However i am
-> > open to any ideas.
-> 
-> It may be different things you need, but both are related to the path
-> between a bus master and memory. We can't have each 'problem'
-> described in a different way. Well, we could as long as each platform
-> has different problems, but that's unlikely.
-> 
-> It could turn out that the only commonality is property naming
-> convention, but that's still better than 2 independent solutions.
+Add support for setting the OPP defined bandwidth for a given
+GPU frequency value for a6xx. On sdm845 even though the GPU
+frequency is set by the GMU but the bus bandwidth quota is
+set by the CPU.
 
-Yeah, I really don't think the two issues are unrelated. Can we maybe
-have a particular interconnect-names value to mark the interconnect
-being used to perform DMA?
+Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+---
+ drivers/gpu/drm/msm/adreno/a6xx_gmu.c   | 27 +++++++++++++++++++++++--
+ drivers/gpu/drm/msm/adreno/adreno_gpu.c |  7 +++++++
+ drivers/gpu/drm/msm/msm_gpu.h           |  3 +++
+ 3 files changed, 35 insertions(+), 2 deletions(-)
 
-> I know you each want to just fix your issues, but the fact that DT
-> doesn't model the DMA side of the bus structure has been an issue at
-> least since the start of DT on ARM. Either we should address this in a
-> flexible way or we can just continue to manage without. So I'm not
-> inclined to take something that only addresses one SoC family.
-
-I'd really like to have it addressed. We're getting bit by this, and
-the hacks we have don't work well anymore.
-
-Maxime
-
+diff --git a/drivers/gpu/drm/msm/adreno/a6xx_gmu.c b/drivers/gpu/drm/msm/adreno/a6xx_gmu.c
+index d0dac4c2e3e7..d63eefc7c74d 100644
+--- a/drivers/gpu/drm/msm/adreno/a6xx_gmu.c
++++ b/drivers/gpu/drm/msm/adreno/a6xx_gmu.c
+@@ -4,6 +4,7 @@
+ #include <linux/clk.h>
+ #include <linux/iopoll.h>
+ #include <linux/pm_opp.h>
++#include <linux/interconnect.h>
+ #include <soc/qcom/cmd-db.h>
+ 
+ #include "a6xx_gpu.h"
+@@ -65,8 +66,15 @@ static bool a6xx_gmu_gx_is_on(struct a6xx_gmu *gmu)
+ 		A6XX_GMU_SPTPRAC_PWR_CLK_STATUS_GX_HM_CLK_OFF));
+ }
+ 
+-static int a6xx_gmu_set_freq(struct a6xx_gmu *gmu, int index)
++static void a6xx_gmu_set_freq(struct a6xx_gmu *gmu, int index)
+ {
++	struct a6xx_gpu *a6xx_gpu = container_of(gmu, struct a6xx_gpu, gmu);
++	struct adreno_gpu *adreno_gpu = &a6xx_gpu->base;
++	struct msm_gpu *gpu = &adreno_gpu->base;
++	struct dev_pm_opp *opp;
++	u64 ab, ib;
++	int ret;
++
+ 	gmu_write(gmu, REG_A6XX_GMU_DCVS_ACK_OPTION, 0);
+ 
+ 	gmu_write(gmu, REG_A6XX_GMU_DCVS_PERF_SETTING,
+@@ -82,7 +90,22 @@ static int a6xx_gmu_set_freq(struct a6xx_gmu *gmu, int index)
+ 	a6xx_gmu_set_oob(gmu, GMU_OOB_DCVS_SET);
+ 	a6xx_gmu_clear_oob(gmu, GMU_OOB_DCVS_SET);
+ 
+-	return gmu_read(gmu, REG_A6XX_GMU_DCVS_RETURN);
++	ret = gmu_read(gmu, REG_A6XX_GMU_DCVS_RETURN);
++	if (ret)
++		dev_err(gmu->dev, "GMU set GPU frequency error: %d\n", ret);
++
++	/* Set the interconnect bandwidth from the CPU */
++	if (IS_ERR_OR_NULL(gpu->icc_path))
++		return;
++
++	opp = dev_pm_opp_find_freq_exact(&gpu->pdev->dev,
++		gmu->gpu_freqs[index], true);
++	if (!IS_ERR_OR_NULL(opp)) {
++		if (!dev_pm_opp_get_interconnect_bw(opp, "port0", &ab, &ib))
++			icc_set(gpu->icc_path, ab, ib);
++
++		dev_pm_opp_put(opp);
++	}
+ }
+ 
+ static bool a6xx_gmu_check_idle_level(struct a6xx_gmu *gmu)
+diff --git a/drivers/gpu/drm/msm/adreno/adreno_gpu.c b/drivers/gpu/drm/msm/adreno/adreno_gpu.c
+index da1363a0c54d..2eace9bf32c7 100644
+--- a/drivers/gpu/drm/msm/adreno/adreno_gpu.c
++++ b/drivers/gpu/drm/msm/adreno/adreno_gpu.c
+@@ -21,6 +21,7 @@
+ #include <linux/kernel.h>
+ #include <linux/pm_opp.h>
+ #include <linux/slab.h>
++#include <linux/interconnect.h>
+ #include "adreno_gpu.h"
+ #include "msm_gem.h"
+ #include "msm_mmu.h"
+@@ -694,6 +695,9 @@ static int adreno_get_pwrlevels(struct device *dev,
+ 
+ 	DBG("fast_rate=%u, slow_rate=27000000", gpu->fast_rate);
+ 
++	/* Check for an interconnect path for the bus */
++	gpu->icc_path = of_icc_get(dev, "port0");
++
+ 	return 0;
+ }
+ 
+@@ -732,10 +736,13 @@ int adreno_gpu_init(struct drm_device *drm, struct platform_device *pdev,
+ 
+ void adreno_gpu_cleanup(struct adreno_gpu *adreno_gpu)
+ {
++	struct msm_gpu *gpu = &adreno_gpu->base;
+ 	unsigned int i;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(adreno_gpu->info->fw); i++)
+ 		release_firmware(adreno_gpu->fw[i]);
+ 
++	icc_put(gpu->icc_path);
++
+ 	msm_gpu_cleanup(&adreno_gpu->base);
+ }
+diff --git a/drivers/gpu/drm/msm/msm_gpu.h b/drivers/gpu/drm/msm/msm_gpu.h
+index 9122ee6e55e4..9c851d03f344 100644
+--- a/drivers/gpu/drm/msm/msm_gpu.h
++++ b/drivers/gpu/drm/msm/msm_gpu.h
+@@ -20,6 +20,7 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/interconnect.h>
+ 
+ #include "msm_drv.h"
+ #include "msm_fence.h"
+@@ -117,6 +118,8 @@ struct msm_gpu {
+ 	struct clk *ebi1_clk, *core_clk, *rbbmtimer_clk;
+ 	uint32_t fast_rate;
+ 
++	struct icc_path *icc_path;
++
+ 	/* Hang and Inactivity Detection:
+ 	 */
+ #define DRM_MSM_INACTIVE_PERIOD   66 /* in ms (roughly four frames) */
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180827/4a2cc41c/attachment.sig>
+2.18.0
