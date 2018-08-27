@@ -1,132 +1,127 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Mon, 27 Aug 2018 15:08:07 -0500
-Subject: [PATCH] perf annotate: Handle arm64 move instructions
-Message-ID: <20180827150807.304110d2e9919a17c832ca48@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 Aug 2018 22:15:40 +0200
+Subject: [PATCH 1/2 v2] gpio: ftgpio: Support optional silicon clock
+Message-ID: <20180827201540.15957-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add default handler for non-jump instructions.  This really only has an
-effect on instructions that compute a PC-relative address, such as 'adrp,'
-as seen in these couple of examples:
+The GPIO silicon is clocked with a PCLK (peripheral clock)
+on all systems, however not all platforms model it and include
+it in e.g. the device tree, so add clock handling but make it
+optional so we bail out safely if it is e.g. always on.
 
-BEFORE: adrp   x0, ffff20000aa11000 <kallsyms_token_index+0xce000>
-AFTER:  adrp   x0, kallsyms_token_index+0xce000
-
-BEFORE: adrp   x23, ffff20000ae94000 <__per_cpu_load>
-AFTER:  adrp   x23, __per_cpu_load
-
-The implementation is identical to that of s390, but with a slight
-adjustment for objdump whitespace propagation (arm64 objdump puts
-spaces after commas, whereas s390's presumably doesn't).
-
-The mov__scnprintf() declaration is moved from s390's to arm64's
-instructions.c because arm64's gets included before s390's.
-
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Thomas Richter <tmricht@linux.vnet.ibm.com>
-Cc: Hendrik Brueckner <brueckner@linux.vnet.ibm.com>
-Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- tools/perf/arch/arm64/annotate/instructions.c | 59 ++++++++++++++++++-
- tools/perf/arch/s390/annotate/instructions.c  |  2 -
- 2 files changed, 58 insertions(+), 3 deletions(-)
+ChangeLog v1->v2:
+- Bail out properly for -EPROBE_DEFER from the clock.
+---
+ drivers/gpio/gpio-ftgpio010.c | 41 +++++++++++++++++++++++++++++++----
+ 1 file changed, 37 insertions(+), 4 deletions(-)
 
-diff --git a/tools/perf/arch/arm64/annotate/instructions.c b/tools/perf/arch/arm64/annotate/instructions.c
-index 6688977e4ac7..76c6345a57d5 100644
---- a/tools/perf/arch/arm64/annotate/instructions.c
-+++ b/tools/perf/arch/arm64/annotate/instructions.c
-@@ -8,6 +8,63 @@ struct arm64_annotate {
- 		jump_insn;
+diff --git a/drivers/gpio/gpio-ftgpio010.c b/drivers/gpio/gpio-ftgpio010.c
+index 868bf8501560..f548bc92e1d1 100644
+--- a/drivers/gpio/gpio-ftgpio010.c
++++ b/drivers/gpio/gpio-ftgpio010.c
+@@ -15,6 +15,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ #include <linux/bitops.h>
++#include <linux/clk.h>
+ 
+ /* GPIO registers definition */
+ #define GPIO_DATA_OUT		0x00
+@@ -40,11 +41,14 @@
+  * struct ftgpio_gpio - Gemini GPIO state container
+  * @dev: containing device for this instance
+  * @gc: gpiochip for this instance
++ * @base: remapped I/O-memory base
++ * @clk: silicon clock
+  */
+ struct ftgpio_gpio {
+ 	struct device *dev;
+ 	struct gpio_chip gc;
+ 	void __iomem *base;
++	struct clk *clk;
  };
  
-+static int arm64_mov__parse(struct arch *arch __maybe_unused,
-+			    struct ins_operands *ops,
-+			    struct map_symbol *ms __maybe_unused)
-+{
-+	char *s = strchr(ops->raw, ','), *target, *endptr;
+ static void ftgpio_gpio_ack_irq(struct irq_data *d)
+@@ -180,6 +184,19 @@ static int ftgpio_gpio_probe(struct platform_device *pdev)
+ 	if (irq <= 0)
+ 		return irq ? irq : -EINVAL;
+ 
++	g->clk = devm_clk_get(dev, NULL);
++	if (!IS_ERR(g->clk)) {
++		ret = clk_prepare_enable(g->clk);
++		if (ret)
++			return ret;
++	} else if (PTR_ERR(g->clk) == -EPROBE_DEFER) {
++		/*
++		 * Percolate deferrals, for anything else,
++		 * just live without the clocking.
++		 */
++		return PTR_ERR(g->clk);
++	}
 +
-+	if (s == NULL)
-+		return -1;
+ 	ret = bgpio_init(&g->gc, dev, 4,
+ 			 g->base + GPIO_DATA_IN,
+ 			 g->base + GPIO_DATA_SET,
+@@ -189,7 +206,7 @@ static int ftgpio_gpio_probe(struct platform_device *pdev)
+ 			 0);
+ 	if (ret) {
+ 		dev_err(dev, "unable to init generic GPIO\n");
+-		return ret;
++		goto dis_clk;
+ 	}
+ 	g->gc.label = "FTGPIO010";
+ 	g->gc.base = -1;
+@@ -199,7 +216,7 @@ static int ftgpio_gpio_probe(struct platform_device *pdev)
+ 
+ 	ret = devm_gpiochip_add_data(dev, &g->gc, g);
+ 	if (ret)
+-		return ret;
++		goto dis_clk;
+ 
+ 	/* Disable, unmask and clear all interrupts */
+ 	writel(0x0, g->base + GPIO_INT_EN);
+@@ -211,14 +228,29 @@ static int ftgpio_gpio_probe(struct platform_device *pdev)
+ 				   IRQ_TYPE_NONE);
+ 	if (ret) {
+ 		dev_info(dev, "could not add irqchip\n");
+-		return ret;
++		goto dis_clk;
+ 	}
+ 	gpiochip_set_chained_irqchip(&g->gc, &ftgpio_gpio_irqchip,
+ 				     irq, ftgpio_gpio_irq_handler);
+ 
++	platform_set_drvdata(pdev, g);
+ 	dev_info(dev, "FTGPIO010 @%p registered\n", g->base);
+ 
+ 	return 0;
 +
-+	*s = '\0';
-+	ops->source.raw = strdup(ops->raw);
-+	*s = ',';
-+
-+	if (ops->source.raw == NULL)
-+		return -1;
-+
-+	target = ++s;
-+	ops->target.raw = strdup(target);
-+	if (ops->target.raw == NULL)
-+		goto out_free_source;
-+
-+	ops->target.addr = strtoull(target, &endptr, 16);
-+	if (endptr == target)
-+		goto out_free_target;
-+
-+	s = strchr(endptr, '<');
-+	if (s == NULL)
-+		goto out_free_target;
-+	endptr = strchr(s + 1, '>');
-+	if (endptr == NULL)
-+		goto out_free_target;
-+
-+	*endptr = '\0';
-+	*s = ' ';
-+	ops->target.name = strdup(s);
-+	*s = '<';
-+	*endptr = '>';
-+	if (ops->target.name == NULL)
-+		goto out_free_target;
-+
-+	return 0;
-+
-+out_free_target:
-+	zfree(&ops->target.raw);
-+out_free_source:
-+	zfree(&ops->source.raw);
-+	return -1;
++dis_clk:
++	if (!IS_ERR(g->clk))
++		clk_disable_unprepare(g->clk);
++	return ret;
 +}
 +
-+static int mov__scnprintf(struct ins *ins, char *bf, size_t size,
-+			  struct ins_operands *ops);
++static int ftgpio_gpio_remove(struct platform_device *pdev)
++{
++	struct ftgpio_gpio *g = platform_get_drvdata(pdev);
 +
-+static struct ins_ops arm64_mov_ops = {
-+	.parse	   = arm64_mov__parse,
-+	.scnprintf = mov__scnprintf,
-+};
-+
- static struct ins_ops *arm64__associate_instruction_ops(struct arch *arch, const char *name)
- {
- 	struct arm64_annotate *arm = arch->priv;
-@@ -21,7 +78,7 @@ static struct ins_ops *arm64__associate_instruction_ops(struct arch *arch, const
- 	else if (!strcmp(name, "ret"))
- 		ops = &ret_ops;
- 	else
--		return NULL;
-+		ops = &arm64_mov_ops;
- 
- 	arch__associate_ins_ops(arch, name, ops);
- 	return ops;
-diff --git a/tools/perf/arch/s390/annotate/instructions.c b/tools/perf/arch/s390/annotate/instructions.c
-index cee4e2f7c057..de0dd66dbb48 100644
---- a/tools/perf/arch/s390/annotate/instructions.c
-+++ b/tools/perf/arch/s390/annotate/instructions.c
-@@ -100,8 +100,6 @@ static int s390_mov__parse(struct arch *arch __maybe_unused,
- 	return -1;
++	if (!IS_ERR(g->clk))
++		clk_disable_unprepare(g->clk);
++	return 0;
  }
  
--static int mov__scnprintf(struct ins *ins, char *bf, size_t size,
--			  struct ins_operands *ops);
- 
- static struct ins_ops s390_mov_ops = {
- 	.parse	   = s390_mov__parse,
+ static const struct of_device_id ftgpio_gpio_of_match[] = {
+@@ -239,6 +271,7 @@ static struct platform_driver ftgpio_gpio_driver = {
+ 		.name		= "ftgpio010-gpio",
+ 		.of_match_table = of_match_ptr(ftgpio_gpio_of_match),
+ 	},
+-	.probe	= ftgpio_gpio_probe,
++	.probe = ftgpio_gpio_probe,
++	.remove = ftgpio_gpio_remove,
+ };
+ builtin_platform_driver(ftgpio_gpio_driver);
 -- 
 2.17.1
