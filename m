@@ -1,123 +1,83 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Mon, 27 Aug 2018 15:05:28 +0800
-Subject: [PATCH v5 5/5] iommu/arm-smmu-v3: add bootup option
- "iommu.non_strict"
-In-Reply-To: <29330cf7-d269-c4db-2f5a-632509058987@arm.com>
-References: <1534296510-12888-1-git-send-email-thunder.leizhen@huawei.com>
- <1534296510-12888-6-git-send-email-thunder.leizhen@huawei.com>
- <29330cf7-d269-c4db-2f5a-632509058987@arm.com>
-Message-ID: <5B83A2B8.7030909@huawei.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 27 Aug 2018 09:11:37 +0200
+Subject: [PATCH v4 1/2] devicetree/bindings: display: Add document for
+ rockchip RGB output
+In-Reply-To: <725cc93f-a441-22bc-ef58-b4b38ec34e17@rock-chips.com>
+References: <1529997340-156879-1-git-send-email-hjc@rock-chips.com>
+ <20180703182559.GA12809@rob-hp-laptop>
+ <725cc93f-a441-22bc-ef58-b4b38ec34e17@rock-chips.com>
+Message-ID: <7915686.3ERLj9EHQN@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sandy,
 
+trying to move this forward a bit :-)
 
-On 2018/8/23 1:02, Robin Murphy wrote:
-> On 15/08/18 02:28, Zhen Lei wrote:
->> Add a bootup option to make the system manager can choose which mode to
->> be used. The default mode is strict.
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>   Documentation/admin-guide/kernel-parameters.txt | 13 +++++++++++++
->>   drivers/iommu/arm-smmu-v3.c                     | 22 +++++++++++++++++++++-
->>   2 files changed, 34 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
->> index 5cde1ff..cb9d043e 100644
->> --- a/Documentation/admin-guide/kernel-parameters.txt
->> +++ b/Documentation/admin-guide/kernel-parameters.txt
->> @@ -1720,6 +1720,19 @@
->>           nobypass    [PPC/POWERNV]
->>               Disable IOMMU bypass, using IOMMU for PCI devices.
->>
->> +    iommu.non_strict=    [ARM64]
->> +            Format: { "0" | "1" }
->> +            0 - strict mode, default.
->> +                Release IOVAs after the related TLBs are invalid
->> +                completely.
->> +            1 - non-strict mode.
->> +                Put off TLBs invalidation and release memory first.
->> +                It's good for scatter-gather performance but lacks
->> +                full isolation, an untrusted device can access the
->> +                reused memory because the TLBs may still valid.
->> +                Please take    full consideration before choosing this
->> +                mode. Note that, VFIO will always use strict mode.
->> +
->>       iommu.passthrough=
->>               [ARM64] Configure DMA to bypass the IOMMU by default.
->>               Format: { "0" | "1" }
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 61eb7ec..0eda90e 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -631,6 +631,26 @@ struct arm_smmu_option_prop {
->>       { 0, NULL},
->>   };
->>
->> +static bool smmu_non_strict __read_mostly;
->> +
->> +static int __init arm_smmu_setup(char *str)
->> +{
->> +    int ret;
->> +
->> +    ret = kstrtobool(str, &smmu_non_strict);
->> +    if (ret)
->> +        return ret;
->> +
->> +    if (smmu_non_strict) {
->> +        pr_warn("WARNING: iommu non-strict mode is chosen.\n"
->> +            "It's good for scatter-gather performance but lacks full isolation\n");
->> +        add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
->> +    }
->> +
->> +    return 0;
->> +}
->> +early_param("iommu.non_strict", arm_smmu_setup);
+Am Mittwoch, 4. Juli 2018, 14:09:56 CEST schrieb Sandy Huang:
+> Hi Rob Herring,
+> Thanks for your review.
 > 
-> As I said on v3, the option should be parsed by iommu-dma, since that's where it takes effect, and I'm sure SMMUv2 users will be interested in trying it out too.
+> ? 2018/7/4 2:25, Rob Herring ??:
+> > On Tue, Jun 26, 2018 at 03:15:39PM +0800, Sandy Huang wrote:
+> >> This path add support rv1108 and px30 rgb output interface driver.
+> > 
+> > Bindings are for h/w, not drivers.
+> > 
+> I will update at next version as following:
+> This patch add support rv1108 and px30 rgb output interface
+> >>
+> >> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
+> >> Link: https://patchwork.freedesktop.org/patch/msgid/1509522765-118759-1-git-send-email-hjc at rock-chips.com
+> >> ---
+> >>
+> >> Changes in v4: Add support px30
+> >> Changes in v3: None
+> >> Changes in v2: None
+> >>
+> >> .../bindings/display/rockchip/rockchip-rgb.txt     | 73 ++++++++++++++++++++++
+> >>   1 file changed, 73 insertions(+)
+> >>   create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+> >> new file mode 100644
+> >> index 0000000..077b9ad
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-rgb.txt
+> >> @@ -0,0 +1,73 @@
+> >> +Rockchip RV1108 RGB interface
+> >> +================================
+> >> +
+> >> +Required properties:
+> >> +- compatible: matching the soc type:
+> >> +	- "rockchip,px30-rgb";
+> >> +	- "rockchip,rv1108-rgb";
+> > 
+> > This doesn't look right? What (and how) is getting programmed here
+> > because you don't have any register interface.
+> > 
+> This is register for DRM encoder and connecter or bridge for some RGB 
+> convert chips driver.
+> so far we don't have any register for rgb interface, but it's most 
+> probable need to config some register for rgb interface in feauture for 
+> rockchip platform.
 
-OK, I am so sorry that I have not understood your opinion correctly.
+I think the basic-issue Rob was pointing out is that the devicetree
+describes hardware blocks and not the software representation.
 
-> 
-> In other words, if iommu_dma_init_domain() does something like:
-> 
->     if (iommu_dma_non_strict && domain->ops->flush_iotlb_all) {
->         domain->non_strict = true;
->         cookie->domain = domain;
->         init_iova_flush_queue(...);
->     }
-> 
->> +
->>   static inline void __iomem *arm_smmu_page1_fixup(unsigned long offset,
->>                            struct arm_smmu_device *smmu)
->>   {
->> @@ -1622,7 +1642,7 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
->>       if (smmu->features & ARM_SMMU_FEAT_COHERENCY)
->>           pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
->>
->> -    if (domain->type == IOMMU_DOMAIN_DMA) {
->> +    if ((domain->type == IOMMU_DOMAIN_DMA) && smmu_non_strict) {
->>           domain->non_strict = true;
->>           pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
->>       }
-> 
-> ...then all the driver should need to do is:
-> 
->     if (domain->non_strict)
->         pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
-> 
-> 
-> Now, that would make it possible to request non-strict mode even with drivers which *don't* understand it, but I think that's not actually harmful, just means that some TLBIs will still get issued synchronously and the flush queue might not do much. If you wanted to avoid even that, you could replace domain->non_strict with an iommu_domain_set_attr() call, so iommu_dma could tell up-front whether the driver understands non-strict mode and it's worth setting the queue up or not.
+And the rgb output is not a separate block, but instead just a property
+of the vop itself, hence should possibly not have a separate "device".
 
-OK, I will think seriously about it, thanks. I've been busy these days, I will reply to you as soon as possible.
+As I'm currently tinkering with rk3188 display support [0] - which only has
+rgb output at all - I modified your patch a bit to to showcase how that
+could look [1], where the soc vop struct simply has a feature flag
+indicating indicating a raw rgb output and the rgb driver then
+looks for bridges in the vop endpoints to distinguish them from
+soc-internals output encoders.
 
-> 
-> Robin.
-> 
-> .
-> 
+Let me know what you think :-)
+Heiko
 
--- 
-Thanks!
-BestRegards
+[0] https://github.com/mmind/linux-rockchip/commits/wip/rk3188-lcdc
+[1] https://github.com/mmind/linux-rockchip/commit/fe74d2c4d76bcb6035b7207753e6afb85335b6cd
+needs also https://github.com/mmind/linux-rockchip/commit/c5a48c772f3564211dcd1ec71004de1d6dbb0307
