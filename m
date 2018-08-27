@@ -1,88 +1,29 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 27 Aug 2018 23:52:06 +0200
-Subject: [PATCH 1/2 v2] gpio: ftgpio: Support optional silicon clock
-In-Reply-To: <20180827201540.15957-1-linus.walleij@linaro.org>
-References: <20180827201540.15957-1-linus.walleij@linaro.org>
-Message-ID: <20180827215206.GS27483@lunn.ch>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Aug 2018 23:26:46 +0100
+Subject: [PATCH 1/3] ARM: dts: NSP: Enable SFP on bcm958625hr
+In-Reply-To: <20180827200344.16158-2-f.fainelli@gmail.com>
+References: <20180827200344.16158-1-f.fainelli@gmail.com>
+ <20180827200344.16158-2-f.fainelli@gmail.com>
+Message-ID: <20180827222646.GF30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2018 at 10:15:40PM +0200, Linus Walleij wrote:
-> The GPIO silicon is clocked with a PCLK (peripheral clock)
-> on all systems, however not all platforms model it and include
-> it in e.g. the device tree, so add clock handling but make it
-> optional so we bail out safely if it is e.g. always on.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - Bail out properly for -EPROBE_DEFER from the clock.
-> ---
->  drivers/gpio/gpio-ftgpio010.c | 41 +++++++++++++++++++++++++++++++----
->  1 file changed, 37 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-ftgpio010.c b/drivers/gpio/gpio-ftgpio010.c
-> index 868bf8501560..f548bc92e1d1 100644
-> --- a/drivers/gpio/gpio-ftgpio010.c
-> +++ b/drivers/gpio/gpio-ftgpio010.c
-> @@ -15,6 +15,7 @@
->  #include <linux/interrupt.h>
->  #include <linux/platform_device.h>
->  #include <linux/bitops.h>
-> +#include <linux/clk.h>
->  
->  /* GPIO registers definition */
->  #define GPIO_DATA_OUT		0x00
-> @@ -40,11 +41,14 @@
->   * struct ftgpio_gpio - Gemini GPIO state container
->   * @dev: containing device for this instance
->   * @gc: gpiochip for this instance
-> + * @base: remapped I/O-memory base
-> + * @clk: silicon clock
->   */
->  struct ftgpio_gpio {
->  	struct device *dev;
->  	struct gpio_chip gc;
->  	void __iomem *base;
-> +	struct clk *clk;
->  };
->  
->  static void ftgpio_gpio_ack_irq(struct irq_data *d)
-> @@ -180,6 +184,19 @@ static int ftgpio_gpio_probe(struct platform_device *pdev)
->  	if (irq <= 0)
->  		return irq ? irq : -EINVAL;
->  
-> +	g->clk = devm_clk_get(dev, NULL);
-> +	if (!IS_ERR(g->clk)) {
-> +		ret = clk_prepare_enable(g->clk);
-> +		if (ret)
-> +			return ret;
-> +	} else if (PTR_ERR(g->clk) == -EPROBE_DEFER) {
-> +		/*
-> +		 * Percolate deferrals, for anything else,
-> +		 * just live without the clocking.
-> +		 */
-> +		return PTR_ERR(g->clk);
+On Mon, Aug 27, 2018 at 01:03:42PM -0700, Florian Fainelli wrote:
+> Enable the SFP connected to port 5 of the switch and wire up all GPIOs
+> to the SFP cage. Because of a hardware limitation of the i2c controller
+> on the iProc SoCs which prevents large i2c (> 256 bytes) transactions to
+> work, we use the i2c-gpio interface instead, which does not have that
+> limitation. This allows us to read the SFP module EEPROM, which would
+> not be possible otherwise since it exceeds that size during a single
+> read transfer.
 
-Hi Linus
+We shouldn't exceed 256 bytes, since 256 bytes is the "page" size
+of the EEPROM.  The most that we read in one block is either
+ETH_MODULE_SFF_8079_LEN or (ETH_MODULE_SFF_8472_LEN - 
+ETH_MODULE_SFF_8079_LEN), both of which result in no more than 256
+byte reads.
 
-This is O.K. But you could also do
-
-               	} else {
-	       		g->clk = NULL;
- 		}
-
-And then:
-
-> +dis_clk:
-> +	if (!IS_ERR(g->clk))
-> +		clk_disable_unprepare(g->clk);
-
-you don't need the test, the clk API is happy with a NULL pointer, and
-does a NOP.
-
-But you can keep it as is.
-
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-
-    Andrew
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
