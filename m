@@ -1,48 +1,199 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Mon, 27 Aug 2018 10:21:37 +0000
-Subject: [PATCH V5 0/5] soc: imx: add scu firmware api support
-In-Reply-To: <AM0PR04MB4211E5D66FD8502278765EC8800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
- <AM0PR04MB4211F68CCD399243613F8D7B80320@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <AM0PR04MB4211F748DBD1FE64A2B2136980360@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180827083310.omqa3kpmj542fu3b@pengutronix.de>
- <AM0PR04MB4211E5D66FD8502278765EC8800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <AM0PR04MB42113BB0FA9E54629339F872800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: tudor.ambarus@microchip.com (Tudor Ambarus)
+Date: Mon, 27 Aug 2018 13:26:44 +0300
+Subject: [RESEND PATCH v2 3/3] mtd: spi-nor: parse SFDP 4-byte Address
+ Instruction Table
+In-Reply-To: <20180827102644.7323-1-tudor.ambarus@microchip.com>
+References: <20180827102644.7323-1-tudor.ambarus@microchip.com>
+Message-ID: <20180827102644.7323-4-tudor.ambarus@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: A.s. Dong
-> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> > On Fri, Aug 24, 2018 at 07:36:38AM +0000, A.s. Dong wrote:
-> > > Hi Jassi & Sasha,
-> > >
-> > > Do you have some suggestions about this patch series?
-> >
-> > I still think that the users like clk and pinctrl should directly call
-> > sc_call_rpc(), no need for this shim at all.
-> >
-> 
-> Sorry, I'm a bit confuse.
-> What specific shim do you mean not needed?
-> 
-> Do you mean we don't need all the SCU SVC APIs (clk/pm/pinctrl/misc and etc)
-> Implemented in this patch series and instead directly implement them in client
-> driver?
-> For example:
-> drivers/soc/imx/sc/svc/pm/rpc_clnt.c
-> sc_err_t sc_pm_get_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
->                               sc_pm_clk_t clk, sc_pm_clock_rate_t *rate)
-> Change to:
-> drivers/clk/imx/scu/scu_clock.c ?
-> sc_err_t sc_pm_get_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
->                               sc_pm_clk_t clk, sc_pm_clock_rate_t *rate)
->
+From: Cyrille Pitchen <cyrille.pitchen@microchip.com>
 
-I thought even make client driver to directly to sc_call_rpc(), it may still better to
-Make them into a serrate function call like sc_pm_get_clock_rate() but just put
-In client driver instead of in the central SCU SVC place.
-Not sure the point to do that.
-Would you please help clarify a bit more?
+Add support for SFDP (JESD216B) 4-byte Address Instruction Table. This
+table is optional but when available, we parse it to get the 4-byte
+address op codes supported by the memory.
+Using these op codes is stateless as opposed to entering the 4-byte
+address mode or setting the Base Address Register (BAR).
 
-Regards
-Dong Aisheng
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@microchip.com>
+Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+---
+ drivers/mtd/spi-nor/spi-nor.c | 148 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 148 insertions(+)
+
+diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+index 522d5aa..4e69d47 100644
+--- a/drivers/mtd/spi-nor/spi-nor.c
++++ b/drivers/mtd/spi-nor/spi-nor.c
+@@ -2196,6 +2196,7 @@ struct sfdp_parameter_header {
+ 
+ #define SFDP_BFPT_ID		0xff00	/* Basic Flash Parameter Table */
+ #define SFDP_SECTOR_MAP_ID	0xff81	/* Sector Map Table */
++#define SFDP_4BAIT_ID		0xff84u	/* 4-byte Address Instruction Table */
+ 
+ #define SFDP_SIGNATURE		0x50444653U
+ #define SFDP_JESD216_MAJOR	1
+@@ -2883,6 +2884,149 @@ static int spi_nor_parse_smpt(struct spi_nor *nor,
+ 	return ret;
+ }
+ 
++struct sfdp_4bait {
++	/* The hardware capability. */
++	u32		hwcaps;
++
++	/*
++	 * The <supported_bit> bit in DWORD1 of the 4BAIT tells us whether
++	 * the associated 4-byte address op code is supported.
++	 */
++	u32		supported_bit;
++};
++
++static int spi_nor_parse_4bait(struct spi_nor *nor,
++			       const struct sfdp_parameter_header *param_header,
++			       struct spi_nor_flash_parameter *params)
++{
++	static const struct sfdp_4bait reads[] = {
++		{ SNOR_HWCAPS_READ,		BIT(0) },
++		{ SNOR_HWCAPS_READ_FAST,	BIT(1) },
++		{ SNOR_HWCAPS_READ_1_1_2,	BIT(2) },
++		{ SNOR_HWCAPS_READ_1_2_2,	BIT(3) },
++		{ SNOR_HWCAPS_READ_1_1_4,	BIT(4) },
++		{ SNOR_HWCAPS_READ_1_4_4,	BIT(5) },
++		{ SNOR_HWCAPS_READ_1_1_1_DTR,	BIT(13) },
++		{ SNOR_HWCAPS_READ_1_2_2_DTR,	BIT(14) },
++		{ SNOR_HWCAPS_READ_1_4_4_DTR,	BIT(15) },
++	};
++	static const struct sfdp_4bait programs[] = {
++		{ SNOR_HWCAPS_PP,		BIT(6) },
++		{ SNOR_HWCAPS_PP_1_1_4,		BIT(7) },
++		{ SNOR_HWCAPS_PP_1_4_4,		BIT(8) },
++	};
++	static const struct sfdp_4bait erases[SNOR_ERASE_TYPE_MAX] = {
++		{ 0u /* not used */,		BIT(9) },
++		{ 0u /* not used */,		BIT(10) },
++		{ 0u /* not used */,		BIT(11) },
++		{ 0u /* not used */,		BIT(12) },
++	};
++	u32 dwords[2], addr, discard_hwcaps, read_hwcaps, pp_hwcaps, erase_mask;
++	struct spi_nor_erase_map *map = &nor->erase_map;
++	int i, err;
++
++	if (param_header->major != SFDP_JESD216_MAJOR ||
++	    param_header->length < ARRAY_SIZE(dwords))
++		return -EINVAL;
++
++	/* Read the 4-byte Address Instruction Table. */
++	addr = SFDP_PARAM_HEADER_PTP(param_header);
++	err = spi_nor_read_sfdp(nor, addr, sizeof(dwords), dwords);
++	if (err)
++		return err;
++
++	/* Fix endianness of the 4BAIT DWORDs. */
++	for (i = 0; i < ARRAY_SIZE(dwords); i++)
++		dwords[i] = le32_to_cpu(dwords[i]);
++
++	/*
++	 * Compute the subset of (Fast) Read commands for which the 4-byte
++	 * version is supported.
++	 */
++	discard_hwcaps = 0;
++	read_hwcaps = 0;
++	for (i = 0; i < ARRAY_SIZE(reads); i++) {
++		const struct sfdp_4bait *read = &reads[i];
++
++		discard_hwcaps |= read->hwcaps;
++		if ((params->hwcaps.mask & read->hwcaps) &&
++		    (dwords[0] & read->supported_bit))
++			read_hwcaps |= read->hwcaps;
++	}
++
++	/*
++	 * Compute the subset of Page Program commands for which the 4-byte
++	 * version is supported.
++	 */
++	pp_hwcaps = 0;
++	for (i = 0; i < ARRAY_SIZE(programs); i++) {
++		const struct sfdp_4bait *program = &programs[i];
++
++		discard_hwcaps |= program->hwcaps;
++		if ((params->hwcaps.mask & program->hwcaps) &&
++		    (dwords[0] & program->supported_bit))
++			pp_hwcaps |= program->hwcaps;
++	}
++
++	/*
++	 * Compute the subet of Sector Erase commands for which the 4-byte
++	 * version is supported.
++	 */
++	erase_mask = 0;
++	for (i = 0; i < SNOR_ERASE_TYPE_MAX; i++) {
++		const struct sfdp_4bait *erase = &erases[i];
++
++		if (map->erase_type[i].size > 0 &&
++		    (dwords[0] & erase->supported_bit))
++			erase_mask |= BIT(i);
++	}
++
++	/*
++	 * We need at least one 4-byte op code per read, program and erase
++	 * operation; the .read(), .write() and .erase() hooks share the
++	 * nor->addr_width value.
++	 */
++	if (!read_hwcaps || !pp_hwcaps || !erase_mask)
++		return 0;
++
++	/*
++	 * Discard all operations from the 4-byte instruction set which are
++	 * not supported by this memory.
++	 */
++	params->hwcaps.mask &= ~discard_hwcaps;
++	params->hwcaps.mask |= (read_hwcaps | pp_hwcaps);
++
++	/* Use the 4-byte address instruction set. */
++	for (i = 0; i < SNOR_CMD_READ_MAX; i++) {
++		struct spi_nor_read_command *read_cmd = &params->reads[i];
++
++		read_cmd->opcode = spi_nor_convert_3to4_read(read_cmd->opcode);
++	}
++	for (i = 0; i < SNOR_CMD_PP_MAX; i++) {
++		struct spi_nor_pp_command *pp_cmd = &params->page_programs[i];
++
++		pp_cmd->opcode = spi_nor_convert_3to4_program(pp_cmd->opcode);
++	}
++	for (i = 0; i < SNOR_ERASE_TYPE_MAX; i++) {
++		struct spi_nor_erase_type *erase = &map->erase_type[i];
++
++		if (erase_mask & BIT(erase->idx))
++			erase->opcode = (dwords[1] >> (erase->idx * 8)) & 0xFF;
++		else
++			spi_nor_set_erase_type(erase, 0u, 0xFF);
++	}
++
++	/*
++	 * We set nor->addr_width here to skip spi_nor_set_4byte_opcodes()
++	 * later because this latest function implements a legacy quirk for
++	 * the erase size of Spansion memory. However this quirk is no longer
++	 * needed with new SFDP compliant memories.
++	 */
++	nor->addr_width = 4;
++	nor->flags |= SPI_NOR_4B_OPCODES;
++	return 0;
++}
++
+ /**
+  * spi_nor_parse_sfdp() - parse the Serial Flash Discoverable Parameters.
+  * @nor:		pointer to a 'struct spi_nor'
+@@ -2980,6 +3124,10 @@ static int spi_nor_parse_sfdp(struct spi_nor *nor,
+ 			err = spi_nor_parse_smpt(nor, param_header);
+ 			break;
+ 
++		case SFDP_4BAIT_ID:
++			err = spi_nor_parse_4bait(nor, param_header, params);
++			break;
++
+ 		default:
+ 			break;
+ 		}
+-- 
+2.9.4
