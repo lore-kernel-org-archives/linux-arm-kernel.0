@@ -1,74 +1,32 @@
 From: ykaukab@suse.de (Mian Yousaf Kaukab)
-Date: Mon, 27 Aug 2018 16:33:05 +0200
-Subject: [PATCH RESEND 1/6] arm64: kpti: move check for non-vulnerable CPUs to
- a function
-In-Reply-To: <20180827143310.641-1-ykaukab@suse.de>
-References: <20180827143310.641-1-ykaukab@suse.de>
-Message-ID: <20180827143310.641-2-ykaukab@suse.de>
+Date: Mon, 27 Aug 2018 16:33:04 +0200
+Subject: [PATCH RESEND 0/6] arm64: add support for generic cpu vulnerabilities
+Message-ID: <20180827143310.641-1-ykaukab@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare to call it in generic cpu vulnerabilities support.
+GENERIC_CPU_VULNERABILITIES provide a common way to figure out if a
+system is affected by vulnerabilities like meltdown and other variants
+of spectre. This small series adds support for it in arm64.
 
-Signed-off-by: Mian Yousaf Kaukab <ykaukab@suse.de>
----
- arch/arm64/include/asm/cpufeature.h | 16 ++++++++++++++++
- arch/arm64/kernel/cpufeature.c      |  9 +--------
- 2 files changed, 17 insertions(+), 8 deletions(-)
+Thank you,
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 1717ba1db35d..0b0b5b3e36ba 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -530,6 +530,22 @@ void arm64_set_ssbd_mitigation(bool state);
- static inline void arm64_set_ssbd_mitigation(bool state) {}
- #endif
- 
-+static inline bool is_cpu_meltdown_safe(void)
-+{
-+	/* List of CPUs that are not vulnerable and don't need KPTI */
-+	static const struct midr_range kpti_safe_list[] = {
-+		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
-+		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
-+		{ /* sentinel */ }
-+	};
-+
-+	/* Don't force KPTI for CPUs that are not vulnerable */
-+	if (is_midr_in_range_list(read_cpuid_id(), kpti_safe_list))
-+		return true;
-+
-+	return false;
-+}
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index e238b7932096..6a94f8bce35a 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -865,12 +865,6 @@ static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
- static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 				int scope)
- {
--	/* List of CPUs that are not vulnerable and don't need KPTI */
--	static const struct midr_range kpti_safe_list[] = {
--		MIDR_ALL_VERSIONS(MIDR_CAVIUM_THUNDERX2),
--		MIDR_ALL_VERSIONS(MIDR_BRCM_VULCAN),
--		{ /* sentinel */ }
--	};
- 	char const *str = "command line option";
- 
- 	/*
-@@ -894,8 +888,7 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
- 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
- 		return true;
- 
--	/* Don't force KPTI for CPUs that are not vulnerable */
--	if (is_midr_in_range_list(read_cpuid_id(), kpti_safe_list))
-+	if (is_cpu_meltdown_safe())
- 		return false;
- 
- 	/* Defer to CPU feature registers */
+Best regards,
+Yousaf
+
+Mian Yousaf Kaukab (6):
+  arm64: kpti: move check for non-vulnerable CPUs to a function
+  arm64: add sysfs vulnerability show for meltdown
+  arm64: add sysfs vulnerability show for spectre v1
+  arm64: add sysfs vulnerability show for spectre v2
+  arm64: add sysfs vulnerability show for speculative store bypass
+  arm64: enable generic CPU vulnerabilites support
+
+ arch/arm64/Kconfig                  |  1 +
+ arch/arm64/include/asm/cpufeature.h | 16 +++++++
+ arch/arm64/kernel/cpu_errata.c      | 84 ++++++++++++++++++++++++++++++++++++-
+ arch/arm64/kernel/cpufeature.c      |  9 +---
+ 4 files changed, 101 insertions(+), 9 deletions(-)
+
 -- 
 2.11.0
