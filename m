@@ -1,70 +1,26 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Mon, 27 Aug 2018 10:47:11 +0200
-Subject: [PATCH 4/4] dma-mapping: clear dev->dma_ops in arch_teardown_dma_ops
-In-Reply-To: <20180827084711.23407-1-hch@lst.de>
-References: <20180827084711.23407-1-hch@lst.de>
-Message-ID: <20180827084711.23407-5-hch@lst.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 27 Aug 2018 10:51:35 +0200
+Subject: [PATCH 2/9] arm64: dts: renesas: r8a774a1: Add I2C and IIC-DVFS
+ support
+In-Reply-To: <1535031788-19907-3-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1535031788-19907-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1535031788-19907-3-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20180827085135.bjzbiws7tdtig5kd@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no reason to leave the per-device dma_ops around when
-deconfiguring a device, so move this code from arm64 into the
-common code.
+On Thu, Aug 23, 2018 at 02:43:01PM +0100, Fabrizio Castro wrote:
+> From: Biju Das <biju.das@bp.renesas.com>
+> 
+> Add the I2C[0-6] and IIC Bus Interface for DVFS (IIC for DVFS)
+> devices nodes to the r8a774a1 device tree.
+> 
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- arch/arm64/include/asm/dma-mapping.h | 5 -----
- arch/arm64/mm/dma-mapping.c          | 5 -----
- include/linux/dma-mapping.h          | 5 ++++-
- 3 files changed, 4 insertions(+), 11 deletions(-)
+Thanks,
 
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index b7847eb8a7bb..0a2d13332545 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -39,11 +39,6 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 			const struct iommu_ops *iommu, bool coherent);
- #define arch_setup_dma_ops	arch_setup_dma_ops
- 
--#ifdef CONFIG_IOMMU_DMA
--void arch_teardown_dma_ops(struct device *dev);
--#define arch_teardown_dma_ops	arch_teardown_dma_ops
--#endif
--
- /* do not use this function in a driver */
- static inline bool is_device_dma_coherent(struct device *dev)
- {
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 072c51fb07d7..cdcb73db9ea2 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -862,11 +862,6 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 		 dev_name(dev));
- }
- 
--void arch_teardown_dma_ops(struct device *dev)
--{
--	dev->dma_ops = NULL;
--}
--
- #else
- 
- static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index 1423b69f3cc9..eafd6f318e78 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -664,7 +664,10 @@ static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base,
- #endif
- 
- #ifndef arch_teardown_dma_ops
--static inline void arch_teardown_dma_ops(struct device *dev) { }
-+static inline void arch_teardown_dma_ops(struct device *dev)
-+{
-+	dev->dma_ops = NULL;
-+}
- #endif
- 
- static inline unsigned int dma_get_max_seg_size(struct device *dev)
--- 
-2.18.0
+This looks fine to me but I will wait to see if there are other reviews
+before applying.
+
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
