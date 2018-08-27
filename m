@@ -1,70 +1,323 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 27 Aug 2018 12:15:30 -0400
-Subject: [RFC PATCH v2 2/3] pstore: Add register read/write{b,w,l,q}
- tracing support
-In-Reply-To: <7b212c02-d7ce-4309-155f-22b36963e41c@codeaurora.org>
-References: <cover.1535119710.git.saiprakash.ranjan@codeaurora.org>
- <65985f8df55b037283746559c1718a54d56e7ec4.1535119711.git.saiprakash.ranjan@codeaurora.org>
- <CAGXu5jL6tGu9U_ANrZSfWREtySqFAJ+CQa3v5YRihZ2oHNMGGw@mail.gmail.com>
- <7b212c02-d7ce-4309-155f-22b36963e41c@codeaurora.org>
-Message-ID: <20180827121530.525299e3@gandalf.local.home>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 27 Aug 2018 18:15:59 +0200
+Subject: [PATCH v2 4/7] drm/i2c: tda998x: convert to bridge driver
+In-Reply-To: <E1fkBFV-00048s-O2@rmk-PC.armlinux.org.uk>
+References: <20180730164137.GD17271@n2100.armlinux.org.uk>
+ <CGME20180731072333epcas3p152812eff8bdb2390ea482a4a20d34438@epcas3p1.samsung.com>
+ <E1fkBFV-00048s-O2@rmk-PC.armlinux.org.uk>
+Message-ID: <20180827161601eucas1p2951c1ce0eeeabbcf9d190d7dca28c91c~OyfFOhdDv1363313633eucas1p2b@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 25 Aug 2018 12:54:07 +0530
-Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org> wrote:
+On 30.07.2018 18:42, Russell King wrote:
+> Convert tda998x to a bridge driver with built-in encoder support for
+> compatibility with existing component drivers.
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  drivers/gpu/drm/i2c/tda998x_drv.c | 154 +++++++++++++++++++-------------------
+>  1 file changed, 79 insertions(+), 75 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+> index 843078e9fbf3..1ea62052f3e0 100644
+> --- a/drivers/gpu/drm/i2c/tda998x_drv.c
+> +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+> @@ -69,6 +69,7 @@ struct tda998x_priv {
+>  	bool edid_delay_active;
+>  
+>  	struct drm_encoder encoder;
+> +	struct drm_bridge bridge;
+>  	struct drm_connector connector;
+>  
+>  	struct tda998x_audio_port audio_port[2];
+> @@ -79,9 +80,10 @@ struct tda998x_priv {
+>  
+>  #define conn_to_tda998x_priv(x) \
+>  	container_of(x, struct tda998x_priv, connector)
+> -
+>  #define enc_to_tda998x_priv(x) \
+>  	container_of(x, struct tda998x_priv, encoder)
+> +#define bridge_to_tda998x_priv(x) \
+> +	container_of(x, struct tda998x_priv, bridge)
+>  
+>  /* The TDA9988 series of devices use a paged register scheme.. to simplify
+>   * things we encode the page # in upper bits of the register #.  To read/
+> @@ -1262,7 +1264,7 @@ tda998x_connector_best_encoder(struct drm_connector *connector)
+>  {
+>  	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
+>  
+> -	return &priv->encoder;
+> +	return priv->bridge.encoder;
+>  }
+>  
+>  static
+> @@ -1292,15 +1294,32 @@ static int tda998x_connector_init(struct tda998x_priv *priv,
+>  	if (ret)
+>  		return ret;
+>  
+> -	drm_mode_connector_attach_encoder(&priv->connector, &priv->encoder);
+> +	drm_mode_connector_attach_encoder(&priv->connector,
+> +					  priv->bridge.encoder);
+>  
+>  	return 0;
+>  }
+>  
+> -/* DRM encoder functions */
+> +/* DRM bridge functions */
+> +
+> +static int tda998x_bridge_attach(struct drm_bridge *bridge)
+> +{
+> +	struct tda998x_priv *priv = bridge_to_tda998x_priv(bridge);
+> +
+> +	return tda998x_connector_init(priv, bridge->dev);
+> +}
+> +
+> +static void tda998x_bridge_detach(struct drm_bridge *bridge)
+> +{
+> +	struct tda998x_priv *priv = bridge_to_tda998x_priv(bridge);
+> +
+> +	drm_connector_cleanup(&priv->connector);
+> +}
+>  
+> -static void tda998x_enable(struct tda998x_priv *priv)
+> +static void tda998x_bridge_enable(struct drm_bridge *bridge)
+>  {
+> +	struct tda998x_priv *priv = bridge_to_tda998x_priv(bridge);
+> +
+>  	if (!priv->is_on) {
+>  		/* enable video ports, audio will be enabled later */
+>  		reg_write(priv, REG_ENA_VP_0, 0xff);
+> @@ -1315,8 +1334,10 @@ static void tda998x_enable(struct tda998x_priv *priv)
+>  	}
+>  }
+>  
+> -static void tda998x_disable(struct tda998x_priv *priv)
+> +static void tda998x_bridge_disable(struct drm_bridge *bridge)
+>  {
+> +	struct tda998x_priv *priv = bridge_to_tda998x_priv(bridge);
+> +
+>  	if (!priv->is_on) {
+>  		/* disable video ports */
+>  		reg_write(priv, REG_ENA_VP_0, 0x00);
+> @@ -1327,29 +1348,11 @@ static void tda998x_disable(struct tda998x_priv *priv)
+>  	}
+>  }
+>  
+> -static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
+> +static void tda998x_bridge_mode_set(struct drm_bridge *bridge,
+> +				    struct drm_display_mode *mode,
+> +				    struct drm_display_mode *adjusted_mode)
+>  {
+> -	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
+> -	bool on;
+> -
+> -	/* we only care about on or off: */
+> -	on = mode == DRM_MODE_DPMS_ON;
+> -
+> -	if (on == priv->is_on)
+> -		return;
+> -
+> -	if (on)
+> -		tda998x_enable(priv);
+> -	else
+> -		tda998x_disable(priv);
+> -}
+> -
+> -static void
+> -tda998x_encoder_mode_set(struct drm_encoder *encoder,
+> -			 struct drm_display_mode *mode,
+> -			 struct drm_display_mode *adjusted_mode)
+> -{
+> -	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
+> +	struct tda998x_priv *priv = bridge_to_tda998x_priv(bridge);
+>  	u16 ref_pix, ref_line, n_pix, n_line;
+>  	u16 hs_pix_s, hs_pix_e;
+>  	u16 vs1_pix_s, vs1_pix_e, vs1_line_s, vs1_line_e;
+> @@ -1556,8 +1559,18 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+>  	mutex_unlock(&priv->audio_mutex);
+>  }
+>  
+> +static const struct drm_bridge_funcs tda998x_bridge_funcs = {
+> +	.attach = tda998x_bridge_attach,
+> +	.detach = tda998x_bridge_detach,
+> +	.disable = tda998x_bridge_disable,
+> +	.mode_set = tda998x_bridge_mode_set,
+> +	.enable = tda998x_bridge_enable,
+> +};
+> +
+>  static void tda998x_destroy(struct tda998x_priv *priv)
+>  {
+> +	drm_bridge_remove(&priv->bridge);
+> +
+>  	/* disable all IRQs and free the IRQ handler */
+>  	cec_write(priv, REG_CEC_RXSHPDINTENA, 0);
+>  	reg_clear(priv, REG_INT_FLAGS_2, INT_FLAGS_2_EDID_BLK_RD);
+> @@ -1650,6 +1663,7 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
+>  	mutex_init(&priv->mutex);	/* protect the page access */
+>  	mutex_init(&priv->audio_mutex); /* protect access from audio thread */
+>  	mutex_init(&priv->edid_mutex);
+> +	INIT_LIST_HEAD(&priv->bridge.list);
 
+This line can be probably removed, unless there is a reason I am not
+aware of.
 
-> Ftrace does not trace __raw{read,write}{b,l,w,q}() functions. I am not 
-> sure why and how it is filtered out because I do not see any notrace 
-> flag in those functions, maybe that whole directory is filtered out.
-> So adding this functionality to ftrace would mean removing the notrace 
-> for these functions i.e., something like using 
-> __raw{read,write}{b,l,w,q}() as the available filter functions. Also 
-> pstore ftrace does not filter functions to trace I suppose?
+>  	init_waitqueue_head(&priv->edid_delay_waitq);
+>  	timer_setup(&priv->edid_delay_timer, tda998x_edid_delay_done, 0);
+>  	INIT_WORK(&priv->detect_work, tda998x_detect_work);
+> @@ -1810,43 +1824,23 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
+>  		tda998x_set_config(priv, client->dev.platform_data);
+>  	}
+>  
+> +	priv->bridge.funcs = &tda998x_bridge_funcs;
+> +	priv->bridge.of_node = dev->of_node;
+> +
+> +	drm_bridge_add(&priv->bridge);
+> +
+>  	return 0;
+>  
+>  fail:
+> -	/* if encoder_init fails, the encoder slave is never registered,
+> -	 * so cleanup here:
+> -	 */
+> -	i2c_unregister_device(priv->cec);
+> -	if (priv->cec_notify)
+> -		cec_notifier_put(priv->cec_notify);
+> -	if (client->irq)
+> -		free_irq(client->irq, priv);
+> +	tda998x_destroy(priv);
+>  err_irq:
+>  	return ret;
+>  }
+>  
+> -static void tda998x_encoder_prepare(struct drm_encoder *encoder)
+> -{
+> -	tda998x_encoder_dpms(encoder, DRM_MODE_DPMS_OFF);
+> -}
+> -
+> -static void tda998x_encoder_commit(struct drm_encoder *encoder)
+> -{
+> -	tda998x_encoder_dpms(encoder, DRM_MODE_DPMS_ON);
+> -}
+> -
+> -static const struct drm_encoder_helper_funcs tda998x_encoder_helper_funcs = {
+> -	.dpms = tda998x_encoder_dpms,
+> -	.prepare = tda998x_encoder_prepare,
+> -	.commit = tda998x_encoder_commit,
+> -	.mode_set = tda998x_encoder_mode_set,
+> -};
+> +/* DRM encoder functions */
+>  
+>  static void tda998x_encoder_destroy(struct drm_encoder *encoder)
+>  {
+> -	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
+> -
+> -	tda998x_destroy(priv);
+>  	drm_encoder_cleanup(encoder);
+>  }
+>  
+> @@ -1854,20 +1848,12 @@ static const struct drm_encoder_funcs tda998x_encoder_funcs = {
+>  	.destroy = tda998x_encoder_destroy,
+>  };
+>  
+> -static int tda998x_bind(struct device *dev, struct device *master, void *data)
+> +static int tda998x_encoder_init(struct device *dev, struct drm_device *drm)
+>  {
+> -	struct i2c_client *client = to_i2c_client(dev);
+> -	struct drm_device *drm = data;
+> -	struct tda998x_priv *priv;
+> +	struct tda998x_priv *priv = dev_get_drvdata(dev);
+>  	u32 crtcs = 0;
+>  	int ret;
+>  
+> -	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> -	if (!priv)
+> -		return -ENOMEM;
+> -
+> -	dev_set_drvdata(dev, priv);
+> -
+>  	if (dev->of_node)
+>  		crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
+>  
+> @@ -1879,35 +1865,53 @@ static int tda998x_bind(struct device *dev, struct device *master, void *data)
+>  
+>  	priv->encoder.possible_crtcs = crtcs;
+>  
+> -	ret = tda998x_create(client, priv);
+> -	if (ret)
+> -		return ret;
+> -
+> -	drm_encoder_helper_add(&priv->encoder, &tda998x_encoder_helper_funcs);
+>  	ret = drm_encoder_init(drm, &priv->encoder, &tda998x_encoder_funcs,
+>  			       DRM_MODE_ENCODER_TMDS, NULL);
+>  	if (ret)
+>  		goto err_encoder;
+>  
+> -	ret = tda998x_connector_init(priv, drm);
+> +	ret = drm_bridge_attach(&priv->encoder, &priv->bridge, NULL);
+>  	if (ret)
+> -		goto err_connector;
+> +		goto err_bridge;
+>  
+>  	return 0;
+>  
+> -err_connector:
+> +err_bridge:
+>  	drm_encoder_cleanup(&priv->encoder);
+>  err_encoder:
+> -	tda998x_destroy(priv);
+>  	return ret;
+>  }
+>  
+> +static int tda998x_bind(struct device *dev, struct device *master, void *data)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct drm_device *drm = data;
+> +	struct tda998x_priv *priv;
+> +	int ret;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	dev_set_drvdata(dev, priv);
+> +
+> +	ret = tda998x_create(client, priv);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = tda998x_encoder_init(dev, drm);
+> +	if (ret) {
+> +		tda998x_destroy(priv);
+> +		return ret;
+> +	}
+> +	return 0;
 
-It's not traced because it is inlined. Simply make the __raw_read
-function a normal function and it will be traced. And then you could
-use ftrace to read the function.
+It could be replaced by:
+??? ret = tda998x_encoder_init(dev, drm);
+??? if (ret)
+??? ??? tda998x_destroy(priv);
+??? return ret;
 
-If this has to be per arch, you can register your callback with the
-REGS flags, and pt_regs will be passed to your callback function you
-attached to __raw_read*() as if you inserted a break point at that
-location, and you can get any reg data you want there.
+but this is probably matter of taste.
 
+Moreover I guess priv->is_on could be removed if enable/disable
+callbacks are called only by drm_core, but this is for another patch.
 
-> 
-> Coming to the reason as to why it would be good to keep this separate 
-> from ftrace would be:
-> * Ftrace can get ip and parent ip, but suppose we need extra data (field 
-> data) as in above sample output we would not be able to get through ftrace.
+With removed initialization of bridge.list:
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
-As mentioned above, you can get regs (and ftrace is being expanded now
-to get parameters of functions).
+?--
+Regards
+Andrzej
 
-> 
-> * Although this patch is for tracing register read/write, we can easily
-> add more functionality since we have dynamic_rtb api which can be hooked 
-> to functions and start tracing events(IRQ, Context ID) something similar 
-> to tracepoints.
-> Initially thought of having tracepoints for logging register read/write 
-> but I do not know if we can export tracepoint data to pstore since the 
-> main usecase is to debug unknown resets and hangs.
-
-I don't know why not? We have read/write tracepoints for
-read/write_msr() calls in x86.
-
-Anything can add a hook to the callback of the tracepoints, and use
-that infrastructure instead of creating yet another dynamic code
-modification infrastructure.
-
-
-> 
-> * This can be something similar to mmiotrace in x86 and kept seperate 
-> from function tracer.
-
-
-mmiotrace is separate because it faults on writes so that we can
-capture any reads and writes to the system that a binary driver does.
-
--- Steve
+> +}
+> +
+>  static void tda998x_unbind(struct device *dev, struct device *master,
+>  			   void *data)
+>  {
+>  	struct tda998x_priv *priv = dev_get_drvdata(dev);
+>  
+> -	drm_connector_cleanup(&priv->connector);
+>  	drm_encoder_cleanup(&priv->encoder);
+>  	tda998x_destroy(priv);
+>  }
