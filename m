@@ -1,25 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 27 Aug 2018 10:00:20 +0200
-Subject: [PATCH] arm64: dts: renesas: r8a774a1: Add GPIO device nodes
-In-Reply-To: <1535033898-23610-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1535033898-23610-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <20180827080019.ry5pbwm24qlmnk7k@verge.net.au>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 27 Aug 2018 16:00:11 +0800
+Subject: [PATCH v2 1/1] ARM: dts: imx6ull: keep IMX6UL_ prefix for
+ signals on both i.MX6UL and i.MX6ULL
+In-Reply-To: <20180822113803.20965-1-sebastien.szymanski@armadeus.com>
+References: <20180822113803.20965-1-sebastien.szymanski@armadeus.com>
+Message-ID: <20180827080008.GL3850@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2018 at 03:18:18PM +0100, Fabrizio Castro wrote:
-> Add GPIO device nodes to the DT of the r8a774a1 SoC.
+On Wed, Aug 22, 2018 at 01:38:03PM +0200, S?bastien Szymanski wrote:
+> Signals available on both i.MX6UL and i.MX6ULL should have the same name
+> because it is the case of all others common signals, it avoids to make
+> mistakes (use the wrong ones) and it makes writing device tree files
+> less complicated. For example:
 > 
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-> ---
+> imx6ul-imx6ull-board.dtsi:
+>  ...
+>  pinctrl_uart5: uart5grp {
+> 	fsl,pins = <
+> 		MX6UL_PAD_UART5_TX_DATA__UART5_DCE_TX   0x1b0b1
+> 	 	MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX   0x1b0b1
+>  	 >;
+>  };
 > 
-> This patch depends on:
-> https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg30549.html
+> imx6ul-board.dts:
+>  #include <imx6ul.dtsi>
+>  #include <imx6ul-imx6ull-board.dtsi>
+>  ...
+> 
+> imx6ull-board.dts:
+>  #include <imx6ull.dtsi>
+>  #include <imx6ul-imx6ull-board.dtsi>
+>  ...
+> 
+> Without this patch, the imx6ull-board.dtb will use
+> MX6UL_PAD_UART5_RX_DATA__UART5_DCE_RX instead of
+> MX6ULL_PAD_UART5_RX_DATA__UART5_DCE_RX and the uart5 will be
+> misconfigured.
+> 
+> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
 
-Thanks,
+Rob and Fabio gave their review/ack tags on v1, so I applied the patch
+with the tags collected.
 
-This looks fine to me but I will wait to see if there are other reviews
-before applying.
-
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+Shawn
