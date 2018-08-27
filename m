@@ -1,76 +1,171 @@
 From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Mon, 27 Aug 2018 09:11:03 -0600
-Subject: [PATCH 0/9] Add interconnect support + bindings for A630 GPU
-Message-ID: <20180827151112.25211-1-jcrouse@codeaurora.org>
+Date: Mon, 27 Aug 2018 09:11:05 -0600
+Subject: [PATCH 2/9] drm/msm/a6xx: Fix PDC register overlap
+In-Reply-To: <20180827151112.25211-1-jcrouse@codeaurora.org>
+References: <20180827151112.25211-1-jcrouse@codeaurora.org>
+Message-ID: <20180827151112.25211-3-jcrouse@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is a first stab at trying to add interconnect support
-for the Adreno 630 GPU in the sdm845 SOC. The most interesting thing
-for discussion is the OPP binding for specifying bandwidth - once that
-is worked out the actual code to implement it is pretty straight forward
-thanks to the hard work from Georgi and the PM lists.
+The current design greedily takes a big chunk of the PDC
+register space instead of just the GPU specific sections
+which conflicts with other drivers and generally makes
+a mess of things.
 
-The first 5 patches are are just a sync / reminder of the still pending
-DT bindings and entries for the GPU itself - the interconnect folks can
-refer to them as a reference to see what the GPU nodes will look like
-but I suspect they are of more interest for the GPU.
+Furthermore we only need to map the GPU PDC sections
+just once during init so map the memory inside the function
+that uses it.
 
-Patch 6 adds a proposed binding to specify the interconnect avg/peak
-BW for a given operating point. On devices that can do aggressive
-frequency scaling like the GPU we want to be able to set a peak
-bandwidth along with the frequency so that we can make sure that
-the bus can handle a faster GPU frequency if we scale up but also
-to reduce power consumption on the bus when we scale down.
+Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+---
+ drivers/gpu/drm/msm/adreno/a6xx_gmu.c | 87 ++++++++++++++++-----------
+ drivers/gpu/drm/msm/adreno/a6xx_gmu.h |  6 --
+ 2 files changed, 51 insertions(+), 42 deletions(-)
 
-The proposed binding uses the form:
-
-opp-interconnect-bw-<name> = <avg peak>
-
-Where 'name' is the corresponding interconnect-name of the interested
-path and 'avg' and 'peak' are the average and peak bandwidth values
-in HZ to program for the operating point. The path name is used to
-identify path specific settings for devices that may have multiple
-active interconnect paths.
-
-The next patch adds a generic OPP API to read the interconnect values
-given a operating point and a name.
-
-The 8th patch adds code support for an interconnect path to the for
-the a6xx GPU reading the bandwidth for the operating point from the
-OPP API.
-
-And the final patch adds the actual interconnect details the
-device tree specifying both the interconnect details as well as
-the bandwidth requirements for each of the operating points on the
-a630 GPU.
-
-Jordan Crouse (9):
-  drm/msm/a6xx: rnndb updates for a6xx
-  drm/msm/a6xx: Fix PDC register overlap
-  drm/msm/a6xx: Rename gmu phandle to qcom,gmu
-  dt-bindings: Document qcom,adreno-gmu
-  arm64: dts: sdm845: Add gpu and gmu device nodes
-  PM / OPP: dt-bindings: Add opp-interconnect-bw
-  OPP: Add dev_pm_opp_get_interconnect_bw()
-  drm/msm/a6xx: Add support for an interconnect path
-  arm64: dts: Add interconnect for the GPU on SDM845
-
- .../devicetree/bindings/display/msm/gmu.txt   |  54 ++
- .../devicetree/bindings/display/msm/gpu.txt   |  10 +-
- Documentation/devicetree/bindings/opp/opp.txt |  36 +
- arch/arm64/boot/dts/qcom/sdm845.dtsi          | 131 ++++
- drivers/gpu/drm/msm/adreno/a6xx.xml.h         | 642 +++++++++++-------
- drivers/gpu/drm/msm/adreno/a6xx_gmu.c         | 114 ++--
- drivers/gpu/drm/msm/adreno/a6xx_gmu.h         |   6 -
- drivers/gpu/drm/msm/adreno/a6xx_gmu.xml.h     |  26 +-
- drivers/gpu/drm/msm/adreno/a6xx_gpu.c         |   2 +-
- drivers/gpu/drm/msm/adreno/adreno_gpu.c       |   7 +
- drivers/gpu/drm/msm/msm_gpu.h                 |   3 +
- drivers/opp/of.c                              |  36 +
- include/linux/pm_opp.h                        |   7 +
- 13 files changed, 775 insertions(+), 299 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/display/msm/gmu.txt
-
+diff --git a/drivers/gpu/drm/msm/adreno/a6xx_gmu.c b/drivers/gpu/drm/msm/adreno/a6xx_gmu.c
+index bbb8126ec5c5..d0dac4c2e3e7 100644
+--- a/drivers/gpu/drm/msm/adreno/a6xx_gmu.c
++++ b/drivers/gpu/drm/msm/adreno/a6xx_gmu.c
+@@ -348,8 +348,23 @@ static void a6xx_rpmh_stop(struct a6xx_gmu *gmu)
+ 	gmu_write(gmu, REG_A6XX_GMU_RSCC_CONTROL_REQ, 0);
+ }
+ 
++static inline void pdc_write(void __iomem *ptr, u32 offset, u32 value)
++{
++	return msm_writel(value, ptr + (offset << 2));
++}
++
++static void __iomem *a6xx_gmu_get_mmio(struct platform_device *pdev,
++		const char *name);
++
+ static void a6xx_gmu_rpmh_init(struct a6xx_gmu *gmu)
+ {
++	struct platform_device *pdev = to_platform_device(gmu->dev);
++	void __iomem *pdcptr = a6xx_gmu_get_mmio(pdev, "gmu_pdc");
++	void __iomem *seqptr = a6xx_gmu_get_mmio(pdev, "gmu_pdc_seq");
++
++	if (!pdcptr || !seqptr)
++		goto err;
++
+ 	/* Disable SDE clock gating */
+ 	gmu_write(gmu, REG_A6XX_GPU_RSCC_RSC_STATUS0_DRV0, BIT(24));
+ 
+@@ -374,44 +389,48 @@ static void a6xx_gmu_rpmh_init(struct a6xx_gmu *gmu)
+ 	gmu_write(gmu, REG_A6XX_RSCC_SEQ_MEM_0_DRV0 + 4, 0x0020e8a8);
+ 
+ 	/* Load PDC sequencer uCode for power up and power down sequence */
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_SEQ_MEM_0, 0xfebea1e1);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_SEQ_MEM_0 + 1, 0xa5a4a3a2);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_SEQ_MEM_0 + 2, 0x8382a6e0);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_SEQ_MEM_0 + 3, 0xbce3e284);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_SEQ_MEM_0 + 4, 0x002081fc);
++	pdc_write(seqptr, REG_A6XX_PDC_GPU_SEQ_MEM_0, 0xfebea1e1);
++	pdc_write(seqptr, REG_A6XX_PDC_GPU_SEQ_MEM_0 + 1, 0xa5a4a3a2);
++	pdc_write(seqptr, REG_A6XX_PDC_GPU_SEQ_MEM_0 + 2, 0x8382a6e0);
++	pdc_write(seqptr, REG_A6XX_PDC_GPU_SEQ_MEM_0 + 3, 0xbce3e284);
++	pdc_write(seqptr, REG_A6XX_PDC_GPU_SEQ_MEM_0 + 4, 0x002081fc);
+ 
+ 	/* Set TCS commands used by PDC sequence for low power modes */
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS1_CMD_ENABLE_BANK, 7);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS1_CMD_WAIT_FOR_CMPL_BANK, 0);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS1_CONTROL, 0);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS1_CMD0_MSGID, 0x10108);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS1_CMD0_ADDR, 0x30010);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS1_CMD0_DATA, 1);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS1_CMD0_MSGID + 4, 0x10108);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS1_CMD0_ADDR + 4, 0x30000);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS1_CMD0_DATA + 4, 0x0);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS1_CMD0_MSGID + 8, 0x10108);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS1_CMD0_ADDR + 8, 0x30080);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS1_CMD0_DATA + 8, 0x0);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS3_CMD_ENABLE_BANK, 7);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS3_CMD_WAIT_FOR_CMPL_BANK, 0);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS3_CONTROL, 0);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS3_CMD0_MSGID, 0x10108);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS3_CMD0_ADDR, 0x30010);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS3_CMD0_DATA, 2);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS3_CMD0_MSGID + 4, 0x10108);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS3_CMD0_ADDR + 4, 0x30000);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS3_CMD0_DATA + 4, 0x3);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS3_CMD0_MSGID + 8, 0x10108);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS3_CMD0_ADDR + 8, 0x30080);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_TCS3_CMD0_DATA + 8, 0x3);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS1_CMD_ENABLE_BANK, 7);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS1_CMD_WAIT_FOR_CMPL_BANK, 0);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS1_CONTROL, 0);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS1_CMD0_MSGID, 0x10108);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS1_CMD0_ADDR, 0x30010);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS1_CMD0_DATA, 1);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS1_CMD0_MSGID + 4, 0x10108);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS1_CMD0_ADDR + 4, 0x30000);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS1_CMD0_DATA + 4, 0x0);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS1_CMD0_MSGID + 8, 0x10108);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS1_CMD0_ADDR + 8, 0x30080);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS1_CMD0_DATA + 8, 0x0);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CMD_ENABLE_BANK, 7);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CMD_WAIT_FOR_CMPL_BANK, 0);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CONTROL, 0);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CMD0_MSGID, 0x10108);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CMD0_ADDR, 0x30010);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CMD0_DATA, 2);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CMD0_MSGID + 4, 0x10108);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CMD0_ADDR + 4, 0x30000);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CMD0_DATA + 4, 0x3);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CMD0_MSGID + 8, 0x10108);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CMD0_ADDR + 8, 0x30080);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_TCS3_CMD0_DATA + 8, 0x3);
+ 
+ 	/* Setup GPU PDC */
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_SEQ_START_ADDR, 0);
+-	pdc_write(gmu, REG_A6XX_PDC_GPU_ENABLE_PDC, 0x80000001);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_SEQ_START_ADDR, 0);
++	pdc_write(pdcptr, REG_A6XX_PDC_GPU_ENABLE_PDC, 0x80000001);
+ 
+ 	/* ensure no writes happen before the uCode is fully written */
+ 	wmb();
++
++err:
++	devm_iounmap(gmu->dev, pdcptr);
++	devm_iounmap(gmu->dev, seqptr);
+ }
+ 
+ /*
+@@ -1170,11 +1189,7 @@ int a6xx_gmu_probe(struct a6xx_gpu *a6xx_gpu, struct device_node *node)
+ 
+ 	/* Map the GMU registers */
+ 	gmu->mmio = a6xx_gmu_get_mmio(pdev, "gmu");
+-
+-	/* Map the GPU power domain controller registers */
+-	gmu->pdc_mmio = a6xx_gmu_get_mmio(pdev, "gmu_pdc");
+-
+-	if (IS_ERR(gmu->mmio) || IS_ERR(gmu->pdc_mmio))
++	if (IS_ERR(gmu->mmio))
+ 		goto err;
+ 
+ 	/* Get the HFI and GMU interrupts */
+diff --git a/drivers/gpu/drm/msm/adreno/a6xx_gmu.h b/drivers/gpu/drm/msm/adreno/a6xx_gmu.h
+index d9a386c18799..09d97e4ed293 100644
+--- a/drivers/gpu/drm/msm/adreno/a6xx_gmu.h
++++ b/drivers/gpu/drm/msm/adreno/a6xx_gmu.h
+@@ -47,7 +47,6 @@ struct a6xx_gmu {
+ 	struct device *dev;
+ 
+ 	void * __iomem mmio;
+-	void * __iomem pdc_mmio;
+ 
+ 	int hfi_irq;
+ 	int gmu_irq;
+@@ -89,11 +88,6 @@ static inline void gmu_write(struct a6xx_gmu *gmu, u32 offset, u32 value)
+ 	return msm_writel(value, gmu->mmio + (offset << 2));
+ }
+ 
+-static inline void pdc_write(struct a6xx_gmu *gmu, u32 offset, u32 value)
+-{
+-	return msm_writel(value, gmu->pdc_mmio + (offset << 2));
+-}
+-
+ static inline void gmu_rmw(struct a6xx_gmu *gmu, u32 reg, u32 mask, u32 or)
+ {
+ 	u32 val = gmu_read(gmu, reg);
 -- 
 2.18.0
