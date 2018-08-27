@@ -1,64 +1,71 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Mon, 27 Aug 2018 09:59:36 +0000
-Subject: [PATCH V5 0/5] soc: imx: add scu firmware api support
-In-Reply-To: <20180827083310.omqa3kpmj542fu3b@pengutronix.de>
-References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
- <AM0PR04MB4211F68CCD399243613F8D7B80320@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <AM0PR04MB4211F748DBD1FE64A2B2136980360@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180827083310.omqa3kpmj542fu3b@pengutronix.de>
-Message-ID: <AM0PR04MB4211E5D66FD8502278765EC8800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Mon, 27 Aug 2018 18:09:59 +0800
+Subject: [PATCH 00/16] Unify MediaTek pinctrl in preparation for MT8183 and
+ MT6765
+Message-ID: <cover.1535363951.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> Sent: Monday, August 27, 2018 4:33 PM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-> Cc: Jassi Brar <jassisinghbrar@gmail.com>; dongas86 at gmail.com;
-> kernel at pengutronix.de; shawnguo at kernel.org; Fabio Estevam
-> <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH V5 0/5] soc: imx: add scu firmware api support
-> 
-> On Fri, Aug 24, 2018 at 07:36:38AM +0000, A.s. Dong wrote:
-> > Hi Jassi & Sasha,
-> >
-> > Do you have some suggestions about this patch series?
-> 
-> I still think that the users like clk and pinctrl should directly call sc_call_rpc(),
-> no need for this shim at all.
-> 
+From: Sean Wang <sean.wang@mediatek.com>
 
-Sorry, I'm a bit confuse.
-What specific shim do you mean not needed?
+Irregular register arrangement and their logic access from various MediaTek
+SoCs being introduced already causes pinctrl-mtk-common to bloat and became
+really hard to maintain so that the patch creates pinctrl-mtk-common-v2 based
+on the core of mt7622 pinctrl to try make the register operations to be simple.
 
-Do you mean we don't need all the SCU SVC APIs (clk/pm/pinctrl/misc and etc)
-Implemented in this patch series and instead directly implement them in client
-driver?
-For example:
-drivers/soc/imx/sc/svc/pm/rpc_clnt.c
-sc_err_t sc_pm_get_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
-                              sc_pm_clk_t clk, sc_pm_clock_rate_t *rate)
-Change to:
-drivers/clk/imx/scu/scu_clock.c ?
-sc_err_t sc_pm_get_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
-                              sc_pm_clk_t clk, sc_pm_clock_rate_t *rate)
+The goals pinctrl-mtk-common-v2 want to achieve are to hopefully support
+all of MediaTek SoCs, and two kinds of dt-bindings being supported,
+Linux generic pinctrl dt-binding which mt762x like to support and MediaTek
+vendor per-pin dt-binding the other SoCs support the MT8183 and MT6765 incline
+to make use of.
 
-Regards
-Dong Aisheng
+The patch starts to refactor MT7622 pinctrl driver first with splitting
+out these portable ways from there such as table-based register operation
+and the other operations in common in the both kinds of driver.
 
-> Sascha
-> 
-> --
-> Pengutronix e.K.                           |
-> |
-> Industrial Linux Solutions                 |
-> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fwww.
-> pengutronix.de%2F&amp;data=02%7C01%7Caisheng.dong%40nxp.com%7C39
-> eeb76a11134dbbf23d08d60bf7b9d1%7C686ea1d3bc2b4c6fa92cd99c5c3016
-> 35%7C0%7C0%7C636709555948361895&amp;sdata=qFfNaPeDvy3IN5O4Ou
-> UUYg3I6360%2FDX6Bg8YAJB11pg%3D&amp;reserved=0  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
-> |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:
-> +49-5121-206917-5555 |
+Sean Wang (16):
+  pinctrl: mediatek: add pinctrl-mtk-common-v2 for all MediaTek pinctrls
+  pinctrl: mediatek: add pinctrl-moore that implements the generic
+    pinctrl dt-bindings
+  pinctrl: mediatek: extend struct mtk_pin_field_calc to
+    pinctrl-mtk-common-v2.c
+  pinctrl: mediatek: extend struct mtk_pin_desc to
+    pinctrl-mtk-common-v2.c
+  pinctrl: mediatek: extend struct mtk_pin_soc to
+    pinctrl-mtk-common-v2.c
+  pinctrl: mediatek: add driving strength related support to
+    pinctrl-mtk-common-v2.c
+  pinctrl: mediatek: add drv register support to pinctrl-mtk-common-v2.c
+  pinctrl: mediatek: add pull related support to pinctrl-mtk-common-v2.c
+  pinctrl: mediatek: add advanced pull related support to
+    pinctrl-mtk-common-v2.c
+  pinctrl: mediatek: add ies register support to pinctrl-mtk-common-v2.c
+  pinctrl: mediatek: add pullen, pullsel register support to
+    pinctrl-mtk-common-v2.c
+  pinctrl: mediatek: add MT7623 pinctrl driver based on generic pinctrl
+    binding
+  pinctrl: mediatek: use pin descriptor all in pinctrl-mtk-common-v2.c
+  pinctrl: mediatek: add multiple register bases support to
+    pinctrl-mtk-common-v2.c
+  pinctrl: mediatek: adjust error code and message when some register
+    not supported is found
+  pinctrl: mediatek: extend struct mtk_pin_desc which per-pin driver
+    depends on
+
+ drivers/pinctrl/mediatek/Kconfig                 |   25 +-
+ drivers/pinctrl/mediatek/Makefile                |    2 +
+ drivers/pinctrl/mediatek/pinctrl-moore.c         |  813 ++++++++++++
+ drivers/pinctrl/mediatek/pinctrl-moore.h         |   57 +
+ drivers/pinctrl/mediatek/pinctrl-mt7622.c        | 1407 ++++-----------------
+ drivers/pinctrl/mediatek/pinctrl-mt7623.c        | 1441 ++++++++++++++++++++++
+ drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c |  510 ++++++++
+ drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h |  281 +++++
+ 8 files changed, 3345 insertions(+), 1191 deletions(-)
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-moore.c
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-moore.h
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt7623.c
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
+ create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
+
+-- 
+2.7.4
