@@ -1,63 +1,25 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 27 Aug 2018 13:03:44 -0700
-Subject: [PATCH 3/3] ARM: dts: NSP: Wire up switch interrupts
-In-Reply-To: <20180827200344.16158-1-f.fainelli@gmail.com>
-References: <20180827200344.16158-1-f.fainelli@gmail.com>
-Message-ID: <20180827200344.16158-4-f.fainelli@gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 27 Aug 2018 22:05:05 +0200
+Subject: [PATCH] ARM: wire up io_pgetevents syscall
+Message-ID: <20180827200505.21991-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Switch Register Access Block (SRAB) has one interrupt for link state
-change on each ports (0-5, 7-8) a PHY interrupt, timestamping interrupt
-and sleep timer interrupts for each management ports (5,7,8). Wire those
-up so we can utilize them to speed up link resolution.
+Wire up the new io_pgetevents syscall for ARM.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/bcm-nsp.dtsi | 31 ++++++++++++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
+ arch/arm/tools/syscall.tbl | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index 09ba85046322..ec869a80f9ba 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -377,7 +377,36 @@
- 
- 		srab: srab at 36000 {
- 			compatible = "brcm,nsp-srab";
--			reg = <0x36000 0x1000>;
-+			reg = <0x36000 0x1000>,
-+			      <0x3f308 0x8>,
-+			      <0x3f410 0xc>;
-+			reg-names = "srab", "mux_config", "sgmii";
-+			interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "link_state_p0",
-+					  "link_state_p1",
-+					  "link_state_p2",
-+					  "link_state_p3",
-+					  "link_state_p4",
-+					  "link_state_p5",
-+					  "link_state_p7",
-+					  "link_state_p8",
-+					  "phy",
-+					  "ts",
-+					  "imp_sleep_timer_p5",
-+					  "imp_sleep_timer_p7",
-+					  "imp_sleep_timer_p8";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 
+diff --git a/arch/arm/tools/syscall.tbl b/arch/arm/tools/syscall.tbl
+index fbc74b5fa3ed..8edf93b4490f 100644
+--- a/arch/arm/tools/syscall.tbl
++++ b/arch/arm/tools/syscall.tbl
+@@ -413,3 +413,4 @@
+ 396	common	pkey_free		sys_pkey_free
+ 397	common	statx			sys_statx
+ 398	common	rseq			sys_rseq
++399	common	io_pgetevents		sys_io_pgetevents
 -- 
-2.17.1
+2.18.0
