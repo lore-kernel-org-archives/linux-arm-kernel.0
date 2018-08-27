@@ -1,22 +1,154 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 27 Aug 2018 10:12:02 +0200
-Subject: [PATCH 1/9] arm64: dts: renesas: r8a774a1: Add SDHI nodes
-In-Reply-To: <1535031788-19907-2-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1535031788-19907-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1535031788-19907-2-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <20180827081202.vgdnbmdkbtkteh63@verge.net.au>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Mon, 27 Aug 2018 16:21:44 +0800
+Subject: [PATCH v5 3/5] iommu/io-pgtable-arm: add support for non-strict
+ mode
+In-Reply-To: <88575452-d370-2488-dd3f-6c3d3ebe150d@arm.com>
+References: <1534296510-12888-1-git-send-email-thunder.leizhen@huawei.com>
+ <1534296510-12888-4-git-send-email-thunder.leizhen@huawei.com>
+ <88575452-d370-2488-dd3f-6c3d3ebe150d@arm.com>
+Message-ID: <5B83B498.1020408@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2018 at 02:43:00PM +0100, Fabrizio Castro wrote:
-> Add SDHI nodes to the DT of the r8a774a1 SoC.
+
+
+On 2018/8/23 1:52, Robin Murphy wrote:
+> On 15/08/18 02:28, Zhen Lei wrote:
+>> To support the non-strict mode, now we only tlbi and sync for the strict
+>> mode. But for the non-leaf case, always follow strict mode.
+>>
+>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> ---
+>>   drivers/iommu/io-pgtable-arm.c | 20 ++++++++++++++------
+>>   drivers/iommu/io-pgtable.h     |  3 +++
+>>   2 files changed, 17 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+>> index 010a254..20d3e98 100644
+>> --- a/drivers/iommu/io-pgtable-arm.c
+>> +++ b/drivers/iommu/io-pgtable-arm.c
+>> @@ -538,6 +538,7 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
+>>       phys_addr_t blk_paddr;
+>>       size_t tablesz = ARM_LPAE_GRANULE(data);
+>>       size_t split_sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
+>> +    size_t unmapped = size;
+>>       int i, unmap_idx = -1;
+>>
+>>       if (WARN_ON(lvl == ARM_LPAE_MAX_LEVELS))
+>> @@ -575,11 +576,16 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
+>>           tablep = iopte_deref(pte, data);
+>>       }
+>>
+>> -    if (unmap_idx < 0)
 > 
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+> [ side note: the more I see this test the more it looks slightly wrong, but that's a separate issue. I'll have to sit down and really remember what's going on here... ]
+> 
+>> -        return __arm_lpae_unmap(data, iova, size, lvl, tablep);
+>> +    if (unmap_idx < 0) {
+>> +        unmapped = __arm_lpae_unmap(data, iova, size, lvl, tablep);
+>> +        if (!(data->iop.cfg.quirks & IO_PGTABLE_QUIRK_NON_STRICT))
+>> +            return unmapped;
+>> +    }
+> 
+> I don't quite get this change - we should only be recursing back into __arm_lpae_unmap() here if nothing's actually been unmapped at this point - the block entry is simply replaced by a full next-level table and we're going to come back and split another block at that next level, or we raced against someone else splitting the same block and that's their table instead. Since that's reverting back to a "regular" unmap, I don't see where the need to introduce an additional flush to that path comes from (relative to the existing behaviour, at least).
 
-Thanks,
+The old block mapping maybe cached in TLBs, it should be invalidated completely before the new next-level mapping to be used. Just ensure that.
 
-This looks fine to me but I will wait to see if there are other reviews
-before applying.
+In fact, I think the code of arm_lpae_split_blk_unmap may has some mistakes. For example:
+	if (size == split_sz)
+		unmap_idx = ARM_LPAE_LVL_IDX(iova, lvl, data);
 
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+It means that "the size" can only be the block/page size of the next-level. Suppose current level is 2M block, but we may unmap 12K, and
+the above "if" will limit us only be able to unmap 4K.
+
+Furthermore, the situation "if (unmap_idx < 0)" should not appear.
+
+Maybe my analysis is wrong, I will try to test it.
+
+
+> 
+>>       io_pgtable_tlb_add_flush(&data->iop, iova, size, size, true);
+> 
+> This is the flush which corresponds to whatever page split_blk_unmap() actually unmapped itself (and also covers any recursively-split intermediate-level entries)...
+> 
+>> -    return size;
+>> +    io_pgtable_tlb_sync(&data->iop);
+> 
+> ...which does want this sync, but only technically for non-strict mode, since it's otherwise covered by the sync in iommu_unmap().
+
+Because split_blk_unmap() is rarely to be called, it has little impact on the overall performance,
+so I ommitted the if statement of non-strict, I will add it back.
+
+> 
+> I'm not *against* tightening up the TLB maintenance here in general, but if so that should be a separately-reasoned patch, not snuck in with other changes.
+
+OK
+
+> 
+> Robin.
+> 
+>> +
+>> +    return unmapped;
+>>   }
+>>
+>>   static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+>> @@ -609,7 +615,7 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
+>>               io_pgtable_tlb_sync(iop);
+>>               ptep = iopte_deref(pte, data);
+>>               __arm_lpae_free_pgtable(data, lvl + 1, ptep);
+>> -        } else {
+>> +        } else if (!(iop->cfg.quirks & IO_PGTABLE_QUIRK_NON_STRICT)) {
+>>               io_pgtable_tlb_add_flush(iop, iova, size, size, true);
+>>           }
+>>
+>> @@ -771,7 +777,8 @@ static void arm_lpae_restrict_pgsizes(struct io_pgtable_cfg *cfg)
+>>       u64 reg;
+>>       struct arm_lpae_io_pgtable *data;
+>>
+>> -    if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA))
+>> +    if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS | IO_PGTABLE_QUIRK_NO_DMA |
+>> +            IO_PGTABLE_QUIRK_NON_STRICT))
+>>           return NULL;
+>>
+>>       data = arm_lpae_alloc_pgtable(cfg);
+>> @@ -863,7 +870,8 @@ static void arm_lpae_restrict_pgsizes(struct io_pgtable_cfg *cfg)
+>>       struct arm_lpae_io_pgtable *data;
+>>
+>>       /* The NS quirk doesn't apply at stage 2 */
+>> -    if (cfg->quirks & ~IO_PGTABLE_QUIRK_NO_DMA)
+>> +    if (cfg->quirks & ~(IO_PGTABLE_QUIRK_NO_DMA |
+>> +        IO_PGTABLE_QUIRK_NON_STRICT))
+>>           return NULL;
+>>
+>>       data = arm_lpae_alloc_pgtable(cfg);
+>> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+>> index 2df7909..beb14a3 100644
+>> --- a/drivers/iommu/io-pgtable.h
+>> +++ b/drivers/iommu/io-pgtable.h
+>> @@ -71,12 +71,15 @@ struct io_pgtable_cfg {
+>>        *    be accessed by a fully cache-coherent IOMMU or CPU (e.g. for a
+>>        *    software-emulated IOMMU), such that pagetable updates need not
+>>        *    be treated as explicit DMA data.
+>> +     * IO_PGTABLE_QUIRK_NON_STRICT: Put off TLBs invalidation and release
+>> +     *    memory first.
+>>        */
+>>       #define IO_PGTABLE_QUIRK_ARM_NS        BIT(0)
+>>       #define IO_PGTABLE_QUIRK_NO_PERMS    BIT(1)
+>>       #define IO_PGTABLE_QUIRK_TLBI_ON_MAP    BIT(2)
+>>       #define IO_PGTABLE_QUIRK_ARM_MTK_4GB    BIT(3)
+>>       #define IO_PGTABLE_QUIRK_NO_DMA        BIT(4)
+>> +    #define IO_PGTABLE_QUIRK_NON_STRICT    BIT(5)
+>>       unsigned long            quirks;
+>>       unsigned long            pgsize_bitmap;
+>>       unsigned int            ias;
+>> -- 
+>> 1.8.3
+>>
+>>
+> 
+> .
+> 
+
+-- 
+Thanks!
+BestRegards
