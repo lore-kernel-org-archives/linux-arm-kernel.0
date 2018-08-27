@@ -1,60 +1,62 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 27 Aug 2018 08:32:21 +0530
-Subject: [RFC PATCH 5/6] arm64: dts: ti: Add Support for AM654 SoC
-In-Reply-To: <20180820143153.GD7523@atomide.com>
-References: <20180605060510.32473-1-nm@ti.com>
- <CAL_JsqJusWTvr4A_-Bk81meYddMHBMJ4=Fch6L0MFoF7HfBW2w@mail.gmail.com>
- <454c277e-8a63-81cb-b341-a50f4e25cbea@ti.com>
- <20180820143153.GD7523@atomide.com>
-Message-ID: <40cecb47-bd32-04aa-b7cd-ff16c1eb28f3@ti.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 27 Aug 2018 03:42:52 +0000
+Subject: [PATCH V4 0/9] clk: add imx7ulp clk support
+In-Reply-To: <5a5950a4-e164-a604-ccb4-ae6d5bbe1708@baylibre.com>
+References: <1531921023-18497-1-git-send-email-aisheng.dong@nxp.com>
+ <AM0PR04MB421169829CFE1A6A32DCC209802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <5a5950a4-e164-a604-ccb4-ae6d5bbe1708@baylibre.com>
+Message-ID: <AM0PR04MB4211EB200D335FCEC382BD0E800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi Alexandre,
 
-On Monday 20 August 2018 08:01 PM, Tony Lindgren wrote:
-> * Kishon Vijay Abraham I <kishon@ti.com> [180808 06:35]:
->> On Tuesday 05 June 2018 07:35 PM, Rob Herring wrote:
->>> Really need 64-bit addresses and sizes? Use ranges to limit the
->>> address space if possible.
->>
->> We now have address-cells as <1>,
->> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/arch/arm64/boot/dts/ti/k3-am65.dtsi#n49
->>
->> However each PCIe instance has 2 data regions and one of the regions
->> (PCIE0_CORE_CORE_DAT_SLV_PCIE_DAT1/PCIE1_CORE_CORE_DAT_SLV_PCIE_DAT1 specified
->> in the "MAIN Domain Memory Map" table of TRM http://www.ti.com/lit/pdf/spruid7)
->> is above the 32bit region and requires 2 cells to specify the start address.
->> This region is used to access MEM_SPACE of PCIe endpoint when operating in root
->> complex mode and access memory of PCI root complex when operating in endpoint mode.
->>
->> In order to describe this, should we change the address-cells back to <2> or do
->> you suggest any other alternatives?
+> -----Original Message-----
+> From: Alexandre Bailon [mailto:abailon at baylibre.com]
+> Sent: Wednesday, August 8, 2018 6:01 PM
+> To: A.s. Dong <aisheng.dong@nxp.com>; linux-clk at vger.kernel.org;
+> sboyd at kernel.org
+> Cc: Jacky Bai <ping.bai@nxp.com>; Anson Huang <anson.huang@nxp.com>;
+> mturquette at baylibre.com; linux-kernel at vger.kernel.org; dl-linux-imx
+> <linux-imx@nxp.com>; shawnguo at kernel.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH V4 0/9] clk: add imx7ulp clk support
 > 
-> It's probably best to have the top level cbass interconnect use
-> #size-cells = <2> and then have it's child interconnects have
-> #size-cells = <1> if they don't need ranges above 4GB.
+> Hi Dong Aisheng,
+> 
+> On 07/26/2018 03:50 AM, A.s. Dong wrote:
+> > Hi Stephen,
+> >
+> > Do you have a chance to look at it?
+> > This patch series has been pending for quite a long time without much
+> comments.
+> I'm not a kernel maintainer but I would not review a series that has checkpatch
+> errors.
+> Please run checkpatch, fix the errors and the warnings, and then resubmit a
+> series.
 
-PCIe has a region starting at 0x40_00000000 and size 4GB. We need 2 address
-cells and 2 size cells to describe this no?
-> 
-> BTW, what's the difference between all these three similar PCIE
-> ranges?
-> 
-> PCIE0_CORE_CORE_DAT_SLV_PCIE_CORE 0x0005500000 0x0005600000 1 MB
-> PCIE1_CORE_CORE_DAT_SLV_PCIE_CORE 0x0005600000 0x0005700000 1 MB
+Yes, I did it. There're some warnings. But unlike errors, normally warnings are judgable.
+For this patch set, all known warnings seems to me not need the fix. 
+E.g. line over 80 or missing maintainer for new files....
 
-This is the register space for the two instances of PCIe controller.
-> 
-> PCIE0_CORE_CORE_DAT_SLV_PCIE_DAT0 0x0010000000 0x0018000000 128 MB
-> PCIE1_CORE_CORE_DAT_SLV_PCIE_DAT0 0x0018000000 0x0020000000 128 MB
-> 
-> PCIE0_CORE_CORE_DAT_SLV_PCIE_DAT1 0x4000000000 0x4100000000 4 GB
-> PCIE1_CORE_CORE_DAT_SLV_PCIE_DAT1 0x4100000000 0x4200000000 4 GB
+BTW there's one special warning I don't see how to fix, seems reported wrongly.
 
-The above are regions which can be used by CPU/DMA to access the PCIe address
-space. The mapping from the above regions to the PCIe address space will be
-programmed in the PCIe controller.
+0005-clk-imx-add-composite-clk-support.patch
+--------------------------------------------
+WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
+#47: 
+new file mode 100644
 
-Thanks
-Kishon
+WARNING: function definition argument 'const char * const' should also have an identifier name
+#145: FILE: drivers/clk/imx/clk.h:74:
++struct clk_hw *imx_clk_composite(const char *name,
+
+total: 0 errors, 2 warnings, 104 lines checked
+
+NOTE: For some of the reported defects, checkpatch may be able to
+      mechanically convert to the typical style using --fix or --fix-inplace.
+
+If you have better suggestions please let me know.
+
+Regards
+Dong Aisheng
