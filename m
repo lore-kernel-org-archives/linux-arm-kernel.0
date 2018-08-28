@@ -1,44 +1,102 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 28 Aug 2018 12:44:05 +0200
-Subject: [PATCH] soc: Convert to using %pOFn instead of device_node.name
-In-Reply-To: <20180828015252.28511-43-robh@kernel.org>
-References: <20180828015252.28511-1-robh@kernel.org>
- <20180828015252.28511-43-robh@kernel.org>
-Message-ID: <20180828104405.GB9386@ulmo>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 28 Aug 2018 13:47:12 +0300
+Subject: [PATCH v6 3/3] mmc: sdhci-of-dwcmshc: solve 128MB DMA boundary
+ limitation
+In-Reply-To: <20180828174814.40dfa48f@xhacker.debian>
+References: <20180828174534.00fb5e24@xhacker.debian>
+ <20180828174814.40dfa48f@xhacker.debian>
+Message-ID: <6f1f9655-7fe4-a25c-c981-5027fa444334@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2018 at 08:52:44PM -0500, Rob Herring wrote:
-> In preparation to remove the node name pointer from struct device_node,
-> convert printf users to use the %pOFn format specifier.
+On 28/08/18 12:48, Jisheng Zhang wrote:
+> When using DMA, if the DMA addr spans 128MB boundary, we have to split
+> the DMA transfer into two so that each one doesn't exceed the boundary.
 > 
-> Cc: Qiang Zhao <qiang.zhao@nxp.com>
-> Cc: Li Yang <leoyang.li@nxp.com>
-> Cc: Andy Gross <andy.gross@linaro.org>
-> Cc: David Brown <david.brown@linaro.org>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Jonathan Hunter <jonathanh@nvidia.com>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-soc at vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  drivers/soc/dove/pmu.c            |  8 +++---
->  drivers/soc/fsl/qe/qe_tdm.c       |  4 +--
->  drivers/soc/qcom/apr.c            |  2 +-
->  drivers/soc/rockchip/pm_domains.c | 44 +++++++++++++++----------------
->  drivers/soc/tegra/pmc.c           | 12 ++++-----
->  drivers/soc/ti/knav_dma.c         |  8 +++---
->  drivers/soc/ti/knav_qmss_queue.c  |  8 +++---
->  7 files changed, 43 insertions(+), 43 deletions(-)
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180828/f505a4a7/attachment.sig>
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
+> ---
+>  drivers/mmc/host/sdhci-of-dwcmshc.c | 39 +++++++++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/sdhci-of-dwcmshc.c b/drivers/mmc/host/sdhci-of-dwcmshc.c
+> index 1b7cd144fb01..a5137845a1c7 100644
+> --- a/drivers/mmc/host/sdhci-of-dwcmshc.c
+> +++ b/drivers/mmc/host/sdhci-of-dwcmshc.c
+> @@ -8,21 +8,51 @@
+>   */
+>  
+>  #include <linux/clk.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/sizes.h>
+>  
+>  #include "sdhci-pltfm.h"
+>  
+> +#define BOUNDARY_OK(addr, len) \
+> +	((addr | (SZ_128M - 1)) == ((addr + len - 1) | (SZ_128M - 1)))
+> +
+>  struct dwcmshc_priv {
+>  	struct clk	*bus_clk;
+>  };
+>  
+> +/*
+> + * If DMA addr spans 128MB boundary, we split the DMA transfer into two
+> + * so that each DMA transfer doesn't exceed the boundary.
+> + */
+> +static void dwcmshc_adma_write_desc(struct sdhci_host *host, void **desc,
+> +				    dma_addr_t addr, int len, unsigned int cmd)
+> +{
+> +	int tmplen, offset;
+> +
+> +	if (likely(!len || BOUNDARY_OK(addr, len))) {
+> +		sdhci_adma_write_desc(host, desc, addr, len, cmd);
+> +		return;
+> +	}
+> +
+> +	offset = addr & (SZ_128M - 1);
+> +	tmplen = SZ_128M - offset;
+> +	sdhci_adma_write_desc(host, desc, addr, tmplen, cmd);
+> +
+> +	addr += tmplen;
+> +	len -= tmplen;
+> +	sdhci_adma_write_desc(host, desc, addr, len, cmd);
+> +}
+> +
+>  static const struct sdhci_ops sdhci_dwcmshc_ops = {
+>  	.set_clock		= sdhci_set_clock,
+>  	.set_bus_width		= sdhci_set_bus_width,
+>  	.set_uhs_signaling	= sdhci_set_uhs_signaling,
+>  	.get_max_clock		= sdhci_pltfm_clk_get_max_clock,
+>  	.reset			= sdhci_reset,
+> +	.adma_write_desc	= dwcmshc_adma_write_desc,
+>  };
+>  
+>  static const struct sdhci_pltfm_data sdhci_dwcmshc_pdata = {
+> @@ -36,12 +66,21 @@ static int dwcmshc_probe(struct platform_device *pdev)
+>  	struct sdhci_host *host;
+>  	struct dwcmshc_priv *priv;
+>  	int err;
+> +	u32 extra;
+>  
+>  	host = sdhci_pltfm_init(pdev, &sdhci_dwcmshc_pdata,
+>  				sizeof(struct dwcmshc_priv));
+>  	if (IS_ERR(host))
+>  		return PTR_ERR(host);
+>  
+> +	/*
+> +	 * extra adma table cnt for cross 128M boundary handling.
+> +	 */
+> +	extra = DIV_ROUND_UP_ULL(dma_get_required_mask(&pdev->dev), SZ_128M);
+> +	if (extra > SDHCI_MAX_SEGS)
+> +		extra = SDHCI_MAX_SEGS;
+> +	host->adma_table_cnt += extra;
+> +
+>  	pltfm_host = sdhci_priv(host);
+>  	priv = sdhci_pltfm_priv(pltfm_host);
+>  
+> 
