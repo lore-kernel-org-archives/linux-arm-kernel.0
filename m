@@ -1,160 +1,181 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 28 Aug 2018 18:11:55 +0100
-Subject: [RFC PATCH] EDAC, ghes: Enable per-layer error reporting for ARM
-In-Reply-To: <CABo9ajAvo-bskhrM8h95Y9D4U88zFUZfVW_HTMLK3o_5Q1VSUw@mail.gmail.com>
-References: <1531762009-15112-1-git-send-email-tbaicar@codeaurora.org>
- <20180719140102.GB25185@nazgul.tnic>
- <94e3a0fb-9b7d-045f-733b-9f063dcb39e4@arm.com>
- <45fefe7d-c6ea-5791-4477-13ecce39ce48@codeaurora.org>
- <b568fdcc-ca39-67ea-2799-8ed246c8ffb6@arm.com>
- <CABo9ajA7SPrVE-oiG=RicH+nL9_pp7fVATCdMugY5fuNAPzHaQ@mail.gmail.com>
- <68a800c7-446e-9b6b-1847-6e45a1d17262@arm.com>
- <CABo9ajAvo-bskhrM8h95Y9D4U88zFUZfVW_HTMLK3o_5Q1VSUw@mail.gmail.com>
-Message-ID: <bcb1b461-76ee-7d9b-2b35-d575ec608027@arm.com>
+From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
+Date: Tue, 28 Aug 2018 22:56:56 +0530
+Subject: [RFC PATCH v2 2/3] pstore: Add register read/write{b,w,l,q}
+ tracing support
+In-Reply-To: <20180828120224.381d406a@gandalf.local.home>
+References: <cover.1535119710.git.saiprakash.ranjan@codeaurora.org>
+ <65985f8df55b037283746559c1718a54d56e7ec4.1535119711.git.saiprakash.ranjan@codeaurora.org>
+ <CAGXu5jL6tGu9U_ANrZSfWREtySqFAJ+CQa3v5YRihZ2oHNMGGw@mail.gmail.com>
+ <7b212c02-d7ce-4309-155f-22b36963e41c@codeaurora.org>
+ <20180827121530.525299e3@gandalf.local.home>
+ <369f384b-c419-99d8-c0a4-3ed38f1dd0f4@codeaurora.org>
+ <20180828120224.381d406a@gandalf.local.home>
+Message-ID: <e5f541ff-21f9-639f-5619-1c6df6db873d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
-
-On 24/08/18 16:14, Tyler Baicar wrote:
-> On Fri, Aug 24, 2018 at 5:48 AM, James Morse <james.morse@arm.com> wrote:
->> On 23/08/18 16:46, Tyler Baicar wrote:
->>> On Thu, Aug 23, 2018 at 5:29 AM James Morse <james.morse@arm.com> wrote:
->>>> On 19/07/18 19:36, Tyler Baicar wrote:
->>>>> This seems pretty hacky to me, so if anyone has other suggestions please share
->>>>> them.
->>>>
->>>> CPER's "Memory Error Record 2" thinks that "NODE, CARD and MODULE should provide
->>>> the information necessary to identify the failing FRU". As EDAC has three
->>>> 'levels', these are what they should correspond to for ghes-edac.
->>>>
->>>> I assume NODE means rack/chassis in some distributed system. Lets ignore it as
->>>> it doesn't seem to map to anything in the SMBIOS table.
+On 8/28/2018 9:32 PM, Steven Rostedt wrote:
+> On Tue, 28 Aug 2018 18:47:33 +0530
+> Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org> wrote:
+> 
+>> On 8/27/2018 9:45 PM, Steven Rostedt wrote:
+>>> On Sat, 25 Aug 2018 12:54:07 +0530
+>>> Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org> wrote:
 >>>
->>> I believe NODE should map to socket number for multi-socket systems.
+>>>    
+>>>> Ftrace does not trace __raw{read,write}{b,l,w,q}() functions. I am not
+>>>> sure why and how it is filtered out because I do not see any notrace
+>>>> flag in those functions, maybe that whole directory is filtered out.
+>>>> So adding this functionality to ftrace would mean removing the notrace
+>>>> for these functions i.e., something like using
+>>>> __raw{read,write}{b,l,w,q}() as the available filter functions. Also
+>>>> pstore ftrace does not filter functions to trace I suppose?
+>>>
+>>> It's not traced because it is inlined. Simply make the __raw_read
+>>> function a normal function and it will be traced. And then you could
+>>> use ftrace to read the function.
+>>>
+>>> If this has to be per arch, you can register your callback with the
+>>> REGS flags, and pt_regs will be passed to your callback function you
+>>> attached to __raw_read*() as if you inserted a break point at that
+>>> location, and you can get any reg data you want there.
+>>>
+>>>   
 >>
->> Isn't the Memory Array Structure still unique in a multi-socket system? If so
->> the node isn't telling us anything new.
-
-> Yes, the Memory Array structure in SMBIOS is still unique, but the NODE value
-> is needed in NODE, CARD, MODULE because the CARD number here typically
-> maps to channel number which each socket has their own channel numbers.
-
-/me flinches at 'typically'.
-
-Okay, so the hierarchy applies to the numbers, not the handles.
-How come there isn't a node handle?
-
-I think we should ignore the extra hierarchy. The module/devices/dimms are the
-only replaceable part, and we don't know if the firmware will provide the
-information.
-
-
->> Do sockets show up in the SMBIOS table? We would need to know how many there are
->> in advance. For arm systems the cpu topology from PPTT is the best bet for this
->> information, but what do we do if that table is missing? (also, does firmware
->> count from 1 or 0?) I suspect we can't use this field unless we know what the
->> range of values is going to be in advance.
+>> Thank you very much for the information Steven. Ok so we can get
+>> function parameters with pt_regs.
 > 
-> An Fan mentioned in his response, what the customers really care about
-> is mapping to
-> a particular DIMM since that is what they can replace. To do this, the
-> Memory Device
-> handle should be enough since those are all unique regardless of
-> Memory Array handle
-> and which socket the DIMM is on. The Firmware I've worked with counts
-> from 0, but I'm
-> not sure if that is required.
-
-If the spec doesn't say, its difficult to know the range of values until we've
-seen one of the limits.
-
-
-> That won't matter if we just use the Memory Device handle.
-
-I agree.
-
-
->>> I think the proper way to get this working would be to use these handles. We can
->>> avoid populating this layer information and instead have a mapping of type 17
->>> index number (how edac is numbering the DIMMs today) to the handle number.
+> Yes.
+> 
 >>
->> Why get avoid the layer stuff? Isn't counting DIMM/memory-devices what
->> EDAC_MC_LAYER_SLOT is for?
+>>>>
+>>>> Coming to the reason as to why it would be good to keep this separate
+>>>> from ftrace would be:
+>>>> * Ftrace can get ip and parent ip, but suppose we need extra data (field
+>>>> data) as in above sample output we would not be able to get through ftrace.
+>>>
+>>> As mentioned above, you can get regs (and ftrace is being expanded now
+>>> to get parameters of functions).
+>>>    
+>> You mean there is another way to get parameters other than regs?
 > 
-> The problem with the layer reporting is that you need to know all the
-> layer information as Fan mentioned.
-
-I haven't spotted what requires this, there seems to be a bit of a mix of
-numbers-of-layers and what order they go in. thunderx_edac.c just uses SLOT.
-I think we can get away with using EDAC_MC_LAYER_ALL_MEM, sized by num_dimms
-(which ghes-edac already does).
-
-Providing extra topology may not be useful unless the firmware populates this
-information. What do we do if we export card+module, but then firmware only
-populates the module-handle?
-
-
-> SoCs can support multiple board combinations (ie
-> 1DPC vs. 2DPC)
-> and there is no standardized way of knowing whether you are booted on a 1DPC or
-> 2DPC board.
+> No, but you could register a callback function to be called when a
+> function is hit, and the pt_regs are passed to it. We are working on
+> getting parameters from the pt_regs (see this patch:
+>   http://lkml.kernel.org/r/152465885737.26224.2822487520472783854.stgit at devbox)
 > 
->>> Then we will need a new function to increment the counter based on the handle
->>> number rather than this layer information. Is that how you are envisioning it?
+Cool, thanks for the link.
 >>
->> I'm not familiar with edac's internals, so I didn't have any particular vision!
+>>>>
+>>>> * Although this patch is for tracing register read/write, we can easily
+>>>> add more functionality since we have dynamic_rtb api which can be hooked
+>>>> to functions and start tracing events(IRQ, Context ID) something similar
+>>>> to tracepoints.
+>>>> Initially thought of having tracepoints for logging register read/write
+>>>> but I do not know if we can export tracepoint data to pstore since the
+>>>> main usecase is to debug unknown resets and hangs.
+>>>
+>>> I don't know why not? We have read/write tracepoints for
+>>> read/write_msr() calls in x86.
+>>>
+>>> Anything can add a hook to the callback of the tracepoints, and use
+>>> that infrastructure instead of creating yet another dynamic code
+>>> modification infrastructure.
+>>>    
+>> Thanks for pointing out to read/write_msr, I checked it and was able to
+>> implement something similar for arm64. But still can we export
+>> tracepoint data to pstore because we need to debug reset cases and for
+>> that pstore is of real importance?. If so then it would be great to have
+>> various events logged into pstore which can be a lot of help for debugging.
 >>
->> Isn't the problem that ghes_edac_report_mem_error() does this:
->> |       e->top_layer = -1;
->> |       e->mid_layer = -1;
->> |       e->low_layer = -1;
+>> Also with the current dynamic filtering of read/write(PATCH 3/3), it is
+>> a lot easier to filter register read/write since we use dynamic debug
+>> framework which provides file, function and line level filtering
+>> capacity. Maybe if we can add something like this to trace events it
+>> would be better?
 > 
-> The other problem is that the sysfs nodes are all setup with a single
-> layer representing
-> all of the memory on the board.
+> I would recommend using the tracepoint infrastructure. Note,
+> tracepoints and trace events are two different things. Trace events use
+> tracepoints, and you use trace events to create tracepoints, thus they
+> are tightly coupled. But once a tracepoint exists, anything can connect
+> to them without needing to use the trace event.
 > 
-> https://elixir.bootlin.com/linux/latest/source/drivers/edac/ghes_edac.c#L469
+> Let's look at the read_msr trace event. Because it is in a header, to
+> avoid "include hell" we open code some of it:
 > 
-> So the DIMM counters exposed in sysfs are all under a single memory
-> controller and just
-> numbered from 0 to n-1 based on the order in which the type 17 SMBIOS
-> entries show up
-> in the DMI walk.
-
-User-space depending on the dmi walk order makes me nervous. Doing this gives
-you per-dimm counters, if user-space needs to know which physical-dimm/slot that
-is, we'd need a way of matching it with one of the smbios location strings.
-
-
->> so edac_raw_mc_handle_error() has no clue where the error happened. (I haven't
->> read what it does with this information yet).
->>
->> ghes_edac_report_mem_error() does check CPER_MEM_VALID_MODULE_HANDLE, and if its
->> set, it uses the handle to find the bank/device strings and prints them out.
+> static inline unsigned long long native_read_msr(unsigned int msr)
+> {
+> 	unsigned long long val;
 > 
-> Yes, I think this is where we need to add support to increment the
-> count based on that module handle.
-
-If layer[0] is EDAC_MC_LAYER_ALL_MEM, sized for num_dimm, don't we just put the
-dimm number in e->top_layer and flip e->enable_per_layer_report?
-
-
->> Naively I thought we could generate some index during ghes_edac_count_dimms(),
->> and use this as e->${whichever}_layer. I hoped there would be something we could
->> already use as the index, but I can't spot it, so this will be more than the
->> one-liner I was hoping for!
+> 	val = __rdmsr(msr);
 > 
-> We could use what ghes_edac_register does by setting up a single layer
-> with all memory and
-> then keep a map of which module handle maps to which index into that
-> layer. From that it would
-> be easy to increment the proper sysfs exposed DIMM counters using the
-> single layer
+> 	if (msr_tracepoint_active(__tracepoint_read_msr))
+> 		do_trace_read_msr(msr, val, 0);
+> 
+> 	return val;
+> }
+> 
+> Where:
+> 
+> #ifdef CONFIG_TRACEPOINTS
+> #define msr_tracepoint_active(t) static_key_false(&(t).key)
+> #else
+> #define msr_tracepoint_active(t) false
+> #endif
+> 
+> We have to open code the access to the tracepoint.key because msr.h is
+> used in a lot of critical headers, we couldn't use the normal
+> tracepoint.h header here.
+> 
+> The "static_key_false()" is a jump label that is just a nop. When the
+> static_key is enabled, the nop is converted to a static "jmp" to the
+> code that calls "do_trace_read_msr()". This is a function call to a
+> function defined in msr.c (where we can do proper includes), and all
+> that does is call the tracepoint "trace_read_msr()", which is also a
+> static key that, when enabled, will iterate over a list of functions it
+> should call with the defined parameters (msr, val, failed).
+> 
+> When defining the trace event for "read_msr", it creates the tracepoint
+> "trace_read_msr()" and we place it in this do_trace_read_msr()
+> function. The TRACE_EVENT() macros creates everything that is needed to
+> connect the trace event "read_msr" to the tracepoint
+> "trace_read_msr()", and you can enable this via the tracefs subsystem
+> or via perf.
+> 
+> But you can also add your own hook to that tracepoint. If you have code
+> that does:
+> 
+> register_trace_read_msr(func, data);
+> 
+> The "func" gets called when trace_read_msr() is hit. Thus you could
+> have:
+> 
+> static void my_func(void *data, unsigned msr, u64 val, int failed)
+> {
+> 	struct my_struct *my_data = data;
+> 
+> 	do_something_with(my_data, msr, val, failed);
+> }
+> 
+> {
+> 	struct my_struct *my_data;
+> 
+> 	my_data = kzalloc(sizeof(*my_data)), GFP_KERNEL);
+> 
+> 	register_trace_read_msr(my_func, my_data);
+> }
+> 
+> 
+> And then your function "my_func" will be called with any data you
+> registered with it (you may register "NULL" if you don't need to pass
+> in data), and it will also get the parameters passed to trace_read_msr()
+> 
+> If you want to have you "my_func" record into pstore, then it will
+> happen at runtime, and if the system resets, you have your data where
+> you want it.
+> 
 
-Yes, I think this is what we should do!
+Wow, thank you so much for the detailed explanation, it helps a lot. I 
+will try to use this and post next version soon.
 
-
-Thanks,
-
-James
+- Sai Prakash
