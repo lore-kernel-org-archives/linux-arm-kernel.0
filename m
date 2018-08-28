@@ -1,47 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 27 Aug 2018 19:37:22 -0700
-Subject: 4.19-rc1 on droid 4: screen not updating
-In-Reply-To: <20180827105121.GA8283@amd>
-References: <20180827105121.GA8283@amd>
-Message-ID: <20180828023722.GK7523@atomide.com>
+From: jian.hu@amlogic.com (Jian Hu)
+Date: Tue, 28 Aug 2018 11:35:32 +0800
+Subject: [PATCH 2/2] clk: meson-g12a: Add AO Clock controller driver
+In-Reply-To: <89b058a7bba26058fab95dea01155221dbb642ce.camel@baylibre.com>
+References: <1533894868-85815-1-git-send-email-jian.hu@amlogic.com>
+ <1533894868-85815-3-git-send-email-jian.hu@amlogic.com>
+ <6c855dc62fe6ed1a01216bd708d401a280f8762c.camel@baylibre.com>
+ <fff1f982-c9f3-8aa4-b108-6c0998827e79@amlogic.com>
+ <89b058a7bba26058fab95dea01155221dbb642ce.camel@baylibre.com>
+Message-ID: <977d8010-6d82-5eac-5da5-6dbe0f73971a@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [180827 10:55]:
-> Hi!
+Hi: Jerome
+
+On 2018/8/27 21:07, Jerome Brunet wrote:
+> On Fri, 2018-08-24 at 21:34 +0800, Jian Hu wrote:
+>>>
+>>
+>> I am confued about aoclk81's parent clocks.
+>>
+>> I can not get the example of axg audio clock driver, Could you provide
+>> the link? Had it merged into clk-meson.git?
 > 
-> With Sebastian's patches, display works on Droid 4 in v4.18.
-
-Hmm care to post your v4.18 patches somewhere too for people?
-I'd have to look around for them since I've been using Linux
-next for past few months.
-
-Also, do you have v4.19-rc1 versions of your pending audio
-patches somewhere? I'd like to play with voice calls again
-now with my WIP pending n_gsm serdev patches..
-
-> I had to do some manual merging, and I see kernel messages in
-> v4.19-rc1, but they are frozen -- no updates.
+> Yes and mainline as well : drivers/clk/meson/axg-audio.c
 > 
-> a) does someone have it working?
+> Basically this driver is creating bypass input clocks (audio_pclk, mst_in[0-9],
+> etc...) .
+> 
+> This allows to collect input clocks from DT (like any consumer should) will
+> keeping constant in the controller clock tree.
+> 
+>>From what I've seen of your controller drivers, the EE controller should have
+> one input, the AO should have 3.
+> 
+> 
+> 
+> .
+> 
+I still can not get the example meaning in axg audio driver.
 
-I have had it working for few weeks since I'm following
-Linux next. I just pushed Sebastian's patches I rebased
-earlier today against v4.19-rc1 to [0][1].
+In 26 page of A113D_Datasheet V0.7 20170725-Baylibre.pdf,We can see the 
+aoclk81 has two parents. clk81 and ao_slow_clk. I can not get 3 parents.
 
-> b) is there some way I can help to get it working in mainline? Droid 4
-> is not exactly new, and this is painful point that makes it hard to
-> use.
+                          clk81|\
+                        -------| \        aoclk81
+src0 |\                       |  |-------------------
+-----| \     ao_slow_clk      |  |
+      |  |---------------------| /
+-----| /                      |/
+  src1|/
 
-Well since Sebastian is busy according to [2], maybe try to update
-Sebastian's mfd-ti-lmu backlight patches so they can get merged?
-Please check with Sebastian, but that would cut down the pending
-pile by quite a few patches.
 
-Regards,
+src0 is from xtal, if can generate 32k clock, but it is never used.
+src1 is from gpio clock, It is never used. If necessary? the ao_slow_clk 
+maybe described.
 
-Tony
-
-[0] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap droid4-pending-v4.19
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git/log/?h=droid4-pending-v4.19
-[2] https://lists.freedesktop.org/archives/dri-devel/2018-August/186226.html
+So why aoclk81 has 3 parents?
