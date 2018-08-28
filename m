@@ -1,52 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Aug 2018 18:02:58 +0100
-Subject: [PATCH] perf: Convert to using %pOFn instead of device_node.name
-In-Reply-To: <20180828015252.28511-38-robh@kernel.org>
-References: <20180828015252.28511-1-robh@kernel.org>
- <20180828015252.28511-38-robh@kernel.org>
-Message-ID: <20180828170258.GD19825@arm.com>
+From: texier.pj2@gmail.com (Pierre-Jean Texier)
+Date: Tue, 28 Aug 2018 19:06:37 +0200
+Subject: [PATCH] ARM: dts: imx7s-warp: use SPDX-License-Identifier
+Message-ID: <1535475997-21027-1-git-send-email-texier.pj2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2018 at 08:52:39PM -0500, Rob Herring wrote:
-> In preparation to remove the node name pointer from struct device_node,
-> convert printf users to use the %pOFn format specifier.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  drivers/perf/arm_pmu_platform.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+Adopt the SPDX license identifier headers to ease
+license compliance management.
 
-Cheers, I can queue this up for 4.20. Let me know if you'd rather take it
-along with the name pointer removal instead.
+Signed-off-by: Pierre-Jean Texier <texier.pj2@gmail.com>
+---
+ arch/arm/boot/dts/imx7s-warp.dts | 39 +--------------------------------------
+ 1 file changed, 1 insertion(+), 38 deletions(-)
 
-Will
-
-> diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
-> index 96075cecb0ae..933bd8410fc2 100644
-> --- a/drivers/perf/arm_pmu_platform.c
-> +++ b/drivers/perf/arm_pmu_platform.c
-> @@ -77,14 +77,14 @@ static int pmu_parse_irq_affinity(struct device_node *node, int i)
->  
->  	dn = of_parse_phandle(node, "interrupt-affinity", i);
->  	if (!dn) {
-> -		pr_warn("failed to parse interrupt-affinity[%d] for %s\n",
-> -			i, node->name);
-> +		pr_warn("failed to parse interrupt-affinity[%d] for %pOFn\n",
-> +			i, node);
->  		return -EINVAL;
->  	}
->  
->  	cpu = of_cpu_node_to_id(dn);
->  	if (cpu < 0) {
-> -		pr_warn("failed to find logical CPU for %s\n", dn->name);
-> +		pr_warn("failed to find logical CPU for %pOFn\n", dn);
->  		cpu = nr_cpu_ids;
->  	}
->  
-> -- 
-> 2.17.1
-> 
+diff --git a/arch/arm/boot/dts/imx7s-warp.dts b/arch/arm/boot/dts/imx7s-warp.dts
+index fa390da..bf33c74 100644
+--- a/arch/arm/boot/dts/imx7s-warp.dts
++++ b/arch/arm/boot/dts/imx7s-warp.dts
+@@ -1,44 +1,7 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+  * Copyright (C) 2016 NXP Semiconductors.
+  * Author: Fabio Estevam <fabio.estevam@nxp.com>
+- *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
+ /dts-v1/;
+-- 
+2.7.4
