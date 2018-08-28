@@ -1,69 +1,105 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Tue, 28 Aug 2018 09:34:23 +0200
-Subject: [PATCH v8 7/8] ARM: dts: sun8i-a33: Add Video Engine and reserved
- memory nodes
-In-Reply-To: <20180828073424.30247-1-paul.kocialkowski@bootlin.com>
-References: <20180828073424.30247-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180828073424.30247-8-paul.kocialkowski@bootlin.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 28 Aug 2018 10:51:02 +0300
+Subject: [PATCH v5 3/3] mmc: sdhci-of-dwcmshc: solve 128MB DMA boundary
+ limitation
+In-Reply-To: <20180827162419.61afe238@xhacker.debian>
+References: <20180827162026.3901de27@xhacker.debian>
+ <20180827162419.61afe238@xhacker.debian>
+Message-ID: <9739a083-cb2f-1cba-19c1-1c4e0d03eedd@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds nodes for the Video Engine and the associated reserved memory
-for the A33. Up to 96 MiB of memory are dedicated to the CMA pool.
+On 27/08/18 11:24, Jisheng Zhang wrote:
+> When using DMA, if the DMA addr spans 128MB boundary, we have to split
+> the DMA transfer into two so that each one doesn't exceed the boundary.
+> 
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> ---
+>  drivers/mmc/host/sdhci-of-dwcmshc.c | 41 +++++++++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/sdhci-of-dwcmshc.c b/drivers/mmc/host/sdhci-of-dwcmshc.c
+> index 1b7cd144fb01..cfbdae8703a1 100644
+> --- a/drivers/mmc/host/sdhci-of-dwcmshc.c
+> +++ b/drivers/mmc/host/sdhci-of-dwcmshc.c
+> @@ -8,21 +8,50 @@
+>   */
+>  
+>  #include <linux/clk.h>
+> +#include <linux/mm.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/sizes.h>
+>  
+>  #include "sdhci-pltfm.h"
+>  
+> +#define BOUNDARY_OK(addr, len) \
+> +	((addr | (SZ_128M - 1)) == ((addr + len - 1) | (SZ_128M - 1)))
+> +
+>  struct dwcmshc_priv {
+>  	struct clk	*bus_clk;
+>  };
+>  
+> +/*
+> + * If DMA addr spans 128MB boundary, we split the DMA transfer into two
+> + * so that each DMA transfer doesn't exceed the boundary.
+> + */
+> +static void dwcmshc_adma_write_desc(struct sdhci_host *host, void **desc,
+> +				    dma_addr_t addr, int len, unsigned int cmd)
+> +{
+> +	int tmplen, offset;
+> +
+> +	if (likely(!len || BOUNDARY_OK(addr, len))) {
+> +		sdhci_adma_write_desc(host, desc, addr, len, cmd);
+> +		return;
+> +	}
+> +
+> +	offset = addr & (SZ_128M - 1);
+> +	tmplen = SZ_128M - offset;
+> +	sdhci_adma_write_desc(host, desc, addr, tmplen, cmd);
+> +
+> +	addr += tmplen;
+> +	len -= tmplen;
+> +	sdhci_adma_write_desc(host, desc, addr, len, cmd);
+> +}
+> +
+>  static const struct sdhci_ops sdhci_dwcmshc_ops = {
+>  	.set_clock		= sdhci_set_clock,
+>  	.set_bus_width		= sdhci_set_bus_width,
+>  	.set_uhs_signaling	= sdhci_set_uhs_signaling,
+>  	.get_max_clock		= sdhci_pltfm_clk_get_max_clock,
+>  	.reset			= sdhci_reset,
+> +	.adma_write_desc	= dwcmshc_adma_write_desc,
+>  };
+>  
+>  static const struct sdhci_pltfm_data sdhci_dwcmshc_pdata = {
+> @@ -36,12 +65,24 @@ static int dwcmshc_probe(struct platform_device *pdev)
+>  	struct sdhci_host *host;
+>  	struct dwcmshc_priv *priv;
+>  	int err;
+> +	u32 extra;
+>  
+>  	host = sdhci_pltfm_init(pdev, &sdhci_dwcmshc_pdata,
+>  				sizeof(struct dwcmshc_priv));
+>  	if (IS_ERR(host))
+>  		return PTR_ERR(host);
+>  
+> +	/*
+> +	 * The DMA table descriptor count is calculated as the maximum
+> +	 * number of segments times 2, to allow for an alignment
+> +	 * descriptor for each segment, plus 1 for a nop end descriptor,
+> +	 * plus extra number for cross 128M boundary handling.
+> +	 */
+> +	extra = DIV_ROUND_UP(totalram_pages, SZ_128M / PAGE_SIZE);
 
-The VPU can only map the first 256 MiB of DRAM, so the reserved memory
-pool has to be located in that area. Following Allwinner's decision in
-downstream software, the last 96 MiB of the first 256 MiB of RAM are
-reserved for this purpose.
+The amount of RAM is not necessarily the same as the highest physical
+address.  I think what you really want is max_pfn or max_possible_pfn
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
----
- arch/arm/boot/dts/sun8i-a33.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index 8d278ee001e9..a212fbee14bc 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -181,6 +181,21 @@
- 		reg = <0x40000000 0x80000000>;
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		/* Address must be kept in the lower 256 MiBs of DRAM for VE. */
-+		cma_pool: cma at 4a000000 {
-+			compatible = "shared-dma-pool";
-+			size = <0x6000000>;
-+			alloc-ranges = <0x4a000000 0x6000000>;
-+			reusable;
-+			linux,cma-default;
-+		};
-+	};
-+
- 	sound: sound {
- 		compatible = "simple-audio-card";
- 		simple-audio-card,name = "sun8i-a33-audio";
-@@ -245,6 +260,17 @@
- 			};
- 		};
- 
-+		video-codec at 01c0e000 {
-+			compatible = "allwinner,sun8i-a33-video-engine";
-+			reg = <0x01c0e000 0x1000>;
-+			clocks = <&ccu CLK_BUS_VE>, <&ccu CLK_VE>,
-+				 <&ccu CLK_DRAM_VE>;
-+			clock-names = "ahb", "mod", "ram";
-+			resets = <&ccu RST_BUS_VE>;
-+			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
-+			allwinner,sram = <&ve_sram 1>;
-+		};
-+
- 		crypto: crypto-engine at 1c15000 {
- 			compatible = "allwinner,sun4i-a10-crypto";
- 			reg = <0x01c15000 0x1000>;
--- 
-2.18.0
+> +	if (extra > SDHCI_MAX_SEGS)
+> +		extra = SDHCI_MAX_SEGS;
+> +	host->adma_table_cnt += extra;
+> +
+>  	pltfm_host = sdhci_priv(host);
+>  	priv = sdhci_pltfm_priv(pltfm_host);
+>  
+> 
