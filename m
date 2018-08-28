@@ -1,81 +1,50 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 28 Aug 2018 11:15:12 +0100
-Subject: [PATCH v2 01/29] nvmem: add support for cell lookups
-In-Reply-To: <CAMRc=MfpZJUEAhM4OoLbmJcnX3rTJk8fvdiL6=9BjNkVcsf=SA@mail.gmail.com>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180810080526.27207-2-brgl@bgdev.pl> <20180824170848.29594318@bbrezillon>
- <20180824152740.GD27483@lunn.ch> <20180825082722.567e8c9a@bbrezillon>
- <CAMRc=Men-MPk5DGshWcVEc0v=gH2WSpx1j-CawOeydwp59tejw@mail.gmail.com>
- <20180827110055.122988d0@bbrezillon>
- <CAMRc=MfpZJUEAhM4OoLbmJcnX3rTJk8fvdiL6=9BjNkVcsf=SA@mail.gmail.com>
-Message-ID: <8cb75723-dc87-f127-2aab-54dd0b08eee8@linaro.org>
+From: yinbo.zhu@nxp.com (Yinbo Zhu)
+Date: Tue, 28 Aug 2018 18:12:13 +0800
+Subject: [PATCH v1] arm64: dts: ls1043a: Add configure-gfladj property to USB3
+ node
+Message-ID: <20180828101213.25750-1-yinbo.zhu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Rajesh Bhagat <rajesh.bhagat@freescale.com>
 
-On 27/08/18 14:37, Bartosz Golaszewski wrote:
-> I didn't notice it before but there's a global list of nvmem cells
+Add "configure-gfladj" boolean property to USB3 node. This property
+is used to determine whether frame length adjustent is required or
+not
 
-Bit of history here.
+Signed-off-by: Rajesh Bhagat <rajesh.bhagat@nxp.com>
+Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-The global list of nvmem_cell is to assist non device tree based cell 
-lookups. These cell entries come as part of the non-dt providers 
-nvmem_config.
-
-All the device tree based cell lookup happen dynamically on 
-request/demand, and all the cell definition comes from DT.
-
-As of today NVMEM supports both DT and non DT usecase, this is much simpler.
-
-Non dt cases have various consumer usecases.
-
-1> Consumer is aware of provider name and cell details.
-	This is probably simple usecase where it can just use device based apis.
-
-2> Consumer is not aware of provider name, its just aware of cell name.
-	This is the case where global list of cells are used.
-
-> with each cell referencing its owner nvmem device. I'm wondering if
-> this isn't some kind of inversion of ownership. Shouldn't each nvmem
-> device have a separate list of nvmem cells owned by it? What happens
-This is mainly done for use case where consumer does not have idea of 
-provider name or any details.
-
-First thing non dt user should do is use "NVMEM device based consumer APIs"
-
-ex: First get handle to nvmem device using its nvmem provider name by 
-calling nvmem_device_get(); and use nvmem_device_cell_read/write() apis.
-
-Also am not 100% sure how would maintaining cells list per nvmem 
-provider would help for the intended purpose of global list?
-
-> if we have two nvmem providers with the same names for cells? I'm
-Yes, it would return the first instance.. which is a known issue.
-Am not really sure this is a big problem as of today! but am open for 
-any better suggestions!
-
-
-> asking because dev_id based lookup doesn't make sense if internally
-> nvmem_cell_get_from_list() doesn't care about any device names (takes
-> only the cell_id as argument).
-
-As I said this is for non DT usecase where consumers are not aware of 
-provider details.
-
-> 
-> This doesn't cause any trouble now since there are no users defining
-> cells in nvmem_config - there are only DT users - but this must be
-> clarified before I can advance with correctly implementing nvmem
-> lookups.
-DT users should not be defining this to start with! It's redundant and 
-does not make sense!
-
-> 
-> BTW: of_nvmem_cell_get() seems to always allocate an nvmem_cell
-> instance even if the cell for this node was already added to the nvmem
-> device.
-I hope you got the reason why of_nvmem_cell_get() always allocates new 
-instance for every get!!
-
-thanks,
-srini
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index a830a2e..a3c5165 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -610,6 +610,7 @@
+ 			snps,dis-u1u2-when-u3-quirk;
+ 			snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
+ 			dma-coherent;
++			configure-gfladj;
+ 		};
+ 
+ 		usb1: usb3 at 3000000 {
+@@ -623,6 +624,7 @@
+ 			snps,dis-u1u2-when-u3-quirk;
+ 			snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
+ 			dma-coherent;
++			configure-gfladj;
+ 		};
+ 
+ 		usb2: usb3 at 3100000 {
+@@ -636,6 +638,7 @@
+ 			snps,dis-u1u2-when-u3-quirk;
+ 			snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
+ 			dma-coherent;
++			configure-gfladj;
+ 		};
+ 
+ 		sata: sata at 3200000 {
+-- 
+1.7.1
