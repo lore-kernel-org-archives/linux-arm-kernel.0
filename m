@@ -1,40 +1,43 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Tue, 28 Aug 2018 13:00:02 +0000
-Subject: [RESEND] PCI: imx: Initial imx7d pm support
-In-Reply-To: <20180828100758.GA27217@e107981-ln.cambridge.arm.com>
-References: <d577303de61fb060aa428898f5df1d0bc9be89b8.1535369231.git.leonard.crestez@nxp.com>
- <20180828100758.GA27217@e107981-ln.cambridge.arm.com>
-Message-ID: <efcb160f08bb53620ba0570e55dbb9190275aeb0.camel@nxp.com>
+From: claudiu.beznea@microchip.com (Claudiu Beznea)
+Date: Tue, 28 Aug 2018 16:01:19 +0300
+Subject: [RESEND PATCH v5 2/9] pwm: clps711x: populate PWM mode in of_xlate
+ function
+In-Reply-To: <1535461286-12308-1-git-send-email-claudiu.beznea@microchip.com>
+References: <1535461286-12308-1-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1535461286-12308-3-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-08-28 at 11:07 +0100, Lorenzo Pieralisi wrote:
-> On Mon, Aug 27, 2018 at 02:28:37PM +0300, Leonard Crestez wrote:
-> > On imx7d the pcie-phy power domain is turned off in suspend and this can
-> > make the system hang after resume when attempting any read from PCI.
-> > 
-> > Fix this by adding minimal suspend/resume code from the nxp internal
-> > tree. This will prepare for powering down on suspend and reset the block
-> > on resume.
-> > 
-> > Code is only for imx7d but a very similar sequence can be used for
-> > other socs.
-> > 
-> > The original author is mostly Richard Zhu <hongxing.zhu@nxp.com>, this
-> > patch adjusts the code to the upstream imx7d implemention using reset
-> > controls and power domains.
-> 
-> I will add a Suggested-by: replacing this paragraph, it is always better
-> to add proper tags rather than credit hidden in commit logs messages.
+Populate PWM mode in of_xlate function to avoid pwm_apply_state() failure.
 
-Isn't "Originally-by:" a better tag for this?
+Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+---
+ drivers/pwm/pwm-clps711x.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-> > Some dependencies in this area are complicated but as far as I know
-> > including this patch without others should not break anything that was
-> > not already broken. Since this is a patch for something that has never
-> > worked before it should be treated as a feature not a bugfix.
-> 
-> Ok, so I consider this v4.20 material, please shout if it has to be
-> sent as a fix, I do not think so given what we discussed above.
-
-Thanks!
+diff --git a/drivers/pwm/pwm-clps711x.c b/drivers/pwm/pwm-clps711x.c
+index 26ec24e457b1..d742e8e375c7 100644
+--- a/drivers/pwm/pwm-clps711x.c
++++ b/drivers/pwm/pwm-clps711x.c
+@@ -109,10 +109,18 @@ static const struct pwm_ops clps711x_pwm_ops = {
+ static struct pwm_device *clps711x_pwm_xlate(struct pwm_chip *chip,
+ 					     const struct of_phandle_args *args)
+ {
++	struct pwm_device *pwm;
++
+ 	if (args->args[0] >= chip->npwm)
+ 		return ERR_PTR(-EINVAL);
+ 
+-	return pwm_request_from_chip(chip, args->args[0], NULL);
++	pwm = pwm_request_from_chip(chip, args->args[0], NULL);
++	if (IS_ERR(pwm))
++		return pwm;
++
++	pwm->args.mode = pwm_mode_get_valid(chip, pwm);
++
++	return pwm;
+ }
+ 
+ static int clps711x_pwm_probe(struct platform_device *pdev)
+-- 
+2.7.4
