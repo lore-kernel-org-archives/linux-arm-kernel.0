@@ -1,174 +1,283 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 28 Aug 2018 12:02:24 -0400
-Subject: [RFC PATCH v2 2/3] pstore: Add register read/write{b,w,l,q}
- tracing support
-In-Reply-To: <369f384b-c419-99d8-c0a4-3ed38f1dd0f4@codeaurora.org>
-References: <cover.1535119710.git.saiprakash.ranjan@codeaurora.org>
- <65985f8df55b037283746559c1718a54d56e7ec4.1535119711.git.saiprakash.ranjan@codeaurora.org>
- <CAGXu5jL6tGu9U_ANrZSfWREtySqFAJ+CQa3v5YRihZ2oHNMGGw@mail.gmail.com>
- <7b212c02-d7ce-4309-155f-22b36963e41c@codeaurora.org>
- <20180827121530.525299e3@gandalf.local.home>
- <369f384b-c419-99d8-c0a4-3ed38f1dd0f4@codeaurora.org>
-Message-ID: <20180828120224.381d406a@gandalf.local.home>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 28 Aug 2018 10:18:22 -0600
+Subject: [PATCH] perf: Support for Arm A32/T32 instruction sets in
+ CoreSight trace
+In-Reply-To: <1534953837-16425-1-git-send-email-robert.walker@arm.com>
+References: <1534953837-16425-1-git-send-email-robert.walker@arm.com>
+Message-ID: <20180828161822.GA8666@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Aug 2018 18:47:33 +0530
-Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org> wrote:
+Hi Robert,
 
-> On 8/27/2018 9:45 PM, Steven Rostedt wrote:
-> > On Sat, 25 Aug 2018 12:54:07 +0530
-> > Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org> wrote:
-> > 
-> >   
-> >> Ftrace does not trace __raw{read,write}{b,l,w,q}() functions. I am not
-> >> sure why and how it is filtered out because I do not see any notrace
-> >> flag in those functions, maybe that whole directory is filtered out.
-> >> So adding this functionality to ftrace would mean removing the notrace
-> >> for these functions i.e., something like using
-> >> __raw{read,write}{b,l,w,q}() as the available filter functions. Also
-> >> pstore ftrace does not filter functions to trace I suppose?  
-> > 
-> > It's not traced because it is inlined. Simply make the __raw_read
-> > function a normal function and it will be traced. And then you could
-> > use ftrace to read the function.
-> > 
-> > If this has to be per arch, you can register your callback with the
-> > REGS flags, and pt_regs will be passed to your callback function you
-> > attached to __raw_read*() as if you inserted a break point at that
-> > location, and you can get any reg data you want there.
-> > 
-> >  
+Your patch landed in the middle of the merge window and will have to be sent
+again rebased on 4.19-rc1 and long with minor fix found below.
+
+Regards,
+Mathieu 
+
+On Wed, Aug 22, 2018 at 05:03:57PM +0100, Robert Walker wrote:
+> This patch adds support for generating instruction samples from trace of
+> AArch32 programs using the A32 and T32 instruction sets.
 > 
-> Thank you very much for the information Steven. Ok so we can get 
-> function parameters with pt_regs.
-
-Yes.
-
+> T32 has variable 2 or 4 byte instruction size, so the conversion between
+> addresses and instruction counts requires extra information from the trace
+> decoder, requiring version 0.9.1 of OpenCSD.  A check for the new struct
+> member has been added to the feature check for OpenCSD.
 > 
-> >>
-> >> Coming to the reason as to why it would be good to keep this separate
-> >> from ftrace would be:
-> >> * Ftrace can get ip and parent ip, but suppose we need extra data (field
-> >> data) as in above sample output we would not be able to get through ftrace.  
-> > 
-> > As mentioned above, you can get regs (and ftrace is being expanded now
-> > to get parameters of functions).
-> >   
-> You mean there is another way to get parameters other than regs?
-
-No, but you could register a callback function to be called when a
-function is hit, and the pt_regs are passed to it. We are working on
-getting parameters from the pt_regs (see this patch:
- http://lkml.kernel.org/r/152465885737.26224.2822487520472783854.stgit at devbox)
-
+> Signed-off-by: Robert Walker <robert.walker@arm.com>
+> ---
+>  tools/build/feature/test-libopencsd.c           |  7 +++
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 27 ++++++++++
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.h | 10 ++++
+>  tools/perf/util/cs-etm.c                        | 71 +++++++++++--------------
+>  4 files changed, 75 insertions(+), 40 deletions(-)
 > 
-> >>
-> >> * Although this patch is for tracing register read/write, we can easily
-> >> add more functionality since we have dynamic_rtb api which can be hooked
-> >> to functions and start tracing events(IRQ, Context ID) something similar
-> >> to tracepoints.
-> >> Initially thought of having tracepoints for logging register read/write
-> >> but I do not know if we can export tracepoint data to pstore since the
-> >> main usecase is to debug unknown resets and hangs.  
-> > 
-> > I don't know why not? We have read/write tracepoints for
-> > read/write_msr() calls in x86.
-> > 
-> > Anything can add a hook to the callback of the tracepoints, and use
-> > that infrastructure instead of creating yet another dynamic code
-> > modification infrastructure.
-> >   
-> Thanks for pointing out to read/write_msr, I checked it and was able to 
-> implement something similar for arm64. But still can we export 
-> tracepoint data to pstore because we need to debug reset cases and for 
-> that pstore is of real importance?. If so then it would be great to have 
-> various events logged into pstore which can be a lot of help for debugging.
+> diff --git a/tools/build/feature/test-libopencsd.c b/tools/build/feature/test-libopencsd.c
+> index 5ff1246..d96b2df 100644
+> --- a/tools/build/feature/test-libopencsd.c
+> +++ b/tools/build/feature/test-libopencsd.c
+> @@ -3,6 +3,13 @@
+>  
+>  int main(void)
+>  {
+> +	/*
+> +	 * Requires ocsd_generic_trace_elem.num_instr_range introduced in
+> +	 * OpenCSD 0.9
+> +	 */
+> +	ocsd_generic_trace_elem elem;
+> +	(void)elem.num_instr_range;
+> +
+
+I really like this - simple and efficient.
+
+>  	(void)ocsd_get_version();
+>  	return 0;
+>  }
+> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> index 938def6..73d8384 100644
+> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> @@ -263,9 +263,12 @@ static void cs_etm_decoder__clear_buffer(struct cs_etm_decoder *decoder)
+>  	decoder->tail = 0;
+>  	decoder->packet_count = 0;
+>  	for (i = 0; i < MAX_BUFFER; i++) {
+> +		decoder->packet_buffer[i].isa = CS_ETM_ISA_UNKNOWN;
+>  		decoder->packet_buffer[i].start_addr = CS_ETM_INVAL_ADDR;
+>  		decoder->packet_buffer[i].end_addr = CS_ETM_INVAL_ADDR;
+> +		decoder->packet_buffer[i].instr_count = 0;
+>  		decoder->packet_buffer[i].last_instr_taken_branch = false;
+> +		decoder->packet_buffer[i].last_instr_size = 0;
+>  		decoder->packet_buffer[i].exc = false;
+>  		decoder->packet_buffer[i].exc_ret = false;
+>  		decoder->packet_buffer[i].cpu = INT_MIN;
+> @@ -294,11 +297,13 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
+>  	decoder->packet_count++;
+>  
+>  	decoder->packet_buffer[et].sample_type = sample_type;
+> +	decoder->packet_buffer[et].isa = CS_ETM_ISA_UNKNOWN;
+>  	decoder->packet_buffer[et].exc = false;
+>  	decoder->packet_buffer[et].exc_ret = false;
+>  	decoder->packet_buffer[et].cpu = *((int *)inode->priv);
+>  	decoder->packet_buffer[et].start_addr = CS_ETM_INVAL_ADDR;
+>  	decoder->packet_buffer[et].end_addr = CS_ETM_INVAL_ADDR;
+> +	decoder->packet_buffer[et].instr_count = 0;
+>  
+>  	if (decoder->packet_count == MAX_BUFFER - 1)
+>  		return OCSD_RESP_WAIT;
+> @@ -321,8 +326,28 @@ cs_etm_decoder__buffer_range(struct cs_etm_decoder *decoder,
+>  
+>  	packet = &decoder->packet_buffer[decoder->tail];
+>  
+> +	switch (elem->isa) {
+> +	case ocsd_isa_aarch64:
+> +		packet->isa = CS_ETM_ISA_A64;
+> +		break;
+> +	case ocsd_isa_arm:
+> +		packet->isa = CS_ETM_ISA_A32;
+> +		break;
+> +	case ocsd_isa_thumb2:
+> +		packet->isa = CS_ETM_ISA_T32;
+> +		break;
+> +	case ocsd_isa_tee:
+> +	case ocsd_isa_jazelle:
+> +	case ocsd_isa_custom:
+> +	case ocsd_isa_unknown:
+> +	default:
+> +		packet->isa = CS_ETM_ISA_UNKNOWN;
+> +	}
+> +
+>  	packet->start_addr = elem->st_addr;
+>  	packet->end_addr = elem->en_addr;
+> +	packet->instr_count = elem->num_instr_range;
+> +
+>  	switch (elem->last_i_type) {
+>  	case OCSD_INSTR_BR:
+>  	case OCSD_INSTR_BR_INDIRECT:
+> @@ -336,6 +361,8 @@ cs_etm_decoder__buffer_range(struct cs_etm_decoder *decoder,
+>  		break;
+>  	}
+>  
+> +	packet->last_instr_size = elem->last_instr_sz;
+> +
+>  	return ret;
+>  }
+>  
+> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+> index 612b575..9a10eda 100644
+> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+> @@ -28,11 +28,21 @@ enum cs_etm_sample_type {
+>  	CS_ETM_TRACE_ON = 1 << 1,
+>  };
+>  
+> +enum cs_etm_isa {
+> +	CS_ETM_ISA_UNKNOWN,
+> +	CS_ETM_ISA_A64,
+> +	CS_ETM_ISA_A32,
+> +	CS_ETM_ISA_T32,
+> +};
+> +
+>  struct cs_etm_packet {
+>  	enum cs_etm_sample_type sample_type;
+> +	enum cs_etm_isa isa;
+>  	u64 start_addr;
+>  	u64 end_addr;
+> +	u64 instr_count;
+
+Shouldn't this be a u32 since ocsd_generic_trace_elem::num_instr_range is a
+uint32_t in the openCSD library?
+
+>  	u8 last_instr_taken_branch;
+> +	u8 last_instr_size;
+>  	u8 exc;
+>  	u8 exc_ret;
+>  	int cpu;
+> diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+> index 2ae6402..579f52a 100644
+> --- a/tools/perf/util/cs-etm.c
+> +++ b/tools/perf/util/cs-etm.c
+> @@ -31,14 +31,6 @@
+>  
+>  #define MAX_TIMESTAMP (~0ULL)
+>  
+> -/*
+> - * A64 instructions are always 4 bytes
+> - *
+> - * Only A64 is supported, so can use this constant for converting between
+> - * addresses and instruction counts, calculting offsets etc
+> - */
+> -#define A64_INSTR_SIZE 4
+> -
+>  struct cs_etm_auxtrace {
+>  	struct auxtrace auxtrace;
+>  	struct auxtrace_queues queues;
+> @@ -492,21 +484,16 @@ static inline void cs_etm__reset_last_branch_rb(struct cs_etm_queue *etmq)
+>  	etmq->last_branch_rb->nr = 0;
+>  }
+>  
+> -static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
+> -{
+> -	/* Returns 0 for the CS_ETM_TRACE_ON packet */
+> -	if (packet->sample_type == CS_ETM_TRACE_ON)
+> -		return 0;
+> +static inline int cs_etm__t32_instr_size(struct cs_etm_queue *etmq,
+> +					 u64 addr) {
+> +	u8 instrBytes[2];
+>  
+> -	/*
+> -	 * The packet records the execution range with an exclusive end address
+> -	 *
+> -	 * A64 instructions are constant size, so the last executed
+> -	 * instruction is A64_INSTR_SIZE before the end address
+> -	 * Will need to do instruction level decode for T32 instructions as
+> -	 * they can be variable size (not yet supported).
+> +	cs_etm__mem_access(etmq, addr, 2, instrBytes);
+
+Please use ARRAY_SIZE(), although trivial here it is just a matter of time
+before someone else submits a patch for it.
+
+> +	/* T32 instruction size is indicated by bits[15:11] of the first
+> +	 * 16-bit word of the instruction: 0b11101, 0b11110 and 0b11111
+> +	 * denote a 32-bit instruction.
+>  	 */
+
+Thanks for the documentation.
+
+> -	return packet->end_addr - A64_INSTR_SIZE;
+> +	return ((instrBytes[1] & 0xF8) >= 0xE8) ? 4 : 2;
+>  }
+>  
+>  static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
+> @@ -518,27 +505,32 @@ static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
+>  	return packet->start_addr;
+>  }
+>  
+> -static inline u64 cs_etm__instr_count(const struct cs_etm_packet *packet)
+> +static inline
+> +u64 cs_etm__last_executed_instr(const struct cs_etm_packet *packet)
+>  {
+> -	/*
+> -	 * Only A64 instructions are currently supported, so can get
+> -	 * instruction count by dividing.
+> -	 * Will need to do instruction level decode for T32 instructions as
+> -	 * they can be variable size (not yet supported).
+> -	 */
+> -	return (packet->end_addr - packet->start_addr) / A64_INSTR_SIZE;
+> +	/* Returns 0 for the CS_ETM_TRACE_ON packet */
+> +	if (packet->sample_type == CS_ETM_TRACE_ON)
+> +		return 0;
+> +
+> +	return packet->end_addr - packet->last_instr_size;
+>  }
+>  
+> -static inline u64 cs_etm__instr_addr(const struct cs_etm_packet *packet,
+> +static inline u64 cs_etm__instr_addr(struct cs_etm_queue *etmq,
+> +				     const struct cs_etm_packet *packet,
+>  				     u64 offset)
+>  {
+> -	/*
+> -	 * Only A64 instructions are currently supported, so can get
+> -	 * instruction address by muliplying.
+> -	 * Will need to do instruction level decode for T32 instructions as
+> -	 * they can be variable size (not yet supported).
+> -	 */
+> -	return packet->start_addr + offset * A64_INSTR_SIZE;
+> +	if (packet->isa == CS_ETM_ISA_T32) {
+> +		u64 addr = packet->start_addr;
+> +
+> +		while (offset > 0) {
+> +			addr += cs_etm__t32_instr_size(etmq, addr);
+> +			offset--;
+> +		}
+> +		return addr;
+> +	}
+> +
+> +	/* Assume a 4 byte instruction size (A32/A64) */
+> +	return packet->start_addr + offset * 4;
+>  }
+>  
+>  static void cs_etm__update_last_branch_rb(struct cs_etm_queue *etmq)
+> @@ -867,9 +859,8 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+>  	struct cs_etm_auxtrace *etm = etmq->etm;
+>  	struct cs_etm_packet *tmp;
+>  	int ret;
+> -	u64 instrs_executed;
+> +	u64 instrs_executed = etmq->packet->instr_count;
+>  
+> -	instrs_executed = cs_etm__instr_count(etmq->packet);
+>  	etmq->period_instructions += instrs_executed;
+>  
+>  	/*
+> @@ -899,7 +890,7 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+>  		 * executed, but PC has not advanced to next instruction)
+>  		 */
+>  		u64 offset = (instrs_executed - instrs_over - 1);
+> -		u64 addr = cs_etm__instr_addr(etmq->packet, offset);
+> +		u64 addr = cs_etm__instr_addr(etmq, etmq->packet, offset);
+>  
+>  		ret = cs_etm__synth_instruction_sample(
+>  			etmq, addr, etm->instructions_sample_period);
+> -- 
+> 2.7.4
 > 
-> Also with the current dynamic filtering of read/write(PATCH 3/3), it is 
-> a lot easier to filter register read/write since we use dynamic debug 
-> framework which provides file, function and line level filtering 
-> capacity. Maybe if we can add something like this to trace events it 
-> would be better?
-
-I would recommend using the tracepoint infrastructure. Note,
-tracepoints and trace events are two different things. Trace events use
-tracepoints, and you use trace events to create tracepoints, thus they
-are tightly coupled. But once a tracepoint exists, anything can connect
-to them without needing to use the trace event.
-
-Let's look at the read_msr trace event. Because it is in a header, to
-avoid "include hell" we open code some of it:
-
-static inline unsigned long long native_read_msr(unsigned int msr)
-{
-	unsigned long long val;
-
-	val = __rdmsr(msr);
-
-	if (msr_tracepoint_active(__tracepoint_read_msr))
-		do_trace_read_msr(msr, val, 0);
-
-	return val;
-}
-
-Where:
-
-#ifdef CONFIG_TRACEPOINTS
-#define msr_tracepoint_active(t) static_key_false(&(t).key)
-#else 
-#define msr_tracepoint_active(t) false
-#endif
-
-We have to open code the access to the tracepoint.key because msr.h is
-used in a lot of critical headers, we couldn't use the normal
-tracepoint.h header here.
-
-The "static_key_false()" is a jump label that is just a nop. When the
-static_key is enabled, the nop is converted to a static "jmp" to the
-code that calls "do_trace_read_msr()". This is a function call to a
-function defined in msr.c (where we can do proper includes), and all
-that does is call the tracepoint "trace_read_msr()", which is also a
-static key that, when enabled, will iterate over a list of functions it
-should call with the defined parameters (msr, val, failed).
-
-When defining the trace event for "read_msr", it creates the tracepoint
-"trace_read_msr()" and we place it in this do_trace_read_msr()
-function. The TRACE_EVENT() macros creates everything that is needed to
-connect the trace event "read_msr" to the tracepoint
-"trace_read_msr()", and you can enable this via the tracefs subsystem
-or via perf.
-
-But you can also add your own hook to that tracepoint. If you have code
-that does:
-
-register_trace_read_msr(func, data);
-
-The "func" gets called when trace_read_msr() is hit. Thus you could
-have:
-
-static void my_func(void *data, unsigned msr, u64 val, int failed)
-{
-	struct my_struct *my_data = data;
-
-	do_something_with(my_data, msr, val, failed);
-}
-
-{
-	struct my_struct *my_data;
-
-	my_data = kzalloc(sizeof(*my_data)), GFP_KERNEL);
-
-	register_trace_read_msr(my_func, my_data);
-}
-
-
-And then your function "my_func" will be called with any data you
-registered with it (you may register "NULL" if you don't need to pass
-in data), and it will also get the parameters passed to trace_read_msr()
-
-If you want to have you "my_func" record into pstore, then it will
-happen at runtime, and if the system resets, you have your data where
-you want it.
-
--- Steve
