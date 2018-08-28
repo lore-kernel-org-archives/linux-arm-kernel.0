@@ -1,68 +1,28 @@
-From: hejianet@gmail.com (Jia He)
-Date: Tue, 28 Aug 2018 20:08:04 +0800
-Subject: [PATCH] irqchip/gic-v3-its: cap lpi_id_bits to reduce memory
- footprint
-In-Reply-To: <865zzuyijp.wl-marc.zyngier@arm.com>
-References: <1535432006-2304-1-git-send-email-jia.he@hxt-semitech.com>
- <865zzuyijp.wl-marc.zyngier@arm.com>
-Message-ID: <a28b854e-3bc9-0c10-2faf-63e4d44ec14b@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Aug 2018 14:08:55 +0200
+Subject: [PATCH 10/15] soc: octeontx2: Reconfig MSIX base with IOVA
+In-Reply-To: <1535453838-12154-11-git-send-email-sunil.kovvuri@gmail.com>
+References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
+ <1535453838-12154-11-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <CAK8P3a1Vdy-VsLWJMer-Z96E4Trhi0WJXJ3fTzyOGny2Mn6RAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Aug 28, 2018 at 12:58 PM <sunil.kovvuri@gmail.com> wrote:
+>
+> From: Geetha sowjanya <gakula@marvell.com>
+>
+> HW interprets RVU_AF_MSIXTR_BASE address as an IOVA, hence
+> create a IOMMU mapping for the physcial address configured by
+> firmware and reconfig RVU_AF_MSIXTR_BASE with IOVA.
+>
+> Signed-off-by: Geetha sowjanya <gakula@marvell.com>
+> Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
 
+I think this needs some more explanation. What is the difference between
+the MSI-X support in this driver and every other one? Are you working
+around a hardware bug, or is there something odd in the implementation
+of your irqchip driver? Do you use a GIC to handle the MSI interrupts
+or something else?
 
-On 8/28/2018 4:58 PM, Marc Zyngier Wrote:
-> On Tue, 28 Aug 2018 05:53:26 +0100,
-> Jia He <hejianet@gmail.com> wrote:
->>
->> In commit fe8e93504ce8 ("irqchip/gic-v3-its: Use full range of LPIs"),
->> it removes the cap for lpi_id_bits. But it will cause more pointless
->> memory footprint.
->>
->> There is a WARN_ON when my QDF2400 server boots up (pagesize is 4k)
->> ============begin===============
-> 
-> [trimming not-so-useful trace]
-> 
->> ============end============
->>
->> In its_alloc_lpi_tables, lpi_id_bits is 24 in QDF2400. Then
->> its_allocate_prop_table will try to allocate 16M(order 12 if
->> pagesize=4k). Thus it causes the WARN_ON.
->>
->> As said by Marc,
->> Capping lpi_id_bits at 16 (which is what we had before) is plenty,
->> will save a some memory, and gives some margin before we need to push
->> it up again.
->>
->> This patch re-caps the lpi_id_bits.
->>
->> Fixes: fe8e93504ce8 ("irqchip/gic-v3-its: Use full range of LPIs")
->> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
->> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Thanks for doing this. Small problem with this patch:
-> 
-> The email comes from hejianet at gmail.com, while the sign off is by
-> jia.he at hxt-semitech.com. Your email should start with a:
-> 
-> 	From: Jia He <jia.he@hxt-semitech.com>
-> 
-
-Thanks for the pointing. And sorry for that problem.
-
----
-Cheers,
-Jia
-> Other than that:
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Thomas, would you mind picking this up so that it gets into the next
-> convenient -rc?
-> 
-> Thanks,
-> 
-> 	M. (/me goes back hiking...)
-> 	
-> 
+       Arnd
