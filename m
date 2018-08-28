@@ -1,411 +1,75 @@
-From: urjaman@gmail.com (Urja Rannikko)
-Date: Tue, 28 Aug 2018 18:55:11 +0000
-Subject: [PATCH 5/7] drm: dw_hdmi-rockchip: better clock selection logic and
- dts-based rate list
-In-Reply-To: <20180828185513.13216-1-urjaman@gmail.com>
-References: <20180828185513.13216-1-urjaman@gmail.com>
-Message-ID: <20180828185513.13216-6-urjaman@gmail.com>
+From: liu.song.a23@gmail.com (Song Liu)
+Date: Tue, 28 Aug 2018 12:07:30 -0700
+Subject: [PATCH v9 1/4] Uprobes: Support SDT markers having reference
+ count (semaphore)
+In-Reply-To: <20180822123943.GD2080@linux.vnet.ibm.com>
+References: <20180820044250.11659-1-ravi.bangoria@linux.ibm.com>
+ <20180820044250.11659-2-ravi.bangoria@linux.ibm.com>
+ <20180822123943.GD2080@linux.vnet.ibm.com>
+Message-ID: <CAPhsuW55gYH2oFg5qEYLW_5hjEOVKvmQvsNPZO4=S=VGdbL6hQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This contains traces of the following commits from the ChromeOS 3.14
-tree, which improve RF/EMI performance and detach the clock selection
-logic from the HDMI PHY configurations, plus support for configuring
-the allowed clock rates via device tree as they are dependent on
-PLL configuration and maybe even the PCB layout and other hardware things,
-eg. interference to wifi or such (EMI).
+Hi all,
 
-Rates that were allowed previous to this patch are added as the fallback
-list if no dts configuration exists.
+What's our plan with this work? Will this be routed via Steven's tree?
 
-CHROMIUM: drm: rockchip/dw_hdmi-rockchip: Adjust rockchip_mpll_cfg for 146.25
-CHROMIUM: drm: rockchip/dw_hdmi-rockchip: expand the informal mpll config
-CHROMIUM: drm: rockchip/dw_hdmi-rockchip: add slop to more tables
-CHROMIUM: drm: rockchip/dw_hdmi-rockchip: redo rockchip hdmi to allow slop
-CHROMIUM: drm: rockchip/dw_hdmi-rockchip: Use auto-generated tables
-CHROMIUM: drm: rockchip/dw_hdmi-rockchip: Fixup the clock to be what we expect
-CHROMIUM: drm/rockchip: hdmi: adjust cklvl & txlvl for RF/EMI
-CHROMIUM: drm: rockchip/dw_hdmi-rockchip: Set cur_ctr to 0 always
-CHROMIUM: drm: rockchip/dw_hdmi-rockchip: Decrease slop
+Thanks,
+Song
 
-Signed-off-by: Urja Rannikko <urjaman@gmail.com>
----
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 269 +++++++++++++-------
- 1 file changed, 175 insertions(+), 94 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-index 11309a2a4e43..740b0aeea796 100644
---- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -49,122 +49,141 @@ struct rockchip_hdmi {
- 	struct clk *vpll_clk;
- 	struct clk *grf_clk;
- 	struct dw_hdmi *hdmi;
-+	u32* rates;
-+	u32 rates_cnt;
- };
- 
-+#define CLK_SLOP(clk)		((clk) / 1000)
-+#define CLK_PLUS_SLOP(clk)	((clk) + CLK_SLOP(clk))
-+
- #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
- 
-+/* These were the rates allowed by the driver before rates list in device tree,
-+ * so keep them around as a fallback */
-+static const u32 dw_hdmi_fallback_rates[] = {
-+	27000000,
-+	36000000,
-+	40000000,
-+	54000000,
-+	65000000,
-+	66000000,
-+	74250000,
-+	83500000,
-+	106500000,
-+	108000000,
-+	146250000,
-+	148500000
-+};
-+
- static const struct dw_hdmi_mpll_config rockchip_mpll_cfg[] = {
- 	{
--		27000000, {
--			{ 0x00b3, 0x0000},
--			{ 0x2153, 0x0000},
--			{ 0x40f3, 0x0000}
-+		30666000, {
-+			{ 0x00b3, 0x0000 },
-+			{ 0x2153, 0x0000 },
-+			{ 0x40f3, 0x0000 },
-+		},
-+	},  {
-+		36800000, {
-+			{ 0x00b3, 0x0000 },
-+			{ 0x2153, 0x0000 },
-+			{ 0x40a2, 0x0001 },
- 		},
--	}, {
--		36000000, {
--			{ 0x00b3, 0x0000},
--			{ 0x2153, 0x0000},
--			{ 0x40f3, 0x0000}
-+	},  {
-+		46000000, {
-+			{ 0x00b3, 0x0000 },
-+			{ 0x2142, 0x0001 },
-+			{ 0x40a2, 0x0001 },
- 		},
--	}, {
--		40000000, {
--			{ 0x00b3, 0x0000},
--			{ 0x2153, 0x0000},
--			{ 0x40f3, 0x0000}
-+	},  {
-+		61333000, {
-+			{ 0x0072, 0x0001 },
-+			{ 0x2142, 0x0001 },
-+			{ 0x40a2, 0x0001 },
- 		},
--	}, {
--		54000000, {
--			{ 0x0072, 0x0001},
--			{ 0x2142, 0x0001},
--			{ 0x40a2, 0x0001},
-+	},  {
-+		73600000, {
-+			{ 0x0072, 0x0001 },
-+			{ 0x2142, 0x0001 },
-+			{ 0x4061, 0x0002 },
- 		},
--	}, {
--		65000000, {
--			{ 0x0072, 0x0001},
--			{ 0x2142, 0x0001},
--			{ 0x40a2, 0x0001},
-+	},  {
-+		92000000, {
-+			{ 0x0072, 0x0001 },
-+			{ 0x2145, 0x0002 },
-+			{ 0x4061, 0x0002 },
- 		},
--	}, {
--		66000000, {
--			{ 0x013e, 0x0003},
--			{ 0x217e, 0x0002},
--			{ 0x4061, 0x0002}
-+	},  {
-+		122666000, {
-+			{ 0x0051, 0x0002 },
-+			{ 0x2145, 0x0002 },
-+			{ 0x4061, 0x0002 },
- 		},
--	}, {
--		74250000, {
--			{ 0x0072, 0x0001},
--			{ 0x2145, 0x0002},
--			{ 0x4061, 0x0002}
-+	},  {
-+		147200000, {
-+			{ 0x0051, 0x0002 },
-+			{ 0x2145, 0x0002 },
-+			{ 0x4064, 0x0003 },
- 		},
--	}, {
--		83500000, {
--			{ 0x0072, 0x0001},
-+	},  {
-+		184000000, {
-+			{ 0x0051, 0x0002 },
-+			{ 0x214c, 0x0003 },
-+			{ 0x4064, 0x0003 },
- 		},
--	}, {
--		108000000, {
--			{ 0x0051, 0x0002},
--			{ 0x2145, 0x0002},
--			{ 0x4061, 0x0002}
-+	},  {
-+		226666000, {
-+			{ 0x0040, 0x0003 },
-+			{ 0x214c, 0x0003 },
-+			{ 0x4064, 0x0003 },
- 		},
--	}, {
--		106500000, {
--			{ 0x0051, 0x0002},
--			{ 0x2145, 0x0002},
--			{ 0x4061, 0x0002}
-+	},  {
-+		272000000, {
-+			{ 0x0040, 0x0003 },
-+			{ 0x214c, 0x0003 },
-+			{ 0x5a64, 0x0003 },
- 		},
--	}, {
--		146250000, {
--			{ 0x0051, 0x0002},
--			{ 0x2145, 0x0002},
--			{ 0x4061, 0x0002}
-+	},  {
-+		340000000, {
-+			{ 0x0040, 0x0003 },
-+			{ 0x3b4c, 0x0003 },
-+			{ 0x5a64, 0x0003 },
- 		},
--	}, {
--		148500000, {
--			{ 0x0051, 0x0003},
--			{ 0x214c, 0x0003},
--			{ 0x4064, 0x0003}
-+	},  {
-+		600000000, {
-+			{ 0x1a40, 0x0003 },
-+			{ 0x3b4c, 0x0003 },
-+			{ 0x5a64, 0x0003 },
- 		},
--	}, {
-+	},  {
- 		~0UL, {
--			{ 0x00a0, 0x000a },
--			{ 0x2001, 0x000f },
--			{ 0x4002, 0x000f },
-+			{ 0x0000, 0x0000 },
-+			{ 0x0000, 0x0000 },
-+			{ 0x0000, 0x0000 },
- 		},
- 	}
- };
- 
- static const struct dw_hdmi_curr_ctrl rockchip_cur_ctr[] = {
--	/*      pixelclk    bpp8    bpp10   bpp12 */
-+	/*      pixelclk     bpp8    bpp10   bpp12 */
- 	{
--		40000000,  { 0x0018, 0x0018, 0x0018 },
--	}, {
--		65000000,  { 0x0028, 0x0028, 0x0028 },
--	}, {
--		66000000,  { 0x0038, 0x0038, 0x0038 },
--	}, {
--		74250000,  { 0x0028, 0x0038, 0x0038 },
--	}, {
--		83500000,  { 0x0028, 0x0038, 0x0038 },
--	}, {
--		146250000, { 0x0038, 0x0038, 0x0038 },
--	}, {
--		148500000, { 0x0000, 0x0038, 0x0038 },
--	}, {
--		~0UL,      { 0x0000, 0x0000, 0x0000},
--	}
-+		600000000, { 0x0000, 0x0000, 0x0000 },
-+	},  {
-+		~0UL,      { 0x0000, 0x0000, 0x0000 },
-+	},
- };
- 
- static const struct dw_hdmi_phy_config rockchip_phy_config[] = {
- 	/*pixelclk   symbol   term   vlev*/
--	{ 74250000,  0x8009, 0x0004, 0x0272},
--	{ 148500000, 0x802b, 0x0004, 0x028d},
--	{ 297000000, 0x8039, 0x0005, 0x028d},
--	{ ~0UL,	     0x0000, 0x0000, 0x0000}
-+	{ CLK_PLUS_SLOP(74250000),  0x8009, 0x0004, 0x0272},
-+	{ CLK_PLUS_SLOP(165000000), 0x802b, 0x0004, 0x0209},
-+	{ CLK_PLUS_SLOP(297000000), 0x8039, 0x0005, 0x028d},
-+	{ ~0UL,	                    0x0000, 0x0000, 0x0000}
- };
- 
- static int rockchip_hdmi_parse_dt(struct rockchip_hdmi *hdmi)
- {
- 	struct device_node *np = hdmi->dev->of_node;
-+	int rates_cnt;
- 
- 	hdmi->regmap = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
- 	if (IS_ERR(hdmi->regmap)) {
-@@ -192,26 +211,55 @@ static int rockchip_hdmi_parse_dt(struct rockchip_hdmi *hdmi)
- 		return PTR_ERR(hdmi->grf_clk);
- 	}
- 
-+	if ((rates_cnt = of_property_count_u32_elems(np, "rockchip,hdmi-rates-hz")) > 0) {
-+		int rv;
-+		u32 *rates = devm_kmalloc_array(hdmi->dev, rates_cnt, sizeof(u32), GFP_KERNEL);
-+		if (!rates)
-+			return -ENOMEM;
-+		rv = of_property_read_u32_array(np, "rockchip,hdmi-rates-hz", rates, rates_cnt);
-+		if (rv)
-+			return rv;
-+		hdmi->rates = rates;
-+		hdmi->rates_cnt = rates_cnt;
-+	} else {
-+		rates_cnt = ARRAY_SIZE(dw_hdmi_fallback_rates);
-+		hdmi->rates = devm_kmalloc_array(hdmi->dev, rates_cnt, sizeof(u32), GFP_KERNEL);
-+		if (!hdmi->rates)
-+			return -ENOMEM;
-+		memcpy(hdmi->rates, dw_hdmi_fallback_rates, rates_cnt * sizeof(u32));
-+		hdmi->rates_cnt = rates_cnt;
-+	}
-+
-+
- 	return 0;
- }
- 
- static enum drm_mode_status
--dw_hdmi_rockchip_mode_valid(struct drm_connector *connector,
-+dw_hdmi_rockchip_encoder_mode_valid(struct drm_encoder *encoder,
- 			    const struct drm_display_mode *mode)
- {
--	const struct dw_hdmi_mpll_config *mpll_cfg = rockchip_mpll_cfg;
-+	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(encoder);
- 	int pclk = mode->clock * 1000;
--	bool valid = false;
-+	int num_rates = hdmi->rates_cnt;
- 	int i;
- 
--	for (i = 0; mpll_cfg[i].mpixelclock != (~0UL); i++) {
--		if (pclk == mpll_cfg[i].mpixelclock) {
--			valid = true;
--			break;
--		}
-+	/*
-+	 * Pixel clocks we support are always < 2GHz and so fit in an
-+	 * int.  We should make sure source rate does too so we don't get
-+	 * overflow when we multiply by 1000.
-+	 */
-+	if (mode->clock > INT_MAX / 1000)
-+		return MODE_BAD;
-+
-+	for (i = 0; i < num_rates; i++) {
-+		int slop = CLK_SLOP(pclk);
-+
-+		if ((pclk >= hdmi->rates[i] - slop) &&
-+		    (pclk <= hdmi->rates[i] + slop))
-+			return MODE_OK;
- 	}
- 
--	return (valid) ? MODE_OK : MODE_BAD;
-+	return MODE_BAD;
- }
- 
- static const struct drm_encoder_funcs dw_hdmi_rockchip_encoder_funcs = {
-@@ -227,7 +275,39 @@ dw_hdmi_rockchip_encoder_mode_fixup(struct drm_encoder *encoder,
- 				    const struct drm_display_mode *mode,
- 				    struct drm_display_mode *adj_mode)
- {
--	return true;
-+	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(encoder);
-+	int pclk = adj_mode->clock * 1000;
-+	int best_diff = INT_MAX;
-+	int best_clock = 0;
-+	int slop;
-+	int i;
-+
-+	/* Pick the best clock */
-+	for (i = 0; i < hdmi->rates_cnt; i++) {
-+		int diff = hdmi->rates[i] - pclk;
-+
-+		if (diff < 0)
-+			diff = -diff;
-+		if (diff < best_diff) {
-+			best_diff = diff;
-+			best_clock = hdmi->rates[i];
-+
-+			/* Bail early if we're exact */
-+			if (best_diff == 0)
-+				return true;
-+		}
-+	}
-+
-+	/* Double check that it's OK */
-+	slop = CLK_SLOP(pclk);
-+	if ((pclk >= best_clock - slop) && (pclk <= best_clock + slop)) {
-+		adj_mode->clock = DIV_ROUND_UP(best_clock, 1000);
-+		return true;
-+	}
-+
-+	/* Shoudn't be here; we should have said rate wasn't valid */
-+	dev_warn(hdmi->dev, "tried to set invalid rate %d\n", adj_mode->clock);
-+	return false;
- }
- 
- static void dw_hdmi_rockchip_encoder_mode_set(struct drm_encoder *encoder,
-@@ -280,6 +360,7 @@ dw_hdmi_rockchip_encoder_atomic_check(struct drm_encoder *encoder,
- }
- 
- static const struct drm_encoder_helper_funcs dw_hdmi_rockchip_encoder_helper_funcs = {
-+	.mode_valid = dw_hdmi_rockchip_encoder_mode_valid,
- 	.mode_fixup = dw_hdmi_rockchip_encoder_mode_fixup,
- 	.mode_set   = dw_hdmi_rockchip_encoder_mode_set,
- 	.enable     = dw_hdmi_rockchip_encoder_enable,
-@@ -294,7 +375,6 @@ static struct rockchip_hdmi_chip_data rk3288_chip_data = {
- };
- 
- static const struct dw_hdmi_plat_data rk3288_hdmi_drv_data = {
--	.mode_valid = dw_hdmi_rockchip_mode_valid,
- 	.mpll_cfg   = rockchip_mpll_cfg,
- 	.cur_ctr    = rockchip_cur_ctr,
- 	.phy_config = rockchip_phy_config,
-@@ -308,7 +388,6 @@ static struct rockchip_hdmi_chip_data rk3399_chip_data = {
- };
- 
- static const struct dw_hdmi_plat_data rk3399_hdmi_drv_data = {
--	.mode_valid = dw_hdmi_rockchip_mode_valid,
- 	.mpll_cfg   = rockchip_mpll_cfg,
- 	.cur_ctr    = rockchip_cur_ctr,
- 	.phy_config = rockchip_phy_config,
-@@ -387,6 +466,7 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
- 	 */
- 	if (IS_ERR(hdmi->hdmi)) {
- 		ret = PTR_ERR(hdmi->hdmi);
-+		devm_kfree(hdmi->dev, hdmi->rates);
- 		drm_encoder_cleanup(encoder);
- 		clk_disable_unprepare(hdmi->vpll_clk);
- 	}
-@@ -399,6 +479,7 @@ static void dw_hdmi_rockchip_unbind(struct device *dev, struct device *master,
- {
- 	struct rockchip_hdmi *hdmi = dev_get_drvdata(dev);
- 
-+	devm_kfree(hdmi->dev, hdmi->rates);
- 	dw_hdmi_unbind(hdmi->hdmi);
- 	clk_disable_unprepare(hdmi->vpll_clk);
- }
--- 
-2.18.0
+On Wed, Aug 22, 2018 at 5:39 AM Srikar Dronamraju
+<srikar@linux.vnet.ibm.com> wrote:
+>
+> * Ravi Bangoria <ravi.bangoria@linux.ibm.com> [2018-08-20 10:12:47]:
+>
+> > Userspace Statically Defined Tracepoints[1] are dtrace style markers
+> > inside userspace applications. Applications like PostgreSQL, MySQL,
+> > Pthread, Perl, Python, Java, Ruby, Node.js, libvirt, QEMU, glib etc
+> > have these markers embedded in them. These markers are added by developer
+> > at important places in the code. Each marker source expands to a single
+> > nop instruction in the compiled code but there may be additional
+> > overhead for computing the marker arguments which expands to couple of
+> > instructions. In case the overhead is more, execution of it can be
+> > omitted by runtime if() condition when no one is tracing on the marker:
+> >
+> >     if (reference_counter > 0) {
+> >         Execute marker instructions;
+> >     }
+> >
+> > Default value of reference counter is 0. Tracer has to increment the
+> > reference counter before tracing on a marker and decrement it when
+> > done with the tracing.
+> >
+> > Implement the reference counter logic in core uprobe. User will be
+> > able to use it from trace_uprobe as well as from kernel module. New
+> > trace_uprobe definition with reference counter will now be:
+> >
+> >     <path>:<offset>[(ref_ctr_offset)]
+> >
+> > where ref_ctr_offset is an optional field. For kernel module, new
+> > variant of uprobe_register() has been introduced:
+> >
+> >     uprobe_register_refctr(inode, offset, ref_ctr_offset, consumer)
+> >
+> > No new variant for uprobe_unregister() because it's assumed to have
+> > only one reference counter for one uprobe.
+> >
+> > [1] https://sourceware.org/systemtap/wiki/UserSpaceProbeImplementation
+> >
+> > Note: 'reference counter' is called as 'semaphore' in original Dtrace
+> > (or Systemtap, bcc and even in ELF) documentation and code. But the
+> > term 'semaphore' is misleading in this context. This is just a counter
+> > used to hold number of tracers tracing on a marker. This is not really
+> > used for any synchronization. So we are calling it a 'reference counter'
+> > in kernel / perf code.
+> >
+>
+>
+> Acked-by: Srikar Dronamraju <srikar@linux.vnet.ibm.com>
+>
+> > Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
+> > Reviewed-by: Masami Hiramatsu <mhiramat@kernel.org>
+> > [Only trace_uprobe.c]
+> > Reviewed-by: Oleg Nesterov <oleg@redhat.com>
+> > ---
+>
