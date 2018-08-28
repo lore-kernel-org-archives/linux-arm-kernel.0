@@ -1,115 +1,150 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 28 Aug 2018 07:31:13 -0700
-Subject: [PATCH] ARM: mm: Stop printing the virtual memory layout
-In-Reply-To: <20180828142225.7941-1-geert+renesas@glider.be>
-References: <20180828142225.7941-1-geert+renesas@glider.be>
-Message-ID: <CAGXu5jKQbgFNEYsd3dB0bjkzAhWfFzK3XaOSNKirZdpTdSBz4A@mail.gmail.com>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Tue, 28 Aug 2018 15:35:46 +0100
+Subject: [PATCH 1/2] drm/bridge: Add virtual display DT bindings
+In-Reply-To: <20180827115302eucas1p24d36cfaf9835ccb217ac81e508484aa1~Ou5eTkYW-3006130061eucas1p2Z@eucas1p2.samsung.com>
+References: <CGME20180824122324epcas3p2922f3e5415dacf4c89cfb136fa5c77b2@epcas3p2.samsung.com>
+ <20180824122308.3092-1-linus.walleij@linaro.org>
+ <20180827115302eucas1p24d36cfaf9835ccb217ac81e508484aa1~Ou5eTkYW-3006130061eucas1p2Z@eucas1p2.samsung.com>
+Message-ID: <20180828143546.GG907@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 7:22 AM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> Since commit ad67b74d2469d9b8 ("printk: hash addresses printed with
-> %p"), the virtual memory layout printed during boot up contains "ptrval"
-> instead of actual addresses:
->
->     Memory: 501296K/524288K available (6144K kernel code, 528K rwdata, 1944K rodata, 1024K init, 7584K bss, 22992K reserved, 0K cma-reserved)
->     Virtual kernel memory layout:
->         vector  : 0xffff0000 - 0xffff1000   (   4 kB)
->         fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
->         vmalloc : 0xe0800000 - 0xff800000   ( 496 MB)
->         lowmem  : 0xc0000000 - 0xe0000000   ( 512 MB)
->         modules : 0xbf000000 - 0xc0000000   (  16 MB)
->           .text : 0x(ptrval) - 0x(ptrval)   (7136 kB)
->           .init : 0x(ptrval) - 0x(ptrval)   (1024 kB)
->           .data : 0x(ptrval) - 0x(ptrval)   ( 529 kB)
->            .bss : 0x(ptrval) - 0x(ptrval)   (7585 kB)
->
-> Instead of changing the printing to "%px", and leaking virtual memory
-> layout information again, just remove the printing completely, cfr. e.g.
-> commits 071929dbdd865f77 ("arm64: Stop printing the virtual memory
-> layout") and  31833332f7987636 ("m68k/mm: Stop printing the virtual
-> memory layout").
->
-> All interesting information (actual section sizes) is already printed by
-> mem_init_print_info() just above anyway.
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Andrzej,
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
+Chirping in, as it was originally my work that Linus is adopting.
 
--Kees
+On Mon, Aug 27, 2018 at 01:53:00PM +0200, Andrzej Hajda wrote:
+> On 24.08.2018 14:23, Linus Walleij wrote:
+> > This adds bindings for a virtual display to be used with displays
+> > inside entirely virtual environments which do not emulate things
+> > like monitors but just need timing information to be supplied to
+> > its display controller.
+> >
+> > This is inspired by earlier work by Liviu Dudau.
+> 
+> If this is pure virtual then it should be connected to other pure
+> virtual components.
 
-> ---
->  arch/arm/mm/init.c | 49 ----------------------------------------------
->  1 file changed, 49 deletions(-)
->
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 0cc8e04295a40dc1..e90422ae8adfa511 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -519,55 +519,6 @@ void __init mem_init(void)
->
->         mem_init_print_info(NULL);
->
-> -#define MLK(b, t) b, t, ((t) - (b)) >> 10
-> -#define MLM(b, t) b, t, ((t) - (b)) >> 20
-> -#define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
-> -
-> -       pr_notice("Virtual kernel memory layout:\n"
-> -                       "    vector  : 0x%08lx - 0x%08lx   (%4ld kB)\n"
-> -#ifdef CONFIG_HAVE_TCM
-> -                       "    DTCM    : 0x%08lx - 0x%08lx   (%4ld kB)\n"
-> -                       "    ITCM    : 0x%08lx - 0x%08lx   (%4ld kB)\n"
-> -#endif
-> -                       "    fixmap  : 0x%08lx - 0x%08lx   (%4ld kB)\n"
-> -                       "    vmalloc : 0x%08lx - 0x%08lx   (%4ld MB)\n"
-> -                       "    lowmem  : 0x%08lx - 0x%08lx   (%4ld MB)\n"
-> -#ifdef CONFIG_HIGHMEM
-> -                       "    pkmap   : 0x%08lx - 0x%08lx   (%4ld MB)\n"
-> -#endif
-> -#ifdef CONFIG_MODULES
-> -                       "    modules : 0x%08lx - 0x%08lx   (%4ld MB)\n"
-> -#endif
-> -                       "      .text : 0x%p" " - 0x%p" "   (%4td kB)\n"
-> -                       "      .init : 0x%p" " - 0x%p" "   (%4td kB)\n"
-> -                       "      .data : 0x%p" " - 0x%p" "   (%4td kB)\n"
-> -                       "       .bss : 0x%p" " - 0x%p" "   (%4td kB)\n",
-> -
-> -                       MLK(VECTORS_BASE, VECTORS_BASE + PAGE_SIZE),
-> -#ifdef CONFIG_HAVE_TCM
-> -                       MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
-> -                       MLK(ITCM_OFFSET, (unsigned long) itcm_end),
-> -#endif
-> -                       MLK(FIXADDR_START, FIXADDR_END),
-> -                       MLM(VMALLOC_START, VMALLOC_END),
-> -                       MLM(PAGE_OFFSET, (unsigned long)high_memory),
-> -#ifdef CONFIG_HIGHMEM
-> -                       MLM(PKMAP_BASE, (PKMAP_BASE) + (LAST_PKMAP) *
-> -                               (PAGE_SIZE)),
-> -#endif
-> -#ifdef CONFIG_MODULES
-> -                       MLM(MODULES_VADDR, MODULES_END),
-> -#endif
-> -
-> -                       MLK_ROUNDUP(_text, _etext),
-> -                       MLK_ROUNDUP(__init_begin, __init_end),
-> -                       MLK_ROUNDUP(_sdata, _edata),
-> -                       MLK_ROUNDUP(__bss_start, __bss_stop));
-> -
-> -#undef MLK
-> -#undef MLM
-> -#undef MLK_ROUNDUP
-> -
->         /*
->          * Check boundaries twice: Some fundamental inconsistencies can
->          * be detected at build time already.
-> --
-> 2.17.1
->
+Any reason why you think this is the only way this should be connected?
+My original implementation (and I haven't seen anything in this patch
+that would invalidate it) assumed that the virtual bridge can be used by
+any driver that uses the component framework. Hiding implementation
+details is one of the benefits of using the component framework, so I
+don't see what you gain by restricting connection to only other pure
+virtual components.
 
+> What will be this virtual bridge attached to? I expect some virtual
+> encoder, virtual crtc? If yes then why don't you create whole virtual
+> drm pipeline in one patchset?
 
+This comment is probably more relevant to patch 2/2, but I agree that
+it probably needs a virtual encoder. As for the CRTC, it should work
+with any real DRM driver, AFAICT.
+
+> Could you describe more what do you want to do.
+
+He wants to enable the PL110 DRM driver on systems that lack a way of
+detecting the actual encoder and connector being used (either because
+there is none and they are emulated in software that doesn't mimic the
+HW behaviour, or because the way you access the HW is done in a way that
+doesn't model easily in the current DRM framework: by firmware, for
+example).
+
+Best regards,
+Liviu
+
+> And one more thing, you are defining virtual panel but you are using
+> drm_bridge framework, why not drm_panel?
+> 
+> Regards
+> Andrzej
+> 
+> >
+> > Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+> > Cc: Ryan Harkin <ryan.harkin@linaro.org>
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > ---
+> >  .../display/bridge/virtual-display-bridge.txt | 62 +++++++++++++++++++
+> >  1 file changed, 62 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt b/Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt
+> > new file mode 100644
+> > index 000000000000..ea4f5a91ab94
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt
+> > @@ -0,0 +1,62 @@
+> > +Virtual Display Bridge
+> > +
+> > +This represents a display that is contained within an emulated
+> > +environment.
+> > +
+> > +This means that the display engine mainly expects some timing
+> > +parameters to be written into it, and after that the emulator will
+> > +respond by creating a virtual display with the requested
+> > +resolution characteristics.
+> > +
+> > +As the operating system cannot "detect" such a display, rather the
+> > +emulator will respond to what the controller outputs, a
+> > +chicken-and-egg problem needs to be solved: the resolution and
+> > +timing characteristics need to be defined and set up somewhere.
+> > +
+> > +The virtual display bridge solves this by defining a bridge with
+> > +all timing characteristics encoded into the device tree node.
+> > +
+> > +Required properies:
+> > +- compatible: shall be "virtual-display-bridge"
+> > +
+> > +Required subnodes:
+> > +- display-timings: contains in turn a display timing node
+> > +  see display-timing.txt
+> > +- ports: contains the display ports, see media/video-interfaces.txt
+> > +
+> > +Example:
+> > +
+> > +bridge {
+> > +	compatible = "virtual-display-bridge";
+> > +	#address-cells = <1>;
+> > +	#size-cells = <0>;
+> > +
+> > +	display-timings {
+> > +		/* Some standard VGA timing */
+> > +		timing0 {
+> > +			clock-frequency = <23750>;
+> > +			hactive = <640>;
+> > +			vactive = <480>;
+> > +			hfront-porch = <48>;
+> > +			hback-porch = <16>;
+> > +			hsync-len = <96>;
+> > +			vfront-porch = <33>;
+> > +			vback-porch = <9>;
+> > +			vsync-len = <3>;
+> > +			vrefresh = <60>;
+> > +		};
+> > +	};
+> > +
+> > +	ports {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		port at 0 {
+> > +			reg = <0>;
+> > +
+> > +			display_bridge_in: endpoint {
+> > +				remote-endpoint = <&foo>;
+> > +			};
+> > +		};
+> > +	};
+> > +};
+> 
+> 
 
 -- 
-Kees Cook
-Pixel Security
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
