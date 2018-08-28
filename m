@@ -1,98 +1,50 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 28 Aug 2018 10:08:31 +0100
-Subject: [RESEND PATCH 3/8] ARM: spectre-v1,
- v1.1: provide helpers for address sanitization
+Date: Tue, 28 Aug 2018 10:08:36 +0100
+Subject: [RESEND PATCH 8/8] ARM: oabi-compat: copy oabi events using
+ __copy_to_user()
 In-Reply-To: <1535447316-32187-1-git-send-email-julien.thierry@arm.com>
 References: <1535447316-32187-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1535447316-32187-4-git-send-email-julien.thierry@arm.com>
+Message-ID: <1535447316-32187-9-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce C and asm helpers to sanitize user address, taking the
-address range they target into account.
-
-Use asm helper for existing sanitization in __copy_from_user().
+Copy all events to user using __copy_to_user() rather than copy members
+of each event individually with __put_user_error().
+This has the benefit of disabling/enabling PAN once for the whole copy
+intead of once per write.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 ---
- arch/arm/include/asm/assembler.h | 10 ++++++++++
- arch/arm/include/asm/uaccess.h   | 25 +++++++++++++++++++++++++
- arch/arm/lib/copy_from_user.S    |  6 +-----
- 3 files changed, 36 insertions(+), 5 deletions(-)
+ arch/arm/kernel/sys_oabi-compat.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index b17ee03..63aeb17 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -467,6 +467,16 @@
- #endif
- 	.endm
+diff --git a/arch/arm/kernel/sys_oabi-compat.c b/arch/arm/kernel/sys_oabi-compat.c
+index f0dd4b6..c89d27e 100644
+--- a/arch/arm/kernel/sys_oabi-compat.c
++++ b/arch/arm/kernel/sys_oabi-compat.c
+@@ -278,7 +278,7 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
+ {
+ 	struct epoll_event *kbuf;
+ 	mm_segment_t fs;
+-	long ret, err, i;
++	long ret, err;
  
-+	.macro uaccess_mask_range_ptr, addr:req, size:req, limit:req, tmp:req
-+#ifdef CONFIG_CPU_SPECTRE
-+	sub	\tmp, \limit, #1
-+	subs	\tmp, \tmp, \addr	@ tmp = limit - 1 - addr
-+	subhss	\tmp, \tmp, \size	@ if (tmp >= 0) tmp = limit - 1 - (addr + size)
-+	movlo	\addr, #0		@ if (tmp < 0) addr = NULL
-+	csdb
-+#endif
-+	.endm
+ 	if (maxevents <= 0 ||
+ 			maxevents > (INT_MAX/sizeof(*kbuf)) ||
+@@ -294,11 +294,9 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
+ 	ret = sys_epoll_wait(epfd, kbuf, maxevents, timeout);
+ 	set_fs(fs);
+ 	err = 0;
+-	for (i = 0; i < ret; i++) {
+-		__put_user_error(kbuf[i].events, &events->events, err);
+-		__put_user_error(kbuf[i].data,   &events->data,   err);
+-		events++;
+-	}
++	if (ret > 0)
++		err = __copy_to_user(events, kbuf, ret * sizeof(*kbuf));
 +
- 	.macro	uaccess_disable, tmp, isb=1
- #ifdef CONFIG_CPU_SW_DOMAIN_PAN
- 	/*
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 2e18b91..9462b8b 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -100,6 +100,31 @@ static inline void set_fs(mm_segment_t fs)
- 	__typeof__(__builtin_choose_expr(sizeof(x) > sizeof(0UL), 0ULL, 0UL))
- 
- /*
-+ * Sanitise a uaccess pointer such that it becomes NULL if addr+size
-+ * is above the current addr_limit.
-+ */
-+#define uaccess_mask_range_ptr(ptr, size)			\
-+	((__typeof__(ptr))__uaccess_mask_range_ptr(ptr, size))
-+static inline void __user *__uaccess_mask_range_ptr(const void __user *ptr,
-+						    size_t size)
-+{
-+	void __user *safe_ptr = (void __user *)ptr;
-+	unsigned long tmp;
-+
-+	asm volatile(
-+	"	sub	%1, %3, #1\n"
-+	"	subs	%1, %1, %0\n"
-+	"	subhss	%1, %1, %2\n"
-+	"	movlo	%0, #0\n"
-+	: "+r" (safe_ptr), "=&r" (tmp)
-+	: "r" (size), "r" (current_thread_info()->addr_limit)
-+	: "cc");
-+
-+	csdb();
-+	return safe_ptr;
-+}
-+
-+/*
-  * Single-value transfer routines.  They automatically use the right
-  * size if we just have the right pointer type.  Note that the functions
-  * which read from user space (*get_*) need to take care not to leak
-diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
-index a826df3..6709a8d 100644
---- a/arch/arm/lib/copy_from_user.S
-+++ b/arch/arm/lib/copy_from_user.S
-@@ -93,11 +93,7 @@ ENTRY(arm_copy_from_user)
- #ifdef CONFIG_CPU_SPECTRE
- 	get_thread_info r3
- 	ldr	r3, [r3, #TI_ADDR_LIMIT]
--	adds	ip, r1, r2	@ ip=addr+size
--	sub	r3, r3, #1	@ addr_limit - 1
--	cmpcc	ip, r3		@ if (addr+size > addr_limit - 1)
--	movcs	r1, #0		@ addr = NULL
--	csdb
-+	uaccess_mask_range_ptr r1, r2, r3, ip
- #endif
- 
- #include "copy_template.S"
+ 	kfree(kbuf);
+ 	return err ? -EFAULT : ret;
+ }
 -- 
 1.9.1
