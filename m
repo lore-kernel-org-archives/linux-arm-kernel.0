@@ -1,50 +1,40 @@
-From: yinbo.zhu@nxp.com (Yinbo Zhu)
-Date: Tue, 28 Aug 2018 18:12:13 +0800
-Subject: [PATCH v1] arm64: dts: ls1043a: Add configure-gfladj property to USB3
- node
-Message-ID: <20180828101213.25750-1-yinbo.zhu@nxp.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Tue, 28 Aug 2018 12:18:55 +0200
+Subject: [PATCH 0/5] ARM: dts: at91: nattis: some cleanup
+In-Reply-To: <20180828094844.10018-1-peda@axentia.se>
+References: <20180828094844.10018-1-peda@axentia.se>
+Message-ID: <20180828101855.GA16561@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajesh Bhagat <rajesh.bhagat@freescale.com>
+On 28/08/2018 11:48:39+0200, Peter Rosin wrote:
+> Hi!
+> 
+> Now that some other patches [1][2] have finally landed in -next, I
+> feel that it is time for this cleanup series that I have been hoarding
+> for a while waiting on those (weak) dependencies.
+> 
+> Cheers,
+> Peter
+> 
+> [1] https://lkml.org/lkml/2018/8/24/187
+> [2] https://lkml.org/lkml/2018/8/25/64
+> 
+> Peter Rosin (5):
+>   ARM: dts: at91: nattis: set the PRLUD and HIPOW signals low
+>   ARM: dts: at91: nattis: make the SD-card slot work
+>   ARM: dts: at91: nattis: state the actual lvds-encoder chip
+>   ARM: dts: at91: nattis: move pinctrls for the lvds chip to the lvds
+>     node
+>   ARM: dts: at91: nattis: describe the lvds panel
+> 
+>  arch/arm/boot/dts/at91-nattis-2-natte-2.dts | 43 ++++++++++++++++++++++-------
+>  1 file changed, 33 insertions(+), 10 deletions(-)
+> 
 
-Add "configure-gfladj" boolean property to USB3 node. This property
-is used to determine whether frame length adjustent is required or
-not
+All applied, thanks.
 
-Signed-off-by: Rajesh Bhagat <rajesh.bhagat@nxp.com>
-Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index a830a2e..a3c5165 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -610,6 +610,7 @@
- 			snps,dis-u1u2-when-u3-quirk;
- 			snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
- 			dma-coherent;
-+			configure-gfladj;
- 		};
- 
- 		usb1: usb3 at 3000000 {
-@@ -623,6 +624,7 @@
- 			snps,dis-u1u2-when-u3-quirk;
- 			snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
- 			dma-coherent;
-+			configure-gfladj;
- 		};
- 
- 		usb2: usb3 at 3100000 {
-@@ -636,6 +638,7 @@
- 			snps,dis-u1u2-when-u3-quirk;
- 			snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
- 			dma-coherent;
-+			configure-gfladj;
- 		};
- 
- 		sata: sata at 3200000 {
 -- 
-1.7.1
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
