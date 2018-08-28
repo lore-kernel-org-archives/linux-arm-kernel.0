@@ -1,37 +1,32 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 27 Aug 2018 20:03:02 -0500
-Subject: [PATCH] serial: 8250_omap: Make 8250_omap driver driver depend on
- ARCH_K3
-Message-ID: <20180828010302.2751-1-nm@ti.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Mon, 27 Aug 2018 18:05:16 -0700
+Subject: [PATCH V3 0/2] firmware: ti_sci: Add host-id as an optional
+ parameter
+In-Reply-To: <20180828005924.13092-1-nm@ti.com>
+References: <20180828005924.13092-1-nm@ti.com>
+Message-ID: <7a73e77f-b119-89bc-cd0e-bbd6628b1395@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lokesh Vutla <lokeshvutla@ti.com>
+On 8/27/2018 5:59 PM, Nishanth Menon wrote:
+> Hi Santosh,
+> 
+> This is the rebase to v4.19-rc1 and repost of the patch series [1]
+> Please find attached series to enable host-id as an optional dt property.
+> 
+> [1] https://patchwork.ozlabs.org/cover/931822/
+> 
+> No Functional changes. Will be great if we can get this in rc cycle,
+> but, will defer to you.
+> 
+> Nishanth Menon (2):
+>    Documentation: dt: keystone: ti-sci: Add optional host-id parameter
+>    firmware: ti_sci: Provide host-id as an optional dt parameter
+> 
+Yes I had this series bookmarked and was going to merge it now since
+rc1 is out. Will get to it in next few days & it should showup
+in next. But don't plan to send it for rc since its not a regression"
+as such. Thanks for following up Nishant !!
 
-Allow 8250 omap serial driver to be used for K3 platforms.
-
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-
-Now that we have the device tree support merged integrated AND we have ARCH_K3,
-Lets enable the 820 OMAP Driver to build for ARCH_K3 and make it operational.
-
- drivers/tty/serial/8250/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
-index f005eaf8bc57..15c2c5463835 100644
---- a/drivers/tty/serial/8250/Kconfig
-+++ b/drivers/tty/serial/8250/Kconfig
-@@ -375,7 +375,7 @@ config SERIAL_8250_RT288X
- 
- config SERIAL_8250_OMAP
- 	tristate "Support for OMAP internal UART (8250 based driver)"
--	depends on SERIAL_8250 && ARCH_OMAP2PLUS
-+	depends on SERIAL_8250 && (ARCH_OMAP2PLUS || ARCH_K3)
- 	help
- 	  If you have a machine based on an Texas Instruments OMAP CPU you
- 	  can enable its onboard serial ports by enabling this option.
--- 
-2.15.1
+Regards,
+Santosh
