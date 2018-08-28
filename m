@@ -1,25 +1,27 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Mon, 27 Aug 2018 17:55:21 -0700
-Subject: [PATCH] clk: keystone: Enable TISCI clocks if K3_ARCH
-In-Reply-To: <20180828005056.27326-1-nm@ti.com>
-References: <20180828005056.27326-1-nm@ti.com>
-Message-ID: <d2027284-5265-388e-f793-cd048ac8a587@oracle.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 27 Aug 2018 19:59:22 -0500
+Subject: [PATCH V3 0/2] firmware: ti_sci: Add host-id as an optional parameter
+Message-ID: <20180828005924.13092-1-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/27/2018 5:50 PM, Nishanth Menon wrote:
-> K3_ARCH uses TISCI for clocks as well. Enable the same
-> for the driver support.
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
-> 
-> Ref: https://patchwork.kernel.org/patch/10447677/
-> 
-> Since ARCH_K3 only got integrated in v4.19-rc1, rebased to v4.19-rc1 tag..
-> 
->   drivers/clk/Makefile         | 1 +
->   drivers/clk/keystone/Kconfig | 2 +-
->   2 files changed, 2 insertions(+), 1 deletion(-)
-> 
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+Hi Santosh,
+
+This is the rebase to v4.19-rc1 and repost of the patch series [1]
+Please find attached series to enable host-id as an optional dt property.
+
+[1] https://patchwork.ozlabs.org/cover/931822/
+
+No Functional changes. Will be great if we can get this in rc cycle,
+but, will defer to you.
+
+Nishanth Menon (2):
+  Documentation: dt: keystone: ti-sci: Add optional host-id parameter
+  firmware: ti_sci: Provide host-id as an optional dt parameter
+
+ .../devicetree/bindings/arm/keystone/ti,sci.txt    |  4 ++++
+ drivers/firmware/ti_sci.c                          | 24 ++++++++++++++++++----
+ 2 files changed, 24 insertions(+), 4 deletions(-)
+
+-- 
+2.15.1
