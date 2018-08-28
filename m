@@ -1,102 +1,92 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Tue, 28 Aug 2018 13:47:12 +0300
-Subject: [PATCH v6 3/3] mmc: sdhci-of-dwcmshc: solve 128MB DMA boundary
- limitation
-In-Reply-To: <20180828174814.40dfa48f@xhacker.debian>
-References: <20180828174534.00fb5e24@xhacker.debian>
- <20180828174814.40dfa48f@xhacker.debian>
-Message-ID: <6f1f9655-7fe4-a25c-c981-5027fa444334@intel.com>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Tue, 28 Aug 2018 16:27:03 +0530
+Subject: [PATCH 00/15] soc: octeontx2: Add RVU admin function driver
+Message-ID: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/08/18 12:48, Jisheng Zhang wrote:
-> When using DMA, if the DMA addr spans 128MB boundary, we have to split
-> the DMA transfer into two so that each one doesn't exceed the boundary.
-> 
-> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+From: Sunil Goutham <sgoutham@marvell.com>
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+Resource virtualization unit (RVU) on Marvell's OcteonTX2 SOC supports
+multiple PCIe SRIOV physical functions (PFs) and virtual functions (VFs).
+PF0 is called administrative / admin function (AF) and has privilege access
+to registers to provision different RVU functional blocks to each of
+PF/VF. 
 
-> ---
->  drivers/mmc/host/sdhci-of-dwcmshc.c | 39 +++++++++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/sdhci-of-dwcmshc.c b/drivers/mmc/host/sdhci-of-dwcmshc.c
-> index 1b7cd144fb01..a5137845a1c7 100644
-> --- a/drivers/mmc/host/sdhci-of-dwcmshc.c
-> +++ b/drivers/mmc/host/sdhci-of-dwcmshc.c
-> @@ -8,21 +8,51 @@
->   */
->  
->  #include <linux/clk.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/sizes.h>
->  
->  #include "sdhci-pltfm.h"
->  
-> +#define BOUNDARY_OK(addr, len) \
-> +	((addr | (SZ_128M - 1)) == ((addr + len - 1) | (SZ_128M - 1)))
-> +
->  struct dwcmshc_priv {
->  	struct clk	*bus_clk;
->  };
->  
-> +/*
-> + * If DMA addr spans 128MB boundary, we split the DMA transfer into two
-> + * so that each DMA transfer doesn't exceed the boundary.
-> + */
-> +static void dwcmshc_adma_write_desc(struct sdhci_host *host, void **desc,
-> +				    dma_addr_t addr, int len, unsigned int cmd)
-> +{
-> +	int tmplen, offset;
-> +
-> +	if (likely(!len || BOUNDARY_OK(addr, len))) {
-> +		sdhci_adma_write_desc(host, desc, addr, len, cmd);
-> +		return;
-> +	}
-> +
-> +	offset = addr & (SZ_128M - 1);
-> +	tmplen = SZ_128M - offset;
-> +	sdhci_adma_write_desc(host, desc, addr, tmplen, cmd);
-> +
-> +	addr += tmplen;
-> +	len -= tmplen;
-> +	sdhci_adma_write_desc(host, desc, addr, len, cmd);
-> +}
-> +
->  static const struct sdhci_ops sdhci_dwcmshc_ops = {
->  	.set_clock		= sdhci_set_clock,
->  	.set_bus_width		= sdhci_set_bus_width,
->  	.set_uhs_signaling	= sdhci_set_uhs_signaling,
->  	.get_max_clock		= sdhci_pltfm_clk_get_max_clock,
->  	.reset			= sdhci_reset,
-> +	.adma_write_desc	= dwcmshc_adma_write_desc,
->  };
->  
->  static const struct sdhci_pltfm_data sdhci_dwcmshc_pdata = {
-> @@ -36,12 +66,21 @@ static int dwcmshc_probe(struct platform_device *pdev)
->  	struct sdhci_host *host;
->  	struct dwcmshc_priv *priv;
->  	int err;
-> +	u32 extra;
->  
->  	host = sdhci_pltfm_init(pdev, &sdhci_dwcmshc_pdata,
->  				sizeof(struct dwcmshc_priv));
->  	if (IS_ERR(host))
->  		return PTR_ERR(host);
->  
-> +	/*
-> +	 * extra adma table cnt for cross 128M boundary handling.
-> +	 */
-> +	extra = DIV_ROUND_UP_ULL(dma_get_required_mask(&pdev->dev), SZ_128M);
-> +	if (extra > SDHCI_MAX_SEGS)
-> +		extra = SDHCI_MAX_SEGS;
-> +	host->adma_table_cnt += extra;
-> +
->  	pltfm_host = sdhci_priv(host);
->  	priv = sdhci_pltfm_priv(pltfm_host);
->  
-> 
+This admin function (AF) driver acts as a configuration / administrative
+software which provisions functional blocks to a PF/VF on demand for them
+to work as one of the following
+ - A basic network controller (i.e NIC).
+ - NIC with packet filtering, shaping and scheduling capabilities.
+ - A crypto device.
+ - A combination of above etc.
+
+PF/VFs communicate with admin function via a shared memory region.
+This patch series adds logic for the following
+ - RVU AF driver with functional blocks provisioning support
+ - Mailbox infrastructure for communication between AF and PFs.
+ - CGX driver which provides information about physcial network
+   interfaces which AF processes and forwards required info to
+   PF/VF drivers.
+
+This is the first set of patches out of 70 odd patches.
+
+Note: This driver neither receives any data nor processes it i.e no I/O,
+      just does the hardware configuration.
+
+Aleksey Makarov (2):
+  soc: octeontx2: Add mailbox support infra
+  soc: octeontx2: Convert mbox msg id check to a macro
+
+Geetha sowjanya (1):
+  soc: octeontx2: Reconfig MSIX base with IOVA
+
+Linu Cherian (3):
+  soc: octeontx2: Set RVU PFs to CGX LMACs mapping
+  soc: octeontx2: Add support for CGX link management
+  soc: octeontx2: Register for CGX lmac events
+
+Sunil Goutham (9):
+  soc: octeontx2: Add Marvell OcteonTX2 RVU AF driver
+  soc: octeontx2: Reset all RVU blocks
+  soc: octeontx2: Gather RVU blocks HW info
+  soc: octeontx2: Add mailbox IRQ and msg handlers
+  soc: octeontx2: Scan blocks for LFs provisioned to PF/VF
+  soc: octeontx2: Add RVU block LF provisioning support
+  soc: octeontx2: Configure block LF's MSIX vector offset
+  soc: octeontx2: Add Marvell OcteonTX2 CGX driver
+  MAINTAINERS: Add entry for Marvell OcteonTX2 Admin Function driver
+
+ MAINTAINERS                                |   10 +
+ drivers/soc/Kconfig                        |    1 +
+ drivers/soc/Makefile                       |    1 +
+ drivers/soc/marvell/Kconfig                |   23 +
+ drivers/soc/marvell/Makefile               |    2 +
+ drivers/soc/marvell/octeontx2/Makefile     |   10 +
+ drivers/soc/marvell/octeontx2/cgx.c        |  529 +++++++++
+ drivers/soc/marvell/octeontx2/cgx.h        |   63 ++
+ drivers/soc/marvell/octeontx2/cgx_fw_if.h  |  225 ++++
+ drivers/soc/marvell/octeontx2/mbox.c       |  300 +++++
+ drivers/soc/marvell/octeontx2/mbox.h       |  211 ++++
+ drivers/soc/marvell/octeontx2/rvu.c        | 1625 ++++++++++++++++++++++++++++
+ drivers/soc/marvell/octeontx2/rvu.h        |  158 +++
+ drivers/soc/marvell/octeontx2/rvu_cgx.c    |  194 ++++
+ drivers/soc/marvell/octeontx2/rvu_reg.h    |  442 ++++++++
+ drivers/soc/marvell/octeontx2/rvu_struct.h |   78 ++
+ 16 files changed, 3872 insertions(+)
+ create mode 100644 drivers/soc/marvell/Kconfig
+ create mode 100644 drivers/soc/marvell/Makefile
+ create mode 100644 drivers/soc/marvell/octeontx2/Makefile
+ create mode 100644 drivers/soc/marvell/octeontx2/cgx.c
+ create mode 100644 drivers/soc/marvell/octeontx2/cgx.h
+ create mode 100644 drivers/soc/marvell/octeontx2/cgx_fw_if.h
+ create mode 100644 drivers/soc/marvell/octeontx2/mbox.c
+ create mode 100644 drivers/soc/marvell/octeontx2/mbox.h
+ create mode 100644 drivers/soc/marvell/octeontx2/rvu.c
+ create mode 100644 drivers/soc/marvell/octeontx2/rvu.h
+ create mode 100644 drivers/soc/marvell/octeontx2/rvu_cgx.c
+ create mode 100644 drivers/soc/marvell/octeontx2/rvu_reg.h
+ create mode 100644 drivers/soc/marvell/octeontx2/rvu_struct.h
+
+-- 
+2.7.4
