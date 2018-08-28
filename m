@@ -1,205 +1,44 @@
-From: john.garry@huawei.com (John Garry)
-Date: Tue, 28 Aug 2018 18:35:29 +0100
-Subject: [PATCH] perf vendor events arm64: Add to core JSON events for eMAG
-In-Reply-To: <20180823202250.30797-1-seanvk.dev@oregontracks.org>
-References: <20180823202250.30797-1-seanvk.dev@oregontracks.org>
-Message-ID: <574a7b6c-e9db-a1fb-7a0a-5bfc8dbe2b7b@huawei.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 28 Aug 2018 18:40:12 +0100
+Subject: [PATCH] arm64: add NUMA emulation support
+In-Reply-To: <20180824230559.32336-1-shuah@kernel.org>
+References: <20180824230559.32336-1-shuah@kernel.org>
+Message-ID: <20180828174011.GE20375@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/08/2018 21:22, Sean V Kelley wrote:
-> Adds the remainder of the supported ARMv8 recommended IMPLEMENTATION
-> DEFINED events for the Ampere Computing eMAG file.
->
-> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-> Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> Cc: Jiri Olsa <jolsa@redhat.com>
-> Cc: Namhyung Kim <namhyung@kernel.org>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: William Cohen <wcohen@redhat.com>
-> Cc: linux-arm-kernel at lists.infradead.org
->
-> Signed-off-by: Sean V Kelley <seanvk.dev@oregontracks.org>
+On Fri, Aug 24, 2018 at 05:05:59PM -0600, Shuah Khan (Samsung OSG) wrote:
+> Add NUMA emulation support to emulate NUMA on non-NUMA platforms. A new
+> CONFIG_NUMA_EMU option enables NUMA emulation and a new kernel command
+> line option "numa=fake=N" allows users to specify the configuration for
+> emulation.
+> 
+> When NUMA emulation is enabled, a flat (non-NUMA) machine will be split
+> into virtual NUMA nodes when booted with "numa=fake=N", where N is the
+> number of nodes, the system RAM will be split into N equal chunks and
+> assigned to each node.
+> 
+> Emulated nodes are bounded by MAX_NUMNODES and the number of memory block
+> count to avoid splitting memory blocks across NUMA nodes.
+> 
+> If NUMA emulation init fails, it will fall back to dummy NUMA init.
+> 
+> This is tested on Raspberry Pi3b+ with ltp NUMA test suite, numactl, and
+> numastat tools. In addition, tested in conjunction with cpuset cgroup to
+> verify cpuset.cpus and cpuset.mems assignments.
+> 
+> Signed-off-by: Shuah Khan (Samsung OSG) <shuah@kernel.org>
 > ---
->  .../arch/arm64/ampere/emag/core-imp-def.json  | 150 +++++++++++++++++-
->  1 file changed, 144 insertions(+), 6 deletions(-)
->
-> diff --git a/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
-> index bc03c06c3918..d95202dbe2b2 100644
-> --- a/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
-> +++ b/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
-> @@ -9,7 +9,7 @@
->          "ArchStdEvent": "L1D_CACHE_REFILL_RD",
->      },
->      {
-> -        "ArchStdEvent": "L1D_CACHE_REFILL_WR",
+>  arch/arm64/Kconfig            |   9 +++
+>  arch/arm64/include/asm/numa.h |   8 +++
+>  arch/arm64/mm/Makefile        |   1 +
+>  arch/arm64/mm/numa.c          |   4 ++
+>  arch/arm64/mm/numa_emu.c      | 109 ++++++++++++++++++++++++++++++++++
+>  5 files changed, 131 insertions(+)
+>  create mode 100644 arch/arm64/mm/numa_emu.c
 
-You seem to be removing event support here, which is not consistent with 
-the commit log. Please explain.
+Hmm, is this just for debugging and kernel development? If so, it's quite a
+lot of code just for that. Can't you achieve the same thing by faking up the
+firmware tables?
 
-> +        "ArchStdEvent": "L1D_CACHE_INVAL",
->      },
->      {
->          "ArchStdEvent": "L1D_TLB_REFILL_RD",
-> @@ -18,15 +18,153 @@
->          "ArchStdEvent": "L1D_TLB_REFILL_WR",
->      },
->      {
-> -        "ArchStdEvent": "L1D_TLB_RD",
-> +        "ArchStdEvent": "L2D_CACHE_RD",
->      },
->      {
-> -        "ArchStdEvent": "L1D_TLB_WR",
-> +        "ArchStdEvent": "L2D_CACHE_WR",
-> +    },
-> +    {
-> +        "ArchStdEvent": "L2D_CACHE_REFILL_RD",
-> +    },
-> +    {
-> +        "ArchStdEvent": "L2D_CACHE_REFILL_WR",
-> +    },
-> +    {
-> +        "ArchStdEvent": "L2D_CACHE_WB_VICTIM",
-> +    },
-> +    {
-> +        "ArchStdEvent": "L2D_CACHE_WB_CLEAN",
-> +    },
-> +    {
-> +        "ArchStdEvent": "L2D_CACHE_INVAL",
->      },
->      {
->          "ArchStdEvent": "BUS_ACCESS_RD",
-> -   },
-> -   {
-> +    },
-> +    {
->          "ArchStdEvent": "BUS_ACCESS_WR",
-> -   }
-> +    },
-> +    {
-> +        "ArchStdEvent": "BUS_ACCESS_SHARED",
-> +    },
-> +    {
-> +        "ArchStdEvent": "BUS_ACCESS_NOT_SHARED",
-> +    },
-> +    {
-> +        "ArchStdEvent": "BUS_ACCESS_NORMAL",
-> +    },
-> +    {
-> +        "ArchStdEvent": "BUS_ACCESS_PERIPH",
-> +    },
-> +    {
-> +        "ArchStdEvent": "MEM_ACCESS_RD",
-> +    },
-> +    {
-> +        "ArchStdEvent": "MEM_ACCESS_WR",
-> +    },
-> +    {
-> +        "ArchStdEvent": "UNALIGNED_LD_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "UNALIGNED_ST_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "UNALIGNED_LDST_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "LDREX_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "STREX_PASS_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "STREX_FAIL_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "STREX_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "LD_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "ST_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "LDST_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "DP_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "ASE_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "VFP_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "PC_WRITE_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "CRYPTO_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "BR_IMMED_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "BR_RETURN_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "BR_INDIRECT_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "ISB_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "DSB_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "DMB_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_UNDEF",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_SVC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_PABORT",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_DABORT",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_IRQ",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_FIQ",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_HVC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_TRAP_PABORT",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_TRAP_DABORT",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_TRAP_OTHER",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_TRAP_IRQ",
-> +    },
-> +    {
-> +        "ArchStdEvent": "EXC_TRAP_FIQ",
-> +    },
-> +    {
-> +        "ArchStdEvent": "RC_LD_SPEC",
-> +    },
-> +    {
-> +        "ArchStdEvent": "RC_ST_SPEC",
-> +    },
->  ]
->
+Will
