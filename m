@@ -1,213 +1,114 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Tue, 28 Aug 2018 07:28:47 +0000
-Subject: [PATCH 2/2] soc: imx: gpcv2: make pgc driver more generic for
- other i.MX platforms
-In-Reply-To: <CAHQ1cqGA37RNoo3KcESCOFeYZxAQCOFkuQQhRPRKCTp=gKLdKQ@mail.gmail.com>
-References: <1533537589-7202-1-git-send-email-Anson.Huang@nxp.com>
- <1533537589-7202-2-git-send-email-Anson.Huang@nxp.com>
- <CAHQ1cqGA37RNoo3KcESCOFeYZxAQCOFkuQQhRPRKCTp=gKLdKQ@mail.gmail.com>
-Message-ID: <DB3PR0402MB39160F15A078B7FE8BF13105F50A0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Tue, 28 Aug 2018 09:31:53 +0200
+Subject: [PATCH v2 4/7] drm/i2c: tda998x: convert to bridge driver
+In-Reply-To: <20180827175947.GE30658@n2100.armlinux.org.uk>
+References: <20180730164137.GD17271@n2100.armlinux.org.uk>
+ <CGME20180731072333epcas3p152812eff8bdb2390ea482a4a20d34438@epcas3p1.samsung.com>
+ <E1fkBFV-00048s-O2@rmk-PC.armlinux.org.uk>
+ <20180827161601eucas1p2951c1ce0eeeabbcf9d190d7dca28c91c~OyfFOhdDv1363313633eucas1p2b@eucas1p2.samsung.com>
+ <20180827175947.GE30658@n2100.armlinux.org.uk>
+Message-ID: <20180828073156eucas1p21e13ba5d7702e6147a05b9750c8eb054~O__x-ibC70308603086eucas1p2B@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 27.08.2018 19:59, Russell King - ARM Linux wrote:
+> Hi Andrzej,
+>
+> On Mon, Aug 27, 2018 at 06:15:59PM +0200, Andrzej Hajda wrote:
+>> On 30.07.2018 18:42, Russell King wrote:
+>>>  static void tda998x_destroy(struct tda998x_priv *priv)
+>>>  {
+>>> +	drm_bridge_remove(&priv->bridge);
+>>> +
+>>>  	/* disable all IRQs and free the IRQ handler */
+>>>  	cec_write(priv, REG_CEC_RXSHPDINTENA, 0);
+>>>  	reg_clear(priv, REG_INT_FLAGS_2, INT_FLAGS_2_EDID_BLK_RD);
+>>> @@ -1650,6 +1663,7 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
+>>>  	mutex_init(&priv->mutex);	/* protect the page access */
+>>>  	mutex_init(&priv->audio_mutex); /* protect access from audio thread */
+>>>  	mutex_init(&priv->edid_mutex);
+>>> +	INIT_LIST_HEAD(&priv->bridge.list);
+>> This line can be probably removed, unless there is a reason I am not
+>> aware of.
+> The addition above of drm_bridge_remove() to tda998x_destroy() means
+> that we end up calling this function in the error cleanup path.  This
+> avoids unnecessary complexity with lots of different gotos - tda998x
+> has had a long history of not cleaning up stuff properly.
+
+1. bridge.list is/should be a private field of drm_bridge framework, so
+it's direct usage in driver looks like layer violation.
+2. Calling drm_bridge_remove() without drm_bridge_add() is not strictly
+forbidden, but at least looks very suspicious. Even if current
+implementation tolerates it, it can change in the future.
+
+Neither argument is a blocker IMO so if you prefer to stay with current
+solution please add a comment in the code explaining why do you
+initializes list field, the code at first sight looks suspicious.
+
+> devm interfaces for bridge do not help avoid that - devm stuff only
+> works if everything that is registered previously is cleaned up via
+> devm mechanisms to ensure that a device's interface becomes unavailable
+> before stuff (eg, edid timers, detect work) is started to be cleaned up.
+> Otherwise, there's a chance of this stuff being triggered during
+> tear-down.
+>
+>>> +static int tda998x_bind(struct device *dev, struct device *master, void *data)
+>>> +{
+>>> +	struct i2c_client *client = to_i2c_client(dev);
+>>> +	struct drm_device *drm = data;
+>>> +	struct tda998x_priv *priv;
+>>> +	int ret;
+>>> +
+>>> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+>>> +	if (!priv)
+>>> +		return -ENOMEM;
+>>> +
+>>> +	dev_set_drvdata(dev, priv);
+>>> +
+>>> +	ret = tda998x_create(client, priv);
+>>> +	if (ret)
+>>> +		return ret;
+>>> +
+>>> +	ret = tda998x_encoder_init(dev, drm);
+>>> +	if (ret) {
+>>> +		tda998x_destroy(priv);
+>>> +		return ret;
+>>> +	}
+>>> +	return 0;
+>> It could be replaced by:
+>> ??? ret = tda998x_encoder_init(dev, drm);
+>> ??? if (ret)
+>> ??? ??? tda998x_destroy(priv);
+>> ??? return ret;
+>>
+>> but this is probably matter of taste.
+> It's not clear to me what "It" is - I think you're suggesting combining
+> tda998x_create() and tda998x_encoder_init() ?
+
+No, just simplifying error path.
+
+>
+> The code is structured this way to make the following patches easier -
+> there is no point of combining things only to have to then break them
+> apart again in a later patch.  Please see patch 7, where tda998x_create()
+> moves out of this function, where exactly this happens.
+
+OK. As I said: up to you.
+
+>
+>> Moreover I guess priv->is_on could be removed if enable/disable
+>> callbacks are called only by drm_core, but this is for another patch.
+> Is it guaranteed that a bridge ->enable or ->disable callback won't be
+> called twice, even for legacy drivers?  I think atomic guarantees this
+> but I don't think it's guaranteed for legacy drivers.
+>
+> I'm guessing Rob had a reason why he added the check when he originally
+> created the driver (encoder ->dpms can be called for the same dpms
+> state multiple times?)
+>
+OK, my guess was incorrect.
 
 
-Anson Huang
-Best Regards!
+Regards
 
-
-> -----Original Message-----
-> From: Andrey Smirnov <andrew.smirnov@gmail.com>
-> Sent: Tuesday, August 28, 2018 6:51 AM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
-> <s.hauer@pengutronix.de>; Sascha Hauer <kernel@pengutronix.de>; Fabio
-> Estevam <fabio.estevam@nxp.com>; linux-arm-kernel
-> <linux-arm-kernel@lists.infradead.org>; linux-kernel
-> <linux-kernel@vger.kernel.org>; dl-linux-imx <linux-imx@nxp.com>
-> Subject: Re: [PATCH 2/2] soc: imx: gpcv2: make pgc driver more generic for
-> other i.MX platforms
-> 
-> On Sun, Aug 5, 2018 at 11:45 PM Anson Huang <Anson.Huang@nxp.com>
-> wrote:
-> >
-> > i.MX8MQ and i.MX8MM share same gpc module with i.MX7D, they can reuse
-> > gpcv2 pgc driver for power domain control, this patch renames all
-> > functions and structure definitions started with "imx7" to "imx", and
-> > check machine type to pass platform specific power domain data for
-> > power domain driver, thus make
-> > gpcv2 pgc driver more generic for i.MX platforms.
-> >
-> 
-> Just for the sake of
-> 
-> 
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > ---
-> >  drivers/soc/imx/gpcv2.c | 68
-> > +++++++++++++++++++++++++++++--------------------
-> >  1 file changed, 40 insertions(+), 28 deletions(-)
-> >
-> > diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c index
-> > 0e31465..0e33cb5 100644
-> > --- a/drivers/soc/imx/gpcv2.c
-> > +++ b/drivers/soc/imx/gpcv2.c
-> > @@ -53,7 +53,7 @@
-> >
-> >  #define GPC_PGC_CTRL_PCR               BIT(0)
-> >
-> > -struct imx7_pgc_domain {
-> > +struct imx_pgc_domain {
-> >         struct generic_pm_domain genpd;
-> >         struct regmap *regmap;
-> >         struct regulator *regulator;
-> > @@ -69,11 +69,11 @@ struct imx7_pgc_domain {
-> >         struct device *dev;
-> >  };
-> >
-> > -static int imx7_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain
-> > *genpd,
-> > +static int imx_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain *genpd,
-> >                                       bool on)  {
-> > -       struct imx7_pgc_domain *domain = container_of(genpd,
-> > -                                                     struct
-> imx7_pgc_domain,
-> > +       struct imx_pgc_domain *domain = container_of(genpd,
-> > +                                                     struct
-> > + imx_pgc_domain,
-> >                                                       genpd);
-> >         unsigned int offset = on ?
-> >                 GPC_PU_PGC_SW_PUP_REQ :
-> GPC_PU_PGC_SW_PDN_REQ; @@
-> > -150,17 +150,17 @@ static int imx7_gpc_pu_pgc_sw_pxx_req(struct
-> generic_pm_domain *genpd,
-> >         return ret;
-> >  }
-> >
-> > -static int imx7_gpc_pu_pgc_sw_pup_req(struct generic_pm_domain
-> > *genpd)
-> > +static int imx_gpc_pu_pgc_sw_pup_req(struct generic_pm_domain *genpd)
-> >  {
-> > -       return imx7_gpc_pu_pgc_sw_pxx_req(genpd, true);
-> > +       return imx_gpc_pu_pgc_sw_pxx_req(genpd, true);
-> >  }
-> >
-> > -static int imx7_gpc_pu_pgc_sw_pdn_req(struct generic_pm_domain
-> > *genpd)
-> > +static int imx_gpc_pu_pgc_sw_pdn_req(struct generic_pm_domain *genpd)
-> >  {
-> > -       return imx7_gpc_pu_pgc_sw_pxx_req(genpd, false);
-> > +       return imx_gpc_pu_pgc_sw_pxx_req(genpd, false);
-> >  }
-> >
-> > -static const struct imx7_pgc_domain imx7_pgc_domains[] = {
-> > +static const struct imx_pgc_domain imx7_pgc_domains[] = {
-> >         [IMX7_POWER_DOMAIN_MIPI_PHY] = {
-> >                 .genpd = {
-> >                         .name      = "mipi-phy",
-> > @@ -198,9 +198,9 @@ static const struct imx7_pgc_domain
-> imx7_pgc_domains[] = {
-> >         },
-> >  };
-> >
-> > -static int imx7_pgc_domain_probe(struct platform_device *pdev)
-> > +static int imx_pgc_domain_probe(struct platform_device *pdev)
-> >  {
-> > -       struct imx7_pgc_domain *domain = pdev->dev.platform_data;
-> > +       struct imx_pgc_domain *domain = pdev->dev.platform_data;
-> >         int ret;
-> >
-> >         domain->dev = &pdev->dev;
-> > @@ -233,9 +233,9 @@ static int imx7_pgc_domain_probe(struct
-> platform_device *pdev)
-> >         return ret;
-> >  }
-> >
-> > -static int imx7_pgc_domain_remove(struct platform_device *pdev)
-> > +static int imx_pgc_domain_remove(struct platform_device *pdev)
-> >  {
-> > -       struct imx7_pgc_domain *domain = pdev->dev.platform_data;
-> > +       struct imx_pgc_domain *domain = pdev->dev.platform_data;
-> >
-> >         of_genpd_del_provider(domain->dev->of_node);
-> >         pm_genpd_remove(&domain->genpd); @@ -243,23 +243,24 @@
-> static
-> > int imx7_pgc_domain_remove(struct platform_device *pdev)
-> >         return 0;
-> >  }
-> >
-> > -static const struct platform_device_id imx7_pgc_domain_id[] = {
-> > -       { "imx7-pgc-domain", },
-> > +static const struct platform_device_id imx_pgc_domain_id[] = {
-> > +       { "imx-pgc-domain", },
-> >         { },
-> >  };
-> >
-> > -static struct platform_driver imx7_pgc_domain_driver = {
-> > +static struct platform_driver imx_pgc_domain_driver = {
-> >         .driver = {
-> > -               .name = "imx7-pgc",
-> > +               .name = "imx-pgc",
-> >         },
-> > -       .probe    = imx7_pgc_domain_probe,
-> > -       .remove   = imx7_pgc_domain_remove,
-> > -       .id_table = imx7_pgc_domain_id,
-> > +       .probe    = imx_pgc_domain_probe,
-> > +       .remove   = imx_pgc_domain_remove,
-> > +       .id_table = imx_pgc_domain_id,
-> >  };
-> > -builtin_platform_driver(imx7_pgc_domain_driver)
-> > +builtin_platform_driver(imx_pgc_domain_driver)
-> >
-> >  static int imx_gpcv2_probe(struct platform_device *pdev)  {
-> > +       static const struct imx_pgc_domain *imx_pgc_domains;
-> >         static const struct regmap_range yes_ranges[] = {
-> >                 regmap_reg_range(GPC_LPCR_A_CORE_BSC,
-> >                                  GPC_M4_PU_PDN_FLG), @@
-> -287,6 +288,7
-> > @@ static int imx_gpcv2_probe(struct platform_device *pdev)
-> >         struct regmap *regmap;
-> >         struct resource *res;
-> >         void __iomem *base;
-> > +       int pgc_max_index;
-> >         int ret;
-> >
-> >         pgc_np = of_get_child_by_name(dev->of_node, "pgc"); @@ -307,9
-> > +309,19 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
-> >                 return ret;
-> >         }
-> >
-> > +       if (of_machine_is_compatible("fsl,imx7d")) {
-> > +               pgc_max_index = ARRAY_SIZE(imx7_pgc_domains);
-> > +               imx_pgc_domains = imx7_pgc_domains;
-> > +       }
-> 
-> Is there any reason to do this explicit call to
-> of_machine_is_compatible() as opposed to passing necessary data via .data in
-> imx_gpcv2_dt_ids[]? The latter seems like a more straightforward way of
-> passing variant specific driver info
-
-The reason of NOT using .data is that currently gpcv2 driver uses a structure array
-of imx7_pgc_domains[] which has no fixed length, the .data can ONLY pass the pointer
-of the starting address of imx7_pgc_domains[], and we need to know the array size of
-imx7_pgc_domains, how can we know it if we ONLY got the starting address of this array
-passed from .data. Please advise, thanks.
-
-
-Anson.
-
-> 
-> > +
-> > +       if (!imx_pgc_domains) {
-> > +               dev_err(&pdev->dev, "no device match found\n");
-> > +               return -ENODEV;
-> > +       }
-> 
-> And doing so would also allow you to drop the check above.
-> 
-> Other that this seems like a reasonable change:
-> 
-> Acked-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> 
-> Thanks,
-> Andrey Smirnov
+Andrzej
