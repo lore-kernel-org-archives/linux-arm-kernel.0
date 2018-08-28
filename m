@@ -1,29 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 28 Aug 2018 09:25:56 -0700
-Subject: [PATCH] arm64: dts: ti: k3-am65: Change #address-cells and
- #size-cells of interconnect to 2
-In-Reply-To: <20180828102642.26482-1-kishon@ti.com>
-References: <20180828102642.26482-1-kishon@ti.com>
-Message-ID: <20180828162556.GQ7523@atomide.com>
+From: dantuguf14105@gmail.com (Neeraj Dantu)
+Date: Tue, 28 Aug 2018 16:37:58 +0000
+Subject: [PATCH v2] Fix file permission for am335x-osd3358-sm-red.dts
+Message-ID: <20180828163758.1305-1-neeraj.dantu@octavosystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [180828 10:31]:
-> AM65 has two PCIe controllers and each PCIe controller has '2' address
-> spaces one within the 4GB address space of the SoC and the other above
-> the 4GB address space of the SoC in addition to the register space. The
-> size of the address space above the 4GB SoC address space is 4GB. These
-> address ranges will be used by CPU/DMA to access the PCIe address space.
-> In order to represent the address space above the 4GB SoC address space
-> and to represent the size of this address space as 4GB, change
-> address-cells and size-cells of interconnect to 2.
-...
->  		cbass_mcu: interconnect at 28380000 {
->  			compatible = "simple-bus";
->  			#address-cells = <1>;
->  			#size-cells = <1>;
+Fix wrong mode for dts file added by 
+commit bb3e3fbbac862fa72951283e3632e1cf21a68223
+("ARM: dts: Add DT support for Octavo Systems OSD3358-SM-RED
+based on TI AM335x").
 
-Yup great, the interconnect instances that don't need above 4GB
-address space should stay this way.
+Signed-off-by: Neeraj Dantu <neeraj.dantu@octavosystems.com>
+CC: Tony Lindgren <tony@atomide.com>
+CC: Robert Nelson <robertcnelson@gmail.com>
+CC: Jason Kridner <jkridner@gmail.com>
+---
+Changes in v2:
+- Fix patch description
+---
+ arch/arm/boot/dts/am335x-osd3358-sm-red.dts | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ mode change 100755 => 100644 arch/arm/boot/dts/am335x-osd3358-sm-red.dts
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+diff --git a/arch/arm/boot/dts/am335x-osd3358-sm-red.dts b/arch/arm/boot/dts/am335x-osd3358-sm-red.dts
+old mode 100755
+new mode 100644
+-- 
+2.7.4
