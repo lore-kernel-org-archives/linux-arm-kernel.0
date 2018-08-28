@@ -1,36 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 28 Aug 2018 13:55:03 +0100
-Subject: Query on dma_set_mask_and_coherent() Usage
-In-Reply-To: <CANdmM3O_q_dAzVAd5Lk+u_OHqgEkHR2p1ucgEZ5v_tLQ6G+3Rw@mail.gmail.com>
-References: <CANdmM3O_q_dAzVAd5Lk+u_OHqgEkHR2p1ucgEZ5v_tLQ6G+3Rw@mail.gmail.com>
-Message-ID: <20180828125503.ws66n2oxrhmuereb@armageddon.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Aug 2018 14:57:05 +0200
+Subject: [PATCH 10/15] soc: octeontx2: Reconfig MSIX base with IOVA
+In-Reply-To: <CA+sq2Cf2BLKsV=gY-MPnygV1ufpvmnw6ETh90JX_uKQBk3Sduw@mail.gmail.com>
+References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
+ <1535453838-12154-11-git-send-email-sunil.kovvuri@gmail.com>
+ <CAK8P3a1Vdy-VsLWJMer-Z96E4Trhi0WJXJ3fTzyOGny2Mn6RAA@mail.gmail.com>
+ <CA+sq2Cf2BLKsV=gY-MPnygV1ufpvmnw6ETh90JX_uKQBk3Sduw@mail.gmail.com>
+Message-ID: <CAK8P3a0+zJRxEYWZpYShRJo-3oqMaC9TJADugaRTiBnjw7ssPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2018 at 08:20:36PM +0530, Kedareswararao Appana wrote:
->               On arm64 platform I have booted Linux only with > 32-bit
-> Address i.e from 0x800000000 (reg =  <0x8 0x00000000 0x0 0x80000000>)
+On Tue, Aug 28, 2018 at 2:42 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+>
+> On Tue, Aug 28, 2018 at 5:39 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> >
+> > On Tue, Aug 28, 2018 at 12:58 PM <sunil.kovvuri@gmail.com> wrote:
+> > >
+> > > From: Geetha sowjanya <gakula@marvell.com>
+> > >
+> > > HW interprets RVU_AF_MSIXTR_BASE address as an IOVA, hence
+> > > create a IOMMU mapping for the physcial address configured by
+> > > firmware and reconfig RVU_AF_MSIXTR_BASE with IOVA.
+> > >
+> > > Signed-off-by: Geetha sowjanya <gakula@marvell.com>
+> > > Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
+> >
+> > I think this needs some more explanation. What is the difference between
+> > the MSI-X support in this driver and every other one? Are you working
+> > around a hardware bug, or is there something odd in the implementation
+> > of your irqchip driver? Do you use a GIC to handle the MSI interrupts
+> > or something else?
+>
+> This admin function is a PCI device which is capable of provisioning
+> HW blocks to other PCIe SRIOV devices in the system. Each HW block
+> (eg memory buffer pools, NIC dewscriptors, crypto engines e.t.c) needs
+> certain no of MSIX vectors. Admin function has a set of 32K MSIX vectors
+> in memory (not on-chip) which based on HW block provisioning to a PCI device
+> attaches the required number of vectors to that device. Some part of this
+> configuration is done by low level firmware.
+>
+> RVU_AF_MSIXTR_BASE points to the memory region allocated for 32K MSIX
+> vectors. If kernel is booted with IOMMU enabled and admin function device
+> is attached to SMMU, HW will go through translation to access this MSIX
+> vector memory region. Hence the mapping done in this patch.
 
-So you have 2GB of RAM starting at 0x8_0000_0000.
+Do you mean this is not a regular PCIe MSI-X interrupt to the GIC, but
+something internal to your device that gets routed through the IOMMU
+back into the device?
 
-> In my driver, I am using dma_set_mask_and_coherent(&pdev->dev,
-> DMA_BIT_MASK(32)); which should fail if I boot Linux
-> with the above configuration but the API is returning success.
-> 
-> I have debugged it further and observed that, in the arm64
-> dma-mapping.c swiotlb is zero resulting dma_supported ops always
-> returning 1
-> 
-> https://elixir.bootlin.com/linux/v4.17.8/source/arch/arm64/mm/dma-mapping.c#L321
-> 
->  I will be grateful if someone can send me some pointers for fixing this issue
+I'm still confused.
 
-It's an assumption we've made here:
-
-https://elixir.bootlin.com/linux/v4.17.8/source/arch/arm64/mm/init.c#L224
-
-32-bit devices are expected to have a dma_pfn_offset (and the hardware
-configured accordingly).
-
--- 
-Catalin
+       Arnd
