@@ -1,109 +1,169 @@
 From: urjaman@gmail.com (Urja Rannikko)
-Date: Tue, 28 Aug 2018 18:55:13 +0000
-Subject: [PATCH 7/7] dts: rk3288-veyron-chromebook: dedicate npll to VOP0/HDMI
- + HDMI rates
+Date: Tue, 28 Aug 2018 18:55:09 +0000
+Subject: [PATCH 3/7] drivers: clk-rk3288: support for dedicating NPLL to a VOP
 In-Reply-To: <20180828185513.13216-1-urjaman@gmail.com>
 References: <20180828185513.13216-1-urjaman@gmail.com>
-Message-ID: <20180828185513.13216-8-urjaman@gmail.com>
+Message-ID: <20180828185513.13216-4-urjaman@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables flexible HDMI rates on the rk3288 chromebooks so that they
-actually work with displays (also others than a 1080p one) in the wild.
-
-The frequency list matches what ChromeOS allows.
-
-The 500Mhz GPU opp is removed since it is not available without NPLL.
+As controlled by the just introduced dts property.
 
 Signed-off-by: Urja Rannikko <urjaman@gmail.com>
 ---
- .../boot/dts/rk3288-veyron-chromebook.dtsi    | 67 +++++++++++++++++++
- 1 file changed, 67 insertions(+)
+ drivers/clk/rockchip/clk-rk3288.c | 69 +++++++++++++++++++++++++------
+ drivers/clk/rockchip/clk.h        |  3 ++
+ 2 files changed, 60 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi b/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi
-index b16d570ff029..70ed0b2a9549 100644
---- a/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi
-+++ b/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi
-@@ -163,6 +163,25 @@
- 	};
- };
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 5a67b7869960..7adf85e43078 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -198,10 +198,14 @@ PNAME(mux_ddrphy_p)		= { "dpll_ddr", "gpll_ddr" };
+ PNAME(mux_aclk_cpu_src_p)	= { "cpll_aclk_cpu", "gpll_aclk_cpu" };
  
-+&cru {
-+	/* Dedicate NPLL for VOP0 / VOP_BIG for HDMI. */
-+	rockchip,npll-for-vop = <0>;
-+	/* The first assigned clocks are DCLK_VOP0 and DCLK_VOP1 */
-+	assigned-clock-parents = <&cru PLL_NPLL>, <&cru PLL_GPLL>;
-+};
+ PNAME(mux_pll_src_cpll_gpll_p)		= { "cpll", "gpll" };
+-PNAME(mux_pll_src_npll_cpll_gpll_p)	= { "npll", "cpll", "gpll" };
+-PNAME(mux_pll_src_cpll_gpll_npll_p)	= { "cpll", "gpll", "npll" };
++PNAME_ED(mux_pll_src_npll_cpll_gpll_p)	= { "npll", "cpll", "gpll" };
 +
-+/* Delete the nodes that allow non-desirable VOP - connector links. That
-+ * is the eDP cannot use vopb and HDMI cannot use vopl. */
++PNAME_ED(mux_pll_src_cgn_pll_nonvop_p)	= { "cpll", "gpll", "npll" };
++PNAME_ED(mux_pll_src_cgn_pll_vop0_p) = { "cpll", "gpll", "npll" };
++PNAME_ED(mux_pll_src_cgn_pll_vop1_p) = { "cpll", "gpll", "npll" };
 +
-+/delete-node/ &edp_in_vopb;
-+/delete-node/ &vopb_out_edp;
-+/delete-node/ &hdmi_in_vopl;
-+/delete-node/ &vopl_out_hdmi;
-+
-+/* Delete the 500 Mhz GPU opp since that cannot be easily made
-+ * without NPLL. */
-+/delete-node/ &{/gpu-opp-table/opp at 500000000};
-+
- &edp {
- 	status = "okay";
+ PNAME(mux_pll_src_cpll_gpll_usb480m_p)	= { "cpll", "gpll", "usbphy480m_src" };
+-PNAME(mux_pll_src_cpll_gll_usb_npll_p)	= { "cpll", "gpll", "usbphy480m_src", "npll" };
++PNAME_ED(mux_pll_src_cpll_gll_usb_npll_p) = { "cpll", "gpll", "usbphy480m_src", "npll" };
  
-@@ -186,6 +205,54 @@
- 	status = "okay";
- };
+ PNAME(mux_mmc_src_p)	= { "cpll", "gpll", "xin24m", "xin24m" };
+ PNAME(mux_i2s_pre_p)	= { "i2s_src", "i2s_frac", "ext_i2s", "xin12m" };
+@@ -447,24 +451,24 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 			RK3288_CLKSEL_CON(30), 14, 2, MFLAGS, 8, 5, DFLAGS,
+ 			RK3288_CLKGATE_CON(3), 4, GFLAGS),
  
-+&hdmi {
-+	/* These depend on NPLL being dedicated to HDMI use. */
-+	rockchip,hdmi-rates-hz = <
-+		25176471	/* for 25.175 MHz, 0.006% off */
-+		25200000
-+		27000000
-+		28320000
-+		30240000
-+		31500000
-+		32000000
-+		33750000
-+		36000000
-+		40000000
-+		49500000
-+		50000000
-+		54000000
-+		57290323	/* for 57.284 MHz, .011 % off */
-+		65000000
-+		68250000
-+		71000000
-+		72000000
-+		73250000
-+		74250000
-+		74437500	/* for 74.44 MHz, .003% off */
-+		75000000
-+		78750000
-+		78800000
-+		79500000
-+		83500000
-+		85500000
-+		88750000
-+		97750000
-+		101000000
-+		106500000
-+		108000000
-+		115500000
-+		118666667	/* for 118.68 MHz, .011% off */
-+		119000000
-+		121714286	/* for 121.75 MHz, .029% off */
-+		135000000
-+		136800000	/* for 136.75 MHz, .037% off */
-+		146250000
-+		148500000
-+		154000000
-+		162000000 >;
-+};
+-	COMPOSITE(DCLK_VOP0, "dclk_vop0", mux_pll_src_cpll_gpll_npll_p, 0,
++	COMPOSITE(DCLK_VOP0, "dclk_vop0", mux_pll_src_cgn_pll_vop0_p, 0,
+ 			RK3288_CLKSEL_CON(27), 0, 2, MFLAGS, 8, 8, DFLAGS,
+ 			RK3288_CLKGATE_CON(3), 1, GFLAGS),
+-	COMPOSITE(DCLK_VOP1, "dclk_vop1", mux_pll_src_cpll_gpll_npll_p, 0,
++	COMPOSITE(DCLK_VOP1, "dclk_vop1", mux_pll_src_cgn_pll_vop1_p, 0,
+ 			RK3288_CLKSEL_CON(29), 6, 2, MFLAGS, 8, 8, DFLAGS,
+ 			RK3288_CLKGATE_CON(3), 3, GFLAGS),
+ 
+ 	COMPOSITE_NODIV(SCLK_EDP_24M, "sclk_edp_24m", mux_edp_24m_p, 0,
+ 			RK3288_CLKSEL_CON(28), 15, 1, MFLAGS,
+ 			RK3288_CLKGATE_CON(3), 12, GFLAGS),
+-	COMPOSITE(SCLK_EDP, "sclk_edp", mux_pll_src_cpll_gpll_npll_p, 0,
++	COMPOSITE(SCLK_EDP, "sclk_edp", mux_pll_src_cgn_pll_nonvop_p, 0,
+ 			RK3288_CLKSEL_CON(28), 6, 2, MFLAGS, 0, 6, DFLAGS,
+ 			RK3288_CLKGATE_CON(3), 13, GFLAGS),
+ 
+-	COMPOSITE(SCLK_ISP, "sclk_isp", mux_pll_src_cpll_gpll_npll_p, 0,
++	COMPOSITE(SCLK_ISP, "sclk_isp", mux_pll_src_cgn_pll_nonvop_p, 0,
+ 			RK3288_CLKSEL_CON(6), 6, 2, MFLAGS, 0, 6, DFLAGS,
+ 			RK3288_CLKGATE_CON(3), 14, GFLAGS),
+-	COMPOSITE(SCLK_ISP_JPE, "sclk_isp_jpe", mux_pll_src_cpll_gpll_npll_p, 0,
++	COMPOSITE(SCLK_ISP_JPE, "sclk_isp_jpe", mux_pll_src_cgn_pll_nonvop_p, 0,
+ 			RK3288_CLKSEL_CON(6), 14, 2, MFLAGS, 8, 6, DFLAGS,
+ 			RK3288_CLKGATE_CON(3), 15, GFLAGS),
+ 
+@@ -473,16 +477,16 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 	GATE(SCLK_HDMI_CEC, "sclk_hdmi_cec", "xin32k", 0,
+ 			RK3288_CLKGATE_CON(5), 11, GFLAGS),
+ 
+-	COMPOSITE(ACLK_HEVC, "aclk_hevc", mux_pll_src_cpll_gpll_npll_p, 0,
++	COMPOSITE(ACLK_HEVC, "aclk_hevc", mux_pll_src_cgn_pll_nonvop_p, 0,
+ 			RK3288_CLKSEL_CON(39), 14, 2, MFLAGS, 8, 5, DFLAGS,
+ 			RK3288_CLKGATE_CON(13), 13, GFLAGS),
+ 	DIV(HCLK_HEVC, "hclk_hevc", "aclk_hevc", 0,
+ 			RK3288_CLKSEL_CON(40), 12, 2, DFLAGS),
+ 
+-	COMPOSITE(SCLK_HEVC_CABAC, "sclk_hevc_cabac", mux_pll_src_cpll_gpll_npll_p, 0,
++	COMPOSITE(SCLK_HEVC_CABAC, "sclk_hevc_cabac", mux_pll_src_cgn_pll_nonvop_p, 0,
+ 			RK3288_CLKSEL_CON(42), 6, 2, MFLAGS, 0, 5, DFLAGS,
+ 			RK3288_CLKGATE_CON(13), 14, GFLAGS),
+-	COMPOSITE(SCLK_HEVC_CORE, "sclk_hevc_core", mux_pll_src_cpll_gpll_npll_p, 0,
++	COMPOSITE(SCLK_HEVC_CORE, "sclk_hevc_core", mux_pll_src_cgn_pll_nonvop_p, 0,
+ 			RK3288_CLKSEL_CON(42), 14, 2, MFLAGS, 8, 5, DFLAGS,
+ 			RK3288_CLKGATE_CON(13), 15, GFLAGS),
+ 
+@@ -556,7 +560,7 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 	COMPOSITE(0, "sclk_tspout", mux_tspout_p, 0,
+ 			RK3288_CLKSEL_CON(35), 14, 2, MFLAGS, 8, 5, DFLAGS,
+ 			RK3288_CLKGATE_CON(4), 11, GFLAGS),
+-	COMPOSITE(0, "sclk_tsp", mux_pll_src_cpll_gpll_npll_p, 0,
++	COMPOSITE(0, "sclk_tsp", mux_pll_src_cgn_pll_nonvop_p, 0,
+ 			RK3288_CLKSEL_CON(35), 6, 2, MFLAGS, 0, 5, DFLAGS,
+ 			RK3288_CLKGATE_CON(4), 10, GFLAGS),
+ 
+@@ -916,6 +920,7 @@ static void __init rk3288_clk_init(struct device_node *np)
+ {
+ 	struct rockchip_clk_provider *ctx;
+ 	struct clk *clk;
++	s32 npll_vop = -1;
+ 
+ 	rk3288_cru_base = of_iomap(np, 0);
+ 	if (!rk3288_cru_base) {
+@@ -923,6 +928,46 @@ static void __init rk3288_clk_init(struct device_node *np)
+ 		return;
+ 	}
+ 
++	if (!of_property_read_s32(np, "rockchip,npll-for-vop", &npll_vop)) {
++		if ((npll_vop < -1) || (npll_vop > 1)) {
++			pr_warn("%s: invalid VOP to dedicate NPLL to: %d\n",
++				__func__, npll_vop);
++		} else if (npll_vop >= 0) {
++			unsigned int vop_clk_id;
++			const char ** npll_names;
++			const char ** non_npll_names;
++			int i;
 +
++			/* Firstly, not-VOP needs to not use npll */
++			mux_pll_src_npll_cpll_gpll_p[0] = "dummy_npll";
++			mux_pll_src_cgn_pll_nonvop_p[2] = "dummy_npll";
++			mux_pll_src_cpll_gll_usb_npll_p[3] = "dummy_npll";
 +
- &gpio_keys {
- 	pinctrl-0 = <&pwr_key_l &ap_lid_int_l>;
- 	lid {
++			/* Then the npll VOP needs to only use npll, and the other one not use npll. */
++			if (npll_vop) {
++				vop_clk_id = DCLK_VOP1;
++				npll_names = mux_pll_src_cgn_pll_vop1_p;
++				non_npll_names = mux_pll_src_cgn_pll_vop0_p;
++			} else {
++				vop_clk_id = DCLK_VOP0;
++				npll_names = mux_pll_src_cgn_pll_vop0_p;
++				non_npll_names = mux_pll_src_cgn_pll_vop1_p;
++			}
++			npll_names[0] = "dummy_cpll";
++			npll_names[1] = "dummy_gpll";
++			non_npll_names[2] = "dummy_npll";
++
++			/* Lastly the npll-dedicated-VOP needs to be able to control npll. */
++			for (i = 0; i < ARRAY_SIZE(rk3288_clk_branches); i++) {
++				if (rk3288_clk_branches[i].id == vop_clk_id) {
++					rk3288_clk_branches[i].flags |= CLK_SET_RATE_PARENT;
++					break;
++				}
++			}
++			pr_debug("%s: npll dedicated for VOP %d\n", __func__, npll_vop);
++		}
++	}
++
+ 	ctx = rockchip_clk_init(np, rk3288_cru_base, CLK_NR_CLKS);
+ 	if (IS_ERR(ctx)) {
+ 		pr_err("%s: rockchip clk init failed\n", __func__);
+diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
+index ef601dded32c..8e2f70d62f03 100644
+--- a/drivers/clk/rockchip/clk.h
++++ b/drivers/clk/rockchip/clk.h
+@@ -343,6 +343,9 @@ struct clk *rockchip_clk_register_muxgrf(const char *name,
+ 
+ #define PNAME(x) static const char *const x[] __initconst
+ 
++/* For when you want to be able to modify the pointers. */
++#define PNAME_ED(x) static const char * x[] __initdata
++
+ enum rockchip_clk_branch_type {
+ 	branch_composite,
+ 	branch_mux,
 -- 
 2.18.0
