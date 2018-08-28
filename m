@@ -1,62 +1,48 @@
-From: tyreld@linux.vnet.ibm.com (Tyrel Datwyler)
-Date: Tue, 28 Aug 2018 15:46:40 -0700
-Subject: [PATCH] soc: Convert to using %pOFn instead of device_node.name
-In-Reply-To: <CADRPPNSoP5K79wCr5QdJ-OR_W9aZrEkBiPqCXU7EWCfZsvaeuQ@mail.gmail.com>
-References: <20180828015252.28511-1-robh@kernel.org>
- <20180828015252.28511-43-robh@kernel.org>
- <CADRPPNRvRKEuV=ZzH6yq6_7COvFSWy2ibAKoEt4YrzES2m9x2Q@mail.gmail.com>
- <a8594a1c-0d10-74c6-0e40-15d49ff876a3@linux.vnet.ibm.com>
- <CADRPPNSoP5K79wCr5QdJ-OR_W9aZrEkBiPqCXU7EWCfZsvaeuQ@mail.gmail.com>
-Message-ID: <9587f8a2-3130-033c-6394-9110b0d399da@linux.vnet.ibm.com>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Tue, 28 Aug 2018 17:49:25 -0500
+Subject: [PATCH 1/2] soc: fsl: qbman: qman_portal: defer probing when qman
+ is not available
+In-Reply-To: <DB6PR0402MB27276B417034E7356B0CFA5886360@DB6PR0402MB2727.eurprd04.prod.outlook.com>
+References: <20180823213600.23426-1-alexandre.belloni@bootlin.com>
+ <DB6PR0402MB27276B417034E7356B0CFA5886360@DB6PR0402MB2727.eurprd04.prod.outlook.com>
+Message-ID: <CADRPPNRJFii=ybTVm=NMGMT8U02JKsjYsgA6PR52owK=Bc3cgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2018 03:29 PM, Li Yang wrote:
-> On Tue, Aug 28, 2018 at 5:16 PM Tyrel Datwyler
-> <tyreld@linux.vnet.ibm.com> wrote:
->>
->> On 08/28/2018 11:48 AM, Li Yang wrote:
->>> On Mon, Aug 27, 2018 at 8:57 PM Rob Herring <robh@kernel.org> wrote:
->>>>
->>>> In preparation to remove the node name pointer from struct device_node,
->>>> convert printf users to use the %pOFn format specifier.
->>>
->>> Please forgive my ignorance, but what is this format specifier do
->>> exactly?   I cannot find anything listed in the printf specification
->>> matching this.  Is this something newly introduced?
->>>
->>> Leo
->>>
->>
->> From Documentation/core-api/printk-formats.rst:
-> 
-> I was trying to find it in the standard c format specifier.  :(
-> Thanks a lot for the pointer.
-> 
+On Fri, Aug 24, 2018 at 9:54 AM Roy Pledge <roy.pledge@nxp.com> wrote:
+>
+> On 8/23/2018 5:36 PM, Alexandre Belloni wrote:
+> > If the qman driver (qman_ccsr) doesn't probe or fail to probe before
+> > qman_portal, qm_ccsr_start will be either NULL or a stale pointer to an
+> > unmapped page.
+> >
+> > This leads to a crash when probing  qman_portal as the init_pcfg function
+> > calls qman_liodn_fixup that tries to read qman registers.
+> >
+> > Assume that qman didn't probe when the pool mask is 0.
+> >
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 
-No problem. Its worth a look through. The usual integer types are at the top, but that is followed by the pointer types which the kernel provides quite a few for a variety of things.
+Series applied to the fix branch of soc/fsl.
 
->>
->> kobjects
->> --------
->>
->> ::
->>
->>         %pOF[fnpPcCF]
->>
->>
->> For printing kobject based structs (device nodes). Default behaviour is
->> equivalent to %pOFf.
->>
->>         - f - device node full_name
->>         - n - device node name
->>         - p - device node phandle
->>         - P - device node path spec (name + @unit)
->>         - F - device node flags
->>         - c - major compatible string
->>         - C - full compatible string
->>
->>
->> -Tyrel
->>
-> 
+> > ---
+> >  drivers/soc/fsl/qbman/qman_portal.c | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> > diff --git a/drivers/soc/fsl/qbman/qman_portal.c b/drivers/soc/fsl/qbman/qman_portal.c
+> > index a120002b630e..4fc80d2c8feb 100644
+> > --- a/drivers/soc/fsl/qbman/qman_portal.c
+> > +++ b/drivers/soc/fsl/qbman/qman_portal.c
+> > @@ -277,6 +277,8 @@ static int qman_portal_probe(struct platform_device *pdev)
+> >       }
+> >
+> >       pcfg->pools = qm_get_pools_sdqcr();
+> > +     if (pcfg->pools == 0)
+> > +             return -EPROBE_DEFER;
+> >
+> >       spin_lock(&qman_lock);
+> >       cpu = cpumask_next_zero(-1, &portal_cpus);
+>
+> Reviewed-by: Roy Pledge <roy.pledge@nxp.com>
+>
+>
