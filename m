@@ -1,207 +1,59 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 28 Aug 2018 14:21:09 +0900
-Subject: [PATCH v13 03/16] s390, kexec_file: drop arch_kexec_mem_walk()
-In-Reply-To: <1235507889.17337085.1533788045597.JavaMail.zimbra@redhat.com>
-References: <20180801075820.3753-1-takahiro.akashi@linaro.org>
- <20180801075820.3753-4-takahiro.akashi@linaro.org>
- <20180801102951.527cfc57@ThinkPad>
- <20180802000150.GN11258@linaro.org>
- <20180806055047.GC4246@dhcp-128-65.nay.redhat.com>
- <20180809033416.GA5069@dhcp-128-65.nay.redhat.com>
- <1235507889.17337085.1533788045597.JavaMail.zimbra@redhat.com>
-Message-ID: <20180828052107.GE12252@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 28 Aug 2018 08:15:09 +0200
+Subject: [PATCH V5 0/5] soc: imx: add scu firmware api support
+In-Reply-To: <AM0PR04MB4211E5D66FD8502278765EC8800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
+ <AM0PR04MB4211F68CCD399243613F8D7B80320@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <AM0PR04MB4211F748DBD1FE64A2B2136980360@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180827083310.omqa3kpmj542fu3b@pengutronix.de>
+ <AM0PR04MB4211E5D66FD8502278765EC8800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20180828061509.ujjjigfjanprro5i@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
-
-On Thu, Aug 09, 2018 at 12:14:05AM -0400, Pingfan Liu wrote:
-> 
-> 
-> 
-> 
-> ----- Original Message -----
-> > From: "Dave Young" <dyoung@redhat.com>
-> > To: "AKASHI Takahiro" <takahiro.akashi@linaro.org>, "Philipp Rudo" <prudo@linux.ibm.com>, "catalin marinas"
-> > <catalin.marinas@arm.com>, "will deacon" <will.deacon@arm.com>, dhowells at redhat.com, vgoyal at redhat.com,
-> > herbert at gondor.apana.org.au, davem at davemloft.net, bhe at redhat.com, arnd at arndb.de, schwidefsky at de.ibm.com, "heiko
-> > carstens" <heiko.carstens@de.ibm.com>, "ard biesheuvel" <ard.biesheuvel@linaro.org>, "james morse"
-> > <james.morse@arm.com>, bhsharma at redhat.com, kexec at lists.infradead.org, linux-arm-kernel at lists.infradead.org,
-> > linux-kernel at vger.kernel.org, "piliu at redhat.com Thiago Jung Bauermann" <bauerman@linux.vnet.ibm.com>
-> > Sent: Thursday, August 9, 2018 11:34:16 AM
-> > Subject: Re: [PATCH v13 03/16] s390, kexec_file: drop arch_kexec_mem_walk()
+On Mon, Aug 27, 2018 at 09:59:36AM +0000, A.s. Dong wrote:
+> > -----Original Message-----
+> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> > Sent: Monday, August 27, 2018 4:33 PM
+> > To: A.s. Dong <aisheng.dong@nxp.com>
+> > Cc: Jassi Brar <jassisinghbrar@gmail.com>; dongas86 at gmail.com;
+> > kernel at pengutronix.de; shawnguo at kernel.org; Fabio Estevam
+> > <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>;
+> > linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH V5 0/5] soc: imx: add scu firmware api support
 > > 
-> > Add more cc. Pingfan Liu confirmed ppc does not use 0 as valid address,
-> > if so it should be safe.
+> > On Fri, Aug 24, 2018 at 07:36:38AM +0000, A.s. Dong wrote:
+> > > Hi Jassi & Sasha,
+> > >
+> > > Do you have some suggestions about this patch series?
 > > 
-> > Pingfan, can you add more words?
+> > I still think that the users like clk and pinctrl should directly call sc_call_rpc(),
+> > no need for this shim at all.
 > > 
 > 
-> ppc64 uses a few KB starting from 0 for exception handler.
+> Sorry, I'm a bit confuse.
+> What specific shim do you mean not needed?
+> 
+> Do you mean we don't need all the SCU SVC APIs (clk/pm/pinctrl/misc and etc)
+> Implemented in this patch series and instead directly implement them in client
+> driver?
+> For example:
+> drivers/soc/imx/sc/svc/pm/rpc_clnt.c
+> sc_err_t sc_pm_get_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
+>                               sc_pm_clk_t clk, sc_pm_clock_rate_t *rate)
+> Change to:
+> drivers/clk/imx/scu/scu_clock.c ?
+> sc_err_t sc_pm_get_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
+>                               sc_pm_clk_t clk, sc_pm_clock_rate_t *rate)
 
-It assures that 0 (zero) is valid, but won't be assigned as a result of
-kexec_add_buffer().
+That particular function would go into drivers/clk/imx/scu/clk-divider-scu.c
+and probably would be no separate function at all but go into
+clk_divider_scu_recalc_rate(), but yes, that's the idea.
 
-So do you think that yet I should submit another patch set, introducing
-explicit KEXEC_BUF_MEM_UNKNOWN, while assuming 0 by default is safe for now?
+Sascha
 
-Now that this is the only comment against my v13, it's up to you.
-
-Thanks,
--Takahiro AKASHI
-
-
-> > On 08/06/18 at 01:50pm, Dave Young wrote:
-> > > Add Thiago in cc so that he can review from powerpc point of view.
-> > > 
-> > > On 08/02/18 at 09:01am, AKASHI Takahiro wrote:
-> > > > Hi,
-> > > > 
-> > > > On Wed, Aug 01, 2018 at 10:29:51AM +0200, Philipp Rudo wrote:
-> > > > > Hey Akashi,
-> > > > > 
-> > > > > I kept thinking about this patch and remembered why I didn't made the
-> > > > > change
-> > > > > you are suggesting now.
-> > > > 
-> > > > Hmm.
-> > > > 
-> > > > > The problem is when you only check for kbuf->mem you are excluding
-> > > > > address 0,
-> > > > > which might be a valid address to load the kernel to. On s390 this is
-> > > > > actually
-> > > > > done when the kernel is not loaded via a boot loader. For kexec_file
-> > > > > however,
-> > > > > we cut off the first few kB of the image and jump directly to
-> > > > > 'startup'. So
-> > > > > checking for !0 does not cause a problem here.
-> > > > 
-> > > > Yeah, as Dave(RedHat) described, all the current kexec-capable
-> > > > architectures,
-> > > > except arm64, implicitly initialize kbuf.mem to zero with "kbuf = { ...
-> > > > }"
-> > > > initializer. So surely my change would not break anything on the existing
-> > > > code.
-> > > > On the other hand, I also see your concern here.
-> > > > 
-> > > > > Anyway, the long term safer solution would be something like
-> > > > > 
-> > > > > #define KEXEC_BUF_MEM_UNKNOWN (-1UL)
-> > > > > 
-> > > > > for architectures to tell common code to search a fitting mem hole.
-> > > > 
-> > > > This would require the existing code on every arch to be modified, which
-> > > > I think should be avoided if possible. Instead,
-> > > > we'd better define in linux/kexec.h:
-> > > >   #ifndef KEXEC_BUF_MEM_UNKNOWN
-> > > >   #define KEXEC_BUF_MEM_UNKNOWN 0
-> > > >   #endif
-> > > > and then check for kbuf in kexec_locate_mem_hole():
-> > > >   if (kbuf->mem != KEXEC_BUF_MEM_UNKNOWN)
-> > > >         return 0;
-> > > >   ...
-> > > > 
-> > > > This way if some arch wants to treat *zero* as a valid address, it can
-> > > > redefine this macro in arch/asm/kexec.h.
-> > > 
-> > > I think this way works if powerpc is safe for using zero as the unknown
-> > > address in this case.  Thiago, can you provide some review?
-> > > 
-> > > Philipp, thanks for catching the problem!
-> > > 
-> > > > 
-> > > > Thanks,
-> > > > -Takahiro AKASHI
-> > > > 
-> > > > > 
-> > > > > Back then I didn't do the change because I had the other workaround,
-> > > > > which
-> > > > > didn't require a common code change. But when you are touching the code
-> > > > > now it
-> > > > > is worth thinking about it.
-> > > > > 
-> > > > > Just wanted to let you know
-> > > > > Philipp
-> > > > > 
-> > > > > 
-> > > > > On Wed,  1 Aug 2018 16:58:07 +0900
-> > > > > AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-> > > > > 
-> > > > > > Since s390 already knows where to locate buffers, calling
-> > > > > > arch_kexec_mem_walk() has no sense. So we can just drop it as
-> > > > > > kbuf->mem
-> > > > > > indicates this while all other architectures sets it to 0 initially.
-> > > > > > 
-> > > > > > This change is a preparatory work for the next patch, where all the
-> > > > > > variant memory walks, either on system resource or memblock, will be
-> > > > > > put in one common place so that it will satisfy all the
-> > > > > > architectures'
-> > > > > > need.
-> > > > > > 
-> > > > > > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > > > > > Reviewed-by: Philipp Rudo <prudo@linux.ibm.com>
-> > > > > > Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-> > > > > > Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-> > > > > > Cc: Dave Young <dyoung@redhat.com>
-> > > > > > Cc: Vivek Goyal <vgoyal@redhat.com>
-> > > > > > Cc: Baoquan He <bhe@redhat.com>
-> > > > > > ---
-> > > > > >  arch/s390/kernel/machine_kexec_file.c | 10 ----------
-> > > > > >  kernel/kexec_file.c                   |  4 ++++
-> > > > > >  2 files changed, 4 insertions(+), 10 deletions(-)
-> > > > > > 
-> > > > > > diff --git a/arch/s390/kernel/machine_kexec_file.c
-> > > > > > b/arch/s390/kernel/machine_kexec_file.c
-> > > > > > index f413f57f8d20..32023b4f9dc0 100644
-> > > > > > --- a/arch/s390/kernel/machine_kexec_file.c
-> > > > > > +++ b/arch/s390/kernel/machine_kexec_file.c
-> > > > > > @@ -134,16 +134,6 @@ int kexec_file_add_initrd(struct kimage *image,
-> > > > > > struct s390_load_data *data,
-> > > > > >  	return ret;
-> > > > > >  }
-> > > > > >  
-> > > > > > -/*
-> > > > > > - * The kernel is loaded to a fixed location. Turn off
-> > > > > > kexec_locate_mem_hole
-> > > > > > - * and provide kbuf->mem by hand.
-> > > > > > - */
-> > > > > > -int arch_kexec_walk_mem(struct kexec_buf *kbuf,
-> > > > > > -			int (*func)(struct resource *, void *))
-> > > > > > -{
-> > > > > > -	return 1;
-> > > > > > -}
-> > > > > > -
-> > > > > >  int arch_kexec_apply_relocations_add(struct purgatory_info *pi,
-> > > > > >  				     Elf_Shdr *section,
-> > > > > >  				     const Elf_Shdr *relsec,
-> > > > > > diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> > > > > > index 63c7ce1c0c3e..bf39df5e5bb9 100644
-> > > > > > --- a/kernel/kexec_file.c
-> > > > > > +++ b/kernel/kexec_file.c
-> > > > > > @@ -534,6 +534,10 @@ int kexec_locate_mem_hole(struct kexec_buf
-> > > > > > *kbuf)
-> > > > > >  {
-> > > > > >  	int ret;
-> > > > > >  
-> > > > > > +	/* Arch knows where to place */
-> > > > > > +	if (kbuf->mem)
-> > > > > > +		return 0;
-> > > > > > +
-> > > > > >  	ret = arch_kexec_walk_mem(kbuf, locate_mem_hole_callback);
-> > > > > >  
-> > > > > >  	return ret == 1 ? 0 : -EADDRNOTAVAIL;
-> > > > > 
-> > > > 
-> > > > _______________________________________________
-> > > > kexec mailing list
-> > > > kexec at lists.infradead.org
-> > > > http://lists.infradead.org/mailman/listinfo/kexec
-> > > 
-> > > Thanks
-> > > Dave
-> > 
-> > _______________________________________________
-> > kexec mailing list
-> > kexec at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/kexec
-> > 
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
