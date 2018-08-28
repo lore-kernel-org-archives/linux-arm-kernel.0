@@ -1,35 +1,23 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Aug 2018 14:12:43 +0100
-Subject: [RFC PATCH 09/11] asm-generic/tlb: Track which levels of the
- page tables have been cleared
-In-Reply-To: <20180827075341.GY24124@hirez.programming.kicks-ass.net>
-References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
- <1535125966-7666-10-git-send-email-will.deacon@arm.com>
- <20180827075341.GY24124@hirez.programming.kicks-ass.net>
-Message-ID: <20180828131243.GC26727@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 28 Aug 2018 15:17:39 +0200
+Subject: [PATCH 2/3] arm64: dts: renesas: r8a774a1: Add USB-DMAC and
+ HSUSB device nodes
+In-Reply-To: <1535107429-5458-3-git-send-email-biju.das@bp.renesas.com>
+References: <1535107429-5458-1-git-send-email-biju.das@bp.renesas.com>
+ <1535107429-5458-3-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <20180828131738.rqhiamruboaggxfz@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2018 at 09:53:41AM +0200, Peter Zijlstra wrote:
-> On Fri, Aug 24, 2018 at 04:52:44PM +0100, Will Deacon wrote:
-> > +static inline unsigned long tlb_get_unmap_granule(struct mmu_gather *tlb)
-> > +{
-> > +	if (tlb->cleared_ptes)
-> > +		return PAGE_SIZE;
-> > +	if (tlb->cleared_pmds)
-> > +		return PMD_SIZE;
-> > +	if (tlb->cleared_puds)
-> > +		return PUD_SIZE;
-> > +	if (tlb->cleared_p4ds)
-> > +		return P4D_SIZE;
-> > +
-> > +	return PAGE_SIZE;
-> > +}
+On Fri, Aug 24, 2018 at 11:43:48AM +0100, Biju Das wrote:
+> Add usb dmac and hsusb device nodes on RZ/G2M SoC dtsi.
 > 
-> When doing the x86 patch; I found _SHIFT more useful than _SIZE.
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-I'll make that change for the next version.
+Thanks,
 
-Cheers,
+This looks fine to me but I will wait to see if there are other reviews
+before applying.
 
-Will
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
