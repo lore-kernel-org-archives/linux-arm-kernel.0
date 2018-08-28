@@ -1,60 +1,37 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 28 Aug 2018 16:51:12 +0100
-Subject: [PATCH v5 02/27] arm64: cpufeature: Use alternatives for VHE
- cpu_enable
+Date: Tue, 28 Aug 2018 16:51:17 +0100
+Subject: [PATCH v5 07/27] arm64: xen: Use existing helper to check interrupt
+ status
 In-Reply-To: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
 References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1535471497-38854-3-git-send-email-julien.thierry@arm.com>
+Message-ID: <1535471497-38854-8-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpu_enable callback for VHE feature requires all alternatives to have
-been applied. This prevents applying VHE alternative separately from the
-rest.
-
-Use an alternative depending on VHE feature to know whether VHE
-alternatives have already been applied.
+The status of interrupts might depend on more than just pstate. Use
+interrupts_disabled() instead of raw_irqs_disabled_flags() to take the full
+context into account.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Stefano Stabellini <sstabellini@kernel.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-Cc: Christoffer Dall <Christoffer.Dall@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/xen/events.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 1e433ac..3bc1c8b 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1014,6 +1014,8 @@ static bool runs_at_el2(const struct arm64_cpu_capabilities *entry, int __unused
+diff --git a/arch/arm64/include/asm/xen/events.h b/arch/arm64/include/asm/xen/events.h
+index 4e22b7a..2788e95 100644
+--- a/arch/arm64/include/asm/xen/events.h
++++ b/arch/arm64/include/asm/xen/events.h
+@@ -14,7 +14,7 @@ enum ipi_vector {
  
- static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+ static inline int xen_irqs_disabled(struct pt_regs *regs)
  {
-+	u64 tmp = 0;
-+
- 	/*
- 	 * Copy register values that aren't redirected by hardware.
- 	 *
-@@ -1022,8 +1024,15 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
- 	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
- 	 * do anything here.
- 	 */
--	if (!alternatives_applied)
--		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
-+	asm volatile(ALTERNATIVE(
-+		"mrs	%0, tpidr_el1\n"
-+		"msr	tpidr_el2, %0",
-+		"nop\n"
-+		"nop",
-+		ARM64_HAS_VIRT_HOST_EXTN)
-+		: "+r" (tmp)
-+		:
-+		: "memory");
+-	return raw_irqs_disabled_flags((unsigned long) regs->pstate);
++	return !interrupts_enabled(regs);
  }
- #endif
  
+ #define xchg_xen_ulong(ptr, val) xchg((ptr), (val))
 -- 
 1.9.1
