@@ -1,57 +1,90 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 28 Aug 2018 11:20:31 +0100
-Subject: [PATCH v2 06/29] mtd: Add support for reading MTD devices via the
- nvmem API
-In-Reply-To: <20180823122921.6857d917@tock>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180810080526.27207-7-brgl@bgdev.pl> <20180817182720.6a6e5e8e@bbrezillon>
- <20180819133106.0420df5f@tock> <20180819184609.6dcdbb9a@bbrezillon>
- <5b8c30b8-41e1-d59e-542b-fef6c6469ff0@linaro.org>
- <20180820202038.5d3dc195@bbrezillon>
- <e0ec3194-fd3a-9b3d-fba8-f88447eb56e9@linaro.org>
- <20180821133916.3a1c51b1@eos>
- <6db14f9c-edd3-5e43-839c-953bb03097ff@linaro.org>
- <20180821150121.4408672f@bbrezillon> <20180823122921.6857d917@tock>
-Message-ID: <58fd7ab3-c115-1f26-6d6e-677af6351239@linaro.org>
+From: dkos@cadence.com (Damian Kos)
+Date: Tue, 28 Aug 2018 11:24:43 +0100
+Subject: [PATCH v3 0/5] drm: add support for Cadence MHDP DPI/DP bridge.
+Message-ID: <1535451894-2518-1-git-send-email-dkos@cadence.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello!
 
+This is the series of patches that will add support for the Cadence's DPI/DP
+bridge. Please note that this is a preliminary version of the driver and there
+will be more patches in the future with updates, fixes and improvements.
+Please keep that in mind when looking at FIXME/TODO/XXX comments.
 
-On 23/08/18 11:29, Alban wrote:
-> Let say I have a device that use the following binding:
-> 
-> device {
->      compatible = "example-device";
->      #address-cells = <2>;
->      #size-cells = <1>;
-> 
->      child at 0,0 {
->          reg = <0x0 0x0>;
->          ...
->      };
-> 
->      child at 1,2 {
->          reg = <0x1 0x2>;
->          ...
->      };
-> 
-> };
-> 
-> Now this binding already use the node address space for something,
-> so putting a nvmem node as direct child would not work.
+Initially, MHDP driver was developed as a DRM bridge driver and was planed to
+be placed in drivers/gpu/drm/bridge/mhdp.c.  However, there was already
+a driver for Cadence's DP controller developed by RockChip, but that driver
+uses the different DRM framework and looks like a part of a bigger system.
+Both controllers (including firmware) are quite different internally
+(MST/FEC/DSC support, link training done by driver, additional commands, IRQ's
+etc.) but they have similar register map, except for Framer/Streamer (which is
+noticeably different), so they appear similar.
 
-AFAIK, It should work but the we would get a DT warning this, as nvmem 
-does not use of_address based apis to parse this. Which should be 
-totally fixed!!
+The following patches contain:
+- Moving common code to drivers/gpu/drm/bridge/cdns-mhdp-common.* and
+  modifying it a bit (mostly new prefixes for functions and data types) so it
+  can be used by two, higher level, drivers.
+- Modifying existing RockChip's DP driver to use the common code after changes
+  made to it (use the new cdns_mhdp_device structure and new function names).
+- Modifying DRM helpers a bit. Some are required for new driver, some are
+  updates from DP 1.2 to 1.3 or 1.4.
+- Adding documentation for device tree bindings.
+- Adding preliminary Cadence DPI/DP bridge driver.
 
-As discussed before once we add support to #address-cells and 
-#size-cells in nvmem core this should not be a problem.
+Some of the things that will be added later on include (but are not limited
+to):
+- Support for Cadence SD0801 PHY (PHY's driver should be on the way by now)
+- MST support
+- DSC support
+- FEC support
+- HDCP support
 
+Changes in v2:
+- Added actual description of what the patch contains, what is it for and
+  what's going on here in general.
+- New structure. Now we have one common low level driver + two high level
+  drivers - one for RockChip with minimum changes and one, more general, for
+  Cadence.
+- Dropped some changes made to DRM helpers.
+- Updated the device tree bindings document.
 
---srini
-  Here it is
-> quiet clear as we have 2 address cells, however even if the number of
-> cells and the cells size would match it would still be conceptually
-> wrong as both bindings then use the same address space for something
-> different.
+Changes in v3:
+- Corrected dt-bindings document
+- Enabled some clocks at startup (since FW doesn't do that anymore).
+- Changed Firmware file name to match the file on Linux Firmware repo.
+- Added SST audio support
+- Made common functions (in cdns-mhdp-common.*) public.
+
+Damian Kos (1):
+  drm/rockchip: prepare common code for cdns and rk dpi/dp driver
+
+Quentin Schulz (4):
+  drm/dp: fix link probing for devices supporting DP 1.4+
+  drm/dp: make dp_link_status and dp_get_lane_status usable from outside
+    of the core
+  dt-bindings: drm/bridge Document Cadence MHDP DPI/DP bridge bindings
+  drm/bridge: add preliminary driver for cadence dpi/dp bridge
+
+ .../bindings/display/bridge/cdns,mhdp.txt     |   43 +
+ drivers/gpu/drm/bridge/Kconfig                |    9 +
+ drivers/gpu/drm/bridge/Makefile               |    3 +
+ drivers/gpu/drm/bridge/cdns-mhdp-common.c     | 1108 ++++++++++++++
+ .../cdns-mhdp-common.h}                       |  135 +-
+ drivers/gpu/drm/bridge/cdns-mhdp.c            | 1308 +++++++++++++++++
+ drivers/gpu/drm/drm_dp_helper.c               |   50 +-
+ drivers/gpu/drm/rockchip/Kconfig              |    1 +
+ drivers/gpu/drm/rockchip/Makefile             |    4 +-
+ drivers/gpu/drm/rockchip/cdn-dp-core.c        |  234 +--
+ drivers/gpu/drm/rockchip/cdn-dp-core.h        |   42 +-
+ drivers/gpu/drm/rockchip/cdn-dp-reg.c         |  969 ------------
+ include/drm/drm_dp_helper.h                   |    5 +-
+ 13 files changed, 2756 insertions(+), 1155 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
+ create mode 100644 drivers/gpu/drm/bridge/cdns-mhdp-common.c
+ rename drivers/gpu/drm/{rockchip/cdn-dp-reg.h => bridge/cdns-mhdp-common.h} (81%)
+ create mode 100644 drivers/gpu/drm/bridge/cdns-mhdp.c
+ delete mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.c
+
+-- 
+2.17.1
