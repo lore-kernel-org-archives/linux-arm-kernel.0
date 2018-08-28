@@ -1,94 +1,371 @@
-From: shuah@kernel.org (Shuah Khan)
-Date: Tue, 28 Aug 2018 12:09:53 -0600
-Subject: [PATCH] arm64: add NUMA emulation support
-In-Reply-To: <20180828174011.GE20375@arm.com>
-References: <20180824230559.32336-1-shuah@kernel.org>
- <20180828174011.GE20375@arm.com>
-Message-ID: <a58ad11f-3c22-ed7f-a0cd-938aabc4adaf@kernel.org>
+From: mkubecek@suse.cz (Michal Kubecek)
+Date: Tue, 28 Aug 2018 19:56:58 +0200 (CEST)
+Subject: [PATCH net-next 2/2] ethtool: drop get_settings and set_settings
+ callbacks
+In-Reply-To: <cover.1535477409.git.mkubecek@suse.cz>
+References: <cover.1535477409.git.mkubecek@suse.cz>
+Message-ID: <30b952c097df318a23b9d041ed5d47528aeea97b.1535477409.git.mkubecek@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2018 11:40 AM, Will Deacon wrote:
-> On Fri, Aug 24, 2018 at 05:05:59PM -0600, Shuah Khan (Samsung OSG) wrote:
->> Add NUMA emulation support to emulate NUMA on non-NUMA platforms. A new
->> CONFIG_NUMA_EMU option enables NUMA emulation and a new kernel command
->> line option "numa=fake=N" allows users to specify the configuration for
->> emulation.
->>
->> When NUMA emulation is enabled, a flat (non-NUMA) machine will be split
->> into virtual NUMA nodes when booted with "numa=fake=N", where N is the
->> number of nodes, the system RAM will be split into N equal chunks and
->> assigned to each node.
->>
->> Emulated nodes are bounded by MAX_NUMNODES and the number of memory block
->> count to avoid splitting memory blocks across NUMA nodes.
->>
->> If NUMA emulation init fails, it will fall back to dummy NUMA init.
->>
->> This is tested on Raspberry Pi3b+ with ltp NUMA test suite, numactl, and
->> numastat tools. In addition, tested in conjunction with cpuset cgroup to
->> verify cpuset.cpus and cpuset.mems assignments.
->>
->> Signed-off-by: Shuah Khan (Samsung OSG) <shuah@kernel.org>
->> ---
->>  arch/arm64/Kconfig            |   9 +++
->>  arch/arm64/include/asm/numa.h |   8 +++
->>  arch/arm64/mm/Makefile        |   1 +
->>  arch/arm64/mm/numa.c          |   4 ++
->>  arch/arm64/mm/numa_emu.c      | 109 ++++++++++++++++++++++++++++++++++
->>  5 files changed, 131 insertions(+)
->>  create mode 100644 arch/arm64/mm/numa_emu.c
-> 
-> Hmm, is this just for debugging and kernel development? If so, it's quite a
-> lot of code just for that. Can't you achieve the same thing by faking up the
-> firmware tables?
-> 
-> Will
-> 
+Since [gs]et_settings ethtool_ops callbacks have been deprecated in
+February 2016, all in tree NIC drivers have been converted to provide
+[gs]et_link_ksettings() and out of tree drivers have had enough time to do
+the same.
 
-The main intent is to use numa emulation in conjunction with cpusets for coarse
-memory management similar to x86_64 use-case for the same.
+Drop get_settings() and set_settings() and implement both ETHTOOL_[GS]SET
+and ETHTOOL_[GS]LINKSETTINGS only using [gs]et_link_ksettings().
 
-I verified the restricted/unrestricted using cpuset cgroup to verify cpuset.cpus
-and cpuset.mems assignments. I could see the Restricted/Unrestricted case memory
-usage differences. Using this it will be possible to restrict memory usage by a
-class of processes or a workload or set aside memory for a workload.
+Signed-off-by: Michal Kubecek <mkubecek@suse.cz>
+---
+ Documentation/ABI/testing/sysfs-class-net |   4 +-
+ include/linux/ethtool.h                   |  33 ++---
+ include/uapi/linux/ethtool.h              |  15 +-
+ net/core/ethtool.c                        | 158 +++++-----------------
+ 4 files changed, 50 insertions(+), 160 deletions(-)
 
-This adds the same feature supported by x86_64 as described in
-
-x86/x86_64/fake-numa-for-cpusets
-Using numa=fake and CPUSets for Resource Management
-
-I could see the Restricted/Unrestricted case memory usage differences with this
-patch on Raspberry Pi3b+.
-
-This can also be used to regression test higher level NUMA changes on non-NUMA
-as well without firmware changes. This will also provide a way to expand NUMA
-regression testing in kernel rings.
-
-I was able to run ltp NUMA tests on this and verify NUMA policy code on non-NUMA
-platform. Results below.
-
-numa01 1 TINFO: The system contains 4 nodes: 
-numa01 1 TPASS: NUMA local node and memory affinity
-numa01 2 TPASS: NUMA preferred node policy
-numa01 3 TPASS: NUMA share memory allocated in preferred node
-numa01 4 TPASS: NUMA interleave policy
-numa01 5 TPASS: NUMA interleave policy on shared memory
-numa01 6 TPASS: NUMA phycpubind policy
-numa01 7 TPASS: NUMA local node allocation
-numa01 8 TPASS: NUMA MEMHOG policy
-numa01 9 TPASS: NUMA policy on lib NUMA_NODE_SIZE API
-numa01 10 TPASS: NUMA MIGRATEPAGES policy
-numa01 11 TCONF: hugepage is not supported
-grep: /sys/kernel/mm/transparent_hugepage/enabled: No such file or directory
-numa01 12 TCONF: THP is not supported/enabled
-
-Summary:
-passed   10
-failed   0
-skipped  2
-warnings 0
-
-thanks,
--- Shuah
+diff --git a/Documentation/ABI/testing/sysfs-class-net b/Documentation/ABI/testing/sysfs-class-net
+index 2f1788111cd9..e2e0fe553ad8 100644
+--- a/Documentation/ABI/testing/sysfs-class-net
++++ b/Documentation/ABI/testing/sysfs-class-net
+@@ -117,7 +117,7 @@ Description:
+ 		full: full duplex
+ 
+ 		Note: This attribute is only valid for interfaces that implement
+-		the ethtool get_settings method (mostly Ethernet).
++		the ethtool get_link_ksettings method (mostly Ethernet).
+ 
+ What:		/sys/class/net/<iface>/flags
+ Date:		April 2005
+@@ -224,7 +224,7 @@ Description:
+ 		an integer representing the link speed in Mbits/sec.
+ 
+ 		Note: this attribute is only valid for interfaces that implement
+-		the ethtool get_settings method (mostly Ethernet ).
++		the ethtool get_link_ksettings method (mostly Ethernet).
+ 
+ What:		/sys/class/net/<iface>/tx_queue_len
+ Date:		April 2005
+diff --git a/include/linux/ethtool.h b/include/linux/ethtool.h
+index f8a2245b70ac..afd9596ce636 100644
+--- a/include/linux/ethtool.h
++++ b/include/linux/ethtool.h
+@@ -183,14 +183,6 @@ bool ethtool_convert_link_mode_to_legacy_u32(u32 *legacy_u32,
+ 
+ /**
+  * struct ethtool_ops - optional netdev operations
+- * @get_settings: DEPRECATED, use %get_link_ksettings/%set_link_ksettings
+- *	API. Get various device settings including Ethernet link
+- *	settings. The @cmd parameter is expected to have been cleared
+- *	before get_settings is called. Returns a negative error code
+- *	or zero.
+- * @set_settings: DEPRECATED, use %get_link_ksettings/%set_link_ksettings
+- *	API. Set various device settings including Ethernet link
+- *	settings.  Returns a negative error code or zero.
+  * @get_drvinfo: Report driver/device information.  Should only set the
+  *	@driver, @version, @fw_version and @bus_info fields.  If not
+  *	implemented, the @driver and @bus_info fields will be filled in
+@@ -297,19 +289,16 @@ bool ethtool_convert_link_mode_to_legacy_u32(u32 *legacy_u32,
+  *	a TX queue has this number, return -EINVAL. If only a RX queue or a TX
+  *	queue has this number, ignore the inapplicable fields.
+  *	Returns a negative error code or zero.
+- * @get_link_ksettings: When defined, takes precedence over the
+- *	%get_settings method. Get various device settings
+- *	including Ethernet link settings. The %cmd and
+- *	%link_mode_masks_nwords fields should be ignored (use
+- *	%__ETHTOOL_LINK_MODE_MASK_NBITS instead of the latter), any
+- *	change to them will be overwritten by kernel. Returns a
+- *	negative error code or zero.
+- * @set_link_ksettings: When defined, takes precedence over the
+- *	%set_settings method. Set various device settings including
+- *	Ethernet link settings. The %cmd and %link_mode_masks_nwords
+- *	fields should be ignored (use %__ETHTOOL_LINK_MODE_MASK_NBITS
+- *	instead of the latter), any change to them will be overwritten
+- *	by kernel. Returns a negative error code or zero.
++ * @get_link_ksettings: Get various device settings including Ethernet link
++ *	settings. The %cmd and %link_mode_masks_nwords fields should be
++ *	ignored (use %__ETHTOOL_LINK_MODE_MASK_NBITS instead of the latter),
++ *	any change to them will be overwritten by kernel. Returns a negative
++ *	error code or zero.
++ * @set_link_ksettings: Set various device settings including Ethernet link
++ *	settings. The %cmd and %link_mode_masks_nwords fields should be
++ *	ignored (use %__ETHTOOL_LINK_MODE_MASK_NBITS instead of the latter),
++ *	any change to them will be overwritten by kernel. Returns a negative
++ *	error code or zero.
+  * @get_fecparam: Get the network device Forward Error Correction parameters.
+  * @set_fecparam: Set the network device Forward Error Correction parameters.
+  * @get_ethtool_phy_stats: Return extended statistics about the PHY device.
+@@ -329,8 +318,6 @@ bool ethtool_convert_link_mode_to_legacy_u32(u32 *legacy_u32,
+  * of the generic netdev features interface.
+  */
+ struct ethtool_ops {
+-	int	(*get_settings)(struct net_device *, struct ethtool_cmd *);
+-	int	(*set_settings)(struct net_device *, struct ethtool_cmd *);
+ 	void	(*get_drvinfo)(struct net_device *, struct ethtool_drvinfo *);
+ 	int	(*get_regs_len)(struct net_device *);
+ 	void	(*get_regs)(struct net_device *, struct ethtool_regs *, void *);
+diff --git a/include/uapi/linux/ethtool.h b/include/uapi/linux/ethtool.h
+index dc69391d2bba..c8f8e2455bf3 100644
+--- a/include/uapi/linux/ethtool.h
++++ b/include/uapi/linux/ethtool.h
+@@ -91,10 +91,6 @@
+  * %ETHTOOL_GSET to get the current values before making specific
+  * changes and then applying them with %ETHTOOL_SSET.
+  *
+- * Drivers that implement set_settings() should validate all fields
+- * other than @cmd that are not described as read-only or deprecated,
+- * and must ignore all fields described as read-only.
+- *
+  * Deprecated fields should be ignored by both users and drivers.
+  */
+ struct ethtool_cmd {
+@@ -1800,14 +1796,9 @@ enum ethtool_reset_flags {
+  * rejected.
+  *
+  * Deprecated %ethtool_cmd fields transceiver, maxtxpkt and maxrxpkt
+- * are not available in %ethtool_link_settings. Until all drivers are
+- * converted to ignore them or to the new %ethtool_link_settings API,
+- * for both queries and changes, users should always try
+- * %ETHTOOL_GLINKSETTINGS first, and if it fails with -ENOTSUPP stick
+- * only to %ETHTOOL_GSET and %ETHTOOL_SSET consistently. If it
+- * succeeds, then users should stick to %ETHTOOL_GLINKSETTINGS and
+- * %ETHTOOL_SLINKSETTINGS (which would support drivers implementing
+- * either %ethtool_cmd or %ethtool_link_settings).
++ * are not available in %ethtool_link_settings. These fields will be
++ * always set to zero in %ETHTOOL_GSET reply and %ETHTOOL_SSET will
++ * fail if any of them is set to non-zero value.
+  *
+  * Users should assume that all fields not marked read-only are
+  * writable and subject to validation by the driver.  They should use
+diff --git a/net/core/ethtool.c b/net/core/ethtool.c
+index c9993c6c2fd4..9d4e56d97080 100644
+--- a/net/core/ethtool.c
++++ b/net/core/ethtool.c
+@@ -539,47 +539,17 @@ struct ethtool_link_usettings {
+ 	} link_modes;
+ };
+ 
+-/* Internal kernel helper to query a device ethtool_link_settings.
+- *
+- * Backward compatibility note: for compatibility with legacy drivers
+- * that implement only the ethtool_cmd API, this has to work with both
+- * drivers implementing get_link_ksettings API and drivers
+- * implementing get_settings API. When drivers implement get_settings
+- * and report ethtool_cmd deprecated fields
+- * (transceiver/maxrxpkt/maxtxpkt), these fields are silently ignored
+- * because the resulting struct ethtool_link_settings does not report them.
+- */
++/* Internal kernel helper to query a device ethtool_link_settings. */
+ int __ethtool_get_link_ksettings(struct net_device *dev,
+ 				 struct ethtool_link_ksettings *link_ksettings)
+ {
+-	int err;
+-	struct ethtool_cmd cmd;
+-
+ 	ASSERT_RTNL();
+ 
+-	if (dev->ethtool_ops->get_link_ksettings) {
+-		memset(link_ksettings, 0, sizeof(*link_ksettings));
+-		return dev->ethtool_ops->get_link_ksettings(dev,
+-							    link_ksettings);
+-	}
+-
+-	/* driver doesn't support %ethtool_link_ksettings API. revert to
+-	 * legacy %ethtool_cmd API, unless it's not supported either.
+-	 * TODO: remove when ethtool_ops::get_settings disappears internally
+-	 */
+-	if (!dev->ethtool_ops->get_settings)
++	if (!dev->ethtool_ops->get_link_ksettings)
+ 		return -EOPNOTSUPP;
+ 
+-	memset(&cmd, 0, sizeof(cmd));
+-	cmd.cmd = ETHTOOL_GSET;
+-	err = dev->ethtool_ops->get_settings(dev, &cmd);
+-	if (err < 0)
+-		return err;
+-
+-	/* we ignore deprecated fields transceiver/maxrxpkt/maxtxpkt
+-	 */
+-	convert_legacy_settings_to_link_ksettings(link_ksettings, &cmd);
+-	return err;
++	memset(link_ksettings, 0, sizeof(*link_ksettings));
++	return dev->ethtool_ops->get_link_ksettings(dev, link_ksettings);
+ }
+ EXPORT_SYMBOL(__ethtool_get_link_ksettings);
+ 
+@@ -635,16 +605,7 @@ store_link_ksettings_for_user(void __user *to,
+ 	return 0;
+ }
+ 
+-/* Query device for its ethtool_link_settings.
+- *
+- * Backward compatibility note: this function must fail when driver
+- * does not implement ethtool::get_link_ksettings, even if legacy
+- * ethtool_ops::get_settings is implemented. This tells new versions
+- * of ethtool that they should use the legacy API %ETHTOOL_GSET for
+- * this driver, so that they can correctly access the ethtool_cmd
+- * deprecated fields (transceiver/maxrxpkt/maxtxpkt), until no driver
+- * implements ethtool_ops::get_settings anymore.
+- */
++/* Query device for its ethtool_link_settings. */
+ static int ethtool_get_link_ksettings(struct net_device *dev,
+ 				      void __user *useraddr)
+ {
+@@ -652,7 +613,6 @@ static int ethtool_get_link_ksettings(struct net_device *dev,
+ 	struct ethtool_link_ksettings link_ksettings;
+ 
+ 	ASSERT_RTNL();
+-
+ 	if (!dev->ethtool_ops->get_link_ksettings)
+ 		return -EOPNOTSUPP;
+ 
+@@ -699,16 +659,7 @@ static int ethtool_get_link_ksettings(struct net_device *dev,
+ 	return store_link_ksettings_for_user(useraddr, &link_ksettings);
+ }
+ 
+-/* Update device ethtool_link_settings.
+- *
+- * Backward compatibility note: this function must fail when driver
+- * does not implement ethtool::set_link_ksettings, even if legacy
+- * ethtool_ops::set_settings is implemented. This tells new versions
+- * of ethtool that they should use the legacy API %ETHTOOL_SSET for
+- * this driver, so that they can correctly update the ethtool_cmd
+- * deprecated fields (transceiver/maxrxpkt/maxtxpkt), until no driver
+- * implements ethtool_ops::get_settings anymore.
+- */
++/* Update device ethtool_link_settings. */
+ static int ethtool_set_link_ksettings(struct net_device *dev,
+ 				      void __user *useraddr)
+ {
+@@ -746,51 +697,31 @@ static int ethtool_set_link_ksettings(struct net_device *dev,
+ 
+ /* Query device for its ethtool_cmd settings.
+  *
+- * Backward compatibility note: for compatibility with legacy ethtool,
+- * this has to work with both drivers implementing get_link_ksettings
+- * API and drivers implementing get_settings API. When drivers
+- * implement get_link_ksettings and report higher link mode bits, a
+- * kernel warning is logged once (with name of 1st driver/device) to
+- * recommend user to upgrade ethtool, but the command is successful
+- * (only the lower link mode bits reported back to user).
++ * Backward compatibility note: for compatibility with legacy ethtool, this is
++ * now implemented via get_link_ksettings. When driver reports higher link mode
++ * bits, a kernel warning is logged once (with name of 1st driver/device) to
++ * recommend user to upgrade ethtool, but the command is successful (only the
++ * lower link mode bits reported back to user). Deprecated fields from
++ * ethtool_cmd (transceiver/maxrxpkt/maxtxpkt) are always set to zero.
+  */
+ static int ethtool_get_settings(struct net_device *dev, void __user *useraddr)
+ {
++	struct ethtool_link_ksettings link_ksettings;
+ 	struct ethtool_cmd cmd;
++	int err;
+ 
+ 	ASSERT_RTNL();
++	if (!dev->ethtool_ops->get_link_ksettings)
++		return -EOPNOTSUPP;
+ 
+-	if (dev->ethtool_ops->get_link_ksettings) {
+-		/* First, use link_ksettings API if it is supported */
+-		int err;
+-		struct ethtool_link_ksettings link_ksettings;
+-
+-		memset(&link_ksettings, 0, sizeof(link_ksettings));
+-		err = dev->ethtool_ops->get_link_ksettings(dev,
+-							   &link_ksettings);
+-		if (err < 0)
+-			return err;
+-		convert_link_ksettings_to_legacy_settings(&cmd,
+-							  &link_ksettings);
+-
+-		/* send a sensible cmd tag back to user */
+-		cmd.cmd = ETHTOOL_GSET;
+-	} else {
+-		/* driver doesn't support %ethtool_link_ksettings
+-		 * API. revert to legacy %ethtool_cmd API, unless it's
+-		 * not supported either.
+-		 */
+-		int err;
+-
+-		if (!dev->ethtool_ops->get_settings)
+-			return -EOPNOTSUPP;
++	memset(&link_ksettings, 0, sizeof(link_ksettings));
++	err = dev->ethtool_ops->get_link_ksettings(dev, &link_ksettings);
++	if (err < 0)
++		return err;
++	convert_link_ksettings_to_legacy_settings(&cmd, &link_ksettings);
+ 
+-		memset(&cmd, 0, sizeof(cmd));
+-		cmd.cmd = ETHTOOL_GSET;
+-		err = dev->ethtool_ops->get_settings(dev, &cmd);
+-		if (err < 0)
+-			return err;
+-	}
++	/* send a sensible cmd tag back to user */
++	cmd.cmd = ETHTOOL_GSET;
+ 
+ 	if (copy_to_user(useraddr, &cmd, sizeof(cmd)))
+ 		return -EFAULT;
+@@ -800,48 +731,29 @@ static int ethtool_get_settings(struct net_device *dev, void __user *useraddr)
+ 
+ /* Update device link settings with given ethtool_cmd.
+  *
+- * Backward compatibility note: for compatibility with legacy ethtool,
+- * this has to work with both drivers implementing set_link_ksettings
+- * API and drivers implementing set_settings API. When drivers
+- * implement set_link_ksettings and user's request updates deprecated
+- * ethtool_cmd fields (transceiver/maxrxpkt/maxtxpkt), a kernel
+- * warning is logged once (with name of 1st driver/device) to
+- * recommend user to upgrade ethtool, and the request is rejected.
++ * Backward compatibility note: for compatibility with legacy ethtool, this is
++ * now always implemented via set_link_settings. When user's request updates
++ * deprecated ethtool_cmd fields (transceiver/maxrxpkt/maxtxpkt), a kernel
++ * warning is logged once (with name of 1st driver/device) to recommend user to
++ * upgrade ethtool, and the request is rejected.
+  */
+ static int ethtool_set_settings(struct net_device *dev, void __user *useraddr)
+ {
++	struct ethtool_link_ksettings link_ksettings;
+ 	struct ethtool_cmd cmd;
+ 
+ 	ASSERT_RTNL();
+ 
+ 	if (copy_from_user(&cmd, useraddr, sizeof(cmd)))
+ 		return -EFAULT;
+-
+-	/* first, try new %ethtool_link_ksettings API. */
+-	if (dev->ethtool_ops->set_link_ksettings) {
+-		struct ethtool_link_ksettings link_ksettings;
+-
+-		if (!convert_legacy_settings_to_link_ksettings(&link_ksettings,
+-							       &cmd))
+-			return -EINVAL;
+-
+-		link_ksettings.base.cmd = ETHTOOL_SLINKSETTINGS;
+-		link_ksettings.base.link_mode_masks_nwords
+-			= __ETHTOOL_LINK_MODE_MASK_NU32;
+-		return dev->ethtool_ops->set_link_ksettings(dev,
+-							    &link_ksettings);
+-	}
+-
+-	/* legacy %ethtool_cmd API */
+-
+-	/* TODO: return -EOPNOTSUPP when ethtool_ops::get_settings
+-	 * disappears internally
+-	 */
+-
+-	if (!dev->ethtool_ops->set_settings)
++	if (!dev->ethtool_ops->set_link_ksettings)
+ 		return -EOPNOTSUPP;
+ 
+-	return dev->ethtool_ops->set_settings(dev, &cmd);
++	if (!convert_legacy_settings_to_link_ksettings(&link_ksettings, &cmd))
++		return -EINVAL;
++	link_ksettings.base.link_mode_masks_nwords =
++		__ETHTOOL_LINK_MODE_MASK_NU32;
++	return dev->ethtool_ops->set_link_ksettings(dev, &link_ksettings);
+ }
+ 
+ static noinline_for_stack int ethtool_get_drvinfo(struct net_device *dev,
+-- 
+2.18.0
