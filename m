@@ -1,216 +1,105 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 28 Aug 2018 16:36:46 +0800
-Subject: [PATCH V2 2/2] soc: imx: gpcv2: make pgc driver more generic for
- other i.MX platforms
-In-Reply-To: <1535445406-19633-1-git-send-email-Anson.Huang@nxp.com>
-References: <1535445406-19633-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1535445406-19633-2-git-send-email-Anson.Huang@nxp.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Tue, 28 Aug 2018 08:53:34 +0000
+Subject: [PATCH V5 0/5] soc: imx: add scu firmware api support
+In-Reply-To: <20180828062113.khmkvsj3ofc7muu6@pengutronix.de>
+References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
+ <AM0PR04MB4211F68CCD399243613F8D7B80320@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <AM0PR04MB4211F748DBD1FE64A2B2136980360@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180827083310.omqa3kpmj542fu3b@pengutronix.de>
+ <AM0PR04MB4211E5D66FD8502278765EC8800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <AM0PR04MB42113BB0FA9E54629339F872800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180828062113.khmkvsj3ofc7muu6@pengutronix.de>
+Message-ID: <AM0PR04MB4211A6BC038A141BA25B638A800A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX8MQ and i.MX8MM share same gpc module with i.MX7D, they
-can reuse gpcv2 pgc driver for power domain control, this
-patch renames all functions and structure definitions started
-with "imx7" to "imx", and use .data in imx_gpcv2_dt_ids[] to
-pass platform specific power domain data for power domain
-driver, thus make gpcv2 pgc driver more generic for i.MX
-platforms.
+> -----Original Message-----
+> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> Sent: Tuesday, August 28, 2018 2:21 PM
+> To: A.s. Dong <aisheng.dong@nxp.com>
+> Cc: Jassi Brar <jassisinghbrar@gmail.com>; dongas86 at gmail.com;
+> kernel at pengutronix.de; shawnguo at kernel.org; Fabio Estevam
+> <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH V5 0/5] soc: imx: add scu firmware api support
+> 
+> On Mon, Aug 27, 2018 at 10:21:37AM +0000, A.s. Dong wrote:
+> > > From: A.s. Dong
+> > > > From: Sascha Hauer [mailto:s.hauer at pengutronix.de] On Fri, Aug 24,
+> > > > 2018 at 07:36:38AM +0000, A.s. Dong wrote:
+> > > > > Hi Jassi & Sasha,
+> > > > >
+> > > > > Do you have some suggestions about this patch series?
+> > > >
+> > > > I still think that the users like clk and pinctrl should directly
+> > > > call sc_call_rpc(), no need for this shim at all.
+> > > >
+> > >
+> > > Sorry, I'm a bit confuse.
+> > > What specific shim do you mean not needed?
+> > >
+> > > Do you mean we don't need all the SCU SVC APIs (clk/pm/pinctrl/misc
+> > > and etc) Implemented in this patch series and instead directly
+> > > implement them in client driver?
+> > > For example:
+> > > drivers/soc/imx/sc/svc/pm/rpc_clnt.c
+> > > sc_err_t sc_pm_get_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
+> > >                               sc_pm_clk_t clk, sc_pm_clock_rate_t
+> > > *rate) Change to:
+> > > drivers/clk/imx/scu/scu_clock.c ?
+> > > sc_err_t sc_pm_get_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
+> > >                               sc_pm_clk_t clk, sc_pm_clock_rate_t
+> > > *rate)
+> > >
+> >
+> > I thought even make client driver to directly to sc_call_rpc(), it may
+> > still better to Make them into a serrate function call like
+> > sc_pm_get_clock_rate() but just put In client driver instead of in the central
+> SCU SVC place.
+> > Not sure the point to do that.
+> > Would you please help clarify a bit more?
+> 
+> I think translating the sc message setup into a function only adds additional
+> overhead that the reader has to follow. I do not see the point for doing this.
+> 
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-Acked-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
-changes since V1:
-	use .data in imx_gpcv2_dt_ids[] instead of calling
-	of_machine_is_compatible() for different platforms support.
- drivers/soc/imx/gpcv2.c | 72 +++++++++++++++++++++++++++++--------------------
- 1 file changed, 43 insertions(+), 29 deletions(-)
+The original point is to separate the SCU service API implementation from the client
+drivers. Client drivers don't have to know the internal details of the API implementation,
+they just use the service API provided by SCU firmware. API implementation and client
+users will be maintained independently.
 
-diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c
-index 0e31465..938103a 100644
---- a/drivers/soc/imx/gpcv2.c
-+++ b/drivers/soc/imx/gpcv2.c
-@@ -14,6 +14,7 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
- 
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/pm_domain.h>
- #include <linux/regmap.h>
-@@ -53,7 +54,7 @@
- 
- #define GPC_PGC_CTRL_PCR		BIT(0)
- 
--struct imx7_pgc_domain {
-+struct imx_pgc_domain {
- 	struct generic_pm_domain genpd;
- 	struct regmap *regmap;
- 	struct regulator *regulator;
-@@ -69,11 +70,16 @@ struct imx7_pgc_domain {
- 	struct device *dev;
- };
- 
--static int imx7_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain *genpd,
-+struct imx_pgc_domain_data {
-+	const struct imx_pgc_domain *domains;
-+	size_t domains_num;
-+};
-+
-+static int imx_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain *genpd,
- 				      bool on)
- {
--	struct imx7_pgc_domain *domain = container_of(genpd,
--						      struct imx7_pgc_domain,
-+	struct imx_pgc_domain *domain = container_of(genpd,
-+						      struct imx_pgc_domain,
- 						      genpd);
- 	unsigned int offset = on ?
- 		GPC_PU_PGC_SW_PUP_REQ : GPC_PU_PGC_SW_PDN_REQ;
-@@ -150,17 +156,17 @@ static int imx7_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain *genpd,
- 	return ret;
- }
- 
--static int imx7_gpc_pu_pgc_sw_pup_req(struct generic_pm_domain *genpd)
-+static int imx_gpc_pu_pgc_sw_pup_req(struct generic_pm_domain *genpd)
- {
--	return imx7_gpc_pu_pgc_sw_pxx_req(genpd, true);
-+	return imx_gpc_pu_pgc_sw_pxx_req(genpd, true);
- }
- 
--static int imx7_gpc_pu_pgc_sw_pdn_req(struct generic_pm_domain *genpd)
-+static int imx_gpc_pu_pgc_sw_pdn_req(struct generic_pm_domain *genpd)
- {
--	return imx7_gpc_pu_pgc_sw_pxx_req(genpd, false);
-+	return imx_gpc_pu_pgc_sw_pxx_req(genpd, false);
- }
- 
--static const struct imx7_pgc_domain imx7_pgc_domains[] = {
-+static const struct imx_pgc_domain imx7_pgc_domains[] = {
- 	[IMX7_POWER_DOMAIN_MIPI_PHY] = {
- 		.genpd = {
- 			.name      = "mipi-phy",
-@@ -198,9 +204,14 @@ static const struct imx7_pgc_domain imx7_pgc_domains[] = {
- 	},
- };
- 
--static int imx7_pgc_domain_probe(struct platform_device *pdev)
-+static const struct imx_pgc_domain_data imx7_pgc_domain_data = {
-+	.domains = imx7_pgc_domains,
-+	.domains_num = ARRAY_SIZE(imx7_pgc_domains),
-+};
-+
-+static int imx_pgc_domain_probe(struct platform_device *pdev)
- {
--	struct imx7_pgc_domain *domain = pdev->dev.platform_data;
-+	struct imx_pgc_domain *domain = pdev->dev.platform_data;
- 	int ret;
- 
- 	domain->dev = &pdev->dev;
-@@ -233,9 +244,9 @@ static int imx7_pgc_domain_probe(struct platform_device *pdev)
- 	return ret;
- }
- 
--static int imx7_pgc_domain_remove(struct platform_device *pdev)
-+static int imx_pgc_domain_remove(struct platform_device *pdev)
- {
--	struct imx7_pgc_domain *domain = pdev->dev.platform_data;
-+	struct imx_pgc_domain *domain = pdev->dev.platform_data;
- 
- 	of_genpd_del_provider(domain->dev->of_node);
- 	pm_genpd_remove(&domain->genpd);
-@@ -243,23 +254,24 @@ static int imx7_pgc_domain_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static const struct platform_device_id imx7_pgc_domain_id[] = {
--	{ "imx7-pgc-domain", },
-+static const struct platform_device_id imx_pgc_domain_id[] = {
-+	{ "imx-pgc-domain", },
- 	{ },
- };
- 
--static struct platform_driver imx7_pgc_domain_driver = {
-+static struct platform_driver imx_pgc_domain_driver = {
- 	.driver = {
--		.name = "imx7-pgc",
-+		.name = "imx-pgc",
- 	},
--	.probe    = imx7_pgc_domain_probe,
--	.remove   = imx7_pgc_domain_remove,
--	.id_table = imx7_pgc_domain_id,
-+	.probe    = imx_pgc_domain_probe,
-+	.remove   = imx_pgc_domain_remove,
-+	.id_table = imx_pgc_domain_id,
- };
--builtin_platform_driver(imx7_pgc_domain_driver)
-+builtin_platform_driver(imx_pgc_domain_driver)
- 
- static int imx_gpcv2_probe(struct platform_device *pdev)
- {
-+	static const struct imx_pgc_domain_data *domain_data;
- 	static const struct regmap_range yes_ranges[] = {
- 		regmap_reg_range(GPC_LPCR_A_CORE_BSC,
- 				 GPC_M4_PU_PDN_FLG),
-@@ -307,9 +319,11 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	domain_data = of_device_get_match_data(&pdev->dev);
-+
- 	for_each_child_of_node(pgc_np, np) {
- 		struct platform_device *pd_pdev;
--		struct imx7_pgc_domain *domain;
-+		struct imx_pgc_domain *domain;
- 		u32 domain_index;
- 
- 		ret = of_property_read_u32(np, "reg", &domain_index);
-@@ -319,14 +333,14 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
- 			return ret;
- 		}
- 
--		if (domain_index >= ARRAY_SIZE(imx7_pgc_domains)) {
-+		if (domain_index >= domain_data->domains_num) {
- 			dev_warn(dev,
- 				 "Domain index %d is out of bounds\n",
- 				 domain_index);
- 			continue;
- 		}
- 
--		pd_pdev = platform_device_alloc("imx7-pgc-domain",
-+		pd_pdev = platform_device_alloc("imx-pgc-domain",
- 						domain_index);
- 		if (!pd_pdev) {
- 			dev_err(dev, "Failed to allocate platform device\n");
-@@ -335,8 +349,8 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
- 		}
- 
- 		ret = platform_device_add_data(pd_pdev,
--					       &imx7_pgc_domains[domain_index],
--					       sizeof(imx7_pgc_domains[domain_index]));
-+					       &domain_data->domains[domain_index],
-+					       sizeof(domain_data->domains[domain_index]));
- 		if (ret) {
- 			platform_device_put(pd_pdev);
- 			of_node_put(np);
-@@ -345,8 +359,8 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
- 
- 		domain = pd_pdev->dev.platform_data;
- 		domain->regmap = regmap;
--		domain->genpd.power_on  = imx7_gpc_pu_pgc_sw_pup_req;
--		domain->genpd.power_off = imx7_gpc_pu_pgc_sw_pdn_req;
-+		domain->genpd.power_on  = imx_gpc_pu_pgc_sw_pup_req;
-+		domain->genpd.power_off = imx_gpc_pu_pgc_sw_pdn_req;
- 
- 		pd_pdev->dev.parent = dev;
- 		pd_pdev->dev.of_node = np;
-@@ -363,7 +377,7 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
- }
- 
- static const struct of_device_id imx_gpcv2_dt_ids[] = {
--	{ .compatible = "fsl,imx7d-gpc" },
-+	{ .compatible = "fsl,imx7d-gpc", .data = &imx7_pgc_domain_data, },
- 	{ }
- };
- 
--- 
-2.7.4
+And this way seems like to be commonly used in current kernel:
+See:
+drivers/firmware/ti_sci.c
+drivers/firmware/arm_scpi.c
+drivers/firmware/arm_scmi/clock.c
+
+Should we be the exception?
+
+> Also when we do the message sending directly in the clients we do not end up
+> with a huge bag of all possible message sending function of which only a
+> fraction is ever going to be used.
+> 
+
+Currently I only add the APIs actually used by client driver. All unused APIs
+are not added until we have real requirements.
+So changing a place seems like would not affect much.
+
+Regards
+Dong Aisheng
+
+> Sascha
+> 
+> --
+> Pengutronix e.K.                           |
+> |
+> Industrial Linux Solutions                 |
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fwww.
+> pengutronix.de%2F&amp;data=02%7C01%7Caisheng.dong%40nxp.com%7C79
+> cabf129d764c8d2dec08d60cae7563%7C686ea1d3bc2b4c6fa92cd99c5c30163
+> 5%7C0%7C0%7C636710340764331803&amp;sdata=vWXc5oHn6fZN0zBYbMI
+> mgsVMzPQMU08wvSt3HNvbGgM%3D&amp;reserved=0  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
+> |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:
+> +49-5121-206917-5555 |
