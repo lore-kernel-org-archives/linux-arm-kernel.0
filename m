@@ -1,17 +1,23 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 28 Aug 2018 16:55:28 +0200
-Subject: [PATCH v8 8/8] ARM: dts: sun8i-h3: Add Video Engine and reserved
+Date: Tue, 28 Aug 2018 16:55:54 +0200
+Subject: [PATCH v8 5/8] ARM: dts: sun5i: Add Video Engine and reserved
  memory nodes
-In-Reply-To: <20180828073424.30247-9-paul.kocialkowski@bootlin.com>
+In-Reply-To: <20180828073424.30247-6-paul.kocialkowski@bootlin.com>
 References: <20180828073424.30247-1-paul.kocialkowski@bootlin.com>
- <20180828073424.30247-9-paul.kocialkowski@bootlin.com>
-Message-ID: <20180828145528.pqihdem4cbe6nafp@flea>
+ <20180828073424.30247-6-paul.kocialkowski@bootlin.com>
+Message-ID: <20180828145554.vj3kewgdr7owxgn4@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 09:34:24AM +0200, Paul Kocialkowski wrote:
+On Tue, Aug 28, 2018 at 09:34:21AM +0200, Paul Kocialkowski wrote:
 > This adds nodes for the Video Engine and the associated reserved memory
-> for the H3. Up to 96 MiB of memory are dedicated to the CMA pool.
+> for sun5i-based platforms. Up to 96 MiB of memory are dedicated to the
+> CMA pool.
+> 
+> The VPU can only map the first 256 MiB of DRAM, so the reserved memory
+> pool has to be located in that area. Following Allwinner's decision in
+> downstream software, the last 96 MiB of the first 256 MiB of RAM are
+> reserved for this purpose.
 > 
 > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
@@ -29,4 +35,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180828/7d16dbc1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180828/1cbbd553/attachment-0001.sig>
