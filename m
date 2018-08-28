@@ -1,72 +1,62 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 29 Aug 2018 00:41:58 +0200
-Subject: 4.19-rc1 on droid 4: screen not updating
-In-Reply-To: <20180828023722.GK7523@atomide.com>
-References: <20180827105121.GA8283@amd>
- <20180828023722.GK7523@atomide.com>
-Message-ID: <20180828224158.GA12978@amd>
+From: tyreld@linux.vnet.ibm.com (Tyrel Datwyler)
+Date: Tue, 28 Aug 2018 15:46:40 -0700
+Subject: [PATCH] soc: Convert to using %pOFn instead of device_node.name
+In-Reply-To: <CADRPPNSoP5K79wCr5QdJ-OR_W9aZrEkBiPqCXU7EWCfZsvaeuQ@mail.gmail.com>
+References: <20180828015252.28511-1-robh@kernel.org>
+ <20180828015252.28511-43-robh@kernel.org>
+ <CADRPPNRvRKEuV=ZzH6yq6_7COvFSWy2ibAKoEt4YrzES2m9x2Q@mail.gmail.com>
+ <a8594a1c-0d10-74c6-0e40-15d49ff876a3@linux.vnet.ibm.com>
+ <CADRPPNSoP5K79wCr5QdJ-OR_W9aZrEkBiPqCXU7EWCfZsvaeuQ@mail.gmail.com>
+Message-ID: <9587f8a2-3130-033c-6394-9110b0d399da@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > With Sebastian's patches, display works on Droid 4 in v4.18.
+On 08/28/2018 03:29 PM, Li Yang wrote:
+> On Tue, Aug 28, 2018 at 5:16 PM Tyrel Datwyler
+> <tyreld@linux.vnet.ibm.com> wrote:
+>>
+>> On 08/28/2018 11:48 AM, Li Yang wrote:
+>>> On Mon, Aug 27, 2018 at 8:57 PM Rob Herring <robh@kernel.org> wrote:
+>>>>
+>>>> In preparation to remove the node name pointer from struct device_node,
+>>>> convert printf users to use the %pOFn format specifier.
+>>>
+>>> Please forgive my ignorance, but what is this format specifier do
+>>> exactly?   I cannot find anything listed in the printf specification
+>>> matching this.  Is this something newly introduced?
+>>>
+>>> Leo
+>>>
+>>
+>> From Documentation/core-api/printk-formats.rst:
 > 
-> Hmm care to post your v4.18 patches somewhere too for people?
-> I'd have to look around for them since I've been using Linux
-> next for past few months.
-
-I don't have patches separated at the moment. I pushed the branch to
-
-git at gitolite.kernel.org:pub/scm/linux/kernel/git/pavel/linux-n900.git
-
-all-v4.18
-
-> Also, do you have v4.19-rc1 versions of your pending audio
-> patches somewhere? I'd like to play with voice calls again
-> now with my WIP pending n_gsm serdev patches..
-
-I pushed that to all-v4.19 .
-
-> > I had to do some manual merging, and I see kernel messages in
-> > v4.19-rc1, but they are frozen -- no updates.
-> > 
-> > a) does someone have it working?
+> I was trying to find it in the standard c format specifier.  :(
+> Thanks a lot for the pointer.
 > 
-> I have had it working for few weeks since I'm following
-> Linux next. I just pushed Sebastian's patches I rebased
-> earlier today against v4.19-rc1 to [0][1].
 
-Thanks, will take a look tommorow.
+No problem. Its worth a look through. The usual integer types are at the top, but that is followed by the pointer types which the kernel provides quite a few for a variety of things.
 
-> > b) is there some way I can help to get it working in mainline? Droid 4
-> > is not exactly new, and this is painful point that makes it hard to
-> > use.
+>>
+>> kobjects
+>> --------
+>>
+>> ::
+>>
+>>         %pOF[fnpPcCF]
+>>
+>>
+>> For printing kobject based structs (device nodes). Default behaviour is
+>> equivalent to %pOFf.
+>>
+>>         - f - device node full_name
+>>         - n - device node name
+>>         - p - device node phandle
+>>         - P - device node path spec (name + @unit)
+>>         - F - device node flags
+>>         - c - major compatible string
+>>         - C - full compatible string
+>>
+>>
+>> -Tyrel
+>>
 > 
-> Well since Sebastian is busy according to [2], maybe try to update
-> Sebastian's mfd-ti-lmu backlight patches so they can get merged?
-> Please check with Sebastian, but that would cut down the pending
-> pile by quite a few patches.
-
-Ok, let me take a look.
-
-I currently don't have the patches separated, and yes, the audio ones
-work, but no, they are not designed right :-(. 
-
-Best regards,
-									Pavel
-
-> [0] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap droid4-pending-v4.19
-> [1] https://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git/log/?h=droid4-pending-v4.19
-> [2] https://lists.freedesktop.org/archives/dri-devel/2018-August/186226.html
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180829/9e19c2df/attachment.sig>
