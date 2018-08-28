@@ -1,42 +1,51 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 28 Aug 2018 16:56:14 +0200
-Subject: [PATCH v8 4/8] media: platform: Add Cedrus VPU decoder driver
-In-Reply-To: <20180828073424.30247-5-paul.kocialkowski@bootlin.com>
-References: <20180828073424.30247-1-paul.kocialkowski@bootlin.com>
- <20180828073424.30247-5-paul.kocialkowski@bootlin.com>
-Message-ID: <20180828145614.rovduhq676eag3gz@flea>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 28 Aug 2018 16:56:46 +0200
+Subject: [PATCH] ARM: shmobile: defconfig: Refresh shmobile_defconfig for
+ v4.19-rc1
+Message-ID: <20180828145646.12014-1-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 09:34:20AM +0200, Paul Kocialkowski wrote:
-> This introduces the Cedrus VPU driver that supports the VPU found in
-> Allwinner SoCs, also known as Video Engine. It is implemented through
-> a v4l2 m2m decoder device and a media device (used for media requests).
-> So far, it only supports MPEG2 decoding.
-> 
-> Since this VPU is stateless, synchronization with media requests is
-> required in order to ensure consistency between frame headers that
-> contain metadata about the frame to process and the raw slice data that
-> is used to generate the frame.
-> 
-> This driver was made possible thanks to the long-standing effort
-> carried out by the linux-sunxi community in the interest of reverse
-> engineering, documenting and implementing support for Allwinner VPU.
-> 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Refresh the defconfig for Renesas ARM boards:
+  - Move options that have moved,
+  - Remove CONFIG_HAVE_ARM_ARCH_TIMER (auto-enabled),
+  - Remove ENABLE_WARN_DEPRECATED (removed).
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/configs/shmobile_defconfig | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Maxime
-
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index c8f2cb9fc7f3c8d8..7b48ec3e63ec3234 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -32,10 +32,8 @@ CONFIG_PCI_RCAR_GEN2=y
+ CONFIG_PCIE_RCAR=y
+ CONFIG_SMP=y
+ CONFIG_SCHED_MC=y
+-CONFIG_HAVE_ARM_ARCH_TIMER=y
+ CONFIG_NR_CPUS=8
+ CONFIG_HIGHMEM=y
+-CONFIG_CMA=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+@@ -50,6 +48,7 @@ CONFIG_CPUFREQ_DT=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_CMA=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+@@ -207,7 +206,6 @@ CONFIG_ROOT_NFS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_PRINTK_TIME=y
+-# CONFIG_ENABLE_WARN_DEPRECATED is not set
+ # CONFIG_ENABLE_MUST_CHECK is not set
+ CONFIG_DEBUG_KERNEL=y
+ # CONFIG_ARM_UNWIND is not set
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180828/0ac1f6c8/attachment.sig>
+2.17.1
