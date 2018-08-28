@@ -1,51 +1,66 @@
-From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Tue, 28 Aug 2018 16:01:24 +0300
-Subject: [RESEND PATCH v5 7/9] pwm: add push-pull mode support
-In-Reply-To: <1535461286-12308-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1535461286-12308-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1535461286-12308-8-git-send-email-claudiu.beznea@microchip.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 28 Aug 2018 14:03:27 +0100
+Subject: [RFC PATCH 02/11] arm64: tlb: Add DSB ISHST prior to TLBI in
+ __flush_tlb_[kernel_]pgtable()
+In-Reply-To: <20180824175609.GR24124@hirez.programming.kicks-ass.net>
+References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
+ <1535125966-7666-3-git-send-email-will.deacon@arm.com>
+ <20180824175609.GR24124@hirez.programming.kicks-ass.net>
+Message-ID: <20180828130326.GB26727@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add push-pull mode support. In push-pull mode the channels' outputs have
-same polarities and the edges are complementary delayed for one period.
+On Fri, Aug 24, 2018 at 07:56:09PM +0200, Peter Zijlstra wrote:
+> On Fri, Aug 24, 2018 at 04:52:37PM +0100, Will Deacon wrote:
+> > __flush_tlb_[kernel_]pgtable() rely on set_pXd() having a DSB after
+> > writing the new table entry and therefore avoid the barrier prior to the
+> > TLBI instruction.
+> > 
+> > In preparation for delaying our walk-cache invalidation on the unmap()
+> > path, move the DSB into the TLB invalidation routines.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/include/asm/tlbflush.h | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+> > index 7e2a35424ca4..e257f8655b84 100644
+> > --- a/arch/arm64/include/asm/tlbflush.h
+> > +++ b/arch/arm64/include/asm/tlbflush.h
+> > @@ -213,6 +213,7 @@ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
+> >  {
+> >  	unsigned long addr = __TLBI_VADDR(uaddr, ASID(mm));
+> >  
+> > +	dsb(ishst);
+> >  	__tlbi(vae1is, addr);
+> >  	__tlbi_user(vae1is, addr);
+> >  	dsb(ish);
+> > @@ -222,6 +223,7 @@ static inline void __flush_tlb_kernel_pgtable(unsigned long kaddr)
+> >  {
+> >  	unsigned long addr = __TLBI_VADDR(kaddr, 0);
+> >  
+> > +	dsb(ishst);
+> >  	__tlbi(vaae1is, addr);
+> >  	dsb(ish);
+> >  }
+> 
+> I would suggest these barrier -- like any other barriers, carry a
+> comment that explain the required ordering.
+> 
+> I think this here reads like:
+> 
+> 	STORE: unhook page
+> 
+> 	DSB-ishst: wait for all stores to complete
+> 	TLBI: invalidate broadcast
+> 	DSB-ish: wait for TLBI to complete
+> 
+> And the 'newly' placed DSB-ishst ensures the page is observed unlinked
+> before we issue the invalidate.
 
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- drivers/pwm/core.c  | 1 +
- include/linux/pwm.h | 3 +++
- 2 files changed, 4 insertions(+)
+Yeah, not a bad idea. We already have a big block comment in this file but
+it's desperately out of date, so lemme rewrite that and justify the barriers
+at the same time.
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 59a9df9120de..5fde2e685ca7 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -348,6 +348,7 @@ const char *pwm_mode_desc(struct pwm_device *pwm, unsigned long mode)
- 		"invalid",
- 		"normal",
- 		"complementary",
-+		"push-pull",
- 	};
- 
- 	if (!pwm_mode_valid(pwm, mode))
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index a4ce4ad7edf0..eb170e2ab431 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -29,11 +29,14 @@ enum pwm_polarity {
-  * PWM modes capabilities
-  * @PWMC_MODE_NORMAL_BIT: PWM has one output
-  * @PWMC_MODE_COMPLEMENTARY_BIT: PWM has 2 outputs with opposite polarities
-+ * @PWMC_MODE_PUSH_PULL_BIT: PWM has 2 outputs with same polarities and the
-+ * edges are complementary delayed for one period
-  * @PWMC_MODE_CNT: PWM modes count
-  */
- enum {
- 	PWMC_MODE_NORMAL_BIT,
- 	PWMC_MODE_COMPLEMENTARY_BIT,
-+	PWMC_MODE_PUSH_PULL_BIT,
- 	PWMC_MODE_CNT,
- };
- 
--- 
-2.7.4
+Will
