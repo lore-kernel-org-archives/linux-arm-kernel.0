@@ -1,228 +1,54 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Tue, 28 Aug 2018 14:54:57 -0400
-Subject: [PATCH] perf vendor events arm64: Add to core JSON events for eMAG
-In-Reply-To: <CAAbOPF1h1S1U2R-xxeYAH=CimZdYjOYUxaL9GDQ7yS5T6W7dpA@mail.gmail.com>
-References: <20180823202250.30797-1-seanvk.dev@oregontracks.org>
- <CAAbOPF1h1S1U2R-xxeYAH=CimZdYjOYUxaL9GDQ7yS5T6W7dpA@mail.gmail.com>
-Message-ID: <c2432492-2a58-205b-a1a4-9cc10d833a3f@redhat.com>
+From: urjaman@gmail.com (Urja Rannikko)
+Date: Tue, 28 Aug 2018 18:55:06 +0000
+Subject: [PATCH 0/7] [RFC] rk3288 veyron chromebook hdmi frequencies
+Message-ID: <20180828185513.13216-1-urjaman@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/28/2018 01:21 PM, Sean V Kelley wrote:
-> 
-> 
-> On Thu, Aug 23, 2018 at 1:23 PM Sean V Kelley <seanvk.dev at oregontracks.org <mailto:seanvk.dev@oregontracks.org>> wrote:
-> 
->     Adds the remainder of the supported ARMv8 recommended IMPLEMENTATION
->     DEFINED events for the Ampere Computing eMAG file.
-> 
-> 
-> Just checking in?? Perhaps John, William or Will could take a look if you have time??
-> 
-> Thanks,
-> 
-> Sean
+Hi all,
 
-Hi,
+This is a series trying to make the "hack" of dedicating a pll (npll)
+on these chromebooks to one of the VOPs (that is used for HDMI)
+more acceptable for upstream.
+Notably it should change nothing for non-chromebook rk3288 designs,
+and allows enough configurability that such designs could later
+use this feature for either VOP if it is desirable.
 
-Is there some public manual that lists the performance events for the Ampere eMAG?  As mentioned that some unavailable events were incorrectly added to the lists for the processor.  Having a reference for this would allow checking for those types of problems.
+I expect the first patch to be acceptable (atleast almost) as-is.
+It just adds the PLL frequencies used for HDMI into the PLL configuration
+list, so they're ready to be used for hdmi whether by fixed configuration,
+automagic magicness or dedicating a PLL.
 
-One suggestions would be to split the events into multiple JSON files like the x86 and arm cortex 53 processors, so related events grouped into meaningful functional groups rather than just one long alphabetical list.
+For the device tree bindings, I added a binding for the list of 
+allowed hdmi frequencies (that quite closely a hardware property both
+due to EMI/RF considerations and clock/PLL configuration...) as
+"rockchip,hdmi-rates-hz" but i think this could have a common name.
+Suggestions?
 
-Otherwise the patch looks reasonable.
+This has been tested on my ASUS C201, and effectively gives
+the same display compatibility as ChromeOS has. (This journey
+started with me plugging in my 1920x1200 samsung 2443BW and
+getting 1280x1024 at 55.555... Hz.)
 
--William Cohen
-> 
-> 
-> ?
-> 
->     Cc: Arnaldo Carvalho de Melo <acme at kernel.org <mailto:acme@kernel.org>>
->     Cc: Alexander Shishkin <alexander.shishkin at linux.intel.com <mailto:alexander.shishkin@linux.intel.com>>
->     Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni at cavium.com <mailto:ganapatrao.kulkarni@cavium.com>>
->     Cc: Jiri Olsa <jolsa at redhat.com <mailto:jolsa@redhat.com>>
->     Cc: Namhyung Kim <namhyung at kernel.org <mailto:namhyung@kernel.org>>
->     Cc: Peter Zijlstra <peterz at infradead.org <mailto:peterz@infradead.org>>
->     Cc: Will Deacon <will.deacon at arm.com <mailto:will.deacon@arm.com>>
->     Cc: William Cohen <wcohen at redhat.com <mailto:wcohen@redhat.com>>
->     Cc: linux-arm-kernel at lists.infradead.org <mailto:linux-arm-kernel@lists.infradead.org>
-> 
->     Signed-off-by: Sean V Kelley <seanvk.dev at oregontracks.org <mailto:seanvk.dev@oregontracks.org>>
->     ---
->     ?.../arch/arm64/ampere/emag/core-imp-def.json? | 150 +++++++++++++++++-
->     ?1 file changed, 144 insertions(+), 6 deletions(-)
-> 
->     diff --git a/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
->     index bc03c06c3918..d95202dbe2b2 100644
->     --- a/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
->     +++ b/tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
->     @@ -9,7 +9,7 @@
->     ? ? ? ? ?"ArchStdEvent": "L1D_CACHE_REFILL_RD",
->     ? ? ?},
->     ? ? ?{
->     -? ? ? ? "ArchStdEvent": "L1D_CACHE_REFILL_WR",
->     +? ? ? ? "ArchStdEvent": "L1D_CACHE_INVAL",
->     ? ? ?},
->     ? ? ?{
->     ? ? ? ? ?"ArchStdEvent": "L1D_TLB_REFILL_RD",
->     @@ -18,15 +18,153 @@
->     ? ? ? ? ?"ArchStdEvent": "L1D_TLB_REFILL_WR",
->     ? ? ?},
->     ? ? ?{
->     -? ? ? ? "ArchStdEvent": "L1D_TLB_RD",
->     +? ? ? ? "ArchStdEvent": "L2D_CACHE_RD",
->     ? ? ?},
->     ? ? ?{
->     -? ? ? ? "ArchStdEvent": "L1D_TLB_WR",
->     +? ? ? ? "ArchStdEvent": "L2D_CACHE_WR",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "L2D_CACHE_REFILL_RD",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "L2D_CACHE_REFILL_WR",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "L2D_CACHE_WB_VICTIM",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "L2D_CACHE_WB_CLEAN",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "L2D_CACHE_INVAL",
->     ? ? ?},
->     ? ? ?{
->     ? ? ? ? ?"ArchStdEvent": "BUS_ACCESS_RD",
->     -? ?},
->     -? ?{
->     +? ? },
->     +? ? {
->     ? ? ? ? ?"ArchStdEvent": "BUS_ACCESS_WR",
->     -? ?}
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "BUS_ACCESS_SHARED",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "BUS_ACCESS_NOT_SHARED",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "BUS_ACCESS_NORMAL",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "BUS_ACCESS_PERIPH",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "MEM_ACCESS_RD",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "MEM_ACCESS_WR",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "UNALIGNED_LD_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "UNALIGNED_ST_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "UNALIGNED_LDST_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "LDREX_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "STREX_PASS_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "STREX_FAIL_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "STREX_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "LD_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "ST_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "LDST_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "DP_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "ASE_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "VFP_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "PC_WRITE_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "CRYPTO_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "BR_IMMED_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "BR_RETURN_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "BR_INDIRECT_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "ISB_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "DSB_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "DMB_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "EXC_UNDEF",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "EXC_SVC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "EXC_PABORT",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "EXC_DABORT",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "EXC_IRQ",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "EXC_FIQ",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "EXC_HVC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "EXC_TRAP_PABORT",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "EXC_TRAP_DABORT",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "EXC_TRAP_OTHER",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "EXC_TRAP_IRQ",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "EXC_TRAP_FIQ",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "RC_LD_SPEC",
->     +? ? },
->     +? ? {
->     +? ? ? ? "ArchStdEvent": "RC_ST_SPEC",
->     +? ? },
->     ?]
->     -- 
->     2.17.1
-> 
+Urja Rannikko (7):
+  clk: rockchip: improve rk3288 pll rates for better hdmi output
+  dt-bindings: clock: rk3288-cru: Add property to dedicate NPLL for VOPx
+  drivers: clk-rk3288: support for dedicating NPLL to a VOP
+  dt-bindings: display/rockchip: dw_hdmi: Add property for HDMI
+    frequency list
+  drm: dw_hdmi-rockchip: better clock selection logic and dts-based rate
+    list
+  dts: rk3288: support for dedicating npll to a vop
+  dts: rk3288-veyron-chromebook: dedicate npll to VOP0/HDMI + HDMI rates
+
+ .../bindings/clock/rockchip,rk3288-cru.txt    |   3 +
+ .../display/rockchip/dw_hdmi-rockchip.txt     |   1 +
+ .../boot/dts/rk3288-veyron-chromebook.dtsi    |  67 +++++
+ arch/arm/boot/dts/rk3288.dtsi                 |   6 +-
+ drivers/clk/rockchip/clk-rk3288.c             |  98 +++++--
+ drivers/clk/rockchip/clk.h                    |   3 +
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c   | 269 ++++++++++++------
+ 7 files changed, 335 insertions(+), 112 deletions(-)
+
+-- 
+2.18.0
