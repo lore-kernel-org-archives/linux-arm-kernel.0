@@ -1,9 +1,9 @@
 From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
-Date: Tue, 28 Aug 2018 12:29:35 +0530
-Subject: [PATCH 1/2][RESEND] ARM: dts: Add big-endian in nor node for ls1021a
+Date: Tue, 28 Aug 2018 12:29:36 +0530
+Subject: [PATCH 2/2][RESEND] arm64: dts: Add big-endian in nor node for ls104xa
 In-Reply-To: <20180828065936.8040-1-prabhakar.kushwaha@nxp.com>
 References: <20180828065936.8040-1-prabhakar.kushwaha@nxp.com>
-Message-ID: <20180828065936.8040-2-prabhakar.kushwaha@nxp.com>
+Message-ID: <20180828065936.8040-3-prabhakar.kushwaha@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,42 +16,65 @@ Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
 Based on 147395ea40b36b "dt-bindings: mtd-physmap: Add endianness supports"
 RESEND keeping Li Yang <leoyang.li@nxp.com> 
 
- arch/arm/boot/dts/ls1021a-qds.dts | 2 ++
- arch/arm/boot/dts/ls1021a-twr.dts | 2 ++
- 2 files changed, 4 insertions(+)
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts | 2 ++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 2 ++
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts | 2 ++
+ 3 files changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
-index 499f41a2c6f0..923a25760516 100644
---- a/arch/arm/boot/dts/ls1021a-qds.dts
-+++ b/arch/arm/boot/dts/ls1021a-qds.dts
-@@ -1,5 +1,6 @@
- /*
-  * Copyright 2013-2014 Freescale Semiconductor, Inc.
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+index c7b8d2c009cd..dff3d648172e 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+@@ -3,6 +3,7 @@
+  * Device Tree Include file for Freescale Layerscape-1043A family SoC.
+  *
+  * Copyright 2014-2015 Freescale Semiconductor, Inc.
 + * Copyright 2018 NXP
   *
-  * This file is dual-licensed: you can use it either under the terms
-  * of the GPL or the X11 license, at your option. Note that this dual
-@@ -235,6 +236,7 @@
- 		#size-cells = <1>;
+  * Mingkai Hu <Mingkai.hu@freescale.com>
+  */
+@@ -50,6 +51,7 @@
+ 	nor at 0,0 {
  		compatible = "cfi-flash";
  		reg = <0x0 0x0 0x8000000>;
 +		big-endian;
  		bank-width = <2>;
  		device-width = <1>;
  	};
-diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-index f0c949d74833..8b48c3c7cd21 100644
---- a/arch/arm/boot/dts/ls1021a-twr.dts
-+++ b/arch/arm/boot/dts/ls1021a-twr.dts
-@@ -1,5 +1,6 @@
- /*
-  * Copyright 2013-2014 Freescale Semiconductor, Inc.
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+index 7b01ba8d3b7e..17ca357e854f 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+@@ -3,6 +3,7 @@
+  * Device Tree Include file for Freescale Layerscape-1043A family SoC.
+  *
+  * Copyright 2014-2015 Freescale Semiconductor, Inc.
 + * Copyright 2018 NXP
   *
-  * This file is dual-licensed: you can use it either under the terms
-  * of the GPL or the X11 license, at your option. Note that this dual
-@@ -203,6 +204,7 @@
- 		#size-cells = <1>;
+  * Mingkai Hu <Mingkai.hu@freescale.com>
+  */
+@@ -65,6 +66,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			reg = <0x0 0x0 0x8000000>;
++			big-endian;
+ 			bank-width = <2>;
+ 			device-width = <1>;
+ 		};
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+index e69306e6b0b1..e58a8ca1386c 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+@@ -3,6 +3,7 @@
+  * Device Tree Include file for Freescale Layerscape-1046A family SoC.
+  *
+  * Copyright 2016 Freescale Semiconductor, Inc.
++ * Copyright 2018 NXP
+  *
+  * Shaohui Xie <Shaohui.Xie@nxp.com>
+  */
+@@ -141,6 +142,7 @@
+ 	nor at 0,0 {
  		compatible = "cfi-flash";
  		reg = <0x0 0x0 0x8000000>;
 +		big-endian;
