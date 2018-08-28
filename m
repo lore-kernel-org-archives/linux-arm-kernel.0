@@ -1,38 +1,49 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 28 Aug 2018 16:51:19 +0100
-Subject: [PATCH v5 09/27] irqchip/gic: Lower priority of GIC interrupts
+Date: Tue, 28 Aug 2018 16:51:16 +0100
+Subject: [PATCH v5 06/27] arm64: Delay daif masking for user return
 In-Reply-To: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
 References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1535471497-38854-10-git-send-email-julien.thierry@arm.com>
+Message-ID: <1535471497-38854-7-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current value used for IRQ priorities is high among the
-non-secure interrupt priority values.
+Masking daif flags is done very early before returning to EL0.
 
-Lower the default priority of interrupts so there is more flexibility
-to define higher priority interrupts.
+Only toggle the interrupt masking while in the vector entry and mask daif
+once in kernel_exit.
 
-Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: James Morse <james.morse@arm.com>
 ---
- include/linux/irqchip/arm-gic-common.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/kernel/entry.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/irqchip/arm-gic-common.h b/include/linux/irqchip/arm-gic-common.h
-index 9a1a479..2c9a4b3 100644
---- a/include/linux/irqchip/arm-gic-common.h
-+++ b/include/linux/irqchip/arm-gic-common.h
-@@ -13,7 +13,7 @@
- #include <linux/types.h>
- #include <linux/ioport.h>
-
--#define GICD_INT_DEF_PRI		0xa0
-+#define GICD_INT_DEF_PRI		0xc0
- #define GICD_INT_DEF_PRI_X4		((GICD_INT_DEF_PRI << 24) |\
- 					(GICD_INT_DEF_PRI << 16) |\
- 					(GICD_INT_DEF_PRI << 8) |\
---
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 09dbea22..85ce06ac 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -259,9 +259,9 @@ alternative_else_nop_endif
+ 	.endm
+ 
+ 	.macro	kernel_exit, el
+-	.if	\el != 0
+ 	disable_daif
+ 
++	.if	\el != 0
+ 	/* Restore the task's original addr_limit. */
+ 	ldr	x20, [sp, #S_ORIG_ADDR_LIMIT]
+ 	str	x20, [tsk, #TSK_TI_ADDR_LIMIT]
+@@ -896,7 +896,7 @@ work_pending:
+  * "slow" syscall return path.
+  */
+ ret_to_user:
+-	disable_daif
++	disable_irq				// disable interrupts
+ 	ldr	x1, [tsk, #TSK_TI_FLAGS]
+ 	and	x2, x1, #_TIF_WORK_MASK
+ 	cbnz	x2, work_pending
+-- 
 1.9.1
