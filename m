@@ -1,232 +1,71 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Tue, 28 Aug 2018 22:45:44 +0200
-Subject: [PATCH 4/4] arm64: dts: add Microsys MPX-LS1046A SoM and SBC-LS1046A
- SBC
-In-Reply-To: <20180828204544.10815-1-alexandre.belloni@bootlin.com>
-References: <20180828204544.10815-1-alexandre.belloni@bootlin.com>
-Message-ID: <20180828204544.10815-4-alexandre.belloni@bootlin.com>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Tue, 28 Aug 2018 15:46:03 -0500
+Subject: [PATCH 1/2][RESEND] ARM: dts: Add big-endian in nor node for
+ ls1021a
+In-Reply-To: <20180828065936.8040-2-prabhakar.kushwaha@nxp.com>
+References: <20180828065936.8040-1-prabhakar.kushwaha@nxp.com>
+ <20180828065936.8040-2-prabhakar.kushwaha@nxp.com>
+Message-ID: <CADRPPNTV4_dUHq0MWY5M2Ga4q0NRmDM2vFCpLAKTYg9i4Q_TBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Microsys designs a SoM based on the LS1046A named miriac MPX-LS1046A
-https://microsys.de/products/system-on-modules/qoriqr-armr-architecture/miriactm-mpx-ls1046a/
+On Tue, Aug 28, 2018 at 2:00 AM Prabhakar Kushwaha
+<prabhakar.kushwaha@nxp.com> wrote:
+>
+> NOR and IFC controller connectivity is big-endian.
+> So add big-endian field in nor device tree node allowing
+> IFC controller to read/write data from/to the flash correctly.
+>
+> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
 
-It also provides an SBC accepting this SoM, the miriac SBC-LS1046
-https://microsys.de/en/products/single-board-computer/miriactm-sbcs/miriactm-sbc-ls1046a/
+Acked-by: Li Yang <leoyang.li@nxp.com>
 
-This adds a dtsi for the SoM and a dts for the SBC.
-
-Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
----
- arch/arm64/boot/dts/freescale/Makefile        |   1 +
- .../fsl-ls1046a-miriac-mpxls1046.dtsi         |  62 ++++++++++
- .../freescale/fsl-ls1046a-miriac-sbc1046.dts  | 117 ++++++++++++++++++
- 3 files changed, 180 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-mpxls1046.dtsi
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-sbc1046.dts
-
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 86e18adb695a..b0b81ca887e8 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-miriac-sbc1046.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1088a-qds.dtb
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-mpxls1046.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-mpxls1046.dtsi
-new file mode 100644
-index 000000000000..d1948e27fdb4
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-mpxls1046.dtsi
-@@ -0,0 +1,62 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+
-+/ {
-+	compatible = "microsys,mpxls1046a", "fsl,ls1046a";
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&duart1 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	temp-sensor at 4c {
-+		compatible = "national,lm90";
-+		reg = <0x4c>;
-+	};
-+
-+	eeprom at 50 {
-+		compatible = "at24,24c128";
-+		reg = <0x50>;
-+	};
-+
-+	rtc at 32 {
-+		compatible = "epson,rx8803";
-+		reg = <0x32>;
-+	};
-+};
-+
-+&ifc {
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+
-+	ranges = <0x0 0x0 0x0 0x7e800000 0x00010000>;
-+	status = "okay";
-+
-+	nand at 0,0 {
-+		compatible = "fsl,ifc-nand";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x0 0x0 0x10000>;
-+	};
-+};
-+
-+&qspi {
-+	num-cs = <1>;
-+	bus-num = <0>;
-+	status = "okay";
-+
-+	qflash0: s25fs512s at 0 {
-+		compatible = "spansion,m25p80";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <20000000>;
-+		m25p,fast-read;
-+		reg = <0>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-sbc1046.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-sbc1046.dts
-new file mode 100644
-index 000000000000..f31be6ed06ea
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-sbc1046.dts
-@@ -0,0 +1,117 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+
-+/dts-v1/;
-+
-+#include "fsl-ls1046a.dtsi"
-+#include "fsl-ls1046a-miriac-mpxls1046.dtsi"
-+
-+/ {
-+	model = "Microsys miriac SBC-LS1046A";
-+	compatible = "microsys,sbc1046a", "microsys,mpxls1046a", "fsl,ls1046a";
-+
-+	aliases {
-+		ethernet0 = &enet2;
-+		ethernet1 = &enet4;
-+		ethernet2 = &enet5;
-+		ethernet3 = &enet6;
-+
-+		serial0 = &duart0;
-+		serial1 = &duart1;
-+		serial2 = &duart2;
-+		serial3 = &duart3;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&duart1 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	eeprom at 57 {
-+		compatible = "at24,24c128";
-+		reg = <0x57>;
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+};
-+
-+&ifc {
-+	nand at 0,0 {
-+		partition at 0 {
-+			reg = <0x0 0x00100000>;
-+			label = "NAND U-Boot Image";
-+			read-only;
-+		};
-+
-+		partition at 100000 {
-+			reg = <0x00100000 0x00100000>;
-+			label = "NAND U-Boot Env";
-+		};
-+
-+		partition at 200000 {
-+			reg = <0x00200000 0x01E00000>;
-+			label = "NAND FIT Image";
-+		};
-+
-+		partition at 02000000 {
-+			reg = <0x02000000 0x1e000000>;
-+			label = "NAND (RW) UBIFS Root File System";
-+		};
-+	};
-+};
-+
-+#include "fsl-ls1046-post.dtsi"
-+
-+&fman0 {
-+	compatible = "fsl,fman", "simple-bus";
-+
-+	ethernet at e4000 {
-+		phy-handle = <&rgmii_phy1>;
-+		phy-connection-type = "rgmii";
-+	};
-+
-+	ethernet at e8000 {
-+		phy-handle = <&sgmii_phy1>;
-+		phy-connection-type = "sgmii";
-+	};
-+
-+	ethernet at ea000 {
-+		phy-handle = <&sgmii_phy2>;
-+		phy-connection-type = "sgmii";
-+	};
-+
-+	ethernet at f0000 {
-+		phy-handle = <&sgmii_phy3>;
-+		phy-connection-type = "sgmii";
-+	};
-+
-+	mdio at fc000 {
-+		rgmii_phy1: ethernet-phy at 3 {
-+			reg = <3>;
-+		};
-+
-+		sgmii_phy1: ethernet-phy at 2 {
-+			reg = <2>;
-+		};
-+
-+		sgmii_phy2: ethernet-phy at 1 {
-+			reg = <1>;
-+		};
-+
-+		sgmii_phy3: ethernet-phy at 0 {
-+			reg = <0>;
-+		};
-+	};
-+};
--- 
-2.18.0
+> ---
+> Based on 147395ea40b36b "dt-bindings: mtd-physmap: Add endianness supports"
+> RESEND keeping Li Yang <leoyang.li@nxp.com>
+>
+>  arch/arm/boot/dts/ls1021a-qds.dts | 2 ++
+>  arch/arm/boot/dts/ls1021a-twr.dts | 2 ++
+>  2 files changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
+> index 499f41a2c6f0..923a25760516 100644
+> --- a/arch/arm/boot/dts/ls1021a-qds.dts
+> +++ b/arch/arm/boot/dts/ls1021a-qds.dts
+> @@ -1,5 +1,6 @@
+>  /*
+>   * Copyright 2013-2014 Freescale Semiconductor, Inc.
+> + * Copyright 2018 NXP
+>   *
+>   * This file is dual-licensed: you can use it either under the terms
+>   * of the GPL or the X11 license, at your option. Note that this dual
+> @@ -235,6 +236,7 @@
+>                 #size-cells = <1>;
+>                 compatible = "cfi-flash";
+>                 reg = <0x0 0x0 0x8000000>;
+> +               big-endian;
+>                 bank-width = <2>;
+>                 device-width = <1>;
+>         };
+> diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
+> index f0c949d74833..8b48c3c7cd21 100644
+> --- a/arch/arm/boot/dts/ls1021a-twr.dts
+> +++ b/arch/arm/boot/dts/ls1021a-twr.dts
+> @@ -1,5 +1,6 @@
+>  /*
+>   * Copyright 2013-2014 Freescale Semiconductor, Inc.
+> + * Copyright 2018 NXP
+>   *
+>   * This file is dual-licensed: you can use it either under the terms
+>   * of the GPL or the X11 license, at your option. Note that this dual
+> @@ -203,6 +204,7 @@
+>                 #size-cells = <1>;
+>                 compatible = "cfi-flash";
+>                 reg = <0x0 0x0 0x8000000>;
+> +               big-endian;
+>                 bank-width = <2>;
+>                 device-width = <1>;
+>         };
+> --
+> 2.14.1
+>
