@@ -1,63 +1,35 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Tue, 28 Aug 2018 18:39:53 +0530
-Subject: [PATCH 11/15] soc: octeontx2: Add Marvell OcteonTX2 CGX driver
-In-Reply-To: <CAK8P3a2CMcYg6vMmRAc4N80BpFwczGiPnaLNCDZYXCsRydtPQw@mail.gmail.com>
-References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
- <1535453838-12154-12-git-send-email-sunil.kovvuri@gmail.com>
- <CAK8P3a0q0P-FuG6cTgMNkeZbtXE4pMk1iJq36_x20WRddtwaDg@mail.gmail.com>
- <CA+sq2Cc1CSKmuEjKt8psR7Zyv9PzLkN10hzy8mrai136SF4-qA@mail.gmail.com>
- <CAK8P3a2CMcYg6vMmRAc4N80BpFwczGiPnaLNCDZYXCsRydtPQw@mail.gmail.com>
-Message-ID: <CA+sq2Ce3ew0X+RMm7fQ+iUZF0HKptzBr1dBk3NuRL8o82wBTjg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 28 Aug 2018 14:12:43 +0100
+Subject: [RFC PATCH 09/11] asm-generic/tlb: Track which levels of the
+ page tables have been cleared
+In-Reply-To: <20180827075341.GY24124@hirez.programming.kicks-ass.net>
+References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
+ <1535125966-7666-10-git-send-email-will.deacon@arm.com>
+ <20180827075341.GY24124@hirez.programming.kicks-ass.net>
+Message-ID: <20180828131243.GC26727@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > If this is a regular PCI ethernet driver, why do you put it into driver/soc
-> > > rather than drivers/net/ethernet/ ?
-> >
-> > No, this is not a ethernet driver, as mentioned in the cover letter
-> > this driver and AF driver doesn't
-> > handle any IO. There will be a separate ethernet driver (will submit
-> > that as well in future) which will
-> > communicate with these drivers for configuring hardware.
-> >
-> > The driver in question here is for a serdes controller which handles
-> > physical ethernet interfaces.
-> > Admin function driver gathers info w.r.t current state of physical
-> > ethernet interfaces from this driver
-> > and notifies actual ethernet driver about changes, if any.
->
-> Ok. Can you describe the structure that the PCI devices appear
-> in? It might help to be make the connection between the differnet
-> patches to understand how things fit together. In the final
-> picture, how many different pci_driver instances do you have,
-> and what part are they for?
+On Mon, Aug 27, 2018 at 09:53:41AM +0200, Peter Zijlstra wrote:
+> On Fri, Aug 24, 2018 at 04:52:44PM +0100, Will Deacon wrote:
+> > +static inline unsigned long tlb_get_unmap_granule(struct mmu_gather *tlb)
+> > +{
+> > +	if (tlb->cleared_ptes)
+> > +		return PAGE_SIZE;
+> > +	if (tlb->cleared_pmds)
+> > +		return PMD_SIZE;
+> > +	if (tlb->cleared_puds)
+> > +		return PUD_SIZE;
+> > +	if (tlb->cleared_p4ds)
+> > +		return P4D_SIZE;
+> > +
+> > +	return PAGE_SIZE;
+> > +}
+> 
+> When doing the x86 patch; I found _SHIFT more useful than _SIZE.
 
-List of PCI devices are CGX, RVU PF0-PFn SRIOV physical functions
-and RVU VF0-VFn SRIOV virtual functions. No of VFs per PF is configurable
-and done by low level firmware.
+I'll make that change for the next version.
 
-List of PCI driver instances would be CGX driver, RVU PF0 (i.e admin
-function) driver,
-PF1-PFn either netdev driver or crypto driver, VF0-VFn functionality would be
-same as their PF.
+Cheers,
 
-The current plan is to have CGX driver, Admin function driver, PF
-netdev driver,
-VF netdev driver and PF/VF crypto drivers.
-
->
-> Is the idea that an ethernet device driver always attaches to a
-> virtual function that gets created by the main driver, and that
-> the two drivers share no interfaces on the kernel side, or do
-> you have multiple drivers linking to each other?
-
-Ethernet device driver can attach to both physical function and virtual function
-whose HW resources are provisioned by admin function driver.
-
-Yes the PF/VF ethernet drivers and these drivers won't share any
-kernel interfaces.
-Physical ethernet interface is owned by ethernet driver only, this driver just
-configures which ethernet driver instance uses which physcial interface.
-
->
->       Arnd
+Will
