@@ -1,53 +1,57 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 28 Aug 2018 14:20:44 +0200
-Subject: [PATCH 4/5] arm64: dts: renesas: r8a774a1: Add Ethernet AVB node
-In-Reply-To: <TY1PR01MB17707A80E98DE4602177C8EBC0360@TY1PR01MB1770.jpnprd01.prod.outlook.com>
-References: <1535014731-64472-1-git-send-email-biju.das@bp.renesas.com>
- <1535014731-64472-5-git-send-email-biju.das@bp.renesas.com>
- <20180824090320.ib7zt4ae6kacjzlu@verge.net.au>
- <TY1PR01MB17707A80E98DE4602177C8EBC0360@TY1PR01MB1770.jpnprd01.prod.outlook.com>
-Message-ID: <20180828122043.h7vup3e5gamfzejz@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Aug 2018 14:23:04 +0200
+Subject: [PATCH 00/15] soc: octeontx2: Add RVU admin function driver
+In-Reply-To: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <CAK8P3a1xC6XjwDAmocpE5TZO7j6uVGtvBtWLPVcYwKqN6Z+seQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2018 at 09:06:49AM +0000, Fabrizio Castro wrote:
-> Hello Simon,
-> 
-> Thank you for your feedback!
-> 
-> > Subject: Re: [PATCH 4/5] arm64: dts: renesas: r8a774a1: Add Ethernet AVB node
-> >
-> > On Thu, Aug 23, 2018 at 09:58:50AM +0100, Biju Das wrote:
-> > > From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > >
-> > > This patch adds the SoC specific part of the Ethernet AVB
-> > > device tree node.
-> > >
-> > > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-> > > ---
-> > >  arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 45 +++++++++++++++++++++++++++++++
-> > >  1 file changed, 45 insertions(+)
-> > >
-> > > diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-> > > index 15d7785..b771211 100644
-> > > --- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-> > > +++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-> > > @@ -350,6 +350,51 @@
-> > >  dma-channels = <16>;
-> > >  };
-> > >
-> > > +avb: ethernet at e6800000 {
-> > > +compatible = "renesas,etheravb-r8a774a1",
-> > > +     "renesas,etheravb-rcar-gen3";
-> > > +reg = <0 0xe6800000 0 0x800>;
-> >
-> > Should a region, <0 0xe6a00000 0 0x10000>, also be added
-> > here to describe the suggested space for descriptors?
-> 
-> There is no STBE (Stream Buffer for EthernetAVB-IF) on the r8a774a1, and that's why this node doesn't come with such a region.
+On Tue, Aug 28, 2018 at 12:57 PM <sunil.kovvuri@gmail.com> wrote:
+>
+> From: Sunil Goutham <sgoutham@marvell.com>
+>
+> Resource virtualization unit (RVU) on Marvell's OcteonTX2 SOC supports
+> multiple PCIe SRIOV physical functions (PFs) and virtual functions (VFs).
+> PF0 is called administrative / admin function (AF) and has privilege access
+> to registers to provision different RVU functional blocks to each of
+> PF/VF.
+>
+> This admin function (AF) driver acts as a configuration / administrative
+> software which provisions functional blocks to a PF/VF on demand for them
+> to work as one of the following
+>  - A basic network controller (i.e NIC).
+>  - NIC with packet filtering, shaping and scheduling capabilities.
+>  - A crypto device.
+>  - A combination of above etc.
+>
+> PF/VFs communicate with admin function via a shared memory region.
+> This patch series adds logic for the following
+>  - RVU AF driver with functional blocks provisioning support
+>  - Mailbox infrastructure for communication between AF and PFs.
+>  - CGX driver which provides information about physcial network
+>    interfaces which AF processes and forwards required info to
+>    PF/VF drivers.
+>
+> This is the first set of patches out of 70 odd patches.
+>
+> Note: This driver neither receives any data nor processes it i.e no I/O,
+>       just does the hardware configuration.
 
-Thanks for the follow-up. In that case I'm fine with this patch but
-I'd like to wait a little longer to allow review by others.
+Hi Sunil,
 
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+Thanks for posting this first series, I'm glad we're seeing support for this
+chip family making some progress.
+
+My feeling overall is that we need a review from the network driver
+folks more than the arm-soc team etc, and that maybe the driver
+as a whole should go into drivers/net/ethernet.
+
+We support some couple of similar hardware already that has
+both support for virtual functions and for crypto offload, including
+the Chelsio cxgb4, Mellanox mlx5, NXP DPAA and probably others,
+and we need to ensure that the exposed interfaces are all
+compatible, and that you use the correct subsystems and
+in-kernel abstractions for thing that are common.
+
+      Arnd
