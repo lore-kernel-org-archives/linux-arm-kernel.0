@@ -1,42 +1,60 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Tue, 28 Aug 2018 18:17:48 +0530
-Subject: [PATCH 04/15] soc: octeontx2: Add mailbox support infra
-In-Reply-To: <CAK8P3a2fgAVB0+uns9f5MH+2OyZbwvReo9j-=u3=30QoK=2Ksw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Aug 2018 14:48:46 +0200
+Subject: [PATCH 11/15] soc: octeontx2: Add Marvell OcteonTX2 CGX driver
+In-Reply-To: <CA+sq2Cc1CSKmuEjKt8psR7Zyv9PzLkN10hzy8mrai136SF4-qA@mail.gmail.com>
 References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
- <1535453838-12154-5-git-send-email-sunil.kovvuri@gmail.com>
- <CAK8P3a2fgAVB0+uns9f5MH+2OyZbwvReo9j-=u3=30QoK=2Ksw@mail.gmail.com>
-Message-ID: <CA+sq2CeyQ8r7bj3vK=cfriif=HhUu36ZUPWqxXm1e0DktHG+Fg@mail.gmail.com>
+ <1535453838-12154-12-git-send-email-sunil.kovvuri@gmail.com>
+ <CAK8P3a0q0P-FuG6cTgMNkeZbtXE4pMk1iJq36_x20WRddtwaDg@mail.gmail.com>
+ <CA+sq2Cc1CSKmuEjKt8psR7Zyv9PzLkN10hzy8mrai136SF4-qA@mail.gmail.com>
+Message-ID: <CAK8P3a2CMcYg6vMmRAc4N80BpFwczGiPnaLNCDZYXCsRydtPQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 5:33 PM Arnd Bergmann <arnd@arndb.de> wrote:
+On Tue, Aug 28, 2018 at 2:30 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
 >
-> On Tue, Aug 28, 2018 at 12:57 PM <sunil.kovvuri@gmail.com> wrote:
+> On Tue, Aug 28, 2018 at 5:40 PM Arnd Bergmann <arnd@arndb.de> wrote:
 > >
-> > From: Aleksey Makarov <amakarov@marvell.com>
+> > On Tue, Aug 28, 2018 at 12:58 PM <sunil.kovvuri@gmail.com> wrote:
+> > >
+> > > From: Sunil Goutham <sgoutham@marvell.com>
+> > >
+> > > This patch adds basic template for Marvell OcteonTX2's
+> > > CGX ethernet interface driver. Just the probe.
+> > > RVU AF driver will use APIs exported by this driver
+> > > for various things like PF to physical interface mapping,
+> > > loopback mode, interface stats etc.
+> > >
+> > > Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
+> > > ---
+> > >  drivers/soc/marvell/Kconfig            |  10 +++
+> > >  drivers/soc/marvell/octeontx2/Makefile |   2 +
+> > >  drivers/soc/marvell/octeontx2/cgx.c    | 117 +++++++++++++++++++++++++++++++++
+> > >  drivers/soc/marvell/octeontx2/cgx.h    |  20 ++++++
 > >
-> > This patch adds mailbox support infrastructure APIs.
-> > Each RVU device has a dedicated 64KB mailbox region
-> > shared with it's peer for communication. RVU AF has
-> > a separate mailbox region shared with each of RVU PFs
-> > and a RVU PF has a separate region shared with each of
-> > it's VF.
-> >
-> > These set of APIs are used by this driver (RVU AF) and
-> > other RVU PF/VF drivers eg netdev, crypto e.t.c.
-> >
-> > Signed-off-by: Aleksey Makarov <amakarov@marvell.com>
-> > Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
-> > Signed-off-by: Lukasz Bartosik <lbartosik@marvell.com>
+> > If this is a regular PCI ethernet driver, why do you put it into driver/soc
+> > rather than drivers/net/ethernet/ ?
 >
-> Why does this driver not use the drivers/mailbox/ infrastructure?
+> No, this is not a ethernet driver, as mentioned in the cover letter
+> this driver and AF driver doesn't
+> handle any IO. There will be a separate ethernet driver (will submit
+> that as well in future) which will
+> communicate with these drivers for configuring hardware.
 >
->        Arnd
+> The driver in question here is for a serdes controller which handles
+> physical ethernet interfaces.
+> Admin function driver gathers info w.r.t current state of physical
+> ethernet interfaces from this driver
+> and notifies actual ethernet driver about changes, if any.
 
-This is a common administrative software driver which will be handling requests
-from kernel drivers and as well as drivers in userspace applications.
-We had to keep
-mailbox communication infrastructure same across all usages.
+Ok. Can you describe the structure that the PCI devices appear
+in? It might help to be make the connection between the differnet
+patches to understand how things fit together. In the final
+picture, how many different pci_driver instances do you have,
+and what part are they for?
 
-Thanks,
-Sunil.
+Is the idea that an ethernet device driver always attaches to a
+virtual function that gets created by the main driver, and that
+the two drivers share no interfaces on the kernel side, or do
+you have multiple drivers linking to each other?
+
+      Arnd
