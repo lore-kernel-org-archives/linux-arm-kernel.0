@@ -1,25 +1,23 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 28 Aug 2018 15:15:55 -0700
-Subject: [PATCH v2] clk: Convert to using %pOFn instead of device_node.name
-In-Reply-To: <20180828154433.5693-3-robh@kernel.org>
-References: <20180828154433.5693-1-robh@kernel.org>
- <20180828154433.5693-3-robh@kernel.org>
-Message-ID: <153549455575.129321.22566359378173086@swboyd.mtv.corp.google.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 28 Aug 2018 17:16:32 -0500
+Subject: [PATCH v6 2/4] dt-bindings: arm: Document emtrion emCON-MX6
+ bindings
+In-Reply-To: <20180824132617.43975-2-jan.tuerk@emtrion.com>
+References: <20180822155137.10018-1-jan.tuerk@emtrion.com>
+ <20180824132617.43975-1-jan.tuerk@emtrion.com>
+ <20180824132617.43975-2-jan.tuerk@emtrion.com>
+Message-ID: <20180828221632.GA1345@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rob Herring (2018-08-28 08:44:29)
-> In preparation to remove the node name pointer from struct device_node,
-> convert printf users to use the %pOFn format specifier.
+On Fri, 24 Aug 2018 15:26:12 +0200, Jan Tuerk wrote:
+> Document the compatible strings for emtrion emCON-MX6 SoM's.
 > 
-> Cc: Eugeniy Paltsev <Eugeniy.Paltsev@synopsys.com>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Stephen Boyd <sboyd@kernel.org>
-> Cc: linux-clk at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-renesas-soc at vger.kernel.org
-> Cc: linux-omap at vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
 > ---
+>  Documentation/devicetree/bindings/arm/emtrion.txt | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/emtrion.txt
+> 
 
-Reviewed-by: Stephen Boyd <sboyd@kernel.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
