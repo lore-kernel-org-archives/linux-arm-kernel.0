@@ -1,80 +1,58 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Tue, 28 Aug 2018 18:54:20 +0530
-Subject: [PATCH 00/15] soc: octeontx2: Add RVU admin function driver
-In-Reply-To: <CAK8P3a1xC6XjwDAmocpE5TZO7j6uVGtvBtWLPVcYwKqN6Z+seQ@mail.gmail.com>
-References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
- <CAK8P3a1xC6XjwDAmocpE5TZO7j6uVGtvBtWLPVcYwKqN6Z+seQ@mail.gmail.com>
-Message-ID: <CA+sq2Cd3R0V5hcaF+ESfkOEBHgBwOB6b8Uwx7K+CeUN6gLFTOg@mail.gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Tue, 28 Aug 2018 15:26:45 +0200
+Subject: [RFC PATCH v2 2/2] mtd: rawnand: meson: add support for Amlogic
+ NAND flash controller
+In-Reply-To: <fdea2d54-7a68-64ec-8bb4-4a94677a3293@amlogic.com>
+References: <20180719094612.5833-1-yixun.lan@amlogic.com>
+ <20180719094612.5833-3-yixun.lan@amlogic.com>
+ <20180801235045.5b4d8211@bbrezillon>
+ <42877a0d-9830-0626-3f64-e49a326eaa3c@amlogic.com>
+ <20180817155608.5929b37a@bbrezillon>
+ <96e538a5-1232-11f2-8b9e-5ddb09dcc2de@amlogic.com>
+ <20180824144810.31c929a5@bbrezillon>
+ <fdea2d54-7a68-64ec-8bb4-4a94677a3293@amlogic.com>
+Message-ID: <20180828152645.457dab5c@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 5:53 PM Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Tue, Aug 28, 2018 at 12:57 PM <sunil.kovvuri@gmail.com> wrote:
-> >
-> > From: Sunil Goutham <sgoutham@marvell.com>
-> >
-> > Resource virtualization unit (RVU) on Marvell's OcteonTX2 SOC supports
-> > multiple PCIe SRIOV physical functions (PFs) and virtual functions (VFs).
-> > PF0 is called administrative / admin function (AF) and has privilege access
-> > to registers to provision different RVU functional blocks to each of
-> > PF/VF.
-> >
-> > This admin function (AF) driver acts as a configuration / administrative
-> > software which provisions functional blocks to a PF/VF on demand for them
-> > to work as one of the following
-> >  - A basic network controller (i.e NIC).
-> >  - NIC with packet filtering, shaping and scheduling capabilities.
-> >  - A crypto device.
-> >  - A combination of above etc.
-> >
-> > PF/VFs communicate with admin function via a shared memory region.
-> > This patch series adds logic for the following
-> >  - RVU AF driver with functional blocks provisioning support
-> >  - Mailbox infrastructure for communication between AF and PFs.
-> >  - CGX driver which provides information about physcial network
-> >    interfaces which AF processes and forwards required info to
-> >    PF/VF drivers.
-> >
-> > This is the first set of patches out of 70 odd patches.
-> >
-> > Note: This driver neither receives any data nor processes it i.e no I/O,
-> >       just does the hardware configuration.
->
-> Hi Sunil,
->
-> Thanks for posting this first series, I'm glad we're seeing support for this
-> chip family making some progress.
+On Tue, 28 Aug 2018 21:21:48 +0800
+Liang Yang <liang.yang@amlogic.com> wrote:
 
-Thanks.
+> Hi Boris,
+> 
+> On 8/24/2018 8:48 PM, Boris Brezillon wrote:
+> > On Wed, 22 Aug 2018 22:08:42 +0800
+> > Liang Yang <liang.yang@amlogic.com> wrote:
+> >   
+> >>> You have to wait tWB, that's for sure.
+> >>>      
+> >> we have a maximum 32 commands fifo. when command is written into
+> >> NFC_REG_CMD, it doesn't mean that command is executing right now, maybe
+> >> it is buffering on the queue.Assume one ERASE operation, when 2nd
+> >> command(0xd0) is written into NFC_REG_CMD and then come into
+> >> NAND_OP_WAITRDY_INSTR, if I read the RB status by register, it may be
+> >> wrong because 0xd0 may not being executed. it is unusual unless
+> >> buffering two many command.  
+> > 
+> > You should flush the queue and wait for it to empty at the end of  
+> > ->exec_op().  
+> >   
+> >> so it seems that i still need to use nand_soft_waitrdy or wait cmd is
+> >> executed somewhere.  
+> > 
+> > Don't you have a WAIT_FOR_RB instruction? What is NFC_CMD_RB for? Also,
+> > NFC_CMD_IDLE seems to allow you to add an arbitrary delay, and that's
+> > probably what you should use for tWB.
+> > 
+> > em, I can wait for RB by reading the status from register now. but when   
+> calling nand_soft_waitrdy, i really met a problem. One *jiffies* is 
+> about 4ms. When programming, it pass 1ms to 
+> instr->ctx.waitrdy.timeout_ms and nand_soft_waitrdy will be only one 
+> *jiffies* to reach timeout. And then calling nand_soft_waitrdy maybe at 
+> the tail of 4ms interval, it may only wait 100us and next jiffies 
+> arrive. Is it correct?
 
->
-> My feeling overall is that we need a review from the network driver
-> folks more than the arm-soc team etc, and that maybe the driver
-> as a whole should go into drivers/net/ethernet.
-
-This driver doesn't handle any network IO and moreever this driver has to handle
-configuration requests from crypto driver as well. There will be
-separate network and
-crypto drivers which will be upstreamed into drivers/net/ethernet and
-drivers/crypto.
-And in future silicons there will be different types of functional
-blocks which will be
-added into this resource virtualization unit (RVU). Hence i thought
-this driver is not a
-right fit in drivers/net/ethernet.
-
->
-> We support some couple of similar hardware already that has
-> both support for virtual functions and for crypto offload, including
-> the Chelsio cxgb4, Mellanox mlx5, NXP DPAA and probably others,
-
-I agree, but i guess that is done to support inline crypto.
-Here this driver has to handle requests from normal crypto driver
-(drivers/crypto) as well.
-
-> and we need to ensure that the exposed interfaces are all
-> compatible, and that you use the correct subsystems and
-> in-kernel abstractions for thing that are common.
->
->       Arnd
+Hm, no. If you initialize the time you compare to (using time_before()
+or time_after()) correctly it should not happen. Anyway, I keep thinking
+this is not how it should be done. Did you try NFC_CMD_RB? Did you ask
+HW designers what it was created for?
