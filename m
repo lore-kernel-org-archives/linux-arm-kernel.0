@@ -1,81 +1,118 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 28 Aug 2018 09:09:44 +0530
-Subject: [RFC PATCH 5/6] arm64: dts: ti: Add Support for AM654 SoC
-In-Reply-To: <20180828012224.fbmcmwfhfuwhcm53@kahuna>
-References: <20180605060510.32473-1-nm@ti.com>
- <CAL_JsqJusWTvr4A_-Bk81meYddMHBMJ4=Fch6L0MFoF7HfBW2w@mail.gmail.com>
- <454c277e-8a63-81cb-b341-a50f4e25cbea@ti.com>
- <20180820143153.GD7523@atomide.com>
- <40cecb47-bd32-04aa-b7cd-ff16c1eb28f3@ti.com>
- <20180827155535.GJ7523@atomide.com> <20180828012224.fbmcmwfhfuwhcm53@kahuna>
-Message-ID: <f947ea13-9273-e951-c6af-673d1e6a9570@ti.com>
+From: hejianet@gmail.com (Jia He)
+Date: Tue, 28 Aug 2018 12:53:26 +0800
+Subject: [PATCH] irqchip/gic-v3-its: cap lpi_id_bits to reduce memory footprint
+Message-ID: <1535432006-2304-1-git-send-email-jia.he@hxt-semitech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In commit fe8e93504ce8 ("irqchip/gic-v3-its: Use full range of LPIs"),
+it removes the cap for lpi_id_bits. But it will cause more pointless
+memory footprint.
 
-On Tuesday 28 August 2018 06:52 AM, Nishanth Menon wrote:
-> On 15:55-20180827, Tony Lindgren wrote:
->> * Kishon Vijay Abraham I <kishon@ti.com> [180827 03:06]:
->>> Hi Tony,
->>>
->>> On Monday 20 August 2018 08:01 PM, Tony Lindgren wrote:
->>>> * Kishon Vijay Abraham I <kishon@ti.com> [180808 06:35]:
->>>>> On Tuesday 05 June 2018 07:35 PM, Rob Herring wrote:
->>>>>> Really need 64-bit addresses and sizes? Use ranges to limit the
->>>>>> address space if possible.
->>>>>
->>>>> We now have address-cells as <1>,
->>>>> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/arch/arm64/boot/dts/ti/k3-am65.dtsi#n49
->>>>>
->>>>> However each PCIe instance has 2 data regions and one of the regions
->>>>> (PCIE0_CORE_CORE_DAT_SLV_PCIE_DAT1/PCIE1_CORE_CORE_DAT_SLV_PCIE_DAT1 specified
->>>>> in the "MAIN Domain Memory Map" table of TRM http://www.ti.com/lit/pdf/spruid7)
->>>>> is above the 32bit region and requires 2 cells to specify the start address.
->>>>> This region is used to access MEM_SPACE of PCIe endpoint when operating in root
->>>>> complex mode and access memory of PCI root complex when operating in endpoint mode.
->>>>>
->>>>> In order to describe this, should we change the address-cells back to <2> or do
->>>>> you suggest any other alternatives?
->>>>
->>>> It's probably best to have the top level cbass interconnect use
->>>> #size-cells = <2> and then have it's child interconnects have
->>>> #size-cells = <1> if they don't need ranges above 4GB.
->>>
->>> PCIe has a region starting at 0x40_00000000 and size 4GB. We need 2 address
->>> cells and 2 size cells to describe this no?
->>
->> Yes.
->>
->>>> BTW, what's the difference between all these three similar PCIE
->>>> ranges?
->>>>
->>>> PCIE0_CORE_CORE_DAT_SLV_PCIE_CORE 0x0005500000 0x0005600000 1 MB
->>>> PCIE1_CORE_CORE_DAT_SLV_PCIE_CORE 0x0005600000 0x0005700000 1 MB
->>>
->>> This is the register space for the two instances of PCIe controller.
->>>>
->>>> PCIE0_CORE_CORE_DAT_SLV_PCIE_DAT0 0x0010000000 0x0018000000 128 MB
->>>> PCIE1_CORE_CORE_DAT_SLV_PCIE_DAT0 0x0018000000 0x0020000000 128 MB
->>>>
->>>> PCIE0_CORE_CORE_DAT_SLV_PCIE_DAT1 0x4000000000 0x4100000000 4 GB
->>>> PCIE1_CORE_CORE_DAT_SLV_PCIE_DAT1 0x4100000000 0x4200000000 4 GB
->>>
->>> The above are regions which can be used by CPU/DMA to access the PCIe address
->>> space. The mapping from the above regions to the PCIe address space will be
->>> programmed in the PCIe controller.
->>
->> OK so not just somethng for dma-ranges but also accessible by
->> the CPU.
->>
-> 
-> Kishon, Sekhar:
-> 
-> Can you guys post patches based on v4.19-rc1 for fixing this? I do have
-> a bunch of dts nodes to build as well for v4.20, once Tony / Rob acks the
-> changes.
+There is a WARN_ON when my QDF2400 server boots up (pagesize is 4k)
+============begin===============
+[    0.000000] GICv3: GIC: Using split EOI/Deactivate mode
+[    0.000000] GICv3: Distributor has no Range Selector support
+[    0.000000] GICv3: VLPI support, no direct LPI support
+[    0.000000] ACPI: SRAT not present
+[    0.000000] ITS [mem 0xff7efe0000-0xff7effffff]
+[    0.000000] ITS at 0x000000ff7efe0000: Using ITS number 0
+[    0.000000] GIC: enabling workaround for ITS: QDF2400 erratum 0065
+[    0.000000] ITS at 0x000000ff7efe0000: allocated 524288 Devices
+@179f000000 (indirect, esz 8, psz 64K, shr 1)
+[    0.000000] ITS at 0x000000ff7efe0000: allocated 8192 Interrupt
+Collections @179f930000 (flat, esz 8, psz 64K, shr 1)
+[    0.000000] ITS at 0x000000ff7efe0000: allocated 65536 Virtual CPUs
+@179f980000 (flat, esz 8, psz 64K, shr 1)
+[    0.000000] WARNING: CPU: 0 PID: 0 at mm/page_alloc.c:4066
+__alloc_pages_nodemask+0x2d8/0x1188
+[    0.000000] Modules linked in:
+[    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.18.0+ #66
+[    0.000000] pstate: 20000085 (nzCv daIf -PAN -UAO)
+[    0.000000] pc : __alloc_pages_nodemask+0x2d8/0x1188
+[    0.000000] lr : __alloc_pages_nodemask+0x134/0x1188
+[    0.000000] sp : ffff0000091b3a30
+[    0.000000] x29: ffff0000091b3a30 x28: 0000000000000000
+[    0.000000] x27: ffff00000a045000 x26: 0000000000000000
+[    0.000000] x25: 0000000000000000 x24: ffff0000091c1000
+[    0.000000] x23: ffff0000091b3b98 x22: 000000000000000c
+[    0.000000] x21: ffff0000082dc130 x20: 0000000000000001
+[    0.000000] x19: 0000000000000000 x18: 000000000000003f
+[    0.000000] x17: 0000000000000000 x16: 0000000000000000
+[    0.000000] x15: ffffffffffffffff x14: 202c74616c662820
+[    0.000000] x13: ffff000009c5f9e0 x12: 0000000000000077
+[    0.000000] x11: 0000000000000078 x10: 0000000097110f47
+[    0.000000] x9 : 0000000000000000 x8 : 00000000009fff3f
+[    0.000000] x7 : 000000000000002b x6 : 000000000000000c
+[    0.000000] x5 : 0000000000000001 x4 : 0000000000000000
+[    0.000000] x3 : ffff000008fd1000 x2 : ffff000008fd1000
+[    0.000000] x1 : ffff0000091c1000 x0 : 0000000000000000
+[    0.000000] Call trace:
+[    0.000000]  __alloc_pages_nodemask+0x2d8/0x1188
+[    0.000000]  alloc_pages_current+0x8c/0xd8
+[    0.000000]  its_allocate_prop_table+0x5c/0xb8
+[    0.000000]  its_init+0x220/0x3c0
+[    0.000000]  gic_init_bases+0x250/0x380
+[    0.000000]  gic_acpi_init+0x16c/0x2a4
+[    0.000000]  acpi_match_madt+0x50/0x88
+[    0.000000]  acpi_table_parse_entries_array+0x180/0x204
+[    0.000000]  acpi_table_parse_entries+0x60/0x84
+[    0.000000]  acpi_table_parse_madt+0x40/0x4c
+[    0.000000]  __acpi_probe_device_table+0x94/0xe8
+[    0.000000]  irqchip_init+0x38/0x40
+[    0.000000]  init_IRQ+0x70/0x9c
+[    0.000000]  start_kernel+0x310/0x4c0
+[    0.000000] irq event stamp: 0
+[    0.000000] hardirqs last  enabled at (0): [<0000000000000000>]
+(null)
+[    0.000000] hardirqs last disabled at (0): [<0000000000000000>]
+(null)
+[    0.000000] softirqs last  enabled at (0): [<0000000000000000>]
+(null)
+[    0.000000] softirqs last disabled at (0): [<0000000000000000>]
+(null)
+[    0.000000] ---[ end trace 943781056d97862b ]---
+============end============
 
-Sure, I'll post that today.
+In its_alloc_lpi_tables, lpi_id_bits is 24 in QDF2400. Then
+its_allocate_prop_table will try to allocate 16M(order 12 if
+pagesize=4k). Thus it causes the WARN_ON.
 
-Thanks
-Kishon
+As said by Marc,
+Capping lpi_id_bits at 16 (which is what we had before) is plenty,
+will save a some memory, and gives some margin before we need to push
+it up again.
+
+This patch re-caps the lpi_id_bits.
+
+Fixes: fe8e93504ce8 ("irqchip/gic-v3-its: Use full range of LPIs")
+Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 316a575..c2df341 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1439,6 +1439,7 @@ static int its_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
+  * The consequence of the above is that allocation is cost is low, but
+  * freeing is expensive. We assumes that freeing rarely occurs.
+  */
++#define ITS_MAX_LPI_NRBITS	16 /* 64K LPIs */
+ 
+ static DEFINE_MUTEX(lpi_range_lock);
+ static LIST_HEAD(lpi_range_list);
+@@ -1625,7 +1626,8 @@ static int __init its_alloc_lpi_tables(void)
+ {
+ 	phys_addr_t paddr;
+ 
+-	lpi_id_bits = GICD_TYPER_ID_BITS(gic_rdists->gicd_typer);
++	lpi_id_bits = min_t(u32, GICD_TYPER_ID_BITS(gic_rdists->gicd_typer),
++				ITS_MAX_LPI_NRBITS);
+ 	gic_rdists->prop_page = its_allocate_prop_table(GFP_NOWAIT);
+ 	if (!gic_rdists->prop_page) {
+ 		pr_err("Failed to allocate PROPBASE\n");
+-- 
+1.8.3.1
