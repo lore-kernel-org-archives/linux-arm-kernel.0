@@ -1,54 +1,52 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 28 Aug 2018 17:12:31 +0200
-Subject: [PATCH] ARM: dts: r9a06g032: Use r9a06g032-sysctrl binding definitions
-Message-ID: <20180828151231.16177-1-geert+renesas@glider.be>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 28 Aug 2018 17:11:40 +0200
+Subject: [PATCH 0/3] arm64: dts: allwinner: a64: pinmux cleanups
+In-Reply-To: <20180828100132.12975-1-wens@csie.org>
+References: <20180828100132.12975-1-wens@csie.org>
+Message-ID: <20180828151140.7vc44czdlv4yhan2@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the hardcoded clock indices by R9A06G032_CLK_* symbols.
+On Tue, Aug 28, 2018 at 06:01:29PM +0800, Chen-Yu Tsai wrote:
+> Hi,
+> 
+> This series does some cleanup of the Allwinner A64 pinmux groups.
+> 
+> The first addresses a limitation on the A64 where we have the eMMC's
+> DS in always muxed in. The DS pin is shared with SPI0's MISO, thereby
+> preventing SPI0 from being used. In this patch we split out the DS
+> pin into a separate group for boards that actually utilize it to
+> select on their own.
+> 
+> The other two patches just rename pinmux group node names and labels
+> from <func>_pins_<[a-z]> to <func>_<pingroup/pin names>_pins. The latter
+> is the style we adopted later on, and is easier to know which pins they
+> correspond to, i.e. easier to review.
+> 
+> Please have a look.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r9a06g032.dtsi | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-diff --git a/arch/arm/boot/dts/r9a06g032.dtsi b/arch/arm/boot/dts/r9a06g032.dtsi
-index afe29c95a006e8fa..3e45375b79aa9c0d 100644
---- a/arch/arm/boot/dts/r9a06g032.dtsi
-+++ b/arch/arm/boot/dts/r9a06g032.dtsi
-@@ -7,6 +7,7 @@
-  */
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/r9a06g032-sysctrl.h>
- 
- / {
- 	compatible = "renesas,r9a06g032";
-@@ -21,14 +22,14 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0>;
--			clocks = <&sysctrl 84>;
-+			clocks = <&sysctrl R9A06G032_CLK_A7MP>;
- 		};
- 
- 		cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <1>;
--			clocks = <&sysctrl 84>;
-+			clocks = <&sysctrl R9A06G032_CLK_A7MP>;
- 			enable-method = "renesas,r9a06g032-smp";
- 			cpu-release-addr = <0 0x4000c204>;
- 		};
-@@ -82,7 +83,7 @@
- 			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&sysctrl 146>;
-+			clocks = <&sysctrl R9A06G032_CLK_UART0>;
- 			clock-names = "baudclk";
- 			status = "disabled";
- 		};
+> While I want to do some more cleanup, I realized that the label and/or
+> node names might be used by distro (Armbian comes to mind) or personal
+> device tree overlay files. Do we need to have these remain fixed? Do
+> we or can we provide a fallback? (Is that even possible?)
+
+I wouldn't worry too much about this. We broke it a number of times
+already, and we probably will in the future for other stuff, I'm not
+sure we have to provide any guarantee there, as long as the old,
+compiled, dt still works.
+
+Maxime
+
 -- 
-2.17.1
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180828/cca1a80d/attachment.sig>
