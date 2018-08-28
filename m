@@ -1,70 +1,51 @@
-From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
-Date: Tue, 28 Aug 2018 08:50:38 -0500
-Subject: [PATCHv8 2/9] arm64: dts: stratix10: add stratix10 service driver
- binding to base dtsi
-In-Reply-To: <1535464245-11638-1-git-send-email-richard.gong@linux.intel.com>
-References: <1535464245-11638-1-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <1535464245-11638-3-git-send-email-richard.gong@linux.intel.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 28 Aug 2018 15:48:42 +0200
+Subject: [RFC PATCH 08/11] asm-generic/tlb: Track freeing of page-table
+ directories in struct mmu_gather
+In-Reply-To: <20180828134638.GK24082@hirez.programming.kicks-ass.net>
+References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
+ <1535125966-7666-9-git-send-email-will.deacon@arm.com>
+ <20180827144457.3f4036e3@roar.ozlabs.ibm.com>
+ <20180828134638.GK24082@hirez.programming.kicks-ass.net>
+Message-ID: <20180828134842.GQ24142@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Gong <richard.gong@intel.com>
+On Tue, Aug 28, 2018 at 03:46:38PM +0200, Peter Zijlstra wrote:
+> On Mon, Aug 27, 2018 at 02:44:57PM +1000, Nicholas Piggin wrote:
+> 
+> > powerpc may be able to use the unmap granule thing to improve
+> > its page size dependent flushes, but it might prefer to go
+> > a different way and track start-end for different page sizes.
+> 
+> I don't really see how tracking multiple ranges would help much with
+> THP. The ranges would end up being almost the same if there is a good
+> mix of page sizes.
+> 
+> But something like:
+> 
+> void tlb_flush_one(struct mmu_gather *tlb, unsigned long addr)
+> {
+> 	if (tlb->cleared_ptes && (addr << BITS_PER_LONG - PAGE_SHIFT))
+> 		tblie_pte(addr);
+> 	if (tlb->cleared_pmds && (addr << BITS_PER_LONG - PMD_SHIFT))
+> 		tlbie_pmd(addr);
+> 	if (tlb->cleared_puds && (addr << BITS_PER_LONG - PUD_SHIFT))
+> 		tlbie_pud(addr);
+> }
 
-Add Intel Stratix10 service layer to the device tree
+Sorry, those all should (of course) be !(addr << ...).
 
-Signed-off-by: Richard Gong <richard.gong@intel.com>
-Signed-off-by: Alan Tull <atull@kernel.org>
-Acked-by: Moritz Fischer <mdf@kernel.org>
----
-v2: change to put service layer driver node under the firmware node
-    change compatible to "intel, stratix10-svc"
-v3: no change
-v4: s/service driver/stratix10 service driver/ in subject line
-v5: no change
-v6: add Moritz's Acked-by
-v7: no change
-v8: no change
----
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+> void tlb_flush_range(struct mmu_gather *tlb)
+> {
+> 	unsigned long stride = 1UL << tlb_get_unmap_shift(tlb);
+> 	unsigned long addr;
+> 
+> 	for (addr = tlb->start; addr < tlb->end; addr += stride)
+> 		tlb_flush_one(tlb, addr);
+> 
+> 	ptesync();
+> }
 
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-index d033da4..ee4715a 100644
---- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-@@ -24,6 +24,19 @@
- 	#address-cells = <2>;
- 	#size-cells = <2>;
- 
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		service_reserved: svcbuffer at 0 {
-+			compatible = "shared-dma-pool";
-+			reg = <0x0 0x0 0x0 0x1000000>;
-+			alignment = <0x1000>;
-+			no-map;
-+		};
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -493,5 +506,13 @@
- 
- 			status = "disabled";
- 		};
-+
-+		firmware {
-+			svc {
-+				compatible = "intel,stratix10-svc";
-+				method = "smc";
-+				memory-region = <&service_reserved>;
-+			};
-+		};
- 	};
- };
--- 
-2.7.4
+And one could; like x86 has; add a threshold above which you just kill
+the complete mm.
