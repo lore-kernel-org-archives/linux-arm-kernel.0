@@ -1,7 +1,7 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 28 Aug 2018 18:09:47 +0100
+Date: Tue, 28 Aug 2018 18:11:55 +0100
 Subject: [RFC PATCH] EDAC, ghes: Enable per-layer error reporting for ARM
-In-Reply-To: <000b01d43bb6$f9419b20$ebc4d160$@codeaurora.org>
+In-Reply-To: <CABo9ajAvo-bskhrM8h95Y9D4U88zFUZfVW_HTMLK3o_5Q1VSUw@mail.gmail.com>
 References: <1531762009-15112-1-git-send-email-tbaicar@codeaurora.org>
  <20180719140102.GB25185@nazgul.tnic>
  <94e3a0fb-9b7d-045f-733b-9f063dcb39e4@arm.com>
@@ -9,92 +9,150 @@ References: <1531762009-15112-1-git-send-email-tbaicar@codeaurora.org>
  <b568fdcc-ca39-67ea-2799-8ed246c8ffb6@arm.com>
  <CABo9ajA7SPrVE-oiG=RicH+nL9_pp7fVATCdMugY5fuNAPzHaQ@mail.gmail.com>
  <68a800c7-446e-9b6b-1847-6e45a1d17262@arm.com>
- <000b01d43bb6$f9419b20$ebc4d160$@codeaurora.org>
-Message-ID: <d4ee6d3a-b3ac-2986-40db-8423de7e960a@arm.com>
+ <CABo9ajAvo-bskhrM8h95Y9D4U88zFUZfVW_HTMLK3o_5Q1VSUw@mail.gmail.com>
+Message-ID: <bcb1b461-76ee-7d9b-2b35-d575ec608027@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fan,
+Hi Tyler,
 
-On 24/08/18 15:30, wufan wrote:
->> Why get avoid the layer stuff? Isn't counting DIMM/memory-devices what
->> EDAC_MC_LAYER_SLOT is for?
+On 24/08/18 16:14, Tyler Baicar wrote:
+> On Fri, Aug 24, 2018 at 5:48 AM, James Morse <james.morse@arm.com> wrote:
+>> On 23/08/18 16:46, Tyler Baicar wrote:
+>>> On Thu, Aug 23, 2018 at 5:29 AM James Morse <james.morse@arm.com> wrote:
+>>>> On 19/07/18 19:36, Tyler Baicar wrote:
+>>>>> This seems pretty hacky to me, so if anyone has other suggestions please share
+>>>>> them.
+>>>>
+>>>> CPER's "Memory Error Record 2" thinks that "NODE, CARD and MODULE should provide
+>>>> the information necessary to identify the failing FRU". As EDAC has three
+>>>> 'levels', these are what they should correspond to for ghes-edac.
+>>>>
+>>>> I assume NODE means rack/chassis in some distributed system. Lets ignore it as
+>>>> it doesn't seem to map to anything in the SMBIOS table.
+>>>
+>>> I believe NODE should map to socket number for multi-socket systems.
+>>
+>> Isn't the Memory Array Structure still unique in a multi-socket system? If so
+>> the node isn't telling us anything new.
+
+> Yes, the Memory Array structure in SMBIOS is still unique, but the NODE value
+> is needed in NODE, CARD, MODULE because the CARD number here typically
+> maps to channel number which each socket has their own channel numbers.
+
+/me flinches at 'typically'.
+
+Okay, so the hierarchy applies to the numbers, not the handles.
+How come there isn't a node handle?
+
+I think we should ignore the extra hierarchy. The module/devices/dimms are the
+only replaceable part, and we don't know if the firmware will provide the
+information.
+
+
+>> Do sockets show up in the SMBIOS table? We would need to know how many there are
+>> in advance. For arm systems the cpu topology from PPTT is the best bet for this
+>> information, but what do we do if that table is missing? (also, does firmware
+>> count from 1 or 0?) I suspect we can't use this field unless we know what the
+>> range of values is going to be in advance.
 > 
-> Borislav has explained it in his response. Here let me elaborate a little more.
-> To use the layer information you need an accurate way to pinpoint each component
-> in the layer and the parent components in the layers above. For example, to use
-> EDAC_MC_LAYER_SLOT you also need information for the parent layer say
-> EDAC_MC_LAYER_CHANNEL, or another layer on top say EDAC_MC_LAYER_BRANCH.
+> An Fan mentioned in his response, what the customers really care about
+> is mapping to
+> a particular DIMM since that is what they can replace. To do this, the
+> Memory Device
+> handle should be enough since those are all unique regardless of
+> Memory Array handle
+> and which socket the DIMM is on. The Firmware I've worked with counts
+> from 0, but I'm
+> not sure if that is required.
 
-I haven't spotted anything that forces a particular meaning/topology on these
-types. (there are four of them, but only three 'levels')
-
-i3000_edac.c has EDAC_MC_LAYER_CHIP_SELECT then EDAC_MC_LAYER_CHANNEL,
-but i5400_edac.c has EDAC_MC_LAYER_BRANCH then EDAC_MC_LAYER_CHANNEL.
-pnd2_edac.c agrees that channel comes before slot, but thunderx_edac.c just uses
-slot directly....
-
-ghes-edac already describes memory as 'EDAC_MC_LAYER_ALL_MEM', with num_dimms, I
-think we just need to get 'the' dimm number. Using the cper-module-handle means
-we don't have to worry about firmware's count of dimms being different, as we
-both agree its smbios-type-17 we're talking about.
+If the spec doesn't say, its difficult to know the range of values until we've
+seen one of the limits.
 
 
-> There
-> are no clear ways to get the information from SMBIOS table. In the case of "memory
-> channel" we looked at type 37 which has the exact spelling but it was introduced
-> to support RamBus and Synclink. Not sure we can readily use it for modern
-> architecture concept of "channel/slot". 
-
-I think we should avoid this 'channel' thing as it means different things to
-different people!
-
-We can use ghes:card smbios:physical-memory-array as the UEFI spec tells us they
-are the same, and we don't actually need to know what they mean.
-
-
->  I think it is good enough if we can pin each error to the corresponding DIMM.
-> At the end of the day DIMMs are what customer can replace in the memory system
-> and that's all that they care about. For the manufacturers of the board/chips
-> they have the knowledge to map the specific DIMMs to the upper layer components,
-> so they can easily collect error counter data for upper layers. 
+> That won't matter if we just use the Memory Device handle.
 
 I agree.
 
 
->> CPER's "Memory Error Record 2" thinks that "NODE, CARD and MODULE
->> should provide the information necessary to identify the failing FRU". As
->> EDAC has three 'levels', these are what they should correspond to for ghes-
->> edac.
+>>> I think the proper way to get this working would be to use these handles. We can
+>>> avoid populating this layer information and instead have a mapping of type 17
+>>> index number (how edac is numbering the DIMMs today) to the handle number.
 >>
->> I assume NODE means rack/chassis in some distributed system. Lets ignore it
->> as it doesn't seem to map to anything in the SMBIOS table.
+>> Why get avoid the layer stuff? Isn't counting DIMM/memory-devices what
+>> EDAC_MC_LAYER_SLOT is for?
 > 
-> How about type 4 "Processor Information"?
+> The problem with the layer reporting is that you need to know all the
+> layer information as Fan mentioned.
 
-As the spec doesn't tell us what the field means, we can't really do anything
-other than print the value out.
+I haven't spotted what requires this, there seems to be a bit of a mix of
+numbers-of-layers and what order they go in. thunderx_edac.c just uses SLOT.
+I think we can get away with using EDAC_MC_LAYER_ALL_MEM, sized by num_dimms
+(which ghes-edac already does).
+
+Providing extra topology may not be useful unless the firmware populates this
+information. What do we do if we export card+module, but then firmware only
+populates the module-handle?
 
 
->> 'Card' doesn't mean much to me, but it maps to SMBIOS:17 "Memory Array
->> Structure", which the Memory Device structure also points to.
->> Card then must mean "a collection of memory devices (DIMMs) that operate
->> together to form an address space".
+> SoCs can support multiple board combinations (ie
+> 1DPC vs. 2DPC)
+> and there is no standardized way of knowing whether you are booted on a 1DPC or
+> 2DPC board.
+> 
+>>> Then we will need a new function to increment the counter based on the handle
+>>> number rather than this layer information. Is that how you are envisioning it?
 >>
->> This might be what I think of as a memory-controller, or it might be
->> something more complicated. Regardless, the CPER records think its relevant.
+>> I'm not familiar with edac's internals, so I didn't have any particular vision!
+>>
+>> Isn't the problem that ghes_edac_report_mem_error() does this:
+>> |       e->top_layer = -1;
+>> |       e->mid_layer = -1;
+>> |       e->low_layer = -1;
 > 
-> Originally I thought "Card" were memory channel. But looking at the definition
-> of "Card Handle" in CPER: "... this field contains the SMBIOS handle for the
-> Type 16 Memory Array Structure that represents the memory card". So Card is
-> memory controller or something similar to that.
-> Right now ghes-edac assumes
-> one mc. We probably need to map mc(s) to the type 16 instances in SMBIOS table. 
+> The other problem is that the sysfs nodes are all setup with a single
+> layer representing
+> all of the memory on the board.
+> 
+> https://elixir.bootlin.com/linux/latest/source/drivers/edac/ghes_edac.c#L469
+> 
+> So the DIMM counters exposed in sysfs are all under a single memory
+> controller and just
+> numbered from 0 to n-1 based on the order in which the type 17 SMBIOS
+> entries show up
+> in the DMI walk.
 
-I think we should ignore 'mc's, and just report the dimm numbers.
+User-space depending on the dmi walk order makes me nervous. Doing this gives
+you per-dimm counters, if user-space needs to know which physical-dimm/slot that
+is, we'd need a way of matching it with one of the smbios location strings.
 
-ghes-edac only cares about the number of dimms today, and this would work on
-systems that only describe the dimms in the smbios table.
+
+>> so edac_raw_mc_handle_error() has no clue where the error happened. (I haven't
+>> read what it does with this information yet).
+>>
+>> ghes_edac_report_mem_error() does check CPER_MEM_VALID_MODULE_HANDLE, and if its
+>> set, it uses the handle to find the bank/device strings and prints them out.
+> 
+> Yes, I think this is where we need to add support to increment the
+> count based on that module handle.
+
+If layer[0] is EDAC_MC_LAYER_ALL_MEM, sized for num_dimm, don't we just put the
+dimm number in e->top_layer and flip e->enable_per_layer_report?
+
+
+>> Naively I thought we could generate some index during ghes_edac_count_dimms(),
+>> and use this as e->${whichever}_layer. I hoped there would be something we could
+>> already use as the index, but I can't spot it, so this will be more than the
+>> one-liner I was hoping for!
+> 
+> We could use what ghes_edac_register does by setting up a single layer
+> with all memory and
+> then keep a map of which module handle maps to which index into that
+> layer. From that it would
+> be easy to increment the proper sysfs exposed DIMM counters using the
+> single layer
+
+Yes, I think this is what we should do!
 
 
 Thanks,
