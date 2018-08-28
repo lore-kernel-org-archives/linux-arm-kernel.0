@@ -1,54 +1,236 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 28 Aug 2018 11:06:56 +0900
-Subject: [PATCH] devfreq: Convert to using %pOFn instead of
- device_node.name
-In-Reply-To: <20180828015252.28511-15-robh@kernel.org>
-References: <20180828015252.28511-1-robh@kernel.org>
- <CGME20180828015312epcas2p2fdb2ee1d1b292f212ec773dd8fb4bfc7@epcas2p2.samsung.com>
- <20180828015252.28511-15-robh@kernel.org>
-Message-ID: <5B84AE40.50305@samsung.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Tue, 28 Aug 2018 02:32:38 +0000
+Subject: [PATCH 2/2] soc: imx: gpcv2: make pgc driver more generic for
+ other i.MX platforms
+In-Reply-To: <CAHQ1cqEy0hQg3ByZVx4tW7f6cifzU++ptrV40TcH01GsKmHP3g@mail.gmail.com>
+References: <1533537589-7202-1-git-send-email-Anson.Huang@nxp.com>
+ <1533537589-7202-2-git-send-email-Anson.Huang@nxp.com>
+ <CAHQ1cqGA37RNoo3KcESCOFeYZxAQCOFkuQQhRPRKCTp=gKLdKQ@mail.gmail.com>
+ <CAHQ1cqEy0hQg3ByZVx4tW7f6cifzU++ptrV40TcH01GsKmHP3g@mail.gmail.com>
+Message-ID: <DB3PR0402MB3916B5A489F6CD0B679C273AF50A0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Rob,
+Hi, Andrey
 
-On 2018? 08? 28? 10:52, Rob Herring wrote:
-> In preparation to remove the node name pointer from struct device_node,
-> convert printf users to use the %pOFn format specifier.
-> 
-> Cc: Chanwoo Choi <cw00.choi@samsung.com>
-> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: linux-pm at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  drivers/devfreq/event/exynos-ppmu.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/devfreq/event/exynos-ppmu.c b/drivers/devfreq/event/exynos-ppmu.c
-> index a9c64f0d3284..c61de0bdf053 100644
-> --- a/drivers/devfreq/event/exynos-ppmu.c
-> +++ b/drivers/devfreq/event/exynos-ppmu.c
-> @@ -535,8 +535,8 @@ static int of_get_devfreq_events(struct device_node *np,
->  
->  		if (i == ARRAY_SIZE(ppmu_events)) {
->  			dev_warn(dev,
-> -				"don't know how to configure events : %s\n",
-> -				node->name);
-> +				"don't know how to configure events : %pOFn\n",
-> +				node);
->  			continue;
->  		}
->  
-> 
+Anson Huang
+Best Regards!
 
-Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
 
--- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+> -----Original Message-----
+> From: Andrey Smirnov <andrew.smirnov@gmail.com>
+> Sent: Tuesday, August 28, 2018 7:04 AM
+> To: Anson Huang <anson.huang@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>; Sascha Hauer
+> <s.hauer@pengutronix.de>; Sascha Hauer <kernel@pengutronix.de>; Fabio
+> Estevam <fabio.estevam@nxp.com>; linux-arm-kernel
+> <linux-arm-kernel@lists.infradead.org>; linux-kernel
+> <linux-kernel@vger.kernel.org>; dl-linux-imx <linux-imx@nxp.com>
+> Subject: Re: [PATCH 2/2] soc: imx: gpcv2: make pgc driver more generic for
+> other i.MX platforms
+> 
+> On Mon, Aug 27, 2018 at 3:51 PM Andrey Smirnov
+> <andrew.smirnov@gmail.com> wrote:
+> >
+> > On Sun, Aug 5, 2018 at 11:45 PM Anson Huang <Anson.Huang@nxp.com>
+> wrote:
+> > >
+> > > i.MX8MQ and i.MX8MM share same gpc module with i.MX7D, they can
+> > > reuse gpcv2 pgc driver for power domain control, this patch renames
+> > > all functions and structure definitions started with "imx7" to
+> > > "imx", and check machine type to pass platform specific power domain
+> > > data for power domain driver, thus make
+> > > gpcv2 pgc driver more generic for i.MX platforms.
+> > >
+> >
+> > Just for the sake of
+> 
+> Oops, forgot to type out the question I had about i.MX8MQ GPC in general. I've
+> noticed that vendor tree for i.MX8MQ has a separate driver for GPC that relies
+> on code in ARM Trusted Firmware binary blob to do the actual switching. Do
+> you by any chances know the relation between this code and the driver I
+> describe? Are they mutually exclusive or complimentary (I assume the former)?
+> Will the ATF-based driver be eventually deprecated?
+ 
+Yes, our internal NXP tree currently put all GPC registers operation in ARM Trusted Firmware, and
+Linux kernel has a gpc-psci.c which is a virtual GPC driver to call SMC and trap into ARM Trusted Firmware
+whenever it wants to read/write GPC registers. But for upstream, we plan to reuse i.MX7D's
+GPC driver for power domain control, since the GPC registers for power domain control are
+independent with other low power mode's control registers, it is NOT necessary to introduce
+another virtual GPC driver to call ARM Trusted Firmware for power domain control.
+
+So yes, ATF-based gpc driver for power domain control will be deprecated when we upstream the ATF for
+i.MX8MQ series SoCs. We prefer to reuse the i.MX7D's GPC driver in upstream Linux kernel. If you are OK
+with this, I will send out a V2 patch set to address your comments, thanks.
+
+Anson.
+
+> 
+> Thanks,
+> Andrey Smirnov
+> 
+> >
+> >
+> > > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> > > ---
+> > >  drivers/soc/imx/gpcv2.c | 68
+> > > +++++++++++++++++++++++++++++--------------------
+> > >  1 file changed, 40 insertions(+), 28 deletions(-)
+> > >
+> > > diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c index
+> > > 0e31465..0e33cb5 100644
+> > > --- a/drivers/soc/imx/gpcv2.c
+> > > +++ b/drivers/soc/imx/gpcv2.c
+> > > @@ -53,7 +53,7 @@
+> > >
+> > >  #define GPC_PGC_CTRL_PCR               BIT(0)
+> > >
+> > > -struct imx7_pgc_domain {
+> > > +struct imx_pgc_domain {
+> > >         struct generic_pm_domain genpd;
+> > >         struct regmap *regmap;
+> > >         struct regulator *regulator; @@ -69,11 +69,11 @@ struct
+> > > imx7_pgc_domain {
+> > >         struct device *dev;
+> > >  };
+> > >
+> > > -static int imx7_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain
+> > > *genpd,
+> > > +static int imx_gpc_pu_pgc_sw_pxx_req(struct generic_pm_domain
+> > > +*genpd,
+> > >                                       bool on)  {
+> > > -       struct imx7_pgc_domain *domain = container_of(genpd,
+> > > -                                                     struct
+> imx7_pgc_domain,
+> > > +       struct imx_pgc_domain *domain = container_of(genpd,
+> > > +                                                     struct
+> > > + imx_pgc_domain,
+> > >                                                       genpd);
+> > >         unsigned int offset = on ?
+> > >                 GPC_PU_PGC_SW_PUP_REQ :
+> GPC_PU_PGC_SW_PDN_REQ; @@
+> > > -150,17 +150,17 @@ static int imx7_gpc_pu_pgc_sw_pxx_req(struct
+> generic_pm_domain *genpd,
+> > >         return ret;
+> > >  }
+> > >
+> > > -static int imx7_gpc_pu_pgc_sw_pup_req(struct generic_pm_domain
+> > > *genpd)
+> > > +static int imx_gpc_pu_pgc_sw_pup_req(struct generic_pm_domain
+> > > +*genpd)
+> > >  {
+> > > -       return imx7_gpc_pu_pgc_sw_pxx_req(genpd, true);
+> > > +       return imx_gpc_pu_pgc_sw_pxx_req(genpd, true);
+> > >  }
+> > >
+> > > -static int imx7_gpc_pu_pgc_sw_pdn_req(struct generic_pm_domain
+> > > *genpd)
+> > > +static int imx_gpc_pu_pgc_sw_pdn_req(struct generic_pm_domain
+> > > +*genpd)
+> > >  {
+> > > -       return imx7_gpc_pu_pgc_sw_pxx_req(genpd, false);
+> > > +       return imx_gpc_pu_pgc_sw_pxx_req(genpd, false);
+> > >  }
+> > >
+> > > -static const struct imx7_pgc_domain imx7_pgc_domains[] = {
+> > > +static const struct imx_pgc_domain imx7_pgc_domains[] = {
+> > >         [IMX7_POWER_DOMAIN_MIPI_PHY] = {
+> > >                 .genpd = {
+> > >                         .name      = "mipi-phy",
+> > > @@ -198,9 +198,9 @@ static const struct imx7_pgc_domain
+> imx7_pgc_domains[] = {
+> > >         },
+> > >  };
+> > >
+> > > -static int imx7_pgc_domain_probe(struct platform_device *pdev)
+> > > +static int imx_pgc_domain_probe(struct platform_device *pdev)
+> > >  {
+> > > -       struct imx7_pgc_domain *domain = pdev->dev.platform_data;
+> > > +       struct imx_pgc_domain *domain = pdev->dev.platform_data;
+> > >         int ret;
+> > >
+> > >         domain->dev = &pdev->dev;
+> > > @@ -233,9 +233,9 @@ static int imx7_pgc_domain_probe(struct
+> platform_device *pdev)
+> > >         return ret;
+> > >  }
+> > >
+> > > -static int imx7_pgc_domain_remove(struct platform_device *pdev)
+> > > +static int imx_pgc_domain_remove(struct platform_device *pdev)
+> > >  {
+> > > -       struct imx7_pgc_domain *domain = pdev->dev.platform_data;
+> > > +       struct imx_pgc_domain *domain = pdev->dev.platform_data;
+> > >
+> > >         of_genpd_del_provider(domain->dev->of_node);
+> > >         pm_genpd_remove(&domain->genpd); @@ -243,23 +243,24
+> @@
+> > > static int imx7_pgc_domain_remove(struct platform_device *pdev)
+> > >         return 0;
+> > >  }
+> > >
+> > > -static const struct platform_device_id imx7_pgc_domain_id[] = {
+> > > -       { "imx7-pgc-domain", },
+> > > +static const struct platform_device_id imx_pgc_domain_id[] = {
+> > > +       { "imx-pgc-domain", },
+> > >         { },
+> > >  };
+> > >
+> > > -static struct platform_driver imx7_pgc_domain_driver = {
+> > > +static struct platform_driver imx_pgc_domain_driver = {
+> > >         .driver = {
+> > > -               .name = "imx7-pgc",
+> > > +               .name = "imx-pgc",
+> > >         },
+> > > -       .probe    = imx7_pgc_domain_probe,
+> > > -       .remove   = imx7_pgc_domain_remove,
+> > > -       .id_table = imx7_pgc_domain_id,
+> > > +       .probe    = imx_pgc_domain_probe,
+> > > +       .remove   = imx_pgc_domain_remove,
+> > > +       .id_table = imx_pgc_domain_id,
+> > >  };
+> > > -builtin_platform_driver(imx7_pgc_domain_driver)
+> > > +builtin_platform_driver(imx_pgc_domain_driver)
+> > >
+> > >  static int imx_gpcv2_probe(struct platform_device *pdev)  {
+> > > +       static const struct imx_pgc_domain *imx_pgc_domains;
+> > >         static const struct regmap_range yes_ranges[] = {
+> > >                 regmap_reg_range(GPC_LPCR_A_CORE_BSC,
+> > >                                  GPC_M4_PU_PDN_FLG), @@
+> -287,6
+> > > +288,7 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
+> > >         struct regmap *regmap;
+> > >         struct resource *res;
+> > >         void __iomem *base;
+> > > +       int pgc_max_index;
+> > >         int ret;
+> > >
+> > >         pgc_np = of_get_child_by_name(dev->of_node, "pgc"); @@
+> > > -307,9 +309,19 @@ static int imx_gpcv2_probe(struct platform_device
+> *pdev)
+> > >                 return ret;
+> > >         }
+> > >
+> > > +       if (of_machine_is_compatible("fsl,imx7d")) {
+> > > +               pgc_max_index = ARRAY_SIZE(imx7_pgc_domains);
+> > > +               imx_pgc_domains = imx7_pgc_domains;
+> > > +       }
+> >
+> > Is there any reason to do this explicit call to
+> > of_machine_is_compatible() as opposed to passing necessary data via
+> > .data in imx_gpcv2_dt_ids[]? The latter seems like a more
+> > straightforward way of passing variant specific driver info
+> >
+> > > +
+> > > +       if (!imx_pgc_domains) {
+> > > +               dev_err(&pdev->dev, "no device match found\n");
+> > > +               return -ENODEV;
+> > > +       }
+> >
+> > And doing so would also allow you to drop the check above.
+> >
+> > Other that this seems like a reasonable change:
+> >
+> > Acked-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> >
+> > Thanks,
+> > Andrey Smirnov
