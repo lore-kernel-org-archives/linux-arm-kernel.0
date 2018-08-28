@@ -1,15 +1,20 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 28 Aug 2018 15:32:09 +0300
-Subject: [PATCH 4/7] arm64: dts: add support for building DT overlays
+Date: Tue, 28 Aug 2018 15:32:10 +0300
+Subject: [PATCH 5/7] arm64: dts: add support for per sub-dir makefiles for DT
+ building
 In-Reply-To: <1535459532-17211-1-git-send-email-t-kristo@ti.com>
 References: <1535459532-17211-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1535459532-17211-5-git-send-email-t-kristo@ti.com>
+Message-ID: <1535459532-17211-6-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add simple support for building DT overlays. This just compiles any
-given .dtso file under the base arch/arm64/boot/dts/*/ directory into
-a .dtbo.
+Currently the makefile for arm64 builds all the DT files based on
+rules in the arch/arm64/boot/dts/Makefile, as this is statically
+passed via the $(build)= parameter. Change the $(build) parameter
+to actually point to the subdir itself, so the makefile from
+that subdir can be used to set-up build flags etc., for example
+setting up DTC_FLAGS. The patsubst magic is used to strip the
+trailing "/" from the path, as that confuses the kbuild system.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
@@ -17,18 +22,18 @@ Signed-off-by: Tero Kristo <t-kristo@ti.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 106039d..f04c814 100644
+index f04c814..2ac4358 100644
 --- a/arch/arm64/Makefile
 +++ b/arch/arm64/Makefile
-@@ -127,7 +127,7 @@ Image.%: Image
- zinstall install:
+@@ -128,7 +128,7 @@ zinstall install:
  	$(Q)$(MAKE) $(build)=$(boot) $@
  
--%.dtb: scripts
-+%.dtb %.dtbo: scripts
- 	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
+ %.dtb %.dtbo: scripts
+-	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
++	$(Q)$(MAKE) $(build)=$(patsubst %/,%,$(boot)/dts/$(dir $@)) $(boot)/dts/$@
  
  PHONY += dtbs dtbs_install
+ 
 -- 
 1.9.1
 
