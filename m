@@ -1,110 +1,225 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 28 Aug 2018 16:51:31 +0100
-Subject: [PATCH v5 21/27] arm64: Switch to PMR masking when starting CPUs
+Date: Tue, 28 Aug 2018 16:51:35 +0100
+Subject: [PATCH v5 25/27] irqchip/gic-v3: Add base support for pseudo-NMI
 In-Reply-To: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
 References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1535471497-38854-22-git-send-email-julien.thierry@arm.com>
+Message-ID: <1535471497-38854-26-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Once the boot CPU has been prepared or a new secondary CPU has been
-brought up, use ICC_PMR_EL1 to mask interrupts on that CPU and clear
-PSR.I bit.
+Provide a higher priority to be used for pseudo-NMIs. When such an
+interrupt is received, enter the NMI state and prevent other NMIs to
+be raised.
 
-Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
+When returning from a pseudo-NMI, skip preemption and tracing if the
+interrupted context has interrupts disabled.
+
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Russell King <linux@armlinux.org.uk>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: James Morse <james.morse@arm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/irqflags.h |  3 +++
- arch/arm64/kernel/head.S          | 35 +++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/smp.c           |  5 +++++
- 3 files changed, 43 insertions(+)
+ arch/arm/include/asm/arch_gicv3.h   |  6 ++++++
+ arch/arm64/include/asm/arch_gicv3.h |  6 ++++++
+ arch/arm64/kernel/entry.S           | 43 +++++++++++++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic-v3.c        | 34 ++++++++++++++++++++++++++++-
+ 4 files changed, 88 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
-index 193cfd0..d31e9b6 100644
---- a/arch/arm64/include/asm/irqflags.h
-+++ b/arch/arm64/include/asm/irqflags.h
-@@ -153,5 +153,8 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
- 	return (ARCH_FLAGS_GET_DAIF(flags) & (PSR_I_BIT)) |
- 		!(ARCH_FLAGS_GET_PMR(flags) & ICC_PMR_EL1_EN_BIT);
+diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
+index b39d620..1ed0476 100644
+--- a/arch/arm/include/asm/arch_gicv3.h
++++ b/arch/arm/include/asm/arch_gicv3.h
+@@ -374,5 +374,11 @@ static inline void gic_start_pmr_masking(void)
+ 	WARN_ON(true);
  }
+ 
++static inline void gic_set_nmi_active(void)
++{
++	/* Should not get called */
++	WARN_ON(true);
++}
 +
-+void maybe_switch_to_sysreg_gic_cpuif(void);
+ #endif /* !__ASSEMBLY__ */
+ #endif /* !__ASM_ARCH_GICV3_H */
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index eb55da8..6213d6f 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -167,5 +167,11 @@ static inline void gic_start_pmr_masking(void)
+ 	asm volatile ("msr daifclr, #2" : : : "memory");
+ }
+ 
++/* Notify an NMI is active, blocking other NMIs */
++static inline void gic_set_nmi_active(void)
++{
++	asm volatile ("msr daifset, #2" : : : "memory");
++}
 +
- #endif
- #endif
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index b085306..ba73690 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -648,6 +648,41 @@ set_cpu_boot_mode_flag:
- ENDPROC(set_cpu_boot_mode_flag)
-
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ASM_ARCH_GICV3_H */
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 91e1e3d..39d6ef0 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -411,6 +411,16 @@ alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
+ 	mov	sp, x19
+ 	.endm
+ 
++	/* Should be checked on return from irq handlers */
++	.macro	branch_if_was_nmi, tmp, target
++	alternative_if ARM64_HAS_IRQ_PRIO_MASKING
++	mrs	\tmp, daif
++	alternative_else
++	mov	\tmp, #0
++	alternative_endif
++	tbnz	\tmp, #7, \target // Exiting an NMI
++	.endm
++
  /*
-+ * void maybe_switch_to_sysreg_gic_cpuif(void)
-+ *
-+ * Enable interrupt controller system register access if this feature
-+ * has been detected by the alternatives system.
-+ *
-+ * Before we jump into generic code we must enable interrupt controller system
-+ * register access because this is required by the irqflags macros.  We must
-+ * also mask interrupts at the PMR and unmask them within the PSR. That leaves
-+ * us set up and ready for the kernel to make its first call to
-+ * arch_local_irq_enable().
-+ *
-+ */
-+ENTRY(maybe_switch_to_sysreg_gic_cpuif)
-+alternative_if_not ARM64_HAS_IRQ_PRIO_MASKING
-+	b	1f
-+alternative_else
-+	mrs_s	x0, SYS_ICC_SRE_EL1
-+alternative_endif
-+	orr	x0, x0, #1
-+	msr_s	SYS_ICC_SRE_EL1, x0	// Set ICC_SRE_EL1.SRE==1
-+	isb				// Make sure SRE is now set
-+	mrs	x0, daif
-+	tbz	x0, #7, no_mask_pmr	// Are interrupts on?
-+	mov	x0, ICC_PMR_EL1_MASKED
-+	msr_s	SYS_ICC_PMR_EL1, x0	// Prepare for unmask of I bit
-+	msr	daifclr, #2		// Clear the I bit
-+	b	1f
-+no_mask_pmr:
-+	mov	x0, ICC_PMR_EL1_UNMASKED
-+	msr_s	SYS_ICC_PMR_EL1, x0
+  * These are the registers used in the syscall handler, and allow us to
+  * have in theory up to 7 arguments to a function - x0 to x6.
+@@ -631,12 +641,30 @@ ENDPROC(el1_sync)
+ el1_irq:
+ 	kernel_entry 1
+ 	enable_da_f
++
+ #ifdef CONFIG_TRACE_IRQFLAGS
++#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
++	ldr	x20, [sp, #S_PMR_SAVE]
++	/* Irqs were disabled, don't trace */
++	tbz	x20, ICC_PMR_EL1_EN_SHIFT, 1f
++#endif
+ 	bl	trace_hardirqs_off
 +1:
-+	ret
-+ENDPROC(maybe_switch_to_sysreg_gic_cpuif)
+ #endif
+ 
+ 	irq_handler
+ 
++#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
++	/*
++	 * Irqs were disabled, we have an nmi.
++	 * We might have interrupted a context with interrupt disabled that set
++	 * NEED_RESCHED flag.
++	 * Skip preemption and irq tracing if needed.
++	 */
++	tbz	x20, ICC_PMR_EL1_EN_SHIFT, untraced_irq_exit
++	branch_if_was_nmi x0, skip_preempt
++#endif
++
+ #ifdef CONFIG_PREEMPT
+ 	ldr	w24, [tsk, #TSK_TI_PREEMPT]	// get preempt count
+ 	cbnz	w24, 1f				// preempt count != 0
+@@ -645,9 +673,13 @@ el1_irq:
+ 	bl	el1_preempt
+ 1:
+ #endif
++
++skip_preempt:
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	bl	trace_hardirqs_on
+ #endif
++
++untraced_irq_exit:
+ 	kernel_exit 1
+ ENDPROC(el1_irq)
+ 
+@@ -873,6 +905,9 @@ el0_irq_naked:
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	bl	trace_hardirqs_on
+ #endif
++
++	branch_if_was_nmi x2, nmi_ret_to_user
++
+ 	b	ret_to_user
+ ENDPROC(el0_irq)
+ 
+@@ -1269,3 +1304,11 @@ alternative_else_nop_endif
+ ENDPROC(__sdei_asm_handler)
+ NOKPROBE(__sdei_asm_handler)
+ #endif /* CONFIG_ARM_SDE_INTERFACE */
 +
 +/*
-  * These values are written with the MMU off, but read with the MMU on.
-  * Writers will invalidate the corresponding address, discarding up to a
-  * 'Cache Writeback Granule' (CWG) worth of data. The linker script ensures
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 22c9a0a..443fa2b 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -185,6 +185,8 @@ asmlinkage notrace void secondary_start_kernel(void)
- 	struct mm_struct *mm = &init_mm;
- 	unsigned int cpu;
-
-+	maybe_switch_to_sysreg_gic_cpuif();
++ * NMI return path to EL0
++ */
++nmi_ret_to_user:
++	ldr	x1, [tsk, #TSK_TI_FLAGS]
++	b	finish_ret_to_user
++ENDPROC(nmi_ret_to_user)
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index ffe98e8..1af2fcc 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -41,6 +41,8 @@
+ 
+ #include "irq-gic-common.h"
+ 
++#define GICD_INT_NMI_PRI		0xa0
 +
- 	cpu = task_cpu(current);
- 	set_my_cpu_offset(per_cpu_offset(cpu));
-
-@@ -421,6 +423,9 @@ void __init smp_prepare_boot_cpu(void)
- 	 * and/or scheduling is enabled.
- 	 */
- 	apply_boot_alternatives();
-+
-+	/* Conditionally switch to GIC PMR for interrupt masking */
-+	maybe_switch_to_sysreg_gic_cpuif();
+ struct redist_region {
+ 	void __iomem		*redist_base;
+ 	phys_addr_t		phys_base;
+@@ -248,6 +250,12 @@ static void gic_unmask_irq(struct irq_data *d)
+ 	gic_poke_irq(d, GICD_ISENABLER);
  }
-
- static u64 __init of_get_cpu_mpidr(struct device_node *dn)
---
+ 
++static inline bool gic_supports_nmi(void)
++{
++	return gic_prio_masking_enabled()
++	       && static_branch_likely(&have_non_secure_prio_view);
++}
++
+ static int gic_irq_set_irqchip_state(struct irq_data *d,
+ 				     enum irqchip_irq_state which, bool val)
+ {
+@@ -381,6 +389,23 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
+ 	if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
+ 		int err;
+ 
++		if (gic_supports_nmi()
++		    && unlikely(gic_read_rpr() == GICD_INT_NMI_PRI)) {
++			/*
++			 * We need to prevent other NMIs to occur even after a
++			 * priority drop.
++			 * We keep I flag set until cpsr is restored from
++			 * kernel_exit.
++			 */
++			gic_set_nmi_active();
++
++			if (static_branch_likely(&supports_deactivate_key))
++				gic_write_eoir(irqnr);
++
++			err = handle_domain_nmi(gic_data.domain, irqnr, regs);
++			return;
++		}
++
+ 		if (static_branch_likely(&supports_deactivate_key))
+ 			gic_write_eoir(irqnr);
+ 		else if (!gic_prio_masking_enabled())
+@@ -1119,6 +1144,11 @@ static int partition_domain_translate(struct irq_domain *d,
+ 	.select = gic_irq_domain_select,
+ };
+ 
++static void gic_enable_nmi_support(void)
++{
++	static_branch_enable(&have_non_secure_prio_view);
++}
++
+ static int __init gic_init_bases(void __iomem *dist_base,
+ 				 struct redist_region *rdist_regs,
+ 				 u32 nr_redist_regions,
+@@ -1188,7 +1218,9 @@ static int __init gic_init_bases(void __iomem *dist_base,
+ 
+ 	if (gic_prio_masking_enabled()) {
+ 		if (!gic_has_group0() || gic_dist_security_disabled())
+-			static_branch_enable(&have_non_secure_prio_view);
++			gic_enable_nmi_support();
++		else
++			pr_warn("SCR_EL3.FIQ set, cannot enable use of pseudo-NMIs\n");
+ 	}
+ 
+ 	return 0;
+-- 
 1.9.1
