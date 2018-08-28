@@ -1,58 +1,81 @@
-From: jian.hu@amlogic.com (Jian Hu)
-Date: Tue, 28 Aug 2018 11:35:32 +0800
-Subject: [PATCH 2/2] clk: meson-g12a: Add AO Clock controller driver
-In-Reply-To: <89b058a7bba26058fab95dea01155221dbb642ce.camel@baylibre.com>
-References: <1533894868-85815-1-git-send-email-jian.hu@amlogic.com>
- <1533894868-85815-3-git-send-email-jian.hu@amlogic.com>
- <6c855dc62fe6ed1a01216bd708d401a280f8762c.camel@baylibre.com>
- <fff1f982-c9f3-8aa4-b108-6c0998827e79@amlogic.com>
- <89b058a7bba26058fab95dea01155221dbb642ce.camel@baylibre.com>
-Message-ID: <977d8010-6d82-5eac-5da5-6dbe0f73971a@amlogic.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 28 Aug 2018 09:09:44 +0530
+Subject: [RFC PATCH 5/6] arm64: dts: ti: Add Support for AM654 SoC
+In-Reply-To: <20180828012224.fbmcmwfhfuwhcm53@kahuna>
+References: <20180605060510.32473-1-nm@ti.com>
+ <CAL_JsqJusWTvr4A_-Bk81meYddMHBMJ4=Fch6L0MFoF7HfBW2w@mail.gmail.com>
+ <454c277e-8a63-81cb-b341-a50f4e25cbea@ti.com>
+ <20180820143153.GD7523@atomide.com>
+ <40cecb47-bd32-04aa-b7cd-ff16c1eb28f3@ti.com>
+ <20180827155535.GJ7523@atomide.com> <20180828012224.fbmcmwfhfuwhcm53@kahuna>
+Message-ID: <f947ea13-9273-e951-c6af-673d1e6a9570@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi: Jerome
+Hi,
 
-On 2018/8/27 21:07, Jerome Brunet wrote:
-> On Fri, 2018-08-24 at 21:34 +0800, Jian Hu wrote:
+On Tuesday 28 August 2018 06:52 AM, Nishanth Menon wrote:
+> On 15:55-20180827, Tony Lindgren wrote:
+>> * Kishon Vijay Abraham I <kishon@ti.com> [180827 03:06]:
+>>> Hi Tony,
 >>>
+>>> On Monday 20 August 2018 08:01 PM, Tony Lindgren wrote:
+>>>> * Kishon Vijay Abraham I <kishon@ti.com> [180808 06:35]:
+>>>>> On Tuesday 05 June 2018 07:35 PM, Rob Herring wrote:
+>>>>>> Really need 64-bit addresses and sizes? Use ranges to limit the
+>>>>>> address space if possible.
+>>>>>
+>>>>> We now have address-cells as <1>,
+>>>>> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/arch/arm64/boot/dts/ti/k3-am65.dtsi#n49
+>>>>>
+>>>>> However each PCIe instance has 2 data regions and one of the regions
+>>>>> (PCIE0_CORE_CORE_DAT_SLV_PCIE_DAT1/PCIE1_CORE_CORE_DAT_SLV_PCIE_DAT1 specified
+>>>>> in the "MAIN Domain Memory Map" table of TRM http://www.ti.com/lit/pdf/spruid7)
+>>>>> is above the 32bit region and requires 2 cells to specify the start address.
+>>>>> This region is used to access MEM_SPACE of PCIe endpoint when operating in root
+>>>>> complex mode and access memory of PCI root complex when operating in endpoint mode.
+>>>>>
+>>>>> In order to describe this, should we change the address-cells back to <2> or do
+>>>>> you suggest any other alternatives?
+>>>>
+>>>> It's probably best to have the top level cbass interconnect use
+>>>> #size-cells = <2> and then have it's child interconnects have
+>>>> #size-cells = <1> if they don't need ranges above 4GB.
+>>>
+>>> PCIe has a region starting at 0x40_00000000 and size 4GB. We need 2 address
+>>> cells and 2 size cells to describe this no?
 >>
->> I am confued about aoclk81's parent clocks.
+>> Yes.
 >>
->> I can not get the example of axg audio clock driver, Could you provide
->> the link? Had it merged into clk-meson.git?
+>>>> BTW, what's the difference between all these three similar PCIE
+>>>> ranges?
+>>>>
+>>>> PCIE0_CORE_CORE_DAT_SLV_PCIE_CORE 0x0005500000 0x0005600000 1 MB
+>>>> PCIE1_CORE_CORE_DAT_SLV_PCIE_CORE 0x0005600000 0x0005700000 1 MB
+>>>
+>>> This is the register space for the two instances of PCIe controller.
+>>>>
+>>>> PCIE0_CORE_CORE_DAT_SLV_PCIE_DAT0 0x0010000000 0x0018000000 128 MB
+>>>> PCIE1_CORE_CORE_DAT_SLV_PCIE_DAT0 0x0018000000 0x0020000000 128 MB
+>>>>
+>>>> PCIE0_CORE_CORE_DAT_SLV_PCIE_DAT1 0x4000000000 0x4100000000 4 GB
+>>>> PCIE1_CORE_CORE_DAT_SLV_PCIE_DAT1 0x4100000000 0x4200000000 4 GB
+>>>
+>>> The above are regions which can be used by CPU/DMA to access the PCIe address
+>>> space. The mapping from the above regions to the PCIe address space will be
+>>> programmed in the PCIe controller.
+>>
+>> OK so not just somethng for dma-ranges but also accessible by
+>> the CPU.
+>>
 > 
-> Yes and mainline as well : drivers/clk/meson/axg-audio.c
+> Kishon, Sekhar:
 > 
-> Basically this driver is creating bypass input clocks (audio_pclk, mst_in[0-9],
-> etc...) .
-> 
-> This allows to collect input clocks from DT (like any consumer should) will
-> keeping constant in the controller clock tree.
-> 
->>From what I've seen of your controller drivers, the EE controller should have
-> one input, the AO should have 3.
-> 
-> 
-> 
-> .
-> 
-I still can not get the example meaning in axg audio driver.
+> Can you guys post patches based on v4.19-rc1 for fixing this? I do have
+> a bunch of dts nodes to build as well for v4.20, once Tony / Rob acks the
+> changes.
 
-In 26 page of A113D_Datasheet V0.7 20170725-Baylibre.pdf,We can see the 
-aoclk81 has two parents. clk81 and ao_slow_clk. I can not get 3 parents.
+Sure, I'll post that today.
 
-                          clk81|\
-                        -------| \        aoclk81
-src0 |\                       |  |-------------------
------| \     ao_slow_clk      |  |
-      |  |---------------------| /
------| /                      |/
-  src1|/
-
-
-src0 is from xtal, if can generate 32k clock, but it is never used.
-src1 is from gpio clock, It is never used. If necessary? the ao_slow_clk 
-maybe described.
-
-So why aoclk81 has 3 parents?
+Thanks
+Kishon
