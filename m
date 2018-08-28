@@ -1,57 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 28 Aug 2018 14:23:04 +0200
-Subject: [PATCH 00/15] soc: octeontx2: Add RVU admin function driver
-In-Reply-To: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <CAK8P3a1xC6XjwDAmocpE5TZO7j6uVGtvBtWLPVcYwKqN6Z+seQ@mail.gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue, 28 Aug 2018 14:27:35 +0200
+Subject: [PATCH] arm64: defconfig: enable modules for amlogic s400 sound card
+Message-ID: <20180828122735.28919-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 12:57 PM <sunil.kovvuri@gmail.com> wrote:
->
-> From: Sunil Goutham <sgoutham@marvell.com>
->
-> Resource virtualization unit (RVU) on Marvell's OcteonTX2 SOC supports
-> multiple PCIe SRIOV physical functions (PFs) and virtual functions (VFs).
-> PF0 is called administrative / admin function (AF) and has privilege access
-> to registers to provision different RVU functional blocks to each of
-> PF/VF.
->
-> This admin function (AF) driver acts as a configuration / administrative
-> software which provisions functional blocks to a PF/VF on demand for them
-> to work as one of the following
->  - A basic network controller (i.e NIC).
->  - NIC with packet filtering, shaping and scheduling capabilities.
->  - A crypto device.
->  - A combination of above etc.
->
-> PF/VFs communicate with admin function via a shared memory region.
-> This patch series adds logic for the following
->  - RVU AF driver with functional blocks provisioning support
->  - Mailbox infrastructure for communication between AF and PFs.
->  - CGX driver which provides information about physcial network
->    interfaces which AF processes and forwards required info to
->    PF/VF drivers.
->
-> This is the first set of patches out of 70 odd patches.
->
-> Note: This driver neither receives any data nor processes it i.e no I/O,
->       just does the hardware configuration.
+Compile the necessary drivers as modules, including codecs, for the
+s400 sound card.
 
-Hi Sunil,
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ arch/arm64/configs/defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Thanks for posting this first series, I'm glad we're seeing support for this
-chip family making some progress.
-
-My feeling overall is that we need a review from the network driver
-folks more than the arm-soc team etc, and that maybe the driver
-as a whole should go into drivers/net/ethernet.
-
-We support some couple of similar hardware already that has
-both support for virtual functions and for crypto offload, including
-the Chelsio cxgb4, Mellanox mlx5, NXP DPAA and probably others,
-and we need to ensure that the exposed interfaces are all
-compatible, and that you use the correct subsystems and
-in-kernel abstractions for thing that are common.
-
-      Arnd
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index f67e8d5e93ad..6b1daea53bd3 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -464,6 +464,7 @@ CONFIG_SND_SOC_ROCKCHIP_I2S=m
+ CONFIG_SND_SOC_ROCKCHIP_SPDIF=m
+ CONFIG_SND_SOC_ROCKCHIP_RT5645=m
+ CONFIG_SND_SOC_RK3399_GRU_SOUND=m
++CONFIG_SND_MESON_AXG_SOUND_CARD=m
+ CONFIG_SND_SOC_SAMSUNG=y
+ CONFIG_SND_SOC_RCAR=m
+ CONFIG_SND_SOC_AK4613=m
+@@ -475,6 +476,9 @@ CONFIG_SND_SOC_RT5514_SPI=m
+ CONFIG_SND_SOC_RT5645=m
+ CONFIG_SND_SIMPLE_CARD=m
+ CONFIG_SND_AUDIO_GRAPH_CARD=m
++CONFIG_SND_SOC_ES7134=m
++CONFIG_SND_SOC_ES7241=m
++CONFIG_SND_SOC_TAS571X=m
+ CONFIG_I2C_HID=m
+ CONFIG_USB=y
+ CONFIG_USB_OTG=y
+-- 
+2.17.1
