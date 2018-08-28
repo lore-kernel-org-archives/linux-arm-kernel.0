@@ -1,61 +1,35 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 28 Aug 2018 16:51:14 +0100
-Subject: [PATCH v5 04/27] arm64: daifflags: Use irqflags functions for
- daifflags
+Date: Tue, 28 Aug 2018 16:51:11 +0100
+Subject: [PATCH v5 01/27] arm64: cpufeature: Set SYSREG_GIC_CPUIF as a boot
+ system feature
 In-Reply-To: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
 References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1535471497-38854-5-git-send-email-julien.thierry@arm.com>
+Message-ID: <1535471497-38854-2-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the work done in daifflags save/restore is already provided
-by irqflags functions. Daifflags should always be a superset of irqflags
-(it handles irq status + status of other flags). Modifying behaviour of
-irqflags should alter the behaviour of daifflags.
-
-Use irqflags_save/restore functions for the corresponding daifflags
-operation.
-
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: James Morse <james.morse@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/daifflags.h | 15 +++++----------
- 1 file changed, 5 insertions(+), 10 deletions(-)
+ arch/arm64/kernel/cpufeature.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/daifflags.h b/arch/arm64/include/asm/daifflags.h
-index 22e4c83..8d91f22 100644
---- a/arch/arm64/include/asm/daifflags.h
-+++ b/arch/arm64/include/asm/daifflags.h
-@@ -36,11 +36,8 @@ static inline unsigned long local_daif_save(void)
- {
- 	unsigned long flags;
- 
--	asm volatile(
--		"mrs	%0, daif		// local_daif_save\n"
--		: "=r" (flags)
--		:
--		: "memory");
-+	flags = arch_local_save_flags();
-+
- 	local_daif_mask();
- 
- 	return flags;
-@@ -60,11 +57,9 @@ static inline void local_daif_restore(unsigned long flags)
- {
- 	if (!arch_irqs_disabled_flags(flags))
- 		trace_hardirqs_on();
--	asm volatile(
--		"msr	daif, %0		// local_daif_restore"
--		:
--		: "r" (flags)
--		: "memory");
-+
-+	arch_local_irq_restore(flags);
-+
- 	if (arch_irqs_disabled_flags(flags))
- 		trace_hardirqs_off();
- }
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index e238b79..1e433ac 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1039,7 +1039,7 @@ static void cpu_has_fwb(const struct arm64_cpu_capabilities *__unused)
+ 	{
+ 		.desc = "GIC system register CPU interface",
+ 		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+-		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
++		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
+ 		.matches = has_useable_gicv3_cpuif,
+ 		.sys_reg = SYS_ID_AA64PFR0_EL1,
+ 		.field_pos = ID_AA64PFR0_GIC_SHIFT,
 -- 
 1.9.1
