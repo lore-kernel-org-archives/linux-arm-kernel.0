@@ -1,304 +1,84 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 28 Aug 2018 14:45:17 +0100
-Subject: [PATCH v2 01/29] nvmem: add support for cell lookups
-In-Reply-To: <CAMRc=Mex5WAm8uiV4T=0+bLduBBdj18iekuYT55W9gA_rzQ_sg@mail.gmail.com>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180810080526.27207-2-brgl@bgdev.pl> <20180824170848.29594318@bbrezillon>
- <20180824152740.GD27483@lunn.ch> <20180825082722.567e8c9a@bbrezillon>
- <CAMRc=Men-MPk5DGshWcVEc0v=gH2WSpx1j-CawOeydwp59tejw@mail.gmail.com>
- <20180827110055.122988d0@bbrezillon>
- <CAMRc=MfpZJUEAhM4OoLbmJcnX3rTJk8fvdiL6=9BjNkVcsf=SA@mail.gmail.com>
- <8cb75723-dc87-f127-2aab-54dd0b08eee8@linaro.org>
- <CAMRc=Mex5WAm8uiV4T=0+bLduBBdj18iekuYT55W9gA_rzQ_sg@mail.gmail.com>
-Message-ID: <916e3e89-82b3-0d52-2b77-4374261a9d0f@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 28 Aug 2018 15:45:53 +0200
+Subject: [PATCH 1/2] drm/bridge: Add virtual display DT bindings
+In-Reply-To: <20180827115302eucas1p24d36cfaf9835ccb217ac81e508484aa1~Ou5eTkYW-3006130061eucas1p2Z@eucas1p2.samsung.com>
+References: <CGME20180824122324epcas3p2922f3e5415dacf4c89cfb136fa5c77b2@epcas3p2.samsung.com>
+ <20180824122308.3092-1-linus.walleij@linaro.org>
+ <20180827115302eucas1p24d36cfaf9835ccb217ac81e508484aa1~Ou5eTkYW-3006130061eucas1p2Z@eucas1p2.samsung.com>
+Message-ID: <CACRpkdaGNhxY-xAAEL1Bu4EMr8x7qTGoM9s-At2v7Ev8PwOTDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Aug 27, 2018 at 1:53 PM Andrzej Hajda <a.hajda@samsung.com> wrote:
 
+> On 24.08.2018 14:23, Linus Walleij wrote:
+> > This adds bindings for a virtual display to be used with displays
+> > inside entirely virtual environments which do not emulate things
+> > like monitors but just need timing information to be supplied to
+> > its display controller.
+> >
+> > This is inspired by earlier work by Liviu Dudau.
+>
+> If this is pure virtual then it should be connected to other pure
+> virtual components.
 
-On 28/08/18 12:56, Bartosz Golaszewski wrote:
-> 2018-08-28 12:15 GMT+02:00 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>:
->>
->> On 27/08/18 14:37, Bartosz Golaszewski wrote:
->>>
->>> I didn't notice it before but there's a global list of nvmem cells
->>
->>
->> Bit of history here.
->>
->> The global list of nvmem_cell is to assist non device tree based cell
->> lookups. These cell entries come as part of the non-dt providers
->> nvmem_config.
->>
->> All the device tree based cell lookup happen dynamically on request/demand,
->> and all the cell definition comes from DT.
->>
-> 
-> Makes perfect sense.
-> 
->> As of today NVMEM supports both DT and non DT usecase, this is much simpler.
->>
->> Non dt cases have various consumer usecases.
->>
->> 1> Consumer is aware of provider name and cell details.
->>          This is probably simple usecase where it can just use device based
->> apis.
->>
->> 2> Consumer is not aware of provider name, its just aware of cell name.
->>          This is the case where global list of cells are used.
->>
-> 
-> I would like to support an additional use case here: the provider is
-> generic and is not aware of its cells at all. Since the only way of
-> defining nvmem cells is through DT or nvmem_config, we lack a way to
-> allow machine code to define cells without the provider code being
-> aware.
+OK it's a bit of half-half but outside of my grasp, I am just trying
+to support legacy systems.
 
-machine driver should be able to do
-nvmem_device_get()
-nvmem_add_cells()
+The device tree is there:
+arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
 
-currently this adds to the global cell list which is exactly like doing 
-it via nvmem_config.
-> 
->>> with each cell referencing its owner nvmem device. I'm wondering if
->>> this isn't some kind of inversion of ownership. Shouldn't each nvmem
->>> device have a separate list of nvmem cells owned by it? What happens
->>
->> This is mainly done for use case where consumer does not have idea of
->> provider name or any details.
->>
-> 
-> It doesn't need to know the provider details, but in most subsystems
-> the core code associates such resources by dev_id and optional con_id
-> as Boris already said.
-> 
+The latter contains the CLCD which is the display driver.
 
-If dev_id here is referring to provider dev_id, then we already do that 
-using nvmem device apis, except in global cell list which makes dev_id 
-optional.
+In RTSM, which is an ARM product I do not develop and
+cannot make changes to, there is an emulated CLCD. So
+that part appear as if it was real hardware. Like in QEMU.
 
+But the display does not have any emulation. The raw
+output from the CLCD is latched out to the screen.
 
->> First thing non dt user should do is use "NVMEM device based consumer APIs"
->>
->> ex: First get handle to nvmem device using its nvmem provider name by
->> calling nvmem_device_get(); and use nvmem_device_cell_read/write() apis.
->>
->> Also am not 100% sure how would maintaining cells list per nvmem provider
->> would help for the intended purpose of global list?
->>
-> 
-> It would fix the use case where the consumer wants to use
-> nvmem_cell_get(dev, name) and two nvmem providers would have a cell
-> with the same name.
+I do not know exactly know how the RTSM emulator
+actually works, but I suspect that the little graphic window
+on the screeen adapts to what gets written into the
+CLCD control registers, so anything goes, more or less.
 
-There is no code to enforce duplicate checks, so this would just 
-decrease the chances rather than fixing the problem totally.
-I guess this is same problem
+To satisfy the CLCD with some timings and resolution,
+this bridge gives it that, from the device tree, in a way
+that clearly conveys that "this is not a real thing".
 
-Finding cell by name without dev_id would still be an issue, am not too 
-concerned about this ATM.
+The old code uses DPI. This is not DPI, not even close
+to it. It worked simply because all the DPI really does is
+what this patch does: provide timings.
 
-However, the idea of having cells per provider does sound good to me.
-We should also maintain list of providers in core as a lookup in cases 
-where dev_id is null.
+By contrast on QEMU I have patches the emulator to
+properly represent the I2C DDC link and provide EDID
+so that is all fine.
 
-I did hack up a patch, incase you might want to try:
-I did only compile test.
----------------------------------->cut<-------------------------------
-Author: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date:   Tue Aug 28 13:46:21 2018 +0100
+I cannot patch RTSM to emulate I2C and DDC. It's not
+open source. But the device tree in the kernel supports
+this "machine" and so, I have to maintain it when modernizng
+the fbdev driver to a DRM driver.
 
-     nvmem: core: maintain per provider cell list
+I'm sorry RTSM is half/half. Not my fault. I can't fix...
 
-     Having a global cell list could be a issue in cases where the 
-cell-id is same across multiple providers. Making the cell list specific 
-to provider could avoid such issue by adding additional checks while 
-addding cells.
+> And one more thing, you are defining virtual panel but you are using
+> drm_bridge framework, why not drm_panel?
 
-     Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+This was discussed before in the previous patch set:
+https://lists.freedesktop.org/archives/dri-devel/2018-July/183516.html
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index aa1657831b70..29da603f2fa4 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -40,6 +40,8 @@ struct nvmem_device {
-         struct device           *base_dev;
-         nvmem_reg_read_t        reg_read;
-         nvmem_reg_write_t       reg_write;
-+       struct list_head        node;
-+       struct list_head        cells;
-         void *priv;
-  };
+Essentially, it's because the display driver is just connected
+to "something" not a panel and a bridge is likely the best I
+can come up with - a bridge over to a virtual display.
 
-@@ -57,9 +59,7 @@ struct nvmem_cell {
+A patch to add "VGA", "SGA" and "XGA" to the simple panels
+was NACKed (sort of, politely):
+https://lists.freedesktop.org/archives/dri-devel/2018-July/183698.html
 
-  static DEFINE_MUTEX(nvmem_mutex);
-  static DEFINE_IDA(nvmem_ida);
--
--static LIST_HEAD(nvmem_cells);
--static DEFINE_MUTEX(nvmem_cells_mutex);
-+static LIST_HEAD(nvmem_devices);
+Also it was noted that it would be nice to have something that
+would make it easy to change resolutions on these virtual
+display things. Voila.
 
-  #ifdef CONFIG_DEBUG_LOCK_ALLOC
-  static struct lock_class_key eeprom_lock_key;
-@@ -284,26 +284,28 @@ static struct nvmem_device *of_nvmem_find(struct 
-device_node *nvmem_np)
-
-  static struct nvmem_cell *nvmem_find_cell(const char *cell_id)
-  {
--       struct nvmem_cell *p;
-+       struct nvmem_device *d;
-
--       mutex_lock(&nvmem_cells_mutex);
--
--       list_for_each_entry(p, &nvmem_cells, node)
--               if (!strcmp(p->name, cell_id)) {
--                       mutex_unlock(&nvmem_cells_mutex);
--                       return p;
--               }
-+       mutex_lock(&nvmem_mutex);
-+       list_for_each_entry(d, &nvmem_devices, node) {
-+               struct nvmem_cell *p;
-+               list_for_each_entry(p, &d->cells, node)
-+                       if (!strcmp(p->name, cell_id)) {
-+                               mutex_unlock(&nvmem_mutex);
-+                               return p;
-+                       }
-+       }
-
--       mutex_unlock(&nvmem_cells_mutex);
-+       mutex_unlock(&nvmem_mutex);
-
-         return NULL;
-  }
-
-  static void nvmem_cell_drop(struct nvmem_cell *cell)
-  {
--       mutex_lock(&nvmem_cells_mutex);
-+       mutex_lock(&nvmem_mutex);
-         list_del(&cell->node);
--       mutex_unlock(&nvmem_cells_mutex);
-+       mutex_unlock(&nvmem_mutex);
-         kfree(cell);
-  }
-
-@@ -312,18 +314,18 @@ static void nvmem_device_remove_all_cells(const 
-struct nvmem_device *nvmem)
-         struct nvmem_cell *cell;
-         struct list_head *p, *n;
-
--       list_for_each_safe(p, n, &nvmem_cells) {
-+       list_for_each_safe(p, n, &nvmem->cells) {
-                 cell = list_entry(p, struct nvmem_cell, node);
-                 if (cell->nvmem == nvmem)
-                         nvmem_cell_drop(cell);
-         }
-  }
-
--static void nvmem_cell_add(struct nvmem_cell *cell)
-+static void nvmem_cell_add(struct nvmem_device *nvmem, struct 
-nvmem_cell *cell)
-  {
--       mutex_lock(&nvmem_cells_mutex);
--       list_add_tail(&cell->node, &nvmem_cells);
--       mutex_unlock(&nvmem_cells_mutex);
-+       mutex_lock(&nvmem_mutex);
-+       list_add_tail(&cell->node, &nvmem->cells);
-+       mutex_unlock(&nvmem_mutex);
-  }
-
-  static int nvmem_cell_info_to_nvmem_cell(struct nvmem_device *nvmem,
-@@ -385,7 +387,7 @@ int nvmem_add_cells(struct nvmem_device *nvmem,
-                         goto err;
-                 }
-
--               nvmem_cell_add(cells[i]);
-+               nvmem_cell_add(nvmem, cells[i]);
-         }
-
-         /* remove tmp array */
-@@ -519,6 +521,10 @@ struct nvmem_device *nvmem_register(const struct 
-nvmem_config *config)
-         if (config->cells)
-                 nvmem_add_cells(nvmem, config->cells, config->ncells);
-
-+       mutex_lock(&nvmem_mutex);
-+       list_add_tail(&nvmem->node, &nvmem_devices);
-+       mutex_unlock(&nvmem_mutex);
-+
-         return nvmem;
-
-  err_device_del:
-@@ -544,6 +550,8 @@ int nvmem_unregister(struct nvmem_device *nvmem)
-                 mutex_unlock(&nvmem_mutex);
-                 return -EBUSY;
-         }
-+
-+       list_del(&nvmem->node);
-         mutex_unlock(&nvmem_mutex);
-
-         if (nvmem->flags & FLAG_COMPAT)
-@@ -899,7 +907,7 @@ struct nvmem_cell *of_nvmem_cell_get(struct 
-device_node *np,
-                 goto err_sanity;
-         }
-
--       nvmem_cell_add(cell);
-+       nvmem_cell_add(nvmem, cell);
-
-         return cell;
-
----------------------------------->cut<-------------------------------
-
-> 
-> Next we could add a way to associate dev_ids with nvmem cells.
-> 
->>> if we have two nvmem providers with the same names for cells? I'm
->>
->> Yes, it would return the first instance.. which is a known issue.
->> Am not really sure this is a big problem as of today! but am open for any
->> better suggestions!
->>
-> 
-> Yes, I would like to rework nvmem a bit. I don't see any non-DT users
-> defining nvmem-cells using nvmem_config. I think that what we need is
-> a way of specifying cell config outside of nvmem providers in some
-> kind of structures. These tables would reference the provider by name
-> and define the cells. Then we would have an additional lookup
-> structure which would associate the consumer (by dev_id and con_id,
-> where dev_id could optionally be NULL and where we would fall back to
-> using con_id only) and the nvmem provider + cell together. Similarly
-> to how GPIO consumers are associated with the gpiochip and hwnum. How
-> does it sound?
-Yes, sounds good.
-
-Correct me if am wrong!
-You should be able to add the new cells using struct nvmem_cell_info and 
-add them to particular provider using nvmem_add_cells().
-
-Sounds like thats exactly what nvmem_add_lookup_table() would look like.
-
-We should add new nvmem_device_cell_get(nvmem, conn_id) which would 
-return nvmem cell which is specific to the provider. This cell can be 
-used by the machine driver to read/write.
-
->>>
->>> BTW: of_nvmem_cell_get() seems to always allocate an nvmem_cell
->>> instance even if the cell for this node was already added to the nvmem
->>> device.
->>
->> I hope you got the reason why of_nvmem_cell_get() always allocates new
->> instance for every get!!
-> 
-> 
-> I admit I didn't test it, but just from reading the code it seems like
-> in nvmem_cell_get() for DT-users we'll always get to
-> of_nvmem_cell_get() and in there we always end up calling line 873:
-> cell = kzalloc(sizeof(*cell), GFP_KERNEL);
-> 
-That is correct, this cell is created when we do a get and release when 
-we do a put().
-
-thanks,
-srini
+Yours,
+Linus Walleij
