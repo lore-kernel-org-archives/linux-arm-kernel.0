@@ -1,36 +1,41 @@
-From: tmricht@linux.ibm.com (Thomas-Mich Richter)
-Date: Tue, 28 Aug 2018 08:22:40 +0200
-Subject: [PATCH] perf annotate: Handle arm64 move instructions
-In-Reply-To: <20180827150807.304110d2e9919a17c832ca48@arm.com>
-References: <20180827150807.304110d2e9919a17c832ca48@arm.com>
-Message-ID: <7b5ea377-91a6-d3f3-56a1-a836d5aaa7c5@linux.ibm.com>
+From: leilk.liu@mediatek.com (Leilk Liu)
+Date: Tue, 28 Aug 2018 14:28:05 +0800
+Subject: [PATCH 3/3] arm64: dts: Add spi slave dts
+In-Reply-To: <1535437685-30230-1-git-send-email-leilk.liu@mediatek.com>
+References: <1535437685-30230-1-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <1535437685-30230-4-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/27/2018 10:08 PM, Kim Phillips wrote:
-> Add default handler for non-jump instructions.  This really only has an
-> effect on instructions that compute a PC-relative address, such as 'adrp,'
-> as seen in these couple of examples:
-> 
-> BEFORE: adrp   x0, ffff20000aa11000 <kallsyms_token_index+0xce000>
-> AFTER:  adrp   x0, kallsyms_token_index+0xce000
-> 
-> BEFORE: adrp   x23, ffff20000ae94000 <__per_cpu_load>
-> AFTER:  adrp   x23, __per_cpu_load
-> 
-> The implementation is identical to that of s390, but with a slight
-> adjustment for objdump whitespace propagation (arm64 objdump puts
-> spaces after commas, whereas s390's presumably doesn't).
-> 
-> The mov__scnprintf() declaration is moved from s390's to arm64's
-> instructions.c because arm64's gets included before s390's.
-> 
+This patch adds MT2712 spi slave into device tree.
 
-Tested-by: Thomas Richter <tmricht@linux.ibm.com>
+Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+index 75cc0f7..064419b 100644
+--- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+@@ -301,6 +301,18 @@
+ 		status = "disabled";
+ 	};
+ 
++	spis1: spi at 10013000 {
++		compatible = "mediatek,mt2712-spi-slave";
++		reg = <0 0x10013000 0 0x100>;
++		interrupts = <GIC_SPI 283 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&topckgen CLK_TOP_UNIVPLL1_D2>,
++			<&topckgen CLK_TOP_SPISLV_SEL>,
++			<&infracfg CLK_INFRA_AO_SPI1>;
++		clock-names = "parent-clk", "sel-clk", "spi-clk";
++		spi-slave;
++		status = "disabled";
++	};
++
+ 	apmixedsys: syscon at 10209000 {
+ 		compatible = "mediatek,mt2712-apmixedsys", "syscon";
+ 		reg = <0 0x10209000 0 0x1000>;
 -- 
-Thomas Richter, Dept 3303, IBM s390 Linux Development, Boeblingen, Germany
---
-Vorsitzende des Aufsichtsrats: Martina Koederitz 
-Gesch?ftsf?hrung: Dirk Wittkopp
-Sitz der Gesellschaft: B?blingen / Registergericht: Amtsgericht Stuttgart, HRB 243294
+1.7.9.5
