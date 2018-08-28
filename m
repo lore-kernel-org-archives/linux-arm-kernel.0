@@ -1,52 +1,56 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 28 Aug 2018 10:08:34 +0100
-Subject: [RESEND PATCH 6/8] ARM: signal: always use __copy_to_user to save
- iwmmxt context
-In-Reply-To: <1535447316-32187-1-git-send-email-julien.thierry@arm.com>
-References: <1535447316-32187-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1535447316-32187-7-git-send-email-julien.thierry@arm.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Tue, 28 Aug 2018 17:45:34 +0800
+Subject: [PATCH v6 0/3] solve SDHCI DWC MSHC 128MB DMA boundary limitation
+Message-ID: <20180828174534.00fb5e24@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When setting a dummy iwmmxt context, create a local instance and
-use __copy_to_user both cases whether iwmmxt is being used or not.
-This has the benefit of disabling/enabling PAN once for the whole copy
-intead of once per write.
+When using DMA, if the DMA addr spans 128MB boundary, we have to split
+the DMA transfer into two so that each one doesn't exceed the boundary.
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
----
- arch/arm/kernel/signal.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+patch1 adds adma_table_cnt to struct sdhci_host so that driver can
+control the ADMA table count.
+patch2 introduces adma_write_desc() hook to struct sdhci_ops so that
+driver can override it.
+patch3 finally solves the 128MB boundary limitation.
 
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index 76fe75d..464393d 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -77,8 +77,6 @@ static int preserve_iwmmxt_context(struct iwmmxt_sigframe __user *frame)
- 		kframe->magic = IWMMXT_MAGIC;
- 		kframe->size = IWMMXT_STORAGE_SIZE;
- 		iwmmxt_task_copy(current_thread_info(), &kframe->storage);
--
--		err = __copy_to_user(frame, kframe, sizeof(*frame));
- 	} else {
- 		/*
- 		 * For bug-compatibility with older kernels, some space
-@@ -86,10 +84,14 @@ static int preserve_iwmmxt_context(struct iwmmxt_sigframe __user *frame)
- 		 * Set the magic and size appropriately so that properly
- 		 * written userspace can skip it reliably:
- 		 */
--		__put_user_error(DUMMY_MAGIC, &frame->magic, err);
--		__put_user_error(IWMMXT_STORAGE_SIZE, &frame->size, err);
-+		*kframe = (struct iwmmxt_sigframe) {
-+			.magic = DUMMY_MAGIC,
-+			.size  = IWMMXT_STORAGE_SIZE,
-+		};
- 	}
- 
-+	err = __copy_to_user(frame, kframe, sizeof(*kframe));
-+
- 	return err;
- }
- 
+since v5:
+  - use dma_get_required_mask() to calculate the extra adma_table_cnt
+
+since v4:
+  - add Adrian's ack to patch 1 and patch 2
+  - address Adrian's comment -- if the boundary is fine, we have to
+    return after writing dma desc once; adma_table_cnt updating could
+    make use of the fact that it's already initialized by the common
+    sdhci code, we just need to tune.
+
+since v3:
+  - s/adma_table_num/adma_table_cnt
+  - add comment to adma_table_cnt
+  - make the exported function name without the _
+  - let sdhci_adma_write_desc() accept &desc param and set the new desc
+    value
+
+since v2:
+  - make use of "likely" to check (!len || BOUNDARY_OK(addr, len))
+  - explicitly include <linux/sizes.h> for SZ_128M
+
+since v1:
+  - fix BOUNDARY_OK macro if addr+len is aligned to 128MB
+  - use DIV_ROUND_UP to cal extra desc num
+  - fix !len for dwcmshc_adma_write_desc()
+
+
+
+Jisheng Zhang (3):
+  mmc: sdhci: add adma_table_cnt member to struct sdhci_host
+  mmc: sdhci: introduce adma_write_desc() hook to struct sdhci_ops
+  mmc: sdhci-of-dwcmshc: solve 128MB DMA boundary limitation
+
+ drivers/mmc/host/sdhci-of-dwcmshc.c | 39 +++++++++++++++++++++
+ drivers/mmc/host/sdhci.c            | 54 +++++++++++++++++------------
+ drivers/mmc/host/sdhci.h            |  7 ++++
+ 3 files changed, 78 insertions(+), 22 deletions(-)
+
 -- 
-1.9.1
+2.18.0
