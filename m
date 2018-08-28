@@ -1,33 +1,24 @@
-From: mkubecek@suse.cz (Michal Kubecek)
-Date: Tue, 28 Aug 2018 19:56:48 +0200 (CEST)
-Subject: [PATCH net-next 0/2] ethtool: drop get_settings and set_settings ops
-Message-ID: <cover.1535477409.git.mkubecek@suse.cz>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 28 Aug 2018 19:03:35 +0100
+Subject: [PATCH v2] ASoC: Convert to using %pOFn instead of
+ device_node.name
+In-Reply-To: <20180828154433.5693-2-robh@kernel.org>
+References: <20180828154433.5693-1-robh@kernel.org>
+ <20180828154433.5693-2-robh@kernel.org>
+Message-ID: <20180828180335.GG2414@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As Andrew Lunn pointed out in recent discussion, there is only one in tree
-driver left which still defines deprecated callbacks get_settings() and
-set_settings() in ethtool_ops. First patch converts this driver to
-get_link_ksettings() and set_link_ksettings(). Second patch then removes
-the deprecated callbacks from struct ethtool_ops and ethtool code which
-falls back to them.
+On Tue, Aug 28, 2018 at 10:44:28AM -0500, Rob Herring wrote:
+> In preparation to remove the node name pointer from struct device_node,
+> convert printf users to use the %pOFn format specifier.
 
-This doesn't break old versions of ethtool or any other userspace code
-using ETHTOOL_{G,S}SET. We still implement both (old) ETHTOOL_{G,S}SET and
-(new) ETHTOOL_{G,S}LINKSETTINGS ioctl commands but after this series both
-will be implemented only using {g,s}et_link_ksettings(). The only affected
-code would be out of tree NIC drivers which have not been converted yet.
-
-Michal Kubecek (2):
-  8390/etherh: convert to ethtool_{get,set}_link_ksettings
-  ethtool: drop get_settings and set_settings callbacks
-
- Documentation/ABI/testing/sysfs-class-net |   4 +-
- drivers/net/ethernet/8390/etherh.c        |  35 ++---
- include/linux/ethtool.h                   |  33 ++---
- include/uapi/linux/ethtool.h              |  15 +-
- net/core/ethtool.c                        | 158 +++++-----------------
- 5 files changed, 69 insertions(+), 176 deletions(-)
-
--- 
-2.18.0
+Please don't send new patches in reply to existing threads, it makes it
+harder to follow what the current versions of things are.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180828/5f34695f/attachment.sig>
