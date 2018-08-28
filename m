@@ -1,107 +1,86 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 28 Aug 2018 16:51:27 +0100
-Subject: [PATCH v5 17/27] irqchip/gic-v3: Factor group0 detection into
- functions
+Date: Tue, 28 Aug 2018 16:51:30 +0100
+Subject: [PATCH v5 20/27] irqchip/gic-v3: Switch to PMR masking after IRQ
+ acknowledge
 In-Reply-To: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
 References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1535471497-38854-18-git-send-email-julien.thierry@arm.com>
+Message-ID: <1535471497-38854-21-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code to detect whether Linux has access to group0 interrupts can
-prove useful in other parts of the driver.
-
-Provide a separate function to do this.
+After an interrupt has been acknowledged, mask the IRQ priority through
+PMR and clear PSR.I bit, allowing higher priority interrupts to be
+received during interrupt handling.
 
 Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3.c | 55 +++++++++++++++++++++++++++++---------------
- 1 file changed, 36 insertions(+), 19 deletions(-)
+ arch/arm/include/asm/arch_gicv3.h   | 6 ++++++
+ arch/arm64/include/asm/arch_gicv3.h | 6 ++++++
+ drivers/irqchip/irq-gic-v3.c        | 8 +++++++-
+ 3 files changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index d5912f1..fef6688 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -392,6 +392,39 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
- 	} while (irqnr != ICC_IAR1_EL1_SPURIOUS);
+diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
+index 58d5d3e..b39d620 100644
+--- a/arch/arm/include/asm/arch_gicv3.h
++++ b/arch/arm/include/asm/arch_gicv3.h
+@@ -368,5 +368,11 @@ static inline bool gic_prio_masking_enabled(void)
+ 	return false;
  }
 
-+static u32 gic_get_pribits(void)
++static inline void gic_start_pmr_masking(void)
 +{
-+	u32 pribits;
-+
-+	pribits = gic_read_ctlr();
-+	pribits &= ICC_CTLR_EL1_PRI_BITS_MASK;
-+	pribits >>= ICC_CTLR_EL1_PRI_BITS_SHIFT;
-+	pribits++;
-+
-+	return pribits;
++	/* Should not get called */
++	WARN_ON(true);
 +}
 +
-+static bool gic_has_group0(void)
+ #endif /* !__ASSEMBLY__ */
+ #endif /* !__ASM_ARCH_GICV3_H */
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index 19a5b1f..eb55da8 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -161,5 +161,11 @@ static inline bool gic_prio_masking_enabled(void)
+ 	       && cpus_have_const_cap(ARM64_HAS_IRQ_PRIO_MASKING);
+ }
+
++static inline void gic_start_pmr_masking(void)
 +{
-+	u32 val;
-+
-+	/*
-+	 * Let's find out if Group0 is under control of EL3 or not by
-+	 * setting the highest possible, non-zero priority in PMR.
-+	 *
-+	 * If SCR_EL3.FIQ is set, the priority gets shifted down in
-+	 * order for the CPU interface to set bit 7, and keep the
-+	 * actual priority in the non-secure range. In the process, it
-+	 * looses the least significant bit and the actual priority
-+	 * becomes 0x80. Reading it back returns 0, indicating that
-+	 * we're don't have access to Group0.
-+	 */
-+	gic_write_pmr(BIT(8 - gic_get_pribits()));
-+	val = gic_read_pmr();
-+
-+	return val != 0;
++	gic_write_pmr(ICC_PMR_EL1_MASKED);
++	asm volatile ("msr daifclr, #2" : : : "memory");
 +}
 +
- static void __init gic_dist_init(void)
- {
- 	unsigned int i;
-@@ -533,7 +566,7 @@ static void gic_cpu_sys_reg_init(void)
- 	u64 mpidr = cpu_logical_map(cpu);
- 	u64 need_rss = MPIDR_RS(mpidr);
- 	bool group0;
--	u32 val, pribits;
-+	u32 pribits;
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ASM_ARCH_GICV3_H */
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index a467fcf..56d1fb9 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -350,12 +350,18 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
 
- 	/*
- 	 * Need to check that the SRE bit has actually been set. If
-@@ -545,25 +578,9 @@ static void gic_cpu_sys_reg_init(void)
- 	if (!gic_enable_sre())
- 		pr_err("GIC: unable to set SRE (disabled at EL2), panic ahead\n");
+ 	irqnr = gic_read_iar();
 
--	pribits = gic_read_ctlr();
--	pribits &= ICC_CTLR_EL1_PRI_BITS_MASK;
--	pribits >>= ICC_CTLR_EL1_PRI_BITS_SHIFT;
--	pribits++;
-+	pribits = gic_get_pribits();
++	if (gic_prio_masking_enabled()) {
++		isb();
++		/* Masking IRQs earlier would prevent to ack the current IRQ */
++		gic_start_pmr_masking();
++	}
++
+ 	if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
+ 		int err;
 
--	/*
--	 * Let's find out if Group0 is under control of EL3 or not by
--	 * setting the highest possible, non-zero priority in PMR.
--	 *
--	 * If SCR_EL3.FIQ is set, the priority gets shifted down in
--	 * order for the CPU interface to set bit 7, and keep the
--	 * actual priority in the non-secure range. In the process, it
--	 * looses the least significant bit and the actual priority
--	 * becomes 0x80. Reading it back returns 0, indicating that
--	 * we're don't have access to Group0.
--	 */
--	write_gicreg(BIT(8 - pribits), ICC_PMR_EL1);
--	val = read_gicreg(ICC_PMR_EL1);
--	group0 = val != 0;
-+	group0 = gic_has_group0();
+ 		if (static_branch_likely(&supports_deactivate_key))
+ 			gic_write_eoir(irqnr);
+-		else
++		else if (!gic_prio_masking_enabled())
+ 			isb();
 
- 	/* Set priority mask register */
- 	write_gicreg(DEFAULT_PMR_VALUE, ICC_PMR_EL1);
+ 		err = handle_domain_irq(gic_data.domain, irqnr, regs);
 --
 1.9.1
