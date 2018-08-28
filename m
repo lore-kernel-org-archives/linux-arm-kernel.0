@@ -1,77 +1,61 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Tue, 28 Aug 2018 17:46:35 +0800
-Subject: [PATCH v6 1/3] mmc: sdhci: add adma_table_cnt member to struct
- sdhci_host
-In-Reply-To: <20180828174534.00fb5e24@xhacker.debian>
-References: <20180828174534.00fb5e24@xhacker.debian>
-Message-ID: <20180828174635.4bba02ee@xhacker.debian>
+From: peda@axentia.se (Peter Rosin)
+Date: Tue, 28 Aug 2018 11:48:44 +0200
+Subject: [PATCH 5/5] ARM: dts: at91: nattis: describe the lvds panel
+In-Reply-To: <20180828094844.10018-1-peda@axentia.se>
+References: <20180828094844.10018-1-peda@axentia.se>
+Message-ID: <20180828094844.10018-6-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds adma_table_cnt member to struct sdhci_host to give more
-flexibility to drivers to control the ADMA table count.
+Make the DT usable with the panel-lvds driver.
 
-Default value of adma_table_cnt is set to (SDHCI_MAX_SEGS * 2 + 1).
-
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+Signed-off-by: Peter Rosin <peda@axentia.se>
 ---
- drivers/mmc/host/sdhci.c | 17 +++++++++--------
- drivers/mmc/host/sdhci.h |  3 +++
- 2 files changed, 12 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/at91-nattis-2-natte-2.dts | 22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 1b3fbd9bd5c5..52ccf4644384 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -3322,6 +3322,13 @@ struct sdhci_host *sdhci_alloc_host(struct device *dev,
+diff --git a/arch/arm/boot/dts/at91-nattis-2-natte-2.dts b/arch/arm/boot/dts/at91-nattis-2-natte-2.dts
+index 2eb0f947ab86..97e972aefac2 100644
+--- a/arch/arm/boot/dts/at91-nattis-2-natte-2.dts
++++ b/arch/arm/boot/dts/at91-nattis-2-natte-2.dts
+@@ -105,10 +105,29 @@
+ 	};
  
- 	host->sdma_boundary = SDHCI_DEFAULT_BOUNDARY_ARG;
- 
-+	/*
-+	 * The DMA table descriptor count is calculated as the maximum
-+	 * number of segments times 2, to allow for an alignment
-+	 * descriptor for each segment, plus 1 for a nop end descriptor.
-+	 */
-+	host->adma_table_cnt = SDHCI_MAX_SEGS * 2 + 1;
+ 	panel: panel {
+-		compatible = "sharp,lq150x1lg11";
++		compatible = "sharp,lq150x1lg11", "panel-lvds";
 +
- 	return host;
- }
+ 		backlight = <&panel_bl>;
+ 		power-supply = <&panel_reg>;
  
-@@ -3567,18 +3574,12 @@ int sdhci_setup_host(struct sdhci_host *host)
- 		dma_addr_t dma;
- 		void *buf;
- 
--		/*
--		 * The DMA descriptor table size is calculated as the maximum
--		 * number of segments times 2, to allow for an alignment
--		 * descriptor for each segment, plus 1 for a nop end descriptor,
--		 * all multipled by the descriptor size.
--		 */
- 		if (host->flags & SDHCI_USE_64_BIT_DMA) {
--			host->adma_table_sz = (SDHCI_MAX_SEGS * 2 + 1) *
-+			host->adma_table_sz = host->adma_table_cnt *
- 					      SDHCI_ADMA2_64_DESC_SZ;
- 			host->desc_sz = SDHCI_ADMA2_64_DESC_SZ;
- 		} else {
--			host->adma_table_sz = (SDHCI_MAX_SEGS * 2 + 1) *
-+			host->adma_table_sz = host->adma_table_cnt *
- 					      SDHCI_ADMA2_32_DESC_SZ;
- 			host->desc_sz = SDHCI_ADMA2_32_DESC_SZ;
- 		}
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index f0bd36ce3817..25bddd21de31 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -563,6 +563,9 @@ struct sdhci_host {
- 	/* Host SDMA buffer boundary. */
- 	u32			sdma_boundary;
- 
-+	/* Host ADMA table count */
-+	u32			adma_table_cnt;
++		width-mm = <304>;
++		height-mm = <228>;
 +
- 	u64			data_timeout;
- 
- 	unsigned long private[0] ____cacheline_aligned;
++		data-mapping = "jeida-18";
++
++		panel-timing {
++			// 1024x768 @ 60Hz (typical)
++			clock-frequency = <50000000 65000000 80000000>;
++			hactive = <1024>;
++			vactive = <768>;
++			hfront-porch = <48 88 88>;
++			hback-porch = <96 168 168>;
++			hsync-len = <32 64 64>;
++			vsync-len = <3 13 74>;
++			vfront-porch = <3 13 74>;
++			vback-porch = <3 12 74>;
++		};
++
+ 		port {
+ 			panel_input: endpoint {
+ 				remote-endpoint = <&lvds_encoder_output>;
+@@ -205,6 +224,7 @@
+ 		port at 0 {
+ 			hlcdc_output: endpoint {
+ 				remote-endpoint = <&lvds_encoder_input>;
++				bus-width = <16>;
+ 			};
+ 		};
+ 	};
 -- 
-2.18.0
+2.11.0
