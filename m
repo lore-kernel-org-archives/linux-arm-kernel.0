@@ -1,83 +1,97 @@
-From: radheys@xilinx.com (Radhey Shyam Pandey)
-Date: Tue, 28 Aug 2018 14:03:30 +0000
-Subject: [PATCH 3/3] dmaengine: xilinx_dma: Fix 64-bit simple CDMA transfer
-In-Reply-To: <20180821155553.GI2388@vkoul-mobl>
-References: <1532688639-32230-1-git-send-email-radhey.shyam.pandey@xilinx.com>
- <1532688639-32230-4-git-send-email-radhey.shyam.pandey@xilinx.com>
- <20180821155553.GI2388@vkoul-mobl>
-Message-ID: <MWHPR0201MB362803E975383398B361330FC70A0@MWHPR0201MB3628.namprd02.prod.outlook.com>
+From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
+Date: Tue, 28 Aug 2018 08:50:37 -0500
+Subject: [PATCHv8 1/9] dt-bindings,
+ firmware: add Intel Stratix10 service layer binding
+In-Reply-To: <1535464245-11638-1-git-send-email-richard.gong@linux.intel.com>
+References: <1535464245-11638-1-git-send-email-richard.gong@linux.intel.com>
+Message-ID: <1535464245-11638-2-git-send-email-richard.gong@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Vinod <vkoul@kernel.org>
-> Sent: Tuesday, August 21, 2018 9:26 PM
-> To: Radhey Shyam Pandey <radheys@xilinx.com>
-> Cc: dan.j.williams at intel.com; Michal Simek <michals@xilinx.com>; Appana
-> Durga Kedareswara Rao <appanad@xilinx.com>; lars at metafoo.de;
-> dmaengine at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org
-> Subject: Re: [PATCH 3/3] dmaengine: xilinx_dma: Fix 64-bit simple CDMA
-> transfer
-> 
-> On 27-07-18, 16:20, Radhey Shyam Pandey wrote:
-> > In AXI CDMA simple mode also pass MSB bits of source and destination
-> > address to xilinx_write function. This fixes simple CDMA operation
-> > mode using 64-bit addressing.
-> >
-> > Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> > Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> > ---
-> >  drivers/dma/xilinx/xilinx_dma.c |    6 ++++--
-> >  1 files changed, 4 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> > index a37871e..2e15d86 100644
-> > --- a/drivers/dma/xilinx/xilinx_dma.c
-> > +++ b/drivers/dma/xilinx/xilinx_dma.c
-> > @@ -1245,8 +1245,10 @@ static void xilinx_cdma_start_transfer(struct
-> xilinx_dma_chan *chan)
-> >
-> >  		hw = &segment->hw;
-> >
-> > -		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR, hw-
-> >src_addr);
-> > -		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR, hw-
-> >dest_addr);
-> > +		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR,
-> (dma_addr_t)
-> > +			     ((u64)hw->src_addr_msb << 32 | hw->src_addr));
-> 
-> so this is:
->         (dma_addr_t)((u64)hw->src_addr_msb << 32 | hw->src_addr)
-> 
-> what is src_addr data type? I think its u32. It would be better to
-> update xilinx_write() to take u64 and not dma_addr_t.
+From: Richard Gong <richard.gong@intel.com>
 
-Yes, src_addr_msb and src_addr BD fields are u32. To explain: There is no
-prob in xilinx_write it takes dma_addr_t as an arg which is 32/64 bit 
-depending on _DMA_ADDR_T_64BIT. In 64bit CDMA transfer, there was a bug
-i.e in the call to xilinx_write src_addr_msb 32 bits were not passed. To fix
-that combine MSB and LSB 32 bits before passing it to xilinx_write.
+Add a device tree binding for the Intel Stratix10 service layer driver
 
-Thanks,
-Radhey
-> 
-> 
-> > +		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR,
-> (dma_addr_t)
-> > +			     ((u64)hw->dest_addr_msb << 32 | hw-
-> >dest_addr));
-> >
-> >  		/* Start the transfer */
-> >  		dma_ctrl_write(chan, XILINX_DMA_REG_BTT,
-> > --
-> > 1.7.1
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> --
-> ~Vinod
+Signed-off-by: Richard Gong <richard.gong@intel.com>
+Signed-off-by: Alan Tull <atull@kernel.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Moritz Fischer <mdf@kernel.org>
+---
+v2: change to put service layer driver node under the firmware node
+    change compatible to "intel, stratix10-svc"
+v3: no change
+v4: add Rob's Reviewed-by
+v5: no change
+v6: add Moritz's Acked-by
+v7: no change
+v8: no change
+---
+ .../bindings/firmware/intel,stratix10-svc.txt      | 57 ++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+
+diff --git a/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+new file mode 100644
+index 0000000..1fa6606
+--- /dev/null
++++ b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+@@ -0,0 +1,57 @@
++Intel Service Layer Driver for Stratix10 SoC
++============================================
++Intel Stratix10 SoC is composed of a 64 bit quad-core ARM Cortex A53 hard
++processor system (HPS) and Secure Device Manager (SDM). When the FPGA is
++configured from HPS, there needs to be a way for HPS to notify SDM the
++location and size of the configuration data. Then SDM will get the
++configuration data from that location and perform the FPGA configuration.
++
++To meet the whole system security needs and support virtual machine requesting
++communication with SDM, only the secure world of software (EL3, Exception
++Layer 3) can interface with SDM. All software entities running on other
++exception layers must channel through the EL3 software whenever it needs
++service from SDM.
++
++Intel Stratix10 service layer driver, running at privileged exception level
++(EL1, Exception Layer 1), interfaces with the service providers and provides
++the services for FPGA configuration, QSPI, Crypto and warm reset. Service layer
++driver also manages secure monitor call (SMC) to communicate with secure monitor
++code running in EL3.
++
++Required properties:
++-------------------
++The svc node has the following mandatory properties, must be located under
++the firmware node.
++
++- compatible: "intel,stratix10-svc"
++- method: smc or hvc
++        smc - Secure Monitor Call
++        hvc - Hypervisor Call
++- memory-region:
++	phandle to the reserved memory node. See
++	Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
++	for details
++
++Example:
++-------
++
++	reserved-memory {
++                #address-cells = <2>;
++                #size-cells = <2>;
++                ranges;
++
++                service_reserved: svcbuffer at 0 {
++                        compatible = "shared-dma-pool";
++                        reg = <0x0 0x0 0x0 0x1000000>;
++                        alignment = <0x1000>;
++                        no-map;
++                };
++        };
++
++	firmware {
++		svc {
++			compatible = "intel,stratix10-svc";
++			method = "smc";
++			memory-region = <&service_reserved>;
++		};
++	};
+-- 
+2.7.4
