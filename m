@@ -1,324 +1,120 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Aug 2018 20:52:44 -0500
-Subject: [PATCH] soc: Convert to using %pOFn instead of device_node.name
+Date: Mon, 27 Aug 2018 20:52:52 -0500
+Subject: [PATCH] ASoC: Convert to using %pOFn instead of device_node.name
 In-Reply-To: <20180828015252.28511-1-robh@kernel.org>
 References: <20180828015252.28511-1-robh@kernel.org>
-Message-ID: <20180828015252.28511-43-robh@kernel.org>
+Message-ID: <20180828015252.28511-51-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 In preparation to remove the node name pointer from struct device_node,
 convert printf users to use the %pOFn format specifier.
 
-Cc: Qiang Zhao <qiang.zhao@nxp.com>
-Cc: Li Yang <leoyang.li@nxp.com>
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: David Brown <david.brown@linaro.org>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Jonathan Hunter <jonathanh@nvidia.com>
-Cc: Santosh Shilimkar <ssantosh@kernel.org>
+Cc: Timur Tabi <timur@kernel.org>
+Cc: Nicolin Chen <nicoleotsuka@gmail.com>
+Cc: Xiubo Li <Xiubo.Lee@gmail.com>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Liam Girdwood <lgirdwood@gmail.com>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Jaroslav Kysela <perex@perex.cz>
+Cc: Takashi Iwai <tiwai@suse.com>
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Olivier Moysan <olivier.moysan@st.com>
+Cc: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Cc: Alexandre Torgue <alexandre.torgue@st.com>
+Cc: alsa-devel at alsa-project.org
 Cc: linuxppc-dev at lists.ozlabs.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-soc at vger.kernel.org
+Cc: linux-amlogic at lists.infradead.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- drivers/soc/dove/pmu.c            |  8 +++---
- drivers/soc/fsl/qe/qe_tdm.c       |  4 +--
- drivers/soc/qcom/apr.c            |  2 +-
- drivers/soc/rockchip/pm_domains.c | 44 +++++++++++++++----------------
- drivers/soc/tegra/pmc.c           | 12 ++++-----
- drivers/soc/ti/knav_dma.c         |  8 +++---
- drivers/soc/ti/knav_qmss_queue.c  |  8 +++---
- 7 files changed, 43 insertions(+), 43 deletions(-)
+ sound/soc/fsl/fsl_esai.c      | 2 +-
+ sound/soc/fsl/fsl_utils.c     | 4 ++--
+ sound/soc/meson/axg-card.c    | 2 +-
+ sound/soc/stm/stm32_sai.c     | 2 +-
+ sound/soc/stm/stm32_sai_sub.c | 8 ++++----
+ 5 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/soc/dove/pmu.c b/drivers/soc/dove/pmu.c
-index 5abb08ffb74d..ffc5311c0ed8 100644
---- a/drivers/soc/dove/pmu.c
-+++ b/drivers/soc/dove/pmu.c
-@@ -383,7 +383,7 @@ int __init dove_init_pmu(void)
+diff --git a/sound/soc/fsl/fsl_esai.c b/sound/soc/fsl/fsl_esai.c
+index c1d1d06783e5..57b484768a58 100644
+--- a/sound/soc/fsl/fsl_esai.c
++++ b/sound/soc/fsl/fsl_esai.c
+@@ -807,7 +807,7 @@ static int fsl_esai_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  
- 	domains_node = of_get_child_by_name(np_pmu, "domains");
- 	if (!domains_node) {
--		pr_err("%s: failed to find domains sub-node\n", np_pmu->name);
-+		pr_err("%pOFn: failed to find domains sub-node\n", np_pmu);
- 		return 0;
+ 	esai_priv->pdev = pdev;
+-	strncpy(esai_priv->name, np->name, sizeof(esai_priv->name) - 1);
++	snprintf(esai_priv->name, sizeof(esai_priv->name), "%pOFn", np);
+ 
+ 	/* Get the addresses and IRQ */
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+diff --git a/sound/soc/fsl/fsl_utils.c b/sound/soc/fsl/fsl_utils.c
+index 7f0fa4b52223..9981668ab590 100644
+--- a/sound/soc/fsl/fsl_utils.c
++++ b/sound/soc/fsl/fsl_utils.c
+@@ -57,8 +57,8 @@ int fsl_asoc_get_dma_channel(struct device_node *ssi_np,
+ 		of_node_put(dma_channel_np);
+ 		return ret;
  	}
+-	snprintf((char *)dai->platform_name, DAI_NAME_SIZE, "%llx.%s",
+-		 (unsigned long long) res.start, dma_channel_np->name);
++	snprintf((char *)dai->platform_name, DAI_NAME_SIZE, "%llx.%pOFn",
++		 (unsigned long long) res.start, dma_channel_np);
  
-@@ -396,7 +396,7 @@ int __init dove_init_pmu(void)
- 	pmu->pmc_base = of_iomap(pmu->of_node, 0);
- 	pmu->pmu_base = of_iomap(pmu->of_node, 1);
- 	if (!pmu->pmc_base || !pmu->pmu_base) {
--		pr_err("%s: failed to map PMU\n", np_pmu->name);
-+		pr_err("%pOFn: failed to map PMU\n", np_pmu);
- 		iounmap(pmu->pmu_base);
- 		iounmap(pmu->pmc_base);
- 		kfree(pmu);
-@@ -414,7 +414,7 @@ int __init dove_init_pmu(void)
- 			break;
+ 	iprop = of_get_property(dma_channel_np, "cell-index", NULL);
+ 	if (!iprop) {
+diff --git a/sound/soc/meson/axg-card.c b/sound/soc/meson/axg-card.c
+index 2914ba0d965b..b76a5f4f1785 100644
+--- a/sound/soc/meson/axg-card.c
++++ b/sound/soc/meson/axg-card.c
+@@ -478,7 +478,7 @@ static int axg_card_set_be_link(struct snd_soc_card *card,
  
- 		domain->pmu = pmu;
--		domain->base.name = kstrdup(np->name, GFP_KERNEL);
-+		domain->base.name = kasprintf(GFP_KERNEL, "%pOFn", np);
- 		if (!domain->base.name) {
- 			kfree(domain);
- 			break;
-@@ -444,7 +444,7 @@ int __init dove_init_pmu(void)
- 	/* Loss of the interrupt controller is not a fatal error. */
- 	parent_irq = irq_of_parse_and_map(pmu->of_node, 0);
- 	if (!parent_irq) {
--		pr_err("%s: no interrupt specified\n", np_pmu->name);
-+		pr_err("%pOFn: no interrupt specified\n", np_pmu);
- 	} else {
- 		ret = dove_init_pmu_irq(pmu, parent_irq);
- 		if (ret)
-diff --git a/drivers/soc/fsl/qe/qe_tdm.c b/drivers/soc/fsl/qe/qe_tdm.c
-index f744c214f680..f78c34647ca2 100644
---- a/drivers/soc/fsl/qe/qe_tdm.c
-+++ b/drivers/soc/fsl/qe/qe_tdm.c
-@@ -131,7 +131,7 @@ int ucc_of_parse_tdm(struct device_node *np, struct ucc_tdm *utdm,
+ 	ret = axg_card_set_link_name(card, link, "be");
+ 	if (ret)
+-		dev_err(card->dev, "error setting %s link name\n", np->name);
++		dev_err(card->dev, "error setting %pOFn link name\n", np);
  
- 	pdev = of_find_device_by_node(np2);
- 	if (!pdev) {
--		pr_err("%s: failed to lookup pdev\n", np2->name);
-+		pr_err("%pOFn: failed to lookup pdev\n", np2);
- 		of_node_put(np2);
- 		return -EINVAL;
- 	}
-@@ -153,7 +153,7 @@ int ucc_of_parse_tdm(struct device_node *np, struct ucc_tdm *utdm,
- 	pdev = of_find_device_by_node(np2);
- 	if (!pdev) {
- 		ret = -EINVAL;
--		pr_err("%s: failed to lookup pdev\n", np2->name);
-+		pr_err("%pOFn: failed to lookup pdev\n", np2);
- 		of_node_put(np2);
- 		goto err_miss_siram_property;
- 	}
-diff --git a/drivers/soc/qcom/apr.c b/drivers/soc/qcom/apr.c
-index 57af8a537332..4bda793ba6ae 100644
---- a/drivers/soc/qcom/apr.c
-+++ b/drivers/soc/qcom/apr.c
-@@ -219,7 +219,7 @@ static int apr_add_device(struct device *dev, struct device_node *np,
- 	adev->domain_id = id->domain_id;
- 	adev->version = id->svc_version;
- 	if (np)
--		strncpy(adev->name, np->name, APR_NAME_SIZE);
-+		snprintf(adev->name, APR_NAME_SIZE, "%pOFn", np);
- 	else
- 		strncpy(adev->name, id->name, APR_NAME_SIZE);
- 
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index 6dff8682155f..6f86a726bb45 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -392,21 +392,21 @@ static int rockchip_pm_add_one_domain(struct rockchip_pmu *pmu,
- 	error = of_property_read_u32(node, "reg", &id);
- 	if (error) {
- 		dev_err(pmu->dev,
--			"%s: failed to retrieve domain id (reg): %d\n",
--			node->name, error);
-+			"%pOFn: failed to retrieve domain id (reg): %d\n",
-+			node, error);
- 		return -EINVAL;
- 	}
- 
- 	if (id >= pmu->info->num_domains) {
--		dev_err(pmu->dev, "%s: invalid domain id %d\n",
--			node->name, id);
-+		dev_err(pmu->dev, "%pOFn: invalid domain id %d\n",
-+			node, id);
- 		return -EINVAL;
- 	}
- 
- 	pd_info = &pmu->info->domain_info[id];
- 	if (!pd_info) {
--		dev_err(pmu->dev, "%s: undefined domain id %d\n",
--			node->name, id);
-+		dev_err(pmu->dev, "%pOFn: undefined domain id %d\n",
-+			node, id);
- 		return -EINVAL;
- 	}
- 
-@@ -424,8 +424,8 @@ static int rockchip_pm_add_one_domain(struct rockchip_pmu *pmu,
- 		if (!pd->clks)
- 			return -ENOMEM;
- 	} else {
--		dev_dbg(pmu->dev, "%s: doesn't have clocks: %d\n",
--			node->name, pd->num_clks);
-+		dev_dbg(pmu->dev, "%pOFn: doesn't have clocks: %d\n",
-+			node, pd->num_clks);
- 		pd->num_clks = 0;
- 	}
- 
-@@ -434,8 +434,8 @@ static int rockchip_pm_add_one_domain(struct rockchip_pmu *pmu,
- 		if (IS_ERR(pd->clks[i].clk)) {
- 			error = PTR_ERR(pd->clks[i].clk);
- 			dev_err(pmu->dev,
--				"%s: failed to get clk at index %d: %d\n",
--				node->name, i, error);
-+				"%pOFn: failed to get clk at index %d: %d\n",
-+				node, i, error);
- 			return error;
- 		}
- 	}
-@@ -486,8 +486,8 @@ static int rockchip_pm_add_one_domain(struct rockchip_pmu *pmu,
- 	error = rockchip_pd_power(pd, true);
- 	if (error) {
- 		dev_err(pmu->dev,
--			"failed to power on domain '%s': %d\n",
--			node->name, error);
-+			"failed to power on domain '%pOFn': %d\n",
-+			node, error);
- 		goto err_unprepare_clocks;
- 	}
- 
-@@ -575,24 +575,24 @@ static int rockchip_pm_add_subdomain(struct rockchip_pmu *pmu,
- 		error = of_property_read_u32(parent, "reg", &idx);
- 		if (error) {
- 			dev_err(pmu->dev,
--				"%s: failed to retrieve domain id (reg): %d\n",
--				parent->name, error);
-+				"%pOFn: failed to retrieve domain id (reg): %d\n",
-+				parent, error);
- 			goto err_out;
- 		}
- 		parent_domain = pmu->genpd_data.domains[idx];
- 
- 		error = rockchip_pm_add_one_domain(pmu, np);
- 		if (error) {
--			dev_err(pmu->dev, "failed to handle node %s: %d\n",
--				np->name, error);
-+			dev_err(pmu->dev, "failed to handle node %pOFn: %d\n",
-+				np, error);
- 			goto err_out;
- 		}
- 
- 		error = of_property_read_u32(np, "reg", &idx);
- 		if (error) {
- 			dev_err(pmu->dev,
--				"%s: failed to retrieve domain id (reg): %d\n",
--				np->name, error);
-+				"%pOFn: failed to retrieve domain id (reg): %d\n",
-+				np, error);
- 			goto err_out;
- 		}
- 		child_domain = pmu->genpd_data.domains[idx];
-@@ -683,16 +683,16 @@ static int rockchip_pm_domain_probe(struct platform_device *pdev)
- 	for_each_available_child_of_node(np, node) {
- 		error = rockchip_pm_add_one_domain(pmu, node);
- 		if (error) {
--			dev_err(dev, "failed to handle node %s: %d\n",
--				node->name, error);
-+			dev_err(dev, "failed to handle node %pOFn: %d\n",
-+				node, error);
- 			of_node_put(node);
- 			goto err_out;
- 		}
- 
- 		error = rockchip_pm_add_subdomain(pmu, node);
- 		if (error < 0) {
--			dev_err(dev, "failed to handle subdomain node %s: %d\n",
--				node->name, error);
-+			dev_err(dev, "failed to handle subdomain node %pOFn: %d\n",
-+				node, error);
- 			of_node_put(node);
- 			goto err_out;
- 		}
-diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
-index 2d6f3fcf3211..acbe63e925d5 100644
---- a/drivers/soc/tegra/pmc.c
-+++ b/drivers/soc/tegra/pmc.c
-@@ -796,7 +796,7 @@ static void tegra_powergate_add(struct tegra_pmc *pmc, struct device_node *np)
- 
- 	id = tegra_powergate_lookup(pmc, np->name);
- 	if (id < 0) {
--		pr_err("powergate lookup failed for %s: %d\n", np->name, id);
-+		pr_err("powergate lookup failed for %pOFn: %d\n", np, id);
- 		goto free_mem;
- 	}
- 
-@@ -816,13 +816,13 @@ static void tegra_powergate_add(struct tegra_pmc *pmc, struct device_node *np)
- 
- 	err = tegra_powergate_of_get_clks(pg, np);
- 	if (err < 0) {
--		pr_err("failed to get clocks for %s: %d\n", np->name, err);
-+		pr_err("failed to get clocks for %pOFn: %d\n", np, err);
- 		goto set_available;
- 	}
- 
- 	err = tegra_powergate_of_get_resets(pg, np, off);
- 	if (err < 0) {
--		pr_err("failed to get resets for %s: %d\n", np->name, err);
-+		pr_err("failed to get resets for %pOFn: %d\n", np, err);
- 		goto remove_clks;
- 	}
- 
-@@ -851,15 +851,15 @@ static void tegra_powergate_add(struct tegra_pmc *pmc, struct device_node *np)
- 
- 	err = pm_genpd_init(&pg->genpd, NULL, off);
- 	if (err < 0) {
--		pr_err("failed to initialise PM domain %s: %d\n", np->name,
-+		pr_err("failed to initialise PM domain %pOFn: %d\n", np,
- 		       err);
- 		goto remove_resets;
- 	}
- 
- 	err = of_genpd_add_provider_simple(np, &pg->genpd);
- 	if (err < 0) {
--		pr_err("failed to add PM domain provider for %s: %d\n",
--		       np->name, err);
-+		pr_err("failed to add PM domain provider for %pOFn: %d\n",
-+		       np, err);
- 		goto remove_genpd;
- 	}
- 
-diff --git a/drivers/soc/ti/knav_dma.c b/drivers/soc/ti/knav_dma.c
-index 224d7ddeeb76..bbd4e5bc8707 100644
---- a/drivers/soc/ti/knav_dma.c
-+++ b/drivers/soc/ti/knav_dma.c
-@@ -544,15 +544,15 @@ static void __iomem *pktdma_get_regs(struct knav_dma_device *dma,
- 
- 	ret = of_address_to_resource(node, index, &res);
- 	if (ret) {
--		dev_err(dev, "Can't translate of node(%s) address for index(%d)\n",
--			node->name, index);
-+		dev_err(dev, "Can't translate of node(%pOFn) address for index(%d)\n",
-+			node, index);
- 		return ERR_PTR(ret);
- 	}
- 
- 	regs = devm_ioremap_resource(kdev->dev, &res);
- 	if (IS_ERR(regs))
--		dev_err(dev, "Failed to map register base for index(%d) node(%s)\n",
--			index, node->name);
-+		dev_err(dev, "Failed to map register base for index(%d) node(%pOFn)\n",
-+			index, node);
- 	if (_size)
- 		*_size = resource_size(&res);
- 
-diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
-index 6755f2af5619..b5d5673c255c 100644
---- a/drivers/soc/ti/knav_qmss_queue.c
-+++ b/drivers/soc/ti/knav_qmss_queue.c
-@@ -1382,15 +1382,15 @@ static void __iomem *knav_queue_map_reg(struct knav_device *kdev,
- 
- 	ret = of_address_to_resource(node, index, &res);
- 	if (ret) {
--		dev_err(kdev->dev, "Can't translate of node(%s) address for index(%d)\n",
--			node->name, index);
-+		dev_err(kdev->dev, "Can't translate of node(%pOFn) address for index(%d)\n",
-+			node, index);
- 		return ERR_PTR(ret);
- 	}
- 
- 	regs = devm_ioremap_resource(kdev->dev, &res);
- 	if (IS_ERR(regs))
--		dev_err(kdev->dev, "Failed to map register base for index(%d) node(%s)\n",
--			index, node->name);
-+		dev_err(kdev->dev, "Failed to map register base for index(%d) node(%pOFn)\n",
-+			index, node);
- 	return regs;
+ 	return ret;
  }
+diff --git a/sound/soc/stm/stm32_sai.c b/sound/soc/stm/stm32_sai.c
+index f22654253c43..d597eba61992 100644
+--- a/sound/soc/stm/stm32_sai.c
++++ b/sound/soc/stm/stm32_sai.c
+@@ -104,7 +104,7 @@ static int stm32_sai_set_sync(struct stm32_sai_data *sai_client,
  
+ 	if (!pdev) {
+ 		dev_err(&sai_client->pdev->dev,
+-			"Device not found for node %s\n", np_provider->name);
++			"Device not found for node %pOFn\n", np_provider);
+ 		return -ENODEV;
+ 	}
+ 
+diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
+index 06fba9650ac4..cad8c7888292 100644
+--- a/sound/soc/stm/stm32_sai_sub.c
++++ b/sound/soc/stm/stm32_sai_sub.c
+@@ -1124,16 +1124,16 @@ static int stm32_sai_sub_parse_of(struct platform_device *pdev,
+ 	sai->sync = SAI_SYNC_NONE;
+ 	if (args.np) {
+ 		if (args.np == np) {
+-			dev_err(&pdev->dev, "%s sync own reference\n",
+-				np->name);
++			dev_err(&pdev->dev, "%pOFn sync own reference\n",
++				np);
+ 			of_node_put(args.np);
+ 			return -EINVAL;
+ 		}
+ 
+ 		sai->np_sync_provider  = of_get_parent(args.np);
+ 		if (!sai->np_sync_provider) {
+-			dev_err(&pdev->dev, "%s parent node not found\n",
+-				np->name);
++			dev_err(&pdev->dev, "%pOFn parent node not found\n",
++				np);
+ 			of_node_put(args.np);
+ 			return -ENODEV;
+ 		}
 -- 
 2.17.1
