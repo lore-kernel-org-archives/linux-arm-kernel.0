@@ -1,44 +1,42 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 28 Aug 2018 07:08:22 +0800
-Subject: [PATCH] clk: sunxi-ng: sun50i: h6: Add 2x fixed post-divider to
- MMC module clocks
-In-Reply-To: <153540143478.129321.8502068006504989469@swboyd.mtv.corp.google.com>
-References: <20180820134013.16527-1-icenowy@aosc.io>
- <153540143478.129321.8502068006504989469@swboyd.mtv.corp.google.com>
-Message-ID: <D5B9F1CA-6108-41EB-9D6C-56883C79F361@aosc.io>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 27 Aug 2018 19:46:50 -0500
+Subject: [PATCH] arm64: defconfig: Enable TI's AM6 SoC platform
+Message-ID: <20180828004650.2184-1-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Enable K3 SoC platform for TI's AM6 SoC.
 
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+Ref: https://www.spinics.net/lists/arm-kernel/msg667805.html
 
-? 2018?8?28? GMT+08:00 ??4:23:54, Stephen Boyd <sboyd@kernel.org> ??:
->Quoting Icenowy Zheng (2018-08-20 06:40:13)
->> On the H6, the MMC module clocks are fixed in the new timing mode,
->> i.e. they do not have a bit to select the mode. These clocks have
->> a 2x divider somewhere between the clock and the MMC module.
->> 
->> To be consistent with other SoCs supporting the new timing mode,
->> we model the 2x divider as a fixed post-divider on the MMC module
->> clocks.
->> 
->> This patch adds the post-dividers to the MMC clocks, following the
->> approach on A64.
->> 
->> Fixes: 542353ea ("clk: sunxi-ng: add support for the Allwinner H6
->CCU")
->
->This commit doesn't exist. Did you mean:
->
->524353ea48
->
->instead?
+Unfortunately, Kconfig changes did'nt hit v4.19-rc1 window.
+So, as promised, patch based off v4.19-rc1 tag.
 
-Yes, it is.
+ arch/arm64/configs/defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Thanks!
-
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index f67e8d5e93ad..db8d364f8476 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -38,6 +38,7 @@ CONFIG_ARCH_BCM_IPROC=y
+ CONFIG_ARCH_BERLIN=y
+ CONFIG_ARCH_BRCMSTB=y
+ CONFIG_ARCH_EXYNOS=y
++CONFIG_ARCH_K3=y
+ CONFIG_ARCH_LAYERSCAPE=y
+ CONFIG_ARCH_LG1K=y
+ CONFIG_ARCH_HISI=y
+@@ -605,6 +606,8 @@ CONFIG_ARCH_TEGRA_132_SOC=y
+ CONFIG_ARCH_TEGRA_210_SOC=y
+ CONFIG_ARCH_TEGRA_186_SOC=y
+ CONFIG_ARCH_TEGRA_194_SOC=y
++CONFIG_ARCH_K3_AM6_SOC=y
++CONFIG_SOC_TI=y
+ CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND=y
+ CONFIG_EXTCON_USB_GPIO=y
+ CONFIG_EXTCON_USBC_CROS_EC=y
+-- 
+2.15.1
