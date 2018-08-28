@@ -1,37 +1,34 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 28 Aug 2018 15:32:06 +0300
-Subject: [PATCH 1/7] kbuild: add support for building %.dtbo targets
+Date: Tue, 28 Aug 2018 15:32:07 +0300
+Subject: [PATCH 2/7] ARM: dts: add support for building DT overlays
 In-Reply-To: <1535459532-17211-1-git-send-email-t-kristo@ti.com>
 References: <1535459532-17211-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1535459532-17211-2-git-send-email-t-kristo@ti.com>
+Message-ID: <1535459532-17211-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for building DT overlay targets, which can be applied
-either runtime or statically on top of base devicetree blobs. The
-only supported runtime application of overlays right now is during
-bootloader execution; if the bootloader in question supports this.
+Add simple support for building DT overlays. This just compiles any
+given .dtso file under the base arch/arm/boot/dts directory into
+a .dtbo.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- scripts/Makefile.lib | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-index 61e5966..527aab9 100644
---- a/scripts/Makefile.lib
-+++ b/scripts/Makefile.lib
-@@ -292,6 +292,9 @@ cmd_dtc = mkdir -p $(dir ${dtc-tmp}) ; \
- $(obj)/%.dtb: $(src)/%.dts $(DTC) FORCE
- 	$(call if_changed_dep,dtc)
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index d1516f8..ab555a0 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -339,7 +339,7 @@ $(BOOT_TARGETS): vmlinux
+ $(INSTALL_TARGETS):
+ 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
  
-+$(obj)/%.dtbo: $(src)/%.dtso $(DTC) FORCE
-+	$(call if_changed_dep,dtc)
-+
- dtc-tmp = $(subst $(comma),_,$(dot-target).dts.tmp)
+-%.dtb: | scripts
++%.dtb %.dtbo: | scripts
+ 	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
  
- # Bzip2
+ PHONY += dtbs dtbs_install
 -- 
 1.9.1
 
