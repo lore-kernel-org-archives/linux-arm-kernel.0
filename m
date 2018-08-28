@@ -1,50 +1,69 @@
-From: liang.yang@amlogic.com (Liang Yang)
-Date: Tue, 28 Aug 2018 21:21:48 +0800
-Subject: [RFC PATCH v2 2/2] mtd: rawnand: meson: add support for Amlogic
- NAND flash controller
-In-Reply-To: <20180824144810.31c929a5@bbrezillon>
-References: <20180719094612.5833-1-yixun.lan@amlogic.com>
- <20180719094612.5833-3-yixun.lan@amlogic.com>
- <20180801235045.5b4d8211@bbrezillon>
- <42877a0d-9830-0626-3f64-e49a326eaa3c@amlogic.com>
- <20180817155608.5929b37a@bbrezillon>
- <96e538a5-1232-11f2-8b9e-5ddb09dcc2de@amlogic.com>
- <20180824144810.31c929a5@bbrezillon>
-Message-ID: <fdea2d54-7a68-64ec-8bb4-4a94677a3293@amlogic.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Tue, 28 Aug 2018 18:53:43 +0530
+Subject: [PATCH 04/15] soc: octeontx2: Add mailbox support infra
+In-Reply-To: <CAK8P3a1CvX1V8h20s_=XUUYfR-zYNwETg5p6dCtpVUqZ89K-tg@mail.gmail.com>
+References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
+ <1535453838-12154-5-git-send-email-sunil.kovvuri@gmail.com>
+ <CAK8P3a2fgAVB0+uns9f5MH+2OyZbwvReo9j-=u3=30QoK=2Ksw@mail.gmail.com>
+ <CA+sq2CeyQ8r7bj3vK=cfriif=HhUu36ZUPWqxXm1e0DktHG+Fg@mail.gmail.com>
+ <CAK8P3a1CvX1V8h20s_=XUUYfR-zYNwETg5p6dCtpVUqZ89K-tg@mail.gmail.com>
+Message-ID: <CA+sq2Cdn6ut3kdTWoOgCayO2evQrD9TjBaUpVUR3_rWZFxYeig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Tue, Aug 28, 2018 at 6:22 PM Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On Tue, Aug 28, 2018 at 2:48 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+> >
+> > On Tue, Aug 28, 2018 at 5:33 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> > >
+> > > On Tue, Aug 28, 2018 at 12:57 PM <sunil.kovvuri@gmail.com> wrote:
+> > > >
+> > > > From: Aleksey Makarov <amakarov@marvell.com>
+> > > >
+> > > > This patch adds mailbox support infrastructure APIs.
+> > > > Each RVU device has a dedicated 64KB mailbox region
+> > > > shared with it's peer for communication. RVU AF has
+> > > > a separate mailbox region shared with each of RVU PFs
+> > > > and a RVU PF has a separate region shared with each of
+> > > > it's VF.
+> > > >
+> > > > These set of APIs are used by this driver (RVU AF) and
+> > > > other RVU PF/VF drivers eg netdev, crypto e.t.c.
+> > > >
+> > > > Signed-off-by: Aleksey Makarov <amakarov@marvell.com>
+> > > > Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
+> > > > Signed-off-by: Lukasz Bartosik <lbartosik@marvell.com>
+> > >
+> > > Why does this driver not use the drivers/mailbox/ infrastructure?
+> > >
+> > This is a common administrative software driver which will be handling requests
+> > from kernel drivers and as well as drivers in userspace applications.
+> > We had to keep mailbox communication infrastructure same across all usages.
+>
+> Can you explain more about the usage of userspace applications
+> and what interface you plan to use into the kernel?
 
-On 8/24/2018 8:48 PM, Boris Brezillon wrote:
-> On Wed, 22 Aug 2018 22:08:42 +0800
-> Liang Yang <liang.yang@amlogic.com> wrote:
-> 
->>> You have to wait tWB, that's for sure.
->>>    
->> we have a maximum 32 commands fifo. when command is written into
->> NFC_REG_CMD, it doesn't mean that command is executing right now, maybe
->> it is buffering on the queue.Assume one ERASE operation, when 2nd
->> command(0xd0) is written into NFC_REG_CMD and then come into
->> NAND_OP_WAITRDY_INSTR, if I read the RB status by register, it may be
->> wrong because 0xd0 may not being executed. it is unusual unless
->> buffering two many command.
-> 
-> You should flush the queue and wait for it to empty at the end of
-> ->exec_op().
-> 
->> so it seems that i still need to use nand_soft_waitrdy or wait cmd is
->> executed somewhere.
-> 
-> Don't you have a WAIT_FOR_RB instruction? What is NFC_CMD_RB for? Also,
-> NFC_CMD_IDLE seems to allow you to add an arbitrary delay, and that's
-> probably what you should use for tWB.
-> 
-> em, I can wait for RB by reading the status from register now. but when 
-calling nand_soft_waitrdy, i really met a problem. One *jiffies* is 
-about 4ms. When programming, it pass 1ms to 
-instr->ctx.waitrdy.timeout_ms and nand_soft_waitrdy will be only one 
-*jiffies* to reach timeout. And then calling nand_soft_waitrdy maybe at 
-the tail of 4ms interval, it may only wait 100us and next jiffies 
-arrive. Is it correct?
-> 
+Any PCI device here irrespective in what domain (kernel or userspace)
+they are in
+use common mailbox communication. Which is
+# Write a mailbox msg (format is agreed between all parties) into
+shared (between AF and other PF/VFs)
+   memory region and trigger a interrupt to admin function.
+# Admin function processes the msg and puts reply in the same memory
+region and trigger
+   IRQ to the requesting device. If the device has a driver instance
+in kernel then it uses
+   IRQ and userspace applications does polling on the IRQ status bit.
+
+>
+> Do you things like AF_XDP and virtual machines, or something else?
+
+I meant drivers in DPDK which may or may not use AF_XDP.
+And yes if a PCI device is attached to a virtual machine then that
+also uses the same mailbox communication.
+
+Sunil.
+
+>
+>         Arnd
