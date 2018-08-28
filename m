@@ -1,179 +1,60 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 28 Aug 2018 16:51:13 +0100
-Subject: [PATCH v5 03/27] arm64: alternative: Apply alternatives early in boot
- process
+Date: Tue, 28 Aug 2018 16:51:12 +0100
+Subject: [PATCH v5 02/27] arm64: cpufeature: Use alternatives for VHE
+ cpu_enable
 In-Reply-To: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
 References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1535471497-38854-4-git-send-email-julien.thierry@arm.com>
+Message-ID: <1535471497-38854-3-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Thompson <daniel.thompson@linaro.org>
+The cpu_enable callback for VHE feature requires all alternatives to have
+been applied. This prevents applying VHE alternative separately from the
+rest.
 
-Currently alternatives are applied very late in the boot process (and
-a long time after we enable scheduling). Some alternative sequences,
-such as those that alter the way CPU context is stored, must be applied
-much earlier in the boot sequence.
+Use an alternative depending on VHE feature to know whether VHE
+alternatives have already been applied.
 
-Introduce apply_boot_alternatives() to allow some alternatives to be
-applied immediately after we detect the CPU features of the boot CPU.
-
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-[julien.thierry at arm.com: rename to fit new cpufeature framework better,
-			 apply BOOT_SCOPE feature early in boot]
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
 Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Marc Zyngier <Marc.Zyngier@arm.com>
+Cc: Christoffer Dall <Christoffer.Dall@arm.com>
 ---
- arch/arm64/include/asm/alternative.h |  3 +--
- arch/arm64/include/asm/cpufeature.h  |  2 ++
- arch/arm64/kernel/alternative.c      | 28 +++++++++++++++++++++++++---
- arch/arm64/kernel/cpufeature.c       |  5 +++++
- arch/arm64/kernel/smp.c              |  7 +++++++
- 5 files changed, 40 insertions(+), 5 deletions(-)
+ arch/arm64/kernel/cpufeature.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-index 4b650ec..17f4554 100644
---- a/arch/arm64/include/asm/alternative.h
-+++ b/arch/arm64/include/asm/alternative.h
-@@ -14,8 +14,6 @@
- #include <linux/stddef.h>
- #include <linux/stringify.h>
- 
--extern int alternatives_applied;
--
- struct alt_instr {
- 	s32 orig_offset;	/* offset to original instruction */
- 	s32 alt_offset;		/* offset to replacement instruction */
-@@ -27,6 +25,7 @@ struct alt_instr {
- typedef void (*alternative_cb_t)(struct alt_instr *alt,
- 				 __le32 *origptr, __le32 *updptr, int nr_inst);
- 
-+void __init apply_boot_alternatives(void);
- void __init apply_alternatives_all(void);
- 
- #ifdef CONFIG_MODULES
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 1717ba1..e6c030a 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -357,6 +357,8 @@ static inline int cpucap_default_scope(const struct arm64_cpu_capabilities *cap)
- extern struct static_key_false cpu_hwcap_keys[ARM64_NCAPS];
- extern struct static_key_false arm64_const_caps_ready;
- 
-+extern unsigned long boot_capabilities;
-+
- bool this_cpu_has_cap(unsigned int cap);
- 
- static inline bool cpu_have_feature(unsigned int num)
-diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-index b5d6039..70c2604 100644
---- a/arch/arm64/kernel/alternative.c
-+++ b/arch/arm64/kernel/alternative.c
-@@ -145,7 +145,8 @@ static void clean_dcache_range_nopatch(u64 start, u64 end)
- 	} while (cur += d_size, cur < end);
- }
- 
--static void __apply_alternatives(void *alt_region, bool is_module)
-+static void __apply_alternatives(void *alt_region,  bool is_module,
-+				 unsigned long feature_mask)
- {
- 	struct alt_instr *alt;
- 	struct alt_region *region = alt_region;
-@@ -155,6 +156,9 @@ static void __apply_alternatives(void *alt_region, bool is_module)
- 	for (alt = region->begin; alt < region->end; alt++) {
- 		int nr_inst;
- 
-+		if ((BIT(alt->cpufeature) & feature_mask) == 0)
-+			continue;
-+
- 		/* Use ARM64_CB_PATCH as an unconditional patch */
- 		if (alt->cpufeature < ARM64_CB_PATCH &&
- 		    !cpus_have_cap(alt->cpufeature))
-@@ -213,7 +217,7 @@ static int __apply_alternatives_multi_stop(void *unused)
- 		isb();
- 	} else {
- 		BUG_ON(alternatives_applied);
--		__apply_alternatives(&region, false);
-+		__apply_alternatives(&region, false, ~boot_capabilities);
- 		/* Barriers provided by the cache flushing */
- 		WRITE_ONCE(alternatives_applied, 1);
- 	}
-@@ -227,6 +231,24 @@ void __init apply_alternatives_all(void)
- 	stop_machine(__apply_alternatives_multi_stop, NULL, cpu_online_mask);
- }
- 
-+/*
-+ * This is called very early in the boot process (directly after we run
-+ * a feature detect on the boot CPU). No need to worry about other CPUs
-+ * here.
-+ */
-+void __init apply_boot_alternatives(void)
-+{
-+	struct alt_region region = {
-+		.begin	= (struct alt_instr *)__alt_instructions,
-+		.end	= (struct alt_instr *)__alt_instructions_end,
-+	};
-+
-+	/* If called on non-boot cpu things could go wrong */
-+	WARN_ON(smp_processor_id() != 0);
-+
-+	__apply_alternatives(&region, false, boot_capabilities);
-+}
-+
- #ifdef CONFIG_MODULES
- void apply_alternatives_module(void *start, size_t length)
- {
-@@ -235,6 +257,6 @@ void apply_alternatives_module(void *start, size_t length)
- 		.end	= start + length,
- 	};
- 
--	__apply_alternatives(&region, true);
-+	__apply_alternatives(&region, true, -1);
- }
- #endif
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 3bc1c8b..0d1e41e 100644
+index 1e433ac..3bc1c8b 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -52,6 +52,8 @@
- DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- EXPORT_SYMBOL(cpu_hwcaps);
+@@ -1014,6 +1014,8 @@ static bool runs_at_el2(const struct arm64_cpu_capabilities *entry, int __unused
  
-+unsigned long boot_capabilities;
+ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+ {
++	u64 tmp = 0;
 +
- /*
-  * Flag to indicate if we have computed the system wide
-  * capabilities based on the boot time active CPUs. This
-@@ -1375,6 +1377,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 		if (!cpus_have_cap(caps->capability) && caps->desc)
- 			pr_info("%s %s\n", info, caps->desc);
- 		cpus_set_cap(caps->capability);
-+
-+		if (caps->type & SCOPE_BOOT_CPU)
-+			__set_bit(caps->capability, &boot_capabilities);
- 	}
- }
- 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 25fcd22..22c9a0a 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -414,6 +414,13 @@ void __init smp_prepare_boot_cpu(void)
+ 	/*
+ 	 * Copy register values that aren't redirected by hardware.
+ 	 *
+@@ -1022,8 +1024,15 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+ 	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
+ 	 * do anything here.
  	 */
- 	jump_label_init();
- 	cpuinfo_store_boot_cpu();
-+
-+	/*
-+	 * We now know enough about the boot CPU to apply the
-+	 * alternatives that cannot wait until interrupt handling
-+	 * and/or scheduling is enabled.
-+	 */
-+	apply_boot_alternatives();
+-	if (!alternatives_applied)
+-		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
++	asm volatile(ALTERNATIVE(
++		"mrs	%0, tpidr_el1\n"
++		"msr	tpidr_el2, %0",
++		"nop\n"
++		"nop",
++		ARM64_HAS_VIRT_HOST_EXTN)
++		: "+r" (tmp)
++		:
++		: "memory");
  }
+ #endif
  
- static u64 __init of_get_cpu_mpidr(struct device_node *dn)
 -- 
 1.9.1
