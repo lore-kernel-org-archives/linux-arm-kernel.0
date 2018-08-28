@@ -1,59 +1,73 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 28 Aug 2018 16:51:15 +0100
-Subject: [PATCH v5 05/27] arm64: Use daifflag_restore after bp_hardening
+Date: Tue, 28 Aug 2018 16:51:18 +0100
+Subject: [PATCH v5 08/27] irqchip/gic: Unify GIC priority definitions
 In-Reply-To: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
 References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1535471497-38854-6-git-send-email-julien.thierry@arm.com>
+Message-ID: <1535471497-38854-9-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For EL0 entries requiring bp_hardening, daif status is kept at
-DAIF_PROCCTX_NOIRQ until after hardening has been done. Then interrupts
-are enabled through local_irq_enable().
+LPIs use the same priority value as other GIC interrupts.
 
-Before using local_irq_* functions, daifflags should be properly restored
-to a state where IRQs are enabled.
+Make the GIC default priority definition visible to ITS implementation
+and use this same definition for LPI priorities.
 
-Enable IRQs by restoring DAIF_PROCCTX state after bp hardening.
-
+Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: James Morse <james.morse@arm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/mm/fault.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c       | 2 +-
+ include/linux/irqchip/arm-gic-common.h | 6 ++++++
+ include/linux/irqchip/arm-gic.h        | 5 -----
+ 3 files changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 50b30ff..dfa2c43 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -37,6 +37,7 @@
- #include <asm/cmpxchg.h>
- #include <asm/cpufeature.h>
- #include <asm/exception.h>
-+#include <asm/daifflags.h>
- #include <asm/debug-monitors.h>
- #include <asm/esr.h>
- #include <asm/sysreg.h>
-@@ -771,7 +772,7 @@ asmlinkage void __exception do_el0_ia_bp_hardening(unsigned long addr,
- 	if (addr > TASK_SIZE)
- 		arm64_apply_bp_hardening();
- 
--	local_irq_enable();
-+	local_daif_restore(DAIF_PROCCTX);
- 	do_mem_abort(addr, esr, regs);
- }
- 
-@@ -785,7 +786,7 @@ asmlinkage void __exception do_sp_pc_abort(unsigned long addr,
- 	if (user_mode(regs)) {
- 		if (instruction_pointer(regs) > TASK_SIZE)
- 			arm64_apply_bp_hardening();
--		local_irq_enable();
-+		local_daif_restore(DAIF_PROCCTX);
- 	}
- 
- 	clear_siginfo(&info);
--- 
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 316a575..f5391f2 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -64,7 +64,7 @@
+ #define LPI_PROPBASE_SZ		ALIGN(BIT(LPI_NRBITS), SZ_64K)
+ #define LPI_PENDBASE_SZ		ALIGN(BIT(LPI_NRBITS) / 8, SZ_64K)
+
+-#define LPI_PROP_DEFAULT_PRIO	0xa0
++#define LPI_PROP_DEFAULT_PRIO	GICD_INT_DEF_PRI
+
+ /*
+  * Collection structure - just an ID, and a redistributor address to
+diff --git a/include/linux/irqchip/arm-gic-common.h b/include/linux/irqchip/arm-gic-common.h
+index 0a83b43..9a1a479 100644
+--- a/include/linux/irqchip/arm-gic-common.h
++++ b/include/linux/irqchip/arm-gic-common.h
+@@ -13,6 +13,12 @@
+ #include <linux/types.h>
+ #include <linux/ioport.h>
+
++#define GICD_INT_DEF_PRI		0xa0
++#define GICD_INT_DEF_PRI_X4		((GICD_INT_DEF_PRI << 24) |\
++					(GICD_INT_DEF_PRI << 16) |\
++					(GICD_INT_DEF_PRI << 8) |\
++					GICD_INT_DEF_PRI)
++
+ enum gic_type {
+ 	GIC_V2,
+ 	GIC_V3,
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 6c4aaf0..6261790 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -65,11 +65,6 @@
+ #define GICD_INT_EN_CLR_X32		0xffffffff
+ #define GICD_INT_EN_SET_SGI		0x0000ffff
+ #define GICD_INT_EN_CLR_PPI		0xffff0000
+-#define GICD_INT_DEF_PRI		0xa0
+-#define GICD_INT_DEF_PRI_X4		((GICD_INT_DEF_PRI << 24) |\
+-					(GICD_INT_DEF_PRI << 16) |\
+-					(GICD_INT_DEF_PRI << 8) |\
+-					GICD_INT_DEF_PRI)
+
+ #define GICD_IIDR_IMPLEMENTER_SHIFT	0
+ #define GICD_IIDR_IMPLEMENTER_MASK	(0xfff << GICD_IIDR_IMPLEMENTER_SHIFT)
+--
 1.9.1
