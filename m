@@ -1,127 +1,53 @@
-From: hjc@rock-chips.com (Sandy Huang)
-Date: Tue, 28 Aug 2018 20:20:13 +0800
-Subject: [PATCH v5 2/2] drm/rockchip: Add support for Rockchip Soc RGB
- output interface
-In-Reply-To: <2164089.bDJbLuhFGU@phil>
-References: <1535443954-38806-1-git-send-email-hjc@rock-chips.com>
- <1535443954-38806-3-git-send-email-hjc@rock-chips.com>
- <2164089.bDJbLuhFGU@phil>
-Message-ID: <c203e409-d2e4-e534-7855-27c3503a78b1@rock-chips.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 28 Aug 2018 14:20:44 +0200
+Subject: [PATCH 4/5] arm64: dts: renesas: r8a774a1: Add Ethernet AVB node
+In-Reply-To: <TY1PR01MB17707A80E98DE4602177C8EBC0360@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+References: <1535014731-64472-1-git-send-email-biju.das@bp.renesas.com>
+ <1535014731-64472-5-git-send-email-biju.das@bp.renesas.com>
+ <20180824090320.ib7zt4ae6kacjzlu@verge.net.au>
+ <TY1PR01MB17707A80E98DE4602177C8EBC0360@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+Message-ID: <20180828122043.h7vup3e5gamfzejz@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi hieko,
+On Fri, Aug 24, 2018 at 09:06:49AM +0000, Fabrizio Castro wrote:
+> Hello Simon,
+> 
+> Thank you for your feedback!
+> 
+> > Subject: Re: [PATCH 4/5] arm64: dts: renesas: r8a774a1: Add Ethernet AVB node
+> >
+> > On Thu, Aug 23, 2018 at 09:58:50AM +0100, Biju Das wrote:
+> > > From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > >
+> > > This patch adds the SoC specific part of the Ethernet AVB
+> > > device tree node.
+> > >
+> > > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+> > > ---
+> > >  arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 45 +++++++++++++++++++++++++++++++
+> > >  1 file changed, 45 insertions(+)
+> > >
+> > > diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> > > index 15d7785..b771211 100644
+> > > --- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> > > +++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> > > @@ -350,6 +350,51 @@
+> > >  dma-channels = <16>;
+> > >  };
+> > >
+> > > +avb: ethernet at e6800000 {
+> > > +compatible = "renesas,etheravb-r8a774a1",
+> > > +     "renesas,etheravb-rcar-gen3";
+> > > +reg = <0 0xe6800000 0 0x800>;
+> >
+> > Should a region, <0 0xe6a00000 0 0x10000>, also be added
+> > here to describe the suggested space for descriptors?
+> 
+> There is no STBE (Stream Buffer for EthernetAVB-IF) on the r8a774a1, and that's why this node doesn't come with such a region.
 
-? 2018/8/28 16:31, Heiko Stuebner ??:
-> Hi Sandy,
-> 
-> Am Dienstag, 28. August 2018, 10:12:34 CEST schrieb Sandy Huang:
->> Some Rockchip CRTCs, like rv1108 and px30, can directly output parallel
->> and serial RGB data to panel or conversion chip, so we add this driver
->> to probe encoder and connector.
->>
->> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
->> Reviewed-by: Sean Paul <seanpaul@chromium.org>
->> Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
->> Link: https://patchwork.freedesktop.org/patch/msgid/1509522851-128181-1-git-send-email-hjc at rock-chips.com
-> 
-> This does not really address, Rob's concern about not being an actual
-> hardware block related to the devicetree node you are using.
-> 
-> I see your reply to my mail, but I guess you didn't see the alternative
-> approach I described a bit below in that mail?
-> 
-> Actual (unfinished) code included below. (2 patches)
-> 
-> Heiko
-> 
-> 
-yes,i didn't see the behind described:(
-As you said devicetree describes hardware blocks,
-I think you implement driver for rgb output interface is more 
-reasonable,  i will adjust this driver refer to your implementation, 
-thanks:)
+Thanks for the follow-up. In that case I'm fine with this patch but
+I'd like to wait a little longer to allow review by others.
 
-
-> 
-> ---- 8< -----
-> From: Heiko Stuebner <heiko@sntech.de>
-> Date: Sat, 25 Aug 2018 19:05:21 +0200
-> Subject: [PATCH 1/2] drm/tockchip: add function to check if endpoint is a
->   subdriver
-> 
-> To be able to have both internal subdrivers and external bridge
-> drivers as output endpoints of vops, add a function to be able
-> to distinguish these.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->   drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 27 +++++++++++++++++++++
->   drivers/gpu/drm/rockchip/rockchip_drm_drv.h |  1 +
->   2 files changed, 28 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> index 1d9c4a9201c8..d18f7f85aa23 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> @@ -24,6 +24,7 @@
->   #include <linux/pm_runtime.h>
->   #include <linux/module.h>
->   #include <linux/of_graph.h>
-> +#include <linux/of_platform.h>
->   #include <linux/component.h>
->   #include <linux/console.h>
->   #include <linux/iommu.h>
-> @@ -267,6 +268,32 @@ static const struct dev_pm_ops rockchip_drm_pm_ops = {
->   static struct platform_driver *rockchip_sub_drivers[MAX_ROCKCHIP_SUB_DRIVERS];
->   static int num_rockchip_sub_drivers;
->   
-> +/*
-> + * check if a vop output-endpoint is a subdriver or bridge.
-> + */
-> +bool rockchip_drm_endpoint_is_subdriver(struct device_node *ep)
-> +{
-> +	struct device_node *node = of_graph_get_remote_port_parent(ep);
-> +	struct platform_device *pdev;
-> +	int i;
-> +
-> +	if (!node)
-> +		return false;
-> +
-> +	pdev = of_find_device_by_node(node);
-> +	if (!pdev)
-> +		return false;
-> +
-> +	for (i = 0; i < num_rockchip_sub_drivers; i++) {
-> +		struct device_driver *drv = pdev->dev.driver;
-> +
-> +		if (rockchip_sub_drivers[i] == to_platform_driver(drv))
-> +			return true;
-> +	}
-> +
-> +	return false;
-> +}
-> +
->   static int compare_dev(struct device *dev, void *data)
->   {
->   	return dev == (struct device *)data;
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> index d67ad0a3cf36..305b4858c522 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> @@ -64,6 +64,7 @@ void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
->   				    struct device *dev);
->   int rockchip_drm_wait_vact_end(struct drm_crtc *crtc, unsigned int mstimeout);
->   
-> +bool rockchip_drm_endpoint_is_subdriver(struct device_node *ep);
->   extern struct platform_driver cdn_dp_driver;
->   extern struct platform_driver dw_hdmi_rockchip_pltfm_driver;
->   extern struct platform_driver dw_mipi_dsi_driver;
-> 
-> 
-> 
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
-> 
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
