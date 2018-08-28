@@ -1,60 +1,37 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 27 Aug 2018 19:59:23 -0500
-Subject: [PATCH V3 1/2] Documentation: dt: keystone: ti-sci: Add optional
- host-id parameter
-In-Reply-To: <20180828005924.13092-1-nm@ti.com>
-References: <20180828005924.13092-1-nm@ti.com>
-Message-ID: <20180828005924.13092-2-nm@ti.com>
+Date: Mon, 27 Aug 2018 20:03:02 -0500
+Subject: [PATCH] serial: 8250_omap: Make 8250_omap driver driver depend on
+ ARCH_K3
+Message-ID: <20180828010302.2751-1-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Texas Instrument's System Control Interface (TISCI) permits
-the ability for OSs running in virtual machines to be able to
-independently communicate with the firmware without the need going
-through an hypervisor.
+From: Lokesh Vutla <lokeshvutla@ti.com>
 
-The "host-id" in effect is the hardware representation of the
-host (example: VMs locked to a core) as identified to the System
-Controller. Hypervisors can either fill in appropriate host-ids in dt
-used for each VM instance OR may use prebuilt blobs where the host-ids
-are pre-populated, as appropriate for the OS running in the VMs.
+Allow 8250 omap serial driver to be used for K3 platforms.
 
-This is introduced as an optional parameter to maintain consistency
-with legacy device tree blobs.
-
-Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
 
-Changes Since V2:
- * Rebase to v4.19-rc1
+Now that we have the device tree support merged integrated AND we have ARCH_K3,
+Lets enable the 820 OMAP Driver to build for ARCH_K3 and make it operational.
 
-V2: https://patchwork.kernel.org/patch/10527307/
-V1: https://patchwork.kernel.org/patch/10475311/
-RFC: https://patchwork.kernel.org/patch/10447753/
+ drivers/tty/serial/8250/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- Documentation/devicetree/bindings/arm/keystone/ti,sci.txt | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-index 31f5f9a104cc..b56a02c10ae6 100644
---- a/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-+++ b/Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-@@ -45,11 +45,15 @@ Optional Properties:
- 	debug_messages - Map the Debug message region
- - reg:  register space corresponding to the debug_messages
- - ti,system-reboot-controller: If system reboot can be triggered by SoC reboot
-+- ti,host-id: Integer value corresponding to the host ID assigned by Firmware
-+	for identification of host processing entities such as virtual
-+	machines
+diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
+index f005eaf8bc57..15c2c5463835 100644
+--- a/drivers/tty/serial/8250/Kconfig
++++ b/drivers/tty/serial/8250/Kconfig
+@@ -375,7 +375,7 @@ config SERIAL_8250_RT288X
  
- Example (K2G):
- -------------
- 	pmmc: pmmc {
- 		compatible = "ti,k2g-sci";
-+		ti,host-id = <2>;
- 		mbox-names = "rx", "tx";
- 		mboxes= <&msgmgr &msgmgr_proxy_pmmc_rx>,
- 			<&msgmgr &msgmgr_proxy_pmmc_tx>;
+ config SERIAL_8250_OMAP
+ 	tristate "Support for OMAP internal UART (8250 based driver)"
+-	depends on SERIAL_8250 && ARCH_OMAP2PLUS
++	depends on SERIAL_8250 && (ARCH_OMAP2PLUS || ARCH_K3)
+ 	help
+ 	  If you have a machine based on an Texas Instruments OMAP CPU you
+ 	  can enable its onboard serial ports by enabling this option.
 -- 
 2.15.1
