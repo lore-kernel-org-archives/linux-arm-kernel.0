@@ -1,37 +1,44 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 28 Aug 2018 16:05:11 +0100
-Subject: [PATCH 0/2] Drop node-local allocation during host controller
- initialisation
-Message-ID: <20180828150513.32458-1-punit.agrawal@arm.com>
+Date: Tue, 28 Aug 2018 16:05:13 +0100
+Subject: [PATCH 2/2] x86/PCI: Remove node-local allocation when initialising
+ host controller
+In-Reply-To: <20180828150513.32458-1-punit.agrawal@arm.com>
+References: <20180828150513.32458-1-punit.agrawal@arm.com>
+Message-ID: <20180828150513.32458-3-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Memory for host controller data structures is allocated local to the
+node to which the controller is associated with. This has been the
+behaviour since 965cd0e4a5e5 ("x86, PCI, ACPI: Use kmalloc_node() to
+optimize for performance") where the node local allocation was added
+without additional context.
 
-As discussed before[0], here are a couple of patches to drop
-node-local allocations during host contoller initialisation. This set
-covers both arm64 and x86.
+Drop the node local allocation as there is no benefit from doing so -
+the usage of these structures is independent from where the controller
+is located.
 
-I'm posting early to give the patches time on the list as well in next
-in case there are issues we've missed.
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: x86 at kernel.org
+---
+ arch/x86/pci/acpi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The patches are based on v4.19-rc1 and has been boot tested on arm64
-and compile tested on x86.
-
-Thanks,
-Punit
-
-[0] https://www.spinics.net/lists/arm-kernel/msg669746.html
-
-Punit Agrawal (2):
-  arm64: PCI: Remove node-local allocations when initialising host
-    controller
-  x86/PCI: Remove node-local allocation when initialising host
-    controller
-
- arch/arm64/kernel/pci.c | 5 ++---
- arch/x86/pci/acpi.c     | 2 +-
- 2 files changed, 3 insertions(+), 4 deletions(-)
-
+diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+index 5559dcaddd5e..948656069cdd 100644
+--- a/arch/x86/pci/acpi.c
++++ b/arch/x86/pci/acpi.c
+@@ -356,7 +356,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	} else {
+ 		struct pci_root_info *info;
+ 
+-		info = kzalloc_node(sizeof(*info), GFP_KERNEL, node);
++		info = kzalloc(sizeof(*info), GFP_KERNEL);
+ 		if (!info)
+ 			dev_err(&root->device->dev,
+ 				"pci_bus %04x:%02x: ignored (out of memory)\n",
 -- 
 2.18.0
