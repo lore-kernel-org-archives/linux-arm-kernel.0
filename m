@@ -1,113 +1,91 @@
 From: dkos@cadence.com (Damian Kos)
-Date: Tue, 28 Aug 2018 11:24:46 +0100
-Subject: [PATCH v3 3/5] drm/dp: make dp_link_status and dp_get_lane_status
- usable from outside of the core
+Date: Tue, 28 Aug 2018 11:24:45 +0100
+Subject: [PATCH v3 2/5] drm/dp: fix link probing for devices supporting DP 1.4+
 In-Reply-To: <1535451894-2518-1-git-send-email-dkos@cadence.com>
 References: <1535451894-2518-1-git-send-email-dkos@cadence.com>
-Message-ID: <1535451894-2518-4-git-send-email-dkos@cadence.com>
+Message-ID: <1535451894-2518-3-git-send-email-dkos@cadence.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Quentin Schulz <quentin.schulz@bootlin.com>
 
-dp_link_status and dp_get_lane_status are pretty generic and can be used for
-other means, so let's make it "public".
+DP 1.4 introduced a DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT bit in
+DP_TRAINING_AUX_RD_INTERVAL register. If set, DPCD registers from DP_DPCD_REV
+to DP_ADAPTER_CAP should be retrieved starting from DP_DPCD_REV_EXTENDED.
+All registers are copied except DP_DPCD_REV, DP_MAX_LINK_RATE and
+DP_DOWNSTREAMPORT_PRESENT which represent the "true capabilities" of DPRX
+device.
 
-This adds drm_dp_link_status and drm_dp_get_lane_status to the header file and
-add the appropriate EXPORT_SYMBOL for it so that it can be used by other
-drivers, be they compiled built-in or as modules.
+Original DP_DPCD_REV, DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT might
+falsely return lower capabilities to "avoid interoperability issues with some
+of the existing DP Source devices that malfunction when they discover the
+higher capabilities within those three registers.".
+
+Before DP 1.4, DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT bit was reserved and read 0
+so it's safe to check against it even if DP revision is <1.4
 
 Signed-off-by: Damian Kos <dkos@cadence.com>
 ---
- drivers/gpu/drm/drm_dp_helper.c | 20 +++++++++++---------
- include/drm/drm_dp_helper.h     |  3 +++
- 2 files changed, 14 insertions(+), 9 deletions(-)
+ drivers/gpu/drm/drm_dp_helper.c | 30 +++++++++++++++++++++++++++++-
+ include/drm/drm_dp_helper.h     |  2 +-
+ 2 files changed, 30 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpu/drm/drm_dp_helper.c b/drivers/gpu/drm/drm_dp_helper.c
-index 4b5bf6ee7fa7..ee9ec2ccf878 100644
+index 8c6b9fd89f8a..4b5bf6ee7fa7 100644
 --- a/drivers/gpu/drm/drm_dp_helper.c
 +++ b/drivers/gpu/drm/drm_dp_helper.c
-@@ -43,19 +43,21 @@
-  */
- 
- /* Helpers for DP link training */
--static u8 dp_link_status(const u8 link_status[DP_LINK_STATUS_SIZE], int r)
-+u8 drm_dp_link_status(const u8 link_status[DP_LINK_STATUS_SIZE], int r)
+@@ -370,10 +370,38 @@ int drm_dp_link_probe(struct drm_dp_aux *aux, struct drm_dp_link *link)
  {
- 	return link_status[r - DP_LANE0_1_STATUS];
- }
-+EXPORT_SYMBOL(drm_dp_link_status);
+ 	u8 values[3];
+ 	int err;
++	unsigned int addr;
  
--static u8 dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE],
-+u8 drm_dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE],
- 			     int lane)
- {
- 	int i = DP_LANE0_1_STATUS + (lane >> 1);
- 	int s = (lane & 1) * 4;
--	u8 l = dp_link_status(link_status, i);
-+	u8 l = drm_dp_link_status(link_status, i);
- 	return (l >> s) & 0xf;
- }
-+EXPORT_SYMBOL(drm_dp_get_lane_status);
+ 	memset(link, 0, sizeof(*link));
  
- bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
- 			  int lane_count)
-@@ -64,12 +66,12 @@ bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
- 	u8 lane_status;
- 	int lane;
+-	err = drm_dp_dpcd_read(aux, DP_DPCD_REV, values, sizeof(values));
++	/*
++	 * DP 1.4 introduced a DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT bit in
++	 * DP_TRAINING_AUX_RD_INTERVAL register. If set, DPCD registers from
++	 * DP_DPCD_REV to DP_ADAPTER_CAP should be retrieved starting from
++	 * DP_DPCD_REV_EXTENDED. All registers are copied except DP_DPCD_REV,
++	 * DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT which represent the
++	 * "true capabilities" of DPRX device.
++	 *
++	 * Original DP_DPCD_REV, DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT
++	 * might falsely return lower capabilities to "avoid interoperability
++	 * issues with some of the existing DP Source devices that malfunction
++	 * when they discover the higher capabilities within those three
++	 * registers.".
++	 *
++	 * Before DP 1.4, DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT bit was reserved
++	 * and read 0 so it's safe to check against it even if DP revision is
++	 * <1.4
++	 */
++	err = drm_dp_dpcd_readb(aux, DP_TRAINING_AUX_RD_INTERVAL, values);
++	if (err < 0)
++		return err;
++
++	if (values[0] & DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT)
++		addr = DP_DP13_DPCD_REV;
++	else
++		addr = DP_DPCD_REV;
++
++	err = drm_dp_dpcd_read(aux, addr, values, sizeof(values));
+ 	if (err < 0)
+ 		return err;
  
--	lane_align = dp_link_status(link_status,
--				    DP_LANE_ALIGN_STATUS_UPDATED);
-+	lane_align = drm_dp_link_status(link_status,
-+					DP_LANE_ALIGN_STATUS_UPDATED);
- 	if ((lane_align & DP_INTERLANE_ALIGN_DONE) == 0)
- 		return false;
- 	for (lane = 0; lane < lane_count; lane++) {
--		lane_status = dp_get_lane_status(link_status, lane);
-+		lane_status = drm_dp_get_lane_status(link_status, lane);
- 		if ((lane_status & DP_CHANNEL_EQ_BITS) != DP_CHANNEL_EQ_BITS)
- 			return false;
- 	}
-@@ -84,7 +86,7 @@ bool drm_dp_clock_recovery_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
- 	u8 lane_status;
- 
- 	for (lane = 0; lane < lane_count; lane++) {
--		lane_status = dp_get_lane_status(link_status, lane);
-+		lane_status = drm_dp_get_lane_status(link_status, lane);
- 		if ((lane_status & DP_LANE_CR_DONE) == 0)
- 			return false;
- 	}
-@@ -99,7 +101,7 @@ u8 drm_dp_get_adjust_request_voltage(const u8 link_status[DP_LINK_STATUS_SIZE],
- 	int s = ((lane & 1) ?
- 		 DP_ADJUST_VOLTAGE_SWING_LANE1_SHIFT :
- 		 DP_ADJUST_VOLTAGE_SWING_LANE0_SHIFT);
--	u8 l = dp_link_status(link_status, i);
-+	u8 l = drm_dp_link_status(link_status, i);
- 
- 	return ((l >> s) & 0x3) << DP_TRAIN_VOLTAGE_SWING_SHIFT;
- }
-@@ -112,7 +114,7 @@ u8 drm_dp_get_adjust_request_pre_emphasis(const u8 link_status[DP_LINK_STATUS_SI
- 	int s = ((lane & 1) ?
- 		 DP_ADJUST_PRE_EMPHASIS_LANE1_SHIFT :
- 		 DP_ADJUST_PRE_EMPHASIS_LANE0_SHIFT);
--	u8 l = dp_link_status(link_status, i);
-+	u8 l = drm_dp_link_status(link_status, i);
- 
- 	return ((l >> s) & 0x3) << DP_TRAIN_PRE_EMPHASIS_SHIFT;
- }
 diff --git a/include/drm/drm_dp_helper.h b/include/drm/drm_dp_helper.h
-index 06a478679781..9930b2b269f2 100644
+index 698082a02b97..06a478679781 100644
 --- a/include/drm/drm_dp_helper.h
 +++ b/include/drm/drm_dp_helper.h
-@@ -952,6 +952,9 @@
- #define DP_MST_LOGICAL_PORT_0 8
+@@ -125,7 +125,7 @@
  
- #define DP_LINK_STATUS_SIZE	   6
-+
-+u8 drm_dp_link_status(const u8 link_status[DP_LINK_STATUS_SIZE], int r);
-+u8 drm_dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE], int lane);
- bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
- 			  int lane_count);
- bool drm_dp_clock_recovery_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+ #define DP_TRAINING_AUX_RD_INTERVAL             0x00e   /* XXX 1.2? */
+ # define DP_TRAINING_AUX_RD_MASK                0x7F    /* DP 1.3 */
+-# define DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT	(1 << 7) /* DP 1.3 */
++# define DP_EXTENDED_RCVR_CAPA_FIELD_PRESENT BIT(7) /* 1.3 */
+ 
+ #define DP_ADAPTER_CAP			    0x00f   /* 1.2 */
+ # define DP_FORCE_LOAD_SENSE_CAP	    (1 << 0)
 -- 
 2.17.1
