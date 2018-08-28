@@ -1,132 +1,47 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 28 Aug 2018 16:51:34 +0100
-Subject: [PATCH v5 24/27] irqchip/gic-v3: Detect current view of GIC priorities
-In-Reply-To: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1535471497-38854-25-git-send-email-julien.thierry@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 28 Aug 2018 08:53:51 -0700
+Subject: [PATCH] Fix file permission for am335x-osd3358-sm-red.dts
+In-Reply-To: <20180828153816.1152-1-neeraj.dantu@octavosystems.com>
+References: <20180828153816.1152-1-neeraj.dantu@octavosystems.com>
+Message-ID: <20180828155351.GN7523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The values non secure EL1 needs to use for PMR and RPR registers depends on
-the value of SCR_EL3.FIQ.
+* Neeraj Dantu <dantuguf14105@gmail.com> [180828 15:42]:
+> OSD3358-SM-RED is a dev board for OSD335x System-in-Package(SiP) devices from
+> Octavo Systems.
+> 
+> This board family can be indentified by the A335BNLTOS00 in the at24 eeprom:
+> A2: [aa 55 33 ee 41 33 33 35  42 4e 4c 54 4f 53 30 30 |.U3.A335BNLTOS00|]
+> 
+> https://octavosystems.com/octavo_products/osd3358-sm-red/
 
-The values non secure EL1 sees from the distributor and redistributor
-depend on whether security is enabled for the GIC or not.
+Hmm can you please repost with a correct patch description?
+Something along the lines of:
 
-Figure out what values we are dealing with to know if the values we use for
-PMR and RPR match the priority values that have been configured in the
-distributor and redistributors.
+Fix wrong mode for dts file added by commit bb3e3fbbac86
+("ARM: dts: Add DT support for Octavo Systems OSD3358-SM-RED
+based on TI AM335x").
 
-Also, add firmware requirements related to SCR_EL3.
+Regards,
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Jonathan Corbet <corbet@lwn.net>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- Documentation/arm64/booting.txt |  5 +++++
- drivers/irqchip/irq-gic-v3.c    | 42 +++++++++++++++++++++++++++++++++++------
- 2 files changed, 41 insertions(+), 6 deletions(-)
+Tony
 
-diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-index 8d0df62..e387938 100644
---- a/Documentation/arm64/booting.txt
-+++ b/Documentation/arm64/booting.txt
-@@ -188,6 +188,11 @@ Before jumping into the kernel, the following conditions must be met:
-   the kernel image will be entered must be initialised by software at a
-   higher exception level to prevent execution in an UNKNOWN state.
- 
-+  - SCR_EL3.FIQ must have the same value across all CPUs the kernel is
-+    executing on.
-+  - The value of SCR_EL3.FIQ must be the same as the one present at boot
-+    time whenever the kernel is executing.
-+
-   For systems with a GICv3 interrupt controller to be used in v3 mode:
-   - If EL3 is present:
-     ICC_SRE_EL3.Enable (bit 3) must be initialiased to 0b1.
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index 56d1fb9..ffe98e8 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -63,6 +63,28 @@ struct gic_chip_data {
- static struct gic_chip_data gic_data __read_mostly;
- static DEFINE_STATIC_KEY_TRUE(supports_deactivate_key);
- 
-+/*
-+ * The behaviours of RPR and PMR registers differ depending on the value of
-+ * SCR_EL3.FIQ, and the behaviour of non-secure priority registers of the
-+ * distributor and redistributors depends on whether security is enabled in the
-+ * GIC.
-+ *
-+ * When security is enabled, non-secure priority values from the (re)distributor
-+ * are presented to the GIC CPUIF as follow:
-+ *     (GIC_(R)DIST_PRI[irq] >> 1) | 0x80;
-+ *
-+ * If SCR_EL3.FIQ == 1, the values writen to/read from PMR and RPR at non-secure
-+ * EL1 are subject to a similar operation thus matching the priorities presented
-+ * from the (re)distributor when security is enabled.
-+ *
-+ * see GICv3/GICv4 Architecture Specification (IHI0069D):
-+ * - section 4.8.1 Non-secure accesses to register fields for Secure interrupt
-+ *   priorities.
-+ * - Figure 4-7 Secure read of the priority field for a Non-secure Group 1
-+ *   interrupt.
-+ */
-+DEFINE_STATIC_KEY_FALSE(have_non_secure_prio_view);
-+
- static struct gic_kvm_info gic_v3_kvm_info;
- static DEFINE_PER_CPU(bool, has_rss);
- 
-@@ -568,6 +590,12 @@ static void gic_update_vlpi_properties(void)
- 		!gic_data.rdists.has_direct_lpi ? "no " : "");
- }
- 
-+/* Check whether it's single security state view */
-+static inline bool gic_dist_security_disabled(void)
-+{
-+	return readl_relaxed(gic_data.dist_base + GICD_CTLR) & GICD_CTLR_DS;
-+}
-+
- static void gic_cpu_sys_reg_init(void)
- {
- 	int i, cpu = smp_processor_id();
-@@ -593,6 +621,9 @@ static void gic_cpu_sys_reg_init(void)
- 	/* Set priority mask register */
- 	if (!gic_prio_masking_enabled())
- 		write_gicreg(DEFAULT_PMR_VALUE, ICC_PMR_EL1);
-+	else if (static_branch_likely(&have_non_secure_prio_view) && group0)
-+		/* Mismatch configuration with boot CPU */
-+		WARN_ON(group0 && !gic_dist_security_disabled());
- 
- 	/*
- 	 * Some firmwares hand over to the kernel with the BPR changed from
-@@ -845,12 +876,6 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- #endif
- 
- #ifdef CONFIG_CPU_PM
--/* Check whether it's single security state view */
--static bool gic_dist_security_disabled(void)
--{
--	return readl_relaxed(gic_data.dist_base + GICD_CTLR) & GICD_CTLR_DS;
--}
--
- static int gic_cpu_pm_notifier(struct notifier_block *self,
- 			       unsigned long cmd, void *v)
- {
-@@ -1161,6 +1186,11 @@ static int __init gic_init_bases(void __iomem *dist_base,
- 	gic_cpu_init();
- 	gic_cpu_pm_init();
- 
-+	if (gic_prio_masking_enabled()) {
-+		if (!gic_has_group0() || gic_dist_security_disabled())
-+			static_branch_enable(&have_non_secure_prio_view);
-+	}
-+
- 	return 0;
- 
- out_free:
--- 
-1.9.1
+> Signed-off-by: Neeraj Dantu <neeraj.dantu@octavosystems.com>
+> CC: Tony Lindgren <tony@atomide.com>
+> CC: Robert Nelson <robertcnelson@gmail.com>
+> CC: Jason Kridner <jkridner@gmail.com>
+> ---
+> Changes:
+> - Fix file permission
+> ---
+>  arch/arm/boot/dts/am335x-osd3358-sm-red.dts | 0
+>  1 file changed, 0 insertions(+), 0 deletions(-)
+>  mode change 100755 => 100644 arch/arm/boot/dts/am335x-osd3358-sm-red.dts
+> 
+> diff --git a/arch/arm/boot/dts/am335x-osd3358-sm-red.dts b/arch/arm/boot/dts/am335x-osd3358-sm-red.dts
+> old mode 100755
+> new mode 100644
+> -- 
+> 2.7.4
+> 
