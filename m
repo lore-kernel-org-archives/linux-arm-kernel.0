@@ -1,39 +1,50 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 28 Aug 2018 14:27:35 +0200
-Subject: [PATCH] arm64: defconfig: enable modules for amlogic s400 sound card
-Message-ID: <20180828122735.28919-1-jbrunet@baylibre.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Tue, 28 Aug 2018 18:00:04 +0530
+Subject: [PATCH 11/15] soc: octeontx2: Add Marvell OcteonTX2 CGX driver
+In-Reply-To: <CAK8P3a0q0P-FuG6cTgMNkeZbtXE4pMk1iJq36_x20WRddtwaDg@mail.gmail.com>
+References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
+ <1535453838-12154-12-git-send-email-sunil.kovvuri@gmail.com>
+ <CAK8P3a0q0P-FuG6cTgMNkeZbtXE4pMk1iJq36_x20WRddtwaDg@mail.gmail.com>
+Message-ID: <CA+sq2Cc1CSKmuEjKt8psR7Zyv9PzLkN10hzy8mrai136SF4-qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compile the necessary drivers as modules, including codecs, for the
-s400 sound card.
+On Tue, Aug 28, 2018 at 5:40 PM Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On Tue, Aug 28, 2018 at 12:58 PM <sunil.kovvuri@gmail.com> wrote:
+> >
+> > From: Sunil Goutham <sgoutham@marvell.com>
+> >
+> > This patch adds basic template for Marvell OcteonTX2's
+> > CGX ethernet interface driver. Just the probe.
+> > RVU AF driver will use APIs exported by this driver
+> > for various things like PF to physical interface mapping,
+> > loopback mode, interface stats etc.
+> >
+> > Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
+> > ---
+> >  drivers/soc/marvell/Kconfig            |  10 +++
+> >  drivers/soc/marvell/octeontx2/Makefile |   2 +
+> >  drivers/soc/marvell/octeontx2/cgx.c    | 117 +++++++++++++++++++++++++++++++++
+> >  drivers/soc/marvell/octeontx2/cgx.h    |  20 ++++++
+>
+> If this is a regular PCI ethernet driver, why do you put it into driver/soc
+> rather than drivers/net/ethernet/ ?
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- arch/arm64/configs/defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+No, this is not a ethernet driver, as mentioned in the cover letter
+this driver and AF driver doesn't
+handle any IO. There will be a separate ethernet driver (will submit
+that as well in future) which will
+communicate with these drivers for configuring hardware.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index f67e8d5e93ad..6b1daea53bd3 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -464,6 +464,7 @@ CONFIG_SND_SOC_ROCKCHIP_I2S=m
- CONFIG_SND_SOC_ROCKCHIP_SPDIF=m
- CONFIG_SND_SOC_ROCKCHIP_RT5645=m
- CONFIG_SND_SOC_RK3399_GRU_SOUND=m
-+CONFIG_SND_MESON_AXG_SOUND_CARD=m
- CONFIG_SND_SOC_SAMSUNG=y
- CONFIG_SND_SOC_RCAR=m
- CONFIG_SND_SOC_AK4613=m
-@@ -475,6 +476,9 @@ CONFIG_SND_SOC_RT5514_SPI=m
- CONFIG_SND_SOC_RT5645=m
- CONFIG_SND_SIMPLE_CARD=m
- CONFIG_SND_AUDIO_GRAPH_CARD=m
-+CONFIG_SND_SOC_ES7134=m
-+CONFIG_SND_SOC_ES7241=m
-+CONFIG_SND_SOC_TAS571X=m
- CONFIG_I2C_HID=m
- CONFIG_USB=y
- CONFIG_USB_OTG=y
--- 
-2.17.1
+The driver in question here is for a serdes controller which handles
+physical ethernet interfaces.
+Admin function driver gathers info w.r.t current state of physical
+ethernet interfaces from this driver
+and notifies actual ethernet driver about changes, if any.
+
+Thanks,
+Sunil.
+
+>
+>       Arnd
