@@ -1,55 +1,142 @@
-From: baicar.tyler@gmail.com (Tyler Baicar)
-Date: Tue, 28 Aug 2018 16:04:41 -0400
-Subject: [RFC PATCH] EDAC, ghes: Enable per-layer error reporting for ARM
-In-Reply-To: <bcb1b461-76ee-7d9b-2b35-d575ec608027@arm.com>
-References: <1531762009-15112-1-git-send-email-tbaicar@codeaurora.org>
- <20180719140102.GB25185@nazgul.tnic>
- <94e3a0fb-9b7d-045f-733b-9f063dcb39e4@arm.com>
- <45fefe7d-c6ea-5791-4477-13ecce39ce48@codeaurora.org>
- <b568fdcc-ca39-67ea-2799-8ed246c8ffb6@arm.com>
- <CABo9ajA7SPrVE-oiG=RicH+nL9_pp7fVATCdMugY5fuNAPzHaQ@mail.gmail.com>
- <68a800c7-446e-9b6b-1847-6e45a1d17262@arm.com>
- <CABo9ajAvo-bskhrM8h95Y9D4U88zFUZfVW_HTMLK3o_5Q1VSUw@mail.gmail.com>
- <bcb1b461-76ee-7d9b-2b35-d575ec608027@arm.com>
-Message-ID: <CABo9ajA3Bs0ibcNXumFLzdaaCTDSBVpCc5UaBRHsw-1pzBuAkA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 28 Aug 2018 21:26:55 +0100 (BST)
+Subject: Applied "ASoC: atmel: tse850: switch to SPDX license identifier" to
+ the asoc tree
+In-Reply-To: <20180820101409.23328-1-peda@axentia.se>
+Message-ID: <20180828202655.4010A440078@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 1:11 PM, James Morse <james.morse@arm.com> wrote:
-> On 24/08/18 16:14, Tyler Baicar wrote:
->> On Fri, Aug 24, 2018 at 5:48 AM, James Morse <james.morse@arm.com> wrote:
->>> On 23/08/18 16:46, Tyler Baicar wrote:
->>> so edac_raw_mc_handle_error() has no clue where the error happened. (I haven't
->>> read what it does with this information yet).
->>>
->>> ghes_edac_report_mem_error() does check CPER_MEM_VALID_MODULE_HANDLE, and if its
->>> set, it uses the handle to find the bank/device strings and prints them out.
->>
->> Yes, I think this is where we need to add support to increment the
->> count based on that module handle.
->
-> If layer[0] is EDAC_MC_LAYER_ALL_MEM, sized for num_dimm, don't we just put the
-> dimm number in e->top_layer and flip e->enable_per_layer_report?
+The patch
 
-Yes, that is all we would need to do. Figuring out that DIMM number is
-the issue, but that can be done with the map of module handles to DIMM
-index.
+   ASoC: atmel: tse850: switch to SPDX license identifier
 
->>> Naively I thought we could generate some index during ghes_edac_count_dimms(),
->>> and use this as e->${whichever}_layer. I hoped there would be something we could
->>> already use as the index, but I can't spot it, so this will be more than the
->>> one-liner I was hoping for!
->>
->> We could use what ghes_edac_register does by setting up a single layer
->> with all memory and
->> then keep a map of which module handle maps to which index into that
->> layer. From that it would
->> be easy to increment the proper sysfs exposed DIMM counters using the
->> single layer
->
-> Yes, I think this is what we should do!
+has been applied to the asoc tree at
 
-Sounds good, I'll start working on this!
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
 Thanks,
-Tyler
+Mark
+
+>From 1b3b7981524af2b6dcdf78cfa6dca89522c13ade Mon Sep 17 00:00:00 2001
+From: Peter Rosin <peda@axentia.se>
+Date: Mon, 20 Aug 2018 12:14:09 +0200
+Subject: [PATCH] ASoC: atmel: tse850: switch to SPDX license identifier
+
+Convert to // comments in the leading comment, drop the boilerplate
+license text and use the correct MODULE_LICENSE.
+
+Signed-off-by: Peter Rosin <peda@axentia.se>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/atmel/tse850-pcm5142.c | 78 +++++++++++++++-----------------
+ 1 file changed, 36 insertions(+), 42 deletions(-)
+
+diff --git a/sound/soc/atmel/tse850-pcm5142.c b/sound/soc/atmel/tse850-pcm5142.c
+index 3a1393283156..214adcad5419 100644
+--- a/sound/soc/atmel/tse850-pcm5142.c
++++ b/sound/soc/atmel/tse850-pcm5142.c
+@@ -1,44 +1,38 @@
+-/*
+- * TSE-850 audio - ASoC driver for the Axentia TSE-850 with a PCM5142 codec
+- *
+- * Copyright (C) 2016 Axentia Technologies AB
+- *
+- * Author: Peter Rosin <peda@axentia.se>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-/*
+- *               loop1 relays
+- *   IN1 +---o  +------------+  o---+ OUT1
+- *            \                /
+- *             +              +
+- *             |   /          |
+- *             +--o  +--.     |
+- *             |  add   |     |
+- *             |        V     |
+- *             |      .---.   |
+- *   DAC +----------->|Sum|---+
+- *             |      '---'   |
+- *             |              |
+- *             +              +
+- *
+- *   IN2 +---o--+------------+--o---+ OUT2
+- *               loop2 relays
+- *
+- * The 'loop1' gpio pin controlls two relays, which are either in loop
+- * position, meaning that input and output are directly connected, or
+- * they are in mixer position, meaning that the signal is passed through
+- * the 'Sum' mixer. Similarly for 'loop2'.
+- *
+- * In the above, the 'loop1' relays are inactive, thus feeding IN1 to the
+- * mixer (if 'add' is active) and feeding the mixer output to OUT1. The
+- * 'loop2' relays are active, short-cutting the TSE-850 from channel 2.
+- * IN1, IN2, OUT1 and OUT2 are TSE-850 connectors and DAC is the PCB name
+- * of the (filtered) output from the PCM5142 codec.
+- */
++// SPDX-License-Identifier: GPL-2.0
++//
++// TSE-850 audio - ASoC driver for the Axentia TSE-850 with a PCM5142 codec
++//
++// Copyright (C) 2016 Axentia Technologies AB
++//
++// Author: Peter Rosin <peda@axentia.se>
++//
++//               loop1 relays
++//   IN1 +---o  +------------+  o---+ OUT1
++//            \                /
++//             +              +
++//             |   /          |
++//             +--o  +--.     |
++//             |  add   |     |
++//             |        V     |
++//             |      .---.   |
++//   DAC +----------->|Sum|---+
++//             |      '---'   |
++//             |              |
++//             +              +
++//
++//   IN2 +---o--+------------+--o---+ OUT2
++//               loop2 relays
++//
++// The 'loop1' gpio pin controlls two relays, which are either in loop
++// position, meaning that input and output are directly connected, or
++// they are in mixer position, meaning that the signal is passed through
++// the 'Sum' mixer. Similarly for 'loop2'.
++//
++// In the above, the 'loop1' relays are inactive, thus feeding IN1 to the
++// mixer (if 'add' is active) and feeding the mixer output to OUT1. The
++// 'loop2' relays are active, short-cutting the TSE-850 from channel 2.
++// IN1, IN2, OUT1 and OUT2 are TSE-850 connectors and DAC is the PCB name
++// of the (filtered) output from the PCM5142 codec.
+ 
+ #include <linux/clk.h>
+ #include <linux/gpio.h>
+@@ -452,4 +446,4 @@ module_platform_driver(tse850_driver);
+ /* Module information */
+ MODULE_AUTHOR("Peter Rosin <peda@axentia.se>");
+ MODULE_DESCRIPTION("ALSA SoC driver for TSE-850 with PCM5142 codec");
+-MODULE_LICENSE("GPL");
++MODULE_LICENSE("GPL v2");
+-- 
+2.18.0
