@@ -1,77 +1,63 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 28 Aug 2018 17:06:57 +0200
-Subject: [PATCH 2/2] media: cedrus: Add HEVC/H.265 decoding support
-In-Reply-To: <20180828080240.10982-3-paul.kocialkowski@bootlin.com>
-References: <20180828080240.10982-1-paul.kocialkowski@bootlin.com>
- <20180828080240.10982-3-paul.kocialkowski@bootlin.com>
-Message-ID: <20180828150657.dxwevt3oaac3lgx5@flea>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 28 Aug 2018 16:09:07 +0100
+Subject: [PATCH v2 01/29] nvmem: add support for cell lookups
+In-Reply-To: <20180828165309.0594ae13@bbrezillon>
+References: <20180810080526.27207-1-brgl@bgdev.pl>
+ <20180810080526.27207-2-brgl@bgdev.pl> <20180824170848.29594318@bbrezillon>
+ <20180824152740.GD27483@lunn.ch> <20180825082722.567e8c9a@bbrezillon>
+ <CAMRc=Men-MPk5DGshWcVEc0v=gH2WSpx1j-CawOeydwp59tejw@mail.gmail.com>
+ <20180827110055.122988d0@bbrezillon>
+ <CAMRc=MfpZJUEAhM4OoLbmJcnX3rTJk8fvdiL6=9BjNkVcsf=SA@mail.gmail.com>
+ <8cb75723-dc87-f127-2aab-54dd0b08eee8@linaro.org>
+ <CAMRc=Mex5WAm8uiV4T=0+bLduBBdj18iekuYT55W9gA_rzQ_sg@mail.gmail.com>
+ <916e3e89-82b3-0d52-2b77-4374261a9d0f@linaro.org>
+ <CAMRc=MeALxpyBQhWxGPt9BubO_ZwKGih1d8zhRzFYZ0+3kHFAA@mail.gmail.com>
+ <20180828165309.0594ae13@bbrezillon>
+Message-ID: <af94be21-328b-d6a2-2024-67b98860c3d5@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tue, Aug 28, 2018 at 10:02:40AM +0200, Paul Kocialkowski wrote:
-> @@ -165,7 +182,8 @@ static inline void cedrus_write(struct cedrus_dev *dev, u32 reg, u32 val)
->  
->  static inline u32 cedrus_read(struct cedrus_dev *dev, u32 reg)
->  {
-> -	return readl(dev->base + reg);
-> +	u32 val = readl(dev->base + reg);
-> +	return val;
 
-I'm not sure that's needed :)
+On 28/08/18 15:53, Boris Brezillon wrote:
+> On Tue, 28 Aug 2018 16:41:04 +0200
+> Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+> 
 
-> +static void cedrus_h265_frame_info_write_dpb(struct cedrus_ctx *ctx,
-> +					     const struct v4l2_hevc_dpb_entry *dpb,
-> +					     u8 num_active_dpb_entries)
-> +{
-> +	struct cedrus_dev *dev = ctx->dev;
-> +	dma_addr_t dst_luma_addr, dst_chroma_addr;
-> +	dma_addr_t mv_col_buf_addr[2];
-> +	u32 pic_order_cnt[2];
-> +	unsigned int i;
-> +
-> +	for (i = 0; i < num_active_dpb_entries; i++) {
-> +		dst_luma_addr = cedrus_dst_buf_addr(ctx, dpb[i].buffer_index,
-> +						    0); // FIXME - PHYS_OFFSET ?
-> +		dst_chroma_addr = cedrus_dst_buf_addr(ctx, dpb[i].buffer_index,
-> +						      1); // FIXME - PHYS_OFFSET ?
-> +		mv_col_buf_addr[0] = cedrus_h265_frame_info_mv_col_buf_addr(ctx,
-> +			dpb[i].buffer_index, 0);
-> +		pic_order_cnt[0] = dpb[i].pic_order_cnt[0];
-> +
-> +		if (dpb[i].field_pic) {
-> +			mv_col_buf_addr[1] =
-> +				cedrus_h265_frame_info_mv_col_buf_addr(ctx,
-> +				dpb[i].buffer_index, 1);
-> +			pic_order_cnt[1] = dpb[i].pic_order_cnt[1];
-> +		}
-> +
-> +		cedrus_h265_frame_info_write_single(dev, i, dpb[i].field_pic,
-> +						    pic_order_cnt,
-> +						    mv_col_buf_addr,
-> +						    dst_luma_addr,
-> +						    dst_chroma_addr);
-> +	}
-> +}
+...
+> 
+>>>
+>>>   static struct nvmem_cell *nvmem_find_cell(const char *cell_id)
+> 
+> Can we get rid of this function and just have the the version that
+> takes an nvmem_name and a cell_id.
 
-You have this a number of times, but you can reduce the range of most
-of the variables (basically all of them but dev and i) to the loop
-itself. Declaring them for the whole function like you did suggests
-that you're going to use the value from one iteration to the other,
-which isn't the case here.
+That should be feasible!
 
-Thanks!
-Maxime
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180828/72a367ab/attachment.sig>
+>>>>>
+>>>>> I hope you got the reason why of_nvmem_cell_get() always allocates new
+>>>>> instance for every get!!
+>>>>
+>>>>
+>>>>
+>>>> I admit I didn't test it, but just from reading the code it seems like
+>>>> in nvmem_cell_get() for DT-users we'll always get to
+>>>> of_nvmem_cell_get() and in there we always end up calling line 873:
+>>>> cell = kzalloc(sizeof(*cell), GFP_KERNEL);
+>>>>   
+>>> That is correct, this cell is created when we do a get and release when we
+>>> do a put().
+>>>   
+>>
+>> Shouldn't we add the cell to the list, and check first if it's there
+>> and only create it if not?
+> 
+> Or even better: create the cells at registration time so that the
+> search code is the same for both DT and non-DT cases. Only the
+> registration would differ (with one path parsing the DT, and the other
+> one searching for nvmem cells defined with a nvmem-provider-lookup
+> table).
+Makes sense! and that would go very well with the plan of "nvmem-cell" 
+compatible for cells!.
+> 
