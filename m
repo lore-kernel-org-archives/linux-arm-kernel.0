@@ -1,16 +1,15 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Tue, 28 Aug 2018 09:34:21 +0200
-Subject: [PATCH v8 5/8] ARM: dts: sun5i: Add Video Engine and reserved memory
- nodes
+Date: Tue, 28 Aug 2018 09:34:22 +0200
+Subject: [PATCH v8 6/8] ARM: dts: sun7i-a20: Add Video Engine and reserved
+ memory nodes
 In-Reply-To: <20180828073424.30247-1-paul.kocialkowski@bootlin.com>
 References: <20180828073424.30247-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20180828073424.30247-6-paul.kocialkowski@bootlin.com>
+Message-ID: <20180828073424.30247-7-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This adds nodes for the Video Engine and the associated reserved memory
-for sun5i-based platforms. Up to 96 MiB of memory are dedicated to the
-CMA pool.
+for the A20. Up to 96 MiB of memory are dedicated to the CMA pool.
 
 The VPU can only map the first 256 MiB of DRAM, so the reserved memory
 pool has to be located in that area. Following Allwinner's decision in
@@ -19,15 +18,15 @@ reserved for this purpose.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- arch/arm/boot/dts/sun5i.dtsi | 26 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi | 26 ++++++++++++++++++++++++++
  1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index 51dcefc76c12..6a9d6d185ade 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -108,6 +108,21 @@
- 		};
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 38999d791cb5..55517b068009 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -161,6 +161,21 @@
+ 		reg = <0x40000000 0x80000000>;
  	};
  
 +	reserved-memory {
@@ -45,26 +44,26 @@ index 51dcefc76c12..6a9d6d185ade 100644
 +		};
 +	};
 +
- 	soc at 1c00000 {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -295,6 +310,17 @@
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+@@ -466,6 +481,17 @@
  			};
  		};
  
 +		video-codec at 1c0e000 {
-+			compatible = "allwinner,sun5i-a13-video-engine";
++			compatible = "allwinner,sun7i-a20-video-engine";
 +			reg = <0x01c0e000 0x1000>;
 +			clocks = <&ccu CLK_AHB_VE>, <&ccu CLK_VE>,
 +				 <&ccu CLK_DRAM_VE>;
 +			clock-names = "ahb", "mod", "ram";
 +			resets = <&ccu RST_VE>;
-+			interrupts = <53>;
++			interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
 +			allwinner,sram = <&ve_sram 1>;
 +		};
 +
  		mmc0: mmc at 1c0f000 {
- 			compatible = "allwinner,sun5i-a13-mmc";
+ 			compatible = "allwinner,sun7i-a20-mmc";
  			reg = <0x01c0f000 0x1000>;
 -- 
 2.18.0
