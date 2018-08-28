@@ -1,71 +1,95 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Tue, 28 Aug 2018 09:11:42 -0500
-Subject: [PATCHv8 7/9] defconfig: enable fpga and service layer
-In-Reply-To: <1535464245-11638-8-git-send-email-richard.gong@linux.intel.com>
-References: <1535464245-11638-1-git-send-email-richard.gong@linux.intel.com>
- <1535464245-11638-8-git-send-email-richard.gong@linux.intel.com>
-Message-ID: <54ccf9d5-1cf4-edf6-47c6-be7cc5badb3e@kernel.org>
+From: npiggin@gmail.com (Nicholas Piggin)
+Date: Wed, 29 Aug 2018 00:12:34 +1000
+Subject: [RFC PATCH 08/11] asm-generic/tlb: Track freeing of page-table
+ directories in struct mmu_gather
+In-Reply-To: <20180828134638.GK24082@hirez.programming.kicks-ass.net>
+References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
+ <1535125966-7666-9-git-send-email-will.deacon@arm.com>
+ <20180827144457.3f4036e3@roar.ozlabs.ibm.com>
+ <20180828134638.GK24082@hirez.programming.kicks-ass.net>
+Message-ID: <20180829001113.1b8b8031@roar.ozlabs.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 28 Aug 2018 15:46:38 +0200
+Peter Zijlstra <peterz@infradead.org> wrote:
 
-
-On 08/28/2018 08:50 AM, richard.gong at linux.intel.com wrote:
-> From: Richard Gong <richard.gong@intel.com>
+> On Mon, Aug 27, 2018 at 02:44:57PM +1000, Nicholas Piggin wrote:
 > 
-> Enable fpga framework, Stratix 10 SoC FPGA manager and Stratix10
-> Service Layer
+> > powerpc may be able to use the unmap granule thing to improve
+> > its page size dependent flushes, but it might prefer to go
+> > a different way and track start-end for different page sizes.  
 > 
+> I don't really see how tracking multiple ranges would help much with
+> THP. The ranges would end up being almost the same if there is a good
+> mix of page sizes.
 
-Please update your commit header be "arm64: defconfig: enable fpga and
-service layer"
+That's assuming quite large unmaps. But a lot of the time they are
+going to go to a full PID flush.
 
-
-> Signed-off-by: Richard Gong <richard.gong@intel.com>
-> Signed-off-by: Alan Tull <atull@kernel.org>
-> ---
-> v2: this patch is added in patch set version 2
-> v3: no change
-> v4: s/CONFIG_INTEL_SERVICE/CONFIG_STRATIX10_SERVICE/
->     add CONFIG_OF_FPGA_REGION=y
->     s/Intel/Stratix10/ in subject line
-> v5: no change
-> v6: no change
-> v7: no change
-> v8: no change
-> ---
->  arch/arm64/configs/defconfig | 7 +++++++
->  1 file changed, 7 insertions(+)
 > 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index f67e8d5..2ad50a5 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -185,6 +185,7 @@ CONFIG_BLK_DEV_LOOP=y
->  CONFIG_BLK_DEV_NBD=m
->  CONFIG_VIRTIO_BLK=y
->  CONFIG_BLK_DEV_NVME=m
-> +CONFIG_STRATIX10_SERVICE=y
+> But something like:
+> 
+> void tlb_flush_one(struct mmu_gather *tlb, unsigned long addr)
+> {
+> 	if (tlb->cleared_ptes && (addr << BITS_PER_LONG - PAGE_SHIFT))
+> 		tblie_pte(addr);
+> 	if (tlb->cleared_pmds && (addr << BITS_PER_LONG - PMD_SHIFT))
+> 		tlbie_pmd(addr);
+> 	if (tlb->cleared_puds && (addr << BITS_PER_LONG - PUD_SHIFT))
+> 		tlbie_pud(addr);
+> }
+> 
+> void tlb_flush_range(struct mmu_gather *tlb)
+> {
+> 	unsigned long stride = 1UL << tlb_get_unmap_shift(tlb);
+> 	unsigned long addr;
+> 
+> 	for (addr = tlb->start; addr < tlb->end; addr += stride)
+> 		tlb_flush_one(tlb, addr);
+> 
+> 	ptesync();
+> }
+> 
+> Should workd I think. You'll only issue multiple TLBIEs on the
+> boundaries, not every stride.
 
-Can this be a module?
+Yeah we already do basically that today in the flush_tlb_range path,
+just without the precise test for which page sizes
 
->  CONFIG_SRAM=y
->  CONFIG_EEPROM_AT25=m
->  # CONFIG_SCSI_PROC_FS is not set
-> @@ -642,6 +643,12 @@ CONFIG_PHY_TEGRA_XUSB=y
->  CONFIG_HISI_PMU=y
->  CONFIG_QCOM_L2_PMU=y
->  CONFIG_QCOM_L3_PMU=y
-> +CONFIG_MESON_EFUSE=m
+                if (hflush) {
+                        hstart = (start + PMD_SIZE - 1) & PMD_MASK;
+                        hend = end & PMD_MASK;
+                        if (hstart == hend)
+                                hflush = false;
+                }
 
-What does this change have to do with this patch?
+                if (gflush) {
+                        gstart = (start + PUD_SIZE - 1) & PUD_MASK;
+                        gend = end & PUD_MASK;
+                        if (gstart == gend)
+                                gflush = false;
+                }
 
-> +CONFIG_FPGA=y
-> +CONFIG_FPGA_MGR_STRATIX10_SOC=y
-> +CONFIG_FPGA_REGION=y
-> +CONFIG_FPGA_BRIDGE=y
-> +CONFIG_OF_FPGA_REGION=y
+                asm volatile("ptesync": : :"memory");
+                if (local) {
+                        __tlbiel_va_range(start, end, pid, page_size, mmu_virtual_psize);
+                        if (hflush)
+                                __tlbiel_va_range(hstart, hend, pid,
+                                                PMD_SIZE, MMU_PAGE_2M);
+                        if (gflush)
+                                __tlbiel_va_range(gstart, gend, pid,
+                                                PUD_SIZE, MMU_PAGE_1G);
+                        asm volatile("ptesync": : :"memory");
 
-Can these be modules?
+Thing is I think it's the smallish range cases you want to optimize
+for. And for those we'll probably do something even smarter (like keep
+a bitmap of pages to flush) because we really want to keep tlbies off
+the bus whereas that's less important for x86.
 
-Dinh
+Still not really seeing a reason not to implement a struct
+arch_mmu_gather. A little bit of data contained to the arch is nothing
+compared with the multitude of hooks and divergence of code.
+
+Thanks,
+Nick
