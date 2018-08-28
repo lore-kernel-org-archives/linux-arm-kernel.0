@@ -1,31 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 28 Aug 2018 14:03:14 +0200
-Subject: [PATCH 04/15] soc: octeontx2: Add mailbox support infra
-In-Reply-To: <1535453838-12154-5-git-send-email-sunil.kovvuri@gmail.com>
-References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
- <1535453838-12154-5-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <CAK8P3a2fgAVB0+uns9f5MH+2OyZbwvReo9j-=u3=30QoK=2Ksw@mail.gmail.com>
+From: hejianet@gmail.com (Jia He)
+Date: Tue, 28 Aug 2018 20:08:04 +0800
+Subject: [PATCH] irqchip/gic-v3-its: cap lpi_id_bits to reduce memory
+ footprint
+In-Reply-To: <865zzuyijp.wl-marc.zyngier@arm.com>
+References: <1535432006-2304-1-git-send-email-jia.he@hxt-semitech.com>
+ <865zzuyijp.wl-marc.zyngier@arm.com>
+Message-ID: <a28b854e-3bc9-0c10-2faf-63e4d44ec14b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 12:57 PM <sunil.kovvuri@gmail.com> wrote:
->
-> From: Aleksey Makarov <amakarov@marvell.com>
->
-> This patch adds mailbox support infrastructure APIs.
-> Each RVU device has a dedicated 64KB mailbox region
-> shared with it's peer for communication. RVU AF has
-> a separate mailbox region shared with each of RVU PFs
-> and a RVU PF has a separate region shared with each of
-> it's VF.
->
-> These set of APIs are used by this driver (RVU AF) and
-> other RVU PF/VF drivers eg netdev, crypto e.t.c.
->
-> Signed-off-by: Aleksey Makarov <amakarov@marvell.com>
-> Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
-> Signed-off-by: Lukasz Bartosik <lbartosik@marvell.com>
 
-Why does this driver not use the drivers/mailbox/ infrastructure?
 
-       Arnd
+On 8/28/2018 4:58 PM, Marc Zyngier Wrote:
+> On Tue, 28 Aug 2018 05:53:26 +0100,
+> Jia He <hejianet@gmail.com> wrote:
+>>
+>> In commit fe8e93504ce8 ("irqchip/gic-v3-its: Use full range of LPIs"),
+>> it removes the cap for lpi_id_bits. But it will cause more pointless
+>> memory footprint.
+>>
+>> There is a WARN_ON when my QDF2400 server boots up (pagesize is 4k)
+>> ============begin===============
+> 
+> [trimming not-so-useful trace]
+> 
+>> ============end============
+>>
+>> In its_alloc_lpi_tables, lpi_id_bits is 24 in QDF2400. Then
+>> its_allocate_prop_table will try to allocate 16M(order 12 if
+>> pagesize=4k). Thus it causes the WARN_ON.
+>>
+>> As said by Marc,
+>> Capping lpi_id_bits at 16 (which is what we had before) is plenty,
+>> will save a some memory, and gives some margin before we need to push
+>> it up again.
+>>
+>> This patch re-caps the lpi_id_bits.
+>>
+>> Fixes: fe8e93504ce8 ("irqchip/gic-v3-its: Use full range of LPIs")
+>> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
+>> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Thanks for doing this. Small problem with this patch:
+> 
+> The email comes from hejianet at gmail.com, while the sign off is by
+> jia.he at hxt-semitech.com. Your email should start with a:
+> 
+> 	From: Jia He <jia.he@hxt-semitech.com>
+> 
+
+Thanks for the pointing. And sorry for that problem.
+
+---
+Cheers,
+Jia
+> Other than that:
+> 
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Thomas, would you mind picking this up so that it gets into the next
+> convenient -rc?
+> 
+> Thanks,
+> 
+> 	M. (/me goes back hiking...)
+> 	
+> 
