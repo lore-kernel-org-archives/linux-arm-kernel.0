@@ -1,55 +1,54 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 28 Aug 2018 10:08:32 +0100
-Subject: [RESEND PATCH 4/8] ARM: spectre-v1.1: harden __copy_to_user
+Date: Tue, 28 Aug 2018 10:08:30 +0100
+Subject: [RESEND PATCH 2/8] ARM: spectre-v1.1: force address sanitizing for
+ __put_user*()
 In-Reply-To: <1535447316-32187-1-git-send-email-julien.thierry@arm.com>
 References: <1535447316-32187-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1535447316-32187-5-git-send-email-julien.thierry@arm.com>
+Message-ID: <1535447316-32187-3-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sanitize user pointer given to __copy_to_user, both for standard version
-and memcopy version of the user accessor.
+When Spectre mitigation is required, define __put_user() and
+__put_user_error() to include check_uaccess, ensuring user address
+is sanitized.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 ---
- arch/arm/lib/copy_to_user.S        | 6 +++++-
- arch/arm/lib/uaccess_with_memcpy.c | 3 ++-
- 2 files changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/uaccess.h | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/lib/copy_to_user.S b/arch/arm/lib/copy_to_user.S
-index caf5019..970abe5 100644
---- a/arch/arm/lib/copy_to_user.S
-+++ b/arch/arm/lib/copy_to_user.S
-@@ -94,6 +94,11 @@
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index d65ef85..2e18b91 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -370,6 +370,20 @@ static inline void set_fs(mm_segment_t fs)
+ 	__pu_err;							\
+ })
  
- ENTRY(__copy_to_user_std)
- WEAK(arm_copy_to_user)
 +#ifdef CONFIG_CPU_SPECTRE
-+	get_thread_info r3
-+	ldr	r3, [r3, #TI_ADDR_LIMIT]
-+	uaccess_mask_range_ptr r0, r2, r3, ip
-+#endif
++/*
++ * When mitigating Spectre variant 1.1, all accessors need to include
++ * verification of the address space.
++ */
++#define __put_user(x, ptr) put_user(x, ptr)
++
++#define __put_user_error(x, ptr, err)					\
++({									\
++	__put_user_switch((x), (ptr), (err), __put_user_check);		\
++	(void) 0;							\
++})
++
++#else
+ #define __put_user(x, ptr)						\
+ ({									\
+ 	long __pu_err = 0;						\
+@@ -462,6 +476,7 @@ static inline void set_fs(mm_segment_t fs)
+ 	: "r" (x), "i" (-EFAULT)				\
+ 	: "cc")
  
- #include "copy_template.S"
++#endif /* !CONFIG_CPU_SPECTRE */
  
-@@ -108,4 +113,3 @@ ENDPROC(__copy_to_user_std)
- 	rsb	r0, r0, r2
- 	copy_abort_end
- 	.popsection
--
-diff --git a/arch/arm/lib/uaccess_with_memcpy.c b/arch/arm/lib/uaccess_with_memcpy.c
-index 9b4ed17..73dc736 100644
---- a/arch/arm/lib/uaccess_with_memcpy.c
-+++ b/arch/arm/lib/uaccess_with_memcpy.c
-@@ -152,7 +152,8 @@
- 		n = __copy_to_user_std(to, from, n);
- 		uaccess_restore(ua_flags);
- 	} else {
--		n = __copy_to_user_memcpy(to, from, n);
-+		n = __copy_to_user_memcpy(uaccess_mask_range_ptr(to, n),
-+					  from, n);
- 	}
- 	return n;
- }
+ #ifdef CONFIG_MMU
+ extern unsigned long __must_check
 -- 
 1.9.1
