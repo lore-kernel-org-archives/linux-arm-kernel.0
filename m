@@ -1,90 +1,113 @@
 From: dkos@cadence.com (Damian Kos)
-Date: Tue, 28 Aug 2018 11:24:43 +0100
-Subject: [PATCH v3 0/5] drm: add support for Cadence MHDP DPI/DP bridge.
-Message-ID: <1535451894-2518-1-git-send-email-dkos@cadence.com>
+Date: Tue, 28 Aug 2018 11:24:46 +0100
+Subject: [PATCH v3 3/5] drm/dp: make dp_link_status and dp_get_lane_status
+ usable from outside of the core
+In-Reply-To: <1535451894-2518-1-git-send-email-dkos@cadence.com>
+References: <1535451894-2518-1-git-send-email-dkos@cadence.com>
+Message-ID: <1535451894-2518-4-git-send-email-dkos@cadence.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+From: Quentin Schulz <quentin.schulz@bootlin.com>
 
-This is the series of patches that will add support for the Cadence's DPI/DP
-bridge. Please note that this is a preliminary version of the driver and there
-will be more patches in the future with updates, fixes and improvements.
-Please keep that in mind when looking at FIXME/TODO/XXX comments.
+dp_link_status and dp_get_lane_status are pretty generic and can be used for
+other means, so let's make it "public".
 
-Initially, MHDP driver was developed as a DRM bridge driver and was planed to
-be placed in drivers/gpu/drm/bridge/mhdp.c.  However, there was already
-a driver for Cadence's DP controller developed by RockChip, but that driver
-uses the different DRM framework and looks like a part of a bigger system.
-Both controllers (including firmware) are quite different internally
-(MST/FEC/DSC support, link training done by driver, additional commands, IRQ's
-etc.) but they have similar register map, except for Framer/Streamer (which is
-noticeably different), so they appear similar.
+This adds drm_dp_link_status and drm_dp_get_lane_status to the header file and
+add the appropriate EXPORT_SYMBOL for it so that it can be used by other
+drivers, be they compiled built-in or as modules.
 
-The following patches contain:
-- Moving common code to drivers/gpu/drm/bridge/cdns-mhdp-common.* and
-  modifying it a bit (mostly new prefixes for functions and data types) so it
-  can be used by two, higher level, drivers.
-- Modifying existing RockChip's DP driver to use the common code after changes
-  made to it (use the new cdns_mhdp_device structure and new function names).
-- Modifying DRM helpers a bit. Some are required for new driver, some are
-  updates from DP 1.2 to 1.3 or 1.4.
-- Adding documentation for device tree bindings.
-- Adding preliminary Cadence DPI/DP bridge driver.
+Signed-off-by: Damian Kos <dkos@cadence.com>
+---
+ drivers/gpu/drm/drm_dp_helper.c | 20 +++++++++++---------
+ include/drm/drm_dp_helper.h     |  3 +++
+ 2 files changed, 14 insertions(+), 9 deletions(-)
 
-Some of the things that will be added later on include (but are not limited
-to):
-- Support for Cadence SD0801 PHY (PHY's driver should be on the way by now)
-- MST support
-- DSC support
-- FEC support
-- HDCP support
-
-Changes in v2:
-- Added actual description of what the patch contains, what is it for and
-  what's going on here in general.
-- New structure. Now we have one common low level driver + two high level
-  drivers - one for RockChip with minimum changes and one, more general, for
-  Cadence.
-- Dropped some changes made to DRM helpers.
-- Updated the device tree bindings document.
-
-Changes in v3:
-- Corrected dt-bindings document
-- Enabled some clocks at startup (since FW doesn't do that anymore).
-- Changed Firmware file name to match the file on Linux Firmware repo.
-- Added SST audio support
-- Made common functions (in cdns-mhdp-common.*) public.
-
-Damian Kos (1):
-  drm/rockchip: prepare common code for cdns and rk dpi/dp driver
-
-Quentin Schulz (4):
-  drm/dp: fix link probing for devices supporting DP 1.4+
-  drm/dp: make dp_link_status and dp_get_lane_status usable from outside
-    of the core
-  dt-bindings: drm/bridge Document Cadence MHDP DPI/DP bridge bindings
-  drm/bridge: add preliminary driver for cadence dpi/dp bridge
-
- .../bindings/display/bridge/cdns,mhdp.txt     |   43 +
- drivers/gpu/drm/bridge/Kconfig                |    9 +
- drivers/gpu/drm/bridge/Makefile               |    3 +
- drivers/gpu/drm/bridge/cdns-mhdp-common.c     | 1108 ++++++++++++++
- .../cdns-mhdp-common.h}                       |  135 +-
- drivers/gpu/drm/bridge/cdns-mhdp.c            | 1308 +++++++++++++++++
- drivers/gpu/drm/drm_dp_helper.c               |   50 +-
- drivers/gpu/drm/rockchip/Kconfig              |    1 +
- drivers/gpu/drm/rockchip/Makefile             |    4 +-
- drivers/gpu/drm/rockchip/cdn-dp-core.c        |  234 +--
- drivers/gpu/drm/rockchip/cdn-dp-core.h        |   42 +-
- drivers/gpu/drm/rockchip/cdn-dp-reg.c         |  969 ------------
- include/drm/drm_dp_helper.h                   |    5 +-
- 13 files changed, 2756 insertions(+), 1155 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
- create mode 100644 drivers/gpu/drm/bridge/cdns-mhdp-common.c
- rename drivers/gpu/drm/{rockchip/cdn-dp-reg.h => bridge/cdns-mhdp-common.h} (81%)
- create mode 100644 drivers/gpu/drm/bridge/cdns-mhdp.c
- delete mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.c
-
+diff --git a/drivers/gpu/drm/drm_dp_helper.c b/drivers/gpu/drm/drm_dp_helper.c
+index 4b5bf6ee7fa7..ee9ec2ccf878 100644
+--- a/drivers/gpu/drm/drm_dp_helper.c
++++ b/drivers/gpu/drm/drm_dp_helper.c
+@@ -43,19 +43,21 @@
+  */
+ 
+ /* Helpers for DP link training */
+-static u8 dp_link_status(const u8 link_status[DP_LINK_STATUS_SIZE], int r)
++u8 drm_dp_link_status(const u8 link_status[DP_LINK_STATUS_SIZE], int r)
+ {
+ 	return link_status[r - DP_LANE0_1_STATUS];
+ }
++EXPORT_SYMBOL(drm_dp_link_status);
+ 
+-static u8 dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE],
++u8 drm_dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE],
+ 			     int lane)
+ {
+ 	int i = DP_LANE0_1_STATUS + (lane >> 1);
+ 	int s = (lane & 1) * 4;
+-	u8 l = dp_link_status(link_status, i);
++	u8 l = drm_dp_link_status(link_status, i);
+ 	return (l >> s) & 0xf;
+ }
++EXPORT_SYMBOL(drm_dp_get_lane_status);
+ 
+ bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+ 			  int lane_count)
+@@ -64,12 +66,12 @@ bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+ 	u8 lane_status;
+ 	int lane;
+ 
+-	lane_align = dp_link_status(link_status,
+-				    DP_LANE_ALIGN_STATUS_UPDATED);
++	lane_align = drm_dp_link_status(link_status,
++					DP_LANE_ALIGN_STATUS_UPDATED);
+ 	if ((lane_align & DP_INTERLANE_ALIGN_DONE) == 0)
+ 		return false;
+ 	for (lane = 0; lane < lane_count; lane++) {
+-		lane_status = dp_get_lane_status(link_status, lane);
++		lane_status = drm_dp_get_lane_status(link_status, lane);
+ 		if ((lane_status & DP_CHANNEL_EQ_BITS) != DP_CHANNEL_EQ_BITS)
+ 			return false;
+ 	}
+@@ -84,7 +86,7 @@ bool drm_dp_clock_recovery_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+ 	u8 lane_status;
+ 
+ 	for (lane = 0; lane < lane_count; lane++) {
+-		lane_status = dp_get_lane_status(link_status, lane);
++		lane_status = drm_dp_get_lane_status(link_status, lane);
+ 		if ((lane_status & DP_LANE_CR_DONE) == 0)
+ 			return false;
+ 	}
+@@ -99,7 +101,7 @@ u8 drm_dp_get_adjust_request_voltage(const u8 link_status[DP_LINK_STATUS_SIZE],
+ 	int s = ((lane & 1) ?
+ 		 DP_ADJUST_VOLTAGE_SWING_LANE1_SHIFT :
+ 		 DP_ADJUST_VOLTAGE_SWING_LANE0_SHIFT);
+-	u8 l = dp_link_status(link_status, i);
++	u8 l = drm_dp_link_status(link_status, i);
+ 
+ 	return ((l >> s) & 0x3) << DP_TRAIN_VOLTAGE_SWING_SHIFT;
+ }
+@@ -112,7 +114,7 @@ u8 drm_dp_get_adjust_request_pre_emphasis(const u8 link_status[DP_LINK_STATUS_SI
+ 	int s = ((lane & 1) ?
+ 		 DP_ADJUST_PRE_EMPHASIS_LANE1_SHIFT :
+ 		 DP_ADJUST_PRE_EMPHASIS_LANE0_SHIFT);
+-	u8 l = dp_link_status(link_status, i);
++	u8 l = drm_dp_link_status(link_status, i);
+ 
+ 	return ((l >> s) & 0x3) << DP_TRAIN_PRE_EMPHASIS_SHIFT;
+ }
+diff --git a/include/drm/drm_dp_helper.h b/include/drm/drm_dp_helper.h
+index 06a478679781..9930b2b269f2 100644
+--- a/include/drm/drm_dp_helper.h
++++ b/include/drm/drm_dp_helper.h
+@@ -952,6 +952,9 @@
+ #define DP_MST_LOGICAL_PORT_0 8
+ 
+ #define DP_LINK_STATUS_SIZE	   6
++
++u8 drm_dp_link_status(const u8 link_status[DP_LINK_STATUS_SIZE], int r);
++u8 drm_dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE], int lane);
+ bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+ 			  int lane_count);
+ bool drm_dp_clock_recovery_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
 -- 
 2.17.1
