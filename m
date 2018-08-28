@@ -1,505 +1,82 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 28 Aug 2018 10:31:25 +0200
-Subject: [PATCH v5 2/2] drm/rockchip: Add support for Rockchip Soc RGB
- output interface
-In-Reply-To: <1535443954-38806-3-git-send-email-hjc@rock-chips.com>
-References: <1535443954-38806-1-git-send-email-hjc@rock-chips.com>
- <1535443954-38806-3-git-send-email-hjc@rock-chips.com>
-Message-ID: <2164089.bDJbLuhFGU@phil>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Tue, 28 Aug 2018 16:36:45 +0800
+Subject: [PATCH V2 1/2] soc: imx: gpc: use A_CORE instread of A7 for more i.MX
+ platforms
+Message-ID: <1535445406-19633-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sandy,
+gpcv2 driver is NOT just used on i.MX7D which has Cortex-A7
+cores, but also on i.MX8MQ/i.MX8MM platforms which use Cortex-A53
+cores, so let's use A_CORE instread of A7 to avoid confusion.
 
-Am Dienstag, 28. August 2018, 10:12:34 CEST schrieb Sandy Huang:
-> Some Rockchip CRTCs, like rv1108 and px30, can directly output parallel
-> and serial RGB data to panel or conversion chip, so we add this driver
-> to probe encoder and connector.
-> 
-> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
-> Reviewed-by: Sean Paul <seanpaul@chromium.org>
-> Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
-> Link: https://patchwork.freedesktop.org/patch/msgid/1509522851-128181-1-git-send-email-hjc at rock-chips.com
-
-This does not really address, Rob's concern about not being an actual
-hardware block related to the devicetree node you are using.
-
-I see your reply to my mail, but I guess you didn't see the alternative
-approach I described a bit below in that mail?
-
-Actual (unfinished) code included below. (2 patches)
-
-Heiko
-
-
-
----- 8< -----
-From: Heiko Stuebner <heiko@sntech.de>
-Date: Sat, 25 Aug 2018 19:05:21 +0200
-Subject: [PATCH 1/2] drm/tockchip: add function to check if endpoint is a
- subdriver
-
-To be able to have both internal subdrivers and external bridge
-drivers as output endpoints of vops, add a function to be able
-to distinguish these.
-
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Acked-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 27 +++++++++++++++++++++
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h |  1 +
- 2 files changed, 28 insertions(+)
+no change since V1.
+ drivers/soc/imx/gpcv2.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index 1d9c4a9201c8..d18f7f85aa23 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -24,6 +24,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/module.h>
- #include <linux/of_graph.h>
-+#include <linux/of_platform.h>
- #include <linux/component.h>
- #include <linux/console.h>
- #include <linux/iommu.h>
-@@ -267,6 +268,32 @@ static const struct dev_pm_ops rockchip_drm_pm_ops = {
- static struct platform_driver *rockchip_sub_drivers[MAX_ROCKCHIP_SUB_DRIVERS];
- static int num_rockchip_sub_drivers;
+diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c
+index 6ef18cf..0e31465 100644
+--- a/drivers/soc/imx/gpcv2.c
++++ b/drivers/soc/imx/gpcv2.c
+@@ -20,14 +20,14 @@
+ #include <linux/regulator/consumer.h>
+ #include <dt-bindings/power/imx7-power.h>
  
-+/*
-+ * check if a vop output-endpoint is a subdriver or bridge.
-+ */
-+bool rockchip_drm_endpoint_is_subdriver(struct device_node *ep)
-+{
-+	struct device_node *node = of_graph_get_remote_port_parent(ep);
-+	struct platform_device *pdev;
-+	int i;
-+
-+	if (!node)
-+		return false;
-+
-+	pdev = of_find_device_by_node(node);
-+	if (!pdev)
-+		return false;
-+
-+	for (i = 0; i < num_rockchip_sub_drivers; i++) {
-+		struct device_driver *drv = pdev->dev.driver;
-+
-+		if (rockchip_sub_drivers[i] == to_platform_driver(drv))
-+			return true;
-+	}
-+
-+	return false;
-+}
-+
- static int compare_dev(struct device *dev, void *data)
+-#define GPC_LPCR_A7_BSC			0x000
++#define GPC_LPCR_A_CORE_BSC			0x000
+ 
+ #define GPC_PGC_CPU_MAPPING		0x0ec
+-#define USB_HSIC_PHY_A7_DOMAIN		BIT(6)
+-#define USB_OTG2_PHY_A7_DOMAIN		BIT(5)
+-#define USB_OTG1_PHY_A7_DOMAIN		BIT(4)
+-#define PCIE_PHY_A7_DOMAIN		BIT(3)
+-#define MIPI_PHY_A7_DOMAIN		BIT(2)
++#define USB_HSIC_PHY_A_CORE_DOMAIN		BIT(6)
++#define USB_OTG2_PHY_A_CORE_DOMAIN		BIT(5)
++#define USB_OTG1_PHY_A_CORE_DOMAIN		BIT(4)
++#define PCIE_PHY_A_CORE_DOMAIN		BIT(3)
++#define MIPI_PHY_A_CORE_DOMAIN		BIT(2)
+ 
+ #define GPC_PU_PGC_SW_PUP_REQ		0x0f8
+ #define GPC_PU_PGC_SW_PDN_REQ		0x104
+@@ -167,7 +167,7 @@ static const struct imx7_pgc_domain imx7_pgc_domains[] = {
+ 		},
+ 		.bits  = {
+ 			.pxx = MIPI_PHY_SW_Pxx_REQ,
+-			.map = MIPI_PHY_A7_DOMAIN,
++			.map = MIPI_PHY_A_CORE_DOMAIN,
+ 		},
+ 		.voltage   = 1000000,
+ 		.pgc	   = PGC_MIPI,
+@@ -179,7 +179,7 @@ static const struct imx7_pgc_domain imx7_pgc_domains[] = {
+ 		},
+ 		.bits  = {
+ 			.pxx = PCIE_PHY_SW_Pxx_REQ,
+-			.map = PCIE_PHY_A7_DOMAIN,
++			.map = PCIE_PHY_A_CORE_DOMAIN,
+ 		},
+ 		.voltage   = 1000000,
+ 		.pgc	   = PGC_PCIE,
+@@ -191,7 +191,7 @@ static const struct imx7_pgc_domain imx7_pgc_domains[] = {
+ 		},
+ 		.bits  = {
+ 			.pxx = USB_HSIC_PHY_SW_Pxx_REQ,
+-			.map = USB_HSIC_PHY_A7_DOMAIN,
++			.map = USB_HSIC_PHY_A_CORE_DOMAIN,
+ 		},
+ 		.voltage   = 1200000,
+ 		.pgc	   = PGC_USB_HSIC,
+@@ -261,7 +261,7 @@ builtin_platform_driver(imx7_pgc_domain_driver)
+ static int imx_gpcv2_probe(struct platform_device *pdev)
  {
- 	return dev == (struct device *)data;
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-index d67ad0a3cf36..305b4858c522 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-@@ -64,6 +64,7 @@ void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
- 				    struct device *dev);
- int rockchip_drm_wait_vact_end(struct drm_crtc *crtc, unsigned int mstimeout);
- 
-+bool rockchip_drm_endpoint_is_subdriver(struct device_node *ep);
- extern struct platform_driver cdn_dp_driver;
- extern struct platform_driver dw_hdmi_rockchip_pltfm_driver;
- extern struct platform_driver dw_mipi_dsi_driver;
+ 	static const struct regmap_range yes_ranges[] = {
+-		regmap_reg_range(GPC_LPCR_A7_BSC,
++		regmap_reg_range(GPC_LPCR_A_CORE_BSC,
+ 				 GPC_M4_PU_PDN_FLG),
+ 		regmap_reg_range(GPC_PGC_CTRL(PGC_MIPI),
+ 				 GPC_PGC_SR(PGC_MIPI)),
 -- 
-2.17.0
----- 8< -----
-From: Sandy Huang <hjc@rock-chips.com>
-Date: Tue, 26 Jun 2018 15:15:40 +0800
-Subject: [PATCH 2/2] drm/rockchip: Add support for RGB output interface
-
-Some Rockchip CRTCs, like rv1108 and px30, can directly output parallel
-and serial RGB data to panel or conversion chip.
-
-So add a feature-bit for vops to mark the ability for these direct outputs
-and add an internal encoder in that case, that can attach to bridge chips
-or panels.
-
-Signed-off-by: Sandy Huang <hjc@rock-chips.com>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/gpu/drm/rockchip/Kconfig            |  11 +
- drivers/gpu/drm/rockchip/Makefile           |   1 +
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  16 ++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h |   1 +
- drivers/gpu/drm/rockchip/rockchip_rgb.c     | 212 ++++++++++++++++++++
- drivers/gpu/drm/rockchip/rockchip_rgb.h     |  19 ++
- drivers/gpu/drm/rockchip/rockchip_vop_reg.c |   1 +
- 7 files changed, 261 insertions(+)
- create mode 100644 drivers/gpu/drm/rockchip/rockchip_rgb.c
- create mode 100644 drivers/gpu/drm/rockchip/rockchip_rgb.h
-
-diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
-index 0ccc76217ee4..e88eb715ae6b 100644
---- a/drivers/gpu/drm/rockchip/Kconfig
-+++ b/drivers/gpu/drm/rockchip/Kconfig
-@@ -8,6 +8,7 @@ config DRM_ROCKCHIP
- 	select DRM_ANALOGIX_DP if ROCKCHIP_ANALOGIX_DP
- 	select DRM_DW_HDMI if ROCKCHIP_DW_HDMI
- 	select DRM_MIPI_DSI if ROCKCHIP_DW_MIPI_DSI
-+	select DRM_RGB if ROCKCHIP_RGB
- 	select SND_SOC_HDMI_CODEC if ROCKCHIP_CDN_DP && SND_SOC
- 	help
- 	  Choose this option if you have a Rockchip soc chipset.
-@@ -66,4 +67,14 @@ config ROCKCHIP_LVDS
- 	  Rockchip rk3288 SoC has LVDS TX Controller can be used, and it
- 	  support LVDS, rgb, dual LVDS output mode. say Y to enable its
- 	  driver.
-+
-+config ROCKCHIP_RGB
-+	bool "Rockchip RGB support"
-+	depends on DRM_ROCKCHIP
-+	depends on PINCTRL
-+	help
-+	  Choose this option to enable support for Rockchip RGB output.
-+	  Some Rockchip CRTCs, like rv1108, can directly output parallel
-+	  and serial RGB format to panel or connect to a conversion chip.
-+	  say Y to enable its driver.
- endif
-diff --git a/drivers/gpu/drm/rockchip/Makefile b/drivers/gpu/drm/rockchip/Makefile
-index a314e2109e76..868263ff0302 100644
---- a/drivers/gpu/drm/rockchip/Makefile
-+++ b/drivers/gpu/drm/rockchip/Makefile
-@@ -14,5 +14,6 @@ rockchipdrm-$(CONFIG_ROCKCHIP_DW_HDMI) += dw_hdmi-rockchip.o
- rockchipdrm-$(CONFIG_ROCKCHIP_DW_MIPI_DSI) += dw-mipi-dsi.o
- rockchipdrm-$(CONFIG_ROCKCHIP_INNO_HDMI) += inno_hdmi.o
- rockchipdrm-$(CONFIG_ROCKCHIP_LVDS) += rockchip_lvds.o
-+rockchipdrm-$(CONFIG_ROCKCHIP_RGB) += rockchip_rgb.o
- 
- obj-$(CONFIG_DRM_ROCKCHIP) += rockchipdrm.o
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 38f8cae7ef51..867b654fe2a3 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -41,6 +41,7 @@
- #include "rockchip_drm_fb.h"
- #include "rockchip_drm_psr.h"
- #include "rockchip_drm_vop.h"
-+#include "rockchip_rgb.h"
- 
- #define VOP_WIN_SET(x, win, name, v) \
- 		vop_reg_set(vop, &win->phy->name, win->base, ~0, v, #name)
-@@ -92,6 +93,7 @@ struct vop_win {
- 	struct vop *vop;
- };
- 
-+struct rockchip_rgb;
- struct vop {
- 	struct drm_crtc crtc;
- 	struct device *dev;
-@@ -135,6 +137,9 @@ struct vop {
- 	/* vop dclk reset */
- 	struct reset_control *dclk_rst;
- 
-+	/* optional internal rgb encoder */
-+	struct rockchip_rgb *rgb;
-+
- 	struct vop_win win[];
- };
- 
-@@ -1638,6 +1643,14 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
- 	if (ret)
- 		goto err_disable_pm_runtime;
- 
-+	if (vop->data->feature & VOP_FEATURE_INTERNAL_RGB) {
-+		vop->rgb = rockchip_rgb_init(dev, &vop->crtc, vop->drm_dev);
-+		if (IS_ERR(vop->rgb)) {
-+			ret = PTR_ERR(vop->rgb);
-+			goto err_disable_pm_runtime;
-+		}
-+	}
-+
- 	return 0;
- 
- err_disable_pm_runtime:
-@@ -1650,6 +1663,9 @@ static void vop_unbind(struct device *dev, struct device *master, void *data)
- {
- 	struct vop *vop = dev_get_drvdata(dev);
- 
-+	if (vop->rgb)
-+		rockchip_rgb_fini(vop->rgb);
-+
- 	pm_runtime_disable(dev);
- 	vop_destroy_crtc(vop);
- 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-index fcb91041a666..fd5765dfd637 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-@@ -162,6 +162,7 @@ struct vop_data {
- 	unsigned int win_size;
- 
- #define VOP_FEATURE_OUTPUT_RGB10	BIT(0)
-+#define VOP_FEATURE_INTERNAL_RGB	BIT(1)
- 	u64 feature;
- };
- 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_rgb.c b/drivers/gpu/drm/rockchip/rockchip_rgb.c
-new file mode 100644
-index 000000000000..6180369e591f
---- /dev/null
-+++ b/drivers/gpu/drm/rockchip/rockchip_rgb.c
-@@ -0,0 +1,212 @@
-+/*
-+ * Copyright (C) Fuzhou Rockchip Electronics Co.Ltd
-+ * Author:
-+ *      Sandy Huang <hjc@rock-chips.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <drm/drmP.h>
-+#include <drm/drm_atomic_helper.h>
-+#include <drm/drm_crtc_helper.h>
-+#include <drm/drm_dp_helper.h>
-+#include <drm/drm_panel.h>
-+#include <drm/drm_of.h>
-+
-+#include <linux/component.h>
-+#include <linux/of_graph.h>
-+
-+#include "rockchip_drm_drv.h"
-+#include "rockchip_drm_vop.h"
-+
-+#define encoder_to_rgb(c) container_of(c, struct rockchip_rgb, encoder)
-+
-+struct rockchip_rgb {
-+	struct device *dev;
-+	struct drm_device *drm_dev;
-+	struct drm_bridge *bridge;
-+	struct drm_encoder encoder;
-+//	struct dev_pin_info *pins;
-+	int output_mode;
-+};
-+
-+static inline int name_to_output_mode(const char *s)
-+{
-+	static const struct {
-+		const char *name;
-+		int format;
-+	} formats[] = {
-+		{ "p888", ROCKCHIP_OUT_MODE_P888 },
-+		{ "p666", ROCKCHIP_OUT_MODE_P666 },
-+		{ "p565", ROCKCHIP_OUT_MODE_P565 }
-+	};
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(formats); i++)
-+		if (!strncmp(s, formats[i].name, strlen(formats[i].name)))
-+			return formats[i].format;
-+
-+	return -EINVAL;
-+}
-+
-+static void rockchip_rgb_encoder_enable(struct drm_encoder *encoder)
-+{
-+	struct rockchip_rgb *rgb = encoder_to_rgb(encoder);
-+
-+//	if (rgb->pins && !IS_ERR(rgb->pins->default_state))
-+//		pinctrl_select_state(rgb->pins->p, rgb->pins->default_state);
-+}
-+
-+static void rockchip_rgb_encoder_disable(struct drm_encoder *encoder)
-+{
-+	struct rockchip_rgb *rgb = encoder_to_rgb(encoder);
-+
-+//FIXME: pin-voodoo?
-+}
-+
-+static int
-+rockchip_rgb_encoder_atomic_check(struct drm_encoder *encoder,
-+				   struct drm_crtc_state *crtc_state,
-+				   struct drm_connector_state *conn_state)
-+{
-+	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc_state);
-+	struct rockchip_rgb *rgb = encoder_to_rgb(encoder);
-+
-+	s->output_mode = rgb->output_mode;
-+	s->output_type = DRM_MODE_CONNECTOR_LVDS;
-+
-+	return 0;
-+}
-+
-+static const
-+struct drm_encoder_helper_funcs rockchip_rgb_encoder_helper_funcs = {
-+	.enable = rockchip_rgb_encoder_enable,
-+	.disable = rockchip_rgb_encoder_disable,
-+	.atomic_check = rockchip_rgb_encoder_atomic_check,
-+};
-+
-+static const struct drm_encoder_funcs rockchip_rgb_encoder_funcs = {
-+	.destroy = drm_encoder_cleanup,
-+};
-+
-+struct rockchip_rgb *rockchip_rgb_init(struct device *dev,
-+				       struct drm_crtc *crtc,
-+				       struct drm_device *drm_dev)
-+{
-+	struct rockchip_rgb *rgb;
-+	struct drm_encoder *encoder;
-+	struct device_node *port, *endpoint;
-+	u32 endpoint_id;
-+	int ret = 0, child_count = 0;
-+	struct drm_panel *panel;
-+	struct drm_bridge *bridge;
-+
-+	rgb = devm_kzalloc(dev, sizeof(*rgb), GFP_KERNEL);
-+	if (!rgb)
-+		return ERR_PTR(-ENOMEM);
-+
-+	rgb->dev = dev;
-+	rgb->drm_dev = drm_dev;
-+
-+/*	rgb->pins = devm_kzalloc(rgb->dev, sizeof(*rgb->pins), GFP_KERNEL);
-+	if (!rgb->pins)
-+		return -ENOMEM; */
-+
-+/*	rgb->pins->p = devm_pinctrl_get(rgb->dev);
-+	if (IS_ERR(rgb->pins->p)) {
-+		DRM_DEV_ERROR(dev, "no pinctrl handle\n");
-+		devm_kfree(rgb->dev, rgb->pins);
-+		rgb->pins = NULL;
-+	} else {
-+		rgb->pins->default_state =
-+			pinctrl_lookup_state(rgb->pins->p, "lcdc");
-+		if (IS_ERR(rgb->pins->default_state)) {
-+			DRM_DEV_ERROR(dev, "no default pinctrl state\n");
-+			devm_kfree(rgb->dev, rgb->pins);
-+			rgb->pins = NULL;
-+		}
-+	} */
-+
-+	port = of_graph_get_port_by_id(dev->of_node, 0);
-+	if (!port)
-+		return ERR_PTR(-EINVAL);
-+
-+	for_each_child_of_node(port, endpoint) {
-+		if (of_property_read_u32(endpoint, "reg", &endpoint_id))
-+			endpoint_id = 0;
-+
-+		if (rockchip_drm_endpoint_is_subdriver(endpoint))
-+			continue;
-+
-+		child_count++;
-+		ret = drm_of_find_panel_or_bridge(dev->of_node, 0, endpoint_id,
-+						  &panel, &bridge);
-+		if (!ret)
-+			break;
-+	}
-+
-+	of_node_put(port);
-+
-+	/* if the rgb output is not connected to anything, just return */
-+	if (!child_count)
-+		return NULL;
-+
-+	if (ret < 0) {
-+		if (ret != -EPROBE_DEFER)
-+			DRM_DEV_ERROR(dev, "failed to find panel or bridge %d\n", ret);
-+		return ERR_PTR(ret);
-+	}
-+
-+	rgb->output_mode = ROCKCHIP_OUT_MODE_P888;
-+
-+	encoder = &rgb->encoder;
-+	encoder->possible_crtcs = drm_crtc_mask(crtc);
-+
-+	ret = drm_encoder_init(drm_dev, encoder, &rockchip_rgb_encoder_funcs,
-+			       DRM_MODE_ENCODER_NONE, NULL);
-+	if (ret < 0) {
-+		DRM_DEV_ERROR(drm_dev->dev,
-+			      "failed to initialize encoder: %d\n", ret);
-+		return ERR_PTR(ret);
-+	}
-+
-+	drm_encoder_helper_add(encoder, &rockchip_rgb_encoder_helper_funcs);
-+
-+	if (panel) {
-+		bridge = drm_panel_bridge_add(panel, DRM_MODE_CONNECTOR_LVDS);
-+		if (IS_ERR(bridge))
-+			return ERR_CAST(bridge);
-+	}
-+
-+	rgb->bridge = bridge;
-+
-+	ret = drm_bridge_attach(encoder, rgb->bridge, NULL);
-+	if (ret) {
-+		DRM_DEV_ERROR(drm_dev->dev,
-+			      "failed to attach bridge: %d\n", ret);
-+		goto err_free_encoder;
-+	}
-+
-+	return rgb;
-+
-+err_free_encoder:
-+	drm_encoder_cleanup(encoder);
-+	return ERR_PTR(ret);
-+}
-+EXPORT_SYMBOL_GPL(rockchip_rgb_init);
-+
-+void rockchip_rgb_fini(struct rockchip_rgb *rgb)
-+{
-+	rockchip_rgb_encoder_disable(&rgb->encoder);
-+
-+	drm_panel_bridge_remove(rgb->bridge);
-+	drm_encoder_cleanup(&rgb->encoder);
-+}
-+EXPORT_SYMBOL_GPL(rockchip_rgb_fini);
-diff --git a/drivers/gpu/drm/rockchip/rockchip_rgb.h b/drivers/gpu/drm/rockchip/rockchip_rgb.h
-new file mode 100644
-index 000000000000..16f05d50abc3
---- /dev/null
-+++ b/drivers/gpu/drm/rockchip/rockchip_rgb.h
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright (C) Fuzhou Rockchip Electronics Co.Ltd
-+ * Author:
-+ *      Sandy Huang <hjc@rock-chips.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+struct rockchip_rgb *rockchip_rgb_init(struct device *dev,
-+				       struct drm_crtc *crtc,
-+				       struct drm_device *drm_dev);
-+void rockchip_rgb_fini(struct rockchip_rgb *rgb);
-diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-index 0c5358350159..f4dd0b143467 100644
---- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-@@ -487,6 +487,7 @@ static const struct vop_data rk3188_vop = {
- 	.output = &rk3188_output,
- 	.win = rk3188_vop_win_data,
- 	.win_size = ARRAY_SIZE(rk3188_vop_win_data),
-+	.feature = VOP_FEATURE_INTERNAL_RGB,
- };
- 
- static const struct vop_scl_extension rk3288_win_full_scl_ext = {
--- 
-2.17.0
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-drm-tockchip-add-function-to-check-if-endpoint-is-a-.patch
-Type: text/x-patch
-Size: 2584 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180828/3ec9cb76/attachment.bin>
+2.7.4
