@@ -1,84 +1,109 @@
 From: urjaman@gmail.com (Urja Rannikko)
-Date: Tue, 28 Aug 2018 18:55:07 +0000
-Subject: [PATCH 1/7] clk: rockchip: improve rk3288 pll rates for better hdmi
- output
+Date: Tue, 28 Aug 2018 18:55:13 +0000
+Subject: [PATCH 7/7] dts: rk3288-veyron-chromebook: dedicate npll to VOP0/HDMI
+ + HDMI rates
 In-Reply-To: <20180828185513.13216-1-urjaman@gmail.com>
 References: <20180828185513.13216-1-urjaman@gmail.com>
-Message-ID: <20180828185513.13216-2-urjaman@gmail.com>
+Message-ID: <20180828185513.13216-8-urjaman@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add and correct PLL rates for better hdmi output.
+This enables flexible HDMI rates on the rk3288 chromebooks so that they
+actually work with displays (also others than a 1080p one) in the wild.
 
-This includes minimizing jitter on 213 MHz for better 71 MHz,
-250.5 MHz for better 83.5 MHz, 428 MHz for better 25.175 Mhz,
-low jitter 273 MHz for better 68.25 mhz, 356 MHz for better 118.68 Mhz
-and 300MHz.
+The frequency list matches what ChromeOS allows.
 
-Increase the used Fvco for 308, 324 MHz, 292.5 MHz, 273.6 MHz,
-238 MHz and 216 MHz.
-
-And add some additional rates allowing to reach better hdmi-related
-rates in general.
-
-These match the rates used by ChromeOS, so have been quite widely tested.
+The 500Mhz GPU opp is removed since it is not available without NPLL.
 
 Signed-off-by: Urja Rannikko <urjaman@gmail.com>
 ---
- drivers/clk/rockchip/clk-rk3288.c | 29 +++++++++++++++++++++++++----
- 1 file changed, 25 insertions(+), 4 deletions(-)
+ .../boot/dts/rk3288-veyron-chromebook.dtsi    | 67 +++++++++++++++++++
+ 1 file changed, 67 insertions(+)
 
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 450de24a1b42..5a67b7869960 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -83,22 +83,43 @@ static struct rockchip_pll_rate_table rk3288_pll_rates[] = {
- 	RK3066_PLL_RATE( 768000000, 1, 64, 2),
- 	RK3066_PLL_RATE( 742500000, 8, 495, 2),
- 	RK3066_PLL_RATE( 696000000, 1, 58, 2),
-+	RK3066_PLL_RATE_NB(621000000, 1, 207, 8, 1),
- 	RK3066_PLL_RATE( 600000000, 1, 50, 2),
- 	RK3066_PLL_RATE_NB(594000000, 1, 198, 8, 1),
- 	RK3066_PLL_RATE( 552000000, 1, 46, 2),
- 	RK3066_PLL_RATE( 504000000, 1, 84, 4),
- 	RK3066_PLL_RATE( 500000000, 3, 125, 2),
- 	RK3066_PLL_RATE( 456000000, 1, 76, 4),
-+	RK3066_PLL_RATE( 428000000, 1, 107, 6),
- 	RK3066_PLL_RATE( 408000000, 1, 68, 4),
- 	RK3066_PLL_RATE( 400000000, 3, 100, 2),
-+	RK3066_PLL_RATE_NB( 394000000, 1, 197, 12, 1),
- 	RK3066_PLL_RATE( 384000000, 2, 128, 4),
- 	RK3066_PLL_RATE( 360000000, 1, 60, 4),
-+	RK3066_PLL_RATE_NB( 356000000, 1, 178, 12, 1),
-+	RK3066_PLL_RATE_NB( 324000000, 1, 189, 14, 1),
- 	RK3066_PLL_RATE( 312000000, 1, 52, 4),
--	RK3066_PLL_RATE( 300000000, 1, 50, 4),
--	RK3066_PLL_RATE( 297000000, 2, 198, 8),
-+	RK3066_PLL_RATE_NB( 308000000, 1, 154, 12, 1),
-+	RK3066_PLL_RATE_NB( 303000000, 1, 202, 16, 1),
-+	RK3066_PLL_RATE( 300000000, 1, 75, 6),
-+	RK3066_PLL_RATE_NB( 297750000, 2, 397, 16, 1),
-+	RK3066_PLL_RATE_NB( 293250000, 2, 391, 16, 1),
-+	RK3066_PLL_RATE_NB( 292500000, 1, 195, 16, 1),
-+	RK3066_PLL_RATE( 273600000, 1, 114, 10),
-+	RK3066_PLL_RATE_NB( 273000000, 1, 182, 16, 1),
-+	RK3066_PLL_RATE_NB( 270000000, 1, 180, 16, 1),
-+	RK3066_PLL_RATE_NB( 266250000, 2, 355, 16, 1),
-+	RK3066_PLL_RATE_NB( 256500000, 1, 171, 16, 1),
- 	RK3066_PLL_RATE( 252000000, 1, 84, 8),
--	RK3066_PLL_RATE( 216000000, 1, 72, 8),
--	RK3066_PLL_RATE( 148500000, 2, 99, 8),
-+	RK3066_PLL_RATE_NB( 250500000, 1, 167, 16, 1),
-+	RK3066_PLL_RATE_NB( 243428571, 1, 142, 14, 1),
-+	RK3066_PLL_RATE( 238000000, 1, 119, 12),
-+	RK3066_PLL_RATE_NB( 219750000, 2, 293, 16, 1),
-+	RK3066_PLL_RATE_NB( 216000000, 1, 144, 16, 1),
-+	RK3066_PLL_RATE_NB( 213000000, 1, 142, 16, 1),
-+	RK3066_PLL_RATE( 195428571, 1, 114, 14),
-+	RK3066_PLL_RATE( 160000000, 1, 80, 12),
-+	RK3066_PLL_RATE( 157500000, 1, 105, 16),
- 	RK3066_PLL_RATE( 126000000, 1, 84, 16),
- 	RK3066_PLL_RATE(  48000000, 1, 64, 32),
- 	{ /* sentinel */ },
+diff --git a/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi b/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi
+index b16d570ff029..70ed0b2a9549 100644
+--- a/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi
++++ b/arch/arm/boot/dts/rk3288-veyron-chromebook.dtsi
+@@ -163,6 +163,25 @@
+ 	};
+ };
+ 
++&cru {
++	/* Dedicate NPLL for VOP0 / VOP_BIG for HDMI. */
++	rockchip,npll-for-vop = <0>;
++	/* The first assigned clocks are DCLK_VOP0 and DCLK_VOP1 */
++	assigned-clock-parents = <&cru PLL_NPLL>, <&cru PLL_GPLL>;
++};
++
++/* Delete the nodes that allow non-desirable VOP - connector links. That
++ * is the eDP cannot use vopb and HDMI cannot use vopl. */
++
++/delete-node/ &edp_in_vopb;
++/delete-node/ &vopb_out_edp;
++/delete-node/ &hdmi_in_vopl;
++/delete-node/ &vopl_out_hdmi;
++
++/* Delete the 500 Mhz GPU opp since that cannot be easily made
++ * without NPLL. */
++/delete-node/ &{/gpu-opp-table/opp at 500000000};
++
+ &edp {
+ 	status = "okay";
+ 
+@@ -186,6 +205,54 @@
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	/* These depend on NPLL being dedicated to HDMI use. */
++	rockchip,hdmi-rates-hz = <
++		25176471	/* for 25.175 MHz, 0.006% off */
++		25200000
++		27000000
++		28320000
++		30240000
++		31500000
++		32000000
++		33750000
++		36000000
++		40000000
++		49500000
++		50000000
++		54000000
++		57290323	/* for 57.284 MHz, .011 % off */
++		65000000
++		68250000
++		71000000
++		72000000
++		73250000
++		74250000
++		74437500	/* for 74.44 MHz, .003% off */
++		75000000
++		78750000
++		78800000
++		79500000
++		83500000
++		85500000
++		88750000
++		97750000
++		101000000
++		106500000
++		108000000
++		115500000
++		118666667	/* for 118.68 MHz, .011% off */
++		119000000
++		121714286	/* for 121.75 MHz, .029% off */
++		135000000
++		136800000	/* for 136.75 MHz, .037% off */
++		146250000
++		148500000
++		154000000
++		162000000 >;
++};
++
++
+ &gpio_keys {
+ 	pinctrl-0 = <&pwr_key_l &ap_lid_int_l>;
+ 	lid {
 -- 
 2.18.0
