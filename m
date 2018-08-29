@@ -1,40 +1,26 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 29 Aug 2018 13:41:50 +0200
-Subject: [PATCH] drm/rockchip: Use struct_size() in devm_kzalloc()
-In-Reply-To: <20180826184712.GA9330@embeddedor.com>
-References: <20180826184712.GA9330@embeddedor.com>
-Message-ID: <2639880.ggikvLCEDc@phil>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Aug 2018 13:47:51 +0200
+Subject: [PATCH] pinctrl: lpc18xx: mark expected switch fall-throughs
+In-Reply-To: <20180815171035.GA17360@embeddedor.com>
+References: <20180815171035.GA17360@embeddedor.com>
+Message-ID: <CACRpkdYLWLhw-O00=Gc3FeVWt9dKFURNO2m5ic4MyjbJrGtGdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, 26. August 2018, 20:47:12 CEST schrieb Gustavo A. R. Silva:
-> One of the more common cases of allocation size calculations is finding
-> the size of a structure that has a zero-sized array at the end, along
-> with memory for some number of elements for that array. For example:
-> 
-> struct foo {
-> 	int stuff;
->         void *entry[];
-> };
-> 
-> instance = devm_kzalloc(dev, sizeof(struct foo) + sizeof(void *) * count, GFP_KERNEL);
-> 
-> or, like in this particular case:
-> 
-> size = sizeof(struct foo) + sizeof(void *) * count;
-> instance = devm_kzalloc(dev, size, GFP_KERNEL);
-> 
-> Instead of leaving these open-coded and prone to type mistakes, we can
-> now use the new struct_size() helper:
-> 
-> instance = devm_kzalloc(dev, struct_size(instance, entry, count),
-> GFP_KERNEL);
-> 
-> This issue was detected with the help of Coccinelle.
-> 
+On Wed, Aug 15, 2018 at 7:10 PM Gustavo A. R. Silva
+<gustavo@embeddedor.com> wrote:
+
+> In preparation to enabling -Wimplicit-fallthrough, mark switch cases
+> where we are expecting to fall through.
+>
+> Addresses-Coverity-ID: 1292308 ("Missing break in switch")
+> Addresses-Coverity-ID: 1292309 ("Missing break in switch")
+> Addresses-Coverity-ID: 1309546 ("Missing break in switch")
+> Addresses-Coverity-ID: 1357369 ("Missing break in switch")
+> Addresses-Coverity-ID: 1357389 ("Missing break in switch")
 > Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
 
-applied to drm-misc with Kees' Review
+Patch applied.
 
-Thanks
-Heiko
+Yours,
+Linus Walleij
